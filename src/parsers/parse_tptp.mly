@@ -26,9 +26,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 TPTP Parser} *)
 
 %{
-  module L = Location
+  open Logtk
+
+  module L = ParseLocation
   module Sym = Symbol
   module PT = PrologTerm
+  module A = Ast_tptp.Untyped
 
   let remove_quotes s =
     assert (s.[0] = '\'' && s.[String.length s - 1] = '\'');
@@ -98,11 +101,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %nonassoc NOTVLINE
 %nonassoc NOTAND
 
-%start <PrologTerm.t> parse_term
-%start <PrologTerm.t> parse_formula
+%start <Logtk.PrologTerm.t> parse_term
+%start <Logtk.PrologTerm.t> parse_formula
 %start <Ast_tptp.Untyped.declaration> parse_declaration
 %start <Ast_tptp.Untyped.declaration list> parse_declarations
-%start <PrologTerm.t list list> parse_answer_tuple
+%start <Logtk.PrologTerm.t list list> parse_answer_tuple
 
 %%
 
@@ -121,9 +124,9 @@ declarations:
 
 declaration:
   | FOF LEFT_PAREN name=name COMMA role=role COMMA f=fof_formula info=annotations RIGHT_PAREN DOT
-    { Ast_tptp.Untyped.FOF (name, role, f, info) }
+    { A.FOF (name, role, f, info) }
   | TFF LEFT_PAREN name=name COMMA role=role COMMA f=fof_formula info=annotations RIGHT_PAREN DOT
-    { Ast_tptp.Untyped.TFF (name, role, f, info) }
+    { A.TFF (name, role, f, info) }
   | TFF LEFT_PAREN name=name COMMA role COMMA tydecl=type_decl info=annotations RIGHT_PAREN DOT
     { let s, ty = tydecl in
       match ty with
@@ -131,15 +134,15 @@ declaration:
       | PT.App (PT.Const (Sym.Conn Sym.Arrow),
                (PT.Const (Sym.Conn Sym.TType) :: _)) ->
         (* declare a new type symbol *)
-        Ast_tptp.Untyped.NewType (name, s, ty)
-      | _ -> Ast_tptp.Untyped.TypeDecl (name, s, ty)
+        A.NewType (name, s, ty)
+      | _ -> A.TypeDecl (name, s, ty)
     }
   | CNF LEFT_PAREN name=name COMMA role=role COMMA c=cnf_formula info=annotations RIGHT_PAREN DOT
-    { Ast_tptp.Untyped.CNF (name, role, c, info) }
+    { A.CNF (name, role, c, info) }
   | INCLUDE LEFT_PAREN x=SINGLE_QUOTED RIGHT_PAREN DOT
-    { Ast_tptp.Untyped.Include (remove_quotes x) }
+    { A.Include (remove_quotes x) }
   | INCLUDE LEFT_PAREN x=SINGLE_QUOTED COMMA names=name_list RIGHT_PAREN DOT
-    { Ast_tptp.Untyped.IncludeOnly (x, names) }
+    { A.IncludeOnly (x, names) }
   | error
     {
       let loc = L.mk_pos $startpos $endpos in
@@ -292,7 +295,7 @@ defined_term:
 defined_atom:
   | n=INTEGER { Sym.int_of_string n }
   | n=RATIONAL { Sym.rat_of_string n }
-  | n=REAL {
+  | REAL {
       let loc = L.mk_pos $startpos $endpos in
       raise (Ast_tptp.ParseError loc)
     }
@@ -410,22 +413,22 @@ annotations:
 
 general_term:
   | general_data { $1 }
-  | l=general_data COLUMN r=general_term { PT.column l r }
+  | l=general_data COLUMN r=general_term { Ast_tptp.GColumn (l, r) }
   | general_list { $1 }
 
 general_data:
-  | w=atomic_word { PT.const (Sym.of_string w) }
+  | w=atomic_word { Ast_tptp.GString w }
   | general_function { $1 }
-  | INTEGER { PT.of_int (int_of_string $1) }
-  | v=UPPER_WORD { PT.var v }
-  | w=DISTINCT_OBJECT { PT.const (Sym.of_string w) }
+  | i=INTEGER { Ast_tptp.GInt (int_of_string i) }
+  | v=UPPER_WORD { Ast_tptp.GVar v }
+  | w=DISTINCT_OBJECT { Ast_tptp.GString w }
 
 general_function:
   | f=atomic_word LEFT_PAREN l=separated_nonempty_list(COMMA, general_term) RIGHT_PAREN
-    { PT.app (PT.const (Sym.of_string f)) l }
+    { Ast_tptp.GNode (f, l) }
 
 general_list:
   | LEFT_BRACKET l=separated_list(COMMA, general_term) RIGHT_BRACKET
-    { PT.list_ l }
+    { Ast_tptp.GList l }
 
 %%

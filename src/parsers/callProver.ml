@@ -40,7 +40,7 @@ module Prover = struct
   } (** data useful to invoke a prover. The prover must read from
         stdin. The command is interpolated using {! Buffer.add_substitude}, with
         the given patterns:
-        
+
         - "timeout" is the timeout in seconds *)
 
   let __table = Hashtbl.create 5

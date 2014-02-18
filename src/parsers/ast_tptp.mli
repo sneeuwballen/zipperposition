@@ -25,7 +25,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 TPTP Ast} *)
 
-exception ParseError of Location.t
+open Logtk
+
+exception ParseError of ParseLocation.t
 
 type name =
   | NameInt of int
@@ -47,7 +49,13 @@ and role =
   | R_unknown     (* error *)
   (** formula role *)
 and optional_info = general_data list
-and general_data = PrologTerm.t
+and general_data =
+  | GString of string
+  | GVar of string   (* variable *)
+  | GInt of int
+  | GColumn of general_data * general_data
+  | GNode of string * general_data list
+  | GList of general_data list
 
 val role_of_string : string -> role
 val string_of_role : role -> string
@@ -86,6 +94,21 @@ module type S = sig
   val get_name : t -> name
     (** Find the name of the declaration, or
         @raise Invalid_argument if the declaration is an include directive *)
+
+  class ['a] visitor : object
+    method clause : 'a -> role -> form list -> 'a
+    method fof : 'a -> role -> form -> 'a
+    method tff : 'a -> role -> form -> 'a
+    method thf : 'a -> role -> hoterm -> 'a
+    method any_form : 'a -> role -> form -> 'a
+    method tydecl : 'a -> string -> ty -> 'a
+    method new_ty : 'a -> string -> ty -> 'a
+    method include_ : 'a -> string -> 'a
+    method include_only : 'a -> string -> name list -> 'a
+  end
+
+  val fold : 'a visitor -> 'a -> t Sequence.t -> 'a
+    (** Fold over declarations *)
 
   (** {2 IO} *)
 

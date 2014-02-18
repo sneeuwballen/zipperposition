@@ -26,6 +26,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Utils related to TPTP} *)
 
+open Logtk
+
 (** {2 Printing/Parsing} *)
 
 val find_file : string -> string -> string
@@ -82,16 +84,26 @@ end
 module Untyped : S with module A = Ast_tptp.Untyped
 module Typed : S with module A = Ast_tptp.Typed
 
-(** {2 Type inference and erasure} *)
+(** {2 Type inference and erasure}
+The following functions can raise Type.Error if the declarations
+are not consistent. *)
 
-val infer_types : TypeInference.Ctx.t ->
+val infer_types : [`ctx of TypeInference.Ctx.t | `sign of Signature.t] ->
                   Ast_tptp.Untyped.t Sequence.t ->
                   Signature.t * Ast_tptp.Typed.t Sequence.t
   (** Infer types from type declarations and formulas, returning a sequence
       of well-typed ASTs, and the inferred signature.
       @raise Type.Error if there is a type error. *)
 
+val signature : [`ctx of TypeInference.Ctx.t | `sign of Signature.t] ->
+                Ast_tptp.Untyped.t Sequence.t -> Signature.t
+
 val erase_types : Ast_tptp.Typed.t Sequence.t ->
                   Ast_tptp.Untyped.t Sequence.t
   (** Reverse operation of {!infer_types}, that erases types and converts
       formulas and terms back to {!PrologTerm.t}. *)
+
+val annotate_types : [`ctx of TypeInference.Ctx.t | `sign of Signature.t] ->
+                     Ast_tptp.Untyped.t Sequence.t ->
+                     Ast_tptp.Untyped.t Sequence.t
+  (** Round-trip of type inference and type erasure. *)

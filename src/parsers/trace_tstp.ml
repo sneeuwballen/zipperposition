@@ -24,20 +24,24 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {6 Trace of a TSTP prover} *)
+(** {1 Trace of a TSTP prover} *)
+
+type id = Ast_tptp.name
 
 module T = FOTerm
-module F = FOFormula
-module S = Substs.FO
+module F = Formula.FO
+module S = Substs
 module A = Ast_tptp
+module AT = Ast_tptp.Typed
 
-type id = A.name
+type form = F.t
+type clause = F.t list
 
 type t =
   | Axiom of string * string (* filename, axiom name *)
   | Theory of string (* a theory used to do an inference *)
-  | InferForm of F.t * step lazy_t
-  | InferClause of F.t list * step lazy_t
+  | InferForm of form * step lazy_t
+  | InferClause of clause * step lazy_t
 and step = {
   id : id;
   rule : string;
@@ -45,7 +49,7 @@ and step = {
   esa : bool;  (** Equisatisfiable step? *)
 }
 
-type proof = t 
+type proof = t
 
 let rec eq p1 p2 = match p1, p2 with
   | Axiom (f1, n1), Axiom (f2, n2) -> f1 = f2 && n1 = n2
@@ -102,8 +106,9 @@ let is_step = function
   | Theory _ -> false
 
 let is_proof_of_false = function
-  | InferForm ({F.form=F.False}, _) -> true
-  | InferClause(l,_) -> List.for_all (F.eq F.mk_false) l
+  | InferForm (form, _) when F.eq form F.Base.false_ -> true
+  | InferClause(l,_) -> List.for_all (F.eq F.Base.false_) l
+  | InferClause([],_) -> true
   | _ -> false
 
 let get_id = function
@@ -210,10 +215,10 @@ let size proof = Sequence.length (to_seq proof)
 
 (** {2 IO} *)
 
-let of_decls ?(base=Signature.base) decls =
+let of_decls ?(base=Signature.TPTP.base) decls =
   let steps = Hashtbl.create 13 in (* maps names to steps *)
   let root = ref None in (* (one) root of proof *)
-  let ctx = TypeInference.Ctx.of_signature base in
+  let ctx = TypeInference.Ctx.create base in
   (* find a proof name *)
   let find_step name =
     try
@@ -262,8 +267,8 @@ let of_decls ?(base=Signature.base) decls =
   (* traverse declarations *)
   Sequence.iter
     begin fun decl -> match decl with
-    | A.CNF (name, role, c, info :: _) ->
-      Util.debug 3 "convert step %a" A.pp_declaration decl;
+    | AT.CNF (name, role, c, info :: _) ->
+      Util.debug 3 "convert step %a" AT.pp decl;
       let c = TypeInference.FO.convert_clause ~ctx c in
       begin match read_info info with
       | `Proof
@@ -273,8 +278,8 @@ let of_decls ?(base=Signature.base) decls =
         let p = InferClause (c, step) in
         add_step name p
       end
-    | A.FOF(name, role, f, info :: _)
-    | A.TFF (name, role, f, info :: _) ->
+    | AT.FOF(name, role, f, info :: _)
+    | AT.TFF (name, role, f, info :: _) ->
       Util.debug 3 "convert step %a" A.pp_declaration decl;
       let f = TypeInference.FO.convert_form ~ctx f in
       begin match read_info info with
@@ -285,16 +290,16 @@ let of_decls ?(base=Signature.base) decls =
         let p = InferForm (f, step) in
         add_step name p
       end
-    | A.TypeDecl (_, s, ty) ->
+    | AT.TypeDecl (_, s, ty) ->
       let ty = TypeConversion.of_basic ty in
       TypeInference.Ctx.declare ctx s ty
-    | A.FOF _
-    | A.CNF _
-    | A.TFF _
-    | A.THF _
-    | A.Include _
-    | A.IncludeOnly _
-    | A.NewType _ -> ()
+    | AT.FOF _
+    | AT.CNF _
+    | AT.TFF _
+    | AT.THF _
+    | AT.Include _
+    | AT.IncludeOnly _
+    | AT.NewType _ -> ()
     end
     decls;
   match !root with
@@ -327,7 +332,7 @@ let pp_tstp buf proof =
   traverse proof
     (fun p ->
       match p with
-      | Axiom _ -> () 
+      | Axiom _ -> ()
       | Theory s -> Printf.bprintf buf "theory(%s)" s
       | InferClause(c, lazy ({rule="axiom"} as step)) when is_axiom step.parents.(0)->
         let id = get_id p in

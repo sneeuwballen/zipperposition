@@ -24,17 +24,18 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {6 Trace of a TSTP prover} *)
-
-(* TODO: make a functor over F (formula type) *)
+(** {1 Trace of a TSTP prover} *)
 
 type id = Ast_tptp.name
+
+type form = Formula.FO.t
+type clause = Formula.FO.t list
 
 type t =
   | Axiom of string * string (* filename, axiom name *)
   | Theory of string (* a theory used to do an inference *)
-  | InferForm of FOFormula.t * step lazy_t
-  | InferClause of FOFormula.t list * step lazy_t
+  | InferForm of form * step lazy_t
+  | InferClause of clause * step lazy_t
 and step = {
   id : id;
   rule : string;
@@ -46,10 +47,10 @@ val eq : t -> t -> bool
 val hash : t -> int
 val cmp : t -> t -> int
 
-val mk_f_axiom : id:id -> FOFormula.t -> file:string -> name:string -> t
-val mk_c_axiom : id:id -> FOFormula.t list -> file:string -> name:string -> t
-val mk_f_step : ?esa:bool -> id:id -> FOFormula.t -> rule:string -> t list -> t
-val mk_c_step : ?esa:bool -> id:id -> FOFormula.t list -> rule:string -> t list -> t
+val mk_f_axiom : id:id -> form -> file:string -> name:string -> t
+val mk_c_axiom : id:id -> clause -> file:string -> name:string -> t
+val mk_f_step : ?esa:bool -> id:id -> form -> rule:string -> t list -> t
+val mk_c_step : ?esa:bool -> id:id -> clause -> rule:string -> t list -> t
 
 val is_axiom : t -> bool
 val is_theory : t -> bool
@@ -61,7 +62,7 @@ val get_id : t -> id
       @raise Invalid_argument if the step is Axiom or Theory *)
 
 val force : t -> unit
-  (** Force proof, if any *)
+  (** Force the lazy proof step, if any *)
 
 (** {3 Proof traversal} *)
 
@@ -88,23 +89,21 @@ val size : t -> int
 (** {3 IO} *)
 
 val of_decls : ?base:Signature.t ->
-                Ast_tptp.declaration Sequence.t -> t option
+                Ast_tptp.Typed.t Sequence.t -> t option
   (** Try to extract a proof from a list of TSTP statements.
       Since it has to check types, it may fail.
       @param base a base signature that can be provided for type inference.
-      @raise TypeUnif.Error if a type error occurs. *)
+      @raise Type.Error if a type error occurs. *)
 
 val parse : ?recursive:bool -> string -> t option
   (** Try to parse a proof from a file. May rise the same IO errors
       as {!Util_tptp.parse_file}. *)
 
-val pp_tstp : Buffer.t -> t -> unit
-  (** Print proof in TSTP format *)
-
-val pp0 : Buffer.t -> t -> unit
-  (** debug printing, non recursive *)
+include Interfaces.PRINT with type t := t
+  (** Debug printing, non recursive *)
 
 val pp1 : Buffer.t -> t -> unit
   (** Print proof step, and its parents *)
 
-val fmt : Format.formatter -> t -> unit
+val pp_tstp : Buffer.t -> t -> unit
+  (** print the whole proofs on the given buffer *)

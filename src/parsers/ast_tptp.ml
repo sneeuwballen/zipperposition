@@ -25,11 +25,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 TPTP Ast} *)
 
+open Logtk
+
 module PT = PrologTerm
 module HOT = HOTerm
 module F = Formula.FO
+module Loc = ParseLocation
 
-exception ParseError of Location.t
+exception ParseError of Loc.t
 
 type name =
   | NameInt of int
@@ -51,7 +54,13 @@ and role =
   | R_unknown     (* error *)
   (** formula role *)
 and optional_info = general_data list
-and general_data = PrologTerm.t
+and general_data =
+  | GString of string
+  | GVar of string   (* variable *)
+  | GInt of int
+  | GColumn of general_data * general_data
+  | GNode of string * general_data list
+  | GList of general_data list
 
 let role_of_string = function
   | "axiom" -> R_axiom
@@ -102,10 +111,29 @@ let pp_name buf n =
 let fmt_name fmt n =
   Format.pp_print_string fmt (string_of_name n)
 
-let pp_general = PT.TPTP.pp
-let pp_general_debug = PT.TPTP.pp
+let rec pp_general buf d = match d with
+  | GString s -> Buffer.add_string buf s
+  | GInt i -> Printf.bprintf buf "%d" i
+  | GVar s -> Buffer.add_string buf s
+  | GColumn (a, b) -> Printf.bprintf buf "%a: %a" pp_general a pp_general b
+  | GNode (f, l) ->
+    Printf.bprintf buf "%s(%a)" f (Util.pp_list pp_general) l
+  | GList l ->
+    Printf.bprintf buf "[%a]" (Util.pp_list pp_general) l
 
-let fmt_general = PT.TPTP.fmt
+let rec pp_general_debug buf d = match d with
+  | GString s -> Printf.bprintf buf "GSstr %s" s
+  | GInt i -> Printf.bprintf buf "GInt %d" i
+  | GVar s -> Printf.bprintf buf "GVar %s" s
+  | GColumn (a, b) -> Printf.bprintf buf "%a: %a" pp_general_debug a pp_general_debug b
+  | GNode (f, l) ->
+    Printf.bprintf buf "GNode(%s[%a])" f (Util.pp_list pp_general_debug) l
+  | GList l ->
+    Printf.bprintf buf "[%a]" (Util.pp_list pp_general_debug) l
+
+let fmt_general fmt d =
+  Format.pp_print_string fmt (Util.sprintf "%a" pp_general d)
+
 let pp_generals buf l =
   Util.pp_list pp_general buf l
 let fmt_generals fmt l =
@@ -133,6 +161,21 @@ module type S = sig
     (** Find the name of the declaration, or
         @raise Invalid_argument if the declaration is an include directive *)
 
+  class ['a] visitor : object
+    method clause : 'a -> role -> form list -> 'a
+    method fof : 'a -> role -> form -> 'a
+    method tff : 'a -> role -> form -> 'a
+    method thf : 'a -> role -> hoterm -> 'a
+    method any_form : 'a -> role -> form -> 'a
+    method tydecl : 'a -> string -> ty -> 'a
+    method new_ty : 'a -> string -> ty -> 'a
+    method include_ : 'a -> string -> 'a
+    method include_only : 'a -> string -> name list -> 'a
+  end
+
+  val fold : 'a visitor -> 'a -> t Sequence.t -> 'a
+    (** Fold over declarations *)
+
   (** {2 IO} *)
 
   include Interfaces.PRINT with type t := t
@@ -156,7 +199,7 @@ module Untyped = struct
 
   type declaration = t
 
-  let name_of_decl = function
+  let get_name = function
     | CNF (n, _, _, _) -> n
     | FOF (n, _, _, _) -> n
     | TFF (n, _, _, _) -> n
@@ -166,6 +209,41 @@ module Untyped = struct
     | IncludeOnly _
     | Include _ ->
       raise (Invalid_argument "Ast_tptp.name_of_decl: include directive has no name")
+
+  class ['a] visitor : object
+    method clause : 'a -> role -> form list -> 'a
+    method fof : 'a -> role -> form -> 'a
+    method tff : 'a -> role -> form -> 'a
+    method thf : 'a -> role -> hoterm -> 'a
+    method any_form : 'a -> role -> form -> 'a
+    method tydecl : 'a -> string -> ty -> 'a
+    method new_ty : 'a -> string -> ty -> 'a
+    method include_ : 'a -> string -> 'a
+    method include_only : 'a -> string -> name list -> 'a
+  end = object
+    method clause acc _r _c = acc
+    method fof acc _r _f = acc
+    method tff acc _r _f = acc
+    method thf acc _r _f = acc
+    method any_form acc _r _f = acc
+    method tydecl acc _s _ty = acc
+    method new_ty acc _s _ty = acc
+    method include_ acc _file = acc
+    method include_only acc _file _names = acc
+  end
+
+  let fold visitor acc seq =
+    Sequence.fold
+      (fun acc decl -> match decl with
+        | CNF (_, r, c, _) -> visitor#clause acc r c
+        | FOF (_, r, f, _) -> visitor#any_form (visitor#fof acc r f) r f
+        | TFF (_, r, f, _) -> visitor#any_form (visitor#tff acc r f) r f
+        | THF (_, r, f, _) -> visitor#thf acc r f
+        | TypeDecl (_, s, ty) -> visitor#tydecl acc s ty
+        | NewType (_, s, ty) -> visitor#new_ty acc s ty
+        | Include f -> visitor#include_ acc f
+        | IncludeOnly (f,names) -> visitor#include_only acc f names
+      ) acc seq
 
   (** {2 IO} *)
 
@@ -219,7 +297,7 @@ module Typed = struct
 
   type declaration = t
 
-  let name_of_decl = function
+  let get_name = function
     | CNF (n, _, _, _) -> n
     | FOF (n, _, _, _) -> n
     | TFF (n, _, _, _) -> n
@@ -229,6 +307,41 @@ module Typed = struct
     | IncludeOnly _
     | Include _ ->
       raise (Invalid_argument "Ast_tptp.name_of_decl: include directive has no name")
+
+  class ['a] visitor : object
+    method clause : 'a -> role -> form list -> 'a
+    method fof : 'a -> role -> form -> 'a
+    method tff : 'a -> role -> form -> 'a
+    method thf : 'a -> role -> hoterm -> 'a
+    method any_form : 'a -> role -> form -> 'a
+    method tydecl : 'a -> string -> ty -> 'a
+    method new_ty : 'a -> string -> ty -> 'a
+    method include_ : 'a -> string -> 'a
+    method include_only : 'a -> string -> name list -> 'a
+  end = object
+    method clause acc _r _c = acc
+    method fof acc _r _f = acc
+    method tff acc _r _f = acc
+    method thf acc _r _f = acc
+    method any_form acc _r _f = acc
+    method tydecl acc _s _ty = acc
+    method new_ty acc _s _ty = acc
+    method include_ acc _file = acc
+    method include_only acc _file _names = acc
+  end
+
+  let fold visitor acc seq =
+    Sequence.fold
+      (fun acc decl -> match decl with
+        | CNF (_, r, c, _) -> visitor#clause acc r c
+        | FOF (_, r, f, _) -> visitor#any_form (visitor#fof acc r f) r f
+        | TFF (_, r, f, _) -> visitor#any_form (visitor#tff acc r f) r f
+        | THF (_, r, f, _) -> visitor#thf acc r f
+        | TypeDecl (_, s, ty) -> visitor#tydecl acc s ty
+        | NewType (_, s, ty) -> visitor#new_ty acc s ty
+        | Include f -> visitor#include_ acc f
+        | IncludeOnly (f,names) -> visitor#include_only acc f names
+      ) acc seq
 
   (** {2 IO} *)
 
@@ -275,6 +388,7 @@ module type MAP = sig
     From.t -> To.t
 
   val flat_map :
+    cnf:(From.form list -> To.form list list) ->
     form:(From.form -> To.form list) ->
     ho:(From.hoterm -> To.hoterm list) ->
     ty:(From.ty -> To.ty) ->

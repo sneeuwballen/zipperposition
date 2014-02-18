@@ -37,7 +37,7 @@ module Prover : sig
   } (** data useful to invoke a prover. The prover must read from
         stdin. The command is interpolated using {! Buffer.add_substitude}, with
         the given patterns:
-        
+
         - "timeout" is the timeout in seconds *)
 
   val lookup : string -> t
@@ -76,17 +76,17 @@ type result =
 (* TODO: optional argument for additional parameters (order,heuristics,etc.) *)
 
 val call : ?timeout:int -> prover:Prover.t ->
-           Ast_tptp.declaration list -> result
+           Ast_tptp.Untyped.t list -> result
   (** Call the prover (if present) on the given problem, and
       return a result. Default timeout is 30. *)
 
 val call_proof : ?timeout:int -> prover:Prover.t ->
-                  Ast_tptp.declaration list ->
+                  Ast_tptp.Untyped.t list ->
                   result * Trace_tstp.t option
   (** Call the prover, and also tries to parse a TSTP derivation,
       if the prover succeeded *)
 
 val call_with_out : ?timeout:int -> prover:Prover.t ->
-                    Ast_tptp.declaration list ->
+                    Ast_tptp.Untyped.t list ->
                     result * string
   (** Same as {!call}, but also returns the raw output of the prover *)
