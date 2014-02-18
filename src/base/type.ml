@@ -302,8 +302,8 @@ end
 (** {2 IO} *)
 
 let rec pp_rec depth buf t = match view t with
-  | Var i -> Printf.bprintf buf "T%d" i
-  | BVar i -> Printf.bprintf buf "Tb%i" (depth-i-1)
+  | Var i -> Printf.bprintf buf "A%d" i
+  | BVar i -> Printf.bprintf buf "T%i" (depth-i-1)
   | App (p, []) -> Buffer.add_string buf (Symbol.to_string p)
   | App (p, args) ->
     Printf.bprintf buf "%s(%a)"
@@ -315,7 +315,7 @@ let rec pp_rec depth buf t = match view t with
     Printf.bprintf buf "(%a) > %a"
       (Util.pp_list ~sep:" * " (pp_inner depth)) l (pp_rec depth) ret
   | Forall ty' ->
-    Printf.bprintf buf "∀ Tb%i. %a" depth (pp_inner (depth+1)) ty'
+    Printf.bprintf buf "Λ T%i. %a" depth (pp_inner (depth+1)) ty'
 and pp_inner depth buf t = match view t with
   | Fun (_, _::_) ->
     Buffer.add_char buf '('; pp_rec depth buf t; Buffer.add_char buf ')'

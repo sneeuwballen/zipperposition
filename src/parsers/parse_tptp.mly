@@ -339,7 +339,7 @@ system_functor: s=atomic_system_word { s }
 tff_quantified_type:
   | ty=tff_type { ty }
   | FORALL_TY LEFT_BRACKET vars=tff_ty_vars RIGHT_BRACKET COLUMN ty=tff_quantified_type
-    { PT.TPTP.forall vars ty }
+    { PT.TPTP.forall_ty vars ty }
 
 /* general type, without quantifiers */
 tff_type:
@@ -368,9 +368,9 @@ tff_ty_vars:
 tff_ty_var: w=UPPER_WORD { PT.var w }
 
 type_const:
+  | WILDCARD { Sym.Base.wildcard }
   | w=LOWER_WORD { Sym.of_string w }
   | w=DOLLAR_WORD { Sym.of_string w }
-  | WILDCARD { Sym.Base.wildcard }
 
 arguments: separated_nonempty_list(COMMA, term) { $1 }
 
@@ -392,9 +392,9 @@ variable:
 atomic_word:
   | s=SINGLE_QUOTED { remove_quotes s }
   | s=LOWER_WORD { s }
-  | WILDCARD { "$_" }
 
 atomic_defined_word:
+  | WILDCARD { Sym.Base.wildcard }
   | w=DOLLAR_WORD { Sym.of_string w }
 
 atomic_system_word:
