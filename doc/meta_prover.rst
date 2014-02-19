@@ -33,9 +33,9 @@ first-order terms with currying, no quantifiers. The variants are:
 - ``Var : int -> term``
     a universal variable, typed, used for abstracted symbols, and for
     Horn clauses
-- ``BVar : int -> term``
+- ``RigidVar : int -> term``
     a universal variable, typed, used for problem-level quantification. This
-    can only by matched with another bound variable (for alpha renaming).
+    can only by matched with another **rigid variable** (for alpha renaming).
 - ``TypeAt : type * term -> term``
     curried application of a term to a type (for polymorphism)
 - ``At : term * term -> term``
@@ -43,15 +43,16 @@ first-order terms with currying, no quantifiers. The variants are:
 - ``App : term * term list -> term``
     uncurried application of a term to a list of terms.
 - ``Multiset : term list -> term``
-    multiset of terms, very handy for representing clauses. Unification
-    assumes that no variable occurs directly under the multiset, for
-    otherwise full AC-unification would be necessary. All terms must have
-    the same type ``tau``, in which case the multiset also has type ``tau``.
+    multiset of terms, very handy for representing clauses. Unification of
+    multiset is not AC-unification, but instead unifies subterms pairwise.
+    All terms must have the same type ``tau``, in which case the multiset
+    has type ``multiset(tau)``.
 - ``Record : (string*term) list * term option -> term``
     record value, with a list of ``field : term`` pairs (with pairwise distinct
-    fields) and an optional "remainder" part that must be of type ``record``
-    and be a variable. The record also has type ``record``. The remainder
-    part is used for unification, for instance ::
+    fields) and an optional "remainder" part that must be a variable
+    of type ``record(T)`` (with ``T`` some type). The type of the record
+    is given by `the typing rules for records`_.
+    The remainder part is used for unification, for instance ::
 
         {x:X, y:2 | R} == {x:1, y:Y, color: red}
 
@@ -61,7 +62,19 @@ first-order terms with currying, no quantifiers. The variants are:
 
     applying the substitution to the first record yields ::
 
-        {x:1, Y:2, color:red}
+        {x:1, Y:2, color:red}bound
+
+.. _the typing rules for records :
+
+The typing rules for records are the following ::
+
+    t_1:tau_1 ....                        t_n : tau_n
+    -------------------------------------------------
+    {f_1:t_1, ..., f_n:t_n} :             {f_i:tau_i}
+
+    t_i : tau_i                             y : tau_y
+    -------------------------------------------------
+    {f_1:t_1, ..., f_n:t_n | y} : {f_i:tau_i | tau_y}
 
 Scanning
 ^^^^^^^^
@@ -101,6 +114,11 @@ The idea is simply to use a term index, and regular unification, to perform
          sigma(A <- B_2, ..., B_n)
 
     if sigma(B_1) = sigma(B)
+
+Indexing
+^^^^^^^^
+
+It is important to have
 
 Biblio
 ------
