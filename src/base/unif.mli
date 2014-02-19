@@ -78,19 +78,3 @@ module Form : sig
   val are_variant : Formula.FO.t -> Formula.FO.t -> bool
 end
 
-(** {2 AC} *)
-
-module type AC_SPEC = sig
-  val is_ac : Symbol.t -> bool
-  val is_comm : Symbol.t -> bool
-end
-
-module AC(S : AC_SPEC) : sig
-  val matching_ac : ?offset:int ref -> ?subst:subst ->
-                    pattern:term -> scope -> term -> scope ->
-                    subst Sequence.t
-  (** [matching_ac ~pattern s_p b s_b] returns substs such that
-      [subst pattern =_AC b]. It
-      is much more costly than [matching].
-      @param offset is used to create new variables. *)
-end

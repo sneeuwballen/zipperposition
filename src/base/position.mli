@@ -26,20 +26,40 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Positions in terms, clauses...} *)
 
-type t = int list
+type t =
+  | Stop
+  | Type of t       (** Switch to type *)
+  | Left of t       (** Left term in curried application *)
+  | Right of t      (** Right term in curried application, and subterm of binder *)
+  | Record_field of string * t  (** Field of a record *)
+  | Record_rest of t  (** Extension part of the record *)
+  | Head of t       (** Head of uncurried term *)
+  | Arg of int * t  (** argument term in uncurried term, or in multiset *)
   (** A position is a path in a tree *)
 
 type position = t
 
-val left_pos : int
-val right_pos : int
+val stop : t
+val left : t -> t
+val right : t -> t
+val type_ : t -> t
+val record_field : string -> t -> t
+val record_rest : t -> t
+val head : t -> t
+val arg : int -> t -> t
+
+val opp : t -> t
+  (** Opposite position, when it makes sense (left/right) *)
+
+val rev : t -> t
+  (** Reverse the position *)
+
+val append : t -> t -> t
+  (** Append two positions *)
 
 val compare : t -> t -> int
 val eq : t -> t -> bool
 val hash : t -> int
-
-val opp : int -> int
-  (** Opposite position left->right, right->left *)
 
 val pp : Buffer.t -> t -> unit
 val fmt : Format.formatter -> t -> unit
@@ -51,22 +71,41 @@ module Build : sig
   type t
 
   val empty : t
-    (** Empty builder *)
+    (** Empty builder (position=[Stop]) *)
+
+  val to_pos : t -> position
+    (** Extract current position *)
 
   val of_pos : position -> t
     (** Start from a given position *)
 
-  val cons : int -> t -> t
-    (** Prefix the position *)
+  val prefix : position -> t -> t
+    (** Prefix the builder with the given position *)
 
-  val add : t -> int -> t
-    (** Add at the end *)
-
-  val append : t -> position -> t
+  val suffix : t -> position -> t
     (** Append position at the end *)
 
-  val to_pos : t -> position
-    (** Extract current position *)
+  (** All the following builders add elements to the {b end}
+      of the builder. This is useful when a term is traversed and
+      positions of subterms are needed, since positions are
+      easier to build in the wrong order (leaf-to-root). *)
+
+  val left : t -> t
+    (** Add [left] at the end *)
+
+  val right : t -> t
+    (** Add [left] at the end *)
+
+  val type_ : t -> t
+
+  val record_field : string -> t -> t
+
+  val record_rest : t -> t
+
+  val head : t -> t
+
+  val arg : int -> t -> t
+    (** Arg position at the end *)
 
   val pp : Buffer.t -> t -> unit
   val fmt : Format.formatter -> t -> unit

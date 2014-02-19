@@ -39,12 +39,16 @@ type t
 type term = t
 
 type view = private
-  | Var of int
-  | BVar of int
-  | Bind of symbol * t * t (** Type, sub-term *)
-  | Const of symbol
-  | Record of (string * t) list
-  | App of t * t list
+  | Var of int              (** Free variable *)
+  | RigidVar of int         (** Variable that only unifies with other rigid variables *)
+  | BVar of int             (** Bound variable (De Bruijn index) *)
+  | Bind of symbol * t * t  (** Type, sub-term *)
+  | Const of symbol         (** Constant *)
+  | Record of (string * t) list * t option (** Extensible record *)
+  | Multiset of t list      (** Multiset of terms *)
+  | App of t * t list       (** Uncurried application *)
+  | At of t * t             (** Curried application *)
+  | SimpleApp of symbol * t list  (** For representing special constructors *)
 
 val view : t -> view
   (** View on the term's head form *)
@@ -77,15 +81,24 @@ val ty_exn : t -> t
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 
-(** {3 Constructors} *)
+(** {3 Constructors}
+
+Some constructors, such as {!record}, may raise
+Failure if the arguments are ill-formed (several occurrences of a key) *)
 
 val const : kind:Kind.t -> ty:t -> symbol -> t
 val app : kind:Kind.t -> ty:t -> t -> t list -> t
 val bind : kind:Kind.t -> ty:t -> varty:t -> symbol -> t -> t
 val var : kind:Kind.t -> ty:t -> int -> t
+val rigid_var : kind:Kind.t -> ty:t -> int -> t
 val bvar : kind:Kind.t -> ty:t -> int -> t
-val record : kind:Kind.t -> ty:t -> (string * t) list -> t
-  (** @raise Failure if record is ill-formed *)
+val record : kind:Kind.t -> ty:t -> (string * t) list -> rest:t option -> t
+val multiset : kind:Kind.t -> ty:t -> t list -> t
+val at : kind:Kind.t -> ty:t -> t -> t -> t
+val simple_app : kind:Kind.t -> ty:t -> symbol -> t list -> t
+
+val mk_at : kind:Kind.t -> ty:t -> t -> t -> t
+  (** alias to {!at} *)
 
 val tType : t
   (** The root of the type system. It doesn't have a type.
@@ -99,9 +112,13 @@ val change_kind : kind:Kind.t -> t -> t
 
 val is_var : t -> bool
 val is_bvar : t -> bool
+val is_rigid_var : t -> bool
 val is_const : t -> bool
 val is_bind : t -> bool
 val is_app : t -> bool
+val is_record : t -> bool
+val is_multiset : t -> bool
+val is_at : t -> bool
 
 (** {3 Containers} *)
 
@@ -156,6 +173,7 @@ val bind_vars : kind:Kind.t -> ty:t -> symbol -> t list -> t -> t
 
 module Seq : sig
   val vars : t -> t Sequence.t
+  val rigid_vars : t -> t Sequence.t
   val subterms : t -> t Sequence.t
   val subterms_depth : t -> (t * int) Sequence.t  (* subterms with their depth *)
   val symbols : t -> symbol Sequence.t

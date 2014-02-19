@@ -48,16 +48,39 @@ module M = PersistentHashtbl.Make(TermInt)
 (** {2 Renaming} *)
 
 module Renaming = struct
+  (** Type used to distinguish between variables to rename. FreshVar is
+      a variable that, conceptually, already belongs to the new scope,
+      so its original scope doesn't matter *)
+  type to_rename =
+    | FreshVar of int * T.t
+        (* same in any scope. Comes from Symbol.FreshVar i *)
+    | Var of T.t * int
+
+  let hash_to_rename = function
+    | FreshVar (i,ty) -> Hash.combine i (T.hash ty)
+    | Var (t, sc) -> Hash.combine (T.hash t) sc
+
+  let equal_to_rename tr1 tr2 = match tr1, tr2 with
+    | FreshVar (i1, ty1), FreshVar (i2, ty2) -> i1 = i2 && T.eq ty1 ty2
+    | Var (v1,sc1), Var (v2, sc2) -> sc1 = sc2 && T.eq v1 v2
+    | _ -> false
+
+  module HR = Hashtbl.Make(struct
+    type t = to_rename
+    let equal = equal_to_rename
+    let hash = hash_to_rename
+  end)
+
   type t =
     | Dummy
-    | Tbl of T.t H.t
+    | Tbl of T.t HR.t
 
-  let create () = Tbl (H.create 5)
+  let create () = Tbl (HR.create 5)
 
   let clear r = match r with
   | Dummy -> ()
   | Tbl r ->
-    H.clear r;
+    HR.clear r;
     ()
 
   (* special renaming that does nothing *)
@@ -65,13 +88,37 @@ module Renaming = struct
 
   (* rename variable *)
   let rename r v s_v = match r, T.view v with
-  | Dummy, T.Var _ -> v  (* do not rename *)
-  | Tbl tbl, T.Var i ->
+  | Dummy, _ -> v  (* do not rename *)
+  | Tbl tbl, T.Var _ ->
+      let key = Var (v, s_v) in
       begin try
-        H.find tbl (v, s_v)
+        HR.find tbl key
       with Not_found ->
-        let v' = T.var ~kind:(T.kind v) ~ty:(T.ty_exn v) (H.length tbl) in
-        H.add tbl (v, s_v) v';
+        let v' = T.var ~kind:(T.kind v) ~ty:(T.ty_exn v) (HR.length tbl) in
+        HR.add tbl key v';
+        v'
+      end
+  | Tbl tbl, T.RigidVar _ ->
+      let key = Var (v, s_v) in
+      begin try
+        HR.find tbl key
+      with Not_found ->
+        let v' = T.rigid_var ~kind:(T.kind v) ~ty:(T.ty_exn v) (HR.length tbl) in
+        HR.add tbl key v';
+        v'
+      end
+  | _ -> assert false
+
+  let rename_fresh_var r v = match r, T.view v with
+  | Dummy, _ -> v   (* XXX very dangerous !! *)
+  | Tbl tbl, T.Const (Symbol.Conn (Symbol.FreshVar i)) ->
+      let ty = T.ty_exn v in
+      let key = FreshVar (i, ty) in
+      begin try
+        HR.find tbl key
+      with Not_found ->
+        let v' = T.var ~kind:(T.kind v) ~ty (HR.length tbl) in
+        HR.add tbl key v';
         v'
       end
   | _ -> assert false
@@ -253,7 +300,13 @@ let apply ?(depth=0) subst ~renaming t s_t =
       let kind = T.kind t in
       let ty = _apply depth ty s_t in
       match T.view t with
-      | T.Const s -> T.const ~kind ~ty s
+      | T.Const (Symbol.Conn (Symbol.FreshVar _)) ->
+        (* special trick to generate new variables. It ignores the
+           original scope. *)
+        Renaming.rename_fresh_var renaming t
+      | T.Const s ->
+        (* regular constant *)
+        T.const ~kind ~ty s
       | T.BVar i -> T.bvar ~kind ~ty i
       | T.Var i ->
         (* the most interesting cases!
@@ -270,17 +323,45 @@ let apply ?(depth=0) subst ~renaming t s_t =
           let t = T.var ~kind ~ty i in
           Renaming.rename renaming t s_t
         end
+      | T.RigidVar i ->
+        (* variable is either bound or renamed, same as Var. However
+          it can only be bound to a variable, so it simplifies handling
+          De Bruijn indices. *)
+        begin try
+          let t', s_t' = lookup subst t s_t in
+          (* also apply [subst] to [t'] *)
+          _apply depth t' s_t'
+        with Not_found ->
+          (* variable not bound by [subst], rename it
+              (after specializing its type if needed) *)
+          let t = T.rigid_var ~kind ~ty i in
+          Renaming.rename renaming t s_t
+        end
       | T.Bind (s, varty, sub_t) ->
           let varty' = _apply depth varty s_t in
           let sub_t' = _apply (depth+1) sub_t s_t in
           T.bind ~kind ~varty:varty' ~ty s sub_t'
+      | T.At (l, r) ->
+          let l' = _apply depth l s_t in
+          let r' = _apply depth r s_t in
+          T.at ~kind ~ty l' r'
       | T.App (hd, l) ->
           let hd' = _apply depth hd s_t in
           let l' = _apply_list depth l s_t in
           T.app ~kind ~ty hd' l'
-      | T.Record l ->
+      | T.Record (l, rest) ->
+          let rest = match rest with
+            | None -> None
+            | Some r -> Some (_apply depth r s_t)
+          in
           let l' = List.map (fun (s,t') -> s, _apply depth t' s_t) l in
-          T.record ~kind ~ty l'
+          T.record ~kind ~ty l' ~rest
+      | T.SimpleApp (s, l) ->
+          let l' = _apply_list depth l s_t in
+          T.simple_app ~kind ~ty s l'
+      | T.Multiset l ->
+          let l' = _apply_list depth l s_t in
+          T.multiset ~kind ~ty l'
   and _apply_list depth l s_l = match l with
     | [] -> []
     | t::l' -> _apply depth t s_l :: _apply_list depth l' s_l
