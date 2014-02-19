@@ -46,7 +46,8 @@ type view =
   | Var of int                (** Term variable *)
   | BVar of int               (** Bound variable (De Bruijn index) *)
   | Const of Symbol.t         (** Typed constant *)
-  | App of t * Type.t list * t list   (** Application to a list of types and term *)
+  | TyApp of t * Type.t       (** Application to type *)
+  | App of t  * t list        (** Application to a list of terms (cannot be left-nested) *)
 
 let kind = T.Kind.FOTerm
 
@@ -61,12 +62,29 @@ let rec _split_types l = match l with
 let view t = match T.view t with
   | T.Var i -> Var i
   | T.BVar i -> BVar i
+  | T.App (_, []) -> assert false
+  | T.At (l, r) ->
+      let ty = Type.of_term_exn r in
+      TyApp (l, ty)
   | T.App (hd, args) ->
-    (* split arguments into type arguments + term arguments *)
-    let tyargs, args = _split_types args in
-    App (hd, tyargs, args)
+    App (hd, args)
   | T.Const s -> Const s
   | _ -> assert false
+
+let open_app t =
+  let rec collect_head_tyargs acc t =
+    match T.view t with
+    | T.At (f, ty) -> collect_head_tyargs (Type.of_term_exn ty::acc) f
+    | _ -> t, acc
+  in
+  match T.view t with
+  | T.App (f, l) ->
+      let f', tyargs = collect_head_tyargs [] f in
+      f', tyargs, l
+  | T.At _ ->
+      let f', tyargs = collect_head_tyargs [] t in
+      f', tyargs, []
+  | _ -> t, [], []
 
 module Classic = struct
   let rec _drop_types l = match l with
@@ -83,14 +101,18 @@ module Classic = struct
   let view t = match T.view t with
     | T.Var i -> Var i
     | T.BVar i -> BVar i
+    | T.At(l, r) ->
+        begin match T.head l with
+        | None -> NonFO
+        | Some s -> App (s, [])
+        end
     | T.App (hd, l) ->
-        begin match T.view hd with
-        | T.Const s -> App (s, _drop_types l)
-        | _ -> NonFO
+        begin match T.head hd with
+        | None -> NonFO
+        | Some s -> App (s, l)
         end
     | T.Const s -> App (s, [])
-    | T.Bind _
-    | T.Record _ -> NonFO
+    | _ -> NonFO
 end
 
 (** {2 Comparison, equality, containers} *)
@@ -181,20 +203,24 @@ let bvar ~(ty:Type.t) i =
 let const ~(ty:Type.t) s =
   T.const ~kind ~ty:(ty :> T.t) s
 
-(* compute type of s(tyargs  *)
-let _compute_ty ty_fun tyargs l =
-  let ty' = Type.apply ty_fun tyargs in
-  Type.apply ty' (List.map ty l)
+let tyapp t tyarg =
+  let ty = Type.apply (ty t) tyarg in
+  T.at ~kind ~ty:(ty:>T.t) t (tyarg : Type.t :> T.t)
 
-let app ?(tyargs=[]) f l =
+let app f l =
   Util.enter_prof prof_mk_node;
   (* first; compute type *)
-  let ty = _compute_ty (ty f) tyargs l in
+  let ty_result = List.fold_left
+    (fun ty_fun t -> Type.apply ty_fun (ty t))
+    (ty f) l
+  in
   (* apply constant to type args and args *)
-  let res = T.app ~kind ~ty:(ty:>T.t) f
-   ((tyargs : Type.t list :> T.t list) @ l) in
+  let res = T.app ~kind ~ty:(ty_result:>T.t) f l in
   Util.exit_prof prof_mk_node;
   res
+
+let app_full f tyargs l =
+  app (List.fold_left tyapp f tyargs) l
 
 let is_var t = match T.view t with
   | T.Var _ -> true
@@ -211,6 +237,10 @@ let is_const t = match T.view t with
 let is_app t = match T.view t with
   | T.Const _
   | T.App _ -> true
+  | _ -> false
+
+let is_tyapp t = match T.view t with
+  | T.At _ -> true
   | _ -> false
 
 let of_term t = match T.kind t with
@@ -343,7 +373,7 @@ module Pos = struct
 
   let replace t pos ~by = of_term_exn (T.Pos.replace (t:>T.t) pos ~by:(by:>T.t))
 
-  (** get subterm by its position *)
+  (** get subterm by its compact position *)
   let at_cpos t pos = 
     let rec recurse t pos =
       match T.view t, pos with
@@ -385,10 +415,10 @@ and _all_pos_rec_list f vars acc pb l i = match l with
     _all_pos_rec_list f vars acc pb l' (i+1)
   | t::l' ->
     assert (is_term t);
-    let acc = _all_pos_rec f vars acc (PB.add pb i) t in
+    let acc = _all_pos_rec f vars acc (PB.arg i pb) t in
     _all_pos_rec_list f vars acc pb l' (i+1)
 
-let all_positions ?(vars=false) ?(pos=[]) t acc f =
+let all_positions ?(vars=false) ?(pos=Position.stop) t acc f =
   _all_pos_rec f vars acc (PB.of_pos pos) t
 
 (** {2 Some AC-utils} *)
@@ -466,11 +496,13 @@ let to_prolog ?(depth=0) t =
     match view t with
     | Var i -> PT.column (PT.var (Util.sprintf "X%d" i)) (Type.Conv.to_prolog ~depth ty)
     | BVar i -> PT.var (Util.sprintf "Y%d" (depth-i-1))
-    | App (f,tyargs,l) ->
-        PT.app (to_prolog f)
-          (List.map (Type.Conv.to_prolog ~depth) tyargs @
-           List.map to_prolog l)
+    | TyApp _
+    | App _ -> gather_left [] t
     | Const f -> PT.const f
+  and gather_left acc t = match view t with
+    | TyApp (f, ty) -> gather_left (Type.Conv.to_prolog ~depth ty :: acc) f
+    | App (f, l) -> gather_left (List.map to_prolog l @ acc) f
+    | _ -> PT.app (to_prolog t) acc
   in to_prolog t
 
 (** {2 Printing/parsing} *)
@@ -486,22 +518,20 @@ let rec pp_depth ?(hooks=[]) depth buf t =
   let rec pp_rec buf t =
     begin match view t with
     | BVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
-    | App (s, tyargs, args) ->
+    | TyApp (f, ty) ->
+        pp_rec buf f;
+        Buffer.add_char buf ' ';
+        Type.pp buf ty
+    | App (f, args) ->
       (* try to use some hook *)
       if List.exists (fun hook -> hook !depth pp_rec buf t) hooks
       then ()
       else (* default case for nodes *)
-        begin match tyargs, args with
-        | [], [] -> pp_rec buf s
-        | _ ->
-          Printf.bprintf buf "%a(" pp_rec s;
-          Util.pp_list Type.pp buf tyargs;
-          begin match tyargs, args with
-          | _::_, _::_ -> Buffer.add_string buf ", "
-          | _ -> ()
-          end;
-          Util.pp_list pp_rec buf args;
-          Buffer.add_string buf ")";
+        begin
+          assert (args <> []);
+          pp_rec buf f;
+          Buffer.add_char buf ' ';
+          Util.pp_list ~sep:" " pp_rec buf args
         end
     | Const s -> Symbol.pp buf s
     | Var i ->
@@ -528,12 +558,11 @@ let rec debug fmt t =
   begin match view t with
   | Var i -> Format.fprintf fmt "X%d" i
   | BVar i -> Format.fprintf fmt "Y%d" i
-  | App (s, [], []) ->
-    debug fmt s
   | Const s -> Symbol.fmt fmt s
-  | App (s, tyargs, l) ->
-    Format.fprintf fmt "(%a %a %a)" debug s
-      (Sequence.pp_seq Type.fmt) (Sequence.of_list tyargs)
+  | TyApp (f, ty) ->
+    Format.fprintf fmt "(%a %a)" debug f Type.fmt ty
+  | App (s, l) ->
+    Format.fprintf fmt "(%a %a)" debug s
       (Sequence.pp_seq debug) (Sequence.of_list l)
   end;
   Format.fprintf fmt ":%a" Type.fmt (ty t)
@@ -550,16 +579,17 @@ module TPTP = struct
     let rec pp_rec buf t = match view t with
     | BVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
     | Const s -> Symbol.TPTP.pp buf s
-    | App (s, [], []) -> pp_rec buf s
-    | App (s, tyargs, args) ->
-      Printf.bprintf buf "%a(" pp_rec s;
-      Util.pp_list Type.TPTP.pp buf tyargs;
-      begin match tyargs, args with
-        | _::_, _::_ -> Buffer.add_string buf ", "
-        | _ -> ();
-      end;
-      Util.pp_list pp_rec buf args;
-      Buffer.add_string buf ")"
+    | App _
+    | TyApp _ ->
+        let f, tyargs, args = open_app t in
+        Printf.bprintf buf "%a(" pp_rec f;
+        Util.pp_list Type.TPTP.pp buf tyargs;
+        begin match tyargs, args with
+          | _::_, _::_ -> Buffer.add_string buf ", "
+          | _ -> ();
+        end;
+        Util.pp_list pp_rec buf args;
+        Buffer.add_string buf ")"
     | Var i -> Printf.bprintf buf "X%d" i
     in
     pp_rec buf t
@@ -569,6 +599,8 @@ module TPTP = struct
   let fmt fmt t = Format.pp_print_string fmt (to_string t)
 
   module Arith = struct
+    let term_pp_depth = pp_depth
+
     open Type.TPTP
 
     let x = Type.var 0
@@ -614,7 +646,7 @@ module TPTP = struct
         | _ -> false
       in
       let pp_surrounded buf t = match view t with
-      | App (s, _, [_;_]) when
+      | App (s, [_;_]) when
         eq s sum ||
         eq s product ||
         eq s difference ||
@@ -625,32 +657,32 @@ module TPTP = struct
       | _ -> pp_rec buf t
       in
       match view t with
-      | App (s, _, [a; b]) when eq s less ->
+      | App (s, [a; b]) when eq s less ->
         Printf.bprintf buf "%a < %a" pp_surrounded a pp_surrounded b; true
-      | App (s, _, [a; b]) when eq s lesseq ->
+      | App (s, [a; b]) when eq s lesseq ->
         Printf.bprintf buf "%a ≤ %a" pp_surrounded a pp_surrounded b; true
-      | App (s, _, [a; b]) when eq s greater ->
+      | App (s, [a; b]) when eq s greater ->
         Printf.bprintf buf "%a > %a" pp_surrounded a pp_surrounded b; true
-      | App (s, _, [a; b]) when eq s greatereq ->
+      | App (s, [a; b]) when eq s greatereq ->
         Printf.bprintf buf "%a ≥ %a" pp_surrounded a pp_surrounded b; true
-      | App (s, _, [a; b]) when eq s sum ->
+      | App (s, [a; b]) when eq s sum ->
         Printf.bprintf buf "%a + %a" pp_surrounded a pp_surrounded b; true
-      | App (s, _, [a; b]) when eq s difference ->
+      | App (s, [a; b]) when eq s difference ->
         Printf.bprintf buf "%a - %a" pp_surrounded a pp_surrounded b; true
-      | App (s, _, [a; b]) when eq s product ->
+      | App (s, [a; b]) when eq s product ->
         Printf.bprintf buf "%a × %a" pp_surrounded a pp_surrounded b; true
-      | App (s, _, [a; b]) when eq s quotient ->
+      | App (s, [a; b]) when eq s quotient ->
         Printf.bprintf buf "%a / %a" pp_surrounded a pp_surrounded b; true
-      | App (s, _, [a; b]) when eq s quotient_e ->
+      | App (s, [a; b]) when eq s quotient_e ->
         Printf.bprintf buf "%a // %a" pp_surrounded a pp_surrounded b; true
-      | App (s, _, [a]) when eq s uminus ->
+      | App (s, [a]) when eq s uminus ->
         Printf.bprintf buf "-%a" pp_surrounded a; true;
-      | App (s, _, [a;b]) when eq s remainder_e ->
+      | App (s, [a;b]) when eq s remainder_e ->
         Printf.bprintf buf "%a mod %a" pp_surrounded a pp_surrounded b; true;
       | _ -> false  (* default *)
 
     let pp_debug buf t =
-      pp_depth ~hooks:(arith_hook:: !__hooks) 0 buf t
+      term_pp_depth ~hooks:(arith_hook:: !__hooks) 0 buf t
   end
 end
 

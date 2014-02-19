@@ -39,7 +39,8 @@ type view = private
   | Var of int                (** Term variable *)
   | BVar of int               (** Bound variable (De Bruijn index) *)
   | Const of Symbol.t         (** Typed constant *)
-  | App of t * Type.t list * t list   (** Application to a list of types and term *)
+  | TyApp of t * Type.t       (** Application to type *)
+  | App of t  * t list        (** Application to a list of terms (cannot be left-nested) *)
 
 type sourced_term =
   t * string * string           (** Term + file,name *)
@@ -47,6 +48,9 @@ type sourced_term =
 val view : t -> view
 
 val kind : ScopedTerm.Kind.t
+
+val open_app : t -> t * Type.t list * t list
+  (** Open application recursively so as to gather all type arguments *)
 
 (** {2 Classic view} *)
 module Classic : sig
@@ -99,9 +103,16 @@ val bvar : ty:Type.t -> int -> t
 val const : ty:Type.t -> symbol -> t
   (** Create a typed constant *)
 
-val app : ?tyargs:Type.t list -> t -> t list -> t
-  (** Apply a term to a list of terms and possibly of type arguments
+val tyapp : t -> Type.t -> t
+  (** Apply a term to a type
       @raise Type.Error if types do not match. *)
+
+val app : t -> t list -> t
+  (** Apply a term to a list of terms
+      @raise Type.Error if types do not match. *)
+
+val app_full : t -> Type.t list -> t list -> t
+  (** Apply the term to types, then to terms *)
 
 val cast : ty:Type.t -> t -> t
   (** Change the type. Only works for variables and bound variables. *)
@@ -112,6 +123,7 @@ val is_term : ScopedTerm.t -> bool
 
 val is_var : t -> bool
 val is_bvar : t -> bool
+val is_tyapp : t -> bool
 val is_app : t -> bool
 val is_const : t -> bool
 
