@@ -273,32 +273,16 @@ module Make(MyT : TERM) = struct
       begin match T.view t with
       | T.Const (Sym.Conn Sym.True) -> True
       | T.Const (Sym.Conn Sym.False) -> False
-      | T.App (hd, [a]) ->
-          begin match T.view hd with
-          | T.Const (Sym.Conn Sym.Not) -> Not a
-          | T.Const (Sym.Conn Sym.And) -> And [a]
-          | T.Const (Sym.Conn Sym.Or) -> Or [a]
-          | _ -> assert false
-          end
-      | T.App (hd, [a; b]) ->
-          begin match T.view hd with
-          | T.Const (Sym.Conn conn) ->
-              begin match conn with
-              | Sym.Equiv -> Equiv (a,b)
-              | Sym.Xor -> Xor (a,b)
-              | Sym.Imply -> Imply (a,b)
-              | Sym.Eq -> Eq (MyT.of_term_exn a, MyT.of_term_exn b)
-              | Sym.Neq -> Neq (MyT.of_term_exn a, MyT.of_term_exn b)
-              | Sym.And -> And [a; b]
-              | Sym.Or -> Or [a; b]
-              | _ -> assert false
-              end
-          | _ -> assert false
-          end
-      | T.App (hd, l) ->
-          begin match T.view hd with
-          | T.Const (Sym.Conn Sym.And) -> And l
-          | T.Const (Sym.Conn Sym.Or) -> Or l
+      | T.SimpleApp (Sym.Conn Sym.And, l) -> And l
+      | T.SimpleApp (Sym.Conn Sym.Or, l) -> Or l
+      | T.SimpleApp (Sym.Conn Sym.Not, [a]) -> Not a
+      | T.SimpleApp (Sym.Conn conn, [a; b]) ->
+          begin match conn with
+          | Sym.Equiv -> Equiv (a,b)
+          | Sym.Xor -> Xor (a,b)
+          | Sym.Imply -> Imply (a,b)
+          | Sym.Eq -> Eq (MyT.of_term_exn a, MyT.of_term_exn b)
+          | Sym.Neq -> Neq (MyT.of_term_exn a, MyT.of_term_exn b)
           | _ -> assert false
           end
       | T.Bind (Sym.Conn Sym.Forall, varty, f') ->
@@ -349,19 +333,10 @@ module Make(MyT : TERM) = struct
     let false_ = T.const ~kind ~ty Sym.Base.false_
     let atom (t:term) = (t:>T.t)
 
-    let __not = T.const ~kind ~ty Sym.Base.not_
-    let __and = T.const ~kind ~ty Sym.Base.and_
-    let __or = T.const ~kind ~ty Sym.Base.or_
-    let __imply = T.const ~kind ~ty Sym.Base.imply
-    let __equiv = T.const ~kind ~ty Sym.Base.equiv
-    let __xor = T.const ~kind ~ty Sym.Base.xor
-    let __eq = T.const ~kind ~ty Sym.Base.eq
-    let __neq = T.const ~kind ~ty Sym.Base.neq
-
-    let not_ f = T.app ~kind ~ty __not [f]
-    let imply f1 f2 = T.app ~kind ~ty __imply [f1; f2]
-    let equiv f1 f2 = T.app ~kind ~ty __equiv [f1; f2]
-    let xor f1 f2 = T.app ~kind ~ty __xor [f1; f2]
+    let not_ f = T.simple_app ~kind ~ty Sym.Base.not_ [f]
+    let imply f1 f2 = T.simple_app ~kind ~ty Sym.Base.imply [f1; f2]
+    let equiv f1 f2 = T.simple_app ~kind ~ty Sym.Base.equiv [f1; f2]
+    let xor f1 f2 = T.simple_app ~kind ~ty Sym.Base.xor [f1; f2]
 
     let __check_same t1 t2 =
       let ty1 = MyT.ty t1 and ty2 = MyT.ty t2 in
@@ -375,19 +350,19 @@ module Make(MyT : TERM) = struct
 
     let eq t1 t2 =
       __check_same t1 t2;
-      T.app ~kind ~ty __eq ([t1; t2] : term list :> T.t list)
+      T.simple_app ~kind ~ty Sym.Base.eq ([t1; t2] : term list :> T.t list)
 
-    let neq t1 t2 = T.app ~kind ~ty __neq ([t1; t2] : term list :> T.t list)
+    let neq t1 t2 = T.simple_app ~kind ~ty Sym.Base.neq ([t1; t2] : term list :> T.t list)
 
     let and_ = function
       | [] -> true_
       | [f] -> f
-      | l -> T.app ~kind ~ty __and l
+      | l -> T.simple_app ~kind ~ty Sym.Base.and_ l
 
     let or_ = function
       | [] -> false_
       | [f] -> f
-      | l -> T.app ~kind ~ty __or l
+      | l -> T.simple_app ~kind ~ty Sym.Base.or_ l
 
     let __mk_forall ~(varty:Type.t) f =
       T.bind ~kind ~ty ~varty:(varty:>T.t) Sym.Base.forall f

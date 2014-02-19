@@ -49,6 +49,7 @@ and view = private
   | App of t * t list               (** apply term *)
   | Bind of Symbol.t * t list * t   (** bind n variables *)
   | List of t list                  (** special constructor for lists *)
+  | Record of (string * t) list * t option  (** extensible record *)
   | Column of t * t                 (** t:t (useful for typing, e.g.) *)
 
 type term = t
@@ -66,6 +67,7 @@ val bind : Symbol.t -> t list -> t -> t
 val list_ : t list -> t
 val nil : t
 val column : t -> t -> t
+val record : (string*t) list -> rest:t option -> t
 val at_loc : loc:location -> t -> t
 
 val is_var : t -> bool

@@ -59,6 +59,7 @@ type view = private
   | BVar of int             (** Bound variable (De Bruijn index) *)
   | App of symbol * t list  (** parametrized type *)
   | Fun of t * t list       (** Function type *)
+  | Record of (string*t) list * t option  (** Record type *)
   | Forall of t             (** explicit quantification using De Bruijn index *)
 
 val view : t -> view
@@ -98,6 +99,9 @@ val forall : t list -> t -> t
   (** [forall vars ty] quantifies [ty] over [vars].
       If [vars] is the empty list, returns [ty].
       @raise Invalid_argument if some element of [vars] is not a variable *)
+
+val record : (string*t) list -> rest:t option -> t
+  (** Record type, with an optional extension *)
 
 val __forall : t -> t
   (** not documented. *)
@@ -164,16 +168,31 @@ val is_ground : t -> bool
 val size : t -> int
   (** Size of type, in number of "nodes" *)
 
-val apply : t -> t list -> t
-  (** Given a function/forall type, and a list of arguments, return the
+val apply : t -> t -> t
+  (** Given a function/forall type, and an argument, return the
       type that results from applying the function/forall to the arguments.
       No unification is done, types must check exactly.
       @raise Error if the types do not match *)
+
+val apply_list : t -> t list -> t
+  (** List version of {!apply}
+      @raise Error if the types do not match *)
+
+(** {2 IO} *)
+
+include Interfaces.PRINT_DE_BRUIJN with type term := t and type t := t
+include Interfaces.PRINT with type t := t
+(*
+include Interfaces.SERIALIZABLE with type t := t
+*)
 
 (** {2 TPTP} specific printer and types *)
 
 module TPTP : sig
   include Interfaces.PRINT with type t := t
+  include Interfaces.PRINT_DE_BRUIJN
+    with type term := t and type t := t
+    and type print_hook := print_hook
 
   (** {2 Basic types} *)
 
@@ -184,13 +203,6 @@ module TPTP : sig
   val rat : t
   val real : t
 end
-
-(** {2 IO} *)
-
-include Interfaces.PRINT with type t := t
-(*
-include Interfaces.SERIALIZABLE with type t := t
-*)
 
 (** {2 Conversions} *)
 

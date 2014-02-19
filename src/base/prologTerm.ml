@@ -40,6 +40,7 @@ and view =
   | App of t * t list               (** apply term *)
   | Bind of Symbol.t * t list * t   (** bind n variables *)
   | List of t list                  (** special constructor for lists *)
+  | Record of (string * t) list * t option  (** extensible record *)
   | Column of t * t                 (** t:t (useful for typing, e.g.) *)
 
 type term = t
@@ -52,7 +53,8 @@ let __to_int = function
   | App _ -> 4
   | Bind _ -> 5
   | List _ -> 6
-  | Column _ -> 7
+  | Record _ -> 7
+  | Column _ -> 8
 
 let rec cmp t1 t2 = match t1.term, t2.term with
   | Var s1, Var s2 -> String.compare s1 s2
@@ -91,6 +93,10 @@ let rec hash t = match t.term with
   | Bind (s,v,t') ->
     let h = Hash.combine (Symbol.hash s) (hash t') in
     Hash.hash_list hash h v
+  | Record (l, rest) ->
+    Hash.hash_list
+      (fun (n,t) -> Hash.combine (Hash.hash_string n) (hash t))
+      (match rest with None -> 13 | Some r -> hash r) l
   | Column (x,y) -> Hash.combine (hash x) (hash y)
 
 let __make view = {term=view; loc=None;}
@@ -110,6 +116,9 @@ let bind s v l = match v with
   | _::_ -> __make (Bind(s,v,l))
 let list_ l = __make (List l)
 let nil = list_ []
+let record l ~rest =
+  let l = List.sort (fun (n1,_)(n2,_) -> String.compare n1 n2) l in
+  __make (Record (l, rest))
 let column x y = __make (Column(x,y))
 let at_loc ~loc t = {t with loc=Some loc; }
 
@@ -141,6 +150,9 @@ module Seq = struct
       | List l
       | App (_, l) -> List.iter iter l
       | Bind (_, v, t') -> List.iter iter v; iter t'
+      | Record (l, rest) ->
+          begin match rest with | None -> () | Some r -> iter r end;
+          List.iter (fun (_,t') -> iter t') l
       | Column(x,y) -> k x; k y
     in iter t
 
@@ -163,6 +175,9 @@ module Seq = struct
             bound v
           in
           iter bound' t'
+      | Record (l, rest) ->
+          begin match rest with | None -> () | Some r -> iter bound r end;
+          List.iter (fun (_,t') -> iter bound t') l
       | Column(x,y) -> k (x, bound); k (y, bound)
     in iter Set.empty t
 
@@ -209,6 +224,23 @@ let rec pp buf t = match t.term with
       Util.pp_list ~sep:"," pp buf vars;
       Buffer.add_string buf "]:";
       pp buf t'
+  | Record (l, None) ->
+    Buffer.add_char buf '{';
+    List.iteri
+      (fun i (s, t') ->
+        if i>0 then Buffer.add_string buf ", ";
+        Printf.bprintf buf "%s: " s;
+        pp buf t')
+      l;
+    Buffer.add_char buf '}'
+  | Record (l, Some r) ->
+    Buffer.add_char buf '{';
+    List.iteri
+      (fun i (s, t') ->
+        if i>0 then Buffer.add_string buf ", ";
+        Printf.bprintf buf "%s: " s;
+        pp buf t')
+      l;
   | Column(x,y) ->
       pp buf x;
       Buffer.add_char buf ':';
@@ -291,6 +323,7 @@ module TPTP = struct
         Util.pp_list ~sep:"," pp_typed_var buf vars;
         Buffer.add_string buf "]:";
         pp_surrounded buf t'
+    | Record _ -> failwith "cannot print records in TPTP"
     | Column(x,y) ->
         pp buf x;
         Buffer.add_char buf ':';

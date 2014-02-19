@@ -42,6 +42,8 @@ type view =
   | BVar of int                 (** bound variable (De Bruijn index) *)
   | Lambda of Type.t * t        (** lambda abstraction over one variable. *)
   | Const of symbol             (** Typed constant *)
+  | At of t * t                 (** Curried application *)
+  | TyAt of t * Type.t          (** Curried application to a type *)
   | App of t * Type.t list * t list
     (** HO function application. Invariant: first term is not a {!App}. *)
 
@@ -66,6 +68,11 @@ let view t = match T.view t with
   | T.Bind (Symbol.Conn Symbol.Lambda, varty, t') ->
     Lambda (Type.of_term_exn varty, t')
   | T.Const s -> Const s
+  | T.At (l,r) ->
+      begin match Type.of_term r with
+      | None -> At (l, r)
+      | Some ty -> TyAt (l, ty)
+      end
   | T.App (hd, l) ->
       let tyargs, args = _split_types l in
       App (hd, tyargs, args)
@@ -161,8 +168,8 @@ let bvar ~(ty:Type.t) i =
 
 (* compute type of s(tyargs  *)
 let _compute_ty ty_fun tyargs l =
-  let ty' = Type.apply ty_fun tyargs in
-  Type.apply ty' (List.map ty l)
+  let ty' = Type.apply_list ty_fun tyargs in
+  Type.apply_list ty' (List.map ty l)
 
 let app ?(tyargs=[]) hd args =
   (* first; compute type *)
@@ -171,6 +178,14 @@ let app ?(tyargs=[]) hd args =
   let res = T.app ~kind ~ty:(ty:>T.t) hd
     ((tyargs : Type.t list :> t list) @ args) in
   res
+
+let tyat t tyarg =
+  let ty = Type.apply (ty t) tyarg in
+  T.at ~kind ~ty:(ty:>T.t) t (tyarg:Type.t:>T.t)
+
+let at l r =
+  let ty = Type.apply (ty l) (ty r) in
+  T.at ~kind ~ty:(ty:>T.t) l r
 
 let const ?(tyargs=[]) ~(ty:Type.t) symbol =
   let c = T.const ~kind ~ty:(ty :> T.t) symbol in
@@ -229,8 +244,12 @@ let rec size t = match T.view t with
   | T.BVar _ -> 1
   | T.Const _ -> 1
   | T.Bind (_, _, t') -> 1+ size t'
-  | T.Record l -> List.fold_left (fun acc (_,t') -> acc+size t') 0 l
+  | T.At (l,r) -> 1 + size l + size r
+  | T.Record (l, rest) ->
+      let s = match rest with None -> 0 | Some r -> size r in
+      List.fold_left (fun acc (_,t') -> acc+size t') s l
   | T.App (f, l) -> List.fold_left (fun s t' -> s + size t') (1+size f) l
+  | T.RigidVar _ | T.Multiset _ | T.SimpleApp _ -> assert false
 
 let is_ground t = Seq.vars t |> Sequence.is_empty
 
@@ -256,13 +275,18 @@ let ty_vars t =
 
 let depth t = Seq.subterms_depth t |> Sequence.map snd |> Sequence.fold max 0
 
-let rec head t = match T.view t with
+let rec head t =
+  match T.view t with
   | T.Const s -> s
+  | T.At (t,_)
   | T.App (t, _) -> head t
   | T.BVar _
-  | T.Bind _ -> raise (Invalid_argument "Term.head: lambda")
-  | T.Record _ -> raise (Invalid_argument "Term.head: record")
   | T.Var _ -> raise (Invalid_argument "Term.head: variable")
+  | T.Bind _ -> raise (Invalid_argument "Term.head: lambda")
+  | T.RigidVar _
+  | T.Multiset _
+  | T.SimpleApp _
+  | T.Record _ -> assert false
 
 module AC = struct
   let flatten f l =
@@ -360,6 +384,12 @@ let pp_depth ?(hooks=[]) depth buf t =
         end;
         Util.pp_list ~sep:" " pp_rec buf l
       end
+  | At (l,r) ->
+    pp_surrounded buf l; Buffer.add_char buf ' ';
+    pp_rec buf r
+  | TyAt (l,r) ->
+    pp_surrounded buf l; Buffer.add_char buf ' ';
+    Type.pp buf r
   and pp_surrounded buf t = match view t with
   | App (_, _, _) | Lambda _ ->
     Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
@@ -385,6 +415,10 @@ let rec debug fmt t = match view t with
   | Lambda (varty,t') ->
     Format.fprintf fmt "(lambda %a %a)" Type.fmt varty debug t'
   | Const s -> Symbol.fmt fmt s
+  | TyAt (l, r) ->
+    Format.fprintf fmt "(%a %a)" debug l Type.fmt r
+  | At (l, r) ->
+    Format.fprintf fmt "(%a %a)" debug l debug r
   | App (t, tyargs, l) ->
     Format.fprintf fmt "(%a %a %a)" debug t
       (Sequence.pp_seq ~sep:" " Type.fmt) (Sequence.of_list tyargs)
@@ -494,6 +528,12 @@ module TPTP = struct
         if not !print_all_types
         then Printf.bprintf buf "X%d:%a" i Type.pp (ty t)
         else Printf.bprintf buf "X%d" i
+    | At (l,r) ->
+      pp_surrounded buf l; Buffer.add_string buf " @ ";
+      pp_rec buf r
+    | TyAt (l,r) ->
+      pp_surrounded buf l; Buffer.add_string buf " @ ";
+      Type.pp buf r
     | App (hd, tyargs, l) ->
       begin match tyargs, l with
       | [], [] -> pp_rec buf hd

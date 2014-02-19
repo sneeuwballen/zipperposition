@@ -41,6 +41,8 @@ type view = private
   | BVar of int                 (** bound variable (De Bruijn index) *)
   | Lambda of Type.t * t        (** lambda abstraction over one variable. *)
   | Const of symbol             (** Typed constant *)
+  | At of t * t                 (** Curried application *)
+  | TyAt of t * Type.t          (** Curried application to a type *)
   | App of t * Type.t list * t list
     (** HO function application. Invariant: first term is not a {!App}. *)
 
@@ -108,6 +110,15 @@ val app : ?tyargs:Type.t list -> t -> t list -> t
       a list of term arguments. Partial application is not
       supported and will raise a type error. The type is automatically
       computed.
+      @raise Type.Error if types do not match. *)
+
+val at : t -> t -> t
+  (** Curried application. The first term must have a function type
+      with the same argument as the type of the second term.
+      @raise Type.Error if types do not match. *)
+
+val tyat : t -> Type.t -> t
+  (** Curried type application.
       @raise Type.Error if types do not match. *)
 
 val const : ?tyargs:Type.t list -> ty:Type.t -> symbol -> t

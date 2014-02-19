@@ -388,7 +388,7 @@ module FO = struct
           and [args], containing [n_args] terms. *)
       let tyargs, args = _split_arity n_args l in
       let tyargs = _complete_type_args ctx n_tyargs tyargs in
-      let ty_s' = Type.apply ty_s tyargs in
+      let ty_s' = Type.apply_list ty_s tyargs in
       Util.debug 5 "applied type for %a: %a" Sym.pp s Type.pp ty_s';
       (* create sub-closures, by inferring the type of [args] *)
       let l = List.map (fun t' -> infer_rec ctx t') args in
@@ -406,7 +406,7 @@ module FO = struct
         let tyargs' = List.map (Ctx.apply_ty ctx) tyargs in
         let ty_s' = Type.close_forall (Ctx.apply_ty ctx ty_s) in
         Util.debug 5 "final type for %a: %a" Sym.pp s Type.pp ty_s';
-        T.app ~tyargs:tyargs' (T.const ~ty:ty_s' s) args'
+        T.app_full (T.const ~ty:ty_s' s) tyargs' args'
       in
       ty_ret, closure
     | PT.Int _
@@ -414,6 +414,7 @@ module FO = struct
     | PT.List _
     | PT.Column _
     | PT.App _
+    | PT.Record _
     | PT.Bind _ -> __error ctx "expected first-order term"
 
   let infer_var_scope ctx t = match t.PT.term with
@@ -536,6 +537,7 @@ module FO = struct
     | PT.List _
     | PT.Int _
     | PT.Bind _
+    | PT.Record _
     | PT.Rat _ -> __error ctx "expected formula, got %a" PT.pp f
 
   let infer_form ctx f =

@@ -99,7 +99,7 @@ let skolem_form ~ctx ~ty f =
     let tyargs = Type.vars ty in
     let ty = Type.forall tyargs ty in
     let const = T.const ~ty (fresh_sym ~ctx ~ty) in
-    let skolem_term = T.app ~tyargs const vars in
+    let skolem_term = T.app_full const tyargs vars in
     (* replace variable by skolem t*)
     let env = DBEnv.singleton (skolem_term : T.t :> ST.t) in
     let new_f =

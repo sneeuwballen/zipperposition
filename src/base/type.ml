@@ -43,6 +43,7 @@ type view =
   | BVar of int             (** Bound variable (De Bruijn index) *)
   | App of symbol * t list  (** parametrized type *)
   | Fun of t * t list       (** Function type *)
+  | Record of (string*t) list * t option  (** Record type *)
   | Forall of t             (** explicit quantification using De Bruijn index *)
 
 let view t = match T.kind t with
@@ -54,12 +55,10 @@ let view t = match T.kind t with
       assert (T.eq varty T.tType);
       Forall t'
     | T.Const s -> App (s, [])
-    | T.App (head, ((t'::l') as l)) ->
-      begin match T.view head with
-      | T.Const (Symbol.Conn Symbol.Arrow) -> Fun (t', l')
-      | T.Const s -> App (s, l)
-      | _ -> failwith "Type.view"
-      end
+    | T.SimpleApp ((Symbol.Conn Symbol.Arrow), ret::l) ->
+        Fun (ret, l)
+    | T.SimpleApp (s, l) -> App (s, l)
+    | T.Record (l, rest) -> Record (l, rest)
     | _ -> failwith "Type.view"
     end
   | _ -> raise (Invalid_argument "Type.view")
@@ -80,7 +79,7 @@ let var i =
   if i < 0 then raise (Invalid_argument "Type.var");
   T.var ~kind ~ty:tType i
 
-let app s l = T.app ~kind ~ty:tType (T.const ~kind ~ty:tType s) l
+let app s l = T.simple_app ~kind ~ty:tType s l
 
 let const s = T.const ~kind ~ty:tType s
 
@@ -88,18 +87,21 @@ let rec mk_fun ret args =
   match args with
   | [] -> ret
   | _::_ ->
-    match view ret with
-    | Fun (ret', args') ->
+    match T.view ret with
+    | T.SimpleApp (Symbol.Conn Symbol.Arrow, ret'::args') ->
       (* invariant: flatten function types. Symmetric w.r.t the {!HOTerm.At}
           constructor invariant. [args] must be applied before [args']
           need to be supplied.
           Example: [(a <- b) <- c] requires [c] first *)
       mk_fun ret' (args @ args')
     | _ ->
-      T.app ~kind ~ty:tType (T.const ~kind ~ty:tType Symbol.Base.arrow) (ret :: args)
+      T.simple_app ~kind ~ty:tType Symbol.Base.arrow (ret :: args)
 
 let forall vars ty =
   T.bind_vars ~kind ~ty:tType Symbol.Base.forall_ty vars ty
+
+let record l ~rest =
+  T.record ~kind ~ty:tType l ~rest
 
 let __bvar i =
   T.bvar ~kind ~ty:tType i
@@ -161,6 +163,7 @@ let rec arity ty = match view ty with
   | Fun (_, l) -> 0, List.length l
   | Var _
   | BVar _
+  | Record _
   | App _ -> 0, 0
   | Forall ty' ->
     let i1, i2 = arity ty' in
@@ -170,6 +173,7 @@ let rec expected_args ty = match view ty with
   | Fun (_, l) -> l
   | BVar _
   | Var _
+  | Record _
   | App _ -> []
   | Forall ty' -> expected_args ty'
 
@@ -179,39 +183,28 @@ let size = T.size
 
 let _error msg = raise (Error msg)
 
+let apply ty arg =
+  match T.view ty with
+  | T.SimpleApp(Symbol.Conn Symbol.Arrow, ret::x::args') ->
+    if eq x arg
+    then mk_fun ret args'
+    else 
+      let msg = Util.sprintf
+        "Type.apply: wrong argument type, expected %a but got %a" T.pp x T.pp arg
+      in _error msg
+  | T.Bind (Symbol.Conn Symbol.ForallTy, _, ty') ->
+      T.DB.eval (DBEnv.singleton arg) ty'
+  | _ ->
+      let msg = Util.sprintf
+        "Type.apply: expected quantified or function type, but got %a" T.pp ty
+      in _error msg
+
 (* apply a type to arguments. *)
-let apply ty args =
-  (* apply ty to args *)
-  let rec apply ty args =
-    match view ty, args with
-    | _, [] -> ty
-    | Fun (ret, l), l' -> apply_fun ret l l'
-    | Forall ty', a::args' ->
-      let ty' = T.DB.eval (DBEnv.singleton a) ty' in
-      apply ty' args'
-    | _, _ -> _error "Type.apply: expected function or forall type"
-  (* recursive matching of expected arguments and provided arguments.
-    careful: we could have a curried function *)
-  and apply_fun f_ret f_args args =
-    match f_args, args with
-    | x::f_args', y::args' ->
-      (* match arguments after substitution *)
-      if eq x y
-        then apply_fun f_ret f_args' args'
-        else
-          let msg = Util.sprintf
-          "Type.apply: wrong argument type, expected %a but got %a" T.pp x T.pp y
-          in _error msg
-    | [], [] ->
-      (* total application, result is return type. special case of last case. *)
-      f_ret
-    | [], _ -> apply f_ret args
-    | _::_, [] ->
-      (* partial application. The remaining arguments will have to be
-          provided by another call to {!apply}. *)
-      mk_fun f_ret f_args
-  in
-  apply ty args
+let rec apply_list ty args = match args with
+  | [] -> ty
+  | arg::args' ->
+      let ty' = apply ty arg in
+      apply_list ty' args'
 
 (*
 let bij = T.bij
@@ -224,40 +217,7 @@ let __var =
     decr r;
     T.var ~ty:tType n
 
-(* apply a type to arguments. *)
-let apply ty args =
-  (* apply ty to args *)
-  let rec apply ty args =
-    match view ty, args with
-    | _, [] -> ty
-    | Fun (ret, l), l' -> apply_fun ret l l'
-    | Forall ty', a::args' ->
-      let ty' = T.DB.eval (DBEnv.singleton a) ty' in
-      apply ty' args'
-    | _, _ -> _error "Type.apply: expected function or forall type"
-  (* recursive matching of expected arguments and provided arguments.
-    careful: we could have a curried function *)
-  and apply_fun f_ret f_args args =
-    match f_args, args with
-    | x::f_args', y::args' ->
-      (* match arguments after substitution *)
-      if eq x y
-        then apply_fun f_ret f_args' args'
-        else
-          let msg = Util.sprintf
-            "Type.apply: argument type mismatch, expected %a but got %a"
-              T.pp (x:>T.t) T.pp (y:>T.t)
-          in _error msg
-    | [], [] ->
-      (* total application, result is return type. special case of last case. *)
-      f_ret
-    | [], _ -> apply f_ret args
-    | _::_, [] ->
-      (* partial application. The remaining arguments will have to be
-          provided by another call to {!apply}. *)
-      mk_fun f_ret f_args
-  in
-  apply ty args
+type print_hook = int -> (Buffer.t -> t-> unit) -> Buffer.t -> t-> bool
 
 module TPTP = struct
   let arrow = Symbol.of_string ">"
@@ -282,6 +242,7 @@ module TPTP = struct
     | Fun (ret, l) ->
       Printf.bprintf buf "(%a) > %a"
         (Util.pp_list ~sep:" * " (pp_inner depth)) l (pp_tstp_rec depth) ret
+    | Record _ -> failwith "cannot print record types in TPTP"
     | Forall ty' ->
       Printf.bprintf buf "!>[Tb%d:$tType]: %a" depth (pp_inner (depth+1)) ty'
   and pp_inner depth buf t = match view t with
@@ -290,6 +251,8 @@ module TPTP = struct
     | _ -> pp_tstp_rec depth buf t
 
   let pp buf t = pp_tstp_rec 0 buf t
+
+  let pp_depth ?hooks depth buf t = pp_tstp_rec depth buf t
 
   let to_string t =
     let b = Buffer.create 15 in
@@ -314,12 +277,31 @@ let rec pp_rec depth buf t = match view t with
   | Fun (ret, l) ->
     Printf.bprintf buf "(%a) > %a"
       (Util.pp_list ~sep:" * " (pp_inner depth)) l (pp_rec depth) ret
+  | Record (l, None) ->
+    Buffer.add_char buf '{';
+    List.iteri
+      (fun i (s, t') ->
+        if i>0 then Buffer.add_string buf ", ";
+        Printf.bprintf buf "%s: " s;
+        pp_rec depth buf t')
+      l;
+    Buffer.add_char buf '}'
+  | Record (l, Some r) ->
+    Buffer.add_char buf '{';
+    List.iteri
+      (fun i (s, t') ->
+        if i>0 then Buffer.add_string buf ", ";
+        Printf.bprintf buf "%s: " s;
+        pp_rec depth buf t')
+      l;
   | Forall ty' ->
     Printf.bprintf buf "Λ T%i. %a" depth (pp_inner (depth+1)) ty'
 and pp_inner depth buf t = match view t with
   | Fun (_, _::_) ->
     Buffer.add_char buf '('; pp_rec depth buf t; Buffer.add_char buf ')'
   | _ -> pp_rec depth buf t
+
+let pp_depth ?hooks depth buf t = pp_rec depth buf t
 
 let pp buf t = pp_rec 0 buf t
 
@@ -387,6 +369,10 @@ module Conv = struct
         let vars = List.map of_prolog vars in
         let t' = of_prolog t' in
         forall vars t'
+      | PT.Record (l, rest) ->
+        let rest = Monad.Opt.map rest of_prolog in
+        let l = List.map (fun (n,t) -> n, of_prolog t) l in
+        record l ~rest
       | PT.Bind _
       | PT.App _
       | PT.Column _
@@ -403,6 +389,9 @@ module Conv = struct
     | Fun (ret, l) ->
       PT.app (PT.const Symbol.Base.arrow)
         (to_prolog depth ret :: List.map (to_prolog depth) l)
+    | Record (l, rest) ->
+      let rest = Monad.Opt.map rest (to_prolog depth) in
+      PT.record (List.map (fun (n,ty) -> n, to_prolog depth ty) l) ~rest
     | Forall t' ->
       PT.bind Symbol.Base.forall_ty
         [PT.var (Util.sprintf "B%d" depth)]
