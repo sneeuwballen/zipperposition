@@ -40,7 +40,12 @@ setup.data:
 tags:
 	otags $(IMPLEMENTATION_FILES) $(INTERFACE_FILES)
 
+rst_doc:
+	@echo "build Sphinx documentation (into _build/doc)"
+	sphinx-build -C doc _build/doc
+	firefox _build/doc/contents.html
+
 push_doc: doc
 	scp -r logtk.docdir/* cedeela.fr:~/simon/root/software/logtk
 
-.PHONY: push_doc tags
+.PHONY: push_doc tags rst_doc
