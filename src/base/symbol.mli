@@ -48,7 +48,6 @@ type connective =
   | Arrow
   | Wildcard
   | Multiset  (* type of multisets *)
-  | Record    (* type of records *)
   | FreshVar of int  (* special symbol to generate fresh vars *)
   | TType (* type of types *)
 
@@ -117,7 +116,6 @@ module Base : sig
   val tType : t
 
   val wildcard : t    (** $_ for type inference *)
-  val record : t      (** type of records *)
   val multiset : t    (** type of multisets *)
 
   val fresh_var : unit -> t (** New, unique symbol (cycles after 2^63 calls...) *)
