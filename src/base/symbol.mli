@@ -47,6 +47,9 @@ type connective =
   | Lambda
   | Arrow
   | Wildcard
+  | Multiset  (* type of multisets *)
+  | Record    (* type of records *)
+  | FreshVar of int  (* special symbol to generate fresh vars *)
   | TType (* type of types *)
 
 type const_symbol = private {
@@ -113,7 +116,11 @@ module Base : sig
   val arrow : t
   val tType : t
 
-  val wildcard : t   (** $_ for type inference *)
+  val wildcard : t    (** $_ for type inference *)
+  val record : t      (** type of records *)
+  val multiset : t    (** type of multisets *)
+
+  val fresh_var : unit -> t (** New, unique symbol (cycles after 2^63 calls...) *)
 end
 
 (** {2 Generation of symbols} *)

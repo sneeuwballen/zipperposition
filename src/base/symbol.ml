@@ -43,6 +43,9 @@ type connective =
   | Lambda
   | Arrow
   | Wildcard
+  | Multiset
+  | Record
+  | FreshVar of int
   | TType
 
 type const_symbol = {
@@ -121,6 +124,9 @@ let to_string s = match s with
       | ForallTy -> "Λ"
       | Arrow -> "->"
       | Wildcard -> "_"
+      | Multiset -> "Ms"
+      | Record -> "Rec"
+      | FreshVar i -> "ν"^string_of_int i
       | TType -> "TType"
       end
 
@@ -174,6 +180,14 @@ module Base = struct
   let forall_ty = Conn ForallTy
   let arrow = Conn Arrow
   let tType = Conn TType
+  let multiset = Conn Multiset
+  let record = Conn Record
+
+  (* generate fresh symbols *)
+  let fresh_var =
+    let r = ref 0 in
+    fun () ->
+      let n = !r in incr r; Conn (FreshVar n)
 end
 
 (* TODO
@@ -232,6 +246,9 @@ module TPTP = struct
           | Arrow -> ">"
           | Wildcard -> "$_"
           | TType -> "$tType"
+          | Multiset
+          | Record
+          | FreshVar _ -> failwith "cannot print this symbol in TPTP"
       )
 
   let to_string = Util.on_buffer pp
