@@ -176,13 +176,10 @@ let const ~kind ~ty s =
   end;
   t
 
-let rec app ~kind ~ty f l =
-  match f.term, l with
-  | _, [] ->
-    H.hashcons {f with ty=HasType ty; id= ~-1; }
-  | App (f', l'), _ ->
-    app ~kind ~ty f' (l' @ l)  (* flatten *)
-  | _ ->
+let app ~kind ~ty f l =
+  match l with
+  | [] -> f
+  | _::_ ->
       let my_t = {term=App (f, l); kind; id= ~-1; ty=HasType ty; flags=0; } in
       let t = H.hashcons my_t in
       if t == my_t then begin
@@ -252,19 +249,22 @@ let simple_app ~kind ~ty s l =
 
 let mk_at = at
 
-let rec tType =
+let tType =
   let _t = {term=Const (Sym.Conn Sym.TType); kind=Kind.Kind;
             id= ~-1; ty=NoType; flags=flag_ground; } in
   H.hashcons _t
 
-let cast ~ty old =
-  let my_t = { old with id= ~-1; ty=HasType ty; } in
-  let t = H.hashcons my_t in
-  if t == my_t then begin
-    if get_flag old flag_ground && ground ty
-      then set_flag t flag_ground true;
-  end;
-  t
+let cast ~ty old = match old.term with
+  | Var i -> var ~kind:old.kind ~ty i
+  | RigidVar i -> rigid_var ~kind:old.kind ~ty i
+  | BVar i -> bvar ~kind:old.kind ~ty i
+  | Const s -> const ~kind:old.kind ~ty s
+  | Bind (s, varty, t') -> bind ~kind:old.kind ~ty s ~varty t'
+  | Record (l, rest) -> record ~kind:old.kind ~ty l ~rest
+  | Multiset l -> multiset ~kind:old.kind ~ty l
+  | App (f,l) -> app ~kind:old.kind ~ty f l
+  | At (f,a) -> at ~kind:old.kind ~ty f a
+  | SimpleApp (s,l) -> simple_app ~kind:old.kind ~ty s l
 
 let change_kind ~kind old =
   let my_t = { old with kind; id= ~-1; } in
