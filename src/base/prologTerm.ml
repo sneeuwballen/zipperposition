@@ -226,21 +226,12 @@ let rec pp buf t = match t.term with
       pp buf t'
   | Record (l, None) ->
     Buffer.add_char buf '{';
-    List.iteri
-      (fun i (s, t') ->
-        if i>0 then Buffer.add_string buf ", ";
-        Printf.bprintf buf "%s: " s;
-        pp buf t')
-      l;
+    Util.pp_list (fun buf (s,t') -> Printf.bprintf buf "%s: %a" s pp t') buf l;
     Buffer.add_char buf '}'
   | Record (l, Some r) ->
     Buffer.add_char buf '{';
-    List.iteri
-      (fun i (s, t') ->
-        if i>0 then Buffer.add_string buf ", ";
-        Printf.bprintf buf "%s: " s;
-        pp buf t')
-      l;
+    Util.pp_list (fun buf (s,t') -> Printf.bprintf buf "%s: %a" s pp t') buf l;
+    Printf.bprintf buf "| %a}" pp r
   | Column(x,y) ->
       pp buf x;
       Buffer.add_char buf ':';
@@ -276,6 +267,7 @@ module TPTP = struct
   let neq ?loc a b = app ?loc (const Symbol.Base.neq) [a;b]
   let forall ?loc vars f = bind ?loc Symbol.Base.forall vars f
   let exists ?loc vars f = bind ?loc Symbol.Base.exists vars f
+  let lambda ?loc vars f = bind ?loc Symbol.Base.lambda vars f
 
   let mk_fun_ty l ret = match l with
     | [] -> ret

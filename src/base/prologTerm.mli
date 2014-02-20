@@ -111,6 +111,7 @@ module TPTP : sig
   val neq : ?loc:location -> t -> t -> t
   val forall : ?loc:location -> t list -> t -> t
   val exists : ?loc:location -> t list -> t -> t
+  val lambda : ?loc:location -> t list -> t -> t
 
   val mk_fun_ty : t list -> t -> t
   val tType : t

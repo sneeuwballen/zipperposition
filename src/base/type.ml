@@ -100,14 +100,24 @@ let rec mk_fun ret args =
 let forall vars ty =
   T.bind_vars ~kind ~ty:tType Symbol.Base.forall_ty vars ty
 
-let record l ~rest =
-  T.record ~kind ~ty:tType l ~rest
+let rec record l ~rest =
+  match rest with
+  | Some r ->
+    begin match T.view r with
+    | T.Record (l', rest') ->
+        (* flatten records! *)
+        T.record ~kind ~ty:tType (l @ l') ~rest:rest'
+    | _ -> T.record ~kind ~ty:tType l ~rest
+    end
+  | None -> T.record ~kind ~ty:tType l ~rest
 
 let __bvar i =
   T.bvar ~kind ~ty:tType i
 
 let __forall ty =
   T.bind ~kind ~ty:tType ~varty:tType Symbol.Base.forall_ty ty
+
+let multiset ty = app Symbol.Base.multiset [ty]
 
 let (<==) = mk_fun
 let (<=.) ret a = mk_fun ret [a]

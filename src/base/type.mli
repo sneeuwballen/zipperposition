@@ -119,6 +119,9 @@ val (<==) : t -> t list -> t
 val (<=.) : t -> t -> t
   (** Unary function type. [x <=. y] is the same as [x <== [y]]. *)
 
+val multiset : t -> t
+  (** Type of multiset *)
+
 val of_term : ScopedTerm.t -> t option
   (** Conversion from a term, if structure matches *)
 

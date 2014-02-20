@@ -215,18 +215,38 @@ let const ~ty symbol =
 let multiset ~ty l =
   if List.exists (fun t -> not (Type.eq ty (__get_ty t))) l
     then raise (Type.Error "type mismatch when building a multiset");
-  let ty_res = Type.app Symbol.Base.multiset [ty] in
+  (* all elements are of type [ty], the result has type [multiset ty] *)
+  let ty_res = Type.multiset ty in
   T.multiset ~kind ~ty:(ty_res:>T.t) l
 
-let record l ~rest =
+(* assume [rest] is not a record. *)
+let __make_record l ~rest =
   (* build record type! *)
   let ty_l = List.map (fun (n,t) -> n, ty t) l in
   let ty_rest = match rest with
     | None -> None
-    | Some r -> Some (ty r)
+    | Some r ->
+      let ty_r = ty r in
+      (* r must be a record type! *)
+      match Type.view ty_r with
+      | Type.Record _ -> Some ty_r
+      | _ ->
+        raise (Type.Error "the type of a row part of a record must be a record")
+
   in
   let ty = Type.record ty_l ~rest:ty_rest in
   T.record ~kind ~ty:(ty:>T.t) l ~rest
+
+let rec record l ~rest =
+  match rest with
+  | None -> __make_record l ~rest
+  | Some r ->
+      match T.view r with
+      | T.Record (l', rest') -> record (l@l') ~rest:rest' (* flatten *)
+      | T.Var _
+      | T.RigidVar _
+      | T.BVar _ -> __make_record l ~rest   (* ok *)
+      | _ -> raise (Type.Error "invalid record row (not a var nor a record)")
 
 let __mk_lambda ~varty t' =
   let ty = Type.mk_fun (ty t') [varty] in
@@ -432,12 +452,8 @@ let pp_depth ?(hooks=[]) depth buf t =
     Printf.bprintf buf "{ | %a}" pp_rec r
   | Record (l, None) ->
     Buffer.add_char buf '{';
-    List.iteri
-      (fun i (s, t') ->
-        if i>0 then Buffer.add_string buf ", ";
-        Printf.bprintf buf "%s: " s;
-        pp_rec buf t')
-      l;
+    Util.pp_list (fun buf (n, t) -> Printf.bprintf buf "%s: %a" n pp_rec t)
+      buf l;
     Buffer.add_char buf '}'
   | Record (l, Some r) ->
     Buffer.add_char buf '{';

@@ -139,6 +139,7 @@ val const : ty:Type.t -> symbol -> t
 val record : (string*t) list -> rest:t option -> t
   (** Build a record. All terms in the list must have the
       same type, and the rest (if present) must have a record() type.
+      @param rest if present, must be either a variable, or a record.
       @raise Type.Error if types mismatch *)
 
 val multiset : ty:Type.t -> t list -> t
