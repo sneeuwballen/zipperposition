@@ -192,24 +192,22 @@ module FO : sig
  
 end
 
-(*
 module HO : sig
-  include S with type untyped = Basic.HO.t and type typed= HOTerm.t
+  include S with type untyped = PrologTerm.t and type typed= HOTerm.t
 
-  val constrain : ctx:Ctx.t -> Basic.HO.t -> unit
+  val constrain : ctx:Ctx.t -> untyped -> unit
     (** Constrain the term to be well-typed and of boolean type *)
 
   val convert : ?generalize:bool -> ?ret:Type.t -> ctx:Ctx.t ->
-                Basic.HO.t -> HOTerm.t
+                untyped -> typed
     (** Convert a single untyped term to a typed term. Binds free constructor
         variables to default.
         @param ret is the type we expect for this term (default: {!Type.o})
         @param generalize if true, constructor types are generalized (default false) *)
 
   val convert_seq : ?generalize:bool -> ctx:Ctx.t ->
-                    Basic.HO.t Sequence.t -> HOTerm.t list
+                    untyped Sequence.t -> typed list
     (** Infer the types of those terms and annotate each term and subterm with
         its type. Also updates the context's signature.
         All terms are assumed to be boolean. *)
 end
-*)

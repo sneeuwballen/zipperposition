@@ -355,19 +355,15 @@ module FO = struct
         | None -> __error ctx "expected type, got %a" PT.pp ty
       in
       let i, ty = Ctx._get_var ctx ~ty name in
-      let closure ctx =
+      ty, (fun ctx ->
         let ty = Ctx.apply_ty ctx ty in
-        T.var ~ty i
-      in
-      ty, closure
+        T.var ~ty i)
     | PT.Var name ->
       (* (possibly) untyped var *)
       let i, ty = Ctx._get_var ctx name in
-      let closure ctx =
+      ty, (fun ctx ->
         let ty = Ctx.apply_ty ctx ty in
-        T.var ~ty i
-      in
-      ty, closure
+        T.var ~ty i)
     | PT.Const (Sym.Conn Sym.Wildcard) ->
       let ty = Ctx._new_ty_var ctx in
       ty, (fun ctx ->
@@ -377,11 +373,9 @@ module FO = struct
     | PT.Const s ->
       let ty_s = Ctx.type_of_fun ~arity:0 ctx s in
       Util.debug 5 "type of symbol %a: %a" Sym.pp s Type.pp ty_s;
-      let closure ctx =
+      ty_s, (fun ctx ->
         let ty = Ctx.apply_ty ctx ty_s in
-        T.const ~ty s
-      in
-      ty_s, closure
+        T.const ~ty s)
     | PT.App ({PT.term=PT.Const s}, l) ->
       (* use type of [s] *)
       let ty_s = Ctx.type_of_fun ~arity:(List.length l) ctx s in
@@ -408,16 +402,18 @@ module FO = struct
       let ty_ret = Ctx._new_ty_var ctx in
       Ctx.unify_and_set ctx ty_s' (Type.mk_fun ty_ret ty_of_args);
       (* now to produce the closure, that first creates subterms *)
-      let closure ctx =
+      ty_ret, (fun ctx ->
         let args' = closure_args ctx in
         let tyargs' = List.map (Ctx.apply_ty ctx) tyargs in
         let ty_s' = Type.close_forall (Ctx.apply_ty ctx ty_s) in
         Util.debug 5 "final type for %a: %a" Sym.pp s Type.pp ty_s';
-        T.app_full (T.const ~ty:ty_s' s) tyargs' args'
-      in
-      ty_ret, closure
-    | PT.Int _
-    | PT.Rat _
+        T.app_full (T.const ~ty:ty_s' s) tyargs' args')
+    | PT.Int n ->
+        let ty = ctx.Ctx.default.default_int in
+        ty, (fun _ -> T.const ~ty (Symbol.mk_int n))
+    | PT.Rat n ->
+        let ty = ctx.Ctx.default.default_rat in
+        ty, (fun _ -> T.const ~ty (Symbol.mk_rat n))
     | PT.List _
     | PT.Column _
     | PT.App _
@@ -431,17 +427,15 @@ module FO = struct
         | None -> __error ctx "expected type, got %a" PT.pp ty
       in
       let i = Ctx._enter_var_scope ctx name ty in
-      let closure ctx =
+      (fun ctx ->
         let ty = Ctx.apply_ty ctx ty in
-        T.var ~ty i
-      in closure
+        T.var ~ty i)
     | PT.Var name ->
       let ty = ctx.Ctx.default.default_i in
       let i = Ctx._enter_var_scope ctx name ty in
-      let closure ctx =
+      (fun ctx ->
         let ty = Ctx.apply_ty ctx ty in
-        T.var ~ty i
-      in closure
+        T.var ~ty i)
     | _ -> assert false
 
   let exit_var_scope ctx t = match t.PT.term with
@@ -589,7 +583,6 @@ module FO = struct
     List.rev_map (fun c -> c ctx) closures
 end
 
-(*
 module HO = struct
   module PT = PrologTerm
   module T = HOTerm
@@ -604,22 +597,31 @@ module HO = struct
     | [] -> Ctx._new_ty_vars ctx arity  (* add variables *)
     | a::args' ->
       (* convert [a] into a type *)
-      let ty = Ctx.ty_of_prolog ctx (BT.as_ty a) in
-      ty :: _complete_type_args ctx (arity-1) args'
+      match Ctx.ty_of_prolog ctx a with
+      | None -> __error ctx "term %a is not a type" PT.pp a
+      | Some ty -> ty :: _complete_type_args ctx (arity-1) args'
 
-  let infer_var_scope ctx t = match t.BT.term with
-    | BT.Var name ->
-      let ty = Ctx.ty_of_prolog ctx (BT.get_ty t) in
-      let i = Ctx._enter_var_scope ctx name ty in
-      let closure renaming subst =
-        let ty = Substs.Ty.apply ~renaming subst ty 0 in
-        T.mk_var ~ty i
+  let infer_var_scope ctx t = match t.PT.term with
+    | PT.Column ({PT.term=PT.Var name}, ty) ->
+      let ty = match Ctx.ty_of_prolog ctx ty with
+        | Some ty -> ty
+        | None -> __error ctx "expected type, got %a" PT.pp ty
       in
-      ty, closure
+      let i = Ctx._enter_var_scope ctx name ty in
+      ty, (fun ctx ->
+        let ty = Ctx.apply_ty ctx ty in
+        T.var ~ty i)
+    | PT.Var name ->
+      let ty = ctx.Ctx.default.default_i in
+      let i = Ctx._enter_var_scope ctx name ty in
+      ty, (fun ctx ->
+        let ty = Ctx.apply_ty ctx ty in
+        T.var ~ty i)
     | _ -> assert false
 
-  let exit_var_scope ctx t = match t.BT.term with
-    | BT.Var name -> Ctx._exit_var_scope ctx name
+  let exit_var_scope ctx t = match t.PT.term with
+    | PT.Column ({PT.term=PT.Var name}, _)
+    | PT.Var name -> Ctx._exit_var_scope ctx name
     | _ -> assert false
 
   (* infer a type for [t], possibly updating [ctx]. Also returns a
@@ -627,16 +629,26 @@ module HO = struct
     @param pred true if we expect a proposition
     @param arity expected number of arguments *)
   let rec infer_rec ?(arity=0) ctx t =
-    let ty, closure = match t.BT.term with
-    | BT.Var name ->
-      let ty = Ctx.ty_of_prolog ctx (BT.get_ty t) in
-      let i, ty = Ctx._get_var ctx ~ty name in
-      let closure renaming subst =
-        let ty = Substs.Ty.apply ~renaming subst ty 0 in
-        T.mk_var ~ty i
+    match t.PT.term with
+    | PT.Column ({PT.term=PT.Var name}, ty) ->
+      (* typed var *)
+      let ty = match Ctx.ty_of_prolog ctx ty with
+        | Some ty -> ty
+        | None -> __error ctx "expected type, got %a" PT.pp ty
       in
-      ty, closure
-    | BT.Lambda (v, t) ->
+      let i, ty = Ctx._get_var ctx ~ty name in
+      ty, (fun ctx ->
+        let ty = Ctx.apply_ty ctx ty in
+        T.var ~ty i)
+    | PT.Var name ->
+      (* (possibly) untyped var *)
+      let i, ty = Ctx._get_var ctx name in
+      ty, (fun ctx ->
+        let ty = Ctx.apply_ty ctx ty in
+        T.var ~ty i)
+    | PT.Bind (Sym.Conn Sym.Lambda, [], t) ->
+      infer_rec ~arity ctx t
+    | PT.Bind (Sym.Conn Sym.Lambda, [v], t) ->
       let ty_v, clos_v = infer_var_scope ctx v in
       let ty_t, clos_t = Util.finally
         ~f:(fun () -> infer_rec ctx t)
@@ -644,22 +656,57 @@ module HO = struct
       in
       (* type is ty_v -> ty_t *)
       let ty = Type.(ty_t <=. ty_v) in
-      let closure renaming subst =
-        let t' = clos_t renaming subst in
-        let v' = clos_v renaming subst in
-        T.mk_lambda [v'] t'
+      ty, (fun ctx ->
+        let t' = clos_t ctx in
+        let v' = clos_v ctx in
+        T.mk_lambda [v'] t')
+    | PT.Bind (Sym.Conn Sym.Lambda, v::vs, t) ->
+      (* on-the-fly conversion to unary lambdas *)
+      infer_rec ~arity ctx (PT.TPTP.lambda [v] (PT.TPTP.lambda vs t))
+    | PT.List l ->
+      let ty_l, l' = List.split (List.map (infer_rec ~arity ctx) l) in
+      let l' = Closure.seq l' in
+      (* what is the type of the elements of the multiset? *)
+      let ty_arg = match ty_l with
+        | [] -> Ctx._new_ty_var ctx  (* empty multiset, any type! *)
+        | ty::ty_l' ->
+          (* make sure all elements have the same type *)
+          List.iter (Ctx.unify_and_set ctx ty) ty_l';
+          ty
       in
-      ty, closure 
-    | BT.Const s ->
+      (* the return type is multiset(ty_arg) *)
+      let ty = Type.multiset ty_arg in
+      ty, (fun ctx ->
+        let ty = Ctx.apply_ty ctx ty and l' = l' ctx in
+        T.multiset ~ty l')
+    | PT.Record (l, rest) ->
+      let ty_l, l' = List.split
+        (List.map
+          (fun (n,t) ->
+            let ty_t, t' = infer_rec ctx t in
+            (n,ty_t), (fun ctx -> n, t' ctx))
+          l)
+      in
+      let l' = Closure.seq l' in
+      let ty_rest, rest' = match rest with
+        | None -> None, (fun ctx -> None)
+        | Some r ->
+            let ty_r, r' = infer_rec ctx r in
+            (* force [ty_r] to be a record *)
+            let ty_record = Type.record [] ~rest:(Some (Ctx._new_ty_var ctx)) in
+            Ctx.unify_and_set ctx ty_r ty_record;
+            Some ty_r, (fun ctx -> Some (r' ctx))
+      in
+      let ty = Type.record ty_l ~rest:ty_rest in
+      ty, (fun ctx ->
+        T.record (l' ctx) ~rest:(rest' ctx))
+    | PT.Const s ->
       (* recover the type *)
       let ty = Ctx.type_of_fun ~arity ctx s in
-      let closure renaming subst =
-        let ty = Type.close_forall (Substs.Ty.apply ~renaming subst ty 0) in
-        let s = Symbol.of_basic ~ty s in
-        T.mk_const s
-      in
-      ty, closure
-    | BT.App (t, l) ->
+      ty, (fun ctx ->
+        let ty = Type.close_forall (Ctx.apply_ty ctx ty) in
+        T.const ~ty s)
+    | PT.App (t, l) ->
       (* we are going to assume that the type of [t], as inferred, is a forall
           or a function (or a constant iff [l] is empty *)
       let ty_t, clos_t = infer_rec ~arity:(List.length l) ctx t in
@@ -670,10 +717,11 @@ module HO = struct
           and [args], containing [n_args] terms. *)
       let tyargs, args = _split_arity n_args l in
       let tyargs = _complete_type_args ctx n_tyargs tyargs in
-      let ty_t' = Type.apply ty_t tyargs in
+      let ty_t' = Type.apply_list ty_t tyargs in
       (* create sub-closures, by inferring the type of [args] *)
       let l = List.map (fun t' -> infer_rec ctx t') args in
       let ty_of_args, closure_args = List.split l in
+      let closure_args = Closure.seq closure_args in
       (* [s] has type [ty_s] once applied to polymorphic type arguments,
           but must also have type [ty_l -> 'a].
           We generate a fresh variable 'a (named [ty_ret]),
@@ -681,24 +729,23 @@ module HO = struct
       let ty_ret = Ctx._new_ty_var ctx in
       Ctx.unify_and_set ctx ty_t' (Type.mk_fun ty_ret ty_of_args);
       (* closure *)
-      let closure renaming subst =
-        let t' = clos_t renaming subst in
-        let tyargs' = List.map (fun ty -> Substs.Ty.apply ~renaming subst ty 0) tyargs in
-        let l' = List.map (fun c -> c renaming subst) closure_args in
-        T.mk_at ~tyargs:tyargs' t' l'
-      in
-      ty_ret, closure
-    in
-    (* ensure consistency of type and type annotation *)
-    match t.BT.ty with
-    | None -> ty, closure
-    | Some ty' ->
-      Ctx.unify_and_set ctx ty (Ctx.ty_of_prolog ctx ty');
-      ty, closure
+      ty_ret, (fun ctx ->
+        let args' = closure_args ctx in
+        let tyargs' = List.map (Ctx.apply_ty ctx) tyargs in
+        let t' = clos_t ctx in
+        T.at_full t' ~tyargs:tyargs' args')
+    | PT.Int n ->
+        let ty = ctx.Ctx.default.default_int in
+        ty, (fun _ -> T.const ~ty (Symbol.mk_int n))
+    | PT.Rat n ->
+        let ty = ctx.Ctx.default.default_rat in
+        ty, (fun _ -> T.const ~ty (Symbol.mk_rat n))
+    | PT.Column _
+    | PT.Bind _ -> __error ctx "expected higher-order term"
 
   let infer ctx t =
     Util.enter_prof prof_infer;
-    Util.debug 5 "infer_term %a" BT.pp t;
+    Util.debug 5 "infer_term %a" PT.pp t;
     try
       let ty, k = infer_rec ctx t in
       Ctx.exit_scope ctx;
@@ -720,20 +767,20 @@ module HO = struct
 
   let constrain ~ctx t =
     let ty, _ = infer ctx t in
-    Ctx.unify_and_set ctx ty Type.o;
+    Ctx.unify_and_set ctx ty Type.TPTP.o;
     ()
 
-  let convert ?(generalize=false) ?(ret=Type.o) ~ctx t =
+  let convert ?(generalize=false) ?(ret=Type.TPTP.o) ~ctx t =
     let ty, closure = infer ctx t in
     Ctx.unify_and_set ctx ty ret;
     if generalize then Ctx.generalize ctx else Ctx.bind_to_default ctx;
-    Ctx.apply_closure ctx closure
+    closure ctx
 
   let convert_seq ?(generalize=false) ~ctx terms =
     let closures = Sequence.map
       (fun t ->
         let ty, closure = infer ctx t in
-        Ctx.unify_and_set ctx ty Type.o;
+        Ctx.unify_and_set ctx ty Type.TPTP.o;
         closure)
       terms
     in
@@ -741,7 +788,6 @@ module HO = struct
     let closures = Sequence.to_rev_list closures in
     if generalize then Ctx.generalize ctx else Ctx.bind_to_default ctx;
     List.rev_map
-      (fun c -> Ctx.apply_closure ctx c)
+      (fun c -> c ctx)
       closures
 end
-*)
