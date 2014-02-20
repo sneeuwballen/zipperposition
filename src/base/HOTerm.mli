@@ -38,13 +38,14 @@ type term = t
 
 type view = private
   | Var of int                  (** variable *)
+  | RigidVar of int             (** rigid variable, only targets other variables *)
   | BVar of int                 (** bound variable (De Bruijn index) *)
   | Lambda of Type.t * t        (** lambda abstraction over one variable. *)
   | Const of symbol             (** Typed constant *)
   | At of t * t                 (** Curried application *)
   | TyAt of t * Type.t          (** Curried application to a type *)
-  | App of t * Type.t list * t list
-    (** HO function application. Invariant: first term is not a {!App}. *)
+  | Multiset of t list
+  | Record of (string*t) list * t option  (** Record of terms *)
 
 type sourced_term =
   t * string * string           (** Term + file,name *)
@@ -58,6 +59,9 @@ val of_term_exn : ScopedTerm.t -> t
 val is_term : ScopedTerm.t -> bool
 
 (** {2 Comparison, equality, containers} *)
+
+val open_at : t -> t * Type.t list * t list
+  (** Open application recursively so as to gather all type arguments *)
 
 val subterm : sub:t -> t -> bool
   (** checks whether [sub] is a (non-strict) subterm of [t] *)
@@ -101,28 +105,46 @@ val var : ty:Type.t -> int -> t
       The index must be non-negative,
       @raise Invalid_argument otherwise. *)
 
+val rigid_var : ty:Type.t -> int -> t
+  (** Rigid variable.
+      @raise Invalid_argument if the index is negative *)
+
 val bvar : ty:Type.t -> int -> t
   (** Create a bound variable. Providing a type is mandatory.
       {b Warning}: be careful and try not to use this function directly*)
 
-val app : ?tyargs:Type.t list -> t -> t list -> t
-  (** Apply a typed symbol to a list of type arguments (optional) and
-      a list of term arguments. Partial application is not
-      supported and will raise a type error. The type is automatically
-      computed.
-      @raise Type.Error if types do not match. *)
-
 val at : t -> t -> t
   (** Curried application. The first term must have a function type
-      with the same argument as the type of the second term.
+      with the same argument as the type of the second term. Note that
+      [at t1 t2] and [app t1 [t2]] are {b not} the same term.
       @raise Type.Error if types do not match. *)
+
+val at_list : t -> t list -> t
+  (** Curried application to several terms, left-parenthesing.
+      @raise Type.Error of types do not match. *)
 
 val tyat : t -> Type.t -> t
   (** Curried type application.
       @raise Type.Error if types do not match. *)
 
-val const : ?tyargs:Type.t list -> ty:Type.t -> symbol -> t
+val tyat_list : t -> Type.t list -> t
+  (** Application to a list of types *)
+
+val at_full : ?tyargs:Type.t list -> t -> t list -> t
+  (** Combination of {!at_list} and {!tyat_list} *)
+
+val const : ty:Type.t -> symbol -> t
   (** Create a typed constant. *)
+
+val record : (string*t) list -> rest:t option -> t
+  (** Build a record. All terms in the list must have the
+      same type, and the rest (if present) must have a record() type.
+      @raise Type.Error if types mismatch *)
+
+val multiset : ty:Type.t -> t list -> t
+  (** Build a multiset. The [ty] argument is the type of the elements,
+      in case the multiset is empty.
+      @raise Type.Error if types mismatch *)
 
 val __mk_lambda : varty:Type.t -> t -> t    (** not documented *)
 
@@ -134,9 +156,12 @@ val mk_lambda : t list -> t -> t   (** (lambda v1,...,vn. t). *)
 
 val is_var : t -> bool
 val is_bvar : t -> bool
-val is_app : t -> bool
+val is_at : t -> bool
+val is_tyat : t -> bool
 val is_const : t -> bool
 val is_lambda : t -> bool
+val is_multiset : t -> bool
+val is_record : t -> bool
 
 (** {2 Sequences} *)
 
@@ -193,17 +218,18 @@ val contains_symbol : Symbol.t -> t -> bool
 
 (** {2 Conversion with {!FOTerm}} *)
 
-(*
 val curry : FOTerm.t -> t
   (** Curry all subterms *)
 
-val uncurry : t -> FOTerm.t
-  (** Un-curry all subterms *)
+val uncurry : t -> FOTerm.t option
+  (** Un-curry all subterms. If some subterms are not convertible to first-order
+   * terms then [None] is returned. *)
 
 val is_fo : t -> bool
   (** Check whether the term is convertible to a
       first-order term (no binders, no variable applied to something...) *)
-*)
+
+(* TODO: move Lambda-calculus operators here *)
 
 (** {2 IO}
 
