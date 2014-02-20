@@ -170,5 +170,8 @@
 <tools/*.ml{,i}>: package(zarith)
 # OASIS_STOP
 true: use_menhir
+"tests/quick/": -traverse
+"tests/quick/": not_hygienic
+
 <src/base/{scopedTerm,FOTerm,Type}.cmx>: inline(15)
 #<src/**/*.cmx>: inline(10)
