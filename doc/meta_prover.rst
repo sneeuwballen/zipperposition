@@ -27,8 +27,9 @@ The meta-prover has two main tasks to carry out:
 Implementation
 --------------
 
-The logic representation of the meta-prover is a form of ``CurriedFOTerm``, ie.
-first-order terms with currying, no quantifiers. The variants are:
+The logic representation of the meta-prover is a form of ``HOTerm``, ie.
+first-order terms with currying, no quantifiers. The relevant variants (a
+``Lambda`` variant is omitted) are:
 
 - ``Var : int -> term``
     a universal variable, typed, used for abstracted symbols, and for
@@ -36,17 +37,17 @@ first-order terms with currying, no quantifiers. The variants are:
 - ``RigidVar : int -> term``
     a universal variable, typed, used for problem-level quantification. This
     can only by matched with another **rigid variable** (for alpha renaming).
-- ``TypeAt : type * term -> term``
+- ``TyAt : type * term -> term``
     curried application of a term to a type (for polymorphism)
 - ``At : term * term -> term``
     curried application of a term to another term
-- ``App : term * term list -> term``
-    uncurried application of a term to a list of terms.
 - ``Multiset : term list -> term``
     multiset of terms, very handy for representing clauses. Unification of
     multiset is not AC-unification, but instead unifies subterms pairwise.
     All terms must have the same type ``tau``, in which case the multiset
-    has type ``multiset(tau)``.
+    has type ``multiset(tau)``. This is used both for equational literals,
+    with ``eq_lit {| a, b |}`` representing ``a = b`` (resp. ``neq_lit``)
+    and clauses (multisets of literals).
 - ``Record : (string*term) list * term option -> term``
     record value, with a list of ``field : term`` pairs (with pairwise distinct
     fields) and an optional "remainder" part that must be a variable
