@@ -121,6 +121,10 @@ let rec _eq_norec t1 t2 =
     eq f1 f2 && _eq_list l1 l2
   | Multiset l1, Multiset l2 ->
     _eq_list l1 l2
+  | Record (l1, None), Record (l2, None) ->
+    _eq_record_list l1 l2
+  | Record (l1, Some r1), Record (l2, Some r2) ->
+    eq r1 r2 && _eq_record_list l1 l2
   | At (l1, r1), At (l2, r2) -> eq l1 l2 && eq r1 r2
   | SimpleApp (s1, l1), SimpleApp (s2, l2) ->
     Sym.eq s1 s2 && _eq_list l1 l2
@@ -134,6 +138,11 @@ and _eq_list l1 l2 = match l1, l2 with
   | [], _
   | _, [] -> false
   | t1::l1', t2::l2' -> eq t1 t2 && _eq_list l1' l2'
+and _eq_record_list l1 l2 = match l1, l2 with
+  | [], [] -> true
+  | [], _
+  | _, [] -> false
+  | (n1,t1)::l1', (n2,t2)::l2' -> n1=n2 && eq t1 t2 && _eq_record_list l1' l2'
 
 (** {3 Flags} *)
 
