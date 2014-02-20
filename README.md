@@ -52,6 +52,8 @@ Logtk provides several useful parts for logic-related implementations:
 
 ## List of modules
 
+TODO UPDATE
+
 - Logic related modules:
     - `Symbol`: representation of logical constants, including text symbols
         and numeric symbols (using `Zarith`).

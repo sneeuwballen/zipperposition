@@ -273,9 +273,9 @@ let rec pp_rec depth buf t = match view t with
       (Symbol.to_string p) (Util.pp_list (pp_rec depth)) args
   | Fun (ret, []) -> assert false
   | Fun (ret, [arg]) ->
-    Printf.bprintf buf "%a > %a" (pp_inner depth) arg (pp_inner depth) ret
+    Printf.bprintf buf "%a → %a" (pp_inner depth) arg (pp_inner depth) ret
   | Fun (ret, l) ->
-    Printf.bprintf buf "(%a) > %a"
+    Printf.bprintf buf "(%a) → %a"
       (Util.pp_list ~sep:" * " (pp_inner depth)) l (pp_rec depth) ret
   | Record (l, None) ->
     Buffer.add_char buf '{';
@@ -306,8 +306,8 @@ let pp_depth ?hooks depth buf t = pp_rec depth buf t
 let pp buf t = pp_rec 0 buf t
 
 (* let pp buf ty = T.pp buf ty *)
-let to_string ty = T.to_string ty
-let fmt fmt ty = T.fmt fmt ty
+let to_string = Util.on_buffer pp
+let fmt fmt ty = Format.pp_print_string fmt (to_string ty)
 
 (*
 let bij =

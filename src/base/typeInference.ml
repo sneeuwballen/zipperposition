@@ -61,7 +61,7 @@ Scope 0 should be used for ground types.
 module Ctx = struct
   type t = {
     default : default_types;        (* default types *)
-    mutable var : int;              (* generate fresh vars *)
+    mutable tyvar : int;            (* generate fresh vars *)
     mutable signature : Signature.t;(* symbol -> type *)
     mutable subst : S.t;            (* variable bindings *)
     mutable to_bind : Type.t list;  (* list of variables to eventually bind (close) *)
@@ -75,7 +75,7 @@ module Ctx = struct
   let create ?(default=tptp_default) signature =
     let ctx = {
       default;
-      var = ~-1;
+      tyvar = ~-1;
       signature;
       subst = S.empty;
       to_bind = [];
@@ -95,7 +95,7 @@ module Ctx = struct
   }
 
   let clear ctx =
-    ctx.var <- ~-1;
+    ctx.tyvar <- ~-1;
     ctx.subst <- S.empty;
     ctx.to_bind <- [];
     ctx.locs <- [];
@@ -114,17 +114,17 @@ module Ctx = struct
   let declare ctx sym ty =
     ctx.signature <- Signature.declare ctx.signature sym ty
 
-  (* generate fresh vars. Those should always live in their own scope *)
-  let _new_var ctx =
-    let n = ctx.var in
-    ctx.var <- n - 1 ;
+  (* generate fresh type var. *)
+  let _new_ty_var ctx =
+    let n = ctx.tyvar in
+    ctx.tyvar <- n - 1 ;
     Type.__var n
 
-  (* generate [n] fresh vars *)
-  let rec _new_vars ctx n =
+  (* generate [n] fresh type vars *)
+  let rec _new_ty_vars ctx n =
     if n = 0
       then []
-      else _new_var ctx :: _new_vars ctx (n-1)
+      else _new_ty_var ctx :: _new_ty_vars ctx (n-1)
 
   (* convert a prolog term into a type *)
   let ty_of_prolog ctx ty =
@@ -188,6 +188,7 @@ module Ctx = struct
     match s with
     | Sym.Int _ -> ctx.default.default_int
     | Sym.Rat _ -> ctx.default.default_rat
+    | Sym.Conn Sym.Wildcard -> _new_ty_var ctx
     | Sym.Conn _ -> assert false
     | Sym.Cst _ ->
       begin match Signature.find ctx.signature s with
@@ -199,8 +200,8 @@ module Ctx = struct
           let ty = Sym.Tbl.find ctx.symbols s in
           ty
         with Not_found ->
-          let ret = _new_var ctx in
-          let new_vars = _new_vars ctx arity in
+          let ret = _new_ty_var ctx in
+          let new_vars = _new_ty_vars ctx arity in
           let ty = Type.(ret <== new_vars) in
           Sym.Tbl.add ctx.symbols s ty;
           ctx.to_bind <- ret :: new_vars @ ctx.to_bind;
@@ -333,7 +334,7 @@ module FO = struct
   let rec _complete_type_args ctx arity args =
     if arity < 0 then raise BadArity;
     match args with
-    | [] -> Ctx._new_vars ctx arity  (* add variables *)
+    | [] -> Ctx._new_ty_vars ctx arity  (* add variables *)
     | a::args' ->
       (* convert [a] into a type *)
       match Ctx.ty_of_prolog ctx a with
@@ -367,6 +368,12 @@ module FO = struct
         T.var ~ty i
       in
       ty, closure
+    | PT.Const (Sym.Conn Sym.Wildcard) ->
+      let ty = Ctx._new_ty_var ctx in
+      ty, (fun ctx ->
+        let ty = Ctx.apply_ty ctx ty in
+        (* generate fresh variable *)
+        Ctx.apply_fo ctx (T.const ~ty (Sym.Base.fresh_var ())))
     | PT.Const s ->
       let ty_s = Ctx.type_of_fun ~arity:0 ctx s in
       Util.debug 5 "type of symbol %a: %a" Sym.pp s Type.pp ty_s;
@@ -398,7 +405,7 @@ module FO = struct
           but must also have type [ty_l -> 'a].
           We generate a fresh variable 'a (named [ty_ret]),
           which is also the result. *)
-      let ty_ret = Ctx._new_var ctx in
+      let ty_ret = Ctx._new_ty_var ctx in
       Ctx.unify_and_set ctx ty_s' (Type.mk_fun ty_ret ty_of_args);
       (* now to produce the closure, that first creates subterms *)
       let closure ctx =
@@ -594,7 +601,7 @@ module HO = struct
   let rec _complete_type_args ctx arity args =
     if arity < 0 then raise BadArity;
     match args with
-    | [] -> Ctx._new_vars ctx arity  (* add variables *)
+    | [] -> Ctx._new_ty_vars ctx arity  (* add variables *)
     | a::args' ->
       (* convert [a] into a type *)
       let ty = Ctx.ty_of_prolog ctx (BT.as_ty a) in
@@ -671,7 +678,7 @@ module HO = struct
           but must also have type [ty_l -> 'a].
           We generate a fresh variable 'a (named [ty_ret]),
           which is also the result. *)
-      let ty_ret = Ctx._new_var ctx in
+      let ty_ret = Ctx._new_ty_var ctx in
       Ctx.unify_and_set ctx ty_t' (Type.mk_fun ty_ret ty_of_args);
       (* closure *)
       let closure renaming subst =
