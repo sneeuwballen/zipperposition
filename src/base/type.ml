@@ -89,9 +89,8 @@ let rec mk_fun ret args =
   | _::_ ->
     match T.view ret with
     | T.SimpleApp (Symbol.Conn Symbol.Arrow, ret'::args') ->
-      (* invariant: flatten function types. Symmetric w.r.t the {!HOTerm.At}
-          constructor invariant. [args] must be applied before [args']
-          need to be supplied.
+      (* invariant: flatten function types. [args] must be applied
+          before [args'] need to be supplied.
           Example: [(a <- b) <- c] requires [c] first *)
       mk_fun ret' (args @ args')
     | _ ->
@@ -100,16 +99,7 @@ let rec mk_fun ret args =
 let forall vars ty =
   T.bind_vars ~kind ~ty:tType Symbol.Base.forall_ty vars ty
 
-let rec record l ~rest =
-  match rest with
-  | Some r ->
-    begin match T.view r with
-    | T.Record (l', rest') ->
-        (* flatten records! *)
-        T.record ~kind ~ty:tType (l @ l') ~rest:rest'
-    | _ -> T.record ~kind ~ty:tType l ~rest
-    end
-  | None -> T.record ~kind ~ty:tType l ~rest
+let record l ~rest = T.record ~kind ~ty:tType l ~rest
 
 let __bvar i =
   T.bvar ~kind ~ty:tType i
@@ -289,21 +279,14 @@ let rec pp_rec depth buf t = match view t with
       (Util.pp_list ~sep:" * " (pp_inner depth)) l (pp_rec depth) ret
   | Record (l, None) ->
     Buffer.add_char buf '{';
-    List.iteri
-      (fun i (s, t') ->
-        if i>0 then Buffer.add_string buf ", ";
-        Printf.bprintf buf "%s: " s;
-        pp_rec depth buf t')
-      l;
+    Util.pp_list (fun buf (n, t) -> Printf.bprintf buf "%s: %a" n (pp_rec depth) t)
+      buf l;
     Buffer.add_char buf '}'
   | Record (l, Some r) ->
     Buffer.add_char buf '{';
-    List.iteri
-      (fun i (s, t') ->
-        if i>0 then Buffer.add_string buf ", ";
-        Printf.bprintf buf "%s: " s;
-        pp_rec depth buf t')
-      l;
+    Util.pp_list (fun buf (n, t) -> Printf.bprintf buf "%s: %a" n (pp_rec depth) t)
+      buf l;
+    Printf.bprintf buf "| %a}" (pp_rec depth) r
   | Forall ty' ->
     Printf.bprintf buf "Λ T%i. %a" depth (pp_inner (depth+1)) ty'
 and pp_inner depth buf t = match view t with

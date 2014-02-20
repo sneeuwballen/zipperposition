@@ -197,8 +197,8 @@ let rec tyat_list t l = match l with
   | ty::l' -> tyat_list (tyat t ty) l'
 
 let at l r =
-  let ty = Type.apply (ty l) (ty r) in
-  T.at ~kind ~ty:(ty:>T.t) l r
+  let ty_ret = Type.apply (ty l) (ty r) in
+  T.at ~kind ~ty:(ty_ret :>T.t) l r
 
 let rec at_list f l = match l with
   | [] -> f
@@ -219,8 +219,7 @@ let multiset ~ty l =
   let ty_res = Type.multiset ty in
   T.multiset ~kind ~ty:(ty_res:>T.t) l
 
-(* assume [rest] is not a record. *)
-let __make_record l ~rest =
+let record l ~rest =
   (* build record type! *)
   let ty_l = List.map (fun (n,t) -> n, ty t) l in
   let ty_rest = match rest with
@@ -228,25 +227,15 @@ let __make_record l ~rest =
     | Some r ->
       let ty_r = ty r in
       (* r must be a record type! *)
-      match Type.view ty_r with
+      begin match Type.view ty_r with
       | Type.Record _ -> Some ty_r
       | _ ->
-        raise (Type.Error "the type of a row part of a record must be a record")
-
+        raise (Type.Error "the type of a row in a record must be a record type")
+      end
   in
   let ty = Type.record ty_l ~rest:ty_rest in
+  (* flattening done by ScopedTerm. *)
   T.record ~kind ~ty:(ty:>T.t) l ~rest
-
-let rec record l ~rest =
-  match rest with
-  | None -> __make_record l ~rest
-  | Some r ->
-      match T.view r with
-      | T.Record (l', rest') -> record (l@l') ~rest:rest' (* flatten *)
-      | T.Var _
-      | T.RigidVar _
-      | T.BVar _ -> __make_record l ~rest   (* ok *)
-      | _ -> raise (Type.Error "invalid record row (not a var nor a record)")
 
 let __mk_lambda ~varty t' =
   let ty = Type.mk_fun (ty t') [varty] in

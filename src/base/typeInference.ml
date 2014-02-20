@@ -147,7 +147,12 @@ module Ctx = struct
     with Not_found ->
       let n = Hashtbl.length ctx.vars in
       let ty = match ty with
-        | None -> ctx.default.default_i
+        | None ->
+            (* for inferring polymorphic types! just be sure to bind it
+             * somewhere. *)
+            let ty = _new_ty_var ctx in
+            ctx.to_bind <- ty :: ctx.to_bind;
+            ty
         | Some ty -> ty
       in
       Hashtbl.add ctx.vars name (n,ty);
@@ -175,8 +180,8 @@ module Ctx = struct
 
   (* same as {!unify}, but also updates the ctx's substitution *)
   let unify_and_set ctx ty1 ty2 =
-    Util.debug 5 "unify %a and %a (ctx: %a)"
-      Type.pp ty1 Type.pp ty2 Substs.pp ctx.subst;
+    (* Util.debug 5 "unify %a and %a (ctx: %a)"
+      Type.pp ty1 Type.pp ty2 Substs.pp ctx.subst; *)
     let subst = unify ctx ty1 ty2 in
     ctx.subst <- subst
 
@@ -390,7 +395,6 @@ module FO = struct
       let tyargs, args = _split_arity n_args l in
       let tyargs = _complete_type_args ctx n_tyargs tyargs in
       let ty_s' = Type.apply_list ty_s tyargs in
-      Util.debug 5 "applied type for %a: %a" Sym.pp s Type.pp ty_s';
       (* create sub-closures, by inferring the type of [args] *)
       let l = List.map (fun t' -> infer_rec ctx t') args in
       let ty_of_args, closure_args = List.split l in
@@ -406,7 +410,6 @@ module FO = struct
         let args' = closure_args ctx in
         let tyargs' = List.map (Ctx.apply_ty ctx) tyargs in
         let ty_s' = Type.close_forall (Ctx.apply_ty ctx ty_s) in
-        Util.debug 5 "final type for %a: %a" Sym.pp s Type.pp ty_s';
         T.app_full (T.const ~ty:ty_s' s) tyargs' args')
     | PT.Int n ->
         let ty = ctx.Ctx.default.default_int in
@@ -454,6 +457,9 @@ module FO = struct
     | BadArity ->
       Util.exit_prof prof_infer;
       __error ctx "bad arity when trying to type %a" PT.pp t
+    | Unif.Fail ->
+      Util.exit_prof prof_infer;
+      __error ctx "unification failure when trying to type %a" PT.pp t
     | e ->
       Util.exit_prof prof_infer;
       raise e
@@ -543,8 +549,16 @@ module FO = struct
 
   let infer_form ctx f =
     Util.debug 5 "infer_form %a" PT.pp f;
-    let c_f = infer_form_rec ctx f in
-    c_f
+    try
+      let c_f = infer_form_rec ctx f in
+      c_f
+    with
+    | BadArity ->
+      Util.exit_prof prof_infer;
+      __error ctx "bad arity when trying to type %a" PT.pp f
+    | Unif.Fail ->
+      Util.exit_prof prof_infer;
+      __error ctx "unification failure when trying to type %a" PT.pp f
 
   let constrain_form ctx f =
     let _ = infer_form ctx f in
@@ -629,7 +643,10 @@ module HO = struct
     @param pred true if we expect a proposition
     @param arity expected number of arguments *)
   let rec infer_rec ?(arity=0) ctx t =
-    match t.PT.term with
+    match t.PT.loc with
+    | None -> infer_rec_view ~arity ctx t.PT.term
+    | Some loc -> Ctx.with_loc ctx ~loc (fun () -> infer_rec_view ~arity ctx t.PT.term)
+  and infer_rec_view ~arity ctx t = match t with
     | PT.Column ({PT.term=PT.Var name}, ty) ->
       (* typed var *)
       let ty = match Ctx.ty_of_prolog ctx ty with
@@ -704,7 +721,7 @@ module HO = struct
       (* recover the type *)
       let ty = Ctx.type_of_fun ~arity ctx s in
       ty, (fun ctx ->
-        let ty = Type.close_forall (Ctx.apply_ty ctx ty) in
+        let ty = Ctx.apply_ty ctx ty in
         T.const ~ty s)
     | PT.App (t, l) ->
       (* we are going to assume that the type of [t], as inferred, is a forall
@@ -719,7 +736,7 @@ module HO = struct
       let tyargs = _complete_type_args ctx n_tyargs tyargs in
       let ty_t' = Type.apply_list ty_t tyargs in
       (* create sub-closures, by inferring the type of [args] *)
-      let l = List.map (fun t' -> infer_rec ctx t') args in
+      let l = List.map (infer_rec ctx) args in
       let ty_of_args, closure_args = List.split l in
       let closure_args = Closure.seq closure_args in
       (* [s] has type [ty_s] once applied to polymorphic type arguments,
@@ -751,7 +768,14 @@ module HO = struct
       Ctx.exit_scope ctx;
       Util.exit_prof prof_infer;
       ty, k
-    with e ->
+    with
+    | BadArity ->
+      Util.exit_prof prof_infer;
+      __error ctx "bad arity when trying to type %a" PT.pp t
+    | Unif.Fail ->
+      Util.exit_prof prof_infer;
+      __error ctx "unification failure when trying to type %a" PT.pp t
+    | e ->
       Ctx.exit_scope ctx;
       Util.exit_prof prof_infer;
       raise e

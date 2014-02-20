@@ -74,6 +74,9 @@ module Ctx : sig
         @param default which types are inferred by default (if not provided
           then {!tptp_default} will be used) *)
 
+  val clear : t -> unit
+    (** Reset totally the context *)
+
   val copy : t -> t
     (** Copy of the context *)
 

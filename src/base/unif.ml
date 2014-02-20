@@ -168,6 +168,7 @@ module RU = RecordUnif
    l1, l2: to unify; l1', l2': to unify with rest1, rest2.
    we use the fact that l1 and l2 are sorted w.r.t keys. *)
 let rec unif_records ~unif subst r1 sc1 r2 sc2 =
+  (* Util.debug 5 "unif_records %a %a" T.pp (RU.to_record r1) T.pp (RU.to_record * r2); *)
   match RU.fields r1, RU.fields r2 with
   | [], _
   | _, [] ->
@@ -186,7 +187,7 @@ let rec unif_records ~unif subst r1 sc1 r2 sc2 =
           let r1 = RU.discard r1 in
           unif_records ~unif subst r1 sc1 r2 sc2
       | _ ->
-          (* n2 too small, ditch it into l1' *)
+          (* n2 too small, ditch it into l2' *)
           let r2 = RU.discard r2 in
           unif_records ~unif subst r1 sc1 r2 sc2
       end
@@ -196,6 +197,7 @@ let rec unif_records ~unif subst r1 sc1 r2 sc2 =
 and __unif_rest ~unif subst r1 sc1 r2 sc2 =
   assert (r1.RU.fields = []);
   assert (r2.RU.fields = []);
+  (* Util.debug 5 "unif_rest %a %a" T.pp (RU.to_record r1) T.pp (RU.to_record r2); *)
   match r1.RU.rest, r1.RU.discarded, r2.RU.rest, r2.RU.discarded with
   | None, [], None, [] -> subst  (* no row, no remaining fields *)
   | None, _, _, _::_

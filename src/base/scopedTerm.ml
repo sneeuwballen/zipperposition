@@ -200,6 +200,21 @@ let rigid_var ~kind ~ty i =
 let bind ~kind ~ty ~varty s t' =
   H.hashcons {term=Bind (s,varty,t'); kind; id= ~-1; ty=HasType ty; flags=0; }
 
+(* merge l1 and l2, which are both sorted. If the same key occurs with
+ * distinct values, fail. *)
+let rec __merge_records l1 l2 = match l1, l2 with
+  | [], [] -> []
+  | [], _ -> l2
+  | _, [] -> l1
+  | (n1,t1)::l1', (n2,t2)::l2' ->
+      match String.compare n1 n2 with
+      | 0 ->
+        if eq t1 t2
+          then (n1,t1) :: __merge_records l1' l2'  (* compatible *)
+          else failwith ("ill-formed record: field "^n1^" has distinct values")
+      | n when n < 0 -> (n1,t1) :: __merge_records l1' l2
+      | _ -> (n2,t2) :: __merge_records l1 l2'
+
 (* if any string of [l] appears in [seen], fail *)
 let rec __check_duplicates seen l = match l with
   | [] -> ()
@@ -208,16 +223,35 @@ let rec __check_duplicates seen l = match l with
       then failwith ("ill-formed record: field " ^ s ^ " appears twice")
       else __check_duplicates (s::seen) l'
 
-let record ~kind ~ty l ~rest =
-  __check_duplicates [] l;
-  let l = List.sort (fun (s1,_) (s2,_) -> String.compare s1 s2) l in
+(* actually build the record *)
+let __make_record ~kind ~ty l ~rest =
   let my_t = {term=Record (l, rest); kind; ty=HasType ty; id= ~-1; flags=0; } in
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty && List.for_all (fun (_,t) -> ground t) l
+    && (match rest with None -> true | Some r -> ground r)
       then set_flag t flag_ground true;
   end;
   t
+
+(* flatten record: if the rest is a record, merge its fields into [l].
+ * precondition: [l] is sorted. *)
+let rec __flatten_record ~kind ~ty l ~rest =
+  match rest with
+  | None -> __make_record ~kind ~ty l ~rest
+  | Some r ->
+      begin match view r with
+      | Record (l', rest') ->
+          (* here be flattening! *)
+          __flatten_record ~kind ~ty (__merge_records l l') ~rest:rest'
+      | _ -> __make_record ~kind ~ty l ~rest
+      end
+
+let record ~kind ~ty l ~rest =
+  let l = List.sort (fun (s1,_) (s2,_) -> String.compare s1 s2) l in
+  (* check that [l] is well-formed *)
+  __check_duplicates [] l;
+  __flatten_record ~kind ~ty l ~rest
 
 let multiset ~kind ~ty l =
   let l = List.sort cmp l in
