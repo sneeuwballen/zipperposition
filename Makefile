@@ -42,7 +42,7 @@ tags:
 
 rst_doc:
 	@echo "build Sphinx documentation (into _build/doc)"
-	sphinx-build -C doc _build/doc
+	sphinx-build doc _build/doc
 
 open_doc: rst_doc
 	firefox _build/doc/contents.html
