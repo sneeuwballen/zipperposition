@@ -173,5 +173,6 @@ true: use_menhir
 "tests/quick/": -traverse
 "tests/quick/": not_hygienic
 
-<src/base/{scopedTerm,FOTerm,Type}.cmx>: inline(15)
+<src/base/{scopedTerm,FOTerm,HOTerm,Type}.cmx>: inline(15)
+<src/base/{substs,unif}.cmx>: inline(8)
 #<src/**/*.cmx>: inline(10)
