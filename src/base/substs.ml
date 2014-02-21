@@ -162,6 +162,7 @@ exception KindError
 
 let bind subst v s_v t s_t =
   if T.kind v <> T.kind t then raise KindError;
+  assert (T.DB.closed t);
   let t', s_t' = get_var subst v s_v in
   if s_t' = s_t && T.eq t' t
     then subst (* compatible (absence of) bindings *)
@@ -313,8 +314,10 @@ let apply ?(depth=0) subst ~renaming t s_t =
            switch depending on whether [t] is bound by [subst] or not *)
         begin try
           let t', s_t' = lookup subst t s_t in
-          (* if t' contains free De Bruijn symbols, lift them by [depth] *)
-          let t' = T.DB.shift ~depth:0 depth t' in
+          (* NOTE: we used to shift [t'], in case it contained free De
+           * Bruijn indices, but that shouldn't happen because only
+           * closed terms should appear in substitutions. *)
+          assert (T.DB.closed t');
           (* also apply [subst] to [t'] *)
           _apply depth t' s_t'
         with Not_found ->

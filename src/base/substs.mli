@@ -85,6 +85,7 @@ exception KindError
 
 val bind : t -> term -> scope -> term -> scope -> t
   (** Add [v] -> [t] to the substitution. Both terms have a context.
+      It is {b important} that the bound term is De-Bruijn-closed (assert).
       @raise Invalid_argument if [v] is already bound in
         the same context, to another term.
       @raise KindError if a term of a given kind is bound to a term
