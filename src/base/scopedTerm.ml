@@ -148,16 +148,19 @@ and _eq_record_list l1 l2 = match l1, l2 with
 
 let _flag_gen = Util.Flag.create ()
 let new_flag () = Util.Flag.get_new _flag_gen
-let set_flag t flag truth =
-  if truth
-    then t.flags <- t.flags lor flag
-    else t.flags <- t.flags land (lnot flag)
+let set_flag t flag = t.flags <- t.flags lor flag
+let unset_flag t flag = t.flags <- t.flags land (lnot flag)
 let get_flag t flag = (t.flags land flag) != 0
 let flags t = t.flags
 
+(* groundness *)
 let flag_ground = new_flag()
 
 let ground t = get_flag t flag_ground
+
+(* DB-closedness. We use two flags because this computation is lazy. *)
+let flag_db_closed_computed = new_flag()
+let flag_db_closed = new_flag()
 
 (** {3 Constructors} *)
 
@@ -172,7 +175,7 @@ let const ~kind ~ty s =
   let my_t = { term=Const s; kind; id= ~-1; ty=HasType ty; flags=0; } in
   let t = H.hashcons my_t in
   if t == my_t then begin
-    if ground ty then set_flag t flag_ground true;
+    if ground ty then set_flag t flag_ground;
   end;
   t
 
@@ -184,7 +187,7 @@ let app ~kind ~ty f l =
       let t = H.hashcons my_t in
       if t == my_t then begin
         if ground ty && ground f && List.for_all ground l
-          then set_flag t flag_ground true;
+          then set_flag t flag_ground;
       end;
       t
 
@@ -230,7 +233,7 @@ let __make_record ~kind ~ty l ~rest =
   if t == my_t then begin
     if ground ty && List.for_all (fun (_,t) -> ground t) l
     && (match rest with None -> true | Some r -> ground r)
-      then set_flag t flag_ground true;
+      then set_flag t flag_ground;
   end;
   t
 
@@ -259,7 +262,7 @@ let multiset ~kind ~ty l =
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty && List.for_all ground l
-      then set_flag t flag_ground true;
+      then set_flag t flag_ground;
   end;
   t
 
@@ -268,7 +271,7 @@ let at ~kind ~ty l r =
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty && ground l && ground r
-      then set_flag t flag_ground true;
+      then set_flag t flag_ground;
   end;
   t
 
@@ -277,7 +280,7 @@ let simple_app ~kind ~ty s l =
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty && List.for_all ground l
-      then set_flag t flag_ground true;
+      then set_flag t flag_ground;
   end;
   t
 
@@ -346,28 +349,41 @@ end
 
 module DB = struct
   (* check wether the term is closed w.r.t. De Bruijn variables *)
-  let closed ?(depth=0) t =
-    let rec closed depth t =
-      (match t.ty with
-        | NoType -> true
-        | HasType ty -> closed depth ty)
-      &&
-      match view t with
-      | BVar i -> i < depth
-      | Bind(_, varty, t') -> closed depth varty && closed (depth+1) t'
-      | Const _
-      | Var _ | RigidVar _ -> true
-      | Record (l, rest) ->
-          begin match rest with
-          | None -> true
-          | Some r -> closed depth r
-          end && List.for_all (fun (_,t') -> closed depth t') l
-      | Multiset l -> List.for_all (closed depth) l
-      | App (f, l) -> closed depth f && List.for_all (closed depth) l
-      | At (l,r) -> closed depth l && closed depth r
-      | SimpleApp (_,l) -> List.for_all (closed depth) l
-    in
-    closed depth t
+  let rec __closed depth t =
+    begin match t.ty with
+      | NoType -> true
+      | HasType ty -> __closed depth ty
+    end
+    &&
+    match view t with
+    | BVar i -> i < depth
+    | Bind(_, varty, t') -> __closed depth varty && __closed (depth+1) t'
+    | Const _
+    | Var _ | RigidVar _ -> true
+    | Record (l, rest) ->
+        begin match rest with
+        | None -> true
+        | Some r -> __closed depth r
+        end && List.for_all (fun (_,t') -> __closed depth t') l
+    | Multiset l -> List.for_all (__closed depth) l
+    | App (f, l) -> __closed depth f && List.for_all (__closed depth) l
+    | At (l,r) -> __closed depth l && __closed depth r
+    | SimpleApp (_,l) -> List.for_all (__closed depth) l
+
+  let closed ?depth t =
+    match depth with
+    | None ->
+        (* depth=0, see whether result is cached *)
+        if get_flag t flag_db_closed_computed
+          then get_flag t flag_db_closed
+          else begin
+            (* compute and cache result *)
+            let res = __closed 0 t in
+            set_flag t flag_db_closed_computed;
+            if res then set_flag t flag_db_closed;
+            res
+          end
+    | Some d -> __closed d t
 
   (* check whether t contains the De Bruijn symbol n *)
   let rec contains t n =
