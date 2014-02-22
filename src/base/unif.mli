@@ -103,7 +103,10 @@ end
 
 (** {2 Base (scoped terms)} *)
 
-include NARY with type term = ScopedTerm.t
+module Nary : NARY with type term = ScopedTerm.t
+
+module Unary : UNARY with type term = ScopedTerm.t
+(** To be used only on terms without {!ScopedTerm.Multiset} constructor *)
 
 (** {2 Specializations} *)
 

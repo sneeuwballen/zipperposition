@@ -235,18 +235,18 @@ module Nary = struct
     | (n1,t1)::_, (n2,t2)::_ ->
         begin match String.compare n1 n2 with
         | 0 ->
-          let stack = Cons (t1,sc1,t2,sc2,stack.stack) in 
+          let stack = Cons (t1,sc1,t2,sc2,stack) in 
           let r1 = RU.pop_field r1 in
           let r2 = RU.pop_field r2 in
-          unif_records stack r1 sc1 r2 sc2
+          unify_records stack r1 sc1 r2 sc2
         | n when n < 0 ->
             (* n1 too small, ditch it into l1' *)
             let r1 = RU.discard r1 in
-            unif_records stack r1 sc1 r2 sc2
+            unify_records stack r1 sc1 r2 sc2
         | _ ->
             (* n2 too small, ditch it into l2' *)
             let r2 = RU.discard r2 in
-            unif_records stack r1 sc1 r2 sc2
+            unify_records stack r1 sc1 r2 sc2
         end
   (* unify the row variables, if any, with the unmatched columns of each term.
       we first unify the record composed of discard fields of r1, with
@@ -267,7 +267,7 @@ module Nary = struct
         (* no discarded fields in r1, so we only need to
          * unify rest1 with { l2 | rest2 } *)
         let t2 = RU.to_record r2 in
-        Some (Cons (rest1,sc1,t2,sc2,stack.stack))
+        Some (Cons (rest1,sc1,t2,sc2,stack))
     | _, _, Some rest2, [] ->
         (* symmetric case of the previous one *)
         let t1 = RU.to_record r1 in
