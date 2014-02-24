@@ -88,9 +88,10 @@ let skolem_form ~ctx ~ty f =
     List.iter
       (fun (f', new_f') ->
         Util.debug 5 "check variant %a and %a" F.pp f F.pp f';
-        Sequence.iter
-          (fun subst -> raise (FoundFormVariant (f', new_f', subst)))
-          (Unif.Form.variant f' 1 f 0))
+        match Unif.Form.variant f' 1 f 0 with
+        | Unif.Res.End -> ()
+        | Unif.Res.Ok (subst, _) ->
+          raise (FoundFormVariant (f', new_f', subst)))
       ctx.sc_fcache;
     (* fresh symbol with the proper type *)
     let ty_of_vars = List.map T.ty vars in
