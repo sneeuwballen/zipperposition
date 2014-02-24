@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: abc99270769f638e8b16a58194a06589)
+# DO NOT EDIT (digest: 21873df2bb0e6b1cd63f9436a2093eed)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -80,24 +80,22 @@
 "src/parsers/lex_tptp.cmx": for-pack(Logtk_parsers)
 "src/parsers/ast_tptp.cmx": for-pack(Logtk_parsers)
 "src/parsers/util_tptp.cmx": for-pack(Logtk_parsers)
+"src/parsers/ast_ho.cmx": for-pack(Logtk_parsers)
+"src/parsers/lex_ho.cmx": for-pack(Logtk_parsers)
+"src/parsers/parse_ho.cmx": for-pack(Logtk_parsers)
 <src/parsers/*.ml{,i}>: use_logtk
 <src/parsers/*.ml{,i}>: package(str)
 <src/parsers/*.ml{,i}>: package(unix)
 <src/parsers/*.ml{,i}>: package(zarith)
 # Library logtk_meta
 "src/meta/logtk_meta.cmxs": use_logtk_meta
-"src/meta/metaPattern.cmx": for-pack(Logtk_meta)
-"src/meta/metaKB.cmx": for-pack(Logtk_meta)
-"src/meta/metaReasoner.cmx": for-pack(Logtk_meta)
-"src/meta/metaProver.cmx": for-pack(Logtk_meta)
-"src/meta/ast_theory.cmx": for-pack(Logtk_meta)
-"src/meta/lex_theory.cmx": for-pack(Logtk_meta)
-"src/meta/parse_theory.cmx": for-pack(Logtk_meta)
-"src/meta/signal.cmx": for-pack(Logtk_meta)
+"src/meta/lib/signal.cmx": for-pack(Logtk_meta)
 <src/meta/*.ml{,i}>: use_logtk
-<src/meta/*.ml{,i}>: package(datalog)
 <src/meta/*.ml{,i}>: package(unix)
 <src/meta/*.ml{,i}>: package(zarith)
+<src/meta/lib/*.ml{,i}>: use_logtk
+<src/meta/lib/*.ml{,i}>: package(unix)
+<src/meta/lib/*.ml{,i}>: package(zarith)
 # Library logtk_arbitrary
 "src/arbitrary/logtk_arbitrary.cmxs": use_logtk_arbitrary
 "src/arbitrary/arTerm.cmx": for-pack(Logtk_arbitrary)
@@ -109,7 +107,6 @@
 <src/arbitrary/*.ml{,i}>: use_logtk_meta
 <src/arbitrary/*.ml{,i}>: use_logtk
 <src/arbitrary/*.ml{,i}>: package(qcheck)
-<src/arbitrary/*.ml{,i}>: package(datalog)
 <src/arbitrary/*.ml{,i}>: package(unix)
 <src/arbitrary/*.ml{,i}>: package(zarith)
 # Executable run_bench
@@ -118,7 +115,6 @@
 "tests/run_bench.native": use_logtk
 "tests/run_bench.native": package(bench)
 "tests/run_bench.native": package(qcheck)
-"tests/run_bench.native": package(datalog)
 "tests/run_bench.native": package(unix)
 "tests/run_bench.native": package(zarith)
 <tests/*.ml{,i}>: package(bench)
@@ -129,7 +125,6 @@
 "tests/run_tests.native": use_logtk
 "tests/run_tests.native": package(oUnit)
 "tests/run_tests.native": package(qcheck)
-"tests/run_tests.native": package(datalog)
 "tests/run_tests.native": package(unix)
 "tests/run_tests.native": package(zarith)
 <tests/*.ml{,i}>: use_logtk_arbitrary
@@ -138,7 +133,6 @@
 <tests/*.ml{,i}>: use_logtk
 <tests/*.ml{,i}>: package(oUnit)
 <tests/*.ml{,i}>: package(qcheck)
-<tests/*.ml{,i}>: package(datalog)
 <tests/*.ml{,i}>: package(unix)
 <tests/*.ml{,i}>: package(zarith)
 # Executable type_check_tptp
@@ -159,13 +153,11 @@
 "tools/detect_theories.native": use_logtk_meta
 "tools/detect_theories.native": use_logtk_extended
 "tools/detect_theories.native": use_logtk
-"tools/detect_theories.native": package(datalog)
 "tools/detect_theories.native": package(unix)
 "tools/detect_theories.native": package(zarith)
 <tools/*.ml{,i}>: use_logtk_meta
 <tools/*.ml{,i}>: use_logtk_extended
 <tools/*.ml{,i}>: use_logtk
-<tools/*.ml{,i}>: package(datalog)
 <tools/*.ml{,i}>: package(unix)
 <tools/*.ml{,i}>: package(zarith)
 # OASIS_STOP

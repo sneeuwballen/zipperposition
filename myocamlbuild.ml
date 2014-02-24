@@ -1,5 +1,5 @@
 (* OASIS_START *)
-(* DO NOT EDIT (digest: 12c634ac15aa63572b7ff734d3b47b21) *)
+(* DO NOT EDIT (digest: d8538f0431c0371d8cfa1d1489ec8ae3) *)
 module OASISGettext = struct
 (* # 22 "src/oasis/OASISGettext.ml" *)
 
@@ -560,7 +560,7 @@ let package_default =
           ("logtk", ["src/base"; "src/base/lib"], []);
           ("logtk_extended", ["src/extended"; "src/extended/lib"], []);
           ("logtk_parsers", ["src/parsers"], []);
-          ("logtk_meta", ["src/meta"], []);
+          ("logtk_meta", ["src/meta"; "src/meta/lib"], []);
           ("logtk_arbitrary", ["src/arbitrary"], [])
        ];
      lib_c = [];
@@ -574,6 +574,7 @@ let package_default =
                "src/extended";
                "src/extended/lib";
                "src/meta";
+               "src/meta/lib";
                "src/parsers"
             ]);
           ("tests",
@@ -583,21 +584,24 @@ let package_default =
                "src/base/lib";
                "src/extended";
                "src/extended/lib";
-               "src/meta"
+               "src/meta";
+               "src/meta/lib"
             ]);
           ("src/parsers", ["src/base"; "src/base/lib"]);
-          ("src/meta", ["src/base"; "src/base/lib"]);
+          ("src/meta/lib", ["src/base"; "src/base/lib"; "src/meta"]);
+          ("src/meta", ["src/base"; "src/base/lib"; "src/meta/lib"]);
           ("src/extended/lib", ["src/base"; "src/base/lib"; "src/extended"]);
           ("src/extended", ["src/base"; "src/base/lib"; "src/extended/lib"]);
           ("src/base/lib", ["src/base"]);
           ("src/base", ["src/base/lib"]);
-          ("src/arbitrary", ["src/base"; "src/base/lib"; "src/meta"])
+          ("src/arbitrary",
+            ["src/base"; "src/base/lib"; "src/meta"; "src/meta/lib"])
        ]
   }
   ;;
 
 let dispatch_default = MyOCamlbuildBase.dispatch_default package_default;;
 
-# 602 "myocamlbuild.ml"
+# 606 "myocamlbuild.ml"
 (* OASIS_STOP *)
 Ocamlbuild_plugin.dispatch dispatch_default;;

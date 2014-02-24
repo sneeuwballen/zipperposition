@@ -61,6 +61,7 @@ print_endline "load extended lib....";;
 #load "logtk_extended.cma";;
 #install_printer Logtk.Transform.fmt;;
 #install_printer Logtk.Trace_tstp.fmt;;
+
 (* optional part: meta *)
 print_endline "load meta prover....";;
 #load "logtk_meta.cma";;

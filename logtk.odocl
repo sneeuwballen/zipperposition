@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: ef257f4b5880cce92dace54dff41345d)
+# DO NOT EDIT (digest: 18bff19178798db366c7b9e95cd5e0b1)
 src/base/Symbol
 src/base/ScopedTerm
 src/base/FOTerm
@@ -33,14 +33,7 @@ src/base/lib/ParseLocation
 src/base/lib/Multiset
 src/base/lib/BV
 src/base/lib/PartialOrder
-src/meta/MetaPattern
-src/meta/MetaKB
-src/meta/MetaReasoner
-src/meta/MetaProver
-src/meta/Ast_theory
-src/meta/Lex_theory
-src/meta/Parse_theory
-src/meta/Signal
+src/meta/lib/Signal
 src/arbitrary/ArTerm
 src/arbitrary/ArForm
 src/arbitrary/ArType
