@@ -290,8 +290,8 @@ let fmt fmt subst =
 
 (** {2 Applying a substitution} *)
 
-let apply ?(depth=0) subst ~renaming t s_t =
-  let rec _apply depth t s_t =
+let apply subst ~renaming t s_t =
+  let rec _apply t s_t =
     match T.ty t with
     | T.NoType ->
       assert(T.ground t);
@@ -299,7 +299,7 @@ let apply ?(depth=0) subst ~renaming t s_t =
     | _ when T.ground t -> t
     | T.HasType ty ->
       let kind = T.kind t in
-      let ty = _apply depth ty s_t in
+      let ty = _apply ty s_t in
       match T.view t with
       | T.Const (Symbol.Conn (Symbol.FreshVar _)) ->
         (* special trick to generate new variables. It ignores the
@@ -319,7 +319,7 @@ let apply ?(depth=0) subst ~renaming t s_t =
            * closed terms should appear in substitutions. *)
           assert (T.DB.closed t');
           (* also apply [subst] to [t'] *)
-          _apply depth t' s_t'
+          _apply t' s_t'
         with Not_found ->
           (* variable not bound by [subst], rename it
               (after specializing its type if needed) *)
@@ -333,7 +333,7 @@ let apply ?(depth=0) subst ~renaming t s_t =
         begin try
           let t', s_t' = lookup subst t s_t in
           (* also apply [subst] to [t'] *)
-          _apply depth t' s_t'
+          _apply t' s_t'
         with Not_found ->
           (* variable not bound by [subst], rename it
               (after specializing its type if needed) *)
@@ -341,38 +341,38 @@ let apply ?(depth=0) subst ~renaming t s_t =
           Renaming.rename renaming t s_t
         end
       | T.Bind (s, varty, sub_t) ->
-          let varty' = _apply depth varty s_t in
-          let sub_t' = _apply (depth+1) sub_t s_t in
+          let varty' = _apply varty s_t in
+          let sub_t' = _apply sub_t s_t in
           T.bind ~kind ~varty:varty' ~ty s sub_t'
       | T.At (l, r) ->
-          let l' = _apply depth l s_t in
-          let r' = _apply depth r s_t in
+          let l' = _apply l s_t in
+          let r' = _apply r s_t in
           T.at ~kind ~ty l' r'
       | T.App (hd, l) ->
-          let hd' = _apply depth hd s_t in
-          let l' = _apply_list depth l s_t in
+          let hd' = _apply hd s_t in
+          let l' = _apply_list l s_t in
           T.app ~kind ~ty hd' l'
       | T.Record (l, rest) ->
           let rest = match rest with
             | None -> None
-            | Some r -> Some (_apply depth r s_t)
+            | Some r -> Some (_apply r s_t)
           in
-          let l' = List.map (fun (s,t') -> s, _apply depth t' s_t) l in
+          let l' = List.map (fun (s,t') -> s, _apply t' s_t) l in
           T.record ~kind ~ty l' ~rest
       | T.SimpleApp (s, l) ->
-          let l' = _apply_list depth l s_t in
+          let l' = _apply_list l s_t in
           T.simple_app ~kind ~ty s l'
       | T.Multiset l ->
-          let l' = _apply_list depth l s_t in
+          let l' = _apply_list l s_t in
           T.multiset ~kind ~ty l'
-  and _apply_list depth l s_l = match l with
+  and _apply_list l s_l = match l with
     | [] -> []
-    | t::l' -> _apply depth t s_l :: _apply_list depth l' s_l
+    | t::l' -> _apply t s_l :: _apply_list l' s_l
   in
-  _apply depth t s_t
+  _apply t s_t
 
-let apply_no_renaming ?depth subst t s_t =
-  apply subst ?depth ~renaming:Renaming.dummy t s_t
+let apply_no_renaming subst t s_t =
+  apply subst ~renaming:Renaming.dummy t s_t
 
   (*
 let bij =
@@ -388,11 +388,11 @@ module type SPECIALIZED = sig
   type term
   type t = subst
 
-  val apply : ?depth:int -> t -> renaming:Renaming.t -> term -> scope -> term
+  val apply : t -> renaming:Renaming.t -> term -> scope -> term
     (** Apply the substitution to the given term/type.
         @param renaming used to desambiguate free variables from distinct scopes *)
 
-  val apply_no_renaming : ?depth:int -> t -> term -> scope -> term
+  val apply_no_renaming : t -> term -> scope -> term
     (** Same as {!apply}, but performs no renaming of free variables.
       {b Caution}, can entail collisions between scopes! *)
 
@@ -406,11 +406,11 @@ module Ty = struct
   type term = Type.t
   type t = subst
 
-  let apply ?depth subst ~renaming t s_t =
-    Type.of_term_exn (apply ?depth subst ~renaming (t : term :> T.t) s_t)
+  let apply subst ~renaming t s_t =
+    Type.of_term_exn (apply subst ~renaming (t : term :> T.t) s_t)
 
-  let apply_no_renaming ?depth subst t s_t =
-    Type.of_term_exn (apply_no_renaming ?depth subst (t : term :> T.t) s_t)
+  let apply_no_renaming subst t s_t =
+    Type.of_term_exn (apply_no_renaming subst (t : term :> T.t) s_t)
 
   let bind = (bind :> t -> term -> scope -> term -> scope -> t)
 end
@@ -419,11 +419,11 @@ module FO = struct
   type term = FOTerm.t
   type t = subst
 
-  let apply ?depth subst ~renaming t s_t =
-    FOTerm.of_term_exn (apply ?depth subst ~renaming (t : term :> T.t) s_t)
+  let apply subst ~renaming t s_t =
+    FOTerm.of_term_exn (apply subst ~renaming (t : term :> T.t) s_t)
 
-  let apply_no_renaming ?depth subst t s_t =
-    FOTerm.of_term_exn (apply_no_renaming ?depth subst (t : term :> T.t) s_t)
+  let apply_no_renaming  subst t s_t =
+    FOTerm.of_term_exn (apply_no_renaming  subst (t : term :> T.t) s_t)
 
   let bind = (bind :> t -> term -> scope -> term -> scope -> t)
 end
@@ -432,11 +432,11 @@ module HO = struct
   type term = HOTerm.t
   type t = subst
 
-  let apply ?depth subst ~renaming t s_t =
-    HOTerm.of_term_exn (apply ?depth subst ~renaming (t : term :> T.t) s_t)
+  let apply  subst ~renaming t s_t =
+    HOTerm.of_term_exn (apply  subst ~renaming (t : term :> T.t) s_t)
 
-  let apply_no_renaming ?depth subst t s_t =
-    HOTerm.of_term_exn (apply_no_renaming ?depth subst (t : term :> T.t) s_t)
+  let apply_no_renaming  subst t s_t =
+    HOTerm.of_term_exn (apply_no_renaming  subst (t : term :> T.t) s_t)
 
   let bind = (bind :> t -> term -> scope -> term -> scope -> t)
 end
@@ -445,11 +445,11 @@ module Form = struct
   type term = Formula.FO.t
   type t = subst
 
-  let apply ?depth subst ~renaming t s_t =
-    Formula.FO.of_term_exn (apply ?depth subst ~renaming (t : term :> T.t) s_t)
+  let apply  subst ~renaming t s_t =
+    Formula.FO.of_term_exn (apply  subst ~renaming (t : term :> T.t) s_t)
 
-  let apply_no_renaming ?depth subst t s_t =
-    Formula.FO.of_term_exn (apply_no_renaming ?depth subst (t : term :> T.t) s_t)
+  let apply_no_renaming  subst t s_t =
+    Formula.FO.of_term_exn (apply_no_renaming  subst (t : term :> T.t) s_t)
 
   let bind = (bind :> t -> term -> scope -> term -> scope -> t)
 end

@@ -129,11 +129,11 @@ val of_list : ?init:t -> (term * scope * term * scope) list -> t
 
 (** {2 Applying a substitution} *)
 
-val apply : ?depth:int -> t -> renaming:Renaming.t -> term -> scope -> term
+val apply : t -> renaming:Renaming.t -> term -> scope -> term
   (** Apply the substitution to the given term.
       @param renaming used to desambiguate free variables from distinct scopes *)
 
-val apply_no_renaming : ?depth:int -> t -> term -> scope -> term
+val apply_no_renaming : t -> term -> scope -> term
   (** Same as {!apply}, but performs no renaming of free variables.
       {b Caution}, can entail collisions between scopes! *)
 
@@ -147,11 +147,11 @@ module type SPECIALIZED = sig
   type term
   type t = subst
 
-  val apply : ?depth:int -> t -> renaming:Renaming.t -> term -> scope -> term
+  val apply : t -> renaming:Renaming.t -> term -> scope -> term
     (** Apply the substitution to the given term/type.
         @param renaming used to desambiguate free variables from distinct scopes *)
 
-  val apply_no_renaming : ?depth:int -> t -> term -> scope -> term
+  val apply_no_renaming : t -> term -> scope -> term
     (** Same as {!apply}, but performs no renaming of free variables.
       {b Caution}, can entail collisions between scopes! *)
 
