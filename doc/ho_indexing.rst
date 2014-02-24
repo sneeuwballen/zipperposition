@@ -1,3 +1,5 @@
+.. _`ho_indexing` :
+
 Higher-Order indexing
 =====================
 

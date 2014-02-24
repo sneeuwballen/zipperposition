@@ -97,8 +97,23 @@ abstracted variable ``F``, then scanning the concrete clause ``g a X Y = g a Y X
 succeeds by binding ``F`` to the concrete term ``g a``, and binding
 universal variables ``X`` and ``Y`` to other universal variables.
 
-A kind of basic indexing could be done by hashing the structure of the term,
-but that doesn't look trivial
+Scanning is actually done by encoding the problem clauses, in a shallow way,
+using ``Multiset`` constructors and ``RigidVar``. For a clause ``c``
+let ``c'`` be its encoding; we then add ``holds c' <- .`` to the clauses
+of the reasoner so that it can match axiom definitions. Axioms are
+described by ``axiom foo <- holds c.`` where ``c`` is the clause that
+describes the axiom.
+
+The encoding of clauses is done by:
+
+#. currying applications
+#. replacing free variables by ``RigidVar`` instances (in order to force
+    unification to be only alpha-equivalence on those)
+#. replacing equational literals ``a = b`` by ``eq_lit [a, b]``
+    and ``a != b`` by ``neq_lit [a, b]``
+#. replacing the clause by ``[l1, l2, ..., ln]`` where the ``li`` are
+    the encoded literals.
+#. adding ``holds c.`` to the meta-prover where ``c`` is the encoded clause.
 
 Reasoning
 ^^^^^^^^^
@@ -119,7 +134,8 @@ The idea is simply to use a term index, and regular unification, to perform
 Indexing
 ^^^^^^^^
 
-It is important to have
+It is important to have some form of indexing. See the page
+about :ref:`ho_indexing`.
 
 Biblio
 ------
