@@ -57,17 +57,17 @@ type term = t
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 
-val var : ?ty:t -> string -> t
+val var : ?loc:location -> ?ty:t -> string -> t
 val int_ : Z.t -> t
 val of_int : int -> t
 val rat : Q.t -> t
-val app : t -> t list -> t
-val const : Symbol.t -> t
-val bind : Symbol.t -> t list -> t -> t
-val list_ : t list -> t
+val app : ?loc:location -> t -> t list -> t
+val const : ?loc:location -> Symbol.t -> t
+val bind : ?loc:location -> Symbol.t -> t list -> t -> t
+val list_ : ?loc:location -> t list -> t
 val nil : t
-val column : t -> t -> t
-val record : (string*t) list -> rest:t option -> t
+val column : ?loc:location -> t -> t -> t
+val record : ?loc:location -> (string*t) list -> rest:t option -> t
 val at_loc : loc:location -> t -> t
 
 val is_var : t -> bool
@@ -92,6 +92,7 @@ val close_all : Symbol.t -> t -> t  (** Bind all free vars with the symbol *)
 
 include Interfaces.PRINT with type t := t
 
+(** {2 TPTP constructors and printing} *)
 module TPTP : sig
   val true_ : t
   val false_ : t

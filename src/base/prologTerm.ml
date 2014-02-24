@@ -99,27 +99,27 @@ let rec hash t = match t.term with
       (match rest with None -> 13 | Some r -> hash r) l
   | Column (x,y) -> Hash.combine (hash x) (hash y)
 
-let __make view = {term=view; loc=None;}
+let __make ?loc view = {term=view; loc;}
 
-let var ?ty s = match ty with
-  | None -> __make (Var s)
-  | Some ty -> __make (Column (__make (Var s), ty))
+let var ?loc ?ty s = match ty with
+  | None -> __make ?loc (Var s)
+  | Some ty -> __make ?loc (Column (__make (Var s), ty))
 let int_ i = __make (Int i)
 let of_int i = __make (Int (Z.of_int i))
 let rat n = __make (Rat n)
-let app s l = match l with
+let app ?loc s l = match l with
   | [] -> s
-  | _::_ -> __make (App(s,l))
-let const s = __make (Const s)
-let bind s v l = match v with
+  | _::_ -> __make ?loc (App(s,l))
+let const ?loc s = __make ?loc (Const s)
+let bind ?loc s v l = match v with
   | [] -> l
-  | _::_ -> __make (Bind(s,v,l))
-let list_ l = __make (List l)
+  | _::_ -> __make ?loc (Bind(s,v,l))
+let list_ ?loc l = __make ?loc (List l)
 let nil = list_ []
-let record l ~rest =
+let record ?loc l ~rest =
   let l = List.sort (fun (n1,_)(n2,_) -> String.compare n1 n2) l in
-  __make (Record (l, rest))
-let column x y = __make (Column(x,y))
+  __make ?loc (Record (l, rest))
+let column ?loc x y = __make ?loc (Column(x,y))
 let at_loc ~loc t = {t with loc=Some loc; }
 
 let is_var = function
@@ -226,12 +226,12 @@ let rec pp buf t = match t.term with
       pp buf t'
   | Record (l, None) ->
     Buffer.add_char buf '{';
-    Util.pp_list (fun buf (s,t') -> Printf.bprintf buf "%s: %a" s pp t') buf l;
+    Util.pp_list (fun buf (s,t') -> Printf.bprintf buf "%s:%a" s pp t') buf l;
     Buffer.add_char buf '}'
   | Record (l, Some r) ->
     Buffer.add_char buf '{';
-    Util.pp_list (fun buf (s,t') -> Printf.bprintf buf "%s: %a" s pp t') buf l;
-    Printf.bprintf buf "| %a}" pp r
+    Util.pp_list (fun buf (s,t') -> Printf.bprintf buf "%s:%a" s pp t') buf l;
+    Printf.bprintf buf " | %a}" pp r
   | Column(x,y) ->
       pp buf x;
       Buffer.add_char buf ':';
@@ -244,18 +244,11 @@ module TPTP = struct
   let true_ = const Symbol.Base.true_
   let false_ = const Symbol.Base.false_
 
-  let const ?loc s = match loc with
-    | None -> const s
-    | Some loc -> at_loc ~loc (const s)
-  let app ?loc hd l = match loc with
-    | None -> app hd l
-    | Some loc -> at_loc ~loc (app hd l)
-  let bind ?loc s vars t = match loc with
-    | None -> bind s vars t
-    | Some loc -> at_loc ~loc (bind s vars t)
-  let var ?loc ?ty name = match loc with
-    | None -> var ?ty name
-    | Some loc -> at_loc ~loc (var ?ty name)
+  let var = var
+  let bind = bind
+  let column = column
+  let const = const
+  let app = app
 
   let and_ ?loc l = app ?loc (const Symbol.Base.and_) l
   let or_ ?loc l = app ?loc (const Symbol.Base.or_) l
