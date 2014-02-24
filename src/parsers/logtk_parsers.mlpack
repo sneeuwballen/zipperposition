@@ -1,7 +1,10 @@
 # OASIS_START
-# DO NOT EDIT (digest: 0351a17c4aa8252487bfbd9f549450b3)
+# DO NOT EDIT (digest: d2cb5fcbf891d6c198b6255736c1cd6c)
 Parse_tptp
 Lex_tptp
 Ast_tptp
 Util_tptp
+Ast_ho
+Lex_ho
+Parse_ho
 # OASIS_STOP
