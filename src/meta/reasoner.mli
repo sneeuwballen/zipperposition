@@ -65,38 +65,34 @@ end
 
 type clause = Clause.t
 
-(** {2 Explanation for Facts} *)
+(** {2 Proofs}
 
-module Explanation : sig
-  type derivation = {
-    rules : clause list;
-    facts : fact list;
-  } 
+Unit-resolution proofs *)
 
-  (** An explanation of why some property holds. *)
+module Proof : sig
   type t =
     | Axiom
-    | Deduced of derivation
-    
+    | Resolved of fact with_proof * clause with_proof
+
+  and 'a with_proof = {
+    conclusion : 'a;
+    proof : t;
+  }
+
+  val facts : t -> fact Sequence.t
+    (** Iterate on the facts that have been used *)
+
+  val rules : t -> clause Sequence.t
+    (** Iterate on the rules that have been used *)
 end
 
-type explanation = Explanation.t
+type proof = Proof.t
 
 (** {2 Consequences}
 What can be deduced when the Database is updated with new rules
 and facts. *)
 
-module Consequence : sig
-  type t = private {
-    fact : fact;
-    explanation : explanation Lazy.t;
-  } (** Consequence of adding a fact or clause to the DB. The second
-        value is a (lazy) explanation of why the first property is true. *)
-
-  val fact : t -> fact
-  val explanation : t -> explanation
-end
-type consequence = Consequence.t
+type consequence = fact * proof
 
 (** {2 Fact and Rules Database}
 
@@ -110,13 +106,14 @@ val empty : t
   (** Empty DB *)
 
 val add : t -> clause -> t * consequence Sequence.t
-  (** Add a clause to the DB, and propagate *)
+  (** Add a clause to the DB, and propagate.
+     See {!Seq.of_seq} for an efficient batch insertion. *)
 
 val add_fact : t -> fact -> t * consequence Sequence.t
   (** Add a fact to the DB. Sugar for {!add} *)
 
 module Seq : sig
   val of_seq : t -> clause Sequence.t -> t * consequence Sequence.t
-  val to_seq : t -> clause Sequence.t
+  val to_seq : t -> clause Sequence.t  (** Only iterate on axioms *)
   val facts : t -> fact Sequence.t
 end

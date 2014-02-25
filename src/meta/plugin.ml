@@ -157,8 +157,7 @@ end
 let facts r plugin =
   Reasoner.Seq.facts r |> Sequence.fmap plugin#of_fact
 
-let of_consequence c plugin =
-  Reasoner.Consequence.fact c |> plugin#of_fact
+let of_consequence (fact,_) plugin = plugin#of_fact fact
 
 let of_consequences seq plugin =
   Sequence.fmap

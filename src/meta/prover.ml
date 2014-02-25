@@ -54,6 +54,13 @@ let add p clause =
   let r', consequences = R.add p.reasoner clause in
   {p with reasoner=r'; }, consequences
 
+let add_fact p fact =
+  add p (R.Clause.rule fact [])
+
+let add_fo_clause p clause =
+  let fact = Plugin.Base.holds#to_fact clause in
+  add_fact p fact
+
 module Seq = struct
   let to_seq p = R.Seq.to_seq p.reasoner
   let of_seq p seq =

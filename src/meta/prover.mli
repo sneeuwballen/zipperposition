@@ -49,6 +49,12 @@ val signature : t -> Signature.t
 val add : t -> Reasoner.clause -> t * Reasoner.consequence Sequence.t
   (** Add a clause *)
 
+val add_fact : t -> Reasoner.fact -> t * Reasoner.consequence Sequence.t
+
+val add_fo_clause : t -> Encoding.foclause ->
+                    t * Reasoner.consequence Sequence.t
+  (** Add a first-order clause (as "holds" predicate) *)
+
 module Seq : sig
   val to_seq : t -> Reasoner.clause Sequence.t
   val of_seq : t -> Reasoner.clause Sequence.t -> t * Reasoner.consequence Sequence.t
