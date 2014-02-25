@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 21873df2bb0e6b1cd63f9436a2093eed)
+# DO NOT EDIT (digest: 8195945545ade9fe996fa89d5095f348)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -54,26 +54,14 @@
 <src/base/lib/*.ml{,i}>: package(zarith)
 # Library logtk_extended
 "src/extended/logtk_extended.cmxs": use_logtk_extended
-"src/extended/lambda.cmx": for-pack(Logtk_extended)
-"src/extended/index.cmx": for-pack(Logtk_extended)
-"src/extended/dtree.cmx": for-pack(Logtk_extended)
-"src/extended/fingerprint.cmx": for-pack(Logtk_extended)
-"src/extended/rewriting.cmx": for-pack(Logtk_extended)
-"src/extended/featureVector.cmx": for-pack(Logtk_extended)
-"src/extended/formulaShape.cmx": for-pack(Logtk_extended)
-"src/extended/transform.cmx": for-pack(Logtk_extended)
-"src/extended/NPDtree.cmx": for-pack(Logtk_extended)
-"src/extended/congruence.cmx": for-pack(Logtk_extended)
-"src/extended/fastFingerprint.cmx": for-pack(Logtk_extended)
-"src/extended/evaluator.cmx": for-pack(Logtk_extended)
 "src/extended/lib/multiMap.cmx": for-pack(Logtk_extended)
 "src/extended/lib/mixtbl.cmx": for-pack(Logtk_extended)
-<src/extended/*.ml{,i}>: use_logtk
 <src/extended/*.ml{,i}>: package(unix)
 <src/extended/*.ml{,i}>: package(zarith)
-<src/extended/lib/*.ml{,i}>: use_logtk
+<src/extended/*.ml{,i}>: use_logtk
 <src/extended/lib/*.ml{,i}>: package(unix)
 <src/extended/lib/*.ml{,i}>: package(zarith)
+<src/extended/lib/*.ml{,i}>: use_logtk
 # Library logtk_parsers
 "src/parsers/logtk_parsers.cmxs": use_logtk_parsers
 "src/parsers/parse_tptp.cmx": for-pack(Logtk_parsers)
@@ -83,19 +71,19 @@
 "src/parsers/ast_ho.cmx": for-pack(Logtk_parsers)
 "src/parsers/lex_ho.cmx": for-pack(Logtk_parsers)
 "src/parsers/parse_ho.cmx": for-pack(Logtk_parsers)
-<src/parsers/*.ml{,i}>: use_logtk
-<src/parsers/*.ml{,i}>: package(str)
 <src/parsers/*.ml{,i}>: package(unix)
 <src/parsers/*.ml{,i}>: package(zarith)
+<src/parsers/*.ml{,i}>: use_logtk
 # Library logtk_meta
 "src/meta/logtk_meta.cmxs": use_logtk_meta
-"src/meta/lib/signal.cmx": for-pack(Logtk_meta)
-<src/meta/*.ml{,i}>: use_logtk
+"src/meta/encoding.cmx": for-pack(Logtk_meta)
+"src/meta/reasoner.cmx": for-pack(Logtk_meta)
+"src/meta/plugin.cmx": for-pack(Logtk_meta)
+"src/meta/prover.cmx": for-pack(Logtk_meta)
 <src/meta/*.ml{,i}>: package(unix)
 <src/meta/*.ml{,i}>: package(zarith)
-<src/meta/lib/*.ml{,i}>: use_logtk
-<src/meta/lib/*.ml{,i}>: package(unix)
-<src/meta/lib/*.ml{,i}>: package(zarith)
+<src/meta/*.ml{,i}>: use_logtk
+<src/meta/*.ml{,i}>: use_logtk_parsers
 # Library logtk_arbitrary
 "src/arbitrary/logtk_arbitrary.cmxs": use_logtk_arbitrary
 "src/arbitrary/arTerm.cmx": for-pack(Logtk_arbitrary)
@@ -104,62 +92,64 @@
 "src/arbitrary/arSignature.cmx": for-pack(Logtk_arbitrary)
 "src/arbitrary/arSymbol.cmx": for-pack(Logtk_arbitrary)
 "src/arbitrary/arPattern.cmx": for-pack(Logtk_arbitrary)
-<src/arbitrary/*.ml{,i}>: use_logtk_meta
-<src/arbitrary/*.ml{,i}>: use_logtk
 <src/arbitrary/*.ml{,i}>: package(qcheck)
 <src/arbitrary/*.ml{,i}>: package(unix)
 <src/arbitrary/*.ml{,i}>: package(zarith)
+<src/arbitrary/*.ml{,i}>: use_logtk
+<src/arbitrary/*.ml{,i}>: use_logtk_meta
+<src/arbitrary/*.ml{,i}>: use_logtk_parsers
 # Executable run_bench
-"tests/run_bench.native": use_logtk_arbitrary
-"tests/run_bench.native": use_logtk_meta
-"tests/run_bench.native": use_logtk
 "tests/run_bench.native": package(bench)
 "tests/run_bench.native": package(qcheck)
 "tests/run_bench.native": package(unix)
 "tests/run_bench.native": package(zarith)
+"tests/run_bench.native": use_logtk
+"tests/run_bench.native": use_logtk_arbitrary
+"tests/run_bench.native": use_logtk_meta
+"tests/run_bench.native": use_logtk_parsers
 <tests/*.ml{,i}>: package(bench)
 # Executable run_tests
-"tests/run_tests.native": use_logtk_arbitrary
-"tests/run_tests.native": use_logtk_meta
-"tests/run_tests.native": use_logtk_extended
-"tests/run_tests.native": use_logtk
 "tests/run_tests.native": package(oUnit)
 "tests/run_tests.native": package(qcheck)
 "tests/run_tests.native": package(unix)
 "tests/run_tests.native": package(zarith)
-<tests/*.ml{,i}>: use_logtk_arbitrary
-<tests/*.ml{,i}>: use_logtk_meta
-<tests/*.ml{,i}>: use_logtk_extended
-<tests/*.ml{,i}>: use_logtk
+"tests/run_tests.native": use_logtk
+"tests/run_tests.native": use_logtk_arbitrary
+"tests/run_tests.native": use_logtk_extended
+"tests/run_tests.native": use_logtk_meta
+"tests/run_tests.native": use_logtk_parsers
 <tests/*.ml{,i}>: package(oUnit)
 <tests/*.ml{,i}>: package(qcheck)
 <tests/*.ml{,i}>: package(unix)
 <tests/*.ml{,i}>: package(zarith)
+<tests/*.ml{,i}>: use_logtk
+<tests/*.ml{,i}>: use_logtk_arbitrary
+<tests/*.ml{,i}>: use_logtk_extended
+<tests/*.ml{,i}>: use_logtk_meta
+<tests/*.ml{,i}>: use_logtk_parsers
 # Executable type_check_tptp
-"tools/type_check_tptp.native": use_logtk_parsers
-"tools/type_check_tptp.native": use_logtk
-"tools/type_check_tptp.native": package(str)
 "tools/type_check_tptp.native": package(unix)
 "tools/type_check_tptp.native": package(zarith)
+"tools/type_check_tptp.native": use_logtk
+"tools/type_check_tptp.native": use_logtk_parsers
 # Executable cnf_of_tptp
-"tools/cnf_of_tptp.native": use_logtk_parsers
-"tools/cnf_of_tptp.native": use_logtk
-"tools/cnf_of_tptp.native": package(str)
 "tools/cnf_of_tptp.native": package(unix)
 "tools/cnf_of_tptp.native": package(zarith)
-<tools/*.ml{,i}>: use_logtk_parsers
-<tools/*.ml{,i}>: package(str)
+"tools/cnf_of_tptp.native": use_logtk
+"tools/cnf_of_tptp.native": use_logtk_parsers
 # Executable detect_theories
-"tools/detect_theories.native": use_logtk_meta
-"tools/detect_theories.native": use_logtk_extended
-"tools/detect_theories.native": use_logtk
 "tools/detect_theories.native": package(unix)
 "tools/detect_theories.native": package(zarith)
-<tools/*.ml{,i}>: use_logtk_meta
-<tools/*.ml{,i}>: use_logtk_extended
-<tools/*.ml{,i}>: use_logtk
+"tools/detect_theories.native": use_logtk
+"tools/detect_theories.native": use_logtk_extended
+"tools/detect_theories.native": use_logtk_meta
+"tools/detect_theories.native": use_logtk_parsers
 <tools/*.ml{,i}>: package(unix)
 <tools/*.ml{,i}>: package(zarith)
+<tools/*.ml{,i}>: use_logtk
+<tools/*.ml{,i}>: use_logtk_extended
+<tools/*.ml{,i}>: use_logtk_meta
+<tools/*.ml{,i}>: use_logtk_parsers
 # OASIS_STOP
 true: use_menhir
 "tests/quick/": -traverse

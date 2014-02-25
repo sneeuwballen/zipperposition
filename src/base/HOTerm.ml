@@ -493,7 +493,7 @@ let pp_depth ?(hooks=[]) depth buf t =
     pp_surrounded buf t';
     decr depth
   | Const s -> Symbol.pp buf s
-  | RigidVar i -> Printf.bprintf buf "Z%d" i
+  | RigidVar i -> Printf.bprintf buf "?x%d" i
   | Var i ->
       if not !print_all_types
       then Printf.bprintf buf "X%d:%a" i Type.pp (ty t)
@@ -542,7 +542,7 @@ let rec debug fmt t = match view t with
   | Var i ->
     Format.fprintf fmt "X%d:%a" i Type.fmt (ty t)
   | RigidVar i ->
-    Format.fprintf fmt "Z%d:%a" i Type.fmt (ty t)
+    Format.fprintf fmt "?x%d:%a" i Type.fmt (ty t)
   | BVar i -> Format.fprintf fmt "Y%d" i
   | Lambda (varty,t') ->
     Format.fprintf fmt "(lambda %a %a)" Type.fmt varty debug t'

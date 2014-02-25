@@ -3,7 +3,7 @@ Name:        logtk
 Version:     0.1
 Homepage:    https://github.com/c-cube/logtk
 Authors:     Simon Cruanes
-License:     BSD3
+License:     BSD-2-clause
 LicenseFile: LICENSE
 Plugins:     META (0.3), DevFiles (0.3)
 OCamlVersion: >= 4.00.1
@@ -62,10 +62,10 @@ Library "logtk_extended"
   FindlibParent:    logtk
   Build$:           flag(extended)
   Install$:         flag(extended)
-  Modules:          Lambda, Index, Dtree, Fingerprint, Rewriting,
-                    FeatureVector, FormulaShape, Transform,
-                    NPDtree, Congruence, FastFingerprint, Evaluator,
-                    lib/MultiMap, lib/Mixtbl
+  Modules:          lib/MultiMap, lib/Mixtbl
+                    #Lambda, Index, Dtree, Fingerprint, Rewriting,
+                    #FeatureVector, FormulaShape, Transform,
+                    #NPDtree, Congruence, FastFingerprint, Evaluator,
   BuildDepends:     logtk,unix,zarith
   XMETARequires:    logtk,unix,zarith
 
@@ -79,20 +79,20 @@ Library "logtk_parsers"
   Install$:         flag(parsers)
   FindlibName:      parsers
   FindlibParent:    logtk
-  BuildDepends:     logtk,str
-  XMETARequires:    logtk,str,menhir
+  BuildDepends:     logtk
+  XMETARequires:    logtk,menhir
 
 Library "logtk_meta"
   Path:             src/meta/
   Pack:             true
   FindlibName:      meta
   FindlibParent:    logtk
-  Modules:          lib/Signal
-                    #MetaPattern, MetaKB, MetaReasoner, MetaProver,
-  BuildDepends:     logtk
+  Modules:          Encoding, Reasoner, Plugin, Prover
+                    #MetaPattern, MetaKB, MetaReasoner, MetaProver, lib/Signal
+  BuildDepends:     logtk,logtk.parsers
   Build$:           flag(meta) & flag(parsers)
   Install$:         flag(meta) & flag(parsers)
-  XMETARequires:    logtk
+  XMETARequires:    logtk,logtk.parsers
 
 Library "logtk_arbitrary"
   Path:             src/arbitrary/
@@ -109,8 +109,8 @@ Document logtk
   Title:                Logtk docs
   Type:                 ocamlbuild (0.3)
   BuildTools+:          ocamldoc
-  Install$:             flag(qcheck) & flag(meta)
-  Build$:               flag(qcheck) & flag(meta)
+  Install$:             flag(qcheck) & flag(meta) & flag(extended)
+  Build$:               flag(qcheck) & flag(meta) & flag(extended)
   XOCamlbuildPath:      .
   XOCamlbuildLibraries: logtk,logtk.meta,logtk.arbitrary
 
