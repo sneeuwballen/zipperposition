@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 8195945545ade9fe996fa89d5095f348)
+# DO NOT EDIT (digest: 946c12e00eb779e9193e82d7a112b266)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -21,11 +21,9 @@
 "src/base/type.cmx": for-pack(Logtk)
 "src/base/util.cmx": for-pack(Logtk)
 "src/base/prologTerm.cmx": for-pack(Logtk)
-"src/base/hash.cmx": for-pack(Logtk)
 "src/base/interfaces.cmx": for-pack(Logtk)
 "src/base/DBEnv.cmx": for-pack(Logtk)
 "src/base/position.cmx": for-pack(Logtk)
-"src/base/hashcons.cmx": for-pack(Logtk)
 "src/base/HOTerm.cmx": for-pack(Logtk)
 "src/base/formula.cmx": for-pack(Logtk)
 "src/base/substs.cmx": for-pack(Logtk)
@@ -38,6 +36,8 @@
 "src/base/ordering.cmx": for-pack(Logtk)
 "src/base/skolem.cmx": for-pack(Logtk)
 "src/base/cnf.cmx": for-pack(Logtk)
+"src/base/lib/hash.cmx": for-pack(Logtk)
+"src/base/lib/hashcons.cmx": for-pack(Logtk)
 "src/base/lib/sequence.cmx": for-pack(Logtk)
 "src/base/lib/cache.cmx": for-pack(Logtk)
 "src/base/lib/bij.cmx": for-pack(Logtk)

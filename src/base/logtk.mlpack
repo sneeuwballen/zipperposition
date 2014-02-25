@@ -1,16 +1,14 @@
 # OASIS_START
-# DO NOT EDIT (digest: 1f3810657fd2e626b5422893a2086537)
+# DO NOT EDIT (digest: c7ef08523912c4a4a8bb6f818dc20020)
 Symbol
 ScopedTerm
 FOTerm
 Type
 Util
 PrologTerm
-Hash
 Interfaces
 DBEnv
 Position
-Hashcons
 HOTerm
 Formula
 Substs
@@ -23,6 +21,8 @@ Precedence
 Ordering
 Skolem
 Cnf
+lib/Hash
+lib/Hashcons
 lib/Sequence
 lib/Cache
 lib/Bij

@@ -45,6 +45,16 @@ let rec hash_list f h l = match l with
   | [] -> h
   | x::l' -> hash_list f (combine h (f x)) l'
 
+let hash_array f h a =
+  let h = ref h in
+  Array.iter (fun x -> h := combine !h (f x)) a;
+  !h
+
 (** Hash string *)
 let hash_string s = Hashtbl.hash s
 
+(** Hash sequence *)
+let hash_seq f h seq =
+  let h = ref h in
+  seq (fun x -> h := combine !h (f x));
+  !h
