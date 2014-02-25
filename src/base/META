@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 22eafacd203766e05e3ebfcd16309f6a)
+# DO NOT EDIT (digest: 8f77d6e49be1462d9b90f90a0805077a)
 version = "0.1"
 description =
 "Logic toolkit, designed primarily for first-order automated reasoning."
@@ -13,7 +13,7 @@ package "parsers" (
  version = "0.1"
  description =
  "Logic toolkit, designed primarily for first-order automated reasoning."
- requires = "logtk str menhir"
+ requires = "logtk menhir"
  archive(byte) = "logtk_parsers.cma"
  archive(byte, plugin) = "logtk_parsers.cma"
  archive(native) = "logtk_parsers.cmxa"
@@ -25,7 +25,7 @@ package "meta" (
  version = "0.1"
  description =
  "Logic toolkit, designed primarily for first-order automated reasoning."
- requires = "logtk"
+ requires = "logtk logtk.parsers"
  archive(byte) = "logtk_meta.cma"
  archive(byte, plugin) = "logtk_meta.cma"
  archive(native) = "logtk_meta.cmxa"

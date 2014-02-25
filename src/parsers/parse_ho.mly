@@ -79,6 +79,7 @@ A parser with a nice curried syntax. *)
 
 %start <Ast_ho.t> parse_decl
 %start <Ast_ho.t list> parse_decls
+%start <Logtk.PrologTerm.t> parse_term
 
 %%
 
@@ -87,6 +88,9 @@ parse_decls:
 
 parse_decl:
   | d=declaration EOI { d }
+
+parse_term:
+  | t=term EOI { t }
 
 declaration:
   | VAL w=LOWER_WORD COLUMN ty=type_ DOT

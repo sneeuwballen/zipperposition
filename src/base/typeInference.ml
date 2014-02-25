@@ -198,7 +198,7 @@ module Ctx = struct
     | Sym.Int _ -> ctx.default.default_int
     | Sym.Rat _ -> ctx.default.default_rat
     | Sym.Conn Sym.Wildcard -> _new_ty_var ctx
-    | Sym.Conn _ -> assert false
+    | Sym.Conn _
     | Sym.Cst _ ->
       begin match Signature.find ctx.signature s with
       | Some ty -> ty
@@ -807,6 +807,10 @@ module HO = struct
     Ctx.unify_and_set ctx ty ret;
     if generalize then Ctx.generalize ctx else Ctx.bind_to_default ctx;
     closure ctx
+
+  let convert_opt ?generalize ?ret ~ctx t =
+    try Some (convert ?generalize ?ret ~ctx t)
+    with _ -> None
 
   let convert_seq ?(generalize=false) ~ctx terms =
     let closures = Sequence.map

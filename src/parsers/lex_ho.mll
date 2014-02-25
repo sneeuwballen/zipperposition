@@ -27,7 +27,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Parser for HO} *)
 
 {
+  open Logtk
   open Parse_ho
+
+  exception Error of string
 }
 
 let printable_char = [^ '\n']
@@ -71,13 +74,33 @@ rule token = parse
   | lower_word { LOWER_WORD(Lexing.lexeme lexbuf) }
   | upper_word { UPPER_WORD(Lexing.lexeme lexbuf) }
   | interrogation_word { INTERROGATION_WORD(Lexing.lexeme lexbuf) }
-  | _ as c { failwith (Printf.sprintf "lexer fails on char '%c'" c) }
+  | _ as c { raise (Error (Printf.sprintf "lexer fails on char '%c'" c)) }
 
 
 {
-  let decl_of_string s =
-    Parse_ho.parse_decl token (Lexing.from_string s)
+  let decl_of_string s : Ast_ho.t Monad.Err.t =
+    try
+      Monad.Err.Ok (Parse_ho.parse_decl token (Lexing.from_string s))
+    with
+    | Parse_ho.Error -> Monad.Err.fail "parse error"
+    | Error msg -> Monad.Err.fail msg
 
-  let decls_of_string s =
-    Parse_ho.parse_decls token (Lexing.from_string s)
+  let decls_of_string s : Ast_ho.t list Monad.Err.t=
+    try
+      Monad.Err.Ok (Parse_ho.parse_decls token (Lexing.from_string s))
+    with
+    | Parse_ho.Error -> Monad.Err.fail "parse error"
+    | Error msg -> Monad.Err.fail msg
+
+  let term_of_string s : PrologTerm.t option =
+    try
+      Some (Parse_ho.parse_term token (Lexing.from_string s))
+    with Parse_ho.Error | Error _ -> None
+
+  let pterm (s:string): HOTerm.t option =
+    Monad.Opt.(
+      term_of_string s >>= fun t ->
+      let ctx = TypeInference.Ctx.create Signature.TPTP.base in
+      TypeInference.HO.convert_opt ~generalize:true ~ctx t
+    )
 }

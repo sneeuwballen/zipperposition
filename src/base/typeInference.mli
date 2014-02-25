@@ -208,6 +208,10 @@ module HO : sig
         @param ret is the type we expect for this term (default: {!Type.o})
         @param generalize if true, constructor types are generalized (default false) *)
 
+  val convert_opt : ?generalize:bool -> ?ret:Type.t -> ctx:Ctx.t ->
+                    untyped -> typed option
+    (** Same as {!convert} but does not raise Type.Error *)
+
   val convert_seq : ?generalize:bool -> ctx:Ctx.t ->
                     untyped Sequence.t -> typed list
     (** Infer the types of those terms and annotate each term and subterm with
