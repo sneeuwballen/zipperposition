@@ -107,6 +107,8 @@ module RigidTerm = struct
   let pp = HOT.pp
   let to_string = HOT.to_string
   let fmt = HOT.fmt
+
+  let __magic t = t
 end
 
 let rigidifying = object
@@ -134,24 +136,35 @@ module EncodedClause = struct
   let to_string = HOT.to_string
   let fmt = HOT.fmt
 
-  let __extract t = t
+  let __magic t = t
 end
 
 (** Encode/Decode clauses into terms:
   * terms are already curried and rigidified, so we only need to replace
   * connectives by their multiset versions. *)
 
+let __ty_or = Type.(multiset TPTP.o)
+let __ty_eq = Type.(forall [var 0] (TPTP.o <== [var 0; var 0]))
+let __ty_not = Type.(TPTP.o <=. TPTP.o)
+
 let __or_conn =
-  HOT.const ~ty:Type.(multiset TPTP.o) Symbol.Base.or_
+  HOT.const ~ty:__ty_or Symbol.Base.or_
 
 let __eq_conn =
-  HOT.const ~ty:Type.(forall [var 0] (TPTP.o <== [var 0; var 0])) Symbol.Base.eq
+  HOT.const ~ty:__ty_eq Symbol.Base.eq
 
 let __neq_conn =
-  HOT.const ~ty:Type.(forall [var 0] (TPTP.o <== [var 0; var 0])) Symbol.Base.neq
+  HOT.const ~ty:__ty_eq Symbol.Base.neq
 
 let __not_conn =
-  HOT.const ~ty:Type.(TPTP.o <=. TPTP.o) Symbol.Base.not_
+  HOT.const ~ty:__ty_not Symbol.Base.not_
+
+let signature = Signature.of_list
+  [ Symbol.Base.or_, __ty_or
+  ; Symbol.Base.eq, __ty_eq
+  ; Symbol.Base.neq, __ty_eq
+  ; Symbol.Base.not_, __ty_not
+  ]
 
 let __encode_lit = function
   | Eq (a, b, truth) ->

@@ -31,6 +31,7 @@ open Logtk_parsers
 
 module P = Plugin
 module R = Reasoner
+module PT = PrologTerm
 
 type t = {
   reasoner : Reasoner.t;
@@ -70,10 +71,27 @@ end
 
 (** {6 IO} *)
 
+(* convert prolog term's literals into their multiset version *)
+let convert_lits t =
+  let a = object
+    inherit PT.id_visitor
+    method app ?loc f l =
+      match PT.view f with
+      | PT.Const (Symbol.Conn (Symbol.Eq | Symbol.Neq | Symbol.Equiv) as s) ->
+          (* transform some connective into multisets
+           * TODO: also do it for OR/AND *)
+          PT.app ?loc (PT.const s) [PT.list_ l]
+      | _ -> PT.app ?loc f l
+  end in
+  a#visit t
+
 (* convert an AST to a clause, if needed. In any case update the
  * context *)
 let __clause_of_ast ~ctx = function
   | Ast_ho.Clause (head, body) ->
+      (* first, conversion *)
+      let head = convert_lits head in
+      let body = List.map convert_lits body in
       (* expected type *)
       let ret = Reasoner.property_ty in
       (* infer types for head, body, and force all types to be [ret] *)
@@ -104,7 +122,7 @@ let __clause_of_ast ~ctx = function
 
 let of_ho_ast p decls =
   try
-    let ctx = TypeInference.Ctx.create Signature.TPTP.base in
+    let ctx = TypeInference.Ctx.create Encoding.signature in
     let clauses = Sequence.fmap (__clause_of_ast ~ctx) decls in
     let p', consequences = Seq.of_seq p clauses in
     Monad.Err.Ok (p', consequences)

@@ -54,6 +54,8 @@ and view = private
 
 type term = t
 
+val view : t -> view
+
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 
@@ -91,6 +93,35 @@ val ground : t -> bool
 val close_all : Symbol.t -> t -> t  (** Bind all free vars with the symbol *)
 
 include Interfaces.PRINT with type t := t
+
+(** {2 Visitor} *)
+
+class virtual ['a] visitor : object
+  method virtual var : ?loc:location -> string -> 'a
+  method virtual int_ : ?loc:location -> Z.t -> 'a
+  method virtual rat_ : ?loc:location -> Q.t -> 'a
+  method virtual const : ?loc:location -> Symbol.t -> 'a
+  method virtual app : ?loc:location -> 'a -> 'a list -> 'a
+  method virtual bind : ?loc:location -> Symbol.t -> 'a list -> 'a -> 'a
+  method virtual list_ : ?loc:location -> 'a list -> 'a
+  method virtual record : ?loc:location -> (string*'a) list -> 'a option -> 'a
+  method virtual column : ?loc:location -> 'a -> 'a -> 'a
+  method visit : t -> 'a
+end
+
+class id_visitor : object
+  method var : ?loc:location -> string -> t
+  method int_ : ?loc:location -> Z.t -> t
+  method rat_ : ?loc:location -> Q.t -> t
+  method const : ?loc:location -> Symbol.t -> t
+  method app : ?loc:location -> t -> t list -> t
+  method bind : ?loc:location -> Symbol.t -> t list -> t -> t
+  method list_ : ?loc:location -> t list -> t
+  method record : ?loc:location -> (string*t) list -> t option -> t
+  method column : ?loc:location -> t -> t -> t
+  method visit : t -> t
+end (** Visitor that maps the subterms into themselves *)
+
 
 (** {2 TPTP constructors and printing} *)
 module TPTP : sig

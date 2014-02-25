@@ -34,41 +34,44 @@ module HOT = HOTerm
 module F = Formula.FO
 module A = Ast_ho
 
-(* FIXME
 let theory_files = ref []
-let kb_files = ref []
 let flag_print_kb = ref false
 let flag_print_datalog = ref false
 
 let add_theory f =
   theory_files := f :: !theory_files
-let add_kb f =
-  kb_files := f :: !kb_files
 
 let options =
-  [ "-theory", Arg.String add_theory, "use theory file"
-  ; "-kb", Arg.String add_kb, "use KB file"
-  ; "-print-kb", Arg.Set flag_print_kb, "print KB"
-  ; "-print-datalog", Arg.Set flag_print_datalog, "print Datalog clauses"
+  [ "-theory", Arg.String add_theory, "use given theory file"
+  ; "-print-theory", Arg.Set flag_print_kb, "print the whole theory"
   ] @ Options.global_opts
 
-(* parse the given theory files into a KB *)
-let parse_kb kb_files theory_files =
-  let open Monad.Err in
-  let kb = Monad.TraverseErr.fold_l kb_files (return MetaKB.empty)
-    (fun kb file -> 
-      Util.debug 3 "parse KB file %s" file;
-      MetaKB.restore file >>= fun kb' ->
-      Monad.Err.return (MetaKB.union kb kb'))
-  in
-  Monad.TraverseErr.fold_l
-    theory_files kb
-    (fun kb file ->
-      Util.debug 3 "parse theory file %s" file;
-      map
-        (MetaKB.parse_theory_file file)
-        (fun kb' -> MetaKB.union kb kb'))
+(* parse the given theory files into the prover *)
+let parse_files prover files =
+  let module E = Monad.Err in
+  E.fold_l files (E.return prover)
+    (fun p file ->
+      E.map (Prover.parse_file p file) fst)
 
+let to_cnf decls =
+  let signature, decls = Util_tptp.infer_types (`sign Signature.TPTP.base) decls in
+  let _, decls = Util_tptp.to_cnf signature decls in
+  fun k ->
+    let a = object
+      inherit [unit] Ast_tptp.Typed.visitor
+      method cnf () c = k c
+    end in
+    Sequence.fold a#visit () decls
+
+let parse_and_cnf files =
+  Sequence.flatMap
+    (fun file ->
+      (* parse *)
+      let decls = Util_tptp.parse_file ~recursive:true file in
+      assert false (* TODO *)
+    )
+
+(* FIXME
 (* conversion to CNF of declarations *)
 let to_cnf ?(ctx=Skolem.create ()) decls =
   let tyctx = TypeInference.Ctx.create ~base:true () in

@@ -105,10 +105,8 @@ module type S = sig
     method new_ty : 'a -> string -> ty -> 'a
     method include_ : 'a -> string -> 'a
     method include_only : 'a -> string -> name list -> 'a
+    method visit : 'a -> t -> 'a
   end
-
-  val fold : 'a visitor -> 'a -> t Sequence.t -> 'a
-    (** Fold over declarations *)
 
   (** {2 IO} *)
 

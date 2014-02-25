@@ -242,14 +242,14 @@ module Untyped = struct
 
   let type_declarations decls =
     let tyctx = Hashtbl.create 5 in
-    AU.fold (object
+    let a = object
       inherit [Signature.t] AU.visitor
       method tydecl signature s ty =
-        begin match Type.Conv.of_prolog ~ctx:tyctx ty with
+        match Type.Conv.of_prolog ~ctx:tyctx ty with
         | None -> raise (Type.Error ("expected type, got " ^ PT.to_string ty))
         | Some ty' -> Signature.declare signature (Symbol.of_string s) ty'
-        end
-      end) Signature.empty decls
+    end in
+    Sequence.fold a#visit Signature.empty decls
 
   let __name_symbol i sy =
     let str = Util.sprintf "'ty_decl_%d_%s'" i sy in
@@ -346,15 +346,13 @@ module Typed = struct
         | AT.THF _ -> None)
       decls
 
-  class ty_decl_visitor = object
-  end
-
   let type_declarations decls =
-    AT.fold (object
-        inherit [Signature.t] AT.visitor
-        method tydecl signature s ty =
-          Signature.declare signature (Symbol.of_string s) ty
-      end) Signature.empty decls
+    let a = object
+      inherit [Signature.t] AT.visitor
+      method tydecl signature s ty =
+        Signature.declare signature (Symbol.of_string s) ty
+    end in
+    Sequence.fold a#visit Signature.empty decls
 
   let __name_symbol i sy =
     let str = Util.sprintf "'ty_decl_%d_%s'" i sy in
@@ -416,26 +414,25 @@ let infer_types init decls =
   TypeInference.Ctx.bind_to_default ctx;
   TI.Ctx.to_signature ctx, s
 
-class sigvisitor ctx = object
-  inherit [unit] AU.visitor
-  method tydecl () s ty =
-    begin match TypeInference.Ctx.ty_of_prolog ctx ty with
-    | None -> raise (Type.Error ("expected type, got " ^ PT.to_string ty))
-    | Some ty' -> 
-      TypeInference.Ctx.declare ctx (Symbol.of_string s) ty'
-    end
-  method any_form () _ f =
-    TypeInference.FO.constrain_form ctx f
-  method clause () _ c =
-    List.iter (TypeInference.FO.constrain_form ctx) c
-end
-
 let signature init decls =
   let ctx = match init with
     | `ctx ctx -> ctx
     | `sign signature -> TypeInference.Ctx.create signature
   in
-  AU.fold (new sigvisitor ctx) () decls;
+  let a = object
+    inherit [unit] AU.visitor
+    method tydecl () s ty =
+      begin match TypeInference.Ctx.ty_of_prolog ctx ty with
+      | None -> raise (Type.Error ("expected type, got " ^ PT.to_string ty))
+      | Some ty' -> 
+        TypeInference.Ctx.declare ctx (Symbol.of_string s) ty'
+      end
+    method any_form () _ f =
+      TypeInference.FO.constrain_form ctx f
+    method clause () _ c =
+      List.iter (TypeInference.FO.constrain_form ctx) c
+  end in
+  Sequence.fold a#visit () decls;
   TypeInference.Ctx.to_signature ctx
 
 let erase_types typed =

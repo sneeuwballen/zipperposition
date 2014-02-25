@@ -171,10 +171,8 @@ module type S = sig
     method new_ty : 'a -> string -> ty -> 'a
     method include_ : 'a -> string -> 'a
     method include_only : 'a -> string -> name list -> 'a
+    method visit : 'a -> t -> 'a
   end
-
-  val fold : 'a visitor -> 'a -> t Sequence.t -> 'a
-    (** Fold over declarations *)
 
   (** {2 IO} *)
 
@@ -210,40 +208,26 @@ module Untyped = struct
     | Include _ ->
       raise (Invalid_argument "Ast_tptp.name_of_decl: include directive has no name")
 
-  class ['a] visitor : object
-    method clause : 'a -> role -> form list -> 'a
-    method fof : 'a -> role -> form -> 'a
-    method tff : 'a -> role -> form -> 'a
-    method thf : 'a -> role -> hoterm -> 'a
-    method any_form : 'a -> role -> form -> 'a
-    method tydecl : 'a -> string -> ty -> 'a
-    method new_ty : 'a -> string -> ty -> 'a
-    method include_ : 'a -> string -> 'a
-    method include_only : 'a -> string -> name list -> 'a
-  end = object
-    method clause acc _r _c = acc
-    method fof acc _r _f = acc
-    method tff acc _r _f = acc
-    method thf acc _r _f = acc
-    method any_form acc _r _f = acc
-    method tydecl acc _s _ty = acc
-    method new_ty acc _s _ty = acc
-    method include_ acc _file = acc
-    method include_only acc _file _names = acc
+  class ['a] visitor = object (self)
+    method clause (acc:'a) _r _c = acc
+    method fof (acc:'a) _r _f = acc
+    method tff (acc:'a) _r _f = acc
+    method thf (acc:'a) _r _f = acc
+    method any_form (acc:'a) _r _f = acc
+    method tydecl (acc:'a) _s _ty = acc
+    method new_ty (acc:'a) _s _ty = acc
+    method include_ (acc:'a) _file = acc
+    method include_only (acc:'a) _file _names = acc
+    method visit (acc:'a) decl = match decl with
+      | CNF (_, r, c, _) -> self#clause acc r c
+      | FOF (_, r, f, _) -> self#any_form (self#fof acc r f) r f
+      | TFF (_, r, f, _) -> self#any_form (self#tff acc r f) r f
+      | THF (_, r, f, _) -> self#thf acc r f
+      | TypeDecl (_, s, ty) -> self#tydecl acc s ty
+      | NewType (_, s, ty) -> self#new_ty acc s ty
+      | Include f -> self#include_ acc f
+      | IncludeOnly (f,names) -> self#include_only acc f names
   end
-
-  let fold visitor acc seq =
-    Sequence.fold
-      (fun acc decl -> match decl with
-        | CNF (_, r, c, _) -> visitor#clause acc r c
-        | FOF (_, r, f, _) -> visitor#any_form (visitor#fof acc r f) r f
-        | TFF (_, r, f, _) -> visitor#any_form (visitor#tff acc r f) r f
-        | THF (_, r, f, _) -> visitor#thf acc r f
-        | TypeDecl (_, s, ty) -> visitor#tydecl acc s ty
-        | NewType (_, s, ty) -> visitor#new_ty acc s ty
-        | Include f -> visitor#include_ acc f
-        | IncludeOnly (f,names) -> visitor#include_only acc f names
-      ) acc seq
 
   (** {2 IO} *)
 
@@ -308,40 +292,26 @@ module Typed = struct
     | Include _ ->
       raise (Invalid_argument "Ast_tptp.name_of_decl: include directive has no name")
 
-  class ['a] visitor : object
-    method clause : 'a -> role -> form list -> 'a
-    method fof : 'a -> role -> form -> 'a
-    method tff : 'a -> role -> form -> 'a
-    method thf : 'a -> role -> hoterm -> 'a
-    method any_form : 'a -> role -> form -> 'a
-    method tydecl : 'a -> string -> ty -> 'a
-    method new_ty : 'a -> string -> ty -> 'a
-    method include_ : 'a -> string -> 'a
-    method include_only : 'a -> string -> name list -> 'a
-  end = object
-    method clause acc _r _c = acc
-    method fof acc _r _f = acc
-    method tff acc _r _f = acc
-    method thf acc _r _f = acc
-    method any_form acc _r _f = acc
-    method tydecl acc _s _ty = acc
-    method new_ty acc _s _ty = acc
-    method include_ acc _file = acc
-    method include_only acc _file _names = acc
+  class ['a] visitor = object (self)
+    method clause (acc:'a) _r _c = acc
+    method fof (acc:'a) _r _f = acc
+    method tff (acc:'a) _r _f = acc
+    method thf (acc:'a) _r _f = acc
+    method any_form (acc:'a) _r _f = acc
+    method tydecl (acc:'a) _s _ty = acc
+    method new_ty (acc:'a) _s _ty = acc
+    method include_ (acc:'a) _file = acc
+    method include_only (acc:'a) _file _names = acc
+    method visit (acc:'a) decl = match decl with
+      | CNF (_, r, c, _) -> self#clause acc r c
+      | FOF (_, r, f, _) -> self#any_form (self#fof acc r f) r f
+      | TFF (_, r, f, _) -> self#any_form (self#tff acc r f) r f
+      | THF (_, r, f, _) -> self#thf acc r f
+      | TypeDecl (_, s, ty) -> self#tydecl acc s ty
+      | NewType (_, s, ty) -> self#new_ty acc s ty
+      | Include f -> self#include_ acc f
+      | IncludeOnly (f,names) -> self#include_only acc f names
   end
-
-  let fold visitor acc seq =
-    Sequence.fold
-      (fun acc decl -> match decl with
-        | CNF (_, r, c, _) -> visitor#clause acc r c
-        | FOF (_, r, f, _) -> visitor#any_form (visitor#fof acc r f) r f
-        | TFF (_, r, f, _) -> visitor#any_form (visitor#tff acc r f) r f
-        | THF (_, r, f, _) -> visitor#thf acc r f
-        | TypeDecl (_, s, ty) -> visitor#tydecl acc s ty
-        | NewType (_, s, ty) -> visitor#new_ty acc s ty
-        | Include f -> visitor#include_ acc f
-        | IncludeOnly (f,names) -> visitor#include_only acc f names
-      ) acc seq
 
   (** {2 IO} *)
 

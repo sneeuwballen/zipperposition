@@ -81,6 +81,9 @@ module RigidTerm : sig
   include Interfaces.PRINT with type t := t
   include Interfaces.HASH with type t := t
   include Interfaces.ORD with type t := t
+
+  val __magic : hoterm -> t
+    (** Don't use unless you know what you're doing. *)
 end
 
 val rigidifying : (hoterm clause, RigidTerm.t clause) t
@@ -88,7 +91,7 @@ val rigidifying : (hoterm clause, RigidTerm.t clause) t
 
 val already_rigid : (hoterm clause, RigidTerm.t clause) t
   (** Keeps free variables untouched by assuming the variables
-   * that must be rigid are already *)
+      that must be rigid are already *)
 
 (** {6 Clause encoding}
 
@@ -102,9 +105,12 @@ module EncodedClause : sig
   include Interfaces.HASH with type t := t
   include Interfaces.ORD with type t := t
 
-  val __extract : Reasoner.term -> t
+  val __magic : hoterm -> t
     (** Don't use unless you know what you're doing. *)
 end
+
+val signature : Signature.t
+  (** Signature to use with this encoding *)
 
 val clause_prop : (RigidTerm.t clause, EncodedClause.t) t
 

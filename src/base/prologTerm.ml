@@ -45,6 +45,8 @@ and view =
 
 type term = t
 
+let view t = t.term
+
 let __to_int = function
   | Var _ -> 0
   | Int _ -> 1
@@ -239,6 +241,51 @@ let rec pp buf t = match t.term with
 
 let to_string = Util.on_buffer pp
 let fmt fmt t = Format.pp_print_string fmt (to_string t)
+
+(** {2 Visitor} *)
+
+class virtual ['a] visitor = object (self)
+  method virtual var : ?loc:location -> string -> 'a
+  method virtual int_ : ?loc:location -> Z.t -> 'a
+  method virtual rat_ : ?loc:location -> Q.t -> 'a
+  method virtual const : ?loc:location -> Symbol.t -> 'a
+  method virtual app : ?loc:location -> 'a -> 'a list -> 'a
+  method virtual bind : ?loc:location -> Symbol.t -> 'a list -> 'a -> 'a
+  method virtual list_ : ?loc:location -> 'a list -> 'a
+  method virtual record : ?loc:location -> (string*'a) list -> 'a option -> 'a
+  method virtual column : ?loc:location -> 'a -> 'a -> 'a
+  method visit t =
+    let loc = t.loc in
+    match t.term with
+    | Var s -> self#var ?loc s
+    | Int n -> self#int_ ?loc n
+    | Rat n -> self#rat_ ?loc n
+    | Const s -> self#const ?loc s
+    | App(f,l) -> self#app ?loc (self#visit f) (List.map self#visit l)
+    | Bind (s, vars,t') ->
+        self#bind ?loc s (List.map self#visit vars) (self#visit t')
+    | List l -> self#list_ ?loc (List.map self#visit l)
+    | Record (l, rest) ->
+        let rest = Monad.Opt.map rest self#visit in
+        let l = List.map (fun (n,t) -> n, self#visit t) l in
+        self#record ?loc l rest
+    | Column (a,b) -> self#column ?loc (self#visit a) (self#visit b)
+end
+
+class id_visitor = object
+  inherit [t] visitor
+  method var ?loc s = var ?loc s
+  method int_ ?loc i = int_ i
+  method rat_ ?loc n = rat n
+  method const ?loc s = const ?loc s
+  method app ?loc f l = app ?loc f l
+  method bind ?loc s vars t = bind ?loc s vars t
+  method list_ ?loc l = list_ ?loc l
+  method record ?loc l rest = record ?loc l ~rest
+  method column ?loc a b = column ?loc a b
+end (** Visitor that maps the subterms into themselves *)
+
+(** {2 TPTP} *)
 
 module TPTP = struct
   let true_ = const Symbol.Base.true_

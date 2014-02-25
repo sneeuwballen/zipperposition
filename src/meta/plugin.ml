@@ -107,7 +107,7 @@ module Base = struct
       method of_fact t =
         match T.view t with
         | T.At (hd', c) when T.eq hd hd' ->
-            __encoding_wrap#decode (Encoding.EncodedClause.__extract c)
+            __encoding_wrap#decode (Encoding.EncodedClause.__magic c)
         | _ -> None
 
       method clauses = clauses
