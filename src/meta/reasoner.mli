@@ -92,6 +92,9 @@ module Consequence : sig
     explanation : explanation Lazy.t;
   } (** Consequence of adding a fact or clause to the DB. The second
         value is a (lazy) explanation of why the first property is true. *)
+
+  val fact : t -> fact
+  val explanation : t -> explanation
 end
 type consequence = Consequence.t
 

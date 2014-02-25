@@ -56,9 +56,12 @@ end
 
 (** {6 IO} *)
 
-val of_ho_ast : t -> Ast_ho.t Sequence.t -> t
-  (** Add the given declarations to the meta-prover *)
+val of_ho_ast : t -> Ast_ho.t Sequence.t ->
+                (t * Reasoner.consequence Sequence.t) Monad.Err.t
+  (** Add the given declarations to the meta-prover. In case of type
+   * inference failure, or other mismatch, an error is returned. *)
 
-val parse_file : t -> string -> t Monad.Err.t
+val parse_file : t -> string ->
+                (t * Reasoner.consequence Sequence.t) Monad.Err.t
   (** Attempt to parse file using {!Logtk_parsers.Parse_ho} and add the
    * parsed content to the prover *)

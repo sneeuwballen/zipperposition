@@ -53,8 +53,14 @@ class type ['a, 'b] t = object
   method decode : 'b -> 'a option
 end
 
+val id : ('a,'a) t
+  (** Identity encoding *)
+
 val compose : ('a,'b) t -> ('b, 'c) t -> ('a, 'c) t
   (** Compose two encodings together *)
+
+val (>>>) : ('a,'b) t -> ('b, 'c) t -> ('a, 'c) t
+  (** Infix notation for composition *)
    
 (** {6 Currying} *)
 
@@ -95,6 +101,9 @@ module EncodedClause : sig
   include Interfaces.PRINT with type t := t
   include Interfaces.HASH with type t := t
   include Interfaces.ORD with type t := t
+
+  val __extract : Reasoner.term -> t
+    (** Don't use unless you know what you're doing. *)
 end
 
 val clause_prop : (RigidTerm.t clause, EncodedClause.t) t

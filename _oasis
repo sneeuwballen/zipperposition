@@ -166,11 +166,11 @@ Executable cnf_of_tptp
 # detection of theories
 Executable detect_theories
   Path:             tools/
-  Build$:           flag(meta) & flag(tools) & flag(extended)
-  Install$:         flag(meta) & flag(tools) & flag(extended)
+  Build$:           flag(meta) & flag(tools) & flag(parsers)
+  Install$:         flag(meta) & flag(tools) & flag(parsers)
   CompiledObject:   native
   MainIs:           detect_theories.ml
-  BuildDepends:     logtk,logtk.extended,logtk.meta
+  BuildDepends:     logtk,logtk.parsers,logtk.meta
 
 SourceRepository head
   Type: git

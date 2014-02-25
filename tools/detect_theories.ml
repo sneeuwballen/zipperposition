@@ -27,13 +27,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Check presence of theories in files} *)
 
 open Logtk
+open Logtk_parsers
 open Logtk_meta
 
 module HOT = HOTerm
-module F = FOFormula
-module A = Ast_tptp
-module KB = MetaKB
+module F = Formula.FO
+module A = Ast_ho
 
+(* FIXME
 let theory_files = ref []
 let kb_files = ref []
 let flag_print_kb = ref false
@@ -182,3 +183,4 @@ let _ =
   with TypeUnif.Error e ->
     Util.printf "%a\n" TypeUnif.pp_error e;
     exit 1
+  *)

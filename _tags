@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 946c12e00eb779e9193e82d7a112b266)
+# DO NOT EDIT (digest: 503c37832dc449d629ba18ba6f7f66a0)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -141,13 +141,11 @@
 "tools/detect_theories.native": package(unix)
 "tools/detect_theories.native": package(zarith)
 "tools/detect_theories.native": use_logtk
-"tools/detect_theories.native": use_logtk_extended
 "tools/detect_theories.native": use_logtk_meta
 "tools/detect_theories.native": use_logtk_parsers
 <tools/*.ml{,i}>: package(unix)
 <tools/*.ml{,i}>: package(zarith)
 <tools/*.ml{,i}>: use_logtk
-<tools/*.ml{,i}>: use_logtk_extended
 <tools/*.ml{,i}>: use_logtk_meta
 <tools/*.ml{,i}>: use_logtk_parsers
 # OASIS_STOP

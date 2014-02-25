@@ -37,6 +37,8 @@ to meta-prover-compatible types. *)
 
 open Logtk
 
+type term = Reasoner.term
+
 class type t = object
   method symbol : Symbol.t
     (** Symbol used to represent properties of this plugin *)
@@ -44,22 +46,22 @@ class type t = object
   method ty : Type.t
     (** Type of the symbol *)
 
-  method list_ : Reasoner.t -> Reasoner.term Sequence.t
-    (** List of meta statements that belong to this plugin *)
+  method owns : term -> bool
+    (** Does this term belong to the plugin? *)
+
+  method clauses : Reasoner.clause list
+    (** Initial clauses to add *)
 end
 
 class type ['inner] extended = object
   inherit t
-  method encoding : ('inner, Reasoner.term) Encoding.t
-    (** Encoding used to convert 'inner to a term *)
 
-  method filter : 'a. ('a -> 'inner -> 'a) ->
-                  Reasoner.t -> 'a -> Reasoner.consequence Sequence.t -> 'a
-    (** React to some consequences by filtering over their decoded
-     * version *)
+  method to_fact : 'inner -> term
+    (** Encode an 'inner value to a fact *)
 
-  method add_fact : Reasoner.t -> 'inner -> Reasoner.t
-    (** Add a fact to the reasoner *)
+  method of_fact : term -> 'inner option
+    (** Decode a fact into an 'inner value, if it actually belongs
+        to the plugin *)
 end
 
 type foclause = Encoding.foclause
@@ -70,22 +72,36 @@ type set = t Symbol.Map.t
 val signature_of_set : set -> Signature.t
   (** Signature of all plugins *)
 
-val holds : foclause extended
-  (** holds: statement about which First-Order clause is true in the
-   * current problem *)
+(** {2 Builtin plugins} *)
 
-val axiom : t
-  (** axioms present in the problem *)
+module Base : sig
+  val holds : foclause extended
+    (** holds: statement about which First-Order clause is true in the
+     * current problem *)
 
-val theory : t
-  (** theories that is present in the problem *)
+  val axiom : (Symbol.t * term) extended
+    (** axioms present in the problem (name of axiom+argument) *)
 
-val lemma : Encoding.EncodedClause.t extended
-  (** Lemma: similar to {!holds}, but explicitely used for facts
-   * deduced by the meta-prover. In general [lemma f => holds f]. *)
+  val theory : (Symbol.t * term) extended
+    (** theories that are present in the problem (name of theory +argument) *)
 
-val default_plugins : set
-  (** Default set of plugins *)
+  val lemma : foclause extended
+    (** Lemma: similar to {!holds}, but explicitely used for facts
+     * deduced by the meta-prover. In general [lemma f => holds f]. *)
 
-val default_signature : Signature.t
-  (** Signature of the set of default plugins *)
+  val set : set
+    (** The set of default plugins *)
+
+  val signature : Signature.t
+end
+
+(** {2 Interaction with Reasoner} *)
+
+val facts : Reasoner.t -> 'a extended -> 'a Sequence.t
+  (** Iterate on values that belong to the given extended plugin
+   * and are currently facts in the reasoner *)
+
+val of_consequence : Reasoner.consequence -> 'a extended -> 'a option
+  (** Try to extract a value from a consequence *)
+
+val of_consequences : Reasoner.consequence Sequence.t -> 'a extended -> 'a Sequence.t
