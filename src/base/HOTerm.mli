@@ -217,6 +217,34 @@ val symbols : ?init:Symbol.Set.t -> t -> Symbol.Set.t (** Symbols of the term (k
 val contains_symbol : Symbol.t -> t -> bool
   (** Does the term contain this given symbol? *)
 
+(** {2 Visitor} *)
+
+class virtual ['a] any_visitor : object
+  method virtual var : Type.t -> int -> 'a
+  method virtual rigid_var : Type.t -> int -> 'a
+  method virtual bvar : Type.t -> int -> 'a
+  method virtual lambda : Type.t -> 'a -> 'a
+  method virtual const : Type.t -> Symbol.t -> 'a
+  method virtual at : 'a -> 'a -> 'a
+  method virtual tyat : 'a -> Type.t -> 'a
+  method virtual multiset : Type.t -> 'a list -> 'a
+  method virtual record : (string*'a) list -> 'a option -> 'a
+  method visit : t -> 'a
+end
+
+class id_visitor : object
+  method var : Type.t -> int -> t
+  method rigid_var : Type.t -> int -> t
+  method bvar : Type.t -> int -> t
+  method lambda : Type.t -> t -> t
+  method const : Type.t -> Symbol.t -> t
+  method at : t -> t -> t
+  method tyat : t -> Type.t -> t
+  method multiset : Type.t -> t list -> t
+  method record : (string*t) list -> t option -> t
+  method visit : t -> t
+end (** Visitor that maps the subterms into themselves *)
+
 (** {2 Conversion with {!FOTerm}} *)
 
 val curry : FOTerm.t -> t
@@ -229,6 +257,14 @@ val uncurry : t -> FOTerm.t option
 val is_fo : t -> bool
   (** Check whether the term is convertible to a
       first-order term (no binders, no variable applied to something...) *)
+
+(** {2 Various operations} *)
+
+val rigidify : t -> t
+  (** Replace {!Var} occurrences with {!RigidVar} ones. *)
+
+val unrigidify : t -> t
+  (** Converse of {!rigidify} *)
 
 (* TODO: move Lambda-calculus operators here *)
 

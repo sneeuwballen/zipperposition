@@ -358,7 +358,60 @@ let symbols ?(init=Symbol.Set.empty) t =
 let contains_symbol s t =
   Seq.symbols t |> Sequence.exists (Symbol.eq s)
 
-(** {2 High level operations} *)
+(** {2 Visitor} *)
+
+class virtual ['a] any_visitor = object (self)
+  method virtual var : Type.t -> int -> 'a
+  method virtual rigid_var : Type.t -> int -> 'a
+  method virtual bvar : Type.t -> int -> 'a
+  method virtual lambda : Type.t -> 'a -> 'a
+  method virtual const : Type.t -> Symbol.t -> 'a
+  method virtual at : 'a -> 'a -> 'a
+  method virtual tyat : 'a -> Type.t -> 'a
+  method virtual multiset : Type.t -> 'a list -> 'a
+  method virtual record : (string*'a) list -> 'a option -> 'a
+  method visit t =
+    let ty = ty t in
+    match T.view t with
+    | T.Var i -> self#var ty i
+    | T.RigidVar i -> self#rigid_var ty i
+    | T.BVar i -> self#bvar ty i
+    | T.Bind (Symbol.Conn Symbol.Lambda, varty, t') ->
+        let varty = Type.of_term_exn varty in
+        self#lambda varty (self#visit t')
+    | T.Const s -> self#const ty s
+    | T.At (l,r) ->
+        begin match Type.of_term r with
+        | Some ty -> self#tyat (self#visit l) ty
+        | None -> self#at (self#visit l) (self#visit r)
+        end
+    | T.Multiset l ->
+        begin match Type.view ty with
+        | Type.App (Symbol.Conn Symbol.Multiset, [ty]) ->
+            self#multiset ty (List.map self#visit l)
+        | _ -> assert false
+        end
+    | T.Record (l,rest) ->
+        let rest = Monad.Opt.map rest self#visit in
+        let l = List.map (fun (n,t) -> n, self#visit t) l in
+        self#record l rest
+    | _ -> assert false
+end
+
+class id_visitor = object (self)
+  inherit [t] any_visitor
+  method var ty i = var ~ty i
+  method rigid_var ty i = rigid_var ~ty i
+  method bvar ty i = bvar ~ty i
+  method lambda varty t' = __mk_lambda ~varty t'
+  method const ty s = const ~ty s
+  method at l r = at l r
+  method tyat t ty = tyat t ty
+  method multiset ty l = multiset ~ty l
+  method record l rest = record l ~rest
+end
+
+(** {2 FO conversion} *)
 
 (* Curry all subterms *)
 let rec curry t =
@@ -406,6 +459,22 @@ let rec is_fo t = match T.view t with
   | T.App _
   | T.SimpleApp _
   | T.Bind _ -> assert false
+
+(** {2 Various operations} *)
+
+let rigidify t =
+  let a = object
+    inherit id_visitor
+    method var ty i = rigid_var ~ty i
+  end in
+  a#visit t
+
+let unrigidify t =
+  let a = object
+    inherit id_visitor
+    method rigid_var ty i = var ~ty i
+  end in
+  a#visit t
 
 (** {2 IO} *)
 

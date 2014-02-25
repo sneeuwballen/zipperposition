@@ -158,6 +158,10 @@ module Ctx = struct
       Hashtbl.add ctx.vars name (n,ty);
       n, ty
 
+  (* a rigid variable starts with "?" *)
+  let _is_rigid_var_name name =
+    name <> "" && name.[0] = '?'
+
   (* enter new scope for the variable with this name *)
   let _enter_var_scope ctx name ty =
     let n = Hashtbl.length ctx.vars in
@@ -656,13 +660,17 @@ module HO = struct
       let i, ty = Ctx._get_var ctx ~ty name in
       ty, (fun ctx ->
         let ty = Ctx.apply_ty ctx ty in
-        T.var ~ty i)
+        if Ctx._is_rigid_var_name name
+          then T.rigid_var ~ty i
+          else T.var ~ty i)
     | PT.Var name ->
       (* (possibly) untyped var *)
       let i, ty = Ctx._get_var ctx name in
       ty, (fun ctx ->
         let ty = Ctx.apply_ty ctx ty in
-        T.var ~ty i)
+        if Ctx._is_rigid_var_name name
+          then T.rigid_var ~ty i
+          else T.var ~ty i)
     | PT.Bind (Sym.Conn Sym.Lambda, [], t) ->
       infer_rec ~arity ctx t
     | PT.Bind (Sym.Conn Sym.Lambda, [v], t) ->
