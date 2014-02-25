@@ -42,13 +42,17 @@ module Res = struct
     (** Result of unification provides a continuation to get other
      * substitutions, in case the unification is n-ary. *)
 
-  let rec all = function
+  let rec to_list = function
     | End -> []
-    | Ok (subst, f) -> subst :: all (f ())
+    | Ok (subst, f) -> subst :: to_list (f ())
 
   let rec to_seq res k = match res with
     | End -> ()
     | Ok (s, f) -> k s; to_seq (f ()) k
+
+  let rec fold f acc res = match res with
+    | End -> acc
+    | Ok (s, cont) -> fold f (f acc s) (cont ())
 
   (* takes a function that requires a success cont. and a failure cont.
    * and returns the lazy result *)

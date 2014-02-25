@@ -38,11 +38,14 @@ module Res : sig
     (** Result of unification provides a continuation to get other
      * substitutions, in case the unification is n-ary. *)
 
-  val all : t -> subst list
+  val to_list : t -> subst list
     (** Compute all results into a list *)
 
   val to_seq : t -> subst Sequence.t
     (** Iterate on results *)
+
+  val fold : ('a -> subst -> 'a) -> 'a -> t -> 'a
+    (** Fold on substitutions *)
 end
 
 exception Fail

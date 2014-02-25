@@ -189,6 +189,8 @@ module Ctx = struct
     let subst = unify ctx ty1 ty2 in
     ctx.subst <- subst
 
+  let constrain_type_type = unify_and_set
+
   (* If the function symbol has an unknown type, a fresh variable
      is returned. Otherwise the known type of the symbol is returned.
 

@@ -107,6 +107,10 @@ module Ctx : sig
     (** Obtain the type of all symbols whose type has been inferred.
         If some instantiated variables remain, they are bound to the
         context's [default] parameter. *)
+
+  val constrain_type_type : t -> Type.t -> Type.t -> unit
+    (** Constrain the two types to be equal
+        @raise Type.Error if it is not possible *)
 end
 
 (** {2 Closures} 
@@ -192,7 +196,6 @@ module FO : sig
     (** Given the signature for those formulas, infer their type and convert
         untyped formulas into typed formulas. Also updates the context.
         @param generalize see {!convert} *)
- 
 end
 
 module HO : sig
