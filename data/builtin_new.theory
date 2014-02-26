@@ -1,10 +1,4 @@
 % Builtin theories and lemmas (new syntax)
-% pre-defined types:
-
-val axiom : meta_prop -> o.
-val theory : meta_prop -> o.
-val lemma : [o] -> o.
-val holds : [o] -> o.
 
 axiom (associative F) <-
   holds [F ?x (F ?y ?z) = F (F ?x ?y) ?z].
@@ -70,11 +64,11 @@ axiom (total2 {pred=P, fun=F}) <-
 
 lemma [P ?x ?y <=> ?y = F ?x] <-
   axiom (functional1 P),
-  axiom (total1 {Pred=P, fun=F}).
+  axiom (total1 {pred=P, fun=F}).
 
 lemma [P ?x ?y ?z <=> ?z = F ?x ?y] <-
   axiom (functional2 P),
-  axiom (total2 {Pred=P, fun=F}).
+  axiom (total2 {pred=P, fun=F}).
 
 % monoid
 
