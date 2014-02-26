@@ -167,8 +167,8 @@ end
   * terms are already curried and rigidified, so we only need to replace
   * connectives by their multiset versions. *)
 
-let __ty_or = Type.(multiset TPTP.o)
-let __ty_eq = Type.(forall [var 0] (TPTP.o <== [var 0; var 0]))
+let __ty_or = Type.(TPTP.o <=. multiset TPTP.o)
+let __ty_eq = Type.(forall [var 0] (TPTP.o <=. multiset (var 0)))
 let __ty_not = Type.(TPTP.o <=. TPTP.o)
 
 let __or_conn =

@@ -80,13 +80,13 @@ let signature_of_set (s:set) : Signature.t =
 
 let __sym_holds = Symbol.of_string "holds"
 let __sym_lemma = Symbol.of_string "lemma"
-let __ty_wrap = Type.(Reasoner.property_ty <=. Type.TPTP.o)
+let __ty_wrap = Type.(Reasoner.property_ty <=. Type.multiset Type.TPTP.o)
 let __encoding_wrap =
   Encoding.(currying >>> rigidifying >>> clause_prop)
 
 (* clause that implies (holds c) whenever (lemma c) is true *)
 let __clause_lemma_imply_holds =
-  let var = T.var ~ty:Type.TPTP.o 0 in
+  let var = T.var ~ty:Type.(multiset TPTP.o) 0 in
   Reasoner.Clause.rule
     (T.at (T.const ~ty:__ty_wrap __sym_holds) var)
     [ T.at (T.const ~ty:__ty_wrap __sym_lemma) var ]

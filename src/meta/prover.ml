@@ -32,6 +32,7 @@ open Logtk_parsers
 module P = Plugin
 module R = Reasoner
 module PT = PrologTerm
+module Loc = ParseLocation
 
 type t = {
   reasoner : Reasoner.t;
@@ -71,23 +72,29 @@ end
 
 (** {6 IO} *)
 
-(* convert prolog term's literals into their multiset version *)
+(* convert prolog term's literals into their multiset version
+ * TODO : remove, shouldn't be useful
 let convert_lits t =
   let a = object
     inherit PT.id_visitor
     method app ?loc f l =
-      match PT.view f with
-      | PT.Const (Symbol.Conn
-        (Symbol.Eq | Symbol.Neq | Symbol.Equiv | Symbol.Or | Symbol.And) as s) ->
+      match PT.view f, l with
+      | PT.Const (Symbol.Eq | Symbol.Neq) as s, [a;b] ->
+          (* equality must be applied to a multiset and a type arg. *)
+          PT.app ?loc (PT.const s) [PT.wildcard; PT.list_ [a; b]]
+      | PT.Const
+        (Symbol.Conn (Symbol.Equiv | Symbol.Or | Symbol.And) as s), l ->
           (* transform some connective into multisets *)
           PT.app ?loc (PT.const s) [PT.list_ l]
       | _ -> PT.app ?loc f l
   end in
   a#visit t
+  *)
 
 (* convert an AST to a clause, if needed. In any case update the
  * context *)
-let __clause_of_ast ~ctx = function
+let __clause_of_ast ~ctx ast =
+  let ast' = match ast with
   | Ast_ho.Clause (head, body) ->
       (* first, conversion *)
       let head = convert_lits head in
@@ -119,6 +126,8 @@ let __clause_of_ast ~ctx = function
         TypeInference.Ctx.declare ctx (Symbol.of_string s) ty;
         None
       end
+  in
+  ast'
 
 let of_ho_ast p decls =
   try
@@ -132,15 +141,18 @@ let of_ho_ast p decls =
 let parse_file p filename =
   try
     let ic = open_in filename in
+    let lexbuf = Lexing.from_channel ic in
+    Loc.set_file lexbuf filename;
     begin try
-      let decls = Parse_ho.parse_decls Lex_ho.token (Lexing.from_channel ic) in
+      let decls = Parse_ho.parse_decls Lex_ho.token lexbuf in
       let res = of_ho_ast p (Sequence.of_list decls) in
       close_in ic;
       res
     with
     | Parse_ho.Error ->
       close_in ic;
-      Monad.Err.fail "parse error"
+      let loc = Loc.of_lexbuf lexbuf in
+      Monad.Err.fail ("parse error at "^Loc.to_string loc)
     | Lex_ho.Error msg ->
       close_in ic;
       Monad.Err.fail ("lexing error: " ^ msg)

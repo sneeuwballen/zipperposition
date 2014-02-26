@@ -67,7 +67,7 @@ val compose : ('a,'b) t -> ('b, 'c) t -> ('a, 'c) t
 
 val (>>>) : ('a,'b) t -> ('b, 'c) t -> ('a, 'c) t
   (** Infix notation for composition *)
-   
+
 (** {6 Currying} *)
 
 val currying : (foterm clause, hoterm clause) t
