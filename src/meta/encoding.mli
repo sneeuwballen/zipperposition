@@ -46,6 +46,12 @@ type hoterm = HOTerm.t
 type foclause = foterm clause
 type hoclause = hoterm clause
 
+val foclause_of_clause : Formula.FO.t list -> foclause
+  (** @raise Invalid_argument if the argument is not a proper clause *)
+
+val pp_clause : (Buffer.t -> 'a -> unit) -> Buffer.t -> 'a clause -> unit
+  (** Printer of clauses *)
+
 (** {6 Encoding abstraction} *)
 
 class type ['a, 'b] t = object

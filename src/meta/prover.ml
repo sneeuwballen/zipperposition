@@ -59,7 +59,7 @@ let add_fact p fact =
   add p (R.Clause.rule fact [])
 
 let add_fo_clause p clause =
-  let fact = Plugin.Base.holds#to_fact clause in
+  let fact = Plugin.holds#to_fact clause in
   add_fact p fact
 
 module Seq = struct
@@ -77,9 +77,9 @@ let convert_lits t =
     inherit PT.id_visitor
     method app ?loc f l =
       match PT.view f with
-      | PT.Const (Symbol.Conn (Symbol.Eq | Symbol.Neq | Symbol.Equiv) as s) ->
-          (* transform some connective into multisets
-           * TODO: also do it for OR/AND *)
+      | PT.Const (Symbol.Conn
+        (Symbol.Eq | Symbol.Neq | Symbol.Equiv | Symbol.Or | Symbol.And) as s) ->
+          (* transform some connective into multisets *)
           PT.app ?loc (PT.const s) [PT.list_ l]
       | _ -> PT.app ?loc f l
   end in

@@ -33,13 +33,15 @@ open Logtk_meta
 module HOT = HOTerm
 module F = Formula.FO
 module A = Ast_ho
+module E = Monad.Err
 
+let files = ref []
 let theory_files = ref []
 let flag_print_kb = ref false
 let flag_print_datalog = ref false
 
-let add_theory f =
-  theory_files := f :: !theory_files
+let add_file f = files := f :: !files
+let add_theory f = theory_files := f :: !theory_files
 
 let options =
   [ "-theory", Arg.String add_theory, "use given theory file"
@@ -48,13 +50,12 @@ let options =
 
 (* parse the given theory files into the prover *)
 let parse_files prover files =
-  let module E = Monad.Err in
   E.fold_l files (E.return prover)
     (fun p file ->
       E.map (Prover.parse_file p file) fst)
 
-let to_cnf decls =
-  let signature, decls = Util_tptp.infer_types (`sign Signature.TPTP.base) decls in
+let to_cnf ~signature decls =
+  let signature, decls = Util_tptp.infer_types (`sign signature) decls in
   let _, decls = Util_tptp.to_cnf signature decls in
   fun k ->
     let a = object
@@ -63,127 +64,72 @@ let to_cnf decls =
     end in
     Sequence.fold a#visit () decls
 
-let parse_and_cnf files =
+let parse_and_cnf ?(signature=Signature.TPTP.base) files =
   Sequence.flatMap
     (fun file ->
       (* parse *)
       let decls = Util_tptp.parse_file ~recursive:true file in
-      assert false (* TODO *)
-    )
+      (* CNF *)
+      let clauses = to_cnf ~signature decls in
+      (* convert clauses into Encoding.foclause *)
+      let clauses = Sequence.map Encoding.foclause_of_clause clauses in
+      let clauses = Sequence.persistent clauses in
+      clauses
+    ) (Sequence.of_list files)
 
-(* FIXME
-(* conversion to CNF of declarations *)
-let to_cnf ?(ctx=Skolem.create ()) decls =
-  let tyctx = TypeInference.Ctx.create ~base:true () in
-  let seq = Sequence.flatMap
-    (function
-      | A.FOF(n,role,f,info)
-      | A.TFF(n,role,f,info) ->
-        (* type formula *)
-        let f = TypeInference.FO.convert_form ~ctx:tyctx f in
-        begin match role with
-        | A.R_conjecture ->
-          (* negate conjecture *)
-          let clauses = Cnf.cnf_of ~ctx (F.mk_not f) in
-          Sequence.of_list clauses
-        | _ ->
-          (* translate, keeping the same role *)
-          let clauses = Cnf.cnf_of ~ctx f in
-          Sequence.of_list clauses
-        end
-      | A.CNF(_,_,c,_) ->
-        let c = TypeInference.FO.convert_clause ~ctx:tyctx c in
-        Sequence.singleton c
-      | _ -> Sequence.empty)
-    decls
-  in
-  (* iterating again would change skolems, etc, which is bad *)
-  Sequence.persistent seq
-
-(* obtain the global CNF of all files *)
-let parse_and_cnf files =
-  let ctx = Skolem.create () in
-  let clauses = List.map
-    (fun file ->
-      try
-        let decls = Util_tptp.parse_file ~recursive:true file in
-        let decls = to_cnf ~ctx decls in
-        decls
-      with Ast_tptp.ParseError loc ->
-        (* syntax error *)
-        Util.eprintf "parse error at %a\n" Location.pp loc;
-        exit 1)
-    files
-  in
-  Sequence.concat (Sequence.of_list clauses)
-
-(* print KB on stdout *)
-let print_kb ~kb =
-  Util.printf "%a\n" KB.pp kb;
-  flush stdout;
+(* print content of the reasoner *)
+let print_theory r =
+  Reasoner.Seq.to_seq r
+    |> Util.printf "theory: %a\n" (Util.pp_seq ~sep:"\n" Reasoner.Clause.pp);
   ()
 
 (* detect theories in clauses *)
-let detect_theories ~kb clauses =
-  let mp = MetaProver.create ~kb () in
-  Util.debug 4 "clauses: %a\n"
-    (Util.pp_seq ~sep:"\n" MetaReasoner.pp_clause)
-    (MetaReasoner.all_clauses (MetaProver.reasoner mp));
-  (* event notifiers *)
-  Signal.on (MetaProver.on_lemma mp)
-    (function
-      | KB.NewLemma (f,_) -> Util.printf "lemma: %a\n" F.pp f; true);
-  Signal.on (MetaProver.on_theory mp)
-    (function
-      | KB.NewTheory (s,args,_) ->
-        Util.printf "theory: %s(%a)\n" s (Util.pp_list HOT.pp) args;
-        true);
-  Signal.on (MetaProver.on_axiom mp)
-    (function
-      | KB.NewAxiom (s,args) ->
-        Util.printf "axiom: %s(%a)\n" s (Util.pp_list HOT.pp) args;
-        true);
-  (* match clauses *)
-  Sequence.iter
-    (fun c ->
-      let facts = MetaProver.match_clause mp c in
-      MetaProver.add_literals mp (Sequence.of_list facts))
-    clauses;
-  mp
+let detect_theories prover clauses =
+  let facts = Sequence.map Plugin.holds#to_fact clauses in
+  let facts = Sequence.map Reasoner.Clause.fact facts in
+  (* add clauses (ignore prover) *)
+  let _, consequences = Prover.Seq.of_seq prover facts in
+  let consequence_terms = Sequence.map fst consequences in
+  (* filter theories, axioms, lemmas... *)
+  let theories = Sequence.fmap Plugin.theory#of_fact consequence_terms
+  and lemmas = Sequence.fmap Plugin.lemma#of_fact consequence_terms
+  and axioms = Sequence.fmap Plugin.axiom#of_fact consequence_terms in
+  theories, lemmas, axioms
 
 let main () =
-  let files = ref [] in
-  let add_file f = files := f :: !files in
-  Arg.parse options add_file "detect_theories [options] [file1|stdin] file2...";
+  Arg.parse options add_file "detect_theories [options] (file1|stdin) [file2...]";
   (* set default *)
-  (match !kb_files, !theory_files with
-    | [], [] -> theory_files := ["data/builtin.theory"]
-    | _ -> ());
-  (if !files = [] then files := ["stdin"]);
-  (* parse KB *)
-  let kb = parse_kb !kb_files !theory_files in
-  match kb with
-  | Monad.Err.Ok kb ->
-    if !flag_print_kb then print_kb ~kb;
+  begin match !theory_files with
+    | [] -> theory_files := ["data/builtin.theory"]
+    | _ -> ()
+  end;
+  if !files = [] then files := ["stdin"];
+  (* parse theory files *)
+  let prover = Prover.empty in
+  let res = E.(
+    parse_files prover !theory_files >>= fun prover ->
+    if !flag_print_kb then print_theory (Prover.reasoner prover);
     (* parse CNF formulas *)
-    let clauses = parse_and_cnf !files in
-    (* detect theories *)
-    let mp = detect_theories ~kb clauses in
-    (* print datalog? *)
-    if !flag_print_datalog then
-      let clauses = MetaReasoner.all_clauses (MetaProver.reasoner mp) in
-      Sequence.iter (fun c -> Util.printf "  %a\n" MetaReasoner.pp_clause c) clauses;
-    flush stdout;
-    Util.debug 1 "success!";
-    ()
-  | Monad.Err.Error msg ->
-    Util.debug 0 "error: %s" msg;
-    exit 1
+    E.guard (fun () -> parse_and_cnf !files) >>= fun clauses ->
+    let theories, lemmas, axioms = detect_theories prover clauses in
+    E.return (theories, lemmas, axioms)
+  ) in
+  match res with
+  | E.Error msg ->
+      Util.debug 0 "error: %s" msg; exit 1
+  | E.Ok (theories, lemmas, axioms) ->
+      Util.debug 1 "success!";
+      Util.debug 1 "axioms:\n  %a\n"
+        (Util.pp_seq ~sep:"\n  " (Util.pp_pair Symbol.pp HOT.pp)) axioms;
+      Util.debug 0 "theories:\n  %a\n"
+        (Util.pp_seq ~sep:"\n  " (Util.pp_pair Symbol.pp HOT.pp)) theories;
+      Util.debug 0 "lemmas:\n  %a\n"
+        (Util.pp_seq ~sep:"\n  " (Encoding.pp_clause FOTerm.pp)) lemmas;
+      ()
 
 let _ =
   try
     main ()
-  with TypeUnif.Error e ->
-    Util.printf "%a\n" TypeUnif.pp_error e;
+  with Type.Error s ->
+    Util.printf "%s\n" s;
     exit 1
-  *)

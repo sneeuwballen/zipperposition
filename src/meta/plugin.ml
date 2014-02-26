@@ -78,70 +78,70 @@ let signature_of_set (s:set) : Signature.t =
 
 (** {2 Builtin plugins} *)
 
+let __sym_holds = Symbol.of_string "holds"
+let __sym_lemma = Symbol.of_string "lemma"
+let __ty_wrap = Type.(Reasoner.property_ty <=. Type.TPTP.o)
+let __encoding_wrap =
+  Encoding.(currying >>> rigidifying >>> clause_prop)
+
+(* clause that implies (holds c) whenever (lemma c) is true *)
+let __clause_lemma_imply_holds =
+  let var = T.var ~ty:Type.TPTP.o 0 in
+  Reasoner.Clause.rule
+    (T.at (T.const ~ty:__ty_wrap __sym_holds) var)
+    [ T.at (T.const ~ty:__ty_wrap __sym_lemma) var ]
+
+let wrap_fo_clause pred clauses : foclause extended =
+  let hd = T.const ~ty:__ty_wrap pred in
+  object
+    method symbol = pred
+    method ty = __ty_wrap
+    method owns t =
+      try Symbol.eq (T.head t) pred
+      with _ -> false
+
+    method to_fact c =
+      T.at hd (__encoding_wrap#encode c : Encoding.EncodedClause.t :> T.t)
+
+    method of_fact t =
+      match T.view t with
+      | T.At (hd', c) when T.eq hd hd' ->
+          __encoding_wrap#decode (Encoding.EncodedClause.__magic c)
+      | _ -> None
+
+    method clauses = clauses
+  end
+
+let holds = wrap_fo_clause __sym_holds []
+let lemma = wrap_fo_clause __sym_lemma [__clause_lemma_imply_holds]
+
+let axiom_or_theory which : (Symbol.t * term) extended  =
+  let s = Symbol.of_string which in
+  let ty_name = Type.const (Symbol.of_string "name") in
+  let ty = Type.(forall [var 0] (Reasoner.property_ty <== [ty_name; var 0])) in
+  let hd = T.const ~ty s in
+  object
+    method symbol = s
+    method ty = ty
+    method owns t =
+      try Symbol.eq (T.head t) s
+      with _ -> false
+    method to_fact (s,t) =
+      T.at_full ~tyargs:[T.ty t] hd [T.const ~ty:ty_name s; t]
+    method of_fact t = match T.open_at t with
+      | hd', _, [s;t] when T.eq hd hd' ->
+          begin match T.view s with
+          | T.Const s -> Some (s, t)
+          | _ -> None
+          end
+      | _ -> None
+    method clauses = []
+  end
+
+let axiom = axiom_or_theory "axiom"
+let theory = axiom_or_theory "theory"
+
 module Base = struct
-  let __sym_holds = Symbol.of_string "holds"
-  let __sym_lemma = Symbol.of_string "lemma"
-  let __ty_wrap = Type.(Reasoner.property_ty <=. Type.TPTP.o)
-  let __encoding_wrap =
-    Encoding.(currying >>> rigidifying >>> clause_prop)
-
-  (* clause that implies (holds c) whenever (lemma c) is true *)
-  let __clause_lemma_imply_holds =
-    let var = T.var ~ty:Type.TPTP.o 0 in
-    Reasoner.Clause.rule
-      (T.at (T.const ~ty:__ty_wrap __sym_holds) var)
-      [ T.at (T.const ~ty:__ty_wrap __sym_lemma) var ]
-
-  let wrap_fo_clause pred clauses : foclause extended =
-    let hd = T.const ~ty:__ty_wrap pred in
-    object
-      method symbol = pred
-      method ty = __ty_wrap
-      method owns t =
-        try Symbol.eq (T.head t) pred
-        with _ -> false
-
-      method to_fact c =
-        T.at hd (__encoding_wrap#encode c : Encoding.EncodedClause.t :> T.t)
-
-      method of_fact t =
-        match T.view t with
-        | T.At (hd', c) when T.eq hd hd' ->
-            __encoding_wrap#decode (Encoding.EncodedClause.__magic c)
-        | _ -> None
-
-      method clauses = clauses
-    end
-
-  let holds = wrap_fo_clause __sym_holds []
-  let lemma = wrap_fo_clause __sym_lemma [__clause_lemma_imply_holds]
-
-  let axiom_or_theory which : (Symbol.t * term) extended  =
-    let s = Symbol.of_string which in
-    let ty_name = Type.const (Symbol.of_string "name") in
-    let ty = Type.(forall [var 0] (Reasoner.property_ty <== [ty_name; var 0])) in
-    let hd = T.const ~ty s in
-    object
-      method symbol = s
-      method ty = ty
-      method owns t =
-        try Symbol.eq (T.head t) s
-        with _ -> false
-      method to_fact (s,t) =
-        T.at_full ~tyargs:[T.ty t] hd [T.const ~ty:ty_name s; t]
-      method of_fact t = match T.open_at t with
-        | hd', _, [s;t] when T.eq hd hd' ->
-            begin match T.view s with
-            | T.Const s -> Some (s, t)
-            | _ -> None
-            end
-        | _ -> None
-      method clauses = []
-    end
-
-  let axiom = axiom_or_theory "axiom"
-  let theory = axiom_or_theory "theory"
-
   let __list = [ (holds :> t) ; (lemma :> t); (axiom :> t) ; (theory :> t) ]
 
   let set =

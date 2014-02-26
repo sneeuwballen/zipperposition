@@ -57,6 +57,30 @@ type hoterm = HOT.t
 type foclause = foterm clause
 type hoclause = hoterm clause
 
+(* convert a list of formulas into a clause *)
+let foclause_of_clause l =
+  let module F = Formula.FO in
+  let term_of_form f = match F.view f with
+    | F.Atom t -> t
+    | _ -> raise (Invalid_argument (Util.sprintf "expected term, got formula %a" F.pp f))
+  in
+  List.map
+    (fun f -> match F.view f with
+      | F.Not f' -> Prop (term_of_form f', false)
+      | F.Eq (a,b) -> Eq (a, b, true)
+      | F.Neq (a,b) -> Eq (a, b, false)
+      | _ -> Prop (term_of_form f, true)
+    ) l
+
+let pp_clause pp_t buf c =
+  Util.pp_list ~sep:" | "
+    (fun buf lit -> match lit with
+      | Eq (a, b, true) -> Printf.bprintf buf "%a = %a" pp_t a pp_t b
+      | Eq (a, b, false) -> Printf.bprintf buf "%a != %a" pp_t a pp_t b
+      | Prop (a, true) -> pp_t buf a
+      | Prop (a, false) -> Printf.bprintf buf "~ %a" pp_t a)
+    buf c
+
 (** {6 Encoding abstraction} *)
 
 class type ['a, 'b] t = object

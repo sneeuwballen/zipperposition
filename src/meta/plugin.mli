@@ -74,21 +74,21 @@ val signature_of_set : set -> Signature.t
 
 (** {2 Builtin plugins} *)
 
+val holds : foclause extended
+  (** holds: statement about which First-Order clause is true in the
+   * current problem *)
+
+val axiom : (Symbol.t * term) extended
+  (** axioms present in the problem (name of axiom+argument) *)
+
+val theory : (Symbol.t * term) extended
+  (** theories that are present in the problem (name of theory +argument) *)
+
+val lemma : foclause extended
+  (** Lemma: similar to {!holds}, but explicitely used for facts
+   * deduced by the meta-prover. In general [lemma f => holds f]. *)
+
 module Base : sig
-  val holds : foclause extended
-    (** holds: statement about which First-Order clause is true in the
-     * current problem *)
-
-  val axiom : (Symbol.t * term) extended
-    (** axioms present in the problem (name of axiom+argument) *)
-
-  val theory : (Symbol.t * term) extended
-    (** theories that are present in the problem (name of theory +argument) *)
-
-  val lemma : foclause extended
-    (** Lemma: similar to {!holds}, but explicitely used for facts
-     * deduced by the meta-prover. In general [lemma f => holds f]. *)
-
   val set : set
     (** The set of default plugins *)
 
