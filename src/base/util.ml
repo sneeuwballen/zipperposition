@@ -273,6 +273,13 @@ let rec list_inter comp l1 l2 = match l1 with
   | x::xs when list_mem comp x l2 -> x::(list_inter comp xs l2)
   | _::xs -> list_inter comp xs l2
 
+let split_at n l =
+  let rec iter acc n l = match l with
+  | _ when n=0 -> List.rev acc, l
+  | [] -> List.rev acc, l
+  | x::l' -> iter (x::acc) (n-1) l'
+  in iter [] n l
+
 let list_find p l =
   let rec search i l = match l with
   | [] -> None

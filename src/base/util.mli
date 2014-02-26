@@ -89,59 +89,84 @@ end
 
 (** {2 Ordering utils} *)
 
-(** lexicographic order on lists l1,l2 which elements are ordered by f *)
 val lexicograph : ('a -> 'b -> int) -> 'a list -> 'b list -> int
-(** combine comparisons by lexicographic order *)
+  (** lexicographic order on lists l1,l2 which elements are ordered by f *)
+
 val lexicograph_combine : int list -> int
+  (** combine comparisons by lexicographic order *)
 
 (** the opposite order, that sorts elements the opposite way *)
 val opposite_order : ('a -> 'b -> int) -> 'a -> 'b -> int
 
 (** {2 List utils} *)
 
-(** get n-th element of list (linear), or Not_found *)
 val list_get : 'a list -> int -> 'a
-(** set n-th element of list (linear) *)
+  (** get n-th element of list (linear), or Not_found *)
+
 val list_set : 'a list -> int -> 'a -> 'a list
-(** map with index *)
+  (** set n-th element of list (linear) *)
+
 val list_mapi : 'a list -> (int -> 'a -> 'b) -> 'b list
-(** iter with index *)
+  (** map with index *)
+
 val list_iteri : 'a list -> (int -> 'a -> unit) -> unit
-(** all the list but i-th element (linear) *)
+  (** iter with index *)
+
 val list_remove : 'a list -> int -> 'a list
-(** zip the list with positions (starting at 0) *)
+  (** all the list but i-th element (linear) *)
+
 val list_pos : 'a list -> ('a * int) list
-(** test for membership using the given comparison function *)
+  (** zip the list with positions (starting at 0) *)
+
 val list_mem : ('a -> 'a -> bool) -> 'a -> 'a list -> bool
-(** test for inclusion *)
+  (** test for membership using the given comparison function *)
+
 val list_subset : ('a -> 'a -> bool) -> 'a list -> 'a list -> bool
-(** list uniq: remove duplicates w.r.t the equality predicate *)
+  (** test for inclusion *)
+
 val list_uniq : ('a -> 'a -> bool) -> 'a list -> 'a list
-(** merges elements from both sorted list, removing duplicates *)
+  (** list uniq: remove duplicates w.r.t the equality predicate *)
+
 val list_merge : ('a -> 'a -> int) -> 'a list -> 'a list -> 'a list
-(** list union, given the comparison function *)
+  (** merges elements from both sorted list, removing duplicates *)
+
 val list_union : ('a -> 'a -> bool) -> 'a list -> 'a list -> 'a list
-(** list intersection, given the comparison function *)
+  (** list union, given the comparison function *)
+
 val list_inter : ('a -> 'a -> bool) -> 'a list -> 'a list -> 'a list
-(** find the first index of element, elemnt s.t. the element satisfies the predicate *)
+  (** list intersection, given the comparison function *)
+
+val list_split_at : int -> 'a list -> 'a list * 'a list
+  (** [split_at n l] returns [l1, l2] with [l1 @ l2 = l]
+      and [length l1 = min n (length l)] *)
+
 val list_find : ('a -> bool) -> 'a list -> (int * 'a) option
-(** filter map *)
+  (** find the first index of element, elemnt s.t. the element satisfies the predicate *)
+
 val list_fmap : ('a -> 'b option) -> 'a list -> 'b list
-(** flatten map *)
+  (** filter map *)
+
 val list_flatmap : ('a -> 'b list) -> 'a list -> 'b list
-(** take n elements *)
+  (** flatten map *)
+
 val list_take : int -> 'a list -> 'a list
-(** drop n elements *)
+  (** take n elements *)
+
 val list_drop : int -> 'a list -> 'a list
-(** range from i to j *)
+  (** drop n elements *)
+
 val list_range : int -> int -> int list
-(** fold on list, with index *)
+  (** range from i to j *)
+
 val list_foldi : ('b -> int -> 'a -> 'b) -> 'b -> 'a list -> 'b
-(** call the function n times with unit *)
+  (** fold on list, with index *)
+
 val times : int -> (unit -> 'a) -> 'a list
+  (** call the function n times with unit *)
 
 val list_product : 'a list -> 'b list -> ('a * 'b) list
   (** Cartesian product *)
+
 val list_fold_product : 'a list -> 'b list -> 'c -> ('c -> 'a -> 'b -> 'c) -> 'c
   (** Fold on the cartesian product *)
 
@@ -149,54 +174,28 @@ val list_diagonal : 'a list -> ('a * 'a) list
   (** All pairs of distinct positions of the list. [list_diagonal l] will
       return the list of [List.nth i l, List.nth j l] if [i < j]. *)
 
-(** shuffle randomly the array, in place *)
 val array_shuffle : 'a array -> unit
-(** shuffle randomly the list *)
+  (** shuffle randomly the array, in place *)
+
 val list_shuffle : 'a list -> 'a list
+  (** shuffle randomly the list *)
 
 (** {2 Array utils} *)
 
-(** fold left on array, with index *)
 val array_foldi : ('b -> int -> 'a -> 'b) -> 'b -> 'a array -> 'b
-(** Forall on array *)
+  (** fold left on array, with index *)
+
 val array_forall : ('a -> bool) -> 'a array -> bool
-(** Forall on pairs of arrays (Invalid_argument if they have distinct lengths) *)
+  (** Forall on array *)
+
 val array_forall2 : ('a -> 'a -> bool) -> 'a array -> 'a array -> bool
-(** exists on array *)
+  (** Forall on pairs of arrays (Invalid_argument if they have distinct lengths) *)
+
 val array_exists : ('a -> bool) -> 'a array -> bool
-(** Elements of array except the one at given index (reverse list) *)
+  (** exists on array *)
+
 val array_except_idx : 'a array -> int -> 'a list
-
-(** {2 Finite Bijections} *)
-
-module Bijection(X : Hashtbl.HashedType) : sig
-  type elt = X.t
-  type t
-  
-  val of_array : elt array -> elt array -> t
-  val of_list : elt list -> elt list -> t
-
-  val is_permutation : t -> bool
-    (** Is the bijection a permutation (ie, domain = codomain)? *)
-
-  val apply : t -> elt -> elt
-
-  val apply_strict : t -> elt -> elt
-    (** Like {! apply}, but fails if the element is not in the
-        domain of the bijection by raising Not_found *)
-
-  val apply_list : t -> elt list -> elt list
-
-  val compose : t -> t -> t
-    (** [compose p1 p2 x] is the same as [p1 (p2 x)] *)
-
-  val compose_list : t list -> t
-
-  val rev : t -> t
-    (** Reverse bijection *)
-
-  val to_list : t -> (elt * elt) list
-end
+  (** Elements of array except the one at given index (reverse list) *)
 
 (** {2 String utils} *)
 
