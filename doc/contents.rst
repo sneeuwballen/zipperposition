@@ -8,3 +8,4 @@ Some design documents and explanations about Logtk.
    Hierarchy of term representations <term_hierarchy>
    Meta-Prover <meta_prover>
    Higher-Order indexing <ho_indexing>
+   Type Inference <type_inference>
