@@ -531,7 +531,7 @@ let rec pp_depth ?(hooks=[]) depth buf t =
           assert (args <> []);
           pp_rec buf f;
           Buffer.add_char buf ' ';
-          Util.pp_list ~sep:" " pp_rec buf args
+          Util.pp_list ~sep:" " pp_inner buf args
         end
     | Const s -> Symbol.pp buf s
     | Var i ->
@@ -542,6 +542,10 @@ let rec pp_depth ?(hooks=[]) depth buf t =
     (* print type of term *)
     if !print_all_types
       then Printf.bprintf buf ":%a" Type.pp (ty t)
+  and pp_inner buf t = match view t with
+    | TyApp _
+    | App _ -> Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
+    | _ -> pp_rec buf t
   in
   pp_rec buf t
 

@@ -63,7 +63,7 @@ let to_cnf ~signature decls =
   fun k ->
     let a = object
       inherit [unit] Ast_tptp.Typed.visitor
-      method cnf () c = k c
+      method clause () _role c = k c
     end in
     Sequence.fold a#visit () decls
 
