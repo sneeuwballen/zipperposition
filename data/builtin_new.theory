@@ -1,5 +1,5 @@
 % Builtin theories and lemmas (new syntax)
-% vim:shiftwidth=2:
+% vim:softtabstop=2:
 
 axiom (associative F) <-
   holds [F ?x (F ?y ?z) = F (F ?x ?y) ?z].
@@ -42,10 +42,10 @@ axiom (left_identity {op=Mult, elem=E}) <-
 axiom (right_identity {op=Mult, elem=E}) <-
   holds [Mult ?x E = ?x].
 
-axiom (right_inverse {op=Mult, inverse=I, elem=E}) <-
+axiom (left_inverse {op=Mult, inverse=I, elem=E}) <-
   holds [Mult (I ?x) ?x = E].
 
-axiom (left_inverse {op=Mult, inverse=I, elem=E}) <-
+axiom (right_inverse {op=Mult, inverse=I, elem=E}) <-
   holds [Mult ?x (I ?x) = E].
 
 axiom (left_absorb {op=Mult, elem=E}) <-
@@ -86,4 +86,14 @@ theory (monoid {op=Mult, neutral=E}) <-
 axiom (associative F) <-
   theory (monoid {op=F | _}).
 
-% group : TODO
+% group
+
+theory (group {op=Mult, neutral=E, inverse=I}) <-
+  theory (monoid {op=Mult, neutral=E}),
+  axiom (left_inverse {op=Mult, inverse=I, elem=E}),
+  axiom (right_inverse {op=Mult, inverse=I, elem=E}).
+
+theory (group {op=Mult, neutral=E, inverse=I}) <-
+  axiom (associative Mult),
+  axiom (left_inverse {op=Mult, inverse=I, elem=E}),
+  axiom (left_identity {op=Mult, elem=E}).

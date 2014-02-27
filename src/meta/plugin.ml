@@ -137,7 +137,7 @@ let axiom_or_theory which : (Symbol.t * term) extended  =
           begin match T.open_at f with
           | name, _, [arg] ->
               begin match T.view name with
-              | T.Const s -> Some (s, t)
+              | T.Const s -> Some (s, arg)
               | _ -> None
               end
           | _ -> None
