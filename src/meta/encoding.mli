@@ -33,6 +33,7 @@ open Logtk
 type 'a lit =
   | Eq of 'a * 'a * bool
   | Prop of 'a * bool
+  | Bool of bool
 
 val fmap_lit : ('a -> 'b) -> 'a lit -> 'b lit
 

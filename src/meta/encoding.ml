@@ -37,15 +37,18 @@ module HOT = HOTerm
 type 'a lit =
   | Eq of 'a * 'a * bool
   | Prop of 'a * bool
+  | Bool of bool
 
 let fmap_lit f = function
   | Eq (a,b, truth) -> Eq (f a, f b, truth)
   | Prop (a, truth) -> Prop (f a, truth)
+  | Bool b -> Bool b
 
 let opt_seq_lit = function
   | Eq (Some a, Some b, truth) -> Some (Eq (a, b, truth))
   | Prop (Some a, truth) -> Some (Prop (a, truth))
   | Eq _ | Prop _ -> None
+  | Bool b -> Some (Bool b)
 
 type 'a clause = 'a lit list
 
@@ -60,6 +63,7 @@ type hoclause = hoterm clause
 (* convert a list of formulas into a clause *)
 let foclause_of_clause l =
   let module F = Formula.FO in
+  Util.debug 5 "foclause_of_clause %a" (Util.pp_list F.pp) l;
   let term_of_form f = match F.view f with
     | F.Atom t -> t
     | _ -> raise (Invalid_argument (Util.sprintf "expected term, got formula %a" F.pp f))
@@ -69,6 +73,8 @@ let foclause_of_clause l =
       | F.Not f' -> Prop (term_of_form f', false)
       | F.Eq (a,b) -> Eq (a, b, true)
       | F.Neq (a,b) -> Eq (a, b, false)
+      | F.True -> Bool true
+      | F.False -> Bool false
       | _ -> Prop (term_of_form f, true)
     ) l
 
@@ -78,8 +84,9 @@ let pp_clause pp_t buf c =
       | Eq (a, b, true) -> Printf.bprintf buf "%a = %a" pp_t a pp_t b
       | Eq (a, b, false) -> Printf.bprintf buf "%a != %a" pp_t a pp_t b
       | Prop (a, true) -> pp_t buf a
-      | Prop (a, false) -> Printf.bprintf buf "~ %a" pp_t a)
-    buf c
+      | Prop (a, false) -> Printf.bprintf buf "~ %a" pp_t a
+      | Bool b -> Printf.bprintf buf "%B" b
+    ) buf c
 
 (** {6 Encoding abstraction} *)
 
@@ -204,6 +211,8 @@ let __encode_lit = function
         else HOT.at (HOT.tyat __neq_conn ty) (HOT.multiset ~ty [a; b])
   | Prop (p, true) -> p
   | Prop (p, false) -> HOT.at __not_conn p
+  | Bool true -> HOT.TPTP.true_
+  | Bool false -> HOT.TPTP.false_
 
 let __decode_lit t = match HOT.open_at t with
   | hd, _, [r] when HOT.eq hd __not_conn -> Prop (r, false)

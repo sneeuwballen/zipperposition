@@ -296,10 +296,12 @@ module Make(MyT : TERM) = struct
   let kind = T.Kind.Formula MyT.kind
 
   let of_term t = match T.kind t with
+    | kind when kind = MyT.kind -> Some t
     | T.Kind.Formula kind when kind = MyT.kind -> Some t
     | _ -> None
 
   let of_term_exn t = match T.kind t with
+    | kind when kind = MyT.kind -> t
     | T.Kind.Formula kind when kind = MyT.kind -> t
     | _ -> raise (Invalid_argument "Formula.of_term_exn")
 
