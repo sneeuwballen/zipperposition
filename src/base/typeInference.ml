@@ -105,7 +105,10 @@ module Ctx = struct
     ()
 
   let exit_scope ctx =
-    Hashtbl.clear ctx.vars
+    Hashtbl.clear ctx.vars;
+    Hashtbl.clear ctx.tyvars;
+    Substs.Renaming.clear ctx.renaming;
+    ()
 
   let add_signature ctx signature =
     ctx.signature <- Signature.merge ctx.signature signature;
@@ -543,7 +546,8 @@ module FO = struct
         | Sym.Exists -> F.Base.exists (vars' ctx) (f' ctx)
         | _ -> assert false
         end
-    | PT.App ({PT.term=PT.Const (Sym.Conn ((Sym.Eq | Sym.Neq) as conn))}, [a;b]) ->
+    | PT.App ({PT.term=PT.Const (Sym.Conn ((Sym.Eq | Sym.Neq) as conn))},
+      ([_;a;b] | [_; {PT.term=PT.List [a;b]}] | [a;b])) ->
       (* a ?= b *)
       let tya, a = infer ctx a in
       let tyb, b = infer ctx b in

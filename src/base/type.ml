@@ -297,8 +297,8 @@ and pp_inner depth buf t = match view t with
 let pp_depth ?hooks depth buf t = pp_rec depth buf t
 
 let pp buf t = pp_rec 0 buf t
+let pp_surrounded buf t = (pp_inner 0) buf t
 
-(* let pp buf ty = T.pp buf ty *)
 let to_string = Util.on_buffer pp
 let fmt fmt ty = Format.pp_print_string fmt (to_string ty)
 

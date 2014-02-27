@@ -38,6 +38,7 @@ module E = Monad.Err
 let files = ref []
 let theory_files = ref []
 let flag_print_theory = ref false
+let flag_print_cnf = ref false
 let flag_print_signature = ref false
 
 let add_file f = files := f :: !files
@@ -46,6 +47,7 @@ let add_theory f = theory_files := f :: !theory_files
 let options =
   [ "-theory", Arg.String add_theory, "use given theory file"
   ; "-print-theory", Arg.Set flag_print_theory, "print the whole theory"
+  ; "-print-cnf", Arg.Set flag_print_cnf, "print the clausal form of input files"
   ; "-print-signature", Arg.Set flag_print_signature, "print initial theory signature"
   ] @ Options.global_opts
 
@@ -66,23 +68,30 @@ let to_cnf ~signature decls =
     Sequence.fold a#visit () decls
 
 let parse_and_cnf ?(signature=Signature.TPTP.base) files =
-  Sequence.flatMap
+  let s = Sequence.flatMap
     (fun file ->
+      Util.debug 1 "parse input file %s" file;
       (* parse *)
       let decls = Util_tptp.parse_file ~recursive:true file in
+      Util.debug 3 "parsed %d declarations..." (Sequence.length decls);
       (* CNF *)
       let clauses = to_cnf ~signature decls in
+      Util.debug 3 "obtained %d clauses..." (Sequence.length clauses);
       (* convert clauses into Encoding.foclause *)
       let clauses = Sequence.map Encoding.foclause_of_clause clauses in
-      let clauses = Sequence.persistent clauses in
       clauses
     ) (Sequence.of_list files)
+  in Sequence.persistent s
 
 (* print content of the reasoner *)
 let print_theory r =
   Reasoner.Seq.to_seq r
-    |> Util.printf "theory: %a\n" (Util.pp_seq ~sep:"\n" Reasoner.Clause.pp);
+    |> Util.printf "theory:\n  %a\n" (Util.pp_seq ~sep:"\n  " Reasoner.Clause.pp);
   ()
+
+let print_clauses c =
+  Util.printf "clauses:\n  %a\n"
+    (Util.pp_seq ~sep:"\n  " (Encoding.pp_clause FOTerm.pp)) c
 
 (* detect theories in clauses *)
 let detect_theories prover clauses =
@@ -111,10 +120,14 @@ let main () =
     then Util.debug 0 "initial signature: %a" Signature.pp (Prover.signature prover);
   let res = E.(
     parse_files prover !theory_files >>= fun prover ->
+    Util.debug 3 "theory files parsed";
     if !flag_print_theory then print_theory (Prover.reasoner prover);
     (* parse CNF formulas *)
     E.guard (fun () -> parse_and_cnf !files) >>= fun clauses ->
+    Util.debug 3 "input files parsed and translated to CNF";
+    if !flag_print_cnf then print_clauses clauses;
     let theories, lemmas, axioms = detect_theories prover clauses in
+    Util.debug 3 "theory detection done";
     E.return (theories, lemmas, axioms)
   ) in
   match res with

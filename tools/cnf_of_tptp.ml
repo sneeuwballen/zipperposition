@@ -49,7 +49,7 @@ let process file =
     (* parse *)
     let decls = Util_tptp.parse_file ~recursive:true file in
     (* to CNF *)
-    let signature, decls = Util_tptp.infer_types (`sign Signature.empty) decls in
+    let signature, decls = Util_tptp.infer_types (`sign Signature.TPTP.base) decls in
     let signature, decls = Util_tptp.to_cnf signature decls in
     let decls = if !declare_types
       then Sequence.append (Util_tptp.Typed.declare_symbols signature) decls

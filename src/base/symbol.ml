@@ -110,7 +110,7 @@ let to_string s = match s with
       | And -> "∧" 
       | Or -> "∨" 
       | Imply -> "→"
-      | Equiv -> "←→"
+      | Equiv -> "<=>"
       | Xor -> "<~>"
       | Eq -> "="
       | Neq -> "≠"

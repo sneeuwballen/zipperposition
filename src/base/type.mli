@@ -192,6 +192,8 @@ val apply_list : t -> t list -> t
 
 include Interfaces.PRINT_DE_BRUIJN with type term := t and type t := t
 include Interfaces.PRINT with type t := t
+val pp_surrounded : Buffer.t -> t -> unit
+
 (*
 include Interfaces.SERIALIZABLE with type t := t
 *)

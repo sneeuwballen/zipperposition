@@ -460,12 +460,8 @@ let to_cnf signature decls =
         in
         let clauses = Cnf.cnf_of ~ctx f in
         Sequence.map
-          (fun c ->
-            match decl with
-            | AT.TFF _ -> AT.TFF(n,role, F.close_forall (F.Base.or_ c),info)
-            | AT.FOF _ -> AT.CNF(n,role, c,info)
-            | _ -> assert false)
-            (Sequence.of_list clauses)
+          (fun c -> AT.CNF(n,role, c,info))
+          (Sequence.of_list clauses)
       | AT.THF _ -> failwith "cnf_of_tptp cannot deal with HO terms right now."
       | _ -> Sequence.singleton decl
     ) decls

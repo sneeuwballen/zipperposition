@@ -109,8 +109,14 @@ module Renaming = struct
       end
   | _ -> assert false
 
+  let __var_count = ref ~-1
+
   let rename_fresh_var r v = match r, T.view v with
-  | Dummy, _ -> v   (* XXX very dangerous !! *)
+  | Dummy, _ ->
+      let ty = T.ty_exn v in
+      let n = !__var_count in
+      decr __var_count;
+      T.var ~kind:(T.kind v) ~ty n
   | Tbl tbl, T.Const (Symbol.Conn (Symbol.FreshVar i)) ->
       let ty = T.ty_exn v in
       let key = FreshVar (i, ty) in

@@ -488,7 +488,7 @@ let pp_depth ?(hooks=[]) depth buf t =
   let rec pp_rec buf t = match view t with
   | BVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
   | Lambda (varty,t') ->
-    Printf.bprintf buf "λ%a:%a. " pp_bvar () Type.pp varty;
+    Printf.bprintf buf "λ%a:%a. " pp_bvar () Type.pp_surrounded varty;
     incr depth;
     pp_surrounded buf t';
     decr depth
@@ -496,7 +496,7 @@ let pp_depth ?(hooks=[]) depth buf t =
   | RigidVar i -> Printf.bprintf buf "?x%d" i
   | Var i ->
       if not !print_all_types
-      then Printf.bprintf buf "X%d:%a" i Type.pp (ty t)
+      then Printf.bprintf buf "X%d:%a" i Type.pp_surrounded (ty t)
       else Printf.bprintf buf "X%d" i
   | At (l,r) ->
     pp_rec buf l; Buffer.add_char buf ' ';
@@ -510,16 +510,16 @@ let pp_depth ?(hooks=[]) depth buf t =
     Printf.bprintf buf "{ | %a}" pp_rec r
   | Record (l, None) ->
     Buffer.add_char buf '{';
-    Util.pp_list (fun buf (n, t) -> Printf.bprintf buf "%s: %a" n pp_rec t)
+    Util.pp_list (fun buf (n, t) -> Printf.bprintf buf "%s=%a" n pp_rec t)
       buf l;
     Buffer.add_char buf '}'
   | Record (l, Some r) ->
     Buffer.add_char buf '{';
-    Util.pp_list (fun buf (n, t) -> Printf.bprintf buf "%s: %a" n pp_rec t)
+    Util.pp_list (fun buf (n, t) -> Printf.bprintf buf "%s=%a" n pp_rec t)
       buf l;
     Printf.bprintf buf " | %a}" pp_rec r
   | Multiset l ->
-    Printf.bprintf buf "{| %a |}" (Util.pp_list pp_rec) l
+    Printf.bprintf buf "[%a]" (Util.pp_list pp_rec) l
   and pp_surrounded buf t = match view t with
   | Lambda _ | At _ | TyAt _ ->
     Buffer.add_char buf '('; pp_rec buf t;  Buffer.add_char buf ')'
