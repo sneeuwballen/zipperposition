@@ -101,7 +101,10 @@ let wrap_fo_clause pred clauses : foclause extended =
       with _ -> false
 
     method to_fact c =
-      T.at hd (__encoding_wrap#encode c : Encoding.EncodedClause.t :> T.t)
+      Util.debug 5 "encode clause %a" (Encoding.pp_clause FOTerm.pp) c;
+      let c' = (__encoding_wrap#encode c : Encoding.EncodedClause.t :> T.t) in
+      Util.debug 5 "... into %a" T.pp c';
+      T.at hd c'
 
     method of_fact t =
       match T.view t with

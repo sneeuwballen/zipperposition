@@ -100,8 +100,10 @@ let print_signature signature =
 
 (* detect theories in clauses *)
 let detect_theories prover clauses =
-  let facts = Sequence.map Plugin.holds#to_fact clauses in
-  let facts = Sequence.map Reasoner.Clause.fact facts in
+  let facts = clauses
+    |> Sequence.map Plugin.holds#to_fact
+    |> Sequence.map Reasoner.Clause.fact
+  in
   (* add clauses (ignore prover) *)
   let _, consequences = Prover.Seq.of_seq prover facts in
   let consequence_terms = Sequence.map fst consequences in
@@ -140,11 +142,11 @@ let main () =
       Util.debug 0 "error: %s" msg; exit 1
   | E.Ok (theories, lemmas, axioms) ->
       Util.debug 1 "success!";
-      Util.debug 1 "axioms:\n  %a\n"
+      Util.printf "axioms:\n  %a\n"
         (Util.pp_seq ~sep:"\n  " (Util.pp_pair Symbol.pp HOT.pp)) axioms;
-      Util.debug 0 "theories:\n  %a\n"
+      Util.printf "theories:\n  %a\n"
         (Util.pp_seq ~sep:"\n  " (Util.pp_pair Symbol.pp HOT.pp)) theories;
-      Util.debug 0 "lemmas:\n  %a\n"
+      Util.printf "lemmas:\n  %a\n"
         (Util.pp_seq ~sep:"\n  " (Encoding.pp_clause FOTerm.pp)) lemmas;
       ()
 

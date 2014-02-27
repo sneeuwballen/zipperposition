@@ -218,7 +218,7 @@ let __decode_lit t = match HOT.open_at t with
 let clause_prop = object
   method encode c =
     let lits = List.map __encode_lit c in
-    HOT.at __or_conn (HOT.multiset ~ty:Type.TPTP.o lits)
+    HOT.multiset ~ty:Type.TPTP.o lits
 
   method decode c =
     match HOT.view c with

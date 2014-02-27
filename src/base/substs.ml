@@ -145,9 +145,11 @@ let is_empty = function
 let lookup subst v s_v = match subst with
   | E -> raise Not_found
   | M m ->
-    if T.is_var v
-      then M.find m (v, s_v)
-      else raise Not_found
+      begin match T.view v with
+      | T.Var _ | T.RigidVar _ ->
+          M.find m (v, s_v)
+      | _ -> raise Not_found
+      end
 
 let mem subst v s_v = match subst with
   | E -> false
@@ -159,9 +161,11 @@ let rec get_var subst v sc_v = match subst with
   | E -> v, sc_v
   | M m ->
     try let t, sc_t = lookup subst v sc_v in
-        if T.is_var t && (sc_t <> sc_v || not (T.eq t v))
-          then get_var subst t sc_t
-          else t, sc_t (* fixpoint of lookup *)
+        begin match T.view t with
+        | (T.Var _ | T.RigidVar _) when (sc_t <> sc_v || not (T.eq t v)) ->
+            get_var subst t sc_t  (* recurse *)
+        | _ -> t, sc_t (* fixpoint of lookup *)
+        end
     with Not_found -> v, sc_v
 
 exception KindError
@@ -172,15 +176,15 @@ let bind subst v s_v t s_t =
   let t', s_t' = get_var subst v s_v in
   if s_t' = s_t && T.eq t' t
     then subst (* compatible (absence of) bindings *)
-    else if T.is_var t'
-      then
+    else match T.view t' with
+    | T.Var _ | T.RigidVar _ ->
         let m = match subst with
           | E -> M.create 11
           | M m -> m
         in
         let m' = M.replace m (t', s_t') (t, s_t) in
         M m'
-      else
+    | _ ->
         let msg = Util.sprintf
           "Subst.bind: inconsistent binding for %a[%d]: %a[%d] and %a[%d]"
             T.pp v s_v T.pp t s_t T.pp t' s_t'
