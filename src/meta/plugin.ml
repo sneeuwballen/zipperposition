@@ -120,20 +120,26 @@ let lemma = wrap_fo_clause __sym_lemma [__clause_lemma_imply_holds]
 
 let axiom_or_theory which : (Symbol.t * term) extended  =
   let s = Symbol.of_string which in
-  let ty = Type.(forall [var 0] (Reasoner.property_ty <== [var 0])) in
+  let ty = Type.(Reasoner.property_ty <=. const s) in
   let hd = T.const ~ty s in
   object
     method symbol = s
     method ty = ty
     method owns t =
-      try Symbol.eq (T.head t) s
-      with _ -> false
+      match T.open_at t with
+      | hd', _, _ -> T.eq hd hd'
     method to_fact (s,t) =
-      T.at_full ~tyargs:[T.ty t] hd [t]
-    method of_fact t = match T.open_at t with
-      | hd', _, [s;t] when T.eq hd hd' ->
-          begin match T.view s with
-          | T.Const s -> Some (s, t)
+      T.at hd t
+    method of_fact t =
+      Util.debug 5 "%s.of_fact %a?" which T.pp t;
+      match T.open_at t with
+      | hd', _, [f] when T.eq hd hd' ->
+          begin match T.open_at f with
+          | name, _, [arg] ->
+              begin match T.view name with
+              | T.Const s -> Some (s, t)
+              | _ -> None
+              end
           | _ -> None
           end
       | _ -> None

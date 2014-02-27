@@ -45,7 +45,7 @@ type clause = Reasoner.clause
 let empty = {
   reasoner = R.empty;
   plugins = P.Base.set;
-  signature = P.Base.signature;
+  signature = Signature.merge P.Base.signature Encoding.signature;
 }
 
 let reasoner p = p.reasoner
@@ -115,7 +115,7 @@ let __clause_of_ast ~ctx ast =
 
 let of_ho_ast p decls =
   try
-    let ctx = TypeInference.Ctx.create Encoding.signature in
+    let ctx = TypeInference.Ctx.create (signature p) in
     let clauses = Sequence.fmap (__clause_of_ast ~ctx) decls in
     (* add clauses to the prover *)
     let p', consequences = Seq.of_seq p clauses in

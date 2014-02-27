@@ -242,11 +242,12 @@ let __add_rule ~state ~proof clause =
       Queue.push (clause', proof') state.to_process)
 
 (* deal with state.to_process until no clause is to be processed *)
-let __process state = 
+let __process state =
   while not (Queue.is_empty state.to_process) do
     let c, proof = Queue.pop state.to_process in
     if not (Clause.Map.mem c state.db.all)
     then begin
+      Util.debug 5 "meta-reasoner: add clause %a" Clause.pp c;
       (* new clause: insert its proof in state.db.all, then update fixpoint *)
       state.db <- {state.db with all=Clause.Map.add c proof state.db.all;};
       match c.Clause.body with
@@ -254,8 +255,7 @@ let __process state =
           let fact = c.Clause.head in
           (* add fact to consequence if it's not an axiom *)
           if proof <> Proof.Axiom
-            then
-              Queue.push (fact,proof) state.consequences;
+            then Queue.push (fact,proof) state.consequences;
           (* update fixpoint *)
           __add_fact ~state ~proof c.Clause.head;
           (* add to index *)
@@ -278,7 +278,7 @@ let add db clause =
   Queue.push (clause, Proof.Axiom) state.to_process;
   __process state;
   state.db, __consequences state
-  
+
 let add_fact db fact =
   add db (Clause.fact fact)
 
