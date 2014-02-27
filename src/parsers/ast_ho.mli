@@ -30,13 +30,44 @@ AST that holds Horn Clauses and type declarations, nothing more. *)
 
 open Logtk
 
+type term = PrologTerm.t
+
 type t =
-  | Clause of PrologTerm.t * PrologTerm.t list
-  | Type of string * PrologTerm.t
+  | Clause of term * term list
+  | Type of string * term
+
+type location = ParseLocation.t
 
 include Interfaces.PRINT with type t := t
 
 module Seq : sig
-  val terms : t -> PrologTerm.t Sequence.t
-  val vars : t -> PrologTerm.t Sequence.t
+  val terms : t -> term Sequence.t
+  val vars : t -> term Sequence.t
+end
+
+module Term : sig
+  val true_ : term
+  val false_ : term
+  val wildcard : term
+
+  val var : ?loc:location -> ?ty:term -> string -> term
+  val const : ?loc:location -> Symbol.t -> term
+  val app : ?loc:location -> term -> term list -> term
+  val bind : ?loc:location -> Symbol.t -> term list -> term -> term
+  val record : ?loc:location -> (string * term) list -> rest:term option -> term
+  val list_ : ?loc:location -> term list -> term
+
+  val and_ : ?loc:location -> term list -> term
+  val or_ : ?loc:location -> term list -> term
+  val not_ : ?loc:location -> term -> term
+  val equiv : ?loc:location -> term -> term -> term
+  val xor : ?loc:location -> term -> term -> term
+  val imply : ?loc:location -> term -> term -> term
+  val eq : ?loc:location -> ?ty:term -> term -> term -> term
+  val neq : ?loc:location -> ?ty:term -> term -> term -> term
+  val forall : ?loc:location -> term list -> term -> term
+  val exists : ?loc:location -> term list -> term -> term
+
+  val mk_fun_ty : ?loc:location -> term list -> term -> term
+  val tType : term
 end

@@ -32,9 +32,13 @@ open Logtk
 
 module PT = PrologTerm
 
+type term = PT.t
+
 type t =
-  | Clause of PT.t * PT.t list
-  | Type of string * PT.t
+  | Clause of term * term list
+  | Type of string * term
+
+type location = ParseLocation.t
 
 let pp buf t = match t with
   | Clause (head, []) ->
@@ -56,5 +60,38 @@ module Seq = struct
 
   let vars decl =
     terms decl
-      |> Sequence.flatMap PT.Seq.vars 
+      |> Sequence.flatMap PT.Seq.vars
+end
+
+module Term = struct
+  let true_ = PT.TPTP.true_
+  let false_ = PT.TPTP.false_
+  let wildcard = PT.wildcard
+
+  let var = PT.var
+  let bind = PT.bind
+  let column = PT.column
+  let const = PT.const
+  let app = PT.app
+  let record = PT.record
+  let list_ = PT.list_
+
+  let and_ ?loc l = app ?loc (const Symbol.Base.and_) [list_ l]
+  let or_ ?loc l = app ?loc (const Symbol.Base.or_) [list_ l]
+  let not_ ?loc a = app ?loc (const Symbol.Base.not_) [a]
+  let equiv ?loc a b = app ?loc (const Symbol.Base.equiv) [list_ [a;b]]
+  let xor ?loc a b = app ?loc (const Symbol.Base.xor) [list_ [a;b]]
+  let imply ?loc a b = app ?loc (const Symbol.Base.imply) [a;b]
+  let eq ?loc ?(ty=wildcard) a b = app ?loc (const Symbol.Base.eq) [ty; list_[a;b]]
+  let neq ?loc ?(ty=wildcard) a b = app ?loc (const Symbol.Base.neq) [ty; list_[a;b]]
+  let forall ?loc vars f = bind ?loc Symbol.Base.forall vars f
+  let exists ?loc vars f = bind ?loc Symbol.Base.exists vars f
+  let lambda ?loc vars f = bind ?loc Symbol.Base.lambda vars f
+
+  let mk_fun_ty ?loc l ret =
+    let rec mk l = match l with
+      | [] -> ret
+      | a::l' -> app ?loc (const Symbol.Base.arrow) [a; mk l']
+    in mk l
+  let tType = PT.TPTP.tType
 end

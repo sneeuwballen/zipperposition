@@ -62,6 +62,7 @@ rule token = parse
   | '_' { WILDCARD }
   | "->" { RIGHT_ARROW }
   | "<-" { LEFT_ARROW }
+  | "~" { NOT }
   | "<=>" { EQUIV }
   | "=>" { IMPLY }
   | "<~>" { XOR }

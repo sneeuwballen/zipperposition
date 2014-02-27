@@ -72,33 +72,11 @@ end
 
 (** {6 IO} *)
 
-(* convert prolog term's literals into their multiset version
- * TODO : remove, shouldn't be useful
-let convert_lits t =
-  let a = object
-    inherit PT.id_visitor
-    method app ?loc f l =
-      match PT.view f, l with
-      | PT.Const (Symbol.Eq | Symbol.Neq) as s, [a;b] ->
-          (* equality must be applied to a multiset and a type arg. *)
-          PT.app ?loc (PT.const s) [PT.wildcard; PT.list_ [a; b]]
-      | PT.Const
-        (Symbol.Conn (Symbol.Equiv | Symbol.Or | Symbol.And) as s), l ->
-          (* transform some connective into multisets *)
-          PT.app ?loc (PT.const s) [PT.list_ l]
-      | _ -> PT.app ?loc f l
-  end in
-  a#visit t
-  *)
-
 (* convert an AST to a clause, if needed. In any case update the
  * context *)
 let __clause_of_ast ~ctx ast =
   let ast' = match ast with
   | Ast_ho.Clause (head, body) ->
-      (* first, conversion *)
-      let head = convert_lits head in
-      let body = List.map convert_lits body in
       (* expected type *)
       let ret = Reasoner.property_ty in
       (* infer types for head, body, and force all types to be [ret] *)

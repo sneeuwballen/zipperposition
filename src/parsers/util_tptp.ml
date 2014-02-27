@@ -65,24 +65,10 @@ let find_file name dir =
       then name  (* found *)
       else failwith ("unable to find file " ^ name)
 
-exception ParseError of string * int * int * int * int
-  (** Error at the given file, start(line, column) stop(line,column) *)
-
-let string_of_error = function
-  | ParseError (filename, s_l, s_c, e_l, e_c) ->
-    Printf.sprintf "syntax error in %s between %d:%d and %d:%d"
-      filename s_l s_c e_l e_c
-  | _ -> assert false
-
 (* raise a readable parse error *)
-let _raise_error filename lexbuf =
-  let start = Lexing.lexeme_start_p lexbuf in
-  let end_ = Lexing.lexeme_end_p lexbuf in
-  let s_l = start.Lexing.pos_lnum in
-  let s_c = start.Lexing.pos_cnum - start.Lexing.pos_bol in
-  let e_l = end_.Lexing.pos_lnum in
-  let e_c = end_.Lexing.pos_cnum - end_.Lexing.pos_bol in
-  raise (ParseError (filename, s_l, s_c, e_l, e_c))
+let _raise_error lexbuf =
+  let loc = Loc.of_lexbuf lexbuf in
+  raise (Ast.ParseError loc)
 
 let parse_file ~recursive f =
   let dir = Filename.dirname f in
@@ -98,7 +84,7 @@ let parse_file ~recursive f =
       let decls =
         try Parse_tptp.parse_declarations Lex_tptp.token buf
         with Parse_tptp.Error ->
-          _raise_error filename buf  (* report error properly *)
+          _raise_error buf  (* report error properly *)
       in
       List.iter
         (fun decl -> match decl, names with
