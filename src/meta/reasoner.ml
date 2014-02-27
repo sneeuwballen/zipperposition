@@ -264,7 +264,7 @@ let __process state =
           (* update fixpoint *)
           __add_rule ~state ~proof c;
           (* add [c] to index, by its first literal *)
-          state.db <- {state.db with facts=Index.add state.db.rules body1 c; }
+          state.db <- {state.db with rules=Index.add state.db.rules body1 c; }
     end
   done
 

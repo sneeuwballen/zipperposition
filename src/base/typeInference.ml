@@ -170,6 +170,7 @@ module Ctx = struct
             ty
         | Some ty -> ty
       in
+      (*Util.debug 5 "var %s now has number %d and type %a" name n Type.pp ty;*)
       Hashtbl.add ctx.vars name (n,ty);
       n, ty
 
@@ -198,7 +199,7 @@ module Ctx = struct
     Unif.Ty.unification ~subst:ctx.subst ty1 0 ty2 0
 
   (* unify within the context's substitution. Wraps {!__unif}
-   * by returning a nicer exception in case of failure *)
+     by returning a nicer exception in case of failure *)
   let unify ctx ty1 ty2 =
     try
       __unif ctx ty1 ty2
@@ -209,8 +210,7 @@ module Ctx = struct
 
   (* same as {!unify}, but also updates the ctx's substitution *)
   let unify_and_set ctx ty1 ty2 =
-    (* Util.debug 5 "unify %a and %a (ctx: %a)"
-      Type.pp ty1 Type.pp ty2 Substs.pp ctx.subst; *)
+    (*Util.debug 5 "unify types %a and %a" Type.pp ty1 Type.pp ty2;*)
     let subst = unify ctx ty1 ty2 in
     ctx.subst <- subst
 
@@ -339,20 +339,6 @@ module type S = sig
     (** Force the term's type and the given type to be the same.
         @raise Error if an inconsistency is detected *)
 end
-
-(* split [l] into a pair [(l1, l2)]. [l2] has length = arity.
-    @raise Type.Error if [length l < arity] *)
-let _split_arity ctx arity l =
-  let n = List.length l in
-  if n < arity then
-    Ctx.__error ctx "bad arity: expected %d arguments, got %d" arity n;
-  let rec drop n pre post =
-    match n, post with
-    | 0, _ -> List.rev pre, post
-    | _, [] -> assert false
-    | _, x::post' -> drop (n-1) (x::pre) post'
-  in
-  drop (n - arity) [] l
 
 module FO = struct
   module PT = PrologTerm
@@ -658,9 +644,8 @@ module HO = struct
     | _ -> assert false
 
   (* infer a type for [t], possibly updating [ctx]. Also returns a
-    continuation to build a typed term
-    @param pred true if we expect a proposition
-    @param arity expected number of arguments *)
+      continuation to build a typed term
+      @param arity expected number of arguments *)
   let rec infer_rec ?(arity=0) ctx t =
     match t.PT.loc with
     | None -> infer_rec_view ~arity ctx t.PT.term
@@ -674,18 +659,18 @@ module HO = struct
       in
       let i, ty = Ctx._get_var ctx ~ty name in
       ty, (fun ctx ->
-        let ty = Ctx.apply_ty ctx ty in
+        let ty' = Ctx.apply_ty ctx ty in
         if Ctx._is_rigid_var_name name
-          then T.rigid_var ~ty i
-          else T.var ~ty i)
+          then T.rigid_var ~ty:ty' i
+          else T.var ~ty:ty' i)
     | PT.Var name ->
       (* (possibly) untyped var *)
       let i, ty = Ctx._get_var ctx name in
       ty, (fun ctx ->
-        let ty = Ctx.apply_ty ctx ty in
+        let ty' = Ctx.apply_ty ctx ty in
         if Ctx._is_rigid_var_name name
-          then T.rigid_var ~ty i
-          else T.var ~ty i)
+          then T.rigid_var ~ty:ty' i
+          else T.var ~ty:ty' i)
     | PT.Const (Sym.Conn Sym.Wildcard) ->
       let ty = Ctx._new_ty_var ctx in
       (* generate fresh term variable *)
@@ -765,13 +750,13 @@ module HO = struct
         | Type.NoArity -> 0, List.length l
         | Type.Arity (a,b) -> a, b
       in
-      Util.debug 5 "fun %a expects %d type args and %d args (applied to %a)"
-        PT.pp t n_tyargs n_args (Util.pp_list PT.pp) l;
+      (*Util.debug 5 "fun %a : %a expects %d type args and %d args (applied to %a)"
+        PT.pp t Type.pp ty_t n_tyargs n_args (Util.pp_list PT.pp) l; *)
       (* separation between type arguments and proper term arguments,
           based on the expected arity of the head [t].
           We split [l] into the list [tyargs], containing [n_tyargs] types,
           and [args], containing [n_args] terms. *)
-      let tyargs, args = _split_arity ctx n_args l in
+      let tyargs, args = Util.list_split_at n_tyargs l in
       let tyargs = _convert_type_args ctx tyargs in
       let ty_t' = Type.apply_list ty_t tyargs in
       (* create sub-closures, by inferring the type of [args] *)
@@ -805,12 +790,10 @@ module HO = struct
     Util.debug 5 "infer_term %a" PT.pp t;
     try
       let ty, k = infer_rec ctx t in
-      Ctx.exit_scope ctx;
       Util.exit_prof prof_infer;
       ty, k
     with
     | e ->
-      Ctx.exit_scope ctx;
       Util.exit_prof prof_infer;
       raise e
 
