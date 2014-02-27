@@ -1,4 +1,5 @@
 % Builtin theories and lemmas (new syntax)
+% vim:shiftwidth=2:
 
 axiom (associative F) <-
   holds [F ?x (F ?y ?z) = F (F ?x ?y) ?z].
@@ -9,6 +10,11 @@ axiom (commutative F) <-
 theory (ac F) <-
   axiom (associative F),
   axiom (commutative F).
+
+axiom (associative F) <-
+  theory (ac F).
+axiom (commutative F) <-
+  theory (ac F).
 
 % a few general definitions (mostly form "rewriting, solving, proving")
 
@@ -56,7 +62,7 @@ axiom (functional1 P) <-
 axiom (total1 {pred=P, fun=F}) <-
   holds [p (?x (F ?x))].
 
-axiom (functional1 P) <-
+axiom (functional2 P) <-
   holds [~ (P ?x ?y ?z), ~ (P ?x ?y ?z2), ?z = ?z2].
 
 axiom (total2 {pred=P, fun=F}) <-
@@ -76,5 +82,8 @@ theory (monoid {op=Mult, neutral=E}) <-
   axiom (left_identity {op=Mult, elem=E}),
   axiom (right_identity {op=Mult, elem=E}),
   axiom (associative Mult).
+
+axiom (associative F) <-
+  theory (monoid {op=F | _}).
 
 % group : TODO
