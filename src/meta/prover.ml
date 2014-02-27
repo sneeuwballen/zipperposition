@@ -73,7 +73,7 @@ end
 (** {6 IO} *)
 
 (* convert an AST to a clause, if needed. In any case update the
- * context *)
+   context *)
 let __clause_of_ast ~ctx ast =
   let ast' = match ast with
   | Ast_ho.Clause (head, body) ->

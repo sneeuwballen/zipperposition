@@ -102,7 +102,7 @@ let compose a b = object (self)
 end
 
 let (>>>) a b = compose a b
-   
+
 (** {6 Currying} *)
 
 let currying = object
@@ -164,8 +164,8 @@ module EncodedClause = struct
 end
 
 (** Encode/Decode clauses into terms:
-  * terms are already curried and rigidified, so we only need to replace
-  * connectives by their multiset versions. *)
+    terms are already curried and rigidified, so we only need to replace
+    connectives by their multiset versions. *)
 
 let __ty_or = Type.(TPTP.o <=. multiset TPTP.o)
 let __ty_eq = Type.(forall [var 0] (TPTP.o <=. multiset (var 0)))
@@ -173,18 +173,24 @@ let __ty_not = Type.(TPTP.o <=. TPTP.o)
 
 let __or_conn =
   HOT.const ~ty:__ty_or Symbol.Base.or_
-
+let __and__conn =
+  HOT.const ~ty:__ty_or Symbol.Base.and_
+let __xor_conn =
+  HOT.const ~ty:__ty_or Symbol.Base.xor
+let __equiv_conn =
+  HOT.const ~ty:__ty_or Symbol.Base.equiv
 let __eq_conn =
   HOT.const ~ty:__ty_eq Symbol.Base.eq
-
 let __neq_conn =
   HOT.const ~ty:__ty_eq Symbol.Base.neq
-
 let __not_conn =
   HOT.const ~ty:__ty_not Symbol.Base.not_
 
 let signature = Signature.of_list
   [ Symbol.Base.or_, __ty_or
+  ; Symbol.Base.and_, __ty_or
+  ; Symbol.Base.xor, __ty_or
+  ; Symbol.Base.equiv, __ty_or
   ; Symbol.Base.eq, __ty_eq
   ; Symbol.Base.neq, __ty_eq
   ; Symbol.Base.not_, __ty_not
@@ -194,17 +200,17 @@ let __encode_lit = function
   | Eq (a, b, truth) ->
       let ty = HOT.ty a in
       if truth
-        then HOT.at __eq_conn (HOT.multiset ~ty [a; b])
-        else HOT.at __neq_conn (HOT.multiset ~ty [a; b])
+        then HOT.at (HOT.tyat __eq_conn ty) (HOT.multiset ~ty [a; b])
+        else HOT.at (HOT.tyat __neq_conn ty) (HOT.multiset ~ty [a; b])
   | Prop (p, true) -> p
   | Prop (p, false) -> HOT.at __not_conn p
 
-let __decode_lit t = match HOT.view t with
-  | HOT.At (l, r) ->
+let __decode_lit t = match HOT.open_at t with
+  | hd, _, [r] when HOT.eq hd __not_conn -> Prop (r, false)
+  | hd, _, [r] ->
       begin match HOT.view r with
-      | _ when HOT.eq l __not_conn -> Prop (r, false)
-      | HOT.Multiset [a;b] when HOT.eq l __eq_conn -> Eq (a, b, true)
-      | HOT.Multiset [a;b] when HOT.eq l __neq_conn -> Eq (a, b, false)
+      | HOT.Multiset [a;b] when HOT.eq hd __eq_conn -> Eq (a, b, true)
+      | HOT.Multiset [a;b] when HOT.eq hd __neq_conn -> Eq (a, b, false)
       | _ -> Prop (t, true)
       end
   | _ -> Prop (t, true)
