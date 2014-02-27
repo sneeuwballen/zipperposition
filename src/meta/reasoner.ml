@@ -227,19 +227,21 @@ let __add_fact ~state ~proof fact =
 
 (* add a rule (non unit Horn clause) to the DB *)
 let __add_rule ~state ~proof clause =
-  assert (not (Clause.is_fact clause));
-  Index.retrieve_unify state.db.facts 1 clause.Clause.head 0 ()
-    (fun () fact_clause subst ->
-      assert (Clause.is_fact fact_clause);
-      let fact = fact_clause.Clause.head in
-      (* compute resolvent *)
-      Substs.Renaming.clear state.renaming;
-      let clause' = Clause.apply_subst subst ~renaming:state.renaming
-        (Clause.pop_body clause) 0 in
-      (* build proof *)
-      let proof_fact = Clause.Map.find fact_clause state.db.all in
-      let proof' = Proof.make fact proof_fact clause proof in
-      Queue.push (clause', proof') state.to_process)
+  match clause.Clause.body with
+  | [] -> assert false
+  | lit::_ ->
+    Index.retrieve_unify state.db.facts 1 lit 0 ()
+      (fun () fact_clause subst ->
+        assert (Clause.is_fact fact_clause);
+        let fact = fact_clause.Clause.head in
+        (* compute resolvent *)
+        Substs.Renaming.clear state.renaming;
+        let clause' = Clause.apply_subst subst ~renaming:state.renaming
+          (Clause.pop_body clause) 0 in
+        (* build proof *)
+        let proof_fact = Clause.Map.find fact_clause state.db.all in
+        let proof' = Proof.make fact proof_fact clause proof in
+        Queue.push (clause', proof') state.to_process)
 
 (* deal with state.to_process until no clause is to be processed *)
 let __process state =
