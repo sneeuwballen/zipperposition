@@ -60,13 +60,13 @@ axiom (functional1 P) <-
   holds [~ (P ?x ?y), ~ (P ?x ?z), ?y = ?z].
 
 axiom (total1 {pred=P, fun=F}) <-
-  holds [p (?x (F ?x))].
+  holds [P ?x (F ?x)].
 
 axiom (functional2 P) <-
   holds [~ (P ?x ?y ?z), ~ (P ?x ?y ?z2), ?z = ?z2].
 
 axiom (total2 {pred=P, fun=F}) <-
-  holds [p (?x ?y (F ?x ?y))].
+  holds [P ?x ?y (F ?x ?y)].
 
 lemma [P ?x ?y <=> ?y = F ?x] <-
   axiom (functional1 P),
