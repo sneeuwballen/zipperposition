@@ -311,9 +311,9 @@ module TPTP = struct
   let exists ?loc vars f = bind ?loc Symbol.Base.exists vars f
   let lambda ?loc vars f = bind ?loc Symbol.Base.lambda vars f
 
-  let mk_fun_ty l ret = match l with
+  let rec mk_fun_ty l ret = match l with
     | [] -> ret
-    | _::_ -> app (const Symbol.Base.arrow) (ret::l)
+    | a::l' -> app (const Symbol.Base.arrow) [a; mk_fun_ty l' ret]
   let tType = const Symbol.Base.tType
   let forall_ty vars t = bind Symbol.Base.forall_ty vars t
 

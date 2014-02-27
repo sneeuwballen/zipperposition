@@ -168,10 +168,10 @@ let arity ty =
     | T.Record _
     | T.BVar _
     | T.Const _
+    | T.SimpleApp _
     | T.App _ -> Arity (i, j)
     | T.Multiset _
     | T.Bind _
-    | T.SimpleApp _
     | T.At _ -> assert false
   in traverse 0 0 ty
 

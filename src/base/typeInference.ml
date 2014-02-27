@@ -401,9 +401,6 @@ module FO = struct
         | Type.NoArity -> 0, List.length l
         | Type.Arity (a,b) -> a, b
       in
-      if n_tyargs + n_args <> List.length l
-        then Ctx.__error ctx "expected %d arguments, got %d"
-          (n_args+n_tyargs) (List.length l);
       (* separation between type arguments and proper term arguments,
           based on the expected arity of the symbol. The first
           [n_tyargs] arguments are converted to types, the remaining
