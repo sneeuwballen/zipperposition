@@ -37,6 +37,7 @@ module Loc = ParseLocation
 type t = {
   reasoner : Reasoner.t;
   plugins : Plugin.set;
+  signature : Signature.t;
 }
 
 type clause = Reasoner.clause
@@ -44,13 +45,14 @@ type clause = Reasoner.clause
 let empty = {
   reasoner = R.empty;
   plugins = P.Base.set;
+  signature = P.Base.signature;
 }
 
 let reasoner p = p.reasoner
 
 let plugins p = p.plugins
 
-let signature p = P.signature_of_set p.plugins
+let signature p = p.signature
 
 let add p clause =
   let r', consequences = R.add p.reasoner clause in
@@ -62,6 +64,10 @@ let add_fact p fact =
 let add_fo_clause p clause =
   let fact = Plugin.holds#to_fact clause in
   add_fact p fact
+
+let add_signature p signature =
+  let signature = Signature.merge p.signature signature in
+  { p with signature; }
 
 module Seq = struct
   let to_seq p = R.Seq.to_seq p.reasoner
@@ -111,7 +117,11 @@ let of_ho_ast p decls =
   try
     let ctx = TypeInference.Ctx.create Encoding.signature in
     let clauses = Sequence.fmap (__clause_of_ast ~ctx) decls in
+    (* add clauses to the prover *)
     let p', consequences = Seq.of_seq p clauses in
+    (* enrich signature *)
+    let signature = TypeInference.Ctx.to_signature ctx in
+    let p' = add_signature p' signature in
     Monad.Err.Ok (p', consequences)
   with Type.Error msg ->
     Monad.Err.fail msg

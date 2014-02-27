@@ -93,6 +93,11 @@ let print_clauses c =
   Util.printf "clauses:\n  %a\n"
     (Util.pp_seq ~sep:"\n  " (Encoding.pp_clause FOTerm.pp)) c
 
+let print_signature signature =
+  Util.printf "signature:\n  %a\n"
+    (Util.pp_seq ~sep:"\n  " (Util.pp_pair ~sep:" : " Symbol.pp Type.pp))
+    (Signature.Seq.to_seq signature)
+
 (* detect theories in clauses *)
 let detect_theories prover clauses =
   let facts = Sequence.map Plugin.holds#to_fact clauses in
@@ -116,12 +121,12 @@ let main () =
   if !files = [] then files := ["stdin"];
   (* parse theory files *)
   let prover = Prover.empty in
-  if !flag_print_signature
-    then Util.debug 0 "initial signature: %a" Signature.pp (Prover.signature prover);
+  if !flag_print_signature then print_signature (Prover.signature prover);
   let res = E.(
     parse_files prover !theory_files >>= fun prover ->
     Util.debug 3 "theory files parsed";
     if !flag_print_theory then print_theory (Prover.reasoner prover);
+    if !flag_print_signature then print_signature (Prover.signature prover);
     (* parse CNF formulas *)
     E.guard (fun () -> parse_and_cnf !files) >>= fun clauses ->
     Util.debug 3 "input files parsed and translated to CNF";
