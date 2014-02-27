@@ -60,7 +60,10 @@ let cardinal signature = SMap.cardinal signature
 
 let arity signature s =
   let ty = find_exn signature s in
-  Type.arity ty
+  match Type.arity ty with
+  | Type.NoArity ->
+    failwith (Util.sprintf "symbol %a has ill-formed type %a" Symbol.pp s Type.pp ty)
+  | Type.Arity (a,b) -> a, b
 
 let is_ground signature =
   SMap.for_all (fun _ ty -> Type.is_ground ty) signature
@@ -103,7 +106,9 @@ let size s = SMap.cardinal s
 
 let well_founded s =
   SMap.exists
-    (fun _ ty -> snd (Type.arity ty) = 0)
+    (fun _ ty -> match Type.arity ty with
+      | Type.Arity (_, 0) -> true
+      | _ -> false)
     s
 
 module Seq = struct

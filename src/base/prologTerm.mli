@@ -72,6 +72,8 @@ val column : ?loc:location -> t -> t -> t
 val record : ?loc:location -> (string*t) list -> rest:t option -> t
 val at_loc : loc:location -> t -> t
 
+val wildcard : t
+
 val is_var : t -> bool
 
 module Set : Sequence.Set.S with type elt = term
@@ -123,7 +125,11 @@ class id_visitor : object
 end (** Visitor that maps the subterms into themselves *)
 
 
-(** {2 TPTP constructors and printing} *)
+(** {2 TPTP constructors and printing}
+
+The constructors take the semantics of TPTP into consideration. In
+particular, wildcard (fresh variables) are inserted in front of
+ad-hoc polymorphic symbols such as [eq] or [neq]. *)
 module TPTP : sig
   val true_ : t
   val false_ : t
@@ -139,8 +145,8 @@ module TPTP : sig
   val equiv : ?loc:location -> t -> t -> t
   val xor : ?loc:location -> t -> t -> t
   val imply : ?loc:location -> t -> t -> t
-  val eq : ?loc:location -> t -> t -> t
-  val neq : ?loc:location -> t -> t -> t
+  val eq : ?loc:location -> ?ty:t -> t -> t -> t
+  val neq : ?loc:location -> ?ty:t -> t -> t -> t
   val forall : ?loc:location -> t list -> t -> t
   val exists : ?loc:location -> t list -> t -> t
   val lambda : ?loc:location -> t list -> t -> t

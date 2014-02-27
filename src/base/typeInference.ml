@@ -130,6 +130,18 @@ module Ctx = struct
   let ty_of_prolog ctx ty =
     Type.Conv.of_prolog ~ctx:ctx.tyvars ty
 
+  (* error-raising function *)
+  let __error ctx msg =
+    let b = Buffer.create 15 in
+    (* print closest location *)
+    begin match ctx.locs with
+    | [] -> ()
+    | loc::_ -> Printf.bprintf b "at %a: " Loc.pp loc
+    end;
+    Printf.kbprintf
+      (fun b -> raise (Type.Error (Buffer.contents b)))
+      b msg
+
   (* variable number and type, for the given name. An optional type can
     be provided.*)
   let _get_var ?ty ctx name =
@@ -178,9 +190,19 @@ module Ctx = struct
       ~h:(fun () -> ctx.locs <- old_locs)
       ~f
 
-  (* unify within the context's substitution. scopes are 0 *)
-  let unify ctx ty1 ty2 =
+  (* unification of types, may raise Unif.Fail *)
+  let __unif ctx ty1 ty2 =
     Unif.Ty.unification ~subst:ctx.subst ty1 0 ty2 0
+
+  (* unify within the context's substitution. Wraps {!__unif}
+   * by returning a nicer exception in case of failure *)
+  let unify ctx ty1 ty2 =
+    try
+      __unif ctx ty1 ty2
+    with Unif.Fail ->
+      let ty1 = Substs.Ty.apply_no_renaming ctx.subst ty1 0 in
+      let ty2 = Substs.Ty.apply_no_renaming ctx.subst ty2 0 in
+      __error ctx "could not unify types %a and %a" Type.pp ty1 Type.pp ty2
 
   (* same as {!unify}, but also updates the ctx's substitution *)
   let unify_and_set ctx ty1 ty2 =
@@ -191,10 +213,17 @@ module Ctx = struct
 
   let constrain_type_type = unify_and_set
 
+  (* Fresh function type with [arity] arguments *)
+  let fresh_fun_ty ~arity ctx =
+    let ret = _new_ty_var ctx in
+    let new_vars = _new_ty_vars ctx arity in
+    let ty = Type.(ret <== new_vars) in
+    ctx.to_bind <- ret :: new_vars @ ctx.to_bind;
+    ty
+
   (* If the function symbol has an unknown type, a fresh variable
      is returned. Otherwise the known type of the symbol is returned.
-
-     @arity the expected arity (if not declared) *)
+     @param arity the expected arity (if not declared) *)
   let type_of_fun ~arity ctx s =
     match s with
     | Sym.Int _ -> ctx.default.default_int
@@ -211,11 +240,8 @@ module Ctx = struct
           let ty = Sym.Tbl.find ctx.symbols s in
           ty
         with Not_found ->
-          let ret = _new_ty_var ctx in
-          let new_vars = _new_ty_vars ctx arity in
-          let ty = Type.(ret <== new_vars) in
+          let ty = fresh_fun_ty ~arity ctx in
           Sym.Tbl.add ctx.symbols s ty;
-          ctx.to_bind <- ret :: new_vars @ ctx.to_bind;
           ty
       end
 
@@ -237,7 +263,9 @@ module Ctx = struct
       (fun v ->
         (* try to bind the variable. Will fail if already bound to
             something else, which is fine. *)
-        try unify_and_set ctx v ctx.default.default_i
+        try
+          let subst = __unif ctx v ctx.default.default_i in
+          ctx.subst <- subst
         with Unif.Fail -> ())
       ctx.to_bind;
     ctx.to_bind <- []
@@ -255,6 +283,10 @@ module Ctx = struct
 
   let reset_renaming ctx =
     Substs.Renaming.clear ctx.renaming
+
+  (* evaluate the type in the current substitution *)
+  let eval_ty ctx ty =
+    Substs.Ty.apply_no_renaming ctx.subst ty 0
 
   (* apply substitution to type *)
   let apply_ty ctx ty =
@@ -305,13 +337,12 @@ module type S = sig
         @raise Error if an inconsistency is detected *)
 end
 
-exception BadArity
-
 (* split [l] into a pair [(l1, l2)]. [l2] has length = arity.
-    @raise Failure if [length l < arity] *)
-let _split_arity arity l =
+    @raise Type.Error if [length l < arity] *)
+let _split_arity ctx arity l =
   let n = List.length l in
-  if n < arity then raise BadArity;
+  if n < arity then
+    Ctx.__error ctx "bad arity: expected %d arguments, got %d" arity n;
   let rec drop n pre post =
     match n, post with
     | 0, _ -> List.rev pre, post
@@ -319,19 +350,6 @@ let _split_arity arity l =
     | _, x::post' -> drop (n-1) (x::pre) post'
   in
   drop (n - arity) [] l
-
-(* error-raising function *)
-let __error ctx msg =
-  let b = Buffer.create 15 in
-  (* print closest location *)
-  begin match ctx.Ctx.locs with
-  | [] -> ()
-  | loc::_ -> Printf.bprintf b "at %a:" Loc.pp loc
-  end;
-  Printf.bprintf b "error during type inference: ";
-  Printf.kbprintf
-    (fun b -> raise (Type.Error (Buffer.contents b)))
-    b msg
 
 module FO = struct
   module PT = PrologTerm
@@ -341,16 +359,14 @@ module FO = struct
   type untyped = PT.t
   type typed = T.t
 
-  (* convert (and possibly complete) this list of args *)
-  let rec _complete_type_args ctx arity args =
-    if arity < 0 then raise BadArity;
-    match args with
-    | [] -> Ctx._new_ty_vars ctx arity  (* add variables *)
-    | a::args' ->
-      (* convert [a] into a type *)
-      match Ctx.ty_of_prolog ctx a with
-      | None -> __error ctx "term %a is not a type" PT.pp a
-      | Some ty -> ty :: _complete_type_args ctx (arity-1) args'
+  (* convert a list of terms into a list of types *)
+  let rec _convert_type_args ctx l = match l with
+  | [] -> []
+  | t::l' ->
+      begin match Ctx.ty_of_prolog ctx t with
+      | None -> Ctx.__error ctx "term %a is not a type" PT.pp t
+      | Some ty -> ty :: _convert_type_args ctx l'
+      end
 
   (* infer a type for [t], possibly updating [ctx]. Also returns a
     continuation to build a typed term. *)
@@ -363,7 +379,7 @@ module FO = struct
       (* typed var *)
       let ty = match Ctx.ty_of_prolog ctx ty with
         | Some ty -> ty
-        | None -> __error ctx "expected type, got %a" PT.pp ty
+        | None -> Ctx.__error ctx "expected type, got %a" PT.pp ty
       in
       let i, ty = Ctx._get_var ctx ~ty name in
       ty, (fun ctx ->
@@ -377,10 +393,11 @@ module FO = struct
         T.var ~ty i)
     | PT.Const (Sym.Conn Sym.Wildcard) ->
       let ty = Ctx._new_ty_var ctx in
+      (* generate fresh term variable *)
+      let x = Sym.Base.fresh_var () in
       ty, (fun ctx ->
         let ty = Ctx.apply_ty ctx ty in
-        (* generate fresh variable *)
-        Ctx.apply_fo ctx (T.const ~ty (Sym.Base.fresh_var ())))
+        Ctx.apply_fo ctx (T.const ~ty x))
     | PT.Const s ->
       let ty_s = Ctx.type_of_fun ~arity:0 ctx s in
       Util.debug 5 "type of symbol %a: %a" Sym.pp s Type.pp ty_s;
@@ -391,15 +408,19 @@ module FO = struct
       (* use type of [s] *)
       let ty_s = Ctx.type_of_fun ~arity:(List.length l) ctx s in
       Util.debug 5 "type of symbol %a: %a" Sym.pp s Type.pp ty_s;
-      let n_tyargs, n_args = Type.arity ty_s in
-      if n_args > List.length l
-        then __error ctx "expected %d arguments, got only %d" n_args (List.length l);
+      let n_tyargs, n_args = match Type.arity ty_s with
+        | Type.NoArity -> 0, List.length l
+        | Type.Arity (a,b) -> a, b
+      in
+      if n_tyargs + n_args <> List.length l
+        then Ctx.__error ctx "expected %d arguments, got %d"
+          (n_args+n_tyargs) (List.length l);
       (* separation between type arguments and proper term arguments,
-          based on the expected arity of the symbol.
-          We split [l] into the list [tyargs], containing [n_tyargs] types,
-          and [args], containing [n_args] terms. *)
-      let tyargs, args = _split_arity n_args l in
-      let tyargs = _complete_type_args ctx n_tyargs tyargs in
+          based on the expected arity of the symbol. The first
+          [n_tyargs] arguments are converted to types, the remaining
+          [n_args] ones are inferred as terms *)
+      let tyargs, args = Util.list_split_at n_tyargs l in
+      let tyargs = _convert_type_args ctx tyargs in
       let ty_s' = Type.apply_list ty_s tyargs in
       (* create sub-closures, by inferring the type of [args] *)
       let l = List.map (fun t' -> infer_rec ctx t') args in
@@ -410,7 +431,7 @@ module FO = struct
           We generate a fresh variable 'a (named [ty_ret]),
           which is also the result. *)
       let ty_ret = Ctx._new_ty_var ctx in
-      Ctx.unify_and_set ctx ty_s' (Type.mk_fun ty_ret ty_of_args);
+      Ctx.unify_and_set ctx ty_s' (Type.arrow_list ty_of_args ty_ret);
       (* now to produce the closure, that first creates subterms *)
       ty_ret, (fun ctx ->
         let args' = closure_args ctx in
@@ -427,13 +448,13 @@ module FO = struct
     | PT.Column _
     | PT.App _
     | PT.Record _
-    | PT.Bind _ -> __error ctx "expected first-order term"
+    | PT.Bind _ -> Ctx.__error ctx "expected first-order term"
 
   let infer_var_scope ctx t = match t.PT.term with
     | PT.Column ({PT.term=PT.Var name}, ty) ->
       let ty = match Ctx.ty_of_prolog ctx ty with
         | Some ty -> ty
-        | None -> __error ctx "expected type, got %a" PT.pp ty
+        | None -> Ctx.__error ctx "expected type, got %a" PT.pp ty
       in
       let i = Ctx._enter_var_scope ctx name ty in
       (fun ctx ->
@@ -460,12 +481,6 @@ module FO = struct
       Util.exit_prof prof_infer;
       ty, k
     with (* error handling: return a nice message *)
-    | BadArity ->
-      Util.exit_prof prof_infer;
-      __error ctx "bad arity when trying to type %a" PT.pp t
-    | Unif.Fail ->
-      Util.exit_prof prof_infer;
-      __error ctx "unification failure when trying to type %a" PT.pp t
     | e ->
       Util.exit_prof prof_infer;
       raise e
@@ -551,20 +566,16 @@ module FO = struct
     | PT.Int _
     | PT.Bind _
     | PT.Record _
-    | PT.Rat _ -> __error ctx "expected formula, got %a" PT.pp f
+    | PT.Rat _ -> Ctx.__error ctx "expected formula, got %a" PT.pp f
 
   let infer_form ctx f =
     Util.debug 5 "infer_form %a" PT.pp f;
     try
       let c_f = infer_form_rec ctx f in
       c_f
-    with
-    | BadArity ->
+    with e ->
       Util.exit_prof prof_infer;
-      __error ctx "bad arity when trying to type %a" PT.pp f
-    | Unif.Fail ->
-      Util.exit_prof prof_infer;
-      __error ctx "unification failure when trying to type %a" PT.pp f
+      raise e
 
   let constrain_form ctx f =
     let _ = infer_form ctx f in
@@ -610,22 +621,20 @@ module HO = struct
   type untyped = PT.t
   type typed = T.t
 
-  (* convert (and possibly complete) this list of args *)
-  let rec _complete_type_args ctx arity args =
-    if arity < 0 then raise BadArity;
-    match args with
-    | [] -> Ctx._new_ty_vars ctx arity  (* add variables *)
-    | a::args' ->
-      (* convert [a] into a type *)
-      match Ctx.ty_of_prolog ctx a with
-      | None -> __error ctx "term %a is not a type" PT.pp a
-      | Some ty -> ty :: _complete_type_args ctx (arity-1) args'
+  (* convert a list of terms into a list of types *)
+  let rec _convert_type_args ctx l = match l with
+  | [] -> []
+  | t::l' ->
+      begin match Ctx.ty_of_prolog ctx t with
+      | None -> Ctx.__error ctx "term %a is not a type" PT.pp t
+      | Some ty -> ty :: _convert_type_args ctx l'
+      end
 
   let infer_var_scope ctx t = match t.PT.term with
     | PT.Column ({PT.term=PT.Var name}, ty) ->
       let ty = match Ctx.ty_of_prolog ctx ty with
         | Some ty -> ty
-        | None -> __error ctx "expected type, got %a" PT.pp ty
+        | None -> Ctx.__error ctx "expected type, got %a" PT.pp ty
       in
       let i = Ctx._enter_var_scope ctx name ty in
       ty, (fun ctx ->
@@ -657,7 +666,7 @@ module HO = struct
       (* typed var *)
       let ty = match Ctx.ty_of_prolog ctx ty with
         | Some ty -> ty
-        | None -> __error ctx "expected type, got %a" PT.pp ty
+        | None -> Ctx.__error ctx "expected type, got %a" PT.pp ty
       in
       let i, ty = Ctx._get_var ctx ~ty name in
       ty, (fun ctx ->
@@ -673,6 +682,13 @@ module HO = struct
         if Ctx._is_rigid_var_name name
           then T.rigid_var ~ty i
           else T.var ~ty i)
+    | PT.Const (Sym.Conn Sym.Wildcard) ->
+      let ty = Ctx._new_ty_var ctx in
+      (* generate fresh term variable *)
+      let x = Sym.Base.fresh_var () in
+      ty, (fun ctx ->
+        let ty = Ctx.apply_ty ctx ty in
+        Ctx.apply_ho ctx (T.const ~ty x))
     | PT.Bind (Sym.Conn Sym.Lambda, [], t) ->
       infer_rec ~arity ctx t
     | PT.Bind (Sym.Conn Sym.Lambda, [v], t) ->
@@ -704,8 +720,8 @@ module HO = struct
       (* the return type is multiset(ty_arg) *)
       let ty = Type.multiset ty_arg in
       ty, (fun ctx ->
-        let ty = Ctx.apply_ty ctx ty and l' = l' ctx in
-        T.multiset ~ty l')
+        let ty_arg = Ctx.apply_ty ctx ty_arg and l' = l' ctx in
+        T.multiset ~ty:ty_arg l')
     | PT.Record (l, rest) ->
       let ty_l, l' = List.split
         (List.map
@@ -733,17 +749,26 @@ module HO = struct
       ty, (fun ctx ->
         let ty = Ctx.apply_ty ctx ty in
         T.const ~ty s)
+    | PT.App (t, []) -> infer_rec ~arity ctx t
     | PT.App (t, l) ->
       (* we are going to assume that the type of [t], as inferred, is a forall
-          or a function (or a constant iff [l] is empty *)
+          or a function (or a constant iff [l] is empty.
+          We then evaluate the term to be sure to get its most precise
+          definition so far (e.g. if F = (f a), the type of F may be
+          more precise than just a type var. *)
       let ty_t, clos_t = infer_rec ~arity:(List.length l) ctx t in
-      let n_tyargs, n_args = Type.arity ty_t in
+      let n_tyargs, n_args = match Type.arity (Ctx.eval_ty ctx ty_t) with
+        | Type.NoArity -> 0, List.length l
+        | Type.Arity (a,b) -> a, b
+      in
+      Util.debug 5 "fun %a expects %d type args and %d args (applied to %a)"
+        PT.pp t n_tyargs n_args (Util.pp_list PT.pp) l;
       (* separation between type arguments and proper term arguments,
           based on the expected arity of the head [t].
           We split [l] into the list [tyargs], containing [n_tyargs] types,
           and [args], containing [n_args] terms. *)
-      let tyargs, args = _split_arity n_args l in
-      let tyargs = _complete_type_args ctx n_tyargs tyargs in
+      let tyargs, args = _split_arity ctx n_args l in
+      let tyargs = _convert_type_args ctx tyargs in
       let ty_t' = Type.apply_list ty_t tyargs in
       (* create sub-closures, by inferring the type of [args] *)
       let l = List.map (infer_rec ctx) args in
@@ -754,7 +779,7 @@ module HO = struct
           We generate a fresh variable 'a (named [ty_ret]),
           which is also the result. *)
       let ty_ret = Ctx._new_ty_var ctx in
-      Ctx.unify_and_set ctx ty_t' (Type.mk_fun ty_ret ty_of_args);
+      Ctx.unify_and_set ctx ty_t' (Type.arrow_list ty_of_args ty_ret);
       (* closure *)
       ty_ret, (fun ctx ->
         let args' = closure_args ctx in
@@ -768,7 +793,8 @@ module HO = struct
         let ty = ctx.Ctx.default.default_rat in
         ty, (fun _ -> T.const ~ty (Symbol.mk_rat n))
     | PT.Column _
-    | PT.Bind _ -> __error ctx "expected higher-order term"
+    | PT.Bind _ ->
+        Ctx.__error ctx "expected higher-order term"
 
   let infer ctx t =
     Util.enter_prof prof_infer;
@@ -779,12 +805,6 @@ module HO = struct
       Util.exit_prof prof_infer;
       ty, k
     with
-    | BadArity ->
-      Util.exit_prof prof_infer;
-      __error ctx "bad arity when trying to type %a" PT.pp t
-    | Unif.Fail ->
-      Util.exit_prof prof_infer;
-      __error ctx "unification failure when trying to type %a" PT.pp t
     | e ->
       Ctx.exit_scope ctx;
       Util.exit_prof prof_infer;
@@ -793,7 +813,7 @@ module HO = struct
   let constrain_term_term ctx t1 t2 =
     let ty1, _ = infer ctx t1 in
     let ty2, _ = infer ctx t2 in
-    Ctx.unify_and_set ctx ty1 ty2 
+    Ctx.unify_and_set ctx ty1 ty2
 
   let constrain_term_type ctx t ty =
     let ty1, _ = infer ctx t in

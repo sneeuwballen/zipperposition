@@ -65,3 +65,6 @@ val pp_opt : Buffer.t -> t option -> unit
 
 val set_file : Lexing.lexbuf -> string -> unit
   (** Change the file name used for positions in this lexbuf *)
+
+val of_lexbuf : Lexing.lexbuf -> t
+  (** Recover a position from a lexbuf *)

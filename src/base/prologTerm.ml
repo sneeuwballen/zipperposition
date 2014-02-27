@@ -124,6 +124,8 @@ let record ?loc l ~rest =
 let column ?loc x y = __make ?loc (Column(x,y))
 let at_loc ~loc t = {t with loc=Some loc; }
 
+let wildcard = const Symbol.Base.wildcard
+
 let is_var = function
   | {term=Var _} -> true
   | _ -> false
@@ -303,8 +305,8 @@ module TPTP = struct
   let equiv ?loc a b = app ?loc (const Symbol.Base.equiv) [a;b]
   let xor ?loc a b = app ?loc (const Symbol.Base.xor) [a;b]
   let imply ?loc a b = app ?loc (const Symbol.Base.imply) [a;b]
-  let eq ?loc a b = app ?loc (const Symbol.Base.eq) [a;b]
-  let neq ?loc a b = app ?loc (const Symbol.Base.neq) [a;b]
+  let eq ?loc ?(ty=wildcard) a b = app ?loc (const Symbol.Base.eq) [ty;a;b]
+  let neq ?loc ?(ty=wildcard) a b = app ?loc (const Symbol.Base.neq) [ty;a;b]
   let forall ?loc vars f = bind ?loc Symbol.Base.forall vars f
   let exists ?loc vars f = bind ?loc Symbol.Base.exists vars f
   let lambda ?loc vars f = bind ?loc Symbol.Base.lambda vars f
@@ -336,9 +338,9 @@ module TPTP = struct
       Printf.bprintf buf "%a <~> %a" pp_surrounded a pp_surrounded b
     | App ({term=Const (Symbol.Conn Symbol.Equiv)}, [a;b]) ->
       Printf.bprintf buf "%a <=> %a" pp_surrounded a pp_surrounded b
-    | App ({term=Const (Symbol.Conn Symbol.Eq)}, [a;b]) ->
+    | App ({term=Const (Symbol.Conn Symbol.Eq)}, [_;a;b]) ->
       Printf.bprintf buf "%a = %a" pp_surrounded a pp_surrounded b
-    | App ({term=Const (Symbol.Conn Symbol.Neq)}, [a;b]) ->
+    | App ({term=Const (Symbol.Conn Symbol.Neq)}, [_;a;b]) ->
       Printf.bprintf buf "%a != %a" pp_surrounded a pp_surrounded b
     | App ({term=Const (Symbol.Conn Symbol.Arrow)}, [ret;a]) ->
       Printf.bprintf buf "%a > %a" pp a pp ret

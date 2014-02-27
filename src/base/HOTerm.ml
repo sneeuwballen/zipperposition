@@ -238,7 +238,7 @@ let record l ~rest =
   T.record ~kind ~ty:(ty:>T.t) l ~rest
 
 let __mk_lambda ~varty t' =
-  let ty = Type.mk_fun (ty t') [varty] in
+  let ty = Type.arrow varty (ty t') in
   T.bind ~kind ~ty:(ty :> T.t) ~varty:(varty:Type.t:>T.t) Symbol.Base.lambda t'
 
 let mk_lambda vars t =
@@ -437,7 +437,7 @@ let uncurry t =
     | T.Const s -> FOT.const ~ty s
     | T.Record _
     | T.Multiset _
-    | T.RigidVar _ 
+    | T.RigidVar _
     | T.Bind (Symbol.Conn Symbol.Lambda, _, _) -> raise Exit
     | T.App _
     | T.SimpleApp _

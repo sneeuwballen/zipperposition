@@ -114,3 +114,13 @@ let set_file buf filename =
   let open Lexing in
   buf.lex_curr_p <- {buf.lex_curr_p with pos_fname=filename;};
   ()
+
+let of_lexbuf lexbuf =
+  let start = Lexing.lexeme_start_p lexbuf in
+  let end_ = Lexing.lexeme_end_p lexbuf in
+  let s_l = start.Lexing.pos_lnum in
+  let s_c = start.Lexing.pos_cnum - start.Lexing.pos_bol in
+  let e_l = end_.Lexing.pos_lnum in
+  let e_c = end_.Lexing.pos_cnum - end_.Lexing.pos_bol in
+  let file = start.Lexing.pos_fname in
+  mk file s_l s_c e_l e_c
