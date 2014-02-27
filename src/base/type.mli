@@ -58,7 +58,7 @@ type view = private
   | Var of int              (** Type variable *)
   | BVar of int             (** Bound variable (De Bruijn index) *)
   | App of symbol * t list  (** parametrized type *)
-  | Fun of t * t list       (** Function type *)
+  | Fun of t * t            (** Function type (left to right) *)
   | Record of (string*t) list * t option  (** Record type *)
   | Forall of t             (** explicit quantification using De Bruijn index *)
 
@@ -91,9 +91,11 @@ val app : symbol -> t list -> t
 val const : symbol -> t
   (** Constant sort *)
 
-val mk_fun : t -> t list -> t
-  (** Function type. The first argument is the return type.
-      see {!(<==)}. *)
+val arrow : t -> t -> t
+  (** [arrow l r] is the type [l -> r]. *)
+
+val arrow_list : t list -> t -> t
+  (** n-ary version of {!arrow} *)
 
 val forall : t list -> t -> t
   (** [forall vars ty] quantifies [ty] over [vars].
@@ -155,11 +157,16 @@ val vars : t -> t list
 val close_forall : t -> t
   (** bind free variables *)
 
-val arity : t -> int * int
+type arity_result =
+  | Arity of int * int
+  | NoArity
+
+val arity : t -> arity_result
   (** Number of arguments the type expects.
-     If [arity ty] returns [a, b] that means that it
+     If [arity ty] returns [Arity (a, b)] that means that it
      expects [a] arguments to be used as arguments of Forall, and
-     [b] arguments to be used for function application. *)
+     [b] arguments to be used for function application. If
+     it returns [NoArity] then the arity is unknown (variable) *)
 
 val expected_args : t -> t list
   (** Types expected as function argument by [ty]. The length of the
