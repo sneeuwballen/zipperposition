@@ -13,6 +13,11 @@ let l = Lex_ho.decls_of_string
 
    val yolo : swag.";;
 
-assert (List.length l = 3);;
+let () =
+  match l with
+  | Monad.Err.Ok l -> assert (List.length l = 3)
+  | Monad.Err.Error msg ->
+      failwith (Printf.sprintf "error : %s\n" msg)
+;;
 
 print_endline "... OK";;

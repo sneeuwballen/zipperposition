@@ -37,15 +37,16 @@ module E = Monad.Err
 
 let files = ref []
 let theory_files = ref []
-let flag_print_kb = ref false
-let flag_print_datalog = ref false
+let flag_print_theory = ref false
+let flag_print_signature = ref false
 
 let add_file f = files := f :: !files
 let add_theory f = theory_files := f :: !theory_files
 
 let options =
   [ "-theory", Arg.String add_theory, "use given theory file"
-  ; "-print-theory", Arg.Set flag_print_kb, "print the whole theory"
+  ; "-print-theory", Arg.Set flag_print_theory, "print the whole theory"
+  ; "-print-signature", Arg.Set flag_print_signature, "print initial theory signature"
   ] @ Options.global_opts
 
 (* parse the given theory files into the prover *)
@@ -106,9 +107,11 @@ let main () =
   if !files = [] then files := ["stdin"];
   (* parse theory files *)
   let prover = Prover.empty in
+  if !flag_print_signature
+    then Util.debug 0 "initial signature: %a" Signature.pp (Prover.signature prover);
   let res = E.(
     parse_files prover !theory_files >>= fun prover ->
-    if !flag_print_kb then print_theory (Prover.reasoner prover);
+    if !flag_print_theory then print_theory (Prover.reasoner prover);
     (* parse CNF formulas *)
     E.guard (fun () -> parse_and_cnf !files) >>= fun clauses ->
     let theories, lemmas, axioms = detect_theories prover clauses in
