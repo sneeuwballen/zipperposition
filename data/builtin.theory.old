@@ -1,0 +1,208 @@
+
+% Builtin theories and lemma
+
+% ac
+
+axiom associative(f) is f(X,f(Y,Z)) = f(f(X,Y), Z).
+axiom commutative(f) is f(X,Y) = f(Y,X).
+
+theory ac(f) is
+  axiom associative(f) and
+  axiom commutative(f).
+
+% a few general definitions (mostly form "rewriting, solving, proving")
+
+axiom involutive(f) is f(f(X)) = X.
+axiom idempotent(f) is f(X,X) = X.
+
+axiom endomorphism(h, mult) is h(mult(X,Y)) = mult(h(X), h(Y)).
+axiom unit_endomorphism(h, e) is h(e) = e.
+axiom anti_endomorphism(h, mult) is h(mult(X,Y)) = mult(h(Y),h(X)).
+
+axiom homomorphism(h, mult, add) is h(mult(X,Y)) = add(h(X), h(Y)).
+
+axiom left_identity(mult, e) is mult(e, X) = X.
+axiom right_identity(mult, e) is mult(X, e) = X.
+
+axiom left_inverse(mult, e, inverse) is mult(inverse(X), X) = e.
+axiom right_inverse(mult, e, inverse) is mult(X, inverse(X)) = e.
+
+axiom left_absorb(mult,e) is mult(e,X) = e.
+axiom right_absorb(mult,e) is mult(X,e) = e.
+
+% functional relations
+
+axiom functional1(p) is ~p(X,Y) | ~p(X,Y2) | Y=Y2.
+axiom total1(p, f) is p(X,f(X)).
+axiom functional2(p) is ~p(X,Y,Z) | ~p(X,Y,Z2) | Z=Z2.
+axiom total2(p, f) is p(X,Y,f(X,Y)).
+
+lemma p(X,Y) <=> Y=f(X)
+  if axiom functional1(p) and axiom total1(p, f).
+lemma p(X,Y,Z) <=> Z = f(X,Y)
+  if axiom functional2(p) and axiom total2(p, f).
+
+% monoid
+
+theory monoid(mult, e) is
+  axiom left_identity(mult, e) and
+  axiom right_identity(mult, e) and
+  axiom associative(mult).
+
+% group
+
+theory group(mult, e, inverse) is
+  theory monoid(mult, e) and
+  axiom left_inverse(mult, e, inverse) and
+  axiom right_inverse(mult, e, inverse).
+
+theory abelian_group(mult, e, inverse) is
+  theory group(mult, e, inverse) and
+  axiom commutative(mult).
+
+% basic set
+
+theory set(member, subset) is
+  ~member(X,Y) | ~subset(Y,Z) | member(X,Z) and
+  subset(X,Y) | member(sk, X) | ~member(sk, Y) and
+  ~subset(X,Y) | ~subset(Y,X) | X=Y and
+  subset(X,Y) | X != Y and
+  subset(Y,X) | X != Y.
+
+% subgroup theory
+
+axiom subgroup_inverse(in_subgroup, inverse) is
+  ~in_subgroup(X) | in_subgroup(inverse(X)).
+axiom subgroup_mult(in_subgroup, mult) is
+  ~in_subgroup(X) | ~in_subgroup(Y) | in_subgroup(mult(X,Y)).
+
+theory subgroup(mult, e, inverse, in_subgroup) is
+  theory group(mult, e, inverse) and
+  axiom subgroup_inverse(in_subgroup, inverse) and
+  axiom subgroup_mult(in_subgroup, mult).
+
+lemma in_subgroup(e) if
+  theory subgroup(mult, e, inverse, in_subgroup).
+
+% ring
+
+axiom left_distributive(mult, sum) is mult(X, sum(Y,Z)) = sum(mult(X,Y), mult(X,Z)).
+axiom right_distributive(mult, sum) is mult(sum(X,Y),Z) = sum(mult(X,Z), mult(Y,Z)).
+
+theory ring(mult, one, add, zero, add_inverse) is
+  theory abelian_group(add, zero, add_inverse) and
+  theory monoid(mult, one) and
+  axiom left_distributive(mult, sum) and
+  axiom right_distributive(mult, sum).
+
+theory commutative_ring(mult, one, add, zero, add_inverse) is
+  theory ring(mult, one, add, zero, add_inverse) and
+  axiom commutative(mult).
+
+% boolean algebra
+
+theory bool_algebra(add, zero, mult, one, inverse) is
+  axiom commutative(add) and
+  axiom commutative(mult) and
+  axiom left_inverse(add, one, inverse) and     % X or not(X) = true
+  axiom right_inverse(add, one, inverse) and
+  axiom left_inverse(mult, zero, inverse) and   % X and not(X) = false
+  axiom right_inverse(mult, zero, inverse) and
+  axiom left_distributive(mult, add) and        % X or (Y and Z) = XorY and XorZ
+  axiom right_distributive(mult, add) and
+  axiom left_distributive(add, mult) and        % X and (Y or Z) = XandY or XandZ
+  axiom right_distributive(add, mult) and
+  axiom left_identity(add, zero) and            % X or false = X
+  axiom right_identity(add, zero) and
+  axiom left_identity(mult, one) and            % X and true = X
+  axiom right_identity(mult, one).
+
+% basic relations
+    
+axiom reflexive(r) is r(X,X).
+axiom irreflexive(r) is ~r(X,X).
+axiom transitive(r) is ~r(X,Y) | ~r(Y,Z) | r(X,Z).
+axiom antisymmetric(r) is ~r(X,Y) | ~r(Y,X) | X=Y.
+axiom symmetric(r) is ~r(X,Y) | r(Y,X).
+
+% partial orders
+
+theory partial_order(r) is
+  axiom reflexive(r) and
+  axiom transitive(r) and
+  axiom antisymmetric(r).
+
+theory partial_order_strict(r) is
+  axiom irreflexive(r) and
+  axiom transitive(r).
+
+% total orders
+
+axiom total_non_strict(r) is r(X,Y) | r(Y,X).
+axiom total_strict(r) is r(X,Y) | X=Y | r(Y,X).
+
+theory total_order_strict(less) is
+  theory partial_order_strict(less) and
+  axiom total_strict(less).
+
+theory total_order_non_strict(lesseq) is
+  theory partial_order(lesseq) and
+  axiom total_non_strict(lesseq).
+
+theory total_order(less, lesseq) is
+  theory total_order_strict(less) and
+  lesseq(X,Y) <=> (less(X,Y) | X=Y).
+
+theory total_order(less, lesseq) is
+  theory total_order_strict(less) and
+  ~lesseq(X,Y) | less(X,Y) | X=Y and
+  ~less(X,Y) | lesseq(X,Y).
+
+theory total_order(less, lesseq) is
+  theory total_order(lesseq) and
+  lesseq(X,Y) <=> (less(X,Y) | X=Y).
+
+theory total_order(less, lesseq) is
+  theory total_order(lesseq) and
+  ~lesseq(X,Y) | less(X,Y) | X=Y and
+  ~less(X,Y) | lesseq(X,Y).
+
+axiom unbounded_order_up(less) is less(X, something_higher_than(X)).
+axiom unbounded_order_down(less) is less(something_lower_than(X), X).
+
+% dense total orders, possibly without endpoints
+
+theory dense_total_order(less) is
+  theory total_order_strict(less) and
+  ~less(X,Y) | less(X, choice(X,Y)) and
+  ~less(X,Y) | less(choice(X,Y),Y).   % x < y ==> \exists z, x < z < y
+
+theory dense_total_order_without_endpoints(less) is
+  theory dense_total_order(less) and
+  axiom unbounded_order_up(less) and
+  axiom unbounded_order_down(less).
+
+% lattices
+
+theory semi_lattice(meet) is
+  theory ac(meet) and
+  axiom idempotent(meet).
+
+axiom absorption(f1, f2) is f1(X, f2(X, Y)) = X.
+
+theory lattice(meet, join) is
+  theory semi_lattice(meet) and
+  theory semi_lattice(join) and
+  axiom absorption(meet, join) and
+  axiom absorption(join, meet).
+
+theory complete_lattice(meet, join, top, bottom) is
+  theory lattice(meet, join) and
+  meet(X,top) = X and
+  join(X,top) = top and
+  meet(X,bottom) = bottom and
+  join(X,bottom) = X.
+
+raw ac(F) if 'theory'(ac, L1, F).
+
+% vim:syntax=ocaml:

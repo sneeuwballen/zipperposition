@@ -1,208 +1,257 @@
+% Builtin theories and lemmas (new syntax)
+% vim:softtabstop=2:
 
-% Builtin theories and lemma
+axiom (associative F) <-
+  holds [F ?x (F ?y ?z) = F (F ?x ?y) ?z].
 
-% ac
+axiom (commutative F) <-
+  holds [F ?x ?y = F ?y ?x].
 
-axiom associative(f) is f(X,f(Y,Z)) = f(f(X,Y), Z).
-axiom commutative(f) is f(X,Y) = f(Y,X).
+theory (ac F) <-
+  axiom (associative F),
+  axiom (commutative F).
 
-theory ac(f) is
-  axiom associative(f) and
-  axiom commutative(f).
+axiom (associative F) <-
+  theory (ac F).
+axiom (commutative F) <-
+  theory (ac F).
 
 % a few general definitions (mostly form "rewriting, solving, proving")
 
-axiom involutive(f) is f(f(X)) = X.
-axiom idempotent(f) is f(X,X) = X.
+axiom (involutive F) <-
+  holds [F (F ?x) = ?x].
 
-axiom endomorphism(h, mult) is h(mult(X,Y)) = mult(h(X), h(Y)).
-axiom unit_endomorphism(h, e) is h(e) = e.
-axiom anti_endomorphism(h, mult) is h(mult(X,Y)) = mult(h(Y),h(X)).
+axiom (idempotent F) <-
+  holds [F ?x ?x = ?x].
 
-axiom homomorphism(h, mult, add) is h(mult(X,Y)) = add(h(X), h(Y)).
+axiom (endomorphism {fun=H, op=Mult}) <-
+  holds [H (Mult ?x ?y) = Mult (H ?x) (H ?y)].
 
-axiom left_identity(mult, e) is mult(e, X) = X.
-axiom right_identity(mult, e) is mult(X, e) = X.
+axiom (unit_endomorphism {fun=H, elem=E}) <-
+  holds [H E = E].
 
-axiom left_inverse(mult, e, inverse) is mult(inverse(X), X) = e.
-axiom right_inverse(mult, e, inverse) is mult(X, inverse(X)) = e.
+axiom (anti_endomorphism {fun=H, op=Mult}) <-
+  holds [H (Mult ?x ?y) = Mult (H ?y) (H ?x)].
 
-axiom left_absorb(mult,e) is mult(e,X) = e.
-axiom right_absorb(mult,e) is mult(X,e) = e.
+axiom (homomorphism {fun=H, op1=Mult, op2=Add}) <-
+  holds [H (Mult ?x ?y) = Add (H ?x) (H ?y)].
+
+axiom (left_identity {op=Mult, elem=E}) <-
+  holds [Mult E ?x = ?x].
+
+axiom (right_identity {op=Mult, elem=E}) <-
+  holds [Mult ?x E = ?x].
+
+axiom (left_inverse {op=Mult, inverse=I, elem=E}) <-
+  holds [Mult (I ?x) ?x = E].
+
+axiom (right_inverse {op=Mult, inverse=I, elem=E}) <-
+  holds [Mult ?x (I ?x) = E].
+
+axiom (left_absorb {op=Mult, elem=E}) <-
+  holds [Mult E ?x = E].
+
+axiom (right_absorb {op=Mult, elem=E}) <-
+  holds [Mult ?x E = E].
 
 % functional relations
 
-axiom functional1(p) is ~p(X,Y) | ~p(X,Y2) | Y=Y2.
-axiom total1(p, f) is p(X,f(X)).
-axiom functional2(p) is ~p(X,Y,Z) | ~p(X,Y,Z2) | Z=Z2.
-axiom total2(p, f) is p(X,Y,f(X,Y)).
+axiom (functional1 P) <-
+  holds [~ (P ?x ?y), ~ (P ?x ?z), ?y = ?z].
 
-lemma p(X,Y) <=> Y=f(X)
-  if axiom functional1(p) and axiom total1(p, f).
-lemma p(X,Y,Z) <=> Z = f(X,Y)
-  if axiom functional2(p) and axiom total2(p, f).
+axiom (total1 {pred=P, fun=F}) <-
+  holds [P ?x (F ?x)].
+
+axiom (functional2 P) <-
+  holds [~ (P ?x ?y ?z), ~ (P ?x ?y ?z2), ?z = ?z2].
+
+axiom (total2 {pred=P, fun=F}) <-
+  holds [P ?x ?y (F ?x ?y)].
+
+lemma [P ?x ?y <=> ?y = F ?x] <-
+  axiom (functional1 P),
+  axiom (total1 {pred=P, fun=F}).
+
+lemma [P ?x ?y ?z <=> ?z = F ?x ?y] <-
+  axiom (functional2 P),
+  axiom (total2 {pred=P, fun=F}).
 
 % monoid
 
-theory monoid(mult, e) is
-  axiom left_identity(mult, e) and
-  axiom right_identity(mult, e) and
-  axiom associative(mult).
+theory (monoid {op=Mult, neutral=E}) <-
+  axiom (left_identity {op=Mult, elem=E}),
+  axiom (right_identity {op=Mult, elem=E}),
+  axiom (associative Mult).
+
+axiom (associative F) <-
+  theory (monoid {op=F | _}).
 
 % group
 
-theory group(mult, e, inverse) is
-  theory monoid(mult, e) and
-  axiom left_inverse(mult, e, inverse) and
-  axiom right_inverse(mult, e, inverse).
+theory (group {op=Mult, neutral=E, inverse=I}) <-
+  theory (monoid {op=Mult, neutral=E}),
+  axiom (left_inverse {op=Mult, inverse=I, elem=E}),
+  axiom (right_inverse {op=Mult, inverse=I, elem=E}).
 
-theory abelian_group(mult, e, inverse) is
-  theory group(mult, e, inverse) and
-  axiom commutative(mult).
+theory (group {op=Mult, neutral=E, inverse=I}) <-
+  axiom (associative Mult),
+  axiom (left_inverse {op=Mult, inverse=I, elem=E}),
+  axiom (left_identity {op=Mult, elem=E}).
 
-% basic set
+theory (abelian_group {op=Mult, neutral=E, inverse=I}) <-
+  theory (group {op=Mult, neutral=E, inverse=I}),
+  axiom (commutative Mult).
 
-theory set(member, subset) is
-  ~member(X,Y) | ~subset(Y,Z) | member(X,Z) and
-  subset(X,Y) | member(sk, X) | ~member(sk, Y) and
-  ~subset(X,Y) | ~subset(Y,X) | X=Y and
-  subset(X,Y) | X != Y and
-  subset(Y,X) | X != Y.
+theory (group {op=Mult, neutral=E, inverse=I}) <-
+  theory (abelian_group {op=Mult, neutral=E, inverse=I}).
 
-% subgroup theory
 
-axiom subgroup_inverse(in_subgroup, inverse) is
-  ~in_subgroup(X) | in_subgroup(inverse(X)).
-axiom subgroup_mult(in_subgroup, mult) is
-  ~in_subgroup(X) | ~in_subgroup(Y) | in_subgroup(mult(X,Y)).
+% subgroup
 
-theory subgroup(mult, e, inverse, in_subgroup) is
-  theory group(mult, e, inverse) and
-  axiom subgroup_inverse(in_subgroup, inverse) and
-  axiom subgroup_mult(in_subgroup, mult).
+theory (subgroup {op=Mult, neutral=E, inverse=I, mem=P}) <-
+  theory (group {op=Mult, neutral=E, inverse=I}),
+  holds [ ~ (P ?x), P (I ?x) ].   % closed by inverse
+  holds [ ~ (P ?x), ~ (P ?y), P (Mult ?x ?y) ].  % closed by op
 
-lemma in_subgroup(e) if
-  theory subgroup(mult, e, inverse, in_subgroup).
+lemma [ P E ] <-
+  theory (subgroup {mem=P, neutral=E | _}).
 
-% ring
+% ring theory
 
-axiom left_distributive(mult, sum) is mult(X, sum(Y,Z)) = sum(mult(X,Y), mult(X,Z)).
-axiom right_distributive(mult, sum) is mult(sum(X,Y),Z) = sum(mult(X,Z), mult(Y,Z)).
+axiom (left_distributive {sum=Sum, prod=Prod}) <-
+  holds [ Prod ?x (Sum ?y ?z) = Sum (Prod ?x ?y) (Prod ?x ?z) ].
 
-theory ring(mult, one, add, zero, add_inverse) is
-  theory abelian_group(add, zero, add_inverse) and
-  theory monoid(mult, one) and
-  axiom left_distributive(mult, sum) and
-  axiom right_distributive(mult, sum).
+axiom (right_distributive {sum=Sum, prod=Prod}) <-
+  holds [ Prod (Sum ?y ?z) ?x = Sum (Prod ?y ?x) (Prod ?z ?x) ].
 
-theory commutative_ring(mult, one, add, zero, add_inverse) is
-  theory ring(mult, one, add, zero, add_inverse) and
-  axiom commutative(mult).
+theory (ring {sum=Sum, prod=Prod, zero=Zero, one=One, minus=Minus}) <-
+  theory (abelian_group {op=Sum, neutral=Zero, inverse=Minus}),
+  theory (monoid {op=Prod, neutral=One}),
+  axiom (left_distributive {sum=Sum, prod=Prod}),
+  axiom (right_distributive {sum=Sum, prod=Prod}).
 
-% boolean algebra
+theory (commutative_ring {sum=Sum, prod=Prod, zero=Zero, one=One, minus=Minus}) <-
+  theory (ring {sum=Sum, prod=Prod, zero=Zero, one=One, minus=Minus}),
+  axiom (commutative Prod).
 
-theory bool_algebra(add, zero, mult, one, inverse) is
-  axiom commutative(add) and
-  axiom commutative(mult) and
-  axiom left_inverse(add, one, inverse) and     % X or not(X) = true
-  axiom right_inverse(add, one, inverse) and
-  axiom left_inverse(mult, zero, inverse) and   % X and not(X) = false
-  axiom right_inverse(mult, zero, inverse) and
-  axiom left_distributive(mult, add) and        % X or (Y and Z) = XorY and XorZ
-  axiom right_distributive(mult, add) and
-  axiom left_distributive(add, mult) and        % X and (Y or Z) = XandY or XandZ
-  axiom right_distributive(add, mult) and
-  axiom left_identity(add, zero) and            % X or false = X
-  axiom right_identity(add, zero) and
-  axiom left_identity(mult, one) and            % X and true = X
-  axiom right_identity(mult, one).
+% XXX omitted: boolean algebras
 
 % basic relations
-    
-axiom reflexive(r) is r(X,X).
-axiom irreflexive(r) is ~r(X,X).
-axiom transitive(r) is ~r(X,Y) | ~r(Y,Z) | r(X,Z).
-axiom antisymmetric(r) is ~r(X,Y) | ~r(Y,X) | X=Y.
-axiom symmetric(r) is ~r(X,Y) | r(Y,X).
+
+axiom (reflexive R) <-
+  holds [ R ?x ?x ].
+
+axiom (irreflexive R) <-
+  holds [ ~ (R ?x ?x) ].
+
+axiom (transitive R) <-
+  holds [ ~ (R ?x ?y), ~ (R ?y ?z), R ?x ?z ].
+
+axiom (antisymmetric R) <-
+  holds [ ~ (R ?x ?y), ~ (R ?y ?x), ?x = ?y ].
+
+axiom (symmetric R) <-
+  holds [ ~ (R ?x ?y), R ?y ?x ].
 
 % partial orders
 
-theory partial_order(r) is
-  axiom reflexive(r) and
-  axiom transitive(r) and
-  axiom antisymmetric(r).
+theory (partial_order R) <-
+  axiom (reflexive R),
+  axiom (transitive R),
+  axiom (antisymmetric R).
 
-theory partial_order_strict(r) is
-  axiom irreflexive(r) and
-  axiom transitive(r).
+theory (strict_partial_order R) <-
+  axiom (irreflexive R),
+  axiom (transitive R).
 
 % total orders
 
-axiom total_non_strict(r) is r(X,Y) | r(Y,X).
-axiom total_strict(r) is r(X,Y) | X=Y | r(Y,X).
+theory (non_strict_total_order R) <-
+  theory (partial_order R),
+  holds [ R ?x ?y, R ?y ?x ].
 
-theory total_order_strict(less) is
-  theory partial_order_strict(less) and
-  axiom total_strict(less).
+theory (strict_total_order R) <-
+  theory (partial_order R),
+  holds [ R ?x ?y, ?x = ?y, R ?y ?x ].
 
-theory total_order_non_strict(lesseq) is
-  theory partial_order(lesseq) and
-  axiom total_non_strict(lesseq).
+theory (total_order {less=Less, lesseq=Lesseq}) <-
+  theory (total_order_strict Less),
+  holds [ ~ (Less ?x ?y), Lesseq ?x ?y ],
+  holds [ ~ (Lesseq ?x ?y), ?x = ?y, Less ?x ?y ].
 
-theory total_order(less, lesseq) is
-  theory total_order_strict(less) and
-  lesseq(X,Y) <=> (less(X,Y) | X=Y).
+theory (total_order {less=Less, lesseq=Lesseq}) <-
+  theory (non_strict_total_order Lesseq),
+  axiom (irreflexive Less),
+  holds [ ~ (Less ?x ?y), Lesseq ?x ?y ],
+  holds [ ~ (Lesseq ?x ?y), ?x = ?y, Less ?x ?y ].
 
-theory total_order(less, lesseq) is
-  theory total_order_strict(less) and
-  ~lesseq(X,Y) | less(X,Y) | X=Y and
-  ~less(X,Y) | lesseq(X,Y).
+theory (strict_total_order Less) <-
+  theory (total_order {less=Less | _}).
 
-theory total_order(less, lesseq) is
-  theory total_order(lesseq) and
-  lesseq(X,Y) <=> (less(X,Y) | X=Y).
+theory (non_strict_total_order Lesseq) <-
+  theory (total_order {lesseq=Lesseq | _}).
 
-theory total_order(less, lesseq) is
-  theory total_order(lesseq) and
-  ~lesseq(X,Y) | less(X,Y) | X=Y and
-  ~less(X,Y) | lesseq(X,Y).
+% dense orders, orders without endpoints
 
-axiom unbounded_order_up(less) is less(X, something_higher_than(X)).
-axiom unbounded_order_down(less) is less(something_lower_than(X), X).
+axiom (no_higher_bound R) <-
+  holds [ R ?x (Some_bound ?x) ].
 
-% dense total orders, possibly without endpoints
+axiom (higher_bound {lesseq=Lesseq, high=High}) <-
+  holds [ Lesseq ?x High ].
 
-theory dense_total_order(less) is
-  theory total_order_strict(less) and
-  ~less(X,Y) | less(X, choice(X,Y)) and
-  ~less(X,Y) | less(choice(X,Y),Y).   % x < y ==> \exists z, x < z < y
+axiom (lower_bound {lesseq=Lesseq, low=Low}) <-
+  holds [ Lesseq Low ?x ].
 
-theory dense_total_order_without_endpoints(less) is
-  theory dense_total_order(less) and
-  axiom unbounded_order_up(less) and
-  axiom unbounded_order_down(less).
+axiom (no_lower_bound R) <-
+  holds [ R (Some_bound ?x) ?x ].
+
+theory (total_order_without_endpoints R) <-
+  theory (strict_total_order R),
+  axiom (no_lower_bound R),
+  axiom (no_higher_bound R).
+
+theory (dense_total_order R) <-
+  theory (strict_total_order R),
+  holds [ ~ (R ?x ?y), R ?x (Middle ?x ?y) ],
+  holds [ ~ (R ?x ?y), R (Middle ?x ?y) ?y ].
+
+theory (dense_total_order_without_endpoints R) <-
+  theory (total_order_without_endpoints R),
+  theory (dense_total_order R).
 
 % lattices
 
-theory semi_lattice(meet) is
-  theory ac(meet) and
-  axiom idempotent(meet).
+theory (semi_lattice Meet) <-
+  theory (ac Meet),
+  axiom (idempotent Meet).
 
-axiom absorption(f1, f2) is f1(X, f2(X, Y)) = X.
+theory (meet_semi_lattice {meet=Meet, order=Lesseq}) <-
+  theory (semi_lattice Meet),
+  theory (partial_order Lesseq),
+  holds [ Lesseq (Meet ?x ?y) ?x ],
+  holds [ Lesseq (Meet ?x ?y) ?y ].
 
-theory lattice(meet, join) is
-  theory semi_lattice(meet) and
-  theory semi_lattice(join) and
-  axiom absorption(meet, join) and
-  axiom absorption(join, meet).
+theory (join_semi_lattice {join=Join, order=Lesseq}) <-
+  theory (semi_lattice Join),
+  theory (partial_order Lesseq),
+  holds [ Lesseq ?x (Join ?x ?y) ],
+  holds [ Lesseq ?y (Join ?x ?y) ].
 
-theory complete_lattice(meet, join, top, bottom) is
-  theory lattice(meet, join) and
-  meet(X,top) = X and
-  join(X,top) = top and
-  meet(X,bottom) = bottom and
-  join(X,bottom) = X.
+axiom (absorption F1 F2) <-
+  holds [ F1 ?x (F2 ?x ?y) = ?x ].
 
-raw ac(F) if 'theory'(ac, L1, F).
+theory (lattice {meet=Meet, join=Join}) <-
+  theory (semi_lattice Meet),
+  theory (semi_lattice Join),
+  axiom (absorption Meet Join),
+  axiom (absorption Join Meet).
 
-% vim:syntax=ocaml:
+theory (ordered_lattice {order=Lesseq, meet=Meet, join=Join}) <-
+  theory (lattice {meet=Meet, join=Join}),
+  theory (meet_semi_lattice {meet=Meet, order=Lesseq}),
+  theory (join_semi_lattice {join=Join, order=Lesseq}).
+
+theory (complete_lattice {meet=Meet, join=Join, order=Lesseq, top=Top, bottom=Bottom}) <-
+  theory (ordered_lattice {meet=Meet, join=Join, order=Lesseq}),
+  axiom (lower_bound {lesseq=Lesseq, low=Bottom}),
+  axiom (higher_bound {lesseq=Lesseq, high=Top}).
