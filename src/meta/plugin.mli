@@ -31,65 +31,64 @@ of the prover. For instance, a default plugin is bound to the predicate
 "holds", which states that some (encoded) clause holds in the current
 problem. The plugin for "holds" provides a view centered on the "holds"
 predicate, and allows to add "holds" facts and filter on them.
-
-Plugins can be extended to handle some inner type that can be encoded/decoded
+Plugins can handle some inner type that can be encoded/decoded
 to meta-prover-compatible types. *)
 
 open Logtk
 
 type term = Reasoner.term
 
-class type t = object
-  method symbol : Symbol.t
-    (** Symbol used to represent properties of this plugin *)
-
-  method ty : Type.t
-    (** Type of the symbol *)
+(** Core features of a plugin, that don't depend on its type parameter *)
+class type core = object
+  method signature : Signature.t
+    (** Signature of symbols used *)
 
   method owns : term -> bool
     (** Does this term belong to the plugin? *)
+end
+
+class type ['a] t = object
+  inherit core
 
   method clauses : Reasoner.clause list
     (** Initial clauses to add *)
-end
 
-class type ['inner] extended = object
-  inherit t
+  method to_fact : 'a -> term
+    (** Encode an 'a value to a fact *)
 
-  method to_fact : 'inner -> term
-    (** Encode an 'inner value to a fact *)
-
-  method of_fact : term -> 'inner option
-    (** Decode a fact into an 'inner value, if it actually belongs
+  method of_fact : term -> 'a option
+    (** Decode a fact into an 'a value, if it actually belongs
         to the plugin *)
 end
 
 type foclause = Encoding.foclause
 
-type set = t Symbol.Map.t
-  (** Set of plugins, by their symbols *)
-
-val signature_of_set : set -> Signature.t
-  (** Signature of all plugins *)
+module Set : sig
+  type t
+  val empty : t
+  val add : t -> core -> t
+  val signature : t -> Signature.t
+end
 
 (** {2 Builtin plugins} *)
 
-val holds : foclause extended
+val holds : foclause t
   (** holds: statement about which First-Order clause is true in the
-   * current problem *)
+      current problem *)
 
-val axiom : (Symbol.t * term) extended
-  (** axioms present in the problem (name of axiom+argument) *)
+val axiom : (string * Type.t list * term) t
+  (** axioms present in the problem (name of axiom+type args+argument) *)
 
-val theory : (Symbol.t * term) extended
-  (** theories that are present in the problem (name of theory +argument) *)
+val theory : (string * Type.t list * term) t
+  (** theories that are present in the problem
+     (name of theory +type args +argument) *)
 
-val lemma : foclause extended
+val lemma : foclause t
   (** Lemma: similar to {!holds}, but explicitely used for facts
-   * deduced by the meta-prover. In general [lemma f => holds f]. *)
+      deduced by the meta-prover. In general [lemma f => holds f]. *)
 
 module Base : sig
-  val set : set
+  val set : Set.t
     (** The set of default plugins *)
 
   val signature : Signature.t
@@ -97,11 +96,11 @@ end
 
 (** {2 Interaction with Reasoner} *)
 
-val facts : Reasoner.t -> 'a extended -> 'a Sequence.t
-  (** Iterate on values that belong to the given extended plugin
-   * and are currently facts in the reasoner *)
+val facts : Reasoner.t -> 'a t -> 'a Sequence.t
+  (** Iterate on values that belong to the given plugin
+      and are currently facts in the reasoner *)
 
-val of_consequence : Reasoner.consequence -> 'a extended -> 'a option
+val of_consequence : Reasoner.consequence -> 'a t -> 'a option
   (** Try to extract a value from a consequence *)
 
-val of_consequences : Reasoner.consequence Sequence.t -> 'a extended -> 'a Sequence.t
+val of_consequences : Reasoner.consequence Sequence.t -> 'a t -> 'a Sequence.t

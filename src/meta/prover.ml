@@ -36,7 +36,7 @@ module Loc = ParseLocation
 
 type t = {
   reasoner : Reasoner.t;
-  plugins : Plugin.set;
+  plugins : Plugin.Set.t;
   signature : Signature.t;
 }
 

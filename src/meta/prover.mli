@@ -35,16 +35,13 @@ type t
 type clause = Reasoner.clause
 
 val empty : t
-  (** Fresh meta-prover (using default plugins) *)
+  (** Fresh meta-prover (using default plugins' signature) *)
 
 val reasoner : t -> Reasoner.t
   (** The inner reasoner, holding a set of clauses and facts *)
 
-val plugins : t -> Plugin.set
-  (** Set of active plugins *)
-
 val signature : t -> Signature.t
-  (** Signature of current plugins *)
+  (** Current signature *)
 
 val add : t -> Reasoner.clause -> t * Reasoner.consequence Sequence.t
   (** Add a clause *)
@@ -68,9 +65,9 @@ end
 val of_ho_ast : t -> Ast_ho.t Sequence.t ->
                 (t * Reasoner.consequence Sequence.t) Monad.Err.t
   (** Add the given declarations to the meta-prover. In case of type
-   * inference failure, or other mismatch, an error is returned. *)
+     inference failure, or other mismatch, an error is returned. *)
 
 val parse_file : t -> string ->
                 (t * Reasoner.consequence Sequence.t) Monad.Err.t
   (** Attempt to parse file using {!Logtk_parsers.Parse_ho} and add the
-   * parsed content to the prover *)
+      parsed content to the prover *)

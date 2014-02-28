@@ -41,40 +41,47 @@ module T = HOTerm
 
 type term = T.t
 
-class type t = object
-  method symbol : Symbol.t
-    (** Symbol used to represent properties of this plugin *)
-
-  method ty : Type.t
-    (** Type of the symbol *)
+(** Core features of a plugin, that don't depend on its type parameter *)
+class type core = object
+  method signature : Signature.t
+    (** Signature of symbols used *)
 
   method owns : term -> bool
     (** Does this term belong to the plugin? *)
+end
+
+class type ['a] t = object
+  inherit core
 
   method clauses : Reasoner.clause list
     (** Initial clauses to add *)
-end
 
-class type ['inner] extended = object
-  inherit t
+  method to_fact : 'a -> term
+    (** Encode an 'a value to a fact *)
 
-  method to_fact : 'inner -> term
-    (** Encode an 'inner value to a fact *)
-
-  method of_fact : term -> 'inner option
-    (** Decode a fact into an 'inner value, if it actually belongs
+  method of_fact : term -> 'a option
+    (** Decode a fact into an 'a value, if it actually belongs
         to the plugin *)
 end
 
 type foclause = Encoding.foclause
 
-type set = t Symbol.Map.t
-  (** Set of plugins, by their symbols *)
+module Set = struct
+  module S = Sequence.Set.Make(struct
+    type t = core
+    let compare a b = Oo.id a - Oo.id b
+  end)
 
-let signature_of_set (s:set) : Signature.t =
-  Symbol.Map.to_seq s
-    |> Sequence.map (fun (s, p) -> s, p#ty)
-    |> Signature.Seq.of_seq
+  type t = S.t
+  let empty = S.empty
+  let add set x = S.add x set
+  let of_seq = S.of_seq
+
+  let signature set =
+    S.fold
+      (fun core signature -> Signature.merge core#signature signature
+      ) set Signature.empty
+end
 
 (** {2 Builtin plugins} *)
 
@@ -91,11 +98,11 @@ let __clause_lemma_imply_holds =
     (T.at (T.const ~ty:__ty_wrap __sym_holds) var)
     [ T.at (T.const ~ty:__ty_wrap __sym_lemma) var ]
 
-let wrap_fo_clause pred clauses : foclause extended =
+let wrap_fo_clause pred clauses : foclause t =
   let hd = T.const ~ty:__ty_wrap pred in
   object
-    method symbol = pred
-    method ty = __ty_wrap
+    method signature = Signature.singleton pred __ty_wrap
+    method clauses = clauses
     method owns t =
       try Symbol.eq (T.head t) pred
       with _ -> false
@@ -111,33 +118,34 @@ let wrap_fo_clause pred clauses : foclause extended =
       | T.At (hd', c) when T.eq hd hd' ->
           __encoding_wrap#decode (Encoding.EncodedClause.__magic c)
       | _ -> None
-
-    method clauses = clauses
   end
 
 let holds = wrap_fo_clause __sym_holds []
 let lemma = wrap_fo_clause __sym_lemma [__clause_lemma_imply_holds]
 
-let axiom_or_theory which : (Symbol.t * term) extended  =
+let axiom_or_theory which : (string * Type.t list * term) t  =
   let s = Symbol.of_string which in
-  let ty = Type.(Reasoner.property_ty <=. const s) in
+  let ty_s = Type.const s in
+  let ty = Type.(Reasoner.property_ty <=. ty_s) in
   let hd = T.const ~ty s in
   object
-    method symbol = s
-    method ty = ty
+    method signature = Signature.singleton s ty
     method owns t =
       match T.open_at t with
       | hd', _, _ -> T.eq hd hd'
-    method to_fact (s,t) =
-      T.at hd t
+    method to_fact (name,tyargs,t) =
+      T.at hd
+        (T.at_full ~tyargs
+          (T.const ~ty:Type.(ty_s <=. T.ty t) (Symbol.of_string name))
+          [t])
     method of_fact t =
       Util.debug 5 "%s.of_fact %a?" which T.pp t;
       match T.open_at t with
       | hd', _, [f] when T.eq hd hd' ->
           begin match T.open_at f with
-          | name, _, [arg] ->
+          | name, tyargs, [arg] ->
               begin match T.view name with
-              | T.Const s -> Some (s, arg)
+              | T.Const name' -> Some (Symbol.to_string name', tyargs, arg)
               | _ -> None
               end
           | _ -> None
@@ -150,14 +158,12 @@ let axiom = axiom_or_theory "axiom"
 let theory = axiom_or_theory "theory"
 
 module Base = struct
-  let __list = [ (holds :> t) ; (lemma :> t); (axiom :> t) ; (theory :> t) ]
+  let __list = [ (holds :> core) ; (lemma :> core); (axiom :> core) ; (theory :> core) ]
 
   let set =
-    List.fold_left
-      (fun set p -> Symbol.Map.add p#symbol (p:>t) set)
-      Symbol.Map.empty __list
+    Set.of_seq (Sequence.of_list __list)
 
-  let signature = signature_of_set set
+  let signature = Set.signature set
 end
 
 (** {2 Interaction with Reasoner} *)

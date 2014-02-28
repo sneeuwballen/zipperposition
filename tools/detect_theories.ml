@@ -98,6 +98,9 @@ let print_signature signature =
     (Util.pp_seq ~sep:"\n  " (Util.pp_pair ~sep:" : " Symbol.pp Type.pp))
     (Signature.Seq.to_seq signature)
 
+let pp_theory_axiom buf (name, _, t) =
+  Printf.bprintf buf "%s %a" name HOT.pp t
+
 (* detect theories in clauses *)
 let detect_theories prover clauses =
   let facts = clauses
@@ -143,9 +146,9 @@ let main () =
   | E.Ok (theories, lemmas, axioms) ->
       Util.debug 1 "success!";
       Util.printf "axioms:\n  %a\n"
-        (Util.pp_seq ~sep:"\n  " (Util.pp_pair Symbol.pp HOT.pp)) axioms;
+        (Util.pp_seq ~sep:"\n  " pp_theory_axiom) axioms;
       Util.printf "theories:\n  %a\n"
-        (Util.pp_seq ~sep:"\n  " (Util.pp_pair Symbol.pp HOT.pp)) theories;
+        (Util.pp_seq ~sep:"\n  " pp_theory_axiom) theories;
       Util.printf "lemmas:\n  %a\n"
         (Util.pp_seq ~sep:"\n  " (Encoding.pp_clause FOTerm.pp)) lemmas;
       ()
