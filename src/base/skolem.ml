@@ -77,8 +77,6 @@ let fresh_var ~ctx =
   ctx.sc_var_index <- n + 1;
   n
 
-exception FoundVariant of T.t * T.t * S.t
-
 exception FoundFormVariant of F.t * F.t * S.t
 
 let skolem_form ~ctx ~ty f =

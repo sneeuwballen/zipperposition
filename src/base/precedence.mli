@@ -109,6 +109,9 @@ module type S = sig
       (** alphabetic ordering on symbols *)
   end
 
+  val weight_modarity : arity:(symbol -> int) -> symbol -> int
+  val weight_constant : symbol -> int
+
   (** {2 Creation of a precedence from constraints} *)
 
   val create : Constr.t list -> symbol list -> t

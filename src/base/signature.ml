@@ -70,12 +70,6 @@ let arity signature s =
 let is_ground signature =
   SMap.for_all (fun _ ty -> Type.is_ground ty) signature
 
-let to_seq signature = SMap.to_seq signature
-let of_seq seq = SMap.of_seq seq
-
-let to_list signature = Sequence.to_rev_list (to_seq signature)
-let of_list l = SMap.of_seq (Sequence.of_list l)
-
 let merge s1 s2 =
   SMap.merge
     (fun s t1 t2 -> match t1, t2 with
@@ -103,8 +97,6 @@ let diff s1 s2 =
       | None, Some _
       | None, None -> None)
     s1 s2
-
-let size s = SMap.cardinal s
 
 let well_founded s =
   SMap.exists
@@ -177,7 +169,6 @@ module TPTP = struct
   (** {2 Pre-defined symbols} *)
 
   let x = Type.var 0
-  let y = Type.var 1
 
   let ty_1_to_int = Type.(forall [x] (Type.TPTP.int <=. x))
   let ty2op = Type.(forall [x] (x <== [x;x]))

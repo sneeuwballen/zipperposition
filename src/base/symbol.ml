@@ -78,7 +78,6 @@ let eq a b = cmp a b = 0
 let hash = function
   | Cst s -> s.cs_id
   | c -> Hashtbl.hash c
-  let of_string s = Cst s
 
 module Map = Sequence.Map.Make(struct type t = sym let compare = cmp end)
 module Set = Sequence.Set.Make(struct type t = sym let compare = cmp end)
@@ -89,16 +88,16 @@ let is_int = function | Int _ -> true | _ -> false
 let is_rat = function | Rat _ -> true | _ -> false
 let is_numeric = function | Int _ | Rat _ | _ -> false
 
-module Seq = struct
-  let add_set set =
-    Sequence.fold (fun set s -> Set.add s set) set
-end
-
 let is_distinct s = match s with
   | Cst c ->
     let s = c.cs_name in
     s <> "" &&  s.[0] = '"' && s.[String.length s - 1] = '"'
   | _ -> false
+
+module Seq = struct
+  let add_set set =
+    Sequence.fold (fun set s -> Set.add s set) set
+end
 
 let to_string s = match s with
   | Cst c -> c.cs_name
@@ -293,11 +292,9 @@ module TPTP = struct
 
     let is_int = mk_const   "$is_int"
     let is_rat = mk_const   "$is_rat"
-    let is_real = mk_const   "$is_real"
 
     let to_int = mk_const   "$to_int"
     let to_rat = mk_const   "$to_rat"
-    let to_real = mk_const  "$to_real"
 
     let less = mk_const   "$less"
     let lesseq = mk_const   "$lesseq"

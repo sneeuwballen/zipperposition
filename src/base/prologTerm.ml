@@ -295,7 +295,6 @@ module TPTP = struct
 
   let var = var
   let bind = bind
-  let column = column
   let const = const
   let app = app
 

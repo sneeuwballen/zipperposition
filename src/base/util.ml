@@ -241,7 +241,7 @@ let rec list_mem comp x l = match l with
   | y::ys when comp x y -> true
   | _::ys -> list_mem comp x ys
 
-let rec list_subset cmp l1 l2 =
+let list_subset cmp l1 l2 =
   List.for_all
     (fun t -> list_mem cmp t l2)
     l1
@@ -401,75 +401,6 @@ let array_except_idx a i =
   array_foldi
     (fun acc j elt -> if i = j then acc else elt::acc)
     [] a
-
-(** {2 Finite bijections} *)
-
-module Bijection(X : Hashtbl.HashedType) = struct
-  type elt = X.t
-  module H = Hashtbl.Make(X)
-  type t = elt H.t
-
-  let of_array cur next =
-    assert (Array.length cur = Array.length next);
-    let h = H.create (Array.length cur) in
-    (* build the hashtable *)
-    for i = 0 to Array.length cur - 1 do
-      let x = cur.(i) and y = next.(i) in
-      (if H.mem h x then failwith "Util.Bijection: duplicate element");
-      H.add h x y
-    done;
-    h
-  
-  (* check it's a bijutation *)
-  let is_permutation b =
-    try
-      H.iter (fun x y -> if not (H.mem b y) then raise Exit) b;
-      true
-    with Exit -> false
-
-  let of_list cur next =
-    of_array (Array.of_list cur) (Array.of_list next)
-
-  let apply bij x =
-    try H.find bij x
-    with Not_found -> x  (* fixpoint *)
-
-  let apply_list bij l =
-    List.map (fun x -> apply bij x) l
-
-  let apply_strict bij x = H.find bij x
-
-  let compose p1 p2 =
-    let h = H.create (H.length p1) in
-    (* image of elements of p2 *)
-    H.iter
-      (fun x y ->
-        try
-          let z = H.find p1 y in
-          H.add h x z  (* composition *)
-        with Not_found ->
-          H.add h x y)
-      p2;
-    (* elements of [p1] that [p2] ignored *)
-    H.iter
-      (fun y z -> if H.mem h y then () else H.add h y z)
-      p1;
-    h
-
-  (* naive composition of a list *)
-  let compose_list l =
-    let id = H.create 3 in
-    List.fold_right (fun p right -> compose p right) l id
-
-  (* reverse function (composition = id) *)
-  let rev b =
-    let h = H.create (H.length b) in
-    H.iter (fun x y -> H.add h y x) b;
-    h
-  
-  let to_list p =
-    H.fold (fun x y l -> (x,y)::l) p []
-end
 
 (** {2 String utils} *)
 
@@ -646,21 +577,21 @@ let rec pp_list ?(sep=", ") pp_item buf = function
   | [] -> ()
 
 (** print an array of items using the printing function *)
-let rec pp_array ?(sep=", ") pp_item buf a =
+let pp_array ?(sep=", ") pp_item buf a =
   for i = 0 to Array.length a - 1 do
     (if i > 0 then Buffer.add_string buf sep);
     pp_item buf a.(i)
   done
 
 (** print an array of items using the printing function *)
-let rec pp_arrayi ?(sep=", ") pp_item buf a =
+let pp_arrayi ?(sep=", ") pp_item buf a =
   for i = 0 to Array.length a - 1 do
     (if i > 0 then Buffer.add_string buf sep);
     pp_item buf i a.(i)
   done
 
 (** Print the sequence *)
-let rec pp_seq ?(sep=", ") pp_item buf seq =
+let pp_seq ?(sep=", ") pp_item buf seq =
   Sequence.iteri
     (fun i x ->
       (if i > 0 then Buffer.add_string buf sep);

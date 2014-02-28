@@ -332,21 +332,6 @@ let rec head t =
   | T.App _
   | T.SimpleApp _ -> assert false
 
-module AC = struct
-  let flatten f l =
-    let rec flatten acc l = match l with
-    | [] -> acc
-    | x::l' -> flatten (deconstruct acc x) l'
-    and deconstruct acc t = match T.view t with
-    | T.App (hd, l) ->
-      begin match T.view hd with
-        | T.Const f' when Symbol.eq f f' -> flatten acc l
-        | _ -> t::acc
-      end
-    | _ -> t::acc
-    in flatten [] l
-end
-
 (** {2 High-level operations} *)
 
 let symbols ?(init=Symbol.Set.empty) t =
@@ -528,8 +513,6 @@ let __hooks = ref []
 let add_hook h = __hooks := h :: !__hooks
 
 let pp buf t = pp_depth ~hooks:!__hooks 0 buf t
-
-let pp_debug buf t = pp_depth 0 buf t
 
 let to_string = Util.on_buffer pp
 

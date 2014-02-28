@@ -115,8 +115,6 @@ end
 
 (** {2 Base (scoped terms)} *)
 
-type term = T.t
-
 (* Does [v] appear in [t] if we apply the substitution? *)
 let occurs_check subst v sc_v t sc_t =
   let rec check t sc_t =

@@ -149,9 +149,8 @@ and _eq_record_list l1 l2 = match l1, l2 with
 let _flag_gen = Util.Flag.create ()
 let new_flag () = Util.Flag.get_new _flag_gen
 let set_flag t flag = t.flags <- t.flags lor flag
-let unset_flag t flag = t.flags <- t.flags land (lnot flag)
+(*let unset_flag t flag = t.flags <- t.flags land (lnot flag)*)
 let get_flag t flag = (t.flags land flag) != 0
-let flags t = t.flags
 
 (* groundness *)
 let flag_ground = new_flag()

@@ -109,6 +109,9 @@ module type S = sig
       (** alphabetic ordering on symbols *)
   end
 
+  val weight_modarity : arity:(symbol -> int) -> symbol -> int
+  val weight_constant : symbol -> int
+
   (** {2 Creation of a precedence from constraints} *)
 
   val create : Constr.t list -> symbol list -> t
@@ -312,7 +315,7 @@ module Make(Sym : SYMBOL) = struct
   (** {3 Weight} *)
 
   (* weight of f = arity of f + 4 *)
-  let weight_modarity arity_of a = arity_of a + 4
+  let weight_modarity ~arity a = arity a + 4
 
   (* constant weight *)
   let weight_constant _ = 4

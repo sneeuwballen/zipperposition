@@ -107,7 +107,6 @@ end
 
 (** {2 Functor} *)
 
-let prof_rpo = Util.mk_profiler "compare_rpo"
 let prof_rpo6 = Util.mk_profiler "compare_rpo6"
 let prof_kbo = Util.mk_profiler "compare_kbo"
 
@@ -187,7 +186,7 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
 
   (** {2 Ordering implementations} *)
 
-  module KBO = struct
+  module KBO : ORD = struct
     let name = "kbo"
 
     (** used to keep track of the balance of variables *)
@@ -361,7 +360,7 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
   (** hopefully more efficient (polynomial) implementation of LPO,
       following the paper "things to know when implementing LPO" by Löchner.
       We adapt here the implementation clpo6 with some multiset symbols (=) *)
-  module RPO6 = struct
+  module RPO6 : ORD = struct
     let name = "rpo6"
 
     (** recursive path ordering *)

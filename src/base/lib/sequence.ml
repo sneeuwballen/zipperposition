@@ -160,9 +160,6 @@ module MList = struct
       tl = _empty ();
     }
 
-  let rec is_empty l =
-    l.len = 0 && (l.tl == _empty () || is_empty l.tl)
-
   let rec iter f l =
     for i = 0 to l.len - 1 do f l.content.(i); done;
     if l.tl != _empty () then iter f l.tl
@@ -202,22 +199,6 @@ module MList = struct
         l.len <- l.len + 1;
         l
       end
-
-  (** Reverse list (in place), and returns the new head *)
-  let rev l =
-    let rec rev prev l =
-      (* reverse array *)
-      for i = 0 to (l.len-1) / 2 do
-        let x = l.content.(i) in
-        l.content.(i) <- l.content.(l.len - i - 1);
-        l.content.(l.len - i - 1) <- x;
-      done;
-      (* reverse next block *)
-      let l' = l.tl in
-      l.tl <- prev;
-      if l' == _empty () then l else rev l l'
-    in
-    rev (_empty ()) l
 
   (** Build a MList of elements of the Seq. The optional argument indicates
       the size of the blocks *)

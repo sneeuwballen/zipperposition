@@ -36,7 +36,6 @@ module Loc = ParseLocation
 
 type t = {
   reasoner : Reasoner.t;
-  plugins : Plugin.Set.t;
   signature : Signature.t;
 }
 
@@ -44,13 +43,10 @@ type clause = Reasoner.clause
 
 let empty = {
   reasoner = R.empty;
-  plugins = P.Base.set;
   signature = Signature.merge P.Base.signature Encoding.signature;
 }
 
 let reasoner p = p.reasoner
-
-let plugins p = p.plugins
 
 let signature p = p.signature
 

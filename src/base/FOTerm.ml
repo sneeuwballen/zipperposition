@@ -512,7 +512,7 @@ let print_all_types = ref false
 type print_hook = int -> (Buffer.t -> t -> unit) -> Buffer.t -> t -> bool
 
 (* lightweight printing *)
-let rec pp_depth ?(hooks=[]) depth buf t =
+let pp_depth ?(hooks=[]) depth buf t =
   let depth = ref depth in
   (* recursive printing *)
   let rec pp_rec buf t =
@@ -608,7 +608,6 @@ module TPTP = struct
     open Type.TPTP
 
     let x = Type.var 0
-    let y = Type.var 1
 
     let ty1 = Type.(forall [x] (int <=. x))
 

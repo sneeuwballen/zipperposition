@@ -171,9 +171,6 @@ module Index = struct
     let set = S.add c set in
     M.add t set idx
 
-  let iter idx k =
-    M.iter (fun t set -> S.iter (fun clause -> k (t,clause)) set) idx
-
   (* fold on unifiable terms and their associated clause *)
   let retrieve_unify ?(subst=Substs.empty) idx s_idx t s_t acc k =
     M.fold

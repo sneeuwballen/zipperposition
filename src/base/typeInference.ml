@@ -278,12 +278,6 @@ module Ctx = struct
         if {!to_signature} is called. *)
     ctx.to_bind <- []
 
-  (* clear and return the renaming *)
-  let renaming_clear ctx =
-    let renaming = ctx.renaming in
-    Substs.Renaming.clear renaming;
-    renaming
-
   let reset_renaming ctx =
     Substs.Renaming.clear ctx.renaming
 

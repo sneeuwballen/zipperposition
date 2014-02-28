@@ -441,21 +441,6 @@ module Make(MyT : TERM) = struct
         | _ -> assert false)
       acc form
 
-  let rec fold f acc form = match view form with
-    | And l
-    | Or l -> List.fold_left (fold f) acc l
-    | Xor (f1, f2)
-    | Imply (f1, f2)
-    | Equiv (f1, f2) -> fold f (fold f acc f1) f2
-    | Not f' -> fold f acc f'
-    | True
-    | False -> acc
-    | Atom p -> f acc p
-    | Eq (t1, t2)
-    | Neq (t1, t2) -> f (f acc t1) t2
-    | Forall (_,f')
-    | Exists (_,f') -> fold f acc f'
-
   let iter f form = fold (fun () t -> f t) () form
 
   let rec map_depth ?(depth=0) f form = match view form with
@@ -959,6 +944,6 @@ end
 module FO = Make(FOTerm)
 
 module Map(From : S)(To : S) = struct
-  let rec map f form = match From.view form with
+  let map f form = match From.view form with
     | _ -> assert false (* TODO *)
 end

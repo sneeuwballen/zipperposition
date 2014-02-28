@@ -87,9 +87,11 @@ val mk_rat : Q.t -> t
 val of_rat : int -> int -> t
 val rat_of_string : string -> t
 
+val is_const : t -> bool
 val is_int : t -> bool
 val is_rat : t -> bool
 val is_numeric : t -> bool
+val is_distinct : t -> bool  (* constant with "" around *)
 
 module Seq : sig
   val add_set : Set.t -> t Sequence.t -> Set.t

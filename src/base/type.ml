@@ -226,10 +226,6 @@ let __var =
 type print_hook = int -> (Buffer.t -> t-> unit) -> Buffer.t -> t-> bool
 
 module TPTP = struct
-  let arrow = Symbol.of_string ">"
-  let forall_ty = Symbol.of_string "!>"
-  let tType = T.tType
-
   let i = const Symbol.TPTP.i
   let o = const Symbol.TPTP.o
   let int = const Symbol.TPTP.int

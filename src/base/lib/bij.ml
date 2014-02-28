@@ -47,8 +47,6 @@ and _ inject_branch =
 and _ extract_branch =
   | BranchFrom : 'b t * ('b -> 'a) -> 'a extract_branch
 
-type 'a bij = 'a t
-
 (** {2 Bijection description} *)
 
 let unit_ = Unit

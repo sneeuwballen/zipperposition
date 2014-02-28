@@ -430,6 +430,8 @@ module Infix : sig
   val (|>) : 'a -> ('a -> 'b) -> 'b
 
   val (@@) : 'a t -> 'a t -> 'a t
+
+  val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
 end
 
 val (--) : int -> int -> int t

@@ -70,7 +70,6 @@ module Term = struct
 
   let var = PT.var
   let bind = PT.bind
-  let column = PT.column
   let const = PT.const
   let app = PT.app
   let record = PT.record
@@ -86,7 +85,6 @@ module Term = struct
   let neq ?loc ?(ty=wildcard) a b = app ?loc (const Symbol.Base.neq) [ty; list_[a;b]]
   let forall ?loc vars f = bind ?loc Symbol.Base.forall vars f
   let exists ?loc vars f = bind ?loc Symbol.Base.exists vars f
-  let lambda ?loc vars f = bind ?loc Symbol.Base.lambda vars f
 
   let mk_fun_ty ?loc l ret =
     let rec mk l = match l with
