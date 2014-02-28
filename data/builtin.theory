@@ -110,7 +110,8 @@ theory (group {op=Mult, neutral=E, inverse=I}) <-
 
 theory (subgroup {op=Mult, neutral=E, inverse=I, mem=P}) <-
   theory (group {op=Mult, neutral=E, inverse=I}),
-  holds [ ~ (P ?x), P (I ?x) ].   % closed by inverse
+  holds [ P Some_element ],       % non-empty
+  holds [ ~ (P ?x), P (I ?x) ],   % closed by inverse
   holds [ ~ (P ?x), ~ (P ?y), P (Mult ?x ?y) ].  % closed by op
 
 lemma [ P E ] <-
@@ -175,7 +176,8 @@ theory (strict_total_order R) <-
   holds [ R ?x ?y, ?x = ?y, R ?y ?x ].
 
 theory (total_order {less=Less, lesseq=Lesseq}) <-
-  theory (total_order_strict Less),
+  theory (strict_total_order Less),
+  holds [ ?x != ?y, Lesseq ?x ?y ],
   holds [ ~ (Less ?x ?y), Lesseq ?x ?y ],
   holds [ ~ (Lesseq ?x ?y), ?x = ?y, Less ?x ?y ].
 
@@ -194,7 +196,7 @@ theory (non_strict_total_order Lesseq) <-
 % dense orders, orders without endpoints
 
 axiom (no_higher_bound R) <-
-  holds [ R ?x (Some_bound ?x) ].
+  holds [ R ?x (Some_successor ?x) ].
 
 axiom (higher_bound {lesseq=Lesseq, high=High}) <-
   holds [ Lesseq ?x High ].
@@ -203,7 +205,7 @@ axiom (lower_bound {lesseq=Lesseq, low=Low}) <-
   holds [ Lesseq Low ?x ].
 
 axiom (no_lower_bound R) <-
-  holds [ R (Some_bound ?x) ?x ].
+  holds [ R (Some_predecessor ?x) ?x ].
 
 theory (total_order_without_endpoints R) <-
   theory (strict_total_order R),
