@@ -49,7 +49,17 @@ module Clause = struct
   }
   type clause = t
 
-  let rule head body = {head; body; }
+  let safe head body =
+    let vars_body = Sequence.flatMap HOT.Seq.vars (Sequence.of_list body) in
+    HOT.Seq.vars head
+      |> Sequence.for_all (fun v -> Sequence.exists (HOT.eq v) vars_body)
+
+  let rule head body =
+    if not (safe head body)
+      then failwith (Util.sprintf "unsafe Horn clause: %a <- %a"
+        HOT.pp head (Util.pp_list HOT.pp) body);
+    {head; body; }
+
   let fact head = rule head []
 
   let is_fact t = t.body = []

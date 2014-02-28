@@ -260,8 +260,8 @@ let is_record t = match T.view t with | T.Record _ -> true | _ -> false
 (** {2 Sequences} *)
 
 module Seq = struct
-  let subterms = T.Seq.subterms
-  let vars = T.Seq.vars
+  let subterms t = T.Seq.subterms t |> Sequence.filter is_term
+  let vars t = T.Seq.vars t |> Sequence.filter is_term
   let subterms_depth = T.Seq.subterms_depth
   let symbols t =
     T.Seq.symbols t |>
@@ -273,9 +273,6 @@ module Seq = struct
   let add_set set ts =
     Sequence.fold (fun set t -> Set.add t set) set ts
 end
-
-let var_occurs ~var t =
-  Seq.vars t |> Sequence.exists (eq t)
 
 (** {2 Subterms and positions} *)
 
