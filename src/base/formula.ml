@@ -669,6 +669,8 @@ module Make(MyT : TERM) = struct
           | Eq (t1, t2) -> Base.neq t1 t2
           | Imply (f1, f2) -> Base.and_ [f1; simplify ~depth (Base.not_ f2)]
           | Not f' -> f'
+          | True -> Base.false_
+          | False -> Base.true_
           | _ -> Base.not_ f'
           end
       | Imply (a, b) ->
