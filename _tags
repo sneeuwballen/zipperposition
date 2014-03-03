@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 503c37832dc449d629ba18ba6f7f66a0)
+# DO NOT EDIT (digest: 3cee00afce98c5c4e9a82a1a8a351959)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -48,6 +48,8 @@
 "src/base/lib/multiset.cmx": for-pack(Logtk)
 "src/base/lib/BV.cmx": for-pack(Logtk)
 "src/base/lib/partialOrder.cmx": for-pack(Logtk)
+"src/base/lib/kList.cmx": for-pack(Logtk)
+"src/base/lib/lazyList.cmx": for-pack(Logtk)
 <src/base/*.ml{,i}>: package(unix)
 <src/base/*.ml{,i}>: package(zarith)
 <src/base/lib/*.ml{,i}>: package(unix)
@@ -84,6 +86,13 @@
 <src/meta/*.ml{,i}>: package(zarith)
 <src/meta/*.ml{,i}>: use_logtk
 <src/meta/*.ml{,i}>: use_logtk_parsers
+# Library logtk_solving
+"src/solving/logtk_solving.cmxs": use_logtk_solving
+"src/solving/lpo.cmx": for-pack(Logtk_solving)
+<src/solving/*.ml{,i}>: package(sat)
+<src/solving/*.ml{,i}>: package(unix)
+<src/solving/*.ml{,i}>: package(zarith)
+<src/solving/*.ml{,i}>: use_logtk
 # Library logtk_arbitrary
 "src/arbitrary/logtk_arbitrary.cmxs": use_logtk_arbitrary
 "src/arbitrary/arTerm.cmx": for-pack(Logtk_arbitrary)
