@@ -31,22 +31,7 @@ type subst = Substs.t
 
 (** {2 Result of (multiple) Unification} *)
 
-module Res : sig
-  type t =
-    | End
-    | Ok of subst * (unit -> t)
-    (** Result of unification provides a continuation to get other
-     * substitutions, in case the unification is n-ary. *)
-
-  val to_list : t -> subst list
-    (** Compute all results into a list *)
-
-  val to_seq : t -> subst Sequence.t
-    (** Iterate on results *)
-
-  val fold : ('a -> subst -> 'a) -> 'a -> t -> 'a
-    (** Fold on substitutions *)
-end
+type res = subst KList.t
 
 exception Fail
   (** Raised when a unification/matching attempt fails *)
@@ -85,7 +70,7 @@ end
 
 module type NARY = sig
   type term
-  type result = Res.t
+  type result = res
 
   val unification : ?subst:subst -> term -> scope -> term -> scope -> result
     (** unification of two terms *)
@@ -122,7 +107,7 @@ module HO : NARY with type term = HOTerm.t
 module Form : sig
   val variant : ?subst:subst ->
                 Formula.FO.t -> scope -> Formula.FO.t -> scope ->
-                Res.t
+                res
 
   val are_variant : Formula.FO.t -> Formula.FO.t -> bool
 end

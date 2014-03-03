@@ -35,29 +35,14 @@ type scope = Substs.scope
 type subst = Substs.t
 
 (** {2 Result of multiple Unification} *)
+
+type res = subst KList.t
+
 module Res = struct
-  type t =
-    | End
-    | Ok of subst * (unit -> t)
-    (** Result of unification provides a continuation to get other
-     * substitutions, in case the unification is n-ary. *)
-
-  let rec to_list = function
-    | End -> []
-    | Ok (subst, f) -> subst :: to_list (f ())
-
-  let rec to_seq res k = match res with
-    | End -> ()
-    | Ok (s, f) -> k s; to_seq (f ()) k
-
-  let rec fold f acc res = match res with
-    | End -> acc
-    | Ok (s, cont) -> fold f (f acc s) (cont ())
-
   (* takes a function that requires a success cont. and a failure cont.
-   * and returns the lazy result *)
+      and returns the lazy result *)
   let of_fun f =
-    f ~k:(fun subst fk -> Ok (subst,fk)) ~fk:(fun () -> End)
+    f ~k:(fun subst fk -> KList.cons subst fk) ~fk:(fun () -> KList.nil)
 end
 
 (** {2 Signatures} *)
@@ -94,7 +79,7 @@ end
 
 module type NARY = sig
   type term
-  type result = Res.t
+  type result = res
 
   val unification : ?subst:subst -> term -> scope -> term -> scope -> result
     (** unification of two terms *)
@@ -205,7 +190,7 @@ module RU = RecordUnif
 
 module Nary = struct
   type term = T.t
-  type result = Res.t
+  type result = res
   type fcont = unit -> result
   type cont = Substs.t -> fcont -> result
   type unif = Substs.t -> T.t -> scope -> T.t -> scope -> k:cont -> fk:fcont -> result
@@ -375,7 +360,7 @@ module Nary = struct
           unif subst ty1 sc_s ty2 sc_t
             ~k:(fun subst fk -> unif_terms subst s sc_s t sc_t ~k ~fk)
             ~fk
-    and unif_terms subst s sc_s t sc_t ~(k:cont) ~(fk:fcont) : Res.t =
+    and unif_terms subst s sc_s t sc_t ~(k:cont) ~(fk:fcont) : res =
       match T.view s, T.view t with
       | _ when T.eq s t && (T.ground s || sc_s = sc_t) ->
         k subst fk (* the terms are equal under any substitution *)
@@ -430,7 +415,7 @@ module Nary = struct
           unif subst ty1 sc_s ty2 sc_t
             ~k:(fun subst fk -> unif_terms subst s sc_s t sc_t ~k ~fk)
             ~fk
-    and unif_terms subst s sc_s t sc_t ~(k:cont) ~(fk:fcont) : Res.t =
+    and unif_terms subst s sc_s t sc_t ~(k:cont) ~(fk:fcont) : res =
       match T.view s, T.view t with
       | _ when T.eq s t && (T.ground s || sc_s = sc_t) ->
         k subst fk (* the terms are equal under any substitution *)
@@ -472,18 +457,18 @@ module Nary = struct
 
   let are_variant t1 t2 =
     match variant t1 0 t2 1 with
-    | Res.End -> false
-    | Res.Ok _ -> true
+    | KList.Nil -> false
+    | KList.Cons _ -> true
 
   let matches ~pattern t =
     match matching ~pattern 0 t 1 with
-    | Res.End -> false
-    | Res.Ok _ -> true
+    | KList.Nil -> false
+    | KList.Cons _ -> true
 
   let are_unifiable t1 t2 =
     match unification t1 0 t2 1 with
-    | Res.End -> false
-    | Res.Ok _ -> true
+    | KList.Nil -> false
+    | KList.Cons _ -> true
 end
 
 (** {2 Unary Unification} *)
@@ -815,7 +800,7 @@ end
 module HO = struct
   open Nary
   type term = HOTerm.t
-  type result = Res.t
+  type result = res
 
   let unification =
     (unification :> ?subst:subst -> term -> scope -> term -> scope -> result)
@@ -906,7 +891,7 @@ module Form = struct
 
   let are_variant f1 f2 =
     match variant f1 0 f2 1 with
-    | Res.End -> false
-    | Res.Ok _ -> true
+    | KList.Nil -> false
+    | KList.Cons _ -> true
 end
 

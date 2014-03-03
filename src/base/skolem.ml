@@ -87,8 +87,8 @@ let skolem_form ~ctx ~ty f =
       (fun (f', new_f') ->
         Util.debug 5 "check variant %a and %a" F.pp f F.pp f';
         match Unif.Form.variant f' 1 f 0 with
-        | Unif.Res.End -> ()
-        | Unif.Res.Ok (subst, _) ->
+        | KList.Nil -> ()
+        | KList.Cons (subst, _) ->
           raise (FoundFormVariant (f', new_f', subst)))
       ctx.sc_fcache;
     (* fresh symbol with the proper type *)
