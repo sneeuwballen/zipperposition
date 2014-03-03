@@ -1,3 +1,4 @@
+
 (*
 Copyright (c) 2013, Simon Cruanes
 All rights reserved.
@@ -23,25 +24,25 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Continuation List} *)
+(** {1 Lazy List} *)
 
-type 'a t =
+type 'a node =
   | Nil
-  | Cons of 'a * (unit -> 'a t)
+  | Cons of 'a * 'a t
+and 'a t = 'a node Lazy.t
 
-let nil = Nil
-let cons a b = Cons (a,b)
+let nil = Lazy.from_val Nil
+let cons a b = Lazy.from_val (Cons (a, b))
 
 let rec to_list = function
-  | Nil -> []
-  | Cons (x, f) -> x :: to_list (f ())
+  | lazy Nil -> []
+  | lazy (Cons (x, f)) -> x :: to_list f
 
 let rec to_seq res k = match res with
-  | Nil -> ()
-  | Cons (s, f) -> k s; to_seq (f ()) k
+  | lazy Nil -> ()
+  | lazy (Cons (s, f)) -> k s; to_seq f k
 
 let rec fold f acc res = match res with
-  | Nil -> acc
-  | Cons (s, cont) -> fold f (f acc s) (cont ())
-
+  | lazy Nil -> acc
+  | lazy (Cons (s, cont)) -> fold f (f acc s) cont
 

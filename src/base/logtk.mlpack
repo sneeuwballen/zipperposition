@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 7661493ff98b672dee44d9e92629a589)
+# DO NOT EDIT (digest: 069932601eec9f52a49ae598a9bb6e9d)
 Symbol
 ScopedTerm
 FOTerm
@@ -34,4 +34,5 @@ lib/Multiset
 lib/BV
 lib/PartialOrder
 lib/KList
+lib/LazyList
 # OASIS_STOP
