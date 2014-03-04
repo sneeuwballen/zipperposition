@@ -214,11 +214,38 @@ module MakeSolver(X : sig end) = struct
 
   (* function to extract symbol -> int from a solution *)
   let int_of_symbol ~n ~solution s =
-    assert false (* TODO *)
+    let r = ref 0 in
+    for i = n-1 downto 0 do
+      let lit = digit s i in
+      let is_true = solution lit in
+      if is_true
+      then r := 2 * !r + 1
+      else r := 2 * !r
+    done;
+    Util.debug 3 "index of symbol %a in precedence is %d" Symbol.pp s !r;
+    !r
 
   (* extract a solution *)
-  let get_solution ~n ~solution : Solution.t =
-    assert false (* TODO *)
+  let get_solution ~n ~solution symbols =
+    let syms = List.map (fun s -> int_of_symbol ~n ~solution s, s) symbols in
+    (* sort in increasing order *)
+    let syms = List.sort (fun (n1,_)(n2,_) -> n1-n2) syms in
+    (* build solution by imposing f>g iff n(f) > n(g) *)
+    let _, _, sol = List.fold_left
+      (fun (cur_n,other_s,acc) (n,s) ->
+        if n = cur_n
+          then n, s::other_s, acc   (* yet another symbol with rank [n] *)
+          else begin
+            (* elements of [other_s] have a lower rank, force them to be smaller  *)
+            assert (cur_n < n);
+            let acc = List.fold_left
+              (fun acc s' -> (s, s') :: acc)
+              acc other_s
+            in n, [s], acc
+          end
+      ) (~-1,[],[]) syms
+    in
+    sol
 
   (* solve the given list of constraints *)
   let solve_list l =
@@ -227,8 +254,9 @@ module MakeSolver(X : sig end) = struct
       Sequence.of_list l
         |> Sequence.flatMap C.Seq.exprs
         |> Symbol.Seq.add_set Symbol.Set.empty
+        |> Symbol.Set.elements
     in
-    let num = Symbol.Set.cardinal symbols in
+    let num = List.length symbols in
     (* the number of digits required to map each symbol to a distinct int *)
     let n = int_of_float (ceil (log (float_of_int num) /. log 2.)) in
     Util.debug 2 "constraints on %d symbols -> %d digits" num n;
@@ -242,7 +270,7 @@ module MakeSolver(X : sig end) = struct
         match S.run_solver S.no_decider with
         | None -> LazyList.Nil
         | Some solution ->
-            let solution = get_solution ~n ~solution in
+            let solution = get_solution ~n ~solution symbols in
             (* obtain another solution: negate current one and continue *)
             let tl = lazy (negate ~n solution) in
             LazyList.Cons (solution, tl)
@@ -259,28 +287,6 @@ let solve_multiple l =
   Util.debug 2 "lpo: solve constraints %a" (Util.pp_list Constraint.pp) l;
   let module S = MakeSolver(struct end) in
   S.solve_list l
-  (*
-  try
-    S.add_list l;
-    let solution = ref None in
-    Stream.from
-      (fun _ ->
-        try
-          (* first, forbid previous solution *)
-          begin match !solution with
-          | None -> ()
-          | Some s -> S.forbid_solution s
-          end;
-          (* check if another solution is available *)
-          S.check_sat ();
-          let s = S.get_solution () in
-          solution := Some s;
-          Some s
-        with Aez.Smt.Unsat _ ->
-          None)
-  with Aez.Smt.Unsat _ ->
-    Stream.from (fun _ -> None)  (* no solution at all *)
-    *)
 
 (** {6 LPO} *)
 
@@ -321,8 +327,7 @@ let rec orient_lpo a b =
   | TC.App (f, l), _ ->
     (* only the subterm property can apply *)
     any_bigger l b
-  | TC.NonFO, _
-  | _, TC.NonFO ->
+  | TC.NonFO, _ ->
     (* no clue... *)
     C.false_
 
