@@ -208,6 +208,10 @@ let close_all s t =
   in
   bind s vars t
 
+let subterm ~strict t ~sub =
+  (not strict && eq t sub)
+  || Sequence.exists (eq sub) (Seq.subterms t)
+
 let rec pp buf t = match t.term with
   | Var s -> Buffer.add_string buf s
   | Int i -> Buffer.add_string buf (Z.to_string i)

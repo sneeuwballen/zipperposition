@@ -93,6 +93,8 @@ end
 
 val ground : t -> bool
 val close_all : Symbol.t -> t -> t  (** Bind all free vars with the symbol *)
+val subterm : strict:bool -> t -> sub:t -> bool
+  (** is [sub] a (strict?) subterm of the other arg? *)
 
 include Interfaces.PRINT with type t := t
 

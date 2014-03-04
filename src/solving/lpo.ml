@@ -28,9 +28,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module T = FOTerm
-type term = T.t
-
 (** {6 Constraints} *)
 
 module Constraint = struct
@@ -290,80 +287,139 @@ let solve_multiple l =
 
 (** {6 LPO} *)
 
-module TC = T.Classic
-
-(* constraint for a > b *)
-let rec orient_lpo a b =
-  match TC.view a, TC.view b with
-  | (TC.Var _ | TC.BVar _), _ ->
-    C.false_  (* a variable cannot be > *)
-  | _, _ when T.subterm b a ->
-    C.true_  (* trivial subterm property --> ok! *)
-  | TC.App (f, ((_::_) as l)), TC.App (g, l')
-  when List.length l = List.length l' ->
-    (* three cases: either some element of [l] is > [r],
-        or precedence of first symbol applies,
-        or lexicographic case applies (with non empty lists) *)
-    C.or_
-      [ C.and_
-          [ C.eq f g
-          ; lexico_order l l' ]  (* f=g, lexicographic order of subterms *)
-      ; C.and_
-          [ C.gt f g
-          ; all_bigger a l'
-          ]  (* f>g and a > all subterms of b *)
-      ; any_bigger l b  (* some subterm of a is > b *)
-      ]
-  | TC.App (f, l), TC.App (g, l') ->
-    (* two cases: either some element of [l] is > [r],
-        or precedence of first symbol applies *)
-    C.or_
-      [ C.and_
-          [ C.gt f g
-          ; all_bigger a l'
-          ]  (* f>g and a > all subterms of b *)
-      ; any_bigger l b  (* some subterm of a is > b *)
-      ]
-  | TC.App (f, l), _ ->
-    (* only the subterm property can apply *)
-    any_bigger l b
-  | TC.NonFO, _ ->
-    (* no clue... *)
-    C.false_
-
-(* constraint that some term in [l] is bigger than [b] *)
-and any_bigger l b = match l with
+  (* constraint that some term in [l] is bigger than [b] *)
+let any_bigger ~orient_lpo l b  = match l with
   | [] -> C.false_
   | [x] -> orient_lpo x b
   | _ -> (* any element of [l] bigger than [r]? *)
     C.or_ (List.map (fun x -> orient_lpo x b) l)
 
 (* [a] bigger than all the elements of [l] *)
-and all_bigger a l = match l with
+and all_bigger ~orient_lpo a l = match l with
   | [] -> C.true_
   | [x] -> orient_lpo a x
   | _ ->
     C.and_ (List.map (fun y -> orient_lpo a y) l)
 
 (* constraint for l1 >_lex l2 (lexicographic extension of LPO) *)
-and lexico_order l1 l2 =
+and lexico_order ~eq ~orient_lpo l1 l2 =
   assert (List.length l1 = List.length l2);
   let c = List.fold_left2
     (fun constr a b ->
       match constr with
       | Some _ -> constr
-      | None when T.eq a b -> None
+      | None when eq a b -> None
       | None -> Some (orient_lpo a b))
     None l1 l2
   in match c with
   | None -> C.false_   (* they are equal *)
   | Some c -> c
 
-let orient_lpo_list l =
-  List.map
-    (fun (l,r) ->
-      let c = orient_lpo l r in
-      let c' = C.simplify c in
-      Util.debug 2 "constr %a simplified into %a" C.pp c C.pp c';
-      c')
-    l
+module FO = struct
+  module T = FOTerm
+  type term = T.t
+  module TC = T.Classic
+
+  (* constraint for a > b *)
+  let rec orient_lpo a b =
+    match TC.view a, TC.view b with
+    | (TC.Var _ | TC.BVar _), _ ->
+      C.false_  (* a variable cannot be > *)
+    | _, _ when T.subterm b a ->
+      C.true_  (* trivial subterm property --> ok! *)
+    | TC.App (f, ((_::_) as l)), TC.App (g, l')
+    when List.length l = List.length l' ->
+      (* three cases: either some element of [l] is > [r],
+          or precedence of first symbol applies,
+          or lexicographic case applies (with non empty lists) *)
+      C.or_
+        [ C.and_
+            [ C.eq f g
+            ; lexico_order ~eq:T.eq ~orient_lpo l l' ]
+              (* f=g, lexicographic order of subterms *)
+        ; C.and_
+            [ C.gt f g
+            ; all_bigger ~orient_lpo a l'
+            ]  (* f>g and a > all subterms of b *)
+        ; any_bigger ~orient_lpo l b  (* some subterm of a is > b *)
+        ]
+    | TC.App (f, l), TC.App (g, l') ->
+      (* two cases: either some element of [l] is > [r],
+          or precedence of first symbol applies *)
+      C.or_
+        [ C.and_
+            [ C.gt f g
+            ; all_bigger ~orient_lpo a l'
+            ]  (* f>g and a > all subterms of b *)
+        ; any_bigger ~orient_lpo l b  (* some subterm of a is > b *)
+        ]
+    | TC.App (f, l), _ ->
+      (* only the subterm property can apply *)
+      any_bigger ~orient_lpo l b
+    | TC.NonFO, _ ->
+      (* no clue... *)
+      C.false_
+
+  let orient_lpo_list l =
+    List.map
+      (fun (l,r) ->
+        let c = orient_lpo l r in
+        let c' = C.simplify c in
+        Util.debug 2 "constr %a simplified into %a" C.pp c C.pp c';
+        c')
+      l
+end
+
+module Prolog = struct
+  module T = PrologTerm
+  type term = T.t
+
+  (* constraint for a > b *)
+  let rec orient_lpo a b =
+    match T.view a, T.view b with
+    | T.Var _ , _ ->
+      C.false_  (* a variable cannot be > *)
+    | _ when T.eq a b -> C.false_
+    | _ when T.subterm ~strict:true a ~sub:b ->
+      C.true_  (* trivial subterm property --> ok! *)
+    | T.App ({T.term=T.Const f}, ((_::_) as l)), T.App ({T.term=T.Const g}, l')
+    when List.length l = List.length l' ->
+      (* three cases: either some element of [l] is > [r],
+          or precedence of first symbol applies,
+          or lexicographic case applies (with non empty lists) *)
+      C.or_
+        [ C.and_
+            [ C.eq f g
+            ; lexico_order ~eq:T.eq ~orient_lpo l l' ]  (* f=g, lexicographic order of subterms *)
+        ; C.and_
+            [ C.gt f g
+            ; all_bigger ~orient_lpo a l'
+            ]  (* f>g and a > all subterms of b *)
+        ; any_bigger ~orient_lpo l b  (* some subterm of a is > b *)
+        ]
+    | T.App ({T.term=T.Const f}, l), T.App ({T.term=T.Const g}, l') ->
+      (* two cases: either some element of [l] is > [r],
+          or precedence of first symbol applies *)
+      C.or_
+        [ C.and_
+            [ C.gt f g
+            ; all_bigger ~orient_lpo a l'
+            ]  (* f>g and a > all subterms of b *)
+        ; any_bigger ~orient_lpo l b  (* some subterm of a is > b *)
+        ]
+    | T.App ({T.term=T.Const _}, l), _ ->
+      (* only the subterm property can apply *)
+      any_bigger ~orient_lpo l b
+    | _ ->
+      (* no clue... *)
+      C.false_
+
+  let orient_lpo_list l =
+    List.map
+      (fun (l,r) ->
+        let c = orient_lpo l r in
+        let c' = C.simplify c in
+        Util.debug 2 "constr %a simplified into %a" C.pp c C.pp c';
+        c')
+      l
+end

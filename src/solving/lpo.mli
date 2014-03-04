@@ -28,8 +28,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-type term = FOTerm.t
-
 (** {6 Constraints} *)
 
 module Constraint : sig
@@ -90,10 +88,26 @@ val solve_multiple : Constraint.t list -> Solution.t LazyList.t
 
 (** {6 Search for a LPO ordering} *)
 
-val orient_lpo : term -> term -> Constraint.t
-  (** [orient a b] generates a constraint that is sufficient for [a]
-      to be bigger than [b] in LPO orderings satisfying the
-      constraints *)
+module FO : sig
+  type term = FOTerm.t
 
-val orient_lpo_list : (term * term) list -> Constraint.t list
-  (** Orient a list of pairs *)
+  val orient_lpo : term -> term -> Constraint.t
+    (** [orient a b] generates a constraint that is sufficient for [a]
+        to be bigger than [b] in LPO orderings satisfying the
+        constraints *)
+
+  val orient_lpo_list : (term * term) list -> Constraint.t list
+    (** Orient a list of pairs *)
+end
+
+module Prolog : sig
+  type term = PrologTerm.t
+
+  val orient_lpo : term -> term -> Constraint.t
+    (** [orient a b] generates a constraint that is sufficient for [a]
+        to be bigger than [b] in LPO orderings satisfying the
+        constraints *)
+
+  val orient_lpo_list : (term * term) list -> Constraint.t list
+    (** Orient a list of pairs *)
+end
