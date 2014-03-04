@@ -66,6 +66,7 @@ A parser with a nice curried syntax. *)
 %token <string> LOWER_WORD
 %token <string> UPPER_WORD
 %token <string> INTERROGATION_WORD
+%token <string> OPERATOR
 
 %nonassoc EQUIV
 %nonassoc XOR
@@ -199,6 +200,11 @@ formula_term:
     {
       let loc = L.mk_pos $startpos $endpos in
       Term.not_ ~loc  t
+    }
+  | l=app_term o=OPERATOR r=app_term
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      Term.app ~loc (Term.const ~loc (Symbol.of_string o)) [l;r]
     }
   | t=app_term{ t }
 

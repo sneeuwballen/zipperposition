@@ -39,6 +39,7 @@ let comment_line = ['%' '#'] printable_char*
 let numeric = ['0' - '9']
 let lower_alpha = ['a' - 'z']
 let upper_alpha = ['A' - 'Z']
+let operator = ['-' '|' '>' '<' '&' '_' '$']+
 let alpha_numeric = lower_alpha | upper_alpha | numeric | '_'
 
 let upper_word = upper_alpha alpha_numeric*
@@ -75,6 +76,7 @@ rule token = parse
   | lower_word { LOWER_WORD(Lexing.lexeme lexbuf) }
   | upper_word { UPPER_WORD(Lexing.lexeme lexbuf) }
   | interrogation_word { INTERROGATION_WORD(Lexing.lexeme lexbuf) }
+  | operator { OPERATOR(Lexing.lexeme lexbuf) }
   | _ as c { raise (Error (Printf.sprintf "lexer fails on char '%c'" c)) }
 
 
