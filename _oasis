@@ -106,8 +106,8 @@ Library "logtk_solving"
   FindlibParent:    logtk
   FindlibName:      solving
   Modules:          Lpo
-  BuildDepends:     logtk,sat
-  XMETARequires:    logtk,sat
+  BuildDepends:     logtk,aez
+  XMETARequires:    logtk,aez
 
 Library "logtk_arbitrary"
   Path:             src/arbitrary/
@@ -167,6 +167,15 @@ Executable cnf_of_tptp
   CompiledObject:   native
   MainIs:           cnf_of_tptp.ml
   BuildDepends:     logtk,logtk.parsers
+
+# Orienting rewrite rules with LPO
+Executable orient
+  Path:             tools/
+  Build$:           flag(tools) & flag(parsers) & flag(solving)
+  Install$:         flag(tools) & flag(parsers) & flag(solving)
+  CompiledObject:   native
+  MainIs:           orient.ml
+  BuildDepends:     logtk,logtk.parsers,logtk.solving,aez
 
 # proof checking
 #Executable proof_check_tstp

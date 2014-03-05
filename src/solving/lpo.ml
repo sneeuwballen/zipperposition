@@ -86,9 +86,9 @@ module Constraint = struct
   (* simplify the constraints *)
   let rec simplify t =
     match t with
-    | EQ (a, b) when a = b -> true_
-    | LE (a, b) when a = b -> true_
-    | LT (a, b) when a = b -> false_
+    | EQ (a, b) when Symbol.eq a b -> true_
+    | LE (a, b) when Symbol.eq a b -> true_
+    | LT (a, b) when Symbol.eq a b -> false_
     | Not (Not t) -> simplify t
     | Not True -> true_
     | Not False -> true_
@@ -102,16 +102,16 @@ module Constraint = struct
       let l' = List.fold_left flatten_and [] l in
       begin match l' with
       | [] -> true_
-      | [x] -> x
       | _ when List.mem false_ l' -> false_
+      | [x] -> x
       | _ -> and_ l'
       end
     | Or l ->
       let l' = List.fold_left flatten_or [] l in
       begin match l' with
       | [] -> false_
-      | [x] -> x
       | _ when List.mem true_ l' -> true_
+      | [x] -> x
       | _ -> or_ l'
       end
     | _ -> t
@@ -154,77 +154,80 @@ module MakeSolver(X : sig end) = struct
   type atom =
     | Digit_n of Symbol.t * int
 
+  let atom_to_hstring = function
+    | Digit_n (s, i) -> Aez.Hstring.make (Util.sprintf "prec_%a_%d" Symbol.pp s i)
+
   (* sat solver *)
-  module S = Sat.MakeSAT(struct
-    type t = atom
-    let equal a b = match a, b with
-      | Digit_n (s1, n1), Digit_n (s2, n2) ->
-          n1 = n2 && Symbol.eq s1 s2
-    let hash = function
-      | Digit_n (s, n) -> Hash.hash_int2 (Symbol.hash s) n
-    let to_string = function
-      | Digit_n (s,n) ->
-          Util.sprintf "digit_%d(%a)" n Symbol.pp s
-  end)
+  module S = Aez.Smt.Make(struct end)
 
-  (* get the propositional variable that represents the n-th
-     bit of [s] *)
-  let digit s n =
-    S.add_variable (Digit_n (s, n))
+  let __declared = ref Aez.Hstring.HSet.empty
 
-  module F = S.Formula
+  let atom_to_term a =
+    let s = atom_to_hstring a in
+    (* declare type, if needed *)
+    if not (Aez.Hstring.HSet.mem s !__declared) then begin
+      Aez.Smt.Symbol.declare s [] Aez.Smt.Type.type_proc;
+      __declared := Aez.Hstring.HSet.add s !__declared
+    end;
+    (* build constant *)
+    Aez.Smt.Term.make_app s []
+
+  (* get the propositional variable that represents the n-th bit of [s] *)
+  let digit s n = atom_to_term (Digit_n (s, n))
+
+  module F = Aez.Smt.Formula
 
   (* encode [a < b]_n where [n] is the number of digits.
       either the n-th digit of [a] is false and the one of [b] is true,
       or they are equal and [a < b]_{n-1}.
       @return a formula *)
   let rec encode_lt ~n a b =
-    if n = 0 then F.false_
+    if n = 0 then F.f_false
     else
-      let d_a = F.atom (digit a n) and d_b = F.atom (digit b n) in
-      F.or_
-        [ F.and_ [ F.not_ d_a; d_b ]
-        ; F.and_ [ F.equiv d_a d_b; encode_lt ~n:(n-1) a b]
+      let d_a = F.make_pred (digit a n) and d_b = F.make_pred (digit b n) in
+      F.make_or
+        [ F.make_and [ F.make_not d_a; d_b ]
+        ; F.make_and [ F.make_equiv d_a d_b; encode_lt ~n:(n-1) a b]
         ]
 
   (* encode [a <= b]_n, with not [b < a]_n. *)
   let encode_leq ~n a b =
-    F.not_ (encode_lt ~n b a)
+    F.make_not (encode_lt ~n b a)
 
   (* encode [a = b]_n, digit per digit *)
   let rec encode_eq ~n a b =
-    if n = 0 then F.true_
+    if n = 0 then F.f_true
     else
-      let d_a = F.atom (digit a n) and d_b = F.atom (digit b n) in
-      F.and_ [ F.equiv d_a d_b; encode_eq ~n:(n-1) a b ]
+      let d_a = F.make_pred (digit a n) and d_b = F.make_pred (digit b n) in
+      F.make_and [ F.make_equiv d_a d_b; encode_eq ~n:(n-1) a b ]
 
   (* encode a constraint with [n] bits into a formula. *)
   let rec encode_constr ~n c = match c with
     | C.EQ(a,b) -> encode_eq ~n a b
     | C.LE(a,b) -> encode_leq ~n a b
     | C.LT(a,b) -> encode_lt ~n a b
-    | C.And l -> F.and_ (List.map (encode_constr ~n) l)
-    | C.Or l -> F.or_ (List.map (encode_constr ~n) l)
-    | C.Not c' -> F.not_ (encode_constr ~n c')
-    | C.True -> F.true_
-    | C.False -> F.false_
+    | C.And l -> F.make_and (List.rev_map (encode_constr ~n) l)
+    | C.Or l -> F.make_or (List.rev_map (encode_constr ~n) l)
+    | C.Not c' -> F.make_not (encode_constr ~n c')
+    | C.True -> F.f_true
+    | C.False -> F.f_false
 
   (* function to extract symbol -> int from a solution *)
-  let int_of_symbol ~n ~solution s =
+  let int_of_symbol ~n s =
     let r = ref 0 in
-    for i = n-1 downto 0 do
+    for i = n downto 1 do
       let lit = digit s i in
-      let is_true = solution lit in
+      let is_true = S.eval lit in
       if is_true
-      then r := 2 * !r + 1
-      else r := 2 * !r
+        then r := 2 * !r + 1
+        else r := 2 * !r
     done;
     Util.debug 3 "index of symbol %a in precedence is %d" Symbol.pp s !r;
     !r
 
   (* extract a solution *)
-  let get_solution ~n ~solution symbols =
-    let syms = List.map (fun s -> int_of_symbol ~n ~solution s, s) symbols in
+  let get_solution ~n symbols =
+    let syms = List.rev_map (fun s -> int_of_symbol ~n s, s) symbols in
     (* sort in increasing order *)
     let syms = List.sort (fun (n1,_)(n2,_) -> n1-n2) syms in
     (* build solution by imposing f>g iff n(f) > n(g) *)
@@ -256,32 +259,47 @@ module MakeSolver(X : sig end) = struct
     let num = List.length symbols in
     (* the number of digits required to map each symbol to a distinct int *)
     let n = int_of_float (ceil (log (float_of_int num) /. log 2.)) in
-    Util.debug 2 "constraints on %d symbols -> %d digits" num n;
-    List.iter
-      (fun c ->
+    Util.debug 2 "constraints on %d symbols -> %d digits (%d bool vars)"
+      num n (n * num);
+    try
+      List.iteri
+        (fun i c ->
+          Util.debug 5 "encode constr %a..." C.pp c;
+          let f = encode_constr ~n c in
+          Format.pp_print_flush Format.std_formatter ();
+          S.assume ~id:i f;
+          Util.debug 5 "form assumed")
+        l;
+      (* generator of solutions *)
+      let rec next () =
+        try
+          Util.debug 5 "check satisfiability";
+          S.check ();
+          Util.debug 5 "next solution exists, try to extract it...";
+          let solution = get_solution ~n symbols in
+          Util.debug 5 "... solution is %a" Solution.pp solution;
+          (* obtain another solution: negate current one and continue *)
+          let tl = lazy (negate ~n solution) in
+          LazyList.Cons (solution, tl)
+        with Aez.Smt.Unsat _ ->
+          LazyList.Nil
+      and negate ~n solution =
+        (* negate current solution to get the next one... if any *)
+        let c = Solution.neg_to_constraint solution in
         let f = encode_constr ~n c in
-        S.add_formula f)
-      l;
-    (* generator of solutions *)
-    let rec next () =
-        match S.run_solver S.no_decider with
-        | None -> LazyList.Nil
-        | Some solution ->
-            let solution = get_solution ~n ~solution symbols in
-            (* obtain another solution: negate current one and continue *)
-            let tl = lazy (negate ~n solution) in
-            LazyList.Cons (solution, tl)
-    and negate ~n solution =
-      let c = Solution.neg_to_constraint solution in
-      let f = encode_constr ~n c in
-      S.add_formula f;
-      next()
-    in
-    lazy (next())
+        try
+          S.assume ~id:0 f;
+          S.check ();
+          next()
+        with Aez.Smt.Unsat _ -> LazyList.Nil
+      in
+      lazy (next())
+    with Aez.Smt.Unsat _ -> LazyList.nil
 end
 
 let solve_multiple l =
-  Util.debug 2 "lpo: solve constraints %a" (Util.pp_list Constraint.pp) l;
+  let l = List.rev_map C.simplify l in
+  Util.debug 2 "lpo: solve constraints %a" (Util.pp_list C.pp) l;
   let module S = MakeSolver(struct end) in
   S.solve_list l
 
@@ -292,14 +310,14 @@ let any_bigger ~orient_lpo l b  = match l with
   | [] -> C.false_
   | [x] -> orient_lpo x b
   | _ -> (* any element of [l] bigger than [r]? *)
-    C.or_ (List.map (fun x -> orient_lpo x b) l)
+    C.or_ (List.rev_map (fun x -> orient_lpo x b) l)
 
 (* [a] bigger than all the elements of [l] *)
 and all_bigger ~orient_lpo a l = match l with
   | [] -> C.true_
   | [x] -> orient_lpo a x
   | _ ->
-    C.and_ (List.map (fun y -> orient_lpo a y) l)
+    C.and_ (List.rev_map (fun y -> orient_lpo a y) l)
 
 (* constraint for l1 >_lex l2 (lexicographic extension of LPO) *)
 and lexico_order ~eq ~orient_lpo l1 l2 =

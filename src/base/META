@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: a772adf5d889985b1bbefffd525bd736)
+# DO NOT EDIT (digest: d4390d44940b2002437ce355ddad64de)
 version = "0.1"
 description =
 "Logic toolkit, designed primarily for first-order automated reasoning."
@@ -13,7 +13,7 @@ package "solving" (
  version = "0.1"
  description =
  "Logic toolkit, designed primarily for first-order automated reasoning."
- requires = "logtk sat"
+ requires = "logtk aez"
  archive(byte) = "logtk_solving.cma"
  archive(byte, plugin) = "logtk_solving.cma"
  archive(native) = "logtk_solving.cmxa"

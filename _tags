@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 3cee00afce98c5c4e9a82a1a8a351959)
+# DO NOT EDIT (digest: 647c7ff49147069bd006f7cfea8ca09e)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -89,7 +89,7 @@
 # Library logtk_solving
 "src/solving/logtk_solving.cmxs": use_logtk_solving
 "src/solving/lpo.cmx": for-pack(Logtk_solving)
-<src/solving/*.ml{,i}>: package(sat)
+<src/solving/*.ml{,i}>: package(aez)
 <src/solving/*.ml{,i}>: package(unix)
 <src/solving/*.ml{,i}>: package(zarith)
 <src/solving/*.ml{,i}>: use_logtk
@@ -146,6 +146,15 @@
 "tools/cnf_of_tptp.native": package(zarith)
 "tools/cnf_of_tptp.native": use_logtk
 "tools/cnf_of_tptp.native": use_logtk_parsers
+# Executable orient
+"tools/orient.native": package(aez)
+"tools/orient.native": package(unix)
+"tools/orient.native": package(zarith)
+"tools/orient.native": use_logtk
+"tools/orient.native": use_logtk_parsers
+"tools/orient.native": use_logtk_solving
+<tools/*.ml{,i}>: package(aez)
+<tools/*.ml{,i}>: use_logtk_solving
 # Executable detect_theories
 "tools/detect_theories.native": package(unix)
 "tools/detect_theories.native": package(zarith)
