@@ -105,6 +105,7 @@ let rules_of_pairs signature pairs =
           let ty_l, l' = TypeInference.FO.infer ctx l in
           let ty_r, r' = TypeInference.FO.infer ctx r in
           TypeInference.Ctx.constrain_type_type ctx ty_l ty_r;
+          TypeInference.Ctx.exit_scope ctx;
           Some (fun ctx -> l' ctx, r' ctx)
         | Type (s, ty) ->
           (* declare the type *)
@@ -115,7 +116,7 @@ let rules_of_pairs signature pairs =
       ) pairs
     in
     let pairs = TypeInference.Closure.seq pairs in
-    TypeInference.Ctx.bind_to_default ctx;
+    TypeInference.Ctx.generalize ctx;
     let signature = TypeInference.Ctx.to_signature ctx in
     (* extract typed rules and signature *)
     let rules = pairs ctx in

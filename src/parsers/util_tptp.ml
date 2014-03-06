@@ -227,7 +227,7 @@ module Untyped = struct
       decls
 
   let type_declarations decls =
-    let tyctx = Hashtbl.create 5 in
+    let tyctx = Type.Conv.create () in
     let a = object
       inherit [Signature.t] AU.visitor
       method tydecl signature s ty =
