@@ -44,7 +44,7 @@ type view = private
   | Const of symbol             (** Typed constant *)
   | At of t * t                 (** Curried application *)
   | TyAt of t * Type.t          (** Curried application to a type *)
-  | Multiset of t list
+  | Multiset of Type.t * t list (** a multiset of terms, and their common type *)
   | Record of (string*t) list * t option  (** Record of terms *)
 
 type sourced_term =

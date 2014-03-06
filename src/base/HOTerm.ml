@@ -45,7 +45,7 @@ type view =
   | Const of symbol             (** Typed constant *)
   | At of t * t                 (** Curried application *)
   | TyAt of t * Type.t          (** Curried application to a type *)
-  | Multiset of t list
+  | Multiset of Type.t * t list
   | Record of (string*t) list * t option (** Record of terms *)
 
 type sourced_term =
@@ -77,7 +77,11 @@ let view t = match T.view t with
       | None -> At (l, r)
       | Some ty -> TyAt (l, ty)
       end
-  | T.Multiset l -> Multiset l
+  | T.Multiset l ->
+      begin match Type.view (ty t) with
+        | Type.App (Symbol.Conn Symbol.Multiset, [tau]) -> Multiset (tau, l)
+        | _ -> assert false
+      end
   | T.Record (l, rest) -> Record (l, rest)
   | T.Bind _
   | T.App _
@@ -500,7 +504,7 @@ let pp_depth ?(hooks=[]) depth buf t =
     Util.pp_list (fun buf (n, t) -> Printf.bprintf buf "%s=%a" n pp_rec t)
       buf l;
     Printf.bprintf buf " | %a}" pp_rec r
-  | Multiset l ->
+  | Multiset (_, l) ->
     Printf.bprintf buf "[%a]" (Util.pp_list pp_rec) l
   and pp_surrounded buf t = match view t with
   | Lambda _ | At _ | TyAt _ ->
@@ -531,7 +535,7 @@ let rec debug fmt t = match view t with
     Format.fprintf fmt "(%a %a)" debug l Type.fmt r
   | At (l, r) ->
     Format.fprintf fmt "(%a %a)" debug l debug r
-  | Multiset l ->
+  | Multiset (_, l) ->
     Format.fprintf fmt "{| %a |}"
       (Sequence.pp_seq debug) (Sequence.of_list l)
   | Record (l, None) ->
