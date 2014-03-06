@@ -23,47 +23,33 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Hash combinators} *)
+(** {1 Hash combinators}
+
+Combination of hashes based on the
+SDBM simple hash (see for instance
+{{:http://www.cse.yorku.ca/~oz/hash.html} this page})
+*)
 
 type t = int
+
 type 'a hash_fun = 'a -> t
 
-let combine hash i =
-  abs (hash * 65599 + i)
+val combine : t -> t -> t
+  (** Combine two hashes. Non-commutative. *)
 
-let (<<>>) = combine
+val (<<>>) : t -> t -> t
+  (** Infix version of {!combine} *)
 
-(** Hash a single int *)
-let hash_int i = combine 0 i
+val hash_int : int -> t
+val hash_int2 : int -> int -> t
+val hash_int3 : int -> int -> int -> t
+val hash_int4 : int -> int -> int -> int -> t
 
-(** Hash two ints *)
-let hash_int2 i j = combine i j
+val hash_string : string -> t
 
-(** Hash three ints *)
-let hash_int3 i j k = combine (combine i j) k
+val hash_list : 'a hash_fun -> t -> 'a list hash_fun
+val hash_array : 'a hash_fun -> t -> 'a array hash_fun
+val hash_seq : 'a hash_fun -> t -> 'a Sequence.t hash_fun
 
-(** Hash four ints *)
-let hash_int4 i j k l =
-  combine (combine (combine i j) k) l
-
-(** Hash a list. Each element is hashed using [f]. *)
-let rec hash_list f h l = match l with
-  | [] -> h
-  | x::l' -> hash_list f (combine h (f x)) l'
-
-let hash_array f h a =
-  let h = ref h in
-  Array.iter (fun x -> h := combine !h (f x)) a;
-  !h
-
-(** Hash string *)
-let hash_string s = Hashtbl.hash s
-
-(** Hash sequence *)
-let hash_seq f h seq =
-  let h = ref h in
-  seq (fun x -> h := combine !h (f x));
-  !h
-
-let hash_pair h1 h2 (x,y) = combine (h1 x) (h2 y)
-let hash_triple h1 h2 h3 (x,y,z) = (h1 x) <<>> (h2 y) <<>> (h3 z)
+val hash_pair : 'a hash_fun -> 'b hash_fun -> ('a * 'b) hash_fun
+val hash_triple : 'a hash_fun -> 'b hash_fun -> 'c hash_fun -> ('a * 'b * 'c) hash_fun
