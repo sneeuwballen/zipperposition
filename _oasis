@@ -68,7 +68,7 @@ Library "logtk_extended"
   FindlibParent:    logtk
   Build$:           flag(extended)
   Install$:         flag(extended)
-  Modules:          lib/MultiMap, lib/Mixtbl
+  Modules:          HORewriting, lib/MultiMap, lib/Mixtbl
                     #Lambda, Index, Dtree, Fingerprint, Rewriting,
                     #FeatureVector, FormulaShape, Transform,
                     #NPDtree, Congruence, FastFingerprint, Evaluator,

@@ -218,8 +218,8 @@ let __decode_lit t = match HOT.open_at t with
   | hd, _, [r] when HOT.eq hd __not_conn -> Prop (r, false)
   | hd, _, [r] ->
       begin match HOT.view r with
-      | HOT.Multiset [a;b] when HOT.eq hd __eq_conn -> Eq (a, b, true)
-      | HOT.Multiset [a;b] when HOT.eq hd __neq_conn -> Eq (a, b, false)
+      | HOT.Multiset (_,[a;b]) when HOT.eq hd __eq_conn -> Eq (a, b, true)
+      | HOT.Multiset (_,[a;b]) when HOT.eq hd __neq_conn -> Eq (a, b, false)
       | _ -> Prop (t, true)
       end
   | _ -> Prop (t, true)
@@ -231,7 +231,7 @@ let clause_prop = object
 
   method decode c =
     match HOT.view c with
-    | HOT.Multiset l -> Some (List.map __decode_lit l)
+    | HOT.Multiset (_,l) -> Some (List.map __decode_lit l)
     | _ -> None
 end
 
