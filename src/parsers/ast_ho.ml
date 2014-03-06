@@ -92,4 +92,5 @@ module Term = struct
       | a::l' -> app ?loc (const Symbol.Base.arrow) [a; mk l']
     in mk l
   let tType = PT.TPTP.tType
+  let forall_ty ?loc vars t = bind ?loc Symbol.Base.forall_ty vars t 
 end

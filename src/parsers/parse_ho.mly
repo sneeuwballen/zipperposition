@@ -53,6 +53,7 @@ A parser with a nice curried syntax. *)
 %token DOT
 %token VAL
 %token COLUMN
+%token FORALL_TY
 
 %token EQ
 %token NEQ
@@ -123,6 +124,12 @@ type_:
     {
       let loc = L.mk_pos $startpos $endpos in
       Term.mk_fun_ty ~loc [l] r
+    }
+  | FORALL_TY v=UPPER_WORD ty=type_
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      let v = Term.var ~loc v in
+      Term.forall_ty ~loc [v] ty
     }
   | t=unary_type { t }
 
