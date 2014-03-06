@@ -132,7 +132,7 @@ module Solution = struct
      clause that makes at least one a>b false. *)
   let neg_to_constraint sol =
     let module C = Constraint in
-    let l = List.map (fun (a,b) -> C.le b a) sol in
+    let l = List.map (fun (a,b) -> C.le a b) sol in
     C.or_ l
 
   let pp buf s =
