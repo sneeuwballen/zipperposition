@@ -63,7 +63,8 @@ module Ctx = struct
     default : default_types;        (* default types *)
     mutable signature : Signature.t;(* symbol -> type *)
     mutable subst : S.t;            (* variable bindings *)
-    mutable to_bind : Type.t list;  (* list of variables to eventually bind (close) *)
+    mutable vars_ty : Type.t list;  (* type variables of variables *)
+    mutable const_ty : Type.t list; (* type variables of constants *)
     mutable locs : Loc.t list; (* stack of locations *)
     renaming : Substs.Renaming.t;
     symbols : Type.t Symbol.Tbl.t;  (* symbol -> instantiated type *)
@@ -76,7 +77,8 @@ module Ctx = struct
       default;
       signature;
       subst = S.empty;
-      to_bind = [];
+      vars_ty = [];
+      const_ty = [];
       locs = [];
       renaming = Substs.Renaming.create ();
       symbols = Symbol.Tbl.create 7;
@@ -94,7 +96,8 @@ module Ctx = struct
 
   let clear ctx =
     ctx.subst <- S.empty;
-    ctx.to_bind <- [];
+    ctx.const_ty <- [];
+    ctx.vars_ty <- [];
     ctx.locs <- [];
     Symbol.Tbl.clear ctx.symbols;
     ctx.signature <- Signature.empty;
@@ -161,7 +164,7 @@ module Ctx = struct
             (* for inferring polymorphic types! just be sure to bind it
              * somewhere. *)
             let ty = _new_ty_var ctx in
-            ctx.to_bind <- ty :: ctx.to_bind;
+            ctx.vars_ty <- ty :: ctx.vars_ty;
             ty
         | Some ty -> ty
       in
@@ -216,7 +219,9 @@ module Ctx = struct
     let ret = _new_ty_var ctx in
     let new_vars = _new_ty_vars ctx arity in
     let ty = Type.(ret <== new_vars) in
-    ctx.to_bind <- ret :: new_vars @ ctx.to_bind;
+    (* only need to specialize the return type
+       XXX justify/explain *)
+    ctx.const_ty <- ret :: ctx.const_ty;
     ty
 
   (* If the function symbol has an unknown type, a fresh variable
@@ -256,22 +261,28 @@ module Ctx = struct
         Signature.declare signature s ty)
       ctx.symbols signature
 
+  let __specialize_ty_var ctx v =
+    try
+      let subst = __unif ctx v ctx.default.default_i in
+      ctx.subst <- subst
+    with Unif.Fail -> ()
+
   let bind_to_default ctx =
-    List.iter
-      (fun v ->
-        (* try to bind the variable. Will fail if already bound to
-            something else, which is fine. *)
-        try
-          let subst = __unif ctx v ctx.default.default_i in
-          ctx.subst <- subst
-        with Unif.Fail -> ())
-      ctx.to_bind;
-    ctx.to_bind <- []
+    (* try to bind the variable. Will fail if already bound to
+      something else, which is fine. *)
+    List.iter (__specialize_ty_var ctx) ctx.const_ty;
+    List.iter (__specialize_ty_var ctx) ctx.vars_ty;
+    ctx.const_ty <- [];
+    ctx.vars_ty <- [];
+    ()
 
   let generalize ctx =
     (* keep constructor variables as they are, they will be generalized
         if {!to_signature} is called. *)
-    ctx.to_bind <- []
+    List.iter (__specialize_ty_var ctx) ctx.const_ty;
+    ctx.const_ty <- [];
+    ctx.vars_ty <- [];
+    ()
 
   let reset_renaming ctx =
     Substs.Renaming.clear ctx.renaming
