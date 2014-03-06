@@ -38,11 +38,13 @@ module Loc = ParseLocation
 let files = ref []
 let flag_print_signature = ref false
 let flag_print_rules = ref false
+let num_solutions = ref 1
 let add_file f = files := f :: !files
 
 let options =
   [ "-print-signature", Arg.Set flag_print_signature, "print the signature of the theory"
   ; "-print-rules", Arg.Set flag_print_rules, "print the rewrite rules"
+  ; "-num", Arg.Set_int num_solutions, "number of solutions to print"
   ] @ Options.global_opts
 
 let rule_arrow = Symbol.of_string "-->"
@@ -160,13 +162,20 @@ let () =
     (* orient rules *)
     let constraints = Lpo.FO.orient_lpo_list rules in
     let solutions = Lpo.solve_multiple constraints in
-    (* print at most one solution *)
-    match solutions with
-    | lazy LazyList.Nil -> E.Error "no solution for this set of rules"
-    | lazy (LazyList.Cons (s,_)) -> E.return s
+    (* get at most !num_solutions solutions *)
+    let rec get_solutions solutions n = match solutions with
+      | _ when n = 0 -> E.return []
+      | lazy LazyList.Nil -> E.return []
+      | lazy (LazyList.Cons (s,tl)) ->
+          get_solutions tl (n-1) >>= fun tl ->
+          E.return (s::tl)
+    in
+    get_solutions solutions !num_solutions
   ) in
   match res with
   | E.Error msg ->
       print_endline msg
-  | E.Ok solution ->
-      print_solution solution
+  | E.Ok [] ->
+      print_endline "no solution for this set of rules"
+  | E.Ok solutions ->
+      List.iter print_solution solutions
