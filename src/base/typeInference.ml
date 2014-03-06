@@ -61,28 +61,26 @@ Scope 0 should be used for ground types.
 module Ctx = struct
   type t = {
     default : default_types;        (* default types *)
-    mutable tyvar : int;            (* generate fresh vars *)
     mutable signature : Signature.t;(* symbol -> type *)
     mutable subst : S.t;            (* variable bindings *)
     mutable to_bind : Type.t list;  (* list of variables to eventually bind (close) *)
     mutable locs : Loc.t list; (* stack of locations *)
     renaming : Substs.Renaming.t;
     symbols : Type.t Symbol.Tbl.t;  (* symbol -> instantiated type *)
-    tyvars : (string, int) Hashtbl.t;            (* type variable -> number *)
+    tyvars : Type.Conv.ctx;         (* type variable -> number *)
     vars : (string, (int * Type.t)) Hashtbl.t;  (* var name -> number + type *)
   }
 
   let create ?(default=tptp_default) signature =
     let ctx = {
       default;
-      tyvar = ~-1;
       signature;
       subst = S.empty;
       to_bind = [];
       locs = [];
       renaming = Substs.Renaming.create ();
       symbols = Symbol.Tbl.create 7;
-      tyvars = Hashtbl.create 6;
+      tyvars = Type.Conv.create ();
       vars = Hashtbl.create 7;
     } in
     ctx
@@ -90,23 +88,23 @@ module Ctx = struct
   let copy t = { t with
     renaming = Substs.Renaming.create ();
     symbols = Symbol.Tbl.copy t.symbols;
-    tyvars = Hashtbl.copy t.tyvars;
+    tyvars = Type.Conv.copy t.tyvars;
     vars = Hashtbl.copy t.vars;
   }
 
   let clear ctx =
-    ctx.tyvar <- ~-1;
     ctx.subst <- S.empty;
     ctx.to_bind <- [];
     ctx.locs <- [];
     Symbol.Tbl.clear ctx.symbols;
     ctx.signature <- Signature.empty;
+    Type.Conv.clear ctx.tyvars;
     Hashtbl.clear ctx.vars;
     ()
 
   let exit_scope ctx =
     Hashtbl.clear ctx.vars;
-    Hashtbl.clear ctx.tyvars;
+    Type.Conv.clear ctx.tyvars;
     Substs.Renaming.clear ctx.renaming;
     ()
 
@@ -118,10 +116,7 @@ module Ctx = struct
     ctx.signature <- Signature.declare ctx.signature sym ty
 
   (* generate fresh type var. *)
-  let _new_ty_var ctx =
-    let n = ctx.tyvar in
-    ctx.tyvar <- n - 1 ;
-    Type.__var n
+  let _new_ty_var ctx = Type.fresh_var ()
 
   (* generate [n] fresh type vars *)
   let rec _new_ty_vars ctx n =
@@ -210,7 +205,7 @@ module Ctx = struct
 
   (* same as {!unify}, but also updates the ctx's substitution *)
   let unify_and_set ctx ty1 ty2 =
-    (*Util.debug 5 "unify types %a and %a" Type.pp ty1 Type.pp ty2;*)
+    Util.debug 5 "unify types %a and %a" Type.pp ty1 Type.pp ty2;
     let subst = unify ctx ty1 ty2 in
     ctx.subst <- subst
 
@@ -365,12 +360,14 @@ module FO = struct
         | None -> Ctx.__error ctx "expected type, got %a" PT.pp ty
       in
       let i, ty = Ctx._get_var ctx ~ty name in
+      Util.debug 5 "type of var %s: %a" name Type.pp ty;
       ty, (fun ctx ->
         let ty = Ctx.apply_ty ctx ty in
         T.var ~ty i)
     | PT.Var name ->
       (* (possibly) untyped var *)
       let i, ty = Ctx._get_var ctx name in
+      Util.debug 5 "type of var %s: %a" name Type.pp ty;
       ty, (fun ctx ->
         let ty = Ctx.apply_ty ctx ty in
         T.var ~ty i)

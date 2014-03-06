@@ -219,7 +219,12 @@ end
 (** {2 Conversions} *)
 
 module Conv : sig
-  val of_prolog : ctx:(string,int) Hashtbl.t -> PrologTerm.t -> t option
+  type ctx
+  val create : unit -> ctx
+  val copy : ctx -> ctx
+  val clear : ctx -> unit
+
+  val of_prolog : ctx:ctx -> PrologTerm.t -> t option
   val to_prolog : ?depth:int -> t -> PrologTerm.t
 end
 
@@ -228,3 +233,6 @@ end
 val __var : int -> t
   (** Escape hatch to generate fresh variables with negative indexes.
       Use at your own risk... *)
+
+val fresh_var : unit -> t
+  (** Fresh var, with negative index *)

@@ -321,12 +321,30 @@ let bij =
         | _ -> raise (DecodingError "expected Type"))))
 *)
 
+(** {2 Misc} *)
+
+let __var i =
+  T.var ~kind ~ty:tType i
+
+let fresh_var =
+  let r = ref ~-1 in
+  fun () ->
+    let n = !r in
+    r := n-1;
+    __var n
+
 (** {2 Conversions} *)
 
 module Conv = struct
   module PT = PrologTerm
 
   exception LocalExit
+
+  type ctx = (string,int) Hashtbl.t
+
+  let create() = Hashtbl.create 5
+  let copy = Hashtbl.copy
+  let clear = Hashtbl.clear
 
   let of_prolog ~ctx t =
     let rec of_prolog t = match t.PT.term with
@@ -340,10 +358,7 @@ module Conv = struct
           var n
         end
       | PT.Const (Symbol.Conn Symbol.Wildcard) ->
-        (* fresh var that will never occur again *)
-        let n = Hashtbl.length ctx in
-        Hashtbl.add ctx "" n;  (* increases length, but not reachable *)
-        var n
+        fresh_var ()
       | PT.Int _
       | PT.Rat _ -> raise LocalExit
       | PT.Const s -> const s
@@ -388,8 +403,3 @@ module Conv = struct
     in
     to_prolog depth t
 end
-
-(** {2 Misc} *)
-
-let __var i =
-  T.var ~kind ~ty:tType i
