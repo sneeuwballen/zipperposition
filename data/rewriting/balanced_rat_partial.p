@@ -2,6 +2,8 @@
 
 % constructors are o (zero), z0(N) = 3*N, z1(N) = 3*N+1, zj(N) = 3*N-1
 
+val o : int.
+
 z0 o --> o.
 
 plus o X --> X.

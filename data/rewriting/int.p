@@ -1,8 +1,11 @@
 % from Raphaël's dedukti code
 % relative integers in base 1
 
-val o : int.
+val o : nat.
 val ite : /\ A bool -> A -> A -> A.
+val true : bool.
+val false : bool.
+
 ite _ true A B --> A.
 ite _ false A B --> B.
 
@@ -26,6 +29,9 @@ nat_eq (s N) o --> false.
 nat_eq (s N) (s M) --> nat_eq N M.
 
 % make(N,M) means N-M
+
+val make : nat -> nat -> int.
+
 make (s N) (s M) --> make N M.
 
 leq (make N M) (make P Q) --> nat_leq (nat_plus N Q) (nat_plus M P).
@@ -40,8 +46,8 @@ mult (make N M) (make P Q) -->
        (nat_plus (nat_mult N Q) (nat_mult M P)).
 opp (make N M) --> make M N.
 
-max A B --> ite _ (leq A  B) B A.
-min A B --> ite _ (leq A  B) A B.
+max A B --> ite _ (leq A B) B A.
+min A B --> ite _ (leq A B) A B.
 
 abs (make (s N) o) --> make (s N) o.
 abs (make o (s N)) --> make (s N) o.

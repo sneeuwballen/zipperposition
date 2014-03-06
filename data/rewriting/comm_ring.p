@@ -1,5 +1,7 @@
 % Commutative rings
 
+val zero : carrier.
+
 plus X (minus X) --> zero.
 plus X zero --> X.
 minus (minus X) --> X.

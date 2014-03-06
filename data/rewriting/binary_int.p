@@ -70,8 +70,11 @@ min_nat A B --> ite _ (leq_nat A B) A B.
 
 % now for relative integers, use pairs (M,N) with meaning (M,N) == M-N
 
+val mkint : nat -> nat -> int.
+
 % should just use successor, but would not terminate
 % FIXME check
+
 mkint (s0 M) (s0 N) --> mkint M N.
 mkint (s1 M) (s1 N) --> mkint M N.
 mkint (s0 (s0 M)) (s1 (s0 N)) --> mkint M (s0 N).
