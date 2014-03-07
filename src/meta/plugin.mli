@@ -87,6 +87,13 @@ val lemma : foclause t
   (** Lemma: similar to {!holds}, but explicitely used for facts
       deduced by the meta-prover. In general [lemma f => holds f]. *)
 
+val pre_rewrite : HORewriting.t t
+  (** Encodes a rewriting system used for pre-processing a set of clauses,
+      into a meta-property. *)
+
+val rewrite : (FOTerm.t * FOTerm.t) list t
+  (** Encodes a set of first-order rewrite rules into a meta-property. *)
+
 module Base : sig
   val set : Set.t
     (** The set of default plugins *)

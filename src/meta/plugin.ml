@@ -157,8 +157,100 @@ let axiom_or_theory which : (string * Type.t list * term) t  =
 let axiom = axiom_or_theory "axiom"
 let theory = axiom_or_theory "theory"
 
+let __sym_rule_arrow = Symbol.of_string "-->"
+let __sym_pre_rewrite = Symbol.of_string "pre_rewrite"
+let __sym_rewrite = Symbol.of_string "rewrite"
+
+let __ty_rule = Type.const (Symbol.of_string "rule")
+let __ty_rule_arrow = Type.(forall [var 0] (__ty_rule <== [var 0; var 0]))
+let __ty_rewrite = Type.(Reasoner.property_ty <=. multiset __ty_rule)
+
+let pre_rewrite : HORewriting.t t =
+  let const_pre_rewrite = T.const ~ty:__ty_rewrite __sym_pre_rewrite in
+  let const_rule = T.const ~ty:__ty_rule_arrow __sym_rule_arrow in
+  let make_rule l r = T.at_list const_rule [l;r] in
+  object
+    method signature = Signature.of_list
+      [ __sym_rule_arrow, __ty_rule_arrow
+      ; __sym_pre_rewrite, __ty_rewrite ]
+    method clauses = []
+    method owns t =
+      try Symbol.eq (T.head t) __sym_pre_rewrite
+      with _ -> false
+
+    method to_fact rules =
+      HORewriting.to_list rules
+        |> List.map (fun (l,r) -> make_rule l r)
+        |> T.multiset ~ty:__ty_rule
+        |> T.at const_pre_rewrite
+
+    method of_fact t = match T.view t with
+    | T.At (l, r) when T.eq l const_pre_rewrite ->
+        begin match T.view r with
+        | T.Multiset (_, l) ->
+            begin try
+              let rules = List.map
+                (fun pair -> match T.open_at pair with
+                | hd, _, [l;r] when T.eq hd const_rule -> l, r
+                | _ -> raise Exit) l
+              in
+              Some (HORewriting.of_list rules)
+              with Exit -> None
+            end
+        | _ -> None
+        end
+    | _ -> None
+  end
+
+let rewrite : (FOTerm.t * FOTerm.t) list t =
+  let const_rewrite = T.const ~ty:__ty_rewrite __sym_rewrite in
+  let const_rule = T.const ~ty:__ty_rule_arrow __sym_rule_arrow in
+  let make_rule l r = T.at_list const_rule [l;r] in
+  object
+    method signature = Signature.of_list
+      [ __sym_rule_arrow, __ty_rule_arrow
+      ; __sym_rewrite, __ty_rewrite ]
+    method clauses = []
+    method owns t =
+      try Symbol.eq (T.head t) __sym_rewrite
+      with _ -> false
+
+    method to_fact rules =
+      rules
+        |> List.map (fun (l,r) ->
+            let l' = HOTerm.curry l in
+            let r' = HOTerm.curry r in
+            make_rule l' r')
+        |> T.multiset ~ty:__ty_rule
+        |> T.at const_rewrite
+
+    method of_fact t = match T.view t with
+    | T.At (l, r) when T.eq l const_rewrite ->
+        begin match T.view r with
+        | T.Multiset (_, l) ->
+            begin try
+              let rules = List.map
+                (fun pair -> match T.open_at pair with
+                | hd, _, [l;r] when T.eq hd const_rule ->
+                    begin match HOTerm.uncurry l, HOTerm.uncurry r with
+                      | Some l', Some r' -> l', r'
+                      | _ -> raise Exit
+                    end
+                | _ -> raise Exit) l
+              in
+              Some rules
+              with Exit -> None
+            end
+        | _ -> None
+        end
+    | _ -> None
+  end
+
+
 module Base = struct
-  let __list = [ (holds :> core) ; (lemma :> core); (axiom :> core) ; (theory :> core) ]
+  let __list =
+    [ (holds :> core); (lemma :> core); (axiom :> core);
+      (theory :> core); (rewrite :> core); (pre_rewrite :> core) ]
 
   let set =
     Set.of_seq (Sequence.of_list __list)

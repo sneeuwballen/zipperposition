@@ -86,6 +86,13 @@ module Term = struct
   let forall ?loc vars f = bind ?loc Symbol.Base.forall vars f
   let exists ?loc vars f = bind ?loc Symbol.Base.exists vars f
 
+  (* XXX: ad-hoc infix symbol constructor *)
+  let app_infix ?loc o a b =
+    let head = const ?loc (Symbol.of_string o) in
+    match o with
+    | "-->" -> app ?loc head [wildcard; a; b]  (* polymorphic! *)
+    | _ -> app ?loc head [a; b] (* default *)
+
   let mk_fun_ty ?loc l ret =
     let rec mk l = match l with
       | [] -> ret

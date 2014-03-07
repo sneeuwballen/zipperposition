@@ -211,7 +211,7 @@ formula_term:
   | l=app_term o=OPERATOR r=app_term
     {
       let loc = L.mk_pos $startpos $endpos in
-      Term.app ~loc (Term.const ~loc (Symbol.of_string o)) [l;r]
+      Term.app_infix ~loc o l r
     }
   | t=app_term{ t }
 

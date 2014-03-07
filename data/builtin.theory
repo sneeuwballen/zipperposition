@@ -68,11 +68,11 @@ axiom (functional2 P) <-
 axiom (total2 {pred=P, fun=F}) <-
   holds [P ?x ?y (F ?x ?y)].
 
-lemma [P ?x ?y <=> ?y = F ?x] <-
+pre_rewrite [P ?x ?y --> (?y = F ?x)] <-
   axiom (functional1 P),
   axiom (total1 {pred=P, fun=F}).
 
-lemma [P ?x ?y ?z <=> ?z = F ?x ?y] <-
+pre_rewrite [P ?x ?y ?z --> (?z = F ?x ?y)] <-
   axiom (functional2 P),
   axiom (total2 {pred=P, fun=F}).
 

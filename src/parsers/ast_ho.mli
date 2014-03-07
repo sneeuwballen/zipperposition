@@ -68,6 +68,9 @@ module Term : sig
   val forall : ?loc:location -> term list -> term -> term
   val exists : ?loc:location -> term list -> term -> term
 
+  val app_infix : ?loc:location -> string -> term -> term -> term
+    (** Ad-hoc infix symbols constructor *)
+
   val mk_fun_ty : ?loc:location -> term list -> term -> term
   val tType : term
   val forall_ty : ?loc:location -> term list -> term -> term

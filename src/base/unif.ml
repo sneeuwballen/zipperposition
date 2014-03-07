@@ -287,6 +287,8 @@ module Nary = struct
             (* upon failure, try to unify [t2] with another term of [right] *)
             __choose_pair ~unif subst (t1::left) right' sc1 t2 l2' sc2 ~k ~fk)
 
+  (* TODO: put a test "if s.kind <> t.kind then fk()" ? *)
+
   let unification ?(subst=Substs.empty) a sc_a b sc_b =
     let rec unif subst s sc_s t sc_t ~k ~fk =
       let s, sc_s = Substs.get_var subst s sc_s
