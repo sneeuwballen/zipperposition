@@ -55,10 +55,11 @@ module Clause = struct
       |> Sequence.for_all (fun v -> Sequence.exists (HOT.eq v) vars_body)
 
   let rule head body =
-    if not (safe head body)
-      then failwith (Util.sprintf "unsafe Horn clause: %a <- %a"
-        HOT.pp head (Util.pp_list HOT.pp) body);
-    {head; body; }
+    if not (safe head body) then
+      let msg = Util.sprintf "unsafe Horn clause: %a <- %a"
+        HOT.pp head (Util.pp_list HOT.pp) body in
+      raise (Invalid_argument msg)
+    else {head; body; }
 
   let fact head = rule head []
 

@@ -101,6 +101,21 @@ let print_signature signature =
 let pp_theory_axiom buf (name, _, t) =
   Printf.bprintf buf "%s %a" name HOT.pp t
 
+let pp_rewrite_system buf l =
+  Printf.bprintf buf "rewrite system\n    ";
+  Util.pp_list ~sep:"\n    " (Util.pp_pair ~sep:" --> " FOTerm.pp FOTerm.pp) buf l
+
+let pp_pre_rewrite_system buf l =
+  HORewriting.pp buf l
+
+type result = {
+  lemmas : Plugin.foclause Sequence.t;
+  theories : (string * Type.t list * HOT.t) Sequence.t;
+  axioms : (string * Type.t list * HOT.t) Sequence.t;
+  rewrite : (FOTerm.t * FOTerm.t) list Sequence.t;
+  pre_rewrite : HORewriting.t Sequence.t;
+}
+
 (* detect theories in clauses *)
 let detect_theories prover clauses =
   let facts = clauses
@@ -113,8 +128,11 @@ let detect_theories prover clauses =
   (* filter theories, axioms, lemmas... *)
   let theories = Sequence.fmap Plugin.theory#of_fact consequence_terms
   and lemmas = Sequence.fmap Plugin.lemma#of_fact consequence_terms
-  and axioms = Sequence.fmap Plugin.axiom#of_fact consequence_terms in
-  theories, lemmas, axioms
+  and axioms = Sequence.fmap Plugin.axiom#of_fact consequence_terms
+  and rewrite = Sequence.fmap Plugin.rewrite#of_fact consequence_terms
+  and pre_rewrite = Sequence.fmap Plugin.pre_rewrite#of_fact consequence_terms
+  in
+  { theories; lemmas; axioms; rewrite; pre_rewrite; }
 
 let main () =
   Arg.parse options add_file "detect_theories [options] (file1|stdin) [file2...]";
@@ -136,14 +154,14 @@ let main () =
     E.guard (fun () -> parse_and_cnf !files) >>= fun clauses ->
     Util.debug 3 "input files parsed and translated to CNF";
     if !flag_print_cnf then print_clauses clauses;
-    let theories, lemmas, axioms = detect_theories prover clauses in
+    let results = detect_theories prover clauses in
     Util.debug 3 "theory detection done";
-    E.return (theories, lemmas, axioms)
+    E.return results
   ) in
   match res with
   | E.Error msg ->
       Util.debug 0 "error: %s" msg; exit 1
-  | E.Ok (theories, lemmas, axioms) ->
+  | E.Ok {theories; lemmas; axioms; rewrite; pre_rewrite; } ->
       Util.debug 1 "success!";
       Util.printf "axioms:\n  %a\n"
         (Util.pp_seq ~sep:"\n  " pp_theory_axiom) axioms;
@@ -151,6 +169,10 @@ let main () =
         (Util.pp_seq ~sep:"\n  " pp_theory_axiom) theories;
       Util.printf "lemmas:\n  %a\n"
         (Util.pp_seq ~sep:"\n  " (Encoding.pp_clause FOTerm.pp)) lemmas;
+      Util.printf "rewrite systems:\n  %a\n"
+        (Util.pp_seq ~sep:"\n  " pp_rewrite_system) rewrite;
+      Util.printf "pre-rewrite systems:\n  %a\n"
+        (Util.pp_seq ~sep:"\n  " pp_pre_rewrite_system) pre_rewrite;
       ()
 
 let _ =

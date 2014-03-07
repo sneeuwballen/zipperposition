@@ -48,8 +48,13 @@ module Clause : sig
     body : term list;
   }
 
-  val fact : term -> t
   val rule : term -> term list -> t
+    (** Build a rule.
+        @raise Invalid_argument if the rule is unsafe, ie if some free variables
+        occur in the consequence but not in the body *)
+
+  val fact : term -> t
+    (** [fact t] is a shortcut for [rule t []] *)
 
   val is_fact : t -> bool
 

@@ -180,7 +180,10 @@ let pre_rewrite : HORewriting.t t =
 
     method to_fact rules =
       HORewriting.to_list rules
-        |> List.map (fun (l,r) -> make_rule l r)
+        |> List.map (fun (l,r) ->
+            let l' = HOTerm.rigidify l in
+            let r' = HOTerm.rigidify r in
+            make_rule l' r')
         |> T.multiset ~ty:__ty_rule
         |> T.at const_pre_rewrite
 
@@ -191,7 +194,8 @@ let pre_rewrite : HORewriting.t t =
             begin try
               let rules = List.map
                 (fun pair -> match T.open_at pair with
-                | hd, _, [l;r] when T.eq hd const_rule -> l, r
+                | hd, _, [l;r] when T.eq hd const_rule ->
+                    HOTerm.unrigidify l, HOTerm.unrigidify r
                 | _ -> raise Exit) l
               in
               Some (HORewriting.of_list rules)
@@ -218,8 +222,8 @@ let rewrite : (FOTerm.t * FOTerm.t) list t =
     method to_fact rules =
       rules
         |> List.map (fun (l,r) ->
-            let l' = HOTerm.curry l in
-            let r' = HOTerm.curry r in
+            let l' = HOTerm.rigidify (HOTerm.curry l) in
+            let r' = HOTerm.rigidify (HOTerm.curry r) in
             make_rule l' r')
         |> T.multiset ~ty:__ty_rule
         |> T.at const_rewrite
@@ -232,6 +236,7 @@ let rewrite : (FOTerm.t * FOTerm.t) list t =
               let rules = List.map
                 (fun pair -> match T.open_at pair with
                 | hd, _, [l;r] when T.eq hd const_rule ->
+                    let l = HOTerm.unrigidify l and r = HOTerm.unrigidify r in
                     begin match HOTerm.uncurry l, HOTerm.uncurry r with
                       | Some l', Some r' -> l', r'
                       | _ -> raise Exit

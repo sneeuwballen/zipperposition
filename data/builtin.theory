@@ -105,6 +105,26 @@ theory (abelian_group {op=Mult, neutral=E, inverse=I}) <-
 theory (group {op=Mult, neutral=E, inverse=I}) <-
   theory (abelian_group {op=Mult, neutral=E, inverse=I}).
 
+rewrite
+  [ Mult ?x E --> ?x
+  , Mult E ?x --> ?x
+  , Mult ?x (I ?x) --> E
+  , Mult (I ?x) ?x --> E
+  , I E --> E
+  , I (I ?x) --> ?x
+  , I (Mult ?x ?y) --> Mult (I ?y) (I ?x)
+  , Mult (Mult ?x ?y) ?z --> Mult ?x (Mult ?y ?z)
+  , Mult ?x (Mult (I ?x) ?y) --> ?y
+  , Mult (I ?x) (Mult ?x ?y) --> ?y
+  ] <- theory (group {op=Mult, neutral=E, inverse=I}).
+
+rewrite
+  [ Mult ?x E --> ?x
+  , Mult ?x (I ?x) --> E
+  , I E --> E
+  , I (I ?x) --> ?x
+  , I (Mult ?x ?y) --> Mult (I ?x) (I ?y)
+  ] <- theory (abelian_group {op=Mult, neutral=E, inverse=I}).
 
 % subgroup
 

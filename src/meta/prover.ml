@@ -119,8 +119,8 @@ let of_ho_ast p decls =
     let signature = TypeInference.Ctx.to_signature ctx in
     let p' = add_signature p' signature in
     Monad.Err.Ok (p', consequences)
-  with Type.Error msg ->
-    Monad.Err.fail msg
+  with Type.Error msg
+  | Invalid_argument msg -> Monad.Err.fail msg
 
 let parse_file p filename =
   try
