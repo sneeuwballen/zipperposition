@@ -26,8 +26,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Rewriting on HO terms} *)
 
-open Logtk
-
 type term = HOTerm.t
 type rule = term * term
 
@@ -41,6 +39,9 @@ val empty : t
 
 val add : t -> rule -> t
   (** Add a rule *)
+
+val merge : t -> t -> t
+  (** Merge two rewrite systems *)
 
 module Seq : sig
   val of_seq : t -> rule Sequence.t -> t

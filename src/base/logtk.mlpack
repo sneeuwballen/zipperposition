@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 069932601eec9f52a49ae598a9bb6e9d)
+# DO NOT EDIT (digest: 69c01a4f5cc05fbc193700d9dce37202)
 Symbol
 ScopedTerm
 FOTerm
@@ -21,6 +21,7 @@ Precedence
 Ordering
 Skolem
 Cnf
+HORewriting
 lib/Hash
 lib/Hashcons
 lib/Sequence

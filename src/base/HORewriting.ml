@@ -26,8 +26,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Rewriting on HO terms} *)
 
-open Logtk
-
 module T = HOTerm
 
 type term = T.t
@@ -48,6 +46,8 @@ type t = S.t
 let empty = S.empty
 
 let add trs rule = S.add rule trs
+
+let merge t1 t2 = S.union t1 t2
 
 let eq = S.equal
 let cmp = S.compare

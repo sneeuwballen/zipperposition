@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 3c18efb1203a3d2d31982b5b2e815e7b)
+# DO NOT EDIT (digest: 9a7e2b86ad420e9728ae0261c0c85e51)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -36,6 +36,7 @@
 "src/base/ordering.cmx": for-pack(Logtk)
 "src/base/skolem.cmx": for-pack(Logtk)
 "src/base/cnf.cmx": for-pack(Logtk)
+"src/base/HORewriting.cmx": for-pack(Logtk)
 "src/base/lib/hash.cmx": for-pack(Logtk)
 "src/base/lib/hashcons.cmx": for-pack(Logtk)
 "src/base/lib/sequence.cmx": for-pack(Logtk)
@@ -56,7 +57,6 @@
 <src/base/lib/*.ml{,i}>: package(zarith)
 # Library logtk_extended
 "src/extended/logtk_extended.cmxs": use_logtk_extended
-"src/extended/HORewriting.cmx": for-pack(Logtk_extended)
 "src/extended/lib/multiMap.cmx": for-pack(Logtk_extended)
 "src/extended/lib/mixtbl.cmx": for-pack(Logtk_extended)
 <src/extended/*.ml{,i}>: package(unix)

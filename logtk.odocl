@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 58f13728f123b068ee10cd895a8e4bea)
+# DO NOT EDIT (digest: cc01bd3dc8b2a8b4c3dfd53f9313e786)
 src/base/Symbol
 src/base/ScopedTerm
 src/base/FOTerm
@@ -21,6 +21,7 @@ src/base/Precedence
 src/base/Ordering
 src/base/Skolem
 src/base/Cnf
+src/base/HORewriting
 src/base/lib/Hash
 src/base/lib/Hashcons
 src/base/lib/Sequence
