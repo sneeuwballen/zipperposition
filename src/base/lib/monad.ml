@@ -181,16 +181,17 @@ module Err = struct
   exception LocalExit of string
 
   let fold seq acc f =
-    match acc with Error s -> acc
+    match acc with
+    | Error s -> acc
     | Ok acc ->
-    try
-      let x = Sequence.fold
-        (fun acc x -> match f acc x with
-          | Error s -> raise (LocalExit s)
-          | Ok y -> y)
-        acc seq
-      in Ok x
-    with LocalExit s -> Error s
+      try
+        let x = Sequence.fold
+          (fun acc x -> match f acc x with
+            | Error s -> raise (LocalExit s)
+            | Ok y -> y)
+          acc seq
+        in Ok x
+      with LocalExit s -> Error s
 
   let fold_l l = fold (Sequence.of_list l)
 
