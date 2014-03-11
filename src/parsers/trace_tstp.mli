@@ -26,6 +26,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Trace of a TSTP prover} *)
 
+open Logtk
+
 type id = Ast_tptp.name
 
 type form = Formula.FO.t
@@ -88,16 +90,11 @@ val size : t -> int
 
 (** {3 IO} *)
 
-val of_decls : ?base:Signature.t ->
-                Ast_tptp.Typed.t Sequence.t -> t option
-  (** Try to extract a proof from a list of TSTP statements.
-      Since it has to check types, it may fail.
-      @param base a base signature that can be provided for type inference.
-      @raise Type.Error if a type error occurs. *)
+val of_decls : Ast_tptp.Typed.t Sequence.t -> t Monad.Err.t
+  (** Try to extract a proof from a list of TSTP statements. *)
 
-val parse : ?recursive:bool -> string -> t option
-  (** Try to parse a proof from a file. May rise the same IO errors
-      as {!Util_tptp.parse_file}. *)
+val parse : ?recursive:bool -> string -> t Monad.Err.t
+  (** Try to parse a proof from a file. *)
 
 include Interfaces.PRINT with type t := t
   (** Debug printing, non recursive *)

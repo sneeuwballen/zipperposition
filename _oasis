@@ -80,8 +80,7 @@ Library "logtk_parsers"
   Path:             src/parsers
   Pack:             true
   Modules:          Parse_tptp, Lex_tptp, Ast_tptp, Util_tptp,
-                    Ast_ho, Lex_ho, Parse_ho
-                    #Trace_tstp, CallProver
+                    Ast_ho, Lex_ho, Parse_ho, Trace_tstp, CallProver
   Build$:           flag(parsers)
   Install$:         flag(parsers)
   FindlibName:      parsers

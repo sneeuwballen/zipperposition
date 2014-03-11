@@ -24,10 +24,13 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {6 Call external provers with TSTP} *)
+(** {1 Call external provers with TSTP} *)
+
+open Logtk
 
 module A = Ast_tptp
 module TT = Trace_tstp
+module Err = Monad.Err
 
 (** {2 Description of provers} *)
 
@@ -35,8 +38,8 @@ module Prover = struct
   type t = {
     name : string;                (** name of the prover *)
     command : string;             (** command to call prover*)
-    unsat : Str.regexp;           (** prover returned unsat *)
-    sat : Str.regexp;             (** prover returned sat *)
+    unsat : string list;           (** prover returned unsat *)
+    sat : string list;             (** prover returned sat *)
   } (** data useful to invoke a prover. The prover must read from
         stdin. The command is interpolated using {! Buffer.add_substitude}, with
         the given patterns:
@@ -60,8 +63,8 @@ module Prover = struct
   let p_E = {
     name = "E";
     command = "eprover --cpu-limit=${timeout} -tAuto -xAuto -l0 --tstp-in";
-    unsat = Str.regexp_case_fold "SZS status \\(Theorem\\|Unsat\\)";
-    sat = Str.regexp_case_fold "SZS status \\(Satisfiable\\|CounterTheorem\\)";
+    unsat = ["SZS status Unsat"; "SZS status Sat"];
+    sat = ["SZS status Satisfiable"; "SZS status CounterTheorem"];
   }
 
   let p_Eproof =
@@ -73,15 +76,15 @@ module Prover = struct
   let p_SPASS = {
     name = "SPASS";
     command = "SPASS -TPTP -TimeLimit=${timeout} -Stdin";
-    unsat = Str.regexp_case_fold "Proof found";
-    sat = Str.regexp_case_fold "Completion found";
+    unsat = ["Proof found"];
+    sat = ["Completion found"];
   }
 
   let p_Zenon = {
     name = "Zenon";
     command = "zenon -itptp -p0 -max-time ${timeout}s -";
-    unsat = Str.regexp_case_fold "PROOF-FOUND";
-    sat = Str.regexp_case_fold "NO-PROOF";
+    unsat = ["PROOF-FOUND"];
+    sat = ["NO-PROOF"];
   }
 
   let default = [p_E; p_SPASS]
@@ -97,54 +100,62 @@ type result =
   | Unknown
   | Error of string
 
+(* among the strings in [patterns], find if one is a substring of [s] *)
+let _find_mem patterns s =
+  List.exists
+    (fun p -> Util.str_find ~sub:p s >= 0)
+    patterns
+
 let call_with_out ?(timeout=30) ~prover decls =
+  (* compute input to give to the prover *)
+  let input = Util.on_buffer (Util.pp_list ~sep:"\n" A.Untyped.pp) decls in
+  (* build command *)
+  let buf = Buffer.create 15 in
+  Buffer.add_substitute buf
+    (function
+      | "timeout" -> string_of_int timeout
+      | s -> s)
+    prover.Prover.command;
+  let cmd = Buffer.contents buf in
+  Util.debug 2 "run prover %s" prover.Prover.name;
+  Util.debug 4 "command is: \"%s\"" cmd;
+  Util.debug 4 "obligation is: \"%s\"" input;
   try
-    (* compute input to give to the prover *)
-    let input = Util.on_buffer (Util.pp_list ~sep:"\n" A.pp_declaration) decls in
-    (* build command *)
-    let buf = Buffer.create 15 in
-    Buffer.add_substitute buf
-      (function
-        | "timeout" -> string_of_int timeout
-        | s -> s)
-      prover.Prover.command;
-    let cmd = Buffer.contents buf in
-    Util.debug 2 "run prover %s" prover.Prover.name;
-    Util.debug 4 "command is: \"%s\"" cmd;
-    Util.debug 4 "obligation is: \"%s\"" input;
     (* run the prover *)
     let output = Util.popen ~cmd ~input in
     Util.debug 2 "prover %s done" prover.Prover.name;
     Util.debug 4 "output: \"%s\"" output;
     (* parse output *)
     let result =
-      try
-        ignore (Str.search_forward prover.Prover.unsat output 0);
-        Unsat
-      with Not_found ->
-        try
-          ignore (Str.search_forward prover.Prover.sat output 0);
-          Sat
-        with Not_found ->
-          Unknown
+      if _find_mem prover.Prover.unsat output
+        then Unsat
+      else if _find_mem prover.Prover.sat output
+        then Sat
+        else Unknown
     in
-    result, output
+    Err.return (result, output)
   with e ->
     let str = Printexc.to_string e in
-    Error str, ""
+    Err.fail str
 
 let call ?timeout ~prover decls =
-  let res, _ = call_with_out ?timeout ~prover decls in
-  res
+  Err.(
+    call_with_out ?timeout ~prover decls
+    >>= fun (res, _) ->
+    return res
+  )
 
 let call_proof ?timeout ~prover decls =
-  let res, output = call_with_out ?timeout ~prover decls in
-  let proof =
-    try
-      let lexbuf = Lexing.from_string output in
-      let decls = Parse_tptp.parse_declarations Lex_tptp.token lexbuf in
-      let proof = Trace_tstp.of_decls (Sequence.of_list decls) in
-      proof
-    with _ -> None
-  in
-  res, proof
+  Err.(
+    call_with_out ?timeout ~prover decls
+    >>= fun (res, output) ->
+    let lexbuf = Lexing.from_string output in
+    ParseLocation.set_file lexbuf ("output of prover "^ prover.Prover.name);
+    Util_tptp.parse_lexbuf lexbuf
+    >>= fun decls ->
+    Util_tptp.infer_types (`sign Signature.TPTP.base) decls
+    >>= fun (_sign,decls') ->
+    Trace_tstp.of_decls decls'
+    >>= fun proof ->
+    return (res, proof)
+  )

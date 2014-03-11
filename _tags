@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 255527f0a139518005be97ee867e3792)
+# DO NOT EDIT (digest: e6878c9695492048a2d2f9750e3865b2)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -74,6 +74,8 @@
 "src/parsers/ast_ho.cmx": for-pack(Logtk_parsers)
 "src/parsers/lex_ho.cmx": for-pack(Logtk_parsers)
 "src/parsers/parse_ho.cmx": for-pack(Logtk_parsers)
+"src/parsers/trace_tstp.cmx": for-pack(Logtk_parsers)
+"src/parsers/callProver.cmx": for-pack(Logtk_parsers)
 <src/parsers/*.ml{,i}>: package(unix)
 <src/parsers/*.ml{,i}>: package(zarith)
 <src/parsers/*.ml{,i}>: use_logtk

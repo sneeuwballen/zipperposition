@@ -24,7 +24,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {6 Call external provers with TSTP} *)
+(** {1 Call external provers with TSTP} *)
+
+open Logtk
 
 (** {2 Description of provers} *)
 
@@ -32,8 +34,8 @@ module Prover : sig
   type t = {
     name : string;                (** name of the prover *)
     command : string;             (** command to call prover*)
-    unsat : Str.regexp;           (** prover returned unsat *)
-    sat : Str.regexp;             (** prover returned sat *)
+    unsat : string list;          (** prover returned unsat (possible outputs)*)
+    sat : string list;            (** prover returned sat (possible outputs)*)
   } (** data useful to invoke a prover. The prover must read from
         stdin. The command is interpolated using {! Buffer.add_substitude}, with
         the given patterns:
@@ -76,17 +78,18 @@ type result =
 (* TODO: optional argument for additional parameters (order,heuristics,etc.) *)
 
 val call : ?timeout:int -> prover:Prover.t ->
-           Ast_tptp.Untyped.t list -> result
+           Ast_tptp.Untyped.t list ->
+           result Monad.Err.t
   (** Call the prover (if present) on the given problem, and
       return a result. Default timeout is 30. *)
 
 val call_proof : ?timeout:int -> prover:Prover.t ->
                   Ast_tptp.Untyped.t list ->
-                  result * Trace_tstp.t option
+                  (result * Trace_tstp.t) Monad.Err.t
   (** Call the prover, and also tries to parse a TSTP derivation,
       if the prover succeeded *)
 
 val call_with_out : ?timeout:int -> prover:Prover.t ->
                     Ast_tptp.Untyped.t list ->
-                    result * string
+                    (result * string) Monad.Err.t
   (** Same as {!call}, but also returns the raw output of the prover *)

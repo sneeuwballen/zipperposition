@@ -26,6 +26,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Trace of a TSTP prover} *)
 
+open Logtk
+
 type id = Ast_tptp.name
 
 module T = FOTerm
@@ -33,6 +35,7 @@ module F = Formula.FO
 module S = Substs
 module A = Ast_tptp
 module AT = Ast_tptp.Typed
+module Err = Monad.Err
 
 type form = F.t
 type clause = F.t list
@@ -51,7 +54,7 @@ and step = {
 
 type proof = t
 
-let rec eq p1 p2 = match p1, p2 with
+let eq p1 p2 = match p1, p2 with
   | Axiom (f1, n1), Axiom (f2, n2) -> f1 = f2 && n1 = n2
   | Theory s1, Theory s2 -> s1 = s2
   | InferForm (f1, lazy step1), InferForm(f2, lazy step2) ->
@@ -107,8 +110,8 @@ let is_step = function
 
 let is_proof_of_false = function
   | InferForm (form, _) when F.eq form F.Base.false_ -> true
-  | InferClause(l,_) -> List.for_all (F.eq F.Base.false_) l
   | InferClause([],_) -> true
+  | InferClause(l,_) -> List.for_all (F.eq F.Base.false_) l
   | _ -> false
 
 let get_id = function
@@ -215,10 +218,9 @@ let size proof = Sequence.length (to_seq proof)
 
 (** {2 IO} *)
 
-let of_decls ?(base=Signature.TPTP.base) decls =
+let of_decls decls =
   let steps = Hashtbl.create 13 in (* maps names to steps *)
   let root = ref None in (* (one) root of proof *)
-  let ctx = TypeInference.Ctx.create base in
   (* find a proof name *)
   let find_step name =
     try
@@ -269,7 +271,6 @@ let of_decls ?(base=Signature.TPTP.base) decls =
     begin fun decl -> match decl with
     | AT.CNF (name, role, c, info :: _) ->
       Util.debug 3 "convert step %a" AT.pp decl;
-      let c = TypeInference.FO.convert_clause ~ctx c in
       begin match read_info info with
       | `Proof
       | `NoIdea -> ()
@@ -280,8 +281,7 @@ let of_decls ?(base=Signature.TPTP.base) decls =
       end
     | AT.FOF(name, role, f, info :: _)
     | AT.TFF (name, role, f, info :: _) ->
-      Util.debug 3 "convert step %a" A.pp_declaration decl;
-      let f = TypeInference.FO.convert_form ~ctx f in
+      Util.debug 3 "convert step %a" AT.pp decl;
       begin match read_info info with
       | `Proof
       | `NoIdea -> ()
@@ -290,9 +290,7 @@ let of_decls ?(base=Signature.TPTP.base) decls =
         let p = InferForm (f, step) in
         add_step name p
       end
-    | AT.TypeDecl (_, s, ty) ->
-      let ty = TypeConversion.of_basic ty in
-      TypeInference.Ctx.declare ctx s ty
+    | AT.TypeDecl _
     | AT.FOF _
     | AT.CNF _
     | AT.TFF _
@@ -303,16 +301,23 @@ let of_decls ?(base=Signature.TPTP.base) decls =
     end
     decls;
   match !root with
-  | None -> None
+  | None -> Monad.Err.fail "could not find the root of the TSTP proof"
   | Some p ->
-    (* force proofs to trigger errors here *)
-    traverse p force; 
-    Some p
+    try
+      (* force proofs to trigger errors here *)
+      traverse p force;
+      Err.return p
+    with Failure msg -> Err.fail msg
 
 let parse ?(recursive=true) filename =
-  let decls = Util_tptp.parse_file ~recursive filename in
-  Util.debug 1 "decls:\n  %a" (Util.pp_seq ~sep:"\n  " A.pp_declaration) decls;
-  of_decls decls
+  Monad.Err.(
+    Util_tptp.parse_file ~recursive filename
+    >>= fun decls ->
+    Util_tptp.infer_types (`sign Signature.TPTP.base) decls
+    >>= fun (signature, decls) ->
+    Util.debug 1 "decls:\n  %a" (Util.pp_seq ~sep:"\n  " AT.pp) decls;
+    of_decls decls
+  )
 
 let _extract_axiom proof = match proof with
   | Axiom (f,n) -> f,n
@@ -320,13 +325,17 @@ let _extract_axiom proof = match proof with
 
 let _pp_clause buf c = match c with
   | [] -> Buffer.add_string buf "$false"
-  | _ -> Util.pp_list ~sep:" | "  F.pp_tstp buf c
+  | _ -> Util.pp_list ~sep:" | "  F.TPTP.pp buf c
 
 let _print_parent p = match p with
   | InferForm _
   | InferClause _ -> Util.on_buffer A.pp_name (get_id  p)
   | Theory s -> Util.sprintf "theory(%s)" s
   | Axiom (f,n) -> Util.sprintf "file('%s', %s)" f n
+
+(* pure fof? (no types but $i/$o) *)
+let _form_is_fof f =
+  F.Seq.terms f |> Sequence.for_all FOTerm.monomorphic
 
 let pp_tstp buf proof =
   traverse proof
@@ -343,14 +352,15 @@ let pp_tstp buf proof =
         let id = get_id p in
         let file,n = _extract_axiom step.parents.(0) in
         Printf.bprintf buf "tff(%a, axiom, %a, file('%s', %s)).\n"
-          A.pp_name id F.pp_tstp f file n
+          A.pp_name id F.TPTP.pp f file n
       | InferForm(f, lazy step) ->
         let id = get_id p in
         let ids = Array.map _print_parent step.parents in
         let status = if step.esa then "esa" else "thm" in
+        let kind = if _form_is_fof f then "fof" else "tff" in
         Printf.bprintf buf
-          "tff(%a, plain, %a, inference('%s', [status(%s)], [%a])).\n"
-          A.pp_name id F.pp_tstp (F.close_forall f) step.rule status
+          "%s(%a, plain, %a, inference('%s', [status(%s)], [%a])).\n"
+          kind A.pp_name id F.TPTP.pp (F.close_forall f) step.rule status
           (Util.pp_array Buffer.add_string) ids
       | InferClause(c, lazy step) ->
         let id = get_id p in
@@ -368,7 +378,7 @@ let pp0 buf proof = match proof with
   | InferClause (c, _) ->
     Printf.bprintf buf "proof for %a (id %a)" _pp_clause c A.pp_name (get_id proof)
   | InferForm (f, _) ->
-    Printf.bprintf buf "proof for %a (id %a)" F.pp_tstp f A.pp_name (get_id proof)
+    Printf.bprintf buf "proof for %a (id %a)" F.TPTP.pp f A.pp_name (get_id proof)
 
 let pp1 buf proof = match proof with
   | Axiom (f,n) -> Printf.bprintf buf "axiom(%s, %s)" f n
@@ -379,7 +389,9 @@ let pp1 buf proof = match proof with
       (Util.pp_array ~sep:"\n  " pp0) step.parents
   | InferForm (f, lazy step) ->
     Printf.bprintf buf "proof for %a (id %a) from\n %a"
-      F.pp_tstp f A.pp_name (get_id proof)
+      F.TPTP.pp f A.pp_name (get_id proof)
       (Util.pp_array ~sep:"\n  " pp0) step.parents
 
 let fmt fmt proof = Format.pp_print_string fmt (Util.on_buffer pp0 proof)
+let pp = pp0
+let to_string = Util.on_buffer pp
