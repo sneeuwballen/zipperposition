@@ -65,7 +65,8 @@ let parse_file filename ic =
       (function
         | Ast_ho.Clause (t, []) ->
             begin match PT.view t with
-            | PT.App ({PT.term=PT.Const s}, [l;r]) when Symbol.eq s rule_arrow ->
+            | PT.App ({PT.term=PT.Const s}, [_;l;r]) when Symbol.eq s rule_arrow ->
+                Util.debug 5 "parsed rule %a --> %a" PT.pp l PT.pp r;
                 Some (Rule (l, r))
             | _ -> None
             end
