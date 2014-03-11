@@ -58,30 +58,44 @@ let parse_files prover files =
       E.map (Prover.parse_file p file) fst)
 
 let to_cnf ~signature decls =
-  let signature, decls = Util_tptp.infer_types (`sign signature) decls in
-  let _, decls = Util_tptp.to_cnf signature decls in
-  fun k ->
-    let a = object
-      inherit [unit] Ast_tptp.Typed.visitor
-      method clause () _role c = k c
-    end in
-    Sequence.fold a#visit () decls
+  E.(
+    Util_tptp.infer_types (`sign signature) decls
+    >>= fun (signature, decls) ->
+    let _sign, clauses = Util_tptp.to_cnf signature decls in
+    let seq k =
+      let a = object
+        inherit [unit] Ast_tptp.Typed.visitor
+        method clause () _role c = k c
+      end in
+      Sequence.fold a#visit () clauses
+    in
+    return seq
+  )
 
 let parse_and_cnf ?(signature=Signature.TPTP.base) files =
-  let s = Sequence.flatMap
-    (fun file ->
+  let q = Queue.create () in
+  let res = E.(fold_l files (return ())
+    (fun () file ->
       Util.debug 1 "parse input file %s" file;
       (* parse *)
-      let decls = Util_tptp.parse_file ~recursive:true file in
+      Util_tptp.parse_file ~recursive:true file
+      >>= fun decls ->
       Util.debug 3 "parsed %d declarations..." (Sequence.length decls);
       (* CNF *)
-      let clauses = to_cnf ~signature decls in
+      to_cnf ~signature decls
+      >>= fun clauses ->
       Util.debug 3 "obtained %d clauses..." (Sequence.length clauses);
       (* convert clauses into Encoding.foclause *)
       let clauses = Sequence.map Encoding.foclause_of_clause clauses in
-      clauses
-    ) (Sequence.of_list files)
-  in Sequence.persistent s
+      Queue.add clauses q;
+      return ()
+    ))
+  in
+  match res with
+  | E.Ok () ->
+      E.return (Sequence.of_queue q |> Sequence.flatten)
+  | E.Error msg ->
+      E.fail msg
 
 (* print content of the reasoner *)
 let print_theory r =
@@ -146,12 +160,14 @@ let main () =
   let prover = Prover.empty in
   if !flag_print_signature then print_signature (Prover.signature prover);
   let res = E.(
-    parse_files prover !theory_files >>= fun prover ->
+    parse_files prover !theory_files
+    >>= fun prover ->
     Util.debug 3 "theory files parsed";
     if !flag_print_theory then print_theory (Prover.reasoner prover);
     if !flag_print_signature then print_signature (Prover.signature prover);
     (* parse CNF formulas *)
-    E.guard (fun () -> parse_and_cnf !files) >>= fun clauses ->
+    parse_and_cnf !files
+    >>= fun clauses ->
     Util.debug 3 "input files parsed and translated to CNF";
     if !flag_print_cnf then print_clauses clauses;
     let results = detect_theories prover clauses in

@@ -32,7 +32,7 @@ module HOT = HOTerm
 module F = Formula.FO
 module Loc = ParseLocation
 
-exception ParseError of Loc.t
+exception ParseError of ParseLocation.t
 
 type name =
   | NameInt of int

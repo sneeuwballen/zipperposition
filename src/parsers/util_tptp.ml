@@ -35,6 +35,7 @@ module Ast = Ast_tptp
 module AU = Ast.Untyped
 module AT = Ast.Typed
 module Loc = ParseLocation
+module Err = Monad.Err
 
 (** {2 Printing/Parsing} *)
 
@@ -47,11 +48,12 @@ let find_file name dir =
   and search dir =
     let cur_name = Filename.concat dir name in
     Util.debug 2 "search %s as %s" name cur_name;
-    if file_exists cur_name then cur_name
+    if file_exists cur_name
+    then Some cur_name
     else
       let dir' = Filename.dirname dir in
       if dir = dir'
-        then failwith "unable to find file"
+        then None
         else search dir'
   in
   if Filename.is_relative name
@@ -62,29 +64,72 @@ let find_file name dir =
         search dir'
       with Not_found -> raise e)
     else if file_exists name
-      then name  (* found *)
-      else failwith ("unable to find file " ^ name)
+      then Some name  (* found *)
+      else None
 
 (* raise a readable parse error *)
-let _raise_error lexbuf =
+let _raise_error msg lexbuf =
   let loc = Loc.of_lexbuf lexbuf in
-  raise (Ast.ParseError loc)
+  failwith (msg^ Loc.to_string loc)
+
+let parse_lexbuf ?names buf =
+  try
+    (* parse declarations from file *)
+    let decls =
+      try Parse_tptp.parse_declarations Lex_tptp.token buf
+      with
+      | Parse_tptp.Error -> _raise_error "parse error at " buf
+      | Failure msg -> _raise_error msg buf
+      | Ast_tptp.ParseError loc -> failwith ("parse error at "^Loc.to_string loc)
+    in
+    let q = Queue.create () in
+    List.iter
+      (fun decl -> match decl, names with
+        | (AU.CNF _ | AU.FOF _ | AU.TFF _ | AU.THF _ | AU.TypeDecl _ | AU.NewType _), None ->
+          Queue.push decl q
+        | (AU.CNF _ | AU.FOF _ | AU.TFF _ | AU.THF _ | AU.TypeDecl _ | AU.NewType _), Some names ->
+          if List.mem (AU.get_name decl) names
+            then Queue.push decl q
+            else ()   (* not included *)
+        | (AU.Include _ | AU.IncludeOnly _), _ ->
+          Queue.push decl q)
+      decls;
+    Err.return (Sequence.of_queue q)
+  with
+  | Failure msg | Sys_error msg ->
+    Err.fail msg
+  | e ->
+    Err.fail (Printexc.to_string e)
+
+(* find file *)
+let _find_and_open filename dir = 
+  match filename with
+  | "stdin" -> stdin
+  | _ ->
+      match find_file filename dir with
+      | Some filename ->
+          begin try open_in filename
+          with Sys_error msg ->
+            failwith ("error when opening file " ^ filename ^ " : " ^ msg)
+          end
+      | None -> failwith ("could not find file " ^ filename)
 
 let parse_file ~recursive f =
   let dir = Filename.dirname f in
   let result_decls = Queue.create () in
   (* function that parses one file *)
   let rec parse_this_file ?names filename =
-    let input = match filename with
-    | "stdin" -> stdin
-    | _ -> open_in (find_file filename dir) in
-    begin try
+    (* find and open file *)
+    let input = _find_and_open filename dir in
+    try
       let buf = Lexing.from_channel input in
       Loc.set_file buf filename;
+      (* parse declarations from file *)
       let decls =
         try Parse_tptp.parse_declarations Lex_tptp.token buf
-        with Parse_tptp.Error ->
-          _raise_error buf  (* report error properly *)
+        with
+        | Parse_tptp.Error -> _raise_error "parse error at " buf
+        | Ast_tptp.ParseError loc -> failwith ("parse error at "^Loc.to_string loc)
       in
       List.iter
         (fun decl -> match decl, names with
@@ -101,17 +146,16 @@ let parse_file ~recursive f =
           | (AU.Include _ | AU.IncludeOnly _), _ ->
             Queue.push decl result_decls)
         decls
-    with (Ast.ParseError loc) as e ->
-      close_in input;
-      Util.debug 1 "parse_tptp: syntax error: %a" Loc.pp loc;
-      raise e
-    | _ as e ->
+    with e ->
       close_in input;
       raise e
-    end;
   in
-  parse_this_file ?names:None f;
-  Sequence.of_queue result_decls
+  try
+    parse_this_file ?names:None f;
+    Err.return (Sequence.of_queue result_decls)
+  with
+  | Failure msg | Sys_error msg -> Err.fail msg
+  | e -> Err.fail (Printexc.to_string e)
 
 module type S = sig
   module A : Ast_tptp.S
@@ -228,6 +272,7 @@ module Untyped = struct
 
   let type_declarations decls =
     let tyctx = Type.Conv.create () in
+    (* traverse the declarations, updating the signature when a type decl is met *)
     let a = object
       inherit [Signature.t] AU.visitor
       method tydecl signature s ty =
@@ -363,42 +408,47 @@ let infer_types init decls =
     | `ctx ctx -> ctx
     | `sign signature -> TI.Ctx.create signature
   in
-  let s = Sequence.map
-    (fun decl ->
-      Util.debug 3 "infer type for %a" AU.pp decl;
-      match decl with
-      | AU.Include f -> AT.Include f
-      | AU.IncludeOnly (f,l) -> AT.IncludeOnly (f,l)
-      | AU.NewType (n,s,ty) ->
-          begin match TI.Ctx.ty_of_prolog ctx ty with
-          | None -> raise (Type.Error ("expected type, got " ^ PT.to_string ty))
-          | Some ty' -> AT.NewType (n,s, ty')
-          end
-      | AU.TypeDecl(n, s, ty) ->
-          begin match TI.Ctx.ty_of_prolog ctx ty with
-          | None -> raise (Type.Error ("expected type, got " ^ PT.to_string ty))
-          | Some ty' ->
-              TI.Ctx.declare ctx (Symbol.of_string s) ty';
-              AT.TypeDecl (n,s, ty')
-          end
-      | AU.CNF(n,r,c,i) ->
-          let c' = TI.FO.convert_clause ~ctx c in
-          AT.CNF(n,r,c',i)
-      | AU.FOF(n,r,f,i) ->
-          let f' = TI.FO.convert_form ~ctx f in
-          AT.FOF(n,r,f',i)
-      | AU.TFF(n,r,f,i) ->
-          let f' = TI.FO.convert_form ~ctx f in
-          AT.TFF(n,r,f',i)
-      | AU.THF(n,r,f,i) ->
-          failwith "type conversion for HO Term: not implemented" (* TODO *)
-      )
-    decls
-  in
-  (* be sure to traverse the list of declarations *)
-  let s = Sequence.persistent s in
-  TypeInference.Ctx.bind_to_default ctx;
-  TI.Ctx.to_signature ctx, s
+  try
+    let s = Sequence.map
+      (fun decl ->
+        Util.debug 3 "infer type for %a" AU.pp decl;
+        match decl with
+        | AU.Include f -> AT.Include f
+        | AU.IncludeOnly (f,l) -> AT.IncludeOnly (f,l)
+        | AU.NewType (n,s,ty) ->
+            begin match TI.Ctx.ty_of_prolog ctx ty with
+            | None -> raise (Type.Error ("expected type, got " ^ PT.to_string ty))
+            | Some ty' -> AT.NewType (n,s, ty')
+            end
+        | AU.TypeDecl(n, s, ty) ->
+            begin match TI.Ctx.ty_of_prolog ctx ty with
+            | None -> raise (Type.Error ("expected type, got " ^ PT.to_string ty))
+            | Some ty' ->
+                TI.Ctx.declare ctx (Symbol.of_string s) ty';
+                AT.TypeDecl (n,s, ty')
+            end
+        | AU.CNF(n,r,c,i) ->
+            let c' = TI.FO.convert_clause ~ctx c in
+            AT.CNF(n,r,c',i)
+        | AU.FOF(n,r,f,i) ->
+            let f' = TI.FO.convert_form ~ctx f in
+            AT.FOF(n,r,f',i)
+        | AU.TFF(n,r,f,i) ->
+            let f' = TI.FO.convert_form ~ctx f in
+            AT.TFF(n,r,f',i)
+        | AU.THF(n,r,f,i) ->
+            let f' = TI.HO.convert ~ctx f in
+            AT.THF(n,r,f',i)
+        )
+      decls
+    in
+    (* be sure to traverse the list of declarations *)
+    let s = Sequence.persistent s in
+    TypeInference.Ctx.bind_to_default ctx;
+    (* success *)
+    Err.return (TI.Ctx.to_signature ctx, s)
+  with Type.Error msg ->
+    Err.fail msg
 
 let signature init decls =
   let ctx = match init with
@@ -444,8 +494,10 @@ let erase_types typed =
     ) typed
 
 let annotate_types init untyped =
-  let _, typed = infer_types init untyped in
-  erase_types typed
+  Err.(
+    infer_types init untyped >>= fun (_, typed) ->
+    Err.return (erase_types typed)
+  )
 
 let to_cnf signature decls =
   (* formulas with correct negation sign *)

@@ -30,17 +30,23 @@ open Logtk
 
 (** {2 Printing/Parsing} *)
 
-val find_file : string -> string -> string
+val find_file : string -> string -> string option
   (** [find_file name dir] looks for a file with the given [name],
       recursively, in [dir], or in its parent dir recursively.
-      It also looks in the "TPTP" environment variable.
-      @raise Failure if no such file can be found. *)
+      It also looks in the "TPTP" environment variable. *)
 
-val parse_file : recursive:bool -> string -> Ast_tptp.Untyped.t Sequence.t
+val parse_lexbuf : ?names:Ast_tptp.name list ->
+                    Lexing.lexbuf ->
+                    Ast_tptp.Untyped.t Sequence.t Monad.Err.t
+  (** Given a lexbuf, try to parse its content into a sequence of untyped
+    declarations *)
+
+val parse_file : recursive:bool -> string ->
+                 Ast_tptp.Untyped.t Sequence.t Monad.Err.t
   (** Parsing a TPTP file is here presented with a [recursive] option
       that, if true, will make "include" directives to be recursively
       parsed. It uses {!find_file} for included files.
-      @raise Ast_tptp.ParseError in case a syntax error is met. *)
+      @return an error-wrapped sequence of declarations. *)
 
 (* TODO: a function that takes a TPTP file, and returns the list of
         files that it depends on (recursive includes) *)
@@ -90,7 +96,7 @@ are not consistent. *)
 
 val infer_types : [`ctx of TypeInference.Ctx.t | `sign of Signature.t] ->
                   Ast_tptp.Untyped.t Sequence.t ->
-                  Signature.t * Ast_tptp.Typed.t Sequence.t
+                  (Signature.t * Ast_tptp.Typed.t Sequence.t) Monad.Err.t
   (** Infer types from type declarations and formulas, returning a sequence
       of well-typed ASTs, and the inferred signature.
       @raise Type.Error if there is a type error. *)
@@ -105,7 +111,7 @@ val erase_types : Ast_tptp.Typed.t Sequence.t ->
 
 val annotate_types : [`ctx of TypeInference.Ctx.t | `sign of Signature.t] ->
                      Ast_tptp.Untyped.t Sequence.t ->
-                     Ast_tptp.Untyped.t Sequence.t
+                     Ast_tptp.Untyped.t Sequence.t Monad.Err.t
   (** Round-trip of type inference and type erasure. *)
 
 val to_cnf : Signature.t ->

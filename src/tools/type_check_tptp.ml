@@ -30,6 +30,7 @@ open Logtk
 open Logtk_parsers
 
 module PT = PrologTerm
+module Err = Monad.Err
 
 let print_line () =
   Printf.printf "%s\n" (Util.str_repeat "=" 60);
@@ -46,13 +47,13 @@ let options =
 
 (* check the given file *)
 let check file =
-  print_line ();
-  Printf.printf "checking file %s...\n" file;
-  try
-    (* parse *)
-    let decls = Util_tptp.parse_file ~recursive:true file in
-    (* type check *)
-    let signature, decls' = Util_tptp.infer_types (`sign Signature.empty) decls in
+  Err.(
+    print_line ();
+    Printf.printf "checking file %s...\n" file;
+    Util_tptp.parse_file ~recursive:true file
+    >>= fun decls ->
+    Util_tptp.infer_types (`sign Signature.empty) decls
+    >>= fun (signature, decls') ->
     let decls' = Util_tptp.erase_types decls' in
     Printf.printf "signature:\n";
     Signature.iter signature
@@ -61,22 +62,16 @@ let check file =
     (* print formulas *)
     if !cat_input then begin
       Printf.printf "formulas:\n";
-      Sequence.iter 
+      Sequence.iter
         (fun decl -> Util.printf "  %a\n" Ast_tptp.Untyped.pp decl)
         decls';
       end;
-    (if !stats then begin
+    if !stats then begin
       Util.printf "number of symbols: %d\n" (Signature.cardinal signature);
       Util.printf "number of input declarations: %d\n" (Sequence.length decls);
-      end);
-  with
-  | Ast_tptp.ParseError loc ->
-    (* syntax error *)
-    Util.eprintf "parse error at %a\n" ParseLocation.pp loc;
-    exit 1
-  | Type.Error msg ->
-    Util.eprintf "%s\n" msg;
-    exit 1
+      end;
+    Err.return ()
+  )
 
 let main () =
   let files = ref [] in
@@ -84,10 +79,17 @@ let main () =
   Arg.parse options add_file "check_tptp [options] [file1|stdin] file2...";
   (if !files = [] then files := ["stdin"]);
   files := List.rev !files;
-  List.iter check !files;
-  print_line ();
-  Printf.printf "success!\n";
-  ()
+  let res =
+    Err.fold_l
+      !files (Err.return ())
+      (fun () file -> check file);
+  in
+  match res with
+  | Err.Ok () ->
+    print_line ();
+    Printf.printf "success!\n"
+  | Err.Error msg ->
+    print_endline msg
 
 let _ =
   main ()

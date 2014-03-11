@@ -33,6 +33,7 @@ module F = Formula.FO
 module A = Ast_tptp
 module AU = Ast_tptp.Untyped
 module AT = Ast_tptp.Typed
+module Err = Monad.Err
 
 let declare_types = ref false
 let print_sig = ref false
@@ -45,11 +46,13 @@ let options =
 (* process the given file, converting it to CNF *)
 let process file =
   Util.debug 1 "process file %s" file;
-  try
+  let res = Err.(
     (* parse *)
-    let decls = Util_tptp.parse_file ~recursive:true file in
+    Util_tptp.parse_file ~recursive:true file
+    >>= fun decls ->
     (* to CNF *)
-    let signature, decls = Util_tptp.infer_types (`sign Signature.TPTP.base) decls in
+    Util_tptp.infer_types (`sign Signature.TPTP.base) decls
+    >>= fun (signature, decls) ->
     let signature, decls = Util_tptp.to_cnf signature decls in
     let decls = if !declare_types
       then Sequence.append (Util_tptp.Typed.declare_symbols signature) decls
@@ -60,16 +63,14 @@ let process file =
     (* print *)
     Sequence.iter
       (fun d -> Util.printf "%a\n" AT.pp d)
-      decls
-  with
-  | Ast_tptp.ParseError loc ->
-    (* syntax error *)
-    Util.eprintf "parse error at %a\n" ParseLocation.pp loc;
-    exit 1
-  | Type.Error e ->
-    Util.eprintf "%s\n" e;
-    Printexc.print_backtrace stderr;
-    exit 1
+      decls;
+    Err.return ()
+  )
+  in match res with
+    | Err.Ok () -> ()
+    | Err.Error msg ->
+        print_endline msg;
+        exit 1
 
 let main () =
   let files = ref [] in
