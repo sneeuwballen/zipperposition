@@ -153,7 +153,7 @@ Executable run_tests
 
 # TPTP syntax and type checking
 Executable type_check_tptp
-  Path:             tools/
+  Path:             src/tools/
   Build$:           flag(tools) & flag(parsers)
   Install$:         flag(tools) & flag(parsers)
   CompiledObject:   native
@@ -162,7 +162,7 @@ Executable type_check_tptp
 
 # Conversion to CNF
 Executable cnf_of_tptp
-  Path:             tools/
+  Path:             src/tools/
   Build$:           flag(tools) & flag(parsers)
   Install$:         flag(tools) & flag(parsers)
   CompiledObject:   native
@@ -171,7 +171,7 @@ Executable cnf_of_tptp
 
 # Orienting rewrite rules with LPO
 Executable orient
-  Path:             tools/
+  Path:             src/tools/
   Build$:           flag(tools) & flag(parsers) & flag(solving)
   Install$:         flag(tools) & flag(parsers) & flag(solving)
   CompiledObject:   native
@@ -180,7 +180,7 @@ Executable orient
 
 # proof checking
 #Executable proof_check_tstp
-#  Path:             tools/
+#  Path:             src/tools/
 #  Build$:           flag(tools) & flag(parsers) & false
 #  Install$:         flag(tools) & flag(parsers) & false
 #  CompiledObject:   native
@@ -189,7 +189,7 @@ Executable orient
 
 # detection of theories
 Executable detect_theories
-  Path:             tools/
+  Path:             src/tools/
   Build$:           flag(meta) & flag(tools) & flag(parsers)
   Install$:         flag(meta) & flag(tools) & flag(parsers)
   CompiledObject:   native

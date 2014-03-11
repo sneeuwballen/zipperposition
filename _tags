@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 9a7e2b86ad420e9728ae0261c0c85e51)
+# DO NOT EDIT (digest: 255527f0a139518005be97ee867e3792)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -138,35 +138,35 @@
 <tests/*.ml{,i}>: use_logtk_meta
 <tests/*.ml{,i}>: use_logtk_parsers
 # Executable type_check_tptp
-"tools/type_check_tptp.native": package(unix)
-"tools/type_check_tptp.native": package(zarith)
-"tools/type_check_tptp.native": use_logtk
-"tools/type_check_tptp.native": use_logtk_parsers
+"src/tools/type_check_tptp.native": package(unix)
+"src/tools/type_check_tptp.native": package(zarith)
+"src/tools/type_check_tptp.native": use_logtk
+"src/tools/type_check_tptp.native": use_logtk_parsers
 # Executable cnf_of_tptp
-"tools/cnf_of_tptp.native": package(unix)
-"tools/cnf_of_tptp.native": package(zarith)
-"tools/cnf_of_tptp.native": use_logtk
-"tools/cnf_of_tptp.native": use_logtk_parsers
+"src/tools/cnf_of_tptp.native": package(unix)
+"src/tools/cnf_of_tptp.native": package(zarith)
+"src/tools/cnf_of_tptp.native": use_logtk
+"src/tools/cnf_of_tptp.native": use_logtk_parsers
 # Executable orient
-"tools/orient.native": package(aez)
-"tools/orient.native": package(unix)
-"tools/orient.native": package(zarith)
-"tools/orient.native": use_logtk
-"tools/orient.native": use_logtk_parsers
-"tools/orient.native": use_logtk_solving
-<tools/*.ml{,i}>: package(aez)
-<tools/*.ml{,i}>: use_logtk_solving
+"src/tools/orient.native": package(aez)
+"src/tools/orient.native": package(unix)
+"src/tools/orient.native": package(zarith)
+"src/tools/orient.native": use_logtk
+"src/tools/orient.native": use_logtk_parsers
+"src/tools/orient.native": use_logtk_solving
+<src/tools/*.ml{,i}>: package(aez)
+<src/tools/*.ml{,i}>: use_logtk_solving
 # Executable detect_theories
-"tools/detect_theories.native": package(unix)
-"tools/detect_theories.native": package(zarith)
-"tools/detect_theories.native": use_logtk
-"tools/detect_theories.native": use_logtk_meta
-"tools/detect_theories.native": use_logtk_parsers
-<tools/*.ml{,i}>: package(unix)
-<tools/*.ml{,i}>: package(zarith)
-<tools/*.ml{,i}>: use_logtk
-<tools/*.ml{,i}>: use_logtk_meta
-<tools/*.ml{,i}>: use_logtk_parsers
+"src/tools/detect_theories.native": package(unix)
+"src/tools/detect_theories.native": package(zarith)
+"src/tools/detect_theories.native": use_logtk
+"src/tools/detect_theories.native": use_logtk_meta
+"src/tools/detect_theories.native": use_logtk_parsers
+<src/tools/*.ml{,i}>: package(unix)
+<src/tools/*.ml{,i}>: package(zarith)
+<src/tools/*.ml{,i}>: use_logtk
+<src/tools/*.ml{,i}>: use_logtk_meta
+<src/tools/*.ml{,i}>: use_logtk_parsers
 # OASIS_STOP
 true: use_menhir
 "tests/quick/": -traverse
