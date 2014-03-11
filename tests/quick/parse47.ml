@@ -1,9 +1,19 @@
 #!/usr/bin/env ocaml
 #use "tests/quick/.common.ml";;
 
-let s = Util_tptp.parse_file ~recursive:true "pelletier_problems/pb47.p";;
-let signature, s' = Util_tptp.infer_types (`sign Signature.empty) s;;
-let forms = Util_tptp.Typed.formulas s';;
-assert (Sequence.for_all F.FO.is_closed forms);;
+module E = Monad.Err
 
-print_endline "... OK";;
+let () =
+  let res = E.(
+    Util_tptp.parse_file ~recursive:true "pelletier_problems/pb47.p"
+    >>= fun s ->
+    Util_tptp.infer_types (`sign Signature.empty) s
+    >>= fun (signature, s') ->
+    let forms = Util_tptp.Typed.formulas s' in
+    E.return (Sequence.for_all F.FO.is_closed forms)
+  ) in
+  match res with
+  | E.Ok true -> print_endline "... OK"
+  | E.Ok false -> print_endline "assertion failure, ERROR"
+  | E.Error msg -> print_endline msg
+;;
