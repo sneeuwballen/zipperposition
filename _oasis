@@ -178,13 +178,13 @@ Executable orient
   BuildDepends:     logtk,logtk.parsers,logtk.solving,aez
 
 # proof checking
-#Executable proof_check_tstp
-#  Path:             src/tools/
-#  Build$:           flag(tools) & flag(parsers) & false
-#  Install$:         flag(tools) & flag(parsers) & false
-#  CompiledObject:   native
-#  MainIs:           proof_check_tstp.ml
-#  BuildDepends:     logtk,logtk.parsers
+Executable proof_check_tstp
+  Path:             src/tools/
+  Build$:           flag(tools) & flag(parsers)
+  Install$:         flag(tools) & flag(parsers)
+  CompiledObject:   native
+  MainIs:           proof_check_tstp.ml
+  BuildDepends:     logtk,logtk.parsers
 
 # detection of theories
 Executable detect_theories

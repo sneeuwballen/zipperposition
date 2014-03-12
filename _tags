@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: e6878c9695492048a2d2f9750e3865b2)
+# DO NOT EDIT (digest: 04142e0cc9aa1480a8aa0cfbd553c0f7)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -158,6 +158,11 @@
 "src/tools/orient.native": use_logtk_solving
 <src/tools/*.ml{,i}>: package(aez)
 <src/tools/*.ml{,i}>: use_logtk_solving
+# Executable proof_check_tstp
+"src/tools/proof_check_tstp.native": package(unix)
+"src/tools/proof_check_tstp.native": package(zarith)
+"src/tools/proof_check_tstp.native": use_logtk
+"src/tools/proof_check_tstp.native": use_logtk_parsers
 # Executable detect_theories
 "src/tools/detect_theories.native": package(unix)
 "src/tools/detect_theories.native": package(zarith)

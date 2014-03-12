@@ -242,7 +242,7 @@ let of_decls decls =
             | A.GString s -> find_step (A.NameString s)
             | A.GNode ("theory", [A.GString th]) -> Theory th
             | _ -> failwith (Util.sprintf "not a valid parent: %a" A.pp_general data))
-        (Array.of_list parents))
+          (Array.of_list parents))
       in
       let esa = status <> "thm" in
       `Parents (rule, esa, parents)
@@ -250,7 +250,13 @@ let of_decls decls =
       let parents = Lazy.from_val [|(Axiom (file,name))|] in
       `Parents ("axiom", false, parents)
     | A.GNode ("trivial", _) ->
-      `Parents ("trivial", false, lazy [||])
+      `Parents ("trivial", false, Lazy.from_val [||])
+    | A.GInt i ->
+        let parent = find_step (A.NameInt i) in
+        `Parents ("trivial", false, Lazy.from_val [|parent|])
+    | A.GString s ->
+        let parent = find_step (A.NameString s) in
+        `Parents ("trivial", false, Lazy.from_val [|parent|])
     | _ ->
       Util.debug 1 "not a valid proof step: %a" A.pp_general_debug info;
       `NoIdea
