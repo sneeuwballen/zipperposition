@@ -75,21 +75,59 @@ type result =
   | Unknown
   | Error of string
 
-(* TODO: optional argument for additional parameters (order,heuristics,etc.) *)
-
-val call : ?timeout:int -> prover:Prover.t ->
+val call : ?timeout:int -> ?args:string list ->
+            prover:Prover.t ->
            Ast_tptp.Untyped.t list ->
            result Monad.Err.t
-  (** Call the prover (if present) on the given problem, and
-      return a result. Default timeout is 30. *)
+(** Call the prover (if present) on the given problem, and
+    return a result. Default timeout is 30. *)
 
-val call_proof : ?timeout:int -> prover:Prover.t ->
+val call_proof : ?timeout:int -> ?args:string list ->
+                  prover:Prover.t ->
                   Ast_tptp.Untyped.t list ->
                   (result * Trace_tstp.t) Monad.Err.t
-  (** Call the prover, and also tries to parse a TSTP derivation,
-      if the prover succeeded *)
+(** Call the prover, and also tries to parse a TSTP derivation,
+    if the prover succeeded *)
 
-val call_with_out : ?timeout:int -> prover:Prover.t ->
+val call_with_out : ?timeout:int -> ?args:string list ->
+                    prover:Prover.t ->
                     Ast_tptp.Untyped.t list ->
                     (result * string) Monad.Err.t
-  (** Same as {!call}, but also returns the raw output of the prover *)
+(** Same as {!call}, but also returns the raw output of the prover *)
+
+(** {2 E-prover specific functions} *)
+
+module Eprover : sig
+  type result = {
+    answer : szs_answer;
+    output : string;
+    decls : Ast_tptp.Untyped.t Sequence.t option;
+    proof : Trace_tstp.t option;
+  }
+  and szs_answer =
+    | Theorem
+    | CounterSatisfiable
+    | Unknown
+
+  val string_of_answer : szs_answer -> string
+
+  val run_eproof : steps:int -> input:string -> result Monad.Err.t
+    (** Run Eproof_ram, and tries to read a proof back. *)
+
+  val run_eprover : ?opts:string list -> ?level:int ->
+                    steps:int -> input:string -> unit -> result Monad.Err.t
+    (** Runs E with the given input (optional verbosity level). The returned
+        result will not contain a proof.
+        [opts] is an additional list of command line options that will be
+        given to E. *)
+
+  val discover : steps:int ->
+                 Ast_tptp.Untyped.t Sequence.t ->
+                 Ast_tptp.Untyped.t Sequence.t Monad.Err.t
+  (** explore the surrounding of this list of declarations, returning the
+      TPTP output of E *)
+
+  val cnf : Ast_tptp.Untyped.t Sequence.t ->
+            Ast_tptp.Untyped.t Sequence.t Monad.Err.t
+  (** Use E to convert a set of statements into CNF *)
+end

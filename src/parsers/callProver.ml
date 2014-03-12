@@ -62,7 +62,7 @@ module Prover = struct
 
   let p_E = {
     name = "E";
-    command = "eprover --cpu-limit=${timeout} -tAuto -xAuto -l0 --tstp-in";
+    command = "eprover --cpu-limit=${timeout} -tAuto -xAuto -l0 --tstp-in --tstp-out";
     unsat = ["SZS status Unsat"; "SZS status Sat"];
     sat = ["SZS status Satisfiable"; "SZS status CounterTheorem"];
   }
@@ -70,7 +70,7 @@ module Prover = struct
   let p_Eproof =
     { p_E with
       name = "Eproof";
-      command = "eproof_ram --cpu-limit=${timeout} -tAuto -xAuto -l0 --tstp-in";
+      command = "eproof_ram --cpu-limit=${timeout} -tAuto -xAuto -l0 --tstp-in --tstp-out";
     }
 
   let p_SPASS = {
@@ -106,23 +106,24 @@ let _find_mem patterns s =
     (fun p -> Util.str_find ~sub:p s >= 0)
     patterns
 
-let call_with_out ?(timeout=30) ~prover decls =
+let call_with_out ?(timeout=30) ?(args=[]) ~prover decls =
   (* compute input to give to the prover *)
   let input = Util.on_buffer (Util.pp_list ~sep:"\n" A.Untyped.pp) decls in
-  (* build command *)
+  (* build command (add arguments to the end) *)
   let buf = Buffer.create 15 in
   Buffer.add_substitute buf
     (function
       | "timeout" -> string_of_int timeout
       | s -> s)
     prover.Prover.command;
-  let cmd = Buffer.contents buf in
+  let cmd = Buffer.contents buf ^ String.concat " " args in
   Util.debug 2 "run prover %s" prover.Prover.name;
   Util.debug 4 "command is: \"%s\"" cmd;
   Util.debug 4 "obligation is: \"%s\"" input;
-  try
+  Err.(
     (* run the prover *)
-    let output = Util.popen ~cmd ~input in
+    Util.popen ~cmd ~input
+    >>= fun output ->
     Util.debug 2 "prover %s done" prover.Prover.name;
     Util.debug 4 "output: \"%s\"" output;
     (* parse output *)
@@ -134,24 +135,36 @@ let call_with_out ?(timeout=30) ~prover decls =
         else Unknown
     in
     Err.return (result, output)
-  with e ->
-    let str = Printexc.to_string e in
-    Err.fail str
+  )
 
-let call ?timeout ~prover decls =
+let call ?timeout ?args ~prover decls =
   Err.(
-    call_with_out ?timeout ~prover decls
+    call_with_out ?timeout ?args ~prover decls
     >>= fun (res, _) ->
     return res
   )
 
-let call_proof ?timeout ~prover decls =
+let decls_of_string ~source str =
+  let lexbuf = Lexing.from_string str in
+  ParseLocation.set_file lexbuf source;
+  Util_tptp.parse_lexbuf lexbuf
+
+(* try to parse a proof. Returns a proof option *)
+let proof_of_decls decls =
+  let res = Err.(
+    Util_tptp.infer_types (`sign Signature.TPTP.base) decls
+    >>= fun (_, decls') ->
+    Trace_tstp.of_decls decls'
+  ) in
+  match res with
+  | Err.Error _ -> None
+  | Err.Ok proof -> Some proof
+
+let call_proof ?timeout ?args ~prover decls =
   Err.(
-    call_with_out ?timeout ~prover decls
+    call_with_out ?timeout ?args ~prover decls
     >>= fun (res, output) ->
-    let lexbuf = Lexing.from_string output in
-    ParseLocation.set_file lexbuf ("output of prover "^ prover.Prover.name);
-    Util_tptp.parse_lexbuf lexbuf
+    decls_of_string ~source:("output of prover "^ prover.Prover.name) output
     >>= fun decls ->
     Util_tptp.infer_types (`sign Signature.TPTP.base) decls
     >>= fun (_sign,decls') ->
@@ -159,3 +172,100 @@ let call_proof ?timeout ~prover decls =
     >>= fun proof ->
     return (res, proof)
   )
+
+module Eprover = struct
+  type result = {
+    answer : szs_answer;
+    output : string;
+    decls : Ast_tptp.Untyped.t Sequence.t option;
+    proof : Trace_tstp.t option;
+  }
+  and szs_answer =
+    | Theorem
+    | CounterSatisfiable
+    | Unknown
+
+  let string_of_answer = function
+    | Theorem -> "Theorem"
+    | CounterSatisfiable -> "CounterSatisfiable"
+    | Unknown -> "Unknown"
+
+  (* parse SZS answer *)
+  let parse_answer output =
+  if Util.str_find ~sub:"SZS status Theorem" output > ~-1
+    then Theorem
+  else if Util.str_find ~sub:"SZS status CounterSatisfiable" output > ~-1
+    then CounterSatisfiable
+  else Unknown
+
+  (* run eproof_ram on the given input. returns a result *)
+  let _run_either ?(opts=[]) ?(level=1) ~prover ~steps ~input () =
+    let level' = Util.sprintf "-l%d" level in
+    let command =
+      [ prover; "--tstp-in"; "--tstp-out"; level'; "-C"
+      ; string_of_int steps; "-xAuto"; "-tAuto" ] @ opts
+    in
+    let cmd = String.concat " " command in
+    Err.(
+      Util.popen ~cmd ~input
+      >>= fun output ->
+      (* parse answer *)
+      let answer = parse_answer output in
+      (* read its output *)
+      let decls, proof =
+        match decls_of_string ~source:"E" output with
+        | Err.Error _ -> None, None
+        | Err.Ok s ->
+            (* try to parse proof, if it's a theorem *)
+            let proof =
+              if answer = Theorem
+              then proof_of_decls s
+              else None
+            in
+            Some s, proof
+      in
+      Err.return { answer; output; decls; proof }
+    )
+
+  (* run eproof_ram on the given input. returns a result *)
+  let run_eproof ~steps ~input =
+    _run_either ~prover:"eproof_ram" ~steps ~input ()
+
+  (* run eprover on the given input. returns a result Lwt *)
+  let run_eprover ?opts ?level ~steps ~input () =
+    _run_either ~prover:"eprover" ?opts ?level ~steps ~input ()
+
+  (* explore the surrounding of this list of formulas, returning a
+    list of terms (clausal form) *)
+  let discover ~steps decls =
+    let command = [ "eprover"; "--tstp-in"; "--tstp-out";
+                    "-S"; "--restrict-literal-comparisons";
+                    "-C"; string_of_int steps ]  in
+    let cmd = String.concat " " command in
+    (* build stdin *)
+    let buf = Buffer.create 128 in
+    Util.pp_seq ~sep:"\n" Ast_tptp.Untyped.pp buf decls;
+    let input = Buffer.contents buf in
+    Err.(
+      (* call E *)
+      Util.popen ~cmd ~input
+      >>= fun output ->
+      (* read its output *)
+      decls_of_string ~source:"E" output
+    )
+
+  let cnf decls =
+    let command = [ "eprover"; "--tstp-in"; "--tstp-out"; "--cnf" ] in
+    let cmd = String.concat " " command in
+    (* build stdin *)
+    let buf = Buffer.create 128 in
+    Util.pp_seq ~sep:"\n" Ast_tptp.Untyped.pp buf decls;
+    let input = Buffer.contents buf in
+    Err.(
+      (* call E *)
+      Util.popen ~cmd ~input
+      >>= fun output ->
+      (* read its output *)
+      decls_of_string ~source:"E" output
+    )
+end

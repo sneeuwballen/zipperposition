@@ -524,15 +524,19 @@ let slurp i_chan =
 
 (** Call given command with given output, and return its output as a string *)
 let popen ~cmd ~input =
-  let from, into = Unix.open_process cmd in
-  (* send input to the subprocess *)
-  output_string into input;
-  close_out into;
-  (* read ouput from the subprocess *)
-  let output = slurp from in
-  (* wait for subprocess to terminate *)
-  ignore (Unix.close_process (from, into));
-  output
+  try
+    let from, into = Unix.open_process cmd in
+    (* send input to the subprocess *)
+    output_string into input;
+    close_out into;
+    (* read ouput from the subprocess *)
+    let output = slurp from in
+    (* wait for subprocess to terminate *)
+    ignore (Unix.close_process (from, into));
+    Monad.Err.return output
+  with Unix.Unix_error (e, _, _) ->
+    let msg = Unix.error_message e in
+    Monad.Err.fail msg
 
 (** {2 Printing utils} *)
 
