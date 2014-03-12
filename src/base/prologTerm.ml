@@ -324,7 +324,7 @@ module TPTP = struct
     | Var s -> Buffer.add_string buf s
     | Int i -> Buffer.add_string buf (Z.to_string i)
     | Rat i -> Buffer.add_string buf (Q.to_string i)
-    | Const s -> Symbol.pp buf s
+    | Const s -> Symbol.TPTP.pp buf s
     | List l ->
         Buffer.add_char buf '[';
         Util.pp_list ~sep:"," pp buf l;
@@ -368,6 +368,8 @@ module TPTP = struct
   and pp_typed_var buf t = match t.term with
     | Column ({term=Var s}, {term=Const (Symbol.Conn Symbol.TType)})
     | Var s -> Buffer.add_string buf s
+    | Column ({term=Var s}, {term=Const sy}) when Symbol.eq sy Symbol.TPTP.i ->
+        Buffer.add_string buf s
     | Column ({term=Var s}, ty) ->
       Printf.bprintf buf "%s:%a" s pp ty
     | _ -> assert false
