@@ -609,6 +609,11 @@ module TPTP = struct
       (fun v f -> at exists (mk_lambda [v] f))
       vars f
 
+  let __mk_forall ~varty f =
+    at forall (__mk_lambda ~varty f)
+  let __mk_exists ~varty f =
+    at exists (__mk_lambda ~varty f)
+
   let mk_not t = at not_ t
   let mk_and a b = at_list and_ [a; b]
   let mk_or a b = at_list or_ [a; b]

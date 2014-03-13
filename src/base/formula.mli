@@ -182,11 +182,7 @@ module type S = sig
   val ac_normal_form : t -> t (** Normal form modulo AC of "or" and "and" *)
   val ac_eq : t -> t -> bool  (** Equal modulo AC? *)
 
-  (** {2 Conversions} TODO
-
-  val to_term : t -> HOTerm.t   (** Conversion to higher-order term *)
-  val of_term : HOTerm.t -> t
-  *)
+  (** {2 Conversions} *)
 
   val to_prolog : ?depth:int -> t -> PrologTerm.t
 
@@ -241,7 +237,14 @@ end
 
 module Make(MyT : TERM) : S with type term = MyT.t
 
-module FO : S with type term = FOTerm.t
+module FO : sig
+  include S with type term = FOTerm.t
+
+  (** {2 Conversion to higher-order term} *)
+
+  val to_hoterm : t -> HOTerm.t
+  val of_hoterm : HOTerm.t -> t option
+end
 
 (** Functor to translate terms *)
 module Map(From:S)(To:S) : sig

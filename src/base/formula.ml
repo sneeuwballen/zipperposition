@@ -178,11 +178,7 @@ module type S = sig
   val ac_normal_form : t -> t (** Normal form modulo AC of "or" and "and" *)
   val ac_eq : t -> t -> bool  (** Equal modulo AC? *)
 
-  (** {2 Conversions} TODO
-
-  val to_term : t -> HOTerm.t   (** Conversion to higher-order term *)
-  val of_term : HOTerm.t -> t
-  *)
+  (** {2 Conversions} *)
 
   val to_prolog : ?depth:int -> t -> PrologTerm.t
 
@@ -733,62 +729,8 @@ module Make(MyT : TERM) = struct
     let f2 = ac_normal_form f2 in
     eq f1 f2
 
-  (** {2 Conversion} FIXME
+  (** {2 Conversion} *)
 
-  let __cache_f2t = FCache.create 513
-
-  let to_term f =
-    let module T = HOTerm in
-    FCache.with_cache_rec __cache_f2t
-      (fun to_term f ->
-      match f.form with
-      | True -> T.true_term
-      | False -> T.false_term
-      | And l -> T.Base.and__list (List.map to_term l)
-      | Or l -> T.Base.or__list (List.map to_term l)
-      | Equiv (f1, f2) -> T.Base.equiv (to_term f1) (to_term f2)
-      | Imply (f1, f2) -> T.Base.imply (to_term f1) (to_term f2)
-      | Equal (t1, t2) -> T.Base.eq (T.curry t1) (T.curry t2)
-      | Not f' -> T.Base.not_ (to_term f')
-      | Forall (ty,f') -> T.__mk_forall ~varty:ty (to_term f')
-      | Exists (ty,f') -> T.__mk_exists ~varty:ty (to_term f')
-      | Atom p -> T.curry p)
-      f
-
-  let of_term t =
-    let module T = HOTerm in
-    let rec recurse t = match t.T.term with
-    | _ when t == T.true_term -> mk_true
-    | _ when t == T.false_term -> mk_false
-    | T.At ({T.term=T.Const s}, _, [{T.term=T.Lambda t'} as lam]) when S.eq s S.forall_symbol ->
-      let ty = T.lambda_var_ty lam in
-      __mk_forall ~ty (recurse t')
-    | T.At ({T.term=T.Const s}, _, [{T.term=T.Lambda t'} as lam]) when S.eq s S.exists_symbol ->
-      let ty = T.lambda_var_ty lam in
-      __mk_exists ~ty (recurse t')
-    | T.Lambda _ -> failwith "FOFormula.of_term: unexpected lambda term"
-    | T.Const s -> Base.atom (FOTerm.mk_const s)
-    | T.Var _ | T.BoundVar _ -> failwith "F.of_term: not first-order, var under formula"
-    | T.At ({T.term=T.Const s}, _, l) when S.eq s S.and_symbol ->
-        Base.and_ (List.map recurse l)
-    | T.At ({T.term=T.Const s}, _, l) when S.eq s S.or_symbol ->
-        Base.or_ (List.map recurse l)
-    | T.At ({T.term=T.Const s}, _, [a; b]) when S.eq s S.equiv_symbol ->
-      Base.equiv (recurse a) (recurse b)
-    | T.At ({T.term=T.Const s}, _, [a; b]) when S.eq s S.imply_symbol ->
-      Base.imply (recurse a) (recurse b)
-    | T.At ({T.term=T.Const s}, _, [a; b]) when S.eq s S.or_symbol ->
-      Base.and_ [recurse a; recurse b]
-    | T.At ({T.term=T.Const s}, _, [a; b]) when S.eq s S.and_symbol ->
-      Base.or_ [recurse a; recurse b]
-    | T.At ({T.term=T.Const s}, _, [a; b]) when S.eq s S.eq_symbol ->
-      Base.eq (T.uncurry a) (T.uncurry b)
-    | T.At ({T.term=T.Const s}, _, [t']) when S.eq s S.not_symbol ->
-      Base.not_ (recurse t')
-    | _ -> Base.atom (T.uncurry t)
-    in
-    recurse t
-  *)
 
   let to_prolog ?(depth=0) f =
     let module PT = PrologTerm in
@@ -941,7 +883,76 @@ module Make(MyT : TERM) = struct
   *)
 end
 
-module FO = Make(FOTerm)
+module FO = struct
+  include Make(FOTerm)
+
+  let rec to_hoterm f =
+    let module T = HOTerm in
+    match view f with
+    | True -> T.TPTP.true_
+    | False -> T.TPTP.false_
+    | And l -> T.TPTP.mk_and_list (List.map to_hoterm l)
+    | Or l -> T.TPTP.mk_or_list (List.map to_hoterm l)
+    | Equiv (f1, f2) -> T.TPTP.mk_equiv (to_hoterm f1) (to_hoterm f2)
+    | Imply (f1, f2) -> T.TPTP.mk_imply (to_hoterm f1) (to_hoterm f2)
+    | Xor (f1, f2) -> T.TPTP.mk_xor (to_hoterm f1) (to_hoterm f2)
+    | Eq (t1, t2) -> T.TPTP.mk_eq (T.curry t1) (T.curry t2)
+    | Neq (t1, t2) -> T.TPTP.mk_neq (T.curry t1) (T.curry t2)
+    | Not f' -> T.TPTP.mk_not (to_hoterm f')
+    | Forall (ty,f') -> T.TPTP.__mk_forall ~varty:ty (to_hoterm f')
+    | Exists (ty,f') -> T.TPTP.__mk_exists ~varty:ty (to_hoterm f')
+    | Atom p -> T.curry p
+
+  let of_hoterm t =
+    let module T = HOTerm in
+    let rec recurse t = match T.view t with
+      | _ when T.eq t T.TPTP.true_ -> Base.true_
+      | _ when T.eq t T.TPTP.false_ -> Base.false_
+      | T.At (hd, lam) when T.eq hd T.TPTP.forall ->
+          begin match T.view lam with
+          | T.Lambda (varty, t') ->
+              Base.__mk_forall ~varty (recurse t')
+          | _ -> raise Exit
+          end
+      | T.At (hd, lam) when T.eq hd T.TPTP.exists ->
+          begin match T.view lam with
+          | T.Lambda (varty, t') ->
+              Base.__mk_exists ~varty (recurse t')
+          | _ -> raise Exit
+          end
+      | T.Lambda _ -> raise Exit
+      | T.Const s -> Base.atom (FOTerm.const ~ty:(T.ty t) s)
+      | T.Var _ | T.BVar _ -> raise Exit
+      | _ ->
+          (* unroll applications *)
+          match T.open_at t with
+          | hd, _, l when T.eq hd T.TPTP.and_ -> Base.and_ (List.map recurse l)
+          | hd, _, l when T.eq hd T.TPTP.or_ -> Base.or_ (List.map recurse l)
+          | hd, _, [a;b] when T.eq hd T.TPTP.equiv ->
+              Base.equiv (recurse a) (recurse b)
+          | hd, _, [a;b] when T.eq hd T.TPTP.xor ->
+              Base.xor (recurse a) (recurse b)
+          | hd, _, [a;b] when T.eq hd T.TPTP.imply ->
+              Base.imply (recurse a) (recurse b)
+          | hd, _, [a;b] when T.eq hd T.TPTP.eq ->
+              begin match T.uncurry a, T.uncurry b with
+              | Some a, Some b -> Base.eq a b
+              | _ -> raise Exit
+              end
+          | hd, _, [a;b] when T.eq hd T.TPTP.neq ->
+              begin match T.uncurry a, T.uncurry b with
+              | Some a, Some b -> Base.neq a b
+              | _ -> raise Exit
+              end
+          | _ ->
+              begin match T.uncurry t with
+              | None -> raise Exit
+              | Some p -> Base.atom p
+              end
+    in
+    try Some (recurse t)
+    with Exit -> None
+end
 
 module Map(From : S)(To : S) = struct
   let map f form = match From.view form with

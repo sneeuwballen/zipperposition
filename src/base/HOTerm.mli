@@ -303,6 +303,8 @@ module TPTP : sig
   val imply : t
   val equiv : t
   val xor : t
+  val forall : t
+  val exists : t
 
   val eq : t
   val neq : t
@@ -329,6 +331,9 @@ module TPTP : sig
 
   val close_exists : t -> t
     (** Bind all free variables with 'exists' *)
+
+  val __mk_forall : varty:Type.t -> t -> t
+  val __mk_exists : varty:Type.t -> t -> t
 end
 
 val debug : Format.formatter -> t -> unit
