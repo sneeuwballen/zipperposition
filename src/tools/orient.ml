@@ -27,7 +27,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Tool to orient a serie of rewriting rules} *)
 
 open Logtk
-open Logtk_parsers
 open Logtk_solving
 
 module PT = PrologTerm
@@ -47,45 +46,7 @@ let options =
   ; "-num", Arg.Set_int num_solutions, "number of solutions to print"
   ] @ Options.global_opts
 
-let rule_arrow = Symbol.of_string "-->"
-
-type statement =
-  | Rule of PT.t * PT.t
-  | Type of string * PT.t
-
-(* parse file into rewrite rules *)
-let parse_file filename ic =
-  let lexbuf = Lexing.from_channel ic in
-  Loc.set_file lexbuf filename;
-  try
-    (* parse declarations *)
-    let terms = Parse_ho.parse_decls Lex_ho.token lexbuf in
-    (* keep the facts of the form  a --> b *)
-    let rules = Util.list_fmap
-      (function
-        | Ast_ho.Clause (t, []) ->
-            begin match PT.view t with
-            | PT.App ({PT.term=PT.Const s}, [_;l;r]) when Symbol.eq s rule_arrow ->
-                Util.debug 5 "parsed rule %a --> %a" PT.pp l PT.pp r;
-                Some (Rule (l, r))
-            | _ -> None
-            end
-        | Ast_ho.Type (s, ty) -> Some (Type (s,ty))
-        | _ -> None)
-      terms
-    in
-    E.return rules
-  with
-  | Parse_ho.Error ->
-    let msg = Util.sprintf "parse error at %a" Loc.pp (Loc.of_lexbuf lexbuf) in
-    E.fail msg
-
-let print_rule buf (l,r) =
-  Printf.bprintf buf "%a --> %a" FOT.pp l FOT.pp r
-
-let print_rules rules =
-  Util.printf "rules:\n  %a\n"
-    (Util.pp_list ~sep:"\n  " print_rule) rules
+type statement = RewriteRules.statement
 
 let print_solution solution =
   Util.printf "solution: %a\n" Lpo.Solution.pp solution
@@ -94,36 +55,6 @@ let print_signature signature =
   Util.printf "signature:\n  %a\n"
     (Util.pp_seq ~sep:"\n  " (Util.pp_pair ~sep:" : " Symbol.pp Type.pp))
     (Signature.Seq.to_seq signature)
-
-(* list of pairs of terms --> list of pairs of FOTerms *)
-let rules_of_pairs signature pairs =
-  try
-    let ctx = TypeInference.Ctx.create signature in
-    (* infer types *)
-    let pairs = Util.list_fmap
-      (function
-        | Rule (l,r) ->
-          let ty_l, l' = TypeInference.FO.infer ctx l in
-          let ty_r, r' = TypeInference.FO.infer ctx r in
-          TypeInference.Ctx.constrain_type_type ctx ty_l ty_r;
-          TypeInference.Ctx.exit_scope ctx;
-          Some (fun ctx -> l' ctx, r' ctx)
-        | Type (s, ty) ->
-          (* declare the type *)
-          begin match TypeInference.Ctx.ty_of_prolog ctx ty with
-          | None -> ()
-          | Some ty -> TypeInference.Ctx.declare ctx (Symbol.of_string s) ty
-          end; None
-      ) pairs
-    in
-    let pairs = TypeInference.Closure.seq pairs in
-    TypeInference.Ctx.generalize ctx;
-    let signature = TypeInference.Ctx.to_signature ctx in
-    (* extract typed rules and signature *)
-    let rules = pairs ctx in
-    E.return (signature,rules)
-  with Type.Error msg ->
-    E.fail msg
 
 (* given a list of files, parse them into pairs of terms, and
    make typed rules from those. returns the signature and
@@ -142,8 +73,8 @@ let parse_files_into_rules files =
                 Monad.Err.fail msg
               end
         end >>=
-        parse_file file >>=
-        rules_of_pairs signature >>= fun (signature,rules') ->
+        RewriteRules.parse_file file >>=
+        RewriteRules.rules_of_pairs signature >>= fun (signature,rules') ->
         E.return (signature, List.rev_append rules' rules)
       ))
 
@@ -160,7 +91,7 @@ let () =
     if !flag_print_signature
       then print_signature signature;
     if !flag_print_rules
-      then print_rules rules;
+      then RewriteRules.print_rules stdout rules;
     (* orient rules *)
     let constraints = Lpo.FO.orient_lpo_list rules in
     let solutions = Lpo.solve_multiple constraints in
