@@ -6,7 +6,7 @@ S src/parsers/
 S src/arbitrary/
 S src/meta
 S src/solving/
-S tools/
+S src/tools/
 S tests/
 B _build/src/
 B _build/src/base
@@ -16,7 +16,7 @@ B _build/src/parsers
 B _build/src/meta
 B _build/src/arbitrary
 B _build/src/solving/
-B _build/tools/
+B _build/src/tools/
 B _build/tests/
 PKG zarith
 PKG oUnit
