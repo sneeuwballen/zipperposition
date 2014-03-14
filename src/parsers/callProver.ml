@@ -237,10 +237,10 @@ module Eprover = struct
 
   (* explore the surrounding of this list of formulas, returning a
     list of terms (clausal form) *)
-  let discover ~steps decls =
+  let discover ?(opts=[]) ~steps decls =
     let command = [ "eprover"; "--tstp-in"; "--tstp-out";
                     "-S"; "--restrict-literal-comparisons";
-                    "-C"; string_of_int steps ]  in
+                    "-C"; string_of_int steps ] @ opts in
     let cmd = String.concat " " command in
     (* build stdin *)
     let buf = Buffer.create 128 in
@@ -254,8 +254,8 @@ module Eprover = struct
       decls_of_string ~source:"E" output
     )
 
-  let cnf decls =
-    let command = [ "eprover"; "--tstp-in"; "--tstp-out"; "--cnf" ] in
+  let cnf ?(opts=[]) decls =
+    let command = [ "eprover"; "--tstp-in"; "--tstp-out"; "--cnf" ] @ opts in
     let cmd = String.concat " " command in
     (* build stdin *)
     let buf = Buffer.create 128 in

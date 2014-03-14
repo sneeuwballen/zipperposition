@@ -65,6 +65,8 @@ A parser with a nice curried syntax. *)
 %token NOT
 
 %token <string> LOWER_WORD
+%token <string> DOLLAR_WORD
+%token <string> DOLLAR_DOLLAR_WORD
 %token <string> UPPER_WORD
 %token <string> INTERROGATION_WORD
 %token <string> OPERATOR
@@ -146,6 +148,8 @@ unary_type:
       Term.var ~loc w
     }
   | w=LOWER_WORD
+  | w=DOLLAR_WORD
+  | w=DOLLAR_DOLLAR_WORD
     {
       let loc = L.mk_pos $startpos $endpos in
       Term.const ~loc (Sym.of_string w)
@@ -241,6 +245,8 @@ unary_term:
       Term.const ~loc Sym.Base.wildcard
     }
   | w=LOWER_WORD
+  | w=DOLLAR_WORD
+  | w=DOLLAR_DOLLAR_WORD
     {
       let loc = L.mk_pos $startpos $endpos in
       Term.const ~loc (Sym.of_string w)

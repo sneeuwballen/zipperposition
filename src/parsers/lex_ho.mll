@@ -44,6 +44,8 @@ let alpha_numeric = lower_alpha | upper_alpha | numeric | '_'
 
 let upper_word = upper_alpha alpha_numeric*
 let lower_word = lower_alpha alpha_numeric*
+let dollar_word = '$' lower_alpha alpha_numeric*
+let dollar_dollar_word = '$' '$' lower_alpha alpha_numeric*
 let interrogation_word = '?' alpha_numeric*
 
 rule token = parse
@@ -75,6 +77,8 @@ rule token = parse
   | ":" { COLUMN }
   | "val" { VAL }
   | lower_word { LOWER_WORD(Lexing.lexeme lexbuf) }
+  | dollar_word { DOLLAR_WORD(Lexing.lexeme lexbuf) }
+  | dollar_dollar_word { DOLLAR_DOLLAR_WORD(Lexing.lexeme lexbuf) }
   | upper_word { UPPER_WORD(Lexing.lexeme lexbuf) }
   | interrogation_word { INTERROGATION_WORD(Lexing.lexeme lexbuf) }
   | operator { OPERATOR(Lexing.lexeme lexbuf) }

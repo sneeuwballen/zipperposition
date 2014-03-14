@@ -121,13 +121,14 @@ module Eprover : sig
         [opts] is an additional list of command line options that will be
         given to E. *)
 
-  val discover : steps:int ->
+  val discover : ?opts:string list -> steps:int ->
                  Ast_tptp.Untyped.t Sequence.t ->
                  Ast_tptp.Untyped.t Sequence.t Monad.Err.t
   (** explore the surrounding of this list of declarations, returning the
       TPTP output of E *)
 
-  val cnf : Ast_tptp.Untyped.t Sequence.t ->
+  val cnf : ?opts:string list ->
+            Ast_tptp.Untyped.t Sequence.t ->
             Ast_tptp.Untyped.t Sequence.t Monad.Err.t
   (** Use E to convert a set of statements into CNF *)
 end

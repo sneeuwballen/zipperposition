@@ -362,9 +362,14 @@ module TPTP = struct
         pp_surrounded buf t'
     | Record _ -> failwith "cannot print records in TPTP"
     | Column(x,y) ->
-        pp buf x;
-        Buffer.add_char buf ':';
-        pp buf y
+        begin match view y with
+        | Const s when Symbol.eq s Symbol.TPTP.i ->
+          pp buf x  (* do not print X:$i *)
+        | _ ->
+          pp buf x;
+          Buffer.add_char buf ':';
+          pp buf y
+        end
   and pp_typed_var buf t = match t.term with
     | Column ({term=Var s}, {term=Const (Symbol.Conn Symbol.TType)})
     | Var s -> Buffer.add_string buf s

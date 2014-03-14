@@ -108,6 +108,12 @@ module type S = sig
     method visit : 'a -> t -> 'a
   end
 
+  val map :
+    ?form:(form -> form) ->
+    ?hoterm:(hoterm -> hoterm) ->
+    t -> t
+  (** Map terms to other terms *)
+
   (** {2 IO} *)
 
   include Interfaces.PRINT with type t := t

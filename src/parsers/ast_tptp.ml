@@ -174,6 +174,12 @@ module type S = sig
     method visit : 'a -> t -> 'a
   end
 
+  val map :
+    ?form:(form -> form) ->
+    ?hoterm:(hoterm -> hoterm) ->
+    t -> t
+  (** Map terms to other terms *)
+
   (** {2 IO} *)
 
   include Interfaces.PRINT with type t := t
@@ -228,6 +234,15 @@ module Untyped = struct
       | Include f -> self#include_ acc f
       | IncludeOnly (f,names) -> self#include_only acc f names
   end
+
+  let __id f = f
+
+  let map ?(form=__id) ?(hoterm=__id) = function
+    | CNF (n,r,c,i) -> CNF(n,r, List.map form c, i)
+    | FOF (n,r,f,i) -> FOF(n,r, form f, i)
+    | TFF (n,r,f,i) -> TFF(n,r, form f, i)
+    | THF (n,r,f,i) -> THF(n,r, hoterm f, i)
+    | (TypeDecl _ | NewType _ | IncludeOnly _ | Include _) as d -> d
 
   (** {2 IO} *)
 
@@ -312,6 +327,15 @@ module Typed = struct
       | Include f -> self#include_ acc f
       | IncludeOnly (f,names) -> self#include_only acc f names
   end
+
+  let __id f = f
+
+  let map ?(form=__id) ?(hoterm=__id) = function
+    | CNF (n,r,c,i) -> CNF(n,r, List.map form c, i)
+    | FOF (n,r,f,i) -> FOF(n,r, form f, i)
+    | TFF (n,r,f,i) -> TFF(n,r, form f, i)
+    | THF (n,r,f,i) -> THF(n,r, hoterm f, i)
+    | (TypeDecl _ | NewType _ | IncludeOnly _ | Include _) as d -> d
 
   (** {2 IO} *)
 
