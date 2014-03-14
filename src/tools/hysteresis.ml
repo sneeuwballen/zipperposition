@@ -55,6 +55,7 @@ let flag_print_rules = ref false
 let flag_print_problem = ref false
 let flag_print_detected = ref false
 let flag_balanced_arith = ref false
+let flag_print_precedence = ref false
 
 let add_file f = files := f :: !files
 let add_theory f = theory_files := f :: !theory_files
@@ -70,6 +71,7 @@ let options =
   ; "-print-signature", Arg.Set flag_print_signature, "print the signature of the theory"
   ; "-print-rules", Arg.Set flag_print_rules, "print the rewrite rules"
   ; "-print-detected", Arg.Set flag_print_detected, "print the detected theories and others"
+  ; "-print-precedence", Arg.Set flag_print_precedence, "print precedence given to E"
   ] @ Options.global_opts
 
 (** MAIN OPERATIONS *)
@@ -115,23 +117,13 @@ type detection_result = {
   pre_rewrite : HORewriting.t Sequence.t;
 }
 
-(* detect theories in clauses *)
-let detect_theories prover clauses =
-  let facts = clauses
-    |> Sequence.map Plugin.holds#to_fact
-    |> Sequence.map Reasoner.Clause.fact
-  in
-  (* add clauses (ignore prover) *)
-  let prover', consequences = Prover.Seq.of_seq prover facts in
-  let consequence_terms = Sequence.map fst consequences in
-  (* filter theories, axioms, lemmas... *)
-  let theories = Sequence.fmap Plugin.theory#of_fact consequence_terms
-  and lemmas = Sequence.fmap Plugin.lemma#of_fact consequence_terms
-  and axioms = Sequence.fmap Plugin.axiom#of_fact consequence_terms
-  and rewrite = Sequence.fmap Plugin.rewrite#of_fact consequence_terms
-  and pre_rewrite = Sequence.fmap Plugin.pre_rewrite#of_fact consequence_terms
-  in
-  prover', { theories; lemmas; axioms; rewrite; pre_rewrite; }
+let merge_detection_result a b =
+  { lemmas = Sequence.append a.lemmas b.lemmas
+  ; theories = Sequence.append a.theories b.theories
+  ; axioms = Sequence.append a.axioms b.axioms
+  ; rewrite = Sequence.append a.rewrite b.rewrite
+  ; pre_rewrite = Sequence.append a.pre_rewrite b.pre_rewrite
+  }
 
 (* convert a sequence of clauses to a sequence of untyped declarations *)
 let erase_types decls =
@@ -146,13 +138,59 @@ let erase_types decls =
 
 module State = struct
   type t = {
+    prover : Prover.t;
     detected : detection_result;
     rewrite : (FOTerm.t * FOTerm.t) list;  (* all rewrite rules *)
     pre_rewrite : HORewriting.t;   (* FIXME: rewrite on formulas/clauses, not HOTerm *)
     axioms : Formula.FO.t list;  (* other axioms *)
     signature : Signature.t;
   }
+
+  let empty = {
+    prover = Prover.empty;
+    detected = {
+      lemmas = Sequence.empty;
+      theories = Sequence.empty;
+      axioms = Sequence.empty;
+      rewrite = Sequence.empty;
+      pre_rewrite = Sequence.empty;
+    };
+    rewrite=[];
+    pre_rewrite=HORewriting.empty;
+    axioms=[];
+    signature=Signature.TPTP.base;
+  }
+
+  let of_prover prover = { empty with prover; }
 end
+
+(* detect theories in clauses, update state *)
+let detect_theories ~st clauses =
+  let facts = clauses
+    |> Sequence.map Plugin.holds#to_fact
+    |> Sequence.map Reasoner.Clause.fact
+  in
+  (* add clauses (ignore prover) *)
+  let prover', consequences = Prover.Seq.of_seq st.State.prover facts in
+  let consequence_terms = Sequence.map fst consequences in
+  (* filter theories, axioms, lemmas... *)
+  let theories = Sequence.fmap Plugin.theory#of_fact consequence_terms
+  and lemmas = Sequence.fmap Plugin.lemma#of_fact consequence_terms
+  and axioms = Sequence.fmap Plugin.axiom#of_fact consequence_terms
+  and rewrite = Sequence.fmap Plugin.rewrite#of_fact consequence_terms
+  and pre_rewrite = Sequence.fmap Plugin.pre_rewrite#of_fact consequence_terms
+  in
+  {st with
+    State.prover=prover';
+    State.detected =
+      merge_detection_result st.State.detected
+      { theories; lemmas; axioms; rewrite; pre_rewrite; };
+    State.rewrite = List.rev_append
+      (Sequence.to_rev_list rewrite |> List.concat |> List.rev)
+      st.State.rewrite;
+    State.pre_rewrite = Sequence.fold HORewriting.merge
+      st.State.pre_rewrite pre_rewrite;
+  }
 
 (** ENCODING ARITH *)
 
@@ -245,12 +283,17 @@ module BalancedInt = struct
         E.return (signature, rules')
     )
 
+  let axioms =
+    []
+    (* TODO: axioms for booleans, for comparisons
+    [ T.app (T.const (Symbol.of_string 
+    *)
+
   (* parse axioms from fil, update state. *)
   let axioms_and_rules ~filename st =
     E.(
       rules ~signature:st.State.signature ~filename
       >>= fun (signature,rules) ->
-      let axioms = [] in (* TODO *)
       let st = {st with
       State.signature = signature;
         State.axioms = List.rev_append axioms st.State.axioms;
@@ -265,6 +308,31 @@ let convert_balanced_arith decls =
   (* convert declarations (encode ints, etc.) *)
   let decls = Sequence.map BalancedInt.convert_decl decls in
   decls
+
+(* given a partial ordering from LPO, build arguments for E *)
+let precedence_to_E_arg prec =
+  match prec with
+  | [] -> []
+  | _ ->
+      let prec_str = String.concat ","
+        (List.map
+          (fun (l,r) -> Util.sprintf "%a>%a" Symbol.pp l Symbol.pp r)
+          prec)
+      in
+      ["--term-ordering=LPO4"; "--precedence='" ^ prec_str ^ "'"]
+
+(* list of rules -> list of formulas *)
+let axioms_of_rules rules =
+  List.map (fun (l,r) -> Formula.FO.Base.eq l r) rules
+
+(* list of axioms -> sequence of TPTP declarations *)
+let axioms_to_decls axioms =
+  axioms
+    |> Sequence.of_list
+    |> Sequence.mapi
+      (fun i f ->
+        let name = Ast_tptp.NameString (Util.sprintf "hyst_axiom_%d" i) in
+        Ast_tptp.Typed.TFF(name, Ast_tptp.R_axiom, f, []))
 
 (** PRINTERS *)
 
@@ -306,6 +374,9 @@ let print_problem decls =
   Util.printf "problem:\n  %a\n"
     (Util.pp_seq ~sep:"\n  " Ast_tptp.Untyped.pp) decls
 
+let print_precedence prec =
+  Util.printf "precedence: %a\n" Lpo.Solution.pp prec
+
 (** MAIN *)
 
 let parse_args () =
@@ -333,32 +404,65 @@ let main () =
     (* extract into typed clauses *)
     Util_tptp.infer_types (`sign Signature.TPTP.base) decls
     >>= fun (_sign, decls) ->
+    (* global state *)
+    let state = State.of_prover prover in
     (* detect theories (selecting only clauses) *)
-    let _prover, detection_result =
-      decls
-        |> Sequence.fmap
-          (function
-            | Ast_tptp.Typed.CNF(_,_,c,_) -> Some c
-            | _ -> None)
-        |> Sequence.map Encoding.foclause_of_clause
-        |> detect_theories prover
+    let state = decls
+      |> Sequence.fmap
+        (function
+          | Ast_tptp.Typed.CNF(_,_,c,_) -> Some c
+          | _ -> None)
+      |> Sequence.map Encoding.foclause_of_clause
+      |> detect_theories ~st:state
     in
     if !flag_print_detected
-      then print_result detection_result;
-    (* enable arith, if required *)
-    let decls = if !flag_balanced_arith
-      then convert_balanced_arith decls
-      else decls
-    in
+      then print_result state.State.detected;
+    (* enable arith, if required. This might modify state by adding
+       rewrite rules and axioms, and also encode declarations *)
+    begin if !flag_balanced_arith
+      then
+        BalancedInt.axioms_and_rules ~filename:!balanced_int_file state
+        >>= fun state ->
+        let decls = convert_balanced_arith decls in
+        E.return (state,decls)
+      else E.return (state,decls)
+    end
+    >>= fun (state,decls) ->
     (* TODO: preprocess *)
-    (* TODO: orient rewrite system *)
-    (* yield to E *)
+
+    (* orient rewrite system to get a precedence *)
+    let orders =
+      state.State.rewrite
+        |> Lpo.FO.orient_lpo_list
+        |> Lpo.solve_multiple
+    in
+    let precedence = match orders with
+      | lazy (LazyList.Cons (prec, _)) ->
+          if !flag_print_precedence
+            then print_precedence prec;
+          prec
+      | lazy LazyList.Nil -> []
+    in
+    let args = precedence_to_E_arg precedence in
+    (* build final sequence of declarations *)
+    let prelude_decls =
+      axioms_of_rules state.State.rewrite
+      |> List.rev_append state.State.axioms
+      |> axioms_to_decls
+    in
+    let decls = Sequence.append prelude_decls decls in
     let final_decls = erase_types decls in
+    (* yield to E *)
     if !flag_print_problem
       then print_problem final_decls;
     let final_decls = List.rev (Sequence.to_rev_list final_decls) in
-    CallProver.call ?timeout:!timeout ~prover:CallProver.Prover.p_E final_decls
+    flush stdout;
+    CallProver.call ~args ?timeout:!timeout ~prover:CallProver.Prover.p_E final_decls
   )
+
+(* FIXME: when calling E, use FOF/CNF when possible, but TFF when
+   necessary (e.g. for arith) ---> check whether there are other types,
+   and declare them if needed. *)
 
 let () =
   parse_args ();

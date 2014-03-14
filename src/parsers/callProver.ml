@@ -116,7 +116,8 @@ let call_with_out ?(timeout=30) ?(args=[]) ~prover decls =
       | "timeout" -> string_of_int timeout
       | s -> s)
     prover.Prover.command;
-  let cmd = Buffer.contents buf ^ String.concat " " args in
+  List.iter (fun arg -> Buffer.add_char buf ' '; Buffer.add_string buf arg) args;
+  let cmd = Buffer.contents buf in
   Util.debug 2 "run prover %s" prover.Prover.name;
   Util.debug 4 "command is: \"%s\"" cmd;
   Util.debug 4 "obligation is: \"%s\"" input;
