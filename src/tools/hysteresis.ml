@@ -1,0 +1,378 @@
+
+(*
+Copyright (c) 2013, Simon Cruanes
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.  Redistributions in binary
+form must reproduce the above copyright notice, this list of conditions and the
+following disclaimer in the documentation and/or other materials provided with
+the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*)
+
+(** {1 Preprocessing for E}
+
+We preprocess the work for E in two ways:
+- removing arithmetic-specific things to replace them
+   with rewrite rules and a symbol encoding of numbers
+- detecting algebraic theories and providing E with rewrite systems
+   LPO-oriented on the fly
+*)
+
+open Logtk
+open Logtk_parsers
+open Logtk_meta
+open Logtk_solving
+
+module PT = PrologTerm
+module HOT = HOTerm
+module E = Monad.Err
+module Loc = ParseLocation
+
+(** OPTIONS *)
+
+let theory_files = ref []
+let files = ref []
+let balanced_int_file = ref "data/rewriting/balanced_int.p"
+let timeout = ref None
+let flag_print_theory = ref false
+let flag_print_signature = ref false
+let flag_print_rules = ref false
+let flag_print_problem = ref false
+let flag_print_detected = ref false
+let flag_balanced_arith = ref false
+
+let add_file f = files := f :: !files
+let add_theory f = theory_files := f :: !theory_files
+
+let options =
+  [ "-theory", Arg.String add_theory, "use given theory file"
+  ; "-balanced-arith", Arg.Set flag_balanced_arith, "enable balanced-int arith"
+  ; "-balanced-rules-file", Arg.Set_string balanced_int_file,
+      "file storing the rewrite rule for balanced-int encoding"
+  ; "-timeout", Arg.Int (fun n -> timeout := Some n), "timeout (in seconds)"
+  ; "-print-problem", Arg.Set flag_print_problem, "print the final problem sent to E"
+  ; "-print-theory", Arg.Set flag_print_theory, "print the whole theory"
+  ; "-print-signature", Arg.Set flag_print_signature, "print the signature of the theory"
+  ; "-print-rules", Arg.Set flag_print_rules, "print the rewrite rules"
+  ; "-print-detected", Arg.Set flag_print_detected, "print the detected theories and others"
+  ] @ Options.global_opts
+
+(** MAIN OPERATIONS *)
+
+(* parse the given theory files into the prover *)
+let parse_theory_files prover files =
+  E.fold_l files (E.return prover)
+    (fun p file ->
+      E.map (Prover.parse_file p file) fst)
+
+(* parse several TPTP files into declarations *)
+let parse_tptp_files files =
+  let q = Queue.create () in
+  let res = E.(
+    fold_l files (E.return ())
+      (fun () file ->
+        Util_tptp.parse_file ~recursive:true file
+        >>= fun decls ->
+        Queue.push decls q;
+        E.return ()
+      )
+    )
+  in match res with
+  | E.Error msg -> E.fail msg
+  | E.Ok () ->
+      E.return (Sequence.of_queue q |> Sequence.flatten)
+
+(* extract clauses from decls *)
+let clauses_of_decls decls =
+  fun k ->
+    let a = object
+      inherit [unit] Ast_tptp.Typed.visitor
+      method clause () role c = k (role, c)
+    end in
+    decls (a#visit ())
+
+(* result of detecting theories *)
+type detection_result = {
+  lemmas : Plugin.foclause Sequence.t;
+  theories : (string * Type.t list * HOT.t) Sequence.t;
+  axioms : (string * Type.t list * HOT.t) Sequence.t;
+  rewrite : (FOTerm.t * FOTerm.t) list Sequence.t;
+  pre_rewrite : HORewriting.t Sequence.t;
+}
+
+(* detect theories in clauses *)
+let detect_theories prover clauses =
+  let facts = clauses
+    |> Sequence.map Plugin.holds#to_fact
+    |> Sequence.map Reasoner.Clause.fact
+  in
+  (* add clauses (ignore prover) *)
+  let prover', consequences = Prover.Seq.of_seq prover facts in
+  let consequence_terms = Sequence.map fst consequences in
+  (* filter theories, axioms, lemmas... *)
+  let theories = Sequence.fmap Plugin.theory#of_fact consequence_terms
+  and lemmas = Sequence.fmap Plugin.lemma#of_fact consequence_terms
+  and axioms = Sequence.fmap Plugin.axiom#of_fact consequence_terms
+  and rewrite = Sequence.fmap Plugin.rewrite#of_fact consequence_terms
+  and pre_rewrite = Sequence.fmap Plugin.pre_rewrite#of_fact consequence_terms
+  in
+  prover', { theories; lemmas; axioms; rewrite; pre_rewrite; }
+
+(* convert a sequence of clauses to a sequence of untyped declarations *)
+let erase_types decls =
+  let module M = Ast_tptp.Map(Ast_tptp.Typed)(Ast_tptp.Untyped) in
+  Sequence.map
+    (M.map ~form:(Formula.FO.to_prolog ~depth:0)
+      ~ho:(fun _ -> failwith "HOT.to_prolog missing")
+      ~ty:(Type.Conv.to_prolog ~depth:0))
+    decls
+
+(** STATE: STORE RULES, AXIOMS, PRE-REWRITE RULES *)
+
+module State = struct
+  type t = {
+    detected : detection_result;
+    rewrite : (FOTerm.t * FOTerm.t) list;  (* all rewrite rules *)
+    pre_rewrite : HORewriting.t;   (* FIXME: rewrite on formulas/clauses, not HOTerm *)
+    axioms : Formula.FO.t list;  (* other axioms *)
+    signature : Signature.t;
+  }
+end
+
+(** ENCODING ARITH *)
+
+module BalancedInt = struct
+  module T = FOTerm
+  module A = T.TPTP.Arith
+
+  (* intermediate representation *)
+  type b_int = Zero | Z1 of b_int | Z0 of b_int | Zj of b_int
+
+  let __3 = Z.of_int 3
+
+  (* convert Z.t into b_int *)
+  let rec bint_of_int n = match Z.sign n with
+    | 0 -> Zero
+    | s when s < 0 -> z_opp (bint_of_int (Z.neg n))
+    | _ ->
+        let q3, rem3 = Z.div_rem n __3 in
+        match Z.to_int rem3 with
+        | 0 -> Z0 (bint_of_int q3)
+        | 1 -> Z1 (bint_of_int q3)
+        | 2 -> Zj (bint_of_int (Z.add Z.one q3))
+        | _ -> assert false
+  and z_opp = function
+  | Zero -> Zero
+  | Zj x -> Z1 (z_opp x)
+  | Z0 x -> Z0 (z_opp x)
+  | Z1 x -> Zj (z_opp x)
+  and int_of_bint = function
+  | Zero -> Z.zero
+  | Z0 x -> Z.mul __3 (int_of_bint x)
+  | Z1 x -> Z.add (Z.mul __3 (int_of_bint x)) Z.one
+  | Zj x -> Z.sub (Z.mul __3 (int_of_bint x)) Z.minus_one
+
+  (* convert b_int into term *)
+  let __ty1 = Type.(TPTP.int <=. TPTP.int)
+  let __z_0 = T.const ~ty:Type.TPTP.int (Symbol.of_string "z_0")
+  let __z_3 = T.const ~ty:__ty1 (Symbol.of_string "z_3")
+  let __z_3p1 = T.const ~ty:__ty1 (Symbol.of_string "z_3p1")
+  let __z_3m1 = T.const ~ty:__ty1 (Symbol.of_string "z_3m1")
+
+  let __mk_z3 x = T.app __z_3 [x]
+  let __mk_z3p1 x = T.app __z_3p1 [x]
+  let __mk_z3m1 x = T.app __z_3m1 [x]
+
+  let rec term_of_b_int = function
+    | Zero -> __z_0
+    | Z0 x -> __mk_z3 (term_of_b_int x)
+    | Z1 x -> __mk_z3p1 (term_of_b_int x)
+    | Zj x -> __mk_z3m1 (term_of_b_int x)
+
+  (* conversion of terms *)
+
+  let __ty2 = Type.(TPTP.int <== [TPTP.int; TPTP.int])
+
+  let __z_opp = T.const ~ty:__ty1 (Symbol.of_string "z_opp")
+  let __z_plus = T.const ~ty:__ty2 (Symbol.of_string "z_plus")
+  let __z_minus = T.const ~ty:__ty2 (Symbol.of_string "z_plus")
+  let __z_mult = T.const ~ty:__ty2 (Symbol.of_string "z_plus")
+
+  let rec convert_term t =
+    let hd, tyargs, args = T.open_app t in
+    match T.view hd, args with
+    | _, [a;b] when T.eq hd A.sum ->
+        T.app __z_plus [convert_term a; convert_term b]
+    | _, [a;b] when T.eq hd A.difference ->
+        T.app __z_minus [convert_term a; convert_term b]
+    | _, [a;b] when T.eq hd A.product ->
+        T.app __z_mult [convert_term a; convert_term b]
+    | T.Const (Symbol.Int n), [] ->
+        (* convert integer literal *)
+        term_of_b_int (bint_of_int n)
+    | (T.Var _ | T.BVar _), [] -> t
+    | _ -> T.app_full hd tyargs (List.map convert_term args)
+
+  let convert_form = Formula.FO.map convert_term
+
+  let convert_decl d = Ast_tptp.Typed.map ~form:convert_form d
+
+  (* signature+list of rules from file. *)
+  let rules ~signature ~filename =
+    E.(
+        begin try E.return (open_in filename)
+        with Sys_error msg ->
+          let msg = Printf.sprintf "could not open file %s: %s" filename msg in
+          Monad.Err.fail msg
+        end >>= fun ic ->
+        RewriteRules.parse_file filename ic >>=
+        RewriteRules.rules_of_pairs signature >>= fun (signature,rules') ->
+        E.return (signature, rules')
+    )
+
+  (* parse axioms from fil, update state. *)
+  let axioms_and_rules ~filename st =
+    E.(
+      rules ~signature:st.State.signature ~filename
+      >>= fun (signature,rules) ->
+      let axioms = [] in (* TODO *)
+      let st = {st with
+      State.signature = signature;
+        State.axioms = List.rev_append axioms st.State.axioms;
+        State.rewrite = List.rev_append rules st.State.rewrite;
+      } in
+      E.return st
+    )
+end
+
+(* encoding of Int arithmetic into TFF0 *)
+let convert_balanced_arith decls =
+  (* convert declarations (encode ints, etc.) *)
+  let decls = Sequence.map BalancedInt.convert_decl decls in
+  decls
+
+(** PRINTERS *)
+
+(* print content of the reasoner *)
+let print_theory r =
+  Reasoner.Seq.to_seq r
+    |> Util.printf "theory:\n  %a\n" (Util.pp_seq ~sep:"\n  " Reasoner.Clause.pp);
+  ()
+
+let pp_theory_axiom buf (name, _, t) =
+  Printf.bprintf buf "%s %a" name HOT.pp t
+
+let pp_rewrite_system buf l =
+  Printf.bprintf buf "rewrite system\n    ";
+  Util.pp_list ~sep:"\n    " (Util.pp_pair ~sep:" --> " FOTerm.pp FOTerm.pp) buf l
+
+let pp_pre_rewrite_system buf l =
+  HORewriting.pp buf l
+
+let print_result {theories; lemmas; axioms; rewrite; pre_rewrite; } =
+  Util.printf "axioms:\n  %a\n"
+    (Util.pp_seq ~sep:"\n  " pp_theory_axiom) axioms;
+  Util.printf "theories:\n  %a\n"
+    (Util.pp_seq ~sep:"\n  " pp_theory_axiom) theories;
+  Util.printf "lemmas:\n  %a\n"
+    (Util.pp_seq ~sep:"\n  " (Encoding.pp_clause FOTerm.pp)) lemmas;
+  Util.printf "rewrite systems:\n  %a\n"
+    (Util.pp_seq ~sep:"\n  " pp_rewrite_system) rewrite;
+  Util.printf "pre-rewrite systems:\n  %a\n"
+    (Util.pp_seq ~sep:"\n  " pp_pre_rewrite_system) pre_rewrite;
+  ()
+
+let print_signature signature =
+  Util.printf "signature:\n  %a\n"
+    (Util.pp_seq ~sep:"\n  " (Util.pp_pair ~sep:" : " Symbol.pp Type.pp))
+    (Signature.Seq.to_seq signature)
+
+let print_problem decls =
+  Util.printf "problem:\n  %a\n"
+    (Util.pp_seq ~sep:"\n  " Ast_tptp.Untyped.pp) decls
+
+(** MAIN *)
+
+let parse_args () =
+  let help_msg = "hysteresis: preprocessor for E" in
+  Arg.parse options add_file help_msg;
+  if !theory_files = []
+    then theory_files := ["data/builtin.theory"];
+  ()
+
+let main () =
+  E.(
+    (* parse theory, obtain a loaded meta-prover *)
+    parse_theory_files Prover.empty !theory_files
+    >>= fun prover ->
+    if !flag_print_theory
+      then print_theory (Prover.reasoner prover);
+    if !flag_print_signature
+      then print_signature (Prover.signature prover);
+    (* parse problem *)
+    parse_tptp_files !files
+    >>= fun decls ->
+    (* use E to reduce to CNF *)
+    CallProver.Eprover.cnf ~opts:["--free-numbers"] decls
+    >>= fun decls ->
+    (* extract into typed clauses *)
+    Util_tptp.infer_types (`sign Signature.TPTP.base) decls
+    >>= fun (_sign, decls) ->
+    (* detect theories (selecting only clauses) *)
+    let _prover, detection_result =
+      decls
+        |> Sequence.fmap
+          (function
+            | Ast_tptp.Typed.CNF(_,_,c,_) -> Some c
+            | _ -> None)
+        |> Sequence.map Encoding.foclause_of_clause
+        |> detect_theories prover
+    in
+    if !flag_print_detected
+      then print_result detection_result;
+    (* enable arith, if required *)
+    let decls = if !flag_balanced_arith
+      then convert_balanced_arith decls
+      else decls
+    in
+    (* TODO: preprocess *)
+    (* TODO: orient rewrite system *)
+    (* yield to E *)
+    let final_decls = erase_types decls in
+    if !flag_print_problem
+      then print_problem final_decls;
+    let final_decls = List.rev (Sequence.to_rev_list final_decls) in
+    CallProver.call ?timeout:!timeout ~prover:CallProver.Prover.p_E final_decls
+  )
+
+let () =
+  parse_args ();
+  let res = main () in
+  match res with
+  | E.Error msg ->
+      print_endline msg;
+      exit 1
+  | E.Ok CallProver.Sat ->
+      print_endline "result: sat."
+  | E.Ok CallProver.Unsat ->
+      print_endline "result: unsat."
+  | E.Ok CallProver.Unknown ->
+      print_endline "result: unknown."
+  | E.Ok (CallProver.Error s) ->
+      print_endline ("E failed with error: " ^ s);
+      exit 1

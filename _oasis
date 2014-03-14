@@ -195,6 +195,15 @@ Executable detect_theories
   MainIs:           detect_theories.ml
   BuildDepends:     logtk,logtk.parsers,logtk.meta
 
+# Preprocessor to E
+Executable hysteresis
+  Path:             src/tools/
+  Build$:           flag(meta) & flag(tools) & flag(parsers) & flag(solving)
+  Install$:         flag(meta) & flag(tools) & flag(parsers) & flag(solving)
+  CompiledObject:   native
+  MainIs:           hysteresis.ml
+  BuildDepends:     logtk,logtk.parsers,logtk.meta,aez
+
 SourceRepository head
   Type: git
   Location: https://github.com/c-cube/logtk
