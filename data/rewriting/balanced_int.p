@@ -1,43 +1,45 @@
 % symmetric presentation of relative integers (see paper)
 
-% constructors are o (zero), z0(N) = 3*N, z1(N) = 3*N+1, zj(N) = 3*N-1
+% constructors are z_0 (zero), z_3(N) = 3*N, z_3p1(N) = 3*N+1, z_3m1(N) = 3*N-1
 
-val z0 : nat -> nat.
+val z_3 : $int -> $int.
 
-z0 o --> o.
+z_3 z_0 --> z_0.
 
-plus o X --> X.
-plus X o --> X.
-plus (z0 X) (z0 Y) --> z0 (plus X Y).
-plus (z0 X) (z1 Y) --> z1 (plus X Y).
-plus (z0 X) (zj Y) --> zj (plus X Y).
-plus (z1 X) (zj Y) --> z0 (plus X Y).
-plus (z1 X) (z1 Y) --> zj (plus X (plus Y (z1 o))).
-plus (zj X) (zj Y) --> z1 (plus X (plus Y (zj o))).
+z_plus z_0 X --> X.
+z_plus X z_0 --> X.
+z_plus (z_3 X) (z_3 Y) --> z_3 (z_plus X Y).
+z_plus (z_3 X) (z_3p1 Y) --> z_3p1 (z_plus X Y).
+z_plus (z_3 X) (z_3m1 Y) --> z_3m1 (z_plus X Y).
+z_plus (z_3p1 X) (z_3m1 Y) --> z_3 (z_plus X Y).
+z_plus (z_3p1 X) (z_3p1 Y) --> z_3m1 (z_plus X (z_plus Y (z_3p1 z_0))).
+z_plus (z_3m1 X) (z_3m1 Y) --> z_3p1 (z_plus X (z_plus Y (z_3m1 z_0))).
 
-opp o --> o.
-opp (z0 X) --> z0 (opp X).
-opp (z1 X) --> zj (opp X).
-opp (zj X) --> z1 (opp X).
+z_opp z_0 --> z_0.
+z_opp (z_3 X) --> z_3 (z_opp X).
+z_opp (z_3p1 X) --> z_3m1 (z_opp X).
+z_opp (z_3m1 X) --> z_3p1 (z_opp X).
 
-minus X Y --> plus X (opp Y).
+z_minus X Y --> z_plus X (z_opp Y).
 
-mult X o --> o.
-mult X (z0 Y) --> z0 (mult X Y).
-mult X (z1 Y) --> plus X (z0 (mult X Y)).
-mult X (zj Y) --> plus (z0 (mult X Y)) (opp X).
+z_muz_lt X z_0 --> z_0.
+z_muz_lt X (z_3 Y) --> z_3 (z_muz_lt X Y).
+z_muz_lt X (z_3p1 Y) --> z_plus X (z_3 (z_muz_lt X Y)).
+z_muz_lt X (z_3m1 Y) --> z_plus (z_3 (z_muz_lt X Y)) (z_opp X).
 
-% positive or null
-pos X --> posAux X true.
-posAux o Y --> Y.
-posAux (z0 X) Y --> posAux X Y.
-posAux (z1 X) Y --> posAux X true.
-posAux (zj X) Y --> posAux X false.
+% z_positiveitive or null
+val z_positive : $int -> z_bool.
 
-geq X Y --> pos (minus X Y).
-gt X Y --> pos (plus (minus X Y) (zj o)).
-leq X Y --> geq Y X.
-lt X Y --> gt Y X.
+z_positive X --> z_positiveAux X b_true.
+z_positiveAux z_0 Y --> Y.
+z_positiveAux (z_3 X) Y --> z_positiveAux X Y.
+z_positiveAux (z_3p1 X) Y --> z_positiveAux X b_true.
+z_positiveAux (z_3m1 X) Y --> z_positiveAux X b_false.
+
+z_geq X Y --> z_positive (z_minus X Y).
+z_gt X Y --> z_positive (z_plus (z_minus X Y) (z_3m1 z_0)).
+z_leq X Y --> z_geq Y X.
+z_lt X Y --> z_gt Y X.
 
 % TODO re-use balanced_rat_partial to implement quotient
 
@@ -46,15 +48,15 @@ lt X Y --> gt Y X.
 % type b_int = Zero | Z1 of b_int | Z0 of b_int | Zj of b_int ;;
 % let rec bint_of_int = function
 % | 0 -> Zero
-% | n when n < 0 -> opp (bint_of_int (-n))
+% | n when n < 0 -> z_opp (bint_of_int (-n))
 % | n when n mod 3 == 0 -> Z0 (bint_of_int (n/3))
 % | n when n mod 3 == 1 -> Z1 (bint_of_int (n/3))
 % | n -> Zj (bint_of_int ((n+3)/3))
-% and opp = function
+% and z_opp = function
 % | Zero -> Zero
-% | Zj x -> Z1 (opp x)
-% | Z0 x -> Z0 (opp x)
-% | Z1 x -> Zj (opp x)
+% | Zj x -> Z1 (z_opp x)
+% | Z0 x -> Z0 (z_opp x)
+% | Z1 x -> Zj (z_opp x)
 % and int_of_bint = function
 % | Zero -> 0
 % | Z0 x -> 3 * (int_of_bint x)
