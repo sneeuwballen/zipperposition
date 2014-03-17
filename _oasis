@@ -86,7 +86,7 @@ Library "logtk_parsers"
   FindlibName:      parsers
   FindlibParent:    logtk
   BuildDepends:     logtk
-  XMETARequires:    logtk,menhir
+  XMETARequires:    logtk
 
 Library "logtk_meta"
   Path:             src/meta/
@@ -204,7 +204,7 @@ Executable hysteresis
   Install$:         flag(meta) & flag(tools) & flag(parsers) & flag(solving)
   CompiledObject:   native
   MainIs:           hysteresis.ml
-  BuildDepends:     logtk,logtk.parsers,logtk.meta,aez
+  BuildDepends:     logtk,logtk.parsers,logtk.meta,logtk.solving,aez
 
 SourceRepository head
   Type: git

@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 9cba9184cb6dfc05f523984df6a708b3)
+# DO NOT EDIT (digest: 7055f8639cffc63dd611e41b54a40abe)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -156,7 +156,6 @@
 "src/tools/orient.native": use_logtk
 "src/tools/orient.native": use_logtk_parsers
 "src/tools/orient.native": use_logtk_solving
-<src/tools/*.ml{,i}>: use_logtk_solving
 # Executable proof_check_tstp
 "src/tools/proof_check_tstp.native": package(unix)
 "src/tools/proof_check_tstp.native": package(zarith)
@@ -175,12 +174,14 @@
 "src/tools/hysteresis.native": use_logtk
 "src/tools/hysteresis.native": use_logtk_meta
 "src/tools/hysteresis.native": use_logtk_parsers
+"src/tools/hysteresis.native": use_logtk_solving
 <src/tools/*.ml{,i}>: package(aez)
 <src/tools/*.ml{,i}>: package(unix)
 <src/tools/*.ml{,i}>: package(zarith)
 <src/tools/*.ml{,i}>: use_logtk
 <src/tools/*.ml{,i}>: use_logtk_meta
 <src/tools/*.ml{,i}>: use_logtk_parsers
+<src/tools/*.ml{,i}>: use_logtk_solving
 # OASIS_STOP
 true: use_menhir
 "tests/quick/": -traverse
