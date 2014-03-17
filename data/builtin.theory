@@ -145,6 +145,7 @@ axiom (left_distributive {sum=Sum, prod=Prod}) <-
 axiom (right_distributive {sum=Sum, prod=Prod}) <-
   holds [ Prod (Sum ?y ?z) ?x = Sum (Prod ?y ?x) (Prod ?z ?x) ].
 
+
 theory (ring {sum=Sum, prod=Prod, zero=Zero, one=One, minus=Minus}) <-
   theory (abelian_group {op=Sum, neutral=Zero, inverse=Minus}),
   theory (monoid {op=Prod, neutral=One}),
@@ -154,6 +155,20 @@ theory (ring {sum=Sum, prod=Prod, zero=Zero, one=One, minus=Minus}) <-
 theory (commutative_ring {sum=Sum, prod=Prod, zero=Zero, one=One, minus=Minus}) <-
   theory (ring {sum=Sum, prod=Prod, zero=Zero, one=One, minus=Minus}),
   axiom (commutative Prod).
+
+rewrite
+  [ Sum ?x Zero --> ?x
+  , Sum ?x (Minus ?x) --> Zero
+  , Minus Zero --> Zero
+  , Minus (Minus ?x) --> ?x
+  , Minus (Sum ?x ?y) --> Sum (Minus ?x) (Minus ?y) % abelian group
+  , Prod ?x (Sum ?y ?z) --> Sum (Prod ?x ?y) (Prod ?x ?z)
+  , Prod (Sum ?x ?y) ?z --> Sum (Prod ?x ?z) (Prod ?y ?z)
+  , Prod ?x Zero --> Zero
+  , Prod ?x (Minus ?y) --> Minus (Prod ?x ?y)
+  , Prod Zero ?x --> Zero
+  , Prod (Minus ?x) ?y --> Minus (Prod ?x ?y)
+  ] <- theory (ring {sum=Sum, prod=Prod, zero=Zero, one=One, minus=Minus}).
 
 % XXX omitted: boolean algebras
 
