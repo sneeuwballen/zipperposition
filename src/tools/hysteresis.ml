@@ -440,10 +440,15 @@ let main () =
       | lazy (LazyList.Cons (prec, _)) ->
           if !flag_print_precedence
             then print_precedence prec;
+          if state.State.rewrite <> []
+            then print_endline "found ordering for rules";
           prec
-      | lazy LazyList.Nil -> []
+      | lazy LazyList.Nil ->
+          if state.State.rewrite <> []
+            then print_endline "no ordering found for rules";
+          []
     in
-    let args = precedence_to_E_arg precedence in
+    let args = precedence_to_E_arg precedence @ ["--memory-limit=512"] in
     (* build final sequence of declarations *)
     let prelude_decls =
       axioms_of_rules state.State.rewrite
@@ -456,6 +461,7 @@ let main () =
     if !flag_print_problem
       then print_problem final_decls;
     let final_decls = List.rev (Sequence.to_rev_list final_decls) in
+    Util.debug 1 "call prover now";
     flush stdout;
     CallProver.call ~args ?timeout:!timeout ~prover:CallProver.Prover.p_E final_decls
   )
