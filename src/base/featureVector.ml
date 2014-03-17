@@ -29,6 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** Feature Vector indexing (see Schulz 2004) for efficient forward
     and backward subsumption *)
 
+module ST = ScopedTerm
 module T = FOTerm
 module STbl = Symbol.Tbl
 module SMap = Symbol.Map
@@ -70,12 +71,20 @@ module Make(C : Index.CLAUSE) = struct
           !cnt);
       }
 
-    let rec _depth_term depth t = match t.T.term with
-      | T.Var _
-      | T.BoundVar _ -> 0
-      | T.Node (_, _, l) ->
+    let rec _depth_term depth t = match ST.view t with
+      | ST.Var _
+      | ST.RigidVar _
+      | ST.Const _
+      | ST.BVar _ -> 0
+      | ST.Bind (_, _, t') -> _depth_term (depth+1) t'
+      | ST.At (t1, t2) ->
+          1 + max (_depth_term depth t1) (_depth_term depth t2)
+      | ST.SimpleApp (_, l)
+      | ST.Multiset l
+      | ST.App (_, l) ->
         let depth' = depth + 1 in
         List.fold_left (fun acc t' -> acc + _depth_term depth' t') depth l
+      | _ -> assert false
 
     (* sum of depths at which symbols occur. Eg f(a, g(b)) will yield 4 (f
        is at depth 0) *)
@@ -83,53 +92,23 @@ module Make(C : Index.CLAUSE) = struct
       { name = "sum_of_depths";
         f = (fun lits -> 
           let n = ref 0 in
-          Sequence.iter (fun (l,r,_) -> n := !n + _depth_term 0 l + _depth_term 0 r) lits;
+          Sequence.iter
+            (fun (l,r,_) ->
+              n := !n + _depth_term 0 (l:T.t:>ST.t) + _depth_term 0 (r:T.t:>ST.t)
+            ) lits;
           !n);
       }
 
-    (** Count the number of distinct split symbols *)
-    let count_split_symb =
-      { name = "count_split_symb";
-        f = (fun lits ->
-          let table = STbl.create 3 in
-          let rec gather t = match t.T.term with
-          | T.Node (s, _, l) ->
-            (if Symbol.has_flag Symbol.flag_split s
-              then STbl.replace table s ());
-            List.iter gather l
-          | T.BoundVar _ | T.Var _ -> ()
-          in
-          Sequence.iter (fun (l,r,_) -> gather l; gather r) lits;
-          STbl.length table);
-      }
+    let _select_sign ~sign lits =
+      lits |> Sequence.filter (fun (_,_,sign') -> sign = sign')
 
-    (** Count the number of distinct skolem symbols *)
-    let count_skolem_symb =
-      { name = "count_skolem_symb";
-        f = (fun lits ->
-          let table = STbl.create 3 in
-          let rec gather t = match t.T.term with
-          | T.Node (s, _, l) ->
-            (if Symbol.has_flag Symbol.flag_skolem s
-              then STbl.replace table s ());
-            List.iter gather l
-          | T.BoundVar _ | T.Var _ -> ()
-          in
-          Sequence.iter (fun (l,r,_) -> gather l; gather r) lits;
-          STbl.length table);
-      }
-
-    (* iterate on symbols of a term *)
-    let rec _iter_symb t k = match t.T.term with
-      | T.Var _ | T.BoundVar _ -> ()
-      | T.Node (s, _, l) -> k s; List.iter (fun t -> _iter_symb t k) l
+    let _terms_of_lit (l,r,_) k = k l; k r
 
     (* sequence of symbols of clause, of given sign *)
     let _symbols ~sign lits =
-      Sequence.from_iter
-        (fun k -> Sequence.iter
-            (fun (l,r,sign') -> if sign = sign' then _iter_symb l k; _iter_symb r k)
-            lits)
+      _select_sign ~sign lits
+        |> Sequence.flatMap _terms_of_lit
+        |> Sequence.flatMap T.Seq.symbols
 
     let count_symb_plus symb =
       { name = Util.sprintf "count+(%a)" Symbol.pp symb;
@@ -142,37 +121,32 @@ module Make(C : Index.CLAUSE) = struct
       }
 
     (* max depth of the symbol in the term, or -1 *)
-    let rec max_depth_term symb t depth =
-      match t.T.term with
-      | T.Var _ | T.BoundVar _ -> -1
-      | T.Node (s, _, l) ->
-        let cur_depth = if Symbol.eq s symb then depth else -1 in
-        List.fold_left
-          (fun maxdepth subterm -> max maxdepth (max_depth_term symb subterm (depth+1)))
-          cur_depth l
+    let max_depth_term symb t =
+      let symbs_depths = T.Seq.subterms_depth t
+        |> Sequence.fmap
+          (fun (t,depth) -> match T.Classic.view t with
+            | T.Classic.App (s, _) when Symbol.eq s symb -> Some depth
+            | _ -> None)
+      in
+      Sequence.max symbs_depths 0
+
+    let _max_depth_lits ~sign symb lits =
+      let depth = ref 0 in
+      Sequence.iter
+        (fun (l,r,sign') -> if sign = sign'
+          then depth := max !depth
+            (max (max_depth_term symb l) (max_depth_term symb r)))
+        lits;
+      !depth
 
     let max_depth_plus symb =
       { name = Util.sprintf "max_depth+(%a)" Symbol.pp symb;
-        f = (fun lits ->
-          let depth = ref 0 in
-          Sequence.iter
-            (fun (l,r,sign) -> if sign
-              then depth := max !depth
-                (max (max_depth_term symb l 0) (max_depth_term symb r 0)))
-            lits;
-          !depth);
+        f = (_max_depth_lits ~sign:true symb);
       }
 
     let max_depth_minus symb =
       { name = Util.sprintf "max_depth-(%a)" Symbol.pp symb;
-        f = (fun lits ->
-          let depth = ref 0 in
-          Sequence.iter
-            (fun (l,r,sign) -> if not sign
-              then depth := max !depth
-                (max (max_depth_term symb l 0) (max_depth_term symb r 0)))
-            lits;
-          !depth);
+        f = (_max_depth_lits ~sign:false symb);
       }
   end
 
@@ -253,34 +227,37 @@ module Make(C : Index.CLAUSE) = struct
   let features idx = idx.features
 
   let default_features =
-    [ Feature.size_plus; Feature.size_minus; Feature.count_skolem_symb;
-      Feature.count_split_symb; Feature.sum_of_depths ]
+    [ Feature.size_plus; Feature.size_minus;
+      Feature.sum_of_depths ]
 
   let empty () = empty_with default_features
 
   (** maximam number of features in addition to basic ones *)
   let max_features = 25
 
-  let features_of_signature ?(ignore=Symbol.is_connective) signature =
+  let features_of_signature ?(ignore=Symbol.TPTP.is_connective) signature =
     (* list of (salience: float, feature) *)
     let features = ref [] in
     (* create features for the symbols *)
     Signature.iter signature
-      (fun _ s ->
-        let ty = Symbol.ty s in
-        let _, arity = Type.arity ty in
+      (fun s ty ->
         if ignore s
           then ()  (* base symbols don't count *)
-        else if Type.eq ty Type.o
-          then features := [1 + arity, Feature.count_symb_plus s;
-                            1 + arity, Feature.count_symb_minus s]
-                            @ !features
         else
-          features := [0, Feature.max_depth_plus s;
-                       0, Feature.max_depth_minus s;
-                       1 + arity, Feature.count_symb_plus s;
-                       1 + arity, Feature.count_symb_minus s]
-                      @ !features);
+          let arity = match Type.arity ty with
+          | Type.NoArity -> 0
+          | Type.Arity (_, i) -> i
+          in
+          if Type.eq ty Type.TPTP.o
+            then features := [1 + arity, Feature.count_symb_plus s;
+                              1 + arity, Feature.count_symb_minus s]
+                              @ !features
+            else
+              features := [0, Feature.max_depth_plus s;
+                           0, Feature.max_depth_minus s;
+                           1 + arity, Feature.count_symb_plus s;
+                           1 + arity, Feature.count_symb_minus s]
+                          @ !features);
     (* only take a limited number of features *)
     let features = List.sort (fun (s1,_) (s2,_) -> s2 - s1) !features in
     let features = Util.list_take max_features features in

@@ -32,9 +32,7 @@ TODO: pre-index on types? *)
 
 module T = FOTerm
 module I = Index
-module S = Substs.FO
-
-let prof_traverse = Util.mk_profiler "fastFingerprint.traverse"
+module S = Substs
 
 type feature =
   | A (* variable *)
@@ -47,15 +45,16 @@ type fingerprint = feature array
 type fingerprint_fun = T.t -> fingerprint
 
 (** compute a feature for a given position *)
-let rec gfpf pos t = match pos, t.T.term with
-  | [], T.Var _ -> A
-  | [], T.BoundVar _ -> S Symbol.db_symbol
-  | [], T.Node (s, _, _) -> S s
-  | i::pos', T.Node (_, _, l) ->
+let rec gfpf pos t = match pos, T.Classic.view t with
+  | [], T.Classic.Var _ -> A
+  | [], T.Classic.BVar _ -> S (Symbol.of_string "__de_bruijn")
+  | [], T.Classic.App (s, _) -> S s
+  | i::pos', T.Classic.App (_, l) ->
     (try gfpf pos' (List.nth l i)  (* recurse in subterm *)
     with Failure _ -> N)  (* not a position in t *)
-  | _::_, T.BoundVar _ -> N
-  | _::_, T.Var _ -> B  (* under variable *)
+  | _::_, T.Classic.BVar _ -> N
+  | _::_, T.Classic.Var _ -> B  (* under variable *)
+  | _, T.Classic.NonFO -> B  (* do not filter *)
 
 (** compute a feature vector for some positions *)
 let fp positions =
@@ -90,7 +89,7 @@ let compare_features f1 f2 = match f1, f2 with
   | N, N
   | A, A
   | B, B -> 0
-  | S s1, S s2 -> Symbol.compare s1 s2
+  | S s1, S s2 -> Symbol.cmp s1 s2
   | _ -> __to_int f1 - __to_int f2
 
 let eq_features f1 f2 = match f1, f2 with
@@ -212,12 +211,12 @@ module Make(X : Set.OrderedType) = struct
     !n
 
   (* try to follow the branch with this given feature *)
-  let rec try_feature k trie acc i feature =
+  let try_feature k trie acc i feature =
     try k (M.find feature trie.sub) acc (i+1)
     with Not_found -> acc
 
   (* try all S branches *)
-  let rec all_symbols k trie acc i =
+  let all_symbols k trie acc i =
     M.fold
       (fun feat' trie' acc -> match feat' with
         | S _ -> k trie' acc (i+1)

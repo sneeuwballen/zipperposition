@@ -53,7 +53,8 @@ Library "logtk"
                     Interfaces, DBEnv, Position, HOTerm, Formula,
                     Substs, Unif, Signature, TypeInference, Options,
                     Comparison, Precedence, Ordering, Skolem, Cnf,
-                    HORewriting, 
+                    HORewriting, Index, Dtree, Fingerprint, NPDtree,
+                    Congruence, FastFingerprint, FeatureVector, 
                     lib/Hash, lib/Hashcons,
                     lib/Sequence, lib/Cache, lib/Bij, lib/Bencode,
                     lib/PersistentHashtbl, lib/Monad, lib/ParseLocation,
@@ -70,7 +71,7 @@ Library "logtk_extended"
   Build$:           flag(extended)
   Install$:         flag(extended)
   Modules:          lib/MultiMap, lib/Mixtbl
-                    #Lambda, Index, Dtree, Fingerprint, Rewriting,
+                    #Lambda, Rewriting,
                     #FeatureVector, FormulaShape, Transform,
                     #NPDtree, Congruence, FastFingerprint, Evaluator,
   BuildDepends:     logtk,unix,zarith

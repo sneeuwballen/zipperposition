@@ -48,8 +48,6 @@ module Make(C : Index.CLAUSE) : sig
     val sum_of_depths : t                 (** sum of depths of symbols *)
     val size_plus : t                     (** size of positive clause *)
     val size_minus : t                    (** size of negative clause *)
-    val count_split_symb : t              (** count number of distinct split symbols *)
-    val count_skolem_symb : t             (** count number of distinct skolem symbols *)
     val count_symb_plus : Symbol.t -> t   (** occurrences of symbol in positive clause *)
     val count_symb_minus : Symbol.t -> t  (** occurrences of symbol in negative clause *)
     val max_depth_plus : Symbol.t -> t    (** maximal depth of symb in positive clause *)

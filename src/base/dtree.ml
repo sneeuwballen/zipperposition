@@ -25,8 +25,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Perfect Discrimination Tree} *)
 
+module ST = ScopedTerm
 module T = FOTerm
-module S = Substs.FO
+module S = Substs
 
 let prof_dtree_retrieve = Util.mk_profiler "dtree_retrieve"
 
@@ -40,45 +41,51 @@ let next t pos = pos+1
 
 (** skip subterms, got to next term that is not a subterm of t|pos *)
 let skip t pos =
-  let t_pos = T.at_cpos t pos in
-  pos + t_pos.T.tsize
+  let t_pos = T.Pos.at_cpos t pos in
+  pos + T.size t_pos
 
 type character =
   | Symbol of Symbol.t
   | BoundVariable of int
   | Variable of T.t
+  | NonFO
+
+let __char2int = function
+  | Symbol _ -> 0
+  | BoundVariable _ -> 1
+  | Variable _ -> 2
+  | NonFO -> 3
 
 let compare_char c1 c2 =
   (* compare variables by index *)
-  let compare_vars v1 v2 = match v1.T.term, v2.T.term with
-    | T.Var i, T.Var j ->
+  let compare_vars v1 v2 = match ST.view (v1:T.t:>ST.t), ST.view (v2:T.t:>ST.t) with
+    | ST.Var i, ST.Var j ->
       if i <> j then i - j else Type.cmp (T.ty v1) (T.ty v2)
     | _ -> assert false
   in
   match c1, c2 with
-  | Symbol s1, Symbol s2 -> Symbol.compare s1 s2
+  | Symbol s1, Symbol s2 -> Symbol.cmp s1 s2
   | BoundVariable i, BoundVariable j -> i - j
   | Variable v1, Variable v2 -> compare_vars v1 v2
-  (* symbol < bound_variable < variable *)
-  | Variable _, _ -> 1
-  | BoundVariable _, _ -> 1
-  | Symbol _, _ -> -1
+  | NonFO, NonFO -> 0
+  | _ -> __char2int c1 - __char2int c2
 
 let eq_char c1 c2 = compare_char c1 c2 = 0
  
 (** first symbol of t, or variable *)
-let rec term_to_char t =
-  match t.T.term with
-  | T.Var _ -> Variable t
-  | T.BoundVar i -> BoundVariable i
-  | T.Node (f, _, _) -> Symbol f
+let term_to_char t =
+  match T.Classic.view t with
+  | T.Classic.Var _ -> Variable t
+  | T.Classic.BVar i -> BoundVariable i
+  | T.Classic.App (f, _) -> Symbol f
+  | T.Classic.NonFO -> NonFO
 
 (** convert term to list of var/symbol *)
 let to_list t =
   let l = ref []
   and pos = ref 0 in
-  for i = 0 to T.max_cpos t do
-    let c = term_to_char (T.at_cpos t !pos) in
+  for _i = 0 to T.Pos.max_cpos t do
+    let c = term_to_char (T.Pos.at_cpos t !pos) in
     l := c :: !l;
     incr pos;
   done;
@@ -89,11 +96,6 @@ module CharMap = Map.Make(struct
   let compare = compare_char
 end)
 
-let char_to_str c = match c with
-  | Symbol s -> Util.sprintf "%a" Symbol.pp s
-  | BoundVariable i -> Util.sprintf "Y%d" i
-  | Variable t -> Util.sprintf "%a" T.pp t
-
 (** {2 Discrimination tree} *)
 
 module Make(E : Index.EQUATION) = struct
@@ -103,7 +105,8 @@ module Make(E : Index.EQUATION) = struct
 
   type trie =
     | TrieNode of trie CharMap.t       (** map atom -> trie *)
-    | TrieLeaf of (T.t * E.t * int) list  (** leaf with (term, value, priority) list *)
+    | TrieLeaf of (T.t * E.t * int) list 
+      (** leaf with (term, value, priority) list *)
 
   let empty_trie n = match n with
     | TrieNode m when CharMap.is_empty m -> true
@@ -166,7 +169,9 @@ module Make(E : Index.EQUATION) = struct
     let chars = to_list t in
     let k l =
       (* remove tuples that match *)
-      let l' = List.filter (fun (t', eqn', _) -> t' != t || E.compare eqn eqn' <> 0) l in
+      let l' = List.filter
+        (fun (t', eqn', _) -> t' != t || E.compare eqn eqn' <> 0) l
+      in
       TrieLeaf l'
     in
     let tree = goto_leaf dt chars k in
@@ -193,7 +198,7 @@ module Make(E : Index.EQUATION) = struct
           acc l
       | TrieNode m ->
         (* "lazy" transformation to flatterm *)
-        let t_pos = T.at_cpos t pos in
+        let t_pos = T.Pos.at_cpos t pos in
         let t1 = term_to_char t_pos in
         CharMap.fold
           (fun t1' subtrie acc ->
@@ -203,19 +208,19 @@ module Make(E : Index.EQUATION) = struct
               else acc
             in
             match t1' with
-            | Variable v1' when S.mem subst v1' sc_dt ->
+            | Variable v1' when S.mem subst (v1':>ST.t) sc_dt ->
                (* already bound, check consistency *)
               begin try
-                let subst = FOUnif.matching ~subst v1' sc_dt t_pos sc_t in
+                let subst = Unif.FO.matching ~subst ~pattern:v1' sc_dt t_pos sc_t in
                 traverse subtrie acc (skip t pos) subst
-              with FOUnif.Fail -> acc (* incompatible binding *)
+              with Unif.Fail -> acc (* incompatible binding *)
               end
             | Variable v1' ->
               (* try to bind and continue *)
               begin try
-                let subst = FOUnif.matching ~subst v1' sc_dt t_pos sc_t in
+                let subst = Unif.FO.matching ~subst ~pattern:v1' sc_dt t_pos sc_t in
                 traverse subtrie acc (skip t pos) subst
-              with FOUnif.Fail -> acc (* incompatible binding *)
+              with Unif.Fail -> acc (* incompatible binding *)
               end
             | _ -> acc)
           m acc

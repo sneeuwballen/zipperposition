@@ -27,8 +27,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Fingerprint term indexing} *)
 
 module T = FOTerm
+module ST = ScopedTerm
 module I = Index
-module S = Substs.FO
+module S = Substs
 
 let prof_traverse = Util.mk_profiler "fingerprint.traverse"
 
@@ -44,15 +45,16 @@ type fingerprint_fun = T.t -> feature list
   are useful instead of folding and filtering *)
 
 (** compute a feature for a given position *)
-let rec gfpf pos t = match pos, t.T.term with
-  | [], T.Var _ -> A
-  | [], T.BoundVar _ -> S Symbol.db_symbol
-  | [], T.Node (s, _, _) -> S s
-  | i::pos', T.Node (_, _, l) ->
+let rec gfpf pos t = match pos, T.Classic.view t with
+  | [], T.Classic.Var _ -> A
+  | [], T.Classic.BVar _ -> S (Symbol.of_string "__de_bruijn")
+  | [], T.Classic.App (s, _) -> S s
+  | i::pos', T.Classic.App (_, l) ->
     (try gfpf pos' (List.nth l i)  (* recurse in subterm *)
     with Failure _ -> N)  (* not a position in t *)
-  | _::_, T.BoundVar _ -> N
-  | _::_, T.Var _ -> B  (* under variable *)
+  | _::_, T.Classic.BVar _ -> N
+  | _::_, T.Classic.Var _ -> B  (* under variable *)
+  | _, T.Classic.NonFO -> B (* don't filter! *)
 
 (* TODO more efficient way to compute a vector of features: if the fingerprint
    is in BFS, compute features during only one traversal of the term? *)
@@ -80,13 +82,18 @@ let fp16 = fp [[]; [1]; [2]; [3]; [4]; [1;1]; [1;2]; [1;3]; [2;1];
 
 (** {2 Index construction} *)
 
-let eq_feature f1 f2 =
-  match f1, f2 with
-  | S s1, S s2 -> Symbol.eq s1 s2
+let __feat2int = function
+  | A -> 0
+  | B -> 1
+  | S _ -> 2
+  | N -> 3
+
+let cmp_feature f1 f2 = match f1, f2 with
+  | A, A
   | B, B
-  | N, N
-  | A, A -> true
-  | _ -> false
+  | N, N -> 0
+  | S s1, S s2 -> Symbol.cmp s1 s2
+  | _ -> __feat2int f1 - __feat2int f2
 
 (** check whether two features are compatible for unification. *)
 let compatible_features_unif f1 f2 =
@@ -113,16 +120,7 @@ let compatible_features_match f1 f2 =
 (** Map whose keys are features *)
 module FeatureMap = Map.Make(struct
   type t = feature
-  let compare f1 f2 = match f1, f2 with
-    (* N < B < A < S, S are ordered by symbols *)
-    | _, _ when eq_feature f1 f2 -> 0
-    | N, _ -> -1
-    | _, N -> 1
-    | B, _ -> -1
-    | _, B -> 1
-    | A, _ -> -1
-    | _, A -> 1
-    | S s1, S s2 -> Symbol.compare s1 s2
+  let compare = cmp_feature
 end)
 
 module Make(X : Set.OrderedType) = struct

@@ -27,9 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 type scope = Substs.scope
 type term = FOTerm.t
-type subst = Substs.FO.t
-
-module T = FOTerm
+type subst = Substs.t
 
 (** {2 Leaf} *)
 
@@ -60,81 +58,9 @@ module type LEAF = sig
     (** Match the query term against the indexed terms *)
 end
 
-module MakeLeaf(X : Set.OrderedType) = struct
-  module S = Set.Make(X)
+module MakeLeaf(X : Set.OrderedType) : LEAF with type elt = X.t
 
-  type t = S.t T.Map.t
-
-  type elt = X.t
-
-  let empty = T.Map.empty
-
-  let _find leaf t =
-    try T.Map.find t leaf with Not_found -> S.empty
-
-  let add leaf t data =
-    let set = _find leaf t in
-    let set = S.add data set in
-    T.Map.add t set leaf
-
-  let remove leaf t data =
-    try
-      let set = T.Map.find t leaf in
-      let set = S.remove data set in
-      if S.is_empty set
-        then T.Map.remove t leaf
-        else T.Map.add t set leaf
-    with Not_found ->
-      leaf
-
-  let is_empty = T.Map.is_empty
-
-  let iter leaf f =
-    T.Map.iter (fun t set -> S.iter (fun elt -> f t elt) set) leaf
-
-  let fold leaf acc f =
-    T.Map.fold (fun t set acc -> S.fold (fun elt acc -> f acc t elt) set acc) leaf acc
-
-  let size leaf =
-    let cnt = ref 0 in
-    T.Map.iter (fun _ set -> cnt := !cnt + S.cardinal set) leaf;
-    !cnt
-
-  let fold_unify ?(subst=Substs.FO.empty) leaf sc_leaf t sc_t acc k =
-    T.Map.fold
-      (fun t' set acc ->
-        try
-          let subst = FOUnif.unification ~subst t' sc_leaf t sc_t in
-          S.fold
-            (fun data acc -> k acc t' data subst)
-            set acc
-        with FOUnif.Fail -> acc)
-      leaf acc
-
-  let fold_match ?(subst=Substs.FO.empty) leaf sc_leaf t sc_t acc k =
-    T.Map.fold
-      (fun t' set acc ->
-        try
-          let subst = FOUnif.matching ~subst t' sc_leaf t sc_t in
-          S.fold
-            (fun data acc -> k acc t' data subst)
-            set acc
-        with FOUnif.Fail -> acc)
-      leaf acc
-
-  let fold_matched ?(subst=Substs.FO.empty) leaf sc_leaf t sc_t acc k =
-    T.Map.fold
-      (fun t' set acc ->
-        try
-          let subst = FOUnif.matching ~subst t sc_t t' sc_leaf in
-          S.fold
-            (fun data acc -> k acc t' data subst)
-            set acc
-        with FOUnif.Fail -> acc)
-      leaf acc
-end
-
-(** {2 Term index} *)
+(** {2 FOTerm index} *)
 
 module type TERM_IDX = sig
   type t
@@ -230,6 +156,8 @@ module type EQUATION = sig
   type t
 
   type rhs
+    (** An equation can have something other than a term as a right-hand
+        side, for instance a formula. *)
 
   val compare : t -> t -> int
     (** Total order on equations *)

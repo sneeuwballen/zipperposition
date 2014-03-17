@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 69c01a4f5cc05fbc193700d9dce37202)
+# DO NOT EDIT (digest: ec91b0c9a217c4f1b53c4684f317b3bc)
 Symbol
 ScopedTerm
 FOTerm
@@ -22,6 +22,13 @@ Ordering
 Skolem
 Cnf
 HORewriting
+Index
+Dtree
+Fingerprint
+NPDtree
+Congruence
+FastFingerprint
+FeatureVector
 lib/Hash
 lib/Hashcons
 lib/Sequence

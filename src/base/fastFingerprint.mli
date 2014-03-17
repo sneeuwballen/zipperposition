@@ -1,3 +1,4 @@
+
 (*
 Copyright (c) 2013, Simon Cruanes
 All rights reserved.
@@ -23,13 +24,22 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Fingerprint term indexing} *)
+(** {1 Experimental Fingerprint Indexing}
+
+This implementation of fingerprint indexing should take types into
+account, and also only traverse the relevant parts of the tree.
+
+Right now it's not more efficient than {!Fingerprint} (see the benchmarks
+in ../tests/run_bench.ml)
+
+TODO: pre-index on types? *)
 
 type fingerprint_fun
 
 val fp3d : fingerprint_fun
 val fp3w : fingerprint_fun
 val fp4d : fingerprint_fun
+val fp4m : fingerprint_fun
 val fp4w : fingerprint_fun
 val fp5m : fingerprint_fun
 val fp6m : fingerprint_fun

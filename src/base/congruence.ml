@@ -390,16 +390,14 @@ module FO = Make(struct
   let eq = T.eq
   let hash = T.hash
 
-  let subterms t = match t.T.term with
-    | T.Var _
-    | T.BoundVar _ -> []
-    | T.Node (s, _, l) -> l
+  let subterms t = match T.Classic.view t with
+    | T.Classic.App (_, l) -> l
+    | _ -> []
 
-  let update_subterms t l = match t.T.term, l with
-    | (T.Var _
-    | T.BoundVar _), [] -> t
-    | T.Node (s, tyargs, l), l' when List.length l = List.length l' ->
-      T.mk_node ~tyargs s l'
+  let update_subterms t l = match T.view t, l with
+    | T.App (hd, l), l' when List.length l = List.length l' ->
+      T.app hd l'
+    | _, [] -> t
     | _ -> assert false
 end)
 
@@ -410,19 +408,23 @@ module HO = Make(struct
   let eq = T.eq
   let hash = T.hash
 
-  let subterms t = match t.T.term with
+  let subterms t = match T.view t with
     | T.Const _
     | T.Var _
-    | T.BoundVar _ -> []
-    | T.At (t, _, l) -> t :: l
-    | T.Lambda t' -> [t']
+    | T.RigidVar _
+    | T.BVar _ -> []
+    | T.Lambda (_,t') -> [t']
+    | T.At (t1, t2) -> [t1;t2]
+    | T.TyAt(t,_) -> [t]
+    | T.Multiset (_,l) -> l
+    | T.Record _ -> assert false   (* TODO *)
 
-  let update_subterms t l = match t.T.term, l with
-    | (T.Const _ | T.Var _ | T.BoundVar _), [] -> t
-    | T.At (t, tyargs, l), (t' :: l') ->
-      T.mk_at ~tyargs t' l'
-    | T.Lambda _, [t'] ->
-      let varty = T.lambda_var_ty t in
-      T.__mk_lambda ~varty t'
+  let update_subterms t l = match T.view t, l with
+    | (T.Const _ | T.Var _ | T.BVar _ | T.RigidVar _), [] -> t
+    | T.At _, [t1'; t2'] -> T.at t1' t2'
+    | T.TyAt(_,ty), [t'] -> T.tyat t' ty
+    | T.Lambda (varty, _), [t'] -> T.__mk_lambda ~varty t'
+    | T.Multiset(ty,_), l -> T.multiset ~ty l
+    | T.Record _, _ -> assert false (* TODO *)
     | _ -> assert false
 end)

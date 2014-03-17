@@ -26,26 +26,25 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Non-Perfect Discrimination Tree} *)
 
 module T = FOTerm
-module S = Substs.FO
+module S = Substs
 module SMap = Symbol.Map
 
 let prof_npdtree_retrieve = Util.mk_profiler "NPDtree_retrieve"
 let prof_npdtree_term_unify = Util.mk_profiler "NPDtree_term_unify"
-let prof_npdtree_term_generalizations = Util.mk_profiler "NPDtree_term_generalizations"
-let prof_npdtree_term_specializations = Util.mk_profiler "NPDtree_term_specializations"
+let prof_npdtree_term_generalizations =
+  Util.mk_profiler "NPDtree_term_generalizations"
+let prof_npdtree_term_specializations =
+  Util.mk_profiler "NPDtree_term_specializations"
 
 (** {2 Term traversal} *)
 
 (** Term traversal in prefix order. This is akin to lazy transformation
     to a flatterm. *)
 
-(** get position of next term *)
-let next t pos = pos+1
-
 (** skip subterms, got to next term that is not a subterm of t|pos *)
 let skip t pos =
-  let t_pos = T.at_cpos t pos in
-  pos + t_pos.T.tsize
+  let t_pos = T.Pos.at_cpos t pos in
+  pos + T.size t_pos
 
 (** {2 Unix index} *)
 
@@ -80,8 +79,8 @@ module Make(E : Index.EQUATION) = struct
         then match k trie.leaf with
           | leaf' when leaf' == trie.leaf -> root (* no change, return same tree *)
           | leaf' -> rebuild {trie with leaf=leaf'; }
-        else match (T.at_cpos t i).T.term with
-          | (T.Var _ | T.BoundVar _) ->
+        else match T.Classic.view (T.Pos.at_cpos t i) with
+          | (T.Classic.Var _ | T.Classic.BVar _) ->
             let subtrie = match trie.star with
               | None -> empty ()
               | Some trie' -> trie'
@@ -92,7 +91,7 @@ module Make(E : Index.EQUATION) = struct
                 else rebuild {trie with star=Some subtrie ;}
             in
             goto subtrie t (i+1) rebuild
-          | T.Node (s, _, _) ->
+          | T.Classic.App (s, _) ->
             let subtrie =
               try SMap.find s trie.map
               with Not_found -> empty ()
@@ -103,6 +102,7 @@ module Make(E : Index.EQUATION) = struct
                 else rebuild {trie with map=SMap.add s subtrie trie.map ;}
             in
             goto subtrie t (i+1) rebuild
+          | T.Classic.NonFO -> assert false (* TODO *)
   in
   goto trie t 0 (fun t -> t)
 
@@ -133,14 +133,14 @@ module Make(E : Index.EQUATION) = struct
     let rec traverse trie acc i =
       if i = T.size t
         then Leaf.fold_match ~subst trie.leaf sc_dt t sc_t acc k'
-        else match (T.at_cpos t i).T.term with
-          | (T.Var _ | T.BoundVar _) ->
+        else match T.Classic.view (T.Pos.at_cpos t i) with
+          | (T.Classic.Var _ | T.Classic.BVar _) ->
             begin match trie.star with
             | None -> acc
             | Some subtrie ->
               traverse subtrie acc (i+1)  (* match "*" against "*" *)
             end
-          | T.Node (s, _, _) ->
+          | T.Classic.App (s, _) ->
             let acc =
               try
                 let subtrie = SMap.find s trie.map in
@@ -152,6 +152,7 @@ module Make(E : Index.EQUATION) = struct
               | Some subtrie ->
                 traverse subtrie acc (skip t i)  (* skip subterm *)
             end
+          | T.Classic.NonFO -> assert false
     in
     try
       let acc = traverse dt acc 0 in
@@ -183,7 +184,8 @@ end
 
 module SIMap = Map.Make(struct
   type t = Symbol.t * int
-  let compare (s1,i1) (s2,i2) = if i1 = i2 then Symbol.compare s1 s2 else i1-i2
+  let compare (s1,i1) (s2,i2) =
+    if i1 = i2 then Symbol.cmp s1 s2 else i1-i2
 end)
 
 module MakeTerm(X : Set.OrderedType) = struct
@@ -215,8 +217,8 @@ module MakeTerm(X : Set.OrderedType) = struct
         then match k trie.leaf with
           | leaf' when leaf' == trie.leaf -> root (* no change, return same tree *)
           | leaf' -> rebuild {trie with leaf=leaf'; }
-        else match (T.at_cpos t i).T.term with
-          | (T.Var _ | T.BoundVar _) ->
+        else match T.Classic.view (T.Pos.at_cpos t i) with
+          | (T.Classic.Var _ | T.Classic.BVar _) ->
             let subtrie = match trie.star with
               | None -> empty ()
               | Some trie' -> trie'
@@ -227,7 +229,7 @@ module MakeTerm(X : Set.OrderedType) = struct
                 else rebuild {trie with star=Some subtrie ;}
             in
             goto subtrie t (i+1) rebuild
-          | T.Node (s, _, l) ->
+          | T.Classic.App (s, l) ->
             let arity = List.length l in
             let subtrie =
               try SIMap.find (s,arity) trie.map
@@ -239,6 +241,7 @@ module MakeTerm(X : Set.OrderedType) = struct
                 else rebuild {trie with map=SIMap.add (s,arity) subtrie trie.map ;}
             in
             goto subtrie t (i+1) rebuild
+          | T.Classic.NonFO -> assert false
   in
   goto trie t 0 (fun t -> t)
 
@@ -274,12 +277,12 @@ module MakeTerm(X : Set.OrderedType) = struct
     let rec traverse trie acc i =
       if i = T.size t
         then Leaf.fold_unify ~subst trie.leaf sc_dt t sc_t acc k
-        else match (T.at_cpos t i).T.term with
-          | (T.Var _ | T.BoundVar _) ->
+        else match T.Classic.view (T.Pos.at_cpos t i) with
+          | (T.Classic.Var _ | T.Classic.BVar _) ->
             (* skip one term in all branches of the trie *)
             skip_tree trie acc
               (fun acc subtrie -> traverse subtrie acc (i+1))
-          | T.Node (s, _, l) ->
+          | T.Classic.App (s, l) ->
             let arity = List.length l in
             let acc =
               try
@@ -292,6 +295,7 @@ module MakeTerm(X : Set.OrderedType) = struct
               | Some subtrie ->
                 traverse subtrie acc (skip t i)  (* skip subterm of [t] *)
             end
+          | T.Classic.NonFO -> assert false
     in
     try
       let acc = traverse dt acc 0 in
@@ -304,17 +308,17 @@ module MakeTerm(X : Set.OrderedType) = struct
   let retrieve_generalizations ?(subst=S.empty) dt sc_dt t sc_t acc k =
     Util.enter_prof prof_npdtree_term_generalizations;
     (* recursive traversal of the trie, following paths compatible with t *)
-    let rec traverse trie acc i =
+   let rec traverse trie acc i =
       if i = T.size t
         then Leaf.fold_match ~subst trie.leaf sc_dt t sc_t acc k
-        else match (T.at_cpos t i).T.term with
-          | (T.Var _ | T.BoundVar _) ->
+        else match T.Classic.view (T.Pos.at_cpos t i) with
+          | (T.Classic.Var _ | T.Classic.BVar _) ->
             begin match trie.star with
             | None -> acc
             | Some subtrie ->
               traverse subtrie acc (i+1)  (* match "*" against "*" only *)
             end
-          | T.Node (s, _, l) ->
+          | T.Classic.App (s, l) ->
             let arity = List.length l in
             let acc =
               try
@@ -327,6 +331,7 @@ module MakeTerm(X : Set.OrderedType) = struct
               | Some subtrie ->
                 traverse subtrie acc (skip t i)  (* skip subterm *)
             end
+          | T.Classic.NonFO -> assert false
     in
     try
       let acc = traverse dt acc 0 in
@@ -342,12 +347,12 @@ module MakeTerm(X : Set.OrderedType) = struct
     let rec traverse trie acc i =
       if i = T.size t
         then Leaf.fold_matched ~subst trie.leaf sc_dt t sc_t acc k
-        else match (T.at_cpos t i).T.term with
-          | (T.Var _ | T.BoundVar _) ->
+        else match T.Classic.view (T.Pos.at_cpos t i) with
+          | (T.Classic.Var _ | T.Classic.BVar _) ->
             (* match * against any subterm *)
             skip_tree trie acc
               (fun acc subtrie -> traverse subtrie acc (i+1))
-          | T.Node (s, _, l) ->
+          | T.Classic.App (s, l) ->
             (* only same symbol *)
             let arity = List.length l in
             begin try
@@ -355,6 +360,7 @@ module MakeTerm(X : Set.OrderedType) = struct
               traverse subtrie acc (i+1)
             with Not_found -> acc
             end
+          | T.Classic.NonFO -> assert false
     in
     try
       let acc = traverse dt acc 0 in
