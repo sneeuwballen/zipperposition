@@ -106,6 +106,8 @@ Library "logtk_solving"
   FindlibParent:    logtk
   FindlibName:      solving
   Modules:          Lpo
+  Build$:           flag(solving)
+  Install$:         flag(solving)
   BuildDepends:     logtk,aez
   XMETARequires:    logtk,aez
 
