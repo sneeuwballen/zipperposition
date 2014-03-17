@@ -41,8 +41,8 @@ and source =
 
 type t
 
-val create : ?kb:Logtk_meta.MetaKB.t -> unit -> t
-  (** Fresh meta-prover, using the given KB *)
+val create : unit -> t
+  (** Fresh meta-prover *)
 
 val has_new_patterns : t -> bool
   (** Are there some new patterns that should be lookud up for in
@@ -63,14 +63,11 @@ val scan_set : t -> Clause.CSet.t -> result list
 val proof_of_source : source -> Proof.t
   (** Extract the proof of a source *)
 
-val explain : t -> MetaReasoner.Logic.literal -> Proof.t list
+val explain : t -> Logtk_meta.Reasoner.fact -> Proof.t list
   (** Find why the given literal is true.
       @raise Invalid_argument if the literal is not true in Datalog
       @raise Not_found if the literal's premises are not explained by
         previous scan_clause/scan_formula *)
-
-val prover : t -> MetaProver.t
-  (** MetaProver itself *)
 
 val theories : t -> (string * HOTerm.t list) Sequence.t
   (** List of theories detected so far *)
@@ -78,23 +75,14 @@ val theories : t -> (string * HOTerm.t list) Sequence.t
 val results : t -> result Sequence.t
   (** All results *)
 
-val reasoner : t -> Logtk_meta.MetaReasoner.t
+val reasoner : t -> Logtk_meta.Reasoner.t
   (** Datalog reasoner *)
 
-val kb : t -> Logtk_meta.MetaKB.t
-  (** Current knowledge base *)
-
-val add_kb : t -> Logtk_meta.MetaKB.t -> unit
-  (** Merge KB with the given KB *)
-
-val parse_kb_file : t -> string -> unit Monad.Err.t
-  (** Parse KB from this file *)
+val prover : t -> Logtk_meta.Prover.t
+  (** meta-prover  *)
 
 val parse_theory_file : t -> string -> unit Monad.Err.t
   (** Update KB with the content of this file *)
-
-val save_kb_file : t -> string -> unit
-  (** Save the KB into this file *)
 
 val pp_result : Buffer.t -> result -> unit
 val pp_theory : Buffer.t -> (string * HOTerm.t list) -> unit

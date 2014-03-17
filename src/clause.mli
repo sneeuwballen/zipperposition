@@ -122,7 +122,7 @@ val create_a : ?parents:t list -> ?selected:BV.t ->
       ownership of the input array. *)
 
 val create_forms : ?parents:t list -> ?selected:BV.t ->
-                    ctx:Ctx.t -> FOFormula.t list ->
+                    ctx:Ctx.t -> Formula.FO.t list ->
                     (CompactClause.t -> Proof.t) -> t
   (** Directly from list of formulas *)
 
@@ -147,31 +147,30 @@ val update_ctx : ctx:Ctx.t -> t -> t
 val check_ord : ord:Ordering.t -> t -> unit
   (** checks that the clause is up-to-date w.r.t. the ordering *)
 
-val apply_subst : renaming:Substs.FO.Renaming.t ->
-                  Substs.FO.t -> t -> Substs.scope -> t
+val apply_subst : renaming:Substs.Renaming.t -> t -> t -> scope -> t
   (** apply the substitution to the clause *)
 
-val maxlits : t -> Substs.scope -> Substs.FO.t -> BV.t
+val maxlits : t -> scope -> Substs.t -> BV.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are maximal under [ord] *)
 
-val is_maxlit : t -> Substs.scope -> Substs.FO.t -> int -> bool
+val is_maxlit : t -> scope -> Substs.t -> int -> bool
   (** Is the i-th literal maximal in subst(clause)? Equivalent to
       Bitvector.get (maxlits ~ord c subst) i *)
 
-val eligible_res : t -> Substs.scope -> Substs.FO.t -> BV.t
+val eligible_res : t -> scope -> Substs.t -> BV.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for resolution. THe literal has to be either maximal
       among selected literals of the same sign, if some literal is selected,
       or maximal if none is selected. *)
 
-val eligible_param : t -> Substs.scope -> Substs.FO.t -> BV.t
+val eligible_param : t -> scope -> Substs.t -> BV.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for paramodulation. That means the literal
       is positive, no literal is selecteed, and the literal
       is maximal among literals of [subst(clause)]. *)
 
-val eligible_chaining : t -> Substs.scope -> Substs.FO.t -> BV.t
+val eligible_chaining : t -> scope -> Substs.t -> BV.t
   (** Bitvector of literals of [subst(clause)] that are eligible
       for equality chaining or inequality chaining. That amouns to being
       a maximal, positive inequality literal within the clause,
@@ -195,8 +194,13 @@ val is_oriented_rule : t -> bool
 val symbols : ?init:Symbol.Set.t -> t Sequence.t -> Symbol.Set.t
   (** symbols that occur in the clause *)
 
-val from_forms : ?role:string -> file:string -> name:string -> ctx:Ctx.t -> FOFormula.t list -> t
+val from_forms : ?role:string -> file:string -> name:string -> ctx:Ctx.t ->
+                  Formula.FO.t list -> t
   (** Conversion of a formula list to a clause *)
+
+module Seq : sig
+  val lits : t -> Literal.t Sequence.t
+end
 
 (** {2 Filter literals} *)
 

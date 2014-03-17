@@ -30,7 +30,7 @@ open Logtk
 
 module STbl = Symbol.Tbl
 module T = FOTerm
-module F = FOFormula
+module F = Formula.FO
 module PF = PFormula
 
 (** {2 Associativity-Commutativity} *)
@@ -81,10 +81,18 @@ module AC = struct
       spec Symbol.Set.empty
 
   let symbols_of_terms ~spec seq =
-    T.ac_symbols ~is_ac:(is_ac ~spec) seq
+    let module A = T.AC(struct
+      let is_ac = is_ac ~spec
+      let is_comm _ = false
+    end) in
+    A.symbols seq
 
   let symbols_of_forms ~spec f =
-    T.ac_symbols ~is_ac:(is_ac ~spec) (Sequence.flatMap F.Seq.terms f)
+    let module A = T.AC(struct
+      let is_ac = is_ac ~spec
+      let is_comm _ = false
+    end) in
+    Sequence.flatMap F.Seq.terms f |> A.symbols
 
   let proofs ~spec =
     STbl.fold

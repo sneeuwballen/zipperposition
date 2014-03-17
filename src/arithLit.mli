@@ -29,9 +29,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Arithmetic-centric views of a literal}.
 
     Two  views are provided, one that compares a monome to zero,
-    and one that has some priviledged term on the side *)
+    and one that has some priviledged term on the side.
+    
+    TODO: specialized variant in Literal that already contains
+    operator+2 monomes. This would allow better and faster views
+    of arith lits. *)
 
 open Logtk
+
+type scope = Substs.scope
 
 val is_arith : Literal.t -> bool
   (** Is this literal arithmetic (i.e., root predicate is equality or
@@ -48,6 +54,10 @@ val mk_eq : ord:Ordering.t -> FOTerm.t -> FOTerm.t -> Literal.t
 
 val mk_neq : ord:Ordering.t -> FOTerm.t -> FOTerm.t -> Literal.t
   (** Smart constructor for inequality *)
+
+module Seq : sig
+  val terms : Literal.t -> FOTerm.t Sequence.t
+end
 
 (** Comparison operator *)
 type op =
@@ -105,11 +115,10 @@ module Canonical : sig
   val to_lit : ord:Ordering.t -> t -> Literal.t
     (** Conversion back to a literal *)
 
-  val apply_subst : renaming:Substs.FO.Renaming.t ->
-                    Substs.FO.t -> t -> Substs.scope -> t
+  val apply_subst : renaming:Substs.Renaming.t -> Substs.t -> t -> scope -> t
     (** Apply substitution to the literal *)
 
-  val factor : t -> Substs.FO.t list
+  val factor : t -> Substs.t list
     (** Unify non-arith subterms pairwise, return corresponding
         substitutions *)
 
@@ -181,8 +190,7 @@ module Focused : sig
   val of_canonical : ord:Ordering.t -> Canonical.t -> t list
     (** Isolate maximal subterms of a {!Canonical.t} representation *)
 
-  val apply_subst : renaming:Substs.FO.Renaming.t ->
-                    Substs.FO.t -> t -> Substs.scope -> t
+  val apply_subst : renaming:Substs.Renaming.t -> Substs.t -> t -> scope -> t
     (** Apply substitution to the focused literal *)
 
   val scale : t -> t -> t * t
@@ -207,12 +215,12 @@ val simplify : ord:Ordering.t -> Literal.t -> Literal.t
 val eliminate : ?elim_var:(FOTerm.t -> bool) ->
                 ?fresh_var:(Type.t -> FOTerm.t) ->
                 Literal.t ->
-                Substs.FO.t list
+                Substs.t list
   (** List of substitutions that make the literal inconsistent.
       [elim_var] is called to check whether eliminating a variable
       in an equation is possible. *)
 
-val heuristic_eliminate : Literal.t -> Substs.FO.t list
+val heuristic_eliminate : Literal.t -> Substs.t list
   (** Heuristic version of [eliminate] that tries to deal with some
       non-linear, or too hard, cases. For instance, square roots.
       TODO: instantiate inside to_int/ to_rat *)
@@ -267,7 +275,7 @@ module Arr : sig
   val eliminate : ord:Ordering.t ->
                   eligible:(int -> Literal.t -> bool) ->
                   Literal.t array ->
-                  (Substs.FO.t * Literal.t array) list
+                  (Substs.t * Literal.t array) list
     (** Try to eliminate literals by finding relevant instantiations.
         Instantiations must bind variables only to satisfiable terms
         (ie terms that always represent at least one integer).
@@ -280,7 +288,7 @@ module Arr : sig
         @raise Invalid_argument if the term is not a var *)
 
   val naked_vars : ?filter:(int -> Literal.t -> bool) ->
-                    Literal.t array -> FOTerm.varlist
+                    Literal.t array -> FOTerm.Set.t
     (** Variables occurring in inequations, that are not shielded *)
 end
 

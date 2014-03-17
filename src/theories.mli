@@ -65,7 +65,7 @@ module AC : sig
   val symbols_of_terms : spec:t -> FOTerm.t Sequence.t -> Symbol.Set.t
     (** set of AC symbols occurring in the given term *)
 
-  val symbols_of_forms : spec:t -> FOFormula.t Sequence.t -> Symbol.Set.t
+  val symbols_of_forms : spec:t -> Formula.FO.t Sequence.t -> Symbol.Set.t
     (** Set of AC symbols occurring in the given formula *)
 
   val proofs : spec:t -> Proof.t list

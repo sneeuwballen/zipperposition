@@ -30,15 +30,15 @@ Library "libzipperposition"
   BuildDepends: unix,num,logtk,logtk.meta,dynlink
 
 Library "libzipperposition_arbitrary"
-  Path: src/arbitrary
-  Pack: true
-  FindlibName: arbitrary
-  FindlibParent: libzipperposition
-  Modules:  ArMonome, ArArith, ArInterval
-  Build$: flag(tests)
-  Install$: flag(tests)
-  BuildDepends: logtk,libzipperposition,qcheck,logtk.arbitrary
-  XMetaRequires: qcheck,logtk,logtk.arbitrary,libzipperposition
+  Path:                 src/arbitrary
+  Pack:                 true
+  FindlibName:          arbitrary
+  FindlibParent:        libzipperposition
+  Modules:              ArMonome, ArArith, ArInterval
+  Build$:               flag(tests)
+  Install$:             flag(tests)
+  BuildDepends:         logtk,libzipperposition,qcheck,logtk.arbitrary
+  XMetaRequires:        qcheck,logtk,logtk.arbitrary,libzipperposition
 
 # main executable for the prover
 Executable zipperposition

@@ -30,7 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 module T = FOTerm
-module S = Substs.FO
+module S = Substs
 module Lit = Literal
 module Lits = Literal.Arr
 
@@ -381,6 +381,10 @@ let from_forms ?(role="axiom") ~file ~name ~ctx forms =
   let lits = Lits.of_forms ~ord:ctx.Ctx.ord forms in
   let proof c = Proof.mk_c_file ~role ~file ~name c in
   create_a ~ctx lits proof
+
+module Seq = struct
+  let lits c = Sequence.of_array c.hclits
+end
 
 (** {2 Filter literals} *)
 

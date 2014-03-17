@@ -29,8 +29,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module F = FOFormula
+module F = Formula.FO
 module CC = CompactClause
+
+type form = F.t
 
 (** Classification of proof steps *)
 type step_kind =
@@ -41,7 +43,7 @@ type step_kind =
   | Trivial  (* trivial, or trivial within theories *)
 
 type step_result =
-  | Form of FOFormula.t
+  | Form of form
   | Clause of CompactClause.t
 
 type t = {
@@ -74,7 +76,7 @@ let cmp p1 p2 =
   let c = Pervasives.compare p1.kind p2.kind in
   if c = 0
     then match p1.result, p2.result with
-      | Form f1, Form f2 -> F.compare f1 f2
+      | Form f1, Form f2 -> F.cmp f1 f2
       | Clause c1, Clause c2 -> CC.cmp c1 c2
       | Form _, Clause _ -> 1
       | Clause _, Form _ -> ~-1
@@ -142,7 +144,7 @@ let is_axiom = function
 
 let is_proof_of_false p =
   match p.result with
-  | Form {F.form=F.False} -> true
+  | Form f when F.eq f F.Base.false_ -> true
   | Clause c when CC.is_empty c -> true
   | _ -> false
 
@@ -242,30 +244,6 @@ let as_graph =
   in
   LazyGraph.make ~eq:eq ~hash:hash f
 
-let bij = Bij.map ~inject:(fun _ -> assert false) ~extract:(fun _ -> assert false) Bij.unit_
-(* FIXME
-  Bij.(fix
-    (fun bij_ ->
-      let bij_step = lazy (map
-        ~inject:(fun step -> step.rule, step.parents, step.esa, step.theories)
-        ~extract:(fun (rule,parents,esa,theories) -> {rule;parents;esa;theories;})
-          (quad string_ (array_ (Lazy.force bij_)) bool_ (list_ string_))) in
-      let bij_axiom = pair string_ string_
-      and bij_form = lazy (pair F.bij (Lazy.force bij_step))
-      and bij_clause = lazy (pair CC.bij (Lazy.force bij_step))
-      in switch
-          ~inject:(function
-            | Axiom (f,n) -> "axiom", BranchTo(bij_axiom, (f,n))
-            | InferForm(f,step) -> "form", BranchTo(Lazy.force bij_form, (f,step))
-            | InferClause(c,step) -> "clause", BranchTo(Lazy.force bij_clause, (c,step)))
-          ~extract:(function
-            | "axiom" -> BranchFrom(bij_axiom, (fun (f,n) -> Axiom(f,n)))
-            | "form" -> BranchFrom(Lazy.force bij_form, (fun(f,step) -> InferForm(f,step)))
-            | "clause" -> BranchFrom(Lazy.force bij_clause, (fun(c,step) -> InferClause(c,step)))
-            | c -> raise (DecodingError "expected proof step"))
-    ))
-*)
-
 (** {2 IO} *)
 
 let pp_kind_tstp buf k = match k with
@@ -359,7 +337,7 @@ let pp_tstp buf proof =
       match p.result with
       | Form f ->
         Printf.bprintf buf "tff(%d, %s, %a, %a).\n"
-          name (role p) F.pp_tstp f _pp_kind_tstp (p.kind,parents)
+          name (role p) F.TPTP.pp f _pp_kind_tstp (p.kind,parents)
       | Clause c ->
         Printf.bprintf buf "cnf(%d, %s, %a, %a).\n"
           name (role p) CC.pp_tstp c _pp_kind_tstp (p.kind,parents)
@@ -412,7 +390,8 @@ let as_dot_graph =
   let attributes = [`Style "filled"] in
   LazyGraph.map
     ~vertices:(fun p ->
-      if is_proof_of_false p then `Color "red" :: `Label "[]" :: `Shape "box" :: attributes
+      if is_proof_of_false p then `Color "red" ::
+          `Label "[]" :: `Shape "box" :: attributes
       else if is_file p then label p :: `Color "yellow" :: `Shape "box" :: attributes
       else if is_trivial p then label p :: `Color "orange" :: shape p :: attributes
       else label p :: shape p :: attributes)

@@ -30,6 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 type scope = Substs.scope
+type form = Formula.FO.t
 
 type t = private
   | Equation of FOTerm.t * FOTerm.t * bool * Comparison.t
@@ -45,9 +46,7 @@ val compare : t -> t -> int     (** lexicographic comparison of literals *)
 val hash : t -> int
 val hash_novar : t -> int
 
-val variant : ?subst:Substs.FO.t ->
-              t -> scope -> t -> scope ->
-              Substs.FO.t
+val variant : ?subst:Substs.t -> t -> scope -> t -> scope -> Substs.t
   (** Are two literals alpha-equivalent? *)
 
 val are_variant : t -> t -> bool
@@ -104,18 +103,18 @@ val mk_less : Theories.TotalOrder.instance -> FOTerm.t -> FOTerm.t -> t
 val mk_lesseq : Theories.TotalOrder.instance -> FOTerm.t -> FOTerm.t -> t
 
 val reord : ord:Ordering.t -> t -> t      (** recompute order *)
-val lit_of_form : ord:Ordering.t -> FOFormula.t -> t (** translate eq/not to literal *)
+val lit_of_form : ord:Ordering.t -> form -> t (** translate eq/not to literal *)
 val to_tuple : t -> (FOTerm.t * FOTerm.t * bool)
-val form_of_lit : t -> FOFormula.t
+val form_of_lit : t -> form
 val term_of_lit : t -> HOTerm.t                   (** translate lit to term *)
 
-val apply_subst : renaming:Substs.FO.Renaming.t ->
-                  ord:Ordering.t -> Substs.FO.t -> t -> Substs.scope -> t
+val apply_subst : renaming:Substs.Renaming.t ->
+                  ord:Ordering.t -> Substs.t -> t -> scope -> t
 
 val negate : t -> t                     (** negate literal *)
 val fmap : ord:Ordering.t -> (FOTerm.t -> FOTerm.t) -> t -> t (** fmap in literal *)
 val add_vars : unit FOTerm.Tbl.t -> t -> unit  (** Add variables to the set *)
-val vars : t -> FOTerm.varlist (** gather variables *)
+val vars : t -> FOTerm.Set.t (** gather variables *)
 val var_occurs : FOTerm.t -> t -> bool
 val is_ground : t -> bool
 
@@ -133,7 +132,7 @@ val at_pos : t -> Position.t -> FOTerm.t
       @raise Not_found if the position is invalid *)
 
 val type_at_pos : TypeInference.Ctx.t ->
-                  t -> Substs.scope -> Position.t -> Type.t
+                  t -> scope -> Position.t -> Type.t
   (** Infer the type of the subterm at given position in the given
       scope and context, and return it. The type is constrained by its
       surrounding environment (e.g., in [cons(1,nil)], [nil] will
@@ -143,8 +142,8 @@ val replace_pos : ord:Ordering.t -> t -> at:Position.t -> by:FOTerm.t -> t
   (** Replace subterm, or
       @raise Invalid_argument if the position is invalid *)
 
-val apply_subst_list : renaming:Substs.FO.Renaming.t ->
-                       ord:Ordering.t -> Substs.FO.t ->
+val apply_subst_list : renaming:Substs.Renaming.t ->
+                       ord:Ordering.t -> Substs.t ->
                        t list -> scope -> t list
 
 val symbols : t -> Symbol.Set.t
@@ -174,14 +173,14 @@ module Arr : sig
   val sort_by_hash : t array -> unit
     (** Sort literals by increasing [hash_novar] *)
 
-  val variant : ?subst:Substs.FO.t ->
-                t array -> Substs.scope -> t array -> Substs.scope ->
-                Substs.FO.t
+  val variant : ?subst:Substs.t ->
+                t array -> scope -> t array -> scope ->
+                Substs.t
   val are_variant : t array -> t array -> bool
 
   val weight : t array -> int
   val depth : t array -> int
-  val vars : t array -> FOTerm.varlist
+  val vars : t array -> FOTerm.Set.t
   val is_ground : t array -> bool             (** all the literals are ground? *)
 
   val terms : t array -> FOTerm.t Sequence.t
@@ -189,11 +188,11 @@ module Arr : sig
   val compact : t array -> CompactClause.t
     (** Make a compact clause *)
 
-  val to_form : t array -> FOFormula.t
+  val to_form : t array -> form
     (** Make a 'or' formula from literals *)
 
-  val apply_subst : renaming:Substs.FO.Renaming.t ->
-                    ord:Ordering.t -> Substs.FO.t ->
+  val apply_subst : renaming:Substs.Renaming.t ->
+                    ord:Ordering.t -> Substs.t ->
                     t array -> scope -> t array
 
   val fmap : ord:Ordering.t -> t array -> (FOTerm.t -> FOTerm.t) -> t array
@@ -208,10 +207,10 @@ module Arr : sig
   val to_seq : t array -> (FOTerm.t * FOTerm.t * bool) Sequence.t
     (** Convert the lits into a sequence of equations *)
 
-  val of_forms : ord:Ordering.t -> FOFormula.t list -> t array
+  val of_forms : ord:Ordering.t -> form list -> t array
     (** Convert a list of atoms into literals *)
 
-  val to_forms : t array -> FOFormula.t list
+  val to_forms : t array -> form list
     (** To list of formulas *)
 
   (** {3 High order combinators} *)

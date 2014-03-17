@@ -128,8 +128,8 @@ val of_term_opt : FOTerm.t -> t option
 val to_term : t -> FOTerm.t
   (** convert back to a term *)
 
-val apply_subst : renaming:Substs.FO.Renaming.t ->
-                  Substs.FO.t -> t -> Substs.scope -> t
+val apply_subst : renaming:Substs.Renaming.t ->
+                  Substs.t -> t -> Substs.scope -> t
   (** Apply a substitution to the monome's terms *)
 
 val is_ground : t -> bool

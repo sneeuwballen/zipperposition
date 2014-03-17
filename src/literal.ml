@@ -30,13 +30,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 module T = FOTerm
-module F = FOFormula
+module F = Formula.FO
 module S = Substs.FO
 module TO = Theories.TotalOrder
 module Pos = Position
 module PB = Position.Build
 
 type scope = Substs.scope
+type form = Formula.FO.t
 
 type t =
   | Equation of T.t * T.t * bool * Comparison.t
