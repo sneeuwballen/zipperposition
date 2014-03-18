@@ -62,7 +62,7 @@ module Prover = struct
 
   let p_E = {
     name = "E";
-    command = "eprover --cpu-limit=${timeout} -tAuto -xAuto -l0 --tstp-in --tstp-out";
+    command = "eprover --cpu-limit=${timeout} --auto -l0 --tstp-in --tstp-out";
     unsat = ["SZS status Unsat"; "SZS status Theorem"];
     sat = ["SZS status Satisfiable"; "SZS status CounterTheorem"];
   }

@@ -137,6 +137,7 @@ module Seq : sig
   val max_var : t Sequence.t -> int
   val min_var : t Sequence.t -> int
   val ty_vars : t -> Type.t Sequence.t
+  val typed_symbols : t -> (Symbol.t * Type.t) Sequence.t
 
   val add_set : Set.t -> t Sequence.t -> Set.t
 end

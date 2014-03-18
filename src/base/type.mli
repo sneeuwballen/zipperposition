@@ -178,6 +178,11 @@ val is_ground : t -> bool
 val size : t -> int
   (** Size of type, in number of "nodes" *)
 
+val open_fun : t -> (t list * t)
+  (** [open_fun ty] "unrolls" function arrows from the left, so that
+      [open_fun (a -> (b -> (c -> d)))] returns [[a;b;c], d].
+      @returns the return type and the list of all its arguments *)
+
 val apply : t -> t -> t
   (** Given a function/forall type, and an argument, return the
       type that results from applying the function/forall to the arguments.
@@ -225,7 +230,10 @@ module Conv : sig
   val clear : ctx -> unit
 
   val of_prolog : ctx:ctx -> PrologTerm.t -> t option
-  val to_prolog : ?depth:int -> t -> PrologTerm.t
+  val to_prolog : ?curry:bool -> ?depth:int -> t -> PrologTerm.t
+  (** convert a type to a prolog term.
+      @param depth the number of surrounding De Bruijn binders
+      @param curry if true, keep types curried (default true), otherwise uncurry *)
 end
 
 (** {2 Misc} *)

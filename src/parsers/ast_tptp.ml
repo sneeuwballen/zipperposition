@@ -180,6 +180,11 @@ module type S = sig
     t -> t
   (** Map terms to other terms *)
 
+  module Seq : sig
+    val forms : t -> form Sequence.t
+    val hoterms : t -> hoterm Sequence.t
+  end
+
   (** {2 IO} *)
 
   include Interfaces.PRINT with type t := t
@@ -243,6 +248,18 @@ module Untyped = struct
     | TFF (n,r,f,i) -> TFF(n,r, form f, i)
     | THF (n,r,f,i) -> THF(n,r, hoterm f, i)
     | (TypeDecl _ | NewType _ | IncludeOnly _ | Include _) as d -> d
+
+  module Seq = struct
+    let forms decl k = match decl with
+      | FOF (_,_,f,_)
+      | TFF (_,_,f,_) -> k f
+      | CNF (_,_,c,_) -> List.iter k c
+      | _ -> ()
+
+    let hoterms decl k = match decl with
+      | THF (_,_,f,_) -> k f
+      | _ -> ()
+  end
 
   (** {2 IO} *)
 
@@ -336,6 +353,18 @@ module Typed = struct
     | TFF (n,r,f,i) -> TFF(n,r, form f, i)
     | THF (n,r,f,i) -> THF(n,r, hoterm f, i)
     | (TypeDecl _ | NewType _ | IncludeOnly _ | Include _) as d -> d
+
+  module Seq = struct
+    let forms decl k = match decl with
+      | FOF (_,_,f,_)
+      | TFF (_,_,f,_) -> k f
+      | CNF (_,_,c,_) -> List.iter k c
+      | _ -> ()
+
+    let hoterms decl k = match decl with
+      | THF (_,_,f,_) -> k f
+      | _ -> ()
+  end
 
   (** {2 IO} *)
 

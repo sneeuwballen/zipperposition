@@ -271,6 +271,7 @@ module Seq = struct
     if is_term t then begin
       k t;
       match T.view t with
+      | T.Const _
       | T.Var _
       | T.BVar _ -> ()
       | T.App (f, l) -> subterms f k; List.iter (fun t' -> subterms t' k) l
@@ -324,6 +325,13 @@ module Seq = struct
 
   let ty_vars t =
     subterms t |> Sequence.flatMap (fun t -> Type.Seq.vars (ty t))
+
+  let typed_symbols t =
+    subterms t
+      |> Sequence.fmap
+        (fun t -> match T.view t with
+          | T.Const s -> Some (s, ty t)
+          | _ -> None)
 end
 
 let var_occurs ~var t =

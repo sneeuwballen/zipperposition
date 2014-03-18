@@ -114,6 +114,11 @@ module type S = sig
     t -> t
   (** Map terms to other terms *)
 
+  module Seq : sig
+    val forms : t -> form Sequence.t
+    val hoterms : t -> hoterm Sequence.t
+  end
+
   (** {2 IO} *)
 
   include Interfaces.PRINT with type t := t

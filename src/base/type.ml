@@ -187,6 +187,12 @@ let is_ground = T.ground
 
 let size = T.size
 
+let rec open_fun ty = match view ty with
+  | Fun (x, ret) ->
+      let xs, ret' = open_fun ret in
+      x::xs, ret'
+  | _ -> [], ty
+
 let _error msg = raise (Error msg)
 
 let apply ty arg =
@@ -385,14 +391,18 @@ module Conv = struct
     try Some (of_prolog t)
     with LocalExit -> None
 
-  let to_prolog ?(depth=0) t =
+  let to_prolog ?(curry=true) ?(depth=0) t =
     let rec to_prolog depth t = match view t with
     | Var i -> PT.var (Util.sprintf "A%d" i)
     | BVar i -> PT.var (Util.sprintf "B%d" (depth-i-1))
     | App (s,l) -> PT.app (PT.const s) (List.map (to_prolog depth) l)
-    | Fun (arg, ret) ->
+    | Fun (arg, ret) when curry ->
       PT.app (PT.const Symbol.Base.arrow)
-        [ to_prolog depth arg ; to_prolog depth ret ]
+            [ to_prolog depth ret ; to_prolog depth arg ]
+    | Fun _ ->
+      let args, ret = open_fun t in
+      let args = List.map (to_prolog depth) args in
+      PT.app (PT.const Symbol.Base.arrow) (to_prolog depth ret :: args)
     | Record (l, rest) ->
       let rest = Monad.Opt.map rest (to_prolog depth) in
       PT.record (List.map (fun (n,ty) -> n, to_prolog depth ty) l) ~rest
