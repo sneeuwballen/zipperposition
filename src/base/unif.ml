@@ -54,14 +54,18 @@ module type UNARY = sig
     (** Unify terms, returns a subst or
         @raise Fail if the terms are not unifiable *)
 
-  val matching : ?subst:subst -> pattern:term -> scope -> term -> scope -> subst
+  val matching : ?allow_open:bool -> ?subst:subst ->
+                 pattern:term -> scope -> term -> scope -> subst
     (** [matching ~pattern scope_p b scope_b] returns
         [sigma] such that [sigma pattern = b], or fails.
         Only variables from the scope of [pattern] can  be bound in the subst.
+        @param subst initial substitution (default empty)
+        @param allow_open if true, variables
         @raise Fail if the terms do not match.
         @raise Invalid_argument if the two scopes are equal *)
 
-  val matching_same_scope : ?subst:subst -> scope:scope -> pattern:term -> term -> subst
+  val matching_same_scope : ?subst:subst -> scope:scope ->
+                            pattern:term -> term -> subst
     (** matches [pattern] (more general) with the other term.
      * The two terms live in the same scope, which is passed as the
      * [scope] argument. *)
@@ -374,7 +378,7 @@ module Nary = struct
       | T.RigidVar _, _
       | _, T.RigidVar _ -> fk ()  (* fail *)
       | T.Var _, _ ->
-        if occurs_check subst s sc_s t sc_t || sc_s = sc_t
+        if occurs_check subst s sc_s t sc_t || sc_s = sc_t || not (T.DB.closed t)
           then fk ()
           else k (Substs.bind subst s sc_s t sc_t) fk (* bind s *)
       | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Symbol.eq s1 s2 ->
@@ -564,11 +568,11 @@ module Unary = struct
       | _ when T.ground s && T.ground t ->
         raise Fail (* terms are not equal, and ground. failure. *)
       | T.Var _, _ ->
-        if occurs_check subst s sc_s t sc_t
+        if occurs_check subst s sc_s t sc_t || not (T.DB.closed t) 
           then raise Fail (* occur check *)
           else Substs.bind subst s sc_s t sc_t (* bind s *)
       | _, T.Var _ ->
-        if occurs_check subst t sc_t s sc_s
+        if occurs_check subst t sc_t s sc_s || not (T.DB.closed s)
           then raise Fail (* occur check *)
           else Substs.bind subst t sc_t s sc_s (* bind s *)
       | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Symbol.eq s1 s2 ->
@@ -594,7 +598,7 @@ module Unary = struct
     let subst = unif subst a sc_a b sc_b in
     subst
 
-  let matching ?(subst=Substs.empty) ~pattern sc_a b sc_b =
+  let matching ?(allow_open=false) ?(subst=Substs.empty) ~pattern sc_a b sc_b =
     (* recursive matching *)
     let rec unif subst s sc_s t sc_t =
       let s, sc_s = Substs.get_var subst s sc_s in
@@ -612,6 +616,7 @@ module Unary = struct
         raise Fail (* terms are not equal, and ground. failure. *)
       | T.Var _, _ ->
         if occurs_check subst s sc_s t sc_t || sc_s = sc_t
+        || (not allow_open && not (T.DB.closed t)) 
           then raise Fail
           else Substs.bind subst s sc_s t sc_t (* bind s *)
       | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Symbol.eq s1 s2 ->
@@ -755,10 +760,12 @@ module Ty = struct
     (unification :> ?subst:subst -> term -> scope -> term -> scope -> subst)
 
   let matching =
-    (matching :> ?subst:subst -> pattern:term -> scope -> term -> scope -> subst)
+    (matching :> ?allow_open:bool -> ?subst:subst ->
+        pattern:term -> scope -> term -> scope -> subst)
 
   let matching_same_scope =
-    (matching_same_scope :> ?subst:subst -> scope:scope -> pattern:term -> term -> subst)
+    (matching_same_scope :> ?subst:subst -> scope:scope ->
+        pattern:term -> term -> subst)
 
   let variant =
     (variant :> ?subst:subst -> term -> scope -> term -> scope -> subst)
@@ -781,10 +788,12 @@ module FO = struct
     (unification :> ?subst:subst -> term -> scope -> term -> scope -> subst)
 
   let matching =
-    (matching :> ?subst:subst -> pattern:term -> scope -> term -> scope -> subst)
+    (matching :> ?allow_open:bool -> ?subst:subst ->
+        pattern:term -> scope -> term -> scope -> subst)
 
   let matching_same_scope =
-    (matching_same_scope :> ?subst:subst -> scope:scope -> pattern:term -> term -> subst)
+    (matching_same_scope :> ?subst:subst -> scope:scope ->
+        pattern:term -> term -> subst)
 
   let variant =
     (variant :> ?subst:subst -> term -> scope -> term -> scope -> subst)

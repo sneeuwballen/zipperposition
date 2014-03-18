@@ -53,7 +53,8 @@ module type ORDERED = sig
         performs term rewriting *)
 end
 
-module MakeOrdered(E : Index.EQUATION with type rhs = FOTerm.t) : ORDERED with module E = E
+module MakeOrdered(E : Index.EQUATION with type rhs = FOTerm.t)
+  : ORDERED with module E = E
 
 (** {2 Regular rewriting} *)
 
@@ -76,7 +77,7 @@ module type SIG_TRS = sig
   val size : t -> int
   val iter : t -> (rule -> unit) -> unit
   
-  val rule_to_form : rule -> FOFormula.t
+  val rule_to_form : rule -> Formula.FO.t
     (** Make a formula out of a rule (an equality) *)
 
   val rewrite_collect : t -> FOTerm.t -> FOTerm.t * rule list
@@ -96,8 +97,9 @@ module TRS : SIG_TRS
 
 module FormRW : sig
   type t
+  type form = Formula.FO.t
 
-  type rule = FOTerm.t * FOFormula.t
+  type rule = FOTerm.t * form
     (** rewrite rule, from left to right *)
 
   val empty : unit -> t 
@@ -116,13 +118,13 @@ module FormRW : sig
   val size : t -> int
   val iter : t -> (rule -> unit) -> unit
 
-  val rule_to_form : rule -> FOFormula.t
+  val rule_to_form : rule -> form
     (** Convert the rule back to a term *)
 
-  val rewrite_collect : t -> FOFormula.t -> FOFormula.t * rule list
+  val rewrite_collect : t -> form -> form * rule list
     (** Compute normal form of the formula, and return it together with
         the list of rules that were used to rewrite. *)
 
-  val rewrite : t -> FOFormula.t -> FOFormula.t
+  val rewrite : t -> form -> form
     (** see {!rewrite_collect} *)
 end

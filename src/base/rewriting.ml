@@ -27,8 +27,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 module T = FOTerm
-module F = FOFormula
-module S = Substs.FO
+module F = Formula.FO
+module S = Substs
 
 let prof_ordered_rewriting = Util.mk_profiler "rewriting.ordered"
 let stat_ordered_rewriting = Util.mk_stat "rewriting.ordered.steps"
@@ -38,7 +38,7 @@ let stat_ordered_rewriting = Util.mk_stat "rewriting.ordered.steps"
 module TermHASH = struct
   type t = T.t
   let equal = (==)
-  let hash t = t.T.tag
+  let hash t = T.hash t
 end
 
 (** Memoization cache for rewriting *)
@@ -81,8 +81,8 @@ module MakeOrdered(E : Index.EQUATION with type rhs = T.t) = struct
   let cmp_rule r1 r2 =
     Util.lexicograph_combine
       [ E.compare r1.rule_equation r2.rule_equation
-      ; T.compare r1.rule_left r2.rule_left
-      ; T.compare r1.rule_right r2.rule_right
+      ; T.cmp r1.rule_left r2.rule_left
+      ; T.cmp r1.rule_right r2.rule_right
       ; Pervasives.compare r1.rule_oriented r2.rule_oriented
       ]
 
@@ -151,13 +151,19 @@ module MakeOrdered(E : Index.EQUATION with type rhs = T.t) = struct
   let mk_rewrite trs ~size =
     (* reduce to normal form. [reduce'] is the memoized version of reduce. *)
     let rec reduce reduce' t =
-      match t.T.term with
-      | T.Var _ | T.BoundVar _ -> t
-      | T.Node (s, tyargs, l) ->
+      match T.view t with
+      | T.Var _ | T.BVar _ -> t
+      | T.TyApp (f, ty) ->
+        let f' = reduce' f in
+        if f == f' then t else T.tyapp f' ty
+      | T.Const _ ->
+        rewrite_here reduce' t
+      | T.App (f, l) ->
+        let f' = reduce' f in
         let l' = List.map reduce' l in
-        let t' = if List.for_all2 (==) l l'
+        let t' = if f == f' && List.for_all2 (==) l l'
           then t
-          else T.mk_node ~tyargs s l' in
+          else T.app f' l' in
         (* now rewrite the term itself *)
         rewrite_here reduce' t'
     (* rewrite once at this position. If it succeeds,
@@ -168,11 +174,11 @@ module MakeOrdered(E : Index.EQUATION with type rhs = T.t) = struct
           (fun () _ _ rule subst ->
             (* right-hand part *)
             let r = rule.rule_right in
-            let r' = S.apply_no_renaming subst r 1 in
+            let r' = S.FO.apply_no_renaming subst r 1 in
             if rule.rule_oriented
               then raise (RewrittenInto r')  (* we know that t > r' *)
               else (
-                assert (t == S.apply_no_renaming subst rule.rule_left 1);
+                assert (t == S.FO.apply_no_renaming subst rule.rule_left 1);
                 if Ordering.compare trs.ord t r' = Comparison.Gt
                   then raise (RewrittenInto r')
                   else ()));
@@ -216,7 +222,7 @@ module type SIG_TRS = sig
   val size : t -> int
   val iter : t -> (rule -> unit) -> unit
   
-  val rule_to_form : rule -> FOFormula.t
+  val rule_to_form : rule -> Formula.FO.t
     (** Make a formula out of a rule (an equality) *)
 
   val rewrite_collect : t -> FOTerm.t -> FOTerm.t * rule list
@@ -227,7 +233,8 @@ module type SIG_TRS = sig
     (** Compute normal form of the term. See {!rewrite_collect}. *)
 end
 
-module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E = E) = struct
+module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E = E) =
+struct
   type rule = T.t * T.t
 
   (** Instance of discrimination tree indexing} *)
@@ -235,7 +242,7 @@ module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E =
     type t = rule
     type rhs = T.t
     let compare (l1,r1) (l2,r2) =
-      Util.lexicograph_combine [T.compare l1 l2; T.compare r1 r2]
+      Util.lexicograph_combine [T.cmp l1 l2; T.cmp r1 r2]
     let extract (l,r) = (l,r,true)
     let priority _ = 1
   end)
@@ -247,7 +254,7 @@ module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E =
 
   let add trs (l, r) =
     (* check that the rule does not introduce variables *)
-    assert (List.for_all (fun v -> T.subterm ~sub:v l) (T.vars r));
+    assert (Sequence.for_all (fun v -> T.subterm ~sub:v l) (T.Seq.vars r));
     assert (not (T.is_var l));
     (* add rule to the discrimination tree *)
     let trs = Idx.add trs (l, r) in
@@ -274,7 +281,7 @@ module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E =
   let of_list l =
     add_list (empty ()) l
 
-  let rule_to_form (l, r) = F.mk_eq l r
+  let rule_to_form (l, r) = F.Base.eq l r
 
   (** {2 Computation of normal forms} *)
 
@@ -284,18 +291,23 @@ module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E =
   let rewrite_collect trs t = 
     (* compute normal form of [subst(t, offset)] *)
     let rec compute_nf ~rules subst t offset =
-      match t.T.term with
-      | T.Node (hd, tyargs, l) ->
+      match T.view t with
+      | T.App (f, l) ->
         (* rewrite subterms first *)
+        let f' = compute_nf ~rules subst f offset in
         let l' = List.map (fun t' -> compute_nf ~rules subst t' offset) l in
-        let t' = T.mk_node ~tyargs hd l' in
+        let t' = T.app f' l' in
         (* rewrite at root *)
         reduce_at_root ~rules t'
+      | T.Const _ -> reduce_at_root ~rules t
+      | T.TyApp (f, ty) ->
+        let f' = compute_nf ~rules subst f offset in
+        if f == f' then t else T.tyapp f' ty
       | T.Var _ ->
         (* normal form in subst. No renaming is needed, because all vars in
           lhs are bound to vars in offset 0 *)
-        S.apply_no_renaming subst t offset
-      | T.BoundVar _ -> t
+        S.FO.apply_no_renaming subst t offset
+      | T.BVar _ -> t
     (* assuming subterms of [t] are in normal form, reduce the term *)
     and reduce_at_root ~rules t =
       try
@@ -325,13 +337,14 @@ module TRS = MakeTRS(Dtree.Make)
 
 module FormRW = struct
   type rule = T.t * F.t
+  type form = F.t
 
   (** Instance of discrimination tree indexing} *)
   module DT = Dtree.Make(struct
     type t = rule
     type rhs = F.t
     let compare (l1,r1) (l2,r2) = 
-      Util.lexicograph_combine [T.compare l1 l2; F.compare r1 r2]
+      Util.lexicograph_combine [T.cmp l1 l2; F.cmp r1 r2]
     let extract (l,r) = (l,r,true)
     let priority (l,r) = F.weight r
   end)
@@ -343,7 +356,7 @@ module FormRW = struct
 
   let add trs (l, r) =
     (* check that the rule does not introduce variables *)
-    assert (List.for_all (fun v -> T.subterm ~sub:v l) (F.free_variables r));
+    assert (Sequence.for_all (fun v -> T.subterm ~sub:v l) (F.Seq.vars r));
     assert (not (T.is_var l));
     (* add rule to the discrimination tree *)
     let trs = DT.add trs (l, r) in
@@ -356,7 +369,7 @@ module FormRW = struct
     List.fold_left add trs l
 
   let add_term_rule trs (l,r) =
-    let rule = l, F.mk_atom r in
+    let rule = l, F.Base.atom r in
     add trs rule
 
   let add_term_rules trs seq =
@@ -377,7 +390,7 @@ module FormRW = struct
   let of_list l =
     add_list (empty ()) l
 
-  let rule_to_form (l, r) = F.mk_equiv (F.mk_atom l) r
+  let rule_to_form (l, r) = F.Base.equiv (F.Base.atom l) r
 
   (** {2 Computation of normal forms} *)
 
@@ -387,22 +400,26 @@ module FormRW = struct
   let rewrite_collect frs f =
     let rec compute_nf ~rules subst f scope =
       F.map_leaf
-        (fun leaf -> match leaf.F.form with
+        (fun leaf -> match F.view leaf with
           | F.Atom p ->
             (* rewrite atoms *)
-            let p' = S.apply_no_renaming subst p scope in
+            let p' = S.FO.apply_no_renaming subst p scope in
             reduce_at_root ~rules p'
-          | F.Equal (l,r) ->
-            F.mk_eq
-              (S.apply_no_renaming subst l scope)
-              (S.apply_no_renaming subst r scope)
+          | F.Eq (l,r) ->
+            F.Base.eq
+              (S.FO.apply_no_renaming subst l scope)
+              (S.FO.apply_no_renaming subst r scope)
+          | F.Neq (l,r) ->
+            F.Base.neq
+              (S.FO.apply_no_renaming subst l scope)
+              (S.FO.apply_no_renaming subst r scope)
           | _ -> leaf)
         f
     (* try to rewrite this term at root *)
     and reduce_at_root ~rules t =
       try
         DT.retrieve ~sign:true frs 1 t 0 () rewrite_handler;
-        F.mk_atom t  (* normal form is itself *)
+        F.Base.atom t  (* normal form is itself *)
       with (RewrittenIn (f, subst, rule)) ->
         Util.debug 3 "rewrite %a into %a (with %a)" T.pp t F.pp f S.pp subst;
         rules := rule :: !rules;

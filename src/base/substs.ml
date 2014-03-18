@@ -172,7 +172,7 @@ exception KindError
 
 let bind subst v s_v t s_t =
   if T.kind v <> T.kind t then raise KindError;
-  assert (T.DB.closed t);
+  (*assert (T.DB.closed t); XXX: sometimes useful to allow it *)
   let t', s_t' = get_var subst v s_v in
   if s_t' = s_t && T.eq t' t
     then subst (* compatible (absence of) bindings *)

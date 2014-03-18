@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: e9183522556a03fd4aaba05993102050)
+# DO NOT EDIT (digest: c28b3b253f1d67e261de8462b1128f7e)
 src/base/Symbol
 src/base/ScopedTerm
 src/base/FOTerm
@@ -29,6 +29,7 @@ src/base/NPDtree
 src/base/Congruence
 src/base/FastFingerprint
 src/base/FeatureVector
+src/base/Rewriting
 src/base/lib/Hash
 src/base/lib/Hashcons
 src/base/lib/Sequence

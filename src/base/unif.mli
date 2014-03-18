@@ -45,14 +45,18 @@ module type UNARY = sig
     (** Unify terms, returns a subst or
         @raise Fail if the terms are not unifiable *)
 
-  val matching : ?subst:subst -> pattern:term -> scope -> term -> scope -> subst
+  val matching : ?allow_open:bool -> ?subst:subst ->
+                 pattern:term -> scope -> term -> scope -> subst
     (** [matching ~pattern scope_p b scope_b] returns
         [sigma] such that [sigma pattern = b], or fails.
         Only variables from the scope of [pattern] can  be bound in the subst.
+        @param subst initial substitution (default empty)
+        @param allow_open if true, variables
         @raise Fail if the terms do not match.
         @raise Invalid_argument if the two scopes are equal *)
 
-  val matching_same_scope : ?subst:subst -> scope:scope -> pattern:term -> term -> subst
+  val matching_same_scope : ?subst:subst -> scope:scope ->
+                            pattern:term -> term -> subst
     (** matches [pattern] (more general) with the other term.
      * The two terms live in the same scope, which is passed as the
      * [scope] argument. *)
