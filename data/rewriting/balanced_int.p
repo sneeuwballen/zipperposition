@@ -22,10 +22,10 @@ z_opp (z_3m1 X) --> z_3p1 (z_opp X).
 
 z_minus X Y --> z_plus X (z_opp Y).
 
-z_muz_lt X z_0 --> z_0.
-z_muz_lt X (z_3 Y) --> z_3 (z_muz_lt X Y).
-z_muz_lt X (z_3p1 Y) --> z_plus X (z_3 (z_muz_lt X Y)).
-z_muz_lt X (z_3m1 Y) --> z_plus (z_3 (z_muz_lt X Y)) (z_opp X).
+z_mult X z_0 --> z_0.
+z_mult X (z_3 Y) --> z_3 (z_mult X Y).
+z_mult X (z_3p1 Y) --> z_plus X (z_3 (z_mult X Y)).
+z_mult X (z_3m1 Y) --> z_plus (z_3 (z_mult X Y)) (z_opp X).
 
 % z_positiveitive or null
 val z_positive : $int -> z_bool.
