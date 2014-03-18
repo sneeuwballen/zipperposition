@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 5a87a1adbd7aed3a561ece6bd5027338)
+# DO NOT EDIT (digest: 313c4beb619574989355e249a76643cf)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -20,7 +20,6 @@
 "src/const.cmx": for-pack(Libzipperposition)
 "src/extensions.cmx": for-pack(Libzipperposition)
 "src/literal.cmx": for-pack(Libzipperposition)
-"src/metaProverState.cmx": for-pack(Libzipperposition)
 "src/compactClause.cmx": for-pack(Libzipperposition)
 "src/ctx.cmx": for-pack(Libzipperposition)
 "src/proof.cmx": for-pack(Libzipperposition)
@@ -40,44 +39,53 @@
 "src/containers/sequence.cmx": for-pack(Libzipperposition)
 "src/containers/smallSet.cmx": for-pack(Libzipperposition)
 "src/containers/unionFind.cmx": for-pack(Libzipperposition)
+<src/containers/*.ml{,i}>: package(dynlink)
 <src/containers/*.ml{,i}>: package(logtk)
 <src/containers/*.ml{,i}>: package(logtk.meta)
-<src/containers/*.ml{,i}>: package(unix)
 <src/containers/*.ml{,i}>: package(num)
-<src/containers/*.ml{,i}>: package(dynlink)
+<src/containers/*.ml{,i}>: package(unix)
+# Library libzipperposition_meta
+"src/meta/libzipperposition_meta.cmxs": use_libzipperposition_meta
+<src/meta/*.ml{,i}>: package(dynlink)
+<src/meta/*.ml{,i}>: package(logtk)
+<src/meta/*.ml{,i}>: package(logtk.meta)
+<src/meta/*.ml{,i}>: package(num)
+<src/meta/*.ml{,i}>: package(unix)
+<src/meta/*.ml{,i}>: use_libzipperposition
 # Executable zipperposition
-"src/zipperposition.native": use_libzipperposition
+"src/zipperposition.native": package(dynlink)
 "src/zipperposition.native": package(logtk)
 "src/zipperposition.native": package(logtk.meta)
-"src/zipperposition.native": package(unix)
 "src/zipperposition.native": package(num)
-"src/zipperposition.native": package(dynlink)
-<src/*.ml{,i}>: use_libzipperposition
+"src/zipperposition.native": package(unix)
+"src/zipperposition.native": use_libzipperposition
+<src/*.ml{,i}>: package(dynlink)
 <src/*.ml{,i}>: package(logtk)
 <src/*.ml{,i}>: package(logtk.meta)
-<src/*.ml{,i}>: package(unix)
 <src/*.ml{,i}>: package(num)
-<src/*.ml{,i}>: package(dynlink)
+<src/*.ml{,i}>: package(unix)
+<src/*.ml{,i}>: use_libzipperposition
 # Executable run_tests
-"tests/run_tests.native": use_libzipperposition
-"tests/run_tests.native": package(logtk)
-"tests/run_tests.native": package(logtk.meta)
-"tests/run_tests.native": package(logtk.arbitrary)
+"tests/run_tests.native": package(dynlink)
 "tests/run_tests.native": package(libzipperposition.arbitrary)
+"tests/run_tests.native": package(logtk)
+"tests/run_tests.native": package(logtk.arbitrary)
+"tests/run_tests.native": package(logtk.meta)
+"tests/run_tests.native": package(num)
 "tests/run_tests.native": package(qcheck)
 "tests/run_tests.native": package(unix)
-"tests/run_tests.native": package(num)
-"tests/run_tests.native": package(dynlink)
-<tests/*.ml{,i}>: use_libzipperposition
-<tests/*.ml{,i}>: package(logtk)
-<tests/*.ml{,i}>: package(logtk.meta)
-<tests/*.ml{,i}>: package(logtk.arbitrary)
+"tests/run_tests.native": use_libzipperposition
+<tests/*.ml{,i}>: package(dynlink)
 <tests/*.ml{,i}>: package(libzipperposition.arbitrary)
+<tests/*.ml{,i}>: package(logtk)
+<tests/*.ml{,i}>: package(logtk.arbitrary)
+<tests/*.ml{,i}>: package(logtk.meta)
+<tests/*.ml{,i}>: package(num)
 <tests/*.ml{,i}>: package(qcheck)
 <tests/*.ml{,i}>: package(unix)
-<tests/*.ml{,i}>: package(num)
-<tests/*.ml{,i}>: package(dynlink)
+<tests/*.ml{,i}>: use_libzipperposition
 # OASIS_STOP
+<**/*.ml>: warn_K, warn_Y, warn_X
 <src/const.cmx>: for-pack(Libzipperposition)
 <**/*.cmx>: inline(15)
 <plugins>: not_hygienic

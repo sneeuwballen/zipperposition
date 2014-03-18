@@ -35,7 +35,7 @@ let prof_scan_set = Util.mk_profiler "meta.scan_set"
 let prof_add_lits = Util.mk_profiler "meta.add_lits"
 
 module T = HOTerm
-module F = FOFormula
+module F = Formula.FO
 module PF = PFormula
 module C = Clause
 module M = Logtk_meta
@@ -51,15 +51,10 @@ and source =
   | FromClause of Clause.t
   | FromForm of PFormula.t
 
-module Logic = M.MetaReasoner.Logic
-
-module LitMap = Map.Make(struct
-  type t = Logic.literal
-  let compare = Pervasives.compare
-end)
+module LitMap = HOTerm.Map
 
 type t = {
-  prover : M.MetaProver.t;    (* real meta-prover *)
+  prover : M.Prover.t;    (* real meta-prover *)
   mutable sources : source LitMap.t;     (** for reconstructing proofs *)
   mutable theories : (string * T.t list * source list) list;
   mutable results : result list;

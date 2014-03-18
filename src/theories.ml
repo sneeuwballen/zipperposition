@@ -30,7 +30,7 @@ open Logtk
 
 module STbl = Symbol.Tbl
 module T = FOTerm
-module F = FOFormula
+module F = Formula.FO
 module PF = PFormula
 
 (** {2 Associativity-Commutativity} *)
@@ -81,10 +81,18 @@ module AC = struct
       spec Symbol.Set.empty
 
   let symbols_of_terms ~spec seq =
-    T.ac_symbols ~is_ac:(is_ac ~spec) seq
+    let module A = T.AC(struct
+      let is_ac = is_ac ~spec
+      let is_comm _ = false
+    end) in
+    A.symbols seq
 
   let symbols_of_forms ~spec f =
-    T.ac_symbols ~is_ac:(is_ac ~spec) (Sequence.flatMap F.Seq.terms f)
+    let module A = T.AC(struct
+      let is_ac = is_ac ~spec
+      let is_comm _ = false
+    end) in
+    Sequence.flatMap F.Seq.terms f |> A.symbols
 
   let proofs ~spec =
     STbl.fold
@@ -173,10 +181,10 @@ module TotalOrder = struct
 
   let tstp_instance ~spec =
     try
-      find ~spec Symbol.Arith.less
+      find ~spec Symbol.TPTP.Arith.less
     with Not_found ->
-      let less = Symbol.Arith.less in
-      let lesseq = Symbol.Arith.lesseq in
+      let less = Symbol.TPTP.Arith.less in
+      let lesseq = Symbol.TPTP.Arith.lesseq in
       (* add instance *)
       add ~spec ?proof:None ~less ~lesseq
 

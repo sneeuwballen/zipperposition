@@ -65,7 +65,7 @@ module AC : sig
   val symbols_of_terms : spec:t -> FOTerm.t Sequence.t -> Symbol.Set.t
     (** set of AC symbols occurring in the given term *)
 
-  val symbols_of_forms : spec:t -> FOFormula.t Sequence.t -> Symbol.Set.t
+  val symbols_of_forms : spec:t -> Formula.FO.t Sequence.t -> Symbol.Set.t
     (** Set of AC symbols occurring in the given formula *)
 
   val proofs : spec:t -> Proof.t list
@@ -80,7 +80,9 @@ module TotalOrder : sig
     lesseq : Symbol.t;
     proof : Proof.t list;
   } (** A single instance of total ordering. A proof is provided to
-        justify why the symbols make a total ordering. *)
+        justify why the symbols make a total ordering.
+        Both symbols are assume to have type
+        [forall x. (x * x) > $o]. *)
 
   type t 
 

@@ -64,6 +64,9 @@ val clause_weight : t
 val goals : t
   (** only select goals (clauses with only negative lits) *)
 
+val non_goals : t
+  (** only select non-goals *)
+
 val ground : t
   (** only select ground clauses *)
 

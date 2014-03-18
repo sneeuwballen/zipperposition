@@ -29,10 +29,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module F = FOFormula
+module F = Formula.FO
+type form = F.t
 
 type t = {
-  form : FOFormula.t;
+  form : F.t;
   proof : Proof.t;
   mutable id : int;
   mutable simpl_to : t option;
@@ -43,12 +44,12 @@ type pform = t
 let eq t1 t2 = F.eq t1.form t2.form && Proof.eq t1.proof t2.proof
 let hash t = Hash.hash_int2 (F.hash t.form) (Proof.hash t.proof)
 let cmp t1 t2 =
-  let c = F.compare t1.form t2.form in
+  let c = F.cmp t1.form t2.form in
   if c <> 0 then c else Proof.cmp t1.proof t2.proof
 
 let eq_noproof t1 t2 = F.eq t1.form t2.form
 
-let cmp_noproof t1 t2 = F.compare t1.form t2.form
+let cmp_noproof t1 t2 = F.cmp t1.form t2.form
 
 module H = Hashcons.Make(struct
   type t = pform
@@ -93,14 +94,16 @@ let simpl_to ~from ~into =
 let symbols ?init f = F.symbols ?init f.form
 
 let pp buf t = F.pp buf t.form
-let pp_tstp buf t = F.pp_tstp buf t.form
+let pp_tstp buf t = F.TPTP.pp buf t.form
 let to_string t = F.to_string t.form
 let fmt fmt t = F.fmt fmt t.form
 
+(*
 let bij = Bij.(map
   ~inject:(fun pf -> pf.form, pf.proof)
   ~extract:(fun (form,proof) -> create form proof)
   (pair F.bij Proof.bij))
+*)
 
 (** {2 Set of formulas} *)
 

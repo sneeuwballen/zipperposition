@@ -117,9 +117,6 @@ type t = {
 
   mutable on_empty : (Clause.t -> unit) list;
     (** Callbacks for empty clause detection *)
-
-  mutable evaluator : Evaluator.FO.t;
-    (** Evaluator *)
 }
 
 (** {2 Basic operations} *)
@@ -143,7 +140,6 @@ let create ?meta ~ctx params signature =
     state;
     empty_clauses = C.CSet.empty;
     on_empty = [];
-    evaluator = Evaluator.FO.create ();
   } in
   env
 
@@ -232,9 +228,6 @@ let add_rewrite_rule ~env name rule =
 
 let add_lit_rule ~env name rule =
   env.lit_rules <- (name, rule) :: env.lit_rules
-
-let interpret_symbol ~env s rule =
-  Evaluator.FO.register env.evaluator s rule
 
 let interpret_symbols ~env l =
   List.iter (fun (s,rule) -> interpret_symbol ~env s rule) l
@@ -364,16 +357,7 @@ let rewrite ~env c =
   let applied_rules = ref (SmallSet.empty ~cmp:String.compare) in
   let rec reduce_term rules t =
     match rules with
-    | [] ->
-      (* all rules tried, now evaluate *)
-      let t' = Evaluator.FO.eval env.evaluator t in
-      if T.eq t t'
-        then t
-        else begin
-          applied_rules := SmallSet.add !applied_rules "evaluation";
-          Util.debug 5 "Env: rewrite %a into %a" T.pp t T.pp t';
-          reduce_term env.rewrite_rules t'  (* re-apply rules *)
-        end
+    | [] -> t
     | (name, r)::rules' ->
       let t' = r t in
       if t != t'

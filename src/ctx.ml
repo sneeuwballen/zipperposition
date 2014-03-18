@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module S = Substs.FO
+module S = Substs
 
 type scope = Substs.scope
 
@@ -48,10 +48,10 @@ let create ?(ord=Ordering.none) ?(select=Selection.no_select) ~signature () =
   let ctx = {
     ord=ord;
     select=select;
-    skolem = Skolem.create ~prefix:"zsk" ();
+    skolem = Skolem.create ~prefix:"zsk" signature;
     signature;
     complete=true;
-    renaming = S.Renaming.create 13;
+    renaming = S.Renaming.create ();
     ac = Theories.AC.create ();
     total_order = Theories.TotalOrder.create ();
   } in
@@ -75,7 +75,11 @@ let is_completeness_preserved ~ctx = ctx.complete
 
 let add_signature ~ctx signature =
   ctx.signature <- Signature.merge ctx.signature signature;
-  ctx.ord <- Ordering.add_seq ctx.ord (Sequence.map snd (Signature.to_seq ctx.signature));
+  ctx.ord <-
+    ctx.signature
+      |> Signature.Seq.to_seq
+      |> Sequence.map fst
+      |> Ordering.add_seq ctx.ord;
   ()
 
 let ac ~ctx = ctx.ac
@@ -107,11 +111,8 @@ let add_order ~ctx ?proof ~less ~lesseq =
     *)
     instance
 
-let declare_ty ~ctx symb ty =
-  ctx.signature <- Signature.declare_ty ctx.signature symb ty
-
-let declare_sym ~ctx symb =
-  ctx.signature <- Signature.declare_sym ctx.signature symb
+let declare ~ctx symb ty =
+  ctx.signature <- Signature.declare ctx.signature symb ty
 
 let add_tstp_order ~ctx =
   let less = Symbol.Arith.less in

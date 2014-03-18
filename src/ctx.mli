@@ -37,7 +37,7 @@ type t = private {
   mutable skolem : Skolem.ctx;        (** Context for skolem symbols *)
   mutable signature : Signature.t;    (** Signature *)
   mutable complete : bool;            (** Completeness preserved? *)
-  renaming : Substs.FO.Renaming.t;    (** Renaming, always useful... *)
+  renaming : Substs.Renaming.t;       (** Renaming, always useful... *)
   ac : Theories.AC.t;                 (** AC symbols *)
   total_order : Theories.TotalOrder.t;(** Total ordering *)
 }
@@ -61,7 +61,7 @@ val ac : ctx:t -> Theories.AC.t
 
 val total_order : ctx:t -> Theories.TotalOrder.t
 
-val renaming_clear : ctx:t -> Substs.FO.Renaming.t
+val renaming_clear : ctx:t -> Substs.Renaming.t
   (** Obtain the global renaming. The renaming is cleared before
       it is returned. *)
 
@@ -86,8 +86,5 @@ val add_order : ctx:t -> ?proof:Proof.t list ->
 val add_tstp_order : ctx:t -> Theories.TotalOrder.instance
   (** Specific version of {!add_order} for $less and $lesseq *)
 
-val declare_ty : ctx:t -> string -> Type.t -> unit
+val declare : ctx:t -> string -> Type.t -> unit
   (** Declare the type of a symbol (updates signature) *)
-
-val declare_sym : ctx:t -> Symbol.t -> unit
-  (** Declare the symbol *)

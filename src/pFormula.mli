@@ -29,8 +29,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+type form = Formula.FO.t
+
 type t = private {
-  form : FOFormula.t;
+  form : form;
   proof : Proof.t;
   mutable id : int;
   mutable simpl_to : t option;
@@ -38,7 +40,7 @@ type t = private {
 
 type pform = t
 
-val get_form : t -> FOFormula.t
+val get_form : t -> form
 val get_proof : t -> Proof.t
 
 val eq : t -> t -> bool
@@ -49,13 +51,13 @@ val eq_noproof : t -> t -> bool
 val cmp_noproof : t -> t -> int
   (** Compare only by formula, not by proof *)
 
-val create : ?follow:bool -> FOFormula.t -> Proof.t -> t
+val create : ?follow:bool -> form -> Proof.t -> t
   (** Create a formula from a proof. If the formula already has a proof,
       then the old proof is kept. PFormulas are hashconsed.
       @param follow follow simpl_to links if the formula has any (default false) *)
 
-val of_sourced : ?role:string -> FOFormula.sourced_form -> t
-val to_sourced : t -> FOFormula.sourced_form option
+val of_sourced : ?role:string -> Formula.FO.sourced_form -> t
+val to_sourced : t -> Formula.FO.sourced_form option
 
 val follow_simpl : t -> t
   (** Follow the "simplify to" links until the formula has None *)
@@ -70,8 +72,6 @@ val pp : Buffer.t -> t -> unit
 val pp_tstp : Buffer.t -> t -> unit
 val to_string : t -> string
 val fmt : Format.formatter -> t -> unit
-
-val bij : t Bij.t
 
 (** {2 Set of formulas} *)
 

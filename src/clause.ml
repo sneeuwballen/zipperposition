@@ -29,17 +29,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+module ST = ScopedTerm
 module T = FOTerm
-module S = Substs.FO
+module S = Substs
 module Lit = Literal
 module Lits = Literal.Arr
 
 let stat_fresh = Util.mk_stat "fresh_clause"
 let stat_mk_hclause = Util.mk_stat "mk_hclause"
 let stat_new_clause = Util.mk_stat "new_clause"
-let prof_check_max_lit = Util.mk_profiler "check_max_lit"
 let prof_mk_hclause = Util.mk_profiler "mk_hclause"
-let prof_mk_hclause_raw = Util.mk_profiler "mk_hclause_raw"
 
 (** {2 Type def} *)
 
@@ -52,7 +51,6 @@ type t = {
   mutable hcflags : int;                  (** boolean flags for the clause *)
   mutable hcweight : int;                 (** weight of clause *)
   mutable hcselected : BV.t;              (** bitvector for selected literals *)
-  mutable hcvars : FOTerm.t list;           (** the free variables *)
   mutable hcproof : Proof.t;              (** Proof of the clause *)
   mutable hcparents : t list;             (** parents of the clause *)
   mutable hcdescendants : int SmallSet.t ;(** the set of IDs of descendants of the clause *)
@@ -94,6 +92,8 @@ let compare hc1 hc2 = hc1.hctag - hc2.hctag
 
 let hash c = Lits.hash c.hclits
 
+let is_ground c = get_flag flag_ground c
+
 module CHashtbl = Hashtbl.Make(struct
   type t = clause
   let hash c = hash c
@@ -115,20 +115,6 @@ end
 
 (** {2 Utils} *)
 
-(** comparison of variables by index *)
-let compare_vars a b =
-  match a.T.term, b.T.term with
-  | T.Var i, T.Var j -> i - j
-  | _ -> assert false
-
-(** check whether variables are from 0 to n *)
-let check_normal vars =
-  let rec check prev = function
-  | [] -> true
-  | {T.term=T.Var n}::l -> n = prev+1 && check n l
-  | _ -> assert false
-  in check (-1) vars
-
 (** [is_child_of ~child c] is to be called to remember that [child] is a child
     of [c], is has been infered/simplified from [c] *)
 let is_child_of ~child c =
@@ -138,11 +124,13 @@ let is_child_of ~child c =
 
 (* see if [c] is known to simplify into some other clause *)
 let rec _follow_simpl n c =
-  if n > 10_000 then failwith (Util.sprintf "follow_simpl loops on %a" Lits.pp c.hclits);
+  if n > 10_000 then
+    failwith (Util.sprintf "follow_simpl loops on %a" Lits.pp c.hclits);
   match c.hcsimplto with
   | None -> c
   | Some c' ->
-    Util.debug 3 "clause %a already simplified to %a" Lits.pp c.hclits Lits.pp c'.hclits;
+    Util.debug 3 "clause %a already simplified to %a"
+      Lits.pp c.hclits Lits.pp c'.hclits;
     _follow_simpl (n+1) c'
 
 let follow_simpl c = _follow_simpl 0 c
@@ -176,7 +164,6 @@ let create_a ?parents ?selected ~ctx lits proof =
   let lits = Lits.apply_subst ~renaming ~ord:ctx.Ctx.ord
     S.empty lits 0 in
   *)
-  let all_vars = Lits.vars lits in
   (* proof *)
   let proof' = proof (Lits.compact lits) in
   (* create the structure *)
@@ -187,7 +174,6 @@ let create_a ?parents ?selected ~ctx lits proof =
     hctag = (-1);
     hcweight = 0;
     hcselected = __no_select;
-    hcvars = all_vars;
     hcproof = proof';
     hcparents = [];
     hcdescendants = SmallSet.empty ~cmp:(fun i j -> i-j);
@@ -203,7 +189,7 @@ let create_a ?parents ?selected ~ctx lits proof =
     (* compute weight *)
     c.hcweight <- Lits.weight lits;
     (* compute flags *)
-    (if Lits.is_ground lits then set_flag flag_ground c true);
+    if Lits.is_ground lits then set_flag flag_ground c true;
     (* parents *)
     begin match parents with
     | None -> ()
@@ -261,7 +247,7 @@ let check_ord ~ord c =
 
 (** Apply substitution to the clause. Note that using the same renaming for all
     literals is important. *)
-let rec apply_subst ~renaming subst c scope =
+let apply_subst ~renaming subst c scope =
   let ctx = c.hcctx in
   let ord = Ctx.ord ~ctx in
   let lits = Array.map
@@ -381,6 +367,10 @@ let from_forms ?(role="axiom") ~file ~name ~ctx forms =
   let lits = Lits.of_forms ~ord:ctx.Ctx.ord forms in
   let proof c = Proof.mk_c_file ~role ~file ~name c in
   create_a ~ctx lits proof
+
+module Seq = struct
+  let lits c = Sequence.of_array c.hclits
+end
 
 (** {2 Filter literals} *)
 
@@ -529,7 +519,7 @@ module WithPos = struct
   let compare t1 t2 =
     let c = t1.clause.hctag - t2.clause.hctag in
     if c <> 0 then c else
-    let c = T.compare t1.term t2.term in
+    let c = T.cmp t1.term t2.term in
     if c <> 0 then c else
     Position.compare t1.pos t2.pos
 
@@ -580,22 +570,4 @@ let pp_set_tstp buf set =
   Sequence.iter
     (fun c -> pp_tstp buf c; Buffer.add_char buf '\n')
     (CSet.to_seq set)
-
-let bij ~ctx =
-  let ord = Ctx.ord ctx in
-  Bij.(map
-    ~inject:(fun c -> c.hclits, c.hcproof)
-    ~extract:(fun (lits,proof) ->
-      let proof = Proof.adapt_c proof in
-      create_a ~ctx lits proof)
-    (pair (Lits.bij ~ord) Proof.bij)
-    )
-
-let bij_set ~ctx =
-  Bij.(map
-    ~inject:(fun set ->
-      let l = CSet.fold set [] (fun acc _ c -> c :: acc) in
-      l)
-    ~extract:(fun l -> CSet.add_list CSet.empty l)
-    (list_ (bij ~ctx)))
 

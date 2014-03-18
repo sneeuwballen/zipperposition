@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 23bce70c701c3929f885a58219a3a13e)
+# DO NOT EDIT (digest: 4794cbbc9e7f06a8c68a7f488fd06118)
 version = "0.3"
 description =
 "Superposition theorem prover, for first order logic with equality."
@@ -9,5 +9,16 @@ archive(byte, plugin) = "libzipperposition.cma"
 archive(native) = "libzipperposition.cmxa"
 archive(native, plugin) = "libzipperposition.cmxs"
 exists_if = "libzipperposition.cma"
+package "meta" (
+ version = "0.3"
+ description =
+ "Superposition theorem prover, for first order logic with equality."
+ requires = "libzipperposition logtk logtk.meta"
+ archive(byte) = "libzipperposition_meta.cma"
+ archive(byte, plugin) = "libzipperposition_meta.cma"
+ archive(native) = "libzipperposition_meta.cmxa"
+ archive(native, plugin) = "libzipperposition_meta.cmxs"
+ exists_if = "libzipperposition_meta.cma"
+)
 # OASIS_STOP
 

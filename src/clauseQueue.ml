@@ -114,9 +114,8 @@ let goals =
   mk_queue ~accept:is_goal_clause ~weight:(fun c -> c.C.hcweight * C.length c) name
 
 let ground =
-  let is_ground c = c.C.hcvars = [] in
   let name = "prefer_ground" in
-  mk_queue ~accept:is_ground ~weight:(fun c -> c.C.hcweight * C.length c) name
+  mk_queue ~accept:C.is_ground ~weight:(fun c -> c.C.hcweight * C.length c) name
 
 let non_goals =
   (* check whether a literal is a goal *)

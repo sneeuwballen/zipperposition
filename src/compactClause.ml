@@ -28,9 +28,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module F = FOFormula
+module F = Formula.FO
 
-type t = FOFormula.t array lazy_t
+type form = F.t
+
+type t = form array lazy_t
 
 let eq (lazy c1) (lazy c2) =
   try
@@ -43,7 +45,7 @@ let hash (lazy c) =
 
 (* TODO: optimize *)
 let cmp (lazy c1) (lazy c2) =
-  Util.lexicograph F.compare (Array.to_list c1) (Array.to_list c2)
+  Util.lexicograph F.cmp (Array.to_list c1) (Array.to_list c2)
 
 let is_empty (lazy c) = Array.length c = 0
 
@@ -60,8 +62,8 @@ let pp buf c =
 let pp_tstp buf c =
   match c with
   | lazy [| |] -> Buffer.add_string buf "$false"
-  | lazy [| x |] -> F.pp_tstp buf x
-  | lazy l -> Printf.bprintf buf "(%a)" (Util.pp_array ~sep:" | " F.pp_tstp) l
+  | lazy [| x |] -> F.TPTP.pp buf x
+  | lazy l -> Printf.bprintf buf "(%a)" (Util.pp_array ~sep:" | " F.TPTP.pp) l
 
 let to_string c =
   Util.on_buffer pp c
@@ -69,8 +71,3 @@ let to_string c =
 let fmt fmt c =
   Format.pp_print_string fmt (to_string c)
 
-let bij =
-  Bij.(map
-    ~inject:(fun (lazy c) -> c)
-    ~extract:(fun c -> Lazy.from_val c)
-    (array_ F.bij))

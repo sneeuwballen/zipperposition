@@ -29,6 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+type form = Formula.FO.t
+
 (** Classification of proof steps *)
 type step_kind =
   | Inference of string
@@ -38,7 +40,7 @@ type step_kind =
   | Trivial (** trivial, or trivial within theories *)
 
 type step_result =
-  | Form of FOFormula.t
+  | Form of form
   | Clause of CompactClause.t
 
 type t = private {
@@ -60,20 +62,20 @@ val cmp : t -> t -> int
 In all the following constructors, [theories] defaults to the empty list.
 Axiom constructors have default role "axiom" *)
 
-val mk_f_trivial : ?info:string list -> ?theories:string list -> FOFormula.t -> t
+val mk_f_trivial : ?info:string list -> ?theories:string list -> form -> t
 
 val mk_f_file : ?info:string list -> ?theories:string list ->
                 role:string -> file:string -> name:string ->
-                FOFormula.t -> t
+                form -> t
 
 val mk_f_inference : ?info:string list -> ?theories:string list -> rule:string ->
-                     FOFormula.t -> t list -> t
+                     form -> t list -> t
 
 val mk_f_simp : ?info:string list -> ?theories:string list -> rule:string ->
-                 FOFormula.t -> t list -> t
+                 form -> t list -> t
 
 val mk_f_esa : ?info:string list -> ?theories:string list -> rule:string ->
-                FOFormula.t -> t list -> t
+                form -> t list -> t
 
 val mk_c_trivial : ?info:string list -> ?theories:string list -> CompactClause.t -> t
 
@@ -90,7 +92,7 @@ val mk_c_simp : ?info:string list -> ?theories:string list -> rule:string ->
 val mk_c_esa : ?info:string list -> ?theories:string list -> rule:string ->
                 CompactClause.t -> t list -> t
 
-val adapt_f : t -> FOFormula.t -> t
+val adapt_f : t -> form -> t
 val adapt_c : t -> CompactClause.t -> t
 
 val is_trivial : t -> bool
@@ -137,9 +139,6 @@ val share : t -> t
 
 val as_graph : (t, t, string) LazyGraph.t
   (** Get a graph of the proof *)
-
-val bij : t Bij.t
-  (** TODO, not implemented *)
 
 (** {2 IO} *)
 

@@ -97,11 +97,9 @@ type t =
     simpl_set : SimplSet.t;              (** index for forward demodulation *)
     active_set : ActiveSet.t;            (** active clauses *)
     passive_set : PassiveSet.t;          (** passive clauses *)
-    meta_prover : MetaProverState.t option;
   >
 
-val create : ctx:Ctx.t -> ?meta:MetaProverState.t ->
-             Params.t -> Signature.t -> t
+val create : ctx:Ctx.t -> Params.t -> Signature.t -> t
   (** create a state from the given ordering, and parameters *)
 
 type stats = int * int * int

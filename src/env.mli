@@ -140,12 +140,6 @@ val add_rewrite_rule : env:t -> string -> term_rewrite_rule -> unit
 val add_lit_rule : env:t -> string -> lit_rewrite_rule -> unit
   (** Add a literal rewrite rule *)
 
-val interpret_symbol : env:t -> Symbol.t -> Evaluator.FO.eval_fun -> unit
-  (** Add an evaluation function for a symbol. The evaluation
-      function will be used by {!simplify}. *)
-
-val interpret_symbols : env:t -> (Symbol.t * Evaluator.FO.eval_fun) list -> unit
-
 (** {2 Use the Env} *)
 
 val simplify : env:t -> Clause.t -> Clause.t
