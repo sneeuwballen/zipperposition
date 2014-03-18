@@ -589,7 +589,11 @@ module TPTP = struct
     let depth = ref depth in
     (* recursive printing *)
     let rec pp_rec buf t = match view t with
-    | BVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
+    | BVar i ->
+        Printf.bprintf buf "Y%d" (!depth - i - 1);
+        (* print type of term *)
+        if !print_all_types || not (Type.eq (ty t) Type.TPTP.i)
+          then Printf.bprintf buf ":%a" Type.TPTP.pp (ty t)
     | Const s -> Symbol.TPTP.pp buf s
     | App _
     | TyApp _ ->
@@ -602,7 +606,11 @@ module TPTP = struct
         end;
         Util.pp_list pp_rec buf args;
         Buffer.add_string buf ")"
-    | Var i -> Printf.bprintf buf "X%d" i
+    | Var i ->
+        Printf.bprintf buf "X%d" i;
+        (* print type of term *)
+        if !print_all_types || not (Type.eq (ty t) Type.TPTP.i)
+          then Printf.bprintf buf ":%a" Type.TPTP.pp (ty t)
     in
     pp_rec buf t
 

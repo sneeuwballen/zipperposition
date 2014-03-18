@@ -196,7 +196,7 @@ let detect_theories ~st clauses =
 
 module BalancedInt = struct
   module T = FOTerm
-  module A = T.TPTP.Arith
+  module F = Formula.FO
 
   (* intermediate representation *)
   type b_int = Zero | Z1 of b_int | Z0 of b_int | Zj of b_int
@@ -245,29 +245,54 @@ module BalancedInt = struct
   (* conversion of terms *)
 
   let __ty2 = Type.(TPTP.int <== [TPTP.int; TPTP.int])
+  let __ty_bool = Type.const (Symbol.of_string "z_bool")
+  let __ty2b = Type.(__ty_bool <== [TPTP.int; TPTP.int])
 
   let __z_opp = T.const ~ty:__ty1 (Symbol.of_string "z_opp")
   let __z_plus = T.const ~ty:__ty2 (Symbol.of_string "z_plus")
   let __z_minus = T.const ~ty:__ty2 (Symbol.of_string "z_plus")
   let __z_mult = T.const ~ty:__ty2 (Symbol.of_string "z_plus")
 
+  let __b_true = T.const ~ty:__ty_bool (Symbol.of_string "b_true")
+  let __b_false = T.const ~ty:__ty_bool (Symbol.of_string "b_false")
+  let __b_istrue =
+    T.const ~ty:Type.(TPTP.o <=. __ty_bool) (Symbol.of_string "b_istrue")
+
+  let __z_less = T.const ~ty:__ty2b (Symbol.of_string "z_lt")
+  let __z_lesseq = T.const ~ty:__ty2b (Symbol.of_string "z_leq")
+  let __z_greater = T.const ~ty:__ty2b (Symbol.of_string "z_gt")
+  let __z_greatereq = T.const ~ty:__ty2b (Symbol.of_string "z_geq")
+
+  let __mk_istrue t = T.app __b_istrue [t]
+
+  module SA = Symbol.TPTP.Arith
+
   let rec convert_term t =
     let hd, tyargs, args = T.open_app t in
     match T.view hd, args with
-    | _, [a;b] when T.eq hd A.sum ->
+    | T.Const s, [a;b] when Symbol.eq s SA.sum ->
         T.app __z_plus [convert_term a; convert_term b]
-    | _, [a;b] when T.eq hd A.difference ->
+    | T.Const s, [a;b] when Symbol.eq s SA.difference ->
         T.app __z_minus [convert_term a; convert_term b]
-    | _, [a;b] when T.eq hd A.product ->
+    | T.Const s, [a;b] when Symbol.eq s SA.product ->
         T.app __z_mult [convert_term a; convert_term b]
+    | T.Const s, [a;b] when Symbol.eq s SA.less ->
+        __mk_istrue (T.app __z_less [convert_term a; convert_term b])
+    | T.Const s, [a;b] when Symbol.eq s SA.lesseq ->
+        __mk_istrue (T.app __z_lesseq [convert_term a; convert_term b])
+    | T.Const s, [a;b] when Symbol.eq s SA.greater ->
+        __mk_istrue (T.app __z_greater [convert_term a; convert_term b])
+    | T.Const s, [a;b] when Symbol.eq s SA.greatereq ->
+        __mk_istrue (T.app __z_greatereq [convert_term a; convert_term b])
     | T.Const (Symbol.Int n), [] ->
         (* convert integer literal *)
         term_of_b_int (bint_of_int n)
+    | T.Const (Symbol.Rat _), _ ->
+        failwith "cannot deal with rationnals"
     | (T.Var _ | T.BVar _), [] -> t
     | _ -> T.app_full hd tyargs (List.map convert_term args)
-  (* TODO: convert predicates too ($less etc.) *)
 
-  let convert_form = Formula.FO.map convert_term
+  let convert_form = F.map convert_term
 
   let convert_decl d = Ast_tptp.Typed.map ~form:convert_form d
 
@@ -284,11 +309,17 @@ module BalancedInt = struct
         E.return (signature, rules')
     )
 
+  (* axioms:
+      istrue(b_true)
+      ~istrue(b_false)
+      !X:bool,  X=b_true | X=b_false
+  *)
   let axioms =
-    []
-    (* TODO: axioms for booleans, for comparisons
-    [ T.app (T.const (Symbol.of_string 
-    *)
+    let x = T.var ~ty:__ty_bool 0 in
+    [ F.Base.atom (__mk_istrue __b_true)
+    ; F.Base.not_ (F.Base.atom (__mk_istrue __b_false))
+    ; F.Base.or_ [F.Base.eq x __b_true; F.Base.eq x __b_false]
+    ]
 
   (* parse axioms from fil, update state. *)
   let axioms_and_rules ~filename st =
@@ -308,7 +339,7 @@ end
 let convert_balanced_arith decls =
   (* convert declarations (encode ints, etc.) *)
   let decls = Sequence.map BalancedInt.convert_decl decls in
-  decls
+  Sequence.persistent decls
 
 (* given a partial ordering from LPO, build arguments for E *)
 let precedence_to_E_arg prec =
@@ -430,7 +461,7 @@ let main () =
     CallProver.Eprover.cnf ~opts:["--free-numbers"] decls
     >>= fun decls ->
     (* extract into typed clauses *)
-    Util_tptp.infer_types (`sign Signature.TPTP.base) decls
+    Util_tptp.infer_types (`sign Signature.TPTP.Arith.signature) decls
     >>= fun (_sign, decls) ->
     (* global state *)
     let state = State.of_prover prover in
@@ -479,13 +510,19 @@ let main () =
     let args = precedence_to_E_arg precedence @ ["--memory-limit=512"] in
     (* build final sequence of declarations: add rules/axioms, then add
       type declarations *)
+    Util.debug 5 "build prelude...";
     let prelude_decls =
       axioms_of_rules state.State.rewrite
       |> List.rev_append state.State.axioms
       |> axioms_to_decls
     in
+    Util.debug 5 "prelude built";
     let decls = Sequence.append prelude_decls decls in
+    Util.debug 5 "all decls:\n  %a\n"
+      (Util.pp_seq ~sep:"\n  " Ast_tptp.Typed.pp)
+      decls;
     let decls = Sequence.append (ty_declarations decls) decls in
+    Util.debug 5 "erase types...";
     let final_decls = erase_types decls in
     (* yield to E *)
     if !flag_print_problem
