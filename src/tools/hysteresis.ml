@@ -131,7 +131,7 @@ let erase_types decls =
   Sequence.map
     (M.map ~form:(Formula.FO.to_prolog ~depth:0)
       ~ho:(fun _ -> failwith "HOT.to_prolog missing")
-      ~ty:(Type.Conv.to_prolog ~depth:0))
+      ~ty:(Type.Conv.to_prolog ~curry:false ~depth:0))
     decls
 
 (** STATE: STORE RULES, AXIOMS, PRE-REWRITE RULES *)
@@ -265,6 +265,7 @@ module BalancedInt = struct
         term_of_b_int (bint_of_int n)
     | (T.Var _ | T.BVar _), [] -> t
     | _ -> T.app_full hd tyargs (List.map convert_term args)
+  (* TODO: convert predicates too ($less etc.) *)
 
   let convert_form = Formula.FO.map convert_term
 
@@ -319,7 +320,7 @@ let precedence_to_E_arg prec =
           (fun (l,r) -> Util.sprintf "%a>%a" Symbol.pp l Symbol.pp r)
           prec)
       in
-      ["--term-ordering=LPO4"; "--precedence='" ^ prec_str ^ "'"]
+      ["--term-ordering=LPO4"; "-G"; "invfreq"; "--precedence='" ^ prec_str ^ "'"]
 
 (* list of rules -> list of formulas *)
 let axioms_of_rules rules =
@@ -333,6 +334,33 @@ let axioms_to_decls axioms =
       (fun i f ->
         let name = Ast_tptp.NameString (Util.sprintf "hyst_axiom_%d" i) in
         Ast_tptp.Typed.TFF(name, Ast_tptp.R_axiom, f, []))
+
+(* is the type a boring FOF type? *)
+let _standard_tptp_ty ty =
+  Type.Seq.sub ty
+    |> Sequence.for_all
+      (fun ty -> match Type.view ty with
+        | Type.App (s, _) -> Symbol.eq s Symbol.TPTP.i || Symbol.eq s Symbol.TPTP.o
+        | _ -> true)
+
+(* type declarations to pre-prend *)
+let ty_declarations decls =
+  let signature = decls
+    |> Sequence.flatMap Ast_tptp.Typed.Seq.forms
+    |> Sequence.flatMap Formula.FO.Seq.terms
+    |> Sequence.flatMap FOTerm.Seq.typed_symbols
+    |> Signature.Seq.of_seq
+  in
+  (* remove "standard" types that don't need be declared *)
+  let signature = Signature.diff signature Signature.TPTP.base in
+  let signature = Signature.filter signature
+    (fun _ ty -> not (_standard_tptp_ty ty)) in
+  signature
+    |> Signature.Seq.to_seq
+    |> Sequence.mapi
+        (fun i (s,ty) ->
+          let name = Ast_tptp.NameString (Util.sprintf "hyst_decl_%d" i) in
+          Ast_tptp.Typed.TypeDecl (name, Symbol.to_string s, ty))
 
 (** PRINTERS *)
 
@@ -449,13 +477,15 @@ let main () =
           []
     in
     let args = precedence_to_E_arg precedence @ ["--memory-limit=512"] in
-    (* build final sequence of declarations *)
+    (* build final sequence of declarations: add rules/axioms, then add
+      type declarations *)
     let prelude_decls =
       axioms_of_rules state.State.rewrite
       |> List.rev_append state.State.axioms
       |> axioms_to_decls
     in
     let decls = Sequence.append prelude_decls decls in
+    let decls = Sequence.append (ty_declarations decls) decls in
     let final_decls = erase_types decls in
     (* yield to E *)
     if !flag_print_problem
@@ -465,10 +495,6 @@ let main () =
     flush stdout;
     CallProver.call ~args ?timeout:!timeout ~prover:CallProver.Prover.p_E final_decls
   )
-
-(* FIXME: when calling E, use FOF/CNF when possible, but TFF when
-   necessary (e.g. for arith) ---> check whether there are other types,
-   and declare them if needed. *)
 
 let () =
   parse_args ();
