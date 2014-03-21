@@ -56,6 +56,7 @@ let flag_print_problem = ref false
 let flag_print_detected = ref false
 let flag_balanced_arith = ref false
 let flag_print_precedence = ref false
+let flag_print_e_output = ref false
 
 let add_file f = files := f :: !files
 let add_theory f = theory_files := f :: !theory_files
@@ -72,6 +73,7 @@ let options =
   ; "-print-rules", Arg.Set flag_print_rules, "print the rewrite rules"
   ; "-print-detected", Arg.Set flag_print_detected, "print the detected theories and others"
   ; "-print-precedence", Arg.Set flag_print_precedence, "print precedence given to E"
+  ; "-print-e-output", Arg.Set flag_print_e_output, "print output of E"
   ] @ Options.global_opts
 
 (** MAIN OPERATIONS *)
@@ -485,6 +487,20 @@ let parse_args () =
     then theory_files := ["data/builtin.theory"];
   ()
 
+let reduce_to_cnf decls =
+  E.(
+    Util_tptp.infer_types (`sign Signature.TPTP.Arith.full) decls
+    >>= fun (sign, decls) ->
+    let _sign, decls = Util_tptp.to_cnf sign decls in
+    E.return (Util_tptp.erase_types decls)
+  )
+
+let reduce_to_cnf_with_E decls =
+  (* use E to reduce to CNF, also declare types of TFF predicates *)
+  let decls' = Sequence.append _tff_type_decls_untyped decls in
+  Util.debug 5 "cnf decls:\n  %a\n" (Util.pp_seq ~sep:"\n  " Ast_tptp.Untyped.pp) decls';
+  CallProver.Eprover.cnf (* XXX ~opts:["--free-numbers"] *) decls'
+
 let main () =
   E.(
     (* parse theory, obtain a loaded meta-prover *)
@@ -497,10 +513,9 @@ let main () =
     (* parse problem *)
     parse_tptp_files !files
     >>= fun decls ->
-    (* use E to reduce to CNF, also declare types of TFF predicates *)
-    let decls' = Sequence.append _tff_type_decls_untyped decls in
-    Util.debug 5 "cnf decls:\n  %a\n" (Util.pp_seq ~sep:"\n  " Ast_tptp.Untyped.pp) decls';
-    CallProver.Eprover.cnf (* XXX ~opts:["--free-numbers"] *) decls'
+    (* reduce to CNF *)
+    (* reduce_to_cnf_with_E decls *)
+    reduce_to_cnf decls
     >>= fun decls ->
     (* extract into typed clauses *)
     Util_tptp.infer_types (`sign Signature.TPTP.Arith.full) decls
@@ -549,7 +564,9 @@ let main () =
             then print_endline "no ordering found for rules";
           []
     in
-    let args = precedence_to_E_arg precedence @ ["--memory-limit=512"] in
+    let args = precedence_to_E_arg precedence
+      @ ["--memory-limit=512"; "--proof-object"]
+    in
     (* build final sequence of declarations: add rules/axioms, then add
       type declarations *)
     Util.debug 5 "build prelude...";
@@ -572,7 +589,7 @@ let main () =
     let final_decls = List.rev (Sequence.to_rev_list final_decls) in
     Util.debug 1 "call prover now";
     flush stdout;
-    CallProver.call ~args ?timeout:!timeout ~prover:CallProver.Prover.p_E final_decls
+    CallProver.call_with_out ~args ?timeout:!timeout ~prover:CallProver.Prover.p_E final_decls
   )
 
 let () =
@@ -582,12 +599,14 @@ let () =
   | E.Error msg ->
       print_endline msg;
       exit 1
-  | E.Ok CallProver.Sat ->
+  | E.Ok (CallProver.Sat, _) ->
       print_endline "result: sat."
-  | E.Ok CallProver.Unsat ->
-      print_endline "result: unsat."
-  | E.Ok CallProver.Unknown ->
+  | E.Ok (CallProver.Unsat, out) ->
+      print_endline "result: unsat.";
+      if !flag_print_e_output
+        then (print_endline "output of E:"; print_endline out)
+  | E.Ok (CallProver.Unknown, _) ->
       print_endline "result: unknown."
-  | E.Ok (CallProver.Error s) ->
+  | E.Ok (CallProver.Error s, _) ->
       print_endline ("E failed with error: " ^ s);
       exit 1

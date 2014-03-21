@@ -261,7 +261,10 @@ module Seq = struct
     else match T.kind t, T.view t with
     | T.Kind.FOTerm, T.Var _ -> k t
     | T.Kind.FOTerm, T.BVar _ -> ()
-    | T.Kind.FOTerm, T.App (f, l) -> vars f k; List.iter (fun t -> vars t k) l
+    | T.Kind.FOTerm, T.App (f, l) ->
+        vars f k;
+        List.iter (fun t -> vars t k) l
+    | T.Kind.FOTerm, T.At (l,r) -> vars l k; vars r k
     | _ -> ()
   and _vars_list l k = match l with
     | [] -> ()
@@ -275,6 +278,7 @@ module Seq = struct
       | T.Var _
       | T.BVar _ -> ()
       | T.App (f, l) -> subterms f k; List.iter (fun t' -> subterms t' k) l
+      | T.At (l,r) -> subterms l k; subterms r k
       | _ -> assert false
     end
 
@@ -286,6 +290,7 @@ module Seq = struct
         | T.App (_, ((_::_) as l)) ->
           let depth' = depth + 1 in
           List.iter (fun t' -> recurse depth' t') l
+        | T.At (l, r) -> recurse depth l; recurse depth r
         | _ -> ()
       end
     in
@@ -301,6 +306,7 @@ module Seq = struct
         | _ -> ()
         end;
         _symbols_list l k
+    | T.Kind.FOTerm, T.At (l,r) -> symbols l k; symbols r k
     | _ -> assert false
   and _symbols_list l k = match l with
     | [] -> ()
