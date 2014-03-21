@@ -315,10 +315,23 @@ module BalancedInt = struct
       !X:bool,  X=b_true | X=b_false
   *)
   let axioms =
-    let x = T.var ~ty:__ty_bool 0 in
+    let b = T.var ~ty:__ty_bool 0 in
+    let x = T.var ~ty:Type.TPTP.int 0 in
+    let y = T.var ~ty:Type.TPTP.int 1 in
+    let z = T.var ~ty:Type.TPTP.int 2 in
     [ F.Base.atom (__mk_istrue __b_true)
     ; F.Base.not_ (F.Base.atom (__mk_istrue __b_false))
-    ; F.Base.or_ [F.Base.eq x __b_true; F.Base.eq x __b_false]
+    ; F.Base.or_ [F.Base.eq b __b_true; F.Base.eq b __b_false]
+    ; F.Base.neq __b_true __b_false
+    ; F.Base.or_ [F.Base.neq (__mk_z3 x) x; F.Base.eq x __z_0]  (* x!=0 -> 3x != x *)
+    ; F.Base.neq (__mk_z3p1 x) x
+    ; F.Base.neq (__mk_z3m1 x) x
+    ; F.Base.eq (T.app __z_plus [x; T.app __z_plus [y;z]])  (* + is AC *)
+                (T.app __z_plus [T.app __z_plus [x;y]; z])
+    ; F.Base.eq (T.app __z_plus [x;y]) (T.app __z_plus [y;x])
+    ; F.Base.eq (T.app __z_mult [x; T.app __z_mult [y;z]])  (* × is AC *)
+                (T.app __z_mult [T.app __z_mult [x;y]; z])
+    ; F.Base.eq (T.app __z_mult [x;y]) (T.app __z_mult [y;x])
     ]
 
   (* parse axioms from fil, update state. *)
@@ -334,6 +347,33 @@ module BalancedInt = struct
       E.return st
     )
 end
+
+(* tff type decls *)
+let _tff_type_decls =
+  let ty2int = Type.(TPTP.int <== [TPTP.int; TPTP.int]) in
+  [ Symbol.TPTP.Arith.less, Type.(TPTP.o <== [TPTP.int; TPTP.int])
+  ; Symbol.TPTP.Arith.lesseq, Type.(TPTP.o <== [TPTP.int; TPTP.int])
+  ; Symbol.TPTP.Arith.greater, Type.(TPTP.o <== [TPTP.int; TPTP.int])
+  ; Symbol.TPTP.Arith.greatereq, Type.(TPTP.o <== [TPTP.int; TPTP.int])
+  ; Symbol.TPTP.Arith.uminus, Type.(TPTP.int <=. TPTP.int)
+  ; Symbol.TPTP.Arith.sum, ty2int
+  ; Symbol.TPTP.Arith.difference, ty2int
+  ; Symbol.TPTP.Arith.product, ty2int
+  ; Symbol.TPTP.Arith.quotient, ty2int
+  ; Symbol.TPTP.Arith.quotient_e, ty2int
+  ; Symbol.TPTP.Arith.quotient_f, ty2int
+  ; Symbol.TPTP.Arith.quotient_t, ty2int
+  ; Symbol.TPTP.Arith.remainder_e, ty2int
+  ; Symbol.TPTP.Arith.remainder_f, ty2int
+  ; Symbol.TPTP.Arith.remainder_t, ty2int
+  ] |> Sequence.of_list
+    |> Sequence.mapi
+      (fun i (s,ty) ->
+        let name = Ast_tptp.NameString (Util.sprintf "hyst_ty_decl_%d" i) in
+        Ast_tptp.Typed.TypeDecl(name, Symbol.TPTP.to_string s, ty))
+
+let _tff_type_decls_untyped =
+  erase_types _tff_type_decls
 
 (* encoding of Int arithmetic into TFF0 *)
 let convert_balanced_arith decls =
@@ -351,7 +391,7 @@ let precedence_to_E_arg prec =
           (fun (l,r) -> Util.sprintf "%a>%a" Symbol.pp l Symbol.pp r)
           prec)
       in
-      ["--term-ordering=LPO4"; "-G"; "invfreq"; "--precedence='" ^ prec_str ^ "'"]
+      ["--term-ordering=LPO4"; "--precedence='" ^ prec_str ^ "'"; "-G"; "invfreq" ]
 
 (* list of rules -> list of formulas *)
 let axioms_of_rules rules =
@@ -457,11 +497,13 @@ let main () =
     (* parse problem *)
     parse_tptp_files !files
     >>= fun decls ->
-    (* use E to reduce to CNF *)
-    CallProver.Eprover.cnf ~opts:["--free-numbers"] decls
+    (* use E to reduce to CNF, also declare types of TFF predicates *)
+    let decls' = Sequence.append _tff_type_decls_untyped decls in
+    Util.debug 5 "cnf decls:\n  %a\n" (Util.pp_seq ~sep:"\n  " Ast_tptp.Untyped.pp) decls';
+    CallProver.Eprover.cnf (* XXX ~opts:["--free-numbers"] *) decls'
     >>= fun decls ->
     (* extract into typed clauses *)
-    Util_tptp.infer_types (`sign Signature.TPTP.Arith.signature) decls
+    Util_tptp.infer_types (`sign Signature.TPTP.Arith.full) decls
     >>= fun (_sign, decls) ->
     (* global state *)
     let state = State.of_prover prover in

@@ -1,4 +1,5 @@
-% symmetric presentation of relative integers (see paper)
+% symmetric presentation of relative integers (see paper
+% "Rewrite systems for natural, integral, and rational arithmetic")
 
 % constructors are z_0 (zero), z_3(N) = 3*N, z_3p1(N) = 3*N+1, z_3m1(N) = 3*N-1
 
@@ -12,6 +13,7 @@ z_plus (z_3 X) (z_3 Y) --> z_3 (z_plus X Y).
 z_plus (z_3 X) (z_3p1 Y) --> z_3p1 (z_plus X Y).
 z_plus (z_3 X) (z_3m1 Y) --> z_3m1 (z_plus X Y).
 z_plus (z_3p1 X) (z_3m1 Y) --> z_3 (z_plus X Y).
+z_plus (z_3m1 X) (z_3p1 Y) --> z_3 (z_plus X Y).
 z_plus (z_3p1 X) (z_3p1 Y) --> z_3m1 (z_plus X (z_plus Y (z_3p1 z_0))).
 z_plus (z_3m1 X) (z_3m1 Y) --> z_3p1 (z_plus X (z_plus Y (z_3m1 z_0))).
 
@@ -27,7 +29,7 @@ z_mult X (z_3 Y) --> z_3 (z_mult X Y).
 z_mult X (z_3p1 Y) --> z_plus X (z_3 (z_mult X Y)).
 z_mult X (z_3m1 Y) --> z_plus (z_3 (z_mult X Y)) (z_opp X).
 
-% z_positiveitive or null
+% z_positive or null
 val z_positive : $int -> z_bool.
 
 z_positive X --> z_positiveAux X b_true.
