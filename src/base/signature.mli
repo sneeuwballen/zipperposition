@@ -121,6 +121,7 @@ module TPTP : sig
 
     val is_operator : Symbol.t -> bool
 
-    val signature : t
+    val base : t  (** arith op *)
+    val full : t  (** arith op + regular op *)
   end
 end

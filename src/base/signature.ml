@@ -244,6 +244,7 @@ module TPTP = struct
 
     let is_operator s = Symbol.Set.mem s operators
 
-    let signature = of_list (table @ arith_table)
+    let base = of_list arith_table
+    let full = of_list (table @ arith_table)
   end
 end

@@ -406,9 +406,17 @@ module FO = struct
       (* separation between type arguments and proper term arguments,
           based on the expected arity of the symbol. The first
           [n_tyargs] arguments are converted to types, the remaining
-          [n_args] ones are inferred as terms *)
-      let tyargs, args = Util.list_split_at n_tyargs l in
-      let tyargs = _convert_type_args ctx tyargs in
+          [n_args] ones are inferred as terms.
+          XXX hack: special case for FO, if n_args=length l then type
+          arguments are assumed to have been omitted*)
+      let tyargs, args =
+        if List.length l = n_args
+          then Ctx._new_ty_vars ctx n_tyargs, l (* hack *)
+          else
+            let tyargs, args = Util.list_split_at n_tyargs l in
+            let tyargs = _convert_type_args ctx tyargs in
+            tyargs, args
+      in
       let ty_s' = Type.apply_list ty_s tyargs in
       (* create sub-closures, by inferring the type of [args] *)
       let l = List.map (fun t' -> infer_rec ctx t') args in
