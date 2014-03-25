@@ -52,11 +52,9 @@ val is_tautology : Clause.t -> bool
   (** Check whether the clause is a (syntactic) tautology, ie whether
       it contains true or "A" and "not A" *)
 
-(*
 val is_semantic_tautology : Clause.t -> bool
   (** semantic tautology deletion, using a congruence closure algorithm
       to see if negative literals imply some positive Literal.t *)
-*)
 
 val handle_distinct_constants : ctx:Ctx.t -> Literal.t -> Literal.t
   (** Decide on "quoted" "symbols" (which are all distinct) *)

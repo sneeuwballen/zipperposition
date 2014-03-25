@@ -115,14 +115,17 @@ let declare ~ctx symb ty =
   ctx.signature <- Signature.declare ctx.signature symb ty
 
 let add_tstp_order ~ctx =
-  let less = Symbol.Arith.less in
-  let lesseq = Symbol.Arith.lesseq in
+  let less = Symbol.TPTP.Arith.less in
+  let lesseq = Symbol.TPTP.Arith.lesseq in
   let spec = ctx.total_order in
   try
     Theories.TotalOrder.find ~spec less
   with Not_found ->
     (* declare types of $less and $lesseq *)
-    declare_sym ~ctx less;
-    declare_sym ~ctx lesseq;
+    let mysig = Signature.filter
+      Signature.TPTP.Arith.base
+      (fun s _ty -> Symbol.eq s less || Symbol.eq s lesseq)
+    in
+    ctx.signature <- Signature.merge ctx.signature mysig;
     let instance = Theories.TotalOrder.add ~spec ?proof:None ~less ~lesseq in
     instance

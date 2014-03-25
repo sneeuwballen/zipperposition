@@ -205,6 +205,8 @@ val from_forms : ?role:string -> file:string -> name:string -> ctx:Ctx.t ->
 
 module Seq : sig
   val lits : t -> Literal.t Sequence.t
+  val terms : t -> FOTerm.t Sequence.t
+  val vars : t -> FOTerm.t Sequence.t
 end
 
 (** {2 Filter literals} *)

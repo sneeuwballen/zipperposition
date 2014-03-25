@@ -40,8 +40,6 @@ module AC = struct
 
   let create () = STbl.create 7
 
-  let is_ac ~spec s = STbl.mem spec s
-
   let axioms s =
     (* FIXME: need to recover type of [f]
     let x = T.mk_var 0 in
@@ -132,11 +130,6 @@ module TotalOrder = struct
       STbl.find spec.less_tbl s
     with Not_found ->
       STbl.find spec.lesseq_tbl s
-
-  let orders ~spec =
-    STbl.fold
-      (fun _ instance acc -> instance :: acc)
-      spec.less_tbl []
 
   let is_order_symbol ~spec s =
     STbl.mem spec.less_tbl s || STbl.mem spec.lesseq_tbl s

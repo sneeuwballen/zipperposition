@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 313c4beb619574989355e249a76643cf)
+# DO NOT EDIT (digest: e6a26ca4a8aa8788c07e06f2eff25427)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -17,7 +17,6 @@
 "src/libzipperposition.cmxs": use_libzipperposition
 "src/clauseQueue.cmx": for-pack(Libzipperposition)
 "src/clause.cmx": for-pack(Libzipperposition)
-"src/const.cmx": for-pack(Libzipperposition)
 "src/extensions.cmx": for-pack(Libzipperposition)
 "src/literal.cmx": for-pack(Libzipperposition)
 "src/compactClause.cmx": for-pack(Libzipperposition)

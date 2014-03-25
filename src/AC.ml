@@ -28,7 +28,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {6 AC redundancy} *)
 
 open Logtk
-open Logtk_meta
 
 module HOT = HOTerm
 module T = FOTerm
@@ -42,18 +41,20 @@ let stat_ac_redundant = Util.mk_stat "ac.redundant"
 
 type spec = Theories.AC.t
 
-let axioms ~ctx s =
+let axioms ~ctx s ty =
   let ord = Ctx.ord ~ctx in
-  let ty = Symbol.ty s in
-  let ty_args_n, args_n = Type.arity ty in
+  let ty_args_n, args_n = match Type.arity ty with
+    | Type.Arity (i,j) -> i,j
+    | Type.NoArity -> 0, 0
+  in
   if args_n <> 2 then failwith "AC.axioms: AC symbol must be of arity 2";
   let ty_var = List.hd (Type.expected_args ty) in
-  let x = T.mk_var ~ty:ty_var 0 in
-  let y = T.mk_var ~ty:ty_var 1 in
-  let z = T.mk_var ~ty:ty_var 2 in
+  let x = T.var ~ty:ty_var 0 in
+  let y = T.var ~ty:ty_var 1 in
+  let z = T.var ~ty:ty_var 2 in
   (* type parameters should be the same as the concrete type? FIXME *)
   let tyargs = Sequence.(to_list (map (fun _ -> ty_var) (1 -- ty_args_n))) in
-  let f x y = T.mk_node ~tyargs s [x;y] in
+  let f x y = T.app_full (T.const ~ty s) tyargs [x;y] in
   let res = ref [] in
   (* build clause l=r *)
   let add_clause l r =
@@ -75,8 +76,9 @@ let axioms ~ctx s =
 let is_trivial_lit ~spec lit =
   if not (Theories.AC.exists_ac ~spec) then false else
   let is_ac = Theories.AC.is_ac ~spec in
+  let module A = T.AC(struct let is_ac = is_ac let is_comm _ = false end) in
   match lit with
-  | Lit.Equation (l, r, true, _) -> T.ac_eq ~is_ac l r
+  | Lit.Equation (l, r, true, _) -> A.eq l r
   | Lit.Equation _
   | Lit.Prop _
   | Lit.False -> false
@@ -93,10 +95,11 @@ let simplify ~spec ~ctx c =
   if not (Theories.AC.exists_ac ~spec) then c else
   let n = Array.length c.C.hclits in
   let is_ac = Theories.AC.is_ac ~spec in
+  let module A = T.AC(struct let is_ac = is_ac let is_comm _ = false end) in
   let lits = Array.to_list c.C.hclits in
   let lits = List.filter
     (fun lit -> match lit with
-    | Lit.Equation (l, r, false, _) -> not (T.ac_eq ~is_ac l r)
+    | Lit.Equation (l, r, false, _) -> not (A.eq l r)
     | Lit.Equation _
     | Lit.Prop _
     | Lit.False
@@ -122,7 +125,7 @@ let simplify ~spec ~ctx c =
       let _ = Util.exit_prof prof_simplify in
       c (* no simplification *)
 
-let add_ac ?proof ~env s =
+let add_ac ?proof ~env s ty =
   Util.debug 1 "enable AC redundancy criterion for %a" Symbol.pp s;
   let ctx = Env.ctx env in
   let spec = Ctx.ac ~ctx in
@@ -135,7 +138,7 @@ let add_ac ?proof ~env s =
   (* remember that the symbols is AC *)
   Ctx.add_ac ?proof ~ctx s;
   (* add clauses *)
-  let clauses = axioms ~ctx s in
+  let clauses = axioms ~ctx s ty in
   Env.add_passive ~env (Sequence.of_list clauses);
   ()
 
@@ -151,27 +154,4 @@ let setup_env ~env =
     Env.add_is_trivial ~env (is_trivial ~spec);
     Env.add_simplify ~env (simplify ~spec ~ctx);
     end;
-  match Env.get_meta ~env with
-  | None -> ()
-  | Some meta ->
-    (* react to future detected theories *)
-    let signal = MetaProver.on_theory (MetaProverState.prover meta) in
-    Signal.on signal
-      (function
-        | MetaKB.NewTheory ("ac", [{HOT.term=HOT.Const f}], lit) ->
-          let proof = MetaProverState.explain meta lit in
-          add_ac ~env ~proof f; true
-        | MetaKB.NewTheory ("ac", [t], _) ->
-          Util.debug 1 "ignore AC instance for term %a" HOT.pp t; true
-        | _ -> true);
-    (* see whether AC symbols have already been detected *)
-    Sequence.iter
-      (function
-        | MetaKB.NewTheory ("ac", [{HOT.term=HOT.Const f}], lit) ->
-          let proof = MetaProverState.explain meta lit in
-          add_ac ~env ~proof f
-        | MetaKB.NewTheory ("ac", [t], _) ->
-          Util.debug 1 "ignore AC instance for term %a" HOT.pp t
-        | _ -> ())
-      (MetaKB.cur_theories (MetaProverState.reasoner meta));
-    ()
+  ()

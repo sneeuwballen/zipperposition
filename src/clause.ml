@@ -370,6 +370,8 @@ let from_forms ?(role="axiom") ~file ~name ~ctx forms =
 
 module Seq = struct
   let lits c = Sequence.of_array c.hclits
+  let terms c = lits c |> Sequence.flatMap Lit.Seq.terms
+  let vars c = terms c |> Sequence.flatMap T.Seq.vars
 end
 
 (** {2 Filter literals} *)

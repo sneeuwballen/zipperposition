@@ -60,9 +60,6 @@ val remove_trivial : operation
 val cnf : ctx:Skolem.ctx -> operation
   (** Transform clauses into their clausal normal form *)
 
-val meta_prover : meta:MetaProverState.t -> operation
-  (** Detect theories in the set, and add lemmas to the set *)
-
 val rw_term : ?rule:string -> premises:PFormula.Set.t ->
               Rewriting.TRS.t -> operation
   (** Rewrite terms in the formula.
@@ -86,10 +83,8 @@ val expand_def : operation
 type t
   (** Environment used for preprocessing of the problem *)
 
-val create : ?base:Signature.t -> ?meta:MetaProverState.t -> Params.t -> t
-  (** Create a new preprocessing env.
-      @param meta is a meta-prover that can be used for processing.
-  *)
+val create : ?base:Signature.t -> Params.t -> t
+  (** Create a new preprocessing env.  *)
 
 val copy : t -> t
   (** Copy of the preprocessing env. Shares the same meta prover, if any *)

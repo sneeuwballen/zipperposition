@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module F = FOFormula
+module F = Formula.FO
 module PF = PFormula
 
 (** {2 Transformations} *)
@@ -138,6 +138,7 @@ let cnf ~ctx =
       in
       [Esa clauses]
 
+(* TODO
 let meta_prover ~meta =
   fun set pf ->
     (* scan formula *)
@@ -152,6 +153,7 @@ let meta_prover ~meta =
     if lemmas = []
       then []
       else [Add lemmas]
+*)
 
 let rw_term ?(rule="rw") ~premises trs =
   fun set pf ->
@@ -224,7 +226,6 @@ type t = {
   mutable constr_rules : (PF.Set.t -> Precedence.Constr.t) list;
   mutable status : (Symbol.t * Precedence.symbol_status) list;
   mutable base : Signature.t;
-  meta : MetaProverState.t option;
   params : Params.t;
 }
 

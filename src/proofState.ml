@@ -58,7 +58,7 @@ module UnitIndex = NPDtree.Make(struct
   type t = T.t * T.t * bool * C.t
   type rhs = T.t
   let compare (t11,t12,s1,c1) (t21,t22,s2,c2) =
-    Util.lexicograph_combine [T.compare t11 t21; T.compare t12 t22;
+    Util.lexicograph_combine [T.cmp t11 t21; T.cmp t12 t22;
                               compare s1 s2; C.compare c1 c2]
   let extract (t1,t2,sign,_) = t1, t2, sign
   let priority (_,_,_,c) =
@@ -180,7 +180,7 @@ module SimplSet = struct
     | [| Lit.Equation (l,r,false,_) |] ->
       op idx (l,r,false,c)
     | [| Lit.Prop (p, sign) |] ->
-      op idx (p,T.true_term,sign,c)
+      op idx (p,T.TPTP.true_,sign,c)
     | _ -> idx
 
   (** Create a simplification set *)
@@ -296,10 +296,9 @@ type t =
     simpl_set : SimplSet.t;              (** index for forward demodulation *)
     active_set : ActiveSet.t;            (** active clauses *)
     passive_set : PassiveSet.t;          (** passive clauses *)
-    meta_prover : MetaProverState.t option;
   >
 
-let create ~ctx ?meta params signature =
+let create ~ctx params signature =
   let queues = ClauseQueue.default_queues in
   object
     val m_active = (ActiveSet.create ~ctx signature :> ActiveSet.t)
@@ -310,7 +309,6 @@ let create ~ctx ?meta params signature =
     method active_set = m_active
     method passive_set = m_passive
     method simpl_set = m_simpl
-    method meta_prover = meta
   end
 
 type stats = int * int * int (* num passive, num active, num simplification *)

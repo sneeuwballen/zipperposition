@@ -70,8 +70,7 @@ type t
 
 (** {2 Modify the Env} *)
 
-val create : ?meta:MetaProverState.t -> ctx:Ctx.t -> Params.t ->
-             Signature.t -> t
+val create : ctx:Ctx.t -> Params.t -> Signature.t -> t
   (** Create an environment (initially empty) *)
 
 val add_passive : env:t -> Clause.t Sequence.t -> unit
@@ -145,8 +144,6 @@ val add_lit_rule : env:t -> string -> lit_rewrite_rule -> unit
 val simplify : env:t -> Clause.t -> Clause.t
   (** Simplify the clause w.r.t the proof state. It uses many simplification
       rules and rewriting rules. *)
-
-val get_meta : env:t -> MetaProverState.t option
 
 val get_params : env:t -> Params.t
 

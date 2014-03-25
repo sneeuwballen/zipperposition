@@ -629,6 +629,7 @@ let all_simplify ~env c =
   Util.exit_prof prof_all_simplify;
   res
 
+(* TODO
 (** Do one step of the meta-prover. The current given clause and active set
     are provided. This returns a list of new clauses. *)
 let meta_step ~env c =
@@ -657,3 +658,4 @@ let meta_step ~env c =
     end
   in
   Sequence.of_list results
+*)
