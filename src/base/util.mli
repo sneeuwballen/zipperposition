@@ -210,6 +210,9 @@ val str_find : ?start:int -> sub:string -> string -> int
 val str_repeat : string -> int -> string
   (** The same char, repeated n times *)
 
+val str_prefix : pre:string -> string -> bool
+  (** [str_prefix ~pre s] returns [true] iff [pre] is a prefix of [s] *)
+
 (** {2 Exceptions} *)
 
 val finally : h:(unit -> unit) -> f:(unit -> 'a) -> 'a

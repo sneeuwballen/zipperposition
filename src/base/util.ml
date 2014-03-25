@@ -458,6 +458,12 @@ let str_repeat s n =
   done;
   buf
 
+let str_prefix ~pre s =
+  String.length pre <= String.length s &&
+  (let i = ref 0 in
+    while !i < String.length pre && s.[!i] = pre.[!i] do incr i done;
+    !i = String.length pre)
+
 (** {2 Exceptions} *)
 
 let finally ~h ~f =
