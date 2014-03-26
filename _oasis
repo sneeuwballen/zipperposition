@@ -55,6 +55,7 @@ Library "logtk"
                     Comparison, Precedence, Ordering, Skolem, Cnf,
                     HORewriting, Index, Dtree, Fingerprint, NPDtree,
                     Congruence, FastFingerprint, FeatureVector, Rewriting,
+                    FormulaShape, Transform,
                     lib/Hash, lib/Hashcons,
                     lib/Sequence, lib/Cache, lib/Bij, lib/Bencode,
                     lib/PersistentHashtbl, lib/Monad, lib/ParseLocation,

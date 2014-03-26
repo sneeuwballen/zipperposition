@@ -26,30 +26,33 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {6 Detect some specific formulas} *)
 
-val is_definition : FOFormula.t -> (FOTerm.t * FOTerm.t) option
+type form = Formula.FO.t
+type term = FOTerm.t
+
+val is_definition : form -> (term * term) option
   (** Check whether the clause defines a symbol, e.g.
       subset(X,Y) = \forall Z(Z in X -> Z in Y). It means the LHS
       is a flat symbol with variables, and all variables in RHS
       are also in LHS *)
 
-val is_pred_definition : FOFormula.t -> (FOTerm.t * FOFormula.t) option
+val is_pred_definition : form -> (term * form) option
   (** Check whether the formula is a predicate definition *)
 
-val is_rewrite_rule : FOFormula.t -> (FOTerm.t * FOTerm.t) list
+val is_rewrite_rule : form -> (term * term) list
   (** More general than definition. It means the clause is an
       equality where all variables in RHS are also in LHS. It
       can return two rewrite rules if the clause can be oriented
       in both ways, e.g. associativity axiom. *)
 
-val is_pred_rewrite_rule : FOFormula.t -> (FOTerm.t * FOFormula.t) option
+val is_pred_rewrite_rule : form -> (term * form) option
   (** Rewriting rule for predicates *)
 
-val is_const_definition : FOFormula.t -> (Symbol.t * FOTerm.t) option
+val is_const_definition : form -> (Symbol.t * term) option
   (** Checks whether the clause is "const = ground composite term", e.g.
       a clause "aIbUc = inter(a, union(b, c))". In this case it returns
       Some(constant, definition of constant) *)
 
-val is_const_pred_definition : FOFormula.t -> (Symbol.t * FOFormula.t) option
+val is_const_pred_definition : form -> (Symbol.t * form) option
   (** Definition of constant predicate *)
 
 (** {2 Interface to Transform} *)
@@ -58,14 +61,14 @@ val is_const_pred_definition : FOFormula.t -> (Symbol.t * FOFormula.t) option
     for instance rewrite rules or term definitions, one can obtain
     interesting transformations *)
 
-val detect : FOFormula.t Sequence.t -> Transform.t list
+val detect : form Sequence.t -> Transform.t list
   (** Detect shapes in the given sequence, and convert them into
       transformations over formulas *)
 
-val detect_list : FOFormula.t list -> Transform.t list
+val detect_list : form list -> Transform.t list
 
 val detect_def : ?only:[`Pred|`Term] -> ?arity:[`Zero|`Nonzero] ->
-                 FOFormula.t Sequence.t -> Transform.t list
+                 form Sequence.t -> Transform.t list
   (** Detect definitions.
       @param only if present, restrict detection to predicates or terms
       @param arity if present, restrict to constant or non-constant symbols *)

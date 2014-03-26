@@ -27,87 +27,123 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {6 Detect some specific formulas} *)
 
 module T = FOTerm
-module F = FOFormula
+module F = Formula.FO
+
+type form = Formula.FO.t
+type term = FOTerm.t
 
 (* map terms to distinct variables of same type *)
 let __mk_vars args =
-  List.mapi (fun i v -> T.mk_var ~ty:(T.ty v) i) args
+  List.mapi (fun i v -> T.var ~ty:(T.ty v) i) args
 
 let is_definition f =
   (* check that r is a definition of l=f(x1,...,xn) *)
   let check_def l r =
-    match l.T.term with
-    | T.Var _ | T.BoundVar _ -> false
-    | T.Node (f, tyargs, ts) ->
+    match T.view l with
+    | T.Var _ | T.BVar _ -> false
+    | T.Const _ -> true
+    | T.App (f, ts) ->
       (* l=f(x1,...,xn) where r contains no other var than x1,...,xn, and n >= 0 *)
       List.for_all T.is_var ts &&
-      let l' = T.mk_node ~tyargs f (__mk_vars ts) in
-      FOUnif.are_variant l l'
-      && not (T.contains_symbol f r)
-      && List.for_all (fun x -> T.var_occurs x l) (T.vars r)
+      let l' = T.app f (__mk_vars ts) in
+      Unif.FO.are_variant l l'
+      &&
+        begin match T.head f with
+          | Some s -> not (T.contains_symbol s r)
+          | None -> false
+        end
+      && Sequence.for_all (fun x -> T.var_occurs ~var:x l) (T.Seq.vars r)
+    | _ -> false
   in
   let f = F.open_forall f in
-  match f.F.form with
-  | F.Equal(l,r) when check_def l r -> Some (l,r)
-  | F.Equal(l,r) when check_def r l -> Some (r,l)
+  match F.view f with
+  | F.Eq(l,r) when check_def l r -> Some (l,r)
+  | F.Eq(l,r) when check_def r l -> Some (r,l)
   | _ -> None
 
 let is_pred_definition f =
   (* check that r is a predicate definition of l=f(x1,...,xn) *)
   let check_def l r =
-    match l.T.term with
-    | T.Var _ | T.BoundVar _ -> false
-    | T.Node (f, tyargs, ts) ->
+    match T.view l with
+    | T.Var _ | T.BVar _ | T.TyApp _ -> false
+    | T.Const _ -> true
+    | T.App (f, ts) ->
       (* l=f(x1,...,xn) where r contains no other var than x1,...,xn, and n >= 0 *)
       List.for_all T.is_var ts &&
-      let l' = T.mk_node ~tyargs f (__mk_vars ts) in
-      (try ignore(FOUnif.variant l 0 l' 1); true with FOUnif.Fail -> false)
-      && not (F.contains_symbol f r)
-      && List.for_all (fun x -> T.var_occurs x l) (F.free_variables r)
+      let l' = T.app f (__mk_vars ts) in
+      Unif.FO.are_variant l l'
+      && not (F.contains_symbol (T.head_exn f) r)
+      && Sequence.for_all (fun var -> T.var_occurs ~var l) (F.Seq.vars r)
   in
   let f = F.open_forall f in
-  match f.F.form with
-  | F.Equiv({F.form=F.Atom l},r) when check_def l r -> Some (l,r)
-  | F.Equiv(l,{F.form=F.Atom r}) when check_def r l -> Some (r,l)
+  match F.view f with
+  | F.Equiv (l, r) ->
+      begin match F.view l, F.view r with
+      | F.Atom l, _ when check_def l r -> Some (l,r)
+      | _, F.Atom r when check_def r l -> Some (r,l)
+      | _ -> None
+      end
   | _ -> None
 
 let is_rewrite_rule f =
   (* check that l -> r is an acceptable rewrite rule *)
   let check_rule l r =
-    match l.T.term with
-    | T.Var _ | T.BoundVar _ -> false
-    | T.Node (_, _, _) -> List.for_all (fun x -> T.var_occurs x l) (T.vars r)
+    match T.view l with
+    | T.Var _ | T.BVar _ | T.TyApp _ -> false
+    | T.Const _ -> T.is_ground r
+    | T.App (_, _) ->
+        Sequence.for_all (fun x -> T.var_occurs ~var:x l) (T.Seq.vars r)
   in
   let f = F.open_forall f in
-  match f.F.form with
-  | F.Equal (l,r) ->
-    (if check_rule l r then [l,r] else []) @ (if check_rule r l then [r, l] else [])
+  match F.view f with
+  | F.Eq (l,r) ->
+    (if check_rule l r then [l,r] else []) @
+    (if check_rule r l then [r,l] else [])
   | _ -> []
 
 let is_pred_rewrite_rule f =
   (* check that l -> r is an acceptable predicate rewrite rule *)
   let check_rule l r =
-    match l.T.term with
-    | T.Var _ | T.BoundVar _ -> false
-    | T.Node (_, _, _) ->
-      List.for_all (fun x -> T.var_occurs x l) (F.free_variables r)
+    match T.view l with
+    | T.Var _ | T.BVar _ | T.TyApp _ -> false
+    | T.Const _ -> F.is_ground r
+    | T.App (_, _) ->
+      Sequence.for_all (fun x -> T.var_occurs x l) (F.Seq.vars r)
   in
   let f = F.open_forall f in
-  match f.F.form with
-  | F.Equiv ({F.form=F.Atom l},r) when check_rule l r -> Some (l,r)
-  | F.Equiv (l,{F.form=F.Atom r}) when check_rule r l -> Some (r,l)
+  match F.view f with
+  | F.Equiv (l,r) ->
+      begin match F.view l, F.view r with
+      | F.Atom l, _ when check_rule l r -> Some (l,r)
+      | _, F.Atom r when check_rule r l -> Some (r,l)
+      | _ -> None
+      end
   | _ -> None
 
 let is_const_definition f =
-  match f.F.form with
-  | F.Equal ({T.term=T.Node (s, _, [])}, r) -> Some (s, r)
-  | F.Equal (l, {T.term=T.Node (s, _, [])}) -> Some (s, l)
+  match F.view f with
+  | F.Eq (l,r) ->
+      begin match T.view l, T.view r with
+      | T.Const s, _ -> Some (s, r)
+      | _, T.Const s -> Some (s, l)
+      | _ -> None
+      end
   | _ -> None
 
 let is_const_pred_definition f =
-  match f.F.form with
-  | F.Equiv ({F.form=F.Atom {T.term=T.Node (s, _, [])}}, r) -> Some (s,r)
-  | F.Equiv (l,{F.form=F.Atom {T.term=T.Node (s, _, [])}}) -> Some (s,l)
+  let check_rule l r = match F.view l with
+    | F.Atom t ->
+        begin match T.view t with
+        | T.Const s -> Some (s,r)
+        | _ -> None
+        end
+    | _ -> None
+  in
+  match F.view f with
+  | F.Equiv (l,r) ->
+      Monad.Opt.(
+        check_rule l r <+> check_rule r l
+      )
   | _ -> None
 
 (** {2 Interface to Tranform} *)

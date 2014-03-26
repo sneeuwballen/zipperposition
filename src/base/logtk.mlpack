@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 80e9edcf1f897941c71cd1cc5a914135)
+# DO NOT EDIT (digest: d2314b78736c89a9cb181d013c45fb5c)
 Symbol
 ScopedTerm
 FOTerm
@@ -30,6 +30,8 @@ Congruence
 FastFingerprint
 FeatureVector
 Rewriting
+FormulaShape
+Transform
 lib/Hash
 lib/Hashcons
 lib/Sequence

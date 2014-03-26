@@ -27,7 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {6 Transformations on Formulas and Terms} *)
 
 type term = FOTerm.t
-type form = FOFormula.t
+type form = Formula.FO.t
 
 (** Provides some transformations on formulas, and sets of formulas.
     Transformations include definition expansion and term rewriting *)

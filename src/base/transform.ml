@@ -27,10 +27,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Transformations on Fs and Terms} *)
 
 module T = FOTerm
-module F = FOFormula
+module F = Formula.FO
 
 type term = FOTerm.t
-type form = FOFormula.t
+type form = Formula.FO.t
 
 type t =
 | RwTerm of Rewriting.TRS.t
