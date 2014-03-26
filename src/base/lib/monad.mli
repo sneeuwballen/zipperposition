@@ -39,6 +39,13 @@ module type S = sig
   val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
 end
 
+module type MPLUS = sig
+  type 'a t
+  val mempty : 'a t
+  val mappend : 'a t -> 'a t -> 'a t
+  val (<+>) : 'a t -> 'a t -> 'a t
+end
+
 (** {2 Monadic traversal}
 This functor allows to build fold and map functions with a monadic interface.
 *)
@@ -71,6 +78,8 @@ module Opt : sig
 
   val is_some : _ option -> bool
   val is_none : _ option -> bool
+
+  include MPLUS with type 'a t := 'a t
 
   include TRAVERSE with type 'a monad := 'a option
 end

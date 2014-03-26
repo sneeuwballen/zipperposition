@@ -345,7 +345,7 @@ module FO = struct
       C.false_  (* a variable cannot be > *)
     | _, _ when T.subterm b a ->
       C.true_  (* trivial subterm property --> ok! *)
-    | TC.App (f, ((_::_) as l)), TC.App (g, l')
+    | TC.App (f, _, ((_::_) as l)), TC.App (g, _, l')
     when List.length l = List.length l' ->
       (* three cases: either some element of [l] is > [r],
           or precedence of first symbol applies,
@@ -361,7 +361,7 @@ module FO = struct
             ]  (* f>g and a > all subterms of b *)
         ; any_bigger ~orient_lpo l b  (* some subterm of a is > b *)
         ]
-    | TC.App (f, l), TC.App (g, l') ->
+    | TC.App (f, _, l), TC.App (g, _, l') ->
       (* two cases: either some element of [l] is > [r],
           or precedence of first symbol applies *)
       C.or_
@@ -371,7 +371,7 @@ module FO = struct
             ]  (* f>g and a > all subterms of b *)
         ; any_bigger ~orient_lpo l b  (* some subterm of a is > b *)
         ]
-    | TC.App (f, l), _ ->
+    | TC.App (f, _, l), _ ->
       (* only the subterm property can apply *)
       any_bigger ~orient_lpo l b
     | TC.NonFO, _ ->

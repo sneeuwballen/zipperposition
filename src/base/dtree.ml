@@ -77,7 +77,7 @@ let term_to_char t =
   match T.Classic.view t with
   | T.Classic.Var _ -> Variable t
   | T.Classic.BVar i -> BoundVariable i
-  | T.Classic.App (f, _) -> Symbol f
+  | T.Classic.App (f, _, _) -> Symbol f
   | T.Classic.NonFO -> NonFO
 
 (** convert term to list of var/symbol *)

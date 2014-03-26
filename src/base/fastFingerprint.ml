@@ -48,10 +48,11 @@ type fingerprint_fun = T.t -> fingerprint
 let rec gfpf pos t = match pos, T.Classic.view t with
   | [], T.Classic.Var _ -> A
   | [], T.Classic.BVar _ -> S (Symbol.of_string "__de_bruijn")
-  | [], T.Classic.App (s, _) -> S s
-  | i::pos', T.Classic.App (_, l) ->
-    (try gfpf pos' (List.nth l i)  (* recurse in subterm *)
-    with Failure _ -> N)  (* not a position in t *)
+  | [], T.Classic.App (s, _, _) -> S s
+  | i::pos', T.Classic.App (_, _, l) ->
+    begin try gfpf pos' (List.nth l i)  (* recurse in subterm *)
+    with Failure _ -> N  (* not a position in t *)
+    end
   | _::_, T.Classic.BVar _ -> N
   | _::_, T.Classic.Var _ -> B  (* under variable *)
   | _, T.Classic.NonFO -> B  (* do not filter *)

@@ -391,7 +391,7 @@ module FO = Make(struct
   let hash = T.hash
 
   let subterms t = match T.Classic.view t with
-    | T.Classic.App (_, l) -> l
+    | T.Classic.App (_, _, l) -> l
     | _ -> []
 
   let update_subterms t l = match T.view t, l with

@@ -57,7 +57,7 @@ module Classic : sig
   type view = private
   | Var of int
   | BVar of int
-  | App of symbol * t list  (** covers Const and App, ignores type arguments *)
+  | App of symbol * Type.t list * t list  (** covers Const and App *)
   | NonFO   (* any other case *)
 
   val view : t -> view
@@ -151,7 +151,8 @@ val add_vars : unit Tbl.t -> t -> unit  (** add variables of the term to the set
 val vars : t Sequence.t -> Set.t        (** compute variables of the terms *)
 val vars_prefix_order : t -> t list     (** variables in prefix traversal order *)
 val depth : t -> int                    (** depth of the term *)
-val head : t -> Symbol.t                (** head symbol (or Invalid_argument) *)
+val head : t -> Symbol.t option         (** head symbol *)
+val head_exn : t -> Symbol.t            (** head symbol (or Invalid_argument) *)
 val size : t -> int                     (** Size (number of nodes) *)
 
 val ty_vars : t -> Type.Set.t

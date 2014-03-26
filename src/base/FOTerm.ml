@@ -95,23 +95,15 @@ module Classic = struct
   type view =
   | Var of int
   | BVar of int
-  | App of symbol * t list  (** covers Const and App *)
+  | App of symbol * Type.t list * t list  (** covers Const and App *)
   | NonFO   (* any other case *)
 
-  let view t = match T.view t with
-    | T.Var i -> Var i
-    | T.BVar i -> BVar i
-    | T.At(l, r) ->
-        begin match T.head l with
-        | None -> NonFO
-        | Some s -> App (s, [])
-        end
-    | T.App (hd, l) ->
-        begin match T.head hd with
-        | None -> NonFO
-        | Some s -> App (s, l)
-        end
-    | T.Const s -> App (s, [])
+  let view t =
+    let hd, tyargs, l = open_app t in
+    match T.view hd, tyargs, l with
+    | T.Var i, [], [] -> Var i
+    | T.BVar i, [], [] -> BVar i
+    | T.Const s, _, _ -> App (s, tyargs, l)
     | _ -> NonFO
 end
 
@@ -369,7 +361,7 @@ let vars_prefix_order t =
 
 let depth t = Seq.subterms_depth t |> Sequence.map snd |> Sequence.fold max 0
 
-let head t = match T.view t with
+let head_exn t = match T.view t with
   | T.Const s -> s
   | T.App (hd,_) ->
       begin match T.view hd with
@@ -377,6 +369,10 @@ let head t = match T.view t with
         | _ -> raise (Invalid_argument "FOTerm.head")
       end
   | _ -> raise (Invalid_argument "FOTerm.head")
+
+let head t =
+  try Some (head_exn t)
+  with Invalid_argument _-> None
 
 let ty_vars t = Seq.ty_vars t |> Type.Seq.add_set Type.Set.empty
 
@@ -449,7 +445,7 @@ module AC(A : AC_SPEC) = struct
     | x::l' when Type.is_type x -> flatten acc l' (* ignore type args *)
     | x::l' -> flatten (deconstruct acc x) l'
     and deconstruct acc t = match T.view t with
-    | T.App (f', l') when Symbol.eq (head f') f ->
+    | T.App (f', l') when Symbol.eq (head_exn f') f ->
       flatten acc l'
     | _ -> t::acc
     in flatten [] l
@@ -460,8 +456,8 @@ module AC(A : AC_SPEC) = struct
       | _ when Type.is_type t -> t
       | T.Var _ -> t
       | T.BVar _ -> t
-      | T.App (f, l) when A.is_ac (head f) ->
-        let l = flatten (head f) l in
+      | T.App (f, l) when A.is_ac (head_exn f) ->
+        let l = flatten (head_exn f) l in
         let tyargs, l = _split_types l in
         let l = List.map normalize l in
         let l = List.sort cmp l in
@@ -474,7 +470,7 @@ module AC(A : AC_SPEC) = struct
               x l'
           | [] -> assert false
         end
-      | T.App (f, [a;b]) when A.is_comm (head f) ->
+      | T.App (f, [a;b]) when A.is_comm (head_exn f) ->
         (* FIXME: doesn't handle polymorphic commutative operators *)
         let a = normalize a in
         let b = normalize b in

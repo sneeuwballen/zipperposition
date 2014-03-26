@@ -39,6 +39,13 @@ module type S = sig
   val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
 end
 
+module type MPLUS = sig
+  type 'a t
+  val mempty : 'a t
+  val mappend : 'a t -> 'a t -> 'a t
+  val (<+>) : 'a t -> 'a t -> 'a t
+end
+
 (** {2 Monadic traversal}
 This functor allows to build fold and map functions with a monadic interface.
 *)
@@ -112,6 +119,12 @@ module Opt = struct
 
   let is_some = function | Some _ -> true | None -> false
   let is_none = function | None -> true | Some _ -> false
+
+  let mempty = None
+  let mappend a b = match a with
+    | None -> b
+    | Some _ -> a
+  let (<+>) = mappend
 
   exception LocalExit
 

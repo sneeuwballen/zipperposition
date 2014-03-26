@@ -250,7 +250,7 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
             then (add_pos_var balance x; (wb + 1, x = y))
             else (add_neg_var balance x; (wb - 1, x = y))
         | TC.BVar _ -> (if pos then wb + 1 else wb - 1), false
-        | TC.App (s, l) ->
+        | TC.App (s, _, l) ->
           let wb' = if pos
             then wb + Prec.weight prec s
             else wb - Prec.weight prec s in
@@ -302,14 +302,14 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
           let wb', contains = balance_weight wb t1 y true in
           (wb' - 1, if contains then Gt else Incomparable)
         (* node/node, De Bruijn/De Bruijn *)
-        | TC.App (f, ss), TC.App (g, ts) -> tckbo_composite wb f g ss ts
+        | TC.App (f, _, ss), TC.App (g, _, ts) -> tckbo_composite wb f g ss ts
         | TC.BVar i, TC.BVar j ->
           (wb, if i = j then Eq else Incomparable)
         (* node and something else *)
-        | TC.App (f, ss), TC.BVar _ ->
+        | TC.App (f, _, ss), TC.BVar _ ->
           let wb', _ = balance_weight wb t1 0 true in
           wb'-1, Comparison.Gt
-        | TC.BVar _, TC.App (g, ts) ->
+        | TC.BVar _, TC.App (g, _, ts) ->
           let wb', _ = balance_weight wb t1 0 false in
           wb'+1, Comparison.Lt
       (** tckbo, for composite terms (ie non variables). It takes a symbol
@@ -374,12 +374,12 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
       | TC.NonFO, _
       | _, TC.NonFO -> Comparison.Incomparable
       (* node/node, De Bruijn/De Bruijn *)
-      | TC.App (f, ss), TC.App (g, ts) -> rpo6_composite ~prec s t f g ss ts
+      | TC.App (f, _, ss), TC.App (g, _, ts) -> rpo6_composite ~prec s t f g ss ts
       | TC.BVar i, TC.BVar j ->
         if i = j && Type.eq (T.ty s) (T.ty t) then Eq else Incomparable
       (* node and something else *)
-      | TC.App (f, ss), TC.BVar _ -> Comparison.Incomparable
-      | TC.BVar _, TC.App (g, ts) -> Comparison.Incomparable
+      | TC.App (f, _, ss), TC.BVar _ -> Comparison.Incomparable
+      | TC.BVar _, TC.App (g, _, ts) -> Comparison.Incomparable
     (* handle the composite cases *)
     and rpo6_composite ~prec s t f g ss ts =
       match Prec.compare prec f g with
