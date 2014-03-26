@@ -132,7 +132,7 @@ let cnf ~ctx =
         List.map
           (fun c ->
             (* clause represented as formula *)
-            let f = F.mk_or c in
+            let f = F.Base.or_ c in
             PF.create f (proof f))
           clauses
       in
@@ -250,7 +250,7 @@ let add_operation ~penv ~prio op =
 let add_operation_rule ~penv ~prio rule =
   penv.ops <- (prio, rule) :: penv.ops
 
-let create ?(base=Signature.base) ?meta params =
+let create ?(base=Signature.TPTP.base) params =
   let penv = {
     axioms = PF.Set.empty;
     ops = [];
@@ -258,14 +258,8 @@ let create ?(base=Signature.base) ?meta params =
     constr_rules = [];
     status = [];
     base;
-    meta;
     params;
   } in
-  (* may add the [meta] operation *)
-  begin match meta with
-  | None -> ()
-  | Some m -> add_operation ~penv ~prio:2 (meta_prover ~meta:m);
-  end;
   penv
 
 let process ~penv set =
@@ -290,10 +284,12 @@ let add_status ~penv l = penv.status <- List.rev_append l penv.status
 let mk_precedence ~penv set =
   let constrs = penv.constrs @ List.map (fun rule -> rule set) penv.constr_rules in
   let signature = penv.base in
-  let symbols = Signature.to_symbols signature in
+  let symbols = Signature.Seq.symbols signature
+        |> Symbol.Seq.add_set Symbol.Set.empty
+  in
   let symbols' = PFormula.Set.symbols set in
-  let symbols' = Symbol.Set.elements symbols' in
-  let p = Precedence.create constrs (List.rev_append symbols symbols') in
+  let all_symbols = Symbol.Set.union symbols symbols' in
+  let p = Precedence.create constrs (Symbol.Set.elements all_symbols) in
   let p = List.fold_left
     (fun p (s,status) -> Precedence.declare_status p s status)
     p penv.status

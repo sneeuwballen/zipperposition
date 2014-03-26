@@ -77,8 +77,6 @@ let given_clause_step ?(generating=true) ~env num =
       C.check_ord ~ord c;
       Util.debug 2 "================= step %5d  ===============" num;
       Util.debug 1 "given: %a" C.pp c;
-      (* yield control to meta-prover *)
-      Vector.append_seq new_clauses (Env.meta_step ~env c);
       (* find clauses that are subsumed by given in active_set *)
       let subsumed_active = C.CSet.to_seq (Env.subsumed_by ~env c) in
       Env.remove_active ~env subsumed_active;

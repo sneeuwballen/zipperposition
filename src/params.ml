@@ -37,11 +37,6 @@ type t = {
   param_dot_file : string option; (** file to print the final state in *)
   param_dot_sat : bool;           (** Print saturated set into DOT? *)
   param_plugins : string list;    (** plugins to load *)
-  param_kb : string;              (** file to use for KB *)
-  param_kb_where : bool;          (** print where is the KB? *)
-  param_kb_load : string list;    (** theory files to read *)
-  param_kb_clear : bool;          (** do we need to clear the KB? *)
-  param_kb_print : bool;          (** print knowledge base and exit *)
   param_expand_def : bool;        (** expand definitions *)
   param_arith : bool;             (** enable arith? *)
   param_arith_ac : bool;          (** enable AC axioms for arith? *)
@@ -69,11 +64,6 @@ let parse_args () =
   and dot_file = ref None
   and dot_sat = ref false
   and plugins = ref []
-  and kb = ref (Filename.concat Const.home "kb")
-  and kb_load = ref []
-  and kb_clear = ref false
-  and kb_print = ref false
-  and kb_where = ref false
   and arith = ref false
   and arith_ac = ref false
   and stats = ref false
@@ -101,18 +91,14 @@ let parse_args () =
     ; "-split", Arg.Set split, "enable splitting"
     ; "-plugin", Arg.String add_plugin, "load given plugin (.cmxs)"
     ; "-plugins", Arg.String add_plugins, "load given plugin(s), comma-separated"
-    ; "-kb", Arg.Set_string kb, "Knowledge Base (KB) file"
-    ; "-kb-load", Arg.String (fun f -> kb_load := f :: !kb_load), "load theory file into KB"
-    ; "-kb-clear", Arg.Set kb_clear, "clear content of KB and exit"
-    ; "-kb-print", Arg.Set kb_print, "print content of KB and exit"
-    ; "-kb-where", Arg.Set kb_where, "print default dir that is search for KB"
     ; "-expand-def", Arg.Set expand_def, "expand definitions"
     ; "-arith", Arg.Set arith, "enable arithmetic"
     ; "-arith-ac", Arg.Set arith_ac, "enable AC axioms for arith"
     ; "-progress", Arg.Unit set_progress, "print progress"
     ; "-theories", Arg.Bool (fun b -> theories := b), "enable/disable theory detection"
     ; "-proof", Arg.Set_string proof, "choose proof printing (none, debug, or tstp)"
-    ; "-presaturate", Arg.Set presaturate, "pre-saturate (interreduction of) the initial clause set"
+    ; "-presaturate", Arg.Set presaturate,
+        "pre-saturate (interreduction of) the initial clause set"
     ; "-stats", Arg.Set stats, "print statistics"
     ; "-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT"
     ; "-dot-sat", Arg.Set dot_sat, "print saturated set into DOT"
@@ -133,8 +119,6 @@ let parse_args () =
     param_proof = !proof; param_split = !split;
     param_presaturate = !presaturate;
     param_dot_file = !dot_file; param_plugins= !plugins;
-    param_kb = !kb; param_kb_load = !kb_load; param_kb_where = !kb_where;
-    param_kb_clear = !kb_clear; param_unary_depth= !unary_depth;
-    param_kb_print = !kb_print; param_dot_sat= !dot_sat;
+    param_unary_depth= !unary_depth; param_dot_sat= !dot_sat;
     param_expand_def= !expand_def; param_arith= !arith;
     param_arith_ac= !arith_ac; }

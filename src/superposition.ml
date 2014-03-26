@@ -361,7 +361,7 @@ let infer_split c =
   in
   (* is the term made of a split symbol? *)
   let is_split_term t = match T.Classic.view t with
-  | T.Classic.App (s, []) ->
+  | T.Classic.App (s, _, []) ->
       Util.str_prefix ~pre:"$$split_" (Symbol.to_string s)
   | _ -> false
   in
@@ -716,11 +716,13 @@ let basic_simplify c =
 let handle_distinct_constants ~ctx lit =
   match lit with
   | Lit.Equation (l, r, sign, _) when T.is_const l && T.is_const r ->
-      let s1 = T.head l and s2 = T.head r in
+      let s1 = T.head_exn l and s2 = T.head_exn r in
       if Symbol.is_distinct s1 && Symbol.is_distinct s2
-      && sign = (Symbol.eq s1 s2)
-      then Lit.mk_tauto  (* "a" = "a", or "a" != "b" *)
-      else Lit.mk_absurd (* "a" = "b" or "a" != "a" *)
+      then
+        if sign = (Symbol.eq s1 s2)
+        then Lit.mk_tauto  (* "a" = "a", or "a" != "b" *)
+        else Lit.mk_absurd (* "a" = "b" or "a" != "a" *)
+      else lit
   | _ -> lit
 
 exception FoundMatch of T.t * Clause.t * S.t
@@ -744,7 +746,7 @@ let positive_simplify_reflect (simpl_set : PS.SimplSet.t) c =
   and equatable_terms clauses t1 t2 =
     match T.Classic.view t1, T.Classic.view t2 with
     | _ when T.eq t1 t2 -> Some clauses  (* trivial *)
-    | T.Classic.App (f, ss), T.Classic.App (g, ts)
+    | T.Classic.App (f, _, ss), T.Classic.App (g, _, ts)
       when Symbol.eq f g && List.length ss = List.length ts ->
       (* try to make the terms equal directly *)
       begin match equate_root clauses t1 t2 with

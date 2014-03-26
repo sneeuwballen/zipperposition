@@ -30,7 +30,7 @@ Library "libzipperposition"
   InternalModules:  containers/LazyGraph, containers/Leftistheap,
                     containers/Vector, containers/Sequence, containers/SmallSet,
                     containers/UnionFind
-  BuildDepends: unix,num,logtk,logtk.meta,dynlink
+  BuildDepends: unix,zarith,logtk,logtk.meta,dynlink
 
 Library "libzipperposition_meta"
   Path:             src/meta/

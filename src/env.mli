@@ -223,7 +223,3 @@ val all_simplify : env:t -> Clause.t -> Clause.t option
   (** Use all simplification rules to convert a clause into a maximally
       simplified clause (or None, if trivial). *)
 
-val meta_step : env:t -> Clause.t -> Clause.t Sequence.t
-  (** Do one step of the meta-prover with the current given clause. New clauses
-      (lemmas) are returned. *)
-

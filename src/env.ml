@@ -31,7 +31,7 @@ open Logtk
 
 module T = FOTerm
 module C = Clause
-module F = FOFormula
+module F = Formula.FO
 module PF = PFormula
 module Lit = Literal
 module Lits = Literal.Arr
@@ -121,8 +121,8 @@ type t = {
 
 (** {2 Basic operations} *)
 
-let create ?meta ~ctx params signature =
-  let state = ProofState.create ~ctx ?meta params signature in
+let create ~ctx params signature =
+  let state = ProofState.create ~ctx params signature in
   let env = {
     params;
     ctx;
@@ -228,12 +228,6 @@ let add_rewrite_rule ~env name rule =
 
 let add_lit_rule ~env name rule =
   env.lit_rules <- (name, rule) :: env.lit_rules
-
-let interpret_symbols ~env l =
-  List.iter (fun (s,rule) -> interpret_symbol ~env s rule) l
-
-let get_meta ~env =
-  env.state#meta_prover
 
 let get_params ~env =
   env.params
@@ -580,7 +574,7 @@ let generate ~env given =
 let remove_orphans ~env removed_clauses =
   (* remove descendants of the clause. If the descendants are redundant
      (cf C.flag_redundant) their descendants are also removed *)
-  let rec remove_descendants c =
+  let remove_descendants c =
     let orphans = c.C.hcdescendants in
     (* remove orphans from passive set *)
     SmallSet.iter

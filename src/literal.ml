@@ -173,7 +173,7 @@ let ineq_lit ~spec lit =
   match lit with
   | Prop (p, true) ->
       begin match T.Classic.view p with
-      | T.Classic.App (s, [l;r]) ->
+      | T.Classic.App (s, _, [l;r]) ->
         let instance = TO.find ~spec s in
         let strict = Symbol.eq s instance.TO.less in
         TO.({ left=l; right=r; strict; instance; })
@@ -208,9 +208,9 @@ let is_nonstrict_ineq ~spec lit =
 let ineq_lit_of ~instance lit = match lit with
   | Prop (p, true) ->
       begin match T.Classic.view p with
-      | T.Classic.App (s, [l;r]) when Symbol.eq s instance.TO.less ->
+      | T.Classic.App (s, _, [l;r]) when Symbol.eq s instance.TO.less ->
         TO.({ left=l; right=r; strict=true; instance; })
-      | T.Classic.App (s, [l;r]) when Symbol.eq s instance.TO.lesseq ->
+      | T.Classic.App (s, _, [l;r]) when Symbol.eq s instance.TO.lesseq ->
         TO.({ left=l; right=r; strict=false; instance; })
       | _ -> raise Not_found
       end
@@ -220,7 +220,7 @@ let is_ineq_of ~instance lit =
   match lit with
   | Prop (p, true) ->
       begin match T.Classic.view p with
-      | T.Classic.App (s, [l;r]) ->
+      | T.Classic.App (s, _, [l;r]) ->
         Symbol.eq s instance.TO.less || Symbol.eq s instance.TO.lesseq
       | _ -> false
       end

@@ -28,7 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Main file for the prover} *)
 
 open Logtk
-open Logtk_meta
+open Logtk_parsers
 open Params
 
 module T = FOTerm
@@ -65,7 +65,7 @@ let print_stats ~env =
       stats.Gc.minor_collections stats.Gc.major_collections
   in
   print_gc ();
-  print_hashcons_stats "terms" (T.H.stats ());
+  print_hashcons_stats "terms" (ScopedTerm.hashcons_stats ());
   print_hashcons_stats "clauses" (C.CHashcons.stats ());
   print_state_stats (Env.stats ~env);
   if Util.get_debug () > 0
@@ -77,16 +77,18 @@ let print_json_stats ~env =
   let open Sequence.Infix in
   let encode_hashcons (x1,x2,x3,x4,x5,x6) =
     Util.sprintf "[%d, %d, %d, %d, %d, %d]" x1 x2 x3 x4 x5 x6 in
+  (*
   let theories = match (Env.get_meta ~env) with
     | None -> "[]"
     | Some meta ->
       let seq = MetaProverState.theories meta in
       Util.sprintf "[%a]" (Util.pp_seq MetaProverState.pp_theory) seq
   in
+  *)
   let o = Util.sprintf
-    "{ \"terms\": %s, \"clauses\": %s, \"theories\": %s }"
-    (encode_hashcons (T.H.stats ()))
-    (encode_hashcons (C.CHashcons.stats ())) theories
+    "{ \"terms\": %s, \"clauses\": %s }"
+    (encode_hashcons (ScopedTerm.hashcons_stats ()))
+    (encode_hashcons (C.CHashcons.stats ()))
   in
   Util.debug 1 "json_stats: %s" o
 
@@ -112,7 +114,7 @@ let print_version ~params =
   if params.param_version
     then (Printf.printf "%% zipperposition v%s\n" Const.version; exit 0)
 
-let setup_penv ?(ctx=Skolem.create ()) ~penv () =
+let setup_penv ?(ctx=Skolem.create Signature.TPTP.base) ~penv () =
   Superposition.setup_penv ~ctx ~penv;
   if (PEnv.get_params ~penv).param_expand_def then
     PEnv.add_operation ~penv ~prio:1 PEnv.expand_def;
@@ -126,6 +128,7 @@ let setup_env ~env =
   AC.setup_env ~env;
   ()
 
+(* TODO
 (** Make an optional meta-prover and parse its KB *)
 let mk_meta ~params =
   if params.param_theories then begin
@@ -146,6 +149,7 @@ let mk_meta ~params =
     Some meta
   end else
     None
+*)
 
 (** Load plugins *)
 let load_plugins ~params =
@@ -173,9 +177,9 @@ let load_plugins ~params =
     params.param_plugins
 
 (* build initial env and clauses *)
-let preprocess ?meta ~signature ~plugins ~params formulas =
+let preprocess ~signature ~plugins ~params formulas =
   (* penv *)
-  let penv = PEnv.create ~base:signature ?meta params in
+  let penv = PEnv.create ~base:signature params in
   setup_penv ~penv ();
   let formulas = PEnv.process ~penv formulas in
   Util.debug 3 "formulas pre-processed into:\n  %a"
@@ -189,7 +193,7 @@ let preprocess ?meta ~signature ~plugins ~params formulas =
   Util.debug 1 "signature: %a" Signature.pp signature;
   let ctx = Ctx.create ~ord ~select ~signature () in
   (* build the env *)
-  let env = Env.create ?meta ~ctx params signature in
+  let env = Env.create ~ctx params signature in
   setup_env ~env;
   (* reduce to CNF *)
   Util.debug 1 "reduce to CNF...";
@@ -230,6 +234,7 @@ let print_dots ~env result =
   end;
   ()
 
+(*
 let print_meta ~env =
   (* print theories *)
   match Env.get_meta ~env with
@@ -240,6 +245,7 @@ let print_meta ~env =
     Util.debug 1 "datalog contains %d clauses"
       (MetaReasoner.size (MetaProverState.reasoner meta))
   | None -> ()
+*)
 
 let print_szs_result ~file ~env result =
   let params = Env.get_params ~env in
@@ -273,7 +279,7 @@ let print_szs_result ~file ~env result =
 
 (* perform type inference on those formulas *)
 let annotate_formulas ~signature formulas =
-  let tyctx = TypeInference.Ctx.of_signature signature in
+  let tyctx = TypeInference.Ctx.create signature in
   let formulas = Sequence.map
     (fun (f, file,name) ->
       let f = TypeInference.FO.convert_form ~ctx:tyctx f in
@@ -307,29 +313,34 @@ let try_to_refute ~env ~params result =
 
 (** Process the given file (try to solve it) *)
 let process_file ?meta ~plugins ~params file =
+  let open Monad.Err in
   Util.debug 1 "================ process file %s ===========" file;
   (* parse formulas *)
-  let decls = Util_tptp.parse_file ~recursive:true file in
+  Util_tptp.parse_file ~recursive:true file
+  >>= fun decls ->
   Util.debug 1 "parsed %d declarations" (Sequence.length decls);
-  (* obtain a set of proved formulas, and an initial signature *)
-  let formulas = Util_tptp.sourced_formulas ~file decls in
-  let signature = Util_tptp.type_declarations decls in
-  (* perform type inference on formulas (also update signature) *)
-  let formulas, signature = annotate_formulas ~signature formulas in
-  let formulas = Sequence.map PF.of_sourced formulas in
-  let formulas = PF.Set.of_seq formulas in
+  (* obtain a typed AST *)
+  Util_tptp.infer_types (`sign Signature.TPTP.base) decls
+  >>= fun (signature,decls) ->
+  (* obtain a set of proved formulas *)
+  let formulas =
+    Util_tptp.Typed.sourced_formulas ~file decls
+    |> Sequence.map PF.of_sourced
+    |> PF.Set.of_seq
+  in
   (* obtain clauses + env *)
   Util.debug 2 "input formulas:\n%%  %a" (Util.pp_seq ~sep:"\n%%  " PF.pp)
     (PF.Set.to_seq formulas);
   Util.debug 2 "input signature: %a" Signature.pp signature;
-  let env, clauses = preprocess ?meta ~signature ~plugins ~params formulas in
+  let env, clauses = preprocess ~signature ~plugins ~params formulas in
   (* pre-saturation *)
   let num_clauses = C.CSet.size clauses in
   let result, clauses = if params.param_presaturate
     then presaturate_clauses ~env (C.CSet.to_seq clauses)
     else Sat.Unknown, C.CSet.to_seq clauses
   in
-  Util.debug 1 "signature: %a" Signature.pp_no_base (Env.signature env);
+  Util.debug 1 "signature: %a" Signature.pp
+    (Signature.diff (Env.signature env) Signature.TPTP.base);
   Util.debug 2 "%d clauses processed into:\n%%  %a"
     num_clauses (Util.pp_seq ~sep:"\n%%  " C.pp) clauses;
   (* add clauses to passive set of [env] *)
@@ -343,40 +354,9 @@ let process_file ?meta ~plugins ~params file =
     print_json_stats ~env;
     end;
   print_dots ~env result;
-  print_meta ~env;
   print_szs_result ~file ~env result;
   Util.debug 1 "=================================================";
-  ()
-
-(** Print the content of the KB, and exit *)
-let print_kb ?meta =
-  begin match meta with
-  | None -> ()
-  | Some meta ->
-    let kb = MetaProverState.kb meta in
-    Util.printf "%a\n" MetaKB.pp kb;
-  end;
-  exit 0
-
-(** Clear the Knowledge Base and exit *)
-let clear_kb params =
-  let file = params.param_kb in
-  Util.with_lock_file file
-    (fun () ->  (* remove file *)
-      Unix.unlink file);
-  exit 0
-
-let print_kb_where params = 
-  Util.debug 0 "KB located at %s" params.param_kb;
-  exit 0
-
-let save_kb ?meta ~params =
-  match meta with
-  | None -> ()
-  | Some meta ->
-    let file = params.param_kb in
-    Util.with_lock_file file
-      (fun () -> MetaProverState.save_kb_file meta file)
+  return ()
 
 let () =
   (* GC! increase max overhead because we want the GC to be faster, even if
@@ -391,30 +371,14 @@ let () =
   print_version params;
   (* plugins *)
   let plugins = load_plugins ~params in
-  (* meta *)
-  let meta = mk_meta ~params in
-  (* operations on knowledge base *)
-  (if params.param_kb_where then print_kb_where params);
-  (if params.param_kb_print then print_kb ?meta);
-  (if params.param_kb_clear then clear_kb params);
   (* master process: process files *)
   Vector.iter params.param_files
     (fun file ->
-      begin try process_file ?meta ~plugins ~params file
-      with
-      | Type.Error msg ->
-        Util.eprintf "type error: %s\n" msg;
-        Printexc.print_backtrace stderr;
-      | TypeUnif.Error e ->
-        Util.eprintf "type error: %a\n" TypeUnif.pp_error e;
-        Printexc.print_backtrace stderr;
-      | Ast_tptp.ParseError loc ->
-        Util.eprintf "parse error (at %a)\n" Location.pp loc;
-        Printexc.print_backtrace stderr;
-      end;
-      flush stderr);
-  (* save KB? *)
-  save_kb ?meta ~params;
+      match process_file ~plugins ~params file with
+      | Monad.Err.Error msg ->
+          print_endline msg;
+          exit 1
+      | Monad.Err.Ok () -> ());
   ()
 
 let _ =
