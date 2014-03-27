@@ -134,10 +134,17 @@ let miniscope ?(distribute_exists=false) f =
   in
   miniscope (F.simplify f)
 
+(* what's the surrounding connective? *)
+type surrounding =
+  | SurroundOr
+  | SurroundAnd
+
 (* negation normal form (also remove equivalence and implications).
-    [polarity] is the polarity of the formula, ie the parity of the number
-    of negations on the path from the root formula to this formula. *)
-let rec nnf polarity f =
+   [surrounding] is either [Or] or [And], and denotes which connective
+   is immediately surrouding the current formula. This information is
+   used to choose among the possible destructions of equiv/xor, to
+   avoid nesting opposite connectives *)
+let rec nnf surrounding f =
   Util.debug 5 "nnf of %a..." F.pp f;
   match F.view f with
   | F.Atom _
@@ -145,45 +152,51 @@ let rec nnf polarity f =
   | F.Eq _ -> f
   | F.Not f' ->
       begin match F.view f' with
-      | F.Not f'' -> nnf polarity f''
+      | F.Not f'' -> nnf surrounding f''
       | F.Neq (a,b) -> F.Base.eq a b
       | F.Eq (a,b) -> F.Base.neq a b
       | F.And l ->
-        F.Base.or_ (List.map (nnf (not polarity)) l)
+        F.Base.or_ (List.map (fun f -> nnf SurroundOr (F.Base.not_ f)) l)
       | F.Or l ->
-        F.Base.and_ (List.map (nnf (not polarity)) l)
-      | F.Equiv _ | F.Xor _ | F.Imply _ ->
-        (* remove negation, but switch polarity *)
-        nnf polarity (F.Base.not_ (nnf (not polarity) f'))
+        F.Base.and_ (List.map (fun f -> nnf SurroundAnd (F.Base.not_ f)) l)
+      | F.Xor (a,b) ->
+        nnf surrounding (F.Base.equiv a b)
+      | F.Equiv (a,b) ->
+        nnf surrounding (F.Base.xor a b)
+      | F.Imply (a,b) -> (* not (a=>b)  is a and not b *)
+        nnf surrounding (F.Base.and_ [a; F.Base.not_ b])
       | F.Forall (varty, f'') ->
-        F.Base.__mk_exists ~varty (nnf polarity (F.Base.not_ f''))
+        F.Base.__mk_exists ~varty (nnf surrounding (F.Base.not_ f''))
       | F.Exists (varty, f'') ->
-        F.Base.__mk_forall ~varty (nnf polarity (F.Base.not_ f''))
-      | _ when F.is_atomic f' -> f  (* leaf *)
-      | _ -> failwith "NNF failure!"
+        F.Base.__mk_forall ~varty (nnf surrounding (F.Base.not_ f''))
+      | F.True -> F.Base.false_
+      | F.False -> F.Base.true_
+      | F.Atom p -> f
       end
-  | F.And l -> F.Base.and_ (List.map (nnf polarity) l)
-  | F.Or l -> F.Base.or_ (List.map (nnf polarity) l)
+  | F.And l -> F.Base.and_ (List.map (nnf SurroundAnd) l)
+  | F.Or l -> F.Base.or_ (List.map (nnf SurroundOr) l)
   | F.Imply (f1, f2) ->
-    nnf polarity (F.Base.or_ [ (F.Base.not_ f1); f2 ])
+    nnf surrounding (F.Base.or_ [ (F.Base.not_ f1); f2 ])
   | F.Equiv(f1,f2) ->
-    if polarity
-      then
-        nnf polarity (F.Base.and_
+    begin match surrounding with
+      | SurroundAnd ->
+        nnf surrounding (F.Base.and_
           [ F.Base.imply f1 f2; F.Base.imply f2 f1 ])
-      else
-        nnf polarity (F.Base.or_
+      | SurroundOr ->
+        nnf surrounding (F.Base.or_
           [ F.Base.and_ [f1; f2]; F.Base.and_ [F.Base.not_ f1; F.Base.not_ f2] ])
+    end
   | F.Xor (f1,f2) ->
-    if polarity
-      then
-        nnf polarity (F.Base.or_
-          [ F.Base.and_ [f1; f2]; F.Base.and_ [F.Base.not_ f1; F.Base.not_ f2] ])
-      else
-        nnf polarity (F.Base.and_
-          [ F.Base.imply f1 f2; F.Base.imply f2 f1 ])
-  | F.Forall (varty,f') -> F.Base.__mk_forall ~varty (nnf polarity f')
-  | F.Exists (varty,f') -> F.Base.__mk_exists ~varty (nnf polarity f')
+    begin match surrounding with
+      | SurroundOr ->
+        nnf surrounding (F.Base.or_
+          [ F.Base.and_ [F.Base.not_ f1; f2]; F.Base.and_ [f1; F.Base.not_ f2] ])
+      | SurroundAnd ->
+        nnf surrounding (F.Base.and_
+          [ F.Base.imply (F.Base.not_ f1) f2; F.Base.imply f2 (F.Base.not_ f1) ])
+    end
+  | F.Forall (varty,f') -> F.Base.__mk_forall ~varty (nnf surrounding f')
+  | F.Exists (varty,f') -> F.Base.__mk_exists ~varty (nnf surrounding f')
   | F.True
   | F.False -> f
 
@@ -292,7 +305,7 @@ let cnf_of ?(opts=[]) ?(ctx=Skolem.create Signature.empty) f =
     else begin
       let f = F.simplify f in
       Util.debug 4 "... simplified: %a" F.pp f;
-      let f = nnf true f in
+      let f = nnf SurroundAnd f in
       Util.debug 4 "... NNF: %a" F.pp f;
       let distribute_exists = List.mem DistributeExists opts in
       let f = miniscope ~distribute_exists f in
