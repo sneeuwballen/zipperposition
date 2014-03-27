@@ -221,6 +221,10 @@ let rec pp buf t = match t.term with
       Buffer.add_char buf '[';
       Util.pp_list ~sep:"," pp buf l;
       Buffer.add_char buf ']'
+  | App ({term=Const (Symbol.Conn Symbol.Arrow)}, [ret;a]) ->
+    Printf.bprintf buf "%a -> %a" pp a pp ret
+  | App ({term=Const (Symbol.Conn Symbol.Arrow)}, ret::l) ->
+    Printf.bprintf buf "(%a) -> %a" (Util.pp_list ~sep:" * " pp) l pp ret
   | App (s, l) ->
       pp buf s;
       Buffer.add_char buf '(';
@@ -314,9 +318,9 @@ module TPTP = struct
   let exists ?loc vars f = bind ?loc Symbol.Base.exists vars f
   let lambda ?loc vars f = bind ?loc Symbol.Base.lambda vars f
 
-  let rec mk_fun_ty l ret = match l with
+  let mk_fun_ty ?loc l ret = match l with
     | [] -> ret
-    | a::l' -> app (const Symbol.Base.arrow) [a; mk_fun_ty l' ret]
+    | _::_ -> app ?loc (const Symbol.Base.arrow) (ret :: l)
   let tType = const Symbol.Base.tType
   let forall_ty vars t = bind Symbol.Base.forall_ty vars t
 

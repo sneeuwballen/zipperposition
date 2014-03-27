@@ -368,10 +368,14 @@ module Conv = struct
       | PT.Int _
       | PT.Rat _ -> raise LocalExit
       | PT.Const s -> const s
-      | PT.App ({PT.term=PT.Const (Symbol.Conn Symbol.Arrow)}, [arg;ret]) ->
+      | PT.App ({PT.term=PT.Const (Symbol.Conn Symbol.Arrow)}, [ret;arg]) ->
         let ret = of_prolog ret in
         let arg = of_prolog arg in
         arrow arg ret
+      | PT.App ({PT.term=PT.Const (Symbol.Conn Symbol.Arrow)}, ret::l) ->
+        let ret = of_prolog ret in
+        let l = List.map of_prolog l in
+        arrow_list l ret
       | PT.App ({PT.term=PT.Const hd}, l) ->
         let l = List.map of_prolog l in
         app hd l

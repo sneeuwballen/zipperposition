@@ -93,11 +93,7 @@ module Term = struct
     | "-->" -> app ?loc head [wildcard; a; b]  (* polymorphic! *)
     | _ -> app ?loc head [a; b] (* default *)
 
-  let mk_fun_ty ?loc l ret =
-    let rec mk l = match l with
-      | [] -> ret
-      | a::l' -> app ?loc (const Symbol.Base.arrow) [a; mk l']
-    in mk l
+  let mk_fun_ty = PT.TPTP.mk_fun_ty
   let tType = PT.TPTP.tType
   let forall_ty ?loc vars t = bind ?loc Symbol.Base.forall_ty vars t 
 end

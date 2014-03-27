@@ -153,7 +153,7 @@ module TPTP : sig
   val exists : ?loc:location -> t list -> t -> t
   val lambda : ?loc:location -> t list -> t -> t
 
-  val mk_fun_ty : t list -> t -> t
+  val mk_fun_ty : ?loc:location -> t list -> t -> t
   val tType : t
   val forall_ty : t list -> t -> t
 
