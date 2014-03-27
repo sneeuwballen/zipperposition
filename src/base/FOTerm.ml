@@ -290,13 +290,11 @@ module Seq = struct
 
   let rec symbols t k =
     match T.kind t, T.view t with
+    | T.Kind.FOTerm, T.Const s -> k s
     | T.Kind.FOTerm, T.Var _
     | T.Kind.FOTerm, T.BVar _ -> ()
-    | T.Kind.FOTerm, T.App (hd, l) ->
-        begin match T.view hd with
-        | T.Const s -> k s
-        | _ -> ()
-        end;
+    | T.Kind.FOTerm, T.App (f, l) ->
+        symbols f k;
         _symbols_list l k
     | T.Kind.FOTerm, T.At (l,r) -> symbols l k; symbols r k
     | _ -> assert false
@@ -339,6 +337,8 @@ let rec size t = match T.view t with
   | T.Var _
   | T.BVar _ -> 1
   | T.App (_, l) -> List.fold_left (fun s t' -> s + size t') 1 l
+  | T.Const _ -> 1
+  | T.At (l, _) -> size l + 1
   | _ -> assert false
 
 let is_ground t = T.ground t
@@ -412,13 +412,15 @@ let contains_symbol f t =
 
 (** {2 Fold} *)
 
-let rec _all_pos_rec f vars acc pb t = match T.view t with
-  | T.Var _ | T.BVar _ ->
+let rec _all_pos_rec f vars acc pb t =
+  match view t with
+  | Var _ | BVar _ ->
     if vars then f acc t (PB.to_pos pb) else acc
-  | T.App (_, tl) ->
+  | Const _ -> f acc t (PB.to_pos pb)
+  | TyApp (l, _) -> _all_pos_rec f vars acc pb l
+  | App (_, tl) ->
     let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
     _all_pos_rec_list f vars acc pb tl 0
-  | _ -> assert false
 and _all_pos_rec_list f vars acc pb l i = match l with
   | [] -> acc
   | t::l' when Type.is_type t ->

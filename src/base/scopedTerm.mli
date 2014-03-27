@@ -120,6 +120,8 @@ val is_record : t -> bool
 val is_multiset : t -> bool
 val is_at : t -> bool
 
+val hashcons_stats : unit -> int*int*int*int*int*int
+
 (** {3 Containers} *)
 
 module Map : Sequence.Map.S with type key = term

@@ -170,6 +170,8 @@ module H = Hashcons.Make(struct
   let tag i t = assert (t.id = ~-1); t.id <- i
 end)
 
+let hashcons_stats () = H.stats ()
+
 let const ~kind ~ty s =
   let my_t = { term=Const s; kind; id= ~-1; ty=HasType ty; flags=0; } in
   let t = H.hashcons my_t in
