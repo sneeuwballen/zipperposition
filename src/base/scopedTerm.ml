@@ -371,7 +371,8 @@ module DB = struct
 
   let closed ?depth t =
     match depth with
-    | None ->
+    | None
+    | Some 0 ->
         (* depth=0, see whether result is cached *)
         if get_flag t flag_db_closed_computed
           then get_flag t flag_db_closed
@@ -398,7 +399,7 @@ module DB = struct
     | Bind (_, varty, t') -> contains varty n || contains t' (n+1)
     | Record (l, rest) ->
         begin match rest with
-        | None -> true
+        | None -> false
         | Some r -> contains r n
         end ||
         List.exists (fun (_,t') -> contains t' n) l
@@ -488,7 +489,7 @@ module DB = struct
             in
             let l = List.map (fun (s,t') -> s, recurse depth t') l in
             record ~kind:t.kind ~ty l ~rest
-          | Multiset l -> 
+          | Multiset l ->
             let l = List.map (recurse depth) l in
             multiset ~kind:t.kind ~ty l
           | App (f, l) ->
