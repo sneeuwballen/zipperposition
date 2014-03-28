@@ -413,7 +413,7 @@ module Conv = struct
     | Forall t' ->
       PT.bind Symbol.Base.forall_ty
         [PT.var (Util.sprintf "B%d" depth)]
-        (to_prolog depth t')
+        (to_prolog (depth+1) t')
     in
     to_prolog depth t
 end
