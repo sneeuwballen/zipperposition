@@ -384,7 +384,7 @@ module Pos = struct
   let replace t pos ~by = of_term_exn (T.Pos.replace (t:>T.t) pos ~by:(by:>T.t))
 
   (** get subterm by its compact position *)
-  let at_cpos t pos = 
+  let at_cpos t pos =
     let rec recurse t pos =
       match T.view t, pos with
       | _, 0 -> t
@@ -547,7 +547,7 @@ let pp_depth ?(hooks=[]) depth buf t =
         end
     | Const s -> Symbol.pp buf s
     | Var i ->
-      if not !print_all_types
+      if not !print_all_types && not (Type.eq (ty t) Type.TPTP.i)
         then Printf.bprintf buf "X%d:%a" i Type.pp (ty t)
         else Printf.bprintf buf "X%d" i
     end;

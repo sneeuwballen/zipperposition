@@ -768,7 +768,7 @@ module Pos = struct
     | HasType ty, App (f, l), P.Head subpos ->
         app ~kind:t.kind ~ty (replace f subpos ~by) l
     | HasType ty, App (f, l), P.Arg (n,subpos) when n < List.length l ->
-        let t' = replace (List.nth l (n-1)) subpos ~by in
+        let t' = replace (List.nth l n) subpos ~by in
         let l' = Util.list_set l n t' in
         app ~kind:t.kind ~ty f l'
     | HasType ty, At (l,r), P.Left subpos ->
@@ -776,11 +776,11 @@ module Pos = struct
     | HasType ty, At (l,r), P.Right subpos ->
         mk_at ~kind:t.kind ~ty l (replace r subpos ~by)
     | HasType ty, Multiset l, P.Arg (n,subpos) when n < List.length l ->
-        let t' = replace (List.nth l (n-1)) subpos ~by in
+        let t' = replace (List.nth l n) subpos ~by in
         let l' = Util.list_set l n t' in
         multiset ~kind:t.kind ~ty l'
     | HasType ty, SimpleApp (s,l), P.Arg (n,subpos) when n < List.length l ->
-        let t' = replace (List.nth l (n-1)) subpos ~by in
+        let t' = replace (List.nth l n) subpos ~by in
         let l' = Util.list_set l n t' in
         simple_app ~kind:t.kind ~ty s l'
     | HasType ty, Record (l, Some r), P.Record_rest subpos ->
