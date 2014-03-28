@@ -487,14 +487,6 @@ let parse_args () =
     then theory_files := ["data/builtin.theory"];
   ()
 
-let reduce_to_cnf decls =
-  E.(
-    Util_tptp.infer_types (`sign Signature.TPTP.Arith.full) decls
-    >>= fun (sign, decls) ->
-    let _sign, decls = Util_tptp.to_cnf sign decls in
-    E.return (Util_tptp.erase_types decls)
-  )
-
 let reduce_to_cnf_with_E decls =
   (* use E to reduce to CNF, also declare types of TFF predicates *)
   let decls' = Sequence.append _tff_type_decls_untyped decls in
@@ -504,6 +496,7 @@ let reduce_to_cnf_with_E decls =
 let main () =
   E.(
     (* parse theory, obtain a loaded meta-prover *)
+    Util.debug 2 "load theory files...";
     parse_theory_files Prover.empty !theory_files
     >>= fun prover ->
     if !flag_print_theory
@@ -511,15 +504,16 @@ let main () =
     if !flag_print_signature
       then print_signature (Prover.signature prover);
     (* parse problem *)
+    Util.debug 2 "read problem files...";
     parse_tptp_files !files
     >>= fun decls ->
-    (* reduce to CNF *)
-    (* reduce_to_cnf_with_E decls *)
-    reduce_to_cnf decls
-    >>= fun decls ->
     (* extract into typed clauses *)
+    Util.debug 2 "infer types...";
     Util_tptp.infer_types (`sign Signature.TPTP.Arith.full) decls
-    >>= fun (_sign, decls) ->
+    >>= fun (signature, decls) ->
+    Util.debug 2 "reduce to CNF...";
+    (* reduce to CNF *)
+    let signature, decls = Util_tptp.to_cnf signature decls in
     (* global state *)
     let state = State.of_prover prover in
     (* detect theories (selecting only clauses) *)
@@ -547,6 +541,7 @@ let main () =
     (* TODO: preprocess *)
 
     (* orient rewrite system to get a precedence *)
+    Util.debug 2 "orient rewrite rules...";
     let orders =
       state.State.rewrite
         |> Lpo.FO.orient_lpo_list
