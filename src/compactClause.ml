@@ -55,9 +55,9 @@ let to_seq c = Sequence.from_iter (fun k -> Array.iter k (Lazy.force c))
 
 let pp buf c =
   match c with
-  | lazy [| |] -> Buffer.add_string buf "$false"
+  | lazy [| |] -> Buffer.add_string buf "⊥"
   | lazy [| x |] -> F.pp buf x
-  | lazy l -> Printf.bprintf buf "[%a]" (Util.pp_array ~sep:" | " F.pp) l
+  | lazy l -> Printf.bprintf buf "%a" (Util.pp_array ~sep:" ∨ " F.pp) l
 
 let pp_tstp buf c =
   match c with
