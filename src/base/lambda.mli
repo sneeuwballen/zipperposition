@@ -43,8 +43,7 @@ val lambda_abstract : term -> sub:term -> term
       a subterm of [term], then [term' == ^[X]: term].
 
       For instance (@ are omitted), [lambda_abstract f(a,g @ b,c) ~sub:g] will return
-      the term [^[X]: f(a, X @ b, c)].
-  *)
+      the term [^[X]: f(a, X @ b, c)].  *)
 
 val lambda_abstract_list : term -> term list -> term
   (** Abstract successively the given subterms, starting from the
@@ -54,9 +53,9 @@ val lambda_abstract_list : term -> term list -> term
 
 val match_types : ?subst:Substs.Ty.t ->
                   Type.t -> scope -> Type.t list -> scope ->
-                  Substs.Ty.t
+                  Substs.t
   (** Match the first type's arguments with the list.
-      @raise TypeUnif.Error if types are not compatible *)
+      @raise Type.Error if types are not compatible *)
 
 val can_apply : Type.t -> Type.t list -> bool
   (** Can we apply a term with the given type to terms with
@@ -66,7 +65,6 @@ val lambda_apply_list : ?depth:int -> term -> term list -> term
   (** Apply a lambda to a list of arguments.
       The type of the lambda must be a generalization of a function
       that takes the list's types as arguments.
-      
-      @raise TypeUnif.Error if the first term doesn't have a function type or
-        if the types are not compatible
-  *)
+
+      @raise Type.Error if the first term doesn't have a function type or
+        if the types are not compatible *)

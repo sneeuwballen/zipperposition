@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: d2314b78736c89a9cb181d013c45fb5c)
+# DO NOT EDIT (digest: 484816365af9f284753a68b4559c11df)
 Symbol
 ScopedTerm
 FOTerm
@@ -32,6 +32,7 @@ FeatureVector
 Rewriting
 FormulaShape
 Transform
+Lambda
 lib/Hash
 lib/Hashcons
 lib/Sequence
