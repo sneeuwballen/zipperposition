@@ -55,7 +55,7 @@ let check_prop prop generator num =
   let failures = ref []
   and success_count = ref 0
   and noprecond_count = ref 0 in
-  for i = 1 to num do
+  for _i = 1 to num do
     match prop (generator ()) with
     | TestOk -> incr success_count
     | TestPreconditionFalse -> incr noprecond_count

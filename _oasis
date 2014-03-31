@@ -55,7 +55,7 @@ Library "logtk"
                     Comparison, Precedence, Ordering, Skolem, Cnf,
                     HORewriting, Index, Dtree, Fingerprint, NPDtree,
                     Congruence, FastFingerprint, FeatureVector, Rewriting,
-                    FormulaShape, Transform,
+                    FormulaShape, Transform, Lambda,
                     lib/Hash, lib/Hashcons,
                     lib/Sequence, lib/Cache, lib/Bij, lib/Bencode,
                     lib/PersistentHashtbl, lib/Monad, lib/ParseLocation,
@@ -118,11 +118,11 @@ Library "logtk_arbitrary"
   Pack:             true
   FindlibName:      arbitrary
   FindlibParent:    logtk
-  Modules:          ArTerm, ArForm, ArType, ArSignature, ArSymbol, ArPattern
+  Modules:          ArTerm, ArForm, ArType, ArSignature, ArSymbol
   BuildDepends:     logtk,qcheck,logtk.meta
-  Build$:           flag(qcheck) & flag(meta)
-  Install$:         flag(qcheck) & flag(meta)
-  XMETARequires:    logtk,logtk.meta,datalog,qcheck
+  Build$:           flag(qcheck)
+  Install$:         flag(qcheck)
+  XMETARequires:    logtk,qcheck
 
 Document logtk
   Title:                Logtk docs
@@ -134,25 +134,25 @@ Document logtk
   XOCamlbuildLibraries: logtk,logtk.meta,logtk.arbitrary
 
 Executable run_bench
-  Path: tests/
-  Install: false
-  CompiledObject: native
-  MainIs: run_bench.ml
-  Build$:   flag(bench) & flag(tests)
-  BuildDepends: logtk, bench, qcheck, logtk.arbitrary
+  Path:             tests/
+  Install:          false
+  CompiledObject:   native
+  MainIs:           run_bench.ml
+  Build$:           flag(bench) & flag(tests)
+  BuildDepends:     logtk,bench,qcheck,logtk.arbitrary
 
 Test all
-  Command: $run_tests
-  TestTools: run_tests
-  Run$: flag(tests) & flag(meta) & flag(qcheck)
+  Command:          $run_tests
+  TestTools:        run_tests
+  Run$:             flag(tests) & flag(qcheck)
 
 Executable run_tests
   Path:             tests/
   Install:          false
   CompiledObject:   native
   MainIs:           run_tests.ml
-  Build$:           flag(tests) & flag(meta) & flag(qcheck) & flag(extended)
-  BuildDepends:     logtk,logtk.extended,oUnit,logtk.meta,logtk.arbitrary
+  Build$:           flag(tests) & flag(meta) & flag(qcheck) & flag(parsers)
+  BuildDepends:     logtk,logtk.parsers,oUnit,logtk.meta,logtk.arbitrary
 
 # TPTP syntax and type checking
 Executable type_check_tptp

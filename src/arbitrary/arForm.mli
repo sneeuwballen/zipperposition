@@ -29,13 +29,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 type 'a arbitrary = 'a QCheck.Arbitrary.t
+type form = Formula.FO.t
 
-val atom : FOFormula.t arbitrary
+val atom : form arbitrary
   (** Atomic formula *)
 
-val clause : FOFormula.t list arbitrary
+val clause : form list arbitrary
   (** clause *)
 
-val default : FOFormula.t arbitrary
+val default : form arbitrary
   (** polymorphic formula with connectives (DB-closed) *)
 

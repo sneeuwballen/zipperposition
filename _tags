@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 73d4c26fe5391e86cad40c1a7b9b0ec4)
+# DO NOT EDIT (digest: 2ede1221bba8ba5e2569d002081ebf5e)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -47,6 +47,7 @@
 "src/base/rewriting.cmx": for-pack(Logtk)
 "src/base/formulaShape.cmx": for-pack(Logtk)
 "src/base/transform.cmx": for-pack(Logtk)
+"src/base/lambda.cmx": for-pack(Logtk)
 "src/base/lib/hash.cmx": for-pack(Logtk)
 "src/base/lib/hashcons.cmx": for-pack(Logtk)
 "src/base/lib/sequence.cmx": for-pack(Logtk)
@@ -113,7 +114,6 @@
 "src/arbitrary/arType.cmx": for-pack(Logtk_arbitrary)
 "src/arbitrary/arSignature.cmx": for-pack(Logtk_arbitrary)
 "src/arbitrary/arSymbol.cmx": for-pack(Logtk_arbitrary)
-"src/arbitrary/arPattern.cmx": for-pack(Logtk_arbitrary)
 <src/arbitrary/*.ml{,i}>: package(qcheck)
 <src/arbitrary/*.ml{,i}>: package(unix)
 <src/arbitrary/*.ml{,i}>: package(zarith)
@@ -137,7 +137,6 @@
 "tests/run_tests.native": package(zarith)
 "tests/run_tests.native": use_logtk
 "tests/run_tests.native": use_logtk_arbitrary
-"tests/run_tests.native": use_logtk_extended
 "tests/run_tests.native": use_logtk_meta
 "tests/run_tests.native": use_logtk_parsers
 <tests/*.ml{,i}>: package(oUnit)
@@ -146,7 +145,6 @@
 <tests/*.ml{,i}>: package(zarith)
 <tests/*.ml{,i}>: use_logtk
 <tests/*.ml{,i}>: use_logtk_arbitrary
-<tests/*.ml{,i}>: use_logtk_extended
 <tests/*.ml{,i}>: use_logtk_meta
 <tests/*.ml{,i}>: use_logtk_parsers
 # Executable type_check_tptp

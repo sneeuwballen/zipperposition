@@ -30,23 +30,22 @@ open Logtk
 open Logtk_arbitrary
 open QCheck
 
-module BT = Basic.FO
+module PT = PrologTerm
 
 let check_infer_all_symbs =
-  let gen = Arbitrary.(list ArTerm.ArbitraryBasic.default) in
+  let gen = Arbitrary.(list ArTerm.PT.default) in
   let name = "type_infer_all_symbols" in
-  let pp = PP.(list BT.to_string) in
+  let pp = PP.(list PT.to_string) in
   (* check that after type inference, all symbols apppear in the signature *)
   let prop terms =
-    let ctx = TypeInference.Ctx.create () in
+    let ctx = TypeInference.Ctx.create Signature.empty in
     List.iter (fun t -> ignore (TypeInference.FO.infer ctx t)) terms;
     let signature = TypeInference.Ctx.to_signature ctx in
-    let symbols = BT.symbols (Sequence.of_list terms) in
-    Basic.Sym.Set.for_all
-      (function
-        | Basic.Sym.Const s -> Signature.mem signature s
-        | _ -> true)
-      symbols
+    let symbols = terms
+      |> Sequence.of_list
+      |> Sequence.flatMap PT.Seq.symbols 
+      |> Symbol.Seq.add_set Symbol.Set.empty in
+    Symbol.Set.for_all (Signature.mem signature) symbols
   in
   mk_test ~pp ~name gen prop
 
@@ -61,7 +60,7 @@ let check_cmp =
     (c = 0) = (Type.eq ty1 ty2)
   in
   mk_test ~name ~pp ~size gen prop
-    
+
 let props =
   [ check_infer_all_symbs
   ; check_cmp

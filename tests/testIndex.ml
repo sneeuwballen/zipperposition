@@ -36,7 +36,7 @@ module T = FOTerm
 module E : Index.EQUATION with type rhs = int and type t = T.t * int = struct
   type t = T.t * int
   type rhs = int
-  let compare (t1,i1) (t2,i2) = if t1 == t2 then i1-i2 else T.compare t1 t2
+  let compare (t1,i1) (t2,i2) = if t1 == t2 then i1-i2 else T.cmp t1 t2
   let extract (t,i) = t, i, true
   let priority _ = 1
 end
@@ -98,8 +98,8 @@ module TestUnit(I : UnitIndex) = struct
           (* all terms must match [t] *)
           List.for_all
             (fun (t',_) ->
-              try ignore (FOUnif.matching t' 0 t 1); true
-              with FOUnif.Fail -> false)
+              try ignore (Unif.FO.matching ~pattern:t' 0 t 1); true
+              with Unif.Fail -> false)
             retrieved)
       seq
     in
@@ -116,11 +116,11 @@ module TestUnit(I : UnitIndex) = struct
           Sequence.for_all
             (fun (t',_) ->
               try
-                let _ = FOUnif.matching t' 1 t 0 in
+                let _ = Unif.FO.matching ~pattern:t' 1 t 0 in
                 List.exists
                   (fun (t'',_) -> T.eq t' t'')
                   retrieved
-              with FOUnif.Fail -> true)
+              with Unif.Fail -> true)
             seq)
         seq
     in
@@ -151,10 +151,6 @@ module TestTerm(I : TermIndex) = struct
     let seq = T.Tbl.to_seq set in
     let seq = Sequence.mapi (fun i t -> t, i) seq in
     return (Sequence.persistent seq))
-
-  let pp seq =
-    let pp buf (t,i) = Printf.bprintf buf "%a -> %d" T.pp t i in
-    Util.on_buffer (Util.pp_seq pp) seq
 
   (* check that the size of index is correct *)
   let check_size_add =
@@ -194,7 +190,7 @@ module TestTerm(I : TermIndex) = struct
         List.for_all
           (fun (t',_) ->
             try ignore (check t 0 t' 1); true
-            with FOUnif.Fail ->
+            with Unif.Fail ->
               Util.debug 1 "problem with %a and %a" T.pp t T.pp t';
               false)
           retrieved)
@@ -213,12 +209,12 @@ module TestTerm(I : TermIndex) = struct
               List.exists
                 (fun (_,i'') -> i' = i'')
                 retrieved
-            with FOUnif.Fail -> true)
+            with Unif.Fail -> true)
           seq)
       seq
 
   let _match_flip ?subst t1 s_1 t2 s_2 =
-    FOUnif.matching ?subst t2 s_2 t1 s_1
+    Unif.FO.matching ?subst ~pattern:t2 s_2 t1 s_1
 
   let size = Sequence.length
   let pp l =
@@ -229,12 +225,13 @@ module TestTerm(I : TermIndex) = struct
   let _limit = 0
 
   let check_retrieved_unify =
-    let prop = _check_all_retrieved_satisfy I.retrieve_unifiables FOUnif.unification in
+    let prop = _check_all_retrieved_satisfy I.retrieve_unifiables Unif.FO.unification in
     let name = Util.sprintf "index(%s)_retrieve_imply_unify" I.name in
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 
   let check_retrieved_specializations =
-    let prop = _check_all_retrieved_satisfy I.retrieve_specializations FOUnif.matching in
+    let prop = _check_all_retrieved_satisfy I.retrieve_specializations
+      (fun t1 s1 t2 s2 -> Unif.FO.matching ~pattern:t1 s1 t2 s2) in
     let name = Util.sprintf "index(%s)_retrieve_imply_specializations" I.name in
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 
@@ -244,12 +241,13 @@ module TestTerm(I : TermIndex) = struct
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 
   let check_retrieve_all_unify =
-    let prop = _check_all_satisfying_are_retrieved I.retrieve_unifiables FOUnif.unification in
+    let prop = _check_all_satisfying_are_retrieved I.retrieve_unifiables Unif.FO.unification in
     let name = Util.sprintf "index(%s)_retrieve_imply_unify" I.name in
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 
   let check_retrieve_all_specializations =
-    let prop = _check_all_satisfying_are_retrieved I.retrieve_specializations FOUnif.matching in
+    let prop = _check_all_satisfying_are_retrieved I.retrieve_specializations
+      (fun t1 s1 t2 s2 -> Unif.FO.matching ~pattern:t1 s1 t2 s2) in
     let name = Util.sprintf "index(%s)_retrieve_imply_specializations" I.name in
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 

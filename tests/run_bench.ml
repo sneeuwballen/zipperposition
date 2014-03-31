@@ -31,22 +31,25 @@ open Logtk_arbitrary
 
 module T = FOTerm
 
-let a = T.mk_const (Symbol.mk_const ~ty:Type.i "a")
-let b = T.mk_const (Symbol.mk_const ~ty:Type.i "b")
-let c = T.mk_const (Symbol.mk_const ~ty:Type.i "c")
-let d = T.mk_const (Symbol.mk_const ~ty:Type.i "d")
-let f x y = T.mk_node (Symbol.mk_const ~ty:Type.i "f") [x; y]
-let g x = T.mk_node (Symbol.mk_const ~ty:Type.(i <=. i) "g") [x]
-let h x = T.mk_node (Symbol.mk_const ~ty:Type.(i <=. i) "h") [x]
-let zero = T.mk_const (Symbol.mk_const ~ty:Type.i "0")
-let succ n = T.mk_node (Symbol.mk_const ~ty:Type.(i <=. i) "s") [n]
-let plus a b = T.mk_node (Symbol.mk_const ~ty:Type.(i <== [i;i]) "+") [a; b]
-let minus a = T.mk_node (Symbol.mk_const ~ty:Type.(i <=. i) "-") [a]
-let times a b = T.mk_node (Symbol.mk_const ~ty:Type.(i <== [i;i]) "x") [a; b]
-let x = T.mk_var ~ty:Type.i 1
-let y = T.mk_var ~ty:Type.i 2
-let z = T.mk_var ~ty:Type.i 3
-let u = T.mk_var ~ty:Type.i 4
+let _const ~ty s =
+  T.const ~ty (Symbol.of_string s)
+
+let a = T.const ~ty:Type.TPTP.i (Symbol.of_string "a")
+let b = T.const ~ty:Type.TPTP.i (Symbol.of_string "b")
+let c = T.const ~ty:Type.TPTP.i (Symbol.of_string "c")
+let d = T.const ~ty:Type.TPTP.i (Symbol.of_string "d")
+let f x y = T.app (_const ~ty:Type.TPTP.i "f") [x; y]
+let g x = T.app (_const ~ty:Type.(TPTP.i <=. TPTP.i) "g") [x]
+let h x = T.app (_const ~ty:Type.(TPTP.i <=. TPTP.i) "h") [x]
+let zero = _const ~ty:Type.TPTP.i "0"
+let succ n = T.app (_const ~ty:Type.(TPTP.i <=. TPTP.i) "s") [n]
+let plus a b = T.app (_const ~ty:Type.(TPTP.i <== [TPTP.i;TPTP.i]) "+") [a; b]
+let minus a = T.app (_const ~ty:Type.(TPTP.i <=. TPTP.i) "-") [a]
+let times a b = T.app (_const ~ty:Type.(TPTP.i <== [TPTP.i;TPTP.i]) "x") [a; b]
+let x = T.var ~ty:Type.TPTP.i 1
+let y = T.var ~ty:Type.TPTP.i 2
+let z = T.var ~ty:Type.TPTP.i 3
+let u = T.var ~ty:Type.TPTP.i 4
 
 let rec from_int n =
   assert (n >= 0);
@@ -83,7 +86,7 @@ module MakeBench(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E
     type t = T.t * unit
     type rhs = unit
     let extract (t,()) = t, (), true
-    let compare (t1,_) (t2,_) = T.compare t1 t2
+    let compare (t1,_) (t2,_) = T.cmp t1 t2
     let priority _ = 1
   end
 
@@ -151,8 +154,8 @@ let bench_idx n =
 
 let bench_type_inf n =
   let terms = QCheck.Arbitrary.generate ~rand ~n
-    ArTerm.ArbitraryBasic.default in
-  let ctx = TypeInference.Ctx.create () in
+    ArTerm.PT.default in
+  let ctx = TypeInference.Ctx.create Signature.empty in
   List.iter
     (fun t -> ignore (TypeInference.FO.infer ctx t))
     terms;

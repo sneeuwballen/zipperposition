@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 4c41dd35ae6dec6778d1ba05adf126bb)
+# DO NOT EDIT (digest: d538fa26f700509129119a4b3a23df20)
 src/base/Symbol
 src/base/ScopedTerm
 src/base/FOTerm
@@ -32,6 +32,7 @@ src/base/FeatureVector
 src/base/Rewriting
 src/base/FormulaShape
 src/base/Transform
+src/base/Lambda
 src/base/lib/Hash
 src/base/lib/Hashcons
 src/base/lib/Sequence
@@ -55,5 +56,4 @@ src/arbitrary/ArForm
 src/arbitrary/ArType
 src/arbitrary/ArSignature
 src/arbitrary/ArSymbol
-src/arbitrary/ArPattern
 # OASIS_STOP

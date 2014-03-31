@@ -30,34 +30,32 @@ open Logtk
 open QCheck
 
 type 'a arbitrary = 'a QCheck.Arbitrary.t
+type form = Formula.FO.t
 
-
-module ArbitraryBasic = struct
-  module UF = Basic.Form
-  module AT = ArTerm.ArbitraryBasic
+module PT = struct
+  module PT = PrologTerm
+  module AT = ArTerm.PT
 
   let atom =
     Arbitrary.(choose
-      [ lift UF.atom AT.pred
-      ; lift (fun t -> UF.mk_not (UF.atom t)) AT.pred
-      ; lift2 UF.mk_eq AT.default AT.default
-      ; lift2 UF.mk_neq AT.default AT.default
-      ; among [ UF.mk_true; UF.mk_false ]
+      [ AT.pred
+      ; lift PT.TPTP.not_ AT.pred
+      ; lift2 PT.TPTP.eq AT.default AT.default
+      ; lift2 PT.TPTP.neq AT.default AT.default
+      ; among [ PT.TPTP.true_; PT.TPTP.false_ ]
       ])
-
-  let clause = Arbitrary.(list atom)
 
   let default =
     Arbitrary.(
-      let f = fix ~max:5 ~base:atom
+      let f = fix ~max:3 ~base:atom
         (fun sub_f -> choose
-          [ lift UF.mk_or (list sub_f)
-          ; lift UF.mk_and (list sub_f)
-          ; lift2 UF.mk_equiv sub_f sub_f
-          ; lift2 UF.mk_imply sub_f sub_f
-          ; lift UF.mk_not sub_f
-          ; lift UF.close_forall sub_f
-          ; lift UF.close_exists sub_f
+          [ lift PT.TPTP.or_ (list sub_f)
+          ; lift PT.TPTP.and_ (list sub_f)
+          ; lift2 PT.TPTP.equiv sub_f sub_f
+          ; lift2 PT.TPTP.imply sub_f sub_f
+          ; lift PT.TPTP.not_ sub_f
+          ; lift (PT.close_all Symbol.Base.forall) sub_f
+          ; lift (PT.close_all Symbol.Base.exists) sub_f
           ])
       in
       f)
@@ -65,21 +63,22 @@ end
 
 let atom =
   Arbitrary.(
-    ArbitraryBasic.atom >>= fun f ->
-    let ctx = TypeInference.Ctx.create () in
+    PT.atom >>= fun f ->
+    let ctx = TypeInference.Ctx.create Signature.empty in
     return (TypeInference.FO.convert_form ~ctx f)
   )
 
 let clause =
   Arbitrary.(
-    list ArbitraryBasic.atom >>= fun lits ->
-    let ctx = TypeInference.Ctx.create () in
+    int 3 >>= fun len ->
+    list_repeat len PT.atom >>= fun lits ->
+    let ctx = TypeInference.Ctx.create Signature.empty in
     return (TypeInference.FO.convert_clause ~ctx lits)
   )
 
-let default = 
+let default =
   Arbitrary.(
-    ArbitraryBasic.default >>= fun f ->
-    let ctx = TypeInference.Ctx.create () in
+    PT.default >>= fun f ->
+    let ctx = TypeInference.Ctx.create Signature.empty in
     return (TypeInference.FO.convert_form ~ctx f)
   )

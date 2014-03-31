@@ -31,19 +31,19 @@ open QCheck
 
 type 'a arbitrary = 'a QCheck.Arbitrary.t
 
-let base = Arbitrary.(among Symbol.connectives)
+let base = Arbitrary.(among (Symbol.TPTP.connectives |> Symbol.Set.elements))
 
-let int = Arbitrary.(lift Symbol.mk_int (~-50 -- 50))
+let int = Arbitrary.(lift Symbol.of_int (~-50 -- 50))
 
-let rat = Arbitrary.(lift2 Symbol.mk_rat (~-50 -- 50) (1 -- 80))
+let rat = Arbitrary.(lift2 Symbol.of_rat (~-50 -- 50) (1 -- 80))
 
 let arith = Arbitrary.choose [int; rat]
 
 let text =
   QCheck.Arbitrary.(
-    among ["f"; "g"; "h"; "a"; "b"; "c"; "d"] >>= fun s ->
-    ArType.ground >>= fun ty ->
-    return (Symbol.mk_const ~ty s))
+    among ["f"; "g"; "h"; "a"; "b"; "c"; "d"]
+      |> lift Symbol.of_string
+  )
 
 let default =
   Arbitrary.choose [base; text; arith]

@@ -134,8 +134,8 @@ module Seq : sig
   val subterms : t -> t Sequence.t
   val subterms_depth : t -> (t * int) Sequence.t  (* subterms with their depth *)
   val symbols : t -> Symbol.t Sequence.t
-  val max_var : t Sequence.t -> int
-  val min_var : t Sequence.t -> int
+  val max_var : t Sequence.t -> int     (** max var, or 0 *)
+  val min_var : t Sequence.t -> int     (** min var, or 0 *)
   val ty_vars : t -> Type.t Sequence.t
   val typed_symbols : t -> (Symbol.t * Type.t) Sequence.t
 

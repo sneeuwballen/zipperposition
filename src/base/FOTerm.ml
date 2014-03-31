@@ -310,7 +310,7 @@ module Seq = struct
     !r
 
   let min_var seq =
-    let r = ref max_int in
+    let r = ref 0 in
     seq (fun t -> match T.view t with
       | T.Var i -> r := min i !r
       | _ -> ());

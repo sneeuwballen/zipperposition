@@ -30,7 +30,7 @@ open Logtk
 open Logtk_arbitrary
 open OUnit
 
-module F = FOFormula
+module F = Formula.FO
 
 (** OUnit *)
 
@@ -39,12 +39,12 @@ let printer = F.to_string
 (* parse a formula *)
 let pform s =
   let f = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s) in
-  let ctx = TypeInference.Ctx.create () in
+  let ctx = TypeInference.Ctx.create Signature.TPTP.base in
   TypeInference.FO.convert_form ~ctx f
 
 let test_mk_not () =
-  assert_equal ~cmp:F.eq ~printer F.mk_true (F.mk_not F.mk_false);
-  assert_equal ~cmp:F.eq ~printer F.mk_false (F.mk_not F.mk_true);
+  assert_equal ~cmp:F.eq ~printer F.Base.true_ (F.Base.not_ F.Base.false_);
+  assert_equal ~cmp:F.eq ~printer F.Base.false_ (F.Base.not_ F.Base.true_);
   ()
 
 let test_simplify () =
@@ -65,11 +65,13 @@ open QCheck
 
 let pp = F.to_string
 
+let __closed f = ScopedTerm.DB.closed (f : F.t :> ScopedTerm.t)
+
 let check_simplify_preserve_closed =
   let gen = ArForm.default in
   let name = "formula_simplify_preserve_closed" in
   let prop f =
-    F.DB.closed f = F.DB.closed (F.simplify f)
+    __closed f = __closed (F.simplify f)
   in
   mk_test ~n:1000 ~pp ~name gen prop
 
@@ -77,8 +79,8 @@ let check_db_lift_preserve_closed =
   let gen = ArForm.default in
   let name = "formula_db_shift_preserve_closed" in
   let prop f =
-    Prop.assume (F.DB.closed f);
-    F.DB.closed (F.DB.shift 1 f)
+    Prop.assume (__closed f);
+    ScopedTerm.DB.closed (ScopedTerm.DB.shift 1 (f : F.t :> ScopedTerm.t))
   in
   mk_test ~n:100 ~pp ~name gen prop
 
@@ -86,8 +88,8 @@ let check_db_unlift_preserve_closed =
   let gen = ArForm.default in
   let name = "formula_db_unshift_preserve_closed" in
   let prop f =
-    Prop.assume (F.DB.closed f);
-    F.DB.closed (F.DB.unshift 1 f)
+    Prop.assume (__closed f);
+    ScopedTerm.DB.closed (ScopedTerm.DB.unshift 1 (f : F.t :> ScopedTerm.t))
   in
   mk_test ~n:100 ~pp ~name gen prop
 

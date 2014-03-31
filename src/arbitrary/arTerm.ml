@@ -12,15 +12,15 @@ form must reproduce the above copyright notice, this list of conditions and the
 following disclaimer in the documentation and/or other materials provided with
 the distribution.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBPTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BPT NOT LIMITED TO, THE IMPLIED
 WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBPTORS BE LIABLE
 FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+DAMAGES (INCLUDING, BPT NOT LIMITED TO, PROCUREMENT OF SUBSTITPTE GOODS OR
 SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OPT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
@@ -30,26 +30,28 @@ open Logtk
 open QCheck
 
 module T = FOTerm
-module F = FOFormula
-module Sym = Basic.Sym
+module F = Formula.FO
+module Sym = Symbol
 module HOT = HOTerm
 
 type 'a arbitrary = 'a QCheck.Arbitrary.t
 
-module ArbitraryBasic = struct
-  module UT = Basic.FO
+module PT = struct
+  module PT = PrologTerm
+
+  let _const s = PT.const (Symbol.of_string s)
 
   let ground =
-    let a = UT.const (Sym.mk_const "a") in
-    let b = UT.const (Sym.mk_const "b") in
-    let c = UT.const (Sym.mk_const "c") in
-    let d = UT.const (Sym.mk_const "d") in
-    let e = UT.const (Sym.mk_const "e") in
-    let f x y = UT.app (Sym.mk_const "f") [x; y] in
-    let sum x y = UT.app (Sym.mk_const "sum") [x; y] in
-    let g x = UT.app (Sym.mk_const "g") [x] in
-    let h x = UT.app (Sym.mk_const "h") [x] in
-    let ite x y z = UT.app (Sym.mk_const "ite") [x; y; z] in
+    let a = PT.const (Sym.of_string "a") in
+    let b = PT.const (Sym.of_string "b") in
+    let c = PT.const (Sym.of_string "c") in
+    let d = PT.const (Sym.of_string "d") in
+    let e = PT.const (Sym.of_string "e") in
+    let f x y = PT.app (_const "f") [x; y] in
+    let sum x y = PT.app (_const "sum") [x; y] in
+    let g x = PT.app (_const "g") [x] in
+    let h x = PT.app (_const "h") [x] in
+    let ite x y z = PT.app (_const "ite") [x; y; z] in
     Arbitrary.(
       let base = among [a; b; c; d; e; ] in
       let t = fix ~max:6 ~base (fun sub ->
@@ -59,19 +61,19 @@ module ArbitraryBasic = struct
       t)
 
   let default =
-    let a = UT.const (Sym.mk_const "a") in
-    let b = UT.const (Sym.mk_const "b") in
-    let c = UT.const (Sym.mk_const "c") in
-    let d = UT.const (Sym.mk_const "d") in
-    let e = UT.const (Sym.mk_const "e") in
-    let x = UT.var ~ty:(Basic.Ty.var "A") "X" in
-    let y = UT.var ~ty:(Basic.Ty.var "B") "Y" in
-    let z = UT.var ~ty:(Basic.Ty.var "C") "Z" in
-    let f x y = UT.app (Sym.mk_const "f") [x; y] in
-    let sum x y = UT.app (Sym.mk_const "sum") [x; y] in
-    let g x = UT.app (Sym.mk_const "g") [x] in
-    let h x = UT.app (Sym.mk_const "h") [x] in
-    let ite x y z = UT.app (Sym.mk_const "ite") [x; y; z] in
+    let a = PT.const (Sym.of_string "a") in
+    let b = PT.const (Sym.of_string "b") in
+    let c = PT.const (Sym.of_string "c") in
+    let d = PT.const (Sym.of_string "d") in
+    let e = PT.const (Sym.of_string "e") in
+    let x = PT.var "X" in
+    let y = PT.var "Y" in
+    let z = PT.var "Z" in
+    let f x y = PT.app (_const "f") [x; y] in
+    let sum x y = PT.app (_const "sum") [x; y] in
+    let g x = PT.app (_const "g") [x] in
+    let h x = PT.app (_const "h") [x] in
+    let ite x y z = PT.app (_const "ite") [x; y; z] in
     Arbitrary.(
       let base = among [a; b; c; d; e; x; y; z] in
       let t = fix ~max:6 ~base (fun sub ->
@@ -80,11 +82,11 @@ module ArbitraryBasic = struct
       in
       t)
 
-  let pred = 
-    let p x y = UT.app (Sym.mk_const "p") [x; y] in
-    let q x = UT.app (Sym.mk_const "q") [x] in
-    let r x = UT.app (Sym.mk_const "r") [x] in
-    let s = UT.const (Sym.mk_const "s") in
+  let pred =
+    let p x y = PT.app (_const "p") [x; y] in
+    let q x = PT.app (_const "q") [x] in
+    let r x = PT.app (_const "r") [x] in
+    let s = PT.const (Sym.of_string "s") in
     let sub = default in
     QCheck.Arbitrary.(choose
       [ lift2 p sub sub; lift q sub; lift r sub; return s; ])
@@ -97,21 +99,21 @@ module ArbitraryBasic = struct
 end
 
 let default =
-  Arbitrary.(ArbitraryBasic.default >>= fun t ->
-    let ctx = TypeInference.Ctx.create () in
-    return (TypeInference.FO.convert ~ctx t))
+  Arbitrary.(PT.default >>= fun t ->
+    let ctx = TypeInference.Ctx.create Signature.empty in
+    return (TypeInference.FO.convert ~generalize:false ~ctx t))
 
 let ground =
-  Arbitrary.(ArbitraryBasic.ground >>= fun t ->
-    let ctx = TypeInference.Ctx.create () in
-    return (TypeInference.FO.convert ~ctx t))
+  Arbitrary.(PT.ground >>= fun t ->
+    let ctx = TypeInference.Ctx.create Signature.empty in
+    return (TypeInference.FO.convert ~ctx ~generalize:false t))
 
 let pred =
-  Arbitrary.(ArbitraryBasic.pred >>= fun t ->
-    let ctx = TypeInference.Ctx.create () in
+  Arbitrary.(PT.pred >>= fun t ->
+    let ctx = TypeInference.Ctx.create Signature.empty in
     let ty, closure = TypeInference.FO.infer ctx t in
-    TypeInference.Ctx.unify_and_set ctx ty Type.o;
-    let t = TypeInference.Ctx.apply_closure ctx closure in
+    TypeInference.Ctx.constrain_type_type ctx ty Type.TPTP.o;
+    let t = closure ctx in
     return t)
 
 let pos t =
@@ -119,24 +121,27 @@ let pos t =
   Arbitrary.(
     let rec recurse t pb st =
       let stop = return (PB.to_pos pb) in
-      match t.T.term with
-        | T.Node (_, _, [])
+      match T.view t with
+        | T.App (_, [])
+        | T.TyApp _
+        | T.Const _
         | T.Var _
-        | T.BoundVar _ -> PB.to_pos pb
-        | T.Node (_, _, l) ->
-          choose (stop :: List.mapi (fun i t' -> recurse t' (PB.add pb i)) l) st
+        | T.BVar _ -> PB.to_pos pb
+        | T.App (_, l) ->
+          choose (stop :: List.mapi (fun i t' -> recurse t' (PB.arg i pb)) l) st
     in
-    recurse t (PB.of_pos []))
+    recurse t PB.empty
+  )
 
 module HO = struct
   let ground =
-    Arbitrary.(ArbitraryBasic.HO.ground >>= fun t ->
-      let ctx = TypeInference.Ctx.create () in
+    Arbitrary.(PT.HO.ground >>= fun t ->
+      let ctx = TypeInference.Ctx.create Signature.empty in
       return (TypeInference.HO.convert ~ctx t))
 
   let default =
-    Arbitrary.(ArbitraryBasic.HO.default >>= fun t ->
-      let ctx = TypeInference.Ctx.create () in
+    Arbitrary.(PT.HO.default >>= fun t ->
+      let ctx = TypeInference.Ctx.create Signature.empty in
       return (TypeInference.HO.convert ~ctx t))
 end
 
@@ -154,7 +159,7 @@ let arbitrary_ground signature =
   let consts = among (Sym.Map.fold (fun s ty acc -> mk_const ~ty s :: acc) base []) in
   let funs = Sequence.to_list (Sym.Map.to_seq recur) in
   _ar_any_ty ~ground:true ~depth:0 ~consts ~funs signature
-      
+
 let arbitrary_pred signature =
   let open QCheck.Arbitrary in
   let types = Sequence.to_list (Sym.Map.values signature) in
