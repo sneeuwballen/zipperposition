@@ -146,7 +146,7 @@ module Make(E : Index.EQUATION) = struct
       | TrieLeaf _, _ -> assert false  (* wrong arity *)
   in
   goto trie t (fun t -> t)
-      
+
   type t = trie
 
   let empty () = TrieNode CharMap.empty

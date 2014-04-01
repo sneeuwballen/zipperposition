@@ -331,7 +331,6 @@ module Make(MyT : TERM) = struct
     let false_ = T.const ~kind ~ty Sym.Base.false_
     let atom (t:term) = (t:>T.t)
 
-    let not_ f = T.simple_app ~kind ~ty Sym.Base.not_ [f]
     let imply f1 f2 = T.simple_app ~kind ~ty Sym.Base.imply [f1; f2]
     let equiv f1 f2 = T.simple_app ~kind ~ty Sym.Base.equiv [f1; f2]
     let xor f1 f2 = T.simple_app ~kind ~ty Sym.Base.xor [f1; f2]
@@ -350,7 +349,15 @@ module Make(MyT : TERM) = struct
       __check_same t1 t2;
       T.simple_app ~kind ~ty Sym.Base.eq ([t1; t2] : term list :> T.t list)
 
-    let neq t1 t2 = T.simple_app ~kind ~ty Sym.Base.neq ([t1; t2] : term list :> T.t list)
+    let neq t1 t2 =
+      T.simple_app ~kind ~ty Sym.Base.neq ([t1; t2] : term list :> T.t list)
+
+    let not_ f = match view f with
+      | True -> false_
+      | False -> true_
+      | Eq(a,b) -> neq a b
+      | Neq(a,b) -> eq a b
+      | _ -> T.simple_app ~kind ~ty Sym.Base.not_ [f]
 
     let and_ = function
       | [] -> true_
@@ -655,6 +662,7 @@ module Make(MyT : TERM) = struct
           | _ -> Base.not_ f'
           end
       | Imply (a, b) ->
+          let a = simplify ~depth a and b = simplify ~depth b in
           begin match view a, view b with
           | True, _ -> simplify ~depth b
           | False, _
@@ -663,6 +671,7 @@ module Make(MyT : TERM) = struct
           | _ -> Base.imply (simplify ~depth a) (simplify ~depth b)
           end
       | Equiv (a, b) ->
+          let a = simplify ~depth a and b = simplify ~depth b in
           begin match view a, view b with
           | _ when eq a b -> Base.true_
           | True, _ -> simplify ~depth b
@@ -671,7 +680,8 @@ module Make(MyT : TERM) = struct
           | _, False -> simplify ~depth (Base.not_ a)
           | _ -> Base.equiv (simplify ~depth a) (simplify ~depth b)
           end
-      | Xor (f1, f2) -> Base.xor (simplify ~depth f1) (simplify ~depth f2) (* TODO *)
+      | Xor (f1, f2) ->
+          Base.xor (simplify ~depth f1) (simplify ~depth f2) (* TODO *)
     in simplify ~depth:0 f
 
   let rec is_trivial f = match view f with

@@ -338,7 +338,7 @@ let rec size t = match T.view t with
   | T.BVar _ -> 1
   | T.App (_, l) -> List.fold_left (fun s t' -> s + size t') 1 l
   | T.Const _ -> 1
-  | T.At (l, _) -> size l + 1
+  | T.At (l, ty) when Type.is_type ty -> size l
   | _ -> assert false
 
 let is_ground t = T.ground t
@@ -392,8 +392,11 @@ module Pos = struct
       | _ -> failwith "bad compact position"
     and get_subpos l pos =
       match l, pos with
-      | t::l', _ when size t > pos -> recurse t pos  (* search inside the term *)
-      | t::l', _ -> get_subpos l' (pos - size t) (* continue to next term *)
+      | t::l', _ ->
+          let st = size t in
+          if st > pos
+            then recurse t pos  (* search inside the term *)
+            else get_subpos l' (pos - st) (* continue to next term *)
       | [], _ -> assert false
     in recurse t pos
 

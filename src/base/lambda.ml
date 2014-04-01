@@ -86,7 +86,7 @@ let rec beta_reduce_rec ~depth env t =
     | _ ->
       let l' = beta_reduce_rec ~depth env l in
       let r' = beta_reduce_rec ~depth env r in
-      T.at l' r'
+      app_with_reduce ~depth env l' r'
     end
   | T.TyAt (t, tyarg) ->
     let t = beta_reduce_rec ~depth env t in
@@ -101,6 +101,14 @@ let rec beta_reduce_rec ~depth env t =
   | T.Multiset (ty, l) ->
     let l = List.map (beta_reduce_rec ~depth env) l in
     T.multiset ~ty l
+(* apply [a] to [b], where both are in beta-normal form, reducing the
+   redex at root if there is one *)
+and app_with_reduce ~depth env a b = match T.view a with
+  | T.Lambda (_, a') ->
+      let env = DBEnv.push env b in
+      beta_reduce_rec ~depth env a'
+  | _ -> T.at a b
+
 
 
 let beta_reduce ?(depth=0) t =
@@ -152,10 +160,16 @@ let can_apply ty args =
 let lambda_apply_list ?(depth=0) t args =
   Util.enter_prof prof_beta_reduce;
   try
-    let t' = T.at_list t args in
-    let t' = beta_reduce_rec ~depth DBEnv.empty t' in
+    let f = beta_reduce_rec ~depth DBEnv.empty t in
+    let res = List.fold_left
+      (fun t arg ->
+        (* evaluate argument and apply [t] to it. *)
+        let arg = beta_reduce_rec ~depth DBEnv.empty arg in
+        app_with_reduce ~depth DBEnv.empty t arg)
+      f args
+    in
     Util.exit_prof prof_beta_reduce;
-    t'
+    res
   with e ->
     Util.exit_prof prof_beta_reduce;
     raise e
