@@ -67,8 +67,14 @@ module type UNARY = sig
   val matching_same_scope : ?subst:subst -> scope:scope ->
                             pattern:term -> term -> subst
     (** matches [pattern] (more general) with the other term.
-     * The two terms live in the same scope, which is passed as the
-     * [scope] argument. *)
+        The two terms live in the same scope, which is passed as the
+        [scope] argument. It needs to gather the variables of the
+        other term to make sure they are not bound. *)
+
+  val matching_adapt_scope : ?subst:subst ->
+                             pattern:term -> scope -> term -> scope -> subst
+    (** Call either {!matching} or {!matching_same_scope} depending on
+        whether the given scopes are the same or not. *)
 
   val variant : ?subst:subst -> term -> scope -> term -> scope -> subst
     (** Succeeds iff the first term is a variant of the second, ie
@@ -602,6 +608,7 @@ module Unary = struct
     (* recursive matching *)
     let rec unif subst s sc_s t sc_t =
       let s, sc_s = Substs.get_var subst s sc_s in
+      let t, sc_t = Substs.get_var subst t sc_t in
       let subst = match T.ty s, T.ty t with
         | T.NoType, T.NoType -> subst
         | T.NoType, _
@@ -645,6 +652,7 @@ module Unary = struct
     (* recursive matching. Blocked vars are [blocked] *)
     let rec unif ~blocked subst s scope t scope  =
       let s, sc_s = Substs.get_var subst s scope in
+      let t, sc_t = Substs.get_var subst t scope in
       let subst = match T.ty s, T.ty t with
         | T.NoType, T.NoType -> subst
         | T.NoType, _
@@ -684,6 +692,11 @@ module Unary = struct
     let blocked = T.Seq.add_set T.Set.empty (T.Seq.vars b) in
     let subst = unif ~blocked subst pattern scope b scope in
     subst
+
+  let matching_adapt_scope ?(subst=Substs.empty) ~pattern s_p t s_t =
+    if s_p = s_t
+      then matching_same_scope ~subst ~scope:s_p ~pattern t
+      else matching ~subst ~pattern s_p t s_t
 
   let variant ?(subst=Substs.empty) a sc_a b sc_b =
     (* recursive variant checking *)
@@ -767,6 +780,10 @@ module Ty = struct
     (matching_same_scope :> ?subst:subst -> scope:scope ->
         pattern:term -> term -> subst)
 
+  let matching_adapt_scope =
+    (matching_adapt_scope :> ?subst:subst ->
+        pattern:term -> scope -> term -> scope -> subst)
+
   let variant =
     (variant :> ?subst:subst -> term -> scope -> term -> scope -> subst)
 
@@ -794,6 +811,10 @@ module FO = struct
   let matching_same_scope =
     (matching_same_scope :> ?subst:subst -> scope:scope ->
         pattern:term -> term -> subst)
+
+  let matching_adapt_scope =
+    (matching_adapt_scope :> ?subst:subst ->
+        pattern:term -> scope -> term -> scope -> subst)
 
   let variant =
     (variant :> ?subst:subst -> term -> scope -> term -> scope -> subst)

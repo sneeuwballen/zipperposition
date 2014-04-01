@@ -87,13 +87,13 @@ let miniscope ?(distribute_exists=false) f =
     | F.And l ->
       (* forall x (and l) -> and (forall x f' \ f' in l) *)
       let l = List.map miniscope l in
-      let with_v, without_v = List.partition (fun f -> __contains_db 0 f) l in
+      let with_v, without_v = List.partition (__contains_db 0) l in
       F.Base.and_
         ( List.map (F.Base.__mk_forall ~varty) with_v
         @ List.map (__unshift 1) without_v)
     | F.Or l ->
       let l = List.map miniscope l in
-      let with_v, without_v = List.partition (fun f -> __contains_db 0 f) l in
+      let with_v, without_v = List.partition (__contains_db 0) l in
       F.Base.or_
         (  F.Base.__mk_forall ~varty (F.Base.or_ with_v)
         :: List.map (__unshift 1) without_v)
@@ -171,7 +171,7 @@ let rec nnf surrounding f =
         F.Base.__mk_forall ~varty (nnf surrounding (F.Base.not_ f''))
       | F.True -> F.Base.false_
       | F.False -> F.Base.true_
-      | F.Atom p -> f
+      | F.Atom _ -> f
       end
   | F.And l -> F.Base.and_ (List.map (nnf SurroundAnd) l)
   | F.Or l -> F.Base.or_ (List.map (nnf SurroundOr) l)

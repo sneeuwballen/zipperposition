@@ -58,8 +58,14 @@ module type UNARY = sig
   val matching_same_scope : ?subst:subst -> scope:scope ->
                             pattern:term -> term -> subst
     (** matches [pattern] (more general) with the other term.
-     * The two terms live in the same scope, which is passed as the
-     * [scope] argument. *)
+        The two terms live in the same scope, which is passed as the
+        [scope] argument. It needs to gather the variables of the
+        other term to make sure they are not bound. *)
+
+  val matching_adapt_scope : ?subst:subst ->
+                             pattern:term -> scope -> term -> scope -> subst
+    (** Call either {!matching} or {!matching_same_scope} depending on
+        whether the given scopes are the same or not. *)
 
   val variant : ?subst:subst -> term -> scope -> term -> scope -> subst
     (** Succeeds iff the first term is a variant of the second, ie
