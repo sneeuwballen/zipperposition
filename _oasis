@@ -1,19 +1,26 @@
-OASISFormat: 0.3
+OASISFormat: 0.4
 Name:        logtk
 Version:     0.1
 Homepage:    https://github.com/c-cube/logtk
 Authors:     Simon Cruanes
-License:     BSD3
+License:     BSD-2-clause
 LicenseFile: LICENSE
-Plugins:     META (0.3)
+Plugins:     META (0.3), DevFiles (0.3)
 OCamlVersion: >= 4.00.1
 BuildTools:  ocamlbuild
+AlphaFeatures: ocamlbuild_more_args
 
 Synopsis:    Logic toolkit, designed primarily for first-order automated reasoning.
 Description: 
     Logic toolkit, designed primarily for first-order automated reasoning. It aims
     at providing basic types and algorithms (terms, unification, orderings,
     indexing, etc.) that can be factored out of several applications.
+
+XOCamlbuildExtraArgs: "-menhir 'menhir --dump --explain'"
+
+Flag "tools"
+  Description:  Build and install basic tools (CNF, etc.)
+  Default:      false
 
 Flag "meta"
   Description:  Build and install meta-prover
@@ -23,112 +30,183 @@ Flag "bench"
   Description:  Build and run benchmarks
   Default:      false
 
+Flag "extended"
+  Description:  Build and install the Extended library
+  Default:      false
+
+Flag "parsers"
+  Description:  Build and install parsers (requires menhir)
+  Default:      false
+
+Flag "solving"
+  Description:  Build and install constraint solvers (requires "sat")
+  Default:      false
+
 Flag "qcheck"
   Description:  Build and install QCheck random generators
   Default:      false
 
 Library "logtk"
-  Path:             src/
+  Path:             src/base/
   Pack:             true
-  Modules:          HO, FO, Symbol, Hash, Hashcons, FOTerm, HOTerm, FOFormula,
-                    Util, FOUnif, HOUnif, Type, Substs, Signature, TypeInference, 
-                    Lex_tptp, Ast_tptp, Parse_tptp, Lambda, Multiset,
-                    ScopedTerm,
-                    Comparison, PartialOrder, Precedence, Ordering, Position,
-                    Cnf, Index, Dtree, Fingerprint, Rewriting, FeatureVector,
-                    FormulaShape, Util_tptp, Skolem, Transform, NPDtree,
-                    Trace_tstp, CallProver, Congruence, TypeUnif, Options,
-                    Basic, Monad, FastFingerprint, Evaluator, Location,
-                    TypeConversion, TypeErasure, DBEnv, Interfaces,
-                    lib/Sequence, lib/Bij, lib/Cache, lib/MultiMap,
-                    lib/Bencode, lib/BV, lib/PersistentHashtbl, lib/Mixtbl
-  BuildDepends:     unix,num,str
+  Modules:          Symbol, ScopedTerm, FOTerm, Type, Util, PrologTerm,
+                    Interfaces, DBEnv, Position, HOTerm, Formula,
+                    Substs, Unif, Signature, TypeInference, Options,
+                    Comparison, Precedence, Ordering, Skolem, Cnf,
+                    HORewriting, Index, Dtree, Fingerprint, NPDtree,
+                    Congruence, FastFingerprint, FeatureVector, Rewriting,
+                    FormulaShape, Transform, Lambda,
+                    lib/Hash, lib/Hashcons,
+                    lib/Sequence, lib/Cache, lib/Bij, lib/Bencode,
+                    lib/PersistentHashtbl, lib/Monad, lib/ParseLocation,
+                    lib/Multiset, lib/BV, lib/PartialOrder, lib/KList,
+                    lib/LazyList
+  BuildDepends:     zarith,unix
+  XMETARequires:    zarith,unix
+
+Library "logtk_extended"
+  Path:             src/extended
+  Pack:             true
+  FindlibName:      extended
+  FindlibParent:    logtk
+  Build$:           flag(extended)
+  Install$:         flag(extended)
+  Modules:          lib/MultiMap, lib/Mixtbl
+                    #Lambda, Rewriting,
+                    #FeatureVector, FormulaShape, Transform,
+                    #NPDtree, Congruence, FastFingerprint, Evaluator,
+  BuildDepends:     logtk,unix,zarith
+  XMETARequires:    logtk,unix,zarith
+
+Library "logtk_parsers"
+  Path:             src/parsers
+  Pack:             true
+  Modules:          Parse_tptp, Lex_tptp, Ast_tptp, Util_tptp,
+                    Ast_ho, Lex_ho, Parse_ho, Trace_tstp, CallProver
+  Build$:           flag(parsers)
+  Install$:         flag(parsers)
+  FindlibName:      parsers
+  FindlibParent:    logtk
+  BuildDepends:     logtk
+  XMETARequires:    logtk
 
 Library "logtk_meta"
   Path:             src/meta/
   Pack:             true
   FindlibName:      meta
   FindlibParent:    logtk
-  Modules:          MetaPattern, MetaKB, MetaReasoner, MetaProver,
-                    Ast_theory, Lex_theory, Parse_theory, Signal
-  BuildDepends:     logtk,datalog
-  Build$:           flag(meta)
-  Install$:         flag(meta)
-  XMETARequires:    logtk,datalog
+  Modules:          Encoding, Reasoner, Plugin, Prover
+                    #MetaPattern, MetaKB, MetaReasoner, MetaProver, lib/Signal
+  BuildDepends:     logtk,logtk.parsers
+  Build$:           flag(meta) & flag(parsers)
+  Install$:         flag(meta) & flag(parsers)
+  XMETARequires:    logtk,logtk.parsers
+
+Library "logtk_solving"
+  Path:             src/solving
+  Pack:             true
+  FindlibParent:    logtk
+  FindlibName:      solving
+  Modules:          Lpo
+  Build$:           flag(solving)
+  Install$:         flag(solving)
+  BuildDepends:     logtk,aez
+  XMETARequires:    logtk,aez
 
 Library "logtk_arbitrary"
   Path:             src/arbitrary/
   Pack:             true
   FindlibName:      arbitrary
   FindlibParent:    logtk
-  Modules:          ArTerm, ArForm, ArType, ArSignature, ArSymbol, ArPattern
+  Modules:          ArTerm, ArForm, ArType, ArSignature, ArSymbol
   BuildDepends:     logtk,qcheck,logtk.meta
-  Build$:           flag(qcheck) & flag(meta)
-  Install$:         flag(qcheck) & flag(meta)
-  XMETARequires:    logtk,logtk.meta,datalog,qcheck
+  Build$:           flag(qcheck)
+  Install$:         flag(qcheck)
+  XMETARequires:    logtk,qcheck
 
 Document logtk
   Title:                Logtk docs
   Type:                 ocamlbuild (0.3)
   BuildTools+:          ocamldoc
-  Install$:             flag(qcheck) & flag(meta)
-  Build$:               flag(qcheck) & flag(meta)
+  Install$:             flag(qcheck) & flag(meta) & flag(extended)
+  Build$:               flag(qcheck) & flag(meta) & flag(extended)
   XOCamlbuildPath:      .
   XOCamlbuildLibraries: logtk,logtk.meta,logtk.arbitrary
 
 Executable run_bench
-  Path: tests/
-  Install: false
-  CompiledObject: native
-  MainIs: run_bench.ml
-  Build$:   flag(bench) & flag(tests)
-  BuildDepends: logtk, bench, qcheck, logtk.arbitrary
+  Path:             tests/
+  Install:          false
+  CompiledObject:   native
+  MainIs:           run_bench.ml
+  Build$:           flag(bench) & flag(tests)
+  BuildDepends:     logtk,bench,qcheck,logtk.arbitrary
 
 Test all
-  Command: $run_tests
-  TestTools: run_tests
-  Run$: flag(tests) & flag(meta) & flag(qcheck)
+  Command:          $run_tests
+  TestTools:        run_tests
+  Run$:             flag(tests) & flag(qcheck)
 
 Executable run_tests
-  Path: tests/
-  Install: false
-  CompiledObject: native
-  MainIs: run_tests.ml
-  Build$: flag(tests) & flag(meta) & flag(qcheck)
-  BuildDepends: logtk,oUnit,logtk.meta,logtk.arbitrary
+  Path:             tests/
+  Install:          false
+  CompiledObject:   native
+  MainIs:           run_tests.ml
+  Build$:           flag(tests) & flag(meta) & flag(qcheck) & flag(parsers)
+  BuildDepends:     logtk,logtk.parsers,oUnit,logtk.meta,logtk.arbitrary
 
 # TPTP syntax and type checking
 Executable type_check_tptp
-  Path: tools/
-  Install: true
-  CompiledObject: native
-  MainIs: type_check_tptp.ml
-  BuildDepends: logtk
+  Path:             src/tools/
+  Build$:           flag(tools) & flag(parsers)
+  Install$:         flag(tools) & flag(parsers)
+  CompiledObject:   native
+  MainIs:           type_check_tptp.ml
+  BuildDepends:     logtk,logtk.parsers
 
 # Conversion to CNF
 Executable cnf_of_tptp
-  Path: tools/
-  Install: true
-  CompiledObject: native
-  MainIs: cnf_of_tptp.ml
-  BuildDepends: logtk
+  Path:             src/tools/
+  Build$:           flag(tools) & flag(parsers)
+  Install$:         flag(tools) & flag(parsers)
+  CompiledObject:   native
+  MainIs:           cnf_of_tptp.ml
+  BuildDepends:     logtk,logtk.parsers
 
-# detection of theories
-Executable detect_theories
-  Path: tools/
-  Build$: flag(meta)
-  Install$: flag(meta)
-  CompiledObject: native
-  MainIs: detect_theories.ml
-  BuildDepends: logtk,logtk.meta
+# Orienting rewrite rules with LPO
+Executable orient
+  Path:             src/tools/
+  Build$:           flag(tools) & flag(parsers) & flag(solving)
+  Install$:         flag(tools) & flag(parsers) & flag(solving)
+  CompiledObject:   native
+  MainIs:           orient.ml
+  BuildDepends:     logtk,logtk.parsers,logtk.solving,aez
 
 # proof checking
 Executable proof_check_tstp
-  Path: tools/
-  Install: true
-  CompiledObject: native
-  MainIs: proof_check_tstp.ml
-  BuildDepends: logtk
+  Path:             src/tools/
+  Build$:           flag(tools) & flag(parsers)
+  Install$:         flag(tools) & flag(parsers)
+  CompiledObject:   native
+  MainIs:           proof_check_tstp.ml
+  BuildDepends:     logtk,logtk.parsers
+
+# detection of theories
+Executable detect_theories
+  Path:             src/tools/
+  Build$:           flag(meta) & flag(tools) & flag(parsers)
+  Install$:         flag(meta) & flag(tools) & flag(parsers)
+  CompiledObject:   native
+  MainIs:           detect_theories.ml
+  BuildDepends:     logtk,logtk.parsers,logtk.meta
+
+# Preprocessor to E
+Executable hysteresis
+  Path:             src/tools/
+  Build$:           flag(meta) & flag(tools) & flag(parsers) & flag(solving)
+  Install$:         flag(meta) & flag(tools) & flag(parsers) & flag(solving)
+  CompiledObject:   native
+  MainIs:           hysteresis.ml
+  BuildDepends:     logtk,logtk.parsers,logtk.meta,logtk.solving,aez
 
 SourceRepository head
   Type: git

@@ -32,15 +32,17 @@ open QCheck
 type 'a arbitrary = 'a QCheck.Arbitrary.t
 
 let base =
-  Arbitrary.(among Type.([i; o; int; rat]))
+  Arbitrary.(among Type.TPTP.([i; o; int; rat]))
+
+let _const s = Type.const (Symbol.of_string s)
 
 let ground =
   Arbitrary.(
-    let base = among Type.([ i; const "$int"; const "a"; const "b" ]) in
+    let base = among Type.TPTP.([ i; int; _const "a"; _const "b" ]) in
     fix ~max:3 ~base (fun sub -> choose
-      [ lift (Type.app "list") (list_repeat 1 sub)
-      ; lift (Type.app "prod") (list_repeat 2 sub)
-      ; lift2 Type.mk_fun sub (list sub)
+      [ lift (Type.app (Symbol.of_string "list")) (list_repeat 1 sub)
+      ; lift (Type.app (Symbol.of_string "prod")) (list_repeat 2 sub)
+      ; lift2 Type.arrow_list (list sub) sub
       ]))
 
 let default =
@@ -48,12 +50,12 @@ let default =
     let var = among [Type.var 0; Type.var 1 ] in
     let base =
       choose
-      [ among [ Type.i; Type.const "$int"; Type.const "a"; Type.const "b"; ]
+      [ among [ Type.TPTP.i; Type.TPTP.int; _const "a"; _const "b"; ]
       ; var ]
     in
     fix ~max:4 ~base (fun sub -> choose
-      [ lift (Type.app "list") (list_repeat 1 sub)
-      ; lift (Type.app "prod") (list_repeat 2 sub)
-      ; lift2 Type.mk_fun sub (list sub)
+      [ lift (Type.app (Symbol.of_string "list")) (list_repeat 1 sub)
+      ; lift (Type.app (Symbol.of_string "prod")) (list_repeat 2 sub)
+      ; lift2 Type.arrow_list (list sub) sub
       ]))
 

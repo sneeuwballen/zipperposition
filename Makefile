@@ -1,69 +1,56 @@
-# Main makefile for LogTK
+# OASIS_START
+# DO NOT EDIT (digest: a3c674b4239234cbbe53afe090018954)
 
-NAME = logtk
-VERSION=0.1
+SETUP = ocaml setup.ml
 
-INTERFACE_FILES = $(shell find src -name '*.mli')
-IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
-SUBMODULES = containers datalog
-PACKAGES = 
-CAML_OPTS = 
-CAML_LIBS = str nums unix
+build: setup.data
+	$(SETUP) -build $(BUILDFLAGS)
 
-# build targets
-TARGETS_LIB = logtk.cmxa logtk.cma logtk.cmi
-TARGETS_TEST = run_tests.native
+doc: setup.data build
+	$(SETUP) -doc $(DOCFLAGS)
 
-# output, ready to install
-LIBS = $(addprefix _build/,$(TARGETS_LIB))
-INSTALL = $(LIBS)
-PWD = $(shell pwd)
-
-OPTIONS = -use-ocamlfind -classic-display
-
-# switch compilation module
-MODE ?= debug
-ifeq ($(MODE),debug)
-	TAGS=-tag debug
-endif
-ifeq ($(MODE),profile)
-	TAGS=-tags debug,profile
-endif
-ifeq ($(MODE),prod)
-	TAGS=-tag noassert
-endif
+test: setup.data build
+	$(SETUP) -test $(TESTFLAGS)
 
 all:
-	ocaml setup.ml -all
+	$(SETUP) -all $(ALLFLAGS)
 
-bin:
-	ocaml setup.ml -build
+install: setup.data
+	$(SETUP) -install $(INSTALLFLAGS)
 
-tests: bin
-	ocaml setup.ml -test
+uninstall: setup.data
+	$(SETUP) -uninstall $(UNINSTALLFLAGS)
 
-doc:
-	ocaml setup.ml -doc
+reinstall: setup.data
+	$(SETUP) -reinstall $(REINSTALLFLAGS)
 
 clean:
-	ocaml setup.ml -clean
+	$(SETUP) -clean $(CLEANFLAGS)
 
-# install the main binary
-install: all
-	ocaml setup.ml -install
-	#ocamlfind install $(NAME) META $(INSTALL)
+distclean:
+	$(SETUP) -distclean $(DISTCLEANFLAGS)
 
-reinstall: all
-	ocaml setup.ml -reinstall
+setup.data:
+	$(SETUP) -configure $(CONFIGUREFLAGS)
 
-uninstall:
-	ocaml setup.ml -uninstall
+configure:
+	$(SETUP) -configure $(CONFIGUREFLAGS)
+
+.PHONY: build doc test all install uninstall reinstall clean distclean configure
+
+# OASIS_STOP
 
 tags:
 	otags $(IMPLEMENTATION_FILES) $(INTERFACE_FILES)
 
+rst_doc:
+	@echo "build Sphinx documentation (into _build/doc)"
+	sphinx-build doc _build/doc
+
+open_doc: rst_doc
+	firefox _build/doc/contents.html
+
 push_doc: doc
 	scp -r logtk.docdir/* cedeela.fr:~/simon/root/software/logtk
 
-
-.PHONY: all lib tests doc clean install reinstall uninstall tags
+.PHONY: push_doc tags rst_doc open_doc

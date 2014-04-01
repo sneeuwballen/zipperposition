@@ -27,7 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open OUnit
 
-let suite = 
+let suite =
   "all_tests" >:::
     [ TestTerm.suite
     ; TestSubsts.suite
@@ -43,9 +43,7 @@ let props = QCheck.flatten
   ; TestCNF.props
   ; TestIndex.props
   ; TestType.props
-  ; TestBij.props
   ; TestOrdering.props
-  ; TestMeta.props
   ; TestCongruence.props
   ; TestPartialOrder.props
   ]

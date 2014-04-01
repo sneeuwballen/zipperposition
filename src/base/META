@@ -1,0 +1,72 @@
+# OASIS_START
+# DO NOT EDIT (digest: 5d63e5dc28b89ba6f0cedbc28cbcf92d)
+version = "0.1"
+description =
+"Logic toolkit, designed primarily for first-order automated reasoning."
+requires = "zarith unix"
+archive(byte) = "logtk.cma"
+archive(byte, plugin) = "logtk.cma"
+archive(native) = "logtk.cmxa"
+archive(native, plugin) = "logtk.cmxs"
+exists_if = "logtk.cma"
+package "solving" (
+ version = "0.1"
+ description =
+ "Logic toolkit, designed primarily for first-order automated reasoning."
+ requires = "logtk aez"
+ archive(byte) = "logtk_solving.cma"
+ archive(byte, plugin) = "logtk_solving.cma"
+ archive(native) = "logtk_solving.cmxa"
+ archive(native, plugin) = "logtk_solving.cmxs"
+ exists_if = "logtk_solving.cma"
+)
+
+package "parsers" (
+ version = "0.1"
+ description =
+ "Logic toolkit, designed primarily for first-order automated reasoning."
+ requires = "logtk"
+ archive(byte) = "logtk_parsers.cma"
+ archive(byte, plugin) = "logtk_parsers.cma"
+ archive(native) = "logtk_parsers.cmxa"
+ archive(native, plugin) = "logtk_parsers.cmxs"
+ exists_if = "logtk_parsers.cma"
+)
+
+package "meta" (
+ version = "0.1"
+ description =
+ "Logic toolkit, designed primarily for first-order automated reasoning."
+ requires = "logtk logtk.parsers"
+ archive(byte) = "logtk_meta.cma"
+ archive(byte, plugin) = "logtk_meta.cma"
+ archive(native) = "logtk_meta.cmxa"
+ archive(native, plugin) = "logtk_meta.cmxs"
+ exists_if = "logtk_meta.cma"
+)
+
+package "extended" (
+ version = "0.1"
+ description =
+ "Logic toolkit, designed primarily for first-order automated reasoning."
+ requires = "logtk unix zarith"
+ archive(byte) = "logtk_extended.cma"
+ archive(byte, plugin) = "logtk_extended.cma"
+ archive(native) = "logtk_extended.cmxa"
+ archive(native, plugin) = "logtk_extended.cmxs"
+ exists_if = "logtk_extended.cma"
+)
+
+package "arbitrary" (
+ version = "0.1"
+ description =
+ "Logic toolkit, designed primarily for first-order automated reasoning."
+ requires = "logtk qcheck"
+ archive(byte) = "logtk_arbitrary.cma"
+ archive(byte, plugin) = "logtk_arbitrary.cma"
+ archive(native) = "logtk_arbitrary.cmxa"
+ archive(native, plugin) = "logtk_arbitrary.cmxs"
+ exists_if = "logtk_arbitrary.cma"
+)
+# OASIS_STOP
+

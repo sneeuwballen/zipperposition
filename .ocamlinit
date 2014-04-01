@@ -1,56 +1,70 @@
 #use "topfind";;
+#require "zarith";;
 #require "num";;
 #require "unix";;
 #require "datalog";;
 #require "str";;
 #directory "_build/src/";;
+#directory "_build/src/base";;
+#directory "_build/src/extended";;
+#directory "_build/src/parsers";;
 #directory "_build/src/meta/";;
 #directory "_build/src/arbitrary/";;
 #directory "_build/tests/";;
+
+print_endline "load base lib....";;
 #load "logtk.cma";;
-#load "logtk_meta.cma";;
-#install_printer Logtk.Symbol.fmt;;
-#install_printer Logtk.Type.fmt;;
-#install_printer Logtk.FOTerm.fmt;;
-#install_printer Logtk.HOTerm.fmt;;
-#install_printer Logtk.FOFormula.fmt;;
-#install_printer Logtk.Signature.fmt;;
-#install_printer Logtk.Substs.FO.fmt;;
-#install_printer Logtk.Substs.HO.fmt;;
-#install_printer Logtk.Substs.Ty.fmt;;
-#install_printer Logtk.Symbol.fmt;;
-#install_printer Logtk.Precedence.fmt;;
-#install_printer Logtk.Ordering.fmt;;
-#install_printer Logtk.Ast_tptp.fmt_general;;
-#install_printer Logtk.Ast_tptp.fmt_role;;
-#install_printer Logtk.Ast_tptp.fmt_declaration;;
-#install_printer Logtk.Transform.fmt;;
-#install_printer Logtk.Trace_tstp.fmt;;
-#install_printer Logtk.TypeUnif.fmt_error;;
-#install_printer Logtk.Basic.Sym.fmt;;
-#install_printer Logtk.Basic.Ty.fmt;;
-#install_printer Logtk.Basic.FO.fmt;;
-#install_printer Logtk.Basic.Form.fmt;;
-#install_printer Logtk.Basic.HO.fmt;;
+open Logtk;;
+module ST = ScopedTerm;;
+module T = FOTerm;;
+module PT = PrologTerm;;
+module Sym = Symbol;;
+let (~<) = Symbol.of_string;;
+#install_printer Symbol.fmt;;
+#install_printer Type.fmt;;
+#install_printer FOTerm.fmt;;
+#install_printer PrologTerm.fmt;;
+#install_printer Formula.FO.fmt;;
+#install_printer HOTerm.fmt;;
+#install_printer Substs.fmt;;
+#install_printer Signature.fmt;;
+#install_printer ParseLocation.fmt;;
+#install_printer Precedence.fmt;;
+#install_printer Ordering.fmt;;
 open Logtk.Sequence.Infix;;
 open Logtk.Type;;
-module T = Logtk.FOTerm;;
-module F = Logtk.FOFormula;;
+module F = Logtk.Formula;;
 module HOT = Logtk.HOTerm;;
-open Logtk;;
+
+(* optional part: parser *)
+print_endline "load parsers....";;
+#load "logtk_parsers.cma";;
+open Logtk_parsers;;
+#install_printer Ast_tptp.Untyped.fmt;;
+#install_printer Ast_tptp.Typed.fmt;;
+#install_printer Ast_tptp.fmt_general;;
+#install_printer Ast_tptp.fmt_role;;
 let pterm s =
     let t = Parse_tptp.parse_term Lex_tptp.token (Lexing.from_string s) in
-    let tyctx = TypeInference.Ctx.create ~base:true () in
+    let tyctx = TypeInference.Ctx.create Signature.TPTP.base in
     let _, clos = TypeInference.FO.infer tyctx t in
-    let renaming = Substs.Ty.Renaming.create 5 in
-    TypeInference.Ctx.apply_closure ~renaming tyctx clos
+    clos tyctx
 ;;
 let pform s =
     let f = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s) in
-    let tyctx = TypeInference.Ctx.create ~base:true () in
+    let tyctx = TypeInference.Ctx.create Signature.TPTP.base in
     TypeInference.FO.convert_form ~ctx:tyctx f
 ;;
+
+(* optional part: extended *)
+print_endline "load extended lib....";;
+#load "logtk_extended.cma";;
+#install_printer Logtk.Transform.fmt;;
+#install_printer Logtk.Trace_tstp.fmt;;
+
 (* optional part: meta *)
+print_endline "load meta prover....";;
+#load "logtk_meta.cma";;
 #install_printer Logtk_meta.MetaPattern.fmt;;
 #install_printer Logtk_meta.MetaPattern.EncodedForm.fmt;;
 #install_printer Logtk_meta.MetaPattern.Set.fmt;;

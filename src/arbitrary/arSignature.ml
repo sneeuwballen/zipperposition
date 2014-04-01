@@ -33,14 +33,18 @@ type 'a arbitrary = 'a QCheck.Arbitrary.t
 let _arbitrary_of gen_ty =
   QCheck.Arbitrary.(
     let gen = 
-      ArSymbol.set >>= fun symbs ->
-      let l = Sequence.to_rev_list (Symbol.Set.to_seq symbs) in
-      let signature = List.fold_left Signature.declare_sym Signature.empty l in
+      ArSymbol.set
+      >>= fun symbs ->
+      let n = Symbol.Set.cardinal symbs in
+      list_repeat n gen_ty
+      >>= fun types ->
+      let pairs = List.combine (Symbol.Set.elements symbs) types in
+      let signature = Signature.of_list pairs in
       (* be sure that we only accept well founded signatures *)
       return (if Signature.well_founded signature then Some signature else None)
     in
     retry gen)
-    
+
 let default = _arbitrary_of ArType.default
 let ground = _arbitrary_of ArType.ground
 

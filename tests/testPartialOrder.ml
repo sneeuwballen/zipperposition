@@ -27,7 +27,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** test partial order *)
 
 open Logtk
-open Logtk_arbitrary
 open QCheck
 
 module PO = PartialOrder.Make(struct

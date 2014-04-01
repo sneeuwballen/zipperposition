@@ -32,22 +32,24 @@ module T = FOTerm
 module S = Substs.FO
 module Rw = Rewriting.TRS
 
-let a = T.mk_const (Symbol.mk_const ~ty:Type.i "a")
-let b = T.mk_const (Symbol.mk_const ~ty:Type.i "b")
-let c = T.mk_const (Symbol.mk_const ~ty:Type.i "c")
-let d = T.mk_const (Symbol.mk_const ~ty:Type.i "d")
-let f x y = T.mk_node (Symbol.mk_const ~ty:Type.i "f") [x; y]
-let g x = T.mk_node (Symbol.mk_const ~ty:Type.(i <=. i) "g") [x]
-let h x = T.mk_node (Symbol.mk_const ~ty:Type.(i <=. i) "h") [x]
-let zero = T.mk_const (Symbol.mk_const ~ty:Type.i "0")
-let succ n = T.mk_node (Symbol.mk_const ~ty:Type.(i <=. i) "s") [n]
-let plus a b = T.mk_node (Symbol.mk_const ~ty:Type.(i <== [i;i]) "+") [a; b]
-let minus a = T.mk_node (Symbol.mk_const ~ty:Type.(i <=. i) "-") [a]
-let times a b = T.mk_node (Symbol.mk_const ~ty:Type.(i <== [i;i]) "x") [a; b]
-let x = T.mk_var ~ty:Type.i 1
-let y = T.mk_var ~ty:Type.i 2
-let z = T.mk_var ~ty:Type.i 3
-let u = T.mk_var ~ty:Type.i 4
+let __const ~ty s = T.const ~ty (Symbol.of_string s)
+
+let a = __const ~ty:Type.TPTP.i "a"
+let b = __const ~ty:Type.TPTP.i "b"
+let c = __const ~ty:Type.TPTP.i "c"
+let d = __const ~ty:Type.TPTP.i "d"
+let f x y = T.app (__const ~ty:Type.TPTP.i "f") [x; y]
+let g x = T.app (__const ~ty:Type.(TPTP.i <=. TPTP.i) "g") [x]
+let h x = T.app (__const ~ty:Type.(TPTP.i <=. TPTP.i) "h") [x]
+let zero = __const ~ty:Type.TPTP.i "0"
+let succ n = T.app (__const ~ty:Type.(TPTP.i <=. TPTP.i) "s") [n]
+let plus a b = T.app (__const ~ty:Type.(TPTP.i <== [TPTP.i;TPTP.i]) "+") [a; b]
+let minus a = T.app (__const ~ty:Type.(TPTP.i <=. TPTP.i) "-") [a]
+let times a b = T.app (__const ~ty:Type.(TPTP.i <== [TPTP.i;TPTP.i]) "x") [a; b]
+let x = T.var ~ty:Type.TPTP.i 1
+let y = T.var ~ty:Type.TPTP.i 2
+let z = T.var ~ty:Type.TPTP.i 3
+let u = T.var ~ty:Type.TPTP.i 4
 
 let rec from_int n =
   assert (n >= 0);
@@ -56,22 +58,19 @@ let rec from_int n =
 (** convert Peano term t to int *)
 let peano_to_int t =
   let rec count t n =
-    match t.T.term with
+    match T.open_app t with
     | _ when T.eq t zero -> n
-    | T.Node (Symbol.Const("s",_), _, [t2]) -> count t2 (n+1)
+    | f, _, [t2] when Symbol.to_string (T.head_exn f) = "s" -> count t2 (n+1)
     | _ -> failwith "not peano!"
   in count t 0
 
 (** print a term with a nice representation for Peano numbers *)
-let rec print_peano_nice buf t =
-  try
-    Printf.bprintf buf "%d" (peano_to_int t)
-  with Failure _ ->
-    match t.T.term with
-    | T.Var _
-    | T.BoundVar _ -> T.pp buf t
-    | T.Node (h, _, []) -> Printf.bprintf buf "%a" Symbol.pp h
-    | T.Node (h, _, l) -> Printf.bprintf buf "%a(%a)" Symbol.pp h (Util.pp_list T.pp) l
+let print_peano_nice buf t =
+  let hook _ pp buf t =
+    try
+      Printf.bprintf buf "%d" (peano_to_int t); true
+    with _ -> false
+  in T.pp_depth ~hooks:[hook] 0 buf t
 
 (** Simple rewriting system for Peano arithmetic with + and x *)
 let peano_trs =
@@ -128,7 +127,7 @@ let benchmark ?(count=benchmark_count) trs a b =
   in
   Gc.major ();
   let start = Unix.gettimeofday () in
-  for i = 1 to count do one_step () done;
+  for _i = 1 to count do one_step () done;
   let stop = Unix.gettimeofday () in
   Util.debug 1 "%f seconds to do %d joins of %a and %a (%f each)\n"
     (stop -. start) count print_peano_nice a print_peano_nice b

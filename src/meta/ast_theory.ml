@@ -27,9 +27,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module BF = Basic.Form
+module PT = PrologTerm
 
-exception ParseError of Location.t
+exception ParseError of ParseLocation.t
 
 type statement =
   | Lemma of string * string list * premise list

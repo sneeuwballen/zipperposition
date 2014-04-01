@@ -52,17 +52,21 @@ let more_specific cmp1 cmp2 = Comparison.(match cmp1, cmp2 with
 
 let check_ordering_inv_by_subst ord =
   let name = Util.sprintf "ordering_%s_inv_by_subst" (O.name ord) in
-  let pp = PP.triple T.to_string T.to_string S.to_string in
+  let pp = PP.triple T.to_string T.to_string Substs.to_string in
   (* generate pairs of terms, and grounding substitutions *)
   let gen = Arbitrary.((pair ArTerm.default ArTerm.default) >>= fun (t1, t2) ->
-    let vars = T.vars_list [t1; t2] in
+    let vars = Sequence.of_list [t1; t2]
+      |> Sequence.flatMap T.Seq.vars
+      |> T.Seq.add_set T.Set.empty
+    in
     (* grounding substitution *)
-    let subst st = List.fold_left
-      (fun subst v -> S.bind subst v 1 (ArTerm.ground st) 0) S.empty vars in
+    let subst st = T.Set.fold
+      (fun v subst -> S.bind subst v 1 (ArTerm.ground st) 0) vars Substs.empty in
     triple (return t1) (return t2) subst)
   in
   let size (t1, t2, s) =
-    T.size t1 + T.size t2 + (S.fold s 0 (fun n _ _ t _ -> n + T.size t))
+    T.size t1 + T.size t2 +
+      (Substs.fold s 0 (fun n _ _ t _ -> n + T.size (T.of_term_exn t)))
   in
   (* do type inference on the fly 
   let tyctx = TypeInference.Ctx.create () in

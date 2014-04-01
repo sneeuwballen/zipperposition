@@ -30,7 +30,7 @@ open Logtk
 open Logtk_arbitrary
 open QCheck
 
-module F = FOFormula
+module F = Formula.FO
 
 let pp = F.to_string
 
@@ -53,7 +53,7 @@ let check_cnf_gives_clauses =
   (* check that the CNf of a formula is in clausal form *)
   let prop f =
     let clauses = Cnf.cnf_of f in
-    let clauses = List.map F.mk_or clauses in
+    let clauses = List.map F.Base.or_ clauses in
     List.for_all Cnf.is_cnf clauses
   in
   mk_test ~name ~pp gen prop
@@ -63,7 +63,7 @@ let check_miniscope_db_closed =
   let name = "cnf_miniscope_db_closed" in
   (* check that miniscoping preserved db_closed *)
   let prop f =
-    F.DB.closed f = F.DB.closed (Cnf.miniscope f)
+    ScopedTerm.(DB.closed (f:F.t:>t) = DB.closed ((Cnf.miniscope f):F.t:>t))
   in
   mk_test ~name ~pp gen prop
 
