@@ -285,3 +285,13 @@ module type UNIT_IDX = sig
     (** print the index in the DOT format *)
 end
 
+module BasicEquation = struct
+  type t = T.t * T.t
+  type rhs = T.t
+  let compare (l1,r1)(l2,r2) =
+    let c = T.cmp l1 l2 in
+    if c <> 0 then c else T.cmp r1 r2
+  let extract (l,r) = l,r,true
+  let priority _ = 1
+end
+

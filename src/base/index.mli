@@ -172,6 +172,10 @@ module type EQUATION = sig
         always returning the same number. *)
 end
 
+module BasicEquation : EQUATION
+  with type t = FOTerm.t * FOTerm.t
+  and type rhs = FOTerm.t
+
 module type UNIT_IDX = sig
   type t
 
