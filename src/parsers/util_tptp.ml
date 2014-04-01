@@ -499,7 +499,7 @@ let annotate_types init untyped =
     Err.return (erase_types typed)
   )
 
-let to_cnf signature decls =
+let to_cnf ?(distribute_exist=false) signature decls =
   (* formulas with correct negation sign *)
   let ctx = Skolem.create signature in
   let clauses = Sequence.flatMap
@@ -510,7 +510,8 @@ let to_cnf signature decls =
         | Ast.R_conjecture -> F.Base.not_ f, Ast.R_negated_conjecture
         | _ -> f, r
         in
-        let clauses = Cnf.cnf_of ~ctx f in
+        let opts = if distribute_exist then [Cnf.DistributeExists] else [] in
+        let clauses = Cnf.cnf_of ~opts ~ctx f in
         Sequence.map
           (fun c -> AT.CNF(n,role, c,info))
           (Sequence.of_list clauses)

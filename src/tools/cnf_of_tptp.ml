@@ -37,10 +37,13 @@ module Err = Monad.Err
 
 let declare_types = ref false
 let print_sig = ref false
+let flag_distribute_exists = ref false
 
 let options =
   [ "-declare", Arg.Set declare_types, "declare types of symbols"
   ; "-signature", Arg.Set print_sig, "print signature"
+  ; "-distribute-exist", Arg.Set flag_distribute_exists,
+    "distribute existential quantifiers during miniscoping"
   ] @ Options.global_opts
 
 (* process the given file, converting it to CNF *)
@@ -53,7 +56,8 @@ let process file =
     (* to CNF *)
     Util_tptp.infer_types (`sign Signature.TPTP.base) decls
     >>= fun (signature, decls) ->
-    let signature, decls = Util_tptp.to_cnf signature decls in
+    let signature, decls = Util_tptp.to_cnf
+      ~distribute_exist:!flag_distribute_exists signature decls in
     let decls = if !declare_types
       then Sequence.append (Util_tptp.Typed.declare_symbols signature) decls
       else decls
