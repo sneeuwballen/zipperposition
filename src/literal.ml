@@ -237,13 +237,13 @@ let __ty_error a b =
 let mk_lit ~ord a b sign =
   if not (Type.eq (T.ty a) (T.ty b)) then __ty_error a b;
   match a, b with
-  | _ when a == b -> if sign then True else False
-  | _ when a == T.TPTP.true_ && b == T.TPTP.false_ -> if sign then False else True
-  | _ when a == T.TPTP.false_ && b == T.TPTP.true_ -> if sign then False else True
-  | _ when a == T.TPTP.true_ -> Prop (b, sign)
-  | _ when b == T.TPTP.true_ -> Prop (a, sign)
-  | _ when a == T.TPTP.false_ -> Prop (b, not sign)
-  | _ when b == T.TPTP.false_ -> Prop (a, not sign)
+  | _ when T.eq a b -> if sign then True else False
+  | _ when T.eq a T.TPTP.true_ && T.eq b T.TPTP.false_ -> if sign then False else True
+  | _ when T.eq a T.TPTP.false_ && T.eq b T.TPTP.true_ -> if sign then False else True
+  | _ when T.eq a T.TPTP.true_ -> Prop (b, sign)
+  | _ when T.eq b T.TPTP.true_ -> Prop (a, sign)
+  | _ when T.eq a T.TPTP.false_ -> Prop (b, not sign)
+  | _ when T.eq b T.TPTP.false_ -> Prop (a, not sign)
   | _ -> Equation (a, b, sign, Ordering.compare ord a b)
 
 let mk_eq ~ord a b = mk_lit ~ord a b true

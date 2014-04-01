@@ -140,7 +140,7 @@ let do_superposition ~ctx active_clause sc_a active_pos
           (Lit.apply_subst_list ~renaming ~ord subst lits_p sc_p)
         in
         let rule = if sign_uv then "sup+" else "sup-" in
-        let proof c = Proof.mk_c_inference ~theories:["equality"]
+        let proof c = Proof.mk_c_inference
           ~info:[S.to_string subst] ~rule
           c [active_clause.C.hcproof; passive_clause.C.hcproof] in
         let parents = [active_clause; passive_clause] in
@@ -226,7 +226,7 @@ let infer_equality_resolution clause =
             Util.incr_stat stat_equality_resolution_call;
             let ord = Ctx.ord ~ctx in
             let renaming = Ctx.renaming_clear ~ctx in
-            let proof c = Proof.mk_c_inference ~theories:["equality"]
+            let proof c = Proof.mk_c_inference
               ~info:[S.to_string subst] ~rule:"eq_res" c [clause.C.hcproof] in
             let new_lits = Util.array_except_idx clause.C.hclits pos in
             let new_lits = Lit.apply_subst_list ~ord ~renaming subst new_lits 0 in
@@ -304,7 +304,7 @@ let infer_equality_factoring clause =
        BV.get (C.eligible_param clause 0 subst) active_idx
       then begin
         Util.incr_stat stat_equality_factoring_call;
-        let proof c = Proof.mk_c_inference ~theories:["equality"]
+        let proof c = Proof.mk_c_inference
           ~info:[S.to_string subst] ~rule:"eq_fact" c [clause.C.hcproof]
         (* new_lits: literals of the new clause. remove active literal
            and replace it by a t!=v one, and apply subst *)
@@ -557,7 +557,7 @@ let demodulate (simpl_set : PS.SimplSet.t) c =
       c
     else begin  (* construct new clause *)
       clauses := Util.list_uniq C.eq !clauses;
-      let proof c' = Proof.mk_c_simp ~theories:["equality"] ~rule:"demod" c'
+      let proof c' = Proof.mk_c_simp ~rule:"demod" c'
         (c.C.hcproof :: List.map (fun hc -> hc.C.hcproof) !clauses) in
       let parents = c :: c.C.hcparents in
       let new_c = C.create_a ~parents ~ctx lits proof in
@@ -705,7 +705,7 @@ let basic_simplify c =
   if List.length new_lits = Array.length lits
     then (Util.exit_prof prof_basic_simplify; c)  (* no simplification *)
     else begin
-      let proof cc= Proof.mk_c_simp ~theories:["equality"] ~rule:"simplify"
+      let proof cc= Proof.mk_c_simp ~rule:"simplify"
         cc [c.C.hcproof] in
       let new_clause = C.create ~parents:[c] ~ctx new_lits proof in
       Util.debug 3 "%a basic_simplifies into %a" C.pp c C.pp new_clause;
@@ -783,7 +783,7 @@ let positive_simplify_reflect (simpl_set : PS.SimplSet.t) c =
   if List.length lits = Array.length c.C.hclits
     then (Util.exit_prof prof_pos_simplify_reflect; c) (* no literal removed, keep c *)
     else 
-      let proof c' = Proof.mk_c_simp ~theories:["equality"]
+      let proof c' = Proof.mk_c_simp
         ~rule:"simplify_reflect+" c' (c.C.hcproof::premises) in
       let parents = c :: c.C.hcparents in
       let new_c = C.create ~parents ~ctx lits proof in
@@ -824,7 +824,7 @@ let negative_simplify_reflect (simpl_set : PS.SimplSet.t) c =
   if List.length lits = Array.length c.C.hclits
     then (Util.exit_prof prof_neg_simplify_reflect; c) (* no literal removed *)
     else 
-      let proof c' = Proof.mk_c_simp ~theories:["equality"] ~rule:"simplify_reflect-"
+      let proof c' = Proof.mk_c_simp ~rule:"simplify_reflect-"
         c' (c.C.hcproof::premises) in
       let parents = c :: c.C.hcparents in
       let new_c = C.create ~parents ~ctx lits proof in
@@ -845,11 +845,13 @@ exception SubsumptionFound of S.t
 let match_lits subst lit_a sc_a lit_b sc_b =
   (* match t1 with t2, then t1' with t2' *)
   let match4 subst t1 t2 t1' t2' =
-    try let subst = Unif.FO.matching ~subst ~pattern:t1 sc_a t2 sc_b in
-        [Unif.FO.matching ~subst ~pattern:t1' sc_a t2' sc_b]
+    try
+      let subst = Unif.FO.matching_adapt_scope ~subst ~pattern:t1 sc_a t2 sc_b in
+      [Unif.FO.matching_adapt_scope ~subst ~pattern:t1' sc_a t2' sc_b]
     with Unif.Fail -> []
   and match2 subst t1 sc1 t2 sc2 =
-    try [Unif.FO.matching ~subst ~pattern:t1 sc1 t2 sc2] with Unif.Fail -> []
+    try [Unif.FO.matching_adapt_scope ~subst ~pattern:t1 sc1 t2 sc2]
+    with Unif.Fail -> []
   in
   match lit_a, lit_b with
   | Lit.Prop (pa, signa), Lit.Prop (pb, signb) ->
