@@ -297,6 +297,7 @@ module Seq = struct
         symbols f k;
         _symbols_list l k
     | T.Kind.FOTerm, T.At (l,r) -> symbols l k; symbols r k
+    | T.Kind.Type, _ -> ()
     | _ -> assert false
   and _symbols_list l k = match l with
     | [] -> ()
