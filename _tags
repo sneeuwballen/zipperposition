@@ -187,6 +187,6 @@ true: use_menhir
 
 <**/*.ml>: warn_K, warn_Y, warn_X
 
-<src/base/{scopedTerm,FOTerm,HOTerm,Type}.cmx>: inline(15)
+<src/base/{scopedTerm,FOTerm,HOTerm,Type,lib/BV}.cmx>: inline(15)
 <src/base/{substs,unif}.cmx>: inline(8)
 #<src/**/*.cmx>: inline(10)

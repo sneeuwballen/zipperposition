@@ -421,7 +421,7 @@ let rec _all_pos_rec f vars acc pb t =
   | Var _ | BVar _ ->
     if vars then f acc t (PB.to_pos pb) else acc
   | Const _ -> f acc t (PB.to_pos pb)
-  | TyApp (l, _) -> _all_pos_rec f vars acc pb l
+  | TyApp (l, _) -> f acc t (PB.to_pos pb)
   | App (_, tl) ->
     let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
     _all_pos_rec_list f vars acc pb tl 0

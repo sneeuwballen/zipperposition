@@ -79,7 +79,7 @@ The matrix is *)
 
 module BoolMatrix = struct
   type t = {
-    bv : BV.t; (* bitvector *)
+    bv : bool array;
     line : int; (* number of lines *)
     column : int; (* number of columns *)
   }
@@ -87,20 +87,18 @@ module BoolMatrix = struct
   (* matrix of size (line,column) *)
   let create line column =
     let n = line * column in
-    let bv = BV.create ~size:n false in
+    let bv = Array.make n false in
     { bv; line; column; }
 
-  let copy m = { m with bv = BV.copy m.bv; }
+  let copy m = { m with bv=Array.copy m.bv; }
 
   (* index of m[i,j]. [i] is the line number. *)
   let _idx m i j =
     m.column * i + j
 
-  let set m i j =
-    BV.set m.bv (_idx m i j)
+  let set m i j = m.bv.(_idx m i j) <- true
 
-  let get m i j =
-    BV.get m.bv (_idx m i j)
+  let get m i j = m.bv.(_idx m i j)
 
   (* assuming the dimensions of m2 are >= those of m1, transfer content
       of m1 to m2 *)
@@ -219,13 +217,11 @@ module Make(E : ELEMENT) = struct
       then () (* stop, already propagated *)
       else begin
         BoolMatrix.set cmp i j;
-        (* k > i and i > j => k > j *)
         for k = 0 to n-1 do
+          (* k > i and i > j => k > j *)
           if k <> i && BoolMatrix.get cmp k i
-            then propagate k j
-        done;
-        (* i > j and j > k => i > k *)
-        for k = 0 to n-1 do
+            then propagate k j;
+          (* i > j and j > k => i > k *)
           if k <> j && BoolMatrix.get cmp j k
             then propagate i k
         done;
