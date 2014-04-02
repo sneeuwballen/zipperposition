@@ -30,10 +30,6 @@ Flag "bench"
   Description:  Build and run benchmarks
   Default:      false
 
-Flag "extended"
-  Description:  Build and install the Extended library
-  Default:      false
-
 Flag "parsers"
   Description:  Build and install parsers (requires menhir)
   Default:      false
@@ -64,20 +60,6 @@ Library "logtk"
   BuildDepends:     zarith,unix
   XMETARequires:    zarith,unix
 
-Library "logtk_extended"
-  Path:             src/extended
-  Pack:             true
-  FindlibName:      extended
-  FindlibParent:    logtk
-  Build$:           flag(extended)
-  Install$:         flag(extended)
-  Modules:          lib/MultiMap, lib/Mixtbl
-                    #Lambda, Rewriting,
-                    #FeatureVector, FormulaShape, Transform,
-                    #NPDtree, Congruence, FastFingerprint, Evaluator,
-  BuildDepends:     logtk,unix,zarith
-  XMETARequires:    logtk,unix,zarith
-
 Library "logtk_parsers"
   Path:             src/parsers
   Pack:             true
@@ -98,8 +80,8 @@ Library "logtk_meta"
   Modules:          Encoding, Reasoner, Plugin, Prover
                     #MetaPattern, MetaKB, MetaReasoner, MetaProver, lib/Signal
   BuildDepends:     logtk,logtk.parsers
-  Build$:           flag(meta) & flag(parsers)
-  Install$:         flag(meta) & flag(parsers)
+  Build$:           flag(meta) && flag(parsers)
+  Install$:         flag(meta) && flag(parsers)
   XMETARequires:    logtk,logtk.parsers
 
 Library "logtk_solving"
@@ -128,8 +110,8 @@ Document logtk
   Title:                Logtk docs
   Type:                 ocamlbuild (0.3)
   BuildTools+:          ocamldoc
-  Install$:             flag(qcheck) & flag(meta) & flag(extended)
-  Build$:               flag(qcheck) & flag(meta) & flag(extended)
+  Install$:             flag(qcheck) && flag(meta)
+  Build$:               flag(qcheck) && flag(meta)
   XOCamlbuildPath:      .
   XOCamlbuildLibraries: logtk,logtk.meta,logtk.arbitrary
 
@@ -138,27 +120,27 @@ Executable run_bench
   Install:          false
   CompiledObject:   native
   MainIs:           run_bench.ml
-  Build$:           flag(bench) & flag(tests)
+  Build$:           flag(bench) && flag(tests)
   BuildDepends:     logtk,bench,qcheck,logtk.arbitrary
 
 Test all
   Command:          $run_tests
   TestTools:        run_tests
-  Run$:             flag(tests) & flag(qcheck)
+  Run$:             flag(tests) && flag(qcheck)
 
 Executable run_tests
   Path:             tests/
   Install:          false
   CompiledObject:   native
   MainIs:           run_tests.ml
-  Build$:           flag(tests) & flag(meta) & flag(qcheck) & flag(parsers)
+  Build$:           flag(tests) && flag(meta) && flag(qcheck) && flag(parsers)
   BuildDepends:     logtk,logtk.parsers,oUnit,logtk.meta,logtk.arbitrary
 
 # TPTP syntax and type checking
 Executable type_check_tptp
   Path:             src/tools/
-  Build$:           flag(tools) & flag(parsers)
-  Install$:         flag(tools) & flag(parsers)
+  Build$:           flag(tools) && flag(parsers)
+  Install$:         flag(tools) && flag(parsers)
   CompiledObject:   native
   MainIs:           type_check_tptp.ml
   BuildDepends:     logtk,logtk.parsers
@@ -166,8 +148,8 @@ Executable type_check_tptp
 # Conversion to CNF
 Executable cnf_of_tptp
   Path:             src/tools/
-  Build$:           flag(tools) & flag(parsers)
-  Install$:         flag(tools) & flag(parsers)
+  Build$:           flag(tools) && flag(parsers)
+  Install$:         flag(tools) && flag(parsers)
   CompiledObject:   native
   MainIs:           cnf_of_tptp.ml
   BuildDepends:     logtk,logtk.parsers
@@ -175,8 +157,8 @@ Executable cnf_of_tptp
 # Orienting rewrite rules with LPO
 Executable orient
   Path:             src/tools/
-  Build$:           flag(tools) & flag(parsers) & flag(solving)
-  Install$:         flag(tools) & flag(parsers) & flag(solving)
+  Build$:           flag(tools) && flag(parsers) && flag(solving)
+  Install$:         flag(tools) && flag(parsers) && flag(solving)
   CompiledObject:   native
   MainIs:           orient.ml
   BuildDepends:     logtk,logtk.parsers,logtk.solving,aez
@@ -184,8 +166,8 @@ Executable orient
 # proof checking
 Executable proof_check_tstp
   Path:             src/tools/
-  Build$:           flag(tools) & flag(parsers)
-  Install$:         flag(tools) & flag(parsers)
+  Build$:           flag(tools) && flag(parsers)
+  Install$:         flag(tools) && flag(parsers)
   CompiledObject:   native
   MainIs:           proof_check_tstp.ml
   BuildDepends:     logtk,logtk.parsers
@@ -193,8 +175,8 @@ Executable proof_check_tstp
 # detection of theories
 Executable detect_theories
   Path:             src/tools/
-  Build$:           flag(meta) & flag(tools) & flag(parsers)
-  Install$:         flag(meta) & flag(tools) & flag(parsers)
+  Build$:           flag(meta) && flag(tools) && flag(parsers)
+  Install$:         flag(meta) && flag(tools) && flag(parsers)
   CompiledObject:   native
   MainIs:           detect_theories.ml
   BuildDepends:     logtk,logtk.parsers,logtk.meta
@@ -202,8 +184,8 @@ Executable detect_theories
 # Preprocessor to E
 Executable hysteresis
   Path:             src/tools/
-  Build$:           flag(meta) & flag(tools) & flag(parsers) & flag(solving)
-  Install$:         flag(meta) & flag(tools) & flag(parsers) & flag(solving)
+  Build$:           flag(meta) && flag(tools) && flag(parsers) && flag(solving)
+  Install$:         flag(meta) && flag(tools) && flag(parsers) && flag(solving)
   CompiledObject:   native
   MainIs:           hysteresis.ml
   BuildDepends:     logtk,logtk.parsers,logtk.meta,logtk.solving,aez

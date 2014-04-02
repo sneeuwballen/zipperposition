@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 2ede1221bba8ba5e2569d002081ebf5e)
+# DO NOT EDIT (digest: 67fcac67993daa741118d57b9e0ae6c4)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -66,16 +66,6 @@
 <src/base/*.ml{,i}>: package(zarith)
 <src/base/lib/*.ml{,i}>: package(unix)
 <src/base/lib/*.ml{,i}>: package(zarith)
-# Library logtk_extended
-"src/extended/logtk_extended.cmxs": use_logtk_extended
-"src/extended/lib/multiMap.cmx": for-pack(Logtk_extended)
-"src/extended/lib/mixtbl.cmx": for-pack(Logtk_extended)
-<src/extended/*.ml{,i}>: package(unix)
-<src/extended/*.ml{,i}>: package(zarith)
-<src/extended/*.ml{,i}>: use_logtk
-<src/extended/lib/*.ml{,i}>: package(unix)
-<src/extended/lib/*.ml{,i}>: package(zarith)
-<src/extended/lib/*.ml{,i}>: use_logtk
 # Library logtk_parsers
 "src/parsers/logtk_parsers.cmxs": use_logtk_parsers
 "src/parsers/parse_tptp.cmx": for-pack(Logtk_parsers)

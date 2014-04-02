@@ -1,5 +1,5 @@
 (* OASIS_START *)
-(* DO NOT EDIT (digest: 40754f2cf59af2a3585ea585baa8e063) *)
+(* DO NOT EDIT (digest: b2d130f7c32334f36cb06095d519a8e9) *)
 module OASISGettext = struct
 (* # 22 "src/oasis/OASISGettext.ml" *)
 
@@ -598,7 +598,6 @@ let package_default =
      MyOCamlbuildBase.lib_ocaml =
        [
           ("logtk", ["src/base"; "src/base/lib"], []);
-          ("logtk_extended", ["src/extended"; "src/extended/lib"], []);
           ("logtk_parsers", ["src/parsers"], []);
           ("logtk_meta", ["src/meta"], []);
           ("logtk_solving", ["src/solving"], []);
@@ -627,8 +626,6 @@ let package_default =
           ("src/solving", ["src/base"; "src/base/lib"]);
           ("src/parsers", ["src/base"; "src/base/lib"]);
           ("src/meta", ["src/base"; "src/base/lib"; "src/parsers"]);
-          ("src/extended/lib", ["src/base"; "src/base/lib"; "src/extended"]);
-          ("src/extended", ["src/base"; "src/base/lib"; "src/extended/lib"]);
           ("src/base/lib", ["src/base"]);
           ("src/base", ["src/base/lib"]);
           ("src/arbitrary", ["src/base"; "src/base/lib"; "src/meta"])
@@ -638,6 +635,6 @@ let package_default =
 
 let dispatch_default = MyOCamlbuildBase.dispatch_default package_default;;
 
-# 642 "myocamlbuild.ml"
+# 639 "myocamlbuild.ml"
 (* OASIS_STOP *)
 Ocamlbuild_plugin.dispatch dispatch_default;;
