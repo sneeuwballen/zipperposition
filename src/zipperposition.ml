@@ -74,7 +74,6 @@ let print_stats ~env =
   ()
 
 let print_json_stats ~env =
-  let open Sequence.Infix in
   let encode_hashcons (x1,x2,x3,x4,x5,x6) =
     Util.sprintf "[%d, %d, %d, %d, %d, %d]" x1 x2 x3 x4 x5 x6 in
   (*

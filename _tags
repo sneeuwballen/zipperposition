@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 3411a7fd2a9b5903aeb1be1238437816)
+# DO NOT EDIT (digest: 5d8139c900c4e234e71b347b73f79985)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -56,14 +56,12 @@
 "src/zipperposition.native": package(dynlink)
 "src/zipperposition.native": package(logtk)
 "src/zipperposition.native": package(logtk.meta)
-"src/zipperposition.native": package(num)
 "src/zipperposition.native": package(unix)
 "src/zipperposition.native": package(zarith)
 "src/zipperposition.native": use_libzipperposition
 <src/*.ml{,i}>: package(dynlink)
 <src/*.ml{,i}>: package(logtk)
 <src/*.ml{,i}>: package(logtk.meta)
-<src/*.ml{,i}>: package(num)
 <src/*.ml{,i}>: package(unix)
 <src/*.ml{,i}>: package(zarith)
 <src/*.ml{,i}>: use_libzipperposition

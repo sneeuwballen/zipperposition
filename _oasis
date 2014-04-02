@@ -5,9 +5,9 @@ Homepage:    https://github.com/c-cube/zipperposition
 Authors:     Simon Cruanes
 License:     BSD3
 LicenseFile: LICENSE
-Plugins:     META (0.3)
+Plugins:     META (0.3), DevFiles (0.3)
 OCamlVersion: >= 4.00.1
-BuildTools:  ocamlbuild
+BuildTools: ocamlbuild
 FilesAB: src/const.ml.ab
 
 Synopsis:  Superposition theorem prover, for first order logic with equality.
@@ -41,16 +41,15 @@ Library "libzipperposition_meta"
   Build$:           flag(meta)
   Install$:         flag(meta)
   BuildDepends:     libzipperposition,logtk,logtk.meta
-    
 
 # main executable for the prover
 Executable zipperposition
-  Path: src/
-  Install: true
-  CompiledObject: native
-  MainIs: zipperposition.ml
-  BuildDepends: unix,num,logtk,logtk.meta,dynlink,libzipperposition
-  DataFiles: builtin.theory
+  Path:             src/
+  Install:          true
+  CompiledObject:   native
+  MainIs:           zipperposition.ml
+  BuildDepends:     unix,zarith,logtk,logtk.meta,dynlink,libzipperposition
+  DataFiles:        builtin.theory
 
 Document zipperposition
   Title:                Documentation for Zipperposition
