@@ -139,6 +139,10 @@ type surrounding =
   | SurroundOr
   | SurroundAnd
 
+(* TODO: actually the handbook still uses a notion of "polarity"
+   to choose how to encode equivalence (and xor). See whether that
+   would lead to smaller CNF. *)
+
 (* negation normal form (also remove equivalence and implications).
    [surrounding] is either [Or] or [And], and denotes which connective
    is immediately surrouding the current formula. This information is

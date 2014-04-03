@@ -35,7 +35,6 @@ type ctx = {
   sc_prefix : string;
   mutable sc_gensym : int;              (* new symbols *)
   mutable sc_var_index : int;           (* fresh universal vars *)
-  mutable sc_cache : (T.t * T.t) list;  (* term -> skolemized term *)
   mutable sc_fcache : (F.t * F.t) list;
   mutable sc_signature : Signature.t;
 }
@@ -47,7 +46,6 @@ let create ?(prefix="logtk_sk__") signature =
     sc_prefix=prefix;
     sc_gensym = 0;
     sc_var_index = 0;
-    sc_cache = [];
     sc_fcache = [];
     sc_signature = signature;
   } in
