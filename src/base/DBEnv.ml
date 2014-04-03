@@ -53,3 +53,19 @@ let pop env =
 
 let find env n =
   if n < env.size then List.nth env.stack n else None
+
+let num_bindings db =
+  let rec count acc l = match l with
+    | [] -> acc
+    | None :: l' -> count acc l'
+    | Some _ :: l' -> count (1+acc) l'
+  in count 0 db.stack
+
+let map f db =
+  let stack = List.map
+    (function
+       | None -> None
+       | Some x -> Some (f x))
+    db.stack
+  in
+  { db with stack; }

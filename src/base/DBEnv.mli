@@ -62,3 +62,9 @@ val size : 'a t -> int
 val find : 'a t -> int -> 'a option
   (** Find to which value the given De Bruijn index is bound to, or
       return None *)
+
+val num_bindings : _ t -> int
+  (** How many variables are actually bound? *)
+
+val map : ('a -> 'b) -> 'a t -> 'b t
+  (** Map bound objects to other bound objects *)
