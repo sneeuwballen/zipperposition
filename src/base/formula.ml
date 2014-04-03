@@ -33,6 +33,7 @@ type symbol = Sym.t
 
 module type S = sig
   type term
+  type term_set
 
   type t = private ScopedTerm.t
 
@@ -154,7 +155,9 @@ module type S = sig
 
   (** {2 High level operations} *)
 
+  val free_vars_set : t -> term_set (** Set of free variables *)
   val free_vars : t -> term list (** Set of free vars *)
+  val de_bruijn_set : t -> term_set  (** Set of De Bruijn indices that are not bound *)
 
   val close_forall : t -> t   (** Bind all free variables with forall *)
   val close_exists : t -> t   (** Bind all free variables with exists *)
@@ -203,6 +206,7 @@ end
 module type TERM = sig
   type t = private ScopedTerm.t
 
+  val of_term : ScopedTerm.t -> t option
   val of_term_exn : ScopedTerm.t -> t
 
   val ty : t -> Type.t
@@ -233,6 +237,7 @@ end
 
 module Make(MyT : TERM) = struct
   type term = MyT.t
+  type term_set = MyT.Set.t
 
   type t = ScopedTerm.t
 
@@ -555,10 +560,16 @@ module Make(MyT : TERM) = struct
 
   let is_ground f = T.ground f
 
-  let free_vars f =
-    Seq.vars f
-      |> Sequence.fold (fun set v -> MyT.Set.add v set) MyT.Set.empty
-      |> MyT.Set.elements
+  let free_vars_set f =
+      Seq.vars f
+        |> Sequence.fold (fun set v -> MyT.Set.add v set) MyT.Set.empty
+
+  let free_vars f = free_vars_set f |> MyT.Set.elements
+
+  let de_bruijn_set f =
+    T.DB.open_vars (f : t :> T.t)
+      |> Sequence.fmap MyT.of_term
+      |> Sequence.fold (fun acc t -> MyT.Set.add t acc) MyT.Set.empty
 
   let is_closed f =
     match free_vars f with
