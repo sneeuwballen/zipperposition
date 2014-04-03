@@ -185,6 +185,10 @@ let rec nnf f =
 let __eval_and_unshift env f =
   __reconvert (ST.DB.unshift 1 (ST.DB.eval env (f : F.t :> ST.t)))
 
+(* TODO: replace universally quantified vars by free vars
+ * only *after* the skolemization of the subformula is done.
+ * Skolemization should proceed from the leaves (alpha-equiv checking
+ * is trivial with De Bruijn indices) up to the root. *)
 let skolemize ~ctx f =
   let rec skolemize f = match F.view f with
   | F.And l -> F.Base.and_ (List.map skolemize l)
@@ -212,6 +216,82 @@ let skolemize ~ctx f =
     skolemize new_f'
   in
   skolemize f
+
+(* estimation for a number of clauses *)
+module Estimation = struct
+  type t =
+    | Exactly of int
+    | TooBig
+
+  let limit = 1_000_000
+
+  let lift2 op a b = match a, b with
+    | TooBig, _
+    | _, TooBig -> TooBig
+    | Exactly a, Exactly b ->
+        let c = op a b in
+        if c < 0 || c > limit then TooBig else Exactly c
+
+  let ( +/ ) = lift2 (+)
+  let ( */ ) = lift2 ( * )
+
+  let sum l = List.fold_left (+/) (Exactly 0) l
+  let prod l = List.fold_left ( */) (Exactly 1) l
+
+  (* comparison: is e > n? *)
+  let gt e n = match e with
+    | TooBig -> true
+    | Exactly e' -> e' > n
+end
+
+(* estimate the number of clauses needed by this formula. *)
+let estimate_num_clauses ~cache f =
+  let module E = Estimation in
+  (* recursive function.
+     @param pos true if the formula is positive, false if it's negated *)
+  let rec num pos f = 
+    try
+      F.Tbl.find cache f
+    with Not_found ->
+      (* compute *)
+      let n = match F.view f with
+        | F.Eq _
+        | F.Neq _
+        | F.Atom _
+        | F.True
+        | F.False -> E.Exactly 1
+        | F.Not f' -> num (not pos) f'
+        | F.And l ->
+            let l' = List.map (num pos) l in
+            if pos then E.sum l' else E.prod l'
+        | F.Or l ->
+            let l' = List.map (num pos) l in
+            if pos then E.prod l' else E.sum l'
+        | F.Imply (a,b) ->
+            if pos
+              then E.(num false a */ num true b)
+              else E.(num true a +/ num false b)
+        | F.Equiv(a,b) ->
+            if pos
+              then E.((num true a */ num false b) +/ (num false a */ num true b))
+              else E.((num true a */ num true b) +/ (num false a */ num false b))
+        | F.Xor(a,b) ->
+            (* a xor b is defined as  (not a) <=> b *)
+            if pos
+              then E.((num false a */ num false b) +/ (num true a */ num true b))
+              else E.((num false a */ num true b) +/ (num true a */ num false b))
+        | F.Forall (_, f')
+        | F.Exists (_, f') -> num pos f'
+      in
+      (* memoize *)
+      F.Tbl.add cache f n;
+      n
+  in
+  num true f
+
+(* introduce definitions for sub-formulas of [f], is needed *)
+let introduce_defs ~cache f =
+  f  (* TODO *)
 
 (* helper: reduction to cnf using De Morgan laws. Returns a list of list of
   atomic formulas *)
@@ -256,52 +336,64 @@ type clause = F.t list
 
 type options =
   | DistributeExists
+  | DisableRenaming
 
-(* Transform the clause into proper CNF; returns a list of clauses *)
-let cnf_of ?(opts=[]) ?(ctx=Skolem.create Signature.empty) f =
-  let f = F.flatten f in
-  Util.debug 4 "reduce %a to CNF..." F.pp f;
-  let clauses = if is_cnf f
-    then
-      match F.view f with
-      | F.Or l -> [l]  (* works because [f] flattened before *)
-      | F.False
-      | F.True
-      | F.Eq _
-      | F.Neq _
-      | F.Atom _ -> [[f]]
-      | F.Not f'  ->
-        begin match F.view f' with
-        | F.Eq (a,b) -> [[F.Base.neq a b]]
-        | F.Neq (a,b) -> [[F.Base.eq a b]]
-        | _ when F.is_atomic f' ->[[f]]
-        | _ -> failwith (Util.sprintf "should be atomic: %a" F.pp f')
-        end
-      | F.Equiv _
-      | F.Imply _
-      | F.Xor _
-      | F.And _
-      | F.Forall _
-      | F.Exists _ -> assert false
-    else begin
-      let f = F.simplify f in
-      Util.debug 4 "... simplified: %a" F.pp f;
-      let f = nnf f in
-      Util.debug 4 "... NNF: %a" F.pp f;
-      let distribute_exists = List.mem DistributeExists opts in
-      let f = miniscope ~distribute_exists f in
-      Util.debug 4 "... miniscoped: %a" F.pp f;
-      (* adjust the variable counter to [f] before skolemizing *)
-      Skolem.clear_var ~ctx;
-      F.iter (Skolem.update_var ~ctx) f;
-      let f = skolemize ~ctx f in
-      Util.debug 4 "... skolemized: %a" F.pp f;
-      let clauses = to_cnf f in
-      clauses
-    end
-  in
-  assert (List.for_all is_clause clauses);
-  clauses
-
+(* Transform the clauses into proper CNF; returns a list of clauses *)
 let cnf_of_list ?(opts=[]) ?(ctx=Skolem.create Signature.empty) l =
-  Util.list_flatmap (fun f -> cnf_of ~opts ~ctx f) l
+  let acc = ref [] in
+  let disable_renaming = List.mem DisableRenaming opts in
+  let cache = F.Tbl.create 128 in
+  List.iter (fun f ->
+    let f = F.flatten f in
+    Util.debug 4 "reduce %a to CNF..." F.pp f;
+    let clauses = if is_cnf f
+      then
+        match F.view f with
+        | F.Or l -> [l]  (* works because [f] flattened before *)
+        | F.False
+        | F.True
+        | F.Eq _
+        | F.Neq _
+        | F.Atom _ -> [[f]]
+        | F.Not f'  ->
+          begin match F.view f' with
+          | F.Eq (a,b) -> [[F.Base.neq a b]]
+          | F.Neq (a,b) -> [[F.Base.eq a b]]
+          | _ when F.is_atomic f' ->[[f]]
+          | _ -> failwith (Util.sprintf "should be atomic: %a" F.pp f')
+          end
+        | F.Equiv _
+        | F.Imply _
+        | F.Xor _
+        | F.And _
+        | F.Forall _
+        | F.Exists _ -> assert false
+      else begin
+        let f = F.simplify f in
+        Util.debug 4 "... simplified: %a" F.pp f;
+        let f = if disable_renaming
+          then f
+          else introduce_defs ~cache f
+        in
+        if disable_renaming
+          then Util.debug 4 "... introduced definitions: %a" F.pp f;
+        let f = nnf f in
+        Util.debug 4 "... NNF: %a" F.pp f;
+        let distribute_exists = List.mem DistributeExists opts in
+        let f = miniscope ~distribute_exists f in
+        Util.debug 4 "... miniscoped: %a" F.pp f;
+        (* adjust the variable counter to [f] before skolemizing *)
+        Skolem.clear_var ~ctx;
+        F.iter (Skolem.update_var ~ctx) f;
+        let f = skolemize ~ctx f in
+        Util.debug 4 "... skolemized: %a" F.pp f;
+        let clauses = to_cnf f in
+        clauses
+      end
+    in
+    assert (List.for_all is_clause clauses);
+    acc := List.rev_append clauses !acc
+  ) l;
+  !acc
+
+let cnf_of ?opts ?ctx f = cnf_of_list ?opts ?ctx [f]

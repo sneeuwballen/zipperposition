@@ -35,7 +35,9 @@ type ctx = {
   sc_prefix : string;
   mutable sc_gensym : int;              (* new symbols *)
   mutable sc_var_index : int;           (* fresh universal vars *)
-  mutable sc_fcache : (F.t * F.t) list;
+  mutable sc_fcache : (F.t * F.t) list; (* cache for skolemization *)
+  mutable sc_defs : (F.t * F.t) list;   (* formula definitions *)
+  mutable sc_new_defs : (F.t * F.t) list; (* pending definitions *)
   mutable sc_signature : Signature.t;
 }
 
@@ -47,6 +49,8 @@ let create ?(prefix="logtk_sk__") signature =
     sc_gensym = 0;
     sc_var_index = 0;
     sc_fcache = [];
+    sc_defs = [];
+    sc_new_defs = [];
     sc_signature = signature;
   } in
   ctx
@@ -107,11 +111,48 @@ let skolem_form ~ctx ~ty f =
           | Some f -> f)
     in
     ctx.sc_fcache <- (f, new_f) :: ctx.sc_fcache;
+    Util.debug 5 "skolemize %a using new term %a" F.pp f T.pp skolem_term;
     new_f
   with FoundFormVariant(f',new_f',subst) ->
     Util.debug 5 "form %a is variant of %a under %a" F.pp f' F.pp f S.pp subst;
     let renaming = S.Renaming.create () in
     let new_f = S.Form.apply ~renaming subst new_f' 1 in
     new_f
+
+let rename_form ?(ty=Type.TPTP.o) ~ctx f =
+  let ty_prop = ty in
+  try
+    List.iter
+      (fun (p, f') ->
+        Util.debug 5 "check variant %a and %a" F.pp f F.pp f';
+        match Unif.Form.variant f' 1 f 0 with
+        | KList.Nil -> ()
+        | KList.Cons (subst, _) ->
+          raise (FoundFormVariant (p, f', subst)))
+      ctx.sc_fcache;
+    (* ok, we have to introduce a new name *)
+    let vars = F.Seq.vars f |> T.Seq.add_set T.Set.empty |> T.Set.elements in
+    let ty_of_vars = List.map T.ty vars in
+    let ty = Type.(ty_prop <== ty_of_vars) in
+    let const = T.const ~ty (fresh_sym ~ctx ~ty) in
+    let p = F.Base.atom (T.app const vars) in
+    (* introduce new name for [f] *)
+    Util.debug 5 "define formula %a with %a" F.pp f F.pp p;
+    ctx.sc_defs <- (p, f) :: ctx.sc_defs;
+    ctx.sc_new_defs <- (p, f) :: ctx.sc_new_defs;
+    p
+  with FoundFormVariant (p, f', subst) ->
+    Util.debug 5 "form %a is variant of %a under %a, use def %a"
+      F.pp f F.pp f' S.pp subst F.pp p;
+    let renaming = S.Renaming.create () in
+    let new_f = S.Form.apply ~renaming subst p 1 in
+    new_f
+
+let all_definitions ~ctx = Sequence.of_list ctx.sc_defs
+
+let new_definitions ~ctx =
+  let l = ctx.sc_new_defs in
+  ctx.sc_new_defs <- [];
+  l
 
 let skolem_ho ~ctx ~ty f = failwith "Skolem_ho: not implemented"

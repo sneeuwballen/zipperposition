@@ -63,6 +63,23 @@ val skolem_form : ctx:ctx -> ty:Type.t -> Formula.FO.t -> Formula.FO.t
 
       @param ty the type of the De Bruijn variable to replace *)
 
+val rename_form : ?ty:Type.t -> ctx:ctx ->
+                  Formula.FO.t -> Formula.FO.t
+  (** [rename_form ~ctx f] returns a (possibly new) predicate for [f],
+      with the free variables of [f] as arguments. If some other formula
+      that is alpha-equivalent to [f] was defined, then the same name is
+      used.
+      @param ty the type of atomic propositions (default [Type.TPTP.o]) *)
+
+val all_definitions : ctx:ctx -> (Formula.FO.t * Formula.FO.t) Sequence.t
+  (** Definitions that were introduced so far. Each returned pair has
+      the form [p, f] where [p] is the renaming of [f] (hence [p]
+      is atomic). *)
+
+val new_definitions : ctx:ctx -> (Formula.FO.t * Formula.FO.t) list
+  (** Pop and return the list of pending (new) definitions. This modifies
+      [ctx], so those definitions will only be returned once! *)
+
 val skolem_ho : ctx:ctx -> ty:Type.t -> HOTerm.t -> HOTerm.t
   (** Skolemize a higher order term. Quite the same as {!skolem_form}.
       {b Not implemented} *)

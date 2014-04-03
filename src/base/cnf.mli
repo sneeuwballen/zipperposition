@@ -49,6 +49,7 @@ type clause = form list
 
 type options =
   | DistributeExists
+  | DisableRenaming
 
 val cnf_of : ?opts:options list -> ?ctx:Skolem.ctx ->
              form -> clause list
