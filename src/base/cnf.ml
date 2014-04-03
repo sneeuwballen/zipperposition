@@ -289,9 +289,32 @@ let estimate_num_clauses ~cache f =
   in
   num true f
 
-(* introduce definitions for sub-formulas of [f], is needed *)
-let introduce_defs ~cache f =
-  f  (* TODO *)
+type polarity =
+  [ `Pos
+  | `Neg
+  | `Both
+  ]
+
+(* TODO: introduce_defs!
+ * TODO: use it before NNF
+ * TODO: how to deal with definitions afterwards? careful not to
+     forget to actually define them, but they might need some renaming
+     underneath... Maybe it's better to call [introduce_defs] on
+     sub-formulas BEFORE renaming the formula itself (simplifies
+     a lot of things) *)
+
+(* introduce definitions for sub-formulas of [f], is needed. This might
+ * modify [ctx] by adding definitions to it, and it will {!NOT} introduce
+ * definitions in the definitions (that has to be done later). *)
+let introduce_defs ~ctx f =
+  let rec recurse ~polarity f =
+    (* first we check whether the formula is already defined! *)
+    if Skolem.has_definition ~ctx f
+    then Skolem.get_definition ~ctx ~polarity f
+    else match F.view f with
+      | _ -> assert false  (* TODO *)
+  in
+  recurse ~polarity:`Pos f
 
 (* helper: reduction to cnf using De Morgan laws. Returns a list of list of
   atomic formulas *)
@@ -373,9 +396,9 @@ let cnf_of_list ?(opts=[]) ?(ctx=Skolem.create Signature.empty) l =
         Util.debug 4 "... simplified: %a" F.pp f;
         let f = if disable_renaming
           then f
-          else introduce_defs ~cache f
+          else introduce_defs ~ctx f
         in
-        if disable_renaming
+        if not disable_renaming
           then Util.debug 4 "... introduced definitions: %a" F.pp f;
         let f = nnf f in
         Util.debug 4 "... NNF: %a" F.pp f;

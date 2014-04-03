@@ -29,9 +29,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 type ctx
   (** Context needed to create new symbols *)
 
-val create : ?prefix:string -> Signature.t ->  ctx
+val create : ?ty_prop:Type.t -> ?prefix:string -> Signature.t ->  ctx
   (** New skolem contex. A prefix can be provided, which will be
       added to all newly created skolem symbols.
+      @param ty_prop the type of atomic propositions (default {!Type.TPTP.o}).
       @param signature initial signature the context holds. *)
 
 val to_signature : ctx -> Signature.t
@@ -41,6 +42,8 @@ val to_signature : ctx -> Signature.t
 val fresh_sym : ctx:ctx -> ty:Type.t -> Symbol.t
   (** Just obtain a fresh skolem symbol. It is also declared
       in the inner signature. *)
+
+(** {2 Skolemization} *)
 
 val clear_var : ctx:ctx -> unit
   (** reset the variable counter (once a formula has been processed) *)
@@ -63,22 +66,49 @@ val skolem_form : ctx:ctx -> ty:Type.t -> Formula.FO.t -> Formula.FO.t
 
       @param ty the type of the De Bruijn variable to replace *)
 
-val rename_form : ?ty:Type.t -> ctx:ctx ->
-                  Formula.FO.t -> Formula.FO.t
+(** {2 Definitions of Formulas} *)
+
+type polarity =
+  [ `Pos
+  | `Neg
+  | `Both
+  ]
+
+type definition = {
+  form : Formula.FO.t;
+  proxy : Formula.FO.t;
+  polarity : polarity;
+}
+
+val has_definition : ctx:ctx -> Formula.FO.t -> bool
+  (** Does this formula already have a definition (in which case it's
+      very cheap to reduce it to CNF) *)
+
+val get_definition : ctx:ctx ->
+                      polarity:polarity ->
+                      Formula.FO.t -> Formula.FO.t
   (** [rename_form ~ctx f] returns a (possibly new) predicate for [f],
       with the free variables of [f] as arguments. If some other formula
       that is alpha-equivalent to [f] was defined, then the same name is
-      used.
-      @param ty the type of atomic propositions (default [Type.TPTP.o]) *)
+      used. This modifies the context to remember that [f] has a definition,
+      and which polarity it is used with.
 
-val all_definitions : ctx:ctx -> (Formula.FO.t * Formula.FO.t) Sequence.t
-  (** Definitions that were introduced so far. Each returned pair has
-      the form [p, f] where [p] is the renaming of [f] (hence [p]
-      is atomic). *)
+      {b NOTE}: we assume no free variable occurs in [f]. If any such variable
+      occurs, alpha-equivalent but distinct formulas will have different
+      names.
 
-val new_definitions : ctx:ctx -> (Formula.FO.t * Formula.FO.t) list
-  (** Pop and return the list of pending (new) definitions. This modifies
-      [ctx], so those definitions will only be returned once! *)
+      @return the atomic formula that stands for [f]. *)
+
+val all_definitions : ctx:ctx -> definition Sequence.t
+  (** Definitions that were introduced so far. *)
+
+val pop_new_definitions : ctx:ctx -> definition list
+  (** List of new definitions, that were introduced since the last
+     call to {!new_definitions}. The list can be obtained only once,
+     after which those definitions are not "new" anymore. *)
+
+val has_new_definitions : ctx:ctx -> bool
+  (** @return true if some new definitions were introduced. *)
 
 val skolem_ho : ctx:ctx -> ty:Type.t -> HOTerm.t -> HOTerm.t
   (** Skolemize a higher order term. Quite the same as {!skolem_form}.
