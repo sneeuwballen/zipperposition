@@ -252,8 +252,8 @@ module BalancedInt = struct
 
   let __z_opp = T.const ~ty:__ty1 (Symbol.of_string "z_opp")
   let __z_plus = T.const ~ty:__ty2 (Symbol.of_string "z_plus")
-  let __z_minus = T.const ~ty:__ty2 (Symbol.of_string "z_plus")
-  let __z_mult = T.const ~ty:__ty2 (Symbol.of_string "z_plus")
+  let __z_minus = T.const ~ty:__ty2 (Symbol.of_string "z_minus")
+  let __z_mult = T.const ~ty:__ty2 (Symbol.of_string "z_mult")
 
   let __b_true = T.const ~ty:__ty_bool (Symbol.of_string "b_true")
   let __b_false = T.const ~ty:__ty_bool (Symbol.of_string "b_false")
@@ -278,6 +278,8 @@ module BalancedInt = struct
         T.app __z_minus [convert_term a; convert_term b]
     | T.Const s, [a;b] when Symbol.eq s SA.product ->
         T.app __z_mult [convert_term a; convert_term b]
+    | T.Const s, [a] when Symbol.eq s SA.uminus ->
+        T.app __z_opp [convert_term a]
     | T.Const s, [a;b] when Symbol.eq s SA.less ->
         __mk_istrue (T.app __z_less [convert_term a; convert_term b])
     | T.Const s, [a;b] when Symbol.eq s SA.lesseq ->
