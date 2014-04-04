@@ -33,6 +33,7 @@ type symbol = Sym.t
 
 module type S = sig
   type term
+  type term_set
 
   type t = private ScopedTerm.t
 
@@ -121,6 +122,9 @@ module type S = sig
   val fold : ('a -> term -> 'a) -> 'a -> t -> 'a  (** Fold on terms *)
   val iter : (term -> unit) -> t -> unit
 
+  val map_shallow : (t -> t) -> t -> t
+    (** Apply the function to the immediate subformulas *)
+
   val map_depth: ?depth:int ->
                   (int -> term -> term) ->
                   t -> t
@@ -154,7 +158,9 @@ module type S = sig
 
   (** {2 High level operations} *)
 
+  val free_vars_set : t -> term_set (** Set of free variables *)
   val free_vars : t -> term list (** Set of free vars *)
+  val de_bruijn_set : t -> term_set  (** Set of De Bruijn indices that are not bound *)
 
   val close_forall : t -> t   (** Bind all free variables with forall *)
   val close_exists : t -> t   (** Bind all free variables with exists *)
@@ -203,6 +209,7 @@ end
 module type TERM = sig
   type t = private ScopedTerm.t
 
+  val of_term : ScopedTerm.t -> t option
   val of_term_exn : ScopedTerm.t -> t
 
   val ty : t -> Type.t
@@ -233,6 +240,7 @@ end
 
 module Make(MyT : TERM) = struct
   type term = MyT.t
+  type term_set = MyT.Set.t
 
   type t = ScopedTerm.t
 
@@ -446,6 +454,21 @@ module Make(MyT : TERM) = struct
 
   let iter f form = fold (fun () t -> f t) () form
 
+  let map_shallow func f = match view f with
+    | And l -> Base.and_ (List.map func l)
+    | Or l -> Base.or_ (List.map func l)
+    | Imply (f1, f2) -> Base.imply (func f1) (func f2)
+    | Equiv (f1, f2) -> Base.equiv (func f1) (func f2)
+    | Xor (f1, f2) -> Base.xor (func f1) (func f2)
+    | Not f' -> Base.not_ (func f')
+    | True
+    | False
+    | Atom _
+    | Eq _
+    | Neq _ -> f
+    | Forall (varty,f') -> Base.__mk_forall ~varty (func f')
+    | Exists (varty,f') -> Base.__mk_exists ~varty (func f')
+
   let rec map_depth ?(depth=0) f form = match view form with
     | And l -> Base.and_ (List.map (map_depth ~depth f) l)
     | Or l -> Base.or_ (List.map (map_depth ~depth f) l)
@@ -555,10 +578,16 @@ module Make(MyT : TERM) = struct
 
   let is_ground f = T.ground f
 
-  let free_vars f =
-    Seq.vars f
-      |> Sequence.fold (fun set v -> MyT.Set.add v set) MyT.Set.empty
-      |> MyT.Set.elements
+  let free_vars_set f =
+      Seq.vars f
+        |> Sequence.fold (fun set v -> MyT.Set.add v set) MyT.Set.empty
+
+  let free_vars f = free_vars_set f |> MyT.Set.elements
+
+  let de_bruijn_set f =
+    T.DB.open_vars (f : t :> T.t)
+      |> Sequence.fmap MyT.of_term
+      |> Sequence.fold (fun acc t -> MyT.Set.add t acc) MyT.Set.empty
 
   let is_closed f =
     match free_vars f with

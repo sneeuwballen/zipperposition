@@ -37,6 +37,7 @@ type symbol = Symbol.t
 
 module type S = sig
   type term
+  type term_set
 
   type t = private ScopedTerm.t
 
@@ -125,6 +126,9 @@ module type S = sig
   val fold : ('a -> term -> 'a) -> 'a -> t -> 'a  (** Fold on terms *)
   val iter : (term -> unit) -> t -> unit
 
+  val map_shallow : (t -> t) -> t -> t
+    (** Apply the function to the immediate subformulas *)
+
   val map_depth: ?depth:int ->
                   (int -> term -> term) ->
                   t -> t
@@ -158,7 +162,9 @@ module type S = sig
 
   (** {2 High level operations} *)
 
+  val free_vars_set : t -> term_set (** Set of free variables *)
   val free_vars : t -> term list (** Set of free vars *)
+  val de_bruijn_set : t -> term_set  (** Set of De Bruijn indices that are not bound *)
 
   val close_forall : t -> t   (** Bind all free variables with forall *)
   val close_exists : t -> t   (** Bind all free variables with exists *)
@@ -207,6 +213,7 @@ end
 module type TERM = sig
   type t = private ScopedTerm.t
 
+  val of_term : ScopedTerm.t -> t option
   val of_term_exn : ScopedTerm.t -> t
 
   val ty : t -> Type.t
@@ -235,10 +242,12 @@ module type TERM = sig
   end
 end
 
-module Make(MyT : TERM) : S with type term = MyT.t
+module Make(MyT : TERM) : S
+  with type term = MyT.t
+  and type term_set = MyT.Set.t
 
 module FO : sig
-  include S with type term = FOTerm.t
+  include S with type term = FOTerm.t and type term_set = FOTerm.Set.t
 
   (** {2 Conversion to higher-order term} *)
 

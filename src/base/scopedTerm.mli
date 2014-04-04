@@ -145,6 +145,9 @@ module DB : sig
   val contains : t -> int -> bool
     (** Does t contains the De Bruijn variable of index n? *)
 
+  val open_vars : t -> t Sequence.t
+    (** List of "open" De Bruijn variables (with too high an index) *)
+
   val shift : ?depth:int -> int -> t -> t
     (** shift the non-captured De Bruijn indexes in the term by n *)
 
