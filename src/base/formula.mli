@@ -126,6 +126,9 @@ module type S = sig
   val fold : ('a -> term -> 'a) -> 'a -> t -> 'a  (** Fold on terms *)
   val iter : (term -> unit) -> t -> unit
 
+  val map_shallow : (t -> t) -> t -> t
+    (** Apply the function to the immediate subformulas *)
+
   val map_depth: ?depth:int ->
                   (int -> term -> term) ->
                   t -> t

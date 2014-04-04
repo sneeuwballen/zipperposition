@@ -122,6 +122,9 @@ module type S = sig
   val fold : ('a -> term -> 'a) -> 'a -> t -> 'a  (** Fold on terms *)
   val iter : (term -> unit) -> t -> unit
 
+  val map_shallow : (t -> t) -> t -> t
+    (** Apply the function to the immediate subformulas *)
+
   val map_depth: ?depth:int ->
                   (int -> term -> term) ->
                   t -> t
@@ -450,6 +453,21 @@ module Make(MyT : TERM) = struct
       acc form
 
   let iter f form = fold (fun () t -> f t) () form
+
+  let map_shallow func f = match view f with
+    | And l -> Base.and_ (List.map func l)
+    | Or l -> Base.or_ (List.map func l)
+    | Imply (f1, f2) -> Base.imply (func f1) (func f2)
+    | Equiv (f1, f2) -> Base.equiv (func f1) (func f2)
+    | Xor (f1, f2) -> Base.xor (func f1) (func f2)
+    | Not f' -> Base.not_ (func f')
+    | True
+    | False
+    | Atom _
+    | Eq _
+    | Neq _ -> f
+    | Forall (varty,f') -> Base.__mk_forall ~varty (func f')
+    | Exists (varty,f') -> Base.__mk_exists ~varty (func f')
 
   let rec map_depth ?(depth=0) f form = match view form with
     | And l -> Base.and_ (List.map (map_depth ~depth f) l)

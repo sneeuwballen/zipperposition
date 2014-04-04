@@ -50,6 +50,7 @@ type clause = form list
 type options =
   | DistributeExists
   | DisableRenaming
+  | DefLimit of int  (* limit size above which names are used *)
 
 val cnf_of : ?opts:options list -> ?ctx:Skolem.ctx ->
              form -> clause list

@@ -29,6 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 type ctx
   (** Context needed to create new symbols *)
 
+(* TODO: a parameter to choose the prefix of proxy formulas *)
+
 val create : ?ty_prop:Type.t -> ?prefix:string -> Signature.t ->  ctx
   (** New skolem contex. A prefix can be provided, which will be
       added to all newly created skolem symbols.
@@ -42,6 +44,9 @@ val to_signature : ctx -> Signature.t
 val fresh_sym : ctx:ctx -> ty:Type.t -> Symbol.t
   (** Just obtain a fresh skolem symbol. It is also declared
       in the inner signature. *)
+
+val fresh_sym_with : ctx:ctx -> ty:Type.t -> string -> Symbol.t
+  (** Fresh symbol with a different name *)
 
 (** {2 Skolemization} *)
 
@@ -102,10 +107,17 @@ val get_definition : ctx:ctx ->
 val all_definitions : ctx:ctx -> definition Sequence.t
   (** Definitions that were introduced so far. *)
 
+val remove_def : ctx:ctx -> definition -> unit
+  (** remove the definition of [f], so that we're sure it will
+      never be used again *)
+
 val pop_new_definitions : ctx:ctx -> definition list
   (** List of new definitions, that were introduced since the last
      call to {!new_definitions}. The list can be obtained only once,
-     after which those definitions are not "new" anymore. *)
+     after which those definitions are not "new" anymore.
+
+     Will call {!remove_def} so there is no risk of re-using a definition
+     with a new polarity. *)
 
 val has_new_definitions : ctx:ctx -> bool
   (** @return true if some new definitions were introduced. *)

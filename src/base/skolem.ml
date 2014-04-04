@@ -71,14 +71,16 @@ let create ?(ty_prop=Type.TPTP.o) ?(prefix="logtk_sk__") signature =
 
 let to_signature ctx = ctx.sc_signature
 
-let fresh_sym ~ctx ~ty =
+let fresh_sym_with ~ctx ~ty prefix =
   let n = ctx.sc_gensym in
   ctx.sc_gensym <- n+1;
-  let s = Symbol.of_string (ctx.sc_prefix ^ string_of_int n) in
+  let s = Symbol.of_string (prefix ^ string_of_int n) in
   (* declare type of the new symbol *)
   ctx.sc_signature <- Signature.declare ctx.sc_signature s ty;
   Util.debug 5 "new skolem symbol %a with type %a" Symbol.pp s Type.pp ty;
   s
+
+let fresh_sym ~ctx ~ty = fresh_sym_with ~ctx ~ty ctx.sc_prefix
 
 (* update varindex in [ctx] so that it won't get captured in [t] *)
 let update_var ~ctx t =
@@ -141,6 +143,8 @@ let has_definition ~ctx f =
 let get_definition ~ctx ~polarity f =
   let ty_prop = ctx.sc_ty_prop in
   try
+    (* we only check alpha equivalence w.r.t the bound variables (De Bruijn)
+     * because it's simple and efficient. *)
     let def = F.Map.find f ctx.sc_defs in
     assert (T.Set.equal (F.free_vars_set f) (F.free_vars_set def.proxy));
     let def' = match polarity, def.polarity with
@@ -151,7 +155,7 @@ let get_definition ~ctx ~polarity f =
     in
     (* same name, no need to introduce a new def! But we need to remember
      * the polarity *)
-    ctx.sc_defs <- F.Map.add f def ctx.sc_defs;
+    ctx.sc_defs <- F.Map.add f def' ctx.sc_defs;
     def.proxy
   with Not_found ->
     (* ok, we have to introduce a new name. It will have all free variables
@@ -161,7 +165,7 @@ let get_definition ~ctx ~polarity f =
     let all_vars = vars @ bvars in
     let ty_of_vars = List.map T.ty all_vars in
     let ty = Type.(ty_prop <== ty_of_vars) in
-    let const = T.const ~ty (fresh_sym ~ctx ~ty) in
+    let const = T.const ~ty (fresh_sym_with ~ctx ~ty "proxy_logtk") in
     let p = F.Base.atom (T.app const all_vars) in
     (* introduce new name for [f] *)
     Util.debug 5 "define formula %a with %a" F.pp f F.pp p;
@@ -170,12 +174,16 @@ let get_definition ~ctx ~polarity f =
     ctx.sc_new_defs <- def :: ctx.sc_new_defs;
     p
 
+let remove_def ~ctx def =
+  ctx.sc_defs <- F.Map.remove def.form ctx.sc_defs
+
 let all_definitions ~ctx =
   F.Map.to_seq ctx.sc_defs
     |> Sequence.map snd
 
 let pop_new_definitions ~ctx =
   let l = ctx.sc_new_defs in
+  List.iter (remove_def ~ctx) l;
   ctx.sc_new_defs <- [];
   l
 
