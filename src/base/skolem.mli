@@ -82,7 +82,7 @@ type polarity =
 type definition = {
   form : Formula.FO.t;
   proxy : Formula.FO.t;
-  polarity : polarity;
+  polarity : polarity ref;
 }
 
 val has_definition : ctx:ctx -> Formula.FO.t -> bool
