@@ -411,6 +411,45 @@ module DB = struct
     | At (l,r) -> contains l n || contains r n
     | SimpleApp (_,l) -> List.exists (fun t' -> contains t' n) l
 
+  let open_vars t k =
+    let rec traverse ~depth t =
+      begin match t.ty with
+        | NoType -> ()
+        | HasType ty -> traverse ~depth ty
+      end;
+      match view t with
+      | BVar i when i >= depth ->
+          (* open variable, collect it *)
+          let ty = ty_exn t in
+          let v = bvar ~kind:t.kind ~ty (i-depth) in
+          k v
+      | BVar _
+      | Var _
+      | RigidVar _
+      | Const _ -> ()
+      | Bind (_, varty, t') ->
+          traverse ~depth varty;
+          traverse ~depth:(depth+1) t'
+      | Record (l, rest) ->
+          begin match rest with
+            | None -> ()
+            | Some r -> traverse ~depth r
+          end;
+          List.iter
+            (fun (_,t) -> traverse ~depth t) l
+      | SimpleApp (_, l)
+      | Multiset l ->
+          List.iter (traverse ~depth) l
+      | App (f, l) ->
+          traverse ~depth f;
+          List.iter (traverse ~depth) l
+      | At (l,r) ->
+          traverse ~depth l;
+          traverse ~depth r
+    in
+    traverse ~depth:0 t
+
+
   (* shift the non-captured De Bruijn indexes in the term by n *)
   let shift ?(depth=0) n t =
     (* traverse the term, looking for non-captured DB indexes.

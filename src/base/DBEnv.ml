@@ -35,6 +35,11 @@ let empty = { size=0; stack=[]; }
 
 let is_empty env = env.size = 0
 
+let make size = {
+  size;
+  stack = Util.list_range 0 size |> List.map (fun _ -> None);
+}
+
 let singleton x = { size=1; stack = [Some x]; }
 
 let push env x = {size=env.size+1; stack=(Some x) :: env.stack; }
@@ -53,3 +58,40 @@ let pop env =
 
 let find env n =
   if n < env.size then List.nth env.stack n else None
+
+let set env n x =
+  if n >= env.size then raise (Invalid_argument "DBEnv.set");
+  {env with stack= Util.list_set env.stack n (Some x); }
+
+let num_bindings db =
+  let rec count acc l = match l with
+    | [] -> acc
+    | None :: l' -> count acc l'
+    | Some _ :: l' -> count (1+acc) l'
+  in count 0 db.stack
+
+let map f db =
+  let stack = List.map
+    (function
+       | None -> None
+       | Some x -> Some (f x))
+    db.stack
+  in
+  { db with stack; }
+
+let of_list l =
+  let l = List.sort (fun (b1,v1) (b2,v2) -> b1 - b2) l in
+  (* fill env until it is of size n *)
+  let rec __fill env n =
+    if env.size = n then env
+    else __fill (push_none env) (n-1)
+  (* convert list into an env *)
+  and next env l = match l with
+    | [] -> env
+    | (db, v) :: l' ->
+        let env = __fill env db in
+        let env = push env v in
+        next env l'
+  in
+  next empty l
+

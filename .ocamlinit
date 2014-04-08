@@ -31,6 +31,7 @@ let (~<) = Symbol.of_string;;
 #install_printer ParseLocation.fmt;;
 #install_printer Precedence.fmt;;
 #install_printer Ordering.fmt;;
+#install_printer Position.fmt;;
 open Logtk.Sequence.Infix;;
 open Logtk.Type;;
 module F = Logtk.Formula;;

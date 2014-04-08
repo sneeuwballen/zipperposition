@@ -36,6 +36,9 @@ val empty : 'a t
 val is_empty : 'a t -> bool
   (** Are there bindings? *)
 
+val make : int -> 'a t
+  (** Empty environment of the given size *)
+
 val singleton : 'a -> 'a t
   (** Single binding *)
 
@@ -62,3 +65,16 @@ val size : 'a t -> int
 val find : 'a t -> int -> 'a option
   (** Find to which value the given De Bruijn index is bound to, or
       return None *)
+
+val set : 'a t -> int -> 'a -> 'a t
+  (** Set the [n]-th variable to the given objects.
+      @raise Invalid_argument if the index isn't in the range [0... size-1] *)
+
+val num_bindings : _ t -> int
+  (** How many variables are actually bound? *)
+
+val map : ('a -> 'b) -> 'a t -> 'b t
+  (** Map bound objects to other bound objects *)
+
+val of_list : (int * 'a) list -> 'a t
+  (** Map indices to objects *)
