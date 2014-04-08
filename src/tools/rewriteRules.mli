@@ -43,6 +43,6 @@ val rules_of_pairs : Signature.t ->
                      statement list ->
                      (Signature.t * rule list) Monad.Err.t
 (** Infer types and signature from a list of statements.
-   @returns typed rules and the new signature *)
+   @return typed rules and the new signature *)
 
 val print_rules : out_channel -> rule list -> unit

@@ -11,29 +11,44 @@ This project is licensed under the BSD2 license. See the `LICENSE` file.
 ## Regular build
 
 You will need OCaml >= 4.00.1 or higher with ocamlbuild,
-[menhir](http://cristal.inria.fr/~fpottier/menhir/) and the standard
-library. Some modules come from
-[containers](https://github.com/c-cube/ocaml-containers/) and are packaged with
+[zarith](https://forge.ocamlcore.org/projects/zarith/)
+and the standard library.
+
+Some modules come from
+[ocaml-containers](https://github.com/c-cube/ocaml-containers/) and are packaged with
 the library.
 
-An additional library, `logtk_meta`, can be built if you have
-[datalog](https://github.com/c-cube/datalog) installed. For instance:
+Additional sub-libraries can be built if their respective dependencies
+are met, and the appropriate `./configure --enable-foobar` flag was set.
+For instance, to build the *meta-prover* library (used to detect axiomatic
+theories), you should run
 
-    $ opam install datalog
     $ ./configure --enable-meta
 
-If you have installed [qcheck](https://github.com/c-cube/qcheck/), for instance
-via `opam install qcheck`, you can enable the property-based testing with
+If [menhir](http://cristal.inria.fr/~fpottier/menhir/) is installed, the
+parsers library `Logtk_parsers` can be built with
 
-    $ ./configure --enable-qcheck
+    $ ./configure --enable-parsers
+
+If you have installed [qcheck](https://github.com/c-cube/qcheck/), for instance
+via `opam install qcheck`, you can enable the property-based testing and
+random term generators with
+
+    $ ./configure --enable-qcheck --enable-tests
     $ make tests
 
-After the configuration is done, to build the library, documentation and tools,
-type in a terminal located in the root directory of the project:
+Several tools are shipped with `Logtk`, including a CNF converter, a type-checker,
+etc. They are built if the flag `--enable-tools` is set. Documentation
+will be built provided `--enable-docs` is set.
+
+After the configuration is done, to build the library, documentation and tools
+(given the appropriate flags are set), type in a terminal located in the root
+directory of the project:
 
     $ make
 
-If you use `ocamlfind` (which you should), installation/uninstallation are just:
+If you use `ocamlfind` (which is strongly recommended),
+installation/uninstallation are just:
 
     $ make install
     $ make uninstall
@@ -43,96 +58,75 @@ If you use `ocamlfind` (which you should), installation/uninstallation are just:
 Logtk provides several useful parts for logic-related implementations:
 
 - a library packed in a module `Logtk`, with terms, formulas, etc.;
-- small tools (see directory `tools/`) to illustrate how to use the library
+- small tools (see directory `src/tools/`) to illustrate how to use the library
     and provide basic services (type-checking, reduction to CNF, etc.);
-- an optional library in a module `Logtk_meta`, that depends on `Datalog`
+- an optional library in a module `Logtk_meta`,
     to provide reasoning at the problem level, about the presence of axiomatic
     theories. A small file describing a few theories can be found in
-    `data/builtin.theory`.
+    `data/builtin.theory` and one of the tools, `detect_theories`, can be
+    used straightforwardly.
 
 ## List of modules
 
-TODO UPDATE
-
-- Logic related modules:
+- `Logtk`
     - `Symbol`: representation of logical constants, including text symbols
         and numeric symbols (using `Zarith`).
-    - `FOTerm`: first-order typed terms
+    - `ScopedTerm`: common internal representation for terms, formulas, etc.
+        that handles De Bruijn indices, substitutions, and hashconsing.
+    - `PrologTerm`: the dual of `ScopedTerm`, an untyped AST with locations
+        but no hashconsing nor scoping.
+    - `FOTerm`: first-order typed terms (built on top of `ScopedTerm`)
     - `HOTerm`: higher-order typed terms
-    - `FOFormula`: first-order formulas (with typed terms)
-    - `Basic`: simple terms and formulas with locations and optional typing. Typically used after parsing. Contains:
-        - `Basic.Ty`: polymorphic types with quantifiers
-        - `Basic.FO`: first order terms
-        - `Basic.Form`: first order formulas
-        - `Basic.HO`: higher order terms
-    - `FOUnif`: unification algorithms on `FOTerm`
-    - `HOUnif`: unification algorithms on `HOTerm`
-    - `Substs`: variable substitutions for types and terms
+    - `Formula`: formulas parametrized by the terms at their leaves.
+        - `Formula.FO`: first-order formulas (with typed terms).
+    - `Type`: polymorphic types with explicit quantification, built on
+        top of `ScopedTerm`, used by `FOTerm` and `HOTerm`.
+    - `Unif`: unification algorithms, both unary and n-ary.
+        - `Unif.FO`: specialization for `FOTerm`
+        - similar sub-modules.
+    - `Substs`: substitutions on free variables for types and terms.
+    - `DBEnv`: De Bruijn environments for bound variables.
     - `Signature`: map from symbols to types
-    - `Type`: polymorphic types (à la ML). Operations on types include:
-        - `TypeUnif`: unification on types
-        - `TypeInference`: Hindley-Milner-like type inference algorithm.
-                           Converts untyped terms and formulas to typed terms and formulas
-        - `TypeErasure`: conversion from typed terms and formulas to basic ones
-        - `TypeConversion`: converts between `Basic.Ty.t` and `Type.t`
-    - `Precedence`: total order on symbols
-    - `Ordering`: orderings on terms
+    - `TypeInference`: Hindley-Milner-like type inference algorithm,
+        that converts `PrologTerm`s to typed terms and formulas.
+    - `Precedence`: total ordering on symbols.
+    - `Ordering`: orderings on terms, including LPO and KBO (parametrized
+        by `Precedence`).
     - `Position`: positions in terms (paths in trees)
-    - `Cnf`: transformation of formulas into Clause Normal Form
+    - `Cnf`: transformation of formulas into *Clause Normal Form*
     - `Index`: definition of term index signatures. Related modules:
         - `Dtree`: perfect discrimination tree, for rewriting
         - `NPDtree`: non-perfect discrimination tree, for rewriting and term indexing
         - `Fingerprint`: fingerprint term indexing
         - `FastFingerprint`: attempt (failed for now) to make `Fingerprint` faster
         - `FeatureVector`: feature-vector indexing for subsumption
-    - `Rewriting`: rewriting on terms, ordered rewriting, formula rewriting
-    - `FormulaShape`: detection of some specific formulas (definitions...)
-    - `Skolem`: skolemization
-    - `Lambda`: lambda-calculus (beta reduction) on higher-order terms
-    - `HO`: higher-order operations, including beta-reduction
+    - `Rewriting`: rewriting on terms, ordered rewriting, formula rewriting.
+    - `FormulaShape`: detection of some specific formulas (definitions...).
+    - `Skolem`: skolemization and definitional CNF.
+    - `Lambda`: lambda-calculus (beta reduction) on higher-order terms.
     - `Transform`: computation of fixpoints over transformations of formulas
     - `Multiset`: low level multiset of elements, with multiset ordering
-    - `Trace_tstp`: proof traces from TSTP provers
-    - `CallProver`: call a TSTP prover on a problem
     - `Congruence`: simple congruence closure on terms (decides ground equality)
-    - `Evaluator`: helps evaluating terms using interpreted symbols
-    - `DBEnv`: environment for substituting De Bruijn indices
-
-- Helpers:
-    - `Hash`: utils for hashing values
-    - `Hashcons`: perfect sharing of structurally equal values (terms...)
-    - `Util`: many utils on lists, printing, strings...
-    - `Monad`: monadic utils (error monad, list, option)
-    - `PartialOrder`: matrix representation of partial orderings, with completion
-    - `Options`: global CLI options to be used with `Arg` (set debug level, etc.)
-    - `Location`: location within a file
-    - `Comparison`: partial order
-    - `Interfaces`: many useful module interfaces
-    - `lib/MultiMap`: functional multimap
-    - `lib/PersistentHashtbl`: persistent (immutable) hashtable
-    - `lib/Sequence`: library of iterators
-    - `lib/Bencode`: B-encode serialization format
-    - `lib/Bij`: GADT-based serialization/deserialization library
-    - `lib/BV`: bitvectors
-    - `lib/Mixtbl`: heterogeneous hashtable
-
-- TPTP:
-    - `Lex_tptp`: TPTP syntax lexer
-    - `Parse_tptp`: TPTP syntax parser
-    - `Ast_tptp`: TPTP Abstract Syntax Tree
-    - `Util_tptp`: high-level API to deal with TPTP problems
-
-- Meta-prover (optional):
-    - `MetaPattern`: patterns, that stand for axioms in any signature
-    - `MetaReasoner`: type-safe encapsulation of a Datalog engine
-    - `MetaKB`: definition of lemmas, theories and axioms
-    - `MetaProver`: global state and main interface for the meta-prover
-    - `Ast_theory`: AST for theory description files
-    - `Lex_theory`: lexer for theory description files
-    - `Parse_theory`: parser for theory description files
-    - `Signal`: lightweight publish-subscribe pattern
-
-- Arbitrary instances (optional):
+    - and many helpers modules that can be found in `src/base/lib/`, including
+        locations, iterators, hashconsing, combinators, etc.
+- `Logtk_parsers` (optional)
+    * TPTP:
+        - `Trace_tstp`: proof traces from TSTP provers.
+        - `CallProver`: call a TSTP prover on a problem.
+        - `Parse_tptp`: TPTP parser
+        - `Lex_tptp`: TPTP lexer
+        - `Ast_tptp`: AST yielded by the parser
+        - `Util_tptp`: higher-level interface to the TPTP parser (the one to use)
+    * HO:
+        - `Parse_ho`: parser for a simple Higher-Order format
+        - `Lex_ho`: lexer for a simple Higher-Order format
+        - `Ast_ho`: AST yielded by `Parse_ho`
+- `Logtk_meta` (Meta-prover, optional):
+    - `Encoding`: encoding of formulas and terms into HO terms.
+    - `Reasoner`: forward-chaining reasoner on meta-level facts.
+    - `Plugin`: bridge between HO terms and their proof-level meaning.
+    - `Prover`: general interface to the meta-prover.
+- `Logtk_arbitrary` (random generators for `qcheck` random-testing, optional)
     - `ArTerm`: generation of random terms
     - `ArForm`: random first order formulas
     - `ArType`: random types
@@ -147,19 +141,12 @@ See [this page](http://cedeela.fr/~simon/software/logtk/).
 ## TODO
 
 - FOTerm:
-    - constructor Ty (Type.t -> Term.t) for easier type arguments
-    - allow partial application (see previous)
     - constructor HVar for hidden, possibly non hashconsed, vars that are only
         used to generate fresh variables (AC/HO unif) and disappear
         during renaming
-    - rename mk_node --> app
     - AC-normalize terms when head symbol is AC, at hashconsing time
 - HOTerm:
     - same as FOTerm: constructor Ty, constructor HVar
-    - careful with scoping of (Ty ty), De Bruijn should live in same space
-- basic:
-    - type to represent FO/HO terms and also types (factors many things)
-- symbol: flags used for hashconsing
 - AC-RPO
 
 - tool to print a trace as DOT
@@ -169,18 +156,8 @@ See [this page](http://cedeela.fr/~simon/software/logtk/).
 - consider moving the proof-checking part of tools/proof_check_tstp.ml
     to trace_tstp (can be used for embedded proof checking)
 
-- functor for unification (parametrized by term/subst and is_var/deref_var/can_unify
-    for specific optims like is_ground)
 - more functors (unif, but also CNF? rewriting? ordering? indexes)
-
-- typing in meta-prover, with typing preconditions (for expressing sets with types)
-    - OR: use untyped HO terms (or maybe hypergraph)
-    - OR: (untyped) hypergraph-rewriting based meta-prover
 
 - substitution trees
 - path indexing? (better for merges)
-
-- tool to maintain/update a KB
-- conditional compilation for parsers on menhir
-- think about extensibility of parser for meta-prover
 
