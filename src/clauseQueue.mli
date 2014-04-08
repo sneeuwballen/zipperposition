@@ -34,59 +34,64 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-(** A priority queue of clauses, purely functional *)
-type t
+(** {2 A priority queue of clauses, purely functional} *)
+module type S = sig
+  module C : Clause.S
 
-val add : t -> Clause.t -> t
-  (** Add a clause to the Queue *)
+  type t
 
-val adds : t -> Clause.t Sequence.t -> t
-  (** Add clauses to the queue *)
+  val add : t -> C.t -> t
+    (** Add a clause to the Queue *)
 
-val is_empty : t -> bool
-  (** check whether the queue is empty *)
+  val adds : t -> C.t Sequence.t -> t
+    (** Add clauses to the queue *)
 
-val take_first : t -> (t * Clause.t)
-  (** Take first element of the queue, or raise Not_found *)
+  val is_empty : t -> bool
+    (** check whether the queue is empty *)
 
-val clean : t -> Clause.CSet.t -> t
-  (** remove all clauses that are not in the set *)
+  val take_first : t -> (t * C.t)
+    (** Take first element of the queue, or raise Not_found *)
 
-val name : t -> string
-  (** Name of the implementation/role of the queue *)
+  val clean : t -> C.CSet.t -> t
+    (** remove all clauses that are not in the set *)
 
-val fifo : t
-  (** select by increasing age (for fairness) *)
+  val name : t -> string
+    (** Name of the implementation/role of the queue *)
 
-val clause_weight : t
-  (** select by increasing weight of clause *)
+  val fifo : t
+    (** select by increasing age (for fairness) *)
 
-val goals : t
-  (** only select goals (clauses with only negative lits) *)
+  val clause_weight : t
+    (** select by increasing weight of clause *)
 
-val non_goals : t
-  (** only select non-goals *)
+  val goals : t
+    (** only select goals (clauses with only negative lits) *)
 
-val ground : t
-  (** only select ground clauses *)
+  val non_goals : t
+    (** only select non-goals *)
 
-val pos_unit_clauses : t
-  (** only select positive unit clauses *)
+  val ground : t
+    (** only select ground clauses *)
 
-val horn : t
-  (** select horn clauses *)
+  val pos_unit_clauses : t
+    (** only select positive unit clauses *)
 
-val lemmas : t
-  (** only select lemmas *)
+  val horn : t
+    (** select horn clauses *)
 
-val mk_queue : ?accept:(Clause.t -> bool) -> weight:(Clause.t -> int) -> string -> t
-  (** Bring your own implementation of queue *)
+  val lemmas : t
+    (** only select lemmas *)
 
-val default_queues : (t * int) list
-  (** default combination of heuristics (TODO: array?) *)
+  val mk_queue : ?accept:(C.t -> bool) -> weight:(C.t -> int) -> string -> t
+    (** Bring your own implementation of queue *)
 
-val pp : Buffer.t -> t -> unit
-val to_string : t -> string
-val pp_list : Buffer.t -> (t * int) list -> unit
-val fmt : Format.formatter -> t -> unit
+  val default_queues : (t * int) list
+    (** default combination of heuristics (TODO: array?) *)
 
+  val pp : Buffer.t -> t -> unit
+  val to_string : t -> string
+  val pp_list : Buffer.t -> (t * int) list -> unit
+  val fmt : Format.formatter -> t -> unit
+end
+
+module Make(C : Clause.S) : S with module C = C
