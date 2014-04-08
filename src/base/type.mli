@@ -181,7 +181,7 @@ val size : t -> int
 val open_fun : t -> (t list * t)
   (** [open_fun ty] "unrolls" function arrows from the left, so that
       [open_fun (a -> (b -> (c -> d)))] returns [[a;b;c], d].
-      @returns the return type and the list of all its arguments *)
+      @return the return type and the list of all its arguments *)
 
 val apply : t -> t -> t
   (** Given a function/forall type, and an argument, return the
