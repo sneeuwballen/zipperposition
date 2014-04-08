@@ -303,12 +303,6 @@ let estimate_num_clauses ~cache ~pos f =
   in
   num pos f
 
-type polarity =
-  [ `Pos
-  | `Neg
-  | `Both
-  ]
-
 (* introduce definitions for sub-formulas of [f], is needed. This might
  * modify [ctx] by adding definitions to it, and it will {!NOT} introduce
  * definitions in the definitions (that has to be done later). *)
@@ -478,7 +472,7 @@ let simplify_and_rename ~ctx ~cache ~disable_renaming ~limit l =
   let defs = List.map
     (fun d ->
       (* introduce the required definition, with polarity as needed *)
-      let f = match d.Skolem.polarity with
+      let f = match !(d.Skolem.polarity) with
         | `Pos -> F.Base.imply d.Skolem.proxy d.Skolem.form
         | `Neg -> F.Base.imply d.Skolem.form d.Skolem.proxy
         | `Both -> F.Base.equiv d.Skolem.proxy d.Skolem.form

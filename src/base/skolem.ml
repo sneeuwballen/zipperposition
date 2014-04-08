@@ -40,7 +40,7 @@ type polarity =
 type definition = {
   form : Formula.FO.t;
   proxy : Formula.FO.t;
-  polarity : polarity;
+  polarity : polarity ref;
 }
 
 type ctx = {
@@ -147,15 +147,14 @@ let get_definition ~ctx ~polarity f =
      * because it's simple and efficient. *)
     let def = F.Map.find f ctx.sc_defs in
     assert (T.Set.equal (F.free_vars_set f) (F.free_vars_set def.proxy));
-    let def' = match polarity, def.polarity with
+    begin match polarity, !(def.polarity) with
       | `Pos, `Pos
       | `Neg, `Neg
-      | `Both, `Both -> def
-      | _ -> { def with polarity=`Both; }
-    in
-    (* same name, no need to introduce a new def! But we need to remember
-     * the polarity *)
-    ctx.sc_defs <- F.Map.add f def' ctx.sc_defs;
+      | `Both, `Both -> ()
+      | _ ->
+          def.polarity := `Both
+    end;
+    (* same name, no need to introduce a new def! *)
     def.proxy
   with Not_found ->
     (* ok, we have to introduce a new name. It will have all free variables
@@ -164,14 +163,29 @@ let get_definition ~ctx ~polarity f =
     let bvars = F.de_bruijn_set f |> T.Set.elements in
     let all_vars = vars @ bvars in
     let ty_of_vars = List.map T.ty all_vars in
+    (* build the proxy literal *)
     let ty = Type.(ty_prop <== ty_of_vars) in
     let const = T.const ~ty (fresh_sym_with ~ctx ~ty "proxy_logtk") in
     let p = F.Base.atom (T.app const all_vars) in
     (* introduce new name for [f] *)
     Util.debug 5 "define formula %a with %a" F.pp f F.pp p;
-    let def = {form=f; proxy=p; polarity; } in
+    let def = {form=f; proxy=p; polarity=ref polarity; } in
     ctx.sc_defs <- F.Map.add f def ctx.sc_defs;
-    ctx.sc_new_defs <- def :: ctx.sc_new_defs;
+    (* map bvars to fresh vars and evaluate [p] and [f] to remove them! *)
+    let env = bvars
+      |> List.map (fun db -> match T.view db with
+          | T.BVar i ->
+              let v = T.var ~ty:(T.ty db) (fresh_var ~ctx) in
+              i, (v : T.t :> ST.t)
+          | _ -> assert false)
+      |> DBEnv.of_list
+    in
+    let p' = ST.DB.eval env (p:F.t:>ST.t) |> F.of_term_exn in
+    let f' = ST.DB.eval env (f:F.t:>ST.t) |> F.of_term_exn in
+    (* the definition to introduce defines [p'] in function of [f'];
+     * they are similar to [p] and [f] but don't have De Bruijn indices *)
+    ctx.sc_new_defs <- {form=f'; proxy=p'; polarity=def.polarity; } :: ctx.sc_new_defs;
+    (* return proxy *)
     p
 
 let remove_def ~ctx def =
