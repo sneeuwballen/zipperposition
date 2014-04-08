@@ -33,7 +33,7 @@ type scope = Substs.scope
 type form = Formula.FO.t
 
 type t = private
-  | Equation of FOTerm.t * FOTerm.t * bool * Comparison.t
+  | Equation of FOTerm.t * FOTerm.t * bool
   | Prop of FOTerm.t * bool
   | True
   | False
@@ -62,7 +62,8 @@ val depth : t -> int                  (** depth of literal *)
 val is_pos : t -> bool                (** is the literal positive? *)
 val is_neg : t -> bool                (** is the literal negative? *)
 val equational : t -> bool            (** is the literal a proper equation? *)
-val orientation_of : t -> Comparison.t  (** get the orientation of the literal *)
+val orientation_of : ord:Ordering.t -> t ->
+                     Comparison.t     (** get the orientation of the literal *)
 
 val ineq_lit : spec:Theories.TotalOrder.t -> t -> Theories.TotalOrder.lit
   (** Assuming the literal is an inequation, returns the corresponding
@@ -89,9 +90,9 @@ val ineq_lit : spec:Theories.TotalOrder.t -> t -> Theories.TotalOrder.lit
 
 (** build literals. If sides so not have the same sort,
     a SortError will be raised. An ordering must be provided *)
-val mk_eq : ord:Ordering.t -> FOTerm.t -> FOTerm.t -> t
-val mk_neq : ord:Ordering.t -> FOTerm.t -> FOTerm.t -> t
-val mk_lit : ord:Ordering.t -> FOTerm.t -> FOTerm.t -> bool -> t
+val mk_eq : FOTerm.t -> FOTerm.t -> t
+val mk_neq : FOTerm.t -> FOTerm.t -> t
+val mk_lit : FOTerm.t -> FOTerm.t -> bool -> t
 val mk_prop : FOTerm.t -> bool -> t   (* proposition *)
 val mk_true : FOTerm.t -> t     (* true proposition *)
 val mk_false : FOTerm.t -> t    (* false proposition *)
@@ -100,18 +101,16 @@ val mk_absurd : t (* absurd literal, like ~ true *)
 
 val mk_less : Theories.TotalOrder.instance -> FOTerm.t -> FOTerm.t -> t
 val mk_lesseq : Theories.TotalOrder.instance -> FOTerm.t -> FOTerm.t -> t
-
-val reord : ord:Ordering.t -> t -> t      (** recompute order *)
-val lit_of_form : ord:Ordering.t -> form -> t (** translate eq/not to literal *)
+val lit_of_form : form -> t (** translate eq/not to literal *)
 val to_tuple : t -> (FOTerm.t * FOTerm.t * bool)
 val form_of_lit : t -> form
 val term_of_lit : t -> HOTerm.t                   (** translate lit to term *)
 
 val apply_subst : renaming:Substs.Renaming.t ->
-                  ord:Ordering.t -> Substs.t -> t -> scope -> t
+                  Substs.t -> t -> scope -> t
 
 val negate : t -> t                     (** negate literal *)
-val fmap : ord:Ordering.t -> (FOTerm.t -> FOTerm.t) -> t -> t (** fmap in literal *)
+val fmap : (FOTerm.t -> FOTerm.t) -> t -> t (** fmap in literal *)
 val add_vars : unit FOTerm.Tbl.t -> t -> unit  (** Add variables to the set *)
 val vars : t -> FOTerm.t list (** gather variables *)
 val var_occurs : FOTerm.t -> t -> bool
@@ -131,13 +130,13 @@ module Pos : sig
     (** Subterm at given position, or
         @raise Not_found if the position is invalid *)
 
-  val replace : ord:Ordering.t -> t -> at:Position.t -> by:FOTerm.t -> t
+  val replace : t -> at:Position.t -> by:FOTerm.t -> t
     (** Replace subterm, or
         @raise Invalid_argument if the position is invalid *)
 end
 
 val apply_subst_list : renaming:Substs.Renaming.t ->
-                       ord:Ordering.t -> Substs.t ->
+                       Substs.t ->
                        t list -> scope -> t list
 
 val symbols : t -> Symbol.Set.t
@@ -181,10 +180,9 @@ module Arr : sig
     (** Make a 'or' formula from literals *)
 
   val apply_subst : renaming:Substs.Renaming.t ->
-                    ord:Ordering.t -> Substs.t ->
-                    t array -> scope -> t array
+                    Substs.t -> t array -> scope -> t array
 
-  val fmap : ord:Ordering.t -> t array -> (FOTerm.t -> FOTerm.t) -> t array
+  val fmap : (FOTerm.t -> FOTerm.t) -> t array -> t array
 
   val pos : t array -> BV.t
   val neg : t array -> BV.t
@@ -196,7 +194,7 @@ module Arr : sig
   val to_seq : t array -> (FOTerm.t * FOTerm.t * bool) Sequence.t
     (** Convert the lits into a sequence of equations *)
 
-  val of_forms : ord:Ordering.t -> form list -> t array
+  val of_forms : form list -> t array
     (** Convert a list of atoms into literals *)
 
   val to_forms : t array -> form list
@@ -209,7 +207,7 @@ module Arr : sig
       (** Return the subterm at the given position, or
           @raise Not_found if no such position is valid *)
 
-    val replace : ord:Ordering.t -> t array -> at:Position.t -> by:FOTerm.t -> unit
+    val replace : t array -> at:Position.t -> by:FOTerm.t -> unit
       (** In-place modification of the array, in which the subterm at given
           position is replaced by the [by] term.
           @raise Invalid_argument if the position is not valid *)
@@ -246,15 +244,17 @@ module Arr : sig
     (** Fold over literals who satisfy [eligible]. The folded function
         is given the literal and its index. *)
 
-  val fold_eqn : ?both:bool -> ?sign:bool ->
+  val fold_eqn : ?both:bool -> ?sign:bool -> ord:Ordering.t ->
                   eligible:(int -> t -> bool) ->
                   t array -> 'a ->
                   ('a -> FOTerm.t -> FOTerm.t -> bool -> Position.t -> 'a) ->
                   'a
     (** fold f over all literals sides, with their positions.
         f is given (acc, left side, right side, sign, position of left side)
+        if [ord] is present, then only the max side of an oriented
+          equation will be visited, otherwise they will both be explored.
         if [both = true], then both sides of a non-oriented equation
-          will be visited.
+          will be visited, otherwise only one side.
         if [sign = true], then only positive equations are visited; if it's
           [false], only negative ones; if it's not defined, both. *)
 
@@ -268,7 +268,8 @@ module Arr : sig
         [eligible] is used to filter which literals to fold over (given
         the literal and its index). *)
 
-  val fold_terms : ?vars:bool -> which:[<`Max|`One|`Both] -> subterms:bool ->
+  val fold_terms : ?vars:bool -> which:[<`Max|`One|`Both] ->
+                   ord:Ordering.t -> subterms:bool ->
                    eligible:(int -> t -> bool) ->
                    t array -> 'a ->
                    ('a -> FOTerm.t -> Position.t -> 'a) ->

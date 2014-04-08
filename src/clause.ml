@@ -208,7 +208,7 @@ let create ?parents ?selected ~ctx lits proof =
   create_a ?parents ?selected ~ctx (Array.of_list lits) proof
 
 let create_forms ?parents ?selected ~ctx forms proof =
-  let lits = Lits.of_forms ~ord:ctx.Ctx.ord forms in
+  let lits = Lits.of_forms forms in
   create_a ?parents ?selected ~ctx lits proof
 
 let get_proof c = c.hcproof
@@ -224,34 +224,17 @@ let descendants c = c.hcdescendants
 
 (** Change the context of the clause *)
 let update_ctx ~ctx c =
-  let lits = Array.map (Lit.reord ~ord:(Ctx.ord ~ctx)) c.hclits in
+  let lits = c.hclits in
   let proof = Proof.adapt_c c.hcproof in
   let c' = create_a ~selected:c.hcselected ~ctx lits proof in
   c'
-
-(** check the ordering relation of lits (always true after reord_clause ~ord) *)
-let check_ord ~ord c =
-  assert (
-  Util.array_forall
-    (function 
-      | Lit.Equation (l,r,sign,o) as lit ->
-        let ok = o = Ordering.compare ord l r in
-        (if not ok then begin
-          Util.printf "Ord problem: literal %a, ord %s is not %s\n"
-            Lit.pp lit (Comparison.to_string o)
-            (Comparison.to_string (Ordering.compare ord l r))
-          end);
-        ok
-      | _ -> true)
-    c.hclits)
 
 (** Apply substitution to the clause. Note that using the same renaming for all
     literals is important. *)
 let apply_subst ~renaming subst c scope =
   let ctx = c.hcctx in
-  let ord = Ctx.ord ~ctx in
   let lits = Array.map
-    (fun lit -> Lit.apply_subst ~renaming ~ord subst lit scope)
+    (fun lit -> Lit.apply_subst ~renaming subst lit scope)
     c.hclits in
   let descendants = c.hcdescendants in
   let proof = Proof.adapt_c c.hcproof in
@@ -264,7 +247,7 @@ let apply_subst ~renaming subst c scope =
 let maxlits c scope subst =
   let ord = Ctx.ord c.hcctx in
   let renaming = Ctx.renaming_clear ~ctx:c.hcctx in
-  let lits = Lits.apply_subst ~ord ~renaming subst c.hclits scope in
+  let lits = Lits.apply_subst ~renaming subst c.hclits scope in
   Lits.maxlits ~ord lits
 
 (** Check whether the literal is maximal *)
@@ -278,7 +261,7 @@ let eligible_res c scope subst =
   let ord = Ctx.ord c.hcctx in
   let renaming = Ctx.renaming_clear ~ctx:c.hcctx in
   (* instantiate lits *)
-  let lits = Lits.apply_subst ~ord ~renaming subst c.hclits scope in
+  let lits = Lits.apply_subst ~renaming subst c.hclits scope in
   let selected = c.hcselected in
   let n = Array.length lits in
   (* Literals that may be eligible: all of them if none is selected,
@@ -317,7 +300,7 @@ let eligible_param c scope subst =
   if BV.is_empty c.hcselected then begin
     (* instantiate lits *)
     let renaming = Ctx.renaming_clear ~ctx:c.hcctx in
-    let lits = Lits.apply_subst ~ord ~renaming subst c.hclits scope in
+    let lits = Lits.apply_subst ~renaming subst c.hclits scope in
     (* maximal ones *)
     let bv = Lits.maxlits ~ord lits in
     (* only keep literals that are positive *)
@@ -330,7 +313,7 @@ let eligible_chaining c scope subst =
   let spec = Ctx.total_order c.hcctx in
   if BV.is_empty c.hcselected then begin
     let renaming = Ctx.renaming_clear ~ctx:c.hcctx in
-    let lits = Lits.apply_subst ~ord ~renaming subst c.hclits scope in
+    let lits = Lits.apply_subst ~renaming subst c.hclits scope in
     let bv = Lits.maxlits ~ord lits in
     (* only keep literals that are positive *)
     BV.filter bv (fun i -> Lit.is_pos lits.(i));
@@ -353,9 +336,16 @@ let is_unit_clause c = match c.hclits with
   | [|_|] -> true
   | _ -> false
 
-let is_oriented_rule c = match c.hclits with
-  | [| Lit.Equation (_,_,true,Comparison.Gt) |]
-  | [| Lit.Equation (_,_,true,Comparison.Lt) |] -> true (* oriented *)
+let is_oriented_rule c =
+  let ord = Ctx.ord c.hcctx in
+  match c.hclits with
+  | [| Lit.Equation (l, r, true) |] ->
+      begin match Ordering.compare ord l r with
+      | Comparison.Gt
+      | Comparison.Lt -> true
+      | Comparison.Eq
+      | Comparison.Incomparable -> false
+      end
   | _ -> false
 
 let symbols ?(init=Symbol.Set.empty) seq =
@@ -364,7 +354,7 @@ let symbols ?(init=Symbol.Set.empty) seq =
     init seq
 
 let from_forms ?(role="axiom") ~file ~name ~ctx forms =
-  let lits = Lits.of_forms ~ord:ctx.Ctx.ord forms in
+  let lits = Lits.of_forms forms in
   let proof c = Proof.mk_c_file ~role ~file ~name c in
   create_a ~ctx lits proof
 
@@ -392,7 +382,7 @@ module Eligible = struct
     fun i lit -> BV.get bv i
 
   let eq i lit = match lit with
-    | Lit.Equation (_, _, true, _) -> true
+    | Lit.Equation (_, _, true) -> true
     | _ -> false
 
   let ineq c =

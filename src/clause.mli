@@ -149,9 +149,6 @@ val descendants : t -> int SmallSet.t
 val update_ctx : ctx:Ctx.t -> t -> t
   (** Change the context of the clause *)
 
-val check_ord : ord:Ordering.t -> t -> unit
-  (** checks that the clause is up-to-date w.r.t. the ordering *)
-
 val apply_subst : renaming:Substs.Renaming.t -> Substs.t -> t -> scope -> t
   (** apply the substitution to the clause *)
 

@@ -54,8 +54,6 @@ let check_timeout = function
 
 (** One iteration of the main loop ("given clause loop") *)
 let given_clause_step ?(generating=true) ~env num =
-  let ctx = Env.ctx env in
-  let ord = Ctx.ord ctx in
   Util.debug 4 "env for next given loop: %a" Env.pp env;
   (* select next given clause *)
   match Env.next_passive ~env with
@@ -74,7 +72,6 @@ let given_clause_step ?(generating=true) ~env num =
       assert (not (Env.is_redundant ~env c));
       (* process the given clause! *)
       Util.incr_stat stat_processed_given;
-      C.check_ord ~ord c;
       Util.debug 2 "================= step %5d  ===============" num;
       Util.debug 1 "given: %a" C.pp c;
       (* find clauses that are subsumed by given in active_set *)

@@ -42,7 +42,6 @@ let stat_ac_redundant = Util.mk_stat "ac.redundant"
 type spec = Theories.AC.t
 
 let axioms ~ctx s ty =
-  let ord = Ctx.ord ~ctx in
   let ty_args_n, args_n = match Type.arity ty with
     | Type.Arity (i,j) -> i,j
     | Type.NoArity -> 0, 0
@@ -60,7 +59,7 @@ let axioms ~ctx s ty =
   let add_clause l r =
     let theories = [Util.sprintf "ac(%a)" Symbol.pp s] in
     let proof cc = Proof.mk_c_trivial ~theories cc in
-    let c = C.create ~ctx [ Lit.mk_eq ~ord l r ] proof in
+    let c = C.create ~ctx [ Lit.mk_eq l r ] proof in
     C.set_flag C.flag_persistent c true;
     res := c :: !res
   in
@@ -70,7 +69,7 @@ let axioms ~ctx s ty =
   add_clause (f x (f y z)) (f y (f x z));
   add_clause (f x (f y z)) (f z (f y x));
   !res
-  
+
 (** {2 Rules} *)
 
 let is_trivial_lit ~spec lit =
@@ -78,7 +77,7 @@ let is_trivial_lit ~spec lit =
   let is_ac = Theories.AC.is_ac ~spec in
   let module A = T.AC(struct let is_ac = is_ac let is_comm _ = false end) in
   match lit with
-  | Lit.Equation (l, r, true, _) -> A.eq l r
+  | Lit.Equation (l, r, true) -> A.eq l r
   | Lit.Equation _
   | Lit.Prop _
   | Lit.False -> false
@@ -99,7 +98,7 @@ let simplify ~spec ~ctx c =
   let lits = Array.to_list c.C.hclits in
   let lits = List.filter
     (fun lit -> match lit with
-    | Lit.Equation (l, r, false, _) -> not (A.eq l r)
+    | Lit.Equation (l, r, false) -> not (A.eq l r)
     | Lit.Equation _
     | Lit.Prop _
     | Lit.False

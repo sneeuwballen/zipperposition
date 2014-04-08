@@ -364,12 +364,12 @@ let rewrite ~env c =
   (* reduce every literal *)
   let lits' = Array.map
     (fun lit -> match lit with
-      | Lit.Equation (l, r, sign, _) ->
+      | Lit.Equation (l, r, sign) ->
         let l' = reduce_term env.rewrite_rules l
         and r' = reduce_term env.rewrite_rules r in
         if l == l' && r == r'
           then lit  (* same lit *)
-          else Lit.mk_lit ~ord:(Ctx.ord env.ctx) l' r' sign
+          else Lit.mk_lit l' r' sign
       | Lit.Prop (p, sign) ->
         let p' = reduce_term env.rewrite_rules p in
         if p == p'

@@ -115,21 +115,22 @@ module ActiveSet = struct
 
       (* apply operation [f] to some parts of [c] *)
       method update f c =
+        let ord = Ctx.ord c.C.hcctx in
         (* index subterms that can be rewritten by superposition *)
-        m_sup_into <- Lits.fold_terms ~which:`Max ~subterms:true
+        m_sup_into <- Lits.fold_terms ~ord ~which:`Max ~subterms:true
           ~eligible:(C.Eligible.res c) c.C.hclits m_sup_into
           (fun tree t pos ->
             let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
             f tree t with_pos);
         (* index terms that can rewrite into other clauses *)
-        m_sup_from <- Lits.fold_eqn ~both:true ~sign:true
+        m_sup_from <- Lits.fold_eqn ~ord ~both:true ~sign:true
           ~eligible:(C.Eligible.param c) c.C.hclits m_sup_from
           (fun tree l r sign pos ->
             assert sign;
             let with_pos = C.WithPos.({term=l; pos; clause=c;}) in
             f tree l with_pos);
         (* terms that can be demodulated: all subterms *)
-        m_back_demod <- Lits.fold_terms ~subterms:true ~which:`Both
+        m_back_demod <- Lits.fold_terms ~ord ~subterms:true ~which:`Both
           ~eligible:C.Eligible.always c.C.hclits m_back_demod
           (fun tree t pos ->
             let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
@@ -169,15 +170,21 @@ module SimplSet = struct
       remove : Clause.t Sequence.t -> unit;
     >
 
-  let apply op idx c = match c.C.hclits with
-    | [| Lit.Equation (l,r,true,Comparison.Gt) |] ->
-      op idx (l,r,true,c)
-    | [| Lit.Equation (l,r,true,Comparison.Lt) |] ->
-      op idx (r,l,true,c)
-    | [| Lit.Equation (l,r,true,Comparison.Incomparable) |] ->
-      let idx = op idx (l,r,true,c) in
-      op idx (r,l,true,c)
-    | [| Lit.Equation (l,r,false,_) |] ->
+  let apply op idx c =
+    let ord = Ctx.ord c.C.hcctx in
+    match c.C.hclits with
+    | [| Lit.Equation (l,r,true) |] ->
+        begin match Ordering.compare ord l r with
+        | Comparison.Gt ->
+          op idx (l,r,true,c)
+        | Comparison.Lt ->
+          op idx (r,l,true,c)
+        | Comparison.Incomparable ->
+          let idx = op idx (l,r,true,c) in
+          op idx (r,l,true,c)
+        | Comparison.Eq -> idx  (* no modif *)
+        end
+    | [| Lit.Equation (l,r,false) |] ->
       op idx (l,r,false,c)
     | [| Lit.Prop (p, sign) |] ->
       op idx (p,T.TPTP.true_,sign,c)
