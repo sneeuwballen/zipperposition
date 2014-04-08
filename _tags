@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 3411a7fd2a9b5903aeb1be1238437816)
+# DO NOT EDIT (digest: bc5b1e62958ffcb52af589878224fa88)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -33,17 +33,17 @@
 "src/pEnv.cmx": for-pack(Libzipperposition)
 "src/params.cmx": for-pack(Libzipperposition)
 "src/env.cmx": for-pack(Libzipperposition)
-"src/containers/lazyGraph.cmx": for-pack(Libzipperposition)
-"src/containers/leftistheap.cmx": for-pack(Libzipperposition)
-"src/containers/vector.cmx": for-pack(Libzipperposition)
-"src/containers/sequence.cmx": for-pack(Libzipperposition)
-"src/containers/smallSet.cmx": for-pack(Libzipperposition)
-"src/containers/unionFind.cmx": for-pack(Libzipperposition)
-<src/containers/*.ml{,i}>: package(dynlink)
-<src/containers/*.ml{,i}>: package(logtk)
-<src/containers/*.ml{,i}>: package(logtk.meta)
-<src/containers/*.ml{,i}>: package(unix)
-<src/containers/*.ml{,i}>: package(zarith)
+"src/lib/lazyGraph.cmx": for-pack(Libzipperposition)
+"src/lib/leftistheap.cmx": for-pack(Libzipperposition)
+"src/lib/vector.cmx": for-pack(Libzipperposition)
+"src/lib/sequence.cmx": for-pack(Libzipperposition)
+"src/lib/smallSet.cmx": for-pack(Libzipperposition)
+"src/lib/unionFind.cmx": for-pack(Libzipperposition)
+"src/lib/choice.cmx": for-pack(Libzipperposition)
+<src/lib/*.ml{,i}>: package(dynlink)
+<src/lib/*.ml{,i}>: package(logtk)
+<src/lib/*.ml{,i}>: package(unix)
+<src/lib/*.ml{,i}>: package(zarith)
 # Library libzipperposition_meta
 "src/meta/libzipperposition_meta.cmxs": use_libzipperposition_meta
 <src/meta/*.ml{,i}>: package(dynlink)

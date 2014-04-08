@@ -21,16 +21,16 @@ Flag "meta"
   Default:      false
 
 Library "libzipperposition"
-  Path: src/
-  Pack: true
-  Modules:  ClauseQueue, Clause, Const, Extensions,
-            Literal, CompactClause, Ctx, Proof, ProofState,
-            Saturate, Selection, Superposition, PFormula, Theories, AC,
-            PEnv, Params, Env
-  InternalModules:  containers/LazyGraph, containers/Leftistheap,
-                    containers/Vector, containers/Sequence, containers/SmallSet,
-                    containers/UnionFind
-  BuildDepends: unix,zarith,logtk,logtk.meta,dynlink
+  Path:             src/
+  Pack:             true
+  Modules:          ClauseQueue, Clause, Const, Extensions,
+                    Literal, CompactClause, Ctx, Proof, ProofState,
+                    Saturate, Selection, Superposition, PFormula, Theories, AC,
+                    PEnv, Params, Env
+  InternalModules:  lib/LazyGraph, lib/Leftistheap,
+                    lib/Vector, lib/Sequence, lib/SmallSet,
+                    lib/UnionFind, lib/Choice
+  BuildDepends:     unix,zarith,logtk,dynlink
 
 Library "libzipperposition_meta"
   Path:             src/meta/

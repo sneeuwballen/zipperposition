@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: a8eca4b5ba4c9381fe913eef7d5990ea)
+# DO NOT EDIT (digest: 687fbecf46e6e3428545e1844b0062e3)
 ClauseQueue
 Clause
 Const
@@ -18,10 +18,11 @@ AC
 PEnv
 Params
 Env
-containers/LazyGraph
-containers/Leftistheap
-containers/Vector
-containers/Sequence
-containers/SmallSet
-containers/UnionFind
+lib/LazyGraph
+lib/Leftistheap
+lib/Vector
+lib/Sequence
+lib/SmallSet
+lib/UnionFind
+lib/Choice
 # OASIS_STOP
