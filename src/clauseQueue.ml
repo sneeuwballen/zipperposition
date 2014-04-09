@@ -98,7 +98,7 @@ module type S = sig
 end
 
 module Make(C : Clause.S) = struct
-  module C = Clause
+  module C = C
 
   let empty_heap =
     let leq (i1, c1) (i2, c2) = i1 <= i2 || (i1 = i2 && C.id c1 <= C.id c2) in
@@ -182,20 +182,22 @@ module Make(C : Clause.S) = struct
   let non_goals =
     (* check whether a literal is a goal *)
     let is_goal_lit lit = Lit.is_neg lit in
-    let is_non_goal_clause c = Util.array_forall (fun x -> not (is_goal_lit x)) c.C.hclits in
+    let is_non_goal_clause c = Util.array_forall
+      (fun x -> not (is_goal_lit x))
+      (C.lits c) in
     let name = "prefer_non_goals" in
     mk_queue ~accept:is_non_goal_clause ~weight:(fun c -> C.weight c * C.length c) name
 
   let pos_unit_clauses =
-    let is_unit_pos c = match c.C.hclits with
+    let is_unit_pos c = match C.lits c with
     | [| lit |] when Lit.is_pos lit -> true
     | _ -> false
     in
     let name = "prefer_pos_unit_clauses" in
-    mk_queue ~accept:is_unit_pos ~weight:(fun c -> C.weigth c * C.length c) name
+    mk_queue ~accept:is_unit_pos ~weight:(fun c -> C.weight c * C.length c) name
 
   let horn =
-    let accept c = Lit.is_horn c.C.hclits in
+    let accept c = Lit.is_horn (C.lits c) in
     let name = "prefer_horn" in
     mk_queue ~accept ~weight:(fun c -> C.weight c * C.length c) name
 

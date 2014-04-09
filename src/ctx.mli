@@ -41,6 +41,8 @@ module type S = sig
 
   val set_selection_fun : Selection.t -> unit
 
+  val set_ord : Ordering.t -> unit
+
   val skolem : Skolem.ctx
 
   val signature : unit -> Signature.t
@@ -96,4 +98,8 @@ module type S = sig
 end
 
 (** {2 Create a new context} *)
-module Make(Dummy : sig end) : S
+module Make(X : sig
+  val signature : Signature.t
+  val ord : Ordering.t
+  val select : Selection.t
+end) : S

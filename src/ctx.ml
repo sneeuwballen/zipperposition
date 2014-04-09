@@ -38,8 +38,12 @@ module type S = sig
   val ord : unit -> Ordering.t
   (** current ordering on terms *)
 
-  val select : unit -> Selection.t
+  val selection_fun : unit -> Selection.t
   (** selection function for clauses *)
+
+  val set_selection_fun : Selection.t -> unit
+
+  val set_ord : Ordering.t -> unit
 
   val skolem : Skolem.ctx
 
@@ -95,16 +99,22 @@ module type S = sig
   end
 end
 
-module Make(Dummy : sig end) : S = struct
-  let _ord = ref Ordering.none
-  let _select = ref Selection.no_select
-  let _signature = ref Signature.empty
+module Make(X : sig
+  val signature : Signature.t
+  val ord : Ordering.t
+  val select : Selection.t
+end) : S = struct
+  let _ord = ref X.ord
+  let _select = ref X.select
+  let _signature = ref X.signature
   let _complete = ref true
 
   let skolem = Skolem.create ~prefix:"zsk" Signature.empty
   let renaming = S.Renaming.create ()
   let ord () = !_ord
-  let select () = !_select
+  let set_ord o = _ord := o
+  let selection_fun () = !_select
+  let set_selection_fun s = _select := s
   let signature () = !_signature
   let complete () = !_complete
 
@@ -116,9 +126,9 @@ module Make(Dummy : sig end) : S = struct
     if !_complete then Util.debug 1 "completeness is lost";
     _complete := false
 
-  let is_completeness_preserved () = complete
+  let is_completeness_preserved = complete
 
-  let add_signature ~ctx signature =
+  let add_signature signature =
     _signature := Signature.merge !_signature signature;
     _ord := !_signature
       |> Signature.Seq.to_seq
@@ -129,7 +139,9 @@ module Make(Dummy : sig end) : S = struct
   let declare symb ty =
     _signature := Signature.declare !_signature symb ty
 
-  let renaming_clear () = S.Renaming.clear renaming
+  let renaming_clear () =
+    S.Renaming.clear renaming;
+    renaming
 
   module Theories = struct
     let ac = Theories.AC.create ()
@@ -143,16 +155,22 @@ module Make(Dummy : sig end) : S = struct
         Theories.TotalOrder.find ~spec less
       with Not_found ->
         let instance = Theories.TotalOrder.add ~spec ?proof ~less ~lesseq in
-        (* declare missing symbols, if any; also take care that
-          less and lesseq have the same type, which is, a binary predicate 
-          FIXME check types?
-        if not (Signature.mem ctx.signature less) || not (Signature.mem ctx.signature lesseq)
-          then failwith "Ctx.add_order: order symbols must be declared";
-        let ty_less = Signature.find ctx.signature less in
-        let ty_lesseq = Signature.find ctx.signature lesseq in
-        if not (Type.eq ty_less ty_lesseq)
-          then TypeUnif.fail Substs.Ty.empty ty_less 0 ty_lesseq 0;
-        *)
+        let ty_less = Signature.find !_signature less in
+        let ty_lesseq = Signature.find !_signature lesseq in
+        begin match ty_less, ty_lesseq with
+        | Some ty1, Some ty2 ->
+          if not (Type.eq ty1 ty2)
+            then raise (Type.Error (Util.sprintf
+              "ordering predicates %a and %a have distinct types %a and %a"
+              Symbol.pp less Symbol.pp lesseq Type.pp ty1 Type.pp ty2))
+            else ()
+        | None, _ ->
+          failwith (Util.sprintf
+            "add_order: type of symbol %a must be declared" Symbol.pp less)
+        | _, None ->
+          failwith (Util.sprintf
+            "add_order: type of symbol %a must be declared" Symbol.pp lesseq)
+        end;
         instance
 
     let add_tstp_order () =
@@ -171,3 +189,4 @@ module Make(Dummy : sig end) : S = struct
         let instance = Theories.TotalOrder.add ~spec ?proof:None ~less ~lesseq in
         instance
   end
+end

@@ -100,9 +100,6 @@ module type S = sig
   val get_active : unit -> C.t Sequence.t
     (** Active clauses *)
 
-  val get_simpl : unit -> C.t Sequence.t
-    (** Cs that can be used for simplification (unit clauses, mostly) *)
-
   val add_binary_inf : string -> binary_inf_rule -> unit
     (** Add a binary inference rule *)
 
@@ -224,5 +221,4 @@ end
 module Make(X : sig
   module Ctx : Ctx.S
   val params : Params.t
-  val signature : Signature.t
 end) : S with module Ctx = X.Ctx

@@ -42,7 +42,7 @@ and keepalive =
 let nop_handler x = ContinueListening
 
 let create () =
-  let s = { 
+  let s = {
     n = 0;
     handlers = Array.create 3 nop_handler;
     alive = NotAlive;
@@ -51,8 +51,9 @@ let create () =
 
 (* remove handler at index i *)
 let remove s i =
-  (if i < s.n - 1  (* erase handler with the last one *)
-    then s.handlers.(i) <- s.handlers.(s.n - 1));
+  assert (s.n > 0 && i >= 0);
+  if i < s.n - 1  (* erase handler with the last one *)
+    then s.handlers.(i) <- s.handlers.(s.n - 1);
   s.handlers.(s.n - 1) <- nop_handler; (* free handler *)
   s.n <- s.n - 1;
   ()
@@ -61,9 +62,9 @@ let send s x =
   for i = 0 to s.n - 1 do
     while
       begin try match s.handlers.(i) x with
-      | ContinueListening -> true
-      | StopListening -> false
-      with _ -> false
+      | ContinueListening -> false  (* keep *)
+      | StopListening -> true
+      with _ -> true
       end
     do
       remove s i  (* i-th handler is done, remove it *)
@@ -72,12 +73,12 @@ let send s x =
 
 let on s f =
   (* resize handlers if needed *)
-  (if s.n = Array.length s.handlers
+  if s.n = Array.length s.handlers
     then begin
       let handlers = Array.create (s.n + 4) nop_handler in
       Array.blit s.handlers 0 handlers 0 s.n;
       s.handlers <- handlers
-    end);
+    end;
   s.handlers.(s.n) <- f;
   s.n <- s.n + 1
 

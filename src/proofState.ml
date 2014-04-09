@@ -41,303 +41,282 @@ module PB = Position.Build
 module CQ = ClauseQueue
 module TO = Theories.TotalOrder
 
-let prof_add_active = Util.mk_profiler "proofState.add_active"
-let prof_remove_active = Util.mk_profiler "proofState.remove_active"
-let prof_add_passive = Util.mk_profiler "proofState.add_passive"
 let prof_next_passive = Util.mk_profiler "proofState.next_passive"
 let prof_clean_passive = Util.mk_profiler "proofState.clean_passive"
-let prof_add_simpl = Util.mk_profiler "proofState.add_simpl"
-let prof_remove_simpl = Util.mk_profiler "proofState.remove_simpl"
 
 let stat_passive_cleanup = Util.mk_stat "cleanup of passive set"
 
-(* module TermIndex = Fingerprint.Make(C.WithPos) *)
-module TermIndex = NPDtree.MakeTerm(C.WithPos)
-
-module UnitIndex = NPDtree.Make(struct
-  type t = T.t * T.t * bool * C.t
-  type rhs = T.t
-  let compare (t11,t12,s1,c1) (t21,t22,s2,c2) =
-    Util.lexicograph_combine [T.cmp t11 t21; T.cmp t12 t22;
-                              compare s1 s2; C.compare c1 c2]
-  let extract (t1,t2,sign,_) = t1, t2, sign
-  let priority (_,_,_,c) =
-    if C.is_oriented_rule c then 2 else 1
-end)
-
-module SubsumptionIndex = FeatureVector.Make(struct
-  type t = C.t
-  let cmp = C.compare
-  let to_lits = C.to_seq
-end)
-
-(* XXX: no customization of indexing for now
-let _indexes =
-  let table = Hashtbl.create 2 in
-  let mk_fingerprint fp = 
-    Fingerprint.mk_index ~cmp:Clauses.compare_clause_pos fp in
-  Hashtbl.add table "fp" (mk_fingerprint Fingerprint.fp6m);
-  Hashtbl.add table "fp7m" (mk_fingerprint Fingerprint.fp7m);
-  Hashtbl.add table "fp16" (mk_fingerprint Fingerprint.fp16);
-  table
-*)
-
 (** {2 Set of active clauses} *)
+module type S = sig
+  module Ctx : Ctx.S
+  module C : Clause.S
 
-module ActiveSet = struct
-  type t = 
-    < ctx : Ctx.t;
-      clauses : Clause.CSet.t;          (** set of active clauses *)
-      idx_sup_into : TermIndex.t;       (** index for superposition into the set *)
-      idx_sup_from : TermIndex.t;       (** index for superposition from the set *)
-      idx_back_demod : TermIndex.t;     (** index for backward demodulation/simplifications *)
-      idx_fv : SubsumptionIndex.t;      (** index for subsumption *)
+  module CQueue : ClauseQueue.S with module C = C
+  (** Priority queues on clauses *)
 
-      add : Clause.t Sequence.t -> unit;   (** add clauses *)
-      remove : Clause.t Sequence.t -> unit;(** remove clauses *)
-    >
+  (** {6 Useful Index structures} *)
 
-  let create ~ctx signature =
-    (* create a FeatureVector index from the current signature *)
-    let idx = SubsumptionIndex.of_signature signature in
-    (object (self)
-      val mutable m_clauses = C.CSet.empty
-      val mutable m_sup_into = TermIndex.empty ()
-      val mutable m_sup_from = TermIndex.empty ()
-      val mutable m_back_demod = TermIndex.empty ()
-      val mutable m_fv = idx
-      method ctx = ctx
-      method clauses = m_clauses
-      method idx_sup_into = m_sup_into
-      method idx_sup_from = m_sup_from
-      method idx_back_demod = m_back_demod
-      method idx_fv = m_fv
+  module TermIndex : Index.TERM_IDX with type elt = C.WithPos.t
+  module UnitIndex : Index.UNIT_IDX
+    with type E.t = (FOTerm.t * FOTerm.t * bool * C.t)
+    and type E.rhs = FOTerm.t
+  module SubsumptionIndex : Index.SUBSUMPTION_IDX with type C.t = C.t
 
-      (* apply operation [f] to some parts of [c] *)
-      method update f c =
-        let ord = Ctx.ord c.C.hcctx in
-        (* index subterms that can be rewritten by superposition *)
-        m_sup_into <- Lits.fold_terms ~ord ~which:`Max ~subterms:true
-          ~eligible:(C.Eligible.res c) c.C.hclits m_sup_into
-          (fun tree t pos ->
-            let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
-            f tree t with_pos);
-        (* index terms that can rewrite into other clauses *)
-        m_sup_from <- Lits.fold_eqn ~ord ~both:true ~sign:true
-          ~eligible:(C.Eligible.param c) c.C.hclits m_sup_from
-          (fun tree l r sign pos ->
-            assert sign;
-            let with_pos = C.WithPos.({term=l; pos; clause=c;}) in
-            f tree l with_pos);
-        (* terms that can be demodulated: all subterms *)
-        m_back_demod <- Lits.fold_terms ~ord ~subterms:true ~which:`Both
-          ~eligible:C.Eligible.always c.C.hclits m_back_demod
-          (fun tree t pos ->
-            let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
-            f tree t with_pos);
-        ()
+  (** {6 Common Interface for Sets} *)
 
-      (** add clauses (only process the ones not present in the set) *)
-      method add cs =
-        Util.enter_prof prof_add_active;
-        let cs = Sequence.filter (fun c -> not (C.CSet.mem m_clauses c)) cs in
-        let cs = Sequence.persistent cs in
-        m_clauses <- C.CSet.of_seq m_clauses cs;
-        Sequence.iter (self#update TermIndex.add) cs;
-        m_fv <- SubsumptionIndex.add_seq m_fv cs;
-        Util.exit_prof prof_add_active
+  module type CLAUSE_SET = sig
+    val on_add_clause : C.t Signal.t
+    (** signal triggered when a clause is added to the set *)
 
-      (** remove clauses (only process the ones present in the set) *)
-      method remove cs =
-        Util.enter_prof prof_remove_active;
-        let cs = Sequence.filter (C.CSet.mem m_clauses) cs in
-        let cs = Sequence.persistent cs in
-        m_clauses <- C.CSet.remove_seq m_clauses cs;
-        Sequence.iter (self#update TermIndex.remove) cs;
-        m_fv <- SubsumptionIndex.remove_seq m_fv cs;
-        Util.exit_prof prof_remove_active
-    end :> t)
-end
+    val on_remove_clause : C.t Signal.t
+    (** signal triggered when a clause is removed from the set *)
 
-(** {2 Set of simplifying (unit) clauses} *)
+    val add : C.t Sequence.t -> unit
+    (** Add clauses to the set *)
 
-module SimplSet = struct
-  type t =
-    < ctx : Ctx.t;
-      idx_simpl : UnitIndex.t;      (** index for forward simplifications *)
-
-      add : Clause.t Sequence.t -> unit;
-      remove : Clause.t Sequence.t -> unit;
-    >
-
-  let apply op idx c =
-    let ord = Ctx.ord c.C.hcctx in
-    match c.C.hclits with
-    | [| Lit.Equation (l,r,true) |] ->
-        begin match Ordering.compare ord l r with
-        | Comparison.Gt ->
-          op idx (l,r,true,c)
-        | Comparison.Lt ->
-          op idx (r,l,true,c)
-        | Comparison.Incomparable ->
-          let idx = op idx (l,r,true,c) in
-          op idx (r,l,true,c)
-        | Comparison.Eq -> idx  (* no modif *)
-        end
-    | [| Lit.Equation (l,r,false) |] ->
-      op idx (l,r,false,c)
-    | [| Lit.Prop (p, sign) |] ->
-      op idx (p,T.TPTP.true_,sign,c)
-    | _ -> idx
-
-  (** Create a simplification set *)
-  let create ~ctx =
-    object
-      val mutable m_simpl = UnitIndex.empty ()
-      method ctx = ctx
-      method idx_simpl = m_simpl
-
-      method add cs =
-        Util.enter_prof prof_add_simpl;
-        let cs = Sequence.filter C.is_unit_clause cs in
-        m_simpl <- Sequence.fold (apply UnitIndex.add) m_simpl cs;
-        Util.exit_prof prof_add_simpl
-
-      method remove cs =
-        Util.enter_prof prof_remove_simpl;
-        let cs = Sequence.filter C.is_unit_clause cs in
-        m_simpl <- Sequence.fold (apply UnitIndex.remove) m_simpl cs;
-        Util.exit_prof prof_remove_simpl
-    end
-end
-
-(** {2 Set of passive clauses} *)
-
-module PassiveSet = struct
-  type t =
-    < ctx : Ctx.t;
-      clauses : Clause.CSet.t;           (** set of clauses *)
-      queues : (ClauseQueue.t * int) list;
-
-      add : Clause.t Sequence.t -> unit;   (** add clauses *)
-      remove : int -> unit;               (** remove clause by ID *)
-      next : unit -> Clause.t option;      (** next passive clause, if any *)
-      clean : unit -> unit;               (** cleanup internal queues *)
-    >
-
-  let create ~ctx queues =
-    assert (queues != []);
-    let length = List.length queues in
-    object
-      val mutable m_clauses = C.CSet.empty
-      val m_queues = Array.of_list queues
-      val mutable m_state = (0,0)
-      method ctx = ctx
-      method clauses = m_clauses
-      method queues = Array.to_list m_queues
-
-      (** add clauses (not already present in set) to the set *)
-      method add cs =
-        Util.enter_prof prof_add_passive;
-        let cs = Sequence.filter (fun c -> not (C.CSet.mem m_clauses c)) cs in
-        let cs = Sequence.persistent cs in
-        m_clauses <- C.CSet.of_seq m_clauses cs;
-        for i = 0 to length - 1 do
-          (* add to i-th queue *)
-          let (q, w) = m_queues.(i) in
-          m_queues.(i) <- (CQ.adds q cs, w)
-        done;
-        Util.exit_prof prof_add_passive
-
-      (** remove clauses (not from the queues) *)
-      method remove id =
-        m_clauses <- C.CSet.remove_id m_clauses id
-
-      (** next clause *)
-      method next () =
-        Util.enter_prof prof_next_passive;
-        let first_idx, w = m_state in
-        (* search in the idx-th queue *)
-        let rec search idx weight =
-          let q, w = m_queues.(idx) in
-          if weight >= w || CQ.is_empty q
-          then next_idx (idx+1) (* empty queue, go to the next one *)
-          else begin
-            let new_q, c = CQ.take_first q in (* pop from this queue *)
-            m_queues.(idx) <- new_q, w;
-            if C.CSet.mem m_clauses c
-              then begin (* done, found a still-valid clause *)
-                Util.debug 3 "taken clause from %s" (CQ.name q);
-                m_clauses <- C.CSet.remove m_clauses c;
-                m_state <- (idx, weight+1);
-                Some c
-              end else search idx weight
-          end
-        (* search the next non-empty queue *)
-        and next_idx idx =
-          if idx = first_idx then None (* all queues are empty *)
-          else if idx = length then next_idx 0 (* cycle *)
-          else search idx 0 (* search in this queue *)
-        in
-        let res = search first_idx w in
-        Util.exit_prof prof_next_passive;
-        res
-
-      (* cleanup the clause queues *)
-      method clean () =
-        Util.enter_prof prof_clean_passive;
-        Util.incr_stat stat_passive_cleanup;
-        for i = 0 to length - 1 do
-          let q, w = m_queues.(i) in
-          m_queues.(i) <- CQ.clean q m_clauses, w
-        done;
-        Util.exit_prof prof_clean_passive
-    end
-end
-
-(** {2 Proof State} *)
-
-type t =
-  < ctx : Ctx.t;
-    params : Params.t;
-    simpl_set : SimplSet.t;              (** index for forward demodulation *)
-    active_set : ActiveSet.t;            (** active clauses *)
-    passive_set : PassiveSet.t;          (** passive clauses *)
-  >
-
-let create ~ctx params signature =
-  let queues = ClauseQueue.default_queues in
-  object
-    val m_active = (ActiveSet.create ~ctx signature :> ActiveSet.t)
-    val m_passive = (PassiveSet.create ~ctx queues :> PassiveSet.t)
-    val m_simpl = (SimplSet.create ~ctx :> SimplSet.t)
-    method ctx = ctx
-    method params = params
-    method active_set = m_active
-    method passive_set = m_passive
-    method simpl_set = m_simpl
+    val remove : C.t Sequence.t -> unit
+    (** Remove clauses from the set *)
   end
 
-type stats = int * int * int (* num passive, num active, num simplification *)
+  module ActiveSet : sig
+    include CLAUSE_SET
 
-let stats (state : t) =
-  ( C.CSet.size state#active_set#clauses
-  , C.CSet.size state#passive_set#clauses
-  , UnitIndex.size state#simpl_set#idx_simpl)
+    val clauses : unit -> C.CSet.t
+    (** Current set of clauses *)
+  end
 
-let pp buf state =
-  let num_active, num_passive, num_simpl = stats state in
-  Printf.bprintf buf
-    "state {%d active clauses; %d passive_clauses; %d simplification_rules; %a}"
-    num_active num_passive num_simpl
-    CQ.pp_list state#passive_set#queues
+  module SimplSet : CLAUSE_SET
 
-let debug buf state =
-  let num_active, num_passive, num_simpl = stats state in
-  Printf.bprintf buf
-    ("state {%d active clauses; %d passive_clauses; %d simplification_rules; %a" ^^
-      "\nactive:%a\npassive:%a\n}")
-    num_active num_passive num_simpl
-    CQ.pp_list state#passive_set#queues
-    C.pp_set state#active_set#clauses
-    C.pp_set state#passive_set#clauses
+  module PassiveSet : sig
+    include CLAUSE_SET
+
+    val remove_by_id : int Sequence.t -> unit
+    (** Remove clauses by their ID *)
+
+    val clauses : unit -> C.CSet.t
+    (** Current set of clauses *)
+
+    val queues : (CQueue.t * int) Sequence.t
+    (** Current state of the clause queues *)
+
+    val add_queue : CQueue.t -> int -> unit
+    (** Add a new queue to the set of queues *)
+
+    val clean : unit -> unit
+    (** Clean clause queues (remove clauses that are no longer passive, but
+        still in the queue) *)
+
+    val next : unit -> C.t option
+    (** Get-and-remove the next passive clause to process *)
+  end
+
+  (** {6 Misc} *)
+
+  type stats = int * int * int
+    (** statistics on the state (num active, num passive, num simplification) *)
+
+  val stats : unit -> stats
+    (** Compute statistics *)
+
+  val pp : Buffer.t -> unit -> unit
+    (** pretty print the content of the state *)
+
+  val debug : Buffer.t -> unit -> unit
+    (** debug functions: much more detailed printing *)
+end
+
+module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
+  module Ctx = C.Ctx
+  module C = C
+
+  module CQueue = ClauseQueue.Make(C)
+
+  (* module TermIndex = Fingerprint.Make(C.WithPos) *)
+  module TermIndex = NPDtree.MakeTerm(C.WithPos)
+
+  module UnitIndex = NPDtree.Make(struct
+    type t = T.t * T.t * bool * C.t
+    type rhs = T.t
+    let compare (t11,t12,s1,c1) (t21,t22,s2,c2) =
+      Util.lexicograph_combine [T.cmp t11 t21; T.cmp t12 t22;
+                                compare s1 s2; C.compare c1 c2]
+    let extract (t1,t2,sign,_) = t1, t2, sign
+    let priority (_,_,_,c) =
+      if C.is_oriented_rule c then 2 else 1
+  end)
+
+  module SubsumptionIndex = FeatureVector.Make(struct
+    type t = C.t
+    let cmp = C.compare
+    let to_lits = C.Seq.eqns
+  end)
+
+  (* XXX: no customization of indexing for now
+  let _indexes =
+    let table = Hashtbl.create 2 in
+    let mk_fingerprint fp = 
+      Fingerprint.mk_index ~cmp:Clauses.compare_clause_pos fp in
+    Hashtbl.add table "fp" (mk_fingerprint Fingerprint.fp6m);
+    Hashtbl.add table "fp7m" (mk_fingerprint Fingerprint.fp7m);
+    Hashtbl.add table "fp16" (mk_fingerprint Fingerprint.fp16);
+    table
+  *)
+
+  (** {6 Common Interface for Sets} *)
+
+  module type CLAUSE_SET = sig
+    val on_add_clause : C.t Signal.t
+    (** signal triggered when a clause is added to the set *)
+
+    val on_remove_clause : C.t Signal.t
+    (** signal triggered when a clause is removed from the set *)
+
+    val add : C.t Sequence.t -> unit
+    (** Add clauses to the set *)
+
+    val remove : C.t Sequence.t -> unit
+    (** Remove clauses from the set *)
+  end
+
+  module MakeClauseSet(X : sig end) = struct
+    let _clauses = ref C.CSet.empty
+
+    let on_add_clause = Signal.create ()
+
+    let on_remove_clause = Signal.create ()
+
+    let clauses () = !_clauses
+
+    let add seq =
+      seq (fun c ->
+        if not (C.CSet.mem !_clauses c)
+        then begin
+          _clauses := C.CSet.add !_clauses c;
+          Signal.send on_add_clause c
+        end);
+      ()
+
+    let remove seq =
+      seq (fun c ->
+        if C.CSet.mem !_clauses c
+        then begin
+          _clauses := C.CSet.remove !_clauses c;
+          Signal.send on_remove_clause c
+        end);
+      ()
+  end
+
+  (** {2 Sets} *)
+
+  module ActiveSet = MakeClauseSet(struct end)
+
+  module SimplSet = struct
+    let on_add_clause = Signal.create ()
+    let on_remove_clause = Signal.create ()
+    let add seq =
+      seq (fun c -> Signal.send on_add_clause c)
+    let remove seq =
+      seq (fun c -> Signal.send on_remove_clause c)
+  end
+
+  module PassiveSet = struct
+    include MakeClauseSet(struct end)
+
+    let _queues = ref (Array.of_list CQueue.default_queues)
+    let _state = ref (0,0)
+
+    let () =
+      assert (Array.length !_queues > 0);
+      ()
+
+    let remove_by_id seq =
+      _clauses := C.CSet.remove_id_seq !_clauses seq;
+      ()
+
+    let queues k =
+      Array.iter (fun (q,coeff) -> k (q,coeff)) !_queues
+
+    let add_queue q coeff =
+      (* add all clauses to the queue *)
+      let q = C.CSet.fold !_clauses q (fun q _ c -> CQueue.add q c) in
+      _queues := Array.of_list ((q, coeff) :: Array.to_list !_queues)
+
+    let clean () =
+      Util.enter_prof prof_clean_passive;
+      Util.incr_stat stat_passive_cleanup;
+      for i = 0 to Array.length (!_queues) - 1 do
+        let q, w = (!_queues).(i) in
+        (!_queues).(i) <- CQueue.clean q !_clauses, w
+      done;
+      Util.exit_prof prof_clean_passive
+
+    let next () =
+      Util.enter_prof prof_next_passive;
+      let first_idx, w = !_state in
+      (* search in the idx-th queue *)
+      let rec search idx weight =
+        let q, w = (!_queues).(idx) in
+        if weight >= w || CQueue.is_empty q
+        then next_idx (idx+1) (* empty queue, go to the next one *)
+        else begin
+          let new_q, c = CQueue.take_first q in (* pop from this queue *)
+          (!_queues).(idx) <- new_q, w;
+          if C.CSet.mem !_clauses c
+            then begin (* done, found a still-valid clause *)
+              Util.debug 3 "taken clause from %s" (CQueue.name q);
+              remove (Sequence.singleton c);
+              _state := (idx, weight+1);
+              Some c
+            end
+            else search idx weight
+        end
+      (* search the next non-empty queue *)
+      and next_idx idx =
+        if idx = first_idx then None (* all queues are empty *)
+        else if idx = Array.length !_queues then next_idx 0 (* cycle *)
+        else search idx 0 (* search in this queue *)
+      in
+      let res = search first_idx w in
+      Util.exit_prof prof_next_passive;
+      res
+
+    (* register to signal *)
+    let () =
+      Signal.on on_add_clause
+        (fun c ->
+          for i = 0 to Array.length (!_queues) - 1 do
+            (* add to i-th queue *)
+            let q, w = !_queues.(i) in
+            (!_queues).(i) <- (CQueue.add q c, w)
+          done;
+          Signal.ContinueListening);
+      ()
+  end
+
+  type stats = int * int * int
+  (* num passive, num active, num simplification *)
+
+  let stats () =
+    ( C.CSet.size (ActiveSet.clauses ())
+    , C.CSet.size (PassiveSet.clauses ())
+    , 0)
+
+  let pp buf state =
+    let num_active, num_passive, num_simpl = stats state in
+    Printf.bprintf buf
+      "state {%d active clauses; %d passive_clauses; %d simplification_rules; %a}"
+      num_active num_passive num_simpl
+      CQueue.pp_list (PassiveSet.queues |> Sequence.to_list)
+
+  let debug buf state =
+    let num_active, num_passive, num_simpl = stats state in
+    Printf.bprintf buf
+      ("state {%d active clauses; %d passive_clauses; %d simplification_rules; %a" ^^
+        "\nactive:%a\npassive:%a\n}")
+      num_active num_passive num_simpl
+      CQueue.pp_list (PassiveSet.queues |> Sequence.to_list)
+      C.pp_set (ActiveSet.clauses ())
+      C.pp_set (PassiveSet.clauses ())
+
+end
+

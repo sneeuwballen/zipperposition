@@ -85,8 +85,15 @@ type load_result =
 val dyn_load : string -> load_result
   (** Try to load the extension located in the given file *)
 
-val apply : env:(module Env.S) -> t -> unit
+val apply_env : env:(module Env.S) -> t -> unit
   (** Apply the extension to the Env, adding rules, modifying the env
       in place. *)
 
-val apply_list : env:(module Env.S) -> t list -> unit
+val apply_penv : penv:PEnv.t -> t -> unit
+  (** Apply the extension to the PEnv *)
+
+val extensions : unit -> t list
+  (** All currently available extensions *)
+
+val by_name : string -> t option
+  (** Get an extension by its name, if any *)

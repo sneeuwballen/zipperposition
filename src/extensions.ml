@@ -31,19 +31,56 @@ open Logtk
 
 module T = FOTerm
 
+(** {2 Type Definitions} *)
+
+module type ACTION = sig
+  module Env : Env.S
+
+  type action =
+    | Ext_general of (unit -> unit)
+    | Ext_binary_inf_rule of string * Env.binary_inf_rule
+    | Ext_unary_inf_rule of string * Env.unary_inf_rule
+    | Ext_signal_incompleteness  (** with extension, prover is incomplete *)
+    | Ext_term_rewrite of string * (FOTerm.t -> FOTerm.t)
+    | Ext_lit_rewrite of string * (Literal.t -> Literal.t)
+    | Ext_simplification_rule of (Env.C.t -> Env.C.t)
+    (** Action that can be performed by an extension *)
+end
+
+module MakeAction(Env : Env.S) = struct
+  module Env = Env
+
+  type action =
+    | Ext_general of (unit -> unit)
+    | Ext_binary_inf_rule of string * Env.binary_inf_rule
+    | Ext_unary_inf_rule of string * Env.unary_inf_rule
+    | Ext_signal_incompleteness  (** with extension, prover is incomplete *)
+    | Ext_term_rewrite of string * (FOTerm.t -> FOTerm.t)
+    | Ext_lit_rewrite of string * (Literal.t -> Literal.t)
+    | Ext_simplification_rule of (Env.C.t -> Env.C.t)
+    (** Action that can be performed by an extension *)
+end
+
+module type S = sig
+  include ACTION
+
+  val actions : action list
+end
+
+module type ENV_TO_S =
+  functor (Env : Env.S) -> S with module Env = Env
+
+type penv_action =
+  | Ext_penv_do of (PEnv.t -> unit)
+
 type t = {
   name : string;
-  actions : action list;
-} (** An extension *)
-and action =
-  | Ext_general of (Env.t -> unit)
-  | Ext_binary_inf_rule of string * Env.binary_inf_rule
-  | Ext_unary_inf_rule of string * Env.unary_inf_rule
-  | Ext_signal_incompleteness  (** with extension, prover is incomplete *)
-  | Ext_term_rewrite of string * (T.t -> T.t)
-  | Ext_lit_rewrite of string * (ctx:Ctx.t -> Literal.t -> Literal.t)
-  | Ext_simplification_rule of (Clause.t -> Clause.t)
-  (** Action that can be performed by an extension *)
+  penv_actions : penv_action list;
+  make : (module ENV_TO_S);
+} (** An extension is a named first-class functor that works
+      over any {!Env.S} *)
+
+(** {2 Registration} *)
 
 type load_result =
   | Ext_success of t
@@ -52,9 +89,17 @@ type load_result =
 
 let (__current : load_result ref) = ref (Ext_failure "could not load plugin")
 
+let _extensions = Hashtbl.create 11
+
 (* TODO: use a mutex? *)
 
 let register self =
+  (* register by name, if loading succeeded *)
+  if not (Hashtbl.mem _extensions self.name)
+  then begin
+    Util.debug 1 "register extension %s..." self.name;
+    Hashtbl.replace _extensions self.name self
+  end;
   __current := Ext_success self
 
 let dyn_load filename =
@@ -75,20 +120,34 @@ let dyn_load filename =
   current
 
 (** Apply the extension to the Env.t *)
-let apply ~env ext =
+let apply_env ~env ext =
+  let module Env = (val env : Env.S) in
+  let module MakePlugin = (val ext.make : ENV_TO_S) in
+  let module Plugin = MakePlugin(Env) in
   let apply_action action = match action with
-  | Ext_general f -> f env
-  | Ext_binary_inf_rule (name, r) -> Env.add_binary_inf ~env name r
-  | Ext_unary_inf_rule (name, r) -> Env.add_unary_inf ~env name r
-  | Ext_signal_incompleteness -> Ctx.lost_completeness (Env.ctx env)
-  | Ext_term_rewrite (name, rule) ->  (* add rewrite rule *)
-    Env.add_rewrite_rule ~env name rule
-  | Ext_lit_rewrite (name, rule) ->
-    Env.add_lit_rule ~env name rule
-  | Ext_simplification_rule r ->  (* add simplifcation rule *)
-    Env.add_simplify ~env r
+    | Plugin.Ext_general f -> f ()
+    | Plugin.Ext_binary_inf_rule (name, r) -> Env.add_binary_inf name r
+    | Plugin.Ext_unary_inf_rule (name, r) -> Env.add_unary_inf name r
+    | Plugin.Ext_signal_incompleteness -> Env.Ctx.lost_completeness ()
+    | Plugin.Ext_term_rewrite (name, rule) ->  (* add rewrite rule *)
+      Env.add_rewrite_rule name rule
+    | Plugin.Ext_lit_rewrite (name, rule) ->
+      Env.add_lit_rule name rule
+    | Plugin.Ext_simplification_rule r ->  (* add simplifcation rule *)
+      Env.add_simplify r
   in
-  List.iter apply_action ext.actions
+  List.iter apply_action Plugin.actions
 
-let apply_list ~env l =
-  List.iter (apply ~env) l
+let apply_penv ~penv ext =
+  List.iter
+    (function Ext_penv_do f -> f penv)
+    ext.penv_actions
+
+let extensions () =
+  Sequence.of_hashtbl _extensions
+    |> Sequence.map snd
+    |> Sequence.to_rev_list
+
+let by_name name =
+  try Some (Hashtbl.find _extensions name)
+  with Not_found -> None

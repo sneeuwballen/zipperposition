@@ -121,7 +121,7 @@ module type S = sig
                        Formula.FO.t list -> t
     (** Construction from formulas as axiom (initial clause) *)
 
-  val get_proof : t -> Proof.t
+  val proof : t -> Proof.t
     (** Extract its proof from the clause *)
 
   val stats : unit -> (int*int*int*int*int*int)
@@ -378,13 +378,11 @@ module Make(Ctx : Ctx.S) = struct
 
   let compact c = Lits.compact c.hclits
 
-  let to_seq c =
-    Lits.to_seq c.hclits
-
-  let terms c =
-    Lits.terms c.hclits
-
   let is_ground c = get_flag flag_ground c
+
+  let weight c = Lits.weight c.hclits
+
+  let lits c = c.hclits
 
   module CHashtbl = Hashtbl.Make(struct
     type t = clause
@@ -439,7 +437,7 @@ module Make(Ctx : Ctx.S) = struct
   module CHashcons = Hashcons.Make(struct
     type t = clause
     let hash c = Lits.hash c.hclits
-    let equal c1 c2 = Lits.eq_com c1.hclits c2.hclits && c1.hcctx == c2.hcctx
+    let equal c1 c2 = Lits.eq_com c1.hclits c2.hclits
     let tag i c = (assert (c.hctag = (-1)); c.hctag <- i)
   end)
 
@@ -448,7 +446,7 @@ module Make(Ctx : Ctx.S) = struct
   (** Build a new hclause from the given literals.
       If there are more than [BV.max_len] literals,
       the prover becomes incomplete by returning [true] instead. *)
-  let create_a ?parents ?selected ~ctx lits proof =
+  let create_a ?parents ?selected lits proof =
     Util.incr_stat stat_mk_hclause;
     Util.enter_prof prof_mk_hclause;
     (* Rename variables.
@@ -461,10 +459,8 @@ module Make(Ctx : Ctx.S) = struct
     (* create the structure *)
     let c = {
       hclits = lits;
-      hcctx = ctx;
       hcflags = 0;
       hctag = (-1);
-      hcweight = 0;
       hcselected = __no_select;
       hcproof = proof';
       hcparents = [];
@@ -476,10 +472,8 @@ module Make(Ctx : Ctx.S) = struct
       (* select literals, if not already done *)
       begin c.hcselected <- match selected with
         | Some bv -> bv
-        | None -> Ctx.select ~ctx lits
+        | None -> Ctx.select lits
       end;
-      (* compute weight *)
-      c.hcweight <- Lits.weight lits;
       (* compute flags *)
       if Lits.is_ground lits then set_flag flag_ground c true;
       (* parents *)
@@ -496,14 +490,19 @@ module Make(Ctx : Ctx.S) = struct
     c
 
   (** Build clause from a list (delegating to create_a) *)
-  let create ?parents ?selected ~ctx lits proof =
-    create_a ?parents ?selected ~ctx (Array.of_list lits) proof
+  let create ?parents ?selected lits proof =
+    create_a ?parents ?selected (Array.of_list lits) proof
 
-  let create_forms ?parents ?selected ~ctx forms proof =
+  let of_forms ?parents ?selected forms proof =
     let lits = Lits.of_forms forms in
-    create_a ?parents ?selected ~ctx lits proof
+    create_a ?parents ?selected lits proof
 
-  let get_proof c = c.hcproof
+  let of_forms_axiom ?(role="axiom") ~file ~name forms =
+    let lits = Lits.of_forms forms in
+    let proof c = Proof.mk_c_file ~role ~file ~name c in
+    create_a lits proof
+
+  let proof c = c.hcproof
 
   let is_empty c = Array.length c.hclits = 0
 
@@ -514,31 +513,23 @@ module Make(Ctx : Ctx.S) = struct
   (** descendants of the clause *)
   let descendants c = c.hcdescendants
 
-  (** Change the context of the clause *)
-  let update_ctx ~ctx c =
-    let lits = c.hclits in
-    let proof = Proof.adapt_c c.hcproof in
-    let c' = create_a ~selected:c.hcselected ~ctx lits proof in
-    c'
-
   (** Apply substitution to the clause. Note that using the same renaming for all
       literals is important. *)
   let apply_subst ~renaming subst c scope =
-    let ctx = c.hcctx in
     let lits = Array.map
       (fun lit -> Lit.apply_subst ~renaming subst lit scope)
       c.hclits in
     let descendants = c.hcdescendants in
     let proof = Proof.adapt_c c.hcproof in
-    let new_hc = create_a ~parents:[c] ~ctx lits proof in
+    let new_hc = create_a ~parents:[c] lits proof in
     new_hc.hcdescendants <- descendants;
     new_hc
 
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are maximal under [ord] *)
   let maxlits c scope subst =
-    let ord = Ctx.ord c.hcctx in
-    let renaming = Ctx.renaming_clear ~ctx:c.hcctx in
+    let ord = Ctx.ord () in
+    let renaming = Ctx.renaming_clear () in
     let lits = Lits.apply_subst ~renaming subst c.hclits scope in
     Lits.maxlits ~ord lits
 
@@ -550,8 +541,8 @@ module Make(Ctx : Ctx.S) = struct
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for resolution. *)
   let eligible_res c scope subst =
-    let ord = Ctx.ord c.hcctx in
-    let renaming = Ctx.renaming_clear ~ctx:c.hcctx in
+    let ord = Ctx.ord () in
+    let renaming = Ctx.renaming_clear () in
     (* instantiate lits *)
     let lits = Lits.apply_subst ~renaming subst c.hclits scope in
     let selected = c.hcselected in
@@ -588,10 +579,10 @@ module Make(Ctx : Ctx.S) = struct
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for paramodulation. *)
   let eligible_param c scope subst =
-    let ord = Ctx.ord c.hcctx in
+    let ord = Ctx.ord () in
     if BV.is_empty c.hcselected then begin
       (* instantiate lits *)
-      let renaming = Ctx.renaming_clear ~ctx:c.hcctx in
+      let renaming = Ctx.renaming_clear () in
       let lits = Lits.apply_subst ~renaming subst c.hclits scope in
       (* maximal ones *)
       let bv = Lits.maxlits ~ord lits in
@@ -601,10 +592,10 @@ module Make(Ctx : Ctx.S) = struct
     end else BV.empty ()  (* no eligible literal when some are selected *)
 
   let eligible_chaining c scope subst =
-    let ord = Ctx.ord c.hcctx in
-    let spec = Ctx.total_order c.hcctx in
+    let ord = Ctx.ord () in
+    let spec = Ctx.Theories.total_order in
     if BV.is_empty c.hcselected then begin
-      let renaming = Ctx.renaming_clear ~ctx:c.hcctx in
+      let renaming = Ctx.renaming_clear () in
       let lits = Lits.apply_subst ~renaming subst c.hclits scope in
       let bv = Lits.maxlits ~ord lits in
       (* only keep literals that are positive *)
@@ -629,7 +620,7 @@ module Make(Ctx : Ctx.S) = struct
     | _ -> false
 
   let is_oriented_rule c =
-    let ord = Ctx.ord c.hcctx in
+    let ord = Ctx.ord () in
     match c.hclits with
     | [| Lit.Equation (l, r, true) |] ->
         begin match Ordering.compare ord l r with
@@ -645,15 +636,12 @@ module Make(Ctx : Ctx.S) = struct
       (fun set c -> Lits.symbols ~init:set c.hclits)
       init seq
 
-  let from_forms ?(role="axiom") ~file ~name ~ctx forms =
-    let lits = Lits.of_forms forms in
-    let proof c = Proof.mk_c_file ~role ~file ~name c in
-    create_a ~ctx lits proof
-
   module Seq = struct
     let lits c = Sequence.of_array c.hclits
     let terms c = lits c |> Sequence.flatMap Lit.Seq.terms
     let vars c = terms c |> Sequence.flatMap T.Seq.vars
+    let eqns c =
+      Lits.Seq.as_eqns c.hclits
   end
 
   (** {2 Filter literals} *)
@@ -678,14 +666,14 @@ module Make(Ctx : Ctx.S) = struct
       | _ -> false
 
     let ineq c =
-      let spec = Ctx.total_order c.hcctx in
+      let spec = Ctx.Theories.total_order in
       fun i lit -> Lit.is_ineq ~spec lit
 
     let ineq_of clause instance =
       fun i lit -> Lit.is_ineq_of ~instance lit
 
     let max c =
-      let bv = Lits.maxlits ~ord:(Ctx.ord c.hcctx) c.hclits in
+      let bv = Lits.maxlits ~ord:(Ctx.ord ()) c.hclits in
       fun i lit ->
         BV.get bv i
 
