@@ -202,7 +202,7 @@ module Arr : sig
 
   module Seq : sig
     val terms : t array -> FOTerm.t Sequence.t
-    val as_eqn : t array -> (FOTerm.t * FOTerm.t * bool) Sequence.t
+    val as_eqns : t array -> (FOTerm.t * FOTerm.t * bool) Sequence.t
       (** Convert the lits into a sequence of equations *)
   end
 

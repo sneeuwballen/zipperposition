@@ -30,7 +30,10 @@ open Logtk
 
 (* TODO: also allow to contribute to {!PEnv} *)
 
-module type S = sig
+(** {2 Type Definitions} *)
+
+(** Actions that can be performed by an extension on a given Env *)
+module type ACTION = sig
   module Env : Env.S
 
   type action =
@@ -42,15 +45,33 @@ module type S = sig
     | Ext_lit_rewrite of string * (Literal.t -> Literal.t)
     | Ext_simplification_rule of (Env.C.t -> Env.C.t)
     (** Action that can be performed by an extension *)
-
-  type env_specific_extension = {
-    name : string;
-    actions : action list;
-  } (** An extension (list of actions + unique name) *)
 end
 
-type t = (module functor (Env : Env.S) -> S with module Env = Env)
-(** An extension is a first-class functor that works over any {!Env.S} *)
+module MakeAction(Env : Env.S) : ACTION with module Env = Env
+
+(** An extension, applied to an Env, can apply a list of actions to it *)
+module type S = sig
+  include ACTION
+
+  val actions : action list
+end
+
+(** An extension defines a functor over any Env *)
+module type ENV_TO_S =
+  functor (Env : Env.S) -> S with module Env = Env
+
+type penv_action =
+  | Ext_penv_do of (PEnv.t -> unit)
+
+type t = {
+  name : string;
+  penv_actions : penv_action list;
+  make : (module ENV_TO_S);
+}
+(** An extension is a named first-class functor that works over any {!Env.S}
+    and can also contribute to the preprocessing env. *)
+
+(** {2 Registration} *)
 
 val register : t -> unit
   (** Register an extension to the (current) prover. Plugins should call this

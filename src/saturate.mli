@@ -31,29 +31,28 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 (** The SZS status of a state *)
-type 'a szs_status = 
-  | Unsat of 'a
+type szs_status =
+  | Unsat
   | Sat
   | Unknown
-  | Error of string 
+  | Error of string
   | Timeout
 
-(** check whether we still have some time w.r.t timeout *)
 val check_timeout : float option -> bool
+(** check whether we still have some time w.r.t timeout *)
 
+val given_clause_step : ?generating:bool -> env:(module Env.S) -> int -> szs_status
 (** Perform one step of the given clause algorithm.
     It performs generating inferences only if [generating] is true (default);
     other parameters are the iteration number and the environment *)
-val given_clause_step : ?generating:bool -> env:Env.t -> int ->
-                        Clause.t szs_status
 
+val given_clause: ?generating:bool -> ?steps:int -> ?timeout:float ->
+                  env:(module Env.S) -> szs_status * int
 (** run the given clause until a timeout occurs or a result
     is found. It returns a tuple (new state, result, number of steps done).
     It performs generating inferences only if [generating] is true (default) *)
-val given_clause: ?generating:bool -> ?steps:int -> ?timeout:float ->
-                  env:Env.t -> Clause.t szs_status * int
 
 (** Interreduction of the given state, without generating inferences. Returns
     the number of steps done for presaturation, with status of the set. *)
-val presaturate : env:Env.t -> Clause.t szs_status * int
+val presaturate : env:(module Env.S) -> szs_status * int
 

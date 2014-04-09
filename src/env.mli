@@ -150,6 +150,9 @@ module type S = sig
   val get_some_empty_clause : unit -> C.t option
     (** Some empty clause, if present, otherwise None *)
 
+  val has_empty_clause : unit -> bool
+    (** Is there an empty clause? *)
+
   val on_empty_clause : C.t Signal.t
     (** Signal triggered when an empty clause is found *)
 

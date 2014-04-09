@@ -36,6 +36,9 @@ module type S = sig
   module Ctx : Ctx.S
   module C : Clause.S
 
+  module CQueue : ClauseQueue.S with module C = C
+  (** Priority queues on clauses *)
+
   (** {6 Useful Index structures} *)
 
   module TermIndex : Index.TERM_IDX with type elt = C.WithPos.t
@@ -58,23 +61,24 @@ module type S = sig
 
     val remove : C.t Sequence.t -> unit
     (** Remove clauses from the set *)
+  end
+
+  module ActiveSet : sig
+    include CLAUSE_SET
 
     val clauses : unit -> C.CSet.t
     (** Current set of clauses *)
   end
-
-  module ActiveSet : CLAUSE_SET
 
   module SimplSet : CLAUSE_SET
 
   module PassiveSet : sig
     include CLAUSE_SET
 
-    module CQueue : ClauseQueue.S with module C = C
-    (** Priority queues on clauses *)
+    val clauses : unit -> C.CSet.t
+    (** Current set of clauses *)
 
-
-    val queues : unit -> (CQueue.t * int) list
+    val queues : (CQueue.t * int) Sequence.t
     (** Current state of the clause queues *)
 
     val add_queue : CQueue.t -> int -> unit
@@ -82,7 +86,10 @@ module type S = sig
 
     val clean : unit -> unit
     (** Clean clause queues (remove clauses that are no longer passive, but
-       still in the queue) *)
+        still in the queue) *)
+
+    val next : unit -> C.t option
+    (** Get-and-remove the next passive clause to process *)
   end
 
   (** {6 Misc} *)
@@ -102,58 +109,4 @@ end
 
 (** {2 Create a Proof State} *)
 
-module Make(X : sig
-  module C : Clause.S
-  val params : Params.t  (** global parameters *)
-end) : S with module C = X.C and module Ctx = X.C.Ctx
-
-(* TODO: move indices to Superposition
-
-
-module ActiveSet : sig
-  type t = 
-    < ctx : Ctx.t;
-      clauses : Clause.CSet.t;          (** set of active clauses *)
-      idx_sup_into : TermIndex.t;       (** index for superposition into the set *)
-      idx_sup_from : TermIndex.t;       (** index for superposition from the set *)
-      idx_back_demod : TermIndex.t;     (** index for backward demodulation/simplifications *)
-      idx_fv : SubsumptionIndex.t;      (** index for subsumption *)
-
-      add : Clause.t Sequence.t -> unit;   (** add clauses *)
-      remove : Clause.t Sequence.t -> unit;(** remove clauses *)
-    >
-
-  val create : ctx:Ctx.t -> Signature.t -> t
-end
-
-(** {2 Set of simplifying (unit) clauses} *)
-
-module SimplSet : sig
-  type t =
-    < ctx : Ctx.t;
-      idx_simpl : UnitIndex.t;      (** index for forward simplifications *)
-
-      add : Clause.t Sequence.t -> unit;
-      remove : Clause.t Sequence.t -> unit;
-    >
-
-  val create : ctx:Ctx.t -> t
-end
-
-(** {2 Set of passive clauses} *)
-
-module PassiveSet : sig
-  type t =
-    < ctx : Ctx.t;
-      clauses : Clause.CSet.t;           (** set of clauses *)
-      queues : (ClauseQueue.t * int) list;
-
-      add : Clause.t Sequence.t -> unit;   (** add clauses *)
-      remove : int -> unit;               (** remove clause by ID *)
-      next : unit -> Clause.t option;      (** next passive clause, if any *)
-      clean : unit -> unit;               (** cleanup internal queues *)
-    >
-
-  val create : ctx:Ctx.t -> (ClauseQueue.t * int) list -> t
-end
-*)
+module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx

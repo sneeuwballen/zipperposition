@@ -36,8 +36,10 @@ module type S = sig
   val ord : unit -> Ordering.t
   (** current ordering on terms *)
 
-  val select : unit -> Selection.t
+  val selection_fun : unit -> Selection.t
   (** selection function for clauses *)
+
+  val set_selection_fun : Selection.t -> unit
 
   val skolem : Skolem.ctx
 

@@ -122,7 +122,7 @@ module type S = sig
                        Formula.FO.t list -> t
     (** Construction from formulas as axiom (initial clause) *)
 
-  val get_proof : t -> Proof.t
+  val proof : t -> Proof.t
     (** Extract its proof from the clause *)
 
   val stats : unit -> (int*int*int*int*int*int)

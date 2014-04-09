@@ -31,26 +31,36 @@ open Logtk
 
 type spec = Theories.AC.t
 
-val axioms : ctx:Ctx.t -> Symbol.t -> Type.t -> Clause.t list
-  (** List of (persistent) axioms that are needed for simplifications to
-      be complete for the given symbol. The [ctx] is required for type inference
-      and building clauses . *)
+module type S = sig
+  module Env : Env.S
+  module C : module type of Env.C
 
-(** {2 Rules} *)
+  val axioms : Symbol.t -> Type.t -> C.t list
+    (** List of (persistent) axioms that are needed for simplifications to
+        be complete for the given symbol. The [ctx] is required for type inference
+        and building clauses . *)
 
-val is_trivial_lit : spec:spec -> Literal.t -> bool
-  (** Is the literal AC-trivial? *)
+  val spec : Theories.AC.t
 
-val is_trivial : spec:spec -> Clause.t -> bool
-  (** Check whether the clause is AC-trivial *)
+  (** {2 Rules} *)
 
-val simplify : spec:spec -> ctx:Ctx.t -> Clause.t -> Clause.t
-  (** Simplify the clause modulo AC *)
+  val is_trivial_lit : Literal.t -> bool
+    (** Is the literal AC-trivial? *)
 
-val add_ac : ?proof:Proof.t list -> env:Env.t -> Symbol.t -> Type.t -> unit
-  (** Declare that the given symbol is AC, and update the Env subsequently
-      by adding clauses, etc. *)
+  val is_trivial : C.t -> bool
+    (** Check whether the clause is AC-trivial *)
 
-val setup_penv : penv:PEnv.t -> unit
+  val simplify : C.t -> C.t
+    (** Simplify the clause modulo AC *)
 
-val setup_env : env:Env.t -> unit
+  val add_ac : ?proof:Proof.t list -> Symbol.t -> Type.t -> unit
+    (** Declare that the given symbol is AC, and update the Env subsequently
+        by adding clauses, etc. *)
+
+  val setup : unit -> unit
+    (** Register on Env *)
+end
+
+module Make(Env: Env.S) : S with module Env = Env
+
+val extension : Extensions.t
