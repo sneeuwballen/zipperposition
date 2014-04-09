@@ -25,9 +25,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Basic signal} *)
 
+type handler_response =
+  | ContinueListening
+  | StopListening
+
 type 'a t = {
   mutable n : int;  (* how many handlers? *)
-  mutable handlers : ('a -> bool) array;
+  mutable handlers : ('a -> handler_response) array;
   mutable alive : keepalive;   (* keep some signal alive *)
 } (** Signal of type 'a *)
 
@@ -35,7 +39,7 @@ and keepalive =
   | Keep : 'a t -> keepalive
   | NotAlive : keepalive
 
-let nop_handler x = true
+let nop_handler x = ContinueListening
 
 let create () =
   let s = { 
@@ -55,7 +59,13 @@ let remove s i =
 
 let send s x =
   for i = 0 to s.n - 1 do
-    while not (try s.handlers.(i) x with _ -> false) do
+    while
+      begin try match s.handlers.(i) x with
+      | ContinueListening -> true
+      | StopListening -> false
+      with _ -> false
+      end
+    do
       remove s i  (* i-th handler is done, remove it *)
     done
   done
@@ -72,10 +82,10 @@ let on s f =
   s.n <- s.n + 1
 
 let once s f =
-  on s (fun x -> ignore (f x); false)
+  on s (fun x -> ignore (f x); StopListening)
 
 let propagate a b =
-  on a (fun x -> send b x; true)
+  on a (fun x -> send b x; ContinueListening)
 
 (** {2 Combinators} *)
 
@@ -86,8 +96,8 @@ let map signal f =
   Weak.set r 0 (Some signal');
   on signal (fun x ->
     match Weak.get r 0 with
-    | None -> false
-    | Some signal' -> send signal' (f x); true);
+    | None -> StopListening
+    | Some signal' -> send signal' (f x); ContinueListening);
   signal'.alive <- Keep signal;
   signal'
 
@@ -98,7 +108,7 @@ let filter signal p =
   Weak.set r 0 (Some signal');
   on signal (fun x ->
     match Weak.get r 0 with
-    | None -> false
-    | Some signal' -> (if p x then send signal' x); true);
+    | None -> StopListening
+    | Some signal' -> (if p x then send signal' x); ContinueListening);
   signal'.alive <- Keep signal;
   signal'

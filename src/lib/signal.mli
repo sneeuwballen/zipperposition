@@ -34,7 +34,11 @@ val create : unit -> 'a t
 val send : 'a t -> 'a -> unit
   (** Trigger the signal *)
 
-val on : 'a t -> ('a -> bool) -> unit
+type handler_response =
+  | ContinueListening
+  | StopListening
+
+val on : 'a t -> ('a -> handler_response) -> unit
   (** Register a handler to the signal; the handler returns [true]
       if it wants to continue being notified, [false] otherwise *)
 
