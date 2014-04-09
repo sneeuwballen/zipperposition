@@ -190,6 +190,7 @@ let get_definition ~ctx ~polarity f =
       in
       DBEnv.of_list (l1 @ l2)
     in
+    Util.debug 5 "remember def...";
     let p' = ST.DB.eval env (p:F.t:>ST.t) |> F.of_term_exn in
     let f' = ST.DB.eval env (f:F.t:>ST.t) |> F.of_term_exn in
     (* the definition to introduce defines [p'] in function of [f'];
@@ -197,6 +198,7 @@ let get_definition ~ctx ~polarity f =
     ctx.sc_new_defs <- {form=f'; proxy=p'; polarity=def.polarity; } :: ctx.sc_new_defs;
     Util.debug 5 "... returning %a" F.pp p;
     (* return proxy *)
+    Util.debug 5 "return def.";
     p
 
 let remove_def ~ctx def =

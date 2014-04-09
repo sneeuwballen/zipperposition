@@ -379,7 +379,11 @@ let introduce_defs ~ctx ~cache ~limit f =
     in
     (* check whether the formula is already defined! *)
     if Skolem.has_definition ~ctx f
-    then Skolem.get_definition ~ctx ~polarity f
+    then begin
+      let p = Skolem.get_definition ~ctx ~polarity f in
+      Util.debug 5 "use definition %a for %a" F.pp p F.pp f;
+      p
+    end
     else
       (* depending on polarity and subformulas, do renamings *)
       match F.view f, polarity with
