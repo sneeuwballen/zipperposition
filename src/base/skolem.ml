@@ -180,12 +180,14 @@ let get_definition ~ctx ~polarity f =
           | _ -> assert false)
       |> DBEnv.of_list
     in
+    Util.debug 5 "remember def...";
     let p' = ST.DB.eval env (p:F.t:>ST.t) |> F.of_term_exn in
     let f' = ST.DB.eval env (f:F.t:>ST.t) |> F.of_term_exn in
     (* the definition to introduce defines [p'] in function of [f'];
      * they are similar to [p] and [f] but don't have De Bruijn indices *)
     ctx.sc_new_defs <- {form=f'; proxy=p'; polarity=def.polarity; } :: ctx.sc_new_defs;
     (* return proxy *)
+    Util.debug 5 "return def.";
     p
 
 let remove_def ~ctx def =
