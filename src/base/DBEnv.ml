@@ -80,18 +80,9 @@ let map f db =
   { db with stack; }
 
 let of_list l =
-  let l = List.sort (fun (b1,v1) (b2,v2) -> b1 - b2) l in
-  (* fill env until it is of size n *)
-  let rec __fill env n =
-    if env.size = n then env
-    else __fill (push_none env) (n-1)
-  (* convert list into an env *)
-  and next env l = match l with
-    | [] -> env
-    | (db, v) :: l' ->
-        let env = __fill env db in
-        let env = push env v in
-        next env l'
-  in
-  next empty l
+  let max = List.fold_left (fun acc (b,_) -> max acc b) ~-1 l in
+  let env = make (max+1) in
+  List.fold_left
+    (fun env (db, v) -> set env db v)
+    env l
 
