@@ -151,3 +151,8 @@ let extensions () =
 let by_name name =
   try Some (Hashtbl.find _extensions name)
   with Not_found -> None
+
+let names () =
+  Sequence.of_hashtbl _extensions
+    |> Sequence.map fst
+    |> Sequence.to_rev_list

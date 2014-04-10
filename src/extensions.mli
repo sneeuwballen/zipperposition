@@ -97,3 +97,6 @@ val extensions : unit -> t list
 
 val by_name : string -> t option
   (** Get an extension by its name, if any *)
+
+val names : unit -> string list
+  (** Names of loaded extensions *)

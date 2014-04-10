@@ -727,10 +727,10 @@ module Make(Sup : Superposition.S) = struct
     Util.debug 2 "register chaining...";
     let spec = Ctx.Theories.total_order in
     let signal = Theories.TotalOrder.on_add_instance spec in
+    (* TODO: index active clauses upon signal? too late? *)
     Signal.on signal
       (fun instance ->
         _setup_rules_if_first ();
-        (* TODO: index active clauses? too late? *)
         Signal.ContinueListening
       );
     if Theories.TotalOrder.exists_order ~spec
@@ -747,13 +747,17 @@ let extension =
   let module DOIT(Env : Env.S) = struct
     include Extensions.MakeAction(Env)
     let actions =
-      let sup = Mixtbl.find ~inj:Superposition.key Env.mixtbl "superposition" in
-      let module Sup = (val sup : Superposition.S) in
-      let module Chaining = Make(Sup) in
-      [Ext_general Chaining.register]
+      try
+        let sup = Mixtbl.find ~inj:Superposition.key Env.mixtbl "superposition" in
+        let module Sup = (val sup : Superposition.S) in
+        let module Chaining = Make(Sup) in
+        [Ext_general Chaining.register]
+      with Not_found ->
+        Printf.eprintf "Chaining needs Superposition to work";
+        exit 1
   end
   in
-  { Extensions.name="superposition";
+  { Extensions.name="chaining";
     Extensions.penv_actions = [Extensions.Ext_penv_do setup_penv];
     Extensions.make=(module DOIT : Extensions.ENV_TO_S);
   }

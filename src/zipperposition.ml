@@ -400,6 +400,8 @@ let () =
 let () =
   (* parse arguments *)
   let params = Params.parse_args () in
+  Util.debug 2 "extensions loaded: %a"
+    (Util.pp_list Buffer.add_string) (Extensions.names ());
   Random.init params.param_seed;
   print_version params;
   (* plugins *)
