@@ -87,7 +87,6 @@ module Make(E : Env.S) = struct
         Util.debug 2 "given clause %a is redundant" Env.C.pp c;
         Unknown
       | Some c when Env.C.is_empty c ->
-        assert (Env.has_empty_clause ());
         Unsat (Env.C.proof c) (* empty clause found *)
       | Some c ->
         (* process this clause! *)
