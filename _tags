@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: bc5b1e62958ffcb52af589878224fa88)
+# DO NOT EDIT (digest: 214cb95e39182e6e12113d62a8331296)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -26,13 +26,13 @@
 "src/proofState.cmx": for-pack(Libzipperposition)
 "src/saturate.cmx": for-pack(Libzipperposition)
 "src/selection.cmx": for-pack(Libzipperposition)
-"src/superposition.cmx": for-pack(Libzipperposition)
 "src/pFormula.cmx": for-pack(Libzipperposition)
 "src/theories.cmx": for-pack(Libzipperposition)
 "src/AC.cmx": for-pack(Libzipperposition)
 "src/pEnv.cmx": for-pack(Libzipperposition)
 "src/params.cmx": for-pack(Libzipperposition)
 "src/env.cmx": for-pack(Libzipperposition)
+"src/calculi/superposition.cmx": for-pack(Libzipperposition)
 "src/lib/lazyGraph.cmx": for-pack(Libzipperposition)
 "src/lib/leftistheap.cmx": for-pack(Libzipperposition)
 "src/lib/vector.cmx": for-pack(Libzipperposition)
@@ -40,6 +40,10 @@
 "src/lib/smallSet.cmx": for-pack(Libzipperposition)
 "src/lib/unionFind.cmx": for-pack(Libzipperposition)
 "src/lib/choice.cmx": for-pack(Libzipperposition)
+<src/calculi/*.ml{,i}>: package(dynlink)
+<src/calculi/*.ml{,i}>: package(logtk)
+<src/calculi/*.ml{,i}>: package(unix)
+<src/calculi/*.ml{,i}>: package(zarith)
 <src/lib/*.ml{,i}>: package(dynlink)
 <src/lib/*.ml{,i}>: package(logtk)
 <src/lib/*.ml{,i}>: package(unix)

@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: ef1995f3ea5013bb4d3e2b436f81e65c)
+# DO NOT EDIT (digest: 0a1a0428b38df0d7d268c92de7396a6e)
 src/ClauseQueue
 src/Clause
 src/Const
@@ -11,11 +11,11 @@ src/Proof
 src/ProofState
 src/Saturate
 src/Selection
-src/Superposition
 src/PFormula
 src/Theories
 src/AC
 src/PEnv
 src/Params
 src/Env
+src/calculi/Superposition
 # OASIS_STOP

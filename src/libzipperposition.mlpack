@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 687fbecf46e6e3428545e1844b0062e3)
+# DO NOT EDIT (digest: 1d816df27cffb4ae11e3a6182810771d)
 ClauseQueue
 Clause
 Const
@@ -11,13 +11,13 @@ Proof
 ProofState
 Saturate
 Selection
-Superposition
 PFormula
 Theories
 AC
 PEnv
 Params
 Env
+calculi/Superposition
 lib/LazyGraph
 lib/Leftistheap
 lib/Vector
