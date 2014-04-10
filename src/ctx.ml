@@ -89,7 +89,7 @@ module type S = sig
     (** Symbol is AC *)
 
     val add_order : ?proof:Proof.t list ->
-                    less:Symbol.t -> lesseq:Symbol.t ->
+                    less:Symbol.t -> lesseq:Symbol.t -> ty:Type.t ->
                     Theories.TotalOrder.instance
     (** Pair of symbols that constitute an ordering.
         @return the corresponding instance. *)
@@ -149,12 +149,12 @@ end) : S = struct
 
     let add_ac ?proof s = Theories.AC.add ~spec:ac ?proof s
 
-    let add_order ?proof ~less ~lesseq =
+    let add_order ?proof ~less ~lesseq ~ty =
       let spec = total_order in
       try
         Theories.TotalOrder.find ~spec less
       with Not_found ->
-        let instance = Theories.TotalOrder.add ~spec ?proof ~less ~lesseq in
+        let instance = Theories.TotalOrder.add ~spec ?proof ~less ~lesseq ~ty in
         let ty_less = Signature.find !_signature less in
         let ty_lesseq = Signature.find !_signature lesseq in
         begin match ty_less, ty_lesseq with
@@ -174,19 +174,7 @@ end) : S = struct
         instance
 
     let add_tstp_order () =
-      let less = Symbol.TPTP.Arith.less in
-      let lesseq = Symbol.TPTP.Arith.lesseq in
       let spec = total_order in
-      try
-        Theories.TotalOrder.find ~spec less
-      with Not_found ->
-        (* declare types of $less and $lesseq *)
-        let mysig = Signature.filter
-          Signature.TPTP.Arith.base
-          (fun s _ty -> Symbol.eq s less || Symbol.eq s lesseq)
-        in
-        _signature := Signature.merge !_signature mysig;
-        let instance = Theories.TotalOrder.add ~spec ?proof:None ~less ~lesseq in
-        instance
+      Theories.TotalOrder.tstp_instance ~spec
   end
 end

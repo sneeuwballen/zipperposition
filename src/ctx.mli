@@ -87,7 +87,7 @@ module type S = sig
     (** Symbol is AC *)
 
     val add_order : ?proof:Proof.t list ->
-                    less:Symbol.t -> lesseq:Symbol.t ->
+                    less:Symbol.t -> lesseq:Symbol.t -> ty:Type.t ->
                     Theories.TotalOrder.instance
     (** Pair of symbols that constitute an ordering.
         @return the corresponding instance. *)

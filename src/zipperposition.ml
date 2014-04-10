@@ -37,6 +37,9 @@ module O = Ordering
 module Lit = Literal
 module S = Substs
 
+(* XXX: load some other modules, but they might not be registered *)
+module Chaining = Chaining
+
 (** setup an alarm for abrupt stop *)
 let setup_alarm timeout =
   let handler s =

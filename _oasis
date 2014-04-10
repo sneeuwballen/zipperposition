@@ -27,10 +27,10 @@ Library "libzipperposition"
                     Literal, CompactClause, Ctx, Proof, ProofState,
                     Saturate, Selection, PFormula, Theories, AC,
                     PEnv, Params, Env,
-                    calculi/Superposition
+                    calculi/Superposition, calculi/Chaining,
   InternalModules:  lib/LazyGraph, lib/Leftistheap,
                     lib/Vector, lib/Sequence, lib/SmallSet,
-                    lib/UnionFind, lib/Choice
+                    lib/UnionFind, lib/Choice, lib/Mixtbl
   BuildDepends:     unix,zarith,logtk,dynlink
 
 Library "libzipperposition_meta"
@@ -42,7 +42,7 @@ Library "libzipperposition_meta"
   Build$:           flag(meta)
   Install$:         flag(meta)
   BuildDepends:     libzipperposition,logtk,logtk.meta
-    
+
 
 # main executable for the prover
 Executable zipperposition
