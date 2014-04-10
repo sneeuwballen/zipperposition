@@ -29,197 +29,196 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-type binary_inf_rule = ProofState.ActiveSet.t -> Clause.t -> Clause.t list
-  (** binary inferences. An inference returns a list of conclusions *)
+(** {2 Signature} *)
+module type S = sig
+  module Ctx : Ctx.S
+  module C : Clause.S with module Ctx = Ctx
+  module ProofState : ProofState.S with module C = C and module Ctx = Ctx
 
-type unary_inf_rule = Clause.t -> Clause.t list
-  (** unary infererences *)
+  type inf_rule = C.t -> C.t list
+  (** An inference returns a list of conclusions *)
 
-type rw_simplify_rule = ProofState.SimplSet.t -> Clause.t -> Clause.t 
-  (** Simplify a clause w.r.t. a simplification set *)
+  type binary_inf_rule = inf_rule
+  type unary_inf_rule = inf_rule
 
-type active_simplify_rule = ProofState.ActiveSet.t -> Clause.t -> Clause.t
-  (** Simplify the given clause using clauses from the active set. *)
-
-type backward_simplify_rule = ProofState.ActiveSet.t -> Clause.t -> Clause.CSet.t
-  (** backward simplification by a unit clause. It returns a set of
-      active clauses that can potentially be simplified by the given clause.
-      [backward_simplify active c] therefore returns a subset of [active]. *)
-
-type redundant_rule = ProofState.ActiveSet.t -> Clause.t -> bool
-  (** check whether the clause is redundant w.r.t the set *)
-
-type backward_redundant_rule = ProofState.ActiveSet.t -> Clause.t -> Clause.CSet.t
-  (** find redundant clauses in set w.r.t the clause *)
-
-type simplify_rule = Clause.t -> Clause.t
+  type simplify_rule = C.t -> C.t
   (** Simplify the clause structurally (basic simplifications) *)
 
-type is_trivial_rule = Clause.t -> bool
-  (** Rule that checks whether the clause is trivial (a tautology) *)
+  type active_simplify_rule = simplify_rule
+  type rw_simplify_rule = simplify_rule
 
-type term_rewrite_rule = FOTerm.t -> FOTerm.t
-  (** Rewrite rule on terms *)
+  type backward_simplify_rule = C.t -> C.CSet.t
+    (** backward simplification by a unit clause. It returns a set of
+        active clauses that can potentially be simplified by the given clause.
+        [backward_simplify c] therefore returns a subset of
+        [ProofState.ActiveSet.clauses ()] *)
 
-type lit_rewrite_rule = ctx:Ctx.t -> Literal.t -> Literal.t
-  (** Rewrite rule on literals *)
+  type redundant_rule = C.t -> bool
+    (** check whether the clause is redundant w.r.t the set *)
 
-type t
-  (** Global context for a superposition proof. It contains the inference
-      rules, the context, the proof state... *)
+  type backward_redundant_rule = C.t -> C.CSet.t
+  (** find redundant clauses in [ProofState.ActiveSet] w.r.t the clause *)
 
-(** {2 Modify the Env} *)
+  type is_trivial_rule = C.t -> bool
+    (** Rule that checks whether the clause is trivial (a tautology) *)
 
-val create : ctx:Ctx.t -> Params.t -> Signature.t -> t
-  (** Create an environment (initially empty) *)
+  type term_rewrite_rule = FOTerm.t -> FOTerm.t
+    (** Rewrite rule on terms *)
 
-val add_passive : env:t -> Clause.t Sequence.t -> unit
-  (** Add passive clauses *)
+  type lit_rewrite_rule = Literal.t -> Literal.t
+    (** Rewrite rule on literals *)
 
-val add_active : env:t -> Clause.t Sequence.t -> unit
-  (** Add active clauses *)
+  (** {2 Modify the Env} *)
 
-val add_simpl : env:t -> Clause.t Sequence.t -> unit
-  (** Add simplification clauses *)
+  val add_passive : C.t Sequence.t -> unit
+    (** Add passive clauses *)
 
-val remove_passive : env:t -> Clause.t Sequence.t -> unit
-  (** Remove passive clauses *)
+  val add_active : C.t Sequence.t -> unit
+    (** Add active clauses *)
 
-val remove_passive_id : env:t -> int Sequence.t -> unit
-  (** Remove passive clauses by their ID *)
+  val add_simpl : C.t Sequence.t -> unit
+    (** Add simplification clauses *)
 
-val remove_active : env:t -> Clause.t Sequence.t -> unit
-  (** Remove active clauses *)
+  val remove_passive : C.t Sequence.t -> unit
+    (** Remove passive clauses *)
 
-val remove_simpl  : env:t -> Clause.t Sequence.t -> unit
-  (** Remove simplification clauses *)
+  val remove_passive_id : int Sequence.t -> unit
+    (** Remove passive clauses by their ID *)
 
-val clean_passive : env:t -> unit
-  (** Clean passive set (remove old clauses from clause queues) *)
+  val remove_active : C.t Sequence.t -> unit
+    (** Remove active clauses *)
 
-val get_passive : env:t -> Clause.t Sequence.t
-  (** Passive clauses *)
+  val remove_simpl  : C.t Sequence.t -> unit
+    (** Remove simplification clauses *)
 
-val get_active : env:t -> Clause.t Sequence.t
-  (** Active clauses *)
+  val clean_passive : unit  -> unit
+    (** Clean passive set (remove old clauses from clause queues) *)
 
-val get_simpl : env:t -> Clause.t Sequence.t
-  (** Clauses that can be used for simplification (unit clauses, mostly) *)
+  val get_passive : unit -> C.t Sequence.t
+    (** Passive clauses *)
 
-val add_binary_inf : env:t -> string -> binary_inf_rule -> unit
-  (** Add a binary inference rule *)
+  val get_active : unit -> C.t Sequence.t
+    (** Active clauses *)
 
-val add_unary_inf : env:t -> string -> unary_inf_rule -> unit
-  (** Add a unary inference rule *)
+  val add_binary_inf : string -> binary_inf_rule -> unit
+    (** Add a binary inference rule *)
 
-val add_rw_simplify : env:t -> rw_simplify_rule -> unit
-  (** Add forward rewriting rule *)
+  val add_unary_inf : string -> unary_inf_rule -> unit
+    (** Add a unary inference rule *)
 
-val add_active_simplify : env:t -> active_simplify_rule -> unit
-  (** Add simplification w.r.t active set *)
+  val add_rw_simplify : rw_simplify_rule -> unit
+    (** Add forward rewriting rule *)
 
-val add_backward_simplify : env:t -> backward_simplify_rule -> unit
-  (** Add simplification of the active set *)
+  val add_active_simplify : active_simplify_rule -> unit
+    (** Add simplification w.r.t active set *)
 
-val add_redundant : env:t -> redundant_rule -> unit
-  (** Add redundancy criterion w.r.t. the active set *)
+  val add_backward_simplify : backward_simplify_rule -> unit
+    (** Add simplification of the active set *)
 
-val add_backward_redundant : env:t -> backward_redundant_rule -> unit
-  (** Add rule that finds redundant clauses within active set *)
+  val add_redundant : redundant_rule -> unit
+    (** Add redundancy criterion w.r.t. the active set *)
 
-val add_simplify : env:t -> simplify_rule -> unit
-  (** Add basic simplification rule *)
+  val add_backward_redundant : backward_redundant_rule -> unit
+    (** Add rule that finds redundant clauses within active set *)
 
-val add_is_trivial : env:t -> is_trivial_rule -> unit
-  (** Add tautology detection rule *)
+  val add_simplify : simplify_rule -> unit
+    (** Add basic simplification rule *)
 
-val add_rewrite_rule : env:t -> string -> term_rewrite_rule -> unit
-  (** Add a term rewrite rule *)
+  val add_is_trivial : is_trivial_rule -> unit
+    (** Add tautology detection rule *)
 
-val add_lit_rule : env:t -> string -> lit_rewrite_rule -> unit
-  (** Add a literal rewrite rule *)
+  val add_rewrite_rule : string -> term_rewrite_rule -> unit
+    (** Add a term rewrite rule *)
 
-(** {2 Use the Env} *)
+  val add_lit_rule : string -> lit_rewrite_rule -> unit
+    (** Add a literal rewrite rule *)
 
-val simplify : env:t -> Clause.t -> Clause.t
-  (** Simplify the clause w.r.t the proof state. It uses many simplification
-      rules and rewriting rules. *)
+  (** {2 Use the Env} *)
 
-val get_params : env:t -> Params.t
+  val simplify : C.t -> C.t
+    (** Simplify the clause w.r.t the proof state. It uses many simplification
+        rules and rewriting rules. *)
 
-val get_empty_clauses : env:t -> Clause.CSet.t
-  (** Set of known empty clauses *)
+  val params : Params.t
 
-val get_some_empty_clause : env:t -> Clause.t option
-  (** Some empty clause, if present, otherwise None *)
+  val get_empty_clauses : unit -> C.CSet.t
+    (** Set of known empty clauses *)
 
-val add_on_empty : env:t -> (Clause.t -> unit) -> unit
-  (** Callback, that will be called when an empty clause is added to the
-      active or passive set *)
+  val get_some_empty_clause : unit -> C.t option
+    (** Some empty clause, if present, otherwise None *)
 
-val ctx : t -> Ctx.t
-val ord : t -> Ordering.t
-val precedence : t -> Precedence.t
-val signature : t -> Signature.t
+  val has_empty_clause : unit -> bool
+    (** Is there an empty clause? *)
 
-val state : t -> ProofState.t
+  val on_empty_clause : C.t Signal.t
+    (** Signal triggered when an empty clause is found *)
 
-val pp : Buffer.t -> t -> unit
-val fmt : Format.formatter -> t -> unit
+  val ord : unit -> Ordering.t
+  val precedence : unit -> Precedence.t
+  val signature : unit -> Signature.t
 
-(** {2 High level operations} *)
+  val pp : Buffer.t -> unit -> unit
+  val fmt : Format.formatter -> unit -> unit
 
-type stats = int * int * int
-  (** statistics on clauses : num active, num passive, num simplification *)
+  (** {2 High level operations} *)
 
-val cnf : env:t -> PFormula.Set.t -> Clause.CSet.t
-  (** Reduce formulas to CNF *)
+  type stats = int * int * int
+    (** statistics on clauses : num active, num passive, num simplification *)
 
-val stats : env:t -> stats
-  (** Compute stats *)
+  val stats : unit -> stats
+    (** Compute stats *)
 
-val next_passive : env:t -> Clause.t option
-  (** Extract next passive clause *)
+  val cnf : PFormula.Set.t -> C.CSet.t
+    (** Reduce formulas to CNF *)
 
-val do_binary_inferences : env:t -> Clause.t -> Clause.t Sequence.t
-  (** do binary inferences that involve the given clause *)
+  val next_passive : unit  -> C.t option
+    (** Extract next passive clause *)
 
-val do_unary_inferences : env:t -> Clause.t -> Clause.t Sequence.t
-  (** do unary inferences for the given clause *)
+  val do_binary_inferences : C.t -> C.t Sequence.t
+    (** do binary inferences that involve the given clause *)
 
-val is_trivial : env:t -> Clause.t -> bool
-  (** Check whether the clause is trivial *)
+  val do_unary_inferences : C.t -> C.t Sequence.t
+    (** do unary inferences for the given clause *)
 
-val is_active : env:t -> Clause.t -> bool
-  (** Is the clause in the active set *)
+  val is_trivial : C.t -> bool
+    (** Check whether the clause is trivial *)
 
-val is_passive : env:t -> Clause.t -> bool
-  (** Is the clause a passive clause? *)
+  val is_active : C.t -> bool
+    (** Is the clause in the active set *)
 
-val simplify : env:t -> Clause.t -> Clause.t * Clause.t
-  (** Simplify the hclause. Returns both the hclause and its simplification. *)
+  val is_passive : C.t -> bool
+    (** Is the clause a passive clause? *)
 
-val backward_simplify : env:t -> Clause.t -> Clause.CSet.t * Clause.t Sequence.t
-  (** Perform backward simplification with the given clause. It returns the
-      CSet of clauses that become redundant, and the sequence of those
-      very same clauses after simplification. *)
+  val simplify : C.t -> C.t * C.t
+    (** Simplify the hclause. Returns both the hclause and its simplification. *)
 
-val forward_simplify : env:t -> Clause.t -> Clause.t
-  (** Simplify the clause w.r.t to the active set and experts *)
+  val backward_simplify : C.t -> C.CSet.t * C.t Sequence.t
+    (** Perform backward simplification with the given clause. It returns the
+        CSet of clauses that become redundant, and the sequence of those
+        very same clauses after simplification. *)
 
-val remove_orphans : env:t -> Clause.t Sequence.t -> unit
-  (** remove orphans of the (now redundant) clauses *)
+  val forward_simplify : C.t -> C.t
+    (** Simplify the clause w.r.t to the active set and experts *)
 
-val generate : env:t -> Clause.t -> Clause.t Sequence.t
-  (** Perform all generating inferences *)
+  val remove_orphans : C.t Sequence.t -> unit
+    (** remove orphans of the (now redundant) clauses *)
 
-val is_redundant : env:t -> Clause.t -> bool
-  (** Is the given clause redundant w.r.t the active set? *)
+  val generate : C.t -> C.t Sequence.t
+    (** Perform all generating inferences *)
 
-val subsumed_by : env:t -> Clause.t -> Clause.CSet.t
-  (** List of active clauses subsumed by the given clause *)
+  val is_redundant : C.t -> bool
+    (** Is the given clause redundant w.r.t the active set? *)
 
-val all_simplify : env:t -> Clause.t -> Clause.t option
-  (** Use all simplification rules to convert a clause into a maximally
-      simplified clause (or None, if trivial). *)
+  val subsumed_by : C.t -> C.CSet.t
+    (** List of active clauses subsumed by the given clause *)
 
+  val all_simplify : C.t -> C.t option
+    (** Use all simplification rules to convert a clause into a maximally
+        simplified clause (or None, if trivial). *)
+end
+
+(** {2 Build a new Environment} *)
+module Make(X : sig
+  module Ctx : Ctx.S
+  val params : Params.t
+end) : S with module Ctx = X.Ctx

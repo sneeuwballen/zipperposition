@@ -1,14 +1,13 @@
 S .
 S ./meta/
 S ./arbitrary/
-S ./containers/
+S ./lib/
 S ../plugins/
 B ../_build/
 B ../_build/src/
 B ../_build/src/meta/
 B ../_build/src/arbitrary/
-B ../_build/src/containers
-PKG datalog
+B ../_build/src/lib
 PKG logtk
 PKG logtk.meta
 PKG qcheck

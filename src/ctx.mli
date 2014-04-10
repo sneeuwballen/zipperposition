@@ -31,60 +31,75 @@ open Logtk
 
 type scope = Substs.scope
 
-type t = private {
-  mutable ord : Ordering.t;           (** current ordering on terms *)
-  mutable select : Selection.t;       (** selection function for literals *)
-  mutable skolem : Skolem.ctx;        (** Context for skolem symbols *)
-  mutable signature : Signature.t;    (** Signature *)
-  mutable complete : bool;            (** Completeness preserved? *)
-  renaming : Substs.Renaming.t;       (** Renaming, always useful... *)
-  ac : Theories.AC.t;                 (** AC symbols *)
-  total_order : Theories.TotalOrder.t;(** Total ordering *)
-}
+(** {2 Context for a Proof} *)
+module type S = sig
+  val ord : unit -> Ordering.t
+  (** current ordering on terms *)
 
-val create : ?ord:Ordering.t -> ?select:Selection.t ->
-              signature:Signature.t -> 
-              unit -> t
-  (** Fresh new context *)
+  val selection_fun : unit -> Selection.t
+  (** selection function for clauses *)
 
-val ord : ctx:t -> Ordering.t
+  val set_selection_fun : Selection.t -> unit
 
-val compare : ctx:t -> FOTerm.t -> FOTerm.t -> Comparison.t
+  val set_ord : Ordering.t -> unit
 
-val select : ctx:t -> Literal.t array -> BV.t
+  val skolem : Skolem.ctx
 
-val skolem_ctx : ctx:t -> Skolem.ctx
+  val signature : unit -> Signature.t
+  (** Current signature *)
 
-val signature : ctx:t -> Signature.t
+  val complete : unit -> bool
+  (** Is completeness preserved? *)
 
-val ac : ctx:t -> Theories.AC.t
+  val renaming : Substs.Renaming.t
 
-val total_order : ctx:t -> Theories.TotalOrder.t
+  (** {2 Utils} *)
 
-val renaming_clear : ctx:t -> Substs.Renaming.t
+  val compare : FOTerm.t -> FOTerm.t -> Comparison.t
+  (** Compare two terms *)
+
+  val select : Literal.t array -> BV.t
+
+  val renaming_clear : unit  -> Substs.Renaming.t
   (** Obtain the global renaming. The renaming is cleared before
       it is returned. *)
 
-val lost_completeness : ctx:t -> unit
+  val lost_completeness : unit -> unit
   (** To be called when completeness is not preserved *)
 
-val is_completeness_preserved : ctx:t -> bool
+  val is_completeness_preserved : unit -> bool
   (** Check whether completeness was preserved so far *)
 
-val add_signature : ctx:t -> Signature.t -> unit
+  val add_signature : Signature.t -> unit
   (** Merge  the given signature with the context's one *)
 
-val add_ac : ctx:t -> ?proof:Proof.t list -> Symbol.t -> unit
-  (** Symbol is AC *)
-
-val add_order : ctx:t -> ?proof:Proof.t list ->
-                less:Symbol.t -> lesseq:Symbol.t ->
-                Theories.TotalOrder.instance
-  (** Pair of symbols that constitute an ordering.
-      @return the corresponding instance. *)
-
-val add_tstp_order : ctx:t -> Theories.TotalOrder.instance
-  (** Specific version of {!add_order} for $less and $lesseq *)
-
-val declare : ctx:t -> Symbol.t -> Type.t -> unit
+  val declare : Symbol.t -> Type.t -> unit
   (** Declare the type of a symbol (updates signature) *)
+
+  (** {2 Theories} *)
+
+  module Theories : sig
+    val ac : Theories.AC.t
+
+    val total_order : Theories.TotalOrder.t
+
+    val add_ac : ?proof:Proof.t list -> Symbol.t -> unit
+    (** Symbol is AC *)
+
+    val add_order : ?proof:Proof.t list ->
+                    less:Symbol.t -> lesseq:Symbol.t ->
+                    Theories.TotalOrder.instance
+    (** Pair of symbols that constitute an ordering.
+        @return the corresponding instance. *)
+
+    val add_tstp_order : unit -> Theories.TotalOrder.instance
+    (** Specific version of {!add_order} for $less and $lesseq *)
+  end
+end
+
+(** {2 Create a new context} *)
+module Make(X : sig
+  val signature : Signature.t
+  val ord : Ordering.t
+  val select : Selection.t
+end) : S

@@ -1,5 +1,4 @@
 (*
-Zipperposition: a functional superposition prover for prototyping
 Copyright (c) 2013, Simon Cruanes
 All rights reserved.
 
@@ -24,30 +23,34 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Compact clause representation} *)
+(** {1 Basic signal} *)
 
-open Logtk
+type 'a t
+  (** Signal of type 'a *)
 
-(* TODO: use literals also for compact clauses (now that they do
-  * not depend on Ordering any more);
-  * also makes creation of CompactClauses faster *)
+val create : unit -> 'a t
+  (** New signal *)
 
-type form = Formula.FO.t
+val send : 'a t -> 'a -> unit
+  (** Trigger the signal *)
 
-type t = form array lazy_t
+type handler_response =
+  | ContinueListening
+  | StopListening
 
-val eq : t -> t -> bool
-val hash : t -> int
-val cmp : t -> t -> int
+val on : 'a t -> ('a -> handler_response) -> unit
+  (** Register a handler to the signal; the handler returns [true]
+      if it wants to continue being notified, [false] otherwise *)
 
-val is_empty : t -> bool
+val once : 'a t -> ('a -> 'b) -> unit
+  (** Register a handler to be called only once *)
 
-val iter : t -> (form -> unit) -> unit
+val propagate : 'a t -> 'a t -> unit
+  (** [propagate a b] propagates all values of [a] into [b]. Cycles
+      are not detected. *)
 
-val to_seq : t -> form Sequence.t
+(** {2 Combinators} *)
 
-val pp : Buffer.t -> t -> unit
-val pp_tstp : Buffer.t -> t -> unit
+val map : 'a t -> ('a -> 'b) -> 'b t
 
-val to_string : t -> string
-val fmt : Format.formatter -> t -> unit
+val filter : 'a t -> ('a -> bool) -> 'a t

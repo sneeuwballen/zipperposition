@@ -122,8 +122,11 @@ module Seq : sig
   val symbols : t -> Symbol.t Sequence.t
 end
 
-val get_eqn : t -> Position.t -> FOTerm.t * FOTerm.t * bool
+val as_eqn : t -> FOTerm.t * FOTerm.t * bool
   (** Equational view of a literal *)
+
+val get_eqn : t -> Position.t -> FOTerm.t * FOTerm.t * bool
+  (** Equational view of a literal, oriented by the position *)
 
 module Pos : sig
   val at : t -> Position.t -> FOTerm.t
@@ -191,14 +194,17 @@ module Arr : sig
   val is_trivial : t array -> bool
     (** Tautology? (simple syntactic criterion only) *)
 
-  val to_seq : t array -> (FOTerm.t * FOTerm.t * bool) Sequence.t
-    (** Convert the lits into a sequence of equations *)
-
   val of_forms : form list -> t array
     (** Convert a list of atoms into literals *)
 
   val to_forms : t array -> form list
     (** To list of formulas *)
+
+  module Seq : sig
+    val terms : t array -> FOTerm.t Sequence.t
+    val as_eqns : t array -> (FOTerm.t * FOTerm.t * bool) Sequence.t
+      (** Convert the lits into a sequence of equations *)
+  end
 
   (** {3 High order combinators} *)
 

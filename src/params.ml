@@ -22,6 +22,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Logtk
 
+(* TODO: params to limit depth of preprocessing *)
+(* TODO: params to enable/disable some preprocessing *)
+
 type t = {
   param_ord : Precedence.t -> Ordering.t;
   param_seed : int;

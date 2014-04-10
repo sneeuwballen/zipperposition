@@ -30,19 +30,48 @@ open Logtk
 
 (* TODO: also allow to contribute to {!PEnv} *)
 
+(** {2 Type Definitions} *)
+
+(** Actions that can be performed by an extension on a given Env *)
+module type ACTION = sig
+  module Env : Env.S
+
+  type action =
+    | Ext_general of (unit -> unit)
+    | Ext_binary_inf_rule of string * Env.binary_inf_rule
+    | Ext_unary_inf_rule of string * Env.unary_inf_rule
+    | Ext_signal_incompleteness  (** with extension, prover is incomplete *)
+    | Ext_term_rewrite of string * (FOTerm.t -> FOTerm.t)
+    | Ext_lit_rewrite of string * (Literal.t -> Literal.t)
+    | Ext_simplification_rule of (Env.C.t -> Env.C.t)
+    (** Action that can be performed by an extension *)
+end
+
+module MakeAction(Env : Env.S) : ACTION with module Env = Env
+
+(** An extension, applied to an Env, can apply a list of actions to it *)
+module type S = sig
+  include ACTION
+
+  val actions : action list
+end
+
+(** An extension defines a functor over any Env *)
+module type ENV_TO_S =
+  functor (Env : Env.S) -> S with module Env = Env
+
+type penv_action =
+  | Ext_penv_do of (PEnv.t -> unit)
+
 type t = {
   name : string;
-  actions : action list;
-} (** An extension *)
-and action =
-  | Ext_general of (Env.t -> unit)
-  | Ext_binary_inf_rule of string * Env.binary_inf_rule
-  | Ext_unary_inf_rule of string * Env.unary_inf_rule
-  | Ext_signal_incompleteness  (** with extension, prover is incomplete *)
-  | Ext_term_rewrite of string * (FOTerm.t -> FOTerm.t)
-  | Ext_lit_rewrite of string * (ctx:Ctx.t -> Literal.t -> Literal.t)
-  | Ext_simplification_rule of (Clause.t -> Clause.t)
-  (** Action that can be performed by an extension *)
+  penv_actions : penv_action list;
+  make : (module ENV_TO_S);
+}
+(** An extension is a named first-class functor that works over any {!Env.S}
+    and can also contribute to the preprocessing env. *)
+
+(** {2 Registration} *)
 
 val register : t -> unit
   (** Register an extension to the (current) prover. Plugins should call this
@@ -56,8 +85,15 @@ type load_result =
 val dyn_load : string -> load_result
   (** Try to load the extension located in the given file *)
 
-val apply : env:Env.t -> t -> unit
-  (** Apply the extension to the Env.t, adding rules, modifying the env
+val apply_env : env:(module Env.S) -> t -> unit
+  (** Apply the extension to the Env, adding rules, modifying the env
       in place. *)
 
-val apply_list : env:Env.t -> t list -> unit
+val apply_penv : penv:PEnv.t -> t -> unit
+  (** Apply the extension to the PEnv *)
+
+val extensions : unit -> t list
+  (** All currently available extensions *)
+
+val by_name : string -> t option
+  (** Get an extension by its name, if any *)

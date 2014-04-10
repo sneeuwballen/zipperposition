@@ -31,85 +31,86 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module TermIndex : Index.TERM_IDX with type elt = Clause.WithPos.t
-module UnitIndex : Index.UNIT_IDX with type E.t = (FOTerm.t * FOTerm.t * bool * Clause.t)
-                                  and type E.rhs = FOTerm.t
-module SubsumptionIndex : Index.SUBSUMPTION_IDX with type C.t = Clause.t
-
 (** {2 Set of active clauses} *)
+module type S = sig
+  module Ctx : Ctx.S
+  module C : Clause.S
 
-module ActiveSet : sig
-  type t = 
-    < ctx : Ctx.t;
-      clauses : Clause.CSet.t;          (** set of active clauses *)
-      idx_sup_into : TermIndex.t;       (** index for superposition into the set *)
-      idx_sup_from : TermIndex.t;       (** index for superposition from the set *)
-      idx_back_demod : TermIndex.t;     (** index for backward demodulation/simplifications *)
-      idx_fv : SubsumptionIndex.t;      (** index for subsumption *)
+  module CQueue : ClauseQueue.S with module C = C
+  (** Priority queues on clauses *)
 
-      add : Clause.t Sequence.t -> unit;   (** add clauses *)
-      remove : Clause.t Sequence.t -> unit;(** remove clauses *)
-    >
+  (** {6 Useful Index structures} *)
 
-  val create : ctx:Ctx.t -> Signature.t -> t
+  module TermIndex : Index.TERM_IDX with type elt = C.WithPos.t
+  module UnitIndex : Index.UNIT_IDX
+    with type E.t = (FOTerm.t * FOTerm.t * bool * C.t)
+    and type E.rhs = FOTerm.t
+  module SubsumptionIndex : Index.SUBSUMPTION_IDX with type C.t = C.t
+
+  (** {6 Common Interface for Sets} *)
+
+  module type CLAUSE_SET = sig
+    val on_add_clause : C.t Signal.t
+    (** signal triggered when a clause is added to the set *)
+
+    val on_remove_clause : C.t Signal.t
+    (** signal triggered when a clause is removed from the set *)
+
+    val add : C.t Sequence.t -> unit
+    (** Add clauses to the set *)
+
+    val remove : C.t Sequence.t -> unit
+    (** Remove clauses from the set *)
+  end
+
+  module ActiveSet : sig
+    include CLAUSE_SET
+
+    val clauses : unit -> C.CSet.t
+    (** Current set of clauses *)
+  end
+
+  module SimplSet : CLAUSE_SET
+
+  module PassiveSet : sig
+    include CLAUSE_SET
+
+    val remove_by_id : int Sequence.t -> unit
+    (** Remove clauses by their ID. This will {b NOT} trigger
+        the signal {!on_remove_clause}. *)
+
+    val clauses : unit -> C.CSet.t
+    (** Current set of clauses *)
+
+    val queues : (CQueue.t * int) Sequence.t
+    (** Current state of the clause queues *)
+
+    val add_queue : CQueue.t -> int -> unit
+    (** Add a new queue to the set of queues *)
+
+    val clean : unit -> unit
+    (** Clean clause queues (remove clauses that are no longer passive, but
+        still in the queue) *)
+
+    val next : unit -> C.t option
+    (** Get-and-remove the next passive clause to process *)
+  end
+
+  (** {6 Misc} *)
+
+  type stats = int * int * int
+    (** statistics on the state (num active, num passive, num simplification) *)
+
+  val stats : unit -> stats
+    (** Compute statistics *)
+
+  val pp : Buffer.t -> unit -> unit
+    (** pretty print the content of the state *)
+
+  val debug : Buffer.t -> unit -> unit
+    (** debug functions: much more detailed printing *)
 end
 
-(** {2 Set of simplifying (unit) clauses} *)
+(** {2 Create a Proof State} *)
 
-module SimplSet : sig
-  type t =
-    < ctx : Ctx.t;
-      idx_simpl : UnitIndex.t;      (** index for forward simplifications *)
-
-      add : Clause.t Sequence.t -> unit;
-      remove : Clause.t Sequence.t -> unit;
-    >
-
-  val create : ctx:Ctx.t -> t
-end
-
-(** {2 Set of passive clauses} *)
-
-module PassiveSet : sig
-  type t =
-    < ctx : Ctx.t;
-      clauses : Clause.CSet.t;           (** set of clauses *)
-      queues : (ClauseQueue.t * int) list;
-
-      add : Clause.t Sequence.t -> unit;   (** add clauses *)
-      remove : int -> unit;               (** remove clause by ID *)
-      next : unit -> Clause.t option;      (** next passive clause, if any *)
-      clean : unit -> unit;               (** cleanup internal queues *)
-    >
-
-  val create : ctx:Ctx.t -> (ClauseQueue.t * int) list -> t
-end
-
-(** {2 Proof State} *)
-
-(** state of a superposition calculus instance.
-    It contains a set of active clauses, a set of passive clauses,
-    and is parametrized by an ordering. *)
-
-type t =
-  < ctx : Ctx.t;
-    params : Params.t;
-    simpl_set : SimplSet.t;              (** index for forward demodulation *)
-    active_set : ActiveSet.t;            (** active clauses *)
-    passive_set : PassiveSet.t;          (** passive clauses *)
-  >
-
-val create : ctx:Ctx.t -> Params.t -> Signature.t -> t
-  (** create a state from the given ordering, and parameters *)
-
-type stats = int * int * int
-  (** statistics on the state (num active, num passive, num simplification) *)
-
-val stats : t -> stats
-  (** Compute statistics *)
-
-val pp : Buffer.t -> t -> unit
-  (** pretty print the content of the state *)
-
-val debug : Buffer.t -> t -> unit
-  (** debug functions: much more detailed printing *)
+module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx

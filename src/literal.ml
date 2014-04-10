@@ -284,6 +284,7 @@ module Seq = struct
 
   let symbols lit =
     Sequence.flatMap T.Seq.symbols (terms lit)
+
 end
 
 let apply_subst ~renaming subst lit scope =
@@ -394,6 +395,12 @@ let get_eqn lit position =
   | True, Position.Left _ -> (T.TPTP.true_, T.TPTP.true_, true)
   | False, Position.Left _ -> (T.TPTP.true_, T.TPTP.true_, false)
   | _ -> invalid_arg "wrong side"
+
+let as_eqn lit = match lit with
+  | Equation (l,r,sign) -> l,r,sign
+  | Prop (p, sign) -> p, T.TPTP.true_, sign
+  | True -> T.TPTP.true_, T.TPTP.true_, true
+  | False -> T.TPTP.true_, T.TPTP.true_, false
 
 module Pos = struct
   let at lit pos = match lit, pos with
@@ -592,24 +599,20 @@ module Arr = struct
       | Prop (_, _) -> false)
       lits
 
-  (** Convert the lits into a sequence of equations *)
-  let to_seq lits =
-    Sequence.from_iter
-      (fun k ->
-        for i = 0 to Array.length lits - 1 do
-          match lits.(i) with
-          | Equation (l,r,sign) -> k (l,r,sign)
-          | Prop (p, sign) -> k (p, T.TPTP.true_, sign)
-          | True -> k (T.TPTP.true_, T.TPTP.true_, true)
-          | False -> k (T.TPTP.true_, T.TPTP.true_, false)
-        done)
-
   let of_forms forms =
     let forms = Array.of_list forms in
     Array.map lit_of_form forms
 
   let to_forms lits =
     Array.to_list (Array.map form_of_lit lits)
+
+  module Seq = struct
+    let terms a =
+      Sequence.of_array a |> Sequence.flatMap Seq.terms
+
+    let as_eqns a =
+      Sequence.of_array a |> Sequence.map as_eqn
+  end
 
   (** {3 High Order combinators} *)
 

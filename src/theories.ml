@@ -63,7 +63,7 @@ module AC = struct
     let proof = match proof with
     | Some p -> p
     | None -> (* new axioms *)
-      List.map PF.get_proof (axioms s)
+      List.map PF.proof (axioms s)
     in
     STbl.replace spec s proof
 
@@ -160,7 +160,7 @@ module TotalOrder = struct
     let proof = match proof with
     | Some p -> p
     | None ->
-      List.map PF.get_proof (axioms ~less ~lesseq)
+      List.map PF.proof (axioms ~less ~lesseq)
     in
     if STbl.mem spec.less_tbl less || STbl.mem spec.lesseq_tbl lesseq
       then raise (Invalid_argument "ordering instances overlap");

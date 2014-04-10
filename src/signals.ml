@@ -1,3 +1,4 @@
+
 (*
 Zipperposition: a functional superposition prover for prototyping
 Copyright (c) 2013, Simon Cruanes
@@ -24,30 +25,10 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Compact clause representation} *)
+(** {1 Useful signals} *)
 
-open Logtk
+let (on_print_stats : unit Signal.t) = Signal.create ()
+(** Called when/if it's time to print statistics *)
 
-(* TODO: use literals also for compact clauses (now that they do
-  * not depend on Ordering any more);
-  * also makes creation of CompactClauses faster *)
-
-type form = Formula.FO.t
-
-type t = form array lazy_t
-
-val eq : t -> t -> bool
-val hash : t -> int
-val cmp : t -> t -> int
-
-val is_empty : t -> bool
-
-val iter : t -> (form -> unit) -> unit
-
-val to_seq : t -> form Sequence.t
-
-val pp : Buffer.t -> t -> unit
-val pp_tstp : Buffer.t -> t -> unit
-
-val to_string : t -> string
-val fmt : Format.formatter -> t -> unit
+let (on_exit : int Signal.t) = Signal.create ()
+(** Called before exit *)

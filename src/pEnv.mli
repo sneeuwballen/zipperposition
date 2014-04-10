@@ -57,7 +57,7 @@ val fix : operation list -> PFormula.Set.t -> PFormula.Set.t
 val remove_trivial : operation
   (** Remove trivial formulas *)
 
-val cnf : ctx:Skolem.ctx -> operation
+val cnf : operation
   (** Transform clauses into their clausal normal form *)
 
 val rw_term : ?rule:string -> premises:PFormula.Set.t ->

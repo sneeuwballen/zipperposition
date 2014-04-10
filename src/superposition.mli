@@ -31,74 +31,95 @@ open Logtk
 
 (** {2 Inference rules} *)
 
-val infer_active: Env.binary_inf_rule 
-  (** superposition where given clause is active *)
+module type S = sig
+  module Env : Env.S
+  module C : module type of Env.C
+  module PS : module type of Env.ProofState
 
-val infer_passive: Env.binary_inf_rule
-  (** superposition where given clause is passive *)
+  (** {6 Term Indices} *)
 
-val infer_equality_resolution: Env.unary_inf_rule
+  val idx_sup_into : unit -> PS.TermIndex.t    (** index for superposition into the set *)
+  val idx_sup_from : unit -> PS.TermIndex.t    (** index for superposition from the set *)
+  val idx_back_demod : unit -> PS.TermIndex.t  (** index for backward demodulation/simplifications *)
+  val idx_fv : unit -> PS.SubsumptionIndex.t   (** index for subsumption *)
+  val idx_simpl : unit -> PS.UnitIndex.t       (** index for forward simplifications *)
 
-val infer_equality_factoring: Env.unary_inf_rule
+  (** {6 Inference Rules} *)
 
-val infer_split : Env.unary_inf_rule
-  (** hyper-splitting *)
+  val infer_active: Env.binary_inf_rule
+    (** superposition where given clause is active *)
 
-(* TODO branch rewriting? *)
+  val infer_passive: Env.binary_inf_rule
+    (** superposition where given clause is passive *)
 
-(** {2 Simplifications rules} *)
+  val infer_equality_resolution: Env.unary_inf_rule
 
-val is_tautology : Clause.t -> bool
-  (** Check whether the clause is a (syntactic) tautology, ie whether
-      it contains true or "A" and "not A" *)
+  val infer_equality_factoring: Env.unary_inf_rule
 
-val is_semantic_tautology : Clause.t -> bool
-  (** semantic tautology deletion, using a congruence closure algorithm
-      to see if negative literals imply some positive Literal.t *)
+  val infer_split : Env.unary_inf_rule
+    (** hyper-splitting *)
 
-val handle_distinct_constants : ctx:Ctx.t -> Literal.t -> Literal.t
-  (** Decide on "quoted" "symbols" (which are all distinct) *)
+  (* TODO branch rewriting? *)
 
-val basic_simplify : Clause.t -> Clause.t
-  (** basic simplifications (remove duplicate literals, trivial literals,
-      destructive equality resolution...) *)
+  (** {6 Simplifications rules} *)
 
-val demodulate : ProofState.SimplSet.t -> Clause.t -> Clause.t
-  (** rewrite clause using orientable unit equations *)
+  val is_tautology : C.t -> bool
+    (** Check whether the clause is a (syntactic) tautology, ie whether
+        it contains true or "A" and "not A" *)
 
-val backward_demodulate : ProofState.ActiveSet.t -> Clause.CSet.t -> Clause.t -> Clause.CSet.t
-  (** backward version of demodulation: add to the set active clauses that
-      can potentially be rewritten by the given clause *)
+  val is_semantic_tautology : C.t -> bool
+    (** semantic tautology deletion, using a congruence closure algorithm
+        to see if negative literals imply some positive Literal.t *)
 
-val positive_simplify_reflect : ProofState.SimplSet.t -> Clause.t -> Clause.t
-val negative_simplify_reflect : ProofState.SimplSet.t -> Clause.t -> Clause.t
+  val handle_distinct_constants : Literal.t -> Literal.t
+    (** Decide on "quoted" "symbols" (which are all distinct) *)
 
-val subsumes : Literal.t array -> Literal.t array -> bool
-  (** subsumes c1 c2 iff c1 subsumes c2 *)
+  val basic_simplify : C.t -> C.t
+    (** basic simplifications (remove duplicate literals, trivial literals,
+        destructive equality resolution...) *)
 
-val subsumes_with : Literal.t array -> Substs.scope ->
-                    Literal.t array -> Substs.scope ->
-                    Substs.FO.t option
-  (** returns subsuming subst if the first clause subsumes the second one *)
+  val demodulate : C.t -> C.t
+    (** rewrite clause using orientable unit equations *)
 
-val eq_subsumes : Literal.t array -> Literal.t array -> bool
-  (** equality subsumption *)
+  val backward_demodulate : C.CSet.t -> C.t -> C.CSet.t
+    (** backward version of demodulation: add to the set active clauses that
+        can potentially be rewritten by the given clause *)
 
-val subsumed_by_set : ProofState.ActiveSet.t -> Clause.t -> bool
-  (** check whether the clause is subsumed by any clause in the set *)
+  val positive_simplify_reflect : C.t -> C.t
+  val negative_simplify_reflect : C.t -> C.t
 
-val subsumed_in_set : ProofState.ActiveSet.t -> Clause.t -> Clause.CSet.t
-  (** list of clauses in the active set that are subsumed by the clause *)
+  val subsumes : Literal.t array -> Literal.t array -> bool
+    (** subsumes c1 c2 iff c1 subsumes c2 *)
 
-val contextual_literal_cutting : ProofState.ActiveSet.t -> Clause.t -> Clause.t
-  (** contexual Literal.t cutting *)
+  val subsumes_with : Literal.t array -> Substs.scope ->
+                      Literal.t array -> Substs.scope ->
+                      Substs.FO.t option
+    (** returns subsuming subst if the first clause subsumes the second one *)
 
-val condensation : Clause.t -> Clause.t
-  (** condensation *)
+  val eq_subsumes : Literal.t array -> Literal.t array -> bool
+    (** equality subsumption *)
 
-(** {2 Contributions to Env and Penv} *)
+  val subsumed_by_active_set : C.t -> bool
+    (** check whether the clause is subsumed by any clause in the set *)
 
-val setup_penv : ctx:Skolem.ctx -> penv:PEnv.t -> unit
+  val subsumed_in_active_set : C.t -> C.CSet.t
+    (** list of clauses in the active set that are subsumed by the clause *)
 
-val setup_env : env:Env.t -> unit
-  (** Add rules to the environment. *)
+  val contextual_literal_cutting : C.t -> C.t
+    (** contexual Literal.t cutting of the given clause by the active set  *)
+
+  val condensation : C.t -> C.t
+    (** condensation *)
+
+  (** {6 Registration} *)
+
+  val register : unit -> unit
+  (** Register rules in the environment *)
+end
+
+module Make(Env : Env.S) : S with module Env = Env
+
+(** {2 As Extension}
+Extension named "superposition" *)
+
+val extension : Extensions.t

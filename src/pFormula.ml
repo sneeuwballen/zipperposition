@@ -58,9 +58,9 @@ module H = Hashcons.Make(struct
   let tag i pf = pf.id <- i
 end)
 
-let get_form t = t.form
-
-let get_proof t = t.proof
+let form t = t.form
+let proof t = t.proof
+let id t = t.id
 
 let to_sourced t =
   match t.proof.Proof.kind with

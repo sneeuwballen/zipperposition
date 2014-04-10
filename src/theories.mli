@@ -29,6 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+(* TODO: eventually move every such theory to its own module/extension? *)
+
 (** TODO: theory of inductive types (e.g. lists, or finite domain types
           with only a few constructors);
           then, some case-reasoning inference over those inductive types *)
