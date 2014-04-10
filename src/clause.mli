@@ -304,6 +304,12 @@ module type S = sig
     val remove_id_seq : t -> int Sequence.t -> t
   end
 
+  (** {2 Position} *)
+
+  module Pos : sig
+    val at : t -> Position.t -> FOTerm.t
+  end
+
   (** {2 Clauses with more data} *)
 
   (** Clause within which a subterm (and its position) are hilighted *)

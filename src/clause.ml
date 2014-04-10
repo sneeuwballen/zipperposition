@@ -303,6 +303,12 @@ module type S = sig
     val remove_id_seq : t -> int Sequence.t -> t
   end
 
+  (** {2 Position} *)
+
+  module Pos : sig
+    val at : t -> Position.t -> FOTerm.t
+  end
+
   (** {2 Clauses with more data} *)
 
   (** Clause within which a subterm (and its position) are hilighted *)
@@ -331,7 +337,7 @@ module type S = sig
 end
 
 (** {2 Type def} *)
-module Make(Ctx : Ctx.S) = struct
+module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   module Ctx = Ctx
 
   type t = {
@@ -780,8 +786,11 @@ module Make(Ctx : Ctx.S) = struct
     let remove_id_seq set seq = Sequence.fold remove_id set seq
   end
 
-
   (** {2 Positions in clauses} *)
+
+  module Pos = struct
+    let at c pos = Lits.Pos.at c.hclits pos
+  end
 
   module WithPos = struct
     type t = {
@@ -796,7 +805,8 @@ module Make(Ctx : Ctx.S) = struct
       if c <> 0 then c else
       Position.compare t1.pos t2.pos
 
-    let pp buf t = failwith "C.WithPos.pp: not implemented"
+    let pp buf t =
+      Printf.bprintf buf "clause %a at pos %a" Lits.pp t.clause.hclits Position.pp t.pos
   end
 
 

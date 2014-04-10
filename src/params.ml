@@ -48,6 +48,12 @@ type t = {
   param_unary_depth : int;        (** Maximum successive levels of unary inferences *)
 }
 
+(** Options that can be added by plugins *)
+let other_opts = ref []
+
+let add_opt o = other_opts := o :: !other_opts
+let add_opts l = other_opts := l @ !other_opts
+
 (** parse_args returns parameters *)
 let parse_args () =
   let help_select = Util.sprintf "selection function (%a)"
@@ -107,7 +113,7 @@ let parse_args () =
     ; "-dot-sat", Arg.Set dot_sat, "print saturated set into DOT"
     ; "-seed", Arg.Set_int seed, "set random seed"
     ; "-unary-depth", Arg.Set_int unary_depth, "maximum depth for successive unary inferences"
-    ] @ Options.global_opts
+    ] @ !other_opts @ Options.global_opts
   in
   Util.set_debug 1;  (* default *)
   Arg.parse options add_file "solve problems in files";

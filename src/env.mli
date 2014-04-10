@@ -215,6 +215,11 @@ module type S = sig
   val all_simplify : C.t -> C.t option
     (** Use all simplification rules to convert a clause into a maximally
         simplified clause (or None, if trivial). *)
+
+  (** {2 Misc} *)
+
+  val mixtbl : string Mixtbl.t
+    (** Global hashtable of "stuff" *)
 end
 
 (** {2 Build a new Environment} *)

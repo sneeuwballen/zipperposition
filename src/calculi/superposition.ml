@@ -1361,6 +1361,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ()
 end
 
+let key = Mixtbl.access ()
+
+let register ~sup =
+  let module Sup = (val sup : S) in
+  try
+    ignore (Mixtbl.find ~inj:key Sup.Env.mixtbl "superposition")
+  with Not_found ->
+    Mixtbl.set ~inj:key Sup.Env.mixtbl "superposition" sup
+
 let setup_penv penv =
   let constrs =
     [ Precedence.Constr.min [Symbol.Base.false_ ; Symbol.Base.true_ ]]
@@ -1373,10 +1382,11 @@ let setup_penv penv =
 let extension =
   let module DOIT(Env : Env.S) = struct
     include Extensions.MakeAction(Env)
-
     module Sup = Make(Env)
-
-    let actions = [Ext_general Sup.register]
+    let actions =
+      [ Ext_general Sup.register
+      ; Ext_general (fun () -> register ~sup:(module Sup : S))
+      ]
   end
   in
   { Extensions.name="superposition";

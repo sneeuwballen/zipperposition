@@ -117,6 +117,15 @@ module type S = sig
   (** Register rules in the environment *)
 end
 
+val key : (string, (module S)) Mixtbl.injection
+  (** key to access the Env's Mixtbl. After registration (after
+      calling [register]), the Env's mixtbl contains
+      a mapping from "superposition" to the packed module. *)
+
+val register : sup:(module S) -> unit
+  (** Register the superposition module to its Environment's
+      mixtbl. Done automatically by the {!extension}. *)
+
 module Make(Env : Env.S) : S with module Env = Env
 
 (** {2 As Extension}

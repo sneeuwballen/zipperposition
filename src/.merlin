@@ -2,12 +2,14 @@ S .
 S ./meta/
 S ./arbitrary/
 S ./lib/
+S ./calculi
 S ../plugins/
 B ../_build/
 B ../_build/src/
 B ../_build/src/meta/
 B ../_build/src/arbitrary/
 B ../_build/src/lib
+B ../_build/src/calculi
 PKG logtk
 PKG logtk.meta
 PKG qcheck

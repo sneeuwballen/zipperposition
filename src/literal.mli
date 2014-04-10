@@ -136,6 +136,9 @@ module Pos : sig
   val replace : t -> at:Position.t -> by:FOTerm.t -> t
     (** Replace subterm, or
         @raise Invalid_argument if the position is invalid *)
+
+  val tail : Position.t -> Position.t
+    (** Sub-position *)
 end
 
 val apply_subst_list : renaming:Substs.Renaming.t ->
@@ -217,6 +220,14 @@ module Arr : sig
       (** In-place modification of the array, in which the subterm at given
           position is replaced by the [by] term.
           @raise Invalid_argument if the position is not valid *)
+
+    val idx : Position.t -> int
+      (** Index in the literal array
+          @raise Invalid_argument if the position is incorrect *)
+
+    val tail : Position.t -> Position.t
+      (** sub-position
+          @raise Invalid_argument if the position is incorrect *)
   end
 
   val get_eqn : t array -> Position.t -> FOTerm.t * FOTerm.t * bool

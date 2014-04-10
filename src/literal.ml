@@ -421,6 +421,12 @@ module Pos = struct
     | True, Position.Left Position.Stop -> lit
     | False, Position.Left Position.Stop -> lit
     | _ -> invalid_arg (Util.sprintf "wrong pos %a" Position.pp at)
+
+  let tail = function
+    | Position.Left pos'
+    | Position.Right pos'
+    | Position.Arg (_, pos') -> pos'
+    | _ -> invalid_arg "not a proper literal position"
 end
 
 let apply_subst_list ~renaming subst lits scope =
@@ -626,6 +632,14 @@ module Arr = struct
       | Position.Arg (idx, pos') when idx >= 0 && idx < Array.length lits ->
         lits.(idx) <- Pos.replace lits.(idx) ~at:pos' ~by
       | _ -> invalid_arg (Util.sprintf "invalid position %a in lits" Position.pp at)
+
+    let idx = function
+      | Position.Arg(i, _) -> i
+      | _ -> invalid_arg "not a proper literal array position"
+
+    let tail = function
+      | Position.Arg (_, pos') -> pos'
+      | _ -> invalid_arg "not a proper literal array position"
   end
 
   (** decompose the literal at given position *)

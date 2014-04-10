@@ -141,6 +141,10 @@ module type S = sig
 
   (** {2 Use the Env} *)
 
+  val simplify : C.t -> C.t
+    (** Simplify the clause w.r.t the proof state. It uses many simplification
+        rules and rewriting rules. *)
+
   val params : Params.t
 
   val get_empty_clauses : unit -> C.CSet.t
@@ -192,7 +196,7 @@ module type S = sig
     (** Is the clause a passive clause? *)
 
   val simplify : C.t -> C.t * C.t
-    (** Simplify the clause. Returns both the clause and its simplification. *)
+    (** Simplify the hclause. Returns both the hclause and its simplification. *)
 
   val backward_simplify : C.t -> C.CSet.t * C.t Sequence.t
     (** Perform backward simplification with the given clause. It returns the
@@ -217,6 +221,11 @@ module type S = sig
   val all_simplify : C.t -> C.t option
     (** Use all simplification rules to convert a clause into a maximally
         simplified clause (or None, if trivial). *)
+
+  (** {2 Misc} *)
+
+  val mixtbl : string Mixtbl.t
+    (** Global hashtable of "stuff" *)
 end
 
 module Make(X : sig
@@ -734,6 +743,10 @@ end) : S with module Ctx = X.Ctx = struct
     in
     Util.exit_prof prof_all_simplify;
     res
+
+  (** {2 Misc} *)
+
+  let mixtbl = Mixtbl.create 15
 end
 
 (* TODO: put meta-prover into its own Extension!

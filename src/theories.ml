@@ -36,9 +36,17 @@ module PF = PFormula
 (** {2 Associativity-Commutativity} *)
 
 module AC = struct
-  type t = Proof.t list STbl.t
+  type t = {
+    tbl : Proof.t list STbl.t;
+    signal : Symbol.t Signal.t;
+  }
 
-  let create () = STbl.create 7
+  let create () = {
+    tbl = STbl.create 7;
+    signal = Signal.create ();
+  }
+
+  let on_add_instance t = t.signal
 
   let axioms s =
     (* FIXME: need to recover type of [f]
@@ -65,18 +73,22 @@ module AC = struct
     | None -> (* new axioms *)
       List.map PF.proof (axioms s)
     in
-    STbl.replace spec s proof
+    if not (STbl.mem spec.tbl s)
+    then begin
+      STbl.replace spec.tbl s proof;
+      Signal.send spec.signal s
+    end
 
-  let is_ac ~spec s = STbl.mem spec s
+  let is_ac ~spec s = STbl.mem spec.tbl s
 
-  let exists_ac ~spec = STbl.length spec > 0
+  let exists_ac ~spec = STbl.length spec.tbl > 0
 
-  let find_proof ~spec s = STbl.find spec s
+  let find_proof ~spec s = STbl.find spec.tbl s
 
   let symbols ~spec =
     STbl.fold
       (fun s _ set -> Symbol.Set.add s set)
-      spec Symbol.Set.empty
+      spec.tbl Symbol.Set.empty
 
   let symbols_of_terms ~spec seq =
     let module A = T.AC(struct
@@ -95,7 +107,7 @@ module AC = struct
   let proofs ~spec =
     STbl.fold
       (fun _ proofs acc -> List.rev_append proofs acc)
-      spec []
+      spec.tbl []
 end
 
 (** {2 Total Ordering} *)
@@ -104,13 +116,17 @@ module TotalOrder = struct
   type instance = {
     less : Symbol.t;
     lesseq : Symbol.t;
+    ty : Type.t;
     proof : Proof.t list;
   } (** A single instance of total ordering *)
 
   type t = {
     less_tbl : instance STbl.t;
     lesseq_tbl : instance STbl.t;
+    signal : instance Signal.t;
   } (** Specification of which symbols implement total orderings *)
+
+  let on_add_instance t = t.signal
 
   type lit = {
     left : FOTerm.t;
@@ -156,18 +172,33 @@ module TotalOrder = struct
     *)
     []
 
-  let add ~spec ?proof ~less ~lesseq =
+  let add ~spec ?proof ~less ~lesseq ~ty =
     let proof = match proof with
     | Some p -> p
     | None ->
       List.map PF.proof (axioms ~less ~lesseq)
     in
-    if STbl.mem spec.less_tbl less || STbl.mem spec.lesseq_tbl lesseq
-      then raise (Invalid_argument "ordering instances overlap");
-    let instance = { less; lesseq; proof; } in
-    STbl.add spec.less_tbl less instance;
-    STbl.add spec.lesseq_tbl lesseq instance;
-    instance
+    let instance =
+      try Some (STbl.find spec.lesseq_tbl lesseq)
+      with Not_found ->
+        if STbl.mem spec.less_tbl less
+          then raise (Invalid_argument "ordering instances overlap")
+          else None
+    in
+    match instance with
+    | None ->
+      (* new instance *)
+      let instance = { less; lesseq; ty; proof; } in
+      STbl.add spec.less_tbl less instance;
+      STbl.add spec.lesseq_tbl lesseq instance;
+      Signal.send spec.signal instance;
+      instance
+    | Some instance ->
+      if not (Unif.Ty.are_variant ty instance.ty)
+      then raise (Invalid_argument "incompatible types")
+      else if not (Symbol.eq less instance.less)
+      then raise (Invalid_argument "incompatible symbol for lesseq")
+      else instance
 
   let eq i1 i2 =
     Symbol.eq i1.less i2.less && Symbol.eq i1.lesseq i2.lesseq
@@ -179,18 +210,23 @@ module TotalOrder = struct
       let less = Symbol.TPTP.Arith.less in
       let lesseq = Symbol.TPTP.Arith.lesseq in
       (* add instance *)
-      add ~spec ?proof:None ~less ~lesseq
+      add ~spec ?proof:None
+        ~ty:Type.(forall [var 0] (TPTP.o <== [var 0; var 0])) ~less ~lesseq
 
   let create () =
     let spec = {
       less_tbl = STbl.create 13;
       lesseq_tbl = STbl.create 13;
+      signal = Signal.create ();
     } in
     spec
 
   let exists_order ~spec =
     assert (STbl.length spec.lesseq_tbl = STbl.length spec.less_tbl);
     STbl.length spec.less_tbl > 0
+
+  let less_const ~instance = T.const ~ty:instance.ty instance.less
+  let lesseq_const ~instance = T.const ~ty:instance.ty instance.lesseq
 
   let pp_instance buf i =
     Printf.bprintf buf "total_order{%a, %a}" Symbol.pp i.less Symbol.pp i.lesseq

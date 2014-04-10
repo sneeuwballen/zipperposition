@@ -43,6 +43,9 @@ module AC : sig
   val create : unit -> t
     (** Create a new specification. *)
 
+  val on_add_instance : t -> Symbol.t Signal.t
+    (** Signal triggered every time a new instance is added *)
+
   val axioms : Symbol.t -> PFormula.t list
     (** Build axioms of AC for the given symbol *)
 
@@ -80,6 +83,7 @@ module TotalOrder : sig
   type instance = {
     less : Symbol.t;
     lesseq : Symbol.t;
+    ty : Type.t;      (** Type of the predicates *)
     proof : Proof.t list;
   } (** A single instance of total ordering. A proof is provided to
         justify why the symbols make a total ordering.
@@ -101,10 +105,13 @@ module TotalOrder : sig
     (** New specification.  *)
 
   val add : spec:t -> ?proof:Proof.t list ->
-            less:Symbol.t -> lesseq:Symbol.t -> instance
+            less:Symbol.t -> lesseq:Symbol.t -> ty:Type.t -> instance
     (** New instance of ordering.
         @raise Invalid_argument if one of the symbols is already part of an
               instance. *)
+
+  val on_add_instance : t -> instance Signal.t
+    (** Signal triggered every time a new instance is added *)
 
   val eq : instance -> instance -> bool
 
@@ -128,6 +135,9 @@ module TotalOrder : sig
 
   val exists_order : spec:t -> bool
     (** Are there some known ordering instances? *)
+
+  val less_const : instance:instance -> FOTerm.t  (** constant *)
+  val lesseq_const : instance:instance -> FOTerm.t  (** constant *)
 
   val pp_instance : Buffer.t -> instance -> unit
   val to_string_instance : instance -> string
