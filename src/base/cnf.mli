@@ -57,5 +57,7 @@ val cnf_of : ?opts:options list -> ?ctx:Skolem.ctx ->
   (** Transform the clause into proper CNF; returns a list of clauses.
       Options are used to tune the behavior. *)
 
+(* TODO: hooks *)
+
 val cnf_of_list : ?opts:options list -> ?ctx:Skolem.ctx ->
                   form list -> clause list

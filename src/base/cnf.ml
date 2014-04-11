@@ -140,7 +140,9 @@ let rec nnf f =
   match F.view f with
   | F.Atom _
   | F.Neq _
-  | F.Eq _ -> f
+  | F.Eq _
+  | F.True
+  | F.False -> f
   | F.Not f' ->
       begin match F.view f' with
       | F.Not f'' -> nnf f''
@@ -178,8 +180,6 @@ let rec nnf f =
       [ F.Base.or_ [f1; f2]; F.Base.or_ [F.Base.not_ f1; F.Base.not_ f2] ])
   | F.Forall (varty,f') -> F.Base.__mk_forall ~varty (nnf f')
   | F.Exists (varty,f') -> F.Base.__mk_exists ~varty (nnf f')
-  | F.True
-  | F.False -> f
 
 (* evaluate [f] in the given [env], and then unshift remaining free DB vars *)
 let __eval_and_unshift env f =
