@@ -50,14 +50,31 @@ type clause = form list
 type options =
   | DistributeExists
   | DisableRenaming
+  | InitialProcessing of (form -> form) (** any processing, at the beginning *)
+  | PostNNF of (form -> form)  (** any processing that keeps negation at leaves *)
+  | PostSkolem of (form -> form) (** must not introduce variables nor negations *)
   | DefLimit of int  (* limit size above which names are used *)
+
+(** Options are used to tune the behavior of the CNF conversion.
+
+- DistributeExists if enabled, will distribute existential quantifiers over
+    disjunctions. This can make skolem symbols smaller (smaller arity) but
+    introduce more of them.
+- DisableRenaming disables formula renaming. Can re-introduce the worst-case
+    exponential behavior of CNF.
+- InitialProcessing a simplification function that is called before CNF starts.
+- PostNNF transformation applied just after reduction to NNF. Its output
+    must not break the NNF form (negation at root only).
+- PostSkolem transformation applied just after skolemization. It must not
+    break skolemization nor NNF (no quantifier, no non-leaf negation).
+- DefLimit number of expected clauses above which a sub-formula is
+    renamed (unless [DisableRenaming] is present).
+*)
 
 val cnf_of : ?opts:options list -> ?ctx:Skolem.ctx ->
              form -> clause list
   (** Transform the clause into proper CNF; returns a list of clauses.
       Options are used to tune the behavior. *)
-
-(* TODO: hooks *)
 
 val cnf_of_list : ?opts:options list -> ?ctx:Skolem.ctx ->
                   form list -> clause list
