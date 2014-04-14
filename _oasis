@@ -24,10 +24,10 @@ Library "libzipperposition"
   Path:             src/
   Pack:             true
   Modules:          ClauseQueue, Clause, Const, Extensions,
-                    Literal, CompactClause, Ctx, Proof, ProofState,
+                    Literal, Literals, CompactClause, Ctx, Proof, ProofState,
                     Saturate, Selection, PFormula, Theories, AC,
-                    PEnv, Params, Env,
-                    calculi/Superposition, calculi/Chaining,
+                    PEnv, Params, Env, Monome,
+                    calculi/Superposition, calculi/Chaining
   InternalModules:  lib/LazyGraph, lib/Leftistheap,
                     lib/Vector, lib/Sequence, lib/SmallSet,
                     lib/UnionFind, lib/Choice, lib/Mixtbl
