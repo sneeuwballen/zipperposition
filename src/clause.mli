@@ -189,8 +189,8 @@ module type S = sig
     val terms : t -> FOTerm.t Sequence.t
     val vars : t -> FOTerm.t Sequence.t
 
-    val eqns : t -> (FOTerm.t * FOTerm.t * bool) Sequence.t
-      (** Easy iteration on literals *)
+    val abstract : t -> (bool * FOTerm.t Sequence.t) Sequence.t
+      (** Easy iteration on an abstract view of literals *)
   end
 
   (** {2 Filter literals} *)
@@ -214,7 +214,7 @@ module type S = sig
     val ineq : clause -> t
       (** Only literals that are inequations *)
 
-    val ineq_of : clause -> Theories.TotalOrder.instance -> t
+    val ineq_of : clause -> Theories.TotalOrder.t -> t
       (** Only literals that are inequations for the given ordering *)
 
     val max : clause -> t

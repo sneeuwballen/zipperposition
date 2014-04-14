@@ -36,14 +36,23 @@ module TO = Theories.TotalOrder
 module PB = Position.Build
 
 type scope = Substs.scope
+type term = FOTerm.t
 type form = Formula.FO.t
 
+type arith_op =
+  | Equal
+  | Different
+  | Less
+  | Lesseq
+
 type t =
-  | Equation of T.t * T.t * bool
-  | Prop of T.t * bool
   | True
   | False
-  (** a literal, that is, a signed equation or a proposition *)
+  | Equation of term * term * bool
+  | Prop of term * bool
+  | Ineq of Theories.TotalOrder.lit
+  | Arith of arith_op * Z.t Monome.t * Z.t Monome.t
+  | Divides of Z.t * int * Z.t Monome.t  (* d^k divides the sum *)
 
 let eq l1 l2 =
   match l1, l2 with
@@ -66,10 +75,13 @@ let eq_com l1 l2 =
   | _, _ -> false
 
 let __to_int = function
-  | Equation _ -> 3
-  | Prop _ -> 2
-  | True -> 1
   | False -> 0
+  | True -> 1
+  | Equation _ -> 2
+  | Prop _ -> 3
+  | Ineq _ -> 4
+  | Arith _ -> 5
+  | Divides _ -> 6
 
 let compare l1 l2 =
   match l1, l2 with
@@ -109,6 +121,7 @@ let are_variant lit1 lit2 =
   with Unif.Fail ->
     false
 
+(* TODO: remove
 let to_multiset lit = match lit with
   | Equation (l, r, true) -> Multiset.create_a [|l; r|]
   | Equation (l, r, false) -> Multiset.create_a [|l; l; r; r|]
@@ -117,120 +130,84 @@ let to_multiset lit = match lit with
   | True -> Multiset.create_a [|T.TPTP.true_ ; T.TPTP.true_|]
   | False -> Multiset.create_a
     [|T.TPTP.true_; T.TPTP.true_; T.TPTP.true_; T.TPTP.true_|]
+*)
 
-let compare_partial ~ord l1 l2 =
+let compare_partial ~ord l1 l2 = assert false
+(*
   let m1 = to_multiset l1 in
   let m2 = to_multiset l2 in
   Multiset.compare (fun t1 t2 -> Ordering.compare ord t1 t2) m1 m2
+  *)
 
-let hash lit = match lit with
-  | Equation (l, r, sign) ->
-    Hash.hash_int2 (T.hash l) (T.hash r)
-  | Prop (p, sign) -> T.hash p
-  | True -> 2
-  | False -> 1
-
-let weight = function
-  | Equation (l, r, _) -> T.size l + T.size r
-  | Prop (p, _) -> T.size p
+let fold f acc lit = match lit with
+  | Equation (l, r, _) -> f (f acc l) r
+  | Prop (p, _) -> f acc p
+  | Ineq olit -> f (f acc olit.TO.left) olit.TO.right
+  | Arith (_, m1, m2) ->
+      let acc = Sequence.fold f acc (Monome.Seq.terms m1) in
+      Sequence.fold f acc (Monome.Seq.terms m2)
+  | Divides (_, _, m) ->
+      Sequence.fold f acc (Monome.Seq.terms m)
   | True
-  | False -> 1
+  | False -> acc
 
-let depth = function
-  | Equation (l, r, _) -> max (T.depth l) (T.depth r)
-  | Prop (p, _) -> T.depth p
-  | True
-  | False -> 0
+let hash lit =
+  fold (fun acc t -> Hash.combine (T.hash t) acc) 17 lit
+
+let weight lit =
+  fold (fun acc t -> acc + T.size t) 0 lit
+
+let depth lit =
+  fold (fun acc t -> max acc (T.depth t)) 0 lit
 
 let is_pos lit = match lit with
   | Equation (_,_,sign)
   | Prop (_, sign) -> sign
+  | Ineq _
+  | Arith _
+  | Divides _ -> true
   | True -> true
   | False -> false
 
-let is_neg lit = match lit with
-  | Equation (_,_,sign)
-  | Prop (_, sign) -> not sign
-  | True -> false
-  | False -> true
+let is_neg lit = not (is_pos lit)
 
-let equational = function
+let is_eqn = function
   | Equation _ -> true
   | Prop _
-  | True 
+  | Ineq _
+  | Arith _
+  | Divides _
+  | True
   | False -> false
 
-let orientation_of ~ord = function
-  | Equation (l, r, _) -> Ordering.compare ord l r
-  | Prop _ -> Comparison.Gt
-  | True
-  | False -> Comparison.Eq
+let is_eq lit = is_eqn lit && is_pos lit
+let is_neq lit = is_eqn lit && is_neg lit
 
-let ineq_lit ~spec lit =
-  match lit with
-  | Prop (p, true) ->
-      begin match T.Classic.view p with
-      | T.Classic.App (s, _, [l;r]) ->
-        let instance = TO.find ~spec s in
-        let strict = Symbol.eq s instance.TO.less in
-        TO.({ left=l; right=r; strict; instance; })
-      | _ -> raise Not_found
-      end
-  | _ -> raise Not_found
+let is_ineq lit = match lit with
+  | Ineq _ -> true
+  | _ -> false
 
-let is_eq lit = equational lit && is_pos lit
-let is_neq lit = equational lit && is_neg lit
+let is_strict_ineq lit = match lit with
+  | Ineq olit -> olit.TO.strict
+  | _ -> false
 
-let is_ineq ~spec lit =
-  try
-    let _ = ineq_lit ~spec lit in
-    true
-  with Not_found ->
-    false
-
-let is_strict_ineq ~spec lit =
-  try
-    let lit' = ineq_lit ~spec lit in
-    lit'.TO.strict
-  with Not_found ->
-    false
-
-let is_nonstrict_ineq ~spec lit =
-  try
-    let lit' = ineq_lit ~spec lit in
-    not lit'.TO.strict
-  with Not_found ->
-    false
-
-let ineq_lit_of ~instance lit = match lit with
-  | Prop (p, true) ->
-      begin match T.Classic.view p with
-      | T.Classic.App (s, _, [l;r]) when Symbol.eq s instance.TO.less ->
-        TO.({ left=l; right=r; strict=true; instance; })
-      | T.Classic.App (s, _, [l;r]) when Symbol.eq s instance.TO.lesseq ->
-        TO.({ left=l; right=r; strict=false; instance; })
-      | _ -> raise Not_found
-      end
-  | _ -> raise Not_found
+let is_nonstrict_ineq lit = match lit with
+  | Ineq olit -> not olit.TO.strict
+  | _ -> false
 
 let is_ineq_of ~instance lit =
   match lit with
-  | Prop (p, true) ->
-      begin match T.Classic.view p with
-      | T.Classic.App (s, _, [l;r]) ->
-        Symbol.eq s instance.TO.less || Symbol.eq s instance.TO.lesseq
-      | _ -> false
-      end
+  | Ineq olit -> TO.eq olit.TO.order instance
   | _ -> false
 
 let __ty_error a b =
   let msg = Util.sprintf
-    "Literal:incompatible types in lit for %a : %a and %a : %a" T.pp a
+    "Literal: incompatible types in lit for %a : %a and %a : %a" T.pp a
     Type.pp (T.ty a) T.pp b Type.pp (T.ty b)
   in
   raise (Type.Error msg)
 
-(* primary constructor *)
+(* primary constructor for equations and predicates *)
 let mk_lit a b sign =
   if not (Type.eq (T.ty a) (T.ty b)) then __ty_error a b;
   match a, b with
@@ -266,17 +243,31 @@ let mk_absurd = False
 let __ty_less = Type.(forall [var 0] (TPTP.o <== [var 0; var 0]))
 
 let mk_less instance l r =
-  let open Theories.TotalOrder in
-  mk_true (T.app_full (T.const ~ty:__ty_less instance.less) [T.ty l] [l; r])
+  let olit = TO.( {order=instance; left=l; right=r; tyargs=[T.ty l]; strict=true; } ) in
+  Ineq olit
 
 let mk_lesseq instance l r =
-  let open Theories.TotalOrder in
-  mk_true (T.app_full (T.const ~ty:__ty_less instance.lesseq) [T.ty l] [l; r])
+  let olit = TO.( {order=instance; left=l; right=r; tyargs=[T.ty l]; strict=false; } ) in
+  Ineq olit
+
+let mk_arith op m1 m2 =
+  Arith (op, m1, m2)
+
+let mk_arith_eq m1 m2 = mk_arith Equal m1 m2
+let mk_arith_neq m1 m2 = mk_arith Different m1 m2
+let mk_arith_less m1 m2 = mk_arith Less m1 m2
+let mk_arith_lesseq m1 m2 = mk_arith Lesseq m1 m2
+
+let mk_divides n ~power m =
+  Divides (n, power, m)
 
 module Seq = struct
   let terms lit k = match lit with
     | Equation(l, r, _) -> k l; k r
     | Prop(p, _) -> k p
+    | Ineq olit -> k olit.TO.left; k olit.TO.right
+    | Arith (_, m1, m2) -> Monome.Seq.terms m1 k; Monome.Seq.terms m2 k
+    | Divides (_, _, m) -> Monome.Seq.terms m k
     | True
     | False -> ()
 
@@ -285,7 +276,22 @@ module Seq = struct
   let symbols lit =
     Sequence.flatMap T.Seq.symbols (terms lit)
 
+  let abstract = function
+    | Equation (l, r, sign) -> sign, Sequence.of_list [l; r]
+    | Prop (p, sign) -> sign, Sequence.singleton p
+    | True -> true, Sequence.singleton T.TPTP.true_
+    | False -> false, Sequence.singleton T.TPTP.true_
+    | Ineq olit -> true, Sequence.of_list [olit.TO.left; olit.TO.right]
+    | Arith (_, m1, m2) ->
+      true, Sequence.append (Monome.Seq.terms m1) (Monome.Seq.terms m2)
+    | Divides (_, _, m) ->
+      true, Monome.Seq.terms m
 end
+
+let symbols lit =
+  Sequence.fold
+    (fun set s -> Symbol.Set.add s set)
+    Symbol.Set.empty (Seq.symbols lit)
 
 let matching ?(subst=Substs.empty) lit_a sc_a lit_b sc_b k =
   (* match t1 with t2, then t1' with t2' *)
@@ -311,6 +317,22 @@ let matching ?(subst=Substs.empty) lit_a sc_a lit_b sc_b k =
   | False, False -> k subst
   | _ -> ()
 
+let map f = function
+  | Equation (left, right, sign) ->
+    let new_left = f left
+    and new_right = f right in
+    mk_lit new_left new_right sign
+  | Prop (p, sign) ->
+    let p' = f p in
+    mk_prop p' sign
+  | Ineq olit -> Ineq (TO.map f olit)
+  | Arith (op, m1, m2) ->
+    Arith (op, Monome.map f m1, Monome.map f m2)
+  | Divides (n, k, m) ->
+    Divides (n, k, Monome.map f m)
+  | True -> True
+  | False -> False
+
 let apply_subst ~renaming subst lit scope =
   match lit with
   | Equation (l,r,sign) ->
@@ -320,63 +342,26 @@ let apply_subst ~renaming subst lit scope =
   | Prop (p, sign) ->
     let p' = S.FO.apply ~renaming subst p scope in
     mk_prop p' sign
+  | Ineq olit -> Ineq (TO.apply_subst ~renaming subst olit scope)
+  | Arith (op, m1, m2) ->
+    Arith (op,
+      Monome.apply_subst ~renaming subst m1 scope,
+      Monome.apply_subst ~renaming subst m1 scope)
+  | Divides (n, k, m) ->
+    Divides (n, k, Monome.apply_subst ~renaming subst m scope)
   | True
   | False -> lit
 
-let symbols lit =
-  Sequence.fold
-    (fun set s -> Symbol.Set.add s set)
-    Symbol.Set.empty (Seq.symbols lit)
-
-let lit_of_form f =
-  let f = F.simplify f in
-  match F.view f with
-  | F.True -> True
-  | F.False -> False
-  | F.Atom a -> mk_true a
-  | F.Eq (l,r) -> mk_eq l r
-  | F.Neq (l,r) -> mk_neq l r
-  | F.Not f' ->
-      begin match F.view f' with
-      | F.Atom a -> mk_false a
-      | F.Eq (l,r) -> mk_neq l r
-      | F.Neq (l,r) -> mk_eq l r
-      | _ -> failwith (Util.sprintf "not a literal: %a" F.pp f)
-      end
-  | _ -> failwith (Util.sprintf "not a literal: %a" F.pp f)
-
-let to_tuple = function
-  | Equation (l,r,sign) -> l,r,sign
-  | Prop (p,sign) -> p, T.TPTP.true_, sign
-  | True -> T.TPTP.true_, T.TPTP.true_, true
-  | False -> T.TPTP.true_, T.TPTP.true_, false
-
-let form_of_lit lit = match lit with
-  | Equation (l, r, true) -> F.Base.eq l r
-  | Equation (l, r, false) -> F.Base.neq l r
-  | Prop (p, true) -> F.Base.atom p
-  | Prop (p, false) -> F.Base.not_ (F.Base.atom p)
-  | True -> F.Base.true_
-  | False -> F.Base.false_
-
-let term_of_lit lit = F.to_hoterm (form_of_lit lit)
+let apply_subst_list ~renaming subst lits scope =
+  List.map
+    (fun lit -> apply_subst ~renaming subst lit scope)
+    lits
 
 let negate lit = match lit with
   | Equation (l,r,sign) -> Equation (l,r,not sign)
   | Prop (p, sign) -> Prop (p, not sign)
   | True -> False
   | False -> True
-
-let fmap f = function
-  | Equation (left, right, sign) ->
-    let new_left = f left
-    and new_right = f right in
-    mk_lit new_left new_right sign
-  | Prop (p, sign) ->
-    let p' = f p in
-    mk_prop p' sign
-  | True -> True
-  | False -> False
 
 let add_vars set = function
   | Equation (l, r, _) ->
@@ -403,29 +388,6 @@ let is_ground lit = match lit with
   | True
   | False -> true
 
-let terms lit =
-  Sequence.from_iter (fun k ->
-    match lit with
-    | Equation (l,r,_) -> k l; k r
-    | Prop (p, _) -> k p
-    | True
-    | False -> ())
-
-let get_eqn lit position =
-  match lit, position with
-  | Equation (l,r,sign), Position.Left _ -> (l, r, sign)
-  | Equation (l,r,sign), Position.Right _ -> (r, l, sign)
-  | Prop (p, sign), Position.Left _ -> (p, T.TPTP.true_, sign)
-  | True, Position.Left _ -> (T.TPTP.true_, T.TPTP.true_, true)
-  | False, Position.Left _ -> (T.TPTP.true_, T.TPTP.true_, false)
-  | _ -> invalid_arg "wrong side"
-
-let as_eqn lit = match lit with
-  | Equation (l,r,sign) -> l,r,sign
-  | Prop (p, sign) -> p, T.TPTP.true_, sign
-  | True -> T.TPTP.true_, T.TPTP.true_, true
-  | False -> T.TPTP.true_, T.TPTP.true_, false
-
 module Pos = struct
   let at lit pos = match lit, pos with
     | Equation (l, _, _), Position.Left pos' -> T.Pos.at l pos'
@@ -446,21 +408,205 @@ module Pos = struct
     | False, Position.Left Position.Stop -> lit
     | _ -> invalid_arg (Util.sprintf "wrong pos %a" Position.pp at)
 
-  let tail = function
-    | Position.Left pos'
-    | Position.Right pos'
-    | Position.Arg (_, pos') -> pos'
+  let cut lit pos =
+    let module P = Position in
+    match lit, pos with
+    | Equation _, P.Left pos' -> P.(left stop), pos'
+    | Equation _, P.Right pos' -> P.(right stop), pos'
+    | Prop _, P.Left pos' -> P.(left stop), pos'
+    | Ineq _, P.Left pos' -> P.(left stop), pos'
+    | Ineq _, P.Right pos' -> P.(right stop), pos'
+    | Divides _, P.Arg (i, pos') -> P.(arg i stop), pos'
+    | Arith (_, _, _), P.Left (P.Arg (i, pos')) ->
+        P.(left @@ arg i stop), pos'
+    | Arith (_, _, _), P.Right (P.Arg (i, pos')) ->
+        P.(right @@ arg i stop), pos'
     | _ -> invalid_arg "not a proper literal position"
+
+  let is_max_term ~ord lit pos =
+    assert false
+    (* TODO: gather all atomic subterms, compare the one at
+     * [fst (cut lit pos)] with them *)
 end
 
-let apply_subst_list ~renaming subst lits scope =
-  List.map
-    (fun lit -> apply_subst ~renaming subst lit scope)
-    lits
+module Conv = struct
+  type hook_from = form -> t option
+  type hook_to = t -> form option
+
+  let arith_hook_from f =
+    None (* TODO: try to convert form into a arith lit *)
+
+  let total_order_hook_from ~instance f =
+    None   (* TODO: try to convert into a total order. *)
+
+  let rec try_hooks x hooks = match hooks with
+    | [] -> None
+    | h::hooks' ->
+        match h x with
+        | None -> try_hooks x hooks'
+        | (Some _) as res -> res
+
+  let of_form ?(hooks=[]) f =
+    let f = F.simplify f in
+    match try_hooks f hooks with
+    | Some lit -> lit
+    | None ->
+      begin match F.view f with
+      | F.True -> True
+      | F.False -> False
+      | F.Atom a -> mk_true a
+      | F.Eq (l,r) -> mk_eq l r
+      | F.Neq (l,r) -> mk_neq l r
+      | F.Not f' ->
+          begin match F.view f' with
+          | F.Atom a -> mk_false a
+          | F.Eq (l,r) -> mk_neq l r
+          | F.Neq (l,r) -> mk_eq l r
+          | _ -> failwith (Util.sprintf "not a literal: %a" F.pp f)
+          end
+      | _ -> failwith (Util.sprintf "not a literal: %a" F.pp f)
+      end
+
+  let to_form ?(hooks=[]) lit =
+    match try_hooks lit hooks with
+    | Some f -> f
+    | None ->
+      match lit with
+      | Equation (l, r, true) -> F.Base.eq l r
+      | Equation (l, r, false) -> F.Base.neq l r
+      | Prop (p, true) -> F.Base.atom p
+      | Prop (p, false) -> F.Base.not_ (F.Base.atom p)
+      | True -> F.Base.true_
+      | False -> F.Base.false_
+      | Ineq olit ->
+        let l = olit.TO.left and r = olit.TO.right in
+        let p = if olit.TO.strict
+          then T.app_full (TO.less_const olit.TO.order) olit.TO.tyargs [l; r]
+          else T.app_full (TO.lesseq_const olit.TO.order) olit.TO.tyargs [l; r]
+        in F.Base.atom p
+      | Arith(op, m1, m2) ->
+        let t1 = Monome.Int.to_term m1 in
+        let t2 = Monome.Int.to_term m2 in
+        begin match op with
+          | Equal -> F.Base.eq t1 t2
+          | Different -> F.Base.neq t1 t2
+          | Less ->
+            let sym = Symbol.TPTP.Arith.less in
+            let ty = Signature.find_exn Signature.TPTP.Arith.base sym in
+            let cst = T.const ~ty sym in
+            F.Base.atom (T.app_full cst [Type.TPTP.int] [t1; t2])
+          | Lesseq ->
+            let sym = Symbol.TPTP.Arith.lesseq in
+            let ty = Signature.find_exn Signature.TPTP.Arith.base sym in
+            let cst = T.const ~ty sym in
+            F.Base.atom (T.app_full cst [Type.TPTP.int] [t1; t2])
+        end
+      | Divides (n, k, m) ->
+        let nk = Z.pow n k in
+        let t = Monome.Int.to_term m in
+        let sym = Symbol.TPTP.Arith.remainder_e in
+        let ty = Signature.find_exn Signature.TPTP.Arith.base sym in
+        let cst = T.const ~ty sym in
+        (* $remainder_e(t, nk) = 0 *)
+        F.Base.eq
+          (T.const ~ty:Type.TPTP.int (Symbol.of_int 0))
+          (T.app cst [t; T.const ~ty:Type.TPTP.int (Symbol.mk_int nk)])
+
+end
+
+module View = struct
+  let as_eqn lit = match lit with
+    | Equation (l,r,sign) -> Some (l, r, sign)
+    | Prop (p, sign) -> Some (p, T.TPTP.true_, sign)
+    | True
+    | False
+    | Ineq _
+    | Arith _
+    | Divides _ -> None
+
+  let get_eqn lit position =
+    match lit, position with
+    | Equation (l,r,sign), Position.Left _ -> Some (l, r, sign)
+    | Equation (l,r,sign), Position.Right _ -> Some (r, l, sign)
+    | Prop (p, sign), Position.Left _ -> Some (p, T.TPTP.true_, sign)
+    | True, _
+    | False, _
+    | Ineq _, _
+    | Arith _, _
+    | Divides _, _ -> None
+    | _ -> invalid_arg "get_eqn: wrong literal or position"
+
+  let get_ineq = function
+    | Ineq lit' -> Some lit'
+    | _ -> None
+
+  let get_ineq_of ~instance lit = match lit with
+    | Ineq olit ->
+        if TO.eq olit.TO.order instance
+        then Some olit
+        else None
+    | _ -> None
+end
+
+let is_trivial lit = match lit with
+  | True -> true
+  | False -> false
+  | Equation (l, r, true) -> T.eq l r
+  | Equation (l, r, false) -> false
+  | Ineq olit ->
+      not olit.TO.strict && T.eq olit.TO.left olit.TO.right
+  | Divides (d, k, m) -> Monome.is_const m && Z.sign (Monome.const m) = 0
+  | Arith _ -> false  (* TODO *)
+  | Prop (_, _) -> false
+
+let fold_terms ?(position=Position.stop) ?(vars=false) ~which ~ord ~subterms lit acc f =
+  (* function to call at terms *)
+  let at_term ~pos acc t =
+    if subterms
+      then T.all_positions ~vars ~pos t acc f
+      else f acc t pos
+  in
+  match lit with
+  | Equation (l,r,sign) ->
+    begin match Ordering.compare ord l r, which with
+    | Comparison.Gt, (`Max | `One) ->
+      at_term
+        ~pos:Position.(append position (left stop))
+        acc l
+    | Comparison.Lt, (`Max | `One) ->
+      at_term
+        ~pos:Position.(append position (right @@ stop))
+        acc r
+    | _, `One ->
+      (* only visit one side (arbitrary) *)
+      at_term ~pos:Position.(append position (left stop)) acc l
+    | (Comparison.Eq | Comparison.Incomparable), `Max ->
+      (* visit both sides, they are both (potentially) maximal *)
+      let acc = at_term ~pos:Position.(append position (left stop)) acc l in
+      at_term ~pos:Position.(append position (right stop)) acc r
+    | _, `Both ->
+      (* visit both sides of the equation *)
+      let acc = at_term
+        ~pos:Position.(append position (left stop)) acc l in
+      let acc = at_term
+        ~pos:Position.(append position (right stop)) acc r in
+      acc
+    end
+  | Prop (p, _) ->
+    at_term ~pos:Position.(append position (left stop)) acc p
+  | Ineq olit ->
+    let acc = at_term
+      ~pos:Position.(append position (left stop)) acc olit.TO.left in
+    let acc = at_term
+      ~pos:Position.(append position (right stop)) acc olit.TO.right in
+    acc
+  | True
+  | False -> acc
 
 (** {2 IO} *)
 
-let pp_debug buf lit =
+(* TODO: use hooks *)
+let pp_debug ?(hooks=[]) buf lit =
   match lit with
   | Prop (p, true) -> T.pp buf p
   | Prop (p, false) -> Printf.bprintf buf "¬%a" T.pp p
@@ -470,6 +616,18 @@ let pp_debug buf lit =
     Printf.bprintf buf "%a = %a" T.pp l T.pp r
   | Equation (l, r, false) ->
     Printf.bprintf buf "%a ≠ %a" T.pp l T.pp r
+  | Ineq olit ->
+    Printf.bprintf buf "%a %s %a" T.pp olit.TO.left
+      (if olit.TO.strict then "<" else "≤") T.pp olit.TO.right
+  | Arith (op, l, r) ->
+    Printf.bprintf buf "%a %s %a"
+      Monome.pp l
+      (match op with Equal -> "=" | Different -> "≠"
+        | Less -> "<" | Lesseq -> "≤")
+      Monome.pp r
+  | Divides (n, k, m) ->
+    let nk = Z.pow n k in
+    Printf.bprintf buf "%s | %a" (Z.to_string nk) Monome.pp m
 
 let pp_tstp buf lit =
   match lit with
@@ -481,8 +639,23 @@ let pp_tstp buf lit =
     Printf.bprintf buf "%a = %a" T.TPTP.pp l T.TPTP.pp r
   | Equation (l, r, false) ->
     Printf.bprintf buf "%a != %a" T.TPTP.pp l T.TPTP.pp r
+  | Ineq olit ->
+    Printf.bprintf buf "%s(%a, %a)"
+      (if olit.TO.strict then "$less" else "$lesseq")
+      T.TPTP.pp olit.TO.left T.TPTP.pp olit.TO.right
+  | Arith (Equal, l, r) ->
+    Printf.bprintf buf "%a = %a" Monome.pp_tstp l Monome.pp_tstp r
+  | Arith (Different, l, r) ->
+    Printf.bprintf buf "%a != %a" Monome.pp_tstp l Monome.pp_tstp r
+  | Arith (Less, l, r) ->
+    Printf.bprintf buf "$less(%a, %a)" Monome.pp_tstp l Monome.pp_tstp r
+  | Arith (Lesseq, l, r) ->
+    Printf.bprintf buf "$lesseq(%a, %a)" Monome.pp_tstp l Monome.pp_tstp r
+  | Divides (n, k, m) ->
+    let nk = Z.mul n (Z.of_int k) in
+    Printf.bprintf buf "$remainder_e(%a, %s) = 0" Monome.pp_tstp m (Z.to_string nk)
 
-(*
+(* TODO: make it a hook
 let pp_arith buf lit =
   match lit with
   | Prop ({T.term=T.Node(f, _, [a;b])},true) when Symbol.eq f Symbol.Arith.less ->
@@ -499,378 +672,14 @@ let pp_arith buf lit =
     Printf.bprintf buf "%a ≠ %a" T.pp_arith l T.pp_arith r
 *)
 
-let __pp = ref pp_debug
-let set_default_pp pp = __pp := pp
+type print_hook = Buffer.t -> t -> bool
+let __hooks = ref []
+let add_default_hook h = __hooks := h :: !__hooks
 
-let pp buf lit = !__pp buf lit
+let pp buf lit = pp_debug ~hooks:!__hooks buf lit
 
 let to_string t = Util.on_buffer pp t
 
 let fmt fmt lit =
   Format.pp_print_string fmt (to_string lit)
 
-(** {2 Arrays of literals} *)
-
-module Arr = struct
-  let eq lits1 lits2 =
-    let rec check i =
-      if i = Array.length lits1 then true else
-      eq lits1.(i) lits2.(i) && check (i+1)
-    in
-    if Array.length lits1 <> Array.length lits2
-      then false
-      else check 0
-
-  let eq_com lits1 lits2 =
-    let rec check i =
-      if i = Array.length lits1 then true else
-      eq_com lits1.(i) lits2.(i) && check (i+1)
-    in
-    if Array.length lits1 <> Array.length lits2
-      then false
-      else check 0
-
-  let compare lits1 lits2 =
-    let rec check i =
-      if i = Array.length lits1 then 0 else
-        let cmp = compare lits1.(i) lits2.(i) in
-        if cmp = 0 then check (i+1) else cmp
-    in
-    if Array.length lits1 <> Array.length lits2
-      then Array.length lits1 - Array.length lits2
-      else check 0
-
-  let hash lits =
-    Array.fold_left
-      (fun h lit -> Hash.combine h (hash lit))
-      13 lits
-
-  let variant ?(subst=S.empty) a1 sc1 a2 sc2 =
-    if Array.length a1 <> Array.length a2
-      then raise Unif.Fail;
-    let subst = ref subst in
-    for i = 0 to Array.length a1 - 1 do
-      subst := variant ~subst:!subst a1.(i) sc1 a2.(i) sc2;
-    done;
-    !subst
-
-  let are_variant a1 a2 =
-    try
-      let _ = variant a1 0 a2 1 in
-      true
-    with Unif.Fail ->
-      false
-
-  let weight lits =
-    Array.fold_left (fun w lit -> w + weight lit) 0 lits
-
-  let depth lits =
-    Array.fold_left (fun d lit -> max d (depth lit)) 0 lits
-
-  let vars lits =
-    let set = T.Tbl.create 11 in
-    for i = 0 to Array.length lits - 1 do
-      add_vars set lits.(i);
-    done;
-    T.Tbl.to_list set
-
-  let is_ground lits =
-    Util.array_forall is_ground lits
-
-  let terms lits =
-    Sequence.flatMap terms (Sequence.of_array lits)
-
-  let compact lits =
-    lazy (Array.map form_of_lit lits)
-
-  let to_form lits =
-    let lits = Array.map form_of_lit lits in
-    let lits = Array.to_list lits in
-    F.Base.or_ lits
-
-  (** Apply the substitution to the array of literals, with scope *)
-  let apply_subst ~renaming subst lits scope =
-    Array.map
-      (fun lit -> apply_subst ~renaming subst lit scope)
-      lits
-
-  let fmap f lits =
-    Array.map (fun lit -> fmap f lit) lits
-
-  (** bitvector of literals that are positive *)
-  let pos lits =
-    let bv = BV.create ~size:(Array.length lits) false in
-    for i = 0 to Array.length lits - 1 do
-      if is_pos lits.(i) then BV.set bv i
-    done;
-    bv
-
-  (** bitvector of literals that are positive *)
-  let neg lits =
-    let bv = BV.create ~size:(Array.length lits) false in
-    for i = 0 to Array.length lits - 1 do
-      if is_neg lits.(i) then BV.set bv i
-    done;
-    bv
-
-  (** Bitvector that indicates which of the literals are maximal *)
-  let maxlits ~ord lits =
-    let m = Multiset.create_a lits in
-    let bv = Multiset.max (fun lit1 lit2 -> compare_partial ~ord lit1 lit2) m in
-    bv
-
-  let is_trivial lits =
-    Util.array_exists
-      (function
-      | True -> true
-      | False -> false
-      | Equation (l, r, true) -> T.eq l r
-      | Equation (l, r, false) -> false
-      | Prop (_, _) -> false)
-      lits
-
-  let of_forms forms =
-    let forms = Array.of_list forms in
-    Array.map lit_of_form forms
-
-  let to_forms lits =
-    Array.to_list (Array.map form_of_lit lits)
-
-  module Seq = struct
-    let terms a =
-      Sequence.of_array a |> Sequence.flatMap Seq.terms
-
-    let as_eqns a =
-      Sequence.of_array a |> Sequence.map as_eqn
-  end
-
-  (** {3 High Order combinators} *)
-
-  module Pos = struct
-    let at lits pos = match pos with
-      | Position.Arg (idx, pos') when idx >= 0 && idx < Array.length lits ->
-        Pos.at lits.(idx) pos'
-      | _ -> raise Not_found
-
-    let replace lits ~at ~by = match at with
-      | Position.Arg (idx, pos') when idx >= 0 && idx < Array.length lits ->
-        lits.(idx) <- Pos.replace lits.(idx) ~at:pos' ~by
-      | _ -> invalid_arg (Util.sprintf "invalid position %a in lits" Position.pp at)
-
-    let idx = function
-      | Position.Arg(i, _) -> i
-      | _ -> invalid_arg "not a proper literal array position"
-
-    let tail = function
-      | Position.Arg (_, pos') -> pos'
-      | _ -> invalid_arg "not a proper literal array position"
-  end
-
-  (** decompose the literal at given position *)
-  let get_eqn lits pos = match pos with
-    | Position.Arg (idx, pos') when idx < Array.length lits ->
-      get_eqn lits.(idx) pos'
-    | _ -> invalid_arg "wrong kind of position (needs list of >= 2 elements)"
-
-  (* extract inequation from given position *)
-  let get_ineq ~spec lits pos = match pos with
-    | Position.Arg (idx, Position.Left _) when idx < Array.length lits ->
-      begin try
-        let lit = ineq_lit ~spec lits.(idx) in
-        lit
-      with Not_found ->
-        invalid_arg (Util.sprintf "lit %a not an inequation" pp lits.(idx))
-      end
-    | _ -> invalid_arg "wrong kind of position (needs list of >= 2 elements)"
-
-  let order_instances ~spec lits =
-    let rec fold acc i =
-      if i = Array.length lits then acc
-      else try
-        let lit = ineq_lit ~spec lits.(i) in
-        let acc = lit.TO.instance :: acc in
-        fold acc (i+1)
-      with Not_found ->
-        fold acc (i+1)
-    in
-    let l = fold [] 0 in
-    Util.list_uniq TO.eq l
-
-  let terms_under_ineq ~instance lits =
-    Sequence.from_iter
-      (fun k ->
-        for i = 0 to Array.length lits - 1 do
-          match lits.(i) with
-          | Equation (l, r, _) -> k l; k r
-          | Prop (p, _) ->
-            begin try
-              let ord_lit = ineq_lit_of ~instance lits.(i) in
-              k ord_lit.TO.left; k ord_lit.TO.right
-            with Not_found ->
-              k p  (* regular predicate *)
-            end
-          | True
-          | False -> ()
-        done)
-
-  let fold_lits ~eligible lits acc f =
-    let rec fold acc i =
-      if i = Array.length lits then acc
-      else if not (eligible i lits.(i)) then fold acc (i+1)
-      else
-        let acc = f acc lits.(i) i in
-        fold acc (i+1)
-    in
-    fold acc 0
-
-  let fold_eqn ?(both=true) ?sign ~ord ~eligible lits acc f =
-    let sign_ok = match sign with
-      | None -> (fun _ -> true)
-      | Some sign -> (fun sign' -> sign = sign')
-    in
-    let rec fold acc i =
-      if i = Array.length lits then acc
-      else if not (eligible i lits.(i)) then fold acc (i+1)
-      else
-        let acc = match lits.(i) with
-        | Equation (l,r,sign) when sign_ok sign ->
-          begin match Ordering.compare ord l r with
-          | Comparison.Gt ->
-            f acc l r sign Position.(arg i @@ left @@ stop)
-          | Comparison.Lt ->
-            f acc r l sign Position.(arg i @@ right @@ stop)
-          | Comparison.Eq
-          | Comparison.Incomparable ->
-            if both
-            then
-              (* visit both sides of the equation *)
-              let acc = f acc r l sign Position.(arg i @@ right @@ stop) in
-              f acc l r sign Position.(arg i @@ left @@ stop)
-            else
-              let acc = f acc r l sign Position.(arg i @@ right @@ stop) in
-              f acc l r sign Position.(arg i @@ left @@ stop)
-          end
-        | Prop (p, sign) when sign_ok sign ->
-          f acc p T.TPTP.true_ sign Position.(arg i @@ left @@ stop)
-        | Prop _
-        | Equation _
-        | True
-        | False -> acc
-        in fold acc (i+1)
-    in fold acc 0
-
-  let fold_ineq ~spec ~eligible lits acc f =
-    let rec fold acc i =
-      if i = Array.length lits then acc
-      else if not (eligible i lits.(i)) then fold acc (i+1)
-      else
-        let acc =
-          try
-            let lit = ineq_lit ~spec lits.(i) in
-            let pos = Position.(arg i @@ left @@ stop) in
-            f acc lit pos
-          with Not_found ->
-            acc
-        in
-        fold acc (i+1)
-    in fold acc 0
-
-  (* TODO: new arguments *)
-  let fold_terms ?(vars=false) ~(which : [< `Max|`One|`Both])
-  ~ord ~subterms ~eligible lits acc f =
-    let rec fold acc i =
-      if i = Array.length lits
-        then acc
-      else if not (eligible i lits.(i))
-        then fold acc (i+1)   (* ignore lit *)
-      else
-        let acc = match lits.(i) with
-        | Equation (l,r,sign) ->
-          begin match Ordering.compare ord l r, which with
-          | Comparison.Gt, (`Max | `One) ->
-            if subterms
-              then T.all_positions ~vars
-                ~pos:Position.(arg i @@ left @@ stop) l acc f
-              else f acc l Position.(arg i @@ left @@ stop)
-          | Comparison.Lt, (`Max | `One) ->
-            if subterms
-              then T.all_positions ~vars
-                ~pos:Position.(arg i @@ right @@ stop) r acc f
-              else f acc r Position.(arg i @@ left @@ stop)
-          | _, `One ->
-            (* only visit one side (arbitrary) *)
-            f acc l Position.(arg i @@ left @@ stop)
-          | (Comparison.Eq | Comparison.Incomparable), `Max ->
-            (* visit both sides, they are both (potentially) maximal *)
-            let acc = f acc l Position.(arg i @@ left @@ stop) in
-            f acc r Position.(arg i @@ right @@ stop)
-          | _, `Both ->
-            (* visit both sides of the equation *)
-            if subterms
-              then
-                let acc = T.all_positions ~vars
-                  ~pos:Position.(arg i @@ left @@ stop) l acc f in
-                let acc = T.all_positions ~vars
-                  ~pos:Position.(arg i @@ right @@ stop) r acc f in
-                acc
-              else
-                let acc = f acc l Position.(arg i @@ left @@ stop) in
-                let acc = f acc r Position.(arg i @@ right @@ stop) in
-                acc
-          end
-        | Prop (p, _) ->
-          if subterms
-            then T.all_positions ~vars ~pos:Position.(arg i @@ left @@ stop) p acc f
-            else f acc p Position.(arg i @@ left @@ stop)
-        | True
-        | False -> acc
-        in fold acc (i+1)
-    in fold acc 0
-
-  let symbols ?(init=Symbol.Set.empty) lits =
-    Array.fold_left
-      (fun set lit -> Symbol.Set.union set (symbols lit))
-      init lits
-
-  (** {3 IO} *)
-
-  let pp buf lits = 
-    Util.pp_arrayi ~sep:" | "
-      (fun buf i lit -> Printf.bprintf buf "%a" pp lit)
-      buf lits
-
-  let pp_tstp buf lits =
-    Util.pp_arrayi ~sep:" | "
-      (fun buf i lit -> Printf.bprintf buf "%a" pp_tstp lit)
-      buf lits
-
-  let to_string a = Util.on_buffer pp a
-
-  let fmt fmt lits =
-    Format.pp_print_string fmt (to_string lits)
-end
-
-(** {2 Special kinds of array} *)
-
-(** Recognized whether the clause is a Range-Restricted Horn clause *)
-let is_RR_horn_clause lits =
-  let bv = Arr.pos lits in
-  match BV.to_list bv with
-  | [i] ->
-    (* single positive lit, check variables restrictions, ie all vars
-        occur in the head *)
-    let vars = vars lits.(i) in
-    List.length vars = List.length (Arr.vars lits)
-  | _ -> false
-
-(** Recognizes Horn clauses (at most one positive literal) *)
-let is_horn lits =
-  let bv = Arr.pos lits in
-  BV.cardinal bv <= 1
-
-let is_pos_eq lits =
-  match lits with
-  | [| Equation (l,r,true) |] -> Some (l,r)
-  | [| Prop(p,true) |] -> Some (p, T.TPTP.true_)
-  | [| True |] -> Some (T.TPTP.true_, T.TPTP.true_)
-  | _ -> None

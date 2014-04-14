@@ -36,6 +36,7 @@ open Logtk
 
 module O = Ordering
 module Lit = Literal
+module Lits = Literals
 
 (** {2 A priority queue of clauses, purely functional} *)
 module type S = sig
@@ -197,7 +198,7 @@ module Make(C : Clause.S) = struct
     mk_queue ~accept:is_unit_pos ~weight:(fun c -> C.weight c * C.length c) name
 
   let horn =
-    let accept c = Lit.is_horn (C.lits c) in
+    let accept c = Lits.is_horn (C.lits c) in
     let name = "prefer_horn" in
     mk_queue ~accept ~weight:(fun c -> C.weight c * C.length c) name
 

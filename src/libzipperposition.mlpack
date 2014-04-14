@@ -1,10 +1,11 @@
 # OASIS_START
-# DO NOT EDIT (digest: 90032e750b7220c2ffdc438a6b4275be)
+# DO NOT EDIT (digest: 4606b7c734242c3ad6aeb1501ebef565)
 ClauseQueue
 Clause
 Const
 Extensions
 Literal
+Literals
 CompactClause
 Ctx
 Proof
@@ -17,6 +18,7 @@ AC
 PEnv
 Params
 Env
+Monome
 calculi/Superposition
 calculi/Chaining
 lib/LazyGraph
@@ -26,4 +28,5 @@ lib/Sequence
 lib/SmallSet
 lib/UnionFind
 lib/Choice
+lib/Mixtbl
 # OASIS_STOP

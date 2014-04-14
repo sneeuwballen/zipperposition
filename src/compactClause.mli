@@ -28,13 +28,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-(* TODO: use literals also for compact clauses (now that they do
-  * not depend on Ordering any more);
-  * also makes creation of CompactClauses faster *)
-
 type form = Formula.FO.t
 
-type t = form array lazy_t
+type t = Literal.t array
 
 val eq : t -> t -> bool
 val hash : t -> int
@@ -42,9 +38,11 @@ val cmp : t -> t -> int
 
 val is_empty : t -> bool
 
-val iter : t -> (form -> unit) -> unit
+val iter : t -> (Literal.t -> unit) -> unit
 
-val to_seq : t -> form Sequence.t
+val to_seq : t -> Literal.t Sequence.t
+
+val to_forms : t -> form array
 
 val pp : Buffer.t -> t -> unit
 val pp_tstp : Buffer.t -> t -> unit
