@@ -33,7 +33,7 @@ module T = FOTerm
 module F = Formula.FO
 module PF = PFormula
 module Lit = Literal
-module Lits = Literal.Arr
+module Lits = Literals
 
 (** {2 Signature} *)
 module type S = sig
@@ -486,21 +486,8 @@ end) : S with module Ctx = X.Ctx = struct
     in
     (* reduce every literal *)
     let lits' = Array.map
-      (fun lit -> match lit with
-        | Lit.Equation (l, r, sign) ->
-          let l' = reduce_term !_rewrite_rules l
-          and r' = reduce_term !_rewrite_rules r in
-          if l == l' && r == r'
-            then lit  (* same lit *)
-            else Lit.mk_lit l' r' sign
-        | Lit.Prop (p, sign) ->
-          let p' = reduce_term !_rewrite_rules p in
-          if p == p'
-            then lit
-            else Lit.mk_prop p' sign
-        | Lit.True
-        | Lit.False -> lit
-      ) (C.lits c)
+      (fun lit -> Lit.map (reduce_term !_rewrite_rules) lit)
+      (C.lits c)
     in
     if SmallSet.is_empty !applied_rules
       then c (* no simplification *)
@@ -641,7 +628,7 @@ end) : S with module Ctx = X.Ctx = struct
       C.CSet.fold candidates (C.CSet.empty, [])
         (fun (before, after) _ c ->
           let c' = rw_simplify c in
-          if not (Lit.Arr.eq (C.lits c) (C.lits c'))
+          if not (Lits.eq (C.lits c) (C.lits c'))
             (* the active clause has been simplified! *)
             then begin
               Util.debug 2 "active clause %a simplified into %a" C.pp c C.pp c';

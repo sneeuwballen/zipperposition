@@ -79,21 +79,67 @@ module type S = sig
   (** {2 Theories} *)
 
   module Theories : sig
-    val ac : Theories.AC.t
+    module AC : sig
+      val on_add : Theories.AC.t Signal.t
 
-    val total_order : Theories.TotalOrder.t
+      val add : ?proof:Proof.t list -> ty:Type.t -> Symbol.t -> unit
 
-    val add_ac : ?proof:Proof.t list -> Symbol.t -> unit
-    (** Symbol is AC *)
+      val is_ac : Symbol.t -> bool
 
-    val add_order : ?proof:Proof.t list ->
-                    less:Symbol.t -> lesseq:Symbol.t -> ty:Type.t ->
-                    Theories.TotalOrder.instance
-    (** Pair of symbols that constitute an ordering.
-        @return the corresponding instance. *)
+      val find_proof : Symbol.t -> Proof.t list
+        (** Recover the proof for the AC-property of this symbol.
+            @raise Not_found if the symbol is not AC *)
 
-    val add_tstp_order : unit -> Theories.TotalOrder.instance
-    (** Specific version of {!add_order} for $less and $lesseq *)
+      val symbols : unit -> Symbol.Set.t
+        (** set of AC symbols *)
+
+      val symbols_of_terms : FOTerm.t Sequence.t -> Symbol.Set.t
+        (** set of AC symbols occurring in the given term *)
+
+      val symbols_of_forms : Formula.FO.t Sequence.t -> Symbol.Set.t
+        (** Set of AC symbols occurring in the given formula *)
+
+      val proofs : unit -> Proof.t list
+        (** All proofs for all AC axioms *)
+
+      val exists_ac : unit -> bool
+        (** Is there any AC symbol? *)
+    end
+
+    module TotalOrder : sig
+      val on_add : Theories.TotalOrder.t Signal.t
+
+      val is_less : Symbol.t -> bool
+
+      val is_lesseq : Symbol.t -> bool
+
+      val find : Symbol.t -> Theories.TotalOrder.t
+        (** Find the instance that corresponds to this symbol.
+            @raise Not_found if the symbol is not part of any instance. *)
+
+      val find_proof : Theories.TotalOrder.t -> Proof.t list
+        (** Recover the proof for the given total ordering
+            @raise Not_found if the instance cannot be found*)
+
+      val is_order_symbol : Symbol.t -> bool
+        (** Is less or lesseq of some instance? *)
+
+      val axioms : less:Symbol.t -> lesseq:Symbol.t -> PFormula.t list
+        (** Axioms that correspond to the given symbols being a total ordering.
+            The proof of the axioms will be "axiom" *)
+
+      val exists_order : unit -> bool
+        (** Are there some known ordering instances? *)
+
+      val add : ?proof:Proof.t list ->
+                less:Symbol.t -> lesseq:Symbol.t -> ty:Type.t ->
+                Theories.TotalOrder.t
+        (** Pair of symbols that constitute an ordering.
+            @return the corresponding instance. *)
+
+      val add_tstp : unit -> Theories.TotalOrder.t
+        (** Specific version of {!add_order} for $less and $lesseq *)
+    end
   end
 end
 

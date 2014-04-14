@@ -29,7 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-(* TODO: eventually move every such theory to its own module/extension? *)
+type scope = Substs.scope
+type term = FOTerm.t
 
 (** TODO: theory of inductive types (e.g. lists, or finite domain types
           with only a few constructors);
@@ -38,108 +39,44 @@ open Logtk
 (** {2 Associativity-Commutativity} *)
 
 module AC : sig
-  type t
-
-  val create : unit -> t
-    (** Create a new specification. *)
-
-  val on_add_instance : t -> Symbol.t Signal.t
-    (** Signal triggered every time a new instance is added *)
-
-  val axioms : Symbol.t -> PFormula.t list
-    (** Build axioms of AC for the given symbol *)
-
-  val add : spec:t -> ?proof:Proof.t list -> Symbol.t -> unit
-    (** Add the symbol to the list of AC symbols. A proof is needed to
-        justify so (so that inference using the AC property will be able
-        to justify it) *)
-
-  val is_ac : spec:t -> Symbol.t -> bool
-    (** Check whether the symbol is AC *)
-
-  val find_proof : spec:t -> Symbol.t -> Proof.t list
-    (** Recover the proof for the AC-property of this symbol.
-        @raise Not_found if the symbol is not AC *)
-
-  val exists_ac : spec:t -> bool
-    (** Are some symbols AC? *)
-
-  val symbols : spec:t -> Symbol.Set.t
-    (** set of AC symbols *)
-
-  val symbols_of_terms : spec:t -> FOTerm.t Sequence.t -> Symbol.Set.t
-    (** set of AC symbols occurring in the given term *)
-
-  val symbols_of_forms : spec:t -> Formula.FO.t Sequence.t -> Symbol.Set.t
-    (** Set of AC symbols occurring in the given formula *)
-
-  val proofs : spec:t -> Proof.t list
-    (** All proofs for all AC axioms *)
+  type t = {
+    sym : Symbol.t;
+    ty : Type.t;
+  }
 end
 
 (** {2 Total Ordering} *)
 
 module TotalOrder : sig
-  type instance = {
+  type t = {
     less : Symbol.t;
     lesseq : Symbol.t;
-    ty : Type.t;      (** Type of the predicates *)
-    proof : Proof.t list;
+    ty : Type.t;  (** Type of the predicates *)
   } (** A single instance of total ordering. A proof is provided to
-        justify why the symbols make a total ordering.
-        Both symbols are assume to have type
-        [forall x. (x * x) > $o]. *)
-
-  type t 
+        justify why the symbols make a total ordering. *)
 
   type lit = {
-    left : FOTerm.t;
-    right : FOTerm.t;
+    left : term;
+    right : term;
+    tyargs : Type.t list;
     strict : bool;
-    instance : instance;
+    order : t;
   } (** A literal is an atomic inequality. [strict] is [true] iff the
       literal is a strict inequality, and the ordering itself
       is also provided. *)
 
-  val create : unit -> t
-    (** New specification.  *)
+  val eq : t -> t -> bool
+    (** Are two instances equal? In particular they must share the same type. *)
 
-  val add : spec:t -> ?proof:Proof.t list ->
-            less:Symbol.t -> lesseq:Symbol.t -> ty:Type.t -> instance
-    (** New instance of ordering.
-        @raise Invalid_argument if one of the symbols is already part of an
-              instance. *)
+  val hash : t -> int
 
-  val on_add_instance : t -> instance Signal.t
-    (** Signal triggered every time a new instance is added *)
+  val map : (term -> term) -> lit -> lit
+  val apply_subst : renaming:Substs.Renaming.t -> Substs.t -> lit -> scope -> lit
 
-  val eq : instance -> instance -> bool
+  val less_const : t -> term  (** typed constant *)
+  val lesseq_const : t -> term  (** typed constant *)
 
-  val is_less : spec:t -> Symbol.t -> bool
-
-  val is_lesseq : spec:t -> Symbol.t -> bool
-
-  val find : spec:t -> Symbol.t -> instance
-    (** Find the instance that corresponds to this symbol.
-        @raise Not_found if the symbol is not part of any instance. *)
-
-  val is_order_symbol : spec:t -> Symbol.t -> bool
-    (** Is less or lesseq of some instance? *)
-
-  val axioms : less:Symbol.t -> lesseq:Symbol.t -> PFormula.t list
-    (** Axioms that correspond to the given symbols being a total ordering.
-        The proof of the axioms will be "axiom" *)
-
-  val tstp_instance : spec:t -> instance
-    (** The specific instance that complies with TSTP signature $less, $lesseq *)
-
-  val exists_order : spec:t -> bool
-    (** Are there some known ordering instances? *)
-
-  val less_const : instance:instance -> FOTerm.t  (** constant *)
-  val lesseq_const : instance:instance -> FOTerm.t  (** constant *)
-
-  val pp_instance : Buffer.t -> instance -> unit
-  val to_string_instance : instance -> string
-  val fmt_instance : Format.formatter -> instance -> unit
+  val pp : Buffer.t -> t -> unit
+  val to_string : t -> string
+  val fmt : Format.formatter -> t -> unit
 end

@@ -35,7 +35,7 @@ module T = FOTerm
 module C = Clause
 module S = Substs.FO
 module Lit = Literal
-module Lits = Literal.Arr
+module Lits = Literals
 module Pos = Position
 module PB = Position.Build
 module CQ = ClauseQueue
@@ -148,7 +148,7 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
   module SubsumptionIndex = FeatureVector.Make(struct
     type t = C.t
     let cmp = C.compare
-    let to_lits = C.Seq.eqns
+    let to_lits = C.Seq.abstract
   end)
 
   (* XXX: no customization of indexing for now

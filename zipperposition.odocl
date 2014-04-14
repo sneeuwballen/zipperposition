@@ -1,10 +1,11 @@
 # OASIS_START
-# DO NOT EDIT (digest: 8ae955f9cabcf2b3805ad4ee7ac6c2d6)
+# DO NOT EDIT (digest: 6ab92472c98e9983988241c78fe854b8)
 src/ClauseQueue
 src/Clause
 src/Const
 src/Extensions
 src/Literal
+src/Literals
 src/CompactClause
 src/Ctx
 src/Proof
@@ -17,6 +18,7 @@ src/AC
 src/PEnv
 src/Params
 src/Env
+src/Monome
 src/calculi/Superposition
 src/calculi/Chaining
 # OASIS_STOP
