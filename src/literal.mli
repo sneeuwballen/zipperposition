@@ -53,8 +53,6 @@ val are_variant : t -> t -> bool
 val compare_partial : ord:Ordering.t -> t -> t -> Comparison.t
   (** partial comparison of literals *)
 
-val to_multiset : t -> FOTerm.t Multiset.t  (** literal to multiset of terms *)
-
 val hash : t -> int                   (** hashing of literal *)
 val weight : t -> int                 (** weight of the lit *)
 val depth : t -> int                  (** depth of literal *)
@@ -105,6 +103,15 @@ val lit_of_form : form -> t (** translate eq/not to literal *)
 val to_tuple : t -> (FOTerm.t * FOTerm.t * bool)
 val form_of_lit : t -> form
 val term_of_lit : t -> HOTerm.t                   (** translate lit to term *)
+
+(* TODO: module Conv, with conversions from/to formulas
+ * including option-wrapped hooks (for theory-specific literals).
+ * TODO: remove as many equational-centric stuff *)
+
+val matching : ?subst:Substs.t -> t -> scope -> t -> scope ->
+               Substs.t Sequence.t
+(** checks whether subst(lit_a) subsumes subst(lit_b). Returns alternative
+    substitutions s such that s(lit_a) = lit_b and s contains subst. *)
 
 val apply_subst : renaming:Substs.Renaming.t ->
                   Substs.t -> t -> scope -> t

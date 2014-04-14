@@ -287,6 +287,30 @@ module Seq = struct
 
 end
 
+let matching ?(subst=Substs.empty) lit_a sc_a lit_b sc_b k =
+  (* match t1 with t2, then t1' with t2' *)
+  let match4 subst t1 t2 t1' t2' =
+    try
+      let subst = Unif.FO.matching_adapt_scope ~subst ~pattern:t1 sc_a t2 sc_b in
+      k (Unif.FO.matching_adapt_scope ~subst ~pattern:t1' sc_a t2' sc_b)
+    with Unif.Fail -> ()
+  and match2 subst t1 sc1 t2 sc2 =
+    try k (Unif.FO.matching_adapt_scope ~subst ~pattern:t1 sc1 t2 sc2)
+    with Unif.Fail -> ()
+  in
+  match lit_a, lit_b with
+  | Prop (pa, signa), Prop (pb, signb) ->
+    if signa = signb
+      then match2 subst pa sc_a pb sc_b
+      else ()
+  | Equation (_, _, signa), Equation (_, _, signb)
+    when signa <> signb -> ()  (* different sign *)
+  | Equation (la, ra, _), Equation (lb, rb, _) ->
+    match4 subst la lb ra rb ; match4 subst la rb ra lb
+  | True, True
+  | False, False -> k subst
+  | _ -> ()
+
 let apply_subst ~renaming subst lit scope =
   match lit with
   | Equation (l,r,sign) ->

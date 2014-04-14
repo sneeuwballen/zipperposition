@@ -1006,50 +1006,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (** raised when a subsuming substitution is found *)
   exception SubsumptionFound of S.t
 
-  (* TODO: use Choice! that makes a lazy stream of substitutions
-   * and makes alternatives lighter (hopefully) *)
-
-  (** checks whether subst(lit_a) subsumes subst(lit_b). Returns a list of
-      substitutions s such that s(lit_a) = lit_b and s contains subst. The list
-      is empty if lit_a does not subsume lit_b. *)
-  let match_lits subst lit_a sc_a lit_b sc_b =
-    (* match t1 with t2, then t1' with t2' *)
-    let match4 subst t1 t2 t1' t2' =
-      try
-        let subst = Unif.FO.matching_adapt_scope ~subst ~pattern:t1 sc_a t2 sc_b in
-        [Unif.FO.matching_adapt_scope ~subst ~pattern:t1' sc_a t2' sc_b]
-      with Unif.Fail -> []
-    and match2 subst t1 sc1 t2 sc2 =
-      try [Unif.FO.matching_adapt_scope ~subst ~pattern:t1 sc1 t2 sc2]
-      with Unif.Fail -> []
-    in
-    match lit_a, lit_b with
-    | Lit.Prop (pa, signa), Lit.Prop (pb, signb) ->
-      if signa = signb
-        then match2 subst pa sc_a pb sc_b
-        else []
-    | Lit.Equation (_, _, signa), Lit.Equation (_, _, signb)
-      when signa <> signb -> [] (* different sign *)
-    (* use monotonicity
-    | Lit.Equation (la, ra, _, Comp.Lt), Lit.Equation (lb, rb, _, Comp.Lt)
-    | Lit.Equation (la, ra, _, Comp.Gt), Lit.Equation (lb, rb, _, Comp.Gt) ->
-      match4 subst la lb ra rb
-    | Lit.Equation (la, ra, _, Comp.Gt), Lit.Equation (lb, rb, _, Comp.Lt)
-    | Lit.Equation (la, ra, _, Comp.Lt), Lit.Equation (lb, rb, _, Comp.Gt) ->
-      match4 subst la rb ra lb
-    *)
-    | Lit.Equation (la, ra, _), Lit.Equation (lb, rb, _) ->
-      (match4 subst la lb ra rb) @ (match4 subst la rb ra lb)
-    | Lit.True, Lit.True
-    | Lit.False, Lit.False -> [subst]
-    | _ -> []
-
   (** check that every literal in a matches at least one literal in b *)
   let all_lits_match a sc_a b sc_b =
     Util.array_forall
       (fun lita ->
         Util.array_exists
-          (fun litb -> match_lits S.empty lita sc_a litb sc_b <> [])
+        (fun litb ->
+          not (Sequence.is_empty (Lit.matching ~subst:S.empty lita sc_a litb sc_b)))
           b)
       a
 
@@ -1092,13 +1055,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       else if BV.get bv j then find_matched lita i subst bv (j+1)
       else begin
         let litb = b.(j) in
-        (* match lita and litb, then flag litb as used, and try with next literal of a *)
-        let substs = match_lits subst lita sc_a litb sc_b in
         BV.set bv j;
-        List.iter (fun subst' -> try_permutations (i+1) subst' bv) substs;
+        (* match lita and litb, then flag litb as used, and try with next literal of a *)
+        let n_subst = ref 0 in
+        Lit.matching ~subst lita sc_a litb sc_b
+          (fun subst' -> incr n_subst; try_permutations (i+1) subst' bv);
         BV.reset bv j;
         (* some variable of lita occur in a[j+1...], try another literal of b *)
-        if substs <> [] && not (check_vars lita (i+1))
+        if !n_subst > 0 && not (check_vars lita (i+1))
           then () (* no backtracking for litb *)
           else find_matched lita i subst bv (j+1)
       end
@@ -1295,9 +1259,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         for j = i+1 to n - 1 do
           let lit' = lits.(j) in
           (* try to match lit with lit' (and vice versa), then check if subst(c) subsumes c *)
-          let substs = match_lits S.empty lit 0 lit' 0 @
-                       match_lits S.empty lit' 0 lit 0 in
-          List.iter
+          let substs = Sequence.append
+            (Lit.matching ~subst:S.empty lit 0 lit' 0)
+            (Lit.matching ~subst:S.empty lit' 0 lit 0) in
+          Sequence.iter
             (fun subst ->
               let new_lits = Array.sub lits 0 (n - 1) in
               (if i <> n-1 then new_lits.(i) <- lits.(n-1));  (* remove i-th lit *)

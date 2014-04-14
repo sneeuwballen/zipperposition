@@ -141,10 +141,6 @@ module type S = sig
 
   (** {2 Use the Env} *)
 
-  val simplify : C.t -> C.t
-    (** Simplify the clause w.r.t the proof state. It uses many simplification
-        rules and rewriting rules. *)
-
   val params : Params.t
 
   val get_empty_clauses : unit -> C.CSet.t
