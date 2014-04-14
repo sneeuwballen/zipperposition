@@ -57,6 +57,7 @@ let flag_print_detected = ref false
 let flag_balanced_arith = ref false
 let flag_print_precedence = ref false
 let flag_print_e_output = ref false
+let flag_use_ord = ref true
 
 let add_file f = files := f :: !files
 let add_theory f = theory_files := f :: !theory_files
@@ -74,6 +75,7 @@ let options =
   ; "-print-detected", Arg.Set flag_print_detected, "print the detected theories and others"
   ; "-print-precedence", Arg.Set flag_print_precedence, "print precedence given to E"
   ; "-print-e-output", Arg.Set flag_print_e_output, "print output of E"
+  ; "-no-ord", Arg.Clear flag_use_ord, "disable LPO ordering generation"
   ] @ Options.global_opts
 
 (** MAIN OPERATIONS *)
@@ -542,28 +544,31 @@ let main () =
     >>= fun (state,decls) ->
     (* TODO: preprocess *)
 
-    (* orient rewrite system to get a precedence *)
-    Util.debug 2 "orient rewrite rules...";
-    let orders =
-      state.State.rewrite
-        |> Lpo.FO.orient_lpo_list
-        |> Lpo.solve_multiple
+    (* orient rewrite system to get a precedence (if flag enabled) *)
+    let precedence_args =
+      if !flag_use_ord then begin
+        Util.debug 2 "orient rewrite rules...";
+        let orders =
+          state.State.rewrite
+            |> Lpo.FO.orient_lpo_list
+            |> Lpo.solve_multiple
+        in
+        let precedence = match orders with
+          | lazy (LazyList.Cons (prec, _)) ->
+              if !flag_print_precedence
+                then print_precedence prec;
+              if state.State.rewrite <> []
+                then print_endline "found ordering for rules";
+              prec
+          | lazy LazyList.Nil ->
+              if state.State.rewrite <> []
+                then print_endline "no ordering found for rules";
+              []
+        in precedence_to_E_arg precedence
+      end
+      else ["--auto"]
     in
-    let precedence = match orders with
-      | lazy (LazyList.Cons (prec, _)) ->
-          if !flag_print_precedence
-            then print_precedence prec;
-          if state.State.rewrite <> []
-            then print_endline "found ordering for rules";
-          prec
-      | lazy LazyList.Nil ->
-          if state.State.rewrite <> []
-            then print_endline "no ordering found for rules";
-          []
-    in
-    let args = precedence_to_E_arg precedence
-      @ ["--memory-limit=512"; "--proof-object"]
-    in
+    let args = precedence_args @ ["--memory-limit=512"; "--proof-object"] in
     (* build final sequence of declarations: add rules/axioms, then add
       type declarations *)
     Util.debug 5 "build prelude...";

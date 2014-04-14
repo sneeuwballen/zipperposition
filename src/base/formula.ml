@@ -365,6 +365,7 @@ module Make(MyT : TERM) = struct
       | False -> true_
       | Eq(a,b) -> neq a b
       | Neq(a,b) -> eq a b
+      | Not f' -> f'
       | _ -> T.simple_app ~kind ~ty Sym.Base.not_ [f]
 
     let and_ = function

@@ -176,7 +176,7 @@ end
 
 (** {2 Subsumption Index} *)
 
-type lits = (term * term * bool) Sequence.t
+type lits = (bool * term Sequence.t) Sequence.t
   (** Sequence of literals, as a cheap abstraction on query clauses *)
 
 module type CLAUSE = sig

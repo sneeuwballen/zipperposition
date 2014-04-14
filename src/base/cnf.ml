@@ -140,7 +140,9 @@ let rec nnf f =
   match F.view f with
   | F.Atom _
   | F.Neq _
-  | F.Eq _ -> f
+  | F.Eq _
+  | F.True
+  | F.False -> f
   | F.Not f' ->
       begin match F.view f' with
       | F.Not f'' -> nnf f''
@@ -178,8 +180,6 @@ let rec nnf f =
       [ F.Base.or_ [f1; f2]; F.Base.or_ [F.Base.not_ f1; F.Base.not_ f2] ])
   | F.Forall (varty,f') -> F.Base.__mk_forall ~varty (nnf f')
   | F.Exists (varty,f') -> F.Base.__mk_exists ~varty (nnf f')
-  | F.True
-  | F.False -> f
 
 (* evaluate [f] in the given [env], and then unshift remaining free DB vars *)
 let __eval_and_unshift env f =
@@ -456,17 +456,23 @@ type clause = F.t list
 type options =
   | DistributeExists
   | DisableRenaming
+  | InitialProcessing of (form -> form) (** any processing, at the beginning *)
+  | PostNNF of (form -> form)  (** any processing that keeps negation at leaves *)
+  | PostSkolem of (form -> form) (** must not introduce variables nor negations *)
   | DefLimit of int  (* limit size above which names are used *)
 
 let default_def_limit = 24
 
 (* simplify formulas and rename them. May introduce new formulas *)
-let simplify_and_rename ~ctx ~cache ~disable_renaming ~limit l =
+let simplify_and_rename ~ctx ~cache ~disable_renaming ~preprocess ~limit l =
   let l' = List.map
     (fun f ->
       let f = F.flatten f in
+      (* preprocessing *)
+      let f = List.fold_left (|>) f preprocess in
+      (* simplification *)
       let f = F.simplify f in
-      if is_cnf f || disable_renaming
+      if disable_renaming || is_cnf f
         then f
         else introduce_defs ~ctx ~cache ~limit f)
     l
@@ -489,7 +495,19 @@ let simplify_and_rename ~ctx ~cache ~disable_renaming ~limit l =
 (* Transform the clauses into proper CNF; returns a list of clauses *)
 let cnf_of_list ?(opts=[]) ?(ctx=Skolem.create Signature.empty) l =
   let acc = ref [] in
+  (* read options *)
   let disable_renaming = List.mem DisableRenaming opts in
+  let preprocess = Util.list_fmap
+    (function InitialProcessing f -> Some f | _ -> None)
+    opts
+  and post_nnf = Util.list_fmap
+    (function PostNNF f -> Some f | _ -> None)
+    opts
+  and post_skolem = Util.list_fmap
+    (function PostSkolem f -> Some f | _ -> None)
+    opts
+  in
+  (* definition limit *)
   let def_limit = List.fold_left
     (fun acc opt -> match opt with
       | DefLimit i -> i
@@ -498,7 +516,8 @@ let cnf_of_list ?(opts=[]) ?(ctx=Skolem.create Signature.empty) l =
   in
   let cache = FPolTbl.create 128 in
   (* simplify and introduce definitions *)
-  let l = simplify_and_rename ~ctx ~cache ~disable_renaming ~limit:def_limit l in
+  let l = simplify_and_rename ~ctx ~cache ~disable_renaming
+    ~preprocess ~limit:def_limit l in
   (* reduce the new formulas to CNF *)
   List.iter (fun f ->
     Util.debug 4 "reduce %a to CNF..." F.pp f;
@@ -528,6 +547,8 @@ let cnf_of_list ?(opts=[]) ?(ctx=Skolem.create Signature.empty) l =
         let f = F.simplify f in
         Util.debug 4 "... simplified: %a" F.pp f;
         let f = nnf f in
+        (* processing post-nnf *)
+        let f = List.fold_left (|>) f post_nnf in
         Util.debug 4 "... NNF: %a" F.pp f;
         let distribute_exists = List.mem DistributeExists opts in
         let f = miniscope ~distribute_exists f in
@@ -536,6 +557,8 @@ let cnf_of_list ?(opts=[]) ?(ctx=Skolem.create Signature.empty) l =
         Skolem.clear_var ~ctx;
         F.iter (Skolem.update_var ~ctx) f;
         let f = skolemize ~ctx f in
+        (* processing post-skolemization *)
+        let f = List.fold_left (|>) f post_skolem in
         Util.debug 4 "... skolemized: %a" F.pp f;
         let clauses = to_cnf f in
         clauses
