@@ -1240,7 +1240,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           (* negate literal *)
           lits.(i) <- Lit.negate lits.(i);
           (* test for subsumption *)
-          SubsumIdx.retrieve_subsuming !_idx_fv (Lits.Seq.as_eqns lits) ()
+          SubsumIdx.retrieve_subsuming !_idx_fv (PS.to_idx_lits lits) ()
             (fun () c' ->
                 if (try_eq_subsumption && eq_subsumes (C.lits c') lits)
                  || subsumes (C.lits c') lits

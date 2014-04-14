@@ -62,6 +62,8 @@ module type S = sig
     and type E.rhs = FOTerm.t
   module SubsumptionIndex : Index.SUBSUMPTION_IDX with type C.t = C.t
 
+  val to_idx_lits : Literal.t array -> Index.lits
+
   (** {6 Common Interface for Sets} *)
 
   module type CLAUSE_SET = sig
@@ -91,7 +93,8 @@ module type S = sig
     include CLAUSE_SET
 
     val remove_by_id : int Sequence.t -> unit
-    (** Remove clauses by their ID *)
+    (** Remove clauses by their ID. This will {b NOT} trigger
+        the signal {!on_remove_clause}. *)
 
     val clauses : unit -> C.CSet.t
     (** Current set of clauses *)
@@ -145,10 +148,19 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
       if C.is_oriented_rule c then 2 else 1
   end)
 
+  let to_idx_lits lits =
+    Sequence.of_array lits
+    |> Sequence.map
+      (function
+        | Lit.Equation (l, r, sign) -> sign, Sequence.of_list [l;r]
+        | Lit.Prop (p, sign) -> sign, Sequence.singleton p
+        | Lit.True -> true, Sequence.singleton T.TPTP.true_
+        | Lit.False -> false, Sequence.singleton T.TPTP.false_)
+
   module SubsumptionIndex = FeatureVector.Make(struct
     type t = C.t
     let cmp = C.compare
-    let to_lits = C.Seq.eqns
+    let to_lits c = to_idx_lits (C.lits c)
   end)
 
   (* XXX: no customization of indexing for now
