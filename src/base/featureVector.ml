@@ -58,17 +58,13 @@ module Make(C : Index.CLAUSE) = struct
     let size_plus =
       { name = "size+";
         f = (fun lits ->
-          let cnt = ref 0 in
-          Sequence.iter (fun (_,_,sign) -> if sign then incr cnt) lits;
-          !cnt);
+          Sequence.filter (fun (sign, _) -> sign) lits |> Sequence.length);
       }
 
     let size_minus =
       { name = "size-";
         f = (fun lits ->
-          let cnt = ref 0 in
-          Sequence.iter (fun (_,_,sign) -> if not sign then incr cnt) lits;
-          !cnt);
+          Sequence.filter (fun (sign, _) -> not sign) lits |> Sequence.length);
       }
 
     let rec _depth_term depth t = match ST.view t with
@@ -91,18 +87,16 @@ module Make(C : Index.CLAUSE) = struct
     let sum_of_depths =
       { name = "sum_of_depths";
         f = (fun lits -> 
-          let n = ref 0 in
-          Sequence.iter
-            (fun (l,r,_) ->
-              n := !n + _depth_term 0 (l:T.t:>ST.t) + _depth_term 0 (r:T.t:>ST.t)
-            ) lits;
-          !n);
+          Sequence.fold
+            (fun acc (_, terms) ->
+              Sequence.fold (fun acc t -> acc + _depth_term 0 (t:T.t:>ST.t)) acc terms
+            ) 0 lits);
       }
 
     let _select_sign ~sign lits =
-      lits |> Sequence.filter (fun (_,_,sign') -> sign = sign')
+      lits |> Sequence.filter (fun (sign', _) -> sign = sign')
 
-    let _terms_of_lit (l,r,_) k = k l; k r
+    let _terms_of_lit (_, t) k = t k
 
     (* sequence of symbols of clause, of given sign *)
     let _symbols ~sign lits =
@@ -131,13 +125,15 @@ module Make(C : Index.CLAUSE) = struct
       Sequence.max symbs_depths 0
 
     let _max_depth_lits ~sign symb lits =
-      let depth = ref 0 in
-      Sequence.iter
-        (fun (l,r,sign') -> if sign = sign'
-          then depth := max !depth
-            (max (max_depth_term symb l) (max_depth_term symb r)))
-        lits;
-      !depth
+      Sequence.fold
+        (fun depth (sign', terms) ->
+          if sign = sign'
+          then Sequence.fold
+            (fun depth t -> max depth (max_depth_term symb t))
+            depth terms
+          else depth
+        )
+        0 lits
 
     let max_depth_plus symb =
       { name = Util.sprintf "max_depth+(%a)" Symbol.pp symb;
