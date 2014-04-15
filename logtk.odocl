@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: d538fa26f700509129119a4b3a23df20)
+# DO NOT EDIT (digest: 83484c79b47015ea317391985b9b29eb)
 src/base/Symbol
 src/base/ScopedTerm
 src/base/FOTerm
@@ -47,6 +47,7 @@ src/base/lib/BV
 src/base/lib/PartialOrder
 src/base/lib/KList
 src/base/lib/LazyList
+src/base/lib/IArray
 src/meta/Encoding
 src/meta/Reasoner
 src/meta/Plugin

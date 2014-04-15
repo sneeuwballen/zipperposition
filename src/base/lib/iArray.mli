@@ -24,51 +24,55 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {6 Generic multisets} *)
-
-(** Those multiset are not optimized for high-cardinality of single
-    elements, but rather for operations such as multiset comparisons
-*)
+(** {1 Immutable Arrays} *)
 
 type 'a t
-  (** A multiset of elements of type 'a *)
+(** Array of values of type 'a *)
 
 val of_list : 'a list -> 'a t
-  (** Multiset from list *)
-
-val create : 'a IArray.t -> 'a t
-  (** Non-copying creation. *)
-
-val create_unsafe : 'a array -> 'a t
-  (** Non-copying creation.  The array is used by the multiset, so it should
-      not be modified later! *)
-
-val size : 'a t -> int
-  (** Number of distinct occurrences of elements *)
-
-val is_empty : 'a t -> bool
-  (** Is the multiset empty? *)
-
-val iter : 'a t -> ('a -> unit) -> unit
-  (** Iterate on distinct occurrences of elements *)
-
-val eq : ('a -> 'a -> Comparison.t) -> 'a t -> 'a t -> bool
-  (** Check equality of two multisets *)
-
-val compare : ('a -> 'a -> Comparison.t) -> 'a t -> 'a t -> Comparison.t
-  (** Compare two multisets with the multiset extension of the
-      given ordering *)
-
-val is_max : ('a -> 'a -> Comparison.t) -> 'a -> 'a t -> bool
-  (** Is the given element maximal (ie not dominated) within the multiset? *)
-
-val max : ('a -> 'a -> Comparison.t) -> 'a t -> BV.t
-  (** Maximal elements of the multiset, w.r.t the given ordering. *)
-
-val get : 'a t -> int -> 'a
-  (** [get m i] returns the i-th element ([i] must be < [size m]) *)
-
-val to_array : 'a t -> 'a IArray.t
-  (** Extract the underlying array *)
 
 val to_list : 'a t -> 'a list
+
+val of_array_unsafe : 'a array -> 'a t
+  (** Take ownership of the given array. Careful, the array must {b NOT}
+      be modified afterwards! *)
+
+val empty : 'a t
+
+val length : _ t -> int
+
+val singleton : 'a -> 'a t
+
+val doubleton : 'a -> 'a -> 'a t
+
+val make : int -> 'a -> 'a t
+
+val init : int -> (int -> 'a) -> 'a t
+
+val get : 'a t -> int -> 'a
+
+val set : 'a t -> int -> 'a -> 'a t
+(** Copy the array and modify its copy *)
+
+val map : ('a -> 'b) -> 'a t -> 'b t
+
+val mapi : (int -> 'a -> 'b) -> 'a t -> 'b t
+
+val append : 'a t -> 'a t -> 'a t
+
+val iter : ('a -> unit) -> 'a t -> unit
+
+val iteri : (int -> 'a -> unit) -> 'a t -> unit
+
+val foldi : ('a -> int -> 'b -> 'a) -> 'a -> 'b t -> 'a
+
+val fold : ('a -> 'b -> 'a) -> 'a -> 'b t -> 'a
+
+val for_all : ('a -> bool) -> 'a t -> bool
+
+val exists : ('a -> bool) -> 'a t -> bool
+
+module Seq : sig
+  val to_seq : 'a t -> 'a Sequence.t
+  val of_seq : 'a Sequence.t -> 'a t
+end

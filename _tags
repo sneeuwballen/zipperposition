@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 67fcac67993daa741118d57b9e0ae6c4)
+# DO NOT EDIT (digest: 80003ba83690d41ad2f596fabc1e5d0c)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -62,6 +62,7 @@
 "src/base/lib/partialOrder.cmx": for-pack(Logtk)
 "src/base/lib/kList.cmx": for-pack(Logtk)
 "src/base/lib/lazyList.cmx": for-pack(Logtk)
+"src/base/lib/iArray.cmx": for-pack(Logtk)
 <src/base/*.ml{,i}>: package(unix)
 <src/base/*.ml{,i}>: package(zarith)
 <src/base/lib/*.ml{,i}>: package(unix)
@@ -187,6 +188,6 @@ true: use_menhir
 
 <**/*.ml>: warn_K, warn_Y, warn_X
 
-<src/base/{scopedTerm,FOTerm,HOTerm,Type,lib/BV}.cmx>: inline(15)
+<src/base/{scopedTerm,FOTerm,HOTerm,Type,lib/BV,lib/IArray}.cmx>: inline(15)
 <src/base/{substs,unif}.cmx>: inline(8)
 #<src/**/*.cmx>: inline(10)

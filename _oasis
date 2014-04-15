@@ -56,7 +56,7 @@ Library "logtk"
                     lib/Sequence, lib/Cache, lib/Bij, lib/Bencode,
                     lib/PersistentHashtbl, lib/Monad, lib/ParseLocation,
                     lib/Multiset, lib/BV, lib/PartialOrder, lib/KList,
-                    lib/LazyList
+                    lib/LazyList, lib/IArray
   BuildDepends:     zarith,unix
   XMETARequires:    zarith,unix
 
