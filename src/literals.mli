@@ -74,7 +74,12 @@ end
 module Pos : sig
   val at : t -> Position.t -> term
     (** Return the subterm at the given position, or
-        @raise Not_found if no such position is valid *)
+        @raise Invalid_argument if the position is not valid *)
+
+  val lit_at : t -> Position.t -> Literal.t * Position.t
+    (** Lookup which literal the position is about, return it
+        and the rest of the position.
+        @raise Invalid_argument if the position is not valid *)
 
   val replace : t -> at:Position.t -> by:term -> unit
     (** In-place modification of the array, in which the subterm at given
@@ -88,6 +93,9 @@ module Pos : sig
   val tail : Position.t -> Position.t
     (** sub-position
         @raise Invalid_argument if the position is incorrect *)
+
+  val cut : Position.t -> int * Position.t
+    (** Index + literal position *)
 end
 
 module Conv : sig

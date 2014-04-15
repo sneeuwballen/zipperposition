@@ -155,23 +155,41 @@ end
 (** {3 High Order combinators} *)
 
 module Pos = struct
+  let _fail_lits lits pos =
+    let msg = Util.sprintf "invalid position %a in lits %a"
+      Position.pp pos (Util.pp_array Lit.pp) lits
+    in invalid_arg msg
+
+  let _fail_pos pos =
+    let msg = Util.sprintf "invalid literal-array position %a" Position.pp pos in
+    invalid_arg msg
+
   let at lits pos = match pos with
     | Position.Arg (idx, pos') when idx >= 0 && idx < Array.length lits ->
       Lit.Pos.at lits.(idx) pos'
-    | _ -> raise Not_found
+    | _ -> _fail_lits lits pos
+
+  let lit_at lits pos = match pos with
+    | Position.Arg (i, pos') when i >= 0 && i < Array.length lits ->
+      lits.(i), pos'
+    | _ -> _fail_lits lits pos
 
   let replace lits ~at ~by = match at with
     | Position.Arg (idx, pos') when idx >= 0 && idx < Array.length lits ->
       lits.(idx) <- Lit.Pos.replace lits.(idx) ~at:pos' ~by
-    | _ -> invalid_arg (Util.sprintf "invalid position %a in lits" Position.pp at)
+    | _ -> _fail_lits lits at
 
   let idx = function
     | Position.Arg(i, _) -> i
-    | _ -> invalid_arg "not a proper literal array position"
+    | p -> _fail_pos p
 
   let tail = function
     | Position.Arg (_, pos') -> pos'
-    | _ -> invalid_arg "not a proper literal array position"
+    | p -> _fail_pos p
+
+  let cut = function
+    | Position.Arg (i, pos') -> i, pos'
+    | p -> _fail_pos p
 end
 
 module Conv = struct
