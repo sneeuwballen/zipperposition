@@ -58,6 +58,9 @@ val (++) : t -> t -> t
 
 type 'a comparator = 'a -> 'a -> t
 
+val (@>>) : 'a comparator -> 'a comparator -> 'a comparator
+  (** Combination of comparators that work on the same values *)
+
 type ('a, 'b) combination
   (** Lexicographic combination of comparators. It is, roughly,
       equivalent to ['a -> 'a -> 'b] *)

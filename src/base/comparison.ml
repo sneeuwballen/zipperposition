@@ -68,6 +68,11 @@ type 'a comparator = 'a -> 'a -> t
 
 let (++) = lexico
 
+let (@>>) f g x y =
+  match f x y with
+  | Incomparable -> g x y
+  | res -> res
+
 type ('a,'b) combination = {
   call : 'a -> 'a -> 'b;
   ignore : t -> 'a -> 'a -> 'b;
