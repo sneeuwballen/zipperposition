@@ -287,6 +287,15 @@ let apply_subst ~renaming subst m sc_m =
 let is_ground m =
   List.for_all (fun (_, t) -> T.is_ground t) m.terms
 
+let fold f acc m =
+  Util.list_foldi
+    (fun acc i (n, t) -> f acc i n t)
+    acc m.terms
+
+let nth n m =
+  try List.nth m.terms n
+  with _ -> raise Not_found
+
 let pp buf e =
   let pp_pair buf (s, t) =
     if e.num.cmp s e.num.one = 0
@@ -448,6 +457,33 @@ module Int = struct
       product m1 d2, product m2 d1
     with Not_found ->
       raise (Invalid_argument "Monome.reduce_same_factor")
+
+  (* multiset-like comparison *)
+  let compare f m1 m2 =
+    let m = difference m1 m2 in
+    let maxterms = Multiset.max_l f (terms m) in
+    (* [m1] dominates [m2] if some maximal term has a strictly positive
+       coeff in [m1 - m2]. *)
+    let m1_dominates =
+      List.exists
+        (fun t -> match find m t with
+        | None -> false
+        | Some n -> Z.sign n > 0)
+        maxterms
+    and m2_dominates =
+      List.exists
+        (fun t -> match find m t with
+        | None -> false
+        | Some n -> Z.sign n < 0)
+        maxterms
+    in
+    match m1_dominates, m2_dominates with
+    | false, false ->
+        assert (is_const m && Z.sign m.const = 0);
+        Comparison.Eq
+    | true, true -> Comparison.Incomparable
+    | true, false -> Comparison.Gt
+    | false, true -> Comparison.Lt
 
   (** {2 Specific to Int} *)
 

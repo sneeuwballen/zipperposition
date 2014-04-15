@@ -138,8 +138,8 @@ let neg lits =
 
 (** Bitvector that indicates which of the literals are maximal *)
 let maxlits ~ord lits =
-  let m = Multiset.create_a lits in
-  let bv = Multiset.max (fun lit1 lit2 -> Lit.compare_partial ~ord lit1 lit2) m in
+  let m = Multiset.create_unsafe lits in
+  let bv = Multiset.max (Lit.Comp.compare ~ord) m in
   bv
 
 let is_trivial lits =

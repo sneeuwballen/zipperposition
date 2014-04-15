@@ -72,6 +72,7 @@ module TotalOrder : sig
 
   val map : (term -> term) -> lit -> lit
   val apply_subst : renaming:Substs.Renaming.t -> Substs.t -> lit -> scope -> lit
+  val neg : lit -> lit
 
   val less_const : t -> term  (** typed constant *)
   val lesseq_const : t -> term  (** typed constant *)

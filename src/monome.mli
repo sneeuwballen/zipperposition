@@ -120,6 +120,12 @@ val apply_subst : renaming:Substs.Renaming.t ->
 val is_ground : _ t -> bool
   (** Are there no variables in the monome? *)
 
+val fold : ('a -> int -> 'b -> term -> 'a) -> 'a -> 'b t -> 'a
+  (** Fold over terms *)
+
+val nth : int -> 'a t -> ('a * term)
+  (** @raise Not_found if the index is invalid *)
+
 val pp : Buffer.t -> 'a t -> unit
 val to_string : 'a t -> string
 val fmt : Format.formatter -> 'a t -> unit
@@ -176,6 +182,10 @@ module Int : sig
     (** [reduce_same_factor m1 m2 t] multiplies [m1] and [m2] by
         some constants, so that their coefficient for [t] is the same.
         @raise Invalid_argument if [t] does not belong to [m1] or [m2] *)
+
+  val compare : (term -> term -> Comparison.t) -> t -> t -> Comparison.t
+    (** Compare monomes as if they were multisets of terms, the coefficient
+        in front of a term being its multiplicity. *)
 
   (** {2 Modular Computations} *)
 

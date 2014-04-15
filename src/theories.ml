@@ -83,6 +83,10 @@ module TotalOrder = struct
     let right = Substs.FO.apply ~renaming subst lit.right s_lit in
     { lit with left; right; tyargs; }
 
+  (* not a<b is b<=a in a total ordering *)
+  let neg lit =
+    { lit with left=lit.right; right=lit.left; strict=not lit.strict; }
+
   let less_const instance = T.const ~ty:instance.ty instance.less
   let lesseq_const instance = T.const ~ty:instance.ty instance.lesseq
 

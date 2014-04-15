@@ -52,7 +52,7 @@ type t =
   | Prop of term * bool
   | Ineq of Theories.TotalOrder.lit
   | Arith of arith_op * Z.t Monome.t * Z.t Monome.t
-  | Divides of Z.t * int * Z.t Monome.t  (* d^k divides the sum *)
+  | Divides of Z.t * int * Z.t Monome.t * bool
 
 let eq l1 l2 =
   match l1, l2 with
@@ -121,24 +121,6 @@ let are_variant lit1 lit2 =
   with Unif.Fail ->
     false
 
-(* TODO: remove
-let to_multiset lit = match lit with
-  | Equation (l, r, true) -> Multiset.create_a [|l; r|]
-  | Equation (l, r, false) -> Multiset.create_a [|l; l; r; r|]
-  | Prop (p, true) -> Multiset.create_a [|p; T.TPTP.true_ |]
-  | Prop (p, false) -> Multiset.create_a [|p; p; T.TPTP.true_ ; T.TPTP.true_ |]
-  | True -> Multiset.create_a [|T.TPTP.true_ ; T.TPTP.true_|]
-  | False -> Multiset.create_a
-    [|T.TPTP.true_; T.TPTP.true_; T.TPTP.true_; T.TPTP.true_|]
-*)
-
-let compare_partial ~ord l1 l2 = assert false
-(*
-  let m1 = to_multiset l1 in
-  let m2 = to_multiset l2 in
-  Multiset.compare (fun t1 t2 -> Ordering.compare ord t1 t2) m1 m2
-  *)
-
 let fold f acc lit = match lit with
   | Equation (l, r, _) -> f (f acc l) r
   | Prop (p, _) -> f acc p
@@ -146,7 +128,7 @@ let fold f acc lit = match lit with
   | Arith (_, m1, m2) ->
       let acc = Sequence.fold f acc (Monome.Seq.terms m1) in
       Sequence.fold f acc (Monome.Seq.terms m2)
-  | Divides (_, _, m) ->
+  | Divides (_, _, m, _) ->
       Sequence.fold f acc (Monome.Seq.terms m)
   | True
   | False -> acc
@@ -159,6 +141,18 @@ let weight lit =
 
 let depth lit =
   fold (fun acc t -> max acc (T.depth t)) 0 lit
+
+let sign = function
+  | Prop (_, sign)
+  | Equation (_, _, sign)
+  | Divides (_, _, _, sign) -> sign
+  | Arith (Different, _, _)
+  | False -> false
+  | Ineq _
+  | True
+  | Arith (Equal, _, _)
+  | Arith (Lesseq, _, _)
+  | Arith (Less, _, _) -> true
 
 let is_pos lit = match lit with
   | Equation (_,_,sign)
@@ -258,8 +252,10 @@ let mk_arith_neq m1 m2 = mk_arith Different m1 m2
 let mk_arith_less m1 m2 = mk_arith Less m1 m2
 let mk_arith_lesseq m1 m2 = mk_arith Lesseq m1 m2
 
-let mk_divides n ~power m =
-  Divides (n, power, m)
+let mk_divides ?(sign=true) n ~power m =
+  Divides (n, power, m, sign)
+
+let mk_not_divides n ~power m = mk_divides ~sign:false n ~power m
 
 module Seq = struct
   let terms lit k = match lit with
@@ -267,7 +263,7 @@ module Seq = struct
     | Prop(p, _) -> k p
     | Ineq olit -> k olit.TO.left; k olit.TO.right
     | Arith (_, m1, m2) -> Monome.Seq.terms m1 k; Monome.Seq.terms m2 k
-    | Divides (_, _, m) -> Monome.Seq.terms m k
+    | Divides (_, _, m, _) -> Monome.Seq.terms m k
     | True
     | False -> ()
 
@@ -284,8 +280,8 @@ module Seq = struct
     | Ineq olit -> true, Sequence.of_list [olit.TO.left; olit.TO.right]
     | Arith (_, m1, m2) ->
       true, Sequence.append (Monome.Seq.terms m1) (Monome.Seq.terms m2)
-    | Divides (_, _, m) ->
-      true, Monome.Seq.terms m
+    | Divides (_, _, m, sign) ->
+      sign, Monome.Seq.terms m
 end
 
 let symbols lit =
@@ -328,8 +324,8 @@ let map f = function
   | Ineq olit -> Ineq (TO.map f olit)
   | Arith (op, m1, m2) ->
     Arith (op, Monome.map f m1, Monome.map f m2)
-  | Divides (n, k, m) ->
-    Divides (n, k, Monome.map f m)
+  | Divides (n, k, m, sign) ->
+    Divides (n, k, Monome.map f m, sign)
   | True -> True
   | False -> False
 
@@ -347,8 +343,8 @@ let apply_subst ~renaming subst lit scope =
     Arith (op,
       Monome.apply_subst ~renaming subst m1 scope,
       Monome.apply_subst ~renaming subst m1 scope)
-  | Divides (n, k, m) ->
-    Divides (n, k, Monome.apply_subst ~renaming subst m scope)
+  | Divides (n, k, m, sign) ->
+    Divides (n, k, Monome.apply_subst ~renaming subst m scope, sign)
   | True
   | False -> lit
 
@@ -362,12 +358,25 @@ let negate lit = match lit with
   | Prop (p, sign) -> Prop (p, not sign)
   | True -> False
   | False -> True
+  | Ineq olit -> Ineq (TO.neg olit)
+  | Arith (op, m1, m2) ->
+      begin match op with
+      | Equal -> Arith (Different, m1, m2)
+      | Different -> Arith (Equal, m1, m2)
+      | Less -> Arith (Lesseq, m2, m1)
+      | Lesseq -> Arith (Less, m2, m1)
+      end
+  | Divides (n, k, m, sign) -> Divides (n, k, m, not sign)
 
-let add_vars set = function
+let add_vars set lit = match lit with
   | Equation (l, r, _) ->
     T.add_vars set l;
     T.add_vars set r
   | Prop (p, _) -> T.add_vars set p
+  | Divides _
+  | Ineq _
+  | Arith _ ->
+      Seq.terms lit (T.add_vars set)
   | True
   | False -> ()
 
@@ -379,14 +388,144 @@ let vars lit =
 let var_occurs v lit = match lit with
   | Prop (p,_) -> T.var_occurs v p
   | Equation (l,r,_) -> T.var_occurs v l || T.var_occurs v r
+  | Divides _
+  | Ineq _
+  | Arith _ -> Sequence.exists (T.var_occurs ~var:v) (Seq.terms lit)
   | True
   | False -> false
 
 let is_ground lit = match lit with
   | Equation (l,r,_) -> T.is_ground l && T.is_ground r
   | Prop (p, _) -> T.is_ground p
+  | Divides _
+  | Ineq _
+  | Arith _ -> Sequence.for_all T.is_ground (Seq.terms lit)
   | True
   | False -> true
+
+let root_terms l =
+  Seq.terms l |> Sequence.to_rev_list
+
+(* comparison should live in its scope *)
+module Comp = struct
+  module O = Ordering
+  module C = Comparison
+
+  let _maxterms2 ~ord l r =
+    match O.compare ord l r with
+    | C.Gt -> [l]
+    | C.Lt -> [r]
+    | C.Eq -> [l]
+    | C.Incomparable -> [l; r]
+
+  (* maximal terms of the literal *)
+  let max_terms ~ord lit =
+    match lit with
+    | Prop (p, _) -> [p]
+    | Equation (l, r, _) -> _maxterms2 ~ord l r
+    | Ineq olit -> _maxterms2 ~ord olit.TO.left olit.TO.right
+    | Divides _
+    | Arith _ ->
+        Multiset.max_l (Ordering.compare ord) (root_terms lit)
+    | True
+    | False -> []
+
+  (* general comparison is a bit complicated.
+    - First we compare literals l1 and l2
+        by their (set of potential) maximal terms.
+    - then by their polarity (neg > pos)
+    - then by their kind (regular equation/prop on bottom)
+    - then, l1 and l2 must be of the same kind, so we use a
+        kind-specific comparison.
+  *)
+
+  let _cmp_by_maxterms ~ord l1 l2 =
+    match l1, l2 with
+    | Prop (p1, _), Prop (p2, _) -> Ordering.compare ord p1 p2
+    | _ ->
+        let t1 = root_terms l1 and t2 = root_terms l2 in
+        Multiset.compare_l (Ordering.compare ord) t1 t2
+
+  (* negative literals dominate *)
+  let _cmp_by_polarity l1 l2 =
+    let sign1 = sign l1 in
+    let sign2 = sign l2 in
+    match sign1, sign2 with
+    | true, true
+    | false, false -> Comparison.Eq
+    | true, false -> Comparison.Lt
+    | false, true -> Comparison.Gt
+
+  let _cmp_by_kind l1 l2 =
+    let _to_int = function
+      | False -> 0
+      | True -> 1
+      | Equation _
+      | Prop _ -> 2  (* eqn and prop are really the same thing *)
+      | Ineq _ -> 4
+      | Arith _ -> 5
+      | Divides _ -> 6
+    and _op_to_int = function
+      | Less -> 3
+      | Lesseq -> 2
+      | Different -> 1
+      | Equal -> 0
+    in
+    match l1, l2 with
+      | Arith (op1, _, _), Arith (op2, _, _) ->
+        C.of_total (_op_to_int op1 - _op_to_int op2)
+      | _ ->
+        C.of_total (_to_int l1 - _to_int l2)
+
+  (* by multiset of terms *)
+  let _cmp_by_term_multiset ~ord l1 l2 =
+    let t1 = root_terms l1 and t2 = root_terms l2 in
+    Multiset.compare_l (Ordering.compare ord) t1 t2
+
+  let _cmp_specific ~ord l1 l2 =
+    match l1, l2 with
+    | Prop _, Prop _
+    | Equation _, Equation _
+    | Prop _, Equation _
+    | Equation _, Prop _ ->
+        _cmp_by_term_multiset ~ord l1 l2
+    | Ineq olit1, Ineq olit2 ->
+        begin match olit1.TO.strict, olit2.TO.strict with
+        | true, true
+        | false, false -> _cmp_by_term_multiset ~ord l1 l2
+        | true, false -> C.Gt
+        | false, true -> C.Lt
+        end
+    | Arith (op1, x1, x2), Arith (op2, y1, y2) ->
+        assert (op1 = op2);
+        let cmp_term = Ordering.compare ord in
+        let cmp_monomes = Monome.Int.compare cmp_term in
+        let left = Multiset.create (IArray.doubleton x1 x2) in
+        let right = Multiset.create (IArray.doubleton y1 y2) in
+        Multiset.compare cmp_monomes left right
+    | Divides (n1, k1, m1, sign1), Divides (n2, k2, m2, sign2) ->
+        assert (sign1=sign2);
+        let c = Z.compare n1 n2 in
+        if c <> 0 then C.of_total c  (* live in totally distinct Z/nZ *)
+        else
+          if is_ground l1 && is_ground l2
+          then
+            C.Incomparable
+            (* TODO: Bezout-normalize, then actually compare Monomes. *)
+          else C.Incomparable
+    | _, _ ->
+        assert false
+
+
+  let compare ~ord l1 l2 =
+    let f = Comparison.(
+      _cmp_by_maxterms ~ord @>>
+      _cmp_by_polarity @>>
+      _cmp_by_kind @>>
+      _cmp_specific ~ord
+    ) in
+    f l1 l2
+end
 
 module Pos = struct
   let at lit pos = match lit, pos with
@@ -408,8 +547,9 @@ module Pos = struct
     | False, Position.Left Position.Stop -> lit
     | _ -> invalid_arg (Util.sprintf "wrong pos %a" Position.pp at)
 
+  module P = Position
+
   let cut lit pos =
-    let module P = Position in
     match lit, pos with
     | Equation _, P.Left pos' -> P.(left stop), pos'
     | Equation _, P.Right pos' -> P.(right stop), pos'
@@ -421,12 +561,39 @@ module Pos = struct
         P.(left @@ arg i stop), pos'
     | Arith (_, _, _), P.Right (P.Arg (i, pos')) ->
         P.(right @@ arg i stop), pos'
-    | _ -> invalid_arg "not a proper literal position"
+    | _ -> invalid_arg "cut: not a proper literal position"
+
+  let root_term lit pos =
+    at lit (fst (cut lit pos))
+
+  let term_pos lit pos = snd (cut lit pos)
 
   let is_max_term ~ord lit pos =
-    assert false
-    (* TODO: gather all atomic subterms, compare the one at
-     * [fst (cut lit pos)] with them *)
+    match lit, pos with
+    | Equation (l, r, _), P.Left _ ->
+        Ordering.compare ord l r <> Comparison.Lt
+    | Equation (l, r, _), P.Right _ ->
+        Ordering.compare ord r l <> Comparison.Lt
+    | Prop _, _ -> true
+    | Ineq olit, P.Left _ ->
+        Ordering.compare ord olit.TO.left olit.TO.right <> Comparison.Lt
+    | Ineq olit, P.Right _ ->
+        Ordering.compare ord olit.TO.right olit.TO.left <> Comparison.Lt
+    | Arith (_, m1, m2), _ ->
+        (* [t] dominates all atomic terms? *)
+        let t = root_term lit pos in
+        Sequence.for_all
+          (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
+          (Seq.terms lit)
+    | Divides (_, _, m, _), _ ->
+        let t = root_term lit pos in
+        Sequence.for_all
+          (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
+          (Monome.Seq.terms m)
+    | True, _
+    | False, _ -> true  (* why not. *)
+    | Equation _, _
+    | Ineq _, _ -> invalid_arg "is_max_term: not a proper literal position"
 end
 
 module Conv = struct
@@ -501,17 +668,18 @@ module Conv = struct
             let cst = T.const ~ty sym in
             F.Base.atom (T.app_full cst [Type.TPTP.int] [t1; t2])
         end
-      | Divides (n, k, m) ->
+      | Divides (n, k, m, sign) ->
         let nk = Z.pow n k in
         let t = Monome.Int.to_term m in
         let sym = Symbol.TPTP.Arith.remainder_e in
         let ty = Signature.find_exn Signature.TPTP.Arith.base sym in
         let cst = T.const ~ty sym in
         (* $remainder_e(t, nk) = 0 *)
-        F.Base.eq
+        let f = F.Base.eq
           (T.const ~ty:Type.TPTP.int (Symbol.of_int 0))
           (T.app cst [t; T.const ~ty:Type.TPTP.int (Symbol.mk_int nk)])
-
+        in
+        if sign then f else F.Base.not_ f
 end
 
 module View = struct
@@ -555,7 +723,8 @@ let is_trivial lit = match lit with
   | Equation (l, r, false) -> false
   | Ineq olit ->
       not olit.TO.strict && T.eq olit.TO.left olit.TO.right
-  | Divides (d, k, m) -> Monome.is_const m && Z.sign (Monome.const m) = 0
+  | Divides (d, k, m, true) -> Monome.is_const m && Z.sign (Monome.const m) = 0
+  | Divides (d, k, m, false) -> Monome.is_const m && Z.sign (Monome.const m) > 0
   | Arith _ -> false  (* TODO *)
   | Prop (_, _) -> false
 
@@ -600,6 +769,18 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ~which ~ord ~subterms lit
     let acc = at_term
       ~pos:Position.(append position (right stop)) acc olit.TO.right in
     acc
+  | Arith (op, m1, m2) ->
+      let acc = Monome.fold
+        (fun acc i _ t -> at_term ~pos:Position.(left @@ arg i stop) acc t)
+        acc m1
+      in
+      Monome.fold
+        (fun acc i _ t -> at_term ~pos:Position.(right @@ arg i stop) acc t)
+        acc m2
+  | Divides (_, _, m, _) ->
+      Monome.fold
+        (fun acc i _ t -> at_term ~pos:Position.(arg i stop) acc t)
+        acc m
   | True
   | False -> acc
 
@@ -607,7 +788,8 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ~which ~ord ~subterms lit
 
 (* TODO: use hooks *)
 let pp_debug ?(hooks=[]) buf lit =
-  match lit with
+  if List.for_all (fun h -> not (h buf lit)) hooks
+  then match lit with
   | Prop (p, true) -> T.pp buf p
   | Prop (p, false) -> Printf.bprintf buf "¬%a" T.pp p
   | True -> Buffer.add_string buf "true"
@@ -625,9 +807,12 @@ let pp_debug ?(hooks=[]) buf lit =
       (match op with Equal -> "=" | Different -> "≠"
         | Less -> "<" | Lesseq -> "≤")
       Monome.pp r
-  | Divides (n, k, m) ->
+  | Divides (n, k, m, true) ->
     let nk = Z.pow n k in
     Printf.bprintf buf "%s | %a" (Z.to_string nk) Monome.pp m
+  | Divides (n, k, m, false) ->
+    let nk = Z.pow n k in
+    Printf.bprintf buf "¬(%s | %a)" (Z.to_string nk) Monome.pp m
 
 let pp_tstp buf lit =
   match lit with
@@ -651,9 +836,12 @@ let pp_tstp buf lit =
     Printf.bprintf buf "$less(%a, %a)" Monome.pp_tstp l Monome.pp_tstp r
   | Arith (Lesseq, l, r) ->
     Printf.bprintf buf "$lesseq(%a, %a)" Monome.pp_tstp l Monome.pp_tstp r
-  | Divides (n, k, m) ->
+  | Divides (n, k, m, true) ->
     let nk = Z.mul n (Z.of_int k) in
     Printf.bprintf buf "$remainder_e(%a, %s) = 0" Monome.pp_tstp m (Z.to_string nk)
+  | Divides (n, k, m, false) ->
+    let nk = Z.mul n (Z.of_int k) in
+    Printf.bprintf buf "$remainder_e(%a, %s) != 0" Monome.pp_tstp m (Z.to_string nk)
 
 (* TODO: make it a hook
 let pp_arith buf lit =
