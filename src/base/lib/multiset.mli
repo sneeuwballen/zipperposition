@@ -56,6 +56,9 @@ val compare : ('a -> 'a -> Comparison.t) -> 'a t -> 'a t -> Comparison.t
   (** Compare two multisets with the multiset extension of the
       given ordering *)
 
+val is_max : ('a -> 'a -> Comparison.t) -> 'a -> 'a t -> bool
+  (** Is the given element maximal (ie not dominated) within the multiset? *)
+
 val max : ('a -> 'a -> Comparison.t) -> 'a t -> BV.t
   (** Maximal elements of the multiset, w.r.t the given ordering. *)
 

@@ -99,6 +99,9 @@ let compare f m1 m2 =
     | _, _ -> Comparison.Incomparable  (* both have maximal elements *)
   end
 
+let is_max f x m =
+  Util.array_forall (fun y -> f x y <> Comparison.Lt) m
+
 (* maximal elements *)
 let max f m =
   (* at the beginning, all literals are potentially maximal *)

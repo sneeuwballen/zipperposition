@@ -96,6 +96,9 @@ module type S = sig
     val eq : term -> term -> t
     val neq : term -> term -> t
 
+    val mk_eq : bool -> term -> term -> t
+    val mk_atom : bool -> term -> t
+
     (** Quantifiers: the term list must be a list of free variables. *)
 
     val forall : term list -> t -> t
