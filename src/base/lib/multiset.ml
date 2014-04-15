@@ -63,6 +63,10 @@ let remove_eq f m1 m2 =
   done;
   bv1, bv2
 
+let to_array m = m
+
+let to_list = IArray.to_list
+
 let eq f m1 m2 =
   size m1 = size m2 &&
   (* could be optimized by failing as soon as some element of [m1] has
@@ -125,6 +129,32 @@ let max f m =
   done;
   bv
 
-let to_array m = m
+(* maximal elements of a list *)
+let max_l f l =
+  (* check whether [x] can be max.
+     [ok]: some max terms; [x]: current element;
+     [rest1]: to process but still candidates, [rest2]: remaining to compare.
+     It always holds that elements of [ok] and
+     [rest1 @ rest2] are incomparable or equal. *)
+  let rec check_max ok x rest1 rest2 =
+    match rest2 with
+    | [] -> start (x::ok) rest1 (* [x] is maximal, next! *)
+    | y :: rest2' ->
+        begin match f x y with
+        | Comparison.Gt -> check_max ok x rest1 rest2'  (* y can't be maximal *)
+        | Comparison.Lt -> start ok (rest1 @ rest2)  (* drop x, can't be max *)
+        | Comparison.Eq
+        | Comparison.Incomparable ->
+            (* keep [y] and [x], both can still be maximal *)
+            check_max ok x (y::rest1) rest2'
+        end
+  (* add maximal elements among [rest] to [ok]. *)
+  and start ok rest = match rest with
+    | [] -> ok
+    | x :: rest' -> check_max ok x [] rest'
+  in
+  start [] l
 
-let to_list = IArray.to_list
+(* for now, simple solution. *)
+let compare_l f l1 l2 =
+  compare f (IArray.of_list l1) (IArray.of_list l2)

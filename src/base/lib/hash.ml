@@ -29,7 +29,7 @@ type t = int
 type 'a hash_fun = 'a -> t
 
 let combine hash i =
-  abs (hash * 65599 + i)
+  (hash * 65599 + i) land max_int
 
 let (<<>>) = combine
 

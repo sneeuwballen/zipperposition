@@ -52,6 +52,14 @@ val is_empty : 'a t -> bool
 val iter : 'a t -> ('a -> unit) -> unit
   (** Iterate on distinct occurrences of elements *)
 
+val to_array : 'a t -> 'a IArray.t
+  (** Extract the underlying array *)
+
+val to_list : 'a t -> 'a list
+
+val get : 'a t -> int -> 'a
+  (** [get m i] returns the i-th element ([i] must be < [size m]) *)
+
 val eq : ('a -> 'a -> Comparison.t) -> 'a t -> 'a t -> bool
   (** Check equality of two multisets *)
 
@@ -65,10 +73,8 @@ val is_max : ('a -> 'a -> Comparison.t) -> 'a -> 'a t -> bool
 val max : ('a -> 'a -> Comparison.t) -> 'a t -> BV.t
   (** Maximal elements of the multiset, w.r.t the given ordering. *)
 
-val get : 'a t -> int -> 'a
-  (** [get m i] returns the i-th element ([i] must be < [size m]) *)
+val max_l : ('a -> 'a -> Comparison.t) -> 'a list -> 'a list
+  (** Maximal elements of a list *)
 
-val to_array : 'a t -> 'a IArray.t
-  (** Extract the underlying array *)
-
-val to_list : 'a t -> 'a list
+val compare_l : ('a -> 'a -> Comparison.t) -> 'a list -> 'a list -> Comparison.t
+  (** Compare two multisets represented as list of elements *)
