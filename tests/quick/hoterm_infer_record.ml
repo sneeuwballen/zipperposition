@@ -19,4 +19,4 @@ let t' = TypeInference.HO.convert ~ret:Type.TPTP.i ~generalize:false ~ctx t;;
 TypeInference.Ctx.clear ctx;;
 let t'' = TypeInference.HO.convert ~ret:Type.TPTP.i ~generalize:true ~ctx t;;
 
-print_endline "... OK";;
+ok ();;

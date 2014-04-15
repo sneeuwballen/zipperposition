@@ -20,4 +20,5 @@ let () =
       failwith (Printf.sprintf "error : %s\n" msg)
 ;;
 
-print_endline "... OK";;
+ok ();;
+

@@ -56,5 +56,9 @@ let pform s =
 ;;
 
 
+let ok () =
+  print_endline "... OK";
+  exit 0;;
+
 (* vim:syntax=ocaml
 *)
