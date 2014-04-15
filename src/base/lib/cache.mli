@@ -70,6 +70,12 @@ module type S2 = sig
 
   val with_cache : 'a t -> (key1 -> key2 -> 'a) -> key1 -> key2 -> 'a
     (** Wrap the function with the cache *)
+
+  type 'a func = key1 -> key2 -> 'a
+
+  val with_cache_rec : 'a t -> ('a func -> 'a func) -> 'a func
+    (** Partially apply the given function with a cached version of itself.
+        It returns the specialized function. *)
 end
 
 (** {2 Dummy cache (no caching)} *)

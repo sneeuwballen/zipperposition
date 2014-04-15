@@ -13,7 +13,7 @@ let () =
     E.return (Sequence.for_all F.FO.is_closed forms)
   ) in
   match res with
-  | E.Ok true -> print_endline "... OK"
+  | E.Ok true -> ok ()
   | E.Ok false -> print_endline "assertion failure, ERROR"
   | E.Error msg -> print_endline msg
 ;;

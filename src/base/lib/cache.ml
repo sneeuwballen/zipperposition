@@ -68,6 +68,12 @@ module type S2 = sig
 
   val with_cache : 'a t -> (key1 -> key2 -> 'a) -> key1 -> key2 -> 'a
     (** Wrap the function with the cache *)
+
+  type 'a func = key1 -> key2 -> 'a
+
+  val with_cache_rec : 'a t -> ('a func -> 'a func) -> 'a func
+    (** Partially apply the given function with a cached version of itself.
+        It returns the specialized function. *)
 end
 
 (** {2 Dummy cache (no caching) *)
@@ -97,6 +103,12 @@ module Dummy2(X : sig type t end)(Y : sig type t end) = struct
   let clear () = ()
 
   let with_cache () f x1 x2 = f x1 x2
+
+  type 'a func = key1 -> key2 -> 'a
+
+  let with_cache_rec () f =
+    let rec f' x y = f f' x y in
+    f'
 end
 
 (** {2 Small linear cache} *)
@@ -182,19 +194,22 @@ module Linear2(X : EQ)(Y : EQ) = struct
       | Empty | Assoc _ -> search (i+1)
     in
     search 0
+
+  type 'a func = key1 -> key2 -> 'a
+
+  let with_cache_rec cache f =
+    let rec f' x y = with_cache cache (fun x y -> f f' x y) x y in
+    f'
 end
 
 (** {2 An imperative cache of fixed size for memoization of pairs} *)
 
+let combine_hash hash i =
+  (hash * 65599 + i) land max_int
+
 module Replacing(X : HASH) = struct
   type key = X.t
 
-  (** A slot of the array contains a (key, value, true)
-      if key->value is stored there (at index hash(key) % length),
-      (null, null, false) otherwise.
-      
-      The first slot in the array contains the function
-      used to produce the value upon a cache miss. *)
   type 'a t = 'a bucket array
   and 'a bucket = Empty | Assoc of key * 'a
 
@@ -207,8 +222,8 @@ module Replacing(X : HASH) = struct
   (** Try to find [f x] in the cache, otherwise compute it
       and cache the result *)
   let with_cache c f x =
-    let i = (X.hash x) mod (Array.length c) in
-    match c.(i) with
+    let i = X.hash x mod (Array.length c) in
+    match Array.unsafe_get c i with
     | Assoc (x', y) when X.equal x x' ->
       y (* cache hit *)
     | Assoc _ | Empty -> (* cache miss *)
@@ -216,19 +231,13 @@ module Replacing(X : HASH) = struct
       c.(i) <- Assoc (x, y);
       y
 
-  let with_cache_rec cache f x =
+  let with_cache_rec cache f =
     (* make a recursive version of [f] that uses the cache *)
     let rec f' x = with_cache cache (fun x -> f f' x) x in
-    f' x
+    f'
 end
 
 module Replacing2(X : HASH)(Y : HASH) = struct
-  (** A slot of the array contains a (key, value, true)
-      if key->value is stored there (at index hash(key) % length),
-      (null, null, false) otherwise.
-      
-      The first slot in the array contains the function
-      used to produce the value upon a cache miss. *)
   type 'a t = 'a bucket array
   and 'a bucket = Empty | Assoc of key1 * key2 * 'a
   and key1 = X.t
@@ -242,14 +251,20 @@ module Replacing2(X : HASH)(Y : HASH) = struct
     Array.fill c 0 (Array.length c) Empty
 
   let with_cache c f x1 x2 =
-    let i = (((X.hash x1 + 17) lxor Y.hash x2) mod Array.length c) in
-    match c.(i) with
+    let i = (combine_hash (X.hash x1) (Y.hash x2)) mod Array.length c in
+    match Array.unsafe_get c i with
     | Assoc (x1', x2', y) when X.equal x1 x1' && Y.equal x2 x2' ->
       y (* cache hit *)
-    | Assoc _ | Empty -> (* cache miss *)
+    | _ -> (* cache miss *)
       let y = f x1 x2 in
       c.(i) <- Assoc (x1, x2, y);
       y
+
+  type 'a func = key1 -> key2 -> 'a
+
+  let with_cache_rec cache f =
+    let rec f' x y = with_cache cache (fun x y -> f f' x y) x y in
+    f'
 end
 
 (** {2 Hashtables with Least Recently Used eviction policy *)

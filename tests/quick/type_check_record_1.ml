@@ -10,4 +10,5 @@ Util.debug 1 "types: %a (%d) and %a (%d)\n"
   Type.pp ty3 (ST.hash (ty3:Type.t:>ST.t));;
 assert (Type.eq ty2 ty3);;
 
-print_endline "... OK";;
+ok ();;
+

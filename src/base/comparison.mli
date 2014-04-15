@@ -49,6 +49,28 @@ val to_total : t -> int
 val of_total : int -> t
   (** Conversion from a total order *)
 
+val lexico : t -> t -> t
+  (** Lexicographic combination (the second is used only if the first
+      is [Incomparable] *)
+
+val (++) : t -> t -> t
+  (** Infix version of {!lexico} *)
+
+type 'a comparator = 'a -> 'a -> t
+
+type ('a, 'b) combination
+  (** Lexicographic combination of comparators. It is, roughly,
+      equivalent to ['a -> 'a -> 'b] *)
+
+val (>>>) : 'a comparator -> ('b, 'c) combination -> ('a, 'b -> 'b -> 'c) combination
+  (** Lexicographic combination starting with the given function *)
+
+val last : 'a comparator -> ('a, t) combination
+  (** Last comparator *)
+
+val call : ('a, 'b) combination -> 'a -> 'a -> 'b
+  (** Call a lexicographic combination on arguments *)
+
 module type PARTIAL_ORD = sig
   type t
 

@@ -1,3 +1,4 @@
+
 (*
 Copyright (c) 2013, Simon Cruanes
 All rights reserved.
@@ -23,47 +24,79 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Hash combinators} *)
+(** {1 Immutable Arrays} *)
 
-type t = int
-type 'a hash_fun = 'a -> t
+type 'a t = 'a array
 
-let combine hash i =
-  (hash * 65599 + i) land max_int
+let of_list = Array.of_list
 
-let (<<>>) = combine
+let to_list = Array.to_list
 
-(** Hash a single int *)
-let hash_int i = combine 0 i
+let of_array_unsafe a = a (* bleh. *)
 
-(** Hash two ints *)
-let hash_int2 i j = combine i j
+let empty = [| |]
 
-(** Hash three ints *)
-let hash_int3 i j k = combine (combine i j) k
+let length = Array.length
 
-(** Hash four ints *)
-let hash_int4 i j k l =
-  combine (combine (combine i j) k) l
+let singleton x = [| x |]
 
-(** Hash a list. Each element is hashed using [f]. *)
-let rec hash_list f h l = match l with
-  | [] -> h
-  | x::l' -> hash_list f (combine h (f x)) l'
+let doubleton x y = [| x; y |]
 
-let hash_array f h a =
-  let h = ref h in
-  Array.iter (fun x -> h := combine !h (f x)) a;
-  !h
+let make n x = Array.make n x
 
-(** Hash string *)
-let hash_string s = Hashtbl.hash s
+let init n f = Array.init n f
 
-(** Hash sequence *)
-let hash_seq f h seq =
-  let h = ref h in
-  seq (fun x -> h := combine !h (f x));
-  !h
+let get = Array.get
 
-let hash_pair h1 h2 (x,y) = combine (h1 x) (h2 y)
-let hash_triple h1 h2 h3 (x,y,z) = (h1 x) <<>> (h2 y) <<>> (h3 z)
+let set a n x =
+  let a' = Array.copy a in
+  a'.(n) <- x;
+  a'
+
+let map = Array.map
+
+let mapi = Array.mapi
+
+let append a b =
+  let na = length a in
+  Array.init (na + length b)
+    (fun i -> if i < na then a.(i) else b.(i-na))
+
+let iter = Array.iter
+
+let iteri = Array.iteri
+
+let fold = Array.fold_left
+
+let foldi f acc a =
+  let n = ref 0 in
+  Array.fold_left
+    (fun acc x ->
+      let acc = f acc !n x in
+      incr n;
+      acc)
+    acc a
+
+exception ExitNow
+
+let for_all p a =
+  try
+    Array.iter (fun x -> if not (p x) then raise ExitNow) a;
+    true
+  with ExitNow -> false
+
+let exists p a =
+  try
+    Array.iter (fun x -> if p x then raise ExitNow) a;
+    false
+  with ExitNow -> true
+
+
+module Seq = struct
+  let to_seq a k = iter k a
+
+  let of_seq s =
+    let l = ref [] in
+    s (fun x -> l := x :: !l);
+    Array.of_list (List.rev !l)
+end

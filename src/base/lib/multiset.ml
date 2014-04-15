@@ -26,18 +26,22 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {6 Generic multisets} *)
 
-type 'a t = 'a array
+type 'a t = 'a IArray.t
   (** We represent multisets as arrays. *)
 
-let create = Array.of_list
+let of_list = IArray.of_list
 
-let create_a a = a
+let create a = a
 
-let size a = Array.length a
+let create_unsafe = IArray.of_array_unsafe
 
-let is_empty a = Array.length a = 0
+let size a = IArray.length a
 
-let iter a f = Array.iter f a
+let is_empty a = IArray.length a = 0
+
+let iter a f = IArray.iter f a
+
+let get = IArray.get
 
 (* returns a pair of bitvectors that are only true for elements of the
    corresponding multisets that have not been removed. An element is removed is
@@ -48,7 +52,7 @@ let remove_eq f m1 m2 =
   let rec find_mate f m1 m2 bv1 bv2 i j =
     if j = size m2
       then ()
-    else if BV.get bv2 j && f m1.(i) m2.(j) = Comparison.Eq
+    else if BV.get bv2 j && f (IArray.get m1 i) (IArray.get m2 j) = Comparison.Eq
       then (BV.reset bv1 i; BV.reset bv2 j)  (* remove both *)
     else find_mate f m1 m2 bv1 bv2 i (j+1)
   in
@@ -58,6 +62,10 @@ let remove_eq f m1 m2 =
     if BV.get bv1 i then find_mate f m1 m2 bv1 bv2 i 0
   done;
   bv1, bv2
+
+let to_array m = m
+
+let to_list = IArray.to_list
 
 let eq f m1 m2 =
   size m1 = size m2 &&
@@ -78,7 +86,7 @@ let compare f m1 m2 =
     else if BV.get bv1 i && BV.get bv2 j then
       (* compare m1(i) and m2(j). The loser, if any, is removed
          from the set of candidates for maximality *)
-      let _ = match f m1.(i) m2.(j) with
+      let _ = match f (IArray.get m1 i) (IArray.get m2 j) with
       | Comparison.Eq -> assert false  (* remove equal failed?*)
       | Comparison.Incomparable -> ()
       | Comparison.Gt -> BV.reset bv2 j
@@ -99,6 +107,9 @@ let compare f m1 m2 =
     | _, _ -> Comparison.Incomparable  (* both have maximal elements *)
   end
 
+let is_max f x m =
+  IArray.for_all (fun y -> f x y <> Comparison.Lt) m
+
 (* maximal elements *)
 let max f m =
   (* at the beginning, all literals are potentially maximal *)
@@ -109,7 +120,7 @@ let max f m =
       else for j = i+1 to size m - 1 do
         if i = j || not (BV.get bv j)
           then ()
-          else match f m.(i) m.(j) with
+          else match f (IArray.get m i) (IArray.get m j) with
             | Comparison.Eq
             | Comparison.Incomparable -> ()
             | Comparison.Lt -> BV.reset bv i  (* i smaller, cannot be max *)
@@ -118,8 +129,32 @@ let max f m =
   done;
   bv
 
-let get m i = m.(i)
+(* maximal elements of a list *)
+let max_l f l =
+  (* check whether [x] can be max.
+     [ok]: some max terms; [x]: current element;
+     [rest1]: to process but still candidates, [rest2]: remaining to compare.
+     It always holds that elements of [ok] and
+     [rest1 @ rest2] are incomparable or equal. *)
+  let rec check_max ok x rest1 rest2 =
+    match rest2 with
+    | [] -> start (x::ok) rest1 (* [x] is maximal, next! *)
+    | y :: rest2' ->
+        begin match f x y with
+        | Comparison.Gt -> check_max ok x rest1 rest2'  (* y can't be maximal *)
+        | Comparison.Lt -> start ok (rest1 @ rest2)  (* drop x, can't be max *)
+        | Comparison.Eq
+        | Comparison.Incomparable ->
+            (* keep [y] and [x], both can still be maximal *)
+            check_max ok x (y::rest1) rest2'
+        end
+  (* add maximal elements among [rest] to [ok]. *)
+  and start ok rest = match rest with
+    | [] -> ok
+    | x :: rest' -> check_max ok x [] rest'
+  in
+  start [] l
 
-let to_array m = m
-
-let to_list = Array.to_list
+(* for now, simple solution. *)
+let compare_l f l1 l2 =
+  compare f (IArray.of_list l1) (IArray.of_list l2)

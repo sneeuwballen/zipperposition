@@ -62,7 +62,8 @@ module type S = sig
 
   val kind : ScopedTerm.Kind.t
   val of_term : ScopedTerm.t -> t option
-  val of_term_exn : ScopedTerm.t -> t  (** @raise Invalid_argument *)
+  val of_term_exn : ScopedTerm.t -> t
+    (** @raise Invalid_argument if the term isn't a formula *)
   val is_form : ScopedTerm.t -> bool
 
   include Interfaces.HASH with type t := t
@@ -74,11 +75,9 @@ module type S = sig
   module Set : Sequence.Set.S with type elt = t
   module Map : Sequence.Map.S with type key = t
 
-  (** {b Caution}: constructors can raise Failure if the types are not
-      as expected.
-      {!atom} expects a term of type {!Type.o}
-      {!eq} and {!neq} expect two terms of the exact same type
-  *)
+  (** {b Caution}: constructors can raise {!Type.Error} if the types are not
+      as expected.  In particular, {!Base.eq} and {!Base.neq} expect two terms
+      of the exact same type. *)
 
   module Base : sig
     val true_ : t
@@ -92,6 +91,9 @@ module type S = sig
     val xor : t -> t -> t
     val eq : term -> term -> t
     val neq : term -> term -> t
+
+    val mk_eq : bool -> term -> term -> t
+    val mk_atom : bool -> term -> t
 
     (** Quantifiers: the term list must be a list of free variables. *)
 
@@ -367,6 +369,12 @@ module Make(MyT : TERM) = struct
       | Neq(a,b) -> eq a b
       | Not f' -> f'
       | _ -> T.simple_app ~kind ~ty Sym.Base.not_ [f]
+
+    let mk_eq sign t1 t2 =
+      if sign then eq t1 t2 else neq t1 t2
+
+    let mk_atom sign p =
+      if sign then atom p else not_ (atom p)
 
     let and_ = function
       | [] -> true_

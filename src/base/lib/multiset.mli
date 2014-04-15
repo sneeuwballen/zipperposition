@@ -33,10 +33,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 type 'a t
   (** A multiset of elements of type 'a *)
 
-val create : 'a list -> 'a t
+val of_list : 'a list -> 'a t
   (** Multiset from list *)
 
-val create_a : 'a array -> 'a t
+val create : 'a IArray.t -> 'a t
+  (** Non-copying creation. *)
+
+val create_unsafe : 'a array -> 'a t
   (** Non-copying creation.  The array is used by the multiset, so it should
       not be modified later! *)
 
@@ -49,6 +52,14 @@ val is_empty : 'a t -> bool
 val iter : 'a t -> ('a -> unit) -> unit
   (** Iterate on distinct occurrences of elements *)
 
+val to_array : 'a t -> 'a IArray.t
+  (** Extract the underlying array *)
+
+val to_list : 'a t -> 'a list
+
+val get : 'a t -> int -> 'a
+  (** [get m i] returns the i-th element ([i] must be < [size m]) *)
+
 val eq : ('a -> 'a -> Comparison.t) -> 'a t -> 'a t -> bool
   (** Check equality of two multisets *)
 
@@ -56,13 +67,14 @@ val compare : ('a -> 'a -> Comparison.t) -> 'a t -> 'a t -> Comparison.t
   (** Compare two multisets with the multiset extension of the
       given ordering *)
 
+val is_max : ('a -> 'a -> Comparison.t) -> 'a -> 'a t -> bool
+  (** Is the given element maximal (ie not dominated) within the multiset? *)
+
 val max : ('a -> 'a -> Comparison.t) -> 'a t -> BV.t
   (** Maximal elements of the multiset, w.r.t the given ordering. *)
 
-val get : 'a t -> int -> 'a
-  (** [get m i] returns the i-th element ([i] must be < [size m]) *)
+val max_l : ('a -> 'a -> Comparison.t) -> 'a list -> 'a list
+  (** Maximal elements of a list *)
 
-val to_array : 'a t -> 'a array
-  (** Extract the underlying array *)
-
-val to_list : 'a t -> 'a list
+val compare_l : ('a -> 'a -> Comparison.t) -> 'a list -> 'a list -> Comparison.t
+  (** Compare two multisets represented as list of elements *)

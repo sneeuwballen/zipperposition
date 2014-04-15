@@ -60,6 +60,34 @@ let of_total ord = match ord with
   | x when x > 0 -> Gt
   | _ -> Lt
 
+let lexico a b = match a with
+  | Incomparable -> b
+  | _ -> a
+
+type 'a comparator = 'a -> 'a -> t
+
+let (++) = lexico
+
+type ('a,'b) combination = {
+  call : 'a -> 'a -> 'b;
+  ignore : t -> 'a -> 'a -> 'b;
+}
+
+let last f = {
+  call = f;
+  ignore = (fun res x y -> res);
+}
+
+let (>>>) f g = {
+  call = (fun x y -> match f x y with
+    | Incomparable -> g.call
+    | res -> g.ignore res
+  );
+  ignore = (fun res _ _ -> g.ignore res);
+}
+
+let call f x y = f.call x y
+
 module type PARTIAL_ORD = sig
   type t
 

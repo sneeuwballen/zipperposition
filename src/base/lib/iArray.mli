@@ -1,3 +1,4 @@
+
 (*
 Copyright (c) 2013, Simon Cruanes
 All rights reserved.
@@ -23,47 +24,55 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Hash combinators} *)
+(** {1 Immutable Arrays} *)
 
-type t = int
-type 'a hash_fun = 'a -> t
+type 'a t
+(** Array of values of type 'a *)
 
-let combine hash i =
-  (hash * 65599 + i) land max_int
+val of_list : 'a list -> 'a t
 
-let (<<>>) = combine
+val to_list : 'a t -> 'a list
 
-(** Hash a single int *)
-let hash_int i = combine 0 i
+val of_array_unsafe : 'a array -> 'a t
+  (** Take ownership of the given array. Careful, the array must {b NOT}
+      be modified afterwards! *)
 
-(** Hash two ints *)
-let hash_int2 i j = combine i j
+val empty : 'a t
 
-(** Hash three ints *)
-let hash_int3 i j k = combine (combine i j) k
+val length : _ t -> int
 
-(** Hash four ints *)
-let hash_int4 i j k l =
-  combine (combine (combine i j) k) l
+val singleton : 'a -> 'a t
 
-(** Hash a list. Each element is hashed using [f]. *)
-let rec hash_list f h l = match l with
-  | [] -> h
-  | x::l' -> hash_list f (combine h (f x)) l'
+val doubleton : 'a -> 'a -> 'a t
 
-let hash_array f h a =
-  let h = ref h in
-  Array.iter (fun x -> h := combine !h (f x)) a;
-  !h
+val make : int -> 'a -> 'a t
 
-(** Hash string *)
-let hash_string s = Hashtbl.hash s
+val init : int -> (int -> 'a) -> 'a t
 
-(** Hash sequence *)
-let hash_seq f h seq =
-  let h = ref h in
-  seq (fun x -> h := combine !h (f x));
-  !h
+val get : 'a t -> int -> 'a
 
-let hash_pair h1 h2 (x,y) = combine (h1 x) (h2 y)
-let hash_triple h1 h2 h3 (x,y,z) = (h1 x) <<>> (h2 y) <<>> (h3 z)
+val set : 'a t -> int -> 'a -> 'a t
+(** Copy the array and modify its copy *)
+
+val map : ('a -> 'b) -> 'a t -> 'b t
+
+val mapi : (int -> 'a -> 'b) -> 'a t -> 'b t
+
+val append : 'a t -> 'a t -> 'a t
+
+val iter : ('a -> unit) -> 'a t -> unit
+
+val iteri : (int -> 'a -> unit) -> 'a t -> unit
+
+val foldi : ('a -> int -> 'b -> 'a) -> 'a -> 'b t -> 'a
+
+val fold : ('a -> 'b -> 'a) -> 'a -> 'b t -> 'a
+
+val for_all : ('a -> bool) -> 'a t -> bool
+
+val exists : ('a -> bool) -> 'a t -> bool
+
+module Seq : sig
+  val to_seq : 'a t -> 'a Sequence.t
+  val of_seq : 'a Sequence.t -> 'a t
+end
