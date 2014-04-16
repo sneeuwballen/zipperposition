@@ -139,8 +139,14 @@ val is_ground : _ t -> bool
 val fold : ('a -> int -> 'b -> term -> 'a) -> 'a -> 'b t -> 'a
   (** Fold over terms *)
 
-val nth : int -> 'a t -> ('a * term)
-  (** @raise Not_found if the index is invalid *)
+val nth : 'a t -> int -> ('a * term)
+  (** @raise Invalid_argument if the index is invalid *)
+
+val set : 'a t -> int -> ('a * term) -> 'a t
+  (** @raise Invalid_argument if the index is invalid *)
+
+val set_term : 'a t -> int -> term -> 'a t
+  (** @raise Invalid_argument if the index is invalid *)
 
 val pp : Buffer.t -> 'a t -> unit
 val to_string : 'a t -> string

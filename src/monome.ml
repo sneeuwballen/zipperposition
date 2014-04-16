@@ -296,10 +296,6 @@ let fold f acc m =
     (fun acc i (n, t) -> f acc i n t)
     acc m.terms
 
-let nth n m =
-  try List.nth m.terms n
-  with _ -> raise Not_found
-
 let pp buf e =
   let pp_pair buf (s, t) =
     if e.num.cmp s e.num.one = 0
@@ -334,6 +330,26 @@ let pp_tstp buf e =
   | _::_ when e.num.sign e.const = 0 -> pp_list buf e.terms
   | _::_ ->
     Printf.bprintf buf "$sum(%s, %a)" (e.num.to_string e.const) pp_list e.terms
+
+let _fail_idx m i =
+  invalid_arg (Util.sprintf "invalid index %d in %a" i pp m)
+
+let nth m n =
+  try List.nth m.terms n
+  with _ -> _fail_idx m n
+
+let set m n (c,t) =
+  try
+    let terms = Util.list_set m.terms n (c,t) in
+    {m with terms; to_term=None; }
+  with _ -> _fail_idx m n
+
+let set_term m n t =
+  try
+    let (c, _) = List.nth m.terms n in
+    let terms = Util.list_set m.terms n (c,t) in
+    {m with terms; to_term=None; }
+  with _ -> _fail_idx m n
 
 let variant ?(subst=Substs.empty) m1 sc1 m2 sc2 k =
   assert (m1.num == m2.num);

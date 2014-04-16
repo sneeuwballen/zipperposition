@@ -166,9 +166,24 @@ end
 
 (** {2 Positions} *)
 module Pos : sig
+  type split = {
+    lit_pos : Position.t;
+    term_pos : Position.t;
+    term : term;
+  }
+  (** Full description of a position in a literal. It contains:
+     - [lit_pos]: the literal-prefix of the position
+     - [term_pos]: the suffix that describes a subterm position
+     - [term]: the term root, just under the literal itself.
+     given this, applying T.Pos.at to the subterm position and
+     the root term we obtain the sub-term itself. *)
+
+  val split : t -> Position.t -> split
+    (** @raise Invalid_argument if the position is incorrect *)
+
   val at : t -> Position.t -> term
     (** Subterm at given position, or
-        @raise Not_found if the position is invalid *)
+        @raise Invalid_argument if the position is invalid *)
 
   val replace : t -> at:Position.t -> by:term -> t
     (** Replace subterm, or

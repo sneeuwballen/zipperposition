@@ -315,9 +315,8 @@ let unif_lits op ~subst lit1 sc1 lit2 sc2 k =
     unif4 op.term ~subst l1 r1 sc1 l2 r2 sc2 k
   | Ineq olit1, Ineq olit2
     when olit1.TO.order == olit2.TO.order && olit1.TO.strict = olit2.TO.strict ->
-    unif4 op.term ~subst
-      olit1.TO.left olit1.TO.right sc1
-      olit2.TO.left olit2.TO.right sc2 k
+    op.term ~subst olit1.TO.left sc1 olit2.TO.left sc2
+      (fun subst -> op.term ~subst olit1.TO.right sc1 olit2.TO.right sc2 k)
   | Arith (Equal, x1, y1), Arith (Equal, x2, y2) ->
     (* try both ways *)
     unif4 op.monomes ~subst x1 y1 sc1 x2 y2 sc2 k
@@ -730,13 +729,49 @@ module Comp = struct
 end
 
 module Pos = struct
-  let at lit pos = match lit, pos with
-    | Equation (l, _, _), Position.Left pos' -> T.Pos.at l pos'
-    | Equation (_, r, _), Position.Right pos' -> T.Pos.at r pos'
-    | Prop (p, _), Position.Left pos' -> T.Pos.at p pos'
-    | True, Position.Left Position.Stop -> T.TPTP.true_
-    | False, Position.Left Position.Stop -> T.TPTP.false_
-    | _ -> raise Not_found
+  module P = Position
+
+  type split = {
+    lit_pos : Position.t;
+    term_pos : Position.t;
+    term : term;
+  }
+
+  let _fail_lit lit pos =
+    let msg = Util.sprintf "invalid position %a in lit %a"
+      Position.pp pos pp lit
+    in invalid_arg msg
+
+  let split lit pos =
+    match lit, pos with
+    | Equation (l,_,_), P.Left pos' ->
+        {lit_pos=P.(left stop); term_pos=pos'; term=l; }
+    | Equation (_,r,_), P.Right pos' ->
+        {lit_pos=P.(right stop); term_pos=pos'; term=r; }
+    | Prop (p,_), P.Left pos' ->
+        {lit_pos=P.(left stop); term_pos=pos'; term=p; }
+    | Ineq olit, P.Left pos' ->
+        {lit_pos=P.(left stop); term_pos= pos'; term=olit.TO.left; }
+    | Ineq olit, P.Right pos' ->
+        {lit_pos=P.(right stop); term_pos=pos'; term=olit.TO.right; }
+    | Divides (_, _, m, _), P.Arg (i, pos') ->
+        let term = try snd(Monome.nth m i) with _ -> _fail_lit lit pos in
+        {lit_pos=P.(arg i stop); term_pos= pos'; term; }
+    | Arith (_, m1, _), P.Left (P.Arg (i, pos')) ->
+        let term = try snd(Monome.nth m1 i) with _ -> _fail_lit lit pos in
+        {lit_pos=P.(left @@ arg i stop); term_pos=pos'; term; }
+    | Arith (_, _, m2), P.Right (P.Arg (i, pos')) ->
+        let term = try snd(Monome.nth m2 i) with _ -> _fail_lit lit pos in
+        {lit_pos=P.(right @@ arg i stop); term_pos=pos'; term; }
+    | _ -> _fail_lit lit pos
+
+  let cut lit pos =
+    let s = split lit pos in
+    s.lit_pos, s.term_pos
+
+  let at lit pos =
+    let s = split lit pos in
+    T.Pos.at s.term s.term_pos
 
   let replace lit ~at ~by = match lit, at with
     | Equation (l, r, sign), Position.Left pos' ->
@@ -747,23 +782,21 @@ module Pos = struct
       mk_prop (T.Pos.replace p pos' ~by) sign
     | True, Position.Left Position.Stop -> lit
     | False, Position.Left Position.Stop -> lit
-    | _ -> invalid_arg (Util.sprintf "wrong pos %a" Position.pp at)
-
-  module P = Position
-
-  let cut lit pos =
-    match lit, pos with
-    | Equation _, P.Left pos' -> P.(left stop), pos'
-    | Equation _, P.Right pos' -> P.(right stop), pos'
-    | Prop _, P.Left pos' -> P.(left stop), pos'
-    | Ineq _, P.Left pos' -> P.(left stop), pos'
-    | Ineq _, P.Right pos' -> P.(right stop), pos'
-    | Divides _, P.Arg (i, pos') -> P.(arg i stop), pos'
-    | Arith (_, _, _), P.Left (P.Arg (i, pos')) ->
-        P.(left @@ arg i stop), pos'
-    | Arith (_, _, _), P.Right (P.Arg (i, pos')) ->
-        P.(right @@ arg i stop), pos'
-    | _ -> invalid_arg "cut: not a proper literal position"
+    | Ineq olit, Position.Left pos' ->
+      let olit' = {olit with TO.left=T.Pos.replace olit.TO.left pos' ~by} in
+      Ineq olit'
+    | Ineq olit, Position.Right pos' ->
+      let olit' = {olit with TO.right=T.Pos.replace olit.TO.right pos' ~by} in
+      Ineq olit'
+    | Arith (op, m1, m2), Position.Left (Position.Arg(i,pos')) ->
+      let _, t = Monome.nth m1 i in
+      let m1' = Monome.set_term m1 i (T.Pos.replace t pos' ~by) in
+      Arith (op, m1', m2)
+    | Arith (op, m1, m2), Position.Right (Position.Arg(i,pos')) ->
+      let _, t = Monome.nth m2 i in
+      let m2' = Monome.set_term m2 i (T.Pos.replace t pos' ~by) in
+      Arith (op, m1, m2')
+    | _ -> _fail_lit lit at
 
   let root_term lit pos =
     at lit (fst (cut lit pos))
@@ -795,11 +828,7 @@ module Pos = struct
     | True, _
     | False, _ -> true  (* why not. *)
     | Equation _, _
-    | Ineq _, _ ->
-        let msg = Util.sprintf
-          "is_max_term: %a not a proper literal position in %a"
-          Position.pp pos pp lit in
-        invalid_arg msg
+    | Ineq _, _ -> _fail_lit lit pos
 end
 
 module Conv = struct
