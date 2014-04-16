@@ -415,7 +415,12 @@ let is_trivial lit = match lit with
       not olit.TO.strict && T.eq olit.TO.left olit.TO.right
   | Divides (d, k, m, true) -> Monome.is_const m && Z.sign (Monome.const m) = 0
   | Divides (d, k, m, false) -> Monome.is_const m && Z.sign (Monome.const m) > 0
-  | Arith _ -> false  (* TODO *)
+  | Arith (Equal, m1, m2) -> Monome.eq m1 m2
+  | Arith (Less, m1, m2) -> Monome.dominates ~strict:true m2 m1
+  | Arith (Lesseq, m1, m2) -> Monome.dominates ~strict:false m2 m1
+  | Arith (Different, m1, m2) ->
+      let m = Monome.difference m1 m2 in
+      Monome.is_const m && Z.sign (Monome.const m) <> 0
   | Prop (_, _) -> false
 
 let is_absurd lit = match lit with

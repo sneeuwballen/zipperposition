@@ -257,8 +257,9 @@ let comparison m1 m2 =
   | true, n when n < 0 -> Comparison.Lt
   | true, _ -> Comparison.Gt
 
-let dominates m1 m2 = match comparison m1 m2 with
-  | Comparison.Eq | Comparison.Gt -> true
+let dominates ~strict m1 m2 = match comparison m1 m2 with
+  | Comparison.Eq -> not strict
+  | Comparison.Gt -> true
   | Comparison.Lt | Comparison.Incomparable -> false
 
 let split m =

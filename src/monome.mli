@@ -102,10 +102,12 @@ val comparison : 'a t -> 'a t -> Comparison.t
       monomes are:
       for instance, 2X + 1 < 2X + 4  is always true *)
 
-val dominates : 'a t -> 'a t -> bool
-  (** [dominates m1 m2] is true if [m1] is always bigger or equal than
+val dominates : strict:bool -> 'a t -> 'a t -> bool
+  (** [dominates ~strict m1 m2] is true if [m1] is always greater than
       [m2], in any model or variable valuation.
-      if [dominates m1 m2 && dominates m2 m1], then [m1 = m2]. *)
+      if [dominates ~strict:false m1 m2 && dominates ~strict:false m2 m1],
+      then [m1 = m2].
+      @argument strict if true, use "greater than", else "greater or equal". *)
 
 val split : 'a t -> 'a t * 'a t
   (** [split m] splits into a monome with positive coefficients, and one
