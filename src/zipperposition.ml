@@ -392,15 +392,17 @@ let process_file ?meta ~plugins ~params file =
   return ()
 
 let () =
+  Util.debug 0 "setup GC and signal handler";
   (* GC! increase max overhead because we want the GC to be faster, even if
       it implies more wasted memory. *)
   let gc = Gc.get () in
   Gc.set { gc with Gc.space_overhead=150; };
-  (* signal handler *)
+  (* signal handler. Re-raise, bugs shouldn't keep hidden *)
   Signal.set_exn_handler (fun e ->
     let msg = Printexc.to_string e in
-      output_string stderr ("exception raised in signal: " ^ msg ^ "\n");
-      flush stderr);
+    output_string stderr ("exception raised in signal: " ^ msg ^ "\n");
+    flush stderr;
+    raise e);
   ()
 
 let () =

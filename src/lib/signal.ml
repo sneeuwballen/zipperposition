@@ -68,7 +68,7 @@ let send s x =
       | StopListening -> true
       with e ->
         !_exn_handler e;
-        false
+        false  (* be conservative, keep... *)
       end
     do
       remove s i  (* i-th handler is done, remove it *)

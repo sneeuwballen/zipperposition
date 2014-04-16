@@ -57,5 +57,5 @@ val filter : 'a t -> ('a -> bool) -> 'a t
 
 val set_exn_handler : (exn -> unit) -> unit
   (** Set the handler that is called upon an exception in
-      a Signal. It should not raise an exception itself!
-      The default handler does nothing. *)
+      a Signal.  The default handler does nothing.
+      If the handler raises an exception, it is not caught! *)

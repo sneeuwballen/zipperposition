@@ -446,14 +446,14 @@ module Make(Sup : Superposition.S) = struct
       Position.pp left_pos C.pp right Position.pp right_pos;
     let signature = Ctx.signature () in
     let instance = (Lits.View.get_ineq_exn (C.lits left) left_pos).TO.order in
-    let mk_less t1 t2 = Lit.mk_true
-      (T.app_full (TO.less_const instance) [T.ty t1] [t1; t2]) in
+    let mk_less t1 t2 = Lit.mk_less instance t1 t2 in
     let t1 = (Lits.View.get_ineq_exn (C.lits right) right_pos).TO.left in
     (* find other inequality literals that can be chained on *)
     let eligible c = C.Eligible.ineq_of c instance in
     let left_pos_list, subst =
       _gather_positions ~eligible:(eligible left) ~signature
-      (C.lits left) s_left left_pos subst in
+      (C.lits left) s_left left_pos subst
+    in
     let right_pos_list, subst =
       _gather_positions ~eligible:(eligible right) ~signature
       (C.lits right) s_right right_pos subst in
