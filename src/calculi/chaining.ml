@@ -695,7 +695,9 @@ module Make(Sup : Superposition.S) = struct
     Util.debug 1 "enable chaining for order %a, %a (type %a)"
       Symbol.pp less Symbol.pp lesseq Type.pp ty;
     (* declare instance *)
-    let instance = Ctx.Theories.TotalOrder.add ?proof ~less ~lesseq ~ty in
+    let instance, is_new = Ctx.Theories.TotalOrder.add ?proof ~less ~lesseq ~ty in
+    if is_new = `New
+      then Ctx.Lit.add_from_hook (Lit.Conv.total_order_hook_from ~instance);
     (* add clauses *)
     let clauses = axioms ~instance in
     Env.add_passive (Sequence.of_list clauses);
@@ -705,7 +707,9 @@ module Make(Sup : Superposition.S) = struct
     Util.debug 1 "enable chaining for TSTP order";
     (* add instance *)
     _setup_rules_if_first ();
-    let instance = Ctx.Theories.TotalOrder.add_tstp () in
+    let instance, is_new = Ctx.Theories.TotalOrder.add_tstp () in
+    if is_new = `New
+      then Ctx.Lit.add_from_hook (Lit.Conv.total_order_hook_from ~instance);
     (* add clauses *)
     let clauses = axioms ~instance in
     Env.add_passive (Sequence.of_list clauses);
@@ -714,7 +718,8 @@ module Make(Sup : Superposition.S) = struct
   let register () =
     Util.debug 2 "register chaining...";
     let signal = Ctx.Theories.TotalOrder.on_add in
-    (* TODO: index active clauses upon signal? too late? *)
+    (* XXX: indexing active clauses upon signal? too late, probably
+        (active set isn't fully saturated...) *)
     Signal.on signal
       (fun instance ->
         _setup_rules_if_first ();
@@ -755,7 +760,7 @@ let () =
     , Arg.Unit (fun () -> Extensions.register extension)
     , "enable chaining"
     ; "-chaining-tptp"
-    , Arg.Set __add_tptp_order
+    , Arg.Unit (fun () -> Extensions.register extension; __add_tptp_order := true)
     , "enable TPTP standard ordering $less,$lesseq"
     ];
   ()
