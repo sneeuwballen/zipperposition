@@ -33,7 +33,7 @@ module T = FOTerm
 module HOT = HOTerm
 module C = Clause
 module Lit = Literal
-module Lits = Literal.Arr
+module Lits = Literals
 module TO = Theories.TotalOrder
 module Ord = Ordering
 module S = Substs
@@ -90,7 +90,7 @@ module type S = sig
   val simplify : C.t -> C.t
     (** Simplify the clause, by removing impossible literals *)
 
-  val axioms : instance:Theories.TotalOrder.instance -> C.t list
+  val axioms : instance:Theories.TotalOrder.t -> C.t list
     (** Additional axioms for a total ordering *)
 
   (** {6 Env} *)
@@ -123,10 +123,8 @@ module Make(Sup : Superposition.S) = struct
   let idx_ord_subterm () = !_idx_ord_subterm
 
   let _update_idx f c =
-    let spec = Ctx.Theories.total_order in
-    let ord = Ctx.ord () in
     (* terms occurring immediately under an inequation, on LHS or RHS *)
-    let left, right = Lits.fold_ineq ~spec
+    let left, right = Lits.fold_ineq
       ~eligible:(C.Eligible.chaining c) (C.lits c) (!_idx_ord_left, !_idx_ord_right)
       (fun (left,right) lit lit_pos ->
         let l = lit.TO.left in
@@ -142,16 +140,18 @@ module Make(Sup : Superposition.S) = struct
     _idx_ord_left := left;
     _idx_ord_right := right;
     (* subterms occurring under an inequation *)
-    _idx_ord_subterm := Lits.fold_terms ~ord ~which:`Both ~subterms:true
+    _idx_ord_subterm := Lits.fold_ineq
       ~eligible:(C.Eligible.chaining c) (C.lits c) !_idx_ord_subterm
-      (fun tree t pos ->
-        let pos_term = Lits.Pos.tail pos |> Lit.Pos.tail in
-        match pos_term with
-        | Position.Stop ->
-          tree  (* this must be the inequality itself, not the subterms *)
-        | _ ->
-          let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
-          f tree t with_pos);
+      (fun tree olit pos ->
+        let at_term ~pos tree t =
+          T.all_positions ~vars:false ~pos t tree
+            (fun tree t pos ->
+              let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
+              f tree t with_pos)
+        in
+        let tree = at_term ~pos:Position.(left pos) tree olit.TO.left in
+        let tree = at_term ~pos:Position.(right pos) tree olit.TO.right in
+        tree);
     ()
 
   let () =
@@ -192,7 +192,7 @@ module Make(Sup : Superposition.S) = struct
 
   (* check ordering conditions for the active clause in equality chaining *)
   let _check_eq_chaining_active active s_a active_pos subst =
-    let s, t, sign = Lits.get_eqn (C.lits active) active_pos in
+    let s, t, sign = Lits.View.get_eqn_exn (C.lits active) active_pos in
     assert (ScopedTerm.DB.closed (t : T.t :> ScopedTerm.t));
     sign &&
     begin (* s' not < t' *)
@@ -214,9 +214,8 @@ module Make(Sup : Superposition.S) = struct
   let _check_eq_chaining_left_passive passive s_p positions subst =
     assert (positions <> []);
     let ord = Ctx.ord () in
-    let spec = Ctx.Theories.total_order in
-    let ord_lit = Lits.get_ineq ~spec (C.lits passive) (List.hd positions) in
-    let instance = ord_lit.TO.instance in
+    let ord_lit = Lits.View.get_ineq_exn (C.lits passive) (List.hd positions) in
+    let instance = ord_lit.TO.order in
     let renaming = S.Renaming.create () in
     let t1' = S.FO.apply ~renaming subst ord_lit.TO.left s_p in
     (* subst(t1) must be a maximal term *)
@@ -234,7 +233,7 @@ module Make(Sup : Superposition.S) = struct
       the term ordering *)
     List.for_all
       begin fun pos ->
-        let ord_lit = Lits.get_ineq ~spec (C.lits passive) pos in
+        let ord_lit = Lits.View.get_ineq_exn (C.lits passive) pos in
         let renaming = Ctx.renaming_clear () in
         let ti = S.FO.apply ~renaming subst ord_lit.TO.left s_p in
         let vi = S.FO.apply ~renaming subst ord_lit.TO.right s_p in
@@ -248,9 +247,8 @@ module Make(Sup : Superposition.S) = struct
   let _check_eq_chaining_right_passive passive s_p positions subst =
     assert (positions <> []);
     let ord = Ctx.ord () in
-    let spec = Ctx.Theories.total_order in
-    let ord_lit = Lits.get_ineq ~spec (C.lits passive) (List.hd positions) in
-    let instance = ord_lit.TO.instance in
+    let ord_lit = Lits.View.get_ineq_exn (C.lits passive) (List.hd positions) in
+    let instance = ord_lit.TO.order in
     let renaming = Ctx.renaming_clear () in
     let t1' = S.FO.apply ~renaming subst ord_lit.TO.right s_p in
     (* subst(t1) must be a maximal term *)
@@ -268,7 +266,7 @@ module Make(Sup : Superposition.S) = struct
       the term ordering *)
     List.for_all
       begin fun pos ->
-        let ord_lit = Lits.get_ineq ~spec (C.lits passive) pos in
+        let ord_lit = Lits.View.get_ineq_exn (C.lits passive) pos in
         let renaming = Ctx.renaming_clear () in
         let ti = S.FO.apply ~renaming subst ord_lit.TO.right s_p in
         let vi = S.FO.apply ~renaming subst ord_lit.TO.left s_p in
@@ -281,16 +279,15 @@ module Make(Sup : Superposition.S) = struct
   (* equality chaining left *)
   let do_eq_chaining_left active s_a active_pos passive s_p passive_pos subst acc =
     let signature = Ctx.signature () in
-    let spec = Ctx.Theories.total_order in
     (* rewrite s into t *)
-    let s, t, _ = Lits.get_eqn (C.lits active) active_pos in
+    let s, t, _ = Lits.View.get_eqn_exn (C.lits active) active_pos in
     (* get all inequalities that can be factored with passive_pos: if
         the passive lit is t1[s1]_p <| v1, we want all the ti[si]_p < vi
         such that si is unifiable with s1 (and thus with [s]).
         We only consider literals that are inequations of the same instance
         as [t1 <| v1]. *)
-    let ord_lit = Lits.get_ineq ~spec (C.lits passive) passive_pos in
-    let eligible = C.Eligible.ineq_of passive ord_lit.TO.instance in
+    let ord_lit = Lits.View.get_ineq_exn (C.lits passive) passive_pos in
+    let eligible = C.Eligible.ineq_of passive ord_lit.TO.order in
     let positions, subst =
       _gather_positions ~eligible ~signature (C.lits passive) s_p passive_pos subst in
     (* check ordering conditions, and well-typedness *)
@@ -328,16 +325,15 @@ module Make(Sup : Superposition.S) = struct
 
   let do_eq_chaining_right active s_a active_pos passive s_p passive_pos subst acc =
     let signature = Ctx.signature () in
-    let spec = Ctx.Theories.total_order in
     (* rewrite s into t *)
-    let s, t, _ = Lits.get_eqn (C.lits active) active_pos in
+    let s, t, _ = Lits.View.get_eqn_exn (C.lits active) active_pos in
     (* get all inequalities that can be factored with passive_pos: if
         the passive lit is v1 <| t1[s1]_p, we want all the vi <| ti[si]_p
         such that si is unifiable with s1 (and thus with [s]).
         We only consider literals that are inequations of the same instance
         as [v1 <| t1]. *)
-    let ord_lit = Lits.get_ineq ~spec (C.lits passive) passive_pos in
-    let eligible = C.Eligible.ineq_of passive ord_lit.TO.instance in
+    let ord_lit = Lits.View.get_ineq_exn (C.lits passive) passive_pos in
+    let eligible = C.Eligible.ineq_of passive ord_lit.TO.order in
     let positions, subst =
       _gather_positions ~eligible ~signature (C.lits passive) s_p passive_pos subst in
     (* check ordering conditions, and well-typedness *)
@@ -408,10 +404,9 @@ module Make(Sup : Superposition.S) = struct
     Util.enter_prof prof_eq_chaining_passive;
     let passive = c in
     let scope = 1 in
-    let spec = Ctx.Theories.total_order in
     let eligible = C.Eligible.chaining c in
     (* fold on ineq lits *)
-    let new_clauses = Lits.fold_ineq ~spec ~eligible (C.lits c) []
+    let new_clauses = Lits.fold_ineq ~eligible (C.lits c) []
       (fun acc ord_lit lit_pos ->
         let pb = Position.Build.of_pos lit_pos in
         (* factorize code for left and right terms *)
@@ -448,14 +443,13 @@ module Make(Sup : Superposition.S) = struct
 
   (* inequality chaining between two clauses *)
   let do_ineq_chaining left s_left left_pos right s_right right_pos subst acc =
-    let spec = Ctx.Theories.total_order in
     Util.debug 5 "ineq_chaining between %a at %a and %a at %a" C.pp left
       Position.pp left_pos C.pp right Position.pp right_pos;
     let signature = Ctx.signature () in
-    let instance = (Lits.get_ineq ~spec (C.lits left) left_pos).TO.instance in
+    let instance = (Lits.View.get_ineq_exn (C.lits left) left_pos).TO.order in
     let mk_less t1 t2 = Lit.mk_true
-      (T.app_full (TO.less_const ~instance) [T.ty t1] [t1; t2]) in
-    let t1 = (Lits.get_ineq ~spec (C.lits right) right_pos).TO.left in
+      (T.app_full (TO.less_const instance) [T.ty t1] [t1; t2]) in
+    let t1 = (Lits.View.get_ineq_exn (C.lits right) right_pos).TO.left in
     (* find other inequality literals that can be chained on *)
     let eligible c = C.Eligible.ineq_of c instance in
     let left_pos_list, subst =
@@ -480,11 +474,11 @@ module Make(Sup : Superposition.S) = struct
         let lits_right = Lit.apply_subst_list ~renaming subst lits_right s_right in
         let product = List.fold_left
           (fun acc left_pos ->
-            let lit_left = Lits.get_ineq ~spec (C.lits left) left_pos in
+            let lit_left = Lits.View.get_ineq_exn (C.lits left) left_pos in
             let ui = lit_left.TO.left in
             List.fold_left
               (fun acc right_pos ->
-                let lit_right = Lits.get_ineq ~spec (C.lits right) right_pos in
+                let lit_right = Lits.View.get_ineq_exn (C.lits right) right_pos in
                 let vj = lit_right.TO.right in
                 (* now to compute INEQ(ui, vj) *)
                 let ui' = S.FO.apply ~renaming subst ui s_left in
@@ -518,10 +512,9 @@ module Make(Sup : Superposition.S) = struct
       the RHS of inequalities will be chained) *)
   let ineq_chaining_left c =
     Util.enter_prof prof_ineq_chaining_left;
-    let spec = Ctx.Theories.total_order in
     let eligible = C.Eligible.chaining c in
     (* fold on ineq lits *)
-    let new_clauses = Lits.fold_ineq ~spec ~eligible (C.lits c) []
+    let new_clauses = Lits.fold_ineq ~eligible (C.lits c) []
       (fun acc ord_lit lit_pos ->
         let s1 = ord_lit.TO.right in
         let left_pos = Position.(append lit_pos (right stop)) in
@@ -538,10 +531,9 @@ module Make(Sup : Superposition.S) = struct
   (* inequality chaining where [c] is on the right *)
   let ineq_chaining_right c =
     Util.enter_prof prof_ineq_chaining_right;
-    let spec = Ctx.Theories.total_order in
     let eligible = C.Eligible.chaining c in
     (* fold on ineq lits *)
-    let new_clauses = Lits.fold_ineq ~spec ~eligible (C.lits c) []
+    let new_clauses = Lits.fold_ineq ~eligible (C.lits c) []
       (fun acc ord_lit lit_pos ->
         let t1 = ord_lit.TO.left in
         let right_pos = Position.(append lit_pos (left stop)) in
@@ -556,9 +548,8 @@ module Make(Sup : Superposition.S) = struct
     new_clauses
 
   let reflexivity_res c =
-    let spec = Ctx.Theories.total_order in
     let eligible = C.Eligible.max c in
-    Lits.fold_ineq ~spec ~eligible (C.lits c) []
+    Lits.fold_ineq ~eligible (C.lits c) []
       (fun acc lit lit_pos ->
         if lit.TO.strict
           then try
@@ -579,10 +570,9 @@ module Make(Sup : Superposition.S) = struct
         else acc)
 
   let is_tautology c =
-    let spec = Ctx.Theories.total_order in
     let eligible = C.Eligible.always in
     try
-      Lits.fold_ineq ~spec ~eligible (C.lits c) ()
+      Lits.fold_ineq ~eligible (C.lits c) ()
         (fun () lit _lit_pos ->
           if not lit.TO.strict && T.eq lit.TO.left lit.TO.right
             (* a <= a is definitely a tautology *)
@@ -603,9 +593,8 @@ module Make(Sup : Superposition.S) = struct
      closure (same as for {!Superposition.is_semantic_tautology}) *)
   let is_semantic_tautology c =
     Util.enter_prof prof_semantic_tautology;
-    let spec = Ctx.Theories.total_order in
     (* find ordering instances *)
-    let instances = Lits.order_instances ~spec (C.lits c) in
+    let instances = Lits.order_instances (C.lits c) in
     let res = List.exists
       (fun instance ->
         let cc = Congruence.FO.create ~size:13 () in
@@ -617,8 +606,8 @@ module Make(Sup : Superposition.S) = struct
           | Lit.Equation (l, r, false) -> Congruence.FO.mk_eq cc l r
           | Lit.Equation (l, r, true) -> to_check := `Eq (l,r) :: !to_check
           | Lit.Prop (_, true) ->
-            begin try
-              let olit = Lit.ineq_lit_of ~instance lit in
+            begin match Lit.View.get_ineq_of ~instance lit with
+            | Some olit ->
               if olit.TO.strict
                 then to_check := `Lt (olit.TO.left, olit.TO.right) :: !to_check
                 else
@@ -626,7 +615,7 @@ module Make(Sup : Superposition.S) = struct
                   let l = olit.TO.left in
                   let r = olit.TO.right in
                   Congruence.FO.mk_less cc r l
-            with Not_found -> ()
+            | None -> ()
             end
           | _ -> ()
           )
@@ -648,20 +637,19 @@ module Make(Sup : Superposition.S) = struct
     res
 
   let simplify c =
-    let spec = Ctx.Theories.total_order in
     let eligible = C.Eligible.always in
     let size = Array.length (C.lits c) in
     let bv = BV.create ~size true in
     let instances = ref [] in
     (* remove absurd literals from [bv] *)
-    Lits.fold_ineq ~spec ~eligible (C.lits c) ()
+    Lits.fold_ineq ~eligible (C.lits c) ()
       (fun () lit lit_pos ->
         if lit.TO.strict && T.eq lit.TO.left lit.TO.right
           then begin
             (* eliminate literal a <= a *)
             let i = Lits.Pos.idx lit_pos in
             BV.reset bv i;
-            instances := lit.TO.instance :: !instances
+            instances := lit.TO.order :: !instances
           end);
     if BV.cardinal bv < size
       then begin
@@ -699,7 +687,7 @@ module Make(Sup : Superposition.S) = struct
 
   (* we have to enable the chaining inferences on the first ordering *)
   let _setup_rules_if_first () =
-    let exists_some = Theories.TotalOrder.exists_order Env.Ctx.Theories.total_order in
+    let exists_some = Ctx.Theories.TotalOrder.exists_order () in
     if not exists_some then _setup_rules ();
     ()
 
@@ -707,7 +695,7 @@ module Make(Sup : Superposition.S) = struct
     Util.debug 1 "enable chaining for order %a, %a (type %a)"
       Symbol.pp less Symbol.pp lesseq Type.pp ty;
     (* declare instance *)
-    let instance = Ctx.Theories.add_order ?proof ~less ~lesseq ~ty in
+    let instance = Ctx.Theories.TotalOrder.add ?proof ~less ~lesseq ~ty in
     (* add clauses *)
     let clauses = axioms ~instance in
     Env.add_passive (Sequence.of_list clauses);
@@ -717,7 +705,7 @@ module Make(Sup : Superposition.S) = struct
     Util.debug 1 "enable chaining for TSTP order";
     (* add instance *)
     _setup_rules_if_first ();
-    let instance = Env.Ctx.Theories.add_tstp_order () in
+    let instance = Ctx.Theories.TotalOrder.add_tstp () in
     (* add clauses *)
     let clauses = axioms ~instance in
     Env.add_passive (Sequence.of_list clauses);
@@ -725,15 +713,14 @@ module Make(Sup : Superposition.S) = struct
 
   let register () =
     Util.debug 2 "register chaining...";
-    let spec = Ctx.Theories.total_order in
-    let signal = Theories.TotalOrder.on_add_instance spec in
+    let signal = Ctx.Theories.TotalOrder.on_add in
     (* TODO: index active clauses upon signal? too late? *)
     Signal.on signal
       (fun instance ->
         _setup_rules_if_first ();
         Signal.ContinueListening
       );
-    if Theories.TotalOrder.exists_order ~spec
+    if Ctx.Theories.TotalOrder.exists_order ()
       then _setup_rules_if_first ();
     (* add TPTP order *)
     if !__add_tptp_order then add_tstp_order ();
@@ -772,3 +759,4 @@ let () =
     , "enable TPTP standard ordering $less,$lesseq"
     ];
   ()
+

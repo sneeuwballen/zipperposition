@@ -81,7 +81,7 @@ module type S = sig
   val simplify : C.t -> C.t
     (** Simplify the clause, by removing impossible literals *)
 
-  val axioms : instance:Theories.TotalOrder.instance -> C.t list
+  val axioms : instance:Theories.TotalOrder.t -> C.t list
     (** Additional axioms for a total ordering *)
 
   (** {6 Env} *)
