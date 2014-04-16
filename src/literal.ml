@@ -74,16 +74,16 @@ let eq_com l1 l2 =
   | False, False -> true
   | _, _ -> false
 
-let __to_int = function
-  | False -> 0
-  | True -> 1
-  | Equation _ -> 2
-  | Prop _ -> 3
-  | Ineq _ -> 4
-  | Arith _ -> 5
-  | Divides _ -> 6
-
 let compare l1 l2 =
+  let __to_int = function
+    | False -> 0
+    | True -> 1
+    | Equation _ -> 2
+    | Prop _ -> 3
+    | Ineq _ -> 4
+    | Arith _ -> 5
+    | Divides _ -> 6
+  in
   match l1, l2 with
   | Equation (l1,r1,sign1), Equation (l2,r2,sign2) ->
       let c = T.cmp l1 l2 in
@@ -406,316 +406,6 @@ let is_ground lit = match lit with
 let root_terms l =
   Seq.terms l |> Sequence.to_rev_list
 
-(* comparison should live in its scope *)
-module Comp = struct
-  module O = Ordering
-  module C = Comparison
-
-  let _maxterms2 ~ord l r =
-    match O.compare ord l r with
-    | C.Gt -> [l]
-    | C.Lt -> [r]
-    | C.Eq -> [l]
-    | C.Incomparable -> [l; r]
-
-  (* maximal terms of the literal *)
-  let max_terms ~ord lit =
-    match lit with
-    | Prop (p, _) -> [p]
-    | Equation (l, r, _) -> _maxterms2 ~ord l r
-    | Ineq olit -> _maxterms2 ~ord olit.TO.left olit.TO.right
-    | Divides _
-    | Arith _ ->
-        Multiset.max_l (Ordering.compare ord) (root_terms lit)
-    | True
-    | False -> []
-
-  (* general comparison is a bit complicated.
-    - First we compare literals l1 and l2
-        by their (set of potential) maximal terms.
-    - then by their polarity (neg > pos)
-    - then by their kind (regular equation/prop on bottom)
-    - then, l1 and l2 must be of the same kind, so we use a
-        kind-specific comparison.
-  *)
-
-  let _cmp_by_maxterms ~ord l1 l2 =
-    match l1, l2 with
-    | Prop (p1, _), Prop (p2, _) -> Ordering.compare ord p1 p2
-    | _ ->
-        let t1 = root_terms l1 and t2 = root_terms l2 in
-        Multiset.compare_l (Ordering.compare ord) t1 t2
-
-  (* negative literals dominate *)
-  let _cmp_by_polarity l1 l2 =
-    let sign1 = sign l1 in
-    let sign2 = sign l2 in
-    match sign1, sign2 with
-    | true, true
-    | false, false -> Comparison.Eq
-    | true, false -> Comparison.Lt
-    | false, true -> Comparison.Gt
-
-  let _cmp_by_kind l1 l2 =
-    let _to_int = function
-      | False -> 0
-      | True -> 1
-      | Equation _
-      | Prop _ -> 2  (* eqn and prop are really the same thing *)
-      | Ineq _ -> 4
-      | Arith _ -> 5
-      | Divides _ -> 6
-    and _op_to_int = function
-      | Less -> 3
-      | Lesseq -> 2
-      | Different -> 1
-      | Equal -> 0
-    in
-    match l1, l2 with
-      | Arith (op1, _, _), Arith (op2, _, _) ->
-        C.of_total (_op_to_int op1 - _op_to_int op2)
-      | _ ->
-        C.of_total (_to_int l1 - _to_int l2)
-
-  (* by multiset of terms *)
-  let _cmp_by_term_multiset ~ord l1 l2 =
-    let t1 = root_terms l1 and t2 = root_terms l2 in
-    Multiset.compare_l (Ordering.compare ord) t1 t2
-
-  let _cmp_specific ~ord l1 l2 =
-    match l1, l2 with
-    | Prop _, Prop _
-    | Equation _, Equation _
-    | Prop _, Equation _
-    | Equation _, Prop _ ->
-        _cmp_by_term_multiset ~ord l1 l2
-    | Ineq olit1, Ineq olit2 ->
-        begin match olit1.TO.strict, olit2.TO.strict with
-        | true, true
-        | false, false -> _cmp_by_term_multiset ~ord l1 l2
-        | true, false -> C.Gt
-        | false, true -> C.Lt
-        end
-    | Arith (op1, x1, x2), Arith (op2, y1, y2) ->
-        assert (op1 = op2);
-        let cmp_term = Ordering.compare ord in
-        let cmp_monomes = Monome.Int.compare cmp_term in
-        let left = Multiset.create (IArray.doubleton x1 x2) in
-        let right = Multiset.create (IArray.doubleton y1 y2) in
-        Multiset.compare cmp_monomes left right
-    | Divides (n1, k1, m1, sign1), Divides (n2, k2, m2, sign2) ->
-        assert (sign1=sign2);
-        let c = Z.compare n1 n2 in
-        if c <> 0 then C.of_total c  (* live in totally distinct Z/nZ *)
-        else
-          if is_ground l1 && is_ground l2
-          then
-            C.Incomparable
-            (* TODO: Bezout-normalize, then actually compare Monomes. *)
-          else C.Incomparable
-    | _, _ ->
-        assert false
-
-
-  let compare ~ord l1 l2 =
-    let f = Comparison.(
-      _cmp_by_maxterms ~ord @>>
-      _cmp_by_polarity @>>
-      _cmp_by_kind @>>
-      _cmp_specific ~ord
-    ) in
-    f l1 l2
-end
-
-module Pos = struct
-  let at lit pos = match lit, pos with
-    | Equation (l, _, _), Position.Left pos' -> T.Pos.at l pos'
-    | Equation (_, r, _), Position.Right pos' -> T.Pos.at r pos'
-    | Prop (p, _), Position.Left pos' -> T.Pos.at p pos'
-    | True, Position.Left Position.Stop -> T.TPTP.true_
-    | False, Position.Left Position.Stop -> T.TPTP.false_
-    | _ -> raise Not_found
-
-  let replace lit ~at ~by = match lit, at with
-    | Equation (l, r, sign), Position.Left pos' ->
-      mk_lit (T.Pos.replace l pos' ~by) r sign
-    | Equation (l, r, sign), Position.Right pos' ->
-      mk_lit l (T.Pos.replace r pos' ~by) sign
-    | Prop (p, sign), Position.Left pos' ->
-      mk_prop (T.Pos.replace p pos' ~by) sign
-    | True, Position.Left Position.Stop -> lit
-    | False, Position.Left Position.Stop -> lit
-    | _ -> invalid_arg (Util.sprintf "wrong pos %a" Position.pp at)
-
-  module P = Position
-
-  let cut lit pos =
-    match lit, pos with
-    | Equation _, P.Left pos' -> P.(left stop), pos'
-    | Equation _, P.Right pos' -> P.(right stop), pos'
-    | Prop _, P.Left pos' -> P.(left stop), pos'
-    | Ineq _, P.Left pos' -> P.(left stop), pos'
-    | Ineq _, P.Right pos' -> P.(right stop), pos'
-    | Divides _, P.Arg (i, pos') -> P.(arg i stop), pos'
-    | Arith (_, _, _), P.Left (P.Arg (i, pos')) ->
-        P.(left @@ arg i stop), pos'
-    | Arith (_, _, _), P.Right (P.Arg (i, pos')) ->
-        P.(right @@ arg i stop), pos'
-    | _ -> invalid_arg "cut: not a proper literal position"
-
-  let root_term lit pos =
-    at lit (fst (cut lit pos))
-
-  let term_pos lit pos = snd (cut lit pos)
-
-  let is_max_term ~ord lit pos =
-    match lit, pos with
-    | Equation (l, r, _), P.Left _ ->
-        Ordering.compare ord l r <> Comparison.Lt
-    | Equation (l, r, _), P.Right _ ->
-        Ordering.compare ord r l <> Comparison.Lt
-    | Prop _, _ -> true
-    | Ineq olit, P.Left _ ->
-        Ordering.compare ord olit.TO.left olit.TO.right <> Comparison.Lt
-    | Ineq olit, P.Right _ ->
-        Ordering.compare ord olit.TO.right olit.TO.left <> Comparison.Lt
-    | Arith (_, m1, m2), _ ->
-        (* [t] dominates all atomic terms? *)
-        let t = root_term lit pos in
-        Sequence.for_all
-          (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
-          (Seq.terms lit)
-    | Divides (_, _, m, _), _ ->
-        let t = root_term lit pos in
-        Sequence.for_all
-          (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
-          (Monome.Seq.terms m)
-    | True, _
-    | False, _ -> true  (* why not. *)
-    | Equation _, _
-    | Ineq _, _ -> invalid_arg "is_max_term: not a proper literal position"
-end
-
-module Conv = struct
-  type hook_from = form -> t option
-  type hook_to = t -> form option
-
-  let arith_hook_from f =
-    None (* TODO: try to convert form into a arith lit *)
-
-  let total_order_hook_from ~instance f =
-    None   (* TODO: try to convert into a total order. *)
-
-  let rec try_hooks x hooks = match hooks with
-    | [] -> None
-    | h::hooks' ->
-        match h x with
-        | None -> try_hooks x hooks'
-        | (Some _) as res -> res
-
-  let of_form ?(hooks=[]) f =
-    let f = F.simplify f in
-    match try_hooks f hooks with
-    | Some lit -> lit
-    | None ->
-      begin match F.view f with
-      | F.True -> True
-      | F.False -> False
-      | F.Atom a -> mk_true a
-      | F.Eq (l,r) -> mk_eq l r
-      | F.Neq (l,r) -> mk_neq l r
-      | F.Not f' ->
-          begin match F.view f' with
-          | F.Atom a -> mk_false a
-          | F.Eq (l,r) -> mk_neq l r
-          | F.Neq (l,r) -> mk_eq l r
-          | _ -> failwith (Util.sprintf "not a literal: %a" F.pp f)
-          end
-      | _ -> failwith (Util.sprintf "not a literal: %a" F.pp f)
-      end
-
-  let to_form ?(hooks=[]) lit =
-    match try_hooks lit hooks with
-    | Some f -> f
-    | None ->
-      match lit with
-      | Equation (l, r, true) -> F.Base.eq l r
-      | Equation (l, r, false) -> F.Base.neq l r
-      | Prop (p, true) -> F.Base.atom p
-      | Prop (p, false) -> F.Base.not_ (F.Base.atom p)
-      | True -> F.Base.true_
-      | False -> F.Base.false_
-      | Ineq olit ->
-        let l = olit.TO.left and r = olit.TO.right in
-        let p = if olit.TO.strict
-          then T.app_full (TO.less_const olit.TO.order) olit.TO.tyargs [l; r]
-          else T.app_full (TO.lesseq_const olit.TO.order) olit.TO.tyargs [l; r]
-        in F.Base.atom p
-      | Arith(op, m1, m2) ->
-        let t1 = Monome.Int.to_term m1 in
-        let t2 = Monome.Int.to_term m2 in
-        begin match op with
-          | Equal -> F.Base.eq t1 t2
-          | Different -> F.Base.neq t1 t2
-          | Less ->
-            let sym = Symbol.TPTP.Arith.less in
-            let ty = Signature.find_exn Signature.TPTP.Arith.base sym in
-            let cst = T.const ~ty sym in
-            F.Base.atom (T.app_full cst [Type.TPTP.int] [t1; t2])
-          | Lesseq ->
-            let sym = Symbol.TPTP.Arith.lesseq in
-            let ty = Signature.find_exn Signature.TPTP.Arith.base sym in
-            let cst = T.const ~ty sym in
-            F.Base.atom (T.app_full cst [Type.TPTP.int] [t1; t2])
-        end
-      | Divides (n, k, m, sign) ->
-        let nk = Z.pow n k in
-        let t = Monome.Int.to_term m in
-        let sym = Symbol.TPTP.Arith.remainder_e in
-        let ty = Signature.find_exn Signature.TPTP.Arith.base sym in
-        let cst = T.const ~ty sym in
-        (* $remainder_e(t, nk) = 0 *)
-        let f = F.Base.eq
-          (T.const ~ty:Type.TPTP.int (Symbol.of_int 0))
-          (T.app cst [t; T.const ~ty:Type.TPTP.int (Symbol.mk_int nk)])
-        in
-        if sign then f else F.Base.not_ f
-end
-
-module View = struct
-  let as_eqn lit = match lit with
-    | Equation (l,r,sign) -> Some (l, r, sign)
-    | Prop (p, sign) -> Some (p, T.TPTP.true_, sign)
-    | True
-    | False
-    | Ineq _
-    | Arith _
-    | Divides _ -> None
-
-  let get_eqn lit position =
-    match lit, position with
-    | Equation (l,r,sign), Position.Left _ -> Some (l, r, sign)
-    | Equation (l,r,sign), Position.Right _ -> Some (r, l, sign)
-    | Prop (p, sign), Position.Left _ -> Some (p, T.TPTP.true_, sign)
-    | True, _
-    | False, _
-    | Ineq _, _
-    | Arith _, _
-    | Divides _, _ -> None
-    | _ -> invalid_arg "get_eqn: wrong literal or position"
-
-  let get_ineq = function
-    | Ineq lit' -> Some lit'
-    | _ -> None
-
-  let get_ineq_of ~instance lit = match lit with
-    | Ineq olit ->
-        if TO.eq olit.TO.order instance
-        then Some olit
-        else None
-    | _ -> None
-end
-
 let is_trivial lit = match lit with
   | True -> true
   | False -> false
@@ -878,3 +568,317 @@ let to_string t = Util.on_buffer pp t
 let fmt fmt lit =
   Format.pp_print_string fmt (to_string lit)
 
+
+(* comparison should live in its scope *)
+module Comp = struct
+  module O = Ordering
+  module C = Comparison
+
+  let _maxterms2 ~ord l r =
+    match O.compare ord l r with
+    | C.Gt -> [l]
+    | C.Lt -> [r]
+    | C.Eq -> [l]
+    | C.Incomparable -> [l; r]
+
+  (* maximal terms of the literal *)
+  let max_terms ~ord lit =
+    match lit with
+    | Prop (p, _) -> [p]
+    | Equation (l, r, _) -> _maxterms2 ~ord l r
+    | Ineq olit -> _maxterms2 ~ord olit.TO.left olit.TO.right
+    | Divides _
+    | Arith _ ->
+        Multiset.max_l (Ordering.compare ord) (root_terms lit)
+    | True
+    | False -> []
+
+  (* general comparison is a bit complicated.
+    - First we compare literals l1 and l2
+        by their (set of potential) maximal terms.
+    - then by their polarity (neg > pos)
+    - then by their kind (regular equation/prop on bottom)
+    - then, l1 and l2 must be of the same kind, so we use a
+        kind-specific comparison.
+  *)
+
+  let _cmp_by_maxterms ~ord l1 l2 =
+    match l1, l2 with
+    | Prop (p1, _), Prop (p2, _) -> Ordering.compare ord p1 p2
+    | _ ->
+        let t1 = root_terms l1 and t2 = root_terms l2 in
+        Multiset.compare_l (Ordering.compare ord) t1 t2
+
+  (* negative literals dominate *)
+  let _cmp_by_polarity l1 l2 =
+    let sign1 = sign l1 in
+    let sign2 = sign l2 in
+    match sign1, sign2 with
+    | true, true
+    | false, false -> Comparison.Eq
+    | true, false -> Comparison.Lt
+    | false, true -> Comparison.Gt
+
+  let _cmp_by_kind l1 l2 =
+    let _to_int = function
+      | False
+      | True -> 0
+      | Equation _
+      | Prop _ -> 1  (* eqn and prop are really the same thing *)
+      | Ineq _ -> 2
+      | Arith _ -> 3
+      | Divides _ -> 4
+    and _op_to_int = function
+      | Less -> 3
+      | Lesseq -> 2
+      | Different -> 1
+      | Equal -> 0
+    in
+    match l1, l2 with
+      | Arith (op1, _, _), Arith (op2, _, _) ->
+        C.of_total (_op_to_int op1 - _op_to_int op2)
+      | _ ->
+        C.of_total (_to_int l1 - _to_int l2)
+
+  (* by multiset of terms *)
+  let _cmp_by_term_multiset ~ord l1 l2 =
+    let t1 = root_terms l1 and t2 = root_terms l2 in
+    Multiset.compare_l (Ordering.compare ord) t1 t2
+
+  let _cmp_specific ~ord l1 l2 =
+    match l1, l2 with
+    | Prop _, Prop _
+    | Equation _, Equation _
+    | Prop _, Equation _
+    | Equation _, Prop _ ->
+        _cmp_by_term_multiset ~ord l1 l2
+    | Ineq olit1, Ineq olit2 ->
+        begin match olit1.TO.strict, olit2.TO.strict with
+        | true, true
+        | false, false -> _cmp_by_term_multiset ~ord l1 l2
+        | true, false -> C.Gt
+        | false, true -> C.Lt
+        end
+    | Arith (op1, x1, x2), Arith (op2, y1, y2) ->
+        assert (op1 = op2);
+        let cmp_term = Ordering.compare ord in
+        let cmp_monomes = Monome.Int.compare cmp_term in
+        let left = Multiset.create (IArray.doubleton x1 x2) in
+        let right = Multiset.create (IArray.doubleton y1 y2) in
+        Multiset.compare cmp_monomes left right
+    | Divides (n1, k1, m1, sign1), Divides (n2, k2, m2, sign2) ->
+        assert (sign1=sign2);
+        let c = Z.compare n1 n2 in
+        if c <> 0 then C.of_total c  (* live in totally distinct Z/nZ *)
+        else
+          if is_ground l1 && is_ground l2
+          then
+            C.Incomparable
+            (* TODO: Bezout-normalize, then actually compare Monomes. *)
+          else C.Incomparable
+    | _, _ ->
+        assert false
+
+
+  let compare ~ord l1 l2 =
+    let f = Comparison.(
+      _cmp_by_maxterms ~ord @>>
+      _cmp_by_polarity @>>
+      _cmp_by_kind @>>
+      _cmp_specific ~ord
+    ) in
+    f l1 l2
+end
+
+module Pos = struct
+  let at lit pos = match lit, pos with
+    | Equation (l, _, _), Position.Left pos' -> T.Pos.at l pos'
+    | Equation (_, r, _), Position.Right pos' -> T.Pos.at r pos'
+    | Prop (p, _), Position.Left pos' -> T.Pos.at p pos'
+    | True, Position.Left Position.Stop -> T.TPTP.true_
+    | False, Position.Left Position.Stop -> T.TPTP.false_
+    | _ -> raise Not_found
+
+  let replace lit ~at ~by = match lit, at with
+    | Equation (l, r, sign), Position.Left pos' ->
+      mk_lit (T.Pos.replace l pos' ~by) r sign
+    | Equation (l, r, sign), Position.Right pos' ->
+      mk_lit l (T.Pos.replace r pos' ~by) sign
+    | Prop (p, sign), Position.Left pos' ->
+      mk_prop (T.Pos.replace p pos' ~by) sign
+    | True, Position.Left Position.Stop -> lit
+    | False, Position.Left Position.Stop -> lit
+    | _ -> invalid_arg (Util.sprintf "wrong pos %a" Position.pp at)
+
+  module P = Position
+
+  let cut lit pos =
+    match lit, pos with
+    | Equation _, P.Left pos' -> P.(left stop), pos'
+    | Equation _, P.Right pos' -> P.(right stop), pos'
+    | Prop _, P.Left pos' -> P.(left stop), pos'
+    | Ineq _, P.Left pos' -> P.(left stop), pos'
+    | Ineq _, P.Right pos' -> P.(right stop), pos'
+    | Divides _, P.Arg (i, pos') -> P.(arg i stop), pos'
+    | Arith (_, _, _), P.Left (P.Arg (i, pos')) ->
+        P.(left @@ arg i stop), pos'
+    | Arith (_, _, _), P.Right (P.Arg (i, pos')) ->
+        P.(right @@ arg i stop), pos'
+    | _ -> invalid_arg "cut: not a proper literal position"
+
+  let root_term lit pos =
+    at lit (fst (cut lit pos))
+
+  let term_pos lit pos = snd (cut lit pos)
+
+  let is_max_term ~ord lit pos =
+    match lit, pos with
+    | Equation (l, r, _), P.Left _ ->
+        Ordering.compare ord l r <> Comparison.Lt
+    | Equation (l, r, _), P.Right _ ->
+        Ordering.compare ord r l <> Comparison.Lt
+    | Prop _, _ -> true
+    | Ineq olit, P.Left _ ->
+        Ordering.compare ord olit.TO.left olit.TO.right <> Comparison.Lt
+    | Ineq olit, P.Right _ ->
+        Ordering.compare ord olit.TO.right olit.TO.left <> Comparison.Lt
+    | Arith (_, m1, m2), _ ->
+        (* [t] dominates all atomic terms? *)
+        let t = root_term lit pos in
+        Sequence.for_all
+          (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
+          (Seq.terms lit)
+    | Divides (_, _, m, _), _ ->
+        let t = root_term lit pos in
+        Sequence.for_all
+          (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
+          (Monome.Seq.terms m)
+    | True, _
+    | False, _ -> true  (* why not. *)
+    | Equation _, _
+    | Ineq _, _ ->
+        let msg = Util.sprintf
+          "is_max_term: %a not a proper literal position in %a"
+          Position.pp pos pp lit in
+        invalid_arg msg
+end
+
+module Conv = struct
+  type hook_from = form -> t option
+  type hook_to = t -> form option
+
+  let arith_hook_from f =
+    None (* TODO: try to convert form into a arith lit *)
+
+  let total_order_hook_from ~instance f =
+    None   (* TODO: try to convert into a total order. *)
+
+  let rec try_hooks x hooks = match hooks with
+    | [] -> None
+    | h::hooks' ->
+        match h x with
+        | None -> try_hooks x hooks'
+        | (Some _) as res -> res
+
+  let of_form ?(hooks=[]) f =
+    let f = F.simplify f in
+    match try_hooks f hooks with
+    | Some lit -> lit
+    | None ->
+      begin match F.view f with
+      | F.True -> True
+      | F.False -> False
+      | F.Atom a -> mk_true a
+      | F.Eq (l,r) -> mk_eq l r
+      | F.Neq (l,r) -> mk_neq l r
+      | F.Not f' ->
+          begin match F.view f' with
+          | F.Atom a -> mk_false a
+          | F.Eq (l,r) -> mk_neq l r
+          | F.Neq (l,r) -> mk_eq l r
+          | _ -> failwith (Util.sprintf "not a literal: %a" F.pp f)
+          end
+      | _ -> failwith (Util.sprintf "not a literal: %a" F.pp f)
+      end
+
+  let to_form ?(hooks=[]) lit =
+    match try_hooks lit hooks with
+    | Some f -> f
+    | None ->
+      match lit with
+      | Equation (l, r, true) -> F.Base.eq l r
+      | Equation (l, r, false) -> F.Base.neq l r
+      | Prop (p, true) -> F.Base.atom p
+      | Prop (p, false) -> F.Base.not_ (F.Base.atom p)
+      | True -> F.Base.true_
+      | False -> F.Base.false_
+      | Ineq olit ->
+        let l = olit.TO.left and r = olit.TO.right in
+        let p = if olit.TO.strict
+          then T.app_full (TO.less_const olit.TO.order) olit.TO.tyargs [l; r]
+          else T.app_full (TO.lesseq_const olit.TO.order) olit.TO.tyargs [l; r]
+        in F.Base.atom p
+      | Arith(op, m1, m2) ->
+        let t1 = Monome.Int.to_term m1 in
+        let t2 = Monome.Int.to_term m2 in
+        begin match op with
+          | Equal -> F.Base.eq t1 t2
+          | Different -> F.Base.neq t1 t2
+          | Less ->
+            let sym = Symbol.TPTP.Arith.less in
+            let ty = Signature.find_exn Signature.TPTP.Arith.base sym in
+            let cst = T.const ~ty sym in
+            F.Base.atom (T.app_full cst [Type.TPTP.int] [t1; t2])
+          | Lesseq ->
+            let sym = Symbol.TPTP.Arith.lesseq in
+            let ty = Signature.find_exn Signature.TPTP.Arith.base sym in
+            let cst = T.const ~ty sym in
+            F.Base.atom (T.app_full cst [Type.TPTP.int] [t1; t2])
+        end
+      | Divides (n, k, m, sign) ->
+        let nk = Z.pow n k in
+        let t = Monome.Int.to_term m in
+        let sym = Symbol.TPTP.Arith.remainder_e in
+        let ty = Signature.find_exn Signature.TPTP.Arith.base sym in
+        let cst = T.const ~ty sym in
+        (* $remainder_e(t, nk) = 0 *)
+        let f = F.Base.eq
+          (T.const ~ty:Type.TPTP.int (Symbol.of_int 0))
+          (T.app cst [t; T.const ~ty:Type.TPTP.int (Symbol.mk_int nk)])
+        in
+        if sign then f else F.Base.not_ f
+end
+
+module View = struct
+  let as_eqn lit = match lit with
+    | Equation (l,r,sign) -> Some (l, r, sign)
+    | Prop (p, sign) -> Some (p, T.TPTP.true_, sign)
+    | True
+    | False
+    | Ineq _
+    | Arith _
+    | Divides _ -> None
+
+  let get_eqn lit position =
+    match lit, position with
+    | Equation (l,r,sign), Position.Left _ -> Some (l, r, sign)
+    | Equation (l,r,sign), Position.Right _ -> Some (r, l, sign)
+    | Prop (p, sign), Position.Left _ -> Some (p, T.TPTP.true_, sign)
+    | True, _
+    | False, _
+    | Ineq _, _
+    | Arith _, _
+    | Divides _, _ -> None
+    | _ -> invalid_arg "get_eqn: wrong literal or position"
+
+  let get_ineq = function
+    | Ineq lit' -> Some lit'
+    | _ -> None
+
+  let get_ineq_of ~instance lit = match lit with
+    | Ineq olit ->
+        if TO.eq olit.TO.order instance
+        then Some olit
+        else None
+    | _ -> None
+end

@@ -156,7 +156,7 @@ end
 
 module Pos = struct
   let _fail_lits lits pos =
-    let msg = Util.sprintf "invalid position %a in lits %a"
+    let msg = Util.sprintf "invalid position %a in lits [%a]"
       Position.pp pos (Util.pp_array Lit.pp) lits
     in invalid_arg msg
 
@@ -321,7 +321,8 @@ let fold_terms ?(vars=false) ~(which : [< `Max|`One|`Both])
     else if not (eligible i lits.(i))
       then fold acc (i+1)   (* ignore lit *)
     else
-      let acc = Lit.fold_terms ~vars ~which ~ord ~subterms lits.(i) acc f in
+      let acc = Lit.fold_terms ~position:Position.(arg i stop)
+        ~vars ~which ~ord ~subterms lits.(i) acc f in
       fold acc (i+1)
   in fold acc 0
 

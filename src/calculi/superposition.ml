@@ -304,7 +304,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let passive_lit' = Lit.apply_subst ~renaming subst info.passive_lit sc_p in
       if (
         O.compare ord (S.FO.apply ~renaming info.subst info.s sc_a) t' = Comp.Lt ||
-        not (Lit.Pos.is_max_term ~ord passive_lit' info.passive_pos) ||
+        not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
         not (BV.get (C.eligible_res info.passive sc_p subst) passive_idx) ||
         not (BV.get (C.eligible_param info.active sc_a subst) active_idx)
       ) then raise (ExitSuperposition "bad ordering conditions");
