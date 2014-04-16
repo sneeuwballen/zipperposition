@@ -171,18 +171,17 @@ module Make(Sup : Superposition.S) = struct
     subterm at the given [pos], and return the list of such positions
     plus the new substitution *)
   let _gather_positions ~eligible ~signature lits scope pos subst =
-    let t = Lits.Pos.at lits pos in
-    (* position within the literal *)
-    let pos' = Lits.Pos.tail pos in
+    let lit, pos_term  = Lits.Pos.lit_at lits pos in
+    let t = Lit.Pos.at lit pos_term in
     let positions, subst = Lits.fold_lits ~eligible lits ([pos], subst)
       (fun (pos_list, subst) lit i ->
         try
-          let t' = Lit.Pos.at lit pos' in
+          let t' = Lit.Pos.at lit pos_term in
           if T.is_var t'
             then raise Exit  (* variables are not eligible *)
             else
               let subst = Unif.FO.unification ~subst t scope t' scope in
-              let pos_list = Position.(arg i pos') :: pos_list in
+              let pos_list = Position.(arg i pos_term) :: pos_list in
               pos_list, subst
         with Not_found | Unif.Fail | Exit | Invalid_argument _ ->
           pos_list, subst)

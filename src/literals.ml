@@ -304,7 +304,7 @@ let fold_ineq ~eligible lits acc f =
       let acc = match Lit.View.get_ineq lits.(i) with
       | None -> acc
       | Some olit ->
-          let pos = Position.(arg i @@ left @@ stop) in
+          let pos = Position.(arg i stop) in
           f acc olit pos
       in
       fold acc (i+1)
