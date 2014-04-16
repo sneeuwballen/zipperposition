@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 1d53e00f63d28fe3df8cb180b48c6e77)
+# DO NOT EDIT (digest: cb935e4b6b2bbdaa18a9c3894d6de6de)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -34,6 +34,7 @@
 "src/params.cmx": for-pack(Libzipperposition)
 "src/env.cmx": for-pack(Libzipperposition)
 "src/monome.cmx": for-pack(Libzipperposition)
+"src/signals.cmx": for-pack(Libzipperposition)
 "src/calculi/superposition.cmx": for-pack(Libzipperposition)
 "src/calculi/chaining.cmx": for-pack(Libzipperposition)
 "src/lib/lazyGraph.cmx": for-pack(Libzipperposition)
@@ -44,6 +45,7 @@
 "src/lib/unionFind.cmx": for-pack(Libzipperposition)
 "src/lib/choice.cmx": for-pack(Libzipperposition)
 "src/lib/mixtbl.cmx": for-pack(Libzipperposition)
+"src/lib/signal.cmx": for-pack(Libzipperposition)
 <src/calculi/*.ml{,i}>: package(dynlink)
 <src/calculi/*.ml{,i}>: package(logtk)
 <src/calculi/*.ml{,i}>: package(unix)

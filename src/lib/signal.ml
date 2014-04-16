@@ -39,6 +39,8 @@ and keepalive =
   | Keep : 'a t -> keepalive
   | NotAlive : keepalive
 
+let _exn_handler = ref (fun _ -> ())
+
 let nop_handler x = ContinueListening
 
 let create () =
@@ -64,7 +66,9 @@ let send s x =
       begin try match s.handlers.(i) x with
       | ContinueListening -> false  (* keep *)
       | StopListening -> true
-      with _ -> true
+      with e ->
+        !_exn_handler e;
+        false
       end
     do
       remove s i  (* i-th handler is done, remove it *)
@@ -113,3 +117,5 @@ let filter signal p =
     | Some signal' -> (if p x then send signal' x); ContinueListening);
   signal'.alive <- Keep signal;
   signal'
+
+let set_exn_handler h = _exn_handler := h

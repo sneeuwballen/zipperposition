@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 4606b7c734242c3ad6aeb1501ebef565)
+# DO NOT EDIT (digest: 0a9c5e4ea2032b137aaf6eccc6cfa553)
 ClauseQueue
 Clause
 Const
@@ -19,6 +19,7 @@ PEnv
 Params
 Env
 Monome
+Signals
 calculi/Superposition
 calculi/Chaining
 lib/LazyGraph
@@ -29,4 +30,5 @@ lib/SmallSet
 lib/UnionFind
 lib/Choice
 lib/Mixtbl
+lib/Signal
 # OASIS_STOP

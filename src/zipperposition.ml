@@ -343,7 +343,7 @@ let process_file ?meta ~plugins ~params file =
     |> PF.Set.of_seq
   in
   (* obtain clauses + env *)
-  Util.debug 2 "input formulas:\n%%  %a" (Util.pp_seq ~sep:"\n%%  " PF.pp)
+  Util.debug 2 "input formulas:\n%%  %a" (Util.pp_seq ~sep:"\n%  " PF.pp)
     (PF.Set.to_seq formulas);
   Util.debug 2 "input signature: %a" Signature.pp signature;
   let res, signature = preprocess ~signature ~params formulas in
@@ -395,7 +395,13 @@ let () =
   (* GC! increase max overhead because we want the GC to be faster, even if
       it implies more wasted memory. *)
   let gc = Gc.get () in
-  Gc.set { gc with Gc.space_overhead=150; }
+  Gc.set { gc with Gc.space_overhead=150; };
+  (* signal handler *)
+  Signal.set_exn_handler (fun e ->
+    let msg = Printexc.to_string e in
+      output_string stderr ("exception raised in signal: " ^ msg ^ "\n");
+      flush stderr);
+  ()
 
 let () =
   (* parse arguments *)
