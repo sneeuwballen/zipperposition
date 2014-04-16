@@ -115,8 +115,13 @@ module View : sig
   val get_ineq : t -> Position.t -> Theories.TotalOrder.lit option
     (** Obtain the l <= r at the given position in the array, plus a
         boolean that is [true] iff the inequality is {b strict}, and
-        the corresponding ordering instance (pair of symbols)
-        @raise Invalid_argument if the position is not valid in the array *)
+        the corresponding ordering instance (pair of symbols) *)
+
+  (** The following functions will raise [Invalid_argument] if the
+     position is not valid or if the literal isn't what's asked for *)
+
+  val get_eqn_exn : t -> Position.t -> (term * term * bool)
+  val get_ineq_exn : t -> Position.t -> Theories.TotalOrder.lit
 end
 
 val order_instances : t -> Theories.TotalOrder.t list

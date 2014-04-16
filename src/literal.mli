@@ -64,8 +64,8 @@ val sign : t -> bool
 val is_pos : t -> bool            (** is the literal positive? *)
 val is_neg : t -> bool            (** is the literal negative? *)
 val is_eqn : t -> bool            (** is the literal a proper (in)equation? *)
-val is_eq : t -> bool (* a = b *)
-val is_neq : t -> bool (* a != b *)
+val is_eq : t -> bool             (** is the literal of the form a = b? *)
+val is_neq : t -> bool            (** is the literal of the form a != b? *)
 val is_ineq : t -> bool
 val is_strict_ineq : t -> bool
 val is_nonstrict_ineq : t -> bool
@@ -75,17 +75,17 @@ val is_ineq_of : instance:Theories.TotalOrder.t -> t -> bool
 
 (** build literals. If sides so not have the same sort,
     a SortError will be raised. An ordering must be provided *)
-val mk_eq : FOTerm.t -> FOTerm.t -> t
-val mk_neq : FOTerm.t -> FOTerm.t -> t
-val mk_lit : FOTerm.t -> FOTerm.t -> bool -> t
-val mk_prop : FOTerm.t -> bool -> t   (* proposition *)
-val mk_true : FOTerm.t -> t     (* true proposition *)
-val mk_false : FOTerm.t -> t    (* false proposition *)
+val mk_eq : term -> term -> t
+val mk_neq : term -> term -> t
+val mk_lit : term -> term -> bool -> t
+val mk_prop : term -> bool -> t   (* proposition *)
+val mk_true : term -> t     (* true proposition *)
+val mk_false : term -> t    (* false proposition *)
 val mk_tauto : t (* tautological literal *)
 val mk_absurd : t (* absurd literal, like ~ true *)
 
-val mk_less : Theories.TotalOrder.t -> FOTerm.t -> FOTerm.t -> t
-val mk_lesseq : Theories.TotalOrder.t -> FOTerm.t -> FOTerm.t -> t
+val mk_less : Theories.TotalOrder.t -> term -> term -> t
+val mk_lesseq : Theories.TotalOrder.t -> term -> term -> t
 
 val mk_arith : arith_op -> Z.t Monome.t -> Z.t Monome.t -> t
 val mk_arith_eq : Z.t Monome.t -> Z.t Monome.t -> t
@@ -114,16 +114,19 @@ val apply_subst_list : renaming:Substs.Renaming.t ->
                        Substs.t -> t list -> scope -> t list
 
 val negate : t -> t   (** negate literal *)
-val map : (FOTerm.t -> FOTerm.t) -> t -> t (** functor *)
+val map : (term -> term) -> t -> t (** functor *)
 val fold : ('a -> term -> 'a) -> 'a -> t -> 'a  (** basic fold *)
 val add_vars : unit FOTerm.Tbl.t -> t -> unit  (** Add variables to the set *)
-val vars : t -> FOTerm.t list (** gather variables *)
-val var_occurs : FOTerm.t -> t -> bool
+val vars : t -> term list (** gather variables *)
+val var_occurs : term -> t -> bool
 val is_ground : t -> bool
 val symbols : t -> Symbol.Set.t
 val root_terms : t -> term list (** all the terms immediatly under the lit *)
 
+(** {2 Basic semantic checks} *)
+
 val is_trivial : t -> bool
+val is_absurd : t -> bool
 
 val fold_terms : ?position:Position.t -> ?vars:bool ->
                  which:[<`Max|`One|`Both] ->
@@ -152,8 +155,8 @@ module Comp : sig
 end
 
 module Seq : sig
-  val terms : t -> FOTerm.t Sequence.t
-  val vars : t -> FOTerm.t Sequence.t
+  val terms : t -> term Sequence.t
+  val vars : t -> term Sequence.t
   val symbols : t -> Symbol.t Sequence.t
 
   val abstract : t -> (bool * term Sequence.t)
@@ -162,11 +165,11 @@ end
 
 (** {2 Positions} *)
 module Pos : sig
-  val at : t -> Position.t -> FOTerm.t
+  val at : t -> Position.t -> term
     (** Subterm at given position, or
         @raise Not_found if the position is invalid *)
 
-  val replace : t -> at:Position.t -> by:FOTerm.t -> t
+  val replace : t -> at:Position.t -> by:term -> t
     (** Replace subterm, or
         @raise Invalid_argument if the position is invalid *)
 
@@ -177,7 +180,7 @@ module Pos : sig
 
         it always holds that [let a,b = cut p in Position.append a b = p] *)
 
-  val root_term : t -> Position.t -> FOTerm.t
+  val root_term : t -> Position.t -> term
     (** Obtain the term at the given position, at the root of the literal.
         It should hold that
         [root_term lit p = [at lit (fst (cut p))]. *)
@@ -193,9 +196,9 @@ end
 
 (** {2 Specific views} *)
 module View : sig
-  val as_eqn : t -> (FOTerm.t * FOTerm.t * bool) option
+  val as_eqn : t -> (term * term * bool) option
 
-  val get_eqn : t -> Position.t -> (FOTerm.t * FOTerm.t * bool) option
+  val get_eqn : t -> Position.t -> (term * term * bool) option
     (** View of a Prop or Equation literal, oriented by the position. If the
         position selects its left term, return l, r, otherwise r, l.
         for propositions it will always be p, true.

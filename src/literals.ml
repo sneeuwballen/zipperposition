@@ -212,6 +212,15 @@ module View = struct
       Lit.View.get_ineq lits.(idx)
     | _ -> None
 
+  let _unwrap2 ~msg f x y = match f x y with
+    | Some z -> z
+    | None -> invalid_arg msg
+
+  let get_eqn_exn =
+    _unwrap2 ~msg:"get_eqn: improper position" get_eqn
+
+  let get_ineq_exn =
+    _unwrap2 ~msg:"get_ineq: improper position" get_ineq
 end
 
 let order_instances lits =

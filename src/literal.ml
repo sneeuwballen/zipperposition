@@ -728,6 +728,13 @@ let is_trivial lit = match lit with
   | Arith _ -> false  (* TODO *)
   | Prop (_, _) -> false
 
+let is_absurd lit = match lit with
+  | Equation (l, r, false) when T.eq l r -> true
+  | Prop (p, false) when T.eq p T.TPTP.true_ -> true
+  | Prop (p, true) when T.eq p T.TPTP.false_ -> true
+  | False -> true
+  | _ -> false
+
 let fold_terms ?(position=Position.stop) ?(vars=false) ~which ~ord ~subterms lit acc f =
   (* function to call at terms *)
   let at_term ~pos acc t =
