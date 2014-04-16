@@ -88,6 +88,12 @@ module Make(E : Index.EQUATION) = struct
 
   let is_empty n = n.star = None && SMap.is_empty n.map && Leaf.is_empty n.leaf
 
+  exception NoSuchTrie
+
+  let find_sub map key =
+    try SMap.find key map
+    with Not_found -> raise NoSuchTrie
+
   (** get/add/remove the leaf for the given term. The
       continuation k takes the leaf, and returns a leaf option
       that replaces the old leaf.
@@ -119,8 +125,8 @@ module Make(E : Index.EQUATION) = struct
             goto subtrie (next i) rebuild
           | T.Classic.App (s, _, _) ->
             let subtrie =
-              try SMap.find s trie.map
-              with Not_found -> empty ()
+              try find_sub trie.map s
+              with NoSuchTrie -> empty ()
             in
             let rebuild subtrie =
               if is_empty subtrie
@@ -171,9 +177,9 @@ module Make(E : Index.EQUATION) = struct
           | T.Classic.App (s, _, _) ->
             let acc =
               try
-                let subtrie = SMap.find s trie.map in
+                let subtrie = find_sub trie.map s in
                 traverse subtrie acc (next i)
-              with Not_found -> acc
+              with NoSuchTrie -> acc
             in
             begin match trie.star with
               | None -> acc
@@ -231,6 +237,12 @@ module MakeTerm(X : Set.OrderedType) = struct
 
   let is_empty n = n.star = None && SIMap.is_empty n.map && Leaf.is_empty n.leaf
 
+  exception NoSuchTrie
+
+  let find_sub map key =
+    try SIMap.find key map
+    with Not_found -> raise NoSuchTrie
+
   (** get/add/remove the leaf for the given term. The
       continuation k takes the leaf, and returns a leaf option
       that replaces the old leaf.
@@ -261,8 +273,8 @@ module MakeTerm(X : Set.OrderedType) = struct
           | T.Classic.App (s, _, l) ->
             let arity = List.length l in
             let subtrie =
-              try SIMap.find (s,arity) trie.map
-              with Not_found -> empty ()
+              try find_sub trie.map (s,arity)
+              with NoSuchTrie -> empty ()
             in
             let rebuild subtrie =
               if is_empty subtrie
@@ -425,7 +437,7 @@ module MakeTerm(X : Set.OrderedType) = struct
     !n
 
   let name = "npdtree"
-  
+
   let to_dot buf t =
     failwith "NPDTree.to_dot: not implemented"
 end
