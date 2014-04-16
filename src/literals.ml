@@ -74,21 +74,19 @@ let hash lits =
     (fun h lit -> Hash.combine h (Lit.hash lit))
     13 lits
 
-let variant ?(subst=S.empty) a1 sc1 a2 sc2 =
-  if Array.length a1 <> Array.length a2
-    then raise Unif.Fail;
-  let subst = ref subst in
-  for i = 0 to Array.length a1 - 1 do
-    subst := Lit.variant ~subst:!subst a1.(i) sc1 a2.(i) sc2;
-  done;
-  !subst
+let variant ?(subst=S.empty) a1 sc1 a2 sc2 k =
+  let rec iter2 subst i =
+    if i = Array.length a1
+      then k subst
+      else
+        Lit.variant ~subst a1.(i) sc1 a2.(i) sc2
+          (fun subst -> iter2 subst (i+1))
+  in
+  if Array.length a1 = Array.length a2
+    then iter2 subst 0
 
 let are_variant a1 a2 =
-  try
-    let _ = variant a1 0 a2 1 in
-    true
-  with Unif.Fail ->
-    false
+  not (Sequence.is_empty (variant a1 0 a2 1))
 
 let weight lits =
   Array.fold_left (fun w lit -> w + Lit.weight lit) 0 lits

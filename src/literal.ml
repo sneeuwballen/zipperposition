@@ -61,7 +61,22 @@ let eq l1 l2 =
   | Prop (p1, sign1), Prop(p2, sign2) -> sign1 = sign2 && T.eq p1 p2
   | True, True
   | False, False -> true
-  | _, _ -> false
+  | Ineq olit1, Ineq olit2 ->
+      olit1.TO.order == olit2.TO.order &&
+      olit1.TO.strict = olit2.TO.strict &&
+      T.eq olit1.TO.left olit2.TO.left &&
+      T.eq olit1.TO.right olit2.TO.right
+  | Arith (op1, x1, y1), Arith (op2, x2, y2) ->
+      op1 = op2 && Monome.eq x1 x2 && Monome.eq y1 y2
+  | Divides (n1, k1, m1, sign1), Divides (n2, k2, m2, sign2) ->
+      sign1 = sign2 && k1 = k2 && Z.equal n1 n2 && Monome.eq m1 m2
+  | Equation _, _
+  | Prop _, _
+  | True, _
+  | False, _
+  | Ineq _, _
+  | Arith _, _
+  | Divides _, _ -> false
 
 let eq_com l1 l2 =
   match l1, l2 with
@@ -72,7 +87,11 @@ let eq_com l1 l2 =
   | Prop (p1, sign1), Prop(p2, sign2) -> sign1 = sign2 && T.eq p1 p2
   | True, True
   | False, False -> true
-  | _, _ -> false
+  | Arith (op1, x1, y1), Arith (op2, x2, y2) when
+    op1 = op2 && (op1 = Equal || op1 = Different) ->
+    (Monome.eq x1 x2 && Monome.eq y1 y2) ||
+    (Monome.eq x1 y2 && Monome.eq x2 y1)
+  | _ -> eq l1 l2  (* regular comparison *)
 
 let compare l1 l2 =
   let __to_int = function
@@ -97,29 +116,6 @@ let compare l1 l2 =
   | True, True
   | False, False -> 0
   | _, _ -> __to_int l1 - __to_int l2
-
-let variant ?(subst=S.empty) lit1 sc1 lit2 sc2 =
-  match lit1, lit2 with
-  | Prop (p1, sign1), Prop (p2, sign2) when sign1 = sign2 ->
-    Unif.FO.variant ~subst p1 sc1 p2 sc2
-  | True, True
-  | False, False -> subst
-  | Equation (l1, r1, sign1), Equation (l2, r2, sign2) when sign1 = sign2 ->
-    begin try
-      let subst = Unif.FO.variant ~subst l1 sc1 l2 sc2 in
-      Unif.FO.variant ~subst r1 sc1 r2 sc2
-    with Unif.Fail ->
-      let subst = Unif.FO.variant ~subst l1 sc1 r2 sc2 in
-      Unif.FO.variant ~subst r1 sc1 l2 sc2
-    end
-  | _ -> raise Unif.Fail
-
-let are_variant lit1 lit2 =
-  try
-    let _ = variant lit1 0 lit2 1 in
-    true
-  with Unif.Fail ->
-    false
 
 let fold f acc lit = match lit with
   | Equation (l, r, _) -> f (f acc l) r
@@ -289,29 +285,85 @@ let symbols lit =
     (fun set s -> Symbol.Set.add s set)
     Symbol.Set.empty (Seq.symbols lit)
 
-let matching ?(subst=Substs.empty) lit_a sc_a lit_b sc_b k =
-  (* match t1 with t2, then t1' with t2' *)
-  let match4 subst t1 t2 t1' t2' =
-    try
-      let subst = Unif.FO.matching_adapt_scope ~subst ~pattern:t1 sc_a t2 sc_b in
-      k (Unif.FO.matching_adapt_scope ~subst ~pattern:t1' sc_a t2' sc_b)
-    with Unif.Fail -> ()
-  and match2 subst t1 sc1 t2 sc2 =
-    try k (Unif.FO.matching_adapt_scope ~subst ~pattern:t1 sc1 t2 sc2)
-    with Unif.Fail -> ()
-  in
-  match lit_a, lit_b with
-  | Prop (pa, signa), Prop (pb, signb) ->
-    if signa = signb
-      then match2 subst pa sc_a pb sc_b
-      else ()
-  | Equation (_, _, signa), Equation (_, _, signb)
-    when signa <> signb -> ()  (* different sign *)
-  | Equation (la, ra, _), Equation (lb, rb, _) ->
-    match4 subst la lb ra rb ; match4 subst la rb ra lb
+(** Unification-like operation on components of a literal. *)
+module UnifOp = struct
+  type op = {
+    term : subst:Substs.t -> term -> scope -> term -> scope ->
+      Substs.t Sequence.t;
+    monomes : subst:Substs.t -> Z.t Monome.t -> scope -> Z.t Monome.t
+      -> scope -> Substs.t Sequence.t;
+  }
+end
+
+(* match t1 with t2, then t1' with t2' *)
+let unif4 op ~subst t1 t2 sc1 t1' t2' sc2 k =
+  op ~subst t1 sc1 t2 sc2
+    (fun subst -> op ~subst t1' sc1 t2' sc2 k);
+  op ~subst t1 sc1 t2' sc2
+    (fun subst -> op ~subst t1' sc1 t2 sc2 k);
+  ()
+
+(* generic unification structure *)
+let unif_lits op ~subst lit1 sc1 lit2 sc2 k =
+  let open UnifOp in
+  match lit1, lit2 with
+  | Prop (p1, sign1), Prop (p2, sign2) when sign1 = sign2 ->
+    op.term ~subst p1 sc1 p2 sc2 k
   | True, True
   | False, False -> k subst
-  | _ -> ()
+  | Equation (l1, r1, sign1), Equation (l2, r2, sign2) when sign1 = sign2 ->
+    unif4 op.term ~subst l1 r1 sc1 l2 r2 sc2 k
+  | Ineq olit1, Ineq olit2
+    when olit1.TO.order == olit2.TO.order && olit1.TO.strict = olit2.TO.strict ->
+    unif4 op.term ~subst
+      olit1.TO.left olit1.TO.right sc1
+      olit2.TO.left olit2.TO.right sc2 k
+  | Arith (Equal, x1, y1), Arith (Equal, x2, y2) ->
+    (* try both ways *)
+    unif4 op.monomes ~subst x1 y1 sc1 x2 y2 sc2 k
+  | Arith (op1, x1, y1), Arith (op2, x2, y2) when op1 = op2 ->
+    op.monomes ~subst x1 sc1 x2 sc2
+      (fun subst -> op.monomes ~subst y1 sc1 y2 sc2 k)
+  | Divides (n1, k1, m1, sign1), Divides (n2, k2, m2, sign2)
+    when Z.equal n1 n2 && k1 = k2 && sign1 = sign2 ->
+    op.monomes ~subst m1 sc1 m2 sc2 k
+  | _, _ -> ()
+
+let variant ?(subst=S.empty) lit1 sc1 lit2 sc2 k =
+  let op = UnifOp.({
+    term=(fun ~subst t1 sc1 t2 sc2 k ->
+      try k (Unif.FO.variant ~subst t1 sc1 t2 sc2)
+      with Unif.Fail -> ());
+    monomes=(fun ~subst m1 sc1 m2 sc2 k ->
+      Monome.variant ~subst m1 sc1 m2 sc2 k)
+  })
+  in
+  unif_lits op ~subst lit1 sc1 lit2 sc2 k
+
+let are_variant lit1 lit2 =
+  not (Sequence.is_empty (variant lit1 0 lit2 1))
+
+let matching ?(subst=Substs.empty) lit1 sc1 lit2 sc2 k =
+  let op = UnifOp.({
+    term=(fun ~subst t1 sc1 t2 sc2 k ->
+      try k (Unif.FO.matching_adapt_scope ~subst ~pattern:t1 sc1 t2 sc2)
+      with Unif.Fail -> ());
+    monomes=(fun ~subst m1 sc1 m2 sc2 k ->
+      Monome.matching ~subst m1 sc1 m2 sc2 k)
+  })
+  in
+  unif_lits op ~subst lit1 sc1 lit2 sc2 k
+
+let unify ?(subst=Substs.empty) lit1 sc1 lit2 sc2 k =
+  let op = UnifOp.({
+    term=(fun ~subst t1 sc1 t2 sc2 k ->
+      try k (Unif.FO.unification ~subst t1 sc1 t2 sc2)
+      with Unif.Fail -> ());
+    monomes=(fun ~subst m1 sc1 m2 sc2 k ->
+      Monome.unify ~subst m1 sc1 m2 sc2 k)
+  })
+  in
+  unif_lits op ~subst lit1 sc1 lit2 sc2 k
 
 let map f = function
   | Equation (left, right, sign) ->
@@ -488,7 +540,6 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ~which ~ord ~subterms lit
 
 (** {2 IO} *)
 
-(* TODO: use hooks *)
 let pp_debug ?(hooks=[]) buf lit =
   if List.for_all (fun h -> not (h buf lit)) hooks
   then match lit with
@@ -544,23 +595,6 @@ let pp_tstp buf lit =
   | Divides (n, k, m, false) ->
     let nk = Z.mul n (Z.of_int k) in
     Printf.bprintf buf "$remainder_e(%a, %s) != 0" Monome.pp_tstp m (Z.to_string nk)
-
-(* TODO: make it a hook
-let pp_arith buf lit =
-  match lit with
-  | Prop ({T.term=T.Node(f, _, [a;b])},true) when Symbol.eq f Symbol.Arith.less ->
-    Printf.bprintf buf "%a < %a" T.pp_arith a T.pp_arith b
-  | Prop ({T.term=T.Node(f, _, [a;b])},true) when Symbol.eq f Symbol.Arith.lesseq ->
-    Printf.bprintf buf "%a ≤ %a" T.pp_arith a T.pp_arith b
-  | Prop (p, true) -> T.pp_arith buf p
-  | Prop (p, false) -> Printf.bprintf buf "¬%a" T.pp_arith p
-  | True -> Buffer.add_string buf "true"
-  | False -> Buffer.add_string buf "false"
-  | Equation (l, r, true, _) ->
-    Printf.bprintf buf "%a = %a" T.pp_arith l T.pp_arith r
-  | Equation (l, r, false, _) ->
-    Printf.bprintf buf "%a ≠ %a" T.pp_arith l T.pp_arith r
-*)
 
 type print_hook = Buffer.t -> t -> bool
 let __hooks = ref []
@@ -776,7 +810,23 @@ module Conv = struct
     None (* TODO: try to convert form into a arith lit *)
 
   let total_order_hook_from ~instance f =
-    None   (* TODO: try to convert into a total order. *)
+    let rec conv f = match F.view f with
+      | F.Not f' ->
+        Monad.Opt.map (conv f') negate
+      | F.Atom p ->
+          begin match T.Classic.view p with
+          | T.Classic.App (s, tyargs, [l; r]) ->
+              if Symbol.eq s instance.TO.less
+                then Some
+                (Ineq TO.({order=instance; tyargs; left=l; right=r; strict=true;} ))
+              else if Symbol.eq s instance.TO.lesseq
+                then Some
+                (Ineq TO.({order=instance; tyargs; left=l; right=r; strict=false;} ))
+              else None
+          | _ -> None
+          end
+      | _ -> None
+    in conv f
 
   let rec try_hooks x hooks = match hooks with
     | [] -> None

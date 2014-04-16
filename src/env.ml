@@ -511,7 +511,8 @@ end) : S with module Ctx = X.Ctx = struct
         then rewrite_lit rules' lit
         else begin
           applied_rules := SmallSet.add !applied_rules name;
-          Util.debug 5 "Env: rewritten lit %a into %a" Lit.pp lit Lit.pp lit';
+          Util.debug 5 "Env: rewritten lit %a into %a (using %s)"
+            Lit.pp lit Lit.pp lit' name;
           rewrite_lit !_lit_rules lit'
         end
     in

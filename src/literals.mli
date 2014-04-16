@@ -41,7 +41,7 @@ val eq_com : t -> t -> bool
 val compare : t -> t -> int
 val hash : t -> int
 
-val variant : ?subst:Substs.t -> t -> scope -> t -> scope -> Substs.t
+val variant : ?subst:Substs.t -> t -> scope -> t -> scope -> Substs.t Sequence.t
 val are_variant : t -> t -> bool
 
 val weight : t -> int

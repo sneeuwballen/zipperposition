@@ -33,6 +33,7 @@ module T = FOTerm
 module S = Symbol
 
 type term = FOTerm.t
+type scope = Substs.scope
 
 (** Typeclass num *)
 type 'a num = {
@@ -44,6 +45,7 @@ type 'a num = {
   zero : 'a;
   one : 'a;
   add : 'a -> 'a -> 'a;
+  sub : 'a -> 'a -> 'a;
   mult : 'a -> 'a -> 'a;
   uminus : 'a -> 'a;
   minus : 'a -> 'a -> 'a;
@@ -60,6 +62,7 @@ let z = {
   zero = Z.zero;
   one = Z.one;
   add = Z.add;
+  sub = Z.sub;
   mult = Z.mul;
   uminus = (fun x -> Z.mul x Z.minus_one);
   minus = Z.sub;
@@ -331,6 +334,82 @@ let pp_tstp buf e =
   | _::_ when e.num.sign e.const = 0 -> pp_list buf e.terms
   | _::_ ->
     Printf.bprintf buf "$sum(%s, %a)" (e.num.to_string e.const) pp_list e.terms
+
+let variant ?(subst=Substs.empty) m1 sc1 m2 sc2 k =
+  assert (m1.num == m2.num);
+  let rec traverse_lists subst (c1,t1) l1' rest2 l2 = match l2 with
+    | [] -> ()  (* fail *)
+    | (c2,t2)::l2' ->
+      if m1.num.cmp c1 c2 = 0
+        then try
+          let subst = Unif.FO.variant ~subst t1 sc1 t2 sc2 in
+          start subst l1' (rest2 @ l2')
+        with Unif.Fail -> ();
+      traverse_lists subst (c1,t1) l1' ((c2,t2)::rest2) l2'
+  and start subst l1 l2 = match l1, l2 with
+    | [], [] -> k subst
+    | [], _ | _, [] -> ()
+    | (c1,t1)::l1', _ -> traverse_lists subst (c1,t1) l1' [] l2
+  in
+  if m1.num.cmp m1.const m2.const <> 0 then ()
+  else start subst m1.terms m2.terms
+
+(* ok, matching is going to be slightly more complicated. For instance,
+   a monome   f(X)+f(Y)+a matches 2.f(b) + a   with X=Y=b.
+   note that we don't implement correctly matching variables against monomes,
+   for instance X = a+b will not work (although X+Y=a+b will yield two substs).
+   Also, matching X+f(a) with 1+f(a) will not work.
+
+  In summary naked variables are evil. *)
+let matching ?(subst=Substs.empty) m1 sc1 m2 sc2 k =
+  assert (m1.num == m2.num);
+  let rec traverse_lists subst (c1,t1) l1' rest2 l2 = match l2 with
+    | [] -> ()
+    | (c2,t2)::l2' ->
+      if m1.num.cmp c1 c2 <= 0
+        then begin try
+          let subst = Unif.FO.matching_adapt_scope ~subst ~pattern:t1 sc1 t2 sc2 in
+          if m1.num.cmp c1 c2 = 0
+            then start subst l1' (rest2 @ l2')
+            else
+              (* some instances of t2 remain to be matched *)
+              start subst l1' ((m1.num.sub c2 c1, t2) :: l2' @ rest2)
+        with Unif.Fail -> ()
+        end;
+      traverse_lists subst (c1,t1) l1' ((c2,t2)::rest2) l2'
+  and start subst l1 l2 = match l1, l2 with
+    | [], [] -> k subst
+    | [], _ | _, [] -> ()
+    | (c1,t1)::l1', _ -> traverse_lists subst (c1,t1) l1' [] l2
+  in
+  if m1.num.cmp m1.const m2.const <> 0 then ()
+  else start subst m1.terms m2.terms
+
+let unify ?(subst=Substs.empty) m1 sc1 m2 sc2 k =
+  assert (m1.num == m2.num);
+  let rec traverse_lists subst (c1,t1) l1' rest2 l2 = match l2 with
+    | [] -> ()
+    | (c2,t2)::l2' ->
+      begin try
+        let subst = Unif.FO.matching ~subst ~pattern:t1 sc1 t2 sc2 in
+        match m1.num.cmp c1 c2 with
+        | 0 -> start subst l1' (rest2 @ l2')  (* t1 removed *)
+        | n when n<0 ->
+          (* t1 removed *)
+          start subst l1' ((m1.num.sub c2 c1, t2) :: l2' @ rest2)
+        | _ ->
+          (* t2 removed *)
+          start subst ((m1.num.sub c1 c2, t1) :: l1') (l2' @ rest2)
+      with Unif.Fail -> ()
+      end;
+      traverse_lists subst (c1,t1) l1' ((c2,t2)::rest2) l2'
+  and start subst l1 l2 = match l1, l2 with
+    | [], [] -> k subst
+    | [], _ | _, [] -> ()
+    | (c1,t1)::l1', _ -> traverse_lists subst (c1,t1) l1' [] l2
+  in
+  if m1.num.cmp m1.const m2.const <> 0 then ()
+  else start subst m1.terms m2.terms
 
 exception NotLinear
 

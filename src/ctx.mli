@@ -76,6 +76,21 @@ module type S = sig
   val declare : Symbol.t -> Type.t -> unit
   (** Declare the type of a symbol (updates signature) *)
 
+  (** {2 Literals} *)
+
+  module Lit : sig
+    val from_hooks : unit -> Literal.Conv.hook_from list
+    val add_from_hook : Literal.Conv.hook_from -> unit
+
+    val to_hooks : unit -> Literal.Conv.hook_to list
+    val add_to_hook : Literal.Conv.hook_to -> unit
+
+    val of_form : Formula.FO.t -> Literal.t
+      (** @raise Invalid_argument if the formula is not atomic *)
+
+    val to_form : Literal.t -> Formula.FO.t
+  end
+
   (** {2 Theories} *)
 
   module Theories : sig
@@ -133,11 +148,12 @@ module type S = sig
 
       val add : ?proof:Proof.t list ->
                 less:Symbol.t -> lesseq:Symbol.t -> ty:Type.t ->
-                Theories.TotalOrder.t
+                Theories.TotalOrder.t * [`New | `Old]
         (** Pair of symbols that constitute an ordering.
-            @return the corresponding instance. *)
+            @return the corresponding instance and a flag to indicate
+              whether the instance was already present. *)
 
-      val add_tstp : unit -> Theories.TotalOrder.t
+      val add_tstp : unit -> Theories.TotalOrder.t * [`New | `Old]
         (** Specific version of {!add_order} for $less and $lesseq *)
     end
   end

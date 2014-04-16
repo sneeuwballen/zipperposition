@@ -500,8 +500,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     create_a ?parents ?selected (Array.of_list lits) proof
 
   let of_forms ?parents ?selected forms proof =
-    let lits = Lits.Conv.of_forms forms in
-    create_a ?parents ?selected lits proof
+    let lits = List.map Ctx.Lit.of_form forms in
+    create ?parents ?selected lits proof
 
   let of_forms_axiom ?(role="axiom") ~file ~name forms =
     let lits = Lits.Conv.of_forms forms in

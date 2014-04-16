@@ -101,9 +101,10 @@ val matching : ?subst:Substs.t -> t -> scope -> t -> scope ->
 (** checks whether subst(lit_a) subsumes subst(lit_b). Returns alternative
     substitutions s such that s(lit_a) = lit_b and s contains subst. *)
 
-val variant : ?subst:Substs.t -> t -> scope -> t -> scope -> Substs.t
-  (** Are two literals alpha-equivalent?
-      @raise Unif.Fail if they are not *)
+val variant : ?subst:Substs.t -> t -> scope -> t -> scope ->
+              Substs.t Sequence.t
+
+val unify : ?subst:Substs.t -> t -> scope -> t -> scope -> Substs.t Sequence.t
 
 val are_variant : t -> t -> bool
 

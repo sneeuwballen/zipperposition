@@ -226,7 +226,7 @@ module type S = sig
     val neg : t
       (** Only negative literals *)
 
-    val always : t 
+    val always : t
       (** All literals *)
 
     val combine : t list -> t

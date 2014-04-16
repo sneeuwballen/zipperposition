@@ -36,6 +36,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 type term = FOTerm.t
+type scope = Substs.scope
 
 type 'a t
 (** A monome over terms, with coefficient of type 'a *)
@@ -118,6 +119,19 @@ val split : 'a t -> 'a t * 'a t
 val apply_subst : renaming:Substs.Renaming.t ->
                   Substs.t -> 'a t -> Substs.scope -> 'a t
   (** Apply a substitution to the monome's terms *)
+
+val variant : ?subst:Substs.t -> 'a t -> scope -> 'a t -> scope -> Substs.t Sequence.t
+
+(** Matching and unification aren't complete in the presence of variables
+    occurring directly under the sum, for this would require the variable 
+    to be bound to sums (monomes) itself in the general case.
+    Instead, such variables are only bound to atomic terms, excluding
+    constants (ie X+1 = a+1 will bind X to a without problem, but
+    will X+a=a+1 will fail to bind X to 1) *)
+
+val matching : ?subst:Substs.t -> 'a t -> scope -> 'a t -> scope -> Substs.t Sequence.t
+
+val unify : ?subst:Substs.t -> 'a t -> scope -> 'a t -> scope -> Substs.t Sequence.t
 
 val is_ground : _ t -> bool
   (** Are there no variables in the monome? *)

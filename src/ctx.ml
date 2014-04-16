@@ -80,6 +80,21 @@ module type S = sig
   val declare : Symbol.t -> Type.t -> unit
   (** Declare the type of a symbol (updates signature) *)
 
+  (** {2 Literals} *)
+
+  module Lit : sig
+    val from_hooks : unit -> Literal.Conv.hook_from list
+    val add_from_hook : Literal.Conv.hook_from -> unit
+
+    val to_hooks : unit -> Literal.Conv.hook_to list
+    val add_to_hook : Literal.Conv.hook_to -> unit
+
+    val of_form : Formula.FO.t -> Literal.t
+      (** @raise Invalid_argument if the formula is not atomic *)
+
+    val to_form : Literal.t -> Formula.FO.t
+  end
+
   (** {2 Theories} *)
 
   module Theories : sig
@@ -137,11 +152,12 @@ module type S = sig
 
       val add : ?proof:Proof.t list ->
                 less:Symbol.t -> lesseq:Symbol.t -> ty:Type.t ->
-                Theories.TotalOrder.t
+                Theories.TotalOrder.t * [`New | `Old]
         (** Pair of symbols that constitute an ordering.
-            @return the corresponding instance. *)
+            @return the corresponding instance and a flag to indicate
+              whether the instance was already present. *)
 
-      val add_tstp : unit -> Theories.TotalOrder.t
+      val add_tstp : unit -> Theories.TotalOrder.t * [`New | `Old]
         (** Specific version of {!add_order} for $less and $lesseq *)
     end
   end
@@ -190,6 +206,20 @@ end) : S = struct
   let renaming_clear () =
     S.Renaming.clear renaming;
     renaming
+
+  module Lit = struct
+    let _from = ref []
+    let _to = ref []
+
+    let from_hooks () = !_from
+    let to_hooks () = !_to
+
+    let add_to_hook h = _to := h :: !_to
+    let add_from_hook h = _from := h :: !_from
+
+    let of_form f = Literal.Conv.of_form ~hooks:!_from f
+    let to_form f = Literal.Conv.to_form ~hooks:!_to f
+  end
 
   module Theories = struct
     module STbl = Symbol.Tbl
@@ -331,17 +361,17 @@ end) : S = struct
           STbl.add lesseq_tbl lesseq instance;
           InstanceTbl.add proofs instance proof;
           Signal.send on_add instance;
-          instance
+          instance, `New
         | Some instance ->
           if not (Unif.Ty.are_variant ty instance.TO.ty)
           then raise (Invalid_argument "incompatible types")
           else if not (Symbol.eq less instance.TO.less)
           then raise (Invalid_argument "incompatible symbol for lesseq")
-          else instance
+          else instance, `Old
 
       let add_tstp () =
         try
-          find Symbol.TPTP.Arith.less
+          find Symbol.TPTP.Arith.less, `Old
         with Not_found ->
           let less = Symbol.TPTP.Arith.less in
           let lesseq = Symbol.TPTP.Arith.lesseq in
