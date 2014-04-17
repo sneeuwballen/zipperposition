@@ -192,8 +192,8 @@ let is_ineq_of ~instance lit =
 
 let __ty_error a b =
   let msg = Util.sprintf
-    "Literal: incompatible types in lit for %a : %a and %a : %a" T.pp a
-    Type.pp (T.ty a) T.pp b Type.pp (T.ty b)
+    "Literal: incompatible types in equational lit for %a : %a and %a : %a"
+      T.pp a Type.pp (T.ty a) T.pp b Type.pp (T.ty b)
   in
   raise (Type.Error msg)
 
@@ -201,7 +201,6 @@ let __ty_error a b =
 let mk_lit a b sign =
   if not (Type.eq (T.ty a) (T.ty b)) then __ty_error a b;
   match a, b with
-  | _ when T.eq a b -> if sign then True else False
   | _ when T.eq a T.TPTP.true_ && T.eq b T.TPTP.false_ -> if sign then False else True
   | _ when T.eq a T.TPTP.false_ && T.eq b T.TPTP.true_ -> if sign then False else True
   | _ when T.eq a T.TPTP.true_ -> Prop (b, sign)
