@@ -122,6 +122,8 @@ module Make(Sup : Superposition.S) = struct
   let idx_ord_right () = !_idx_ord_right
   let idx_ord_subterm () = !_idx_ord_subterm
 
+  let _active = ref false
+
   let _update_idx f c =
     (* terms occurring immediately under an inequation, on LHS or RHS *)
     let left, right = Lits.fold_ineq
@@ -157,11 +159,11 @@ module Make(Sup : Superposition.S) = struct
   let () =
     Signal.on PS.ActiveSet.on_add_clause
       (fun c ->
-        _update_idx PS.TermIndex.add c;
+        if !_active then _update_idx PS.TermIndex.add c;
         Signal.ContinueListening);
     Signal.on PS.ActiveSet.on_remove_clause
       (fun c ->
-        _update_idx PS.TermIndex.remove c;
+        if !_active then _update_idx PS.TermIndex.remove c;
         Signal.ContinueListening);
     ()
 
@@ -686,6 +688,7 @@ module Make(Sup : Superposition.S) = struct
 
   (* we have to enable the chaining inferences on the first ordering *)
   let _setup_rules_if_first () =
+    _active := true;
     let exists_some = Ctx.Theories.TotalOrder.exists_order () in
     if not exists_some then _setup_rules ();
     ()
@@ -718,7 +721,8 @@ module Make(Sup : Superposition.S) = struct
     Util.debug 2 "register chaining...";
     let signal = Ctx.Theories.TotalOrder.on_add in
     (* XXX: indexing active clauses upon signal? too late, probably
-        (active set isn't fully saturated...) *)
+        (active set isn't fully saturated, and literals haven't been
+        properly built...) *)
     Signal.on signal
       (fun instance ->
         _setup_rules_if_first ();
