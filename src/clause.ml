@@ -535,7 +535,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       are maximal under [ord] *)
   let maxlits c scope subst =
     let ord = Ctx.ord () in
-    let renaming = Ctx.renaming_clear () in
+    let renaming = S.Renaming.create () in
     let lits = Lits.apply_subst ~renaming subst c.hclits scope in
     Lits.maxlits ~ord lits
 
@@ -548,7 +548,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       are eligible for resolution. *)
   let eligible_res c scope subst =
     let ord = Ctx.ord () in
-    let renaming = Ctx.renaming_clear () in
+    let renaming = S.Renaming.create () in
     (* instantiate lits *)
     let lits = Lits.apply_subst ~renaming subst c.hclits scope in
     let selected = c.hcselected in
@@ -588,7 +588,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let ord = Ctx.ord () in
     if BV.is_empty c.hcselected then begin
       (* instantiate lits *)
-      let renaming = Ctx.renaming_clear () in
+      let renaming = S.Renaming.create () in
       let lits = Lits.apply_subst ~renaming subst c.hclits scope in
       (* maximal ones *)
       let bv = Lits.maxlits ~ord lits in
@@ -600,7 +600,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let eligible_chaining c scope subst =
     let ord = Ctx.ord () in
     if BV.is_empty c.hcselected then begin
-      let renaming = Ctx.renaming_clear () in
+      let renaming = S.Renaming.create () in
       let lits = Lits.apply_subst ~renaming subst c.hclits scope in
       let bv = Lits.maxlits ~ord lits in
       (* only keep literals that are positive *)
