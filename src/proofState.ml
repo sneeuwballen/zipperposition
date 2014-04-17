@@ -35,7 +35,7 @@ module T = FOTerm
 module C = Clause
 module S = Substs.FO
 module Lit = Literal
-module Lits = Literal.Arr
+module Lits = Literals
 module Pos = Position
 module PB = Position.Build
 module CQ = ClauseQueue
@@ -61,8 +61,6 @@ module type S = sig
     with type E.t = (FOTerm.t * FOTerm.t * bool * C.t)
     and type E.rhs = FOTerm.t
   module SubsumptionIndex : Index.SUBSUMPTION_IDX with type C.t = C.t
-
-  val to_idx_lits : Literal.t array -> Index.lits
 
   (** {6 Common Interface for Sets} *)
 
@@ -148,19 +146,10 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
       if C.is_oriented_rule c then 2 else 1
   end)
 
-  let to_idx_lits lits =
-    Sequence.of_array lits
-    |> Sequence.map
-      (function
-        | Lit.Equation (l, r, sign) -> sign, Sequence.of_list [l;r]
-        | Lit.Prop (p, sign) -> sign, Sequence.singleton p
-        | Lit.True -> true, Sequence.singleton T.TPTP.true_
-        | Lit.False -> false, Sequence.singleton T.TPTP.false_)
-
   module SubsumptionIndex = FeatureVector.Make(struct
     type t = C.t
     let cmp = C.compare
-    let to_lits c = to_idx_lits (C.lits c)
+    let to_lits = C.Seq.abstract
   end)
 
   (* XXX: no customization of indexing for now

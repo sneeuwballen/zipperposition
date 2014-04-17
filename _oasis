@@ -24,12 +24,13 @@ Library "libzipperposition"
   Path:             src/
   Pack:             true
   Modules:          ClauseQueue, Clause, Const, Extensions,
-                    Literal, CompactClause, Ctx, Proof, ProofState,
-                    Saturate, Selection, Superposition, PFormula, Theories, AC,
-                    PEnv, Params, Env
+                    Literal, Literals, CompactClause, Ctx, Proof, ProofState,
+                    Saturate, Selection, PFormula, Theories, AC,
+                    PEnv, Params, Env, Monome, Signals,
+                    calculi/Superposition, calculi/Chaining
   InternalModules:  lib/LazyGraph, lib/Leftistheap,
                     lib/Vector, lib/Sequence, lib/SmallSet,
-                    lib/UnionFind, lib/Choice
+                    lib/UnionFind, lib/Choice, lib/Mixtbl, lib/Signal
   BuildDepends:     unix,zarith,logtk,dynlink
 
 Library "libzipperposition_meta"
@@ -41,7 +42,7 @@ Library "libzipperposition_meta"
   Build$:           flag(meta)
   Install$:         flag(meta)
   BuildDepends:     libzipperposition,logtk,logtk.meta
-    
+
 
 # main executable for the prover
 Executable zipperposition

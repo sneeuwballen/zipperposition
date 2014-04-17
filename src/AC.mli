@@ -40,8 +40,6 @@ module type S = sig
         be complete for the given symbol. The [ctx] is required for type inference
         and building clauses . *)
 
-  val spec : Theories.AC.t
-
   (** {2 Rules} *)
 
   val is_trivial_lit : Literal.t -> bool

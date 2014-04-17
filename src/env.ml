@@ -33,7 +33,7 @@ module T = FOTerm
 module F = Formula.FO
 module PF = PFormula
 module Lit = Literal
-module Lits = Literal.Arr
+module Lits = Literals
 
 (** {2 Signature} *)
 module type S = sig
@@ -192,7 +192,7 @@ module type S = sig
     (** Is the clause a passive clause? *)
 
   val simplify : C.t -> C.t * C.t
-    (** Simplify the clause. Returns both the clause and its simplification. *)
+    (** Simplify the hclause. Returns both the hclause and its simplification. *)
 
   val backward_simplify : C.t -> C.CSet.t * C.t Sequence.t
     (** Perform backward simplification with the given clause. It returns the
@@ -217,6 +217,11 @@ module type S = sig
   val all_simplify : C.t -> C.t option
     (** Use all simplification rules to convert a clause into a maximally
         simplified clause (or None, if trivial). *)
+
+  (** {2 Misc} *)
+
+  val mixtbl : string Mixtbl.t
+    (** Global hashtable of "stuff" *)
 end
 
 module Make(X : sig
@@ -481,21 +486,8 @@ end) : S with module Ctx = X.Ctx = struct
     in
     (* reduce every literal *)
     let lits' = Array.map
-      (fun lit -> match lit with
-        | Lit.Equation (l, r, sign) ->
-          let l' = reduce_term !_rewrite_rules l
-          and r' = reduce_term !_rewrite_rules r in
-          if l == l' && r == r'
-            then lit  (* same lit *)
-            else Lit.mk_lit l' r' sign
-        | Lit.Prop (p, sign) ->
-          let p' = reduce_term !_rewrite_rules p in
-          if p == p'
-            then lit
-            else Lit.mk_prop p' sign
-        | Lit.True
-        | Lit.False -> lit
-      ) (C.lits c)
+      (fun lit -> Lit.map (reduce_term !_rewrite_rules) lit)
+      (C.lits c)
     in
     if SmallSet.is_empty !applied_rules
       then c (* no simplification *)
@@ -519,7 +511,8 @@ end) : S with module Ctx = X.Ctx = struct
         then rewrite_lit rules' lit
         else begin
           applied_rules := SmallSet.add !applied_rules name;
-          Util.debug 5 "Env: rewritten lit %a into %a" Lit.pp lit Lit.pp lit';
+          Util.debug 5 "Env: rewritten lit %a into %a (using %s)"
+            Lit.pp lit Lit.pp lit' name;
           rewrite_lit !_lit_rules lit'
         end
     in
@@ -636,7 +629,7 @@ end) : S with module Ctx = X.Ctx = struct
       C.CSet.fold candidates (C.CSet.empty, [])
         (fun (before, after) _ c ->
           let c' = rw_simplify c in
-          if not (Lit.Arr.eq (C.lits c) (C.lits c'))
+          if not (Lits.eq (C.lits c) (C.lits c'))
             (* the active clause has been simplified! *)
             then begin
               Util.debug 2 "active clause %a simplified into %a" C.pp c C.pp c';
@@ -734,6 +727,10 @@ end) : S with module Ctx = X.Ctx = struct
     in
     Util.exit_prof prof_all_simplify;
     res
+
+  (** {2 Misc} *)
+
+  let mixtbl = Mixtbl.create 15
 end
 
 (* TODO: put meta-prover into its own Extension!

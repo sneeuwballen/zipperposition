@@ -189,8 +189,8 @@ module type S = sig
     val terms : t -> FOTerm.t Sequence.t
     val vars : t -> FOTerm.t Sequence.t
 
-    val eqns : t -> (FOTerm.t * FOTerm.t * bool) Sequence.t
-      (** Easy iteration on literals *)
+    val abstract : t -> (bool * FOTerm.t Sequence.t) Sequence.t
+      (** Easy iteration on an abstract view of literals *)
   end
 
   (** {2 Filter literals} *)
@@ -214,7 +214,7 @@ module type S = sig
     val ineq : clause -> t
       (** Only literals that are inequations *)
 
-    val ineq_of : clause -> Theories.TotalOrder.instance -> t
+    val ineq_of : clause -> Theories.TotalOrder.t -> t
       (** Only literals that are inequations for the given ordering *)
 
     val max : clause -> t
@@ -226,7 +226,7 @@ module type S = sig
     val neg : t
       (** Only negative literals *)
 
-    val always : t 
+    val always : t
       (** All literals *)
 
     val combine : t list -> t
@@ -302,6 +302,12 @@ module type S = sig
     val of_seq : t -> clause Sequence.t -> t
     val remove_seq : t -> clause Sequence.t -> t
     val remove_id_seq : t -> int Sequence.t -> t
+  end
+
+  (** {2 Position} *)
+
+  module Pos : sig
+    val at : t -> Position.t -> FOTerm.t
   end
 
   (** {2 Clauses with more data} *)

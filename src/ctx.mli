@@ -76,24 +76,86 @@ module type S = sig
   val declare : Symbol.t -> Type.t -> unit
   (** Declare the type of a symbol (updates signature) *)
 
+  (** {2 Literals} *)
+
+  module Lit : sig
+    val from_hooks : unit -> Literal.Conv.hook_from list
+    val add_from_hook : Literal.Conv.hook_from -> unit
+
+    val to_hooks : unit -> Literal.Conv.hook_to list
+    val add_to_hook : Literal.Conv.hook_to -> unit
+
+    val of_form : Formula.FO.t -> Literal.t
+      (** @raise Invalid_argument if the formula is not atomic *)
+
+    val to_form : Literal.t -> Formula.FO.t
+  end
+
   (** {2 Theories} *)
 
   module Theories : sig
-    val ac : Theories.AC.t
+    module AC : sig
+      val on_add : Theories.AC.t Signal.t
 
-    val total_order : Theories.TotalOrder.t
+      val add : ?proof:Proof.t list -> ty:Type.t -> Symbol.t -> unit
 
-    val add_ac : ?proof:Proof.t list -> Symbol.t -> unit
-    (** Symbol is AC *)
+      val is_ac : Symbol.t -> bool
 
-    val add_order : ?proof:Proof.t list ->
-                    less:Symbol.t -> lesseq:Symbol.t ->
-                    Theories.TotalOrder.instance
-    (** Pair of symbols that constitute an ordering.
-        @return the corresponding instance. *)
+      val find_proof : Symbol.t -> Proof.t list
+        (** Recover the proof for the AC-property of this symbol.
+            @raise Not_found if the symbol is not AC *)
 
-    val add_tstp_order : unit -> Theories.TotalOrder.instance
-    (** Specific version of {!add_order} for $less and $lesseq *)
+      val symbols : unit -> Symbol.Set.t
+        (** set of AC symbols *)
+
+      val symbols_of_terms : FOTerm.t Sequence.t -> Symbol.Set.t
+        (** set of AC symbols occurring in the given term *)
+
+      val symbols_of_forms : Formula.FO.t Sequence.t -> Symbol.Set.t
+        (** Set of AC symbols occurring in the given formula *)
+
+      val proofs : unit -> Proof.t list
+        (** All proofs for all AC axioms *)
+
+      val exists_ac : unit -> bool
+        (** Is there any AC symbol? *)
+    end
+
+    module TotalOrder : sig
+      val on_add : Theories.TotalOrder.t Signal.t
+
+      val is_less : Symbol.t -> bool
+
+      val is_lesseq : Symbol.t -> bool
+
+      val find : Symbol.t -> Theories.TotalOrder.t
+        (** Find the instance that corresponds to this symbol.
+            @raise Not_found if the symbol is not part of any instance. *)
+
+      val find_proof : Theories.TotalOrder.t -> Proof.t list
+        (** Recover the proof for the given total ordering
+            @raise Not_found if the instance cannot be found*)
+
+      val is_order_symbol : Symbol.t -> bool
+        (** Is less or lesseq of some instance? *)
+
+      val axioms : less:Symbol.t -> lesseq:Symbol.t -> PFormula.t list
+        (** Axioms that correspond to the given symbols being a total ordering.
+            The proof of the axioms will be "axiom" *)
+
+      val exists_order : unit -> bool
+        (** Are there some known ordering instances? *)
+
+      val add : ?proof:Proof.t list ->
+                less:Symbol.t -> lesseq:Symbol.t -> ty:Type.t ->
+                Theories.TotalOrder.t * [`New | `Old]
+        (** Pair of symbols that constitute an ordering.
+            @return the corresponding instance and a flag to indicate
+              whether the instance was already present. *)
+
+      val add_tstp : unit -> Theories.TotalOrder.t * [`New | `Old]
+        (** Specific version of {!add_order} for $less and $lesseq *)
+    end
   end
 end
 

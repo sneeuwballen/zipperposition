@@ -33,7 +33,7 @@ module ST = ScopedTerm
 module T = FOTerm
 module S = Substs
 module Lit = Literal
-module Lits = Literal.Arr
+module Lits = Literals
 
 let stat_fresh = Util.mk_stat "fresh_clause"
 let stat_mk_hclause = Util.mk_stat "mk_hclause"
@@ -188,8 +188,8 @@ module type S = sig
     val terms : t -> FOTerm.t Sequence.t
     val vars : t -> FOTerm.t Sequence.t
 
-    val eqns : t -> (FOTerm.t * FOTerm.t * bool) Sequence.t
-      (** Easy iteration on literals *)
+    val abstract : t -> (bool * FOTerm.t Sequence.t) Sequence.t
+      (** Easy iteration on an abstract view of literals *)
   end
 
   (** {2 Filter literals} *)
@@ -213,7 +213,7 @@ module type S = sig
     val ineq : clause -> t
       (** Only literals that are inequations *)
 
-    val ineq_of : clause -> Theories.TotalOrder.instance -> t
+    val ineq_of : clause -> Theories.TotalOrder.t -> t
       (** Only literals that are inequations for the given ordering *)
 
     val max : clause -> t
@@ -303,6 +303,12 @@ module type S = sig
     val remove_id_seq : t -> int Sequence.t -> t
   end
 
+  (** {2 Position} *)
+
+  module Pos : sig
+    val at : t -> Position.t -> FOTerm.t
+  end
+
   (** {2 Clauses with more data} *)
 
   (** Clause within which a subterm (and its position) are hilighted *)
@@ -331,7 +337,7 @@ module type S = sig
 end
 
 (** {2 Type def} *)
-module Make(Ctx : Ctx.S) = struct
+module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   module Ctx = Ctx
 
   type t = {
@@ -343,7 +349,7 @@ module Make(Ctx : Ctx.S) = struct
     mutable hcparents : t list;             (** parents of the clause *)
     mutable hcdescendants : int SmallSet.t ;(** the set of IDs of descendants of the clause *)
     mutable hcsimplto : t option;           (** simplifies into the clause *)
-  } 
+  }
 
   type clause = t
 
@@ -376,7 +382,7 @@ module Make(Ctx : Ctx.S) = struct
 
   let parents c = c.hcparents
 
-  let compact c = Lits.compact c.hclits
+  let compact c = c.hclits
 
   let is_ground c = get_flag flag_ground c
 
@@ -455,7 +461,7 @@ module Make(Ctx : Ctx.S) = struct
       S.empty lits 0 in
     *)
     (* proof *)
-    let proof' = proof (Lits.compact lits) in
+    let proof' = proof lits in
     (* create the structure *)
     let c = {
       hclits = lits;
@@ -494,11 +500,11 @@ module Make(Ctx : Ctx.S) = struct
     create_a ?parents ?selected (Array.of_list lits) proof
 
   let of_forms ?parents ?selected forms proof =
-    let lits = Lits.of_forms forms in
-    create_a ?parents ?selected lits proof
+    let lits = List.map Ctx.Lit.of_form forms in
+    create ?parents ?selected lits proof
 
   let of_forms_axiom ?(role="axiom") ~file ~name forms =
-    let lits = Lits.of_forms forms in
+    let lits = Lits.Conv.of_forms forms in
     let proof c = Proof.mk_c_file ~role ~file ~name c in
     create_a lits proof
 
@@ -562,12 +568,12 @@ module Make(Ctx : Ctx.S) = struct
       let lit = lits.(i) in
       for j = i+1 to n-1 do
         let lit' = lits.(j) in
-        (* check if both lits are still potentially eligible, and have the same sign 
-           if [check_sign] is true. *)
+        (* check if both lits are still potentially eligible, and have the same
+           sign if [check_sign] is true. *)
         if (check_sign && Lit.is_pos lit <> Lit.is_pos lit')
             || not (BV.get bv j)
           then ()
-          else match Lit.compare_partial ~ord lits.(i) lits.(j) with
+          else match Lit.Comp.compare ~ord lits.(i) lits.(j) with
           | Comparison.Incomparable
           | Comparison.Eq -> ()     (* no further information about i-th and j-th *)
           | Comparison.Gt -> BV.reset bv j  (* j-th cannot be max *)
@@ -593,7 +599,6 @@ module Make(Ctx : Ctx.S) = struct
 
   let eligible_chaining c scope subst =
     let ord = Ctx.ord () in
-    let spec = Ctx.Theories.total_order in
     if BV.is_empty c.hcselected then begin
       let renaming = Ctx.renaming_clear () in
       let lits = Lits.apply_subst ~renaming subst c.hclits scope in
@@ -601,7 +606,7 @@ module Make(Ctx : Ctx.S) = struct
       (* only keep literals that are positive *)
       BV.filter bv (fun i -> Lit.is_pos lits.(i));
       (* only keep ordering lits *)
-      BV.filter bv (fun i -> Lit.is_ineq ~spec lits.(i));
+      BV.filter bv (fun i -> Lit.is_ineq lits.(i));
       bv
     end else BV.empty ()
 
@@ -641,8 +646,8 @@ module Make(Ctx : Ctx.S) = struct
     let lits c = Sequence.of_array c.hclits
     let terms c = lits c |> Sequence.flatMap Lit.Seq.terms
     let vars c = terms c |> Sequence.flatMap T.Seq.vars
-    let eqns c =
-      Lits.Seq.as_eqns c.hclits
+    let abstract c =
+      Lits.Seq.abstract c.hclits
   end
 
   (** {2 Filter literals} *)
@@ -666,9 +671,7 @@ module Make(Ctx : Ctx.S) = struct
       | Lit.Equation (_, _, true) -> true
       | _ -> false
 
-    let ineq c =
-      let spec = Ctx.Theories.total_order in
-      fun i lit -> Lit.is_ineq ~spec lit
+    let ineq c = fun i lit -> Lit.is_ineq lit
 
     let ineq_of clause instance =
       fun i lit -> Lit.is_ineq_of ~instance lit
@@ -780,8 +783,11 @@ module Make(Ctx : Ctx.S) = struct
     let remove_id_seq set seq = Sequence.fold remove_id set seq
   end
 
-
   (** {2 Positions in clauses} *)
+
+  module Pos = struct
+    let at c pos = Lits.Pos.at c.hclits pos
+  end
 
   module WithPos = struct
     type t = {
@@ -796,7 +802,8 @@ module Make(Ctx : Ctx.S) = struct
       if c <> 0 then c else
       Position.compare t1.pos t2.pos
 
-    let pp buf t = failwith "C.WithPos.pp: not implemented"
+    let pp buf t =
+      Printf.bprintf buf "clause %a at pos %a" Lits.pp t.clause.hclits Position.pp t.pos
   end
 
 

@@ -47,8 +47,6 @@ module type S = sig
     and type E.rhs = FOTerm.t
   module SubsumptionIndex : Index.SUBSUMPTION_IDX with type C.t = C.t
 
-  val to_idx_lits : Literal.t array -> Index.lits
-
   (** {6 Common Interface for Sets} *)
 
   module type CLAUSE_SET = sig

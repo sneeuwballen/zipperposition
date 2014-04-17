@@ -2,7 +2,7 @@
 
 INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
-PLUGIN_FILES = $(shell find plugins/ -name '*.ml')
+PLUGIN_FILES = $(shell find plugins/ -name 'ext_*.ml')
 INSTALLDIR ?= /usr/bin/
 SUBMODULES = containers
 

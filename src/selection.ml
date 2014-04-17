@@ -32,7 +32,7 @@ open Logtk
 module T = FOTerm
 module S = Substs.FO
 module Lit = Literal
-module Lits = Literal.Arr
+module Lits = Literals
 
 type t = Literal.t array -> BV.t
 
@@ -62,13 +62,20 @@ let select_diff_neg_lit ~strict ~ord lits =
      the weights of the sides of the equation *)
   let rec find_lit best_diff best_idx lits i =
     if i = Array.length lits then best_idx
-    else match Literal.to_tuple lits.(i) with
-      | l, r, false ->
-        let weightdiff = abs (T.size l - T.size r) in
-        if weightdiff > best_diff
-          then find_lit weightdiff i lits (i+1) (* prefer this lit *)
-          else find_lit best_diff best_idx lits (i+1)
-      | _ -> find_lit best_diff best_idx lits (i+1)
+    else
+      let weightdiff, ok = match lits.(i) with
+        | Lit.Equation(l,r,false) ->
+          abs (T.size l - T.size r), true
+        | Lit.Prop (p, false) ->
+          T.size p - 1, true
+        | _ -> 0, false
+      in
+      let best_idx, best_diff =
+        if ok && weightdiff > best_diff
+          then i, weightdiff  (* prefer this lit *)
+          else best_idx, best_diff
+      in
+      find_lit best_diff best_idx lits (i+1)
   in
   (* search such a lit among the clause's lits *)
   match find_lit (-1) (-1) lits 0 with
@@ -83,13 +90,19 @@ let select_complex ~strict ~ord lits =
   (* find the ground negative literal with highest diff in size *)
   let rec find_neg_ground best_diff best_i lits i =
     if i = Array.length lits then best_i else
-    match Literal.to_tuple lits.(i) with
-    | l, r, false when Literal.is_ground lits.(i) ->
-      let diff = abs (T.size l - T.size r) in
-      if diff > best_diff
-        then find_neg_ground diff i lits (i+1)
-        else find_neg_ground best_diff best_i lits (i+1)
-    | _ -> find_neg_ground best_diff best_i lits (i+1)
+      let weightdiff, ok = match lits.(i) with
+        | Lit.Equation(l,r,false) when Lit.is_ground lits.(i) ->
+          abs (T.size l - T.size r), true
+        | Lit.Prop (p, false) when Lit.is_ground lits.(i) ->
+          T.size p - 1, true
+        | _ -> 0, false
+      in
+      let best_i, best_diff =
+        if ok && weightdiff > best_diff
+          then i, weightdiff  (* prefer this lit *)
+          else best_i, best_diff
+      in
+      find_neg_ground best_diff best_i lits (i+1)
   in
   (* try to find ground negative lit with bigger weight difference, else delegate *)
   let i = find_neg_ground (-1) (-1) lits 0 in
@@ -104,7 +117,7 @@ let select_complex ~strict ~ord lits =
       select_diff_neg_lit ~strict ~ord lits (* delegate to select_diff_neg_lit *)
 
 let select_complex_except_RR_horn ~strict ~ord lits =
-  if Literal.is_RR_horn_clause lits
+  if Lits.is_RR_horn_clause lits
     then BV.empty ()  (* do not select (conditional rewrite rule) *)
     else select_complex ~strict ~ord lits  (* like select_complex *)
 

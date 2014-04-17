@@ -54,3 +54,8 @@ val propagate : 'a t -> 'a t -> unit
 val map : 'a t -> ('a -> 'b) -> 'b t
 
 val filter : 'a t -> ('a -> bool) -> 'a t
+
+val set_exn_handler : (exn -> unit) -> unit
+  (** Set the handler that is called upon an exception in
+      a Signal.  The default handler does nothing.
+      If the handler raises an exception, it is not caught! *)

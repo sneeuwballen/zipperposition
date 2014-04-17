@@ -1,23 +1,27 @@
 # OASIS_START
-# DO NOT EDIT (digest: 687fbecf46e6e3428545e1844b0062e3)
+# DO NOT EDIT (digest: 0a9c5e4ea2032b137aaf6eccc6cfa553)
 ClauseQueue
 Clause
 Const
 Extensions
 Literal
+Literals
 CompactClause
 Ctx
 Proof
 ProofState
 Saturate
 Selection
-Superposition
 PFormula
 Theories
 AC
 PEnv
 Params
 Env
+Monome
+Signals
+calculi/Superposition
+calculi/Chaining
 lib/LazyGraph
 lib/Leftistheap
 lib/Vector
@@ -25,4 +29,6 @@ lib/Sequence
 lib/SmallSet
 lib/UnionFind
 lib/Choice
+lib/Mixtbl
+lib/Signal
 # OASIS_STOP

@@ -37,6 +37,9 @@ module O = Ordering
 module Lit = Literal
 module S = Substs
 
+(* XXX: load some other modules, but they might not be registered *)
+module Chaining = Chaining
+
 (** setup an alarm for abrupt stop *)
 let setup_alarm timeout =
   let handler s =
@@ -340,7 +343,7 @@ let process_file ?meta ~plugins ~params file =
     |> PF.Set.of_seq
   in
   (* obtain clauses + env *)
-  Util.debug 2 "input formulas:\n%%  %a" (Util.pp_seq ~sep:"\n%%  " PF.pp)
+  Util.debug 2 "input formulas:\n%%  %a" (Util.pp_seq ~sep:"\n%  " PF.pp)
     (PF.Set.to_seq formulas);
   Util.debug 2 "input signature: %a" Signature.pp signature;
   let res, signature = preprocess ~signature ~params formulas in
@@ -389,14 +392,24 @@ let process_file ?meta ~plugins ~params file =
   return ()
 
 let () =
+  Util.debug 0 "setup GC and signal handler";
   (* GC! increase max overhead because we want the GC to be faster, even if
       it implies more wasted memory. *)
   let gc = Gc.get () in
-  Gc.set { gc with Gc.space_overhead=150; }
+  Gc.set { gc with Gc.space_overhead=150; };
+  (* signal handler. Re-raise, bugs shouldn't keep hidden *)
+  Signal.set_exn_handler (fun e ->
+    let msg = Printexc.to_string e in
+    output_string stderr ("exception raised in signal: " ^ msg ^ "\n");
+    flush stderr;
+    raise e);
+  ()
 
 let () =
   (* parse arguments *)
   let params = Params.parse_args () in
+  Util.debug 2 "extensions loaded: %a"
+    (Util.pp_list Buffer.add_string) (Extensions.names ());
   Random.init params.param_seed;
   print_version params;
   (* plugins *)
