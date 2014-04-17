@@ -73,6 +73,15 @@ val is_nonstrict_ineq : t -> bool
 val is_ineq_of : instance:Theories.TotalOrder.t -> t -> bool
   (** [true] iff the literal is an inequation for the given total order *)
 
+val is_arith : t -> bool
+val is_arith_eqn : t -> bool
+val is_arith_eq : t -> bool
+val is_arith_neq : t -> bool
+val is_arith_less : t -> bool
+val is_arith_lesseq : t -> bool
+
+val is_divides : t -> bool
+
 (** build literals. If sides so not have the same sort,
     a SortError will be raised. An ordering must be provided *)
 val mk_eq : term -> term -> t
@@ -130,7 +139,7 @@ val is_trivial : t -> bool
 val is_absurd : t -> bool
 
 val fold_terms : ?position:Position.t -> ?vars:bool ->
-                 which:[<`Max|`One|`Both] ->
+                 which:[<`Max|`All] ->
                  ord:Ordering.t -> subterms:bool ->
                  t -> 'a ->
                  ('a -> term -> Position.t -> 'a) ->
@@ -139,12 +148,12 @@ val fold_terms : ?position:Position.t -> ?vars:bool ->
       Variables are ignored if [vars] is [false].
 
       [vars] decides whether variables are iterated on too (default [false])
-      [subterms] decides whether subterms are explored.
+      [subterms] decides whether strict subterms, not only terms that
+      occur directly under the literal, are explored.
 
-      [which] is used to decide on equational literals:
-      - if [which] is [`Max], only the maximal side is explored (or both if not comparable)
-      - if [which] is [`One], the maximal side, or an arbitrary one, is visited
-      - if [which] is [`Both], both sides of any equations are visited. *)
+      [which] is used to decide which terms to visit:
+      - if [which] is [`Max], only the maximal terms are explored
+      - if [which] is [`All], all root terms are explored *)
 
 (** {2 Comparisons} *)
 module Comp : sig
@@ -218,7 +227,8 @@ module View : sig
     (** View of a Prop or Equation literal, oriented by the position. If the
         position selects its left term, return l, r, otherwise r, l.
         for propositions it will always be p, true.
-        @return None for other literals *)
+        @return None for other literals
+        @raise Invalid_argument if the position doesn't match the literal. *)
 
   val get_ineq : t -> Theories.TotalOrder.lit option
     (** Assuming the literal is an inequation, returns the corresponding
@@ -228,6 +238,27 @@ module View : sig
                     t -> Theories.TotalOrder.lit option
     (** Extract a total ordering literal from the literal, only for the
         given ordering instance *)
+
+  val get_arith : t -> (arith_op * Z.t Monome.t * Z.t Monome.t) option
+    (** Extract an arithmetic literal *)
+
+  (* focus on a term in one of the two monomes *)
+  type arith_view =
+    | ArithLeft of arith_op * Z.t Monome.Focus.t * Z.t Monome.t
+    | ArithRight of arith_op * Z.t Monome.t * Z.t Monome.Focus.t
+
+  val focus_arith : t -> Position.t -> arith_view option
+    (** Focus on a specific term in an arithmetic literal. The focused term is
+        removed from its monome, and its coefficient is returned. *)
+
+  val get_divides : t -> (Z.t * int * Z.t Monome.t * bool) option
+    (** Extract a divisibility literal.  *)
+
+  type divides_view = Z.t * int * Z.t Monome.Focus.t * bool
+
+  val focus_divides : t -> Position.t -> divides_view option
+    (** Focus on a given subterm of the divisibility literal. The
+        term is removed from the monome it belongs to. *)
 end
 
 (** {2 Conversions} *)

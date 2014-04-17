@@ -73,6 +73,9 @@ end
 val is_const : _ t -> bool
   (** Returns [true] if the monome is only a constant *)
 
+val is_zero : _ t -> bool
+  (** return [true] if the monome is the constant 0 *)
+
 val sign : _ t -> int
   (** Assuming [is_constant m], [sign m] returns the sign of [m].
       @raise Invalid_argument if the monome is not a constant *)
@@ -139,6 +142,10 @@ val is_ground : _ t -> bool
 val fold : ('a -> int -> 'b -> term -> 'a) -> 'a -> 'b t -> 'a
   (** Fold over terms *)
 
+val fold_max : ord:Ordering.t ->
+               ('a -> int -> 'b -> term -> 'a) -> 'a -> 'b t -> 'a
+  (** Fold over terms that are maximal in the given ordering. *)
+
 val nth : 'a t -> int -> ('a * term)
   (** @raise Invalid_argument if the index is invalid *)
 
@@ -147,6 +154,24 @@ val set : 'a t -> int -> ('a * term) -> 'a t
 
 val set_term : 'a t -> int -> term -> 'a t
   (** @raise Invalid_argument if the index is invalid *)
+
+(** Focus on a specific term *)
+module Focus : sig
+  type 'a t = {
+    term : term;
+    coeff : 'a;
+    rest : 'a monome;
+  }
+
+  val get : 'a monome -> int -> 'a t
+    (** @raise Invalid_argument if the index is invalid *)
+
+  val to_monome : 'a t -> 'a monome
+    (** Conversion back to an unfocused monome *)
+
+  val pp : Buffer.t -> 'a t -> unit
+  val fmt : Format.formatter -> 'a t -> unit
+end
 
 val pp : Buffer.t -> 'a t -> unit
 val to_string : 'a t -> string

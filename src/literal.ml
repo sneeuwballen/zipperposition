@@ -34,6 +34,7 @@ module F = Formula.FO
 module S = Substs
 module TO = Theories.TotalOrder
 module PB = Position.Build
+module P = Position
 
 type scope = Substs.scope
 type term = FOTerm.t
@@ -188,6 +189,34 @@ let is_nonstrict_ineq lit = match lit with
 let is_ineq_of ~instance lit =
   match lit with
   | Ineq olit -> TO.eq olit.TO.order instance
+  | _ -> false
+
+let is_arith = function
+  | Arith _ -> true
+  | _ -> false
+
+let is_arith_eqn = function
+  | Arith ((Equal | Different), _, _) -> true
+  | _ -> false
+
+let is_arith_eq = function
+  | Arith (Equal, _, _) -> true
+  | _ -> false
+
+let is_arith_neq = function
+  | Arith (Equal, _, _) -> true
+  | _ -> false
+
+let is_arith_less = function
+  | Arith (Less, _, _) -> true
+  | _ -> false
+
+let is_arith_lesseq = function
+  | Arith (Lesseq, _, _) -> true
+  | _ -> false
+
+let is_divides = function
+  | Divides _ -> true
   | _ -> false
 
 let __ty_error a b =
@@ -486,55 +515,59 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ~which ~ord ~subterms lit
     if subterms
       then T.all_positions ~vars ~pos t acc f
       else f acc t pos
+  and fold_monome = match which with
+    | `All -> Monome.fold
+    | `Max -> Monome.fold_max ~ord
   in
-  match lit with
-  | Equation (l,r,sign) ->
-    begin match Ordering.compare ord l r, which with
-    | Comparison.Gt, (`Max | `One) ->
-      at_term
-        ~pos:Position.(append position (left stop))
-        acc l
-    | Comparison.Lt, (`Max | `One) ->
-      at_term
-        ~pos:Position.(append position (right @@ stop))
-        acc r
-    | _, `One ->
-      (* only visit one side (arbitrary) *)
-      at_term ~pos:Position.(append position (left stop)) acc l
-    | (Comparison.Eq | Comparison.Incomparable), `Max ->
+  match lit, which with
+  | Equation (l,r,sign), `All ->
+    (* visit both sides of the equation *)
+    let acc = at_term ~pos:P.(append position (left stop)) acc l in
+    let acc = at_term ~pos:P.(append position (right stop)) acc r in
+    acc
+  | Equation (l, r, sign), `Max ->
+    begin match Ordering.compare ord l r with
+    | Comparison.Gt ->
+      at_term ~pos:P.(append position (left stop)) acc l
+    | Comparison.Lt ->
+      at_term ~pos:P.(append position (right @@ stop)) acc r
+    | Comparison.Eq | Comparison.Incomparable ->
       (* visit both sides, they are both (potentially) maximal *)
-      let acc = at_term ~pos:Position.(append position (left stop)) acc l in
-      at_term ~pos:Position.(append position (right stop)) acc r
-    | _, `Both ->
-      (* visit both sides of the equation *)
-      let acc = at_term
-        ~pos:Position.(append position (left stop)) acc l in
-      let acc = at_term
-        ~pos:Position.(append position (right stop)) acc r in
+      let acc = at_term ~pos:P.(append position (left stop)) acc l in
+      at_term ~pos:P.(append position (right stop)) acc r
+    end
+  | Prop (p, _), _ ->
+    (* p is the only term, and it's maximal *)
+    at_term ~pos:P.(append position (left stop)) acc p
+  | Ineq olit, `All ->
+    let acc = at_term ~pos:P.(append position (left stop)) acc olit.TO.left in
+    let acc = at_term ~pos:P.(append position (right stop)) acc olit.TO.right in
+    acc
+  | Ineq olit, `Max ->
+    begin match Ordering.compare ord olit.TO.left olit.TO.right with
+    | Comparison.Gt ->
+        at_term ~pos:P.(append position (left stop)) acc olit.TO.left
+    | Comparison.Lt ->
+        at_term ~pos:P.(append position (right stop)) acc olit.TO.right
+    | Comparison.Eq | Comparison.Incomparable ->
+      let acc = at_term ~pos:P.(append position (left stop)) acc olit.TO.left in
+      let acc = at_term ~pos:P.(append position (right stop)) acc olit.TO.right in
       acc
     end
-  | Prop (p, _) ->
-    at_term ~pos:Position.(append position (left stop)) acc p
-  | Ineq olit ->
-    let acc = at_term
-      ~pos:Position.(append position (left stop)) acc olit.TO.left in
-    let acc = at_term
-      ~pos:Position.(append position (right stop)) acc olit.TO.right in
-    acc
-  | Arith (op, m1, m2) ->
-      let acc = Monome.fold
-        (fun acc i _ t -> at_term ~pos:Position.(left @@ arg i stop) acc t)
+  | Arith (op, m1, m2), _ ->
+      let acc = fold_monome
+        (fun acc i _ t -> at_term ~pos:P.(left @@ arg i stop) acc t)
         acc m1
       in
-      Monome.fold
-        (fun acc i _ t -> at_term ~pos:Position.(right @@ arg i stop) acc t)
+      fold_monome
+        (fun acc i _ t -> at_term ~pos:P.(right @@ arg i stop) acc t)
         acc m2
-  | Divides (_, _, m, _) ->
-      Monome.fold
-        (fun acc i _ t -> at_term ~pos:Position.(arg i stop) acc t)
+  | Divides (_, _, m, _), _ ->
+      fold_monome
+        (fun acc i _ t -> at_term ~pos:P.(arg i stop) acc t)
         acc m
-  | True
-  | False -> acc
+  | True, _
+  | False, _ -> acc
 
 (** {2 IO} *)
 
@@ -728,7 +761,6 @@ module Comp = struct
 end
 
 module Pos = struct
-  module P = Position
 
   type split = {
     lit_pos : Position.t;
@@ -743,7 +775,7 @@ module Pos = struct
 
   let split lit pos =
     match lit, pos with
-    | (True | False), Position.Stop ->
+    | (True | False), P.Stop ->
         {lit_pos=P.stop; term_pos=P.stop; term=T.TPTP.true_; }
     | Equation (l,_,_), P.Left pos' ->
         {lit_pos=P.(left stop); term_pos=pos'; term=l; }
@@ -775,25 +807,25 @@ module Pos = struct
     T.Pos.at s.term s.term_pos
 
   let replace lit ~at ~by = match lit, at with
-    | Equation (l, r, sign), Position.Left pos' ->
+    | Equation (l, r, sign), P.Left pos' ->
       mk_lit (T.Pos.replace l pos' ~by) r sign
-    | Equation (l, r, sign), Position.Right pos' ->
+    | Equation (l, r, sign), P.Right pos' ->
       mk_lit l (T.Pos.replace r pos' ~by) sign
-    | Prop (p, sign), Position.Left pos' ->
+    | Prop (p, sign), P.Left pos' ->
       mk_prop (T.Pos.replace p pos' ~by) sign
     | True, _
     | False, _ -> lit  (* flexible, lit can be the result of a simplification *)
-    | Ineq olit, Position.Left pos' ->
+    | Ineq olit, P.Left pos' ->
       let olit' = {olit with TO.left=T.Pos.replace olit.TO.left pos' ~by} in
       Ineq olit'
-    | Ineq olit, Position.Right pos' ->
+    | Ineq olit, P.Right pos' ->
       let olit' = {olit with TO.right=T.Pos.replace olit.TO.right pos' ~by} in
       Ineq olit'
-    | Arith (op, m1, m2), Position.Left (Position.Arg(i,pos')) ->
+    | Arith (op, m1, m2), P.Left (P.Arg(i,pos')) ->
       let _, t = Monome.nth m1 i in
       let m1' = Monome.set_term m1 i (T.Pos.replace t pos' ~by) in
       Arith (op, m1', m2)
-    | Arith (op, m1, m2), Position.Right (Position.Arg(i,pos')) ->
+    | Arith (op, m1, m2), P.Right (P.Arg(i,pos')) ->
       let _, t = Monome.nth m2 i in
       let m2' = Monome.set_term m2 i (T.Pos.replace t pos' ~by) in
       Arith (op, m1, m2')
@@ -946,9 +978,9 @@ module View = struct
 
   let get_eqn lit position =
     match lit, position with
-    | Equation (l,r,sign), Position.Left _ -> Some (l, r, sign)
-    | Equation (l,r,sign), Position.Right _ -> Some (r, l, sign)
-    | Prop (p, sign), Position.Left _ -> Some (p, T.TPTP.true_, sign)
+    | Equation (l,r,sign), P.Left _ -> Some (l, r, sign)
+    | Equation (l,r,sign), P.Right _ -> Some (r, l, sign)
+    | Prop (p, sign), P.Left _ -> Some (p, T.TPTP.true_, sign)
     | True, _
     | False, _
     | Ineq _, _
@@ -965,5 +997,34 @@ module View = struct
         if TO.eq olit.TO.order instance
         then Some olit
         else None
+    | _ -> None
+
+  let get_arith = function
+    | Arith (op, m1, m2) -> Some (op, m1, m2)
+    | _ -> None
+
+  (* focus on a term in one of the two monomes *)
+  type arith_view =
+    | ArithLeft of arith_op * Z.t Monome.Focus.t * Z.t Monome.t
+    | ArithRight of arith_op * Z.t Monome.t * Z.t Monome.Focus.t
+
+  let focus_arith lit pos =
+    match lit, pos with
+    | Arith (op, m1, m2), P.Left (P.Arg (i, _)) ->
+        Some (ArithLeft (op, Monome.Focus.get m1 i, m2))
+    | Arith (op, m1, m2), P.Right (P.Arg (i, _)) ->
+        Some (ArithRight (op, m1, Monome.Focus.get m2 i))
+    | _ -> None
+
+  let get_divides = function
+    | Divides (n, k, m, sign) -> Some (n, k, m, sign)
+    | _ -> None
+
+  type divides_view = Z.t * int * Z.t Monome.Focus.t * bool
+
+  let focus_divides lit pos =
+    match lit, pos with
+    | Divides (n, k, m, sign), P.Arg (i, _) ->
+        Some (n, k, Monome.Focus.get m i, sign)
     | _ -> None
 end

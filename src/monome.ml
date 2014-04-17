@@ -212,6 +212,8 @@ end
 
 let is_const e = match e.terms with | [] -> true | _ -> false
 
+let is_zero e = is_const e && e.num.sign e.const = 0
+
 let sign m =
   if not (is_const m) then invalid_arg "Monome.sign";
   m.num.sign m.const
@@ -294,6 +296,14 @@ let fold f acc m =
     (fun acc i (n, t) -> f acc i n t)
     acc m.terms
 
+let fold_max ~ord f acc m =
+  let terms = Multiset.of_list m.terms in
+  let bv = Multiset.max
+    (fun (_,t1)(_,t2) -> Ordering.compare ord t1 t2) terms in
+  IArray.foldi
+    (fun acc i (c, t) -> if BV.get bv i then f acc i c t else acc)
+    acc (Multiset.to_array terms)
+
 let pp buf e =
   let pp_pair buf (s, t) =
     if e.num.cmp s e.num.one = 0
@@ -348,6 +358,40 @@ let set_term m n t =
     let terms = Util.list_set m.terms n (c,t) in
     {m with terms; }
   with _ -> _fail_idx m n
+
+module Focus = struct
+  type 'a t = {
+    term : term;
+    coeff : 'a;
+    rest : 'a monome;
+  }
+
+  let get m i =
+    try
+      let coeff, term = List.nth m.terms i in
+      assert (m.num.sign coeff <> 0);
+      let rest = {m with terms=Util.list_remove m.terms i} in
+      { term; coeff; rest; }
+    with _ -> _fail_idx m i
+
+  let to_monome t =
+    add t.rest t.coeff t.term
+
+  let pp buf t =
+    let num = t.rest.num in
+    (* print the focused part *)
+    let pp_focused buf t =
+      if num.cmp num.one t.coeff = 0
+      then T.pp buf t.term
+      else Printf.bprintf buf "%s·%a" (num.to_string t.coeff) T.pp t.term
+    in
+    if is_zero t.rest
+      then Printf.bprintf buf "[%a]" pp_focused t
+      else Printf.bprintf buf "[%a] + %a" pp_focused t pp t.rest
+
+  let to_string m = Util.on_buffer pp m
+  let fmt fmt t = Format.pp_print_string fmt (to_string t)
+end
 
 let variant ?(subst=Substs.empty) m1 sc1 m2 sc2 k =
   assert (m1.num == m2.num);

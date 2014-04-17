@@ -210,6 +210,16 @@ module View = struct
       Lit.View.get_ineq lits.(idx)
     | _ -> None
 
+  let get_arith lits pos = match pos with
+    | Position.Arg (idx, pos') when idx < Array.length lits ->
+      Lit.View.focus_arith lits.(idx) pos'
+    | _ -> None
+
+  let get_divides lits pos = match pos with
+    | Position.Arg (idx, pos') when idx < Array.length lits ->
+      Lit.View.focus_divides lits.(idx) pos'
+    | _ -> None
+
   let _unwrap2 ~msg f x y = match f x y with
     | Some z -> z
     | None -> invalid_arg msg
@@ -219,6 +229,12 @@ module View = struct
 
   let get_ineq_exn =
     _unwrap2 ~msg:"get_ineq: improper position" get_ineq
+
+  let get_arith_exn =
+    _unwrap2 ~msg:"get_arith: improper position" get_arith
+
+  let get_divides_exn =
+    _unwrap2 ~msg:"get_divides: improper position" get_divides
 end
 
 let order_instances lits =
@@ -310,8 +326,7 @@ let fold_ineq ~eligible lits acc f =
       fold acc (i+1)
   in fold acc 0
 
-(* TODO: new arguments *)
-let fold_terms ?(vars=false) ~(which : [< `Max|`One|`Both])
+let fold_terms ?(vars=false) ~(which : [< `All|`Max])
 ~ord ~subterms ~eligible lits acc f =
   let rec fold acc i =
     if i = Array.length lits

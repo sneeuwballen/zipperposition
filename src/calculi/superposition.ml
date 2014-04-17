@@ -200,7 +200,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let with_pos = C.WithPos.({term=l; pos; clause=c;}) in
         f tree l with_pos);
     (* terms that can be demodulated: all subterms *)
-    _idx_back_demod := Lits.fold_terms ~ord ~subterms:true ~which:`Both
+    _idx_back_demod := Lits.fold_terms ~ord ~subterms:true ~which:`All
       ~eligible:C.Eligible.always (C.lits c) !_idx_back_demod
       (fun tree t pos ->
         let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
@@ -372,8 +372,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     (* do the inferences in which clause is passive (rewritten),
        so we consider both negative and positive literals *)
-    let new_clauses = Lits.fold_terms ~subterms:true ~ord:(Ctx.ord ()) ~which:`Both
-      ~eligible (C.lits clause) []
+    let new_clauses = Lits.fold_terms ~subterms:true ~ord:(Ctx.ord ())
+      ~which:`All ~eligible (C.lits clause) []
       (fun acc u_p passive_pos ->
         let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
         if T.is_var u_p
