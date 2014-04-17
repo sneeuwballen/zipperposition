@@ -374,6 +374,23 @@ module Focus = struct
       { term; coeff; rest; }
     with _ -> _fail_idx m i
 
+  let sum t m =
+    assert (t.rest.num == m.num);
+    { t with rest = sum t.rest m; }
+
+  let difference t m =
+    assert (t.rest.num == m.num);
+    { t with rest = difference t.rest m; }
+
+  let uminus t =
+    let num = t.rest.num in
+    { t with coeff = num.uminus t.coeff; rest=uminus t.rest; }
+
+  let product t z =
+    let num = t.rest.num in
+    if num.sign z = 0 then invalid_arg "Monome.Lit.product";
+    { t with coeff=num.mult t.coeff z; rest=product t.rest z; }
+
   let to_monome t =
     add t.rest t.coeff t.term
 

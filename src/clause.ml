@@ -216,6 +216,12 @@ module type S = sig
     val ineq_of : clause -> Theories.TotalOrder.t -> t
       (** Only literals that are inequations for the given ordering *)
 
+    val arith : t
+
+    val divides : t
+
+    val filter : (Literal.t -> bool) -> t
+
     val max : clause -> t
       (** Maximal literals of the clause *)
 
@@ -225,12 +231,21 @@ module type S = sig
     val neg : t
       (** Only negative literals *)
 
-    val always : t 
+    val always : t
       (** All literals *)
 
     val combine : t list -> t
       (** Logical "and" of the given eligibility criteria. A literal is
           eligible only if all elements of the list say so. *)
+
+    val ( ** ) : t -> t -> t
+      (** Logical "and" *)
+
+    val ( ++ ) : t -> t -> t
+      (** Logical "or" *)
+
+    val ( ~~ ) : t -> t
+      (** Logical "not" *)
   end
 
   (** {2 Set of clauses} *)
@@ -676,6 +691,12 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let ineq_of clause instance =
       fun i lit -> Lit.is_ineq_of ~instance lit
 
+    let arith i lit = Lit.is_arith lit
+
+    let divides i lit = Lit.is_divides lit
+
+    let filter f i lit = f lit
+
     let max c =
       let bv = Lits.maxlits ~ord:(Ctx.ord ()) c.hclits in
       fun i lit ->
@@ -693,6 +714,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     | [x; y] -> (fun i lit -> x i lit && y i lit)
     | [x; y; z] -> (fun i lit -> x i lit && y i lit && z i lit)
     | _ -> (fun i lit -> List.for_all (fun eligible -> eligible i lit) l)
+
+    let ( ** ) f1 f2 i lit = f1 i lit && f2 i lit
+    let ( ++ ) f1 f2 i lit = f1 i lit || f2 i lit
+    let ( ~~ ) f i lit = not (f i lit)
   end
 
   (** {2 Set of clauses} *)

@@ -207,6 +207,10 @@ let is_arith_neq = function
   | Arith (Equal, _, _) -> true
   | _ -> false
 
+let is_arith_ineq = function
+  | Arith ((Less | Lesseq), _, _) -> true
+  | _ -> false
+
 let is_arith_less = function
   | Arith (Less, _, _) -> true
   | _ -> false
@@ -1016,6 +1020,10 @@ module View = struct
         Some (ArithRight (op, m1, Monome.Focus.get m2 i))
     | _ -> None
 
+  let unfocus_arith = function
+    | ArithLeft (op, m1_f, m2) -> Arith (op, Monome.Focus.to_monome m1_f, m2)
+    | ArithRight (op, m1, m2_f) -> Arith (op, m1, Monome.Focus.to_monome m2_f)
+
   let get_divides = function
     | Divides (n, k, m, sign) -> Some (n, k, m, sign)
     | _ -> None
@@ -1027,4 +1035,7 @@ module View = struct
     | Divides (n, k, m, sign), P.Arg (i, _) ->
         Some (n, k, Monome.Focus.get m i, sign)
     | _ -> None
+
+  let unfocus_divides (n,k,m_f,sign) =
+    Divides (n, k, Monome.Focus.to_monome m_f, sign)
 end

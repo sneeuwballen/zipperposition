@@ -74,9 +74,10 @@ val is_ineq_of : instance:Theories.TotalOrder.t -> t -> bool
   (** [true] iff the literal is an inequation for the given total order *)
 
 val is_arith : t -> bool
-val is_arith_eqn : t -> bool
+val is_arith_eqn : t -> bool    (** = or != *)
 val is_arith_eq : t -> bool
 val is_arith_neq : t -> bool
+val is_arith_ineq : t -> bool   (** < or <= *)
 val is_arith_less : t -> bool
 val is_arith_lesseq : t -> bool
 
@@ -251,6 +252,8 @@ module View : sig
     (** Focus on a specific term in an arithmetic literal. The focused term is
         removed from its monome, and its coefficient is returned. *)
 
+  val unfocus_arith : arith_view -> t
+
   val get_divides : t -> (Z.t * int * Z.t Monome.t * bool) option
     (** Extract a divisibility literal.  *)
 
@@ -259,6 +262,8 @@ module View : sig
   val focus_divides : t -> Position.t -> divides_view option
     (** Focus on a given subterm of the divisibility literal. The
         term is removed from the monome it belongs to. *)
+
+  val unfocus_divides : divides_view -> t
 end
 
 (** {2 Conversions} *)

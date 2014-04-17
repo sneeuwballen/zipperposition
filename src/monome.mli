@@ -159,7 +159,7 @@ val set_term : 'a t -> int -> term -> 'a t
 module Focus : sig
   type 'a t = {
     term : term;
-    coeff : 'a;
+    coeff : 'a;  (** Never 0 *)
     rest : 'a monome;
   }
 
@@ -168,6 +168,13 @@ module Focus : sig
 
   val to_monome : 'a t -> 'a monome
     (** Conversion back to an unfocused monome *)
+
+  val sum : 'a t -> 'a monome -> 'a t
+  val difference : 'a t -> 'a monome -> 'a t
+  val uminus : 'a t -> 'a t
+
+  val product : 'a t -> 'a -> 'a t
+    (** @raise Invalid_argument if the number is 0 *)
 
   val pp : Buffer.t -> 'a t -> unit
   val fmt : Format.formatter -> 'a t -> unit

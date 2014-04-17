@@ -217,6 +217,12 @@ module type S = sig
     val ineq_of : clause -> Theories.TotalOrder.t -> t
       (** Only literals that are inequations for the given ordering *)
 
+    val arith : t
+
+    val divides : t
+
+    val filter : (Literal.t -> bool) -> t
+
     val max : clause -> t
       (** Maximal literals of the clause *)
 
@@ -232,6 +238,15 @@ module type S = sig
     val combine : t list -> t
       (** Logical "and" of the given eligibility criteria. A literal is
           eligible only if all elements of the list say so. *)
+
+    val ( ** ) : t -> t -> t
+      (** Logical "and" *)
+
+    val ( ++ ) : t -> t -> t
+      (** Logical "or" *)
+
+    val ( ~~ ) : t -> t
+      (** Logical "not" *)
   end
 
   (** {2 Set of clauses} *)
