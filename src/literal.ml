@@ -295,12 +295,12 @@ module UnifOp = struct
   }
 end
 
-(* match t1 with t2, then t1' with t2' *)
-let unif4 op ~subst t1 t2 sc1 t1' t2' sc2 k =
-  op ~subst t1 sc1 t2 sc2
-    (fun subst -> op ~subst t1' sc1 t2' sc2 k);
-  op ~subst t1 sc1 t2' sc2
-    (fun subst -> op ~subst t1' sc1 t2 sc2 k);
+(* match {x1,y1} in scope 1, with {x2,y2} with scope2 *)
+let unif4 op ~subst x1 y1 sc1 x2 y2 sc2 k =
+  op ~subst x1 sc1 x2 sc2
+    (fun subst -> op ~subst y1 sc1 y2 sc2 k);
+  op ~subst y1 sc1 x2 sc2
+    (fun subst -> op ~subst x1 sc1 y2 sc2 k);
   ()
 
 (* generic unification structure *)

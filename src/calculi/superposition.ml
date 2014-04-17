@@ -287,7 +287,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let active_idx = Lits.Pos.idx info.active_pos in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
     try
-      let renaming = Ctx.renaming_clear () in
+      let renaming = S.Renaming.create () in
       let subst = info.subst in
       let t' = S.FO.apply ~renaming subst info.t sc_a in
       begin match info.passive_lit, info.passive_pos with
@@ -296,7 +296,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | Lit.Prop (v, true), P.Arg(_, P.Left P.Stop) ->
             (* are we in the specific, but no that rare, case where we
                rewrite s=t using s=t (into a tautology t=t)? *)
-            let v' = S.FO.apply ~renaming subst v info.scope_passive in
+            let v' = S.FO.apply ~renaming subst v sc_p in
             if T.eq t' v'
               then raise (ExitSuperposition "will yield a tautology");
         | _ -> ()
@@ -312,6 +312,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let lits_a = Util.array_except_idx (C.lits info.active) active_idx in
       let lits_p = Util.array_except_idx (C.lits info.passive) passive_idx in
       (* replace s\sigma by t\sigma in u|_p\sigma *)
+      let t' = S.FO.apply ~renaming subst info.t sc_a in
       let new_passive_lit = Lit.Pos.replace passive_lit'
         ~at:passive_lit_pos ~by:t' in
       (* apply substitution to other literals *)
