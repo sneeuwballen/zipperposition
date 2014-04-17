@@ -74,7 +74,6 @@ type 'a t = {
   num : 'a num;
   const : 'a;
   terms : ('a * term) list;
-  mutable to_term : term option;
 }
 type 'a monome = 'a t
 
@@ -132,12 +131,12 @@ let _fmap f e =
         else Some (s', t))
     e.terms
   in
-  { e with const=f e.const; terms; to_term=None; }
+  { e with const=f e.const; terms; }
 
 let map_num = _fmap
 
 let mk_const ~num s =
-  { num; const=s; terms=[]; to_term=None; }
+  { num; const=s; terms=[]; }
 
 let singleton ~num coeff t =
   if num.cmp num.zero coeff = 0
@@ -145,7 +144,7 @@ let singleton ~num coeff t =
     else
       let terms = [coeff, t] in
       let const = num.zero in
-      { num; terms; const; to_term=None; }
+      { num; terms; const; }
 
 let find e t =
   let rec find l t = match l with
@@ -176,7 +175,7 @@ let add e s t =
             else (s'', t) :: l'
         else (s', t') :: add l' s t
   in
-  { e with terms = add e.terms s t; to_term=None; }
+  { e with terms = add e.terms s t; }
 
 let of_list ~num s l =
   List.fold_left
@@ -191,15 +190,14 @@ let map f e =
     const terms
 
 let add_const e s =
-  { e with const = e.num.add e.const s; to_term=None; }
+  { e with const = e.num.add e.const s; }
 
 let remove e t =
   { e with
-    terms = List.filter (fun (_, t') -> not (T.eq t t')) e.terms;
-    to_term=None; }
+    terms = List.filter (fun (_, t') -> not (T.eq t t')) e.terms; }
 
 let remove_const e =
-  { e with const = e.num.zero; to_term=None; }
+  { e with const = e.num.zero; }
 
 module Seq = struct
   let terms m =
@@ -231,7 +229,7 @@ let sum e1 e2 =
   assert (e1.num == e2.num);
   let const = e1.num.add e1.const e2.const in
   let terms = _merge ~num:e1.num e1.num.add e1.terms e2.terms in
-  { e1 with const; terms; to_term=None; }
+  { e1 with const; terms; }
 
 let uminus e = _fmap e.num.uminus e
 
@@ -279,8 +277,8 @@ let split m =
         else l1, (m.num.uminus c, t)::l2
   in
   let terms1, terms2 = partition m.terms in
-  let m1 = {m with terms=terms1; const=const1; to_term=None; } in
-  let m2 = {m with terms=terms2; const=const2; to_term=None; } in
+  let m1 = {m with terms=terms1; const=const1; } in
+  let m2 = {m with terms=terms2; const=const2; } in
   m1, m2
 
 let apply_subst ~renaming subst m sc_m =
@@ -341,14 +339,14 @@ let nth m n =
 let set m n (c,t) =
   try
     let terms = Util.list_set m.terms n (c,t) in
-    {m with terms; to_term=None; }
+    {m with terms; }
   with _ -> _fail_idx m n
 
 let set_term m n t =
   try
     let (c, _) = List.nth m.terms n in
     let terms = Util.list_set m.terms n (c,t) in
-    {m with terms; to_term=None; }
+    {m with terms; }
   with _ -> _fail_idx m n
 
 let variant ?(subst=Substs.empty) m1 sc1 m2 sc2 k =
@@ -496,26 +494,22 @@ module Int = struct
   let mk_const n = T.const ~ty:num.ty (Symbol.mk_int n)
 
   let to_term e =
-    match e.to_term with
-    | Some t -> t
-    | None ->
-      let t = match e.terms with
-      | [] -> mk_const e.const
-      | (c, t)::rest ->
-        (* remove one coeff to make the basic sum *)
-        let sum = mk_sum (mk_const c) t in
-        (* add coeff*term for the remaining terms *)
-        let sum = List.fold_left
-          (fun sum (coeff, t') ->
-            assert (num.sign coeff <> 0);
-            mk_sum sum (mk_product (mk_const coeff) t))
-          sum rest
-        in
-        (* add the constant (if needed) *)
-        mk_sum (mk_const e.const) sum
+    let t = match e.terms with
+    | [] -> mk_const e.const
+    | (c, t)::rest ->
+      (* remove one coeff to make the basic sum *)
+      let sum = mk_sum (mk_const c) t in
+      (* add coeff*term for the remaining terms *)
+      let sum = List.fold_left
+        (fun sum (coeff, t') ->
+          assert (num.sign coeff <> 0);
+          mk_sum sum (mk_product (mk_const coeff) t))
+        sum rest
       in
-      e.to_term <- Some t;
-      t
+      (* add the constant (if needed) *)
+      mk_sum (mk_const e.const) sum
+    in
+    t
 
   let normalize_wrt_zero m =
     if is_const m
