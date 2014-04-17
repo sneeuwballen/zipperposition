@@ -744,6 +744,8 @@ module Pos = struct
 
   let split lit pos =
     match lit, pos with
+    | (True | False), Position.Stop ->
+        {lit_pos=P.stop; term_pos=P.stop; term=T.TPTP.true_; }
     | Equation (l,_,_), P.Left pos' ->
         {lit_pos=P.(left stop); term_pos=pos'; term=l; }
     | Equation (_,r,_), P.Right pos' ->
@@ -780,8 +782,8 @@ module Pos = struct
       mk_lit l (T.Pos.replace r pos' ~by) sign
     | Prop (p, sign), Position.Left pos' ->
       mk_prop (T.Pos.replace p pos' ~by) sign
-    | True, Position.Left Position.Stop -> lit
-    | False, Position.Left Position.Stop -> lit
+    | True, _
+    | False, _ -> lit  (* flexible, lit can be the result of a simplification *)
     | Ineq olit, Position.Left pos' ->
       let olit' = {olit with TO.left=T.Pos.replace olit.TO.left pos' ~by} in
       Ineq olit'
