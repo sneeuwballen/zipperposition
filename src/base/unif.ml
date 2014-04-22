@@ -80,6 +80,11 @@ module type UNARY = sig
     (** Succeeds iff the first term is a variant of the second, ie
         if they are alpha-equivalent *)
 
+  val eq : subst:subst -> term -> scope -> term -> scope -> bool
+    (** [eq subst t1 s1 t2 s2] returns [true] iff the two terms
+        are equal under the given substitution, i.e. if applying the
+        substitution will return the same term. *)
+
   val are_unifiable : term -> term -> bool
 
   val matches : pattern:term -> term -> bool
@@ -741,6 +746,53 @@ module Unary = struct
         if T.eq a b then subst else raise Fail
       else unif subst a sc_a b sc_b
 
+  let rec eq ~subst t1 s1 t2 s2 =
+    let t1, s1 = Substs.get_var subst t1 s1 in
+    let t2, s2 = Substs.get_var subst t2 s2 in
+    begin match T.ty t1, T.ty t2 with
+      | T.NoType, T.NoType -> true
+      | T.NoType, T.HasType _
+      | T.HasType _, T.NoType -> false
+      | T.HasType ty1, T.HasType ty2 -> eq ~subst ty1 s1 ty2 s2
+    end &&
+    match T.view t1, T.view t2 with
+    | T.BVar i, T.BVar j
+    | T.RigidVar i, T.RigidVar j
+    | T.Var i, T.Var j -> i=j
+    | T.Bind (f1, varty1, t1'), T.Bind (f2, varty2, t2') when Symbol.eq f1 f2 ->
+        eq ~subst varty1 s1 varty2 s2
+        &&
+        eq ~subst t1' s1 t2' s2
+    | T.App (t1, l1), T.App (t2, l2) when List.length l1 = List.length l2 ->
+        eq ~subst t1 s1 t2 s2
+        &&
+        List.for_all2 (fun t1 t2 -> eq ~subst t1 s1 t2 s2) l1 l2
+    | T.SimpleApp (f1,l1), T.SimpleApp (f2, l2) when Symbol.eq f1 f2 ->
+      begin try
+        List.for_all2 (fun t1 t2 -> eq ~subst t1 s1 t2 s2) l1 l2
+      with Invalid_argument _ -> false
+      end
+    | T.At (l1, r1), T.At (l2, r2) ->
+      eq ~subst l1 s1 l2 s2
+      &&
+      eq ~subst r1 s1 r2 s2
+    | T.Record (l1, rest1), T.Record (l2, rest2) ->
+      begin try
+        List.for_all2
+          (fun (n1,t1) (n2,t2) -> n1 = n2 && eq ~subst t1 s1 t2 s2)
+          l1 l2
+      with Invalid_argument _ -> false
+      end
+      &&
+      begin match rest1, rest2 with
+        | Some r1, Some r2 -> eq ~subst r1 s1 r2 s2
+        | None, None -> true
+        | Some _, None
+        | None, Some _ -> false
+      end
+    | T.Multiset _, T.Multiset _   (* not unary *)
+    | _, _ -> false
+
   let are_variant t1 t2 =
     try
       let _ = variant t1 0 t2 1 in
@@ -787,6 +839,9 @@ module Ty = struct
   let variant =
     (variant :> ?subst:subst -> term -> scope -> term -> scope -> subst)
 
+  let eq =
+    (eq :> subst:subst -> term -> scope -> term -> scope -> bool)
+
   let are_unifiable =
     (are_unifiable :> term -> term -> bool)
 
@@ -818,6 +873,9 @@ module FO = struct
 
   let variant =
     (variant :> ?subst:subst -> term -> scope -> term -> scope -> subst)
+
+  let eq =
+    (eq :> subst:subst -> term -> scope -> term -> scope -> bool)
 
   let are_unifiable =
     (are_unifiable :> term -> term -> bool)
