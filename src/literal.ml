@@ -431,6 +431,9 @@ let is_absurd lit = match lit with
   | Prop (p, false) when T.eq p T.TPTP.true_ -> true
   | Prop (p, true) when T.eq p T.TPTP.false_ -> true
   | False -> true
+  | Ineq olit ->
+      olit.TO.strict && T.eq olit.TO.left olit.TO.right
+  | Arith o -> ArithLit.is_absurd o
   | _ -> false
 
 let fold_terms ?(position=Position.stop) ?(vars=false) ~which ~ord ~subterms lit acc f =

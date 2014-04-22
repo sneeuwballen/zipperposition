@@ -246,6 +246,16 @@ let is_trivial = function
       M.is_const m && Z.sign (M.const m) <> 0
 
 let is_absurd = function
+  | Binary (Equal, m1, m2) ->
+      let m = M.difference m1 m2 in
+      M.is_const m && M.sign m <> 0
+  | Binary (Different, m1, m2) -> M.eq m1 m2
+  | Binary (Less, m1, m2) ->
+      let m = M.difference m1 m2 in
+      M.is_const m && M.sign m >= 0
+  | Binary (Lesseq, m1, m2) ->
+      let m = M.difference m1 m2 in
+      M.is_const m && M.sign m > 0
   | _ -> false   (* TODO *)
 
 let fold_terms ?(pos=P.stop) ?(vars=false) ~which ~ord ~subterms lit acc f =
