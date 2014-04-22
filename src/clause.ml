@@ -218,8 +218,6 @@ module type S = sig
 
     val arith : t
 
-    val divides : t
-
     val filter : (Literal.t -> bool) -> t
 
     val max : clause -> t
@@ -692,8 +690,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       fun i lit -> Lit.is_ineq_of ~instance lit
 
     let arith i lit = Lit.is_arith lit
-
-    let divides i lit = Lit.is_divides lit
 
     let filter f i lit = f lit
 

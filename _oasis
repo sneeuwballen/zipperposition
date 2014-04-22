@@ -26,8 +26,8 @@ Library "libzipperposition"
   Modules:          ClauseQueue, Clause, Const, Extensions,
                     Literal, Literals, CompactClause, Ctx, Proof, ProofState,
                     Saturate, Selection, PFormula, Theories, AC,
-                    PEnv, Params, Env, Monome, Signals,
-                    calculi/Superposition, calculi/Chaining
+                    PEnv, Params, Env, Monome, ArithLit, Signals,
+                    calculi/Superposition, calculi/Chaining, calculi/ArithInt
   InternalModules:  lib/LazyGraph, lib/Leftistheap,
                     lib/Vector, lib/Sequence, lib/SmallSet,
                     lib/UnionFind, lib/Choice, lib/Mixtbl, lib/Signal

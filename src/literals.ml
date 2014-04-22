@@ -215,11 +215,6 @@ module View = struct
       Lit.View.focus_arith lits.(idx) pos'
     | _ -> None
 
-  let get_divides lits pos = match pos with
-    | Position.Arg (idx, pos') when idx < Array.length lits ->
-      Lit.View.focus_divides lits.(idx) pos'
-    | _ -> None
-
   let _unwrap2 ~msg f x y = match f x y with
     | Some z -> z
     | None -> invalid_arg msg
@@ -232,9 +227,6 @@ module View = struct
 
   let get_arith_exn =
     _unwrap2 ~msg:"get_arith: improper position" get_arith
-
-  let get_divides_exn =
-    _unwrap2 ~msg:"get_divides: improper position" get_divides
 end
 
 let order_instances lits =
@@ -258,7 +250,6 @@ let terms_under_ineq ~instance lits =
         | Lit.Equation (l, r, _) -> k l; k r
         | Lit.Prop (p, _) -> k p
         | Lit.Arith _
-        | Lit.Divides _
         | Lit.True
         | Lit.False -> ()
       done)
@@ -306,7 +297,6 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits acc f =
       | Lit.Equation _
       | Lit.Ineq _
       | Lit.Arith _
-      | Lit.Divides _
       | Lit.True
       | Lit.False -> acc
       in fold acc (i+1)
@@ -325,6 +315,40 @@ let fold_ineq ~eligible lits acc f =
       in
       fold acc (i+1)
   in fold acc 0
+
+let fold_arith ~eligible lits acc f =
+  let rec fold acc i =
+    if i = Array.length lits then acc
+    else if not (eligible i lits.(i)) then fold acc (i+1)
+    else
+      let acc = match Lit.View.get_arith lits.(i) with
+      | None -> acc
+      | Some x ->
+          let pos = Position.(arg i stop) in
+          f acc x pos
+      in
+      fold acc (i+1)
+  in fold acc 0
+
+let fold_arith_terms ~eligible ~which ~ord lits acc f =
+  let module M = Monome in let module MF = Monome.Focus in
+  fold_arith ~eligible lits acc
+    (fun acc a_lit pos ->
+      (* do we use the given term? *)
+      let do_term =
+        match which with
+        | `All -> (fun _ -> true)
+        | `Max ->
+          let max_terms = ArithLit.max_terms ~ord a_lit in
+          fun t -> Util.list_mem T.eq t max_terms
+      in
+      ArithLit.Focus.fold_terms ~pos a_lit acc
+        (fun acc foc_lit pos ->
+          let t = ArithLit.Focus.term foc_lit in
+          if do_term t
+            then f acc t foc_lit pos
+            else acc)
+    )
 
 let fold_terms ?(vars=false) ~(which : [< `All|`Max])
 ~ord ~subterms ~eligible lits acc f =

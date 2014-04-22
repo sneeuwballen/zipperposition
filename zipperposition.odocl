@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: dacb7894cc2df1395bafc58164ca4ba3)
+# DO NOT EDIT (digest: b9860a17ff82cc2e747913aefa75af4a)
 src/ClauseQueue
 src/Clause
 src/Const
@@ -19,7 +19,9 @@ src/PEnv
 src/Params
 src/Env
 src/Monome
+src/ArithLit
 src/Signals
 src/calculi/Superposition
 src/calculi/Chaining
+src/calculi/ArithInt
 # OASIS_STOP

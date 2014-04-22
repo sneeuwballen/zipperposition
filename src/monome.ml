@@ -420,6 +420,15 @@ module Focus = struct
         | _ -> true)
       mf.rest.terms
 
+  let fold_m ~pos m acc f =
+    Util.list_foldi
+      (fun acc i (c,t) ->
+        let pos = Position.(arg i pos) in
+        let rest = {m with terms=Util.list_remove m.terms i} in
+        let mf = {coeff=c; term=t; rest;} in
+        f acc mf pos
+      ) acc m.terms
+
   let apply_subst ~renaming subst mf scope =
     let rest = map (fun t -> Substs.FO.apply subst ~renaming t scope) mf.rest in
     let term = Substs.FO.apply subst ~renaming mf.term scope in

@@ -184,6 +184,11 @@ module Focus : sig
   val is_max : ord:Ordering.t -> _ t -> bool
     (** Is the focused term maximal in the monome? *)
 
+  val fold_m : pos:Position.t -> 'a monome -> 'b ->
+               ('b -> 'a t -> Position.t -> 'b) -> 'b
+    (** Fold on terms of the given monome, focusing on them one by one,
+        along with the position of the focused term *)
+
   val apply_subst : renaming:Substs.Renaming.t ->
                     Substs.t -> 'a t -> scope -> 'a t
     (** Apply a substitution. This can modify the set of terms in [rest]

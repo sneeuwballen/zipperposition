@@ -37,8 +37,11 @@ module O = Ordering
 module Lit = Literal
 module S = Substs
 
-(* XXX: load some other modules, but they might not be registered *)
-module Chaining = Chaining
+(* load some other modules, but they might not be registered *)
+module Import = struct
+  open! Chaining
+  open! ArithInt
+end
 
 (** setup an alarm for abrupt stop *)
 let setup_alarm timeout =

@@ -219,8 +219,6 @@ module type S = sig
 
     val arith : t
 
-    val divides : t
-
     val filter : (Literal.t -> bool) -> t
 
     val max : clause -> t

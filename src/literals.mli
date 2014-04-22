@@ -117,17 +117,14 @@ module View : sig
         boolean that is [true] iff the inequality is {b strict}, and
         the corresponding ordering instance (pair of symbols) *)
 
-  val get_arith : t -> Position.t -> Literal.View.arith_view option
-
-  val get_divides : t -> Position.t -> Literal.View.divides_view option
+  val get_arith : t -> Position.t -> ArithLit.Focus.t option
 
   (** The following functions will raise [Invalid_argument] if the
      position is not valid or if the literal isn't what's asked for *)
 
   val get_eqn_exn : t -> Position.t -> (term * term * bool)
   val get_ineq_exn : t -> Position.t -> Theories.TotalOrder.lit
-  val get_arith_exn : t -> Position.t -> Literal.View.arith_view
-  val get_divides_exn : t -> Position.t -> Literal.View.divides_view
+  val get_arith_exn : t -> Position.t -> ArithLit.Focus.t
 end
 
 val order_instances : t -> Theories.TotalOrder.t list
@@ -167,6 +164,20 @@ val fold_ineq : eligible:(int -> Literal.t -> bool) ->
       the inequation instance, plus its position within the array.
       [eligible] is used to filter which literals to fold over (given
       the literal and its index). *)
+
+val fold_arith : eligible:(int -> Literal.t -> bool) ->
+                 t -> 'a ->
+                 ('a -> ArithLit.t -> Position.t -> 'a) ->
+                'a
+  (** Fold over eligible arithmetic literals *)
+
+val fold_arith_terms : eligible:(int -> Literal.t -> bool) ->
+                       which:[<`Max|`All] -> ord:Ordering.t ->
+                       t -> 'a ->
+                       ('a -> term -> ArithLit.Focus.t -> Position.t -> 'a) ->
+                       'a
+  (** Fold on terms under arithmetic literals, with the focus on
+      the current term *)
 
 val fold_terms : ?vars:bool -> which:[<`Max|`All] ->
                  ord:Ordering.t -> subterms:bool ->

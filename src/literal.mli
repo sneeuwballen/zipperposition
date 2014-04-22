@@ -33,12 +33,6 @@ type scope = Substs.scope
 type term = FOTerm.t
 type form = Formula.FO.t
 
-type arith_op =
-  | Equal
-  | Different
-  | Less
-  | Lesseq
-
 (** a literal, that is, a signed atomic formula *)
 type t = private
   | True
@@ -46,9 +40,7 @@ type t = private
   | Equation of term * term * bool
   | Prop of term * bool
   | Ineq of Theories.TotalOrder.lit
-  | Arith of arith_op * Z.t Monome.t * Z.t Monome.t
-  | Divides of Z.t * int * Z.t Monome.t * bool
-      (** d^k divides the sum (or not) *)
+  | Arith of ArithLit.t
 
 val eq : t -> t -> bool         (** equality of literals *)
 val eq_com : t -> t -> bool     (** commutative equality of lits *)
@@ -80,8 +72,7 @@ val is_arith_neq : t -> bool
 val is_arith_ineq : t -> bool   (** < or <= *)
 val is_arith_less : t -> bool
 val is_arith_lesseq : t -> bool
-
-val is_divides : t -> bool
+val is_arith_divides : t -> bool
 
 (** build literals. If sides so not have the same sort,
     a SortError will be raised. An ordering must be provided *)
@@ -97,7 +88,8 @@ val mk_absurd : t (* absurd literal, like ~ true *)
 val mk_less : Theories.TotalOrder.t -> term -> term -> t
 val mk_lesseq : Theories.TotalOrder.t -> term -> term -> t
 
-val mk_arith : arith_op -> Z.t Monome.t -> Z.t Monome.t -> t
+val mk_arith : ArithLit.t -> t
+val mk_arith_op : ArithLit.op -> Z.t Monome.t -> Z.t Monome.t -> t
 val mk_arith_eq : Z.t Monome.t -> Z.t Monome.t -> t
 val mk_arith_neq : Z.t Monome.t -> Z.t Monome.t -> t
 val mk_arith_less : Z.t Monome.t -> Z.t Monome.t -> t
@@ -240,30 +232,14 @@ module View : sig
     (** Extract a total ordering literal from the literal, only for the
         given ordering instance *)
 
-  val get_arith : t -> (arith_op * Z.t Monome.t * Z.t Monome.t) option
+  val get_arith : t -> ArithLit.t option
     (** Extract an arithmetic literal *)
 
-  (* focus on a term in one of the two monomes *)
-  type arith_view =
-    | ArithLeft of arith_op * Z.t Monome.Focus.t * Z.t Monome.t
-    | ArithRight of arith_op * Z.t Monome.t * Z.t Monome.Focus.t
-
-  val focus_arith : t -> Position.t -> arith_view option
+  val focus_arith : t -> Position.t -> ArithLit.Focus.t option
     (** Focus on a specific term in an arithmetic literal. The focused term is
         removed from its monome, and its coefficient is returned. *)
 
-  val unfocus_arith : arith_view -> t
-
-  val get_divides : t -> (Z.t * int * Z.t Monome.t * bool) option
-    (** Extract a divisibility literal.  *)
-
-  type divides_view = Z.t * int * Z.t Monome.Focus.t * bool
-
-  val focus_divides : t -> Position.t -> divides_view option
-    (** Focus on a given subterm of the divisibility literal. The
-        term is removed from the monome it belongs to. *)
-
-  val unfocus_divides : divides_view -> t
+  val unfocus_arith : ArithLit.Focus.t -> t
 end
 
 (** {2 Conversions} *)
