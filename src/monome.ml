@@ -394,6 +394,10 @@ module Focus = struct
   let to_monome t =
     add t.rest t.coeff t.term
 
+  let coeff t = t.coeff
+  let term t = t.term
+  let rest t = t.rest
+
   let pp buf t =
     let num = t.rest.num in
     (* print the focused part *)
@@ -408,6 +412,103 @@ module Focus = struct
 
   let to_string m = Util.on_buffer pp m
   let fmt fmt t = Format.pp_print_string fmt (to_string t)
+
+  let is_max ~ord mf =
+    List.for_all
+      (fun (_, t) -> match Ordering.compare ord mf.term t with
+        | Comparison.Lt -> false  (* [t > mf.term] *)
+        | _ -> true)
+      mf.rest.terms
+
+  let apply_subst ~renaming subst mf scope =
+    let rest = map (fun t -> Substs.FO.apply subst ~renaming t scope) mf.rest in
+    let term = Substs.FO.apply subst ~renaming mf.term scope in
+    (* if [term] occurs in the new [rest], remove it and add its
+       coefficient. *)
+    let coeff, rest =
+      if mem rest term
+        then (rest.num.add mf.coeff (find_exn rest term), remove rest term)
+        else (mf.coeff, rest)
+    in
+    if rest.num.sign coeff = 0 then failwith "Monome.Focus.apply_subst: coeff 0";
+    {coeff; rest; term; }
+
+  let unify_ff ?(subst=Substs.empty) mf1 s1 mf2 s2 k =
+    assert(mf1.rest.num == mf2.rest.num);
+    let num = mf1.rest.num in
+    (* recursive unification of the term [t] with members of the monome *)
+    let rec iter_terms subst c t l scope k = match l with
+      | [] -> k (c, subst)
+      | (c', t') :: l' ->
+          if Unif.FO.eq ~subst t scope t' scope
+          then
+            (* we do not have a choice, [t = t'] is true *)
+            iter_terms subst (num.add c c') t l' scope k
+          else begin
+            begin try
+              (* maybe we can merge [t] and [t'] *)
+              let subst' = Unif.FO.unification ~subst t scope t' scope in
+              iter_terms subst' (num.add c c') t l' scope k
+            with Unif.Fail -> ()
+            end;
+            (* we can also choose not to unify [t] and [t']. *)
+            iter_terms subst c t l' scope k
+          end
+    in
+    try
+      let subst = Unif.FO.unification ~subst mf1.term s1 mf2.term s2 in
+      iter_terms subst mf1.coeff mf1.term mf1.rest.terms s1
+        (fun (c1, subst) ->
+          iter_terms subst mf2.coeff mf2.term mf2.rest.terms s2
+            (fun (c2, subst) -> k (c1, c2, subst)))
+    with Unif.Fail -> ()
+
+  let unify_mm ?(subst=Substs.empty) m1 s1 m2 s2 k =
+    assert(m1.num==m2.num);
+    let num = m1.num in
+    (* recursive unification of the term [t] with members of the same monome *)
+    let rec iter_terms subst c t l rest scope k = match l with
+      | [] -> k (c, t, rest, subst)
+      | (c', t') :: l' ->
+          if Unif.FO.eq ~subst t scope t' scope
+          then
+            (* we do not have a choice, [t = t'] is true *)
+            iter_terms subst (num.add c c') t l' rest scope k
+          else begin
+            begin try
+              (* maybe we can merge [t] and [t'] *)
+              let subst' = Unif.FO.unification ~subst t scope t' scope in
+              iter_terms subst' (num.add c c') t l' rest scope k
+            with Unif.Fail -> ()
+            end;
+            (* we can also choose not to unify [t] and [t']. *)
+            iter_terms subst c t l' ((c',t')::rest) scope k
+          end
+    (* choose a term in the left monome. *)
+    and choose_first subst l1 rest1 k = match l1 with
+      | [] -> ()
+      | (c1,t1)::l1' ->
+          (* first, choose [t1], unify it with some remaining terms of
+              [m1] (no need for the left-wise ones that were dropped, choosing
+              them previously was enough). *)
+          iter_terms subst c1 t1 l1' rest1 s1 k;
+          (* don't choose [t1] *)
+          choose_first subst l1' ((c1,t1)::rest1) k
+  in
+  choose_first subst m1.terms []
+    (fun (c1, t1, rest1, subst) ->
+      let mf1 = {coeff=c1; term=t1; rest={m1 with terms=rest1}; } in
+      choose_first subst m2.terms []
+        (fun (c2, t2, rest2, subst) ->
+          let mf2 = {coeff=c2; term=t2; rest={m2 with terms=rest2}; } in
+          k (mf1, mf2, subst)
+        )
+    )
+
+  (*
+  let unify_fm ?(subst=Substs.empty) mf1 s1 m2 s2 k =
+    assert false  (* TODO *)
+  *)
 end
 
 let variant ?(subst=Substs.empty) m1 sc1 m2 sc2 k =

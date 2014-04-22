@@ -134,7 +134,8 @@ val variant : ?subst:Substs.t -> 'a t -> scope -> 'a t -> scope -> Substs.t Sequ
 
 val matching : ?subst:Substs.t -> 'a t -> scope -> 'a t -> scope -> Substs.t Sequence.t
 
-val unify : ?subst:Substs.t -> 'a t -> scope -> 'a t -> scope -> Substs.t Sequence.t
+val unify : ?subst:Substs.t -> 'a t -> scope -> 'a t -> scope ->
+            Substs.t Sequence.t
 
 val is_ground : _ t -> bool
   (** Are there no variables in the monome? *)
@@ -169,12 +170,58 @@ module Focus : sig
   val to_monome : 'a t -> 'a monome
     (** Conversion back to an unfocused monome *)
 
+  val coeff : 'a t -> 'a
+  val term : 'a t -> term
+  val rest : 'a t -> 'a monome
+
   val sum : 'a t -> 'a monome -> 'a t
   val difference : 'a t -> 'a monome -> 'a t
   val uminus : 'a t -> 'a t
 
   val product : 'a t -> 'a -> 'a t
     (** @raise Invalid_argument if the number is 0 *)
+
+  val is_max : ord:Ordering.t -> _ t -> bool
+    (** Is the focused term maximal in the monome? *)
+
+  val apply_subst : renaming:Substs.Renaming.t ->
+                    Substs.t -> 'a t -> scope -> 'a t
+    (** Apply a substitution. This can modify the set of terms in [rest]
+        because some of them may become equal to the focused term. *)
+
+  (** Here we don't unify full (focused) monomes together, but only the
+      focused part (and possibly some unfocused terms too) together.
+      For instance, unifying
+      [f(x)* + 2a] and [f(y)* + f(z) + b] (where focused terms are starred)
+      will yield both
+      [(1,1,x=y)] and [(1,2,x=y=z)] since [f(z)] becomes focused too.
+
+      Again, arith constants are not unifiable with unshielded variables. *)
+
+  val unify_ff : ?subst:Substs.t ->
+                  'a t -> scope -> 'a t -> scope ->
+                  ('a * 'a * Substs.t) Sequence.t
+    (** Unify two focused monomes. All returned unifiers are unifiers
+        of the focused terms, but maybe also of other unfocused terms;
+        the coefficient of the resulting unified term in both focused monomes
+        are yielded along with the unifier *)
+
+  val unify_mm : ?subst:Substs.t ->
+                'a monome -> scope -> 'a monome -> scope ->
+                ('a t * 'a t * Substs.t) Sequence.t
+    (** Unify parts of two monomes [m1] and [m2]. For each such unifier we
+        return the versions of [m1] and [m2] where the unified terms
+        are focused. *)
+
+  (* TODO
+  val unify_fm : ?subst:Substs.t ->
+                 'a t -> scope -> 'a monome -> scope ->
+                 ('a * 'a t * Substs.t) Sequence.t
+    (** Unify a focused monome and an unfocused monome. All unifiers
+        are unifiers of the focused term and of at least one of the
+        terms of the opposite monome. Each result is the coeff of the
+        left-focused term, the right-focused monome, and the substitution. *)
+  *)
 
   val pp : Buffer.t -> 'a t -> unit
   val fmt : Format.formatter -> 'a t -> unit
