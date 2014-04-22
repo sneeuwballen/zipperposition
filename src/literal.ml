@@ -544,8 +544,7 @@ module Comp = struct
     | Prop (p, _) -> [p]
     | Equation (l, r, _) -> _maxterms2 ~ord l r
     | Ineq olit -> _maxterms2 ~ord olit.TO.left olit.TO.right
-    | Arith _ ->
-        Multiset.max_l (Ordering.compare ord) (root_terms lit)
+    | Arith a -> ArithLit.max_terms ~ord a
     | True
     | False -> []
 
@@ -611,12 +610,12 @@ module Comp = struct
         | true, false -> C.Gt
         | false, true -> C.Lt
         end
-    | Arith (AL.Binary(op1, x1, x2)), Arith (AL.Binary(op2, y1, y2)) ->
+    | Arith (AL.Binary(op1, x1, y1)), Arith (AL.Binary(op2, x2, y2)) ->
         assert (op1 = op2);
         let cmp_term = Ordering.compare ord in
         let cmp_monomes = Monome.Int.compare cmp_term in
-        let left = Multiset.create (IArray.doubleton x1 x2) in
-        let right = Multiset.create (IArray.doubleton y1 y2) in
+        let left = Multiset.create (IArray.doubleton x1 y1) in
+        let right = Multiset.create (IArray.doubleton x2 y2) in
         Multiset.compare cmp_monomes left right
     | Arith(AL.Divides d1), Arith(AL.Divides d2) ->
         assert (d1.AL.sign=d2.AL.sign);
@@ -631,7 +630,6 @@ module Comp = struct
     | _, _ ->
         assert false
 
-
   let compare ~ord l1 l2 =
     let f = Comparison.(
       _cmp_by_maxterms ~ord @>>
@@ -639,7 +637,9 @@ module Comp = struct
       _cmp_by_kind @>>
       _cmp_specific ~ord
     ) in
-    f l1 l2
+    let res = f l1 l2 in
+    Util.debug 5 "compare %a and %a: %s" pp l1 pp l2 (C.to_string res);
+    res
 end
 
 module Pos = struct

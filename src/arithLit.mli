@@ -176,6 +176,12 @@ module Focus : sig
   val apply_subst : renaming:Substs.Renaming.t -> Substs.t -> t -> scope -> t
     (** Apply a substitution *)
 
+  val unify : ?subst:Substs.t -> t -> scope -> t -> scope ->
+              (t * t * Substs.t) Sequence.t
+    (** Unify the two focused terms, and possibly other terms of their
+        respective focused monomes; yield the new literals accounting for
+        the unification along with the unifier *)
+
   val fold_terms : ?pos:Position.t -> lit -> 'a ->
                   ('a -> t -> Position.t -> 'a) -> 'a
     (** Fold on focused terms in the literal, one by one, with
@@ -186,4 +192,8 @@ module Focus : sig
 
   val unfocus : t -> lit
     (** Conversion back to a literal *)
+
+  val pp : Buffer.t -> t -> unit
+  val to_string : t -> string
+  val fmt : Format.formatter -> t -> unit
 end

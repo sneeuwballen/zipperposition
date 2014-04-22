@@ -39,9 +39,10 @@ module type S = sig
   module C : module type of Env.C
   module PS : module type of Env.ProofState
 
-  val idx_eq : unit -> PS.TermIndex.t  (** both sides of Eq/Ineq *)
+  val idx_eq : unit -> PS.TermIndex.t   (** both sides of Eq/Ineq *)
   val idx_ineq : unit -> PS.TermIndex.t (** inequations *)
   val idx_div : unit -> PS.TermIndex.t  (** divisibility *)
+  val idx_all : unit -> PS.TermIndex.t  (** all root terms under arith lits *)
 
   val canc_sup_active: Env.binary_inf_rule
     (** cancellative superposition where given clause is active *)

@@ -143,7 +143,7 @@ module type S = sig
     (** Bitvector that indicates which of the literals of [subst(clause)]
         are maximal under [ord] *)
 
-  val is_maxlit : t -> scope -> Substs.t -> int -> bool
+  val is_maxlit : t -> scope -> Substs.t -> idx:int -> bool
     (** Is the i-th literal maximal in subst(clause)? Equivalent to
         Bitvector.get (maxlits ~ord c subst) i *)
 
@@ -553,9 +553,9 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     Lits.maxlits ~ord lits
 
   (** Check whether the literal is maximal *)
-  let is_maxlit c scope subst i =
+  let is_maxlit c scope subst ~idx =
     let bv = maxlits c scope subst in
-    BV.get bv i
+    BV.get bv idx
 
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for resolution. *)

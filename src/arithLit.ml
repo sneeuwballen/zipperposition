@@ -405,6 +405,17 @@ module Focus = struct
       ~f_m:(fun m -> M.apply_subst ~renaming subst m scope)
       lit
 
+  let unify ?(subst=Substs.empty) lit1 sc1 lit2 sc2 k =
+    let _set_mf lit mf = match lit with
+    | Left (op, _, m) -> Left (op, mf, m)
+    | Right (op, m, _) -> Right (op, m, mf)
+    | Div d ->
+        Div { d with monome=mf; }
+    in
+    MF.unify_ff ~subst (focused_monome lit1) sc1 (focused_monome lit2) sc2
+      (fun (mf1, mf2, subst) ->
+        k (_set_mf lit1 mf1, _set_mf lit2 mf2, subst))
+
   (* scale focused literals to have the same coefficient *)
   let scale l1 l2 =
     let z1 = MF.coeff (focused_monome l1)
@@ -426,4 +437,26 @@ module Focus = struct
           monome=MF.to_monome d.monome;
         } in
         Divides d'
+
+  let pp buf lit =
+    let op2str = function
+      | Equal -> "="
+      | Different -> "≠"
+      | Less -> "<"
+      | Lesseq -> "≤"
+    in
+    match lit with
+    | Left (op, mf, m) ->
+        Printf.bprintf buf "%a %s %a" MF.pp mf (op2str op) M.pp m
+    | Right (op, m, mf) ->
+        Printf.bprintf buf "%a %s %a" M.pp m (op2str op) MF.pp mf
+    | Div d when d.sign ->
+      let nk = Z.pow d.num d.power in
+      Printf.bprintf buf "%s | %a" (Z.to_string nk) MF.pp d.monome
+    | Div d ->
+      let nk = Z.pow d.num d.power in
+      Printf.bprintf buf "¬(%s | %a)" (Z.to_string nk) MF.pp d.monome
+
+  let to_string = Util.on_buffer pp
+  let fmt fmt lit = Format.pp_print_string fmt (to_string lit)
 end

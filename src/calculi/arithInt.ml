@@ -41,8 +41,10 @@ module ALF = ArithLit.Focus
 (* TODO: check maximality of focused terms in literals after substitution
   (t + m1 R m2:  check that not (t < t') for t' in m1 and t' in m2 *)
 
+(* TODO: purification of clauses *)
+
 let stat_arith_sup = Util.mk_stat "arith.superposition"
-let stat_arithellation = Util.mk_stat "arith.arithellation"
+let stat_arith_cancellation = Util.mk_stat "arith.arith_cancellation"
 let stat_arith_eq_factoring = Util.mk_stat "arith.eq_factoring"
 let stat_arith_ineq_factoring = Util.mk_stat "arith.ineq_factoring"
 let stat_arith_ineq_chaining = Util.mk_stat "arith.ineq_chaining"
@@ -51,7 +53,7 @@ let stat_arith_case_switch = Util.mk_stat "arith.case_switch"
 let stat_arith_inner_case_switch = Util.mk_stat "arith.inner_case_switch"
 
 let prof_arith_sup = Util.mk_profiler "arith.superposition"
-let prof_arithellation = Util.mk_profiler "arith.arithellation"
+let prof_arith_cancellation = Util.mk_profiler "arith.arith_cancellation"
 let prof_arith_eq_factoring = Util.mk_profiler "arith.eq_factoring"
 let prof_arith_ineq_factoring = Util.mk_profiler "arith.ineq_factoring"
 let prof_arith_ineq_chaining = Util.mk_profiler "arith.ineq_chaining"
@@ -67,9 +69,10 @@ module type S = sig
   module C : module type of Env.C
   module PS : module type of Env.ProofState
 
-  val idx_eq : unit -> PS.TermIndex.t  (** both sides of Eq/Ineq *)
+  val idx_eq : unit -> PS.TermIndex.t   (** both sides of Eq/Ineq *)
   val idx_ineq : unit -> PS.TermIndex.t (** inequations *)
   val idx_div : unit -> PS.TermIndex.t  (** divisibility *)
+  val idx_all : unit -> PS.TermIndex.t  (** all root terms under arith lits *)
 
   val canc_sup_active: Env.binary_inf_rule
     (** cancellative superposition where given clause is active *)
@@ -125,6 +128,7 @@ end
 let theories = ["arith"]
 type scope = S.scope
 
+let _enable_arith = ref false
 let _enable_semantic_tauto = ref false
 
 module Make(E : Env.S) : S with module Env = E = struct
@@ -136,12 +140,12 @@ module Make(E : Env.S) : S with module Env = E = struct
   let _idx_eq = ref (PS.TermIndex.empty ())
   let _idx_ineq = ref (PS.TermIndex.empty ())
   let _idx_div = ref (PS.TermIndex.empty ())
+  let _idx_all = ref (PS.TermIndex.empty ())
 
   let idx_eq () = !_idx_eq
   let idx_ineq () = !_idx_ineq
   let idx_div () = !_idx_div
-
-  let _active = ref false
+  let idx_all () = !_idx_all
 
   (* apply [f] to some subterms of [c] *)
   let update f c =
@@ -167,16 +171,23 @@ module Make(E : Env.S) : S with module Env = E = struct
       (fun acc t pos ->
         let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
         f acc t with_pos);
+    _idx_all :=
+      Lits.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false
+      ~eligible:C.Eligible.(filter Lit.is_arith ** max c)
+      (C.lits c) !_idx_all
+      (fun acc t pos ->
+        let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
+        f acc t with_pos);
     ()
 
   let () =
     Signal.on PS.ActiveSet.on_add_clause
       (fun c ->
-        if !_active then update PS.TermIndex.add c;
+        if !_enable_arith then update PS.TermIndex.add c;
         Signal.ContinueListening);
     Signal.on PS.ActiveSet.on_remove_clause
       (fun c ->
-        if !_active then update PS.TermIndex.remove c;
+        if !_enable_arith then update PS.TermIndex.remove c;
         Signal.ContinueListening);
     ()
 
@@ -209,9 +220,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     let s_a = info.active_scope and s_p = info.passive_scope in
     let lit_a = ALF.apply_subst ~renaming subst info.active_lit s_a in
     let lit_p = ALF.apply_subst ~renaming subst info.passive_lit s_p in
+    Util.debug 5 "arith superposition between %a[%d] and %a[%d] (subst %a)..."
+      C.pp info.active s_a C.pp info.passive s_p Substs.pp subst;
     (* check ordering conditions *)
-    if C.is_maxlit info.active idx_a subst s_a
-    && C.is_maxlit info.passive idx_p subst s_p
+    if C.is_maxlit info.active s_a subst idx_a
+    && C.is_maxlit info.passive s_p subst idx_p
     && ALF.is_max ~ord lit_a
     && ALF.is_max ~ord lit_p
     then begin
@@ -247,16 +260,47 @@ module Make(E : Env.S) : S with module Env = E = struct
         ~info:[Substs.to_string subst; Util.sprintf "lhs(%a)" MF.pp mf_a]
         ~rule:"canc_sup" cc [C.proof info.active; C.proof info.passive] in
       let new_c = C.create ~parents:[info.active;info.passive] all_lits proof in
-      Util.debug 5 "arith superposition of %a and %a gives %a"
-        C.pp info.active C.pp info.passive C.pp new_c;
+      Util.debug 5 "... gives %a" C.pp new_c;
       Util.incr_stat stat_arith_sup;
       new_c :: acc
-    end else
+    end else begin
+      Util.debug 5 "... has bad ordering conditions";
       acc
+    end
 
-  let canc_sup_active c = []  (* TODO *)
-  (*
+  let canc_sup_active c =
     Util.enter_prof prof_arith_sup;
+    let ord = Ctx.ord () in
+    let eligible = C.Eligible.(pos ** max c ** filter Lit.is_arith_eq) in
+    let sc_a = 0 and sc_p = 1 in
+    let res = Lits.fold_arith_terms ~eligible ~which:`Max ~ord (C.lits c) []
+      (fun acc t active_lit active_pos ->
+        assert (ALF.op active_lit = `Binary AL.Equal);
+        Util.debug 5 "active canc. sup. with %a in %a" ALF.pp active_lit C.pp c;
+        PS.TermIndex.retrieve_unifiables !_idx_all sc_p t sc_a acc
+          (fun acc t' with_pos subst ->
+            let passive = with_pos.C.WithPos.clause in
+            let passive_pos = with_pos.C.WithPos.pos in
+            let passive_lit = Lits.View.get_arith_exn (C.lits passive) passive_pos in
+            Util.debug 5 "  possible match: %a in %a" ALF.pp passive_lit C.pp passive;
+            (* now to unify active_lit and passive_lit further *)
+            ALF.unify ~subst active_lit sc_a passive_lit sc_p
+            |> Sequence.fold
+              (fun acc (active_lit, passive_lit, subst) ->
+                let info = SupInfo.({
+                  active=c; active_pos; active_lit; active_scope=sc_a;
+                  passive; passive_pos; passive_lit; passive_scope=sc_p; subst;
+                }) in
+                _do_canc info acc
+              ) acc
+          )
+      )
+    in
+    Util.exit_prof prof_arith_sup;
+    res
+
+
+  (*
     let ord = Ctx.ord () in
     let eligible = C.Eligible.(pos ** max c ** arith) in
     let res = Lits.fold_arith ~eligible (C.lits c) []
@@ -935,10 +979,9 @@ let extension =
 
 (* TODO: a flag (and code) to declare that arith symbols are AC *)
 
-let _enabled = ref false
 let _enable_arith () =
-  if not !_enabled then begin
-    _enabled := true;
+  if not !_enable_arith then begin
+    _enable_arith := true;
     T.add_hook T.TPTP.Arith.arith_hook;  (* enable arith printing *)
     Extensions.register extension;
   end

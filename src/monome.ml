@@ -177,6 +177,13 @@ let add e s t =
   in
   { e with terms = add e.terms s t; }
 
+let mk_const ~num const = { num; const; terms=[]; }
+
+let mk_full ~num const l =
+  List.fold_left
+    (fun m (c,t) -> add m c t)
+    (mk_const ~num const) l
+
 let of_list ~num s l =
   List.fold_left
     (fun e (s,t) -> add e s t)
@@ -198,6 +205,8 @@ let remove e t =
 
 let remove_const e =
   { e with const = e.num.zero; }
+
+let add_list m l = List.fold_left (fun m (c,t) -> add m c t) m l
 
 module Seq = struct
   let terms m =
@@ -446,71 +455,72 @@ module Focus = struct
     assert(mf1.rest.num == mf2.rest.num);
     let num = mf1.rest.num in
     (* recursive unification of the term [t] with members of the monome *)
-    let rec iter_terms subst c t l scope k = match l with
-      | [] -> k (c, subst)
+    let rec iter_terms subst c t l rest cst scope k = match l with
+      | [] ->
+          let mf = { coeff=c; term=t; rest=mk_full ~num cst rest;} in
+          k (mf, subst)
       | (c', t') :: l' ->
           if Unif.FO.eq ~subst t scope t' scope
           then
             (* we do not have a choice, [t = t'] is true *)
-            iter_terms subst (num.add c c') t l' scope k
+            iter_terms subst (num.add c c') t l' rest cst scope k
           else begin
             begin try
               (* maybe we can merge [t] and [t'] *)
               let subst' = Unif.FO.unification ~subst t scope t' scope in
-              iter_terms subst' (num.add c c') t l' scope k
+              iter_terms subst' (num.add c c') t l' rest cst scope k
             with Unif.Fail -> ()
             end;
             (* we can also choose not to unify [t] and [t']. *)
-            iter_terms subst c t l' scope k
+            iter_terms subst c t l' ((c',t')::rest) cst scope k
           end
     in
     try
       let subst = Unif.FO.unification ~subst mf1.term s1 mf2.term s2 in
-      iter_terms subst mf1.coeff mf1.term mf1.rest.terms s1
-        (fun (c1, subst) ->
-          iter_terms subst mf2.coeff mf2.term mf2.rest.terms s2
-            (fun (c2, subst) -> k (c1, c2, subst)))
+      iter_terms subst mf1.coeff mf1.term mf1.rest.terms [] mf1.rest.const s1
+        (fun (mf1, subst) ->
+          iter_terms subst mf2.coeff mf2.term mf2.rest.terms [] mf2.rest.const s2
+            (fun (mf2, subst) -> k (mf1, mf2, subst)))
     with Unif.Fail -> ()
 
   let unify_mm ?(subst=Substs.empty) m1 s1 m2 s2 k =
     assert(m1.num==m2.num);
     let num = m1.num in
     (* recursive unification of the term [t] with members of the same monome *)
-    let rec iter_terms subst c t l rest scope k = match l with
-      | [] -> k (c, t, rest, subst)
+    let rec iter_terms subst c t l rest cst scope k = match l with
+      | [] ->
+          let mf = { coeff=c; term=t; rest=mk_full ~num cst rest;} in
+          k (mf, subst)
       | (c', t') :: l' ->
           if Unif.FO.eq ~subst t scope t' scope
           then
             (* we do not have a choice, [t = t'] is true *)
-            iter_terms subst (num.add c c') t l' rest scope k
+            iter_terms subst (num.add c c') t l' rest cst scope k
           else begin
             begin try
               (* maybe we can merge [t] and [t'] *)
               let subst' = Unif.FO.unification ~subst t scope t' scope in
-              iter_terms subst' (num.add c c') t l' rest scope k
+              iter_terms subst' (num.add c c') t l' rest cst scope k
             with Unif.Fail -> ()
             end;
             (* we can also choose not to unify [t] and [t']. *)
-            iter_terms subst c t l' ((c',t')::rest) scope k
+            iter_terms subst c t l' ((c',t')::rest) cst scope k
           end
     (* choose a term in the left monome. *)
-    and choose_first subst l1 rest1 k = match l1 with
+    and choose_first subst l1 rest1 cst1 k = match l1 with
       | [] -> ()
       | (c1,t1)::l1' ->
           (* first, choose [t1], unify it with some remaining terms of
               [m1] (no need for the left-wise ones that were dropped, choosing
               them previously was enough). *)
-          iter_terms subst c1 t1 l1' rest1 s1 k;
+          iter_terms subst c1 t1 l1' rest1 cst1 s1 k;
           (* don't choose [t1] *)
-          choose_first subst l1' ((c1,t1)::rest1) k
+          choose_first subst l1' ((c1,t1)::rest1) cst1 k
   in
-  choose_first subst m1.terms []
-    (fun (c1, t1, rest1, subst) ->
-      let mf1 = {coeff=c1; term=t1; rest={m1 with terms=rest1}; } in
-      choose_first subst m2.terms []
-        (fun (c2, t2, rest2, subst) ->
-          let mf2 = {coeff=c2; term=t2; rest={m2 with terms=rest2}; } in
-          k (mf1, mf2, subst)
+  choose_first subst m1.terms [] m1.const
+    (fun (mf1, subst) ->
+      choose_first subst m2.terms [] m2.const
+        (fun (mf2, subst) -> k (mf1, mf2, subst)
         )
     )
 

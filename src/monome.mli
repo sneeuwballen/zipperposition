@@ -61,6 +61,8 @@ val add_const : 'a t -> 'a -> 'a t    (** Add given number to constant *)
 val remove : 'a t -> term -> 'a t     (** Remove the term *)
 val remove_const : 'a t -> 'a t       (** Remove the constant *)
 
+val add_list : 'a t -> ('a * term) list -> 'a t
+
 val map : (term -> term) -> 'a t -> 'a t
 val map_num : ('a -> 'a) -> 'a t -> 'a t
 
@@ -205,11 +207,12 @@ module Focus : sig
 
   val unify_ff : ?subst:Substs.t ->
                   'a t -> scope -> 'a t -> scope ->
-                  ('a * 'a * Substs.t) Sequence.t
+                  ('a t * 'a t * Substs.t) Sequence.t
     (** Unify two focused monomes. All returned unifiers are unifiers
         of the focused terms, but maybe also of other unfocused terms;
-        the coefficient of the resulting unified term in both focused monomes
-        are yielded along with the unifier *)
+        Focused monomes are modified by unification because several terms
+        might merge with the focused term, so the new ones are
+        returned with the unifier itself *)
 
   val unify_mm : ?subst:Substs.t ->
                 'a monome -> scope -> 'a monome -> scope ->
