@@ -114,7 +114,13 @@ let fold f acc lit = match lit with
   | False -> acc
 
 let hash lit =
-  fold (fun acc t -> Hash.combine (T.hash t) acc) 17 lit
+  let hash_sign = function true -> 1 | false -> 2 in
+  match lit with
+  | Arith o -> ArithLit.hash o
+  | Prop (p, sign) -> Hash.combine (T.hash p) (hash_sign sign)
+  | Equation (l, r, sign) -> Hash.hash_int3 (T.hash l) (T.hash r) (hash_sign sign)
+  | _ ->
+      fold (fun acc t -> Hash.combine (T.hash t) acc) 17 lit
 
 let weight lit =
   fold (fun acc t -> acc + T.size t) 0 lit
