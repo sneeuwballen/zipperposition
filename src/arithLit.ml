@@ -210,7 +210,7 @@ let generic_unif m_unif ~subst lit1 sc1 lit2 sc2 k = match lit1, lit2 with
       then m_unif ~subst x1 sc1 x2 sc2
         (fun subst -> m_unif ~subst y1 sc1 y2 sc2 k)
   | Divides d1, Divides d2 ->
-    if  Z.equal d1.num d2.num && d1.power = d2.power && d1.sign = d2.sign
+    if Z.equal d1.num d2.num && d1.power = d2.power && d1.sign = d2.sign
       then m_unif ~subst d1.monome sc1 d2.monome sc2 k
   | Binary _, Divides _
   | Divides _, Binary _ -> ()
@@ -223,6 +223,26 @@ let matching ?(subst=Substs.empty) lit1 sc1 lit2 sc2 =
 
 let variant ?(subst=Substs.empty) lit1 sc1 lit2 sc2 =
   generic_unif (fun ~subst -> M.variant ~subst) ~subst lit1 sc1 lit2 sc2
+
+let subsumes ?(subst=Substs.empty) lit1 sc1 lit2 sc2 k =
+  match lit1, lit2 with
+  | Binary (Less, l1, r1), Binary (Less, l2, r2) ->
+      (* if subst(r1 - l1) = r2-l2 - k where k>=0, then l1<r1 => l2+k<r2 => l2<r2
+          so l1<r1 subsumes l2<r2. *)
+      let m1 = M.difference r1 l1 in
+      let m2 = M.difference r2 l2 in
+      M.matching ~subst (M.remove_const m1) sc1 (M.remove_const m2) sc2
+        (fun subst ->
+          let renaming = Substs.Renaming.create () in
+          let m = M.difference
+            (M.apply_subst ~renaming subst m1 sc1)
+            (M.apply_subst ~renaming subst m2 sc2) in
+          assert (M.is_const m);
+          (* now, if [m <= 0], then subst(r1-l1) always dominates r2-l2
+              and subst is subsuming *)
+          if M.sign m <= 0 then k subst)
+  | _ ->
+    generic_unif (fun ~subst -> M.matching ~subst) ~subst lit1 sc1 lit2 sc2 k
 
 let are_variant lit1 lit2 =
   not (Sequence.is_empty (variant lit1 0 lit2 1))

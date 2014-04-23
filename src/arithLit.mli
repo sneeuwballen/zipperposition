@@ -105,13 +105,17 @@ val apply_subst : renaming:Substs.Renaming.t -> Substs.t -> t -> scope -> t
 
 val matching : ?subst:Substs.t -> t -> scope -> t -> scope ->
                Substs.t Sequence.t
-(** checks whether subst(lit_a) subsumes subst(lit_b). Returns alternative
+(** checks whether subst(lit_a) is equal to lit_b. Returns alternative
     substitutions s such that s(lit_a) = lit_b and s contains subst. *)
 
 val variant : ?subst:Substs.t -> t -> scope -> t -> scope ->
               Substs.t Sequence.t
 
 val unify : ?subst:Substs.t -> t -> scope -> t -> scope -> Substs.t Sequence.t
+
+val subsumes : ?subst:Substs.t -> t -> scope -> t -> scope -> Substs.t Sequence.t
+  (** Find substitutions such that [subst(lit_a)] implies [lit_b]. This is
+      more general than matching. *)
 
 val are_variant : t -> t -> bool
 

@@ -1021,7 +1021,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (fun lita ->
         Util.array_exists
         (fun litb ->
-          not (Sequence.is_empty (Lit.matching ~subst:S.empty lita sc_a litb sc_b)))
+          not (Sequence.is_empty (Lit.subsumes ~subst:S.empty lita sc_a litb sc_b)))
           b)
       a
 
@@ -1070,7 +1070,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         BV.set bv j;
         (* match lita and litb, then flag litb as used, and try with next literal of a *)
         let n_subst = ref 0 in
-        Lit.matching ~subst lita sc_a litb sc_b
+        Lit.subsumes ~subst lita sc_a litb sc_b
           (fun subst' -> incr n_subst; try_permutations (i+1) subst' bv);
         BV.reset bv j;
         (* some variable of lita occur in a[j+1...], try another literal of b *)
@@ -1272,8 +1272,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           let lit' = lits.(j) in
           (* try to match lit with lit' (and vice versa), then check if subst(c) subsumes c *)
           let substs = Sequence.append
-            (Lit.matching ~subst:S.empty lit 0 lit' 0)
-            (Lit.matching ~subst:S.empty lit' 0 lit 0) in
+            (Lit.subsumes ~subst:S.empty lit 0 lit' 0)
+            (Lit.subsumes ~subst:S.empty lit' 0 lit 0) in
           Sequence.iter
             (fun subst ->
               let new_lits = Array.sub lits 0 (n - 1) in

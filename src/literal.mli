@@ -100,8 +100,13 @@ val mk_not_divides : Z.t -> power:int -> Z.t Monome.t -> t
 
 val matching : ?subst:Substs.t -> t -> scope -> t -> scope ->
                Substs.t Sequence.t
-(** checks whether subst(lit_a) subsumes subst(lit_b). Returns alternative
+(** checks whether subst(lit_a) matches lit_b. Returns alternative
     substitutions s such that s(lit_a) = lit_b and s contains subst. *)
+
+val subsumes : ?subst:Substs.t -> t -> scope -> t -> scope ->
+               Substs.t Sequence.t
+(** More general version of {!matching}, yields [subst]
+    such that [subst(lit_a) => lit_b]. *)
 
 val variant : ?subst:Substs.t -> t -> scope -> t -> scope ->
               Substs.t Sequence.t

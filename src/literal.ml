@@ -330,6 +330,14 @@ let matching ?(subst=Substs.empty) lit1 sc1 lit2 sc2 k =
   in
   unif_lits op ~subst lit1 sc1 lit2 sc2 k
 
+let subsumes ?(subst=Substs.empty) lit1 sc1 lit2 sc2 k =
+  match lit1, lit2 with
+  | Arith o1, Arith o2 ->
+      (* use the more specific subsumption mechanism *)
+      Util.debug 5 "subsumption check: %a for %a" ArithLit.pp o1 ArithLit.pp o2;
+      ArithLit.subsumes ~subst o1 sc1 o2 sc2 k
+  | _ -> matching ~subst lit1 sc1 lit2 sc2 k
+
 let unify ?(subst=Substs.empty) lit1 sc1 lit2 sc2 k =
   let op = UnifOp.({
     term=(fun ~subst t1 sc1 t2 sc2 k ->
