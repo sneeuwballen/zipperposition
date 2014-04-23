@@ -52,6 +52,9 @@ let other_opts = ref []
 let add_opt o = other_opts := o :: !other_opts
 let add_opts l = other_opts := l @ !other_opts
 
+(** Default signature *)
+let signature = ref Signature.TPTP.base
+
 (** parse_args returns parameters *)
 let parse_args () =
   let help_select = Util.sprintf "selection function (%a)"

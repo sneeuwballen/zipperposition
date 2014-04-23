@@ -488,6 +488,7 @@ module Focus = struct
     let num = m1.num in
     (* recursive unification of the term [t] with members of the same monome *)
     let rec iter_terms subst c t l rest cst scope k = match l with
+      | [] when Substs.is_empty subst -> ()
       | [] ->
           let mf = { coeff=c; term=t; rest=mk_full ~num cst rest;} in
           k (mf, subst)
@@ -506,23 +507,28 @@ module Focus = struct
             (* we can also choose not to unify [t] and [t']. *)
             iter_terms subst c t l' ((c',t')::rest) cst scope k
           end
-    (* choose a term in the left monome. *)
-    and choose_first subst l1 rest1 cst1 k = match l1 with
-      | [] -> ()
-      | (c1,t1)::l1' ->
-          (* first, choose [t1], unify it with some remaining terms of
-              [m1] (no need for the left-wise ones that were dropped, choosing
-              them previously was enough). *)
-          iter_terms subst c1 t1 l1' rest1 cst1 s1 k;
+    (* unify a term of [m1] with a term of [m2] *)
+    and choose_first subst l1 rest1 cst1 l2 rest2 cst2 k = match l1, l2 with
+      | [], _
+      | _, [] -> ()
+      | (c1,t1)::l1', (c2,t2)::l2' ->
+          (* first, choose [t1] and [t2] if they are unifiable, and extend
+              the unifier to the other terms if needed. *)
+          begin try
+            let subst = Unif.FO.unification ~subst t1 s1 t2 s2 in
+            iter_terms subst c1 t1 [] (rest1@l1') cst1 s1
+              (fun (mf1, subst) ->
+                iter_terms subst c2 t2 [] (rest2@l2') cst2 s2
+                  (fun (mf2, subst) -> k (mf1, mf2, subst))
+              )
+          with Unif.Fail -> ()
+          end;
           (* don't choose [t1] *)
-          choose_first subst l1' ((c1,t1)::rest1) cst1 k
+          choose_first subst l1' ((c1,t1)::rest1) cst1 l1 rest2 cst2 k;
+          (* don't choose [t2] *)
+          choose_first subst l1 rest1 cst1 l2' ((c2,t2)::rest2) cst2 k
   in
-  choose_first subst m1.terms [] m1.const
-    (fun (mf1, subst) ->
-      choose_first subst m2.terms [] m2.const
-        (fun (mf2, subst) -> k (mf1, mf2, subst)
-        )
-    )
+  choose_first subst m1.terms [] m1.const m2.terms [] m2.const k
 
   (*
   let unify_fm ?(subst=Substs.empty) mf1 s1 m2 s2 k =

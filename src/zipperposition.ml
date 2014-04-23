@@ -320,7 +320,7 @@ let preprocess ~signature ~params formulas =
   let ord = params.param_ord precedence in
   let select = Selection.selection_from_string ~ord params.param_select in
   Util.debug 1 "selection function: %s" params.param_select;
-  Util.debug 1 "signature: %a" Signature.pp signature;
+  Util.debug 1 "signature: %a" Signature.pp (Signature.diff signature !Params.signature);
   let module Result = struct
     let signature = signature
     let select = select
@@ -337,7 +337,7 @@ let process_file ?meta ~plugins ~params file =
   >>= fun decls ->
   Util.debug 1 "parsed %d declarations" (Sequence.length decls);
   (* obtain a typed AST *)
-  Util_tptp.infer_types (`sign Signature.TPTP.base) decls
+  Util_tptp.infer_types (`sign !Params.signature) decls
   >>= fun (signature,decls) ->
   (* obtain a set of proved formulas *)
   let formulas =
@@ -348,7 +348,8 @@ let process_file ?meta ~plugins ~params file =
   (* obtain clauses + env *)
   Util.debug 2 "input formulas:\n%%  %a" (Util.pp_seq ~sep:"\n%  " PF.pp)
     (PF.Set.to_seq formulas);
-  Util.debug 2 "input signature: %a" Signature.pp signature;
+  Util.debug 2 "input signature: %a" Signature.pp
+    (Signature.diff signature !Params.signature);
   let res, signature = preprocess ~signature ~params formulas in
   let module Res = (val res : POST_PREPROCESS) in
   (* build the context and env *)
@@ -376,7 +377,7 @@ let process_file ?meta ~plugins ~params file =
     else Saturate.Unknown, MyEnv.C.CSet.to_seq clauses
   in
   Util.debug 1 "signature: %a" Signature.pp
-    (Signature.diff (MyEnv.signature ()) Signature.TPTP.Arith.full);
+    (Signature.diff (MyEnv.signature ()) !Params.signature);
   Util.debug 2 "%d clauses processed into:\n%%  %a"
     num_clauses (Util.pp_seq ~sep:"\n%%  " MyEnv.C.pp) clauses;
   (* add clauses to passive set of [env] *)
