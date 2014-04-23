@@ -299,86 +299,82 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.exit_prof prof_arith_sup;
     res
 
-
-  (*
+  let canc_sup_passive c =
+    Util.enter_prof prof_arith_sup;
     let ord = Ctx.ord () in
-    let eligible = C.Eligible.(pos ** max c ** arith) in
-    let res = Lits.fold_arith ~eligible (C.lits c) []
-      (fun acc i lit ->
-        match lit.Foc.op with
-        | ArithLit.Eq ->
-          let t = lit.Foc.term in
-          Util.debug 5 "attempt to active superpose %a in %a[%d]" T.pp t C.pp c i;
-          I.retrieve_unifiables state#idx_canc 0 t 1 acc
-            (fun acc t' (passive,j,lit') subst ->
-              _do_canc ~ctx ~active:(c,i,lit,1) ~passive:(passive,j,lit',0) subst acc
-            )
-        | _ -> acc)
-    in
-    Util.exit_prof prof_canc_sup;
-    res
-    *)
-
-  let canc_sup_passive c = []  (* TODO *)
-  (*
-    Util.enter_prof prof_canc_sup;
-    let ctx = state#ctx in
-    let ord = Ctx.ord ctx in
-    let eligible = C.Eligible.res c in
-    let res = ArithLit.Arr.fold_focused ~eligible ~ord c.C.hclits []
-      (fun acc i lit ->
-        let t = lit.Foc.term in
-        Util.debug 5 "attempt to passive superpose %a in %a[%d]" T.pp t C.pp c i;
-        I.retrieve_unifiables state#idx_canc 1 t 0 acc
-          (fun acc t' (active,j,lit') subst ->
-            match lit'.Foc.op with
-            | ArithLit.Eq ->
-              (* rewrite using lit' *)
-              _do_canc ~ctx ~active:(active,j,lit',1) ~passive:(c,i,lit,0) subst acc
+    let eligible = C.Eligible.arith in
+    let sc_a = 0 and sc_p = 1 in
+    let res = Lits.fold_arith_terms ~eligible ~which:`Max ~ord (C.lits c) []
+      (fun acc t passive_lit passive_pos ->
+        Util.debug 5 "passive canc. sup. with %a in %a" ALF.pp passive_lit C.pp c;
+        PS.TermIndex.retrieve_unifiables !_idx_eq sc_a t sc_p acc
+          (fun acc t' with_pos subst ->
+            let active = with_pos.C.WithPos.clause in
+            let active_pos = with_pos.C.WithPos.pos in
+            let active_lit = Lits.View.get_arith_exn (C.lits active) active_pos in
+            (* must have an equation as active lit *)
+            match ALF.op active_lit with
+            | `Binary AL.Equal ->
+              Util.debug 5 "  possible match: %a in %a" ALF.pp passive_lit C.pp c;
+              (* unify literals further *)
+              ALF.unify ~subst active_lit sc_a passive_lit sc_p
+              |> Sequence.fold
+                (fun acc (active_lit, passive_lit, subst) ->
+                  let info = SupInfo.({
+                    active; active_pos; active_lit; active_scope=sc_a;
+                    passive=c; passive_pos; passive_lit; passive_scope=sc_p; subst;
+                  }) in
+                  _do_canc info acc
+                ) acc
             | _ -> acc
-          ))
+          )
+      )
     in
-    Util.exit_prof prof_canc_sup;
+    Util.exit_prof prof_arith_sup;
     res
-  *)
 
-  let cancellation c = []  (* TODO *)
-  (*
-    Util.enter_prof prof_cancellation;
-    let ctx = c.C.hcctx in
-    let ord = Ctx.ord ctx in
-    let eligible = C.Eligible.max c in
-    (* instantiate the clause with subst *)
-    let mk_instance subst =
-      let renaming = Ctx.renaming_clear ~ctx in
-      let lits' = Literal.Arr.apply_subst ~ord ~renaming subst c.C.hclits 0 in
-      let proof cc = Proof.mk_c_inference ~info:[Substs.FO.to_string subst] ~theories
-        ~rule:"cancellation" cc [c.C.hcproof] in
-      let new_c = C.create_a ~parents:[c] ~ctx lits' proof in
-      Util.debug 3 "cancellation of %a (with %a) into %a" C.pp c Substs.FO.pp subst C.pp new_c;
-      Util.incr_stat stat_cancellation;
-      new_c
+  let cancellation c =
+    Util.enter_prof prof_arith_cancellation;
+    let ord = Ctx.ord () in
+    let eligible = C.Eligible.(max c ** arith) in
+    let res = Lits.fold_arith ~eligible (C.lits c) []
+      (fun acc a_lit pos ->
+        let max_terms = AL.max_terms ~ord a_lit in
+        let idx = Lits.Pos.idx pos in
+        (* cancellation depends on what the literal looks like *)
+        match a_lit with
+        | AL.Binary (op, m1, m2) ->
+            (* try to unify terms in [m1] and [m2] *)
+            MF.unify_mm m1 0 m2 0
+            |> Sequence.fold
+              (fun acc (mf1, mf2, subst) ->
+                let renaming = Ctx.renaming_clear () in
+                let mf1' = MF.apply_subst ~renaming subst mf1 0 in
+                let mf2' = MF.apply_subst ~renaming subst mf2 0 in
+                if C.is_maxlit c 0 subst ~idx
+                && MF.is_max ~ord mf1' && MF.is_max ~ord mf2'
+                then begin
+                  (* do the inference *)
+                  let lits' = Util.array_except_idx (C.lits c) idx in
+                  let lits' = Lit.apply_subst_list ~renaming subst lits' 0 in
+                  let new_lit = Lit.mk_arith_op op (MF.rest mf1') (MF.rest mf2') in
+                  let all_lits = new_lit :: lits' in
+                  let proof cc = Proof.mk_c_inference
+                    ~info:[Substs.to_string subst] ~theories
+                    ~rule:"cancellation" cc [C.proof c] in
+                  let new_c = C.create ~parents:[c] all_lits proof in
+                  Util.debug 3 "cancellation of %a (with %a) into %a" C.pp c
+                    Substs.pp subst C.pp new_c;
+                  Util.incr_stat stat_arith_cancellation;
+                  new_c :: acc
+                end else
+                  acc
+              ) acc
+        | AL.Divides d -> acc  (* TODO *)
+      )
     in
-    (* try to factor arith literals *)
-    let res = ArithLit.Arr.fold_canonical ~eligible c.C.hclits []
-      (fun acc i lit ->
-        match lit with
-        | Canon.True | Canon.False -> acc
-        | Canon.Compare (op, m1, m2) ->
-          let l1 = M.terms m1 in
-          let l2 = M.terms m2 in
-          Util.list_fold_product l1 l2 acc
-            (fun acc t1 t2 ->
-              try
-                let subst = FOUnif.unification t1 0 t2 0 in
-                if C.is_maxlit c i subst 0
-                  then mk_instance subst :: acc
-                  else acc
-              with FOUnif.Fail -> acc))
-    in
-    Util.exit_prof prof_cancellation;
+    Util.exit_prof prof_arith_cancellation;
     res
-  *)
 
   let canc_equality_factoring c = [] (* TODO *)
   (*
@@ -982,7 +978,11 @@ let extension =
 let _enable_arith () =
   if not !_enable_arith then begin
     _enable_arith := true;
-    T.add_hook T.TPTP.Arith.arith_hook;  (* enable arith printing *)
+    (* enable arith printing of terms *)
+    T.add_hook T.TPTP.Arith.arith_hook;
+    (* enrich signature with arith operators *)
+    Params.signature := Signature.merge
+      !Params.signature Signature.TPTP.Arith.full;
     Extensions.register extension;
   end
 
