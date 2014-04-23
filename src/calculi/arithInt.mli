@@ -60,9 +60,6 @@ module type S = sig
   val canc_ineq_chaining : Env.binary_inf_rule
     (** cancellative inequality chaining *)
 
-  val canc_reflexivity_res : Env.unary_inf_rule
-    (** cancellative reflexivity resolution *)
-
   val canc_ineq_factoring : Env.unary_inf_rule
     (** Factoring between two inequation literals *)
 

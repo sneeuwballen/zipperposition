@@ -90,9 +90,6 @@ module type S = sig
   val canc_ineq_chaining : Env.binary_inf_rule
     (** cancellative inequality chaining *)
 
-  val canc_reflexivity_res : Env.unary_inf_rule
-    (** cancellative reflexivity resolution *)
-
   val canc_ineq_factoring : Env.unary_inf_rule
     (** Factoring between two inequation literals *)
 
@@ -756,26 +753,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     new_clauses
   *)
 
-  (* XXX note: useless since there is factor/cancellation + simplifications
-    on literals *)
-  let canc_reflexivity_res c =
-    []
-    (*
-    Util.enter_prof prof_canc_reflexivity_resolution;
-    let ctx = c.C.hcctx in
-    let ord = Ctx.ord ctx in
-    let eligible = C.Eligible.(combine [neg; max c]) in
-    let res = ArithLit.Arr.fold_canonical ~eligible c.C.hclits []
-      (fun acc i lit -> match lit with
-        | Canon.Compare (ArithLit.Lt, m1, m2) ->
-          acc (* TODO *)
-
-        | _ -> acc)
-    in
-    Util.exit_prof prof_canc_reflexivity_resolution;
-    res
-    *)
-
   let canc_ineq_factoring c = [] (* TODO *)
   (*
     Util.enter_prof prof_canc_ineq_factoring;
@@ -982,7 +959,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_unary_inf "cancellation" cancellation;
     Env.add_unary_inf "canc_eq_factoring" canc_equality_factoring;
     Env.add_binary_inf "canc_ineq_chaining" canc_ineq_chaining;
-    Env.add_unary_inf "canc_reflexivity_res" canc_reflexivity_res;
     Env.add_unary_inf "canc_ineq_factoring" canc_ineq_factoring;
     Env.add_binary_inf "canc_case_switch" canc_case_switch;
     Env.add_unary_inf "canc_inner_case_switch" canc_inner_case_switch;
