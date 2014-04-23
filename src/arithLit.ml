@@ -365,6 +365,16 @@ module Focus = struct
     | Right (_, _, mf) -> mf
     | Div d -> d.monome
 
+  let opposite_monome = function
+    | Left (_, _, m)
+    | Right (_, m, _) -> Some m
+    | Div _ -> None
+
+  let opposite_monome_exn l =
+    match opposite_monome l with
+    | None -> invalid_arg "ALF.opposite_monome_exn"
+    | Some m -> m
+
   let term lit = MF.term (focused_monome lit)
 
   let fold_terms ?(pos=P.stop) lit acc f =

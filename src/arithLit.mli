@@ -156,6 +156,14 @@ module Focus : sig
     (** Focused term *)
 
   val focused_monome : t -> Z.t Monome.Focus.t
+    (** The focused monome *)
+
+  val opposite_monome : t -> Z.t Monome.t option
+    (** The opposite monome (in [Left] and [Right]), if any. *)
+
+  val opposite_monome_exn : t -> Z.t Monome.t
+    (** Unsafe version of {!opposite_monome}.
+        @raise Invalid_argument if the literal is a [Div] *)
 
   val is_max : ord:Ordering.t -> t -> bool
     (** Is the focused term maximal in the literal? *)

@@ -376,80 +376,71 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.exit_prof prof_arith_cancellation;
     res
 
-  let canc_equality_factoring c = [] (* TODO *)
-  (*
-    Util.enter_prof prof_canc_eq_factoring;
-    let ctx = c.C.hcctx in
-    let ord = Ctx.ord ctx in
-    let eligible = C.Eligible.eq in
-    let _do_factoring ~left:(lit,i) ~right:(lit',j) subst acc =
-      let renaming = Ctx.renaming_clear ctx in
-      (* check maximality of left literal, and maximality of involved
-          terms within their literal *)
-      if C.is_maxlit c i subst 0
-      && Foc.is_max ~ord (Foc.apply_subst ~renaming subst lit 0)
-      && Foc.is_max ~ord (Foc.apply_subst ~renaming subst lit' 0)
-      then begin
-        (* lit is [t + m1 = m2], lit' is [t + m1' = m2']
-            now we infer, as for regular eq.factoring,
-            t = m2-m1 | t = m2'-m1'
-            ----------------------------------
-            m2 - m1 != m2' - m1'| t = m2' - m1'
-            ===================================
-            m2 + m1' != m2' + m1 | t + m1' = m2'
-            and canonize literals again.
-            Here we keep the second literal, and remove the first. *)
-        let lit, lit' = Foc.scale lit lit' in
-        let lit = Foc.apply_subst ~renaming subst lit 0 in
-        let lit' = Foc.apply_subst ~renaming subst lit' 0 in
-        let m1, m2 = lit.Foc.same_side, lit.Foc.other_side in
-        let m1', m2' = lit'.Foc.same_side, lit'.Foc.other_side in
-        let new_lit = Canon.to_lit ~ord
-          (Canon.of_monome ArithLit.Neq
-            (M.difference (M.sum m2 m1') (M.sum m2' m1)))
-        in
-        let other_lits = Util.array_except_idx c.C.hclits i in
-        let other_lits = Literal.apply_subst_list ~renaming ~ord subst other_lits 0 in
-        (* apply subst and build clause *)
-        let all_lits = new_lit :: other_lits in
-        let proof cc = Proof.mk_c_inference ~theories
-          ~info:[Substs.FO.to_string subst; Util.sprintf "idx(%d,%d)" i j]
-          ~rule:"canc_eq_factoring" cc [c.C.hcproof] in
-        let new_c = C.create ~ctx all_lits proof in
-        Util.debug 5 "cancellative_eq_factoring: %a gives %a" C.pp c C.pp new_c;
-        Util.incr_stat stat_canc_eq_factoring;
-        new_c :: acc
-      end else acc
-    in
-    (* focused literals (only for equalities) *)
-    let lits = ArithLit.Arr.view_focused ~ord ~eligible c.C.hclits in
-    let res = Util.array_foldi
-      (fun acc i lit -> match lit with
-        | `Focused (ArithLit.Eq, l) ->
-          (* try each focused term in this literal *)
-          List.fold_left
-            (fun acc lit ->
-              assert (lit.Foc.op = ArithLit.Eq);
-              Util.array_foldi
-                (fun acc j lit' -> match lit' with
-                  | `Focused (ArithLit.Eq, l') when j <> i ->
-                    List.fold_left
-                      (fun acc lit' ->
-                        try
-                          (* try to unify both focused terms *)
-                          let subst = FOUnif.unification lit.Foc.term 0 lit'.Foc.term 0 in
-                          _do_factoring ~left:(lit,i) ~right:(lit',j) subst acc
-                        with FOUnif.Fail | Exit -> acc)
-                      acc l'
-                  | _ -> acc)
-                acc lits)
-            acc l
-        | _ -> acc)
-      [] lits
-    in
-    Util.exit_prof prof_canc_eq_factoring;
+  let canc_equality_factoring c =
+    Util.enter_prof prof_arith_eq_factoring;
+    let ord = Ctx.ord () in
+    let eligible = C.Eligible.(max c ** filter Lit.is_arith_eq) in
+    let res = Lits.fold_arith_terms ~which:`Max ~eligible ~ord (C.lits c) []
+      (fun acc t1 lit1 pos1 ->
+        assert(ALF.op lit1 = `Binary AL.Equal);
+        let idx1 = Lits.Pos.idx pos1 in
+        (* lit1 is the factored literal *)
+        Lits.fold_arith_terms ~which:`Max ~ord
+          ~eligible:C.Eligible.(filter Lit.is_arith_eq) (C.lits c) acc
+          (fun acc t2 lit2 pos2 ->
+            assert(ALF.op lit2 = `Binary AL.Equal);
+            let idx2 = Lits.Pos.idx pos2 in
+            let mf1 = ALF.focused_monome lit1
+            and mf2 = ALF.focused_monome lit2 in
+            try
+              let subst = Unif.FO.unification t1 0 t2 0 in
+              Util.debug 5
+                "arith canc. eq. factoring: possible match in %a (at %d, %d)"
+                C.pp c idx1 idx2;
+              MF.unify_ff ~subst mf1 0 mf2 0
+              |> Sequence.fold
+                (fun acc (_, _, subst) ->
+                  let renaming = Ctx.renaming_clear () in
+                  let lit1' = ALF.apply_subst ~renaming subst lit1 0 in
+                  let lit2' = ALF.apply_subst ~renaming subst lit2 0 in
+                  if C.is_maxlit c 0 subst ~idx:idx1
+                  && ALF.is_max ~ord lit1'
+                  && ALF.is_max ~ord lit2'
+                  then begin
+                    (*  lit1 is   a.t + l1 = l2,
+                        lit2 is   a'.t + l1' = l2',
+                        so we scale them, and replace lit1 with
+                        a'.l1 + a.l2' != a'.l2 + a.l1' *)
+                    let lit1', lit2' = ALF.scale lit1' lit2' in
+                    let m1 = ALF.opposite_monome_exn lit1'
+                    and mf1 = ALF.focused_monome lit1'
+                    and m2 = ALF.opposite_monome_exn lit2'
+                    and mf2 = ALF.focused_monome lit2' in
+                    let new_lit = Lit.mk_arith_neq
+                      (M.sum m1 (MF.rest mf2))
+                      (M.sum m2 (MF.rest mf1))
+                    in
+                    let other_lits = Util.array_except_idx (C.lits c) idx1 in
+                    let other_lits = Lit.apply_subst_list
+                      ~renaming subst other_lits 0 in
+                    (* apply subst and build clause *)
+                    let all_lits = new_lit :: other_lits in
+                    let proof cc = Proof.mk_c_inference ~theories
+                      ~info:[Substs.to_string subst;
+                             Util.sprintf "idx(%d,%d)" idx1 idx2]
+                      ~rule:"arith_eq_factoring" cc [C.proof c] in
+                    let new_c = C.create all_lits proof in
+                    Util.debug 5 "arith_eq_factoring: %a gives %a" C.pp c C.pp new_c;
+                    Util.incr_stat stat_arith_eq_factoring;
+                    new_c :: acc
+                  end else acc
+                ) acc
+            with Unif.Fail ->
+              acc
+          )
+      )
+    in Util.exit_prof prof_arith_eq_factoring;
     res
-  *)
 
   let canc_ineq_chaining c = [] (* TODO *)
   (*
