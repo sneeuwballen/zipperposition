@@ -164,16 +164,19 @@ let mem e t =
   | Some _ -> true
 
 let add e s t =
+  (* sorted insertion *)
   let rec add l s t = match l with
     | [] -> [s, t]
     | (s', t')::l' ->
-      if T.eq t t'
-        then
-          let s'' = e.num.add s s' in
-          if e.num.cmp e.num.zero s'' = 0
-            then l'
-            else (s'', t) :: l'
-        else (s', t') :: add l' s t
+      begin match T.cmp t t' with
+      | 0 ->
+        let s'' = e.num.add s s' in
+        if e.num.cmp e.num.zero s'' = 0
+          then l'
+          else (s'', t) :: l'
+      | n when n < 0 -> (s, t) :: l
+      | _ -> (s', t') :: add l' s t
+      end
   in
   { e with terms = add e.terms s t; }
 
