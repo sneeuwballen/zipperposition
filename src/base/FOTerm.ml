@@ -567,6 +567,7 @@ let pp_depth ?(hooks=[]) depth buf t =
 
 let __hooks = ref []
 let add_hook h = __hooks := h :: !__hooks
+let default_hooks () = !__hooks
 
 let pp buf t = pp_depth ~hooks:!__hooks 0 buf t
 
