@@ -87,6 +87,9 @@ module type S = sig
           the rule  (b < a and c < b) -> C1, then make the head of the rule
           true *)
 
+  val canc_lesseq_to_less : Env.lit_rewrite_rule
+    (** Simplification:  a <= b  ----> a < b+1 *)
+
   val is_tautology : C.t -> bool
     (** is the clause a tautology w.r.t linear expressions? *)
 

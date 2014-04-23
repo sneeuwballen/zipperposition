@@ -117,6 +117,9 @@ module type S = sig
           the rule  (b < a and c < b) -> C1, then make the head of the rule
           true *)
 
+  val canc_lesseq_to_less : Env.lit_rewrite_rule
+    (** Simplification:  a <= b  ----> a < b+1 *)
+
   val is_tautology : C.t -> bool
     (** is the clause a tautology w.r.t linear expressions? *)
 
@@ -393,6 +396,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             let mf1 = ALF.focused_monome lit1
             and mf2 = ALF.focused_monome lit2 in
             try
+              if idx1 = idx2 then raise Unif.Fail;  (* exit *)
               let subst = Unif.FO.unification t1 0 t2 0 in
               Util.debug 5
                 "arith canc. eq. factoring: possible match in %a (at %d, %d)"
@@ -442,92 +446,127 @@ module Make(E : Env.S) : S with module Env = E = struct
     in Util.exit_prof prof_arith_eq_factoring;
     res
 
-  let canc_ineq_chaining c = [] (* TODO *)
-  (*
-    Util.enter_prof prof_canc_ineq_chaining;
-    let ctx = c.C.hcctx in
-    let ord = Ctx.ord ctx in
-    (* perform chaining (if ordering conditions respected) *)
-    let _chaining ~left:(c,s_c,i,lit,strict) ~right:(c',s_c',j,lit',strict') subst acc =
-      Util.debug 5 "attempt chaining between %a and %a..." C.pp c C.pp c';
-      let renaming = Ctx.renaming_clear ~ctx in
-      if C.is_maxlit c s_c subst i
-      && C.is_maxlit c' s_c' subst j
-      && Foc.is_max ~ord (Foc.apply_subst ~renaming subst lit s_c)
-      && Foc.is_max ~ord (Foc.apply_subst ~renaming subst lit' s_c')
-      then begin
-        Util.debug 5 "chaining: left=%a, right=%a" Foc.pp lit Foc.pp lit';
-        assert (lit.Foc.side = ArithLit.Left);
-        assert (lit'.Foc.side = ArithLit.Right);
-        (* make sure [t] has the same coefficient in [lit] and [lit'] *)
-        let lit, lit' = Foc.scale lit lit' in
-        let lit = Foc.apply_subst ~renaming subst lit s_c in
-        let lit' = Foc.apply_subst ~renaming subst lit' s_c' in
-        (* now, lit = [c.t + m1 <| m2],  lit' = [m1' <| m2' + c.t] for some positive
-            coefficient [c]. let us deduce (with context) that
-            [m1' - m2' <| m2 - m1], therefore [m1' + m1 <| m2 + m2'] 
-            and canonize this literal. *)
-        let m1, m2 = lit.Foc.same_side, lit.Foc.other_side in
-        let m1', m2' = lit'.Foc.other_side, lit'.Foc.same_side in
-        let lits_left = Util.array_except_idx c.C.hclits i in
-        let lits_left = Literal.apply_subst_list ~renaming ~ord subst lits_left s_c in
-        let lits_right = Util.array_except_idx c'.C.hclits j in
-        let lits_right = Literal.apply_subst_list ~renaming ~ord subst lits_right s_c' in
-        let lits =
-          if strict || strict'
-            then
-              (* m1+m1' - (m2+m2') < 0 *)
-              [ Canon.to_lit ~ord
-                  (Canon.of_monome ArithLit.Lt
-                    (M.difference (M.sum m1 m1') (M.sum m2 m2')))
-              ]
-            else
-              (* m1'-m2' = c.t   OR   m1+m1' - (m2+m2') < 0 *)
-              [ Canon.to_lit ~ord
-                  (Canon.of_monome ArithLit.Eq
-                    (M.difference m1' (M.add m2' lit.Foc.coeff lit.Foc.term)))
-              ; Canon.to_lit ~ord
-                  (Canon.of_monome ArithLit.Lt
-                    (M.difference (M.sum m1 m1') (M.sum m2 m2')))
-              ]
+  (** Data necessary to fully describe a chaining inference.
+      [left] is basically the clause/literal in which the chained
+      term is on the left of <,
+      [right] is the other one. *)
+  module ChainingInfo = struct
+    type t = {
+      left : C.t;
+      left_scope : scope;
+      left_pos : Position.t;
+      left_lit : ArithLit.Focus.t;
+      right : C.t;
+      right_scope : scope;
+      right_pos : Position.t;
+      right_lit : ArithLit.Focus.t;
+      subst : Substs.t;
+    }
+  end
+
+  (* cancellative chaining *)
+  let _do_chaining info acc =
+    let open ChainingInfo in
+    let ord = Ctx.ord () in
+    let renaming = Ctx.renaming_clear () in
+    let subst = info.subst in
+    let idx_l, _ = Lits.Pos.cut info.left_pos in
+    let idx_r, _ = Lits.Pos.cut info.right_pos in
+    let s_l = info.left_scope and s_r = info.right_scope in
+    let lit_l = ALF.apply_subst ~renaming subst info.left_lit s_l in
+    let lit_r = ALF.apply_subst ~renaming subst info.right_lit s_r in
+    Util.debug 5 "arith superposition between %a[%d] and %a[%d] (subst %a)..."
+      C.pp info.left s_l C.pp info.right s_r Substs.pp subst;
+    (* check ordering conditions *)
+    if C.is_maxlit info.left s_l subst idx_l
+    && C.is_maxlit info.right s_r subst idx_r
+    && ALF.is_max ~ord lit_l
+    && ALF.is_max ~ord lit_r
+    then begin
+      (* scale literals *)
+      let lit_l, lit_r = ALF.scale lit_l lit_r in
+      match lit_l, lit_r with
+      | ALF.Left (AL.Less, mf_1, m1), ALF.Right (AL.Less, m2, mf_2) ->
+        (* m2 < mf_2 and mf_1 < m1, with mf_1 and mf_2 sharing the same
+          focused term. We deduce m2 + mf_1 + 1 < m1 + mf_2 and cancel the
+          term out (after scaling) *)
+        assert (Z.equal (MF.coeff mf_1) (MF.coeff mf_2));
+        let new_lit = Lit.mk_arith_less
+          (M.succ (M.sum m2 (MF.rest mf_1)))
+          (M.sum m1 (MF.rest mf_2))
         in
-        let all_lits = lits @ lits_left @ lits_right in
-        (* build clause *)
+        let lits_l = Util.array_except_idx (C.lits info.left) idx_l in
+        let lits_l = Lit.apply_subst_list ~renaming subst lits_l s_l in
+        let lits_r = Util.array_except_idx (C.lits info.right) idx_r in
+        let lits_r = Lit.apply_subst_list ~renaming subst lits_r s_r in
+        let all_lits = new_lit :: lits_l @ lits_r in
         let proof cc = Proof.mk_c_inference ~theories
-          ~info:[Substs.FO.to_string subst; Util.sprintf "idx(%d,%d)" i j
-                ; Util.sprintf "left(%a)" T.pp lit.Foc.term
-                ; Util.sprintf "right(%a)" T.pp lit'.Foc.term]
-          ~rule:"canc_ineq_chaining" cc [c.C.hcproof; c'.C.hcproof] in
-        let new_c = C.create ~ctx ~parents:[c;c'] all_lits proof in
-        Util.debug 5 "ineq chaining of %a and %a gives %a" C.pp c C.pp c' C.pp new_c;
-        Util.incr_stat stat_canc_ineq_chaining;
+          ~info:[Substs.to_string subst; Util.sprintf "idx(%d,%d)" idx_l idx_r
+                ; Util.sprintf "left(%a)" T.pp (MF.term mf_2)
+                ; Util.sprintf "right(%a)" T.pp (MF.term mf_1)]
+          ~rule:"canc_ineq_chaining" cc [C.proof info.left; C.proof info.right] in
+        let new_c = C.create ~parents:[info.left; info.right] all_lits proof in
+        Util.debug 5 "ineq chaining of %a and %a gives %a"
+          C.pp info.left C.pp info.right C.pp new_c;
+        Util.incr_stat stat_arith_ineq_chaining;
         new_c :: acc
-      end else
-        acc
-    in
-    let res = ArithLit.Arr.fold_focused ~ord c.C.hclits []
-      (fun acc i lit ->
-        match lit.Foc.op with
-        | ArithLit.Leq | ArithLit.Lt ->
-          let t = lit.Foc.term in
-          let strict = lit.Foc.op = ArithLit.Lt in
-          I.retrieve_unifiables state#idx_canc 0 t 1 acc
-            (fun acc t' (c',j,lit') subst ->
-              (* lit' = t' + m1' <| m2' ? *)
-              match lit'.Foc.op, lit.Foc.side, lit'.Foc.side with
-              | (ArithLit.Leq | ArithLit.Lt), ArithLit.Left, ArithLit.Right ->
-                let strict' = lit'.Foc.op = ArithLit.Lt in
-                _chaining ~left:(c,1,i,lit,strict) ~right:(c',0,j,lit',strict') subst acc
-              | (ArithLit.Leq | ArithLit.Lt), ArithLit.Right, ArithLit.Left ->
-                let strict' = lit'.Foc.op = ArithLit.Lt in
-                _chaining ~left:(c',0,j,lit',strict') ~right:(c,1,i,lit,strict) subst acc
+      | _ -> assert false
+    end else
+      acc
+
+  let canc_ineq_chaining c =
+    Util.enter_prof prof_arith_ineq_chaining;
+    let ord = Ctx.ord () in
+    let eligible = C.Eligible.(max c ** filter Lit.is_arith_less) in
+    let sc_l = 0 and sc_r = 1 in
+    let res = Lits.fold_arith_terms ~eligible ~ord ~which:`Max (C.lits c) []
+      (fun acc t lit pos ->
+        let idx = Lits.Pos.idx pos in
+        match lit with
+        | ALF.Left (AL.Less, mf_l, _) ->
+          (* find a right-chaining literal in some other clause *)
+          PS.TermIndex.retrieve_unifiables !_idx_ineq sc_r t sc_l acc
+            (fun acc _t' with_pos subst ->
+              let right = with_pos.C.WithPos.clause in
+              let right_pos = with_pos.C.WithPos.pos in
+              let lit_r = Lits.View.get_arith_exn (C.lits right) right_pos in
+              match lit_r with
+              | ALF.Right (AL.Less, _, mf_r) ->
+                MF.unify_ff ~subst mf_l sc_l mf_r sc_r
+                |> Sequence.fold
+                  (fun acc (_, _, subst) ->
+                    let info = ChainingInfo.({
+                      left=c; left_scope=sc_l; left_lit=lit; left_pos=pos;
+                      right; right_scope=sc_r; right_lit=lit_r; right_pos; subst;
+                    }) in _do_chaining info acc
+                  ) acc
               | _ -> acc
             )
-        | _ -> acc)
+        | ALF.Right (AL.Less, _, mf_r) ->
+          (* find a right-chaining literal in some other clause *)
+          PS.TermIndex.retrieve_unifiables !_idx_ineq sc_l t sc_r acc
+            (fun acc _t' with_pos subst ->
+              let left = with_pos.C.WithPos.clause in
+              let left_pos = with_pos.C.WithPos.pos in
+              let lit_l = Lits.View.get_arith_exn (C.lits left) left_pos in
+              match lit_l with
+              | ALF.Left (AL.Less, mf_l, _) ->
+                MF.unify_ff ~subst mf_l sc_l mf_r sc_r
+                |> Sequence.fold
+                  (fun acc (_, _, subst) ->
+                    let info = ChainingInfo.({
+                      left; left_scope=sc_l; left_lit=lit_l; left_pos; subst;
+                      right=c; right_scope=sc_r; right_lit=lit; right_pos=pos;
+                    }) in _do_chaining info acc
+                  ) acc
+              | _ -> acc
+            )
+        | _ -> assert false
+      )
     in
-    Util.exit_prof prof_canc_ineq_chaining;
+    Util.exit_prof prof_arith_ineq_chaining;
     res
-  *)
+
 
   let case_switch_limit = ref (Z.of_int 30)
 
@@ -928,6 +967,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     res
   *)
 
+  (* a <= b ----> a < b+1 *)
+  let canc_lesseq_to_less = function
+    | Lit.Arith (AL.Binary (AL.Lesseq, m1, m2)) ->
+        Lit.mk_arith_less m1 (M.succ m2)
+    | lit -> lit
+
   (** {2 Setup} *)
 
   let register () =
@@ -941,6 +986,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_unary_inf "canc_ineq_factoring" canc_ineq_factoring;
     Env.add_binary_inf "canc_case_switch" canc_case_switch;
     Env.add_unary_inf "canc_inner_case_switch" canc_inner_case_switch;
+    Env.add_lit_rule "lesseq_to_less" canc_lesseq_to_less;
     Env.add_is_trivial is_tautology;
     Ctx.Lit.add_from_hook Lit.Conv.arith_hook_from;
     ()
