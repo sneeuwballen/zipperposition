@@ -191,3 +191,4 @@ true: use_menhir
 <src/base/{scopedTerm,FOTerm,HOTerm,Type,lib/BV,lib/IArray,lib/Cache}.cmx>: inline(15)
 <src/base/{substs,unif}.cmx>: inline(8)
 #<src/**/*.cmx>: inline(10)
+true: bin_annot
