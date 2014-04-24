@@ -68,6 +68,10 @@ module type S = sig
   type lit_rewrite_rule = Literal.t -> Literal.t
     (** Rewrite rule on literals *)
 
+  type multi_simpl_rule = C.t -> C.t list option
+    (** (maybe) rewrite a clause to a set of clauses.
+        Must return [None] if the clause is unmodified *)
+
   (** {2 Modify the Env} *)
 
   val add_passive : C.t Sequence.t -> unit
@@ -124,6 +128,9 @@ module type S = sig
   val add_simplify : simplify_rule -> unit
     (** Add basic simplification rule *)
 
+  val add_multi_simpl_rule : multi_simpl_rule -> unit
+    (** Add a multi-clause simplification rule *)
+
   val add_is_trivial : is_trivial_rule -> unit
     (** Add tautology detection rule *)
 
@@ -135,9 +142,8 @@ module type S = sig
 
   (** {2 Use the Env} *)
 
-  val simplify : C.t -> C.t
-    (** Simplify the clause w.r.t the proof state. It uses many simplification
-        rules and rewriting rules. *)
+  val multi_simplify : C.t -> C.t list option
+    (** Can we simplify the clause into a List of simplified clauses? *)
 
   val params : Params.t
 
@@ -212,9 +218,9 @@ module type S = sig
   val subsumed_by : C.t -> C.CSet.t
     (** List of active clauses subsumed by the given clause *)
 
-  val all_simplify : C.t -> C.t option
-    (** Use all simplification rules to convert a clause into a maximally
-        simplified clause (or None, if trivial). *)
+  val all_simplify : C.t -> C.t list
+    (** Use all simplification rules to convert a clause into a set
+        of maximally simplified clause (or [[]] if they are all trivial). *)
 
   (** {2 Misc} *)
 
