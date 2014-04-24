@@ -362,13 +362,11 @@ let vars_prefix_order t =
 
 let depth t = Seq.subterms_depth t |> Sequence.map snd |> Sequence.fold max 0
 
-let head_exn t = match T.view t with
+let rec head_exn t = match T.view t with
+  | T.SimpleApp (s, _)
   | T.Const s -> s
-  | T.App (hd,_) ->
-      begin match T.view hd with
-        | T.Const s -> s
-        | _ -> raise (Invalid_argument "FOTerm.head")
-      end
+  | T.At (hd, _)
+  | T.App (hd,_) -> head_exn hd
   | _ -> raise (Invalid_argument "FOTerm.head")
 
 let head t =
