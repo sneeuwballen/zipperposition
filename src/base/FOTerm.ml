@@ -669,43 +669,40 @@ module TPTP = struct
 
     (* hook that prints arithmetic expressions *)
     let arith_hook depth pp_rec buf t =
-      let _eq_sym s cst =  match T.view cst with
-        | T.Const s' -> Symbol.eq s s'
-        | _ -> false
-      in
-      let pp_surrounded buf t = match view t with
-      | App (s, [_;_]) when
-        eq s sum ||
-        eq s product ||
-        eq s difference ||
-        eq s quotient ->
+      let module SA = Symbol.TPTP.Arith in
+      let pp_surrounded buf t = match Classic.view t with
+      | Classic.App (s, _, [_;_]) when
+        Symbol.eq s SA.sum ||
+        Symbol.eq s SA.product ||
+        Symbol.eq s SA.difference ||
+        Symbol.eq s SA.quotient ->
         Buffer.add_char buf '(';
         pp_rec buf t;
         Buffer.add_char buf ')'
       | _ -> pp_rec buf t
       in
-      match view t with
-      | App (s, [a; b]) when eq s less ->
+      match Classic.view t with
+      | Classic.App (s, _,[a; b]) when Symbol.eq s SA.less ->
         Printf.bprintf buf "%a < %a" pp_surrounded a pp_surrounded b; true
-      | App (s, [a; b]) when eq s lesseq ->
+      | Classic.App (s, _,[a; b]) when Symbol.eq s SA.lesseq ->
         Printf.bprintf buf "%a ≤ %a" pp_surrounded a pp_surrounded b; true
-      | App (s, [a; b]) when eq s greater ->
+      | Classic.App (s, _,[a; b]) when Symbol.eq s SA.greater ->
         Printf.bprintf buf "%a > %a" pp_surrounded a pp_surrounded b; true
-      | App (s, [a; b]) when eq s greatereq ->
+      | Classic.App (s, _,[a; b]) when Symbol.eq s SA.greatereq ->
         Printf.bprintf buf "%a ≥ %a" pp_surrounded a pp_surrounded b; true
-      | App (s, [a; b]) when eq s sum ->
+      | Classic.App (s, _,[a; b]) when Symbol.eq s SA.sum ->
         Printf.bprintf buf "%a + %a" pp_surrounded a pp_surrounded b; true
-      | App (s, [a; b]) when eq s difference ->
+      | Classic.App (s, _,[a; b]) when Symbol.eq s SA.difference ->
         Printf.bprintf buf "%a - %a" pp_surrounded a pp_surrounded b; true
-      | App (s, [a; b]) when eq s product ->
+      | Classic.App (s, _,[a; b]) when Symbol.eq s SA.product ->
         Printf.bprintf buf "%a × %a" pp_surrounded a pp_surrounded b; true
-      | App (s, [a; b]) when eq s quotient ->
+      | Classic.App (s, _,[a; b]) when Symbol.eq s SA.quotient ->
         Printf.bprintf buf "%a / %a" pp_surrounded a pp_surrounded b; true
-      | App (s, [a; b]) when eq s quotient_e ->
+      | Classic.App (s, _,[a; b]) when Symbol.eq s SA.quotient_e ->
         Printf.bprintf buf "%a // %a" pp_surrounded a pp_surrounded b; true
-      | App (s, [a]) when eq s uminus ->
+      | Classic.App (s, _,[a]) when Symbol.eq s SA.uminus ->
         Printf.bprintf buf "-%a" pp_surrounded a; true;
-      | App (s, [a;b]) when eq s remainder_e ->
+      | Classic.App (s, _,[a;b]) when Symbol.eq s SA.remainder_e ->
         Printf.bprintf buf "%a mod %a" pp_surrounded a pp_surrounded b; true;
       | _ -> false  (* default *)
 
