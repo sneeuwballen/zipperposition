@@ -209,3 +209,21 @@ module Focus : sig
   val to_string : t -> string
   val fmt : Format.formatter -> t -> unit
 end
+
+(** {2 Some Utils for arith} *)
+module Util : sig
+  type divisor = {
+    prime : Z.t;
+    power : int;
+  }
+
+  val is_prime : Z.t -> bool
+    (** Is the integer prime? *)
+
+  val prime_decomposition : Z.t -> divisor list
+    (** Decompose the number into a product of power-of-primes
+        @raise Invalid_argument if the number is negative *)
+
+  val primes_leq : Z.t -> Z.t Sequence.t
+    (** Sequence of prime numbers smaller than (or equal to) the given number *)
+end

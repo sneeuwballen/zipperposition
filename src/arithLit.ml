@@ -128,8 +128,14 @@ let mk_neq = make Different
 let mk_less = make Less
 let mk_lesseq = make Lesseq
 
-(* TODO: normalize coeffs by n^power *)
 let mk_divides ?(sign=true) n ~power m =
+  let nk = Z.pow n power in
+  (* normalize coefficients so that they are within [0...nk-1] *)
+  let norm_coeff c =
+    let c = Z.rem c nk in
+    if Z.sign c < 0 then Z.add nk c else c
+  in
+  let m = M.map_num norm_coeff m in
   Divides { sign; num=n; power; monome=m; }
 
 let mk_not_divides = mk_divides ~sign:false
@@ -276,7 +282,12 @@ let is_absurd = function
   | Binary (Lesseq, m1, m2) ->
       let m = M.difference m1 m2 in
       M.is_const m && M.sign m > 0
-  | _ -> false   (* TODO *)
+  | Divides d when d.sign ->
+      (* n^k should divise a non-zero constant *)
+      M.is_const d.monome && M.sign d.monome <> 0
+  | Divides d ->
+      (* n^k doesn't divise 0 is absurd *)
+      M.is_const d.monome && M.sign d.monome <> 0
 
 let fold_terms ?(pos=P.stop) ?(vars=false) ~which ~ord ~subterms lit acc f =
   (* function to call at terms *)
@@ -499,4 +510,112 @@ module Focus = struct
 
   let to_string = Util.on_buffer pp
   let fmt fmt lit = Format.pp_print_string fmt (to_string lit)
+end
+
+module Util = struct
+  (* inspiration from
+    http://www.thelowlyprogrammer.com/2010/03/writing-efficient-seive-of-eratosthenes.html
+    with a lazy Erathostene sieve *)
+  module ZTbl = Hashtbl.Make(Z)
+
+  type divisor = {
+    prime : Z.t;
+    power : int;
+  }
+
+  let _divisors ~sieve n =
+    try ZTbl.find sieve n
+    with Not_found -> []
+
+  (* assuming [n] is prime, add it to the sieve *)
+  let _add ~sieve n =
+    let n2 = Z.mul n n in
+    assert (not (ZTbl.mem sieve n2)); (* n2=n^2 where n prime, no other factor *)
+    ZTbl.add sieve n2 [n]
+
+  let two = Z.of_int 2
+
+  (* add the next odd multiple of the given prime to the sieve. *)
+  let _next ~sieve n prime =
+    let n' = Z.add n (Z.mul prime two) in
+    let l = _divisors ~sieve n' in
+    ZTbl.add sieve n' (prime :: l)
+
+  type prime_result =
+    | Prime
+    | Composite of Z.t list   (* prime divisors *)
+
+  (* calls [k] with all primes that are [<= sqrt n0]; returns a [prime_result]. *)
+  let _sieve_prime n0 k =
+    let sieve = ZTbl.create 32 in
+    k two;
+    let n = ref (Z.of_int 3) in
+    while Z.lt (Z.mul !n !n) n0 do
+      begin match _divisors ~sieve !n with
+      | [] ->
+          (* prime, add n^2 to the sieve *)
+          _add ~sieve !n;
+          k !n;
+      | l ->
+          ZTbl.remove sieve !n;
+          (* add next multiple of prime divisors to the table *)
+          List.iter (_next ~sieve !n) l
+      end;
+      n := Z.add !n two;
+    done;
+    match _divisors ~sieve n0 with
+    | [] -> Prime
+    | l -> Composite l
+
+  let _threshold = Z.of_int 50_000
+  let _memo = lazy (
+    let tbl = ZTbl.create 16 in
+    ignore (_sieve_prime _threshold (fun n -> ZTbl.add tbl n ()));
+    tbl
+  )
+
+  let is_prime n =
+    (* see http://docs.camlcity.org/docs/godipkg/4.00/godi-zarith/doc/godi-zarith/html/Z.html *)
+    match Z.probab_prime n 7 with
+    | 0 -> false
+    | 2 -> true
+    | 1 ->
+        if Z.leq n _threshold
+        then
+          ZTbl.mem (Lazy.force _memo) n
+        else begin match _sieve_prime n (fun _ -> ()) with
+          | Prime -> true
+          | Composite _ -> false
+        end
+    | _ -> assert false
+
+  (* decompose into prime factors *)
+  let rec _decompose acc n prime power primes =
+    let q, r = Z.div_rem n prime in
+    if Z.sign r = 0
+    then _decompose acc q prime (power+1) primes
+    else
+      let acc = {prime; power; }::acc in
+      match primes with
+      | p::primes' ->
+          _decompose acc n p 0 primes'
+      | [] -> acc
+
+  let prime_decomposition n =
+    if Z.lt n Z.zero then invalid_arg "prime_decomposition";
+    match Z.probab_prime n 7 with
+    | 2 -> [{prime=n; power=1}]  (* prime *)
+    | 0
+    | 1 ->
+        begin match _sieve_prime n (fun _ -> ()) with
+        | Prime -> [{prime=n; power=1}]  (* prime *)
+        | Composite (p::l) ->
+            (* decompose [n] again *)
+            _decompose [] n p 0 l
+        | Composite [] -> assert false
+        end
+    | _ -> assert false
+
+  let primes_leq n k =
+    ignore (_sieve_prime (Z.mul n n) k)
 end
