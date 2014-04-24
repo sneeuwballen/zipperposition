@@ -530,30 +530,25 @@ let pp_depth ?(hooks=[]) depth buf t =
   let depth = ref depth in
   (* recursive printing *)
   let rec pp_rec buf t =
-    begin match view t with
+    if not (List.exists (fun hook -> hook !depth pp_rec buf t) hooks)
+    then begin match view t with
     | BVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
     | TyApp (f, ty) ->
         pp_rec buf f;
         Buffer.add_char buf ' ';
         Type.pp buf ty
     | App (f, args) ->
-      (* try to use some hook *)
-      if List.exists (fun hook -> hook !depth pp_rec buf t) hooks
-      then ()
-      else (* default case for nodes *)
-        begin
-          assert (args <> []);
-          pp_rec buf f;
-          Buffer.add_char buf ' ';
-          Util.pp_list ~sep:" " pp_inner buf args
-        end
+        assert (args <> []);
+        pp_rec buf f;
+        Buffer.add_char buf ' ';
+        Util.pp_list ~sep:" " pp_inner buf args
     | Const s -> Symbol.pp buf s
     | Var i ->
       if not !print_all_types && not (Type.eq (ty t) Type.TPTP.i)
         then Printf.bprintf buf "X%d:%a" i Type.pp (ty t)
         else Printf.bprintf buf "X%d" i
     end;
-    (* print type of term *)
+    (* print type of term? *)
     if !print_all_types
       then Printf.bprintf buf ":%a" Type.pp (ty t)
   and pp_inner buf t = match view t with
@@ -680,6 +675,10 @@ module TPTP = struct
       | _ -> pp_rec buf t
       in
       match Classic.view t with
+      | Classic.Var i when Type.eq (ty t) Type.TPTP.int ->
+        Printf.bprintf buf "X%d_z" i; true
+      | Classic.Var i when Type.eq (ty t) Type.TPTP.rat ->
+        Printf.bprintf buf "X%d_q" i; true
       | Classic.App (s, _,[a; b]) when Symbol.eq s SA.less ->
         Printf.bprintf buf "%a < %a" pp_surrounded a pp_surrounded b; true
       | Classic.App (s, _,[a; b]) when Symbol.eq s SA.lesseq ->
