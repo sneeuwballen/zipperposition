@@ -129,6 +129,7 @@ let theories = ["arith"]
 type scope = S.scope
 
 let _enable_arith = ref false
+let _enable_ac = ref false
 let _enable_semantic_tauto = ref false
 
 module Make(E : Env.S) : S with module Env = E = struct
@@ -965,6 +966,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_lit_rule "lesseq_to_less" canc_lesseq_to_less;
     Env.add_is_trivial is_tautology;
     Ctx.Lit.add_from_hook Lit.Conv.arith_hook_from;
+    (* enable AC-property of sum *)
+    if !_enable_ac then begin
+      let sum = Symbol.TPTP.Arith.sum in
+      let ty = Signature.find_exn Signature.TPTP.Arith.full sum in
+      Ctx.Theories.AC.add ~ty sum;
+    end;
     ()
 end
 
@@ -986,8 +993,6 @@ let extension =
     Extensions.make=(module DOIT : Extensions.ENV_TO_S);
   }
 
-(* TODO: a flag (and code) to declare that arith symbols are AC *)
-
 let _enable_arith () =
   if not !_enable_arith then begin
     _enable_arith := true;
@@ -1002,10 +1007,13 @@ let _enable_arith () =
 let () =
   Params.add_opts
     [ "-arith-semantic-tauto"
-    , Arg.Unit (fun () -> _enable_arith (); _enable_semantic_tauto := true)
-    , "enable arithmetic semantic tautology check"
+      , Arg.Unit (fun () -> _enable_arith (); _enable_semantic_tauto := true)
+      , "enable arithmetic semantic tautology check"
     ; "-arith"
-    , Arg.Unit _enable_arith
-    , "enable axiomatic integer arithmetic"
+      , Arg.Unit _enable_arith
+      , "enable axiomatic integer arithmetic"
+    ; "-arith-ac"
+      , Arg.Set _enable_ac
+      , "enable AC axioms for arithmetic (sum)"
     ];
   ()
