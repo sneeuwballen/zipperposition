@@ -655,7 +655,6 @@ module Comp = struct
       _cmp_specific ~ord
     ) in
     let res = f l1 l2 in
-    Util.debug 5 "compare %a and %a: %s" pp l1 pp l2 (C.to_string res);
     res
 end
 

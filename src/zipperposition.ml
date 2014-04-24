@@ -379,7 +379,7 @@ let process_file ?meta ~plugins ~params file =
   Util.debug 1 "signature: %a" Signature.pp
     (Signature.diff (MyEnv.signature ()) !Params.signature);
   Util.debug 2 "%d clauses processed into:\n%%  %a"
-    num_clauses (Util.pp_seq ~sep:"\n%%  " MyEnv.C.pp) clauses;
+    num_clauses (Util.pp_seq ~sep:"\n%  " MyEnv.C.pp) clauses;
   (* add clauses to passive set of [env] *)
   MyEnv.add_passive clauses;
   (* saturate, possibly changing env *)

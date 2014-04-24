@@ -182,22 +182,16 @@ let add e s t =
 
 let mk_const ~num const = { num; const; terms=[]; }
 
-let mk_full ~num const l =
-  List.fold_left
-    (fun m (c,t) -> add m c t)
-    (mk_const ~num const) l
-
 let of_list ~num s l =
   List.fold_left
     (fun e (s,t) -> add e s t)
     (mk_const ~num s) l
 
 let map f e =
-  let terms = List.map (fun (n,t) -> n, f t) e.terms in
   let const = {e with terms = []} in
   List.fold_left
-    (fun e (n, t) -> add e n t)
-    const terms
+    (fun e (n, t) -> add e n (f t))
+    const e.terms
 
 let add_const e s =
   { e with const = e.num.add e.const s; }
@@ -460,7 +454,7 @@ module Focus = struct
     (* recursive unification of the term [t] with members of the monome *)
     let rec iter_terms subst c t l rest cst scope k = match l with
       | [] ->
-          let mf = { coeff=c; term=t; rest=mk_full ~num cst rest;} in
+          let mf = { coeff=c; term=t; rest=of_list ~num cst rest;} in
           k (mf, subst)
       | (c', t') :: l' ->
           if Unif.FO.eq ~subst t scope t' scope
@@ -493,7 +487,7 @@ module Focus = struct
     let rec iter_terms subst c t l rest cst scope k = match l with
       | [] when Substs.is_empty subst -> ()
       | [] ->
-          let mf = { coeff=c; term=t; rest=mk_full ~num cst rest;} in
+          let mf = { coeff=c; term=t; rest=of_list ~num cst rest;} in
           k (mf, subst)
       | (c', t') :: l' ->
           if Unif.FO.eq ~subst t scope t' scope

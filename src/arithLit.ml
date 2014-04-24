@@ -251,7 +251,7 @@ let apply_subst ~renaming subst lit scope = match lit with
   | Binary (op, m1, m2) ->
     Binary (op,
       M.apply_subst ~renaming subst m1 scope,
-      M.apply_subst ~renaming subst m1 scope)
+      M.apply_subst ~renaming subst m2 scope)
   | Divides d ->
       Divides { d with monome=M.apply_subst ~renaming subst d.monome scope; }
 
