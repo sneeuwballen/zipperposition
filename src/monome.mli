@@ -224,6 +224,12 @@ module Focus : sig
         return the versions of [m1] and [m2] where the unified terms
         are focused. *)
 
+  val unify_self : ?subst:Substs.t ->
+                    'a t -> scope -> ('a t * Substs.t) Sequence.t
+    (** Extend the substitution to other terms within the focused monome,
+        if possible. For instance it might return
+        [2f(x)+a, {x=y}] for the monome [f(x)+f(y)+a] where [f(x)] is focused. *)
+
   (* TODO
   val unify_fm : ?subst:Substs.t ->
                  'a t -> scope -> 'a monome -> scope ->

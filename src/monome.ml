@@ -454,6 +454,31 @@ module Focus = struct
     if rest.num.sign coeff = 0 then failwith "Monome.Focus.apply_subst: coeff 0";
     {coeff; rest; term; }
 
+  let unify_self ?(subst=Substs.empty) mf scope k =
+    let t = mf.term and num = mf.rest.num in
+    (* recursive unification of the term [t] with members of the same monome.
+        [c] is the current coefficient of all terms unified with [t]. *)
+    let rec iter_terms subst c l rest = match l with
+      | [] ->
+          let mf' = { mf with coeff=c; rest=of_list ~num mf.rest.const rest;} in
+          k (mf', subst)
+      | (c', t') :: l' ->
+          if Unif.FO.eq ~subst t scope t' scope
+          then
+            (* we do not have a choice, [t = t'] is true *)
+            iter_terms subst (num.add c c') l' rest
+          else begin
+            begin try
+              (* maybe we can merge [t] and [t'] *)
+              let subst' = Unif.FO.unification ~subst t scope t' scope in
+              iter_terms subst' (num.add c c') l' rest
+            with Unif.Fail -> ()
+            end;
+            (* we can also choose not to unify [t] and [t']. *)
+            iter_terms subst c l' ((c',t')::rest)
+          end
+    in iter_terms subst mf.coeff mf.rest.terms []
+
   let unify_ff ?(subst=Substs.empty) mf1 s1 mf2 s2 k =
     assert(mf1.rest.num == mf2.rest.num);
     let num = mf1.rest.num in
@@ -491,7 +516,6 @@ module Focus = struct
     let num = m1.num in
     (* recursive unification of the term [t] with members of the same monome *)
     let rec iter_terms subst c t l rest cst scope k = match l with
-      | [] when Substs.is_empty subst -> ()
       | [] ->
           let mf = { coeff=c; term=t; rest=of_list ~num cst rest;} in
           k (mf, subst)

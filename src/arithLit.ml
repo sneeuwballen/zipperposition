@@ -131,10 +131,7 @@ let mk_lesseq = make Lesseq
 let mk_divides ?(sign=true) n ~power m =
   let nk = Z.pow n power in
   (* normalize coefficients so that they are within [0...nk-1] *)
-  let norm_coeff c =
-    let c = Z.rem c nk in
-    if Z.sign c < 0 then Z.add nk c else c
-  in
+  let norm_coeff c = Z.erem c nk in
   let m = M.map_num norm_coeff m in
   Divides { sign; num=n; power; monome=m; }
 
