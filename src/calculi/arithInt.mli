@@ -34,6 +34,13 @@ as to bring the unified terms to the same coefficient. *)
 
 open Logtk
 
+val case_switch_limit : int ref
+  (** Positive integer: maximum width of an inequality case switch. Default: 30 *)
+
+val div_case_switch_limit : int ref
+  (** Positive integer: maximum prime number suitable for div_case_switch
+      (ie maximum n for enumeration of cases in n^k | x) *)
+
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C
@@ -43,6 +50,8 @@ module type S = sig
   val idx_ineq : unit -> PS.TermIndex.t (** inequations *)
   val idx_div : unit -> PS.TermIndex.t  (** divisibility *)
   val idx_all : unit -> PS.TermIndex.t  (** all root terms under arith lits *)
+
+  (** {3 Equations and Inequations} *)
 
   val canc_sup_active: Env.binary_inf_rule
     (** cancellative superposition where given clause is active *)
@@ -62,9 +71,6 @@ module type S = sig
 
   val canc_ineq_factoring : Env.unary_inf_rule
     (** Factoring between two inequation literals *)
-
-  val case_switch_limit : Z.t ref
-    (** Positive integers: maximum width of a case switch. Default: 30 *)
 
   val canc_case_switch : Env.binary_inf_rule
     (** inference rule
@@ -87,8 +93,33 @@ module type S = sig
   val canc_lesseq_to_less : Env.lit_rewrite_rule
     (** Simplification:  a <= b  ----> a < b+1 *)
 
+  (** {3 Divisibility} *)
+
+  val canc_div_chaining : Env.binary_inf_rule
+    (** Chain together two divisibility literals, assuming they share the
+        same prime *)
+
+  val canc_div_case_switch : Env.simplify_rule
+    (** Eliminate negative divisibility literals within a power-of-prime
+        quotient of Z:
+        not (d^i | m) -----> *)
+
+  val canc_div_prime_decomposition : Env.multi_simpl_rule
+    (** Eliminate divisibility literals with a non-power-of-prime
+        quotient of Z (for instance  6 | a ---> { 2 | a, 3 | a }) *)
+
+  (** {3 Other} *)
+
   val is_tautology : C.t -> bool
     (** is the clause a tautology w.r.t linear expressions? *)
+
+  val purify : Env.simplify_rule
+    (** Purify clauses by replacing arithmetic expressions occurring
+        under terms by variables, and adding constraints *)
+
+  val eliminate_unshielded : Env.multi_simpl_rule
+    (** Eliminate unshielded variables using an adaptation of
+        Cooper's algorithm *)
 
   (** {2 Contributions to Env} *)
 

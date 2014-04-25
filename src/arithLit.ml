@@ -159,10 +159,10 @@ let pp buf = function
       M.pp r
   | Divides d when d.sign ->
     let nk = Z.pow d.num d.power in
-    Printf.bprintf buf "%s | %a" (Z.to_string nk) M.pp d.monome
+    Printf.bprintf buf "%s div %a" (Z.to_string nk) M.pp d.monome
   | Divides d ->
     let nk = Z.pow d.num d.power in
-    Printf.bprintf buf "¬(%s | %a)" (Z.to_string nk) M.pp d.monome
+    Printf.bprintf buf "¬(%s div %a)" (Z.to_string nk) M.pp d.monome
 
 let pp_tstp buf = function
   | Binary (Equal, l, r) ->

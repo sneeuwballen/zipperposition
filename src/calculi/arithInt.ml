@@ -51,6 +51,7 @@ let stat_arith_ineq_chaining = Util.mk_stat "arith.ineq_chaining"
 let stat_arith_reflexivity_resolution = Util.mk_stat "arith.reflexivity_resolution"
 let stat_arith_case_switch = Util.mk_stat "arith.case_switch"
 let stat_arith_inner_case_switch = Util.mk_stat "arith.inner_case_switch"
+let stat_arith_purify = Util.mk_stat "arith.purify"
 
 let prof_arith_sup = Util.mk_profiler "arith.superposition"
 let prof_arith_cancellation = Util.mk_profiler "arith.arith_cancellation"
@@ -60,6 +61,7 @@ let prof_arith_ineq_chaining = Util.mk_profiler "arith.ineq_chaining"
 let prof_arith_reflexivity_resolution = Util.mk_profiler "arith.reflexivity_resolution"
 let prof_arith_case_switch = Util.mk_profiler "arith.case_switch"
 let prof_arith_inner_case_switch = Util.mk_profiler "arith.inner_case_switch"
+let prof_arith_purify = Util.mk_profiler "arith.purify"
 
 let stat_arith_semantic_tautology = Util.mk_stat "arith.semantic_tauto"
 let prof_arith_semantic_tautology = Util.mk_profiler "arith.semantic_tauto"
@@ -73,6 +75,8 @@ module type S = sig
   val idx_ineq : unit -> PS.TermIndex.t (** inequations *)
   val idx_div : unit -> PS.TermIndex.t  (** divisibility *)
   val idx_all : unit -> PS.TermIndex.t  (** all root terms under arith lits *)
+
+  (** {3 Equations and Inequations} *)
 
   val canc_sup_active: Env.binary_inf_rule
     (** cancellative superposition where given clause is active *)
@@ -92,9 +96,6 @@ module type S = sig
 
   val canc_ineq_factoring : Env.unary_inf_rule
     (** Factoring between two inequation literals *)
-
-  val case_switch_limit : Z.t ref
-    (** Positive integers: maximum width of a case switch. Default: 30 *)
 
   val canc_case_switch : Env.binary_inf_rule
     (** inference rule
@@ -117,8 +118,33 @@ module type S = sig
   val canc_lesseq_to_less : Env.lit_rewrite_rule
     (** Simplification:  a <= b  ----> a < b+1 *)
 
+  (** {3 Divisibility} *)
+
+  val canc_div_chaining : Env.binary_inf_rule
+    (** Chain together two divisibility literals, assuming they share the
+        same prime *)
+
+  val canc_div_case_switch : Env.simplify_rule
+    (** Eliminate negative divisibility literals within a power-of-prime
+        quotient of Z:
+        not (d^i | m) -----> *)
+
+  val canc_div_prime_decomposition : Env.multi_simpl_rule
+    (** Eliminate divisibility literals with a non-power-of-prime
+        quotient of Z (for instance  6 | a ---> { 2 | a, 3 | a }) *)
+
+  (** {3 Other} *)
+
   val is_tautology : C.t -> bool
     (** is the clause a tautology w.r.t linear expressions? *)
+
+  val purify : Env.simplify_rule
+    (** Purify clauses by replacing arithmetic expressions occurring
+        under terms by variables, and adding constraints *)
+
+  val eliminate_unshielded : Env.multi_simpl_rule
+    (** Eliminate unshielded variables using an adaptation of
+        Cooper's algorithm *)
 
   (** {2 Contributions to Env} *)
 
@@ -131,6 +157,9 @@ type scope = S.scope
 let _enable_arith = ref false
 let _enable_ac = ref false
 let _enable_semantic_tauto = ref false
+
+let case_switch_limit = ref 30
+let div_case_switch_limit = ref 100
 
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
@@ -565,9 +594,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.exit_prof prof_arith_ineq_chaining;
     res
 
-
-  let case_switch_limit = ref (Z.of_int 30)
-
   (* new inference, kind of the dual of inequality chaining for integer
      inequalities. See the .mli file for more explanations. *)
   let canc_case_switch c = [] (* TODO *)
@@ -881,6 +907,140 @@ module Make(E : Env.S) : S with module Env = E = struct
     res
   *)
 
+  (** {3 Divisibility} *)
+
+  let canc_div_chaining c = []  (* TODO *)
+
+  exception ReplaceLitByLitsInSameClause of int * Lit.t list
+  exception ReplaceLitByLitsInManyClauses of int * Lit.t list
+
+  let canc_div_case_switch c =
+    let eligible = C.Eligible.(max c ** neg ** filter Lit.is_arith_divides) in
+    try
+      Lits.fold_arith ~eligible (C.lits c) ()
+        (fun () lit pos -> match lit with
+          | AL.Divides d ->
+            assert (not (d.AL.sign));
+            let n = d.AL.num and power = d.AL.power in
+            (* check that [n] is a not-too-big prime *)
+            if Z.gt n Z.one && AL.Util.is_prime n then
+              if Z.leq n (Z.of_int !div_case_switch_limit)
+                then begin
+                  let idx = Lits.Pos.idx pos in
+                  (* build the list of alternatives *)
+                  let lits = ref [] in
+                  for e = 0 to power-1 do
+                    for i=1 to Z.to_int n - 1 do
+                      (* new lit:   n^{e+1} | m + i·n^e *)
+                      let m' = M.add_const d.AL.monome
+                        Z.((n ** e) * of_int i)
+                      in
+                      let new_lit = Lit.mk_divides
+                        n ~power:(e+1) m'
+                      in
+                      lits := new_lit :: !lits
+                    done
+                  done;
+                  raise (ReplaceLitByLitsInSameClause (idx, !lits))
+                end
+                else Ctx.lost_completeness ()
+              else ()
+          | _ -> assert false
+        );
+      c
+    with ReplaceLitByLitsInSameClause (i, lits) ->
+      (* replace lit number [i] with [lits] *)
+      let lits' = Util.array_except_idx (C.lits c) i in
+      let all_lits = List.rev_append lits lits' in
+      let proof cc = Proof.mk_c_inference ~rule:"div_case_switch"
+        ~theories cc [C.proof c] in
+      let new_c = C.create ~parents:[c] all_lits proof in
+      Util.debug 5 "div_case_switch of %a into %a" C.pp c C.pp new_c;
+      new_c
+
+  let canc_div_prime_decomposition c =
+    let eligible = C.Eligible.(max c ** filter Lit.is_arith_divides) in
+    try
+      Lits.fold_arith ~eligible (C.lits c) ()
+        (fun () lit pos -> match lit with
+          | AL.Divides d when d.AL.sign ->
+            (* positive "divides" predicate *)
+            let n = d.AL.num and power = d.AL.power in
+            (* check that [n] is a composite number *)
+            if Z.gt n Z.one && not (AL.Util.is_prime n) then begin
+              let idx = Lits.Pos.idx pos in
+              let divisors = AL.Util.prime_decomposition n in
+              assert (List.length divisors >= 2);
+              let lits = List.map
+                (fun div -> Lit.mk_divides ~sign:true
+                    div.AL.Util.prime ~power:div.AL.Util.power d.AL.monome)
+                divisors
+              in
+              raise (ReplaceLitByLitsInManyClauses (idx, lits))
+            end
+          | AL.Divides d ->
+            (* negative "divides" predicate *)
+            let n = d.AL.num and power = d.AL.power in
+            (* check that [n] is a composite number *)
+            if Z.gt n Z.one && not (AL.Util.is_prime n) then begin
+              let idx = Lits.Pos.idx pos in
+              let divisors = AL.Util.prime_decomposition n in
+              assert (List.length divisors >= 2);
+              let lits = List.map
+                (fun div -> Lit.mk_divides ~sign:false
+                    div.AL.Util.prime ~power:div.AL.Util.power d.AL.monome)
+                divisors
+              in
+              raise (ReplaceLitByLitsInSameClause (idx, lits))
+            end
+          | _ -> assert false
+        );
+      None
+    with ReplaceLitByLitsInSameClause (i, lits) ->
+      (* replace lit number [i] with [lits] *)
+      let lits' = Util.array_except_idx (C.lits c) i in
+      let all_lits = List.rev_append lits lits' in
+      let proof cc = Proof.mk_c_inference ~rule:"div_prime_decomposition"
+        ~theories cc [C.proof c] in
+      let new_c = C.create ~parents:[c] all_lits proof in
+      Util.debug 5 "prime_decomposition of %a into %a" C.pp c C.pp new_c;
+      Some [new_c]
+    | ReplaceLitByLitsInManyClauses (i, lits) ->
+      let clauses = List.map
+        (fun lit ->
+          let all_lits = Array.copy (C.lits c) in
+          all_lits.(i) <- lit;
+          let proof cc = Proof.mk_c_inference ~theories
+            ~rule:"div_prime_decomposition" cc [C.proof c] in
+          let new_c = C.create_a ~parents:[c] all_lits proof in
+          new_c)
+        lits
+      in
+      Util.debug 5 "prime_decomposition of %a into [%a]"
+        C.pp c (Util.pp_list C.pp) clauses;
+      Some clauses
+
+  (* a mod n = n' ----> divisibility literal *)
+  let canc_div_of_remainder lit =
+    let module TC = FOTerm.Classic in
+    let module SA = Symbol.TPTP.Arith in
+    match lit with
+    | Lit.Equation (l, r, sign) ->
+        begin match TC.view l, TC.view r with
+        | (TC.App (s, _, [l'; r']), opp
+        | opp, TC.App (s, _, [l'; r'])) when Symbol.eq s SA.remainder_e ->
+            begin match Monome.Int.of_term l', T.view r', opp with
+            | Some m, T.Const (Symbol.Int n), TC.App (Symbol.Int opp', _, []) ->
+                (* remainder(l1, n) = opp ----> n | l1-opp *)
+                Lit.mk_divides ~sign n ~power:1 (M.add_const m Z.(~- opp'))
+            | _ -> lit
+            end
+        | _ -> lit
+        end
+    | _ -> lit
+
+  (** {3 Others} *)
+
   (* redundancy criterion: if variables are replaced by constants,
      do equations and inequations in left part of =>
      always imply something on the right part of => ?
@@ -951,6 +1111,89 @@ module Make(E : Env.S) : S with module Env = E = struct
         Lit.mk_arith_less m1 (M.succ m2)
     | lit -> lit
 
+  (* replace arith subterms with fresh variable + constraint *)
+  let purify c =
+    Util.enter_prof prof_arith_purify;
+    (* set of new literals *)
+    let new_lits = ref [] in
+    let _add_lit lit = new_lits := lit :: !new_lits in
+    let varidx = ref ((Lits.Seq.terms (C.lits c)
+      |> Sequence.flatMap T.Seq.vars |> T.Seq.max_var) + 1) in
+    (* purify a term (adding constraints to the list).  *)
+    let rec purify_term t = match T.view t with
+      | T.Const s when Symbol.is_numeric s -> t   (* keep constants *)
+      | T.Const _
+      | T.TyApp _
+      | T.BVar _
+      | T.Var _ -> t
+      | T.App (hd, l) ->
+        Util.debug 5 "purification at %a" T.pp t;
+        match T.head hd with
+        | Some s when Symbol.TPTP.Arith.is_arith s ->
+          Util.debug 5 "need to purify term %a" T.pp t;
+          (* purify the term and add a constraint *)
+          let l' = List.map purify_term l in
+          let t' = T.app hd l' in
+          begin match M.Int.of_term t' with
+          | None ->
+            Util.debug 5 "could not purify %a (non linear)" T.pp t';
+            t'  (* non linear, abort. *)
+          | Some m ->
+            (* purify this term out! *)
+            let ty = T.ty t in
+            let v = T.var ~ty !varidx in
+            incr varidx;
+            let lit = Lit.mk_arith_neq (M.Int.singleton Z.one v) m in
+            _add_lit lit;
+            (* return variable instead of literal *)
+            v
+          end
+        | None -> Util.debug 5 "no head for %a" T.pp t; t
+        | Some _ ->
+          T.app hd (List.map purify_term l)
+    in
+    (* replace! *)
+    let lits' = Lits.map purify_term (C.lits c) in
+    let res = match !new_lits with
+    | [] -> c (* no change *)
+    | _::_ ->
+        let all_lits = !new_lits @ (Array.to_list lits') in
+        let proof cc = Proof.mk_c_inference ~theories ~rule:"purify" cc [C.proof c] in
+        let new_c = C.create ~parents:[c] all_lits proof in
+        Util.debug 5 "purify %a into %a" C.pp c C.pp new_c;
+        Util.incr_stat stat_arith_purify;
+        new_c
+    in
+    Util.exit_prof prof_arith_purify;
+    res
+
+  let is_shielded lits ~var =
+    let rec shielded_by_term ~root t = match T.view t with
+      | T.Var _ when T.eq t var -> not root
+      | T.Var _
+      | T.BVar _
+      | T.Const _
+      | T.TyApp _ -> false
+      | T.App (hd, l) ->
+          match T.head hd with
+          | Some s when Symbol.TPTP.Arith.is_arith s ->
+            (* arithmetic term, [root] may continue to be true *)
+            List.exists (shielded_by_term ~root) l
+          | None
+          | Some _ ->
+            List.exists (shielded_by_term ~root:false) l
+    in
+    (* is there a term, directly under a literal, that shields the variable? *)
+    lits
+      |> Lits.Seq.terms
+      |> Sequence.exists (shielded_by_term ~root:true)
+
+  let naked_vars lits =
+    let vars = Lits.vars lits in
+    List.filter (fun var -> not (is_shielded lits ~var)) vars
+
+  let eliminate_unshielded c = None  (* TODO *)
+
   (** {2 Setup} *)
 
   let register () =
@@ -963,8 +1206,14 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_unary_inf "canc_ineq_factoring" canc_ineq_factoring;
     Env.add_binary_inf "canc_case_switch" canc_case_switch;
     Env.add_unary_inf "canc_inner_case_switch" canc_inner_case_switch;
+    Env.add_binary_inf "div_chaining" canc_div_chaining;
+    Env.add_simplify canc_div_case_switch;
+    Env.add_multi_simpl_rule canc_div_prime_decomposition;
+    Env.add_lit_rule "div_of_remainder" canc_div_of_remainder;
     Env.add_lit_rule "lesseq_to_less" canc_lesseq_to_less;
     Env.add_is_trivial is_tautology;
+    Env.add_simplify purify;
+    Env.add_multi_simpl_rule eliminate_unshielded;
     Ctx.Lit.add_from_hook Lit.Conv.arith_hook_from;
     (* enable AC-property of sum *)
     if !_enable_ac then begin
