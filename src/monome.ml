@@ -321,8 +321,9 @@ let pp buf e =
   | _::_ when e.num.sign e.const = 0 ->
     Util.pp_list ~sep:" + " pp_pair buf e.terms
   | _::_ ->
-    Printf.bprintf buf "%s + %a" (e.num.to_string e.const)
+    Printf.bprintf buf "%a + %s"
       (Util.pp_list ~sep:" + " pp_pair) e.terms
+      (e.num.to_string e.const)
 
 let to_string monome = Util.on_buffer pp monome
 
@@ -404,6 +405,11 @@ module Focus = struct
   let term t = t.term
   let rest t = t.rest
 
+  (* scale focused monomes to have the same coefficient *)
+  let scale m1 m2 =
+    let gcd = Z.gcd m1.coeff m2.coeff in
+    product m1 (Z.divexact m2.coeff gcd), product m2 (Z.divexact m1.coeff gcd)
+
   let pp buf t =
     let num = t.rest.num in
     (* print the focused part *)
@@ -429,7 +435,7 @@ module Focus = struct
   let fold_m ~pos m acc f =
     Util.list_foldi
       (fun acc i (c,t) ->
-        let pos = Position.(arg i pos) in
+        let pos = Position.(append pos (arg i stop)) in
         let rest = {m with terms=Util.list_remove m.terms i} in
         let mf = {coeff=c; term=t; rest;} in
         f acc mf pos

@@ -183,6 +183,9 @@ module Focus : sig
   val product : 'a t -> 'a -> 'a t
     (** @raise Invalid_argument if the number is 0 *)
 
+  val scale : Z.t t -> Z.t t -> Z.t t * Z.t t
+    (** Scale to the same coefficient *)
+
   val is_max : ord:Ordering.t -> _ t -> bool
     (** Is the focused term maximal in the monome? *)
 

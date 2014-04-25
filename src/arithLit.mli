@@ -185,6 +185,12 @@ module Focus : sig
     (** Multiply the two literals by some constant so that their focused
         literals have the same coefficient *)
 
+  val scale_power : t -> int -> t
+    (** For a "divides" literal, bring it to the given power.
+        @raise Invalid_argument if the current power is strictly greater
+          than the argument (cannot scale down), or if the literal
+          is not a {!Div} *)
+
   val apply_subst : renaming:Substs.Renaming.t -> Substs.t -> t -> scope -> t
     (** Apply a substitution *)
 

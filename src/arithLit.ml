@@ -474,6 +474,19 @@ module Focus = struct
     let gcd = Z.gcd z1 z2 in
     product l1 (Z.divexact z2 gcd), product l2 (Z.divexact z1 gcd)
 
+  let scale_power lit power = match lit with
+    | Div d ->
+        if d.power > power then invalid_arg "scale_power: cannot scale down";
+        (* multiply monome by d.num^(power-d.power) *)
+        let diff = power - d.power in
+        if diff = 0
+          then lit
+          else
+            let monome = MF.product d.monome Z.(pow d.num diff) in
+            Div { d with monome; power;}
+    | Left _
+    | Right _ -> invalid_arg "scale_power: not a divisibility lit"
+
   let op = function
     | Left (op, _, _)
     | Right (op, _, _) -> `Binary op
@@ -503,10 +516,10 @@ module Focus = struct
         Printf.bprintf buf "%a %s %a" M.pp m (op2str op) MF.pp mf
     | Div d when d.sign ->
       let nk = Z.pow d.num d.power in
-      Printf.bprintf buf "%s | %a" (Z.to_string nk) MF.pp d.monome
+      Printf.bprintf buf "%s div %a" (Z.to_string nk) MF.pp d.monome
     | Div d ->
       let nk = Z.pow d.num d.power in
-      Printf.bprintf buf "¬(%s | %a)" (Z.to_string nk) MF.pp d.monome
+      Printf.bprintf buf "¬(%s div %a)" (Z.to_string nk) MF.pp d.monome
 
   let to_string = Util.on_buffer pp
   let fmt fmt lit = Format.pp_print_string fmt (to_string lit)
