@@ -513,9 +513,6 @@ module Focus = struct
 end
 
 module Util = struct
-  (* inspiration from
-    http://www.thelowlyprogrammer.com/2010/03/writing-efficient-seive-of-eratosthenes.html
-    with a lazy Erathostene sieve *)
   module ZTbl = Hashtbl.Make(Z)
 
   type divisor = {
@@ -523,99 +520,85 @@ module Util = struct
     power : int;
   }
 
-  let _divisors ~sieve n =
-    try ZTbl.find sieve n
-    with Not_found -> []
-
-  (* assuming [n] is prime, add it to the sieve *)
-  let _add ~sieve n =
-    let n2 = Z.mul n n in
-    assert (not (ZTbl.mem sieve n2)); (* n2=n^2 where n prime, no other factor *)
-    ZTbl.add sieve n2 [n]
-
   let two = Z.of_int 2
 
-  (* add the next odd multiple of the given prime to the sieve. *)
-  let _next ~sieve n prime =
-    let n' = Z.add n (Z.mul prime two) in
-    let l = _divisors ~sieve n' in
-    ZTbl.add sieve n' (prime :: l)
+  (* table from numbers to some of their divisor (if any) *)
+  let _table = lazy (
+    let t = ZTbl.create 256 in
+    ZTbl.add t two None;
+    t)
 
-  type prime_result =
-    | Prime
-    | Composite of Z.t list   (* prime divisors *)
+  let _divisors n = ZTbl.find (Lazy.force _table) n
 
-  (* calls [k] with all primes that are [<= sqrt n0]; returns a [prime_result]. *)
-  let _sieve_prime n0 k =
-    let sieve = ZTbl.create 32 in
-    k two;
-    let n = ref (Z.of_int 3) in
-    while Z.lt (Z.mul !n !n) n0 do
-      begin match _divisors ~sieve !n with
-      | [] ->
-          (* prime, add n^2 to the sieve *)
-          _add ~sieve !n;
-          k !n;
-      | l ->
-          ZTbl.remove sieve !n;
-          (* add next multiple of prime divisors to the table *)
-          List.iter (_next ~sieve !n) l
+  let _add_prime n =
+    ZTbl.replace (Lazy.force _table) n None
+
+  (* add to the table the fact that [d] is a divisor of [n] *)
+  let _add_divisor n d =
+    assert (not (ZTbl.mem (Lazy.force _table) n));
+    ZTbl.add (Lazy.force _table) n (Some d)
+
+  (* primality test, modifies _table *)
+  let _is_prime n0 =
+    let n = ref two in
+    let bound = Z.succ (Z.sqrt n0) in
+    let is_prime = ref true in
+    while !is_prime && Z.leq !n bound do
+      if Z.sign (Z.rem n0 !n) = 0
+      then begin
+        is_prime := false;
+        _add_divisor n0 !n;
       end;
-      n := Z.add !n two;
+      n := Z.succ !n;
     done;
-    match _divisors ~sieve n0 with
-    | [] -> Prime
-    | l -> Composite l
-
-  let _threshold = Z.of_int 50_000
-  let _memo = lazy (
-    let tbl = ZTbl.create 16 in
-    ignore (_sieve_prime _threshold (fun n -> ZTbl.add tbl n ()));
-    tbl
-  )
+    if !is_prime then _add_prime n0;
+    !is_prime
 
   let is_prime n =
-    (* see http://docs.camlcity.org/docs/godipkg/4.00/godi-zarith/doc/godi-zarith/html/Z.html *)
-    match Z.probab_prime n 7 with
-    | 0 -> false
-    | 2 -> true
-    | 1 ->
-        if Z.leq n _threshold
-        then
-          ZTbl.mem (Lazy.force _memo) n
-        else begin match _sieve_prime n (fun _ -> ()) with
-          | Prime -> true
-          | Composite _ -> false
-        end
-    | _ -> assert false
+    try
+      begin match _divisors n with
+      | None -> true
+      | Some _ -> false
+      end
+    with Not_found ->
+      match Z.probab_prime n 7 with
+      | 0 -> false
+      | 2 -> (_add_prime n; true)
+      | 1 ->
+          _is_prime n
+      | _ -> assert false
 
-  (* decompose into prime factors *)
-  let rec _decompose acc n prime power primes =
-    let q, r = Z.div_rem n prime in
-    if Z.sign r = 0
-    then _decompose acc q prime (power+1) primes
-    else
-      let acc = {prime; power; }::acc in
-      match primes with
-      | p::primes' ->
-          _decompose acc n p 0 primes'
-      | [] -> acc
+  let rec _merge l1 l2 = match l1, l2 with
+    | [], _ -> l2
+    | _, [] -> l1
+    | p1::l1', p2::l2' ->
+        match Z.compare p1.prime p2.prime with
+        | 0 ->
+            {prime=p1.prime; power=p1.power+p2.power} :: _merge l1' l2'
+        | n when n < 0 ->
+            p1 :: _merge l1' l2
+        | _ -> p2 :: _merge l1 l2'
+
+  let rec _decompose n =
+    try
+      begin match _divisors n with
+      | None -> [{prime=n; power=1;}]
+      | Some q1 ->
+          let q2 = Z.divexact n q1 in
+          _merge (_decompose q1) (_decompose q2)
+      end
+    with Not_found ->
+      ignore (_is_prime n);
+      _decompose n
 
   let prime_decomposition n =
-    if Z.lt n Z.zero then invalid_arg "prime_decomposition";
-    match Z.probab_prime n 7 with
-    | 2 -> [{prime=n; power=1}]  (* prime *)
-    | 0
-    | 1 ->
-        begin match _sieve_prime n (fun _ -> ()) with
-        | Prime -> [{prime=n; power=1}]  (* prime *)
-        | Composite (p::l) ->
-            (* decompose [n] again *)
-            _decompose [] n p 0 l
-        | Composite [] -> assert false
-        end
-    | _ -> assert false
+    if is_prime n
+    then [{prime=n; power=1;}]
+    else _decompose n
 
-  let primes_leq n k =
-    ignore (_sieve_prime (Z.mul n n) k)
+  let primes_leq n0 k =
+    let n = ref two in
+    while Z.leq !n n0 do
+      if is_prime !n then k !n
+    done
 end

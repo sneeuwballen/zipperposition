@@ -221,7 +221,8 @@ module Util : sig
     (** Is the integer prime? *)
 
   val prime_decomposition : Z.t -> divisor list
-    (** Decompose the number into a product of power-of-primes
+    (** Decompose the number into a product of power-of-primes. Cheap if
+        [is_prime n] was called before.
         @raise Invalid_argument if the number is negative *)
 
   val primes_leq : Z.t -> Z.t Sequence.t
