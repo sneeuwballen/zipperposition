@@ -108,6 +108,10 @@ module type S = sig
     (** Eliminate divisibility literals with a non-power-of-prime
         quotient of Z (for instance  6 | a ---> { 2 | a, 3 | a }) *)
 
+  val canc_divisibility : Env.unary_inf_rule
+    (** Infer divisibility constraints from integer equations,
+        for instace   C or  2a=b ---->  C or 2 | b    if a is maximal *)
+
   (** {3 Other} *)
 
   val is_tautology : C.t -> bool

@@ -133,6 +133,10 @@ module type S = sig
     (** Eliminate divisibility literals with a non-power-of-prime
         quotient of Z (for instance  6 | a ---> { 2 | a, 3 | a }) *)
 
+  val canc_divisibility : Env.unary_inf_rule
+    (** Infer divisibility constraints from integer equations,
+        for instace   C or  2a=b ---->  C or 2 | b    if a is maximal *)
+
   (** {3 Other} *)
 
   val is_tautology : C.t -> bool
@@ -369,7 +373,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     let eligible = C.Eligible.(max c ** arith) in
     let res = Lits.fold_arith ~eligible (C.lits c) []
       (fun acc a_lit pos ->
-        let max_terms = AL.max_terms ~ord a_lit in
         let idx = Lits.Pos.idx pos in
         (* cancellation depends on what the literal looks like *)
         match a_lit with
@@ -548,7 +551,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     let sc_l = 0 and sc_r = 1 in
     let res = Lits.fold_arith_terms ~eligible ~ord ~which:`Max (C.lits c) []
       (fun acc t lit pos ->
-        let idx = Lits.Pos.idx pos in
         match lit with
         | ALF.Left (AL.Less, mf_l, _) ->
           (* find a right-chaining literal in some other clause *)
@@ -909,7 +911,83 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (** {3 Divisibility} *)
 
-  let canc_div_chaining c = []  (* TODO *)
+  let canc_div_chaining c =
+    let ord = Ctx.ord () in
+    let eligible = C.Eligible.(max c ** pos ** filter Lit.is_arith_divides) in
+    let sc1 = 0 and sc2 = 1 in
+    (* do the inference (if ordering conditions are ok) *)
+    let _do_chaining n power c1 lit1 pos1 c2 lit2 pos2 subst acc =
+      let renaming = Ctx.renaming_clear () in
+      let idx1 = Lits.Pos.idx pos1 and idx2 = Lits.Pos.idx pos2 in
+      let lit1' = ALF.apply_subst ~renaming subst lit1 sc1 in
+      let lit2' = ALF.apply_subst ~renaming subst lit2 sc2 in
+      let lit1', lit2' = ALF.scale lit1' lit2' in
+      let mf1' = ALF.focused_monome lit1'
+      and mf2' = ALF.focused_monome lit2' in
+      (* now we have two literals with the same power and coeff *)
+      let gcd = Z.gcd (MF.coeff mf1') (MF.coeff mf2') in
+      (* check that we didn't "overflow", and that ordering conditions
+        are good *)
+      Util.debug 5 "div. chaining with %a between\n%%  %a (at %a) and\n%%  %a (at %a)"
+        Substs.pp subst C.pp c1 Position.pp pos1 C.pp c2 Position.pp pos2;
+      if Z.lt gcd Z.(pow n power)
+      && C.is_maxlit c1 sc1 subst ~idx:idx1
+      && C.is_maxlit c2 sc2 subst ~idx:idx2
+      && ALF.is_max ~ord lit1'
+      && ALF.is_max ~ord lit2'
+      then begin
+        let new_lit = Lit.mk_divides
+          n ~power
+          (M.difference (MF.rest mf1') (MF.rest mf2'))
+        in
+        let lits1 = Util.array_except_idx (C.lits c1) idx1
+        and lits2 = Util.array_except_idx (C.lits c2) idx2 in
+        let lits1 = Lit.apply_subst_list ~renaming subst lits1 sc1
+        and lits2 = Lit.apply_subst_list ~renaming subst lits2 sc2 in
+        let all_lits = new_lit :: lits1 @ lits2 in
+        let proof cc = Proof.mk_c_inference ~theories ~rule:"div_chaining"
+          cc [C.proof c1; C.proof c2] in
+        let new_c = C.create ~parents:[c1;c2] all_lits proof in
+        Util.debug 5 "... gives %a" C.pp new_c;
+        new_c :: acc
+      end else begin
+        Util.debug 5 "... has bad ordering conditions";
+        acc
+      end
+    in
+    let res = Lits.fold_arith_terms ~eligible ~which:`Max ~ord (C.lits c) []
+      (fun acc t lit1 pos1 ->
+        match lit1 with
+        | ALF.Div d1 when AL.Util.is_prime d1.AL.num ->
+          (* inferences only possible when lit1 is a power-of-prime *)
+          assert d1.AL.sign;
+          let n = d1.AL.num in
+          PS.TermIndex.retrieve_unifiables !_idx_div sc2 t sc1 acc
+            (fun acc t' with_pos subst ->
+              (* [subst t = subst t'], see whether they belong to the same group *)
+              let c2 = with_pos.C.WithPos.clause in
+              let pos2 = with_pos.C.WithPos.pos in
+              let lit2 = Lits.View.get_arith_exn (C.lits c2) pos2 in
+              match lit2 with
+              | ALF.Div d2 when d2.AL.sign && Z.equal n d2.AL.num ->
+                (* scale the literals to the same power *)
+                let power = max d1.AL.power d2.AL.power in
+                let lit1 = ALF.scale_power lit1 power
+                and lit2 = ALF.scale_power lit2 power in
+                let mf1 = ALF.focused_monome lit1
+                and mf2 = ALF.focused_monome lit2 in
+                (* unify mf1 and mf2 as possible *)
+                MF.unify_ff ~subst mf1 sc1 mf2 sc2
+                |> Sequence.fold
+                  (fun acc (_, _, subst) ->
+                    _do_chaining n power c lit1 pos1 c2 lit2 pos2 subst acc
+                  ) acc
+              | _ -> acc
+            )
+        | _ -> acc
+      )
+    in
+    res
 
   exception ReplaceLitByLitsInSameClause of int * Lit.t list
   exception ReplaceLitByLitsInManyClauses of int * Lit.t list
@@ -965,7 +1043,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun () lit pos -> match lit with
           | AL.Divides d when d.AL.sign ->
             (* positive "divides" predicate *)
-            let n = d.AL.num and power = d.AL.power in
+            let n = d.AL.num in
             (* check that [n] is a composite number *)
             if Z.gt n Z.one && not (AL.Util.is_prime n) then begin
               let idx = Lits.Pos.idx pos in
@@ -980,7 +1058,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             end
           | AL.Divides d ->
             (* negative "divides" predicate *)
-            let n = d.AL.num and power = d.AL.power in
+            let n = d.AL.num in
             (* check that [n] is a composite number *)
             if Z.gt n Z.one && not (AL.Util.is_prime n) then begin
               let idx = Lits.Pos.idx pos in
@@ -1019,6 +1097,70 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debug 5 "prime_decomposition of %a into [%a]"
         C.pp c (Util.pp_list C.pp) clauses;
       Some clauses
+
+  let canc_divisibility c =
+    (* inference on 1/ positive eq  2/ positive divibility *)
+    let eligible = C.Eligible.(max c **
+      (filter Lit.is_arith_eq ++ (pos ** filter Lit.is_arith_divides))) in
+    let ord = Ctx.ord () in
+    let res = Lits.fold_arith_terms ~eligible ~which:`Max ~ord (C.lits c) []
+      (fun acc t lit pos ->
+        let mf = ALF.focused_monome lit in
+        let idx = Lits.Pos.idx pos in
+        MF.unify_self mf 0
+        |> Sequence.fold
+          (fun acc (_, subst) ->
+            let renaming = Ctx.renaming_clear () in
+            let lit' = ALF.apply_subst ~renaming subst lit 0 in
+            let mf' = ALF.focused_monome lit' in
+            (* does the maximal term have a coeff bigger-than-one? *)
+            let n = MF.coeff mf' in
+            if Z.gt n Z.one
+            && C.is_maxlit c 0 subst ~idx
+            && ALF.is_max ~ord lit'
+            &&
+              (* in case we have a divisibility, only infer if the coefficient
+                of [t] divides [d^k]. In particular it means [n] is a
+                power-of-prime *)
+              begin match lit' with
+                | ALF.Div d -> Z.sign (Z.rem (Z.pow d.AL.num d.AL.power) n) = 0
+                | _ -> true
+              end
+            then begin
+              (* do the inference *)
+              Util.debug 5 "divisibility on %a at %a with %a..."
+                C.pp c Position.pp pos Substs.pp subst;
+              let new_lit = match lit' with
+                | ALF.Left (AL.Equal, mf, m)
+                | ALF.Right (AL.Equal, m, mf) ->
+                    (* remove the max term from [mf], and inject into the Z/nZ group *)
+                    Lit.mk_divides n ~power:1 (M.difference m (MF.rest mf))
+                | ALF.Div d ->
+                    assert d.AL.sign;
+                    let n', power' = match AL.Util.prime_decomposition n with
+                      | [{AL.Util.prime=n'; AL.Util.power=p}] ->
+                          assert (Z.equal n' d.AL.num);
+                          assert (p <= d.AL.power);
+                          n', p
+                      | _ -> assert false
+                    in
+                    Lit.mk_divides n' ~power:power' (MF.rest d.AL.monome)
+                | _ -> assert false
+              in
+              let lits' = Util.array_except_idx (C.lits c) idx in
+              let lits' = Lit.apply_subst_list ~renaming subst lits' 0 in
+              let all_lits = new_lit :: lits' in
+              let proof cc = Proof.mk_c_inference ~theories
+                ~rule:"divisibility" cc [C.proof c] in
+              let new_c = C.create ~parents:[c] all_lits proof in
+              Util.debug 5 "... gives %a" C.pp new_c;
+              new_c :: acc
+            end
+            else acc
+          ) acc
+      )
+    in
+    res
 
   (* a mod n = n' ----> divisibility literal *)
   let canc_div_of_remainder lit =
@@ -1207,6 +1349,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_binary_inf "canc_case_switch" canc_case_switch;
     Env.add_unary_inf "canc_inner_case_switch" canc_inner_case_switch;
     Env.add_binary_inf "div_chaining" canc_div_chaining;
+    Env.add_unary_inf "divisibility" canc_divisibility;
     Env.add_simplify canc_div_case_switch;
     Env.add_multi_simpl_rule canc_div_prime_decomposition;
     Env.add_lit_rule "div_of_remainder" canc_div_of_remainder;
