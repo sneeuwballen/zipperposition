@@ -1048,7 +1048,6 @@ module Make(E : Env.S) : S with module Env = E = struct
             if Z.gt n Z.one && not (AL.Util.is_prime n) then begin
               let idx = Lits.Pos.idx pos in
               let divisors = AL.Util.prime_decomposition n in
-              assert (List.length divisors >= 2);
               let lits = List.map
                 (fun div -> Lit.mk_divides ~sign:true
                     div.AL.Util.prime ~power:div.AL.Util.power d.AL.monome)
@@ -1255,47 +1254,59 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* replace arith subterms with fresh variable + constraint *)
   let purify c =
+    let module TC = T.Classic in
     Util.enter_prof prof_arith_purify;
     (* set of new literals *)
     let new_lits = ref [] in
     let _add_lit lit = new_lits := lit :: !new_lits in
     let varidx = ref ((Lits.Seq.terms (C.lits c)
       |> Sequence.flatMap T.Seq.vars |> T.Seq.max_var) + 1) in
+    (* replace term by a fresh var + constraint *)
+    let replace t ~by =
+      (* purify this term out! *)
+      let ty = T.ty t in
+      let v = T.var ~ty !varidx in
+      incr varidx;
+      let lit = Lit.mk_arith_neq (M.Int.singleton Z.one v) by in
+      _add_lit lit;
+      (* return variable instead of literal *)
+      v
+    (* should we purify the term t with head symbol [s] ?
+      yes if it's an arith expression or if it a int-sorted
+      function/constant under some other function *)
+    and should_purify ~root s t =
+      Symbol.TPTP.Arith.is_arith s
+      ||
+      ( not root && Type.eq (T.ty t) Type.TPTP.int)
+    in
     (* purify a term (adding constraints to the list).  *)
-    let rec purify_term t = match T.view t with
-      | T.Const s when Symbol.is_numeric s -> t   (* keep constants *)
-      | T.Const _
-      | T.TyApp _
-      | T.BVar _
-      | T.Var _ -> t
-      | T.App (hd, l) ->
-        Util.debug 5 "purification at %a" T.pp t;
-        match T.head hd with
-        | Some s when Symbol.TPTP.Arith.is_arith s ->
-          Util.debug 5 "need to purify term %a" T.pp t;
-          (* purify the term and add a constraint *)
-          let l' = List.map purify_term l in
-          let t' = T.app hd l' in
-          begin match M.Int.of_term t' with
-          | None ->
-            Util.debug 5 "could not purify %a (non linear)" T.pp t';
-            t'  (* non linear, abort. *)
-          | Some m ->
-            (* purify this term out! *)
-            let ty = T.ty t in
-            let v = T.var ~ty !varidx in
-            incr varidx;
-            let lit = Lit.mk_arith_neq (M.Int.singleton Z.one v) m in
-            _add_lit lit;
-            (* return variable instead of literal *)
-            v
-          end
-        | None -> Util.debug 5 "no head for %a" T.pp t; t
-        | Some _ ->
-          T.app hd (List.map purify_term l)
+    let rec purify_term ~root t = match TC.view t with
+      | TC.App (s, _, []) when Symbol.is_numeric s -> t   (* keep constants *)
+      | TC.NonFO
+      | TC.BVar _
+      | TC.Var _ -> t
+      | TC.App (s, _, l) when should_purify ~root s t ->
+        Util.debug 5 "need to purify term %a" T.pp t;
+        (* purify the term and add a constraint *)
+        begin match M.Int.of_term t with
+        | None ->
+          Util.debug 5 "could not purify %a (non linear)" T.pp t;
+          t  (* non linear, abort. *)
+        | Some m -> replace t ~by:m
+        end
+      | TC.App _ ->
+        (* not an arith term. *)
+        begin match T.view t with
+          | T.App (hd, l) ->
+            T.app hd (List.map (purify_term ~root:false) l)
+          | T.BVar _
+          | T.Var _ -> assert false
+          | T.Const _ -> t
+          | T.TyApp (t, ty) -> T.tyapp (purify_term ~root:false t) ty
+        end
     in
     (* replace! *)
-    let lits' = Lits.map purify_term (C.lits c) in
+    let lits' = Lits.map (purify_term ~root:true) (C.lits c) in
     let res = match !new_lits with
     | [] -> c (* no change *)
     | _::_ ->
