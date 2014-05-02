@@ -74,6 +74,10 @@ val last : 'a comparator -> ('a, t) combination
 val call : ('a, 'b) combination -> 'a -> 'a -> 'b
   (** Call a lexicographic combination on arguments *)
 
+val dominates : ('a -> 'b -> t) -> 'a list -> 'b list -> bool
+  (** [dominates f l1 l2] returns [true] iff for all element [y] of [l2],
+      there is some [x] in [l1] with [f x y = Gt] *)
+
 module type PARTIAL_ORD = sig
   type t
 
