@@ -1228,14 +1228,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         None (* no change *)
       with (RemoveLit (i, c')) ->
         (* remove the literal and recurse *)
-        Some (Util.array_except_idx lits i, c')
+        Some (Util.array_except_idx lits i, i, c')
     in
     match remove_one_lit (C.lits c) with
     | None -> (Util.exit_prof prof_clc; c) (* no literal removed *)
-    | Some (new_lits, c') ->
+    | Some (new_lits, i, c') ->
       (* hc' allowed us to cut a literal *)
       assert (List.length new_lits + 1 = Array.length (C.lits c));
-      let proof c'' = Proof.mk_c_inference ~rule:"clc" c'' [C.proof c; C.proof c'] in
+      let info = [Util.sprintf "cut lit %a" Lit.pp (C.lits c).(i)] in
+      let proof c'' = Proof.mk_c_inference ~rule:"clc" ~info c'' [C.proof c; C.proof c'] in
       let parents = c :: C.parents c in
       let new_c = C.create ~parents new_lits proof in
       Util.debug 3 "contextual literal cutting in %a using %a gives\n\t%a"
