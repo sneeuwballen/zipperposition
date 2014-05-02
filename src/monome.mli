@@ -169,6 +169,10 @@ module Focus : sig
   val get : 'a monome -> int -> 'a t
     (** @raise Invalid_argument if the index is invalid *)
 
+  val focus_term : 'a monome -> term -> 'a t option
+    (** Focus on the given term, if it is one of the members of
+        the given monome. *)
+
   val to_monome : 'a t -> 'a monome
     (** Conversion back to an unfocused monome *)
 
@@ -182,6 +186,9 @@ module Focus : sig
 
   val product : 'a t -> 'a -> 'a t
     (** @raise Invalid_argument if the number is 0 *)
+
+  val map : ?term:(term->term) -> ?coeff:('a -> 'a) ->
+            ?rest:('a monome -> 'a monome) -> 'a t -> 'a t
 
   val scale : Z.t t -> Z.t t -> Z.t t * Z.t t
     (** Scale to the same coefficient *)

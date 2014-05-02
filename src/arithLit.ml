@@ -388,6 +388,25 @@ module Focus = struct
           P.pp pos pp lit)
     | Some x -> x
 
+  let focus_term lit t =
+    match lit with
+    | Binary (op, m1, m2) ->
+        begin match M.Focus.focus_term m1 t with
+        | Some mf1 ->
+            assert (not (M.mem m2 t));
+            Some (Left (op, mf1, m2))
+        | None ->
+            match M.Focus.focus_term m2 t with
+            | None -> None
+            | Some mf2 -> Some (Right (op, m1, mf2))
+        end
+    | Divides d ->
+        begin match M.Focus.focus_term d.monome t with
+        | None -> None
+        | Some mf ->
+            Some (Div {d with monome=mf; })
+        end
+
   let focused_monome = function
     | Left (_, mf, _)
     | Right (_, _, mf) -> mf

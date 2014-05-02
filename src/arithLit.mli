@@ -156,6 +156,10 @@ module Focus : sig
   val get_exn : lit -> Position.t -> t
     (** @raise Invalid_argument if the position doesn't fit *)
 
+  val focus_term : lit -> term -> t option
+    (** Attempt to focus on the given atomic term, if it occurs directly
+        under the arith literal *)
+
   val term : t -> term
     (** Focused term *)
 

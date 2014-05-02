@@ -381,6 +381,13 @@ module Focus = struct
       { term; coeff; rest; }
     with _ -> _fail_idx m i
 
+  let focus_term m term =
+    match find m term with
+    | None -> None
+    | Some coeff ->
+        let rest = remove m term in
+        Some {coeff; rest; term; }
+
   let sum t m =
     assert (t.rest.num == m.num);
     { t with rest = sum t.rest m; }
@@ -453,6 +460,10 @@ module Focus = struct
     in
     if rest.num.sign coeff = 0 then failwith "Monome.Focus.apply_subst: coeff 0";
     {coeff; rest; term; }
+
+  let _id x = x
+  let map ?(term=_id) ?(coeff=_id) ?(rest=_id) mf =
+    { term=term mf.term; coeff=coeff mf.coeff; rest=rest mf.rest; }
 
   let unify_self ?(subst=Substs.empty) mf scope k =
     let t = mf.term and num = mf.rest.num in
