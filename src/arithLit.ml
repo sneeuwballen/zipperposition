@@ -117,8 +117,11 @@ let is_divides = function
   | Divides _ -> true
   | Binary _ -> false
 
+let _normalize = Monome.Int.normalize
+
 (* main constructor *)
 let make op m1 m2 =
+  let m1, m2 = _normalize m1, _normalize m2 in
   let m = Monome.difference m1 m2 in
   let m1, m2 = Monome.split m in
   Binary (op, m1, m2)
@@ -129,6 +132,7 @@ let mk_less = make Less
 let mk_lesseq = make Lesseq
 
 let mk_divides ?(sign=true) n ~power m =
+  let m = _normalize m in
   let nk = Z.pow n power in
   (* normalize coefficients so that they are within [0...nk-1] *)
   let norm_coeff c = Z.erem c nk in
@@ -252,11 +256,12 @@ let are_variant lit1 lit2 =
 
 let apply_subst ~renaming subst lit scope = match lit with
   | Binary (op, m1, m2) ->
-    Binary (op,
-      M.apply_subst ~renaming subst m1 scope,
-      M.apply_subst ~renaming subst m2 scope)
+    make op
+      (M.apply_subst ~renaming subst m1 scope)
+      (M.apply_subst ~renaming subst m2 scope)
   | Divides d ->
-      Divides { d with monome=M.apply_subst ~renaming subst d.monome scope; }
+    mk_divides ~sign:d.sign d.num ~power:d.power
+      (M.apply_subst ~renaming subst d.monome scope)
 
 let is_trivial = function
   | Divides d when d.sign && Z.equal d.num Z.one -> true  (* 1 | x tauto *)

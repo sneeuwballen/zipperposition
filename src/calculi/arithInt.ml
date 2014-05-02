@@ -498,7 +498,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let _do_chaining info acc =
     let open ChainingInfo in
     let ord = Ctx.ord () in
-    let renaming = Ctx.renaming_clear () in
+    let renaming = S.Renaming.create () in
     let subst = info.subst in
     let idx_l, _ = Lits.Pos.cut info.left_pos in
     let idx_r, _ = Lits.Pos.cut info.right_pos in
@@ -1161,8 +1161,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
     res
 
-  (* a mod n = n' ----> divisibility literal *)
-  let canc_div_of_remainder lit =
+  (* regular literal ----> arith literal, sometimes *)
+  let canc_lit_of_lit lit =
     let module TC = FOTerm.Classic in
     let module SA = Symbol.TPTP.Arith in
     match lit with
@@ -1176,7 +1176,15 @@ module Make(E : Env.S) : S with module Env = E = struct
                 Lit.mk_divides ~sign n ~power:1 (M.add_const m Z.(~- opp'))
             | _ -> lit
             end
-        | _ -> lit
+        | _ ->
+          begin match Monome.Int.of_term l, Monome.Int.of_term r with
+          | Some m1, Some m2 ->
+              if sign
+                then Lit.mk_arith_eq m1 m2
+                else Lit.mk_arith_neq m1 m2
+          | _, None
+          | None, _-> lit
+          end
         end
     | _ -> lit
 
@@ -1285,6 +1293,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | TC.NonFO
       | TC.BVar _
       | TC.Var _ -> t
+      | TC.App (Symbol.Int _, _, []) -> t  (* don't purify numbers *)
       | TC.App (s, _, l) when should_purify ~root s t ->
         Util.debug 5 "need to purify term %a" T.pp t;
         (* purify the term and add a constraint *)
@@ -1639,7 +1648,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_simplify canc_div_case_switch;
     Env.add_multi_simpl_rule canc_div_prime_decomposition;
     Env.add_multi_simpl_rule eliminate_unshielded;
-    Env.add_lit_rule "div_of_remainder" canc_div_of_remainder;
+    Env.add_lit_rule "canc_lit_of_lit" canc_lit_of_lit;
     Env.add_lit_rule "lesseq_to_less" canc_lesseq_to_less;
     Env.add_is_trivial is_tautology;
     Env.add_simplify purify;

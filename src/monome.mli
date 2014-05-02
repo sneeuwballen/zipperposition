@@ -275,6 +275,12 @@ module Int : sig
   val to_term : t -> term
     (** convert back to a term *)
 
+  val normalize : t -> t
+    (** Normalize the monome, which means that if some terms are
+        integer constants, they are moved to the constant part
+        (e.g after apply X->3 in 2.X+1, one gets 2.3 +1. Normalization
+        reduces this to 7). *)
+
   val has_instances : t -> bool
     (** For real or rational, always true. For integers, returns true
         iff g divides [m.constant], where g is the

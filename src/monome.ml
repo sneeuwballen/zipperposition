@@ -736,6 +736,20 @@ module Int = struct
     in
     t
 
+  let normalize m =
+    let cst, changed, terms =
+      List.fold_left
+        (fun (cst, changed, acc) (c,t) ->
+          match T.view t with
+          | T.Const (Symbol.Int n) ->
+              Z.add cst (Z.mul n c), true, acc
+          | _ -> cst, changed, (c,t)::acc
+        ) (m.const, false, []) m.terms
+    in
+    if changed
+      then {m with const=cst; terms; }
+      else m
+
   let normalize_wrt_zero m =
     if is_const m
     then m
