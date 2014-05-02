@@ -38,33 +38,32 @@ module MF = Monome.Focus
 module AL = ArithLit
 module ALF = ArithLit.Focus
 
-(* TODO: check maximality of focused terms in literals after substitution
-  (t + m1 R m2:  check that not (t < t') for t' in m1 and t' in m2 *)
-
-(* TODO: purification of clauses *)
-
 let stat_arith_sup = Util.mk_stat "arith.superposition"
 let stat_arith_cancellation = Util.mk_stat "arith.arith_cancellation"
 let stat_arith_eq_factoring = Util.mk_stat "arith.eq_factoring"
-let stat_arith_ineq_factoring = Util.mk_stat "arith.ineq_factoring"
 let stat_arith_ineq_chaining = Util.mk_stat "arith.ineq_chaining"
+let stat_arith_purify = Util.mk_stat "arith.purify"
+(*
+let stat_arith_ineq_factoring = Util.mk_stat "arith.ineq_factoring"
 let stat_arith_reflexivity_resolution = Util.mk_stat "arith.reflexivity_resolution"
 let stat_arith_case_switch = Util.mk_stat "arith.case_switch"
 let stat_arith_inner_case_switch = Util.mk_stat "arith.inner_case_switch"
-let stat_arith_purify = Util.mk_stat "arith.purify"
+let stat_arith_semantic_tautology = Util.mk_stat "arith.semantic_tauto"
+let prof_arith_semantic_tautology = Util.mk_profiler "arith.semantic_tauto"
+*)
 
 let prof_arith_sup = Util.mk_profiler "arith.superposition"
 let prof_arith_cancellation = Util.mk_profiler "arith.arith_cancellation"
 let prof_arith_eq_factoring = Util.mk_profiler "arith.eq_factoring"
-let prof_arith_ineq_factoring = Util.mk_profiler "arith.ineq_factoring"
 let prof_arith_ineq_chaining = Util.mk_profiler "arith.ineq_chaining"
+let prof_arith_purify = Util.mk_profiler "arith.purify"
+(*
+let prof_arith_ineq_factoring = Util.mk_profiler "arith.ineq_factoring"
 let prof_arith_reflexivity_resolution = Util.mk_profiler "arith.reflexivity_resolution"
 let prof_arith_case_switch = Util.mk_profiler "arith.case_switch"
 let prof_arith_inner_case_switch = Util.mk_profiler "arith.inner_case_switch"
-let prof_arith_purify = Util.mk_profiler "arith.purify"
+*)
 
-let stat_arith_semantic_tautology = Util.mk_stat "arith.semantic_tauto"
-let prof_arith_semantic_tautology = Util.mk_profiler "arith.semantic_tauto"
 
 module type S = sig
   module Env : Env.S
@@ -377,6 +376,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         (* cancellation depends on what the literal looks like *)
         match a_lit with
         | AL.Binary (op, m1, m2) ->
+            Util.debug 5 "try cancellation in %a" AL.pp a_lit;
             (* try to unify terms in [m1] and [m2] *)
             MF.unify_mm m1 0 m2 0
             |> Sequence.fold
@@ -1259,6 +1259,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* set of new literals *)
     let new_lits = ref [] in
     let _add_lit lit = new_lits := lit :: !new_lits in
+    (* index of the next fresh variable *)
     let varidx = ref ((Lits.Seq.terms (C.lits c)
       |> Sequence.flatMap T.Seq.vars |> T.Seq.max_var) + 1) in
     (* replace term by a fresh var + constraint *)
@@ -1269,8 +1270,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       incr varidx;
       let lit = Lit.mk_arith_neq (M.Int.singleton Z.one v) by in
       _add_lit lit;
-      (* return variable instead of literal *)
-      v
+      v (* return variable instead of literal *)
     (* should we purify the term t with head symbol [s] ?
       yes if it's an arith expression or if it a int-sorted
       function/constant under some other function *)
@@ -1320,6 +1320,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.exit_prof prof_arith_purify;
     res
 
+  (** {6 Variable Elimination Procedure} *)
+
   let is_shielded lits ~var =
     let rec shielded_by_term ~root t = match T.view t with
       | T.Var _ when T.eq t var -> not root
@@ -1345,7 +1347,273 @@ module Make(E : Env.S) : S with module Env = E = struct
     let vars = Lits.vars lits in
     List.filter (fun var -> not (is_shielded lits ~var)) vars
 
-  let eliminate_unshielded c = None  (* TODO *)
+  (** Description of a clause, focused around the elimination
+      of some variable x *)
+  module NakedVarElim = struct
+    type t = {
+      rest : Literal.t list;  (* x doesn't occur in rest *)
+      x : T.t; (* variable to eliminate *)
+      a_lit : ALF.t list;  (* c.x + m1 = m2 *)
+      b_lit : ALF.t list;  (* c.x + m1 != m2 *)
+      c_lit : ALF.t list;  (* n | m_c.x + m  *)
+      d_lit : ALF.t list;  (* n not| m_c.x + m *)
+      e_lit : ALF.t list;  (* c.x + m1 < m2 *)
+      f_lit : ALF.t list;  (* m1 < c.x + m2 *)
+    }
+
+    let _empty x = {
+      rest = []; x; a_lit = []; b_lit = []; c_lit = [];
+      d_lit = []; e_lit = []; f_lit = [];
+    }
+
+    let _lits c k =
+      List.iter k c.a_lit;
+      List.iter k c.b_lit;
+      List.iter k c.c_lit;
+      List.iter k c.d_lit;
+      List.iter k c.e_lit;
+      List.iter k c.f_lit;
+      ()
+
+    (* sequence of coeffs *)
+    let coeffs c =
+      _lits c |> Sequence.map ALF.focused_monome |> Sequence.map MF.coeff
+
+    let map f c =
+      {c with
+        a_lit = List.map f c.a_lit;
+        b_lit = List.map f c.b_lit;
+        c_lit = List.map f c.c_lit;
+        d_lit = List.map f c.d_lit;
+        e_lit = List.map f c.e_lit;
+        f_lit = List.map f c.f_lit;
+      }
+
+    (* map literals to 'a option, and return a list of 'a *)
+    let map_lits f c =
+      List.concat
+        [ List.map f c.a_lit
+        ; List.map f c.b_lit
+        ; List.map f c.c_lit
+        ; List.map f c.d_lit
+        ; List.map f c.e_lit
+        ; List.map f c.f_lit
+        ]
+
+    (* reduce all occurrences of [x] to the same coefficient (their LCM).
+      then, pretend we replace LCM.x with x, so all the coefficients
+      become 1 (but the monomes keep their multiplicative factors!) *)
+    let scale c =
+      let lcm = Sequence.fold Z.lcm Z.one (coeffs c) in
+      if Z.equal lcm Z.one then Z.one, c
+      else
+        let c' = map
+          (fun lit ->
+            let n = Z.divexact lcm (ALF.focused_monome lit |> MF.coeff) in
+            let lit = ALF.product lit n in
+            (* scale monome by n, and do the variable change *)
+            let f_m m = M.product m n in
+            ALF.map_lit
+              ~f_m
+              ~f_mf:(fun mf -> MF.map ~coeff:(fun _ -> Z.one) ~rest:f_m mf)
+              lit
+          )
+          c
+        in lcm, c'
+
+    (* make from clause *)
+    let of_lits lits x =
+      Array.fold_left
+        (fun acc lit -> match lit with
+          | Lit.Arith o when Lit.var_occurs x lit ->
+            (* one of the literals [x] occurs in! classify it, but
+              remember that we need to {b negate} it first. *)
+            begin match AL.Focus.focus_term (AL.negate o) x with
+            | None -> assert false
+            | Some (ALF.Left (AL.Equal, _, _) as lit)
+            | Some (ALF.Right (AL.Equal, _, _) as lit) ->
+              { acc with a_lit = lit::acc.a_lit; }
+            | Some (ALF.Left (AL.Different, _, _) as lit)
+            | Some (ALF.Right (AL.Different, _, _) as lit) ->
+              { acc with b_lit = lit::acc.b_lit; }
+            | Some (ALF.Div d as lit) when d.AL.sign ->
+              { acc with c_lit = lit::acc.c_lit; }
+            | Some (ALF.Div d as lit) ->
+              assert (not(d.AL.sign));
+              { acc with d_lit = lit::acc.d_lit; }
+            | Some (ALF.Left (AL.Less, _, _) as lit) ->
+              { acc with e_lit = lit::acc.e_lit; }
+            | Some (ALF.Left (AL.Lesseq, mf1, m2)) ->
+              (* mf1 <= m2 ------> mf1 < m2+1 *)
+              let lit = ALF.Left (AL.Less, mf1, M.succ m2) in
+              { acc with e_lit = lit::acc.e_lit; }
+            | Some (ALF.Right (AL.Less, _, _) as lit) ->
+              { acc with f_lit = lit::acc.f_lit; }
+            | Some (ALF.Right (AL.Lesseq, m1, mf2)) ->
+              (* m1 <= mf2 -----> m1-1 < mf2 *)
+              let lit = ALF.Right (AL.Less, M.pred m1, mf2) in
+              { acc with f_lit = lit::acc.f_lit; }
+            end
+          | _ ->
+            { acc with rest=lit::acc.rest; }
+        ) (_empty x) lits
+
+
+    (* higher bounds *)
+    let a_set c =
+      List.concat
+        [ List.map (function
+            | ALF.Left (AL.Equal, mf, m)
+            | ALF.Right (AL.Equal, m, mf) -> M.difference (M.succ m) (MF.rest mf)
+            | _ -> assert false)
+          c.a_lit
+        ; List.map (function
+            | ALF.Left (AL.Different, mf, m)
+            | ALF.Right (AL.Different, m, mf) -> M.difference m (MF.rest mf)
+            | _ -> assert false)
+          c.b_lit
+        ; List.map (function
+            | ALF.Left (AL.Less, mf, m) -> M.difference m (MF.rest mf)
+            | _ -> assert false)
+          c.e_lit
+        ]
+
+    let b_set c =
+      List.concat
+        [ List.map (function
+            | ALF.Left (AL.Equal, mf, m)
+            | ALF.Right (AL.Equal, m, mf) -> M.difference (M.pred m) (MF.rest mf)
+            | _ -> assert false)
+          c.a_lit
+        ; List.map (function
+            | ALF.Left (AL.Different, mf, m)
+            | ALF.Right (AL.Different, m, mf) -> M.difference m (MF.rest mf)
+            | _ -> assert false)
+          c.b_lit
+        ; List.map (function
+            | ALF.Right (AL.Less, m, mf) -> M.difference m (MF.rest mf)
+            | _ -> assert false)
+          c.f_lit
+        ]
+
+    (* evaluate when the variable is equal to x *)
+    let eval_at c x =
+      map_lits
+        (function
+          | ALF.Left (op, mf, m) ->
+              Lit.mk_arith_op op (M.sum (MF.rest mf) x) m
+          | ALF.Right (op, m, mf) ->
+              Lit.mk_arith_op op m (M.sum (MF.rest mf) x)
+          | ALF.Div d ->
+              Lit.mk_divides ~sign:d.AL.sign d.AL.num
+                ~power:d.AL.power (M.sum (MF.rest d.AL.monome) x)
+        ) c
+
+    (* evaluate when the variable is equal to x, but as small as needed.
+        Many literals will become true or false *)
+    let eval_minus_infty c x =
+      map_lits
+        (function
+          | ALF.Left (AL.Different, _, _)
+          | ALF.Right (AL.Different, _, _)
+          | ALF.Left (AL.Less, _, _) -> Lit.mk_tauto
+          | ALF.Left (AL.Equal, _, _)
+          | ALF.Right (AL.Equal, _, _)
+          | ALF.Right (AL.Less, _, _) -> Lit.mk_absurd
+          | ALF.Div d ->
+              Lit.mk_divides ~sign:d.AL.sign d.AL.num
+                ~power:d.AL.power (M.sum (MF.rest d.AL.monome) x)
+          | ALF.Left (AL.Lesseq, _, _) | ALF.Right (AL.Lesseq, _, _) -> assert false
+        ) c
+
+    (* evaluate when the variable is equal to x, but as big as needed.
+        Many literals will become true or false *)
+    let eval_plus_infty c x =
+      map_lits
+        (function
+          | ALF.Left (AL.Different, _, _)
+          | ALF.Right (AL.Different, _, _)
+          | ALF.Right (AL.Less, _, _) -> Lit.mk_tauto
+          | ALF.Left (AL.Equal, _, _)
+          | ALF.Right (AL.Equal, _, _)
+          | ALF.Left (AL.Less, _, _) -> Lit.mk_absurd
+          | ALF.Div d ->
+              Lit.mk_divides ~sign:d.AL.sign d.AL.num
+                ~power:d.AL.power (M.sum (MF.rest d.AL.monome) x)
+          | ALF.Left (AL.Lesseq, _, _) | ALF.Right (AL.Lesseq, _, _) -> assert false
+        ) c
+  end
+
+  let _negate_lits = List.map Lit.negate
+
+  let eliminate_unshielded c =
+    let module NVE = NakedVarElim in
+    let nvars = naked_vars (C.lits c) in
+    match nvars with
+    | [] -> None
+    | x::_ ->
+      (* eliminate v *)
+      Util.debug 3 "eliminate naked variable %a from %a" T.pp x C.pp c;
+      (* split C into C' (not containing v) and 6 kinds of literals *)
+      let view = NVE.of_lits (C.lits c) x in
+      let lcm, view = NVE.scale view in
+      if not (Z.fits_int lcm) then None
+      else begin
+        let lcm = Z.to_int lcm in
+        let a_set = NVE.a_set view
+        and b_set = NVE.b_set view in
+        (* prepare to build clauses *)
+        let acc = ref [] in
+        let add_clause lits =
+          let proof cc = Proof.mk_c_inference
+            ~info:[Util.sprintf "elim var %a" T.pp x]
+            ~theories ~rule:"var_elim" cc [C.proof c] in
+          let new_c = C.create ~parents:[c] lits proof in
+          Util.debug 5 "elimination of %a in %a: gives %a" T.pp x C.pp c C.pp new_c;
+          acc := new_c :: !acc
+        in
+        (* choose which form to use *)
+        if List.length a_set > List.length b_set
+          then begin
+            (* use B *)
+            (* first, the -infty part *)
+            for i = 1 to lcm do
+              let x' = M.Int.const (Z.of_int i) in
+              let lits = view.NVE.rest @
+                _negate_lits (NVE.eval_minus_infty view x') in
+              add_clause lits
+            done;
+            (* then the enumeration *)
+            for i = 1 to lcm do
+              List.iter
+                (fun x' ->
+                  (* evaluate at x'+i *)
+                  let x'' = M.add_const x' Z.(of_int i) in
+                  let lits = view.NVE.rest @ _negate_lits (NVE.eval_at view x'') in
+                  add_clause lits
+                ) b_set
+            done;
+          end else begin
+            (* use A *)
+            (* first, the +infty part *)
+            for i = 1 to lcm do
+              let x' = M.Int.const Z.(neg (of_int i)) in
+              let lits = view.NVE.rest @ _negate_lits (NVE.eval_plus_infty view x') in
+              add_clause lits
+            done;
+            (* then the enumeration *)
+            for i = 1 to lcm do
+              List.iter
+                (fun x' ->
+                  (* evaluate at x'-i *)
+                  let x'' = M.difference x' (M.Int.const Z.(of_int i)) in
+                  let lits = view.NVE.rest @ _negate_lits (NVE.eval_at view x'') in
+                  add_clause lits
+                ) a_set
+            done;
+          end;
+        Some !acc
+      end
 
   (** {2 Setup} *)
 
@@ -1363,6 +1631,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_unary_inf "divisibility" canc_divisibility;
     Env.add_simplify canc_div_case_switch;
     Env.add_multi_simpl_rule canc_div_prime_decomposition;
+    Env.add_multi_simpl_rule eliminate_unshielded;
     Env.add_lit_rule "div_of_remainder" canc_div_of_remainder;
     Env.add_lit_rule "lesseq_to_less" canc_lesseq_to_less;
     Env.add_is_trivial is_tautology;
