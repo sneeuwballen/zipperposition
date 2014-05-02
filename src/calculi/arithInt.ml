@@ -1359,11 +1359,12 @@ module Make(E : Env.S) : S with module Env = E = struct
       d_lit : ALF.t list;  (* n not| m_c.x + m *)
       e_lit : ALF.t list;  (* c.x + m1 < m2 *)
       f_lit : ALF.t list;  (* m1 < c.x + m2 *)
+      lcm : Z.t; (* for the additional divisibility guard) *)
     }
 
     let _empty x = {
       rest = []; x; a_lit = []; b_lit = []; c_lit = [];
-      d_lit = []; e_lit = []; f_lit = [];
+      d_lit = []; e_lit = []; f_lit = []; lcm=Z.one;
     }
 
     let _lits c k =
@@ -1419,7 +1420,9 @@ module Make(E : Env.S) : S with module Env = E = struct
               lit
           )
           c
-        in lcm, c'
+        in
+        let c' = {c' with lcm; } in
+        lcm, c'
 
     (* make from clause *)
     let of_lits lits x =
@@ -1498,6 +1501,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     (* evaluate when the variable is equal to x *)
     let eval_at c x =
+      Lit.mk_divides ~power:1 c.lcm x ::
       map_lits
         (function
           | ALF.Left (op, mf, m) ->
@@ -1512,6 +1516,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* evaluate when the variable is equal to x, but as small as needed.
         Many literals will become true or false *)
     let eval_minus_infty c x =
+      Lit.mk_divides ~power:1 c.lcm x ::
       map_lits
         (function
           | ALF.Left (AL.Different, _, _)
@@ -1529,6 +1534,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* evaluate when the variable is equal to x, but as big as needed.
         Many literals will become true or false *)
     let eval_plus_infty c x =
+      Lit.mk_divides ~power:1 c.lcm x ::
       map_lits
         (function
           | ALF.Left (AL.Different, _, _)
@@ -1564,10 +1570,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         and b_set = NVE.b_set view in
         (* prepare to build clauses *)
         let acc = ref [] in
-        let add_clause lits =
+        let add_clause ~by ?which lits =
+          let info = [Util.sprintf "elim %d×%a → %a" lcm T.pp x M.pp by] in
+          let info = match which with None -> info | Some i -> i :: info in
           let proof cc = Proof.mk_c_inference
-            ~info:[Util.sprintf "elim var %a" T.pp x]
-            ~theories ~rule:"var_elim" cc [C.proof c] in
+            ~info ~theories ~rule:"var_elim" cc [C.proof c] in
           let new_c = C.create ~parents:[c] lits proof in
           Util.debug 5 "elimination of %a in %a: gives %a" T.pp x C.pp c C.pp new_c;
           acc := new_c :: !acc
@@ -1581,7 +1588,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               let x' = M.Int.const (Z.of_int i) in
               let lits = view.NVE.rest @
                 _negate_lits (NVE.eval_minus_infty view x') in
-              add_clause lits
+              add_clause ~by:x' ~which:"-∝" lits
             done;
             (* then the enumeration *)
             for i = 1 to lcm do
@@ -1590,7 +1597,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   (* evaluate at x'+i *)
                   let x'' = M.add_const x' Z.(of_int i) in
                   let lits = view.NVE.rest @ _negate_lits (NVE.eval_at view x'') in
-                  add_clause lits
+                  add_clause ~by:x'' lits
                 ) b_set
             done;
           end else begin
@@ -1599,7 +1606,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             for i = 1 to lcm do
               let x' = M.Int.const Z.(neg (of_int i)) in
               let lits = view.NVE.rest @ _negate_lits (NVE.eval_plus_infty view x') in
-              add_clause lits
+              add_clause ~by:x' ~which:"+∝" lits
             done;
             (* then the enumeration *)
             for i = 1 to lcm do
@@ -1608,7 +1615,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   (* evaluate at x'-i *)
                   let x'' = M.difference x' (M.Int.const Z.(of_int i)) in
                   let lits = view.NVE.rest @ _negate_lits (NVE.eval_at view x'') in
-                  add_clause lits
+                  add_clause ~by:x'' lits
                 ) a_set
             done;
           end;

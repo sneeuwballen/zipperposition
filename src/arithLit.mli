@@ -160,6 +160,8 @@ module Focus : sig
     (** Attempt to focus on the given atomic term, if it occurs directly
         under the arith literal *)
 
+  val focus_term_exn : lit -> term -> t
+
   val term : t -> term
     (** Focused term *)
 

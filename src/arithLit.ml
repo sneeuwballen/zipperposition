@@ -259,6 +259,7 @@ let apply_subst ~renaming subst lit scope = match lit with
       Divides { d with monome=M.apply_subst ~renaming subst d.monome scope; }
 
 let is_trivial = function
+  | Divides d when d.sign && Z.equal d.num Z.one -> true  (* 1 | x tauto *)
   | Divides d when d.sign -> M.is_const d.monome && Z.sign (M.const d.monome) = 0
   | Divides d -> M.is_const d.monome && Z.sign (M.const d.monome) <> 0
   | Binary (Equal, m1, m2) -> M.eq m1 m2
@@ -279,6 +280,8 @@ let is_absurd = function
   | Binary (Lesseq, m1, m2) ->
       let m = M.difference m1 m2 in
       M.is_const m && M.sign m > 0
+  | Divides d when not (d.sign) && Z.equal d.num Z.one ->
+      true  (* 1 not| x  is absurd *)
   | Divides d when d.sign ->
       (* n^k should divise a non-zero constant *)
       M.is_const d.monome && M.sign d.monome <> 0
@@ -406,6 +409,10 @@ module Focus = struct
         | Some mf ->
             Some (Div {d with monome=mf; })
         end
+
+  let focus_term_exn lit t = match focus_term lit t with
+    | None -> failwith "ALF.focus_term_exn"
+    | Some lit' -> lit'
 
   let focused_monome = function
     | Left (_, mf, _)

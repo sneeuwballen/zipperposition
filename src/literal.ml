@@ -242,7 +242,11 @@ let mk_arith_less m1 m2 = mk_arith_op ArithLit.Less m1 m2
 let mk_arith_lesseq m1 m2 = mk_arith_op ArithLit.Lesseq m1 m2
 
 let mk_divides ?(sign=true) n ~power m =
-  Arith (ArithLit.mk_divides ~sign n ~power m)
+  let alit = ArithLit.mk_divides ~sign n ~power m in
+  (* simplify things like  not (5 | 10) ---> false *)
+  if ArithLit.is_trivial alit then mk_tauto
+  else if ArithLit.is_absurd alit then mk_absurd
+  else Arith alit
 
 let mk_not_divides n ~power m = mk_divides ~sign:false n ~power m
 
@@ -579,7 +583,12 @@ module Comp = struct
     | Prop (p1, _), Prop (p2, _) -> Ordering.compare ord p1 p2
     | _ ->
         let t1 = root_terms l1 and t2 = root_terms l2 in
-        Multiset.compare_l (Ordering.compare ord) t1 t2
+        let f = Ordering.compare ord in
+        match C.dominates f t1 t2, C.dominates f t2 t1 with
+        | false, false
+        | true, true -> C.Incomparable
+        | true, false -> C.Gt
+        | false, true -> C.Lt
 
   (* negative literals dominate *)
   let _cmp_by_polarity l1 l2 =
