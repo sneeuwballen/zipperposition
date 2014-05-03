@@ -305,7 +305,7 @@ let is_absurd = function
       M.is_const d.monome && M.sign d.monome <> 0
   | Divides d ->
       (* n^k doesn't divise 0 is absurd *)
-      M.is_const d.monome && M.sign d.monome <> 0
+      M.is_const d.monome && M.sign d.monome = 0
 
 let fold_terms ?(pos=P.stop) ?(vars=false) ~which ~ord ~subterms lit acc f =
   (* function to call at terms *)
