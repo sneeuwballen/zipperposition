@@ -106,7 +106,7 @@ module type S = sig
 
   val canc_div_prime_decomposition : Env.multi_simpl_rule
     (** Eliminate divisibility literals with a non-power-of-prime
-        quotient of Z (for instance  6 | a ---> { 2 | a, 3 | a }) *)
+        quotient of Z (for instance  [6 | a ---> { 2 | a, 3 | a }]) *)
 
   val canc_divisibility : Env.unary_inf_rule
     (** Infer divisibility constraints from integer equations,

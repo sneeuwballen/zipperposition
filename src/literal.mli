@@ -206,7 +206,7 @@ module Pos : sig
   val root_term : t -> Position.t -> term
     (** Obtain the term at the given position, at the root of the literal.
         It should hold that
-        [root_term lit p = [at lit (fst (cut p))]. *)
+        [root_term lit p = [at lit (fst (cut p))]]. *)
 
   val term_pos : t -> Position.t -> Position.t
     (** [term_pos lit p = snd (cut lit p)], the subterm position. *)
