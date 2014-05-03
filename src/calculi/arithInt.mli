@@ -67,19 +67,18 @@ module type S = sig
     (** cancellative equality factoring *)
 
   val canc_ineq_chaining : Env.binary_inf_rule
-    (** cancellative inequality chaining *)
+    (** cancellative inequality chaining.
 
-  val canc_ineq_factoring : Env.unary_inf_rule
-    (** Factoring between two inequation literals *)
-
-  val canc_case_switch : Env.binary_inf_rule
-    (** inference rule
-            C1 or a <= b     C2 or b <= c
+        Also does case switch if conditions are present:
+            C1 or a < b     C2 or b < c
         -------------------------------------
-            C1 or C2 or or_{i=a....c} (b = i)
+            C1 or C2 or or_{i=a+1....c-1} (b = i)
         if a and c are integer linear expressions whose difference is
         a constant. If a > c, then the range a...c is empty and the literal
         is just removed. *)
+
+  val canc_ineq_factoring : Env.unary_inf_rule
+    (** Factoring between two inequation literals *)
 
   val canc_inner_case_switch : Env.unary_inf_rule
     (** inference rule

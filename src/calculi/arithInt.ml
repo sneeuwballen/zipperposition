@@ -43,13 +43,12 @@ let stat_arith_cancellation = Util.mk_stat "arith.arith_cancellation"
 let stat_arith_eq_factoring = Util.mk_stat "arith.eq_factoring"
 let stat_arith_ineq_chaining = Util.mk_stat "arith.ineq_chaining"
 let stat_arith_purify = Util.mk_stat "arith.purify"
+let stat_arith_case_switch = Util.mk_stat "arith.case_switch"
+let stat_arith_inner_case_switch = Util.mk_stat "arith.inner_case_switch"
 (*
 let stat_arith_ineq_factoring = Util.mk_stat "arith.ineq_factoring"
 let stat_arith_reflexivity_resolution = Util.mk_stat "arith.reflexivity_resolution"
-let stat_arith_case_switch = Util.mk_stat "arith.case_switch"
-let stat_arith_inner_case_switch = Util.mk_stat "arith.inner_case_switch"
 let stat_arith_semantic_tautology = Util.mk_stat "arith.semantic_tauto"
-let prof_arith_semantic_tautology = Util.mk_profiler "arith.semantic_tauto"
 *)
 
 let prof_arith_sup = Util.mk_profiler "arith.superposition"
@@ -57,11 +56,11 @@ let prof_arith_cancellation = Util.mk_profiler "arith.arith_cancellation"
 let prof_arith_eq_factoring = Util.mk_profiler "arith.eq_factoring"
 let prof_arith_ineq_chaining = Util.mk_profiler "arith.ineq_chaining"
 let prof_arith_purify = Util.mk_profiler "arith.purify"
+let prof_arith_inner_case_switch = Util.mk_profiler "arith.inner_case_switch"
 (*
 let prof_arith_ineq_factoring = Util.mk_profiler "arith.ineq_factoring"
 let prof_arith_reflexivity_resolution = Util.mk_profiler "arith.reflexivity_resolution"
-let prof_arith_case_switch = Util.mk_profiler "arith.case_switch"
-let prof_arith_inner_case_switch = Util.mk_profiler "arith.inner_case_switch"
+let prof_arith_semantic_tautology = Util.mk_profiler "arith.semantic_tauto"
 *)
 
 
@@ -91,19 +90,18 @@ module type S = sig
     (** cancellative equality factoring *)
 
   val canc_ineq_chaining : Env.binary_inf_rule
-    (** cancellative inequality chaining *)
+    (** cancellative inequality chaining.
 
-  val canc_ineq_factoring : Env.unary_inf_rule
-    (** Factoring between two inequation literals *)
-
-  val canc_case_switch : Env.binary_inf_rule
-    (** inference rule
-            C1 or a <= b     C2 or b <= c
+        Also does case switch if conditions are present:
+            C1 or a < b     C2 or b < c
         -------------------------------------
-            C1 or C2 or or_{i=a....c} (b = i)
+            C1 or C2 or or_{i=a+1....c-1} (b = i)
         if a and c are integer linear expressions whose difference is
         a constant. If a > c, then the range a...c is empty and the literal
         is just removed. *)
+
+  val canc_ineq_factoring : Env.unary_inf_rule
+    (** Factoring between two inequation literals *)
 
   val canc_inner_case_switch : Env.unary_inf_rule
     (** inference rule
@@ -130,7 +128,7 @@ module type S = sig
 
   val canc_div_prime_decomposition : Env.multi_simpl_rule
     (** Eliminate divisibility literals with a non-power-of-prime
-        quotient of Z (for instance  6 | a ---> { 2 | a, 3 | a }) *)
+        quotient of Z (for instance  [6 | a ---> { 2 | a, 3 | a }]) *)
 
   val canc_divisibility : Env.unary_inf_rule
     (** Infer divisibility constraints from integer equations,
@@ -494,6 +492,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     }
   end
 
+  (* range from low+1 to low+len-1 *)
+  let _range low len =
+    let rec make acc i len =
+      if Z.sign len = 0 then acc
+      else make (i::acc) (Z.succ i) (Z.pred len)
+    in make [] (Z.succ low) (Z.pred len)
+
   (* cancellative chaining *)
   let _do_chaining info acc =
     let open ChainingInfo in
@@ -505,7 +510,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let s_l = info.left_scope and s_r = info.right_scope in
     let lit_l = ALF.apply_subst ~renaming subst info.left_lit s_l in
     let lit_r = ALF.apply_subst ~renaming subst info.right_lit s_r in
-    Util.debug 5 "arith superposition between %a[%d] and %a[%d] (subst %a)..."
+    Util.debug 5 "arith chaining between %a[%d] and %a[%d] (subst %a)..."
       C.pp info.left s_l C.pp info.right s_r Substs.pp subst;
     (* check ordering conditions *)
     if C.is_maxlit info.left s_l subst idx_l
@@ -539,7 +544,34 @@ module Make(E : Env.S) : S with module Env = E = struct
         Util.debug 5 "ineq chaining of %a and %a gives %a"
           C.pp info.left C.pp info.right C.pp new_c;
         Util.incr_stat stat_arith_ineq_chaining;
-        new_c :: acc
+        let acc = new_c :: acc in
+        
+        (* now, maybe we can also perform case switch! We can if
+           mf_1 - m1 = k + (m2 - mf_2). In this case necessarily
+           Or_{i=1...k-1} mf_2 = m2 + i *)
+        let diff = M.difference
+          (M.sum m1 (MF.rest mf_2))
+          (M.sum m2 (MF.rest mf_1)) in
+        if M.is_const diff && Z.leq (M.const diff) Z.(of_int !case_switch_limit)
+        then begin
+          (* re-use lits_l and lits_r, but build an enumeration *)
+          let new_lits = List.map
+            (fun i ->
+              (* mf_2 = m2 + i *)
+              Lit.mk_arith_eq (MF.to_monome mf_2) (M.add_const m2 i)
+            ) (_range Z.zero (M.const diff))
+          in
+          let lits = List.rev_append new_lits (lits_l @ lits_r) in
+          let proof cc = Proof.mk_c_inference ~theories
+            ~info:[Substs.to_string subst]
+            ~rule:"canc_case_switch" cc [C.proof info.left; C.proof info.right] in
+          let new_c = C.create ~parents:[info.left; info.right] all_lits proof in
+          Util.debug 5 "case switch of %a and %a gives %a"
+            C.pp info.left C.pp info.right C.pp new_c;
+          Util.incr_stat stat_arith_case_switch;
+          new_c :: acc
+          end
+        else acc
       | _ -> assert false
     end else
       acc
@@ -595,96 +627,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
     Util.exit_prof prof_arith_ineq_chaining;
     res
-
-  (* new inference, kind of the dual of inequality chaining for integer
-     inequalities. See the .mli file for more explanations. *)
-  let canc_case_switch c = [] (* TODO *)
-  (*
-    Util.enter_prof prof_canc_case_switch;
-    let ctx = state#ctx in
-    let ord = Ctx.ord ctx in
-    (* try case switch between ~left and ~right.
-      lit = [m1 + nt <| m2], lit' = [m2' <| m1' + nt],
-      so [nt] lives within [m2'-m1', ..., m2-m1]. If those two bounds differ
-      only by a constant, then we can enumerate the cases. *)
-    let _case_switch ~left:(c,s_c,i,lit,strict) ~right:(c',s_c',j,lit',strict') subst acc =
-      let lit, lit' = Foc.scale lit lit' in
-      (* negation of strictness (range inclusive if bound was exclusive,
-          because contrapositive) *)
-      let strict_low = lit'.Foc.op = ArithLit.Lt in
-      let strict_high = lit.Foc.op = ArithLit.Lt in
-      (* apply subst and decompose *)
-      let renaming = Ctx.renaming_clear ~ctx in
-      let lit = Foc.apply_subst ~renaming subst lit s_c in
-      let lit' = Foc.apply_subst ~renaming subst lit' s_c' in
-      let m1, m2 = lit.Foc.same_side, lit.Foc.other_side in
-      let m1', m2' = lit'.Foc.same_side, lit'.Foc.other_side in
-      let m = M.difference (M.sum m2 m1') (M.sum m1 m2') in
-      let n = lit.Foc.coeff in
-      let t = lit.Foc.term in
-      if M.is_const m
-      && S.Arith.Op.less m.M.const !case_switch_limit
-      && C.is_maxlit c s_c subst i
-      && C.is_maxlit c' s_c' subst j
-      && Foc.is_max ~ord (Foc.apply_subst ~renaming subst lit s_c)
-      && Foc.is_max ~ord (Foc.apply_subst ~renaming subst lit' s_c')
-      then begin
-        let low = M.difference m2' m1' in
-        Util.debug 5 "case_switch between %a at %d and %a at %d" C.pp c i C.pp c' j;
-        let range = match m.M.const with
-          | S.Int n -> n
-          | _ -> assert false
-        in
-        let lits_left = Util.array_except_idx c.C.hclits i in
-        let lits_left = Lit.apply_subst_list ~renaming ~ord subst lits_left s_c in
-        let lits_right = Util.array_except_idx c'.C.hclits j in
-        let lits_right = Lit.apply_subst_list ~renaming ~ord subst lits_right s_c' in
-        (* the case switch on [nt]: for n=0...range, add literal  [nt=low + n] *)
-        let lits_case = List.map
-          (fun k ->
-            let lit = Canon.to_lit ~ord
-              (Canon.of_monome ArithLit.Eq
-                (M.add
-                  (M.add_const low (S.mk_bigint k))
-                  (S.Arith.Op.uminus n) t))
-            in
-            lit)
-          (AT.int_range ~strict_low ~strict_high range)
-        in
-        let new_lits = lits_left @ lits_right @ lits_case in
-        let proof cc = Proof.mk_c_inference
-          ~theories:["arith"] ~info:[Substs.FO.to_string subst]
-          ~rule:"arith_case_switch" cc [c.C.hcproof; c'.C.hcproof] in
-        let parents = [c; c'] in
-        let new_c = C.create ~parents ~ctx new_lits proof in
-        Util.debug 5 "  --> case switch gives clause %a" C.pp new_c;
-        Util.incr_stat stat_canc_case_switch;
-        new_c :: acc
-      end else acc
-    in
-    let new_clauses = ArithLit.Arr.fold_focused ~ord c.C.hclits []
-      (fun acc i lit ->
-        match lit.Foc.op with
-        | (ArithLit.Leq | ArithLit.Lt) when Type.eq Type.int (S.ty lit.Foc.coeff) ->
-          let t = lit.Foc.term in
-          let strict = lit.Foc.op = ArithLit.Lt in
-          I.retrieve_unifiables state#idx_canc 0 t 1 acc
-            (fun acc t' (c',j,lit') subst ->
-              (* lit' = t' + m1' <| m2' ? *)
-              match lit'.Foc.op, lit.Foc.side, lit'.Foc.side with
-              | (ArithLit.Leq | ArithLit.Lt), ArithLit.Left, ArithLit.Right ->
-                let strict' = lit'.Foc.op = ArithLit.Lt in
-                _case_switch ~left:(c,1,i,lit,strict) ~right:(c',0,j,lit',strict') subst acc
-              | (ArithLit.Leq | ArithLit.Lt), ArithLit.Right, ArithLit.Left ->
-                let strict' = lit'.Foc.op = ArithLit.Lt in
-                _case_switch ~left:(c',0,j,lit',strict') ~right:(c,1,i,lit,strict) subst acc
-              | _ -> acc
-            )
-        | _ -> acc)
-    in
-    Util.exit_prof prof_canc_case_switch;
-    new_clauses
-  *)
 
   let canc_inner_case_switch c = []
   (*
@@ -1641,7 +1583,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_unary_inf "canc_eq_factoring" canc_equality_factoring;
     Env.add_binary_inf "canc_ineq_chaining" canc_ineq_chaining;
     Env.add_unary_inf "canc_ineq_factoring" canc_ineq_factoring;
-    Env.add_binary_inf "canc_case_switch" canc_case_switch;
     Env.add_unary_inf "canc_inner_case_switch" canc_inner_case_switch;
     Env.add_binary_inf "div_chaining" canc_div_chaining;
     Env.add_unary_inf "divisibility" canc_divisibility;
