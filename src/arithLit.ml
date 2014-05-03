@@ -272,12 +272,25 @@ let is_trivial = function
   | Binary (Lesseq, m1, m2) -> M.dominates ~strict:false m2 m1
   | Binary (Different, m1, m2) ->
       let m = M.difference m1 m2 in
-      M.is_const m && Z.sign (M.const m) <> 0
+      (* gcd of all the coefficients *)
+      let gcd = M.coeffs m
+        |> List.fold_left (fun c1 (c2,_) -> Z.gcd c1 c2) Z.one in
+      (* trivial if: either it's a!=0, with a a constant, or if
+        the GCD of all coefficients does not divide the constant
+        (unsolvable diophantine equation) *)
+      (M.is_const m && Z.sign (M.const m) <> 0)
+      || (Z.sign (Z.rem (M.const m) gcd) <> 0)
 
 let is_absurd = function
   | Binary (Equal, m1, m2) ->
       let m = M.difference m1 m2 in
-      M.is_const m && M.sign m <> 0
+      let gcd = M.coeffs m
+        |> List.fold_left (fun c1 (c2,_) -> Z.gcd c1 c2) Z.one in
+      (* absurd if: either it's a=0, with a a constant, or if
+        the GCD of all coefficients does not divide the constant
+        (unsolvable diophantine equation) *)
+      (M.is_const m && M.sign m <> 0)
+      || (Z.sign (Z.rem (M.const m) gcd) <> 0)
   | Binary (Different, m1, m2) -> M.eq m1 m2
   | Binary (Less, m1, m2) ->
       let m = M.difference m1 m2 in
