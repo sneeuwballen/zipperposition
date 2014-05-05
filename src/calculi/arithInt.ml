@@ -545,7 +545,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           C.pp info.left C.pp info.right C.pp new_c;
         Util.incr_stat stat_arith_ineq_chaining;
         let acc = new_c :: acc in
-        
+
         (* now, maybe we can also perform case switch! We can if
            mf_1 - m1 = k + (m2 - mf_2). In this case necessarily
            Or_{i=1...k-1} mf_2 = m2 + i *)
@@ -561,7 +561,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               Lit.mk_arith_eq (MF.to_monome mf_2) (M.add_const m2 i)
             ) (_range Z.zero (M.const diff))
           in
-          let lits = List.rev_append new_lits (lits_l @ lits_r) in
+          let all_lits = List.rev_append new_lits (lits_l @ lits_r) in
           let proof cc = Proof.mk_c_inference ~theories
             ~info:[Substs.to_string subst]
             ~rule:"canc_case_switch" cc [C.proof info.left; C.proof info.right] in
