@@ -155,7 +155,7 @@ module TPTP : sig
 
   val mk_fun_ty : ?loc:location -> t list -> t -> t
   val tType : t
-  val forall_ty : t list -> t -> t
+  val forall_ty : ?loc:location -> t list -> t -> t
 
   include Interfaces.PRINT with type t := t
 end

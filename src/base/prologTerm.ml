@@ -322,7 +322,7 @@ module TPTP = struct
     | [] -> ret
     | _::_ -> app ?loc (const Symbol.Base.arrow) (ret :: l)
   let tType = const Symbol.Base.tType
-  let forall_ty vars t = bind Symbol.Base.forall_ty vars t
+  let forall_ty ?loc vars t = bind ?loc Symbol.Base.forall_ty vars t
 
   let rec pp buf t = match t.term with
     | Var s -> Buffer.add_string buf s
