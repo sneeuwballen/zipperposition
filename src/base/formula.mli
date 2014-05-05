@@ -60,6 +60,7 @@ module type S = sig
     | Neq of term * term
     | Forall of Type.t * t  (** Quantified formula, with De Bruijn index *)
     | Exists of Type.t * t
+    | ForallTy of t  (** quantification on type variable *)
 
   val view : t -> view
     (** View of the formula *)
@@ -101,9 +102,11 @@ module type S = sig
 
     val forall : term list -> t -> t
     val exists : term list -> t -> t
+    val forall_ty : Type.t list -> t -> t
 
     val __mk_forall : varty:Type.t -> t -> t
     val __mk_exists : varty:Type.t -> t -> t
+    val __mk_forall_ty : t -> t
   end
 
   (** {2 Sequence} *)
@@ -164,7 +167,8 @@ module type S = sig
 
   val free_vars_set : t -> term_set (** Set of free variables *)
   val free_vars : t -> term list (** Set of free vars *)
-  val de_bruijn_set : t -> term_set  (** Set of De Bruijn indices that are not bound *)
+  val de_bruijn_set : t -> Type.Set.t * term_set
+    (** Set of De Bruijn indices that are not bound for types and terms *)
 
   val close_forall : t -> t   (** Bind all free variables with forall *)
   val close_exists : t -> t   (** Bind all free variables with exists *)

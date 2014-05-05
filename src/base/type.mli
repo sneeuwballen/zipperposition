@@ -144,6 +144,7 @@ module Seq : sig
   val vars : t -> t Sequence.t
   val sub : t -> t Sequence.t
   val add_set : Set.t -> t Sequence.t -> Set.t
+  val max_var : t Sequence.t -> int
 end
 
 (** {2 Utils} *)

@@ -144,6 +144,11 @@ module Seq = struct
   let vars ty = Sequence.fmap of_term (T.Seq.vars ty)
   let sub ty = Sequence.fmap of_term (T.Seq.subterms ty)
   let add_set set t = Sequence.fold (fun set x -> Set.add x set) set t
+  let max_var =
+    Sequence.fold
+      (fun m ty -> match view ty with
+      | Var i -> max i m
+      | _ -> m) 0
 end
 
 let vars_set set t =

@@ -84,7 +84,9 @@ let fresh_sym ~ctx ~ty = fresh_sym_with ~ctx ~ty ctx.sc_prefix
 
 (* update varindex in [ctx] so that it won't get captured in [t] *)
 let update_var ~ctx t =
-  let m = max ctx.sc_var_index ((T.Seq.vars t |> T.Seq.max_var) + 1) in
+  let m1 = T.Seq.vars t |> T.Seq.max_var in
+  let m2 = T.Seq.ty_vars t |> Type.Seq.max_var in
+  let m = max ctx.sc_var_index (max m1 m2) + 1 in
   ctx.sc_var_index <- m
 
 let clear_var ~ctx =
@@ -160,31 +162,40 @@ let get_definition ~ctx ~polarity f =
     (* ok, we have to introduce a new name. It will have all free variables
        (bound in a surrouding scope or not) as arguments. *)
     let vars = F.free_vars f in
-    let bvars = F.de_bruijn_set f |> T.Set.elements in
+    let ty_bvars, bvars = F.de_bruijn_set f in
+    let ty_bvars = Type.Set.elements ty_bvars
+    and bvars = T.Set.elements bvars in
     let all_vars = vars @ bvars in
     let ty_of_vars = List.map T.ty all_vars in
     (* build the proxy literal *)
-    let ty = Type.(ty_prop <== ty_of_vars) in
+    let ty = Type.(forall ty_bvars (ty_prop <== ty_of_vars)) in
     let const = T.const ~ty (fresh_sym_with ~ctx ~ty "proxy_logtk") in
-    let p = F.Base.atom (T.app const all_vars) in
+    let p = F.Base.atom (T.app_full const ty_bvars all_vars) in
     (* introduce new name for [f] *)
     Util.debug 5 "define formula %a with %a" F.pp f F.pp p;
     let def = {form=f; proxy=p; polarity=ref polarity; } in
     ctx.sc_defs <- F.Map.add f def ctx.sc_defs;
     (* map bvars to fresh vars and evaluate [p] and [f] to remove them! *)
-    let env = bvars
-      |> List.map (fun db -> match T.view db with
-          | T.BVar i ->
-              let v = T.var ~ty:(T.ty db) (fresh_var ~ctx) in
-              i, (v : T.t :> ST.t)
-          | _ -> assert false)
-      |> DBEnv.of_list
+    let env =
+      let l1 = List.map (fun db -> match T.view db with
+        | T.BVar i ->
+            let v = T.var ~ty:(T.ty db) (fresh_var ~ctx) in
+            i, (v : T.t :> ST.t)
+        | _ -> assert false) bvars
+      and l2 = List.map (fun db -> match Type.view db with
+        | Type.BVar i ->
+            let v = Type.var (fresh_var ~ctx) in
+            i, (v : Type.t :> ST.t)
+        | _ -> assert false) ty_bvars
+      in
+      DBEnv.of_list (l1 @ l2)
     in
     let p' = ST.DB.eval env (p:F.t:>ST.t) |> F.of_term_exn in
     let f' = ST.DB.eval env (f:F.t:>ST.t) |> F.of_term_exn in
     (* the definition to introduce defines [p'] in function of [f'];
      * they are similar to [p] and [f] but don't have De Bruijn indices *)
     ctx.sc_new_defs <- {form=f'; proxy=p'; polarity=def.polarity; } :: ctx.sc_new_defs;
+    Util.debug 5 "... returning %a" F.pp p;
     (* return proxy *)
     p
 
