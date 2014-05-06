@@ -121,7 +121,7 @@ module type S = sig
     (** Chain together two divisibility literals, assuming they share the
         same prime *)
 
-  val canc_div_case_switch : Env.simplify_rule
+  val canc_div_case_switch : Env.unary_inf_rule
     (** Eliminate negative divisibility literals within a power-of-prime
         quotient of Z:
         not (d^i | m) -----> *)
@@ -967,7 +967,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               else ()
           | _ -> assert false
         );
-      c
+      []
     with ReplaceLitByLitsInSameClause (i, lits) ->
       (* replace lit number [i] with [lits] *)
       let lits' = Util.array_except_idx (C.lits c) i in
@@ -976,7 +976,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         ~theories cc [C.proof c] in
       let new_c = C.create ~parents:[c] all_lits proof in
       Util.debug 5 "div_case_switch of %a into %a" C.pp c C.pp new_c;
-      new_c
+      [new_c]
 
   let canc_div_prime_decomposition c =
     let eligible = C.Eligible.(max c ** filter Lit.is_arith_divides) in
@@ -1592,7 +1592,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_unary_inf "canc_inner_case_switch" canc_inner_case_switch;
     Env.add_binary_inf "div_chaining" canc_div_chaining;
     Env.add_unary_inf "divisibility" canc_divisibility;
-    Env.add_simplify canc_div_case_switch;
+    Env.add_unary_inf "div_case_switch" canc_div_case_switch;
     Env.add_multi_simpl_rule canc_div_prime_decomposition;
     Env.add_multi_simpl_rule eliminate_unshielded;
     Env.add_lit_rule "canc_lit_of_lit" canc_lit_of_lit;

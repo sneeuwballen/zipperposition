@@ -98,7 +98,7 @@ module type S = sig
     (** Chain together two divisibility literals, assuming they share the
         same prime *)
 
-  val canc_div_case_switch : Env.simplify_rule
+  val canc_div_case_switch : Env.unary_inf_rule
     (** Eliminate negative divisibility literals within a power-of-prime
         quotient of Z:
         not (d^i | m) -----> *)
