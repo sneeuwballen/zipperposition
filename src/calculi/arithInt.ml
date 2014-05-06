@@ -495,7 +495,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* range from low+1 to low+len-1 *)
   let _range low len =
     let rec make acc i len =
-      if Z.sign len = 0 then acc
+      if Z.sign len <= 0 then acc
       else make (i::acc) (Z.succ i) (Z.pred len)
     in make [] (Z.succ low) (Z.pred len)
 
@@ -1364,13 +1364,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         let c' = map
           (fun lit ->
             let n = Z.divexact lcm (ALF.focused_monome lit |> MF.coeff) in
-            let lit = ALF.product lit n in
-            (* scale monome by n, and do the variable change *)
-            let f_m m = M.product m n in
-            ALF.map_lit
-              ~f_m
-              ~f_mf:(fun mf -> MF.map ~coeff:(fun _ -> Z.one) ~rest:f_m mf)
-              lit
+            (* scale monome by n *)
+            ALF.product lit n
           )
           c
         in

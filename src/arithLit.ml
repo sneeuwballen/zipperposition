@@ -146,7 +146,7 @@ let negate = function
       begin match op with
       | Equal -> Binary (Different, m1, m2)
       | Different -> Binary (Equal, m1, m2)
-      | Less -> Binary (Less, m2, M.succ m1)  (* a<b --> b<=a ---> b<a+1 *)
+      | Less -> make Less m2 (M.succ m1) (* a<b --> b<=a ---> b<a+1 *)
       | Lesseq -> Binary (Less, m2, m1)
       end
   | Divides d -> Divides { d with sign=not d.sign; }
