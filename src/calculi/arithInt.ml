@@ -1202,6 +1202,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         Lit.mk_arith_less m1 (M.succ m2)
     | lit -> lit
 
+  (* flag to be used to know when a clause cannot be purified *)
+  let flag_no_purify = C.new_flag ()
+
   (* replace arith subterms with fresh variable + constraint *)
   let purify c =
     let module TC = T.Classic in
@@ -1241,7 +1244,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         (* purify the term and add a constraint *)
         begin match M.Int.of_term t with
         | None ->
-          Util.debug 5 "could not purify %a (non linear)" T.pp t;
+          Util.debug 5 "could not purify %a (non linear; cache)" T.pp t;
+          C.set_flag flag_no_purify c true;
           t  (* non linear, abort. *)
         | Some m -> replace t ~by:m
         end
@@ -1260,6 +1264,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let lits' = Lits.map (purify_term ~root:true) (C.lits c) in
     let res = match !new_lits with
     | [] -> c (* no change *)
+    | _ when C.get_flag flag_no_purify c -> c  (* cannot/should not purify *)
     | _::_ ->
         let all_lits = !new_lits @ (Array.to_list lits') in
         let proof cc = Proof.mk_c_inference ~theories ~rule:"purify" cc [C.proof c] in
@@ -1281,13 +1286,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       | T.Const _
       | T.TyApp _ -> false
       | T.App (hd, l) ->
-          match T.head hd with
-          | Some s when Symbol.TPTP.Arith.is_arith s ->
-            (* arithmetic term, [root] may continue to be true *)
-            List.exists (shielded_by_term ~root) l
-          | None
-          | Some _ ->
-            List.exists (shielded_by_term ~root:false) l
+        (* ignore arith terms, they are shielding as well. We should
+          only eliminate variables that occur directly under proper arith
+          literals *)
+        List.exists (shielded_by_term ~root:false) l
     in
     (* is there a term, directly under a literal, that shields the variable? *)
     lits
@@ -1527,13 +1529,15 @@ module Make(E : Env.S) : S with module Env = E = struct
           let proof cc = Proof.mk_c_inference
             ~info ~theories ~rule:"var_elim" cc [C.proof c] in
           let new_c = C.create ~parents:[c] lits proof in
-          Util.debug 5 "elimination of %a in %a: gives %a" T.pp x C.pp c C.pp new_c;
+          Util.debug 5 "elimination of %d×%a by %a in %a: gives %a"
+            lcm T.pp x M.pp by C.pp c C.pp new_c;
           acc := new_c :: !acc
         in
         (* choose which form to use *)
         if List.length a_set > List.length b_set
           then begin
             (* use B *)
+            Util.debug 5 "use the B elimination algorithm";
             (* first, the -infty part *)
             for i = 1 to lcm do
               let x' = M.Int.const (Z.of_int i) in
@@ -1553,10 +1557,12 @@ module Make(E : Env.S) : S with module Env = E = struct
             done;
           end else begin
             (* use A *)
+            Util.debug 5 "use the A elimination algorithm";
             (* first, the +infty part *)
             for i = 1 to lcm do
               let x' = M.Int.const Z.(neg (of_int i)) in
-              let lits = view.NVE.rest @ _negate_lits (NVE.eval_plus_infty view x') in
+              let lits = view.NVE.rest @
+                _negate_lits (NVE.eval_plus_infty view x') in
               add_clause ~by:x' ~which:"+∝" lits
             done;
             (* then the enumeration *)
@@ -1564,7 +1570,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               List.iter
                 (fun x' ->
                   (* evaluate at x'-i *)
-                  let x'' = M.difference x' (M.Int.const Z.(of_int i)) in
+                  let x'' = M.add_const x' Z.(neg (of_int i)) in
                   let lits = view.NVE.rest @ _negate_lits (NVE.eval_at view x'') in
                   add_clause ~by:x'' lits
                 ) a_set

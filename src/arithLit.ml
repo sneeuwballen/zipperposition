@@ -265,8 +265,10 @@ let apply_subst ~renaming subst lit scope = match lit with
 
 let is_trivial = function
   | Divides d when d.sign && Z.equal d.num Z.one -> true  (* 1 | x tauto *)
-  | Divides d when d.sign -> M.is_const d.monome && Z.sign (M.const d.monome) = 0
-  | Divides d -> M.is_const d.monome && Z.sign (M.const d.monome) <> 0
+  | Divides d when d.sign ->
+      M.is_const d.monome && Z.sign (Z.rem (M.const d.monome) d.num) = 0
+  | Divides d ->
+      M.is_const d.monome && Z.sign (Z.rem (M.const d.monome) d.num) <> 0
   | Binary (Equal, m1, m2) -> M.eq m1 m2
   | Binary (Less, m1, m2) -> M.dominates ~strict:true m2 m1
   | Binary (Lesseq, m1, m2) -> M.dominates ~strict:false m2 m1
@@ -301,11 +303,11 @@ let is_absurd = function
   | Divides d when not (d.sign) && Z.equal d.num Z.one ->
       true  (* 1 not| x  is absurd *)
   | Divides d when d.sign ->
-      (* n^k should divise a non-zero constant *)
-      M.is_const d.monome && M.sign d.monome <> 0
+      (* n^k should divide a non-zero constant *)
+      M.is_const d.monome && Z.sign (Z.rem (M.const d.monome) d.num) <> 0
   | Divides d ->
-      (* n^k doesn't divise 0 is absurd *)
-      M.is_const d.monome && M.sign d.monome = 0
+      (* n^k doesn't divide 0 is absurd *)
+      M.is_const d.monome && Z.sign (Z.rem (M.const d.monome) d.num) = 0
 
 let fold_terms ?(pos=P.stop) ?(vars=false) ~which ~ord ~subterms lit acc f =
   (* function to call at terms *)
