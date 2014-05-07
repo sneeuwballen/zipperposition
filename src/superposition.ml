@@ -741,13 +741,15 @@ let positive_simplify_reflect (simpl_set : PS.SimplSet.t) c =
       iterate_lits acc lits' new_clauses
     end
   | lit::lits' -> iterate_lits (lit::acc) lits' clauses
-  (** try to make the terms equal using some positive unit clauses
-      from active_set *)
+  (* try to make the terms equal using some positive unit clauses
+     from active_set *)
   and equatable_terms clauses t1 t2 =
     match T.Classic.view t1, T.Classic.view t2 with
     | _ when T.eq t1 t2 -> Some clauses  (* trivial *)
-    | T.Classic.App (f, _, ss), T.Classic.App (g, _, ts)
-      when Symbol.eq f g && List.length ss = List.length ts ->
+    | T.Classic.App (f, ty_f, ss), T.Classic.App (g, ty_g, ts)
+      when Symbol.eq f g
+      && List.for_all2 Type.eq ty_f ty_g
+      && List.length ss = List.length ts ->
       (* try to make the terms equal directly *)
       begin match equate_root clauses t1 t2 with
       | None -> (* otherwise try to make subterms pairwise equal *)
@@ -764,16 +766,20 @@ let positive_simplify_reflect (simpl_set : PS.SimplSet.t) c =
       | Some clauses -> Some clauses
       end
     | _ -> equate_root clauses t1 t2 (* try to solve it with a unit equality *)
-  (** try to equate terms with a positive unit clause that match them *)
+  (* try to equate terms with a positive unit clause that match them *)
   and equate_root clauses t1 t2 =
     try UnitIdx.retrieve ~sign:true simpl_set#idx_simpl 1 t1 0 ()
       (fun () l r (_,_,_,c') subst ->
-        let renaming = Ctx.renaming_clear ~ctx in
-        if T.eq t2 (S.FO.apply ~renaming subst r 1)
-        then begin  (* t1!=t2 is refuted by l\sigma = r\sigma *)
+        Util.debug 5 "simpl_reflect+: %a = %a may subsume %a != %a with %a"
+          T.pp l T.pp r T.pp t1 T.pp t2 S.pp subst;
+        assert (Unif.FO.eq ~subst l 1 t1 0);
+        if Unif.FO.eq ~subst r 1 t2 0
+        then begin
+          (* t1!=t2 is refuted by l\sigma = r\sigma *)
           Util.debug 4 "equate %a and %a using %a" T.pp t1 T.pp t2 C.pp c';
           raise (FoundMatch (r, c', subst)) (* success *)
-        end else ());
+        end
+      );
       None (* no match *)
     with FoundMatch (r, c', subst) ->
       Some (c'.C.hcproof :: clauses)  (* success *)
@@ -782,7 +788,7 @@ let positive_simplify_reflect (simpl_set : PS.SimplSet.t) c =
   let lits, premises = iterate_lits [] (Array.to_list c.C.hclits) [] in
   if List.length lits = Array.length c.C.hclits
     then (Util.exit_prof prof_pos_simplify_reflect; c) (* no literal removed, keep c *)
-    else 
+    else begin
       let proof c' = Proof.mk_c_simp
         ~rule:"simplify_reflect+" c' (c.C.hcproof::premises) in
       let parents = c :: c.C.hcparents in
@@ -790,6 +796,7 @@ let positive_simplify_reflect (simpl_set : PS.SimplSet.t) c =
       Util.debug 3 "%a pos_simplify_reflect into %a" C.pp c C.pp new_c;
       Util.exit_prof prof_pos_simplify_reflect;
       new_c
+    end
 
 let negative_simplify_reflect (simpl_set : PS.SimplSet.t) c =
   Util.enter_prof prof_neg_simplify_reflect;
@@ -809,12 +816,14 @@ let negative_simplify_reflect (simpl_set : PS.SimplSet.t) c =
   and can_refute s t =
     try UnitIdx.retrieve ~sign:false simpl_set#idx_simpl 1 s 0 ()
       (fun () l r (_,_,_,c') subst ->
-        let renaming = Ctx.renaming_clear ~ctx in
-        if T.eq t (S.FO.apply ~renaming subst r 1)
+        assert (Unif.FO.eq ~subst l 1 s 0);
+        if Unif.FO.eq ~subst r 1 t 0
         then begin
+          let subst = Unif.FO.matching ~subst ~pattern:r 1 t 0 in
           Util.debug 3 "neg_reflect eliminates %a=%a with %a" T.pp s T.pp t C.pp c';
           raise (FoundMatch (r, c', subst)) (* success *)
-        end else ());
+        end
+      );
       None (* no match *)
     with FoundMatch (r, c', subst) ->
       Some c'.C.hcproof  (* success *)
@@ -823,7 +832,7 @@ let negative_simplify_reflect (simpl_set : PS.SimplSet.t) c =
   let lits, premises = iterate_lits [] (Array.to_list c.C.hclits) [] in
   if List.length lits = Array.length c.C.hclits
     then (Util.exit_prof prof_neg_simplify_reflect; c) (* no literal removed *)
-    else 
+    else begin
       let proof c' = Proof.mk_c_simp ~rule:"simplify_reflect-"
         c' (c.C.hcproof::premises) in
       let parents = c :: c.C.hcparents in
@@ -831,6 +840,7 @@ let negative_simplify_reflect (simpl_set : PS.SimplSet.t) c =
       Util.debug 3 "%a neg_simplify_reflect into %a" C.pp c C.pp new_c;
       Util.exit_prof prof_neg_simplify_reflect;
       new_c
+    end
 
 (* ----------------------------------------------------------------------
  * subsumption
