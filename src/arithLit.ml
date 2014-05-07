@@ -390,6 +390,11 @@ module Focus = struct
     | Right of op * Z.t Monome.t * Z.t Monome.Focus.t
     | Div of Z.t Monome.Focus.t divides
 
+  let mk_left op mf m = Left (op, mf, m)
+  let mk_right op m mf = Right (op, m, mf)
+  let mk_div ?(sign=true) num ~power m =
+    Div {power;num;sign;monome=m;}
+
   let get lit pos =
     match lit, pos with
     | Binary (op, m1, m2), P.Left (P.Arg (i, _)) ->

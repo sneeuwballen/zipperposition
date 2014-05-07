@@ -151,6 +151,10 @@ module Focus : sig
     | Right of op * Z.t Monome.t * Z.t Monome.Focus.t
     | Div of Z.t Monome.Focus.t divides
 
+  val mk_left : op -> Z.t Monome.Focus.t -> Z.t Monome.t -> t
+  val mk_right : op -> Z.t Monome.t -> Z.t Monome.Focus.t -> t
+  val mk_div : ?sign:bool -> Z.t -> power:int -> Z.t Monome.Focus.t -> t
+
   val get : lit -> Position.t -> t option
 
   val get_exn : lit -> Position.t -> t

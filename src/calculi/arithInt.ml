@@ -628,9 +628,97 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.exit_prof prof_arith_ineq_chaining;
     res
 
-  let canc_inner_case_switch c = []
+  let canc_inner_case_switch c =
+    Util.enter_prof prof_arith_inner_case_switch;
+    let ord = Ctx.ord () in
+    let acc = ref [] in
+    (* do the chaining if ordering conditions are ok,
+      and the monomes differ only by a constant.
+      The literals are   l < mf_l and mf_r < r *)
+    let _do_case_switch ~subst lit1 lit2 i j =
+      let renaming = S.Renaming.create () in
+      let lit1 = ALF.apply_subst ~renaming subst lit1 0 in
+      let lit2 = ALF.apply_subst ~renaming subst lit2 0 in
+      (* same coefficient for the focused term *)
+      let lit1, lit2 = ALF.scale lit1 lit2 in
+      match lit1, lit2 with
+      | ALF.Left (AL.Less, mf_r, r), ALF.Right (AL.Less, l, mf_l)
+      | ALF.Right (AL.Less, l, mf_l), ALF.Left (AL.Less, mf_r, r) ->
+        let diff = M.difference
+          (M.difference (MF.rest mf_r) r)
+          (M.difference (MF.rest mf_l) l)
+        in
+        if M.is_const diff
+        && Z.fits_int (M.const diff)
+        && Z.sign (M.const diff) >= 0
+        && Z.lt (M.const diff) (Z.of_int !case_switch_limit)
+        && ALF.is_max ~ord lit1
+        && ALF.is_max ~ord lit2
+        && (C.is_maxlit c 0 subst i || C.is_maxlit c 0 subst j)
+        (* C = C' or l < mf_l or mf_r < r,
+          with mf_l and mf_r sharing the focus on a.t, so
+          if mf_r.rest - r = k + l - mf_l.rest, then
+            (a.t + mf_l.rest = l + k') => C' is true for k'=0...k *)
+        then begin
+          let k = Z.to_int (M.const diff) in
+          (* build literals *)
+          let other_lits = Util.array_foldi
+            (fun acc i' lit -> if i' <> i && i' <> j then lit :: acc else acc)
+            [] (C.lits c)
+          in
+          let other_lits = Lit.apply_subst_list ~renaming subst other_lits 0 in
+          for i=0 to k do
+            let new_lit = Lit.mk_arith_neq
+              (MF.to_monome mf_l)
+              (M.add_const l (Z.of_int i))
+            in
+            let lits = new_lit :: other_lits in
+            (* build clauses *)
+            let proof cc = Proof.mk_c_inference ~theories
+              ~info:[Substs.to_string subst]
+              ~rule:"canc_inner_case_switch" cc [C.proof c] in
+            let new_c = C.create ~parents:[c] lits proof in
+            Util.debug 5 "inner case switch of %a gives %a" C.pp c C.pp new_c;
+            Util.incr_stat stat_arith_inner_case_switch;
+            acc := new_c :: !acc
+          done
+        end
+      | _ -> ()
+    in
+    (* traverse the clause to find matching pairs *)
+    let eligible = C.Eligible.(max c ** filter Lit.is_arith_less) in
+    Lits.fold_arith ~eligible (C.lits c) ()
+      (fun () lit1 pos1 ->
+        let i = Lits.Pos.idx pos1 in
+        let eligible' = C.Eligible.(filter Lit.is_arith_less) in
+        Lits.fold_arith ~eligible:eligible' (C.lits c) ()
+          (fun () lit2 pos2 ->
+            let j = Lits.Pos.idx pos2 in
+            match lit1, lit2 with
+            | _ when i=j -> ()  (* need distinct lits *)
+            | AL.Binary (AL.Less, l1, r1), AL.Binary (AL.Less, l2, r2) ->
+              (* see whether we have   l2 < a.x + m < r1 *)
+              MF.unify_mm l1 0 r2 0
+                (fun (mf1,mf2,subst) ->
+                  let lit1 = ALF.mk_left AL.Less mf1 r1 in
+                  let lit2 = ALF.mk_right AL.Less l2 mf2 in
+                  _do_case_switch ~subst lit1 lit2 i j
+                );
+              (* see whether we have   l1 < a.x + m < r2 *)
+              MF.unify_mm r1 0 l2 0
+                (fun (mf1,mf2,subst) ->
+                  let lit1 = ALF.mk_right AL.Less l1 mf1 in
+                  let lit2 = ALF.mk_left AL.Less mf2 r2 in
+                  _do_case_switch ~subst lit1 lit2 i j
+                );
+              ()
+            | _ -> assert false
+          )
+      );
+    Util.enter_prof prof_arith_inner_case_switch;
+    !acc
+
   (*
-    Util.enter_prof prof_canc_inner_case_switch;
     let ctx = c.C.hcctx in
     let ord = Ctx.ord ctx in
     (* lit = [t + m1 <| m2], lit' = [m2' <| t + m1']. In other words,
@@ -852,6 +940,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   *)
 
   (** {3 Divisibility} *)
+
+  (* TODO: negative div chaining *)
 
   let canc_div_chaining c =
     let ord = Ctx.ord () in
