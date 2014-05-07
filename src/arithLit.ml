@@ -234,29 +234,20 @@ let variant ?(subst=Substs.empty) lit1 sc1 lit2 sc2 =
 let subsumes ?(subst=Substs.empty) lit1 sc1 lit2 sc2 k =
   match lit1, lit2 with
   | Binary (Less, l1, r1), Binary (Less, l2, r2) ->
-      M.matching ~subst l1 sc1 l2 sc2
+      (* if subst(r1 - l1) = r2-l2 - k where k>=0, then l1<r1 => l2+k<r2 => l2<r2
+          so l1<r1 subsumes l2<r2. *)
+      let m1 = M.difference r1 l1 in
+      let m2 = M.difference r2 l2 in
+      M.matching ~subst (M.remove_const m1) sc1 (M.remove_const m2) sc2
         (fun subst ->
-          M.matching ~subst r1 sc1 r2 sc2
-            (fun subst ->
-              let renaming = Substs.Renaming.create () in
-              let r1 = M.apply_subst ~renaming subst r1 sc1 in
-              let l1 = M.apply_subst ~renaming subst l1 sc1 in
-              let r2 = M.apply_subst ~renaming subst r2 sc2 in
-              let l2 = M.apply_subst ~renaming subst l2 sc2 in
-              (* if subst(r1 - l1) = r2-l2 - k where k>=0, then l1<r1 => l2+k<r2 => l2<r2
-                  so l1<r1 subsumes l2<r2. *)
-              let m1 = M.difference r1 l1 in
-              let m2 = M.difference r2 l2 in
-              let m = M.difference m1 m2 in
-              (* now, if [m <= 0], then subst(r1-l1) always dominates r2-l2
-                  and subst is subsuming *)
-              if M.is_const m && M.sign m <= 0
-                then begin
-                  Util.debug 5 "lit %a subsumes %a with %a" pp lit1 pp lit2 S.pp subst;
-                  k subst
-                end
-            )
-        )
+          let renaming = Substs.Renaming.create () in
+          let m = M.difference
+            (M.apply_subst ~renaming subst m1 sc1)
+            (M.apply_subst ~renaming subst m2 sc2) in
+          assert (M.is_const m);
+          (* now, if [m <= 0], then subst(r1-l1) always dominates r2-l2
+              and subst is subsuming *)
+          if M.sign m <= 0 then k subst)
   | _ ->
     generic_unif (fun ~subst -> M.matching ~subst) ~subst lit1 sc1 lit2 sc2 k
 
