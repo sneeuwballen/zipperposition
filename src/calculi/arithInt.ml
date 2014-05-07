@@ -1402,12 +1402,13 @@ module Make(E : Env.S) : S with module Env = E = struct
       d_lit : ALF.t list;  (* n not| m_c.x + m *)
       e_lit : ALF.t list;  (* c.x + m1 < m2 *)
       f_lit : ALF.t list;  (* m1 < c.x + m2 *)
-      lcm : Z.t; (* for the additional divisibility guard) *)
+      lcm : Z.t; (* scaling coefficient (divisibility guard) *)
+      delta : Z.t; (* lcm of all divisibility constraints *)
     }
 
     let _empty x = {
       rest = []; x; a_lit = []; b_lit = []; c_lit = [];
-      d_lit = []; e_lit = []; f_lit = []; lcm=Z.one;
+      d_lit = []; e_lit = []; f_lit = []; lcm=Z.one; delta=Z.one;
     }
 
     let _lits c k =
@@ -1448,8 +1449,18 @@ module Make(E : Env.S) : S with module Env = E = struct
       then, pretend we replace LCM.x with x, so all the coefficients
       become 1 (but the monomes keep their multiplicative factors!) *)
     let scale c =
-      let lcm = Sequence.fold Z.lcm Z.one (coeffs c) in
-      if Z.equal lcm Z.one then Z.one, c
+      let lcm, delta = _lits c
+        |> Sequence.fold
+          (fun (lcm,delta) lit ->
+            let lcm = Z.lcm lcm (ALF.focused_monome lit |> MF.coeff) in
+            let delta = match lit with
+              | ALF.Div d -> Z.lcm delta (Z.pow d.AL.num d.AL.power)
+              | _ -> delta
+            in lcm, Z.lcm lcm delta
+          ) (Z.one,Z.one)
+      in
+      assert (Z.geq delta lcm);
+      if Z.equal lcm Z.one then delta, {c with delta; }
       else
         let c' = map
           (fun lit ->
@@ -1459,8 +1470,8 @@ module Make(E : Env.S) : S with module Env = E = struct
           )
           c
         in
-        let c' = {c' with lcm; } in
-        lcm, c'
+        let c' = {c' with lcm; delta; } in
+        delta, c'
 
     (* make from clause *)
     let of_lits lits x =
@@ -1602,22 +1613,23 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debug 3 "eliminate naked variable %a from %a" T.pp x C.pp c;
       (* split C into C' (not containing v) and 6 kinds of literals *)
       let view = NVE.of_lits (C.lits c) x in
-      let lcm, view = NVE.scale view in
-      if not (Z.fits_int lcm) then None
+      let delta, view = NVE.scale view in
+      if not (Z.fits_int delta) then None
       else begin
-        let lcm = Z.to_int lcm in
+        let delta = Z.to_int delta in
         let a_set = NVE.a_set view
         and b_set = NVE.b_set view in
         (* prepare to build clauses *)
         let acc = ref [] in
         let add_clause ~by ?which lits =
-          let info = [Util.sprintf "elim %d×%a → %a" lcm T.pp x M.pp by] in
+          let info =
+            [Util.sprintf "elim %s×%a → %a" (Z.to_string view.NVE.lcm) T.pp x M.pp by] in
           let info = match which with None -> info | Some i -> i :: info in
           let proof cc = Proof.mk_c_inference
             ~info ~theories ~rule:"var_elim" cc [C.proof c] in
           let new_c = C.create ~parents:[c] lits proof in
-          Util.debug 5 "elimination of %d×%a by %a in %a: gives %a"
-            lcm T.pp x M.pp by C.pp c C.pp new_c;
+          Util.debug 5 "elimination of %s×%a by %a in %a: gives %a"
+            (Z.to_string view.NVE.lcm) T.pp x M.pp by C.pp c C.pp new_c;
           acc := new_c :: !acc
         in
         (* choose which form to use *)
@@ -1626,14 +1638,14 @@ module Make(E : Env.S) : S with module Env = E = struct
             (* use B *)
             Util.debug 5 "use the B elimination algorithm";
             (* first, the -infty part *)
-            for i = 1 to lcm do
+            for i = 1 to delta do
               let x' = M.Int.const (Z.of_int i) in
               let lits = view.NVE.rest @
                 _negate_lits (NVE.eval_minus_infty view x') in
               add_clause ~by:x' ~which:"-∝" lits
             done;
             (* then the enumeration *)
-            for i = 1 to lcm do
+            for i = 1 to delta do
               List.iter
                 (fun x' ->
                   (* evaluate at x'+i *)
@@ -1646,14 +1658,14 @@ module Make(E : Env.S) : S with module Env = E = struct
             (* use A *)
             Util.debug 5 "use the A elimination algorithm";
             (* first, the +infty part *)
-            for i = 1 to lcm do
+            for i = 1 to delta do
               let x' = M.Int.const Z.(neg (of_int i)) in
               let lits = view.NVE.rest @
                 _negate_lits (NVE.eval_plus_infty view x') in
               add_clause ~by:x' ~which:"+∝" lits
             done;
             (* then the enumeration *)
-            for i = 1 to lcm do
+            for i = 1 to delta do
               List.iter
                 (fun x' ->
                   (* evaluate at x'-i *)
