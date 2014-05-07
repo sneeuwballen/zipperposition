@@ -787,34 +787,35 @@ module Conv = struct
     let open Monad.Opt in
     let module SA = Symbol.TPTP.Arith in
     let module AL = ArithLit in
+    let type_ok t = Type.eq Type.TPTP.int (T.ty t) in
     (* arithmetic conversion! *)
     let rec conv f = match F.view f with
     | F.Not f' -> map (conv f') negate
     | F.Atom p ->
         begin match T.Classic.view p with
-        | T.Classic.App (s, _, [l; r]) when Symbol.eq s SA.less ->
+        | T.Classic.App (s, _, [l; r]) when Symbol.eq s SA.less && type_ok l ->
           Monome.Int.of_term l >>= fun m1 ->
           Monome.Int.of_term r >>= fun m2 ->
           return (Arith (AL.mk_less m1 m2))
-        | T.Classic.App (s, _, [l; r]) when Symbol.eq s SA.lesseq ->
+        | T.Classic.App (s, _, [l; r]) when Symbol.eq s SA.lesseq && type_ok l ->
           Monome.Int.of_term l >>= fun m1 ->
           Monome.Int.of_term r >>= fun m2 ->
           return (Arith (AL.mk_lesseq m1 m2))
-        | T.Classic.App (s, _, [l; r]) when Symbol.eq s SA.greater ->
+        | T.Classic.App (s, _, [l; r]) when Symbol.eq s SA.greater && type_ok l ->
           Monome.Int.of_term l >>= fun m1 ->
           Monome.Int.of_term r >>= fun m2 ->
           return (Arith (AL.mk_less m2 m1))
-        | T.Classic.App (s, _, [l; r]) when Symbol.eq s SA.greatereq ->
+        | T.Classic.App (s, _, [l; r]) when Symbol.eq s SA.greatereq && type_ok l ->
           Monome.Int.of_term l >>= fun m1 ->
           Monome.Int.of_term r >>= fun m2 ->
           return (Arith (AL.mk_lesseq m2 m1))
         | _ -> None
         end
-    | F.Eq (l, r) ->
+    | F.Eq (l, r) when type_ok l ->
         Monome.Int.of_term l >>= fun m1 ->
         Monome.Int.of_term r >>= fun m2 ->
         return (Arith (AL.mk_eq m1 m2))
-    | F.Neq (l, r) ->
+    | F.Neq (l, r) when type_ok l ->
         Monome.Int.of_term l >>= fun m1 ->
         Monome.Int.of_term r >>= fun m2 ->
         return (Arith (AL.mk_neq m1 m2))

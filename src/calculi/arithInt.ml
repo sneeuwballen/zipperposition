@@ -1198,7 +1198,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let module TC = FOTerm.Classic in
     let module SA = Symbol.TPTP.Arith in
     match lit with
-    | Lit.Equation (l, r, sign) ->
+    | Lit.Equation (l, r, sign) when Type.eq Type.TPTP.int (T.ty l) ->
         begin match TC.view l, TC.view r with
         | (TC.App (s, _, [l'; r']), opp
         | opp, TC.App (s, _, [l'; r'])) when Symbol.eq s SA.remainder_e ->
@@ -1592,7 +1592,9 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let eliminate_unshielded c =
     let module NVE = NakedVarElim in
-    let nvars = naked_vars (C.lits c) in
+    let nvars = naked_vars (C.lits c)
+        |> List.filter (fun t -> Type.eq (T.ty t) Type.TPTP.int)
+    in
     match nvars with
     | [] -> None
     | x::_ ->
