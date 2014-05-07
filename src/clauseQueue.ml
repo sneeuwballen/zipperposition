@@ -210,7 +210,7 @@ module Make(C : Clause.S) = struct
 
   let default_queues =
     [ fifo, 2
-    ; clause_weight, 2
+    ; clause_weight, 4
     (* ; lemmas, 1 *)
     ]
     (*
