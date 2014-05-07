@@ -1230,7 +1230,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (* remove the literal and recurse *)
         Some (Util.array_except_idx lits i, i, c')
     in
-    match remove_one_lit (C.lits c) with
+    match remove_one_lit (Array.copy (C.lits c)) with
     | None -> (Util.exit_prof prof_clc; c) (* no literal removed *)
     | Some (new_lits, i, c') ->
       (* hc' allowed us to cut a literal *)
