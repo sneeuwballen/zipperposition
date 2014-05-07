@@ -945,12 +945,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and equate_root clauses t1 t2 =
       try UnitIdx.retrieve ~sign:true !_idx_simpl 1 t1 0 ()
         (fun () l r (_,_,_,c') subst ->
-          let renaming = Ctx.renaming_clear () in
-          if T.eq t2 (S.FO.apply ~renaming subst r 1)
-          then begin  (* t1!=t2 is refuted by l\sigma = r\sigma *)
+          assert (Unif.FO.eq ~subst l 1 t1 0);
+          if Unif.FO.eq ~subst r 1 t2 0
+          then begin
+            (* t1!=t2 is refuted by l\sigma = r\sigma *)
             Util.debug 4 "equate %a and %a using %a" T.pp t1 T.pp t2 C.pp c';
             raise (FoundMatch (r, c', subst)) (* success *)
-          end else ());
+          end
+        );
         None (* no match *)
       with FoundMatch (r, c', subst) ->
         Some (C.proof c' :: clauses)  (* success *)
@@ -985,12 +987,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and can_refute s t =
       try UnitIdx.retrieve ~sign:false !_idx_simpl 1 s 0 ()
         (fun () l r (_,_,_,c') subst ->
-          let renaming = Ctx.renaming_clear () in
-          if T.eq t (S.FO.apply ~renaming subst r 1)
+          assert (Unif.FO.eq ~subst l 1 s 0);
+          if Unif.FO.eq ~subst r 1 t 0
           then begin
+            let subst = Unif.FO.matching ~subst ~pattern:r 1 t 0 in
             Util.debug 3 "neg_reflect eliminates %a=%a with %a" T.pp s T.pp t C.pp c';
             raise (FoundMatch (r, c', subst)) (* success *)
-          end else ());
+          end
+        );
         None (* no match *)
       with FoundMatch (r, c', subst) ->
         Some (C.proof c') (* success *)
