@@ -756,9 +756,10 @@ module Unary = struct
       | T.HasType ty1, T.HasType ty2 -> eq ~subst ty1 s1 ty2 s2
     end &&
     match T.view t1, T.view t2 with
-    | T.BVar i, T.BVar j
+    | T.BVar i, T.BVar j -> i=j
     | T.RigidVar i, T.RigidVar j
-    | T.Var i, T.Var j -> i=j
+    | T.Var i, T.Var j -> i=j && s1 = s2
+    | T.Const f, T.Const g -> Symbol.eq f g
     | T.Bind (f1, varty1, t1'), T.Bind (f2, varty2, t2') when Symbol.eq f1 f2 ->
         eq ~subst varty1 s1 varty2 s2
         &&
