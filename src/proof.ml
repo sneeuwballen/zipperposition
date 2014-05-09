@@ -357,7 +357,7 @@ let _escape_dot s =
   String.iter
     (fun c ->
       begin match c with
-      | '|' | '\\' | '{' | '}' | '<' | '>' -> Buffer.add_char b '\\';
+      | '|' | '\\' | '{' | '}' | '<' | '>' | '"' -> Buffer.add_char b '\\';
       | _ -> ()
       end;
       Buffer.add_char b c)
@@ -377,7 +377,7 @@ let as_dot_graph =
   in
   let label proof =
     let s = if no_other_info proof
-      then Util.on_buffer pp_result_of proof
+      then _to_str_escape "%a" pp_result_of proof
       else Util.sprintf "{%s|{theories:%s|info:%s}}"
         (_to_str_escape "%a" pp_result_of proof)
         (_to_str_escape "%a" _pp_list_str proof.theories)
