@@ -124,7 +124,7 @@ class Run(object):
         # limit memory (address space)
         memory = self.memory
         log.debug('memory limit is %d', memory)
-        resource.setrlimit(resource.RLIMIT_AS, (memory * 1024, memory * 1024))
+        resource.setrlimit(resource.RLIMIT_DATA, (memory * 1024, memory * 1024))
 
         log.debug('time limit is %d', self.timeout)
 
@@ -280,9 +280,9 @@ class Run(object):
     def inconsistency(self, display=True):
         "finds the files on which provers give inconsistent results"
         query = """select filename, prover, result, time from results r where
-          (select count(*) from results r2 where r2.filename=r.filename and r2.result = "sat" > 0)
+          (select count(*) from results r2 where r2.filename=r.filename and r2.result = "sat") > 0
           and
-          (select count(*) from results r2 where r2.filename=r.filename and r2.result = "unsat" > 0)
+          (select count(*) from results r2 where r2.filename=r.filename and r2.result = "unsat") > 0
           ;"""
         rows = list(self.conn.execute(query))
         if display:
