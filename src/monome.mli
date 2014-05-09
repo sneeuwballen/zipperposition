@@ -173,6 +173,10 @@ module Focus : sig
     (** Focus on the given term, if it is one of the members of
         the given monome. *)
 
+  val focus_term_exn : 'a monome -> term -> 'a t
+    (** Same as {!focus_term}, but
+        @raise Failure on failure *)
+
   val to_monome : 'a t -> 'a monome
     (** Conversion back to an unfocused monome *)
 
@@ -236,6 +240,10 @@ module Focus : sig
     (** Extend the substitution to other terms within the focused monome,
         if possible. For instance it might return
         [2f(x)+a, {x=y}] for the monome [f(x)+f(y)+a] where [f(x)] is focused. *)
+
+  val unify_self_monome : ?subst:Substs.t ->
+                          'a monome -> scope -> ('a t * Substs.t) Sequence.t
+    (** Unify at least two terms of the monome together *)
 
   (* TODO
   val unify_fm : ?subst:Substs.t ->

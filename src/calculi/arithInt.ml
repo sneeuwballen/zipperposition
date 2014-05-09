@@ -401,7 +401,32 @@ module Make(E : Env.S) : S with module Env = E = struct
                 end else
                   acc
               ) acc
-        | AL.Divides d -> acc  (* TODO *)
+        | AL.Divides d ->
+            Util.debug 5 "try cancellation in %a" AL.pp a_lit;
+            MF.unify_self_monome d.AL.monome 0
+            |> Sequence.fold
+              (fun acc (mf, subst) ->
+                let renaming = Ctx.renaming_clear () in
+                let mf' = MF.apply_subst ~renaming subst mf 0 in
+                if C.is_maxlit c 0 subst ~idx
+                && MF.is_max ~ord mf
+                then begin
+                  let lits' = Util.array_except_idx (C.lits c) idx in
+                  let lits' = Lit.apply_subst_list ~renaming subst lits' 0 in
+                  let new_lit = Lit.mk_divides
+                    ~sign:d.AL.sign d.AL.num ~power:d.AL.power (MF.to_monome mf')
+                  in
+                  let all_lits = new_lit :: lits' in
+                  let proof cc = Proof.mk_c_inference
+                    ~info:[Substs.to_string subst] ~theories
+                    ~rule:"cancellation" cc [C.proof c] in
+                  let new_c = C.create ~parents:[c] all_lits proof in
+                  Util.debug 3 "cancellation of %a (with %a) into %a" C.pp c
+                    Substs.pp subst C.pp new_c;
+                  Util.incr_stat stat_arith_cancellation;
+                  new_c :: acc
+                end else acc
+              ) acc
       )
     in
     Util.exit_prof prof_arith_cancellation;
