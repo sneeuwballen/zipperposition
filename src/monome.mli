@@ -125,6 +125,10 @@ val apply_subst : renaming:Substs.Renaming.t ->
                   Substs.t -> 'a t -> Substs.scope -> 'a t
   (** Apply a substitution to the monome's terms *)
 
+val apply_subst_no_renaming : Substs.t -> 'a t -> Substs.scope -> 'a t
+  (** Apply a substitution but doesn't rename free variables. Careful
+      with the collisions *)
+
 val variant : ?subst:Substs.t -> 'a t -> scope -> 'a t -> scope -> Substs.t Sequence.t
 
 (** Matching and unification aren't complete in the presence of variables
@@ -209,6 +213,10 @@ module Focus : sig
                     Substs.t -> 'a t -> scope -> 'a t
     (** Apply a substitution. This can modify the set of terms in [rest]
         because some of them may become equal to the focused term. *)
+
+  val apply_subst_no_renaming : Substs.t -> 'a t -> Substs.scope -> 'a t
+    (** Apply a substitution but doesn't rename free variables. Careful
+        with the collisions *)
 
   (** Here we don't unify full (focused) monomes together, but only the
       focused part (and possibly some unfocused terms too) together.

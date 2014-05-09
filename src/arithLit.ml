@@ -439,6 +439,12 @@ module Focus = struct
     | None -> failwith "ALF.focus_term_exn"
     | Some lit' -> lit'
 
+  let replace a by = match a with
+    | Left (op, mf, m) -> make op (M.sum (MF.rest mf) by) m
+    | Right (op, m, mf) -> make op m (M.sum (MF.rest mf) by)
+    | Div d -> mk_divides
+      ~sign:d.sign d.num ~power:d.power (M.sum (MF.rest d.monome) by)
+
   let focused_monome = function
     | Left (_, mf, _)
     | Right (_, _, mf) -> mf
@@ -484,6 +490,21 @@ module Focus = struct
           (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
           (MF.rest d.monome |> M.Seq.terms)
 
+  (* is the focused term maximal in the arithmetic literal? *)
+  let is_strictly_max ~ord = function
+    | Left (_, mf, m)
+    | Right (_, m, mf) ->
+        let t = MF.term mf in
+        let terms = Sequence.append (M.Seq.terms m) (MF.rest mf |> M.Seq.terms) in
+        Sequence.for_all
+          (fun t' -> Ordering.compare ord t t' = Comparison.Gt)
+          terms
+    | Div d ->
+        let t = MF.term d.monome in
+        Sequence.for_all
+          (fun t' -> Ordering.compare ord t t' = Comparison.Gt)
+          (MF.rest d.monome |> M.Seq.terms)
+
   let map_lit ~f_m ~f_mf lit = match lit with
     | Left (op, mf, m) ->
         Left (op, f_mf mf, f_m m)
@@ -502,6 +523,12 @@ module Focus = struct
     map_lit
       ~f_mf:(fun mf -> MF.apply_subst ~renaming subst mf scope)
       ~f_m:(fun m -> M.apply_subst ~renaming subst m scope)
+      lit
+
+  let apply_subst_no_renaming subst lit scope =
+    map_lit
+      ~f_mf:(fun mf -> MF.apply_subst_no_renaming subst mf scope)
+      ~f_m:(fun m -> M.apply_subst_no_renaming subst m scope)
       lit
 
   let unify ?(subst=Substs.empty) lit1 sc1 lit2 sc2 k =

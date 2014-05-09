@@ -166,6 +166,10 @@ module Focus : sig
 
   val focus_term_exn : lit -> term -> t
 
+  val replace : t -> Z.t Monome.t -> lit
+    (** [replace a m] replaces [mf.coeff × mf.term] with [m] where [mf] is the
+        focused monome in [a], and return the resulting literal *)
+
   val term : t -> term
     (** Focused term *)
 
@@ -181,6 +185,10 @@ module Focus : sig
 
   val is_max : ord:Ordering.t -> t -> bool
     (** Is the focused term maximal in the literal? *)
+
+  val is_strictly_max : ord:Ordering.t -> t -> bool
+    (** Is the focused term maximal in the literal, ie is it greater
+        than all the othe terms? *)
 
   val map_lit :
     f_m:(Z.t Monome.t -> Z.t Monome.t) ->
@@ -203,6 +211,9 @@ module Focus : sig
 
   val apply_subst : renaming:Substs.Renaming.t -> Substs.t -> t -> scope -> t
     (** Apply a substitution *)
+
+  val apply_subst_no_renaming : Substs.t -> t -> scope -> t
+    (** Apply a substitution with renaming (careful with collisions!) *)
 
   val unify : ?subst:Substs.t -> t -> scope -> t -> scope ->
               (t * t * Substs.t) Sequence.t

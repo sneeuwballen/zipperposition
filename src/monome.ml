@@ -294,6 +294,11 @@ let apply_subst ~renaming subst m sc_m =
     (fun t -> Substs.FO.apply ~renaming subst t sc_m)
     m
 
+let apply_subst_no_renaming subst m sc_m =
+  map
+    (fun t -> Substs.FO.apply_no_renaming subst t sc_m)
+    m
+
 let is_ground m =
   List.for_all (fun (_, t) -> T.is_ground t) m.terms
 
@@ -452,9 +457,9 @@ module Focus = struct
         f acc mf pos
       ) acc m.terms
 
-  let apply_subst ~renaming subst mf scope =
-    let rest = map (fun t -> Substs.FO.apply subst ~renaming t scope) mf.rest in
-    let term = Substs.FO.apply subst ~renaming mf.term scope in
+  let _apply_subst how subst mf scope =
+    let rest = map (fun t -> how subst  t scope) mf.rest in
+    let term = how subst mf.term scope in
     (* if [term] occurs in the new [rest], remove it and add its
        coefficient. *)
     let coeff, rest =
@@ -464,6 +469,12 @@ module Focus = struct
     in
     if rest.num.sign coeff = 0 then failwith "Monome.Focus.apply_subst: coeff 0";
     {coeff; rest; term; }
+
+  let apply_subst ~renaming subst mf scope =
+    _apply_subst (Substs.FO.apply ~renaming) subst mf scope
+
+  let apply_subst_no_renaming subst mf scope =
+    _apply_subst Substs.FO.apply_no_renaming subst mf scope
 
   let _id x = x
   let map ?(term=_id) ?(coeff=_id) ?(rest=_id) mf =

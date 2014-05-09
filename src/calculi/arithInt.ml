@@ -57,6 +57,7 @@ let prof_arith_eq_factoring = Util.mk_profiler "arith.eq_factoring"
 let prof_arith_ineq_chaining = Util.mk_profiler "arith.ineq_chaining"
 let prof_arith_purify = Util.mk_profiler "arith.purify"
 let prof_arith_inner_case_switch = Util.mk_profiler "arith.inner_case_switch"
+let prof_arith_demod = Util.mk_profiler "arith.demod"
 (*
 let prof_arith_ineq_factoring = Util.mk_profiler "arith.ineq_factoring"
 let prof_arith_reflexivity_resolution = Util.mk_profiler "arith.reflexivity_resolution"
@@ -173,6 +174,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   let _idx_div = ref (PS.TermIndex.empty ())
   let _idx_all = ref (PS.TermIndex.empty ())
 
+  (* unit clauses *)
+  let _idx_unit = ref (PS.TermIndex.empty ())
+
   let idx_eq () = !_idx_eq
   let idx_ineq () = !_idx_ineq
   let idx_div () = !_idx_div
@@ -211,14 +215,38 @@ module Make(E : Env.S) : S with module Env = E = struct
         f acc t with_pos);
     ()
 
+  (* simplification set *)
+  let update_simpl f c =
+    let ord = Ctx.ord () in
+    begin match C.lits c with
+    | [| Lit.Arith alit |] ->
+        let pos = Position.(arg 0 stop) in
+        _idx_unit := AL.fold_terms ~subterms:false ~vars:false ~pos ~which:`Max ~ord
+          alit !_idx_unit
+            (fun acc t pos ->
+              let with_pos = C.WithPos.( {term=t; pos; clause=c;} ) in
+              f acc t with_pos
+            )
+    | _ -> ()
+    end;
+    ()
+
   let () =
     Signal.on PS.ActiveSet.on_add_clause
       (fun c ->
         if !_enable_arith then update PS.TermIndex.add c;
         Signal.ContinueListening);
+    Signal.on PS.SimplSet.on_add_clause
+      (fun c ->
+        if !_enable_arith then update_simpl PS.TermIndex.add c;
+        Signal.ContinueListening);
     Signal.on PS.ActiveSet.on_remove_clause
       (fun c ->
         if !_enable_arith then update PS.TermIndex.remove c;
+        Signal.ContinueListening);
+    Signal.on PS.SimplSet.on_remove_clause
+      (fun c ->
+        if !_enable_arith then update_simpl PS.TermIndex.remove c;
         Signal.ContinueListening);
     ()
 
@@ -362,6 +390,108 @@ module Make(E : Env.S) : S with module Env = E = struct
       )
     in
     Util.exit_prof prof_arith_sup;
+    res
+
+  exception SimplifyInto of Literal.t * C.t
+
+  (* demodulation (simplification)
+    TODO: this should be split into forward/backward simplifications
+    same as regular demodulation... *)
+  let canc_demodulation c =
+    Util.enter_prof prof_arith_demod;
+    let ord = Ctx.ord () in
+    let did_simplify = ref false in
+    let lits = ref [] in  (* simplified literals *)
+    let add_lit l = lits := l :: !lits in
+    let clauses = ref [] in  (* simplifying clauses *)
+    let s_a = 1 and s_p = 0 in  (* scopes *)
+    (* how to simplify the passive lit with the active lit *)
+    let _try_simplify ~subst passive_lit pos active_lit c' pos' =
+      let i = Lits.Pos.idx pos in
+      let renaming = Ctx.renaming_clear () in
+      let active_lit' = ALF.apply_subst ~renaming subst active_lit s_a in
+      (* restrictions:
+        - the rewriting term must be bigger than other terms
+          (in other words, the inference is strictly decreasing)
+        - all variables of active clause must be bound by subst
+        - must not rewrite itself (c != c') *)
+      if ALF.is_max ~ord active_lit'
+      && ((C.lits c |> Array.length) > 1
+          || not(Lit.is_arith_eq (C.lits c).(i))
+          || not(C.is_maxlit c s_p S.empty ~idx:i))
+      && (C.Seq.vars c'
+          |> Sequence.for_all (fun v -> S.mem subst (v:T.t:>ScopedTerm.t) s_a))
+      then
+        (* we know all variables of [active_lit] are bound, no need
+          for a renaming *)
+        let active_lit = ALF.apply_subst_no_renaming subst active_lit s_a in
+        let active_lit, passive_lit = ALF.scale active_lit passive_lit in
+        match active_lit, passive_lit with
+        | ALF.Left (AL.Equal, mf1, m1), _
+        | ALF.Right (AL.Equal, m1, mf1), _ ->
+            let new_lit = Lit.mk_arith
+              (ALF.replace passive_lit (M.difference m1 (MF.rest mf1))) in
+            raise (SimplifyInto (new_lit, c'))
+        | ALF.Div d1, ALF.Div d2 when d1.AL.sign ->
+            let n1 = Z.pow d1.AL.num d1.AL.power and n2 = Z.pow d2.AL.num d2.AL.power in
+            let gcd = Z.gcd (MF.coeff d1.AL.monome) (MF.coeff d2.AL.monome) in
+            (* simplification: we only do the rewriting if both
+               literals have exactly the same num and power...
+               TODO: generalize *)
+            if Z.equal n1 n2
+            && Z.lt gcd Z.(pow d2.AL.num d2.AL.power)
+            then
+              let new_lit = Lit.mk_arith
+                (ALF.replace passive_lit (MF.rest d1.AL.monome)) in
+              raise (SimplifyInto (new_lit, c'))
+        | _ -> ()
+      else ()
+    in
+    (* simplify each and every literal *)
+    Lits.fold_lits ~eligible:C.Eligible.always (C.lits c) ()
+      (fun () lit i ->
+        let pos = Position.(arg i stop) in
+        match lit with
+        | Lit.Arith a_lit ->
+            begin try
+              AL.fold_terms ~pos ~vars:false ~which:`Max
+              ~ord ~subterms:false a_lit ()
+                (fun () t pos ->
+                  let passive_lit = Lits.View.get_arith_exn (C.lits c) pos in
+                  (* search for generalizations of [t] *)
+                  PS.TermIndex.retrieve_generalizations !_idx_unit s_a t s_p ()
+                    (fun () t' with_pos subst ->
+                      let c' = with_pos.C.WithPos.clause in
+                      let pos' = with_pos.C.WithPos.pos in
+                      assert (Lits.Pos.idx pos' = 0);
+                      let active_lit = Lits.View.get_arith_exn (C.lits c') pos' in
+                      _try_simplify ~subst passive_lit pos active_lit c' pos'
+                    )
+                );
+              (* could not simplify, keep the literal *)
+              add_lit lit
+            with SimplifyInto (lit',c') ->
+              (* lit ----> lit' *)
+              did_simplify := true;
+              clauses := c' :: !clauses;
+              add_lit lit'
+            end
+        | _ -> add_lit lit
+      );
+    (* build result clause (if it was simplified) *)
+    let res =
+      if !did_simplify
+      then begin
+        let proof cc = Proof.mk_c_inference ~theories ~rule:"canc_demod"
+          cc (C.proof c :: List.map C.proof !clauses) in
+        let new_c = C.create ~parents:(c::!clauses) (List.rev !lits) proof in
+        Util.debug 5 "arith demodulation of %a with [%a] gives %a"
+          C.pp c (Util.pp_list C.pp) !clauses C.pp new_c;
+        new_c
+      end
+      else c
+    in
+    Util.exit_prof prof_arith_demod;
     res
 
   let cancellation c =
@@ -1621,6 +1751,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_multi_simpl_rule eliminate_unshielded;
     Env.add_lit_rule "canc_lit_of_lit" canc_lit_of_lit;
     Env.add_lit_rule "lesseq_to_less" canc_lesseq_to_less;
+    Env.add_simplify canc_demodulation;
     Env.add_is_trivial is_tautology;
     Env.add_simplify purify;
     Env.add_multi_simpl_rule eliminate_unshielded;
