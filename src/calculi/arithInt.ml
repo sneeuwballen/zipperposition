@@ -718,100 +718,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.enter_prof prof_arith_inner_case_switch;
     !acc
 
-  (*
-    let ctx = c.C.hcctx in
-    let ord = Ctx.ord ctx in
-    (* lit = [t + m1 <| m2], lit' = [m2' <| t + m1']. In other words,
-        [t > m2-m1 and t < m2'-m1' --> other_lits]. If
-        [m2'-m1' - (m2-m1) is a constant, we can enumerate the possibilities
-        by replacing lit and lit' by [n.t != m2'+m1-(m2+m1')+k]
-        for k in [0... range] *)
-    let _try_case_switch ~left:(lit,i,op) ~right:(lit',j,op') subst acc =
-      assert (lit.Foc.side = ArithLit.Left);
-      assert (lit'.Foc.side = ArithLit.Right);
-      (* negation of strictness (range inclusive if bound was exclusive,
-          because contrapositive) *)
-      let strict_low = lit'.Foc.op = ArithLit.Leq in
-      let strict_high = lit.Foc.op = ArithLit.Leq in
-      (* apply subst and decompose *)
-      let renaming = Ctx.renaming_clear ~ctx in
-      let lit = Foc.apply_subst ~renaming subst lit 0 in
-      let lit' = Foc.apply_subst ~renaming subst lit' 0 in
-      let m1, m2 = lit.Foc.same_side, lit.Foc.other_side in
-      let m1', m2' = lit'.Foc.same_side, lit'.Foc.other_side in
-      let m = M.difference (M.sum m2' m1) (M.sum m1' m2) in
-      let n = lit.Foc.coeff in
-      let t = lit.Foc.term in
-      if M.is_const m
-      && S.Arith.Op.less m.M.const !case_switch_limit
-      then begin
-        let low = M.difference m2 m1 in
-        let range = match m.M.const with
-          | S.Int n -> n
-          | _ -> assert false
-        in
-        Util.debug 5 "inner_case_switch in %a for %a·%a; subst is %a, range=%s"
-          C.pp c S.pp n T.pp t Substs.FO.pp subst (Big_int.string_of_big_int range);
-        (* remove lits i and j *)
-        let other_lits = Util.array_foldi
-          (fun acc i' lit -> if i' <> i && i' <> j then lit :: acc else acc)
-          [] c.C.hclits
-        in
-        let other_lits = Literal.apply_subst_list ~renaming ~ord subst other_lits 0 in
-        List.fold_left
-          (fun acc k ->
-            let lit = Canon.to_lit ~ord
-              (Canon.of_monome ArithLit.Neq
-                (M.add
-                  (M.add_const low (S.mk_bigint k))
-                  (S.Arith.Op.uminus n) t))
-            in
-            let new_lits = lit :: other_lits in
-            let proof cc = Proof.mk_c_inference ~theories:["arith";"equality"]
-              ~rule:"canc_inner_case_switch" cc [c.C.hcproof] in
-            let parents = [c] in
-            let new_clause = C.create ~parents ~ctx new_lits proof in
-            Util.debug 5 "  --> inner case switch gives clause %a" C.pp new_clause;
-            Util.incr_stat stat_canc_inner_case_switch;
-            new_clause :: acc)
-          acc (AT.int_range ~strict_low ~strict_high range)
-      end else acc
-    in
-    (* focused view of arith literals *)
-    let lits = ArithLit.Arr.view_focused ~ord c.C.hclits in
-    (* fold on literals *)
-    let new_clauses = Util.array_foldi
-      (fun acc i lit -> match lit with
-      | `Focused ((ArithLit.Leq|ArithLit.Lt) as op, l) ->
-        List.fold_left
-          (fun acc lit ->
-            let side = lit.Foc.side in
-            Util.array_foldi
-              (fun acc j lit' -> match lit' with
-              | `Focused ((ArithLit.Leq|ArithLit.Lt) as op', l') ->
-                List.fold_left
-                  begin fun acc lit' ->
-                    let side' = lit'.Foc.side in
-                    if side <> side' && Type.eq Type.int (T.ty lit.Foc.term) then try
-                      (* unify the two terms, then scale them to the same coefficient *)
-                      let subst = FOUnif.unification lit.Foc.term 0 lit'.Foc.term 0 in
-                      let lit, lit' = Foc.scale lit lit' in
-                      if side = ArithLit.Left
-                        then _try_case_switch ~left:(lit,i,op) ~right:(lit',j,op') subst acc
-                        else _try_case_switch ~left:(lit',j,op') ~right:(lit,i,op) subst acc
-                    with FOUnif.Fail -> acc
-                    else acc
-                  end acc l'
-              | _ -> acc)
-            acc lits
-          ) acc l
-      | _ -> acc
-      ) [] lits
-    in
-    Util.exit_prof prof_canc_inner_case_switch;
-    new_clauses
-  *)
-
   let canc_ineq_factoring c = [] (* TODO *)
   (*
     Util.enter_prof prof_canc_ineq_factoring;
@@ -1700,6 +1606,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_simplify purify;
     Env.add_multi_simpl_rule eliminate_unshielded;
     Ctx.Lit.add_from_hook Lit.Conv.arith_hook_from;
+    (* completeness? I don't think so *)
+    Ctx.lost_completeness ();
     (* enable AC-property of sum *)
     if !_enable_ac then begin
       let sum = Symbol.TPTP.Arith.sum in
