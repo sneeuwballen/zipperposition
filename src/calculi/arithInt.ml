@@ -847,14 +847,12 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (** {3 Divisibility} *)
 
-  (* TODO: negative div chaining *)
-
   let canc_div_chaining c =
     let ord = Ctx.ord () in
-    let eligible = C.Eligible.(max c ** pos ** filter Lit.is_arith_divides) in
+    let eligible = C.Eligible.(max c ** filter Lit.is_arith_divides) in
     let sc1 = 0 and sc2 = 1 in
     (* do the inference (if ordering conditions are ok) *)
-    let _do_chaining n power c1 lit1 pos1 c2 lit2 pos2 subst acc =
+    let _do_chaining ~sign n power c1 lit1 pos1 c2 lit2 pos2 subst acc =
       let renaming = Ctx.renaming_clear () in
       let idx1 = Lits.Pos.idx pos1 and idx2 = Lits.Pos.idx pos2 in
       let lit1' = ALF.apply_subst ~renaming subst lit1 sc1 in
@@ -874,8 +872,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       && ALF.is_max ~ord lit1'
       && ALF.is_max ~ord lit2'
       then begin
-        let new_lit = Lit.mk_divides
-          n ~power
+        let new_lit = Lit.mk_divides ~sign n ~power
           (M.difference (MF.rest mf1') (MF.rest mf2'))
         in
         let lits1 = Util.array_except_idx (C.lits c1) idx1
@@ -898,7 +895,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         match lit1 with
         | ALF.Div d1 when AL.Util.is_prime d1.AL.num ->
           (* inferences only possible when lit1 is a power-of-prime *)
-          assert d1.AL.sign;
           let n = d1.AL.num in
           PS.TermIndex.retrieve_unifiables !_idx_div sc2 t sc1 acc
             (fun acc t' with_pos subst ->
@@ -907,8 +903,10 @@ module Make(E : Env.S) : S with module Env = E = struct
               let pos2 = with_pos.C.WithPos.pos in
               let lit2 = Lits.View.get_arith_exn (C.lits c2) pos2 in
               match lit2 with
-              | ALF.Div d2 when d2.AL.sign && Z.equal n d2.AL.num ->
-                (* scale the literals to the same power *)
+              | ALF.Div d2 when (d1.AL.sign || d2.AL.sign) && Z.equal n d2.AL.num ->
+                (* inference seems possible (at least one lit is positive).
+                  start with scaling the literals to the same power *)
+                let sign = d1.AL.sign && d2.AL.sign in
                 let power = max d1.AL.power d2.AL.power in
                 let lit1 = ALF.scale_power lit1 power
                 and lit2 = ALF.scale_power lit2 power in
@@ -918,7 +916,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 MF.unify_ff ~subst mf1 sc1 mf2 sc2
                 |> Sequence.fold
                   (fun acc (_, _, subst) ->
-                    _do_chaining n power c lit1 pos1 c2 lit2 pos2 subst acc
+                    _do_chaining ~sign n power c lit1 pos1 c2 lit2 pos2 subst acc
                   ) acc
               | _ -> acc
             )
@@ -1325,10 +1323,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       List.iter k c.e_lit;
       List.iter k c.f_lit;
       ()
-
-    (* sequence of coeffs *)
-    let coeffs c =
-      _lits c |> Sequence.map ALF.focused_monome |> Sequence.map MF.coeff
 
     let map f c =
       {c with
