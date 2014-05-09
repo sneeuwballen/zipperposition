@@ -25,7 +25,7 @@ CONFIG_FILE = "./benchs.ini"
 DB_FILE = "./benchs.db"
 TIMEOUT = 120
 LOG_LEVEL = 'info'
-MEMORY = 1024 * 1024
+MEMORY = 512 * 1024
 CLI = '__cli'  # config section for CLI arguments
 
 log = logging.getLogger("benchmark")
@@ -127,6 +127,7 @@ class Run(object):
         resource.setrlimit(resource.RLIMIT_DATA, (memory * 1024, memory * 1024))
 
         log.debug('time limit is %d', self.timeout)
+        resource.setrlimit(resource.RLIMIT_CPU, (self.timeout, self.timeout + 5))
 
         print "solve %-30s with prover %-20s... " % (filename, prover),
         sys.stdout.flush()
