@@ -1723,10 +1723,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     ()
 end
 
-let setup_penv penv =
-  Util.debug 2 "arith inf: setup penv";
-  ()
-
 let extension =
   let module DOIT(Env : Env.S) = struct
     include Extensions.MakeAction(Env)
@@ -1736,8 +1732,8 @@ let extension =
       ]
   end
   in
-  { Extensions.name="arith_int";
-    Extensions.penv_actions = [Extensions.Ext_penv_do setup_penv];
+  { Extensions.default with
+    Extensions.name="arith_int";
     Extensions.make=(module DOIT : Extensions.ENV_TO_S);
   }
 

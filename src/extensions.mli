@@ -63,13 +63,20 @@ module type ENV_TO_S =
 type penv_action =
   | Ext_penv_do of (PEnv.t -> unit)
 
+type init_action =
+  | Init_do of (unit -> unit)
+
 type t = {
   name : string;
   penv_actions : penv_action list;
+  init_actions : init_action list;
   make : (module ENV_TO_S);
 }
 (** An extension is a named first-class functor that works over any {!Env.S}
     and can also contribute to the preprocessing env. *)
+
+val default : t
+(** Default extension. *)
 
 (** {2 Registration} *)
 
@@ -91,6 +98,9 @@ val apply_env : env:(module Env.S) -> t -> unit
 
 val apply_penv : penv:PEnv.t -> t -> unit
   (** Apply the extension to the PEnv *)
+
+val init : t -> unit
+  (** Apply all initialization functions of the given extension *)
 
 val extensions : unit -> t list
   (** All currently available extensions *)

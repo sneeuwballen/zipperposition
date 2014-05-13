@@ -418,6 +418,8 @@ let () =
   print_version params;
   (* plugins *)
   let plugins = load_plugins ~params in
+  (* initialize plugins *)
+  List.iter Extensions.init plugins;
   (* master process: process files *)
   Vector.iter params.param_files
     (fun file ->

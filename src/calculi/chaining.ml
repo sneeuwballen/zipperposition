@@ -752,7 +752,8 @@ let extension =
         exit 1
   end
   in
-  { Extensions.name="chaining";
+  { Extensions.default with
+    Extensions.name="chaining";
     Extensions.penv_actions = [Extensions.Ext_penv_do setup_penv];
     Extensions.make=(module DOIT : Extensions.ENV_TO_S);
   }
