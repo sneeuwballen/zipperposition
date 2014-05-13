@@ -46,8 +46,8 @@ let stat_arith_purify = Util.mk_stat "arith.purify"
 let stat_arith_case_switch = Util.mk_stat "arith.case_switch"
 let stat_arith_inner_case_switch = Util.mk_stat "arith.inner_case_switch"
 let stat_arith_semantic_tautology = Util.mk_stat "arith.semantic_tauto"
-(*
 let stat_arith_ineq_factoring = Util.mk_stat "arith.ineq_factoring"
+(*
 let stat_arith_reflexivity_resolution = Util.mk_stat "arith.reflexivity_resolution"
 *)
 
@@ -59,8 +59,8 @@ let prof_arith_purify = Util.mk_profiler "arith.purify"
 let prof_arith_inner_case_switch = Util.mk_profiler "arith.inner_case_switch"
 let prof_arith_demod = Util.mk_profiler "arith.demod"
 let prof_arith_semantic_tautology = Util.mk_profiler "arith.semantic_tauto"
-(*
 let prof_arith_ineq_factoring = Util.mk_profiler "arith.ineq_factoring"
+(*
 let prof_arith_reflexivity_resolution = Util.mk_profiler "arith.reflexivity_resolution"
 *)
 
@@ -870,135 +870,90 @@ module Make(E : Env.S) : S with module Env = E = struct
             | _ -> assert false
           )
       );
-    Util.enter_prof prof_arith_inner_case_switch;
+    Util.exit_prof prof_arith_inner_case_switch;
     !acc
 
-  let canc_ineq_factoring c = [] (* TODO *)
-  (*
-    Util.enter_prof prof_canc_ineq_factoring;
-    let ctx = c.C.hcctx in
-    let ord = Ctx.ord ctx in
-    (* factoring1 for lit, lit'. Let:
-        lit = [t + m1 <| m2], and lit' = [t + m1' <| m2'].
-        If [m2 - m1 < m2' - m1'], then the first lit doesn't
-        contribute a constraint to the clause
-        (a < 0 | a < 5 ----> a < 5), so by constraining this
-        to be false we have
-        [m2' - m1' <| m2 - m1 | lit'], in other words,
-        [m2' + m1 <| m2 + m1' | lit'] *)
-    let _factor1 ~info lit lit' other_lits acc =
-      let strict = lit.Foc.op = ArithLit.Lt in
-      let strict' = lit'.Foc.op = ArithLit.Lt in
-      let m1, m2 = lit.Foc.same_side, lit.Foc.other_side in
-      let m1', m2' = lit'.Foc.same_side, lit'.Foc.other_side in
-      (* always using a "<" constraint is safe, so its negation is to always
-          use "<=" as an alternative. But if both are strict, we know that
-          using "<" is ok (see paper on cancellative sup/chaining). *)
-      let new_op = if strict && strict' then ArithLit.Lt else ArithLit.Leq in
-      (* build new literal (the guard) *)
-      let new_lit = match lit.Foc.side, lit'.Foc.side with
-        | ArithLit.Left, ArithLit.Left ->
-          (* t on left, relation is a "lower than" relation *)
-          Canon.to_lit ~ord
-            (Canon.of_monome new_op
-              (M.difference (M.sum m2' m1) (M.sum m2 m1')))
-        | ArithLit.Right, ArithLit.Right ->
-          (* t on right, relation is "bigger than" *)
-          Canon.to_lit ~ord
-            (Canon.of_monome new_op
-              (M.difference (M.sum m2 m1') (M.sum m2' m1)))
-        | _ -> assert false
-      in
-      let new_lits = new_lit :: other_lits in
-      (* apply subst and build clause *)
-      let proof cc = Proof.mk_c_inference ~theories ~info
-        ~rule:"canc_ineq_factoring1" cc [c.C.hcproof] in
-      let new_c = C.create ~ctx new_lits proof in
-      Util.debug 5 "cancellative_ineq_factoring1: %a gives %a" C.pp c C.pp new_c;
-      Util.incr_stat stat_canc_ineq_factoring;
-      new_c :: acc
-    (* slightly different: with same notation for lit and lit',
-      but this time we eliminate lit' *)
-    and _factor2 ~info lit lit' other_lits acc =
-      let strict = lit.Foc.op = ArithLit.Lt in
-      let strict' = lit'.Foc.op = ArithLit.Lt in
-      let m1, m2 = lit.Foc.same_side, lit.Foc.other_side in
-      let m1', m2' = lit'.Foc.same_side, lit'.Foc.other_side in
-      let new_op = if strict && strict' then ArithLit.Lt else ArithLit.Leq in
-      (* build new literal (the guard) *)
-      let new_lit = match lit.Foc.side, lit'.Foc.side with
-        | ArithLit.Left, ArithLit.Left ->
-          (* t on left, relation is a "lower than" relation *)
-          Canon.to_lit ~ord
-            (Canon.of_monome new_op
-              (M.difference (M.sum m1' m2) (M.sum m1 m2')))
-        | ArithLit.Right, ArithLit.Right ->
-          (* t on right, relation is "bigger than" *)
-          Canon.to_lit ~ord
-            (Canon.of_monome new_op
-              (M.difference (M.sum m1 m2') (M.sum m1' m2)))
-        | _ -> assert false
-      in
-      let new_lits = new_lit :: other_lits in
-      (* apply subst and build clause *)
-      let proof cc = Proof.mk_c_inference ~theories ~info
-        ~rule:"canc_ineq_factoring2" cc [c.C.hcproof] in
-      let new_c = C.create ~ctx new_lits proof in
-      Util.debug 5 "cancellative_ineq_factoring2: %a gives %a" C.pp c C.pp new_c;
-      Util.incr_stat stat_canc_ineq_factoring;
-      new_c :: acc
+  let canc_ineq_factoring c =
+    Util.enter_prof prof_arith_ineq_factoring;
+    let ord = Ctx.ord () in
+    let acc = ref [] in
+    (* do the factoring if ordering conditions are ok *)
+    let _do_factoring ~subst lit1 lit2 i j =
+      let renaming = S.Renaming.create () in
+      let lit1 = ALF.apply_subst ~renaming subst lit1 0 in
+      let lit2 = ALF.apply_subst ~renaming subst lit2 0 in
+      (* same coefficient for the focused term *)
+      let lit1, lit2 = ALF.scale lit1 lit2 in
+      match lit1, lit2 with
+      | ALF.Left (AL.Less, mf1, m1), ALF.Left (AL.Less, mf2, m2)
+      | ALF.Right (AL.Less, m1, mf1), ALF.Right (AL.Less, m2, mf2) ->
+        (* mf1 < m1  or  mf2 < m2  (symmetry with > if needed)
+           so we deduce that if  m1-mf1.rest < m2 - mf2.rest
+           then the first literal implies the second, so we only
+           keep the second one *)
+        if (C.is_maxlit c 0 subst i || C.is_maxlit c 0 subst j)
+        && (ALF.is_max ~ord lit1 || ALF.is_max ~ord lit2)
+        then begin
+          let left = match lit1 with ALF.Left _ -> true | _ -> false in
+          (* remove lit1, add the guard *)
+          let other_lits = Util.array_except_idx (C.lits c) i in
+          let other_lits = Lit.apply_subst_list ~renaming subst other_lits 0 in
+          (* build new literal *)
+          let new_lit =
+            if left
+            then Lit.mk_arith_less
+              (M.difference m1 (MF.rest mf1))
+              (M.difference m2 (MF.rest mf2))
+            else Lit.mk_arith_less
+              (M.difference m2 (MF.rest mf2))
+              (M.difference m1 (MF.rest mf1))
+          in
+          (* negate the literal to obtain a guard *)
+          let new_lit = Lit.negate new_lit in
+          let lits = new_lit :: other_lits in
+          (* build clauses *)
+          let proof cc = Proof.mk_c_inference ~theories
+            ~info:[Substs.to_string subst]
+            ~rule:"canc_ineq_factoring" cc [C.proof c] in
+          let new_c = C.create ~parents:[c] lits proof in
+          Util.debug 5 "ineq factoring of %a gives %a" C.pp c C.pp new_c;
+          Util.incr_stat stat_arith_ineq_factoring;
+          acc := new_c :: !acc
+        end
+      | _ -> ()
     in
-    (* factor lit and lit' (2 ways) *)
-    let _factor ~left:(lit,i,op) ~right:(lit',j,op') subst acc =
-      let renaming = Ctx.renaming_clear ~ctx in
-      (* check maximality of left literal, and maximality of factored terms
-        within their respective literals *)
-      if C.is_maxlit c i subst 0
-      && Foc.is_max ~ord (Foc.apply_subst ~renaming subst lit 0)
-      && Foc.is_max ~ord (Foc.apply_subst ~renaming subst lit' 0)
-      then begin
-        let lit, lit' = Foc.scale lit lit' in
-        let lit = Foc.apply_subst ~renaming subst lit 0 in
-        let lit' = Foc.apply_subst ~renaming subst lit' 0 in
-        let all_lits = Literal.Arr.apply_subst ~renaming ~ord subst c.C.hclits 0 in
-        (* the two inferences (eliminate lit i/lit j respectively) *)
-        let info = [Substs.FO.to_string subst; Util.sprintf "idx(%d,%d)" i j] in
-        let acc = _factor1 ~info lit lit' (Util.array_except_idx all_lits i) acc in
-        let acc = _factor2 ~info lit lit' (Util.array_except_idx all_lits j) acc in
-        acc
-      end else acc
-    in
-    (* pairwise unify terms of focused lits *)
-    let eligible = C.Eligible.pos in
-    let view = ArithLit.Arr.view_focused ~eligible ~ord c.C.hclits in
-    let res = Util.array_foldi
-      (fun acc i lit -> match lit with
-      | `Focused ((ArithLit.Lt | ArithLit.Leq) as op, l) ->
-        List.fold_left
-          (fun acc lit ->
-            Util.array_foldi
-              (fun acc j lit' -> match lit' with
-              | `Focused ((ArithLit.Lt | ArithLit.Leq) as op', l') when i <> j ->
-                List.fold_left
-                  (fun acc lit' ->
-                    (* only work on same side of comparison *)
-                    if lit'.Foc.side = lit.Foc.side
-                      then try
-                        (* unify the two terms *)
-                        let subst = FOUnif.unification lit.Foc.term 0 lit'.Foc.term 0 in
-                        _factor ~left:(lit,i,op) ~right:(lit',j,op') subst acc
-                      with FOUnif.Fail -> acc
-                    else acc)
-                  acc l'
-              | _ -> acc)
-              acc view)
-          acc l
-        | _ -> acc)
-      [] view
-    in
-    Util.exit_prof prof_canc_ineq_factoring;
-    res
-  *)
+    (* traverse the clause to find matching pairs *)
+    let eligible = C.Eligible.(max c ** filter Lit.is_arith_less) in
+    Lits.fold_arith ~eligible (C.lits c) ()
+      (fun () lit1 pos1 ->
+        let i = Lits.Pos.idx pos1 in
+        let eligible' = C.Eligible.(filter Lit.is_arith_less) in
+        Lits.fold_arith ~eligible:eligible' (C.lits c) ()
+          (fun () lit2 pos2 ->
+            let j = Lits.Pos.idx pos2 in
+            match lit1, lit2 with
+            | _ when i=j -> ()  (* need distinct lits *)
+            | AL.Binary (AL.Less, l1, r1), AL.Binary (AL.Less, l2, r2) ->
+              (* see whether we have   l1 < a.x + mf1  and  l2 < a.x + mf2 *)
+              MF.unify_mm r1 0 r2 0
+                (fun (mf1,mf2,subst) ->
+                  let lit1 = ALF.mk_right AL.Less l1 mf1 in
+                  let lit2 = ALF.mk_right AL.Less l2 mf2 in
+                  _do_factoring ~subst lit1 lit2 i j
+                );
+              (* see whether we have   a.x + mf1 < r1 and a.x + mf2 < r2  *)
+              MF.unify_mm l1 0 l2 0
+                (fun (mf1,mf2,subst) ->
+                  let lit1 = ALF.mk_left AL.Less mf1 r1 in
+                  let lit2 = ALF.mk_left AL.Less mf2 r2 in
+                  _do_factoring ~subst lit1 lit2 i j
+                );
+              ()
+            | _ -> assert false
+          )
+      );
+    Util.exit_prof prof_arith_ineq_factoring;
+    !acc
 
   (** {3 Divisibility} *)
 
