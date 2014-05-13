@@ -45,10 +45,10 @@ let stat_arith_ineq_chaining = Util.mk_stat "arith.ineq_chaining"
 let stat_arith_purify = Util.mk_stat "arith.purify"
 let stat_arith_case_switch = Util.mk_stat "arith.case_switch"
 let stat_arith_inner_case_switch = Util.mk_stat "arith.inner_case_switch"
+let stat_arith_semantic_tautology = Util.mk_stat "arith.semantic_tauto"
 (*
 let stat_arith_ineq_factoring = Util.mk_stat "arith.ineq_factoring"
 let stat_arith_reflexivity_resolution = Util.mk_stat "arith.reflexivity_resolution"
-let stat_arith_semantic_tautology = Util.mk_stat "arith.semantic_tauto"
 *)
 
 let prof_arith_sup = Util.mk_profiler "arith.superposition"
@@ -58,10 +58,10 @@ let prof_arith_ineq_chaining = Util.mk_profiler "arith.ineq_chaining"
 let prof_arith_purify = Util.mk_profiler "arith.purify"
 let prof_arith_inner_case_switch = Util.mk_profiler "arith.inner_case_switch"
 let prof_arith_demod = Util.mk_profiler "arith.demod"
+let prof_arith_semantic_tautology = Util.mk_profiler "arith.semantic_tauto"
 (*
 let prof_arith_ineq_factoring = Util.mk_profiler "arith.ineq_factoring"
 let prof_arith_reflexivity_resolution = Util.mk_profiler "arith.reflexivity_resolution"
-let prof_arith_semantic_tautology = Util.mk_profiler "arith.semantic_tauto"
 *)
 
 
@@ -1281,69 +1281,63 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (** {3 Others} *)
 
-  (* redundancy criterion: if variables are replaced by constants,
-     do equations and inequations in left part of =>
-     always imply something on the right part of => ?
+  let _has_arith c =
+    Util.array_exists Lit.is_arith (C.lits c)
 
-     e,g, transitivity is redundant, because we have
-     ~ x<y | ~ y<z | x<z, once simplified and grounded,
-     x < y & y < z ==> x < z is always trivial
+  module Simp = Simplex.MakeHelp(struct
+    type t = T.t
+    let compare = T.cmp
+  end)
 
-     We consider that  a <= b is negation for b < a, and use the congruence
-     closure (same as for {!Superposition.is_semantic_tautology}) *)
-  let is_tautology c = false
-  (* TODO
-    Util.enter_prof prof_canc_semantic_tautology;
-    let cc = Congruence.FO.create ~size:13 () in
-    (* ineq to checks afterward *)
-    let to_check = ref [] in
-    (* monomes met so far (to compare them) *)
-    let monomes = ref [] in
-    (* build congruence *)
-    ArithLit.Arr.fold_canonical c.C.hclits ()
-      begin fun () i lit -> match lit with
-        | Canon.True | Canon.False -> ()
-        | Canon.Compare (op, m1, m2) ->
-          monomes := m1 :: m2 :: !monomes;
-          match op with
-          | ArithLit.Neq ->
-            Congruence.FO.mk_eq cc (M.to_term m1) (M.to_term m2)
-          | ArithLit.Eq ->
-            to_check := `Eq (M.to_term m1, M.to_term m2) :: !to_check
-          | ArithLit.Leq ->
-            Congruence.FO.mk_less cc (M.to_term m2) (M.to_term m1)
-          | ArithLit.Lt ->
-            to_check := `Lt (M.to_term m1, M.to_term m2) :: !to_check
-      end;
-    List.iter
-      (fun (m1, m2) ->
-        if m1 != m2 then
-          (* m1 and m2 are comparable? *)
-          match M.comparison m1 m2 with
-          | Comparison.Eq ->
-            Congruence.FO.mk_eq cc (M.to_term m1) (M.to_term m2)
-          | Comparison.Lt ->
-            Congruence.FO.mk_less cc (M.to_term m1) (M.to_term m2)
-          | Comparison.Gt ->
-            Congruence.FO.mk_less cc (M.to_term m2) (M.to_term m1)
-          | Comparison.Incomparable -> ())
-      (Util.list_diagonal !monomes);
-    (* check if inequality holds in congruence OR congruence tautological *)
-    let res =
-      Congruence.FO.cycles cc ||
-      List.exists
-        (function
-        | `Eq (l,r) -> Congruence.FO.is_eq cc l r
-        | `Lt (l,r) -> Congruence.FO.is_less cc l r)
-        !to_check
+  (* tautology check: take the linear system that is the negation
+    of all a!=b and a<b, and check its (rational) satisfiability. If
+    it's unsat in Q, it's unsat in Z, and its negation (a subset of c)
+    is tautological *)
+  let _is_tautology c =
+    Util.enter_prof prof_arith_semantic_tautology;
+    (* convert a monome into a rational monome + Q constant *)
+    let to_rat m =
+      let const = Q.of_bigint (M.const m) in
+      List.map (fun (c,t) -> Q.of_bigint c, t) (M.coeffs m), const
     in
-    if res then begin
-      Util.incr_stat stat_canc_semantic_tautology;
-      Util.debug 2 "%a is a cancellative semantic tautology" C.pp c;
-      end;
-    Util.exit_prof prof_canc_semantic_tautology;
-    res
-  *)
+    (* create a list of constraints for some arith lits *)
+    let constraints = Lits.fold_arith ~eligible:C.Eligible.arith (C.lits c) []
+      (fun acc lit _ ->
+        (* negate the literal and make a constraint out of it *)
+        match lit with
+        | AL.Binary (AL.Less, m1, m2) ->
+            (* m1 < m2 ----> m1-m2 >= 0 *)
+            let m, c = to_rat (M.difference m1 m2) in
+            (Simp.GreaterEq, m, c) :: acc
+        | AL.Binary (AL.Different, m1, m2) ->
+            (* m1 != m2  -----> (m1-m2) = 0 *)
+            let m, c = to_rat (M.difference m1 m2) in
+            (Simp.Eq, m, c) :: acc
+        | _ -> acc
+      )
+    in
+    let simplex = Simp.add_constraints Simp.empty constraints in
+    Util.exit_prof prof_arith_semantic_tautology;
+    match Simp.ksolve simplex with
+    | Simp.Unsatisfiable _ -> true (* negation unsatisfiable *)
+    | Simp.Solution _ -> false
+
+  let flag_tauto = C.new_flag ()
+  let flag_computed_tauto = C.new_flag ()
+
+  (* cache the result because it's a bit expensive *)
+  let is_tautology c =
+    if C.get_flag flag_computed_tauto c
+    then C.get_flag flag_tauto c
+    else begin
+      (* compute whether [c] is an arith tautology *)
+      let res = _has_arith c && _is_tautology c in
+      C.set_flag flag_tauto c res;
+      C.set_flag flag_computed_tauto c true;
+      if res then Util.debug 4 "clause %a is an arith tautology" C.pp c;
+      Util.incr_stat stat_arith_semantic_tautology;
+      res
+    end
 
   (* a <= b ----> a < b+1 *)
   let canc_lesseq_to_less = function

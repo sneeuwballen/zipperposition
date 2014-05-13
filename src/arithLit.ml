@@ -231,6 +231,10 @@ let matching ?(subst=Substs.empty) lit1 sc1 lit2 sc2 =
 let variant ?(subst=Substs.empty) lit1 sc1 lit2 sc2 =
   generic_unif (fun ~subst -> M.variant ~subst) ~subst lit1 sc1 lit2 sc2
 
+(* FIXME: how can we manage for
+    a < 10 to subsumes  2.a < 21 ?
+    this requires scaling before matching... Use MF.unify_mm then scaling?
+*)
 let subsumes ?(subst=Substs.empty) lit1 sc1 lit2 sc2 k =
   match lit1, lit2 with
   | Binary (Less, l1, r1), Binary (Less, l2, r2) ->
