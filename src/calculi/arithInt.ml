@@ -1309,16 +1309,23 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.enter_prof prof_arith_purify;
     (* set of new literals *)
     let new_lits = ref [] in
+    let cache = T.Tbl.create 16 in  (* cache for term->var *)
     let _add_lit lit = new_lits := lit :: !new_lits in
     (* index of the next fresh variable *)
     let varidx = ref ((Lits.Seq.terms (C.lits c)
       |> Sequence.flatMap T.Seq.vars |> T.Seq.max_var) + 1) in
     (* replace term by a fresh var + constraint *)
     let replace t ~by =
-      (* purify this term out! *)
-      let ty = T.ty t in
-      let v = T.var ~ty !varidx in
-      incr varidx;
+      (* [v]: fresh var that will replace [t] *)
+      let v =
+        try T.Tbl.find cache t
+        with Not_found ->
+          let ty = T.ty t in
+          let v = T.var ~ty !varidx in
+          T.Tbl.replace cache t v;
+          incr varidx;
+          v
+      in
       let lit = Lit.mk_arith_neq (M.Int.singleton Z.one v) by in
       _add_lit lit;
       v (* return variable instead of literal *)
