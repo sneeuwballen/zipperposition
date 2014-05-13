@@ -1263,11 +1263,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         | AL.Binary (AL.Less, m1, m2) ->
             (* m1 < m2 ----> m1-m2 >= 0 *)
             let m, c = to_rat (M.difference m1 m2) in
-            (Simp.GreaterEq, m, c) :: acc
+            (Simp.GreaterEq, m, Q.neg c) :: acc
         | AL.Binary (AL.Different, m1, m2) ->
             (* m1 != m2  -----> (m1-m2) = 0 *)
             let m, c = to_rat (M.difference m1 m2) in
-            (Simp.Eq, m, c) :: acc
+            (Simp.Eq, m, Q.neg c) :: acc
         | _ -> acc
       )
     in
