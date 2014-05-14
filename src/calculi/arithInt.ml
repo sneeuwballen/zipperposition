@@ -314,7 +314,8 @@ module Make(E : Env.S) : S with module Env = E = struct
             Lit.mk_arith_op op
               (M.sum m_p (MF.rest mf_a))
               (M.sum (MF.rest mf_p) m_a)
-        | ALF.Div d -> failwith "sup in div: not implemented"  (* FIXME *)
+        | ALF.Div d ->
+            Lit.mk_arith (ALF.replace lit_p (M.difference m_a (MF.rest mf_a)))
       in
       let all_lits = new_lit :: lits_a @ lits_p in
       (* build clause *)
@@ -418,7 +419,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           (in other words, the inference is strictly decreasing)
         - all variables of active clause must be bound by subst
         - must not rewrite itself (c != c') *)
-      if ALF.is_max ~ord active_lit'
+      if ALF.is_strictly_max ~ord active_lit'
       && ((C.lits c |> Array.length) > 1
           || not(Lit.is_arith_eq (C.lits c).(i))
           || not(C.is_maxlit c s_p S.empty ~idx:i))
