@@ -49,6 +49,7 @@ let stat_arith_semantic_tautology = Util.mk_stat "arith.semantic_tauto"
 let stat_arith_ineq_factoring = Util.mk_stat "arith.ineq_factoring"
 let stat_arith_div_chaining = Util.mk_stat "arith.div_chaining"
 let stat_arith_divisibility = Util.mk_stat "arith.divisibility"
+let stat_arith_demod = Util.mk_stat "arith.demod"
 (*
 let stat_arith_reflexivity_resolution = Util.mk_stat "arith.reflexivity_resolution"
 *)
@@ -489,6 +490,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let proof cc = Proof.mk_c_inference ~theories ~rule:"canc_demod"
           cc (C.proof c :: List.map C.proof !clauses) in
         let new_c = C.create ~parents:(c::!clauses) (List.rev !lits) proof in
+        Util.incr_stat stat_arith_demod;
         Util.debug 5 "arith demodulation of %a with [%a] gives %a"
           C.pp c (Util.pp_list C.pp) !clauses C.pp new_c;
         new_c
