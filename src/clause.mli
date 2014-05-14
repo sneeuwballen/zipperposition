@@ -38,8 +38,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 val stat_fresh : Util.stat
-val stat_mk_hclause : Util.stat
-val stat_new_clause : Util.stat
+val stat_clause_create : Util.stat
 
 type scope = Substs.scope
 

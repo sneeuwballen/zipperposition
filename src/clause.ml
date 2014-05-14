@@ -36,9 +36,8 @@ module Lit = Literal
 module Lits = Literals
 
 let stat_fresh = Util.mk_stat "fresh_clause"
-let stat_mk_hclause = Util.mk_stat "mk_hclause"
-let stat_new_clause = Util.mk_stat "new_clause"
-let prof_mk_hclause = Util.mk_profiler "mk_hclause"
+let stat_clause_create = Util.mk_stat "clause_create"
+let prof_clause_create = Util.mk_profiler "clause_create"
 
 type scope = Substs.scope
 
@@ -463,8 +462,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let __no_select = BV.empty ()
 
   let create_a ?parents ?selected lits proof =
-    Util.incr_stat stat_mk_hclause;
-    Util.enter_prof prof_mk_hclause;
+    Util.enter_prof prof_clause_create;
     (* Rename variables.
     let renaming = Ctx.renaming_clear ~ctx in
     let lits = Lits.apply_subst ~renaming ~ord:ctx.Ctx.ord
@@ -501,8 +499,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       end
     end;
     (* return clause *)
-    Util.incr_stat stat_new_clause;
-    Util.exit_prof prof_mk_hclause;
+    Util.incr_stat stat_clause_create;
+    Util.exit_prof prof_clause_create;
     c
 
   (** Build clause from a list (delegating to create_a) *)

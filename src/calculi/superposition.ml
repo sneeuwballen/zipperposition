@@ -137,6 +137,7 @@ let stat_demodulate_call = Util.mk_stat "demodulate calls"
 let stat_demodulate_step = Util.mk_stat "demodulate steps"
 let stat_splits = Util.mk_stat "splits"
 let stat_semantic_tautology = Util.mk_stat "semantic_tautologies"
+let stat_condensation = Util.mk_stat "condensation"
 
 let prof_demodulate = Util.mk_profiler "demodulate"
 let prof_back_demodulate = Util.mk_profiler "backward_demodulate"
@@ -1303,6 +1304,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         C.pp c S.pp subst C.pp new_c;
       (* try to condense further *)
       Util.exit_prof prof_condensation;
+      Util.incr_stat stat_condensation;
       condensation new_c
 
   (** {2 Registration} *)

@@ -47,6 +47,8 @@ let stat_arith_case_switch = Util.mk_stat "arith.case_switch"
 let stat_arith_inner_case_switch = Util.mk_stat "arith.inner_case_switch"
 let stat_arith_semantic_tautology = Util.mk_stat "arith.semantic_tauto"
 let stat_arith_ineq_factoring = Util.mk_stat "arith.ineq_factoring"
+let stat_arith_div_chaining = Util.mk_stat "arith.div_chaining"
+let stat_arith_divisibility = Util.mk_stat "arith.divisibility"
 (*
 let stat_arith_reflexivity_resolution = Util.mk_stat "arith.reflexivity_resolution"
 *)
@@ -60,6 +62,8 @@ let prof_arith_inner_case_switch = Util.mk_profiler "arith.inner_case_switch"
 let prof_arith_demod = Util.mk_profiler "arith.demod"
 let prof_arith_semantic_tautology = Util.mk_profiler "arith.semantic_tauto"
 let prof_arith_ineq_factoring = Util.mk_profiler "arith.ineq_factoring"
+let prof_arith_div_chaining = Util.mk_profiler "arith.div_chaining"
+let prof_arith_divisibility = Util.mk_profiler "arith.divisibility"
 (*
 let prof_arith_reflexivity_resolution = Util.mk_profiler "arith.reflexivity_resolution"
 *)
@@ -958,6 +962,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let canc_div_chaining c =
     let ord = Ctx.ord () in
+    Util.enter_prof prof_arith_div_chaining;
     let eligible = C.Eligible.(max c ** filter Lit.is_arith_divides) in
     let sc1 = 0 and sc2 = 1 in
     (* do the inference (if ordering conditions are ok) *)
@@ -993,6 +998,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           cc [C.proof c1; C.proof c2] in
         let new_c = C.create ~parents:[c1;c2] all_lits proof in
         Util.debug 5 "... gives %a" C.pp new_c;
+        Util.incr_stat stat_arith_div_chaining;
         new_c :: acc
       end else begin
         Util.debug 5 "... has bad ordering conditions";
@@ -1032,6 +1038,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         | _ -> acc
       )
     in
+    Util.exit_prof prof_arith_div_chaining;
     res
 
   exception ReplaceLitByLitsInSameClause of int * Lit.t list
@@ -1143,7 +1150,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       Some clauses
 
   let canc_divisibility c =
-    (* inference on 1/ positive eq  2/ positive divibility *)
+    Util.enter_prof prof_arith_divisibility;
+    (* inference on 1/ positive eq  2/ positive divisibility *)
     let eligible = C.Eligible.(max c **
       (filter Lit.is_arith_eq ++ (pos ** filter Lit.is_arith_divides))) in
     let ord = Ctx.ord () in
@@ -1198,12 +1206,14 @@ module Make(E : Env.S) : S with module Env = E = struct
                 ~rule:"divisibility" cc [C.proof c] in
               let new_c = C.create ~parents:[c] all_lits proof in
               Util.debug 5 "... gives %a" C.pp new_c;
+              Util.incr_stat stat_arith_divisibility;
               new_c :: acc
             end
             else acc
           ) acc
       )
     in
+    Util.exit_prof prof_arith_divisibility;
     res
 
   (* regular literal ----> arith literal, sometimes *)
