@@ -461,13 +461,13 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let __no_select = BV.empty ()
 
-  let create_a ?parents ?selected lits proof =
+  let create ?parents ?selected lits proof =
     Util.enter_prof prof_clause_create;
-    (* Rename variables.
-    let renaming = Ctx.renaming_clear ~ctx in
-    let lits = Lits.apply_subst ~renaming ~ord:ctx.Ctx.ord
-      S.empty lits 0 in
-    *)
+    let lits = lits
+      |> List.filter (function Lit.False -> false | _ -> true)
+      |> List.sort Lit.compare
+    in
+    let lits = Array.of_list lits in
     (* proof *)
     let proof' = proof lits in
     (* create the structure *)
@@ -503,18 +503,17 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     Util.exit_prof prof_clause_create;
     c
 
-  (** Build clause from a list (delegating to create_a) *)
-  let create ?parents ?selected lits proof =
-    create_a ?parents ?selected (Array.of_list lits) proof
+  let create_a ?parents ?selected lits proof =
+    create ?parents ?selected (Array.to_list lits) proof
 
   let of_forms ?parents ?selected forms proof =
     let lits = List.map Ctx.Lit.of_form forms in
     create ?parents ?selected lits proof
 
   let of_forms_axiom ?(role="axiom") ~file ~name forms =
-    let lits = Lits.Conv.of_forms forms in
+    let lits = List.map Lit.Conv.of_form forms in
     let proof c = Proof.mk_c_file ~role ~file ~name c in
-    create_a lits proof
+    create lits proof
 
   let proof c = c.hcproof
 

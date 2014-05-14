@@ -109,8 +109,7 @@ module type S = sig
   val create_a : ?parents:t list -> ?selected:BV.t ->
                   Literal.t array ->
                   (CompactClause.t -> Proof.t) -> t
-    (** Build a new hclause from the given literals. This function takes
-        ownership of the input array. *)
+    (** Build a new hclause from the given literals. *)
 
   val of_forms : ?parents:t list -> ?selected:BV.t ->
                       Formula.FO.t list ->
