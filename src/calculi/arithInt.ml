@@ -70,11 +70,6 @@ module type S = sig
   module C : module type of Env.C
   module PS : module type of Env.ProofState
 
-  val idx_eq : unit -> PS.TermIndex.t   (** both sides of Eq/Ineq *)
-  val idx_ineq : unit -> PS.TermIndex.t (** inequations *)
-  val idx_div : unit -> PS.TermIndex.t  (** divisibility *)
-  val idx_all : unit -> PS.TermIndex.t  (** all root terms under arith lits *)
-
   (** {3 Equations and Inequations} *)
 
   val canc_sup_active: Env.binary_inf_rule
@@ -170,17 +165,13 @@ module Make(E : Env.S) : S with module Env = E = struct
   module PS = Env.ProofState
 
   let _idx_eq = ref (PS.TermIndex.empty ())
-  let _idx_ineq = ref (PS.TermIndex.empty ())
+  let _idx_ineq_left = ref (PS.TermIndex.empty ())
+  let _idx_ineq_right = ref (PS.TermIndex.empty ())
   let _idx_div = ref (PS.TermIndex.empty ())
   let _idx_all = ref (PS.TermIndex.empty ())
 
   (* unit clauses *)
   let _idx_unit = ref (PS.TermIndex.empty ())
-
-  let idx_eq () = !_idx_eq
-  let idx_ineq () = !_idx_ineq
-  let idx_div () = !_idx_div
-  let idx_all () = !_idx_all
 
   (* apply [f] to some subterms of [c] *)
   let update f c =
@@ -192,13 +183,21 @@ module Make(E : Env.S) : S with module Env = E = struct
       (fun acc t pos ->
         let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
         f acc t with_pos);
-    _idx_ineq :=
+    let left, right = 
       Lits.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false
       ~eligible:C.Eligible.(filter Lit.is_arith_ineq** max c)
-      (C.lits c) !_idx_ineq
-      (fun acc t pos ->
+      (C.lits c) (!_idx_ineq_left, !_idx_ineq_right)
+      (fun (left,right) t pos ->
         let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
-        f acc t with_pos);
+        match pos with
+        | Position.Arg (_, Position.Left _) ->
+            f left t with_pos, right
+        | Position.Arg (_, Position.Right _) ->
+            left, f right t with_pos
+        | _ -> assert false)
+    in
+    _idx_ineq_left := left;
+    _idx_ineq_right := right;
     _idx_div :=
       Lits.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false
       ~eligible:C.Eligible.(filter Lit.is_arith_divides ** max c)
@@ -741,7 +740,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         match lit with
         | ALF.Left (AL.Less, mf_l, _) ->
           (* find a right-chaining literal in some other clause *)
-          PS.TermIndex.retrieve_unifiables !_idx_ineq sc_r t sc_l acc
+          PS.TermIndex.retrieve_unifiables !_idx_ineq_right sc_r t sc_l acc
             (fun acc _t' with_pos subst ->
               let right = with_pos.C.WithPos.clause in
               let right_pos = with_pos.C.WithPos.pos in
@@ -760,7 +759,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             )
         | ALF.Right (AL.Less, _, mf_r) ->
           (* find a right-chaining literal in some other clause *)
-          PS.TermIndex.retrieve_unifiables !_idx_ineq sc_l t sc_r acc
+          PS.TermIndex.retrieve_unifiables !_idx_ineq_left sc_l t sc_r acc
             (fun acc _t' with_pos subst ->
               let left = with_pos.C.WithPos.clause in
               let left_pos = with_pos.C.WithPos.pos in

@@ -462,9 +462,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let __no_select = BV.empty ()
 
-  (** Build a new hclause from the given literals.
-      If there are more than [BV.max_len] literals,
-      the prover becomes incomplete by returning [true] instead. *)
   let create_a ?parents ?selected lits proof =
     Util.incr_stat stat_mk_hclause;
     Util.enter_prof prof_mk_hclause;
