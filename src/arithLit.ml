@@ -122,8 +122,10 @@ let _normalize = Monome.Int.normalize
 (* main constructor *)
 let make op m1 m2 =
   let m1, m2 = _normalize m1, _normalize m2 in
-  let m = Monome.difference m1 m2 in
-  let m1, m2 = Monome.split m in
+  let m = M.difference m1 m2 in
+  (* divide by gcd *)
+  let m = M.Int.normalize_wrt_zero m in
+  let m1, m2 = M.split m in
   Binary (op, m1, m2)
 
 let mk_eq = make Equal
@@ -137,6 +139,8 @@ let mk_divides ?(sign=true) n ~power m =
   (* normalize coefficients so that they are within [0...nk-1] *)
   let norm_coeff c = Z.erem c nk in
   let m = M.map_num norm_coeff m in
+  (* TODO: factorize m by some k; if k is n^p, then
+      make the literal n^{power-p} | m/k *)
   Divides { sign; num=n; power; monome=m; }
 
 let mk_not_divides = mk_divides ~sign:false

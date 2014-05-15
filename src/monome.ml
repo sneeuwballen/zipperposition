@@ -754,7 +754,8 @@ module Int = struct
     then m
     else
       (* divide by common gcd of coeffs and constant *)
-      let gcd = List.fold_left (fun gcd (c,_) -> Z.gcd c gcd) m.const m.terms in
+      let gcd = if Z.(equal m.const zero) then Z.one else m.const in
+      let gcd = List.fold_left (fun gcd (c,_) -> Z.gcd c gcd) gcd m.terms in
       let gcd = Z.abs gcd in
       if Z.equal Z.one gcd
         then m
