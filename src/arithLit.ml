@@ -235,29 +235,164 @@ let matching ?(subst=Substs.empty) lit1 sc1 lit2 sc2 =
 let variant ?(subst=Substs.empty) lit1 sc1 lit2 sc2 =
   generic_unif (fun ~subst -> M.variant ~subst) ~subst lit1 sc1 lit2 sc2
 
-(* FIXME: how can we manage for
-    a < 10 to subsumes  2.a < 21 ?
-    this requires scaling before matching... Use MF.unify_mm then scaling?
+(* Interesting sub-part of the prover. This subsumption relation must be
+  a subset of the implication relation, be decidable, but yet be as powerful
+  as possible. A few examples:
+
+    a < 10 subsumes  2.a < 21
+    a = 1  subsumes a > 0
+    a > 0  subsumes a > -10
+    2.a < 10 subsumes a < 11
 *)
-let subsumes ?(subst=Substs.empty) lit1 sc1 lit2 sc2 k =
-  match lit1, lit2 with
-  | Binary (Less, l1, r1), Binary (Less, l2, r2) ->
-      (* if subst(r1 - l1) = r2-l2 - k where k>=0, then l1<r1 => l2+k<r2 => l2<r2
-          so l1<r1 subsumes l2<r2. *)
-      let m1 = M.difference r1 l1 in
-      let m2 = M.difference r2 l2 in
-      M.matching ~subst (M.remove_const m1) sc1 (M.remove_const m2) sc2
+module Subsumption = struct
+  (* verify postcondition of [matching] *)
+  let _matching_postcond m1 sc1 m2 sc2 (subst,c1,c2) =
+    let m1 = M.apply_subst_no_renaming subst m1 sc1 in
+    let m1 = M.product m1 c1
+    and m2 = M.product m2 c2 in
+    M.is_const (M.difference m1 m2)
+
+  (* matching that is allowed to scale m1, and, if [scale2] is true, to
+    scale [m2] too. Constants are not taken into account.
+    [k] is called with [subst, c1, c2] where [c_i] is the scaling coefficient
+    for [m_i].
+    postcondition: for a result (subst,c1,c2),
+      c1 * subst(m1.terms) = c2 * subst(m2.terms) *)
+  let matching ~subst m1 sc1 ~scale2 m2 sc2 k =
+    (* match some terms of [l1] with the given term [t2].
+      [c1] is the accumulated coefficient for terms of [l1] so far. *)
+    let rec init_with_coeff ~subst c1 l1 rest1 t2 c2 rest2 =
+      match l1 with
+      | [] when Z.sign c1 = 0 ->
+          ()  (* no match with [t2] *)
+      | [] ->
+          (* ok, we did match some terms with [t2]. Scale coefficients if
+              possible, otherwise fail  *)
+          if scale2
+            then
+              (* can scale both, so we take the [gcd], and multiply
+                the first monome with [c2/gcd] and the second with [c1/gcd] *)
+              let g = Z.gcd c1 c2 in
+              check_other_terms ~subst
+                ~scale1:(Z.divexact c2 g)
+                ~scale2:(Z.divexact c1 g)
+                rest1 rest2
+            else
+              (* can only scale [c1], so it only works if [c1] divides [c2] *)
+              if Z.(equal (c2 mod c1) zero)
+                then
+                  check_other_terms ~subst
+                    ~scale1:(Z.divexact c1 c2)
+                    ~scale2:Z.one
+                    rest1 rest2
+                else ()
+      | (c1',t1) :: l1' ->
+          (* choose [t1], if possible, and then extend the substitution for t2 *)
+          begin try
+            let subst = Unif.FO.matching ~subst ~pattern:t1 sc1 t2 sc2 in
+            init_with_coeff ~subst Z.(c1 + c1') l1' rest1 t2 c2 rest2
+          with Unif.Fail -> ()
+          end;
+          (* disregard [t1] *)
+          init_with_coeff ~subst c1 l1' ((c1',t1)::rest1) t2 c2 rest2
+    and
+    (* match other terms with the given scaling coeff *)
+    check_other_terms ~subst ~scale1 ~scale2 l1 l2 =
+      let l1 = List.map (fun (c,t) -> Z.(c * scale1), t) l1
+      and l2 = List.map (fun (c,t) -> Z.(c * scale2), t) l2
+      in
+      match_lists ~subst l1 [] l2
         (fun subst ->
-          let renaming = Substs.Renaming.create () in
-          let m = M.difference
-            (M.apply_subst ~renaming subst m1 sc1)
-            (M.apply_subst ~renaming subst m2 sc2) in
-          assert (M.is_const m);
-          (* now, if [m <= 0], then subst(r1-l1) always dominates r2-l2
-              and subst is subsuming *)
-          if M.sign m <= 0 then k subst)
-  | _ ->
-    generic_unif (fun ~subst -> M.matching ~subst) ~subst lit1 sc1 lit2 sc2 k
+          assert (_matching_postcond m1 sc1 m2 sc2 (subst, scale1, scale2));
+          k (subst, scale1, scale2))
+    and
+    (* match lists together exactly. No scaling authorized *)
+    match_lists ~subst l1 rest1 l2 k = match l1, l2 with
+    | [], [] -> k subst
+    | [], _
+    | _, [] -> ()
+    | (c1,t1)::l1', (c2,t2)::l2' when Z.leq c1 c2  ->
+        begin try
+          let subst = Unif.FO.matching ~subst ~pattern:t1 sc1 t2 sc2 in
+          if Z.equal c1 c2
+            then match_lists ~subst (rest1 @ l1') [] l2' k
+            else match_lists ~subst l1' rest1 ((Z.(c2 - c1),t2)::l2') k
+        with Unif.Fail -> ()
+        end;
+        (* ignore [t1] for now *)
+        match_lists ~subst l1' ((c1,t1)::rest1) l2 k
+    | (c1,t1)::l1', (c2,t2)::l2' ->
+        (* cannot match, c1 too high *)
+        match_lists ~subst l1' ((c1,t1)::rest1) l2 k
+    in
+    match M.coeffs m2 with
+    | [] ->
+        check_other_terms ~subst ~scale1:Z.one ~scale2:Z.one (M.coeffs m1) []
+    | (c2,t2)::l2 ->
+        (* start with matching terms of [m1] with [t2] *)
+        init_with_coeff ~subst Z.zero (M.coeffs m1) [] t2 c2 l2
+
+  let check ~subst lit1 sc1 lit2 sc2 k =
+    match lit1, lit2 with
+    | Binary (Equal, l1, r1), Binary (Equal, l2, r2)
+    | Binary (Different, l1, r1), Binary (Different, l2, r2) ->
+        (* careful with equality, don't scale right literal because
+          it might involve divisibility issues *)
+        let m1 = M.difference l1 r1 in
+        let m2 = M.difference l2 r2 in
+        matching ~subst m1 sc1 ~scale2:false m2 sc2
+          (fun (subst, c1, c2) ->
+            if Z.(equal (c1 * M.const m1) (c2 * M.const m2)) then k subst)
+    | Binary (Equal, l1, r1), Binary (Less, l2, r2) ->
+        (* l1=r1  can subsume l2<r2 if
+          l1-r1 = (l2-r2) + k with k<0 *)
+        let m1 = M.difference l1 r1 in
+        let m2 = M.difference l2 r2 in
+        matching ~subst m1 sc1 ~scale2:true m2 sc2
+          (fun (subst, c1, c2) ->
+            if Z.(lt (c1 * M.const m1) (c2 * M.const m2)) then k subst)
+    | Binary (Less, l1, r1), Binary (Different, l2, r2) ->
+        (* l1<r1 can subsume l2 != r2 if
+          l1-r1 (<0) = l2-r2+k with k>0 *)
+        let m1 = M.difference l1 r1 in
+        let m2 = M.difference l2 r2 in
+        matching ~subst m1 sc1 ~scale2:true m2 sc2
+          (fun (subst, c1, c2) ->
+            if Z.(gt (c1 * M.const m1) (c2 * M.const m2)) then k subst)
+    | Binary (Less, l1, r1), Binary (Less, l2, r2) ->
+        (* if subst(r1 - l1) = r2-l2 - k where k>=0, then l1<r1 => l2+k<r2 => l2<r2
+            so l1<r1 subsumes l2<r2. *)
+        let m1 = M.difference l1 r1 in
+        let m2 = M.difference l2 r2 in
+        matching ~subst m1 sc1 ~scale2:true m2 sc2
+          (fun (subst, c1, c2) ->
+            (* we removed all terms but the constants,
+                if subst(l1-r1) is a smaller constant than l2-r2
+                then subst is subsuming *)
+            if Z.(lt (c1 * M.const m1) (c2 * M.const m2)) then k subst)
+    | Binary (Equal, l1, r1), Divides d when d.sign ->
+        let m1 = M.difference l1 r1 in
+        matching ~subst m1 sc1 ~scale2:false d.monome sc2
+          (fun (subst, c1, c2) ->
+            (* l1-r1 = d.monome + something.num^power *)
+            if Z.(equal
+              ((c1 * M.const m1) mod (d.num ** d.power))
+              (c2 * M.const d.monome)) then k subst)
+    | Divides d1, Divides d2 when d1.sign = d2.sign
+      && Z.equal d1.num d2.num && d1.power >= d2.power ->
+        (* n^{k+k'} | m1  can subsume n^k | m2
+          (with k' = d1.power - d2.power) if
+            c1.m1 = c2.m2 + something.n^k *)
+        matching ~subst d1.monome sc1 ~scale2:false d2.monome sc2
+          (fun (subst, c1, c2) ->
+            if Z.(equal
+              ((c1 * M.const d1.monome) mod (d2.num ** d2.power))
+              (c2 * M.const d2.monome)) then k subst)
+    | _ -> () (* fail *)
+end
+
+let subsumes ?(subst=Substs.empty) lit1 sc1 lit2 sc2 k =
+  Subsumption.check ~subst lit1 sc1 lit2 sc2 k
 
 let are_variant lit1 lit2 =
   not (Sequence.is_empty (variant lit1 0 lit2 1))
