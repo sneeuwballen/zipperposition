@@ -133,6 +133,7 @@ let stat_subsumption_call = Util.mk_stat "subsumption calls"
 let stat_eq_subsumption_call = Util.mk_stat "equality subsumption calls"
 let stat_subsumed_in_active_set_call = Util.mk_stat "subsumed_in_active_set calls"
 let stat_subsumed_by_active_set_call = Util.mk_stat "subsumed_by_active_set calls"
+let stat_clauses_subsumed = Util.mk_stat "clauses subsumed"
 let stat_demodulate_call = Util.mk_stat "demodulate calls"
 let stat_demodulate_step = Util.mk_stat "demodulate steps"
 let stat_splits = Util.mk_stat "splits"
@@ -1102,7 +1103,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let bv = BV.empty () in
       try_permutations 0 S.empty bv;
       None
-    with (SubsumptionFound subst) -> Some subst
+    with (SubsumptionFound subst) ->
+      Util.incr_stat stat_clauses_subsumed;
+      Some subst
 
   let subsumes a b =
     Util.enter_prof prof_subsumption;
