@@ -26,135 +26,410 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {6 Generic multisets} *)
 
-type 'a t = 'a IArray.t
-  (** We represent multisets as arrays. *)
+module type S = sig
+  type elt
+  (** Elements of the multiset *)
 
-let of_list = IArray.of_list
+  type t
+  (** A multiset of elements of type 'a *)
 
-let create a = a
+  val size : t -> int
+  (** Number of distinct elements. *)
 
-let create_unsafe = IArray.of_array_unsafe
+  val cardinal : t -> Z.t
+  (** Number of unique occurrences of elements (the multiplicity of each
+      element is considered) *)
 
-let size a = IArray.length a
+  val empty : t
+  (** Empty multiset *)
 
-let is_empty a = IArray.length a = 0
+  val is_empty : t -> bool
+  (** Is the multiset empty? *)
 
-let iter a f = IArray.iter f a
+  val mem : t -> elt -> bool
+  (** Is the element part of the multiset? *)
 
-let get = IArray.get
+  val find : t -> elt -> Z.t
+  (** Return the multiplicity of the element within the multiset.
+      Will return [Z.zero] if the element is not part of the multiset *)
 
-(* returns a pair of bitvectors that are only true for elements of the
-   corresponding multisets that have not been removed. An element is removed is
-   it occurs also in the other multiset. *)
-let remove_eq f m1 m2 =
-  (* find an element of [m2] that can remove [i] from [bv1], On success
-      remove elements from [m1] and [m2] using [bv1] and [bv2]. *)
-  let rec find_mate f m1 m2 bv1 bv2 i j =
-    if j = size m2
-      then ()
-    else if BV.get bv2 j && f (IArray.get m1 i) (IArray.get m2 j) = Comparison.Eq
-      then (BV.reset bv1 i; BV.reset bv2 j)  (* remove both *)
-    else find_mate f m1 m2 bv1 bv2 i (j+1)
-  in
-  let bv1 = BV.create ~size:(size m1) true in
-  let bv2 = BV.create ~size:(size m2) true in
-  for i = 0 to size m1 - 1 do
-    if BV.get bv1 i then find_mate f m1 m2 bv1 bv2 i 0
-  done;
-  bv1, bv2
+  val singleton : elt -> t
 
-let to_array m = m
+  val doubleton : elt -> elt -> t
 
-let to_list = IArray.to_list
+  val add : t -> elt -> t
+  (** Add one occurrence of the element *)
 
-let eq f m1 m2 =
-  size m1 = size m2 &&
-  (* could be optimized by failing as soon as some element of [m1] has
-     not been removed by [remove_eq]... *)
-  let bv1, bv2 = remove_eq f m1 m2 in
-  BV.is_empty bv1 && BV.is_empty bv2
+  val add_coeff : t -> elt -> Z.t -> t
+  (** Add several occurrences of the element *)
 
-let compare f m1 m2 =
-  (* here, bitvectors are be used to determine whether
-    an element can be maximal, ie if it dominates every element of the
-    other set. *)
-  let rec compare_all f m1 m2 bv1 bv2 i j =
-    if i = size m1
-      then ()
-    else if j = size m2
-      then compare_all f m1 m2 bv1 bv2 (i+1) 0
-    else if BV.get bv1 i && BV.get bv2 j then
-      (* compare m1(i) and m2(j). The loser, if any, is removed
-         from the set of candidates for maximality *)
-      let _ = match f (IArray.get m1 i) (IArray.get m2 j) with
-      | Comparison.Eq -> assert false  (* remove equal failed?*)
-      | Comparison.Incomparable -> ()
-      | Comparison.Gt -> BV.reset bv2 j
-      | Comparison.Lt -> BV.reset bv1 i
-      in
-      compare_all f m1 m2 bv1 bv2 i (j+1)
-    else compare_all f m1 m2 bv1 bv2 i (j+1)
-  in
-  let bv1, bv2 = remove_eq f m1 m2 in
-  if BV.is_empty bv1 && BV.is_empty bv2
-    then Comparison.Eq
-  else begin
-    compare_all f m1 m2 bv1 bv2 0 0;
-    match BV.cardinal bv1, BV.cardinal bv2 with
-    | 0, 0 -> assert false    (* inconsistent: where is the dominating elemt? *)
-    | 0, _ -> Comparison.Lt   (* m2 has at least one maximal element *)
-    | _, 0 -> Comparison.Gt
-    | _, _ -> Comparison.Incomparable  (* both have maximal elements *)
+  val union : t -> t -> t
+  (** Union of multisets (max of multiplicies) *)
+
+  val intersection : t -> t -> t
+  (** Intersection of multisets (min of multiplicies) *)
+
+  val sum : t -> t -> t
+  (** Sum of multiplicies *)
+
+  val difference : t -> t -> t
+  (** Difference of multisets. If [x] has a bigger multiplicity in the
+      second argument it won't appear in the result *)
+
+  val product : Z.t -> t -> t
+  (** Multiply all multiplicities with the given coefficient *)
+
+  val filter : (elt -> Z.t -> bool) -> t -> t
+  (** Filter out elements that don't satisfy the predicate *)
+
+  val map : (elt -> elt) -> t -> t
+  (** Apply a function to all elements *)
+
+  val map_coeff : (elt -> Z.t -> Z.t) -> t -> t
+  (** Apply a function to all coefficients. *)
+
+  val filter_map : (elt -> Z.t -> (elt * Z.t) option) -> t -> t
+  (** More powerful mapping *)
+
+  val flat_map : (elt -> t) -> t -> t
+  (** replace each element by a multiset in its own *)
+
+  module Seq : sig
+    val of_seq : t -> elt Sequence.t -> t
+    val to_seq : t -> elt Sequence.t
+
+    val of_coeffs : t -> (elt * Z.t) Sequence.t -> t
+    val to_coeffs : t -> (elt * Z.t) Sequence.t
   end
 
-let is_max f x m =
-  IArray.for_all (fun y -> f x y <> Comparison.Lt) m
+  val iter : (elt -> unit) -> t -> unit
+  (** Iterate on distinct occurrences of elements *)
 
-(* maximal elements *)
-let max f m =
-  (* at the beginning, all literals are potentially maximal *)
-  let bv = BV.create ~size:(size m) true in
-  for i = 0 to size m - 1 do
-    if not (BV.get bv i)
-      then ()
-      else for j = i+1 to size m - 1 do
-        if i = j || not (BV.get bv j)
-          then ()
-          else match f (IArray.get m i) (IArray.get m j) with
-            | Comparison.Eq
-            | Comparison.Incomparable -> ()
-            | Comparison.Lt -> BV.reset bv i  (* i smaller, cannot be max *)
-            | Comparison.Gt -> BV.reset bv j  (* j smaller, cannot be max *)
-      done
-  done;
-  bv
+  val fold : ('a -> elt -> 'a) -> 'a -> t -> 'a
+  (** fold on occurrences of elements *)
 
-(* maximal elements of a list *)
-let max_l f l =
-  (* check whether [x] can be max.
-     [ok]: some max terms; [x]: current element;
-     [rest1]: to process but still candidates, [rest2]: remaining to compare.
-     It always holds that elements of [ok] and
-     [rest1 @ rest2] are incomparable or equal. *)
-  let rec check_max ok x rest1 rest2 =
-    match rest2 with
-    | [] -> start (x::ok) rest1 (* [x] is maximal, next! *)
-    | y :: rest2' ->
-        begin match f x y with
-        | Comparison.Gt -> check_max ok x rest1 rest2'  (* y can't be maximal *)
-        | Comparison.Lt -> start ok (rest1 @ rest2)  (* drop x, can't be max *)
-        | Comparison.Eq
-        | Comparison.Incomparable ->
-            (* keep [y] and [x], both can still be maximal *)
-            check_max ok x (y::rest1) rest2'
-        end
-  (* add maximal elements among [rest] to [ok]. *)
-  and start ok rest = match rest with
-    | [] -> ok
-    | x :: rest' -> check_max ok x [] rest'
-  in
-  start [] l
+  val iter_coeffs : (elt -> Z.t -> unit) -> t -> unit
+  (** Iterate on elements with their multiplicity *)
 
-(* for now, simple solution. *)
-let compare_l f l1 l2 =
-  compare f (IArray.of_list l1) (IArray.of_list l2)
+  val fold_coeffs : ('a -> elt -> Z.t -> 'a) -> 'a -> t -> 'a
+  (** Fold on elements with their multiplicity *)
+
+  val for_all : (elt -> bool) -> t -> bool
+
+  val exists : (elt -> bool) -> t -> bool
+
+  val choose : t -> elt
+  (** Chose one element, or
+      @raise Not_found if the multiset is empty *)
+
+  val of_list : elt list -> t
+  (** Multiset from list *)
+
+  val of_iarray : elt IArray.t -> t
+  (** From immutable array *)
+
+  val of_array : elt array -> t
+
+  val to_list : t -> (elt * Z.t) list
+  (** List of elements with their coefficients *)
+
+  val eq : t -> t -> bool
+  (** Check equality of two multisets *)
+
+  val cancel : t -> t -> t * t
+  (** Remove common elements from the multisets. For instance,
+    on [{1,1,2}] and [{1,2,2,3}], [cance] will return [({1}, {2,3})] *)
+
+  (** {6 Comparisons}
+
+  In the following, the comparison function must be equality-compatible
+  with [E.compare]. In other words, if [f x y = Comparison.Eq] then
+  [E.compare x y = 0] should hold. *)
+
+  val compare : (elt -> elt -> Comparison.t) -> t -> t -> Comparison.t
+  (** Compare two multisets with the multiset extension of the
+      given ordering. This ordering is total iff the element
+      ordering is. *)
+
+  val is_max : (elt -> elt -> Comparison.t) -> elt -> t -> bool
+  (** Is the given element maximal (ie not dominated by any
+      other element) within the multiset? *)
+
+  val max : (elt -> elt -> Comparison.t) -> t -> t
+  (** Maximal elements of the multiset, w.r.t the given ordering. *)
+
+  val max_l : (elt -> elt -> Comparison.t) -> elt list -> elt list
+    (** Maximal elements of a list *)
+
+  val compare_l : (elt -> elt -> Comparison.t) -> elt list -> elt list -> Comparison.t
+    (** Compare two multisets represented as list of elements *)
+end
+
+module Make(E : Map.OrderedType) = struct
+  type elt = E.t
+
+  type t = (elt * Z.t) list (* map element -> multiplicity *)
+
+  let empty = []
+
+  let size = List.length
+
+  let cardinal m =
+    List.fold_left (fun acc (_,n) -> Z.add n acc) Z.zero m
+
+  let is_empty = function
+    | [] -> true
+    | _ -> false
+
+  let rec mem m x = match m with
+    | [] -> false
+    | (y,_)::m' ->
+        let c = E.compare x y in
+        c = 0 || (c < 0 && mem m' x)
+
+  let rec find m x = match m with
+    | [] -> Z.zero
+    | (y,n) :: m' ->
+        let c = E.compare x y in
+        if c = 0 then n
+        else if c < 0 then find m' x
+        else Z.zero
+
+  let singleton x = [x, Z.one]
+
+  let rec add_coeff m x n = match m with
+    | [] -> [x, n]
+    | (y,n') :: m' ->
+        let c = E.compare x y in
+        if c=0 then (x,Z.add n n') :: m'
+        else if c < 0 then (x,n)::m
+        else (y,n') :: add_coeff m' x n
+
+  let add m x = add_coeff m x Z.one
+
+  let doubleton x y = add (singleton x) y
+
+  let _cons x n m =
+    if Z.gt n Z.zero
+      then (x,n) :: m
+      else m
+
+  let rec _map f m = match m with
+    | [] -> []
+    | (x,n)::m' ->
+      let n' = f x n in
+      _cons x n' (_map f m')
+
+  (* merge two lists together *)
+  let rec _merge f m1 m2 = match m1, m2 with
+    | [], _ -> m2
+    | _, [] -> m1
+    | (x1,n1)::m1', (x2,n2)::m2' ->
+        let c = E.compare x1 x2 in
+        if c < 0
+          then _cons x1 (f n1 Z.zero) (_merge f m1' m2)
+        else if c > 0
+          then _cons x2 (f Z.zero n2) (_merge f m1 m2')
+        else
+          _cons x1 (f n1 n2) (_merge f m1' m2')
+
+  let union = _merge Z.max
+
+  let intersection = _merge Z.min
+
+  let sum = _merge Z.add
+
+  let difference = _merge Z.sub
+
+  let product n m =
+    if Z.sign n <= 0 then empty
+    else _map (fun x n' -> Z.mul n n') m
+
+  let map f m =
+    List.fold_left
+      (fun acc (x,n) -> add_coeff acc (f x) n)
+      empty m
+
+  let map_coeff f m = _map f m
+
+  let filter_map f m =
+    List.fold_left
+      (fun acc (x, n) ->
+        match f x n with
+        | None -> acc
+        | Some (x',n') -> add_coeff acc x' n'
+      ) empty m
+
+  let filter p m = map_coeff (fun x n -> if p x n then n else Z.zero) m
+
+  let flat_map f m =
+    List.fold_left
+      (fun m' (x,n) ->
+        let m'' = f x in
+        union m' m''
+      ) empty m
+
+  module Seq = struct
+    let of_seq m seq =
+      let m = ref m in
+      seq (fun x -> m := add !m x);
+      !m
+
+    let to_seq m k =
+      List.iter (fun (x,n) -> for _i=1 to Z.to_int n do k x; done) m
+
+    let of_coeffs m seq =
+      let m = ref m in
+      seq (fun (x,n) -> m := add_coeff !m x n);
+      !m
+
+    let to_coeffs m k = List.iter k m
+  end
+
+  let iter f m = Seq.to_seq m f
+  let iter_coeffs f m = Seq.to_coeffs m (fun (x,n) -> f x n)
+
+  let fold f acc m =
+    let acc = ref acc in
+    Seq.to_seq m (fun x -> acc := f !acc x);
+    !acc
+
+  let fold_coeffs f acc m =
+    List.fold_left (fun acc (x,n) -> f acc x n) acc m
+
+  let for_all p m = List.for_all (fun (x,_) -> p x) m
+  let exists p m = List.exists (fun (x,_) -> p x) m
+
+  let choose m = match m with
+    | [] -> raise Not_found
+    | (x,_)::_ -> x
+
+  let of_list = List.fold_left add empty
+
+  let of_iarray = IArray.fold add empty
+
+  let of_array = Array.fold_left add empty
+
+  let to_list m = m
+
+  let rec eq m1 m2 = match m1, m2 with
+    | [], [] -> true
+    | [], _
+    | _, [] -> false
+    | (x1,n1)::m1', (x2,n2)::m2' ->
+        E.compare x1 x2 = 0 && Z.equal n1 n2 && eq m1' m2'
+
+  let rec cancel m1 m2 = match m1, m2 with
+    | [], _
+    | _, [] -> m1, m2
+    | (x1,n1)::m1', (x2,n2)::m2' ->
+        let c = E.compare x1 x2 in
+        if c = 0
+          then match Z.compare n1 n2 with
+            | 0 -> cancel m1' m2'  (* remove from both sides *)
+            | n when n<0 ->
+                let m1'', m2'' = cancel m1' m2' in
+                m1'', (x2, Z.sub n2 n1) :: m2''  (* keep some at right *)
+            | _ ->
+                let m1'', m2'' = cancel m1' m2' in
+                (x1, Z.sub n1 n2) :: m1'', m2''  (* keep some at left *)
+        else if c < 0
+          then
+            let m1'', m2'' = cancel m1' m2 in
+            (x1,n1)::m1'', m2''
+        else
+          let m1'', m2'' = cancel m1 m2' in
+            m1'', (x2,n2)::m2''
+
+  let compare f m1 m2 =
+    let m1, m2 = cancel m1 m2 in
+    (* for now we can break the sorted list invariant. We look for some
+       element of [m1] or [m2] that isn't dominated by any element of
+       the other list. [m_i @ rest_i] is the set of potentially maximal
+       elements of the multset. *)
+    let rec check_left ~max1 m1 ~max2 m2 = match m1 with
+      | [] ->
+          (* max2 is true if some terms are not dominated within m2 *)
+          let max2 = max2 || (m2<>[]) in
+          begin match max1, max2 with
+          | true, true -> Comparison.Incomparable
+          | true, false -> Comparison.Gt
+          | false, true -> Comparison.Lt
+          | false, false -> Comparison.Eq
+          end
+      | (x1,n1)::m1' ->
+          (* remove terms of [m2] that are dominated by [x1] *)
+          filter_with ~max1 x1 n1 m1' ~max2 m2 []
+    and filter_with ~max1 x1 n1 m1' ~max2 m2 rest2 = match m2 with
+      | [] ->
+          (* [x1] is not dominated *)
+          check_left ~max1:true m1' ~max2 rest2
+      | (x2,n2)::m2' ->
+          begin match f x1 x2 with
+          | Comparison.Eq ->
+              assert(E.compare x1 x2 = 0);
+              let c = Z.compare n1 n2 in
+              if c > 0
+              then (* remove x1 *)
+                check_left ~max1 m1' ~max2 (List.rev_append m2 rest2)
+              else if c < 0
+              then (* remove x2 *)
+                filter_with ~max1 x1 Z.(n1-n2) m1' ~max2 m2' rest2
+              else (* remove both *)
+                check_left ~max1 m1' ~max2 (List.rev_append m2' rest2)
+          | Comparison.Incomparable ->
+              (* keep both *)
+              filter_with ~max1 x1 n1 m1' ~max2 m2' ((x2,n2)::rest2)
+          | Comparison.Gt ->
+              (* remove x2 *)
+              filter_with ~max1 x1 n1 m1' ~max2 m2' rest2
+          | Comparison.Lt ->
+              (* remove x1 *)
+              check_left ~max1 m1' ~max2 (List.rev_append m2 rest2)
+          end
+    in
+    check_left ~max1:false m1 ~max2:false m2
+
+  let is_max f x m =
+    List.for_all
+      (fun (y,n) -> match f x y with
+        | Comparison.Lt -> false
+        | _ -> true)
+      m
+
+  (* multiset of maximal elements *)
+  let max f m =
+    (* acc: set of max terms so far. Find other max terms
+      within [m] (none of which is comparable with elements of [acc]) *)
+    let rec filter ~acc m = match m with
+      | [] -> List.rev acc
+      | (x,n)::m' -> check_max ~acc x n m' m'
+    and check_max ~acc x n m rest = match m with
+      | [] ->
+          (* success, [x] is max *)
+          filter ~acc:((x,n)::acc) rest
+      | (y,n') :: m' ->
+          begin match f x y with
+          | Comparison.Lt ->
+              (* failure, drop [x] since it's not maximal *)
+              filter ~acc rest
+          | Comparison.Gt ->
+              (* drop [y] *)
+              check_max ~acc x n m' rest
+          | Comparison.Eq ->
+              assert (E.compare x y = 0);
+              assert false   (* should be merged *)
+          | Comparison.Incomparable ->
+              (* keep both [x] and [y] *)
+              check_max ~acc x n m' ((y,n')::rest)
+          end
+    in
+    filter ~acc:[] m
+
+  let max_l f l =
+    let max_set = max f (of_list l) in
+    List.filter (fun x -> mem max_set x) l
+
+  let compare_l f l1 l2 =
+    compare f (of_list l1) (of_list l2)
+end

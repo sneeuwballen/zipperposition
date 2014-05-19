@@ -24,57 +24,146 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {6 Generic multisets} *)
+(** {1 Generic multisets} *)
 
-(** Those multiset are not optimized for high-cardinality of single
-    elements, but rather for operations such as multiset comparisons
-*)
+module type S = sig
+  type elt
+  (** Elements of the multiset *)
 
-type 'a t
+  type t
   (** A multiset of elements of type 'a *)
 
-val of_list : 'a list -> 'a t
-  (** Multiset from list *)
+  val size : t -> int
+  (** Number of distinct elements. *)
 
-val create : 'a IArray.t -> 'a t
-  (** Non-copying creation. *)
+  val cardinal : t -> Z.t
+  (** Number of unique occurrences of elements (the multiplicity of each
+      element is considered) *)
 
-val create_unsafe : 'a array -> 'a t
-  (** Non-copying creation.  The array is used by the multiset, so it should
-      not be modified later! *)
+  val empty : t
+  (** Empty multiset *)
 
-val size : 'a t -> int
-  (** Number of distinct occurrences of elements *)
-
-val is_empty : 'a t -> bool
+  val is_empty : t -> bool
   (** Is the multiset empty? *)
 
-val iter : 'a t -> ('a -> unit) -> unit
+  val mem : t -> elt -> bool
+  (** Is the element part of the multiset? *)
+
+  val find : t -> elt -> Z.t
+  (** Return the multiplicity of the element within the multiset.
+      Will return [Z.zero] if the element is not part of the multiset *)
+
+  val singleton : elt -> t
+
+  val doubleton : elt -> elt -> t
+
+  val add : t -> elt -> t
+  (** Add one occurrence of the element *)
+
+  val add_coeff : t -> elt -> Z.t -> t
+  (** Add several occurrences of the element *)
+
+  val union : t -> t -> t
+  (** Union of multisets (max of multiplicies) *)
+
+  val intersection : t -> t -> t
+  (** Intersection of multisets (min of multiplicies) *)
+
+  val sum : t -> t -> t
+  (** Sum of multiplicies *)
+
+  val difference : t -> t -> t
+  (** Difference of multisets. If [x] has a bigger multiplicity in the
+      second argument it won't appear in the result *)
+
+  val product : Z.t -> t -> t
+  (** Multiply all multiplicities with the given coefficient *)
+
+  val filter : (elt -> Z.t -> bool) -> t -> t
+  (** Filter out elements that don't satisfy the predicate *)
+
+  val map : (elt -> elt) -> t -> t
+  (** Apply a function to all elements *)
+
+  val map_coeff : (elt -> Z.t -> Z.t) -> t -> t
+  (** Apply a function to all coefficients. *)
+
+  val filter_map : (elt -> Z.t -> (elt * Z.t) option) -> t -> t
+  (** More powerful mapping *)
+
+  val flat_map : (elt -> t) -> t -> t
+  (** replace each element by a multiset in its own *)
+
+  module Seq : sig
+    val of_seq : t -> elt Sequence.t -> t
+    val to_seq : t -> elt Sequence.t
+
+    val of_coeffs : t -> (elt * Z.t) Sequence.t -> t
+    val to_coeffs : t -> (elt * Z.t) Sequence.t
+  end
+
+  val iter : (elt -> unit) -> t -> unit
   (** Iterate on distinct occurrences of elements *)
 
-val to_array : 'a t -> 'a IArray.t
-  (** Extract the underlying array *)
+  val fold : ('a -> elt -> 'a) -> 'a -> t -> 'a
+  (** fold on occurrences of elements *)
 
-val to_list : 'a t -> 'a list
+  val iter_coeffs : (elt -> Z.t -> unit) -> t -> unit
+  (** Iterate on elements with their multiplicity *)
 
-val get : 'a t -> int -> 'a
-  (** [get m i] returns the i-th element ([i] must be < [size m]) *)
+  val fold_coeffs : ('a -> elt -> Z.t -> 'a) -> 'a -> t -> 'a
+  (** Fold on elements with their multiplicity *)
 
-val eq : ('a -> 'a -> Comparison.t) -> 'a t -> 'a t -> bool
+  val for_all : (elt -> bool) -> t -> bool
+
+  val exists : (elt -> bool) -> t -> bool
+
+  val choose : t -> elt
+  (** Chose one element, or
+      @raise Not_found if the multiset is empty *)
+
+  val of_list : elt list -> t
+  (** Multiset from list *)
+
+  val of_iarray : elt IArray.t -> t
+  (** From immutable array *)
+
+  val of_array : elt array -> t
+
+  val to_list : t -> (elt * Z.t) list
+  (** List of elements with their coefficients *)
+
+  val eq : t -> t -> bool
   (** Check equality of two multisets *)
 
-val compare : ('a -> 'a -> Comparison.t) -> 'a t -> 'a t -> Comparison.t
+  val cancel : t -> t -> t * t
+  (** Remove common elements from the multisets. For instance,
+    on [{1,1,2}] and [{1,2,2,3}], [cance] will return [({1}, {2,3})] *)
+
+  (** {6 Comparisons}
+
+  In the following, the comparison function must be equality-compatible
+  with [E.compare]. In other words, if [f x y = Comparison.Eq] then
+  [E.compare x y = 0] should hold. *)
+
+  val compare : (elt -> elt -> Comparison.t) -> t -> t -> Comparison.t
   (** Compare two multisets with the multiset extension of the
-      given ordering *)
+      given ordering. This ordering is total iff the element
+      ordering is. *)
 
-val is_max : ('a -> 'a -> Comparison.t) -> 'a -> 'a t -> bool
-  (** Is the given element maximal (ie not dominated) within the multiset? *)
+  val is_max : (elt -> elt -> Comparison.t) -> elt -> t -> bool
+  (** Is the given element maximal (ie not dominated by any
+      other element) within the multiset? *)
 
-val max : ('a -> 'a -> Comparison.t) -> 'a t -> BV.t
+  val max : (elt -> elt -> Comparison.t) -> t -> t
   (** Maximal elements of the multiset, w.r.t the given ordering. *)
 
-val max_l : ('a -> 'a -> Comparison.t) -> 'a list -> 'a list
-  (** Maximal elements of a list *)
+  val max_l : (elt -> elt -> Comparison.t) -> elt list -> elt list
+    (** Maximal elements of a list *)
 
-val compare_l : ('a -> 'a -> Comparison.t) -> 'a list -> 'a list -> Comparison.t
-  (** Compare two multisets represented as list of elements *)
+  val compare_l : (elt -> elt -> Comparison.t) -> elt list -> elt list -> Comparison.t
+    (** Compare two multisets represented as list of elements *)
+end
+
+
+module Make(X : Map.OrderedType) : S with type elt = X.t

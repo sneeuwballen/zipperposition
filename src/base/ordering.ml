@@ -25,6 +25,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Term Orderings} *)
 
+module MT = Multiset.Make(struct
+  type t = FOTerm.t
+  let compare = FOTerm.cmp
+end)
+
 (** {2 Type definitions} *)
 
 module type S = sig
@@ -278,7 +283,7 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
           avoid breaking the weight computing invariants *)
       and tckbocommute wb ss ts =
         (* multiset comparison *)
-        let res = Multiset.compare (kbo ~prec) (Multiset.of_list ss) (Multiset.of_list ts) in
+        let res = MT.compare_l (kbo ~prec) ss ts in
         (* also compute weights of subterms *)
         let wb', _ = balance_weight_rec wb ss 0 true false in
         let wb'', _ = balance_weight_rec wb' ts 0 false false in
@@ -415,7 +420,7 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
       | _ -> assert false (* different length... *)
     (** multiset comparison of subterms (not optimized) *)
     and cMultiset ~prec ss ts =
-      Multiset.compare (rpo6 ~prec) (Multiset.of_list ss) (Multiset.of_list ts)
+      MT.compare_l (rpo6 ~prec) ss ts
     (** bidirectional comparison by subterm property (bidirectional alpha) *)
     and cAA ~prec s t ss ts =
       match alpha ~prec ss t with
