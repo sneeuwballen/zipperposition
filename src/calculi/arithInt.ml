@@ -447,7 +447,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             && Z.lt gcd Z.(pow d2.AL.num d2.AL.power)
             then
               let new_lit = Lit.mk_arith
-                (ALF.replace passive_lit (MF.rest d1.AL.monome)) in
+                (ALF.replace passive_lit (M.uminus (MF.rest d1.AL.monome))) in
               raise (SimplifyInto (new_lit, c'))
         | _ -> ()
       else ()
@@ -518,6 +518,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 let renaming = Ctx.renaming_clear () in
                 let mf1' = MF.apply_subst ~renaming subst mf1 0 in
                 let mf2' = MF.apply_subst ~renaming subst mf2 0 in
+                Util.debug 5 "... candidate: %a (max lit ? %B)" S.pp subst (C.is_maxlit c 0 subst ~idx);
                 if C.is_maxlit c 0 subst ~idx
                 && MF.is_max ~ord mf1' && MF.is_max ~ord mf2'
                 then begin
@@ -1312,6 +1313,28 @@ module Make(E : Env.S) : S with module Env = E = struct
         Lit.mk_arith_less m1 (M.succ m2)
     | lit -> lit
 
+  (* a != b ------> a < b | a > b *)
+  let canc_diff_to_less c =
+    let bv = C.maxlits c 0 S.empty in
+    let lits = Array.to_list (C.lits c) in
+    let lits = Util.list_mapi lits (fun i x -> BV.get bv i, x) in
+    let changed = ref false in
+    let lits = Util.list_flatmap
+      (function
+        | true, Lit.Arith (AL.Binary (AL.Different, m1, m2)) ->
+            changed := true;
+            [ Lit.mk_arith_less m1 m2; Lit.mk_arith_less m2 m1 ]
+        | _, lit -> [lit]
+      ) lits
+    in
+    if !changed
+    then begin
+      let proof cc = Proof.mk_c_esa ~theories ~rule:"arith_diff_to_less" cc [C.proof c] in
+      let c' = C.create ~parents:[c] lits proof in
+      Util.debug 5 "diff2less: %a ----> %a" C.pp c C.pp c';
+      c'
+    end else c
+
   (* flag to be used to know when a clause cannot be purified *)
   let flag_no_purify = C.new_flag ()
 
@@ -1719,6 +1742,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_multi_simpl_rule eliminate_unshielded;
     Env.add_lit_rule "canc_lit_of_lit" canc_lit_of_lit;
     Env.add_lit_rule "lesseq_to_less" canc_lesseq_to_less;
+    Env.add_simplify canc_diff_to_less;
     Env.add_simplify canc_demodulation;
     Env.add_is_trivial is_tautology;
     Env.add_simplify purify;

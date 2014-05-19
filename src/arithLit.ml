@@ -282,14 +282,14 @@ module Subsumption = struct
               if Z.(equal (c2 mod c1) zero)
                 then
                   check_other_terms ~subst
-                    ~scale1:(Z.divexact c1 c2)
+                    ~scale1:(Z.divexact c2 c1)
                     ~scale2:Z.one
                     rest1 rest2
                 else ()
       | (c1',t1) :: l1' ->
           (* choose [t1], if possible, and then extend the substitution for t2 *)
           begin try
-            let subst = Unif.FO.matching ~subst ~pattern:t1 sc1 t2 sc2 in
+            let subst = Unif.FO.matching_adapt_scope ~subst ~pattern:t1 sc1 t2 sc2 in
             init_with_coeff ~subst Z.(c1 + c1') l1' rest1 t2 c2 rest2
           with Unif.Fail -> ()
           end;
@@ -379,15 +379,28 @@ module Subsumption = struct
               ((c1 * M.const m1) mod (d.num ** d.power))
               (c2 * M.const d.monome)) then k subst)
     | Divides d1, Divides d2 when d1.sign = d2.sign
-      && Z.equal d1.num d2.num && d1.power >= d2.power ->
+      && Z.equal d1.num d2.num &&
+        ((d1.sign && d1.power >= d2.power)
+        || not d1.sign && d1.power = d2.power) ->
         (* n^{k+k'} | m1  can subsume n^k | m2
           (with k' = d1.power - d2.power) if
-            c1.m1 = c2.m2 + something.n^k *)
+            c1.m1 = c2.m2 + something.n^k
+          for "not divides" relation we play safe and require the same power.*)
         matching ~subst d1.monome sc1 ~scale2:false d2.monome sc2
           (fun (subst, c1, c2) ->
             if Z.(equal
               ((c1 * M.const d1.monome) mod (d2.num ** d2.power))
               (c2 * M.const d2.monome)) then k subst)
+    | Divides d1, Divides d2 when d1.sign && not d2.sign
+      && Z.equal d1.num d2.num && d1.power >= d2.power ->
+        (* n^{k+k'} | m1 can subsume not(n^k | m2) if
+          c1.m1 = c2.m2 + k with k not divisible by n^k *)
+        matching ~subst d1.monome sc1 ~scale2:false d2.monome sc2
+          (fun (subst, c1, c2) ->
+            if Z.(gt
+              ((c1 * M.const d1.monome - c2 * M.const d2.monome) mod (d2.num ** d2.power))
+              zero)
+            then k subst)
     | _ -> () (* fail *)
 end
 
