@@ -125,6 +125,10 @@ module type S = sig
   val of_list : elt list -> t
   (** Multiset from list *)
 
+  val of_coeffs : (elt * Z.t) list -> t
+  (** From list of elements with multiplicities. Multiplicities lower
+      than 0 will not count. *)
+
   val of_iarray : elt IArray.t -> t
   (** From immutable array *)
 
@@ -305,6 +309,11 @@ module Make(E : Map.OrderedType) = struct
     | (x,_)::_ -> x
 
   let of_list = List.fold_left add empty
+
+  let of_coeffs =
+    List.fold_left
+      (fun acc (x,n) -> add_coeff acc x n)
+      empty
 
   let of_iarray = IArray.fold add empty
 

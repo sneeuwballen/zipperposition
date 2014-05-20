@@ -125,6 +125,10 @@ module type S = sig
   val of_list : elt list -> t
   (** Multiset from list *)
 
+  val of_coeffs : (elt * Z.t) list -> t
+  (** From list of elements with multiplicities. Multiplicities lower
+      than 0 will not count. *)
+
   val of_iarray : elt IArray.t -> t
   (** From immutable array *)
 

@@ -34,6 +34,7 @@ let suite =
     ; TestFormula.suite
     ; TestOrdering.suite
     ; TestRewriting.suite
+    ; TestMultiset.suite
     ]
 
 let props = QCheck.flatten
