@@ -1,6 +1,7 @@
 
 open Logtk
 open OUnit
+module Q = QCheck
 
 module M = Multiset.Make(struct
   type t = int
@@ -29,9 +30,35 @@ let test_cardinal_size () =
   assert_equal ~cmp:Z.equal ~printer:Z.to_string Z.(~$ 42) (M.cardinal m);
   ()
 
+let _sign = function
+  | 0 -> 0
+  | n when n < 0 -> -1
+  | _ -> 1
+
+let compare_and_partial =
+  let gen = Q.Arbitrary.(
+    pair (list small_int) (list small_int) >>= fun (l1, l2) ->
+    return (M.of_list l1, M.of_list l2)
+  ) in
+  (* "naive" comparison function (using the general ordering on multisets) *)
+  let compare' m1 m2 =
+    let f x y = Comparison.of_total (Pervasives.compare x y) in
+    Comparison.to_total (M.compare_partial f m1 m2)
+  in
+  let pp =
+    let pp1 = Util.on_buffer (M.pp (fun b -> Printf.bprintf b "%d")) in
+    Q.PP.pair pp1 pp1
+  in
+  let prop (m1,m2) =
+    _sign (compare' m1 m2) = _sign (M.compare m1 m2)
+  in
+  Q.mk_test ~name:"multiset_compare_and_compare_partial" ~pp ~n:1000 gen prop
+
 let suite =
   "test_multiset" >:::
     [ "max" >:: test_max
     ; "compare" >:: test_compare
     ; "cardinal_size" >:: test_cardinal_size
     ]
+
+let props = [ compare_and_partial ]

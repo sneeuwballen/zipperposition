@@ -47,6 +47,7 @@ let props = QCheck.flatten
   ; TestOrdering.props
   ; TestCongruence.props
   ; TestPartialOrder.props
+  ; TestMultiset.props
   ]
 
 let specs = Options.global_opts

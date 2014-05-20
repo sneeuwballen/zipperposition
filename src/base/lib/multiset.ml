@@ -165,7 +165,7 @@ module type S = sig
   val max : (elt -> elt -> Comparison.t) -> t -> t
   (** Maximal elements of the multiset, w.r.t the given ordering. *)
 
-  val max_seq : (elt -> elt -> Comparison.t) -> t -> (elt,Z.t) Sequence.t2
+  val max_seq : (elt -> elt -> Comparison.t) -> t -> (elt, Z.t) Sequence.t2
   (** Fold on maximal elements *)
 
   val max_l : (elt -> elt -> Comparison.t) -> elt list -> elt list
@@ -173,6 +173,8 @@ module type S = sig
 
   val compare_partial_l : (elt -> elt -> Comparison.t) -> elt list -> elt list -> Comparison.t
   (** Compare two multisets represented as list of elements *)
+
+  val pp : (Buffer.t -> elt -> unit) -> Buffer.t -> t -> unit
 end
 
 module Make(E : Map.OrderedType) = struct
@@ -406,8 +408,28 @@ module Make(E : Map.OrderedType) = struct
     check_left ~max1:false m1 ~max2:false m2
 
   let compare m1 m2 =
-    let f x y = Comparison.of_total (E.compare x y) in
-    Comparison.to_total (compare_partial f m1 m2)
+    let rec aux m1 m2 = match m1, m2 with
+      | [], [] -> 0
+      | [], _ -> -1
+      | _, [] -> 1
+      | (x1,n1)::m1', (x2,n2)::m2' ->
+          let c = E.compare x1 x2 in
+          if c = 0
+          then
+            let c' = aux m1' m2' in
+            if c' <> 0 then c'
+            else Z.compare n1 n2
+          else if c < 0
+            then
+            let c' = aux m1' m2 in
+            if c' <> 0 then c'
+            else 1
+          else (* c > 0 *)
+            let c' = aux m1 m2' in
+            if c' <> 0 then c'
+            else -1
+    in
+    aux m1 m2
 
   let is_max f x m =
     List.for_all
@@ -438,7 +460,7 @@ module Make(E : Map.OrderedType) = struct
               check_max x n m' rest k
           | Comparison.Eq ->
               assert (E.compare x y = 0);
-              assert false   (* should be merged *)
+              check_max x n m' ((y,n')::rest) k
           | Comparison.Incomparable ->
               (* keep both [x] and [y] *)
               check_max x n m' ((y,n')::rest) k
@@ -455,4 +477,12 @@ module Make(E : Map.OrderedType) = struct
 
   let compare_partial_l f l1 l2 =
     compare_partial f (of_list l1) (of_list l2)
+
+  let pp pp_x buf l =
+    Buffer.add_string buf "{";
+    Util.pp_list ~sep:", "
+      (fun buf (x,n) ->
+        Printf.bprintf buf "%a: %s" pp_x x (Z.to_string n)
+      ) buf l;
+    Buffer.add_string buf "}"
 end

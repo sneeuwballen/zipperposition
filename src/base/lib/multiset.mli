@@ -173,6 +173,8 @@ module type S = sig
 
   val compare_partial_l : (elt -> elt -> Comparison.t) -> elt list -> elt list -> Comparison.t
   (** Compare two multisets represented as list of elements *)
+
+  val pp : (Buffer.t -> elt -> unit) -> Buffer.t -> t -> unit
 end
 
 
