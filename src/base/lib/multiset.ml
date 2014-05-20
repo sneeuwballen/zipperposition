@@ -150,7 +150,10 @@ module type S = sig
   with [E.compare]. In other words, if [f x y = Comparison.Eq] then
   [E.compare x y = 0] should hold. *)
 
-  val compare : (elt -> elt -> Comparison.t) -> t -> t -> Comparison.t
+  val compare : t -> t -> int
+  (** Compare two multisets with the multiset extension of {!E.compare} *)
+
+  val compare_partial : (elt -> elt -> Comparison.t) -> t -> t -> Comparison.t
   (** Compare two multisets with the multiset extension of the
       given ordering. This ordering is total iff the element
       ordering is. *)
@@ -165,7 +168,7 @@ module type S = sig
   val max_l : (elt -> elt -> Comparison.t) -> elt list -> elt list
     (** Maximal elements of a list *)
 
-  val compare_l : (elt -> elt -> Comparison.t) -> elt list -> elt list -> Comparison.t
+  val compare_partial_l : (elt -> elt -> Comparison.t) -> elt list -> elt list -> Comparison.t
     (** Compare two multisets represented as list of elements *)
 end
 
@@ -350,7 +353,7 @@ module Make(E : Map.OrderedType) = struct
           let m1'', m2'' = cancel m1 m2' in
             m1'', (x2,n2)::m2''
 
-  let compare f m1 m2 =
+  let compare_partial f m1 m2 =
     let m1, m2 = cancel m1 m2 in
     (* for now we can break the sorted list invariant. We look for some
        element of [m1] or [m2] that isn't dominated by any element of
@@ -399,6 +402,10 @@ module Make(E : Map.OrderedType) = struct
     in
     check_left ~max1:false m1 ~max2:false m2
 
+  let compare m1 m2 =
+    let f x y = Comparison.of_total (E.compare x y) in
+    Comparison.to_total (compare_partial f m1 m2)
+
   let is_max f x m =
     List.for_all
       (fun (y,n) -> match f x y with
@@ -439,6 +446,6 @@ module Make(E : Map.OrderedType) = struct
     let max_set = max f (of_list l) in
     List.filter (fun x -> mem max_set x) l
 
-  let compare_l f l1 l2 =
-    compare f (of_list l1) (of_list l2)
+  let compare_partial_l f l1 l2 =
+    compare_partial f (of_list l1) (of_list l2)
 end

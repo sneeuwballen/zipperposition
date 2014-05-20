@@ -19,7 +19,8 @@ let test_max () =
 let test_compare () =
   let m1 = M.of_list [1;1;2;3] in
   let m2 = M.of_list [1;2;2;3] in
-  assert_equal ~printer:Comparison.to_string Comparison.Lt (M.compare f m1 m2);
+  assert_equal ~printer:Comparison.to_string Comparison.Lt (M.compare_partial f m1 m2);
+  assert_bool "ord" (M.compare m1 m2 < 0);
   ()
 
 let test_cardinal_size () =
