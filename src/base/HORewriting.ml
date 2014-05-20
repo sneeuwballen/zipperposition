@@ -109,8 +109,8 @@ let normalize_collect trs t =
         (fun (l,r) ->
           let substs = Unif.HO.matching ~pattern:l 1 t 0 in
           match substs with
-          | KList.Nil -> ()   (* failure, try next rule *)
-          | KList.Cons (subst, _) ->
+          | `Nil -> ()   (* failure, try next rule *)
+          | `Cons (subst, _) ->
               (* l\subst = t, rewrite into r\subst *)
               let r = Substs.HO.apply_no_renaming subst r 1 in
               raise (RewrittenIn (r, subst, (l,r)))

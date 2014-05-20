@@ -474,18 +474,18 @@ module Nary = struct
 
   let are_variant t1 t2 =
     match variant t1 0 t2 1 with
-    | KList.Nil -> false
-    | KList.Cons _ -> true
+    | `Nil -> false
+    | `Cons _ -> true
 
   let matches ~pattern t =
     match matching ~pattern 0 t 1 with
-    | KList.Nil -> false
-    | KList.Cons _ -> true
+    | `Nil -> false
+    | `Cons _ -> true
 
   let are_unifiable t1 t2 =
     match unification t1 0 t2 1 with
-    | KList.Nil -> false
-    | KList.Cons _ -> true
+    | `Nil -> false
+    | `Cons _ -> true
 end
 
 (** {2 Unary Unification} *)
@@ -982,7 +982,7 @@ module Form = struct
 
   let are_variant f1 f2 =
     match variant f1 0 f2 1 with
-    | KList.Nil -> false
-    | KList.Cons _ -> true
+    | `Nil -> false
+    | `Cons _ -> true
 end
 

@@ -165,11 +165,14 @@ module type S = sig
   val max : (elt -> elt -> Comparison.t) -> t -> t
   (** Maximal elements of the multiset, w.r.t the given ordering. *)
 
+  val max_seq : (elt -> elt -> Comparison.t) -> t -> (elt, Z.t) Sequence.t2
+  (** Fold on maximal elements *)
+
   val max_l : (elt -> elt -> Comparison.t) -> elt list -> elt list
-    (** Maximal elements of a list *)
+  (** Maximal elements of a list *)
 
   val compare_partial_l : (elt -> elt -> Comparison.t) -> elt list -> elt list -> Comparison.t
-    (** Compare two multisets represented as list of elements *)
+  (** Compare two multisets represented as list of elements *)
 end
 
 

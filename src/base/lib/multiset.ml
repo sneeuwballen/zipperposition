@@ -165,11 +165,14 @@ module type S = sig
   val max : (elt -> elt -> Comparison.t) -> t -> t
   (** Maximal elements of the multiset, w.r.t the given ordering. *)
 
+  val max_seq : (elt -> elt -> Comparison.t) -> t -> (elt,Z.t) Sequence.t2
+  (** Fold on maximal elements *)
+
   val max_l : (elt -> elt -> Comparison.t) -> elt list -> elt list
-    (** Maximal elements of a list *)
+  (** Maximal elements of a list *)
 
   val compare_partial_l : (elt -> elt -> Comparison.t) -> elt list -> elt list -> Comparison.t
-    (** Compare two multisets represented as list of elements *)
+  (** Compare two multisets represented as list of elements *)
 end
 
 module Make(E : Map.OrderedType) = struct
@@ -413,38 +416,42 @@ module Make(E : Map.OrderedType) = struct
         | _ -> true)
       m
 
-  (* multiset of maximal elements *)
-  let max f m =
+  (* iterate on the max elements *)
+  let max_seq f m k =
     (* acc: set of max terms so far. Find other max terms
       within [m] (none of which is comparable with elements of [acc]) *)
-    let rec filter ~acc m = match m with
-      | [] -> List.rev acc
-      | (x,n)::m' -> check_max ~acc x n m' m'
-    and check_max ~acc x n m rest = match m with
+    let rec filter m k = match m with
+      | [] -> ()
+      | (x,n)::m' -> check_max x n m' m' k
+    and check_max x n m rest k = match m with
       | [] ->
           (* success, [x] is max *)
-          filter ~acc:((x,n)::acc) rest
+          k x n;
+          filter rest k
       | (y,n') :: m' ->
           begin match f x y with
           | Comparison.Lt ->
               (* failure, drop [x] since it's not maximal *)
-              filter ~acc rest
+              filter rest k
           | Comparison.Gt ->
               (* drop [y] *)
-              check_max ~acc x n m' rest
+              check_max x n m' rest k
           | Comparison.Eq ->
               assert (E.compare x y = 0);
               assert false   (* should be merged *)
           | Comparison.Incomparable ->
               (* keep both [x] and [y] *)
-              check_max ~acc x n m' ((y,n')::rest)
+              check_max x n m' ((y,n')::rest) k
           end
     in
-    filter ~acc:[] m
+    filter m k
+
+  let max f m =
+    max_seq f m |> Sequence.fold2 add_coeff empty
 
   let max_l f l =
-    let max_set = max f (of_list l) in
-    List.filter (fun x -> mem max_set x) l
+    max_seq f (of_list l)
+      |> Sequence.fold2 (fun acc x _n -> x::acc) []
 
   let compare_partial_l f l1 l2 =
     compare_partial f (of_list l1) (of_list l2)
