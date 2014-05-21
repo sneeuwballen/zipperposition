@@ -252,10 +252,33 @@ module Subsumption = struct
     and m2 = M.product m2 c2 in
     M.is_const (M.difference m1 m2)
 
+  (* match lists together exactly. No scaling authorized *)
+  let rec match_lists ~subst l1 rest1 sc1 l2 sc2 k = match l1, l2 with
+    | _, [] ->
+        if l1 = [] && rest1 = []
+          then k subst
+    | [], _ -> ()
+    | (c1,t1)::l1', (c2,t2)::l2' when Z.leq c1 c2  ->
+        begin try
+          let subst = Unif.FO.matching_adapt_scope ~subst ~pattern:t1 sc1 t2 sc2 in
+          if Z.equal c1 c2
+            then match_lists ~subst (rest1 @ l1') [] sc1 l2' sc2 k
+            else match_lists ~subst l1' rest1 sc1 ((Z.(c2 - c1),t2)::l2') sc2 k
+        with Unif.Fail -> ()
+        end;
+        (* ignore [t1] for now *)
+        match_lists ~subst l1' ((c1,t1)::rest1) sc1 l2 sc2 k
+    | (c1,t1)::l1', (c2,t2)::l2' ->
+        (* cannot match, c1 too high *)
+        assert Z.(gt c1 zero);
+        assert Z.(gt c2 zero);
+        match_lists ~subst l1' ((c1,t1)::rest1) sc1 l2 sc2 k
+
   (* matching that is allowed to scale m1, and, if [scale2] is true, to
     scale [m2] too. Constants are not taken into account.
     [k] is called with [subst, c1, c2] where [c_i] is the scaling coefficient
     for [m_i].
+    @param [scale2] allow to multiply m2 with a (positive) constant
     postcondition: for a result (subst,c1,c2),
       c1 * subst(m1.terms) = c2 * subst(m2.terms) *)
   let matching ~subst m1 sc1 ~scale2 m2 sc2 k =
@@ -263,16 +286,18 @@ module Subsumption = struct
       [c1] is the accumulated coefficient for terms of [l1] so far. *)
     let rec init_with_coeff ~subst c1 l1 rest1 t2 c2 rest2 =
       match l1 with
-      | [] when Z.sign c1 = 0 ->
-          ()  (* no match with [t2] *)
+      | [] when Z.(equal c1 zero) ->
+          () (* no match with [t2]: no term matches [t2] *)
       | [] ->
           (* ok, we did match some terms with [t2]. Scale coefficients if
-              possible, otherwise fail  *)
+              possible, possibly changing their sign, otherwise fail  *)
+          assert Z.(gt c1 zero);
+          assert Z.(gt c2 zero);
           if scale2
             then
               (* can scale both, so we take the [gcd], and multiply
                 the first monome with [c2/gcd] and the second with [c1/gcd] *)
-              let g = Z.gcd c1 c2 in
+              let g = Z.(gcd c1 c2) in
               check_other_terms ~subst
                 ~scale1:(Z.divexact c2 g)
                 ~scale2:(Z.divexact c1 g)
@@ -301,36 +326,34 @@ module Subsumption = struct
       let l1 = List.map (fun (c,t) -> Z.(c * scale1), t) l1
       and l2 = List.map (fun (c,t) -> Z.(c * scale2), t) l2
       in
-      match_lists ~subst l1 [] l2
+      match_lists ~subst l1 [] sc1 l2 sc2
         (fun subst ->
           assert (_matching_postcond m1 sc1 m2 sc2 (subst, scale1, scale2));
           k (subst, scale1, scale2))
-    and
-    (* match lists together exactly. No scaling authorized *)
-    match_lists ~subst l1 rest1 l2 k = match l1, l2 with
-    | [], [] -> k subst
-    | [], _
-    | _, [] -> ()
-    | (c1,t1)::l1', (c2,t2)::l2' when Z.leq c1 c2  ->
-        begin try
-          let subst = Unif.FO.matching ~subst ~pattern:t1 sc1 t2 sc2 in
-          if Z.equal c1 c2
-            then match_lists ~subst (rest1 @ l1') [] l2' k
-            else match_lists ~subst l1' rest1 ((Z.(c2 - c1),t2)::l2') k
-        with Unif.Fail -> ()
-        end;
-        (* ignore [t1] for now *)
-        match_lists ~subst l1' ((c1,t1)::rest1) l2 k
-    | (c1,t1)::l1', (c2,t2)::l2' ->
-        (* cannot match, c1 too high *)
-        match_lists ~subst l1' ((c1,t1)::rest1) l2 k
     in
     match M.coeffs m2 with
     | [] ->
-        check_other_terms ~subst ~scale1:Z.one ~scale2:Z.one (M.coeffs m1) []
+        begin match M.coeffs m1 with
+        | [] -> k (subst,Z.one,Z.one)
+        | _::_ -> ()  (* fail *)
+        end
     | (c2,t2)::l2 ->
         (* start with matching terms of [m1] with [t2] *)
         init_with_coeff ~subst Z.zero (M.coeffs m1) [] t2 c2 l2
+
+  (* match l1 with l2, and r1 with r2, with the same scaling coefficient *)
+  let matching2 ~subst l1 r1 sc1 ~scale2 l2 r2 sc2 k =
+    if M.is_const l1 && M.is_const l2
+    then
+      (* only one problem *)
+      matching ~subst r1 sc1 ~scale2 r2 sc2 k
+    else
+      matching ~subst l1 sc1 ~scale2 l2 sc2
+        (fun (subst,c1,c2) ->
+          let r1 = List.map (fun (c,t) -> Z.(c * c1), t) (M.coeffs r1)
+          and r2 = List.map (fun (c,t) -> Z.(c * c2), t) (M.coeffs r2) in
+          match_lists ~subst r1 [] sc1 r2 sc2
+            (fun subst -> k (subst,c1,c2)))
 
   let check ~subst lit1 sc1 lit2 sc2 k =
     match lit1, lit2 with
@@ -338,40 +361,74 @@ module Subsumption = struct
     | Binary (Different, l1, r1), Binary (Different, l2, r2) ->
         (* careful with equality, don't scale right literal because
           it might involve divisibility issues *)
-        let m1 = M.difference l1 r1 in
-        let m2 = M.difference l2 r2 in
-        matching ~subst m1 sc1 ~scale2:false m2 sc2
+        matching2 ~subst l1 r1 sc1 ~scale2:false l2 r2 sc2
           (fun (subst, c1, c2) ->
-            if Z.(equal (c1 * M.const m1) (c2 * M.const m2)) then k subst)
+            if Z.(equal
+              (c1 * (M.const r1 - M.const l1))
+              (c2 * (M.const r2 - M.const l2)))
+            then k subst);
+        matching2 ~subst l1 r1 sc1 ~scale2:false r2 l2 sc2
+          (fun (subst, c1, c2) ->
+            if Z.(equal
+              (c1 * (M.const r1 - M.const l1))
+              (c2 * (M.const l2 - M.const r2)))
+            then k subst)
     | Binary (Equal, l1, r1), Binary (Less, l2, r2) ->
         (* l1=r1  can subsume l2<r2 if
-          l1-r1 = (l2-r2) + k with k<0 *)
-        let m1 = M.difference l1 r1 in
-        let m2 = M.difference l2 r2 in
-        matching ~subst m1 sc1 ~scale2:true m2 sc2
+          r1.const-l1.const > subst(l1-r1) = l2-r2 < r2.const - l2.const
+          with r1.const-l1.const < r2.const - l2.const (tighter bound) *)
+        matching2 ~subst l1 r1 sc1 ~scale2:true l2 r2 sc2
           (fun (subst, c1, c2) ->
-            if Z.(lt (c1 * M.const m1) (c2 * M.const m2)) then k subst)
+            if Z.(lt
+              (c1 * (M.const r1 - M.const l1))
+              (c2 * (M.const r2 - M.const l2)))
+            then k subst)
     | Binary (Less, l1, r1), Binary (Different, l2, r2) ->
         (* l1<r1 can subsume l2 != r2 if
-          l1-r1 (<0) = l2-r2+k with k>0 *)
-        let m1 = M.difference l1 r1 in
-        let m2 = M.difference l2 r2 in
-        matching ~subst m1 sc1 ~scale2:true m2 sc2
+          l1-r1 < r1.const-l1.const and l2-r2 = r2.const-l2.const
+          with subst(l1-r1) = l2-r2 and r1.const-l2.const < r2.const-l2.const
+          (same with r2-l2 and l2.const-r2.const of course)*)
+        matching2 ~subst l1 r1 sc1 ~scale2:true l2 r2 sc2
           (fun (subst, c1, c2) ->
-            if Z.(gt (c1 * M.const m1) (c2 * M.const m2)) then k subst)
+            if Z.(leq
+              (c1 * (M.const r1 - M.const l1))
+              (c2 * (M.const r2 - M.const l2)))
+            then k subst);
+        matching2 ~subst l1 r1 sc1 ~scale2:true r2 l2 sc2
+          (fun (subst, c1, c2) ->
+            if Z.(leq
+              (c1 * (M.const r1 - M.const l1))
+              (c2 * (M.const l2 - M.const r2)))
+            then k subst);
+        (* l1<r1 can also subsume l2!=r2 if
+           r1-l1 > l1.const-r1.const with
+           subst(r1-l1)=l2-r2  and l1.const-r1.const > r2.const-l2.const *)
+        matching2 ~subst r1 l1 sc1 ~scale2:true r2 l2 sc2
+          (fun (subst, c1, c2) ->
+            if Z.(geq
+              (c1 * (M.const l1 - M.const r1))
+              (c2 * (M.const l2 - M.const r2)))
+            then k subst);
+        matching2 ~subst r1 l1 sc1 ~scale2:true l2 r2 sc2
+          (fun (subst, c1, c2) ->
+            if Z.(geq
+              (c1 * (M.const l1 - M.const r1))
+              (c2 * (M.const r2 - M.const l2)))
+            then k subst);
     | Binary (Less, l1, r1), Binary (Less, l2, r2) ->
         (* if subst(r1 - l1) = r2-l2 - k where k>=0, then l1<r1 => l2+k<r2 => l2<r2
             so l1<r1 subsumes l2<r2. *)
-        let m1 = M.difference l1 r1 in
-        let m2 = M.difference l2 r2 in
-        matching ~subst m1 sc1 ~scale2:true m2 sc2
+        matching2 ~subst l1 r1 sc1 ~scale2:true l2 r2 sc2
           (fun (subst, c1, c2) ->
             (* we removed all terms but the constants,
-                if subst(l1-r1) is a smaller constant than l2-r2
-                then subst is subsuming *)
-            if Z.(lt (c1 * M.const m1) (c2 * M.const m2)) then k subst)
+                l1-r1 = l2-r2. Now lit1= l1-r1 < r1.const-l1.const,
+                so if r1.const-l1.const < r2.const - l2.const then lit1 => lit2 *)
+            if Z.(leq
+              (c1 * (M.const r1 - M.const l1))
+              (c2 * (M.const r2 - M.const l2)))
+            then k subst);
     | Binary (Equal, l1, r1), Divides d when d.sign ->
-        let m1 = M.difference l1 r1 in
+        let m1 = _normalize_in_div d.num ~power:d.power (M.difference l1 r1) in
         matching ~subst m1 sc1 ~scale2:false d.monome sc2
           (fun (subst, c1, c2) ->
             (* l1-r1 = d.monome + something.num^power *)
