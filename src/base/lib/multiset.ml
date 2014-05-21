@@ -209,13 +209,17 @@ module Make(E : Map.OrderedType) = struct
 
   let singleton x = [x, Z.one]
 
-  let rec add_coeff m x n = match m with
-    | [] -> [x, n]
-    | (y,n') :: m' ->
-        let c = E.compare x y in
-        if c=0 then (x,Z.add n n') :: m'
-        else if c < 0 then (x,n)::m
-        else (y,n') :: add_coeff m' x n
+  let add_coeff m x n =
+    let rec aux m x n = match m with
+      | [] -> [x, n]
+      | (y,n') :: m' ->
+          let c = E.compare x y in
+          if c=0 then (x,Z.add n n') :: m'
+          else if c < 0 then (x,n)::m
+          else (y,n') :: aux m' x n
+    in
+    assert (Z.geq n Z.zero);
+    aux m x n
 
   let add m x = add_coeff m x Z.one
 
@@ -384,12 +388,11 @@ module Make(E : Map.OrderedType) = struct
       | (x2,n2)::m2' ->
           begin match f x1 x2 with
           | Comparison.Eq ->
-              assert(E.compare x1 x2 = 0);
               let c = Z.compare n1 n2 in
-              if c > 0
+              if c < 0
               then (* remove x1 *)
                 check_left ~max1 m1' ~max2 (List.rev_append m2 rest2)
-              else if c < 0
+              else if c > 0
               then (* remove x2 *)
                 filter_with ~max1 x1 Z.(n1-n2) m1' ~max2 m2' rest2
               else (* remove both *)
@@ -444,7 +447,7 @@ module Make(E : Map.OrderedType) = struct
       within [m] (none of which is comparable with elements of [acc]) *)
     let rec filter m k = match m with
       | [] -> ()
-      | (x,n)::m' -> check_max x n m' m' k
+      | (x,n)::m' -> check_max x n m' [] k
     and check_max x n m rest k = match m with
       | [] ->
           (* success, [x] is max *)
@@ -454,13 +457,13 @@ module Make(E : Map.OrderedType) = struct
           begin match f x y with
           | Comparison.Lt ->
               (* failure, drop [x] since it's not maximal *)
-              filter rest k
+              filter (List.rev_append rest m) k
           | Comparison.Gt ->
               (* drop [y] *)
               check_max x n m' rest k
           | Comparison.Eq ->
-              assert (E.compare x y = 0);
-              check_max x n m' ((y,n')::rest) k
+              (* merge x and y together *)
+              check_max x Z.(add n n') m' rest k
           | Comparison.Incomparable ->
               (* keep both [x] and [y] *)
               check_max x n m' ((y,n')::rest) k

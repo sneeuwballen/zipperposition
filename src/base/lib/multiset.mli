@@ -142,13 +142,13 @@ module type S = sig
 
   val cancel : t -> t -> t * t
   (** Remove common elements from the multisets. For instance,
-    on [{1,1,2}] and [{1,2,2,3}], [cance] will return [({1}, {2,3})] *)
+    on [{1,1,2}] and [{1,2,2,3}], [cancel] will return [({1}, {2,3})] *)
 
   (** {6 Comparisons}
 
   In the following, the comparison function must be equality-compatible
-  with [E.compare]. In other words, if [f x y = Comparison.Eq] then
-  [E.compare x y = 0] should hold. *)
+  with [E.compare]. In other words, if [E.compare x y = 0] then
+  [f x y = Comparison.Eq] must hold. *)
 
   val compare : t -> t -> int
   (** Compare two multisets with the multiset extension of {!E.compare} *)
