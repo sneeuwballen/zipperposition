@@ -47,17 +47,19 @@ let debug_level_ = ref 0
 let set_debug l = debug_level_ := l
 let get_debug () = !debug_level_
 let need_cleanup = ref false
+
+let __b = Buffer.create 0 (* unused buffer *)
 let debug l format =
-  let b = Buffer.create 15 in
   if l <= !debug_level_
     then (
-      (if !need_cleanup then clear_line ());
+      let b = Buffer.create 15 in
+      if !need_cleanup then clear_line ();
       Printf.bprintf b "%% [%.3f] " (get_total_time ());
       Printf.kbprintf
         (fun b -> print_endline (Buffer.contents b))
         b format)
     else
-      Printf.ifprintf b format
+      Printf.ifprintf __b format
 
 let pp_pos pos =
   let open Lexing in
