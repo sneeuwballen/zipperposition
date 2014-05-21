@@ -139,6 +139,7 @@ let stat_demodulate_step = Util.mk_stat "demodulate steps"
 let stat_splits = Util.mk_stat "splits"
 let stat_semantic_tautology = Util.mk_stat "semantic_tautologies"
 let stat_condensation = Util.mk_stat "condensation"
+let stat_clc = Util.mk_stat "clc"
 
 let prof_demodulate = Util.mk_profiler "demodulate"
 let prof_back_demodulate = Util.mk_profiler "backward_demodulate"
@@ -1104,7 +1105,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       try_permutations 0 S.empty bv;
       None
     with (SubsumptionFound subst) ->
-      Util.incr_stat stat_clauses_subsumed;
       Some subst
 
   let subsumes a b =
@@ -1174,6 +1174,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       false
     with Exit ->
       Util.debug 3 "%a subsumed by active set" C.pp c;
+      Util.incr_stat stat_clauses_subsumed;
       Util.exit_prof prof_subsumption_set;
       true
 
@@ -1189,8 +1190,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (fun res c' ->
           if (try_eq_subsumption && eq_subsumes (C.lits c) (C.lits c'))
            || subsumes (C.lits c) (C.lits c')
-        then C.CSet.add res c'
-        else res)
+        then begin
+          Util.incr_stat stat_clauses_subsumed;
+          C.CSet.add res c'
+        end else res)
     in
     Util.exit_prof prof_subsumption_in_set;
     res
@@ -1249,6 +1252,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let new_c = C.create ~parents new_lits proof in
       Util.debug 3 "contextual literal cutting in %a using %a gives\n\t%a"
         C.pp c C.pp c' C.pp new_c;
+      Util.incr_stat stat_clc;
       (* try to cut another literal *)
       Util.exit_prof prof_clc;
       contextual_literal_cutting new_c

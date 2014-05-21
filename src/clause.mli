@@ -1,4 +1,3 @@
-
 (*
 Zipperposition: a functional superposition prover for prototyping
 Copyright (c) 2013, Simon Cruanes
@@ -139,8 +138,7 @@ module type S = sig
     (** apply the substitution to the clause *)
 
   val maxlits : t -> scope -> Substs.t -> BV.t
-    (** Bitvector that indicates which of the literals of [subst(clause)]
-        are maximal under [ord] *)
+    (** List of maximal literals *)
 
   val is_maxlit : t -> scope -> Substs.t -> idx:int -> bool
     (** Is the i-th literal maximal in subst(clause)? Equivalent to

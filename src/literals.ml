@@ -41,6 +41,8 @@ type form = Formula.FO.t
 
 type t = Literal.t array
 
+let prof_maxlits = Util.mk_profiler "lits.maxlits"
+
 let eq lits1 lits2 =
   let rec check i =
     if i = Array.length lits1 then true else
@@ -134,11 +136,39 @@ let neg lits =
   done;
   bv
 
-(** Bitvector that indicates which of the literals are maximal *)
+(** Multiset of literals, with their index *)
+module MLI = Multiset.Make(struct
+  type t = Lit.t * int
+  let compare (l1,i1)(l2,i2) =
+    if i1=i2 then Lit.compare l1 l2 else Pervasives.compare i1 i2
+end)
+
+let _compare_lit_with_idx ~ord (lit1,_) (lit2,_) =
+  Lit.Comp.compare ~ord lit1 lit2
+
+let _to_multiset_with_idx lits =
+  Util.array_foldi
+    (fun acc i x -> MLI.add acc (x,i))
+    MLI.empty lits
+
+let maxlits_l ~ord lits =
+  Util.enter_prof prof_maxlits;
+  let m = _to_multiset_with_idx lits in
+  let max = MLI.max (_compare_lit_with_idx ~ord) m
+    |> MLI.to_list
+    |> List.map fst in
+  Util.exit_prof prof_maxlits;
+  max
+
 let maxlits ~ord lits =
-  let m = Multiset.create_unsafe lits in
-  let bv = Multiset.max (Lit.Comp.compare ~ord) m in
-  bv
+  let l = maxlits_l ~ord lits in
+  l |> List.map snd |> BV.of_list
+
+let is_max ~ord lits =
+  let m = _to_multiset_with_idx lits in
+  fun i ->
+    let lit = lits.(i) in
+    MLI.is_max (_compare_lit_with_idx ~ord) (lit,i) m
 
 let is_trivial lits =
   Util.array_exists Lit.is_trivial lits

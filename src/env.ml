@@ -436,6 +436,7 @@ end) : S with module Ctx = X.Ctx = struct
       C.CSet.empty (PF.Set.to_seq set)
     in
     (* declaration of new skolem symbols *)
+    Util.debug 5 "declare skolem symbols";
     Ctx.add_signature (Skolem.to_signature Ctx.skolem);
     clauses
 

@@ -74,6 +74,7 @@ val mk_not_divides : Z.t -> power:int -> Z.t Monome.t -> t
 val negate : t -> t
 
 val sign : t -> bool
+val polarity : t -> bool  (** Used for the literal ordering *)
 val is_pos : t -> bool
 val is_neg : t -> bool
 
@@ -102,6 +103,10 @@ val generic_unif: Z.t Monome.t unif -> t unif
   (** Generic unification/matching/variant, given such an operation on monomes *)
 
 val apply_subst : renaming:Substs.Renaming.t -> Substs.t -> t -> scope -> t
+
+val apply_subst_no_simp : renaming:Substs.Renaming.t -> Substs.t -> t -> scope -> t
+  (** Same as {!apply_subst} but takes care {B NOT} simplifying the
+      literal. In practice, mostly useful for comparison purpose. *)
 
 val matching : ?subst:Substs.t -> t -> scope -> t -> scope ->
                Substs.t Sequence.t
@@ -140,6 +145,7 @@ val to_form : t -> Formula.FO.t
 module Seq : sig
   val terms : t -> term Sequence.t
   val vars : t -> term Sequence.t
+  val to_multiset : t -> (term * Z.t) Sequence.t
 end
 
 (** {2 Focus on a Term} *)

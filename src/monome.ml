@@ -214,6 +214,9 @@ module Seq = struct
 
   let coeffs m =
     fun k -> List.iter k m.terms
+
+  let coeffs_swap m k =
+    List.iter (fun (x,y) -> k (y,x)) m.terms
 end
 
 let is_const e = match e.terms with | [] -> true | _ -> false
@@ -307,13 +310,23 @@ let fold f acc m =
     (fun acc i (n, t) -> f acc i n t)
     acc m.terms
 
+module MT = Multiset.Make(struct
+  type t = term
+  let compare = T.cmp
+end)
+
 let fold_max ~ord f acc m =
-  let terms = Multiset.of_list m.terms in
-  let bv = Multiset.max
-    (fun (_,t1)(_,t2) -> Ordering.compare ord t1 t2) terms in
-  IArray.foldi
-    (fun acc i (c, t) -> if BV.get bv i then f acc i c t else acc)
-    acc (Multiset.to_array terms)
+  (* set of max terms *)
+  let max =
+    Seq.terms m
+    |> MT.Seq.of_seq MT.empty
+    |> MT.max_seq (Ordering.compare ord)
+    |> Sequence.map2 (fun t _ -> t)
+    |> T.Seq.add_set T.Set.empty
+  in
+  Util.list_foldi
+    (fun acc i (c, t) -> if T.Set.mem t max then f acc i c t else acc)
+    acc m.terms
 
 let pp buf e =
   let pp_pair buf (s, t) =
@@ -552,7 +565,7 @@ module Focus = struct
           assert (num.sign c1 <> 0 && num.sign c2 <> 0);
           begin try
             let subst = Unif.FO.unification ~subst t1 s1 t2 s2 in
-            Util.debug 5 "unify_mm : with %a and %a" T.pp t1 T.pp t2;
+            Util.debug 5 "unify_mm : %a = %a with %a" T.pp t1 T.pp t2 Substs.pp subst;
             _iter_self ~num ~subst c1 t1 l1' [] m1.const s1
               (fun (mf1, subst) ->
                 _iter_self ~num ~subst c2 t2 l2' [] m2.const s2
@@ -787,32 +800,13 @@ module Int = struct
     with Not_found ->
       raise (Invalid_argument "Monome.reduce_same_factor")
 
+  let to_multiset m =
+    Seq.coeffs_swap m |> Multisets.MT.Seq.of_coeffs Multisets.MT.empty
+
   (* multiset-like comparison *)
   let compare f m1 m2 =
-    let m = difference m1 m2 in
-    let maxterms = Multiset.max_l f (terms m) in
-    (* [m1] dominates [m2] if some maximal term has a strictly positive
-       coeff in [m1 - m2]. *)
-    let m1_dominates =
-      List.exists
-        (fun t -> match find m t with
-        | None -> false
-        | Some n -> Z.sign n > 0)
-        maxterms
-    and m2_dominates =
-      List.exists
-        (fun t -> match find m t with
-        | None -> false
-        | Some n -> Z.sign n < 0)
-        maxterms
-    in
-    match m1_dominates, m2_dominates with
-    | false, false ->
-        assert (is_const m && Z.sign m.const = 0);
-        Comparison.Eq
-    | true, true -> Comparison.Incomparable
-    | true, false -> Comparison.Gt
-    | false, true -> Comparison.Lt
+    let m1 = to_multiset m1 and m2 = to_multiset m2 in
+    Multisets.MT.compare_partial f m1 m2
 
   (** {2 Specific to Int} *)
 

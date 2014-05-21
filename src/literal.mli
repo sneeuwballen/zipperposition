@@ -118,6 +118,9 @@ val are_variant : t -> t -> bool
 val apply_subst : renaming:Substs.Renaming.t ->
                   Substs.t -> t -> scope -> t
 
+val apply_subst_no_simp : renaming:Substs.Renaming.t ->
+                          Substs.t -> t -> scope -> t
+
 val apply_subst_list : renaming:Substs.Renaming.t ->
                        Substs.t -> t list -> scope -> t list
 

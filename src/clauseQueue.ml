@@ -209,7 +209,7 @@ module Make(C : Clause.S) = struct
     mk_queue ~accept ~weight:C.weight name
 
   let default_queues =
-    [ fifo, 2
+    [ fifo, 4
     ; clause_weight, 3
     ; goals, 1
     ; pos_unit_clauses, 1

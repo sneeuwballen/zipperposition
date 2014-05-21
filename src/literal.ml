@@ -35,6 +35,7 @@ module S = Substs
 module TO = Theories.TotalOrder
 module PB = Position.Build
 module P = Position
+module AL = ArithLit
 
 type scope = Substs.scope
 type term = FOTerm.t
@@ -135,6 +136,11 @@ let sign = function
   | Arith o -> ArithLit.sign o
   | Ineq _
   | True -> true
+
+(* specific: for the term comparison *)
+let polarity = function
+  | Arith o -> ArithLit.polarity o
+  | lit -> sign lit
 
 let is_pos = sign
 
@@ -264,6 +270,11 @@ module Seq = struct
   let symbols lit =
     Sequence.flatMap T.Seq.symbols (terms lit)
 
+  (* used to represent arithmetic lits... *)
+  let _arith_term =
+    let s = Symbol.of_string "$arith_term" in
+    T.const ~ty:Type.(const s) s
+
   let abstract = function
     | Equation (l, r, sign) -> sign, Sequence.of_list [l; r]
     | Prop (p, sign) -> sign, Sequence.singleton p
@@ -271,7 +282,8 @@ module Seq = struct
     | False -> false, Sequence.singleton T.TPTP.true_
     | Ineq olit -> true, Sequence.of_list [olit.TO.left; olit.TO.right]
     | Arith o ->
-      ArithLit.sign o, ArithLit.Seq.terms o
+      (* indexing won't really work... *)
+      true, Sequence.singleton _arith_term
 end
 
 let symbols lit =
@@ -386,6 +398,11 @@ let apply_subst ~renaming subst lit scope =
   | True
   | False -> lit
 
+let apply_subst_no_simp ~renaming subst lit scope =
+  match lit with
+  | Arith o -> Arith (ArithLit.apply_subst_no_simp ~renaming subst o scope)
+  | _ -> apply_subst ~renaming subst lit scope
+
 let apply_subst_list ~renaming subst lits scope =
   List.map
     (fun lit -> apply_subst ~renaming subst lit scope)
@@ -433,6 +450,16 @@ let is_ground lit = match lit with
 
 let root_terms l =
   Seq.terms l |> Sequence.to_rev_list
+
+let to_multiset lit = match lit with
+  | Prop (p,_) -> Multisets.MT.singleton p
+  | Equation (l, r, _) -> Multisets.MT.doubleton l r
+  | Ineq olit -> Multisets.MT.doubleton olit.TO.left olit.TO.right
+  | True
+  | False -> Multisets.MT.singleton T.TPTP.true_
+  | Arith alit ->
+      AL.Seq.to_multiset alit
+        |> Multisets.MT.Seq.of_coeffs Multisets.MT.empty
 
 let is_trivial lit = match lit with
   | True -> true
@@ -546,7 +573,6 @@ let to_string t = Util.on_buffer pp t
 let fmt fmt lit =
   Format.pp_print_string fmt (to_string lit)
 
-
 (* comparison should live in its scope *)
 module Comp = struct
   module O = Ordering
@@ -592,9 +618,9 @@ module Comp = struct
 
   (* negative literals dominate *)
   let _cmp_by_polarity l1 l2 =
-    let sign1 = sign l1 in
-    let sign2 = sign l2 in
-    match sign1, sign2 with
+    let p1 = polarity l1 in
+    let p2 = polarity l2 in
+    match p1, p2 with
     | true, true
     | false, false -> Comparison.Eq
     | true, false -> Comparison.Lt
@@ -618,11 +644,10 @@ module Comp = struct
 
   (* by multiset of terms *)
   let _cmp_by_term_multiset ~ord l1 l2 =
-    let t1 = root_terms l1 and t2 = root_terms l2 in
-    Multiset.compare_l (Ordering.compare ord) t1 t2
+    let m1 = to_multiset l1 and m2 = to_multiset l2 in
+    Multisets.MT.compare_partial (Ordering.compare ord) m1 m2
 
   let _cmp_specific ~ord l1 l2 =
-    let module AL = ArithLit in
     match l1, l2 with
     | Prop _, Prop _
     | Equation _, Equation _
@@ -638,11 +663,12 @@ module Comp = struct
         end
     | Arith (AL.Binary(op1, x1, y1)), Arith (AL.Binary(op2, x2, y2)) ->
         assert (op1 = op2);
-        let cmp_term = Ordering.compare ord in
-        let cmp_monomes = Monome.Int.compare cmp_term in
-        let left = Multiset.create (IArray.doubleton x1 y1) in
-        let right = Multiset.create (IArray.doubleton x2 y2) in
-        Multiset.compare cmp_monomes left right
+        let module MI = Monome.Int in
+        let left = Multisets.MMT.doubleton (MI.to_multiset x1) (MI.to_multiset y1) in
+        let right = Multisets.MMT.doubleton (MI.to_multiset x2) (MI.to_multiset y2) in
+        Multisets.MMT.compare_partial
+          (Multisets.MT.compare_partial (Ordering.compare ord))
+          left right
     | Arith(AL.Divides d1), Arith(AL.Divides d2) ->
         assert (d1.AL.sign=d2.AL.sign);
         let c = Z.compare d1.AL.num d2.AL.num in

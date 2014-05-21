@@ -59,7 +59,15 @@ val map : (term -> term) -> t -> t
 
 val pos : t -> BV.t
 val neg : t -> BV.t
+
 val maxlits : ord:Ordering.t -> t -> BV.t
+  (** Bitvector of positions of maximal literals *)
+
+val maxlits_l : ord:Ordering.t -> t -> (Literal.t * int) list
+  (** List of maximal literals, with their index, among the array *)
+
+val is_max : ord:Ordering.t -> t -> int -> bool
+  (** Is the i-th literal maximal in the ordering? *)
 
 val is_trivial : t -> bool
   (** Tautology? (simple syntactic criterion only) *)

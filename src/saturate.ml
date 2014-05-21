@@ -131,7 +131,7 @@ module Make(E : Env.S) = struct
             let c = Env.forward_simplify c in
             (* keep clauses  that are not redundant *)
             if Env.is_trivial c || Env.is_active c || Env.is_passive c
-              then None
+              then (Util.debug 5 "clause %a is trivial, dump" Env.C.pp c; None)
               else Some c)
           inferred_clauses
         in

@@ -100,6 +100,13 @@ let sign = function
   | Binary (Different, _, _) -> false
   | Divides d -> d.sign
 
+(* polarity used for the literal ordering *)
+let polarity = function
+  | Binary ((Less | Lesseq), _, _) -> false
+  | Binary (Different, _, _) -> false
+  | Binary (Equal,_,_) -> true
+  | Divides d -> d.sign
+
 let is_pos = sign
 let is_neg l = not (is_pos l)
 
@@ -133,12 +140,16 @@ let mk_neq = make Different
 let mk_less = make Less
 let mk_lesseq = make Lesseq
 
-let mk_divides ?(sign=true) n ~power m =
-  let m = _normalize m in
+(* normalize coefficients of [m] in Z/n^power Z *)
+let _normalize_in_div n ~power m =
   let nk = Z.pow n power in
   (* normalize coefficients so that they are within [0...nk-1] *)
   let norm_coeff c = Z.erem c nk in
-  let m = M.map_num norm_coeff m in
+  M.map_num norm_coeff m
+
+let mk_divides ?(sign=true) n ~power m =
+  let m = _normalize m in
+  let m = _normalize_in_div n ~power m in
   (* TODO: factorize m by some k; if k is n^p, then
       make the literal n^{power-p} | m/k *)
   Divides { sign; num=n; power; monome=m; }
@@ -476,6 +487,15 @@ let apply_subst ~renaming subst lit scope = match lit with
     mk_divides ~sign:d.sign d.num ~power:d.power
       (M.apply_subst ~renaming subst d.monome scope)
 
+let apply_subst_no_simp ~renaming subst lit scope = match lit with
+  | Binary (op, m1, m2) ->
+    Binary (op,
+      (M.apply_subst ~renaming subst m1 scope),
+      (M.apply_subst ~renaming subst m2 scope) )
+  | Divides d ->
+    mk_divides ~sign:d.sign d.num ~power:d.power
+      (M.apply_subst ~renaming subst d.monome scope)
+
 let is_trivial = function
   | Divides d when d.sign && Z.equal d.num Z.one -> true  (* 1 | x tauto *)
   | Divides d when d.sign ->
@@ -546,12 +566,22 @@ let fold_terms ?(pos=P.stop) ?(vars=false) ~which ~ord ~subterms lit acc f =
         (fun acc i _ t -> at_term ~pos:P.(append pos (arg i stop)) acc t)
         acc d.monome
 
-let max_terms ~ord = function
-  | Binary (_, m1, m2) ->
-      let l = M.terms m1 @ M.terms m2 in
-      Multiset.max_l (Ordering.compare ord) l
-  | Divides d ->
-      Multiset.max_l (Ordering.compare ord) (M.terms d.monome)
+let _to_coeffs lit =
+  match lit with
+    | Binary (_, m1, m2) ->
+        Sequence.append (M.Seq.coeffs_swap m1) (M.Seq.coeffs_swap m2)
+    | Divides d ->
+        M.Seq.coeffs_swap d.monome
+
+let to_multiset lit =
+  _to_coeffs lit
+    |> Multisets.MT.Seq.of_coeffs Multisets.MT.empty
+
+let max_terms ~ord lit =
+  let m = to_multiset lit in
+  Multisets.MT.max (Ordering.compare ord) m
+    |> Multisets.MT.to_list
+    |> List.map fst
 
 let to_form = function
   | Binary (op, m1, m2) ->
@@ -592,6 +622,8 @@ module Seq = struct
     | Divides d -> M.Seq.terms d.monome k
 
   let vars lit = terms lit |> Sequence.flatMap T.Seq.vars
+
+  let to_multiset = _to_coeffs
 end
 
 (** {2 Focus on a Term} *)

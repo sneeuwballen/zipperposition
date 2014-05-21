@@ -70,6 +70,7 @@ module Seq : sig
   val terms : _ t -> term Sequence.t
   val vars : _ t -> term Sequence.t
   val coeffs : 'a t -> ('a * term) Sequence.t
+  val coeffs_swap : 'a t -> (term * 'a) Sequence.t
 end
 
 val is_const : _ t -> bool
@@ -333,6 +334,9 @@ module Int : sig
   val compare : (term -> term -> Comparison.t) -> t -> t -> Comparison.t
     (** Compare monomes as if they were multisets of terms, the coefficient
         in front of a term being its multiplicity. *)
+
+  val to_multiset : t -> Multisets.MT.t
+    (** Multiset of terms with multiplicity *)
 
   (** {2 Modular Computations} *)
 
