@@ -1401,17 +1401,20 @@ module Make(E : Env.S) : S with module Env = E = struct
         end
     in
     (* replace! *)
-    let lits' = Lits.map (purify_term ~root:true) (C.lits c) in
-    let res = match !new_lits with
-    | [] -> c (* no change *)
-    | _ when C.get_flag flag_no_purify c -> c  (* cannot/should not purify *)
-    | _::_ ->
-        let all_lits = !new_lits @ (Array.to_list lits') in
-        let proof cc = Proof.mk_c_inference ~theories ~rule:"purify" cc [C.proof c] in
-        let new_c = C.create ~parents:[c] all_lits proof in
-        Util.debug 5 "purify %a into %a" C.pp c C.pp new_c;
-        Util.incr_stat stat_arith_purify;
-        new_c
+    let res =
+      if C.get_flag flag_no_purify c
+      then c
+      else
+        let lits' = Lits.map (purify_term ~root:true) (C.lits c) in
+        match !new_lits with
+        | [] -> c (* no change *)
+        | _::_ ->
+            let all_lits = !new_lits @ (Array.to_list lits') in
+            let proof cc = Proof.mk_c_inference ~theories ~rule:"purify" cc [C.proof c] in
+            let new_c = C.create ~parents:[c] all_lits proof in
+            Util.debug 5 "purify %a into %a" C.pp c C.pp new_c;
+            Util.incr_stat stat_arith_purify;
+            new_c
     in
     Util.exit_prof prof_arith_purify;
     res
@@ -1437,8 +1440,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Sequence.exists (shielded_by_term ~root:true)
 
   let naked_vars lits =
-    let vars = Lits.vars lits in
-    List.filter (fun var -> not (is_shielded lits ~var)) vars
+    Lits.vars lits
+      |> List.filter (fun var -> Type.eq (T.ty var) Type.TPTP.int)
+      |> List.filter (fun var -> not (is_shielded lits ~var))
 
   (** Description of a clause, focused around the elimination
       of some variable x *)
@@ -1649,9 +1653,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let eliminate_unshielded c =
     let module NVE = NakedVarElim in
-    let nvars = naked_vars (C.lits c)
-        |> List.filter (fun t -> Type.eq (T.ty t) Type.TPTP.int)
-    in
+    let nvars = naked_vars (C.lits c) in
     match nvars with
     | [] -> None
     | x::_ ->
