@@ -349,10 +349,6 @@ module Int : sig
 
     val uminus : n:Z.t -> Z.t -> Z.t
       (** Additive inverse in Z/nZ *)
-
-    val inverse : n:Z.t -> Z.t -> Z.t
-      (** Multiplicative inverse in Z/nZ.
-          TODO (only works if [n] prime? or n^k where n prime?) *)
   end
 
   (** {2 Find Solutions} *)

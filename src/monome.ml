@@ -582,7 +582,7 @@ module Focus = struct
 
   (*
   let unify_fm ?(subst=Substs.empty) mf1 s1 m2 s2 k =
-    assert false  (* TODO *)
+    assert false  (* TODO? unify_fm *)
   *)
 end
 
@@ -851,8 +851,6 @@ module Int = struct
     let sum ~n c1 c2 = modulo ~n (Z.add c1 c2)
 
     let uminus ~n c = modulo ~n (Z.mul Z.minus_one c)
-
-    let inverse ~n c = failwith "Monome.Modulo.inverse: not implemented"
   end
 
   (** {2 Find Solutions} *)

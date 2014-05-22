@@ -393,11 +393,10 @@ let fold_terms ?(vars=false) ~(which : [< `All|`Max])
       fold acc (i+1)
   in fold acc 0
 
-(* TODO: more efficient implem with Sequence and Symbol.Seq.add_set *)
 let symbols ?(init=Symbol.Set.empty) lits =
-  Array.fold_left
-    (fun set lit -> Symbol.Set.union set (Lit.symbols lit))
-    init lits
+  Sequence.of_array lits
+    |> Sequence.map Lit.Seq.symbols
+    |> Sequence.fold Symbol.Seq.add_set Symbol.Set.empty
 
 (** {3 IO} *)
 

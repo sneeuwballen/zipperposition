@@ -150,8 +150,15 @@ let _normalize_in_div n ~power m =
 let mk_divides ?(sign=true) n ~power m =
   let m = _normalize m in
   let m = _normalize_in_div n ~power m in
-  (* TODO: factorize m by some k; if k is n^p, then
-      make the literal n^{power-p} | m/k *)
+  (* factorize m by some k; if k is n^p, then make the literal
+    n^{power-p} | m/k *)
+  let rec factor m power =
+    if power <= 1 then m,power
+    else match M.Int.quotient m n with
+      | None -> m, power
+      | Some m' ->  factor m' (power-1)
+  in
+  let m, power = factor m power in
   Divides { sign; num=n; power; monome=m; }
 
 let mk_not_divides = mk_divides ~sign:false
