@@ -1,6 +1,6 @@
 # OASIS_START
-# DO NOT EDIT (digest: ee4d706558b8ba32af45a5f0883275f2)
-version = "0.1"
+# DO NOT EDIT (digest: 43fb0169ae107968376f189e98ac9c93)
+version = "0.3.5"
 description =
 "Logic toolkit, designed primarily for first-order automated reasoning."
 requires = "zarith unix"
@@ -10,7 +10,7 @@ archive(native) = "logtk.cmxa"
 archive(native, plugin) = "logtk.cmxs"
 exists_if = "logtk.cma"
 package "solving" (
- version = "0.1"
+ version = "0.3.5"
  description =
  "Logic toolkit, designed primarily for first-order automated reasoning."
  requires = "logtk aez"
@@ -22,7 +22,7 @@ package "solving" (
 )
 
 package "parsers" (
- version = "0.1"
+ version = "0.3.5"
  description =
  "Logic toolkit, designed primarily for first-order automated reasoning."
  requires = "logtk"
@@ -34,7 +34,7 @@ package "parsers" (
 )
 
 package "meta" (
- version = "0.1"
+ version = "0.3.5"
  description =
  "Logic toolkit, designed primarily for first-order automated reasoning."
  requires = "logtk logtk.parsers"
@@ -46,7 +46,7 @@ package "meta" (
 )
 
 package "arbitrary" (
- version = "0.1"
+ version = "0.3.5"
  description =
  "Logic toolkit, designed primarily for first-order automated reasoning."
  requires = "logtk qcheck"
