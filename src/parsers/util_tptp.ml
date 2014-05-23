@@ -517,10 +517,10 @@ let to_cnf ?opts signature decls =
       | AT.THF _ -> failwith "cnf_of_tptp cannot deal with HO terms right now."
       | _ -> Sequence.singleton decl
     ) decls
+    (* make sure the clauses don't change.
+      iterating again would change skolems, etc, which is bad. *)
+    |> Sequence.persistent
   in
-  (* make sure the clauses don't change.
-    iterating again would change skolems, etc, which is bad. *)
-  let clauses = Sequence.persistent clauses in
   let signature = Skolem.to_signature ctx in
   signature, clauses
 

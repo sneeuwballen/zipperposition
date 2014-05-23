@@ -579,6 +579,8 @@ let cnf_of_list ?(opts=[]) ?(ctx=Skolem.create Signature.empty) l =
         let f = List.fold_left (|>) f post_skolem in
         Util.debug 4 "... skolemized: %a" F.pp f;
         let clauses = to_cnf f in
+        Util.debug 4 "... CNF: %a"
+          (Util.pp_list ~sep:", " (Util.pp_list ~sep:" | " F.pp)) clauses;
         clauses
       end
     in
