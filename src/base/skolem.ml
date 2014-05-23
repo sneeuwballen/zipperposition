@@ -133,8 +133,7 @@ let skolem_form ~ctx ~ty f =
     new_f
   with FoundFormVariant(f',new_f',subst) ->
     Util.debug 5 "form %a is variant of %a under %a" F.pp f' F.pp f S.pp subst;
-    let renaming = S.Renaming.create () in
-    let new_f = S.Form.apply ~renaming subst new_f' 1 in
+    let new_f = S.Form.apply_no_renaming subst new_f' 1 in
     new_f
 
 (** {2 Definitions} *)
