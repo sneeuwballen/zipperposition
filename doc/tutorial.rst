@@ -36,7 +36,7 @@ can be either a numeric constant, a *connective* or a [hashconsed]_ string:
    let twelve = Symbol.of_int 12;;
 
    (* big integer, here built from string *)
-   let very_big_num = Symbol.mk_int (Z.of_string "9999999999999999");;
+   let very_big_num = Symbol.mk_int (Z.of_string "99999999999999999999999");;
 
 Some symbols are already defined because they are pervasive in logic.
 We call those *connectives*. They are defined in
@@ -179,10 +179,8 @@ the constructor ``forall`` takes care of the De Bruijn indices itself.
 ``x`` will not appear in the resulting type because it will be a bound
 variable. Conversely, ``Type.apply`` is used to apply a type to another one.
 
-- ``Type.apply (forall [x] T) a`` will be ``[T/x]a``, a (partial)
-    monomorphization of the left argument
-- ``Type.apply (a -> b) a`` will be ``b``, the application of a function
-    type to a matching argument.
+- ``Type.apply (forall [x] T) a`` will be ``[T/x]a``, a (partial) monomorphization of the left argument
+- ``Type.apply (a -> b) a`` will be ``b``, the application of a function type to a matching argument.
 
 Terms
 ^^^^^
@@ -222,12 +220,15 @@ We can also examine and build them in a similar way:
    let const_i i =
      T.const ~ty:Type.TPTP.int (Symbol.of_int i);;
 
+   (* the empty list of terms of the TPTP type $i *)
+   let l_empty = T.tyapp nil Type.TPTP.i;;
+
    (* the integer list [1;2;3;4] as a term *)
    let l =
      List.fold_right
       (fun i tl ->
         T.app_full cons [Type.TPTP.int] [const_i i; tl]
-      ) [1;2;3;4] (T.tyapp nil Type.TPTP.int)
+      ) [1;2;3;4] (T.tyapp nil Type.TPTP.int) ;;
 
    (* the type of l is "list of integers" *)
    Type.eq (T.ty l) int_list;;
