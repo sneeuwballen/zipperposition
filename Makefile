@@ -50,7 +50,8 @@ rst_doc:
 open_doc: rst_doc
 	firefox _build/doc/contents.html
 
-push_doc: doc
-	scp -r logtk.docdir/* cedeela.fr:~/simon/root/software/logtk
+push_doc: doc rst_doc
+	rsync -tavu logtk.docdir/* cedeela.fr:~/simon/root/software/logtk/
+	rsync -tavu _build/doc/* cedeela.fr:~/simon/root/software/logtk/rst/
 
 .PHONY: push_doc tags rst_doc open_doc

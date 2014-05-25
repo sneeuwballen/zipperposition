@@ -107,13 +107,31 @@ Library "logtk_arbitrary"
   XMETARequires:    logtk,qcheck
 
 Document logtk
-  Title:                Logtk docs
+  Title:                Logtk documentation
   Type:                 ocamlbuild (0.3)
   BuildTools+:          ocamldoc
-  Install$:             flag(qcheck) && flag(meta)
-  Build$:               flag(qcheck) && flag(meta)
+  Install$:             flag(docs)
+  Build$:               flag(docs)
   XOCamlbuildPath:      .
-  XOCamlbuildLibraries: logtk,logtk.meta,logtk.arbitrary
+  XOCamlbuildLibraries: logtk
+
+Document logtk_meta
+  Title:                Logtk_meta documentation
+  Type:                 ocamlbuild (0.3)
+  BuildTools+:          ocamldoc
+  Install$:             flag(docs) && flag(meta)
+  Build$:               flag(docs) && flag(meta)
+  XOCamlbuildPath:      .
+  XOCamlbuildLibraries: logtk,logtk.meta
+
+Document logtk_arbitrary
+  Title:                Logtk_arbitrary documentation
+  Type:                 ocamlbuild (0.3)
+  BuildTools+:          ocamldoc
+  Install$:             flag(docs) && flag(qcheck)
+  Build$:               flag(docs) && flag(qcheck)
+  XOCamlbuildPath:      .
+  XOCamlbuildLibraries: logtk,logtk.arbitrary
 
 Executable run_bench
   Path:             tests/

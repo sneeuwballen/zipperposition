@@ -214,12 +214,12 @@ module TPTP : sig
 
   (** {2 Basic types} *)
 
-  val i : t       (* individuals *)
-  val o : t       (* propositions *)
+  val i : t       (** individuals *)
+  val o : t       (** propositions *)
 
-  val int : t
-  val rat : t
-  val real : t
+  val int : t     (** integers *)
+  val rat : t     (** rationals *)
+  val real : t    (** reals *)
 end
 
 (** {2 Conversions} *)
