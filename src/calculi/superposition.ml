@@ -1118,8 +1118,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.exit_prof prof_subsumption;
     res
 
-  (* TODO: move this in the literal subsumption relation *)
   let eq_subsumes a b =
+    (* counter for fresh scopes ([a] can be used several times with
+      distinct scopes, e.g.  f(x)=x subsumes   g(f(a),f(b))=g(a,b) *)
+    let a_scope = ref 1 in
     (* subsume a literal using a = b *)
     let rec equate_lit_with a b lit =
       match lit with
@@ -1138,12 +1140,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | _ -> false
     (* check whether a\sigma = u and b\sigma = v, for some sigma; or the commutation thereof *)
     and equate_root a b u v =
-          (try let subst = Unif.FO.matching ~pattern:a 1 u 0 in
-                let _ = Unif.FO.matching ~subst ~pattern:b 1 v 0 in
+      let sc1 = !a_scope in
+      incr a_scope;
+          (try let subst = Unif.FO.matching ~pattern:a sc1 u 0 in
+                let _ = Unif.FO.matching ~subst ~pattern:b sc1 v 0 in
                 true
            with Unif.Fail -> false)
-      ||  (try let subst = Unif.FO.matching ~pattern:b 1 u 0 in
-                let _ = Unif.FO.matching ~subst ~pattern:a 1 v 0 in
+      ||  (try let subst = Unif.FO.matching ~pattern:b sc1 u 0 in
+                let _ = Unif.FO.matching ~subst ~pattern:a sc1 v 0 in
                 true
            with Unif.Fail -> false)
     in
