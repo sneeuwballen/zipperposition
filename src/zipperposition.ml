@@ -69,6 +69,15 @@ let setup_penv ~penv () =
     |> List.iter (Extensions.apply_penv ~penv);
   if (PEnv.get_params ~penv).param_expand_def then
     PEnv.add_operation ~penv ~prio:1 PEnv.expand_def;
+  (* use "invfreq" *)
+  PEnv.add_constr_rule ~penv
+    (fun set ->
+      let symbols = PF.Set.to_seq set
+        |> Sequence.map PF.form
+        |> Sequence.flatMap Formula.FO.Seq.symbols
+      in
+      Precedence.Constr.invfreq symbols
+    );
   (* be sure to get a total order on symbols *)
   PEnv.add_constr ~penv Precedence.Constr.alpha;
   ()
