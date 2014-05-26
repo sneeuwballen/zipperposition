@@ -64,17 +64,22 @@ module type UNARY = sig
         @raise Fail if the terms do not match.
         @raise Invalid_argument if the two scopes are equal *)
 
-  val matching_same_scope : ?subst:subst -> scope:scope ->
-                            pattern:term -> term -> subst
+  val matching_same_scope : ?protect:(term Sequence.t) -> ?subst:subst ->
+                            scope:scope -> pattern:term -> term -> subst
     (** matches [pattern] (more general) with the other term.
         The two terms live in the same scope, which is passed as the
         [scope] argument. It needs to gather the variables of the
-        other term to make sure they are not bound. *)
+        other term to make sure they are not bound.
+        @param scope the common scope of both terms
+        @param protect a sequence of variables to protect (they cannot
+          be bound during matching!). Variables of the second term
+          are automatically protected. *)
 
-  val matching_adapt_scope : ?subst:subst ->
+  val matching_adapt_scope : ?protect:(term Sequence.t) -> ?subst:subst ->
                              pattern:term -> scope -> term -> scope -> subst
     (** Call either {!matching} or {!matching_same_scope} depending on
-        whether the given scopes are the same or not. *)
+        whether the given scopes are the same or not.
+        @param protect used if scopes are the same, see {!matching_same_scope} *)
 
   val variant : ?subst:subst -> term -> scope -> term -> scope -> subst
     (** Succeeds iff the first term is a variant of the second, ie
@@ -653,7 +658,8 @@ module Unary = struct
     let subst = unif subst pattern sc_a b sc_b in
     subst
 
-  let matching_same_scope ?(subst=Substs.empty) ~scope ~pattern b =
+  let matching_same_scope ?(protect=Sequence.empty) ?(subst=Substs.empty)
+  ~scope ~pattern b =
     (* recursive matching. Blocked vars are [blocked] *)
     let rec unif ~blocked subst s scope t scope  =
       let s, sc_s = Substs.get_var subst s scope in
@@ -694,13 +700,14 @@ module Unary = struct
       | _, _ -> raise Fail
     in
     (* compute set of free vars of [b], that cannot be bound *)
-    let blocked = T.Seq.add_set T.Set.empty (T.Seq.vars b) in
+    let protect = Sequence.append protect (T.Seq.vars b) in
+    let blocked = T.Seq.add_set T.Set.empty protect in
     let subst = unif ~blocked subst pattern scope b scope in
     subst
 
-  let matching_adapt_scope ?(subst=Substs.empty) ~pattern s_p t s_t =
+  let matching_adapt_scope ?protect ?(subst=Substs.empty) ~pattern s_p t s_t =
     if s_p = s_t
-      then matching_same_scope ~subst ~scope:s_p ~pattern t
+      then matching_same_scope ?protect ~subst ~scope:s_p ~pattern t
       else matching ~subst ~pattern s_p t s_t
 
   let variant ?(subst=Substs.empty) a sc_a b sc_b =
@@ -830,11 +837,11 @@ module Ty = struct
         pattern:term -> scope -> term -> scope -> subst)
 
   let matching_same_scope =
-    (matching_same_scope :> ?subst:subst -> scope:scope ->
-        pattern:term -> term -> subst)
+    (matching_same_scope :>  ?protect:(term Sequence.t) -> ?subst:subst ->
+        scope:scope -> pattern:term -> term -> subst)
 
   let matching_adapt_scope =
-    (matching_adapt_scope :> ?subst:subst ->
+    (matching_adapt_scope :>  ?protect:(term Sequence.t) -> ?subst:subst ->
         pattern:term -> scope -> term -> scope -> subst)
 
   let variant =
@@ -865,11 +872,11 @@ module FO = struct
         pattern:term -> scope -> term -> scope -> subst)
 
   let matching_same_scope =
-    (matching_same_scope :> ?subst:subst -> scope:scope ->
-        pattern:term -> term -> subst)
+    (matching_same_scope :>  ?protect:(term Sequence.t) -> ?subst:subst ->
+        scope:scope -> pattern:term -> term -> subst)
 
   let matching_adapt_scope =
-    (matching_adapt_scope :> ?subst:subst ->
+    (matching_adapt_scope :>  ?protect:(term Sequence.t) -> ?subst:subst ->
         pattern:term -> scope -> term -> scope -> subst)
 
   let variant =
