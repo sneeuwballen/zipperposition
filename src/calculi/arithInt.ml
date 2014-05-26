@@ -812,7 +812,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         in
         if M.is_const diff
         && Z.fits_int (M.const diff)
-        && Z.sign (M.const diff) >= 0
         && Z.lt (M.const diff) (Z.of_int !case_switch_limit)
         && ALF.is_max ~ord lit1
         && ALF.is_max ~ord lit2
@@ -1313,6 +1312,43 @@ module Make(E : Env.S) : S with module Env = E = struct
         Lit.mk_arith_less m1 (M.succ m2)
     | lit -> lit
 
+  exception VarElim of int * S.t
+
+  (* X != Y or C -----> C[X/Y] *)
+  let canc_eq_resolution c =
+    (* check whether [m] is only one variable with coeff 1 *)
+    let is_unary_var m =
+      match M.coeffs m with
+      | [c, v] when T.is_var v && Z.(equal c one) && Z.(equal (M.const m) zero) ->
+          Some v
+      | _ -> None
+    in
+    try
+      Lits.fold_arith ~eligible:C.Eligible.(filter Lit.is_arith_neq)
+        (C.lits c) ()
+        (fun acc lit pos ->
+          match lit with
+          | AL.Binary (AL.Different, m1, m2) ->
+              begin match is_unary_var m1, is_unary_var m2 with
+              | Some v1, Some v2 ->
+                  let subst = S.FO.bind S.empty v1 0 v2 0 in
+                  let i = Lits.Pos.idx pos in
+                  raise (VarElim (i, subst))
+              | _ -> ()
+              end
+          | _ -> ()
+      );
+      c  (* could not simplify *)
+  with VarElim (i, subst) ->
+    let lits' = Util.array_except_idx (C.lits c) i in
+    let renaming = Ctx.renaming_clear () in
+    let lits' = Lit.apply_subst_list ~renaming subst lits' 0 in
+    let proof cc = Proof.mk_c_inference ~theories ~info:[S.to_string subst]
+      ~rule:"canc_eq_res" cc [C.proof c] in
+    let c' = C.create ~parents:[c] lits' proof in
+    Util.debug 4 "arith_eq_res: simplify %a into %a" C.pp c C.pp c';
+    c'
+
   (* a != b ------> a < b | a > b *)
   let canc_diff_to_less c =
     let ord = Ctx.ord () in
@@ -1746,6 +1782,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_lit_rule "canc_lit_of_lit" canc_lit_of_lit;
     Env.add_lit_rule "lesseq_to_less" canc_lesseq_to_less;
     Env.add_unary_inf "canc_diff_to_less" canc_diff_to_less;
+    Env.add_simplify canc_eq_resolution;
     Env.add_simplify canc_demodulation;
     Env.add_is_trivial is_tautology;
     Env.add_simplify purify;
