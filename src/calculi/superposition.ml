@@ -1118,6 +1118,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.exit_prof prof_subsumption;
     res
 
+  (* TODO: move this in the literal subsumption relation *)
   let eq_subsumes a b =
     (* subsume a literal using a = b *)
     let rec equate_lit_with a b lit =

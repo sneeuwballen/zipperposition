@@ -268,29 +268,41 @@ module Subsumption = struct
     let m1 = M.apply_subst_no_renaming subst m1 sc1 in
     let m1 = M.product m1 c1
     and m2 = M.product m2 c2 in
-    M.is_const (M.difference m1 m2)
+    let d = M.difference m1 m2 in
+    M.is_const d
+    ||
+    (
+      Util.debug 5 "postcond: %a[%d] scaled %s, and %a[%d] scaled %s with %a"
+        M.pp m1 sc1 (Z.to_string c1) M.pp m2 sc2 (Z.to_string c2) S.pp subst;
+      false
+    )
 
   (* match lists together exactly. No scaling authorized *)
-  let rec match_lists ~subst l1 rest1 sc1 l2 sc2 k = match l1, l2 with
-    | _, [] ->
-        if l1 = [] && rest1 = []
+  let rec match_lists ~protect ~subst l1 rest1 sc1 l2 sc2 k = match l1, l2 with
+    | [], [] ->
+        if rest1 = []
           then k subst
+    | _, []
     | [], _ -> ()
     | (c1,t1)::l1', (c2,t2)::l2' when Z.leq c1 c2  ->
         begin try
-          let subst = Unif.FO.matching_adapt_scope ~subst ~pattern:t1 sc1 t2 sc2 in
+          let subst = Unif.FO.matching_adapt_scope
+            ~protect ~subst ~pattern:t1 sc1 t2 sc2
+          in
           if Z.equal c1 c2
-            then match_lists ~subst (rest1 @ l1') [] sc1 l2' sc2 k
-            else match_lists ~subst l1' rest1 sc1 ((Z.(c2 - c1),t2)::l2') sc2 k
+            then match_lists ~protect ~subst
+              (rest1 @ l1') [] sc1 l2' sc2 k
+            else match_lists ~protect ~subst
+              l1' rest1 sc1 ((Z.(c2 - c1),t2)::l2') sc2 k
         with Unif.Fail -> ()
         end;
         (* ignore [t1] for now *)
-        match_lists ~subst l1' ((c1,t1)::rest1) sc1 l2 sc2 k
+        match_lists ~protect ~subst l1' ((c1,t1)::rest1) sc1 l2 sc2 k
     | (c1,t1)::l1', (c2,t2)::l2' ->
         (* cannot match, c1 too high *)
         assert Z.(gt c1 zero);
         assert Z.(gt c2 zero);
-        match_lists ~subst l1' ((c1,t1)::rest1) sc1 l2 sc2 k
+        match_lists ~protect ~subst l1' ((c1,t1)::rest1) sc1 l2 sc2 k
 
   (* matching that is allowed to scale m1, and, if [scale2] is true, to
     scale [m2] too. Constants are not taken into account.
@@ -299,7 +311,7 @@ module Subsumption = struct
     @param [scale2] allow to multiply m2 with a (positive) constant
     postcondition: for a result (subst,c1,c2),
       c1 * subst(m1.terms) = c2 * subst(m2.terms) *)
-  let matching ~subst m1 sc1 ~scale2 m2 sc2 k =
+  let matching ~protect ~subst m1 sc1 ~scale2 m2 sc2 k =
     (* match some terms of [l1] with the given term [t2].
       [c1] is the accumulated coefficient for terms of [l1] so far. *)
     let rec init_with_coeff ~subst c1 l1 rest1 t2 c2 rest2 =
@@ -332,7 +344,8 @@ module Subsumption = struct
       | (c1',t1) :: l1' ->
           (* choose [t1], if possible, and then extend the substitution for t2 *)
           begin try
-            let subst = Unif.FO.matching_adapt_scope ~subst ~pattern:t1 sc1 t2 sc2 in
+            let subst = Unif.FO.matching_adapt_scope ~protect ~subst
+              ~pattern:t1 sc1 t2 sc2 in
             init_with_coeff ~subst Z.(c1 + c1') l1' rest1 t2 c2 rest2
           with Unif.Fail -> ()
           end;
@@ -344,7 +357,7 @@ module Subsumption = struct
       let l1 = List.map (fun (c,t) -> Z.(c * scale1), t) l1
       and l2 = List.map (fun (c,t) -> Z.(c * scale2), t) l2
       in
-      match_lists ~subst l1 [] sc1 l2 sc2
+      match_lists ~protect ~subst l1 [] sc1 l2 sc2
         (fun subst ->
           assert (_matching_postcond m1 sc1 m2 sc2 (subst, scale1, scale2));
           k (subst, scale1, scale2))
@@ -361,16 +374,17 @@ module Subsumption = struct
 
   (* match l1 with l2, and r1 with r2, with the same scaling coefficient *)
   let matching2 ~subst l1 r1 sc1 ~scale2 l2 r2 sc2 k =
+    let protect = Sequence.append (M.Seq.vars l2) (M.Seq.vars r2) in
     if M.is_const l1 && M.is_const l2
     then
       (* only one problem *)
-      matching ~subst r1 sc1 ~scale2 r2 sc2 k
+      matching ~protect ~subst r1 sc1 ~scale2 r2 sc2 k
     else
-      matching ~subst l1 sc1 ~scale2 l2 sc2
+      matching ~protect ~subst l1 sc1 ~scale2 l2 sc2
         (fun (subst,c1,c2) ->
           let r1 = List.map (fun (c,t) -> Z.(c * c1), t) (M.coeffs r1)
           and r2 = List.map (fun (c,t) -> Z.(c * c2), t) (M.coeffs r2) in
-          match_lists ~subst r1 [] sc1 r2 sc2
+          match_lists ~protect ~subst r1 [] sc1 r2 sc2
             (fun subst -> k (subst,c1,c2)))
 
   let check ~subst lit1 sc1 lit2 sc2 k =
@@ -447,7 +461,8 @@ module Subsumption = struct
             then k subst);
     | Binary (Equal, l1, r1), Divides d when d.sign ->
         let m1 = _normalize_in_div d.num ~power:d.power (M.difference l1 r1) in
-        matching ~subst m1 sc1 ~scale2:false d.monome sc2
+        let protect = M.Seq.vars d.monome in
+        matching ~protect ~subst m1 sc1 ~scale2:false d.monome sc2
           (fun (subst, c1, c2) ->
             (* l1-r1 = d.monome + something.num^power *)
             if Z.(equal
@@ -461,7 +476,8 @@ module Subsumption = struct
           (with k' = d1.power - d2.power) if
             c1.m1 = c2.m2 + something.n^k
           for "not divides" relation we play safe and require the same power.*)
-        matching ~subst d1.monome sc1 ~scale2:false d2.monome sc2
+        let protect = M.Seq.vars d2.monome in
+        matching ~protect ~subst d1.monome sc1 ~scale2:false d2.monome sc2
           (fun (subst, c1, c2) ->
             if Z.(equal
               ((c1 * M.const d1.monome) mod (d2.num ** d2.power))
@@ -470,7 +486,8 @@ module Subsumption = struct
       && Z.equal d1.num d2.num && d1.power >= d2.power ->
         (* n^{k+k'} | m1 can subsume not(n^k | m2) if
           c1.m1 = c2.m2 + k with k not divisible by n^k *)
-        matching ~subst d1.monome sc1 ~scale2:false d2.monome sc2
+        let protect = M.Seq.vars d2.monome in
+        matching ~protect ~subst d1.monome sc1 ~scale2:false d2.monome sc2
           (fun (subst, c1, c2) ->
             if Z.(gt
               ((c1 * M.const d1.monome - c2 * M.const d2.monome) mod (d2.num ** d2.power))

@@ -356,7 +356,8 @@ let subsumes ?(subst=Substs.empty) lit1 sc1 lit2 sc2 k =
   match lit1, lit2 with
   | Arith o1, Arith o2 ->
       (* use the more specific subsumption mechanism *)
-      Util.debug 5 "subsumption check: %a for %a" ArithLit.pp o1 ArithLit.pp o2;
+      Util.debug 5 "subsumption check: %a[%d] for %a [%d]"
+        ArithLit.pp o1 sc1 ArithLit.pp o2 sc2;
       ArithLit.subsumes ~subst o1 sc1 o2 sc2 k
   | _ -> matching ~subst lit1 sc1 lit2 sc2 k
 
