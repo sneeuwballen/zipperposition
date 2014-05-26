@@ -62,6 +62,8 @@ module type S = sig
   val name : t -> string
     (** Name of the implementation/role of the queue *)
 
+  (** {6 Available Queues} *)
+
   val fifo : t
     (** select by increasing age (for fairness) *)
 
@@ -89,14 +91,43 @@ module type S = sig
   val mk_queue : ?accept:(C.t -> bool) -> weight:(C.t -> int) -> string -> t
     (** Bring your own implementation of queue *)
 
-  val default_queues : (t * int) list
-    (** default combination of heuristics (TODO: array?) *)
+  (** {6 Combination of queues} *)
+
+  type queues = (t * int) list
+
+  module Profiles : sig
+    val bfs : queues
+      (** Strong orientation toward FIFO *)
+
+    val explore : queues
+      (** Use heuristics for selecting "small" clauses *)
+
+    val ground : queues
+      (** Favor positive unit clauses and ground clauses *)
+  end
+
+  val default_queues : queues
+    (** default combination of heuristics *)
+
+  (** {6 IO} *)
 
   val pp : Buffer.t -> t -> unit
   val to_string : t -> string
   val pp_list : Buffer.t -> (t * int) list -> unit
   val fmt : Format.formatter -> t -> unit
 end
+
+let _profile = ref "default"
+let profile () = !_profile
+let set_profile s = _profile := s
+
+let () =
+  Params.add_opts
+    [ "-clause-queue"
+    , Arg.String set_profile
+    , "choose which set of clause queues to use \
+      (for selecting next active clause): choices: default,bfs,explore,ground"
+    ]
 
 module Make(C : Clause.S) = struct
   module C = C
@@ -208,25 +239,41 @@ module Make(C : Clause.S) = struct
     (* use a fifo on lemmas *)
     mk_queue ~accept ~weight:C.weight name
 
+  (** {6 Combination of queues} *)
+
+  type queues = (t * int) list
+
+  module Profiles = struct
+    let bfs =
+      [ fifo, 5
+      ; clause_weight, 1
+      ]
+
+    let explore =
+      [ fifo, 1
+      ; clause_weight, 4
+      ; goals, 1
+      ]
+
+    let ground =
+      [ fifo, 1
+      ; pos_unit_clauses, 1
+      ; ground, 2
+      ]
+  end
+
   let default_queues =
-    [ fifo, 4
-    ; clause_weight, 3
-    ; goals, 1
-    ; pos_unit_clauses, 1
-    (* ; lemmas, 1 *)
-    ]
-    (*
-    [ (clause_weight, 4);
-      (ground, 1);
-      (*
-      (non_goals, 1);
-      (goals, 1);
-      *)
-      (fifo, 2);
-      (horn, 1);  (* FIXME: if just before "fifo", incompleteness on pelletier_problems/pb64.p *)
-      (lemmas, 1);
-    ]
-    *)
+    match !_profile with
+    | "default" ->
+        [ fifo, 4
+        ; clause_weight, 3
+        ; goals, 1
+        ; pos_unit_clauses, 1
+        ]
+    | "bfs" -> Profiles.bfs
+    | "explore" -> Profiles.explore
+    | "ground" -> Profiles.ground
+    | n -> failwith ("no such profile: " ^ n)
 
   let pp buf q =
     Printf.bprintf buf "queue %s" (name q)
