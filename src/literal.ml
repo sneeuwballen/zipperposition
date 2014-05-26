@@ -352,6 +352,48 @@ let matching ?(subst=Substs.empty) lit1 sc1 lit2 sc2 k =
   in
   unif_lits op ~subst lit1 sc1 lit2 sc2 k
 
+(* find substitutions such that subst(l1=r1) implies l2=r2 *)
+let _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k =
+  (* make l2 and r2 equal using l1 = r2 (possibly several times) *)
+  let rec equate_terms ~subst l2 r2 k =
+    (* try to make the terms themselves equal *)
+    equate_root ~subst l2 r2 k;
+    (* decompose *)
+    match T.view l2, T.view r2 with
+    | _ when T.eq l2 r2 -> k subst
+    | T.TyApp(f, tyf), T.TyApp(g, tyg) when Type.eq tyf tyg ->
+      (* we can't make tyf=tyg with a term equation, so this reduces
+        to making f=g*)
+      equate_terms ~subst f g k
+    | T.App (f, ss), T.App (g, ts) when List.length ss = List.length ts ->
+      equate_terms ~subst f g
+        (fun subst -> equate_lists ~subst ss ts k)
+    | _ -> ()
+  and equate_lists ~subst l2s r2s k = match l2s, r2s with
+    | [], [] -> k subst
+    | [], _
+    | _, [] -> ()
+    | l2::l2s', r2::r2s' ->
+        equate_terms ~subst l2 r2 (fun subst -> equate_lists ~subst l2s' r2s' k)
+  (* make l2=r2 by a direct application of l1=r1, if possible. This can
+      enrich [subst] *)
+  and equate_root ~subst l2 r2 k =
+    begin try
+      let subst = Unif.FO.matching_adapt_scope ~subst ~pattern:l1 sc1 l2 sc2 in
+      let subst = Unif.FO.matching_adapt_scope ~subst ~pattern:r1 sc1 r2 sc2 in
+      k subst
+    with Unif.Fail -> ()
+    end;
+    begin try
+      let subst = Unif.FO.matching_adapt_scope ~subst ~pattern:l1 sc1 r2 sc2 in
+      let subst = Unif.FO.matching_adapt_scope ~subst ~pattern:r1 sc1 l2 sc2 in
+      k subst
+    with Unif.Fail -> ()
+    end;
+    ()
+  in
+  equate_terms ~subst l2 r2 k
+
 let subsumes ?(subst=Substs.empty) lit1 sc1 lit2 sc2 k =
   match lit1, lit2 with
   | Arith o1, Arith o2 ->
@@ -359,6 +401,8 @@ let subsumes ?(subst=Substs.empty) lit1 sc1 lit2 sc2 k =
       Util.debug 5 "subsumption check: %a[%d] for %a [%d]"
         ArithLit.pp o1 sc1 ArithLit.pp o2 sc2;
       ArithLit.subsumes ~subst o1 sc1 o2 sc2 k
+  | Equation (l1, r1, true), Equation (l2, r2, true) ->
+      _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k
   | _ -> matching ~subst lit1 sc1 lit2 sc2 k
 
 let unify ?(subst=Substs.empty) lit1 sc1 lit2 sc2 k =
