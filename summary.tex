@@ -26,11 +26,10 @@ pdftitle={superposition modulo modular arithmetic},pdfauthor={Simon Cruanes}]{hy
 \subsection{Definitions}
 %{{{
 Literals are of the form $\bigcap_i a_i \subseteq \bigcup_j b_j$
-or $\bigcap_i a_i \not\subseteq \bigcup_j b_j$
+or $\bigcup_i a_i \not\subseteq \bigcap_j b_j$
 where the $a_i$ and $b_j$ are terms of type set.
-$\dot\subseteq$ stands for either $\subseteq$ or $\not\subseteq$.
 We write
-$\bigcap_i a_i ~\dot\subseteq~ \emptyset$ if the set of $b_j$ is empty (since
+$\bigcap_i a_i \subseteq \emptyset$ if the set of $b_j$ is empty (since
 $\emptyset$ is the neutral element for $\cup$).
 The terms of type $\set{\alpha}$
 are of the form:
@@ -115,18 +114,18 @@ A \not\subseteq B \cup (C \backslash D)
     &\leadsto A \not\subseteq B \cup C \lor A \cap D \not\subseteq B \\
 A \not\subseteq B \backslash C
     &\leadsto A \not\subseteq B \lor A \cap C \not\subseteq \emptyset \\
-A \cap (B \backslash D) \not\subseteq C
+A \cup (B \backslash D) \not\subseteq C
     &\leadsto A \cap B \not\subseteq C \cup D \\
 A \backslash B \not\subseteq C
-    &\leadsto A \not\subseteq B \cup C \\
-A \cap (B \cup D) \not\subseteq C
-    & \leadsto A \cap B \not\subseteq C \lor A \cap D \not\subseteq C \\
-A \cup B \not\subseteq C
-    & \leadsto A \not\subseteq C \lor B \not\subseteq C \\
-A \not\subseteq B \cup (C \cap D)
-    & \leadsto A \not\subseteq B \cup C \lor A \not\subseteq B \cup D \\
-A \not\subseteq B \cap C
-    & \leadsto A \not\subseteq B \lor A \not\subseteq C \\
+    &\leadsto A \not\subseteq B \cup C \\  % TODO: fix all neg. cases above (including this line)
+A \cap B \not\subseteq C
+    & \leadsto A \not\subseteq C \land B \not\subseteq C \\
+A \cup (B \cap D) \not\subseteq C
+    & \leadsto A \cup B \not\subseteq C \land A \cup D \not\subseteq C \\
+A \not\subseteq B \cup C
+    & \leadsto A \not\subseteq B \land A \not\subseteq C \\
+A \not\subseteq B \cap (C \cup D)
+    & \leadsto A \not\subseteq B \cap C \land A \not\subseteq B \cap D \\
 A \cap \emptyset
     & \leadsto \emptyset \\
 A \cup \emptyset
@@ -155,35 +154,110 @@ We mix \emph{The Strive-based Subset Prover} and
 \emph{Rewrite Techniques for Transitive Relations}.
 We will use monotonicity properties $A \subseteq B \Rightarrow A \cap C
 \subseteq B \cap C$ and $A \subseteq B \Rightarrow A \cup C \subseteq B \cup C$
-a lot. The rules are exposed in Figure~\ref{fig:rules}.
+a lot. The rules are exposed in Figure~\ref{fig:rules}. We will use capitalized
+letter such as $A_\cap$ to denote $\bigcap_i a_i$, and $A_\cup$ to denote
+$\bigcup_i a_i$.
 
-Let us develop the chaining inferences. Say we have $A \subseteq t\cup B$
-and $t \cap B' \subseteq C'$, then we can deduce intermediate literals
-$A \cap B' \subseteq (t \cup B) \cap B'$ and
-$(t\cap B')\cup B \subseteq C' \cup B$. Then, we use the fact that
-$(t \cup B) \cap B' = (t\cap B') \cup (B\cap B')$, and that
-$B \cap B' \subseteq B$, so $(t\cap B') \cup (B\cap B') \subseteq (t \cap B')\cup B$.
+Let us develop the chaining inferences. Say we have $A_\cap \subseteq t\cup B_\cup$
+and $t \cap B'_\cap \subseteq C'_\cup$, then we can deduce intermediate literals
+$A_\cap \cap B'_\cap \subseteq (t \cup B_\cup) \cap B'_\cup$ and
+$(t\cap B'_\cap)\cup B_\cup \subseteq C'_\cup \cup B_\cup$. Then, we use the fact that
+$(t \cup B_\cup) \cap B'_\cap = (t\cap B'_\cap) \cup (B_\cup\cap B'_\cap)$, and that
+$B_\cup \cap B'_\cap \subseteq B_\cup$, so
+$(t\cap B'_\cap) \cup (B_\cup\cap B'_\cap) \subseteq (t \cap B'_\cap)\cup B_\cup$.
 Therefore by transitivity of $\subseteq$, we obtain
-$A\cap B' \subseteq C' \cup B$.
+$A_\cap\cap B'_\cap \subseteq C'_\cup \cup B_\cup$.
 
 Conversely, the negative chaining rules use the contrapositive of transitivity,
 that is, $A \subseteq B \land A \not\subseteq C \Rightarrow B \not\subseteq C$
 (otherwise we would have $A \subseteq B \subseteq C$ and therefore $A \subseteq C$).
-Therefore, from $A \cap t \subseteq B$ and $A' \cap t \not\subseteq B'$ we
-deduce $A\cap A'\cap t \subseteq B\cap A'$
-and $A\cap A'\cap t \not\subseteq B'\cap A$ by monotonicity. Therefore
-$B\cap A' \not\subseteq B'\cap A$
+Therefore, from $A_\cap \cap t \subseteq B_\cup$ and
+$A'_\cup \cup t \not\subseteq B'_\cap$ we
+deduce $(A_\cap\cap t)\cup A'_\cup \subseteq B_\cup\cup A'_\cup$
+and $(A'_\cup\cup t) \cap A_\cap \not\subseteq B'_\cap\cap A_\cap$ by monotonicity.
+Since $(A'_\cup \cup t)\cap A_\cap
+    = (A'_\cup \cap A_\cap)\cup (A_\cap\cap t)
+    \subseteq (A_\cap\cap t) \cup A'_\cup$.
+Therefore $B_\cup\cup A'_\cup \not\subseteq B'_\cap\cap A_\cap$.
+A similar reasoning applies when $t$ occurs at the right-hand side of
+$\subseteq$ and $\not\subseteq$, using the transitivity rule
+$A \subseteq B \land C \not\subseteq B \Rightarrow C \not\subseteq A$.
+
+Factoring rules are used to \emph{merge} together two literals whose maximal
+terms are the same. The basic idea is that if $A \subseteq B
+\lor A \subseteq C$, then if we assume $B\subseteq C$ we can deduce
+$A \subseteq B \Rightarrow A \subseteq C$. Therefore $A\subseteq C$ is true
+in both cases and we can merge together the two literals provided $B\subseteq C$.
+
+Say we have
+$t \cap A_\cap \subseteq B_\cup \lor t \cap A'_\cap \subseteq B'_\cup$; if
+TODO %TODO
 
 \begin{figure}[htp]
 %{{{
 \begin{center}
 
 \begin{prooftree}
-    \AxiomC{$ K\lor (A \subseteq t \cup B) $}
-    \AxiomC{$ K'\lor (t \cap B' \subseteq C') $}
+    \AxiomC{$ K\lor (A_\cap \subseteq t \cup B_\cup) $}
+    \AxiomC{$ K'\lor (t \cap B'_\cap \subseteq C'_\cup) $}
     \RightLabel{positive chaining}
-    \BinaryInfC{$ K \lor K' \lor (A \cap B' \subseteq B \cup C') $}
+    \BinaryInfC{$ K \lor K' \lor (A_\cap \cap B'_\cap \subseteq B_\cup \cup C'_\cup) $}
 \end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$ K\lor (A_\cap \cap t \subseteq B_\cup) $}
+    \AxiomC{$ K'\lor (A'_\cup \cup t \not\subseteq B'_\cap) $}
+    \RightLabel{negative chaining left}
+    \BinaryInfC{$ K \lor K' \lor (A'_\cup \cup B_\cup \not\subseteq A_\cap \cap B'_\cap) $}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$ K\lor (A_\cap \subseteq B_\cup \cup t) $}
+    \AxiomC{$ K'\lor (A'_\cup \not\subseteq B'_\cap \cap t) $}
+    \RightLabel{negative chaining right}
+    \BinaryInfC{$ K \lor K' \lor (A'_\cup \cup B_\cup \not\subseteq A_\cap \cap B'_\cap) $}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$ K
+        \lor (t \cap A_\cap \subseteq B_\cup)
+        \lor (t \cap A'_\cap \subseteq B'_\cup) $}
+    \RightLabel{factoring left}
+    \UnaryInfC{$ K \lor B_\cup \not\subseteq A'_\cap \lor $} % TODO
+\end{prooftree}
+
+\mbox{
+    \AxiomC{$ K \lor \{ t \} \subseteq \emptyset $}
+    \doubleLine
+    \UnaryInfC{$ K $}
+    \DisplayProof
+
+    and
+
+    \AxiomC{$ K \lor \{ t \} \not\subseteq \emptyset $}
+    \RightLabel{emptyset}
+    \doubleLine
+    \UnaryInfC{$~$}
+    \DisplayProof
+} \\[10pt]
+
+
+\mbox{
+    \AxiomC{$ K \lor t \cap A_\cap \subseteq t\cup B_\cup $}
+    \doubleLine
+    \UnaryInfC{$~ $}
+    \DisplayProof
+
+    and
+
+    \AxiomC{$ K \lor t \cap A_\cap \not\subseteq t\cup B_\cup $}
+    \RightLabel{reflexivity}
+    \doubleLine
+    \UnaryInfC{$K$}
+    \DisplayProof
+} \\[10pt]
+
+
 
 \caption{Inference Rules}
 \label{fig:rules}
