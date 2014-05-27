@@ -676,14 +676,14 @@ module Comp = struct
     let _to_int = function
       | False
       | True -> 0
-      | Equation _
-      | Prop _ -> 1  (* eqn and prop are really the same thing *)
       | Ineq _ -> 2
       | Arith (Binary (Equal, _, _)) -> 3
       | Arith (Binary (Different, _, _)) -> 4
       | Arith (Binary (Less, _, _)) -> 5
       | Arith (Binary (Lesseq, _, _)) -> 6
       | Arith (Divides _) -> 7
+      | Equation _
+      | Prop _ -> 8  (* eqn and prop are really the same thing *)
     in
     C.of_total (_to_int l1 - _to_int l2)
 
