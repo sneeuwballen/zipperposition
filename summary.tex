@@ -1,0 +1,197 @@
+\documentclass{article}
+
+%{{{ prelude
+\usepackage{bussproofs}
+\usepackage[english]{babel}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{paralist}
+\usepackage[colorlinks=false,pdfborder={0 0 0},
+pdftitle={superposition modulo modular arithmetic},pdfauthor={Simon Cruanes}]{hyperref}
+
+\newcommand{\set}[1]{\ensuremath{\text{set}({#1})}}
+
+\title{Superposition and Chaining with Sets}
+%}}}
+
+\begin{document}
+
+\maketitle
+
+\section{Basics}
+%{{{
+
+\subsection{Definitions}
+%{{{
+Literals are of the form $\bigcap_i a_i \subseteq \bigcup_j b_j$
+or $\bigcap_i a_i \not\subseteq \bigcup_j b_j$
+where the $a_i$ and $b_j$ are terms of type set.
+$\dot\subseteq$ stands for either $\subseteq$ or $\not\subseteq$.
+We write
+$\bigcap_i a_i ~\dot\subseteq~ \emptyset$ if the set of $b_j$ is empty (since
+$\emptyset$ is the neutral element for $\cup$).
+The terms of type $\set{\alpha}$
+are of the form:
+
+\begin{itemize}
+    \item $\{ t \}$ where $t : \alpha$;
+    \item $ f(t_1,\dots,t_n) $ where $f$ is a function of domain set.
+\end{itemize}
+%}}}
+
+\subsection{Powerset}
+%{{{
+\noindent{}We can encode the powerset operator $\mathbb{P}$ as follows, using a fresh
+variable $s:\set{\alpha}$ where $\mathbb{P}: \set{\set{\alpha}}$. If
+$\mathbb{P}(t) \cap A \subseteq B$,
+it means $\forall s, s\in \mathbb{P}(t) \cap A \Rightarrow s \in B$;
+$s \in \mathbb{P}(t) \cap A$ is synonymous to $s \subseteq t \land
+\{ s \} \subseteq A$. Conversely, $A \subseteq \mathbb{P}(t) \cup B$
+means $\forall s, s\in A \Rightarrow s \in \mathbb{P}(t) \lor s\in B$,
+hence $\forall s, \{s \}\subseteq A \Rightarrow s \subseteq t \lor \{ s \} \subseteq B$.
+
+When $\mathbb{P}$ occurs in a clause, the rule is hence:
+
+\begin{prooftree}
+\AxiomC{$ C \lor \mathbb{P}(t) \cap A \subseteq B$}
+\doubleLine
+\UnaryInfC{$C \lor s \not\subseteq t \lor \{ s \} \not\subseteq A \lor \{ s \} \subseteq B$}
+\end{prooftree}
+
+and
+
+\begin{prooftree}
+\AxiomC{$ C \lor A \subseteq \mathbb{P}(t) \cup B$}
+\doubleLine
+\UnaryInfC{$C \lor \{ s \} \not\subseteq A \lor s \subseteq t \lor \{ s \} \subseteq B$}
+\end{prooftree}
+%}}}
+%}}}
+
+\section{Skolemisation and CNF}
+%{{{
+The numerous set operators must be translated to the rigid clause format
+we defined above; Figure~\ref{fig:skolem} describes the translation process
+that must take place after NNF and before Skolemization.
+In the rules, $A$ and $B$ have type $\set{\alpha}$, $s$ is a term
+of type $\alpha$, and $x:\alpha$ is a
+variable. The rules for simplifying $\not\subseteq$ are obtained by
+transforming $A \not\subseteq B$ into $\lnot(A \subseteq B)$, applying
+adequate rules on $\subseteq$, and then putting $\lnot$ back and
+applying NNF again. Then, usual CNF transformation, with skolemization
+and distribution of $\land$ over $\lor$, can proceed.
+
+\begin{figure}[htbp]
+%{{{
+\begin{center}
+\begin{align*}
+A \not\subset B &\leadsto (B \subseteq A \lor A \not\subseteq B) \\
+A \not= B       &\leadsto (A \not\subseteq B \lor B \not\subseteq A) \\
+A \subset B     &\leadsto (A \subseteq B \land B \not\subseteq A) \\
+A = B           &\leadsto (A \subseteq B \land B \subseteq A) \\
+s \in A         &\leadsto \{ s \} \subseteq A \\
+s \not\in A     &\leadsto \{ s \} \not\subseteq A \\
+\text{nonempty}(A)          &\leadsto A \not\subseteq \emptyset \\
+\lnot \text{nonempty}(A)    &\leadsto A \subseteq \emptyset \\
+A \subseteq B \cup (C \backslash D)
+    &\leadsto A \subseteq B \cup C \land A \cap D \subseteq B \\
+A \subseteq B \backslash C
+    &\leadsto A \subseteq B \land A \cap C \subseteq \emptyset \\
+A \cap (B \backslash D) \subseteq C
+    &\leadsto A \cap B \subseteq C \cup D \\
+A \backslash B \subseteq C
+    &\leadsto A \subseteq B \cup C \\
+A \cap (B \cup D) \subseteq C
+    & \leadsto A \cap B \subseteq C \land A \cap D \subseteq C \\
+A \cup B \subseteq C
+    & \leadsto A \subseteq C \land B \subseteq C \\
+A \subseteq B \cup (C \cap D)
+    & \leadsto A \subseteq B \cup C \land A \subseteq B \cup D \\
+A \subseteq B \cap C
+    & \leadsto A \subseteq B \land A \subseteq C \\
+A \not\subseteq B \cup (C \backslash D)
+    &\leadsto A \not\subseteq B \cup C \lor A \cap D \not\subseteq B \\
+A \not\subseteq B \backslash C
+    &\leadsto A \not\subseteq B \lor A \cap C \not\subseteq \emptyset \\
+A \cap (B \backslash D) \not\subseteq C
+    &\leadsto A \cap B \not\subseteq C \cup D \\
+A \backslash B \not\subseteq C
+    &\leadsto A \not\subseteq B \cup C \\
+A \cap (B \cup D) \not\subseteq C
+    & \leadsto A \cap B \not\subseteq C \lor A \cap D \not\subseteq C \\
+A \cup B \not\subseteq C
+    & \leadsto A \not\subseteq C \lor B \not\subseteq C \\
+A \not\subseteq B \cup (C \cap D)
+    & \leadsto A \not\subseteq B \cup C \lor A \not\subseteq B \cup D \\
+A \not\subseteq B \cap C
+    & \leadsto A \not\subseteq B \lor A \not\subseteq C \\
+A \cap \emptyset
+    & \leadsto \emptyset \\
+A \cup \emptyset
+    & \leadsto A \\
+\emptyset \subseteq B
+    & \leadsto \top \\
+\emptyset \not\subseteq B
+    & \leadsto \bot \\
+\{ s \} \subseteq \emptyset
+    & \leadsto \bot \\
+\{ s \} \not\subseteq \emptyset
+    & \leadsto \top \\
+\end{align*}
+\caption{Skolemization and CNF rules}
+\label{fig:skolem}
+\end{center}
+%}}}
+\end{figure}
+
+%}}}
+
+
+\section{Inference Rules}
+%{{{
+We mix \emph{The Strive-based Subset Prover} and
+\emph{Rewrite Techniques for Transitive Relations}.
+We will use monotonicity properties $A \subseteq B \Rightarrow A \cap C
+\subseteq B \cap C$ and $A \subseteq B \Rightarrow A \cup C \subseteq B \cup C$
+a lot. The rules are exposed in Figure~\ref{fig:rules}.
+
+Let us develop the chaining inferences. Say we have $A \subseteq t\cup B$
+and $t \cap B' \subseteq C'$, then we can deduce intermediate literals
+$A \cap B' \subseteq (t \cup B) \cap B'$ and
+$(t\cap B')\cup B \subseteq C' \cup B$. Then, we use the fact that
+$(t \cup B) \cap B' = (t\cap B') \cup (B\cap B')$, and that
+$B \cap B' \subseteq B$, so $(t\cap B') \cup (B\cap B') \subseteq (t \cap B')\cup B$.
+Therefore by transitivity of $\subseteq$, we obtain
+$A\cap B' \subseteq C' \cup B$.
+
+Conversely, the negative chaining rules use the contrapositive of transitivity,
+that is, $A \subseteq B \land A \not\subseteq C \Rightarrow B \not\subseteq C$
+(otherwise we would have $A \subseteq B \subseteq C$ and therefore $A \subseteq C$).
+Therefore, from $A \cap t \subseteq B$ and $A' \cap t \not\subseteq B'$ we
+deduce $A\cap A'\cap t \subseteq B\cap A'$
+and $A\cap A'\cap t \not\subseteq B'\cap A$ by monotonicity. Therefore
+$B\cap A' \not\subseteq B'\cap A$
+
+\begin{figure}[htp]
+%{{{
+\begin{center}
+
+\begin{prooftree}
+    \AxiomC{$ K\lor (A \subseteq t \cup B) $}
+    \AxiomC{$ K'\lor (t \cap B' \subseteq C') $}
+    \RightLabel{positive chaining}
+    \BinaryInfC{$ K \lor K' \lor (A \cap B' \subseteq B \cup C') $}
+\end{prooftree}
+
+\caption{Inference Rules}
+\label{fig:rules}
+\end{center}
+%}}}
+\end{figure}
+
+%}}}
+
+
+\end{document}
