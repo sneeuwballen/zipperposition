@@ -20,6 +20,9 @@ pdftitle={superposition modulo modular arithmetic},pdfauthor={Simon Cruanes}]{hy
 
 \maketitle
 
+% XXX: on a un ensemble maximal (top) pour chaque type
+%       ----> complémentaire ? peut être bien pratique !
+
 \section{Basics}
 %{{{
 
@@ -43,29 +46,60 @@ are of the form:
 \subsection{Powerset}
 %{{{
 \noindent{}We can encode the powerset operator $\mathbb{P}$ as follows, using a fresh
-variable $s:\set{\alpha}$ where $\mathbb{P}: \set{\set{\alpha}}$. If
-$\mathbb{P}(t) \cap A \subseteq B$,
-it means $\forall s, s\in \mathbb{P}(t) \cap A \Rightarrow s \in B$;
-$s \in \mathbb{P}(t) \cap A$ is synonymous to $s \subseteq t \land
-\{ s \} \subseteq A$. Conversely, $A \subseteq \mathbb{P}(t) \cup B$
-means $\forall s, s\in A \Rightarrow s \in \mathbb{P}(t) \lor s\in B$,
-hence $\forall s, \{s \}\subseteq A \Rightarrow s \subseteq t \lor \{ s \} \subseteq B$.
+variable $s:\set{\alpha}$ and a fresh skolem
+symbol $k:\set{\alpha}$ where $\mathbb{P}: \set{\set{\alpha}}$.
+\begin{itemize}
+\item If $\mathbb{P}(t) \cap A \subseteq B$,
+    it means $\forall s, s\in \mathbb{P}(t) \cap A \Rightarrow s \in B$;
+    $s \in \mathbb{P}(t) \cap A$ is synonymous to $s \subseteq t \land
+    \{ s \} \subseteq A$.
+\item Similarly, $A \subseteq \mathbb{P}(t) \cup B$
+    means $\forall s, s\in A \Rightarrow s \in \mathbb{P}(t) \lor s\in B$,
+    hence $\forall s, \{s \}\subseteq A \Rightarrow s \subseteq t \lor \{ s \} \subseteq B$.
+\item $\mathbb{P}(t) \cup A \not\subseteq B$ means that there exists
+    some set $s$ such that $s \subseteq t \lor \{s\} \in A$ but $\{s\} \not\in B$.
+    Therefore we transform this into two clauses.
+\item $A \not\subseteq \mathbb{P}(t) \cap B$ is similar, but $s$ not being
+    a member of $\mathbb{P}(t)\cap B$ means that $s \not\in B \lor s\not\subseteq t$.
+    Therefore we translate it into the two clauses obtained from
+    $\exists s, \{s\} \subseteq A \land (\{s\}\not\subseteq B \lor s\not\subseteq t)$.
+\end{itemize}
 
-When $\mathbb{P}$ occurs in a clause, the rule is hence:
+When $\mathbb{P}$ occurs in a clause, the rules to eliminate it are shown
+in Figure~\ref{fig:powerset}.
 
+\begin{figure}[htp]
+%{{{
 \begin{prooftree}
 \AxiomC{$ C \lor \mathbb{P}(t) \cap A \subseteq B$}
 \doubleLine
 \UnaryInfC{$C \lor s \not\subseteq t \lor \{ s \} \not\subseteq A \lor \{ s \} \subseteq B$}
 \end{prooftree}
 
-and
-
 \begin{prooftree}
 \AxiomC{$ C \lor A \subseteq \mathbb{P}(t) \cup B$}
 \doubleLine
 \UnaryInfC{$C \lor \{ s \} \not\subseteq A \lor s \subseteq t \lor \{ s \} \subseteq B$}
 \end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$ C \lor \mathbb{P}(t) \cup A \not\subseteq B $}
+\doubleLine
+\UnaryInfC{$C \lor \{k\}\subseteq A \lor k \subseteq t 
+    \qquad   C \lor \{k\}\not\subseteq B$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$ C \lor A \not\subseteq \mathbb{P}(t) \cap B $}
+\doubleLine
+\UnaryInfC{$ C \lor k \subseteq A
+    \qquad  C \lor \{k\} \not\subseteq B \lor k \not\subseteq t$}
+\end{prooftree}
+\caption{Elimination of $\mathbb{P}$}
+\label{fig:powerset}
+\end{figure}
+%}}}
+
 %}}}
 %}}}
 
@@ -76,16 +110,14 @@ we defined above; Figure~\ref{fig:skolem} describes the translation process
 that must take place after NNF and before Skolemization.
 In the rules, $A$ and $B$ have type $\set{\alpha}$, $s$ is a term
 of type $\alpha$, and $x:\alpha$ is a
-variable. The rules for simplifying $\not\subseteq$ are obtained by
-transforming $A \not\subseteq B$ into $\lnot(A \subseteq B)$, applying
-adequate rules on $\subseteq$, and then putting $\lnot$ back and
-applying NNF again. Then, usual CNF transformation, with skolemization
-and distribution of $\land$ over $\lor$, can proceed.
+variable. Then, usual CNF transformation, with skolemization
+and distribution of $\land$ over $\lor$, can proceed as usual.
 
 \begin{figure}[htbp]
 %{{{
 \begin{center}
 \begin{align*}
+% basics
 A \not\subset B &\leadsto (B \subseteq A \lor A \not\subseteq B) \\
 A \not= B       &\leadsto (A \not\subseteq B \lor B \not\subseteq A) \\
 A \subset B     &\leadsto (A \subseteq B \land B \not\subseteq A) \\
@@ -94,30 +126,35 @@ s \in A         &\leadsto \{ s \} \subseteq A \\
 s \not\in A     &\leadsto \{ s \} \not\subseteq A \\
 \text{nonempty}(A)          &\leadsto A \not\subseteq \emptyset \\
 \lnot \text{nonempty}(A)    &\leadsto A \subseteq \emptyset \\
-A \subseteq B \cup (C \backslash D)
-    &\leadsto A \subseteq B \cup C \land A \cap D \subseteq B \\
-A \subseteq B \backslash C
-    &\leadsto A \subseteq B \land A \cap C \subseteq \emptyset \\
-A \cap (B \backslash D) \subseteq C
-    &\leadsto A \cap B \subseteq C \cup D \\
-A \backslash B \subseteq C
-    &\leadsto A \subseteq B \cup C \\
-A \cap (B \cup D) \subseteq C
-    & \leadsto A \cap B \subseteq C \land A \cap D \subseteq C \\
-A \cup B \subseteq C
-    & \leadsto A \subseteq C \land B \subseteq C \\
-A \subseteq B \cup (C \cap D)
-    & \leadsto A \subseteq B \cup C \land A \subseteq B \cup D \\
-A \subseteq B \cap C
-    & \leadsto A \subseteq B \land A \subseteq C \\
-A \not\subseteq B \cup (C \backslash D)
-    &\leadsto A \not\subseteq B \cup C \lor A \cap D \not\subseteq B \\
-A \not\subseteq B \backslash C
-    &\leadsto A \not\subseteq B \lor A \cap C \not\subseteq \emptyset \\
-A \cup (B \backslash D) \not\subseteq C
-    &\leadsto A \cap B \not\subseteq C \cup D \\
-A \backslash B \not\subseteq C
-    &\leadsto A \not\subseteq B \cup C \\  % TODO: fix all neg. cases above (including this line)
+% subseteq (FIXME)
+%A \subseteq B \cup (C \backslash D)
+%    &\leadsto A \subseteq B \cup C \land A \cap D \subseteq B \\
+%A \subseteq B \backslash C
+%    &\leadsto A \subseteq B \land A \cap C \subseteq \emptyset \\
+%A \cap (B \backslash D) \subseteq C
+%    &\leadsto A \cap B \subseteq C \cup D \\
+%A \backslash B \subseteq C
+%    &\leadsto A \subseteq B \cup C \\
+%A \cap (B \cup D) \subseteq C
+%    & \leadsto A \cap B \subseteq C \land A \cap D \subseteq C \\
+%A \cup B \subseteq C
+%    & \leadsto A \subseteq C \land B \subseteq C \\
+%A \subseteq B \cup (C \cap D)
+%    & \leadsto A \subseteq B \cup C \land A \subseteq B \cup D \\
+%A \subseteq B \cap C
+%    & \leadsto A \subseteq B \land A \subseteq C \\
+%% not subseteq
+%A \not\subseteq B \cap (C \backslash D)
+%    &\leadsto A \cup D \not\subseteq B \cap C \lor A \cap D \not\subseteq B
+%    % exists x, x in A and x notin (B cap (C \ D)). so
+%    % x notin B cap C, or x in D (so not in C\D)
+%    \\
+%A \not\subseteq B \backslash C
+%    &\leadsto A \not\subseteq B \lor A \cap C \not\subseteq \emptyset \\
+%A \cup (B \backslash D) \not\subseteq C
+%    &\leadsto A \cap B \not\subseteq C \cup D \\
+%A \backslash B \not\subseteq C
+%    &\leadsto A \not\subseteq B \cup C \\
 A \cap B \not\subseteq C
     & \leadsto A \not\subseteq C \land B \not\subseteq C \\
 A \cup (B \cap D) \not\subseteq C
@@ -126,6 +163,7 @@ A \not\subseteq B \cup C
     & \leadsto A \not\subseteq B \land A \not\subseteq C \\
 A \not\subseteq B \cap (C \cup D)
     & \leadsto A \not\subseteq B \cap C \land A \not\subseteq B \cap D \\
+% empty set, singleton
 A \cap \emptyset
     & \leadsto \emptyset \\
 A \cup \emptyset
@@ -147,33 +185,62 @@ A \cup \emptyset
 
 %}}}
 
-
 \section{Inference Rules}
 %{{{
 We mix \emph{The Strive-based Subset Prover} and
-\emph{Rewrite Techniques for Transitive Relations}.
-We will use monotonicity properties $A \subseteq B \Rightarrow A \cap C
-\subseteq B \cap C$ and $A \subseteq B \Rightarrow A \cup C \subseteq B \cup C$
-a lot. The rules are exposed in Figure~\ref{fig:rules}. We will use capitalized
+\emph{Rewrite Techniques for Transitive Relations} papers for our
+inference rules.
+We will pervasively use monotonicity properties $A \subseteq B \Rightarrow A \cap C
+\subseteq B \cap C$ and $A \subseteq B \Rightarrow A \cup C \subseteq B \cup C$.
+The rules are exposed in Figure~\ref{fig:rules}. We will use capitalized
 letter such as $A_\cap$ to denote $\bigcap_i a_i$, and $A_\cup$ to denote
 $\bigcup_i a_i$.
 
+All the inference operate on ground clauses, but can easily be lifted to
+first-order terms by first unifying terms. Since $\cap$ and $\cup$ are
+idempotent, several terms on one side of a literal can be unified at once
+without trouble (unlike, for instance, unification of terms in arithmetic
+sums or surrounded with AC operators). For instance positive chaining
+for first-order clauses is (assuming the sets $I$ and $J$ are non empty,
+none of the $t_i, t'_j$ are variables
+and the two clauses do not share variables):
+
+\begin{prooftree}
+    \AxiomC{$ K \lor A_\cap \bigcap_{i\in I} t_i \subseteq B_\cup $}
+    \AxiomC{$ K' \lor A'_\cap \subseteq B_\cup \cup \bigcup_{j\in J} t'_j $}
+    \RightLabel{$\forall i,j,~ t_i\sigma = t'_j\sigma$}
+    \BinaryInfC{$ (K \lor K' \lor A_\cap \cap A'_\cap
+        \subseteq B_\cup \cup B'_\cup)\sigma $}
+\end{prooftree}
+
 Let us develop the chaining inferences. Say we have $A_\cap \subseteq t\cup B_\cup$
-and $t \cap B'_\cap \subseteq C'_\cup$, then we can deduce intermediate literals
-$A_\cap \cap B'_\cap \subseteq (t \cup B_\cup) \cap B'_\cup$ and
-$(t\cap B'_\cap)\cup B_\cup \subseteq C'_\cup \cup B_\cup$. Then, we use the fact that
-$(t \cup B_\cup) \cap B'_\cap = (t\cap B'_\cap) \cup (B_\cup\cap B'_\cap)$, and that
-$B_\cup \cap B'_\cap \subseteq B_\cup$, so
-$(t\cap B'_\cap) \cup (B_\cup\cap B'_\cap) \subseteq (t \cap B'_\cap)\cup B_\cup$.
+and $t \cap A'_\cap \subseteq B'_\cup$, then we can deduce intermediate literals
+$A_\cap \cap A'_\cap \subseteq (t \cup B_\cup) \cap A'_\cap$ and
+$(t\cap A'_\cap)\cup B_\cup \subseteq B'_\cup \cup B_\cup$. Then, we use the fact that
+$(t \cup B_\cup) \cap A'_\cap = (t\cap A'_\cap) \cup (B_\cup\cap A'_\cap)$, and that
+$B_\cup \cap A'_\cap \subseteq B_\cup$, so
+$(t\cap A'_\cap) \cup (B_\cup\cap A'_\cap) \subseteq (t \cap A'_\cap)\cup B_\cup$.
 Therefore by transitivity of $\subseteq$, we obtain
-$A_\cap\cap B'_\cap \subseteq C'_\cup \cup B_\cup$.
+$A_\cap\cap A'_\cap \subseteq B_\cup \cup B'_\cup$.
+
+% a & t => b
+% a' & t not=> b'
+%     ---> exists x, x in a' & x in t & x notin b'
+%     ---> if b => b', then x in a & a' & t => x in b => x in b'  ---> absurd
+%     ---> therefore   b not=> b' | (x in (a' & t) \ a)
+%     ---> therefore,  b not=> b' | (a' & t) not=> a
 
 Conversely, the negative chaining rules use the contrapositive of transitivity,
 that is, $A \subseteq B \land A \not\subseteq C \Rightarrow B \not\subseteq C$
-(otherwise we would have $A \subseteq B \subseteq C$ and therefore $A \subseteq C$).
+(otherwise we would have $A \subseteq B \subseteq C$ and therefore $A \subseteq
+C$)\footnote{more precisely we use
+$A\subseteq B \land A\subseteq A' \land A' \not\subseteq C \Rightarrow $
+}.
 Therefore, from $A_\cap \cap t \subseteq B_\cup$ and
 $A'_\cup \cup t \not\subseteq B'_\cap$ we
-deduce $(A_\cap\cap t)\cup A'_\cup \subseteq B_\cup\cup A'_\cup$
+deduce $(A_\cap\cap t)\cup A'_\cup \subseteq B_\cup\cup A'_\cup$ by monotonicity.
+
+
 and $(A'_\cup\cup t) \cap A_\cap \not\subseteq B'_\cap\cap A_\cap$ by monotonicity.
 Since $(A'_\cup \cup t)\cap A_\cap
     = (A'_\cup \cap A_\cap)\cup (A_\cap\cap t)
@@ -191,7 +258,7 @@ in both cases and we can merge together the two literals provided $B\subseteq C$
 
 Say we have
 $t \cap A_\cap \subseteq B_\cup \lor t \cap A'_\cap \subseteq B'_\cup$; if
-TODO %TODO
+TODO %TODO factoring
 
 \begin{figure}[htp]
 %{{{
@@ -199,9 +266,9 @@ TODO %TODO
 
 \begin{prooftree}
     \AxiomC{$ K\lor (A_\cap \subseteq t \cup B_\cup) $}
-    \AxiomC{$ K'\lor (t \cap B'_\cap \subseteq C'_\cup) $}
+    \AxiomC{$ K'\lor (t \cap A'_\cap \subseteq B'_\cup) $}
     \RightLabel{positive chaining}
-    \BinaryInfC{$ K \lor K' \lor (A_\cap \cap B'_\cap \subseteq B_\cup \cup C'_\cup) $}
+    \BinaryInfC{$ K \lor K' \lor (A_\cap \cap A'_\cap \subseteq B_\cup \cup B'_\cup) $}
 \end{prooftree}
 
 \begin{prooftree}
@@ -223,7 +290,7 @@ TODO %TODO
         \lor (t \cap A_\cap \subseteq B_\cup)
         \lor (t \cap A'_\cap \subseteq B'_\cup) $}
     \RightLabel{factoring left}
-    \UnaryInfC{$ K \lor B_\cup \not\subseteq A'_\cap \lor $} % TODO
+    \UnaryInfC{$ K \lor B_\cup \not\subseteq A'_\cap \lor TODO$} % TODO
 \end{prooftree}
 
 \mbox{
