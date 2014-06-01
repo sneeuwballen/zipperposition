@@ -9,7 +9,7 @@
 \usepackage{amsthm}
 \usepackage{paralist}
 \usepackage[colorlinks=false,pdfborder={0 0 0},
-pdftitle={superposition modulo modular arithmetic},pdfauthor={Simon Cruanes}]{hyperref}
+pdftitle={superposition and chaining with sets},pdfauthor={Simon Cruanes}]{hyperref}
 
 \newcommand{\set}[1]{\ensuremath{\text{set}({#1})}}
 \newcommand{\total}[1]{\ensuremath{\text{total}({#1})}}
@@ -280,8 +280,14 @@ terms are the same. The basic idea is that if $A \subseteq B
 $A \subseteq B \Rightarrow A \subseteq C$. Therefore $A\subseteq C$ is true
 in both cases and we can merge together the two literals provided $B\subseteq C$.
 Say we have
-$t \cap A_\cap \subseteq B_\cup \lor t \cap A'_\cap \subseteq B'_\cup$; if
-TODO %TODO factoring
+$t \cap A_\cap \subseteq B_\cup \lor t \cap A'_\cap \subseteq B'_\cup$; we
+can transform this into
+$t \subseteq \compl{A_\cap} \cup B_\cup \lor t \subseteq \compl{A'_\cap} \cup B'_\cup$.
+Then if $\compl{A_\cap} \cup B_\cup \subseteq \compl{A'_\cap} \cup B'_\cup$
+the second literal is necessarily true, hence the conclusion:
+$\normalize{(\compl{A_\cap} \cap A'_\cap \not\subseteq \compl{B_\cup} \cup B'_\cup) 
+    \lor (t \cap A'_\cap \subseteq B'_\cup)}$ (eliminating complements
+on the fly).
 
 \begin{figure}[htp]
 %{{{
@@ -317,7 +323,9 @@ TODO %TODO factoring
         \lor (t \cap A_\cap \subseteq B_\cup)
         \lor (t \cap A'_\cap \subseteq B'_\cup) $}
     \RightLabel{factoring left}
-    \UnaryInfC{$ K \lor B_\cup \not\subseteq A'_\cap \lor TODO$} % TODO
+    \UnaryInfC{$ \normalize{K \lor
+        (\compl{A_\cap} \cap A'_\cap \not\subseteq \compl{B_\cup} \cup B'_\cup) 
+        \lor (t \cap A'_\cap \subseteq B'_\cup)}$}
 \end{prooftree}
 
 \mbox{
