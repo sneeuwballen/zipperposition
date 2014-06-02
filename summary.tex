@@ -238,8 +238,8 @@ none of the $t_i, t'_j$ are variables
 and the two clauses do not share variables):
 
 \begin{prooftree}
-    \AxiomC{$ K \lor A_\cap \bigcap_{i\in I} t_i \subseteq B_\cup $}
-    \AxiomC{$ K' \lor A'_\cap \subseteq B_\cup \cup \bigcup_{j\in J} t'_j $}
+    \AxiomC{$ K \lor A_\cap \cap \bigcap_{i\in I} t_i \subseteq B_\cup $}
+    \AxiomC{$ K' \lor A'_\cap \subseteq B'_\cup \cup \bigcup_{j\in J} t'_j $}
     \RightLabel{$\forall i,j,~ t_i\sigma = t'_j\sigma$}
     \BinaryInfC{$ (K \lor K' \lor A_\cap \cap A'_\cap
         \subseteq B_\cup \cup B'_\cup)\sigma $}
@@ -254,7 +254,7 @@ and $t \cap A'_\cap \subseteq B'_\cup$. Then this is equivalent
 to $A_\cap \cap \compl{B_\cup} \subseteq t$ and
 $t \subseteq \compl{A'_\cap}\cup B'_\cup$; by transitivity of
 $\subseteq$ we get
-$A_\cap \compl{B_\cup} \subseteq B'_\cup \cup \compl{A'_\cap}$, and by moving
+$A_\cap \cap \compl{B_\cup} \subseteq B'_\cup \cup \compl{A'_\cap}$, and by moving
 the complements around again we obtain the result.
 
 Conversely, the negative chaining rules use the contrapositive of transitivity,
