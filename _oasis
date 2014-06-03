@@ -1,6 +1,6 @@
 OASISFormat: 0.3
 Name:        zipperposition
-Version:     0.3
+Version:     0.4-arith-dev
 Homepage:    https://github.com/c-cube/zipperposition
 Authors:     Simon Cruanes
 License:     BSD3
