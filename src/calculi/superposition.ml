@@ -315,7 +315,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let lits_a = Util.array_except_idx (C.lits info.active) active_idx in
       let lits_p = Util.array_except_idx (C.lits info.passive) passive_idx in
       (* replace s\sigma by t\sigma in u|_p\sigma *)
-      let t' = S.FO.apply ~renaming subst info.t sc_a in
       let new_passive_lit = Lit.Pos.replace passive_lit'
         ~at:passive_lit_pos ~by:t' in
       (* apply substitution to other literals *)
@@ -1288,14 +1287,21 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let lit = lits.(i) in
         for j = i+1 to n - 1 do
           let lit' = lits.(j) in
-          (* try to match lit with lit' (and vice versa), then check if subst(c) subsumes c *)
-          let substs = Sequence.append
-            (Lit.subsumes ~subst:S.empty lit 0 lit' 0)
-            (Lit.subsumes ~subst:S.empty lit' 0 lit 0) in
+          (* see whether lit=>lit', and if removing __lit__ gives a clause
+            that subsumes c. Also do the symmetric operation *)
+          let subst_remove_lit =
+            Lit.subsumes ~subst:S.empty lit 0 lit' 0
+            |> Sequence.map (fun s -> s, i)
+          and subst_remove_lit' =
+            Lit.subsumes ~subst:S.empty lit' 0 lit 0
+            |> Sequence.map (fun s -> s, j)
+          in
+          let substs = Sequence.append subst_remove_lit subst_remove_lit' in
           Sequence.iter
-            (fun subst ->
+            (fun (subst,idx_to_remove) ->
               let new_lits = Array.sub lits 0 (n - 1) in
-              (if i <> n-1 then new_lits.(i) <- lits.(n-1));  (* remove i-th lit *)
+              if idx_to_remove <> n-1
+                then new_lits.(idx_to_remove) <- lits.(n-1);  (* remove lit *)
               let renaming = Ctx.renaming_clear () in
               let new_lits = Lits.apply_subst ~renaming subst new_lits 0 in
               (* check subsumption *)
