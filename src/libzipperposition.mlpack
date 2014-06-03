@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 123c9f3f5f7097f1d5e7ce2903b745c8)
+# DO NOT EDIT (digest: ea51d5ea6aec4ee3755a9c602b383851)
 ClauseQueue
 Clause
 Const
@@ -21,6 +21,7 @@ Env
 Monome
 ArithLit
 Signals
+Multisets
 calculi/Superposition
 calculi/Chaining
 calculi/ArithInt
