@@ -222,6 +222,7 @@ end) = struct
 
   (** Print some content of the state, based on environment variables *)
   let print_dots result =
+    Signal.send Signals.on_dot_output ();
     (* see if we need to print proof state *)
     begin match params.param_dot_file, result with
     | Some dot_f, Saturate.Unsat proof ->

@@ -160,6 +160,8 @@ let prof_infer_equality_factoring = Util.mk_profiler "infer_equality_factoring"
 let prof_split = Util.mk_profiler "infer_split"
 
 let _enable_semantic_tauto = ref false
+let _dot_sup_into = ref None
+let _dot_sup_from = ref None
 
 module Make(Env : Env.S) : S with module Env = Env = struct
   module Env = Env
@@ -1327,6 +1329,27 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   (** {2 Registration} *)
 
+  (* print index into file *)
+  let _print_idx file idx =
+    Util.with_output file
+      (fun oc ->
+        let pp_leaf buf v = () in
+        Util.fprintf oc "%a" (TermIndex.to_dot pp_leaf) idx;
+        flush oc)
+
+  let setup_dot_printers () =
+    CCOpt.iter
+      (fun f ->
+          Signal.once Signals.on_dot_output
+            (fun () -> _print_idx f !_idx_sup_into)
+      ) !_dot_sup_into;
+    CCOpt.iter
+      (fun f ->
+          Signal.once Signals.on_dot_output
+            (fun () -> _print_idx f !_idx_sup_from)
+      ) !_dot_sup_from;
+    ()
+
   let register () =
     let rw_simplify c =
       let c = basic_simplify (demodulate c) in
@@ -1359,6 +1382,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       then Env.add_is_trivial is_semantic_tautology;
     Env.add_is_trivial is_trivial;
     Env.add_lit_rule "distinct_symbol" handle_distinct_constants;
+    setup_dot_printers ();
     ()
 end
 
@@ -1399,7 +1423,13 @@ let extension =
 let () =
   Params.add_opts
     [ "-semantic-tauto"
-    , Arg.Set _enable_semantic_tauto
-    , "enable semantic tautology check"
-    ];
-  ()
+      , Arg.Set _enable_semantic_tauto
+      , "enable semantic tautology check"
+    ; "-dot-sup-into"
+      , Arg.String (fun s -> _dot_sup_into := Some s)
+      , "print superposition-into index into file"
+    ; "-dot-sup-from"
+      , Arg.String (fun s -> _dot_sup_from := Some s)
+      , "print superposition-from index into file"
+    ]
+
