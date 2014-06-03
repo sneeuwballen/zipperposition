@@ -576,8 +576,7 @@ let rec debug fmt t =
   | TyApp (f, ty) ->
     Format.fprintf fmt "(%a %a)" debug f Type.fmt ty
   | App (s, l) ->
-    Format.fprintf fmt "(%a %a)" debug s
-      (Sequence.pp_seq debug) (Sequence.of_list l)
+    Format.fprintf fmt "(%a %a)" debug s (CCList.print debug) l
   end;
   Format.fprintf fmt ":%a" Type.fmt (ty t)
 

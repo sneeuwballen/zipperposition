@@ -536,16 +536,14 @@ let rec debug fmt t = match view t with
   | At (l, r) ->
     Format.fprintf fmt "(%a %a)" debug l debug r
   | Multiset (_, l) ->
-    Format.fprintf fmt "{| %a |}"
-      (Sequence.pp_seq debug) (Sequence.of_list l)
+    Format.fprintf fmt "{| %a |}" (CCList.print debug) l
   | Record (l, None) ->
     Format.fprintf fmt "{ %a }"
-      (Sequence.pp_seq (fun fmt (n,t) -> Format.fprintf fmt "%s: %a" n debug t))
-      (Sequence.of_list l)
+      (CCList.print (fun fmt (n,t) -> Format.fprintf fmt "%s: %a" n debug t)) l
   | Record (l, Some r) ->
     Format.fprintf fmt "{ %a | %a }"
-      (Sequence.pp_seq (fun fmt (n,t) -> Format.fprintf fmt "%s: %a" n debug t))
-      (Sequence.of_list l) debug r
+      (CCList.print (fun fmt (n,t) -> Format.fprintf fmt "%s: %a" n debug t))
+      l debug r
 
 (*
 let bij =

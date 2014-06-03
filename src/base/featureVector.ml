@@ -122,7 +122,9 @@ module Make(C : Index.CLAUSE) = struct
             | T.Classic.App (s, _, _) when Symbol.eq s symb -> Some depth
             | _ -> None)
       in
-      Sequence.max symbs_depths 0
+      match Sequence.max symbs_depths with
+      | None -> 0
+      | Some m -> m
 
     let _max_depth_lits ~sign symb lits =
       Sequence.fold
