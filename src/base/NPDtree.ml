@@ -210,13 +210,39 @@ module Make(E : Index.EQUATION) = struct
     iter dt (fun _ _ -> incr n);
     !n
 
+  let _as_graph =
+    LazyGraph.make ~eq:(==)
+      (fun t ->
+        let s1 =
+          (match t.star with
+            | None -> Sequence.empty
+            | Some t' -> Sequence.singleton ("*", t')
+          )
+        and s2 = SMap.to_seq t.map
+          |> Sequence.map (fun (sym, t') -> Symbol.to_string sym, t')
+        in
+        LazyGraph.Node(t, t, Sequence.append s1 s2)
+      )
+
+  let _as_dot_graph =
+    LazyGraph.map
+      ~vertices:(fun t ->
+        let len = Leaf.size t.leaf in
+        [`Shape "circle"; `Label (string_of_int len)]
+      )
+      ~edges:(fun e -> [`Label e])
+      _as_graph
+
   let to_dot buf t =
-    failwith "NPDTree.to_dot: not implemented"
+    let fmt = Format.formatter_of_buffer buf in
+    LazyGraph.Dot.pp ~name:"NPDtree" _as_dot_graph fmt (Sequence.singleton t);
+    Format.pp_print_flush fmt ();
+    ()
 end
 
 (** {2 General purpose index} *)
 
-module SIMap = Map.Make(struct
+module SIMap = Sequence.Map.Make(struct
   type t = Symbol.t * int
   let compare (s1,i1) (s2,i2) =
     if i1 = i2 then Symbol.cmp s1 s2 else i1-i2
@@ -438,6 +464,35 @@ module MakeTerm(X : Set.OrderedType) = struct
 
   let name = "npdtree"
 
-  let to_dot buf t =
-    failwith "NPDTree.to_dot: not implemented"
+  let _as_graph =
+    LazyGraph.make ~eq:(==)
+      (fun t ->
+        let s1 =
+          (match t.star with
+            | None -> Sequence.empty
+            | Some t' -> Sequence.singleton ("*", t')
+          )
+        and s2 = SIMap.to_seq t.map
+          |> Sequence.map
+              (fun ((sym,i), t') ->
+               Util.sprintf "%a/%d" Symbol.pp sym i, t')
+        in
+        LazyGraph.Node(t, t, Sequence.append s1 s2)
+      )
+
+  (* TODO: print leaf itself *)
+  let _as_dot_graph pp_elem =
+    LazyGraph.map
+      ~vertices:(fun t ->
+        let len = Leaf.size t.leaf in
+        [`Shape "circle"; `Label (string_of_int len)]
+      )
+      ~edges:(fun e -> [`Label e])
+      _as_graph
+
+  let to_dot pp_elem buf t =
+    let fmt = Format.formatter_of_buffer buf in
+    LazyGraph.Dot.pp ~name (_as_dot_graph pp_elem) fmt (Sequence.singleton t);
+    Format.pp_print_flush fmt ();
+    ()
 end
