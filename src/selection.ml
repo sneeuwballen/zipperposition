@@ -38,24 +38,39 @@ type t = Literal.t array -> BV.t
 
 let no_select _ = BV.empty ()
 
+(* does the clause belong to pure superposition, without other theories? *)
+let _pure_superposition lits =
+  Util.array_forall
+    (function
+      | Lit.Prop _
+      | Lit.Equation _
+      | Lit.True
+      | Lit.False -> true
+      | _ -> false)
+    lits
+
 (** Select all positives literals *)
 let select_positives lits =
-  let bv = Lits.pos lits in
-  bv
+  if _pure_superposition lits
+    then Lits.pos lits
+    else BV.empty ()
 
 let select_max_goal ~strict ~ord lits =
-  let bv = Lits.maxlits ~ord lits in
-  BV.filter bv (fun i -> Lit.is_neg lits.(i));
-  try
-    (* keep only first satisfying lit *)
-    let i = BV.first bv in
-    BV.clear bv;
-    BV.set bv i;
-    if not strict
-      then BV.union_into ~into:bv (select_positives lits);
-    bv
-  with Not_found ->
-    BV.empty ()  (* empty one *)
+  if _pure_superposition lits
+  then
+    let bv = Lits.maxlits ~ord lits in
+    BV.filter bv (fun i -> Lit.is_neg lits.(i));
+    try
+      (* keep only first satisfying lit *)
+      let i = BV.first bv in
+      BV.clear bv;
+      BV.set bv i;
+      if not strict
+        then BV.union_into ~into:bv (select_positives lits);
+      bv
+    with Not_found ->
+      BV.empty ()  (* empty one *)
+  else BV.empty ()
 
 let select_diff_neg_lit ~strict ~ord lits =
   (* find a negative literal with maximal difference between
@@ -78,13 +93,15 @@ let select_diff_neg_lit ~strict ~ord lits =
       find_lit best_diff best_idx lits (i+1)
   in
   (* search such a lit among the clause's lits *)
-  match find_lit (-1) (-1) lits 0 with
-  | -1 -> BV.empty ()
-  | n when strict -> BV.of_list [n]
-  | n ->
-    let bv = select_positives lits in
-    BV.set bv n;
-    bv
+  if _pure_superposition lits
+  then match find_lit (-1) (-1) lits 0 with
+    | -1 -> BV.empty ()
+    | n when strict -> BV.of_list [n]
+    | n ->
+      let bv = select_positives lits in
+      BV.set bv n;
+      bv
+  else BV.empty ()
 
 let select_complex ~strict ~ord lits =
   (* find the ground negative literal with highest diff in size *)
@@ -105,19 +122,22 @@ let select_complex ~strict ~ord lits =
       find_neg_ground best_diff best_i lits (i+1)
   in
   (* try to find ground negative lit with bigger weight difference, else delegate *)
-  let i = find_neg_ground (-1) (-1) lits 0 in
-  if i >= 0
-    then if strict
-      then BV.of_list [i]
+  if _pure_superposition lits
+  then
+    let i = find_neg_ground (-1) (-1) lits 0 in
+    if i >= 0
+      then if strict
+        then BV.of_list [i]
+        else
+          let bv = select_positives lits in
+          let _ = BV.set bv i in
+          bv
       else
-        let bv = select_positives lits in
-        let _ = BV.set bv i in
-        bv
-    else
-      select_diff_neg_lit ~strict ~ord lits (* delegate to select_diff_neg_lit *)
+        select_diff_neg_lit ~strict ~ord lits (* delegate to select_diff_neg_lit *)
+  else BV.empty ()
 
 let select_complex_except_RR_horn ~strict ~ord lits =
-  if Lits.is_RR_horn_clause lits
+  if not (_pure_superposition lits) || Lits.is_RR_horn_clause lits
     then BV.empty ()  (* do not select (conditional rewrite rule) *)
     else select_complex ~strict ~ord lits  (* like select_complex *)
 
