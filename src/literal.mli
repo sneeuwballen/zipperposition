@@ -49,7 +49,8 @@ val compare : t -> t -> int     (** lexicographic comparison of literals *)
 val hash : t -> int
 
 val hash : t -> int               (** hashing of literal *)
-val weight : t -> int             (** weight of the lit *)
+val weight : t -> int             (** weight of the lit (sum of weights of terms) *)
+val heuristic_weight : t -> int   (** heuristic difficulty to eliminate lit *)
 val depth : t -> int              (** depth of literal *)
 val sign : t -> bool
 

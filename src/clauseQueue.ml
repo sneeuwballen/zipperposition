@@ -192,24 +192,33 @@ module Make(C : Clause.S) = struct
 
   let name q = q.functions.name
 
+  (* weight function, that estimates how "difficult" it is to get rid of
+      the literals of the clause. In other words, by selecting the clause,
+      how far we are from the empty clause. *)
+  let _default_weight c =
+    let w = Array.fold_left
+      (fun acc lit -> acc + Lit.heuristic_weight lit)
+      0 (C.lits c)
+    in w * Array.length (C.lits c)
+
   let fifo =
     let name = "fifo_queue" in
     mk_queue ~weight:(fun c -> C.id c) name
 
   let clause_weight =
     let name = "clause_weight" in
-    mk_queue ~weight:(fun c -> C.weight c * C.length c) name
+    mk_queue ~weight:_default_weight name
 
   let goals =
     (* check whether a literal is a goal *)
     let is_goal_lit lit = Lit.is_neg lit in
     let is_goal_clause c = Util.array_forall is_goal_lit (C.lits c) in
     let name = "prefer_goals" in
-    mk_queue ~accept:is_goal_clause ~weight:(fun c -> C.weight c * C.length c) name
+    mk_queue ~accept:is_goal_clause ~weight:_default_weight name
 
   let ground =
     let name = "prefer_ground" in
-    mk_queue ~accept:C.is_ground ~weight:(fun c -> C.weight c * C.length c) name
+    mk_queue ~accept:C.is_ground ~weight:_default_weight name
 
   let non_goals =
     (* check whether a literal is a goal *)
@@ -218,7 +227,7 @@ module Make(C : Clause.S) = struct
       (fun x -> not (is_goal_lit x))
       (C.lits c) in
     let name = "prefer_non_goals" in
-    mk_queue ~accept:is_non_goal_clause ~weight:(fun c -> C.weight c * C.length c) name
+    mk_queue ~accept:is_non_goal_clause ~weight:_default_weight name
 
   let pos_unit_clauses =
     let is_unit_pos c = match C.lits c with
@@ -226,18 +235,18 @@ module Make(C : Clause.S) = struct
     | _ -> false
     in
     let name = "prefer_pos_unit_clauses" in
-    mk_queue ~accept:is_unit_pos ~weight:(fun c -> C.weight c * C.length c) name
+    mk_queue ~accept:is_unit_pos ~weight:_default_weight name
 
   let horn =
     let accept c = Lits.is_horn (C.lits c) in
     let name = "prefer_horn" in
-    mk_queue ~accept ~weight:(fun c -> C.weight c * C.length c) name
+    mk_queue ~accept ~weight:_default_weight name
 
   let lemmas =
     let name = "lemmas" in
     let accept c = C.get_flag C.flag_lemma c in
     (* use a fifo on lemmas *)
-    mk_queue ~accept ~weight:C.weight name
+    mk_queue ~accept ~weight:_default_weight name
 
   (** {6 Combination of queues} *)
 

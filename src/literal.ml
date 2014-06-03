@@ -126,6 +126,18 @@ let hash lit =
 let weight lit =
   fold (fun acc t -> acc + T.size t) 0 lit
 
+let heuristic_weight = function
+  | Prop (p, _) -> T.size p
+  | Equation (l, r, _) -> T.size l + T.size r
+  | True
+  | False -> 0
+  | Ineq olit -> T.size olit.TO.left + T.size olit.TO.right
+  | Arith alit ->
+      (* sum of weights of terms, without the (naked) variables *)
+      AL.Seq.terms alit
+        |> Sequence.filter (fun t -> not (T.is_var t))
+        |> Sequence.fold (fun acc t -> acc+T.size t) 0
+
 let depth lit =
   fold (fun acc t -> max acc (T.depth t)) 0 lit
 
