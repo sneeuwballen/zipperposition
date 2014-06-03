@@ -108,7 +108,7 @@ let normalize_collect trs t =
       S.iter
         (fun (l,r) ->
           let substs = Unif.HO.matching ~pattern:l 1 t 0 in
-          match substs with
+          match substs () with
           | `Nil -> ()   (* failure, try next rule *)
           | `Cons (subst, _) ->
               (* l\subst = t, rewrite into r\subst *)

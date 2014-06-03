@@ -34,6 +34,8 @@ exception Fail
 type scope = Substs.scope
 type subst = Substs.t
 
+let prof_unify = Util.mk_profiler "unify"
+
 (** {2 Result of multiple Unification} *)
 
 type res = subst KList.t
@@ -42,7 +44,7 @@ module Res = struct
   (* takes a function that requires a success cont. and a failure cont.
       and returns the lazy result *)
   let of_fun f =
-    f ~k:(fun subst fk -> KList.cons subst fk) ~fk:(fun () -> KList.nil)
+    f ~k:(fun subst fk -> KList.cons subst (fk ())) ~fk:(fun () -> KList.nil)
 end
 
 (** {2 Signatures} *)
@@ -478,17 +480,17 @@ module Nary = struct
     Res.of_fun (unif subst a sc_a b sc_b)
 
   let are_variant t1 t2 =
-    match variant t1 0 t2 1 with
+    match variant t1 0 t2 1 () with
     | `Nil -> false
     | `Cons _ -> true
 
   let matches ~pattern t =
-    match matching ~pattern 0 t 1 with
+    match matching ~pattern 0 t 1 () with
     | `Nil -> false
     | `Cons _ -> true
 
   let are_unifiable t1 t2 =
-    match unification t1 0 t2 1 with
+    match unification t1 0 t2 1 () with
     | `Nil -> false
     | `Cons _ -> true
 end
@@ -566,6 +568,7 @@ module Unary = struct
         subst
 
   let unification ?(subst=Substs.empty) a sc_a b sc_b =
+    Util.enter_prof prof_unify;
     (* recursive unification *)
     let rec unif subst s sc_s t sc_t =
       let s, sc_s = Substs.get_var subst s sc_s
@@ -611,8 +614,13 @@ module Unary = struct
       | _, _ -> raise Fail
     in
     (* try unification, and return solution/exception (with profiler handling) *)
-    let subst = unif subst a sc_a b sc_b in
-    subst
+    try
+      let subst = unif subst a sc_a b sc_b in
+      Util.exit_prof prof_unify;
+      subst
+    with e ->
+      Util.exit_prof prof_unify;
+      raise e
 
   let matching ?(allow_open=false) ?(subst=Substs.empty) ~pattern sc_a b sc_b =
     (* recursive matching *)
@@ -988,7 +996,7 @@ module Form = struct
     Res.of_fun (unif subst f1 f2)
 
   let are_variant f1 f2 =
-    match variant f1 0 f2 1 with
+    match variant f1 0 f2 1 () with
     | `Nil -> false
     | `Cons _ -> true
 end

@@ -106,7 +106,7 @@ let skolem_form ~ctx ~ty f =
     List.iter
       (fun (f', new_f') ->
         Util.debug 5 "check variant %a and %a" F.pp f F.pp f';
-        match Unif.Form.variant f' 1 f 0 with
+        match Unif.Form.variant f' 1 f 0 () with
         | `Nil -> ()
         | `Cons (subst, _) ->
           raise (FoundFormVariant (f', new_f', subst)))
