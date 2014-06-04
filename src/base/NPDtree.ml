@@ -165,7 +165,10 @@ module Make(E : Index.EQUATION) = struct
     let rec traverse trie acc iter =
       match iter with
       | None ->
-        Leaf.fold_match ~subst trie.leaf sc_dt t sc_t acc k'
+          Util.exit_prof prof_npdtree_retrieve;
+          let acc = Leaf.fold_match ~subst trie.leaf sc_dt t sc_t acc k' in
+          Util.enter_prof prof_npdtree_retrieve;
+          acc
       | Some i ->
         match T.Classic.view i.cur_term with
           | (T.Classic.Var _ | T.Classic.BVar _) ->
@@ -343,7 +346,10 @@ module MakeTerm(X : Set.OrderedType) = struct
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie acc iter = match iter with
       | None ->
-        Leaf.fold_unify ~subst trie.leaf sc_dt t sc_t acc k
+        Util.exit_prof prof_npdtree_term_unify;
+        let acc = Leaf.fold_unify ~subst trie.leaf sc_dt t sc_t acc k in
+        Util.enter_prof prof_npdtree_term_unify;
+        acc
       | Some i ->
         match T.Classic.view i.cur_term with
           | (T.Classic.Var _ | T.Classic.BVar _) ->
