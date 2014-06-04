@@ -160,6 +160,12 @@ module type S = sig
       val add_tstp : unit -> Theories.TotalOrder.t * [`New | `Old]
         (** Specific version of {!add_order} for $less and $lesseq *)
     end
+
+    module Sets : sig
+      val on_add : Theories.Sets.t Signal.t
+
+      val add : Theories.Sets.t -> unit
+    end
   end
 end
 
@@ -382,6 +388,12 @@ end) : S = struct
       let exists_order () =
         assert (STbl.length lesseq_tbl = STbl.length less_tbl);
         STbl.length less_tbl > 0
+    end
+
+    module Sets = struct
+      let on_add = Signal.create ()
+
+      let add s = Signal.send on_add s
     end
   end
 end

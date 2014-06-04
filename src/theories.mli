@@ -81,3 +81,38 @@ module TotalOrder : sig
   val to_string : t -> string
   val fmt : Format.formatter -> t -> unit
 end
+
+(** {2 Set Theory} *)
+
+module Sets : sig
+  type t = {
+    member : Symbol.t;
+    subset : Symbol.t;
+    subseteq : Symbol.t;
+    union : Symbol.t;
+    inter : Symbol.t;
+    emptyset : Symbol.t;
+    singleton : Symbol.t;
+    complement : Symbol.t;
+    set_type : Symbol.t;
+  }
+
+  val signature : t -> Signature.t
+  (** Obtain a signature from a specification (types are fixed) *)
+
+  val default : t
+  (** Default naming for TPTP axioms SET002.ax *)
+
+  (** {4 constructors} *)
+  val mk_member : sets:t -> term -> term -> term
+  val mk_subset: sets:t -> term -> term -> term
+  val mk_subseteq: sets:t -> term -> term -> term
+  val mk_union: sets:t -> term -> term -> term
+  val mk_inter: sets:t -> term -> term -> term
+  val mk_empty: sets:t -> Type.t -> term
+  val mk_singleton : sets:t -> term -> term
+  val mk_complement : sets:t -> term -> term
+  val mk_set_type : sets:t -> Type.t -> Type.t
+
+  val pp : Buffer.t -> t -> unit
+end

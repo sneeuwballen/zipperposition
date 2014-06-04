@@ -156,6 +156,12 @@ module type S = sig
       val add_tstp : unit -> Theories.TotalOrder.t * [`New | `Old]
         (** Specific version of {!add_order} for $less and $lesseq *)
     end
+
+    module Sets : sig
+      val on_add : Theories.Sets.t Signal.t
+
+      val add : Theories.Sets.t -> unit
+    end
   end
 end
 

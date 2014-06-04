@@ -97,3 +97,113 @@ module TotalOrder = struct
 
   let fmt fmt i = Format.pp_print_string fmt (to_string i)
 end
+
+(** {2 Set Theory} *)
+
+module Sets = struct
+  type t = {
+    member : Symbol.t;
+    subset : Symbol.t;
+    subseteq : Symbol.t;
+    union : Symbol.t;
+    inter : Symbol.t;
+    emptyset : Symbol.t;
+    singleton : Symbol.t;
+    complement : Symbol.t;
+    set_type : Symbol.t;
+  }
+
+  let _ty_member ~sets =
+    let x = Type.var 0 in
+    let _set a = Type.app sets.set_type [a] in
+    Type.(forall [x] (TPTP.o <== [x; _set x]))
+
+  let _ty_subset ~sets =
+    let x = Type.var 0 in
+    let _set a = Type.app sets.set_type [a] in
+    Type.(forall [x] (TPTP.o <== [_set x; _set x]))
+
+  let _ty_union ~sets =
+    let x = Type.var 0 in
+    let _set a = Type.app sets.set_type [a] in
+    Type.(forall [x] (_set x <== [_set x; _set x]))
+
+  let _ty_empty ~sets =
+    let x = Type.var 0 in
+    let _set a = Type.app sets.set_type [a] in
+    Type.(forall [x] (_set x))
+
+  let _ty_singleton ~sets =
+    let x = Type.var 0 in
+    let _set a = Type.app sets.set_type [a] in
+    Type.(forall [x] (_set x <== [x]))
+
+  let _ty_complement ~sets =
+    let x = Type.var 0 in
+    let _set a = Type.app sets.set_type [a] in
+    Type.(forall [x] (_set x <== [_set x]))
+
+  let signature sets =
+    Signature.of_list
+      [ sets.member, _ty_member ~sets
+      ; sets.subset, _ty_subset ~sets
+      ; sets.subseteq, _ty_subset ~sets
+      ; sets.union, _ty_union ~sets
+      ; sets.inter, _ty_union ~sets
+      ; sets.emptyset, _ty_empty ~sets
+      ; sets.singleton, _ty_singleton ~sets
+      ; sets.complement, _ty_complement ~sets
+      ]
+
+  let default = {
+    member = Symbol.of_string "member";
+    subset = Symbol.of_string "subset";
+    subseteq = Symbol.of_string "subseteq";
+    union = Symbol.of_string "union";
+    inter = Symbol.of_string "intersection";
+    emptyset = Symbol.of_string "emptyset";
+    singleton = Symbol.of_string "singleton";
+    complement = Symbol.of_string "complement";
+    set_type = Symbol.of_string "set";
+  }
+
+  let mk_member ~sets x set =
+    T.app_full (T.const ~ty:(_ty_member ~sets) sets.member) [T.ty x] [x;set]
+
+  (* if t:set(alpha) then return alpha, otherwise raise Invalid_argument *)
+  let _get_set_type ~sets t =
+    match Type.view (T.ty t) with
+      | Type.App (s, [alpha]) when Symbol.eq s sets.set_type -> alpha
+      | ty -> invalid_arg (Util.sprintf "%a does not a set type" T.pp t)
+
+  let mk_subset ~sets s1 s2 =
+    let alpha = _get_set_type ~sets s1 in
+    T.app_full (T.const ~ty:(_ty_subset ~sets) sets.subset) [alpha] [s1;s2]
+
+  let mk_subseteq ~sets s1 s2 =
+    let alpha = _get_set_type ~sets s1 in
+    T.app_full (T.const ~ty:(_ty_subset ~sets) sets.subseteq) [alpha] [s1;s2]
+
+  let mk_union ~sets s1 s2 =
+    let alpha = _get_set_type ~sets s1 in
+    T.app_full (T.const ~ty:(_ty_union ~sets) sets.union) [alpha] [s1;s2]
+
+  let mk_inter ~sets s1 s2 =
+    let alpha = _get_set_type ~sets s1 in
+    T.app_full (T.const ~ty:(_ty_union ~sets) sets.inter) [alpha] [s1;s2]
+
+  let mk_empty ~sets ty =
+    T.tyapp (T.const ~ty:(_ty_empty ~sets) sets.emptyset) ty
+
+  let mk_singleton ~sets t =
+    T.app_full (T.const ~ty:(_ty_singleton ~sets) sets.singleton) [T.ty t] [t]
+
+  let mk_complement~sets s =
+    let alpha = _get_set_type ~sets s in
+    T.app_full (T.const ~ty:(_ty_complement ~sets) sets.complement) [alpha] [s]
+
+  let mk_set_type ~sets ty =
+    Type.app sets.set_type [ty]
+
+  let pp buf sets = failwith "TODO" (* TODO *)
+end
