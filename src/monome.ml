@@ -1022,7 +1022,6 @@ module Int = struct
     let _is_one_abs (s, _) = Z.equal Z.one (Z.abs s)
 
     let eq_zero ?fresh_var m =
-      let open Sequence.Infix in
       (* generation of fresh variables, with default function *)
       let fresh_var = match fresh_var with
         | None -> __fresh_var m
