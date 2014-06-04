@@ -103,6 +103,20 @@ module Sets : sig
   val default : t
   (** Default naming for TPTP axioms SET002.ax *)
 
+  type view = private
+    | Member of term * term
+    | Subset of term * term
+    | Subseteq of term * term
+    | Union of term * term
+    | Inter of term * term
+    | Emptyset of Type.t
+    | Singleton of term
+    | Complement of term
+    | Other of term  (** not a set constructor *)
+
+  val view : sets:t -> term -> view
+  (** View of the term as a set operator, if possible *)
+
   (** {4 constructors} *)
   val mk_member : sets:t -> term -> term -> term
   val mk_subset: sets:t -> term -> term -> term

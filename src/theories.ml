@@ -167,6 +167,30 @@ module Sets = struct
     set_type = Symbol.of_string "set";
   }
 
+  type view =
+    | Member of term * term
+    | Subset of term * term
+    | Subseteq of term * term
+    | Union of term * term
+    | Inter of term * term
+    | Emptyset of Type.t
+    | Singleton of term
+    | Complement of term
+    | Other of term  (** not a set constructor *)
+
+  let view ~sets t =
+    let module TC = T.Classic in
+    match TC.view t with
+    | TC.App (s, _, [x;set]) when Symbol.eq s sets.member -> Member (x,set)
+    | TC.App (s, _, [s1;s2]) when Symbol.eq s sets.subset -> Subset (s1,s2)
+    | TC.App (s, _, [s1;s2]) when Symbol.eq s sets.subseteq -> Subseteq (s1,s2)
+    | TC.App (s, _, [s1;s2]) when Symbol.eq s sets.union -> Union (s1,s2)
+    | TC.App (s, _, [s1;s2]) when Symbol.eq s sets.inter -> Inter (s1,s2)
+    | TC.App (s, [ty], []) when Symbol.eq s sets.emptyset -> Emptyset ty
+    | TC.App (s, _, [t]) when Symbol.eq s sets.singleton -> Singleton t
+    | TC.App (s, _, [t]) when Symbol.eq s sets.complement -> Complement t
+    | _ -> Other t
+
   let mk_member ~sets x set =
     T.app_full (T.const ~ty:(_ty_member ~sets) sets.member) [T.ty x] [x;set]
 
