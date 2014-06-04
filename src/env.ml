@@ -180,6 +180,9 @@ module type S = sig
   val stats : unit -> stats
     (** Compute stats *)
 
+  val add_cnf_option : Cnf.options -> unit
+    (** Add an option for the CNF transformation *)
+
   val cnf : PFormula.Set.t -> C.CSet.t
     (** Reduce formulas to CNF *)
 
@@ -418,13 +421,16 @@ end) : S with module Ctx = X.Ctx = struct
 
   let stats () = ProofState.stats ()
 
+  let _cnf_options = ref []
+  let add_cnf_option o = _cnf_options := o :: !_cnf_options
+
   let cnf set =
     let clauses = Sequence.fold
       (fun cset pf ->
         let f = PF.form pf in
         Util.debug 3 "reduce %a to CNF..." F.pp f;
         (* reduce to CNF this clause *)
-        let clauses = Cnf.cnf_of ~ctx:Ctx.skolem f in
+        let clauses = Cnf.cnf_of ~opts:!_cnf_options ~ctx:Ctx.skolem f in
         (* now build "proper" clauses, with proof and all *)
         let proof cc =
           match clauses with

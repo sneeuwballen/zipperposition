@@ -174,6 +174,9 @@ module type S = sig
   val stats : unit -> stats
     (** Compute stats *)
 
+  val add_cnf_option : Cnf.options -> unit
+    (** Add an option for the CNF transformation *)
+
   val cnf : PFormula.Set.t -> C.CSet.t
     (** Reduce formulas to CNF *)
 

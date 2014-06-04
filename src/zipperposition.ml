@@ -41,6 +41,7 @@ module S = Substs
 module Import = struct
   open! Chaining
   open! ArithInt
+  open! SetChaining
 end
 
 (** setup an alarm for abrupt stop *)
