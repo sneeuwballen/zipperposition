@@ -133,10 +133,46 @@ let _normalize = Monome.Int.normalize
 let make op m1 m2 =
   let m1, m2 = _normalize m1, _normalize m2 in
   let m = M.difference m1 m2 in
-  (* divide by gcd *)
-  let m = M.Int.normalize_wrt_zero m in
-  let m1, m2 = M.split m in
-  Binary (op, m1, m2)
+  (* build from a single monome *)
+  let _make_split op m =
+    let m1, m2 = M.split m in
+    Binary (op, m1, m2)
+  in
+  match op with
+  | Equal
+  | Different ->
+    (* divide by gcd *)
+    let m = M.Int.normalize_wrt_zero m in
+    _make_split op m
+  | Lesseq ->
+    (* XXX: should be eliminated, don't optimize *)
+    _make_split op m
+  | Less ->
+    let c = M.const m in
+    let m' = M.remove_const m in
+    begin match Monome.Int.factorize m' with
+    | Some (m'', g) when Z.gt g Z.one ->
+      if Z.sign c > 0
+      then
+        (* a constant occurs in m1, so m1' + k < m2. In this
+          case we check whether m2 - m1' can be factored by some d,
+          and we replace k with floor (k/d).
+          Example: 3 < 2a  ----> 3/2 < a ---> 1 < a  *)
+        let c' = Z.fdiv c g in
+        _make_split op (M.add_const m'' c')
+      else if Z.equal c Z.zero
+      then
+        (* no constant, just divide by gcd *)
+        _make_split op m''
+      else
+        (* m1 < k + m2'. If g is the gcd of m1 and m2' then
+            we replace k with ceil(k/g) *)
+        let c' = Z.neg (Z.cdiv (Z.abs c) g) in
+        _make_split op (M.add_const m'' c')
+    | _ ->
+      (* no gcd other than 1 *)
+      _make_split op m
+    end
 
 let mk_eq = make Equal
 let mk_neq = make Different
