@@ -195,8 +195,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     _idx_sup_into := Lits.fold_terms ~ord ~which:`Max ~subterms:true
       ~eligible:(C.Eligible.res c) (C.lits c) !_idx_sup_into
       (fun tree t pos ->
-        let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
-        f tree t with_pos);
+        if T.is_var t
+        then tree
+        else
+          let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
+          f tree t with_pos);
     (* index terms that can rewrite into other clauses *)
     _idx_sup_from := Lits.fold_eqn ~ord ~both:true ~sign:true
       ~eligible:(C.Eligible.param c) (C.lits c) !_idx_sup_from
@@ -273,6 +276,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   end
 
   exception ExitSuperposition of string
+
+  (* TODO: use simultaneous superposition? See E's documentation *)
 
   (* Helper that does one or zero superposition inference, with all
      the given parameters. Clauses have a scope. *)
