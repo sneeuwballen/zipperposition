@@ -289,7 +289,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     if C.is_maxlit info.active s_a subst idx_a
     && C.is_maxlit info.passive s_p subst idx_p
     && ALF.is_max ~ord lit_a
-    && ALF.is_max ~ord lit_p
+    (* && ALF.is_max ~ord lit_p *)
     then begin
       (* the active literals *)
       let lit_a, lit_p = ALF.scale lit_a lit_p in
@@ -368,9 +368,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   let canc_sup_passive c =
     Util.enter_prof prof_arith_sup;
     let ord = Ctx.ord () in
-    let eligible = C.Eligible.arith in
+    let eligible = C.Eligible.(max c ** arith) in
     let sc_a = 0 and sc_p = 1 in
-    let res = Lits.fold_arith_terms ~eligible ~which:`Max ~ord (C.lits c) []
+    let res = Lits.fold_arith_terms ~eligible ~which:`All ~ord (C.lits c) []
       (fun acc t passive_lit passive_pos ->
         Util.debug 5 "passive canc. sup. with %a in %a" ALF.pp passive_lit C.pp c;
         PS.TermIndex.retrieve_unifiables !_idx_eq sc_a t sc_p acc
