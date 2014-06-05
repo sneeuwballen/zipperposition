@@ -348,7 +348,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             let passive_lit = Lits.View.get_arith_exn (C.lits passive) passive_pos in
             Util.debug 5 "  possible match: %a in %a" ALF.pp passive_lit C.pp passive;
             (* now to unify active_lit and passive_lit further *)
-            ALF.unify ~subst active_lit sc_a passive_lit sc_p
+            if T.is_var t || T.is_var t'
+            then acc
+            else ALF.unify ~subst active_lit sc_a passive_lit sc_p
             |> Sequence.fold
               (fun acc (active_lit, passive_lit, subst) ->
                 let info = SupInfo.({
@@ -378,7 +380,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             let active_lit = Lits.View.get_arith_exn (C.lits active) active_pos in
             (* must have an equation as active lit *)
             match ALF.op active_lit with
-            | `Binary AL.Equal ->
+            | `Binary AL.Equal when not (T.is_var t) && not (T.is_var t') ->
               Util.debug 5 "  possible match: %a in %a" ALF.pp passive_lit C.pp c;
               (* unify literals further *)
               ALF.unify ~subst active_lit sc_a passive_lit sc_p
@@ -462,6 +464,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               AL.fold_terms ~pos ~vars:false ~which:`Max
               ~ord ~subterms:false a_lit ()
                 (fun () t pos ->
+                  assert (not (T.is_var t));
                   let passive_lit = Lits.View.get_arith_exn (C.lits c) pos in
                   (* search for generalizations of [t] *)
                   PS.TermIndex.retrieve_generalizations !_idx_unit s_a t s_p ()
@@ -746,6 +749,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let res = Lits.fold_arith_terms ~eligible ~ord ~which:`Max (C.lits c) []
       (fun acc t lit pos ->
         match lit with
+        | _ when T.is_var t -> acc (* ignore variables *)
         | ALF.Left (AL.Less, mf_l, _) ->
           (* find a right-chaining literal in some other clause *)
           PS.TermIndex.retrieve_unifiables !_idx_ineq_right sc_r t sc_l acc

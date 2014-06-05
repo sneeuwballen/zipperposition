@@ -574,7 +574,10 @@ let fold_terms ?(pos=P.stop) ?(vars=false) ~which ~ord ~subterms lit acc f =
   let at_term ~pos acc t =
     if subterms
       then T.all_positions ~vars ~pos t acc f
-      else f acc t pos
+      else (* don't do anything if [t] is a var and [vars=false] *)
+        if vars || not (T.is_var t)
+          then f acc t pos
+          else acc
   and fold_monome = match which with
     | `All -> M.fold
     | `Max -> M.fold_max ~ord

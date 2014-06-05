@@ -319,7 +319,7 @@ module Int : sig
 
   val factorize : t -> (t * Z.t) option
     (** Factorize [e] into [Some (e',s)] if [e = e' x s], None
-        otherwise (ie if s=1) *)
+        otherwise (ie if s=1). In case it returns [Some (e', s)], [s > 1] holds *)
 
   val normalize_wrt_zero : t -> t
     (** Allows to multiply or divide by any positive number since we consider

@@ -832,9 +832,18 @@ module Int = struct
     List.for_all (fun (c',_) -> Z.sign (Z.rem c' c) = 0) e.terms
 
   let factorize e =
-    let gcd = List.fold_left
-      (fun gcd (c, _) -> Z.gcd c gcd)
-      e.const e.terms
+    let gcd =
+      if Z.equal e.const Z.zero
+      then match e.terms with
+        | [] -> Z.one
+        | (c,_)::terms' ->
+          List.fold_left
+            (fun gcd (c, _) -> Z.gcd c gcd)
+            c terms'
+      else
+        List.fold_left
+          (fun gcd (c, _) -> Z.gcd c gcd)
+          e.const e.terms
     in
     let gcd = Z.abs gcd in
     if Z.equal Z.one gcd || Z.sign gcd = 0
