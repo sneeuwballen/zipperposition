@@ -418,6 +418,27 @@ end) : S with module Ctx = X.Ctx = struct
 
   let stats () = ProofState.stats ()
 
+  (* biggest bucket of clauses
+  let biggest_bucket () =
+    let module CH = C.CHashcons in
+    let tbl = CH.default |> CH.weak_of in
+    let size,_,_,_,_,_ = CH.H.stats tbl in
+    let a = Array.make size [] in
+    CH.H.iter
+      (fun x ->
+        let i = C.hash x mod size in
+        a.(i) <- x :: a.(i)
+      ) tbl;
+    let max_idx, max_size = Util.array_foldi
+      (fun (idx,len) i l ->
+        if List.length l > len
+          then i,List.length l
+          else idx,len
+      ) (0,List.length a.(0)) a
+    in
+    max_size, a.(max_idx)
+  *)
+
   let cnf set =
     let clauses = Sequence.fold
       (fun cset pf ->

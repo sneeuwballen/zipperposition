@@ -90,10 +90,13 @@ let cmp lit1 lit2 = match lit1, lit2 with
   | Binary _,  Divides _ -> 1
   | Divides _, Binary _ -> -1
 
-let hash = function
-  | Binary (op, m1, m2) -> Hash.hash_int3 (Hashtbl.hash op) (M.hash m1) (M.hash m2)
+let hash lit =
+  let hash_sign s h = if s then h else lnot h in
+  match lit with
+  | Binary (op, m1, m2) ->
+      Hash.hash_int3 (Hashtbl.hash op) (M.hash m1) (M.hash m2)
   | Divides d ->
-      Hash.hash_int3 (Z.hash d.num) (M.hash d.monome) d.power
+      hash_sign d.sign (Hash.hash_int3 (Z.hash d.num) (M.hash d.monome) d.power)
 
 let sign = function
   | Binary ((Equal | Lesseq | Less), _, _) -> true
