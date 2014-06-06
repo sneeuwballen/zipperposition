@@ -90,7 +90,7 @@ let setup_env ~env =
 
 (** Load plugins *)
 let load_plugins ~params =
-  Util.list_flatmap
+  List.iter
     (fun filename ->
       let n = String.length filename in
       let filename =  (* plugin name, or file? *)
@@ -106,12 +106,12 @@ let load_plugins ~params =
             Filename.concat Const.home home_filename
       in
       match Extensions.dyn_load filename with
-      | Extensions.Ext_failure msg -> (* Could not load plugin *)
-        []
+      | Extensions.Ext_failure msg -> () (* Could not load plugin *)
       | Extensions.Ext_success ext ->
         Util.debug 0 "loaded extension %s" ext.Extensions.name;
-        [ext])
-    params.param_plugins
+        ()
+    ) params.param_plugins;
+  Extensions.extensions ()
 
 (** What we get after preprocessing *)
 module type POST_PREPROCESS = sig

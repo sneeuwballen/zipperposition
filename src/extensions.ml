@@ -160,6 +160,7 @@ let apply_penv ~penv ext =
     ext.penv_actions
 
 let init ext =
+  Util.debug 5 "run init actions of %s" ext.name;
   List.iter
     (function
       Init_do f -> f ()

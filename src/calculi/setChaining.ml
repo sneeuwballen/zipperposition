@@ -43,24 +43,33 @@ module type S = sig
   val setup : unit -> unit
 end
 
+(* global theory currently in use *)
+let _theory = ref Theories.Sets.default
+
 module Make(E : Env.S) = struct
   module Env = E
   module PS = Env.ProofState
   module C = Env.C
   module Ctx = Env.Ctx
 
-  let _theory = ref Theories.Sets.default
-
   let preprocess f = f  (* TODO *)
 
   let setup () =
     Util.debug 1 "setup set chaining";
     Env.add_cnf_option (Cnf.PostNNF preprocess);
-    (* maybe change the set signature? *)
+    (* maybe change the set signature? FIXME
     Signal.on Ctx.Theories.Sets.on_add
       (fun theory' -> _theory := theory'; Signal.ContinueListening);
+    *)
     ()
 end
+
+(* declare types for set operators *)
+let _declare_signature () =
+  Util.debug 3 "declaring set types...";
+  let set_signature = Theories.Sets.signature !_theory in
+  Params.signature := Signature.merge !Params.signature set_signature;
+  ()
 
 let extension =
   let module DOIT(Env : Env.S) = struct
@@ -72,7 +81,7 @@ let extension =
   in
   { Extensions.default with
     Extensions.name="set";
-    Extensions.penv_actions = [];
+    Extensions.init_actions = [Extensions.Init_do _declare_signature];
     Extensions.make=(module DOIT : Extensions.ENV_TO_S);
   }
 
