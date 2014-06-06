@@ -107,6 +107,7 @@ module Sets = struct
     subseteq : Symbol.t;
     union : Symbol.t;
     inter : Symbol.t;
+    diff : Symbol.t;
     emptyset : Symbol.t;
     singleton : Symbol.t;
     complement : Symbol.t;
@@ -124,6 +125,11 @@ module Sets = struct
     Type.(forall [x] (TPTP.o <== [_set x; _set x]))
 
   let _ty_union ~sets =
+    let x = Type.var 0 in
+    let _set a = Type.app sets.set_type [a] in
+    Type.(forall [x] (_set x <== [_set x; _set x]))
+
+  let _ty_diff ~sets =
     let x = Type.var 0 in
     let _set a = Type.app sets.set_type [a] in
     Type.(forall [x] (_set x <== [_set x; _set x]))
@@ -150,6 +156,7 @@ module Sets = struct
       ; sets.subseteq, _ty_subset ~sets
       ; sets.union, _ty_union ~sets
       ; sets.inter, _ty_union ~sets
+      ; sets.diff, _ty_diff ~sets
       ; sets.emptyset, _ty_empty ~sets
       ; sets.singleton, _ty_singleton ~sets
       ; sets.complement, _ty_complement ~sets
@@ -161,6 +168,7 @@ module Sets = struct
     subseteq = Symbol.of_string "subseteq";
     union = Symbol.of_string "union";
     inter = Symbol.of_string "intersection";
+    diff = Symbol.of_string "difference";
     emptyset = Symbol.of_string "emptyset";
     singleton = Symbol.of_string "singleton";
     complement = Symbol.of_string "complement";
@@ -171,12 +179,21 @@ module Sets = struct
     | Member of term * term
     | Subset of term * term
     | Subseteq of term * term
-    | Union of term * term
-    | Inter of term * term
+    | Union of term list
+    | Inter of term list
+    | Diff of term * term
     | Emptyset of Type.t
     | Singleton of term
     | Complement of term
     | Other of term  (** not a set constructor *)
+
+  (** flattens a union or internsection into a list of sets
+      helps the preprocessing *)
+  let rec unfold symbol t acc =
+    let module TC = T.Classic in
+    match TC.view t with
+      | TC.App (s, _, [s1;s2]) when Symbol.eq s symbol -> unfold symbol s1 (unfold symbol s2 acc)
+      | _ -> t::acc
 
   let view ~sets t =
     let module TC = T.Classic in
@@ -184,8 +201,9 @@ module Sets = struct
     | TC.App (s, _, [x;set]) when Symbol.eq s sets.member -> Member (x,set)
     | TC.App (s, _, [s1;s2]) when Symbol.eq s sets.subset -> Subset (s1,s2)
     | TC.App (s, _, [s1;s2]) when Symbol.eq s sets.subseteq -> Subseteq (s1,s2)
-    | TC.App (s, _, [s1;s2]) when Symbol.eq s sets.union -> Union (s1,s2)
-    | TC.App (s, _, [s1;s2]) when Symbol.eq s sets.inter -> Inter (s1,s2)
+    | TC.App (s, _, _) when Symbol.eq s sets.union -> Union (unfold sets.union t [])
+    | TC.App (s, _, _) when Symbol.eq s sets.inter -> Inter (unfold sets.inter t [])
+    | TC.App (s, _, [s1;s2]) when Symbol.eq s sets.diff -> Diff(s1,s2)
     | TC.App (s, [ty], []) when Symbol.eq s sets.emptyset -> Emptyset ty
     | TC.App (s, _, [t]) when Symbol.eq s sets.singleton -> Singleton t
     | TC.App (s, _, [t]) when Symbol.eq s sets.complement -> Complement t
@@ -200,6 +218,11 @@ module Sets = struct
       | Type.App (s, [alpha]) when Symbol.eq s sets.set_type -> alpha
       | ty -> invalid_arg (Util.sprintf "%a does not a set type" T.pp t)
 
+  let is_set ~sets t =
+    match Type.view (T.ty t) with
+      | Type.App (s,_) when Symbol.eq s sets.set_type -> true
+      | _ -> false
+
   let mk_subset ~sets s1 s2 =
     let alpha = _get_set_type ~sets s1 in
     T.app_full (T.const ~ty:(_ty_subset ~sets) sets.subset) [alpha] [s1;s2]
@@ -208,13 +231,17 @@ module Sets = struct
     let alpha = _get_set_type ~sets s1 in
     T.app_full (T.const ~ty:(_ty_subset ~sets) sets.subseteq) [alpha] [s1;s2]
 
-  let mk_union ~sets s1 s2 =
-    let alpha = _get_set_type ~sets s1 in
-    T.app_full (T.const ~ty:(_ty_union ~sets) sets.union) [alpha] [s1;s2]
+  let mk_union ~sets s_list =
+    let alpha = _get_set_type ~sets (List.hd s_list) in
+    T.app_full (T.const ~ty:(_ty_union ~sets) sets.union) [alpha] s_list
 
-  let mk_inter ~sets s1 s2 =
+  let mk_inter ~sets s_list =
+    let alpha = _get_set_type ~sets (List.hd s_list) in
+    T.app_full (T.const ~ty:(_ty_union ~sets) sets.inter) [alpha] s_list
+
+  let mk_diff ~sets s1 s2 =
     let alpha = _get_set_type ~sets s1 in
-    T.app_full (T.const ~ty:(_ty_union ~sets) sets.inter) [alpha] [s1;s2]
+    T.app_full (T.const ~ty:(_ty_diff ~sets) sets.diff) [alpha] [s1;s2]
 
   let mk_empty ~sets ty =
     T.tyapp (T.const ~ty:(_ty_empty ~sets) sets.emptyset) ty

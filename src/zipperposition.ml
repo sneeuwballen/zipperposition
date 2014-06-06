@@ -40,7 +40,6 @@ module S = Substs
 (* load some other modules, but they might not be registered *)
 module Import = struct
   open! Chaining
-  open! ArithInt
   open! SetChaining
 end
 

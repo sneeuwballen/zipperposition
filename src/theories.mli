@@ -91,6 +91,7 @@ module Sets : sig
     subseteq : Symbol.t;
     union : Symbol.t;
     inter : Symbol.t;
+    diff : Symbol.t;
     emptyset : Symbol.t;
     singleton : Symbol.t;
     complement : Symbol.t;
@@ -107,8 +108,9 @@ module Sets : sig
     | Member of term * term
     | Subset of term * term
     | Subseteq of term * term
-    | Union of term * term
-    | Inter of term * term
+    | Union of term list
+    | Inter of term list
+    | Diff of term * term
     | Emptyset of Type.t
     | Singleton of term
     | Complement of term
@@ -117,12 +119,15 @@ module Sets : sig
   val view : sets:t -> term -> view
   (** View of the term as a set operator, if possible *)
 
+  val is_set : sets:t -> term -> bool
+
   (** {4 constructors} *)
   val mk_member : sets:t -> term -> term -> term
   val mk_subset: sets:t -> term -> term -> term
   val mk_subseteq: sets:t -> term -> term -> term
-  val mk_union: sets:t -> term -> term -> term
-  val mk_inter: sets:t -> term -> term -> term
+  val mk_union: sets:t -> term list -> term
+  val mk_inter: sets:t -> term list -> term
+  val mk_diff: sets:t -> term -> term -> term
   val mk_empty: sets:t -> Type.t -> term
   val mk_singleton : sets:t -> term -> term
   val mk_complement : sets:t -> term -> term
