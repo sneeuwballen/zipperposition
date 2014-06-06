@@ -231,13 +231,27 @@ module Sets = struct
     let alpha = _get_set_type ~sets s1 in
     T.app_full (T.const ~ty:(_ty_subset ~sets) sets.subseteq) [alpha] [s1;s2]
 
-  let mk_union ~sets s_list =
-    let alpha = _get_set_type ~sets (List.hd s_list) in
-    T.app_full (T.const ~ty:(_ty_union ~sets) sets.union) [alpha] s_list
+  let rec mk_union ~sets s_list =
+    match s_list with
+      | [] -> failwith "type of intersection not defined"
+      | [set] -> set
+      | [s1;s2] ->
+        let alpha = _get_set_type ~sets s1 in
+          T.app_full (T.const ~ty:(_ty_union ~sets) sets.union) [alpha] [s1;s2]
+      | s1::s2::t ->
+        let alpha = _get_set_type ~sets s1 in
+          T.app_full (T.const ~ty:(_ty_union ~sets) sets.union) [alpha] [s1;mk_union ~sets (s2::t)]
 
-  let mk_inter ~sets s_list =
-    let alpha = _get_set_type ~sets (List.hd s_list) in
-    T.app_full (T.const ~ty:(_ty_union ~sets) sets.inter) [alpha] s_list
+  let rec mk_inter ~sets s_list =
+    match s_list with
+      | [] -> failwith "type of intersection not defined"
+      | [set] -> set
+      | [s1;s2] ->
+        let alpha = _get_set_type ~sets s1 in
+          T.app_full (T.const ~ty:(_ty_union ~sets) sets.inter) [alpha] [s1;s2]
+      | s1::s2::t ->
+        let alpha = _get_set_type ~sets s1 in
+          T.app_full (T.const ~ty:(_ty_union ~sets) sets.inter) [alpha] [s1;mk_inter ~sets (s2::t)]
 
   let mk_diff ~sets s1 s2 =
     let alpha = _get_set_type ~sets s1 in
