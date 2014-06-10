@@ -155,7 +155,7 @@ in Figure~\ref{fig:powerset}.
 The numerous set operators must be translated to the rigid clause format
 we defined above; Figure~\ref{fig:skolem} describes the translation process
 that must take place after NNF and before Skolemization.
-In the rules, $A$ and $B$ have type $\set{\alpha}$, $s$ is a term
+In the rules, $A$ and $B$ have type $\set{\alpha}$, $s$, $t$, $u$, $v$ are terms
 of type $\alpha$, and $x:\alpha$ is a
 variable. We de-sugar $A \backslash B$ into $A \cap \compl{B}$.
 Then, usual CNF transformation, with skolemization
@@ -307,6 +307,11 @@ on the fly).
     \BinaryInfC{$ \normalize{K \lor K' \lor
         (B_\cup \cup \compl{A_\cap} \not\subseteq \compl{A'_\cap} \cup B'_\cup)}
     $}
+    \UnaryInfC{$
+        K \lor K'
+        \lor \bigvee_{s \in B_\cup} (A'_\cap \cap s \subseteq B'_\cup)
+        \lor \bigvee_{s \in A_\cap} (A'_\cap \subseteq s \cup B'_\cup)
+    $}
 \end{prooftree}
 
 \begin{prooftree}
@@ -315,6 +320,11 @@ on the fly).
     \RightLabel{negative chaining right}
     \BinaryInfC{$ \normalize{K \lor K' \lor
         (A'_\cap \cap \compl{B'_\cup} \not\subseteq A_\cap \cap \compl{B_\cup})}
+    $}
+    \UnaryInfC{$
+        K \lor K'
+        \lor \bigvee_{s \in A_\cap} (A'_\cap \subseteq s \cup B'_\cup)
+        \lor \bigvee_{s \in B_\cup} (A'_\cap \cap s \subseteq B'_\cup)
     $}
 \end{prooftree}
 
@@ -326,6 +336,13 @@ on the fly).
     \UnaryInfC{$ \normalize{K \lor
         (\compl{A_\cap} \cap A'_\cap \not\subseteq \compl{B_\cup} \cup B'_\cup) 
         \lor (t \cap A'_\cap \subseteq B'_\cup)}$}
+    \UnaryInfC{$
+        K
+        \lor (t \cap A'_\cap \subseteq B'_\cup)
+        \lor \bigvee_{u \in A_\cap}
+            \bigvee_{v \in B_\cup}
+                (v \cap A'_\cap \subseteq u \cup B'_\cup)
+    $}
 \end{prooftree}
 
 \mbox{
