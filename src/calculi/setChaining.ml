@@ -29,6 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+module Lit = Literal
+
 (** {2 Inference Rules} *)
 module type S = sig
   module Env : Env.S
@@ -295,6 +297,8 @@ module Make(E : Env.S) = struct
   let setup () =
     Util.debug 1 "setup set chaining";
     Env.add_cnf_option (Cnf.PostNNF preprocess);
+    Ctx.Lit.add_from_hook (Lit.Conv.set_hook_from ~sets:!_theory);
+    Ctx.Lit.add_to_hook (Lit.Conv.set_hook_to ~sets:!_theory);
     (* maybe change the set signature? FIXME
     Signal.on Ctx.Theories.Sets.on_add
       (fun theory' -> _theory := theory'; Signal.ContinueListening);
@@ -302,11 +306,13 @@ module Make(E : Env.S) = struct
     ()
 end
 
-(* declare types for set operators *)
-let _declare_signature () =
+let _initial_setup () =
+  (* declare types for set operators *)
   Util.debug 3 "declaring set types...";
   let set_signature = Theories.Sets.signature !_theory in
   Params.signature := Signature.merge !Params.signature set_signature;
+  (* add hooks (printing, lit conversion) *)
+  FOTerm.add_hook (Theories.Sets.print_hook ~sets:!_theory);
   ()
 
 let extension =
@@ -319,15 +325,15 @@ let extension =
   in
   { Extensions.default with
     Extensions.name="set";
-    Extensions.init_actions = [Extensions.Init_do _declare_signature];
+    Extensions.init_actions = [Extensions.Init_do _initial_setup];
     Extensions.make=(module DOIT : Extensions.ENV_TO_S);
   }
 
 let () =
   Params.add_opts
     [ "-set"
-    , Arg.Unit (fun () -> Extensions.register extension)
-    , "enable set chaining"
+      , Arg.Unit (fun () -> Extensions.register extension)
+      , "enable set chaining"
     ];
   ()
 
