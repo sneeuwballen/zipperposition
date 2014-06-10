@@ -280,6 +280,7 @@ let terms_under_ineq ~instance lits =
         | Lit.Equation (l, r, _) -> k l; k r
         | Lit.Prop (p, _) -> k p
         | Lit.Arith _
+        | Lit.Subseteq _
         | Lit.True
         | Lit.False -> ()
       done)
@@ -327,6 +328,7 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits acc f =
       | Lit.Equation _
       | Lit.Ineq _
       | Lit.Arith _
+      | Lit.Subseteq _
       | Lit.True
       | Lit.False -> acc
       in fold acc (i+1)
