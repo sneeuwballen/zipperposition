@@ -57,7 +57,8 @@ module Make(E : Env.S) = struct
   let _theory = ref T.default
 
   (** Preprocessing of set terms in both sides of a \subseteq
-      if ~left, returns a list of unions of sets ; otherwise it will be a list of intersections of terms
+      if ~left, returns a list of unions of sets ;
+      otherwise it will be a list of intersections of terms
     *)
   let rec preprocess_subseteq ~sets ~left s_list acc =
     match s_list with
@@ -66,7 +67,8 @@ module Make(E : Env.S) = struct
         begin match vs with
           | T.Union s_list' ->
             if left then begin
-              Util.debug 3 " --- A inter (B union C) subseteq D --> (A inter B subseteq D) and (A inter C subseteq D)";
+              Util.debug 3 " --- A inter (B union C) subseteq D --> %s"
+                "(A inter B subseteq D) and (A inter C subseteq D)";
               let rec aux l_aux acc_aux =
                 match l_aux with
                   | h::t -> aux t ((preprocess_subseteq ~sets ~left (h::l) acc)@acc_aux)
@@ -81,7 +83,8 @@ module Make(E : Env.S) = struct
               Util.debug 3 " --- A inter (B inter C) --> A inter B inter C";
               preprocess_subseteq ~sets ~left s_list' (preprocess_subseteq ~sets ~left l acc)
             end else begin
-              Util.debug 3 " --- A subseteq B union (C inter D) --> (A subseteq B union C) and (A subseteq B union D)";
+              Util.debug 3 " --- A subseteq B union (C inter D) --> %s"
+                "(A subseteq B union C) and (A subseteq B union D)";
               let rec aux l_aux acc_aux =
                 match l_aux with
                   | h::t -> aux t ((preprocess_subseteq ~sets ~left (h::l) acc)@acc_aux)
@@ -90,7 +93,9 @@ module Make(E : Env.S) = struct
             end
           | T.Diff (s1,s2) -> 
             Util.debug 3 " --- A diff B --> A inter comp(B)";
-            preprocess_subseteq ~sets ~left ((T.mk_inter ~sets [s1;(T.mk_complement ~sets s2)])::l) acc
+            preprocess_subseteq ~sets ~left
+              ((T.mk_inter ~sets [s1;(T.mk_complement ~sets s2)])::l)
+              acc
           | T.Singleton x ->
             Util.debug 3 " --- {x} --> {x}";
             preprocess_subseteq ~sets ~left l (List.map (fun sl -> s::sl) acc)
@@ -107,13 +112,16 @@ module Make(E : Env.S) = struct
             begin match vs' with
               | T.Union s_list' ->
                 Util.debug 3 " --- comp(A union B) --> comp A inter comp(B)";
-                preprocess_subseteq ~sets ~left (T.mk_inter ~sets (List.map (fun x -> T.mk_complement ~sets x) s_list')::l) acc
+                preprocess_subseteq ~sets ~left
+                  (T.mk_inter ~sets (List.map (fun x -> T.mk_complement ~sets x) s_list')::l) acc
               | T.Inter s_list' ->
                 Util.debug 3 " --- comp(A inter B) --> comp A union comp(B)";
-                preprocess_subseteq ~sets ~left (T.mk_union ~sets (List.map (fun x -> T.mk_complement ~sets x) s_list')::l) acc
+                preprocess_subseteq ~sets ~left
+                  (T.mk_union ~sets (List.map (fun x -> T.mk_complement ~sets x) s_list')::l) acc
               | T.Diff (s1,s2) -> 
                 Util.debug 3 " --- comp(A diff B) --> comp(A) union B";
-                preprocess_subseteq ~sets ~left ((T.mk_union ~sets [(T.mk_complement ~sets s1);s2])::l) acc
+                preprocess_subseteq ~sets ~left
+                  ((T.mk_union ~sets [(T.mk_complement ~sets s1);s2])::l) acc
               | T.Singleton x -> 
                 Util.debug 3 " --- comp({x}) --> comp({x})";
                 preprocess_subseteq ~sets ~left l (List.map (fun sl -> s::sl) acc)
@@ -167,15 +175,27 @@ module Make(E : Env.S) = struct
         let vt = T.view ~sets t in
         begin match vt with
           | T.Member (x,s) ->
-            Util.debug 3 "Found a set of type member -- applying: x in A --> {x} subseteq A";
+            Util.debug 3 "Found a set of type member -- %s"
+              "applying: x in A --> {x} subseteq A";
             preprocess (F.Base.atom (T.mk_subseteq ~sets (T.mk_singleton ~sets x) s))
           | T.Subset (s1,s2) ->
-            Util.debug 3 "Fund a set of type subset -- applying: A subset B --> A subseteq B and not(B subseteq A)";
-            preprocess (F.Base.and_ [(F.Base.atom (T.mk_subseteq ~sets s1 s2));(F.Base.not_ (F.Base.atom (T.mk_subseteq ~sets s2 s1)))])
+            Util.debug 3 "Found a set of type subset -- %s"
+              "applying: A subset B --> A subseteq B and not(B subseteq A)";
+            preprocess (F.Base.and_
+                [(F.Base.atom (T.mk_subseteq ~sets s1 s2));
+                 (F.Base.not_ (F.Base.atom (T.mk_subseteq ~sets s2 s1)))
+                ])
           | T.Subseteq (s1,s2) ->
-            Util.debug 3 "Found a set of type subseteq -- beginning transformation into a conjonction of subseteq clauses";
-            let preproc_left = List.map (fun l -> (T.mk_inter ~sets l)) (preprocess_subseteq ~sets ~left:true [s1] [[]])
-            and preproc_right = List.map (fun l -> (T.mk_union ~sets l)) (preprocess_subseteq ~sets ~left:false [s2] [[]]) in
+            Util.debug 3 "Found a set of type subseteq -- %s"
+              "beginning transformation into a conjonction of subseteq clauses";
+            let preproc_left = 
+              List.map
+                (fun l -> (T.mk_inter ~sets l))
+                (preprocess_subseteq ~sets ~left:true [s1] [[]])
+            and preproc_right =
+              List.map
+                (fun l -> (T.mk_union ~sets l))
+                (preprocess_subseteq ~sets ~left:false [s2] [[]]) in
               F.Base.and_ (reform_subseteq ~sets preproc_left preproc_right)
           | T.Other _ -> f
           | _ -> assert false
@@ -190,16 +210,28 @@ module Make(E : Env.S) = struct
             let vt = T.view ~sets t in
             begin match vt with
               | T.Member (x,s) ->
-                Util.debug 3 "Found a set of type not member -- applying x not in A --> not({x} subseteq A)";
-                preprocess (F.Base.not_ (F.Base.atom (T.mk_subseteq ~sets (T.mk_singleton ~sets x) s)))
+                Util.debug 3 "Found a set of type not member -- %s"
+                  "applying x not in A --> not({x} subseteq A)";
+                let subseteq_new = T.mk_subseteq ~sets (T.mk_singleton ~sets x) s in
+                  preprocess (F.Base.not_ (F.Base.atom subseteq_new))
               | T.Subset (s1,s2) ->
-                Util.debug 3 "Found a set of type not subset -- applying not(A subset B) --> (B subseteq A) or not(A subseteq B)";
-                preprocess (F.Base.or_ [(F.Base.atom (T.mk_subseteq ~sets s2 s1));(F.Base.not_ (F.Base.atom (T.mk_subseteq ~sets s1 s2)))])
+                Util.debug 3 "Found a set of type not subset -- %s"
+                  "applying not(A subset B) --> (B subseteq A) or not(A subseteq B)";
+                preprocess (F.Base.or_
+                  [(F.Base.atom (T.mk_subseteq ~sets s2 s1));
+                   (F.Base.not_ (F.Base.atom (T.mk_subseteq ~sets s1 s2)))
+                  ])
               | T.Subseteq (s1,s2) ->
-                Util.debug 3 "Found a set of type not subseteq -- beginning transformation into a disjonction of not subseteq clauses";
-                let preproc_left = List.map (fun l -> (T.mk_inter ~sets l)) (preprocess_subseteq ~sets ~left:true [s1] [[]])
-                and preproc_right = List.map (fun l -> (T.mk_union ~sets l)) (preprocess_subseteq ~sets ~left:false [s2] [[]]) in
-                  F.Base.or_ (List.map (fun x -> F.Base.not_ x) (reform_subseteq ~sets preproc_left preproc_right)) 
+                Util.debug 3 "Found a set of type not subseteq -- %s"
+                  "beginning transformation into a disjonction of not subseteq clauses";
+                let preproc_left =
+                  List.map (fun l -> (T.mk_inter ~sets l))
+                    (preprocess_subseteq ~sets ~left:true [s1] [[]])
+                and preproc_right =
+                  List.map (fun l -> (T.mk_union ~sets l))
+                    (preprocess_subseteq ~sets ~left:false [s2] [[]]) in
+                  F.Base.or_ (List.map (fun x -> F.Base.not_ x)
+                    (reform_subseteq ~sets preproc_left preproc_right))
               | T.Other _ -> f
               | _ -> assert false
             end
@@ -212,7 +244,8 @@ module Make(E : Env.S) = struct
           | F.Eq (t1,t2) ->
             if T.is_set ~sets t1
             then begin
-              Util.debug 3 "Found a set of type not equals -- applying not(A = B) --> not(A subseteq B) or not(B subseteq A)";
+              Util.debug 3 "Found a set of type not equals -- %s"
+                "applying not(A = B) --> not(A subseteq B) or not(B subseteq A)";
               preprocess (F.Base.or_
                 [(F.Base.not_ (F.Base.atom (T.mk_subseteq ~sets t1 t2)));
                 (F.Base.not_ (F.Base.atom (T.mk_subseteq ~sets t2 t1)))]
@@ -221,7 +254,8 @@ module Make(E : Env.S) = struct
           | F.Neq (t1,t2) ->
             if T.is_set ~sets t1
             then begin
-              Util.debug 3 "Found a set of type equals -- applying not(A <> B) --> (A subseteq B) and (B subseteq A)";
+              Util.debug 3 "Found a set of type equals -- %s"
+                "applying not(A <> B) --> (A subseteq B) and (B subseteq A)";
               preprocess (F.Base.and_
                 [(F.Base.atom (T.mk_subseteq ~sets t1 t2));
                 (F.Base.atom (T.mk_subseteq ~sets t2 t1))]
@@ -237,7 +271,8 @@ module Make(E : Env.S) = struct
       | F.Eq (t1,t2) ->
         if T.is_set ~sets t1
         then begin
-        Util.debug 3 "Found a set of type equals -- applying A = B --> (A subseteq B) and (B subseteq A)";
+        Util.debug 3 "Found a set of type equals -- %s"
+          "applying A = B --> (A subseteq B) and (B subseteq A)";
           preprocess (F.Base.and_
             [(F.Base.atom (T.mk_subseteq ~sets t1 t2));
              (F.Base.atom (T.mk_subseteq ~sets t2 t1))]
@@ -246,7 +281,8 @@ module Make(E : Env.S) = struct
       | F.Neq (t1,t2) ->
         if T.is_set ~sets t1
         then begin
-          Util.debug 3 "Found a set of type not equals -- applying A <> B --> not(A subseteq B) or not(B subseteq A)";
+          Util.debug 3 "Found a set of type not equals -- %s"
+            "applying A <> B --> not(A subseteq B) or not(B subseteq A)";
           preprocess (F.Base.or_
             [(F.Base.not_ (F.Base.atom (T.mk_subseteq ~sets t1 t2)));
              (F.Base.not_ (F.Base.atom (T.mk_subseteq ~sets t2 t1)))]

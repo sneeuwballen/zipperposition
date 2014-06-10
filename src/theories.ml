@@ -187,7 +187,8 @@ module Sets = struct
   let rec unfold symbol t acc =
     let module TC = T.Classic in
     match TC.view t with
-      | TC.App (s, _, [s1;s2]) when Symbol.eq s symbol -> unfold symbol s1 (unfold symbol s2 acc)
+      | TC.App (s, _, [s1;s2]) when Symbol.eq s symbol ->
+        unfold symbol s1 (unfold symbol s2 acc)
       | _ -> t::acc
 
   let view ~sets t =
@@ -235,7 +236,8 @@ module Sets = struct
           T.app_full (T.const ~ty:(_ty_union ~sets) sets.union) [alpha] [s1;s2]
       | s1::s2::t ->
         let alpha = _get_set_type ~sets s1 in
-          T.app_full (T.const ~ty:(_ty_union ~sets) sets.union) [alpha] [s1;mk_union ~sets (s2::t)]
+        let union' = mk_union ~sets (s2::t) in
+          T.app_full (T.const ~ty:(_ty_union ~sets) sets.union) [alpha] [s1;union']
 
   let rec mk_inter ~sets s_list =
     match s_list with
@@ -246,7 +248,8 @@ module Sets = struct
           T.app_full (T.const ~ty:(_ty_union ~sets) sets.inter) [alpha] [s1;s2]
       | s1::s2::t ->
         let alpha = _get_set_type ~sets s1 in
-          T.app_full (T.const ~ty:(_ty_union ~sets) sets.inter) [alpha] [s1;mk_inter ~sets (s2::t)]
+        let inter' = mk_inter ~sets (s2::t) in
+          T.app_full (T.const ~ty:(_ty_union ~sets) sets.inter) [alpha] [s1;inter']
 
   let mk_diff ~sets s1 s2 =
     let alpha = _get_set_type ~sets s1 in
