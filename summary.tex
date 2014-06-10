@@ -341,7 +341,7 @@ on the fly).
         \lor (t \cap A'_\cap \subseteq B'_\cup)
         \lor \bigvee_{u \in A_\cap}
             \bigvee_{v \in B_\cup}
-                (v \cap A'_\cap \subseteq u \cup B'_\cup)
+                (v \cap A'_\cap \not\subseteq u \cup B'_\cup)
     $}
 \end{prooftree}
 
@@ -356,7 +356,7 @@ on the fly).
     \AxiomC{$ K \lor \{ t \} \not\subseteq \emptyset $}
     \RightLabel{emptyset}
     \doubleLine
-    \UnaryInfC{$~$}
+    \UnaryInfC{$\top$}
     \DisplayProof
 } \\[10pt]
 
@@ -364,7 +364,7 @@ on the fly).
 \mbox{
     \AxiomC{$ K \lor t \cap A_\cap \subseteq t\cup B_\cup $}
     \doubleLine
-    \UnaryInfC{$~ $}
+    \UnaryInfC{$\top $}
     \DisplayProof
 
     and
@@ -385,6 +385,46 @@ on the fly).
 \end{figure}
 
 %}}}
+
+\section{Other Considerations}
+%{{{
+\subsection{Handling Equality}
+%{{{
+As we saw in Figure~\ref{fig:rules}, the calculus doesn't deal directly
+with (extensional) equality between sets. Instead, $ a = b$ is
+translated into $a \subseteq b \land b \subseteq a$. However, replacing
+equals by equals in set literals is still possible.
+We assume $u=v$ was translated into $u \subseteq v\land v\subseteq u$,
+and show that we can replace $u$ with $v$ in set contexts:
+
+\begin{prooftree}
+    \AxiomC{$ K \lor u \cap A_\cap \subseteq B_\cup $}
+    \AxiomC{$ K' \lor v \subseteq u $ }
+    \BinaryInfC{$ K \lor K' \lor v \cap A_\cap \subseteq B_\cup $}
+\end{prooftree}
+
+and
+
+\begin{prooftree}
+    \AxiomC{$ K \lor A_\cap \subseteq u \cup B_\cup $}
+    \AxiomC{$ K' \lor u \subseteq v $ }
+    \BinaryInfC{$ K \lor K' \lor A_\cap \subseteq v \cup B_\cup $}
+\end{prooftree}
+%}}}
+
+\subsection{Purification}
+%{{{
+More difficult is the treatment of set-typed terms that occur under function
+symbols (or predicate symbols), for instance $p(s)$ when $s:\set{\alpha}$.
+The usual solution to this issue is
+to replace $C[p(s)]$ (where $C[.]$ is a clause context) with
+$C[p(x)] \lor x \not= s$, that is, replacing $s$ with a fresh variable
+$x\not\in \text{vars}(C[p(s)])$ and force $x=s$. We then obtain
+$C[p(x)] \lor x\not\subseteq s \lor s\not\subseteq x$.
+%}}}
+
+%}}}  section
+
 
 
 \end{document}
