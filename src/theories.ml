@@ -129,11 +129,6 @@ module Sets = struct
     let _set a = Type.app sets.set_type [a] in
     Type.(forall [x] (_set x <== [_set x; _set x]))
 
-  let _ty_diff ~sets =
-    let x = Type.var 0 in
-    let _set a = Type.app sets.set_type [a] in
-    Type.(forall [x] (_set x <== [_set x; _set x]))
-
   let _ty_empty ~sets =
     let x = Type.var 0 in
     let _set a = Type.app sets.set_type [a] in
@@ -156,7 +151,7 @@ module Sets = struct
       ; sets.subseteq, _ty_subset ~sets
       ; sets.union, _ty_union ~sets
       ; sets.inter, _ty_union ~sets
-      ; sets.diff, _ty_diff ~sets
+      ; sets.diff, _ty_union ~sets
       ; sets.emptyset, _ty_empty ~sets
       ; sets.singleton, _ty_singleton ~sets
       ; sets.complement, _ty_complement ~sets
@@ -255,7 +250,7 @@ module Sets = struct
 
   let mk_diff ~sets s1 s2 =
     let alpha = _get_set_type ~sets s1 in
-    T.app_full (T.const ~ty:(_ty_diff ~sets) sets.diff) [alpha] [s1;s2]
+    T.app_full (T.const ~ty:(_ty_union ~sets) sets.diff) [alpha] [s1;s2]
 
   let mk_empty ~sets ty =
     T.tyapp (T.const ~ty:(_ty_empty ~sets) sets.emptyset) ty

@@ -181,7 +181,7 @@ module Make(E : Env.S) = struct
           | _ -> assert false
         end
       | F.And f_list -> F.Base.and_ (List.map preprocess f_list)
-      | F.Or f_list -> F.Base.and_ (List.map preprocess f_list)
+      | F.Or f_list -> F.Base.or_ (List.map preprocess f_list)
       | F.Not f' ->
         begin match F.view f' with
           | F.True
