@@ -133,5 +133,5 @@ module Sets : sig
   val mk_complement : sets:t -> term -> term
   val mk_set_type : sets:t -> Type.t -> Type.t
 
-  val pp : Buffer.t -> t -> unit
+  val print_hook : sets:t -> FOTerm.print_hook
 end

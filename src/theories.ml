@@ -268,5 +268,16 @@ module Sets = struct
   let mk_set_type ~sets ty =
     Type.app sets.set_type [ty]
 
-  let pp buf sets = failwith "TODO" (* TODO *)
+  let print_hook ~sets _depth pp_rec buf t =
+    match view ~sets t with
+    | Member (x, s) -> Printf.bprintf buf "%a ∈ %a" pp_rec x pp_rec s; true
+    | Subset (a, b) -> Printf.bprintf buf "%a ⊂ %a" pp_rec a pp_rec b; true
+    | Subseteq (a, b) -> Printf.bprintf buf "%a ⊆ %a" pp_rec a pp_rec b; true
+    | Inter l -> CCList.pp ~start:"" ~stop:"" ~sep:" ∩ " pp_rec buf l; true
+    | Union l -> CCList.pp ~start:"" ~stop:"" ~sep:" ∪ " pp_rec buf l; true
+    | Diff (a, b) -> Printf.bprintf buf "%a \ %a" pp_rec a pp_rec b; true
+    | Emptyset _ -> Buffer.add_string buf "∅"; true
+    | Singleton t -> Printf.bprintf buf "{%a}" pp_rec t; true
+    | Complement t -> Printf.bprintf buf "%a^c" pp_rec t; true
+    | Other _ -> false
 end
