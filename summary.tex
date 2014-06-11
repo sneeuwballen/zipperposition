@@ -423,6 +423,28 @@ $x\not\in \text{vars}(C[p(s)])$ and force $x=s$. We then obtain
 $C[p(x)] \lor x\not\subseteq s \lor s\not\subseteq x$.
 %}}}
 
+
+\subsection{Subsumption}
+%{{{
+It is often useful to have a \emph{subsumption relation}, to prune the search
+space by removing clauses that are implied by smaller, simpler clauses. This
+relation on clauses is deduced from a subsumption relation on literals (most
+often, just matching). Here, we can use the subsumption relation $\models_s$ defined
+by
+
+\begin{align*}
+(A_\cap \subseteq B_\cup) &\models_s
+    (A_\cap\sigma \cap A'_\cap \subseteq B_\cup\sigma \cup B'_\cup) \\
+(A_\cap\sigma \cap A'_\cap \not\subseteq B_\cup\sigma \cup B'_\cup) &\models_s
+    (A_\cap \not\subseteq B_\cup) \\
+\end{align*}
+
+This relation, on positive literals, corresponds to instantiation and
+weakening on the left and right sides of a sequent. The negative counterpart
+is very interesting as it departs from the usual subsumption rules, the
+more specialized (instantiated) literal being on the left.
+%}}}
+
 %}}}  section
 
 
