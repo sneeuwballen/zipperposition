@@ -144,30 +144,30 @@ let make op m1 m2 =
     (* divide by gcd *)
     let m = M.Int.normalize_wrt_zero m in
     _make_split op m
-  | Lesseq ->
-    (* XXX: should be eliminated, don't optimize *)
-    _make_split op m
   | Less ->
+    (* should be removed *)
+    _make_split op m
+  | Lesseq ->
     let c = M.const m in
     let m' = M.remove_const m in
     begin match Monome.Int.factorize m' with
     | Some (m'', g) when Z.gt g Z.one ->
       if Z.sign c > 0
       then
-        (* a constant occurs in m1, so m1' + k < m2. In this
+        (* a constant occurs in m1, so m1' + k ≤ m2. In this
           case we check whether m2 - m1' can be factored by some d,
-          and we replace k with floor (k/d).
-          Example: 3 < 2a  ----> 3/2 < a ---> 1 < a  *)
-        let c' = Z.fdiv c g in
+          and we replace k with ceil (k/d).
+          Example: 3 ≤ 2a  ----> 3/2 ≤ a ---> 2 ≤ a  *)
+        let c' = Z.cdiv c g in
         _make_split op (M.add_const m'' c')
       else if Z.equal c Z.zero
       then
         (* no constant, just divide by gcd *)
         _make_split op m''
       else
-        (* m1 < k + m2'. If g is the gcd of m1 and m2' then
-            we replace k with ceil(k/g) *)
-        let c' = Z.neg (Z.cdiv (Z.abs c) g) in
+        (* m1 ≤ k + m2'. If g is the gcd of m1 and m2' then
+            we replace k with floor(k/g) *)
+        let c' = Z.neg (Z.fdiv (Z.abs c) g) in
         _make_split op (M.add_const m'' c')
     | _ ->
       (* no gcd other than 1 *)
@@ -207,8 +207,8 @@ let negate = function
       begin match op with
       | Equal -> Binary (Different, m1, m2)
       | Different -> Binary (Equal, m1, m2)
-      | Less -> make Less m2 (M.succ m1) (* a<b --> b<=a ---> b<a+1 *)
-      | Lesseq -> Binary (Less, m2, m1)
+      | Less -> make Lesseq m2 m1 (* a<b --> b≤a *)
+      | Lesseq -> make Lesseq (M.succ m2) m1 (* a≤b --> b<a --> b+1≤a *)
       end
   | Divides d -> Divides { d with sign=not d.sign; }
 
@@ -296,10 +296,10 @@ let variant ?(subst=Substs.empty) lit1 sc1 lit2 sc2 =
   a subset of the implication relation, be decidable, but yet be as powerful
   as possible. A few examples:
 
-    a < 10 subsumes  2.a < 21
-    a = 1  subsumes a > 0
-    a > 0  subsumes a > -10
-    2.a < 10 subsumes a < 11
+    a ≤ 10 subsumes  2.a ≤ 21
+    a = 1  subsumes a ≥ 0
+    a ≥ 0  subsumes a ≥ -10
+    2.a ≤ 10 subsumes a ≤ 11
 *)
 module Subsumption = struct
   (* verify postcondition of [matching] *)
@@ -444,51 +444,51 @@ module Subsumption = struct
               (c1 * (M.const r1 - M.const l1))
               (c2 * (M.const l2 - M.const r2)))
             then k subst)
-    | Binary (Equal, l1, r1), Binary (Less, l2, r2) ->
-        (* l1=r1  can subsume l2<r2 if
-          r1.const-l1.const > subst(l1-r1) = l2-r2 < r2.const - l2.const
-          with r1.const-l1.const < r2.const - l2.const (tighter bound) *)
+    | Binary (Equal, l1, r1), Binary (Lesseq, l2, r2) ->
+        (* l1=r1  can subsume l2≤r2 if
+          r1.const-l1.const = subst(l1-r1) = l2-r2 ≤ r2.const - l2.const
+          with r1.const-l1.const ≤ r2.const - l2.const (tighter bound) *)
+        matching2 ~subst l1 r1 sc1 ~scale2:true l2 r2 sc2
+          (fun (subst, c1, c2) ->
+            if Z.(leq
+              (c1 * (M.const r1 - M.const l1))
+              (c2 * (M.const r2 - M.const l2)))
+            then k subst)
+    | Binary (Lesseq, l1, r1), Binary (Different, l2, r2) ->
+        (* l1≤r1 can subsume l2 != r2 if
+          l1-r1 ≤ r1.const-l1.const and l2-r2 = r2.const-l2.const
+          with subst(l1-r1) = l2-r2 and r1.const-l1.const < r2.const-l2.const
+          (same with r2-l2 and l2.const-r2.const of course)*)
         matching2 ~subst l1 r1 sc1 ~scale2:true l2 r2 sc2
           (fun (subst, c1, c2) ->
             if Z.(lt
               (c1 * (M.const r1 - M.const l1))
               (c2 * (M.const r2 - M.const l2)))
-            then k subst)
-    | Binary (Less, l1, r1), Binary (Different, l2, r2) ->
-        (* l1<r1 can subsume l2 != r2 if
-          l1-r1 < r1.const-l1.const and l2-r2 = r2.const-l2.const
-          with subst(l1-r1) = l2-r2 and r1.const-l2.const < r2.const-l2.const
-          (same with r2-l2 and l2.const-r2.const of course)*)
-        matching2 ~subst l1 r1 sc1 ~scale2:true l2 r2 sc2
-          (fun (subst, c1, c2) ->
-            if Z.(leq
-              (c1 * (M.const r1 - M.const l1))
-              (c2 * (M.const r2 - M.const l2)))
             then k subst);
         matching2 ~subst l1 r1 sc1 ~scale2:true r2 l2 sc2
           (fun (subst, c1, c2) ->
-            if Z.(leq
+            if Z.(lt
               (c1 * (M.const r1 - M.const l1))
               (c2 * (M.const l2 - M.const r2)))
             then k subst);
-        (* l1<r1 can also subsume l2!=r2 if
-           r1-l1 > l1.const-r1.const with
+        (* l1≤r1 can also subsume l2!=r2 if
+           r1-l1 ≥ l1.const-r1.const with
            subst(r1-l1)=l2-r2  and l1.const-r1.const > r2.const-l2.const *)
         matching2 ~subst r1 l1 sc1 ~scale2:true r2 l2 sc2
           (fun (subst, c1, c2) ->
-            if Z.(geq
+            if Z.(gt
               (c1 * (M.const l1 - M.const r1))
               (c2 * (M.const l2 - M.const r2)))
             then k subst);
         matching2 ~subst r1 l1 sc1 ~scale2:true l2 r2 sc2
           (fun (subst, c1, c2) ->
-            if Z.(geq
+            if Z.(gt
               (c1 * (M.const l1 - M.const r1))
               (c2 * (M.const r2 - M.const l2)))
             then k subst);
-    | Binary (Less, l1, r1), Binary (Less, l2, r2) ->
-        (* if subst(r1 - l1) = r2-l2 - k where k>=0, then l1<r1 => l2+k<r2 => l2<r2
-            so l1<r1 subsumes l2<r2. *)
+    | Binary (Lesseq, l1, r1), Binary (Lesseq, l2, r2) ->
+        (* if subst(r1 - l1) = r2-l2 - k where k≥0, then l1≤r1 => l2+k≤r2 => l2≤r2
+            so l1≤r1 subsumes l2≤r2. *)
         matching2 ~subst l1 r1 sc1 ~scale2:true l2 r2 sc2
           (fun (subst, c1, c2) ->
             (* we removed all terms but the constants,

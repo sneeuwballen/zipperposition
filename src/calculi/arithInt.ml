@@ -113,7 +113,7 @@ module type S = sig
           the rule  (b < a and c < b) -> C1, then make the head of the rule
           true *)
 
-  val canc_lesseq_to_less : Env.lit_rewrite_rule
+  val canc_less_to_lesseq : Env.lit_rewrite_rule
     (** Simplification:  a <= b  ----> a < b+1 *)
 
   (** {3 Divisibility} *)
@@ -188,7 +188,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       (fun acc t pos ->
         let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
         f acc t with_pos);
-    let left, right = 
+    let left, right =
       Lits.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false
       ~eligible:C.Eligible.(filter Lit.is_arith_ineq** max c)
       (C.lits c) (!_idx_ineq_left, !_idx_ineq_right)
@@ -228,6 +228,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         _idx_unit := AL.fold_terms ~subterms:false ~vars:false ~pos ~which:`Max ~ord
           alit !_idx_unit
             (fun acc t pos ->
+              assert (not (T.is_var t));
               let with_pos = C.WithPos.( {term=t; pos; clause=c;} ) in
               f acc t with_pos
             )
@@ -657,12 +658,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     }
   end
 
-  (* range from low+1 to low+len-1 *)
+  (* range from low to low+len *)
   let _range low len =
     let rec make acc i len =
-      if Z.sign len <= 0 then acc
+      if Z.sign len < 0 then acc
       else make (i::acc) (Z.succ i) (Z.pred len)
-    in make [] (Z.succ low) (Z.pred len)
+    in make [] low len
 
   (* cancellative chaining *)
   let _do_chaining info acc =
@@ -686,13 +687,13 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* scale literals *)
       let lit_l, lit_r = ALF.scale lit_l lit_r in
       match lit_l, lit_r with
-      | ALF.Left (AL.Less, mf_1, m1), ALF.Right (AL.Less, m2, mf_2) ->
-        (* m2 < mf_2 and mf_1 < m1, with mf_1 and mf_2 sharing the same
-          focused term. We deduce m2 + mf_1 + 1 < m1 + mf_2 and cancel the
+      | ALF.Left (AL.Lesseq, mf_1, m1), ALF.Right (AL.Lesseq, m2, mf_2) ->
+        (* m2 ≤ mf_2 and mf_1 ≤ m1, with mf_1 and mf_2 sharing the same
+          focused term. We deduce m2 + mf_1 ≤ m1 + mf_2 and cancel the
           term out (after scaling) *)
         assert (Z.equal (MF.coeff mf_1) (MF.coeff mf_2));
-        let new_lit = Lit.mk_arith_less
-          (M.succ (M.sum m2 (MF.rest mf_1)))
+        let new_lit = Lit.mk_arith_lesseq
+          (M.sum m2 (MF.rest mf_1))
           (M.sum m1 (MF.rest mf_2))
         in
         let lits_l = Util.array_except_idx (C.lits info.left) idx_l in
@@ -713,7 +714,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
         (* now, maybe we can also perform case switch! We can if
            mf_1 - m1 = k + (m2 - mf_2). In this case necessarily
-           Or_{i=1...k-1} mf_2 = m2 + i *)
+           Or_{i=0...k} mf_2 = m2 + i *)
         let diff = M.difference
           (M.sum m1 (MF.rest mf_2))
           (M.sum m2 (MF.rest mf_1)) in
@@ -744,13 +745,13 @@ module Make(E : Env.S) : S with module Env = E = struct
   let canc_ineq_chaining c =
     Util.enter_prof prof_arith_ineq_chaining;
     let ord = Ctx.ord () in
-    let eligible = C.Eligible.(max c ** filter Lit.is_arith_less) in
+    let eligible = C.Eligible.(max c ** filter Lit.is_arith_lesseq) in
     let sc_l = 0 and sc_r = 1 in
     let res = Lits.fold_arith_terms ~eligible ~ord ~which:`Max (C.lits c) []
       (fun acc t lit pos ->
         match lit with
         | _ when T.is_var t -> acc (* ignore variables *)
-        | ALF.Left (AL.Less, mf_l, _) ->
+        | ALF.Left (AL.Lesseq, mf_l, _) ->
           (* find a right-chaining literal in some other clause *)
           PS.TermIndex.retrieve_unifiables !_idx_ineq_right sc_r t sc_l acc
             (fun acc _t' with_pos subst ->
@@ -758,7 +759,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               let right_pos = with_pos.C.WithPos.pos in
               let lit_r = Lits.View.get_arith_exn (C.lits right) right_pos in
               match lit_r with
-              | ALF.Right (AL.Less, _, mf_r) ->
+              | ALF.Right (AL.Lesseq, _, mf_r) ->
                 MF.unify_ff ~subst mf_l sc_l mf_r sc_r
                 |> Sequence.fold
                   (fun acc (_, _, subst) ->
@@ -769,7 +770,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   ) acc
               | _ -> acc
             )
-        | ALF.Right (AL.Less, _, mf_r) ->
+        | ALF.Right (AL.Lesseq, _, mf_r) ->
           (* find a right-chaining literal in some other clause *)
           PS.TermIndex.retrieve_unifiables !_idx_ineq_left sc_l t sc_r acc
             (fun acc _t' with_pos subst ->
@@ -777,7 +778,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               let left_pos = with_pos.C.WithPos.pos in
               let lit_l = Lits.View.get_arith_exn (C.lits left) left_pos in
               match lit_l with
-              | ALF.Left (AL.Less, mf_l, _) ->
+              | ALF.Left (AL.Lesseq, mf_l, _) ->
                 MF.unify_ff ~subst mf_l sc_l mf_r sc_r
                 |> Sequence.fold
                   (fun acc (_, _, subst) ->
@@ -800,7 +801,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let acc = ref [] in
     (* do the chaining if ordering conditions are ok,
       and the monomes differ only by a constant.
-      The literals are   l < mf_l and mf_r < r *)
+      The literals are   l ≤ mf_l and mf_r ≤ r *)
     let _do_case_switch ~subst lit1 lit2 i j =
       let renaming = S.Renaming.create () in
       let lit1 = ALF.apply_subst ~renaming subst lit1 0 in
@@ -808,8 +809,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* same coefficient for the focused term *)
       let lit1, lit2 = ALF.scale lit1 lit2 in
       match lit1, lit2 with
-      | ALF.Left (AL.Less, mf_r, r), ALF.Right (AL.Less, l, mf_l)
-      | ALF.Right (AL.Less, l, mf_l), ALF.Left (AL.Less, mf_r, r) ->
+      | ALF.Left (AL.Lesseq, mf_r, r), ALF.Right (AL.Lesseq, l, mf_l)
+      | ALF.Right (AL.Lesseq, l, mf_l), ALF.Left (AL.Lesseq, mf_r, r) ->
         let diff = M.difference
           (M.difference (MF.rest mf_r) r)
           (M.difference (MF.rest mf_l) l)
@@ -820,10 +821,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         && ALF.is_max ~ord lit1
         && ALF.is_max ~ord lit2
         && (C.is_maxlit c 0 subst i || C.is_maxlit c 0 subst j)
-        (* C = C' or l < mf_l or mf_r < r,
+        (* C = C' or l ≤ mf_l or mf_r ≤ r,
           with mf_l and mf_r sharing the focus on a.t, so
           if mf_r.rest - r = k + l - mf_l.rest, then
-            (a.t + mf_l.rest = l + k') => C' is true for k'=0...k *)
+            (a.t + mf_l.rest = l + k') => C' is true for k'=1...k-1 *)
         then begin
           let k = Z.to_int (M.const diff) in
           (* build literals *)
@@ -832,7 +833,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             [] (C.lits c)
           in
           let other_lits = Lit.apply_subst_list ~renaming subst other_lits 0 in
-          for i=0 to k do
+          for i=1 to k-1 do
             let new_lit = Lit.mk_arith_neq
               (MF.to_monome mf_l)
               (M.add_const l (Z.of_int i))
@@ -851,29 +852,29 @@ module Make(E : Env.S) : S with module Env = E = struct
       | _ -> ()
     in
     (* traverse the clause to find matching pairs *)
-    let eligible = C.Eligible.(max c ** filter Lit.is_arith_less) in
+    let eligible = C.Eligible.(max c ** filter Lit.is_arith_lesseq) in
     Lits.fold_arith ~eligible (C.lits c) ()
       (fun () lit1 pos1 ->
         let i = Lits.Pos.idx pos1 in
-        let eligible' = C.Eligible.(filter Lit.is_arith_less) in
+        let eligible' = C.Eligible.(filter Lit.is_arith_lesseq) in
         Lits.fold_arith ~eligible:eligible' (C.lits c) ()
           (fun () lit2 pos2 ->
             let j = Lits.Pos.idx pos2 in
             match lit1, lit2 with
             | _ when i=j -> ()  (* need distinct lits *)
-            | AL.Binary (AL.Less, l1, r1), AL.Binary (AL.Less, l2, r2) ->
+            | AL.Binary (AL.Lesseq, l1, r1), AL.Binary (AL.Lesseq, l2, r2) ->
               (* see whether we have   l2 < a.x + m < r1 *)
               MF.unify_mm l1 0 r2 0
                 (fun (mf1,mf2,subst) ->
-                  let lit1 = ALF.mk_left AL.Less mf1 r1 in
-                  let lit2 = ALF.mk_right AL.Less l2 mf2 in
+                  let lit1 = ALF.mk_left AL.Lesseq mf1 r1 in
+                  let lit2 = ALF.mk_right AL.Lesseq l2 mf2 in
                   _do_case_switch ~subst lit1 lit2 i j
                 );
               (* see whether we have   l1 < a.x + m < r2 *)
               MF.unify_mm r1 0 l2 0
                 (fun (mf1,mf2,subst) ->
-                  let lit1 = ALF.mk_right AL.Less l1 mf1 in
-                  let lit2 = ALF.mk_left AL.Less mf2 r2 in
+                  let lit1 = ALF.mk_right AL.Lesseq l1 mf1 in
+                  let lit2 = ALF.mk_left AL.Lesseq mf2 r2 in
                   _do_case_switch ~subst lit1 lit2 i j
                 );
               ()
@@ -895,10 +896,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* same coefficient for the focused term *)
       let lit1, lit2 = ALF.scale lit1 lit2 in
       match lit1, lit2 with
-      | ALF.Left (AL.Less, mf1, m1), ALF.Left (AL.Less, mf2, m2)
-      | ALF.Right (AL.Less, m1, mf1), ALF.Right (AL.Less, m2, mf2) ->
-        (* mf1 < m1  or  mf2 < m2  (symmetry with > if needed)
-           so we deduce that if  m1-mf1.rest < m2 - mf2.rest
+      | ALF.Left (AL.Lesseq, mf1, m1), ALF.Left (AL.Lesseq, mf2, m2)
+      | ALF.Right (AL.Lesseq, m1, mf1), ALF.Right (AL.Lesseq, m2, mf2) ->
+        (* mf1 ≤ m1  or  mf2 ≤ m2  (symmetry with > if needed)
+           so we deduce that if  m1-mf1.rest ≤ m2 - mf2.rest
            then the first literal implies the second, so we only
            keep the second one *)
         if (C.is_maxlit c 0 subst i || C.is_maxlit c 0 subst j)
@@ -911,10 +912,10 @@ module Make(E : Env.S) : S with module Env = E = struct
           (* build new literal *)
           let new_lit =
             if left
-            then Lit.mk_arith_less
+            then Lit.mk_arith_lesseq
               (M.difference m1 (MF.rest mf1))
               (M.difference m2 (MF.rest mf2))
-            else Lit.mk_arith_less
+            else Lit.mk_arith_lesseq
               (M.difference m2 (MF.rest mf2))
               (M.difference m1 (MF.rest mf1))
           in
@@ -933,29 +934,29 @@ module Make(E : Env.S) : S with module Env = E = struct
       | _ -> ()
     in
     (* traverse the clause to find matching pairs *)
-    let eligible = C.Eligible.(max c ** filter Lit.is_arith_less) in
+    let eligible = C.Eligible.(max c ** filter Lit.is_arith_lesseq) in
     Lits.fold_arith ~eligible (C.lits c) ()
       (fun () lit1 pos1 ->
         let i = Lits.Pos.idx pos1 in
-        let eligible' = C.Eligible.(filter Lit.is_arith_less) in
+        let eligible' = C.Eligible.(filter Lit.is_arith_lesseq) in
         Lits.fold_arith ~eligible:eligible' (C.lits c) ()
           (fun () lit2 pos2 ->
             let j = Lits.Pos.idx pos2 in
             match lit1, lit2 with
             | _ when i=j -> ()  (* need distinct lits *)
-            | AL.Binary (AL.Less, l1, r1), AL.Binary (AL.Less, l2, r2) ->
+            | AL.Binary (AL.Lesseq, l1, r1), AL.Binary (AL.Lesseq, l2, r2) ->
               (* see whether we have   l1 < a.x + mf1  and  l2 < a.x + mf2 *)
               MF.unify_mm r1 0 r2 0
                 (fun (mf1,mf2,subst) ->
-                  let lit1 = ALF.mk_right AL.Less l1 mf1 in
-                  let lit2 = ALF.mk_right AL.Less l2 mf2 in
+                  let lit1 = ALF.mk_right AL.Lesseq l1 mf1 in
+                  let lit2 = ALF.mk_right AL.Lesseq l2 mf2 in
                   _do_factoring ~subst lit1 lit2 i j
                 );
               (* see whether we have   a.x + mf1 < r1 and a.x + mf2 < r2  *)
               MF.unify_mm l1 0 l2 0
                 (fun (mf1,mf2,subst) ->
-                  let lit1 = ALF.mk_left AL.Less mf1 r1 in
-                  let lit2 = ALF.mk_left AL.Less mf2 r2 in
+                  let lit1 = ALF.mk_left AL.Lesseq mf1 r1 in
+                  let lit2 = ALF.mk_left AL.Lesseq mf2 r2 in
                   _do_factoring ~subst lit1 lit2 i j
                 );
               ()
@@ -1276,10 +1277,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       (fun acc lit _ ->
         (* negate the literal and make a constraint out of it *)
         match lit with
-        | AL.Binary (AL.Less, m1, m2) ->
-            (* m1 < m2 ----> m1-m2 >= 0 *)
+        | AL.Binary (AL.Lesseq, m1, m2) ->
+            (* m1 ≤ m2 ----> m1-m2 > 0 ---> m1-m2 ≥ 1 *)
             let m, c = to_rat (M.difference m1 m2) in
-            (Simp.GreaterEq, m, Q.neg c) :: acc
+            (Simp.GreaterEq, m, Q.add (Q.neg c) Q.one) :: acc
         | AL.Binary (AL.Different, m1, m2) ->
             (* m1 != m2  -----> (m1-m2) = 0 *)
             let m, c = to_rat (M.difference m1 m2) in
@@ -1310,10 +1311,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       res
     end
 
-  (* a <= b ----> a < b+1 *)
-  let canc_lesseq_to_less = function
-    | Lit.Arith (AL.Binary (AL.Lesseq, m1, m2)) ->
-        Lit.mk_arith_less m1 (M.succ m2)
+  (* Simplification:  a < b  ----> a+1 ≤ b *)
+  let canc_less_to_lesseq = function
+    | Lit.Arith (AL.Binary (AL.Less, m1, m2)) ->
+        Lit.mk_arith_lesseq (M.succ m1) m2
     | lit -> lit
 
   exception VarElim of int * S.t
@@ -1353,8 +1354,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.debug 4 "arith_eq_res: simplify %a into %a" C.pp c C.pp c';
     c'
 
-  (* a != b ------> a < b | a > b *)
-  let canc_diff_to_less c =
+  (* a != b ------> a+1 ≤ b | a ≥ b+1 *)
+  let canc_diff_to_lesseq c =
     let ord = Ctx.ord () in
     Lits.fold_lits ~eligible:C.Eligible.(filter Lit.is_arith_neq ** max c)
       (C.lits c) []
@@ -1364,12 +1365,12 @@ module Make(E : Env.S) : S with module Env = E = struct
             assert (Lits.is_max ~ord (C.lits c) i);
             let lits = Util.array_except_idx (C.lits c) i in
             let new_lits =
-              [ Lit.mk_arith_less m1 m2
-              ; Lit.mk_arith_less m2 m1
+              [ Lit.mk_arith_lesseq (M.succ m1) m2
+              ; Lit.mk_arith_lesseq (M.succ m2) m1
               ]
             in
             let proof cc = Proof.mk_c_inference
-              ~theories ~rule:"arith_diff_to_less" cc [C.proof c] in
+              ~theories ~rule:"arith_diff_to_lesseq" cc [C.proof c] in
             let c' = C.create ~parents:[c] (new_lits @ lits) proof in
             Util.debug 5 "diff2less: %a ----> %a" C.pp c C.pp c';
             c' :: acc
@@ -1495,8 +1496,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       b_lit : ALF.t list;  (* c.x + m1 != m2 *)
       c_lit : ALF.t list;  (* n | m_c.x + m  *)
       d_lit : ALF.t list;  (* n not| m_c.x + m *)
-      e_lit : ALF.t list;  (* c.x + m1 < m2 *)
-      f_lit : ALF.t list;  (* m1 < c.x + m2 *)
+      e_lit : ALF.t list;  (* c.x + m1 ≤ m2 *)
+      f_lit : ALF.t list;  (* m1 ≤ c.x + m2 *)
       lcm : Z.t; (* scaling coefficient (divisibility guard) *)
       delta : Z.t; (* lcm of all divisibility constraints *)
     }
@@ -1584,17 +1585,17 @@ module Make(E : Env.S) : S with module Env = E = struct
             | Some (ALF.Div d as lit) ->
               assert (not(d.AL.sign));
               { acc with d_lit = lit::acc.d_lit; }
-            | Some (ALF.Left (AL.Less, _, _) as lit) ->
+            | Some (ALF.Left (AL.Lesseq, _, _) as lit) ->
               { acc with e_lit = lit::acc.e_lit; }
-            | Some (ALF.Left (AL.Lesseq, mf1, m2)) ->
-              (* mf1 <= m2 ------> mf1 < m2+1 *)
-              let lit = ALF.Left (AL.Less, mf1, M.succ m2) in
+            | Some (ALF.Left (AL.Less, mf1, m2)) ->
+              (* mf1 < m2 ------> mf1 ≤ m2-1 *)
+              let lit = ALF.Left (AL.Lesseq, mf1, M.pred m2) in
               { acc with e_lit = lit::acc.e_lit; }
-            | Some (ALF.Right (AL.Less, _, _) as lit) ->
+            | Some (ALF.Right (AL.Lesseq, _, _) as lit) ->
               { acc with f_lit = lit::acc.f_lit; }
-            | Some (ALF.Right (AL.Lesseq, m1, mf2)) ->
-              (* m1 <= mf2 -----> m1-1 < mf2 *)
-              let lit = ALF.Right (AL.Less, M.pred m1, mf2) in
+            | Some (ALF.Right (AL.Less, m1, mf2)) ->
+              (* m1 < mf2 -----> m1+1 ≤ mf2 *)
+              let lit = ALF.Right (AL.Lesseq, M.succ m1, mf2) in
               { acc with f_lit = lit::acc.f_lit; }
             end
           | _ ->
@@ -1616,7 +1617,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             | _ -> assert false)
           c.b_lit
         ; List.map (function
-            | ALF.Left (AL.Less, mf, m) -> M.difference m (MF.rest mf)
+            | ALF.Left (AL.Lesseq, mf, m) -> M.difference (M.succ m) (MF.rest mf)
             | _ -> assert false)
           c.e_lit
         ]
@@ -1634,7 +1635,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             | _ -> assert false)
           c.b_lit
         ; List.map (function
-            | ALF.Right (AL.Less, m, mf) -> M.difference m (MF.rest mf)
+            | ALF.Right (AL.Lesseq, m, mf) -> M.difference (M.pred m) (MF.rest mf)
             | _ -> assert false)
           c.f_lit
         ]
@@ -1661,14 +1662,14 @@ module Make(E : Env.S) : S with module Env = E = struct
         (function
           | ALF.Left (AL.Different, _, _)
           | ALF.Right (AL.Different, _, _)
-          | ALF.Left (AL.Less, _, _) -> Lit.mk_tauto
+          | ALF.Left (AL.Lesseq, _, _) -> Lit.mk_tauto
           | ALF.Left (AL.Equal, _, _)
           | ALF.Right (AL.Equal, _, _)
-          | ALF.Right (AL.Less, _, _) -> Lit.mk_absurd
+          | ALF.Right (AL.Lesseq, _, _) -> Lit.mk_absurd
           | ALF.Div d ->
               Lit.mk_divides ~sign:d.AL.sign d.AL.num
                 ~power:d.AL.power (M.sum (MF.rest d.AL.monome) x)
-          | ALF.Left (AL.Lesseq, _, _) | ALF.Right (AL.Lesseq, _, _) -> assert false
+          | ALF.Left (AL.Less, _, _) | ALF.Right (AL.Less, _, _) -> assert false
         ) c
 
     (* evaluate when the variable is equal to x, but as big as needed.
@@ -1679,14 +1680,14 @@ module Make(E : Env.S) : S with module Env = E = struct
         (function
           | ALF.Left (AL.Different, _, _)
           | ALF.Right (AL.Different, _, _)
-          | ALF.Right (AL.Less, _, _) -> Lit.mk_tauto
+          | ALF.Right (AL.Lesseq, _, _) -> Lit.mk_tauto
           | ALF.Left (AL.Equal, _, _)
           | ALF.Right (AL.Equal, _, _)
-          | ALF.Left (AL.Less, _, _) -> Lit.mk_absurd
+          | ALF.Left (AL.Lesseq, _, _) -> Lit.mk_absurd
           | ALF.Div d ->
               Lit.mk_divides ~sign:d.AL.sign d.AL.num
                 ~power:d.AL.power (M.sum (MF.rest d.AL.monome) x)
-          | ALF.Left (AL.Lesseq, _, _) | ALF.Right (AL.Lesseq, _, _) -> assert false
+          | ALF.Left (AL.Less, _, _) | ALF.Right (AL.Less, _, _) -> assert false
         ) c
   end
 
@@ -1784,8 +1785,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_multi_simpl_rule canc_div_prime_decomposition;
     Env.add_multi_simpl_rule eliminate_unshielded;
     Env.add_lit_rule "canc_lit_of_lit" canc_lit_of_lit;
-    Env.add_lit_rule "lesseq_to_less" canc_lesseq_to_less;
-    Env.add_unary_inf "canc_diff_to_less" canc_diff_to_less;
+    Env.add_lit_rule "less_to_lesseq" canc_less_to_lesseq;
+    Env.add_unary_inf "canc_diff_to_lesseq" canc_diff_to_lesseq;
     Env.add_simplify canc_eq_resolution;
     Env.add_simplify canc_demodulation;
     Env.add_is_trivial is_tautology;
