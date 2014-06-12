@@ -205,8 +205,11 @@ module Sets = struct
     | TC.App (s, _, [t]) when Symbol.eq s sets.complement -> Complement t
     | _ -> Other t
 
-  let mk_member ~sets x set =
-    T.app_full (T.const ~ty:(_ty_member ~sets) sets.member) [T.ty x] [x;set]
+
+  let get_set_type ~sets t =
+    match Type.view (T.ty t) with
+      | Type.App (s, [alpha]) when Symbol.eq s sets.set_type -> Some alpha
+      | _ -> None
 
   (* if t:set(alpha) then return alpha, otherwise raise Invalid_argument *)
   let _get_set_type ~sets t =
@@ -218,6 +221,9 @@ module Sets = struct
     match Type.view (T.ty t) with
       | Type.App (s,_) when Symbol.eq s sets.set_type -> true
       | _ -> false
+
+  let mk_member ~sets x set =
+    T.app_full (T.const ~ty:(_ty_member ~sets) sets.member) [T.ty x] [x;set]
 
   let mk_subset ~sets s1 s2 =
     let alpha = _get_set_type ~sets s1 in
