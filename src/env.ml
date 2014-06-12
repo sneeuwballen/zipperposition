@@ -682,7 +682,7 @@ end) : S with module Ctx = X.Ctx = struct
       else None
 
   (* find candidates for backward simplification in active set *)
-  let backward_simplify given =
+  let backward_simplify_find_candidates given =
     match !_backward_simplify with
     | [] -> C.CSet.empty
     | [f] -> f given
@@ -693,7 +693,7 @@ end) : S with module Ctx = X.Ctx = struct
   let backward_simplify given =
     Util.enter_prof prof_back_simplify;
     (* set of candidate clauses, that may be unit-simplifiable *)
-    let candidates = backward_simplify given in
+    let candidates = backward_simplify_find_candidates given in
     (* try to simplify the candidates. Before is the set of clauses that
        are simplified, after is the list of those clauses after simplification *)
     let before, after =
