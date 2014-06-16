@@ -551,29 +551,33 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let canc_demodulation c = _demodulation c
 
-  let _backward_demod a_lit =
-    C.CSet.empty  (* TODO
-    let ord = Ctx.ord () in
-    match a_lit with
-    | AL.Binary (AL.Equal, _, _) ->
-        AL.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false
-          a_lit C.CSet.empty
-          (fun acc t _pos ->
-            PS.TermIndex.retrieve_specializations !_idx_all 1 t 0 acc
-              (fun acc
-
-          )
-    | _ ->
-    *)
-
   (* find clauses in which some literal could be rewritten by [c], iff
     [c] is a positive unit arith clause *)
   let canc_backward_demodulation c =
     Util.enter_prof prof_arith_backward_demod;
+    let ord = Ctx.ord () in
+    let res = C.CSet.empty in
     let res = match C.lits c with
-    | [| Lit.Arith a_lit |] when AL.is_pos a_lit ->
-        _backward_demod a_lit
-    | _ -> C.CSet.empty
+      | [| Lit.Arith (AL.Binary (AL.Equal, _, _) as alit) |] ->
+        AL.fold_terms ~vars:false ~which:`Max ~subterms:false ~ord
+          alit C.CSet.empty
+          (fun acc t pos ->
+            PS.TermIndex.retrieve_specializations !_idx_all 0 t 1 acc
+              (fun acc _t' with_pos subst ->
+                (* check whether the term [t] is indeed maximal in
+                  its literal (and clause) after substitution *)
+                let alit' = ALF.get_exn alit pos in
+                let alit' = ALF.apply_subst_no_renaming subst alit' 1 in
+                if ALF.is_max ~ord alit'
+                then
+                  C.CSet.add acc with_pos.C.WithPos.clause
+                else acc
+              ))
+      | [| Lit.Arith (AL.Binary (AL.Lesseq, m1, m2)) |] ->
+          res (* TODO *)
+      | [| Lit.Arith (AL.Divides d) |] when d.AL.sign ->
+          res (* TODO *)
+      | _ -> res (* no demod *)
     in
     Util.exit_prof prof_arith_backward_demod;
     res
