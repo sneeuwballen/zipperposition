@@ -453,7 +453,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       match active_lit, passive_lit with
       | ALF.Left (AL.Equal, mf1, m1), _
       | ALF.Right (AL.Equal, m1, mf1), _ ->
-          Util.debug 1 "active_lit: %a (mf=%a, m=%a)" ALF.pp active_lit MF.pp mf1 M.pp m1;
           let new_lit = ALF.replace passive_lit
             (M.difference m1 (MF.rest mf1)) in
           raise (SimplifyInto (new_lit, c',subst))
@@ -508,7 +507,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* lit ----> lit' *)
       add_premise c';
       (* recurse until the literal isn't reducible *)
-      Util.debug 1 "rewrite arith lit (%a) into (%a)\n%% using clause %a and subst %a"
+      Util.debug 4 "rewrite arith lit (%a) into (%a)\n%% using clause %a and subst %a"
         AL.pp a_lit AL.pp a_lit' C.pp c' S.pp subst;
       _demod_lit_nf ~add_premise ~add_lit ~i c a_lit'
     end
