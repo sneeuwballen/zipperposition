@@ -159,6 +159,7 @@ type scope = S.scope
 let _enable_arith = ref false
 let _enable_ac = ref false
 let _enable_semantic_tauto = ref false
+let _dot_unit = ref None
 
 let case_switch_limit = ref 30
 let div_case_switch_limit = ref 100
@@ -405,7 +406,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* demodulation (simplification)
     TODO: this should be split into forward/backward simplifications
     same as regular demodulation... *)
-  let canc_demodulation c =
+  let _demodulation c =
     Util.enter_prof prof_arith_demod;
     let ord = Ctx.ord () in
     let did_simplify = ref false in
@@ -488,9 +489,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         | _ -> add_lit lit
       );
     (* build result clause (if it was simplified) *)
-    let res =
-      if !did_simplify
-      then begin
+    let res = if !did_simplify
+      then (
         let proof cc = Proof.mk_c_inference ~theories ~rule:"canc_demod"
           cc (C.proof c :: List.map C.proof !clauses) in
         let new_c = C.create ~parents:(c::!clauses) (List.rev !lits) proof in
@@ -498,11 +498,12 @@ module Make(E : Env.S) : S with module Env = E = struct
         Util.debug 5 "arith demodulation of %a with [%a] gives %a"
           C.pp c (Util.pp_list C.pp) !clauses C.pp new_c;
         new_c
-      end
-      else c
+      ) else c
     in
     Util.exit_prof prof_arith_demod;
     res
+
+  let canc_demodulation c = _demodulation c
 
   let cancellation c =
     Util.enter_prof prof_arith_cancellation;
@@ -1711,15 +1712,14 @@ module Make(E : Env.S) : S with module Env = E = struct
         and b_set = NVE.b_set view in
         (* prepare to build clauses *)
         let acc = ref [] in
-        let add_clause ~by ?which lits =
+        let add_clause ~by ~which lits =
           let info =
-            [Util.sprintf "elim %s×%a → %a" (Z.to_string view.NVE.lcm) T.pp x M.pp by] in
-          let info = match which with None -> info | Some i -> i :: info in
+            [which; Util.sprintf "elim %s×%a → %a" (Z.to_string view.NVE.lcm) T.pp x M.pp by] in
           let proof cc = Proof.mk_c_inference
             ~info ~theories ~rule:"var_elim" cc [C.proof c] in
           let new_c = C.create ~parents:[c] lits proof in
-          Util.debug 5 "elimination of %s×%a by %a in %a: gives %a"
-            (Z.to_string view.NVE.lcm) T.pp x M.pp by C.pp c C.pp new_c;
+          Util.debug 5 "elimination of %s×%a by %a (which:%s) in %a: gives %a"
+            (Z.to_string view.NVE.lcm) T.pp x M.pp by which C.pp c C.pp new_c;
           acc := new_c :: !acc
         in
         (* choose which form to use *)
@@ -1741,7 +1741,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   (* evaluate at x'+i *)
                   let x'' = M.add_const x' Z.(of_int i) in
                   let lits = view.NVE.rest @ _negate_lits (NVE.eval_at view x'') in
-                  add_clause ~by:x'' lits
+                  add_clause ~by:x'' ~which:"middle" lits
                 ) b_set
             done;
           end else begin
@@ -1761,7 +1761,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   (* evaluate at x'-i *)
                   let x'' = M.add_const x' Z.(neg (of_int i)) in
                   let lits = view.NVE.rest @ _negate_lits (NVE.eval_at view x'') in
-                  add_clause ~by:x'' lits
+                  add_clause ~by:x'' ~which:"middle" lits
                 ) a_set
             done;
           end;
@@ -1769,6 +1769,22 @@ module Make(E : Env.S) : S with module Env = E = struct
       end
 
   (** {2 Setup} *)
+
+  (* print index into file *)
+  let _print_idx file idx =
+    Util.with_output file
+      (fun oc ->
+        let pp_leaf buf v = () in
+        Util.fprintf oc "%a" (PS.TermIndex.to_dot pp_leaf) idx;
+        flush oc)
+
+  let setup_dot_printers () =
+    CCOpt.iter
+      (fun f ->
+          Signal.once Signals.on_dot_output
+            (fun () -> _print_idx f !_idx_unit)
+      ) !_dot_unit;
+    ()
 
   let register () =
     Util.debug 2 "cancellative inf: setup env";
@@ -1801,6 +1817,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let ty = Signature.find_exn Signature.TPTP.Arith.full sum in
       Ctx.Theories.AC.add ~ty sum;
     end;
+    setup_dot_printers ();
     ()
 end
 
@@ -1840,5 +1857,8 @@ let () =
     ; "-arith-ac"
       , Arg.Set _enable_ac
       , "enable AC axioms for arithmetic (sum)"
+    ; "-dot-arith-unit"
+      , Arg.String (fun s -> _dot_unit := Some s)
+      , "print arith-unit index into file"
     ];
   ()
