@@ -402,96 +402,119 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.exit_prof prof_arith_sup;
     res
 
-  exception SimplifyInto of Literal.t * C.t
+  exception SimplifyInto of ArithLit.t * C.t * S.t
 
-  (* demodulation (simplification)
-    TODO: this should be split into forward/backward simplifications
-    same as regular demodulation... *)
+  (* how to simplify the passive lit with the active lit, in one step *)
+  let _try_demod_step ~subst passive_lit s_p c pos active_lit s_a c' pos' =
+    let ord = Ctx.ord () in
+    let i = Lits.Pos.idx pos in
+    let renaming = S.Renaming.create () in
+    let active_lit' = ALF.apply_subst ~renaming subst active_lit s_a in
+    (* restrictions:
+      - the rewriting term must be bigger than other terms
+        (in other words, the inference is strictly decreasing)
+      - all variables of active clause must be bound by subst
+      - must not rewrite itself (c != c') *)
+    if ALF.is_strictly_max ~ord active_lit'
+    && (C.Seq.vars c'
+        |> Sequence.for_all (fun v -> S.mem subst (v:T.t:>ScopedTerm.t) s_a))
+    && ( (C.lits c |> Array.length) > 1
+        || not(Lit.eq (C.lits c).(i) (C.lits c').(0))
+        || not(ALF.is_max ~ord passive_lit && C.is_maxlit c 0 S.empty ~idx:i)
+      )
+    then (
+      (* we know all variables of [active_lit] are bound, no need
+        for a renaming *)
+      let active_lit = ALF.apply_subst_no_renaming subst active_lit s_a in
+      let active_lit, passive_lit = ALF.scale active_lit passive_lit in
+      match active_lit, passive_lit with
+      | ALF.Left (AL.Equal, mf1, m1), _
+      | ALF.Right (AL.Equal, m1, mf1), _ ->
+          Util.debug 1 "active_lit: %a (mf=%a, m=%a)" ALF.pp active_lit MF.pp mf1 M.pp m1;
+          let new_lit = ALF.replace passive_lit
+            (M.difference m1 (MF.rest mf1)) in
+          raise (SimplifyInto (new_lit, c',subst))
+      | ALF.Div d1, ALF.Div d2 when d1.AL.sign ->
+          let n1 = Z.pow d1.AL.num d1.AL.power and n2 = Z.pow d2.AL.num d2.AL.power in
+          let gcd = Z.gcd (MF.coeff d1.AL.monome) (MF.coeff d2.AL.monome) in
+          (* simplification: we only do the rewriting if both
+             literals have exactly the same num and power...
+             TODO: generalize *)
+          if Z.equal n1 n2
+          && Z.lt gcd Z.(pow d2.AL.num d2.AL.power)
+          then
+            let new_lit = ALF.replace passive_lit
+              (M.uminus (MF.rest d1.AL.monome)) in
+            raise (SimplifyInto (new_lit, c',subst))
+      | _ -> ()
+    ) else ()
+
+  (* reduce an arithmetic literal to its current normal form *)
+  let rec _demod_lit_nf ~add_lit ~add_premise ~i c a_lit =
+    let ord = Ctx.ord () in
+    let s_a = 1 and s_p = 0 in  (* scopes *)
+    (* which term indexes can be used *)
+    let indexes = match a_lit with
+      | AL.Divides _ -> [!_idx_unit_div; !_idx_unit_eq]
+      | AL.Binary _ -> [!_idx_unit_eq]
+    in
+    begin try
+      AL.fold_terms ~pos:Position.stop ~vars:false ~which:`Max
+      ~ord ~subterms:false a_lit ()
+        (fun () t lit_pos ->
+          assert (not (T.is_var t));
+          let passive_lit = ALF.get_exn a_lit lit_pos in
+          (* search for generalizations of [t] *)
+          List.iter
+            (fun index ->
+              PS.TermIndex.retrieve_generalizations index s_a t s_p ()
+              (fun () t' with_pos subst ->
+                let c' = with_pos.C.WithPos.clause in
+                let pos' = with_pos.C.WithPos.pos in
+                assert (C.is_unit_clause c');
+                assert (Lits.Pos.idx pos' = 0);
+                let active_lit = Lits.View.get_arith_exn (C.lits c') pos' in
+                let pos = Position.(arg i lit_pos) in
+                _try_demod_step ~subst passive_lit s_p c pos active_lit s_a c' pos'
+              )
+            ) indexes
+        );
+      (* could not simplify, keep the literal *)
+      add_lit (Lit.mk_arith a_lit)
+    with SimplifyInto (a_lit',c',subst) ->
+      (* lit ----> lit' *)
+      add_premise c';
+      (* recurse until the literal isn't reducible *)
+      Util.debug 1 "rewrite arith lit (%a) into (%a)\n%% using clause %a and subst %a"
+        AL.pp a_lit AL.pp a_lit' C.pp c' S.pp subst;
+      _demod_lit_nf ~add_premise ~add_lit ~i c a_lit'
+    end
+
+  (* demodulation (simplification) *)
   let _demodulation c =
     Util.enter_prof prof_arith_demod;
-    let ord = Ctx.ord () in
     let did_simplify = ref false in
     let lits = ref [] in  (* simplified literals *)
     let add_lit l = lits := l :: !lits in
     let clauses = ref [] in  (* simplifying clauses *)
-    let s_a = 1 and s_p = 0 in  (* scopes *)
-    (* how to simplify the passive lit with the active lit *)
-    let _try_simplify ~subst passive_lit pos active_lit c' pos' =
-      let i = Lits.Pos.idx pos in
-      let renaming = Ctx.renaming_clear () in
-      let active_lit' = ALF.apply_subst ~renaming subst active_lit s_a in
-      (* restrictions:
-        - the rewriting term must be bigger than other terms
-          (in other words, the inference is strictly decreasing)
-        - all variables of active clause must be bound by subst
-        - must not rewrite itself (c != c') *)
-      if ALF.is_strictly_max ~ord active_lit'
-      && ((C.lits c |> Array.length) > 1
-          || not(Lit.is_arith_eq (C.lits c).(i))
-          || not(C.is_maxlit c s_p S.empty ~idx:i))
-      && (C.Seq.vars c'
-          |> Sequence.for_all (fun v -> S.mem subst (v:T.t:>ScopedTerm.t) s_a))
-      then
-        (* we know all variables of [active_lit] are bound, no need
-          for a renaming *)
-        let active_lit = ALF.apply_subst_no_renaming subst active_lit s_a in
-        let active_lit, passive_lit = ALF.scale active_lit passive_lit in
-        match active_lit, passive_lit with
-        | ALF.Left (AL.Equal, mf1, m1), _
-        | ALF.Right (AL.Equal, m1, mf1), _ ->
-            let new_lit = Lit.mk_arith
-              (ALF.replace passive_lit (M.difference m1 (MF.rest mf1))) in
-            raise (SimplifyInto (new_lit, c'))
-        | ALF.Div d1, ALF.Div d2 when d1.AL.sign ->
-            let n1 = Z.pow d1.AL.num d1.AL.power and n2 = Z.pow d2.AL.num d2.AL.power in
-            let gcd = Z.gcd (MF.coeff d1.AL.monome) (MF.coeff d2.AL.monome) in
-            (* simplification: we only do the rewriting if both
-               literals have exactly the same num and power...
-               TODO: generalize *)
-            if Z.equal n1 n2
-            && Z.lt gcd Z.(pow d2.AL.num d2.AL.power)
-            then
-              let new_lit = Lit.mk_arith
-                (ALF.replace passive_lit (M.uminus (MF.rest d1.AL.monome))) in
-              raise (SimplifyInto (new_lit, c'))
-        | _ -> ()
-      else ()
+    (* add a rewriting clause *)
+    let add_premise c' =
+      did_simplify := true;
+      clauses := c' :: !clauses
     in
     (* simplify each and every literal *)
     Lits.fold_lits ~eligible:C.Eligible.always (C.lits c) ()
       (fun () lit i ->
-        let pos = Position.(arg i stop) in
         match lit with
         | Lit.Arith a_lit ->
-            begin try
-              AL.fold_terms ~pos ~vars:false ~which:`Max
-              ~ord ~subterms:false a_lit ()
-                (fun () t pos ->
-                  assert (not (T.is_var t));
-                  let passive_lit = Lits.View.get_arith_exn (C.lits c) pos in
-                  (* search for generalizations of [t] *)
-                  PS.TermIndex.retrieve_generalizations !_idx_unit s_a t s_p ()
-                    (fun () t' with_pos subst ->
-                      let c' = with_pos.C.WithPos.clause in
-                      let pos' = with_pos.C.WithPos.pos in
-                      assert (Lits.Pos.idx pos' = 0);
-                      let active_lit = Lits.View.get_arith_exn (C.lits c') pos' in
-                      _try_simplify ~subst passive_lit pos active_lit c' pos'
-                    )
-                );
-              (* could not simplify, keep the literal *)
-              add_lit lit
-            with SimplifyInto (lit',c') ->
-              (* lit ----> lit' *)
-              did_simplify := true;
-              clauses := c' :: !clauses;
-              add_lit lit'
-            end
-        | _ -> add_lit lit
+            _demod_lit_nf ~add_lit ~add_premise ~i c a_lit
+        | _ ->
+            add_lit lit (* keep non-arith literals *)
       );
     (* build result clause (if it was simplified) *)
     let res = if !did_simplify
       then (
+        clauses := CCList.Set.uniq ~eq:C.eq !clauses;
         let proof cc = Proof.mk_c_inference ~theories ~rule:"canc_demod"
           cc (C.proof c :: List.map C.proof !clauses) in
         let new_c = C.create ~parents:(c::!clauses) (List.rev !lits) proof in
