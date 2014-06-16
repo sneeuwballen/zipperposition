@@ -104,6 +104,8 @@ val generic_unif: Z.t Monome.t unif -> t unif
 
 val apply_subst : renaming:Substs.Renaming.t -> Substs.t -> t -> scope -> t
 
+val apply_subst_no_renaming : Substs.t -> t -> scope -> t
+
 val apply_subst_no_simp : renaming:Substs.Renaming.t -> Substs.t -> t -> scope -> t
   (** Same as {!apply_subst} but takes care {B NOT} simplifying the
       literal. In practice, mostly useful for comparison purpose. *)

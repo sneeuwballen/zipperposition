@@ -550,6 +550,15 @@ let apply_subst ~renaming subst lit scope = match lit with
     mk_divides ~sign:d.sign d.num ~power:d.power
       (M.apply_subst ~renaming subst d.monome scope)
 
+let apply_subst_no_renaming subst lit scope = match lit with
+  | Binary (op, m1, m2) ->
+    make op
+      (M.apply_subst_no_renaming subst m1 scope)
+      (M.apply_subst_no_renaming subst m2 scope)
+  | Divides d ->
+    mk_divides ~sign:d.sign d.num ~power:d.power
+      (M.apply_subst_no_renaming subst d.monome scope)
+
 let apply_subst_no_simp ~renaming subst lit scope = match lit with
   | Binary (op, m1, m2) ->
     Binary (op,
@@ -806,10 +815,13 @@ module Focus = struct
     | Left (_, mf, m)
     | Right (_, m, mf) ->
         let t = MF.term mf in
-        let terms = Sequence.append (M.Seq.terms m) (MF.rest mf |> M.Seq.terms) in
         Sequence.for_all
           (fun t' -> Ordering.compare ord t t' = Comparison.Gt)
-          terms
+          (M.Seq.terms m)
+        &&
+        Sequence.for_all
+          (fun t' -> Ordering.compare ord t t' = Comparison.Gt)
+          (MF.rest mf |> M.Seq.terms)
     | Div d ->
         let t = MF.term d.monome in
         Sequence.for_all

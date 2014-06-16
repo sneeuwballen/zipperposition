@@ -399,6 +399,7 @@ module Focus = struct
       { term; coeff; rest; }
     with _ -> _fail_idx m i
 
+    (* TODO: optimize *)
   let focus_term m term =
     match find m term with
     | None -> None
