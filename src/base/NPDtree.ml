@@ -346,7 +346,7 @@ module MakeTerm(X : Set.OrderedType) = struct
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie acc iter = match iter with
       | None ->
-        Util.exit_prof prof_npdtree_term_unify;
+        Util.yield_prof prof_npdtree_term_unify;
         let acc = Leaf.fold_unify ~subst trie.leaf sc_dt t sc_t acc k in
         Util.enter_prof prof_npdtree_term_unify;
         acc
@@ -384,14 +384,17 @@ module MakeTerm(X : Set.OrderedType) = struct
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie acc iter = match iter with
       | None ->
-        Leaf.fold_match ~subst trie.leaf sc_dt t sc_t acc k
+        Util.yield_prof prof_npdtree_term_generalizations;
+        let acc = Leaf.fold_match ~subst trie.leaf sc_dt t sc_t acc k in
+        Util.enter_prof prof_npdtree_term_generalizations;
+        acc
       | Some i ->
           match T.Classic.view i.cur_term with
           | (T.Classic.Var _ | T.Classic.BVar _) ->
             begin match trie.star with
             | None -> acc
             | Some subtrie ->
-              traverse subtrie acc (next i)  (* match "*" against "*" only *)
+              traverse subtrie acc (next i) (* match "*" against "*" only *)
             end
           | T.Classic.App (s, _, l) ->
             let arity = List.length l in
@@ -421,7 +424,10 @@ module MakeTerm(X : Set.OrderedType) = struct
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie acc iter = match iter with
       | None ->
-        Leaf.fold_matched ~subst trie.leaf sc_dt t sc_t acc k
+        Util.yield_prof prof_npdtree_term_specializations;
+        let acc = Leaf.fold_matched ~subst trie.leaf sc_dt t sc_t acc k in
+        Util.enter_prof prof_npdtree_term_specializations;
+        acc
       | Some i ->
           match T.Classic.view i.cur_term with
           | (T.Classic.Var _ | T.Classic.BVar _) ->

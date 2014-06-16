@@ -119,6 +119,15 @@ let exit_prof profiler =
     (if delta > profiler.prof_max then profiler.prof_max <- delta);
   end
 
+(* difference with [exit_prof]: does not increment the total count *)
+let yield_prof profiler =
+  if !enable_profiling then begin
+    let stop = Unix.gettimeofday () in
+    let delta = stop -. profiler.prof_enter in
+    profiler.prof_total <- profiler.prof_total +. delta;
+    (if delta > profiler.prof_max then profiler.prof_max <- delta);
+  end
+
 (** Print profiling data upon exit *)
 let () =
   at_exit (fun () ->
