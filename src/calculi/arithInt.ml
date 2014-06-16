@@ -61,6 +61,7 @@ let prof_arith_ineq_chaining = Util.mk_profiler "arith.ineq_chaining"
 let prof_arith_purify = Util.mk_profiler "arith.purify"
 let prof_arith_inner_case_switch = Util.mk_profiler "arith.inner_case_switch"
 let prof_arith_demod = Util.mk_profiler "arith.demod"
+let prof_arith_backward_demod = Util.mk_profiler "arith.backward_demod"
 let prof_arith_semantic_tautology = Util.mk_profiler "arith.semantic_tauto"
 let prof_arith_ineq_factoring = Util.mk_profiler "arith.ineq_factoring"
 let prof_arith_div_chaining = Util.mk_profiler "arith.div_chaining"
@@ -504,6 +505,33 @@ module Make(E : Env.S) : S with module Env = E = struct
     res
 
   let canc_demodulation c = _demodulation c
+
+  let _backward_demod a_lit =
+    C.CSet.empty  (* TODO
+    let ord = Ctx.ord () in
+    match a_lit with
+    | AL.Binary (AL.Equal, _, _) ->
+        AL.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false
+          a_lit C.CSet.empty
+          (fun acc t _pos ->
+            PS.TermIndex.retrieve_specializations !_idx_all 1 t 0 acc
+              (fun acc
+
+          )
+    | _ ->
+    *)
+
+  (* find clauses in which some literal could be rewritten by [c], iff
+    [c] is a positive unit arith clause *)
+  let canc_backward_demodulation c =
+    Util.enter_prof prof_arith_backward_demod;
+    let res = match C.lits c with
+    | [| Lit.Arith a_lit |] when AL.is_pos a_lit ->
+        _backward_demod a_lit
+    | _ -> C.CSet.empty
+    in
+    Util.exit_prof prof_arith_backward_demod;
+    res
 
   let cancellation c =
     Util.enter_prof prof_arith_cancellation;
@@ -1805,6 +1833,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_unary_inf "canc_diff_to_lesseq" canc_diff_to_lesseq;
     Env.add_simplify canc_eq_resolution;
     Env.add_simplify canc_demodulation;
+    Env.add_backward_simplify canc_backward_demodulation;
     Env.add_is_trivial is_tautology;
     Env.add_simplify purify;
     Env.add_multi_simpl_rule eliminate_unshielded;
