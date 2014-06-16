@@ -35,6 +35,7 @@ type scope = Substs.scope
 type subst = Substs.t
 
 let prof_unify = Util.mk_profiler "unify"
+let prof_matching = Util.mk_profiler "matching"
 
 (** {2 Result of multiple Unification} *)
 
@@ -623,6 +624,7 @@ module Unary = struct
       raise e
 
   let matching ?(allow_open=false) ?(subst=Substs.empty) ~pattern sc_a b sc_b =
+    Util.enter_prof prof_matching;
     (* recursive matching *)
     let rec unif subst s sc_s t sc_t =
       let s, sc_s = Substs.get_var subst s sc_s in
@@ -663,8 +665,13 @@ module Unary = struct
         unif subst r1 sc_s r2 sc_t
       | _, _ -> raise Fail
     in
-    let subst = unif subst pattern sc_a b sc_b in
-    subst
+    try
+      let subst = unif subst pattern sc_a b sc_b in
+      Util.exit_prof prof_matching;
+      subst
+    with e ->
+      Util.exit_prof prof_matching;
+      raise e
 
   let matching_same_scope ?(protect=Sequence.empty) ?(subst=Substs.empty)
   ~scope ~pattern b =
