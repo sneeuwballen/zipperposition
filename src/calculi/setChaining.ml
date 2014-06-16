@@ -332,7 +332,7 @@ module Make(E : Env.S) = struct
     Util.debug 1 "setup set chaining";
     Env.add_cnf_option (Cnf.PostNNF preprocess);
     Ctx.Lit.add_from_hook (Lit.Conv.set_hook_from ~sets:!_theory);
-    Ctx.Lit.add_to_hook (Lit.Conv.set_hook_to ~sets:!_theory);
+    Ctx.Lit.add_to_hook (Lit.Conv.set_hook_to);
     (* maybe change the set signature? FIXME
     Signal.on Ctx.Theories.Sets.on_add
       (fun theory' -> _theory := theory'; Signal.ContinueListening);

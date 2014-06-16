@@ -400,6 +400,26 @@ let symbols ?(init=Symbol.Set.empty) lits =
     |> Sequence.map Lit.Seq.symbols
     |> Sequence.fold Symbol.Seq.add_set Symbol.Set.empty
 
+let fold_subseteq ?sign ~eligible lits acc f =
+  let sign_ok = match sign with
+    | None -> (fun _ -> true)
+    | Some sign -> (fun sign' -> sign' = sign)
+  in
+  let rec fold acc i =
+    if i = Array.length lits then acc
+    else if not(eligible i lits.(i)) then fold acc (i+1)
+    else match Literal.View.get_subseteq (lits.(i)) with
+      | None -> fold acc (i+1)
+      | Some (sets,l,r,s) ->
+        if sign_ok s then
+          let pos = Position.(arg i stop) in
+          let sign = (Some s) in
+          fold (f acc (Literal.mk_subseteq ?sign ~sets l r) pos) (i+1)
+        else
+          fold acc (i+1)
+  in fold acc 0
+
+
 (** {3 IO} *)
 
 let pp buf lits =

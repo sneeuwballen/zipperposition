@@ -41,7 +41,7 @@ type t = private
   | Prop of term * bool
   | Ineq of Theories.TotalOrder.lit
   | Arith of ArithLit.t
-  | Subseteq of term list * term list * bool
+  | Subseteq of Theories.Sets.t * term list * term list * bool
 
 val eq : t -> t -> bool         (** equality of literals *)
 val eq_com : t -> t -> bool     (** commutative equality of lits *)
@@ -100,8 +100,8 @@ val mk_arith_lesseq : Z.t Monome.t -> Z.t Monome.t -> t
 val mk_divides : ?sign:bool -> Z.t -> power:int -> Z.t Monome.t -> t
 val mk_not_divides : Z.t -> power:int -> Z.t Monome.t -> t
 
-val mk_subseteq : ?sign:bool -> term list -> term list -> t
-val mk_notsubseteq : term list -> term list -> t
+val mk_subseteq : ?sign:bool -> sets:Theories.Sets.t -> term list -> term list -> t
+val mk_notsubseteq : sets:Theories.Sets.t -> term list -> term list -> t
 
 val matching : ?subst:Substs.t -> t -> scope -> t -> scope ->
                Substs.t Sequence.t
@@ -254,7 +254,7 @@ module View : sig
 
   val unfocus_arith : ArithLit.Focus.t -> t
 
-  val get_subseteq : t -> (term list * term list * bool) option
+  val get_subseteq : t -> (Theories.Sets.t * term list * term list * bool) option
 end
 
 (** {2 Conversions} *)
@@ -265,7 +265,7 @@ module Conv : sig
   val arith_hook_from : hook_from
   val total_order_hook_from : instance:Theories.TotalOrder.t -> hook_from
   val set_hook_from : sets:Theories.Sets.t -> hook_from
-  val set_hook_to : sets:Theories.Sets.t -> hook_to
+  val set_hook_to : hook_to
 
   val of_form : ?hooks:hook_from list -> form -> t
   (** Conversion from a formula. By default no ordering or arith theory

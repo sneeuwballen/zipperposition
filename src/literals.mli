@@ -198,6 +198,11 @@ val fold_terms : ?vars:bool -> which:[<`Max|`All] ->
 
 val symbols : ?init:Symbol.Set.t -> t -> Symbol.Set.t
 
+val fold_subseteq : ?sign:bool -> eligible:(int -> Literal.t -> bool) ->
+                    t -> 'a ->
+                    ('a -> Literal.t -> Position.t -> 'a) ->
+                    'a
+
 (** {2 IO} *)
 
 val pp : Buffer.t -> t -> unit
