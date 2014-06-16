@@ -50,6 +50,7 @@ let stat_arith_ineq_factoring = Util.mk_stat "arith.ineq_factoring"
 let stat_arith_div_chaining = Util.mk_stat "arith.div_chaining"
 let stat_arith_divisibility = Util.mk_stat "arith.divisibility"
 let stat_arith_demod = Util.mk_stat "arith.demod"
+let stat_arith_trivial_ineq = Util.mk_stat "arith.redundant_by_ineq"
 (*
 let stat_arith_reflexivity_resolution = Util.mk_stat "arith.reflexivity_resolution"
 *)
@@ -66,6 +67,7 @@ let prof_arith_semantic_tautology = Util.mk_profiler "arith.semantic_tauto"
 let prof_arith_ineq_factoring = Util.mk_profiler "arith.ineq_factoring"
 let prof_arith_div_chaining = Util.mk_profiler "arith.div_chaining"
 let prof_arith_divisibility = Util.mk_profiler "arith.divisibility"
+let prof_arith_trivial_ineq = Util.mk_profiler "arith.redundant_by_ineq"
 (*
 let prof_arith_reflexivity_resolution = Util.mk_profiler "arith.reflexivity_resolution"
 *)
@@ -159,7 +161,8 @@ type scope = S.scope
 
 let _enable_arith = ref false
 let _enable_ac = ref false
-let _enable_semantic_tauto = ref false
+let _enable_semantic_tauto = ref true
+let _enable_trivial_ineq = ref true
 let _dot_unit = ref None
 
 let case_switch_limit = ref 30
@@ -178,7 +181,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   let _idx_all = ref (PS.TermIndex.empty ())
 
   (* unit clauses *)
-  let _idx_unit = ref (PS.TermIndex.empty ())
+  let _idx_unit_eq = ref (PS.TermIndex.empty ())
+  let _idx_unit_div = ref (PS.TermIndex.empty ())
+  let _idx_unit_ineq = ref (PS.TermIndex.empty ())
 
   (* apply [f] to some subterms of [c] *)
   let update f c =
@@ -225,10 +230,28 @@ module Make(E : Env.S) : S with module Env = E = struct
   let update_simpl f c =
     let ord = Ctx.ord () in
     begin match C.lits c with
-    | [| Lit.Arith alit |] ->
+    | [| Lit.Arith ((AL.Binary (AL.Equal, _, _)) as alit) |] ->
         let pos = Position.(arg 0 stop) in
-        _idx_unit := AL.fold_terms ~subterms:false ~vars:false ~pos ~which:`Max ~ord
-          alit !_idx_unit
+        _idx_unit_eq := AL.fold_terms ~subterms:false ~vars:false ~pos ~which:`Max ~ord
+          alit !_idx_unit_eq
+            (fun acc t pos ->
+              assert (not (T.is_var t));
+              let with_pos = C.WithPos.( {term=t; pos; clause=c;} ) in
+              f acc t with_pos
+            )
+    | [| Lit.Arith ((AL.Binary (AL.Lesseq, _, _)) as alit) |] ->
+        let pos = Position.(arg 0 stop) in
+        _idx_unit_ineq := AL.fold_terms ~subterms:false ~vars:false ~pos ~which:`Max ~ord
+          alit !_idx_unit_ineq
+            (fun acc t pos ->
+              assert (not (T.is_var t));
+              let with_pos = C.WithPos.( {term=t; pos; clause=c;} ) in
+              f acc t with_pos
+            )
+    | [| Lit.Arith (AL.Divides d as alit) |] when d.AL.sign ->
+        let pos = Position.(arg 0 stop) in
+        _idx_unit_div := AL.fold_terms ~subterms:false ~vars:false ~pos ~which:`Max ~ord
+          alit !_idx_unit_div
             (fun acc t pos ->
               assert (not (T.is_var t));
               let with_pos = C.WithPos.( {term=t; pos; clause=c;} ) in
@@ -1017,6 +1040,121 @@ module Make(E : Env.S) : S with module Env = E = struct
       );
     Util.exit_prof prof_arith_ineq_factoring;
     !acc
+
+  (** One-shot literal/clause removal.
+    We use unit clauses to try to prove a literal absurd/tautological, possibly
+    using {b several} instances of unit clauses.
+
+    For instance, 0 ≤ f(x)  makes  0 ≤ f(a) + f(b) redundant, but subsumption
+    is not able to detect it. *)
+
+  (* rewrite a literal [l] into a smaller literal [l'], such that [l'] and
+    the current set of unit clauses imply [l]; then compute the
+    transitive closure of this relation. If we obtain a trivial
+    literal, then [l] is redundant (we keep a trace of literals used).
+    We use continuations to deal with the multiple choices. *)
+  let rec _ineq_find_sufficient ~ord ~trace lit k = match lit with
+    | _ when AL.is_trivial lit -> k (trace,lit)
+    | AL.Binary (AL.Lesseq, _, _) ->
+        assert (not (Sequence.exists T.is_var (AL.Seq.terms lit)));
+        AL.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false lit ()
+          (fun () t pos ->
+            let plit = ALF.get_exn lit pos in
+            let is_left = match pos with
+              | Position.Left _ -> true
+              | Position.Right _ -> false
+              | _ -> assert false
+            in
+            (* try to eliminate [t] in passive lit [plit]*)
+            PS.TermIndex.retrieve_generalizations !_idx_unit_ineq 1 t 0 ()
+              (fun () t' with_pos subst ->
+                let active_clause = with_pos.C.WithPos.clause in
+                let active_pos = with_pos.C.WithPos.pos in
+                match Lits.View.get_arith (C.lits active_clause) active_pos with
+                | None -> assert false
+                | Some (ALF.Left (AL.Lesseq, _, _) as alit') when is_left ->
+                    let alit' = ALF.apply_subst_no_renaming subst alit' 1 in
+                    if ALF.is_strictly_max ~ord alit'
+                    then
+                      (* scale *)
+                      let plit, alit' = ALF.scale plit alit' in
+                      let mf1', m2' =
+                        match Lits.View.get_arith (C.lits active_clause) active_pos with
+                        | Some (ALF.Left (_, mf1', m2')) -> mf1', m2'
+                        | _ -> assert false
+                      in
+                      let mf1' = MF.apply_subst_no_renaming subst mf1' 1 in
+                      let m2' = M.apply_subst_no_renaming subst m2' 1 in
+                      (* from t+mf1 ≤ m2  and t+mf1' ≤ m2', we deduce
+                        that if m2'-mf1' ≤ m2-mf1  then [lit] is redundant.
+                        That is, the sufficient literal is
+                        mf1 + m2' ≤ m2 + mf1'  (we replace [t] with [m2'-mf1']) *)
+                      let new_plit = ALF.replace plit
+                        (M.difference m2' (MF.rest mf1')) in
+                      (* transitive closure *)
+                      let trace = active_clause::trace in
+                      _ineq_find_sufficient ~ord ~trace new_plit k
+                | Some (ALF.Right (AL.Lesseq, _, _) as alit') when not is_left ->
+                    (* symmetric case *)
+                    let alit' = ALF.apply_subst_no_renaming subst alit' 1 in
+                    if ALF.is_strictly_max ~ord alit'
+                    then
+                      (* scale *)
+                      let plit, alit' = ALF.scale plit alit' in
+                      let m1', mf2' =
+                        match Lits.View.get_arith (C.lits active_clause) active_pos with
+                        | Some (ALF.Right (_, m1', mf2')) -> m1', mf2'
+                        | _ -> assert false
+                      in
+                      let mf2' = MF.apply_subst_no_renaming subst mf2' 1 in
+                      let m1' = M.apply_subst_no_renaming subst m1' 1 in
+                      let new_plit = ALF.replace plit
+                        (M.difference m1' (MF.rest mf2')) in
+                      (* transitive closure *)
+                      let trace = active_clause::trace in
+                      _ineq_find_sufficient ~ord ~trace new_plit k
+                | Some _ ->
+                    ()   (* cannot make a sufficient literal *)
+              )
+          )
+    | _ -> ()
+
+  (* is a literal redundant w.r.t the current set of unit clauses *)
+  let _ineq_is_redundant_by_unit lit =
+    match lit with
+    | _ when Lit.is_trivial lit || Lit.is_absurd lit ->
+        None  (* something more efficient will take care of it *)
+    | Lit.Arith a_lit when Sequence.exists T.is_var (AL.Seq.terms a_lit) ->
+        None  (* no way we rewrite this into a tautology *)
+    | Lit.Arith (AL.Binary (AL.Lesseq, m1, m2) as alit) ->
+        let ord = Ctx.ord () in
+        let traces = _ineq_find_sufficient ~ord ~trace:[] alit
+          |> Sequence.take 1  (* one is enough *)
+          |> Sequence.to_list
+        in
+        begin match traces with
+          | [trace, _lit'] ->
+              assert (AL.is_trivial _lit');
+              let trace = CCList.Set.uniq ~eq:C.eq trace in
+              Some trace
+          | _ -> None
+        end
+    | _ -> None
+
+  let is_redundant_by_ineq c =
+    Util.enter_prof prof_arith_trivial_ineq;
+    let res = !_enable_trivial_ineq && Util.array_exists
+      (fun lit -> match _ineq_is_redundant_by_unit lit with
+        | None -> false
+        | Some trace ->
+            Util.debug 3 "clause %a trivial by inequations %a"
+              C.pp c (CCList.pp C.pp) trace;
+            Util.incr_stat stat_arith_trivial_ineq;
+            true
+      ) (C.lits c)
+    in
+    Util.exit_prof prof_arith_trivial_ineq;
+    res
 
   (** {3 Divisibility} *)
 
@@ -1833,7 +1971,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     CCOpt.iter
       (fun f ->
           Signal.once Signals.on_dot_output
-            (fun () -> _print_idx f !_idx_unit)
+            (fun () -> _print_idx f !_idx_unit_eq)
       ) !_dot_unit;
     ()
 
@@ -1858,6 +1996,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_simplify canc_demodulation;
     Env.add_backward_simplify canc_backward_demodulation;
     Env.add_is_trivial is_tautology;
+    Env.add_redundant is_redundant_by_ineq;
     Env.add_simplify purify;
     Env.add_multi_simpl_rule eliminate_unshielded;
     Ctx.Lit.add_from_hook Lit.Conv.arith_hook_from;
@@ -1900,9 +2039,12 @@ let _enable_arith () =
 
 let () =
   Params.add_opts
-    [ "-arith-semantic-tauto"
-      , Arg.Unit (fun () -> _enable_arith (); _enable_semantic_tauto := true)
-      , "enable arithmetic semantic tautology check"
+    [ "-arith-no-semantic-tauto"
+      , Arg.Unit (fun () -> _enable_arith (); _enable_semantic_tauto := false)
+      , "disable arithmetic semantic tautology check"
+    ; "-arith-no-trivial-ineq"
+      , Arg.Unit (fun () -> _enable_arith (); _enable_trivial_ineq := false)
+      , "disable inequality triviality checking by rewriting"
     ; "-arith"
       , Arg.Unit _enable_arith
       , "enable axiomatic integer arithmetic"
