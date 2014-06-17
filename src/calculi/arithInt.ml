@@ -901,8 +901,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         && (C.is_maxlit c 0 subst i || C.is_maxlit c 0 subst j)
         (* C = C' or l ≤ mf_l or mf_r ≤ r,
           with mf_l and mf_r sharing the focus on a.t, so
-          if mf_r.rest - r = k + l - mf_l.rest, then
-            (a.t + mf_l.rest = l + k') => C' is true for k'=1...k-1 *)
+          if mf_l.rest - l = k + r - mf_r.rest, then
+            (a.t + mf_r.rest = r + k') => C' is true for k'=1...k-1 *)
         then begin
           let k = Z.to_int (M.const diff) in
           (* build literals *)
@@ -913,8 +913,8 @@ module Make(E : Env.S) : S with module Env = E = struct
           let other_lits = Lit.apply_subst_list ~renaming subst other_lits 0 in
           for i=1 to k-1 do
             let new_lit = Lit.mk_arith_neq
-              (MF.to_monome mf_l)
-              (M.add_const l (Z.of_int i))
+              (MF.to_monome mf_r)
+              (M.add_const r (Z.of_int i))
             in
             let lits = new_lit :: other_lits in
             (* build clauses *)
