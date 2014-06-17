@@ -1058,8 +1058,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     We use continuations to deal with the multiple choices. *)
   let rec _ineq_find_sufficient ~ord ~trace lit k = match lit with
     | _ when AL.is_trivial lit -> k (trace,lit)
+    | AL.Binary _ when Sequence.exists T.is_var (AL.Seq.terms lit) ->
+        ()  (* no way we rewrite this into a tautology *)
     | AL.Binary (AL.Lesseq, _, _) ->
-        assert (not (Sequence.exists T.is_var (AL.Seq.terms lit)));
         AL.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false lit ()
           (fun () t pos ->
             let plit = ALF.get_exn lit pos in
@@ -1127,8 +1128,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     match lit with
     | _ when Lit.is_trivial lit || Lit.is_absurd lit ->
         None  (* something more efficient will take care of it *)
-    | Lit.Arith a_lit when Sequence.exists T.is_var (AL.Seq.terms a_lit) ->
-        None  (* no way we rewrite this into a tautology *)
     | Lit.Arith (AL.Binary (AL.Lesseq, m1, m2) as alit) ->
         let ord = Ctx.ord () in
         let traces = _ineq_find_sufficient ~ord ~trace:[] alit
