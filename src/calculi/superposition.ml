@@ -999,6 +999,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           assert (Unif.FO.eq ~subst l 1 s 0);
           if Unif.FO.eq ~subst r 1 t 0
           then begin
+            (* TODO: useless? *)
             let subst = Unif.FO.matching ~subst ~pattern:r 1 t 0 in
             Util.debug 3 "neg_reflect eliminates %a=%a with %a" T.pp s T.pp t C.pp c';
             raise (FoundMatch (r, c', subst)) (* success *)
