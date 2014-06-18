@@ -50,6 +50,7 @@ let stat_arith_ineq_factoring = Util.mk_stat "arith.ineq_factoring"
 let stat_arith_div_chaining = Util.mk_stat "arith.div_chaining"
 let stat_arith_divisibility = Util.mk_stat "arith.divisibility"
 let stat_arith_demod = Util.mk_stat "arith.demod"
+let stat_arith_backward_demod = Util.mk_stat "arith.backward_demod"
 let stat_arith_trivial_ineq = Util.mk_stat "arith.redundant_by_ineq"
 (*
 let stat_arith_reflexivity_resolution = Util.mk_stat "arith.reflexivity_resolution"
@@ -569,9 +570,10 @@ module Make(E : Env.S) : S with module Env = E = struct
                 let alit' = ALF.get_exn alit pos in
                 let alit' = ALF.apply_subst_no_renaming subst alit' 1 in
                 if ALF.is_max ~ord alit'
-                then
+                then (
+                  Util.incr_stat stat_arith_backward_demod;
                   C.CSet.add acc with_pos.C.WithPos.clause
-                else acc
+                ) else acc
               ))
       | [| Lit.Arith (AL.Binary (AL.Lesseq, m1, m2)) |] ->
           res (* TODO *)
