@@ -112,6 +112,7 @@ let parse_args () =
     ; "-unary-depth", Arg.Set_int unary_depth, "maximum depth for successive unary inferences"
     ] @ !other_opts @ Options.global_opts
   in
+  let options = List.sort (fun (a1,_,_)(a2,_,_)->String.compare a1 a2) options in
   Util.set_debug 1;  (* default *)
   Arg.parse options add_file "solve problems in files";
   if Vector.is_empty files
