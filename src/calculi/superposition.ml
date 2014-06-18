@@ -373,7 +373,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               then raise (ExitSuperposition "will yield a tautology");
         | _ -> ()
       end;
-      let passive_lit' = Lit.apply_subst ~renaming subst info.passive_lit sc_p in
+      let passive_lit' = Lit.apply_subst_no_simp ~renaming subst info.passive_lit sc_p in
       if (
         O.compare ord (S.FO.apply ~renaming info.subst info.s sc_a) t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
