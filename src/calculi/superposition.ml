@@ -1504,11 +1504,8 @@ let () =
     ; "-dot-sup-from"
       , Arg.String (fun s -> _dot_sup_from := Some s)
       , "print superposition-from index into file"
-    ; "-non-simultaneous-sup"
-      , Arg.Clear _use_simultaneous_sup
-      , "disable simultaneous superposition (use the classic superposition instead)"
     ; "-simultaneous-sup"
-      , Arg.Set _use_simultaneous_sup
-      , "enable simultaneous superposition"
+      , Arg.Bool (fun b -> _use_simultaneous_sup := b)
+      , "enable/disable simultaneous superposition"
     ]
 
