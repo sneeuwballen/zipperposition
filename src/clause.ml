@@ -36,9 +36,8 @@ module Lit = Literal
 module Lits = Literals
 
 let stat_fresh = Util.mk_stat "fresh_clause"
-let stat_mk_hclause = Util.mk_stat "mk_hclause"
-let stat_new_clause = Util.mk_stat "new_clause"
-let prof_mk_hclause = Util.mk_profiler "mk_hclause"
+let stat_clause_create = Util.mk_stat "clause_create"
+let prof_clause_create = Util.mk_profiler "clause_create"
 
 type scope = Substs.scope
 
@@ -143,7 +142,7 @@ module type S = sig
     (** Bitvector that indicates which of the literals of [subst(clause)]
         are maximal under [ord] *)
 
-  val is_maxlit : t -> scope -> Substs.t -> int -> bool
+  val is_maxlit : t -> scope -> Substs.t -> idx:int -> bool
     (** Is the i-th literal maximal in subst(clause)? Equivalent to
         Bitvector.get (maxlits ~ord c subst) i *)
 
@@ -216,6 +215,10 @@ module type S = sig
     val ineq_of : clause -> Theories.TotalOrder.t -> t
       (** Only literals that are inequations for the given ordering *)
 
+    val arith : t
+
+    val filter : (Literal.t -> bool) -> t
+
     val max : clause -> t
       (** Maximal literals of the clause *)
 
@@ -225,12 +228,21 @@ module type S = sig
     val neg : t
       (** Only negative literals *)
 
-    val always : t 
+    val always : t
       (** All literals *)
 
     val combine : t list -> t
       (** Logical "and" of the given eligibility criteria. A literal is
           eligible only if all elements of the list say so. *)
+
+    val ( ** ) : t -> t -> t
+      (** Logical "and" *)
+
+    val ( ++ ) : t -> t -> t
+      (** Logical "or" *)
+
+    val ( ~~ ) : t -> t
+      (** Logical "not" *)
   end
 
   (** {2 Set of clauses} *)
@@ -449,17 +461,13 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let __no_select = BV.empty ()
 
-  (** Build a new hclause from the given literals.
-      If there are more than [BV.max_len] literals,
-      the prover becomes incomplete by returning [true] instead. *)
-  let create_a ?parents ?selected lits proof =
-    Util.incr_stat stat_mk_hclause;
-    Util.enter_prof prof_mk_hclause;
-    (* Rename variables.
-    let renaming = Ctx.renaming_clear ~ctx in
-    let lits = Lits.apply_subst ~renaming ~ord:ctx.Ctx.ord
-      S.empty lits 0 in
-    *)
+  let create ?parents ?selected lits proof =
+    Util.enter_prof prof_clause_create;
+    let lits = lits
+      |> List.filter (function Lit.False -> false | _ -> true)
+      |> List.sort Lit.compare
+    in
+    let lits = Array.of_list lits in
     (* proof *)
     let proof' = proof lits in
     (* create the structure *)
@@ -491,22 +499,21 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       end
     end;
     (* return clause *)
-    Util.incr_stat stat_new_clause;
-    Util.exit_prof prof_mk_hclause;
+    Util.incr_stat stat_clause_create;
+    Util.exit_prof prof_clause_create;
     c
 
-  (** Build clause from a list (delegating to create_a) *)
-  let create ?parents ?selected lits proof =
-    create_a ?parents ?selected (Array.of_list lits) proof
+  let create_a ?parents ?selected lits proof =
+    create ?parents ?selected (Array.to_list lits) proof
 
   let of_forms ?parents ?selected forms proof =
     let lits = List.map Ctx.Lit.of_form forms in
     create ?parents ?selected lits proof
 
   let of_forms_axiom ?(role="axiom") ~file ~name forms =
-    let lits = Lits.Conv.of_forms forms in
+    let lits = List.map Lit.Conv.of_form forms in
     let proof c = Proof.mk_c_file ~role ~file ~name c in
-    create_a lits proof
+    create lits proof
 
   let proof c = c.hcproof
 
@@ -531,28 +538,32 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     new_hc.hcdescendants <- descendants;
     new_hc
 
+  let _apply_subst_no_simpl subst lits sc =
+    let renaming = S.Renaming.create () in
+    Array.map
+      (fun l -> Lit.apply_subst_no_simp ~renaming subst l sc)
+      lits
+
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are maximal under [ord] *)
   let maxlits c scope subst =
     let ord = Ctx.ord () in
-    let renaming = Ctx.renaming_clear () in
-    let lits = Lits.apply_subst ~renaming subst c.hclits scope in
-    Lits.maxlits ~ord lits
+    let lits' = _apply_subst_no_simpl subst c.hclits scope in
+    Lits.maxlits ~ord lits'
 
   (** Check whether the literal is maximal *)
-  let is_maxlit c scope subst i =
-    let bv = maxlits c scope subst in
-    BV.get bv i
+  let is_maxlit c scope subst ~idx =
+    let ord = Ctx.ord () in
+    let lits' = _apply_subst_no_simpl subst c.hclits scope in
+    Lits.is_max ~ord lits' idx
 
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for resolution. *)
   let eligible_res c scope subst =
     let ord = Ctx.ord () in
-    let renaming = Ctx.renaming_clear () in
-    (* instantiate lits *)
-    let lits = Lits.apply_subst ~renaming subst c.hclits scope in
+    let lits' = _apply_subst_no_simpl subst c.hclits scope in
     let selected = c.hcselected in
-    let n = Array.length lits in
+    let n = Array.length lits' in
     (* Literals that may be eligible: all of them if none is selected,
        selected ones otherwise. *)
     let check_sign = not (BV.is_empty selected) in
@@ -565,15 +576,15 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     for i = 0 to n-1 do
       (* i-th lit is already known not to be max? *)
       if not (BV.get bv i) then () else
-      let lit = lits.(i) in
+      let lit = lits'.(i) in
       for j = i+1 to n-1 do
-        let lit' = lits.(j) in
+        let lit' = lits'.(j) in
         (* check if both lits are still potentially eligible, and have the same
            sign if [check_sign] is true. *)
         if (check_sign && Lit.is_pos lit <> Lit.is_pos lit')
             || not (BV.get bv j)
           then ()
-          else match Lit.Comp.compare ~ord lits.(i) lits.(j) with
+          else match Lit.Comp.compare ~ord lits'.(i) lits'.(j) with
           | Comparison.Incomparable
           | Comparison.Eq -> ()     (* no further information about i-th and j-th *)
           | Comparison.Gt -> BV.reset bv j  (* j-th cannot be max *)
@@ -587,20 +598,18 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let eligible_param c scope subst =
     let ord = Ctx.ord () in
     if BV.is_empty c.hcselected then begin
-      (* instantiate lits *)
-      let renaming = Ctx.renaming_clear () in
-      let lits = Lits.apply_subst ~renaming subst c.hclits scope in
+      let lits' = _apply_subst_no_simpl subst c.hclits scope in
       (* maximal ones *)
-      let bv = Lits.maxlits ~ord lits in
+      let bv = Lits.maxlits ~ord lits' in
       (* only keep literals that are positive *)
-      BV.filter bv (fun i -> Lit.is_pos lits.(i));
+      BV.filter bv (fun i -> Lit.is_pos lits'.(i));
       bv
     end else BV.empty ()  (* no eligible literal when some are selected *)
 
   let eligible_chaining c scope subst =
     let ord = Ctx.ord () in
     if BV.is_empty c.hcselected then begin
-      let renaming = Ctx.renaming_clear () in
+      let renaming = S.Renaming.create () in
       let lits = Lits.apply_subst ~renaming subst c.hclits scope in
       let bv = Lits.maxlits ~ord lits in
       (* only keep literals that are positive *)
@@ -676,6 +685,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let ineq_of clause instance =
       fun i lit -> Lit.is_ineq_of ~instance lit
 
+    let arith i lit = Lit.is_arith lit
+
+    let filter f i lit = f lit
+
     let max c =
       let bv = Lits.maxlits ~ord:(Ctx.ord ()) c.hclits in
       fun i lit ->
@@ -693,6 +706,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     | [x; y] -> (fun i lit -> x i lit && y i lit)
     | [x; y; z] -> (fun i lit -> x i lit && y i lit && z i lit)
     | _ -> (fun i lit -> List.for_all (fun eligible -> eligible i lit) l)
+
+    let ( ** ) f1 f2 i lit = f1 i lit && f2 i lit
+    let ( ++ ) f1 f2 i lit = f1 i lit || f2 i lit
+    let ( ~~ ) f i lit = not (f i lit)
   end
 
   (** {2 Set of clauses} *)

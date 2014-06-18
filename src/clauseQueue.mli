@@ -34,6 +34,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+val profile : unit -> string
+val set_profile : string -> unit
+
 (** {2 A priority queue of clauses, purely functional} *)
 module type S = sig
   module C : Clause.S
@@ -57,6 +60,8 @@ module type S = sig
 
   val name : t -> string
     (** Name of the implementation/role of the queue *)
+
+  (** {6 Available Queues} *)
 
   val fifo : t
     (** select by increasing age (for fairness) *)
@@ -85,8 +90,25 @@ module type S = sig
   val mk_queue : ?accept:(C.t -> bool) -> weight:(C.t -> int) -> string -> t
     (** Bring your own implementation of queue *)
 
-  val default_queues : (t * int) list
-    (** default combination of heuristics (TODO: array?) *)
+  (** {6 Combination of queues} *)
+
+  type queues = (t * int) list
+
+  module Profiles : sig
+    val bfs : queues
+      (** Strong orientation toward FIFO *)
+
+    val explore : queues
+      (** Use heuristics for selecting "small" clauses *)
+
+    val ground : queues
+      (** Favor positive unit clauses and ground clauses *)
+  end
+
+  val default_queues : queues
+    (** default combination of heuristics *)
+
+  (** {6 IO} *)
 
   val pp : Buffer.t -> t -> unit
   val to_string : t -> string

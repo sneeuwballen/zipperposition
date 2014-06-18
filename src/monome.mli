@@ -61,6 +61,8 @@ val add_const : 'a t -> 'a -> 'a t    (** Add given number to constant *)
 val remove : 'a t -> term -> 'a t     (** Remove the term *)
 val remove_const : 'a t -> 'a t       (** Remove the constant *)
 
+val add_list : 'a t -> ('a * term) list -> 'a t
+
 val map : (term -> term) -> 'a t -> 'a t
 val map_num : ('a -> 'a) -> 'a t -> 'a t
 
@@ -68,10 +70,14 @@ module Seq : sig
   val terms : _ t -> term Sequence.t
   val vars : _ t -> term Sequence.t
   val coeffs : 'a t -> ('a * term) Sequence.t
+  val coeffs_swap : 'a t -> (term * 'a) Sequence.t
 end
 
 val is_const : _ t -> bool
   (** Returns [true] if the monome is only a constant *)
+
+val is_zero : _ t -> bool
+  (** return [true] if the monome is the constant 0 *)
 
 val sign : _ t -> int
   (** Assuming [is_constant m], [sign m] returns the sign of [m].
@@ -120,6 +126,10 @@ val apply_subst : renaming:Substs.Renaming.t ->
                   Substs.t -> 'a t -> Substs.scope -> 'a t
   (** Apply a substitution to the monome's terms *)
 
+val apply_subst_no_renaming : Substs.t -> 'a t -> Substs.scope -> 'a t
+  (** Apply a substitution but doesn't rename free variables. Careful
+      with the collisions *)
+
 val variant : ?subst:Substs.t -> 'a t -> scope -> 'a t -> scope -> Substs.t Sequence.t
 
 (** Matching and unification aren't complete in the presence of variables
@@ -131,13 +141,18 @@ val variant : ?subst:Substs.t -> 'a t -> scope -> 'a t -> scope -> Substs.t Sequ
 
 val matching : ?subst:Substs.t -> 'a t -> scope -> 'a t -> scope -> Substs.t Sequence.t
 
-val unify : ?subst:Substs.t -> 'a t -> scope -> 'a t -> scope -> Substs.t Sequence.t
+val unify : ?subst:Substs.t -> 'a t -> scope -> 'a t -> scope ->
+            Substs.t Sequence.t
 
 val is_ground : _ t -> bool
   (** Are there no variables in the monome? *)
 
 val fold : ('a -> int -> 'b -> term -> 'a) -> 'a -> 'b t -> 'a
   (** Fold over terms *)
+
+val fold_max : ord:Ordering.t ->
+               ('a -> int -> 'b -> term -> 'a) -> 'a -> 'b t -> 'a
+  (** Fold over terms that are maximal in the given ordering. *)
 
 val nth : 'a t -> int -> ('a * term)
   (** @raise Invalid_argument if the index is invalid *)
@@ -147,6 +162,111 @@ val set : 'a t -> int -> ('a * term) -> 'a t
 
 val set_term : 'a t -> int -> term -> 'a t
   (** @raise Invalid_argument if the index is invalid *)
+
+(** Focus on a specific term *)
+module Focus : sig
+  type 'a t = {
+    term : term;
+    coeff : 'a;  (** Never 0 *)
+    rest : 'a monome;
+  }
+
+  val get : 'a monome -> int -> 'a t
+    (** @raise Invalid_argument if the index is invalid *)
+
+  val focus_term : 'a monome -> term -> 'a t option
+    (** Focus on the given term, if it is one of the members of
+        the given monome. *)
+
+  val focus_term_exn : 'a monome -> term -> 'a t
+    (** Same as {!focus_term}, but
+        @raise Failure on failure *)
+
+  val to_monome : 'a t -> 'a monome
+    (** Conversion back to an unfocused monome *)
+
+  val coeff : 'a t -> 'a
+  val term : 'a t -> term
+  val rest : 'a t -> 'a monome
+
+  val sum : 'a t -> 'a monome -> 'a t
+  val difference : 'a t -> 'a monome -> 'a t
+  val uminus : 'a t -> 'a t
+
+  val product : 'a t -> 'a -> 'a t
+    (** @raise Invalid_argument if the number is 0 *)
+
+  val map : ?term:(term->term) -> ?coeff:('a -> 'a) ->
+            ?rest:('a monome -> 'a monome) -> 'a t -> 'a t
+
+  val scale : Z.t t -> Z.t t -> Z.t t * Z.t t
+    (** Scale to the same coefficient *)
+
+  val is_max : ord:Ordering.t -> _ t -> bool
+    (** Is the focused term maximal in the monome? *)
+
+  val fold_m : pos:Position.t -> 'a monome -> 'b ->
+               ('b -> 'a t -> Position.t -> 'b) -> 'b
+    (** Fold on terms of the given monome, focusing on them one by one,
+        along with the position of the focused term *)
+
+  val apply_subst : renaming:Substs.Renaming.t ->
+                    Substs.t -> 'a t -> scope -> 'a t
+    (** Apply a substitution. This can modify the set of terms in [rest]
+        because some of them may become equal to the focused term. *)
+
+  val apply_subst_no_renaming : Substs.t -> 'a t -> Substs.scope -> 'a t
+    (** Apply a substitution but doesn't rename free variables. Careful
+        with the collisions *)
+
+  (** Here we don't unify full (focused) monomes together, but only the
+      focused part (and possibly some unfocused terms too) together.
+      For instance, unifying
+      [f(x)* + 2a] and [f(y)* + f(z) + b] (where focused terms are starred)
+      will yield both
+      [(1,1,x=y)] and [(1,2,x=y=z)] since [f(z)] becomes focused too.
+
+      Again, arith constants are not unifiable with unshielded variables. *)
+
+  val unify_ff : ?subst:Substs.t ->
+                  'a t -> scope -> 'a t -> scope ->
+                  ('a t * 'a t * Substs.t) Sequence.t
+    (** Unify two focused monomes. All returned unifiers are unifiers
+        of the focused terms, but maybe also of other unfocused terms;
+        Focused monomes are modified by unification because several terms
+        might merge with the focused term, so the new ones are
+        returned with the unifier itself *)
+
+  val unify_mm : ?subst:Substs.t ->
+                'a monome -> scope -> 'a monome -> scope ->
+                ('a t * 'a t * Substs.t) Sequence.t
+    (** Unify parts of two monomes [m1] and [m2]. For each such unifier we
+        return the versions of [m1] and [m2] where the unified terms
+        are focused. *)
+
+  val unify_self : ?subst:Substs.t ->
+                    'a t -> scope -> ('a t * Substs.t) Sequence.t
+    (** Extend the substitution to other terms within the focused monome,
+        if possible. For instance it might return
+        [2f(x)+a, {x=y}] for the monome [f(x)+f(y)+a] where [f(x)] is focused. *)
+
+  val unify_self_monome : ?subst:Substs.t ->
+                          'a monome -> scope -> ('a t * Substs.t) Sequence.t
+    (** Unify at least two terms of the monome together *)
+
+  (* TODO
+  val unify_fm : ?subst:Substs.t ->
+                 'a t -> scope -> 'a monome -> scope ->
+                 ('a * 'a t * Substs.t) Sequence.t
+    (** Unify a focused monome and an unfocused monome. All unifiers
+        are unifiers of the focused term and of at least one of the
+        terms of the opposite monome. Each result is the coeff of the
+        left-focused term, the right-focused monome, and the substitution. *)
+  *)
+
+  val pp : Buffer.t -> 'a t -> unit
+  val fmt : Format.formatter -> 'a t -> unit
+end
 
 val pp : Buffer.t -> 'a t -> unit
 val to_string : 'a t -> string
@@ -172,6 +292,12 @@ module Int : sig
   val to_term : t -> term
     (** convert back to a term *)
 
+  val normalize : t -> t
+    (** Normalize the monome, which means that if some terms are
+        integer constants, they are moved to the constant part
+        (e.g after apply X->3 in 2.X+1, one gets 2.3 +1. Normalization
+        reduces this to 7). *)
+
   val has_instances : t -> bool
     (** For real or rational, always true. For integers, returns true
         iff g divides [m.constant], where g is the
@@ -193,7 +319,7 @@ module Int : sig
 
   val factorize : t -> (t * Z.t) option
     (** Factorize [e] into [Some (e',s)] if [e = e' x s], None
-        otherwise (ie if s=1) *)
+        otherwise (ie if s=1). In case it returns [Some (e', s)], [s > 1] holds *)
 
   val normalize_wrt_zero : t -> t
     (** Allows to multiply or divide by any positive number since we consider
@@ -209,6 +335,9 @@ module Int : sig
     (** Compare monomes as if they were multisets of terms, the coefficient
         in front of a term being its multiplicity. *)
 
+  val to_multiset : t -> Multisets.MT.t
+    (** Multiset of terms with multiplicity *)
+
   (** {2 Modular Computations} *)
 
   module Modulo : sig
@@ -220,10 +349,6 @@ module Int : sig
 
     val uminus : n:Z.t -> Z.t -> Z.t
       (** Additive inverse in Z/nZ *)
-
-    val inverse : n:Z.t -> Z.t -> Z.t
-      (** Multiplicative inverse in Z/nZ.
-          TODO (only works if [n] prime? or n^k where n prime?) *)
   end
 
   (** {2 Find Solutions} *)

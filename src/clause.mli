@@ -1,4 +1,3 @@
-
 (*
 Zipperposition: a functional superposition prover for prototyping
 Copyright (c) 2013, Simon Cruanes
@@ -38,8 +37,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 val stat_fresh : Util.stat
-val stat_mk_hclause : Util.stat
-val stat_new_clause : Util.stat
+val stat_clause_create : Util.stat
 
 type scope = Substs.scope
 
@@ -110,8 +108,7 @@ module type S = sig
   val create_a : ?parents:t list -> ?selected:BV.t ->
                   Literal.t array ->
                   (CompactClause.t -> Proof.t) -> t
-    (** Build a new hclause from the given literals. This function takes
-        ownership of the input array. *)
+    (** Build a new hclause from the given literals. *)
 
   val of_forms : ?parents:t list -> ?selected:BV.t ->
                       Formula.FO.t list ->
@@ -141,10 +138,9 @@ module type S = sig
     (** apply the substitution to the clause *)
 
   val maxlits : t -> scope -> Substs.t -> BV.t
-    (** Bitvector that indicates which of the literals of [subst(clause)]
-        are maximal under [ord] *)
+    (** List of maximal literals *)
 
-  val is_maxlit : t -> scope -> Substs.t -> int -> bool
+  val is_maxlit : t -> scope -> Substs.t -> idx:int -> bool
     (** Is the i-th literal maximal in subst(clause)? Equivalent to
         Bitvector.get (maxlits ~ord c subst) i *)
 
@@ -217,6 +213,10 @@ module type S = sig
     val ineq_of : clause -> Theories.TotalOrder.t -> t
       (** Only literals that are inequations for the given ordering *)
 
+    val arith : t
+
+    val filter : (Literal.t -> bool) -> t
+
     val max : clause -> t
       (** Maximal literals of the clause *)
 
@@ -232,6 +232,15 @@ module type S = sig
     val combine : t list -> t
       (** Logical "and" of the given eligibility criteria. A literal is
           eligible only if all elements of the list say so. *)
+
+    val ( ** ) : t -> t -> t
+      (** Logical "and" *)
+
+    val ( ++ ) : t -> t -> t
+      (** Logical "or" *)
+
+    val ( ~~ ) : t -> t
+      (** Logical "not" *)
   end
 
   (** {2 Set of clauses} *)

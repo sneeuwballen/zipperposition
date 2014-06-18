@@ -184,7 +184,8 @@ let extension =
     let actions = [Ext_general AC.setup]
   end in
   Extensions.({
-    name = "ac";
+    default with
+    name="ac";
     penv_actions = [];
-    make = (module DoIt);
+    make = (module DoIt : ENV_TO_S);
   })

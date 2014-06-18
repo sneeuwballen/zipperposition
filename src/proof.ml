@@ -228,7 +228,18 @@ let depth proof =
   !depth
 
 (* physically share subproofs, to save memory *)
-let share t = failwith "Proof.share: not implemented"  (* TODO *)
+let share t =
+  let h = ProofTbl.create 15 in
+  let rec share t =
+    let t' = { t with
+      parents = Array.map share t.parents;
+    } in
+    try ProofTbl.find h t'
+    with Not_found ->
+      ProofTbl.add h t' t';
+      t'
+  in
+  share t
 
 (** {2 Conversion to a graph of proofs} *)
 

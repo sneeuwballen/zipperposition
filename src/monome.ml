@@ -164,18 +164,23 @@ let mem e t =
   | Some _ -> true
 
 let add e s t =
+  (* sorted insertion *)
   let rec add l s t = match l with
     | [] -> [s, t]
     | (s', t')::l' ->
-      if T.eq t t'
-        then
-          let s'' = e.num.add s s' in
-          if e.num.cmp e.num.zero s'' = 0
-            then l'
-            else (s'', t) :: l'
-        else (s', t') :: add l' s t
+      begin match T.cmp t t' with
+      | 0 ->
+        let s'' = e.num.add s s' in
+        if e.num.cmp e.num.zero s'' = 0
+          then l'
+          else (s'', t) :: l'
+      | n when n < 0 -> (s, t) :: l
+      | _ -> (s', t') :: add l' s t
+      end
   in
   { e with terms = add e.terms s t; }
+
+let mk_const ~num const = { num; const; terms=[]; }
 
 let of_list ~num s l =
   List.fold_left
@@ -183,11 +188,10 @@ let of_list ~num s l =
     (mk_const ~num s) l
 
 let map f e =
-  let terms = List.map (fun (n,t) -> n, f t) e.terms in
   let const = {e with terms = []} in
   List.fold_left
-    (fun e (n, t) -> add e n t)
-    const terms
+    (fun e (n, t) -> add e n (f t))
+    const e.terms
 
 let add_const e s =
   { e with const = e.num.add e.const s; }
@@ -199,6 +203,8 @@ let remove e t =
 let remove_const e =
   { e with const = e.num.zero; }
 
+let add_list m l = List.fold_left (fun m (c,t) -> add m c t) m l
+
 module Seq = struct
   let terms m =
     fun k -> List.iter (fun (_, t) -> k t) m.terms
@@ -208,9 +214,14 @@ module Seq = struct
 
   let coeffs m =
     fun k -> List.iter k m.terms
+
+  let coeffs_swap m k =
+    List.iter (fun (x,y) -> k (y,x)) m.terms
 end
 
 let is_const e = match e.terms with | [] -> true | _ -> false
+
+let is_zero e = is_const e && e.num.sign e.const = 0
 
 let sign m =
   if not (is_const m) then invalid_arg "Monome.sign";
@@ -286,12 +297,35 @@ let apply_subst ~renaming subst m sc_m =
     (fun t -> Substs.FO.apply ~renaming subst t sc_m)
     m
 
+let apply_subst_no_renaming subst m sc_m =
+  map
+    (fun t -> Substs.FO.apply_no_renaming subst t sc_m)
+    m
+
 let is_ground m =
   List.for_all (fun (_, t) -> T.is_ground t) m.terms
 
 let fold f acc m =
   Util.list_foldi
     (fun acc i (n, t) -> f acc i n t)
+    acc m.terms
+
+module MT = Multiset.Make(struct
+  type t = term
+  let compare = T.cmp
+end)
+
+let fold_max ~ord f acc m =
+  (* set of max terms *)
+  let max =
+    Seq.terms m
+    |> MT.Seq.of_seq MT.empty
+    |> MT.max_seq (Ordering.compare ord)
+    |> Sequence.map2 (fun t _ -> t)
+    |> T.Seq.add_set T.Set.empty
+  in
+  Util.list_foldi
+    (fun acc i (c, t) -> if T.Set.mem t max then f acc i c t else acc)
     acc m.terms
 
 let pp buf e =
@@ -305,8 +339,9 @@ let pp buf e =
   | _::_ when e.num.sign e.const = 0 ->
     Util.pp_list ~sep:" + " pp_pair buf e.terms
   | _::_ ->
-    Printf.bprintf buf "%s + %a" (e.num.to_string e.const)
+    Printf.bprintf buf "%a + %s"
       (Util.pp_list ~sep:" + " pp_pair) e.terms
+      (e.num.to_string e.const)
 
 let to_string monome = Util.on_buffer pp monome
 
@@ -348,6 +383,209 @@ let set_term m n t =
     let terms = Util.list_set m.terms n (c,t) in
     {m with terms; }
   with _ -> _fail_idx m n
+
+module Focus = struct
+  type 'a t = {
+    term : term;
+    coeff : 'a;
+    rest : 'a monome;
+  }
+
+  let get m i =
+    try
+      let coeff, term = List.nth m.terms i in
+      assert (m.num.sign coeff <> 0);
+      let rest = {m with terms=Util.list_remove m.terms i} in
+      { term; coeff; rest; }
+    with _ -> _fail_idx m i
+
+    (* TODO: optimize *)
+  let focus_term m term =
+    match find m term with
+    | None -> None
+    | Some coeff ->
+        let rest = remove m term in
+        Some {coeff; rest; term; }
+
+  let focus_term_exn m t = match focus_term m t with
+    | None -> failwith "focus_term_exn"
+    | Some x -> x
+
+  let sum t m =
+    assert (t.rest.num == m.num);
+    { t with rest = sum t.rest m; }
+
+  let difference t m =
+    assert (t.rest.num == m.num);
+    { t with rest = difference t.rest m; }
+
+  let uminus t =
+    let num = t.rest.num in
+    { t with coeff = num.uminus t.coeff; rest=uminus t.rest; }
+
+  let product t z =
+    let num = t.rest.num in
+    if num.sign z = 0 then invalid_arg "Monome.Lit.product";
+    { t with coeff=num.mult t.coeff z; rest=product t.rest z; }
+
+  let to_monome t =
+    add t.rest t.coeff t.term
+
+  let coeff t = t.coeff
+  let term t = t.term
+  let rest t = t.rest
+
+  (* scale focused monomes to have the same coefficient *)
+  let scale m1 m2 =
+    let gcd = Z.gcd m1.coeff m2.coeff in
+    product m1 (Z.divexact m2.coeff gcd), product m2 (Z.divexact m1.coeff gcd)
+
+  let pp buf t =
+    let num = t.rest.num in
+    (* print the focused part *)
+    let pp_focused buf t =
+      if num.cmp num.one t.coeff = 0
+      then T.pp buf t.term
+      else Printf.bprintf buf "%s·%a" (num.to_string t.coeff) T.pp t.term
+    in
+    if is_zero t.rest
+      then Printf.bprintf buf "[%a]" pp_focused t
+      else Printf.bprintf buf "[%a] + %a" pp_focused t pp t.rest
+
+  let to_string m = Util.on_buffer pp m
+  let fmt fmt t = Format.pp_print_string fmt (to_string t)
+
+  let is_max ~ord mf =
+    List.for_all
+      (fun (_, t) -> match Ordering.compare ord mf.term t with
+        | Comparison.Lt -> false  (* [t > mf.term] *)
+        | _ -> true)
+      mf.rest.terms
+
+  let fold_m ~pos m acc f =
+    Util.list_foldi
+      (fun acc i (c,t) ->
+        let pos = Position.(append pos (arg i stop)) in
+        let rest = {m with terms=Util.list_remove m.terms i} in
+        let mf = {coeff=c; term=t; rest;} in
+        f acc mf pos
+      ) acc m.terms
+
+  let _apply_subst how subst mf scope =
+    let rest = map (fun t -> how subst  t scope) mf.rest in
+    let term = how subst mf.term scope in
+    (* if [term] occurs in the new [rest], remove it and add its
+       coefficient. *)
+    let coeff, rest =
+      if mem rest term
+        then (rest.num.add mf.coeff (find_exn rest term), remove rest term)
+        else (mf.coeff, rest)
+    in
+    if rest.num.sign coeff = 0 then failwith "Monome.Focus.apply_subst: coeff 0";
+    {coeff; rest; term; }
+
+  let apply_subst ~renaming subst mf scope =
+    _apply_subst (Substs.FO.apply ~renaming) subst mf scope
+
+  let apply_subst_no_renaming subst mf scope =
+    _apply_subst Substs.FO.apply_no_renaming subst mf scope
+
+  let _id x = x
+  let map ?(term=_id) ?(coeff=_id) ?(rest=_id) mf =
+    { term=term mf.term; coeff=coeff mf.coeff; rest=rest mf.rest; }
+
+  (* unification between terms of the same monome *)
+  let rec _iter_self ~num ~subst c t l rest const scope k =
+    match l with
+    | [] ->
+        let mf' = { coeff=c; term=t; rest=of_list ~num const rest;} in
+        if num.sign c <> 0 then k (mf', subst)
+    | (c', t') :: l' ->
+        if Unif.FO.eq ~subst t scope t' scope
+        then
+          (* we do not have a choice, [t = t'] is true *)
+          _iter_self ~num ~subst (num.add c c') t l' rest const scope k
+        else begin
+          begin try
+            (* maybe we can merge [t] and [t'] *)
+            let subst' = Unif.FO.unification ~subst t scope t' scope in
+            _iter_self ~num ~subst:subst' (num.add c c') t (l'@ rest) [] const scope k
+          with Unif.Fail -> ()
+          end;
+          (* we can also choose not to unify [t] and [t']. *)
+          _iter_self ~num ~subst c t l' ((c',t')::rest) const scope k
+        end
+
+  let unify_self ?(subst=Substs.empty) mf scope k =
+    let num = mf.rest.num in
+    _iter_self ~num ~subst mf.coeff mf.term mf.rest.terms [] mf.rest.const scope k
+
+  let unify_self_monome ?(subst=Substs.empty) m scope k =
+    let num = m.num in
+    let rec choose_first subst l rest = match l with
+    | [] -> ()
+    | (c,t)::l' ->
+        choose_second subst c t l' rest;
+        choose_first subst l' ((c,t)::rest)
+    and choose_second subst c t l rest = match l with
+    | [] -> ()
+    | (c',t')::l' ->
+        (* see whether we can unify t and t' *)
+        begin try
+          let subst = Unif.FO.unification ~subst t scope t' scope in
+          (* extend the unifier *)
+          _iter_self ~num ~subst (num.add c c') t (l'@rest) [] m.const scope k
+        with Unif.Fail -> ()
+        end;
+        (* ignore t' and search another partner *)
+        choose_second subst c t l' ((c',t')::rest)
+    in
+    choose_first subst m.terms []
+
+  let unify_ff ?(subst=Substs.empty) mf1 s1 mf2 s2 k =
+    assert(mf1.rest.num == mf2.rest.num);
+    let num = mf1.rest.num in
+    try
+      let subst = Unif.FO.unification ~subst mf1.term s1 mf2.term s2 in
+      _iter_self ~num ~subst mf1.coeff mf1.term mf1.rest.terms [] mf1.rest.const s1
+        (fun (mf1, subst) ->
+          _iter_self ~num ~subst mf2.coeff mf2.term mf2.rest.terms [] mf2.rest.const s2
+            (fun (mf2, subst) -> k (mf1, mf2, subst)))
+    with Unif.Fail -> ()
+
+  let unify_mm ?(subst=Substs.empty) m1 s1 m2 s2 k =
+    assert(m1.num==m2.num);
+    let num = m1.num in
+    (* unify a term of [m1] with a term of [m2] *)
+    let rec choose_first subst l1 rest1 cst1 l2 rest2 cst2 k = match l1, l2 with
+      | [], _
+      | _, [] -> ()
+      | (c1,t1)::l1', (c2,t2)::l2' ->
+          (* first, choose [t1] and [t2] if they are unifiable, and extend
+              the unifier to the other terms if needed. *)
+          assert (num.sign c1 <> 0 && num.sign c2 <> 0);
+          begin try
+            let subst = Unif.FO.unification ~subst t1 s1 t2 s2 in
+            Util.debug 5 "unify_mm : %a = %a with %a" T.pp t1 T.pp t2 Substs.pp subst;
+            _iter_self ~num ~subst c1 t1 l1' [] m1.const s1
+              (fun (mf1, subst) ->
+                _iter_self ~num ~subst c2 t2 l2' [] m2.const s2
+                  (fun (mf2, subst) -> k (mf1, mf2, subst))
+              )
+          with Unif.Fail -> ()
+          end;
+          (* don't choose [t1] *)
+          choose_first subst l1' ((c1,t1)::rest1) cst1 l2 rest2 cst2 k;
+          (* don't choose [t2] *)
+          choose_first subst l1 rest1 cst1 l2' ((c2,t2)::rest2) cst2 k
+  in
+  choose_first subst m1.terms [] m1.const m2.terms [] m2.const k
+
+  (*
+  let unify_fm ?(subst=Substs.empty) mf1 s1 m2 s2 k =
+    assert false  (* TODO? unify_fm *)
+  *)
+end
 
 let variant ?(subst=Substs.empty) m1 sc1 m2 sc2 k =
   assert (m1.num == m2.num);
@@ -511,12 +749,27 @@ module Int = struct
     in
     t
 
+  let normalize m =
+    let cst, changed, terms =
+      List.fold_left
+        (fun (cst, changed, acc) (c,t) ->
+          match T.view t with
+          | T.Const (Symbol.Int n) ->
+              Z.add cst (Z.mul n c), true, acc
+          | _ -> cst, changed, (c,t)::acc
+        ) (m.const, false, []) m.terms
+    in
+    if changed
+      then {m with const=cst; terms; }
+      else m
+
   let normalize_wrt_zero m =
     if is_const m
     then m
     else
       (* divide by common gcd of coeffs and constant *)
-      let gcd = List.fold_left (fun gcd (c,_) -> Z.gcd c gcd) m.const m.terms in
+      let gcd = if Z.(equal m.const zero) then Z.one else m.const in
+      let gcd = List.fold_left (fun gcd (c,_) -> Z.gcd c gcd) gcd m.terms in
       let gcd = Z.abs gcd in
       if Z.equal Z.one gcd
         then m
@@ -548,32 +801,13 @@ module Int = struct
     with Not_found ->
       raise (Invalid_argument "Monome.reduce_same_factor")
 
+  let to_multiset m =
+    Seq.coeffs_swap m |> Multisets.MT.Seq.of_coeffs Multisets.MT.empty
+
   (* multiset-like comparison *)
   let compare f m1 m2 =
-    let m = difference m1 m2 in
-    let maxterms = Multiset.max_l f (terms m) in
-    (* [m1] dominates [m2] if some maximal term has a strictly positive
-       coeff in [m1 - m2]. *)
-    let m1_dominates =
-      List.exists
-        (fun t -> match find m t with
-        | None -> false
-        | Some n -> Z.sign n > 0)
-        maxterms
-    and m2_dominates =
-      List.exists
-        (fun t -> match find m t with
-        | None -> false
-        | Some n -> Z.sign n < 0)
-        maxterms
-    in
-    match m1_dominates, m2_dominates with
-    | false, false ->
-        assert (is_const m && Z.sign m.const = 0);
-        Comparison.Eq
-    | true, true -> Comparison.Incomparable
-    | true, false -> Comparison.Gt
-    | false, true -> Comparison.Lt
+    let m1 = to_multiset m1 and m2 = to_multiset m2 in
+    Multisets.MT.compare_partial f m1 m2
 
   (** {2 Specific to Int} *)
 
@@ -599,9 +833,18 @@ module Int = struct
     List.for_all (fun (c',_) -> Z.sign (Z.rem c' c) = 0) e.terms
 
   let factorize e =
-    let gcd = List.fold_left
-      (fun gcd (c, _) -> Z.gcd c gcd)
-      e.const e.terms
+    let gcd =
+      if Z.equal e.const Z.zero
+      then match e.terms with
+        | [] -> Z.one
+        | (c,_)::terms' ->
+          List.fold_left
+            (fun gcd (c, _) -> Z.gcd c gcd)
+            c terms'
+      else
+        List.fold_left
+          (fun gcd (c, _) -> Z.gcd c gcd)
+          e.const e.terms
     in
     let gcd = Z.abs gcd in
     if Z.equal Z.one gcd || Z.sign gcd = 0
@@ -618,8 +861,6 @@ module Int = struct
     let sum ~n c1 c2 = modulo ~n (Z.add c1 c2)
 
     let uminus ~n c = modulo ~n (Z.mul Z.minus_one c)
-
-    let inverse ~n c = failwith "Monome.Modulo.inverse: not implemented"
   end
 
   (** {2 Find Solutions} *)
@@ -791,7 +1032,6 @@ module Int = struct
     let _is_one_abs (s, _) = Z.equal Z.one (Z.abs s)
 
     let eq_zero ?fresh_var m =
-      let open Sequence.Infix in
       (* generation of fresh variables, with default function *)
       let fresh_var = match fresh_var with
         | None -> __fresh_var m

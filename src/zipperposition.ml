@@ -37,8 +37,10 @@ module O = Ordering
 module Lit = Literal
 module S = Substs
 
-(* XXX: load some other modules, but they might not be registered *)
-module Chaining = Chaining
+(* load some other modules, but they might not be registered *)
+module Import = struct
+  open! Chaining
+end
 
 (** setup an alarm for abrupt stop *)
 let setup_alarm timeout =
@@ -66,6 +68,15 @@ let setup_penv ~penv () =
     |> List.iter (Extensions.apply_penv ~penv);
   if (PEnv.get_params ~penv).param_expand_def then
     PEnv.add_operation ~penv ~prio:1 PEnv.expand_def;
+  (* use "invfreq" *)
+  PEnv.add_constr_rule ~penv
+    (fun set ->
+      let symbols = PF.Set.to_seq set
+        |> Sequence.map PF.form
+        |> Sequence.flatMap Formula.FO.Seq.symbols
+      in
+      Precedence.Constr.invfreq symbols
+    );
   (* be sure to get a total order on symbols *)
   PEnv.add_constr ~penv Precedence.Constr.alpha;
   ()
@@ -77,7 +88,7 @@ let setup_env ~env =
 
 (** Load plugins *)
 let load_plugins ~params =
-  Util.list_flatmap
+  List.iter
     (fun filename ->
       let n = String.length filename in
       let filename =  (* plugin name, or file? *)
@@ -93,12 +104,12 @@ let load_plugins ~params =
             Filename.concat Const.home home_filename
       in
       match Extensions.dyn_load filename with
-      | Extensions.Ext_failure msg -> (* Could not load plugin *)
-        []
+      | Extensions.Ext_failure msg -> () (* Could not load plugin *)
       | Extensions.Ext_success ext ->
         Util.debug 0 "loaded extension %s" ext.Extensions.name;
-        [ext])
-    params.param_plugins
+        ()
+    ) params.param_plugins;
+  Extensions.extensions ()
 
 (** What we get after preprocessing *)
 module type POST_PREPROCESS = sig
@@ -210,6 +221,7 @@ end) = struct
 
   (** Print some content of the state, based on environment variables *)
   let print_dots result =
+    Signal.send Signals.on_dot_output ();
     (* see if we need to print proof state *)
     begin match params.param_dot_file, result with
     | Some dot_f, Saturate.Unsat proof ->
@@ -317,7 +329,7 @@ let preprocess ~signature ~params formulas =
   let ord = params.param_ord precedence in
   let select = Selection.selection_from_string ~ord params.param_select in
   Util.debug 1 "selection function: %s" params.param_select;
-  Util.debug 1 "signature: %a" Signature.pp signature;
+  Util.debug 1 "signature: %a" Signature.pp (Signature.diff signature !Params.signature);
   let module Result = struct
     let signature = signature
     let select = select
@@ -334,7 +346,7 @@ let process_file ?meta ~plugins ~params file =
   >>= fun decls ->
   Util.debug 1 "parsed %d declarations" (Sequence.length decls);
   (* obtain a typed AST *)
-  Util_tptp.infer_types (`sign Signature.TPTP.base) decls
+  Util_tptp.infer_types (`sign !Params.signature) decls
   >>= fun (signature,decls) ->
   (* obtain a set of proved formulas *)
   let formulas =
@@ -345,7 +357,8 @@ let process_file ?meta ~plugins ~params file =
   (* obtain clauses + env *)
   Util.debug 2 "input formulas:\n%%  %a" (Util.pp_seq ~sep:"\n%  " PF.pp)
     (PF.Set.to_seq formulas);
-  Util.debug 2 "input signature: %a" Signature.pp signature;
+  Util.debug 2 "input signature: %a" Signature.pp
+    (Signature.diff signature !Params.signature);
   let res, signature = preprocess ~signature ~params formulas in
   let module Res = (val res : POST_PREPROCESS) in
   (* build the context and env *)
@@ -373,9 +386,9 @@ let process_file ?meta ~plugins ~params file =
     else Saturate.Unknown, MyEnv.C.CSet.to_seq clauses
   in
   Util.debug 1 "signature: %a" Signature.pp
-    (Signature.diff (MyEnv.signature ()) Signature.TPTP.Arith.full);
+    (Signature.diff (MyEnv.signature ()) !Params.signature);
   Util.debug 2 "%d clauses processed into:\n%%  %a"
-    num_clauses (Util.pp_seq ~sep:"\n%%  " MyEnv.C.pp) clauses;
+    num_clauses (Util.pp_seq ~sep:"\n%  " MyEnv.C.pp) clauses;
   (* add clauses to passive set of [env] *)
   MyEnv.add_passive clauses;
   (* saturate, possibly changing env *)
@@ -414,6 +427,8 @@ let () =
   print_version params;
   (* plugins *)
   let plugins = load_plugins ~params in
+  (* initialize plugins *)
+  List.iter Extensions.init plugins;
   (* master process: process files *)
   Vector.iter params.param_files
     (fun file ->

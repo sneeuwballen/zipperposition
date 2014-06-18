@@ -82,14 +82,18 @@ module Make(E : Env.S) = struct
     | None -> Sat (* passive set is empty *)
     | Some c ->
       begin match Env.all_simplify c with
-      | None ->
+      | [] ->
         Util.incr_stat stat_redundant_given;
         Util.debug 2 "given clause %a is redundant" Env.C.pp c;
         Unknown
-      | Some c when Env.C.is_empty c ->
-        Unsat (Env.C.proof c) (* empty clause found *)
-      | Some c ->
-        (* process this clause! *)
+      | l when List.exists Env.C.is_empty l ->
+        (* empty clause found *)
+        let proof = Env.C.proof (List.find Env.C.is_empty l) in
+        Unsat proof
+      | c :: l' ->
+        (* put clauses of [l'] back in passive set *)
+        Env.add_passive (Sequence.of_list l');
+        (* process the clause [c] *)
         let new_clauses = Vector.create 15 in
         assert (not (Env.is_redundant c));
         (* process the given clause! *)
@@ -127,7 +131,7 @@ module Make(E : Env.S) = struct
             let c = Env.forward_simplify c in
             (* keep clauses  that are not redundant *)
             if Env.is_trivial c || Env.is_active c || Env.is_passive c
-              then None
+              then (Util.debug 5 "clause %a is trivial, dump" Env.C.pp c; None)
               else Some c)
           inferred_clauses
         in

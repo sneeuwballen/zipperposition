@@ -62,6 +62,8 @@ module type S = sig
   val name : t -> string
     (** Name of the implementation/role of the queue *)
 
+  (** {6 Available Queues} *)
+
   val fifo : t
     (** select by increasing age (for fairness) *)
 
@@ -89,14 +91,43 @@ module type S = sig
   val mk_queue : ?accept:(C.t -> bool) -> weight:(C.t -> int) -> string -> t
     (** Bring your own implementation of queue *)
 
-  val default_queues : (t * int) list
-    (** default combination of heuristics (TODO: array?) *)
+  (** {6 Combination of queues} *)
+
+  type queues = (t * int) list
+
+  module Profiles : sig
+    val bfs : queues
+      (** Strong orientation toward FIFO *)
+
+    val explore : queues
+      (** Use heuristics for selecting "small" clauses *)
+
+    val ground : queues
+      (** Favor positive unit clauses and ground clauses *)
+  end
+
+  val default_queues : queues
+    (** default combination of heuristics *)
+
+  (** {6 IO} *)
 
   val pp : Buffer.t -> t -> unit
   val to_string : t -> string
   val pp_list : Buffer.t -> (t * int) list -> unit
   val fmt : Format.formatter -> t -> unit
 end
+
+let _profile = ref "default"
+let profile () = !_profile
+let set_profile s = _profile := s
+
+let () =
+  Params.add_opts
+    [ "-clause-queue"
+    , Arg.String set_profile
+    , "choose which set of clause queues to use \
+      (for selecting next active clause): choices: default,bfs,explore,ground"
+    ]
 
 module Make(C : Clause.S) = struct
   module C = C
@@ -161,24 +192,33 @@ module Make(C : Clause.S) = struct
 
   let name q = q.functions.name
 
+  (* weight function, that estimates how "difficult" it is to get rid of
+      the literals of the clause. In other words, by selecting the clause,
+      how far we are from the empty clause. *)
+  let _default_weight c =
+    let w = Array.fold_left
+      (fun acc lit -> acc + Lit.heuristic_weight lit)
+      0 (C.lits c)
+    in w * Array.length (C.lits c)
+
   let fifo =
     let name = "fifo_queue" in
     mk_queue ~weight:(fun c -> C.id c) name
 
   let clause_weight =
     let name = "clause_weight" in
-    mk_queue ~weight:(fun c -> C.weight c * C.length c) name
+    mk_queue ~weight:_default_weight name
 
   let goals =
     (* check whether a literal is a goal *)
     let is_goal_lit lit = Lit.is_neg lit in
     let is_goal_clause c = Util.array_forall is_goal_lit (C.lits c) in
     let name = "prefer_goals" in
-    mk_queue ~accept:is_goal_clause ~weight:(fun c -> C.weight c * C.length c) name
+    mk_queue ~accept:is_goal_clause ~weight:_default_weight name
 
   let ground =
     let name = "prefer_ground" in
-    mk_queue ~accept:C.is_ground ~weight:(fun c -> C.weight c * C.length c) name
+    mk_queue ~accept:C.is_ground ~weight:_default_weight name
 
   let non_goals =
     (* check whether a literal is a goal *)
@@ -187,7 +227,7 @@ module Make(C : Clause.S) = struct
       (fun x -> not (is_goal_lit x))
       (C.lits c) in
     let name = "prefer_non_goals" in
-    mk_queue ~accept:is_non_goal_clause ~weight:(fun c -> C.weight c * C.length c) name
+    mk_queue ~accept:is_non_goal_clause ~weight:_default_weight name
 
   let pos_unit_clauses =
     let is_unit_pos c = match C.lits c with
@@ -195,36 +235,54 @@ module Make(C : Clause.S) = struct
     | _ -> false
     in
     let name = "prefer_pos_unit_clauses" in
-    mk_queue ~accept:is_unit_pos ~weight:(fun c -> C.weight c * C.length c) name
+    mk_queue ~accept:is_unit_pos ~weight:_default_weight name
 
   let horn =
     let accept c = Lits.is_horn (C.lits c) in
     let name = "prefer_horn" in
-    mk_queue ~accept ~weight:(fun c -> C.weight c * C.length c) name
+    mk_queue ~accept ~weight:_default_weight name
 
   let lemmas =
     let name = "lemmas" in
     let accept c = C.get_flag C.flag_lemma c in
     (* use a fifo on lemmas *)
-    mk_queue ~accept ~weight:C.weight name
+    mk_queue ~accept ~weight:_default_weight name
+
+  (** {6 Combination of queues} *)
+
+  type queues = (t * int) list
+
+  module Profiles = struct
+    let bfs =
+      [ fifo, 5
+      ; clause_weight, 1
+      ]
+
+    let explore =
+      [ fifo, 1
+      ; clause_weight, 4
+      ; goals, 1
+      ]
+
+    let ground =
+      [ fifo, 1
+      ; pos_unit_clauses, 1
+      ; ground, 2
+      ]
+  end
 
   let default_queues =
-    [ fifo, 2
-    ; clause_weight, 2
-    (* ; lemmas, 1 *)
-    ]
-    (*
-    [ (clause_weight, 4);
-      (ground, 1);
-      (*
-      (non_goals, 1);
-      (goals, 1);
-      *)
-      (fifo, 2);
-      (horn, 1);  (* FIXME: if just before "fifo", incompleteness on pelletier_problems/pb64.p *)
-      (lemmas, 1);
-    ]
-    *)
+    match !_profile with
+    | "default" ->
+        [ fifo, 4
+        ; clause_weight, 3
+        ; goals, 1
+        ; pos_unit_clauses, 1
+        ]
+    | "bfs" -> Profiles.bfs
+    | "explore" -> Profiles.explore
+    | "ground" -> Profiles.ground
+    | n -> failwith ("no such profile: " ^ n)
 
   let pp buf q =
     Printf.bprintf buf "queue %s" (name q)

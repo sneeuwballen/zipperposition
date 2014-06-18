@@ -41,8 +41,6 @@ type t = {
   param_dot_sat : bool;           (** Print saturated set into DOT? *)
   param_plugins : string list;    (** plugins to load *)
   param_expand_def : bool;        (** expand definitions *)
-  param_arith : bool;             (** enable arith? *)
-  param_arith_ac : bool;          (** enable AC axioms for arith? *)
   param_stats : bool;
   param_presaturate : bool;       (** initial interreduction of proof state? *)
   param_unary_depth : int;        (** Maximum successive levels of unary inferences *)
@@ -53,6 +51,9 @@ let other_opts = ref []
 
 let add_opt o = other_opts := o :: !other_opts
 let add_opts l = other_opts := l @ !other_opts
+
+(** Default signature *)
+let signature = ref Signature.TPTP.base
 
 (** parse_args returns parameters *)
 let parse_args () =
@@ -73,8 +74,6 @@ let parse_args () =
   and dot_file = ref None
   and dot_sat = ref false
   and plugins = ref []
-  and arith = ref false
-  and arith_ac = ref false
   and stats = ref false
   and expand_def = ref false
   and select = ref "SelectComplex"
@@ -101,8 +100,6 @@ let parse_args () =
     ; "-plugin", Arg.String add_plugin, "load given plugin (.cmxs)"
     ; "-plugins", Arg.String add_plugins, "load given plugin(s), comma-separated"
     ; "-expand-def", Arg.Set expand_def, "expand definitions"
-    ; "-arith", Arg.Set arith, "enable arithmetic"
-    ; "-arith-ac", Arg.Set arith_ac, "enable AC axioms for arith"
     ; "-progress", Arg.Unit set_progress, "print progress"
     ; "-theories", Arg.Bool (fun b -> theories := b), "enable/disable theory detection"
     ; "-proof", Arg.Set_string proof, "choose proof printing (none, debug, or tstp)"
@@ -129,5 +126,4 @@ let parse_args () =
     param_presaturate = !presaturate;
     param_dot_file = !dot_file; param_plugins= !plugins;
     param_unary_depth= !unary_depth; param_dot_sat= !dot_sat;
-    param_expand_def= !expand_def; param_arith= !arith;
-    param_arith_ac= !arith_ac; }
+    param_expand_def= !expand_def; }

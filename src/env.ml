@@ -74,6 +74,10 @@ module type S = sig
   type lit_rewrite_rule = Literal.t -> Literal.t
     (** Rewrite rule on literals *)
 
+  type multi_simpl_rule = C.t -> C.t list option
+    (** (maybe) rewrite a clause to a set of clauses.
+        Must return [None] if the clause is unmodified *)
+
   (** {2 Modify the Env} *)
 
   val add_passive : C.t Sequence.t -> unit
@@ -130,6 +134,9 @@ module type S = sig
   val add_simplify : simplify_rule -> unit
     (** Add basic simplification rule *)
 
+  val add_multi_simpl_rule : multi_simpl_rule -> unit
+    (** Add a multi-clause simplification rule *)
+
   val add_is_trivial : is_trivial_rule -> unit
     (** Add tautology detection rule *)
 
@@ -140,6 +147,9 @@ module type S = sig
     (** Add a literal rewrite rule *)
 
   (** {2 Use the Env} *)
+
+  val multi_simplify : C.t -> C.t list option
+    (** Can we simplify the clause into a List of simplified clauses? *)
 
   val params : Params.t
 
@@ -214,9 +224,9 @@ module type S = sig
   val subsumed_by : C.t -> C.CSet.t
     (** List of active clauses subsumed by the given clause *)
 
-  val all_simplify : C.t -> C.t option
-    (** Use all simplification rules to convert a clause into a maximally
-        simplified clause (or None, if trivial). *)
+  val all_simplify : C.t -> C.t list
+    (** Use all simplification rules to convert a clause into a set
+        of maximally simplified clause (or [[]] if they are all trivial). *)
 
   (** {2 Misc} *)
 
@@ -266,6 +276,10 @@ end) : S with module Ctx = X.Ctx = struct
   type lit_rewrite_rule = Literal.t -> Literal.t
     (** Rewrite rule on literals *)
 
+  type multi_simpl_rule = C.t -> C.t list option
+    (** (maybe) rewrite a clause to a set of clauses.
+        Must return [None] if the clause is unmodified *)
+
   let _binary_rules = ref []
   let _unary_rules = ref []
   let _rewrite_rules = ref []
@@ -278,6 +292,7 @@ end) : S with module Ctx = X.Ctx = struct
   let _backward_redundant = ref []
   let _is_trivial = ref []
   let _empty_clauses = ref C.CSet.empty
+  let _multi_simpl_rule = ref []
 
   let on_empty_clause = Signal.create ()
 
@@ -360,6 +375,9 @@ end) : S with module Ctx = X.Ctx = struct
   let add_lit_rule name rule =
     _lit_rules := (name, rule) :: !_lit_rules
 
+  let add_multi_simpl_rule rule =
+    _multi_simpl_rule := rule :: !_multi_simpl_rule
+
   let params = X.params
 
   let get_empty_clauses () =
@@ -400,6 +418,27 @@ end) : S with module Ctx = X.Ctx = struct
 
   let stats () = ProofState.stats ()
 
+  (* biggest bucket of clauses
+  let biggest_bucket () =
+    let module CH = C.CHashcons in
+    let tbl = CH.default |> CH.weak_of in
+    let size,_,_,_,_,_ = CH.H.stats tbl in
+    let a = Array.make size [] in
+    CH.H.iter
+      (fun x ->
+        let i = C.hash x mod size in
+        a.(i) <- x :: a.(i)
+      ) tbl;
+    let max_idx, max_size = Util.array_foldi
+      (fun (idx,len) i l ->
+        if List.length l > len
+          then i,List.length l
+          else idx,len
+      ) (0,List.length a.(0)) a
+    in
+    max_size, a.(max_idx)
+  *)
+
   let cnf set =
     let clauses = Sequence.fold
       (fun cset pf ->
@@ -418,6 +457,7 @@ end) : S with module Ctx = X.Ctx = struct
       C.CSet.empty (PF.Set.to_seq set)
     in
     (* declaration of new skolem symbols *)
+    Util.debug 5 "declare skolem symbols";
     Ctx.add_signature (Skolem.to_signature Ctx.skolem);
     clauses
 
@@ -610,8 +650,39 @@ end) : S with module Ctx = X.Ctx = struct
     Util.exit_prof prof_simplify;
     old_c, c
 
+  let multi_simplify c =
+    let did_something = ref false in
+    (* try rules one by one until some of them succeeds *)
+    let rec try_next c rules = match rules with
+      | [] -> None
+      | r::rules' ->
+          match r c with
+          | Some l -> Some l
+          | None -> try_next c rules'
+    in
+    (* fixpoint of [try_next] *)
+    let set = ref C.CSet.empty in
+    let q = Queue.create () in
+    Queue.push c q;
+    while not (Queue.is_empty q) do
+      let c = Queue.pop q in
+      if not (C.CSet.mem !set c) then begin
+        let c = basic_simplify c in
+        match try_next c !_multi_simpl_rule with
+        | None ->
+            (* keep the clause! *)
+            set := C.CSet.add !set c;
+        | Some l ->
+            did_something := true;
+            List.iter (fun c -> Queue.push c q) l;
+      end
+    done;
+    if !did_something
+      then Some (C.CSet.to_list !set)
+      else None
+
   (* find candidates for backward simplification in active set *)
-  let backward_simplify given =
+  let backward_simplify_find_candidates given =
     match !_backward_simplify with
     | [] -> C.CSet.empty
     | [f] -> f given
@@ -622,7 +693,7 @@ end) : S with module Ctx = X.Ctx = struct
   let backward_simplify given =
     Util.enter_prof prof_back_simplify;
     (* set of candidate clauses, that may be unit-simplifiable *)
-    let candidates = backward_simplify given in
+    let candidates = backward_simplify_find_candidates given in
     (* try to simplify the candidates. Before is the set of clauses that
        are simplified, after is the list of those clauses after simplification *)
     let before, after =
@@ -716,15 +787,26 @@ end) : S with module Ctx = X.Ctx = struct
     Util.exit_prof prof_subsumed_by;
     res
 
-  (** Use all simplification rules to convert a clause into a maximally
-      simplified clause, or None *)
+  (** Use all simplification rules to convert a clause into a list of
+      maximally simplified clauses *)
   let all_simplify c =
     Util.enter_prof prof_all_simplify;
-    let _, c' = simplify c in
-    let res = if is_trivial c' || is_redundant c'
-      then None
-      else Some c'
-    in
+    let set = ref C.CSet.empty in
+    let q = Queue.create () in
+    Queue.push c q;
+    while not (Queue.is_empty q) do
+      let c = Queue.pop q in
+      let _, c' = simplify c in
+      if is_trivial c' || is_redundant c'
+        then ()
+        else match multi_simplify c' with
+        | None ->
+            (* clause has reached fixpoint *)
+            set := C.CSet.add !set c'
+        | Some l ->
+            List.iter (fun c -> Queue.push c q) l
+    done;
+    let res = C.CSet.to_list !set in
     Util.exit_prof prof_all_simplify;
     res
 

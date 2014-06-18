@@ -25,7 +25,7 @@ CONFIG_FILE = "./benchs.ini"
 DB_FILE = "./benchs.db"
 TIMEOUT = 120
 LOG_LEVEL = 'info'
-MEMORY = 1024 * 1024
+MEMORY = 512 * 1024
 CLI = '__cli'  # config section for CLI arguments
 
 log = logging.getLogger("benchmark")
@@ -44,8 +44,6 @@ levels = {
     'info': logging.INFO,
     'error': logging.ERROR,
 }
-
-
 
 class Run(object):
     """Contains everything needed for running benchmarks."""
@@ -93,11 +91,14 @@ class Run(object):
         except sqlite3.OperationalError as e:
             pass
 
-    def save(self, filename, prover, result, time, output):
+    def save(self, filename, prover, result, time, output, save_output=True):
         """Save this individual result in the table. If an entry with same
         (filename,prover) already exists, it will be deleted. """ 
         try:
-            output = output.decode('utf8')
+            if save_output:
+                output = output.decode('utf8')
+            else:
+                output = u''
             self.conn.execute("""insert into results (filename, prover, result, time, output)
                 values (?, ?, ?, ?, ?);""",
                 [filename.strip(), prover.strip(), result.strip(), time, output])
@@ -124,9 +125,10 @@ class Run(object):
         # limit memory (address space)
         memory = self.memory
         log.debug('memory limit is %d', memory)
-        resource.setrlimit(resource.RLIMIT_AS, (memory * 1024, memory * 1024))
+        resource.setrlimit(resource.RLIMIT_DATA, (memory * 1024, memory * 1024))
 
         log.debug('time limit is %d', self.timeout)
+        resource.setrlimit(resource.RLIMIT_CPU, (self.timeout, self.timeout + 5))
 
         print "solve %-30s with prover %-20s... " % (filename, prover),
         sys.stdout.flush()
@@ -158,6 +160,7 @@ class Run(object):
         # TODO use the self.cores argument to run those in parallel
         already_done = self.tasks['solved'] if self.tasks else set(())
         rows = []
+        no_output = self.config[MAIN_SECTION].get('no_output', False)
         for filename in filenames:
             results = []
             print '-' * 70
@@ -166,7 +169,7 @@ class Run(object):
                     log.info('skip already executed task (%s,%s)', filename, prover_name)
                     continue
                 result, t, out = self.solve_with(filename, prover_name)
-                self.save(filename, prover_name, result, t, out)
+                self.save(filename, prover_name, result, t, out, save_output=not no_output)
                 results.append( [prover_name, result] )
             # check all results are similar
             bools = set(r for _, r in results)
@@ -280,9 +283,9 @@ class Run(object):
     def inconsistency(self, display=True):
         "finds the files on which provers give inconsistent results"
         query = """select filename, prover, result, time from results r where
-          (select count(*) from results r2 where r2.filename=r.filename and r2.result = "sat" > 0)
+          (select count(*) from results r2 where r2.filename=r.filename and r2.result = "sat") > 0
           and
-          (select count(*) from results r2 where r2.filename=r.filename and r2.result = "unsat" > 0)
+          (select count(*) from results r2 where r2.filename=r.filename and r2.result = "unsat") > 0
           ;"""
         rows = list(self.conn.execute(query))
         if display:
@@ -380,6 +383,8 @@ def arg_parser():
     parser.add_argument("--memory", "-m", dest="memory", type=int, default=None, help="memory limit (in kbytes)")
     parser.add_argument("--tasks", dest="tasks", default=None, help="use a file to store the queue of tasks")
     parser.add_argument("--db", dest="db", default=None, help="db to use")
+    parser.add_argument("--no-output", dest="no_output", action="store_true",
+        default=False, help="do not save output")
     return parser
 
 def parse_args(args):
@@ -410,6 +415,8 @@ def read_config(config_file):
         config[CLI]['provers'] = args.provers
     if args.tasks:
         config[CLI]['tasks'] = args.tasks
+    if args.no_output:
+        config[MAIN_SECTION]['no_output'] = True
     return config
 
 if __name__ == "__main__":

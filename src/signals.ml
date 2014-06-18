@@ -32,3 +32,6 @@ let (on_print_stats : unit Signal.t) = Signal.create ()
 
 let (on_exit : int Signal.t) = Signal.create ()
 (** Called before exit *)
+
+let (on_dot_output : unit Signal.t) = Signal.create ()
+(** Called when dot printers should activate *)

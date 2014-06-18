@@ -1,6 +1,6 @@
 OASISFormat: 0.3
 Name:        zipperposition
-Version:     0.3
+Version:     0.4-arith-dev
 Homepage:    https://github.com/c-cube/zipperposition
 Authors:     Simon Cruanes
 License:     BSD3
@@ -26,7 +26,7 @@ Library "libzipperposition"
   Modules:          ClauseQueue, Clause, Const, Extensions,
                     Literal, Literals, CompactClause, Ctx, Proof, ProofState,
                     Saturate, Selection, PFormula, Theories, AC,
-                    PEnv, Params, Env, Monome, Signals,
+                    PEnv, Params, Env, Monome, ArithLit, Signals, Multisets,
                     calculi/Superposition, calculi/Chaining
   InternalModules:  lib/LazyGraph, lib/Leftistheap,
                     lib/Vector, lib/Sequence, lib/SmallSet,

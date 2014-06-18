@@ -41,6 +41,8 @@ type form = Formula.FO.t
 
 type t = Literal.t array
 
+let prof_maxlits = Util.mk_profiler "lits.maxlits"
+
 let eq lits1 lits2 =
   let rec check i =
     if i = Array.length lits1 then true else
@@ -134,11 +136,39 @@ let neg lits =
   done;
   bv
 
-(** Bitvector that indicates which of the literals are maximal *)
+(** Multiset of literals, with their index *)
+module MLI = Multiset.Make(struct
+  type t = Lit.t * int
+  let compare (l1,i1)(l2,i2) =
+    if i1=i2 then Lit.compare l1 l2 else Pervasives.compare i1 i2
+end)
+
+let _compare_lit_with_idx ~ord (lit1,_) (lit2,_) =
+  Lit.Comp.compare ~ord lit1 lit2
+
+let _to_multiset_with_idx lits =
+  Util.array_foldi
+    (fun acc i x -> MLI.add acc (x,i))
+    MLI.empty lits
+
+let maxlits_l ~ord lits =
+  Util.enter_prof prof_maxlits;
+  let m = _to_multiset_with_idx lits in
+  let max = MLI.max (_compare_lit_with_idx ~ord) m
+    |> MLI.to_list
+    |> List.map fst in
+  Util.exit_prof prof_maxlits;
+  max
+
 let maxlits ~ord lits =
-  let m = Multiset.create_unsafe lits in
-  let bv = Multiset.max (Lit.Comp.compare ~ord) m in
-  bv
+  let l = maxlits_l ~ord lits in
+  l |> List.map snd |> BV.of_list
+
+let is_max ~ord lits =
+  let m = _to_multiset_with_idx lits in
+  fun i ->
+    let lit = lits.(i) in
+    MLI.is_max (_compare_lit_with_idx ~ord) (lit,i) m
 
 let is_trivial lits =
   Util.array_exists Lit.is_trivial lits
@@ -210,6 +240,11 @@ module View = struct
       Lit.View.get_ineq lits.(idx)
     | _ -> None
 
+  let get_arith lits pos = match pos with
+    | Position.Arg (idx, pos') when idx < Array.length lits ->
+      Lit.View.focus_arith lits.(idx) pos'
+    | _ -> None
+
   let _unwrap2 ~msg f x y = match f x y with
     | Some z -> z
     | None -> invalid_arg msg
@@ -219,6 +254,9 @@ module View = struct
 
   let get_ineq_exn =
     _unwrap2 ~msg:"get_ineq: improper position" get_ineq
+
+  let get_arith_exn =
+    _unwrap2 ~msg:"get_arith: improper position" get_arith
 end
 
 let order_instances lits =
@@ -242,7 +280,6 @@ let terms_under_ineq ~instance lits =
         | Lit.Equation (l, r, _) -> k l; k r
         | Lit.Prop (p, _) -> k p
         | Lit.Arith _
-        | Lit.Divides _
         | Lit.True
         | Lit.False -> ()
       done)
@@ -290,7 +327,6 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits acc f =
       | Lit.Equation _
       | Lit.Ineq _
       | Lit.Arith _
-      | Lit.Divides _
       | Lit.True
       | Lit.False -> acc
       in fold acc (i+1)
@@ -310,8 +346,41 @@ let fold_ineq ~eligible lits acc f =
       fold acc (i+1)
   in fold acc 0
 
-(* TODO: new arguments *)
-let fold_terms ?(vars=false) ~(which : [< `Max|`One|`Both])
+let fold_arith ~eligible lits acc f =
+  let rec fold acc i =
+    if i = Array.length lits then acc
+    else if not (eligible i lits.(i)) then fold acc (i+1)
+    else
+      let acc = match Lit.View.get_arith lits.(i) with
+      | None -> acc
+      | Some x ->
+          let pos = Position.(arg i stop) in
+          f acc x pos
+      in
+      fold acc (i+1)
+  in fold acc 0
+
+let fold_arith_terms ~eligible ~which ~ord lits acc f =
+  let module M = Monome in let module MF = Monome.Focus in
+  fold_arith ~eligible lits acc
+    (fun acc a_lit pos ->
+      (* do we use the given term? *)
+      let do_term =
+        match which with
+        | `All -> (fun _ -> true)
+        | `Max ->
+          let max_terms = ArithLit.max_terms ~ord a_lit in
+          fun t -> Util.list_mem T.eq t max_terms
+      in
+      ArithLit.Focus.fold_terms ~pos a_lit acc
+        (fun acc foc_lit pos ->
+          let t = ArithLit.Focus.term foc_lit in
+          if do_term t
+            then f acc t foc_lit pos
+            else acc)
+    )
+
+let fold_terms ?(vars=false) ~(which : [< `All|`Max])
 ~ord ~subterms ~eligible lits acc f =
   let rec fold acc i =
     if i = Array.length lits
@@ -324,11 +393,10 @@ let fold_terms ?(vars=false) ~(which : [< `Max|`One|`Both])
       fold acc (i+1)
   in fold acc 0
 
-(* TODO: more efficient implem with Sequence and Symbol.Seq.add_set *)
 let symbols ?(init=Symbol.Set.empty) lits =
-  Array.fold_left
-    (fun set lit -> Symbol.Set.union set (Lit.symbols lit))
-    init lits
+  Sequence.of_array lits
+    |> Sequence.map Lit.Seq.symbols
+    |> Sequence.fold Symbol.Seq.add_set Symbol.Set.empty
 
 (** {3 IO} *)
 

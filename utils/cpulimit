@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+MEMORY=512000
+TIME=$1
+shift
+
+ulimit -t "$TIME" -m "$MEMORY"
+
+exec $@

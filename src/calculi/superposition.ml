@@ -133,10 +133,13 @@ let stat_subsumption_call = Util.mk_stat "subsumption calls"
 let stat_eq_subsumption_call = Util.mk_stat "equality subsumption calls"
 let stat_subsumed_in_active_set_call = Util.mk_stat "subsumed_in_active_set calls"
 let stat_subsumed_by_active_set_call = Util.mk_stat "subsumed_by_active_set calls"
+let stat_clauses_subsumed = Util.mk_stat "clauses subsumed"
 let stat_demodulate_call = Util.mk_stat "demodulate calls"
 let stat_demodulate_step = Util.mk_stat "demodulate steps"
 let stat_splits = Util.mk_stat "splits"
 let stat_semantic_tautology = Util.mk_stat "semantic_tautologies"
+let stat_condensation = Util.mk_stat "condensation"
+let stat_clc = Util.mk_stat "clc"
 
 let prof_demodulate = Util.mk_profiler "demodulate"
 let prof_back_demodulate = Util.mk_profiler "backward_demodulate"
@@ -157,6 +160,8 @@ let prof_infer_equality_factoring = Util.mk_profiler "infer_equality_factoring"
 let prof_split = Util.mk_profiler "infer_split"
 
 let _enable_semantic_tauto = ref false
+let _dot_sup_into = ref None
+let _dot_sup_from = ref None
 
 module Make(Env : Env.S) : S with module Env = Env = struct
   module Env = Env
@@ -190,8 +195,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     _idx_sup_into := Lits.fold_terms ~ord ~which:`Max ~subterms:true
       ~eligible:(C.Eligible.res c) (C.lits c) !_idx_sup_into
       (fun tree t pos ->
-        let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
-        f tree t with_pos);
+        if T.is_var t
+        then tree
+        else
+          let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
+          f tree t with_pos);
     (* index terms that can rewrite into other clauses *)
     _idx_sup_from := Lits.fold_eqn ~ord ~both:true ~sign:true
       ~eligible:(C.Eligible.param c) (C.lits c) !_idx_sup_from
@@ -200,7 +208,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let with_pos = C.WithPos.({term=l; pos; clause=c;}) in
         f tree l with_pos);
     (* terms that can be demodulated: all subterms *)
-    _idx_back_demod := Lits.fold_terms ~ord ~subterms:true ~which:`Both
+    _idx_back_demod := Lits.fold_terms ~ord ~subterms:true ~which:`All
       ~eligible:C.Eligible.always (C.lits c) !_idx_back_demod
       (fun tree t pos ->
         let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
@@ -269,6 +277,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   exception ExitSuperposition of string
 
+  (* TODO: use simultaneous superposition? See E's documentation *)
+
   (* Helper that does one or zero superposition inference, with all
      the given parameters. Clauses have a scope. *)
   let do_superposition info acc =
@@ -312,7 +322,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let lits_a = Util.array_except_idx (C.lits info.active) active_idx in
       let lits_p = Util.array_except_idx (C.lits info.passive) passive_idx in
       (* replace s\sigma by t\sigma in u|_p\sigma *)
-      let t' = S.FO.apply ~renaming subst info.t sc_a in
       let new_passive_lit = Lit.Pos.replace passive_lit'
         ~at:passive_lit_pos ~by:t' in
       (* apply substitution to other literals *)
@@ -372,8 +381,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     (* do the inferences in which clause is passive (rewritten),
        so we consider both negative and positive literals *)
-    let new_clauses = Lits.fold_terms ~subterms:true ~ord:(Ctx.ord ()) ~which:`Both
-      ~eligible (C.lits clause) []
+    let new_clauses = Lits.fold_terms ~subterms:true ~ord:(Ctx.ord ())
+      ~which:`All ~eligible (C.lits clause) []
       (fun acc u_p passive_pos ->
         let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
         if T.is_var u_p
@@ -945,12 +954,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and equate_root clauses t1 t2 =
       try UnitIdx.retrieve ~sign:true !_idx_simpl 1 t1 0 ()
         (fun () l r (_,_,_,c') subst ->
-          let renaming = Ctx.renaming_clear () in
-          if T.eq t2 (S.FO.apply ~renaming subst r 1)
-          then begin  (* t1!=t2 is refuted by l\sigma = r\sigma *)
+          assert (Unif.FO.eq ~subst l 1 t1 0);
+          if Unif.FO.eq ~subst r 1 t2 0
+          then begin
+            (* t1!=t2 is refuted by l\sigma = r\sigma *)
             Util.debug 4 "equate %a and %a using %a" T.pp t1 T.pp t2 C.pp c';
             raise (FoundMatch (r, c', subst)) (* success *)
-          end else ());
+          end
+        );
         None (* no match *)
       with FoundMatch (r, c', subst) ->
         Some (C.proof c' :: clauses)  (* success *)
@@ -985,12 +996,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and can_refute s t =
       try UnitIdx.retrieve ~sign:false !_idx_simpl 1 s 0 ()
         (fun () l r (_,_,_,c') subst ->
-          let renaming = Ctx.renaming_clear () in
-          if T.eq t (S.FO.apply ~renaming subst r 1)
+          assert (Unif.FO.eq ~subst l 1 s 0);
+          if Unif.FO.eq ~subst r 1 t 0
           then begin
+            (* TODO: useless? *)
+            let subst = Unif.FO.matching ~subst ~pattern:r 1 t 0 in
             Util.debug 3 "neg_reflect eliminates %a=%a with %a" T.pp s T.pp t C.pp c';
             raise (FoundMatch (r, c', subst)) (* success *)
-          end else ());
+          end
+        );
         None (* no match *)
       with FoundMatch (r, c', subst) ->
         Some (C.proof c') (* success *)
@@ -1021,7 +1035,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (fun lita ->
         Util.array_exists
         (fun litb ->
-          not (Sequence.is_empty (Lit.matching ~subst:S.empty lita sc_a litb sc_b)))
+          not (Sequence.is_empty (Lit.subsumes ~subst:S.empty lita sc_a litb sc_b)))
           b)
       a
 
@@ -1070,7 +1084,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         BV.set bv j;
         (* match lita and litb, then flag litb as used, and try with next literal of a *)
         let n_subst = ref 0 in
-        Lit.matching ~subst lita sc_a litb sc_b
+        Lit.subsumes ~subst lita sc_a litb sc_b
           (fun subst' -> incr n_subst; try_permutations (i+1) subst' bv);
         BV.reset bv j;
         (* some variable of lita occur in a[j+1...], try another literal of b *)
@@ -1097,7 +1111,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let bv = BV.empty () in
       try_permutations 0 S.empty bv;
       None
-    with (SubsumptionFound subst) -> Some subst
+    with (SubsumptionFound subst) ->
+      Some subst
 
   let subsumes a b =
     Util.enter_prof prof_subsumption;
@@ -1111,6 +1126,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     res
 
   let eq_subsumes a b =
+    (* counter for fresh scopes ([a] can be used several times with
+      distinct scopes, e.g.  f(x)=x subsumes   g(f(a),f(b))=g(a,b) *)
+    let a_scope = ref 1 in
     (* subsume a literal using a = b *)
     let rec equate_lit_with a b lit =
       match lit with
@@ -1129,12 +1147,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | _ -> false
     (* check whether a\sigma = u and b\sigma = v, for some sigma; or the commutation thereof *)
     and equate_root a b u v =
-          (try let subst = Unif.FO.matching ~pattern:a 1 u 0 in
-                let _ = Unif.FO.matching ~subst ~pattern:b 1 v 0 in
+      let sc1 = !a_scope in
+      incr a_scope;
+          (try let subst = Unif.FO.matching ~pattern:a sc1 u 0 in
+                let _ = Unif.FO.matching ~subst ~pattern:b sc1 v 0 in
                 true
            with Unif.Fail -> false)
-      ||  (try let subst = Unif.FO.matching ~pattern:b 1 u 0 in
-                let _ = Unif.FO.matching ~subst ~pattern:a 1 v 0 in
+      ||  (try let subst = Unif.FO.matching ~pattern:b sc1 u 0 in
+                let _ = Unif.FO.matching ~subst ~pattern:a sc1 v 0 in
                 true
            with Unif.Fail -> false)
     in
@@ -1166,6 +1186,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       false
     with Exit ->
       Util.debug 3 "%a subsumed by active set" C.pp c;
+      Util.incr_stat stat_clauses_subsumed;
       Util.exit_prof prof_subsumption_set;
       true
 
@@ -1181,8 +1202,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (fun res c' ->
           if (try_eq_subsumption && eq_subsumes (C.lits c) (C.lits c'))
            || subsumes (C.lits c) (C.lits c')
-        then C.CSet.add res c'
-        else res)
+        then begin
+          Util.incr_stat stat_clauses_subsumed;
+          C.CSet.add res c'
+        end else res)
     in
     Util.exit_prof prof_subsumption_in_set;
     res
@@ -1228,18 +1251,20 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         None (* no change *)
       with (RemoveLit (i, c')) ->
         (* remove the literal and recurse *)
-        Some (Util.array_except_idx lits i, c')
+        Some (Util.array_except_idx lits i, i, c')
     in
-    match remove_one_lit (C.lits c) with
+    match remove_one_lit (Array.copy (C.lits c)) with
     | None -> (Util.exit_prof prof_clc; c) (* no literal removed *)
-    | Some (new_lits, c') ->
+    | Some (new_lits, i, c') ->
       (* hc' allowed us to cut a literal *)
       assert (List.length new_lits + 1 = Array.length (C.lits c));
-      let proof c'' = Proof.mk_c_inference ~rule:"clc" c'' [C.proof c; C.proof c'] in
+      let info = [Util.sprintf "cut lit %a" Lit.pp (C.lits c).(i)] in
+      let proof c'' = Proof.mk_c_inference ~rule:"clc" ~info c'' [C.proof c; C.proof c'] in
       let parents = c :: C.parents c in
       let new_c = C.create ~parents new_lits proof in
       Util.debug 3 "contextual literal cutting in %a using %a gives\n\t%a"
         C.pp c C.pp c' C.pp new_c;
+      Util.incr_stat stat_clc;
       (* try to cut another literal *)
       Util.exit_prof prof_clc;
       contextual_literal_cutting new_c
@@ -1270,14 +1295,21 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let lit = lits.(i) in
         for j = i+1 to n - 1 do
           let lit' = lits.(j) in
-          (* try to match lit with lit' (and vice versa), then check if subst(c) subsumes c *)
-          let substs = Sequence.append
-            (Lit.matching ~subst:S.empty lit 0 lit' 0)
-            (Lit.matching ~subst:S.empty lit' 0 lit 0) in
+          (* see whether lit=>lit', and if removing __lit__ gives a clause
+            that subsumes c. Also do the symmetric operation *)
+          let subst_remove_lit =
+            Lit.subsumes ~subst:S.empty lit 0 lit' 0
+            |> Sequence.map (fun s -> s, i)
+          and subst_remove_lit' =
+            Lit.subsumes ~subst:S.empty lit' 0 lit 0
+            |> Sequence.map (fun s -> s, j)
+          in
+          let substs = Sequence.append subst_remove_lit subst_remove_lit' in
           Sequence.iter
-            (fun subst ->
+            (fun (subst,idx_to_remove) ->
               let new_lits = Array.sub lits 0 (n - 1) in
-              (if i <> n-1 then new_lits.(i) <- lits.(n-1));  (* remove i-th lit *)
+              if idx_to_remove <> n-1
+                then new_lits.(idx_to_remove) <- lits.(n-1);  (* remove lit *)
               let renaming = Ctx.renaming_clear () in
               let new_lits = Lits.apply_subst ~renaming subst new_lits 0 in
               (* check subsumption *)
@@ -1298,9 +1330,31 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         C.pp c S.pp subst C.pp new_c;
       (* try to condense further *)
       Util.exit_prof prof_condensation;
+      Util.incr_stat stat_condensation;
       condensation new_c
 
   (** {2 Registration} *)
+
+  (* print index into file *)
+  let _print_idx file idx =
+    Util.with_output file
+      (fun oc ->
+        let pp_leaf buf v = () in
+        Util.fprintf oc "%a" (TermIndex.to_dot pp_leaf) idx;
+        flush oc)
+
+  let setup_dot_printers () =
+    CCOpt.iter
+      (fun f ->
+          Signal.once Signals.on_dot_output
+            (fun () -> _print_idx f !_idx_sup_into)
+      ) !_dot_sup_into;
+    CCOpt.iter
+      (fun f ->
+          Signal.once Signals.on_dot_output
+            (fun () -> _print_idx f !_idx_sup_from)
+      ) !_dot_sup_from;
+    ()
 
   let register () =
     let rw_simplify c =
@@ -1334,6 +1388,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       then Env.add_is_trivial is_semantic_tautology;
     Env.add_is_trivial is_trivial;
     Env.add_lit_rule "distinct_symbol" handle_distinct_constants;
+    setup_dot_printers ();
     ()
 end
 
@@ -1365,7 +1420,8 @@ let extension =
       ]
   end
   in
-  { Extensions.name="superposition";
+  { Extensions.default with
+    Extensions.name="superposition";
     Extensions.penv_actions = [Extensions.Ext_penv_do setup_penv];
     Extensions.make=(module DOIT : Extensions.ENV_TO_S);
   }
@@ -1373,7 +1429,13 @@ let extension =
 let () =
   Params.add_opts
     [ "-semantic-tauto"
-    , Arg.Set _enable_semantic_tauto
-    , "enable semantic tautology check"
-    ];
-  ()
+      , Arg.Set _enable_semantic_tauto
+      , "enable semantic tautology check"
+    ; "-dot-sup-into"
+      , Arg.String (fun s -> _dot_sup_into := Some s)
+      , "print superposition-into index into file"
+    ; "-dot-sup-from"
+      , Arg.String (fun s -> _dot_sup_from := Some s)
+      , "print superposition-from index into file"
+    ]
+

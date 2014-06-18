@@ -73,12 +73,28 @@ module type ENV_TO_S =
 type penv_action =
   | Ext_penv_do of (PEnv.t -> unit)
 
+type init_action =
+  | Init_do of (unit -> unit)
+
 type t = {
   name : string;
   penv_actions : penv_action list;
+  init_actions : init_action list;
   make : (module ENV_TO_S);
 } (** An extension is a named first-class functor that works
       over any {!Env.S} *)
+
+let default = {
+  name="<no name>";
+  penv_actions = [];
+  init_actions = [];
+  make =
+    let module Make(E:Env.S) = struct
+      include MakeAction(E)
+      let actions = []
+    end in
+    (module Make : ENV_TO_S);
+}
 
 (** {2 Registration} *)
 
@@ -142,6 +158,13 @@ let apply_penv ~penv ext =
   List.iter
     (function Ext_penv_do f -> f penv)
     ext.penv_actions
+
+let init ext =
+  Util.debug 5 "run init actions of %s" ext.name;
+  List.iter
+    (function
+      Init_do f -> f ()
+    ) ext.init_actions
 
 let extensions () =
   Sequence.of_hashtbl _extensions
