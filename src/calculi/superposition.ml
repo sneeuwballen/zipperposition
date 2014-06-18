@@ -160,6 +160,7 @@ let prof_infer_equality_factoring = Util.mk_profiler "infer_equality_factoring"
 let prof_split = Util.mk_profiler "infer_split"
 
 let _enable_semantic_tauto = ref false
+let _use_simultaneous_sup = ref true
 let _dot_sup_into = ref None
 let _dot_sup_from = ref None
 
@@ -277,11 +278,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   exception ExitSuperposition of string
 
-  (* TODO: use simultaneous superposition? See E's documentation *)
-
   (* Helper that does one or zero superposition inference, with all
      the given parameters. Clauses have a scope. *)
-  let do_superposition info acc =
+  let do_classic_superposition info acc =
     let ord = Ctx.ord () in
     let open SupInfo in
     let module P = Position in
@@ -341,6 +340,74 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     with ExitSuperposition reason ->
       Util.debug 4 "... cancel, %s" reason;
       acc
+
+  (* simultaneous superposition: when rewriting D with C \lor s=t,
+      replace s with t everywhere in D rather than at one place. *)
+  let do_simultaneous_superposition info acc =
+    let ord = Ctx.ord () in
+    let open SupInfo in
+    let module P = Position in
+    Util.incr_stat stat_superposition_call;
+    let sc_a = info.scope_active in
+    let sc_p = info.scope_passive in
+    Util.debug 3 ("simultaneous sup\n  %a[%d] s=%a t=%a \n  %a[%d] passive_lit=%a p=%a\n  subst=%a")
+                  C.pp info.active sc_a T.pp info.s T.pp info.t
+                  C.pp info.passive sc_p Lit.pp info.passive_lit
+                  Position.pp info.passive_pos S.pp info.subst;
+    assert (ScopedTerm.DB.closed (info.s:>ScopedTerm.t));
+    assert (ScopedTerm.DB.closed (info.u_p:T.t:>ScopedTerm.t));
+    let active_idx = Lits.Pos.idx info.active_pos in
+    let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
+    try
+      let renaming = S.Renaming.create () in
+      let subst = info.subst in
+      let t' = S.FO.apply ~renaming subst info.t sc_a in
+      begin match info.passive_lit, info.passive_pos with
+        | Lit.Equation (v, _, true), P.Arg(_, P.Left P.Stop)
+        | Lit.Equation (_, v, true), P.Arg(_, P.Right P.Stop)
+        | Lit.Prop (v, true), P.Arg(_, P.Left P.Stop) ->
+            (* are we in the specific, but no that rare, case where we
+               rewrite s=t using s=t (into a tautology t=t)? *)
+            let v' = S.FO.apply ~renaming subst v sc_p in
+            if T.eq t' v'
+              then raise (ExitSuperposition "will yield a tautology");
+        | _ -> ()
+      end;
+      let passive_lit' = Lit.apply_subst ~renaming subst info.passive_lit sc_p in
+      if (
+        O.compare ord (S.FO.apply ~renaming info.subst info.s sc_a) t' = Comp.Lt ||
+        not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
+        not (BV.get (C.eligible_res info.passive sc_p subst) passive_idx) ||
+        not (BV.get (C.eligible_param info.active sc_a subst) active_idx)
+      ) then raise (ExitSuperposition "bad ordering conditions");
+      (* ordering constraints are ok, build new active lits (excepted s=t) *)
+      let lits_a = Util.array_except_idx (C.lits info.active) active_idx in
+      let lits_a = Lit.apply_subst_list ~renaming subst lits_a sc_a in
+      (* build passive literals and replace u|p\sigma with t\sigma *)
+      let u = Lits.Pos.at (C.lits info.passive) info.passive_pos in
+      let u' = S.FO.apply ~renaming subst u sc_p in
+      let lits_p = Array.to_list (C.lits info.passive) in
+      let lits_p = Lit.apply_subst_list ~renaming subst lits_p sc_p in
+      let lits_p = List.map (Lit.map (fun t-> T.replace t ~old:u' ~by:t')) lits_p in
+      (* build clause *)
+      let new_lits = lits_a @ lits_p in
+      let rule = if Lit.sign passive_lit' then "s_sup+" else "s_sup-" in
+      let proof c = Proof.mk_c_inference
+        ~info:[S.to_string subst] ~rule
+        c [C.proof info.active; C.proof info.passive] in
+      let parents = [info.active; info.passive] in
+      let new_clause = C.create ~parents new_lits proof in
+      Util.debug 3 "... ok, conclusion %a" C.pp new_clause;
+      new_clause :: acc
+    with ExitSuperposition reason ->
+      Util.debug 4 "... cancel, %s" reason;
+      acc
+
+  (* choose between regular and simultaneous superposition *)
+  let do_superposition info acc=
+    if !_use_simultaneous_sup
+      then do_simultaneous_superposition info acc
+      else do_classic_superposition info acc
 
   let infer_active clause =
     Util.enter_prof prof_infer_active;
@@ -1437,5 +1504,11 @@ let () =
     ; "-dot-sup-from"
       , Arg.String (fun s -> _dot_sup_from := Some s)
       , "print superposition-from index into file"
+    ; "-non-simultaneous-sup"
+      , Arg.Clear _use_simultaneous_sup
+      , "disable simultaneous superposition (use the classic superposition instead)"
+    ; "-simultaneous-sup"
+      , Arg.Set _use_simultaneous_sup
+      , "enable simultaneous superposition"
     ]
 
