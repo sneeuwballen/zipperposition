@@ -193,14 +193,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let _update_active f c =
     let ord = Ctx.ord () in
     (* index subterms that can be rewritten by superposition *)
-    _idx_sup_into := Lits.fold_terms ~ord ~which:`Max ~subterms:true
+    _idx_sup_into := Lits.fold_terms ~vars:false ~ord ~which:`Max ~subterms:true
       ~eligible:(C.Eligible.res c) (C.lits c) !_idx_sup_into
       (fun tree t pos ->
-        if T.is_var t
-        then tree
-        else
-          let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
-          f tree t with_pos);
+        assert (not(T.is_var t));
+        let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
+        f tree t with_pos);
     (* index terms that can rewrite into other clauses *)
     _idx_sup_from := Lits.fold_eqn ~ord ~both:true ~sign:true
       ~eligible:(C.Eligible.param c) (C.lits c) !_idx_sup_from
@@ -356,6 +354,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   Position.pp info.passive_pos S.pp info.subst;
     assert (ScopedTerm.DB.closed (info.s:>ScopedTerm.t));
     assert (ScopedTerm.DB.closed (info.u_p:T.t:>ScopedTerm.t));
+    assert (not(T.is_var info.u_p));
     let active_idx = Lits.Pos.idx info.active_pos in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
     try
@@ -384,8 +383,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let lits_a = Util.array_except_idx (C.lits info.active) active_idx in
       let lits_a = Lit.apply_subst_list ~renaming subst lits_a sc_a in
       (* build passive literals and replace u|p\sigma with t\sigma *)
-      let u = Lits.Pos.at (C.lits info.passive) info.passive_pos in
-      let u' = S.FO.apply ~renaming subst u sc_p in
+      let u' = S.FO.apply ~renaming subst info.u_p sc_p in
       let lits_p = Array.to_list (C.lits info.passive) in
       let lits_p = Lit.apply_subst_list ~renaming subst lits_p sc_p in
       let lits_p = List.map (Lit.map (fun t-> T.replace t ~old:u' ~by:t')) lits_p in
