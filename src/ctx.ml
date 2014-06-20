@@ -77,6 +77,13 @@ module type S = sig
   val add_signature : Signature.t -> unit
   (** Merge  the given signature with the context's one *)
 
+  val find_signature : Symbol.t -> Type.t option
+  (** Find the type of the given symbol *)
+
+  val find_signature_exn : Symbol.t -> Type.t
+  (** Unsafe version of {!find_signature}.
+      @raise Not_found for unknown symbols *)
+
   val declare : Symbol.t -> Type.t -> unit
   (** Declare the type of a symbol (updates signature) *)
 
@@ -181,6 +188,9 @@ end) : S = struct
   let set_selection_fun s = _select := s
   let signature () = !_signature
   let complete () = !_complete
+
+  let find_signature s = Signature.find !_signature s
+  let find_signature_exn s = Signature.find_exn !_signature s
 
   let compare t1 t2 = Ordering.compare !_ord t1 t2
 

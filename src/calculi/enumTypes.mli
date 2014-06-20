@@ -37,12 +37,17 @@ module type S = sig
   module Env : Env.S
   module C : module type of Env.C
 
-  val declare_type : ty:Type.t -> var:term -> term list -> unit
+  val declare_type : proof:Proof.t -> ty:Type.t -> var:term -> term list -> unit
   (** Declare that the given type's domain is the given list of cases
       for the given variable [var] (whose type must be [ty].
       Will be ignored if the type already has a enum declaration. *)
 
-  val simplify : Env.multi_simpl_rule
+  val instantiate_vars : Env.multi_simpl_rule
+  (** Instantiate variables whose type is a known enumerated type,
+      with all variables of this type. *)
+
+  val add_symbol_declaration : Env.unary_inf_rule
+  (** Add an axiom for symbols whose return type is an enumeration *)
 
   (** {6 Registration} *)
 
