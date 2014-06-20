@@ -31,7 +31,7 @@ type t = {
   param_steps : int;
   param_version : bool;
   param_timeout : float;
-  param_files : string Vector.t;
+  param_files : string Vector.vector;
   param_split : bool;             (** use splitting *)
   param_theories : bool;          (** detect theories *)
   param_select : string;          (** name of the selection function *)
@@ -79,7 +79,7 @@ let parse_args () =
   and select = ref "SelectComplex"
   and progress = ref false
   and unary_depth = ref 1
-  and files = Vector.create 15 in
+  and files = Vector.create () in
   (* special handlers *)
   let set_progress () =
     Util.need_cleanup := true;

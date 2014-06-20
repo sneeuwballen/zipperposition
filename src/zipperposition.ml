@@ -430,13 +430,14 @@ let () =
   (* initialize plugins *)
   List.iter Extensions.init plugins;
   (* master process: process files *)
-  Vector.iter params.param_files
+  Vector.iter
     (fun file ->
       match process_file ~plugins ~params file with
       | Monad.Err.Error msg ->
           print_endline msg;
           exit 1
-      | Monad.Err.Ok () -> ());
+      | Monad.Err.Ok () -> ()
+    ) params.param_files;
   ()
 
 let _ =
