@@ -83,11 +83,11 @@ module Make(E : Env.S) = struct
   let on_new_decl = Signal.create ()
 
   (* find whether some declaration matches this type, and return it *)
-  let _find ?(subst=S.empty) s_decl ty s_ty =
+  let _find_match ?(subst=S.empty) s_decl ty s_ty =
     CCList.find
       (fun decl ->
         try
-          let subst = Unif.Ty.unification ~subst decl.decl_ty s_decl ty s_ty in
+          let subst = Unif.Ty.matching ~subst ~pattern:decl.decl_ty s_decl ty s_ty in
           Some (decl, subst)
         with Unif.Fail -> None
       ) !_decls
@@ -108,24 +108,30 @@ module Make(E : Env.S) = struct
       then failwith "EnumTypes: invalid declaration (free variables)";
     Util.debug 1 "EnumTypes: declare new enum type %a (cases %a = %a)"
       Type.pp ty T.pp var (CCList.pp ~sep:"|" T.pp) cases;
-    Util.incr_stat stat_declare;
-    (* set of already declared symbols *)
-    let decl_symbols = List.fold_left
-      (fun set t -> match T.head t with
-        | None -> failwith "EnumTypes: non-symbolic case?"
-        | Some s -> Symbol.Set.add s set
-      ) Symbol.Set.empty cases
-    in
-    let decl = {
-      decl_ty=ty;
-      decl_var=var;
-      decl_cases=cases;
-      decl_symbols;
-      decl_proof=proof;
-    } in
-    _decls := decl :: !_decls;
-    Signal.send on_new_decl decl;
-    ()
+    if List.exists (fun decl -> Unif.Ty.are_variant ty decl.decl_ty) !_decls
+    then (
+      Util.debug 3 "EnumTypes: an enum is already declared for type %a" Type.pp ty;
+      ()
+    ) else (
+      Util.incr_stat stat_declare;
+      (* set of already declared symbols *)
+      let decl_symbols = List.fold_left
+        (fun set t -> match T.head t with
+          | None -> failwith "EnumTypes: non-symbolic case?"
+          | Some s -> Symbol.Set.add s set
+        ) Symbol.Set.empty cases
+      in
+      let decl = {
+        decl_ty=ty;
+        decl_var=var;
+        decl_cases=cases;
+        decl_symbols;
+        decl_proof=proof;
+      } in
+      _decls := decl :: !_decls;
+      Signal.send on_new_decl decl;
+    );
+      ()
 
   let declare_type ~proof ~ty ~var enum =
     _declare ~proof ~ty ~var enum
@@ -185,7 +191,7 @@ module Make(E : Env.S) = struct
     let s_c = 0 and s_decl = 1 in
     CCList.find
       (fun v ->
-        match _find s_decl (T.ty v) s_c with
+        match _find_match s_decl (T.ty v) s_c with
         | None -> None
         | Some (decl, subst) ->
             (* we found an enum type declaration for [v], replace it
