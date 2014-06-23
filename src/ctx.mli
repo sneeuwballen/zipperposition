@@ -83,6 +83,9 @@ module type S = sig
   val declare : Symbol.t -> Type.t -> unit
   (** Declare the type of a symbol (updates signature) *)
 
+  val on_new_symbol : (Symbol.t * Type.t) Signal.t
+  val on_signature_update : Signature.t Signal.t
+
   (** {2 Literals} *)
 
   module Lit : sig
