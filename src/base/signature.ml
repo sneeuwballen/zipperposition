@@ -32,6 +32,8 @@ type t = Type.t SMap.t
 
 let empty = SMap.empty
 
+let is_empty = SMap.is_empty
+
 let singleton = SMap.singleton
 
 let mem signature s = SMap.mem s signature
