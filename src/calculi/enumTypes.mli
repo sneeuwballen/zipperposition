@@ -46,9 +46,6 @@ module type S = sig
   (** Instantiate variables whose type is a known enumerated type,
       with all variables of this type. *)
 
-  val add_symbol_declaration : Env.unary_inf_rule
-  (** Add an axiom for symbols whose return type is an enumeration *)
-
   (** {6 Registration} *)
 
   val register : unit -> unit
