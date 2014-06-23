@@ -203,35 +203,41 @@ module Make(E : Env.S) = struct
         let vars = List.mapi (fun i ty -> T.var ~ty i) ty_args in
         T.app_full (T.const ~ty s) ty_vars vars
 
-  (* check whether the given symbol's type unifies with the declaration.
+  (* check whether the given symbol's return type unifies with the declaration.
     If it does, return a new clause (instance) *)
   let _check_symbol_decl ~ty s decl =
-    try
-      (* does the symbol's type [ty] unify with the declaration's type? *)
-      let subst = Unif.Ty.unification ty 0 decl.decl_ty 1 in
+    match s with
+    | Symbol.Cst _ ->
       let t = _make_term_of_sym s ty in
-      let subst = Unif.FO.unification ~subst t 0 decl.decl_var 1 in
-      if Symbol.Set.mem s decl.decl_symbols then None
-      else (
-        (* need to add an axiom instance for this symbol and declaration *)
-        decl.decl_symbols <- Symbol.Set.add s decl.decl_symbols;
-        (* create the axiom *)
-        let renaming = S.Renaming.create () in
-        let lits = List.map
-          (fun case -> Lit.mk_eq
-            (S.FO.apply ~renaming subst t 0)
-            (S.FO.apply ~renaming subst case 1)
-          ) decl.decl_cases
-        in
-        let proof cc = Proof.mk_c_inference
-          ~rule:"axiom_enum_types" cc [decl.decl_proof] in
-        let c' = C.create lits proof in
-        Util.debug 1 "declare enum type for %a: clause %a" Symbol.pp s C.pp c';
-        Util.incr_stat stat_instantiate;
-        Some c'
-      )
-    with Unif.Fail ->
-      None
+      begin try
+        (* can we unify a generic instancez of [s] (the term [t]) with
+          the declaration's variable? *)
+        let subst = Unif.FO.unification t 0 decl.decl_var 1 in
+        if Symbol.Set.mem s decl.decl_symbols then None
+        else (
+          (* need to add an axiom instance for this symbol and declaration *)
+          decl.decl_symbols <- Symbol.Set.add s decl.decl_symbols;
+          (* create the axiom *)
+          let renaming = S.Renaming.create () in
+          let lits = List.map
+            (fun case -> Lit.mk_eq
+              (S.FO.apply ~renaming subst t 0)
+              (S.FO.apply ~renaming subst case 1)
+            ) decl.decl_cases
+          in
+          let proof cc = Proof.mk_c_inference
+            ~rule:"axiom_enum_types" cc [decl.decl_proof] in
+          let c' = C.create lits proof in
+          Util.debug 1 "declare enum type for %a: clause %a" Symbol.pp s C.pp c';
+          Util.incr_stat stat_instantiate;
+          Some c'
+        )
+      with Unif.Fail ->
+        None
+      end
+    | Symbol.Int _
+    | Symbol.Rat _
+    | Symbol.Conn _ -> None
 
   (* add axioms for new symbol [s] with type [ty], if needed *)
   let _on_new_symbol s ~ty =
