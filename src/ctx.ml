@@ -77,8 +77,18 @@ module type S = sig
   val add_signature : Signature.t -> unit
   (** Merge  the given signature with the context's one *)
 
+  val find_signature : Symbol.t -> Type.t option
+  (** Find the type of the given symbol *)
+
+  val find_signature_exn : Symbol.t -> Type.t
+  (** Unsafe version of {!find_signature}.
+      @raise Not_found for unknown symbols *)
+
   val declare : Symbol.t -> Type.t -> unit
   (** Declare the type of a symbol (updates signature) *)
+
+  val on_new_symbol : (Symbol.t * Type.t) Signal.t
+  val on_signature_update : Signature.t Signal.t
 
   (** {2 Literals} *)
 
@@ -182,6 +192,12 @@ end) : S = struct
   let signature () = !_signature
   let complete () = !_complete
 
+  let on_new_symbol = Signal.create()
+  let on_signature_update = Signal.create()
+
+  let find_signature s = Signature.find !_signature s
+  let find_signature_exn s = Signature.find_exn !_signature s
+
   let compare t1 t2 = Ordering.compare !_ord t1 t2
 
   let select lits = !_select lits
@@ -193,7 +209,10 @@ end) : S = struct
   let is_completeness_preserved = complete
 
   let add_signature signature =
+    let _diff = Signature.diff signature !_signature in
     _signature := Signature.merge !_signature signature;
+    Signal.send on_signature_update !_signature;
+    Signature.iter _diff (fun s ty -> Signal.send on_new_symbol (s,ty));
     _ord := !_signature
       |> Signature.Seq.to_seq
       |> Sequence.map fst
@@ -201,7 +220,12 @@ end) : S = struct
     ()
 
   let declare symb ty =
-    _signature := Signature.declare !_signature symb ty
+    let is_new = not (Signature.mem !_signature symb) in
+    _signature := Signature.declare !_signature symb ty;
+    if is_new then (
+      Signal.send on_signature_update !_signature;
+      Signal.send on_new_symbol (symb,ty);
+    )
 
   let renaming_clear () =
     S.Renaming.clear renaming;

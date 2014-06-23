@@ -73,8 +73,18 @@ module type S = sig
   val add_signature : Signature.t -> unit
   (** Merge  the given signature with the context's one *)
 
+  val find_signature : Symbol.t -> Type.t option
+  (** Find the type of the given symbol *)
+
+  val find_signature_exn : Symbol.t -> Type.t
+  (** Unsafe version of {!find_signature}.
+      @raise Not_found for unknown symbols *)
+
   val declare : Symbol.t -> Type.t -> unit
   (** Declare the type of a symbol (updates signature) *)
+
+  val on_new_symbol : (Symbol.t * Type.t) Signal.t
+  val on_signature_update : Signature.t Signal.t
 
   (** {2 Literals} *)
 

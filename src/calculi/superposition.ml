@@ -1104,9 +1104,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           b)
       a
 
-  (** Compare literals by subsumption difficulty (see "towards efficient subsumption", Tammet).
-      We sort by increasing order, so non-ground, deep, heavy literals are smaller
-      (thus tested early) *)
+  (** Compare literals by subsumption difficulty
+      (see "towards efficient subsumption", Tammet).
+      We sort by increasing order, so non-ground, deep, heavy literals are
+      smaller (thus tested early) *)
   let compare_literals_subsumption lita litb =
     (* ground literal is bigger *)
     if Lit.is_ground lita && not (Lit.is_ground litb) then 1
@@ -1119,7 +1120,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     then Lit.weight litb - Lit.weight lita
     else 0
 
-  (* TODO: replace the bitvector system by some backtracking scheme?
+  (* replace the bitvector system by some backtracking scheme?
    * XXX: maybe not a good idea. the algorithm is actually quite subtle
    * and needs tight control over the traversal (lookahead of free
    * variables in next literals, see [check_vars]...) *)
@@ -1128,10 +1129,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       corresponding substitution *)
   let subsumes_with a sc_a b sc_b =
     Util.incr_stat stat_subsumption_call;
-    (* a must not have more literals *)
-    if Array.length a > Array.length b then None else
-    (* variables that cannot be bound during subsumption *)
-    if not (all_lits_match a sc_a b sc_b) then None else
+    (* a must not have more literals, and it must be possible to bind
+        all its vars during subsumption *)
+    if Array.length a > Array.length b
+      || not (all_lits_match a sc_a b sc_b)
+    then None
+    else
     (* sort a copy of [a] by decreasing difficulty *)
     let a = Array.copy a in
     (* try to subsumes literals of b whose index are not in bv, with [subst] *)
