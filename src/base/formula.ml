@@ -261,6 +261,7 @@ module Make(MyT : TERM) = struct
   let eq = T.eq
   let cmp = T.cmp
   let hash = T.hash
+  let hash_fun = T.hash_fun
 
   type view =
     | True

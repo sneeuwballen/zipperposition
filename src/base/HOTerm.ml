@@ -125,6 +125,7 @@ let subterm ~sub t =
 
 let eq = T.eq
 let cmp = T.cmp
+let hash_fun = T.hash_fun
 let hash = T.hash
 
 module TermHASH = struct

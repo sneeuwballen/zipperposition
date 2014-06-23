@@ -73,39 +73,36 @@ let ty_exn t = match t.ty with
   | HasType ty -> ty
 let kind t = t.kind
 
-let hash t = t.id
+let hash_fun t s = Hash.int_ t.id s
+let hash t = Hash.apply hash_fun t
 let eq t1 t2 = t1 == t2
 let cmp t1 t2 = t1.id - t2.id
 
-let _hash_ty h t =
-  let hash_ty = match t.ty with
-    | NoType -> 1
-    | HasType ty -> ty.id
-  in
-  Hash.hash_int3 h hash_ty (Hashtbl.hash t.kind)
-let _hash_norec t =
+let _hash_ty t h =
+  h
+  |> Hash.int_ (Hashtbl.hash t.kind)
+  |> fun h ->
+    match t.ty with
+    | NoType -> h
+    | HasType ty -> Hash.int_ ty.id h
+let _hash_norec t h =
   let h = match view t with
-  | Var i -> i
-  | RigidVar i -> Hash.combine 17 i
-  | BVar i -> Hash.combine 11 i
-  | Bind (s, varty, t') -> Hash.hash_int3 (Sym.hash s) (hash varty) (hash t')
-  | Const s -> Sym.hash s
+  | Var i -> Hash.int_ i h
+  | RigidVar i -> Hash.int_ (17 lxor i) h
+  | BVar i -> Hash.int_ (11 lxor i) h
+  | Bind (s, varty, t') ->
+      h |> Sym.hash_fun s |> hash_fun varty |> hash_fun t'
+  | Const s -> Sym.hash_fun s h
   | Record (l, rest) ->
-      let h_list h l = Hash.hash_list
-        (fun (s,t') -> Hash.combine (Hash.hash_string s) (hash t')) h l
-      in
-      begin match rest with
-      | None -> h_list 17 l
-      | Some rest -> h_list (hash rest) l
-      end
-  | Multiset l -> Hash.hash_list hash 44 l
-  | App (f, l) ->
-    Hash.hash_list hash (hash f) l
-  | At (t1, t2) -> Hash.combine (hash t1) (hash t2)
-  | SimpleApp (s, l) ->
-      Hash.hash_list hash (Sym.hash s) l
+      h
+      |> Hash.list_ (fun (s,t') h -> h |> Hash.string_ s |> hash_fun t') l
+      |> Hash.opt hash_fun rest
+  | Multiset l -> Hash.list_ hash_fun l h
+  | App (f, l) -> hash_fun f h |> Hash.list_ hash_fun l
+  | At (t1, t2) -> hash_fun t1 (hash_fun t2 h)
+  | SimpleApp (s, l) -> Hash.list_ hash_fun l (Sym.hash_fun s h)
   in
-  _hash_ty h t
+  _hash_ty t h
 
 let rec _eq_norec t1 t2 =
   t1.kind = t2.kind &&
@@ -166,7 +163,7 @@ let flag_db_closed = new_flag()
 module H = Hashcons.Make(struct
   type t = term
   let equal = _eq_norec
-  let hash = _hash_norec
+  let hash = Hash.apply _hash_norec
   let tag i t = assert (t.id = ~-1); t.id <- i
 end)
 

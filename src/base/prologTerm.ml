@@ -84,22 +84,21 @@ let rec cmp t1 t2 = match t1.term, t2.term with
 
 let eq t1 t2 = cmp t1 t2 = 0
 
-let rec hash t = match t.term with
-  | Var s -> Hash.hash_string s
-  | Int i -> Z.hash i
-  | Rat n -> Hash.hash_string (Q.to_string n)  (* TODO: find better *)
-  | Const s -> Symbol.hash s
-  | App (s, l) ->
-    Hash.hash_list hash (hash s) l
-  | List l -> Hash.hash_list hash 0x42 l
+let rec hash_fun t h = match t.term with
+  | Var s -> Hash.string_ s h
+  | Int i -> Hash.int_ (Z.hash i) h
+  | Rat n -> Hash.string_ (Q.to_string n) h  (* TODO: find better *)
+  | Const s -> Symbol.hash_fun s h
+  | App (s, l) -> Hash.list_ hash_fun l (hash_fun s h)
+  | List l -> Hash.list_ hash_fun l (Hash.int_ 42 h)
   | Bind (s,v,t') ->
-    let h = Hash.combine (Symbol.hash s) (hash t') in
-    Hash.hash_list hash h v
+    h |> Symbol.hash_fun s |> hash_fun t' |> Hash.list_ hash_fun v
   | Record (l, rest) ->
-    Hash.hash_list
-      (fun (n,t) -> Hash.combine (Hash.hash_string n) (hash t))
-      (match rest with None -> 13 | Some r -> hash r) l
-  | Column (x,y) -> Hash.combine (hash x) (hash y)
+    h |> Hash.opt hash_fun rest
+      |> Hash.list_ (fun (n,t) h -> Hash.string_ n (hash_fun t h)) l
+  | Column (x,y) -> hash_fun x (hash_fun y h)
+
+let hash x = Hash.apply hash_fun x
 
 let __make ?loc view = {term=view; loc;}
 

@@ -51,9 +51,8 @@ let merge t1 t2 = S.union t1 t2
 
 let eq = S.equal
 let cmp = S.compare
-let hash s =
-  S.to_seq s
-    |> Hash.(hash_seq (hash_pair T.hash T.hash) 19)
+let hash_fun s h = Hash.seq (Hash.pair T.hash_fun T.hash_fun) (S.to_seq s) h
+let hash s = Hash.apply hash_fun s
 
 module Seq = struct
   let to_seq = S.to_seq

@@ -62,6 +62,7 @@ let view t = match T.kind t with
     end
   | _ -> raise (Invalid_argument "Type.view")
 
+let hash_fun = T.hash_fun
 let hash = T.hash
 let eq = T.eq
 let cmp = T.cmp
