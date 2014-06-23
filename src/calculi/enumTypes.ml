@@ -106,13 +106,13 @@ module Make(E : Env.S) = struct
       then failwith "EnumTypes: cannot declare enum for type variable";
     if not (_check_uniq_var_cond ~var cases)
       then failwith "EnumTypes: invalid declaration (free variables)";
-    Util.debug 1 "EnumTypes: declare new enum type %a (cases %a = %a)"
-      Type.pp ty T.pp var (CCList.pp ~sep:"|" T.pp) cases;
     if List.exists (fun decl -> Unif.Ty.are_variant ty decl.decl_ty) !_decls
     then (
       Util.debug 3 "EnumTypes: an enum is already declared for type %a" Type.pp ty;
       ()
     ) else (
+      Util.debug 1 "EnumTypes: declare new enum type %a (cases %a = %a)"
+        Type.pp ty T.pp var (CCList.pp ~sep:"|" T.pp) cases;
       Util.incr_stat stat_declare;
       (* set of already declared symbols *)
       let decl_symbols = List.fold_left
