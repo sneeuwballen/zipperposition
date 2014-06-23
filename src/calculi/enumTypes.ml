@@ -128,7 +128,7 @@ module Make(E : Env.S) = struct
     ()
 
   let declare_type ~proof ~ty ~var enum =
-    _declare ~ty ~var ~proof enum
+    _declare ~proof ~ty ~var enum
 
   (* detect whether the clause [c] is a declaration of enum type *)
   let _detect_declaration c =
@@ -157,13 +157,31 @@ module Make(E : Env.S) = struct
   (* retrieve variables that are directly under a positive equation *)
   let _vars_under_eq lits =
     Sequence.of_array lits
+      |> Sequence.filter Lit.is_eq
       |> Sequence.flatMap Lit.Seq.terms
       |> Sequence.filter T.is_var
+
+  (* variables occurring under some function symbol (at non-0 depth) *)
+  let _shielded_vars lits =
+    Sequence.of_array lits
+      |> Sequence.flatMap Lit.Seq.terms
+      |> Sequence.flatMap T.Seq.subterms_depth
+      |> Sequence.fmap
+        (fun (v,depth) ->
+          if depth>0 && T.is_var v then Some v else None
+        )
       |> T.Seq.add_set T.Set.empty
+
+  let _naked_vars lits =
+    let v =
+      _vars_under_eq lits
+      |> T.Seq.add_set T.Set.empty
+    in
+    T.Set.diff v (_shielded_vars lits)
       |> T.Set.elements
 
   let instantiate_vars c =
-    let vars = _vars_under_eq (C.lits c) in
+    let vars = _naked_vars (C.lits c) in
     let s_c = 0 and s_decl = 1 in
     CCList.find
       (fun v ->
@@ -184,7 +202,7 @@ module Make(E : Env.S) = struct
                     ~rule:"enum_type_case_switch" cc [C.proof c]
                   in
                   let c' = C.create_a ~parents:[c] lits' proof in
-                  Util.debug 4 "deduce %a\n   from %a (enum_type switch on %a)"
+                  Util.debug 3 "deduce %a\n   from %a (enum_type switch on %a)"
                     C.pp c' C.pp c Type.pp decl.decl_ty;
                   c'
                 ) decl.decl_cases
@@ -228,7 +246,7 @@ module Make(E : Env.S) = struct
           let proof cc = Proof.mk_c_inference
             ~rule:"axiom_enum_types" cc [decl.decl_proof] in
           let c' = C.create lits proof in
-          Util.debug 1 "declare enum type for %a: clause %a" Symbol.pp s C.pp c';
+          Util.debug 3 "declare enum type for %a: clause %a" Symbol.pp s C.pp c';
           Util.incr_stat stat_instantiate;
           Some c'
         )
