@@ -33,8 +33,8 @@ type form = Formula.FO.t
 type t = Literal.t array
 
 val eq : t -> t -> bool
-val hash : t -> int
 val cmp : t -> t -> int
+include Interfaces.HASH with type t := t
 
 val is_empty : t -> bool
 

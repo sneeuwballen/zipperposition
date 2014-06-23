@@ -114,17 +114,20 @@ let fold f acc lit = match lit with
   | True
   | False -> acc
 
-let hash lit =
-  let hash_sign b h = if b then h else lnot h in
+let hash_fun lit h =
+  let hash_sign b h = Hash.bool_ b h in
   match lit with
-  | Arith o -> ArithLit.hash o
-  | Prop (p, sign) -> hash_sign sign (T.hash p)
-  | Equation (l, r, sign) -> hash_sign sign (Hash.hash_int2 (T.hash l) (T.hash r))
-  | True -> 13
-  | False -> 23
+  | Arith o -> ArithLit.hash_fun o h
+  | Prop (p, sign) -> hash_sign sign (T.hash_fun p h)
+  | Equation (l, r, sign) ->
+      h |> hash_sign sign |> T.hash_fun l |> T.hash_fun r
+  | True -> h
+  | False -> h |> Hash.int_ 23
   | Ineq olit ->
-      hash_sign olit.TO.strict
-        (Hash.hash_int2 (T.hash olit.TO.left) (T.hash olit.TO.right))
+      h |> hash_sign olit.TO.strict
+        |> T.hash_fun olit.TO.left |> T.hash_fun olit.TO.right
+
+let hash lit = Hash.apply hash_fun lit
 
 let weight lit =
   fold (fun acc t -> acc + T.size t) 0 lit

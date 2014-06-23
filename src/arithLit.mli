@@ -58,8 +58,9 @@ type lit = t
 
 val eq : t -> t -> bool
 val eq_com : t -> t -> bool
-val hash : t -> int
 val cmp : t -> t -> int
+
+include Interfaces.HASH with type t := t
 
 val make : op -> Z.t Monome.t -> Z.t Monome.t -> t
 

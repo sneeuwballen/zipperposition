@@ -63,9 +63,9 @@ module type S = sig
 
   (** {2 Basics} *)
 
-  val eq : t -> t -> bool         (** equality of clauses *)
-  val hash : t -> int             (** hash a clause *)
-  val compare : t -> t -> int     (** simple order on clauses (by ID) *)
+  include Interfaces.EQ with type t := t
+  include Interfaces.HASH with type t := t
+  val compare : t -> t -> int
 
   val id : t -> int
   val lits : t -> Literal.t array
@@ -108,8 +108,7 @@ module type S = sig
   val create_a : ?parents:t list -> ?selected:BV.t ->
                   Literal.t array ->
                   (CompactClause.t -> Proof.t) -> t
-    (** Build a new hclause from the given literals. This function takes
-        ownership of the input array. *)
+    (** Build a new hclause from the given literals. *)
 
   val of_forms : ?parents:t list -> ?selected:BV.t ->
                       Formula.FO.t list ->
@@ -139,8 +138,7 @@ module type S = sig
     (** apply the substitution to the clause *)
 
   val maxlits : t -> scope -> Substs.t -> BV.t
-    (** Bitvector that indicates which of the literals of [subst(clause)]
-        are maximal under [ord] *)
+    (** List of maximal literals *)
 
   val is_maxlit : t -> scope -> Substs.t -> idx:int -> bool
     (** Is the i-th literal maximal in subst(clause)? Equivalent to
@@ -388,7 +386,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let compare hc1 hc2 = hc1.hctag - hc2.hctag
 
-  let hash c = Lits.hash c.hclits
+  let hash_fun c h = Lits.hash_fun c.hclits h
+  let hash c = Hash.apply hash_fun c
 
   let id c = c.hctag
 

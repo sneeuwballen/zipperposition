@@ -71,10 +71,10 @@ let compare lits1 lits2 =
     then Array.length lits1 - Array.length lits2
     else check 0
 
-let hash lits =
-  Array.fold_left
-    (fun h lit -> Hash.combine h (Lit.hash lit))
-    13 lits
+let hash_fun lits h =
+  Hash.array_ Lit.hash_fun lits h
+
+let hash lits = Hash.apply hash_fun lits
 
 let variant ?(subst=S.empty) a1 sc1 a2 sc2 k =
   let rec iter2 subst i =

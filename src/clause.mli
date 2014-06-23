@@ -63,9 +63,9 @@ module type S = sig
 
   (** {2 Basics} *)
 
-  val eq : t -> t -> bool         (** equality of clauses *)
-  val hash : t -> int             (** hash a clause *)
-  val compare : t -> t -> int     (** simple order on clauses (by ID) *)
+  include Interfaces.EQ with type t := t
+  include Interfaces.HASH with type t := t
+  val compare : t -> t -> int
 
   val id : t -> int
   val lits : t -> Literal.t array
