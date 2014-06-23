@@ -36,6 +36,9 @@ module Lits = Literals
 
 type term = T.t
 
+let prof_detect = Util.mk_profiler "enum_types.detect"
+let prof_instantiate = Util.mk_profiler "enum_types.instantiate_vars"
+
 let stat_declare = Util.mk_stat "enum_types.declare"
 let stat_simplify = Util.mk_stat "enum_types.simplify"
 let stat_instantiate = Util.mk_stat "enum_types.instantiate_axiom"
@@ -138,6 +141,7 @@ module Make(E : Env.S) = struct
 
   (* detect whether the clause [c] is a declaration of enum type *)
   let _detect_declaration c =
+    Util.enter_prof prof_detect;
     (* loop over literals checking whether they are all of the form
       [var = t] for some [t] *)
     let rec _check_all_vars ~ty ~var acc lits = match lits with
@@ -153,12 +157,15 @@ module Make(E : Env.S) = struct
           _check_all_vars ~ty ~var (l::acc) lits'
       | _ -> None
     in
-    match Array.to_list (C.lits c) with
-    | Lit.Equation (l,r,true) :: lits when T.is_var l && not (Type.is_var (T.ty l))->
-        _check_all_vars ~ty:(T.ty l) ~var:l [r] lits
-    | Lit.Equation (l,r,true) :: lits when T.is_var r && not (Type.is_var (T.ty r))->
-        _check_all_vars ~ty:(T.ty r) ~var:r [l] lits
-    | _ -> None
+    let res = match Array.to_list (C.lits c) with
+      | Lit.Equation (l,r,true) :: lits when T.is_var l && not (Type.is_var (T.ty l))->
+          _check_all_vars ~ty:(T.ty l) ~var:l [r] lits
+      | Lit.Equation (l,r,true) :: lits when T.is_var r && not (Type.is_var (T.ty r))->
+          _check_all_vars ~ty:(T.ty r) ~var:r [l] lits
+      | _ -> None
+    in
+    Util.exit_prof prof_detect;
+    res
 
   (* retrieve variables that are directly under a positive equation *)
   let _vars_under_eq lits =
@@ -187,9 +194,10 @@ module Make(E : Env.S) = struct
       |> T.Set.elements
 
   let instantiate_vars c =
+    Util.enter_prof prof_instantiate;
     let vars = _naked_vars (C.lits c) in
     let s_c = 0 and s_decl = 1 in
-    CCList.find
+    let res = CCList.find
       (fun v ->
         match _find_match s_decl (T.ty v) s_c with
         | None -> None
@@ -214,6 +222,9 @@ module Make(E : Env.S) = struct
                 ) decl.decl_cases
             )
       ) vars
+    in
+    Util.exit_prof prof_instantiate;
+    res
 
   let _make_term_of_sym s ty =
     match Type.arity ty with
