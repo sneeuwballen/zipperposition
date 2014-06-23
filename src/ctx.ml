@@ -211,8 +211,8 @@ end) : S = struct
   let add_signature signature =
     let _diff = Signature.diff signature !_signature in
     _signature := Signature.merge !_signature signature;
-    Signal.send !_signature on_signature_update;
-    Signature.iter (fun s ty -> Signal.send on_new_symbol (s,ty)) _diff;
+    Signal.send on_signature_update !_signature;
+    Signature.iter _diff (fun s ty -> Signal.send on_new_symbol (s,ty));
     _ord := !_signature
       |> Signature.Seq.to_seq
       |> Sequence.map fst
@@ -221,9 +221,9 @@ end) : S = struct
 
   let declare symb ty =
     let is_new = not (Signature.mem !_signature symb) in
-    _signature := Signature.declare !_signature symb ty
+    _signature := Signature.declare !_signature symb ty;
     if is_new then (
-      Signal.send !_signature on_signature_update;
+      Signal.send on_signature_update !_signature;
       Signal.send on_new_symbol (symb,ty);
     )
 
