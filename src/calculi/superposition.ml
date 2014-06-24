@@ -927,43 +927,52 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.exit_prof prof_semantic_tautology;
     res
 
+  let flag_simplified = C.new_flag()
+
   let basic_simplify c =
-    Util.enter_prof prof_basic_simplify;
-    Util.incr_stat stat_basic_simplify;
-    let lits = C.lits c in
-    (* bv: literals to keep *)
-    let bv = BV.create ~size:(Array.length lits) true in
-    (* eliminate absurd lits *)
-    Array.iteri (fun i lit -> if Lit.is_absurd lit then BV.reset bv i) lits;
-    (* eliminate inequations x != t *)
-    let subst = ref S.empty in
-    Array.iteri
-      (fun i lit ->
-        if BV.get bv i then match lit with
-          | Lit.Equation (l, r, false) when T.is_var l || T.is_var r ->
-              (* eligible for destructive Equality Resolution, try to update
-                  [subst]. *)
-                begin try
-                  let subst' = Unif.FO.unification ~subst:!subst l 0 r 0 in
-                  BV.reset bv i;
-                  subst := subst';
-                with Unif.Fail -> ()
-                end
-          | _ -> ())
-      lits;
-    let new_lits = BV.select bv lits in
-    let renaming = Ctx.renaming_clear () in
-    let new_lits = Lit.apply_subst_list ~renaming !subst new_lits 0 in
-    let new_lits = Util.list_uniq Lit.eq_com new_lits in
-    if List.length new_lits = Array.length lits
-      then (Util.exit_prof prof_basic_simplify; c)  (* no simplification *)
-      else begin
-        let proof cc= Proof.mk_c_simp ~rule:"simplify" cc [C.proof c] in
-        let new_clause = C.create ~parents:[c] new_lits proof in
-        Util.debug 3 "%a basic_simplifies into %a" C.pp c C.pp new_clause;
-        Util.exit_prof prof_basic_simplify;
-        new_clause
-      end
+    if C.get_flag flag_simplified c
+    then c
+    else (
+      Util.enter_prof prof_basic_simplify;
+      Util.incr_stat stat_basic_simplify;
+      let lits = C.lits c in
+      (* bv: literals to keep *)
+      let bv = BV.create ~size:(Array.length lits) true in
+      (* eliminate absurd lits *)
+      Array.iteri (fun i lit -> if Lit.is_absurd lit then BV.reset bv i) lits;
+      (* eliminate inequations x != t *)
+      let subst = ref S.empty in
+      Array.iteri
+        (fun i lit ->
+          if BV.get bv i then match lit with
+            | Lit.Equation (l, r, false) when T.is_var l || T.is_var r ->
+                (* eligible for destructive Equality Resolution, try to update
+                    [subst]. *)
+                  begin try
+                    let subst' = Unif.FO.unification ~subst:!subst l 0 r 0 in
+                    BV.reset bv i;
+                    subst := subst';
+                  with Unif.Fail -> ()
+                  end
+            | _ -> ())
+        lits;
+      let new_lits = BV.select bv lits in
+      let renaming = Ctx.renaming_clear () in
+      let new_lits = Lit.apply_subst_list ~renaming !subst new_lits 0 in
+      let new_lits = Util.list_uniq Lit.eq_com new_lits in
+      if List.length new_lits = Array.length lits
+        then (
+          Util.exit_prof prof_basic_simplify;
+          C.set_flag flag_simplified c true;
+          c  (* no simplification *)
+        ) else (
+          let proof cc= Proof.mk_c_simp ~rule:"simplify" cc [C.proof c] in
+          let new_clause = C.create ~parents:[c] new_lits proof in
+          Util.debug 3 "%a basic_simplifies into %a" C.pp c C.pp new_clause;
+          Util.exit_prof prof_basic_simplify;
+          new_clause
+        )
+    )
 
   let handle_distinct_constants lit =
     match lit with
