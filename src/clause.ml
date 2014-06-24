@@ -564,11 +564,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let selected = c.hcselected in
     if BV.is_empty selected
     then (
-      (* maximal ones *)
-      let bv = Lits.maxlits ~ord lits' in
-      (* only keep literals that are positive *)
-      BV.filter bv (fun i -> Lit.is_pos lits'.(i));
-      bv
+      (* maximal literals *)
+      Lits.maxlits ~ord lits'
     ) else (
       let bv = BV.copy selected in
       let n = Array.length lits' in
@@ -583,7 +580,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
           (* check if both lits are still potentially eligible, and have the same
              sign if [check_sign] is true. *)
           if Lit.is_pos lit = Lit.is_pos lit' &&  BV.get bv j
-          then match Lit.Comp.compare ~ord lits'.(i) lits'.(j) with
+          then match Lit.Comp.compare ~ord lit lit' with
             | Comparison.Incomparable
             | Comparison.Eq -> ()     (* no further information about i-th and j-th *)
             | Comparison.Gt -> BV.reset bv j  (* j-th cannot be max *)
@@ -601,8 +598,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       let lits' = _apply_subst_no_simpl subst c.hclits scope in
       (* maximal ones *)
       let bv = Lits.maxlits ~ord lits' in
-      (* only keep literals that are positive *)
-      BV.filter bv (fun i -> Lit.is_pos lits'.(i));
+      (* only keep literals that are positive equations *)
+      BV.filter bv (fun i -> Lit.is_eq lits'.(i));
       bv
     end else BV.empty ()  (* no eligible literal when some are selected *)
 

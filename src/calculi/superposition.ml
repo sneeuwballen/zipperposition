@@ -364,9 +364,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let subst = info.subst in
       let t' = S.FO.apply ~renaming subst info.t sc_a in
       begin match info.passive_lit, info.passive_pos with
-        | Lit.Equation (v, _, true), P.Arg(_, P.Left P.Stop)
-        | Lit.Equation (_, v, true), P.Arg(_, P.Right P.Stop)
-        | Lit.Prop (v, true), P.Arg(_, P.Left P.Stop) ->
+        | Lit.Prop (_, true), P.Arg(_, P.Left P.Stop) ->
+            if T.eq t' T.TPTP.true_
+              then raise (ExitSuperposition "will yield a bool tautology")
+        | Lit.Equation (_, v, true), P.Arg(_, P.Left P.Stop)
+        | Lit.Equation (v, _, true), P.Arg(_, P.Right P.Stop) ->
             (* are we in the specific, but no that rare, case where we
                rewrite s=t using s=t (into a tautology t=t)? *)
             let v' = S.FO.apply ~renaming subst v sc_p in
@@ -442,10 +444,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let infer_passive clause =
     Util.enter_prof prof_infer_passive;
     (* perform inference on this lit? *)
-    let eligible =
-      let bv = C.eligible_res clause 0 S.empty in
-      fun i lit -> BV.get bv i
-    in
+    let eligible = C.Eligible.(res clause) in
     (* do the inferences in which clause is passive (rewritten),
        so we consider both negative and positive literals *)
     let new_clauses = Lits.fold_terms ~subterms:true ~ord:(Ctx.ord ())
@@ -481,9 +480,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ~both:false ~eligible (C.lits clause) []
       (fun acc l r sign l_pos ->
         assert (not sign);
-        match l_pos with
-        | Position.Arg(pos,_) ->
-          begin try
+        let pos = match l_pos with
+          | Position.Arg (p,_) -> p
+          | _ -> assert false
+        in
+        try
           let subst = Unif.FO.unification l 0 r 0 in
           if BV.get (C.eligible_res clause 0 subst) pos
             (* subst(lit) is maximal, we can do the inference *)
@@ -502,8 +503,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               acc
           with Unif.Fail ->
             acc  (* l and r not unifiable, try next *)
-          end
-        | _ -> assert false)
+      )
     in
     Util.exit_prof prof_infer_equality_resolution;
     new_clauses
@@ -747,7 +747,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   O.compare ord
                     (S.FO.apply_no_renaming subst l 1)
                     (S.FO.apply_no_renaming subst r 1) = Comp.Gt);
-                Util.debug 5 "t=%a[0], l= %a[1], r=%a[1], subst=%a"
+                Util.debug 5 "demod: t=%a[0], l= %a[1], r=%a[1], subst=%a"
                   T.pp t T.pp l T.pp r S.pp subst;
                 clauses := unit_clause :: !clauses;
                 Util.incr_stat stat_demodulate_step;
@@ -755,7 +755,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               end);
         t (* not found any match, normal form found *)
       with RewriteInto (t', subst) ->
-        Util.debug 5 "rewrite %a into %a" T.pp t T.pp t';
+        Util.debug 5 "demod: rewrite %a into %a" T.pp t T.pp t';
         normal_form ~restrict subst t' 1 (* done one rewriting step, continue *)
     (* rewrite innermost-leftmost of [subst(t,scope)]. The initial scope is
        0, but then we normal_form terms in which variables are really the variables
@@ -779,9 +779,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     normal_form ~restrict S.empty t 0
 
-  (* TODO: rewrite all subterms generically, but be careful that
-   *  maximal root terms should have [restrict=true] *)
-
   (** Demodulate the clause, with restrictions on which terms to rewrite *)
   let demodulate c =
     Util.enter_prof prof_demodulate;
@@ -790,12 +787,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* clauses used to rewrite *)
     let clauses = ref [] in
     (* literals that are eligible for resolution *)
-    let eligible_res = C.eligible_res c 0 S.empty in
+    let eligible_res = lazy (C.eligible_res c 0 S.empty) in
     (* demodulate literals *)
     let demod_lit i lit =
-      (* shall we restrict a subterm? *)
+      (* shall we restrict a subterm? only for max terms in positive
+          equations that are eligible for resolution *)
       let restrict_term =
-        if Lit.is_pos lit && BV.get eligible_res i
+        if Lit.is_eq lit && BV.get (Lazy.force eligible_res) i
         then
           let max_terms = Lit.Comp.max_terms ~ord lit in
           fun t ->
@@ -810,10 +808,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* demodulate every literal *)
     let lits = Array.mapi demod_lit (C.lits c) in
     if Lits.eq_com (C.lits c) lits
-      then (* no rewriting performed *)
-        let _ = Util.exit_prof prof_demodulate in
+      then ( (* no rewriting performed *)
+        Util.exit_prof prof_demodulate;
         c
-      else begin  (* construct new clause *)
+      ) else (
+        (* construct new clause *)
         clauses := Util.list_uniq C.eq !clauses;
         let proof c' = Proof.mk_c_simp ~rule:"demod" c'
           (C.proof c :: List.map C.proof !clauses) in
@@ -824,7 +823,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (* return simplified clause *)
         Util.exit_prof prof_demodulate;
         new_c
-      end
+      )
 
   (** Find clauses that [given] may demodulate, add them to set *)
   let backward_demodulate set given =
