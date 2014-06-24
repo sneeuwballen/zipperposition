@@ -562,35 +562,38 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let ord = Ctx.ord () in
     let lits' = _apply_subst_no_simpl subst c.hclits scope in
     let selected = c.hcselected in
-    let n = Array.length lits' in
-    (* Literals that may be eligible: all of them if none is selected,
-       selected ones otherwise. *)
-    let check_sign = not (BV.is_empty selected) in
-    let bv = if BV.is_empty selected
-      then BV.create ~size:n true
-      else BV.copy selected
-    in
-    (* Only keep literals that are maximal. If [check_sign] is true, comparisons
-       are only done between same-sign literals. *)
-    for i = 0 to n-1 do
-      (* i-th lit is already known not to be max? *)
-      if not (BV.get bv i) then () else
-      let lit = lits'.(i) in
-      for j = i+1 to n-1 do
-        let lit' = lits'.(j) in
-        (* check if both lits are still potentially eligible, and have the same
-           sign if [check_sign] is true. *)
-        if (check_sign && Lit.is_pos lit <> Lit.is_pos lit')
-            || not (BV.get bv j)
-          then ()
-          else match Lit.Comp.compare ~ord lits'.(i) lits'.(j) with
-          | Comparison.Incomparable
-          | Comparison.Eq -> ()     (* no further information about i-th and j-th *)
-          | Comparison.Gt -> BV.reset bv j  (* j-th cannot be max *)
-          | Comparison.Lt -> BV.reset bv i  (* i-th cannot be max *)
+    if BV.is_empty selected
+    then (
+      (* maximal ones *)
+      let bv = Lits.maxlits ~ord lits' in
+      (* only keep literals that are positive *)
+      BV.filter bv (fun i -> Lit.is_pos lits'.(i));
+      bv
+    ) else (
+      let bv = BV.copy selected in
+      let n = Array.length lits' in
+      (* Only keep literals that are maximal among selected literals of the
+          same sign. *)
+      for i = 0 to n-1 do
+        (* i-th lit is already known not to be max? *)
+        if not (BV.get bv i) then () else
+        let lit = lits'.(i) in
+        for j = i+1 to n-1 do
+          let lit' = lits'.(j) in
+          (* check if both lits are still potentially eligible, and have the same
+             sign if [check_sign] is true. *)
+          if (Lit.is_pos lit <> Lit.is_pos lit')
+              || not (BV.get bv j)
+            then ()
+            else match Lit.Comp.compare ~ord lits'.(i) lits'.(j) with
+            | Comparison.Incomparable
+            | Comparison.Eq -> ()     (* no further information about i-th and j-th *)
+            | Comparison.Gt -> BV.reset bv j  (* j-th cannot be max *)
+            | Comparison.Lt -> BV.reset bv i  (* i-th cannot be max *)
+        done;
       done;
-    done;
-    bv
+      bv
+    )
 
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for paramodulation. *)
