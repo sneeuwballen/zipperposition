@@ -91,8 +91,7 @@ module type S = sig
     include CLAUSE_SET
 
     val remove_by_id : int Sequence.t -> unit
-    (** Remove clauses by their ID. This will {b NOT} trigger
-        the signal {!on_remove_clause}. *)
+    (** Remove clauses by their ID *)
 
     val clauses : unit -> C.CSet.t
     (** Current set of clauses *)
