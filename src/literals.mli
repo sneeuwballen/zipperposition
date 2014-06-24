@@ -39,7 +39,8 @@ type t = Literal.t array
 val eq : t -> t -> bool
 val eq_com : t -> t -> bool
 val compare : t -> t -> int
-val hash : t -> int
+
+include Interfaces.HASH with type t := t
 
 val variant : ?subst:Substs.t -> t -> scope -> t -> scope -> Substs.t Sequence.t
 val are_variant : t -> t -> bool

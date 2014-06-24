@@ -40,8 +40,8 @@ val form : t -> form
 val id : t -> int
 
 val eq : t -> t -> bool
-val hash : t -> int
 val cmp : t -> t -> int
+include Interfaces.HASH with type t := t
 
 val eq_noproof : t -> t -> bool
 val cmp_noproof : t -> t -> int

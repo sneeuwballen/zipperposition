@@ -41,7 +41,7 @@ type 'a num = {
   sign : 'a -> int;
   abs : 'a -> 'a;
   cmp : 'a -> 'a -> int;
-  hash : 'a -> int;
+  hash : 'a -> int64 -> int64;
   zero : 'a;
   one : 'a;
   add : 'a -> 'a -> 'a;
@@ -58,7 +58,7 @@ let z = {
   sign = Z.sign;
   abs = Z.abs;
   cmp = Z.compare;
-  hash = Z.hash;
+  hash = (fun x h -> Hash.int_ (Z.hash x) h);
   zero = Z.zero;
   one = Z.one;
   add = Z.add;
@@ -96,9 +96,11 @@ let compare m1 m2 =
     ; Util.lexicograph cmp_pair m1.terms m2.terms;
     ]
 
-let hash m =
-  let hash_pair (s,t) = Hash.combine (m.num.hash s) (T.hash t) in
-  Hash.hash_list hash_pair (m.num.hash m.const) m.terms
+let hash_fun m h =
+  let hash_pair = Hash.pair m.num.hash T.hash_fun in
+  h |> m.num.hash m.const |> Hash.list_ hash_pair m.terms
+
+let hash m = Hash.apply hash_fun m
 
 let ty m = m.num.ty
 

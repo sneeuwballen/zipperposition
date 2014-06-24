@@ -42,10 +42,12 @@ type t = {
 type pform = t
 
 let eq t1 t2 = F.eq t1.form t2.form && Proof.eq t1.proof t2.proof
-let hash t = Hash.hash_int2 (F.hash t.form) (Proof.hash t.proof)
 let cmp t1 t2 =
   let c = F.cmp t1.form t2.form in
   if c <> 0 then c else Proof.cmp t1.proof t2.proof
+
+let hash_fun t h = F.hash_fun t.form (Proof.hash_fun t.proof h)
+let hash t = Hash.apply hash_fun t
 
 let eq_noproof t1 t2 = F.eq t1.form t2.form
 

@@ -46,7 +46,7 @@ val eq : t -> t -> bool         (** equality of literals *)
 val eq_com : t -> t -> bool     (** commutative equality of lits *)
 val compare : t -> t -> int     (** lexicographic comparison of literals *)
 
-val hash : t -> int
+include Interfaces.HASH with type t := t
 
 val hash : t -> int               (** hashing of literal *)
 val weight : t -> int             (** weight of the lit (sum of weights of terms) *)
