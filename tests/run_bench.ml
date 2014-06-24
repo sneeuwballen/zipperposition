@@ -169,6 +169,31 @@ let bench_type_inf n =
     terms;
   ()
 
+(** {2 Term Hashconsing} *)
+
+let bench_hashcons n =
+  let terms = QCheck.Arbitrary.generate ~rand ~n ArTerm.PT.default in
+  let ctx = TypeInference.Ctx.create Signature.empty in
+  let terms = CCList.map
+    (fun t ->
+      let ty, t' = TypeInference.FO.infer ctx t in
+      TypeInference.Ctx.constrain_type_type ctx ty Type.TPTP.i;
+      TypeInference.Ctx.bind_to_default ctx;
+      t' ctx)
+    terms
+  in
+  (* print hashconsing stats *)
+  let print_hashcons_stats (sz, num, sum_length, small, median, big) =
+    Util.printf ("hashcons stats for terms: size %d, num %d, sum length %d, "
+                ^^ "buckets: small %d, median %d, big %d\n\n")
+      sz num sum_length small median big;
+    flush stdout;
+  in
+  (* terms can die now *)
+  ignore terms;
+  print_hashcons_stats (ScopedTerm.hashcons_stats ());
+  ()
+
 (** {2 Main} *)
 
 let draw_line () =
@@ -182,6 +207,15 @@ let run_bench () =
   draw_line ();
   let res = Benchmark.throughput1 2 ~name:"type_inf_200" bench_type_inf 200 in
   Benchmark.tabulate res;
+  (* hashconsing *)
+  List.iter
+    (fun n ->
+      draw_line();
+      Util.printf "generate %d random terms...\n" n;
+      flush stdout;
+      Gc.major();
+      bench_hashcons n;
+    ) [ 1000; 100_000; 500_000 ];
   draw_line ();
   (* indexing *)
   bench_idx 1000;

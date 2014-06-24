@@ -42,11 +42,11 @@ module PT = struct
   let _const s = PT.const (Symbol.of_string s)
 
   let ground =
-    let a = PT.const (Sym.of_string "a") in
-    let b = PT.const (Sym.of_string "b") in
-    let c = PT.const (Sym.of_string "c") in
-    let d = PT.const (Sym.of_string "d") in
-    let e = PT.const (Sym.of_string "e") in
+    let a = _const "a" in
+    let b = _const "b" in
+    let c = _const "c" in
+    let d = _const "d" in
+    let e = _const "e" in
     let f x y = PT.app (_const "f") [x; y] in
     let sum x y = PT.app (_const "sum") [x; y] in
     let g x = PT.app (_const "g") [x] in
@@ -61,11 +61,11 @@ module PT = struct
       t)
 
   let default =
-    let a = PT.const (Sym.of_string "a") in
-    let b = PT.const (Sym.of_string "b") in
-    let c = PT.const (Sym.of_string "c") in
-    let d = PT.const (Sym.of_string "d") in
-    let e = PT.const (Sym.of_string "e") in
+    let a = _const "a" in
+    let b = _const "b" in
+    let c = _const "c" in
+    let d = _const "d" in
+    let e = _const "e" in
     let x = PT.var "X" in
     let y = PT.var "Y" in
     let z = PT.var "Z" in
