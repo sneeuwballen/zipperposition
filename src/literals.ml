@@ -295,9 +295,9 @@ let fold_lits ~eligible lits acc f =
   fold acc 0
 
 let fold_eqn ?(both=true) ?sign ~ord ~eligible lits acc f =
-  let sign_ok = match sign with
-    | None -> (fun _ -> true)
-    | Some sign -> (fun sign' -> sign = sign')
+  let sign_ok s = match sign with
+    | None -> true
+    | Some sign -> sign = s
   in
   let rec fold acc i =
     if i = Array.length lits then acc
@@ -318,7 +318,7 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits acc f =
             let acc = f acc r l sign Position.(arg i @@ right @@ stop) in
             f acc l r sign Position.(arg i @@ left @@ stop)
           else
-            let acc = f acc r l sign Position.(arg i @@ right @@ stop) in
+            (* only one side *)
             f acc l r sign Position.(arg i @@ left @@ stop)
         end
       | Lit.Prop (p, sign) when sign_ok sign ->

@@ -582,10 +582,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
           let lit' = lits'.(j) in
           (* check if both lits are still potentially eligible, and have the same
              sign if [check_sign] is true. *)
-          if (Lit.is_pos lit <> Lit.is_pos lit')
-              || not (BV.get bv j)
-            then ()
-            else match Lit.Comp.compare ~ord lits'.(i) lits'.(j) with
+          if Lit.is_pos lit = Lit.is_pos lit' &&  BV.get bv j
+          then match Lit.Comp.compare ~ord lits'.(i) lits'.(j) with
             | Comparison.Incomparable
             | Comparison.Eq -> ()     (* no further information about i-th and j-th *)
             | Comparison.Gt -> BV.reset bv j  (* j-th cannot be max *)

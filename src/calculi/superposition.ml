@@ -206,8 +206,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         assert sign;
         let with_pos = C.WithPos.({term=l; pos; clause=c;}) in
         f tree l with_pos);
-    (* terms that can be demodulated: all subterms *)
-    _idx_back_demod := Lits.fold_terms ~ord ~subterms:true ~which:`All
+    (* terms that can be demodulated: all subterms (but vars) *)
+    _idx_back_demod := Lits.fold_terms ~vars:false ~ord ~subterms:true ~which:`All
       ~eligible:C.Eligible.always (C.lits c) !_idx_back_demod
       (fun tree t pos ->
         let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
@@ -298,9 +298,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let subst = info.subst in
       let t' = S.FO.apply ~renaming subst info.t sc_a in
       begin match info.passive_lit, info.passive_pos with
-        | Lit.Equation (v, _, true), P.Arg(_, P.Left P.Stop)
-        | Lit.Equation (_, v, true), P.Arg(_, P.Right P.Stop)
-        | Lit.Prop (v, true), P.Arg(_, P.Left P.Stop) ->
+        | Lit.Prop (_, true), P.Arg(_, P.Left P.Stop) ->
+            if T.eq t' T.TPTP.true_
+              then raise (ExitSuperposition "will yield a bool tautology")
+        | Lit.Equation (_, v, true), P.Arg(_, P.Left P.Stop)
+        | Lit.Equation (v, _, true), P.Arg(_, P.Right P.Stop) ->
             (* are we in the specific, but no that rare, case where we
                rewrite s=t using s=t (into a tautology t=t)? *)
             let v' = S.FO.apply ~renaming subst v sc_p in
@@ -473,11 +475,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_equality_resolution clause =
     Util.enter_prof prof_infer_equality_resolution;
-    (* literals that can potentially be eligible for resolution *)
-    let eligible =
-      let bv = C.eligible_res clause 0 S.empty in
-      fun i lit -> Lit.is_neg lit && BV.get bv i
-    in
+    let eligible = C.Eligible.(filter Lit.is_neq) in
     (* iterate on those literals *)
     let new_clauses = Lits.fold_eqn ~sign:false ~ord:(Ctx.ord ())
       ~both:false ~eligible (C.lits clause) []
@@ -489,7 +487,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           let subst = Unif.FO.unification l 0 r 0 in
           if BV.get (C.eligible_res clause 0 subst) pos
             (* subst(lit) is maximal, we can do the inference *)
-            then begin
+            then (
               Util.incr_stat stat_equality_resolution_call;
               let renaming = Ctx.renaming_clear () in
               let proof c = Proof.mk_c_inference
@@ -500,7 +498,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               Util.debug 3 "equality resolution on %a yields %a"
                 C.pp clause C.pp new_clause;
               new_clause::acc
-            end else
+            ) else
               acc
           with Unif.Fail ->
             acc  (* l and r not unifiable, try next *)
@@ -530,12 +528,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let s = info.s and t = info.t and v = info.v in
     let subst = info.subst in
     (* check whether subst(lit) is maximal, and not (subst(s) < subst(t)) *)
-    let renaming = Ctx.renaming_clear () in
+    let renaming = S.Renaming.create () in
     if O.compare ord (S.FO.apply ~renaming subst s info.scope)
                      (S.FO.apply ~renaming subst t info.scope) <> Comp.Lt
     &&
       BV.get (C.eligible_param info.clause info.scope subst) info.active_idx
-      then begin
+      then (
         Util.incr_stat stat_equality_factoring_call;
         let proof c = Proof.mk_c_inference
           ~info:[S.to_string subst] ~rule:"eq_fact" c [C.proof info.clause]
@@ -552,61 +550,55 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Util.debug 3 "equality factoring on %a yields %a"
           C.pp info.clause C.pp new_clause;
         new_clause :: acc
-      end else acc
+      ) else
+        acc
 
   let infer_equality_factoring clause =
     Util.enter_prof prof_infer_equality_factoring;
-    (* is the literal eligible for paramodulation? *)
-    let eligible =
-      let bv = C.eligible_param clause 0 S.empty in
-      fun i lit -> BV.get bv i
-    in
+    let eligible = C.Eligible.(filter Lit.is_eq) in
     (* find root terms that are unifiable with s and are not in the
-       literal at s_pos. This returns a list of position and substitution *)
-    let find_unifiable_lits s s_pos =
-      let pos_idx = Lits.Pos.idx s_pos in
-      Util.array_foldi
-        (fun acc i lit ->
+       literal at s_pos. Calls [k] with a position and substitution *)
+    let find_unifiable_lits idx s s_pos k =
+      Array.iteri
+        (fun i lit ->
           match lit with
-          | _ when i = pos_idx -> acc (* same index *)
+          | _ when i = idx -> () (* same index *)
           | Lit.Prop (p, true) ->
             (* positive proposition *)
             begin try
               let subst = Unif.FO.unification s 0 p 0 in
-              (p, T.TPTP.true_, subst) :: acc
-            with Unif.Fail -> acc
+              k (p, T.TPTP.true_, subst)
+            with Unif.Fail -> ()
             end
           | Lit.Equation (u, v, true) ->
             (* positive equation *)
-            let try_u =  (* try inference between s and u *)
-              try
-                let subst = Unif.FO.unification s 0 u 0 in
-                [u, v, subst]
-              with Unif.Fail -> []
-            and try_v =  (* try inference between s and v *)
-              try
-                let subst = Unif.FO.unification s 0 v 0 in
-                [v, u, subst]
-              with Unif.Fail -> []
-            in
-            List.rev_append try_u @@ List.rev_append try_v acc
-          | _ -> acc  (* ignore specifically the rest *)
-        )
-        [] (C.lits clause)
-    (* try to do inferences with each positive literal *)
+            begin try
+              let subst = Unif.FO.unification s 0 u 0 in
+              k (u, v, subst)
+            with Unif.Fail -> ()
+            end;
+            begin try
+              let subst = Unif.FO.unification s 0 v 0 in
+              k (v, u, subst)
+            with Unif.Fail -> ()
+            end;
+          | _ -> () (* ignore other literals *)
+        ) (C.lits clause)
     in
+    (* try to do inferences with each positive literal *)
     let new_clauses = Lits.fold_eqn ~sign:true ~ord:(Ctx.ord ())
       ~both:true ~eligible (C.lits clause) []
       (fun acc s t _ s_pos -> (* try with s=t *)
-        let unifiables = find_unifiable_lits s s_pos in
         let active_idx = Lits.Pos.idx s_pos in
-        List.fold_left
-          (fun acc (u, v, subst) ->
-            let info = EqFactInfo.({
-              clause; s; t; u; v; active_idx; subst; scope=0;
-            }) in
-            do_eq_factoring info acc)
-          acc unifiables)
+        find_unifiable_lits active_idx s s_pos
+          |> Sequence.fold
+            (fun acc (u,v,subst) ->
+              let info = EqFactInfo.({
+                clause; s; t; u; v; active_idx; subst; scope=0;
+              }) in
+              do_eq_factoring info acc)
+            acc
+      )
     in
     Util.exit_prof prof_infer_equality_factoring;
     new_clauses
@@ -1289,10 +1281,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   (* Number of equational lits. Used as an estimation for the difficulty of the subsumption
      check for this clause. *)
-  let rec num_equational lits i =
-    if i = Array.length lits then 0
-    else if Lit.is_eqn lits.(i) then 1 + (num_equational lits (i+1))
-    else num_equational lits (i+1)
+  let num_equational lits =
+    Array.fold_left
+      (fun acc lit -> match lit with
+        | Lit.Equation _ -> acc+1
+        | _ -> acc
+      ) 0 lits
 
   (* ----------------------------------------------------------------------
    * contextual literal cutting
@@ -1304,7 +1298,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let rec contextual_literal_cutting c =
     Util.enter_prof prof_clc;
     if Array.length (C.lits c) <= 1
-    || num_equational (C.lits c) 0 > 3
+    || num_equational (C.lits c) > 3
     || Array.length (C.lits c) > 8
       then (Util.exit_prof prof_clc; c) else
     (* do we need to try to use equality subsumption? *)
@@ -1361,7 +1355,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let rec condensation c =
     Util.enter_prof prof_condensation;
     if Array.length (C.lits c) <= 1
-    || num_equational (C.lits c) 0 > 3
+    || num_equational (C.lits c) > 3
     || Array.length (C.lits c) > 8
       then (Util.exit_prof prof_condensation; c) else
     (* scope is used to rename literals for subsumption *)
