@@ -73,7 +73,7 @@ module MakeBench(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E
         (times zero x, zero);
       ]
 
-  let bench_peano n () =
+  let bench_peano n =
     let a = plus (from_int n) (from_int n)
     and b = from_int (2 * n) in
     let a' = TRS.rewrite peano_trs a in
@@ -92,7 +92,7 @@ module MakeBench(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E
 
   module Idx2 = I(E2)
 
-  let bench_random n () =
+  let bench_random n =
     let terms = QCheck.Arbitrary.generate ~rand ~n ArTerm.default in
     let idx = Idx2.add_seq (Idx2.empty ())
       (Sequence.map (fun t -> t,()) (Sequence.of_list terms)) in
@@ -113,7 +113,7 @@ module MakeIdxBench(I : Index.TERM_IDX with type elt = int) = struct
     in
     idx
 
-  let bench idx terms () =
+  let bench idx terms =
     List.iter
       (fun t ->
         I.retrieve_unifiables idx 0 t 1 ()
@@ -127,8 +127,14 @@ module BenchFingerprint = MakeIdxBench(IntFingerprint)
 module IntFastFingerprint = FastFingerprint.Make(OrderedInt)
 module BenchFastFingerprint = MakeIdxBench(IntFastFingerprint)
 
-module BenchFingerprint16 = MakeIdxBench(struct include IntFingerprint let empty () = empty_with Fingerprint.fp16 end)
-module BenchFastFingerprint16 = MakeIdxBench(struct include IntFastFingerprint let empty () = empty_with FastFingerprint.fp16 end)
+module BenchFingerprint16 = MakeIdxBench(struct
+  include IntFingerprint
+  let empty () = empty_with Fingerprint.fp16
+end)
+module BenchFastFingerprint16 = MakeIdxBench(struct
+  include IntFastFingerprint
+  let empty () = empty_with FastFingerprint.fp16
+end)
 
 module IntNPDtree = NPDtree.MakeTerm(OrderedInt)
 module BenchNPDTree = MakeIdxBench(IntNPDtree)
@@ -142,13 +148,15 @@ let bench_idx n =
   let ifinger16 = BenchFingerprint16.idx_of_terms terms in
   let ifastfinger16 = BenchFastFingerprint16.idx_of_terms terms in
   let inpdtree = BenchNPDTree.idx_of_terms terms in
-  Bench.bench
-    [ Util.sprintf "bench_fingerprint_%d" n, BenchFingerprint.bench ifinger terms
-    ; Util.sprintf "bench_fast_fingerprint_%d" n, BenchFastFingerprint.bench ifastfinger terms
-    ; Util.sprintf "bench_fingerprint_fp16_%d" n, BenchFingerprint16.bench ifinger16 terms
-    ; Util.sprintf "bench_fast_fingerprint_fp16_%d" n, BenchFastFingerprint16.bench ifastfinger16 terms
-    ; Util.sprintf "bench_npdtree_%d" n, BenchNPDTree.bench inpdtree terms
+  let res = Benchmark.throughputN 3
+    [ Util.sprintf "fingerprint_%d" n, BenchFingerprint.bench ifinger, terms
+    ; Util.sprintf "fast_fingerprint_%d" n, BenchFastFingerprint.bench ifastfinger, terms
+    ; Util.sprintf "fingerprint_fp16_%d" n, BenchFingerprint16.bench ifinger16, terms
+    ; Util.sprintf "fast_fingerprint_fp16_%d" n, BenchFastFingerprint16.bench ifastfinger16, terms
+    ; Util.sprintf "npdtree_%d" n, BenchNPDTree.bench inpdtree, terms
     ]
+  in
+  Benchmark.tabulate res
 
 (** {2 Type checking} *)
 
@@ -170,13 +178,10 @@ let draw_line () =
 let run_bench () =
   let module B_Dtree = MakeBench(Dtree.Make) in
   let module B_NPDtree = MakeBench(NPDtree.Make) in
-  let conf = Bench.config in
-  let old_sample = conf.Bench.samples in
-  conf.Bench.samples <- 100;
   (* type inference *)
   draw_line ();
-  let res = Bench.bench_arg ["type_inf_200", bench_type_inf, 200] in
-  Bench.summarize 1. res;
+  let res = Benchmark.throughput1 2 ~name:"type_inf_200" bench_type_inf 200 in
+  Benchmark.tabulate res;
   draw_line ();
   (* indexing *)
   bench_idx 1000;
@@ -184,21 +189,26 @@ let run_bench () =
   bench_idx 2_000;
   draw_line();
   (* rewriting *)
-  Bench.bench
-    [ "dtree_peano_1000", B_Dtree.bench_peano 1000
-    ; "npdtree_peano_1000", B_NPDtree.bench_peano 1000
-    ];
+  let res = Benchmark.throughputN 2
+    [ "dtree_peano_1000", B_Dtree.bench_peano, 1000
+    ; "npdtree_peano_1000", B_NPDtree.bench_peano, 1000
+    ]
+  in
+  Benchmark.tabulate res;
   draw_line ();
-  Bench.bench
-    [ "dtree_peano_5_000", B_Dtree.bench_peano 5_000
-    ; "npdtree_peano_5_000", B_NPDtree.bench_peano 5_000
-    ];
+  let res = Benchmark.throughputN 2
+    [ "dtree_peano_5_000", B_Dtree.bench_peano, 5_000
+    ; "npdtree_peano_5_000", B_NPDtree.bench_peano, 5_000
+    ]
+  in
+  Benchmark.tabulate res;
   draw_line ();
-  Bench.bench
-    [ "dtree_rand_1000", B_Dtree.bench_random 1000
-    ; "npdtree_rand_1000", B_NPDtree.bench_random 1000
-    ];
-  conf.Bench.samples <- old_sample;
+  let res = Benchmark.throughputN 2
+    [ "dtree_rand_1000", B_Dtree.bench_random, 1000
+    ; "npdtree_rand_1000", B_NPDtree.bench_random, 1000
+    ]
+  in
+  Benchmark.tabulate res;
   ()
 
 let _ = run_bench ()
