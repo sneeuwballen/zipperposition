@@ -76,31 +76,31 @@ let kind t = t.kind
 let hash_fun t s = Hash.int_ t.id s
 let hash t = Hash.apply hash_fun t
 let eq t1 t2 = t1 == t2
-let cmp t1 t2 = t1.id - t2.id
+let cmp t1 t2 = Pervasives.compare t1.id t2.id
 
 let _hash_ty t h =
-  h
-  |> Hash.int_ (Hashtbl.hash t.kind)
-  |> fun h ->
-    match t.ty with
-    | NoType -> h
-    | HasType ty -> Hash.int_ ty.id h
+  match t.ty with
+  | NoType -> h
+  | HasType ty -> Hash.int_ ty.id (Hash.string_ "type" h)
+
 let _hash_norec t h =
   let h = match view t with
-  | Var i -> Hash.int_ i h
-  | RigidVar i -> Hash.int_ (17 lxor i) h
-  | BVar i -> Hash.int_ (11 lxor i) h
+  | Var i -> h |> Hash.string_ "var" |> Hash.int_ i
+  | RigidVar i -> h |> Hash.string_ "rigid" |> Hash.int_ i
+  | BVar i -> h |> Hash.string_ "bvar" |> Hash.int_ i
   | Bind (s, varty, t') ->
-      h |> Sym.hash_fun s |> hash_fun varty |> hash_fun t'
-  | Const s -> Sym.hash_fun s h
+      h |> Hash.string_ "bind" |> Sym.hash_fun s |> hash_fun varty |> hash_fun t'
+  | Const s -> h |> Hash.string_ "const" |> Sym.hash_fun s
   | Record (l, rest) ->
       h
+      |> Hash.string_ "record"
       |> Hash.list_ (fun (s,t') h -> h |> Hash.string_ s |> hash_fun t') l
       |> Hash.opt hash_fun rest
-  | Multiset l -> Hash.list_ hash_fun l h
-  | App (f, l) -> hash_fun f h |> Hash.list_ hash_fun l
-  | At (t1, t2) -> hash_fun t1 (hash_fun t2 h)
-  | SimpleApp (s, l) -> Hash.list_ hash_fun l (Sym.hash_fun s h)
+  | Multiset l -> h |> Hash.string_ "ms" |> Hash.list_ hash_fun l
+  | App (f, l) -> h |> Hash.string_ "app" |> hash_fun f |> Hash.list_ hash_fun l
+  | At (t1, t2) -> h |> Hash.string_ "at" |> hash_fun t1 |> hash_fun t2
+  | SimpleApp (s, l) ->
+      h |> Hash.string_ "sapp" |> Sym.hash_fun s |> Hash.list_ hash_fun l
   in
   _hash_ty t h
 
