@@ -156,6 +156,9 @@ module type S = sig
         is positive, no literal is selecteed, and the literal
         is maximal among literals of [subst(clause)]. *)
 
+  val is_eligible_param : t -> scope -> Substs.t -> idx:int -> bool
+    (** Check whether the [idx]-th literal is eligible for paramodulation *)
+
   val eligible_chaining : t -> scope -> Substs.t -> BV.t
     (** Bitvector of literals of [subst(clause)] that are eligible
         for equality chaining or inequality chaining. That amouns to being
@@ -538,10 +541,13 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     new_hc
 
   let _apply_subst_no_simpl subst lits sc =
-    let renaming = S.Renaming.create () in
-    Array.map
-      (fun l -> Lit.apply_subst_no_simp ~renaming subst l sc)
-      lits
+    if Substs.is_empty subst
+    then lits  (* id *)
+    else
+      let renaming = S.Renaming.create () in
+      Array.map
+        (fun l -> Lit.apply_subst_no_simp ~renaming subst l sc)
+        lits
 
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are maximal under [ord] *)
@@ -602,6 +608,13 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       BV.filter bv (fun i -> Lit.is_eq lits'.(i));
       bv
     end else BV.empty ()  (* no eligible literal when some are selected *)
+
+  let is_eligible_param c scope subst ~idx =
+    Lit.is_pos c.hclits.(idx)
+    &&
+    BV.is_empty c.hcselected
+    &&
+    is_maxlit c scope subst ~idx
 
   let eligible_chaining c scope subst =
     let ord = Ctx.ord () in

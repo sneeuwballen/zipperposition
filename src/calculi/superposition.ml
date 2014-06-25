@@ -125,7 +125,8 @@ module type S = sig
 end
 
 (* statistics *)
-let stat_basic_simplify = Util.mk_stat "basic_simplify calls"
+let stat_basic_simplify_calls = Util.mk_stat "basic_simplify calls"
+let stat_basic_simplify = Util.mk_stat "basic_simplify"
 let stat_superposition_call = Util.mk_stat "superposition calls"
 let stat_equality_resolution_call = Util.mk_stat "equality_resolution calls"
 let stat_equality_factoring_call = Util.mk_stat "equality_factoring calls"
@@ -315,7 +316,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         O.compare ord (S.FO.apply ~renaming info.subst info.s sc_a) t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
         not (BV.get (C.eligible_res info.passive sc_p subst) passive_idx) ||
-        not (BV.get (C.eligible_param info.active sc_a subst) active_idx)
+        not (C.is_eligible_param info.active sc_a subst ~idx:active_idx)
       ) then raise (ExitSuperposition "bad ordering conditions");
       (* ordering constraints are ok *)
       let lits_a = Util.array_except_idx (C.lits info.active) active_idx in
@@ -338,7 +339,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Util.debug 3 "... ok, conclusion %a" C.pp new_clause;
       new_clause :: acc
     with ExitSuperposition reason ->
-      Util.debug 4 "... cancel, %s" reason;
+      Util.debug 3 "... cancel, %s" reason;
       acc
 
   (* simultaneous superposition: when rewriting D with C \lor s=t,
@@ -381,7 +382,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         O.compare ord (S.FO.apply ~renaming info.subst info.s sc_a) t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
         not (BV.get (C.eligible_res info.passive sc_p subst) passive_idx) ||
-        not (BV.get (C.eligible_param info.active sc_a subst) active_idx)
+        not (C.is_eligible_param info.active sc_a subst ~idx:active_idx)
       ) then raise (ExitSuperposition "bad ordering conditions");
       (* ordering constraints are ok, build new active lits (excepted s=t) *)
       let lits_a = Util.array_except_idx (C.lits info.active) active_idx in
@@ -402,7 +403,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Util.debug 3 "... ok, conclusion %a" C.pp new_clause;
       new_clause :: acc
     with ExitSuperposition reason ->
-      Util.debug 4 "... cancel, %s" reason;
+      Util.debug 3 "... cancel, %s" reason;
       acc
 
   (* choose between regular and simultaneous superposition *)
@@ -415,14 +416,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.enter_prof prof_infer_active;
     (* no literal can be eligible for paramodulation if some are selected.
        This checks if inferences with i-th literal are needed? *)
-    let eligible =
-      let bv = C.eligible_param clause 0 S.empty in
-      fun i lit -> BV.get bv i
-    in
+    let eligible = C.Eligible.param clause in
     (* do the inferences where clause is active; for this,
        we try to rewrite conditionally other clauses using
        non-minimal sides of every positive literal *)
-    let new_clauses = Lits.fold_eqn ~ord:(Ctx.ord ())
+    let new_clauses = Lits.fold_eqn ~sign:true ~ord:(Ctx.ord ())
       ~both:true ~eligible (C.lits clause) []
       (fun acc s t _ s_pos ->
         (* rewrite clauses using s *)
@@ -447,15 +445,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let eligible = C.Eligible.(res clause) in
     (* do the inferences in which clause is passive (rewritten),
        so we consider both negative and positive literals *)
-    let new_clauses = Lits.fold_terms ~subterms:true ~ord:(Ctx.ord ())
+    let new_clauses = Lits.fold_terms ~vars:false ~subterms:true ~ord:(Ctx.ord ())
       ~which:`All ~eligible (C.lits clause) []
       (fun acc u_p passive_pos ->
         let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
-        if T.is_var u_p
-        then acc
+        assert (not (T.is_var u_p));
         (* all terms that occur in an equation in the active_set
            and that are potentially unifiable with u_p (u at position p) *)
-        else I.retrieve_unifiables !_idx_sup_from 1 u_p 0 acc
+        I.retrieve_unifiables !_idx_sup_from 1 u_p 0 acc
           (fun acc s with_pos subst ->
             let active = with_pos.C.WithPos.clause in
             let s_pos = with_pos.C.WithPos.pos in
@@ -474,16 +471,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_equality_resolution clause =
     Util.enter_prof prof_infer_equality_resolution;
-    let eligible = C.Eligible.(filter Lit.is_neq) in
+    let eligible = C.Eligible.always in
     (* iterate on those literals *)
     let new_clauses = Lits.fold_eqn ~sign:false ~ord:(Ctx.ord ())
       ~both:false ~eligible (C.lits clause) []
       (fun acc l r sign l_pos ->
         assert (not sign);
-        let pos = match l_pos with
-          | Position.Arg (p,_) -> p
-          | _ -> assert false
-        in
+        let pos = Lits.Pos.idx l_pos in
         try
           let subst = Unif.FO.unification l 0 r 0 in
           if BV.get (C.eligible_res clause 0 subst) pos
@@ -532,7 +526,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     if O.compare ord (S.FO.apply ~renaming subst s info.scope)
                      (S.FO.apply ~renaming subst t info.scope) <> Comp.Lt
     &&
-      BV.get (C.eligible_param info.clause info.scope subst) info.active_idx
+    C.is_eligible_param info.clause info.scope subst ~idx:info.active_idx
       then (
         Util.incr_stat stat_equality_factoring_call;
         let proof c = Proof.mk_c_inference
@@ -925,7 +919,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     then c
     else (
       Util.enter_prof prof_basic_simplify;
-      Util.incr_stat stat_basic_simplify;
+      Util.incr_stat stat_basic_simplify_calls;
       let lits = C.lits c in
       (* bv: literals to keep *)
       let bv = BV.create ~size:(Array.length lits) true in
@@ -948,8 +942,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             | _ -> ())
         lits;
       let new_lits = BV.select bv lits in
-      let renaming = Ctx.renaming_clear () in
-      let new_lits = Lit.apply_subst_list ~renaming !subst new_lits 0 in
+      let new_lits =
+        if S.is_empty !subst then new_lits
+        else
+          let renaming = Ctx.renaming_clear () in
+          Lit.apply_subst_list ~renaming !subst new_lits 0
+      in
       let new_lits = Util.list_uniq Lit.eq_com new_lits in
       if List.length new_lits = Array.length lits
         then (
@@ -960,6 +958,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           let proof cc= Proof.mk_c_simp ~rule:"simplify" cc [C.proof c] in
           let new_clause = C.create ~parents:[c] new_lits proof in
           Util.debug 3 "%a basic_simplifies into %a" C.pp c C.pp new_clause;
+          Util.incr_stat stat_basic_simplify;
           Util.exit_prof prof_basic_simplify;
           new_clause
         )

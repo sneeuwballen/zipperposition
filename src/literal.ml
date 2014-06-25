@@ -564,6 +564,8 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ~which ~ord ~subterms lit
   let at_term ~pos acc t =
     if subterms
       then T.all_positions ~vars ~pos t acc f
+    else if T.is_var t && not vars
+      then acc (* ignore *)
       else f acc t pos
   in
   match lit, which with
@@ -577,7 +579,7 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ~which ~ord ~subterms lit
     | Comparison.Gt ->
       at_term ~pos:P.(append position (left stop)) acc l
     | Comparison.Lt ->
-      at_term ~pos:P.(append position (right @@ stop)) acc r
+      at_term ~pos:P.(append position (right stop)) acc r
     | Comparison.Eq | Comparison.Incomparable ->
       (* visit both sides, they are both (potentially) maximal *)
       let acc = at_term ~pos:P.(append position (left stop)) acc l in
