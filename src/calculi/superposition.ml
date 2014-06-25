@@ -930,9 +930,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Array.iteri
         (fun i lit ->
           if BV.get bv i then match lit with
-            | Lit.Equation (l, r, false) when T.is_var l || T.is_var r ->
+            | Lit.Equation (l, r, false)
+              when (T.is_var l && not (S.mem !subst (l:T.t:>ScopedTerm.t) 0))
+                || (T.is_var r && not (S.mem !subst (r:T.t:>ScopedTerm.t) 0)) ->
                 (* eligible for destructive Equality Resolution, try to update
-                    [subst]. *)
+                    [subst]. Careful: in the case [X!=a | X!=b | C] we must
+                    bind X only to [a] or [b], not unify [a] with [b]. *)
                   begin try
                     let subst' = Unif.FO.unification ~subst:!subst l 0 r 0 in
                     BV.reset bv i;
@@ -957,7 +960,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ) else (
           let proof cc= Proof.mk_c_simp ~rule:"simplify" cc [C.proof c] in
           let new_clause = C.create ~parents:[c] new_lits proof in
-          Util.debug 3 "%a basic_simplifies into %a" C.pp c C.pp new_clause;
+          Util.debug 3 "%a basic_simplifies into\n %a  with %a"
+            C.pp c C.pp new_clause S.pp !subst;
           Util.incr_stat stat_basic_simplify;
           Util.exit_prof prof_basic_simplify;
           new_clause
