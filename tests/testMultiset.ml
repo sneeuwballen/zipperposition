@@ -54,6 +54,16 @@ let compare_and_partial =
   in
   Q.mk_test ~name:"multiset_compare_and_compare_partial" ~pp ~n:1000 gen prop
 
+let max_is_max =
+  let gen = Q.Arbitrary.(map (list small_int) M.of_list) in
+  let prop m =
+    let f x y = Comparison.of_total (Pervasives.compare x y) in
+    let l = M.max f m |> M.to_list |> List.map fst in
+    List.for_all (fun x -> M.is_max f x m) l
+  in
+  let pp = Util.sprintf "%a" (M.pp CCInt.pp) in
+  Q.mk_test ~name:"multiset_max_l_is_max" ~pp ~n:1000 gen prop
+
 let suite =
   "test_multiset" >:::
     [ "max" >:: test_max
@@ -61,4 +71,7 @@ let suite =
     ; "cardinal_size" >:: test_cardinal_size
     ]
 
-let props = [ compare_and_partial ]
+let props =
+  [ compare_and_partial
+  ; max_is_max
+  ]
