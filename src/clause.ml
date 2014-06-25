@@ -156,6 +156,9 @@ module type S = sig
         is positive, no literal is selecteed, and the literal
         is maximal among literals of [subst(clause)]. *)
 
+  val is_eligible_param : t -> scope -> Substs.t -> idx:int -> bool
+    (** Check whether the [idx]-th literal is eligible for paramodulation *)
+
   val eligible_chaining : t -> scope -> Substs.t -> BV.t
     (** Bitvector of literals of [subst(clause)] that are eligible
         for equality chaining or inequality chaining. That amouns to being
@@ -538,10 +541,13 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     new_hc
 
   let _apply_subst_no_simpl subst lits sc =
-    let renaming = S.Renaming.create () in
-    Array.map
-      (fun l -> Lit.apply_subst_no_simp ~renaming subst l sc)
-      lits
+    if Substs.is_empty subst
+    then lits  (* id *)
+    else
+      let renaming = S.Renaming.create () in
+      Array.map
+        (fun l -> Lit.apply_subst_no_simp ~renaming subst l sc)
+        lits
 
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are maximal under [ord] *)
@@ -562,35 +568,33 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let ord = Ctx.ord () in
     let lits' = _apply_subst_no_simpl subst c.hclits scope in
     let selected = c.hcselected in
-    let n = Array.length lits' in
-    (* Literals that may be eligible: all of them if none is selected,
-       selected ones otherwise. *)
-    let check_sign = not (BV.is_empty selected) in
-    let bv = if BV.is_empty selected
-      then BV.create ~size:n true
-      else BV.copy selected
-    in
-    (* Only keep literals that are maximal. If [check_sign] is true, comparisons
-       are only done between same-sign literals. *)
-    for i = 0 to n-1 do
-      (* i-th lit is already known not to be max? *)
-      if not (BV.get bv i) then () else
-      let lit = lits'.(i) in
-      for j = i+1 to n-1 do
-        let lit' = lits'.(j) in
-        (* check if both lits are still potentially eligible, and have the same
-           sign if [check_sign] is true. *)
-        if (check_sign && Lit.is_pos lit <> Lit.is_pos lit')
-            || not (BV.get bv j)
-          then ()
-          else match Lit.Comp.compare ~ord lits'.(i) lits'.(j) with
-          | Comparison.Incomparable
-          | Comparison.Eq -> ()     (* no further information about i-th and j-th *)
-          | Comparison.Gt -> BV.reset bv j  (* j-th cannot be max *)
-          | Comparison.Lt -> BV.reset bv i  (* i-th cannot be max *)
+    if BV.is_empty selected
+    then (
+      (* maximal literals *)
+      Lits.maxlits ~ord lits'
+    ) else (
+      let bv = BV.copy selected in
+      let n = Array.length lits' in
+      (* Only keep literals that are maximal among selected literals of the
+          same sign. *)
+      for i = 0 to n-1 do
+        (* i-th lit is already known not to be max? *)
+        if not (BV.get bv i) then () else
+        let lit = lits'.(i) in
+        for j = i+1 to n-1 do
+          let lit' = lits'.(j) in
+          (* check if both lits are still potentially eligible, and have the same
+             sign if [check_sign] is true. *)
+          if Lit.is_pos lit = Lit.is_pos lit' &&  BV.get bv j
+          then match Lit.Comp.compare ~ord lit lit' with
+            | Comparison.Incomparable
+            | Comparison.Eq -> ()     (* no further information about i-th and j-th *)
+            | Comparison.Gt -> BV.reset bv j  (* j-th cannot be max *)
+            | Comparison.Lt -> BV.reset bv i  (* i-th cannot be max *)
+        done;
       done;
-    done;
-    bv
+      bv
+    )
 
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for paramodulation. *)
@@ -600,10 +604,17 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       let lits' = _apply_subst_no_simpl subst c.hclits scope in
       (* maximal ones *)
       let bv = Lits.maxlits ~ord lits' in
-      (* only keep literals that are positive *)
-      BV.filter bv (fun i -> Lit.is_pos lits'.(i));
+      (* only keep literals that are positive equations *)
+      BV.filter bv (fun i -> Lit.is_eq lits'.(i));
       bv
     end else BV.empty ()  (* no eligible literal when some are selected *)
+
+  let is_eligible_param c scope subst ~idx =
+    Lit.is_pos c.hclits.(idx)
+    &&
+    BV.is_empty c.hcselected
+    &&
+    is_maxlit c scope subst ~idx
 
   let eligible_chaining c scope subst =
     let ord = Ctx.ord () in

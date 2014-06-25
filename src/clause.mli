@@ -156,6 +156,9 @@ module type S = sig
         is positive, no literal is selecteed, and the literal
         is maximal among literals of [subst(clause)]. *)
 
+  val is_eligible_param : t -> scope -> Substs.t -> idx:int -> bool
+    (** Check whether the [idx]-th literal is eligible for paramodulation *)
+
   val eligible_chaining : t -> scope -> Substs.t -> BV.t
     (** Bitvector of literals of [subst(clause)] that are eligible
         for equality chaining or inequality chaining. That amouns to being
