@@ -407,6 +407,9 @@ module type SPECIALIZED = sig
   type term
   type t = subst
 
+  val mem : t -> term -> scope -> bool
+    (** Variable is bound? *)
+
   val apply : t -> renaming:Renaming.t -> term -> scope -> term
     (** Apply the substitution to the given term/type.
         @param renaming used to desambiguate free variables from distinct scopes *)
@@ -425,6 +428,8 @@ module Ty = struct
   type term = Type.t
   type t = subst
 
+  let mem subst t s_t = mem subst (t:term:>T.t) s_t
+
   let apply subst ~renaming t s_t =
     Type.of_term_exn (apply subst ~renaming (t : term :> T.t) s_t)
 
@@ -437,6 +442,8 @@ end
 module FO = struct
   type term = FOTerm.t
   type t = subst
+
+  let mem subst t s_t = mem subst (t:term:>T.t) s_t
 
   let apply subst ~renaming t s_t =
     FOTerm.of_term_exn (apply subst ~renaming (t : term :> T.t) s_t)
@@ -451,6 +458,8 @@ module HO = struct
   type term = HOTerm.t
   type t = subst
 
+  let mem subst t s_t = mem subst (t:term:>T.t) s_t
+
   let apply  subst ~renaming t s_t =
     HOTerm.of_term_exn (apply  subst ~renaming (t : term :> T.t) s_t)
 
@@ -463,6 +472,8 @@ end
 module Form = struct
   type term = Formula.FO.t
   type t = subst
+
+  let mem subst t s_t = mem subst (t:term:>T.t) s_t
 
   let apply  subst ~renaming t s_t =
     Formula.FO.of_term_exn (apply  subst ~renaming (t : term :> T.t) s_t)
