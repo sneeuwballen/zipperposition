@@ -684,15 +684,21 @@ module Comp = struct
         kind-specific comparison.
   *)
 
+  (* is there an element of [l1] that dominates all elements of [l2]? *)
+  let _some_term_dominates f l1 l2 =
+    List.exists
+      (fun x -> List.for_all (fun y -> f x y = Comparison.Gt) l2)
+      l1
+
   let _cmp_by_maxterms ~ord l1 l2 =
     match l1, l2 with
     | Prop (p1, _), Prop (p2, _) -> Ordering.compare ord p1 p2
     | _ ->
         let t1 = max_terms ~ord l1 and t2 = max_terms ~ord l2 in
         let f = Ordering.compare ord in
-        match C.dominates f t1 t2, C.dominates f t2 t1 with
-        | false, false -> C.Eq
-        | true, true -> C.Incomparable
+        match _some_term_dominates f t1 t2, _some_term_dominates f t2 t1 with
+        | false, false -> C.Eq (* go further *)
+        | true, true -> assert false
         | true, false -> C.Gt
         | false, true -> C.Lt
 

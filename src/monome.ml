@@ -141,6 +141,7 @@ let mk_const ~num s =
   { num; const=s; terms=[]; }
 
 let singleton ~num coeff t =
+  assert (Type.eq (T.ty t) num.ty);
   if num.cmp num.zero coeff = 0
     then mk_const ~num coeff  (* 0 *)
     else
@@ -166,6 +167,7 @@ let mem e t =
   | Some _ -> true
 
 let add e s t =
+  assert (Type.eq (T.ty t) e.num.ty);
   (* sorted insertion *)
   let rec add l s t = match l with
     | [] -> [s, t]

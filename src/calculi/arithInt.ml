@@ -1551,11 +1551,13 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* a != b ------> a+1 ≤ b | a ≥ b+1 *)
   let canc_diff_to_lesseq c =
     let ord = Ctx.ord () in
-    Lits.fold_lits ~eligible:C.Eligible.(filter Lit.is_arith_neq ** max c)
-      (C.lits c) []
+    let eligible = C.Eligible.(filter Lit.is_arith_neq ** max c) in
+    Lits.fold_lits ~eligible (C.lits c) []
       (fun acc lit i ->
         match lit with
         | Lit.Arith (AL.Binary (AL.Different, m1, m2)) ->
+            assert (eligible i lit);
+            Util.debug 1 "lit %a [%d] in %a" Lit.pp lit i C.pp c;
             assert (Lits.is_max ~ord (C.lits c) i);
             let lits = Util.array_except_idx (C.lits c) i in
             let new_lits =
