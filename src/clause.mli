@@ -63,9 +63,9 @@ module type S = sig
 
   (** {2 Basics} *)
 
-  val eq : t -> t -> bool         (** equality of clauses *)
-  val hash : t -> int             (** hash a clause *)
-  val compare : t -> t -> int     (** simple order on clauses (by ID) *)
+  include Interfaces.EQ with type t := t
+  include Interfaces.HASH with type t := t
+  val compare : t -> t -> int
 
   val id : t -> int
   val lits : t -> Literal.t array
@@ -155,6 +155,9 @@ module type S = sig
         are eligible for paramodulation. That means the literal
         is positive, no literal is selecteed, and the literal
         is maximal among literals of [subst(clause)]. *)
+
+  val is_eligible_param : t -> scope -> Substs.t -> idx:int -> bool
+    (** Check whether the [idx]-th literal is eligible for paramodulation *)
 
   val eligible_chaining : t -> scope -> Substs.t -> BV.t
     (** Bitvector of literals of [subst(clause)] that are eligible

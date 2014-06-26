@@ -50,6 +50,8 @@ let stat_arith_ineq_factoring = Util.mk_stat "arith.ineq_factoring"
 let stat_arith_div_chaining = Util.mk_stat "arith.div_chaining"
 let stat_arith_divisibility = Util.mk_stat "arith.divisibility"
 let stat_arith_demod = Util.mk_stat "arith.demod"
+let stat_arith_backward_demod = Util.mk_stat "arith.backward_demod"
+let stat_arith_trivial_ineq = Util.mk_stat "arith.redundant_by_ineq"
 (*
 let stat_arith_reflexivity_resolution = Util.mk_stat "arith.reflexivity_resolution"
 *)
@@ -61,10 +63,12 @@ let prof_arith_ineq_chaining = Util.mk_profiler "arith.ineq_chaining"
 let prof_arith_purify = Util.mk_profiler "arith.purify"
 let prof_arith_inner_case_switch = Util.mk_profiler "arith.inner_case_switch"
 let prof_arith_demod = Util.mk_profiler "arith.demod"
+let prof_arith_backward_demod = Util.mk_profiler "arith.backward_demod"
 let prof_arith_semantic_tautology = Util.mk_profiler "arith.semantic_tauto"
 let prof_arith_ineq_factoring = Util.mk_profiler "arith.ineq_factoring"
 let prof_arith_div_chaining = Util.mk_profiler "arith.div_chaining"
 let prof_arith_divisibility = Util.mk_profiler "arith.divisibility"
+let prof_arith_trivial_ineq = Util.mk_profiler "arith.redundant_by_ineq"
 (*
 let prof_arith_reflexivity_resolution = Util.mk_profiler "arith.reflexivity_resolution"
 *)
@@ -113,7 +117,7 @@ module type S = sig
           the rule  (b < a and c < b) -> C1, then make the head of the rule
           true *)
 
-  val canc_lesseq_to_less : Env.lit_rewrite_rule
+  val canc_less_to_lesseq : Env.lit_rewrite_rule
     (** Simplification:  a <= b  ----> a < b+1 *)
 
   (** {3 Divisibility} *)
@@ -158,7 +162,9 @@ type scope = S.scope
 
 let _enable_arith = ref false
 let _enable_ac = ref false
-let _enable_semantic_tauto = ref false
+let _enable_semantic_tauto = ref true
+let _enable_trivial_ineq = ref true
+let _dot_unit = ref None
 
 let case_switch_limit = ref 30
 let div_case_switch_limit = ref 100
@@ -176,7 +182,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   let _idx_all = ref (PS.TermIndex.empty ())
 
   (* unit clauses *)
-  let _idx_unit = ref (PS.TermIndex.empty ())
+  let _idx_unit_eq = ref (PS.TermIndex.empty ())
+  let _idx_unit_div = ref (PS.TermIndex.empty ())
+  let _idx_unit_ineq = ref (PS.TermIndex.empty ())
 
   (* apply [f] to some subterms of [c] *)
   let update f c =
@@ -188,7 +196,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       (fun acc t pos ->
         let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
         f acc t with_pos);
-    let left, right = 
+    let left, right =
       Lits.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false
       ~eligible:C.Eligible.(filter Lit.is_arith_ineq** max c)
       (C.lits c) (!_idx_ineq_left, !_idx_ineq_right)
@@ -223,11 +231,30 @@ module Make(E : Env.S) : S with module Env = E = struct
   let update_simpl f c =
     let ord = Ctx.ord () in
     begin match C.lits c with
-    | [| Lit.Arith alit |] ->
+    | [| Lit.Arith ((AL.Binary (AL.Equal, _, _)) as alit) |] ->
         let pos = Position.(arg 0 stop) in
-        _idx_unit := AL.fold_terms ~subterms:false ~vars:false ~pos ~which:`Max ~ord
-          alit !_idx_unit
+        _idx_unit_eq := AL.fold_terms ~subterms:false ~vars:false ~pos ~which:`Max ~ord
+          alit !_idx_unit_eq
             (fun acc t pos ->
+              assert (not (T.is_var t));
+              let with_pos = C.WithPos.( {term=t; pos; clause=c;} ) in
+              f acc t with_pos
+            )
+    | [| Lit.Arith ((AL.Binary (AL.Lesseq, _, _)) as alit) |] ->
+        let pos = Position.(arg 0 stop) in
+        _idx_unit_ineq := AL.fold_terms ~subterms:false ~vars:false ~pos ~which:`Max ~ord
+          alit !_idx_unit_ineq
+            (fun acc t pos ->
+              assert (not (T.is_var t));
+              let with_pos = C.WithPos.( {term=t; pos; clause=c;} ) in
+              f acc t with_pos
+            )
+    | [| Lit.Arith (AL.Divides d as alit) |] when d.AL.sign ->
+        let pos = Position.(arg 0 stop) in
+        _idx_unit_div := AL.fold_terms ~subterms:false ~vars:false ~pos ~which:`Max ~ord
+          alit !_idx_unit_div
+            (fun acc t pos ->
+              assert (not (T.is_var t));
               let with_pos = C.WithPos.( {term=t; pos; clause=c;} ) in
               f acc t with_pos
             )
@@ -399,97 +426,118 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.exit_prof prof_arith_sup;
     res
 
-  exception SimplifyInto of Literal.t * C.t
+  exception SimplifyInto of ArithLit.t * C.t * S.t
 
-  (* demodulation (simplification)
-    TODO: this should be split into forward/backward simplifications
-    same as regular demodulation... *)
-  let canc_demodulation c =
-    Util.enter_prof prof_arith_demod;
+  (* how to simplify the passive lit with the active lit, in one step *)
+  let _try_demod_step ~subst passive_lit s_p c pos active_lit s_a c' pos' =
     let ord = Ctx.ord () in
+    let i = Lits.Pos.idx pos in
+    let renaming = S.Renaming.create () in
+    let active_lit' = ALF.apply_subst ~renaming subst active_lit s_a in
+    (* restrictions:
+      - the rewriting term must be bigger than other terms
+        (in other words, the inference is strictly decreasing)
+      - all variables of active clause must be bound by subst
+      - must not rewrite itself (c != c') *)
+    if ALF.is_strictly_max ~ord active_lit'
+    && (C.Seq.vars c'
+        |> Sequence.for_all (fun v -> S.mem subst (v:T.t:>ScopedTerm.t) s_a))
+    && ( (C.lits c |> Array.length) > 1
+        || not(Lit.eq (C.lits c).(i) (C.lits c').(0))
+        || not(ALF.is_max ~ord passive_lit && C.is_maxlit c 0 S.empty ~idx:i)
+      )
+    then (
+      (* we know all variables of [active_lit] are bound, no need
+        for a renaming *)
+      let active_lit = ALF.apply_subst_no_renaming subst active_lit s_a in
+      let active_lit, passive_lit = ALF.scale active_lit passive_lit in
+      match active_lit, passive_lit with
+      | ALF.Left (AL.Equal, mf1, m1), _
+      | ALF.Right (AL.Equal, m1, mf1), _ ->
+          let new_lit = ALF.replace passive_lit
+            (M.difference m1 (MF.rest mf1)) in
+          raise (SimplifyInto (new_lit, c',subst))
+      | ALF.Div d1, ALF.Div d2 when d1.AL.sign ->
+          let n1 = Z.pow d1.AL.num d1.AL.power and n2 = Z.pow d2.AL.num d2.AL.power in
+          let gcd = Z.gcd (MF.coeff d1.AL.monome) (MF.coeff d2.AL.monome) in
+          (* simplification: we only do the rewriting if both
+             literals have exactly the same num and power...
+             TODO: generalize *)
+          if Z.equal n1 n2
+          && Z.lt gcd Z.(pow d2.AL.num d2.AL.power)
+          then
+            let new_lit = ALF.replace passive_lit
+              (M.uminus (MF.rest d1.AL.monome)) in
+            raise (SimplifyInto (new_lit, c',subst))
+      | _ -> ()
+    ) else ()
+
+  (* reduce an arithmetic literal to its current normal form *)
+  let rec _demod_lit_nf ~add_lit ~add_premise ~i c a_lit =
+    let ord = Ctx.ord () in
+    let s_a = 1 and s_p = 0 in  (* scopes *)
+    (* which term indexes can be used *)
+    let indexes = match a_lit with
+      | AL.Divides _ -> [!_idx_unit_div; !_idx_unit_eq]
+      | AL.Binary _ -> [!_idx_unit_eq]
+    in
+    begin try
+      AL.fold_terms ~pos:Position.stop ~vars:false ~which:`Max
+      ~ord ~subterms:false a_lit ()
+        (fun () t lit_pos ->
+          assert (not (T.is_var t));
+          let passive_lit = ALF.get_exn a_lit lit_pos in
+          (* search for generalizations of [t] *)
+          List.iter
+            (fun index ->
+              PS.TermIndex.retrieve_generalizations index s_a t s_p ()
+              (fun () t' with_pos subst ->
+                let c' = with_pos.C.WithPos.clause in
+                let pos' = with_pos.C.WithPos.pos in
+                assert (C.is_unit_clause c');
+                assert (Lits.Pos.idx pos' = 0);
+                let active_lit = Lits.View.get_arith_exn (C.lits c') pos' in
+                let pos = Position.(arg i lit_pos) in
+                _try_demod_step ~subst passive_lit s_p c pos active_lit s_a c' pos'
+              )
+            ) indexes
+        );
+      (* could not simplify, keep the literal *)
+      add_lit (Lit.mk_arith a_lit)
+    with SimplifyInto (a_lit',c',subst) ->
+      (* lit ----> lit' *)
+      add_premise c';
+      (* recurse until the literal isn't reducible *)
+      Util.debug 4 "rewrite arith lit (%a) into (%a)\n%% using clause %a and subst %a"
+        AL.pp a_lit AL.pp a_lit' C.pp c' S.pp subst;
+      _demod_lit_nf ~add_premise ~add_lit ~i c a_lit'
+    end
+
+  (* demodulation (simplification) *)
+  let _demodulation c =
+    Util.enter_prof prof_arith_demod;
     let did_simplify = ref false in
     let lits = ref [] in  (* simplified literals *)
     let add_lit l = lits := l :: !lits in
     let clauses = ref [] in  (* simplifying clauses *)
-    let s_a = 1 and s_p = 0 in  (* scopes *)
-    (* how to simplify the passive lit with the active lit *)
-    let _try_simplify ~subst passive_lit pos active_lit c' pos' =
-      let i = Lits.Pos.idx pos in
-      let renaming = Ctx.renaming_clear () in
-      let active_lit' = ALF.apply_subst ~renaming subst active_lit s_a in
-      (* restrictions:
-        - the rewriting term must be bigger than other terms
-          (in other words, the inference is strictly decreasing)
-        - all variables of active clause must be bound by subst
-        - must not rewrite itself (c != c') *)
-      if ALF.is_strictly_max ~ord active_lit'
-      && ((C.lits c |> Array.length) > 1
-          || not(Lit.is_arith_eq (C.lits c).(i))
-          || not(C.is_maxlit c s_p S.empty ~idx:i))
-      && (C.Seq.vars c'
-          |> Sequence.for_all (fun v -> S.mem subst (v:T.t:>ScopedTerm.t) s_a))
-      then
-        (* we know all variables of [active_lit] are bound, no need
-          for a renaming *)
-        let active_lit = ALF.apply_subst_no_renaming subst active_lit s_a in
-        let active_lit, passive_lit = ALF.scale active_lit passive_lit in
-        match active_lit, passive_lit with
-        | ALF.Left (AL.Equal, mf1, m1), _
-        | ALF.Right (AL.Equal, m1, mf1), _ ->
-            let new_lit = Lit.mk_arith
-              (ALF.replace passive_lit (M.difference m1 (MF.rest mf1))) in
-            raise (SimplifyInto (new_lit, c'))
-        | ALF.Div d1, ALF.Div d2 when d1.AL.sign ->
-            let n1 = Z.pow d1.AL.num d1.AL.power and n2 = Z.pow d2.AL.num d2.AL.power in
-            let gcd = Z.gcd (MF.coeff d1.AL.monome) (MF.coeff d2.AL.monome) in
-            (* simplification: we only do the rewriting if both
-               literals have exactly the same num and power...
-               TODO: generalize *)
-            if Z.equal n1 n2
-            && Z.lt gcd Z.(pow d2.AL.num d2.AL.power)
-            then
-              let new_lit = Lit.mk_arith
-                (ALF.replace passive_lit (M.uminus (MF.rest d1.AL.monome))) in
-              raise (SimplifyInto (new_lit, c'))
-        | _ -> ()
-      else ()
+    (* add a rewriting clause *)
+    let add_premise c' =
+      did_simplify := true;
+      clauses := c' :: !clauses
     in
     (* simplify each and every literal *)
     Lits.fold_lits ~eligible:C.Eligible.always (C.lits c) ()
       (fun () lit i ->
-        let pos = Position.(arg i stop) in
         match lit with
         | Lit.Arith a_lit ->
-            begin try
-              AL.fold_terms ~pos ~vars:false ~which:`Max
-              ~ord ~subterms:false a_lit ()
-                (fun () t pos ->
-                  assert (not (T.is_var t));
-                  let passive_lit = Lits.View.get_arith_exn (C.lits c) pos in
-                  (* search for generalizations of [t] *)
-                  PS.TermIndex.retrieve_generalizations !_idx_unit s_a t s_p ()
-                    (fun () t' with_pos subst ->
-                      let c' = with_pos.C.WithPos.clause in
-                      let pos' = with_pos.C.WithPos.pos in
-                      assert (Lits.Pos.idx pos' = 0);
-                      let active_lit = Lits.View.get_arith_exn (C.lits c') pos' in
-                      _try_simplify ~subst passive_lit pos active_lit c' pos'
-                    )
-                );
-              (* could not simplify, keep the literal *)
-              add_lit lit
-            with SimplifyInto (lit',c') ->
-              (* lit ----> lit' *)
-              did_simplify := true;
-              clauses := c' :: !clauses;
-              add_lit lit'
-            end
-        | _ -> add_lit lit
+            _demod_lit_nf ~add_lit ~add_premise ~i c a_lit
+        | _ ->
+            add_lit lit (* keep non-arith literals *)
       );
     (* build result clause (if it was simplified) *)
-    let res =
-      if !did_simplify
-      then begin
+    let res = if !did_simplify
+      then (
+        clauses := CCList.Set.uniq ~eq:C.eq !clauses;
         let proof cc = Proof.mk_c_inference ~theories ~rule:"canc_demod"
           cc (C.proof c :: List.map C.proof !clauses) in
         let new_c = C.create ~parents:(c::!clauses) (List.rev !lits) proof in
@@ -497,10 +545,43 @@ module Make(E : Env.S) : S with module Env = E = struct
         Util.debug 5 "arith demodulation of %a with [%a] gives %a"
           C.pp c (Util.pp_list C.pp) !clauses C.pp new_c;
         new_c
-      end
-      else c
+      ) else c
     in
     Util.exit_prof prof_arith_demod;
+    res
+
+  let canc_demodulation c = _demodulation c
+
+  (* find clauses in which some literal could be rewritten by [c], iff
+    [c] is a positive unit arith clause *)
+  let canc_backward_demodulation c =
+    Util.enter_prof prof_arith_backward_demod;
+    let ord = Ctx.ord () in
+    let res = C.CSet.empty in
+    let res = match C.lits c with
+      | [| Lit.Arith (AL.Binary (AL.Equal, _, _) as alit) |] ->
+        AL.fold_terms ~vars:false ~which:`Max ~subterms:false ~ord
+          alit C.CSet.empty
+          (fun acc t pos ->
+            PS.TermIndex.retrieve_specializations !_idx_all 0 t 1 acc
+              (fun acc _t' with_pos subst ->
+                (* check whether the term [t] is indeed maximal in
+                  its literal (and clause) after substitution *)
+                let alit' = ALF.get_exn alit pos in
+                let alit' = ALF.apply_subst_no_renaming subst alit' 1 in
+                if ALF.is_max ~ord alit'
+                then (
+                  Util.incr_stat stat_arith_backward_demod;
+                  C.CSet.add acc with_pos.C.WithPos.clause
+                ) else acc
+              ))
+      | [| Lit.Arith (AL.Binary (AL.Lesseq, m1, m2)) |] ->
+          res (* TODO *)
+      | [| Lit.Arith (AL.Divides d) |] when d.AL.sign ->
+          res (* TODO *)
+      | _ -> res (* no demod *)
+    in
+    Util.exit_prof prof_arith_backward_demod;
     res
 
   let cancellation c =
@@ -657,12 +738,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     }
   end
 
-  (* range from low+1 to low+len-1 *)
+  (* range from low to low+len *)
   let _range low len =
     let rec make acc i len =
-      if Z.sign len <= 0 then acc
+      if Z.sign len < 0 then acc
       else make (i::acc) (Z.succ i) (Z.pred len)
-    in make [] (Z.succ low) (Z.pred len)
+    in make [] low len
 
   (* cancellative chaining *)
   let _do_chaining info acc =
@@ -686,13 +767,13 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* scale literals *)
       let lit_l, lit_r = ALF.scale lit_l lit_r in
       match lit_l, lit_r with
-      | ALF.Left (AL.Less, mf_1, m1), ALF.Right (AL.Less, m2, mf_2) ->
-        (* m2 < mf_2 and mf_1 < m1, with mf_1 and mf_2 sharing the same
-          focused term. We deduce m2 + mf_1 + 1 < m1 + mf_2 and cancel the
+      | ALF.Left (AL.Lesseq, mf_1, m1), ALF.Right (AL.Lesseq, m2, mf_2) ->
+        (* m2 ≤ mf_2 and mf_1 ≤ m1, with mf_1 and mf_2 sharing the same
+          focused term. We deduce m2 + mf_1 ≤ m1 + mf_2 and cancel the
           term out (after scaling) *)
         assert (Z.equal (MF.coeff mf_1) (MF.coeff mf_2));
-        let new_lit = Lit.mk_arith_less
-          (M.succ (M.sum m2 (MF.rest mf_1)))
+        let new_lit = Lit.mk_arith_lesseq
+          (M.sum m2 (MF.rest mf_1))
           (M.sum m1 (MF.rest mf_2))
         in
         let lits_l = Util.array_except_idx (C.lits info.left) idx_l in
@@ -713,7 +794,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
         (* now, maybe we can also perform case switch! We can if
            mf_1 - m1 = k + (m2 - mf_2). In this case necessarily
-           Or_{i=1...k-1} mf_2 = m2 + i *)
+           Or_{i=0...k} mf_2 = m2 + i *)
         let diff = M.difference
           (M.sum m1 (MF.rest mf_2))
           (M.sum m2 (MF.rest mf_1)) in
@@ -744,13 +825,13 @@ module Make(E : Env.S) : S with module Env = E = struct
   let canc_ineq_chaining c =
     Util.enter_prof prof_arith_ineq_chaining;
     let ord = Ctx.ord () in
-    let eligible = C.Eligible.(max c ** filter Lit.is_arith_less) in
+    let eligible = C.Eligible.(max c ** filter Lit.is_arith_lesseq) in
     let sc_l = 0 and sc_r = 1 in
     let res = Lits.fold_arith_terms ~eligible ~ord ~which:`Max (C.lits c) []
       (fun acc t lit pos ->
         match lit with
         | _ when T.is_var t -> acc (* ignore variables *)
-        | ALF.Left (AL.Less, mf_l, _) ->
+        | ALF.Left (AL.Lesseq, mf_l, _) ->
           (* find a right-chaining literal in some other clause *)
           PS.TermIndex.retrieve_unifiables !_idx_ineq_right sc_r t sc_l acc
             (fun acc _t' with_pos subst ->
@@ -758,7 +839,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               let right_pos = with_pos.C.WithPos.pos in
               let lit_r = Lits.View.get_arith_exn (C.lits right) right_pos in
               match lit_r with
-              | ALF.Right (AL.Less, _, mf_r) ->
+              | ALF.Right (AL.Lesseq, _, mf_r) ->
                 MF.unify_ff ~subst mf_l sc_l mf_r sc_r
                 |> Sequence.fold
                   (fun acc (_, _, subst) ->
@@ -769,7 +850,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   ) acc
               | _ -> acc
             )
-        | ALF.Right (AL.Less, _, mf_r) ->
+        | ALF.Right (AL.Lesseq, _, mf_r) ->
           (* find a right-chaining literal in some other clause *)
           PS.TermIndex.retrieve_unifiables !_idx_ineq_left sc_l t sc_r acc
             (fun acc _t' with_pos subst ->
@@ -777,7 +858,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               let left_pos = with_pos.C.WithPos.pos in
               let lit_l = Lits.View.get_arith_exn (C.lits left) left_pos in
               match lit_l with
-              | ALF.Left (AL.Less, mf_l, _) ->
+              | ALF.Left (AL.Lesseq, mf_l, _) ->
                 MF.unify_ff ~subst mf_l sc_l mf_r sc_r
                 |> Sequence.fold
                   (fun acc (_, _, subst) ->
@@ -800,7 +881,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let acc = ref [] in
     (* do the chaining if ordering conditions are ok,
       and the monomes differ only by a constant.
-      The literals are   l < mf_l and mf_r < r *)
+      The literals are   l ≤ mf_l and mf_r ≤ r *)
     let _do_case_switch ~subst lit1 lit2 i j =
       let renaming = S.Renaming.create () in
       let lit1 = ALF.apply_subst ~renaming subst lit1 0 in
@@ -808,8 +889,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* same coefficient for the focused term *)
       let lit1, lit2 = ALF.scale lit1 lit2 in
       match lit1, lit2 with
-      | ALF.Left (AL.Less, mf_r, r), ALF.Right (AL.Less, l, mf_l)
-      | ALF.Right (AL.Less, l, mf_l), ALF.Left (AL.Less, mf_r, r) ->
+      | ALF.Left (AL.Lesseq, mf_r, r), ALF.Right (AL.Lesseq, l, mf_l)
+      | ALF.Right (AL.Lesseq, l, mf_l), ALF.Left (AL.Lesseq, mf_r, r) ->
         let diff = M.difference
           (M.difference (MF.rest mf_r) r)
           (M.difference (MF.rest mf_l) l)
@@ -820,10 +901,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         && ALF.is_max ~ord lit1
         && ALF.is_max ~ord lit2
         && (C.is_maxlit c 0 subst i || C.is_maxlit c 0 subst j)
-        (* C = C' or l < mf_l or mf_r < r,
+        (* C = C' or l ≤ mf_l or mf_r ≤ r,
           with mf_l and mf_r sharing the focus on a.t, so
-          if mf_r.rest - r = k + l - mf_l.rest, then
-            (a.t + mf_l.rest = l + k') => C' is true for k'=0...k *)
+          if mf_l.rest - l = k + r - mf_r.rest, then
+            (a.t + mf_r.rest = r + k') => C' is true for k'=1...k-1 *)
         then begin
           let k = Z.to_int (M.const diff) in
           (* build literals *)
@@ -832,10 +913,10 @@ module Make(E : Env.S) : S with module Env = E = struct
             [] (C.lits c)
           in
           let other_lits = Lit.apply_subst_list ~renaming subst other_lits 0 in
-          for i=0 to k do
+          for i=1 to k-1 do
             let new_lit = Lit.mk_arith_neq
-              (MF.to_monome mf_l)
-              (M.add_const l (Z.of_int i))
+              (MF.to_monome mf_r)
+              (M.add_const r (Z.of_int i))
             in
             let lits = new_lit :: other_lits in
             (* build clauses *)
@@ -851,29 +932,29 @@ module Make(E : Env.S) : S with module Env = E = struct
       | _ -> ()
     in
     (* traverse the clause to find matching pairs *)
-    let eligible = C.Eligible.(max c ** filter Lit.is_arith_less) in
+    let eligible = C.Eligible.(max c ** filter Lit.is_arith_lesseq) in
     Lits.fold_arith ~eligible (C.lits c) ()
       (fun () lit1 pos1 ->
         let i = Lits.Pos.idx pos1 in
-        let eligible' = C.Eligible.(filter Lit.is_arith_less) in
+        let eligible' = C.Eligible.(filter Lit.is_arith_lesseq) in
         Lits.fold_arith ~eligible:eligible' (C.lits c) ()
           (fun () lit2 pos2 ->
             let j = Lits.Pos.idx pos2 in
             match lit1, lit2 with
             | _ when i=j -> ()  (* need distinct lits *)
-            | AL.Binary (AL.Less, l1, r1), AL.Binary (AL.Less, l2, r2) ->
+            | AL.Binary (AL.Lesseq, l1, r1), AL.Binary (AL.Lesseq, l2, r2) ->
               (* see whether we have   l2 < a.x + m < r1 *)
               MF.unify_mm l1 0 r2 0
                 (fun (mf1,mf2,subst) ->
-                  let lit1 = ALF.mk_left AL.Less mf1 r1 in
-                  let lit2 = ALF.mk_right AL.Less l2 mf2 in
+                  let lit1 = ALF.mk_left AL.Lesseq mf1 r1 in
+                  let lit2 = ALF.mk_right AL.Lesseq l2 mf2 in
                   _do_case_switch ~subst lit1 lit2 i j
                 );
               (* see whether we have   l1 < a.x + m < r2 *)
               MF.unify_mm r1 0 l2 0
                 (fun (mf1,mf2,subst) ->
-                  let lit1 = ALF.mk_right AL.Less l1 mf1 in
-                  let lit2 = ALF.mk_left AL.Less mf2 r2 in
+                  let lit1 = ALF.mk_right AL.Lesseq l1 mf1 in
+                  let lit2 = ALF.mk_left AL.Lesseq mf2 r2 in
                   _do_case_switch ~subst lit1 lit2 i j
                 );
               ()
@@ -895,10 +976,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* same coefficient for the focused term *)
       let lit1, lit2 = ALF.scale lit1 lit2 in
       match lit1, lit2 with
-      | ALF.Left (AL.Less, mf1, m1), ALF.Left (AL.Less, mf2, m2)
-      | ALF.Right (AL.Less, m1, mf1), ALF.Right (AL.Less, m2, mf2) ->
-        (* mf1 < m1  or  mf2 < m2  (symmetry with > if needed)
-           so we deduce that if  m1-mf1.rest < m2 - mf2.rest
+      | ALF.Left (AL.Lesseq, mf1, m1), ALF.Left (AL.Lesseq, mf2, m2)
+      | ALF.Right (AL.Lesseq, m1, mf1), ALF.Right (AL.Lesseq, m2, mf2) ->
+        (* mf1 ≤ m1  or  mf2 ≤ m2  (symmetry with > if needed)
+           so we deduce that if  m1-mf1.rest ≤ m2 - mf2.rest
            then the first literal implies the second, so we only
            keep the second one *)
         if (C.is_maxlit c 0 subst i || C.is_maxlit c 0 subst j)
@@ -911,10 +992,10 @@ module Make(E : Env.S) : S with module Env = E = struct
           (* build new literal *)
           let new_lit =
             if left
-            then Lit.mk_arith_less
+            then Lit.mk_arith_lesseq
               (M.difference m1 (MF.rest mf1))
               (M.difference m2 (MF.rest mf2))
-            else Lit.mk_arith_less
+            else Lit.mk_arith_lesseq
               (M.difference m2 (MF.rest mf2))
               (M.difference m1 (MF.rest mf1))
           in
@@ -933,29 +1014,29 @@ module Make(E : Env.S) : S with module Env = E = struct
       | _ -> ()
     in
     (* traverse the clause to find matching pairs *)
-    let eligible = C.Eligible.(max c ** filter Lit.is_arith_less) in
+    let eligible = C.Eligible.(max c ** filter Lit.is_arith_lesseq) in
     Lits.fold_arith ~eligible (C.lits c) ()
       (fun () lit1 pos1 ->
         let i = Lits.Pos.idx pos1 in
-        let eligible' = C.Eligible.(filter Lit.is_arith_less) in
+        let eligible' = C.Eligible.(filter Lit.is_arith_lesseq) in
         Lits.fold_arith ~eligible:eligible' (C.lits c) ()
           (fun () lit2 pos2 ->
             let j = Lits.Pos.idx pos2 in
             match lit1, lit2 with
             | _ when i=j -> ()  (* need distinct lits *)
-            | AL.Binary (AL.Less, l1, r1), AL.Binary (AL.Less, l2, r2) ->
+            | AL.Binary (AL.Lesseq, l1, r1), AL.Binary (AL.Lesseq, l2, r2) ->
               (* see whether we have   l1 < a.x + mf1  and  l2 < a.x + mf2 *)
               MF.unify_mm r1 0 r2 0
                 (fun (mf1,mf2,subst) ->
-                  let lit1 = ALF.mk_right AL.Less l1 mf1 in
-                  let lit2 = ALF.mk_right AL.Less l2 mf2 in
+                  let lit1 = ALF.mk_right AL.Lesseq l1 mf1 in
+                  let lit2 = ALF.mk_right AL.Lesseq l2 mf2 in
                   _do_factoring ~subst lit1 lit2 i j
                 );
               (* see whether we have   a.x + mf1 < r1 and a.x + mf2 < r2  *)
               MF.unify_mm l1 0 l2 0
                 (fun (mf1,mf2,subst) ->
-                  let lit1 = ALF.mk_left AL.Less mf1 r1 in
-                  let lit2 = ALF.mk_left AL.Less mf2 r2 in
+                  let lit1 = ALF.mk_left AL.Lesseq mf1 r1 in
+                  let lit2 = ALF.mk_left AL.Lesseq mf2 r2 in
                   _do_factoring ~subst lit1 lit2 i j
                 );
               ()
@@ -964,6 +1045,120 @@ module Make(E : Env.S) : S with module Env = E = struct
       );
     Util.exit_prof prof_arith_ineq_factoring;
     !acc
+
+  (** One-shot literal/clause removal.
+    We use unit clauses to try to prove a literal absurd/tautological, possibly
+    using {b several} instances of unit clauses.
+
+    For instance, 0 ≤ f(x)  makes  0 ≤ f(a) + f(b) redundant, but subsumption
+    is not able to detect it. *)
+
+  (* rewrite a literal [l] into a smaller literal [l'], such that [l'] and
+    the current set of unit clauses imply [l]; then compute the
+    transitive closure of this relation. If we obtain a trivial
+    literal, then [l] is redundant (we keep a trace of literals used).
+    We use continuations to deal with the multiple choices. *)
+  let rec _ineq_find_sufficient ~ord ~trace lit k = match lit with
+    | _ when AL.is_trivial lit -> k (trace,lit)
+    | AL.Binary _ when Sequence.exists T.is_var (AL.Seq.terms lit) ->
+        ()  (* no way we rewrite this into a tautology *)
+    | AL.Binary (AL.Lesseq, _, _) ->
+        AL.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false lit ()
+          (fun () t pos ->
+            let plit = ALF.get_exn lit pos in
+            let is_left = match pos with
+              | Position.Left _ -> true
+              | Position.Right _ -> false
+              | _ -> assert false
+            in
+            (* try to eliminate [t] in passive lit [plit]*)
+            PS.TermIndex.retrieve_generalizations !_idx_unit_ineq 1 t 0 ()
+              (fun () t' with_pos subst ->
+                let active_clause = with_pos.C.WithPos.clause in
+                let active_pos = with_pos.C.WithPos.pos in
+                match Lits.View.get_arith (C.lits active_clause) active_pos with
+                | None -> assert false
+                | Some (ALF.Left (AL.Lesseq, _, _) as alit') when is_left ->
+                    let alit' = ALF.apply_subst_no_renaming subst alit' 1 in
+                    if ALF.is_strictly_max ~ord alit'
+                    then
+                      (* scale *)
+                      let plit, alit' = ALF.scale plit alit' in
+                      let mf1', m2' =
+                        match Lits.View.get_arith (C.lits active_clause) active_pos with
+                        | Some (ALF.Left (_, mf1', m2')) -> mf1', m2'
+                        | _ -> assert false
+                      in
+                      let mf1' = MF.apply_subst_no_renaming subst mf1' 1 in
+                      let m2' = M.apply_subst_no_renaming subst m2' 1 in
+                      (* from t+mf1 ≤ m2  and t+mf1' ≤ m2', we deduce
+                        that if m2'-mf1' ≤ m2-mf1  then [lit] is redundant.
+                        That is, the sufficient literal is
+                        mf1 + m2' ≤ m2 + mf1'  (we replace [t] with [m2'-mf1']) *)
+                      let new_plit = ALF.replace plit
+                        (M.difference m2' (MF.rest mf1')) in
+                      (* transitive closure *)
+                      let trace = active_clause::trace in
+                      _ineq_find_sufficient ~ord ~trace new_plit k
+                | Some (ALF.Right (AL.Lesseq, _, _) as alit') when not is_left ->
+                    (* symmetric case *)
+                    let alit' = ALF.apply_subst_no_renaming subst alit' 1 in
+                    if ALF.is_strictly_max ~ord alit'
+                    then
+                      (* scale *)
+                      let plit, alit' = ALF.scale plit alit' in
+                      let m1', mf2' =
+                        match Lits.View.get_arith (C.lits active_clause) active_pos with
+                        | Some (ALF.Right (_, m1', mf2')) -> m1', mf2'
+                        | _ -> assert false
+                      in
+                      let mf2' = MF.apply_subst_no_renaming subst mf2' 1 in
+                      let m1' = M.apply_subst_no_renaming subst m1' 1 in
+                      let new_plit = ALF.replace plit
+                        (M.difference m1' (MF.rest mf2')) in
+                      (* transitive closure *)
+                      let trace = active_clause::trace in
+                      _ineq_find_sufficient ~ord ~trace new_plit k
+                | Some _ ->
+                    ()   (* cannot make a sufficient literal *)
+              )
+          )
+    | _ -> ()
+
+  (* is a literal redundant w.r.t the current set of unit clauses *)
+  let _ineq_is_redundant_by_unit lit =
+    match lit with
+    | _ when Lit.is_trivial lit || Lit.is_absurd lit ->
+        None  (* something more efficient will take care of it *)
+    | Lit.Arith (AL.Binary (AL.Lesseq, m1, m2) as alit) ->
+        let ord = Ctx.ord () in
+        let traces = _ineq_find_sufficient ~ord ~trace:[] alit
+          |> Sequence.take 1  (* one is enough *)
+          |> Sequence.to_list
+        in
+        begin match traces with
+          | [trace, _lit'] ->
+              assert (AL.is_trivial _lit');
+              let trace = CCList.Set.uniq ~eq:C.eq trace in
+              Some trace
+          | _ -> None
+        end
+    | _ -> None
+
+  let is_redundant_by_ineq c =
+    Util.enter_prof prof_arith_trivial_ineq;
+    let res = !_enable_trivial_ineq && Util.array_exists
+      (fun lit -> match _ineq_is_redundant_by_unit lit with
+        | None -> false
+        | Some trace ->
+            Util.debug 3 "clause %a trivial by inequations %a"
+              C.pp c (CCList.pp C.pp) trace;
+            Util.incr_stat stat_arith_trivial_ineq;
+            true
+      ) (C.lits c)
+    in
+    Util.exit_prof prof_arith_trivial_ineq;
+    res
 
   (** {3 Divisibility} *)
 
@@ -1261,7 +1456,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   end)
 
   (* tautology check: take the linear system that is the negation
-    of all a!=b and a<b, and check its (rational) satisfiability. If
+    of all a!=b and a≤b, and check its (rational) satisfiability. If
     it's unsat in Q, it's unsat in Z, and its negation (a subset of c)
     is tautological *)
   let _is_tautology c =
@@ -1276,10 +1471,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       (fun acc lit _ ->
         (* negate the literal and make a constraint out of it *)
         match lit with
-        | AL.Binary (AL.Less, m1, m2) ->
-            (* m1 < m2 ----> m1-m2 >= 0 *)
+        | AL.Binary (AL.Lesseq, m1, m2) ->
+            (* m1 ≤ m2 ----> m1-m2 > 0 ---> m1-m2 ≥ 1 *)
             let m, c = to_rat (M.difference m1 m2) in
-            (Simp.GreaterEq, m, Q.neg c) :: acc
+            (Simp.GreaterEq, m, Q.add (Q.neg c) Q.one) :: acc
         | AL.Binary (AL.Different, m1, m2) ->
             (* m1 != m2  -----> (m1-m2) = 0 *)
             let m, c = to_rat (M.difference m1 m2) in
@@ -1310,10 +1505,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       res
     end
 
-  (* a <= b ----> a < b+1 *)
-  let canc_lesseq_to_less = function
-    | Lit.Arith (AL.Binary (AL.Lesseq, m1, m2)) ->
-        Lit.mk_arith_less m1 (M.succ m2)
+  (* Simplification:  a < b  ----> a+1 ≤ b *)
+  let canc_less_to_lesseq = function
+    | Lit.Arith (AL.Binary (AL.Less, m1, m2)) ->
+        Lit.mk_arith_lesseq (M.succ m1) m2
     | lit -> lit
 
   exception VarElim of int * S.t
@@ -1353,23 +1548,25 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.debug 4 "arith_eq_res: simplify %a into %a" C.pp c C.pp c';
     c'
 
-  (* a != b ------> a < b | a > b *)
-  let canc_diff_to_less c =
+  (* a != b ------> a+1 ≤ b | a ≥ b+1 *)
+  let canc_diff_to_lesseq c =
     let ord = Ctx.ord () in
-    Lits.fold_lits ~eligible:C.Eligible.(filter Lit.is_arith_neq ** max c)
-      (C.lits c) []
+    let eligible = C.Eligible.(filter Lit.is_arith_neq ** max c) in
+    Lits.fold_lits ~eligible (C.lits c) []
       (fun acc lit i ->
         match lit with
         | Lit.Arith (AL.Binary (AL.Different, m1, m2)) ->
+            assert (eligible i lit);
+            Util.debug 1 "lit %a [%d] in %a" Lit.pp lit i C.pp c;
             assert (Lits.is_max ~ord (C.lits c) i);
             let lits = Util.array_except_idx (C.lits c) i in
             let new_lits =
-              [ Lit.mk_arith_less m1 m2
-              ; Lit.mk_arith_less m2 m1
+              [ Lit.mk_arith_lesseq (M.succ m1) m2
+              ; Lit.mk_arith_lesseq (M.succ m2) m1
               ]
             in
             let proof cc = Proof.mk_c_inference
-              ~theories ~rule:"arith_diff_to_less" cc [C.proof c] in
+              ~theories ~rule:"arith_diff_to_lesseq" cc [C.proof c] in
             let c' = C.create ~parents:[c] (new_lits @ lits) proof in
             Util.debug 5 "diff2less: %a ----> %a" C.pp c C.pp c';
             c' :: acc
@@ -1495,8 +1692,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       b_lit : ALF.t list;  (* c.x + m1 != m2 *)
       c_lit : ALF.t list;  (* n | m_c.x + m  *)
       d_lit : ALF.t list;  (* n not| m_c.x + m *)
-      e_lit : ALF.t list;  (* c.x + m1 < m2 *)
-      f_lit : ALF.t list;  (* m1 < c.x + m2 *)
+      e_lit : ALF.t list;  (* c.x + m1 ≤ m2 *)
+      f_lit : ALF.t list;  (* m1 ≤ c.x + m2 *)
       lcm : Z.t; (* scaling coefficient (divisibility guard) *)
       delta : Z.t; (* lcm of all divisibility constraints *)
     }
@@ -1584,17 +1781,17 @@ module Make(E : Env.S) : S with module Env = E = struct
             | Some (ALF.Div d as lit) ->
               assert (not(d.AL.sign));
               { acc with d_lit = lit::acc.d_lit; }
-            | Some (ALF.Left (AL.Less, _, _) as lit) ->
+            | Some (ALF.Left (AL.Lesseq, _, _) as lit) ->
               { acc with e_lit = lit::acc.e_lit; }
-            | Some (ALF.Left (AL.Lesseq, mf1, m2)) ->
-              (* mf1 <= m2 ------> mf1 < m2+1 *)
-              let lit = ALF.Left (AL.Less, mf1, M.succ m2) in
+            | Some (ALF.Left (AL.Less, mf1, m2)) ->
+              (* mf1 < m2 ------> mf1 ≤ m2-1 *)
+              let lit = ALF.Left (AL.Lesseq, mf1, M.pred m2) in
               { acc with e_lit = lit::acc.e_lit; }
-            | Some (ALF.Right (AL.Less, _, _) as lit) ->
+            | Some (ALF.Right (AL.Lesseq, _, _) as lit) ->
               { acc with f_lit = lit::acc.f_lit; }
-            | Some (ALF.Right (AL.Lesseq, m1, mf2)) ->
-              (* m1 <= mf2 -----> m1-1 < mf2 *)
-              let lit = ALF.Right (AL.Less, M.pred m1, mf2) in
+            | Some (ALF.Right (AL.Less, m1, mf2)) ->
+              (* m1 < mf2 -----> m1+1 ≤ mf2 *)
+              let lit = ALF.Right (AL.Lesseq, M.succ m1, mf2) in
               { acc with f_lit = lit::acc.f_lit; }
             end
           | _ ->
@@ -1616,7 +1813,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             | _ -> assert false)
           c.b_lit
         ; List.map (function
-            | ALF.Left (AL.Less, mf, m) -> M.difference m (MF.rest mf)
+            | ALF.Left (AL.Lesseq, mf, m) -> M.difference (M.succ m) (MF.rest mf)
             | _ -> assert false)
           c.e_lit
         ]
@@ -1634,7 +1831,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             | _ -> assert false)
           c.b_lit
         ; List.map (function
-            | ALF.Right (AL.Less, m, mf) -> M.difference m (MF.rest mf)
+            | ALF.Right (AL.Lesseq, m, mf) -> M.difference (M.pred m) (MF.rest mf)
             | _ -> assert false)
           c.f_lit
         ]
@@ -1661,14 +1858,14 @@ module Make(E : Env.S) : S with module Env = E = struct
         (function
           | ALF.Left (AL.Different, _, _)
           | ALF.Right (AL.Different, _, _)
-          | ALF.Left (AL.Less, _, _) -> Lit.mk_tauto
+          | ALF.Left (AL.Lesseq, _, _) -> Lit.mk_tauto
           | ALF.Left (AL.Equal, _, _)
           | ALF.Right (AL.Equal, _, _)
-          | ALF.Right (AL.Less, _, _) -> Lit.mk_absurd
+          | ALF.Right (AL.Lesseq, _, _) -> Lit.mk_absurd
           | ALF.Div d ->
               Lit.mk_divides ~sign:d.AL.sign d.AL.num
                 ~power:d.AL.power (M.sum (MF.rest d.AL.monome) x)
-          | ALF.Left (AL.Lesseq, _, _) | ALF.Right (AL.Lesseq, _, _) -> assert false
+          | ALF.Left (AL.Less, _, _) | ALF.Right (AL.Less, _, _) -> assert false
         ) c
 
     (* evaluate when the variable is equal to x, but as big as needed.
@@ -1679,14 +1876,14 @@ module Make(E : Env.S) : S with module Env = E = struct
         (function
           | ALF.Left (AL.Different, _, _)
           | ALF.Right (AL.Different, _, _)
-          | ALF.Right (AL.Less, _, _) -> Lit.mk_tauto
+          | ALF.Right (AL.Lesseq, _, _) -> Lit.mk_tauto
           | ALF.Left (AL.Equal, _, _)
           | ALF.Right (AL.Equal, _, _)
-          | ALF.Left (AL.Less, _, _) -> Lit.mk_absurd
+          | ALF.Left (AL.Lesseq, _, _) -> Lit.mk_absurd
           | ALF.Div d ->
               Lit.mk_divides ~sign:d.AL.sign d.AL.num
                 ~power:d.AL.power (M.sum (MF.rest d.AL.monome) x)
-          | ALF.Left (AL.Lesseq, _, _) | ALF.Right (AL.Lesseq, _, _) -> assert false
+          | ALF.Left (AL.Less, _, _) | ALF.Right (AL.Less, _, _) -> assert false
         ) c
   end
 
@@ -1710,15 +1907,14 @@ module Make(E : Env.S) : S with module Env = E = struct
         and b_set = NVE.b_set view in
         (* prepare to build clauses *)
         let acc = ref [] in
-        let add_clause ~by ?which lits =
+        let add_clause ~by ~which lits =
           let info =
-            [Util.sprintf "elim %s×%a → %a" (Z.to_string view.NVE.lcm) T.pp x M.pp by] in
-          let info = match which with None -> info | Some i -> i :: info in
+            [which; Util.sprintf "elim %s×%a → %a" (Z.to_string view.NVE.lcm) T.pp x M.pp by] in
           let proof cc = Proof.mk_c_inference
             ~info ~theories ~rule:"var_elim" cc [C.proof c] in
           let new_c = C.create ~parents:[c] lits proof in
-          Util.debug 5 "elimination of %s×%a by %a in %a: gives %a"
-            (Z.to_string view.NVE.lcm) T.pp x M.pp by C.pp c C.pp new_c;
+          Util.debug 5 "elimination of %s×%a by %a (which:%s) in %a: gives %a"
+            (Z.to_string view.NVE.lcm) T.pp x M.pp by which C.pp c C.pp new_c;
           acc := new_c :: !acc
         in
         (* choose which form to use *)
@@ -1740,7 +1936,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   (* evaluate at x'+i *)
                   let x'' = M.add_const x' Z.(of_int i) in
                   let lits = view.NVE.rest @ _negate_lits (NVE.eval_at view x'') in
-                  add_clause ~by:x'' lits
+                  add_clause ~by:x'' ~which:"middle" lits
                 ) b_set
             done;
           end else begin
@@ -1760,7 +1956,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   (* evaluate at x'-i *)
                   let x'' = M.add_const x' Z.(neg (of_int i)) in
                   let lits = view.NVE.rest @ _negate_lits (NVE.eval_at view x'') in
-                  add_clause ~by:x'' lits
+                  add_clause ~by:x'' ~which:"middle" lits
                 ) a_set
             done;
           end;
@@ -1768,6 +1964,22 @@ module Make(E : Env.S) : S with module Env = E = struct
       end
 
   (** {2 Setup} *)
+
+  (* print index into file *)
+  let _print_idx file idx =
+    Util.with_output file
+      (fun oc ->
+        let pp_leaf buf v = () in
+        Util.fprintf oc "%a" (PS.TermIndex.to_dot pp_leaf) idx;
+        flush oc)
+
+  let setup_dot_printers () =
+    CCOpt.iter
+      (fun f ->
+          Signal.once Signals.on_dot_output
+            (fun () -> _print_idx f !_idx_unit_eq)
+      ) !_dot_unit;
+    ()
 
   let register () =
     Util.debug 2 "cancellative inf: setup env";
@@ -1784,11 +1996,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_multi_simpl_rule canc_div_prime_decomposition;
     Env.add_multi_simpl_rule eliminate_unshielded;
     Env.add_lit_rule "canc_lit_of_lit" canc_lit_of_lit;
-    Env.add_lit_rule "lesseq_to_less" canc_lesseq_to_less;
-    Env.add_unary_inf "canc_diff_to_less" canc_diff_to_less;
+    Env.add_lit_rule "less_to_lesseq" canc_less_to_lesseq;
+    Env.add_unary_inf "canc_diff_to_lesseq" canc_diff_to_lesseq;
     Env.add_simplify canc_eq_resolution;
     Env.add_simplify canc_demodulation;
+    Env.add_backward_simplify canc_backward_demodulation;
     Env.add_is_trivial is_tautology;
+    Env.add_redundant is_redundant_by_ineq;
     Env.add_simplify purify;
     Env.add_multi_simpl_rule eliminate_unshielded;
     Ctx.Lit.add_from_hook Lit.Conv.arith_hook_from;
@@ -1800,6 +2014,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       let ty = Signature.find_exn Signature.TPTP.Arith.full sum in
       Ctx.Theories.AC.add ~ty sum;
     end;
+    (* careful: arith operators are ad-hoc polymorphic *)
+    Ctx.add_ad_hoc_symbols Symbol.TPTP.Arith.symbols;
+    setup_dot_printers ();
     ()
 end
 
@@ -1830,14 +2047,20 @@ let _enable_arith () =
 
 let () =
   Params.add_opts
-    [ "-arith-semantic-tauto"
-      , Arg.Unit (fun () -> _enable_arith (); _enable_semantic_tauto := true)
-      , "enable arithmetic semantic tautology check"
+    [ "-arith-no-semantic-tauto"
+      , Arg.Unit (fun () -> _enable_arith (); _enable_semantic_tauto := false)
+      , "disable arithmetic semantic tautology check"
+    ; "-arith-no-trivial-ineq"
+      , Arg.Unit (fun () -> _enable_arith (); _enable_trivial_ineq := false)
+      , "disable inequality triviality checking by rewriting"
     ; "-arith"
       , Arg.Unit _enable_arith
       , "enable axiomatic integer arithmetic"
     ; "-arith-ac"
       , Arg.Set _enable_ac
       , "enable AC axioms for arithmetic (sum)"
+    ; "-dot-arith-unit"
+      , Arg.String (fun s -> _dot_unit := Some s)
+      , "print arith-unit index into file"
     ];
   ()

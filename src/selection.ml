@@ -49,6 +49,19 @@ let _pure_superposition lits =
       | _ -> false)
     lits
 
+(* checks that [bv] is an acceptable selection for [lits]. In case
+  some literal is selected, at least one negative literal must be selected. *)
+let _validate_select lits bv =
+  BV.is_empty bv
+  ||
+  try
+    Array.iteri
+      (fun i lit ->
+        if Lit.is_neg lit && BV.get bv i then raise Exit
+      ) lits;
+    false
+  with Exit -> true
+
 (** Select all positives literals *)
 let select_positives lits =
   if _pure_superposition lits
@@ -67,6 +80,7 @@ let select_max_goal ~strict ~ord lits =
       BV.set bv i;
       if not strict
         then BV.union_into ~into:bv (select_positives lits);
+      assert (_validate_select lits bv);
       bv
     with Not_found ->
       BV.empty ()  (* empty one *)
@@ -100,6 +114,7 @@ let select_diff_neg_lit ~strict ~ord lits =
     | n ->
       let bv = select_positives lits in
       BV.set bv n;
+      assert (_validate_select lits bv);
       bv
   else BV.empty ()
 
@@ -128,10 +143,12 @@ let select_complex ~strict ~ord lits =
     if i >= 0
       then if strict
         then BV.of_list [i]
-        else
+        else (
           let bv = select_positives lits in
           let _ = BV.set bv i in
+          assert (_validate_select lits bv);
           bv
+        )
       else
         select_diff_neg_lit ~strict ~ord lits (* delegate to select_diff_neg_lit *)
   else BV.empty ()

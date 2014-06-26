@@ -1,3 +1,4 @@
+
 (*
 Zipperposition: a functional superposition prover for prototyping
 Copyright (c) 2013, Simon Cruanes
@@ -24,28 +25,35 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Compact clause representation} *)
+(** {1 Inference and simplification rules for Algebraic types} *)
 
 open Logtk
 
-type form = Formula.FO.t
+type term = FOTerm.t
 
-type t = Literal.t array
+(** {2 Inference rules} *)
 
-val eq : t -> t -> bool
-val cmp : t -> t -> int
-include Interfaces.HASH with type t := t
+module type S = sig
+  module Env : Env.S
+  module C : module type of Env.C
 
-val is_empty : t -> bool
+  val declare_type : proof:Proof.t -> ty:Type.t -> var:term -> term list -> unit
+  (** Declare that the given type's domain is the given list of cases
+      for the given variable [var] (whose type must be [ty].
+      Will be ignored if the type already has a enum declaration. *)
 
-val iter : t -> (Literal.t -> unit) -> unit
+  val instantiate_vars : Env.multi_simpl_rule
+  (** Instantiate variables whose type is a known enumerated type,
+      with all variables of this type. *)
 
-val to_seq : t -> Literal.t Sequence.t
+  (** {6 Registration} *)
 
-val to_forms : t -> form array
+  val register : unit -> unit
+  (** Register rules in the environment *)
+end
 
-val pp : Buffer.t -> t -> unit
-val pp_tstp : Buffer.t -> t -> unit
+module Make(E : Env.S) : S with module Env = E
 
-val to_string : t -> string
-val fmt : Format.formatter -> t -> unit
+(** {2 As Extension} *)
+
+val extension : Extensions.t

@@ -55,7 +55,7 @@ type t = private {
 account. Two proofs that have the same conclusion are equal. *)
 
 val eq : t -> t -> bool
-val hash : t -> int
+include Interfaces.HASH with type t := t
 val cmp : t -> t -> int
 
 (** {2 Constructors and utils}

@@ -114,17 +114,20 @@ let fold f acc lit = match lit with
   | True
   | False -> acc
 
-let hash lit =
-  let hash_sign b h = if b then h else lnot h in
+let hash_fun lit h =
+  let hash_sign b h = Hash.bool_ b h in
   match lit with
-  | Arith o -> ArithLit.hash o
-  | Prop (p, sign) -> hash_sign sign (T.hash p)
-  | Equation (l, r, sign) -> hash_sign sign (Hash.hash_int2 (T.hash l) (T.hash r))
-  | True -> 13
-  | False -> 23
+  | Arith o -> ArithLit.hash_fun o h
+  | Prop (p, sign) -> hash_sign sign (T.hash_fun p h)
+  | Equation (l, r, sign) ->
+      h |> hash_sign sign |> T.hash_fun l |> T.hash_fun r
+  | True -> h
+  | False -> h |> Hash.int_ 23
   | Ineq olit ->
-      hash_sign olit.TO.strict
-        (Hash.hash_int2 (T.hash olit.TO.left) (T.hash olit.TO.right))
+      h |> hash_sign olit.TO.strict
+        |> T.hash_fun olit.TO.left |> T.hash_fun olit.TO.right
+
+let hash lit = Hash.apply hash_fun lit
 
 let weight lit =
   fold (fun acc t -> acc + T.size t) 0 lit
@@ -162,8 +165,8 @@ let is_pos = sign
 let is_neg lit = not (is_pos lit)
 
 let is_eqn = function
-  | Equation _ -> true
-  | Prop _
+  | Equation _
+  | Prop _ -> true
   | Ineq _
   | Arith _
   | True
@@ -171,6 +174,14 @@ let is_eqn = function
 
 let is_eq lit = is_eqn lit && is_pos lit
 let is_neq lit = is_eqn lit && is_neg lit
+
+let is_prop = function
+  | Prop _
+  | True
+  | False -> true
+  | Arith _
+  | Equation _
+  | Ineq _ -> false
 
 let is_ineq lit = match lit with
   | Ineq _ -> true
@@ -461,6 +472,13 @@ let apply_subst ~renaming subst lit scope =
 let apply_subst_no_simp ~renaming subst lit scope =
   match lit with
   | Arith o -> Arith (ArithLit.apply_subst_no_simp ~renaming subst o scope)
+  | Equation (l,r,sign) ->
+      Equation (S.FO.apply ~renaming subst l scope,
+                S.FO.apply ~renaming subst r scope, sign)
+  | Prop (p, sign) ->
+      Prop (S.FO.apply ~renaming subst p scope, sign)
+  | True
+  | False -> lit
   | _ -> apply_subst ~renaming subst lit scope
 
 let apply_subst_list ~renaming subst lits scope =
@@ -546,6 +564,8 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ~which ~ord ~subterms lit
   let at_term ~pos acc t =
     if subterms
       then T.all_positions ~vars ~pos t acc f
+    else if T.is_var t && not vars
+      then acc (* ignore *)
       else f acc t pos
   in
   match lit, which with
@@ -559,7 +579,7 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ~which ~ord ~subterms lit
     | Comparison.Gt ->
       at_term ~pos:P.(append position (left stop)) acc l
     | Comparison.Lt ->
-      at_term ~pos:P.(append position (right @@ stop)) acc r
+      at_term ~pos:P.(append position (right stop)) acc r
     | Comparison.Eq | Comparison.Incomparable ->
       (* visit both sides, they are both (potentially) maximal *)
       let acc = at_term ~pos:P.(append position (left stop)) acc l in
@@ -664,15 +684,21 @@ module Comp = struct
         kind-specific comparison.
   *)
 
+  (* is there an element of [l1] that dominates all elements of [l2]? *)
+  let _some_term_dominates f l1 l2 =
+    List.exists
+      (fun x -> List.for_all (fun y -> f x y = Comparison.Gt) l2)
+      l1
+
   let _cmp_by_maxterms ~ord l1 l2 =
     match l1, l2 with
     | Prop (p1, _), Prop (p2, _) -> Ordering.compare ord p1 p2
     | _ ->
-        let t1 = root_terms l1 and t2 = root_terms l2 in
+        let t1 = max_terms ~ord l1 and t2 = max_terms ~ord l2 in
         let f = Ordering.compare ord in
-        match C.dominates f t1 t2, C.dominates f t2 t1 with
-        | false, false
-        | true, true -> C.Incomparable
+        match _some_term_dominates f t1 t2, _some_term_dominates f t2 t1 with
+        | false, false -> C.Eq (* go further *)
+        | true, true -> assert false
         | true, false -> C.Gt
         | false, true -> C.Lt
 
@@ -700,7 +726,7 @@ module Comp = struct
       | Equation _
       | Prop _ -> 8  (* eqn and prop are really the same thing *)
     in
-    C.of_total (_to_int l1 - _to_int l2)
+    C.of_total (Pervasives.compare (_to_int l1) (_to_int l2))
 
   (* by multiset of terms *)
   let _cmp_by_term_multiset ~ord l1 l2 =

@@ -58,8 +58,9 @@ type lit = t
 
 val eq : t -> t -> bool
 val eq_com : t -> t -> bool
-val hash : t -> int
 val cmp : t -> t -> int
+
+include Interfaces.HASH with type t := t
 
 val make : op -> Z.t Monome.t -> Z.t Monome.t -> t
 
@@ -103,6 +104,8 @@ val generic_unif: Z.t Monome.t unif -> t unif
   (** Generic unification/matching/variant, given such an operation on monomes *)
 
 val apply_subst : renaming:Substs.Renaming.t -> Substs.t -> t -> scope -> t
+
+val apply_subst_no_renaming : Substs.t -> t -> scope -> t
 
 val apply_subst_no_simp : renaming:Substs.Renaming.t -> Substs.t -> t -> scope -> t
   (** Same as {!apply_subst} but takes care {B NOT} simplifying the

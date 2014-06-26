@@ -1,0 +1,1 @@
+../Problems/SYO/SYO521=1.p

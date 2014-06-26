@@ -31,7 +31,7 @@ type t = {
   param_steps : int;
   param_version : bool;
   param_timeout : float;
-  param_files : string Vector.t;
+  param_files : string Vector.vector;
   param_split : bool;             (** use splitting *)
   param_theories : bool;          (** detect theories *)
   param_select : string;          (** name of the selection function *)
@@ -79,7 +79,7 @@ let parse_args () =
   and select = ref "SelectComplex"
   and progress = ref false
   and unary_depth = ref 1
-  and files = Vector.create 15 in
+  and files = Vector.create () in
   (* special handlers *)
   let set_progress () =
     Util.need_cleanup := true;
@@ -112,6 +112,7 @@ let parse_args () =
     ; "-unary-depth", Arg.Set_int unary_depth, "maximum depth for successive unary inferences"
     ] @ !other_opts @ Options.global_opts
   in
+  let options = List.sort (fun (a1,_,_)(a2,_,_)->String.compare a1 a2) options in
   Util.set_debug 1;  (* default *)
   Arg.parse options add_file "solve problems in files";
   if Vector.is_empty files

@@ -41,7 +41,7 @@ type 'a num = {
   sign : 'a -> int;
   abs : 'a -> 'a;
   cmp : 'a -> 'a -> int;
-  hash : 'a -> int;
+  hash : 'a -> int64 -> int64;
   zero : 'a;
   one : 'a;
   add : 'a -> 'a -> 'a;
@@ -58,7 +58,7 @@ let z = {
   sign = Z.sign;
   abs = Z.abs;
   cmp = Z.compare;
-  hash = Z.hash;
+  hash = (fun x h -> Hash.int_ (Z.hash x) h);
   zero = Z.zero;
   one = Z.one;
   add = Z.add;
@@ -96,9 +96,11 @@ let compare m1 m2 =
     ; Util.lexicograph cmp_pair m1.terms m2.terms;
     ]
 
-let hash m =
-  let hash_pair (s,t) = Hash.combine (m.num.hash s) (T.hash t) in
-  Hash.hash_list hash_pair (m.num.hash m.const) m.terms
+let hash_fun m h =
+  let hash_pair = Hash.pair m.num.hash T.hash_fun in
+  h |> m.num.hash m.const |> Hash.list_ hash_pair m.terms
+
+let hash m = Hash.apply hash_fun m
 
 let ty m = m.num.ty
 
@@ -139,6 +141,7 @@ let mk_const ~num s =
   { num; const=s; terms=[]; }
 
 let singleton ~num coeff t =
+  assert (Type.eq (T.ty t) num.ty);
   if num.cmp num.zero coeff = 0
     then mk_const ~num coeff  (* 0 *)
     else
@@ -164,6 +167,7 @@ let mem e t =
   | Some _ -> true
 
 let add e s t =
+  assert (Type.eq (T.ty t) e.num.ty);
   (* sorted insertion *)
   let rec add l s t = match l with
     | [] -> [s, t]
@@ -399,6 +403,7 @@ module Focus = struct
       { term; coeff; rest; }
     with _ -> _fail_idx m i
 
+    (* TODO: optimize *)
   let focus_term m term =
     match find m term with
     | None -> None

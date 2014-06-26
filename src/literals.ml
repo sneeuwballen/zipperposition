@@ -71,10 +71,10 @@ let compare lits1 lits2 =
     then Array.length lits1 - Array.length lits2
     else check 0
 
-let hash lits =
-  Array.fold_left
-    (fun h lit -> Hash.combine h (Lit.hash lit))
-    13 lits
+let hash_fun lits h =
+  Hash.array_ Lit.hash_fun lits h
+
+let hash lits = Hash.apply hash_fun lits
 
 let variant ?(subst=S.empty) a1 sc1 a2 sc2 k =
   let rec iter2 subst i =
@@ -143,8 +143,10 @@ module MLI = Multiset.Make(struct
     if i1=i2 then Lit.compare l1 l2 else Pervasives.compare i1 i2
 end)
 
-let _compare_lit_with_idx ~ord (lit1,_) (lit2,_) =
-  Lit.Comp.compare ~ord lit1 lit2
+let _compare_lit_with_idx ~ord (lit1,i1) (lit2,i2) =
+  if i1=i2
+    then Comparison.Eq (* ignore collisions *)
+    else Lit.Comp.compare ~ord lit1 lit2
 
 let _to_multiset_with_idx lits =
   Util.array_foldi
@@ -154,17 +156,29 @@ let _to_multiset_with_idx lits =
 let maxlits_l ~ord lits =
   Util.enter_prof prof_maxlits;
   let m = _to_multiset_with_idx lits in
-  let max = MLI.max (_compare_lit_with_idx ~ord) m
-    |> MLI.to_list
-    |> List.map fst in
+  let max = MLI.max_seq (_compare_lit_with_idx ~ord) m
+    |> Sequence.map2 (fun x _ -> x)
+    |> Sequence.to_list
+  in
   Util.exit_prof prof_maxlits;
   max
 
 let maxlits ~ord lits =
-  let l = maxlits_l ~ord lits in
-  l |> List.map snd |> BV.of_list
+  Util.enter_prof prof_maxlits;
+  let m = _to_multiset_with_idx lits in
+  let max = MLI.max_seq (_compare_lit_with_idx ~ord) m
+    |> Sequence.map2 (fun x _ -> snd x)
+    |> Sequence.to_list
+    |> BV.of_list
+  in
+  Util.exit_prof prof_maxlits;
+  max
 
 let is_max ~ord lits =
+  (*
+  let max = maxlits_l ~ord lits in
+  fun i -> List.exists (fun (_,j) -> i=j) max
+  *)
   let m = _to_multiset_with_idx lits in
   fun i ->
     let lit = lits.(i) in
@@ -295,9 +309,9 @@ let fold_lits ~eligible lits acc f =
   fold acc 0
 
 let fold_eqn ?(both=true) ?sign ~ord ~eligible lits acc f =
-  let sign_ok = match sign with
-    | None -> (fun _ -> true)
-    | Some sign -> (fun sign' -> sign = sign')
+  let sign_ok s = match sign with
+    | None -> true
+    | Some sign -> sign = s
   in
   let rec fold acc i =
     if i = Array.length lits then acc
@@ -318,7 +332,7 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits acc f =
             let acc = f acc r l sign Position.(arg i @@ right @@ stop) in
             f acc l r sign Position.(arg i @@ left @@ stop)
           else
-            let acc = f acc r l sign Position.(arg i @@ right @@ stop) in
+            (* only one side *)
             f acc l r sign Position.(arg i @@ left @@ stop)
         end
       | Lit.Prop (p, sign) when sign_ok sign ->

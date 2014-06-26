@@ -84,8 +84,8 @@ module type S = sig
           the rule  (b < a and c < b) -> C1, then make the head of the rule
           true *)
 
-  val canc_lesseq_to_less : Env.lit_rewrite_rule
-    (** Simplification:  a <= b  ----> a < b+1 *)
+  val canc_less_to_lesseq : Env.lit_rewrite_rule
+    (** Simplification:  a < b  ----> a+1 ≤ b *)
 
   (** {3 Divisibility} *)
 

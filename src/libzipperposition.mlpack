@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 123c9f3f5f7097f1d5e7ce2903b745c8)
+# DO NOT EDIT (digest: 8bfa245931f1c9669164a6369d0054d9)
 ClauseQueue
 Clause
 Const
@@ -21,8 +21,10 @@ Env
 Monome
 ArithLit
 Signals
+Multisets
 calculi/Superposition
 calculi/Chaining
+calculi/EnumTypes
 calculi/ArithInt
 lib/LazyGraph
 lib/Leftistheap

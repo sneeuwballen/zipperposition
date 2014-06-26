@@ -94,7 +94,7 @@ module Make(E : Env.S) = struct
         (* put clauses of [l'] back in passive set *)
         Env.add_passive (Sequence.of_list l');
         (* process the clause [c] *)
-        let new_clauses = Vector.create 15 in
+        let new_clauses = Vector.create () in
         assert (not (Env.is_redundant c));
         (* process the given clause! *)
         Util.incr_stat stat_processed_given;
@@ -136,7 +136,7 @@ module Make(E : Env.S) = struct
           inferred_clauses
         in
         Vector.append_seq new_clauses inferred_clauses;
-        (if Util.get_debug () >= 2 then Vector.iter new_clauses
+        (if Util.get_debug () >= 2 then Vector.to_seq new_clauses
           (fun new_c -> Util.debug 2 "    inferred new clause %a" Env.C.pp new_c));
         (* add new clauses (including simplified active clauses) to passive set and simpl_set *)
         Env.add_passive (Vector.to_seq new_clauses);
