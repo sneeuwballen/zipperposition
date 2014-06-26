@@ -175,7 +175,7 @@ Executable cnf_of_tptp
 
 # Orienting rewrite rules with LPO
 Executable orient
-  Path:             src/tools/
+  Path:             src/tools/orient/
   Build$:           flag(tools) && flag(parsers) && flag(solving)
   Install$:         flag(tools) && flag(parsers) && flag(solving)
   CompiledObject:   native
@@ -202,7 +202,7 @@ Executable detect_theories
 
 # Preprocessor to E
 Executable hysteresis
-  Path:             src/tools/
+  Path:             src/tools/hysteresis/
   Build$:           flag(meta) && flag(tools) && flag(parsers) && flag(solving)
   Install$:         flag(meta) && flag(tools) && flag(parsers) && flag(solving)
   CompiledObject:   native
