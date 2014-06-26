@@ -187,8 +187,6 @@ let rec nnf f =
   | F.Forall (varty,f') -> F.Base.__mk_forall ~varty (nnf f')
   | F.Exists (varty,f') -> F.Base.__mk_exists ~varty (nnf f')
   | F.ForallTy f' -> F.Base.__mk_forall_ty (nnf f')
-  | F.True
-  | F.False -> f
 
 (* evaluate [f] in the given [env], and then unshift remaining free DB vars *)
 let __eval_and_unshift env f =
