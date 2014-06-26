@@ -2014,6 +2014,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       let ty = Signature.find_exn Signature.TPTP.Arith.full sum in
       Ctx.Theories.AC.add ~ty sum;
     end;
+    (* careful: arith operators are ad-hoc polymorphic *)
+    Ctx.add_ad_hoc_symbols Symbol.TPTP.Arith.symbols;
     setup_dot_printers ();
     ()
 end
