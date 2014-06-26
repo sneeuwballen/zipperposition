@@ -58,10 +58,10 @@ val apply_subst : renaming:Substs.Renaming.t ->
 
 val map : (term -> term) -> t -> t
 
-val pos : t -> BV.t
-val neg : t -> BV.t
+val pos : t -> CCBV.t
+val neg : t -> CCBV.t
 
-val maxlits : ord:Ordering.t -> t -> BV.t
+val maxlits : ord:Ordering.t -> t -> CCBV.t
   (** Bitvector of positions of maximal literals *)
 
 val maxlits_l : ord:Ordering.t -> t -> (Literal.t * int) list

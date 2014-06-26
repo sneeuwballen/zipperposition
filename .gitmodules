@@ -1,6 +1,0 @@
-[submodule "containers"]
-	path = containers
-	url = http://github.com/c-cube/ocaml-containers.git
-[submodule "simplex"]
-	path = simplex
-	url = https://git@github.com/Gbury/ocaml-simplex.git

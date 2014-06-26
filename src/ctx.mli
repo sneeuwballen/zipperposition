@@ -58,7 +58,7 @@ module type S = sig
   val compare : FOTerm.t -> FOTerm.t -> Comparison.t
   (** Compare two terms *)
 
-  val select : Literal.t array -> BV.t
+  val select : Selection.t
 
   val renaming_clear : unit  -> Substs.Renaming.t
   (** Obtain the global renaming. The renaming is cleared before

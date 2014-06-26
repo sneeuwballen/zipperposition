@@ -94,7 +94,7 @@ module Make(E : Env.S) = struct
         (* put clauses of [l'] back in passive set *)
         Env.add_passive (Sequence.of_list l');
         (* process the clause [c] *)
-        let new_clauses = Vector.create () in
+        let new_clauses = CCVector.create () in
         assert (not (Env.is_redundant c));
         (* process the given clause! *)
         Util.incr_stat stat_processed_given;
@@ -116,7 +116,7 @@ module Make(E : Env.S) = struct
         Env.remove_active simplified_actives;
         Env.remove_simpl simplified_actives;
         Env.remove_orphans simplified_actives;
-        Vector.append_seq new_clauses newly_simplified;
+        CCVector.append_seq new_clauses newly_simplified;
         (* add given clause to active set *)
         Env.add_active (Sequence.singleton c);
         (* do inferences between c and the active set (including c),
@@ -135,11 +135,11 @@ module Make(E : Env.S) = struct
               else Some c)
           inferred_clauses
         in
-        Vector.append_seq new_clauses inferred_clauses;
-        (if Util.get_debug () >= 2 then Vector.to_seq new_clauses
+        CCVector.append_seq new_clauses inferred_clauses;
+        (if Util.get_debug () >= 2 then CCVector.to_seq new_clauses
           (fun new_c -> Util.debug 2 "    inferred new clause %a" Env.C.pp new_c));
         (* add new clauses (including simplified active clauses) to passive set and simpl_set *)
-        Env.add_passive (Vector.to_seq new_clauses);
+        Env.add_passive (CCVector.to_seq new_clauses);
         (* test whether the empty clause has been found *)
         match Env.get_some_empty_clause () with
         | None -> Unknown
