@@ -86,6 +86,13 @@ module type S = sig
   val on_new_symbol : (Symbol.t * Type.t) Signal.t
   val on_signature_update : Signature.t Signal.t
 
+  val ad_hoc_symbols : unit -> Symbol.Set.t
+  (** Current set of ad-hoc symbols *)
+
+  val add_ad_hoc_symbols : Symbol.t Sequence.t -> unit
+  (** Declare that some symbols are "ad hoc", ie they are not really
+      polymorphic and should not be considered as such *)
+
   (** {2 Literals} *)
 
   module Lit : sig
