@@ -134,10 +134,8 @@ let rec pp_general_debug buf d = match d with
 let fmt_general fmt d =
   Format.pp_print_string fmt (Util.sprintf "%a" pp_general d)
 
-let pp_generals buf l =
-  Util.pp_list pp_general buf l
-let fmt_generals fmt l =
-  Sequence.pp_seq fmt_general fmt (Sequence.of_list l)
+let pp_generals buf l = CCList.pp pp_general buf l
+let fmt_generals fmt l = CCList.print fmt_general fmt l
 
 module type S = sig
   type hoterm

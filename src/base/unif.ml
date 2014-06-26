@@ -34,6 +34,9 @@ exception Fail
 type scope = Substs.scope
 type subst = Substs.t
 
+let prof_unify = Util.mk_profiler "unify"
+let prof_matching = Util.mk_profiler "matching"
+
 (** {2 Result of multiple Unification} *)
 
 type res = subst KList.t
@@ -42,7 +45,7 @@ module Res = struct
   (* takes a function that requires a success cont. and a failure cont.
       and returns the lazy result *)
   let of_fun f =
-    f ~k:(fun subst fk -> KList.cons subst fk) ~fk:(fun () -> KList.nil)
+    f ~k:(fun subst fk -> KList.cons subst (fk ())) ~fk:(fun () -> KList.nil)
 end
 
 (** {2 Signatures} *)
@@ -64,17 +67,22 @@ module type UNARY = sig
         @raise Fail if the terms do not match.
         @raise Invalid_argument if the two scopes are equal *)
 
-  val matching_same_scope : ?subst:subst -> scope:scope ->
-                            pattern:term -> term -> subst
+  val matching_same_scope : ?protect:(term Sequence.t) -> ?subst:subst ->
+                            scope:scope -> pattern:term -> term -> subst
     (** matches [pattern] (more general) with the other term.
         The two terms live in the same scope, which is passed as the
         [scope] argument. It needs to gather the variables of the
-        other term to make sure they are not bound. *)
+        other term to make sure they are not bound.
+        @param scope the common scope of both terms
+        @param protect a sequence of variables to protect (they cannot
+          be bound during matching!). Variables of the second term
+          are automatically protected. *)
 
-  val matching_adapt_scope : ?subst:subst ->
+  val matching_adapt_scope : ?protect:(term Sequence.t) -> ?subst:subst ->
                              pattern:term -> scope -> term -> scope -> subst
     (** Call either {!matching} or {!matching_same_scope} depending on
-        whether the given scopes are the same or not. *)
+        whether the given scopes are the same or not.
+        @param protect used if scopes are the same, see {!matching_same_scope} *)
 
   val variant : ?subst:subst -> term -> scope -> term -> scope -> subst
     (** Succeeds iff the first term is a variant of the second, ie
@@ -473,19 +481,19 @@ module Nary = struct
     Res.of_fun (unif subst a sc_a b sc_b)
 
   let are_variant t1 t2 =
-    match variant t1 0 t2 1 with
-    | KList.Nil -> false
-    | KList.Cons _ -> true
+    match variant t1 0 t2 1 () with
+    | `Nil -> false
+    | `Cons _ -> true
 
   let matches ~pattern t =
-    match matching ~pattern 0 t 1 with
-    | KList.Nil -> false
-    | KList.Cons _ -> true
+    match matching ~pattern 0 t 1 () with
+    | `Nil -> false
+    | `Cons _ -> true
 
   let are_unifiable t1 t2 =
-    match unification t1 0 t2 1 with
-    | KList.Nil -> false
-    | KList.Cons _ -> true
+    match unification t1 0 t2 1 () with
+    | `Nil -> false
+    | `Cons _ -> true
 end
 
 (** {2 Unary Unification} *)
@@ -561,6 +569,7 @@ module Unary = struct
         subst
 
   let unification ?(subst=Substs.empty) a sc_a b sc_b =
+    Util.enter_prof prof_unify;
     (* recursive unification *)
     let rec unif subst s sc_s t sc_t =
       let s, sc_s = Substs.get_var subst s sc_s
@@ -606,10 +615,16 @@ module Unary = struct
       | _, _ -> raise Fail
     in
     (* try unification, and return solution/exception (with profiler handling) *)
-    let subst = unif subst a sc_a b sc_b in
-    subst
+    try
+      let subst = unif subst a sc_a b sc_b in
+      Util.exit_prof prof_unify;
+      subst
+    with e ->
+      Util.exit_prof prof_unify;
+      raise e
 
   let matching ?(allow_open=false) ?(subst=Substs.empty) ~pattern sc_a b sc_b =
+    Util.enter_prof prof_matching;
     (* recursive matching *)
     let rec unif subst s sc_s t sc_t =
       let s, sc_s = Substs.get_var subst s sc_s in
@@ -650,10 +665,16 @@ module Unary = struct
         unif subst r1 sc_s r2 sc_t
       | _, _ -> raise Fail
     in
-    let subst = unif subst pattern sc_a b sc_b in
-    subst
+    try
+      let subst = unif subst pattern sc_a b sc_b in
+      Util.exit_prof prof_matching;
+      subst
+    with e ->
+      Util.exit_prof prof_matching;
+      raise e
 
-  let matching_same_scope ?(subst=Substs.empty) ~scope ~pattern b =
+  let matching_same_scope ?(protect=Sequence.empty) ?(subst=Substs.empty)
+  ~scope ~pattern b =
     (* recursive matching. Blocked vars are [blocked] *)
     let rec unif ~blocked subst s scope t scope  =
       let s, sc_s = Substs.get_var subst s scope in
@@ -694,13 +715,14 @@ module Unary = struct
       | _, _ -> raise Fail
     in
     (* compute set of free vars of [b], that cannot be bound *)
-    let blocked = T.Seq.add_set T.Set.empty (T.Seq.vars b) in
+    let protect = Sequence.append protect (T.Seq.vars b) in
+    let blocked = T.Seq.add_set T.Set.empty protect in
     let subst = unif ~blocked subst pattern scope b scope in
     subst
 
-  let matching_adapt_scope ?(subst=Substs.empty) ~pattern s_p t s_t =
+  let matching_adapt_scope ?protect ?(subst=Substs.empty) ~pattern s_p t s_t =
     if s_p = s_t
-      then matching_same_scope ~subst ~scope:s_p ~pattern t
+      then matching_same_scope ?protect ~subst ~scope:s_p ~pattern t
       else matching ~subst ~pattern s_p t s_t
 
   let variant ?(subst=Substs.empty) a sc_a b sc_b =
@@ -830,11 +852,11 @@ module Ty = struct
         pattern:term -> scope -> term -> scope -> subst)
 
   let matching_same_scope =
-    (matching_same_scope :> ?subst:subst -> scope:scope ->
-        pattern:term -> term -> subst)
+    (matching_same_scope :>  ?protect:(term Sequence.t) -> ?subst:subst ->
+        scope:scope -> pattern:term -> term -> subst)
 
   let matching_adapt_scope =
-    (matching_adapt_scope :> ?subst:subst ->
+    (matching_adapt_scope :>  ?protect:(term Sequence.t) -> ?subst:subst ->
         pattern:term -> scope -> term -> scope -> subst)
 
   let variant =
@@ -865,11 +887,11 @@ module FO = struct
         pattern:term -> scope -> term -> scope -> subst)
 
   let matching_same_scope =
-    (matching_same_scope :> ?subst:subst -> scope:scope ->
-        pattern:term -> term -> subst)
+    (matching_same_scope :>  ?protect:(term Sequence.t) -> ?subst:subst ->
+        scope:scope -> pattern:term -> term -> subst)
 
   let matching_adapt_scope =
-    (matching_adapt_scope :> ?subst:subst ->
+    (matching_adapt_scope :>  ?protect:(term Sequence.t) -> ?subst:subst ->
         pattern:term -> scope -> term -> scope -> subst)
 
   let variant =
@@ -981,8 +1003,8 @@ module Form = struct
     Res.of_fun (unif subst f1 f2)
 
   let are_variant f1 f2 =
-    match variant f1 0 f2 1 with
-    | KList.Nil -> false
-    | KList.Cons _ -> true
+    match variant f1 0 f2 1 () with
+    | `Nil -> false
+    | `Cons _ -> true
 end
 

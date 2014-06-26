@@ -55,17 +55,22 @@ module type UNARY = sig
         @raise Fail if the terms do not match.
         @raise Invalid_argument if the two scopes are equal *)
 
-  val matching_same_scope : ?subst:subst -> scope:scope ->
-                            pattern:term -> term -> subst
+  val matching_same_scope : ?protect:(term Sequence.t) -> ?subst:subst ->
+                            scope:scope -> pattern:term -> term -> subst
     (** matches [pattern] (more general) with the other term.
         The two terms live in the same scope, which is passed as the
         [scope] argument. It needs to gather the variables of the
-        other term to make sure they are not bound. *)
+        other term to make sure they are not bound.
+        @param scope the common scope of both terms
+        @param protect a sequence of variables to protect (they cannot
+          be bound during matching!). Variables of the second term
+          are automatically protected. *)
 
-  val matching_adapt_scope : ?subst:subst ->
+  val matching_adapt_scope : ?protect:(term Sequence.t) -> ?subst:subst ->
                              pattern:term -> scope -> term -> scope -> subst
     (** Call either {!matching} or {!matching_same_scope} depending on
-        whether the given scopes are the same or not. *)
+        whether the given scopes are the same or not.
+        @param protect used if scopes are the same, see {!matching_same_scope} *)
 
   val variant : ?subst:subst -> term -> scope -> term -> scope -> subst
     (** Succeeds iff the first term is a variant of the second, ie
@@ -92,7 +97,7 @@ module type NARY = sig
 
   val matching : ?subst:subst -> pattern:term -> scope -> term -> scope -> result
     (** matching of two terms.
-     * @raise Invalid_argument if the two scopes are equal. *)
+        @raise Invalid_argument if the two scopes are equal. *)
 
   val variant : ?subst:subst -> term -> scope -> term -> scope -> result
     (** alpha-equivalence checking of two terms *)

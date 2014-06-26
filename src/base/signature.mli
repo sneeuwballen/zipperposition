@@ -33,6 +33,8 @@ type t = private Type.t SMap.t
 val empty : t
   (** Empty signature *)
 
+val is_empty : t -> bool
+
 val singleton : Symbol.t -> Type.t -> t
 
 val mem : t -> Symbol.t -> bool

@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 83484c79b47015ea317391985b9b29eb)
+# DO NOT EDIT (digest: f8a93d35ed7ca8a7a73e8f6ac6e90d63)
 src/base/Symbol
 src/base/ScopedTerm
 src/base/FOTerm
@@ -48,13 +48,7 @@ src/base/lib/PartialOrder
 src/base/lib/KList
 src/base/lib/LazyList
 src/base/lib/IArray
-src/meta/Encoding
-src/meta/Reasoner
-src/meta/Plugin
-src/meta/Prover
-src/arbitrary/ArTerm
-src/arbitrary/ArForm
-src/arbitrary/ArType
-src/arbitrary/ArSignature
-src/arbitrary/ArSymbol
+src/base/lib/LazyGraph
+src/base/lib/CCSequence
+src/base/lib/CCList
 # OASIS_STOP

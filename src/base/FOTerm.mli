@@ -241,6 +241,9 @@ include Interfaces.PRINT_DE_BRUIJN with type t := t
 val add_hook : print_hook -> unit
   (** Hook used by default for printing *)
 
+val default_hooks : unit -> print_hook list
+  (** List of default hooks *)
+
 (* TODO
 include Interfaces.SERIALIZABLE with type t := t
 *)

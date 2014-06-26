@@ -66,11 +66,13 @@ let eq p1 p2 = match p1, p2 with
     end
   | _ -> false
 
-let hash p = match p with
-  | Axiom (f, n) -> Hash.hash_int2 (Hash.hash_string f) (Hash.hash_string n)
-  | Theory s -> Hash.hash_string s
-  | InferForm (f,_) -> F.hash f
-  | InferClause (c, _) -> Hash.hash_list F.hash 42 c
+let hash_fun p h = match p with
+  | Axiom (f, n) -> Hash.string_ f (Hash.string_ n h)
+  | Theory s -> Hash.string_ s h
+  | InferForm (f,_) -> F.hash_fun f h
+  | InferClause (c, _) -> Hash.list_ F.hash_fun c h
+
+let hash p = Hash.apply hash_fun p
 
 let cmp p1 p2 = Pervasives.compare p1 p2  (* FIXME *)
 

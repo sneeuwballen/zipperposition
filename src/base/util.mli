@@ -64,6 +64,7 @@ val enable_profiling : bool ref           (** Enable/disable profiling *)
 val mk_profiler : string -> profiler      (** Create a named profiler *)
 val enter_prof : profiler -> unit         (** Enter the profiler *)
 val exit_prof : profiler -> unit          (** Exit the profiler *)
+val yield_prof : profiler -> unit         (** Yield control to sub-call *)
 
 (** {2 Runtime statistics} *)
 

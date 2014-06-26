@@ -120,6 +120,7 @@ let subterm ~sub t =
   check t
 
 let eq = T.eq
+let hash_fun = T.hash_fun
 let hash = T.hash
 let cmp = T.cmp
 let ty t = match T.ty t with
@@ -362,13 +363,11 @@ let vars_prefix_order t =
 
 let depth t = Seq.subterms_depth t |> Sequence.map snd |> Sequence.fold max 0
 
-let head_exn t = match T.view t with
+let rec head_exn t = match T.view t with
+  | T.SimpleApp (s, _)
   | T.Const s -> s
-  | T.App (hd,_) ->
-      begin match T.view hd with
-        | T.Const s -> s
-        | _ -> raise (Invalid_argument "FOTerm.head")
-      end
+  | T.At (hd, _)
+  | T.App (hd,_) -> head_exn hd
   | _ -> raise (Invalid_argument "FOTerm.head")
 
 let head t =
@@ -532,30 +531,25 @@ let pp_depth ?(hooks=[]) depth buf t =
   let depth = ref depth in
   (* recursive printing *)
   let rec pp_rec buf t =
-    begin match view t with
+    if not (List.exists (fun hook -> hook !depth pp_rec buf t) hooks)
+    then begin match view t with
     | BVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
     | TyApp (f, ty) ->
         pp_rec buf f;
         Buffer.add_char buf ' ';
         Type.pp buf ty
     | App (f, args) ->
-      (* try to use some hook *)
-      if List.exists (fun hook -> hook !depth pp_rec buf t) hooks
-      then ()
-      else (* default case for nodes *)
-        begin
-          assert (args <> []);
-          pp_rec buf f;
-          Buffer.add_char buf ' ';
-          Util.pp_list ~sep:" " pp_inner buf args
-        end
+        assert (args <> []);
+        pp_rec buf f;
+        Buffer.add_char buf ' ';
+        Util.pp_list ~sep:" " pp_inner buf args
     | Const s -> Symbol.pp buf s
     | Var i ->
       if not !print_all_types && not (Type.eq (ty t) Type.TPTP.i)
         then Printf.bprintf buf "X%d:%a" i Type.pp (ty t)
         else Printf.bprintf buf "X%d" i
     end;
-    (* print type of term *)
+    (* print type of term? *)
     if !print_all_types
       then Printf.bprintf buf ":%a" Type.pp (ty t)
   and pp_inner buf t = match view t with
@@ -567,6 +561,7 @@ let pp_depth ?(hooks=[]) depth buf t =
 
 let __hooks = ref []
 let add_hook h = __hooks := h :: !__hooks
+let default_hooks () = !__hooks
 
 let pp buf t = pp_depth ~hooks:!__hooks 0 buf t
 
@@ -582,8 +577,7 @@ let rec debug fmt t =
   | TyApp (f, ty) ->
     Format.fprintf fmt "(%a %a)" debug f Type.fmt ty
   | App (s, l) ->
-    Format.fprintf fmt "(%a %a)" debug s
-      (Sequence.pp_seq debug) (Sequence.of_list l)
+    Format.fprintf fmt "(%a %a)" debug s (CCList.print debug) l
   end;
   Format.fprintf fmt ":%a" Type.fmt (ty t)
 
@@ -668,43 +662,44 @@ module TPTP = struct
 
     (* hook that prints arithmetic expressions *)
     let arith_hook depth pp_rec buf t =
-      let _eq_sym s cst =  match T.view cst with
-        | T.Const s' -> Symbol.eq s s'
-        | _ -> false
-      in
-      let pp_surrounded buf t = match view t with
-      | App (s, [_;_]) when
-        eq s sum ||
-        eq s product ||
-        eq s difference ||
-        eq s quotient ->
+      let module SA = Symbol.TPTP.Arith in
+      let pp_surrounded buf t = match Classic.view t with
+      | Classic.App (s, _, [_;_]) when
+        Symbol.eq s SA.sum ||
+        Symbol.eq s SA.product ||
+        Symbol.eq s SA.difference ||
+        Symbol.eq s SA.quotient ->
         Buffer.add_char buf '(';
         pp_rec buf t;
         Buffer.add_char buf ')'
       | _ -> pp_rec buf t
       in
-      match view t with
-      | App (s, [a; b]) when eq s less ->
+      match Classic.view t with
+      | Classic.Var i when Type.eq (ty t) Type.TPTP.int ->
+        Printf.bprintf buf "X%d_z" i; true
+      | Classic.Var i when Type.eq (ty t) Type.TPTP.rat ->
+        Printf.bprintf buf "X%d_q" i; true
+      | Classic.App (s, _,[a; b]) when Symbol.eq s SA.less ->
         Printf.bprintf buf "%a < %a" pp_surrounded a pp_surrounded b; true
-      | App (s, [a; b]) when eq s lesseq ->
+      | Classic.App (s, _,[a; b]) when Symbol.eq s SA.lesseq ->
         Printf.bprintf buf "%a ≤ %a" pp_surrounded a pp_surrounded b; true
-      | App (s, [a; b]) when eq s greater ->
+      | Classic.App (s, _,[a; b]) when Symbol.eq s SA.greater ->
         Printf.bprintf buf "%a > %a" pp_surrounded a pp_surrounded b; true
-      | App (s, [a; b]) when eq s greatereq ->
+      | Classic.App (s, _,[a; b]) when Symbol.eq s SA.greatereq ->
         Printf.bprintf buf "%a ≥ %a" pp_surrounded a pp_surrounded b; true
-      | App (s, [a; b]) when eq s sum ->
+      | Classic.App (s, _,[a; b]) when Symbol.eq s SA.sum ->
         Printf.bprintf buf "%a + %a" pp_surrounded a pp_surrounded b; true
-      | App (s, [a; b]) when eq s difference ->
+      | Classic.App (s, _,[a; b]) when Symbol.eq s SA.difference ->
         Printf.bprintf buf "%a - %a" pp_surrounded a pp_surrounded b; true
-      | App (s, [a; b]) when eq s product ->
+      | Classic.App (s, _,[a; b]) when Symbol.eq s SA.product ->
         Printf.bprintf buf "%a × %a" pp_surrounded a pp_surrounded b; true
-      | App (s, [a; b]) when eq s quotient ->
+      | Classic.App (s, _,[a; b]) when Symbol.eq s SA.quotient ->
         Printf.bprintf buf "%a / %a" pp_surrounded a pp_surrounded b; true
-      | App (s, [a; b]) when eq s quotient_e ->
+      | Classic.App (s, _,[a; b]) when Symbol.eq s SA.quotient_e ->
         Printf.bprintf buf "%a // %a" pp_surrounded a pp_surrounded b; true
-      | App (s, [a]) when eq s uminus ->
+      | Classic.App (s, _,[a]) when Symbol.eq s SA.uminus ->
         Printf.bprintf buf "-%a" pp_surrounded a; true;
-      | App (s, [a;b]) when eq s remainder_e ->
+      | Classic.App (s, _,[a;b]) when Symbol.eq s SA.remainder_e ->
         Printf.bprintf buf "%a mod %a" pp_surrounded a pp_surrounded b; true;
       | _ -> false  (* default *)
 

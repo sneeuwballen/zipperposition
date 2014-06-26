@@ -241,6 +241,9 @@ module type TERM = sig
 
   include Interfaces.PRINT_DE_BRUIJN with type t := t
       and type term := t
+
+  val default_hooks : unit -> print_hook list
+
   module TPTP : sig
     include Interfaces.PRINT_DE_BRUIJN with type t := t
       and type term := t

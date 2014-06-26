@@ -147,6 +147,9 @@ module type SPECIALIZED = sig
   type term
   type t = subst
 
+  val mem : t -> term -> scope -> bool
+    (** Variable is bound? *)
+
   val apply : t -> renaming:Renaming.t -> term -> scope -> term
     (** Apply the substitution to the given term/type.
         @param renaming used to desambiguate free variables from distinct scopes *)

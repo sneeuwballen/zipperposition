@@ -68,6 +68,11 @@ type 'a comparator = 'a -> 'a -> t
 
 let (++) = lexico
 
+let (@>>) f g x y =
+  match f x y with
+  | Eq -> g x y
+  | res -> res
+
 type ('a,'b) combination = {
   call : 'a -> 'a -> 'b;
   ignore : t -> 'a -> 'a -> 'b;
@@ -87,6 +92,19 @@ let (>>>) f g = {
 }
 
 let call f x y = f.call x y
+
+let dominates f l1 l2 =
+  let rec find_x l1 y = match l1 with
+    | [] -> false
+    | x::l1' ->
+        match f x y with
+        | Gt -> true
+        | _ -> find_x l1' y
+  and check_all l2 = match l2 with
+    | [] -> true
+    | y :: l2' -> find_x l1 y && check_all l2'
+  in
+  check_all l2;;
 
 module type PARTIAL_ORD = sig
   type t

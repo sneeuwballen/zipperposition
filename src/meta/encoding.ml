@@ -133,6 +133,7 @@ module RigidTerm = struct
   type t = HOT.t
 
   let eq = HOT.eq
+  let hash_fun = HOT.hash_fun
   let hash = HOT.hash
   let cmp = HOT.cmp
   let pp = HOT.pp
@@ -162,6 +163,7 @@ module EncodedClause = struct
 
   let eq = HOT.eq
   let hash = HOT.hash
+  let hash_fun = HOT.hash_fun
   let cmp = HOT.cmp
   let pp = HOT.pp
   let to_string = HOT.to_string

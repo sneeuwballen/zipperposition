@@ -47,17 +47,19 @@ let debug_level_ = ref 0
 let set_debug l = debug_level_ := l
 let get_debug () = !debug_level_
 let need_cleanup = ref false
+
+let __b = Buffer.create 0 (* unused buffer *)
 let debug l format =
-  let b = Buffer.create 15 in
   if l <= !debug_level_
     then (
-      (if !need_cleanup then clear_line ());
+      let b = Buffer.create 15 in
+      if !need_cleanup then clear_line ();
       Printf.bprintf b "%% [%.3f] " (get_total_time ());
       Printf.kbprintf
         (fun b -> print_endline (Buffer.contents b))
         b format)
     else
-      Printf.ifprintf b format
+      Printf.ifprintf __b format
 
 let pp_pos pos =
   let open Lexing in
@@ -114,6 +116,15 @@ let exit_prof profiler =
     let delta = stop -. profiler.prof_enter in
     profiler.prof_total <- profiler.prof_total +. delta;
     profiler.prof_calls <- profiler.prof_calls + 1;
+    (if delta > profiler.prof_max then profiler.prof_max <- delta);
+  end
+
+(* difference with [exit_prof]: does not increment the total count *)
+let yield_prof profiler =
+  if !enable_profiling then begin
+    let stop = Unix.gettimeofday () in
+    let delta = stop -. profiler.prof_enter in
+    profiler.prof_total <- profiler.prof_total +. delta;
     (if delta > profiler.prof_max then profiler.prof_max <- delta);
   end
 

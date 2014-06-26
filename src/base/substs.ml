@@ -38,7 +38,7 @@ type term = T.t
 module TermInt = struct
   type t = (T.t * int)
   let equal (t1,i1)(t2,i2) = i1 = i2 && T.eq t1 t2
-  let hash (t,i) = Hash.combine i (T.hash t)
+  let hash = Hash.apply (fun (t,i) h -> Hash.int_ i (T.hash_fun t h))
 end
 
 module H = Hashtbl.Make(TermInt)
@@ -56,9 +56,11 @@ module Renaming = struct
         (* same in any scope. Comes from Symbol.FreshVar i *)
     | Var of T.t * int
 
-  let hash_to_rename = function
-    | FreshVar (i,ty) -> Hash.combine i (T.hash ty)
-    | Var (t, sc) -> Hash.combine (T.hash t) sc
+  let hash_to_rename_fun it h = match it with
+    | FreshVar (i,ty) -> Hash.int_ i (T.hash_fun ty h)
+    | Var (t, sc) -> T.hash_fun t (Hash.int_ sc h)
+
+  let hash_to_rename x = Hash.apply hash_to_rename_fun x
 
   let equal_to_rename tr1 tr2 = match tr1, tr2 with
     | FreshVar (i1, ty1), FreshVar (i2, ty2) -> i1 = i2 && T.eq ty1 ty2
@@ -405,6 +407,9 @@ module type SPECIALIZED = sig
   type term
   type t = subst
 
+  val mem : t -> term -> scope -> bool
+    (** Variable is bound? *)
+
   val apply : t -> renaming:Renaming.t -> term -> scope -> term
     (** Apply the substitution to the given term/type.
         @param renaming used to desambiguate free variables from distinct scopes *)
@@ -423,6 +428,8 @@ module Ty = struct
   type term = Type.t
   type t = subst
 
+  let mem subst t s_t = mem subst (t:term:>T.t) s_t
+
   let apply subst ~renaming t s_t =
     Type.of_term_exn (apply subst ~renaming (t : term :> T.t) s_t)
 
@@ -435,6 +442,8 @@ end
 module FO = struct
   type term = FOTerm.t
   type t = subst
+
+  let mem subst t s_t = mem subst (t:term:>T.t) s_t
 
   let apply subst ~renaming t s_t =
     FOTerm.of_term_exn (apply subst ~renaming (t : term :> T.t) s_t)
@@ -449,6 +458,8 @@ module HO = struct
   type term = HOTerm.t
   type t = subst
 
+  let mem subst t s_t = mem subst (t:term:>T.t) s_t
+
   let apply  subst ~renaming t s_t =
     HOTerm.of_term_exn (apply  subst ~renaming (t : term :> T.t) s_t)
 
@@ -461,6 +472,8 @@ end
 module Form = struct
   type term = Formula.FO.t
   type t = subst
+
+  let mem subst t s_t = mem subst (t:term:>T.t) s_t
 
   let apply  subst ~renaming t s_t =
     Formula.FO.of_term_exn (apply  subst ~renaming (t : term :> T.t) s_t)

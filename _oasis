@@ -56,7 +56,8 @@ Library "logtk"
                     lib/Sequence, lib/Cache, lib/Bij, lib/Bencode,
                     lib/PersistentHashtbl, lib/Monad, lib/ParseLocation,
                     lib/Multiset, lib/BV, lib/PartialOrder, lib/KList,
-                    lib/LazyList, lib/IArray
+                    lib/LazyList, lib/IArray, lib/LazyGraph,
+                    lib/CCSequence, lib/CCList
   BuildDepends:     zarith,unix
   XMETARequires:    zarith,unix
 
@@ -107,13 +108,31 @@ Library "logtk_arbitrary"
   XMETARequires:    logtk,qcheck
 
 Document logtk
-  Title:                Logtk docs
+  Title:                Logtk documentation
   Type:                 ocamlbuild (0.3)
   BuildTools+:          ocamldoc
-  Install$:             flag(qcheck) && flag(meta)
-  Build$:               flag(qcheck) && flag(meta)
+  Install$:             flag(docs)
+  Build$:               flag(docs)
   XOCamlbuildPath:      .
-  XOCamlbuildLibraries: logtk,logtk.meta,logtk.arbitrary
+  XOCamlbuildLibraries: logtk
+
+Document logtk_meta
+  Title:                Logtk_meta documentation
+  Type:                 ocamlbuild (0.3)
+  BuildTools+:          ocamldoc
+  Install$:             flag(docs) && flag(meta)
+  Build$:               flag(docs) && flag(meta)
+  XOCamlbuildPath:      .
+  XOCamlbuildLibraries: logtk,logtk.meta
+
+Document logtk_arbitrary
+  Title:                Logtk_arbitrary documentation
+  Type:                 ocamlbuild (0.3)
+  BuildTools+:          ocamldoc
+  Install$:             flag(docs) && flag(qcheck)
+  Build$:               flag(docs) && flag(qcheck)
+  XOCamlbuildPath:      .
+  XOCamlbuildLibraries: logtk,logtk.arbitrary
 
 Executable run_bench
   Path:             tests/
@@ -121,7 +140,7 @@ Executable run_bench
   CompiledObject:   native
   MainIs:           run_bench.ml
   Build$:           flag(bench) && flag(tests)
-  BuildDepends:     logtk,bench,qcheck,logtk.arbitrary
+  BuildDepends:     logtk,benchmark,qcheck,logtk.arbitrary
 
 Test all
   Command:          $run_tests

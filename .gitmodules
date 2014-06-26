@@ -1,0 +1,9 @@
+[submodule "containers"]
+	path = containers
+	url = https://github.com/c-cube/ocaml-containers.git
+[submodule "sequence"]
+	path = sequence
+	url = https://github.com/c-cube/sequence.git
+[submodule "gen"]
+	path = gen
+	url = https://github.com/c-cube/gen.git

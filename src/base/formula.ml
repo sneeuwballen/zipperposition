@@ -237,6 +237,9 @@ module type TERM = sig
 
   include Interfaces.PRINT_DE_BRUIJN with type t := t
       and type term := t
+
+  val default_hooks : unit -> print_hook list
+
   module TPTP : sig
     include Interfaces.PRINT_DE_BRUIJN with type t := t
       and type term := t
@@ -258,6 +261,7 @@ module Make(MyT : TERM) = struct
   let eq = T.eq
   let cmp = T.cmp
   let hash = T.hash
+  let hash_fun = T.hash_fun
 
   type view =
     | True
@@ -901,7 +905,7 @@ module Make(MyT : TERM) = struct
     in
     pp_outer buf f
 
-  let pp = pp_depth 0
+  let pp buf f = pp_depth ~hooks:(MyT.default_hooks ()) 0 buf f
 
   let to_string f = Util.on_buffer pp f
 

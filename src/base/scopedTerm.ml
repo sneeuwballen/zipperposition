@@ -73,39 +73,36 @@ let ty_exn t = match t.ty with
   | HasType ty -> ty
 let kind t = t.kind
 
-let hash t = t.id
+let hash_fun t s = Hash.int_ t.id s
+let hash t = Hash.apply hash_fun t
 let eq t1 t2 = t1 == t2
-let cmp t1 t2 = t1.id - t2.id
+let cmp t1 t2 = Pervasives.compare t1.id t2.id
 
-let _hash_ty h t =
-  let hash_ty = match t.ty with
-    | NoType -> 1
-    | HasType ty -> ty.id
-  in
-  Hash.hash_int3 h hash_ty (Hashtbl.hash t.kind)
-let _hash_norec t =
+let _hash_ty t h =
+  match t.ty with
+  | NoType -> h
+  | HasType ty -> Hash.int_ ty.id (Hash.string_ "type" h)
+
+let _hash_norec t h =
   let h = match view t with
-  | Var i -> i
-  | RigidVar i -> Hash.combine 17 i
-  | BVar i -> Hash.combine 11 i
-  | Bind (s, varty, t') -> Hash.hash_int3 (Sym.hash s) (hash varty) (hash t')
-  | Const s -> Sym.hash s
+  | Var i -> h |> Hash.string_ "var" |> Hash.int_ i
+  | RigidVar i -> h |> Hash.string_ "rigid" |> Hash.int_ i
+  | BVar i -> h |> Hash.string_ "bvar" |> Hash.int_ i
+  | Bind (s, varty, t') ->
+      h |> Hash.string_ "bind" |> Sym.hash_fun s |> hash_fun varty |> hash_fun t'
+  | Const s -> h |> Hash.string_ "const" |> Sym.hash_fun s
   | Record (l, rest) ->
-      let h_list h l = Hash.hash_list
-        (fun (s,t') -> Hash.combine (Hash.hash_string s) (hash t')) h l
-      in
-      begin match rest with
-      | None -> h_list 17 l
-      | Some rest -> h_list (hash rest) l
-      end
-  | Multiset l -> Hash.hash_list hash 44 l
-  | App (f, l) ->
-    Hash.hash_list hash (hash f) l
-  | At (t1, t2) -> Hash.combine (hash t1) (hash t2)
+      h
+      |> Hash.string_ "record"
+      |> Hash.list_ (fun (s,t') h -> h |> Hash.string_ s |> hash_fun t') l
+      |> Hash.opt hash_fun rest
+  | Multiset l -> h |> Hash.string_ "ms" |> Hash.list_ hash_fun l
+  | App (f, l) -> h |> Hash.string_ "app" |> hash_fun f |> Hash.list_ hash_fun l
+  | At (t1, t2) -> h |> Hash.string_ "at" |> hash_fun t1 |> hash_fun t2
   | SimpleApp (s, l) ->
-      Hash.hash_list hash (Sym.hash s) l
+      h |> Hash.string_ "sapp" |> Sym.hash_fun s |> Hash.list_ hash_fun l
   in
-  _hash_ty h t
+  _hash_ty t h
 
 let rec _eq_norec t1 t2 =
   t1.kind = t2.kind &&
@@ -166,7 +163,7 @@ let flag_db_closed = new_flag()
 module H = Hashcons.Make(struct
   type t = term
   let equal = _eq_norec
-  let hash = _hash_norec
+  let hash = Hash.apply _hash_norec
   let tag i t = assert (t.id = ~-1); t.id <- i
 end)
 

@@ -88,6 +88,12 @@ module Make(E : Index.EQUATION) = struct
 
   let is_empty n = n.star = None && SMap.is_empty n.map && Leaf.is_empty n.leaf
 
+  exception NoSuchTrie
+
+  let find_sub map key =
+    try SMap.find key map
+    with Not_found -> raise NoSuchTrie
+
   (** get/add/remove the leaf for the given term. The
       continuation k takes the leaf, and returns a leaf option
       that replaces the old leaf.
@@ -119,8 +125,8 @@ module Make(E : Index.EQUATION) = struct
             goto subtrie (next i) rebuild
           | T.Classic.App (s, _, _) ->
             let subtrie =
-              try SMap.find s trie.map
-              with Not_found -> empty ()
+              try find_sub trie.map s
+              with NoSuchTrie -> empty ()
             in
             let rebuild subtrie =
               if is_empty subtrie
@@ -159,7 +165,10 @@ module Make(E : Index.EQUATION) = struct
     let rec traverse trie acc iter =
       match iter with
       | None ->
-        Leaf.fold_match ~subst trie.leaf sc_dt t sc_t acc k'
+          Util.exit_prof prof_npdtree_retrieve;
+          let acc = Leaf.fold_match ~subst trie.leaf sc_dt t sc_t acc k' in
+          Util.enter_prof prof_npdtree_retrieve;
+          acc
       | Some i ->
         match T.Classic.view i.cur_term with
           | (T.Classic.Var _ | T.Classic.BVar _) ->
@@ -171,9 +180,9 @@ module Make(E : Index.EQUATION) = struct
           | T.Classic.App (s, _, _) ->
             let acc =
               try
-                let subtrie = SMap.find s trie.map in
+                let subtrie = find_sub trie.map s in
                 traverse subtrie acc (next i)
-              with Not_found -> acc
+              with NoSuchTrie -> acc
             in
             begin match trie.star with
               | None -> acc
@@ -204,13 +213,39 @@ module Make(E : Index.EQUATION) = struct
     iter dt (fun _ _ -> incr n);
     !n
 
+  let _as_graph =
+    LazyGraph.make ~eq:(==)
+      (fun t ->
+        let s1 =
+          (match t.star with
+            | None -> Sequence.empty
+            | Some t' -> Sequence.singleton ("*", t')
+          )
+        and s2 = SMap.to_seq t.map
+          |> Sequence.map (fun (sym, t') -> Symbol.to_string sym, t')
+        in
+        LazyGraph.Node(t, t, Sequence.append s1 s2)
+      )
+
+  let _as_dot_graph =
+    LazyGraph.map
+      ~vertices:(fun t ->
+        let len = Leaf.size t.leaf in
+        [`Shape "circle"; `Label (string_of_int len)]
+      )
+      ~edges:(fun e -> [`Label e])
+      _as_graph
+
   let to_dot buf t =
-    failwith "NPDTree.to_dot: not implemented"
+    let fmt = Format.formatter_of_buffer buf in
+    LazyGraph.Dot.pp ~name:"NPDtree" _as_dot_graph fmt (Sequence.singleton t);
+    Format.pp_print_flush fmt ();
+    ()
 end
 
 (** {2 General purpose index} *)
 
-module SIMap = Map.Make(struct
+module SIMap = Sequence.Map.Make(struct
   type t = Symbol.t * int
   let compare (s1,i1) (s2,i2) =
     if i1 = i2 then Symbol.cmp s1 s2 else i1-i2
@@ -230,6 +265,12 @@ module MakeTerm(X : Set.OrderedType) = struct
   let empty () = {map=SIMap.empty; star=None; leaf=Leaf.empty;}
 
   let is_empty n = n.star = None && SIMap.is_empty n.map && Leaf.is_empty n.leaf
+
+  exception NoSuchTrie
+
+  let find_sub map key =
+    try SIMap.find key map
+    with Not_found -> raise NoSuchTrie
 
   (** get/add/remove the leaf for the given term. The
       continuation k takes the leaf, and returns a leaf option
@@ -261,8 +302,8 @@ module MakeTerm(X : Set.OrderedType) = struct
           | T.Classic.App (s, _, l) ->
             let arity = List.length l in
             let subtrie =
-              try SIMap.find (s,arity) trie.map
-              with Not_found -> empty ()
+              try find_sub trie.map (s,arity)
+              with NoSuchTrie -> empty ()
             in
             let rebuild subtrie =
               if is_empty subtrie
@@ -305,7 +346,10 @@ module MakeTerm(X : Set.OrderedType) = struct
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie acc iter = match iter with
       | None ->
-        Leaf.fold_unify ~subst trie.leaf sc_dt t sc_t acc k
+        Util.yield_prof prof_npdtree_term_unify;
+        let acc = Leaf.fold_unify ~subst trie.leaf sc_dt t sc_t acc k in
+        Util.enter_prof prof_npdtree_term_unify;
+        acc
       | Some i ->
         match T.Classic.view i.cur_term with
           | (T.Classic.Var _ | T.Classic.BVar _) ->
@@ -340,14 +384,17 @@ module MakeTerm(X : Set.OrderedType) = struct
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie acc iter = match iter with
       | None ->
-        Leaf.fold_match ~subst trie.leaf sc_dt t sc_t acc k
+        Util.yield_prof prof_npdtree_term_generalizations;
+        let acc = Leaf.fold_match ~subst trie.leaf sc_dt t sc_t acc k in
+        Util.enter_prof prof_npdtree_term_generalizations;
+        acc
       | Some i ->
           match T.Classic.view i.cur_term with
           | (T.Classic.Var _ | T.Classic.BVar _) ->
             begin match trie.star with
             | None -> acc
             | Some subtrie ->
-              traverse subtrie acc (next i)  (* match "*" against "*" only *)
+              traverse subtrie acc (next i) (* match "*" against "*" only *)
             end
           | T.Classic.App (s, _, l) ->
             let arity = List.length l in
@@ -377,7 +424,10 @@ module MakeTerm(X : Set.OrderedType) = struct
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie acc iter = match iter with
       | None ->
-        Leaf.fold_matched ~subst trie.leaf sc_dt t sc_t acc k
+        Util.yield_prof prof_npdtree_term_specializations;
+        let acc = Leaf.fold_matched ~subst trie.leaf sc_dt t sc_t acc k in
+        Util.enter_prof prof_npdtree_term_specializations;
+        acc
       | Some i ->
           match T.Classic.view i.cur_term with
           | (T.Classic.Var _ | T.Classic.BVar _) ->
@@ -425,7 +475,36 @@ module MakeTerm(X : Set.OrderedType) = struct
     !n
 
   let name = "npdtree"
-  
-  let to_dot buf t =
-    failwith "NPDTree.to_dot: not implemented"
+
+  let _as_graph =
+    LazyGraph.make ~eq:(==)
+      (fun t ->
+        let s1 =
+          (match t.star with
+            | None -> Sequence.empty
+            | Some t' -> Sequence.singleton ("*", t')
+          )
+        and s2 = SIMap.to_seq t.map
+          |> Sequence.map
+              (fun ((sym,i), t') ->
+               Util.sprintf "%a/%d" Symbol.pp sym i, t')
+        in
+        LazyGraph.Node(t, t, Sequence.append s1 s2)
+      )
+
+  (* TODO: print leaf itself *)
+  let _as_dot_graph pp_elem =
+    LazyGraph.map
+      ~vertices:(fun t ->
+        let len = Leaf.size t.leaf in
+        [`Shape "circle"; `Label (string_of_int len)]
+      )
+      ~edges:(fun e -> [`Label e])
+      _as_graph
+
+  let to_dot pp_elem buf t =
+    let fmt = Format.formatter_of_buffer buf in
+    LazyGraph.Dot.pp ~name (_as_dot_graph pp_elem) fmt (Sequence.singleton t);
+    Format.pp_print_flush fmt ();
+    ()
 end

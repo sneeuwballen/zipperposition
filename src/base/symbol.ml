@@ -75,9 +75,11 @@ let cmp a b = match a, b with
 
 let eq a b = cmp a b = 0
 
-let hash = function
-  | Cst s -> s.cs_id
-  | c -> Hashtbl.hash c
+let hash_fun s h = match s with
+  | Cst s -> Hash.int_ s.cs_id h
+  | Int i -> Hash.int_ (Z.hash i) h
+  | c -> Hash.int_ (Hashtbl.hash c) h
+let hash s = Hash.apply hash_fun s
 
 module Map = Sequence.Map.Make(struct type t = sym let compare = cmp end)
 module Set = Sequence.Set.Make(struct type t = sym let compare = cmp end)
@@ -140,7 +142,7 @@ let ty = function
 module H = Hashcons.Make(struct
   type t = const_symbol
   let equal x y = x.cs_name = y.cs_name
-  let hash c = Hash.hash_string c.cs_name
+  let hash c = Hash.(apply string_ c.cs_name)
   let tag i c = c.cs_id <- i
 end)
 

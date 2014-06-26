@@ -84,8 +84,8 @@ module Clause = struct
     let vars c = terms c |> Sequence.flatMap HOT.Seq.vars
   end
 
-  let hash c =
-    Hash.hash_seq HOT.hash 13 (Seq.terms c)
+  let hash_fun c h = Hash.seq HOT.hash_fun (Seq.terms c) h
+  let hash c = Hash.apply hash_fun c
 
   let cmp c1 c2 =
     let c = HOT.cmp c1.head c2.head in

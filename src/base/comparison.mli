@@ -58,6 +58,12 @@ val (++) : t -> t -> t
 
 type 'a comparator = 'a -> 'a -> t
 
+val (@>>) : 'a comparator -> 'a comparator -> 'a comparator
+  (** Combination of comparators that work on the same values.
+      Its behavior is the following:
+      [(f1 @>> f2) x y] is the same as [f1 x y] if
+      [f1 x y] is not [Eq]; otherwise it is the same as [f2 x y] *)
+
 type ('a, 'b) combination
   (** Lexicographic combination of comparators. It is, roughly,
       equivalent to ['a -> 'a -> 'b] *)
@@ -70,6 +76,10 @@ val last : 'a comparator -> ('a, t) combination
 
 val call : ('a, 'b) combination -> 'a -> 'a -> 'b
   (** Call a lexicographic combination on arguments *)
+
+val dominates : ('a -> 'b -> t) -> 'a list -> 'b list -> bool
+  (** [dominates f l1 l2] returns [true] iff for all element [y] of [l2],
+      there is some [x] in [l1] with [f x y = Gt] *)
 
 module type PARTIAL_ORD = sig
   type t
