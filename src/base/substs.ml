@@ -286,8 +286,15 @@ let of_list ?(init=empty) l = match l with
     List.fold_left (fun subst (v,s_v,t,s_t) -> bind subst v s_v t s_t) init l
 
 let pp buf subst =
+  let pp_term buf t =
+    match T.kind t with
+    | T.Kind.FOTerm -> FOTerm.pp buf (FOTerm.of_term_exn t)
+    | T.Kind.Type -> Type.pp buf (Type.of_term_exn t)
+    | T.Kind.HOTerm -> HOTerm.pp buf (HOTerm.of_term_exn t)
+    | _ -> T.pp buf t
+  in
   let pp_binding buf (v,s_v,t,s_t) =
-    Printf.bprintf buf "%a[%d] → %a[%d]" T.pp v s_v T.pp t s_t
+    Printf.bprintf buf "%a[%d] → %a[%d]" pp_term v s_v pp_term t s_t
   in
   match to_list subst with
   | [] -> Buffer.add_string buf "{}"

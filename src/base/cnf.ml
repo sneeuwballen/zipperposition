@@ -46,7 +46,8 @@ let rec is_cnf f = match F.view f with
   | F.Xor _
   | F.Imply _
   | F.Forall _
-  | F.Exists _ -> false
+  | F.Exists _
+  | F.ForallTy _ -> false
 
 and is_lit f = match F.view f with
   | F.Not f' -> F.is_atomic f'
@@ -61,7 +62,8 @@ and is_lit f = match F.view f with
   | F.Xor _
   | F.Imply _
   | F.Forall _
-  | F.Exists _ -> false
+  | F.Exists _
+  | F.ForallTy _ -> false
 
 let is_clause l = List.for_all is_lit l
 
@@ -120,6 +122,8 @@ let miniscope ?(distribute_exists=false) f =
       F.Base.or_ (with_v @ without_v)
     | _ -> F.Base.__mk_exists ~varty (miniscope f')
     end
+  | F.ForallTy f' ->
+    F.Base.__mk_forall_ty (miniscope f')  (* do not bother *)
   | F.And l -> F.Base.and_ (List.map miniscope l)
   | F.Or l -> F.Base.or_ (List.map miniscope l)
   | F.Imply (f1, f2) -> F.Base.imply (miniscope f1) (miniscope f2)
@@ -162,6 +166,8 @@ let rec nnf f =
         F.Base.__mk_exists ~varty (nnf (F.Base.not_ f''))
       | F.Exists (varty, f'') ->
         F.Base.__mk_forall ~varty (nnf (F.Base.not_ f''))
+      | F.ForallTy f' ->
+        failwith "quantification on type variables in contravariant position"
       | F.True -> F.Base.false_
       | F.False -> F.Base.true_
       | F.Atom _ -> f
@@ -180,6 +186,9 @@ let rec nnf f =
       [ F.Base.or_ [f1; f2]; F.Base.or_ [F.Base.not_ f1; F.Base.not_ f2] ])
   | F.Forall (varty,f') -> F.Base.__mk_forall ~varty (nnf f')
   | F.Exists (varty,f') -> F.Base.__mk_exists ~varty (nnf f')
+  | F.ForallTy f' -> F.Base.__mk_forall_ty (nnf f')
+  | F.True
+  | F.False -> f
 
 (* evaluate [f] in the given [env], and then unshift remaining free DB vars *)
 let __eval_and_unshift env f =
@@ -212,6 +221,12 @@ let skolemize ~ctx f =
     Util.debug 5 "type of variable: %a" Type.pp ty;
     let v = T.var ~ty (Skolem.fresh_var ~ctx) in
     let env = DBEnv.singleton (v:T.t:>ST.t) in
+    let new_f' = __eval_and_unshift env f' in
+    skolemize new_f'
+  | F.ForallTy f' ->
+    F.iter (Skolem.update_var ~ctx) f';
+    let v = Type.var (Skolem.fresh_var ~ctx) in
+    let env = DBEnv.singleton (v:Type.t:> ST.t) in
     let new_f' = __eval_and_unshift env f' in
     skolemize new_f'
   in
@@ -294,7 +309,8 @@ let estimate_num_clauses ~cache ~pos f =
               then E.((num false a */ num false b) +/ (num true a */ num true b))
               else E.((num false a */ num true b) +/ (num true a */ num false b))
         | F.Forall (_, f')
-        | F.Exists (_, f') -> num pos f'
+        | F.Exists (_, f')
+        | F.ForallTy f' -> num pos f'
       in
       (* memoize *)
       Util.debug 5 "estimated %a clauses (sign %B) for %a" E.pp n pos F.pp f;
@@ -360,6 +376,8 @@ let introduce_defs ~ctx ~cache ~limit f =
           F.Base.__mk_forall ~varty (recurse ~polarity f')
       | F.Exists (varty, f') ->
           F.Base.__mk_exists ~varty (recurse ~polarity f')
+      | F.ForallTy f' ->
+          F.Base.__mk_forall_ty (recurse ~polarity f')
     in
     (* check whether the formula is already defined! *)
     if Skolem.has_definition ~ctx f
@@ -437,7 +455,8 @@ let rec to_cnf f = match F.view f with
       (to_cnf f')
       l
   | F.Forall _
-  | F.Exists _ -> failwith "Cnf.to_cnf: can only clausify a skolemized formula"
+  | F.Exists _
+  | F.ForallTy _ -> failwith "Cnf.to_cnf: can only clausify a skolemized formula"
   | F.Xor _
   | F.Imply _
   | F.Equiv _ -> failwith "Cnf.to_cnf: can only clausify a NNF formula"
@@ -542,7 +561,8 @@ let cnf_of_list ?(opts=[]) ?(ctx=Skolem.create Signature.empty) l =
         | F.Xor _
         | F.And _
         | F.Forall _
-        | F.Exists _ -> assert false
+        | F.Exists _
+        | F.ForallTy _ -> assert false
       else begin
         let f = F.simplify f in
         Util.debug 4 "... simplified: %a" F.pp f;
@@ -561,6 +581,8 @@ let cnf_of_list ?(opts=[]) ?(ctx=Skolem.create Signature.empty) l =
         let f = List.fold_left (|>) f post_skolem in
         Util.debug 4 "... skolemized: %a" F.pp f;
         let clauses = to_cnf f in
+        Util.debug 4 "... CNF: %a"
+          (Util.pp_list ~sep:", " (Util.pp_list ~sep:" | " F.pp)) clauses;
         clauses
       end
     in

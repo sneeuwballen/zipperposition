@@ -56,6 +56,7 @@ module type S = sig
     | Neq of term * term
     | Forall of Type.t * t  (** Quantified formula, with De Bruijn index *)
     | Exists of Type.t * t
+    | ForallTy of t  (** quantification on type variable *)
 
   val view : t -> view
     (** View of the formula *)
@@ -99,9 +100,11 @@ module type S = sig
 
     val forall : term list -> t -> t
     val exists : term list -> t -> t
+    val forall_ty : Type.t list -> t -> t
 
     val __mk_forall : varty:Type.t -> t -> t
     val __mk_exists : varty:Type.t -> t -> t
+    val __mk_forall_ty : t -> t
   end
 
   (** {2 Sequence} *)
@@ -162,7 +165,8 @@ module type S = sig
 
   val free_vars_set : t -> term_set (** Set of free variables *)
   val free_vars : t -> term list (** Set of free vars *)
-  val de_bruijn_set : t -> term_set  (** Set of De Bruijn indices that are not bound *)
+  val de_bruijn_set : t -> Type.Set.t * term_set
+    (** Set of De Bruijn indices that are not bound for types and terms *)
 
   val close_forall : t -> t   (** Bind all free variables with forall *)
   val close_exists : t -> t   (** Bind all free variables with exists *)
@@ -269,6 +273,7 @@ module Make(MyT : TERM) = struct
     | Neq of term * term
     | Forall of Type.t * t  (** Quantified formula, with De Bruijn index *)
     | Exists of Type.t * t
+    | ForallTy of t  (** quantification on type variable *)
 
   let view t = match T.kind t with
     | kind when kind = MyT.kind ->
@@ -295,6 +300,8 @@ module Make(MyT : TERM) = struct
           Forall (Type.of_term_exn varty, f')
       | T.Bind (Sym.Conn Sym.Exists, varty, f') ->
           Exists (Type.of_term_exn varty, f')
+      | T.Bind (Sym.Conn Sym.ForallTy, ty, f') when T.eq ty T.tType->
+          ForallTy f'
       | _ -> assert false
       end
     | _ -> failwith "wrong kind for formula"
@@ -392,6 +399,9 @@ module Make(MyT : TERM) = struct
     let __mk_exists ~(varty:Type.t) f =
       T.bind ~kind ~ty ~varty:(varty:>T.t) Sym.Base.exists f
 
+    let __mk_forall_ty f =
+      T.bind ~kind ~ty ~varty:T.tType Sym.Base.forall_ty f
+
     let forall vars f =
       List.fold_right
         (fun (v:term) f ->
@@ -404,6 +414,13 @@ module Make(MyT : TERM) = struct
         (fun (v:term) f ->
           let f' = T.DB.replace (T.DB.shift 1 f) ~sub:(v:>T.t) in
           __mk_exists ~varty:(MyT.ty v) f')
+        vars f
+
+    let forall_ty vars f =
+      List.fold_right
+        (fun (v:Type.t) f ->
+          let f' = T.DB.replace (T.DB.shift 1 f) ~sub:(v:>T.t) in
+          __mk_forall_ty f')
         vars f
   end
 
@@ -423,6 +440,7 @@ module Make(MyT : TERM) = struct
     | Eq _ -> f form  (* replace by image *)
     | Forall (varty,f') -> Base.__mk_forall ~varty (map_leaf f f')
     | Exists (varty,f') -> Base.__mk_exists ~varty (map_leaf f f')
+    | ForallTy f' -> Base.__mk_forall_ty (map_leaf f f')
 
   let map (f:term->term) form =
     map_leaf
@@ -448,7 +466,8 @@ module Make(MyT : TERM) = struct
     | Eq _
     | Neq _ -> f acc form
     | Forall (_,f')
-    | Exists (_,f') -> fold_atom f acc f'
+    | Exists (_,f')
+    | ForallTy f' -> fold_atom f acc f'
 
   let fold f acc form =
     fold_atom
@@ -477,6 +496,7 @@ module Make(MyT : TERM) = struct
     | Neq _ -> f
     | Forall (varty,f') -> Base.__mk_forall ~varty (func f')
     | Exists (varty,f') -> Base.__mk_exists ~varty (func f')
+    | ForallTy f' -> Base.__mk_forall_ty (func f')
 
   let rec map_depth ?(depth=0) f form = match view form with
     | And l -> Base.and_ (List.map (map_depth ~depth f) l)
@@ -492,6 +512,7 @@ module Make(MyT : TERM) = struct
     | Neq (t1, t2) -> Base.neq (f depth t1) (f depth t2)
     | Forall (varty,f') -> Base.__mk_forall ~varty (map_depth ~depth:(depth+1) f f')
     | Exists (varty,f') -> Base.__mk_exists ~varty (map_depth ~depth:(depth+1) f f')
+    | ForallTy f' -> Base.__mk_forall_ty (map_depth ~depth:(depth+1) f f')
 
   let rec map_leaf_depth ?(depth=0) f form = match view form with
     | And l -> Base.and_ (List.map (map_leaf_depth ~depth f) l)
@@ -507,6 +528,7 @@ module Make(MyT : TERM) = struct
     | Eq _ -> f depth form  (* replace by image *)
     | Forall (varty,f') -> Base.__mk_forall ~varty (map_leaf_depth ~depth:(depth+1) f f')
     | Exists (varty,f') -> Base.__mk_exists ~varty (map_leaf_depth ~depth:(depth+1) f f')
+    | ForallTy f' -> Base.__mk_forall_ty (map_leaf_depth ~depth:(depth+1) f f')
 
   let fold_depth ?(depth=0) f acc form =
     let rec recurse f acc depth form = match view form with
@@ -528,7 +550,8 @@ module Make(MyT : TERM) = struct
       let acc = f acc depth t2 in
       acc
     | Forall (_, f')
-    | Exists (_, f') ->
+    | Exists (_, f')
+    | ForallTy f' ->
       recurse f acc (depth+1) f'
     in
     recurse f acc depth form
@@ -539,7 +562,8 @@ module Make(MyT : TERM) = struct
     | False -> n + 1
     | Not f'
     | Forall (_,f')
-    | Exists (_,f') -> count (n+1) f'
+    | Exists (_,f')
+    | ForallTy f' -> count (n+1) f'
     | Neq (t1, t2)
     | Eq (t1, t2) -> n + MyT.size t1 + MyT.size t2
     | Atom p -> n + MyT.size p
@@ -578,7 +602,8 @@ module Make(MyT : TERM) = struct
     | Xor _
     | Not _
     | Forall _
-    | Exists _ -> false
+    | Exists _
+    | ForallTy _ -> false
     | True
     | False
     | Atom _
@@ -594,9 +619,14 @@ module Make(MyT : TERM) = struct
   let free_vars f = free_vars_set f |> MyT.Set.elements
 
   let de_bruijn_set f =
-    T.DB.open_vars (f : t :> T.t)
+    let seq = T.DB.open_vars (f : t :> T.t) in
+    let tvars = seq
       |> Sequence.fmap MyT.of_term
       |> Sequence.fold (fun acc t -> MyT.Set.add t acc) MyT.Set.empty
+    and tyvars = seq
+      |> Sequence.fmap Type.of_term
+      |> Sequence.fold (fun acc t -> Type.Set.add t acc) Type.Set.empty
+    in tyvars, tvars
 
   let is_closed f =
     match free_vars f with
@@ -660,6 +690,7 @@ module Make(MyT : TERM) = struct
     | Not f' -> Base.not_ (flatten f')
     | Forall (varty,f') -> Base.__mk_forall ~varty (flatten f')
     | Exists (varty,f') -> Base.__mk_exists ~varty (flatten f')
+    | ForallTy f' -> Base.__mk_forall_ty (flatten f')
     | True
     | False
     | Atom _
@@ -676,9 +707,10 @@ module Make(MyT : TERM) = struct
         flatten (Base.or_ l')
       | Forall (_,f')
       | Exists (_,f') when not (T.DB.contains f' 0) ->
-        simplify ~depth (of_term_exn (T.DB.unshift ~depth 1 f'))
+        simplify ~depth (of_term_exn (T.DB.unshift ~depth:0 1 f'))
       | Forall (varty,f') -> Base.__mk_forall ~varty (simplify ~depth:(depth+1) f')
       | Exists (varty,f') -> Base.__mk_exists ~varty (simplify ~depth:(depth+1) f')
+      | ForallTy f' -> Base.__mk_forall_ty (simplify ~depth:(depth+1) f')
       | Neq (a, b) when MyT.eq a b -> Base.false_
       | Eq (a,b) when MyT.eq a b -> Base.true_
       | Neq _
@@ -736,7 +768,8 @@ module Make(MyT : TERM) = struct
     | Imply _
     | Not _ -> false
     | Exists (_,f')
-    | Forall (_,f') -> is_trivial f'
+    | Forall (_,f')
+    | ForallTy f' -> is_trivial f'
 
   let ac_normal_form f =
     let rec recurse f = match view f with
@@ -769,6 +802,7 @@ module Make(MyT : TERM) = struct
       Base.or_ l'
     | Forall (varty,f') -> Base.__mk_forall ~varty (recurse f')
     | Exists (varty,f') -> Base.__mk_exists ~varty (recurse f')
+    | ForallTy f' -> Base.__mk_forall_ty (recurse f')
     in
     recurse (flatten f)
 
@@ -806,6 +840,10 @@ module Make(MyT : TERM) = struct
             (PT.var (Util.sprintf "Y%d" depth))
             (Type.Conv.to_prolog ~depth tyvar)]
         (to_prolog (depth+1) f')
+    | ForallTy f' ->
+      PT.TPTP.forall_ty
+        [PT.var (Util.sprintf "A%d" depth)]
+        (to_prolog (depth+1) f')
     in to_prolog depth f
 
   (** {2 IO} *)
@@ -838,6 +876,11 @@ module Make(MyT : TERM) = struct
       let v = !depth in
       incr depth;
       Printf.bprintf buf "∀ Y%d: %a. %a" v Type.pp ty pp_inner f';
+      decr depth
+    | ForallTy f' ->
+      let v = !depth in
+      incr depth;
+      Printf.bprintf buf "∀ A%d. %a" v pp_inner f';
       decr depth
     | Exists (ty, f') ->
       let v = !depth in
@@ -894,6 +937,11 @@ module Make(MyT : TERM) = struct
           then Printf.bprintf buf "![Y%d]: %a" v pp_inner f'
           else Printf.bprintf buf "![Y%d:%a]: %a" v Type.pp ty pp_inner f';
         decr depth
+      | ForallTy f' ->
+        let v = !depth in
+        incr depth;
+        Printf.bprintf buf "![A%d:$tType]: %a" v pp_inner f';
+        decr depth
       | Exists (ty, f') ->
         let v = !depth in
         incr depth;
@@ -949,6 +997,7 @@ module FO = struct
     | Not f' -> T.TPTP.mk_not (to_hoterm f')
     | Forall (ty,f') -> T.TPTP.__mk_forall ~varty:ty (to_hoterm f')
     | Exists (ty,f') -> T.TPTP.__mk_exists ~varty:ty (to_hoterm f')
+    | ForallTy f' -> failwith "HOTerm doesn't support dependent types"
     | Atom p -> T.curry p
 
   let of_hoterm t =

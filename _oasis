@@ -1,6 +1,6 @@
 OASISFormat: 0.4
 Name:        logtk
-Version:     0.1
+Version:     0.3.5
 Homepage:    https://github.com/c-cube/logtk
 Authors:     Simon Cruanes
 License:     BSD-2-clause

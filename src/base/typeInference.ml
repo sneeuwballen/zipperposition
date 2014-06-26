@@ -143,6 +143,12 @@ module Ctx = struct
       (fun b -> raise (Type.Error (Buffer.contents b)))
       b msg
 
+  (* obtain a (possibly fresh) type var for this name *)
+  let _get_ty_var ctx name =
+    match Type.Conv.of_prolog ~ctx:ctx.tyvars name with
+    | None -> assert false
+    | Some v -> v
+
   (* variable number and type, for the given name. An optional type can
     be provided.*)
   let _get_var ?ty ctx name =
@@ -539,6 +545,13 @@ module FO = struct
         | Sym.Exists -> F.Base.exists (vars' ctx) (f' ctx)
         | _ -> assert false
         end
+    | PT.Bind(Sym.Conn Sym.ForallTy, vars, f') ->
+      let vars' = List.map (Ctx._get_ty_var ctx) vars in
+      if not (List.for_all Type.is_var vars')
+        then Ctx.__error ctx "expected type variables";
+      let f' = infer_form_rec ctx f' in
+      fun ctx ->
+        F.Base.forall_ty vars' (f' ctx)
     | PT.App ({PT.term=PT.Const (Sym.Conn ((Sym.Eq | Sym.Neq) as conn))},
       ([_;a;b] | [_; {PT.term=PT.List [a;b]}] | [a;b])) ->
       (* a ?= b *)
