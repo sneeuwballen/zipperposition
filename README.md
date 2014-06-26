@@ -11,12 +11,10 @@ This project is licensed under the BSD2 license. See the `LICENSE` file.
 ## Regular build
 
 You will need OCaml >= 4.00.1 or higher with ocamlbuild,
-[zarith](https://forge.ocamlcore.org/projects/zarith/)
+[zarith](https://forge.ocamlcore.org/projects/zarith/),
+[ocaml-containers](https://github.com/c-cube/ocaml-containers/),
+[sequence](https://github.com/c-cube/sequence/)
 and the standard library.
-
-Some modules come from
-[ocaml-containers](https://github.com/c-cube/ocaml-containers/) and are packaged with
-the library.
 
 Additional sub-libraries can be built if their respective dependencies
 are met, and the appropriate `./configure --enable-foobar` flag was set.
