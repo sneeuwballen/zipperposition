@@ -33,6 +33,7 @@ module T = FOTerm
 module S = Substs.FO
 module Lit = Literal
 module Lits = Literals
+module BV = CCBV
 
 type t = Literal.t array -> BV.t
 

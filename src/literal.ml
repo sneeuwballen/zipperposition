@@ -29,6 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+module Hash = CCHash
 module T = FOTerm
 module F = Formula.FO
 module S = Substs
@@ -896,13 +897,13 @@ module Conv = struct
   type hook_to = t -> form option
 
   let arith_hook_from f =
-    let open Monad.Opt in
+    let open CCOpt in
     let module SA = Symbol.TPTP.Arith in
     let module AL = ArithLit in
     let type_ok t = Type.eq Type.TPTP.int (T.ty t) in
     (* arithmetic conversion! *)
     let rec conv f = match F.view f with
-    | F.Not f' -> map (conv f') negate
+    | F.Not f' -> map negate (conv f')
     | F.Atom p ->
         begin match T.Classic.view p with
         | T.Classic.App (s, _, [l; r]) when Symbol.eq s SA.less && type_ok l ->
@@ -937,7 +938,7 @@ module Conv = struct
   let total_order_hook_from ~instance f =
     let rec conv f = match F.view f with
       | F.Not f' ->
-        Monad.Opt.map (conv f') negate
+        CCOpt.map negate (conv f')
       | F.Atom p ->
           begin match T.Classic.view p with
           | T.Classic.App (s, tyargs, [l; r]) ->

@@ -1,14 +1,15 @@
-OASISFormat: 0.3
+OASISFormat: 0.4
 Name:        zipperposition
-Version:     0.4-arith-dev
+Version:     0.4-dev
 Homepage:    https://github.com/c-cube/zipperposition
 Authors:     Simon Cruanes
 License:     BSD3
 LicenseFile: LICENSE
-Plugins:     META (0.3)
+Plugins:     META (0.3), DevFiles (0.3)
 OCamlVersion: >= 4.00.1
 BuildTools:  ocamlbuild
 FilesAB: src/const.ml.ab
+AlphaFeatures: compiled_setup_ml
 
 Synopsis:  Superposition theorem prover, for first order logic with equality.
 Description:
@@ -29,10 +30,9 @@ Library "libzipperposition"
                     PEnv, Params, Env, Monome, ArithLit, Signals, Multisets,
                     calculi/Superposition, calculi/Chaining, calculi/EnumTypes,
                     calculi/ArithInt
-  InternalModules:  lib/LazyGraph, lib/Leftistheap,
-                    lib/Vector, lib/Sequence, lib/SmallSet,
-                    lib/UnionFind, lib/Choice, lib/Mixtbl, lib/Signal
-  BuildDepends:     unix,zarith,logtk,dynlink
+  InternalModules:  lib/LazyGraph, lib/SmallSet, lib/UnionFind,
+                    lib/Choice, lib/Mixtbl, lib/Signal
+  BuildDepends:     containers,sequence,unix,zarith,logtk,dynlink
 
 Library "libzipperposition_meta"
   Path:             src/meta/
@@ -47,12 +47,11 @@ Library "libzipperposition_meta"
 
 # main executable for the prover
 Executable zipperposition
-  Path: src/
-  Install: true
-  CompiledObject: native
-  MainIs: zipperposition.ml
-  BuildDepends: unix,num,logtk,logtk.meta,dynlink,libzipperposition
-  DataFiles: builtin.theory
+  Path:             src/
+  Install:          true
+  CompiledObject:   native
+  MainIs:           zipperposition.ml
+  BuildDepends:     containers,sequence,unix,logtk,logtk.parsers,dynlink,libzipperposition
 
 Document zipperposition
   Title:                Documentation for Zipperposition
@@ -63,18 +62,18 @@ Document zipperposition
   XOCamlbuildLibraries: libzipperposition
 
 Test all
-  Command: $run_tests
-  TestTools: run_tests
-  Run$: flag(tests)
+  Command:      $run_tests
+  TestTools:    run_tests
+  Run$:         flag(tests)
 
 Executable run_tests
-  Path: tests/
-  Install: false
-  CompiledObject: native
-  MainIs: run_tests.ml
-  Build$: flag(tests)
-  BuildDepends: logtk, logtk.meta, logtk.arbitrary,
-                libzipperposition, libzipperposition.arbitrary, qcheck
+  Path:             tests/
+  Install:          false
+  CompiledObject:   native
+  MainIs:           run_tests.ml
+  Build$:           flag(tests)
+  BuildDepends:     containers, logtk, logtk.parsers, logtk.arbitrary,
+                    libzipperposition, libzipperposition.arbitrary, qcheck
 
 SourceRepository head
   Type: git

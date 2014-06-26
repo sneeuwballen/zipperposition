@@ -341,7 +341,7 @@ let preprocess ~signature ~params formulas =
 
 (** Process the given file (try to solve it) *)
 let process_file ?meta ~plugins ~params file =
-  let open Monad.Err in
+  let open CCError in
   Util.debug 1 "================ process file %s ===========" file;
   (* parse formulas *)
   Util_tptp.parse_file ~recursive:true file
@@ -432,13 +432,13 @@ let () =
   (* initialize plugins *)
   List.iter Extensions.init plugins;
   (* master process: process files *)
-  Vector.iter
+  CCVector.iter
     (fun file ->
       match process_file ~plugins ~params file with
-      | Monad.Err.Error msg ->
+      | `Error msg ->
           print_endline msg;
           exit 1
-      | Monad.Err.Ok () -> ()
+      | `Ok () -> ()
     ) params.param_files;
   ()
 

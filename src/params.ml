@@ -31,7 +31,7 @@ type t = {
   param_steps : int;
   param_version : bool;
   param_timeout : float;
-  param_files : string Vector.vector;
+  param_files : (string, CCVector.ro) CCVector.t;
   param_split : bool;             (** use splitting *)
   param_theories : bool;          (** detect theories *)
   param_select : string;          (** name of the selection function *)
@@ -79,14 +79,14 @@ let parse_args () =
   and select = ref "SelectComplex"
   and progress = ref false
   and unary_depth = ref 1
-  and files = Vector.create () in
+  and files = CCVector.create () in
   (* special handlers *)
   let set_progress () =
     Util.need_cleanup := true;
     progress := true
   and add_plugin s = plugins := s :: !plugins
   and add_plugins s = plugins := (Util.str_split ~by:"," s) @ !plugins
-  and add_file s = Vector.push files s 
+  and add_file s = CCVector.push files s 
   in
   (* options list *) 
   let options =
@@ -115,8 +115,9 @@ let parse_args () =
   let options = List.sort (fun (a1,_,_)(a2,_,_)->String.compare a1 a2) options in
   Util.set_debug 1;  (* default *)
   Arg.parse options add_file "solve problems in files";
-  if Vector.is_empty files
-    then Vector.push files "stdin";
+  if CCVector.is_empty files
+    then CCVector.push files "stdin";
+  let files = CCVector.freeze files in (* from now on, immutable *)
   let param_ord = Ordering.by_name !ord in
   (* return parameter structure *)
   { param_ord; param_seed = !seed; param_steps = !steps;

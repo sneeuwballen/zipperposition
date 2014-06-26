@@ -100,17 +100,17 @@ module type S = sig
 
   module CHashcons : Hashcons.S with type elt = clause
 
-  val create : ?parents:t list -> ?selected:BV.t ->
+  val create : ?parents:t list -> ?selected:CCBV.t ->
                Literal.t list ->
                (CompactClause.t -> Proof.t) -> t
     (** Build a new hclause from the given literals. *)
 
-  val create_a : ?parents:t list -> ?selected:BV.t ->
+  val create_a : ?parents:t list -> ?selected:CCBV.t ->
                   Literal.t array ->
                   (CompactClause.t -> Proof.t) -> t
     (** Build a new hclause from the given literals. *)
 
-  val of_forms : ?parents:t list -> ?selected:BV.t ->
+  val of_forms : ?parents:t list -> ?selected:CCBV.t ->
                       Formula.FO.t list ->
                       (CompactClause.t -> Proof.t) -> t
     (** Directly from list of formulas *)
@@ -137,20 +137,20 @@ module type S = sig
   val apply_subst : renaming:Substs.Renaming.t -> Substs.t -> t -> scope -> t
     (** apply the substitution to the clause *)
 
-  val maxlits : t -> scope -> Substs.t -> BV.t
+  val maxlits : t -> scope -> Substs.t -> CCBV.t
     (** List of maximal literals *)
 
   val is_maxlit : t -> scope -> Substs.t -> idx:int -> bool
     (** Is the i-th literal maximal in subst(clause)? Equivalent to
         Bitvector.get (maxlits ~ord c subst) i *)
 
-  val eligible_res : t -> scope -> Substs.t -> BV.t
+  val eligible_res : t -> scope -> Substs.t -> CCBV.t
     (** Bitvector that indicates which of the literals of [subst(clause)]
         are eligible for resolution. THe literal has to be either maximal
         among selected literals of the same sign, if some literal is selected,
         or maximal if none is selected. *)
 
-  val eligible_param : t -> scope -> Substs.t -> BV.t
+  val eligible_param : t -> scope -> Substs.t -> CCBV.t
     (** Bitvector that indicates which of the literals of [subst(clause)]
         are eligible for paramodulation. That means the literal
         is positive, no literal is selecteed, and the literal
@@ -159,7 +159,7 @@ module type S = sig
   val is_eligible_param : t -> scope -> Substs.t -> idx:int -> bool
     (** Check whether the [idx]-th literal is eligible for paramodulation *)
 
-  val eligible_chaining : t -> scope -> Substs.t -> BV.t
+  val eligible_chaining : t -> scope -> Substs.t -> CCBV.t
     (** Bitvector of literals of [subst(clause)] that are eligible
         for equality chaining or inequality chaining. That amouns to being
         a maximal, positive inequality literal within the clause,

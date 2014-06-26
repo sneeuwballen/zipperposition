@@ -30,6 +30,7 @@ open Logtk
 type term = FOTerm.t
 type scope = Substs.scope
 
+module Hash = CCHash
 module T = FOTerm
 module S = Substs
 module F = Formula.FO
