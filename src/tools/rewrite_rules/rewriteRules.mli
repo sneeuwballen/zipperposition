@@ -29,6 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open Logtk_parsers
 
+type 'a or_error = [`Error of string | `Ok of 'a]
+
 type statement =
   | Rule of PrologTerm.t * PrologTerm.t
   | Type of string * PrologTerm.t
@@ -36,12 +38,12 @@ type statement =
 type rule = FOTerm.t * FOTerm.t
 (** Rewrite rules on terms *)
 
-val parse_file : string -> in_channel -> statement list Monad.Err.t
+val parse_file : string -> in_channel -> statement list or_error
 (** Parse the given file, containing rules, into statements *)
 
 val rules_of_pairs : Signature.t ->
                      statement list ->
-                     (Signature.t * rule list) Monad.Err.t
+                     (Signature.t * rule list) or_error
 (** Infer types and signature from a list of statements.
    @return typed rules and the new signature *)
 

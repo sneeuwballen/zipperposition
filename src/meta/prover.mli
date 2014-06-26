@@ -29,6 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open Logtk_parsers
 
+type 'a or_error = [`Error of string | `Ok of 'a]
+
 type t
   (** Meta-prover *)
 
@@ -63,11 +65,11 @@ end
 (** {6 IO} *)
 
 val of_ho_ast : t -> Ast_ho.t Sequence.t ->
-                (t * Reasoner.consequence Sequence.t) Monad.Err.t
+                (t * Reasoner.consequence Sequence.t) or_error
   (** Add the given declarations to the meta-prover. In case of type
      inference failure, or other mismatch, an error is returned. *)
 
 val parse_file : t -> string ->
-                (t * Reasoner.consequence Sequence.t) Monad.Err.t
+                (t * Reasoner.consequence Sequence.t) or_error
   (** Attempt to parse file using {!Logtk_parsers.Parse_ho} and add the
       parsed content to the prover *)

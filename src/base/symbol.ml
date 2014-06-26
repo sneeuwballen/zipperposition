@@ -25,6 +25,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Symbols} *)
 
+module Hash = CCHash
+
 type connective =
   | Not
   | And

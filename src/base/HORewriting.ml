@@ -26,6 +26,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Rewriting on HO terms} *)
 
+module Hash = CCHash
 module T = HOTerm
 
 type term = T.t
@@ -90,7 +91,7 @@ let normalize_collect trs t =
         rewrite_here ~trs ~rules (T.multiset ~ty:tau l')
     | T.Record (l, rest) ->
         let l' = List.map (fun (n,t) -> n, reduce ~trs ~rules t) l in
-        let rest = Monad.Opt.map rest (reduce ~trs ~rules) in
+        let rest = CCOpt.map (reduce ~trs ~rules) rest in
         rewrite_here ~trs ~rules (T.record l' ~rest)
     | T.RigidVar _
     | T.Var _

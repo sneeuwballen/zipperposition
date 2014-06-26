@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: cfda060eb5b955dcb77a0f706e4ac40d)
+# DO NOT EDIT (digest: 69037d7b323577702e7cc71ce0b45f0d)
 Symbol
 ScopedTerm
 FOTerm
@@ -33,22 +33,14 @@ Rewriting
 FormulaShape
 Transform
 Lambda
-lib/Hash
 lib/Hashcons
-lib/Sequence
 lib/Cache
 lib/Bij
 lib/Bencode
-lib/PersistentHashtbl
-lib/Monad
 lib/ParseLocation
 lib/Multiset
-lib/BV
 lib/PartialOrder
-lib/KList
 lib/LazyList
 lib/IArray
 lib/LazyGraph
-lib/CCSequence
-lib/CCList
 # OASIS_STOP

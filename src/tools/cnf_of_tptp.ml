@@ -33,7 +33,7 @@ module F = Formula.FO
 module A = Ast_tptp
 module AU = Ast_tptp.Untyped
 module AT = Ast_tptp.Typed
-module Err = Monad.Err
+module Err = CCError
 
 let declare_types = ref false
 let print_sig = ref false
@@ -79,8 +79,8 @@ let process file =
     Err.return ()
   )
   in match res with
-    | Err.Ok () -> ()
-    | Err.Error msg ->
+    | `Ok () -> ()
+    | `Error msg ->
         print_endline msg;
         exit 1
 

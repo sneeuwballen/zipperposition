@@ -33,7 +33,7 @@ open Logtk_meta
 module HOT = HOTerm
 module F = Formula.FO
 module A = Ast_ho
-module E = Monad.Err
+module E = CCError
 
 let files = ref []
 let theory_files = ref []
@@ -53,9 +53,9 @@ let options =
 
 (* parse the given theory files into the prover *)
 let parse_files prover files =
-  E.fold_l files (E.return prover)
-    (fun p file ->
-      E.map (Prover.parse_file p file) fst)
+  E.fold_l
+    (fun p file -> E.map fst (Prover.parse_file p file))
+    prover files
 
 let to_cnf ~signature decls =
   E.(
@@ -74,7 +74,8 @@ let to_cnf ~signature decls =
 
 let parse_and_cnf ?(signature=Signature.TPTP.base) files =
   let q = Queue.create () in
-  let res = E.(fold_l files (return ())
+  let res = E.(
+    fold_l
     (fun () file ->
       Util.debug 1 "parse input file %s" file;
       (* parse *)
@@ -89,12 +90,13 @@ let parse_and_cnf ?(signature=Signature.TPTP.base) files =
       let clauses = Sequence.map Encoding.foclause_of_clause clauses in
       Queue.add clauses q;
       return ()
-    ))
+    ) () files
+  )
   in
   match res with
-  | E.Ok () ->
+  | `Ok () ->
       E.return (Sequence.of_queue q |> Sequence.flatten)
-  | E.Error msg ->
+  | `Error msg ->
       E.fail msg
 
 (* print content of the reasoner *)
@@ -175,9 +177,9 @@ let main () =
     E.return results
   ) in
   match res with
-  | E.Error msg ->
+  | `Error msg ->
       Util.debug 0 "error: %s" msg; exit 1
-  | E.Ok {theories; lemmas; axioms; rewrite; pre_rewrite; } ->
+  | `Ok {theories; lemmas; axioms; rewrite; pre_rewrite; } ->
       Util.debug 1 "success!";
       Util.printf "axioms:\n  %a\n"
         (Util.pp_seq ~sep:"\n  " pp_theory_axiom) axioms;

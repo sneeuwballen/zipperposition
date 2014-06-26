@@ -237,7 +237,9 @@ val with_output : string -> (out_channel -> 'a) -> 'a option
 val slurp : in_channel -> string
   (** Read the whole filedescriptor into a string *)
 
-val popen : cmd:string -> input:string -> string Monad.Err.t
+type 'a or_error = [`Error of string | `Ok of 'a]
+
+val popen : cmd:string -> input:string -> string or_error
   (** Run the given command [cmd] with the given [input], wait for it
       to terminate, and return its stdout. *)
 

@@ -29,9 +29,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 type scope = Substs.scope
 type subst = Substs.t
 
+type 'a klist = unit -> [`Nil | `Cons of 'a * 'a klist]
+
 (** {2 Result of (multiple) Unification} *)
 
-type res = subst KList.t
+type res = subst klist
 
 exception Fail
   (** Raised when a unification/matching attempt fails *)

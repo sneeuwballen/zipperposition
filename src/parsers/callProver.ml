@@ -28,9 +28,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+type 'a or_error = [`Error of string | `Ok of 'a]
+
 module A = Ast_tptp
 module TT = Trace_tstp
-module Err = Monad.Err
+module Err = CCError
 
 (** {2 Description of provers} *)
 
@@ -158,8 +160,8 @@ let proof_of_decls decls =
     Trace_tstp.of_decls decls'
   ) in
   match res with
-  | Err.Error _ -> None
-  | Err.Ok proof -> Some proof
+  | `Error _ -> None
+  | `Ok proof -> Some proof
 
 let call_proof ?timeout ?args ~prover decls =
   Err.(
@@ -215,8 +217,8 @@ module Eprover = struct
       (* read its output *)
       let decls, proof =
         match decls_of_string ~source:"E" output with
-        | Err.Error _ -> None, None
-        | Err.Ok s ->
+        | `Error _ -> None, None
+        | `Ok s ->
             (* try to parse proof, if it's a theorem *)
             let proof =
               if answer = Theorem

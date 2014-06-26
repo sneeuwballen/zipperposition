@@ -29,10 +29,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open Logtk_parsers
 
+type 'a or_error = [`Error of string | `Ok of 'a]
+
 module P = Plugin
 module R = Reasoner
 module PT = PrologTerm
 module Loc = ParseLocation
+module Err = CCError
 
 type t = {
   reasoner : Reasoner.t;
@@ -118,9 +121,9 @@ let of_ho_ast p decls =
     (* enrich signature *)
     let signature = TypeInference.Ctx.to_signature ctx in
     let p' = add_signature p' signature in
-    Monad.Err.Ok (p', consequences)
+    Err.return (p', consequences)
   with Type.Error msg
-  | Invalid_argument msg -> Monad.Err.fail msg
+  | Invalid_argument msg -> Err.fail msg
 
 let parse_file p filename =
   try
@@ -136,11 +139,11 @@ let parse_file p filename =
     | Parse_ho.Error ->
       close_in ic;
       let loc = Loc.of_lexbuf lexbuf in
-      Monad.Err.fail ("parse error at "^Loc.to_string loc)
+      Err.fail ("parse error at "^Loc.to_string loc)
     | Lex_ho.Error msg ->
       close_in ic;
-      Monad.Err.fail ("lexing error: " ^ msg)
+      Err.fail ("lexing error: " ^ msg)
     end
   with Sys_error msg ->
     let msg = Printf.sprintf "could not open file %s: %s" filename msg in
-    Monad.Err.fail msg
+    Err.fail msg

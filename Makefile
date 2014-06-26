@@ -59,7 +59,4 @@ push_doc: doc rst_doc
 	rsync -tavu logtk.docdir/* cedeela.fr:~/simon/root/software/logtk/
 	rsync -tavu _build/doc/* cedeela.fr:~/simon/root/software/logtk/rst/
 
-fetch-submodules:
-	git submodule update --init
-
 .PHONY: push_doc tags rst_doc open_doc fetch-submodules

@@ -30,7 +30,7 @@ open Logtk
 open Logtk_parsers
 
 module PT = PrologTerm
-module Err = Monad.Err
+module Err = CCError
 
 let print_line () =
   Printf.printf "%s\n" (Util.str_repeat "=" 60);
@@ -79,16 +79,15 @@ let main () =
   Arg.parse options add_file "check_tptp [options] [file1|stdin] file2...";
   (if !files = [] then files := ["stdin"]);
   files := List.rev !files;
-  let res =
-    Err.fold_l
-      !files (Err.return ())
-      (fun () file -> check file);
+  let res = Err.fold_l
+    (fun () file -> check file)
+    () !files;
   in
   match res with
-  | Err.Ok () ->
+  | `Ok () ->
     print_line ();
     Printf.printf "success!\n"
-  | Err.Error msg ->
+  | `Error msg ->
     print_endline msg
 
 let _ =

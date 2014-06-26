@@ -106,7 +106,7 @@ let hash_feature f = match f with
   | A -> 5
   | S s -> Symbol.hash s
 
-module PH = PersistentHashtbl.Make(struct
+module PH = CCPersistentHashtbl.Make(struct
   type t = feature
   let equal = eq_features
   let hash = hash_feature

@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 2904ab37968fa434ed6eab928a3e4885)
+# DO NOT EDIT (digest: eac404162364cd230662a0178830d82f)
 src/base/Symbol
 src/base/ScopedTerm
 src/base/FOTerm
@@ -33,24 +33,16 @@ src/base/Rewriting
 src/base/FormulaShape
 src/base/Transform
 src/base/Lambda
-src/base/lib/Hash
 src/base/lib/Hashcons
-src/base/lib/Sequence
 src/base/lib/Cache
 src/base/lib/Bij
 src/base/lib/Bencode
-src/base/lib/PersistentHashtbl
-src/base/lib/Monad
 src/base/lib/ParseLocation
 src/base/lib/Multiset
-src/base/lib/BV
 src/base/lib/PartialOrder
-src/base/lib/KList
 src/base/lib/LazyList
 src/base/lib/IArray
 src/base/lib/LazyGraph
-src/base/lib/CCSequence
-src/base/lib/CCList
 src/meta/Encoding
 src/meta/Reasoner
 src/meta/Plugin

@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 9e4b95cd97f968d49dc2f327302c9bc2)
+# DO NOT EDIT (digest: e3e5eb74c26e2e0699c55bfbe4aaa873)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -48,26 +48,22 @@
 "src/base/formulaShape.cmx": for-pack(Logtk)
 "src/base/transform.cmx": for-pack(Logtk)
 "src/base/lambda.cmx": for-pack(Logtk)
-"src/base/lib/hash.cmx": for-pack(Logtk)
 "src/base/lib/hashcons.cmx": for-pack(Logtk)
-"src/base/lib/sequence.cmx": for-pack(Logtk)
 "src/base/lib/cache.cmx": for-pack(Logtk)
 "src/base/lib/bij.cmx": for-pack(Logtk)
 "src/base/lib/bencode.cmx": for-pack(Logtk)
-"src/base/lib/persistentHashtbl.cmx": for-pack(Logtk)
-"src/base/lib/monad.cmx": for-pack(Logtk)
 "src/base/lib/parseLocation.cmx": for-pack(Logtk)
 "src/base/lib/multiset.cmx": for-pack(Logtk)
-"src/base/lib/BV.cmx": for-pack(Logtk)
 "src/base/lib/partialOrder.cmx": for-pack(Logtk)
-"src/base/lib/kList.cmx": for-pack(Logtk)
 "src/base/lib/lazyList.cmx": for-pack(Logtk)
 "src/base/lib/iArray.cmx": for-pack(Logtk)
 "src/base/lib/lazyGraph.cmx": for-pack(Logtk)
-"src/base/lib/CCSequence.cmx": for-pack(Logtk)
-"src/base/lib/CCList.cmx": for-pack(Logtk)
+<src/base/*.ml{,i}>: package(containers)
+<src/base/*.ml{,i}>: package(sequence)
 <src/base/*.ml{,i}>: package(unix)
 <src/base/*.ml{,i}>: package(zarith)
+<src/base/lib/*.ml{,i}>: package(containers)
+<src/base/lib/*.ml{,i}>: package(sequence)
 <src/base/lib/*.ml{,i}>: package(unix)
 <src/base/lib/*.ml{,i}>: package(zarith)
 # Library logtk_parsers
@@ -81,6 +77,8 @@
 "src/parsers/parse_ho.cmx": for-pack(Logtk_parsers)
 "src/parsers/trace_tstp.cmx": for-pack(Logtk_parsers)
 "src/parsers/callProver.cmx": for-pack(Logtk_parsers)
+<src/parsers/*.ml{,i}>: package(containers)
+<src/parsers/*.ml{,i}>: package(sequence)
 <src/parsers/*.ml{,i}>: package(unix)
 <src/parsers/*.ml{,i}>: package(zarith)
 <src/parsers/*.ml{,i}>: use_logtk
@@ -90,6 +88,8 @@
 "src/meta/reasoner.cmx": for-pack(Logtk_meta)
 "src/meta/plugin.cmx": for-pack(Logtk_meta)
 "src/meta/prover.cmx": for-pack(Logtk_meta)
+<src/meta/*.ml{,i}>: package(containers)
+<src/meta/*.ml{,i}>: package(sequence)
 <src/meta/*.ml{,i}>: package(unix)
 <src/meta/*.ml{,i}>: package(zarith)
 <src/meta/*.ml{,i}>: use_logtk
@@ -98,6 +98,8 @@
 "src/solving/logtk_solving.cmxs": use_logtk_solving
 "src/solving/lpo.cmx": for-pack(Logtk_solving)
 <src/solving/*.ml{,i}>: package(aez)
+<src/solving/*.ml{,i}>: package(containers)
+<src/solving/*.ml{,i}>: package(sequence)
 <src/solving/*.ml{,i}>: package(unix)
 <src/solving/*.ml{,i}>: package(zarith)
 <src/solving/*.ml{,i}>: use_logtk
@@ -108,7 +110,9 @@
 "src/arbitrary/arType.cmx": for-pack(Logtk_arbitrary)
 "src/arbitrary/arSignature.cmx": for-pack(Logtk_arbitrary)
 "src/arbitrary/arSymbol.cmx": for-pack(Logtk_arbitrary)
+<src/arbitrary/*.ml{,i}>: package(containers)
 <src/arbitrary/*.ml{,i}>: package(qcheck)
+<src/arbitrary/*.ml{,i}>: package(sequence)
 <src/arbitrary/*.ml{,i}>: package(unix)
 <src/arbitrary/*.ml{,i}>: package(zarith)
 <src/arbitrary/*.ml{,i}>: use_logtk
@@ -116,7 +120,9 @@
 <src/arbitrary/*.ml{,i}>: use_logtk_parsers
 # Executable run_bench
 "tests/run_bench.native": package(benchmark)
+"tests/run_bench.native": package(containers)
 "tests/run_bench.native": package(qcheck)
+"tests/run_bench.native": package(sequence)
 "tests/run_bench.native": package(unix)
 "tests/run_bench.native": package(zarith)
 "tests/run_bench.native": use_logtk
@@ -125,16 +131,20 @@
 "tests/run_bench.native": use_logtk_parsers
 <tests/*.ml{,i}>: package(benchmark)
 # Executable run_tests
+"tests/run_tests.native": package(containers)
 "tests/run_tests.native": package(oUnit)
 "tests/run_tests.native": package(qcheck)
+"tests/run_tests.native": package(sequence)
 "tests/run_tests.native": package(unix)
 "tests/run_tests.native": package(zarith)
 "tests/run_tests.native": use_logtk
 "tests/run_tests.native": use_logtk_arbitrary
 "tests/run_tests.native": use_logtk_meta
 "tests/run_tests.native": use_logtk_parsers
+<tests/*.ml{,i}>: package(containers)
 <tests/*.ml{,i}>: package(oUnit)
 <tests/*.ml{,i}>: package(qcheck)
+<tests/*.ml{,i}>: package(sequence)
 <tests/*.ml{,i}>: package(unix)
 <tests/*.ml{,i}>: package(zarith)
 <tests/*.ml{,i}>: use_logtk
@@ -142,39 +152,53 @@
 <tests/*.ml{,i}>: use_logtk_meta
 <tests/*.ml{,i}>: use_logtk_parsers
 # Executable type_check_tptp
+"src/tools/type_check_tptp.native": package(containers)
+"src/tools/type_check_tptp.native": package(sequence)
 "src/tools/type_check_tptp.native": package(unix)
 "src/tools/type_check_tptp.native": package(zarith)
 "src/tools/type_check_tptp.native": use_logtk
 "src/tools/type_check_tptp.native": use_logtk_parsers
 # Executable cnf_of_tptp
+"src/tools/cnf_of_tptp.native": package(containers)
+"src/tools/cnf_of_tptp.native": package(sequence)
 "src/tools/cnf_of_tptp.native": package(unix)
 "src/tools/cnf_of_tptp.native": package(zarith)
 "src/tools/cnf_of_tptp.native": use_logtk
 "src/tools/cnf_of_tptp.native": use_logtk_parsers
 # Executable orient
 "src/tools/orient/orient.native": package(aez)
+"src/tools/orient/orient.native": package(containers)
+"src/tools/orient/orient.native": package(sequence)
 "src/tools/orient/orient.native": package(unix)
 "src/tools/orient/orient.native": package(zarith)
 "src/tools/orient/orient.native": use_logtk
 "src/tools/orient/orient.native": use_logtk_parsers
 "src/tools/orient/orient.native": use_logtk_solving
 <src/tools/orient/*.ml{,i}>: package(aez)
+<src/tools/orient/*.ml{,i}>: package(containers)
+<src/tools/orient/*.ml{,i}>: package(sequence)
 <src/tools/orient/*.ml{,i}>: package(unix)
 <src/tools/orient/*.ml{,i}>: package(zarith)
 <src/tools/orient/*.ml{,i}>: use_logtk
 <src/tools/orient/*.ml{,i}>: use_logtk_parsers
 <src/tools/orient/*.ml{,i}>: use_logtk_solving
 # Executable proof_check_tstp
+"src/tools/proof_check_tstp.native": package(containers)
+"src/tools/proof_check_tstp.native": package(sequence)
 "src/tools/proof_check_tstp.native": package(unix)
 "src/tools/proof_check_tstp.native": package(zarith)
 "src/tools/proof_check_tstp.native": use_logtk
 "src/tools/proof_check_tstp.native": use_logtk_parsers
 # Executable detect_theories
+"src/tools/detect_theories.native": package(containers)
+"src/tools/detect_theories.native": package(sequence)
 "src/tools/detect_theories.native": package(unix)
 "src/tools/detect_theories.native": package(zarith)
 "src/tools/detect_theories.native": use_logtk
 "src/tools/detect_theories.native": use_logtk_meta
 "src/tools/detect_theories.native": use_logtk_parsers
+<src/tools/*.ml{,i}>: package(containers)
+<src/tools/*.ml{,i}>: package(sequence)
 <src/tools/*.ml{,i}>: package(unix)
 <src/tools/*.ml{,i}>: package(zarith)
 <src/tools/*.ml{,i}>: use_logtk
@@ -182,6 +206,8 @@
 <src/tools/*.ml{,i}>: use_logtk_parsers
 # Executable hysteresis
 "src/tools/hysteresis/hysteresis.native": package(aez)
+"src/tools/hysteresis/hysteresis.native": package(containers)
+"src/tools/hysteresis/hysteresis.native": package(sequence)
 "src/tools/hysteresis/hysteresis.native": package(unix)
 "src/tools/hysteresis/hysteresis.native": package(zarith)
 "src/tools/hysteresis/hysteresis.native": use_logtk
@@ -189,6 +215,8 @@
 "src/tools/hysteresis/hysteresis.native": use_logtk_parsers
 "src/tools/hysteresis/hysteresis.native": use_logtk_solving
 <src/tools/hysteresis/*.ml{,i}>: package(aez)
+<src/tools/hysteresis/*.ml{,i}>: package(containers)
+<src/tools/hysteresis/*.ml{,i}>: package(sequence)
 <src/tools/hysteresis/*.ml{,i}>: package(unix)
 <src/tools/hysteresis/*.ml{,i}>: package(zarith)
 <src/tools/hysteresis/*.ml{,i}>: use_logtk

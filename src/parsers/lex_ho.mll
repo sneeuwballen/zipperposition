@@ -86,19 +86,21 @@ rule token = parse
 
 
 {
-  let decl_of_string s : Ast_ho.t Monad.Err.t =
-    try
-      Monad.Err.Ok (Parse_ho.parse_decl token (Lexing.from_string s))
-    with
-    | Parse_ho.Error -> Monad.Err.fail "parse error"
-    | Error msg -> Monad.Err.fail msg
+  module E = CCError
 
-  let decls_of_string s : Ast_ho.t list Monad.Err.t=
+  let decl_of_string s : Ast_ho.t E.t =
     try
-      Monad.Err.Ok (Parse_ho.parse_decls token (Lexing.from_string s))
+      E.return (Parse_ho.parse_decl token (Lexing.from_string s))
     with
-    | Parse_ho.Error -> Monad.Err.fail "parse error"
-    | Error msg -> Monad.Err.fail msg
+    | Parse_ho.Error -> E.fail "parse error"
+    | Error msg -> E.fail msg
+
+  let decls_of_string s : Ast_ho.t list E.t=
+    try
+      E.return (Parse_ho.parse_decls token (Lexing.from_string s))
+    with
+    | Parse_ho.Error -> E.fail "parse error"
+    | Error msg -> E.fail msg
 
   let term_of_string s : PrologTerm.t option =
     try
@@ -106,7 +108,7 @@ rule token = parse
     with Parse_ho.Error | Error _ -> None
 
   let pterm (s:string): HOTerm.t option =
-    Monad.Opt.(
+    CCOpt.(
       term_of_string s >>= fun t ->
       let ctx = TypeInference.Ctx.create Signature.TPTP.base in
       TypeInference.HO.convert_opt ~generalize:true ~ctx t

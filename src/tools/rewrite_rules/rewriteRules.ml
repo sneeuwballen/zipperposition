@@ -30,9 +30,11 @@ open Logtk
 open Logtk_parsers
 
 module PT = PrologTerm
-module E = Monad.Err
+module E = CCError
 module FOT = FOTerm
 module Loc = ParseLocation
+
+type 'a or_error = [`Error of string | `Ok of 'a]
 
 type statement =
   | Rule of PT.t * PT.t

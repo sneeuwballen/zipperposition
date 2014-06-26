@@ -34,7 +34,7 @@ module AU = Ast_tptp.Untyped
 module F = Formula.FO
 module TT = Trace_tstp
 module StepTbl = TT.StepTbl
-module E = Monad.Err
+module E = CCError
 
 (* result of checking the step: success or failure, with name of prover.
   The step may be unchecked. *)
@@ -175,9 +175,9 @@ let check_all ~progress ~provers ~timeout ~checked =
           (fun prover ->
             (* check step with prover *)
             match  check_step ~timeout ~prover step with
-            | E.Ok res ->
+            | `Ok res ->
               CheckedTrace.add ~checked step res
-            | E.Error msg ->
+            | `Error msg ->
                 failwith msg)
           provers);
     (* clean line of progress *)
@@ -291,7 +291,7 @@ let main file =
 let () =
   parse_args ();
   match main !file with
-  | E.Ok () -> ()
-  | E.Error msg ->
+  | `Ok () -> ()
+  | `Error msg ->
       print_endline msg;
       exit 1

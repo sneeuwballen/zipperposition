@@ -30,7 +30,7 @@ open Logtk
 open Logtk_solving
 
 module PT = PrologTerm
-module E = Monad.Err
+module E = CCError
 module FOT = FOTerm
 module Loc = ParseLocation
 
@@ -60,9 +60,7 @@ let print_signature signature =
    make typed rules from those. returns the signature and
    the typed rules *)
 let parse_files_into_rules files =
-  E.(fold
-      (Sequence.of_list files)
-      (E.return (Signature.empty, []))
+  E.(fold_l
       (fun (signature,rules) file ->
         begin match file with
           | "stdin" -> E.return stdin
@@ -70,13 +68,15 @@ let parse_files_into_rules files =
               begin try E.return (open_in file)
               with Sys_error msg ->
                 let msg = Printf.sprintf "could not open file %s: %s" file msg in
-                Monad.Err.fail msg
+                fail msg
               end
         end >>=
         RewriteRules.parse_file file >>=
         RewriteRules.rules_of_pairs signature >>= fun (signature,rules') ->
         E.return (signature, List.rev_append rules' rules)
-      ))
+      )
+      (Signature.empty, []) files
+    )
 
 let parse_args () =
   let help_msg = "orient: finds orderings for rewriting rules" in
@@ -106,9 +106,9 @@ let () =
     get_solutions solutions !num_solutions
   ) in
   match res with
-  | E.Error msg ->
+  | `Error msg ->
       print_endline msg
-  | E.Ok [] ->
+  | `Ok [] ->
       print_endline "no solution for this set of rules"
-  | E.Ok solutions ->
+  | `Ok solutions ->
       List.iter print_solution solutions

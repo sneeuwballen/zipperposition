@@ -26,6 +26,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Substitutions} *)
 
 module T = ScopedTerm
+module Hash = CCHash
 
 type scope = int
   (** A scope is an integer. Variables can only be bound in one scope,
@@ -43,7 +44,7 @@ end
 
 module H = Hashtbl.Make(TermInt)
 
-module M = PersistentHashtbl.Make(TermInt)
+module M = CCPersistentHashtbl.Make(TermInt)
 
 (** {2 Renaming} *)
 

@@ -26,6 +26,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Prolog-like Terms}. *)
 
+module Hash = CCHash
+
 type location = ParseLocation.t
 
 type t = {
@@ -275,7 +277,7 @@ class virtual ['a] visitor = object (self)
         self#bind ?loc s (List.map self#visit vars) (self#visit t')
     | List l -> self#list_ ?loc (List.map self#visit l)
     | Record (l, rest) ->
-        let rest = Monad.Opt.map rest self#visit in
+        let rest = CCOpt.map self#visit rest in
         let l = List.map (fun (n,t) -> n, self#visit t) l in
         self#record ?loc l rest
     | Column (a,b) -> self#column ?loc (self#visit a) (self#visit b)

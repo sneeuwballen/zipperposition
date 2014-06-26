@@ -539,6 +539,8 @@ let slurp i_chan =
       else (Buffer.add_substring content buf 0 num; next ())
   in next ()
 
+type 'a or_error = [`Error of string | `Ok of 'a]
+
 (** Call given command with given output, and return its output as a string *)
 let popen ~cmd ~input =
   try
@@ -550,10 +552,10 @@ let popen ~cmd ~input =
     let output = slurp from in
     (* wait for subprocess to terminate *)
     ignore (Unix.close_process (from, into));
-    Monad.Err.return output
+    CCError.return output
   with Unix.Unix_error (e, _, _) ->
     let msg = Unix.error_message e in
-    Monad.Err.fail msg
+    CCError.fail msg
 
 (** {2 Printing utils} *)
 
