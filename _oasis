@@ -71,6 +71,7 @@ Library "logtk_parsers"
   FindlibName:      parsers
   FindlibParent:    logtk
   BuildDepends:     logtk
+  BuildTools:       menhir
   XMETARequires:    logtk
 
 Library "logtk_meta"
