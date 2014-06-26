@@ -84,8 +84,8 @@ module Clause = struct
     let vars c = terms c |> Sequence.flatMap HOT.Seq.vars
   end
 
-  let hash_fun c h = Hash.seq HOT.hash_fun (Seq.terms c) h
-  let hash c = Hash.apply hash_fun c
+  let hash_fun c h = CCHash.seq HOT.hash_fun (Seq.terms c) h
+  let hash c = CCHash.apply hash_fun c
 
   let cmp c1 c2 =
     let c = HOT.cmp c1.head c2.head in
@@ -177,7 +177,7 @@ module Index = struct
     M.fold
       (fun t' set acc ->
         let res = Unif.HO.unification ~subst t' s_idx t s_t in
-        KList.fold
+        CCKList.fold
           (fun acc subst ->
             S.fold (fun clause acc -> k acc clause subst) set acc)
           acc res)

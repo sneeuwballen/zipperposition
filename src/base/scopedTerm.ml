@@ -26,6 +26,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Scoped Terms} *)
 
+module Hash = CCHash
 module Sym = Symbol
 
 type symbol = Sym.t

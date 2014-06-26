@@ -90,10 +90,12 @@ val size : t -> int
 
 (** {3 IO} *)
 
-val of_decls : Ast_tptp.Typed.t Sequence.t -> t Monad.Err.t
+type 'a or_error = [`Error of string | `Ok of 'a]
+
+val of_decls : Ast_tptp.Typed.t Sequence.t -> t or_error
   (** Try to extract a proof from a list of TSTP statements. *)
 
-val parse : ?recursive:bool -> string -> t Monad.Err.t
+val parse : ?recursive:bool -> string -> t or_error
   (** Try to parse a proof from a file. *)
 
 include Interfaces.PRINT with type t := t

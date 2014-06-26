@@ -28,6 +28,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+type 'a or_error = [`Error of string | `Ok of 'a]
+
 (** {2 Printing/Parsing} *)
 
 val find_file : string -> string -> string option
@@ -37,12 +39,12 @@ val find_file : string -> string -> string option
 
 val parse_lexbuf : ?names:Ast_tptp.name list ->
                     Lexing.lexbuf ->
-                    Ast_tptp.Untyped.t Sequence.t Monad.Err.t
+                    Ast_tptp.Untyped.t Sequence.t or_error
   (** Given a lexbuf, try to parse its content into a sequence of untyped
     declarations *)
 
 val parse_file : recursive:bool -> string ->
-                 Ast_tptp.Untyped.t Sequence.t Monad.Err.t
+                 Ast_tptp.Untyped.t Sequence.t or_error
   (** Parsing a TPTP file is here presented with a [recursive] option
       that, if true, will make "include" directives to be recursively
       parsed. It uses {!find_file} for included files.
@@ -96,7 +98,7 @@ are not consistent. *)
 
 val infer_types : [`ctx of TypeInference.Ctx.t | `sign of Signature.t] ->
                   Ast_tptp.Untyped.t Sequence.t ->
-                  (Signature.t * Ast_tptp.Typed.t Sequence.t) Monad.Err.t
+                  (Signature.t * Ast_tptp.Typed.t Sequence.t) or_error
   (** Infer types from type declarations and formulas, returning a sequence
       of well-typed ASTs, and the inferred signature.
       @raise Type.Error if there is a type error. *)
@@ -111,7 +113,7 @@ val erase_types : Ast_tptp.Typed.t Sequence.t ->
 
 val annotate_types : [`ctx of TypeInference.Ctx.t | `sign of Signature.t] ->
                      Ast_tptp.Untyped.t Sequence.t ->
-                     Ast_tptp.Untyped.t Sequence.t Monad.Err.t
+                     Ast_tptp.Untyped.t Sequence.t or_error
   (** Round-trip of type inference and type erasure. *)
 
 val to_cnf : ?opts:Cnf.options list ->

@@ -128,7 +128,18 @@ The same closure will therefore be used to build [nil:$int] and [nil:$string]
 respectively.
 *)
 
-module Closure : module type of Monad.Fun(Ctx)
+module Closure : sig
+  type 'a t = Ctx.t -> 'a
+  val return : 'a -> 'a t
+  val map : 'a t -> ('a -> 'b) -> 'b t
+  val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
+
+  type 'a monad = 'a t (** monad used for traversal *)
+  val fold : 'a Sequence.t -> 'b monad -> ('b -> 'a -> 'b monad) -> 'b monad
+  val fold_l : 'a list -> 'b monad -> ('b -> 'a -> 'b monad) -> 'b monad
+  val map_l : 'a list -> ('a -> 'b monad) -> 'b list monad
+  val seq : 'a monad list -> 'a list monad
+end
 
 (** {2 Hindley-Milner}
 

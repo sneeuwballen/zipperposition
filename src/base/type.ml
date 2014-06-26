@@ -390,7 +390,7 @@ module Conv = struct
         let t' = of_prolog t' in
         forall vars t'
       | PT.Record (l, rest) ->
-        let rest = Monad.Opt.map rest of_prolog in
+        let rest = CCOpt.map of_prolog rest in
         let l = List.map (fun (n,t) -> n, of_prolog t) l in
         record l ~rest
       | PT.Bind _
@@ -414,7 +414,7 @@ module Conv = struct
       let args = List.map (to_prolog depth) args in
       PT.app (PT.const Symbol.Base.arrow) (to_prolog depth ret :: args)
     | Record (l, rest) ->
-      let rest = Monad.Opt.map rest (to_prolog depth) in
+      let rest = CCOpt.map (to_prolog depth) rest in
       PT.record (List.map (fun (n,ty) -> n, to_prolog depth ty) l) ~rest
     | Forall t' ->
       PT.bind Symbol.Base.forall_ty

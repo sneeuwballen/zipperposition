@@ -25,6 +25,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Reduction to CNF and simplifications} *)
 
+module Hash = CCHash
 module T = FOTerm
 module ST = ScopedTerm
 module S = Symbol

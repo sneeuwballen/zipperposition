@@ -35,7 +35,8 @@ module F = Formula.FO
 module S = Substs
 module A = Ast_tptp
 module AT = Ast_tptp.Typed
-module Err = Monad.Err
+module Hash = CCHash
+module Err = CCError
 
 type form = F.t
 type clause = F.t list
@@ -220,6 +221,8 @@ let size proof = Sequence.length (to_seq proof)
 
 (** {2 IO} *)
 
+type 'a or_error = [`Error of string | `Ok of 'a]
+
 let of_decls decls =
   let steps = Hashtbl.create 13 in (* maps names to steps *)
   let root = ref None in (* (one) root of proof *)
@@ -309,7 +312,7 @@ let of_decls decls =
     end
     decls;
   match !root with
-  | None -> Monad.Err.fail "could not find the root of the TSTP proof"
+  | None -> Err.fail "could not find the root of the TSTP proof"
   | Some p ->
     try
       (* force proofs to trigger errors here *)
@@ -318,7 +321,7 @@ let of_decls decls =
     with Failure msg -> Err.fail msg
 
 let parse ?(recursive=true) filename =
-  Monad.Err.(
+  Err.(
     Util_tptp.parse_file ~recursive filename
     >>= fun decls ->
     Util_tptp.infer_types (`sign Signature.TPTP.base) decls

@@ -146,7 +146,7 @@ end
 module Make(Sym : SYMBOL) = struct
   type symbol = Sym.t
 
-  module Tbl = PersistentHashtbl.Make(struct
+  module Tbl = CCPersistentHashtbl.Make(struct
     type t = Sym.t
     let equal = Sym.eq
     let hash = Sym.hash

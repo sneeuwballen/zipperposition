@@ -141,9 +141,10 @@ let is_const_pred_definition f =
   in
   match F.view f with
   | F.Equiv (l,r) ->
-      Monad.Opt.(
-        check_rule l r <+> check_rule r l
-      )
+      begin match check_rule l r with
+        | None -> check_rule r l
+        | Some _ as res -> res
+      end
   | _ -> None
 
 (** {2 Interface to Tranform} *)

@@ -28,6 +28,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+type 'a or_error = [`Error of string | `Ok of 'a]
+
 module T = FOTerm
 module F = Formula.FO
 module PT = PrologTerm
@@ -35,7 +37,7 @@ module Ast = Ast_tptp
 module AU = Ast.Untyped
 module AT = Ast.Typed
 module Loc = ParseLocation
-module Err = Monad.Err
+module Err = CCError
 
 (** {2 Printing/Parsing} *)
 

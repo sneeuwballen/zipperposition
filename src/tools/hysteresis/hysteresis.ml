@@ -40,7 +40,7 @@ open Logtk_solving
 
 module PT = PrologTerm
 module HOT = HOTerm
-module E = Monad.Err
+module E = CCError
 module Loc = ParseLocation
 
 (** OPTIONS *)
@@ -82,25 +82,25 @@ let options =
 
 (* parse the given theory files into the prover *)
 let parse_theory_files prover files =
-  E.fold_l files (E.return prover)
-    (fun p file ->
-      E.map (Prover.parse_file p file) fst)
+  E.fold_l
+    (fun p file -> E.map fst (Prover.parse_file p file))
+    prover files
 
 (* parse several TPTP files into declarations *)
 let parse_tptp_files files =
   let q = Queue.create () in
   let res = E.(
-    fold_l files (E.return ())
+    fold_l
       (fun () file ->
         Util_tptp.parse_file ~recursive:true file
         >>= fun decls ->
         Queue.push decls q;
         E.return ()
-      )
+      ) () files
     )
   in match res with
-  | E.Error msg -> E.fail msg
-  | E.Ok () ->
+  | `Error msg -> E.fail msg
+  | `Ok () ->
       E.return (Sequence.of_queue q |> Sequence.flatten)
 
 (* extract clauses from decls *)
@@ -308,7 +308,7 @@ module BalancedInt = struct
         begin try E.return (open_in filename)
         with Sys_error msg ->
           let msg = Printf.sprintf "could not open file %s: %s" filename msg in
-          Monad.Err.fail msg
+          E.fail msg
         end >>= fun ic ->
         RewriteRules.parse_file filename ic >>=
         RewriteRules.rules_of_pairs signature >>= fun (signature,rules') ->
@@ -598,17 +598,17 @@ let () =
   parse_args ();
   let res = main () in
   match res with
-  | E.Error msg ->
+  | `Error msg ->
       print_endline msg;
       exit 1
-  | E.Ok (CallProver.Sat, _) ->
+  | `Ok (CallProver.Sat, _) ->
       print_endline "result: sat."
-  | E.Ok (CallProver.Unsat, out) ->
+  | `Ok (CallProver.Unsat, out) ->
       print_endline "result: unsat.";
       if !flag_print_e_output
         then (print_endline "output of E:"; print_endline out)
-  | E.Ok (CallProver.Unknown, _) ->
+  | `Ok (CallProver.Unknown, _) ->
       print_endline "result: unknown."
-  | E.Ok (CallProver.Error s, _) ->
+  | `Ok (CallProver.Error s, _) ->
       print_endline ("E failed with error: " ^ s);
       exit 1

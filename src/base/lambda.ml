@@ -92,7 +92,7 @@ let rec beta_reduce_rec ~depth env t =
     let t = beta_reduce_rec ~depth env t in
     T.tyat t tyarg
   | T.Record (l, rest) ->
-    let rest = Monad.Opt.map rest (beta_reduce_rec ~depth env) in
+    let rest = CCOpt.map (beta_reduce_rec ~depth env) rest in
     let l = List.map
       (fun (name,t) -> name, beta_reduce_rec ~depth env t)
       l
@@ -135,7 +135,7 @@ let rec eta_reduce t =
       | _ -> T.__mk_lambda ~varty (eta_reduce t')
     end
   | T.Record (l, rest) ->
-    let rest = Monad.Opt.map rest eta_reduce in
+    let rest = CCOpt.map eta_reduce rest in
     let l = List.map (fun (n,t) -> n, eta_reduce t) l in
     T.record l ~rest
   | T.Multiset (ty, l) -> T.multiset ~ty (List.map eta_reduce l)

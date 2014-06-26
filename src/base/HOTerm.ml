@@ -379,7 +379,7 @@ class virtual ['a] any_visitor = object (self)
         | _ -> assert false
         end
     | T.Record (l,rest) ->
-        let rest = Monad.Opt.map rest self#visit in
+        let rest = CCOpt.map self#visit rest in
         let l = List.map (fun (n,t) -> n, self#visit t) l in
         self#record l rest
     | _ -> assert false

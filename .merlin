@@ -19,8 +19,4 @@ B _build/src/solving/
 B _build/src/tools/
 B _build/tests/
 PKG zarith
-PKG oUnit
-PKG benchmark
-PKG datalog
-PKG qcheck
-PKG aez
+PKG sequence

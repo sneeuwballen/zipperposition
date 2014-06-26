@@ -52,14 +52,11 @@ Library "logtk"
                     HORewriting, Index, Dtree, Fingerprint, NPDtree,
                     Congruence, FastFingerprint, FeatureVector, Rewriting,
                     FormulaShape, Transform, Lambda,
-                    lib/Hash, lib/Hashcons,
-                    lib/Sequence, lib/Cache, lib/Bij, lib/Bencode,
-                    lib/PersistentHashtbl, lib/Monad, lib/ParseLocation,
-                    lib/Multiset, lib/BV, lib/PartialOrder, lib/KList,
-                    lib/LazyList, lib/IArray, lib/LazyGraph,
-                    lib/CCSequence, lib/CCList
-  BuildDepends:     zarith,unix
-  XMETARequires:    zarith,unix
+                    lib/Hashcons, lib/Cache, lib/Bij, lib/Bencode,
+                    lib/ParseLocation, lib/Multiset,
+                    lib/PartialOrder, lib/LazyList, lib/IArray, lib/LazyGraph
+  BuildDepends:     zarith,unix,sequence,containers
+  XMETARequires:    zarith,unix,sequence,containers
 
 Library "logtk_parsers"
   Path:             src/parsers

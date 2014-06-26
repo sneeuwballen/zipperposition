@@ -33,19 +33,20 @@ exception Fail
 
 type scope = Substs.scope
 type subst = Substs.t
+type 'a klist = unit -> [`Nil | `Cons of 'a * 'a klist]
 
 let prof_unify = Util.mk_profiler "unify"
 let prof_matching = Util.mk_profiler "matching"
 
 (** {2 Result of multiple Unification} *)
 
-type res = subst KList.t
+type res = subst klist
 
 module Res = struct
   (* takes a function that requires a success cont. and a failure cont.
       and returns the lazy result *)
   let of_fun f =
-    f ~k:(fun subst fk -> KList.cons subst (fk ())) ~fk:(fun () -> KList.nil)
+    f ~k:(fun subst fk -> CCKList.cons subst (fk ())) ~fk:(fun () -> CCKList.nil)
 end
 
 (** {2 Signatures} *)

@@ -112,13 +112,15 @@ let (>>>) a b = compose a b
 
 (** {6 Currying} *)
 
-let currying = object
+let currying =
+  let module ListOpt = CCList.Traverse(CCOpt) in
+  object
   method encode c = fmap_clause HOT.curry c
   method decode c =
     fmap_clause HOT.uncurry c
       |> List.map opt_seq_lit
-      |> Monad.Opt.seq
-end
+      |> ListOpt.sequence_m
+  end
 
 (** {6 Rigidifying variables}
 This step replaces free variables by rigid variables. It is needed for

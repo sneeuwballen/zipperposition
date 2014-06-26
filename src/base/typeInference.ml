@@ -310,9 +310,36 @@ module Ctx = struct
     Substs.HO.apply ~renaming:ctx.renaming ctx.subst t 0
 end
 
-(** {2 Closures} *)
+(** {2 Composition monad} *)
 
-module Closure = Monad.Fun(Ctx)
+module MonadFun(Domain : sig type t end) = struct
+  type domain = Domain.t
+  type 'a fun_ = domain -> 'a
+  type 'a t = 'a fun_
+  type 'a monad = 'a fun_
+
+  let return x _ = x
+
+  let (>>=) f1 f2 x =
+    f2 (f1 x) x
+
+  let map f f1 x = f1 (f x)
+
+  let fold (seq:'a Sequence.t) (acc:'b t) (f:'b -> 'a -> 'b t) =
+    Sequence.fold
+      (fun acc x ->
+        fun elt -> (f (acc elt) x) elt)
+      acc seq
+
+  let fold_l l = fold (Sequence.of_list l)
+
+  let map_l l f elt = List.map (fun x -> f x elt) l
+
+  let seq l elt =
+    List.map (fun f -> f elt) l
+end
+
+module Closure = MonadFun(Ctx)
 
 (** {2 Hindley-Milner} *)
 
