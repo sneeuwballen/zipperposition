@@ -90,6 +90,13 @@ module type S = sig
   val on_new_symbol : (Symbol.t * Type.t) Signal.t
   val on_signature_update : Signature.t Signal.t
 
+  val ad_hoc_symbols : unit -> Symbol.Set.t
+  (** Current set of ad-hoc symbols *)
+
+  val add_ad_hoc_symbols : Symbol.t Sequence.t -> unit
+  (** Declare that some symbols are "ad hoc", ie they are not really
+      polymorphic and should not be considered as such *)
+
   (** {2 Literals} *)
 
   module Lit : sig
@@ -182,6 +189,7 @@ end) : S = struct
   let _select = ref X.select
   let _signature = ref X.signature
   let _complete = ref true
+  let _ad_hoc = ref (Symbol.Set.singleton Symbol.Base.eq)
 
   let skolem = Skolem.create ~prefix:"zsk" Signature.empty
   let renaming = S.Renaming.create ()
@@ -226,6 +234,10 @@ end) : S = struct
       Signal.send on_signature_update !_signature;
       Signal.send on_new_symbol (symb,ty);
     )
+
+  let ad_hoc_symbols () = !_ad_hoc
+  let add_ad_hoc_symbols seq =
+    _ad_hoc := Sequence.fold (fun set s -> Symbol.Set.add s set) !_ad_hoc seq
 
   let renaming_clear () =
     S.Renaming.clear renaming;

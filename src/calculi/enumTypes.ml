@@ -245,6 +245,8 @@ module Make(E : Env.S) = struct
     | Symbol.Cst _ ->
       let t = _make_term_of_sym s ty in
       begin try
+        (* ignore ad-hoc polymorphic symbols *)
+        if Symbol.Set.mem s (Ctx.ad_hoc_symbols ()) then raise Exit;
         (* can we unify a generic instancez of [s] (the term [t]) with
           the declaration's variable? *)
         let subst = Unif.FO.unification t 0 decl.decl_var 1 in
@@ -267,7 +269,7 @@ module Make(E : Env.S) = struct
           Util.incr_stat stat_instantiate;
           Some c'
         )
-      with Unif.Fail ->
+      with Unif.Fail | Exit ->
         None
       end
     | Symbol.Int _
