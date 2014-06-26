@@ -30,17 +30,19 @@ open Logtk
 
 type form = Formula.FO.t
 
-type t = form array lazy_t
+type t = Literal.t array
 
 val eq : t -> t -> bool
-val hash : t -> int
 val cmp : t -> t -> int
+include Interfaces.HASH with type t := t
 
 val is_empty : t -> bool
 
-val iter : t -> (form -> unit) -> unit
+val iter : t -> (Literal.t -> unit) -> unit
 
-val to_seq : t -> form Sequence.t
+val to_seq : t -> Literal.t Sequence.t
+
+val to_forms : t -> form array
 
 val pp : Buffer.t -> t -> unit
 val pp_tstp : Buffer.t -> t -> unit

@@ -22,13 +22,16 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Logtk
 
+(* TODO: params to limit depth of preprocessing *)
+(* TODO: params to enable/disable some preprocessing *)
+
 type t = {
   param_ord : Precedence.t -> Ordering.t;
   param_seed : int;
   param_steps : int;
   param_version : bool;
   param_timeout : float;
-  param_files : string Vector.t;
+  param_files : (string, CCVector.ro) CCVector.t;
   param_split : bool;             (** use splitting *)
   param_theories : bool;          (** detect theories *)
   param_select : string;          (** name of the selection function *)
@@ -38,12 +41,19 @@ type t = {
   param_dot_sat : bool;           (** Print saturated set into DOT? *)
   param_plugins : string list;    (** plugins to load *)
   param_expand_def : bool;        (** expand definitions *)
-  param_arith : bool;             (** enable arith? *)
-  param_arith_ac : bool;          (** enable AC axioms for arith? *)
   param_stats : bool;
   param_presaturate : bool;       (** initial interreduction of proof state? *)
   param_unary_depth : int;        (** Maximum successive levels of unary inferences *)
 }
+
+(** Options that can be added by plugins *)
+let other_opts = ref []
+
+let add_opt o = other_opts := o :: !other_opts
+let add_opts l = other_opts := l @ !other_opts
+
+(** Default signature *)
+let signature = ref Signature.TPTP.base
 
 (** parse_args returns parameters *)
 let parse_args () =
@@ -64,21 +74,19 @@ let parse_args () =
   and dot_file = ref None
   and dot_sat = ref false
   and plugins = ref []
-  and arith = ref false
-  and arith_ac = ref false
   and stats = ref false
   and expand_def = ref false
   and select = ref "SelectComplex"
   and progress = ref false
   and unary_depth = ref 1
-  and files = Vector.create 15 in
+  and files = CCVector.create () in
   (* special handlers *)
   let set_progress () =
     Util.need_cleanup := true;
     progress := true
   and add_plugin s = plugins := s :: !plugins
   and add_plugins s = plugins := (Util.str_split ~by:"," s) @ !plugins
-  and add_file s = Vector.push files s 
+  and add_file s = CCVector.push files s 
   in
   (* options list *) 
   let options =
@@ -92,8 +100,6 @@ let parse_args () =
     ; "-plugin", Arg.String add_plugin, "load given plugin (.cmxs)"
     ; "-plugins", Arg.String add_plugins, "load given plugin(s), comma-separated"
     ; "-expand-def", Arg.Set expand_def, "expand definitions"
-    ; "-arith", Arg.Set arith, "enable arithmetic"
-    ; "-arith-ac", Arg.Set arith_ac, "enable AC axioms for arith"
     ; "-progress", Arg.Unit set_progress, "print progress"
     ; "-theories", Arg.Bool (fun b -> theories := b), "enable/disable theory detection"
     ; "-proof", Arg.Set_string proof, "choose proof printing (none, debug, or tstp)"
@@ -104,12 +110,14 @@ let parse_args () =
     ; "-dot-sat", Arg.Set dot_sat, "print saturated set into DOT"
     ; "-seed", Arg.Set_int seed, "set random seed"
     ; "-unary-depth", Arg.Set_int unary_depth, "maximum depth for successive unary inferences"
-    ] @ Options.global_opts
+    ] @ !other_opts @ Options.global_opts
   in
+  let options = List.sort (fun (a1,_,_)(a2,_,_)->String.compare a1 a2) options in
   Util.set_debug 1;  (* default *)
   Arg.parse options add_file "solve problems in files";
-  if Vector.is_empty files
-    then Vector.push files "stdin";
+  if CCVector.is_empty files
+    then CCVector.push files "stdin";
+  let files = CCVector.freeze files in (* from now on, immutable *)
   let param_ord = Ordering.by_name !ord in
   (* return parameter structure *)
   { param_ord; param_seed = !seed; param_steps = !steps;
@@ -120,5 +128,4 @@ let parse_args () =
     param_presaturate = !presaturate;
     param_dot_file = !dot_file; param_plugins= !plugins;
     param_unary_depth= !unary_depth; param_dot_sat= !dot_sat;
-    param_expand_def= !expand_def; param_arith= !arith;
-    param_arith_ac= !arith_ac; }
+    param_expand_def= !expand_def; }

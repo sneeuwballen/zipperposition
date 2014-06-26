@@ -92,7 +92,7 @@ let fix ops set =
               ops := List.rev_append l !ops;
               Util.debug 5 "restart after adding %d operations" (List.length l);
               restart ()
-            | SimplifyInto f' when F.ac_eq pf.PF.form f'.PF.form ->
+            | SimplifyInto f' when F.ac_eq (PF.form pf) (PF.form f') ->
               () (* not really simplified *)
             | SimplifyInto f' ->
               (* ignore [f], process [f'] instead, and remember the
@@ -113,30 +113,29 @@ let fix ops set =
 
 (* remove trivial formulas *)
 let remove_trivial set pf =
-  if F.is_trivial pf.PF.form
+  if F.is_trivial (PF.form pf)
     then [Remove]
     else []
 
 (* reduce formulas to CNF *)
-let cnf ~ctx =
-  fun set pf ->
-    Util.debug 3 "reduce %a to CNF..." PF.pp pf;
-    (* reduce to CNF this formula *)
-    let clauses = Cnf.cnf_of ~ctx pf.PF.form in
-    (* now build "proper" clauses, with proof and all *)
-    match clauses with
-    | [[f]] when F.eq f pf.PF.form -> []
-    | _ ->
-      let proof f' = Proof.mk_f_esa ~rule:"cnf" f' [pf.PF.proof] in
-      let clauses =
-        List.map
-          (fun c ->
-            (* clause represented as formula *)
-            let f = F.Base.or_ c in
-            PF.create f (proof f))
-          clauses
-      in
-      [Esa clauses]
+let cnf _set pf =
+  Util.debug 3 "reduce %a to CNF..." PF.pp pf;
+  (* reduce to CNF this formula *)
+  let clauses = Cnf.cnf_of (PF.form pf) in
+  (* now build "proper" clauses, with proof and all *)
+  match clauses with
+  | [[f]] when F.eq f (PF.form pf) -> []
+  | _ ->
+    let proof f' = Proof.mk_f_esa ~rule:"cnf" f' [PF.proof pf] in
+    let clauses =
+      List.map
+        (fun c ->
+          (* clause represented as formula *)
+          let f = F.Base.or_ c in
+          PF.create f (proof f))
+        clauses
+    in
+    [Esa clauses]
 
 (* TODO
 let meta_prover ~meta =
@@ -157,20 +156,20 @@ let meta_prover ~meta =
 
 let rw_term ?(rule="rw") ~premises trs =
   fun set pf ->
-    let f = pf.PF.form in
+    let f = PF.form pf in
     let f' = F.map (fun t -> Rewriting.TRS.rewrite trs t) f in
     if F.eq f f'
       then []
       else
         let premises = PF.Set.to_seq premises in
-        let premises = Sequence.to_list (Sequence.map PF.get_proof premises) in
-        let proof = Proof.mk_f_simp ~rule f' (pf.PF.proof::premises) in
+        let premises = Sequence.to_list (Sequence.map PF.proof premises) in
+        let proof = Proof.mk_f_simp ~rule f' (PF.proof pf :: premises) in
         let pf' = PF.create f' proof in
         [SimplifyInto pf']
 
 let rw_form ?(rule="rw") ~premises frs =
   fun set pf ->
-    let f = pf.PF.form in
+    let f = PF.form pf  in
     Util.debug 5 "start rewriting %a" PF.pp pf;
     let f' = Rewriting.FormRW.rewrite frs f in
     Util.debug 5 "done rewriting %a" PF.pp pf;
@@ -178,27 +177,28 @@ let rw_form ?(rule="rw") ~premises frs =
       then []
       else
         let premises = PF.Set.to_seq premises in
-        let premises = Sequence.to_list (Sequence.map PF.get_proof premises) in
-        let proof = Proof.mk_f_simp ~rule f' (pf.PF.proof::premises) in
+        let premises = Sequence.to_list (Sequence.map PF.proof premises) in
+        let proof = Proof.mk_f_simp ~rule f' (PF.proof pf::premises) in
         let pf' = PF.create f' proof in
         let _ = Util.debug 5 "rewritten %a in %a!" PF.pp pf PF.pp pf' in
         [SimplifyInto pf']
 
 let fmap_term ~rule func =
   fun set pf ->
-    let f = pf.PF.form in
+    let f = PF.form pf in
     let f' = F.map func f in
     if F.eq f f'
       then []
       else
-        let proof = Proof.mk_f_simp ~rule f' [pf.PF.proof] in
+        let proof = Proof.mk_f_simp ~rule f' [PF.proof pf] in
         let pf' = PF.create f' proof in
         [SimplifyInto pf']
 
 (* expand definitions *)
 let expand_def set pf =
   (* detect definitions in [pf] *)
-  let transforms = FormulaShape.detect_def ~only:`Pred (Sequence.singleton pf.PF.form) in
+  let transforms = FormulaShape.detect_def ~only:`Pred
+    (Sequence.singleton (PF.form pf)) in
   (* make new operations on the set of formulas *)
   let premises = PF.Set.singleton pf in
   let ops = Util.list_fmap

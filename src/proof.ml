@@ -29,6 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+module Hash = CCHash
 module F = Formula.FO
 module CC = CompactClause
 
@@ -65,12 +66,13 @@ let eq p1 p2 =
   | Clause c1, Clause c2 -> CC.eq c1 c2
   | _ -> false
 
-let hash p =
-  Hash.combine
-    (Hashtbl.hash p.kind)
-    (match p.result with
-      | Form f -> F.hash f
-      | Clause c -> CC.hash c)
+let hash_fun p h =
+  h |> Hash.int_ (Hashtbl.hash p.kind)
+    |> (fun h -> match p.result with
+        | Form f -> F.hash_fun f h
+        | Clause c -> CC.hash_fun c h)
+
+let hash p = Hash.apply hash_fun p
 
 let cmp p1 p2 =
   let c = Pervasives.compare p1.kind p2.kind in
@@ -228,7 +230,18 @@ let depth proof =
   !depth
 
 (* physically share subproofs, to save memory *)
-let share t = failwith "Proof.share: not implemented"  (* TODO *)
+let share t =
+  let h = ProofTbl.create 15 in
+  let rec share t =
+    let t' = { t with
+      parents = Array.map share t.parents;
+    } in
+    try ProofTbl.find h t'
+    with Not_found ->
+      ProofTbl.add h t' t';
+      t'
+  in
+  share t
 
 (** {2 Conversion to a graph of proofs} *)
 
@@ -357,7 +370,7 @@ let _escape_dot s =
   String.iter
     (fun c ->
       begin match c with
-      | '|' | '\\' | '{' | '}' | '<' | '>' -> Buffer.add_char b '\\';
+      | '|' | '\\' | '{' | '}' | '<' | '>' | '"' -> Buffer.add_char b '\\';
       | _ -> ()
       end;
       Buffer.add_char b c)
@@ -377,7 +390,7 @@ let as_dot_graph =
   in
   let label proof =
     let s = if no_other_info proof
-      then Util.on_buffer pp_result_of proof
+      then _to_str_escape "%a" pp_result_of proof
       else Util.sprintf "{%s|{theories:%s|info:%s}}"
         (_to_str_escape "%a" pp_result_of proof)
         (_to_str_escape "%a" _pp_list_str proof.theories)

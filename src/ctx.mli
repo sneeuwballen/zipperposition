@@ -31,60 +31,154 @@ open Logtk
 
 type scope = Substs.scope
 
-type t = private {
-  mutable ord : Ordering.t;           (** current ordering on terms *)
-  mutable select : Selection.t;       (** selection function for literals *)
-  mutable skolem : Skolem.ctx;        (** Context for skolem symbols *)
-  mutable signature : Signature.t;    (** Signature *)
-  mutable complete : bool;            (** Completeness preserved? *)
-  renaming : Substs.Renaming.t;       (** Renaming, always useful... *)
-  ac : Theories.AC.t;                 (** AC symbols *)
-  total_order : Theories.TotalOrder.t;(** Total ordering *)
-}
+(** {2 Context for a Proof} *)
+module type S = sig
+  val ord : unit -> Ordering.t
+  (** current ordering on terms *)
 
-val create : ?ord:Ordering.t -> ?select:Selection.t ->
-              signature:Signature.t -> 
-              unit -> t
-  (** Fresh new context *)
+  val selection_fun : unit -> Selection.t
+  (** selection function for clauses *)
 
-val ord : ctx:t -> Ordering.t
+  val set_selection_fun : Selection.t -> unit
 
-val compare : ctx:t -> FOTerm.t -> FOTerm.t -> Comparison.t
+  val set_ord : Ordering.t -> unit
 
-val select : ctx:t -> Literal.t array -> BV.t
+  val skolem : Skolem.ctx
 
-val skolem_ctx : ctx:t -> Skolem.ctx
+  val signature : unit -> Signature.t
+  (** Current signature *)
 
-val signature : ctx:t -> Signature.t
+  val complete : unit -> bool
+  (** Is completeness preserved? *)
 
-val ac : ctx:t -> Theories.AC.t
+  val renaming : Substs.Renaming.t
 
-val total_order : ctx:t -> Theories.TotalOrder.t
+  (** {2 Utils} *)
 
-val renaming_clear : ctx:t -> Substs.Renaming.t
+  val compare : FOTerm.t -> FOTerm.t -> Comparison.t
+  (** Compare two terms *)
+
+  val select : Selection.t
+
+  val renaming_clear : unit  -> Substs.Renaming.t
   (** Obtain the global renaming. The renaming is cleared before
       it is returned. *)
 
-val lost_completeness : ctx:t -> unit
+  val lost_completeness : unit -> unit
   (** To be called when completeness is not preserved *)
 
-val is_completeness_preserved : ctx:t -> bool
+  val is_completeness_preserved : unit -> bool
   (** Check whether completeness was preserved so far *)
 
-val add_signature : ctx:t -> Signature.t -> unit
+  val add_signature : Signature.t -> unit
   (** Merge  the given signature with the context's one *)
 
-val add_ac : ctx:t -> ?proof:Proof.t list -> Symbol.t -> unit
-  (** Symbol is AC *)
+  val find_signature : Symbol.t -> Type.t option
+  (** Find the type of the given symbol *)
 
-val add_order : ctx:t -> ?proof:Proof.t list ->
-                less:Symbol.t -> lesseq:Symbol.t ->
-                Theories.TotalOrder.instance
-  (** Pair of symbols that constitute an ordering.
-      @return the corresponding instance. *)
+  val find_signature_exn : Symbol.t -> Type.t
+  (** Unsafe version of {!find_signature}.
+      @raise Not_found for unknown symbols *)
 
-val add_tstp_order : ctx:t -> Theories.TotalOrder.instance
-  (** Specific version of {!add_order} for $less and $lesseq *)
-
-val declare : ctx:t -> Symbol.t -> Type.t -> unit
+  val declare : Symbol.t -> Type.t -> unit
   (** Declare the type of a symbol (updates signature) *)
+
+  val on_new_symbol : (Symbol.t * Type.t) Signal.t
+  val on_signature_update : Signature.t Signal.t
+
+  val ad_hoc_symbols : unit -> Symbol.Set.t
+  (** Current set of ad-hoc symbols *)
+
+  val add_ad_hoc_symbols : Symbol.t Sequence.t -> unit
+  (** Declare that some symbols are "ad hoc", ie they are not really
+      polymorphic and should not be considered as such *)
+
+  (** {2 Literals} *)
+
+  module Lit : sig
+    val from_hooks : unit -> Literal.Conv.hook_from list
+    val add_from_hook : Literal.Conv.hook_from -> unit
+
+    val to_hooks : unit -> Literal.Conv.hook_to list
+    val add_to_hook : Literal.Conv.hook_to -> unit
+
+    val of_form : Formula.FO.t -> Literal.t
+      (** @raise Invalid_argument if the formula is not atomic *)
+
+    val to_form : Literal.t -> Formula.FO.t
+  end
+
+  (** {2 Theories} *)
+
+  module Theories : sig
+    module AC : sig
+      val on_add : Theories.AC.t Signal.t
+
+      val add : ?proof:Proof.t list -> ty:Type.t -> Symbol.t -> unit
+
+      val is_ac : Symbol.t -> bool
+
+      val find_proof : Symbol.t -> Proof.t list
+        (** Recover the proof for the AC-property of this symbol.
+            @raise Not_found if the symbol is not AC *)
+
+      val symbols : unit -> Symbol.Set.t
+        (** set of AC symbols *)
+
+      val symbols_of_terms : FOTerm.t Sequence.t -> Symbol.Set.t
+        (** set of AC symbols occurring in the given term *)
+
+      val symbols_of_forms : Formula.FO.t Sequence.t -> Symbol.Set.t
+        (** Set of AC symbols occurring in the given formula *)
+
+      val proofs : unit -> Proof.t list
+        (** All proofs for all AC axioms *)
+
+      val exists_ac : unit -> bool
+        (** Is there any AC symbol? *)
+    end
+
+    module TotalOrder : sig
+      val on_add : Theories.TotalOrder.t Signal.t
+
+      val is_less : Symbol.t -> bool
+
+      val is_lesseq : Symbol.t -> bool
+
+      val find : Symbol.t -> Theories.TotalOrder.t
+        (** Find the instance that corresponds to this symbol.
+            @raise Not_found if the symbol is not part of any instance. *)
+
+      val find_proof : Theories.TotalOrder.t -> Proof.t list
+        (** Recover the proof for the given total ordering
+            @raise Not_found if the instance cannot be found*)
+
+      val is_order_symbol : Symbol.t -> bool
+        (** Is less or lesseq of some instance? *)
+
+      val axioms : less:Symbol.t -> lesseq:Symbol.t -> PFormula.t list
+        (** Axioms that correspond to the given symbols being a total ordering.
+            The proof of the axioms will be "axiom" *)
+
+      val exists_order : unit -> bool
+        (** Are there some known ordering instances? *)
+
+      val add : ?proof:Proof.t list ->
+                less:Symbol.t -> lesseq:Symbol.t -> ty:Type.t ->
+                Theories.TotalOrder.t * [`New | `Old]
+        (** Pair of symbols that constitute an ordering.
+            @return the corresponding instance and a flag to indicate
+              whether the instance was already present. *)
+
+      val add_tstp : unit -> Theories.TotalOrder.t * [`New | `Old]
+        (** Specific version of {!add_order} for $less and $lesseq *)
+    end
+  end
+end
+
+(** {2 Create a new context} *)
+module Make(X : sig
+  val signature : Signature.t
+  val ord : Ordering.t
+  val select : Selection.t
+end) : S

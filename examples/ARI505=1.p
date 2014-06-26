@@ -1,0 +1,1 @@
+../Problems/ARI/ARI505=1.p

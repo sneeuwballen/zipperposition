@@ -32,7 +32,7 @@ open Logtk
 (** See "E: a brainiac theorem prover". A selection function
     returns a bitvector of selected literals. *)
 
-type t = Literal.t array -> BV.t
+type t = Literal.t array -> CCBV.t
 
 val no_select : t
 

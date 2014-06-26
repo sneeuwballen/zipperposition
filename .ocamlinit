@@ -14,46 +14,25 @@ open Logtk;;
 open Libzipperposition;;
 open Logtk.Sequence.Infix;;
 open Logtk.Type;;
+module T = Logtk.FOTerm;;
+module F = Logtk.Formula.FO;;
+module M = Monome;;
+module MF = Monome.Focus;;
 #install_printer FOTerm.fmt;;
 #install_printer HOTerm.fmt;;
 #install_printer Literal.fmt;;
 #install_printer Clause.fmt;;
 #install_printer FOFormula.fmt;;
-#install_printer Basic.FO.fmt;;
-#install_printer Basic.Ty.fmt;;
-#install_printer Basic.Form.fmt;;
-#install_printer Basic.HO.fmt;;
+#install_printer PrologTerm.fmt;;
 #install_printer Substs.FO.fmt;;
 #install_printer Substs.HO.fmt;;
 #install_printer Proof.fmt;;
 #install_printer Symbol.fmt;;
 #install_printer Signature.fmt;;
 #install_printer Type.fmt;;
-<<<<<<< HEAD
-module T = Logtk.Term;;
-module F = Logtk.Formula;;
+#install_printer Monome.fmt;;
 let pterm s = Logtk.Parse_tptp.parse_term Logtk.Lex_tptp.token (Lexing.from_string s);;
 let pform s = Logtk.Parse_tptp.parse_formula Logtk.Lex_tptp.token (Lexing.from_string s);;
-=======
-#install_printer Monome.fmt;;
-#install_printer ArithLit.Canonical.fmt;;
-#install_printer ArithLit.Focused.fmt;;
-module T = Logtk.FOTerm;;
-module F = Logtk.FOFormula;;
-module M = Monome;;
-let pterm s =
-    let t = Parse_tptp.parse_term Lex_tptp.token (Lexing.from_string s) in
-    let tyctx = TypeInference.Ctx.create ~base:true () in
-    let _, clos = TypeInference.FO.infer tyctx t in
-    let renaming = Substs.Ty.Renaming.create 5 in
-    TypeInference.Ctx.apply_closure ~renaming tyctx clos
-;;
-let pform s =
-    let f = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s) in
-    let tyctx = TypeInference.Ctx.create ~base:true () in
-    TypeInference.FO.convert_form ~ctx:tyctx f
-;;
->>>>>>> fm-cancellative
 Printf.printf "finished loading\n";;
 (* vim:syntax=ocaml
 *)

@@ -30,279 +30,256 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 type scope = Substs.scope
+type term = FOTerm.t
 type form = Formula.FO.t
 
+(** a literal, that is, a signed atomic formula *)
 type t = private
-  | Equation of FOTerm.t * FOTerm.t * bool * Comparison.t
-  | Prop of FOTerm.t * bool
   | True
   | False
-  (** a literal, that is, a signed equation or a proposition *)
+  | Equation of term * term * bool
+  | Prop of term * bool
+  | Ineq of Theories.TotalOrder.lit
+  | Arith of ArithLit.t
 
 val eq : t -> t -> bool         (** equality of literals *)
 val eq_com : t -> t -> bool     (** commutative equality of lits *)
 val compare : t -> t -> int     (** lexicographic comparison of literals *)
 
-val hash : t -> int
+include Interfaces.HASH with type t := t
 
-val variant : ?subst:Substs.t -> t -> scope -> t -> scope -> Substs.t
-  (** Are two literals alpha-equivalent? *)
+val hash : t -> int               (** hashing of literal *)
+val weight : t -> int             (** weight of the lit (sum of weights of terms) *)
+val heuristic_weight : t -> int   (** heuristic difficulty to eliminate lit *)
+val depth : t -> int              (** depth of literal *)
+val sign : t -> bool
 
-val are_variant : t -> t -> bool
+val is_pos : t -> bool            (** is the literal positive? *)
+val is_neg : t -> bool            (** is the literal negative? *)
+val is_eqn : t -> bool            (** is the literal a proper (in)equation or prop? *)
+val is_prop : t -> bool           (** is the literal a boolean proposition? *)
+val is_eq : t -> bool             (** is the literal of the form a = b? *)
+val is_neq : t -> bool            (** is the literal of the form a != b? *)
+val is_ineq : t -> bool
+val is_strict_ineq : t -> bool
+val is_nonstrict_ineq : t -> bool
 
-val compare_partial : ord:Ordering.t -> t -> t -> Comparison.t
-  (** partial comparison of literals *)
-
-val to_multiset : t -> FOTerm.t Multiset.t  (** literal to multiset of terms *)
-
-val hash : t -> int                   (** hashing of literal *)
-val weight : t -> int                 (** weight of the lit *)
-val depth : t -> int                  (** depth of literal *)
-
-val is_pos : t -> bool                (** is the literal positive? *)
-val is_neg : t -> bool                (** is the literal negative? *)
-val equational : t -> bool            (** is the literal a proper equation? *)
-val orientation_of : t -> Comparison.t  (** get the orientation of the literal *)
-
-val ineq_lit : spec:Theories.TotalOrder.t -> t -> Theories.TotalOrder.lit
-  (** Assuming the literal is an inequation, returns the corresponding
-      total order literal.
-      @raise Not_found if the literal is not an inequality *)
-
-val is_eq : t -> bool (* a = b *)
-val is_neq : t -> bool (* a != b *)
-val is_ineq : spec:Theories.TotalOrder.t -> t -> bool
-val is_strict_ineq : spec:Theories.TotalOrder.t -> t -> bool
-val is_nonstrict_ineq : spec:Theories.TotalOrder.t -> t -> bool
-
-val ineq_lit_of : instance:Theories.TotalOrder.instance -> t -> Theories.TotalOrder.lit
-  (** Extract a total ordering literal from the literal, only for the
-      given ordering instance *)
-
-val is_ineq_of : instance:Theories.TotalOrder.instance -> t -> bool
+val is_ineq_of : instance:Theories.TotalOrder.t -> t -> bool
   (** [true] iff the literal is an inequation for the given total order *)
 
-val ineq_lit : spec:Theories.TotalOrder.t -> t -> Theories.TotalOrder.lit
-  (** Assuming the literal is an inequation, returns the corresponding
-      total order literal.
-      @raise Not_found if the literal is not an inequality *)
+val is_arith : t -> bool
+val is_arith_eqn : t -> bool    (** = or != *)
+val is_arith_eq : t -> bool
+val is_arith_neq : t -> bool
+val is_arith_ineq : t -> bool   (** < or <= *)
+val is_arith_less : t -> bool
+val is_arith_lesseq : t -> bool
+val is_arith_divides : t -> bool
 
 (** build literals. If sides so not have the same sort,
     a SortError will be raised. An ordering must be provided *)
-val mk_eq : ord:Ordering.t -> FOTerm.t -> FOTerm.t -> t
-val mk_neq : ord:Ordering.t -> FOTerm.t -> FOTerm.t -> t
-val mk_lit : ord:Ordering.t -> FOTerm.t -> FOTerm.t -> bool -> t
-val mk_prop : FOTerm.t -> bool -> t   (* proposition *)
-val mk_true : FOTerm.t -> t     (* true proposition *)
-val mk_false : FOTerm.t -> t    (* false proposition *)
+val mk_eq : term -> term -> t
+val mk_neq : term -> term -> t
+val mk_lit : term -> term -> bool -> t
+val mk_prop : term -> bool -> t   (* proposition *)
+val mk_true : term -> t     (* true proposition *)
+val mk_false : term -> t    (* false proposition *)
 val mk_tauto : t (* tautological literal *)
 val mk_absurd : t (* absurd literal, like ~ true *)
 
-val mk_less : Theories.TotalOrder.instance -> FOTerm.t -> FOTerm.t -> t
-val mk_lesseq : Theories.TotalOrder.instance -> FOTerm.t -> FOTerm.t -> t
+val mk_less : Theories.TotalOrder.t -> term -> term -> t
+val mk_lesseq : Theories.TotalOrder.t -> term -> term -> t
 
-val reord : ord:Ordering.t -> t -> t      (** recompute order *)
-val lit_of_form : ord:Ordering.t -> form -> t (** translate eq/not to literal *)
-val to_tuple : t -> (FOTerm.t * FOTerm.t * bool)
-val form_of_lit : t -> form
-val term_of_lit : t -> HOTerm.t                   (** translate lit to term *)
+val mk_arith : ArithLit.t -> t
+val mk_arith_op : ArithLit.op -> Z.t Monome.t -> Z.t Monome.t -> t
+val mk_arith_eq : Z.t Monome.t -> Z.t Monome.t -> t
+val mk_arith_neq : Z.t Monome.t -> Z.t Monome.t -> t
+val mk_arith_less : Z.t Monome.t -> Z.t Monome.t -> t
+val mk_arith_lesseq : Z.t Monome.t -> Z.t Monome.t -> t
+
+val mk_divides : ?sign:bool -> Z.t -> power:int -> Z.t Monome.t -> t
+val mk_not_divides : Z.t -> power:int -> Z.t Monome.t -> t
+
+val matching : ?subst:Substs.t -> t -> scope -> t -> scope ->
+               Substs.t Sequence.t
+(** checks whether subst(lit_a) matches lit_b. Returns alternative
+    substitutions s such that s(lit_a) = lit_b and s contains subst. *)
+
+val subsumes : ?subst:Substs.t -> t -> scope -> t -> scope ->
+               Substs.t Sequence.t
+(** More general version of {!matching}, yields [subst]
+    such that [subst(lit_a) => lit_b]. *)
+
+val variant : ?subst:Substs.t -> t -> scope -> t -> scope ->
+              Substs.t Sequence.t
+
+val unify : ?subst:Substs.t -> t -> scope -> t -> scope -> Substs.t Sequence.t
+
+val are_variant : t -> t -> bool
 
 val apply_subst : renaming:Substs.Renaming.t ->
-                  ord:Ordering.t -> Substs.t -> t -> scope -> t
+                  Substs.t -> t -> scope -> t
 
-val negate : t -> t                     (** negate literal *)
-val fmap : ord:Ordering.t -> (FOTerm.t -> FOTerm.t) -> t -> t (** fmap in literal *)
-val add_vars : unit FOTerm.Tbl.t -> t -> unit  (** Add variables to the set *)
-val vars : t -> FOTerm.t list (** gather variables *)
-val var_occurs : FOTerm.t -> t -> bool
-val is_ground : t -> bool
-
-module Seq : sig
-  val terms : t -> FOTerm.t Sequence.t
-  val vars : t -> FOTerm.t Sequence.t
-  val symbols : t -> Symbol.t Sequence.t
-end
-
-val get_eqn : t -> Position.t -> FOTerm.t * FOTerm.t * bool
-  (** Equational view of a literal *)
-
-module Pos : sig
-  val at : t -> Position.t -> FOTerm.t
-    (** Subterm at given position, or
-        @raise Not_found if the position is invalid *)
-
-  val replace : ord:Ordering.t -> t -> at:Position.t -> by:FOTerm.t -> t
-    (** Replace subterm, or
-        @raise Invalid_argument if the position is invalid *)
-end
+val apply_subst_no_simp : renaming:Substs.Renaming.t ->
+                          Substs.t -> t -> scope -> t
 
 val apply_subst_list : renaming:Substs.Renaming.t ->
-                       ord:Ordering.t -> Substs.t ->
-                       t list -> scope -> t list
+                       Substs.t -> t list -> scope -> t list
 
+val negate : t -> t   (** negate literal *)
+val map : (term -> term) -> t -> t (** functor *)
+val fold : ('a -> term -> 'a) -> 'a -> t -> 'a  (** basic fold *)
+val add_vars : unit FOTerm.Tbl.t -> t -> unit  (** Add variables to the set *)
+val vars : t -> term list (** gather variables *)
+val var_occurs : term -> t -> bool
+val is_ground : t -> bool
 val symbols : t -> Symbol.Set.t
-  (** Symbols occurring in the literal *)
+val root_terms : t -> term list (** all the terms immediatly under the lit *)
+
+(** {2 Basic semantic checks} *)
+
+val is_trivial : t -> bool
+val is_absurd : t -> bool
+
+val fold_terms : ?position:Position.t -> ?vars:bool ->
+                 which:[<`Max|`All] ->
+                 ord:Ordering.t -> subterms:bool ->
+                 t -> 'a ->
+                 ('a -> term -> Position.t -> 'a) ->
+                 'a
+  (** Fold on terms, maybe subterms, of the literal.
+      Variables are ignored if [vars] is [false].
+
+      [vars] decides whether variables are iterated on too (default [false])
+      [subterms] decides whether strict subterms, not only terms that
+      occur directly under the literal, are explored.
+
+      [which] is used to decide which terms to visit:
+      - if [which] is [`Max], only the maximal terms are explored
+      - if [which] is [`All], all root terms are explored *)
+
+(** {2 Comparisons} *)
+module Comp : sig
+  val max_terms : ord:Ordering.t -> t -> term list
+    (** Maximal terms of the literal *)
+
+  val compare : ord:Ordering.t -> t -> t -> Comparison.t
+    (** partial comparison of literals under the given term ordering *)
+end
+
+module Seq : sig
+  val terms : t -> term Sequence.t
+  val vars : t -> term Sequence.t
+  val symbols : t -> Symbol.t Sequence.t
+
+  val abstract : t -> (bool * term Sequence.t)
+    (** Abstract view, suitable for term indexing for instance *)
+end
+
+(** {2 Positions} *)
+module Pos : sig
+  type split = {
+    lit_pos : Position.t;
+    term_pos : Position.t;
+    term : term;
+  }
+  (** Full description of a position in a literal. It contains:
+     - [lit_pos]: the literal-prefix of the position
+     - [term_pos]: the suffix that describes a subterm position
+     - [term]: the term root, just under the literal itself.
+     given this, applying T.Pos.at to the subterm position and
+     the root term we obtain the sub-term itself. *)
+
+  val split : t -> Position.t -> split
+    (** @raise Invalid_argument if the position is incorrect *)
+
+  val at : t -> Position.t -> term
+    (** Subterm at given position, or
+        @raise Invalid_argument if the position is invalid *)
+
+  val replace : t -> at:Position.t -> by:term -> t
+    (** Replace subterm, or
+        @raise Invalid_argument if the position is invalid *)
+
+  val cut : t -> Position.t -> Position.t * Position.t
+    (** cut the subterm position off. For instance a position "left.1.2.stop"
+        in an equation "l=r" will yield
+        "left.stop", "1.2.stop".
+
+        it always holds that [let a,b = cut p in Position.append a b = p] *)
+
+  val root_term : t -> Position.t -> term
+    (** Obtain the term at the given position, at the root of the literal.
+        It should hold that
+        [root_term lit p = [at lit (fst (cut p))]]. *)
+
+  val term_pos : t -> Position.t -> Position.t
+    (** [term_pos lit p = snd (cut lit p)], the subterm position. *)
+
+  val is_max_term : ord:Ordering.t -> t -> Position.t -> bool
+    (** Is the term at the given position, maximal in the literal w.r.t this
+       ordering? In other words, if the term is replaced by a smaller term,
+       can the whole literal becomes smaller? *)
+end
+
+(** {2 Specific views} *)
+module View : sig
+  val as_eqn : t -> (term * term * bool) option
+
+  val get_eqn : t -> Position.t -> (term * term * bool) option
+    (** View of a Prop or Equation literal, oriented by the position. If the
+        position selects its left term, return l, r, otherwise r, l.
+        for propositions it will always be p, true.
+        @return None for other literals
+        @raise Invalid_argument if the position doesn't match the literal. *)
+
+  val get_ineq : t -> Theories.TotalOrder.lit option
+    (** Assuming the literal is an inequation, returns the corresponding
+        total order literal. *)
+
+  val get_ineq_of : instance:Theories.TotalOrder.t ->
+                    t -> Theories.TotalOrder.lit option
+    (** Extract a total ordering literal from the literal, only for the
+        given ordering instance *)
+
+  val get_arith : t -> ArithLit.t option
+    (** Extract an arithmetic literal *)
+
+  val focus_arith : t -> Position.t -> ArithLit.Focus.t option
+    (** Focus on a specific term in an arithmetic literal. The focused term is
+        removed from its monome, and its coefficient is returned. *)
+
+  val unfocus_arith : ArithLit.Focus.t -> t
+end
+
+(** {2 Conversions} *)
+module Conv : sig
+  type hook_from = form -> t option
+  type hook_to = t -> form option
+
+  val arith_hook_from : hook_from
+  val total_order_hook_from : instance:Theories.TotalOrder.t -> hook_from
+
+  val of_form : ?hooks:hook_from list -> form -> t
+  (** Conversion from a formula. By default no ordering or arith theory
+      is considered.
+      @raise Invalid_argument if the formula is not atomic. *)
+
+  val to_form : ?hooks:hook_to list -> t -> form
+end
 
 (** {2 IO} *)
 
-val pp_debug : Buffer.t -> t -> unit
-val pp_tstp : Buffer.t -> t -> unit
-(*val pp_arith : Buffer.t -> t -> unit TODO *)
+type print_hook = Buffer.t -> t -> bool
+  (** might print the literal on the given buffer.
+      @return true if it printed, false otherwise *)
+
+val add_default_hook : print_hook -> unit
+
+val pp_debug : ?hooks:print_hook list -> Buffer.t -> t -> unit
+
 val pp : Buffer.t -> t -> unit
-val set_default_pp : (Buffer.t -> t -> unit) -> unit
+val pp_tstp : Buffer.t -> t -> unit
 
 val to_string : t -> string
 val fmt : Format.formatter -> t -> unit
-
-(** {2 Arrays of literals} *)
-
-module Arr : sig
-  val eq : t array -> t array -> bool
-  val eq_com : t array -> t array -> bool
-  val compare : t array -> t array -> int
-  val hash : t array -> int
-
-  val variant : ?subst:Substs.t ->
-                t array -> scope -> t array -> scope ->
-                Substs.t
-  val are_variant : t array -> t array -> bool
-
-  val weight : t array -> int
-  val depth : t array -> int
-  val vars : t array -> FOTerm.t list
-  val is_ground : t array -> bool             (** all the literals are ground? *)
-
-  val terms : t array -> FOTerm.t Sequence.t
-
-  val compact : t array -> CompactClause.t
-    (** Make a compact clause *)
-
-  val to_form : t array -> form
-    (** Make a 'or' formula from literals *)
-
-  val apply_subst : renaming:Substs.Renaming.t ->
-                    ord:Ordering.t -> Substs.t ->
-                    t array -> scope -> t array
-
-  val fmap : ord:Ordering.t -> t array -> (FOTerm.t -> FOTerm.t) -> t array
-
-  val pos : t array -> BV.t
-  val neg : t array -> BV.t
-  val maxlits : ord:Ordering.t -> t array -> BV.t
-
-  val is_trivial : t array -> bool
-    (** Tautology? (simple syntactic criterion only) *)
-
-  val to_seq : t array -> (FOTerm.t * FOTerm.t * bool) Sequence.t
-    (** Convert the lits into a sequence of equations *)
-
-  val of_forms : ord:Ordering.t -> form list -> t array
-    (** Convert a list of atoms into literals *)
-
-  val to_forms : t array -> form list
-    (** To list of formulas *)
-
-  (** {3 High order combinators} *)
-
-  module Pos : sig
-    val at : t array -> Position.t -> FOTerm.t
-      (** Return the subterm at the given position, or
-          @raise Not_found if no such position is valid *)
-
-    val replace : ord:Ordering.t -> t array -> at:Position.t -> by:FOTerm.t -> unit
-      (** In-place modification of the array, in which the subterm at given
-          position is replaced by the [by] term.
-          @raise Invalid_argument if the position is not valid *)
-  end
-
-  val get_eqn : t array -> Position.t -> FOTerm.t * FOTerm.t * bool
-    (** get the term l at given position in clause, and r such that l ?= r
-        is the Literal.t at the given position.
-        @raise Invalid_argument if the position is not valid in the array *)
-
-  val get_ineq : spec:Theories.TotalOrder.t ->
-                 t array -> Position.t ->
-                Theories.TotalOrder.lit
-    (** Obtain the l <= r at the given position in the array, plus a
-        boolean that is [true] iff the inequality is {b strict}, and
-        the corresponding ordering instance (pair of symbols)
-        @raise Invalid_argument if the position is not valid in the array
-          or if the literal is not an inequation. *)
-
-  val order_instances : spec:Theories.TotalOrder.t ->
-                        t array ->
-                        Theories.TotalOrder.instance list
-    (** Returns a list of all ordering instances present in the array *)
-
-  val terms_under_ineq : instance:Theories.TotalOrder.instance ->
-                         t array -> FOTerm.t Sequence.t
-    (** All terms that occur under an equation, a predicate,
-        or an inequation for the given total ordering. *)
-
-  val fold_lits : eligible:(int -> t -> bool) ->
-                  t array -> 'a ->
-                  ('a -> t -> int -> 'a) ->
-                  'a
-    (** Fold over literals who satisfy [eligible]. The folded function
-        is given the literal and its index. *)
-
-  val fold_eqn : ?both:bool -> ?sign:bool ->
-                  eligible:(int -> t -> bool) ->
-                  t array -> 'a ->
-                  ('a -> FOTerm.t -> FOTerm.t -> bool -> Position.t -> 'a) ->
-                  'a
-    (** fold f over all literals sides, with their positions.
-        f is given (acc, left side, right side, sign, position of left side)
-        if [both = true], then both sides of a non-oriented equation
-          will be visited.
-        if [sign = true], then only positive equations are visited; if it's
-          [false], only negative ones; if it's not defined, both. *)
-
-  val fold_ineq : spec:Theories.TotalOrder.t ->
-                  eligible:(int -> t -> bool) ->
-                  t array -> 'a ->
-                  ('a -> Theories.TotalOrder.lit -> Position.t -> 'a) ->
-                  'a
-    (** Fold on inequalities of the lits. The fold function is given
-        the inequation instance, plus its position within the array.
-        [eligible] is used to filter which literals to fold over (given
-        the literal and its index). *)
-
-  val fold_terms : ?vars:bool -> which:[<`Max|`One|`Both] -> subterms:bool ->
-                   eligible:(int -> t -> bool) ->
-                   t array -> 'a ->
-                   ('a -> FOTerm.t -> Position.t -> 'a) ->
-                   'a
-    (** Fold on terms, maybe subterms, of the literal array.
-        Variables are ignored if [vars] is [false]. 
-
-        [vars] decides whether variables are iterated on too (default [false])
-        [eligible] decides whether literals are explored.
-        [subterms] decides whether subterms are explored.
-
-        [which] is used to decide on equational literals:
-        - if [which] is [`Max], only the maximal side is explored (or both if not comparable)
-        - if [which] is [`One], the maximal side, or an arbitrary one, is visited
-        - if [which] is [`Both], both sides of any equations are visited.
-    *)
-
-  val symbols : ?init:Symbol.Set.t -> t array -> Symbol.Set.t
-
-  (** {3 IO} *)
-
-  val pp : Buffer.t -> t array -> unit
-  val pp_tstp : Buffer.t -> t array -> unit
-  val to_string : t array -> string
-  val fmt : Format.formatter -> t array -> unit
-end
-
-(** {2 Special kinds of literal arrays} *)
-
-val is_RR_horn_clause : t array -> bool
-  (** Recognized whether the clause is a Range-Restricted Horn clause *)
-
-val is_horn : t array -> bool
-  (** Recognizes Horn clauses (at most one positive literal) *)
-
-val is_pos_eq : t array -> (FOTerm.t * FOTerm.t) option
-  (** Recognize whether the clause is a positive unit equality. *)

@@ -31,21 +31,17 @@ open Logtk
 
 type form = Formula.FO.t
 
-type t = private {
-  form : form;
-  proof : Proof.t;
-  mutable id : int;
-  mutable simpl_to : t option;
-}
+type t
 
 type pform = t
 
-val get_form : t -> form
-val get_proof : t -> Proof.t
+val proof : t -> Proof.t
+val form : t -> form
+val id : t -> int
 
 val eq : t -> t -> bool
-val hash : t -> int
 val cmp : t -> t -> int
+include Interfaces.HASH with type t := t
 
 val eq_noproof : t -> t -> bool
 val cmp_noproof : t -> t -> int
