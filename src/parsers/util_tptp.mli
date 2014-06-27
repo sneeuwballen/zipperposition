@@ -101,10 +101,15 @@ val infer_types : [`ctx of TypeInference.Ctx.t | `sign of Signature.t] ->
                   (Signature.t * Ast_tptp.Typed.t Sequence.t) or_error
   (** Infer types from type declarations and formulas, returning a sequence
       of well-typed ASTs, and the inferred signature.
-      @raise Type.Error if there is a type error. *)
+      @param the first parameter is either a typing context, or an
+        initial signature to use for type-checking
+      @return `Error if some formula is ill-typed, `Ok otherwise *)
 
 val signature : [`ctx of TypeInference.Ctx.t | `sign of Signature.t] ->
-                Ast_tptp.Untyped.t Sequence.t -> Signature.t
+                Ast_tptp.Untyped.t Sequence.t -> Signature.t or_error
+  (** Similar to {!infer_types} but only keeps the signature. It doesn't
+      build typed terms/formulas.
+      @return `Error in case of type error. *)
 
 val erase_types : Ast_tptp.Typed.t Sequence.t ->
                   Ast_tptp.Untyped.t Sequence.t

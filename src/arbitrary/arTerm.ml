@@ -101,17 +101,17 @@ end
 let default =
   Arbitrary.(PT.default >>= fun t ->
     let ctx = TypeInference.Ctx.create Signature.empty in
-    return (TypeInference.FO.convert ~generalize:false ~ctx t))
+    return (TypeInference.FO.convert_exn ~generalize:false ~ctx t))
 
 let ground =
   Arbitrary.(PT.ground >>= fun t ->
     let ctx = TypeInference.Ctx.create Signature.empty in
-    return (TypeInference.FO.convert ~ctx ~generalize:false t))
+    return (TypeInference.FO.convert_exn ~ctx ~generalize:false t))
 
 let pred =
   Arbitrary.(PT.pred >>= fun t ->
     let ctx = TypeInference.Ctx.create Signature.empty in
-    let ty, closure = TypeInference.FO.infer ctx t in
+    let ty, closure = TypeInference.FO.infer_exn ctx t in
     TypeInference.Ctx.constrain_type_type ctx ty Type.TPTP.o;
     let t = closure ctx in
     return t)
@@ -137,12 +137,12 @@ module HO = struct
   let ground =
     Arbitrary.(PT.HO.ground >>= fun t ->
       let ctx = TypeInference.Ctx.create Signature.empty in
-      return (TypeInference.HO.convert ~ctx t))
+      return (TypeInference.HO.convert_exn ~ctx t))
 
   let default =
     Arbitrary.(PT.HO.default >>= fun t ->
       let ctx = TypeInference.Ctx.create Signature.empty in
-      return (TypeInference.HO.convert ~ctx t))
+      return (TypeInference.HO.convert_exn ~ctx t))
 end
 
 (*

@@ -33,8 +33,11 @@ module Ty = Type
 module S = Substs
 module Sym = Symbol
 module Loc = ParseLocation
+module Err = CCError
 
 let prof_infer = Util.mk_profiler "TypeInference.infer"
+
+type 'a or_error = [`Error of string | `Ok of 'a]
 
 (** {2 Default Types} *)
 
@@ -344,10 +347,10 @@ module Closure = MonadFun(Ctx)
 (** {2 Hindley-Milner} *)
 
 module type S = sig
-  type untyped (* untyped term *)
-  type typed   (* typed term *)
+  type untyped (** untyped term *)
+  type typed   (** typed term *)
 
-  val infer : Ctx.t -> untyped -> Type.t * typed Closure.t
+  val infer_exn : Ctx.t -> untyped -> Type.t * typed Closure.t
     (** Infer the type of this term under the given signature. This updates
         the context's typing environment!
 
@@ -357,21 +360,57 @@ module type S = sig
         @return the inferred type of the untyped term (possibly a type var)
           along with a closure to produce a typed term once every
           constraint has been solved
-        @raise Error if the types are inconsistent *)
+        @raise Type.Error if the types are inconsistent *)
+
+  val infer : Ctx.t -> untyped -> (Type.t * typed Closure.t) or_error
+    (** Safe version of {!infer_exn}. It returns [`Error s] rather
+        than raising {!Type.Error} if the typechecking fails. *)
 
   (** {3 Constraining types}
 
   This section is mostly useful for inferring a signature without
   converting untyped_terms into typed_terms. *)
 
-  val constrain_term_term : Ctx.t -> untyped -> untyped -> unit
+  val constrain_term_term_exn : Ctx.t -> untyped -> untyped -> unit
     (** Force the two terms to have the same type in this context
-        @raise Error if an inconsistency is detected *)
+        @raise Type.Error if an inconsistency is detected *)
 
-  val constrain_term_type : Ctx.t -> untyped -> Type.t -> unit
+  val constrain_term_type_exn : Ctx.t -> untyped -> Type.t -> unit
     (** Force the term's type and the given type to be the same.
-        @raise Error if an inconsistency is detected *)
+        @raise Type.Error if an inconsistency is detected *)
+
+  val constrain_term_term : Ctx.t -> untyped -> untyped -> unit or_error
+    (** Safe version of {!constrain_term_term_exn} *)
+
+  val constrain_term_type : Ctx.t -> untyped -> Type.t -> unit or_error
+    (** Safe version of {!constrain_term_type_exn} *)
 end
+
+exception ExitSequence of string
+
+let map_error_seq f seq =
+  try
+    let s = Sequence.map
+      (fun x -> match f x with
+        | `Error s -> raise (ExitSequence s)
+        | `Ok y -> y
+      ) seq
+    in
+    Err.return (Sequence.persistent s)
+  with ExitSequence s ->
+    Err.fail s
+
+let _err_wrap1 f x =
+  try Err.return (f x)
+  with Type.Error s -> Err.fail s
+
+let _err_wrap2 f x y =
+  try Err.return (f x y)
+  with Type.Error s -> Err.fail s
+
+let _err_wrap3 f x y z =
+  try Err.return (f x y z)
+  with Type.Error s -> Err.fail s
 
 module FO = struct
   module PT = PrologTerm
@@ -380,6 +419,7 @@ module FO = struct
 
   type untyped = PT.t
   type typed = T.t
+  type typed_form = F.t
 
   (* convert a list of terms into a list of types *)
   let rec _convert_type_args ctx l = match l with
@@ -502,7 +542,7 @@ module FO = struct
     | PT.Var name -> Ctx._exit_var_scope ctx name
     | _ -> assert false
 
-  let infer ctx t =
+  let infer_exn ctx t =
     Util.enter_prof prof_infer;
     Util.debug 5 "infer_term %a" PT.pp t;
     try
@@ -514,14 +554,22 @@ module FO = struct
       Util.exit_prof prof_infer;
       raise e
 
-  let constrain_term_term ctx t1 t2 =
-    let ty1, _ = infer ctx t1 in
-    let ty2, _ = infer ctx t2 in
+  let infer ctx t = _err_wrap2 infer_exn ctx t
+
+  let constrain_term_term_exn ctx t1 t2 =
+    let ty1, _ = infer_exn ctx t1 in
+    let ty2, _ = infer_exn ctx t2 in
     Ctx.unify_and_set ctx ty1 ty2
 
-  let constrain_term_type ctx t ty =
-    let ty1, _ = infer ctx t in
+  let constrain_term_term ctx t1 t2 =
+    _err_wrap3 constrain_term_term_exn ctx t1 t2
+
+  let constrain_term_type_exn ctx t ty =
+    let ty1, _ = infer_exn ctx t in
     Ctx.unify_and_set ctx ty1 ty
+
+  let constrain_term_type ctx t ty =
+    _err_wrap3 constrain_term_type_exn ctx t ty
 
   let rec infer_form_rec ctx f =
     match f.PT.loc with
@@ -582,8 +630,8 @@ module FO = struct
     | PT.App ({PT.term=PT.Const (Sym.Conn ((Sym.Eq | Sym.Neq) as conn))},
       ([_;a;b] | [_; {PT.term=PT.List [a;b]}] | [a;b])) ->
       (* a ?= b *)
-      let tya, a = infer ctx a in
-      let tyb, b = infer ctx b in
+      let tya, a = infer_exn ctx a in
+      let tyb, b = infer_exn ctx b in
       Ctx.unify_and_set ctx tya tyb;
       fun ctx ->
         begin match conn with
@@ -594,7 +642,7 @@ module FO = struct
     | PT.Const _
     | PT.App _ ->
       (* atoms *)
-      let tyt, t = infer ctx f in
+      let tyt, t = infer_exn ctx f in
       Ctx.unify_and_set ctx tyt ctx.Ctx.default.default_prop;
       fun ctx -> F.Base.atom (t ctx)
     | PT.Var _
@@ -605,7 +653,7 @@ module FO = struct
     | PT.Record _
     | PT.Rat _ -> Ctx.__error ctx "expected formula, got %a" PT.pp f
 
-  let infer_form ctx f =
+  let infer_form_exn ctx f =
     Util.debug 5 "infer_form %a" PT.pp f;
     try
       let c_f = infer_form_rec ctx f in
@@ -614,27 +662,39 @@ module FO = struct
       Util.exit_prof prof_infer;
       raise e
 
-  let constrain_form ctx f =
+  let infer_form ctx f = _err_wrap2 infer_form_exn ctx f
+
+  let constrain_form_exn ctx f =
     let _ = infer_form ctx f in
     ()
 
-  let signature_forms signature seq =
+  let constrain_form ctx f = _err_wrap2 constrain_form_exn ctx f
+
+  let signature_forms_exn signature seq =
     let ctx = Ctx.create signature in
-    Sequence.iter (constrain_form ctx) seq;
+    Sequence.iter (constrain_form_exn ctx) seq;
     Ctx.to_signature ctx
 
-  let convert ?(generalize=false) ~ctx t =
-    let _, closure = infer ctx t in
+  let signature_forms s seq = _err_wrap2 signature_forms_exn s seq
+
+  let convert_exn ?(generalize=false) ~ctx t =
+    let _, closure = infer_exn ctx t in
     if generalize then Ctx.generalize ctx else Ctx.bind_to_default ctx;
     closure ctx
 
-  let convert_form ?(generalize=false) ~ctx f =
-    let closure = infer_form ctx f in
+  let convert ?generalize ~ctx t =
+    _err_wrap1 (convert_exn ?generalize ~ctx) t
+
+  let convert_form_exn ?(generalize=false) ~ctx f =
+    let closure = infer_form_exn ctx f in
     if generalize then Ctx.generalize ctx else Ctx.bind_to_default ctx;
     closure ctx
 
-  let convert_clause ?(generalize=false) ~ctx c =
-    let closures = List.map (fun lit -> infer_form ctx lit) c in
+  let convert_form ?generalize ~ctx f =
+    _err_wrap1 (convert_form_exn ?generalize ~ctx) f
+
+  let convert_clause_exn ?(generalize=false) ~ctx c =
+    let closures = List.map (fun lit -> infer_form_exn ctx lit) c in
     Ctx.exit_scope ctx;
     (* use same renaming for all formulas, to keep
       a consistent scope *)
@@ -642,13 +702,23 @@ module FO = struct
     if generalize then Ctx.generalize ctx else Ctx.bind_to_default ctx;
     List.map (fun c' -> c' ctx) closures
 
-  let convert_seq ?(generalize=false) ~ctx forms =
+  let convert_clause ?generalize ~ctx f =
+    _err_wrap1 (convert_clause_exn ?generalize ~ctx) f
+
+  let convert_seq_exn ?(generalize=false) input forms =
+    let ctx = match input with
+      | `ctx c -> c
+      | `sign s -> Ctx.create s
+    in
     (* build closures, inferring all types *)
-    let closures = Sequence.map (fun f -> infer_form ctx f) forms in
+    let closures = Sequence.map (fun f -> infer_form_exn ctx f) forms in
     let closures = Sequence.to_rev_list closures in
     if generalize then Ctx.generalize ctx else Ctx.bind_to_default ctx;
     (* apply closures to the final substitution *)
     List.rev_map (fun c -> c ctx) closures
+
+  let convert_seq ?generalize i forms =
+    _err_wrap2 (convert_seq_exn ?generalize) i forms
 end
 
 module HO = struct
@@ -832,7 +902,7 @@ module HO = struct
     | PT.Bind _ ->
         Ctx.__error ctx "expected higher-order term"
 
-  let infer ctx t =
+  let infer_exn ctx t =
     Util.enter_prof prof_infer;
     Util.debug 5 "infer_term %a" PT.pp t;
     try
@@ -844,34 +914,43 @@ module HO = struct
       Util.exit_prof prof_infer;
       raise e
 
-  let constrain_term_term ctx t1 t2 =
-    let ty1, _ = infer ctx t1 in
-    let ty2, _ = infer ctx t2 in
+  let infer ctx t = _err_wrap2 infer_exn ctx t
+
+  let constrain_term_term_exn ctx t1 t2 =
+    let ty1, _ = infer_exn ctx t1 in
+    let ty2, _ = infer_exn ctx t2 in
     Ctx.unify_and_set ctx ty1 ty2
 
-  let constrain_term_type ctx t ty =
-    let ty1, _ = infer ctx t in
+  let constrain_term_term ctx t1 t2 =
+    _err_wrap3 constrain_term_term_exn ctx t1 t2
+
+  let constrain_term_type_exn ctx t ty =
+    let ty1, _ = infer_exn ctx t in
     Ctx.unify_and_set ctx ty1 ty
 
-  let constrain ~ctx t =
-    let ty, _ = infer ctx t in
+  let constrain_term_type ctx t ty =
+    _err_wrap3 constrain_term_type_exn ctx t ty
+
+  let constrain_exn ~ctx t =
+    let ty, _ = infer_exn ctx t in
     Ctx.unify_and_set ctx ty Type.TPTP.o;
     ()
 
-  let convert ?(generalize=false) ?(ret=Type.TPTP.o) ~ctx t =
-    let ty, closure = infer ctx t in
+  let constrain ~ctx t = _err_wrap1 (constrain_exn ~ctx) t
+
+  let convert_exn ?(generalize=false) ?(ret=Type.TPTP.o) ~ctx t =
+    let ty, closure = infer_exn ctx t in
     Ctx.unify_and_set ctx ty ret;
     if generalize then Ctx.generalize ctx else Ctx.bind_to_default ctx;
     closure ctx
 
-  let convert_opt ?generalize ?ret ~ctx t =
-    try Some (convert ?generalize ?ret ~ctx t)
-    with _ -> None
+  let convert ?generalize ?ret ~ctx t =
+    _err_wrap1 (convert_exn ?generalize ?ret ~ctx) t
 
-  let convert_seq ?(generalize=false) ~ctx terms =
+  let convert_seq_exn ?(generalize=false) ~ctx terms =
     let closures = Sequence.map
       (fun t ->
-        let ty, closure = infer ctx t in
+        let ty, closure = infer_exn ctx t in
         Ctx.unify_and_set ctx ty Type.TPTP.o;
         closure)
       terms
@@ -882,4 +961,7 @@ module HO = struct
     List.rev_map
       (fun c -> c ctx)
       closures
+
+  let convert_seq ?generalize ~ctx terms =
+    _err_wrap1 (convert_seq_exn ?generalize ~ctx) terms
 end

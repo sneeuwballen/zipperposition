@@ -65,7 +65,7 @@ let atom =
   Arbitrary.(
     PT.atom >>= fun f ->
     let ctx = TypeInference.Ctx.create Signature.empty in
-    return (TypeInference.FO.convert_form ~ctx f)
+    return (TypeInference.FO.convert_form_exn ~ctx f)
   )
 
 let clause =
@@ -73,12 +73,12 @@ let clause =
     int 3 >>= fun len ->
     list_repeat len PT.atom >>= fun lits ->
     let ctx = TypeInference.Ctx.create Signature.empty in
-    return (TypeInference.FO.convert_clause ~ctx lits)
+    return (TypeInference.FO.convert_clause_exn ~ctx lits)
   )
 
 let default =
   Arbitrary.(
     PT.default >>= fun f ->
     let ctx = TypeInference.Ctx.create Signature.empty in
-    return (TypeInference.FO.convert_form ~ctx f)
+    return (TypeInference.FO.convert_form_exn ~ctx f)
   )

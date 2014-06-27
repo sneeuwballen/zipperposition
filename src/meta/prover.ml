@@ -85,11 +85,11 @@ let __clause_of_ast ~ctx ast =
       (* expected type *)
       let ret = Reasoner.property_ty in
       (* infer types for head, body, and force all types to be [ret] *)
-      let ty_head, head' = TypeInference.HO.infer ctx head in
+      let ty_head, head' = TypeInference.HO.infer_exn ctx head in
       TypeInference.Ctx.constrain_type_type ctx ty_head ret;
       let body' = List.map
         (fun t ->
-          let ty, t' = TypeInference.HO.infer ctx t in
+          let ty, t' = TypeInference.HO.infer_exn ctx t in
           TypeInference.Ctx.constrain_type_type ctx ty ret;
           t')
         body

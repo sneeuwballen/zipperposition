@@ -430,16 +430,16 @@ let infer_types init decls =
                 AT.TypeDecl (n,s, ty')
             end
         | AU.CNF(n,r,c,i) ->
-            let c' = TI.FO.convert_clause ~ctx c in
+            let c' = TI.FO.convert_clause_exn ~ctx c in
             AT.CNF(n,r,c',i)
         | AU.FOF(n,r,f,i) ->
-            let f' = TI.FO.convert_form ~ctx f in
+            let f' = TI.FO.convert_form_exn ~ctx f in
             AT.FOF(n,r,f',i)
         | AU.TFF(n,r,f,i) ->
-            let f' = TI.FO.convert_form ~ctx f in
+            let f' = TI.FO.convert_form_exn ~ctx f in
             AT.TFF(n,r,f',i)
         | AU.THF(n,r,f,i) ->
-            let f' = TI.HO.convert ~ctx f in
+            let f' = TI.HO.convert_exn ~ret:Type.TPTP.o ~ctx f in
             AT.THF(n,r,f',i)
         )
       decls
@@ -466,12 +466,15 @@ let signature init decls =
         TypeInference.Ctx.declare ctx (Symbol.of_string s) ty'
       end
     method any_form () _ f =
-      TypeInference.FO.constrain_form ctx f
+      TypeInference.FO.constrain_form_exn ctx f
     method clause () _ c =
-      List.iter (TypeInference.FO.constrain_form ctx) c
+      List.iter (TypeInference.FO.constrain_form_exn ctx) c
   end in
-  Sequence.fold a#visit () decls;
-  TypeInference.Ctx.to_signature ctx
+  try
+    Sequence.fold a#visit () decls;
+    Err.return (TypeInference.Ctx.to_signature ctx)
+  with Type.Error e ->
+    Err.fail e
 
 let erase_types typed =
   Sequence.map

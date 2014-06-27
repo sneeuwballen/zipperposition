@@ -40,7 +40,7 @@ let printer = F.to_string
 let pform s =
   let f = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s) in
   let ctx = TypeInference.Ctx.create Signature.TPTP.base in
-  TypeInference.FO.convert_form ~ctx f
+  TypeInference.FO.convert_form_exn ~ctx f
 
 let test_mk_not () =
   assert_equal ~cmp:F.eq ~printer F.Base.true_ (F.Base.not_ F.Base.false_);

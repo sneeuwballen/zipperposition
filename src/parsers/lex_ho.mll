@@ -111,6 +111,6 @@ rule token = parse
     CCOpt.(
       term_of_string s >>= fun t ->
       let ctx = TypeInference.Ctx.create Signature.TPTP.base in
-      TypeInference.HO.convert_opt ~generalize:true ~ctx t
+      CCError.to_opt (TypeInference.HO.convert ~generalize:true ~ctx t)
     )
 }
