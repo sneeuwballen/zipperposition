@@ -40,6 +40,14 @@ module type S = sig
       keeping only those of the form
       a \cap b \cap ...  \subseteq a' \cup b' \cup ... *)
 
+  val positive_chaining: Env.binary_inf_rule
+
+  val is_tautology: Env.is_trivial_rule
+
+  val is_absurd: Env.lit_rewrite_rule
+
+  val reflexivity_res: Env.unary_inf_rule
+
   val setup : unit -> unit
 end
 

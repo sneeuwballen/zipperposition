@@ -245,6 +245,11 @@ module View = struct
       Lit.View.focus_arith lits.(idx) pos'
     | _ -> None
 
+  let get_subseteq lits pos = match pos with
+    | Position.Arg (idx, pos') when idx < Array.length lits ->
+      Lit.View.get_subseteq lits.(idx)
+    | _ -> None
+
   let _unwrap2 ~msg f x y = match f x y with
     | Some z -> z
     | None -> invalid_arg msg
@@ -257,6 +262,9 @@ module View = struct
 
   let get_arith_exn =
     _unwrap2 ~msg:"get_arith: improper position" get_arith
+
+  let get_subseteq_exn =
+    _unwrap2 ~msg:"get_subseteq: improper position" get_subseteq
 end
 
 let order_instances lits =
@@ -418,6 +426,11 @@ let fold_subseteq ?sign ~eligible lits acc f =
         else
           fold acc (i+1)
   in fold acc 0
+
+let fold_subseteq_terms ?sign ~eligible lits acc f =
+  fold_subseteq ?sign ~eligible lits acc
+  (fun acc term position ->
+    Lit.fold_terms ~position ~which:`All ~ord:Ordering.none ~subterms:false term acc f)
 
 
 (** {3 IO} *)

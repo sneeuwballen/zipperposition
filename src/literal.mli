@@ -255,6 +255,8 @@ module View : sig
   val unfocus_arith : ArithLit.Focus.t -> t
 
   val get_subseteq : t -> (Theories.Sets.t * term list * term list * bool) option
+
+  val get_subseteq_exn : t -> Theories.Sets.t * term list * term list * bool
 end
 
 (** {2 Conversions} *)

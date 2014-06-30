@@ -42,6 +42,14 @@ module type S = sig
       keeping only those of the form
       a \cap b \cap ...  \subseteq a' \cup b' \cup ... *)
 
+  val positive_chaining: Env.binary_inf_rule
+
+  val is_tautology: Env.is_trivial_rule
+
+  val is_absurd: Env.lit_rewrite_rule
+
+  val reflexivity_res: Env.unary_inf_rule
+
   val setup : unit -> unit
 end
 
@@ -55,8 +63,55 @@ module Make(E : Env.S) = struct
   module Ctx = Env.Ctx
   module F = Formula.FO
   module TS = Theories.Sets
+  module S = Substs
+  module Lits = Literals
+  module Lit = Literal
+  module I = PS.TermIndex
+
+
 
   let _theory = ref TS.default
+
+  type scope = S.scope
+
+  let _idx_left = ref (PS.TermIndex.empty ())
+  let _idx_right = ref (PS.TermIndex.empty ())
+
+  let idx_left () = !_idx_left
+  let idx_right () = !_idx_right
+
+  let _update_idx f c =
+    let ord = Ctx.ord () in
+    (* terms appearing under a subseteq *)
+    let left, right = Lits.fold_subseteq
+      ~eligible:(C.Eligible.(filter Lit.is_subseteq)) (C.lits c) (idx_left (), idx_right ())
+      (fun (left,right) lit position ->
+        Lit.fold_terms ~position ~which:`All ~ord ~subterms:false lit (left,right)
+        (fun acc term pos -> match pos with
+          | Position.Arg(_,Position.Left _) ->
+            let with_pos = C.WithPos.( {term; pos; clause=c} ) in
+            (f left term with_pos,right)
+          | Position.Arg(_,Position.Right _) ->
+            let with_pos = C.WithPos.( {term; pos; clause=c} ) in
+            (left,f right term with_pos)
+          | _ -> left,right)
+      )
+    in
+    _idx_left := left;
+    _idx_right := right;
+    ()
+
+  let () =
+  Signal.on PS.ActiveSet.on_add_clause
+      (fun c ->
+        _update_idx PS.TermIndex.add c;
+        Signal.ContinueListening);
+    Signal.on PS.ActiveSet.on_remove_clause
+      (fun c ->
+        _update_idx PS.TermIndex.remove c;
+        Signal.ContinueListening);
+    ()
+
 
   type sets_list = {
     sets : F.term list;
@@ -179,7 +234,7 @@ module Make(E : Env.S) = struct
       constructed by doing the cartesian product of left side terms and right side terms
     *)
   let reform_subseteq ~sets left right =
-    Util.debug 3 "Reconstruction of clauses...";
+    Util.debug 3 "Reconstruction...";
     let rec aux l r acc =
       match l with
         | h::t ->
@@ -328,11 +383,182 @@ module Make(E : Env.S) = struct
       | F.Exists (t,f') -> F.Base.__mk_exists t (preprocess f')
       | F.ForallTy f' -> F.Base.__mk_forall_ty (preprocess f')
 
+  module SetChainingInfo = struct
+    type t = {
+      left: C.t;
+      left_pos: Position.t;
+      left_lit: Literal.t;
+      left_scope: scope;
+      right: C.t;
+      right_pos: Position.t;
+      right_lit: Literal.t;
+      right_scope: scope;
+      subst: Substs.t;
+      u_p: Lit.term
+    }
+  end
+
+  (* remove the term at the given position of a subseteq literal *)
+  let remove_term_at lit pos =
+    let module P = Position in
+    match lit,pos with
+      | Lit.Subseteq(sets,l,r,sign), P.Left (P.Arg(i,P.Stop)) ->
+        let seq = Sequence.of_list l in
+        Lit.mk_subseteq ~sign ~sets (Sequence.foldi
+          (fun l j elt -> if (i = j) then l else elt::l) [] seq) r
+      | Lit.Subseteq(sets,l,r,sign),P.Right (P.Arg(i,P.Stop)) ->
+        let seq = Sequence.of_list r in
+        Lit.mk_subseteq ~sign ~sets l (Sequence.foldi
+          (fun r j elt -> if (i = j) then r else elt::r) [] seq)
+      | _,_ -> assert false
+
+  (* perform positive chaining *)
+  let do_positive_chaining info acc =
+    let open SetChainingInfo in
+    let module P = Position in
+    let renaming = Ctx.renaming_clear () in
+    let subst = info.subst in
+    let sc_l = info.left_scope and sc_r = info.right_scope in
+    (* get the index of the literals, and the position of the chaining terms *)
+    let left_idx,left_pos = Lits.Pos.cut info.left_pos in
+    let right_idx,right_pos = Lits.Pos.cut info.right_pos in
+    (* applying the substitution on all the other literals *)
+    let lits_left = Util.array_except_idx (C.lits info.left) left_idx in
+    let lits_left = Lit.apply_subst_list ~renaming subst lits_left sc_l in
+    let lits_right = Util.array_except_idx (C.lits info.right) right_idx in
+    let lits_right = Lit.apply_subst_list ~renaming subst lits_right sc_r in
+    (* new literal :
+     * given lit_l = [A inter t subseteq B] and
+     *       lit_r = [A' subseteq B' union t],
+     * we remove t in those literals, and then we merge them, obtaining
+     * [A inter A' subseteq B inter B'] *)
+    let new_lit =
+      let new_lit_left = remove_term_at info.left_lit left_pos in
+      let new_lit_right = remove_term_at info.right_lit right_pos in
+      let sets,l1,r1,_ = Lit.View.get_subseteq_exn new_lit_left in
+      let _,l2,r2,_ = Lit.View.get_subseteq_exn new_lit_right in
+      Lit.mk_subseteq ~sets (l1 @ l2) (r1 @ r2) in
+    Util.debug 2 "new literal: %a" Lit.pp new_lit;
+    (* construct the new clause *)
+    let new_lits = new_lit :: (lits_left @ lits_right) in
+    let proof cc = Proof.mk_c_inference ~theories:["sets"]
+      ~info:[Substs.to_string subst; Util.sprintf "positive chaining"]
+      ~rule:"positive_chaining" cc [C.proof info.left;C.proof info.right] in
+    let new_c = C.create ~parents:[info.left;info.right] new_lits proof in
+    Util.debug 2 "chaining %a with %a using %a" C.pp info.left C.pp info.right
+    Substs.pp subst;
+    new_c :: acc
+
+  (* positive chaining on both sides of each literal of the given clause c *)
+  let positive_chaining c =
+    Util.debug 2 "apply binary rule positive_chaining";
+    let eligible = C.Eligible.(filter Lit.is_subseteq) in
+    let new_clauses = Lits.fold_subseteq ~sign:true ~eligible (C.lits c) []
+    (fun acc lit position ->
+      Util.debug 2 "try positive chaining in %a" Lit.pp lit;
+      Lit.fold_terms ~position ~which:`All ~ord:Ordering.none ~subterms:false
+      lit acc
+      (fun acc term pos -> match pos with
+        | Position.Arg (_,Position.Right _) ->
+          Util.debug 2 "current position: %a" Position.pp pos;
+          I.retrieve_unifiables !_idx_left 0 term 1 acc
+          (fun acc u_p with_pos subst ->
+            let left = with_pos.C.WithPos.clause in
+            let left_pos = with_pos.C.WithPos.pos in
+            let left_lit,_ = Lits.Pos.lit_at (C.lits left) left_pos in
+            Util.debug 2 "... candidate: %a" Lit.pp left_lit;
+            Util.debug 2 "position: %a" Position.pp left_pos;
+            let info = SetChainingInfo.( {
+              left; left_pos; left_lit; left_scope=1;
+              right=c; right_pos=pos; right_lit=lit; right_scope=0;
+              subst; u_p} )
+            in
+            do_positive_chaining info acc)
+        | Position.Arg(_,Position.Left _) ->
+          Util.debug 2 "current position: %a" Position.pp pos;
+          I.retrieve_unifiables !_idx_right 0 term 1 acc
+          (fun acc u_p with_pos subst ->
+            let right = with_pos.C.WithPos.clause in
+            let right_pos = with_pos.C.WithPos.pos in
+            let right_lit,_ = Lits.Pos.lit_at (C.lits right) right_pos in
+            Util.debug 2 "... candidate: %a" Lit.pp right_lit;
+            Util.debug 2 "position: %a" Position.pp right_pos;
+            let info = SetChainingInfo.( {
+              left=c; left_pos=pos; left_lit=lit; left_scope=0;
+              right; right_pos; right_lit; right_scope=1;
+              subst; u_p} )
+            in
+            do_positive_chaining info acc)
+        | _ -> assert false
+      )
+    )
+    in new_clauses
+
+  let is_tautology c =
+    let module Seq = Sequence in
+    let eligible = C.Eligible.(filter Lit.is_subseteq) in
+    Lits.fold_subseteq ~sign:true ~eligible (C.lits c) false
+    (fun res lit _ ->
+      res ||
+      (match lit with
+        | Lit.Subseteq(_,l,r,_) ->
+            let seq = Seq.product (Seq.of_list l) (Seq.of_list r) in
+            Seq.exists (fun (a,b) -> FOTerm.eq a b) seq
+        | _ -> assert false))
+
+  let is_absurd lit =
+    let module Seq = Sequence in
+    match lit with
+      | Lit.Subseteq(_,l,r,sign) ->
+      if sign then lit
+          else let seq = Seq.product (Seq.of_list l) (Seq.of_list r) in
+          Seq.fold (fun lit (a,b) -> if FOTerm.eq a b then Lit.mk_absurd else lit)
+            lit seq
+      | _ -> assert false
+
+  let reflexivity_res c =
+    Util.debug 2 "apply uniary inference reflexivity res";
+    let module P = Position in
+    let eligible = C.Eligible.(filter Lit.is_subseteq) in
+    let new_clauses = Lits.fold_subseteq ~eligible (C.lits c) []
+    (fun acc lit pos ->
+      Util.debug 2 "try reflexifvity res in %a" Lit.pp lit;
+      match lit with
+        | Lit.Subseteq(sets,l,r,sign) ->
+          let seq_l = Sequence.of_list l and seq_r = Sequence.of_list r in
+          let seq = Sequence.product seq_l seq_r in
+          let f acc (term_l,term_r) =
+            try
+              let subst = Unif.FO.unification term_l 0 term_r 0 in
+              let i = Lits.Pos.idx pos in
+              let renaming = Ctx.renaming_clear () in
+              let lits =
+                if sign then []
+                else
+                  let lits_except_idx = Util.array_except_idx (C.lits c) i in
+                    Lit.apply_subst_list ~renaming subst lits_except_idx 0
+              in
+              let proof cc = Proof.mk_c_inference ~theories:["sets"]
+              ~rule:"reflexivity_res" cc [C.proof c]
+              ~info:[Substs.to_string subst; Util.sprintf "reflexivity resolution"] in
+              let new_c = C.create ~parents:[c] lits proof in
+              Util.debug 2 "reflexivity res of %a gives %a" C.pp c C.pp new_c;
+              new_c :: acc
+            with Unif.Fail -> acc
+          in Sequence.fold f acc seq
+        | _ -> acc)
+    in new_clauses
+    
+ 
   let setup () =
     Util.debug 1 "setup set chaining";
     Env.add_cnf_option (Cnf.PostNNF preprocess);
     Ctx.Lit.add_from_hook (Lit.Conv.set_hook_from ~sets:!_theory);
     Ctx.Lit.add_to_hook (Lit.Conv.set_hook_to);
+    Env.add_binary_inf "positive_chaining" positive_chaining;
+    Env.add_unary_inf "reflexivity_res" reflexivity_res;
+    Env.add_is_trivial is_tautology;
+    Env.add_lit_rule "remove_absurd" is_absurd;
     (* maybe change the set signature? FIXME
     Signal.on Ctx.Theories.Sets.on_add
       (fun theory' -> _theory := theory'; Signal.ContinueListening);

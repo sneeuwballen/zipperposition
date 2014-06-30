@@ -1244,4 +1244,8 @@ module View = struct
   let get_subseteq = function
     | Subseteq (sets, l, r, sign) -> Some (sets, l, r, sign)
     | _ -> None
+
+  let get_subseteq_exn = function
+    | Subseteq (sets, l, r, sign) -> sets, l, r, sign
+    | _ -> failwith "not a subseteq"
 end

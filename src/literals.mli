@@ -127,12 +127,15 @@ module View : sig
 
   val get_arith : t -> Position.t -> ArithLit.Focus.t option
 
+  val get_subseteq : t -> Position.t -> (Theories.Sets.t * term list * term list * bool) option
+
   (** The following functions will raise [Invalid_argument] if the
      position is not valid or if the literal isn't what's asked for *)
 
   val get_eqn_exn : t -> Position.t -> (term * term * bool)
   val get_ineq_exn : t -> Position.t -> Theories.TotalOrder.lit
   val get_arith_exn : t -> Position.t -> ArithLit.Focus.t
+  val get_subseteq_exn : t -> Position.t -> (Theories.Sets.t * term list * term list * bool)
 end
 
 val order_instances : t -> Theories.TotalOrder.t list
@@ -202,6 +205,11 @@ val fold_subseteq : ?sign:bool -> eligible:(int -> Literal.t -> bool) ->
                     t -> 'a ->
                     ('a -> Literal.t -> Position.t -> 'a) ->
                     'a
+
+val fold_subseteq_terms : ?sign:bool -> eligible:(int -> Literal.t -> bool) ->
+                         t -> 'a ->
+                         ('a -> term -> Position.t -> 'a) ->
+                         'a
 
 (** {2 IO} *)
 
