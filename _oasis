@@ -141,7 +141,7 @@ Executable run_bench
   BuildDepends:     logtk,benchmark,qcheck,logtk.arbitrary
 
 Test all
-  Command:          $run_tests
+  Command:          make test-all
   TestTools:        run_tests
   Run$:             flag(tests) && flag(qcheck)
 

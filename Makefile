@@ -59,4 +59,8 @@ push_doc: doc rst_doc
 	rsync -tavu logtk.docdir/* cedeela.fr:~/simon/root/software/logtk/
 	rsync -tavu _build/doc/* cedeela.fr:~/simon/root/software/logtk/rst/
 
-.PHONY: push_doc tags rst_doc open_doc fetch-submodules
+test-all: build
+	./run_tests.native
+	./tests/quick/all.sh
+
+.PHONY: push_doc tags rst_doc open_doc test-all
