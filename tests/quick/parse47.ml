@@ -1,7 +1,7 @@
 #!/usr/bin/env ocaml
 #use "tests/quick/.common.ml";;
 
-module E = Monad.Err
+module E = CCError
 
 let () =
   let res = E.(
@@ -13,7 +13,7 @@ let () =
     E.return (Sequence.for_all F.FO.is_closed forms)
   ) in
   match res with
-  | E.Ok true -> ok ()
-  | E.Ok false -> print_endline "assertion failure, ERROR"
-  | E.Error msg -> print_endline msg
+  | `Ok true -> ok ()
+  | `Ok false -> print_endline "assertion failure, ERROR"
+  | `Error msg -> print_endline msg
 ;;

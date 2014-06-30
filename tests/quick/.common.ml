@@ -1,5 +1,7 @@
 #use "topfind";;
 #require "zarith";;
+#require "sequence";;
+#require "containers";;
 #require "num";;
 #require "unix";;
 #require "datalog";;
@@ -31,7 +33,7 @@ let (~<) = Symbol.of_string;;
 #install_printer ParseLocation.fmt;;
 #install_printer Precedence.fmt;;
 #install_printer Ordering.fmt;;
-open Logtk.Sequence.Infix;;
+open Sequence.Infix;;
 open Logtk.Type;;
 module F = Logtk.Formula;;
 module HOT = Logtk.HOTerm;;
@@ -46,13 +48,13 @@ open Logtk_parsers;;
 let pterm s =
     let t = Parse_tptp.parse_term Lex_tptp.token (Lexing.from_string s) in
     let tyctx = TypeInference.Ctx.create Signature.TPTP.base in
-    let _, clos = TypeInference.FO.infer tyctx t in
+    let _, clos = TypeInference.FO.infer_exn tyctx t in
     clos tyctx
 ;;
 let pform s =
     let f = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s) in
     let tyctx = TypeInference.Ctx.create Signature.TPTP.base in
-    TypeInference.FO.convert_form ~ctx:tyctx f
+    TypeInference.FO.convert_form_exn ~ctx:tyctx f
 ;;
 
 

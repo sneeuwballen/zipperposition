@@ -15,8 +15,8 @@ let l = Lex_ho.decls_of_string
 
 let () =
   match l with
-  | Monad.Err.Ok l -> assert (List.length l = 3)
-  | Monad.Err.Error msg ->
+  | `Ok l -> assert (List.length l = 3)
+  | `Error msg ->
       failwith (Printf.sprintf "error : %s\n" msg)
 ;;
 
