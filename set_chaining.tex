@@ -274,6 +274,20 @@ obtain, from $A_\cap \subseteq t\cup B_\cup$ and
 $A'_\cap \not\subseteq t\cup B'_\cup$, the result
 $A'_\cap \cap \compl{B'_\cup} \not\subseteq A_\cap \cap \compl{B_\cup}$.
 
+In some cases, the left-hand side of a negative inclusion comprises
+a singleton. Since an intersection with a singleton $\{ t \}$ is either
+$\emptyset$ or $\{ t\}$, we know that a non-inclusion witness has to be $t$.
+In other words, $\{ t \} \cap \bigcap_i a_i \not\subseteq \emptyset$
+means that $t$ has to belong to all $a_i$; therefore
+$\bigcap_i \{ t_i \} \cap \bigcap_j a_j \not\subseteq \bigcup_k b_k$
+implies $\forall i, t_i = t_1$,
+$\forall j, \{ t_1 \} \subseteq a_j$, and
+$\forall k, \{ t_1 \} \subseteq \compl{b_j}$ (i.e.,
+$\{ t_1 \} \not\subseteq b_j$ because $\{ t\} \subseteq \compl{A}$
+is equivalent to $\{t \} \not\subseteq A$).
+That justifies the rule \emph{singleton witness} (note that the \emph{emptyset}
+tautology criterion is a special case where all three conjunctions are empty).
+
 Factoring rules are used to \emph{merge} together two literals whose maximal
 terms are the same. The basic idea is that if $A \subseteq B
 \lor A \subseteq C$, then if we assume $B\subseteq C$ we can deduce
@@ -325,6 +339,19 @@ on the fly).
         K \lor K'
         \lor \bigvee_{s \in A_\cap} (A'_\cap \not\subseteq s \cup B'_\cup)
         \lor \bigvee_{s \in B_\cup} (A'_\cap \cap s \not\subseteq B'_\cup)
+    $}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$ K \lor \bigcap_{i=1}^n \{ t_i \} \cap A_\cap \not\subseteq B_\cup $}
+    \AxiomC{$ n \geq 1 $}
+    \RightLabel{singleton witness}
+    \BinaryInfC{$
+        \bigwedge_{i} (K \lor t_i = t_1)
+        \land
+        \bigwedge_{a \in A_\cap} (K \lor \{ t_1 \} \subseteq a)
+        \land
+        \bigwedge_{b \in B_\cap} (K \lor \{ t_1 \} \not\subseteq b)
     $}
 \end{prooftree}
 
