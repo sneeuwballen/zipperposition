@@ -309,8 +309,8 @@ on the fly).
     $}
     \UnaryInfC{$
         K \lor K'
-        \lor \bigvee_{s \in B_\cup} (A'_\cap \cap s \subseteq B'_\cup)
-        \lor \bigvee_{s \in A_\cap} (A'_\cap \subseteq s \cup B'_\cup)
+        \lor \bigvee_{s \in B_\cup} (A'_\cap \cap s \not\subseteq B'_\cup)
+        \lor \bigvee_{s \in A_\cap} (A'_\cap \not\subseteq s \cup B'_\cup)
     $}
 \end{prooftree}
 
@@ -323,8 +323,8 @@ on the fly).
     $}
     \UnaryInfC{$
         K \lor K'
-        \lor \bigvee_{s \in A_\cap} (A'_\cap \subseteq s \cup B'_\cup)
-        \lor \bigvee_{s \in B_\cup} (A'_\cap \cap s \subseteq B'_\cup)
+        \lor \bigvee_{s \in A_\cap} (A'_\cap \not\subseteq s \cup B'_\cup)
+        \lor \bigvee_{s \in B_\cup} (A'_\cap \cap s \not\subseteq B'_\cup)
     $}
 \end{prooftree}
 
