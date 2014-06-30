@@ -207,8 +207,8 @@ val fold_subseteq : ?sign:bool -> eligible:(int -> Literal.t -> bool) ->
                     'a
 
 val fold_subseteq_terms : ?sign:bool -> eligible:(int -> Literal.t -> bool) ->
-                         t -> 'a ->
-                         ('a -> term -> Position.t -> 'a) ->
+                         ord:Ordering.t -> t -> 'a ->
+                         ('a -> Literal.term -> Position.t -> 'a) ->
                          'a
 
 (** {2 IO} *)

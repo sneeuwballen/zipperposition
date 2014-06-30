@@ -87,7 +87,8 @@ module Make(E : Env.S) = struct
       ~eligible:(C.Eligible.(filter Lit.is_subseteq)) (C.lits c) (idx_left (), idx_right ())
       (fun (left,right) lit position ->
         Lit.fold_terms ~position ~which:`All ~ord ~subterms:false lit (left,right)
-        (fun acc term pos -> match pos with
+        (fun (left,right) term pos ->
+          match pos with
           | Position.Arg(_,Position.Left _) ->
             let with_pos = C.WithPos.( {term; pos; clause=c} ) in
             (f left term with_pos,right)
@@ -102,7 +103,7 @@ module Make(E : Env.S) = struct
     ()
 
   let () =
-  Signal.on PS.ActiveSet.on_add_clause
+    Signal.on PS.ActiveSet.on_add_clause
       (fun c ->
         _update_idx PS.TermIndex.add c;
         Signal.ContinueListening);
@@ -383,7 +384,7 @@ module Make(E : Env.S) = struct
       | F.Exists (t,f') -> F.Base.__mk_exists t (preprocess f')
       | F.ForallTy f' -> F.Base.__mk_forall_ty (preprocess f')
 
-  module SetChainingInfo = struct
+  module SetPositiveInfo = struct
     type t = {
       left: C.t;
       left_pos: Position.t;
@@ -394,7 +395,6 @@ module Make(E : Env.S) = struct
       right_lit: Literal.t;
       right_scope: scope;
       subst: Substs.t;
-      u_p: Lit.term
     }
   end
 
@@ -414,7 +414,7 @@ module Make(E : Env.S) = struct
 
   (* perform positive chaining *)
   let do_positive_chaining info acc =
-    let open SetChainingInfo in
+    let open SetPositiveInfo in
     let module P = Position in
     let renaming = Ctx.renaming_clear () in
     let subst = info.subst in
@@ -438,7 +438,6 @@ module Make(E : Env.S) = struct
       let sets,l1,r1,_ = Lit.View.get_subseteq_exn new_lit_left in
       let _,l2,r2,_ = Lit.View.get_subseteq_exn new_lit_right in
       Lit.mk_subseteq ~sets (l1 @ l2) (r1 @ r2) in
-    Util.debug 2 "new literal: %a" Lit.pp new_lit;
     (* construct the new clause *)
     let new_lits = new_lit :: (lits_left @ lits_right) in
     let proof cc = Proof.mk_c_inference ~theories:["sets"]
@@ -447,46 +446,48 @@ module Make(E : Env.S) = struct
     let new_c = C.create ~parents:[info.left;info.right] new_lits proof in
     Util.debug 2 "chaining %a with %a using %a" C.pp info.left C.pp info.right
     Substs.pp subst;
+    Util.debug 2 "new literal: %a" Lit.pp new_lit;
     new_c :: acc
 
-  (* positive chaining on both sides of each literal of the given clause c *)
+  (* positive chaining on both sides of each literal of the given clause *)
   let positive_chaining c =
+    let ord = Ctx.ord () in
     Util.debug 2 "apply binary rule positive_chaining";
     let eligible = C.Eligible.(filter Lit.is_subseteq) in
     let new_clauses = Lits.fold_subseteq ~sign:true ~eligible (C.lits c) []
     (fun acc lit position ->
       Util.debug 2 "try positive chaining in %a" Lit.pp lit;
-      Lit.fold_terms ~position ~which:`All ~ord:Ordering.none ~subterms:false
+      Lit.fold_terms ~position ~which:`All ~ord ~subterms:false
       lit acc
       (fun acc term pos -> match pos with
         | Position.Arg (_,Position.Right _) ->
-          Util.debug 2 "current position: %a" Position.pp pos;
+          Util.debug 4 "current position: %a" Position.pp pos;
           I.retrieve_unifiables !_idx_left 0 term 1 acc
-          (fun acc u_p with_pos subst ->
+          (fun acc _ with_pos subst ->
             let left = with_pos.C.WithPos.clause in
             let left_pos = with_pos.C.WithPos.pos in
             let left_lit,_ = Lits.Pos.lit_at (C.lits left) left_pos in
-            Util.debug 2 "... candidate: %a" Lit.pp left_lit;
-            Util.debug 2 "position: %a" Position.pp left_pos;
-            let info = SetChainingInfo.( {
+            Util.debug 3 "... candidate: %a" Lit.pp left_lit;
+            Util.debug 4 "position: %a" Position.pp left_pos;
+            let info = SetPositiveInfo.( {
               left; left_pos; left_lit; left_scope=1;
               right=c; right_pos=pos; right_lit=lit; right_scope=0;
-              subst; u_p} )
+              subst} )
             in
             do_positive_chaining info acc)
         | Position.Arg(_,Position.Left _) ->
-          Util.debug 2 "current position: %a" Position.pp pos;
+          Util.debug 4 "current position: %a" Position.pp pos;
           I.retrieve_unifiables !_idx_right 0 term 1 acc
-          (fun acc u_p with_pos subst ->
+          (fun acc _ with_pos subst ->
             let right = with_pos.C.WithPos.clause in
             let right_pos = with_pos.C.WithPos.pos in
             let right_lit,_ = Lits.Pos.lit_at (C.lits right) right_pos in
-            Util.debug 2 "... candidate: %a" Lit.pp right_lit;
-            Util.debug 2 "position: %a" Position.pp right_pos;
-            let info = SetChainingInfo.( {
+            Util.debug 3 "... candidate: %a" Lit.pp right_lit;
+            Util.debug 4 "position: %a" Position.pp right_pos;
+            let info = SetPositiveInfo.( {
               left=c; left_pos=pos; left_lit=lit; left_scope=0;
               right; right_pos; right_lit; right_scope=1;
-              subst; u_p} )
+              subst} )
             in
             do_positive_chaining info acc)
         | _ -> assert false
@@ -517,14 +518,14 @@ module Make(E : Env.S) = struct
       | _ -> assert false
 
   let reflexivity_res c =
-    Util.debug 2 "apply uniary inference reflexivity res";
+    Util.debug 2 "apply unary inference reflexivity res";
     let module P = Position in
     let eligible = C.Eligible.(filter Lit.is_subseteq) in
     let new_clauses = Lits.fold_subseteq ~eligible (C.lits c) []
     (fun acc lit pos ->
-      Util.debug 2 "try reflexifvity res in %a" Lit.pp lit;
       match lit with
-        | Lit.Subseteq(sets,l,r,sign) ->
+        | Lit.Subseteq(sets,l,r,sign) when not sign ->
+          Util.debug 2 "try reflexifvity res in %a" Lit.pp lit;
           let seq_l = Sequence.of_list l and seq_r = Sequence.of_list r in
           let seq = Sequence.product seq_l seq_r in
           let f acc (term_l,term_r) =
@@ -532,12 +533,8 @@ module Make(E : Env.S) = struct
               let subst = Unif.FO.unification term_l 0 term_r 0 in
               let i = Lits.Pos.idx pos in
               let renaming = Ctx.renaming_clear () in
-              let lits =
-                if sign then []
-                else
-                  let lits_except_idx = Util.array_except_idx (C.lits c) i in
-                    Lit.apply_subst_list ~renaming subst lits_except_idx 0
-              in
+              let lits = Util.array_except_idx (C.lits c) i in
+              let lits = Lit.apply_subst_list ~renaming subst lits 0 in
               let proof cc = Proof.mk_c_inference ~theories:["sets"]
               ~rule:"reflexivity_res" cc [C.proof c]
               ~info:[Substs.to_string subst; Util.sprintf "reflexivity resolution"] in
@@ -548,8 +545,7 @@ module Make(E : Env.S) = struct
           in Sequence.fold f acc seq
         | _ -> acc)
     in new_clauses
-    
- 
+
   let setup () =
     Util.debug 1 "setup set chaining";
     Env.add_cnf_option (Cnf.PostNNF preprocess);

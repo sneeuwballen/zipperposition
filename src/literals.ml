@@ -418,19 +418,18 @@ let fold_subseteq ?sign ~eligible lits acc f =
     else if not(eligible i lits.(i)) then fold acc (i+1)
     else match Literal.View.get_subseteq (lits.(i)) with
       | None -> fold acc (i+1)
-      | Some (sets,l,r,s) ->
+      | Some (_,_,_,s) ->
         if sign_ok s then
           let pos = Position.(arg i stop) in
-          let sign = (Some s) in
-          fold (f acc (Literal.mk_subseteq ?sign ~sets l r) pos) (i+1)
+          fold (f acc lits.(i) pos) (i+1)
         else
           fold acc (i+1)
   in fold acc 0
 
-let fold_subseteq_terms ?sign ~eligible lits acc f =
+let fold_subseteq_terms ?sign ~eligible ~ord lits acc f =
   fold_subseteq ?sign ~eligible lits acc
-  (fun acc term position ->
-    Lit.fold_terms ~position ~which:`All ~ord:Ordering.none ~subterms:false term acc f)
+  (fun acc lit position ->
+    Lit.fold_terms ~position ~which:`All ~ord ~subterms:false lit acc f)
 
 
 (** {3 IO} *)
