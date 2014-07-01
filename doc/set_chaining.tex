@@ -1,0 +1,494 @@
+\documentclass{article}
+
+%{{{ prelude
+\usepackage{bussproofs}
+\usepackage[english]{babel}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{paralist}
+\usepackage[colorlinks=false,pdfborder={0 0 0},
+pdftitle={superposition and chaining with sets},pdfauthor={Simon Cruanes}]{hyperref}
+
+\newcommand{\set}[1]{\ensuremath{\text{set}({#1})}}
+\newcommand{\total}[1]{\ensuremath{\text{total}({#1})}}
+\newcommand{\compl}[1]{\ensuremath{\overline{#1}}}
+\newcommand{\normalize}[1]{\ensuremath{\text{norm}(#1)}}
+
+\title{Superposition and Chaining with Sets}
+%}}}
+
+\begin{document}
+
+\maketitle
+
+\section{Basics}
+%{{{
+
+\subsection{Definitions}
+%{{{
+Literals are of the form $\bigcap_i a_i \subseteq \bigcup_j b_j$
+or $\bigcap_i a_i \not\subseteq \bigcup_j b_j$ where
+the $a_i$ and $b_j$ are terms of type set. 
+The terms of type $\set{\alpha}$ are of the form:
+
+\begin{itemize}
+    \item $\{ t \}$ where $t : \alpha$;
+    \item $\compl{t}$ where $t : \set{\alpha}$, with $\compl{\compl{t}} \equiv t$.
+        This denotes the complement of $t$, which is well defined because
+        the type $\set{\alpha}$ contains an element which is a set of all
+        elements of type $\alpha$. Those can always be removed from literals
+        as we will see later;
+    \item $ f(t_1,\dots,t_n) $ where $f$ is a function of codomain $\set{\alpha}$;
+    \item $ x $ where $x:\set{\alpha}$ is a variable.
+\end{itemize}
+%}}}
+
+\subsection{Properties}\label{sec:properties}
+%{{{
+Let us start with some basic properties we are going to use.
+
+\begin{itemize}
+\item $A \cap B \subseteq C$ implies $A \subseteq \compl{B} \cup C$. All
+    $x \in A\cap B$ satisfy $x \in A \land x \in C \land x \not\in \compl{B}$,
+    therefore any $x\in A$ either satisfies $x \not\in B$ or $x \in B \land x \in C$.
+    Which means precisely $A \subseteq \compl{B} \cup C$.
+\item Similarly, $A \subseteq B \cup C \Rightarrow A \cap \compl{B} \subseteq C$.
+\item $A \not\subseteq B \cup C$ implies $A \cap \compl{B} \not\subseteq C$.
+    Proof:
+    $\exists x, x \in A \land x \not\in (B \cup C)$, hence
+    $\exists x, x \in A \land x \not\in B \land x \not\in C$,
+    $\exists x, x \in A \land x \in \compl{B} \land x \not\in C$,
+    $A \cap \compl{B} \not\subseteq C$.
+\item $A \cap B \not\subseteq C$ implies $A \not\subseteq \compl{B}\cup C$.
+    Indeed, $\exists x, x \in A \land x \in B \land x \not\in C$, so
+    $\exists x, x \in A \land x \not\in \compl{B} \land x \not\in C$,
+    so $\exists x, x\in A \land x \not\in (\compl{B} \cup C)$, and
+    therefore $A \not\subseteq \compl{B} \cup C$.
+\end{itemize}
+
+
+Clause normalization rules are as follows, using distributivity of $\cap$
+over $\cup$ and conversely:
+\begin{itemize}
+\item a clause $K \lor (A \subseteq B \cap C)$ will be normalized into the
+    set of clauses
+    $\{ K \lor (A \subseteq B),  K \lor (A \subseteq C) \}$.
+\item a clause $K \lor (A \cup B \subseteq C)$ will become
+    $\{ K \lor (A \subseteq C) , K \lor (B \subseteq C) \}$.
+\item a clause $K \lor (A \cup B \not\subseteq C)$ will become
+    $K \lor (A \not\subseteq C) \lor (B \not\subseteq C)$ (because the witness
+    of non-inclusion is either in $A$ or in $B$).
+\item a clause $K \lor (A \not\subseteq B \cap C)$ will become
+    $K \lor (A \not\subseteq B) \lor (A \not\subseteq C)$ because
+    the witness $x \in A$ can be either outside of $B$ or outside of $C$.
+\end{itemize}
+%}}}
+
+\subsection{Powerset}
+%{{{
+\noindent{}We can encode the powerset operator $\mathbb{P}$ as follows, using a fresh
+variable $s:\set{\alpha}$ and a fresh skolem
+symbol $k:\set{\alpha}$ where $\mathbb{P}: \set{\set{\alpha}}$. Similar
+techniques should be usable to eliminate infinite
+union (of type $\set{\set{\alpha}} \rightarrow \set{\alpha}$) and other operators.
+
+\begin{itemize}
+\item If $\mathbb{P}(t) \cap A \subseteq B$,
+    it means $\forall s, s\in \mathbb{P}(t) \cap A \Rightarrow s \in B$;
+    $s \in \mathbb{P}(t) \cap A$ is synonymous to $s \subseteq t \land
+    \{ s \} \subseteq A$.
+\item Similarly, $A \subseteq \mathbb{P}(t) \cup B$
+    means $\forall s, s\in A \Rightarrow s \in \mathbb{P}(t) \lor s\in B$,
+    hence $\forall s, \{s \}\subseteq A \Rightarrow s \subseteq t \lor \{ s \} \subseteq B$.
+\item $A \cap \mathbb{P}(t) \not\subseteq B$ means
+    $\exists s, s \in A \land s \subseteq t \land s \not\in B$.
+    Therefore $\{k\} \subseteq A \land k \subseteq t \land \{k\} \not\subseteq B$.
+\item $A \not\subseteq \mathbb{P}(t) \cup B$ becomes
+    $\{ k\} \subseteq A \land \{k\} \not\subseteq B \land k \not\subseteq t$.
+\end{itemize}
+
+When $\mathbb{P}$ occurs in a clause, the rules to eliminate it are shown
+in Figure~\ref{fig:powerset}.
+
+\begin{figure}[htp]
+%{{{
+\begin{prooftree}
+\AxiomC{$ C \lor \mathbb{P}(t) \cap A \subseteq B$}
+\doubleLine
+\UnaryInfC{$C \lor s \not\subseteq t \lor \{ s \} \not\subseteq A \lor \{ s \} \subseteq B$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$ C \lor \mathbb{P}(t) \cap A \not\subseteq B$}
+\doubleLine
+\UnaryInfC{$C \lor \{k\} \subseteq A
+    \qquad C \lor k \subseteq t
+    \qquad C \lor \{k\} \not\subseteq B $}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$ C \lor A \subseteq \mathbb{P}(t) \cup B$}
+\doubleLine
+\UnaryInfC{$C \lor \{ s \} \not\subseteq A \lor s \subseteq t \lor \{ s \} \subseteq B$}
+\end{prooftree}
+
+\begin{prooftree}
+\AxiomC{$ C \lor A \not\subseteq \mathbb{P}(t) \cup B$}
+\doubleLine
+\UnaryInfC{$C \lor \{ k \} \subseteq A
+    \qquad C \lor \{k\} \not\subseteq B
+    \qquad C \lor k \not\subseteq t $}
+\end{prooftree}
+
+\caption{Elimination of $\mathbb{P}$}
+\label{fig:powerset}
+\end{figure}
+%}}}
+
+%}}}
+%}}}
+
+\section{Skolemisation and CNF}
+%{{{
+The numerous set operators must be translated to the rigid clause format
+we defined above; Figure~\ref{fig:skolem} describes the translation process
+that must take place after NNF and before Skolemization.
+In the rules, $A$ and $B$ have type $\set{\alpha}$, $s$, $t$, $u$, $v$ are terms
+of type $\alpha$, and $x:\alpha$ is a
+variable. We de-sugar $A \backslash B$ into $A \cap \compl{B}$.
+Then, usual CNF transformation, with skolemization
+and distribution of $\land$ over $\lor$, can proceed as usual.
+
+\begin{figure}[htbp]
+%{{{
+\begin{center}
+\begin{align*}
+% basics
+A \not\subset B &\leadsto (B \subseteq A \lor A \not\subseteq B) \\
+A \not= B       &\leadsto (A \not\subseteq B \lor B \not\subseteq A) \\
+A \subset B     &\leadsto (A \subseteq B \land B \not\subseteq A) \\
+A = B           &\leadsto (A \subseteq B \land B \subseteq A) \\
+s \in A         &\leadsto \{ s \} \subseteq A \\
+s \not\in A     &\leadsto \{ s \} \not\subseteq A \\
+\text{nonempty}(A)          &\leadsto A \not\subseteq \emptyset \\
+\lnot \text{nonempty}(A)    &\leadsto A \subseteq \emptyset \\
+% difference
+A \backslash B
+    & \leadsto A \cap \compl{B} \\
+% subseteq
+A \cap (B \cup D) \subseteq C
+    & \leadsto A \cap B \subseteq C \land A \cap D \subseteq C \\
+A \cup B \subseteq C
+    & \leadsto A \subseteq C \land B \subseteq C \\
+A \subseteq B \cup (C \cap D)
+    & \leadsto A \subseteq B \cup C \land A \subseteq B \cup D \\
+A \subseteq B \cap C
+    & \leadsto A \subseteq B \land A \subseteq C \\
+% not subseteq (FIXME)
+A \cup B \not\subseteq C
+    & \leadsto A \not\subseteq C \lor B \not\subseteq C \\
+A \cap (B \cup C) \not\subseteq D
+    & \leadsto A \cap B \not\subseteq D \lor A \cap C \not\subseteq D \\
+A \not\subseteq B \cap C
+    & \leadsto A \not\subseteq B \lor A \not\subseteq C \\
+A \not\subseteq B \cup (C \cap D)
+    & \leadsto A \not\subseteq B \cup C \lor A \not\subseteq B \cup D \\
+% empty set, singleton
+A \cap \emptyset
+    & \leadsto \emptyset \\
+A \cup \emptyset
+    & \leadsto A \\
+\emptyset \subseteq B
+    & \leadsto \top \\
+\emptyset \not\subseteq B
+    & \leadsto \bot \\
+\{ s \} \subseteq \emptyset
+    & \leadsto \bot \\
+\{ s \} \not\subseteq \emptyset
+    & \leadsto \top \\
+\end{align*}
+\caption{Skolemization and CNF rules}
+\label{fig:skolem}
+\end{center}
+%}}}
+\end{figure}
+
+%}}}
+
+\section{Inference Rules}
+%{{{
+We mix \emph{The Strive-based Subset Prover} and
+\emph{Rewrite Techniques for Transitive Relations} papers for our
+inference rules.
+We will use basic properties detailed in section~\ref{sec:properties}.
+We will use capitalized
+letter such as $A_\cap$ to denote $\bigcap_i a_i$, and $A_\cup$ to denote
+$\bigcup_i a_i$. Note that $\compl{A_\cap}$ is a union and
+$\compl{A_\cup}$ is an intersection.
+
+All the inference operate on ground clauses, but can easily be lifted to
+first-order terms by first unifying terms. Since $\cap$ and $\cup$ are
+idempotent, several terms on one side of a literal can be unified at once
+without trouble (unlike, for instance, unification of terms in arithmetic
+sums or surrounded with AC operators). For instance positive chaining
+for first-order clauses is (assuming the sets $I$ and $J$ are non empty,
+none of the $t_i, t'_j$ are variables
+and the two clauses do not share variables):
+
+\begin{prooftree}
+    \AxiomC{$ K \lor A_\cap \cap \bigcap_{i\in I} t_i \subseteq B_\cup $}
+    \AxiomC{$ K' \lor A'_\cap \subseteq B'_\cup \cup \bigcup_{j\in J} t'_j $}
+    \RightLabel{$\forall i,j,~ t_i\sigma = t'_j\sigma$}
+    \BinaryInfC{$ (K \lor K' \lor A_\cap \cap A'_\cap
+        \subseteq B_\cup \cup B'_\cup)\sigma $}
+\end{prooftree}
+
+Let us explain and justify the inferences. We will note $\normalize{C}$ for
+the set of clauses that result from normalizing $C$ by distributing $\cap$
+and $\cup$.
+
+First, the positive chaining inference. Say we have $A_\cap \subseteq t\cup B_\cup$
+and $t \cap A'_\cap \subseteq B'_\cup$. Then this is equivalent
+to $A_\cap \cap \compl{B_\cup} \subseteq t$ and
+$t \subseteq \compl{A'_\cap}\cup B'_\cup$; by transitivity of
+$\subseteq$ we get
+$A_\cap \cap \compl{B_\cup} \subseteq B'_\cup \cup \compl{A'_\cap}$, and by moving
+the complements around again we obtain the result.
+
+Conversely, the negative chaining rules use the contrapositive of transitivity,
+that is, $A \subseteq B \land A \not\subseteq C \Rightarrow B \not\subseteq C$
+(otherwise we would have $A \subseteq B \subseteq C$ and therefore $A \subseteq
+C$).
+Therefore, from $A_\cap \cap t \subseteq B_\cup$ and
+$A'_\cap \cap t \not\subseteq B'_\cup$ we deduce
+$t \subseteq B_\cup \cup \compl{A_\cap}$ and
+$t \not\subseteq B'_\cup \cup \compl{A'_\cap}$. Using the transitivity,
+we obtain $B_\cup \cup \compl{A_\cap} \not\subseteq B'_\cup \cup \compl{A'_\cap}$.
+
+A similar reasoning applies when $t$ occurs at the right-hand side of
+$\subseteq$ and $\not\subseteq$, using the transitivity rule
+$A \subseteq B \land C \not\subseteq B \Rightarrow C \not\subseteq A$. We
+obtain, from $A_\cap \subseteq t\cup B_\cup$ and
+$A'_\cap \not\subseteq t\cup B'_\cup$, the result
+$A'_\cap \cap \compl{B'_\cup} \not\subseteq A_\cap \cap \compl{B_\cup}$.
+
+In some cases, the left-hand side of a negative inclusion comprises
+a singleton. Since an intersection with a singleton $\{ t \}$ is either
+$\emptyset$ or $\{ t\}$, we know that a non-inclusion witness has to be $t$.
+In other words, $\{ t \} \cap \bigcap_i a_i \not\subseteq \emptyset$
+means that $t$ has to belong to all $a_i$; therefore
+$\bigcap_i \{ t_i \} \cap \bigcap_j a_j \not\subseteq \bigcup_k b_k$
+implies $\forall i, t_i = t_1$,
+$\forall j, \{ t_1 \} \subseteq a_j$, and
+$\forall k, \{ t_1 \} \subseteq \compl{b_j}$ (i.e.,
+$\{ t_1 \} \not\subseteq b_j$ because $\{ t\} \subseteq \compl{A}$
+is equivalent to $\{t \} \not\subseteq A$).
+That justifies the rule \emph{singleton witness} (note that the \emph{emptyset}
+tautology criterion is a special case where all three conjunctions are empty).
+
+Factoring rules are used to \emph{merge} together two literals whose maximal
+terms are the same. The basic idea is that if $A \subseteq B
+\lor A \subseteq C$, then if we assume $B\subseteq C$ we can deduce
+$A \subseteq B \Rightarrow A \subseteq C$. Therefore $A\subseteq C$ is true
+in both cases and we can merge together the two literals provided $B\subseteq C$.
+Say we have
+$t \cap A_\cap \subseteq B_\cup \lor t \cap A'_\cap \subseteq B'_\cup$; we
+can transform this into
+$t \subseteq \compl{A_\cap} \cup B_\cup \lor t \subseteq \compl{A'_\cap} \cup B'_\cup$.
+Then if $\compl{A_\cap} \cup B_\cup \subseteq \compl{A'_\cap} \cup B'_\cup$
+the second literal is necessarily true, hence the conclusion:
+$\normalize{(\compl{A_\cap} \cap A'_\cap \not\subseteq \compl{B_\cup} \cup B'_\cup) 
+    \lor (t \cap A'_\cap \subseteq B'_\cup)}$ (eliminating complements
+on the fly).
+
+The tautology rule on literals
+$A_\cap \cap A'_\cap \subseteq B_\cup \cup B'_\cup$
+and $A_\cap \not\subseteq B_\cup$
+is easy to obtain from the excluded middle principle on
+$A_\cap \not\subseteq B_\cup$ by weakening of the positive literal.
+
+\begin{figure}[htp]
+%{{{
+\begin{center}
+
+\begin{prooftree}
+    \AxiomC{$ K\lor (A_\cap \subseteq t \cup B_\cup) $}
+    \AxiomC{$ K'\lor (t \cap A'_\cap \subseteq B'_\cup) $}
+    \RightLabel{positive chaining}
+    \BinaryInfC{$ K \lor K' \lor (A_\cap \cap A'_\cap \subseteq B_\cup \cup B'_\cup) $}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$ K\lor (A_\cap \cap t \subseteq B_\cup) $}
+    \AxiomC{$ K'\lor (A'_\cap \cap t \not\subseteq B'_\cup) $}
+    \RightLabel{negative chaining left}
+    \BinaryInfC{$ \normalize{K \lor K' \lor
+        (B_\cup \cup \compl{A_\cap} \not\subseteq \compl{A'_\cap} \cup B'_\cup)}
+    $}
+    \UnaryInfC{$
+        K \lor K'
+        \lor \bigvee_{s \in B_\cup} (A'_\cap \cap s \not\subseteq B'_\cup)
+        \lor \bigvee_{s \in A_\cap} (A'_\cap \not\subseteq s \cup B'_\cup)
+    $}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$ K\lor (A_\cap \subseteq B_\cup \cup t) $}
+    \AxiomC{$ K'\lor (A'_\cap \not\subseteq B'_\cup \cup t) $}
+    \RightLabel{negative chaining right}
+    \BinaryInfC{$ \normalize{K \lor K' \lor
+        (A'_\cap \cap \compl{B'_\cup} \not\subseteq A_\cap \cap \compl{B_\cup})}
+    $}
+    \UnaryInfC{$
+        K \lor K'
+        \lor \bigvee_{s \in A_\cap} (A'_\cap \not\subseteq s \cup B'_\cup)
+        \lor \bigvee_{s \in B_\cup} (A'_\cap \cap s \not\subseteq B'_\cup)
+    $}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$ K \lor \bigcap_{i=1}^n \{ t_i \} \cap A_\cap \not\subseteq B_\cup $}
+    \AxiomC{$ n \geq 1 $}
+    \RightLabel{singleton witness}
+    \BinaryInfC{$
+        \bigwedge_{i} (K \lor t_i = t_1)
+        \land
+        \bigwedge_{a \in A_\cap} (K \lor \{ t_1 \} \subseteq a)
+        \land
+        \bigwedge_{b \in B_\cap} (K \lor \{ t_1 \} \not\subseteq b)
+    $}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$ K
+        \lor (t \cap A_\cap \subseteq B_\cup)
+        \lor (t \cap A'_\cap \subseteq B'_\cup) $}
+    \RightLabel{factoring left}
+    \UnaryInfC{$ \normalize{K \lor
+        (\compl{A_\cap} \cap A'_\cap \not\subseteq \compl{B_\cup} \cup B'_\cup) 
+        \lor (t \cap A'_\cap \subseteq B'_\cup)}$}
+    \UnaryInfC{$
+        K
+        \lor (t \cap A'_\cap \subseteq B'_\cup)
+        \lor \bigvee_{u \in A_\cap}
+            \bigvee_{v \in B_\cup}
+                (v \cap A'_\cap \not\subseteq u \cup B'_\cup)
+    $}
+\end{prooftree}
+
+\mbox{
+    \AxiomC{$ K \lor \{ t \} \subseteq \emptyset $}
+    \doubleLine
+    \UnaryInfC{$ K $}
+    \DisplayProof
+
+    and
+
+    \AxiomC{$ K \lor \{ t \} \not\subseteq \emptyset $}
+    \RightLabel{emptyset}
+    \doubleLine
+    \UnaryInfC{$\top$}
+    \DisplayProof
+} \\[10pt]
+
+
+\mbox{
+    \AxiomC{$ K \lor t \cap A_\cap \subseteq t\cup B_\cup $}
+    \doubleLine
+    \UnaryInfC{$\top $}
+    \DisplayProof
+
+    and
+
+    \AxiomC{$ K \lor t \cap A_\cap \not\subseteq t\cup B_\cup $}
+    \RightLabel{reflexivity}
+    \doubleLine
+    \UnaryInfC{$K$}
+    \DisplayProof
+} \\[10pt]
+
+\begin{prooftree}
+    \AxiomC{$ K
+        \lor (A_\cap \cap A'_\cap \subseteq B_\cup \cup B'_\cup)
+        \lor (A_\cap \not\subseteq B_\cup)
+        $}
+    \doubleLine
+    \RightLabel{tautology}
+    \UnaryInfC{$ \top $}
+\end{prooftree}
+
+
+
+\caption{Inference Rules}
+\label{fig:rules}
+\end{center}
+%}}}
+\end{figure}
+
+%}}}
+
+\section{Other Considerations}
+%{{{
+\subsection{Handling Equality}
+%{{{
+As we saw in Figure~\ref{fig:rules}, the calculus doesn't deal directly
+with (extensional) equality between sets. Instead, $ a = b$ is
+translated into $a \subseteq b \land b \subseteq a$. However, replacing
+equals by equals in set literals is still possible.
+We assume $u=v$ was translated into $u \subseteq v\land v\subseteq u$,
+and show that we can replace $u$ with $v$ in set contexts:
+
+\begin{prooftree}
+    \AxiomC{$ K \lor u \cap A_\cap \subseteq B_\cup $}
+    \AxiomC{$ K' \lor v \subseteq u $ }
+    \BinaryInfC{$ K \lor K' \lor v \cap A_\cap \subseteq B_\cup $}
+\end{prooftree}
+
+and
+
+\begin{prooftree}
+    \AxiomC{$ K \lor A_\cap \subseteq u \cup B_\cup $}
+    \AxiomC{$ K' \lor u \subseteq v $ }
+    \BinaryInfC{$ K \lor K' \lor A_\cap \subseteq v \cup B_\cup $}
+\end{prooftree}
+%}}}
+
+\subsection{Purification}
+%{{{
+More difficult is the treatment of set-typed terms that occur under function
+symbols (or predicate symbols), for instance $p(s)$ when $s:\set{\alpha}$.
+The usual solution to this issue is
+to replace $C[p(s)]$ (where $C[.]$ is a clause context) with
+$C[p(x)] \lor x \not= s$, that is, replacing $s$ with a fresh variable
+$x\not\in \text{vars}(C[p(s)])$ and force $x=s$. We then obtain
+$C[p(x)] \lor x\not\subseteq s \lor s\not\subseteq x$.
+%}}}
+
+\subsection{Subsumption}
+%{{{
+It is often useful to have a \emph{subsumption relation}, to prune the search
+space by removing clauses that are implied by smaller, simpler clauses. This
+relation on clauses is deduced from a subsumption relation on literals (most
+often, just matching). Here, we can use the subsumption relation $\models_s$ defined
+by
+
+\begin{align*}
+(A_\cap \subseteq B_\cup) &\models_s
+    (A_\cap\sigma \cap A'_\cap \subseteq B_\cup\sigma \cup B'_\cup) \\
+(A_\cap \cap A'_\cap \not\subseteq B_\cup \cup B'_\cup) &\models_s
+    (A_\cap\sigma\not\subseteq B_\cup\sigma) \\
+\end{align*}
+
+This relation, on positive literals, corresponds to instantiation and
+weakening on the left and right sides of a sequent. The negative counterpart
+is very interesting as it departs from the usual subsumption rules, the
+more specialized (instantiated) literal being on the left.
+%}}}
+
+%}}}  section
+
+
+
+\end{document}
