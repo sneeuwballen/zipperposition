@@ -303,6 +303,12 @@ $\normalize{(\compl{A_\cap} \cap A'_\cap \not\subseteq \compl{B_\cup} \cup B'_\c
     \lor (t \cap A'_\cap \subseteq B'_\cup)}$ (eliminating complements
 on the fly).
 
+The tautology rule on literals
+$A_\cap \cap A'_\cap \subseteq B_\cup \cup B'_\cup$
+and $A_\cap \not\subseteq B_\cup$
+is easy to obtain from the excluded middle principle on
+$A_\cap \not\subseteq B_\cup$ by weakening of the positive literal.
+
 \begin{figure}[htp]
 %{{{
 \begin{center}
@@ -403,6 +409,16 @@ on the fly).
     \DisplayProof
 } \\[10pt]
 
+\begin{prooftree}
+    \AxiomC{$ K
+        \lor (A_\cap \cap A'_\cap \subseteq B_\cup \cup B'_\cup)
+        \lor (A_\cap \not\subseteq B_\cup)
+        $}
+    \doubleLine
+    \RightLabel{tautology}
+    \UnaryInfC{$ \top $}
+\end{prooftree}
+
 
 
 \caption{Inference Rules}
@@ -449,7 +465,6 @@ $C[p(x)] \lor x \not= s$, that is, replacing $s$ with a fresh variable
 $x\not\in \text{vars}(C[p(s)])$ and force $x=s$. We then obtain
 $C[p(x)] \lor x\not\subseteq s \lor s\not\subseteq x$.
 %}}}
-
 
 \subsection{Subsumption}
 %{{{
