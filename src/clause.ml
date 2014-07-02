@@ -702,9 +702,9 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let filter f i lit = f lit
 
     let max c =
-      let bv = Lits.maxlits ~ord:(Ctx.ord ()) c.hclits in
+      let bv = lazy (Lits.maxlits ~ord:(Ctx.ord ()) c.hclits) in
       fun i lit ->
-        BV.get bv i
+        BV.get (Lazy.force bv) i
 
     let pos i lit = Lit.is_pos lit
 

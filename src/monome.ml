@@ -142,6 +142,7 @@ let mk_const ~num s =
   { num; const=s; terms=[]; }
 
 let singleton ~num coeff t =
+  assert (Type.eq (T.ty t) num.ty);
   if num.cmp num.zero coeff = 0
     then mk_const ~num coeff  (* 0 *)
     else
@@ -167,6 +168,7 @@ let mem e t =
   | Some _ -> true
 
 let add e s t =
+  assert (Type.eq (T.ty t) e.num.ty);
   (* sorted insertion *)
   let rec add l s t = match l with
     | [] -> [s, t]
@@ -763,7 +765,9 @@ module Int = struct
         ) (m.const, false, []) m.terms
     in
     if changed
-      then {m with const=cst; terms; }
+      then
+        let terms = List.rev terms in  (* sort again *)
+        {m with const=cst; terms; }
       else m
 
   let normalize_wrt_zero m =
@@ -827,8 +831,11 @@ module Int = struct
   let quotient e c =
     if Z.sign c <= 0
     then None
-    else try Some (_fmap (fun s -> Z.divexact s c) e)
-    with _ -> None
+    else try Some
+      (_fmap
+        (fun s -> if Z.(equal (erem s c) zero) then Z.divexact s c else raise Exit)
+      e)
+    with Exit -> None
 
   let divisible e c =
     Z.sign (Z.rem e.const c) = 0

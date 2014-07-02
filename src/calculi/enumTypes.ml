@@ -65,6 +65,7 @@ module type S = sig
 end
 
 let _enable = ref true
+let _instantiate_shielded = ref false
 
 module Make(E : Env.S) = struct
   module Env = E
@@ -112,7 +113,7 @@ module Make(E : Env.S) = struct
     if List.exists (fun decl -> Unif.Ty.are_variant ty decl.decl_ty) !_decls
     then (
       Util.debug 3 "EnumTypes: an enum is already declared for type %a" Type.pp ty;
-      ()
+      false
     ) else (
       Util.debug 1 "EnumTypes: declare new enum type %a (cases %a = %a)"
         Type.pp ty T.pp var (CCList.pp ~sep:"|" T.pp) cases;
@@ -133,11 +134,18 @@ module Make(E : Env.S) = struct
       } in
       _decls := decl :: !_decls;
       Signal.send on_new_decl decl;
-    );
-      ()
+      true
+    )
 
   let declare_type ~proof ~ty ~var enum =
-    _declare ~proof ~ty ~var enum
+    ignore (_declare ~proof ~ty ~var enum)
+
+  (* TODO: require that the type is as general as possible: either
+    a constant, or a polymorphic type that has only type variables as
+    arguments. Enum types for things like [list(int)] are dangerous
+    because if we remove the clause, since instantiation is a
+    simplification, we won't deal properly with [list(rat)] (no unification
+    whatsoever) *)
 
   (* detect whether the clause [c] is a declaration of enum type *)
   let _detect_declaration c =
@@ -195,7 +203,12 @@ module Make(E : Env.S) = struct
 
   let instantiate_vars c =
     Util.enter_prof prof_instantiate;
-    let vars = _naked_vars (C.lits c) in
+    (* which variables are candidate? depends on a CLI flag *)
+    let vars =
+      if !_instantiate_shielded
+      then _vars_under_eq (C.lits c) |> Sequence.to_rev_list
+      else _naked_vars (C.lits c)
+    in
     let s_c = 0 and s_decl = 1 in
     let res = CCList.find
       (fun v ->
@@ -294,10 +307,17 @@ module Make(E : Env.S) = struct
     in
     PS.PassiveSet.add (Sequence.of_list clauses)
 
+  (* flag for clauses that are declarations of enumerated types *)
+  let flag_enumeration_clause = C.new_flag ()
+
+  let is_trivial c =
+    C.get_flag flag_enumeration_clause c
+
   let register () =
     if !_enable then begin
       Util.debug 1 "register handling of enumerated types";
       Env.add_multi_simpl_rule instantiate_vars;
+      Env.add_is_trivial is_trivial;
       (* signals: instantiate axioms upon new symbols, or when new
           declarations are added *)
       Signal.on Ctx.on_new_symbol
@@ -318,7 +338,10 @@ module Make(E : Env.S) = struct
       let _detect_and_declare c =
         begin match _detect_declaration c with
         | None -> ()
-        | Some (ty,var,cases) -> _declare ~ty ~var ~proof:(C.proof c) cases
+        | Some (ty,var,cases) ->
+            let is_new = _declare ~ty ~var ~proof:(C.proof c) cases in
+            (* clause becomes redundant if it's a new declaration *)
+            if is_new then C.set_flag flag_enumeration_clause c true
         end; Signal.ContinueListening
       in
       Signal.on PS.PassiveSet.on_add_clause _detect_and_declare;
@@ -349,4 +372,7 @@ let () =
     [ "-enum-types"
       , Arg.Bool (fun b -> _enable := b)
       , "enable/disable special handling for enumerated types"
+    ; "-enum-shielded"
+      , Arg.Bool (fun b -> _instantiate_shielded := b)
+      , "enable/disable instantiation of shielded variables of enum type"
     ]
