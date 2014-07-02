@@ -698,7 +698,11 @@ module Comp = struct
         let t1 = max_terms ~ord l1 and t2 = max_terms ~ord l2 in
         let f = Ordering.compare ord in
         match _some_term_dominates f t1 t2, _some_term_dominates f t2 t1 with
-        | false, false -> C.Eq (* go further *)
+        | false, false ->
+            let t1' = List.sort T.cmp t1 and t2' = List.sort T.cmp t2 in
+            if CCList.equal T.eq t1' t2'
+              then C.Eq (* next criterion *)
+              else C.Incomparable
         | true, true -> assert false
         | true, false -> C.Gt
         | false, true -> C.Lt
