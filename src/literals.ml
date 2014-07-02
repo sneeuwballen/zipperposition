@@ -145,8 +145,10 @@ module MLI = Multiset.Make(struct
     if i1=i2 then Lit.compare l1 l2 else Pervasives.compare i1 i2
 end)
 
-let _compare_lit_with_idx ~ord (lit1,_) (lit2,_) =
-  Lit.Comp.compare ~ord lit1 lit2
+let _compare_lit_with_idx ~ord (lit1,i1) (lit2,i2) =
+  if i1=i2
+    then Comparison.Eq (* ignore collisions *)
+    else Lit.Comp.compare ~ord lit1 lit2
 
 let _to_multiset_with_idx lits =
   Util.array_foldi
@@ -156,17 +158,29 @@ let _to_multiset_with_idx lits =
 let maxlits_l ~ord lits =
   Util.enter_prof prof_maxlits;
   let m = _to_multiset_with_idx lits in
-  let max = MLI.max (_compare_lit_with_idx ~ord) m
-    |> MLI.to_list
-    |> List.map fst in
+  let max = MLI.max_seq (_compare_lit_with_idx ~ord) m
+    |> Sequence.map2 (fun x _ -> x)
+    |> Sequence.to_list
+  in
   Util.exit_prof prof_maxlits;
   max
 
 let maxlits ~ord lits =
-  let l = maxlits_l ~ord lits in
-  l |> List.map snd |> BV.of_list
+  Util.enter_prof prof_maxlits;
+  let m = _to_multiset_with_idx lits in
+  let max = MLI.max_seq (_compare_lit_with_idx ~ord) m
+    |> Sequence.map2 (fun x _ -> snd x)
+    |> Sequence.to_list
+    |> BV.of_list
+  in
+  Util.exit_prof prof_maxlits;
+  max
 
 let is_max ~ord lits =
+  (*
+  let max = maxlits_l ~ord lits in
+  fun i -> List.exists (fun (_,j) -> i=j) max
+  *)
   let m = _to_multiset_with_idx lits in
   fun i ->
     let lit = lits.(i) in
