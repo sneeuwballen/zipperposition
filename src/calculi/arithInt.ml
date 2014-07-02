@@ -1290,6 +1290,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debug 5 "div_case_switch of %a into %a" C.pp c C.pp new_c;
       [new_c]
 
+  let _pp_z buf z = Buffer.add_string buf (Z.to_string z)
+  let _pp_div buf d =
+    Printf.bprintf buf "%a^%d" _pp_z d.AL.Util.prime d.AL.Util.power
+
   let canc_div_prime_decomposition c =
     let eligible = C.Eligible.(max c ** filter Lit.is_arith_divides) in
     try
@@ -1300,8 +1304,11 @@ module Make(E : Env.S) : S with module Env = E = struct
             let n = d.AL.num in
             (* check that [n] is a composite number *)
             if Z.gt n Z.one && not (AL.Util.is_prime n) then begin
+              let n' = Z.pow n d.AL.power in
               let idx = Lits.Pos.idx pos in
-              let divisors = AL.Util.prime_decomposition n in
+              let divisors = AL.Util.prime_decomposition n' in
+              Util.debug 5 "composite num: %a = %a"
+                _pp_z n' (CCList.pp _pp_div) divisors;
               let lits = List.map
                 (fun div -> Lit.mk_divides ~sign:true
                     div.AL.Util.prime ~power:div.AL.Util.power d.AL.monome)
@@ -1314,8 +1321,11 @@ module Make(E : Env.S) : S with module Env = E = struct
             let n = d.AL.num in
             (* check that [n] is a composite number *)
             if Z.gt n Z.one && not (AL.Util.is_prime n) then begin
+              let n' = Z.pow n d.AL.power in
               let idx = Lits.Pos.idx pos in
-              let divisors = AL.Util.prime_decomposition n in
+              let divisors = AL.Util.prime_decomposition n' in
+              Util.debug 5 "composite num: %a = %a"
+                _pp_z n' (CCList.pp _pp_div) divisors;
               assert (List.length divisors >= 2);
               let lits = List.map
                 (fun div -> Lit.mk_divides ~sign:false
@@ -1334,7 +1344,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof cc = Proof.mk_c_inference ~rule:"div_prime_decomposition"
         ~theories cc [C.proof c] in
       let new_c = C.create ~parents:[c] all_lits proof in
-      Util.debug 5 "prime_decomposition of %a into %a" C.pp c C.pp new_c;
+      Util.debug 5 "prime_decomposition- of %a into %a" C.pp c C.pp new_c;
       Some [new_c]
     | ReplaceLitByLitsInManyClauses (i, lits) ->
       let clauses = List.map
@@ -1347,7 +1357,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           new_c)
         lits
       in
-      Util.debug 5 "prime_decomposition of %a into [%a]"
+      Util.debug 5 "prime_decomposition+ of %a into set {%a}"
         C.pp c (Util.pp_list C.pp) clauses;
       Some clauses
 
