@@ -575,11 +575,12 @@ let apply_subst_no_simp ~renaming subst lit scope = match lit with
       (M.apply_subst ~renaming subst d.monome scope)
 
 let is_trivial = function
-  | Divides d when d.sign && Z.equal d.num Z.one -> true  (* 1 | x tauto *)
+  | Divides d when d.sign && (Z.equal d.num Z.one || d.power = 0) ->
+      true  (* 1 | x tauto *)
   | Divides d when d.sign ->
-      M.is_const d.monome && Z.sign (Z.rem (M.const d.monome) d.num) = 0
+      M.is_const d.monome && Z.sign (Z.erem (M.const d.monome) d.num) = 0
   | Divides d ->
-      M.is_const d.monome && Z.sign (Z.rem (M.const d.monome) d.num) <> 0
+      M.is_const d.monome && Z.sign (Z.erem (M.const d.monome) d.num) <> 0
   | Binary (Equal, m1, m2) -> M.eq m1 m2
   | Binary (Less, m1, m2) -> M.dominates ~strict:true m2 m1
   | Binary (Lesseq, m1, m2) -> M.dominates ~strict:false m2 m1
@@ -611,7 +612,7 @@ let is_absurd = function
   | Binary (Lesseq, m1, m2) ->
       let m = M.difference m1 m2 in
       M.is_const m && M.sign m > 0
-  | Divides d when not (d.sign) && Z.equal d.num Z.one ->
+  | Divides d when not (d.sign) && (Z.equal d.num Z.one || d.power=0)->
       true  (* 1 not| x  is absurd *)
   | Divides d when d.sign ->
       (* n^k should divide a non-zero constant *)
