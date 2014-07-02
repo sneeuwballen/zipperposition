@@ -691,6 +691,14 @@ module Comp = struct
       (fun x -> List.for_all (fun y -> f x y = Comparison.Gt) l2)
       l1
 
+  let _list_sort_uniq (type elt) cmp l =
+    let module S = Set.Make(struct
+      type t = elt
+      let compare = cmp
+    end) in
+    let set = CCList.fold_right S.add l S.empty in
+    S.elements set
+
   let _cmp_by_maxterms ~ord l1 l2 =
     match l1, l2 with
     | Prop (p1, _), Prop (p2, _) -> Ordering.compare ord p1 p2
@@ -699,7 +707,8 @@ module Comp = struct
         let f = Ordering.compare ord in
         match _some_term_dominates f t1 t2, _some_term_dominates f t2 t1 with
         | false, false ->
-            let t1' = List.sort T.cmp t1 and t2' = List.sort T.cmp t2 in
+            let t1' = _list_sort_uniq T.cmp t1
+            and t2' = _list_sort_uniq T.cmp t2 in
             if CCList.equal T.eq t1' t2'
               then C.Eq (* next criterion *)
               else C.Incomparable
