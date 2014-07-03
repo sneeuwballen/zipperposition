@@ -735,10 +735,14 @@ let pp_debug ?(hooks=[]) buf lit =
       (if olit.TO.strict then "<" else "≤") T.pp olit.TO.right
   | Arith o -> ArithLit.pp buf o
   | Subseteq (_, l, r, sign) ->
+      let _pp_union buf l = match l with
+        | [] -> Buffer.add_string buf "∅"
+        | _ -> CCList.pp ~start:"" ~stop:"" ~sep:"∪" T.pp buf l
+      in
       Printf.bprintf buf "%a %s %a"
         (CCList.pp ~start:"" ~stop:"" ~sep:"∩" T.pp) l
         (if sign then "⊆" else "⊊")
-        (CCList.pp ~start:"" ~stop:"" ~sep:"∪" T.pp) r
+        _pp_union r
 
 let pp_tstp buf lit =
   match lit with
