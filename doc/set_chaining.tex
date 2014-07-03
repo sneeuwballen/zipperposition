@@ -274,20 +274,6 @@ obtain, from $A_\cap \subseteq t\cup B_\cup$ and
 $A'_\cap \not\subseteq t\cup B'_\cup$, the result
 $A'_\cap \cap \compl{B'_\cup} \not\subseteq A_\cap \cap \compl{B_\cup}$.
 
-In some cases, the left-hand side of a negative inclusion comprises
-a singleton. Since an intersection with a singleton $\{ t \}$ is either
-$\emptyset$ or $\{ t\}$, we know that a non-inclusion witness has to be $t$.
-In other words, $\{ t \} \cap \bigcap_i a_i \not\subseteq \emptyset$
-means that $t$ has to belong to all $a_i$; therefore
-$\bigcap_i \{ t_i \} \cap \bigcap_j a_j \not\subseteq \bigcup_k b_k$
-implies $\forall i, t_i = t_1$,
-$\forall j, \{ t_1 \} \subseteq a_j$, and
-$\forall k, \{ t_1 \} \subseteq \compl{b_j}$ (i.e.,
-$\{ t_1 \} \not\subseteq b_j$ because $\{ t\} \subseteq \compl{A}$
-is equivalent to $\{t \} \not\subseteq A$).
-That justifies the rule \emph{singleton witness} (note that the \emph{emptyset}
-tautology criterion is a special case where all three conjunctions are empty).
-
 Factoring rules are used to \emph{merge} together two literals whose maximal
 terms are the same. The basic idea is that if $A \subseteq B
 \lor A \subseteq C$, then if we assume $B\subseteq C$ we can deduce
@@ -302,6 +288,25 @@ the second literal is necessarily true, hence the conclusion:
 $\normalize{(\compl{A_\cap} \cap A'_\cap \not\subseteq \compl{B_\cup} \cup B'_\cup) 
     \lor (t \cap A'_\cap \subseteq B'_\cup)}$ (eliminating complements
 on the fly).
+
+In some cases, the left-hand side of a negative inclusion comprises
+a singleton. Since an intersection with a singleton $\{ t \}$ is either
+$\emptyset$ or $\{ t\}$, we know that a non-inclusion witness has to be $t$.
+In other words, $\{ t \} \cap \bigcap_i a_i \not\subseteq \emptyset$
+means that $t$ has to belong to all $a_i$; therefore
+$\bigcap_i \{ t_i \} \cap \bigcap_j a_j \not\subseteq \bigcup_k b_k$
+implies $\forall i, t_i = t_1$,
+$\forall j, \{ t_1 \} \subseteq a_j$, and
+$\forall k, \{ t_1 \} \subseteq \compl{b_j}$ (i.e.,
+$\{ t_1 \} \not\subseteq b_j$ because $\{ t\} \subseteq \compl{A}$
+is equivalent to $\{t \} \cap A \subseteq \emptyset$).
+That justifies the rule \emph{singleton witness} (note that the \emph{emptyset}
+tautology criterion is a special case where all three conjunctions are empty).
+
+The rule \empty{disjoint singletons} is justified because if
+an intersection of singletons is empty, two of them must be singletons
+of distinct terms (otherwise the whole intersection reduces to a singleton
+which cannot be empty).
 
 The tautology rule on literals
 $A_\cap \cap A'_\cap \subseteq B_\cup \cup B'_\cup$
@@ -349,19 +354,6 @@ $A_\cap \not\subseteq B_\cup$ by weakening of the positive literal.
 \end{prooftree}
 
 \begin{prooftree}
-    \AxiomC{$ K \lor \bigcap_{i=1}^n \{ t_i \} \cap A_\cap \not\subseteq B_\cup $}
-    \AxiomC{$ n \geq 1 $}
-    \RightLabel{singleton witness}
-    \BinaryInfC{$
-        \bigwedge_{i} (K \lor t_i = t_1)
-        \land
-        \bigwedge_{a \in A_\cap} (K \lor \{ t_1 \} \subseteq a)
-        \land
-        \bigwedge_{b \in B_\cap} (K \lor \{ t_1 \} \not\subseteq b)
-    $}
-\end{prooftree}
-
-\begin{prooftree}
     \AxiomC{$ K
         \lor (t \cap A_\cap \subseteq B_\cup)
         \lor (t \cap A'_\cap \subseteq B'_\cup) $}
@@ -376,6 +368,28 @@ $A_\cap \not\subseteq B_\cup$ by weakening of the positive literal.
             \bigvee_{v \in B_\cup}
                 (v \cap A'_\cap \not\subseteq u \cup B'_\cup)
     $}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$ K \lor (\bigcap_{i=1}^n \{ t_i \} \cap A_\cap \not\subseteq B_\cup) $}
+    \AxiomC{$ n \geq 1 $}
+    \RightLabel{singleton witness}
+    \doubleLine
+    \BinaryInfC{$
+        \bigwedge_{i} (K \lor t_i = t_1)
+        \land
+        \bigwedge_{a \in A_\cap} (K \lor \{ t_1 \} \subseteq a)
+        \land
+        \bigwedge_{b \in B_\cap} (K \lor \{ t_1 \} \cap b \subseteq \emptyset)
+    $}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$K \lor (\bigcap_{i=1}^n \{ t_i \} \subseteq \emptyset) $}
+    \AxiomC{$ n\geq 2 $}
+    \RightLabel{disjoint singletons}
+    \doubleLine
+    \BinaryInfC{$ K \lor \bigvee_{i=1}^{n-1}\bigvee_{j=i+1}^n (t_i \not= t_j)$}
 \end{prooftree}
 
 \mbox{
@@ -484,11 +498,10 @@ by
 This relation, on positive literals, corresponds to instantiation and
 weakening on the left and right sides of a sequent. The negative counterpart
 is very interesting as it departs from the usual subsumption rules, the
-more specialized (instantiated) literal being on the left.
+subsuming literal being "bigger" (more terms) than the subsumed literal.
 %}}}
 
 %}}}  section
-
 
 
 \end{document}
