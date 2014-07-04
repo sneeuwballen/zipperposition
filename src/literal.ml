@@ -1113,6 +1113,7 @@ module Conv = struct
           begin match TS.view ~sets a with
           | TS.Inter l -> Some l
           | TS.Singleton _
+          | TS.Emptyset _
           | TS.Other _ -> Some [a]
           | _ -> None
           end
@@ -1120,6 +1121,7 @@ module Conv = struct
           begin match TS.view ~sets b with
           | TS.Union l -> Some l
           | TS.Singleton _
+          | TS.Emptyset _
           | TS.Other _ -> Some [b]
           | _ -> None
           end

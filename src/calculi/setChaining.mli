@@ -35,22 +35,43 @@ module type S = sig
   module C : module type of Env.C
   module PS : module type of Env.ProofState
 
+  val idx_left : unit -> PS.TermIndex.t     (* terms at LHS of subseteq *)
+  val idx_right : unit -> PS.TermIndex.t    (* terms at RHS of subseteq *)
+
   val preprocess : Formula.FO.t -> Formula.FO.t
   (** Preprocessing of formula, during CNF, to remove most set operators,
       keeping only those of the form
       a \cap b \cap ...  \subseteq a' \cup b' \cup ... *)
 
   val positive_chaining: Env.binary_inf_rule
+    (* positive chaining *)
 
-  val is_tautology: Env.is_trivial_rule
+  val negative_chaining_left: Env.binary_inf_rule
+    (* negative chaining where the clause is on the left *)
 
-  val is_absurd: Env.lit_rewrite_rule
+  val negative_chaining_right: Env.binary_inf_rule
+    (* negative chaining where the clause is on the right *)
 
   val reflexivity_res: Env.unary_inf_rule
+    (* reflexivity resolution *)
+
+  val singleton_witness: Env.unary_inf_rule
+    (* choice of a witness for all terms appearing in a singleton on the left
+     * side of a \not\subseteq *)
+
+  val reflexivity: Env.is_trivial_rule
+    (* reflexivity tautology : when the same term appears in each side of a
+     * positive literal*)
+
+  val is_tautology: Env.is_trivial_rule
+    (* finds tautologies of the form : A \subseteq B or A \not\subseteq B
+     * the positive literal can have stronger constraints *)
+
+  val is_absurd: Env.lit_rewrite_rule
+    (* eliminates negative literals that have the same term appearing in each
+     * side *)
 
   val setup : unit -> unit
 end
 
 module Make(E : Env.S) : S with module Env = E
-
-val extension : Extensions.t
