@@ -1567,7 +1567,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         match lit with
         | Lit.Arith (AL.Binary (AL.Different, m1, m2)) ->
             assert (eligible i lit);
-            Util.debug 1 "lit %a [%d] in %a" Lit.pp lit i C.pp c;
+            Util.debug 5 "lit %a [%d] in %a" Lit.pp lit i C.pp c;
             assert (Lits.is_max ~ord (C.lits c) i);
             let lits = Util.array_except_idx (C.lits c) i in
             let new_lits =
