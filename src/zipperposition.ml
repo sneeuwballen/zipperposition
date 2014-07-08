@@ -62,6 +62,7 @@ let print_version ~params =
 let () =
   Extensions.register Superposition.extension;
   Extensions.register AC.extension;
+  Extensions.register Heuristics.extension;
   ()
 
 let setup_penv ~penv () =

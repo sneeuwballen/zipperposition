@@ -28,7 +28,8 @@ Library "libzipperposition"
                     Literal, Literals, CompactClause, Ctx, Proof, ProofState,
                     Saturate, Selection, PFormula, Theories, AC,
                     PEnv, Params, Env, Monome, ArithLit, Signals, Multisets,
-                    calculi/Superposition, calculi/Chaining, calculi/EnumTypes
+                    calculi/Superposition, calculi/Chaining,
+                    calculi/EnumTypes, calculi/Heuristics
   InternalModules:  lib/LazyGraph, lib/SmallSet,
                     lib/UnionFind, lib/Choice, lib/Mixtbl, lib/Signal
   BuildDepends:     containers,sequence,unix,zarith,logtk,dynlink
