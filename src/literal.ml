@@ -349,7 +349,7 @@ let unif4 op ~subst x1 y1 sc1 x2 y2 sc2 k =
 let unif_lists op ~subst l1 sc1 l2 sc2 k =
   (* unify firs term of [l1] with [l2], then process [l1'] *)
   let rec unif_left ~subst l1 l2 k = match l1 with
-    | [] -> k subst
+    | [] -> if l2=[] then k subst
     | x1::l1' ->
         unif_right ~subst x1 l2 (fun subst -> unif_left ~subst l1' l2 k)
   (* unify [x1] with all terms of [l2] *)
