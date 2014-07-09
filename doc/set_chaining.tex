@@ -289,9 +289,10 @@ $\normalize{(\compl{A_\cap} \cap A'_\cap \not\subseteq \compl{B_\cup} \cup B'_\c
     \lor (t \cap A'_\cap \subseteq B'_\cup)}$ (eliminating complements
 on the fly).
 
-In some cases, the left-hand side of a negative inclusion comprises
+In some cases, the left-hand side of a literal comprises
 a singleton. Since an intersection with a singleton $\{ t \}$ is either
-$\emptyset$ or $\{ t\}$, we know that a non-inclusion witness has to be $t$.
+$\emptyset$ or $\{ t\}$, we know that a non-inclusion witness has to be $t$,
+and that an inclusion witness is either $t$ or nothing (empty intersection).
 In other words, $\{ t \} \cap \bigcap_i a_i \not\subseteq \emptyset$
 means that $t$ has to belong to all $a_i$; therefore
 $\bigcap_i \{ t_i \} \cap \bigcap_j a_j \not\subseteq \bigcup_k b_k$
@@ -299,9 +300,13 @@ implies $\forall i, t_i = t_1$,
 $\forall j, \{ t_1 \} \subseteq a_j$, and
 $\forall k, \{ t_1 \} \subseteq \compl{b_j}$ (i.e.,
 $\{ t_1 \} \not\subseteq b_j$ because $\{ t\} \subseteq \compl{A}$
-is equivalent to $\{t \} \cap A \subseteq \emptyset$).
-That justifies the rule \emph{singleton witness} (note that the \emph{emptyset}
-tautology criterion is a special case where all three conjunctions are empty).
+is equivalent to $\{t \} \cap A \subseteq \emptyset$). Similarly,
+$\bigcap_{i=1}^n \{ t_i \} \cap A_\cap \subseteq B_\cup$ means that
+either the intersection is empty ($t_i \not= t_1$ for some $i$,
+or $t_1 \not\in a$ for some $a \in A_\cap$), or either
+$t_1 \in b$ for some $b \in B_\cup$.
+That justifies the rules \emph{singleton pos.} and \emph{singleton neg.}
+(note that the \emph{emptyset} rules are special cases).
 
 The rule \empty{disjoint singletons} is justified because if
 an intersection of singletons is empty, two of them must be singletons
@@ -371,16 +376,29 @@ $A_\cap \not\subseteq B_\cup$ by weakening of the positive literal.
 \end{prooftree}
 
 \begin{prooftree}
-    \AxiomC{$ K \lor (\bigcap_{i=1}^n \{ t_i \} \cap A_\cap \not\subseteq B_\cup) $}
+    \AxiomC{$ K \lor (\bigcap_{i=1}^n \{ t_i \} \cap A_\cap \subseteq B_\cup) $}
     \AxiomC{$ n \geq 1 $}
-    \RightLabel{singleton witness}
+    \RightLabel{singleton pos.}
     \doubleLine
     \BinaryInfC{$
-        \bigwedge_{i} (K \lor t_i = t_1)
+        K
+        \lor \bigvee_{i=2}^n (t_i \not= t_1)
+        \lor \bigvee_{a \in A_\cap} (\{ t_1 \} \not\subseteq a)
+        \lor \bigvee_{b \in B_\cup} (\{ t_1 \} \subseteq b)
+    $}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$ K \lor (\bigcap_{i=1}^n \{ t_i \} \cap A_\cap \not\subseteq B_\cup) $}
+    \AxiomC{$ n \geq 1 $}
+    \RightLabel{singleton neg.}
+    \doubleLine
+    \BinaryInfC{$
+        \bigwedge_{i=2}^n (K \lor t_i = t_1)
         \land
         \bigwedge_{a \in A_\cap} (K \lor \{ t_1 \} \subseteq a)
         \land
-        \bigwedge_{b \in B_\cap} (K \lor \{ t_1 \} \cap b \subseteq \emptyset)
+        \bigwedge_{b \in B_\cup} (K \lor \{ t_1 \} \cap b \subseteq \emptyset)
     $}
 \end{prooftree}
 
