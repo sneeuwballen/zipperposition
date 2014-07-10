@@ -88,12 +88,12 @@ module T2Cache : Cache.S2 with type key1 = t and type key2 = t
 
 val var : ty:Type.t -> int -> t
   (** Create a variable. Providing a type is mandatory.
-      The index must be non-negative,
-      @raise Invalid_argument otherwise. *)
+      @raise ScopedTerm.IllFormedTerm if the index is < 0 *)
 
 val bvar : ty:Type.t -> int -> t
   (** Create a bound variable. Providing a type is mandatory.
-      {b Warning}: be careful and try not to use this function directly*)
+      {b Warning}: be careful and try not to use this function directly.
+      @raise ScopedTerm.IllFormedTerm if the index is < 0 *)
 
 val const : ty:Type.t -> symbol -> t
   (** Create a typed constant *)
@@ -292,7 +292,3 @@ module TPTP : sig
   end
 end
 
-(** {2 Misc} *)
-
-val __var : ty:Type.t -> int -> t
-  (** create vars even with negative indices. Caution. *)

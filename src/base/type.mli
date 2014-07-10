@@ -83,7 +83,8 @@ val tType : t
   (** Pseudo-type of types *)
 
 val var : int -> t
-  (** Build a type variable. The integer must be >= 0 *)
+  (** Build a type variable.
+      @raise ScopedTerm.IllFormedTerm if the integer is negative *)
 
 val app : symbol -> t list -> t
   (** Parametrized type *)
@@ -238,10 +239,6 @@ module Conv : sig
 end
 
 (** {2 Misc} *)
-
-val __var : int -> t
-  (** Escape hatch to generate fresh variables with negative indexes.
-      Use at your own risk... *)
 
 val fresh_var : unit -> t
   (** Fresh var, with negative index *)

@@ -39,7 +39,7 @@ type t
 type term = t
 
 type view = private
-  | Var of int              (** Free variable *)
+  | Var of int              (** Free variable (integer: mostly useless) *)
   | RigidVar of int         (** Variable that only unifies with other rigid variables *)
   | BVar of int             (** Bound variable (De Bruijn index) *)
   | Bind of symbol * t * t  (** Type, sub-term *)
@@ -87,14 +87,18 @@ include Interfaces.ORD with type t := t
 (** {3 Constructors}
 
 Some constructors, such as {!record}, may raise
-Failure if the arguments are ill-formed (several occurrences of a key) *)
+{!IllFormedTerm}if the arguments are ill-formed (several occurrences of
+a key), or, for variables, if the number is negative *)
+
+exception IllFormedTerm of string
+type nat = int
 
 val const : kind:Kind.t -> ty:t -> symbol -> t
 val app : kind:Kind.t -> ty:t -> t -> t list -> t
 val bind : kind:Kind.t -> ty:t -> varty:t -> symbol -> t -> t
-val var : kind:Kind.t -> ty:t -> int -> t
-val rigid_var : kind:Kind.t -> ty:t -> int -> t
-val bvar : kind:Kind.t -> ty:t -> int -> t
+val var : kind:Kind.t -> ty:t -> nat -> t
+val rigid_var : kind:Kind.t -> ty:t -> nat -> t
+val bvar : kind:Kind.t -> ty:t -> nat -> t
 val record : kind:Kind.t -> ty:t -> (string * t) list -> rest:t option -> t
 val record_get : kind:Kind.t -> ty:t -> t -> string -> t
 val record_set : kind:Kind.t -> ty:t -> t -> string -> t -> t

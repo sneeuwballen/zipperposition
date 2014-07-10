@@ -177,6 +177,9 @@ end)
 
 let hashcons_stats () = H.stats ()
 
+exception IllFormedTerm of string
+type nat = int
+
 let _make ~kind ~ty term = {
   term;
   kind;
@@ -214,20 +217,24 @@ let app ~kind ~ty f l =
       t
 
 let var ~kind ~ty i =
+  if i<0 then raise (IllFormedTerm "var");
   H.hashcons (_make ~kind ~ty:(HasType ty) (Var i))
 
 let fresh_var =
-  let r = ref 0 in
+  let r = ref ~-1 in
   fun ~kind ~ty () ->
+    if !r >= 0 then failwith "ScopedTerm.fresh_var: overflow";
     let id = H.fresh_unique_id () in
     let my_t = _make_id ~id ~kind ~ty:(HasType ty) (Var !r) in
-    incr r;
+    decr r;
     my_t
 
 let bvar ~kind ~ty i =
+  if i<0 then raise (IllFormedTerm "bvar");
   H.hashcons (_make ~kind ~ty:(HasType ty) (BVar i))
 
 let rigid_var ~kind ~ty i =
+  if i<0 then raise (IllFormedTerm "rigid_var");
   H.hashcons (_make ~kind ~ty:(HasType ty) (RigidVar i))
 
 let bind ~kind ~ty ~varty s t' =

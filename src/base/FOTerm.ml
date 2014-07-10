@@ -678,9 +678,6 @@ end
 
 (** {2 Misc} *)
 
-let __var ~(ty:Type.t) i =
-  T.var ~kind:T.Kind.FOTerm ~ty:(ty:>T.t) i
-
 
 (*
 let bij =

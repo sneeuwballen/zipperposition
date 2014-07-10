@@ -76,7 +76,6 @@ let is_forall ty = match view ty with | Forall _ -> true | _ -> false
 let tType = T.tType
 
 let var i =
-  if i < 0 then raise (Invalid_argument "Type.var");
   T.var ~kind ~ty:tType i
 
 let app s l = T.simple_app ~kind ~ty:tType s l
@@ -323,15 +322,7 @@ let bij =
 
 (** {2 Misc} *)
 
-let __var i =
-  T.var ~kind ~ty:tType i
-
-let fresh_var =
-  let r = ref ~-1 in
-  fun () ->
-    let n = !r in
-    r := n-1;
-    __var n
+let fresh_var = T.fresh_var ~kind ~ty:tType
 
 (** {2 Conversions} *)
 

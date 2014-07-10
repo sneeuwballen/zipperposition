@@ -37,7 +37,7 @@ operation.
 
 type location = ParseLocation.t
 
-type t = {
+type t = private {
   term : view;
   loc : location option;
 }
