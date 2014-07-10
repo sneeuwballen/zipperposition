@@ -37,6 +37,7 @@ type form = F.t
 type t = {
   form : F.t;
   proof : Proof.t;
+  is_conjecture : bool;
   mutable id : int;
   mutable simpl_to : t option;
 }
@@ -65,10 +66,12 @@ end)
 let form t = t.form
 let proof t = t.proof
 let id t = t.id
+let is_conjecture t = t.is_conjecture
 
 let to_sourced t =
   match t.proof.Proof.kind with
-  | Proof.File (_, file, name) -> Some (t.form, file, name)
+  | Proof.File (_, file, name) ->
+      Some (Sourced.make ~file ~name ~is_conjecture:t.is_conjecture t.form)
   | _ -> None
 
 let rec _follow_simpl n pf =
@@ -79,15 +82,16 @@ let rec _follow_simpl n pf =
 
 let follow_simpl pf = _follow_simpl 0 pf
 
-let create ?(follow=false) form proof =
-  let pf = H.hashcons { form; proof; id= ~-1; simpl_to=None; } in
+let create ?(is_conjecture=false) ?(follow=false) form proof =
+  let pf = H.hashcons { form; proof; id= ~-1; is_conjecture; simpl_to=None; } in
   if follow
     then follow_simpl pf
     else pf
 
-let of_sourced ?(role="axiom") (f, file,name) =
-  let proof = Proof.mk_f_file ~role ~file ~name f in
-  create f proof
+let of_sourced ?(role="axiom") src =
+  let open Sourced in
+  let proof = Proof.mk_f_file ~role ~file:src.name ~name:src.name src.content in
+  create ~is_conjecture:src.is_conjecture src.content proof
 
 let simpl_to ~from ~into =
   let from = follow_simpl from in
