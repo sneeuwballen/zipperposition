@@ -45,6 +45,8 @@ type view = private
   | Bind of symbol * t * t  (** Type, sub-term *)
   | Const of symbol         (** Constant *)
   | Record of (string * t) list * t option (** Extensible record *)
+  | RecordGet of t * string       (** [get r name] is [r.name] *)
+  | RecordSet of t * string * t   (** [set r name t] is [r.name <- t] *)
   | Multiset of t list      (** Multiset of terms *)
   | App of t * t list       (** Uncurried application *)
   | At of t * t             (** Curried application *)
@@ -93,6 +95,8 @@ val var : kind:Kind.t -> ty:t -> int -> t
 val rigid_var : kind:Kind.t -> ty:t -> int -> t
 val bvar : kind:Kind.t -> ty:t -> int -> t
 val record : kind:Kind.t -> ty:t -> (string * t) list -> rest:t option -> t
+val record_get : kind:Kind.t -> ty:t -> t -> string -> t
+val record_set : kind:Kind.t -> ty:t -> t -> string -> t -> t
 val multiset : kind:Kind.t -> ty:t -> t list -> t
 val at : kind:Kind.t -> ty:t -> t -> t -> t
 val simple_app : kind:Kind.t -> ty:t -> symbol -> t list -> t
@@ -117,6 +121,8 @@ val is_const : t -> bool
 val is_bind : t -> bool
 val is_app : t -> bool
 val is_record : t -> bool
+val is_record_get : t -> bool
+val is_record_set : t -> bool
 val is_multiset : t -> bool
 val is_at : t -> bool
 
@@ -230,9 +236,20 @@ val all_positions : ?vars:bool -> ?pos:Position.t ->
       @param vars if true, also fold on variables Default: [false].
       @return the accumulator *)
 
-(** {3 IO} *)
+(** {2 IO} *)
 
 include Interfaces.PRINT with type t := t
+include Interfaces.PRINT_DE_BRUIJN with type t := t
+  and type term := t
+
+val add_default_hook : print_hook -> unit
+  (** Add a print hook that will be used from now on *)
+
+(** {2 Misc} *)
+
+val fresh_var : kind:Kind.t -> ty:t -> unit -> t
+(** [fresh_var ~kind ~ty ()] returns a fresh, unique, {b NOT HASHCONSED}
+    variable that will therefore never be equal to any other variable. *)
 
 (* FIXME
 include Interfaces.SERIALIZABLE with type t := t

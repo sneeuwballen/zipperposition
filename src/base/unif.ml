@@ -28,6 +28,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module T = ScopedTerm
 
+(* TODO:
+  - reduce {foo=t, .... | ...}.foo into t
+  - when unifying X.foo with t, unify X with {foo=t | \rho}
+*)
+
 exception Fail
   (** Raised when a unification/matching attempt fails *)
 
@@ -152,6 +157,8 @@ let occurs_check subst v sc_v t sc_t =
             | Some r -> check r sc_t
           end ||
           List.exists (fun (_,t') -> check t' sc_t) l
+      | T.RecordGet (r, _) -> check r sc_t
+      | T.RecordSet (r, _, sub) -> check r sc_t || check sub sc_t
       | T.SimpleApp (_, l)
       | T.Multiset l ->
         List.exists (fun t' -> check t' sc_t) l
@@ -360,6 +367,12 @@ module Nary = struct
         let r1 = RU.of_record s l1 rest1 in
         let r2 = RU.of_record t l2 rest2 in
         __unify_records ~unif subst r1 sc_s r2 sc_t ~k ~fk
+      | T.RecordGet (r1, name1), T.RecordGet (r2, name2) when name1=name2 ->
+        unif subst r1 sc_s r2 sc_t ~k ~fk
+      | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
+        unif subst r1 sc_s r2 sc_t
+          ~k:(fun subst fk -> unif subst sub1 sc_s sub2 sc_t ~k ~fk)
+          ~fk
       | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when Symbol.eq s1 s2 ->
         __unify_list ~unif subst l1 sc_s l2 sc_t ~k ~fk
       | T.Multiset l1, T.Multiset l2 when List.length l1 = List.length l2 ->
@@ -415,6 +428,12 @@ module Nary = struct
         let r1 = RU.of_record s l1 rest1 in
         let r2 = RU.of_record t l2 rest2 in
         __unify_records ~unif subst r1 sc_s r2 sc_t ~k ~fk
+      | T.RecordGet (r1, name1), T.RecordGet (r2, name2) when name1=name2 ->
+        unif subst r1 sc_s r2 sc_t ~k ~fk
+      | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
+        unif subst r1 sc_s r2 sc_t
+          ~k:(fun subst fk -> unif subst sub1 sc_s sub2 sc_t ~k ~fk)
+          ~fk
       | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when Symbol.eq s1 s2 ->
         __unify_list ~unif subst l1 sc_s l2 sc_t ~k ~fk
       | T.Multiset l1, T.Multiset l2 when List.length l1 = List.length l2 ->
@@ -469,6 +488,12 @@ module Nary = struct
         let r1 = RU.of_record s l1 rest1 in
         let r2 = RU.of_record t l2 rest2 in
         __unify_records ~unif subst r1 sc_s r2 sc_t ~k ~fk
+      | T.RecordGet (r1, name1), T.RecordGet (r2, name2) when name1=name2 ->
+        unif subst r1 sc_s r2 sc_t ~k ~fk
+      | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
+        unif subst r1 sc_s r2 sc_t
+          ~k:(fun subst fk -> unif subst sub1 sc_s sub2 sc_t ~k ~fk)
+          ~fk
       | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when Symbol.eq s1 s2 ->
         __unify_list ~unif subst l1 sc_s l2 sc_t ~k ~fk
       | T.Multiset l1, T.Multiset l2 when List.length l1 = List.length l2 ->
@@ -608,6 +633,11 @@ module Unary = struct
           let r1 = RU.of_record s l1 rest1 in
           let r2 = RU.of_record t l2 rest2 in
           unif_records ~unif subst r1 sc_s r2 sc_t
+      | T.RecordGet (r1, name1), T.RecordGet (r2, name2) when name1=name2 ->
+        unif subst r1 sc_s r2 sc_t
+      | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
+        let subst = unif subst r1 sc_s r2 sc_t in
+        unif subst sub1 sc_s sub2 sc_t
       | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when Symbol.eq s1 s2 ->
         unif_list ~unif subst l1 sc_s l2 sc_t
       | T.At (l1, r1), T.At (l2, r2) ->
@@ -659,6 +689,11 @@ module Unary = struct
           let r1 = RU.of_record s l1 rest1 in
           let r2 = RU.of_record t l2 rest2 in
           unif_records ~unif subst r1 sc_s r2 sc_t
+      | T.RecordGet (r1, name1), T.RecordGet (r2, name2) when name1=name2 ->
+        unif subst r1 sc_s r2 sc_t
+      | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
+        let subst = unif subst r1 sc_s r2 sc_t in
+        unif subst sub1 sc_s sub2 sc_t
       | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when Symbol.eq s1 s2 ->
         unif_list ~unif subst l1 sc_s l2 sc_t
       | T.At (l1, r1), T.At (l2, r2) ->
@@ -708,6 +743,11 @@ module Unary = struct
           let r1 = RU.of_record s l1 rest1 in
           let r2 = RU.of_record t l2 rest2 in
           unif_records ~unif:(unif ~blocked) subst r1 scope r2 scope
+      | T.RecordGet (r1, name1), T.RecordGet (r2, name2) when name1=name2 ->
+        unif ~blocked subst r1 sc_s r2 sc_t
+      | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
+        let subst = unif ~blocked subst r1 sc_s r2 sc_t in
+        unif ~blocked subst sub1 sc_s sub2 sc_t
       | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when Symbol.eq s1 s2 ->
         unif_list ~unif:(unif ~blocked) subst l1 scope l2 scope
       | T.At (l1, r1), T.At (l2, r2) ->
@@ -757,6 +797,11 @@ module Unary = struct
           let r1 = RU.of_record s l1 rest1 in
           let r2 = RU.of_record t l2 rest2 in
           unif_records ~unif subst r1 sc_s r2 sc_t
+      | T.RecordGet (r1, name1), T.RecordGet (r2, name2) when name1=name2 ->
+        unif subst r1 sc_s r2 sc_t
+      | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
+        let subst = unif subst r1 sc_s r2 sc_t in
+        unif subst sub1 sc_s sub2 sc_t
       | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when Symbol.eq s1 s2 ->
         unif_list ~unif subst l1 sc_s l2 sc_t
       | T.At (l1, r1), T.At (l2, r2) ->

@@ -53,6 +53,9 @@ module type S = sig
   val mem : ?table:t -> elt -> bool
     (** Is the element present in this table? *)
 
+  val fresh_unique_id : ?table:t -> unit -> int
+    (** Unique ID that will never occur again in this table (modulo 2^63...) *)
+
   val stats : ?table:t -> unit -> int*int*int*int*int*int
 end
 

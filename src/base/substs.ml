@@ -379,6 +379,10 @@ let apply subst ~renaming t s_t =
           in
           let l' = List.map (fun (s,t') -> s, _apply t' s_t) l in
           T.record ~kind ~ty l' ~rest
+      | T.RecordGet (r, name) ->
+          T.record_get ~kind ~ty (_apply r s_t) name
+      | T.RecordSet (r, name, sub) ->
+          T.record_set ~kind ~ty (_apply r s_t) name (_apply sub s_t)
       | T.SimpleApp (s, l) ->
           let l' = _apply_list l s_t in
           T.simple_app ~kind ~ty s l'

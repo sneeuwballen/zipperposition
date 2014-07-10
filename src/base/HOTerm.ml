@@ -80,6 +80,8 @@ let view t = match T.view t with
         | _ -> assert false
       end
   | T.Record (l, rest) -> Record (l, rest)
+  | T.RecordGet _
+  | T.RecordSet _
   | T.Bind _
   | T.App _
   | T.SimpleApp _ -> assert false
@@ -295,6 +297,7 @@ let rec size t = match T.view t with
       let s = match rest with None -> 0 | Some r -> size r in
       List.fold_left (fun acc (_,t') -> acc+size t') s l
   | T.App (f, l) -> List.fold_left (fun s t' -> s + size t') (1+size f) l
+  | T.RecordGet _ | T.RecordSet _
   | T.RigidVar _ | T.Multiset _ | T.SimpleApp _ -> assert false
 
 let is_ground t = Seq.vars t |> Sequence.is_empty
@@ -331,6 +334,8 @@ let rec head t =
   | T.Bind _ -> raise (Invalid_argument "Term.head: lambda")
   | T.Multiset _ -> raise (Invalid_argument "Term.head: record")
   | T.Record _ -> raise (Invalid_argument "Term.head: record")
+  | T.RecordGet _
+  | T.RecordSet _
   | T.App _
   | T.SimpleApp _ -> assert false
 
@@ -423,6 +428,8 @@ let uncurry t =
     | T.Multiset _
     | T.RigidVar _
     | T.Bind (Symbol.Conn Symbol.Lambda, _, _) -> raise Exit
+    | T.RecordGet _
+    | T.RecordSet _
     | T.App _
     | T.SimpleApp _
     | T.Bind _ -> assert false
@@ -440,6 +447,8 @@ let rec is_fo t = match T.view t with
   | T.Multiset _
   | T.RigidVar _ 
   | T.Bind (Symbol.Conn Symbol.Lambda, _, _) -> false
+  | T.RecordGet _
+  | T.RecordSet _
   | T.App _
   | T.SimpleApp _
   | T.Bind _ -> assert false

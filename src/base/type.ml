@@ -176,6 +176,8 @@ let arity ty =
     | T.Const _
     | T.SimpleApp _
     | T.App _ -> Arity (i, j)
+    | T.RecordGet _
+    | T.RecordSet _
     | T.Multiset _
     | T.Bind _
     | T.At _ -> assert false
