@@ -3,7 +3,23 @@ The documentation can be found {{:rst/contents.html} here}.
 
 {2 API Documentation}
 
-{!indexlist}
+{!modules:
+Comparison Precedence Ordering Skolem Cnf
+Congruence FastFingerprint FeatureVector Rewriting
+FormulaShape Transform Lambda Sourced
+HORewriting Index Dtree Fingerprint NPDtree
+Hashcons Cache Bij Bencode
+Interfaces DBEnv Position HOTerm Formula
+ParseLocation Multiset
+PartialOrder LazyList IArray LazyGraph
+Substs Unif Signature TypeInference Options
+Symbol ScopedTerm FOTerm Type Util PrologTerm
+}
 
 A description of modules can be found {{:rst/modules.html} here}.
+
+{2 List of modules}
+
+{!indexlist}
+
 

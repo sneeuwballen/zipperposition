@@ -107,6 +107,7 @@ Library "logtk_arbitrary"
 
 Document logtk
   Title:                Logtk documentation
+  Abstract:             Main API documentation for Logtk.
   Type:                 ocamlbuild (0.3)
   BuildTools+:          ocamldoc
   Install$:             flag(docs)
