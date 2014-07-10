@@ -48,9 +48,6 @@ type view =
   | Multiset of Type.t * t list
   | Record of (string*t) list * t option (** Record of terms *)
 
-type sourced_term =
-  t * string * string           (** Term + file,name *)
-
 let ty t = match T.ty t with
   | T.NoType -> assert false
   | T.HasType ty -> Type.of_term_exn ty

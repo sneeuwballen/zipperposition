@@ -187,7 +187,7 @@ module type S = sig
   val sourced_formulas : ?negate:(Ast_tptp.role -> bool) ->
                          ?file:string ->
                          A.t Sequence.t ->
-                         (A.form * string * string) Sequence.t
+                         A.form Sourced.t Sequence.t
     (** Same as {!formulas}, but keeps a source attached to formulas.
         A [file] name has to be provided for the source to be accurate,
         the default is "unknown_file". *)
@@ -259,16 +259,19 @@ module Untyped = struct
         | AU.Include _
         | AU.IncludeOnly _ -> None
         | AU.CNF(name, role, c, _) ->
-          let source = Ast.string_of_name name in
-          if negate role
-            then Some (PT.TPTP.not_ (PT.TPTP.or_ c), file, source)
-            else Some (PT.TPTP.or_ c, file, source)
+          let name = Ast.string_of_name name in
+          let is_conjecture = __is_conjecture role in
+          let form = if negate role
+            then PT.TPTP.not_ (PT.TPTP.or_ c)
+            else PT.TPTP.or_ c
+          in
+          Some (Sourced.make ~file ~name ~is_conjecture form)
         | AU.FOF(name, role, f, _)
         | AU.TFF(name, role, f, _) ->
-          let source = Ast.string_of_name name in
-          if negate role
-            then Some (PT.TPTP.not_ f, file, source)
-            else Some (f, file, source)
+          let name = Ast.string_of_name name in
+          let is_conjecture = __is_conjecture role in
+          let form = if negate role then PT.TPTP.not_ f else f in
+          Some (Sourced.make ~file ~name ~is_conjecture form)
         | AU.THF _ -> None)
       decls
 
@@ -366,16 +369,19 @@ module Typed = struct
         | AT.Include _
         | AT.IncludeOnly _ -> None
         | AT.CNF(name, role, c, _) ->
-          let source = Ast.string_of_name name in
-          if negate role
-            then Some (F.Base.not_ (F.Base.or_ c), file, source)
-            else Some (F.Base.or_ c, file, source)
+          let name = Ast.string_of_name name in
+          let is_conjecture = __is_conjecture role in
+          let form = if negate role
+            then F.Base.not_ (F.Base.or_ c)
+            else F.Base.or_ c
+          in
+          Some (Sourced.make ~file ~name ~is_conjecture form)
         | AT.FOF(name, role, f, _)
         | AT.TFF(name, role, f, _) ->
-          let source = Ast.string_of_name name in
-          if negate role
-            then Some (F.Base.not_ f, file, source)
-            else Some (f, file, source)
+          let name = Ast.string_of_name name in
+          let is_conjecture = __is_conjecture role in
+          let form = if negate role then F.Base.not_ f else f in
+          Some (Sourced.make ~file ~name ~is_conjecture form)
         | AT.THF _ -> None)
       decls
 

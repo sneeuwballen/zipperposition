@@ -39,9 +39,6 @@ type t = T.t
 
 type term = t
 
-type sourced_term =
-  t * string * string           (** Term + file,name *)
-
 type view =
   | Var of int                (** Term variable *)
   | BVar of int               (** Bound variable (De Bruijn index) *)

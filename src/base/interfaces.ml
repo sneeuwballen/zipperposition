@@ -50,6 +50,13 @@ module type PRINT = sig
   val fmt : Format.formatter -> t -> unit
 end
 
+module type PRINT1 = sig
+  type 'a t
+  val pp : (Buffer.t -> 'a -> unit) -> Buffer.t -> 'a t -> unit
+  val to_string : (Buffer.t -> 'a -> unit) -> 'a t -> string
+  val fmt : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
+end
+
 (** Register printers by name *)
 module type PRINT_OVERLOAD = sig
   type t

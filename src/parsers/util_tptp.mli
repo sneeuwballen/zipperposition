@@ -83,7 +83,7 @@ module type S = sig
   val sourced_formulas : ?negate:(Ast_tptp.role -> bool) ->
                          ?file:string ->
                          A.t Sequence.t ->
-                         (A.form * string * string) Sequence.t
+                         A.form Sourced.t Sequence.t
     (** Same as {!formulas}, but keeps a source attached to formulas.
         A [file] name has to be provided for the source to be accurate,
         the default is "unknown_file". *)

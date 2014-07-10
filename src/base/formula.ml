@@ -39,9 +39,6 @@ module type S = sig
 
   type form = t
 
-  type sourced_form = t * string * string
-    (** form, filename, axiom name *)
-
   type view = private
     | True
     | False
@@ -254,9 +251,6 @@ module Make(MyT : TERM) = struct
   type t = ScopedTerm.t
 
   type form = t
-
-  type sourced_form = t * string * string
-    (** form, filename, axiom name *)
 
   let eq = T.eq
   let cmp = T.cmp
