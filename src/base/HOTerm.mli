@@ -74,13 +74,11 @@ val cast : ty:Type.t -> t -> t
   (** Change the type. Only works for variables and bound variables. *)
 
 module Tbl : sig
-  include Hashtbl.S with type key = t
-  val to_list : unit t -> term list
-  val from_list : term list -> unit t
-  val to_seq : unit t -> term Sequence.t
-  val from_seq : term Sequence.t -> unit t
-  val add_list : unit t -> term list -> unit
-  val add_seq : unit t -> term Sequence.t -> unit
+  include Hashtbl.S with type key = term
+  val to_list : 'a t -> (key * 'a) list
+  val of_list : ?init:'a t -> (key * 'a) list -> 'a t
+  val to_seq : 'a t -> (key * 'a) Sequence.t
+  val of_seq : ?init:'a t -> (key * 'a) Sequence.t -> 'a t
 end
 
 module Set : Sequence.Set.S with type elt = t

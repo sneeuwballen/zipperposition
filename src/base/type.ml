@@ -127,29 +127,15 @@ let () =
 
 (** {2 Containers} *)
 
-module Set = Sequence.Set.Make(struct
-  type t = ty
-  let compare = cmp
-end)
-module Map = Sequence.Map.Make(struct
-  type t = ty
-  let compare = cmp
-end)
-module Tbl = Hashtbl.Make(struct
-  type t = ty
-  let hash = hash
-  let equal = eq
-end)
+module Set = T.Set
+module Map = T.Map
+module Tbl = T.Tbl
 
 module Seq = struct
   let vars ty = Sequence.fmap of_term (T.Seq.vars ty)
   let sub ty = Sequence.fmap of_term (T.Seq.subterms ty)
-  let add_set set t = Sequence.fold (fun set x -> Set.add x set) set t
-  let max_var =
-    Sequence.fold
-      (fun m ty -> match view ty with
-      | Var i -> max i m
-      | _ -> m) 0
+  let add_set = T.Seq.add_set
+  let max_var = T.Seq.max_var
 end
 
 let vars_set set t =

@@ -51,8 +51,7 @@ module TestUnit(I : UnitIndex) = struct
   (* lists of unique terms *)
   let gen low high = Arbitrary.(
     list ~len:(low -- high) ArTerm.default >>= fun l ->
-    let set = T.Tbl.from_list l in
-    let seq = T.Tbl.to_seq set in
+    let seq = T.Set.of_list l |> T.Set.to_seq in
     let seq = Sequence.mapi (fun i t -> t, i) seq in
     return (Sequence.persistent seq))
 
@@ -147,8 +146,7 @@ module TestTerm(I : TermIndex) = struct
   (* lists of unique terms *)
   let gen low high = Arbitrary.(
     list ~len:(low -- high) ArTerm.default >>= fun l ->
-    let set = T.Tbl.from_list l in
-    let seq = T.Tbl.to_seq set in
+    let seq = T.Set.of_list l |> T.Set.to_seq in
     let seq = Sequence.mapi (fun i t -> t, i) seq in
     return (Sequence.persistent seq))
 

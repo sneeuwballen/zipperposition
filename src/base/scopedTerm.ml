@@ -38,6 +38,7 @@ module Kind = struct
     | FOTerm
     | HOTerm
     | Formula of t
+    | Untyped
     | Generic  (* other terms *)
 end
 
@@ -176,8 +177,24 @@ end)
 
 let hashcons_stats () = H.stats ()
 
+let _make ~kind ~ty term = {
+  term;
+  kind;
+  ty;
+  id = ~-1;
+  flags=0;
+}
+
+let _make_id ~id ~kind ~ty term = {
+  term;
+  kind;
+  ty;
+  id;
+  flags=0;
+}
+
 let const ~kind ~ty s =
-  let my_t = { term=Const s; kind; id= ~-1; ty=HasType ty; flags=0; } in
+  let my_t = _make ~kind ~ty:(HasType ty) (Const s) in
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty then set_flag t flag_ground;
@@ -188,7 +205,7 @@ let app ~kind ~ty f l =
   match l with
   | [] -> f
   | _::_ ->
-      let my_t = {term=App (f, l); kind; id= ~-1; ty=HasType ty; flags=0; } in
+      let my_t = _make ~kind ~ty:(HasType ty) (App (f,l)) in
       let t = H.hashcons my_t in
       if t == my_t then begin
         if ground ty && ground f && List.for_all ground l
@@ -197,24 +214,24 @@ let app ~kind ~ty f l =
       t
 
 let var ~kind ~ty i =
-  H.hashcons {term=Var i; kind; id= ~-1; ty=HasType ty; flags=0; }
+  H.hashcons (_make ~kind ~ty:(HasType ty) (Var i))
 
 let fresh_var =
   let r = ref 0 in
   fun ~kind ~ty () ->
     let id = H.fresh_unique_id () in
-    let my_t = {term=Var !r; kind; id; ty=HasType ty; flags=0; } in
+    let my_t = _make_id ~id ~kind ~ty:(HasType ty) (Var !r) in
     incr r;
     my_t
 
 let bvar ~kind ~ty i =
-  H.hashcons {term=BVar i; kind; id= ~-1; ty=HasType ty; flags=0; }
+  H.hashcons (_make ~kind ~ty:(HasType ty) (BVar i))
 
 let rigid_var ~kind ~ty i =
-  H.hashcons {term=RigidVar i; kind; id= ~-1; ty=HasType ty; flags=0; }
+  H.hashcons (_make ~kind ~ty:(HasType ty) (RigidVar i))
 
 let bind ~kind ~ty ~varty s t' =
-  H.hashcons {term=Bind (s,varty,t'); kind; id= ~-1; ty=HasType ty; flags=0; }
+  H.hashcons (_make ~kind ~ty:(HasType ty) (Bind (s, varty, t')))
 
 (* merge l1 and l2, which are both sorted. If the same key occurs with
  * distinct values, fail. *)
@@ -241,7 +258,7 @@ let rec __check_duplicates seen l = match l with
 
 (* actually build the record *)
 let __make_record ~kind ~ty l ~rest =
-  let my_t = {term=Record (l, rest); kind; ty=HasType ty; id= ~-1; flags=0; } in
+  let my_t = _make ~kind ~ty:(HasType ty) (Record (l,rest)) in
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty && List.for_all (fun (_,t) -> ground t) l
@@ -270,7 +287,7 @@ let record ~kind ~ty l ~rest =
   __flatten_record ~kind ~ty l ~rest
 
 let record_get ~kind ~ty r name =
-  let my_t = {term=RecordGet(r,name); kind; ty=HasType ty; id= ~-1; flags=0; } in
+  let my_t = _make ~kind ~ty:(HasType ty) (RecordGet(r,name)) in
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty && ground r
@@ -279,7 +296,7 @@ let record_get ~kind ~ty r name =
   t
 
 let record_set ~kind ~ty r name sub =
-  let my_t = {term=RecordSet(r,name,sub); kind; ty=HasType ty; id= ~-1; flags=0; } in
+  let my_t = _make ~kind ~ty:(HasType ty) (RecordSet(r,name,sub)) in
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty && ground r && ground sub
@@ -289,7 +306,7 @@ let record_set ~kind ~ty r name sub =
 
 let multiset ~kind ~ty l =
   let l = List.sort cmp l in
-  let my_t = {term=Multiset l; kind; ty=HasType ty; id= ~-1; flags=0; } in
+  let my_t = _make ~kind ~ty:(HasType ty) (Multiset l) in
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty && List.for_all ground l
@@ -298,7 +315,7 @@ let multiset ~kind ~ty l =
   t
 
 let at ~kind ~ty l r =
-  let my_t = {term=At(l,r); kind; ty=HasType ty; id= ~-1; flags=0; } in
+  let my_t = _make ~kind ~ty:(HasType ty) (At (l,r)) in
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty && ground l && ground r
@@ -307,7 +324,7 @@ let at ~kind ~ty l r =
   t
 
 let simple_app ~kind ~ty s l =
-  let my_t = {term=SimpleApp(s,l); kind; ty=HasType ty; id= ~-1; flags=0; } in
+  let my_t = _make ~kind ~ty:(HasType ty) (SimpleApp (s,l)) in
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty && List.for_all ground l
@@ -318,9 +335,9 @@ let simple_app ~kind ~ty s l =
 let mk_at = at
 
 let tType =
-  let _t = {term=Const (Sym.Conn Sym.TType); kind=Kind.Kind;
-            id= ~-1; ty=NoType; flags=flag_ground; } in
-  H.hashcons _t
+  let my_t = _make ~kind:Kind.Kind ~ty:NoType (Const (Sym.Conn Sym.TType)) in
+  set_flag my_t flag_ground;
+  H.hashcons my_t
 
 let cast ~ty old = match old.term with
   | Var i -> var ~kind:old.kind ~ty i

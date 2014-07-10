@@ -64,6 +64,7 @@ module Kind : sig
     | FOTerm
     | HOTerm
     | Formula of t
+    | Untyped
     | Generic  (* other terms *)
 end
 

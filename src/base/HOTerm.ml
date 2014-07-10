@@ -133,39 +133,9 @@ module TermHASH = struct
   let hash = hash
 end
 
-module Tbl = struct
-  include Hashtbl.Make(TermHASH)
-
-  let add_list tbl l =
-    List.iter (fun x -> replace tbl x ()) l
-
-  let add_seq tbl seq =
-    Sequence.iter (fun x -> replace tbl x ()) seq
-
-  let to_list set = fold (fun x _ acc -> x :: acc) set []
-
-  let from_list l =
-    let tbl = create 13 in
-    add_list tbl l;
-    tbl
-
-  let to_seq set = fun k -> iter (fun x () -> k x) set
-
-  let from_seq seq =
-    let tbl = create 13 in
-    add_seq tbl seq;
-    tbl
-end
-
-module Set = Sequence.Set.Make(struct
-  type t = term
-  let compare = compare
-end)
-
-module Map = Sequence.Map.Make(struct
-  type t = term
-  let compare = compare
-end)
+module Set = T.Set
+module Map = T.Map
+module Tbl = T.Tbl
 
 module Cache = Cache.Replacing(TermHASH)
 
