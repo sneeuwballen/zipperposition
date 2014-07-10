@@ -283,7 +283,15 @@ let mk_not_divides n ~power m = mk_divides ~sign:false n ~power m
 let mk_subseteq ?(sign=true) ~sets l r =
   (* sort and remove duplicates *)
   let l = List.sort T.cmp l |> CCList.Set.uniq ~eq:T.eq in
-  let r = List.sort T.cmp r |> CCList.Set.uniq ~eq:T.eq in
+  let r =
+    match r with
+      | [x] ->
+        begin match TS.view ~sets x with
+          | TS.Emptyset _ -> []
+          | _ -> List.sort T.cmp r |> CCList.Set.uniq ~eq:T.eq
+        end
+      | _ -> List.sort T.cmp r |> CCList.Set.uniq ~eq:T.eq
+  in
   Subseteq (sets, l, r, sign)
 
 let mk_notsubseteq ~sets l r = mk_subseteq ~sign:false ~sets l r
@@ -735,13 +743,17 @@ let pp_debug ?(hooks=[]) buf lit =
       (if olit.TO.strict then "<" else "≤") T.pp olit.TO.right
   | Arith o -> ArithLit.pp buf o
   | Subseteq (_, l, r, sign) ->
+      let _pp_inter buf l = match l with
+        | [] -> Buffer.add_string buf "Ω"
+        | _ -> CCList.pp ~start:"" ~stop:"" ~sep:" ∩ " T.pp buf l
+      in
       let _pp_union buf l = match l with
         | [] -> Buffer.add_string buf "∅"
-        | _ -> CCList.pp ~start:"" ~stop:"" ~sep:"∪" T.pp buf l
+        | _ -> CCList.pp ~start:"" ~stop:"" ~sep:" ∪ " T.pp buf l
       in
       Printf.bprintf buf "%a %s %a"
-        (CCList.pp ~start:"" ~stop:"" ~sep:"∩" T.pp) l
-        (if sign then "⊆" else "⊊")
+        _pp_inter l
+        (if sign then " ⊆ " else " ⊊ ")
         _pp_union r
 
 let pp_tstp buf lit =

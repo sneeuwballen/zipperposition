@@ -118,7 +118,7 @@ module Sets : sig
 
   val get_set_type : sets:t -> term -> Type.ty option
 
-  val _get_set_type : sets:t -> term -> Type.ty
+  val get_set_type_exn : sets:t -> term -> Type.ty
 
   val view : sets:t -> term -> view
   (** View of the term as a set operator, if possible *)

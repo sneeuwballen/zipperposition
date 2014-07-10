@@ -212,7 +212,7 @@ module Sets = struct
       | _ -> None
 
   (* if t:set(alpha) then return alpha, otherwise raise Invalid_argument *)
-  let _get_set_type ~sets t =
+  let get_set_type_exn ~sets t =
     match Type.view (T.ty t) with
       | Type.App (s, [alpha]) when Symbol.eq s sets.set_type -> alpha
       | ty -> invalid_arg (Util.sprintf "%a does not a set type" T.pp t)
@@ -226,22 +226,22 @@ module Sets = struct
     T.app_full (T.const ~ty:(_ty_member ~sets) sets.member) [T.ty x] [x;set]
 
   let mk_subset ~sets s1 s2 =
-    let alpha = _get_set_type ~sets s1 in
+    let alpha = get_set_type_exn ~sets s1 in
     T.app_full (T.const ~ty:(_ty_subset ~sets) sets.subset) [alpha] [s1;s2]
 
   let mk_subseteq ~sets s1 s2 =
-    let alpha = _get_set_type ~sets s1 in
+    let alpha = get_set_type_exn ~sets s1 in
     T.app_full (T.const ~ty:(_ty_subset ~sets) sets.subseteq) [alpha] [s1;s2]
 
   let rec mk_union ~sets s_list =
     match s_list with
-      | [] -> failwith "type of intersection not defined"
+      | [] -> failwith "type of union not defined"
       | [set] -> set
       | [s1;s2] ->
-        let alpha = _get_set_type ~sets s1 in
+        let alpha = get_set_type_exn ~sets s1 in
           T.app_full (T.const ~ty:(_ty_union ~sets) sets.union) [alpha] [s1;s2]
       | s1::s2::t ->
-        let alpha = _get_set_type ~sets s1 in
+        let alpha = get_set_type_exn ~sets s1 in
         let union' = mk_union ~sets (s2::t) in
           T.app_full (T.const ~ty:(_ty_union ~sets) sets.union) [alpha] [s1;union']
 
@@ -250,15 +250,15 @@ module Sets = struct
       | [] -> failwith "type of intersection not defined"
       | [set] -> set
       | [s1;s2] ->
-        let alpha = _get_set_type ~sets s1 in
+        let alpha = get_set_type_exn ~sets s1 in
           T.app_full (T.const ~ty:(_ty_union ~sets) sets.inter) [alpha] [s1;s2]
       | s1::s2::t ->
-        let alpha = _get_set_type ~sets s1 in
+        let alpha = get_set_type_exn ~sets s1 in
         let inter' = mk_inter ~sets (s2::t) in
           T.app_full (T.const ~ty:(_ty_union ~sets) sets.inter) [alpha] [s1;inter']
 
   let mk_diff ~sets s1 s2 =
-    let alpha = _get_set_type ~sets s1 in
+    let alpha = get_set_type_exn ~sets s1 in
     T.app_full (T.const ~ty:(_ty_union ~sets) sets.diff) [alpha] [s1;s2]
 
   let mk_empty ~sets ty =
@@ -268,7 +268,7 @@ module Sets = struct
     T.app_full (T.const ~ty:(_ty_singleton ~sets) sets.singleton) [T.ty t] [t]
 
   let mk_complement~sets s =
-    let alpha = _get_set_type ~sets s in
+    let alpha = get_set_type_exn ~sets s in
     T.app_full (T.const ~ty:(_ty_complement ~sets) sets.complement) [alpha] [s]
 
   let mk_set_type ~sets ty =
@@ -281,7 +281,7 @@ module Sets = struct
     | Subseteq (a, b) -> Printf.bprintf buf "%a ⊆ %a" pp_rec a pp_rec b; true
     | Inter l -> CCList.pp ~start:"" ~stop:"" ~sep:" ∩ " pp_rec buf l; true
     | Union l -> CCList.pp ~start:"" ~stop:"" ~sep:" ∪ " pp_rec buf l; true
-    | Diff (a, b) -> Printf.bprintf buf "%a \ %a" pp_rec a pp_rec b; true
+    | Diff (a, b) -> Printf.bprintf buf "%a \\ %a" pp_rec a pp_rec b; true
     | Emptyset _ -> Buffer.add_string buf "∅"; true
     | Singleton t -> Printf.bprintf buf "{%a}" pp_rec t; true
     | Complement t -> Printf.bprintf buf "%a^c" pp_rec t; true
