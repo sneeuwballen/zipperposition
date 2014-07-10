@@ -79,8 +79,8 @@ let rules_of_pairs signature pairs =
     let pairs = Util.list_fmap
       (function
         | Rule (l,r) ->
-          let ty_l, l' = TypeInference.FO.infer ctx l in
-          let ty_r, r' = TypeInference.FO.infer ctx r in
+          let ty_l, l' = TypeInference.FO.infer_exn ctx l in
+          let ty_r, r' = TypeInference.FO.infer_exn ctx r in
           TypeInference.Ctx.constrain_type_type ctx ty_l ty_r;
           TypeInference.Ctx.exit_scope ctx;
           Some (fun ctx -> l' ctx, r' ctx)

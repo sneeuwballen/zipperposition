@@ -39,9 +39,6 @@ type t = T.t
 
 type term = t
 
-type sourced_term =
-  t * string * string           (** Term + file,name *)
-
 type view =
   | Var of int                (** Term variable *)
   | BVar of int               (** Bound variable (De Bruijn index) *)
@@ -676,9 +673,9 @@ module TPTP = struct
       in
       match Classic.view t with
       | Classic.Var i when Type.eq (ty t) Type.TPTP.int ->
-        Printf.bprintf buf "X%d_z" i; true
+        Printf.bprintf buf "I%d" i; true
       | Classic.Var i when Type.eq (ty t) Type.TPTP.rat ->
-        Printf.bprintf buf "X%d_q" i; true
+        Printf.bprintf buf "Q%d" i; true
       | Classic.App (s, _,[a; b]) when Symbol.eq s SA.less ->
         Printf.bprintf buf "%a < %a" pp_surrounded a pp_surrounded b; true
       | Classic.App (s, _,[a; b]) when Symbol.eq s SA.lesseq ->

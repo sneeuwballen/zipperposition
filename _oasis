@@ -51,7 +51,7 @@ Library "logtk"
                     Comparison, Precedence, Ordering, Skolem, Cnf,
                     HORewriting, Index, Dtree, Fingerprint, NPDtree,
                     Congruence, FastFingerprint, FeatureVector, Rewriting,
-                    FormulaShape, Transform, Lambda,
+                    FormulaShape, Transform, Lambda, Sourced,
                     lib/Hashcons, lib/Cache, lib/Bij, lib/Bencode,
                     lib/ParseLocation, lib/Multiset,
                     lib/PartialOrder, lib/LazyList, lib/IArray, lib/LazyGraph
@@ -141,7 +141,7 @@ Executable run_bench
   BuildDepends:     logtk,benchmark,qcheck,logtk.arbitrary
 
 Test all
-  Command:          $run_tests
+  Command:          make test-all
   TestTools:        run_tests
   Run$:             flag(tests) && flag(qcheck)
 

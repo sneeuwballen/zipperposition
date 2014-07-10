@@ -176,7 +176,7 @@ let bench_hashcons n =
   let ctx = TypeInference.Ctx.create Signature.empty in
   let terms = CCList.map
     (fun t ->
-      let ty, t' = TypeInference.FO.infer ctx t in
+      let ty, t' = TypeInference.FO.infer_exn ctx t in
       TypeInference.Ctx.constrain_type_type ctx ty Type.TPTP.i;
       TypeInference.Ctx.bind_to_default ctx;
       t' ctx)

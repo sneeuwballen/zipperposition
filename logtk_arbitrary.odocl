@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: a90a238c9f4c563a22506aa78dbff024)
+# DO NOT EDIT (digest: 17319f0aca1270a5ca8ca212218c6be0)
 src/base/Symbol
 src/base/ScopedTerm
 src/base/FOTerm
@@ -33,6 +33,7 @@ src/base/Rewriting
 src/base/FormulaShape
 src/base/Transform
 src/base/Lambda
+src/base/Sourced
 src/base/lib/Hashcons
 src/base/lib/Cache
 src/base/lib/Bij

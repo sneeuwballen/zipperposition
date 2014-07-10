@@ -138,9 +138,10 @@ end
 (** {3 De Bruijn indices handling} *)
 
 module DB : sig
-  val closed : ?depth:int -> t -> bool
-    (** check whether the term is closed (all DB vars are bound within
-        the term) *)
+  val closed : t -> bool
+    (** check whether the term is closed (all DB vars are bound within the
+        term). If this returns [true] then the term doesn't depend on
+        its environment. *)
 
   val contains : t -> int -> bool
     (** Does t contains the De Bruijn variable of index n? *)
@@ -148,17 +149,18 @@ module DB : sig
   val open_vars : t -> t Sequence.t
     (** List of "open" De Bruijn variables (with too high an index) *)
 
-  val shift : ?depth:int -> int -> t -> t
+  val shift : int -> t -> t
     (** shift the non-captured De Bruijn indexes in the term by n *)
 
-  val unshift : ?depth:int -> int -> t -> t
-    (** Unshift the term (decrement indices of all free De Bruijn variables
-        inside) by [n] *)
+  val unshift : int -> t -> t
+  (** [unshift n t] unshifts the term [t]'s bound variables by [n]. In
+      other words it decrements indices of all free De Bruijn variables
+      inside by [n]. Variables bound within [t] are left untouched. *)
 
-  val replace : ?depth:int -> t -> sub:t -> t
+  val replace : t -> sub:t -> t
     (** [db_from_term t ~sub] replaces [sub] by a fresh De Bruijn index in [t]. *)
 
-  val from_var : ?depth:int -> t -> var:t -> t
+  val from_var : t -> var:t -> t
     (** [db_from_var t ~var] replace [var] by a De Bruijn symbol in t.
         Same as {!replace}. *)
 

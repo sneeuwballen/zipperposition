@@ -1,3 +1,4 @@
+
 (*
 Copyright (c) 2013-2014, Simon Cruanes
 All rights reserved.
@@ -23,3 +24,33 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
+(** {1 Sourced Statements} *)
+
+type 'a t = {
+  content : 'a;
+  file : string;
+  name : string;
+  is_conjecture : bool;
+}
+
+let get x = x.content
+let file x = x.file
+let name x = x.name
+let is_conjecture x = x.is_conjecture
+
+let make ?(is_conjecture=false) ~name ~file content = {
+  name; file; content; is_conjecture;
+}
+
+let map f x = {x with content=f x.content; }
+
+let pp pp_x buf x =
+  Printf.bprintf buf "%a [at %s in %s (conj: %B)]"
+    pp_x x.content x.name x.file x.is_conjecture
+
+let to_string pp_x x =
+  CCPrint.to_string (pp pp_x) x
+
+let fmt pp_x fmt x =
+  Format.fprintf fmt "%a [at %s in %s (conj: %B)]"
+    pp_x x.content x.name x.file x.is_conjecture

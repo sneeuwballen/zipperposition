@@ -347,285 +347,229 @@ end
 (** {3 De Bruijn} *)
 
 module DB = struct
-  (* check wether the term is closed w.r.t. De Bruijn variables *)
-  let rec __closed depth t =
+  (* sequence2 of [De Bruijn, depth] pairs *)
+  let rec _to_seq ~depth t k =
     begin match t.ty with
-      | NoType -> true
-      | HasType ty -> __closed depth ty
-    end
-    &&
+      | NoType -> ()
+      | HasType ty -> _to_seq ~depth ty k
+    end;
     match view t with
-    | BVar i -> i < depth
-    | Bind(_, varty, t') -> __closed depth varty && __closed (depth+1) t'
-    | Const _
-    | Var _ | RigidVar _ -> true
+    | BVar _ -> k t depth
+    | Var _
+    | RigidVar _
+    | Const _ -> ()
+    | Bind (_, varty, t') ->
+        _to_seq ~depth varty k;
+        _to_seq ~depth:(depth+1) t' k
     | Record (l, rest) ->
         begin match rest with
-        | None -> true
-        | Some r -> __closed depth r
-        end && List.for_all (fun (_,t') -> __closed depth t') l
-    | Multiset l -> List.for_all (__closed depth) l
-    | App (f, l) -> __closed depth f && List.for_all (__closed depth) l
-    | At (l,r) -> __closed depth l && __closed depth r
-    | SimpleApp (_,l) -> List.for_all (__closed depth) l
+          | None -> ()
+          | Some r -> _to_seq~depth r k
+        end;
+        List.iter (fun (_,t) -> _to_seq ~depth t k) l
+    | SimpleApp (_, l)
+    | Multiset l ->
+        List.iter (fun t -> _to_seq ~depth t k) l
+    | App (f, l) ->
+        _to_seq ~depth f k;
+        List.iter (fun t -> _to_seq ~depth t k) l
+    | At (l,r) ->
+        _to_seq ~depth l k;
+        _to_seq ~depth r k
 
-  let closed ?depth t =
-    match depth with
-    | None
-    | Some 0 ->
-        (* depth=0, see whether result is cached *)
-        if get_flag t flag_db_closed_computed
-          then get_flag t flag_db_closed
-          else begin
-            (* compute and cache result *)
-            let res = __closed 0 t in
-            set_flag t flag_db_closed_computed;
-            if res then set_flag t flag_db_closed;
-            res
-          end
-    | Some d -> __closed d t
+  let _id x = x
+
+  let _closed t =
+    _to_seq ~depth:0 t
+      |> Sequence.map2
+        (fun bvar depth -> match view bvar with
+          | BVar i -> i<depth
+          | _ -> assert false
+        )
+      |> Sequence.for_all _id
+
+  let closed t =
+    (* depth=0, see whether result is cached *)
+    if get_flag t flag_db_closed_computed
+      then get_flag t flag_db_closed
+      else begin
+        (* compute and cache result *)
+        let res = _closed t in
+        set_flag t flag_db_closed_computed;
+        if res then set_flag t flag_db_closed;
+        res
+      end
 
   (* check whether t contains the De Bruijn symbol n *)
-  let rec contains t n =
-    begin match t.ty with
-      | NoType -> false
-      | HasType ty -> contains ty n
-    end ||
-    match view t with
-    | BVar i -> i = n
-    | Const _
-    | Var _
-    | RigidVar _ -> false
-    | Bind (_, varty, t') -> contains varty n || contains t' (n+1)
-    | Record (l, rest) ->
-        begin match rest with
-        | None -> false
-        | Some r -> contains r n
-        end ||
-        List.exists (fun (_,t') -> contains t' n) l
-    | Multiset l -> List.exists (fun t' -> contains t' n) l
-    | App (f, l) ->
-      contains f n || List.exists (fun t' -> contains t' n) l
-    | At (l,r) -> contains l n || contains r n
-    | SimpleApp (_,l) -> List.exists (fun t' -> contains t' n) l
+  let contains t n =
+    _to_seq ~depth:0 t
+      |> Sequence.map2
+        (fun bvar depth -> match view bvar with
+          | BVar i -> i=n
+          | _ -> assert false
+        )
+      |> Sequence.exists _id
 
-  let open_vars t k =
-    let rec traverse ~depth t =
-      begin match t.ty with
-        | NoType -> ()
-        | HasType ty -> traverse ~depth ty
-      end;
+  let open_vars t =
+    _to_seq ~depth:0 t
+      |> Sequence.map2
+        (fun bvar depth -> match view bvar with
+          | BVar i ->
+              if i>= depth then Some bvar else None
+          | _ -> assert false
+        )
+      |> Sequence.fmap _id
+
+  (* maps the term to another term, calling [on_binder acc t]
+    when it meets a binder, and [on_bvar acc t] when it meets a
+    bound variable. *)
+  let _fold_map ~depth acc ~on_bvar ~on_binder t =
+    let rec recurse ~depth acc t = match t.ty with
+    | NoType ->
+      assert (t == tType);
+      t
+    | HasType ty ->
+      let ty = recurse ~depth acc ty in
       match view t with
-      | BVar i when i >= depth ->
-          (* open variable, collect it *)
-          let ty = ty_exn t in
-          let v = bvar ~kind:t.kind ~ty (i-depth) in
-          k v
-      | BVar _
-      | Var _
-      | RigidVar _
-      | Const _ -> ()
-      | Bind (_, varty, t') ->
-          traverse ~depth varty;
-          traverse ~depth:(depth+1) t'
-      | Record (l, rest) ->
-          begin match rest with
-            | None -> ()
-            | Some r -> traverse ~depth r
-          end;
-          List.iter
-            (fun (_,t) -> traverse ~depth t) l
-      | SimpleApp (_, l)
-      | Multiset l ->
-          List.iter (traverse ~depth) l
-      | App (f, l) ->
-          traverse ~depth f;
-          List.iter (traverse ~depth) l
-      | At (l,r) ->
-          traverse ~depth l;
-          traverse ~depth r
+        | Var i -> var ~kind:t.kind ~ty i
+        | RigidVar i -> rigid_var ~kind:t.kind ~ty i
+        | Const s -> const ~kind:t.kind ~ty s
+        | BVar i ->
+          on_bvar ~kind:t.kind ~ty ~depth acc i
+        | Bind (s, varty, t') ->
+          let acc' = on_binder ~kind:t.kind ~ty ~depth acc s varty in
+          let varty' = recurse ~depth acc varty in
+          let t' = recurse ~depth:(depth+1) acc' t' in
+          bind ~kind:t.kind ~ty ~varty:varty' s t'
+        | Record (l, rest) ->
+          let rest = match rest with
+            | None -> None
+            | Some r -> Some (recurse ~depth acc r)
+          in
+          let l = List.map (fun (s,t') -> s, recurse ~depth acc t') l in
+          record ~kind:t.kind ~ty l ~rest
+        | Multiset l ->
+          let l = List.map (recurse ~depth acc) l in
+          multiset ~kind:t.kind ~ty l
+        | App (f, l) ->
+          app ~kind:t.kind ~ty (recurse ~depth acc f) (List.map (recurse ~depth acc) l)
+        | At (l,r) ->
+          at ~kind:t.kind ~ty (recurse ~depth acc l) (recurse ~depth acc r)
+        | SimpleApp (s,l) ->
+          simple_app ~kind:t.kind ~ty s (List.map (recurse ~depth acc) l)
     in
-    traverse ~depth:0 t
-
+    recurse ~depth:0 acc t
 
   (* shift the non-captured De Bruijn indexes in the term by n *)
-  let shift ?(depth=0) n t =
-    (* traverse the term, looking for non-captured DB indexes.
-       [depth] is the number of binders on the path from the root of the
-       term, to the current position. *)
-    let rec recurse depth t =
-      match t.ty with
-      | NoType ->
-        assert (t == tType);
-        t
-      | HasType ty ->
-        let ty = recurse depth ty in
-        match t.term with
-          | _ when ground t -> t
-          | Var i -> var ~kind:t.kind ~ty i
-          | RigidVar i -> rigid_var ~kind:t.kind ~ty i
-          | Const s -> const ~kind:t.kind ~ty s
-          | BVar i ->
-            if i >= depth
-              then (* shift *)
-                bvar ~kind:t.kind ~ty (i + n)
-              else bvar ~kind:t.kind ~ty i
-          | Bind (s, varty, t') ->
-            let varty' = recurse depth varty in
-            let t' = recurse (depth+1) t' in
-            bind ~kind:t.kind ~ty ~varty:varty' s t'
-          | Record (l, rest) ->
-            let rest = match rest with
-              | None -> None
-              | Some r -> Some (recurse depth r)
-            in
-            let l = List.map (fun (s,t') -> s, recurse depth t') l in
-            record ~kind:t.kind ~ty l ~rest
-          | Multiset l -> 
-            let l = List.map (recurse depth) l in
-            multiset ~kind:t.kind ~ty l
-          | App (f, l) ->
-            app ~kind:t.kind ~ty (recurse depth f) (List.map (recurse depth) l)
-          | At (l,r) ->
-            at ~kind:t.kind ~ty (recurse depth l) (recurse depth r)
-          | SimpleApp (s,l) ->
-            simple_app ~kind:t.kind ~ty s (List.map (recurse depth) l)
-    in
+  let shift n t =
     assert (n >= 0);
-    if depth=0 && n = 0
-      then t
-      else recurse depth t
+    _fold_map ~depth:0 ()
+      ~on_bvar:(
+        fun ~kind ~ty ~depth () i ->
+          if i >= depth
+            then (* shift *)
+              bvar ~kind ~ty (i + n)
+            else bvar ~kind ~ty i
+        )
+      ~on_binder:(fun ~kind ~ty ~depth () _ _ -> ())
+      t
 
-  (* unshift the term (decrement indices of all free De Bruijn variables inside *)
-  let unshift ?(depth=0) n t =
-    (* only unlift DB symbol that are free. [depth] is the number of binders
-       on the path from the root term. *)
-    let rec recurse depth t =
-      match t.ty with
-      | NoType ->
-        assert (t == tType);
-        t
-      | HasType ty ->
-        let ty = recurse depth ty in
-        match view t with
-          | _ when ground t -> t
-          | Var i -> var ~kind:t.kind ~ty i
-          | RigidVar i -> rigid_var ~kind:t.kind ~ty i
-          | BVar i ->
-            if i >= depth
-              then (* unshift this free De Bruijn index *)
-                bvar ~kind:t.kind ~ty (i-n)
-              else bvar ~kind:t.kind ~ty i
-          | Const s -> const ~kind:t.kind ~ty s
-          | Bind (s, varty, t') ->
-            let varty' = recurse depth varty in
-            let t' = recurse (depth+1) t' in
-            bind ~kind:t.kind ~ty ~varty:varty' s t'
-          | Record (l, rest) ->
-            let rest = match rest with
-              | None -> None
-              | Some r -> Some (recurse depth r)
-            in
-            let l = List.map (fun (s,t') -> s, recurse depth t') l in
-            record ~kind:t.kind ~ty l ~rest
-          | Multiset l ->
-            let l = List.map (recurse depth) l in
-            multiset ~kind:t.kind ~ty l
-          | App (f, l) ->
-            app ~kind:t.kind ~ty (recurse depth f) (List.map (recurse depth) l)
-          | At (l,r) ->
-            at ~kind:t.kind ~ty (recurse depth l) (recurse depth r)
-          | SimpleApp (s,l) ->
-            simple_app ~kind:t.kind ~ty s (List.map (recurse depth) l)
-    in
-    recurse depth t
+  let unshift n t =
+    _fold_map ~depth:0 ()
+      ~on_bvar:(
+        fun ~kind ~ty ~depth () i ->
+          if i >= depth
+            then (* ushift *)
+              bvar ~kind ~ty (i - n)
+            else bvar ~kind ~ty i
+        )
+      ~on_binder:(fun ~kind ~ty ~depth () _ _ -> ())
+      t
 
-  let replace ?(depth=0) t ~sub =
-    (* recurse and replace [sub]. *)
-    let rec recurse depth t =
-      match t.ty with
-      | NoType ->
-        assert (t == tType);
-        t
-      | HasType ty ->
-        let ty = recurse depth ty in
-        match view t with
-          | _ when eq t sub ->
-            bvar ~kind:t.kind ~ty depth  (* replace *)
-          | Var i -> var ~kind:t.kind ~ty i
-          | RigidVar i -> rigid_var ~kind:t.kind ~ty i
-          | BVar i -> bvar ~kind:t.kind ~ty i
-          | Const s -> const ~kind:t.kind ~ty s
-          | Bind (s, varty, t') ->
-            let varty' = recurse depth varty in
-            let t' = recurse (depth+1) t' in
-            bind ~kind:t.kind ~ty ~varty:varty' s t'
-          | Record (l, rest) ->
-            let rest = match rest with
-              | None -> None
-              | Some r -> Some (recurse depth r)
-            in
-            let l = List.map (fun (s,t') -> s, recurse depth t') l in
-            record ~kind:t.kind ~ty l ~rest
-          | Multiset l -> 
-            let l = List.map (recurse depth) l in
-            multiset ~kind:t.kind ~ty l
-          | App (f, l) ->
-            app ~kind:t.kind ~ty (recurse depth f) (List.map (recurse depth) l)
-          | At (l,r) ->
-            at ~kind:t.kind ~ty (recurse depth l) (recurse depth r)
-          | SimpleApp (s,l) ->
-            simple_app ~kind:t.kind ~ty s (List.map (recurse depth) l)
-    in
-    recurse depth t
+  (* recurse and replace [sub]. *)
+  let rec _replace depth ~sub t =
+    match t.ty with
+    | NoType ->
+      assert (t == tType);
+      t
+    | HasType ty ->
+      let ty = _replace depth ty ~sub in
+      match view t with
+        | _ when eq t sub ->
+          bvar ~kind:t.kind ~ty depth  (* replace *)
+        | Var i -> var ~kind:t.kind ~ty i
+        | RigidVar i -> rigid_var ~kind:t.kind ~ty i
+        | BVar i -> bvar ~kind:t.kind ~ty i
+        | Const s -> const ~kind:t.kind ~ty s
+        | Bind (s, varty, t') ->
+          let varty' = _replace depth ~sub varty in
+          let t' = _replace (depth+1) t' ~sub in
+          bind ~kind:t.kind ~ty ~varty:varty' s t'
+        | Record (l, rest) ->
+          let rest = match rest with
+            | None -> None
+            | Some r -> Some (_replace depth ~sub r)
+          in
+          let l = List.map (fun (s,t') -> s, _replace depth t' ~sub) l in
+          record ~kind:t.kind ~ty l ~rest
+        | Multiset l ->
+          let l = List.map (_replace depth ~sub) l in
+          multiset ~kind:t.kind ~ty l
+        | App (f, l) ->
+          app ~kind:t.kind ~ty (_replace depth ~sub f) (List.map (_replace depth ~sub) l)
+        | At (l,r) ->
+          at ~kind:t.kind ~ty (_replace depth l ~sub) (_replace depth r ~sub)
+        | SimpleApp (s,l) ->
+          simple_app ~kind:t.kind ~ty s (List.map (_replace depth ~sub) l)
 
-  let from_var ?depth t ~var =
+  let replace t ~sub = _replace 0 t ~sub
+
+  let from_var t ~var =
     assert (is_var var);
-    replace ?depth t ~sub:var
+    replace t ~sub:var
 
-  let eval env t =
-    let rec eval env t =
-      match t.ty with
-      | NoType ->
-        assert (t == tType);
-        t
-      | HasType ty ->
-        let ty = eval env ty in
-        match view t with
-          | _ when ground t -> t
-          | Var i -> var ~kind:t.kind ~ty i
-          | RigidVar i -> rigid_var ~kind:t.kind ~ty i
-          | Const s -> const ~kind:t.kind ~ty s
-          | BVar i ->
-            begin match DBEnv.find env i with
-              | None -> bvar ~kind:t.kind ~ty i
-              | Some t' ->
-                (* need to shift this term, because we crossed [i] binder
-                    from the scope [t'] was defined in. *)
-                shift i t'
-            end
-          | Bind (s, varty, t') ->
-            let varty' = eval env varty in
-            let t' = eval (DBEnv.push_none env) t' in
-            bind ~kind:t.kind ~ty ~varty:varty' s t'
-          | Record (l, rest) ->
-            let rest = match rest with
-              | None -> None
-              | Some r -> Some (eval env r)
-            in
-            let l = List.map (fun (s,t') -> s, eval env t') l in
-            record ~kind:t.kind ~ty l ~rest
-          | Multiset l -> 
-            let l = List.map (eval env) l in
-            multiset ~kind:t.kind ~ty l
-          | App (f, l) ->
-            app ~kind:t.kind ~ty (eval env f) (List.map (eval env) l)
-          | At (l,r) ->
-            at ~kind:t.kind ~ty (eval env l) (eval env r)
-          | SimpleApp (s,l) ->
-            simple_app ~kind:t.kind ~ty s (List.map (eval env) l)
-    in
-    eval env t
+  let rec _eval env t =
+    match t.ty with
+    | NoType ->
+      assert (t == tType);
+      t
+    | HasType ty ->
+      let ty = _eval env ty in
+      match view t with
+        | _ when ground t -> t
+        | Var i -> var ~kind:t.kind ~ty i
+        | RigidVar i -> rigid_var ~kind:t.kind ~ty i
+        | Const s -> const ~kind:t.kind ~ty s
+        | BVar i ->
+          begin match DBEnv.find env i with
+            | None -> bvar ~kind:t.kind ~ty i
+            | Some t' ->
+              (* need to shift this term, because we crossed [i] binder
+                  from the scope [t'] was defined in. *)
+              shift i t'
+          end
+        | Bind (s, varty, t') ->
+          let varty' = _eval env varty in
+          let t' = _eval (DBEnv.push_none env) t' in
+          bind ~kind:t.kind ~ty ~varty:varty' s t'
+        | Record (l, rest) ->
+          let rest = match rest with
+            | None -> None
+            | Some r -> Some (_eval env r)
+          in
+          let l = List.map (fun (s,t') -> s, _eval env t') l in
+          record ~kind:t.kind ~ty l ~rest
+        | Multiset l ->
+          let l = List.map (_eval env) l in
+          multiset ~kind:t.kind ~ty l
+        | App (f, l) ->
+          app ~kind:t.kind ~ty (_eval env f) (List.map (_eval env) l)
+        | At (l,r) ->
+          at ~kind:t.kind ~ty (_eval env l) (_eval env r)
+        | SimpleApp (s,l) ->
+          simple_app ~kind:t.kind ~ty s (List.map (_eval env) l)
+
+  let eval env t = _eval env t
 end
 
 let bind_vars ~kind ~ty s vars t =

@@ -72,7 +72,6 @@ val fmt_general : Format.formatter -> general_data -> unit
 val pp_generals : Buffer.t -> general_data list -> unit
 val fmt_generals : Format.formatter -> general_data list -> unit
 
-
 module type S = sig
   type hoterm
   type form

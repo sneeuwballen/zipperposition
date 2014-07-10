@@ -47,9 +47,6 @@ type view = private
   | Multiset of Type.t * t list (** a multiset of terms, and their common type *)
   | Record of (string*t) list * t option  (** Record of terms *)
 
-type sourced_term =
-  t * string * string           (** Term + file,name *)
-
 val view : t -> view
 val ty : t -> Type.t
 val kind : ScopedTerm.Kind.t

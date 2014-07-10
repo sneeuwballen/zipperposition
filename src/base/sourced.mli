@@ -1,3 +1,4 @@
+
 (*
 Copyright (c) 2013-2014, Simon Cruanes
 All rights reserved.
@@ -23,3 +24,25 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
+(** {1 Sourced Statements}
+
+Formulas, Terms, etc. with a source, so we know where it comes from. *)
+
+type 'a t = {
+  content : 'a;
+  file : string;
+  name : string;
+  is_conjecture : bool;
+}
+
+val get : 'a t -> 'a
+val file : _ t -> string
+val name : _ t -> string
+val is_conjecture : _ t -> bool
+
+val make : ?is_conjecture:bool -> name:string -> file:string -> 'a -> 'a t
+(** make a new sourced item. Default [is_conjecture] is [false]. *)
+
+val map : ('a -> 'b) -> 'a t -> 'b t
+
+include Interfaces.PRINT1 with type 'a t := 'a t

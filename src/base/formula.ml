@@ -39,9 +39,6 @@ module type S = sig
 
   type form = t
 
-  type sourced_form = t * string * string
-    (** form, filename, axiom name *)
-
   type view = private
     | True
     | False
@@ -254,9 +251,6 @@ module Make(MyT : TERM) = struct
   type t = ScopedTerm.t
 
   type form = t
-
-  type sourced_form = t * string * string
-    (** form, filename, axiom name *)
 
   let eq = T.eq
   let cmp = T.cmp
@@ -711,7 +705,7 @@ module Make(MyT : TERM) = struct
         flatten (Base.or_ l')
       | Forall (_,f')
       | Exists (_,f') when not (T.DB.contains f' 0) ->
-        simplify ~depth (of_term_exn (T.DB.unshift ~depth:0 1 f'))
+        simplify ~depth (of_term_exn (T.DB.unshift 1 f'))
       | Forall (varty,f') -> Base.__mk_forall ~varty (simplify ~depth:(depth+1) f')
       | Exists (varty,f') -> Base.__mk_exists ~varty (simplify ~depth:(depth+1) f')
       | ForallTy f' -> Base.__mk_forall_ty (simplify ~depth:(depth+1) f')

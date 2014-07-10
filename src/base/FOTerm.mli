@@ -42,9 +42,6 @@ type view = private
   | TyApp of t * Type.t       (** Application to type *)
   | App of t  * t list        (** Application to a list of terms (cannot be left-nested) *)
 
-type sourced_term =
-  t * string * string           (** Term + file,name *)
-
 val view : t -> view
 
 val kind : ScopedTerm.Kind.t

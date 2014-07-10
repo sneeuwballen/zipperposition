@@ -43,9 +43,6 @@ module type S = sig
 
   type form = t
 
-  type sourced_form = t * string * string
-    (** form, filename, axiom name *)
-
   type view = private
     | True
     | False
