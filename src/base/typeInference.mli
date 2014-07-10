@@ -27,14 +27,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 This module is used for two things that overlap:
 - inferring the types of symbols that have not been declared (e.g. in
-  "fof" or "cnf" TPTP statements) so as to enrich a {!Signature.t}
+  "fof" or "cnf" TPTP statements) so as to enrich a {!Logtk.Signature.t}
 - converting {i untyped} terms or formulas into {i typed} formulas, by inferring
   the exact type of each subterm (and possibly inferring type parameters).
 
 In this context, {b generalizing} type variables means that if some symbol
 whose type was unknown and its type still contains variables after the
 type inference, those variables are quantified instead of being bound to
-a default type (typically {!Type.i}).
+a default type (typically {!Logtk.Type.i}).
 
 For instance: say [f] is not declared and occurs in the term [f(f(nil))]
 with the declared constructor [nil : list(A)]. The inferred type for
@@ -230,7 +230,7 @@ module FO : sig
                      untyped -> Formula.FO.t or_error
     (** Convert a formula into a typed formula.
         @param generalize see {!convert}
-        @param [ctx] the typing context to use. Updated in place.
+        @param ctx the typing context to use. Updated in place.
         @raise Type.Error if types are inconsistent *)
 
   val convert_clause : ?generalize:bool ->
