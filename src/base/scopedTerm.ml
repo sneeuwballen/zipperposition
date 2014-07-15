@@ -216,18 +216,20 @@ let app ~kind ~ty f l =
       end;
       t
 
+let _var ~kind ~ty i =
+  H.hashcons (_make ~kind ~ty:(HasType ty) (Var i))
+
 let var ~kind ~ty i =
   if i<0 then raise (IllFormedTerm "var");
-  H.hashcons (_make ~kind ~ty:(HasType ty) (Var i))
+  _var ~kind ~ty i
 
 let fresh_var =
   let r = ref ~-1 in
   fun ~kind ~ty () ->
     if !r >= 0 then failwith "ScopedTerm.fresh_var: overflow";
-    let id = H.fresh_unique_id () in
-    let my_t = _make_id ~id ~kind ~ty:(HasType ty) (Var !r) in
+    let t = _var ~kind ~ty !r in
     decr r;
-    my_t
+    t
 
 let bvar ~kind ~ty i =
   if i<0 then raise (IllFormedTerm "bvar");
@@ -347,7 +349,7 @@ let tType =
   H.hashcons my_t
 
 let cast ~ty old = match old.term with
-  | Var i -> var ~kind:old.kind ~ty i
+  | Var i -> _var ~kind:old.kind ~ty i
   | RigidVar i -> rigid_var ~kind:old.kind ~ty i
   | BVar i -> bvar ~kind:old.kind ~ty i
   | Const s -> const ~kind:old.kind ~ty s
@@ -493,7 +495,7 @@ module DB = struct
     | HasType ty ->
       let ty = recurse ~depth acc ty in
       match view t with
-        | Var i -> var ~kind:t.kind ~ty i
+        | Var i -> _var ~kind:t.kind ~ty i
         | RigidVar i -> rigid_var ~kind:t.kind ~ty i
         | Const s -> const ~kind:t.kind ~ty s
         | BVar i ->
@@ -565,7 +567,7 @@ module DB = struct
       match view t with
         | _ when eq t sub ->
           bvar ~kind:t.kind ~ty depth  (* replace *)
-        | Var i -> var ~kind:t.kind ~ty i
+        | Var i -> _var ~kind:t.kind ~ty i
         | RigidVar i -> rigid_var ~kind:t.kind ~ty i
         | BVar i -> bvar ~kind:t.kind ~ty i
         | Const s -> const ~kind:t.kind ~ty s
@@ -612,7 +614,7 @@ module DB = struct
       let ty = _eval env ty in
       match view t with
         | _ when ground t -> t
-        | Var i -> var ~kind:t.kind ~ty i
+        | Var i -> _var ~kind:t.kind ~ty i
         | RigidVar i -> rigid_var ~kind:t.kind ~ty i
         | Const s -> const ~kind:t.kind ~ty s
         | BVar i ->

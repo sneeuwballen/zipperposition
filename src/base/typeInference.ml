@@ -468,6 +468,7 @@ module FO = struct
       ty_s, (fun ctx ->
         let ty = Ctx.apply_ty ctx ty_s in
         T.const ~ty s)
+    | PT.Syntactic (s, l)
     | PT.App ({PT.term=PT.Const s}, l) ->
       (* use type of [s] *)
       let ty_s = Ctx.type_of_fun ~arity:(List.length l) ctx s in
@@ -584,17 +585,17 @@ module FO = struct
         | Sym.False -> F.Base.false_
         | _ -> assert false
         end
-    | PT.App ({PT.term=PT.Const (Sym.Conn Sym.And)}, l) ->
+    | PT.Syntactic (Sym.Conn Sym.And, l) ->
       let l' = List.map (fun f' -> infer_form_rec ctx f') l in
       fun ctx ->
         let l' = (Closure.seq l') ctx in
         F.Base.and_ l'
-    | PT.App ({PT.term=PT.Const (Sym.Conn Sym.Or)}, l) ->
+    | PT.Syntactic (Sym.Conn Sym.Or, l) ->
       let l' = List.map (fun f' -> infer_form_rec ctx f') l in
       fun ctx ->
         let l' = (Closure.seq l') ctx in
         F.Base.or_ l'
-    | PT.App ({PT.term=PT.Const (Sym.Conn ((Sym.Equiv | Sym.Xor | Sym.Imply) as conn))}, [a;b]) ->
+    | PT.Syntactic (Sym.Conn ((Sym.Equiv | Sym.Xor | Sym.Imply) as conn), [a;b]) ->
       let a' = infer_form_rec ctx a  and b' = infer_form_rec ctx b in
       fun ctx ->
         let a = a' ctx and b = b' ctx in
@@ -604,7 +605,7 @@ module FO = struct
         | Sym.Imply -> F.Base.imply a b
         | _ -> assert false
         end
-    | PT.App ({PT.term=PT.Const (Sym.Conn Sym.Not)}, [a]) ->
+    | PT.Syntactic (Sym.Conn Sym.Not, [a]) ->
       let a' = infer_form_rec ctx a in
       fun ctx -> F.Base.not_ (a' ctx)
     | PT.Bind(Sym.Conn ((Sym.Forall | Sym.Exists) as conn), vars, f') ->
@@ -627,7 +628,7 @@ module FO = struct
       let f' = infer_form_rec ctx f' in
       fun ctx ->
         F.Base.forall_ty vars' (f' ctx)
-    | PT.App ({PT.term=PT.Const (Sym.Conn ((Sym.Eq | Sym.Neq) as conn))},
+    | PT.Syntactic (Sym.Conn ((Sym.Eq | Sym.Neq) as conn),
       ([_;a;b] | [_; {PT.term=PT.List [a;b]}] | [a;b])) ->
       (* a ?= b *)
       let tya, a = infer_exn ctx a in
@@ -651,6 +652,7 @@ module FO = struct
     | PT.Int _
     | PT.Bind _
     | PT.Record _
+    | PT.Syntactic _
     | PT.Rat _ -> Ctx.__error ctx "expected formula, got %a" PT.pp f
 
   let infer_form_exn ctx f =
@@ -855,6 +857,9 @@ module HO = struct
       ty, (fun ctx ->
         let ty = Ctx.apply_ty ctx ty in
         T.const ~ty s)
+    | PT.Syntactic (s, l) ->
+      (* reduce to next case *)
+      infer_rec ~arity ctx (PT.app (PT.const s) l)
     | PT.App (t, []) -> infer_rec ~arity ctx t
     | PT.App (t, l) ->
       (* we are going to assume that the type of [t], as inferred, is a forall

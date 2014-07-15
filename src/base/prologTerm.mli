@@ -46,6 +46,7 @@ and view = private
   | Int of Z.t                      (** integer *)
   | Rat of Q.t                      (** rational *)
   | Const of Symbol.t               (** constant *)
+  | Syntactic of Symbol.t * t list  (** syntactic construct (operator...) *)
   | App of t * t list               (** apply term *)
   | Bind of Symbol.t * t list * t   (** bind n variables *)
   | List of t list                  (** special constructor for lists *)
@@ -64,6 +65,7 @@ val int_ : Z.t -> t
 val of_int : int -> t
 val rat : Q.t -> t
 val app : ?loc:location -> t -> t list -> t
+val syntactic : ?loc:location -> Symbol.t -> t list -> t
 val const : ?loc:location -> Symbol.t -> t
 val bind : ?loc:location -> Symbol.t -> t list -> t -> t
 val list_ : ?loc:location -> t list -> t
@@ -105,6 +107,7 @@ class virtual ['a] visitor : object
   method virtual int_ : ?loc:location -> Z.t -> 'a
   method virtual rat_ : ?loc:location -> Q.t -> 'a
   method virtual const : ?loc:location -> Symbol.t -> 'a
+  method virtual syntactic : ?loc:location -> Symbol.t -> 'a list -> 'a
   method virtual app : ?loc:location -> 'a -> 'a list -> 'a
   method virtual bind : ?loc:location -> Symbol.t -> 'a list -> 'a -> 'a
   method virtual list_ : ?loc:location -> 'a list -> 'a
@@ -118,6 +121,7 @@ class id_visitor : object
   method int_ : ?loc:location -> Z.t -> t
   method rat_ : ?loc:location -> Q.t -> t
   method const : ?loc:location -> Symbol.t -> t
+  method syntactic : ?loc:location -> Symbol.t -> t list -> t
   method app : ?loc:location -> t -> t list -> t
   method bind : ?loc:location -> Symbol.t -> t list -> t -> t
   method list_ : ?loc:location -> t list -> t

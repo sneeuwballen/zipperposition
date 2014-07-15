@@ -256,6 +256,9 @@ val fresh_var : kind:Kind.t -> ty:t -> unit -> t
 (** [fresh_var ~kind ~ty ()] returns a fresh, unique, {b NOT HASHCONSED}
     variable that will therefore never be equal to any other variable. *)
 
+val _var : kind:Kind.t -> ty:t -> int -> t
+(** Unsafe version of {!var} that accepts negative index *)
+
 (* FIXME
 include Interfaces.SERIALIZABLE with type t := t
 *)

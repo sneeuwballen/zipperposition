@@ -353,11 +353,11 @@ module Conv = struct
       | PT.Int _
       | PT.Rat _ -> raise LocalExit
       | PT.Const s -> const s
-      | PT.App ({PT.term=PT.Const (Symbol.Conn Symbol.Arrow)}, [ret;arg]) ->
+      | PT.Syntactic (Symbol.Conn Symbol.Arrow, [ret;arg]) ->
         let ret = of_prolog ret in
         let arg = of_prolog arg in
         arrow arg ret
-      | PT.App ({PT.term=PT.Const (Symbol.Conn Symbol.Arrow)}, ret::l) ->
+      | PT.Syntactic (Symbol.Conn Symbol.Arrow, ret::l) ->
         let ret = of_prolog ret in
         let l = List.map of_prolog l in
         arrow_list l ret
@@ -373,6 +373,7 @@ module Conv = struct
         let l = List.map (fun (n,t) -> n, of_prolog t) l in
         record l ~rest
       | PT.Bind _
+      | PT.Syntactic _
       | PT.App _
       | PT.Column _
       | PT.List _ -> raise LocalExit
@@ -386,12 +387,12 @@ module Conv = struct
     | BVar i -> PT.var (Util.sprintf "B%d" (depth-i-1))
     | App (s,l) -> PT.app (PT.const s) (List.map (to_prolog depth) l)
     | Fun (arg, ret) when curry ->
-      PT.app (PT.const Symbol.Base.arrow)
-            [ to_prolog depth ret ; to_prolog depth arg ]
+      PT.TPTP.mk_fun_ty [to_prolog depth arg] (to_prolog depth ret)
     | Fun _ ->
       let args, ret = open_fun t in
       let args = List.map (to_prolog depth) args in
-      PT.app (PT.const Symbol.Base.arrow) (to_prolog depth ret :: args)
+      let ret = to_prolog depth ret in
+      PT.TPTP.mk_fun_ty args ret
     | Record (l, rest) ->
       let rest = CCOpt.map (to_prolog depth) rest in
       PT.record (List.map (fun (n,ty) -> n, to_prolog depth ty) l) ~rest

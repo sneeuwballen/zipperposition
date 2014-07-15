@@ -97,7 +97,7 @@ module Renaming = struct
       begin try
         HR.find tbl key
       with Not_found ->
-        let v' = T.var ~kind:(T.kind v) ~ty:(T.ty_exn v) (HR.length tbl) in
+        let v' = T._var ~kind:(T.kind v) ~ty:(T.ty_exn v) (HR.length tbl) in
         HR.add tbl key v';
         v'
       end
@@ -119,14 +119,14 @@ module Renaming = struct
       let ty = T.ty_exn v in
       let n = !__var_count in
       decr __var_count;
-      T.var ~kind:(T.kind v) ~ty n
+      T._var ~kind:(T.kind v) ~ty n
   | Tbl tbl, T.Const (Symbol.Conn (Symbol.FreshVar i)) ->
       let ty = T.ty_exn v in
       let key = FreshVar (i, ty) in
       begin try
         HR.find tbl key
       with Not_found ->
-        let v' = T.var ~kind:(T.kind v) ~ty (HR.length tbl) in
+        let v' = T._var ~kind:(T.kind v) ~ty (HR.length tbl) in
         HR.add tbl key v';
         v'
       end
@@ -343,7 +343,7 @@ let apply subst ~renaming t s_t =
         with Not_found ->
           (* variable not bound by [subst], rename it
               (after specializing its type if needed) *)
-          let t = T.var ~kind ~ty i in
+          let t = T._var ~kind ~ty i in
           Renaming.rename renaming t s_t
         end
       | T.RigidVar i ->
