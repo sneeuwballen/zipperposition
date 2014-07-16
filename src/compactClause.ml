@@ -37,6 +37,7 @@ type form = F.t
 type t = Literal.t array
 
 let eq = Lits.eq_com
+let hash_fun = Lits.hash_fun
 let hash = Lits.hash
 let cmp = Lits.compare
 

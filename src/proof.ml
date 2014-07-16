@@ -29,6 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+module Hash = CCHash
 module F = Formula.FO
 module CC = CompactClause
 
@@ -65,12 +66,13 @@ let eq p1 p2 =
   | Clause c1, Clause c2 -> CC.eq c1 c2
   | _ -> false
 
-let hash p =
-  Hash.combine
-    (Hashtbl.hash p.kind)
-    (match p.result with
-      | Form f -> F.hash f
-      | Clause c -> CC.hash c)
+let hash_fun p h =
+  h |> Hash.int_ (Hashtbl.hash p.kind)
+    |> (fun h -> match p.result with
+        | Form f -> F.hash_fun f h
+        | Clause c -> CC.hash_fun c h)
+
+let hash p = Hash.apply hash_fun p
 
 let cmp p1 p2 =
   let c = Pervasives.compare p1.kind p2.kind in

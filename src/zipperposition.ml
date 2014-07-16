@@ -62,6 +62,7 @@ let print_version ~params =
 let () =
   Extensions.register Superposition.extension;
   Extensions.register AC.extension;
+  Extensions.register Heuristics.extension;
   ()
 
 let setup_penv ~penv () =
@@ -129,6 +130,8 @@ end) = struct
   module Sat = Saturate.Make(Env)
 
   let params = X.params
+
+  let has_conjecture = ref false
 
   (** print stats *)
   let print_stats () =
@@ -222,6 +225,7 @@ end) = struct
 
   (** Print some content of the state, based on environment variables *)
   let print_dots result =
+    Signal.send Signals.on_dot_output ();
     (* see if we need to print proof state *)
     begin match params.param_dot_file, result with
     | Some dot_f, Saturate.Unsat proof ->
@@ -251,17 +255,23 @@ end) = struct
     | None -> ()
   *)
 
+  let _sat () =
+    if !has_conjecture then "CounterSatisfiable" else "Satisfiable"
+  let _unsat () =
+    if !has_conjecture then "Theorem" else "Unsatisfiable"
+
   let print_szs_result ~file result =
     match result with
     | Saturate.Unknown
-    | Saturate.Timeout -> Printf.printf "%% SZS status ResourceOut for '%s'\n" file
+    | Saturate.Timeout ->
+      Printf.printf "%% SZS status ResourceOut for '%s'\n" file
     | Saturate.Error s ->
       Printf.printf "%% SZS status InternalError for '%s'\n" file;
       Util.debug 1 "error is: %s" s
+    | Saturate.Sat when Ctx.is_completeness_preserved () ->
+      Printf.printf "%% SZS status %s for '%s'\n" (_sat ()) file
     | Saturate.Sat ->
-      if Ctx.is_completeness_preserved ()
-        then Printf.printf "%% SZS status CounterSatisfiable for '%s'\n" file
-        else Printf.printf "%% SZS status GaveUp for '%s'\n" file;
+      Printf.printf "%% SZS status GaveUp for '%s'\n" file;
       begin match params.param_proof with
         | "none" -> ()
         | "tstp" ->
@@ -274,7 +284,7 @@ end) = struct
       end
     | Saturate.Unsat proof ->
       (* print status then proof *)
-      Printf.printf "%% SZS status Theorem for '%s'\n" file;
+      Printf.printf "%% SZS status %s for '%s'\n" (_unsat ()) file;
       Util.printf "%% SZS output start Refutation\n";
       Util.printf "%a" (Proof.pp params.param_proof) proof;
       Printf.printf "%% SZS output end Refutation\n";
@@ -337,14 +347,29 @@ let preprocess ~signature ~params formulas =
   end in
   (module Result : POST_PREPROCESS), formulas
 
+(* does the sequence of declarations contain at least one conjecture? *)
+let _has_conjecture decls =
+  let _roles k =
+    let visitor = object
+      inherit [unit] Ast_tptp.Untyped.visitor
+      method clause () role _ = k role
+      method any_form () role _ = k role
+      end
+    in
+    decls (visitor#visit ())
+  in
+  Sequence.exists (fun r -> r = Ast_tptp.R_conjecture) _roles
+
 (** Process the given file (try to solve it) *)
 let process_file ?meta ~plugins ~params file =
-  let open Monad.Err in
+  let open CCError in
   Util.debug 1 "================ process file %s ===========" file;
   (* parse formulas *)
   Util_tptp.parse_file ~recursive:true file
   >>= fun decls ->
-  Util.debug 1 "parsed %d declarations" (Sequence.length decls);
+  let has_conjecture = _has_conjecture decls in
+  Util.debug 1 "parsed %d declarations (%sconjecture)"
+    (Sequence.length decls) (if has_conjecture then "" else "no ");
   (* obtain a typed AST *)
   Util_tptp.infer_types (`sign !Params.signature) decls
   >>= fun (signature,decls) ->
@@ -379,6 +404,7 @@ let process_file ?meta ~plugins ~params file =
     module Env = MyEnv
     let params = params
   end) in
+  Main.has_conjecture := has_conjecture;
   (* pre-saturation *)
   let num_clauses = MyEnv.C.CSet.size clauses in
   let result, clauses = if params.param_presaturate
@@ -430,13 +456,14 @@ let () =
   (* initialize plugins *)
   List.iter Extensions.init plugins;
   (* master process: process files *)
-  Vector.iter params.param_files
+  CCVector.iter
     (fun file ->
       match process_file ~plugins ~params file with
-      | Monad.Err.Error msg ->
+      | `Error msg ->
           print_endline msg;
           exit 1
-      | Monad.Err.Ok () -> ());
+      | `Ok () -> ()
+    ) params.param_files;
   ()
 
 let _ =

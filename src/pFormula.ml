@@ -29,12 +29,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+module Hash = CCHash
 module F = Formula.FO
+
 type form = F.t
 
 type t = {
   form : F.t;
   proof : Proof.t;
+  is_conjecture : bool;
   mutable id : int;
   mutable simpl_to : t option;
 }
@@ -42,10 +45,12 @@ type t = {
 type pform = t
 
 let eq t1 t2 = F.eq t1.form t2.form && Proof.eq t1.proof t2.proof
-let hash t = Hash.hash_int2 (F.hash t.form) (Proof.hash t.proof)
 let cmp t1 t2 =
   let c = F.cmp t1.form t2.form in
   if c <> 0 then c else Proof.cmp t1.proof t2.proof
+
+let hash_fun t h = F.hash_fun t.form (Proof.hash_fun t.proof h)
+let hash t = Hash.apply hash_fun t
 
 let eq_noproof t1 t2 = F.eq t1.form t2.form
 
@@ -61,10 +66,12 @@ end)
 let form t = t.form
 let proof t = t.proof
 let id t = t.id
+let is_conjecture t = t.is_conjecture
 
 let to_sourced t =
   match t.proof.Proof.kind with
-  | Proof.File (_, file, name) -> Some (t.form, file, name)
+  | Proof.File (_, file, name) ->
+      Some (Sourced.make ~file ~name ~is_conjecture:t.is_conjecture t.form)
   | _ -> None
 
 let rec _follow_simpl n pf =
@@ -75,15 +82,16 @@ let rec _follow_simpl n pf =
 
 let follow_simpl pf = _follow_simpl 0 pf
 
-let create ?(follow=false) form proof =
-  let pf = H.hashcons { form; proof; id= ~-1; simpl_to=None; } in
+let create ?(is_conjecture=false) ?(follow=false) form proof =
+  let pf = H.hashcons { form; proof; id= ~-1; is_conjecture; simpl_to=None; } in
   if follow
     then follow_simpl pf
     else pf
 
-let of_sourced ?(role="axiom") (f, file,name) =
-  let proof = Proof.mk_f_file ~role ~file ~name f in
-  create f proof
+let of_sourced ?(role="axiom") src =
+  let open Sourced in
+  let proof = Proof.mk_f_file ~role ~file:src.name ~name:src.name src.content in
+  create ~is_conjecture:src.is_conjecture src.content proof
 
 let simpl_to ~from ~into =
   let from = follow_simpl from in

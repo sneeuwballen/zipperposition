@@ -132,12 +132,13 @@ let () =
 module Make(C : Clause.S) = struct
   module C = C
 
-  let empty_heap =
-    let leq (i1, c1) (i2, c2) = i1 <= i2 || (i1 = i2 && C.id c1 <= C.id c2) in
-    Leftistheap.empty_with ~leq
+  module H = CCHeap.Make(struct
+    type t = (int * C.t)
+    let leq (i1, c1) (i2, c2) = i1 <= i2 || (i1 = i2 && C.id c1 <= C.id c2)
+  end)
 
   type t = {
-    heap : (int * C.t) Leftistheap.t;
+    heap : H.t;
     functions : functions;
   } (** A priority queue of clauses, purely functional *)
   and functions = {
@@ -154,16 +155,16 @@ module Make(C : Clause.S) = struct
       accept;
       name;
     } in
-    { heap = empty_heap; functions; }
+    { heap = H.empty; functions; }
 
   let is_empty q =
-    Leftistheap.is_empty q.heap
+    H.is_empty q.heap
 
   let add q c =
     if q.functions.accept c
       then
         let w = q.functions.weight c in
-        let heap = Leftistheap.insert q.heap (w, c) in
+        let heap = H.insert (w, c) q.heap in
         { q with heap; }
       else q
 
@@ -174,23 +175,32 @@ module Make(C : Clause.S) = struct
           if q.functions.accept c
             then
               let w = q.functions.weight c in
-              Leftistheap.insert heap (w,c)
+              H.insert (w,c) heap
             else heap)
         q.heap hcs in
     { q with heap; }
 
   let take_first q =
     (if is_empty q then raise Not_found);
-    let new_h, (_, c) = Leftistheap.extract_min q.heap in
+    let new_h, (_, c) = H.take_exn q.heap in
     let q' = { q with heap=new_h; } in
     q', c
 
   (** Keep only the clauses that are in the set *)
   let clean q set =
-    let new_heap = Leftistheap.filter q.heap (fun (_, c) -> C.CSet.mem set c) in
+    let new_heap = H.filter (fun (_, c) -> C.CSet.mem set c) q.heap in
     { q with heap=new_heap; }
 
   let name q = q.functions.name
+
+  (* weight function, that estimates how "difficult" it is to get rid of
+      the literals of the clause. In other words, by selecting the clause,
+      how far we are from the empty clause. *)
+  let _default_weight c =
+    let w = Array.fold_left
+      (fun acc lit -> acc + Lit.heuristic_weight lit)
+      0 (C.lits c)
+    in w * Array.length (C.lits c)
 
   let fifo =
     let name = "fifo_queue" in
@@ -198,18 +208,18 @@ module Make(C : Clause.S) = struct
 
   let clause_weight =
     let name = "clause_weight" in
-    mk_queue ~weight:(fun c -> C.weight c * C.length c) name
+    mk_queue ~weight:_default_weight name
 
   let goals =
     (* check whether a literal is a goal *)
     let is_goal_lit lit = Lit.is_neg lit in
     let is_goal_clause c = Util.array_forall is_goal_lit (C.lits c) in
     let name = "prefer_goals" in
-    mk_queue ~accept:is_goal_clause ~weight:(fun c -> C.weight c * C.length c) name
+    mk_queue ~accept:is_goal_clause ~weight:_default_weight name
 
   let ground =
     let name = "prefer_ground" in
-    mk_queue ~accept:C.is_ground ~weight:(fun c -> C.weight c * C.length c) name
+    mk_queue ~accept:C.is_ground ~weight:_default_weight name
 
   let non_goals =
     (* check whether a literal is a goal *)
@@ -218,7 +228,7 @@ module Make(C : Clause.S) = struct
       (fun x -> not (is_goal_lit x))
       (C.lits c) in
     let name = "prefer_non_goals" in
-    mk_queue ~accept:is_non_goal_clause ~weight:(fun c -> C.weight c * C.length c) name
+    mk_queue ~accept:is_non_goal_clause ~weight:_default_weight name
 
   let pos_unit_clauses =
     let is_unit_pos c = match C.lits c with
@@ -226,18 +236,18 @@ module Make(C : Clause.S) = struct
     | _ -> false
     in
     let name = "prefer_pos_unit_clauses" in
-    mk_queue ~accept:is_unit_pos ~weight:(fun c -> C.weight c * C.length c) name
+    mk_queue ~accept:is_unit_pos ~weight:_default_weight name
 
   let horn =
     let accept c = Lits.is_horn (C.lits c) in
     let name = "prefer_horn" in
-    mk_queue ~accept ~weight:(fun c -> C.weight c * C.length c) name
+    mk_queue ~accept ~weight:_default_weight name
 
   let lemmas =
     let name = "lemmas" in
     let accept c = C.get_flag C.flag_lemma c in
     (* use a fifo on lemmas *)
-    mk_queue ~accept ~weight:C.weight name
+    mk_queue ~accept ~weight:_default_weight name
 
   (** {6 Combination of queues} *)
 

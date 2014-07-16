@@ -29,6 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+module Hash = CCHash
 module T = FOTerm
 module S = Symbol
 
@@ -41,7 +42,7 @@ type 'a num = {
   sign : 'a -> int;
   abs : 'a -> 'a;
   cmp : 'a -> 'a -> int;
-  hash : 'a -> int;
+  hash : 'a -> int64 -> int64;
   zero : 'a;
   one : 'a;
   add : 'a -> 'a -> 'a;
@@ -58,7 +59,7 @@ let z = {
   sign = Z.sign;
   abs = Z.abs;
   cmp = Z.compare;
-  hash = Z.hash;
+  hash = (fun x h -> Hash.int_ (Z.hash x) h);
   zero = Z.zero;
   one = Z.one;
   add = Z.add;
@@ -96,9 +97,11 @@ let compare m1 m2 =
     ; Util.lexicograph cmp_pair m1.terms m2.terms;
     ]
 
-let hash m =
-  let hash_pair (s,t) = Hash.combine (m.num.hash s) (T.hash t) in
-  Hash.hash_list hash_pair (m.num.hash m.const) m.terms
+let hash_fun m h =
+  let hash_pair = Hash.pair m.num.hash T.hash_fun in
+  h |> m.num.hash m.const |> Hash.list_ hash_pair m.terms
+
+let hash m = Hash.apply hash_fun m
 
 let ty m = m.num.ty
 
@@ -139,6 +142,7 @@ let mk_const ~num s =
   { num; const=s; terms=[]; }
 
 let singleton ~num coeff t =
+  assert (Type.eq (T.ty t) num.ty);
   if num.cmp num.zero coeff = 0
     then mk_const ~num coeff  (* 0 *)
     else
@@ -164,6 +168,7 @@ let mem e t =
   | Some _ -> true
 
 let add e s t =
+  assert (Type.eq (T.ty t) e.num.ty);
   (* sorted insertion *)
   let rec add l s t = match l with
     | [] -> [s, t]
@@ -399,6 +404,7 @@ module Focus = struct
       { term; coeff; rest; }
     with _ -> _fail_idx m i
 
+    (* TODO: optimize *)
   let focus_term m term =
     match find m term with
     | None -> None
@@ -759,7 +765,9 @@ module Int = struct
         ) (m.const, false, []) m.terms
     in
     if changed
-      then {m with const=cst; terms; }
+      then
+        let terms = List.rev terms in  (* sort again *)
+        {m with const=cst; terms; }
       else m
 
   let normalize_wrt_zero m =
@@ -823,8 +831,11 @@ module Int = struct
   let quotient e c =
     if Z.sign c <= 0
     then None
-    else try Some (_fmap (fun s -> Z.divexact s c) e)
-    with _ -> None
+    else try Some
+      (_fmap
+        (fun s -> if Z.(equal (erem s c) zero) then Z.divexact s c else raise Exit)
+      e)
+    with Exit -> None
 
   let divisible e c =
     Z.sign (Z.rem e.const c) = 0
@@ -832,9 +843,18 @@ module Int = struct
     List.for_all (fun (c',_) -> Z.sign (Z.rem c' c) = 0) e.terms
 
   let factorize e =
-    let gcd = List.fold_left
-      (fun gcd (c, _) -> Z.gcd c gcd)
-      e.const e.terms
+    let gcd =
+      if Z.equal e.const Z.zero
+      then match e.terms with
+        | [] -> Z.one
+        | (c,_)::terms' ->
+          List.fold_left
+            (fun gcd (c, _) -> Z.gcd c gcd)
+            c terms'
+      else
+        List.fold_left
+          (fun gcd (c, _) -> Z.gcd c gcd)
+          e.const e.terms
     in
     let gcd = Z.abs gcd in
     if Z.equal Z.one gcd || Z.sign gcd = 0
@@ -1022,7 +1042,6 @@ module Int = struct
     let _is_one_abs (s, _) = Z.equal Z.one (Z.abs s)
 
     let eq_zero ?fresh_var m =
-      let open Sequence.Infix in
       (* generation of fresh variables, with default function *)
       let fresh_var = match fresh_var with
         | None -> __fresh_var m

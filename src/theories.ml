@@ -28,6 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+module Hash = CCHash
 module T = FOTerm
 module F = Formula.FO
 
@@ -68,8 +69,9 @@ module TotalOrder = struct
     && Symbol.eq i1.lesseq i2.lesseq
     && Type.eq i1.ty i2.ty
 
-  let hash i =
-    Hash.hash_int3 (Symbol.hash i.less) (Symbol.hash i.lesseq) (Type.hash i.ty)
+  let hash_fun i h =
+    h |> Symbol.hash_fun i.less |> Symbol.hash_fun i.lesseq |> Type.hash_fun i.ty
+  let hash i = Hash.apply hash_fun i
 
   let map f lit =
     { lit with left=f lit.left; right=f lit.right; }

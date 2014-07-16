@@ -305,10 +305,10 @@ module Make(E : Env.S) = struct
               "beginning transformation into a conjonction of subseteq clauses";
             let preproc_left =
               preprocess_subseteq ~sets ~left:true [s1]
-              [{sets = []; comp = []; empty = false; ty = TS._get_set_type ~sets s1}]
+              [{sets = []; comp = []; empty = false; ty = TS.get_set_type_exn ~sets s1}]
             and preproc_right =
               preprocess_subseteq ~sets ~left:false [s2]
-              [{sets = []; comp = []; empty = false; ty = TS._get_set_type ~sets s2}] in
+              [{sets = []; comp = []; empty = false; ty = TS.get_set_type_exn ~sets s2}] in
               F.Base.and_ (reform_subseteq ~sets preproc_left preproc_right)
           | TS.Other _ -> f
           | _ -> f
@@ -337,10 +337,10 @@ module Make(E : Env.S) = struct
                   "beginning transformation into a disjonction of not subseteq clauses";
                 let preproc_left =
                   preprocess_subseteq ~sets ~left:true [s1]
-                    [{sets = []; comp = []; empty = false; ty = TS._get_set_type ~sets s1}]
+                    [{sets = []; comp = []; empty = false; ty = TS.get_set_type_exn ~sets s1}]
                 and preproc_right =
                   preprocess_subseteq ~sets ~left:false [s2]
-                    [{sets = []; comp = []; empty = false; ty = TS._get_set_type ~sets s1}] in
+                    [{sets = []; comp = []; empty = false; ty = TS.get_set_type_exn ~sets s1}] in
                   F.Base.or_ (List.map (fun x -> F.Base.not_ x)
                     (reform_subseteq ~sets preproc_left preproc_right))
               | TS.Other _ -> f
@@ -660,7 +660,7 @@ module Make(E : Env.S) = struct
     (fun acc lit pos ->
       match lit with
         | Lit.Subseteq(sets,l,r,_) ->
-          Util.debug 2 "try reflexifvity res in %a" Lit.pp lit;
+          Util.debug 2 "try reflexivity res in %a" Lit.pp lit;
           let seq_l = Sequence.of_list l and seq_r = Sequence.of_list r in
           let seq = Sequence.product seq_l seq_r in
           let f acc (term_l,term_r) =

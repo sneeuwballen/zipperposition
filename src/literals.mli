@@ -39,7 +39,8 @@ type t = Literal.t array
 val eq : t -> t -> bool
 val eq_com : t -> t -> bool
 val compare : t -> t -> int
-val hash : t -> int
+
+include Interfaces.HASH with type t := t
 
 val variant : ?subst:Substs.t -> t -> scope -> t -> scope -> Substs.t Sequence.t
 val are_variant : t -> t -> bool
@@ -57,10 +58,10 @@ val apply_subst : renaming:Substs.Renaming.t ->
 
 val map : (term -> term) -> t -> t
 
-val pos : t -> BV.t
-val neg : t -> BV.t
+val pos : t -> CCBV.t
+val neg : t -> CCBV.t
 
-val maxlits : ord:Ordering.t -> t -> BV.t
+val maxlits : ord:Ordering.t -> t -> CCBV.t
   (** Bitvector of positions of maximal literals *)
 
 val maxlits_l : ord:Ordering.t -> t -> (Literal.t * int) list

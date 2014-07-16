@@ -38,22 +38,25 @@ type pform = t
 val proof : t -> Proof.t
 val form : t -> form
 val id : t -> int
+val is_conjecture : t -> bool
 
 val eq : t -> t -> bool
-val hash : t -> int
 val cmp : t -> t -> int
+include Interfaces.HASH with type t := t
 
 val eq_noproof : t -> t -> bool
 val cmp_noproof : t -> t -> int
   (** Compare only by formula, not by proof *)
 
-val create : ?follow:bool -> form -> Proof.t -> t
+val create : ?is_conjecture:bool -> ?follow:bool ->
+             form -> Proof.t -> t
   (** Create a formula from a proof. If the formula already has a proof,
       then the old proof is kept. PFormulas are hashconsed.
-      @param follow follow simpl_to links if the formula has any (default false) *)
+      @param follow follow simpl_to links if the formula has any (default false)
+      @param is_conjecture is the formula a goal? (default [false]) *)
 
-val of_sourced : ?role:string -> Formula.FO.sourced_form -> t
-val to_sourced : t -> Formula.FO.sourced_form option
+val of_sourced : ?role:string -> Formula.FO.t Sourced.t -> t
+val to_sourced : t -> Formula.FO.t Sourced.t option
 
 val follow_simpl : t -> t
   (** Follow the "simplify to" links until the formula has None *)

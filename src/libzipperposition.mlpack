@@ -24,6 +24,7 @@ Signals
 Multisets
 calculi/Superposition
 calculi/Chaining
+calculi/EnumTypes
 calculi/ArithInt
 lib/LazyGraph
 lib/Leftistheap

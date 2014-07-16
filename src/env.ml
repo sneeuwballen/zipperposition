@@ -212,6 +212,14 @@ module type S = sig
         CSet of clauses that become redundant, and the sequence of those
         very same clauses after simplification. *)
 
+  val simplify_active_with : (C.t -> C.t list option) -> unit
+    (** Can be called when a simplification relation becomes stronger,
+        with the strengthened relation.
+        (e.g. new axioms should be declared because a theory was detected).
+        This will go through the whole active set, trying to simplify clauses
+        with the given function. Simplified clauses will be put back in the
+        passive set. *)
+
   val forward_simplify : C.t -> C.t
     (** Simplify the clause w.r.t to the active set and experts *)
 
@@ -667,7 +675,7 @@ end) : S with module Ctx = X.Ctx = struct
       else None
 
   (* find candidates for backward simplification in active set *)
-  let backward_simplify given =
+  let backward_simplify_find_candidates given =
     match !_backward_simplify with
     | [] -> C.CSet.empty
     | [f] -> f given
@@ -678,7 +686,7 @@ end) : S with module Ctx = X.Ctx = struct
   let backward_simplify given =
     Util.enter_prof prof_back_simplify;
     (* set of candidate clauses, that may be unit-simplifiable *)
-    let candidates = backward_simplify given in
+    let candidates = backward_simplify_find_candidates given in
     (* try to simplify the candidates. Before is the set of clauses that
        are simplified, after is the list of those clauses after simplification *)
     let before, after =
@@ -694,6 +702,29 @@ end) : S with module Ctx = X.Ctx = struct
     in
     Util.exit_prof prof_back_simplify;
     before, Sequence.of_list after
+
+  let simplify_active_with f =
+    let set = C.CSet.fold
+      (ProofState.ActiveSet.clauses ()) []
+      (fun set _id c ->
+        match f c with
+        | None -> set
+        | Some c'_list ->
+            let c''_list = List.map basic_simplify c'_list in
+            Util.debug 3 "active clause %a simplified into clauses %a"
+              C.pp c (CCList.pp C.pp) c''_list;
+            (c, c''_list) :: set
+      )
+    in
+    (* remove clauses from active set, put their simplified version into
+        the passive set for further processing *)
+    ProofState.ActiveSet.remove (Sequence.of_list set |> Sequence.map fst);
+    Sequence.of_list set
+      |> Sequence.map snd
+      |> Sequence.map Sequence.of_list
+      |> Sequence.flatten
+      |> ProofState.PassiveSet.add;
+    ()
 
   (** Simplify the clause w.r.t to the active set *)
   let forward_simplify c =

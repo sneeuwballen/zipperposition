@@ -29,6 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+module Hash = CCHash
 module T = FOTerm
 module F = Formula.FO
 module S = Substs
@@ -131,17 +132,44 @@ let fold f acc lit = match lit with
   | True
   | False -> acc
 
-let hash lit =
-  let hash_sign = function true -> 1 | false -> 2 in
+let hash_fun lit h =
+  let hash_sign b h = Hash.bool_ b h in
   match lit with
-  | Arith o -> ArithLit.hash o
-  | Prop (p, sign) -> Hash.combine (T.hash p) (hash_sign sign)
-  | Equation (l, r, sign) -> Hash.hash_int3 (T.hash l) (T.hash r) (hash_sign sign)
-  | _ ->
-      fold (fun acc t -> Hash.combine (T.hash t) acc) 17 lit
+  | Arith o -> ArithLit.hash_fun o h
+  | Prop (p, sign) -> hash_sign sign (T.hash_fun p h)
+  | Equation (l, r, sign) ->
+      h |> hash_sign sign |> T.hash_fun l |> T.hash_fun r
+  | True -> h
+  | False -> h |> Hash.int_ 23
+  | Ineq olit ->
+      h |> hash_sign olit.TO.strict
+        |> T.hash_fun olit.TO.left |> T.hash_fun olit.TO.right
+  | Subseteq (_, l, r, sign) ->
+      h |> Hash.bool_ sign
+        |> Hash.list_ T.hash_fun l
+        |> Hash.list_ T.hash_fun r
+
+let hash lit = Hash.apply hash_fun lit
 
 let weight lit =
   fold (fun acc t -> acc + T.size t) 0 lit
+
+let heuristic_weight = function
+  | Prop (p, _) -> T.size p
+  | Equation (l, r, _) -> T.size l + T.size r
+  | True
+  | False -> 0
+  | Ineq olit -> T.size olit.TO.left + T.size olit.TO.right
+  | Arith alit ->
+      (* sum of weights of terms, without the (naked) variables *)
+      AL.Seq.terms alit
+        |> Sequence.filter (fun t -> not (T.is_var t))
+        |> Sequence.fold (fun acc t -> acc+T.size t) 0
+  | Subseteq (_, l, r, _) ->
+      Sequence.(
+        append (of_list l) (of_list r)
+        |> fold (fun acc t -> acc+T.size t) 0
+      )
 
 let depth lit =
   fold (fun acc t -> max acc (T.depth t)) 0 lit
@@ -165,8 +193,8 @@ let is_pos = sign
 let is_neg lit = not (is_pos lit)
 
 let is_eqn = function
-  | Equation _ -> true
-  | Prop _
+  | Equation _
+  | Prop _ -> true
   | Ineq _
   | Arith _
   | Subseteq _
@@ -175,6 +203,15 @@ let is_eqn = function
 
 let is_eq lit = is_eqn lit && is_pos lit
 let is_neq lit = is_eqn lit && is_neg lit
+
+let is_prop = function
+  | Prop _
+  | True
+  | False -> true
+  | Arith _
+  | Equation _
+  | Subseteq _
+  | Ineq _ -> false
 
 let is_ineq lit = match lit with
   | Ineq _ -> true
@@ -520,6 +557,13 @@ let apply_subst ~renaming subst lit scope =
 let apply_subst_no_simp ~renaming subst lit scope =
   match lit with
   | Arith o -> Arith (ArithLit.apply_subst_no_simp ~renaming subst o scope)
+  | Equation (l,r,sign) ->
+      Equation (S.FO.apply ~renaming subst l scope,
+                S.FO.apply ~renaming subst r scope, sign)
+  | Prop (p, sign) ->
+      Prop (S.FO.apply ~renaming subst p scope, sign)
+  | True
+  | False -> lit
   | _ -> apply_subst ~renaming subst lit scope
 
 let apply_subst_list ~renaming subst lits scope =
@@ -684,7 +728,7 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ~which ~ord ~subterms lit
     | Comparison.Gt ->
       at_term ~pos:P.(append position (left stop)) acc l
     | Comparison.Lt ->
-      at_term ~pos:P.(append position (right @@ stop)) acc r
+      at_term ~pos:P.(append position (right stop)) acc r
     | Comparison.Eq | Comparison.Incomparable ->
       (* visit both sides, they are both (potentially) maximal *)
       let acc = at_term ~pos:P.(append position (left stop)) acc l in
@@ -753,7 +797,7 @@ let pp_debug ?(hooks=[]) buf lit =
       in
       Printf.bprintf buf "%a %s %a"
         _pp_inter l
-        (if sign then " ⊆ " else " ⊊ ")
+        (if sign then "⊆" else "⊊")
         _pp_union r
 
 let pp_tstp buf lit =
@@ -820,15 +864,26 @@ module Comp = struct
         kind-specific comparison.
   *)
 
+  (* is there an element of [l1] that dominates all elements of [l2]? *)
+  let _some_term_dominates f l1 l2 =
+    List.exists
+      (fun x -> List.for_all (fun y -> f x y = Comparison.Gt) l2)
+      l1
+
   let _cmp_by_maxterms ~ord l1 l2 =
     match l1, l2 with
     | Prop (p1, _), Prop (p2, _) -> Ordering.compare ord p1 p2
     | _ ->
-        let t1 = root_terms l1 and t2 = root_terms l2 in
+        let t1 = max_terms ~ord l1 and t2 = max_terms ~ord l2 in
         let f = Ordering.compare ord in
-        match C.dominates f t1 t2, C.dominates f t2 t1 with
-        | false, false
-        | true, true -> C.Incomparable
+        match _some_term_dominates f t1 t2, _some_term_dominates f t2 t1 with
+        | false, false ->
+            let t1' = CCList.fold_right T.Set.add t1 T.Set.empty
+            and t2' = CCList.fold_right T.Set.add t2 T.Set.empty in
+            if T.Set.equal t1' t2'
+              then C.Eq (* next criterion *)
+              else C.Incomparable
+        | true, true -> assert false
         | true, false -> C.Gt
         | false, true -> C.Lt
 
@@ -857,7 +912,7 @@ module Comp = struct
       | Equation _
       | Prop _ -> 9  (* eqn and prop are really the same thing *)
     in
-    C.of_total (_to_int l1 - _to_int l2)
+    C.of_total (Pervasives.compare (_to_int l1) (_to_int l2))
 
   (* by multiset of terms *)
   let _cmp_by_term_multiset ~ord l1 l2 =
@@ -1060,13 +1115,13 @@ module Conv = struct
   type hook_to = t -> form option
 
   let arith_hook_from f =
-    let open Monad.Opt in
+    let open CCOpt in
     let module SA = Symbol.TPTP.Arith in
     let module AL = ArithLit in
     let type_ok t = Type.eq Type.TPTP.int (T.ty t) in
     (* arithmetic conversion! *)
     let rec conv f = match F.view f with
-    | F.Not f' -> map (conv f') negate
+    | F.Not f' -> map negate (conv f')
     | F.Atom p ->
         begin match T.Classic.view p with
         | T.Classic.App (s, _, [l; r]) when Symbol.eq s SA.less && type_ok l ->
@@ -1101,7 +1156,7 @@ module Conv = struct
   let total_order_hook_from ~instance f =
     let rec conv f = match F.view f with
       | F.Not f' ->
-        Monad.Opt.map (conv f') negate
+        CCOpt.map negate (conv f')
       | F.Atom p ->
           begin match T.Classic.view p with
           | T.Classic.App (s, tyargs, [l; r]) ->
@@ -1119,7 +1174,7 @@ module Conv = struct
 
   let set_hook_from ~sets f =
     let module TS = Theories.Sets in
-    let (>>=) = Monad.Opt.(>>=) in
+    let (>>=) = CCOpt.(>>=) in
     let extract_lit t = match TS.view ~sets t with
       | TS.Subseteq (a, b) ->
           begin match TS.view ~sets a with

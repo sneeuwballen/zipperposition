@@ -1,4 +1,6 @@
+
 (*
+Zipperposition: a functional superposition prover for prototyping
 Copyright (c) 2013, Simon Cruanes
 All rights reserved.
 
@@ -23,44 +25,35 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Leftist Heaps} *)
+(** {1 Inference and simplification rules for Algebraic types} *)
 
-(** Polymorphic implementation, following Okasaki *)
+open Logtk
 
-type 'a t
-  (** Heap containing values of type 'a *)
+type term = FOTerm.t
 
-val empty_with : leq:('a -> 'a -> bool) -> 'a t
-  (** Empty heap. The function is used to check whether the first element is
-      smaller than the second. *)
+(** {2 Inference rules} *)
 
-val empty : 'a t
-  (** Empty heap using Pervasives.compare *)
+module type S = sig
+  module Env : Env.S
+  module C : module type of Env.C
 
-val is_empty : _ t -> bool
-  (** Is the heap empty? *)
+  val declare_type : proof:Proof.t -> ty:Type.t -> var:term -> term list -> unit
+  (** Declare that the given type's domain is the given list of cases
+      for the given variable [var] (whose type must be [ty].
+      Will be ignored if the type already has a enum declaration. *)
 
-val merge : 'a t -> 'a t -> 'a t
-  (** Merge two heaps (assume they have the same comparison function) *)
+  val instantiate_vars : Env.multi_simpl_rule
+  (** Instantiate variables whose type is a known enumerated type,
+      with all variables of this type. *)
 
-val insert : 'a t -> 'a -> 'a t
-  (** Insert a value in the heap *)
+  (** {6 Registration} *)
 
-val filter : 'a t -> ('a -> bool) -> 'a t
-  (** Filter values, only retaining the ones that satisfy the predicate *)
+  val register : unit -> unit
+  (** Register rules in the environment *)
+end
 
-val find_min : 'a t -> 'a
-  (** Find minimal element, or raise Not_found *)
+module Make(E : Env.S) : S with module Env = E
 
-val extract_min : 'a t -> 'a t * 'a
-  (** Extract and returns the minimal element, or raise Not_found *)
+(** {2 As Extension} *)
 
-val iter : 'a t -> ('a -> unit) -> unit
-  (** Iterate on elements *)
-
-val size : _ t -> int
-  (** Number of elements (linear) *)
-
-val of_seq : 'a t -> 'a Sequence.t -> 'a t
-
-val to_seq : 'a t -> 'a Sequence.t
+val extension : Extensions.t

@@ -46,6 +46,7 @@ type 'a monome = 'a t
 val eq : 'n t -> 'n t -> bool       (* structural equality *)
 val compare : 'n t -> 'n t -> int   (* arbitrary total order on monomes *)
 val hash : _ t -> int
+val hash_fun : _ t -> int64 -> int64
 
 val ty : _ t -> Type.t   (** type of the monome (int or rat) *)
 
@@ -319,7 +320,7 @@ module Int : sig
 
   val factorize : t -> (t * Z.t) option
     (** Factorize [e] into [Some (e',s)] if [e = e' x s], None
-        otherwise (ie if s=1) *)
+        otherwise (ie if s=1). In case it returns [Some (e', s)], [s > 1] holds *)
 
   val normalize_wrt_zero : t -> t
     (** Allows to multiply or divide by any positive number since we consider

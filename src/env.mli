@@ -206,6 +206,14 @@ module type S = sig
         CSet of clauses that become redundant, and the sequence of those
         very same clauses after simplification. *)
 
+  val simplify_active_with : (C.t -> C.t list option) -> unit
+    (** Can be called when a simplification relation becomes stronger,
+        with the strengthened relation.
+        (e.g. new axioms should be declared because a theory was detected).
+        This will go through the whole active set, trying to simplify clauses
+        with the given function. Simplified clauses will be put back in the
+        passive set. *)
+
   val forward_simplify : C.t -> C.t
     (** Simplify the clause w.r.t to the active set and experts *)
 

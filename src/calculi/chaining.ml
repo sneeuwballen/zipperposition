@@ -29,6 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+module BV = CCBV
 module T = FOTerm
 module HOT = HOTerm
 module C = Clause

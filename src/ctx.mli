@@ -58,7 +58,7 @@ module type S = sig
   val compare : FOTerm.t -> FOTerm.t -> Comparison.t
   (** Compare two terms *)
 
-  val select : Literal.t array -> BV.t
+  val select : Selection.t
 
   val renaming_clear : unit  -> Substs.Renaming.t
   (** Obtain the global renaming. The renaming is cleared before
@@ -73,8 +73,25 @@ module type S = sig
   val add_signature : Signature.t -> unit
   (** Merge  the given signature with the context's one *)
 
+  val find_signature : Symbol.t -> Type.t option
+  (** Find the type of the given symbol *)
+
+  val find_signature_exn : Symbol.t -> Type.t
+  (** Unsafe version of {!find_signature}.
+      @raise Not_found for unknown symbols *)
+
   val declare : Symbol.t -> Type.t -> unit
   (** Declare the type of a symbol (updates signature) *)
+
+  val on_new_symbol : (Symbol.t * Type.t) Signal.t
+  val on_signature_update : Signature.t Signal.t
+
+  val ad_hoc_symbols : unit -> Symbol.Set.t
+  (** Current set of ad-hoc symbols *)
+
+  val add_ad_hoc_symbols : Symbol.t Sequence.t -> unit
+  (** Declare that some symbols are "ad hoc", ie they are not really
+      polymorphic and should not be considered as such *)
 
   (** {2 Literals} *)
 
