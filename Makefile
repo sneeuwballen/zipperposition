@@ -54,4 +54,12 @@ tags:
 dot:
 	for i in *.dot; do dot -Tsvg "$$i" > "$$( basename $$i .dot )".svg; done
 
-.PHONY: tags dot
+TARBALL=zipperposition.tar.gz
+
+package: clean
+	rm $(TARBALL) || true
+	oasis setup
+	tar cavf $(TARBALL) _oasis setup.ml configure myocamlbuild.ml _tags \
+		Makefile pelletier_problems README.md src/ tests/ utils/
+
+.PHONY: tags dot package
