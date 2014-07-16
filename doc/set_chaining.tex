@@ -326,6 +326,15 @@ calculus, for instance $K \lor \{x\} \not\subseteq A \lor \{x\} \subseteq B$
 $K \lor \forall x. (x \in A \Rightarrow x \in B)$,
 that is, $K \lor A \subseteq B$.
 
+A very similar rule applies for set variables that occur unshielded on the
+left-hand side of literals. If we have $K \lor (\bigwedge_i x \subseteq a_i
+\Rightarrow \bigvee_j x \subseteq b_j)$ with $x:\set{\alpha}$,
+then obviously we can instantiate $x$ with $\bigcap_i a_i$. Conversely, if
+we have $K \lor \bigvee_j (\bigcap_i a_i \subseteq b_j)$, then for
+every $x$ with $\forall i, x \subseteq a_i$, we know that
+$x \subseteq \bigcap_i a_i \subseteq b_j$ for some $j$. Thus equivalence is
+proved.
+
 The tautology rule on literals
 $A_\cap \cap A'_\cap \subseteq B_\cup \cup B'_\cup$
 and $A_\cap \not\subseteq B_\cup$
@@ -434,7 +443,7 @@ $A_\cap \not\subseteq B_\cup$ by weakening of the positive literal.
 
     \AxiomC{$K
         \lor \bigvee_i (\{ x \} \cap {A_i}_\cap \not\subseteq {B_i}_\cup)
-        \lor \bigvee_j (\{ x \} \cap {A'_i}_\cap \subseteq {B'_j}_\cup)
+        \lor \bigvee_j (\{ x \} \cap {A'_j}_\cap \subseteq {B'_j}_\cup)
         \lor \bigvee_k (x = t_k) $}
     \RightLabel{singleton elim}
     \doubleLine
@@ -445,6 +454,23 @@ $A_\cap \not\subseteq B_\cup$ by weakening of the positive literal.
     }
     \doubleLine
     %\UnaryInfC{$ \bigvee_i\bigvee_{a\in \
+    $}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$K
+        \lor \bigvee_i (x \cap {A_i}_\cap \not\subseteq {B_i}_\cup)
+        \lor \bigvee_j (x \cap {A'_j}_\cap \subseteq {B'_j}_\cup)
+        $}
+    \RightLabel{var elim}
+    \doubleLine
+    \UnaryInfC{$ \normalize{K
+        \lor \bigvee_j
+            (   \bigcap_i ({B_i}_\cup \cup \compl{{A_i}_\cap})
+                \subseteq
+                {B'_j}_\cup \cup \compl{{A'_j}_\cap}
+            )
+    }
     $}
 \end{prooftree}
 
