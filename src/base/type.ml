@@ -234,10 +234,11 @@ module TPTP = struct
   let rec pp_tstp_rec depth buf t = match view t with
     | Var i -> Printf.bprintf buf "T%d" i
     | BVar i -> Printf.bprintf buf "Tb%d" (depth-i-1)
-    | App (p, []) -> Symbol.pp buf p
-    | App (p, args) -> Printf.bprintf buf "%a(%a)" Symbol.pp p
+    | App (p, []) -> Symbol.TPTP.pp buf p
+    | App (p, args) -> Printf.bprintf buf "%a(%a)" Symbol.TPTP.pp p
       (Util.pp_list (pp_tstp_rec depth)) args
     | Fun (arg, ret) ->
+      (* FIXME: uncurry? *)
       Printf.bprintf buf "%a > %a" (pp_inner depth) arg (pp_tstp_rec depth) ret
     | Record _ -> failwith "cannot print record types in TPTP"
     | Forall ty' ->
