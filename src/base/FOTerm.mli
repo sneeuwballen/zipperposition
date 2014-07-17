@@ -72,12 +72,10 @@ val ty : t -> Type.t                (** Obtain the type of a term.. *)
 
 module Tbl : sig
   include Hashtbl.S with type key = t
-  val to_list : unit t -> term list
-  val from_list : term list -> unit t
-  val to_seq : unit t -> term Sequence.t
-  val from_seq : term Sequence.t -> unit t
-  val add_list : unit t -> term list -> unit
-  val add_seq : unit t -> term Sequence.t -> unit
+  val to_list : 'a t -> (key * 'a) list
+  val of_list : ?init:'a t -> (key * 'a) list -> 'a t
+  val to_seq : 'a t -> (key * 'a) Sequence.t
+  val of_seq : ?init:'a t -> (key * 'a) Sequence.t -> 'a t
 end
 
 module Set : Sequence.Set.S with type elt = t
@@ -90,12 +88,12 @@ module T2Cache : Cache.S2 with type key1 = t and type key2 = t
 
 val var : ty:Type.t -> int -> t
   (** Create a variable. Providing a type is mandatory.
-      The index must be non-negative,
-      @raise Invalid_argument otherwise. *)
+      @raise ScopedTerm.IllFormedTerm if the index is < 0 *)
 
 val bvar : ty:Type.t -> int -> t
   (** Create a bound variable. Providing a type is mandatory.
-      {b Warning}: be careful and try not to use this function directly*)
+      {b Warning}: be careful and try not to use this function directly.
+      @raise ScopedTerm.IllFormedTerm if the index is < 0 *)
 
 val const : ty:Type.t -> symbol -> t
   (** Create a typed constant *)
@@ -294,7 +292,3 @@ module TPTP : sig
   end
 end
 
-(** {2 Misc} *)
-
-val __var : ty:Type.t -> int -> t
-  (** create vars even with negative indices. Caution. *)

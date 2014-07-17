@@ -39,6 +39,7 @@ and view =
   | Int of Z.t                      (** integer *)
   | Rat of Q.t                      (** rational *)
   | Const of Symbol.t               (** constant *)
+  | Syntactic of Symbol.t * t list  (** syntactic construct (operator...) *)
   | App of t * t list               (** apply term *)
   | Bind of Symbol.t * t list * t   (** bind n variables *)
   | List of t list                  (** special constructor for lists *)
@@ -54,11 +55,12 @@ let __to_int = function
   | Int _ -> 1
   | Rat _ -> 2
   | Const _ -> 3
-  | App _ -> 4
-  | Bind _ -> 5
-  | List _ -> 6
-  | Record _ -> 7
-  | Column _ -> 8
+  | Syntactic _ -> 4
+  | App _ -> 5
+  | Bind _ -> 6
+  | List _ -> 7
+  | Record _ -> 8
+  | Column _ -> 9
 
 let rec cmp t1 t2 = match t1.term, t2.term with
   | Var s1, Var s2 -> String.compare s1 s2
@@ -67,6 +69,11 @@ let rec cmp t1 t2 = match t1.term, t2.term with
   | Const s1, Const s2 -> Symbol.cmp s1 s2
   | App (s1,l1), App (s2, l2) ->
     let c = cmp s1 s2 in
+    if c = 0
+    then Util.lexicograph cmp l1 l2
+    else c
+  | Syntactic (s1,l1), Syntactic (s2,l2) ->
+    let c = Symbol.cmp s1 s2 in
     if c = 0
     then Util.lexicograph cmp l1 l2
     else c
@@ -91,6 +98,7 @@ let rec hash_fun t h = match t.term with
   | Int i -> Hash.int_ (Z.hash i) h
   | Rat n -> Hash.string_ (Q.to_string n) h  (* TODO: find better *)
   | Const s -> Symbol.hash_fun s h
+  | Syntactic (s,l) -> Symbol.hash_fun s (Hash.list_ hash_fun l h)
   | App (s, l) -> Hash.list_ hash_fun l (hash_fun s h)
   | List l -> Hash.list_ hash_fun l (Hash.int_ 42 h)
   | Bind (s,v,t') ->
@@ -110,6 +118,7 @@ let var ?loc ?ty s = match ty with
 let int_ i = __make (Int i)
 let of_int i = __make (Int (Z.of_int i))
 let rat n = __make (Rat n)
+let syntactic ?loc s l = __make ?loc (Syntactic(s,l))
 let app ?loc s l = match l with
   | [] -> s
   | _::_ -> __make ?loc (App(s,l))
@@ -153,7 +162,8 @@ module Seq = struct
       match t.term with
       | Var _ | Int _ | Rat _ | Const _ -> ()
       | List l
-      | App (_, l) -> List.iter iter l
+      | Syntactic (_,l) -> List.iter iter l
+      | App (f, l) -> iter f; List.iter iter l
       | Bind (_, v, t') -> List.iter iter v; iter t'
       | Record (l, rest) ->
           begin match rest with | None -> () | Some r -> iter r end;
@@ -171,8 +181,9 @@ module Seq = struct
       k (t, bound);
       match t.term with
       | Var _ | Int _ | Rat _ | Const _ -> ()
-      | List l
-      | App (_, l) -> List.iter (iter bound) l
+      | Syntactic (_, l)
+      | List l -> List.iter (iter bound) l
+      | App (f, l) -> iter bound f; List.iter (iter bound) l
       | Bind (_, v, t') ->
           (* add variables of [v] to the set *)
           let bound' = List.fold_left
@@ -222,10 +233,12 @@ let rec pp buf t = match t.term with
       Buffer.add_char buf '[';
       Util.pp_list ~sep:"," pp buf l;
       Buffer.add_char buf ']'
-  | App ({term=Const (Symbol.Conn Symbol.Arrow)}, [ret;a]) ->
+  | Syntactic (Symbol.Conn Symbol.Arrow, [ret;a]) ->
     Printf.bprintf buf "%a -> %a" pp a pp ret
-  | App ({term=Const (Symbol.Conn Symbol.Arrow)}, ret::l) ->
+  | Syntactic (Symbol.Conn Symbol.Arrow, ret::l) ->
     Printf.bprintf buf "(%a) -> %a" (Util.pp_list ~sep:" * " pp) l pp ret
+  | Syntactic (s, l) ->
+      Printf.bprintf buf "%a(%a)" Symbol.pp s (Util.pp_list ~sep:", " pp) l
   | App (s, l) ->
       pp buf s;
       Buffer.add_char buf '(';
@@ -260,6 +273,7 @@ class virtual ['a] visitor = object (self)
   method virtual int_ : ?loc:location -> Z.t -> 'a
   method virtual rat_ : ?loc:location -> Q.t -> 'a
   method virtual const : ?loc:location -> Symbol.t -> 'a
+  method virtual syntactic : ?loc:location -> Symbol.t -> 'a list -> 'a
   method virtual app : ?loc:location -> 'a -> 'a list -> 'a
   method virtual bind : ?loc:location -> Symbol.t -> 'a list -> 'a -> 'a
   method virtual list_ : ?loc:location -> 'a list -> 'a
@@ -272,6 +286,7 @@ class virtual ['a] visitor = object (self)
     | Int n -> self#int_ ?loc n
     | Rat n -> self#rat_ ?loc n
     | Const s -> self#const ?loc s
+    | Syntactic(s,l) -> self#syntactic ?loc s (List.map self#visit l)
     | App(f,l) -> self#app ?loc (self#visit f) (List.map self#visit l)
     | Bind (s, vars,t') ->
         self#bind ?loc s (List.map self#visit vars) (self#visit t')
@@ -289,6 +304,7 @@ class id_visitor = object
   method int_ ?loc i = int_ i
   method rat_ ?loc n = rat n
   method const ?loc s = const ?loc s
+  method syntactic ?loc s l = syntactic ?loc s l
   method app ?loc f l = app ?loc f l
   method bind ?loc s vars t = bind ?loc s vars t
   method list_ ?loc l = list_ ?loc l
@@ -307,21 +323,21 @@ module TPTP = struct
   let const = const
   let app = app
 
-  let and_ ?loc l = app ?loc (const Symbol.Base.and_) l
-  let or_ ?loc l = app ?loc (const Symbol.Base.or_) l
-  let not_ ?loc a = app ?loc (const Symbol.Base.not_) [a]
-  let equiv ?loc a b = app ?loc (const Symbol.Base.equiv) [a;b]
-  let xor ?loc a b = app ?loc (const Symbol.Base.xor) [a;b]
-  let imply ?loc a b = app ?loc (const Symbol.Base.imply) [a;b]
-  let eq ?loc ?(ty=wildcard) a b = app ?loc (const Symbol.Base.eq) [ty;a;b]
-  let neq ?loc ?(ty=wildcard) a b = app ?loc (const Symbol.Base.neq) [ty;a;b]
+  let and_ ?loc l = syntactic ?loc Symbol.Base.and_ l
+  let or_ ?loc l = syntactic ?loc Symbol.Base.or_ l
+  let not_ ?loc a = syntactic ?loc Symbol.Base.not_ [a]
+  let equiv ?loc a b = syntactic ?loc Symbol.Base.equiv [a;b]
+  let xor ?loc a b = syntactic ?loc Symbol.Base.xor [a;b]
+  let imply ?loc a b = syntactic ?loc Symbol.Base.imply [a;b]
+  let eq ?loc ?(ty=wildcard) a b = syntactic ?loc Symbol.Base.eq [ty;a;b]
+  let neq ?loc ?(ty=wildcard) a b = syntactic ?loc Symbol.Base.neq [ty;a;b]
   let forall ?loc vars f = bind ?loc Symbol.Base.forall vars f
   let exists ?loc vars f = bind ?loc Symbol.Base.exists vars f
   let lambda ?loc vars f = bind ?loc Symbol.Base.lambda vars f
 
   let mk_fun_ty ?loc l ret = match l with
     | [] -> ret
-    | _::_ -> app ?loc (const Symbol.Base.arrow) (ret :: l)
+    | _::_ -> syntactic ?loc Symbol.Base.arrow (ret :: l)
   let tType = const Symbol.Base.tType
   let forall_ty ?loc vars t = bind ?loc Symbol.Base.forall_ty vars t
 
@@ -334,26 +350,28 @@ module TPTP = struct
         Buffer.add_char buf '[';
         Util.pp_list ~sep:"," pp buf l;
         Buffer.add_char buf ']'
-    | App ({term=Const (Symbol.Conn Symbol.And)}, l) ->
+    | Syntactic (Symbol.Conn Symbol.And, l) ->
       Util.pp_list ~sep:" & " pp_surrounded buf l
-    | App ({term=Const (Symbol.Conn Symbol.Or)}, l) ->
+    | Syntactic (Symbol.Conn Symbol.Or, l) ->
       Util.pp_list ~sep:" | " pp_surrounded buf l
-    | App ({term=Const (Symbol.Conn Symbol.Not)}, [a]) ->
+    | Syntactic (Symbol.Conn Symbol.Not, [a]) ->
       Printf.bprintf buf "~%a" pp_surrounded a
-    | App ({term=Const (Symbol.Conn Symbol.Imply)}, [a;b]) ->
+    | Syntactic (Symbol.Conn Symbol.Imply, [a;b]) ->
       Printf.bprintf buf "%a => %a" pp_surrounded a pp_surrounded b
-    | App ({term=Const (Symbol.Conn Symbol.Xor)}, [a;b]) ->
+    | Syntactic (Symbol.Conn Symbol.Xor, [a;b]) ->
       Printf.bprintf buf "%a <~> %a" pp_surrounded a pp_surrounded b
-    | App ({term=Const (Symbol.Conn Symbol.Equiv)}, [a;b]) ->
+    | Syntactic (Symbol.Conn Symbol.Equiv, [a;b]) ->
       Printf.bprintf buf "%a <=> %a" pp_surrounded a pp_surrounded b
-    | App ({term=Const (Symbol.Conn Symbol.Eq)}, [_;a;b]) ->
+    | Syntactic (Symbol.Conn Symbol.Eq, [_;a;b]) ->
       Printf.bprintf buf "%a = %a" pp_surrounded a pp_surrounded b
-    | App ({term=Const (Symbol.Conn Symbol.Neq)}, [_;a;b]) ->
+    | Syntactic (Symbol.Conn Symbol.Neq, [_;a;b]) ->
       Printf.bprintf buf "%a != %a" pp_surrounded a pp_surrounded b
-    | App ({term=Const (Symbol.Conn Symbol.Arrow)}, [ret;a]) ->
+    | Syntactic (Symbol.Conn Symbol.Arrow, [ret;a]) ->
       Printf.bprintf buf "%a > %a" pp a pp ret
-    | App ({term=Const (Symbol.Conn Symbol.Arrow)}, ret::l) ->
+    | Syntactic (Symbol.Conn Symbol.Arrow, ret::l) ->
       Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " pp) l pp_surrounded ret
+    | Syntactic (s, l) ->
+      Printf.bprintf buf "%a(%a)" Symbol.pp s (Util.pp_list ~sep:", " pp_surrounded) l
     | App (s, l) ->
         pp buf s;
         Buffer.add_char buf '(';

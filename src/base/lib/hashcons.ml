@@ -53,6 +53,9 @@ module type S = sig
   val mem : ?table:t -> elt -> bool
     (** Is the element present in this table? *)
 
+  val fresh_unique_id : ?table:t -> unit -> int
+    (** Unique ID that will never occur again in this table (modulo 2^63...) *)
+
   val stats : ?table:t -> unit -> int*int*int*int*int*int
 end
 
@@ -87,6 +90,11 @@ module Make(X : HashedType) = struct
 
   let mem ?(table=default) x =
     H.mem table.tbl x
+
+  let fresh_unique_id ?(table=default) () =
+    let x = table.count in
+    table.count <- x+1;
+    x
 
   let stats ?(table=default) () =
     H.stats table.tbl

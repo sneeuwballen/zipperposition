@@ -39,12 +39,14 @@ type t
 type term = t
 
 type view = private
-  | Var of int              (** Free variable *)
+  | Var of int              (** Free variable (integer: mostly useless) *)
   | RigidVar of int         (** Variable that only unifies with other rigid variables *)
   | BVar of int             (** Bound variable (De Bruijn index) *)
   | Bind of symbol * t * t  (** Type, sub-term *)
   | Const of symbol         (** Constant *)
   | Record of (string * t) list * t option (** Extensible record *)
+  | RecordGet of t * string       (** [get r name] is [r.name] *)
+  | RecordSet of t * string * t   (** [set r name t] is [r.name <- t] *)
   | Multiset of t list      (** Multiset of terms *)
   | App of t * t list       (** Uncurried application *)
   | At of t * t             (** Curried application *)
@@ -62,6 +64,7 @@ module Kind : sig
     | FOTerm
     | HOTerm
     | Formula of t
+    | Untyped
     | Generic  (* other terms *)
 end
 
@@ -84,15 +87,21 @@ include Interfaces.ORD with type t := t
 (** {3 Constructors}
 
 Some constructors, such as {!record}, may raise
-Failure if the arguments are ill-formed (several occurrences of a key) *)
+{!IllFormedTerm}if the arguments are ill-formed (several occurrences of
+a key), or, for variables, if the number is negative *)
+
+exception IllFormedTerm of string
+type nat = int
 
 val const : kind:Kind.t -> ty:t -> symbol -> t
 val app : kind:Kind.t -> ty:t -> t -> t list -> t
 val bind : kind:Kind.t -> ty:t -> varty:t -> symbol -> t -> t
-val var : kind:Kind.t -> ty:t -> int -> t
-val rigid_var : kind:Kind.t -> ty:t -> int -> t
-val bvar : kind:Kind.t -> ty:t -> int -> t
+val var : kind:Kind.t -> ty:t -> nat -> t
+val rigid_var : kind:Kind.t -> ty:t -> nat -> t
+val bvar : kind:Kind.t -> ty:t -> nat -> t
 val record : kind:Kind.t -> ty:t -> (string * t) list -> rest:t option -> t
+val record_get : kind:Kind.t -> ty:t -> t -> string -> t
+val record_set : kind:Kind.t -> ty:t -> t -> string -> t -> t
 val multiset : kind:Kind.t -> ty:t -> t list -> t
 val at : kind:Kind.t -> ty:t -> t -> t -> t
 val simple_app : kind:Kind.t -> ty:t -> symbol -> t list -> t
@@ -117,6 +126,8 @@ val is_const : t -> bool
 val is_bind : t -> bool
 val is_app : t -> bool
 val is_record : t -> bool
+val is_record_get : t -> bool
+val is_record_set : t -> bool
 val is_multiset : t -> bool
 val is_at : t -> bool
 
@@ -138,6 +149,8 @@ end
 (** {3 De Bruijn indices handling} *)
 
 module DB : sig
+  type env = t DBEnv.t
+
   val closed : t -> bool
     (** check whether the term is closed (all DB vars are bound within the
         term). If this returns [true] then the term doesn't depend on
@@ -147,7 +160,8 @@ module DB : sig
     (** Does t contains the De Bruijn variable of index n? *)
 
   val open_vars : t -> t Sequence.t
-    (** List of "open" De Bruijn variables (with too high an index) *)
+    (** List of "open" De Bruijn variables (with too high an index)
+        @deprecated *)
 
   val shift : int -> t -> t
     (** shift the non-captured De Bruijn indexes in the term by n *)
@@ -164,7 +178,7 @@ module DB : sig
     (** [db_from_var t ~var] replace [var] by a De Bruijn symbol in t.
         Same as {!replace}. *)
 
-  val eval : t DBEnv.t -> t -> t
+  val eval : env -> t -> t
     (** Evaluate the term in the given De Bruijn environment, by
         replacing De Bruijn indices by their value in the environment. *)
 end
@@ -230,9 +244,23 @@ val all_positions : ?vars:bool -> ?pos:Position.t ->
       @param vars if true, also fold on variables Default: [false].
       @return the accumulator *)
 
-(** {3 IO} *)
+(** {2 IO} *)
 
 include Interfaces.PRINT with type t := t
+include Interfaces.PRINT_DE_BRUIJN with type t := t
+  and type term := t
+
+val add_default_hook : print_hook -> unit
+  (** Add a print hook that will be used from now on *)
+
+(** {2 Misc} *)
+
+val fresh_var : kind:Kind.t -> ty:t -> unit -> t
+(** [fresh_var ~kind ~ty ()] returns a fresh, unique, {b NOT HASHCONSED}
+    variable that will therefore never be equal to any other variable. *)
+
+val _var : kind:Kind.t -> ty:t -> int -> t
+(** Unsafe version of {!var} that accepts negative index *)
 
 (* FIXME
 include Interfaces.SERIALIZABLE with type t := t

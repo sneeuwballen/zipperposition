@@ -38,6 +38,7 @@ module Kind = struct
     | FOTerm
     | HOTerm
     | Formula of t
+    | Untyped
     | Generic  (* other terms *)
 end
 
@@ -57,6 +58,8 @@ and view =
   | Bind of symbol * t * t  (** Type, sub-term *)
   | Const of symbol         (** Constant *)
   | Record of (string * t) list * t option (** Extensible record *)
+  | RecordGet of t * string       (** [get r name] is [r.name] *)
+  | RecordSet of t * string * t   (** [set r name t] is [r.name <- t] *)
   | Multiset of t list      (** Multiset of terms *)
   | App of t * t list       (** Uncurried application *)
   | At of t * t             (** Curried application *)
@@ -97,6 +100,10 @@ let _hash_norec t h =
       |> Hash.string_ "record"
       |> Hash.list_ (fun (s,t') h -> h |> Hash.string_ s |> hash_fun t') l
       |> Hash.opt hash_fun rest
+  | RecordGet (t, name) ->
+      h |> Hash.string_ "get" |> hash_fun t |> Hash.string_ name
+  | RecordSet (t, name, t') ->
+      h |> Hash.string_ "set" |> hash_fun t |> Hash.string_ name |> hash_fun t'
   | Multiset l -> h |> Hash.string_ "ms" |> Hash.list_ hash_fun l
   | App (f, l) -> h |> Hash.string_ "app" |> hash_fun f |> Hash.list_ hash_fun l
   | At (t1, t2) -> h |> Hash.string_ "at" |> hash_fun t1 |> hash_fun t2
@@ -170,8 +177,27 @@ end)
 
 let hashcons_stats () = H.stats ()
 
+exception IllFormedTerm of string
+type nat = int
+
+let _make ~kind ~ty term = {
+  term;
+  kind;
+  ty;
+  id = ~-1;
+  flags=0;
+}
+
+let _make_id ~id ~kind ~ty term = {
+  term;
+  kind;
+  ty;
+  id;
+  flags=0;
+}
+
 let const ~kind ~ty s =
-  let my_t = { term=Const s; kind; id= ~-1; ty=HasType ty; flags=0; } in
+  let my_t = _make ~kind ~ty:(HasType ty) (Const s) in
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty then set_flag t flag_ground;
@@ -182,7 +208,7 @@ let app ~kind ~ty f l =
   match l with
   | [] -> f
   | _::_ ->
-      let my_t = {term=App (f, l); kind; id= ~-1; ty=HasType ty; flags=0; } in
+      let my_t = _make ~kind ~ty:(HasType ty) (App (f,l)) in
       let t = H.hashcons my_t in
       if t == my_t then begin
         if ground ty && ground f && List.for_all ground l
@@ -190,17 +216,31 @@ let app ~kind ~ty f l =
       end;
       t
 
+let _var ~kind ~ty i =
+  H.hashcons (_make ~kind ~ty:(HasType ty) (Var i))
+
 let var ~kind ~ty i =
-  H.hashcons {term=Var i; kind; id= ~-1; ty=HasType ty; flags=0; }
+  if i<0 then raise (IllFormedTerm "var");
+  _var ~kind ~ty i
+
+let fresh_var =
+  let r = ref ~-1 in
+  fun ~kind ~ty () ->
+    if !r >= 0 then failwith "ScopedTerm.fresh_var: overflow";
+    let t = _var ~kind ~ty !r in
+    decr r;
+    t
 
 let bvar ~kind ~ty i =
-  H.hashcons {term=BVar i; kind; id= ~-1; ty=HasType ty; flags=0; }
+  if i<0 then raise (IllFormedTerm "bvar");
+  H.hashcons (_make ~kind ~ty:(HasType ty) (BVar i))
 
 let rigid_var ~kind ~ty i =
-  H.hashcons {term=RigidVar i; kind; id= ~-1; ty=HasType ty; flags=0; }
+  if i<0 then raise (IllFormedTerm "rigid_var");
+  H.hashcons (_make ~kind ~ty:(HasType ty) (RigidVar i))
 
 let bind ~kind ~ty ~varty s t' =
-  H.hashcons {term=Bind (s,varty,t'); kind; id= ~-1; ty=HasType ty; flags=0; }
+  H.hashcons (_make ~kind ~ty:(HasType ty) (Bind (s, varty, t')))
 
 (* merge l1 and l2, which are both sorted. If the same key occurs with
  * distinct values, fail. *)
@@ -227,7 +267,7 @@ let rec __check_duplicates seen l = match l with
 
 (* actually build the record *)
 let __make_record ~kind ~ty l ~rest =
-  let my_t = {term=Record (l, rest); kind; ty=HasType ty; id= ~-1; flags=0; } in
+  let my_t = _make ~kind ~ty:(HasType ty) (Record (l,rest)) in
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty && List.for_all (fun (_,t) -> ground t) l
@@ -255,9 +295,27 @@ let record ~kind ~ty l ~rest =
   __check_duplicates [] l;
   __flatten_record ~kind ~ty l ~rest
 
+let record_get ~kind ~ty r name =
+  let my_t = _make ~kind ~ty:(HasType ty) (RecordGet(r,name)) in
+  let t = H.hashcons my_t in
+  if t == my_t then begin
+    if ground ty && ground r
+      then set_flag t flag_ground;
+  end;
+  t
+
+let record_set ~kind ~ty r name sub =
+  let my_t = _make ~kind ~ty:(HasType ty) (RecordSet(r,name,sub)) in
+  let t = H.hashcons my_t in
+  if t == my_t then begin
+    if ground ty && ground r && ground sub
+      then set_flag t flag_ground;
+  end;
+  t
+
 let multiset ~kind ~ty l =
   let l = List.sort cmp l in
-  let my_t = {term=Multiset l; kind; ty=HasType ty; id= ~-1; flags=0; } in
+  let my_t = _make ~kind ~ty:(HasType ty) (Multiset l) in
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty && List.for_all ground l
@@ -266,7 +324,7 @@ let multiset ~kind ~ty l =
   t
 
 let at ~kind ~ty l r =
-  let my_t = {term=At(l,r); kind; ty=HasType ty; id= ~-1; flags=0; } in
+  let my_t = _make ~kind ~ty:(HasType ty) (At (l,r)) in
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty && ground l && ground r
@@ -275,7 +333,7 @@ let at ~kind ~ty l r =
   t
 
 let simple_app ~kind ~ty s l =
-  let my_t = {term=SimpleApp(s,l); kind; ty=HasType ty; id= ~-1; flags=0; } in
+  let my_t = _make ~kind ~ty:(HasType ty) (SimpleApp (s,l)) in
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty && List.for_all ground l
@@ -286,17 +344,19 @@ let simple_app ~kind ~ty s l =
 let mk_at = at
 
 let tType =
-  let _t = {term=Const (Sym.Conn Sym.TType); kind=Kind.Kind;
-            id= ~-1; ty=NoType; flags=flag_ground; } in
-  H.hashcons _t
+  let my_t = _make ~kind:Kind.Kind ~ty:NoType (Const (Sym.Conn Sym.TType)) in
+  set_flag my_t flag_ground;
+  H.hashcons my_t
 
 let cast ~ty old = match old.term with
-  | Var i -> var ~kind:old.kind ~ty i
+  | Var i -> _var ~kind:old.kind ~ty i
   | RigidVar i -> rigid_var ~kind:old.kind ~ty i
   | BVar i -> bvar ~kind:old.kind ~ty i
   | Const s -> const ~kind:old.kind ~ty s
   | Bind (s, varty, t') -> bind ~kind:old.kind ~ty s ~varty t'
   | Record (l, rest) -> record ~kind:old.kind ~ty l ~rest
+  | RecordGet (r, name) -> record_get ~kind:old.kind ~ty r name
+  | RecordSet (r, name, sub) -> record_set ~kind:old.kind ~ty r name sub
   | Multiset l -> multiset ~kind:old.kind ~ty l
   | App (f,l) -> app ~kind:old.kind ~ty f l
   | At (f,a) -> at ~kind:old.kind ~ty f a
@@ -312,6 +372,8 @@ let is_rigid_var t = match view t with | RigidVar _ -> true | _ -> false
 let is_const t = match view t with | Const _ -> true | _ -> false
 let is_bind t = match view t with | Bind _ -> true | _ -> false
 let is_record t = match view t with | Record _ -> true | _ -> false
+let is_record_get t = match view t with | RecordGet _ -> true | _ -> false
+let is_record_set t = match view t with | RecordSet _ -> true | _ -> false
 let is_multiset t = match view t with | Multiset _ -> true | _ -> false
 let is_app t = match view t with | App _ -> true | _ -> false
 let is_at t = match view t with | At _ -> true | _ -> false
@@ -347,6 +409,8 @@ end
 (** {3 De Bruijn} *)
 
 module DB = struct
+  type env = t DBEnv.t
+
   (* sequence2 of [De Bruijn, depth] pairs *)
   let rec _to_seq ~depth t k =
     begin match t.ty with
@@ -367,6 +431,8 @@ module DB = struct
           | Some r -> _to_seq~depth r k
         end;
         List.iter (fun (_,t) -> _to_seq ~depth t k) l
+    | RecordGet (r, name) -> _to_seq ~depth r k
+    | RecordSet (r, name, sub) -> _to_seq ~depth r k; _to_seq ~depth sub k
     | SimpleApp (_, l)
     | Multiset l ->
         List.iter (fun t -> _to_seq ~depth t k) l
@@ -410,16 +476,6 @@ module DB = struct
         )
       |> Sequence.exists _id
 
-  let open_vars t =
-    _to_seq ~depth:0 t
-      |> Sequence.map2
-        (fun bvar depth -> match view bvar with
-          | BVar i ->
-              if i>= depth then Some bvar else None
-          | _ -> assert false
-        )
-      |> Sequence.fmap _id
-
   (* maps the term to another term, calling [on_binder acc t]
     when it meets a binder, and [on_bvar acc t] when it meets a
     bound variable. *)
@@ -431,7 +487,7 @@ module DB = struct
     | HasType ty ->
       let ty = recurse ~depth acc ty in
       match view t with
-        | Var i -> var ~kind:t.kind ~ty i
+        | Var i -> _var ~kind:t.kind ~ty i
         | RigidVar i -> rigid_var ~kind:t.kind ~ty i
         | Const s -> const ~kind:t.kind ~ty s
         | BVar i ->
@@ -448,6 +504,12 @@ module DB = struct
           in
           let l = List.map (fun (s,t') -> s, recurse ~depth acc t') l in
           record ~kind:t.kind ~ty l ~rest
+        | RecordGet (r,name) ->
+          record_get ~kind:t.kind ~ty (recurse ~depth acc r) name
+        | RecordSet (r,name,sub) ->
+          let r = recurse ~depth acc r in
+          let sub = recurse ~depth acc sub in
+          record_set ~kind:t.kind ~ty r name sub
         | Multiset l ->
           let l = List.map (recurse ~depth acc) l in
           multiset ~kind:t.kind ~ty l
@@ -486,6 +548,17 @@ module DB = struct
       ~on_binder:(fun ~kind ~ty ~depth () _ _ -> ())
       t
 
+  let open_vars t =
+    _to_seq ~depth:0 t
+      |> Sequence.zip
+      |> Sequence.fmap
+        (fun (t,depth) -> match view t with
+          | BVar i when i>=depth ->
+              let ty = unshift depth (ty_exn t) in
+              Some (bvar ~kind:t.kind ~ty (i-depth))
+          | _ -> None
+        )
+
   (* recurse and replace [sub]. *)
   let rec _replace depth ~sub t =
     match t.ty with
@@ -497,7 +570,7 @@ module DB = struct
       match view t with
         | _ when eq t sub ->
           bvar ~kind:t.kind ~ty depth  (* replace *)
-        | Var i -> var ~kind:t.kind ~ty i
+        | Var i -> _var ~kind:t.kind ~ty i
         | RigidVar i -> rigid_var ~kind:t.kind ~ty i
         | BVar i -> bvar ~kind:t.kind ~ty i
         | Const s -> const ~kind:t.kind ~ty s
@@ -506,12 +579,16 @@ module DB = struct
           let t' = _replace (depth+1) t' ~sub in
           bind ~kind:t.kind ~ty ~varty:varty' s t'
         | Record (l, rest) ->
-          let rest = match rest with
-            | None -> None
-            | Some r -> Some (_replace depth ~sub r)
-          in
+          let rest = CCOpt.map (_replace depth ~sub) rest in
           let l = List.map (fun (s,t') -> s, _replace depth t' ~sub) l in
           record ~kind:t.kind ~ty l ~rest
+        | RecordGet (r, name) ->
+          let r = _replace depth ~sub r in
+          record_get ~kind:t.kind ~ty r name
+        | RecordSet (r, name, rhs) ->
+          let r = _replace depth ~sub r in
+          let rhs = _replace depth ~sub rhs in
+          record_set ~kind:t.kind ~ty r name rhs
         | Multiset l ->
           let l = List.map (_replace depth ~sub) l in
           multiset ~kind:t.kind ~ty l
@@ -537,28 +614,28 @@ module DB = struct
       let ty = _eval env ty in
       match view t with
         | _ when ground t -> t
-        | Var i -> var ~kind:t.kind ~ty i
+        | Var i -> _var ~kind:t.kind ~ty i
         | RigidVar i -> rigid_var ~kind:t.kind ~ty i
         | Const s -> const ~kind:t.kind ~ty s
         | BVar i ->
           begin match DBEnv.find env i with
             | None -> bvar ~kind:t.kind ~ty i
             | Some t' ->
-              (* need to shift this term, because we crossed [i] binder
-                  from the scope [t'] was defined in. *)
-              shift i t'
+              assert (closed t');
+              t'
           end
         | Bind (s, varty, t') ->
           let varty' = _eval env varty in
           let t' = _eval (DBEnv.push_none env) t' in
           bind ~kind:t.kind ~ty ~varty:varty' s t'
         | Record (l, rest) ->
-          let rest = match rest with
-            | None -> None
-            | Some r -> Some (_eval env r)
-          in
+          let rest = CCOpt.map (_eval env) rest in
           let l = List.map (fun (s,t') -> s, _eval env t') l in
           record ~kind:t.kind ~ty l ~rest
+        | RecordGet(r, name) ->
+          record_get ~kind:t.kind ~ty (_eval env r) name
+        | RecordSet(r, name, sub) ->
+          record_set ~kind:t.kind ~ty (_eval env r) name (_eval env sub)
         | Multiset l ->
           let l = List.map (_eval env) l in
           multiset ~kind:t.kind ~ty l
@@ -587,43 +664,46 @@ let bind_vars ~kind ~ty s vars t =
 (** {3 Iterators} *)
 
 module Seq = struct
-  let rec vars t k = match view t with
-    | _ when ground t -> ()
-    | Var _ -> k t
-    | RigidVar _
-    | BVar _
-    | Const _ -> ()
-    | App (head, l) -> vars head k; _vars_list l k
-    | Record (l, rest) ->
-        begin match rest with
-        | None -> () | Some r -> vars r k
-        end;
-        List.iter (fun (s,t') -> vars t' k) l
-    | SimpleApp (_,l)
-    | Multiset l -> _vars_list l k
-    | Bind (_, varty, t') -> vars varty k; vars t' k
-    | At (l,r) -> vars l k; vars r k
-  and _vars_list l k = match l with
-    | [] -> ()
-    | t::l' -> vars t k; _vars_list l' k
+  let vars t k =
+    let rec vars t = match view t with
+      | _ when ground t -> ()
+      | Var _ -> k t
+      | RigidVar _
+      | BVar _
+      | Const _ -> ()
+      | App (head, l) -> vars head; List.iter vars l
+      | Record (l, rest) ->
+          CCOpt.iter vars rest;
+          List.iter (fun (s,t') -> vars t') l
+      | RecordGet (r, _) -> vars r
+      | RecordSet (r, _, sub) -> vars r; vars sub
+      | SimpleApp (_,l)
+      | Multiset l -> List.iter vars l
+      | Bind (_, varty, t') -> vars varty; vars t'
+      | At (l,r) -> vars l; vars r
+    in
+    vars t
 
-  let rec subterms t k =
-    k t;
-    match view t with
-    | Var _
-    | RigidVar _
-    | BVar _
-    | Const _ -> ()
-    | Bind (_, varty, t') -> subterms varty k; subterms t' k
-    | Record (l, rest) ->
-        begin match rest with
-        | None -> () | Some r -> subterms r k
-        end;
-        List.iter (fun (s,t') -> subterms t' k) l
-    | SimpleApp (_, l)
-    | Multiset l -> List.iter (fun t' -> subterms t' k) l
-    | App(_, l) -> List.iter (fun t' -> subterms t' k) l
-    | At (l,r) -> subterms l k; subterms r k
+  let subterms t k =
+    let rec subterms t =
+      k t;
+      match view t with
+      | Var _
+      | RigidVar _
+      | BVar _
+      | Const _ -> ()
+      | Bind (_, varty, t') -> subterms varty; subterms t'
+      | Record (l, rest) ->
+          CCOpt.iter subterms rest;
+          List.iter (fun (_,t') -> subterms t') l
+      | RecordGet (r, _) -> subterms r
+      | RecordSet (r, _, sub) -> subterms r; subterms sub
+      | SimpleApp (_, l)
+      | Multiset l -> List.iter subterms l
+      | App(f, l) -> subterms f; List.iter subterms l
+      | At (l,r) -> subterms l; subterms r
+    in
+    subterms t
 
   let rigid_vars t =
     subterms t |> Sequence.filter is_rigid_var
@@ -640,6 +720,8 @@ module Seq = struct
           | None -> () | Some r -> recurse (depth+1) r
           end;
           List.iter (fun (s,t') -> recurse depth t') l
+      | RecordGet (r, _) -> recurse depth r
+      | RecordSet (r, _, sub) -> recurse depth r; recurse depth sub
       | SimpleApp (_,l)
       | Multiset l -> List.iter (recurse (depth+1)) l
       | Bind (_, varty, t') -> recurse depth varty; recurse (depth+1) t'
@@ -651,42 +733,44 @@ module Seq = struct
     in
     recurse 0 t
 
-  let rec symbols t k = match view t with
-    | Var _ | BVar _ | RigidVar _ -> ()
-    | Const s -> k s
-    | App (head, l) -> symbols head k; _symbols_list l k
-    | At (l,r) -> symbols l k; symbols r k
-    | Record (l, rest) ->
-        begin match rest with
-        | None -> () | Some r -> symbols r k
-        end;
-        List.iter (fun (s,t') -> symbols t' k) l
-    | Multiset l -> List.iter (fun t' -> symbols t' k) l
-    | SimpleApp (s,l) ->
-      k s;
-      List.iter (fun t' -> symbols t' k) l
-    | Bind (s, varty, t') -> k s; symbols varty k; symbols t' k
-  and _symbols_list l k = match l with
-    | [] -> ()
-    | t::l' -> symbols t k; _symbols_list l' k
+  let symbols t k =
+    let rec symbols t = match view t with
+      | Var _ | BVar _ | RigidVar _ -> ()
+      | Const s -> k s
+      | App (head, l) -> symbols head; List.iter symbols l
+      | At (l,r) -> symbols l; symbols r
+      | Record (l, rest) ->
+          CCOpt.iter symbols rest;
+          List.iter (fun (_,t') -> symbols t') l
+      | Multiset l -> List.iter symbols l
+      | SimpleApp (s,l) ->
+        k s;
+        List.iter symbols l
+      | RecordGet (r, _) -> symbols r
+      | RecordSet (r, _, sub) -> symbols r; symbols sub
+      | Bind (s, varty, t') -> k s; symbols varty; symbols t'
+    in
+    symbols t
 
-  let rec types t k =
-    begin match t.ty with
-    | NoType -> ()
-    | HasType ty -> k ty
-    end;
-    match view t with
-    | Var _ | BVar _ | RigidVar _ | Const _ -> ()
-    | App (head, l) -> types head k; List.iter (fun t' -> types t' k) l
-    | Record (l,rest) ->
-        begin match rest with
-        | None -> () | Some r -> types r k
-        end;
-        List.iter (fun (s,t') -> types t' k) l
-    | SimpleApp (_,l)
-    | Multiset l -> List.iter (fun t' -> types t' k) l
-    | Bind (_, _, t') -> types t' k
-    | At (l,r) -> types l k; types r k
+  let types t k =
+    let rec types t =
+      begin match t.ty with
+      | NoType -> ()
+      | HasType ty -> k ty
+      end;
+      match view t with
+      | Var _ | BVar _ | RigidVar _ | Const _ -> ()
+      | App (head, l) -> types head; List.iter types l
+      | Record (l,rest) ->
+          CCOpt.iter types rest;
+          List.iter (fun (_,t') -> types t') l
+      | RecordGet (r, _) -> types r
+      | RecordSet (r, _, sub) -> types r; types sub
+      | SimpleApp (_,l)
+      | Multiset l -> List.iter types l
+      | Bind (_, _, t') -> types t'
+      | At (l,r) -> types l; types r
+    in types t
 
   let max_var seq =
     let r = ref 0 in
@@ -805,6 +889,10 @@ let rec replace t ~old ~by = match t.ty, view t with
   | HasType ty, SimpleApp (s,l) ->
     let l' = List.map (fun t' -> replace t' ~old ~by) l in
     simple_app ~kind:t.kind ~ty s l'
+  | HasType ty, RecordGet (r, name) ->
+    record_get ~kind:t.kind ~ty (replace r ~old ~by) name
+  | HasType ty, RecordSet (r, name, sub) ->
+    record_set ~kind:t.kind ~ty (replace r ~old ~by) name (replace sub ~old ~by)
   | NoType, _ -> t
   | _, (Var _ | BVar _ | RigidVar _ | Const _) -> t
 
@@ -825,6 +913,8 @@ let rec size t = match view t with
   | Record (l, rest) ->
       let s = match rest with | None -> 0 | Some r -> size r in
       List.fold_left (fun acc (_,t') -> acc + size t') (1+s) l
+  | RecordGet (r,_ ) -> 1 + size r
+  | RecordSet (r,_ , sub) -> 1 + size r + size sub
   | SimpleApp (_,l)
   | Multiset l -> List.fold_left (fun s t -> s+size t) 1 l
   | App (head, l) -> _size_list (1 + size head) l
@@ -837,7 +927,8 @@ let depth t =
   Seq.subterms_depth t |> Sequence.map snd |> Sequence.fold max 0
 
 let rec head t = match view t with
-  | BVar _ | Var _ | RigidVar _ | Record _ | Multiset _ -> None
+  | BVar _ | Var _ | RigidVar _ | Record _ | Multiset _
+  | RecordGet _ | RecordSet _ -> None
   | SimpleApp (s, _)
   | Const s
   | Bind (s, _, _) -> Some s
@@ -869,6 +960,13 @@ let rec _all_pos_rec f vars acc pb t = match view t with
   | Multiset l ->
     let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
     _all_pos_rec_list f vars acc pb l 0
+  | RecordGet (r, _) ->
+    let acc = f acc t (PB.to_pos pb) in
+    _all_pos_rec f vars acc (PB.left pb) r
+  | RecordSet (r, _, sub) ->
+    let acc = f acc t (PB.to_pos pb) in
+    let acc = _all_pos_rec f vars acc (PB.left pb) r in
+    _all_pos_rec f vars acc (PB.right pb) sub
   | Bind (_, _, t') ->
     let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
     _all_pos_rec f vars acc (PB.right pb) t'
@@ -883,26 +981,35 @@ let all_positions ?(vars=false) ?(pos=Position.stop) t acc f =
 
 (** {3 IO} *)
 
-let rec pp_depth depth buf t =
-  begin match view t with
+type print_hook = int -> (Buffer.t -> t -> unit) -> Buffer.t -> t -> bool
+
+let _hooks = ref []
+let add_default_hook h = _hooks := h :: !_hooks
+
+let pp_depth ?(hooks=[]) depth buf t =
+  let rec _pp depth buf t =
+    if List.exists (fun h -> h depth (_pp depth) buf t) hooks
+    then () (* hook took control *)
+    else _pp_root depth buf t; _pp_ty depth buf t
+  and _pp_root depth buf t = match view t with
   | Var i -> Printf.bprintf buf "X%d" i
   | RigidVar i -> Printf.bprintf buf "Z%d" i
   | BVar i -> Printf.bprintf buf "Y%d" (depth-i-1)
   | Const s -> Sym.pp buf s
   | Bind (s, varty, t') ->
     Printf.bprintf buf "%a Y%d:%a. %a" Sym.pp s depth
-      (pp_depth depth) varty (_pp_surrounded (depth+1)) t'
+      (_pp depth) varty (_pp_surrounded (depth+1)) t'
   | Record ([], None) ->
     Buffer.add_string buf "{}"
   | Record ([], Some r) ->
-    Printf.bprintf buf "{ | %a}" (pp_depth depth) r
+    Printf.bprintf buf "{ | %a}" (_pp depth) r
   | Record (l, None) ->
     Buffer.add_char buf '{';
     List.iteri
       (fun i (s, t') ->
         if i>0 then Buffer.add_string buf ", ";
         Printf.bprintf buf "%s: " s;
-        pp_depth depth buf t')
+        _pp depth buf t')
       l;
     Buffer.add_char buf '}'
   | Record (l, Some r) ->
@@ -911,17 +1018,21 @@ let rec pp_depth depth buf t =
       (fun i (s, t') ->
         if i>0 then Buffer.add_string buf ", ";
         Printf.bprintf buf "%s: " s;
-        pp_depth depth buf t')
+        _pp depth buf t')
       l;
-    Printf.bprintf buf " | %a}" (pp_depth depth) r
+    Printf.bprintf buf " | %a}" (_pp depth) r
+  | RecordGet (r, name) ->
+    Printf.bprintf buf "%a.%s" (_pp depth) r name
+  | RecordSet (r, name,sub) ->
+    Printf.bprintf buf "%a.%s <- %a" (_pp depth) r name (_pp depth) sub
   | Multiset l ->
-    Printf.bprintf buf "{| %a |}" (Util.pp_list (pp_depth depth)) l
+    Printf.bprintf buf "{| %a |}" (Util.pp_list (_pp depth)) l
   | SimpleApp (s, l) ->
-    Printf.bprintf buf "%a(%a)" Sym.pp s (Util.pp_list (pp_depth depth)) l
+    Printf.bprintf buf "%a(%a)" Sym.pp s (Util.pp_list (_pp depth)) l
   | At (l,r) ->
     _pp_surrounded depth buf l;
     Buffer.add_char buf ' ';
-    pp_depth depth buf r
+    _pp depth buf r
   | App (f, l) ->
     assert (l <> []);
     _pp_surrounded depth buf f;
@@ -929,22 +1040,22 @@ let rec pp_depth depth buf t =
       (fun t' ->
         Buffer.add_char buf ' '; _pp_surrounded depth buf t')
       l
-  end;
-  match t.ty, view t with
+  and _pp_ty depth buf t = match t.ty, view t with
     | HasType ty, (Var _ | BVar _) ->
       Printf.bprintf buf ":%a" (_pp_surrounded depth) ty
     | _ -> ()
-
-and _pp_surrounded depth buf t = match view t with
+  and _pp_surrounded depth buf t = match view t with
   | Bind _
   | At _
   | App _ ->
     Buffer.add_char buf '(';
-    pp_depth depth buf t;
+    _pp depth buf t;
     Buffer.add_char buf ')'
-  | _ -> pp_depth depth buf t
+  | _ -> _pp depth buf t
+  in
+  _pp depth buf t
 
-let pp buf t = pp_depth 0 buf t
+let pp buf t = pp_depth ~hooks:!_hooks 0 buf t
 let to_string t = Util.on_buffer pp t
 let fmt fmt t = Format.pp_print_string fmt (to_string t)
 

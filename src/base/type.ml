@@ -76,7 +76,6 @@ let is_forall ty = match view ty with | Forall _ -> true | _ -> false
 let tType = T.tType
 
 let var i =
-  if i < 0 then raise (Invalid_argument "Type.var");
   T.var ~kind ~ty:tType i
 
 let app s l = T.simple_app ~kind ~ty:tType s l
@@ -127,29 +126,15 @@ let () =
 
 (** {2 Containers} *)
 
-module Set = Sequence.Set.Make(struct
-  type t = ty
-  let compare = cmp
-end)
-module Map = Sequence.Map.Make(struct
-  type t = ty
-  let compare = cmp
-end)
-module Tbl = Hashtbl.Make(struct
-  type t = ty
-  let hash = hash
-  let equal = eq
-end)
+module Set = T.Set
+module Map = T.Map
+module Tbl = T.Tbl
 
 module Seq = struct
   let vars ty = Sequence.fmap of_term (T.Seq.vars ty)
   let sub ty = Sequence.fmap of_term (T.Seq.subterms ty)
-  let add_set set t = Sequence.fold (fun set x -> Set.add x set) set t
-  let max_var =
-    Sequence.fold
-      (fun m ty -> match view ty with
-      | Var i -> max i m
-      | _ -> m) 0
+  let add_set = T.Seq.add_set
+  let max_var = T.Seq.max_var
 end
 
 let vars_set set t =
@@ -176,6 +161,8 @@ let arity ty =
     | T.Const _
     | T.SimpleApp _
     | T.App _ -> Arity (i, j)
+    | T.RecordGet _
+    | T.RecordSet _
     | T.Multiset _
     | T.Bind _
     | T.At _ -> assert false
@@ -247,10 +234,11 @@ module TPTP = struct
   let rec pp_tstp_rec depth buf t = match view t with
     | Var i -> Printf.bprintf buf "T%d" i
     | BVar i -> Printf.bprintf buf "Tb%d" (depth-i-1)
-    | App (p, []) -> Symbol.pp buf p
-    | App (p, args) -> Printf.bprintf buf "%a(%a)" Symbol.pp p
+    | App (p, []) -> Symbol.TPTP.pp buf p
+    | App (p, args) -> Printf.bprintf buf "%a(%a)" Symbol.TPTP.pp p
       (Util.pp_list (pp_tstp_rec depth)) args
     | Fun (arg, ret) ->
+      (* FIXME: uncurry? *)
       Printf.bprintf buf "%a > %a" (pp_inner depth) arg (pp_tstp_rec depth) ret
     | Record _ -> failwith "cannot print record types in TPTP"
     | Forall ty' ->
@@ -335,15 +323,7 @@ let bij =
 
 (** {2 Misc} *)
 
-let __var i =
-  T.var ~kind ~ty:tType i
-
-let fresh_var =
-  let r = ref ~-1 in
-  fun () ->
-    let n = !r in
-    r := n-1;
-    __var n
+let fresh_var = T.fresh_var ~kind ~ty:tType
 
 (** {2 Conversions} *)
 
@@ -374,11 +354,11 @@ module Conv = struct
       | PT.Int _
       | PT.Rat _ -> raise LocalExit
       | PT.Const s -> const s
-      | PT.App ({PT.term=PT.Const (Symbol.Conn Symbol.Arrow)}, [ret;arg]) ->
+      | PT.Syntactic (Symbol.Conn Symbol.Arrow, [ret;arg]) ->
         let ret = of_prolog ret in
         let arg = of_prolog arg in
         arrow arg ret
-      | PT.App ({PT.term=PT.Const (Symbol.Conn Symbol.Arrow)}, ret::l) ->
+      | PT.Syntactic (Symbol.Conn Symbol.Arrow, ret::l) ->
         let ret = of_prolog ret in
         let l = List.map of_prolog l in
         arrow_list l ret
@@ -394,6 +374,7 @@ module Conv = struct
         let l = List.map (fun (n,t) -> n, of_prolog t) l in
         record l ~rest
       | PT.Bind _
+      | PT.Syntactic _
       | PT.App _
       | PT.Column _
       | PT.List _ -> raise LocalExit
@@ -407,12 +388,12 @@ module Conv = struct
     | BVar i -> PT.var (Util.sprintf "B%d" (depth-i-1))
     | App (s,l) -> PT.app (PT.const s) (List.map (to_prolog depth) l)
     | Fun (arg, ret) when curry ->
-      PT.app (PT.const Symbol.Base.arrow)
-            [ to_prolog depth ret ; to_prolog depth arg ]
+      PT.TPTP.mk_fun_ty [to_prolog depth arg] (to_prolog depth ret)
     | Fun _ ->
       let args, ret = open_fun t in
       let args = List.map (to_prolog depth) args in
-      PT.app (PT.const Symbol.Base.arrow) (to_prolog depth ret :: args)
+      let ret = to_prolog depth ret in
+      PT.TPTP.mk_fun_ty args ret
     | Record (l, rest) ->
       let rest = CCOpt.map (to_prolog depth) rest in
       PT.record (List.map (fun (n,ty) -> n, to_prolog depth ty) l) ~rest

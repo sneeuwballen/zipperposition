@@ -1,7 +1,7 @@
 #use "topfind";;
 #require "zarith";;
-#require "num";;
-#require "unix";;
+#require "containers";;
+#require "sequence";;
 #require "datalog";;
 #require "str";;
 #directory "_build/src/";;
