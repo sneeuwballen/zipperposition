@@ -31,6 +31,12 @@ module ST = ScopedTerm
 module S = Symbol
 module F = Formula.FO
 
+let prof_estimate = Util.mk_profiler "cnf.estimate_num_clauses"
+let prof_simplify_rename = Util.mk_profiler "cnf.simplify_rename"
+let prof_to_cnf = Util.mk_profiler "cnf.distribute"
+let prof_miniscope = Util.mk_profiler "cnf.miniscope"
+let prof_skolemize = Util.mk_profiler "cnf.skolemize"
+
 type form = Formula.FO.t
 
 (* check whether the formula is already in CNF *)
@@ -83,6 +89,7 @@ let __contains_db n f =
 
 (* miniscoping (push quantifiers as deep as possible in the formula) *)
 let miniscope ?(distribute_exists=false) f =
+  Util.enter_prof prof_miniscope;
   (* recursive miniscoping *)
   let rec miniscope f = match F.view f with
   | F.Forall (varty, f') ->
@@ -137,7 +144,9 @@ let miniscope ?(distribute_exists=false) f =
   | F.Eq _
   | F.Atom _ -> f
   in
-  miniscope (F.simplify f)
+  let res = miniscope (F.simplify f) in
+  Util.exit_prof prof_miniscope;
+  res
 
 (* negation normal form (also remove equivalence and implications). *)
 let rec nnf f =
@@ -198,6 +207,7 @@ let __eval_and_unshift env f =
  * Skolemization should proceed from the leaves (alpha-equiv checking
  * is trivial with De Bruijn indices) up to the root. *)
 let skolemize ~ctx f =
+  Util.enter_prof prof_skolemize;
   let rec skolemize f = match F.view f with
   | F.And l -> F.Base.and_ (List.map skolemize l)
   | F.Or l -> F.Base.or_ (List.map skolemize l)
@@ -229,7 +239,9 @@ let skolemize ~ctx f =
     let new_f' = __eval_and_unshift env f' in
     skolemize new_f'
   in
-  skolemize f
+  let res = skolemize f in
+  Util.exit_prof prof_skolemize;
+  res
 
 (* estimation for a number of clauses *)
 module Estimation = struct
@@ -273,6 +285,7 @@ end)
 
 (* estimate the number of clauses needed by this formula. *)
 let estimate_num_clauses ~cache ~pos f =
+  Util.enter_prof prof_estimate;
   let module E = Estimation in
   (* recursive function.
      @param pos true if the formula is positive, false if it's negated *)
@@ -316,7 +329,9 @@ let estimate_num_clauses ~cache ~pos f =
       FPolTbl.add cache (f,pos) n;
       n
   in
-  num pos f
+  let n = num pos f in
+  Util.exit_prof prof_estimate;
+  n
 
 (* introduce definitions for sub-formulas of [f], is needed. This might
  * modify [ctx] by adding definitions to it, and it will {!NOT} introduce
@@ -431,7 +446,7 @@ let introduce_defs ~ctx ~cache ~limit f =
 
 (* helper: reduction to cnf using De Morgan laws. Returns a list of list of
   atomic formulas *)
-let rec to_cnf f = match F.view f with
+let rec to_cnf_rec f = match F.view f with
   | F.Eq _
   | F.Neq _
   | F.Atom _
@@ -446,19 +461,19 @@ let rec to_cnf f = match F.view f with
       end
   | F.And l ->
     (* simply concat sub-CNF *)
-    Util.list_flatmap to_cnf l
+    Util.list_flatmap to_cnf_rec l
   | F.Or (f'::l) ->
     (* cartesian products of sub-CNF *)
     List.fold_left
-      (fun cnf f' -> product (to_cnf f') cnf)
-      (to_cnf f')
+      (fun cnf f' -> product (to_cnf_rec f') cnf)
+      (to_cnf_rec f')
       l
   | F.Forall _
   | F.Exists _
-  | F.ForallTy _ -> failwith "Cnf.to_cnf: can only clausify a skolemized formula"
+  | F.ForallTy _ -> failwith "Cnf.to_cnf_rec: can only clausify a skolemized formula"
   | F.Xor _
   | F.Imply _
-  | F.Equiv _ -> failwith "Cnf.to_cnf: can only clausify a NNF formula"
+  | F.Equiv _ -> failwith "Cnf.to_cnf_rec: can only clausify a NNF formula"
   | F.Or [] -> assert false
 (* cartesian product of lists of lists *)
 and product a b =
@@ -467,6 +482,12 @@ and product a b =
       (fun acc' litsb -> (litsa @ litsb) :: acc')
       acc b)
     [] a
+
+let to_cnf l =
+  Util.enter_prof prof_to_cnf;
+  let res = to_cnf_rec l in
+  Util.exit_prof prof_to_cnf;
+  res
 
 type clause = F.t list
   (** Basic clause representation, as list of literals *)
@@ -483,6 +504,7 @@ let default_def_limit = 24
 
 (* simplify formulas and rename them. May introduce new formulas *)
 let simplify_and_rename ~ctx ~cache ~disable_renaming ~preprocess ~limit l =
+  Util.enter_prof prof_simplify_rename;
   let l' = List.map
     (fun f ->
       let f = F.flatten f in
@@ -508,7 +530,9 @@ let simplify_and_rename ~ctx ~cache ~disable_renaming ~preprocess ~limit l =
       F.simplify f)
     defs
   in
-  List.rev_append defs l'
+  let res = List.rev_append defs l' in
+  Util.exit_prof prof_simplify_rename;
+  res
 
 (* Transform the clauses into proper CNF; returns a list of clauses *)
 let cnf_of_list ?(opts=[]) ?(ctx=Skolem.create Signature.empty) l =
