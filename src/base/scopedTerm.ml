@@ -474,16 +474,6 @@ module DB = struct
         )
       |> Sequence.exists _id
 
-  let open_vars t =
-    _to_seq ~depth:0 t
-      |> Sequence.map2
-        (fun bvar depth -> match view bvar with
-          | BVar i ->
-              if i>= depth then Some bvar else None
-          | _ -> assert false
-        )
-      |> Sequence.fmap _id
-
   (* maps the term to another term, calling [on_binder acc t]
     when it meets a binder, and [on_bvar acc t] when it meets a
     bound variable. *)
@@ -555,6 +545,17 @@ module DB = struct
         )
       ~on_binder:(fun ~kind ~ty ~depth () _ _ -> ())
       t
+
+  let open_vars t =
+    _to_seq ~depth:0 t
+      |> Sequence.zip
+      |> Sequence.fmap
+        (fun (t,depth) -> match view t with
+          | BVar i when i>=depth ->
+              let ty = unshift depth (ty_exn t) in
+              Some (bvar ~kind:t.kind ~ty (i-depth))
+          | _ -> None
+        )
 
   (* recurse and replace [sub]. *)
   let rec _replace depth ~sub t =
