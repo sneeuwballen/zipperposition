@@ -49,11 +49,13 @@ module type LEAF = sig
                     ('a -> term -> elt -> subst -> 'a) -> 'a
     (** Unify the given term with indexed terms *)
 
-  val fold_match: ?subst:subst -> t -> scope -> term -> scope -> 'a ->
+  val fold_match: ?allow_open:bool -> ?subst:subst ->
+                   t -> scope -> term -> scope -> 'a ->
                   ('a -> term -> elt -> subst -> 'a) -> 'a
     (** Match the indexed terms against the given query term *)
 
-  val fold_matched: ?subst:subst -> t -> scope -> term -> scope -> 'a ->
+  val fold_matched: ?allow_open:bool -> ?subst:subst ->
+                    t -> scope -> term -> scope -> 'a ->
                     ('a -> term -> elt -> subst -> 'a) -> 'a
     (** Match the query term against the indexed terms *)
 end
@@ -88,11 +90,11 @@ module type TERM_IDX = sig
                             t -> scope -> term -> scope -> 'a ->
                             ('a -> term -> elt -> subst -> 'a) -> 'a
 
-  val retrieve_generalizations : ?subst:subst ->
+  val retrieve_generalizations : ?allow_open:bool -> ?subst:subst ->
                                 t -> scope -> term -> scope -> 'a ->
                                 ('a -> term -> elt -> subst -> 'a) -> 'a
 
-  val retrieve_specializations : ?subst:subst ->
+  val retrieve_specializations : ?allow_open:bool -> ?subst:subst ->
                                   t -> scope -> term -> scope -> 'a ->
                                  ('a -> term -> elt -> subst -> 'a) -> 'a
 
@@ -204,7 +206,7 @@ module type UNIT_IDX = sig
   val iter : t -> (term -> E.t -> unit) -> unit
     (** Iterate on indexed equations *)
 
-  val retrieve : ?subst:subst -> sign:bool ->
+  val retrieve : ?allow_open:bool -> ?subst:subst -> sign:bool ->
                   t -> scope -> term -> scope -> 'a ->
                  ('a -> term -> rhs -> E.t -> subst -> 'a) ->
                  'a

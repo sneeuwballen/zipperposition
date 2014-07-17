@@ -311,7 +311,7 @@ struct
     (* assuming subterms of [t] are in normal form, reduce the term *)
     and reduce_at_root ~rules t =
       try
-        Idx.retrieve ~sign:true trs 1 t 0 () rewrite_handler;
+        Idx.retrieve ~allow_open:true ~sign:true trs 1 t 0 () rewrite_handler;
         t  (* normal form *)
       with (RewrittenIn (t', subst, rule)) ->
         Util.debug 3 "rewrite %a into %a (with %a)" T.pp t T.pp t' S.pp subst;

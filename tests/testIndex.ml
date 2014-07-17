@@ -228,13 +228,13 @@ module TestTerm(I : TermIndex) = struct
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 
   let check_retrieved_specializations =
-    let prop = _check_all_retrieved_satisfy I.retrieve_specializations
+    let prop = _check_all_retrieved_satisfy (I.retrieve_specializations ~allow_open:false)
       (fun t1 s1 t2 s2 -> Unif.FO.matching ~pattern:t1 s1 t2 s2) in
     let name = Util.sprintf "index(%s)_retrieve_imply_specializations" I.name in
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 
   let check_retrieved_generalizations =
-    let prop = _check_all_retrieved_satisfy I.retrieve_generalizations _match_flip in
+    let prop = _check_all_retrieved_satisfy (I.retrieve_generalizations ~allow_open:false) _match_flip in
     let name = Util.sprintf "index(%s)_retrieve_imply_generalizations" I.name in
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 
@@ -244,13 +244,13 @@ module TestTerm(I : TermIndex) = struct
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 
   let check_retrieve_all_specializations =
-    let prop = _check_all_satisfying_are_retrieved I.retrieve_specializations
+    let prop = _check_all_satisfying_are_retrieved (I.retrieve_specializations ~allow_open:false)
       (fun t1 s1 t2 s2 -> Unif.FO.matching ~pattern:t1 s1 t2 s2) in
     let name = Util.sprintf "index(%s)_retrieve_imply_specializations" I.name in
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 
   let check_retrieve_all_generalizations =
-    let prop = _check_all_satisfying_are_retrieved I.retrieve_generalizations _match_flip in
+    let prop = _check_all_satisfying_are_retrieved (I.retrieve_generalizations ~allow_open:false) _match_flip in
     let name = Util.sprintf "index(%s)_retrieve_imply_generalizations" I.name in
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 

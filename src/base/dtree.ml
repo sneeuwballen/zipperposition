@@ -219,7 +219,7 @@ module Make(E : Index.EQUATION) = struct
   let remove_seq dt seq =
     Sequence.fold remove dt seq
 
-  let retrieve ?(subst=S.empty) ~sign dt sc_dt t sc_t acc k =
+  let retrieve ?(allow_open=false) ?(subst=S.empty) ~sign dt sc_dt t sc_t acc k =
     Util.enter_prof prof_dtree_retrieve;
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie acc iter subst =
@@ -247,14 +247,16 @@ module Make(E : Index.EQUATION) = struct
             | Variable v2 when S.mem subst (v2:>ST.t) sc_dt ->
                (* already bound, check consistency *)
               begin try
-                let subst = Unif.FO.matching ~subst ~pattern:v2 sc_dt t_pos sc_t in
+                let subst = Unif.FO.matching ~allow_open ~subst
+                  ~pattern:v2 sc_dt t_pos sc_t in
                 traverse subtrie acc (skip i) subst
               with Unif.Fail -> acc (* incompatible binding *)
               end
             | Variable v2 ->
               (* try to bind and continue *)
               begin try
-                let subst = Unif.FO.matching ~subst ~pattern:v2 sc_dt t_pos sc_t in
+                let subst = Unif.FO.matching ~allow_open ~subst
+                  ~pattern:v2 sc_dt t_pos sc_t in
                 traverse subtrie acc (skip i) subst
               with Unif.Fail -> acc (* incompatible binding *)
               end

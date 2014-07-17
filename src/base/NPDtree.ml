@@ -154,7 +154,7 @@ module Make(E : Index.EQUATION) = struct
   let remove_seq dt seq =
     Sequence.fold remove dt seq
 
-  let retrieve ?(subst=S.empty) ~sign dt sc_dt t sc_t acc k =
+  let retrieve ?(allow_open=false) ?(subst=S.empty) ~sign dt sc_dt t sc_t acc k =
     Util.enter_prof prof_npdtree_retrieve;
     (* extended callback *)
     let k' acc t' eqn subst =
@@ -166,7 +166,7 @@ module Make(E : Index.EQUATION) = struct
       match iter with
       | None ->
           Util.exit_prof prof_npdtree_retrieve;
-          let acc = Leaf.fold_match ~subst trie.leaf sc_dt t sc_t acc k' in
+          let acc = Leaf.fold_match ~allow_open ~subst trie.leaf sc_dt t sc_t acc k' in
           Util.enter_prof prof_npdtree_retrieve;
           acc
       | Some i ->
@@ -379,13 +379,14 @@ module MakeTerm(X : Set.OrderedType) = struct
       Util.exit_prof prof_npdtree_term_unify;
       raise e
 
-  let retrieve_generalizations ?(subst=S.empty) dt sc_dt t sc_t acc k =
+  let retrieve_generalizations ?(allow_open=false) ?(subst=S.empty)
+  dt sc_dt t sc_t acc k =
     Util.enter_prof prof_npdtree_term_generalizations;
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie acc iter = match iter with
       | None ->
         Util.yield_prof prof_npdtree_term_generalizations;
-        let acc = Leaf.fold_match ~subst trie.leaf sc_dt t sc_t acc k in
+        let acc = Leaf.fold_match ~allow_open ~subst trie.leaf sc_dt t sc_t acc k in
         Util.enter_prof prof_npdtree_term_generalizations;
         acc
       | Some i ->
@@ -419,13 +420,14 @@ module MakeTerm(X : Set.OrderedType) = struct
       Util.exit_prof prof_npdtree_term_generalizations;
       raise e
 
-  let retrieve_specializations ?(subst=S.empty) dt sc_dt t sc_t acc k =
+  let retrieve_specializations ?(allow_open=false) ?(subst=S.empty)
+  dt sc_dt t sc_t acc k =
     Util.enter_prof prof_npdtree_term_specializations;
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie acc iter = match iter with
       | None ->
         Util.yield_prof prof_npdtree_term_specializations;
-        let acc = Leaf.fold_matched ~subst trie.leaf sc_dt t sc_t acc k in
+        let acc = Leaf.fold_matched ~allow_open ~subst trie.leaf sc_dt t sc_t acc k in
         Util.enter_prof prof_npdtree_term_specializations;
         acc
       | Some i ->
