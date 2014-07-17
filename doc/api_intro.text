@@ -4,16 +4,50 @@ The documentation can be found {{:rst/contents.html} here}.
 {2 API Documentation}
 
 {!modules:
-Comparison Precedence Ordering Skolem Cnf
-Congruence FastFingerprint FeatureVector Rewriting
-FormulaShape Transform Lambda Sourced
-HORewriting Index Dtree Fingerprint NPDtree
-Hashcons Cache Bij Bencode
-Interfaces DBEnv Position HOTerm Formula
-ParseLocation Multiset
-PartialOrder LazyList IArray LazyGraph
-Substs Unif Signature TypeInference Options
-Symbol ScopedTerm FOTerm Type Util PrologTerm
+Bencode
+Bij
+Cache
+Cnf
+Comparison
+Congruence
+DBEnv
+Dtree
+FOTerm
+FastFingerprint
+FeatureVector
+Fingerprint
+Formula
+FormulaShape
+HORewriting
+HOTerm
+Hashcons
+IArray
+Index
+Interfaces
+Lambda
+LazyGraph
+LazyList
+Multiset
+NPDtree
+Options
+Ordering
+ParseLocation
+PartialOrder
+Position
+Precedence
+PrologTerm
+Rewriting
+ScopedTerm
+Signature
+Skolem
+Sourced
+Substs
+Symbol
+Transform
+Type
+TypeInference
+Unif
+Util
 }
 
 A description of modules can be found {{:rst/modules.html} here}.
