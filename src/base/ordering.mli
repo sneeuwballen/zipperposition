@@ -25,6 +25,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Term Orderings} *)
 
+(* TODO: compute orderings modulo a substitution *)
+
 (** {2 Type definitions} *)
 
 module type S = sig

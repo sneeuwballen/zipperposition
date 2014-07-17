@@ -409,6 +409,8 @@ end
 (** {3 De Bruijn} *)
 
 module DB = struct
+  type env = t DBEnv.t
+
   (* sequence2 of [De Bruijn, depth] pairs *)
   let rec _to_seq ~depth t k =
     begin match t.ty with
@@ -577,10 +579,7 @@ module DB = struct
           let t' = _replace (depth+1) t' ~sub in
           bind ~kind:t.kind ~ty ~varty:varty' s t'
         | Record (l, rest) ->
-          let rest = match rest with
-            | None -> None
-            | Some r -> Some (_replace depth ~sub r)
-          in
+          let rest = CCOpt.map (_replace depth ~sub) rest in
           let l = List.map (fun (s,t') -> s, _replace depth t' ~sub) l in
           record ~kind:t.kind ~ty l ~rest
         | RecordGet (r, name) ->
@@ -622,19 +621,15 @@ module DB = struct
           begin match DBEnv.find env i with
             | None -> bvar ~kind:t.kind ~ty i
             | Some t' ->
-              (* need to shift this term, because we crossed [i] binder
-                  from the scope [t'] was defined in. *)
-              shift i t'
+              assert (closed t');
+              t'
           end
         | Bind (s, varty, t') ->
           let varty' = _eval env varty in
           let t' = _eval (DBEnv.push_none env) t' in
           bind ~kind:t.kind ~ty ~varty:varty' s t'
         | Record (l, rest) ->
-          let rest = match rest with
-            | None -> None
-            | Some r -> Some (_eval env r)
-          in
+          let rest = CCOpt.map (_eval env) rest in
           let l = List.map (fun (s,t') -> s, _eval env t') l in
           record ~kind:t.kind ~ty l ~rest
         | RecordGet(r, name) ->
@@ -669,47 +664,46 @@ let bind_vars ~kind ~ty s vars t =
 (** {3 Iterators} *)
 
 module Seq = struct
-  let rec vars t k = match view t with
-    | _ when ground t -> ()
-    | Var _ -> k t
-    | RigidVar _
-    | BVar _
-    | Const _ -> ()
-    | App (head, l) -> vars head k; _vars_list l k
-    | Record (l, rest) ->
-        begin match rest with
-        | None -> () | Some r -> vars r k
-        end;
-        List.iter (fun (s,t') -> vars t' k) l
-    | RecordGet (r, _) -> vars r k
-    | RecordSet (r, _, sub) -> vars r k; vars sub k
-    | SimpleApp (_,l)
-    | Multiset l -> _vars_list l k
-    | Bind (_, varty, t') -> vars varty k; vars t' k
-    | At (l,r) -> vars l k; vars r k
-  and _vars_list l k = match l with
-    | [] -> ()
-    | t::l' -> vars t k; _vars_list l' k
+  let vars t k =
+    let rec vars t = match view t with
+      | _ when ground t -> ()
+      | Var _ -> k t
+      | RigidVar _
+      | BVar _
+      | Const _ -> ()
+      | App (head, l) -> vars head; List.iter vars l
+      | Record (l, rest) ->
+          CCOpt.iter vars rest;
+          List.iter (fun (s,t') -> vars t') l
+      | RecordGet (r, _) -> vars r
+      | RecordSet (r, _, sub) -> vars r; vars sub
+      | SimpleApp (_,l)
+      | Multiset l -> List.iter vars l
+      | Bind (_, varty, t') -> vars varty; vars t'
+      | At (l,r) -> vars l; vars r
+    in
+    vars t
 
-  let rec subterms t k =
-    k t;
-    match view t with
-    | Var _
-    | RigidVar _
-    | BVar _
-    | Const _ -> ()
-    | Bind (_, varty, t') -> subterms varty k; subterms t' k
-    | Record (l, rest) ->
-        begin match rest with
-        | None -> () | Some r -> subterms r k
-        end;
-        List.iter (fun (s,t') -> subterms t' k) l
-    | RecordGet (r, _) -> subterms r k
-    | RecordSet (r, _, sub) -> subterms r k; subterms sub k
-    | SimpleApp (_, l)
-    | Multiset l -> List.iter (fun t' -> subterms t' k) l
-    | App(_, l) -> List.iter (fun t' -> subterms t' k) l
-    | At (l,r) -> subterms l k; subterms r k
+  let subterms t k =
+    let rec subterms t =
+      k t;
+      match view t with
+      | Var _
+      | RigidVar _
+      | BVar _
+      | Const _ -> ()
+      | Bind (_, varty, t') -> subterms varty; subterms t'
+      | Record (l, rest) ->
+          CCOpt.iter subterms rest;
+          List.iter (fun (_,t') -> subterms t') l
+      | RecordGet (r, _) -> subterms r
+      | RecordSet (r, _, sub) -> subterms r; subterms sub
+      | SimpleApp (_, l)
+      | Multiset l -> List.iter subterms l
+      | App(f, l) -> subterms f; List.iter subterms l
+      | At (l,r) -> subterms l; subterms r
+    in
+    subterms t
 
   let rigid_vars t =
     subterms t |> Sequence.filter is_rigid_var
@@ -739,46 +733,44 @@ module Seq = struct
     in
     recurse 0 t
 
-  let rec symbols t k = match view t with
-    | Var _ | BVar _ | RigidVar _ -> ()
-    | Const s -> k s
-    | App (head, l) -> symbols head k; _symbols_list l k
-    | At (l,r) -> symbols l k; symbols r k
-    | Record (l, rest) ->
-        begin match rest with
-        | None -> () | Some r -> symbols r k
-        end;
-        List.iter (fun (s,t') -> symbols t' k) l
-    | Multiset l -> List.iter (fun t' -> symbols t' k) l
-    | SimpleApp (s,l) ->
-      k s;
-      List.iter (fun t' -> symbols t' k) l
-    | RecordGet (r, _) -> symbols r k
-    | RecordSet (r, _, sub) -> symbols r k; symbols sub k
-    | Bind (s, varty, t') -> k s; symbols varty k; symbols t' k
-  and _symbols_list l k = match l with
-    | [] -> ()
-    | t::l' -> symbols t k; _symbols_list l' k
+  let symbols t k =
+    let rec symbols t = match view t with
+      | Var _ | BVar _ | RigidVar _ -> ()
+      | Const s -> k s
+      | App (head, l) -> symbols head; List.iter symbols l
+      | At (l,r) -> symbols l; symbols r
+      | Record (l, rest) ->
+          CCOpt.iter symbols rest;
+          List.iter (fun (_,t') -> symbols t') l
+      | Multiset l -> List.iter symbols l
+      | SimpleApp (s,l) ->
+        k s;
+        List.iter symbols l
+      | RecordGet (r, _) -> symbols r
+      | RecordSet (r, _, sub) -> symbols r; symbols sub
+      | Bind (s, varty, t') -> k s; symbols varty; symbols t'
+    in
+    symbols t
 
-  let rec types t k =
-    begin match t.ty with
-    | NoType -> ()
-    | HasType ty -> k ty
-    end;
-    match view t with
-    | Var _ | BVar _ | RigidVar _ | Const _ -> ()
-    | App (head, l) -> types head k; List.iter (fun t' -> types t' k) l
-    | Record (l,rest) ->
-        begin match rest with
-        | None -> () | Some r -> types r k
-        end;
-        List.iter (fun (s,t') -> types t' k) l
-    | RecordGet (r, _) -> types r k
-    | RecordSet (r, _, sub) -> types r k; types sub k
-    | SimpleApp (_,l)
-    | Multiset l -> List.iter (fun t' -> types t' k) l
-    | Bind (_, _, t') -> types t' k
-    | At (l,r) -> types l k; types r k
+  let types t k =
+    let rec types t =
+      begin match t.ty with
+      | NoType -> ()
+      | HasType ty -> k ty
+      end;
+      match view t with
+      | Var _ | BVar _ | RigidVar _ | Const _ -> ()
+      | App (head, l) -> types head; List.iter types l
+      | Record (l,rest) ->
+          CCOpt.iter types rest;
+          List.iter (fun (_,t') -> types t') l
+      | RecordGet (r, _) -> types r
+      | RecordSet (r, _, sub) -> types r; types sub
+      | SimpleApp (_,l)
+      | Multiset l -> List.iter types l
+      | Bind (_, _, t') -> types t'
+      | At (l,r) -> types l; types r
+    in types t
 
   let max_var seq =
     let r = ref 0 in

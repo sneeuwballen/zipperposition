@@ -149,6 +149,8 @@ end
 (** {3 De Bruijn indices handling} *)
 
 module DB : sig
+  type env = t DBEnv.t
+
   val closed : t -> bool
     (** check whether the term is closed (all DB vars are bound within the
         term). If this returns [true] then the term doesn't depend on
@@ -158,7 +160,8 @@ module DB : sig
     (** Does t contains the De Bruijn variable of index n? *)
 
   val open_vars : t -> t Sequence.t
-    (** List of "open" De Bruijn variables (with too high an index) *)
+    (** List of "open" De Bruijn variables (with too high an index)
+        @deprecated *)
 
   val shift : int -> t -> t
     (** shift the non-captured De Bruijn indexes in the term by n *)
@@ -175,7 +178,7 @@ module DB : sig
     (** [db_from_var t ~var] replace [var] by a De Bruijn symbol in t.
         Same as {!replace}. *)
 
-  val eval : t DBEnv.t -> t -> t
+  val eval : env -> t -> t
     (** Evaluate the term in the given De Bruijn environment, by
         replacing De Bruijn indices by their value in the environment. *)
 end
