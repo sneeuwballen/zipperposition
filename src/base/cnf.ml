@@ -582,6 +582,7 @@ let cnf_of_list ?(opts=[]) ?(ctx=Skolem.create Signature.empty) l =
         let clauses = to_cnf f in
         Util.debug 4 "... CNF: %a"
           (Util.pp_list ~sep:", " (Util.pp_list ~sep:" | " F.pp)) clauses;
+        assert (List.for_all (List.for_all F.is_closed) clauses);
         clauses
       end
     in
