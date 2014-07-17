@@ -54,11 +54,19 @@ module Make(E : Env.S) = struct
   module C = Env.C
   module Ctx = Env.Ctx
 
+  let _depth_types lits =
+    Literals.Seq.terms lits
+    |> Sequence.map T.ty
+    |> Sequence.map (fun t -> ScopedTerm.depth (t : Type.t :> ScopedTerm.t))
+    |> Sequence.max ?lt:None
+    |> CCOpt.maybe CCFun.id 0
+
   let is_too_deep c =
     match !_depth_limit with
     | None -> false
     | Some d ->
-      let depth = Literals.depth (C.lits c) in
+      let lits = C.lits c in
+      let depth = max (_depth_types lits) (Literals.depth lits) in
       if depth > d
       then (
         Ctx.lost_completeness();
