@@ -626,10 +626,7 @@ module Make(MyT : TERM) = struct
       |> Sequence.fold (fun acc t -> Type.Set.add t acc) Type.Set.empty
     in tyvars, tvars
 
-  let is_closed f =
-    match free_vars f with
-    | [] -> true
-    | _ -> false
+  let is_closed f = T.DB.closed f
 
   let contains_symbol sy f =
     Sequence.exists (Symbol.eq sy) (Seq.symbols f)
