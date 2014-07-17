@@ -35,6 +35,10 @@ type 'a sequence = ('a -> unit) -> unit
 
 type res = subst sequence
 
+val res_head : res -> subst option
+(** Obtain the first result, if any
+    @since NEXT_RELEASE *)
+
 exception Fail
   (** Raised when a unification/matching attempt fails *)
 

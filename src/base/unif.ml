@@ -48,6 +48,13 @@ let prof_matching = Util.mk_profiler "matching"
 
 type res = subst sequence
 
+let res_head seq =
+  let r = ref None in
+  try
+    seq (fun x -> r := Some x; raise Exit);
+    None
+  with Exit -> !r
+
 (** {2 Signatures} *)
 
 module type UNARY = sig
