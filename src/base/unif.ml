@@ -38,21 +38,15 @@ exception Fail
 
 type scope = Substs.scope
 type subst = Substs.t
-type 'a klist = unit -> [`Nil | `Cons of 'a * 'a klist]
+type env = ScopedTerm.DB.env
+type 'a sequence = ('a -> unit) -> unit
 
 let prof_unify = Util.mk_profiler "unify"
 let prof_matching = Util.mk_profiler "matching"
 
 (** {2 Result of multiple Unification} *)
 
-type res = subst klist
-
-module Res = struct
-  (* takes a function that requires a success cont. and a failure cont.
-      and returns the lazy result *)
-  let of_fun f =
-    f ~k:(fun subst fk -> CCKList.cons subst (fk ())) ~fk:(fun () -> CCKList.nil)
-end
+type res = subst sequence
 
 (** {2 Signatures} *)
 
@@ -63,13 +57,12 @@ module type UNARY = sig
     (** Unify terms, returns a subst or
         @raise Fail if the terms are not unifiable *)
 
-  val matching : ?allow_open:bool -> ?subst:subst ->
+  val matching : ?subst:subst ->
                  pattern:term -> scope -> term -> scope -> subst
     (** [matching ~pattern scope_p b scope_b] returns
         [sigma] such that [sigma pattern = b], or fails.
         Only variables from the scope of [pattern] can  be bound in the subst.
         @param subst initial substitution (default empty)
-        @param allow_open if true, variables
         @raise Fail if the terms do not match.
         @raise Invalid_argument if the two scopes are equal *)
 
@@ -222,45 +215,42 @@ module RU = RecordUnif
 module Nary = struct
   type term = T.t
   type result = res
-  type fcont = unit -> result
-  type cont = Substs.t -> fcont -> result
-  type unif = Substs.t -> T.t -> scope -> T.t -> scope -> k:cont -> fk:fcont -> result
+  type unif = Substs.t -> T.t -> scope -> T.t -> scope -> res
 
   (* unify lists pairwise *)
-  let rec __unify_list ~(unif:unif) subst l1 sc1 l2 sc2 ~(k:cont) ~(fk:fcont) : result =
+  let rec __unify_list ~(unif:unif) subst l1 sc1 l2 sc2 k =
     match l1, l2 with
-    | [], [] -> k subst fk
+    | [], [] -> k subst
     | [], _
-    | _, [] -> fk ()
+    | _, [] -> ()
     | t1::l1', t2::l2' ->
         unif subst t1 sc1 t2 sc2
-          ~k:(fun subst fk -> __unify_list ~unif subst l1' sc1 l2' sc2 ~k ~fk)
-          ~fk
+          (fun subst -> __unify_list ~unif subst l1' sc1 l2' sc2 k)
 
   (* unify the row variables, if any, with the unmatched columns of each term.
       we first unify the record composed of discard fields of r1, with
       the row of r2, and then conversely.*)
-  let __unify_record_rest ~unif subst r1 sc1 r2 sc2 ~k ~fk =
+  let __unify_record_rest ~unif subst r1 sc1 r2 sc2 k =
     assert (r1.RU.fields = []);
     assert (r2.RU.fields = []);
     (* Util.debug 5 "unif_rest %a %a" T.pp (RU.to_record r1) T.pp (RU.to_record r2); *)
     match r1.RU.rest, r1.RU.discarded, r2.RU.rest, r2.RU.discarded with
     | None, [], None, [] ->
-        k subst fk  (* no row, no remaining fields *)
+        k subst (* no row, no remaining fields *)
     | None, _, _, _::_
     | _, _::_, None, _ ->
         (* must unify an empty rest against a non-empty set of discarded
-         * fields, that is impossible *)
-        fk ()
+           fields, that is impossible *)
+        ()
     | Some rest1, [], _, _ ->
         (* no discarded fields in r1, so we only need to
-         * unify rest1 with { l2 | rest2 } *)
+           unify rest1 with { l2 | rest2 } *)
         let t2 = RU.to_record r2 in
-        unif subst rest1 sc1 t2 sc2 ~k ~fk
+        unif subst rest1 sc1 t2 sc2 k
     | _, _, Some rest2, [] ->
         (* symmetric case of the previous one *)
         let t1 = RU.to_record r1 in
-        unif subst t1 sc1 rest2 sc2 ~k ~fk
+        unif subst t1 sc1 rest2 sc2 k
     | Some rest1, l1, Some rest2, l2 ->
         (* create fresh var R and unify rest1 with {l2 | R} (t2)
          * and rest2 with { l1 | R } (t1) *)
@@ -268,258 +258,234 @@ module Nary = struct
         let t1 = RU.to_record (RU.set_rest r1 ~rest:(Some r)) in
         let t2 = RU.to_record (RU.set_rest r1 ~rest:(Some r)) in
         unif subst rest1 sc1 t2 sc2
-          ~k:(fun subst fk -> unif subst t1 sc1 rest2 sc2 ~k ~fk)
-          ~fk
+          (fun subst -> unif subst t1 sc1 rest2 sc2 k)
 
   (* unify the two records *)
-  let rec __unify_records ~unif subst r1 sc1 r2 sc2 ~k ~fk =
+  let rec __unify_records ~unif subst r1 sc1 r2 sc2 k =
     match RU.fields r1, RU.fields r2 with
     | [], _
     | _, [] ->
         let r1 = RU.discard_all r1 in
         let r2 = RU.discard_all r2 in
-        __unify_record_rest ~unif subst r1 sc1 r2 sc2 ~k ~fk
+        __unify_record_rest ~unif subst r1 sc1 r2 sc2 k
     | (n1,t1)::_, (n2,t2)::_ ->
         begin match String.compare n1 n2 with
         | 0 ->
           unif subst t1 sc1 t2 sc2
-            ~k:(fun subst fk ->
+            (fun subst ->
               let r1' = RU.pop_field r1 in
               let r2' = RU.pop_field r2 in
-              __unify_records ~unif subst r1' sc1 r2' sc2 ~k ~fk)
-            ~fk
+              __unify_records ~unif subst r1' sc1 r2' sc2 k)
         | n when n < 0 ->
             (* n1 too small, ditch it into l1' *)
             let r1' = RU.discard r1 in
-            __unify_records ~unif subst r1' sc1 r2 sc2 ~k ~fk
+            __unify_records ~unif subst r1' sc1 r2 sc2 k
         | _ ->
             (* n2 too small, ditch it into l2' *)
             let r2' = RU.discard r2 in
-            __unify_records ~unif subst r1 sc1 r2' sc2 ~k ~fk
+            __unify_records ~unif subst r1 sc1 r2' sc2 k
         end
 
   (* unify multisets pairwise. Precondition: l1 and l2 have the same length. *)
-  let rec __unify_multiset ~unif subst l1 sc1 l2 sc2 ~k ~fk =
+  let rec __unify_multiset ~unif subst l1 sc1 l2 sc2 k =
     match l2 with
-    | [] -> k subst fk  (* success! *)
-    | t2::l2' -> 
+    | [] -> k subst (* success! *)
+    | t2::l2' ->
         (* need to unify some element of [l1] with [t2] first *)
-        __choose_pair ~unif subst [] l1 sc1 t2 l2' sc2 ~k ~fk
+        __choose_pair ~unif subst [] l1 sc1 t2 l2' sc2 k
   (* choose an element of [l1] to unify with the head of [l2] *)
-  and __choose_pair ~unif subst left right sc1 t2 l2' sc2 ~k ~fk =
+  and __choose_pair ~unif subst left right sc1 t2 l2' sc2 k =
     match right with
-    | [] -> fk ()   (* exhausted all possibilities *)
+    | [] -> ()   (* exhausted all possibilities *)
     | t1::right' ->
         unif subst t1 sc1 t2 sc2
-          ~k:(fun subst fk ->
+          (fun subst ->
             (* upon success, unify remaining pairs *)
-            __unify_multiset ~unif subst (left@right') sc1 l2' sc2 ~k ~fk)
-          ~fk:(fun () ->
-            (* upon failure, try to unify [t2] with another term of [right] *)
-            __choose_pair ~unif subst (t1::left) right' sc1 t2 l2' sc2 ~k ~fk)
+            __unify_multiset ~unif subst (left@right') sc1 l2' sc2 k);
+        (* also try to unify [t2] with another term of [right] *)
+        __choose_pair ~unif subst (t1::left) right' sc1 t2 l2' sc2 k
 
   (* TODO: put a test "if s.kind <> t.kind then fk()" ? *)
 
   let unification ?(subst=Substs.empty) a sc_a b sc_b =
-    let rec unif subst s sc_s t sc_t ~k ~fk =
+    let rec unif subst s sc_s t sc_t k =
       let s, sc_s = Substs.get_var subst s sc_s
       and t, sc_t = Substs.get_var subst t sc_t in
       (* unify types. On success, unify terms. *)
       match T.ty s, T.ty t with
         | T.NoType, T.NoType ->
-          unif_terms subst s sc_s t sc_t ~k ~fk
+          unif_terms subst s sc_s t sc_t k
         | T.NoType, _
-        | _, T.NoType -> fk ()
+        | _, T.NoType -> ()
         | T.HasType ty1, T.HasType ty2 ->
           unif subst ty1 sc_s ty2 sc_t
-            ~k:(fun subst fk -> unif_terms subst s sc_s t sc_t ~k ~fk)
-            ~fk
-    and unif_terms subst s sc_s t sc_t ~(k:cont) ~(fk:fcont) : result =
+            (fun subst -> unif_terms subst s sc_s t sc_t k)
+    and unif_terms subst s sc_s t sc_t k =
       match T.view s, T.view t with
       | _ when T.eq s t && (T.ground s || sc_s = sc_t) ->
-        k subst fk (* the terms are equal under any substitution *)
+        k subst (* the terms are equal under any substitution *)
       | _ when T.ground s && T.ground t ->
-        fk () (* terms are not equal, and ground. failure. *)
-      | T.RigidVar i, T.RigidVar j when sc_s = sc_t && i = j -> k subst fk
+        () (* terms are not equal, and ground. failure. *)
+      | T.RigidVar i, T.RigidVar j when sc_s = sc_t && i = j -> k subst
       | T.RigidVar i, T.RigidVar j when sc_s <> sc_t ->
-          k (Substs.bind subst s sc_s t sc_t) fk
+          k (Substs.bind subst s sc_s t sc_t)
       | T.RigidVar _, _
-      | _, T.RigidVar _ -> fk ()  (* fail *)
+      | _, T.RigidVar _ -> ()  (* fail *)
       | T.Var _, _ ->
         if occurs_check subst s sc_s t sc_t || not (T.DB.closed t)
-          then fk () (* occur check *)
-          else k (Substs.bind subst s sc_s t sc_t) fk (* bind s *)
+          then () (* occur check *)
+          else k (Substs.bind subst s sc_s t sc_t)
       | _, T.Var _ ->
         if occurs_check subst t sc_t s sc_s || not (T.DB.closed s)
-          then fk () (* occur check *)
-          else k (Substs.bind subst t sc_t s sc_s) fk (* bind s *)
+          then () (* occur check *)
+          else k (Substs.bind subst t sc_t s sc_s)
       | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Symbol.eq s1 s2 ->
         unif subst varty1 sc_s varty2 sc_t
-          ~k:(fun subst fk -> unif subst t1' sc_s t2' sc_t ~k ~fk)
-          ~fk
-      | T.BVar i, T.BVar j when i = j -> k subst fk
-      | T.Const f, T.Const g when Symbol.eq f g -> k subst fk
+          (fun subst -> unif subst t1' sc_s t2' sc_t k)
+      | T.BVar i, T.BVar j when i = j -> k subst
+      | T.Const f, T.Const g when Symbol.eq f g -> k subst
       | T.App (hd1, l1), T.App (hd2, l2) when List.length l1 = List.length l2 ->
         unif subst hd1 sc_s hd2 sc_t
-          ~k:(fun subst fk -> __unify_list ~unif subst l1 sc_s l2 sc_t ~k ~fk)
-          ~fk
+          (fun subst -> __unify_list ~unif subst l1 sc_s l2 sc_t k)
       | T.Record (l1, rest1), T.Record (l2, rest2) ->
         let r1 = RU.of_record s l1 rest1 in
         let r2 = RU.of_record t l2 rest2 in
-        __unify_records ~unif subst r1 sc_s r2 sc_t ~k ~fk
+        __unify_records ~unif subst r1 sc_s r2 sc_t k
       | T.RecordGet (r1, name1), T.RecordGet (r2, name2) when name1=name2 ->
-        unif subst r1 sc_s r2 sc_t ~k ~fk
+        unif subst r1 sc_s r2 sc_t k
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         unif subst r1 sc_s r2 sc_t
-          ~k:(fun subst fk -> unif subst sub1 sc_s sub2 sc_t ~k ~fk)
-          ~fk
+          (fun subst -> unif subst sub1 sc_s sub2 sc_t k)
       | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when Symbol.eq s1 s2 ->
-        __unify_list ~unif subst l1 sc_s l2 sc_t ~k ~fk
+        __unify_list ~unif subst l1 sc_s l2 sc_t k
       | T.Multiset l1, T.Multiset l2 when List.length l1 = List.length l2 ->
-        __unify_multiset ~unif subst l1 sc_s l2 sc_t ~k ~fk
+        __unify_multiset ~unif subst l1 sc_s l2 sc_t k
       | T.At (l1, r1), T.At (l2, r2) ->
         unif subst l1 sc_s l2 sc_t
-          ~k:(fun subst fk -> unif subst r1 sc_s r2 sc_t ~k ~fk)
-          ~fk
-      | _, _ -> fk ()  (* fail *)
+          (fun subst -> unif subst r1 sc_s r2 sc_t k)
+      | _, _ -> ()  (* fail *)
     in
-    Res.of_fun (unif subst a sc_a b sc_b)
+    unif subst a sc_a b sc_b
 
   let matching ?(subst=Substs.empty) ~pattern sc_pattern b sc_b =
-    let rec unif subst s sc_s t sc_t ~k ~fk =
+    let rec unif subst s sc_s t sc_t k =
       let s, sc_s = Substs.get_var subst s sc_s
       and t, sc_t = Substs.get_var subst t sc_t in
       (* unify types. On success, unify terms. *)
       match T.ty s, T.ty t with
         | T.NoType, T.NoType ->
-          unif_terms subst s sc_s t sc_t ~k ~fk
+          unif_terms subst s sc_s t sc_t k
         | T.NoType, _
-        | _, T.NoType -> fk ()
+        | _, T.NoType -> ()
         | T.HasType ty1, T.HasType ty2 ->
           unif subst ty1 sc_s ty2 sc_t
-            ~k:(fun subst fk -> unif_terms subst s sc_s t sc_t ~k ~fk)
-            ~fk
-    and unif_terms subst s sc_s t sc_t ~(k:cont) ~(fk:fcont) : res =
+            (fun subst -> unif_terms subst s sc_s t sc_t k)
+    and unif_terms subst s sc_s t sc_t k =
       match T.view s, T.view t with
       | _ when T.eq s t && (T.ground s || sc_s = sc_t) ->
-        k subst fk (* the terms are equal under any substitution *)
+        k subst  (* the terms are equal under any substitution *)
       | _ when T.ground s && T.ground t ->
-        fk () (* terms are not equal, and ground. failure. *)
-      | T.RigidVar i, T.RigidVar j when sc_s = sc_t && i = j -> k subst fk
+        () (* terms are not equal, and ground. failure. *)
+      | T.RigidVar i, T.RigidVar j when sc_s = sc_t && i = j -> k subst
       | T.RigidVar i, T.RigidVar j when sc_s <> sc_t ->
-          k (Substs.bind subst s sc_s t sc_t) fk
+          k (Substs.bind subst s sc_s t sc_t)
       | T.RigidVar _, _
-      | _, T.RigidVar _ -> fk ()  (* fail *)
+      | _, T.RigidVar _ -> ()  (* fail *)
       | T.Var _, _ ->
         if occurs_check subst s sc_s t sc_t || sc_s = sc_t || not (T.DB.closed t)
-          then fk ()
-          else k (Substs.bind subst s sc_s t sc_t) fk (* bind s *)
+          then ()
+          else k (Substs.bind subst s sc_s t sc_t)  (* bind s *)
       | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Symbol.eq s1 s2 ->
         unif subst varty1 sc_s varty2 sc_t
-          ~k:(fun subst fk -> unif subst t1' sc_s t2' sc_t ~k ~fk)
-          ~fk
-      | T.BVar i, T.BVar j when i = j -> k subst fk
-      | T.Const f, T.Const g when Symbol.eq f g -> k subst fk
+          (fun subst  -> unif subst t1' sc_s t2' sc_t k)
+      | T.BVar i, T.BVar j when i = j -> k subst
+      | T.Const f, T.Const g when Symbol.eq f g -> k subst
       | T.App (hd1, l1), T.App (hd2, l2) when List.length l1 = List.length l2 ->
         unif subst hd1 sc_s hd2 sc_t
-          ~k:(fun subst fk -> __unify_list ~unif subst l1 sc_s l2 sc_t ~k ~fk)
-          ~fk
+          (fun subst -> __unify_list ~unif subst l1 sc_s l2 sc_t k)
       | T.Record (l1, rest1), T.Record (l2, rest2) ->
         let r1 = RU.of_record s l1 rest1 in
         let r2 = RU.of_record t l2 rest2 in
-        __unify_records ~unif subst r1 sc_s r2 sc_t ~k ~fk
+        __unify_records ~unif subst r1 sc_s r2 sc_t k
       | T.RecordGet (r1, name1), T.RecordGet (r2, name2) when name1=name2 ->
-        unif subst r1 sc_s r2 sc_t ~k ~fk
+        unif subst r1 sc_s r2 sc_t k
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         unif subst r1 sc_s r2 sc_t
-          ~k:(fun subst fk -> unif subst sub1 sc_s sub2 sc_t ~k ~fk)
-          ~fk
+          (fun subst -> unif subst sub1 sc_s sub2 sc_t k)
       | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when Symbol.eq s1 s2 ->
-        __unify_list ~unif subst l1 sc_s l2 sc_t ~k ~fk
+        __unify_list ~unif subst l1 sc_s l2 sc_t k
       | T.Multiset l1, T.Multiset l2 when List.length l1 = List.length l2 ->
-        __unify_multiset ~unif subst l1 sc_s l2 sc_t ~k ~fk
+        __unify_multiset ~unif subst l1 sc_s l2 sc_t k
       | T.At (l1, r1), T.At (l2, r2) ->
         unif subst l1 sc_s l2 sc_t
-          ~k:(fun subst fk -> unif subst r1 sc_s r2 sc_t ~k ~fk)
-          ~fk
-      | _, _ -> fk ()  (* fail *)
+          (fun subst -> unif subst r1 sc_s r2 sc_t k)
+      | _, _ -> ()  (* fail *)
     in
-    Res.of_fun (unif subst pattern sc_pattern b sc_b)
+    unif subst pattern sc_pattern b sc_b
 
   let variant ?(subst=Substs.empty) a sc_a b sc_b =
-    let rec unif subst s sc_s t sc_t ~k ~fk =
+    let rec unif subst s sc_s t sc_t k =
       let s, sc_s = Substs.get_var subst s sc_s
       and t, sc_t = Substs.get_var subst t sc_t in
       (* unify types. On success, unify terms. *)
       match T.ty s, T.ty t with
         | T.NoType, T.NoType ->
-          unif_terms subst s sc_s t sc_t ~k ~fk
+          unif_terms subst s sc_s t sc_t k
         | T.NoType, _
-        | _, T.NoType -> fk ()
+        | _, T.NoType -> ()
         | T.HasType ty1, T.HasType ty2 ->
           unif subst ty1 sc_s ty2 sc_t
-            ~k:(fun subst fk -> unif_terms subst s sc_s t sc_t ~k ~fk)
-            ~fk
-    and unif_terms subst s sc_s t sc_t ~(k:cont) ~(fk:fcont) : res =
+            (fun subst  -> unif_terms subst s sc_s t sc_t k)
+    and unif_terms subst s sc_s t sc_t k =
       match T.view s, T.view t with
       | _ when T.eq s t && (T.ground s || sc_s = sc_t) ->
-        k subst fk (* the terms are equal under any substitution *)
+        k subst  (* the terms are equal under any substitution *)
       | _ when T.ground s && T.ground t ->
-        fk () (* terms are not equal, and ground. failure. *)
-      | T.RigidVar i, T.RigidVar j when sc_s = sc_t && i = j -> k subst fk
+        () (* terms are not equal, and ground. failure. *)
+      | T.RigidVar i, T.RigidVar j when sc_s = sc_t && i = j -> k subst
       | T.RigidVar i, T.RigidVar j when sc_s <> sc_t ->
-          k (Substs.bind subst s sc_s t sc_t) fk
+          k (Substs.bind subst s sc_s t sc_t)
       | T.RigidVar _, _
-      | _, T.RigidVar _ -> fk ()  (* fail *)
-      | T.Var i, T.Var j when i <> j && sc_s = sc_t -> fk ()
+      | _, T.RigidVar _ -> ()  (* fail *)
+      | T.Var i, T.Var j when i <> j && sc_s = sc_t -> ()
       | T.Var _, T.Var _ when sc_s <> sc_t ->
-          k (Substs.bind subst s sc_s t sc_t) fk (* bind s *)
+          k (Substs.bind subst s sc_s t sc_t)  (* bind s *)
       | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Symbol.eq s1 s2 ->
         unif subst varty1 sc_s varty2 sc_t
-          ~k:(fun subst fk -> unif subst t1' sc_s t2' sc_t ~k ~fk)
-          ~fk
-      | T.BVar i, T.BVar j when i = j -> k subst fk
-      | T.Const f, T.Const g when Symbol.eq f g -> k subst fk
+          (fun subst  -> unif subst t1' sc_s t2' sc_t k)
+      | T.BVar i, T.BVar j when i = j -> k subst
+      | T.Const f, T.Const g when Symbol.eq f g -> k subst
       | T.App (hd1, l1), T.App (hd2, l2) when List.length l1 = List.length l2 ->
         unif subst hd1 sc_s hd2 sc_t
-          ~k:(fun subst fk -> __unify_list ~unif subst l1 sc_s l2 sc_t ~k ~fk)
-          ~fk
+          (fun subst  -> __unify_list ~unif subst l1 sc_s l2 sc_t k)
       | T.Record (l1, rest1), T.Record (l2, rest2) ->
         let r1 = RU.of_record s l1 rest1 in
         let r2 = RU.of_record t l2 rest2 in
-        __unify_records ~unif subst r1 sc_s r2 sc_t ~k ~fk
+        __unify_records ~unif subst r1 sc_s r2 sc_t k
       | T.RecordGet (r1, name1), T.RecordGet (r2, name2) when name1=name2 ->
-        unif subst r1 sc_s r2 sc_t ~k ~fk
+        unif subst r1 sc_s r2 sc_t k
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         unif subst r1 sc_s r2 sc_t
-          ~k:(fun subst fk -> unif subst sub1 sc_s sub2 sc_t ~k ~fk)
-          ~fk
+          (fun subst  -> unif subst sub1 sc_s sub2 sc_t k)
       | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when Symbol.eq s1 s2 ->
-        __unify_list ~unif subst l1 sc_s l2 sc_t ~k ~fk
+        __unify_list ~unif subst l1 sc_s l2 sc_t k
       | T.Multiset l1, T.Multiset l2 when List.length l1 = List.length l2 ->
-        __unify_multiset ~unif subst l1 sc_s l2 sc_t ~k ~fk
+        __unify_multiset ~unif subst l1 sc_s l2 sc_t k
       | T.At (l1, r1), T.At (l2, r2) ->
         unif subst l1 sc_s l2 sc_t
-          ~k:(fun subst fk -> unif subst r1 sc_s r2 sc_t ~k ~fk)
-          ~fk
-      | _, _ -> fk ()  (* fail *)
+          (fun subst  -> unif subst r1 sc_s r2 sc_t k)
+      | _, _ -> ()  (* fail *)
     in
-    Res.of_fun (unif subst a sc_a b sc_b)
+    unif subst a sc_a b sc_b
 
   let are_variant t1 t2 =
-    match variant t1 0 t2 1 () with
-    | `Nil -> false
-    | `Cons _ -> true
+    not (Sequence.is_empty (variant t1 0 t2 1))
 
   let matches ~pattern t =
-    match matching ~pattern 0 t 1 () with
-    | `Nil -> false
-    | `Cons _ -> true
+    not (Sequence.is_empty (matching ~pattern 0 t 1))
 
   let are_unifiable t1 t2 =
-    match unification t1 0 t2 1 () with
-    | `Nil -> false
-    | `Cons _ -> true
+    not (Sequence.is_empty (unification t1 0 t2 1))
 end
 
 (** {2 Unary Unification} *)
@@ -614,7 +580,7 @@ module Unary = struct
       | _ when T.ground s && T.ground t ->
         raise Fail (* terms are not equal, and ground. failure. *)
       | T.Var _, _ ->
-        if occurs_check subst s sc_s t sc_t || not (T.DB.closed t) 
+        if occurs_check subst s sc_s t sc_t || not (T.DB.closed t)
           then raise Fail (* occur check *)
           else Substs.bind subst s sc_s t sc_t (* bind s *)
       | _, T.Var _ ->
@@ -654,7 +620,7 @@ module Unary = struct
       Util.exit_prof prof_unify;
       raise e
 
-  let matching ?(allow_open=false) ?(subst=Substs.empty) ~pattern sc_a b sc_b =
+  let matching ?(subst=Substs.empty) ~pattern sc_a b sc_b =
     Util.enter_prof prof_matching;
     (* recursive matching *)
     let rec unif subst s sc_s t sc_t =
@@ -674,7 +640,7 @@ module Unary = struct
         raise Fail (* terms are not equal, and ground. failure. *)
       | T.Var _, _ ->
         if occurs_check subst s sc_s t sc_t || sc_s = sc_t
-        || (not allow_open && not (T.DB.closed t)) 
+        || not (T.DB.closed t) 
           then raise Fail
           else Substs.bind subst s sc_s t sc_t (* bind s *)
       | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Symbol.eq s1 s2 ->
@@ -894,7 +860,7 @@ module Ty = struct
     (unification :> ?subst:subst -> term -> scope -> term -> scope -> subst)
 
   let matching =
-    (matching :> ?allow_open:bool -> ?subst:subst ->
+    (matching :> ?subst:subst ->
         pattern:term -> scope -> term -> scope -> subst)
 
   let matching_same_scope =
@@ -929,7 +895,7 @@ module FO = struct
     (unification :> ?subst:subst -> term -> scope -> term -> scope -> subst)
 
   let matching =
-    (matching :> ?allow_open:bool -> ?subst:subst ->
+    (matching :> ?subst:subst ->
         pattern:term -> scope -> term -> scope -> subst)
 
   let matching_same_scope =
@@ -986,71 +952,67 @@ module Form = struct
   let variant ?(subst=Substs.empty) f1 sc_1 f2 sc_2 =
     (* CPS, with [k] the continuation that is given the answer
       substitutions *)
-    let rec unif subst f1 f2 ~k ~fk = match F.view f1, F.view f2 with
-      | _ when F.eq f1 f2 -> k subst fk
+    let rec unif subst f1 f2 k = match F.view f1, F.view f2 with
+      | _ when F.eq f1 f2 -> k subst
       | F.Atom p1, F.Atom p2 ->
         begin try
           let subst = FO.variant ~subst p1 sc_1 p2 sc_2 in
-          k subst fk
-        with Fail -> fk ()
+          k subst
+        with Fail -> ()
         end
       | F.Eq (t11, t12), F.Eq (t21, t22)
       | F.Neq (t11, t12), F.Neq (t21, t22) ->
         begin try
           let subst = FO.variant ~subst t11 sc_1 t21 sc_2 in
           let subst = FO.variant ~subst t12 sc_1 t22 sc_2 in
-          k subst fk
-        with Fail -> fk ()
+          k subst
+        with Fail -> ()
         end;
         begin try
           let subst = FO.variant ~subst t11 sc_1 t22 sc_2 in
           let subst = FO.variant ~subst t12 sc_1 t21 sc_2 in
-          k subst fk
-        with Fail -> fk ()
+          k subst
+        with Fail -> ()
         end;
-      | F.Not f1', F.Not f2' -> unif subst f1' f2' ~k ~fk
+      | F.Not f1', F.Not f2' -> unif subst f1' f2' k
       | F.Imply (f11, f12), F.Imply (f21, f22)
       | F.Xor (f11, f12), F.Xor (f21, f22)
       | F.Equiv(f11, f12), F.Imply (f21, f22) ->
         unif subst f11 f21
-          ~k:(fun subst fk -> unif subst f21 f22 ~k ~fk)
-          ~fk
+          (fun subst -> unif subst f21 f22 k)
       | F.And l1, F.And l2
       | F.Or l1, F.Or l2 ->
         if List.length l1 = List.length l2
-          then unif_ac subst l1 [] l2 ~k ~fk
-          else fk ()  (* not. *)
+          then unif_ac subst l1 [] l2 k
+          else ()  (* not. *)
       | F.Exists (ty1,f1'), F.Exists (ty2,f2')
       | F.Forall (ty1,f1'), F.Forall (ty2,f2') ->
         begin try
           let subst = Ty.variant ~subst ty1 sc_1 ty2 sc_2 in
-          unif subst f1' f2' ~k ~fk
-        with Fail -> fk ()
+          unif subst f1' f2' k
+        with Fail -> ()
         end
       | F.True, F.True
-      | F.False, F.False -> k subst fk (* yep :) *)
-      | _ -> fk ()  (* failure *)
+      | F.False, F.False -> k subst (* yep :) *)
+      | _ -> ()  (* failure *)
     (* invariant: [l1] and [left @ right] always have the same length *)
-    and unif_ac subst l1 left right ~k ~fk = match l1, left, right with
-      | [], [], [] -> k subst fk  (* success! *)
+    and unif_ac subst l1 left right k = match l1, left, right with
+      | [], [], [] -> k subst (* success! *)
       | f1::l1', left, f2::right' ->
         (* f1 = f2 ? *)
         unif subst f1 f2
-          ~k:(fun subst fk -> unif_ac subst l1' [] (left @ right') ~k ~fk)
-          ~fk:(fun () ->
-            (* f1 against right', keep f2 for later *)
-            unif_ac subst l1 (f2::left) right' ~k ~fk)
-      | _::_, left, [] -> fk ()
+          (fun subst -> unif_ac subst l1' [] (left @ right') k);
+        (* f1 against right', keep f2 for later *)
+        unif_ac subst l1 (f2::left) right' k
+      | _::_, left, [] -> ()
       | _ -> assert false
     in
     (* flattening (for and/or) *)
     let f1 = F.flatten f1 in
     let f2 = F.flatten f2 in
-    Res.of_fun (unif subst f1 f2)
+    unif subst f1 f2
 
   let are_variant f1 f2 =
-    match variant f1 0 f2 1 () with
-    | `Nil -> false
-    | `Cons _ -> true
+    not (Sequence.is_empty (variant f1 0 f2 1))
 end
 

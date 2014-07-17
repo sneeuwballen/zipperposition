@@ -28,12 +28,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 type scope = Substs.scope
 type subst = Substs.t
-
-type 'a klist = unit -> [`Nil | `Cons of 'a * 'a klist]
+type env = ScopedTerm.DB.env
+type 'a sequence = ('a -> unit) -> unit
 
 (** {2 Result of (multiple) Unification} *)
 
-type res = subst klist
+type res = subst sequence
 
 exception Fail
   (** Raised when a unification/matching attempt fails *)
@@ -47,13 +47,12 @@ module type UNARY = sig
     (** Unify terms, returns a subst or
         @raise Fail if the terms are not unifiable *)
 
-  val matching : ?allow_open:bool -> ?subst:subst ->
+  val matching : ?subst:subst ->
                  pattern:term -> scope -> term -> scope -> subst
     (** [matching ~pattern scope_p b scope_b] returns
         [sigma] such that [sigma pattern = b], or fails.
         Only variables from the scope of [pattern] can  be bound in the subst.
         @param subst initial substitution (default empty)
-        @param allow_open if true, variables
         @raise Fail if the terms do not match.
         @raise Invalid_argument if the two scopes are equal *)
 

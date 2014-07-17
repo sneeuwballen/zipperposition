@@ -108,12 +108,12 @@ let normalize_collect trs t =
       S.iter
         (fun (l,r) ->
           let substs = Unif.HO.matching ~pattern:l 1 t 0 in
-          match substs () with
-          | `Nil -> ()   (* failure, try next rule *)
-          | `Cons (subst, _) ->
+          match substs |> Sequence.take 1 |> Sequence.to_list with
+          | [subst] ->
               (* l\subst = t, rewrite into r\subst *)
               let r = Substs.HO.apply_no_renaming subst r 1 in
               raise (RewrittenIn (r, subst, (l,r)))
+          | _ -> ()   (* failure, try next rule *)
         ) trs;
       (* could not rewrite [t], just return it *)
       t
