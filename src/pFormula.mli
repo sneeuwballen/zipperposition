@@ -48,12 +48,10 @@ val eq_noproof : t -> t -> bool
 val cmp_noproof : t -> t -> int
   (** Compare only by formula, not by proof *)
 
-val create : ?is_conjecture:bool -> ?follow:bool ->
-             form -> Proof.t -> t
+val create : ?follow:bool -> form -> Proof.t -> t
   (** Create a formula from a proof. If the formula already has a proof,
       then the old proof is kept. PFormulas are hashconsed.
-      @param follow follow simpl_to links if the formula has any (default false)
-      @param is_conjecture is the formula a goal? (default [false]) *)
+      @param follow follow simpl_to links if the formula has any (default false) *)
 
 val of_sourced : ?role:string -> Formula.FO.t Sourced.t -> t
 val to_sourced : t -> Formula.FO.t Sourced.t option

@@ -34,13 +34,23 @@ module F = Formula.FO
 module CC = CompactClause
 
 type form = F.t
+type 'a sequence = ('a -> unit) -> unit
+
+module FileInfo = struct
+  type t = {
+    filename : string;  (* file name *)
+    name : string;      (* statement name *)
+    role : string;
+    conjecture : bool;  (* conjecture/negated conjecture? *)
+  }
+end
 
 (** Classification of proof steps *)
 type step_kind =
   | Inference of string
   | Simplification of string
   | Esa of string
-  | File of string * string * string
+  | File of FileInfo.t
   | Trivial  (* trivial, or trivial within theories *)
 
 type step_result =
@@ -56,6 +66,11 @@ type t = {
 }
 
 type proof = t 
+
+let kind p = p.kind
+let parents p = p.parents
+let theories p = p.theories
+let additional_info p = p.additional_info
 
 let eq p1 p2 =
   p1.kind = p2.kind &&
@@ -90,8 +105,9 @@ let mk_f_trivial ?(info=[]) ?(theories=[]) f =
   { result=Form f; kind=Trivial; theories;
     parents = [| |]; additional_info=info; }
 
-let mk_f_file ?(info=[]) ?(theories=[]) ~role ~file ~name f =
-  { result=Form f; kind=File(role,file,name); theories;
+let mk_f_file ?(conjecture=false) ?(info=[]) ?(theories=[]) ~role ~file ~name f =
+  let file_info = FileInfo.( {conjecture; name;filename=file; role; } ) in
+  { result=Form f; kind=File file_info; theories;
     parents = [| |]; additional_info=info; }
 
 let mk_f_inference ?(info=[]) ?(theories=[]) ~rule f parents =
@@ -110,8 +126,9 @@ let mk_c_trivial ?(info=[]) ?(theories=[]) c =
   { result=Clause c; kind=Trivial; theories;
     parents = [| |]; additional_info=info; }
 
-let mk_c_file ?(info=[]) ?(theories=[]) ~role ~file ~name c =
-  { result=Clause c; kind=File(role,file,name); theories;
+let mk_c_file ?(conjecture=false) ?(info=[]) ?(theories=[]) ~role ~file ~name c =
+  let file_info = FileInfo.( {conjecture; name;filename=file; role; } ) in
+  { result=Clause c; kind=File file_info; theories;
     parents = [| |]; additional_info=info; }
 
 let mk_c_inference ?(info=[]) ?(theories=[]) ~rule c parents =
@@ -141,7 +158,7 @@ let is_trivial = function
   | _ -> false
 
 let is_axiom = function
-  | {kind=File("axiom", _, _)} -> true
+  | {kind=File {FileInfo.role="axiom"}} -> true
   | _ -> false
 
 let is_proof_of_false p =
@@ -162,7 +179,11 @@ let role p = match p.kind with
   | Inference _
   | Esa _
   | Simplification _ -> "plain"
-  | File(role,_,_) -> role
+  | File {FileInfo.role=role} -> role
+
+let is_conjecture p = match p.kind with
+  | File {FileInfo.conjecture=true} -> true
+  | _ -> false
 
 module Theories = struct
   let eq = ["equality"]
@@ -181,23 +202,45 @@ type proof_set = unit ProofTbl.t
 
 type proof_name = int ProofTbl.t
 
-(** Traverse the proof. Each proof node is traversed only once. *)
-let traverse ?(traversed=ProofTbl.create 11) proof k =
-  (* set of already traversed proof nodes; queue of proof nodes
-     yet to traverse *)
-  let queue = Queue.create () in
-  Queue.push proof queue;
-  while not (Queue.is_empty queue) do
-    let proof = Queue.take queue in
-    if ProofTbl.mem traversed proof then ()
-    else begin
-      ProofTbl.add traversed proof ();
-      (* traverse premises first *)
-      Array.iter (fun proof' -> Queue.push proof' queue) proof.parents;
-      (* call [k] on the proof *)
-      k proof;
-    end
+let traverse_depth ?(traversed=ProofTbl.create 11) proof k =
+  let depth = ref 0 in
+  let current, next = ref [proof], ref [] in
+  while !current <> [] do
+    (* exhaust the current layer of proofs to explore *)
+    while !current <> [] do
+      let proof = List.hd !current in
+      current := List.tl !current;
+      if ProofTbl.mem traversed proof then ()
+      else begin
+        ProofTbl.add traversed proof ();
+        (* traverse premises first *)
+        Array.iter (fun proof' -> next := proof' :: !next) proof.parents;
+        (* yield proof *)
+        k (proof, !depth);
+      end
+    done;
+    (* explore next layer *)
+    current := !next;
+    next := [];
+    incr depth;
   done
+
+let traverse ?traversed proof k =
+  traverse_depth ?traversed proof (fun (p, _depth) -> k p)
+
+let distance_to_conjecture p =
+  let best_distance = ref None in
+  traverse_depth p
+    (fun (p', depth) -> 
+      if is_conjecture p'
+      then
+        let new_best = match !best_distance with
+          | None -> depth
+          | Some depth' -> max depth depth'
+        in
+        best_distance := Some new_best
+    );
+  !best_distance
 
 let get_name ~namespace p =
   try
@@ -259,8 +302,10 @@ let as_graph =
 
 (** {2 IO} *)
 
-let pp_kind_tstp buf k = match k with
-  | File (role,file,name) ->
+let pp_kind_tstp buf k =
+  let module F = FileInfo in
+  match k with
+  | File {F.role=role; F.filename=file; F.name=name} ->
     Printf.bprintf buf "file('%s', '%s')" file name
   | Inference rule ->
     Printf.bprintf buf "inference(%s, [status(thm)])" rule
@@ -271,9 +316,12 @@ let pp_kind_tstp buf k = match k with
   | Trivial ->
     Printf.bprintf buf "trivial([status(thm)])"
 
-let pp_kind buf k = match k with
-  | File (role,file,name) ->
-    Printf.bprintf buf "%s '%s' in '%s'" role name file
+let pp_kind buf k =
+  let module F = FileInfo in
+  match k with
+  | File {F.role=role; F.filename=file; F.name=name; F.conjecture=c} ->
+    Printf.bprintf buf "%s '%s' in '%s'%s" role name file
+      (if c then " (conjecture)" else "")
   | Inference rule ->
     Printf.bprintf buf "inf %s" rule
   | Simplification rule ->
@@ -297,12 +345,14 @@ let fmt fmt proof =
   Format.pp_print_string fmt (Util.on_buffer pp_notrec proof)
 
 let pp_debug buf proof =
+  let module F = FileInfo in
   traverse proof
     begin fun p -> match p.kind with
-      | File(role,file,name) ->
-        Printf.bprintf buf "%a <--- %a, theories [%a]\n"
+      | File {F.role=role; F.filename=file; F.name=name; F.conjecture=c} ->
+        Printf.bprintf buf "%a <--- %a, theories [%a]%s\n"
           pp_result p.result pp_kind p.kind
-          (Util.pp_list Buffer.add_string) p.theories;
+            (Util.pp_list Buffer.add_string) p.theories
+            (if c then " (conjecture)" else "")
       | Trivial ->
         Printf.bprintf buf "%a <--- trivial, theories [%a]\n"
           pp_result p.result (Util.pp_list Buffer.add_string) p.theories;
@@ -321,11 +371,13 @@ let _pp_parent buf = function
   | `Name i -> Printf.bprintf buf "%d" i
   | `Theory s -> Printf.bprintf buf "theory(%s)" s
 
-let _pp_kind_tstp buf (k,parents) = match k with
+let _pp_kind_tstp buf (k,parents) =
+  let module F = FileInfo in
+  match k with
   | Trivial ->
     Printf.bprintf buf "trivial([%a])"
       (Util.pp_list _pp_parent) parents
-  | File (role,file,name) ->
+  | File {F.role=role; F.filename=file; F.name=name} ->
     Printf.bprintf buf "file('%s', '%s', [%a])"
       file name (Util.pp_list _pp_parent) parents
   | Inference rule ->
