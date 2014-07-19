@@ -256,8 +256,10 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
       (* search in the idx-th queue *)
       let rec search idx weight =
         let q, w = (!_queues).(idx) in
-        if weight >= w || CQueue.is_empty q
-        then next_idx (idx+1) (* empty queue, go to the next one *)
+        if Array.length !_queues=1 && CQueue.is_empty q then None
+        else
+          if (Array.length !_queues > 1 && weight >= w) || CQueue.is_empty q
+          then next_idx (idx+1) (* empty queue, go to the next one *)
         else begin
           let new_q, c = CQueue.take_first q in (* pop from this queue *)
           (!_queues).(idx) <- new_q, w;
