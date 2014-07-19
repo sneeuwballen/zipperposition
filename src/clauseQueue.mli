@@ -41,7 +41,31 @@ val set_profile : string -> unit
 module type S = sig
   module C : Clause.S
 
+  (** {6 Weight functions} *)
+  module WeightFun : sig
+    type t = C.t -> int
+    (** attribute a weight to a clause. The smaller, the better (lightweight
+        clauses will be favored). A weight must always be positive;
+        the weight of the empty clause should alwyays be 0. *)
+
+    val default : t
+    (** Use {!Literal.heuristic_weight} *)
+
+    val age : t
+    (** Returns the age of the clause (or 0 for the empty clause) *)
+
+    val favor_conjecture : t
+    (** The closest a clause is from conjectures, the lowest its weight.
+        Some threshold is used for clauses that are too far away *)
+
+    val combine : (t * int) list -> t
+    (** Combine a list of pairs [w, coeff] where [w] is a weight function,
+        and [coeff] a strictly positive number. This is a weighted sum
+        of weights. *)
+  end
+
   type t
+  (** A priority queue. *)
 
   val add : t -> C.t -> t
     (** Add a clause to the Queue *)
@@ -87,6 +111,10 @@ module type S = sig
   val lemmas : t
     (** only select lemmas *)
 
+  val goal_oriented : t
+    (** custom weight function that favors clauses that are "close" to
+        initial conjectures. It is fair.  *)
+
   val mk_queue : ?accept:(C.t -> bool) -> weight:(C.t -> int) -> string -> t
     (** Bring your own implementation of queue *)
 
@@ -103,6 +131,9 @@ module type S = sig
 
     val ground : queues
       (** Favor positive unit clauses and ground clauses *)
+
+    val why3 : queues
+      (** Optimized for why3 *)
   end
 
   val default_queues : queues
