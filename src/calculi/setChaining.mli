@@ -47,17 +47,28 @@ module type S = sig
     (* positive chaining *)
 
   val negative_chaining_left: Env.binary_inf_rule
-    (* negative chaining where the clause is on the left *)
+    (* negative chaining where the left side of literals are treated *)
 
   val negative_chaining_right: Env.binary_inf_rule
-    (* negative chaining where the clause is on the right *)
+    (* negative chaining where the right side of literals are treated *)
 
   val reflexivity_res: Env.unary_inf_rule
     (* reflexivity resolution *)
 
-  val singleton_witness: Env.unary_inf_rule
+  val factoring_left: Env.unary_inf_rule
+    (* factoring terms that are on the left side of literals *)
+
+  val rewrite_set_eq: Env.multi_simpl_rule
+
+  val rewrite_set_neq: Env.multi_simpl_rule
+
+  val singleton_pos: Env.rw_simplify_rule
     (* choice of a witness for all terms appearing in a singleton on the left
      * side of a \not\subseteq *)
+
+  val singleton_neg: Env.multi_simpl_rule
+
+  val singleton_elim: Env.multi_simpl_rule
 
   val reflexivity: Env.is_trivial_rule
     (* reflexivity tautology : when the same term appears in each side of a

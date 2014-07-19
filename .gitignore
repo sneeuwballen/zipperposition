@@ -8,7 +8,9 @@ E/
 *.nav
 *.snm
 *.
-docs/*.pdf
+*.exe
+doc/*.pdf
+doc/*.sty
 *.aux
 *.out
 _build
@@ -21,6 +23,7 @@ tags
 **/*.cmx
 **/*.o
 **/*.cmo
+simplex/*
 .session
 .subdirtouch
 *.docdir
