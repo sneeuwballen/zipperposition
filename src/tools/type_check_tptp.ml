@@ -45,6 +45,8 @@ let options =
   ; "-base", Arg.Set pp_base, "print signature of base symbols"
   ] @ Options.global_opts
 
+let base_sign = Signature.TPTP.Arith.full
+
 (* check the given file *)
 let check file =
   Err.(
@@ -52,9 +54,10 @@ let check file =
     Printf.printf "checking file %s...\n" file;
     Util_tptp.parse_file ~recursive:true file
     >>= fun decls ->
-    Util_tptp.infer_types (`sign Signature.empty) decls
+    Util_tptp.infer_types (`sign base_sign) decls
     >>= fun (signature, decls') ->
     let decls' = Util_tptp.erase_types decls' in
+    let signature = Signature.diff signature base_sign in
     Printf.printf "signature:\n";
     Signature.iter signature
       (fun s ty ->
