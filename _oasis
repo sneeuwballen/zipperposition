@@ -42,6 +42,10 @@ Flag "qcheck"
   Description:  Build and install QCheck random generators
   Default:      false
 
+Flag "demo"
+  Description:  Build and install demo programs
+  Default:      true
+
 Library "logtk"
   Path:             src/base/
   Pack:             true
@@ -207,6 +211,16 @@ Executable hysteresis
   CompiledObject:   native
   MainIs:           hysteresis.ml
   BuildDepends:     logtk,logtk.parsers,logtk.meta,logtk.solving,aez
+
+# Demo: resolution
+Executable logtk_resolution
+  Path:             src/demo/resolution
+  Build$:           flag(parsers) && flag(demo)
+  Install$:         flag(parsers) && flag(demo)
+  CompiledObject:   native
+  MainIs:           resolution.ml
+  BuildDepends:     logtk,logtk.parsers,sequence,containers
+
 
 SourceRepository head
   Type: git
