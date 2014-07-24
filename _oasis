@@ -126,7 +126,7 @@ Document logtk_meta
   Install$:             flag(docs) && flag(meta)
   Build$:               flag(docs) && flag(meta)
   XOCamlbuildPath:      .
-  XOCamlbuildLibraries: logtk,logtk.meta
+  XOCamlbuildLibraries: logtk.meta
 
 Document logtk_arbitrary
   Title:                Logtk_arbitrary documentation
@@ -135,7 +135,7 @@ Document logtk_arbitrary
   Install$:             flag(docs) && flag(qcheck)
   Build$:               flag(docs) && flag(qcheck)
   XOCamlbuildPath:      .
-  XOCamlbuildLibraries: logtk,logtk.arbitrary
+  XOCamlbuildLibraries: logtk.arbitrary
 
 Executable run_bench
   Path:             tests/
