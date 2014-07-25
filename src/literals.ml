@@ -103,7 +103,7 @@ let vars lits =
   for i = 0 to Array.length lits - 1 do
     Lit.add_vars set lits.(i);
   done;
-  T.Tbl.to_list set
+  T.Tbl.fold (fun t () acc -> t::acc) set []
 
 let is_ground lits =
   Util.array_forall Lit.is_ground lits

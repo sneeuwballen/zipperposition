@@ -37,6 +37,7 @@ type form = F.t
 type t = {
   form : F.t;
   proof : Proof.t;
+  is_conjecture : bool;
   mutable id : int;
   mutable simpl_to : t option;
 }
@@ -82,8 +83,8 @@ let rec _follow_simpl n pf =
 
 let follow_simpl pf = _follow_simpl 0 pf
 
-let create ?(follow=false) form proof =
-  let pf = H.hashcons { form; proof; id= ~-1; simpl_to=None; } in
+let create ?(is_conjecture=false) ?(follow=false) form proof =
+  let pf = H.hashcons { form; proof; id= ~-1; is_conjecture; simpl_to=None; } in
   if follow
     then follow_simpl pf
     else pf
