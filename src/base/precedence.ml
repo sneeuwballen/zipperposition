@@ -109,12 +109,16 @@ module type S = sig
       (** alphabetic ordering on symbols *)
   end
 
-  val weight_modarity : arity:(symbol -> int) -> symbol -> int
-  val weight_constant : symbol -> int
+  type weight_fun = symbol -> int
+  val weight_modarity : arity:(symbol -> int) -> weight_fun
+  val weight_constant : weight_fun
+
+  val set_weight : t -> weight_fun -> t
+  (** Change the weight function of the precedence *)
 
   (** {2 Creation of a precedence from constraints} *)
 
-  val create : Constr.t list -> symbol list -> t
+  val create : ?weight:weight_fun -> Constr.t list -> symbol list -> t
     (** make a precedence from the given constraints. Constraints near
         the head of the list are {b more important} than constraints close
         to the tail. Only the very first constraint is assured to be totally
@@ -314,11 +318,15 @@ module Make(Sym : SYMBOL) = struct
 
   (** {3 Weight} *)
 
+  type weight_fun = symbol -> int
+
   (* weight of f = arity of f + 4 *)
   let weight_modarity ~arity a = arity a + 4
 
   (* constant weight *)
   let weight_constant _ = 4
+
+  let set_weight p weight = {p with weight; }
 
   (** {2 Creation of a precedence from constraints} *)
 
@@ -333,13 +341,12 @@ module Make(Sym : SYMBOL) = struct
       then failwith "Precedence: constraints are not total";
     PO.elements po
 
-  let create constrs symbols =
+  let create ?(weight=weight_constant) constrs symbols =
     (* compute snapshot *)
     let symbols = List.fold_left
       (fun tbl s -> Tbl.replace tbl s ()) (Tbl.create 7) symbols in
     let snapshot = _order_symbols constrs symbols in
     let index = _mk_table snapshot in
-    let weight = weight_constant in
     let status = Tbl.create 5 in
     { snapshot; index; weight; status; constr=constrs; }
 
