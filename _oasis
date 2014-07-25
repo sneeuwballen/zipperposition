@@ -1,6 +1,6 @@
 OASISFormat: 0.4
 Name:        logtk
-Version:     0.4-dev
+Version:     0.5.2
 Homepage:    https://github.com/c-cube/logtk
 Authors:     Simon Cruanes
 License:     BSD-2-clause
@@ -44,7 +44,7 @@ Flag "qcheck"
 
 Flag "demo"
   Description:  Build and install demo programs
-  Default:      true
+  Default:      false
 
 Library "logtk"
   Path:             src/base/
@@ -216,19 +216,10 @@ Executable hysteresis
 Executable logtk_resolution1
   Path:             src/demo/resolution
   Build$:           flag(parsers) && flag(demo)
-  Install$:         flag(parsers) && flag(demo)
+  Install:          false
   CompiledObject:   native
   MainIs:           resolution1.ml
   BuildDepends:     logtk,logtk.parsers,sequence,containers
-
-Document logtk_resolution1
-  Title:                Tutorial: Resolution prover (1)
-  Type:                 ocamlbuild (0.3)
-  BuildTools+:          ocamldoc
-  Install$:             flag(docs)
-  Build$:               flag(docs)
-  XOCamlbuildPath:      .
-  XOCamlbuildModules:   src/demo/resolution/Resolution1
 
 SourceRepository head
   Type: git
