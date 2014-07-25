@@ -29,8 +29,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+module T = FOTerm
 module F = Formula.FO
 module PF = PFormula
+module Sym = Symbol
 
 (** {2 Transformations} *)
 
@@ -224,6 +226,7 @@ type t = {
   mutable ops : (int * (PF.Set.t -> operation)) list;  (* int: priority *)
   mutable constrs : Precedence.Constr.t list;
   mutable constr_rules : (PF.Set.t -> Precedence.Constr.t) list;
+  mutable weight_rule : (PF.Set.t -> Symbol.t -> int);
   mutable status : (Symbol.t * Precedence.symbol_status) list;
   mutable base : Signature.t;
   params : Params.t;
@@ -250,12 +253,42 @@ let add_operation ~penv ~prio op =
 let add_operation_rule ~penv ~prio rule =
   penv.ops <- (prio, rule) :: penv.ops
 
+(* default weight: symbols that occur often are heavier, except
+  constants which have weight 1 *)
+let _default_weight signature set =
+  let rank_to_symbols = CCLinq.(
+    PF.Set.to_seq set
+      |> Sequence.map PF.form
+      |> Sequence.flatMap F.Seq.symbols
+      |> of_seq
+      |> count ~eq:Sym.eq ~hash:Sym.hash () (* symbol -> frequency *)
+      |> M.reverse ~cmp:CCInt.compare ()  (* frequency -> symbols *)
+      |> M.iter
+      |> L.run_exn
+  ) in
+  (* map symbol -> inverse rank *)
+  let s_to_rank = Sym.Tbl.create 15 in
+  let n = List.length rank_to_symbols in
+  List.iter
+    (fun (rank,syms) ->
+      List.iter (fun s -> Sym.Tbl.add s_to_rank s (1+n-rank)) syms
+    ) rank_to_symbols;
+  (* is the symbol a constant? *)
+  let is_const s =
+    try snd (Signature.arity signature s) = 0
+    with Not_found -> false
+  in
+  fun s ->
+    if is_const s then 1
+    else try Sym.Tbl.find s_to_rank s with Not_found -> n
+
 let create ?(base=Signature.TPTP.base) params =
   let penv = {
     axioms = PF.Set.empty;
     ops = [];
     constrs = [];
     constr_rules = [];
+    weight_rule = _default_weight base; (* constant weight *)
     status = [];
     base;
     params;
@@ -279,6 +312,9 @@ let add_constrs ~penv l =
 let add_constr_rule ~penv r =
   penv.constr_rules <- r :: penv.constr_rules
 
+let set_weight_rule ~penv r =
+  penv.weight_rule <- r
+
 let add_status ~penv l = penv.status <- List.rev_append l penv.status
 
 let mk_precedence ~penv set =
@@ -289,7 +325,9 @@ let mk_precedence ~penv set =
   in
   let symbols' = PFormula.Set.symbols set in
   let all_symbols = Symbol.Set.union symbols symbols' in
-  let p = Precedence.create constrs (Symbol.Set.elements all_symbols) in
+  let weight = penv.weight_rule set in
+  let p = Precedence.create ~weight constrs (Symbol.Set.elements all_symbols) in
+  (* multiset status *)
   let p = List.fold_left
     (fun p (s,status) -> Precedence.declare_status p s status)
     p penv.status
