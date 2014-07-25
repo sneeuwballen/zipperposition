@@ -133,6 +133,16 @@ val is_at : t -> bool
 
 val hashcons_stats : unit -> int*int*int*int*int*int
 
+(** {3 Flags}
+be {b VERY} careful with flags. Due to hashconsing, they will be shared
+between every instance of a term, so only use them for properties
+that are universal. Only {!Sys.word_size - 1} flags can exist in a program. *)
+
+type flag
+val new_flag: unit -> flag
+val set_flag : t -> flag -> unit
+val get_flag : t -> flag -> bool
+
 (** {3 Containers} *)
 
 module Map : Sequence.Map.S with type key = term
