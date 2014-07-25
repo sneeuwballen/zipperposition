@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: e62fa9874ad2aaf208d771dcd1f261c6)
+# DO NOT EDIT (digest: d75ed03230da69189234333635872ad4)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -224,6 +224,19 @@
 <src/tools/hysteresis/*.ml{,i}>: use_logtk_meta
 <src/tools/hysteresis/*.ml{,i}>: use_logtk_parsers
 <src/tools/hysteresis/*.ml{,i}>: use_logtk_solving
+# Executable logtk_resolution1
+"src/demo/resolution/resolution1.native": package(containers)
+"src/demo/resolution/resolution1.native": package(sequence)
+"src/demo/resolution/resolution1.native": package(unix)
+"src/demo/resolution/resolution1.native": package(zarith)
+"src/demo/resolution/resolution1.native": use_logtk
+"src/demo/resolution/resolution1.native": use_logtk_parsers
+<src/demo/resolution/*.ml{,i}>: package(containers)
+<src/demo/resolution/*.ml{,i}>: package(sequence)
+<src/demo/resolution/*.ml{,i}>: package(unix)
+<src/demo/resolution/*.ml{,i}>: package(zarith)
+<src/demo/resolution/*.ml{,i}>: use_logtk
+<src/demo/resolution/*.ml{,i}>: use_logtk_parsers
 # OASIS_STOP
 true: use_menhir
 "tests/quick/": -traverse

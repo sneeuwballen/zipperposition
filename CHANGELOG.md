@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.5.2
+
+- demo program `resolution1.ml`
+- oasis: `--enable-demo` flag
+- arithmetic binary predicates are polymorphic (`$sum`, etc)
+- target in Makefile to update `@next_release` tags
+- refactor:
+    - unification now works with two (optional) DB environments in which bound variables of both terms live.
+    - matching: parameter `?allow_open` is now used properly in rewriting and indexing
+- unif.res_head
+- N-ary unification now uses `Sequence` (simpler, more efficient)
+
+## 0.5.1
+
+- sort list of modules in doc/api_intro.txt
+- code cleanup in `ScopedTerm.Seq`, less closures, simpler
+- bugfix in `scopedTerm.DB.open_vars` (shift variables!)
+- profiling information in CNF
+- safety check in CNF: clauses must be closed (!)
+- bugfix: Formula.is_closed
+- fix printing of Type in TPTP
+- add `PrologTerm.Syntactic` constructor (in place of `SimpleApp` which doesn't make much sense)
+- cleanup: check i>=0 for bvar/var in ScopedTerm, share a common fresh_var generator
+- simplified and factorized some code (share term containers)
+
 ## 0.5
 
 - module `Sourced`; removed `Formula.sourced` and the likes
