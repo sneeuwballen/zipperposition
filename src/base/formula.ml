@@ -31,6 +31,8 @@ module Sym = Symbol
 
 type symbol = Sym.t
 
+let prof_simplify = Util.mk_profiler "formula.simplify"
+
 module type S = sig
   type term
   type term_set
@@ -692,8 +694,18 @@ module Make(MyT : TERM) = struct
     | Eq _
     | Neq _ -> f
 
+  let flag_simplified = T.new_flag()
+
   let simplify f =
-    let rec simplify ~depth f = match view f with
+    let rec simplify ~depth f =
+      if T.get_flag f flag_simplified then f
+      else (
+        (* cache result: f' is simplified *)
+        let f' = simplify_rec ~depth f in
+        T.set_flag f' flag_simplified;
+        f'
+      )
+    and simplify_rec ~depth f = match view f with
       | And l ->
         let l' = List.map (simplify ~depth) l in
         flatten (Base.and_ l')
@@ -747,7 +759,11 @@ module Make(MyT : TERM) = struct
           end
       | Xor (f1, f2) ->
           Base.xor (simplify ~depth f1) (simplify ~depth f2) (* TODO *)
-    in simplify ~depth:0 f
+    in
+    Util.enter_prof prof_simplify;
+    let f' = simplify ~depth:0 f in
+    Util.exit_prof prof_simplify;
+    f'
 
   let rec is_trivial f = match view f with
     | True -> true
