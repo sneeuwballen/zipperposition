@@ -168,10 +168,17 @@ module Make(C : Clause.S) = struct
     type t = C.t -> int
 
     let default c =
+      let _depth_ty =
+        Lits.Seq.terms (C.lits c)
+        |> Sequence.map FOTerm.ty
+        |> Sequence.map Type.depth
+        |> Sequence.max ?lt:None
+        |> CCOpt.maybe CCFun.id 0
+      in
       let w = Array.fold_left
         (fun acc lit -> acc + Lit.heuristic_weight lit)
         0 (C.lits c)
-      in w * Array.length (C.lits c)
+      in w * Array.length (C.lits c) + _depth_ty
 
     let age c =
       if C.is_empty c then 0
