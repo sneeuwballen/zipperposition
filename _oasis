@@ -42,6 +42,10 @@ Flag "qcheck"
   Description:  Build and install QCheck random generators
   Default:      false
 
+Flag "demo"
+  Description:  Build and install demo programs
+  Default:      true
+
 Library "logtk"
   Path:             src/base/
   Pack:             true
@@ -122,7 +126,7 @@ Document logtk_meta
   Install$:             flag(docs) && flag(meta)
   Build$:               flag(docs) && flag(meta)
   XOCamlbuildPath:      .
-  XOCamlbuildLibraries: logtk,logtk.meta
+  XOCamlbuildLibraries: logtk.meta
 
 Document logtk_arbitrary
   Title:                Logtk_arbitrary documentation
@@ -131,7 +135,7 @@ Document logtk_arbitrary
   Install$:             flag(docs) && flag(qcheck)
   Build$:               flag(docs) && flag(qcheck)
   XOCamlbuildPath:      .
-  XOCamlbuildLibraries: logtk,logtk.arbitrary
+  XOCamlbuildLibraries: logtk.arbitrary
 
 Executable run_bench
   Path:             tests/
@@ -207,6 +211,24 @@ Executable hysteresis
   CompiledObject:   native
   MainIs:           hysteresis.ml
   BuildDepends:     logtk,logtk.parsers,logtk.meta,logtk.solving,aez
+
+# Demo: resolution
+Executable logtk_resolution1
+  Path:             src/demo/resolution
+  Build$:           flag(parsers) && flag(demo)
+  Install$:         flag(parsers) && flag(demo)
+  CompiledObject:   native
+  MainIs:           resolution1.ml
+  BuildDepends:     logtk,logtk.parsers,sequence,containers
+
+Document logtk_resolution1
+  Title:                Tutorial: Resolution prover (1)
+  Type:                 ocamlbuild (0.3)
+  BuildTools+:          ocamldoc
+  Install$:             flag(docs)
+  Build$:               flag(docs)
+  XOCamlbuildPath:      .
+  XOCamlbuildModules:   src/demo/resolution/Resolution1
 
 SourceRepository head
   Type: git

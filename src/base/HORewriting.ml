@@ -32,6 +32,8 @@ module T = HOTerm
 type term = T.t
 type rule = term * term
 
+exception IllFormedRule of rule
+
 (** {2 Rewrite system} *)
 
 (** Set of rules *)
@@ -46,7 +48,22 @@ type t = S.t
 
 let empty = S.empty
 
-let add trs rule = S.add rule trs
+(* check whether the rule is valid for rewriting *)
+let _validate_rule (l,r) =
+  let cond1 =
+    T.Seq.vars r
+    |> Sequence.for_all (fun v -> Sequence.mem ~eq:T.eq v (T.Seq.vars l))
+  and cond2 =
+    T.Seq.subterms_depth r
+    |> Sequence.filter (fun (v,_) -> T.is_var v)
+    |> Sequence.for_all (fun (_,d) -> d = 0)
+  in
+  if not (cond1 && cond2)
+    then raise (IllFormedRule (l,r))
+
+let add trs rule =
+  _validate_rule rule;
+  S.add rule trs
 
 let merge t1 t2 = S.union t1 t2
 
@@ -107,13 +124,13 @@ let normalize_collect trs t =
     try
       S.iter
         (fun (l,r) ->
-          let substs = Unif.HO.matching ~pattern:l 1 t 0 in
-          match substs () with
-          | `Nil -> ()   (* failure, try next rule *)
-          | `Cons (subst, _) ->
+          let substs = Unif.HO.matching ~allow_open:true ~pattern:l 1 t 0 in
+          match substs |> Sequence.take 1 |> Sequence.to_list with
+          | [subst] ->
               (* l\subst = t, rewrite into r\subst *)
               let r = Substs.HO.apply_no_renaming subst r 1 in
               raise (RewrittenIn (r, subst, (l,r)))
+          | _ -> ()   (* failure, try next rule *)
         ) trs;
       (* could not rewrite [t], just return it *)
       t

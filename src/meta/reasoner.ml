@@ -177,7 +177,7 @@ module Index = struct
     M.fold
       (fun t' set acc ->
         let res = Unif.HO.unification ~subst t' s_idx t s_t in
-        CCKList.fold
+        Sequence.fold
           (fun acc subst ->
             S.fold (fun clause acc -> k acc clause subst) set acc)
           acc res)

@@ -29,6 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 type term = HOTerm.t
 type rule = term * term
 
+exception IllFormedRule of rule
+
 (** {2 Building rewrite systems} *)
 
 type t
@@ -38,7 +40,11 @@ val empty : t
   (** No rules *)
 
 val add : t -> rule -> t
-  (** Add a rule *)
+  (** Add a rule. A rule must satisfy several conditions:
+      - every free variable on the RHS must occur in the LHS
+      - every free variable on the RHS must not occur under
+        any binder (would cause problems with De Bruijn indices)
+      @raise IllFormedRule if the rule isn't valid. *)
 
 val merge : t -> t -> t
   (** Merge two rewrite systems *)

@@ -59,8 +59,18 @@ let pop env =
 let find env n =
   if n < env.size then List.nth env.stack n else None
 
+let find_exn env n =
+  if n < env.size
+    then match List.nth env.stack n with
+      | None -> failwith "DBEnv.find_exn"
+      | Some x -> x
+    else failwith "DBEnv.find_exn"
+
+let mem env n =
+  if n < env.size then List.nth env.stack n <> None else false
+
 let set env n x =
-  if n >= env.size then raise (Invalid_argument "DBEnv.set");
+  if n<0 || n >= env.size then raise (Invalid_argument "DBEnv.set");
   {env with stack= Util.list_set env.stack n (Some x); }
 
 let num_bindings db =

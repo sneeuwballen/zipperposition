@@ -335,8 +335,8 @@ let apply subst ~renaming t s_t =
         begin try
           let t', s_t' = lookup subst t s_t in
           (* NOTE: we used to shift [t'], in case it contained free De
-           * Bruijn indices, but that shouldn't happen because only
-           * closed terms should appear in substitutions. *)
+             Bruijn indices, but that shouldn't happen because only
+             closed terms should appear in substitutions. *)
           assert (T.DB.closed t');
           (* also apply [subst] to [t'] *)
           _apply t' s_t'

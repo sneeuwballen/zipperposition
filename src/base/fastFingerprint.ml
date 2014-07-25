@@ -251,11 +251,11 @@ module Make(X : Set.OrderedType) = struct
     in
     retrieve idx.trie acc 0
 
-  let retrieve_generalizations ?(subst=S.empty) idx o_i t o_t acc f =
+  let retrieve_generalizations ?(allow_open=false) ?(subst=S.empty) idx o_i t o_t acc f =
     let fingerprint = idx.fp t in
     let rec retrieve trie acc i =
       if i = Array.length fingerprint
-        then Leaf.fold_match ~subst trie.leaf o_i t o_t acc f
+        then Leaf.fold_match ~allow_open ~subst trie.leaf o_i t o_t acc f
       else
         let feat = fingerprint.(i) in
         match feat with
@@ -273,11 +273,11 @@ module Make(X : Set.OrderedType) = struct
     in
     retrieve idx.trie acc 0
 
-  let retrieve_specializations ?(subst=S.empty) idx o_i t o_t acc f = 
+  let retrieve_specializations ?(allow_open=false) ?(subst=S.empty) idx o_i t o_t acc f = 
     let fingerprint = idx.fp t in
     let rec retrieve trie acc i =
       if i = Array.length fingerprint
-        then Leaf.fold_matched ~subst trie.leaf o_i t o_t acc f
+        then Leaf.fold_matched ~allow_open ~subst trie.leaf o_i t o_t acc f
       else
         let feat = fingerprint.(i) in
         match feat with

@@ -64,6 +64,14 @@ Logtk provides several useful parts for logic-related implementations:
     `data/builtin.theory` and one of the tools, `detect_theories`, can be
     used straightforwardly.
 
+
+## Documentation
+
+See [this page](http://cedeela.fr/~simon/software/logtk/).
+
+There are some examples of how to use the code in `src/tools/`
+and `src/demo/`.
+
 ## List of modules
 
 - `Logtk`
@@ -131,10 +139,6 @@ Logtk provides several useful parts for logic-related implementations:
     - `ArSignature`: random signatures
     - `ArSymbol`: random symbols
     - `ArPattern`: random meta-patterns
-
-## Documentation
-
-See [this page](http://cedeela.fr/~simon/software/logtk/).
 
 ## TODO
 

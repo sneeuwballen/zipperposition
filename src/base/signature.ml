@@ -175,7 +175,7 @@ module TPTP = struct
   let ty_1_to_int = Type.(forall [x] (Type.TPTP.int <=. x))
   let ty2op = Type.(forall [x] (x <== [x;x]))
   let ty2op_to_i = Type.(TPTP.(int <== [int;int]))
-  let ty2op_to_o = Type.(TPTP.(o <== [int;int]))
+  let ty2op_to_o = Type.(forall [x] (TPTP.(o <== [x;x])))
 
   let arith_table =
     let open Type.TPTP in

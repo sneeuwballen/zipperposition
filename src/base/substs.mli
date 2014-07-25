@@ -131,6 +131,11 @@ val of_list : ?init:t -> (term * scope * term * scope) list -> t
 
 val apply : t -> renaming:Renaming.t -> term -> scope -> term
   (** Apply the substitution to the given term.
+      This function assumes that all terms in the substitution are closed,
+      and it will not perform De Bruijn indices shifting. For instance,
+      applying [{X -> f(db0)}] (with [db0] the De Bruijn index [0])
+      to the term [forall. p(X)] will yield [forall. p(f(db0))] (capturing)
+      and not [forall. p(f(db1))].
       @param renaming used to desambiguate free variables from distinct scopes *)
 
 val apply_no_renaming : t -> term -> scope -> term

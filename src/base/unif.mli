@@ -28,12 +28,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 type scope = Substs.scope
 type subst = Substs.t
-
-type 'a klist = unit -> [`Nil | `Cons of 'a * 'a klist]
+type env = ScopedTerm.t DBEnv.t
+type 'a sequence = ('a -> unit) -> unit
 
 (** {2 Result of (multiple) Unification} *)
 
-type res = subst klist
+type res = subst sequence
+
+val res_head : res -> subst option
+(** Obtain the first result, if any
+    @since NEXT_RELEASE *)
 
 exception Fail
   (** Raised when a unification/matching attempt fails *)
@@ -43,21 +47,24 @@ exception Fail
 module type UNARY = sig
   type term
 
-  val unification : ?subst:subst -> term -> scope -> term -> scope -> subst
+  val unification : ?env1:env -> ?env2:env -> ?subst:subst ->
+                    term -> scope -> term -> scope -> subst
     (** Unify terms, returns a subst or
-        @raise Fail if the terms are not unifiable *)
+        @raise Fail if the terms are not unifiable
+        @param env1 environment for the first term
+        @param env2 environment for the second term *)
 
-  val matching : ?allow_open:bool -> ?subst:subst ->
+  val matching : ?allow_open:bool -> ?env1:env -> ?env2:env -> ?subst:subst ->
                  pattern:term -> scope -> term -> scope -> subst
     (** [matching ~pattern scope_p b scope_b] returns
         [sigma] such that [sigma pattern = b], or fails.
         Only variables from the scope of [pattern] can  be bound in the subst.
         @param subst initial substitution (default empty)
-        @param allow_open if true, variables
+        @param allow_open if true, variables can bind to non-closed DB terms (default [false])
         @raise Fail if the terms do not match.
         @raise Invalid_argument if the two scopes are equal *)
 
-  val matching_same_scope : ?protect:(term Sequence.t) -> ?subst:subst ->
+  val matching_same_scope : ?env1:env -> ?env2:env -> ?protect:(term Sequence.t) -> ?subst:subst ->
                             scope:scope -> pattern:term -> term -> subst
     (** matches [pattern] (more general) with the other term.
         The two terms live in the same scope, which is passed as the
@@ -68,17 +75,18 @@ module type UNARY = sig
           be bound during matching!). Variables of the second term
           are automatically protected. *)
 
-  val matching_adapt_scope : ?protect:(term Sequence.t) -> ?subst:subst ->
+  val matching_adapt_scope : ?env1:env -> ?env2:env -> ?protect:(term Sequence.t) -> ?subst:subst ->
                              pattern:term -> scope -> term -> scope -> subst
     (** Call either {!matching} or {!matching_same_scope} depending on
         whether the given scopes are the same or not.
         @param protect used if scopes are the same, see {!matching_same_scope} *)
 
-  val variant : ?subst:subst -> term -> scope -> term -> scope -> subst
+  val variant : ?env1:env -> ?env2:env -> ?subst:subst ->
+                term -> scope -> term -> scope -> subst
     (** Succeeds iff the first term is a variant of the second, ie
         if they are alpha-equivalent *)
 
-  val eq : subst:subst -> term -> scope -> term -> scope -> bool
+  val eq : ?env1:env -> ?env2:env -> subst:subst -> term -> scope -> term -> scope -> bool
     (** [eq subst t1 s1 t2 s2] returns [true] iff the two terms
         are equal under the given substitution, i.e. if applying the
         substitution will return the same term. *)
@@ -94,14 +102,18 @@ module type NARY = sig
   type term
   type result = res
 
-  val unification : ?subst:subst -> term -> scope -> term -> scope -> result
+  val unification : ?env1:env -> ?env2:env -> ?subst:subst ->
+                    term -> scope -> term -> scope -> result
     (** unification of two terms *)
 
-  val matching : ?subst:subst -> pattern:term -> scope -> term -> scope -> result
+  val matching : ?allow_open:bool -> ?env1:env -> ?env2:env -> ?subst:subst ->
+                 pattern:term -> scope -> term -> scope -> result
     (** matching of two terms.
+        @param allow_open if true, variables can bind to non-closed DB terms (default [false])
         @raise Invalid_argument if the two scopes are equal. *)
 
-  val variant : ?subst:subst -> term -> scope -> term -> scope -> result
+  val variant : ?env1:env -> ?env2:env -> ?subst:subst ->
+                term -> scope -> term -> scope -> result
     (** alpha-equivalence checking of two terms *)
 
   val are_unifiable : term -> term -> bool
@@ -127,7 +139,7 @@ module HO : NARY with type term = HOTerm.t
 (** {2 Formulas} *)
 
 module Form : sig
-  val variant : ?subst:subst ->
+  val variant : ?env1:env -> ?env2:env -> ?subst:subst ->
                 Formula.FO.t -> scope -> Formula.FO.t -> scope ->
                 res
 

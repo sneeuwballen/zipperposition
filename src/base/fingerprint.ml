@@ -276,24 +276,24 @@ module Make(X : Set.OrderedType) = struct
       Util.exit_prof prof_traverse;
       raise e
 
-  let retrieve_unifiables ?(subst=S.empty) idx o_i t o_t acc f = 
+  let retrieve_unifiables ?(subst=S.empty) idx o_i t o_t acc f =
     let features = idx.fp t in
     let compatible = compatible_features_unif in
     traverse ~compatible idx features acc
       (fun acc leaf -> Leaf.fold_unify ~subst leaf o_i t o_t acc f)
 
-  let retrieve_generalizations ?(subst=S.empty) idx o_i t o_t acc f = 
+  let retrieve_generalizations ?(allow_open=false) ?(subst=S.empty) idx o_i t o_t acc f =
     let features = idx.fp t in
     (* compatible t1 t2 if t2 can match t1 *)
     let compatible f1 f2 = compatible_features_match f2 f1 in
     traverse ~compatible idx features acc
-      (fun acc leaf -> Leaf.fold_match ~subst leaf o_i t o_t acc f)
+      (fun acc leaf -> Leaf.fold_match ~allow_open ~subst leaf o_i t o_t acc f)
 
-  let retrieve_specializations ?(subst=S.empty) idx o_i t o_t acc f = 
+  let retrieve_specializations ?(allow_open=false) ?(subst=S.empty) idx o_i t o_t acc f =
     let features = idx.fp t in
     let compatible = compatible_features_match in
     traverse ~compatible idx features acc
-      (fun acc leaf -> Leaf.fold_matched ~subst leaf o_i t o_t acc f)
+      (fun acc leaf -> Leaf.fold_matched ~allow_open ~subst leaf o_i t o_t acc f)
 
   let to_dot buf t =
     failwith "Fingerprint: to_dot not implemented"

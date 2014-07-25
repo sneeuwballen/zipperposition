@@ -66,6 +66,15 @@ val find : 'a t -> int -> 'a option
   (** Find to which value the given De Bruijn index is bound to, or
       return None *)
 
+val find_exn : 'a t -> int -> 'a
+  (** Unsafe version of {!find}.
+      @raise Failure if the index is not bound within [env] *)
+
+val mem : _ t -> int -> bool
+  (** [mem env i] returns [true] iff [find env i] returns [Some _]
+      rather than [None], ie. whether the [i]-th De Bruijn variable
+      is bound within [env] *)
+
 val set : 'a t -> int -> 'a -> 'a t
   (** Set the [n]-th variable to the given objects.
       @raise Invalid_argument if the index isn't in the range [0... size-1] *)
