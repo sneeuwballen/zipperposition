@@ -163,6 +163,9 @@ let () =
 module Make(C : Clause.S) = struct
   module C = C
 
+  (* weight of a term [t], using the precedence's weight *)
+  let term_weight t = FOTerm.size t
+
   (** {6 Weight functions} *)
   module WeightFun = struct
     type t = C.t -> int
@@ -176,7 +179,7 @@ module Make(C : Clause.S) = struct
         |> CCOpt.maybe CCFun.id 0
       in
       let w = Array.fold_left
-        (fun acc lit -> acc + Lit.heuristic_weight lit)
+        (fun acc lit -> acc + Lit.heuristic_weight term_weight lit)
         0 (C.lits c)
       in w * Array.length (C.lits c) + _depth_ty
 
