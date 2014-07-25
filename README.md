@@ -8,7 +8,17 @@ indexing, etc.) that can be factored out of several applications.
 
 This project is licensed under the BSD2 license. See the `LICENSE` file.
 
-## Regular build
+## Build
+
+### Via opam
+
+We recommand using [opam](http://opam.ocaml.org). Once you installed it,
+type
+
+    $ opam repository add deducteam https://gforge.inria.fr/git/opam-deducteam/opam-deducteam.git
+    $ opam install logtk
+
+### From sources
 
 You will need OCaml >= 4.00.1 or higher with ocamlbuild,
 [zarith](https://forge.ocamlcore.org/projects/zarith/),
