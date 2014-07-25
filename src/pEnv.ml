@@ -255,32 +255,34 @@ let add_operation_rule ~penv ~prio rule =
 
 (* default weight: symbols that occur often are heavier, except
   constants which have weight 1 *)
-let _default_weight signature set =
+let _default_weight ?(ignore_sym= !Params.signature) signature set =
+  (* is the symbol a constant? *)
+  let is_const s =
+    try snd (Signature.arity signature s) = 0
+    with Not_found -> false
+  in
   let rank_to_symbols = CCLinq.(
     PF.Set.to_seq set
       |> Sequence.map PF.form
       |> Sequence.flatMap F.Seq.symbols
+      |> Sequence.filter (fun s -> not (Signature.mem ignore_sym s) && not (is_const s))
       |> of_seq
       |> count ~eq:Sym.eq ~hash:Sym.hash () (* symbol -> frequency *)
       |> M.reverse ~cmp:CCInt.compare ()  (* frequency -> symbols *)
       |> M.iter
       |> L.run_exn
   ) in
-  (* map symbol -> inverse rank *)
+  (* map symbol -> inverse rank. We iterate on symbol equiv. classes by
+    increasing frequency. *)
   let s_to_rank = Sym.Tbl.create 15 in
   let n = List.length rank_to_symbols in
-  List.iter
-    (fun (rank,syms) ->
-      List.iter (fun s -> Sym.Tbl.add s_to_rank s (1+n-rank)) syms
+  List.iteri
+    (fun i (_,syms) ->
+      List.iter (fun s -> Sym.Tbl.add s_to_rank s (2+n-i)) syms
     ) rank_to_symbols;
-  (* is the symbol a constant? *)
-  let is_const s =
-    try snd (Signature.arity signature s) = 0
-    with Not_found -> false
-  in
   fun s ->
     if is_const s then 1
-    else try Sym.Tbl.find s_to_rank s with Not_found -> n
+    else try Sym.Tbl.find s_to_rank s with Not_found ->2+n
 
 let create ?(base=Signature.TPTP.base) params =
   let penv = {

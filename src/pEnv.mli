@@ -84,7 +84,8 @@ type t
   (** Environment used for preprocessing of the problem *)
 
 val create : ?base:Signature.t -> Params.t -> t
-  (** Create a new preprocessing env.  *)
+  (** Create a new preprocessing env.
+      @param base initial signature *)
 
 val copy : t -> t
   (** Copy of the preprocessing env. Shares the same meta prover, if any *)
