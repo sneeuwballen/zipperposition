@@ -180,6 +180,18 @@ let is_ground = T.ground
 
 let size = T.size
 
+let rec depth ty = match view ty with
+  | Var _
+  | BVar _ -> 1
+  | App (_, l) -> 1 + List.fold_left (fun d t -> max d (depth t)) 0 l
+  | Forall ty' -> 1 + depth ty'
+  | Fun (t1,t2) -> 1 + max (depth t1) (depth t2)
+  | Record (r,rest) ->
+      let d = CCOpt.maybe depth 0 rest in
+      List.fold_left
+        (fun d (_,ty) -> max d (depth ty))
+        d r
+
 let rec open_fun ty = match view ty with
   | Fun (x, ret) ->
       let xs, ret' = open_fun ret in

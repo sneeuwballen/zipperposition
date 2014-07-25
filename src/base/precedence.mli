@@ -110,11 +110,13 @@ module type S = sig
   end
 
   type weight_fun = symbol -> int
+
   val weight_modarity : arity:(symbol -> int) -> weight_fun
   val weight_constant : weight_fun
 
   val set_weight : t -> weight_fun -> t
-  (** Change the weight function of the precedence *)
+  (** Change the weight function of the precedence
+      @since NEXT_RELEASE *)
 
   (** {2 Creation of a precedence from constraints} *)
 
