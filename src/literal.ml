@@ -741,10 +741,22 @@ module Comp = struct
 
   let _cmp_specific ~ord l1 l2 =
     match l1, l2 with
+    | True, True
+    | True, False
+    | True, Prop _
+    | True, Equation _
+    | False, False
+    | False, True
+    | False, Prop _
+    | False, Equation _
     | Prop _, Prop _
-    | Equation _, Equation _
     | Prop _, Equation _
-    | Equation _, Prop _ ->
+    | Prop _, True
+    | Prop _, False
+    | Equation _, Equation _
+    | Equation _, Prop _
+    | Equation _, True
+    | Equation _, False ->
         _cmp_by_term_multiset ~ord l1 l2
     | Ineq olit1, Ineq olit2 ->
         begin match olit1.TO.strict, olit2.TO.strict with
