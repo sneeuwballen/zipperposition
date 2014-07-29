@@ -62,7 +62,7 @@ let parse_args () =
     (Selection.available_selections ())
   in
   (* parameters *)
-  let ord = ref "rpo6"
+  let ord = ref "kbo"
   and seed = ref 1928575
   and steps = ref 0
   and version = ref false
