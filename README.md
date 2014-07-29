@@ -8,15 +8,23 @@ indexing, etc.) that can be factored out of several applications.
 
 This project is licensed under the BSD2 license. See the `LICENSE` file.
 
-## Regular build
+## Build
+
+### Via opam
+
+We recommand using [opam](http://opam.ocaml.org). Once you installed it,
+type
+
+    $ opam repository add deducteam https://gforge.inria.fr/git/opam-deducteam/opam-deducteam.git
+    $ opam install logtk
+
+### From sources
 
 You will need OCaml >= 4.00.1 or higher with ocamlbuild,
-[zarith](https://forge.ocamlcore.org/projects/zarith/)
+[zarith](https://forge.ocamlcore.org/projects/zarith/),
+[ocaml-containers](https://github.com/c-cube/ocaml-containers/),
+[sequence](https://github.com/c-cube/sequence/)
 and the standard library.
-
-Some modules come from
-[ocaml-containers](https://github.com/c-cube/ocaml-containers/) and are packaged with
-the library.
 
 Additional sub-libraries can be built if their respective dependencies
 are met, and the appropriate `./configure --enable-foobar` flag was set.
@@ -65,6 +73,14 @@ Logtk provides several useful parts for logic-related implementations:
     theories. A small file describing a few theories can be found in
     `data/builtin.theory` and one of the tools, `detect_theories`, can be
     used straightforwardly.
+
+
+## Documentation
+
+See [this page](http://cedeela.fr/~simon/software/logtk/).
+
+There are some examples of how to use the code in `src/tools/`
+and `src/demo/`.
 
 ## List of modules
 
@@ -133,10 +149,6 @@ Logtk provides several useful parts for logic-related implementations:
     - `ArSignature`: random signatures
     - `ArSymbol`: random symbols
     - `ArPattern`: random meta-patterns
-
-## Documentation
-
-See [this page](http://cedeela.fr/~simon/software/logtk/).
 
 ## TODO
 
