@@ -311,6 +311,16 @@ let rec size t = match T.view t with
   | T.At (l, ty) when Type.is_type ty -> size l
   | _ -> assert false
 
+let weight ?(var=1) ?(sym=fun _ -> 1) t =
+  let rec weight t = match T.view t with
+    | T.Var _
+    | T.BVar _ -> var
+    | T.App (_, l) -> List.fold_left (fun s t' -> s + weight t') 1 l
+    | T.Const s -> sym s
+    | T.At (l, ty) when Type.is_type ty -> weight l
+    | _ -> assert false
+  in weight t
+
 let is_ground t = T.ground t
 
 let monomorphic t = Sequence.is_empty (Seq.ty_vars t)

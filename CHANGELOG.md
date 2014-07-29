@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.3
+
+- `FOTerm.weight`
+- `Type.depth`
+- KBO checks that weights are > 0
+- use a flag in `Formula.simplify`, for memoization; makes CNF fast again on some examples
+- expose `ScopedTerm.flags`
+- `Precedence`: make it possible to choose/change the weight fun
+- updated README to favor opam
+
 ## 0.5.2
 
 - demo program `resolution1.ml`

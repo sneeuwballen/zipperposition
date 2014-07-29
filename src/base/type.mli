@@ -180,6 +180,10 @@ val is_ground : t -> bool
 val size : t -> int
   (** Size of type, in number of "nodes" *)
 
+val depth : t -> int
+  (** Depth of the type (length of the longest path to some leaf)
+      @since 0.5.3 *)
+
 val open_fun : t -> (t list * t)
   (** [open_fun ty] "unrolls" function arrows from the left, so that
       [open_fun (a -> (b -> (c -> d)))] returns [[a;b;c], d].

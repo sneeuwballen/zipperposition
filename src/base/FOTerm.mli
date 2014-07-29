@@ -150,6 +150,13 @@ val head : t -> Symbol.t option         (** head symbol *)
 val head_exn : t -> Symbol.t            (** head symbol (or Invalid_argument) *)
 val size : t -> int                     (** Size (number of nodes) *)
 
+val weight : ?var:int -> ?sym:(Symbol.t -> int) -> t -> int
+  (** Compute the weight of a term, given a weight for variables
+      and one for symbols.
+      @param var unique weight for every variable (default 1)
+      @param sym function from symbols to their weight (default [const 1])
+      @since 0.5.3 *)
+
 val ty_vars : t -> Type.Set.t
   (** Set of free type variables *)
 

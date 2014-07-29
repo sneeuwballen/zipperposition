@@ -241,6 +241,11 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
         else if n = 1 then balance.pos_counter <- balance.pos_counter - 1);
       balance.balance.(idx) <- n - 1
 
+    let _weight prec s =
+      let x = Prec.weight prec s in
+      assert (x>0);
+      x
+
     (** the KBO ordering itself. The implementation is borrowed from
         the kbo_5 version of "things to know when implementing KBO".
         It should be linear time. *)
@@ -257,8 +262,8 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
         | TC.BVar _ -> (if pos then wb + 1 else wb - 1), false
         | TC.App (s, _, l) ->
           let wb' = if pos
-            then wb + Prec.weight prec s
-            else wb - Prec.weight prec s in
+            then wb + _weight prec s
+            else wb - _weight prec s in
           balance_weight_rec wb' l y pos false
         | TC.NonFO -> assert false
       (** list version of the previous one, threaded with the check result *)
@@ -322,7 +327,7 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
       and tckbo_composite wb f g ss ts =
         (* do the recursive computation of kbo *)
         let wb', recursive = tckbo_rec wb f g ss ts in
-        let wb'' = wb' + Prec.weight prec f - Prec.weight prec g in
+        let wb'' = wb' + _weight prec f - _weight prec g in
         (* check variable condition *)
         let g_or_n = if balance.neg_counter = 0 then Gt else Incomparable
         and l_or_n = if balance.pos_counter = 0 then Lt else Incomparable in

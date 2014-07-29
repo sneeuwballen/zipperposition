@@ -151,6 +151,7 @@ and _eq_record_list l1 l2 = match l1, l2 with
 
 (** {3 Flags} *)
 
+type flag=int
 let _flag_gen = Util.Flag.create ()
 let new_flag () = Util.Flag.get_new _flag_gen
 let set_flag t flag = t.flags <- t.flags lor flag
