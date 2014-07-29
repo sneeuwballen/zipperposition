@@ -100,6 +100,16 @@ module type S = sig
     (** [simpl_to ~from ~into] sets the link of [from] to [into], so that
         the simplification of [from] into [into] is cached. *)
 
+  val is_conjecture : t -> bool
+    (** Looking at the clause's proof, return [true] iff the clause is an
+        initial conjecture from the problem *)
+
+  val distance_to_conjecture : t -> int option
+    (** [distance_to_conjecture c] returns [None] if [c] has no ancestor
+        that is a conjecture (including [c] itself). It returns [Some d]
+        if [d] is the distance, in the proof graph, to the closest
+        conjecture ancestor of [c] *)
+
   module CHashcons : Hashcons.S with type elt = clause
 
   val create : ?parents:t list -> ?selected:CCBV.t ->
@@ -113,8 +123,8 @@ module type S = sig
     (** Build a new hclause from the given literals. *)
 
   val of_forms : ?parents:t list -> ?selected:CCBV.t ->
-                      Formula.FO.t list ->
-                      (CompactClause.t -> Proof.t) -> t
+                    Formula.FO.t list ->
+                    (CompactClause.t -> Proof.t) -> t
     (** Directly from list of formulas *)
 
   val of_forms_axiom : ?role:string -> file:string -> name:string ->
@@ -455,6 +465,11 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     (* avoid cycles *)
     if from != into' then
       from.hcsimplto <- Some into
+
+  let is_conjecture c = Proof.is_conjecture c.hcproof
+
+  let distance_to_conjecture c =
+    Proof.distance_to_conjecture c.hcproof
 
   module CHashcons = Hashcons.Make(struct
     type t = clause
