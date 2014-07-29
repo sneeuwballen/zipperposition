@@ -56,7 +56,7 @@ To upgrade to more recent versions:
 If you really need to, you can download a release on the
 following [github page for releases](https://github.com/c-cube/zipperposition/releases).
 
-You first need to install `logtk`, `menhir`, `aez`, `containers` and `sequence`.
+You first need to install `logtk`, `menhir`, `zarith`, `containers` and `sequence`.
 
     $ ./configure
 
