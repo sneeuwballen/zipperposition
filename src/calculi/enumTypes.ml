@@ -66,6 +66,7 @@ end
 
 let _enable = ref true
 let _instantiate_shielded = ref false
+let _accept_unary_types = ref false
 
 module Make(E : Env.S) = struct
   module Env = E
@@ -156,7 +157,8 @@ module Make(E : Env.S) = struct
       | [] ->
           (* now also check that no case has free variables other than [var],
               and that there are at least 2 cases *)
-          if _check_uniq_var_cond ~var acc && List.length acc >= 2
+          if _check_uniq_var_cond ~var acc
+          && (!_accept_unary_types || List.length acc >= 2)
             then Some (ty, var, acc)
             else None
       | Lit.Equation (l, r, true) :: lits' when T.eq l var ->
@@ -375,4 +377,7 @@ let () =
     ; "-enum-shielded"
       , Arg.Bool (fun b -> _instantiate_shielded := b)
       , "enable/disable instantiation of shielded variables of enum type"
+    ; "-enum-unary"
+      , Arg.Bool (fun b -> _accept_unary_types := b)
+      , "enable/disable support for unary enum types (one case)"
     ]

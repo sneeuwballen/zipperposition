@@ -509,7 +509,7 @@ let add_vars set lit = match lit with
 let vars lit =
   let set = T.Tbl.create 7 in
   add_vars set lit;
-  T.Tbl.to_list set
+  T.Tbl.fold (fun t () acc -> t::acc) set []
 
 let var_occurs v lit = match lit with
   | Prop (p,_) -> T.var_occurs v p

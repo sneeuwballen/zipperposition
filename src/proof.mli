@@ -30,13 +30,23 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 type form = Formula.FO.t
+type 'a sequence = ('a -> unit) -> unit
+
+module FileInfo : sig
+  type t = {
+    filename : string;  (* file name *)
+    name : string;      (* statement name *)
+    role : string;
+    conjecture : bool;  (* conjecture/negated conjecture? *)
+  }
+end
 
 (** Classification of proof steps *)
 type step_kind =
   | Inference of string
   | Simplification of string
   | Esa of string
-  | File of string * string * string  (** role, file, name *)
+  | File of FileInfo.t
   | Trivial (** trivial, or trivial within theories *)
 
 type step_result =
@@ -58,13 +68,18 @@ val eq : t -> t -> bool
 include Interfaces.HASH with type t := t
 val cmp : t -> t -> int
 
+val kind : t -> step_kind
+val parents : t -> t array
+val theories : t -> string list
+val additional_info : t -> string list
+
 (** {2 Constructors and utils}
 In all the following constructors, [theories] defaults to the empty list.
 Axiom constructors have default role "axiom" *)
 
 val mk_f_trivial : ?info:string list -> ?theories:string list -> form -> t
 
-val mk_f_file : ?info:string list -> ?theories:string list ->
+val mk_f_file : ?conjecture:bool -> ?info:string list -> ?theories:string list ->
                 role:string -> file:string -> name:string ->
                 form -> t
 
@@ -79,7 +94,7 @@ val mk_f_esa : ?info:string list -> ?theories:string list -> rule:string ->
 
 val mk_c_trivial : ?info:string list -> ?theories:string list -> CompactClause.t -> t
 
-val mk_c_file : ?info:string list -> ?theories:string list ->
+val mk_c_file : ?conjecture:bool -> ?info:string list -> ?theories:string list ->
                 role:string -> file:string -> name:string ->
                 CompactClause.t -> t
 
@@ -106,6 +121,9 @@ val rule : t -> string option
 val role : t -> string
   (** TSTP role of the proof step ("plain" for inferences/simp/esa) *)
 
+val is_conjecture : t -> bool
+  (** Is the proof a conjecture from a file? *)
+
 module Theories : sig
   val eq : string list
   val arith : string list
@@ -119,9 +137,20 @@ type proof_set = unit ProofTbl.t
 
 type proof_name = int ProofTbl.t
 
-val traverse : ?traversed:proof_set -> t -> (t -> unit) -> unit
+val traverse : ?traversed:proof_set -> t -> t sequence
   (** Traverse the proof. Each proof node is traversed only once,
       using the set to recognize already traversed proofs. *)
+
+val traverse_depth : ?traversed:proof_set -> t -> (t * int) sequence
+  (** Traverse the proof, yielding each proof node along with its
+      depth from the initial proof. Each proof node is traversed only once,
+      using the set to recognize already traversed proofs. *)
+
+val distance_to_conjecture : t -> int option
+  (** [distance_to_conjecture p] returns [None] if [p] has no ancestor
+      that is a conjecture (including [p] itself). It returns [Some d]
+      if [d] is the distance, in the proof graph, to the closest
+      conjecture ancestor of [p] *)
 
 val get_name : namespace:proof_name -> t -> int
   (** Unique name of the proof, within the given [namespace] *)
@@ -156,7 +185,8 @@ val pp_debug : Buffer.t -> t -> unit
 val pp : string -> Buffer.t -> t -> unit
   (** Prints the proof according to the given input switch *)
 
-val as_dot_graph : (t, LazyGraph.Dot.attribute list, LazyGraph.Dot.attribute list) LazyGraph.t
+val as_dot_graph : (t, LazyGraph.Dot.attribute list,
+                       LazyGraph.Dot.attribute list) LazyGraph.t
 
 val pp_dot : name:string -> Buffer.t -> t -> unit
   (** Pretty print the proof as a DOT graph *)

@@ -40,6 +40,7 @@ module S = Substs
 (* load some other modules, but they might not be registered *)
 module Import = struct
   open! Chaining
+  open! ArithInt
   open! EnumTypes
 end
 
@@ -62,6 +63,7 @@ let print_version ~params =
 let () =
   Extensions.register Superposition.extension;
   Extensions.register AC.extension;
+  Extensions.register Heuristics.extension;
   ()
 
 let setup_penv ~penv () =
