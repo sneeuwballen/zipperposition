@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: b720d041db41acaa529ccec282eabc32)
+# DO NOT EDIT (digest: b6b11d16c701d48b0bdb929e00aeedf5)
 src/ClauseQueue
 src/Clause
 src/Const
@@ -25,4 +25,6 @@ src/Multisets
 src/calculi/Superposition
 src/calculi/Chaining
 src/calculi/EnumTypes
+src/calculi/ArithInt
+src/calculi/Heuristics
 # OASIS_STOP

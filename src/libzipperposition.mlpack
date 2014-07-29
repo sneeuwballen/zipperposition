@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 1237d08f92e5f8f4b41a0d2dafbd76dc)
+# DO NOT EDIT (digest: 2694817fb2aa5497f9acf811e06c3e14)
 ClauseQueue
 Clause
 Const
@@ -25,6 +25,8 @@ Multisets
 calculi/Superposition
 calculi/Chaining
 calculi/EnumTypes
+calculi/ArithInt
+calculi/Heuristics
 lib/LazyGraph
 lib/SmallSet
 lib/UnionFind

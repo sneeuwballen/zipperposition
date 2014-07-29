@@ -6,11 +6,7 @@ Automated theorem prover for first-order logic with equality and theories.
 
 Zipperposition is intended to be a superposition prover for full first order logic. The accent
 is on flexibility, modularity and simplicity rather than performance, to allow
-quick experimenting on automated theorem proving. It generates TSTP traces; I did
-not find a free proof checker so I wrote a simple one (available on
-[a github repository](https://github.com/c-cube/tstp-proof-checker "proof checker"))
-that uses external provers (E and SPASS) to check each deduction step. You still
-have to trust the (possibly lazy) CNF reduction steps, sadly.
+quick experimenting on automated theorem proving. It generates TSTP traces.
 
 Zipperposition is written in the functional and imperative language
 [OCaml](http://caml.inria.fr). The name is a bad play on the words "zipper" (a
@@ -35,27 +31,37 @@ what came from matita or Darwin .
 
 See file LICENSE.
 
-## Regular build
+## Build
 
-OCaml >= 4.00.1 is needed. You also need the libraries `datalog` and `logtk`.
+### Via opam
 
-Some submodules are used:
+The recommended way to install Zipperposition is through [opam](http://opam.ocaml.org/).
+Deducteam has its [own opam repository](https://gforge.inria.fr/projects/opam-deducteam/)
+whose adress is https://gforge.inria.fr/git/opam-deducteam/opam-deducteam.git .
+You need to have GMP (with headers) installed (it's not handled by opam).  Once
+you installed GMP and opam, type:
 
-    $ git submodule update --init
+    $ opam repository add deducteam https://gforge.inria.fr/git/opam-deducteam/opam-deducteam.git
 
-Then, type in a terminal located in the root directory of the project:
+    $ opam install zipperposition
 
-    $ make
+To upgrade to more recent versions:
 
-It should build the project files (using ocamlbuild).
-The executable is `zipperposition.native`. If you want to install the prover
-in your global path, type:
+    $ opam update
+
+    $ opam upgrade
+
+### Manually
+
+If you really need to, you can download a release on the
+following [github page for releases](https://github.com/c-cube/zipperposition/releases).
+
+You first need to install `logtk`, `menhir`, `aez`, `containers` and `sequence`.
+
+    $ ./configure
 
     $ make install
 
-or, if you want to change the installation directory (default is `/usr/bin/`), type:
-
-    $ make INSTALLDIR=/foo/bar/ install
 
 ## Use
 
@@ -63,22 +69,11 @@ Typical usage:
 
     $ zipperposition -help
     $ zipperposition problem_file [options]
-    $ zipperposition problem_file -calculus [delayed|superposition]
+    $ zipperposition -arith ARI114=1.p
 
-to run the prover. Help is available with the option *-help*. The prover
-accepts CNF and FOF files for both calculi `-calculus superposition` and
-`-calculus delayed` (where reduction to CNF is done during the saturation
-process). The prover now embeds its own (simple) reduction to CNF algorithm
-for the former case.
+to run the prover. Help is available with the option *-help*.
 
 For instance,
 
-    $ zipperposition pelletier_problems/pb47.p -calculus delayed -ord kbo -progress -timeout 30
+    $ zipperposition pelletier_problems/pb47.p -ord rpo6 -progress -timeout 30
 
-## Knowledge Base
-
-Zipperposition now uses a `Knowledge Base` that contains information about theories,
-lemmas, rewriting systems, etc. By default it tries to access
-`$ZIPPERPOSITION_HOME/kb`, and loads
-the theory file `builtin.theory` (written in a human-readable syntax). If you
-wish to deactivate this feature, use `-no-theories` or `-kb /dev/null`.
