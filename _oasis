@@ -118,6 +118,7 @@ Document logtk
   Build$:               flag(docs)
   XOCamlbuildPath:      .
   XOCamlbuildLibraries: logtk
+  XOCamlbuildExtraArgs: "-docflags '-keep-code -colorize-code -short-functors -charset utf-8'"
 
 Document logtk_meta
   Title:                Logtk_meta documentation
