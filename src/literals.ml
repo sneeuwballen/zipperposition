@@ -445,7 +445,7 @@ let fold_subseteq ?sign ~eligible lits acc f =
 let fold_subseteq_terms ?sign ~eligible ~ord lits acc f =
   fold_subseteq ?sign ~eligible lits acc
   (fun acc lit position ->
-    Lit.fold_terms ~position ~which:`All ~ord ~subterms:false lit acc f)
+    Lit.fold_terms ~vars:true ~position ~which:`All ~ord ~subterms:false lit acc f)
 
 
 (** {3 IO} *)

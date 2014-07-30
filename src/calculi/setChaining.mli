@@ -59,24 +59,33 @@ module type S = sig
     (* factoring terms that are on the left side of literals *)
 
   val rewrite_set_eq: Env.multi_simpl_rule
+    (* rewrite A=B into A subseteq B and B subseteq A *)
 
   val rewrite_set_neq: Env.multi_simpl_rule
+    (* rewrite A!=B into A notsubseteq B or B notsubseteq A *)
 
   val singleton_pos: Env.rw_simplify_rule
     (* choice of a witness for all terms appearing in a singleton on the left
-     * side of a \not\subseteq *)
+     * side of a subseteq *)
 
   val singleton_neg: Env.multi_simpl_rule
+    (* choice of a witness for all terms appearing in a singleton on the left
+     * side of a notsubseteq *)
 
   val singleton_elim: Env.multi_simpl_rule
+    (* eliminates a variable that appears in singletons only on the left side
+     * of set literals and in equalities *)
+
+  val var_elim: Env.multi_simpl_rule
+    (* eliminates a variable that appears only on one side of set literals *)
 
   val reflexivity: Env.is_trivial_rule
     (* reflexivity tautology : when the same term appears in each side of a
      * positive literal*)
 
   val is_tautology: Env.is_trivial_rule
-    (* finds tautologies of the form : A \subseteq B or A \not\subseteq B
-     * the positive literal can have stronger constraints *)
+    (* finds the following tautologies :
+     * A inter A' subseteq B union B' or A notsubseteq B *)
 
   val is_absurd: Env.lit_rewrite_rule
     (* eliminates negative literals that have the same term appearing in each
