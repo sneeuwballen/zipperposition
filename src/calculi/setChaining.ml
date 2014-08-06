@@ -1026,12 +1026,9 @@ module Make(E : Env.S) = struct
     match l with
       | [] -> k (accl,accr)
       | (hl,hr)::t ->
-        let f side x = match side with
-          | `Left -> mk_seq_sing t (x::accl,accr) k
-          | `Right -> mk_seq_sing t (accl,x::accr) k
-        in
-        List.iter (f `Left) hl;
-        List.iter (f `Right) hr
+        List.iter (fun x -> mk_seq_sing t (x::accl,accr) k) hl;
+        List.iter (fun x -> mk_seq_sing t (accl,x::accr) k) hr;
+        ()
 
   (** eliminate variables occuring in singletons on the left side of subseteq *)
   let singleton_elim c =
