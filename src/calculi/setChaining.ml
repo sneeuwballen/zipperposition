@@ -1025,11 +1025,13 @@ module Make(E : Env.S) = struct
   let rec mk_seq_sing l (accl,accr) k =
     match l with
       | [] -> k (accl,accr)
-      | h::t -> List.iter
-        (fun x -> match x with
-          | term,`Left -> mk_seq_sing t (term::accl,accr) k
-          | term,`Right -> mk_seq_sing t (accl,term::accr) k
-          | _ -> assert false) h
+      | (hl,hr)::t ->
+        let f side x = match side with
+          | `Left -> mk_seq_sing t (x::accl,accr) k
+          | `Right -> mk_seq_sing t (accl,x::accr) k
+        in
+        List.iter (f `Left) hl;
+        List.iter (f `Right) hr
 
   (** eliminate variables occuring in singletons on the left side of subseteq *)
   let singleton_elim c =
@@ -1069,14 +1071,10 @@ module Make(E : Env.S) = struct
             then
               (* remove {x} from the left side of the literal, and update the
                * context *)
-              let a = Util.list_fmap
-              (fun t -> if FOTerm.eq sing_x t
-                then None
-                else Some (t,`Right)) a
-              in
+              let a = List.filter (fun t -> not (FOTerm.eq sing_x t)) a in
               let idx = Lits.Pos.idx pos in
               let cont = Util.array_except_idx (Array.of_list cont) idx in
-              cont,(List.fold_left (fun acc t -> (t,`Left)::acc ) a b)::acc
+              cont,(a,b)::acc
             else cont,acc
           | _ -> assert false)
         in
@@ -1109,7 +1107,8 @@ module Make(E : Env.S) = struct
         (fun new_clauses (left,right) ->
           let new_lit = Lit.mk_subseteq ~sets left right in
           let proof cc = Proof.mk_c_inference ~theories:["sets"]
-            ~rule:"singleton_elim" cc [C.proof c] in
+          ~rule:"singleton_elim" ~info:[Util.sprintf "%a elimination" FOTerm.pp x]
+          cc [C.proof c] in
           let new_c = C.create ~parents:[c] (new_lit::context) proof in
           Util.debug 3 "    %a" C.pp new_c;
           new_c::new_clauses) [] seq
@@ -1127,15 +1126,10 @@ module Make(E : Env.S) = struct
       let _,a',b',_ = Lit.View.get_subseteq_exn lit in
       if List.exists (FOTerm.eq x) a' then
         (* remove x from the literal, and update the context *)
-        let a' = Util.list_fmap
-          (fun t ->
-            if (FOTerm.eq t x) then None
-            else Some (t,`Left)) a'
-        in
+        let a' = List.filter (fun t -> not (FOTerm.eq t x)) a' in
         let idx = Lits.Pos.idx pos in
         let ctx = Util.array_except_idx (Array.of_list ctx) idx in
-        let neg_terms = a'@(List.map (fun t -> t,`Right) b') in
-        ctx,neg_terms::acc'
+        ctx,(a',b')::acc'
       else ctx,acc'
     in
     (* search all the positive set literals that contain x *)
@@ -1187,7 +1181,8 @@ module Make(E : Env.S) = struct
     let new_clauses = Sequence.fold
     (fun acc lits ->
       let proof cc = Proof.mk_c_inference ~theories:["sets"]
-        ~rule:"var_elimi_right" cc [C.proof c] in
+      ~rule:"var_elim" ~info:[Util.sprintf "%a elimination" FOTerm.pp x]
+      cc [C.proof c] in
       let new_c = C.create ~parents:[c] lits proof in
       Util.debug 3 "    %a" C.pp new_c;
       new_c::acc) [] lits_seq
@@ -1199,10 +1194,9 @@ module Make(E : Env.S) = struct
       the variable must appear in the same side of each literal, and not in the
       other *)
   let var_elim c =
-    Util.debug 2 "try variable elimination right in %a" C.pp c;
+    Util.debug 2 "try variable elimination in %a" C.pp c;
     let module P = Position in
     let lits = C.lits c in
-    let eligible = C.Eligible.(filter Lit.is_subseteq) in
     (* choose a variable that appears in a subseteq, named x *)
     match choose_var lits with
       | None -> None
@@ -1215,20 +1209,15 @@ module Make(E : Env.S) = struct
         (* if the variable is in the right side of the literals,
          * rename it by x' = comp(x), so that x' is in the left side of the
          * literals; then apply the same rewriting rule as above *)
-        Util.debug 3 "variabla to eliminate : %a" FOTerm.pp x;
-        let lits = Lits.fold_subseteq ~eligible lits lits
-        (fun acc lit pos ->
-          let sets,a,b,sign = Lit.View.get_subseteq_exn lit in
-          if List.mem x b then
-            (* renaming *)
+        Util.debug 3 "variable to eliminate : %a" FOTerm.pp x;
+        let lits = Array.to_list lits |>
+        List.map (fun lit -> match lit with
+          | Lit.Subseteq (sets,a,b,sign) when List.mem x b ->
             let a = x::a in
-            let b = List.filter (fun t -> not(FOTerm.eq t x)) b in
-            let lit = Lit.mk_subseteq ~sets ~sign a b in
-            let idx = Lits.Pos.idx pos in
-            let lits = Util.array_except_idx acc idx in
-            Array.of_list (lit::lits)
-          else acc)
-        in do_var_elim x lits c
+            let b = List.filter (fun t -> not (FOTerm.eq t x)) b in
+              Lit.mk_subseteq ~sets ~sign a b
+          | _ -> lit)
+        in do_var_elim x (Array.of_list lits) c
 
   (** reflexivity tautology *)
   let reflexivity c =
