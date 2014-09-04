@@ -30,6 +30,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 module Lit = Literal
+module F = Formula.FO
+module TS = Theories.Sets
+module S = Substs
+module Lits = Literals
+module Lit = Literal
 
 (** {2 Inference Rules} *)
 module type S = sig
@@ -105,11 +110,6 @@ module Make(E : Env.S) = struct
   module C = Env.C
   module PS = Env.ProofState
   module Ctx = Env.Ctx
-  module F = Formula.FO
-  module TS = Theories.Sets
-  module S = Substs
-  module Lits = Literals
-  module Lit = Literal
   module I = PS.TermIndex
 
   let sets = !_theory
