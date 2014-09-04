@@ -154,21 +154,21 @@ let hash lit = Hash.apply hash_fun lit
 let weight lit =
   fold (fun acc t -> acc + T.size t) 0 lit
 
-let heuristic_weight = function
-  | Prop (p, _) -> T.size p
-  | Equation (l, r, _) -> T.size l + T.size r
+let heuristic_weight weight = function
+  | Prop (p, _) -> weight p
+  | Equation (l, r, _) -> weight l + weight r
   | True
   | False -> 0
-  | Ineq olit -> T.size olit.TO.left + T.size olit.TO.right
+  | Ineq olit -> weight olit.TO.left + weight olit.TO.right
   | Arith alit ->
       (* sum of weights of terms, without the (naked) variables *)
       AL.Seq.terms alit
         |> Sequence.filter (fun t -> not (T.is_var t))
-        |> Sequence.fold (fun acc t -> acc+T.size t) 0
+        |> Sequence.fold (fun acc t -> acc + weight t) 0
   | Subseteq (_, l, r, _) ->
       Sequence.(
         append (of_list l) (of_list r)
-        |> fold (fun acc t -> acc+T.size t) 0
+        |> fold (fun acc t -> acc+ weight t) 0
       )
 
 let depth lit =
@@ -595,7 +595,7 @@ let add_vars set lit = match lit with
 let vars lit =
   let set = T.Tbl.create 7 in
   add_vars set lit;
-  T.Tbl.to_list set
+  T.Tbl.fold (fun t () acc -> t::acc) set []
 
 let var_occurs v lit = match lit with
   | Prop (p,_) -> T.var_occurs v p
@@ -921,10 +921,22 @@ module Comp = struct
 
   let _cmp_specific ~ord l1 l2 =
     match l1, l2 with
+    | True, True
+    | True, False
+    | True, Prop _
+    | True, Equation _
+    | False, False
+    | False, True
+    | False, Prop _
+    | False, Equation _
     | Prop _, Prop _
-    | Equation _, Equation _
     | Prop _, Equation _
-    | Equation _, Prop _ ->
+    | Prop _, True
+    | Prop _, False
+    | Equation _, Equation _
+    | Equation _, Prop _
+    | Equation _, True
+    | Equation _, False ->
         _cmp_by_term_multiset ~ord l1 l2
     | Ineq olit1, Ineq olit2 ->
         begin match olit1.TO.strict, olit2.TO.strict with

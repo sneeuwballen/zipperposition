@@ -766,6 +766,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let l' = List.map (fun t' -> normal_form ~restrict:false subst t' scope) l in
         let tyargs' = List.map
           (fun ty -> Substs.Ty.apply_no_renaming subst ty scope) tyargs in
+        assert (T.eq hd (Substs.FO.apply_no_renaming subst hd scope));
         let t' = T.app_full hd tyargs' l' in
         (* rewrite term at root *)
         reduce_at_root ~restrict t'

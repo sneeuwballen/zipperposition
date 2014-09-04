@@ -98,6 +98,13 @@ module type S = sig
     (** [simpl_to ~from ~into] sets the link of [from] to [into], so that
         the simplification of [from] into [into] is cached. *)
 
+  val is_conjecture : t -> bool
+    (** Looking at the clause's proof, return [true] iff the clause is an
+        initial conjecture from the problem *)
+
+  val distance_to_conjecture : t -> int option
+    (** See {!Proof.distance_to_conjecture}, applied to the clause's proof *)
+
   module CHashcons : Hashcons.S with type elt = clause
 
   val create : ?parents:t list -> ?selected:CCBV.t ->
@@ -111,8 +118,8 @@ module type S = sig
     (** Build a new hclause from the given literals. *)
 
   val of_forms : ?parents:t list -> ?selected:CCBV.t ->
-                      Formula.FO.t list ->
-                      (CompactClause.t -> Proof.t) -> t
+                    Formula.FO.t list ->
+                    (CompactClause.t -> Proof.t) -> t
     (** Directly from list of formulas *)
 
   val of_forms_axiom : ?role:string -> file:string -> name:string ->

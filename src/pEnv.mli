@@ -84,7 +84,8 @@ type t
   (** Environment used for preprocessing of the problem *)
 
 val create : ?base:Signature.t -> Params.t -> t
-  (** Create a new preprocessing env.  *)
+  (** Create a new preprocessing env.
+      @param base initial signature *)
 
 val copy : t -> t
   (** Copy of the preprocessing env. Shares the same meta prover, if any *)
@@ -120,6 +121,9 @@ val add_constrs : penv:t -> Precedence.Constr.t list -> unit
 
 val add_constr_rule : penv:t -> (PFormula.Set.t -> Precedence.Constr.t) -> unit
   (** Add a precedence constraint rule *)
+
+val set_weight_rule : penv:t -> (PFormula.Set.t -> Symbol.t -> int) -> unit
+  (** Choose the way weights are computed *)
 
 val add_status : penv:t -> (Symbol.t * Precedence.symbol_status) list -> unit
   (** Specify explicitely the status of some symbols *)

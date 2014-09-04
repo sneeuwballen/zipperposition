@@ -42,7 +42,31 @@ module Lits = Literals
 module type S = sig
   module C : Clause.S
 
+  (** {6 Weight functions} *)
+  module WeightFun : sig
+    type t = C.t -> int
+    (** attribute a weight to a clause. The smaller, the better (lightweight
+        clauses will be favored). A weight must always be positive;
+        the weight of the empty clause should alwyays be 0. *)
+
+    val default : t
+    (** Use {!Literal.heuristic_weight} *)
+
+    val age : t
+    (** Returns the age of the clause (or 0 for the empty clause) *)
+
+    val favor_conjecture : t
+    (** The closest a clause is from conjectures, the lowest its weight.
+        Some threshold is used for clauses that are too far away *)
+
+    val combine : (t * int) list -> t
+    (** Combine a list of pairs [w, coeff] where [w] is a weight function,
+        and [coeff] a strictly positive number. This is a weighted sum
+        of weights. *)
+  end
+
   type t
+  (** A priority queue. *)
 
   val add : t -> C.t -> t
     (** Add a clause to the Queue *)
@@ -88,6 +112,10 @@ module type S = sig
   val lemmas : t
     (** only select lemmas *)
 
+  val goal_oriented : t
+    (** custom weight function that favors clauses that are "close" to
+        initial conjectures. It is fair.  *)
+
   val mk_queue : ?accept:(C.t -> bool) -> weight:(C.t -> int) -> string -> t
     (** Bring your own implementation of queue *)
 
@@ -104,6 +132,9 @@ module type S = sig
 
     val ground : queues
       (** Favor positive unit clauses and ground clauses *)
+
+    val why3 : queues
+      (** Optimized for why3 *)
   end
 
   val default_queues : queues
@@ -131,6 +162,50 @@ let () =
 
 module Make(C : Clause.S) = struct
   module C = C
+
+  (* weight of a term [t], using the precedence's weight *)
+  let term_weight t = FOTerm.size t
+
+  (** {6 Weight functions} *)
+  module WeightFun = struct
+    type t = C.t -> int
+
+    let default c =
+      let _depth_ty =
+        Lits.Seq.terms (C.lits c)
+        |> Sequence.map FOTerm.ty
+        |> Sequence.map Type.depth
+        |> Sequence.max ?lt:None
+        |> CCOpt.maybe CCFun.id 0
+      in
+      let w = Array.fold_left
+        (fun acc lit -> acc + Lit.heuristic_weight term_weight lit)
+        0 (C.lits c)
+      in w * Array.length (C.lits c) + _depth_ty
+
+    let age c =
+      if C.is_empty c then 0
+      else C.id c
+
+    let _conjecture_threshold = 15
+
+    let favor_conjecture c =
+      if C.is_empty c then 0
+      else
+        let d = match C.distance_to_conjecture c with
+          | Some d -> min d _conjecture_threshold
+          | None -> _conjecture_threshold
+        in
+        1+d
+
+    let combine ws =
+      assert (ws <> []);
+      assert (List.for_all (fun (_,c) -> c > 0) ws);
+      fun c ->
+        List.fold_left
+          (fun sum (w,coeff) -> coeff * w c)
+          0 ws
+  end
 
   module H = CCHeap.Make(struct
     type t = (int * C.t)
@@ -193,33 +268,24 @@ module Make(C : Clause.S) = struct
 
   let name q = q.functions.name
 
-  (* weight function, that estimates how "difficult" it is to get rid of
-      the literals of the clause. In other words, by selecting the clause,
-      how far we are from the empty clause. *)
-  let _default_weight c =
-    let w = Array.fold_left
-      (fun acc lit -> acc + Lit.heuristic_weight lit)
-      0 (C.lits c)
-    in w * Array.length (C.lits c)
-
   let fifo =
     let name = "fifo_queue" in
     mk_queue ~weight:(fun c -> C.id c) name
 
   let clause_weight =
     let name = "clause_weight" in
-    mk_queue ~weight:_default_weight name
+    mk_queue ~weight:WeightFun.default name
 
   let goals =
     (* check whether a literal is a goal *)
     let is_goal_lit lit = Lit.is_neg lit in
     let is_goal_clause c = Util.array_forall is_goal_lit (C.lits c) in
     let name = "prefer_goals" in
-    mk_queue ~accept:is_goal_clause ~weight:_default_weight name
+    mk_queue ~accept:is_goal_clause ~weight:WeightFun.default name
 
   let ground =
     let name = "prefer_ground" in
-    mk_queue ~accept:C.is_ground ~weight:_default_weight name
+    mk_queue ~accept:C.is_ground ~weight:WeightFun.default name
 
   let non_goals =
     (* check whether a literal is a goal *)
@@ -228,7 +294,7 @@ module Make(C : Clause.S) = struct
       (fun x -> not (is_goal_lit x))
       (C.lits c) in
     let name = "prefer_non_goals" in
-    mk_queue ~accept:is_non_goal_clause ~weight:_default_weight name
+    mk_queue ~accept:is_non_goal_clause ~weight:WeightFun.default name
 
   let pos_unit_clauses =
     let is_unit_pos c = match C.lits c with
@@ -236,18 +302,24 @@ module Make(C : Clause.S) = struct
     | _ -> false
     in
     let name = "prefer_pos_unit_clauses" in
-    mk_queue ~accept:is_unit_pos ~weight:_default_weight name
+    mk_queue ~accept:is_unit_pos ~weight:WeightFun.default name
 
   let horn =
     let accept c = Lits.is_horn (C.lits c) in
     let name = "prefer_horn" in
-    mk_queue ~accept ~weight:_default_weight name
+    mk_queue ~accept ~weight:WeightFun.default name
 
   let lemmas =
     let name = "lemmas" in
     let accept c = C.get_flag C.flag_lemma c in
     (* use a fifo on lemmas *)
-    mk_queue ~accept ~weight:_default_weight name
+    mk_queue ~accept ~weight:WeightFun.default name
+
+  let goal_oriented =
+    let weight = WeightFun.(combine [age, 1; default, 4; favor_conjecture, 1]) in
+    let name = "goal_oriented" in
+    let accept _ = true in
+    mk_queue ~accept ~weight name
 
   (** {6 Combination of queues} *)
 
@@ -270,6 +342,11 @@ module Make(C : Clause.S) = struct
       ; pos_unit_clauses, 1
       ; ground, 2
       ]
+
+    let why3 =
+      [ goal_oriented, 3
+      ; fifo, 1
+      ]
   end
 
   let default_queues =
@@ -283,6 +360,7 @@ module Make(C : Clause.S) = struct
     | "bfs" -> Profiles.bfs
     | "explore" -> Profiles.explore
     | "ground" -> Profiles.ground
+    | "why3" -> Profiles.why3
     | n -> failwith ("no such profile: " ^ n)
 
   let pp buf q =

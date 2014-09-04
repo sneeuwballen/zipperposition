@@ -41,6 +41,8 @@ module S = Substs
 module Import = struct
   open! Chaining
   open! SetChaining
+  open! ArithInt
+  open! EnumTypes
 end
 
 (** setup an alarm for abrupt stop *)
@@ -325,6 +327,10 @@ end) = struct
     result, env
 end
 
+(* print weight of [s] within precedence [prec] *)
+let _pp_weight prec buf s =
+  Printf.bprintf buf "w(%a)=%d" Symbol.pp s (Precedence.weight prec s)
+
 (* preprocess formulas and choose signature,select,ord *)
 let preprocess ~signature ~params formulas =
   (* penv *)
@@ -336,6 +342,9 @@ let preprocess ~signature ~params formulas =
   (* now build a context *)
   let precedence = PEnv.mk_precedence ~penv formulas in
   Util.debug 1 "precedence: %a" Precedence.pp precedence;
+  Util.debug 1 "weights: %a"
+    (Sequence.pp_buf (_pp_weight precedence))
+    (Signature.Seq.symbols signature);
   let ord = params.param_ord precedence in
   let select = Selection.selection_from_string ~ord params.param_select in
   Util.debug 1 "selection function: %s" params.param_select;
@@ -382,8 +391,8 @@ let process_file ?meta ~plugins ~params file =
   (* obtain clauses + env *)
   Util.debug 2 "input formulas:\n%%  %a" (Util.pp_seq ~sep:"\n%  " PF.pp)
     (PF.Set.to_seq formulas);
-  Util.debug 2 "input signature: %a" Signature.pp
-    (Signature.diff signature !Params.signature);
+    Util.debug 2 "input signature: %a"
+      Signature.pp (Signature.diff signature !Params.signature);
   let res, signature = preprocess ~signature ~params formulas in
   let module Res = (val res : POST_PREPROCESS) in
   (* build the context and env *)

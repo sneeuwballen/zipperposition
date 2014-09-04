@@ -51,7 +51,7 @@ include Interfaces.HASH with type t := t
 
 val hash : t -> int               (** hashing of literal *)
 val weight : t -> int             (** weight of the lit (sum of weights of terms) *)
-val heuristic_weight : t -> int   (** heuristic difficulty to eliminate lit *)
+val heuristic_weight : (term -> int) -> t -> int   (** heuristic difficulty to eliminate lit *)
 val depth : t -> int              (** depth of literal *)
 val sign : t -> bool
 

@@ -66,12 +66,13 @@ end)
 let form t = t.form
 let proof t = t.proof
 let id t = t.id
-let is_conjecture t = t.is_conjecture
+let is_conjecture t = Proof.is_conjecture t.proof
 
 let to_sourced t =
-  match t.proof.Proof.kind with
-  | Proof.File (_, file, name) ->
-      Some (Sourced.make ~file ~name ~is_conjecture:t.is_conjecture t.form)
+  let module F = Proof.FileInfo in
+  match Proof.kind t.proof with
+  | Proof.File {F.filename=file; F.name=name} ->
+      Some (Sourced.make ~file ~name ~is_conjecture:(is_conjecture t) t.form)
   | _ -> None
 
 let rec _follow_simpl n pf =
@@ -90,8 +91,10 @@ let create ?(is_conjecture=false) ?(follow=false) form proof =
 
 let of_sourced ?(role="axiom") src =
   let open Sourced in
-  let proof = Proof.mk_f_file ~role ~file:src.name ~name:src.name src.content in
-  create ~is_conjecture:src.is_conjecture src.content proof
+  let conjecture = src.is_conjecture in
+  let proof = Proof.mk_f_file ~conjecture
+    ~role ~file:src.name ~name:src.name src.content in
+  create src.content proof
 
 let simpl_to ~from ~into =
   let from = follow_simpl from in
