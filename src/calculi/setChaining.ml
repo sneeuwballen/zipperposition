@@ -34,7 +34,6 @@ module F = Formula.FO
 module TS = Theories.Sets
 module S = Substs
 module Lits = Literals
-module Lit = Literal
 
 (** {2 Inference Rules} *)
 module type S = sig
