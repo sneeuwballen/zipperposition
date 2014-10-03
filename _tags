@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 160cdaa7de1160d1ddde92f889029164)
+# DO NOT EDIT (digest: 067a0c718da1709bae7ca45af05c4d4c)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -49,12 +49,14 @@
 "src/lib/mixtbl.cmx": for-pack(Libzipperposition)
 "src/lib/signal.cmx": for-pack(Libzipperposition)
 <src/calculi/*.ml{,i}>: package(containers)
+<src/calculi/*.ml{,i}>: package(containers.advanced)
 <src/calculi/*.ml{,i}>: package(dynlink)
 <src/calculi/*.ml{,i}>: package(logtk)
 <src/calculi/*.ml{,i}>: package(sequence)
 <src/calculi/*.ml{,i}>: package(unix)
 <src/calculi/*.ml{,i}>: package(zarith)
 <src/lib/*.ml{,i}>: package(containers)
+<src/lib/*.ml{,i}>: package(containers.advanced)
 <src/lib/*.ml{,i}>: package(dynlink)
 <src/lib/*.ml{,i}>: package(logtk)
 <src/lib/*.ml{,i}>: package(sequence)
@@ -63,6 +65,7 @@
 # Library libzipperposition_meta
 "src/meta/libzipperposition_meta.cmxs": use_libzipperposition_meta
 <src/meta/*.ml{,i}>: package(containers)
+<src/meta/*.ml{,i}>: package(containers.advanced)
 <src/meta/*.ml{,i}>: package(dynlink)
 <src/meta/*.ml{,i}>: package(logtk)
 <src/meta/*.ml{,i}>: package(logtk.meta)
@@ -72,6 +75,7 @@
 <src/meta/*.ml{,i}>: use_libzipperposition
 # Executable zipperposition
 "src/zipperposition.native": package(containers)
+"src/zipperposition.native": package(containers.advanced)
 "src/zipperposition.native": package(dynlink)
 "src/zipperposition.native": package(logtk)
 "src/zipperposition.native": package(logtk.parsers)
@@ -80,6 +84,7 @@
 "src/zipperposition.native": package(zarith)
 "src/zipperposition.native": use_libzipperposition
 <src/*.ml{,i}>: package(containers)
+<src/*.ml{,i}>: package(containers.advanced)
 <src/*.ml{,i}>: package(dynlink)
 <src/*.ml{,i}>: package(logtk)
 <src/*.ml{,i}>: package(logtk.parsers)
@@ -89,6 +94,7 @@
 <src/*.ml{,i}>: use_libzipperposition
 # Executable run_tests
 "tests/run_tests.native": package(containers)
+"tests/run_tests.native": package(containers.advanced)
 "tests/run_tests.native": package(dynlink)
 "tests/run_tests.native": package(libzipperposition.arbitrary)
 "tests/run_tests.native": package(logtk)
@@ -100,6 +106,7 @@
 "tests/run_tests.native": package(zarith)
 "tests/run_tests.native": use_libzipperposition
 <tests/*.ml{,i}>: package(containers)
+<tests/*.ml{,i}>: package(containers.advanced)
 <tests/*.ml{,i}>: package(dynlink)
 <tests/*.ml{,i}>: package(libzipperposition.arbitrary)
 <tests/*.ml{,i}>: package(logtk)
