@@ -7,7 +7,7 @@ License:     BSD-3-clause
 LicenseFile: LICENSE
 Plugins:     META (0.3), DevFiles (0.3)
 OCamlVersion: >= 4.00.1
-BuildTools:  ocamlbuild
+BuildTools: ocamlbuild
 FilesAB: src/const.ml.ab
 AlphaFeatures: compiled_setup_ml
 
@@ -43,7 +43,6 @@ Library "libzipperposition_meta"
   Build$:           flag(meta)
   Install$:         flag(meta)
   BuildDepends:     libzipperposition,logtk,logtk.meta
-
 
 # main executable for the prover
 Executable zipperposition
