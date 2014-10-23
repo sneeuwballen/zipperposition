@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: d75ed03230da69189234333635872ad4)
+# DO NOT EDIT (digest: 8ba2cfb0ba4e4ad7aaaa225ee3bac019)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -51,14 +51,16 @@
 "src/base/sourced.cmx": for-pack(Logtk)
 "src/base/lib/hashcons.cmx": for-pack(Logtk)
 "src/base/lib/cache.cmx": for-pack(Logtk)
-"src/base/lib/bij.cmx": for-pack(Logtk)
-"src/base/lib/bencode.cmx": for-pack(Logtk)
 "src/base/lib/parseLocation.cmx": for-pack(Logtk)
 "src/base/lib/multiset.cmx": for-pack(Logtk)
 "src/base/lib/partialOrder.cmx": for-pack(Logtk)
 "src/base/lib/lazyList.cmx": for-pack(Logtk)
 "src/base/lib/iArray.cmx": for-pack(Logtk)
 "src/base/lib/lazyGraph.cmx": for-pack(Logtk)
+<src/base/*.ml{,i}>: oasis_library_logtk_ccopt
+<src/base/lib/*.ml{,i}>: oasis_library_logtk_ccopt
+"src/base/util_stubs.c": oasis_library_logtk_ccopt
+<src/base/logtk.{cma,cmxa}>: use_liblogtk_stubs
 <src/base/*.ml{,i}>: package(containers)
 <src/base/*.ml{,i}>: package(sequence)
 <src/base/*.ml{,i}>: package(unix)
@@ -67,6 +69,10 @@
 <src/base/lib/*.ml{,i}>: package(sequence)
 <src/base/lib/*.ml{,i}>: package(unix)
 <src/base/lib/*.ml{,i}>: package(zarith)
+"src/base/util_stubs.c": package(containers)
+"src/base/util_stubs.c": package(sequence)
+"src/base/util_stubs.c": package(unix)
+"src/base/util_stubs.c": package(zarith)
 # Library logtk_parsers
 "src/parsers/logtk_parsers.cmxs": use_logtk_parsers
 "src/parsers/parse_tptp.cmx": for-pack(Logtk_parsers)

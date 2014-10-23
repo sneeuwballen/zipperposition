@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: ec395d4451e4c018bf6406c73e422e51)
+# DO NOT EDIT (digest: b789d06fb451ece51d105d8100ccb88c)
 Symbol
 ScopedTerm
 FOTerm
@@ -36,8 +36,6 @@ Lambda
 Sourced
 lib/Hashcons
 lib/Cache
-lib/Bij
-lib/Bencode
 lib/ParseLocation
 lib/Multiset
 lib/PartialOrder

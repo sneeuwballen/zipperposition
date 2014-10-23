@@ -89,12 +89,6 @@ module type ITER = sig
   val of_list : ?init:'a t -> 'a list -> 'a t
 end
 
-module type SERIALIZABLE = sig
-  type t
-  
-  val bij : t Bij.t
-end
-
 module type MONOID = sig
   type t
 

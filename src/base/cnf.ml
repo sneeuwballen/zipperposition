@@ -203,9 +203,9 @@ let __eval_and_unshift env f =
   __reconvert (ST.DB.unshift 1 (ST.DB.eval env (f : F.t :> ST.t)))
 
 (* TODO: replace universally quantified vars by free vars
- * only *after* the skolemization of the subformula is done.
- * Skolemization should proceed from the leaves (alpha-equiv checking
- * is trivial with De Bruijn indices) up to the root. *)
+   only *after* the skolemization of the subformula is done.
+   Skolemization should proceed from the leaves (alpha-equiv checking
+   is trivial with De Bruijn indices) up to the root. *)
 let skolemize ~ctx f =
   Util.enter_prof prof_skolemize;
   let rec skolemize f = match F.view f with
@@ -243,6 +243,13 @@ let skolemize ~ctx f =
   Util.exit_prof prof_skolemize;
   res
 
+(** For the following, we use "handbook of automated reasoning",
+  chapter "compute small clause normal forms". We use a naive computation
+  of clause sizes, but with a caching mechanism to block the exponential
+  re-computation of sizes.
+  The criterion for renaming is: if renaming makes less clauses, then
+  always do it *)
+
 (* estimation for a number of clauses *)
 module Estimation = struct
   type t =
@@ -262,13 +269,16 @@ module Estimation = struct
   let ( +/ ) = lift2 (+)
   let ( */ ) = lift2 ( * )
 
-  let sum l = List.fold_left (+/) (Exactly 0) l
-  let prod l = List.fold_left ( */) (Exactly 1) l
-
   (* comparison: is e > n? *)
   let gt e n = match e with
     | TooBig -> true
     | Exactly e' -> e' > n
+
+  (* comparison, but also assume that if both are too big, the first is bigger *)
+  let geq_or_big e1 e2 = match e1, e2 with
+    | TooBig, _ -> true
+    | Exactly e', Exactly e'' -> e' >= e''
+    | Exactly _, TooBig -> false
 
   let pp buf n = match n with
     | TooBig -> Buffer.add_string buf "<too_big>"
@@ -294,155 +304,175 @@ let estimate_num_clauses ~cache ~pos f =
       FPolTbl.find cache (f,pos)
     with Not_found ->
       (* compute *)
-      let n = match F.view f with
-        | F.Eq _
-        | F.Neq _
-        | F.Atom _
-        | F.True
-        | F.False -> E.Exactly 1
-        | F.Not f' -> num (not pos) f'
-        | F.And l ->
-            let l' = List.rev_map (num pos) l in
-            if pos then E.sum l' else E.prod l'
-        | F.Or l ->
-            let l' = List.rev_map (num pos) l in
-            if pos then E.prod l' else E.sum l'
-        | F.Imply (a,b) ->
-            if pos
-              then E.(num false a */ num true b)
-              else E.(num true a +/ num false b)
-        | F.Equiv(a,b) ->
-            if pos
-              then E.((num true a */ num false b) +/ (num false a */ num true b))
-              else E.((num true a */ num true b) +/ (num false a */ num false b))
-        | F.Xor(a,b) ->
+      let n = match F.view f, pos with
+        | F.Eq _, _
+        | F.Neq _, _
+        | F.Atom _, _
+        | F.True, _
+        | F.False, _ -> E.Exactly 1
+        | F.Not f', _ -> num (not pos) f'
+        | F.And l, true -> sum_list pos l
+        | F.And l, false -> prod_list pos l
+        | F.Or l, true -> prod_list pos l
+        | F.Or l, false -> sum_list pos l
+        | F.Imply (a,b), true -> E.(num false a */ num true b)
+        | F.Imply (a,b), false -> E.(num true a +/ num false b)
+        | F.Equiv(a,b), true ->
+            E.((num true a */ num false b) +/ (num false a */ num true b))
+        | F.Equiv(a,b), false ->
+            E.((num true a */ num true b) +/ (num false a */ num false b))
+        | F.Xor(a,b), true ->
             (* a xor b is defined as  (not a) <=> b *)
-            if pos
-              then E.((num false a */ num false b) +/ (num true a */ num true b))
-              else E.((num false a */ num true b) +/ (num true a */ num false b))
-        | F.Forall (_, f')
-        | F.Exists (_, f')
-        | F.ForallTy f' -> num pos f'
+            E.((num false a */ num false b) +/ (num true a */ num true b))
+        | F.Xor(a,b), false ->
+            E.((num false a */ num true b) +/ (num true a */ num false b))
+        | F.Forall (_, f'), _
+        | F.Exists (_, f'), _
+        | F.ForallTy f', _ -> num pos f'
       in
       (* memoize *)
       Util.debug 5 "estimated %a clauses (sign %B) for %a" E.pp n pos F.pp f;
       FPolTbl.add cache (f,pos) n;
       n
+  and sum_list pos l = match l with
+    | [] -> E.Exactly 0
+    | x :: tail -> E.(num pos x +/ sum_list pos tail)
+  and prod_list pos l = match l with
+    | [] -> E.Exactly 1
+    | x :: tail -> E.(num pos x */ prod_list pos tail)
   in
   let n = num pos f in
   Util.exit_prof prof_estimate;
   n
 
 (* introduce definitions for sub-formulas of [f], is needed. This might
- * modify [ctx] by adding definitions to it, and it will {!NOT} introduce
- * definitions in the definitions (that has to be done later). *)
-let introduce_defs ~ctx ~cache ~limit f =
+   modify [ctx] by adding definitions to it, and it will {!NOT} introduce
+   definitions in the definitions (that has to be done later). *)
+let introduce_defs ~ctx ~cache f =
+  let module E = Estimation in
+  (* shortcut to compute the number of clauses *)
+  let p pos f = estimate_num_clauses ~cache ~pos f in
   let _neg = function
     | `Pos -> `Neg
     | `Neg -> `Pos
     | `Both -> `Both
-  and should_rename ~polarity ~limit f =
-    match polarity with
-    | `Pos ->
-      Estimation.gt (estimate_num_clauses ~cache ~pos:true f) limit
-    | `Neg ->
-      Estimation.gt (estimate_num_clauses ~cache ~pos:false f) limit
-    | `Both ->
-        Estimation.(gt
-          (estimate_num_clauses ~cache ~pos:true f +/
-           estimate_num_clauses ~cache ~pos:false f)
-        limit)
+  (* rename formula *)
+  and _rename ~polarity f =
+    let p = Skolem.get_definition ~ctx ~polarity f in
+    Util.debug 4 "introduce def. %a for subformula %a" F.pp p F.pp f;
+    p
   in
-  (* rename [f] if its count of clauses is above the limit *)
-  let rename_if_above_limit ~polarity ~limit f =
-    if should_rename ~polarity ~limit f
-      then begin
-        let p = Skolem.get_definition ~ctx ~polarity f in
-        Util.debug 4 "introduce def. %a for subformula %a" F.pp p F.pp f;
-        p
-      end
-      else f
-  in
-  let rec recurse ~polarity f =
-    (* first introduce definitions for subterms *)
-    let f = match F.view f with
-      | F.True
-      | F.False
-      | F.Atom _
-      | F.Eq _
-      | F.Neq _ -> f
-      | F.And l -> F.Base.and_ (List.map (recurse ~polarity) l)
-      | F.Or l -> F.Base.or_ (List.map (recurse ~polarity) l)
-      | F.Not f' -> F.Base.not_ (recurse ~polarity:(_neg polarity) f')
-      | F.Imply (f1, f2) ->
-          F.Base.imply
-            (recurse ~polarity:(_neg polarity) f1)
-            (recurse ~polarity f2)
-      | F.Equiv (f1, f2) ->
-          F.Base.equiv
-            (recurse ~polarity:`Both f1)
-            (recurse ~polarity:`Both f2)
-      | F.Xor (f1, f2) ->
-          F.Base.xor
-            (recurse ~polarity:`Both f1)
-            (recurse ~polarity:`Both f2)
-      | F.Forall (varty, f') ->
-          F.Base.__mk_forall ~varty (recurse ~polarity f')
-      | F.Exists (varty, f') ->
-          F.Base.__mk_exists ~varty (recurse ~polarity f')
-      | F.ForallTy f' ->
-          F.Base.__mk_forall_ty (recurse ~polarity f')
-    in
-    (* check whether the formula is already defined! *)
+  (* recurse in sub-formulas, renaming as needed.
+     a is the multiplicative factor for the number of clauses of (cnf f)
+     b is the multiplicative factor for the number of clauses of (cnf ~f)
+     polarity is the polarity of f within the outermost formula *)
+  let rec maybe_rename ~polarity a b f =
+    let f = maybe_rename_subformulas ~polarity a b f in
+    (* check whether the formula is already defined! In which case, it's for free *)
     if Skolem.has_definition ~ctx f
-    then begin
-      let p = Skolem.get_definition ~ctx ~polarity f in
-      Util.debug 5 "use definition %a for %a" F.pp p F.pp f;
-      p
-    end
+    then (
+      let atom = Skolem.get_definition ~ctx ~polarity f in
+      Util.debug 5 "use definition %a for %a" F.pp atom F.pp f;
+      atom
+    )
+    (* depending on polarity and subformulas, do renamings.
+      The condition is (where p is the expected number of clauses):
+      if pol=1,  a * p(F) >= a + p(F)
+      if pol=-1, b * p(~F) >= b + p(~F)
+      if pol=0, a * p(F) + b * p(~F) >= a + b + p(F) + p(~F)
+    *)
     else
-      (* depending on polarity and subformulas, do renamings *)
-      match F.view f, polarity with
-      | F.And l, (`Neg | `Both) ->
-          let l' = List.map (rename_if_above_limit ~polarity ~limit) l in
-          let f = F.Base.and_ l' in
-          (* maybe there are 15 formulas that give 2 clauses each! In that
-             case we need to rename them all *)
-          if should_rename ~polarity ~limit:1 f
-          then F.Base.and_
-            (List.map (rename_if_above_limit ~polarity ~limit:1) l')
-          else f
-      | F.Or l, (`Pos | `Both) ->
-          let l' = List.map (rename_if_above_limit ~polarity ~limit) l in
-          let f = F.Base.or_ l' in
-          (* maybe there are 15 formulas that give 2 clauses each! In that
-             case we need to rename them all *)
-          if should_rename ~polarity ~limit:1 f
-            then F.Base.or_
-              (List.map (rename_if_above_limit ~polarity ~limit:1) l')
-            else f
-      | F.Equiv(f1, f2), _ ->
-          F.Base.equiv
-            (rename_if_above_limit ~polarity:`Both ~limit f1)
-            (rename_if_above_limit ~polarity:`Both ~limit f2)
-      | F.Xor(f1, f2), _ ->
-          F.Base.xor
-            (rename_if_above_limit ~polarity:`Both ~limit f1)
-            (rename_if_above_limit ~polarity:`Both ~limit f2)
-      | F.Imply(f1, f2), `Pos ->
-          F.Base.imply
-            (rename_if_above_limit ~polarity:`Neg ~limit f1)
-            (rename_if_above_limit ~polarity:`Pos ~limit f2)
-      | F.Imply(f1, f2), `Both ->
-          F.Base.imply
-            (rename_if_above_limit ~polarity:`Pos ~limit f1)
-            (rename_if_above_limit ~polarity:`Neg ~limit f2)
-      | F.Not f', _ ->
-          let f' = rename_if_above_limit ~polarity:(_neg polarity) ~limit f' in
-          F.Base.not_ f'
-      | _ -> f (* do not rename *)
+      let should_rename = match polarity with
+        | `Pos ->
+            E.(geq_or_big (a */ p true f) (a +/ p true f))
+        | `Neg ->
+            E.(geq_or_big (b */ p false f) (b +/ p false f))
+        | `Both ->
+            E.(geq_or_big
+              (a */ p true f +/ b */ p false f)
+              (a +/ b +/ p true f +/ p false f)
+            )
+      in
+      if should_rename
+        then _rename ~polarity f
+        else f
+  (* introduce definitions for subterms *)
+  and maybe_rename_subformulas ~polarity a b f = match F.view f with
+    | F.True
+    | F.False
+    | F.Atom _
+    | F.Eq _
+    | F.Neq _ -> f
+    | F.And l ->
+        let l' = List.mapi
+          (fun i f' ->
+            let a' = a in
+            let b' = E.(b */ prod_p ~pos:false ~except:i l 0) in
+            maybe_rename ~polarity a' b' f'
+          ) l
+        in
+        F.Base.and_ l'
+    | F.Or l ->
+        let l' = List.mapi
+          (fun i f' ->
+            let a' = E.(a */ prod_p ~pos:true ~except:i l 0) in
+            let b' = b in
+            maybe_rename ~polarity a' b' f'
+          ) l
+        in
+        F.Base.or_ l'
+    | F.Not f' ->
+        let a' = b and b' = a in
+        F.Base.not_ (maybe_rename ~polarity:(_neg polarity) a' b' f')
+    | F.Imply (f1, f2) ->
+        let f1' =
+          let a' = b and b' = E.(a */ p true f2) in
+          maybe_rename ~polarity:(_neg polarity) a' b' f1
+        and f2' =
+          let a' = E.(a */ p false f1) and b' = b in
+          maybe_rename ~polarity a' b' f2
+        in
+        F.Base.imply f1' f2'
+    | F.Equiv (f1, f2) ->
+        let f1' =
+          let a' = E.(a */ p false f2 +/ b */ p true f2) in
+          let b' = E.(a */ p true f2 +/ b */ p false f2) in
+          maybe_rename ~polarity:`Both a' b' f1
+        and f2' =
+          let a' = E.(a */ p false f1 +/ b */ p true f1) in
+          let b' = E.(a */ p true f1 +/ b */ p false f1) in
+          maybe_rename ~polarity:`Both a' b' f2
+        in
+        F.Base.equiv f1' f2'
+    | F.Xor (f1, f2) ->
+        (* we consider that f1 has reverted polarity *)
+        let f1' =
+          let b' = E.(a */ p false f2 +/ b */ p true f2) in
+          let a' = E.(a */ p true f2 +/ b */ p false f2) in
+          maybe_rename ~polarity:`Both a' b' f1
+        and f2' =
+          let a' = E.(a */ p true f1 +/ b */ p false f1) in
+          let b' = E.(a */ p false f1 +/ b */ p true f1) in
+          maybe_rename ~polarity:`Both a' b' f2
+        in
+        F.Base.xor f1' f2'
+    | F.Forall (varty, f') ->
+        F.Base.__mk_forall ~varty (maybe_rename ~polarity a b f')
+    | F.Exists (varty, f') ->
+        F.Base.__mk_exists ~varty (maybe_rename ~polarity a b f')
+    | F.ForallTy f' ->
+        F.Base.__mk_forall_ty (maybe_rename ~polarity a b f')
+  (* product of all (p ~pos x) for x in l if idx(x) != except *)
+  and prod_p ~pos l i ~except = match l with
+    | [] -> E.Exactly 1
+    | x :: tail ->
+        if i = except
+        then prod_p ~pos tail (i+1) ~except
+        else
+          let p_x = estimate_num_clauses ~cache ~pos x in
+          E.(p_x */ prod_p ~pos tail (i+1) ~except)
   in
-  recurse ~polarity:`Pos f
+  maybe_rename ~polarity:`Pos (E.Exactly 1) (E.Exactly 0) f
 
 (* helper: reduction to cnf using De Morgan laws. Returns a list of list of
   atomic formulas *)
@@ -514,7 +544,7 @@ let simplify_and_rename ~ctx ~cache ~disable_renaming ~preprocess ~limit l =
       let f = F.simplify f in
       if disable_renaming || is_cnf f
         then f
-        else introduce_defs ~ctx ~cache ~limit f)
+        else introduce_defs ~ctx ~cache f)
     l
   in
   (* add the new definitions to the list of formulas to reduce to CNF *)

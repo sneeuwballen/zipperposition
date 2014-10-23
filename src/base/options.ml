@@ -57,6 +57,7 @@ let make opts =
       "choose printing format for terms and formulas (default \"debug\""
   ; "-print-types", Arg.Unit _print_types , "print type annotations everywhere"
   ; "-bt", Arg.Bool Printexc.record_backtrace, "enable backtraces"
+  ; "-mem-limit", Arg.Int Util.set_memory_limit, "memory limit (in MB)"
   ]
 
 let global = ref default
