@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.4
+
+- better CNF (with more accurate criterion to choose whether to rename formulas)
+- `Util.set_{memory,time}_limit`
+- remove old files
+
 ## 0.5.3
 
 - `FOTerm.weight`
