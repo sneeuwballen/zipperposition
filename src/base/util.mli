@@ -47,6 +47,9 @@ val pp_pos : Lexing.position -> string
 val set_memory_limit : int -> unit
 (** Limit the amount of memory available to the process (in MB) *)
 
+val set_time_limit : int -> unit
+(** Limit the CPU time available to the process (in seconds) *)
+
 (** {2 Infix operators} *)
 
 module Infix : sig

@@ -72,6 +72,14 @@ let set_memory_limit n =
   debug 1 "limit memory to %d MB" n;
   set_memory_limit_stub n
 
+external set_time_limit_stub : int -> unit = "logtk_set_time_limit"
+
+let set_time_limit n =
+  if n <= 0 then invalid_arg "set_time_limit: expect positive arg";
+  debug 1 "limit time to %ds" n;
+  set_time_limit_stub n
+
+
 (** {2 Infix operators} *)
 
 module Infix = struct

@@ -30,3 +30,25 @@ CAMLprim value logtk_set_memory_limit(value megabytes)
 
   CAMLreturn (Val_unit);
 }
+
+CAMLprim value logtk_set_time_limit(value t)
+{
+  struct rlimit r = { 0 };
+  rlim_t limit = Int_val(t); /* in seconds */
+  int err;
+
+  CAMLparam0();
+
+  r.rlim_cur = limit;
+  r.rlim_max = limit;
+
+  err = setrlimit(RLIMIT_CPU, &r);
+  if (err != 0)
+  {
+    fprintf(stderr, "could not set the time limit to %ds: %s\n",
+            (int)limit, strerror(errno));
+    exit(1);
+  }
+
+  CAMLreturn (Val_unit);
+}
