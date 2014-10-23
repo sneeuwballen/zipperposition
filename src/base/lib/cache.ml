@@ -123,7 +123,7 @@ module Linear(X : EQ) = struct
 
   let create size =
     assert (size >= 1);
-    Array.create size Empty
+    Array.make size Empty
 
   let clear cache =
     Array.fill cache 0 (Array.length cache) Empty
@@ -166,7 +166,7 @@ module Linear2(X : EQ)(Y : EQ) = struct
 
   let create size =
     assert (size >= 1);
-    Array.create size Empty
+    Array.make size Empty
 
   let clear cache =
     Array.fill cache 0 (Array.length cache) Empty
@@ -214,7 +214,7 @@ module Replacing(X : HASH) = struct
   and 'a bucket = Empty | Assoc of key * 'a
 
   let create size =
-    Array.create size Empty
+    Array.make size Empty
 
   let clear c =
     Array.fill c 0 (Array.length c) Empty
@@ -245,7 +245,7 @@ module Replacing2(X : HASH)(Y : HASH) = struct
 
 
   let create size =
-    Array.create size Empty
+    Array.make size Empty
 
   let clear c =
     Array.fill c 0 (Array.length c) Empty

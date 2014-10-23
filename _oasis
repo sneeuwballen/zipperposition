@@ -56,7 +56,7 @@ Library "logtk"
                     HORewriting, Index, Dtree, Fingerprint, NPDtree,
                     Congruence, FastFingerprint, FeatureVector, Rewriting,
                     FormulaShape, Transform, Lambda, Sourced, TypedPrologTerm,
-                    lib/Hashcons, lib/Cache, lib/Bij, lib/Bencode,
+                    lib/Hashcons, lib/Cache,
                     lib/ParseLocation, lib/Multiset,
                     lib/PartialOrder, lib/LazyList, lib/IArray, lib/LazyGraph
   BuildDepends:     zarith,unix,sequence,containers
