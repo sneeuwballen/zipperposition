@@ -289,4 +289,97 @@ end) : S = struct
 
   (** Boolean Mapping *)
   module BoolLit = BBox.Make(struct end)
+
+  (** Induction *)
+  module Induction = struct
+    type constructor = Symbol.t * Type.t
+
+    type inductive_type = {
+      pattern : Type.t;
+      constructors : constructor list;
+    }
+
+    let _tbl_ty : inductive_type Symbol.Tbl.t = Symbol.Tbl.create 16
+
+    let _extract_hd ty =
+      match Type.view (snd (Type.open_fun ty)) with
+      | Type.App (s, _) -> s
+      | _ ->
+          let msg = Util.sprintf "expected function type, got %a" Type.pp ty in
+          invalid_arg msg
+
+    let declare_ty ty constructors =
+      let name = _extract_hd ty in
+      if constructors = []
+        then invalid_arg "InductiveCst.declare_ty: no constructors provided";
+      try
+        Symbol.Tbl.find _tbl_ty name
+      with Not_found ->
+        let ity = { pattern=ty; constructors; } in
+        Symbol.Tbl.add _tbl_ty name ity;
+        ity
+
+    let inductive_types yield =
+      Symbol.Tbl.iter (fun _ ity -> yield ity) _tbl_ty
+
+    type cst = FOTerm.t
+
+    type cst_data = {
+      cst : cst;
+      ty : inductive_type;
+      subst : Substs.Ty.t; (* matched against [ty.pattern] *)
+      parent : cst option;
+      level : int;
+    }
+
+    (* cst -> cst_data *)
+    let _tbl : cst_data T.Tbl.t = T.Tbl.create 16
+
+    let level t =
+      let cst_data = T.Tbl.find _tbl t in
+      cst_data.level
+
+    let cst_of_term ?parent t =
+      if T.is_ground t
+      then if T.Tbl.mem _tbl t then Some t
+      else
+        try
+          (* check that the type of [t] is inductive *)
+          let ty = T.ty t in
+          let name = _extract_hd ty in
+          let ity = Symbol.Tbl.find _tbl_ty name in
+          let subst = Unif.Ty.matching ~pattern:ity.pattern 1 ty 0 in
+          let level = match parent with
+            | None -> 1
+            | Some t' -> level t' + 1
+          in
+          let cst_data = { cst=t; ty=ity; subst; parent; level; } in
+          T.Tbl.add _tbl t cst_data;
+          Some t
+        with Invalid_argument _ | Unif.Fail | Not_found ->
+          None
+      else None
+
+    let is_inductive cst = T.Tbl.mem _tbl cst
+
+    let inductive_cst yield =
+      T.Tbl.iter (fun t _ -> yield t) _tbl
+
+    module Set = T.Set
+
+    let parent t =
+      let cst_data = T.Tbl.find _tbl t in
+      cst_data.parent
+
+    let rec depends_on a b = match parent a with
+      | None -> false
+      | Some a' -> T.eq a' b || depends_on a' b
+
+    let parent_exn t = match parent t with
+      | None -> failwith "no parent"
+      | Some t' -> t'
+
+    let is_max_among t set =
+      Set.for_all (fun t' -> not (depends_on t' t)) set
+  end
 end

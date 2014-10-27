@@ -172,5 +172,75 @@ module type S = sig
   (** {2 Booleans Literals} *)
 
   module BoolLit : BBox.S
+
+  (** {2 Induction} *)
+  module Induction : sig
+    (** {6 Inductive Types} *)
+
+    type constructor = Symbol.t * Type.t
+    (** Constructor for an inductive type *)
+
+    type inductive_type = private {
+      pattern : Type.t;  (* type, possibly with free variables *)
+      constructors : constructor list;
+    }
+    (** An inductive type, along with its covering,disjoint constructors *)
+
+    val declare_ty : Type.t -> constructor list -> inductive_type
+    (** Declare the given inductive type.
+        @raise Failure if the type is already declared
+        @raise Invalid_argument if the list of constructors is empty. *)
+
+    val inductive_types : inductive_type Sequence.t
+    (** Set of inductive types known so far. *)
+
+    (** {6 Inductive Constants} *)
+
+    type cst = private FOTerm.t
+    (** A ground term of an inductive type. It must correspond to a
+        term built with the corresponding {!inductive_type} only.
+        For instance, a constant of type [nat] should be equal to
+        [s^n(0)] in any model. *)
+
+    val cst_of_term : ?parent:cst -> FOTerm.t -> cst option
+    (** Check whether the  given term can be an inductive constant,
+        and if possible, adds it to the set of inductive constants.
+
+        Requirements: it must be ground, and its type must be a
+        known {!inductive type}.
+
+        @param parent if present, makes [c] depend on the given constant
+          that must be inductive already.
+        @raise Invalid_argument if the parent isn't inductive or the
+          term is non-ground *)
+
+    val is_inductive : FOTerm.t -> bool
+    (** Check whether the given constant is ready for induction *)
+
+    val inductive_cst : cst Sequence.t
+    (** set of all inductive constants *)
+
+    module Set : Set.S with type elt = cst
+    (** Set of constants *)
+
+    val depends_on : cst -> cst -> bool
+    (** [depends_on a b] is [true] iff [a] depends on [b]. This forms a
+        partial strict order. *)
+
+    val parent : cst -> cst option
+    (** [parent c] returns [Some d] iff [c] depends directly on [d]. *)
+
+    val parent_exn : cst -> cst
+    (** Unsafe version of {!parent}.
+        @raise Failure if the constant has no parent *)
+
+    val level : cst -> int
+    (** Level of dependency (starts at 1 for constants that don't depend
+        on any other constant, otherwise [1+level (parent c)]) *)
+
+    val is_max_among : cst -> Set.t -> bool
+    (** Checks whether the constant is maximal among the given ones, that is,
+        if no constant in the set depends on it *)
+  end
 end
 
