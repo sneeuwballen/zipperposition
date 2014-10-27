@@ -30,11 +30,13 @@ Library "libzipperposition"
                     PEnv, Params, Env, Monome, ArithLit, Signals, Multisets,
                     Ctx_intf, Clause_intf, Env_intf, ProofState_intf,
                     BBox, BBox_intf,
+                    Quantor_bridge, calculi/Avatar,  # link quantor
                     calculi/Superposition, calculi/Chaining,
                     calculi/EnumTypes, calculi/ArithInt, calculi/Heuristics
   InternalModules:  lib/LazyGraph, lib/SmallSet,
                     lib/UnionFind, lib/Choice, lib/Mixtbl, lib/Signal
-  BuildDepends:     containers,containers.advanced,sequence,unix,zarith,logtk,dynlink
+  BuildDepends:     containers,containers.advanced,sequence,unix,zarith,
+                    logtk,dynlink,qbf,qbf.quantor
 
 Library "libzipperposition_meta"
   Path:             src/meta/
@@ -52,7 +54,8 @@ Executable zipperposition
   Install:          true
   CompiledObject:   native
   MainIs:           zipperposition.ml
-  BuildDepends:     containers,sequence,unix,logtk,logtk.parsers,dynlink,libzipperposition
+  BuildDepends:     containers,sequence,unix,logtk,logtk.parsers,dynlink,
+                    libzipperposition,qbf,qbf.quantor
 
 Document libzipperposition
   Title:                Documentation for Zipperposition

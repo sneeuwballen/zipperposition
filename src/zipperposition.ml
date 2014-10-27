@@ -42,6 +42,7 @@ module Import = struct
   open! Chaining
   open! ArithInt
   open! EnumTypes
+  open! Quantor_bridge
 end
 
 (** setup an alarm for abrupt stop *)
@@ -64,6 +65,7 @@ let () =
   Extensions.register Superposition.extension;
   Extensions.register AC.extension;
   Extensions.register Heuristics.extension;
+  Extensions.register Avatar.extension;
   ()
 
 let setup_penv ~penv () =
