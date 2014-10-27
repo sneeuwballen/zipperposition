@@ -52,7 +52,7 @@ Executable zipperposition
   MainIs:           zipperposition.ml
   BuildDepends:     containers,sequence,unix,logtk,logtk.parsers,dynlink,libzipperposition
 
-Document zipperposition
+Document libzipperposition
   Title:                Documentation for Zipperposition
   Type:                 ocamlbuild (0.3)
   BuildTools+:          ocamldoc
