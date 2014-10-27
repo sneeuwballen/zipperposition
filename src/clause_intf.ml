@@ -174,6 +174,18 @@ module type S = sig
   val symbols : ?init:Symbol.Set.t -> t Sequence.t -> Symbol.Set.t
     (** symbols that occur in the clause *)
 
+  val as_bool : t -> int option
+  (** Boolean atom for this clause (if any) *)
+
+  val as_bool_exn : t -> int
+  (** Unsafe version of {!as_bool}.
+      @raise Failure if the clause doesn't have a boolean name *)
+
+  val set_bool_name : t -> int -> unit
+  (** Set the boolean name of this clause.
+      Basically, [set_bool_name c i; as_bool i = Some i] holds.
+      @raise Failure if the clause already has a name *)
+
   module Seq : sig
     val lits : t -> Literal.t Sequence.t
     val terms : t -> FOTerm.t Sequence.t

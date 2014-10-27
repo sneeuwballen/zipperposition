@@ -58,6 +58,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     mutable hcparents : t list;             (** parents of the clause *)
     mutable hcdescendants : int SmallSet.t ;(** the set of IDs of descendants of the clause *)
     mutable hcsimplto : t option;           (** simplifies into the clause *)
+    mutable as_bool : int option;           (** boolean wrap *)
   }
 
   type clause = t
@@ -97,6 +98,16 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let is_ground c = get_flag flag_ground c
 
   let weight c = Lits.weight c.hclits
+
+  let as_bool c = c.as_bool
+
+  let as_bool_exn c = match c.as_bool with
+    | None -> failwith "C.as_bool_exn"
+    | Some i -> i
+
+  let set_bool_name c i =
+    if c.as_bool <> None then failwith "C.set_bool_name";
+    c.as_bool <- Some i
 
   let lits c = c.hclits
 
@@ -183,6 +194,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       hcparents = [];
       hcdescendants = SmallSet.empty ~cmp:(fun i j -> i-j);
       hcsimplto = None;
+      as_bool = None;
     } in
     let old_hc, c = c, CHashcons.hashcons c in
     if c == old_hc then begin

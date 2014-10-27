@@ -29,6 +29,7 @@ Library "libzipperposition"
                     Saturate, Selection, PFormula, Theories, AC,
                     PEnv, Params, Env, Monome, ArithLit, Signals, Multisets,
                     Ctx_intf, Clause_intf, Env_intf, ProofState_intf,
+                    BBox, BBox_intf,
                     calculi/Superposition, calculi/Chaining,
                     calculi/EnumTypes, calculi/ArithInt, calculi/Heuristics
   InternalModules:  lib/LazyGraph, lib/SmallSet,
