@@ -79,15 +79,31 @@ let hash_fun lits h =
 let hash lits = Hash.apply hash_fun lits
 
 let variant ?(subst=S.empty) a1 sc1 a2 sc2 k =
-  let rec iter2 subst i =
+  (* match a1.(i...) with a2\bv *)
+  let rec iter2 subst bv i =
     if i = Array.length a1
       then k subst
-      else
-        Lit.variant ~subst a1.(i) sc1 a2.(i) sc2
-          (fun subst -> iter2 subst (i+1))
+      else iter3 subst bv i 0
+  (* find a matching literal for a1.(i), within a2.(j...) *)
+  and iter3 subst bv i j =
+    if j = Array.length a2
+      then ()  (* stop *)
+    else (
+      if not (BV.get bv j)
+        then (
+          (* try to match i-th literal of a1 with j-th literal of a2 *)
+          BV.set bv j;
+          Lit.variant ~subst a1.(i) sc1 a2.(i) sc2
+            (fun subst -> iter2 subst bv (i+1));
+          BV.reset bv j
+        );
+      iter3 subst bv i (j+1)
+    )
   in
   if Array.length a1 = Array.length a2
-    then iter2 subst 0
+    then
+      let bv = BV.create ~size:(Array.length a1) false in
+      iter2 subst bv 0
 
 let are_variant a1 a2 =
   not (Sequence.is_empty (variant a1 0 a2 1))
