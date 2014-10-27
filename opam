@@ -1,7 +1,8 @@
 opam-version: "1"
 maintainer: "simon.cruanes@inria.fr"
 build: [
-    ["ocaml" "setup.ml" "-configure" "--%{menhir:enable}%-meta" "--%{qcheck:enable}%-qcheck" "--disable-docs" "--%{menhir:enable}%-parsers" "--%{aez:enable}%-solving" "--disable-tests" "--disable-tools" "--enable-meta"]
+    [make "setup.exe"]
+    ["./setup.exe" "-configure" "--%{menhir:enable}%-meta" "--%{qcheck:enable}%-qcheck" "--disable-docs" "--%{menhir:enable}%-parsers" "--%{aez:enable}%-solving" "--disable-tests" "--disable-tools" "--enable-meta"]
     [make "all"]
     [make "install"]
 ]
