@@ -28,40 +28,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-(* TODO: also allow to contribute to {!PEnv} *)
+type 'a or_error = [ `Ok of 'a | `Error of string ]
 
 (** {2 Type Definitions} *)
 
-(** Actions that can be performed by an extension on a given Env *)
-module type ACTION = sig
-  module Env : Env.S
-
-  type action =
-    | Ext_general of (unit -> unit)
-    | Ext_binary_inf_rule of string * Env.binary_inf_rule
-    | Ext_unary_inf_rule of string * Env.unary_inf_rule
-    | Ext_signal_incompleteness  (** with extension, prover is incomplete *)
-    | Ext_term_rewrite of string * (FOTerm.t -> FOTerm.t)
-    | Ext_lit_rewrite of string * (Literal.t -> Literal.t)
-    | Ext_simplification_rule of (Env.C.t -> Env.C.t)
-    (** Action that can be performed by an extension *)
-end
-
-module MakeAction(Env : Env.S) : ACTION with module Env = Env
-
-(** An extension, applied to an Env, can apply a list of actions to it *)
-module type S = sig
-  include ACTION
-
-  val actions : action list
-end
-
-(** An extension defines a functor over any Env *)
-module type ENV_TO_S =
-  functor (Env : Env.S) -> S with module Env = Env
+(** An extension is allowed to modify an environment *)
+type action =
+  | Do of ((module Env.S) -> unit)
 
 type penv_action =
-  | Ext_penv_do of (PEnv.t -> unit)
+  | Penv_do of (PEnv.t -> unit)
 
 type init_action =
   | Init_do of (unit -> unit)
@@ -70,26 +46,22 @@ type t = {
   name : string;
   penv_actions : penv_action list;
   init_actions : init_action list;
-  make : (module ENV_TO_S);
+  actions : action list;
 }
-(** An extension is a named first-class functor that works over any {!Env.S}
-    and can also contribute to the preprocessing env. *)
+(** An extension contains a number of actions that can modify a {!PEnv},
+    an environment {!Env.S} or run some initialization action
+    (typically, add some CLI argument) *)
 
 val default : t
-(** Default extension. *)
+(** Default extension. Does nothing. *)
 
 (** {2 Registration} *)
 
 val register : t -> unit
-  (** Register an extension to the (current) prover. Plugins should call this
-      when they are loaded. *)
+(** Register an extension to the (current) prover. Plugins should call this
+    when they are loaded. *)
 
-type load_result =
-  | Ext_success of t
-  | Ext_failure of string
-  (** Result of an attempt to load a plugin *)
-
-val dyn_load : string -> load_result
+val dyn_load : string -> t or_error
   (** Try to load the extension located in the given file *)
 
 val apply_env : env:(module Env.S) -> t -> unit

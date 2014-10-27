@@ -107,8 +107,8 @@ let load_plugins ~params =
             Filename.concat Const.home home_filename
       in
       match Extensions.dyn_load filename with
-      | Extensions.Ext_failure msg -> () (* Could not load plugin *)
-      | Extensions.Ext_success ext ->
+      | `Error msg -> () (* Could not load plugin *)
+      | `Ok ext ->
         Util.debug 0 "loaded extension %s" ext.Extensions.name;
         ()
     ) params.param_plugins;

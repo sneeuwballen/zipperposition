@@ -1486,19 +1486,16 @@ let setup_penv penv =
   ()
 
 let extension =
-  let module DOIT(Env : Env.S) = struct
-    include Extensions.MakeAction(Env)
-    module Sup = Make(Env)
-    let actions =
-      [ Ext_general Sup.register
-      ; Ext_general (fun () -> register ~sup:(module Sup : S))
-      ]
-  end
+  let action env =
+    let module E = (val env : Env.S) in
+    let module Sup = Make(E) in
+    Sup.register();
+    register ~sup:(module Sup : S)
   in
   { Extensions.default with
     Extensions.name="superposition";
-    Extensions.penv_actions = [Extensions.Ext_penv_do setup_penv];
-    Extensions.make=(module DOIT : Extensions.ENV_TO_S);
+    Extensions.penv_actions = [Extensions.Penv_do setup_penv];
+    Extensions.actions = [Extensions.Do action];
   }
 
 let () =

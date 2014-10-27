@@ -740,23 +740,21 @@ let setup_penv penv =
   ()
 
 let extension =
-  let module DOIT(Env : Env.S) = struct
-    include Extensions.MakeAction(Env)
-    let actions =
-      try
-        let sup = Mixtbl.find ~inj:Superposition.key Env.mixtbl "superposition" in
-        let module Sup = (val sup : Superposition.S) in
-        let module Chaining = Make(Sup) in
-        [Ext_general Chaining.register]
-      with Not_found ->
-        Printf.eprintf "Chaining needs Superposition to work";
-        exit 1
-  end
+  let action env =
+    let module E = (val env : Env.S) in
+    try
+      let sup = Mixtbl.find ~inj:Superposition.key E.mixtbl "superposition" in
+      let module Sup = (val sup : Superposition.S) in
+      let module Chaining = Make(Sup) in
+      Chaining.register ()
+    with Not_found ->
+      Printf.eprintf "Chaining needs Superposition to work";
+      exit 1
   in
   { Extensions.default with
     Extensions.name="chaining";
-    Extensions.penv_actions = [Extensions.Ext_penv_do setup_penv];
-    Extensions.make=(module DOIT : Extensions.ENV_TO_S);
+    Extensions.penv_actions = [Extensions.Penv_do setup_penv];
+    Extensions.actions = [Extensions.Do action];
   }
 
 let () =

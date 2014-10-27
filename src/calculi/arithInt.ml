@@ -2031,17 +2031,14 @@ module Make(E : Env.S) : S with module Env = E = struct
 end
 
 let extension =
-  let module DOIT(Env : Env.S) = struct
-    include Extensions.MakeAction(Env)
-    module I = Make(Env)
-    let actions =
-      [ Ext_general I.register
-      ]
-  end
+  let action env =
+    let module E = (val env : Env.S) in
+    let module I = Make(E) in
+    I.register ()
   in
   { Extensions.default with
     Extensions.name="arith_int";
-    Extensions.make=(module DOIT : Extensions.ENV_TO_S);
+    Extensions.actions=[Extensions.Do action];
   }
 
 let _enable_arith () =

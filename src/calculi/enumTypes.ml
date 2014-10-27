@@ -356,16 +356,14 @@ end
 (** {2 As Extension} *)
 
 let extension =
-  let module DOIT(Env : Env.S) = struct
-    include Extensions.MakeAction(Env)
-    module ET = Make(Env)
-    let actions =
-      [ Ext_general ET.register
-      ]
-  end in
+  let register env =
+    let module E = (val env : Env.S) in
+    let module ET = Make(E) in
+    ET.register ()
+  in
   { Extensions.default with
     Extensions.name = "enum_types";
-    Extensions.make=(module DOIT : Extensions.ENV_TO_S);
+    Extensions.actions=[Extensions.Do register];
   }
 
 let () =

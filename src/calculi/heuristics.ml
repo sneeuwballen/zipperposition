@@ -81,16 +81,12 @@ module Make(E : Env.S) = struct
 end
 
 let extension =
-  let module DOIT(Env : Env.S) = struct
-    include Extensions.MakeAction(Env)
-    let actions =
-      let module H = Make(Env) in
-      [Ext_general H.register]
-  end in
-  { Extensions.default with
-    Extensions.name="heuristics";
-    Extensions.make=(module DOIT : Extensions.ENV_TO_S);
-  }
+  let action env =
+    let module E = (val env : Env.S) in
+    let module H = Make(E) in
+    H.register ()
+  in
+  Extensions.{ default with name="heuristics"; actions=[Do action]; }
 
 let () =
   Params.add_opts
