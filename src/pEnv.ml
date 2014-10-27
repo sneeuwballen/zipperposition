@@ -34,6 +34,9 @@ module F = Formula.FO
 module PF = PFormula
 module Sym = Symbol
 
+let prof_preprocess = Util.mk_profiler "preprocess"
+let prof_mk_prec = Util.mk_profiler "mk_precedence"
+
 (** {2 Transformations} *)
 
 type operation_result =
@@ -298,12 +301,15 @@ let create ?(base=Signature.TPTP.base) params =
   penv
 
 let process ~penv set =
+  Util.enter_prof prof_preprocess;
   let compare (p1, _) (p2, _) = p1 - p2 in
   let rules = List.map snd (List.sort compare penv.ops) in
   let ops = List.map (fun rule -> rule set) rules in
   (* also add axioms *)
   let set = PF.Set.union set penv.axioms in
-  fix ops set
+  let res = fix ops set in
+  Util.exit_prof prof_preprocess;
+  res
 
 let add_constr ~penv c =
   penv.constrs <- c::penv.constrs
@@ -320,6 +326,7 @@ let set_weight_rule ~penv r =
 let add_status ~penv l = penv.status <- List.rev_append l penv.status
 
 let mk_precedence ~penv set =
+  Util.enter_prof prof_mk_prec;
   let constrs = penv.constrs @ List.map (fun rule -> rule set) penv.constr_rules in
   let signature = penv.base in
   let symbols = Signature.Seq.symbols signature
@@ -334,4 +341,5 @@ let mk_precedence ~penv set =
     (fun p (s,status) -> Precedence.declare_status p s status)
     p penv.status
   in
+  Util.exit_prof prof_mk_prec;
   p

@@ -180,6 +180,9 @@ module type S = sig
   end
 end
 
+let prof_add_signature = Util.mk_profiler "ctx.add_signature"
+let prof_declare_sym= Util.mk_profiler "ctx.declare"
+
 module Make(X : sig
   val signature : Signature.t
   val ord : Ordering.t
@@ -217,6 +220,7 @@ end) : S = struct
   let is_completeness_preserved = complete
 
   let add_signature signature =
+    Util.enter_prof prof_add_signature;
     let _diff = Signature.diff signature !_signature in
     _signature := Signature.merge !_signature signature;
     Signal.send on_signature_update !_signature;
@@ -225,15 +229,19 @@ end) : S = struct
       |> Signature.Seq.to_seq
       |> Sequence.map fst
       |> Ordering.add_seq !_ord;
+    Util.exit_prof prof_add_signature;
     ()
 
   let declare symb ty =
+    Util.enter_prof prof_declare_sym;
     let is_new = not (Signature.mem !_signature symb) in
     _signature := Signature.declare !_signature symb ty;
     if is_new then (
       Signal.send on_signature_update !_signature;
       Signal.send on_new_symbol (symb,ty);
-    )
+    );
+    Util.exit_prof prof_declare_sym;
+    ()
 
   let ad_hoc_symbols () = !_ad_hoc
   let add_ad_hoc_symbols seq =

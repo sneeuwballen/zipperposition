@@ -332,6 +332,7 @@ let _pp_weight prec buf s =
 
 (* preprocess formulas and choose signature,select,ord *)
 let preprocess ~signature ~params formulas =
+  Util.debug 2 "start preprocessing";
   (* penv *)
   let penv = PEnv.create ~base:signature params in
   setup_penv ~penv ();
