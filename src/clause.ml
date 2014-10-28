@@ -109,7 +109,11 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     | Some i -> i
 
   let set_bool_name c i =
-    if c.as_bool <> None then failwith "C.set_bool_name";
+    (* check consistency *)
+    begin match c.as_bool with
+      | None -> ()
+      | Some j -> if i<>j then failwith "C.set_bool_name"
+    end;
     c.as_bool <- Some i
 
   module Trail = struct
@@ -120,11 +124,18 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let hash_fun trail h = Hash.seq Hash.int_ (ISet.to_seq trail) h
     let hash = Hash.apply hash_fun
 
+    type bool_lit = Ctx.BoolLit.bool_lit
+
+    let singleton = ISet.singleton
+    let of_list = ISet.of_list
+    let to_list = ISet.to_list
     let is_empty = ISet.is_empty
 
+    let subsumes t1 t2 = ISet.subset t1 t2
+
     let is_trivial trail =
-      ISet.for_all
-        (fun i -> not (ISet.mem (-i) trail))
+      ISet.exists
+        (fun i -> ISet.mem (-i) trail)
         trail
 
     let merge = function
@@ -133,7 +144,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       | [t1;t2] -> ISet.union t1 t2
       | t::l -> List.fold_left ISet.union t l
 
-    type valuation = int -> bool
+    type valuation = bool_lit -> bool
     (** A boolean valuation *)
 
     let is_active trail ~v =
@@ -143,30 +154,20 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
           (i > 0) = (v j)  (* valuation match sign *)
         ) trail
 
-    let _lit_printer = ref
-      (fun i ->
-        if i<0
-          then Printf.sprintf "¬L%d" (abs i)
-          else Printf.sprintf "L%d" i
-      )
-
-    let set_lit_printer f = _lit_printer := f
-    let _pp_lit buf l = Buffer.add_string buf (!_lit_printer l)
-    let _print_lit fmt l = Format.pp_print_string fmt (!_lit_printer l)
-
     let pp buf trail =
       if not (ISet.is_empty trail)
-        then Printf.bprintf buf "← [%a]"
-          (Sequence.pp_buf ~sep:", " _pp_lit) (ISet.to_seq trail)
+        then Printf.bprintf buf " ← %a"
+          (Sequence.pp_buf ~sep:" ⊓ " Ctx.BoolLit.pp) (ISet.to_seq trail)
 
     let print fmt trail =
       if not (ISet.is_empty trail)
-      then Format.fprintf fmt "@[<h>← [%a]@]"
-          (Sequence.pp_seq ~sep:", " _print_lit) (ISet.to_seq trail)
+      then Format.fprintf fmt " ← @[<hov>%a@]"
+          (Sequence.pp_seq ~sep:" ⊓ " Ctx.BoolLit.print) (ISet.to_seq trail)
   end
 
   let get_trail c = c.trail
   let has_trail c = not (Trail.is_empty c.trail)
+  let trail_subsumes c1 c2 = Trail.subsumes (get_trail c1) (get_trail c2)
   let is_active c ~v = Trail.is_active c.trail ~v
 
   let lits c = c.hclits
@@ -304,7 +305,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let proof c = c.hcproof
 
-  let is_empty c = Array.length c.hclits = 0
+  let is_empty c =
+    Array.length c.hclits = 0 && Trail.is_empty c.trail
 
   let length c = Array.length c.hclits
 

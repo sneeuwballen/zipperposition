@@ -111,6 +111,15 @@ module type S = sig
     val hash : t -> int
     val compare : t -> t -> int
 
+    type bool_lit = Ctx.BoolLit.bool_lit
+
+    val singleton : bool_lit -> t
+    val of_list : bool_lit list -> t
+    val to_list : t -> bool_lit list
+
+    val subsumes : t -> t -> bool
+    (** [subsumes a b] is true iff [a] is a subset of [b] *)
+
     val is_empty : t -> bool
     (** Empty trail? *)
 
@@ -120,14 +129,13 @@ module type S = sig
     val merge : t list -> t
     (** Merge several trails (e.g. from different clauses) *)
 
-    type valuation = int -> bool
+    type valuation = bool_lit -> bool
     (** A boolean valuation *)
 
     val is_active : t -> v:valuation -> bool
     (** [Trail.is_active t ~v] is true iff all boolean literals
         in [t] are satisfied in the boolean valuation [v]. *)
 
-    val set_lit_printer : (int -> string) -> unit
     val pp : Buffer.t -> t -> unit
     val print : Format.formatter -> t -> unit
   end
@@ -137,6 +145,9 @@ module type S = sig
 
   val get_trail : t -> Trail.t
   (** Get the clause's trail *)
+
+  val trail_subsumes : t -> t -> bool
+  (** [trail_subsumes c1 c2 = Trail.subsumes (get_trail c1) (get_trail c2)] *)
 
   val is_active : t -> v:Trail.valuation -> bool
   (** True if the clause's trail is active in this valuation *)
