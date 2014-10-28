@@ -28,19 +28,28 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Interface of BBox} *)
 
 module type S = sig
-  module Ctx : Ctx.S
-  module C : Clause.S with module Ctx = Ctx
 
-  type bool_lit
+  type bool_lit = int
   (** Abstract boolean literal *)
 
-  type injected = private
-    | C of C.t
+  val neg : bool_lit -> bool_lit
 
-  val inject_clause : C.t -> bool_lit
+  type injected = private
+    | Clause_component of Literals.t
+
+  val inject_lits : Literals.t -> bool_lit
   (** Inject a clause into a boolean literal. No other clause will map
-      to the same literal unless it is alpha-equivalent to this one. *)
+      to the same literal unless it is alpha-equivalent to this one.
+      The boolean literal can be negative is the argument is a
+      unary negative clause *)
 
   val extract : bool_lit -> injected option
-  (** Recover the value that was injected into the literal, if any *)
+  (** Recover the value that was injected into the literal, if any
+      @raise Failure if the literal is <= 0 *)
+
+  (** {2 Printers}
+  Those printers print the content (injection) of a boolean literal, if any *)
+
+  val pp : Buffer.t -> bool_lit -> unit
+  val print : Format.formatter -> bool_lit -> unit
 end

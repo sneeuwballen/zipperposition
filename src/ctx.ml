@@ -286,4 +286,7 @@ end) : S = struct
         STbl.length less_tbl > 0
     end
   end
+
+  (** Boolean Mapping *)
+  module BoolLit = BBox.Make(struct end)
 end

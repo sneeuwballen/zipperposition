@@ -33,20 +33,4 @@ encapsulated values and boolean literals *)
 
 module type S = BBox_intf.S
 
-module type BLit = sig
-  type t
-
-  val of_int : int -> t
-  (** Build a literal from a > 0 integer *)
-
-  val neg : t -> t
-  (** Boolean negation *)
-
-  val to_int : t -> int
-  (** Obtain the unique ID behind this literal (must be > 0) *)
-end
-
-module Make(C : Clause.S)(L : BLit) : S
-  with module Ctx = C.Ctx
-  and module C = C
-  and type bool_lit = L.t
+module Make(Any : sig end) : S

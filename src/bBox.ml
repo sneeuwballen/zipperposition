@@ -29,34 +29,21 @@ open Logtk
 
 module Lits = Literals
 
-module type BLit = sig
-  type t
-
-  val of_int : int -> t
-  (** Build a literal from a > 0 integer *)
-
-  val neg : t -> t
-  (** Boolean negation *)
-
-  val to_int : t -> int
-  (** Obtain the unique ID behind this literal (must be > 0) *)
-end
-
 module type S = BBox_intf.S
 
-module Make(C : Clause.S)(BLit : BLit) = struct
-  module C = C
-  module Ctx = C.Ctx
+module Make(Any : sig end) = struct
 
-  type bool_lit = BLit.t
+  type bool_lit = int
+
+  let neg i = -i
 
   type injected =
-    | C of C.t
+    | Clause_component of Literals.t
 
   module FV = FeatureVector.Make(struct
-    type t = C.t
-    let cmp = C.compare
-    let to_lits = C.Seq.abstract
+    type t = Lits.t * bool_lit
+    let cmp (l1,_)(l2,_) = Lits.compare l1 l2
+    let to_lits (l,_) = Lits.Seq.abstract l
   end)
   module ITbl = Hashtbl.Make(CCInt)
 
@@ -64,26 +51,54 @@ module Make(C : Clause.S)(BLit : BLit) = struct
   let _clause_set = ref (FV.empty())
   let _lit2inj = ITbl.create 56
 
+  let _apply_sign sign b =
+    if sign then b else neg b
+
   (* clause -> boolean lit *)
-  let inject_clause c =
-    let c' = FV.retrieve_alpha_equiv_c !_clause_set c ()
-      |> Sequence.map2 (fun _ c -> c)
-      |> Sequence.filter (fun c' -> Lits.are_variant (C.lits c) (C.lits c'))
+  let inject_lits lits  =
+    (* special case: one negative literal. *)
+    let lits, sign =
+      if Array.length lits = 1 && Literal.is_neq lits.(0)
+        then [| Literal.negate lits.(0) |], false
+        else lits, true
+    in
+    (* retrieve clause. the index doesn't matter for retrieval *)
+    let other = FV.retrieve_alpha_equiv_c !_clause_set (lits,1) ()
+      |> Sequence.map2 (fun _ l -> l)
+      |> Sequence.filter (fun (lits',_) -> Lits.are_variant lits lits')
       |> Sequence.head
     in
-    match c' with
-    | Some c' -> BLit.of_int (C.as_bool_exn c')
+    match other with
+    | Some (_, bool_lit) -> _apply_sign sign bool_lit
     | None ->
         let i = !_next in
         incr _next;
         (* maintain mapping *)
-        C.set_bool_name c i;
-        _clause_set := FV.add !_clause_set c;
-        ITbl.add _lit2inj i (C c);
-        BLit.of_int i
+        let lits_copy = Array.copy lits in
+        _clause_set := FV.add !_clause_set (lits_copy, i);
+        ITbl.add _lit2inj i (Clause_component lits_copy);
+        _apply_sign sign i
 
   (* boolean lit -> injected *)
   let extract i =
-    try Some (ITbl.find _lit2inj (BLit.to_int i))
+    if i<=0 then failwith "BBox.extract: require >0 integer";
+    try Some (ITbl.find _lit2inj i)
     with Not_found -> None
+
+  let pp buf i =
+    if i<0 then Buffer.add_string buf "¬";
+    let i = abs i in
+    match extract i with
+    | None -> Printf.bprintf buf "L%d" i
+    | Some (Clause_component lits) ->
+        Printf.bprintf buf "⟦%a⟧" (Util.pp_array ~sep:"∨" Literal.pp) lits
+
+  let print fmt i =
+    if i<0 then Format.pp_print_string fmt "¬";
+    let i = abs i in
+    match extract i with
+    | None -> Format.fprintf fmt "L%d" i
+    | Some (Clause_component lits) ->
+        Format.fprintf fmt "@[⟦%a⟧@]"
+          (CCArray.print ~sep:"∨" Literal.fmt) lits
 end

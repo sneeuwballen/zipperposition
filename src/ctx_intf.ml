@@ -168,5 +168,9 @@ module type S = sig
         (** Specific version of {!add_order} for $less and $lesseq *)
     end
   end
+
+  (** {2 Booleans Literals} *)
+
+  module BoolLit : BBox.S
 end
 
