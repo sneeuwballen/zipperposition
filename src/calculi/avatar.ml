@@ -27,7 +27,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Basic Splitting à la Avatar} *)
 
-open Logtk
+module T = Logtk.FOTerm
+module Lit = Literal
+module Util = Logtk.Util
+
+type 'a printer = Format.formatter -> 'a -> unit
 
 (** {2 Sat-Solvers} *)
 
@@ -42,7 +46,8 @@ end
 type sat_solver_instance = {
   add_lits : BoolLit.t list -> unit;
   add_clauses : BoolLit.t list list -> unit;
-  check : unit -> [`Sat | `Unsat]
+  check : unit -> [`Sat | `Unsat];
+  set_printer : int printer -> unit;
 }
 
 (** A factory of SAT-solver instances *)
@@ -75,9 +80,18 @@ let set_current_solver s =
 
 (** {2 Avatar} *)
 
+let prof_splits = Util.mk_profiler "avatar.split"
+let prof_check = Util.mk_profiler "avatar.check"
+
+let stat_splits = Util.mk_stat "avatar.splits"
+
 module Make(E : Env.S) = struct
   module Ctx = E.Ctx
   module C = E.C
+  module BoolLit = Ctx.BoolLit
+
+  let _pp_bclause buf lits =
+    Printf.bprintf buf "%a" (Util.pp_list ~sep:" ⊔ " BoolLit.pp) lits
 
   let _solver = ref None
 
@@ -85,13 +99,108 @@ module Make(E : Env.S) = struct
     | None -> failwith "Avatar: error, solver shouldn't be None"
     | Some s -> s
 
-  let split c =
-    None (* TODO *)
+  let _add_lits l = (_get_solver()).add_lits l
+  let _add_clauses l = (_get_solver()).add_clauses l
 
-  (* ignore the clause. We should just check the solver *)
-  let check_satisfiability _c =
+  (* union-find that maps terms to list of literals, used for splitting *)
+  module UF = UnionFind.Make(struct
+    type key = T.t
+    type value = Lit.t list
+    let equal = T.eq
+    let hash = T.hash
+    let zero = []
+    let merge = List.rev_append
+  end)
+
+  module LitSet = Sequence.Set.Make(Lit)
+
+  let _infer_split c =
+    let lits = C.lits c in
+    (* maps each variable to a list of literals. Sets can be merged whenever
+      two variables occur in the same literal.  *)
+    let uf_vars =
+      C.Seq.vars c |> T.Seq.add_set T.Set.empty |> T.Set.elements |> UF.create
+    (* set of ground literals (each one is its own component) *)
+    and cluster_ground = ref LitSet.empty in
+
+    (* literals belong to either their own ground component, or to every
+        sets in [uf_vars] associated to their variables *)
+    Array.iter
+      (fun lit ->
+        let v_opt = Lit.Seq.vars lit |> Sequence.head in
+        match v_opt with
+        | None -> (* ground, lit has its own component *)
+            cluster_ground := LitSet.add lit !cluster_ground
+        | Some v ->
+            (* merge other variables of the literal with [v] *)
+            Lit.Seq.vars lit
+              |> Sequence.iter
+                (fun v' ->
+                  UF.add uf_vars v' [lit];  (* lit is in the equiv class of [v'] *)
+                  UF.union uf_vars v v'
+                );
+      ) lits;
+
+    (* now gather all the components as a literal list list *)
+    let components = ref [] in
+    LitSet.iter (fun lit -> components := [lit] :: !components) !cluster_ground;
+    UF.iter uf_vars (fun _ comp -> components := comp :: !components);
+
+    match !components with
+    | [] -> assert (Array.length lits=0); None
+    | [_] -> None
+    | _::_ ->
+        (* do a simplification! *)
+        Util.incr_stat stat_splits;
+        let clauses_and_names = List.map
+          (fun lits ->
+            let proof cc = Proof.mk_c_esa ~rule:"split" cc [C.proof c] in
+            let lits = Array.of_list lits in
+            let bool_name = BoolLit.inject_lits lits in
+            let trail = C.Trail.singleton bool_name in
+            let c = C.create_a ~parents:[c] ~trail lits proof in
+            C.set_bool_name c bool_name;
+            c, bool_name
+          ) !components
+        in
+        let clauses, bool_clause = List.split clauses_and_names in
+        Util.debug 4 "Avatar: split of %a yields %a" C.pp c (Util.pp_list C.pp) clauses;
+        (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
+        _add_lits bool_clause;
+        let bool_guard = C.get_trail c |> C.Trail.to_list |> List.map BoolLit.neg in
+        let bool_clause = List.append bool_clause bool_guard in 
+        _add_clauses [bool_clause];
+        Util.debug 4 "Avatar: constraint clause is %a" _pp_bclause bool_clause;
+        (* return the clauses *)
+        Some clauses
+
+  (* Hyper-splitting *)
+  let split c =
+    Util.enter_prof prof_splits;
+    let res = if Array.length (C.lits c) <= 1
+      then None
+      else _infer_split c
+    in
+    Util.exit_prof prof_splits;
+    res
+
+  (* if c.lits = [], negate c.trail *)
+  let check_empty c =
+    if Array.length (C.lits c) = 0
+    then (
+      assert (not (C.Trail.is_empty (C.get_trail c)));
+      let b_lits = C.get_trail c |> C.Trail.to_list  in
+      let b_clause = List.map BoolLit.neg b_lits in
+      Util.debug 4 "Avatar: negate trail of %a with %a" C.pp c _pp_bclause b_clause;
+      _add_clauses [b_clause];
+    );
+    [] (* never infers anything! *)
+
+  (* Just check the solver *)
+  let check_satisfiability () =
+    Util.enter_prof prof_check;
     let s = _get_solver () in
-    match s.check () with
+    let res = match s.check () with
     | `Sat ->
         Util.debug 3 "Avatar: SAT-solver reports \"SAT\"";
         []
@@ -101,6 +210,9 @@ module Make(E : Env.S) = struct
         let proof cc = Proof.mk_c_inference ~rule:"avatar" ~theories:["sat"] cc [] in
         let c = C.create [] proof in
         [c]
+    in
+    Util.exit_prof prof_check;
+    res
 
   let register () =
     Util.debug 2 "register extension Avatar";
@@ -108,10 +220,13 @@ module Make(E : Env.S) = struct
       | None -> failwith "Avatar: expect a default SAT solver to be defined."
       | Some s ->
           Util.debug 2 "Avatar: create a new solver (kind %s)" s.name;
-          _solver := Some (s.create ())
+          let solver = s.create() in
+          solver.set_printer BoolLit.print;
+          _solver := Some solver
     end;
     E.add_multi_simpl_rule split;
-    E.add_unary_inf "avatar_check" check_satisfiability;
+    E.add_unary_inf "avatar_check_empty" check_empty;
+    E.add_generate "avatar_check_sat" check_satisfiability;
     ()
 end
 

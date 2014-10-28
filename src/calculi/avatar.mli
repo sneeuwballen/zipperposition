@@ -33,6 +33,8 @@ Trails are only used to make splits easier {b currently}.
 
 Future work may include locking clauses whose trails are unsatisfied. *)
 
+type 'a printer = Format.formatter -> 'a -> unit
+
 (** {2 Sat-Solvers} *)
 
 module BoolLit : sig
@@ -46,7 +48,8 @@ end
 type sat_solver_instance = {
   add_lits : BoolLit.t list -> unit;
   add_clauses : BoolLit.t list list -> unit;
-  check : unit -> [`Sat | `Unsat]
+  check : unit -> [`Sat | `Unsat];
+  set_printer : int printer -> unit;
 }
 
 (** A factory of SAT-solver instances *)
@@ -75,7 +78,11 @@ module Make(E : Env.S) : sig
   val split : E.multi_simpl_rule
   (** Split a clause into components *)
 
-  val check_satisfiability : E.unary_inf_rule
+  val check_empty : E.unary_inf_rule
+  (** Forbid empty clauses with trails, i.e. adds the negation of their
+      trails to the SAT-solver *)
+
+  val check_satisfiability : E.generate_rule
   (** Checks  that the SAT context is still valid *)
 
   val register : unit -> unit
