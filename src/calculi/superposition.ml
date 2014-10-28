@@ -720,7 +720,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (** Compute normal form of term w.r.t active set. Clauses used to
       rewrite are added to the clauses hashset.
       restrict is an option for restricting demodulation in positive maximal terms *)
-  let demod_nf ?(restrict=false) clauses t =
+  let demod_nf ?(restrict=false) c clauses t =
     let ord = Ctx.ord () in
     (* compute normal form of subterm. If restrict is true, substitutions that
        are variable renamings are forbidden (since we are at root of a max term) *) 
@@ -732,6 +732,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             (* r is the term subterm is going to be rewritten into *)
             assert (C.is_unit_clause unit_clause);
             if (not restrict || not (S.is_renaming subst))
+            && C.trail_subsumes unit_clause c
             && (C.is_oriented_rule unit_clause ||
                 O.compare ord
                   (S.FO.apply_no_renaming subst l 1)
@@ -798,7 +799,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         else fun t -> false
       in
       Lit.map
-        (fun t -> demod_nf ~restrict:(restrict_term t) clauses t)
+        (fun t -> demod_nf ~restrict:(restrict_term t) c clauses t)
         lit
     in
     (* demodulate every literal *)
@@ -832,10 +833,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun set t' with_pos subst ->
           let c = with_pos.C.WithPos.clause in
           (* subst(l) matches t' and is > subst(r), very likely to rewrite! *)
-          if oriented ||
-            O.compare ord
-              (S.FO.apply ~renaming subst l 0)
-              (S.FO.apply ~renaming subst r 0) = Comp.Gt
+          if ((oriented ||
+              O.compare ord
+                (S.FO.apply ~renaming subst l 0)
+                (S.FO.apply ~renaming subst r 0) = Comp.Gt
+              ) && C.trail_subsumes c given
+            )
             then  (* add the clause to the set, it may be rewritten by l -> r *)
               C.CSet.add set c
             else set)
@@ -1253,8 +1256,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     try
       SubsumIdx.retrieve_subsuming_c !_idx_fv c ()
         (fun () c' ->
-          if (try_eq_subsumption && eq_subsumes (C.lits c') (C.lits c))
-           || subsumes (C.lits c') (C.lits c) then raise Exit);
+          let redundant =
+            (try_eq_subsumption && eq_subsumes (C.lits c') (C.lits c))
+              ||
+            subsumes (C.lits c') (C.lits c)
+          in
+          if redundant && C.trail_subsumes c' c
+            then raise Exit
+        );
       Util.exit_prof prof_subsumption_set;
       false
     with Exit ->
@@ -1273,12 +1282,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* use feature vector indexing *)
     let res = SubsumIdx.retrieve_subsumed_c !_idx_fv c C.CSet.empty
       (fun res c' ->
-          if (try_eq_subsumption && eq_subsumes (C.lits c) (C.lits c'))
-           || subsumes (C.lits c) (C.lits c')
-        then begin
+        let redundant =
+            (try_eq_subsumption && eq_subsumes (C.lits c) (C.lits c'))
+            || subsumes (C.lits c) (C.lits c')
+        in
+        if redundant && C.trail_subsumes c c'
+        then (
           Util.incr_stat stat_clauses_subsumed;
           C.CSet.add res c'
-        end else res)
+        ) else res)
     in
     Util.exit_prof prof_subsumption_in_set;
     res
@@ -1316,10 +1328,17 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           (* test for subsumption *)
           SubsumIdx.retrieve_subsuming !_idx_fv (Lits.Seq.abstract lits) ()
             (fun () c' ->
-                if (try_eq_subsumption && eq_subsumes (C.lits c') lits)
-                 || subsumes (C.lits c') lits
-               (* some clause subsumes the literals with i-th literal flipped *)
-               then (lits.(i) <- Lit.negate lits.(i); raise (RemoveLit (i, c'))));
+              let redundant =
+                (try_eq_subsumption && eq_subsumes (C.lits c') lits)
+                || subsumes (C.lits c') lits
+              in
+              if redundant && C.trail_subsumes c' c
+                (* some clause subsumes the literals with i-th literal flipped *)
+                then (
+                  lits.(i) <- Lit.negate lits.(i);
+                  raise (RemoveLit (i, c'))
+                )
+            );
           (* restore literal *)
           lits.(i) <- Lit.negate lits.(i);
         done;
