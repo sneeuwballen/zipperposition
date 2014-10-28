@@ -50,6 +50,8 @@ end) : S with module Ctx = X.Ctx = struct
   type inf_rule = C.t -> C.t list
   (** An inference returns a list of conclusions *)
 
+  type generate_rule = unit -> C.t list
+
   type binary_inf_rule = inf_rule
   type unary_inf_rule = inf_rule
 
@@ -97,6 +99,7 @@ end) : S with module Ctx = X.Ctx = struct
   let _is_trivial = ref []
   let _empty_clauses = ref C.CSet.empty
   let _multi_simpl_rule = ref []
+  let _generate_rules = ref []
 
   let on_empty_clause = Signal.create ()
 
@@ -151,6 +154,10 @@ end) : S with module Ctx = X.Ctx = struct
   let add_unary_inf name rule =
     if not (List.mem_assoc name !_unary_rules)
       then _unary_rules := (name, rule) :: !_unary_rules
+
+  let add_generate name rule =
+    if not (List.mem_assoc name !_generate_rules)
+      then _generate_rules := (name, rule) :: !_generate_rules
 
   let add_rw_simplify r =
     _rw_simplify := r :: !_rw_simplify
@@ -297,6 +304,15 @@ end) : S with module Ctx = X.Ctx = struct
       [] !_unary_rules in
     Util.exit_prof prof_generate_unary;
     Sequence.of_list clauses
+
+  let do_generate () =
+    let clauses = List.fold_left
+      (fun acc (name,g) ->
+        Util.debug 3 "apply generating rule %s" name;
+        List.rev_append (g()) acc
+      ) [] !_generate_rules
+    in
+    clauses
 
   let is_trivial c =
     if C.get_flag C.flag_persistent c then false else
@@ -570,7 +586,14 @@ end) : S with module Ctx = X.Ctx = struct
           end
       end
     done;
-    let result = Sequence.append (Sequence.of_list !unary_clauses) binary_clauses in
+    (* generating rules *)
+    let other_clauses = do_generate () in
+    (* combine all clauses *)
+    let result = Sequence.(
+      append
+        (of_list !unary_clauses)
+        (append binary_clauses (of_list other_clauses)))
+    in
     Util.add_stat stat_inferred (Sequence.length result);
     Util.exit_prof prof_generate;
     result

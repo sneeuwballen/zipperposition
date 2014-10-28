@@ -35,6 +35,9 @@ module type S = sig
   type inf_rule = C.t -> C.t list
   (** An inference returns a list of conclusions *)
 
+  type generate_rule = unit -> C.t list
+  (** Generation of clauses regardless of current clause *)
+
   type binary_inf_rule = inf_rule
   type unary_inf_rule = inf_rule
 
@@ -136,6 +139,8 @@ module type S = sig
 
   val add_lit_rule : string -> lit_rewrite_rule -> unit
     (** Add a literal rewrite rule *)
+
+  val add_generate : string -> generate_rule -> unit
 
   (** {2 Use the Env} *)
 
