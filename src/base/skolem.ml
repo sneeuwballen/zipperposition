@@ -45,6 +45,7 @@ type definition = {
 
 type ctx = {
   sc_prefix : string;
+  sc_prop_prefix : string;
   sc_ty_prop : Type.t;
   mutable sc_gensym : int;              (* new symbols *)
   mutable sc_var_index : int;           (* fresh universal vars *)
@@ -56,9 +57,11 @@ type ctx = {
 
 (* TODO: use a term index for the cache? *)
 
-let create ?(ty_prop=Type.TPTP.o) ?(prefix="logtk_sk__") signature =
+let create ?(ty_prop=Type.TPTP.o)
+?(prefix="logtk_sk__") ?(prop_prefix="logtk_prop__") signature =
   let ctx = {
     sc_prefix=prefix;
+    sc_prop_prefix=prop_prefix;
     sc_ty_prop=ty_prop;
     sc_gensym = 0;
     sc_var_index = 0;
@@ -167,7 +170,7 @@ let get_definition ~ctx ~polarity f =
     let ty_of_vars = List.map T.ty all_vars in
     (* build the proxy literal *)
     let ty = Type.(forall ty_bvars (ty_prop <== ty_of_vars)) in
-    let const = T.const ~ty (fresh_sym_with ~ctx ~ty "proxy_logtk") in
+    let const = T.const ~ty (fresh_sym_with ~ctx ~ty ctx.sc_prop_prefix) in
     let p = F.Base.atom (T.app_full const ty_bvars all_vars) in
     (* introduce new name for [f] *)
     Util.debug 5 "define formula %a with %a" F.pp f F.pp p;
