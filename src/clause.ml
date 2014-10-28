@@ -45,6 +45,8 @@ type scope = Substs.scope
 
 module type S = Clause_intf.S
 
+module ISet = Sequence.Set.Make(CCInt)
+
 (** {2 Type def} *)
 module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   module Ctx = Ctx
@@ -59,6 +61,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     mutable hcdescendants : int SmallSet.t ;(** the set of IDs of descendants of the clause *)
     mutable hcsimplto : t option;           (** simplifies into the clause *)
     mutable as_bool : int option;           (** boolean wrap *)
+    mutable trail : ISet.t;                 (** boolean trail *)
   }
 
   type clause = t
@@ -108,6 +111,63 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let set_bool_name c i =
     if c.as_bool <> None then failwith "C.set_bool_name";
     c.as_bool <- Some i
+
+  module Trail = struct
+    type t = ISet.t
+
+    let equal = ISet.equal
+    let compare = ISet.compare
+    let hash_fun trail h = Hash.seq Hash.int_ (ISet.to_seq trail) h
+    let hash = Hash.apply hash_fun
+
+    let is_empty = ISet.is_empty
+
+    let is_trivial trail =
+      ISet.for_all
+        (fun i -> not (ISet.mem (-i) trail))
+        trail
+
+    let merge = function
+      | [] -> ISet.empty
+      | [t] -> t
+      | [t1;t2] -> ISet.union t1 t2
+      | t::l -> List.fold_left ISet.union t l
+
+    type valuation = int -> bool
+    (** A boolean valuation *)
+
+    let is_active trail ~v =
+      ISet.for_all
+        (fun i ->
+          let j = abs i in
+          (i > 0) = (v j)  (* valuation match sign *)
+        ) trail
+
+    let _lit_printer = ref
+      (fun i ->
+        if i<0
+          then Printf.sprintf "¬L%d" (abs i)
+          else Printf.sprintf "L%d" i
+      )
+
+    let set_lit_printer f = _lit_printer := f
+    let _pp_lit buf l = Buffer.add_string buf (!_lit_printer l)
+    let _print_lit fmt l = Format.pp_print_string fmt (!_lit_printer l)
+
+    let pp buf trail =
+      if not (ISet.is_empty trail)
+        then Printf.bprintf buf "← [%a]"
+          (Sequence.pp_buf ~sep:", " _pp_lit) (ISet.to_seq trail)
+
+    let print fmt trail =
+      if not (ISet.is_empty trail)
+      then Format.fprintf fmt "@[<h>← [%a]@]"
+          (Sequence.pp_seq ~sep:", " _print_lit) (ISet.to_seq trail)
+  end
+
+  let get_trail c = c.trail
+  let has_trail c = not (Trail.is_empty c.trail)
+  let is_active c ~v = Trail.is_active c.trail ~v
 
   let lits c = c.hclits
 
@@ -166,16 +226,21 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let distance_to_conjecture c =
     Proof.distance_to_conjecture c.hcproof
 
+  (* hashconsing of clauses. Clauses are equal if they have the same literals
+      and the same trail *)
   module CHashcons = Hashcons.Make(struct
     type t = clause
-    let hash c = Lits.hash c.hclits
-    let equal c1 c2 = Lits.eq_com c1.hclits c2.hclits
+    let hash_fun c h =
+      h |> Lits.hash_fun c.hclits |> Trail.hash_fun c.trail
+    let hash c = Hash.apply hash_fun c
+    let equal c1 c2 =
+      Lits.eq_com c1.hclits c2.hclits && Trail.equal c1.trail c2.trail
     let tag i c = (assert (c.hctag = (-1)); c.hctag <- i)
   end)
 
   let __no_select = BV.empty ()
 
-  let create ?parents ?selected lits proof =
+  let create ?parents ?selected ?trail lits proof =
     Util.enter_prof prof_clause_create;
     let lits = lits
       |> List.filter (function Lit.False -> false | _ -> true)
@@ -184,6 +249,12 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let lits = Array.of_list lits in
     (* proof *)
     let proof' = proof lits in
+    (* trail *)
+    let trail = match trail, parents with
+      | Some t, _ -> t
+      | None, None -> ISet.empty
+      | None, Some parent_list -> Trail.merge (List.map get_trail parent_list)
+    in
     (* create the structure *)
     let c = {
       hclits = lits;
@@ -195,6 +266,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       hcdescendants = SmallSet.empty ~cmp:(fun i j -> i-j);
       hcsimplto = None;
       as_bool = None;
+      trail;
     } in
     let old_hc, c = c, CHashcons.hashcons c in
     if c == old_hc then begin
@@ -211,19 +283,19 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       | Some parents ->
         c.hcparents <- parents;
         List.iter (fun parent -> is_child_of ~child:c parent) parents
-      end
+      end;
     end;
     (* return clause *)
     Util.incr_stat stat_clause_create;
     Util.exit_prof prof_clause_create;
     c
 
-  let create_a ?parents ?selected lits proof =
-    create ?parents ?selected (Array.to_list lits) proof
+  let create_a ?parents ?selected ?trail lits proof =
+    create ?parents ?selected ?trail (Array.to_list lits) proof
 
-  let of_forms ?parents ?selected forms proof =
+  let of_forms ?parents ?selected ?trail forms proof =
     let lits = List.map Ctx.Lit.of_form forms in
-    create ?parents ?selected lits proof
+    create ?parents ?selected ?trail lits proof
 
   let of_forms_axiom ?(role="axiom") ~file ~name forms =
     let lits = List.map Lit.Conv.of_form forms in
@@ -565,6 +637,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         Buffer.add_string buf annot)
       buf c.hclits;
     Buffer.add_char buf ']';
+    Trail.pp buf c.trail;
     ()
 
   let pp_tstp buf c =

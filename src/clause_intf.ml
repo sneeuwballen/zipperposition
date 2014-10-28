@@ -89,19 +89,77 @@ module type S = sig
   val distance_to_conjecture : t -> int option
     (** See {!Proof.distance_to_conjecture}, applied to the clause's proof *)
 
+  (** {2 Boolean Abstraction} *)
+
+  val as_bool : t -> int option
+  (** Boolean atom for this clause (if any) *)
+
+  val as_bool_exn : t -> int
+  (** Unsafe version of {!as_bool}.
+      @raise Failure if the clause doesn't have a boolean name *)
+
+  val set_bool_name : t -> int -> unit
+  (** Set the boolean name of this clause.
+      Basically, [set_bool_name c i; as_bool i = Some i] holds.
+      @raise Failure if the clause already has a name *)
+
+  module Trail : sig
+    type t
+
+    val equal : t -> t -> bool
+    val hash_fun : t -> int64 -> int64
+    val hash : t -> int
+    val compare : t -> t -> int
+
+    val is_empty : t -> bool
+    (** Empty trail? *)
+
+    val is_trivial : t -> bool
+    (** returns [true] iff the trail contains both [i] and [-i]. *)
+
+    val merge : t list -> t
+    (** Merge several trails (e.g. from different clauses) *)
+
+    type valuation = int -> bool
+    (** A boolean valuation *)
+
+    val is_active : t -> v:valuation -> bool
+    (** [Trail.is_active t ~v] is true iff all boolean literals
+        in [t] are satisfied in the boolean valuation [v]. *)
+
+    val set_lit_printer : (int -> string) -> unit
+    val pp : Buffer.t -> t -> unit
+    val print : Format.formatter -> t -> unit
+  end
+
+  val has_trail : t -> bool
+  (** Has a non-empty trail? *)
+
+  val get_trail : t -> Trail.t
+  (** Get the clause's trail *)
+
+  val is_active : t -> v:Trail.valuation -> bool
+  (** True if the clause's trail is active in this valuation *)
+
+  (** {2 Constructors} *)
+
   module CHashcons : Hashcons.S with type elt = clause
 
-  val create : ?parents:t list -> ?selected:CCBV.t ->
+  val create : ?parents:t list -> ?selected:CCBV.t -> ?trail:Trail.t ->
                Literal.t list ->
                (CompactClause.t -> Proof.t) -> t
-    (** Build a new hclause from the given literals. *)
+    (** Build a new clause from the given literals.
+        @param parents parent clauses (if none, should be a tautology or axiom)
+        @param selected selected literals (can be computed later)
+        @param trail boolean trail (default [[]])
+        also takes a list of literals and a proof builder *)
 
-  val create_a : ?parents:t list -> ?selected:CCBV.t ->
+  val create_a : ?parents:t list -> ?selected:CCBV.t -> ?trail:Trail.t ->
                   Literal.t array ->
                   (CompactClause.t -> Proof.t) -> t
-    (** Build a new hclause from the given literals. *)
+    (** Build a new clause from the given literals. *)
 
-  val of_forms : ?parents:t list -> ?selected:CCBV.t ->
+  val of_forms : ?parents:t list -> ?selected:CCBV.t -> ?trail:Trail.t ->
                     Formula.FO.t list ->
                     (CompactClause.t -> Proof.t) -> t
     (** Directly from list of formulas *)
@@ -174,17 +232,7 @@ module type S = sig
   val symbols : ?init:Symbol.Set.t -> t Sequence.t -> Symbol.Set.t
     (** symbols that occur in the clause *)
 
-  val as_bool : t -> int option
-  (** Boolean atom for this clause (if any) *)
-
-  val as_bool_exn : t -> int
-  (** Unsafe version of {!as_bool}.
-      @raise Failure if the clause doesn't have a boolean name *)
-
-  val set_bool_name : t -> int -> unit
-  (** Set the boolean name of this clause.
-      Basically, [set_bool_name c i; as_bool i = Some i] holds.
-      @raise Failure if the clause already has a name *)
+  (** {2 Iterators} *)
 
   module Seq : sig
     val lits : t -> Literal.t Sequence.t

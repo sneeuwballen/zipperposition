@@ -879,7 +879,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           in
           triv || check lits (i+1)
     in
-    let is_tauto = check (C.lits c) 0 in
+    let is_tauto = check (C.lits c) 0 || C.Trail.is_trivial (C.get_trail c) in
     (if is_tauto then Util.debug 3 "%a is a tautology" C.pp c);
     is_tauto
 

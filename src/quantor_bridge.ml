@@ -50,6 +50,5 @@ let solver_instance () =
 let sat_solver = A.({create=solver_instance; name="quantor"})
 
 let () =
-  Logtk.Util.debug 4 "load module Quantor_bridge...";
   A.register_solver sat_solver;
   ()
