@@ -632,6 +632,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let selected = c.hcselected in
     let max = maxlits c 0 S.empty in
     Buffer.add_char buf '[';
+    if Array.length c.hclits = 0 then Buffer.add_string buf "⊥";
     Util.pp_arrayi ~sep:" | "
       (fun buf i lit ->
         let annot = pp_annot selected max i in
