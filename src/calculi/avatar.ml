@@ -238,3 +238,14 @@ let extension =
   in
   Extensions.({default with name="avatar"; actions=[Do action]})
 
+let _enabled = ref false
+let _enable_avatar () =
+  if not !_enabled then (
+    _enabled := true;
+    Extensions.register extension
+  )
+
+let () =
+  Params.add_opts
+    [ "-avatar", Arg.Unit _enable_avatar, "enable Avatar-like splitting (based on SAT)"
+    ]

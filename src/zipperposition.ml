@@ -65,7 +65,6 @@ let () =
   Extensions.register Superposition.extension;
   Extensions.register AC.extension;
   Extensions.register Heuristics.extension;
-  Extensions.register Avatar.extension;
   ()
 
 let setup_penv ~penv () =
