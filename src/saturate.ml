@@ -79,7 +79,27 @@ module Make(E : Env.S) = struct
     Util.debug 4 "env for next given loop: %a" Env.pp ();
     (* select next given clause *)
     match Env.next_passive () with
-    | None -> Sat (* passive set is empty *)
+    | None ->
+        (* final check: might generate other clauses *)
+        let clauses = Env.do_generate() in
+        let clauses = clauses
+          |> Sequence.filter_map
+            (fun c ->
+              let _, c = Env.simplify c in
+              if Env.is_trivial c || Env.is_active c || Env.is_passive c
+                then None
+                else Some c
+            )
+          |> Sequence.to_list
+        in
+        if clauses=[]
+        then Sat
+        else (
+          (if Util.get_debug () >= 2 then List.iter
+            (fun new_c -> Util.debug 2 "    inferred new clause %a" Env.C.pp new_c) clauses);
+          Env.add_passive (Sequence.of_list clauses);
+          Unknown
+        )
     | Some c ->
       begin match Env.all_simplify c with
       | [] ->

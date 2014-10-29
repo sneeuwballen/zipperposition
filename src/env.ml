@@ -312,7 +312,7 @@ end) : S with module Ctx = X.Ctx = struct
         List.rev_append (g()) acc
       ) [] !_generate_rules
     in
-    clauses
+    Sequence.of_list clauses
 
   let is_trivial c =
     if C.get_flag C.flag_persistent c then false else
@@ -592,7 +592,7 @@ end) : S with module Ctx = X.Ctx = struct
     let result = Sequence.(
       append
         (of_list !unary_clauses)
-        (append binary_clauses (of_list other_clauses)))
+        (append binary_clauses other_clauses))
     in
     Util.add_stat stat_inferred (Sequence.length result);
     Util.exit_prof prof_generate;

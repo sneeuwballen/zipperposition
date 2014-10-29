@@ -188,6 +188,9 @@ module type S = sig
   val do_unary_inferences : C.t -> C.t Sequence.t
     (** do unary inferences for the given clause *)
 
+  val do_generate : unit -> C.t Sequence.t
+    (** do generating inferences *)
+
   val is_trivial : C.t -> bool
     (** Check whether the clause is trivial *)
 
