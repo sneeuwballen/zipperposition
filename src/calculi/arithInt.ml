@@ -438,7 +438,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       - the rewriting term must be bigger than other terms
         (in other words, the inference is strictly decreasing)
       - all variables of active clause must be bound by subst
-      - must not rewrite itself (c != c') *)
+      - must not rewrite itself (c != c')
+      - trail(active) must subsume trail(passive) *)
     if ALF.is_strictly_max ~ord active_lit'
     && (C.Seq.vars c'
         |> Sequence.for_all (fun v -> S.mem subst (v:T.t:>ScopedTerm.t) s_a))
@@ -446,6 +447,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         || not(Lit.eq (C.lits c).(i) (C.lits c').(0))
         || not(ALF.is_max ~ord passive_lit && C.is_maxlit c 0 S.empty ~idx:i)
       )
+    && (C.trail_subsumes c' c)
     then (
       (* we know all variables of [active_lit] are bound, no need
         for a renaming *)
@@ -565,14 +567,15 @@ module Make(E : Env.S) : S with module Env = E = struct
           (fun acc t pos ->
             PS.TermIndex.retrieve_specializations !_idx_all 0 t 1 acc
               (fun acc _t' with_pos subst ->
+                let c' = with_pos.C.WithPos.clause in
                 (* check whether the term [t] is indeed maximal in
                   its literal (and clause) after substitution *)
                 let alit' = ALF.get_exn alit pos in
                 let alit' = ALF.apply_subst_no_renaming subst alit' 1 in
-                if ALF.is_max ~ord alit'
+                if C.trail_subsumes c' c && ALF.is_max ~ord alit'
                 then (
                   Util.incr_stat stat_arith_backward_demod;
-                  C.CSet.add acc with_pos.C.WithPos.clause
+                  C.CSet.add acc c'
                 ) else acc
               ))
       | [| Lit.Arith (AL.Binary (AL.Lesseq, m1, m2)) |] ->
@@ -1058,7 +1061,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     transitive closure of this relation. If we obtain a trivial
     literal, then [l] is redundant (we keep a trace of literals used).
     We use continuations to deal with the multiple choices. *)
-  let rec _ineq_find_sufficient ~ord ~trace lit k = match lit with
+  let rec _ineq_find_sufficient ~ord ~trace c lit k = match lit with
     | _ when AL.is_trivial lit -> k (trace,lit)
     | AL.Binary _ when Sequence.exists T.is_var (AL.Seq.terms lit) ->
         ()  (* no way we rewrite this into a tautology *)
@@ -1080,7 +1083,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                 | None -> assert false
                 | Some (ALF.Left (AL.Lesseq, _, _) as alit') when is_left ->
                     let alit' = ALF.apply_subst_no_renaming subst alit' 1 in
-                    if ALF.is_strictly_max ~ord alit'
+                    if C.trail_subsumes active_clause c
+                    && ALF.is_strictly_max ~ord alit'
                     then
                       (* scale *)
                       let plit, alit' = ALF.scale plit alit' in
@@ -1099,11 +1103,12 @@ module Make(E : Env.S) : S with module Env = E = struct
                         (M.difference m2' (MF.rest mf1')) in
                       (* transitive closure *)
                       let trace = active_clause::trace in
-                      _ineq_find_sufficient ~ord ~trace new_plit k
+                      _ineq_find_sufficient ~ord ~trace c new_plit k
                 | Some (ALF.Right (AL.Lesseq, _, _) as alit') when not is_left ->
                     (* symmetric case *)
                     let alit' = ALF.apply_subst_no_renaming subst alit' 1 in
-                    if ALF.is_strictly_max ~ord alit'
+                    if C.trail_subsumes active_clause c
+                    && ALF.is_strictly_max ~ord alit'
                     then
                       (* scale *)
                       let plit, alit' = ALF.scale plit alit' in
@@ -1118,7 +1123,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                         (M.difference m1' (MF.rest mf2')) in
                       (* transitive closure *)
                       let trace = active_clause::trace in
-                      _ineq_find_sufficient ~ord ~trace new_plit k
+                      _ineq_find_sufficient ~ord ~trace c new_plit k
                 | Some _ ->
                     ()   (* cannot make a sufficient literal *)
               )
@@ -1126,13 +1131,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ -> ()
 
   (* is a literal redundant w.r.t the current set of unit clauses *)
-  let _ineq_is_redundant_by_unit lit =
+  let _ineq_is_redundant_by_unit c lit =
     match lit with
     | _ when Lit.is_trivial lit || Lit.is_absurd lit ->
         None  (* something more efficient will take care of it *)
     | Lit.Arith (AL.Binary (AL.Lesseq, m1, m2) as alit) ->
         let ord = Ctx.ord () in
-        let traces = _ineq_find_sufficient ~ord ~trace:[] alit
+        let traces = _ineq_find_sufficient ~ord ~trace:[] c alit
           |> Sequence.take 1  (* one is enough *)
           |> Sequence.to_list
         in
@@ -1148,7 +1153,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let is_redundant_by_ineq c =
     Util.enter_prof prof_arith_trivial_ineq;
     let res = !_enable_trivial_ineq && Util.array_exists
-      (fun lit -> match _ineq_is_redundant_by_unit lit with
+      (fun lit -> match _ineq_is_redundant_by_unit c lit with
         | None -> false
         | Some trace ->
             Util.debug 3 "clause %a trivial by inequations %a"
