@@ -33,51 +33,6 @@ module Util = Logtk.Util
 
 type 'a printer = Format.formatter -> 'a -> unit
 
-(** {2 Sat-Solvers} *)
-
-module BoolLit = struct
-  type t = int
-  let neg i = - i
-  let to_int i = abs i
-  let of_int i = i
-end
-
-(** A running SAT-solver *)
-type sat_solver_instance = {
-  add_lits : BoolLit.t list -> unit;
-  add_clauses : BoolLit.t list list -> unit;
-  check : unit -> [`Sat | `Unsat];
-  set_printer : int printer -> unit;
-}
-
-(** A factory of SAT-solver instances *)
-type sat_solver = {
-  create : unit -> sat_solver_instance;
-  name : string;
-}
-
-let _solvers = Hashtbl.create 5
-let _default = ref None
-
-let register_solver s =
-  if Hashtbl.mem _solvers s.name
-    then failwith (Printf.sprintf "solver \"%s\" already registered" s.name);
-  (* be sure we have a default solver *)
-  if !_default = None
-    then _default := Some s;
-  Hashtbl.add _solvers s.name s
-
-let solver_by_name n =
-  try Some (Hashtbl.find _solvers n)
-  with Not_found -> None
-
-let current_solver () = !_default
-
-let set_current_solver s =
-  if not (Hashtbl.mem _solvers s.name)
-    then register_solver s;
-  _default := Some s
-
 (** {2 Avatar} *)
 
 let prof_splits = Util.mk_profiler "avatar.split"
@@ -85,22 +40,13 @@ let prof_check = Util.mk_profiler "avatar.check"
 
 let stat_splits = Util.mk_stat "avatar.splits"
 
-module Make(E : Env.S) = struct
+module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
   module Ctx = E.Ctx
   module C = E.C
   module BoolLit = Ctx.BoolLit
 
   let _pp_bclause buf lits =
     Printf.bprintf buf "%a" (Util.pp_list ~sep:" ⊔ " BoolLit.pp) lits
-
-  let _solver = ref None
-
-  let _get_solver () = match !_solver with
-    | None -> failwith "Avatar: error, solver shouldn't be None"
-    | Some s -> s
-
-  let _add_lits l = (_get_solver()).add_lits l
-  let _add_clauses l = (_get_solver()).add_clauses l
 
   (* union-find that maps terms to list of literals, used for splitting *)
   module UF = UnionFind.Make(struct
@@ -166,10 +112,9 @@ module Make(E : Env.S) = struct
         let clauses, bool_clause = List.split clauses_and_names in
         Util.debug 4 "Avatar: split of %a yields %a" C.pp c (Util.pp_list C.pp) clauses;
         (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
-        _add_lits bool_clause;
         let bool_guard = C.get_trail c |> C.Trail.to_list |> List.map BoolLit.neg in
         let bool_clause = List.append bool_clause bool_guard in 
-        _add_clauses [bool_clause];
+        Sat.add_clauses [bool_clause];
         Util.debug 4 "Avatar: constraint clause is %a" _pp_bclause bool_clause;
         (* return the clauses *)
         Some clauses
@@ -192,19 +137,18 @@ module Make(E : Env.S) = struct
       let b_lits = C.get_trail c |> C.Trail.to_list  in
       let b_clause = List.map BoolLit.neg b_lits in
       Util.debug 4 "Avatar: negate trail of %a with %a" C.pp c _pp_bclause b_clause;
-      _add_clauses [b_clause];
+      Sat.add_clauses [b_clause];
     );
     [] (* never infers anything! *)
 
   (* Just check the solver *)
   let check_satisfiability () =
     Util.enter_prof prof_check;
-    let s = _get_solver () in
-    let res = match s.check () with
-    | `Sat ->
+    let res = match Sat.check ()  with
+    | Sat.Sat ->
         Util.debug 3 "Avatar: SAT-solver reports \"SAT\"";
         []
-    | `Unsat ->
+    | Sat.Unsat ->
         Util.debug 1 "Avatar: SAT-solver reports \"UNSAT\"";
         (* TODO: proper proof handling (collect unsat core? collect all clauses?)*)
         let proof cc = Proof.mk_c_inference ~rule:"avatar" ~theories:["sat"] cc [] in
@@ -216,14 +160,7 @@ module Make(E : Env.S) = struct
 
   let register () =
     Util.debug 2 "register extension Avatar";
-    begin match current_solver() with
-      | None -> failwith "Avatar: expect a default SAT solver to be defined."
-      | Some s ->
-          Util.debug 2 "Avatar: create a new solver (kind %s)" s.name;
-          let solver = s.create() in
-          solver.set_printer BoolLit.print;
-          _solver := Some solver
-    end;
+    Sat.set_printer BoolLit.print;
     E.add_multi_simpl_rule split;
     E.add_unary_inf "avatar_check_empty" check_empty;
     E.add_generate "avatar_check_sat" check_satisfiability;
@@ -233,7 +170,9 @@ end
 let extension =
   let action env =
     let module E = (val env : Env.S) in
-    let module A = Make(E) in
+    let module Sat = (val BoolSolver.get_sat() : BoolSolver.SAT) in
+    Util.debug 1 "create new SAT solver: \"%s\"" Sat.name;
+    let module A = Make(E)(Sat) in
     A.register()
   in
   Extensions.({default with name="avatar"; actions=[Do action]})
