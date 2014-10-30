@@ -43,6 +43,8 @@ module Import = struct
   open! ArithInt
   open! EnumTypes
   open! Quantor_bridge
+  open! Avatar
+  open! Induction
 end
 
 (** setup an alarm for abrupt stop *)
