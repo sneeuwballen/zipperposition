@@ -174,6 +174,7 @@ module type S = sig
   module BoolLit : BBox.S
 
   (** {2 Induction} *)
+
   module Induction : sig
     (** {6 Inductive Types} *)
 
