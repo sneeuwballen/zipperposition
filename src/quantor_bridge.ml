@@ -45,7 +45,12 @@ module Make(X : sig end) : BS.QBF = struct
 
   (* stack of quantified literals *)
   let _lits : (quantifier * LitSet.t, CCVector.rw) CCVector.t =
-    CCVector.create ()
+    let v = CCVector.create () in
+    (* create level 0 *)
+    CCVector.push v (Qbf.Exists, LitSet.empty);
+    v
+
+  let level0 = 0
 
   let _clauses = ref []
   let _pp = ref Qbf.Lit.print

@@ -70,6 +70,9 @@ module type QBF = sig
   type level = private int
   (** Quantification level *)
 
+  val level0 : level
+  (** Level 0 is the outermost level, existentially quantified. *)
+
   val quant_at_level : level -> quantifier
   (** Which quantifier is it at this level? *)
 
