@@ -31,10 +31,13 @@ module type S = sig
   module Env : Env.S
   module Ctx : module type of Env.Ctx
 
+  val scan : Env.C.t Sequence.t -> unit
+  (** Scan clauses (typically initial set) for inductive constants *)
+
   val register : unit -> unit
 end
 
-module Make(E : Env.S) : S
+module Make(E : Env.S)(Solver : BoolSolver.QBF) : S
   with module Env = E
   and module Ctx = E.Ctx
 

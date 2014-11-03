@@ -192,25 +192,25 @@ module type S = sig
         @raise Failure if the type is already declared
         @raise Invalid_argument if the list of constructors is empty. *)
 
-    val inductive_types : inductive_type Sequence.t
-    (** Set of inductive types known so far. *)
+    val is_inductive_type : Type.t -> bool
+    (** [is_inductive_type ty] holds iff [ty] is an instance of some
+        registered type (registered with {!declare_ty}). *)
 
     (** {6 Inductive Constants} *)
 
-    type cst = private FOTerm.t
+    type cst = FOTerm.t
     (** A ground term of an inductive type. It must correspond to a
         term built with the corresponding {!inductive_type} only.
         For instance, a constant of type [nat] should be equal to
         [s^n(0)] in any model. *)
 
-    val cst_of_term : ?parent:cst -> FOTerm.t -> cst option
+    val declare : ?parent:cst -> FOTerm.t -> unit
     (** Check whether the  given term can be an inductive constant,
         and if possible, adds it to the set of inductive constants.
-
         Requirements: it must be ground, and its type must be a
         known {!inductive type}.
 
-        @param parent if present, makes [c] depend on the given constant
+        @param parent if present, makes the term depend on the given constant
           that must be inductive already.
         @raise Invalid_argument if the parent isn't inductive or the
           term is non-ground *)
@@ -218,11 +218,18 @@ module type S = sig
     val is_inductive : FOTerm.t -> bool
     (** Check whether the given constant is ready for induction *)
 
-    val inductive_cst : cst Sequence.t
-    (** set of all inductive constants *)
+    type cover_set = {
+      cases : FOTerm.t list;
+      sub_constants : FOTerm.t list;  (* leaves of recursive cases *)
+    }
 
-    module Set : Set.S with type elt = cst
-    (** Set of constants *)
+    val cover_set : ?depth:int -> cst -> cover_set * [`New|`Old]
+    (** [cover_set t] gives a set of ground terms [[t1,...,tn]] with fresh
+        constants inside (that are not declared as inductive!) such that
+        [bigor_{i in 1...n} t=ti] is the skolemized version of the
+        exhaustivity axiom on [t]'s type.
+        @param depth (default 1) depth of cover terms; the deeper, the more
+          covering terms there will be. *)
 
     val depends_on : cst -> cst -> bool
     (** [depends_on a b] is [true] iff [a] depends on [b]. This forms a
@@ -235,13 +242,17 @@ module type S = sig
     (** Unsafe version of {!parent}.
         @raise Failure if the constant has no parent *)
 
-    val level : cst -> int
-    (** Level of dependency (starts at 1 for constants that don't depend
-        on any other constant, otherwise [1+level (parent c)]) *)
+    module Set : Set.S with type elt = cst
+    (** Set of constants *)
 
     val is_max_among : cst -> Set.t -> bool
     (** Checks whether the constant is maximal among the given ones, that is,
         if no constant in the set depends on it *)
+
+    module Seq : sig
+      val ty : inductive_type Sequence.t
+      val cst : cst Sequence.t
+    end
   end
 end
 

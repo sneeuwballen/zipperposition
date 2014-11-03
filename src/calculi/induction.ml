@@ -28,29 +28,56 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Induction Through QBF} *)
 
 module Sym = Logtk.Symbol
+module T = Logtk.FOTerm
 module Ty = Logtk.Type
 module Util = Logtk.Util
+module Lits = Literals
 
 module type S = sig
   module Env : Env.S
   module Ctx : module type of Env.Ctx
 
+  val scan : Env.C.t Sequence.t -> unit
   val register : unit -> unit
 end
 
 let _ind_types = ref []
 
-module Make(E : Env.S) = struct
+module Make(E : Env.S)(Solver : BoolSolver.QBF) = struct
   module Env = E
   module Ctx = Env.Ctx
 
   module CI = Ctx.Induction
+  module BoolLit = Ctx.BoolLit
+  module Avatar = Avatar.Make(E)(Solver)  (* will use some inferences *)
+
+  let _level0 = Solver.level0
+  let _level1 = Solver.push Qbf.Forall []
+  let _level2 = Solver.push Qbf.Exists []
+
+  (* maps each inductive constant to
+      set(clause contexts that are candidate for induction) *)
+  let _candidates : ClauseContext.Set.t T.Tbl.t =
+    T.Tbl.create 15
+
+  (* scan clauses for ground terms of an inductive type, and declare those terms *)
+  let scan seq =
+    Sequence.iter
+      (fun c ->
+        Lits.Seq.terms (Env.C.lits c)
+        |> Sequence.filter
+          (fun t ->
+            T.is_ground t && CI.is_inductive_type (T.ty t)
+          )
+        |> Sequence.iter (fun t -> CI.declare t)
+      ) seq
 
   (* detect ground terms of an inductive type, and perform a special
       case split with Xor on them. *)
   let case_split_ind c =
-    assert false (* TODO *)
+    None (* TODO *)
 
+  (* declare a list of inductive types *)
   let _declare_types l =
     List.iter
       (fun (ty,cstors) ->
@@ -74,18 +101,31 @@ module Make(E : Env.S) = struct
       ) l
 
   (* TODO: use inference rules from Avatar, but requiring a QBF solver.
-    Do not use its check, use the QBF check instead, probably less often *)
+     TODO: Do not use its check, use the QBF check instead,
+        probably less often, but with provability relation.
+
+        XXX: when shall we encode the provability relation?
+        XXX: manage set of clause contexts to subsume/be subsumed
+        XXX: manager S_candidates (contexts for which C[n]<-trail provable) *)
 
   let register() =
     Util.debug 1 "register induction calculus";
     _declare_types !_ind_types;
+    (* avatar rules *)
+    Env.add_multi_simpl_rule Avatar.split;
+    Env.add_unary_inf "avatar.check_empty" Avatar.check_empty;
+    Env.add_generate "avatar.check_sat" Avatar.check_satisfiability;
+    (* induction rules TODO *)
+    Env.add_multi_simpl_rule case_split_ind;
     ()
 end
 
 let extension =
   let action env =
     let module E = (val env : Env.S) in
-    let module A = Make(E) in
+    let module Solver = (val BoolSolver.get_qbf() : BoolSolver.QBF) in
+    Util.debug 1 "created QBF solver \"%s\"" Solver.name;
+    let module A = Make(E)(Solver) in
     A.register()
   in
   Extensions.({default with name="induction"; actions=[Do action]})

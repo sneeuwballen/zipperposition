@@ -42,6 +42,9 @@ type t = {
   var : T.t;
 }
 
+val compare : t -> t -> int
+val equal : t -> t -> bool
+
 val make : Literals.t -> var:T.t -> t
 (** Make a context from a var and literals containing this var.
     @raise Assert_failure if the variable isn't present in any literal *)
@@ -63,3 +66,7 @@ val apply_same_scope : t -> T.t -> Literals.t
 
 val pp : Buffer.t -> t -> unit
 val print : Format.formatter -> t -> unit
+
+(** {2 Sets of contexts} *)
+
+module Set : Set.S with type elt = t

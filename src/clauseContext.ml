@@ -43,6 +43,13 @@ type t = {
   lits : Literals.t;
   var : T.t;
 }
+type ctx=t
+
+let equal c1 c2 =
+  T.eq c1.var c2.var && Lits.eq c1.lits c2.lits
+
+let compare c1 c2 =
+  CCOrd.(T.cmp c1.var c2.var <?> (Lits.compare, c1.lits, c2.lits))
 
 let make lits ~var =
   assert (Lits.Seq.terms lits
@@ -91,3 +98,7 @@ let print fmt c =
   let lits = apply_same_scope c cst in
   Lits.fmt fmt lits
 
+module Set = Sequence.Set.Make(struct
+  type t = ctx
+  let compare = compare
+end)
