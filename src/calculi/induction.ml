@@ -42,11 +42,13 @@ module type S = sig
 end
 
 let _ind_types = ref []
+let _depth = ref 1
 
 module Make(E : Env.S)(Solver : BoolSolver.QBF) = struct
   module Env = E
   module Ctx = Env.Ctx
 
+  module C = Env.C
   module CI = Ctx.Induction
   module BoolLit = Ctx.BoolLit
   module Avatar = Avatar.Make(E)(Solver)  (* will use some inferences *)
@@ -60,22 +62,73 @@ module Make(E : Env.S)(Solver : BoolSolver.QBF) = struct
   let _candidates : ClauseContext.Set.t T.Tbl.t =
     T.Tbl.create 15
 
+  (* true if [t = c] where [c] is some inductive constructor *)
+  let _is_a_constructor t = match T.Classic.view t with
+    | T.Classic.App (s, _, _) ->
+        Sequence.exists (Sym.eq s) CI.Seq.constructors
+    | _ -> false
+
   (* scan clauses for ground terms of an inductive type, and declare those terms *)
   let scan seq =
     Sequence.iter
       (fun c ->
         Lits.Seq.terms (Env.C.lits c)
+        |> Sequence.flat_map T.Seq.subterms
         |> Sequence.filter
           (fun t ->
-            T.is_ground t && CI.is_inductive_type (T.ty t)
+            T.is_ground t
+            && T.is_const t  (* TODO: allow nil(alpha) *)
+            && CI.is_inductive_type (T.ty t)
+            && not (_is_a_constructor t)   (* 0 and nil: not inductive const *)
           )
         |> Sequence.iter (fun t -> CI.declare t)
       ) seq
 
+  (* boolean xor *)
+  let _mk_xor l =
+    let at_least_one = l in
+    let at_most_one =
+      CCList.diagonal l
+        |> List.map (fun (l1,l2) -> [BoolLit.neg l1; BoolLit.neg l2])
+    in
+    at_least_one :: at_most_one
+
   (* detect ground terms of an inductive type, and perform a special
       case split with Xor on them. *)
   let case_split_ind c =
-    None (* TODO *)
+    let res = ref [] in
+    (* first scan for new inductive consts *)
+    scan (Sequence.singleton c);
+    Lits.Seq.terms (Env.C.lits c)
+      |> Sequence.flat_map T.Seq.subterms
+      |> Sequence.filter CI.is_inductive
+      |> Sequence.iter
+        (fun t ->
+          match CI.cover_set ~depth:!_depth t with
+          | _, `Old -> ()
+          | set, `New ->
+              (* Make a case split on the cover set (one clause per literal) *)
+              Util.debug 2 "make a case split on inductive %a" T.pp t;
+              let clauses_and_lits = List.map
+                (fun t' ->
+                  assert (T.is_ground t');
+                  let lits = [| Literal.mk_eq t t' |] in
+                  let bool_lit = BoolLit.inject_lits lits in
+                  let proof cc = Proof.mk_c_trivial ~theories:["induction"] cc in
+                  let trail = C.Trail.of_list [bool_lit] in
+                  let clause = C.create_a ~trail lits proof in
+                  clause, bool_lit
+                ) set.CI.cases
+              in
+              let clauses, bool_lits = List.split clauses_and_lits in
+              (* add a boolean constraint: Xor of boolean lits *)
+              Solver.add_clauses (_mk_xor bool_lits);
+              (* return clauses *)
+              Util.debug 4 "split inference for %a: %a"
+                T.pp t (CCList.pp C.pp) clauses;
+              res := List.rev_append clauses !res
+        );
+    !res
 
   (* declare a list of inductive types *)
   let _declare_types l =
@@ -88,15 +141,16 @@ module Make(E : Env.S)(Solver : BoolSolver.QBF) = struct
             let s = Sym.of_string str in
             match Ctx.find_signature s with
               | None ->
-                  failwith
-                    (Util.sprintf
-                      "cannot find the type of inductive constructor %s" str)
+                  let msg = Util.sprintf
+                    "cannot find the type of inductive constructor %s" str
+                  in failwith msg
               | Some ty ->
                   s, ty
           ) cstors
         in
         (* declare type. *)
         ignore (CI.declare_ty pattern constructors);
+        Util.debug 1 "... declare inductive type %a" Ty.pp pattern;
         ()
       ) l
 
@@ -116,7 +170,7 @@ module Make(E : Env.S)(Solver : BoolSolver.QBF) = struct
     Env.add_unary_inf "avatar.check_empty" Avatar.check_empty;
     Env.add_generate "avatar.check_sat" Avatar.check_satisfiability;
     (* induction rules TODO *)
-    Env.add_multi_simpl_rule case_split_ind;
+    Env.add_unary_inf "induction.case_split" case_split_ind;
     ()
 end
 
@@ -124,7 +178,7 @@ let extension =
   let action env =
     let module E = (val env : Env.S) in
     let module Solver = (val BoolSolver.get_qbf() : BoolSolver.QBF) in
-    Util.debug 1 "created QBF solver \"%s\"" Solver.name;
+    Util.debug 2 "created QBF solver \"%s\"" Solver.name;
     let module A = Make(E)(Solver) in
     A.register()
   in
@@ -146,13 +200,16 @@ let _add_ind_type str =
   in
   match Util.str_split ~by:":" str with
   | [ty; cstors] ->
-      let cstors = Util.str_split ~by:"|" str in
+      let cstors = Util.str_split ~by:"|" cstors in
       if List.length cstors < 2 then _fail();
       (* remember to declare this type as inductive *)
+      Util.debug 2 "user declares inductive type %s = %a"
+        ty (CCList.pp CCString.pp) cstors;
       _ind_types := (ty, cstors) :: !_ind_types
   | _ -> _fail()
 
 let () =
   Params.add_opts
     [ "-induction", Arg.String _add_ind_type, "enable Induction on the given type"
+    ; "-induction-depth", Arg.Set_int _depth, "set default induction depth"
     ]

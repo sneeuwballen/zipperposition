@@ -252,6 +252,9 @@ module type S = sig
     module Seq : sig
       val ty : inductive_type Sequence.t
       val cst : cst Sequence.t
+
+      val constructors : Symbol.t Sequence.t
+      (** All known constructors *)
     end
   end
 end

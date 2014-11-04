@@ -301,14 +301,20 @@ end) : S = struct
       constructors : constructor list;
     }
 
+    let _raise f fmt =
+      let buf = Buffer.create 15 in
+      Printf.kbprintf (fun buf -> f (Buffer.contents buf))
+        buf fmt
+    let _failwith fmt = _raise failwith fmt
+    let _invalid_arg fmt = _raise invalid_arg fmt
+
     let _tbl_ty : inductive_type Symbol.Tbl.t = Symbol.Tbl.create 16
 
     let _extract_hd ty =
       match Type.view (snd (Type.open_fun ty)) with
       | Type.App (s, _) -> s
       | _ ->
-          let msg = Util.sprintf "expected function type, got %a" Type.pp ty in
-          invalid_arg msg
+          _invalid_arg "expected function type, got %a" Type.pp ty
 
     let declare_ty ty constructors =
       let name = _extract_hd ty in
@@ -359,19 +365,19 @@ end) : S = struct
       if T.is_ground t
       then
         if T.Tbl.mem _tbl t then ()
-        else
-          try
-            (* check that the type of [t] is inductive *)
-            let ty = T.ty t in
-            let name = _extract_hd ty in
-            let ity = Symbol.Tbl.find _tbl_ty name in
-            let subst = Unif.Ty.matching ~pattern:ity.pattern 1 ty 0 in
-            let cst_data = { cst=t; ty=ity; subst; parent; coversets=IMap.empty } in
-            T.Tbl.add _tbl t cst_data;
-            ()
-          with Unif.Fail | Not_found ->
-            invalid_arg "term doesn't have an inductive type"
-      else invalid_arg "term is not ground, cannot be an inductive constant"
+        else try
+          Util.debug 2 "declare new inductive constant %a" T.pp t;
+          (* check that the type of [t] is inductive *)
+          let ty = T.ty t in
+          let name = _extract_hd ty in
+          let ity = Symbol.Tbl.find _tbl_ty name in
+          let subst = Unif.Ty.matching ~pattern:ity.pattern 1 ty 0 in
+          let cst_data = { cst=t; ty=ity; subst; parent; coversets=IMap.empty } in
+          T.Tbl.add _tbl t cst_data;
+          ()
+        with Unif.Fail | Not_found ->
+          _invalid_arg "term %a doesn't have an inductive type" T.pp t
+      else _invalid_arg "term %a is not ground, cannot be an inductive constant" T.pp t
 
     (* input [l]: list of required types;
        output: list of terms + list of cases with same type *)
@@ -401,16 +407,14 @@ end) : S = struct
           let t = T.const ~ty c in
           sub_constants := t :: !sub_constants;
           k t
-        );
+        )
         (* inner nodes or base cases: constructors *)
-        List.iter
+        else List.iter
           (fun (f, ty_f) ->
             match Type.arity ty_f with
             | Type.NoArity ->
-                let msg = Util.sprintf
-                  "invalid constructor %a for inductive type %a"
-                    Symbol.pp f Type.pp ity.pattern
-                in failwith msg
+                _failwith "invalid constructor %a for inductive type %a"
+                  Symbol.pp f Type.pp ity.pattern
             | Type.Arity (0, 0) ->
                 if depth > 0
                 then k (T.const ~ty:ty_f f)  (* only one answer : f *)
@@ -421,10 +425,9 @@ end) : S = struct
                     let t = T.app (T.const f ~ty:ty_f) args in
                     k t)
             | Type.Arity (m,_) ->
-                let msg = Util.sprintf
+                _failwith
                   "inductive constructor %a requires %d type parameters, expected 0"
-                    Symbol.pp f m
-                in failwith msg
+                  Symbol.pp f m
           ) ity.constructors
       (* given a list of types [l], yield all lists of cover terms
           that have types [l] *)
@@ -462,13 +465,11 @@ end) : S = struct
           let coverset = _make_coverset ~depth ity t in
           (* save coverset *)
           cst.coversets <- IMap.add depth coverset cst.coversets;
-          Util.debug 2 "new coverset for %a: {%a}" T.pp t (CCList.pp T.pp) coverset.cases;
+          Util.debug 2 "new coverset for %a: %a" T.pp t (CCList.pp T.pp) coverset.cases;
           coverset, `New
         end
       with Not_found ->
-        let msg = Util.sprintf
-          "term %a is not an inductive constant, no coverset" T.pp t in
-        failwith msg
+        _failwith "term %a is not an inductive constant, no coverset" T.pp t
 
     let is_inductive cst = T.Tbl.mem _tbl cst
 
@@ -495,6 +496,11 @@ end) : S = struct
     module Seq = struct
       let ty = _seq_inductive_types
       let cst = _seq_inductive_cst
+
+      let constructors =
+        _seq_inductive_types
+        |> Sequence.flat_map (fun ity -> Sequence.of_list ity.constructors)
+        |> Sequence.map fst
     end
   end
 end
