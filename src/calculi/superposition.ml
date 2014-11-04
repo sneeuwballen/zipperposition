@@ -1256,13 +1256,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     try
       SubsumIdx.retrieve_subsuming_c !_idx_fv c ()
         (fun () c' ->
-          let redundant =
-            (try_eq_subsumption && eq_subsumes (C.lits c') (C.lits c))
-              ||
-            subsumes (C.lits c') (C.lits c)
-          in
-          if redundant && C.trail_subsumes c' c
-            then raise Exit
+          if C.trail_subsumes c' c
+          then
+            let redundant =
+              (try_eq_subsumption && eq_subsumes (C.lits c') (C.lits c))
+                ||
+              subsumes (C.lits c') (C.lits c)
+            in if redundant then raise Exit
         );
       Util.exit_prof prof_subsumption_set;
       false
@@ -1282,15 +1282,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* use feature vector indexing *)
     let res = SubsumIdx.retrieve_subsumed_c !_idx_fv c C.CSet.empty
       (fun res c' ->
-        let redundant =
-            (try_eq_subsumption && eq_subsumes (C.lits c) (C.lits c'))
-            || subsumes (C.lits c) (C.lits c')
-        in
-        if redundant && C.trail_subsumes c c'
-        then (
-          Util.incr_stat stat_clauses_subsumed;
-          C.CSet.add res c'
-        ) else res)
+        if C.trail_subsumes c c'
+        then
+          let redundant =
+              (try_eq_subsumption && eq_subsumes (C.lits c) (C.lits c'))
+              || subsumes (C.lits c) (C.lits c')
+          in if redundant then (
+            Util.incr_stat stat_clauses_subsumed;
+            C.CSet.add res c'
+          ) else res
+        else res)
     in
     Util.exit_prof prof_subsumption_in_set;
     res
