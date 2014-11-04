@@ -433,11 +433,13 @@ let symbols ?(init=Symbol.Set.empty) lits =
 (** {3 IO} *)
 
 let pp buf lits =
+  if Array.length lits = 0 then Buffer.add_string buf "⊥";
   Util.pp_arrayi ~sep:" | "
     (fun buf i lit -> Printf.bprintf buf "%a" Lit.pp lit)
     buf lits
 
 let pp_tstp buf lits =
+  if Array.length lits = 0 then Buffer.add_string buf "$false";
   Util.pp_arrayi ~sep:" | "
     (fun buf i lit -> Printf.bprintf buf "%a" Lit.pp_tstp lit)
     buf lits
