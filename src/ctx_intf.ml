@@ -74,6 +74,9 @@ module type S = sig
   (** Unsafe version of {!find_signature}.
       @raise Not_found for unknown symbols *)
 
+  val update_prec : Symbol.t Sequence.t -> unit
+  (** Update the precedence of the ordering {!ord} *)
+
   val declare : Symbol.t -> Type.t -> unit
   (** Declare the type of a symbol (updates signature) *)
 
@@ -203,6 +206,11 @@ module type S = sig
         term built with the corresponding {!inductive_type} only.
         For instance, a constant of type [nat] should be equal to
         [s^n(0)] in any model. *)
+
+    val is_blocked : FOTerm.t -> bool
+    (** Some terms that could be inductive constants are {b blocked}. In
+        particular, constructors, but also skolem constants introduced by
+        calls to {!cover_set}. *)
 
     val declare : ?parent:cst -> FOTerm.t -> unit
     (** Check whether the  given term can be an inductive constant,

@@ -78,6 +78,7 @@ module Make(E : Env.S)(Solver : BoolSolver.QBF) = struct
           (fun t ->
             T.is_ground t
             && T.is_const t  (* TODO: allow nil(alpha) *)
+            && not (CI.is_blocked t)
             && CI.is_inductive_type (T.ty t)
             && not (_is_a_constructor t)   (* 0 and nil: not inductive const *)
           )

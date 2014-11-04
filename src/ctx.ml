@@ -91,16 +91,24 @@ end) : S = struct
     Util.exit_prof prof_add_signature;
     ()
 
-  let declare symb ty =
-    Util.enter_prof prof_declare_sym;
+  let _declare_symb symb ty =
     let is_new = not (Signature.mem !_signature symb) in
     _signature := Signature.declare !_signature symb ty;
     if is_new then (
       Signal.send on_signature_update !_signature;
       Signal.send on_new_symbol (symb,ty);
-    );
+    )
+
+  let declare symb ty =
+    Util.enter_prof prof_declare_sym;
+    _declare_symb symb ty;
     Util.exit_prof prof_declare_sym;
     ()
+
+  let update_prec symbs =
+    Util.debug 2 "update precedence...";
+    _ord := Ordering.update_precedence !_ord
+      (fun prec -> Precedence.add_seq prec symbs)
 
   let ad_hoc_symbols () = !_ad_hoc
   let add_ad_hoc_symbols seq =
@@ -361,6 +369,10 @@ end) : S = struct
     (* cst -> cst_data *)
     let _tbl : cst_data T.Tbl.t = T.Tbl.create 16
 
+    let _blocked = ref []
+
+    let is_blocked t = List.exists (T.eq t) !_blocked
+
     let declare ?parent t =
       if T.is_ground t
       then
@@ -404,7 +416,9 @@ end) : S = struct
           let ty = ity.pattern in
           let name = Util.sprintf "#%a" Symbol.pp (_extract_hd ty) in
           let c = Skolem.fresh_sym_with ~ctx:skolem ~ty name in
+          _declare_symb c ty;
           let t = T.const ~ty c in
+          _blocked := t :: !_blocked;
           sub_constants := t :: !sub_constants;
           k t
         )
@@ -440,6 +454,7 @@ end) : S = struct
               (* not an inductive sub-case, just create a skolem symbol *)
               let name = Util.sprintf "#%a" Symbol.pp (_extract_hd ty) in
               let c = Skolem.fresh_sym_with ~ctx:skolem ~ty name in
+              _declare_symb c ty;
               let t = T.const ~ty c in
               (* declare [t] as a new inductive constant if its type is inductive
                 FIXME: also remember to which case it belongs?

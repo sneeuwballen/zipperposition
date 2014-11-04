@@ -308,6 +308,13 @@ end) = struct
     let signature = TypeInference.Ctx.to_signature tyctx in
     formulas, signature
 
+  let setup_handlers() =
+    Signal.on Ctx.on_signature_update
+      (fun signature ->
+        Ctx.update_prec (Signature.Seq.symbols signature);
+        Signal.ContinueListening);
+    ()
+
   (* try to refute the set of clauses contained in the [env]. Parameters are
      used to influence how saturation is done, for how long it runs, etc.
      @return the result and final env. *)
@@ -417,6 +424,7 @@ let process_file ?meta ~plugins ~params file =
     let params = params
   end) in
   Main.has_conjecture := has_conjecture;
+  Main.setup_handlers();
   (* pre-saturation *)
   let num_clauses = MyEnv.C.CSet.size clauses in
   let result, clauses = if params.param_presaturate
