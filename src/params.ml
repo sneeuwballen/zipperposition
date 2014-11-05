@@ -91,7 +91,6 @@ let parse_args () =
   (* options list *) 
   let options =
     [ "-ord", Arg.Set_string ord, "choose ordering (rpo,kbo)"
-    ; "-bt", Arg.Bool Printexc.record_backtrace, "enable/disable backtraces"
     ; "-version", Arg.Set version, "print version"
     ; "-steps", Arg.Set_int steps, "maximal number of steps of given clause loop"
     ; "-timeout", Arg.Set_float timeout, "timeout (in seconds)"
@@ -105,7 +104,6 @@ let parse_args () =
     ; "-proof", Arg.Set_string proof, "choose proof printing (none, debug, or tstp)"
     ; "-presaturate", Arg.Set presaturate,
         "pre-saturate (interreduction of) the initial clause set"
-    ; "-stats", Arg.Set stats, "print statistics"
     ; "-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT"
     ; "-dot-sat", Arg.Set dot_sat, "print saturated set into DOT"
     ; "-seed", Arg.Set_int seed, "set random seed"
