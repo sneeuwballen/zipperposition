@@ -30,11 +30,21 @@ open Logtk
 
 type form = Formula.FO.t
 
-type t = Literal.t array
+type bool_lit = bool * [`Box_clause of Literal.t array ]
+(** A boolean literal, here, is a boxed (unsplittable) clause
+    with a sign *)
+
+type t = {
+  lits : Literal.t array;
+  trail : bool_lit list;
+}
 
 val eq : t -> t -> bool
 val cmp : t -> t -> int
 include Interfaces.HASH with type t := t
+
+val make : Literal.t array -> bool_lit list -> t
+(** Make a compact clause *)
 
 val is_empty : t -> bool
 
@@ -43,6 +53,8 @@ val iter : t -> (Literal.t -> unit) -> unit
 val to_seq : t -> Literal.t Sequence.t
 
 val to_forms : t -> form array
+
+val trail : t -> bool_lit list
 
 val pp : Buffer.t -> t -> unit
 val pp_tstp : Buffer.t -> t -> unit
