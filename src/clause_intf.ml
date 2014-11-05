@@ -156,6 +156,10 @@ module type S = sig
 
   module CHashcons : Hashcons.S with type elt = clause
 
+  val on_proof : (Literal.t array * Proof.t) Signal.t
+  (** signal triggered with [c, p] whenever a proof [p]  is associated with
+      the clause [c], even if the proof is dumped *)
+
   val create : ?parents:t list -> ?selected:CCBV.t -> ?trail:Trail.t ->
                Literal.t list ->
                (CompactClause.t -> Proof.t) -> t

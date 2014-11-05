@@ -124,7 +124,7 @@ module Make(Any : sig end) = struct
 
   (* boolean lit -> injected *)
   let extract i =
-    if i<=0 then failwith "BBox.extract: require >0 integer";
+    if i<=0 then failwith "BBox.extract: require integer > 0";
     try Some (ITbl.find _lit2inj i)
     with Not_found -> None
 

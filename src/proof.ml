@@ -65,7 +65,7 @@ type t = {
   additional_info : string list;   (** additional info, prover-dependent *)
 }
 
-type proof = t 
+type proof = t
 
 let kind p = p.kind
 let parents p = p.parents

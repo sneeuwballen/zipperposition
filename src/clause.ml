@@ -96,7 +96,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let parents c = c.hcparents
 
-  let compact c = c.hclits
 
   let is_ground c = get_flag flag_ground c
 
@@ -241,6 +240,20 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let __no_select = BV.empty ()
 
+  let on_proof = Signal.create ()
+
+  let _compact_trail trail =
+    ISet.fold
+      (fun i acc ->
+        let sign = i<0 in
+        match Ctx.BoolLit.extract (abs i) with
+        | None -> failwith "wrong trail"
+        | Some (Ctx.BoolLit.Clause_component lits) -> (sign, `Box_clause lits) :: acc
+        | Some (Ctx.BoolLit.Provable _) -> failwith "clause trail contains 'provable'"
+      ) trail []
+
+  let compact c = CompactClause.make c.hclits (_compact_trail c.trail)
+
   let create ?parents ?selected ?trail lits proof =
     Util.enter_prof prof_clause_create;
     let lits = lits
@@ -248,14 +261,16 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       |> List.sort Lit.compare
     in
     let lits = Array.of_list lits in
-    (* proof *)
-    let proof' = proof lits in
     (* trail *)
     let trail = match trail, parents with
       | Some t, _ -> t
       | None, None -> ISet.empty
       | None, Some parent_list -> Trail.merge (List.map get_trail parent_list)
     in
+    (* proof *)
+    let cc = CompactClause.make lits (_compact_trail trail) in
+    let proof' = proof cc in
+    Signal.send on_proof (lits, proof');
     (* create the structure *)
     let c = {
       hclits = lits;
