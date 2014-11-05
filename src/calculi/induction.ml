@@ -62,6 +62,68 @@ module Make(E : Env.S)(Solver : BoolSolver.QBF) = struct
   let _candidates : ClauseContext.Set.t T.Tbl.t =
     T.Tbl.create 15
 
+  (* one way to prove a clause: parent clauses and the union of their trails *)
+  type proof = CompactClause.t list
+
+  (* a set of proofs *)
+  type proof_set = {
+    mutable proofs : proof list;
+  }
+  let _dummy_set = {proofs=[]}
+
+  module FV = Logtk.FeatureVector.Make(struct
+    type t = Lits.t * proof_set
+    let cmp (l1,_)(l2,_) = Lits.compare l1 l2
+    let to_lits (l,_) = Lits.Seq.abstract l
+  end)
+
+  (* maps clauses to a list of their known proofs *)
+  let _proofs = ref (FV.empty ())
+
+  (* find all known proofs of the given lits *)
+  let _find_proofs lits =
+    FV.retrieve_alpha_equiv_c !_proofs (lits,_dummy_set) ()
+      |> Sequence.map2 (fun _ x -> x)
+      |> Sequence.filter_map
+        (fun (lits', proofs) ->
+          if Lits.are_variant lits lits'
+            then Some proofs else None
+        )
+      |> Sequence.head
+
+  exception NonClausalProof
+  (* raised when a proof doesn't use only clauses (also formulas...) *)
+
+  (* add a proof to the set of proofs for [lits] *)
+  let _add_proof lits p =
+    try
+      let parents = Array.to_list p.Proof.parents in
+      let parents = List.map
+        (fun p -> match p.Proof.result with
+          | Proof.Form _ -> raise NonClausalProof
+          | Proof.Clause lits -> lits
+        ) parents
+      in
+      (* all proofs of [lits] *)
+      let set = match _find_proofs lits with
+        | None ->
+            let set = {proofs=[]} in
+            _proofs := FV.add !_proofs (lits,set);
+            set
+        | Some set -> set
+      in
+      set.proofs <- parents :: set.proofs
+    with NonClausalProof ->
+      ()  (* ignore the proof *)
+
+  let () =
+    Signal.on C.on_proof
+      (fun (lits, p) ->
+        _add_proof lits p;
+        Signal.ContinueListening
+      );
+    ()
+
   (* true if [t = c] where [c] is some inductive constructor *)
   let _is_a_constructor t = match T.Classic.view t with
     | T.Classic.App (s, _, _) ->
@@ -166,6 +228,7 @@ module Make(E : Env.S)(Solver : BoolSolver.QBF) = struct
   let register() =
     Util.debug 1 "register induction calculus";
     _declare_types !_ind_types;
+    Solver.set_printer BoolLit.print;
     (* avatar rules *)
     Env.add_multi_simpl_rule Avatar.split;
     Env.add_unary_inf "avatar.check_empty" Avatar.check_empty;
