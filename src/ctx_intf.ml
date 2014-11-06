@@ -228,8 +228,17 @@ module type S = sig
 
     type cover_set = {
       cases : FOTerm.t list;
-      sub_constants : FOTerm.t list;  (* leaves of recursive cases *)
+      sub_constants : FOTerm.Set.t;  (* leaves of recursive cases *)
     }
+
+    val is_sub_constant : FOTerm.t -> bool
+    (** Is the term a constant that was created within a cover set? *)
+
+    val inductive_cst_of_sub_cst : FOTerm.t -> cst * FOTerm.t
+    (** [inductive_cst_of_sub_cst t] finds a pair [c, t'] such
+        that [c] is an inductive const, [t'] belongs to a coverset
+        of [c], and [t] is a sub-constant within [t'].
+        @raise Not_found if [t] isn't an inductive constant *)
 
     val cover_set : ?depth:int -> cst -> cover_set * [`New|`Old]
     (** [cover_set t] gives a set of ground terms [[t1,...,tn]] with fresh

@@ -46,7 +46,7 @@ module Make(X : sig
   val signature : Signature.t
   val ord : Ordering.t
   val select : Selection.t
-end) : S = struct
+end) = struct
   let _ord = ref X.ord
   let _select = ref X.select
   let _signature = ref X.signature
@@ -354,7 +354,7 @@ end) : S = struct
 
     type cover_set = {
       cases : T.t list; (* covering set itself *)
-      sub_constants : T.t list;  (* skolem constants for recursive cases *)
+      sub_constants : T.Set.t;  (* skolem constants for recursive cases *)
     }
 
     type cst_data = {
@@ -369,9 +369,16 @@ end) : S = struct
     (* cst -> cst_data *)
     let _tbl : cst_data T.Tbl.t = T.Tbl.create 16
 
+    (* sub_constants -> cst * case in which the sub_constant occurs *)
+    let _tbl_sub_cst : (cst * T.t) T.Tbl.t = T.Tbl.create 16
+
     let _blocked = ref []
 
-    let is_blocked t = List.exists (T.eq t) !_blocked
+    let is_sub_constant t =
+      T.Tbl.mem _tbl_sub_cst t
+
+    let is_blocked t =
+      is_sub_constant t
 
     let declare ?parent t =
       if T.is_ground t
@@ -391,39 +398,25 @@ end) : S = struct
           _invalid_arg "term %a doesn't have an inductive type" T.pp t
       else _invalid_arg "term %a is not ground, cannot be an inductive constant" T.pp t
 
-    (* input [l]: list of required types;
-       output: list of terms + list of cases with same type *)
-    let rec _instantiate_vars ity name subst sub_cst l = match l with
-      | [] -> subst, sub_cst
-      | v :: tail ->
-          let t = T.const ~ty:(T.ty v)
-            (Skolem.fresh_sym_with ~ctx:skolem ~ty:(T.ty v) name) in
-          let sub_cst =
-            if Unif.Ty.matches ~pattern:ity.pattern (T.ty v)
-              then t :: sub_cst (* inductive sub-case *)
-              else sub_cst
-          in
-          let subst = Substs.FO.bind subst v 0 t 0 in
-          _instantiate_vars ity name subst sub_cst tail
+    (* monad over "lazy" values *)
+    module FunM = CCFun.Monad(struct type t = unit end)
+    module FunT = CCList.Traverse(FunM)
 
     (* coverset of given depth for this type and constant *)
     let _make_coverset ~depth ity cst =
-      let sub_constants = ref [] in
-      (* iterator over cover terms *)
-      let rec make depth k =
+      (* list of cover term generators *)
+      let rec make depth =
         (* leaves: fresh constants *)
-        if depth=0 then (
+        if depth=0 then [fun () ->
           let ty = ity.pattern in
           let name = Util.sprintf "#%a" Symbol.pp (_extract_hd ty) in
           let c = Skolem.fresh_sym_with ~ctx:skolem ~ty name in
           _declare_symb c ty;
           let t = T.const ~ty c in
-          _blocked := t :: !_blocked;
-          sub_constants := t :: !sub_constants;
-          k t
-        )
+          t, T.Set.singleton t
+        ]
         (* inner nodes or base cases: constructors *)
-        else List.iter
+        else CCList.flat_map
           (fun (f, ty_f) ->
             match Type.arity ty_f with
             | Type.NoArity ->
@@ -431,13 +424,16 @@ end) : S = struct
                   Symbol.pp f Type.pp ity.pattern
             | Type.Arity (0, 0) ->
                 if depth > 0
-                then k (T.const ~ty:ty_f f)  (* only one answer : f *)
+                then [fun () -> T.const ~ty:ty_f f, T.Set.empty]  (* only one answer : f *)
+                else []
             | Type.Arity (0, n) ->
                 let ty_args = Type.expected_args ty_f in
-                make_list (depth-1) [] ty_args
-                  (fun args ->
-                    let t = T.app (T.const f ~ty:ty_f) args in
-                    k t)
+                CCList.(
+                  make_list (depth-1) ty_args >>= fun mk_args ->
+                  return (fun () ->
+                    let args, set = mk_args () in
+                    T.app (T.const f ~ty:ty_f) args, set)
+                )
             | Type.Arity (m,_) ->
                 _failwith
                   "inductive constructor %a requires %d type parameters, expected 0"
@@ -445,28 +441,47 @@ end) : S = struct
           ) ity.constructors
       (* given a list of types [l], yield all lists of cover terms
           that have types [l] *)
-      and make_list depth acc l k = match l with
-        | [] -> k (List.rev acc)
+      and make_list depth l : (T.t list * T.Set.t) FunM.t list = match l with
+        | [] -> [fun()->[],T.Set.empty]
         | ty :: tail ->
-            if Unif.Ty.matches ~pattern:ity.pattern ty
-            then make depth (fun t -> make_list depth (t::acc) tail k)
-            else (
-              (* not an inductive sub-case, just create a skolem symbol *)
-              let name = Util.sprintf "#%a" Symbol.pp (_extract_hd ty) in
-              let c = Skolem.fresh_sym_with ~ctx:skolem ~ty name in
-              _declare_symb c ty;
-              let t = T.const ~ty c in
-              (* declare [t] as a new inductive constant if its type is inductive
-                FIXME: also remember to which case it belongs?
-                FIXME: may be shared between several cases because of iterators *)
-              if is_inductive_type ty
-                then declare ~parent:cst t;
-              make_list depth (t::acc) tail k
-            )
+            let t_builders = if Unif.Ty.matches ~pattern:ity.pattern ty
+              then make depth
+              else [fun () ->
+                (* not an inductive sub-case, just create a skolem symbol *)
+                let name = Util.sprintf "#%a" Symbol.pp (_extract_hd ty) in
+                let c = Skolem.fresh_sym_with ~ctx:skolem ~ty name in
+                _declare_symb c ty;
+                let t = T.const ~ty c in
+                (* declare [t] as a new inductive constant if its type is inductive *)
+                if is_inductive_type ty then declare ~parent:cst t;
+                t, T.Set.empty
+            ] in
+            let tail_builders = make_list depth tail in
+            CCList.(
+              t_builders >>= fun mk_t ->
+              tail_builders >>= fun mk_tail ->
+              [FunM.(mk_t >>= fun (t,set) ->
+                     mk_tail >>= fun (tail,set') ->
+                     return (t::tail, T.Set.union set set'))] 
+            ) 
       in
       assert (depth>0);
-      let cases = make depth |> Sequence.to_rev_list in
-      {cases; sub_constants= !sub_constants; }
+      let cases_and_subs = List.map (fun gen -> gen()) (make depth) in
+      List.iter 
+        (fun (t, set) ->
+          T.Set.iter
+            (fun sub_cst -> T.Tbl.replace _tbl_sub_cst sub_cst (cst, t))
+            set;
+        ) cases_and_subs;
+      let cases, sub_constants = List.split cases_and_subs in
+      let sub_constants = List.fold_left T.Set.union T.Set.empty sub_constants in
+      {cases; sub_constants= sub_constants; }
+
+      (* TODO
+          T.Tbl.replace _tbl_sub_cst t (cst, T.);
+          *)
+
+    let inductive_cst_of_sub_cst t = T.Tbl.find _tbl_sub_cst t
 
     let cover_set ?(depth=1) t =
       try
