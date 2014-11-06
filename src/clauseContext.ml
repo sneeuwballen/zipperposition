@@ -36,6 +36,8 @@ module T = Logtk.FOTerm
 module Subst = Logtk.Substs
 module Lits = Literals
 
+type term = T.t
+
 (** A context is represented as a regular array of literals, containing
 at least one specific variable [x], paired with this variable [x].
 Applying the context is a mere substitution *)
@@ -73,6 +75,10 @@ let extract lits t =
     in
     Some {lits;var}
   else None
+
+let extract_exn lits t = match extract lits t with
+  | None -> invalid_arg "ClauseContext.extract_exn"
+  | Some c -> c
 
 let _apply_subst subst lits sc =
   let renaming = Subst.Renaming.create () in
