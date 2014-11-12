@@ -62,10 +62,10 @@ module Make(C : Index.CLAUSE) : sig
 
   val retrieve_alpha_equiv : t -> Index.lits -> 'a -> ('a -> C.t -> 'a) -> 'a
   (** Retrieve clauses that are potentially alpha-equivalent to the given clause
-      @since NEXT_RELEASE *)
+      @since 0.6 *)
 
   val retrieve_alpha_equiv_c : t -> C.t -> 'a -> ('a -> C.t -> 'a) -> 'a
-  (** @since NEXT_RELEASE *)
+  (** @since 0.6 *)
 
   val empty_with : Feature.t list -> t
 

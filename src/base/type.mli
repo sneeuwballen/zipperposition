@@ -182,7 +182,7 @@ val size : t -> int
 
 val depth : t -> int
   (** Depth of the type (length of the longest path to some leaf)
-      @since NEXT_RELEASE *)
+      @since 0.5.3 *)
 
 val open_fun : t -> (t list * t)
   (** [open_fun ty] "unrolls" function arrows from the left, so that

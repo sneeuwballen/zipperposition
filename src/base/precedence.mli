@@ -116,7 +116,7 @@ module type S = sig
 
   val set_weight : t -> weight_fun -> t
   (** Change the weight function of the precedence
-      @since NEXT_RELEASE *)
+      @since 0.5.3 *)
 
   (** {2 Creation of a precedence from constraints} *)
 

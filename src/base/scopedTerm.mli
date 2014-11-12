@@ -171,7 +171,7 @@ module DB : sig
 
   val open_vars : t -> t Sequence.t
     (** List of "open" De Bruijn variables (with too high an index)
-        @deprecated since NEXT_RELEASE *)
+        @deprecated since 0.5.2, dangerous, use DBEnv functions instead *)
 
   val shift : int -> t -> t
     (** shift the non-captured De Bruijn indexes in the term by n *)
