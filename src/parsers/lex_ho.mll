@@ -87,15 +87,16 @@ rule token = parse
 
 {
   module E = CCError
+  type 'a or_error = [`Ok of 'a | `Error of string ]
 
-  let decl_of_string s : Ast_ho.t E.t =
+  let decl_of_string s : Ast_ho.t or_error =
     try
       E.return (Parse_ho.parse_decl token (Lexing.from_string s))
     with
     | Parse_ho.Error -> E.fail "parse error"
     | Error msg -> E.fail msg
 
-  let decls_of_string s : Ast_ho.t list E.t=
+  let decls_of_string s : Ast_ho.t list or_error =
     try
       E.return (Parse_ho.parse_decls token (Lexing.from_string s))
     with
