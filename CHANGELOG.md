@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6
+
+- do not depend on `CCError.t` arity
+- require `bytes` to keep compatibility with < 4.02 (`String.init` too recent)
+- `Skolem`: at creation, now possible to specify prefix for Tseitin atoms
+- `Util`: removed a String.create deprecation warning
+- `FeatureVector.Make.retrieve_alpha_equiv`
+- opam file (for easy developement version)
+
 ## 0.5.4
 
 - better CNF (with more accurate criterion to choose whether to rename formulas)
