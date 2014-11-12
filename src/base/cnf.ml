@@ -269,11 +269,6 @@ module Estimation = struct
   let ( +/ ) = lift2 (+)
   let ( */ ) = lift2 ( * )
 
-  (* comparison: is e > n? *)
-  let gt e n = match e with
-    | TooBig -> true
-    | Exactly e' -> e' > n
-
   (* comparison, but also assume that if both are too big, the first is bigger *)
   let geq_or_big e1 e2 = match e1, e2 with
     | TooBig, _ -> true

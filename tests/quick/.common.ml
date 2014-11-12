@@ -4,8 +4,7 @@
 #require "containers";;
 #require "num";;
 #require "unix";;
-#require "datalog";;
-#require "str";;
+#require "bytes";;
 #directory "_build/src/";;
 #directory "_build/src/base";;
 #directory "_build/src/extended";;

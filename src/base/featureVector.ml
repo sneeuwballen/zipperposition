@@ -319,9 +319,28 @@ module Make(C : Index.CLAUSE) = struct
     in
     fold_higher acc fv idx.trie
 
+  (** clauses that are potentially alpha-equivalent to the given clause*)
+  let retrieve_alpha_equiv idx lits acc f =
+    (* feature vector of the hc *)
+    let fv = compute_fv idx.features lits in
+    let rec fold_higher acc fv node = match fv, node with
+    | [], TrieLeaf set -> CSet.fold (fun c acc -> f acc c) set acc
+    | i::fv', TrieNode map ->
+      IntMap.fold
+        (fun j subnode acc -> if j = i
+          then fold_higher acc fv' subnode  (* go in the branch *)
+          else acc)
+        map acc
+    | _ -> failwith "number of features in feature vector changed"
+    in
+    fold_higher acc fv idx.trie
+
   let retrieve_subsuming_c idx c acc f =
     retrieve_subsuming idx (C.to_lits c) acc f
 
   let retrieve_subsumed_c idx c acc f =
     retrieve_subsumed idx (C.to_lits c) acc f
+
+  let retrieve_alpha_equiv_c idx c acc f =
+    retrieve_alpha_equiv idx (C.to_lits c) acc f
 end

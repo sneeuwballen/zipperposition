@@ -478,11 +478,8 @@ let str_repeat s n =
   assert (n>=0);
   let len = String.length s in
   assert(len > 0);
-  let buf = String.create (len * n) in
-  for i = 0 to n-1 do
-    String.blit s 0 buf (i * len) len;
-  done;
-  buf
+  let buf = Bytes.init (len*n) (fun i -> s.[i mod len]) in
+  Bytes.unsafe_to_string buf
 
 let str_prefix ~pre s =
   String.length pre <= String.length s &&

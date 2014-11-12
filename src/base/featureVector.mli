@@ -60,11 +60,18 @@ module Make(C : Index.CLAUSE) : sig
 
   include Index.SUBSUMPTION_IDX with module C = C
 
+  val retrieve_alpha_equiv : t -> Index.lits -> 'a -> ('a -> C.t -> 'a) -> 'a
+  (** Retrieve clauses that are potentially alpha-equivalent to the given clause
+      @since NEXT_RELEASE *)
+
+  val retrieve_alpha_equiv_c : t -> C.t -> 'a -> ('a -> C.t -> 'a) -> 'a
+  (** @since NEXT_RELEASE *)
+
   val empty_with : Feature.t list -> t
 
   val default_features : Feature.t list
 
-  val features_of_signature : ?ignore:(Symbol.t -> bool) -> 
+  val features_of_signature : ?ignore:(Symbol.t -> bool) ->
                               Signature.t -> Feature.t list
     (** Build a set of features from the given signature. Symbols
         that satisfy [ignore] are not considered (default ignores

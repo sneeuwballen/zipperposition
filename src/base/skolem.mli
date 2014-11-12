@@ -29,12 +29,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 type ctx
   (** Context needed to create new symbols *)
 
-(* TODO: a parameter to choose the prefix of proxy formulas *)
-
-val create : ?ty_prop:Type.t -> ?prefix:string -> Signature.t ->  ctx
+val create : ?ty_prop:Type.t -> ?prefix:string -> ?prop_prefix:string ->
+             Signature.t ->  ctx
   (** New skolem contex. A prefix can be provided, which will be
       added to all newly created skolem symbols.
       @param ty_prop the type of atomic propositions (default {!Type.TPTP.o}).
+      @param prefix used to name skolem functions/constants
+      @param prop_prefix used to name sub-formulas during CNF
       @param signature initial signature the context holds. *)
 
 val to_signature : ctx -> Signature.t
