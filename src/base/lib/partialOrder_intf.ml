@@ -48,6 +48,11 @@ module type S = sig
     (** Is the ordering total (i.e. each pair of elements it contains
         is ordered)? *)
 
+  val is_total_details : t -> [`total | `unordered of elt * elt | `eq of elt * elt ]
+    (** More details than [is_total], which returns [true] iff this function
+        returns [`total].
+        @since NEXT_RELEASE *)
+
   val enrich : t -> (elt -> elt -> Comparison.t) -> unit
     (** Compare unordered pairs with the given partial order function.
         If the function returns {!Comparison.Eq} on two elements [x] and

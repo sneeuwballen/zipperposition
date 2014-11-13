@@ -138,27 +138,39 @@ module Make(E : ELEMENT) = struct
     BoolMatrix.transfer po.cmp cmp;
     { elements; tbl; size; cmp; total=false; }
 
+  exception Unordered of int * int
+  exception Eq of int * int
+
   (* check whether the ordering is total *)
   let _check_is_total po =
     let n = po.size in
-    try
-      for i = 0 to n-1 do
-        for j = i+1 to n-1 do
-          if BoolMatrix.get po.cmp i j = BoolMatrix.get po.cmp j i
-            then raise Exit
-              (* pair of elements that are equal or incomparable *)
-        done;
+    for i = 0 to n-1 do
+      for j = i+1 to n-1 do
+        let b_i_j = BoolMatrix.get po.cmp i j in
+        let b_j_i = BoolMatrix.get po.cmp j i in
+        if b_i_j && b_j_i then raise (Eq (i,j));
+        if (not b_i_j) && not b_j_i then raise (Unordered (i,j));
+        (* pair of elements that are equal or incomparable *)
       done;
-      true
-    with Exit -> false
+    done
 
   let is_total po =
     po.total ||
     begin
-      let res = _check_is_total po in
-      if res then po.total <- true;
-      res
+      try
+        _check_is_total po;
+        po.total <- true;
+        true
+      with Unordered _ | Eq _ ->
+        false
     end
+
+  let is_total_details po =
+    try
+      _check_is_total po;
+      `total
+    with Unordered (i,j) -> `unordered (po.elements.(i),po.elements.(j))
+    | Eq (i,j) -> `eq (po.elements.(i),po.elements.(j))
 
   (* update the transitive closure where i>j has just been added. *)
   let _propagate po i j =

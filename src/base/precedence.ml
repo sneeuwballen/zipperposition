@@ -239,8 +239,20 @@ module Make(Sym : SYMBOL) = struct
     (* complete the partial order using constraints, starting with the
        strongest ones *)
     List.iter (fun constr -> PO.enrich po constr) constrs;
-    if not (PO.is_total po)
-      then failwith "Precedence: constraints are not total";
+    if not (PO.is_total po) then (
+      match PO.is_total_details po with
+        | `total -> assert false
+        | `eq (s1, s2) ->
+            let msg = Util.sprintf
+              "Precedence: symbols %a and %a made equal"
+              Sym.pp s1 Sym.pp s2 in
+            failwith msg
+        | `unordered (s1, s2) ->
+            let msg = Util.sprintf
+              "Precedence: symbols %a and %a not ordered by constraints"
+              Sym.pp s1 Sym.pp s2 in
+            failwith msg
+    );
     PO.elements po
 
   let create ?(weight=weight_constant) constrs symbols =

@@ -59,7 +59,8 @@ Library "logtk"
                     FormulaShape, Transform, Lambda, Sourced, TypedPrologTerm,
                     lib/Hashcons, lib/Cache,
                     lib/ParseLocation, lib/Multiset,
-                    lib/PartialOrder, lib/LazyList, lib/IArray, lib/LazyGraph
+                    lib/PartialOrder, lib/PartialOrder_intf,
+                    lib/LazyList, lib/IArray, lib/LazyGraph
   CSources:         util_stubs.c, util_stubs.h
   CCOpt:            -Wextra -Wno-unused-parameter
   BuildDepends:     zarith,unix,sequence,containers,bytes
