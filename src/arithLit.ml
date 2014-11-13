@@ -252,8 +252,8 @@ let fmt fmt lit = Format.pp_print_string fmt (to_string lit)
 (** {2 Operators} *)
 
 let map f = function
-  | Binary (op, m1, m2) -> Binary (op, M.map f m1, M.map f m2)
-  | Divides d -> Divides { d with monome=M.map f d.monome; }
+  | Binary (op, m1, m2) -> make op (M.map f m1) (M.map f m2)
+  | Divides d -> mk_divides ~sign:d.sign d.num ~power:d.power (M.map f d.monome)
 
 let fold f acc = function
   | Binary (_, m1, m2) ->
