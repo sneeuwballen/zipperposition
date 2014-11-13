@@ -37,7 +37,7 @@ module type S = sig
   val register : unit -> unit
 end
 
-module Make(E : Env.S)(Solver : BoolSolver.QBF) : S
+module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) : S
   with module Env = E
   and module Ctx = E.Ctx
 

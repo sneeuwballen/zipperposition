@@ -37,6 +37,8 @@ module Subst = Logtk.Substs
 module Lits = Literals
 
 type term = T.t
+type scope = Logtk.Substs.scope
+type subst = Logtk.Substs.t
 
 (** A context is represented as a regular array of literals, containing
 at least one specific variable [x], paired with this variable [x].

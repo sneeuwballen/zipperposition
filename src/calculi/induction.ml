@@ -44,23 +44,67 @@ end
 let _ind_types = ref []
 let _depth = ref 1
 
-module Make(E : Env.S)(Solver : BoolSolver.QBF) = struct
+module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
   module Env = E
   module Ctx = Env.Ctx
 
   module C = Env.C
   module CI = Ctx.Induction
+  module CCtx = ClauseContext
   module BoolLit = Ctx.BoolLit
   module Avatar = Avatar.Make(E)(Solver)  (* will use some inferences *)
 
-  let _level0 = Solver.level0
-  let _level1 = Solver.push Qbf.Forall []
-  let _level2 = Solver.push Qbf.Exists []
+  (** Map that is subsumption-aware *)
+  module FVMap(X : sig type t end) = struct
+    module FV = Logtk.FeatureVector.Make(struct
+      type t = Lits.t * X.t
+      let cmp (l1,_)(l2,_) = Lits.compare l1 l2
+      let to_lits (l,_) = Lits.Seq.abstract l
+    end)
 
-  (* maps each inductive constant to
-      set(clause contexts that are candidate for induction) *)
-  let _candidates : ClauseContext.Set.t T.Tbl.t =
-    T.Tbl.create 15
+    type t = FV.t
+
+    let empty () = FV.empty ()
+
+    let add fv lits x = FV.add fv (lits,x)
+
+    let remove fv lits = FV.remove fv lits
+
+    let find fv lits =
+      FV.retrieve_alpha_equiv fv (Lits.Seq.abstract lits) ()
+        |> Sequence.map2 (fun _ x -> x)
+        |> Sequence.filter_map
+          (fun (lits', x) ->
+            if Lits.are_variant lits lits'
+              then Some x else None
+          )
+        |> Sequence.head
+
+    (* find clauses in [fv] that are subsumes by [lits] *)
+    let find_subsumed_by fv lits =
+      FV.retrieve_subsumed fv (Lits.Seq.abstract lits) ()
+        |> Sequence.map2 (fun _ x -> x)
+        |> Sequence.filter_map
+          (fun (lits', x) ->
+            if Sup.subsumes lits lits'
+              then Some x else None
+          )
+
+    (* find clauses in [fv] that subsume [lits] *)
+    let find_subsuming fv lits =
+      FV.retrieve_subsuming fv (Lits.Seq.abstract lits) ()
+        |> Sequence.map2 (fun _ x -> x)
+        |> Sequence.filter_map
+          (fun (lits', x) ->
+            if Sup.subsumes lits' lits
+              then Some x else None
+          )
+  end
+
+  let level0 = Solver.level0
+  let level1 = Solver.push Qbf.Forall []
+
+  (** {6 Proof Relation} *)
 
   (* one way to prove a clause: parent clauses and the union of their trails *)
   type proof = CompactClause.t list
@@ -69,33 +113,22 @@ module Make(E : Env.S)(Solver : BoolSolver.QBF) = struct
   type proof_set = {
     mutable proofs : proof list;
   }
-  let _dummy_set = {proofs=[]}
 
-  module FV = Logtk.FeatureVector.Make(struct
-    type t = Lits.t * proof_set
-    let cmp (l1,_)(l2,_) = Lits.compare l1 l2
-    let to_lits (l,_) = Lits.Seq.abstract l
+  module FV_proofs = FVMap(struct
+    type t = proof_set
   end)
 
   (* maps clauses to a list of their known proofs *)
-  let _proofs = ref (FV.empty ())
+  let proofs_ = ref (FV_proofs.empty ())
 
   (* find all known proofs of the given lits *)
-  let _find_proofs lits =
-    FV.retrieve_alpha_equiv_c !_proofs (lits,_dummy_set) ()
-      |> Sequence.map2 (fun _ x -> x)
-      |> Sequence.filter_map
-        (fun (lits', proofs) ->
-          if Lits.are_variant lits lits'
-            then Some proofs else None
-        )
-      |> Sequence.head
+  let find_proofs_ lits = FV_proofs.find !proofs_ lits
 
   exception NonClausalProof
   (* raised when a proof doesn't use only clauses (also formulas...) *)
 
   (* add a proof to the set of proofs for [lits] *)
-  let _add_proof lits p =
+  let add_proof_ lits p =
     try
       let parents = Array.to_list p.Proof.parents in
       let parents = List.map
@@ -105,10 +138,10 @@ module Make(E : Env.S)(Solver : BoolSolver.QBF) = struct
         ) parents
       in
       (* all proofs of [lits] *)
-      let set = match _find_proofs lits with
+      let set = match find_proofs_ lits with
         | None ->
             let set = {proofs=[]} in
-            _proofs := FV.add !_proofs (lits,set);
+            proofs_ := FV_proofs.add !proofs_ lits set;
             set
         | Some set -> set
       in
@@ -119,13 +152,15 @@ module Make(E : Env.S)(Solver : BoolSolver.QBF) = struct
   let () =
     Signal.on C.on_proof
       (fun (lits, p) ->
-        _add_proof lits p;
+        add_proof_ lits p;
         Signal.ContinueListening
       );
     ()
 
+  (** {6 Split on Inductive Constants} *)
+
   (* true if [t = c] where [c] is some inductive constructor *)
-  let _is_a_constructor t = match T.Classic.view t with
+  let is_a_constructor_ t = match T.Classic.view t with
     | T.Classic.App (s, _, _) ->
         Sequence.exists (Sym.eq s) CI.Seq.constructors
     | _ -> false
@@ -142,13 +177,13 @@ module Make(E : Env.S)(Solver : BoolSolver.QBF) = struct
             && T.is_const t  (* TODO: allow nil(alpha) *)
             && not (CI.is_blocked t)
             && CI.is_inductive_type (T.ty t)
-            && not (_is_a_constructor t)   (* 0 and nil: not inductive const *)
+            && not (is_a_constructor_ t)   (* 0 and nil: not inductive const *)
           )
         |> Sequence.iter (fun t -> CI.declare t)
       ) seq
 
   (* boolean xor *)
-  let _mk_xor l =
+  let mk_xor_ l =
     let at_least_one = l in
     let at_most_one =
       CCList.diagonal l
@@ -185,7 +220,7 @@ module Make(E : Env.S)(Solver : BoolSolver.QBF) = struct
               in
               let clauses, bool_lits = List.split clauses_and_lits in
               (* add a boolean constraint: Xor of boolean lits *)
-              Solver.add_clauses (_mk_xor bool_lits);
+              Solver.add_clauses (mk_xor_ bool_lits);
               (* return clauses *)
               Util.debug 4 "split inference for %a: %a"
                 T.pp t (CCList.pp C.pp) clauses;
@@ -193,8 +228,157 @@ module Make(E : Env.S)(Solver : BoolSolver.QBF) = struct
         );
     !res
 
+  (** {6 Clause Contexts} *)
+
+  (* a candidate clause context *)
+  type candidate_context = {
+    mutable cand_initialized : bool; (* is ctx[I] proved yet? *)
+    cand_ctx : CCtx.t; (* the ctx itself *)
+    cand_cst : T.t;  (* the inductive constant *)
+    mutable cand_sub_cst : T.t list;  (* inductive sub-cases on which ctx is provable *)
+  }
+
+  module FV_cand = FVMap(struct
+    type t = T.t * candidate_context
+  end)
+
+  type candidate_context_set = FV_cand.t ref
+
+  (* maps each inductive constant to
+      set(clause contexts that are candidate for induction) *)
+  let candidates_ : candidate_context_set T.Tbl.t = T.Tbl.create 255
+
+  (* set of contexts we watch for *)
+  let watched_ : FV_cand.t ref = ref (FV_cand.empty())
+
+  (* candidates for a term *)
+  let find_candidates_ t =
+    try T.Tbl.find candidates_ t
+    with Not_found ->
+      let set = ref (FV_cand.empty ()) in
+      T.Tbl.add candidates_ t set;
+      set
+
+  (* set of subterms of [lits] that could be extruded to form a context.
+    TODO: if [t] is a sub_cst and its constant also occurs in [lits],
+      should we extrude context?
+        e.g.  in [n = s(n')] no need to extract n' nor n *)
+  let subterms_candidates_for_context_ lits =
+    Lits.Seq.terms lits
+      |> Sequence.flat_map T.Seq.subterms
+      |> Sequence.filter
+        (fun t -> CI.is_inductive t || CI.is_sub_constant t)
+      |> T.Seq.add_set T.Set.empty
+
+  (* ctx [c] is now initialized. Return [true] if it wasn't initialized before *)
+  let cand_ctx_initialized_ c =
+    assert (not c.cand_initialized);
+    Util.debug 2 "ind: clause context %a[%a] now initialized"
+      CCtx.pp c.cand_ctx T.pp c.cand_cst;
+    let is_new = c.cand_initialized in
+    if is_new then c.cand_initialized <- true;
+    is_new
+
+  let cand_ctx_add_sub_cst_ c t =
+    (* remember that ctx[t] is proved, can be useful later *)
+    if not (CCList.Set.mem ~eq:T.eq t c.cand_sub_cst)
+      then (
+        Util.debug 2 "ind: clause context {%a} now proved for subcase %a"
+          CCtx.pp c.cand_ctx T.pp t;
+        c.cand_sub_cst <- t :: c.cand_sub_cst;
+      )
+
+  (* see whether (ctx,t) is of interest. *)
+  let on_context_ c ctx t =
+    let set = find_candidates_ t in
+    (* if [t] is an inductive constant, ctx is enabled! *)
+    if CI.is_inductive t
+      then (
+        match FV_cand.find !set (C.lits c) with
+          | None ->
+              let ctx = {
+                cand_initialized=true;
+                cand_ctx=ctx;
+                cand_cst=t;
+                cand_sub_cst=[]
+              } in
+              Util.debug 2 "ind: new (initialized) context for %a: %a"
+                T.pp t CCtx.pp ctx.cand_ctx;
+              set := FV_cand.add !set (C.lits c) (t,ctx);
+              None
+          | Some (t',ctx) ->
+              assert (T.eq t t');
+              let is_new = cand_ctx_initialized_ ctx in (* we just proved ctx[t] *)
+              if is_new then Some c else None
+      ) else
+        (* [t] is a subterm of the case [t'] of an inductive [cst] *)
+        let cst, t' = CI.inductive_cst_of_sub_cst t in
+        match FV_cand.find !set (C.lits c) with
+          | None ->
+              let ctx = {
+                cand_initialized=false;
+                cand_ctx=ctx;
+                cand_cst=t;
+                cand_sub_cst=[]
+              } in
+              (* need to watch ctx[cst] until it is proved *)
+              let lits' = CCtx.apply ctx.cand_ctx cst in
+              Util.debug 2 "ind: now watching clause %a" Lits.pp lits';
+              watched_ := FV_cand.add !watched_ lits' (cst,ctx);
+              set := FV_cand.add !set (C.lits c) (t,ctx);
+              None
+          | Some (t_bis,c) ->
+              assert (T.eq t t_bis);
+              cand_ctx_add_sub_cst_ c t;
+              None
+
+  (* search whether given clause [c] contains some "interesting" occurrences
+     of an inductive  term. This is pretty much the main heuristic *)
+  let scan_given_for_context c =
+    let terms = subterms_candidates_for_context_ (C.lits c) in
+    T.Set.fold
+      (fun t acc ->
+        let lits = C.lits c in
+        let ctx = CCtx.extract_exn lits t in
+        match on_context_ c ctx t with
+          | None -> acc
+          | Some c -> c :: acc
+      ) terms []
+
+  (* search whether [c] subsumes some watched clause
+     if [C[i]] subsumed, where [i] is an inductive constant:
+      - "infer" the clause [C[i]]
+      - monitor for [C[i']] for every [i'] sub-case of [i]
+        - if such [C[i']] is detected, add its proof relation to QBF. Will
+          be checked by avatar.check_satisfiability. Watch for proofs
+          of [C[i']], they could evolve!! *)
+  let scan_given_for_proof c =
+    FV_cand.find_subsumed_by !watched_ (C.lits c)
+      |> Sequence.fold
+        (fun acc (t, cand_ctx) ->
+           if CI.is_inductive t
+           then
+             let is_new = cand_ctx_initialized_ cand_ctx in
+             if is_new then (
+               (* ctx[t] is now proved, deduce ctx[t] and add it to set of clauses *)
+               let lits = CCtx.apply cand_ctx.cand_ctx t in
+               let proof cc = Proof.mk_c_inference ~rule:"subsumes" cc [C.proof c] in
+               let clause = C.create_a ~parents:[c] ~trail:(C.get_trail c) lits proof in
+               (* disable subsumption for [clause] *)
+               C.set_flag C.flag_persistent clause true;
+               clause :: acc
+             ) else acc
+          else (
+             assert (CI.is_sub_constant t);
+             cand_ctx_add_sub_cst_ cand_ctx t;
+             acc
+           )
+        ) []
+
+  (** {6 Registration} *)
+
   (* declare a list of inductive types *)
-  let _declare_types l =
+  let declare_types_ l =
     List.iter
       (fun (ty,cstors) ->
         (* TODO: support polymorphic types? *)
@@ -213,27 +397,27 @@ module Make(E : Env.S)(Solver : BoolSolver.QBF) = struct
         in
         (* declare type. *)
         ignore (CI.declare_ty pattern constructors);
-        Util.debug 1 "... declare inductive type %a" Ty.pp pattern;
+        Util.debug 1 "ind: declare inductive type %a" Ty.pp pattern;
         ()
       ) l
 
-  (* TODO: use inference rules from Avatar, but requiring a QBF solver.
-     TODO: Do not use its check, use the QBF check instead,
-        probably less often, but with provability relation.
-
-        XXX: when shall we encode the provability relation?
-        XXX: manage set of clause contexts to subsume/be subsumed
-        XXX: manager S_candidates (contexts for which C[n]<-trail provable) *)
+  (* TODO: ensure inductive_cst > sub_cst > ind constructors
+    in the term ordering *)
 
   let register() =
     Util.debug 1 "register induction calculus";
-    _declare_types !_ind_types;
+    declare_types_ !_ind_types;
     Solver.set_printer BoolLit.print;
     (* avatar rules *)
     Env.add_multi_simpl_rule Avatar.split;
     Env.add_unary_inf "avatar.check_empty" Avatar.check_empty;
     Env.add_generate "avatar.check_sat" Avatar.check_satisfiability;
-    (* induction rules TODO *)
+    (* induction rules *)
+    Env.add_unary_inf "induction.scan_extrude" scan_given_for_context;
+    Env.add_unary_inf "induction.scan_proof" scan_given_for_proof;
+    (* XXX: ugly, but we must do case_split before scan_extrude/proof.
+      Currently we depend on Env.generate_unary applying inferences in
+      the reverse order of their addition *)
     Env.add_unary_inf "induction.case_split" case_split_ind;
     ()
 end
@@ -241,24 +425,26 @@ end
 let extension =
   let action env =
     let module E = (val env : Env.S) in
+    let sup = Mixtbl.find ~inj:Superposition.key E.mixtbl "superposition" in
+    let module Sup = (val sup : Superposition.S) in
     let module Solver = (val BoolSolver.get_qbf() : BoolSolver.QBF) in
     Util.debug 2 "created QBF solver \"%s\"" Solver.name;
-    let module A = Make(E)(Solver) in
+    let module A = Make(E)(Sup)(Solver) in
     A.register()
   in
   Extensions.({default with name="induction"; actions=[Do action]})
 
-let _enabled = ref false
-let _enable () =
-  if not !_enabled then (
-    _enabled := true;
+let enabled_ = ref false
+let enable_ () =
+  if not !enabled_ then (
+    enabled_ := true;
     Extensions.register extension
   )
 
 (* [str] describes an inductive type, under the form "foo:c1|c2|c3" where
     "foo" is the type name and "c1", "c2", "c3" are the type constructors. *)
-let _add_ind_type str =
-  _enable();
+let add_ind_type_ str =
+  enable_();
   let _fail() =
     failwith "expected \"type:c1|c2|c3\" where c1,... are constructors"
   in
@@ -274,6 +460,6 @@ let _add_ind_type str =
 
 let () =
   Params.add_opts
-    [ "-induction", Arg.String _add_ind_type, "enable Induction on the given type"
+    [ "-induction", Arg.String add_ind_type_, "enable Induction on the given type"
     ; "-induction-depth", Arg.Set_int _depth, "set default induction depth"
     ]

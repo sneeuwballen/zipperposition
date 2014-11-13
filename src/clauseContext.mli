@@ -33,11 +33,13 @@ A clause with a "hole" in it. Filling the whole with a term [t] is called
 The point is to relate different applications of the same context. *)
 
 type term = Logtk.FOTerm.t
+type scope = Logtk.Substs.scope
+type subst = Logtk.Substs.t
 
 (** A context is represented as a regular array of literals, containing
 at least one specific variable [x], paired with this variable [x].
 Applying the context is a mere substitution *)
-type t = {
+type t = private {
   lits : Literals.t;
   var : term;
 }
@@ -66,6 +68,13 @@ val apply : t -> term -> Literals.t
 val apply_same_scope : t -> term -> Literals.t
 (** Same as {!apply}, but now variables from the context and variables
     from the term live in the same scope *)
+
+(*
+val matching : t -> Literals.t -> term option
+(** Match the context against a proper clause. On success, [matching ctx c]
+    returns a term [Some t] such that [extract c t = ctx],
+    and [apply ctx t = c] *)
+FIXME: is this even doable?*)
 
 val pp : Buffer.t -> t -> unit
 val print : Format.formatter -> t -> unit

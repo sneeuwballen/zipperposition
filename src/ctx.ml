@@ -106,7 +106,7 @@ end) = struct
     ()
 
   let update_prec symbs =
-    Util.debug 2 "update precedence...";
+    Util.debug 3 "update precedence...";
     _ord := Ordering.update_precedence !_ord
       (fun prec -> Precedence.add_seq prec symbs)
 
@@ -355,7 +355,7 @@ end) = struct
     type cover_set = {
       cases : T.t list; (* covering set itself *)
       sub_constants : T.Set.t;  (* skolem constants for recursive cases *)
-    }
+    } (* TODO: recursive cases; base cases *)
 
     type cst_data = {
       cst : cst;
@@ -476,10 +476,6 @@ end) = struct
       let cases, sub_constants = List.split cases_and_subs in
       let sub_constants = List.fold_left T.Set.union T.Set.empty sub_constants in
       {cases; sub_constants= sub_constants; }
-
-      (* TODO
-          T.Tbl.replace _tbl_sub_cst t (cst, T.);
-          *)
 
     let inductive_cst_of_sub_cst t = T.Tbl.find _tbl_sub_cst t
 
