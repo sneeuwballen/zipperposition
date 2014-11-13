@@ -125,10 +125,25 @@ module type S = sig
         to the tail. Only the very first constraint is assured to be totally
         satisfied if constraints do not agree with one another. *)
 
+  val create_sort : ?weight:weight_fun -> (int * Constr.t) list -> symbol list -> t
+    (** Sort the list of constraints by {b increasing} priority, then
+        call {!create} to build a precedence. The constraint with the smallest
+        priority will be considered first.
+        @since NEXT_RELEASE *)
+
   val default : symbol list -> t
     (** default precedence. Default status for symbols is {!Lexicographic}. *)
 
   val default_seq : symbol Sequence.t -> t
     (** default precedence on the given sequence of symbols *)
+
+  val constr_list : t -> Constr.t list
+    (** Obtain the list of constraints
+        @since NEXT_RELEASE *)
+
+  val with_constr_list : t -> Constr.t list -> t
+    (** Update the precedence by replacing its list of constraints.
+        Caution, this can be dangerous (change the precedence totally, for instance)
+        @since NEXT_RELEASE *)
 end
 

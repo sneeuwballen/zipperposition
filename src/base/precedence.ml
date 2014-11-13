@@ -252,6 +252,11 @@ module Make(Sym : SYMBOL) = struct
     let status = Tbl.create 5 in
     { snapshot; index; weight; status; constr=constrs; }
 
+  let create_sort ?weight l symbols =
+    let l = List.sort (fun (p1,_)(p2,_) -> CCInt.compare p1 p2) l in
+    let l = List.map snd l in
+    create ?weight l symbols
+
   (* how to add a list of symbols to a precedence *)
   let add_list p l =
     if List.for_all (fun s -> Tbl.mem p.index s) l
@@ -287,6 +292,11 @@ module Make(Sym : SYMBOL) = struct
 
   let default_seq seq =
     default (Sequence.to_rev_list seq)
+
+  let constr_list p = p.constr
+
+  let with_constr_list p constrs =
+    create ~weight:p.weight constrs (snapshot p)
 end
 
 module Default = Make(struct
