@@ -25,113 +25,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Precedence (total ordering) on symbols} *)
 
-type symbol_status =
+type symbol_status = Precedence_intf.symbol_status =
   | Multiset
   | Lexicographic
 
 (** {2 Signature} *)
 
-module type S = sig
-  type symbol
-
-  type t
-    (** Total Ordering on a finite number of symbols, plus a few more
-        data (weight for KBO, status for RPC) *)
-
-  type precedence = t
-
-  val eq : t -> t -> bool
-    (** Check whether the two precedences are equal (same snapshot) *)
-
-  val snapshot : t -> symbol list
-    (** Current list of symbols, in decreasing order *)
-
-  val compare : t -> symbol -> symbol -> int
-    (** Compare two symbols using the precedence *)
-
-  val mem : t -> symbol -> bool
-    (** Is the symbol part of the precedence? *)
-
-  val status : t -> symbol -> symbol_status
-    (** Status of the symbol *)
-
-  val weight : t -> symbol -> int
-    (** Weight of a symbol (for KBO). Strictly positive int. *)
-
-  val add_list : t -> symbol list -> t
-    (** Update the precedence with the given symbols *)
-
-  val add_seq : t -> symbol Sequence.t -> t
-
-  val declare_status : t -> symbol -> symbol_status -> t
-    (** Change the status of the given precedence *)
-
-  module Seq : sig
-    val symbols : t -> symbol Sequence.t
-  end
-
-  val pp_snapshot : Buffer.t -> symbol list -> unit
-  val pp_debug : Buffer.t -> t -> unit
-  val pp : Buffer.t -> t -> unit
-  val fmt : Format.formatter -> t -> unit
-  val to_string : t -> string
-
-  (** {2 Builtin constraints} *)
-
-  module Constr : sig
-    type t = symbol -> symbol -> Comparison.t
-      (** A partial order on symbols, used to make the precedence more
-          precise *)
-
-    val cluster : symbol list list -> t
-      (** ordering constraint by clustering symbols by decreasing order.
-          all symbols in the first clusters are bigger than those in the second, etc. *)
-
-    val of_list : symbol list -> t
-      (** symbols in the given list are in decreasing order *)
-
-    val of_precedence : precedence -> t
-      (** Copy of another precedence on the common symbols *)
-
-    val arity : (symbol -> int) -> t
-      (** decreasing arity constraint (big arity => high in precedence) *)
-
-    val invfreq : symbol Sequence.t -> t
-      (** symbols with high frequency are smaller *)
-
-    val max : symbol list -> t
-      (** maximal symbols, in decreasing order *)
-
-    val min : symbol list -> t
-      (** minimal symbols, in decreasing order *)
-
-    val alpha : t
-      (** alphabetic ordering on symbols *)
-  end
-
-  type weight_fun = symbol -> int
-
-  val weight_modarity : arity:(symbol -> int) -> weight_fun
-  val weight_constant : weight_fun
-
-  val set_weight : t -> weight_fun -> t
-  (** Change the weight function of the precedence
-      @since 0.5.3 *)
-
-  (** {2 Creation of a precedence from constraints} *)
-
-  val create : ?weight:weight_fun -> Constr.t list -> symbol list -> t
-    (** make a precedence from the given constraints. Constraints near
-        the head of the list are {b more important} than constraints close
-        to the tail. Only the very first constraint is assured to be totally
-        satisfied if constraints do not agree with one another. *)
-
-  val default : symbol list -> t
-    (** default precedence. Default status for symbols is {!Lexicographic}. *)
-
-  val default_seq : symbol Sequence.t -> t
-    (** default precedence on the given sequence of symbols *)
-end
+module type S = Precedence_intf.S
 
 (** {2 Functor} *)
 
