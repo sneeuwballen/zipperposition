@@ -42,16 +42,20 @@ module type S = Ctx_intf.S
 let prof_add_signature = Util.mk_profiler "ctx.add_signature"
 let prof_declare_sym= Util.mk_profiler "ctx.declare"
 
-module Make(X : sig
+module type PARAMETERS = sig
   val signature : Signature.t
   val ord : Ordering.t
   val select : Selection.t
-end) = struct
+  val constr_list : (int * Precedence.Constr.t) list
+end
+
+module Make(X : PARAMETERS) = struct
   let _ord = ref X.ord
   let _select = ref X.select
   let _signature = ref X.signature
   let _complete = ref true
   let _ad_hoc = ref (Symbol.Set.singleton Symbol.Base.eq)
+  let _constrs = ref X.constr_list
 
   let skolem = Skolem.create ~prefix:"zsk" Signature.empty
   let renaming = S.Renaming.create ()
@@ -113,6 +117,18 @@ end) = struct
   let ad_hoc_symbols () = !_ad_hoc
   let add_ad_hoc_symbols seq =
     _ad_hoc := Sequence.fold (fun set s -> Symbol.Set.add s set) !_ad_hoc seq
+
+  let add_constr p c =
+    Util.debug 2 "update precedence using a *new* constraint!";
+    _constrs := (p,c) :: !_constrs;
+    _ord := Ordering.update_precedence !_ord
+      (fun p ->
+        let constr = !_constrs
+          |> List.sort (fun (p1,_)(p2,_) -> CCInt.compare p1 p2)
+          |> List.map snd
+        in
+        Precedence.with_constr_list p constr
+      )
 
   let renaming_clear () =
     S.Renaming.clear renaming;
@@ -353,9 +369,11 @@ end) = struct
     module IMap = Sequence.Map.Make(CCInt)
 
     type cover_set = {
-      cases : T.t list; (* covering set itself *)
-      sub_constants : T.Set.t;  (* skolem constants for recursive cases *)
-    } (* TODO: recursive cases; base cases *)
+      cases : T.t list;
+      rec_cases : T.t list;
+      base_cases : T.t list;
+      sub_constants : T.Set.t;
+    }
 
     type cst_data = {
       cst : cst;
@@ -371,11 +389,15 @@ end) = struct
 
     (* sub_constants -> cst * case in which the sub_constant occurs *)
     let _tbl_sub_cst : (cst * T.t) T.Tbl.t = T.Tbl.create 16
+    let _tbl_sub_cst_sym : unit Symbol.Tbl.t = Symbol.Tbl.create 16
 
     let _blocked = ref []
 
     let is_sub_constant t =
       T.Tbl.mem _tbl_sub_cst t
+
+    let is_sub_constant_symbol s =
+      Symbol.Tbl.mem _tbl_sub_cst_sym s
 
     let is_blocked t =
       is_sub_constant t
@@ -412,6 +434,7 @@ end) = struct
           let name = Util.sprintf "#%a" Symbol.pp (_extract_hd ty) in
           let c = Skolem.fresh_sym_with ~ctx:skolem ~ty name in
           _declare_symb c ty;
+          Symbol.Tbl.replace _tbl_sub_cst_sym c ();
           let t = T.const ~ty c in
           t, T.Set.singleton t
         ]
@@ -462,20 +485,31 @@ end) = struct
               tail_builders >>= fun mk_tail ->
               [FunM.(mk_t >>= fun (t,set) ->
                      mk_tail >>= fun (tail,set') ->
-                     return (t::tail, T.Set.union set set'))] 
-            ) 
+                     return (t::tail, T.Set.union set set'))]
+            )
       in
       assert (depth>0);
-      let cases_and_subs = List.map (fun gen -> gen()) (make depth) in
-      List.iter 
-        (fun (t, set) ->
+      let cases_and_subs = List.map
+        (fun gen ->
+          let t, set = gen() in
+          if T.Set.is_empty set then (t, `Base), set else (t, `Rec), set
+        ) (make depth)
+      in
+      List.iter
+        (fun ((t, _), set) ->
           T.Set.iter
             (fun sub_cst -> T.Tbl.replace _tbl_sub_cst sub_cst (cst, t))
             set;
         ) cases_and_subs;
       let cases, sub_constants = List.split cases_and_subs in
+      let cases, rec_cases, base_cases = List.fold_left
+        (fun (c,r,b) (t,is_base) -> match is_base with
+          | `Base -> t::c, r, t::b
+          | `Rec -> t::c, t::r, b
+        ) ([],[],[]) cases
+      in
       let sub_constants = List.fold_left T.Set.union T.Set.empty sub_constants in
-      {cases; sub_constants= sub_constants; }
+      {cases; rec_cases; base_cases; sub_constants; }
 
     let inductive_cst_of_sub_cst t = T.Tbl.find _tbl_sub_cst t
 

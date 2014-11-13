@@ -90,6 +90,11 @@ module type S = sig
   (** Declare that some symbols are "ad hoc", ie they are not really
       polymorphic and should not be considered as such *)
 
+  val add_constr : int -> Precedence.Constr.t -> unit
+  (** XXX caution, dangerous: add a new constraint to the precedence.
+      If you don't know what you are doing, it might change the precedence
+      into an incompatible one. *)
+
   (** {2 Literals} *)
 
   module Lit : sig
@@ -227,12 +232,17 @@ module type S = sig
     (** Check whether the given constant is ready for induction *)
 
     type cover_set = {
-      cases : FOTerm.t list;
+      cases : FOTerm.t list; (* all cases *)
+      rec_cases : FOTerm.t list; (* recursive cases *)
+      base_cases : FOTerm.t list;  (* non-recursive (base) cases *)
       sub_constants : FOTerm.Set.t;  (* leaves of recursive cases *)
     }
 
     val is_sub_constant : FOTerm.t -> bool
     (** Is the term a constant that was created within a cover set? *)
+
+    val is_sub_constant_symbol : Symbol.t -> bool
+    (** Is the symbol a sub-constant of an inductive term? *)
 
     val inductive_cst_of_sub_cst : FOTerm.t -> cst * FOTerm.t
     (** [inductive_cst_of_sub_cst t] finds a pair [c, t'] such

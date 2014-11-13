@@ -34,9 +34,12 @@ type scope = Substs.scope
 (** {2 Context for a Proof} *)
 module type S = Ctx_intf.S
 
-(** {2 Create a new context} *)
-module Make(X : sig
+module type PARAMETERS = sig
   val signature : Signature.t
   val ord : Ordering.t
   val select : Selection.t
-end) : S
+  val constr_list : (int * Precedence.Constr.t) list
+end
+
+(** {2 Create a new context} *)
+module Make(X : PARAMETERS) : S

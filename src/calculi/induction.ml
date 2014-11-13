@@ -41,8 +41,15 @@ module type S = sig
   val register : unit -> unit
 end
 
-let _ind_types = ref []
-let _depth = ref 1
+let ind_types_ = ref []
+let cover_set_depth_ = ref 1
+
+(* is [s] a constructor symbol for some inductive type? *)
+let is_constructor_ s = match s with
+  | Sym.Cst info ->
+      let name = info.Sym.cs_name in
+      List.exists (fun (_, cstors) -> List.mem name cstors) !ind_types_
+  | _ -> false
 
 module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
   module Env = E
@@ -90,7 +97,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
               then Some x else None
           )
 
-    (* find clauses in [fv] that subsume [lits] *)
+    (* find clauses in [fv] that subsume [lits]
     let find_subsuming fv lits =
       FV.retrieve_subsuming fv (Lits.Seq.abstract lits) ()
         |> Sequence.map2 (fun _ x -> x)
@@ -99,6 +106,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
             if Sup.subsumes lits' lits
               then Some x else None
           )
+    *)
   end
 
   let level0 = Solver.level0
@@ -202,7 +210,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       |> Sequence.filter CI.is_inductive
       |> Sequence.iter
         (fun t ->
-          match CI.cover_set ~depth:!_depth t with
+          match CI.cover_set ~depth:!cover_set_depth_ t with
           | _, `Old -> ()
           | set, `New ->
               (* Make a case split on the cover set (one clause per literal) *)
@@ -401,13 +409,25 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
         ()
       ) l
 
-  (* TODO: ensure inductive_cst > sub_cst > ind constructors
-    in the term ordering *)
+  (* ensure inductive_cst > sub_cst in the term ordering *)
+  let constr_sub_cst_ s1 s2 =
+    let module C = Logtk.Comparison in
+    (*
+    let s1_is_sub_cst = CI.is_sub_constant_symbol s1 in
+    let s2_is_sub_cst = CI.is_sub_constant_symbol s2 in
+    match s1_is_sub_cst, s2_is_sub_cst with
+    | false, false -> C.Incomparable
+    | true, false -> 
+    *)
+    C.Incomparable
+    (* TODO: if s1 is an inductive cst, and s2 a subcase of this very inductive cst,
+      then s1>s2 *)
 
   let register() =
     Util.debug 1 "register induction calculus";
-    declare_types_ !_ind_types;
+    declare_types_ !ind_types_;
     Solver.set_printer BoolLit.print;
+    Ctx.add_constr 20 constr_sub_cst_;
     (* avatar rules *)
     Env.add_multi_simpl_rule Avatar.split;
     Env.add_unary_inf "avatar.check_empty" Avatar.check_empty;
@@ -431,8 +451,23 @@ let extension =
     Util.debug 2 "created QBF solver \"%s\"" Solver.name;
     let module A = Make(E)(Sup)(Solver) in
     A.register()
+  (* add an ordering constraint: ensure that constructors are smaller
+    than other terms *)
+  and add_constr penv =
+    let module C = Logtk.Comparison in
+    let constr_cstor s1 s2 = match is_constructor_ s1, is_constructor_ s2 with
+      | true, true
+      | false, false -> if Sym.eq s1 s2 then C.Eq else C.Incomparable
+      | true, false -> C.Lt
+      | false, true -> C.Gt
+    in
+    PEnv.add_constr ~penv 15 constr_cstor
   in
-  Extensions.({default with name="induction"; actions=[Do action]})
+  Extensions.({default with
+    name="induction";
+    actions=[Do action];
+    penv_actions=[Penv_do add_constr];
+  })
 
 let enabled_ = ref false
 let enable_ () =
@@ -455,11 +490,11 @@ let add_ind_type_ str =
       (* remember to declare this type as inductive *)
       Util.debug 2 "user declares inductive type %s = %a"
         ty (CCList.pp CCString.pp) cstors;
-      _ind_types := (ty, cstors) :: !_ind_types
+      ind_types_ := (ty, cstors) :: !ind_types_
   | _ -> _fail()
 
 let () =
   Params.add_opts
     [ "-induction", Arg.String add_ind_type_, "enable Induction on the given type"
-    ; "-induction-depth", Arg.Set_int _depth, "set default induction depth"
+    ; "-induction-depth", Arg.Set_int cover_set_depth_, "set default induction depth"
     ]
