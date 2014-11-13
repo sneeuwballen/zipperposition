@@ -1501,11 +1501,9 @@ let register ~sup =
     Mixtbl.set ~inj:key Sup.Env.mixtbl "superposition" sup
 
 let setup_penv penv =
-  let constrs =
-    [ Precedence.Constr.min [Symbol.Base.false_ ; Symbol.Base.true_ ]]
-  and rule_remove_trivial = PEnv.remove_trivial
-  in
-  PEnv.add_constrs ~penv constrs;
+  let constr = Precedence.Constr.min [Symbol.Base.false_ ; Symbol.Base.true_ ] in
+  let rule_remove_trivial = PEnv.remove_trivial in
+  PEnv.add_constr ~penv 0 constr;
   PEnv.add_operation ~penv ~prio:1 rule_remove_trivial;
   ()
 

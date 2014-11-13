@@ -41,16 +41,20 @@ module type S = Ctx_intf.S
 let prof_add_signature = Util.mk_profiler "ctx.add_signature"
 let prof_declare_sym= Util.mk_profiler "ctx.declare"
 
-module Make(X : sig
+module type PARAMETERS = sig
   val signature : Signature.t
   val ord : Ordering.t
   val select : Selection.t
-end) : S = struct
+  val constr_list : (int * Precedence.Constr.t) list
+end
+
+module Make(X : PARAMETERS) = struct
   let _ord = ref X.ord
   let _select = ref X.select
   let _signature = ref X.signature
   let _complete = ref true
   let _ad_hoc = ref (Symbol.Set.singleton Symbol.Base.eq)
+  let _constrs = ref X.constr_list
 
   let skolem = Skolem.create ~prefix:"zsk" Signature.empty
   let renaming = S.Renaming.create ()
@@ -104,6 +108,18 @@ end) : S = struct
   let ad_hoc_symbols () = !_ad_hoc
   let add_ad_hoc_symbols seq =
     _ad_hoc := Sequence.fold (fun set s -> Symbol.Set.add s set) !_ad_hoc seq
+
+  let add_constr p c =
+    Util.debug 2 "update precedence using a *new* constraint!";
+    _constrs := (p,c) :: !_constrs;
+    _ord := Ordering.update_precedence !_ord
+      (fun p ->
+        let constr = !_constrs
+          |> List.sort (fun (p1,_)(p2,_) -> CCInt.compare p1 p2)
+          |> List.map snd
+        in
+        Precedence.with_constr_list p constr
+      )
 
   let renaming_clear () =
     S.Renaming.clear renaming;

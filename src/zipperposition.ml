@@ -73,7 +73,7 @@ let setup_penv ~penv () =
   if (PEnv.get_params ~penv).param_expand_def then
     PEnv.add_operation ~penv ~prio:1 PEnv.expand_def;
   (* use "invfreq" *)
-  PEnv.add_constr_rule ~penv
+  PEnv.add_constr_rule ~penv 50
     (fun set ->
       let symbols = PF.Set.to_seq set
         |> Sequence.map PF.form
@@ -81,8 +81,8 @@ let setup_penv ~penv () =
       in
       Precedence.Constr.invfreq symbols
     );
-  (* be sure to get a total order on symbols *)
-  PEnv.add_constr ~penv Precedence.Constr.alpha;
+  (* be sure to get a total order on symbols, as last resort *)
+  PEnv.add_constr ~penv 99 Precedence.Constr.alpha;
   ()
 
 let setup_env ~env =
@@ -114,13 +114,6 @@ let load_plugins ~params =
         ()
     ) params.param_plugins;
   Extensions.extensions ()
-
-(** What we get after preprocessing *)
-module type POST_PREPROCESS = sig
-  val signature : Signature.t
-  val ord : Ordering.t
-  val select : Selection.t
-end
 
 module MakeNew(X : sig
   module Env : Env.S
@@ -341,7 +334,7 @@ let preprocess ~signature ~params formulas =
   Util.debug 3 "formulas pre-processed into:\n  %a"
     (Util.pp_seq ~sep:"\n  " PF.pp) (PF.Set.to_seq formulas);
   (* now build a context *)
-  let precedence = PEnv.mk_precedence ~penv formulas in
+  let precedence, constr_list = PEnv.mk_precedence ~penv formulas in
   Util.debug 1 "precedence: %a" Precedence.pp precedence;
   Util.debug 1 "weights: %a"
     (Sequence.pp_buf (_pp_weight precedence))
@@ -354,8 +347,9 @@ let preprocess ~signature ~params formulas =
     let signature = signature
     let select = select
     let ord = ord
+    let constr_list = constr_list
   end in
-  (module Result : POST_PREPROCESS), formulas
+  (module Result : Ctx.PARAMETERS), formulas
 
 (* does the sequence of declarations contain at least one conjecture? *)
 let _has_conjecture decls =
@@ -395,7 +389,7 @@ let process_file ?meta ~plugins ~params file =
     Util.debug 2 "input signature: %a"
       Signature.pp (Signature.diff signature !Params.signature);
   let res, signature = preprocess ~signature ~params formulas in
-  let module Res = (val res : POST_PREPROCESS) in
+  let module Res = (val res : Ctx.PARAMETERS) in
   (* build the context and env *)
   let module Ctx = Ctx.Make(Res) in
   let module MyEnv = Env.Make(struct

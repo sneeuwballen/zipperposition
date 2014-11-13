@@ -87,6 +87,11 @@ module type S = sig
   (** Declare that some symbols are "ad hoc", ie they are not really
       polymorphic and should not be considered as such *)
 
+  val add_constr : int -> Precedence.Constr.t -> unit
+  (** XXX caution, dangerous: add a new constraint to the precedence.
+      If you don't know what you are doing, it might change the precedence
+      into an incompatible one. *)
+
   (** {2 Literals} *)
 
   module Lit : sig

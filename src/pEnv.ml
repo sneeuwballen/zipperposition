@@ -227,8 +227,8 @@ let expand_def set pf =
 type t = {
   mutable axioms : PF.Set.t;
   mutable ops : (int * (PF.Set.t -> operation)) list;  (* int: priority *)
-  mutable constrs : Precedence.Constr.t list;
-  mutable constr_rules : (PF.Set.t -> Precedence.Constr.t) list;
+  mutable constrs : (int * Precedence.Constr.t) list;
+  mutable constr_rules : (int * (PF.Set.t -> Precedence.Constr.t)) list;
   mutable weight_rule : (PF.Set.t -> Symbol.t -> int);
   mutable status : (Symbol.t * Precedence.symbol_status) list;
   mutable base : Signature.t;
@@ -311,14 +311,14 @@ let process ~penv set =
   Util.exit_prof prof_preprocess;
   res
 
-let add_constr ~penv c =
-  penv.constrs <- c::penv.constrs
+let add_constr ~penv p c =
+  penv.constrs <- (p,c)::penv.constrs
 
 let add_constrs ~penv l =
-  List.iter (add_constr ~penv) l
+  List.iter (fun (p,c) -> add_constr ~penv p c) l
 
-let add_constr_rule ~penv r =
-  penv.constr_rules <- r :: penv.constr_rules
+let add_constr_rule ~penv p r =
+  penv.constr_rules <- (p, r) :: penv.constr_rules
 
 let set_weight_rule ~penv r =
   penv.weight_rule <- r
@@ -327,19 +327,25 @@ let add_status ~penv l = penv.status <- List.rev_append l penv.status
 
 let mk_precedence ~penv set =
   Util.enter_prof prof_mk_prec;
-  let constrs = penv.constrs @ List.map (fun rule -> rule set) penv.constr_rules in
+  let constrs =
+    penv.constrs @
+    List.map (fun (p,rule) -> p, rule set) penv.constr_rules in
+  Util.debug 2 "penv: %d precedence constraints" (List.length constrs);
   let signature = penv.base in
-  let symbols = Signature.Seq.symbols signature
-        |> Symbol.Seq.add_set Symbol.Set.empty
-  in
+  let symbols = Signature.to_set signature in
   let symbols' = PFormula.Set.symbols set in
   let all_symbols = Symbol.Set.union symbols symbols' in
   let weight = penv.weight_rule set in
-  let p = Precedence.create ~weight constrs (Symbol.Set.elements all_symbols) in
+  (* sort constraint by increasing priority *)
+  let sorted_constr = constrs
+    |> List.sort (fun (p1,_)(p2,_) -> CCInt.compare p1 p2)
+    |> List.map snd
+  in
+  let p = Precedence.create ~weight sorted_constr (Symbol.Set.elements all_symbols) in
   (* multiset status *)
   let p = List.fold_left
     (fun p (s,status) -> Precedence.declare_status p s status)
     p penv.status
   in
   Util.exit_prof prof_mk_prec;
-  p
+  p, constrs
