@@ -27,14 +27,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Arbitrary Typed Terms and Formulas} *)
 
 open Logtk
-open QCheck
 
+module QA = QCheck.Arbitrary
 module T = FOTerm
 module F = Formula.FO
 module Sym = Symbol
 module HOT = HOTerm
 
-type 'a arbitrary = 'a QCheck.Arbitrary.t
+type 'a arbitrary = 'a QA.t
 
 module PT = struct
   module PT = PrologTerm
@@ -52,7 +52,7 @@ module PT = struct
     let g x = PT.app (_const "g") [x] in
     let h x = PT.app (_const "h") [x] in
     let ite x y z = PT.app (_const "ite") [x; y; z] in
-    Arbitrary.(
+    QA.(
       let base = among [a; b; c; d; e; ] in
       let t = fix ~max:6 ~base (fun sub ->
         choose [ lift2 f sub sub; lift g sub; lift h sub; sub;
@@ -60,7 +60,19 @@ module PT = struct
       in
       t)
 
-  let default =
+  let map1_ f self = QA.( self 1 >>= function
+    | [x] -> return (f x) | _ -> assert false
+  )
+
+  let map2_ f self = QA.( self 2 >>= function
+    | [x;y] -> return (f x y) | _ -> assert false
+  )
+
+  let map3_ f self = QA.( self 3 >>= function
+    | [x;y;z] -> return (f x y z) | _ -> assert false
+  )
+
+  let default_fuel fuel =
     let a = _const "a" in
     let b = _const "b" in
     let c = _const "c" in
@@ -74,13 +86,27 @@ module PT = struct
     let g x = PT.app (_const "g") [x] in
     let h x = PT.app (_const "h") [x] in
     let ite x y z = PT.app (_const "ite") [x; y; z] in
-    Arbitrary.(
-      let base = among [a; b; c; d; e; x; y; z] in
-      let t = fix ~max:6 ~base (fun sub ->
-        choose [ lift2 f sub sub; lift g sub; lift h sub; sub;
-          choose [lift2 sum sub sub; lift3 ite sub sub sub]])
+    QA.(
+      let t = fix_fuel
+        [ `Base (return a)
+        ; `Base (return b)
+        ; `Base (return c)
+        ; `Base (return d)
+        ; `Base (return e)
+        ; `Base (return x)
+        ; `Base (return y)
+        ; `Base (return z)
+        ; `Rec (map2_ f)
+        ; `Rec (map2_ sum)
+        ; `Rec (map1_ g)
+        ; `Rec (map1_ h)
+        ; `Rec (map3_ ite)
+        ]
       in
-      t)
+      retry (t fuel)
+    )
+
+  let default = QA.(int 40 >>= default_fuel)
 
   let pred =
     let p x y = PT.app (_const "p") [x; y] in
@@ -88,7 +114,7 @@ module PT = struct
     let r x = PT.app (_const "r") [x] in
     let s = PT.const (Sym.of_string "s") in
     let sub = default in
-    QCheck.Arbitrary.(choose
+    QA.(choose
       [ lift2 p sub sub; lift q sub; lift r sub; return s; ])
 
   module HO = struct
@@ -99,17 +125,22 @@ module PT = struct
 end
 
 let default =
-  Arbitrary.(PT.default >>= fun t ->
+  QA.(PT.default >>= fun t ->
+    let ctx = TypeInference.Ctx.create Signature.empty in
+    return (TypeInference.FO.convert_exn ~generalize:false ~ctx t))
+
+let default_fuel f =
+  QA.(PT.default_fuel f >>= fun t ->
     let ctx = TypeInference.Ctx.create Signature.empty in
     return (TypeInference.FO.convert_exn ~generalize:false ~ctx t))
 
 let ground =
-  Arbitrary.(PT.ground >>= fun t ->
+  QA.(PT.ground >>= fun t ->
     let ctx = TypeInference.Ctx.create Signature.empty in
     return (TypeInference.FO.convert_exn ~ctx ~generalize:false t))
 
 let pred =
-  Arbitrary.(PT.pred >>= fun t ->
+  QA.(PT.pred >>= fun t ->
     let ctx = TypeInference.Ctx.create Signature.empty in
     let ty, closure = TypeInference.FO.infer_exn ctx t in
     TypeInference.Ctx.constrain_type_type ctx ty Type.TPTP.o;
@@ -118,7 +149,7 @@ let pred =
 
 let pos t =
   let module PB = Position.Build in
-  Arbitrary.(
+  QA.(
     let rec recurse t pb st =
       let stop = return (PB.to_pos pb) in
       match T.view t with
@@ -135,12 +166,12 @@ let pos t =
 
 module HO = struct
   let ground =
-    Arbitrary.(PT.HO.ground >>= fun t ->
+    QA.(PT.HO.ground >>= fun t ->
       let ctx = TypeInference.Ctx.create Signature.empty in
       return (TypeInference.HO.convert_exn ~ctx t))
 
   let default =
-    Arbitrary.(PT.HO.default >>= fun t ->
+    QA.(PT.HO.default >>= fun t ->
       let ctx = TypeInference.Ctx.create Signature.empty in
       return (TypeInference.HO.convert_exn ~ctx t))
 end

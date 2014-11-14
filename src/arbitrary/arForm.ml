@@ -27,9 +27,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Arbitrary Basic Terms} *)
 
 open Logtk
-open QCheck
+module QA = QCheck.Arbitrary
 
-type 'a arbitrary = 'a QCheck.Arbitrary.t
+type 'a arbitrary = 'a QA.t
 type form = Formula.FO.t
 
 module PT = struct
@@ -37,7 +37,7 @@ module PT = struct
   module AT = ArTerm.PT
 
   let atom =
-    Arbitrary.(choose
+    QA.(choose
       [ AT.pred
       ; lift PT.TPTP.not_ AT.pred
       ; lift2 PT.TPTP.eq AT.default AT.default
@@ -45,40 +45,51 @@ module PT = struct
       ; among [ PT.TPTP.true_; PT.TPTP.false_ ]
       ])
 
-  let default =
-    Arbitrary.(
-      let f = fix ~max:3 ~base:atom
-        (fun sub_f -> choose
-          [ lift PT.TPTP.or_ (list sub_f)
-          ; lift PT.TPTP.and_ (list sub_f)
-          ; lift2 PT.TPTP.equiv sub_f sub_f
-          ; lift2 PT.TPTP.imply sub_f sub_f
-          ; lift PT.TPTP.not_ sub_f
-          ; lift (PT.close_all Symbol.Base.forall) sub_f
-          ; lift (PT.close_all Symbol.Base.exists) sub_f
-          ])
+  let map1_ f self = QA.( self 1 >>= function
+    | [x] -> return (f x) | _ -> assert false
+  )
+
+  let map2_ f self = QA.( self 2 >>= function
+    | [x;y] -> return (f x y) | _ -> assert false
+  )
+
+  let default_fuel fuel =
+    QA.(
+      let f = fix_fuel
+        [ `Rec (fun self -> (small_int >>= self) >|= PT.TPTP.or_)
+        ; `Rec (fun self -> (small_int >>= self) >|= PT.TPTP.and_)
+        ; `Rec (fun self -> map2_ PT.TPTP.equiv self)
+        ; `Rec (fun self -> map2_ PT.TPTP.imply self)
+        ; `Rec (fun self -> map1_ PT.TPTP.not_ self)
+        ; `Rec (fun self -> map1_ (PT.close_all Symbol.Base.forall) self)
+        ; `Rec (fun self -> map1_ (PT.close_all Symbol.Base.exists) self)
+        ]
       in
-      f)
+      retry (f fuel))
+
+  let default = QA.(int 50 >>= default_fuel)
 end
 
 let atom =
-  Arbitrary.(
+  QA.(
     PT.atom >>= fun f ->
     let ctx = TypeInference.Ctx.create Signature.empty in
     return (TypeInference.FO.convert_form_exn ~ctx f)
   )
 
 let clause =
-  Arbitrary.(
+  QA.(
     int 3 >>= fun len ->
     list_repeat len PT.atom >>= fun lits ->
     let ctx = TypeInference.Ctx.create Signature.empty in
     return (TypeInference.FO.convert_clause_exn ~ctx lits)
   )
 
-let default =
-  Arbitrary.(
-    PT.default >>= fun f ->
+let default_fuel fuel =
+  QA.(
+    PT.default_fuel fuel >>= fun f ->
     let ctx = TypeInference.Ctx.create Signature.empty in
     return (TypeInference.FO.convert_form_exn ~ctx f)
   )
+
+let default = QA.(int 50 >>= default_fuel)

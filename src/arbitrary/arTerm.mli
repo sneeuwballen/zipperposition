@@ -33,6 +33,8 @@ type 'a arbitrary = 'a QCheck.Arbitrary.t
 val default : FOTerm.t arbitrary
   (** Default polymorphic term *)
 
+val default_fuel : int -> FOTerm.t arbitrary
+
 val ground : FOTerm.t arbitrary
   (** Default ground monomorphic term *)
 
