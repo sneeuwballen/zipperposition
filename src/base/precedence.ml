@@ -139,7 +139,9 @@ module Make(Sym : SYMBOL) = struct
   (** {3 Constraints} *)
 
   module Constr = struct
-    type t = symbol -> symbol -> Comparison.t
+    module C = Comparison
+
+    type t = symbol -> symbol -> C.t
 
     let cluster clusters =
       (* symbol -> index of cluster the symbol belongs to *)
@@ -154,8 +156,8 @@ module Make(Sym : SYMBOL) = struct
         try
           let i1 = Tbl.find tbl s1 in
           let i2 = Tbl.find tbl s2 in
-          Comparison.of_total (i2 - i1)
-        with Not_found -> Comparison.Incomparable
+          C.of_total (i2 - i1)
+        with Not_found -> C.Incomparable
 
     let of_list l =
       let tbl = _mk_table l in
@@ -164,14 +166,14 @@ module Make(Sym : SYMBOL) = struct
         try
           let i1 = Tbl.find tbl s1 in
           let i2 = Tbl.find tbl s2 in
-          Comparison.of_total (i2 - i1)
-        with Not_found -> Comparison.Incomparable
+          C.of_total (i2 - i1)
+        with Not_found -> C.Incomparable
 
     let of_precedence p = of_list p.snapshot
 
     let arity arity_of s1 s2 =
       (* bigger arity means bigger symbol *)
-      Comparison.of_total (arity_of s1 - arity_of s2)
+      C.of_total (arity_of s1 - arity_of s2)
 
     let invfreq seq =
       (* symbol -> number of occurrences of symbol in seq *)
@@ -186,8 +188,11 @@ module Make(Sym : SYMBOL) = struct
         try
           let n1 = Tbl.find tbl s1 in
           let n2 = Tbl.find tbl s2 in
-          Comparison.of_total (n2 - n1)
-        with Not_found -> Comparison.Incomparable
+          if n1=n2 then C.Incomparable
+          else if n1<n2 then C.Gt
+          else C.Lt
+        with Not_found ->
+          if Sym.eq s1 s2 then C.Eq else C.Incomparable
 
     let _find_noexc tbl s =
       try Some (Tbl.find tbl s)
@@ -198,24 +203,24 @@ module Make(Sym : SYMBOL) = struct
       (* not found implies the symbol is smaller than maximal symbols *)
       fun s1 s2 ->
         match _find_noexc tbl s1, _find_noexc tbl s2 with
-        | None, None -> Comparison.Incomparable
-        | Some _, None -> Comparison.Gt
-        | None, Some _ -> Comparison.Lt
-        | Some i1, Some i2 -> Comparison.of_total (i2 - i1)
+        | None, None -> C.Incomparable
+        | Some _, None -> C.Gt
+        | None, Some _ -> C.Lt
+        | Some i1, Some i2 -> C.of_total (i2 - i1)
 
     let min symbols =
       let tbl = _mk_table symbols in
       (* not found implies the symbol is smaller than maximal symbols *)
       fun s1 s2 ->
         match _find_noexc tbl s1, _find_noexc tbl s2 with
-        | None, None -> Comparison.Incomparable
-        | Some _, None -> Comparison.Lt
-        | None, Some _ -> Comparison.Gt
-        | Some i1, Some i2 -> Comparison.of_total (i2 - i1)
+        | None, None -> C.Incomparable
+        | Some _, None -> C.Lt
+        | None, Some _ -> C.Gt
+        | Some i1, Some i2 -> C.of_total (i2 - i1)
 
     (* regular string ordering *)
     let alpha a b =
-      Comparison.of_total (Sym.cmp a b)
+      C.of_total (Sym.cmp a b)
   end
 
   (** {3 Weight} *)
