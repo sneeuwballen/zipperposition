@@ -380,24 +380,22 @@ module Make(X : PARAMETERS) = struct
       ty : inductive_type;
       subst : Substs.t; (* matched against [ty.pattern] *)
       parent : cst option;
+      dominates : unit Symbol.Tbl.t;
       mutable coversets : cover_set IMap.t;
         (* depth-> exhaustive decomposition of given depth  *)
     }
 
     (* cst -> cst_data *)
     let _tbl : cst_data T.Tbl.t = T.Tbl.create 16
+    let _tbl_sym : cst_data Symbol.Tbl.t = Symbol.Tbl.create 16
 
     (* sub_constants -> cst * case in which the sub_constant occurs *)
     let _tbl_sub_cst : (cst * T.t) T.Tbl.t = T.Tbl.create 16
-    let _tbl_sub_cst_sym : unit Symbol.Tbl.t = Symbol.Tbl.create 16
 
     let _blocked = ref []
 
     let is_sub_constant t =
       T.Tbl.mem _tbl_sub_cst t
-
-    let is_sub_constant_symbol s =
-      Symbol.Tbl.mem _tbl_sub_cst_sym s
 
     let is_blocked t =
       is_sub_constant t
@@ -413,8 +411,12 @@ module Make(X : PARAMETERS) = struct
           let name = _extract_hd ty in
           let ity = Symbol.Tbl.find _tbl_ty name in
           let subst = Unif.Ty.matching ~pattern:ity.pattern 1 ty 0 in
-          let cst_data = { cst=t; ty=ity; subst; parent; coversets=IMap.empty } in
+          let cst_data = { cst=t; ty=ity; subst; parent;
+                           dominates=Symbol.Tbl.create 16;
+                           coversets=IMap.empty } in
           T.Tbl.add _tbl t cst_data;
+          let s = T.head_exn t in
+          Symbol.Tbl.replace _tbl_sym s cst_data;
           ()
         with Unif.Fail | Not_found ->
           _invalid_arg "term %a doesn't have an inductive type" T.pp t
@@ -426,6 +428,7 @@ module Make(X : PARAMETERS) = struct
 
     (* coverset of given depth for this type and constant *)
     let _make_coverset ~depth ity cst =
+      let cst_data = T.Tbl.find _tbl cst in
       (* list of cover term generators *)
       let rec make depth =
         (* leaves: fresh constants *)
@@ -433,9 +436,9 @@ module Make(X : PARAMETERS) = struct
           let ty = ity.pattern in
           let name = Util.sprintf "#%a" Symbol.pp (_extract_hd ty) in
           let c = Skolem.fresh_sym_with ~ctx:skolem ~ty name in
-          _declare_symb c ty;
-          Symbol.Tbl.replace _tbl_sub_cst_sym c ();
           let t = T.const ~ty c in
+          Symbol.Tbl.replace cst_data.dominates c ();
+          _declare_symb c ty;
           t, T.Set.singleton t
         ]
         (* inner nodes or base cases: constructors *)
@@ -473,10 +476,12 @@ module Make(X : PARAMETERS) = struct
                 (* not an inductive sub-case, just create a skolem symbol *)
                 let name = Util.sprintf "#%a" Symbol.pp (_extract_hd ty) in
                 let c = Skolem.fresh_sym_with ~ctx:skolem ~ty name in
-                _declare_symb c ty;
                 let t = T.const ~ty c in
+                Symbol.Tbl.replace cst_data.dominates c ();
                 (* declare [t] as a new inductive constant if its type is inductive *)
-                if is_inductive_type ty then declare ~parent:cst t;
+                if is_inductive_type ty
+                  then declare ~parent:cst t;
+                _declare_symb c ty;
                 t, T.Set.empty
             ] in
             let tail_builders = make_list depth tail in
@@ -532,6 +537,14 @@ module Make(X : PARAMETERS) = struct
         _failwith "term %a is not an inductive constant, no coverset" T.pp t
 
     let is_inductive cst = T.Tbl.mem _tbl cst
+
+    let is_inductive_symbol s = Symbol.Tbl.mem _tbl_sym s
+
+    (* true iff s2 is one of the sub-cases of s1 *)
+    let dominates s1 s2 =
+      assert (is_inductive_symbol s1);
+      let cst_data = Symbol.Tbl.find _tbl_sym s1 in
+      Symbol.Tbl.mem cst_data.dominates s2
 
     let _seq_inductive_cst yield =
       T.Tbl.iter (fun t _ -> yield t) _tbl

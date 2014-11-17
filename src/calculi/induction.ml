@@ -409,25 +409,22 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
         ()
       ) l
 
-  (* ensure inductive_cst > sub_cst in the term ordering *)
+  (* ensure s1 > s2 if s1 is an inductive constant and s2 is a sub-case of s1 *)
   let constr_sub_cst_ s1 s2 =
     let module C = Logtk.Comparison in
-    (*
-    let s1_is_sub_cst = CI.is_sub_constant_symbol s1 in
-    let s2_is_sub_cst = CI.is_sub_constant_symbol s2 in
-    match s1_is_sub_cst, s2_is_sub_cst with
-    | false, false -> C.Incomparable
-    | true, false -> 
-    *)
-    C.Incomparable
-    (* TODO: if s1 is an inductive cst, and s2 a subcase of this very inductive cst,
-      then s1>s2 *)
+    let res =
+      if CI.is_inductive_symbol s1 && CI.dominates s1 s2
+        then C.Gt
+      else if CI.is_inductive_symbol s2 && CI.dominates s2 s1
+        then C.Lt
+      else C.Incomparable
+    in res
 
   let register() =
     Util.debug 1 "register induction calculus";
     declare_types_ !ind_types_;
     Solver.set_printer BoolLit.print;
-    Ctx.add_constr 20 constr_sub_cst_;
+    Ctx.add_constr 20 constr_sub_cst_;  (* enforce new constraint *)
     (* avatar rules *)
     Env.add_multi_simpl_rule Avatar.split;
     Env.add_unary_inf "avatar.check_empty" Avatar.check_empty;
@@ -473,6 +470,9 @@ let enabled_ = ref false
 let enable_ () =
   if not !enabled_ then (
     enabled_ := true;
+    Util.debug 1 "Induction: requires ord=rpo6; select=NoSelection";
+    Params.ord := "rpo6";   (* new default! RPO is necessary*)
+    Params.select := "NoSelection";
     Extensions.register extension
   )
 

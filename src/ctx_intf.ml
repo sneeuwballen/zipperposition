@@ -231,6 +231,9 @@ module type S = sig
     val is_inductive : FOTerm.t -> bool
     (** Check whether the given constant is ready for induction *)
 
+    val is_inductive_symbol : Symbol.t -> bool
+    (** Head symbol of some inductive (ground) term?*)
+
     type cover_set = {
       cases : FOTerm.t list; (* all cases *)
       rec_cases : FOTerm.t list; (* recursive cases *)
@@ -241,8 +244,8 @@ module type S = sig
     val is_sub_constant : FOTerm.t -> bool
     (** Is the term a constant that was created within a cover set? *)
 
-    val is_sub_constant_symbol : Symbol.t -> bool
-    (** Is the symbol a sub-constant of an inductive term? *)
+    val dominates : Symbol.t -> Symbol.t -> bool
+    (** [dominates s1 s2] true iff s2 is one of the sub-cases of s1 *)
 
     val inductive_cst_of_sub_cst : FOTerm.t -> cst * FOTerm.t
     (** [inductive_cst_of_sub_cst t] finds a pair [c, t'] such

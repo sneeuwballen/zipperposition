@@ -55,6 +55,25 @@ let add_opts l = other_opts := l @ !other_opts
 (** Default signature *)
 let signature = ref Signature.TPTP.base
 
+let ord = ref "kbo"
+and seed = ref 1928575
+and steps = ref 0
+and version = ref false
+and timeout = ref 0.
+and proof = ref "debug"
+and split = ref false
+and theories = ref false
+and presaturate = ref false
+and dot_file = ref None
+and dot_sat = ref false
+and plugins = ref []
+and stats = ref false
+and expand_def = ref false
+and select = ref "SelectComplex"
+and progress = ref false
+and unary_depth = ref 1
+and files = CCVector.create ()
+
 (** parse_args returns parameters *)
 let parse_args () =
   let help_select = Util.sprintf "selection function (%a)"
@@ -62,32 +81,13 @@ let parse_args () =
     (Selection.available_selections ())
   in
   (* parameters *)
-  let ord = ref "kbo"
-  and seed = ref 1928575
-  and steps = ref 0
-  and version = ref false
-  and timeout = ref 0.
-  and proof = ref "debug"
-  and split = ref false
-  and theories = ref false
-  and presaturate = ref false
-  and dot_file = ref None
-  and dot_sat = ref false
-  and plugins = ref []
-  and stats = ref false
-  and expand_def = ref false
-  and select = ref "SelectComplex"
-  and progress = ref false
-  and unary_depth = ref 1
-  and files = CCVector.create () in
   (* special handlers *)
   let set_progress () =
     Util.need_cleanup := true;
     progress := true
   and add_plugin s = plugins := s :: !plugins
   and add_plugins s = plugins := (Util.str_split ~by:"," s) @ !plugins
-  and add_file s = CCVector.push files s 
-  in
+  and add_file s = CCVector.push files s in
   (* options list *) 
   let options =
     [ "-ord", Arg.Set_string ord, "choose ordering (rpo,kbo)"
