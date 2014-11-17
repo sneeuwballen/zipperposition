@@ -459,7 +459,7 @@ let as_dot_graph =
           `Label "[]" :: `Shape "box" :: attributes
       else if is_file p then label p :: `Color "yellow" :: `Shape "box" :: attributes
       else if is_conjecture p then label p :: `Color "orange" :: `Shape "box" :: attributes
-      else if is_trivial p then label p :: `Color "blue" :: shape p :: attributes
+      else if is_trivial p then label p :: `Color "cyan" :: shape p :: attributes
       else label p :: shape p :: attributes)
     ~edges:(fun e -> [`Label e])
     as_graph
