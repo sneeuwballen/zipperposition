@@ -52,6 +52,17 @@ module type SAT = sig
 
   val name : string
   (** Name of the solver *)
+
+  (** {6 Incrementality}
+  We manage a stack for backtracking to older states *)
+
+  type save_level
+
+  val save : unit -> save_level
+  (** Save current state on the stack *)
+
+  val restore : save_level -> unit
+  (** Restore to a level below in the stack *)
 end
 
 module type QBF = sig
@@ -67,22 +78,22 @@ module type QBF = sig
   A stack of quantifiers is maintained, along with a set of literals
   at each stage. *)
 
-  type level = private int
+  type quant_level = private int
   (** Quantification level *)
 
-  val level0 : level
+  val level0 : quant_level
   (** Level 0 is the outermost level, existentially quantified. *)
 
-  val quant_at_level : level -> quantifier
+  val quant_at_level : quant_level -> quantifier
   (** Which quantifier is it at this level? *)
 
-  val lits_at_level : level -> LitSet.t
+  val lits_at_level : quant_level -> LitSet.t
   (** Which literals are quantified at this level? *)
 
-  val push : quantifier -> lit list -> level
+  val push : quantifier -> lit list -> quant_level
   (** Push a new level on top of the others *)
 
-  val quantify_lits : level -> lit list -> unit
+  val quantify_lits : quant_level -> lit list -> unit
   (** Add some literals at the given quantification level *)
 
   (** The functions from {!SAT}, such as {!SAT.check}, still work. They

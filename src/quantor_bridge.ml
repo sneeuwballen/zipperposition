@@ -34,7 +34,6 @@ let rec _rev_append_map f l acc = match l with
   | x::tail -> _rev_append_map f tail (f x :: acc)
 
 module Make(X : sig end) : BS.QBF = struct
-
   module LitSet = Sequence.Set.Make(CCInt)
 
   (* add a list of literals to the set *)
@@ -52,26 +51,46 @@ module Make(X : sig end) : BS.QBF = struct
 
   let level0 = 0
 
-  let _clauses = ref []
-  let _pp = ref Qbf.Lit.print
-  let _result = ref Qbf.Unsat
-
   type lit = int
-  type level = int
+
+  let pp_ = ref Qbf.Lit.print
+
+  (* current (backtrackable) state  *)
+  type state = {
+    mutable clauses : lit list list;
+    mutable result : Qbf.result;
+  }
+
+  (* stack of states *)
+  let stack : state CCVector.vector = CCVector.create ()
+  let state = ref {clauses=[]; result=Qbf.Unknown}
+
+  let save () =
+    let i = CCVector.length stack in
+    CCVector.push stack !state;
+    i
+
+  let restore l =
+    if l>= CCVector.length stack then failwith "restore: level too high";
+    state := CCVector.get stack l;
+    CCVector.shrink stack l
+
+  type quant_level = int
+  type save_level = int
 
   type result =
     | Sat
     | Unsat
 
-  let set_printer p = _pp := p
+  let set_printer p = pp_ := p
   let name = "quantor"
 
   let add_clause c =
-    _clauses := c :: !_clauses
+    !state.clauses <- c :: !state.clauses
 
   let valuation l =
     if l<=0 then invalid_arg "valuation";
-    match !_result with
+    match !state.result with
     | Qbf.Sat v ->
         begin match v (abs l) with
           | Qbf.Undef -> failwith "literal not valued in the model"
@@ -100,7 +119,7 @@ module Make(X : sig end) : BS.QBF = struct
     (* at quantifier level [i] *)
     let rec _recurse_quant i =
       if i = CCVector.length _lits
-        then Qbf.CNF.cnf !_clauses
+        then Qbf.CNF.cnf !state.clauses
         else
           let q, lits = CCVector.get _lits i in
           Qbf.CNF.quantify q (LitSet.to_list lits) (_recurse_quant (i+1))
@@ -111,10 +130,10 @@ module Make(X : sig end) : BS.QBF = struct
     let f = _mk_form () in
     if Logtk.Util.get_debug() >= 5 then (
       Format.printf "QBF formula: @[<hov>%a@]@."
-        (Qbf.CNF.print_with ~pp_lit:!_pp) f
+        (Qbf.CNF.print_with ~pp_lit:!pp_) f
     );
-    _result := Quantor.solve f;
-    match !_result with
+    !state.result <- Quantor.solve f;
+    match !state.result with
     | Qbf.Unsat -> Unsat
     | Qbf.Sat _ -> Sat
     | Qbf.Timeout
