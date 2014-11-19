@@ -149,6 +149,9 @@ module type S = sig
   val trail_subsumes : t -> t -> bool
   (** [trail_subsumes c1 c2 = Trail.subsumes (get_trail c1) (get_trail c2)] *)
 
+  val compact_trail : Trail.t -> CompactClause.bool_lit list
+  (** Compact the trail for use with {!CompactClause} *)
+
   val is_active : t -> v:Trail.valuation -> bool
   (** True if the clause's trail is active in this valuation *)
 

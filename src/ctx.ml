@@ -370,9 +370,9 @@ module Make(X : PARAMETERS) = struct
 
     type cover_set = {
       cases : T.t list;
-      rec_cases : T.t list;
-      base_cases : T.t list;
-      sub_constants : T.Set.t;
+      rec_cases : T.t list;  (* recursive cases *)
+      base_cases : T.t list;  (* base cases *)
+      sub_constants : T.Set.t;  (* all sub-constants *)
     }
 
     type cst_data = {
@@ -518,6 +518,8 @@ module Make(X : PARAMETERS) = struct
 
     let inductive_cst_of_sub_cst t = T.Tbl.find _tbl_sub_cst t
 
+    let on_new_cover_set = Signal.create ()
+
     let cover_set ?(depth=1) t =
       try
         let cst = T.Tbl.find _tbl t in
@@ -531,6 +533,7 @@ module Make(X : PARAMETERS) = struct
           (* save coverset *)
           cst.coversets <- IMap.add depth coverset cst.coversets;
           Util.debug 2 "new coverset for %a: %a" T.pp t (CCList.pp T.pp) coverset.cases;
+          Signal.send on_new_cover_set (t, coverset);
           coverset, `New
         end
       with Not_found ->
@@ -539,6 +542,12 @@ module Make(X : PARAMETERS) = struct
     let is_inductive cst = T.Tbl.mem _tbl cst
 
     let is_inductive_symbol s = Symbol.Tbl.mem _tbl_sym s
+
+    let cover_sets t =
+      try
+        let cst = T.Tbl.find _tbl t in
+        IMap.to_seq cst.coversets |> Sequence.map snd
+      with Not_found -> Sequence.empty
 
     (* true iff s2 is one of the sub-cases of s1 *)
     let dominates s1 s2 =

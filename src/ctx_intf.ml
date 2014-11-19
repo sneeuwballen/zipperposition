@@ -261,6 +261,12 @@ module type S = sig
         @param depth (default 1) depth of cover terms; the deeper, the more
           covering terms there will be. *)
 
+    val cover_sets : cst -> cover_set Sequence.t
+    (** All current cover sets of [cst] *)
+
+    val on_new_cover_set : (cst * cover_set) Signal.t
+    (** triggered with [t, set] when [set] is a new cover set for [t] *)
+
     val depends_on : cst -> cst -> bool
     (** [depends_on a b] is [true] iff [a] depends on [b]. This forms a
         partial strict order. *)

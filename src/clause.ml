@@ -242,7 +242,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let on_proof = Signal.create ()
 
-  let _compact_trail trail =
+  let compact_trail trail =
     ISet.fold
       (fun i acc ->
         let sign = i<0 in
@@ -252,7 +252,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         | Some (Ctx.BoolLit.Provable _) -> failwith "clause trail contains 'provable'"
       ) trail []
 
-  let compact c = CompactClause.make c.hclits (_compact_trail c.trail)
+  let compact c = CompactClause.make c.hclits (compact_trail c.trail)
 
   let create ?parents ?selected ?trail lits proof =
     Util.enter_prof prof_clause_create;
@@ -268,7 +268,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       | None, Some parent_list -> Trail.merge (List.map get_trail parent_list)
     in
     (* proof *)
-    let cc = CompactClause.make lits (_compact_trail trail) in
+    let cc = CompactClause.make lits (compact_trail trail) in
     let proof' = proof cc in
     Signal.send on_proof (lits, proof');
     (* create the structure *)
