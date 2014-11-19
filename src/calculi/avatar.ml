@@ -141,9 +141,13 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
     );
     [] (* never infers anything! *)
 
+  let before_check_sat = Signal.create()
+  let after_check_sat = Signal.create()
+
   (* Just check the solver *)
   let check_satisfiability () =
     Util.enter_prof prof_check;
+    Signal.send before_check_sat ();
     let res = match Sat.check ()  with
     | Sat.Sat ->
         Util.debug 3 "Avatar: SAT-solver reports \"SAT\"";
@@ -155,6 +159,7 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
         let c = C.create [] proof in
         [c]
     in
+    Signal.send after_check_sat ();
     Util.exit_prof prof_check;
     res
 

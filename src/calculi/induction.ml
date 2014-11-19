@@ -209,6 +209,34 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
   let qbf_encode_top_ () =
     assert false (* TODO *)
 
+  (* current save level *)
+  let save_level_ = ref Solver.root_save_level
+
+  (* the whole process of:
+      - adding non-backtracking constraints
+      - save state
+      - adding backtrackable constraints *)
+  let qbf_encode_enter_ () =
+    (* TODO add normal constraints *)
+    Util.debug 4 "ind: save QBF solver";
+    save_level_ := Solver.save ();
+    (* TODO add backtrackable constraints *)
+    ()
+
+  (* restoring state *)
+  let qbf_encode_exit_ () =
+    Util.debug 4 "ind: restore QBF solver";
+    Solver.restore !save_level_;
+    ()
+
+  (* add/remove constraints before/after satisfiability checking *)
+  let () =
+    Signal.on Avatar.before_check_sat
+      (fun () -> qbf_encode_enter_ (); Signal.ContinueListening);
+    Signal.on Avatar.after_check_sat
+      (fun () -> qbf_encode_exit_ (); Signal.ContinueListening);
+    ()
+
   (** {6 Split on Inductive Constants} *)
 
   (* true if [t = c] where [c] is some inductive constructor *)

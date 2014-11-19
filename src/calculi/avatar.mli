@@ -45,6 +45,9 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) : sig
   (** Forbid empty clauses with trails, i.e. adds the negation of their
       trails to the SAT-solver *)
 
+  val before_check_sat : unit Signal.t
+  val after_check_sat : unit Signal.t
+
   val check_satisfiability : E.generate_rule
   (** Checks  that the SAT context is still valid *)
 
