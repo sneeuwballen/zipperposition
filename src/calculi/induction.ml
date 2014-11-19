@@ -89,7 +89,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
           )
         |> Sequence.head
 
-    (* find clauses in [fv] that are subsumes by [lits] *)
+    (* find clauses in [fv] that are subsumed by [lits] *)
     let find_subsumed_by fv lits =
       FV.retrieve_subsumed fv (Lits.Seq.abstract lits) ()
         |> Sequence.map2 (fun _ x -> x)
@@ -201,6 +201,14 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       );
     ()
 
+  (* TODO: encode proof relation into QBF, starting from the set of "roots"
+      that are (applications of) clause contexts + false *)
+
+  (* encode bigand_{i inductive} (path_constraint(i) => valid(i))
+    where valid(i) = cases(i) & (not proofgraph | empty(i) | not loop(i)) *)
+  let qbf_encode_top_ () =
+    assert false (* TODO *)
+
   (** {6 Split on Inductive Constants} *)
 
   (* true if [t = c] where [c] is some inductive constructor *)
@@ -234,6 +242,8 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
         |> List.map (fun (l1,l2) -> [BoolLit.neg l1; BoolLit.neg l2])
     in
     at_least_one :: at_most_one
+
+  (* TODO: observe new cover sets, to split clauses again *)
 
   (* detect ground terms of an inductive type, and perform a special
       case split with Xor on them. *)
@@ -335,11 +345,12 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
 
   (* ctx [c] is now initialized. Return [true] if it wasn't initialized before *)
   let cand_ctx_initialized_ c =
-    assert (not c.cand_initialized);
-    Util.debug 2 "ind: clause context %a[%a] now initialized"
-      CCtx.pp c.cand_ctx T.pp c.cand_cst;
-    let is_new = c.cand_initialized in
-    if is_new then c.cand_initialized <- true;
+    let is_new = not c.cand_initialized in
+    if is_new then (
+      c.cand_initialized <- true;
+      Util.debug 2 "ind: clause context %a[%a] now initialized"
+        CCtx.pp c.cand_ctx T.pp c.cand_cst;
+    );
     is_new
 
   (* see whether (ctx,t) is of interest. *)
@@ -404,6 +415,36 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       ) terms []
     )
 
+  (* [c] (same as [lits] subsumes [lits'] which is watched with list
+    of contexts [l] *)
+  let _process_clause_match_watched acc c lits lits' l =
+    (* remember proof *)
+    let proof cc = Proof.mk_c_inference ~rule:"subsumes" cc [C.proof c] in
+    let proof' = proof (CompactClause.make lits' (C.get_trail c |> C.compact_trail)) in
+    add_proof_ lits' proof';
+    Util.debug 2 "add proof of watched %a because of %a" Lits.pp lits' C.pp c;
+    (* check whether that makes some cand_ctx initialized *)
+    List.fold_left
+      (fun acc elt -> match elt with
+        | `Sub_cst -> acc  (* sub-constant, no initialization *)
+        | `Inductive_cst cand_ctx ->
+            (* [c] proves the initialization of [cand_ctx], i.e. the
+              clause context applied to the corresponding
+              inductive constant (rather than a sub-case) *)
+            assert (CI.is_inductive cand_ctx.cand_cst);
+            let is_new = cand_ctx_initialized_ cand_ctx in
+            if is_new then (
+              (* ctx[t] is now proved, deduce ctx[t] and add it to set of clauses *)
+              let clause = C.create_a ~parents:[c]
+                ~trail:(C.get_trail c) lits proof in
+              (* disable subsumption for [clause] *)
+              C.set_flag C.flag_persistent clause true;
+              Util.debug 2 "initialized %a by subsumption from %a"
+                C.pp clause C.pp c;
+              clause :: acc
+            ) else acc
+      ) acc !l
+
   (* search whether [c] subsumes some watched clause
      if [C[i]] subsumed, where [i] is an inductive constant:
       - "infer" the clause [C[i]]
@@ -413,35 +454,30 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
           of [C[i']], they could evolve!! *)
   let scan_given_for_proof c =
     let lits = C.lits c in
-    FV_watch.find_subsumed_by !to_watch_ lits
+    if Array.length lits = 0
+    then [] (* proofs from [false] aren't interesting *)
+    else FV_watch.find_subsumed_by !to_watch_ lits
       |> Sequence.fold
         (fun acc (lits', l) ->
-          (* remember proof *)
-          let proof cc = Proof.mk_c_inference ~rule:"subsumes" cc [C.proof c] in
-          let proof' = proof (CompactClause.make lits' (C.get_trail c |> C.compact_trail)) in
-          add_proof_ lits' proof';
-          Util.debug 2 "add proof of watched %a because of %a" Lits.pp lits' C.pp c;
-          (* check whether that makes some cand_ctx initialized *)
-          List.fold_left
-            (fun acc elt -> match elt with
-              | `Sub_cst -> acc  (* sub-constant, no initialization *)
-              | `Inductive_cst cand_ctx ->
-                  (* [c] proves the initialization of [cand_ctx], i.e. the
-                    clause context applied to the corresponding
-                    inductive constant (rather than a sub-case) *)
-                  assert (CI.is_inductive cand_ctx.cand_cst);
-                  let is_new = cand_ctx_initialized_ cand_ctx in
-                  if is_new then (
-                    (* ctx[t] is now proved, deduce ctx[t] and add it to set of clauses *)
-                    let clause = C.create_a ~parents:[c]
-                      ~trail:(C.get_trail c) lits proof in
-                    (* disable subsumption for [clause] *)
-                    C.set_flag C.flag_persistent clause true;
-                    Util.debug 2 "initialized %a by subsumption from %a"
-                      C.pp clause C.pp c;
-                    clause :: acc
-                  ) else acc
-            ) acc !l
+          _process_clause_match_watched acc c lits lits' l
+        ) []
+
+  (* scan the set of active clauses, to see whether it proves some
+      of the lits in [to_watch_new_] *)
+  let scan_backward () =
+    let w = !to_watch_new_ in
+    to_watch_new_ := FV_watch.empty ();
+    Env.ProofState.ActiveSet.clauses ()
+      |> C.CSet.to_seq
+      |> Sequence.filter (fun c -> Array.length (C.lits c) > 0)
+      |> Sequence.fold
+        (fun acc c ->
+          let lits = C.lits c in
+          FV_watch.find_subsumed_by w lits
+            |> Sequence.fold
+              (fun acc (lits',l) ->
+                _process_clause_match_watched acc c lits lits' l
+              ) acc
         ) []
 
   (** {6 Registration} *)
@@ -491,6 +527,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     Env.add_unary_inf "avatar.check_empty" Avatar.check_empty;
     Env.add_generate "avatar.check_sat" Avatar.check_satisfiability;
     (* induction rules *)
+    Env.add_generate "induction.scan_backward" scan_backward;
     Env.add_unary_inf "induction.scan_extrude" scan_given_for_context;
     Env.add_unary_inf "induction.scan_proof" scan_given_for_proof;
     (* XXX: ugly, but we must do case_split before scan_extrude/proof.
