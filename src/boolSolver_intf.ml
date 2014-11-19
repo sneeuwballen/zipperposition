@@ -58,6 +58,8 @@ module type SAT = sig
 
   type save_level
 
+  val root_save_level : save_level
+
   val save : unit -> save_level
   (** Save current state on the stack *)
 

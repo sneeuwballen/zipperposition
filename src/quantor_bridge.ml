@@ -62,18 +62,26 @@ module Make(X : sig end) : BS.QBF = struct
   }
 
   (* stack of states *)
-  let stack : state CCVector.vector = CCVector.create ()
-  let state = ref {clauses=[]; result=Qbf.Unknown}
+  let stack : state CCVector.vector =
+    let v = CCVector.create () in
+    CCVector.push v {clauses=[]; result=Qbf.Unknown};
+    v
+
+  let get_state_ () =
+    CCVector.get stack (CCVector.length stack-1)
+
+  let root_save_level = 0
 
   let save () =
+    let state = get_state_ () in
     let i = CCVector.length stack in
-    CCVector.push stack !state;
+    CCVector.push stack state;
     i
 
   let restore l =
+    assert(l>=0);
     if l>= CCVector.length stack then failwith "restore: level too high";
-    state := CCVector.get stack l;
-    CCVector.shrink stack l
+    CCVector.shrink stack (l+1)  (* so vec.(l) is the new state *)
 
   type quant_level = int
   type save_level = int
@@ -86,11 +94,13 @@ module Make(X : sig end) : BS.QBF = struct
   let name = "quantor"
 
   let add_clause c =
-    !state.clauses <- c :: !state.clauses
+    let st = get_state_ () in
+    st.clauses <- c :: st.clauses
 
   let valuation l =
     if l<=0 then invalid_arg "valuation";
-    match !state.result with
+    let st = get_state_ () in
+    match st.result with
     | Qbf.Sat v ->
         begin match v (abs l) with
           | Qbf.Undef -> failwith "literal not valued in the model"
@@ -119,7 +129,9 @@ module Make(X : sig end) : BS.QBF = struct
     (* at quantifier level [i] *)
     let rec _recurse_quant i =
       if i = CCVector.length _lits
-        then Qbf.CNF.cnf !state.clauses
+        then
+          let st = get_state_ () in
+          Qbf.CNF.cnf st.clauses
         else
           let q, lits = CCVector.get _lits i in
           Qbf.CNF.quantify q (LitSet.to_list lits) (_recurse_quant (i+1))
@@ -132,8 +144,9 @@ module Make(X : sig end) : BS.QBF = struct
       Format.printf "QBF formula: @[<hov>%a@]@."
         (Qbf.CNF.print_with ~pp_lit:!pp_) f
     );
-    !state.result <- Quantor.solve f;
-    match !state.result with
+    let st = get_state_ () in
+    st.result <- Quantor.solve f;
+    match st.result with
     | Qbf.Unsat -> Unsat
     | Qbf.Sat _ -> Sat
     | Qbf.Timeout
