@@ -29,11 +29,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module T = Logtk.FOTerm
 module Util = Logtk.Util
 module Lits = Literals
+module StringTbl = CCHashtbl.Make(struct
+  type t = string
+  let hash = CCString.hash
+  let equal = CCString.equal
+end)
 
 module type S = BBox_intf.S
 
 module Make(Any : sig end) = struct
-
   type bool_lit = int
   type inductive_cst = T.t
 
@@ -42,6 +46,7 @@ module Make(Any : sig end) = struct
   type injected =
     | Clause_component of Literals.t
     | Provable of Literals.t * inductive_cst
+    | Name of string  (* name for CNF *)
 
   module FV = Logtk.FeatureVector.Make(struct
     type t = Lits.t * injected * bool_lit
@@ -53,6 +58,7 @@ module Make(Any : sig end) = struct
   let _next = ref 1 (* next lit *)
   let _clause_set = ref (FV.empty())
   let _lit2inj = ITbl.create 56
+  let _names = StringTbl.create 15
 
   let _fresh () =
     let i = !_next in
@@ -69,11 +75,15 @@ module Make(Any : sig end) = struct
       |> Sequence.map2 (fun _ l -> l)
 
   let _save injected bool_lit =
+    ITbl.add _lit2inj bool_lit injected;
     match injected with
     | Clause_component lits
     | Provable (lits, _) ->
-        _clause_set := FV.add !_clause_set (lits, injected, bool_lit);
-        ITbl.add _lit2inj bool_lit injected
+        (* also be able to retrieve by lits *)
+        _clause_set := FV.add !_clause_set (lits, injected, bool_lit)
+    | Name s ->
+        StringTbl.add _names s (injected, bool_lit)
+
 
   (* clause -> boolean lit *)
   let inject_lits lits  =
@@ -122,6 +132,13 @@ module Make(Any : sig end) = struct
               i
           )
 
+  let inject_name s =
+    try snd (StringTbl.find _names s)
+    with Not_found ->
+      let i = _fresh () in
+      _save (Name s) i;
+      i
+
   (* boolean lit -> injected *)
   let extract i =
     if i<=0 then failwith "BBox.extract: require integer > 0";
@@ -137,6 +154,8 @@ module Make(Any : sig end) = struct
         Printf.bprintf buf "⟦%a⟧" (Util.pp_array ~sep:"∨" Literal.pp) lits
     | Some (Provable (lits,ind)) ->
         Printf.bprintf buf "⟦loop(%a) ⊢ %a⟧" T.pp ind Lits.pp lits
+    | Some (Name s) ->
+        Printf.bprintf buf "⟦%s⟧" s
 
   let print fmt i =
     if i<0 then Format.pp_print_string fmt "¬";
@@ -148,4 +167,6 @@ module Make(Any : sig end) = struct
           (CCArray.print ~sep:"∨" Literal.fmt) lits
     | Some (Provable (lits,ind)) ->
         Format.fprintf fmt "⟦loop(%a) ⊢ %a⟧" T.fmt ind Lits.fmt lits
+    | Some (Name s) ->
+        Format.fprintf fmt "⟦%s⟧" s
 end

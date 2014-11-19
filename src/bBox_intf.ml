@@ -28,7 +28,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Interface of BBox} *)
 
 module type S = sig
-
   type inductive_cst
 
   type bool_lit = int
@@ -39,6 +38,7 @@ module type S = sig
   type injected = private
     | Clause_component of Literals.t
     | Provable of Literals.t * inductive_cst  (* clause provable within loop(i) *)
+    | Name of string  (* name for CNF *)
 
   val inject_lits : Literals.t -> bool_lit
   (** Inject a clause into a boolean literal. No other clause will map
@@ -49,6 +49,8 @@ module type S = sig
   val inject_provable : Literals.t -> inductive_cst -> bool_lit
   (** Obtain the positive boolean literal such that [inject_provable lits n]
       represents "(bigOr lits) provable from S_loop(n)" *)
+
+  val inject_name : string -> bool_lit
 
   val extract : bool_lit -> injected option
   (** Recover the value that was injected into the literal, if any
