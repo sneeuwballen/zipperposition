@@ -139,6 +139,12 @@ module Make(Any : sig end) = struct
       _save (Name s) i;
       i
 
+  let inject_name' fmt =
+    let buf = Buffer.create 16 in
+    Printf.kbprintf
+      (fun _ -> inject_name (Buffer.contents buf))
+      buf fmt
+
   (* boolean lit -> injected *)
   let extract i =
     if i<=0 then failwith "BBox.extract: require integer > 0";

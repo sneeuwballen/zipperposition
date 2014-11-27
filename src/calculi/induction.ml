@@ -201,42 +201,6 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       );
     ()
 
-  (* TODO: encode proof relation into QBF, starting from the set of "roots"
-      that are (applications of) clause contexts + false *)
-
-  (* encode bigand_{i inductive} (path_constraint(i) => valid(i))
-    where valid(i) = cases(i) & (not proofgraph | empty(i) | not loop(i)) *)
-  let qbf_encode_top_ () =
-    assert false (* TODO *)
-
-  (* current save level *)
-  let save_level_ = ref Solver.root_save_level
-
-  (* the whole process of:
-      - adding non-backtracking constraints
-      - save state
-      - adding backtrackable constraints *)
-  let qbf_encode_enter_ () =
-    (* TODO add normal constraints *)
-    Util.debug 4 "ind: save QBF solver";
-    save_level_ := Solver.save ();
-    (* TODO add backtrackable constraints *)
-    ()
-
-  (* restoring state *)
-  let qbf_encode_exit_ () =
-    Util.debug 4 "ind: restore QBF solver";
-    Solver.restore !save_level_;
-    ()
-
-  (* add/remove constraints before/after satisfiability checking *)
-  let () =
-    Signal.on Avatar.before_check_sat
-      (fun () -> qbf_encode_enter_ (); Signal.ContinueListening);
-    Signal.on Avatar.after_check_sat
-      (fun () -> qbf_encode_exit_ (); Signal.ContinueListening);
-    ()
-
   (** {6 Split on Inductive Constants} *)
 
   (* true if [t = c] where [c] is some inductive constructor *)
@@ -507,6 +471,99 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
                 _process_clause_match_watched acc c lits lits' l
               ) acc
         ) []
+
+  (** {6 Encoding to QBF} *)
+
+  let neg_ = BoolLit.neg
+  let valid_ = BoolLit.inject_name' "valid(%a)" T.pp
+  let cases_ = BoolLit.inject_name' "cases(%a)" T.pp
+  let pgraph_ = BoolLit.inject_name' "proofgraph(%a)" T.pp
+  let empty_ = BoolLit.inject_name' "empty(%a)" T.pp
+  let loop_ = BoolLit.inject_name' "loop(%a)" T.pp
+
+  (* TODO: encode proof relation into QBF, starting from the set of "roots"
+      that are (applications of) clause contexts + false.
+
+      Plan:
+        non-backtrackable:
+          case splits
+          bigAnd i:inductive_cst:
+            def of [cases(i)]
+            (path_constraint(i) => valid(i))
+            valid(i) = [cases(i)] & (not [proofgraph] | [empty(i)] | not [loop(i)])
+        backtrackable:
+          (bigAnd_coversets(i) (bigXOr_{t in coverset(i)} i=t)) => [valid(i)]
+          constraints of proofgraph => [proofgraph]
+          bigAnd i:inductive_cst:
+            def of loop(i) => [loop(i)]
+            empty(i) => def of empty(i)
+        *)
+
+  (* current save level *)
+  let save_level_ = ref Solver.root_save_level
+
+  (* the whole process of:
+      - adding non-backtracking constraints
+      - save state
+      - adding backtrackable constraints *)
+  let qbf_encode_enter_ () =
+    (* normal constraints should be added already *)
+    Util.debug 4 "ind: save QBF solver";
+    save_level_ := Solver.save ();
+    (* TODO add backtrackable constraints *)
+    ()
+
+  (* restoring state *)
+  let qbf_encode_exit_ () =
+    Util.debug 4 "ind: restore QBF solver";
+    Solver.restore !save_level_;
+    ()
+
+  (* add
+    - pathconditions(i) => [valid(i)]
+    - valid(i) => [cases(i)] &
+    - (not [proofgraph] | [empty(i)] | not [loop(i)]) *)
+  let qbf_encode_valid_ cst =
+    let pc = CI.pc cst in
+    Solver.add_clauses
+      [ valid_ cst :: List.map (fun pc -> neg_ pc.CI.pc_lit) pc (* pc -> valid *)
+      ; [ neg_ (valid_ cst); cases_ cst ]
+      ; [ neg_ (valid_ cst); neg_ (pgraph_ cst); empty_ cst; neg_ (loop_ cst) ]
+      ];
+    ()
+
+  (* encode: cases(i) => bigAnd_{s in coversets(i) (xor_{t in s} i=t} *)
+  let qbf_encode_cover_set cst set =
+    let big_xor =
+      mk_xor_
+        (List.map
+          (fun t -> BoolLit.inject_lits [|Literal.mk_eq cst t|])
+        set.CI.cases
+      )
+    in
+    (* guard every clause with "cases(i) => clause" *)
+    let cases = cases_ cst in
+    let clauses = List.map (fun c -> neg_ cases :: c) big_xor in
+    Solver.add_clauses clauses;
+    ()
+
+  (* add/remove constraints before/after satisfiability checking *)
+  let () =
+    Signal.on Avatar.before_check_sat
+      (fun () -> qbf_encode_enter_ (); Signal.ContinueListening);
+    Signal.on Avatar.after_check_sat
+      (fun () -> qbf_encode_exit_ (); Signal.ContinueListening);
+    Signal.on CI.on_new_inductive
+      (fun cst ->
+        qbf_encode_valid_ cst;
+        Signal.ContinueListening
+      );
+    Signal.on CI.on_new_cover_set
+      (fun (cst, set) ->
+        qbf_encode_cover_set cst set;
+        Signal.ContinueListening
+      );
+    ()
 
   (** {6 Registration} *)
 

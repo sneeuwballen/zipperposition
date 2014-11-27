@@ -217,16 +217,26 @@ module type S = sig
         particular, constructors, but also skolem constants introduced by
         calls to {!cover_set}. *)
 
-    val declare : ?parent:cst -> FOTerm.t -> unit
+    type path_condition = {
+      pc_cst : cst;
+      pc_case : FOTerm.t;
+      pc_lit : BoolLit.bool_lit;
+    }
+
+    val declare : ?pc:path_condition list -> FOTerm.t -> unit
     (** Check whether the  given term can be an inductive constant,
         and if possible, adds it to the set of inductive constants.
         Requirements: it must be ground, and its type must be a
         known {!inductive type}.
 
-        @param parent if present, makes the term depend on the given constant
-          that must be inductive already.
+        @param pc if present, makes the term depend on the given
+          path condition (a list of literals that must hold
+          for the inductive literal to be "active")
         @raise Invalid_argument if the parent isn't inductive or the
           term is non-ground *)
+
+    val on_new_inductive : cst Signal.t
+    (** Triggered with new inductive constants *)
 
     val is_inductive : FOTerm.t -> bool
     (** Check whether the given constant is ready for induction *)
@@ -271,12 +281,8 @@ module type S = sig
     (** [depends_on a b] is [true] iff [a] depends on [b]. This forms a
         partial strict order. *)
 
-    val parent : cst -> cst option
-    (** [parent c] returns [Some d] iff [c] depends directly on [d]. *)
-
-    val parent_exn : cst -> cst
-    (** Unsafe version of {!parent}.
-        @raise Failure if the constant has no parent *)
+    val pc : cst -> path_condition list
+    (** [pc c] returns the list of path conditions under which [c] is valid *)
 
     module Set : Set.S with type elt = cst
     (** Set of constants *)

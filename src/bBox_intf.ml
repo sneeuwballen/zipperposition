@@ -51,6 +51,7 @@ module type S = sig
       represents "(bigOr lits) provable from S_loop(n)" *)
 
   val inject_name : string -> bool_lit
+  val inject_name' : ('a, Buffer.t, unit, bool_lit) format4 -> 'a
 
   val extract : bool_lit -> injected option
   (** Recover the value that was injected into the literal, if any

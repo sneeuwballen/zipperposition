@@ -249,7 +249,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         match Ctx.BoolLit.extract (abs i) with
         | None -> failwith "wrong trail"
         | Some (Ctx.BoolLit.Clause_component lits) -> (sign, `Box_clause lits) :: acc
-        | Some (Ctx.BoolLit.Provable _) -> failwith "clause trail contains 'provable'"
+        | Some (Ctx.BoolLit.Provable _ | Ctx.BoolLit.Name _) ->
+            failwith "clause trail contains a non-Clause_component guard"
       ) trail []
 
   let compact c = CompactClause.make c.hclits (compact_trail c.trail)

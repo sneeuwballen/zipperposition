@@ -375,15 +375,23 @@ module Make(X : PARAMETERS) = struct
       sub_constants : T.Set.t;  (* all sub-constants *)
     }
 
+    type path_condition = {
+      pc_cst : cst;
+      pc_case : FOTerm.t;
+      pc_lit : BoolLit.bool_lit;
+    }
+
     type cst_data = {
       cst : cst;
       ty : inductive_type;
       subst : Substs.t; (* matched against [ty.pattern] *)
-      parent : cst option;
+      pc : path_condition list; (* path conditions *)
       dominates : unit Symbol.Tbl.t;
       mutable coversets : cover_set IMap.t;
         (* depth-> exhaustive decomposition of given depth  *)
     }
+
+    let on_new_inductive = Signal.create()
 
     (* cst -> cst_data *)
     let _tbl : cst_data T.Tbl.t = T.Tbl.create 16
@@ -400,7 +408,7 @@ module Make(X : PARAMETERS) = struct
     let is_blocked t =
       is_sub_constant t
 
-    let declare ?parent t =
+    let declare ?(pc=[]) t =
       if T.is_ground t
       then
         if T.Tbl.mem _tbl t then ()
@@ -411,12 +419,13 @@ module Make(X : PARAMETERS) = struct
           let name = _extract_hd ty in
           let ity = Symbol.Tbl.find _tbl_ty name in
           let subst = Unif.Ty.matching ~pattern:ity.pattern 1 ty 0 in
-          let cst_data = { cst=t; ty=ity; subst; parent;
+          let cst_data = { cst=t; ty=ity; subst; pc;
                            dominates=Symbol.Tbl.create 16;
                            coversets=IMap.empty } in
           T.Tbl.add _tbl t cst_data;
           let s = T.head_exn t in
           Symbol.Tbl.replace _tbl_sym s cst_data;
+          Signal.send on_new_inductive t;
           ()
         with Unif.Fail | Not_found ->
           _invalid_arg "term %a doesn't have an inductive type" T.pp t
@@ -429,7 +438,11 @@ module Make(X : PARAMETERS) = struct
     (* coverset of given depth for this type and constant *)
     let _make_coverset ~depth ity cst =
       let cst_data = T.Tbl.find _tbl cst in
-      (* list of cover term generators *)
+      (* list of generators of:
+          - member of the coverset (one of the t such that cst=t)
+          - set of sub-constants of this term
+          - set of new inductive constants of another type
+              (e.g. a new nat "n" in the cover set of a list of naturals "l" *)
       let rec make depth =
         (* leaves: fresh constants *)
         if depth=0 then [fun () ->
@@ -439,7 +452,7 @@ module Make(X : PARAMETERS) = struct
           let t = T.const ~ty c in
           Symbol.Tbl.replace cst_data.dominates c ();
           _declare_symb c ty;
-          t, T.Set.singleton t
+          t, T.Set.singleton t, T.Set.empty
         ]
         (* inner nodes or base cases: constructors *)
         else CCList.flat_map
@@ -450,15 +463,15 @@ module Make(X : PARAMETERS) = struct
                   Symbol.pp f Type.pp ity.pattern
             | Type.Arity (0, 0) ->
                 if depth > 0
-                then [fun () -> T.const ~ty:ty_f f, T.Set.empty]  (* only one answer : f *)
+                then [fun () -> T.const ~ty:ty_f f, T.Set.empty, T.Set.empty]  (* only one answer : f *)
                 else []
             | Type.Arity (0, n) ->
                 let ty_args = Type.expected_args ty_f in
                 CCList.(
                   make_list (depth-1) ty_args >>= fun mk_args ->
                   return (fun () ->
-                    let args, set = mk_args () in
-                    T.app (T.const f ~ty:ty_f) args, set)
+                    let args, set, set' = mk_args () in
+                    T.app (T.const f ~ty:ty_f) args, set, set')
                 )
             | Type.Arity (m,_) ->
                 _failwith
@@ -467,8 +480,8 @@ module Make(X : PARAMETERS) = struct
           ) ity.constructors
       (* given a list of types [l], yield all lists of cover terms
           that have types [l] *)
-      and make_list depth l : (T.t list * T.Set.t) FunM.t list = match l with
-        | [] -> [fun()->[],T.Set.empty]
+      and make_list depth l : (T.t list * T.Set.t * T.Set.t) FunM.t list = match l with
+        | [] -> [fun()->[],T.Set.empty,T.Set.empty]
         | ty :: tail ->
             let t_builders = if Unif.Ty.matches ~pattern:ity.pattern ty
               then make depth
@@ -478,28 +491,46 @@ module Make(X : PARAMETERS) = struct
                 let c = Skolem.fresh_sym_with ~ctx:skolem ~ty name in
                 let t = T.const ~ty c in
                 Symbol.Tbl.replace cst_data.dominates c ();
-                (* declare [t] as a new inductive constant if its type is inductive *)
-                if is_inductive_type ty
-                  then declare ~parent:cst t;
+                (* remember to declare [t] as a new inductive constant
+                   if its type is inductive *)
+                let set' = if is_inductive_type ty
+                  then T.Set.singleton t
+                  else T.Set.empty
+                in
                 _declare_symb c ty;
-                t, T.Set.empty
+                t, T.Set.empty, set'
             ] in
             let tail_builders = make_list depth tail in
             CCList.(
               t_builders >>= fun mk_t ->
               tail_builders >>= fun mk_tail ->
-              [FunM.(mk_t >>= fun (t,set) ->
-                     mk_tail >>= fun (tail,set') ->
-                     return (t::tail, T.Set.union set set'))]
+              [FunM.(mk_t >>= fun (t,set,set_new) ->
+                     mk_tail >>= fun (tail,set',set_new') ->
+                     return (t::tail,
+                             T.Set.union set set',
+                             T.Set.union set_new set_new'))]
             )
       in
       assert (depth>0);
+      (* make the cover set's cases, tagged with `Base or `Rec depending
+        on whether they contain sub-cases *)
       let cases_and_subs = List.map
         (fun gen ->
-          let t, set = gen() in
+          let t, set, set' = gen() in
+          (* declare members of set' as new inductive constants *)
+          T.Set.iter
+            (fun t' ->
+              assert (is_inductive_type (T.ty t'));
+              let lit = BoolLit.inject_lits [| Literal.mk_eq cst t |] in
+              let pc = {pc_lit=lit; pc_cst=cst; pc_case=t} :: cst_data.pc in
+              declare ~pc t';
+            ) set';
+          (* remember whether [t] is base or recursive case *)
           if T.Set.is_empty set then (t, `Base), set else (t, `Rec), set
         ) (make depth)
       in
+      (* declare sub-constants as such. They won't be candidate for induction
+        and will be smaller than [t] *)
       List.iter
         (fun ((t, _), set) ->
           T.Set.iter
@@ -560,17 +591,12 @@ module Make(X : PARAMETERS) = struct
 
     module Set = T.Set
 
-    let parent t =
+    let pc t =
       let cst_data = T.Tbl.find _tbl t in
-      cst_data.parent
+      cst_data.pc
 
-    let rec depends_on a b = match parent a with
-      | None -> false
-      | Some a' -> T.eq a' b || depends_on a' b
-
-    let parent_exn t = match parent t with
-      | None -> failwith "no parent"
-      | Some t' -> t'
+    let depends_on a b =
+      List.exists (fun pc -> T.eq pc.pc_cst b) (pc a)
 
     let is_max_among t set =
       Set.for_all (fun t' -> not (depends_on t' t)) set
