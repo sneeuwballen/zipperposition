@@ -89,27 +89,27 @@ let parse_args () =
   and add_file s = CCVector.push files s 
   in
   (* options list *) 
-  let options =
-    [ "-ord", Arg.Set_string ord, "choose ordering (rpo,kbo)"
-    ; "-version", Arg.Set version, "print version"
-    ; "-steps", Arg.Set_int steps, "maximal number of steps of given clause loop"
-    ; "-timeout", Arg.Set_float timeout, "timeout (in seconds)"
+  let options = Arg.align (
+    [ "-ord", Arg.Set_string ord, " choose ordering (rpo,kbo)"
+    ; "-version", Arg.Set version, " print version"
+    ; "-steps", Arg.Set_int steps, " maximal number of steps of given clause loop"
+    ; "-timeout", Arg.Set_float timeout, " timeout (in seconds)"
     ; "-select", Arg.Set_string select, help_select
-    ; "-split", Arg.Set split, "enable splitting"
-    ; "-plugin", Arg.String add_plugin, "load given plugin (.cmxs)"
-    ; "-plugins", Arg.String add_plugins, "load given plugin(s), comma-separated"
-    ; "-expand-def", Arg.Set expand_def, "expand definitions"
-    ; "-progress", Arg.Unit set_progress, "print progress"
-    ; "-theories", Arg.Bool (fun b -> theories := b), "enable/disable theory detection"
-    ; "-proof", Arg.Set_string proof, "choose proof printing (none, debug, or tstp)"
+    ; "-split", Arg.Set split, " enable splitting"
+    ; "-plugin", Arg.String add_plugin, " load given plugin (.cmxs)"
+    ; "-plugins", Arg.String add_plugins, " load given plugin(s), comma-separated"
+    ; "-expand-def", Arg.Set expand_def, " expand definitions"
+    ; "-progress", Arg.Unit set_progress, " print progress"
+    ; "-theories", Arg.Bool (fun b -> theories := b), " enable/disable theory detection"
+    ; "-proof", Arg.Set_string proof, " choose proof printing (none, debug, or tstp)"
     ; "-presaturate", Arg.Set presaturate,
-        "pre-saturate (interreduction of) the initial clause set"
-    ; "-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT"
-    ; "-dot-sat", Arg.Set dot_sat, "print saturated set into DOT"
-    ; "-seed", Arg.Set_int seed, "set random seed"
-    ; "-unary-depth", Arg.Set_int unary_depth, "maximum depth for successive unary inferences"
-    ] @ !other_opts @ Options.global_opts
-  in
+        " pre-saturate (interreduction of) the initial clause set"
+    ; "-dot", Arg.String (fun s -> dot_file := Some s) , " print final state to file in DOT"
+    ; "-dot-sat", Arg.Set dot_sat, " print saturated set into DOT"
+    ; "-seed", Arg.Set_int seed, " set random seed"
+    ; "-unary-depth", Arg.Set_int unary_depth, " maximum depth for successive unary inferences"
+    ] @ !other_opts @ Options.mk_global_opts ()
+  ) in
   let options = List.sort (fun (a1,_,_)(a2,_,_)->String.compare a1 a2) options in
   Util.set_debug 1;  (* default *)
   Arg.parse options add_file "solve problems in files";

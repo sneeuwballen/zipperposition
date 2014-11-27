@@ -31,6 +31,8 @@ open Logtk
 
 (** {2 Inference rules} *)
 
+val section : Util.Section.t
+
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C

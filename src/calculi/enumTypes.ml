@@ -43,6 +43,8 @@ let stat_declare = Util.mk_stat "enum_types.declare"
 let stat_simplify = Util.mk_stat "enum_types.simplify"
 let stat_instantiate = Util.mk_stat "enum_types.instantiate_axiom"
 
+let section = Util.Section.make ~parent:Const.section "enum_ty"
+
 (** {2 Inference rules} *)
 
 module type S = sig
@@ -113,10 +115,10 @@ module Make(E : Env.S) = struct
       then failwith "EnumTypes: invalid declaration (free variables)";
     if List.exists (fun decl -> Unif.Ty.are_variant ty decl.decl_ty) !_decls
     then (
-      Util.debug 3 "EnumTypes: an enum is already declared for type %a" Type.pp ty;
+      Util.debug ~section 3 "an enum is already declared for type %a" Type.pp ty;
       false
     ) else (
-      Util.debug 1 "EnumTypes: declare new enum type %a (cases %a = %a)"
+      Util.debug ~section 1 "declare new enum type %a (cases %a = %a)"
         Type.pp ty T.pp var (CCList.pp ~sep:"|" T.pp) cases;
       Util.incr_stat stat_declare;
       (* set of already declared symbols *)
@@ -231,7 +233,7 @@ module Make(E : Env.S) = struct
                     ~rule:"enum_type_case_switch" cc [C.proof c]
                   in
                   let c' = C.create_a ~parents:[c] lits' proof in
-                  Util.debug 3 "deduce %a\n   from %a (enum_type switch on %a)"
+                  Util.debug ~section 3 "deduce %a\n   from %a (enum_type switch on %a)"
                     C.pp c' C.pp c Type.pp decl.decl_ty;
                   c'
                 ) decl.decl_cases
@@ -280,7 +282,7 @@ module Make(E : Env.S) = struct
           let proof cc = Proof.mk_c_inference
             ~rule:"axiom_enum_types" cc [decl.decl_proof] in
           let c' = C.create lits proof in
-          Util.debug 3 "declare enum type for %a: clause %a" Symbol.pp s C.pp c';
+          Util.debug ~section  3"declare enum type for %a: clause %a" Symbol.pp s C.pp c';
           Util.incr_stat stat_instantiate;
           Some c'
         )
@@ -317,7 +319,7 @@ module Make(E : Env.S) = struct
 
   let register () =
     if !_enable then begin
-      Util.debug 1 "register handling of enumerated types";
+      Util.debug ~section  1 "register handling of enumerated types";
       Env.add_multi_simpl_rule instantiate_vars;
       Env.add_is_trivial is_trivial;
       (* signals: instantiate axioms upon new symbols, or when new

@@ -33,6 +33,8 @@ module Util = Logtk.Util
 
 type 'a printer = Format.formatter -> 'a -> unit
 
+let section = Logtk.Util.Section.make ~parent:Const.section "avatar"
+
 (** {2 Sat-Solvers} *)
 
 module BoolLit = struct
@@ -61,7 +63,7 @@ let _default = ref None
 
 let register_solver s =
   if Hashtbl.mem _solvers s.name
-    then failwith (Printf.sprintf "solver \"%s\" already registered" s.name);
+    then failwith (Printf.sprintf "Avatar: solver \"%s\" already registered" s.name);
   (* be sure we have a default solver *)
   if !_default = None
     then _default := Some s;
@@ -96,7 +98,7 @@ module Make(E : Env.S) = struct
   let _solver = ref None
 
   let _get_solver () = match !_solver with
-    | None -> failwith "Avatar: error, solver shouldn't be None"
+    | None -> failwith "error, solver shouldn't be None"
     | Some s -> s
 
   let _add_lits l = (_get_solver()).add_lits l
@@ -164,13 +166,13 @@ module Make(E : Env.S) = struct
           ) !components
         in
         let clauses, bool_clause = List.split clauses_and_names in
-        Util.debug 4 "Avatar: split of %a yields %a" C.pp c (Util.pp_list C.pp) clauses;
+        Util.debug ~section 4 "split of %a yields %a" C.pp c (Util.pp_list C.pp) clauses;
         (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
         _add_lits bool_clause;
         let bool_guard = C.get_trail c |> C.Trail.to_list |> List.map BoolLit.neg in
         let bool_clause = List.append bool_clause bool_guard in 
         _add_clauses [bool_clause];
-        Util.debug 4 "Avatar: constraint clause is %a" _pp_bclause bool_clause;
+        Util.debug ~section 4 "constraint clause is %a" _pp_bclause bool_clause;
         (* return the clauses *)
         Some clauses
 
@@ -191,7 +193,7 @@ module Make(E : Env.S) = struct
       assert (not (C.Trail.is_empty (C.get_trail c)));
       let b_lits = C.get_trail c |> C.Trail.to_list  in
       let b_clause = List.map BoolLit.neg b_lits in
-      Util.debug 4 "Avatar: negate trail of %a with %a" C.pp c _pp_bclause b_clause;
+      Util.debug ~section 4 "negate trail of %a with %a" C.pp c _pp_bclause b_clause;
       _add_clauses [b_clause];
     );
     [] (* never infers anything! *)
@@ -200,12 +202,15 @@ module Make(E : Env.S) = struct
   let check_satisfiability () =
     Util.enter_prof prof_check;
     let s = _get_solver () in
+    if Util.Section.cur_level section >= 5 then (
+      Printf.printf "Boolean formula: TODO@."
+    );
     let res = match s.check () with
     | `Sat ->
-        Util.debug 3 "Avatar: SAT-solver reports \"SAT\"";
+        Util.debug ~section 3 "SAT-solver reports \"SAT\"";
         []
     | `Unsat ->
-        Util.debug 1 "Avatar: SAT-solver reports \"UNSAT\"";
+        Util.debug ~section 1 "SAT-solver reports \"UNSAT\"";
         (* TODO: proper proof handling (collect unsat core? collect all clauses?)*)
         let proof cc = Proof.mk_c_inference ~rule:"avatar" ~theories:["sat"] cc [] in
         let c = C.create [] proof in
@@ -215,11 +220,11 @@ module Make(E : Env.S) = struct
     res
 
   let register () =
-    Util.debug 2 "register extension Avatar";
+    Util.debug ~section:Const.section 2 "register extension Avatar";
     begin match current_solver() with
       | None -> failwith "Avatar: expect a default SAT solver to be defined."
       | Some s ->
-          Util.debug 2 "Avatar: create a new solver (kind %s)" s.name;
+          Util.debug ~section 2 "create a new solver (kind %s)" s.name;
           let solver = s.create() in
           solver.set_printer BoolLit.print;
           _solver := Some solver
