@@ -92,6 +92,10 @@ module Make(X : sig end) : BS.QBF = struct
     | Sat
     | Unsat
 
+  let pp_result buf = function
+    | Sat -> Buffer.add_string buf "sat"
+    | Unsat -> Buffer.add_string buf "unsat"
+
   let set_printer p = pp_ := p
   let name = "quantor"
 
@@ -148,12 +152,15 @@ module Make(X : sig end) : BS.QBF = struct
     );
     let st = get_state_ () in
     st.result <- Quantor.solve f;
-    match st.result with
+    let res = match st.result with
     | Qbf.Unsat -> Unsat
     | Qbf.Sat _ -> Sat
     | Qbf.Timeout
     | Qbf.Spaceout -> assert false
     | Qbf.Unknown -> failwith "quantor: return unknown"
+    in
+    Logtk.Util.debug ~section 3 "quantor check: %a" pp_result res;
+    res
 end
 
 let qbf_solver =

@@ -44,6 +44,10 @@ end
 let ind_types_ = ref []
 let cover_set_depth_ = ref 1
 
+let section = Util.Section.make ~parent:Const.section "ind"
+let section_qbf = Util.Section.make
+  ~parent:section ~inheriting:[BoolSolver.section] "qbf"
+
 (* is [s] a constructor symbol for some inductive type? *)
 let is_constructor_ s = match s with
   | Sym.Cst info ->
@@ -189,7 +193,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
         | Some set -> set
       in
       set.proofs <- parents :: set.proofs;
-      Util.debug 4 "add proof: %a" Proof.pp_notrec p;
+      Util.debug ~section 4 "add proof: %a" Proof.pp_notrec p;
     with NonClausalProof ->
       ()  (* ignore the proof *)
 
@@ -252,7 +256,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
           | _, `Old -> ()
           | set, `New ->
               (* Make a case split on the cover set (one clause per literal) *)
-              Util.debug 2 "make a case split on inductive %a" T.pp t;
+              Util.debug ~section 2 "make a case split on inductive %a" T.pp t;
               let clauses_and_lits = List.map
                 (fun t' ->
                   assert (T.is_ground t');
@@ -269,7 +273,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
               (* add a boolean constraint: Xor of boolean lits *)
               Solver.add_clauses (mk_xor_ bool_lits);
               (* return clauses *)
-              Util.debug 4 "split inference for %a: %a"
+              Util.debug ~section 4 "split inference for %a: %a"
                 T.pp t (CCList.pp C.pp) clauses;
               res := List.rev_append clauses !res
         );
@@ -308,14 +312,14 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       (* new context: watch proofs of ctx[i]
         and ctx[t] for all [t] that is a sub-constant of [i] *)
       watch_proofs_of_clause ctx.cand_lits (`Inductive_cst ctx);
-      Util.debug 2 "ind: watch %a (initialization, %a)"
+      Util.debug ~section 2 "watch %a (initialization, %a)"
         Lits.pp ctx.cand_lits T.pp ctx.cand_cst;
       CI.cover_sets ctx.cand_cst
         |> Sequence.flat_map (fun set -> T.Set.to_seq set.CI.sub_constants)
         |> Sequence.iter
           (fun t ->
             let c = CCtx.apply ctx.cand_ctx t in
-            Util.debug 2 "ind: watch %a (sub-cst %a)" Lits.pp c T.pp t;
+            Util.debug ~section 2 "watch %a (sub-cst %a)" Lits.pp c T.pp t;
             watch_proofs_of_clause c `Sub_cst
           );
       Signal.ContinueListening
@@ -340,7 +344,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     let is_new = not c.cand_initialized in
     if is_new then (
       c.cand_initialized <- true;
-      Util.debug 2 "ind: clause context %a[%a] now initialized"
+      Util.debug ~section 2 "clause context %a[%a] now initialized"
         CCtx.pp c.cand_ctx T.pp c.cand_cst;
     );
     is_new
@@ -359,7 +363,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
                 cand_cst=t;
                 cand_lits=C.lits c;
               } in
-              Util.debug 2 "ind: new (initialized) context for %a: %a"
+              Util.debug ~section 2 "new (initialized) context for %a: %a"
                 T.pp t CCtx.pp ctx.cand_ctx;
               set := FV_cand.add !set (C.lits c) ctx;
               Signal.send on_new_context ctx;
@@ -384,7 +388,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
                 cand_lits=lits'; (* ctx[cst] *)
               } in
               (* need to watch ctx[cst] until it is proved *)
-              Util.debug 2 "ind: new context %a" CCtx.pp ctx;
+              Util.debug ~section 2 "new context %a" CCtx.pp ctx;
               Signal.send on_new_context cand_ctx;
               set := FV_cand.add !set lits' cand_ctx;
               None
@@ -414,7 +418,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     let proof cc = Proof.mk_c_inference ~rule:"subsumes" cc [C.proof c] in
     let proof' = proof (CompactClause.make lits' (C.get_trail c |> C.compact_trail)) in
     add_proof_ lits' proof';
-    Util.debug 2 "add proof of watched %a because of %a" Lits.pp lits' C.pp c;
+    Util.debug ~section 2 "add proof of watched %a because of %a" Lits.pp lits' C.pp c;
     (* check whether that makes some cand_ctx initialized *)
     List.fold_left
       (fun acc elt -> match elt with
@@ -431,7 +435,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
                 ~trail:(C.get_trail c) lits proof in
               (* disable subsumption for [clause] *)
               C.set_flag C.flag_persistent clause true;
-              Util.debug 2 "initialized %a by subsumption from %a"
+              Util.debug ~section 2 "initialized %a by subsumption from %a"
                 C.pp clause C.pp c;
               clause :: acc
             ) else acc
@@ -508,14 +512,14 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       - adding backtrackable constraints *)
   let qbf_encode_enter_ () =
     (* normal constraints should be added already *)
-    Util.debug 4 "ind: save QBF solver";
+    Util.debug ~section:section_qbf 4 "save QBF solver...";
     save_level_ := Solver.save ();
     (* TODO add backtrackable constraints *)
     ()
 
   (* restoring state *)
   let qbf_encode_exit_ () =
-    Util.debug 4 "ind: restore QBF solver";
+    Util.debug ~section:section_qbf 4 "...restore QBF solver";
     Solver.restore !save_level_;
     ()
 
@@ -542,8 +546,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       )
     in
     (* guard every clause with "cases(i) => clause" *)
-    let cases = cases_ cst in
-    let clauses = List.map (fun c -> neg_ cases :: c) big_xor in
+    let clauses = List.map (fun c -> neg_ (cases_ cst) :: c) big_xor in
     Solver.add_clauses clauses;
     ()
 
@@ -587,7 +590,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
         in
         (* declare type. *)
         ignore (CI.declare_ty pattern constructors);
-        Util.debug 1 "ind: declare inductive type %a" Ty.pp pattern;
+        Util.debug ~section 1 "declare inductive type %a" Ty.pp pattern;
         ()
       ) l
 
@@ -603,7 +606,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     in res
 
   let register() =
-    Util.debug 1 "register induction calculus";
+    Util.debug ~section 1 "register induction calculus";
     declare_types_ !ind_types_;
     Solver.set_printer BoolLit.print;
     Ctx.add_constr 20 constr_sub_cst_;  (* enforce new constraint *)
@@ -628,7 +631,7 @@ let extension =
     let sup = Mixtbl.find ~inj:Superposition.key E.mixtbl "superposition" in
     let module Sup = (val sup : Superposition.S) in
     let module Solver = (val BoolSolver.get_qbf() : BoolSolver.QBF) in
-    Util.debug 2 "created QBF solver \"%s\"" Solver.name;
+    Util.debug ~section:section_qbf 2 "created QBF solver \"%s\"" Solver.name;
     let module A = Make(E)(Sup)(Solver) in
     A.register()
   (* add an ordering constraint: ensure that constructors are smaller
@@ -653,7 +656,7 @@ let enabled_ = ref false
 let enable_ () =
   if not !enabled_ then (
     enabled_ := true;
-    Util.debug 1 "Induction: requires ord=rpo6; select=NoSelection";
+    Util.debug ~section 1 "Induction: requires ord=rpo6; select=NoSelection";
     Params.ord := "rpo6";   (* new default! RPO is necessary*)
     Params.select := "NoSelection";
     Extensions.register extension
@@ -671,7 +674,7 @@ let add_ind_type_ str =
       let cstors = Util.str_split ~by:"|" cstors in
       if List.length cstors < 2 then _fail();
       (* remember to declare this type as inductive *)
-      Util.debug 2 "user declares inductive type %s = %a"
+      Util.debug ~section 2 "user declares inductive type %s = %a"
         ty (CCList.pp CCString.pp) cstors;
       ind_types_ := (ty, cstors) :: !ind_types_
   | _ -> _fail()
