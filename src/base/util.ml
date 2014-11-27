@@ -52,7 +52,7 @@ module Section = struct
   }
   and descr =
     | Root
-    | Sub of string * t  (* name, parent *)
+    | Sub of string * t * t list  (* name, parent, inheriting *)
 
   let root={descr=Root; full_name=""; level=0; }
 
@@ -61,7 +61,7 @@ module Section = struct
     let buf = Buffer.create 15 in
     let rec add s = match s.descr with
       | Root -> true
-      | Sub (name, parent) ->
+      | Sub (name, parent, _) ->
           let parent_is_root = add parent in
           if not parent_is_root then Buffer.add_char buf '.';
           Buffer.add_string buf name;
@@ -80,9 +80,13 @@ module Section = struct
   let get_debug s =
     if s.level=null_level then None else Some s.level
 
-  let make ?(parent=root) name =
+  let make ?(parent=root) ?(inheriting=[]) name =
     if name="" then invalid_arg "Section.make: empty name";
-    let sec = {descr=Sub(name, parent); full_name=""; level=null_level; } in
+    let sec = {
+      descr=Sub(name, parent, inheriting);
+      full_name="";
+      level=null_level;
+    } in
     let name' = compute_full_name sec in
     try
       Hashtbl.find section_table name'
@@ -103,7 +107,12 @@ module Section = struct
     if s.level = null_level
     then match s.descr with
       | Root -> 0
-      | Sub (_, parent) -> cur_level_rec parent
+      | Sub (_, parent, []) -> cur_level_rec parent
+      | Sub (_, parent, [i]) -> max (cur_level_rec parent) (cur_level_rec i)
+      | Sub (_, parent, inheriting) ->
+          List.fold_left
+            (fun m i -> max m (cur_level_rec i))
+            (cur_level_rec parent) inheriting
     else s.level
 
   (* inlinable function *)

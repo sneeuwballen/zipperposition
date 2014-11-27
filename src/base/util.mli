@@ -47,7 +47,14 @@ module Section : sig
 
   val root : t (** Default section, with no parent *)
   val logtk : t (** Section for all Logtk-related things *)
-  val make : ?parent:t -> string -> t
+
+  val make : ?parent:t -> ?inheriting:t list -> string -> t
+  (** [make ?parent ?inheriting name] makes a new section with the given name.
+      It has a parent (default [root]), used to give it a name. It can
+      also have a list of sections it inherits from.
+      Unless specificed explicitely otherwise (using
+      {!set_debug}, the level of the section will be the max level of its
+      parent and its inherited sections. *)
 end
 
 val set_debug : int -> unit     (** Set debug level of [Section.root] *)
