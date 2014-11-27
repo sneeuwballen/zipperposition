@@ -33,6 +33,7 @@ module Util = Logtk.Util
 
 type 'a printer = Format.formatter -> 'a -> unit
 
+let section = Logtk.Util.Section.make ~parent:Const.section "avatar"
 (** {2 Avatar} *)
 
 let prof_splits = Util.mk_profiler "avatar.split"
@@ -110,12 +111,12 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
           ) !components
         in
         let clauses, bool_clause = List.split clauses_and_names in
-        Util.debug 4 "Avatar: split of %a yields %a" C.pp c (Util.pp_list C.pp) clauses;
+        Util.debug ~section 4 "split of %a yields %a" C.pp c (Util.pp_list C.pp) clauses;
         (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
         let bool_guard = C.get_trail c |> C.Trail.to_list |> List.map BoolLit.neg in
         let bool_clause = List.append bool_clause bool_guard in 
         Sat.add_clauses [bool_clause];
-        Util.debug 4 "Avatar: constraint clause is %a" _pp_bclause bool_clause;
+        Util.debug ~section 4 "constraint clause is %a" _pp_bclause bool_clause;
         (* return the clauses *)
         Some clauses
 
@@ -136,7 +137,7 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
       assert (not (C.Trail.is_empty (C.get_trail c)));
       let b_lits = C.get_trail c |> C.Trail.to_list  in
       let b_clause = List.map BoolLit.neg b_lits in
-      Util.debug 4 "Avatar: negate trail of %a with %a" C.pp c _pp_bclause b_clause;
+      Util.debug ~section 4 "negate trail of %a with %a" C.pp c _pp_bclause b_clause;
       Sat.add_clauses [b_clause];
     );
     [] (* never infers anything! *)
@@ -150,10 +151,10 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
     Signal.send before_check_sat ();
     let res = match Sat.check ()  with
     | Sat.Sat ->
-        Util.debug 3 "Avatar: SAT-solver reports \"SAT\"";
+        Util.debug ~section 3 "SAT-solver reports \"SAT\"";
         []
     | Sat.Unsat ->
-        Util.debug 1 "Avatar: SAT-solver reports \"UNSAT\"";
+        Util.debug ~section 1 "SAT-solver reports \"UNSAT\"";
         (* TODO: proper proof handling (collect unsat core? collect all clauses?)*)
         let proof cc = Proof.mk_c_inference ~rule:"avatar" ~theories:["sat"] cc [] in
         let c = C.create [] proof in
@@ -164,7 +165,7 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
     res
 
   let register () =
-    Util.debug 2 "register extension Avatar";
+    Util.debug ~section:Const.section 2 "register extension Avatar";
     Sat.set_printer BoolLit.print;
     E.add_multi_simpl_rule split;
     E.add_unary_inf "avatar_check_empty" check_empty;
@@ -191,5 +192,5 @@ let _enable_avatar () =
 
 let () =
   Params.add_opts
-    [ "-avatar", Arg.Unit _enable_avatar, "enable Avatar-like splitting (based on SAT)"
+    [ "-avatar", Arg.Unit _enable_avatar, " enable Avatar-like splitting (based on SAT)"
     ]

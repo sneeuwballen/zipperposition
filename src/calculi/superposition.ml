@@ -39,6 +39,9 @@ module Comp = Comparison
 
 type scope = Substs.scope
 
+let section =
+  Logtk.Util.Section.make ~parent:Const.section "sup"
+
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C
@@ -287,7 +290,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.incr_stat stat_superposition_call;
     let sc_a = info.scope_active in
     let sc_p = info.scope_passive in
-    Util.debug 3 ("sup\n  %a[%d] s=%a t=%a \n  %a[%d] passive_lit=%a p=%a\n  subst=%a")
+    Util.debug ~section 3
+      ("sup\n  %a[%d] s=%a t=%a \n  %a[%d] passive_lit=%a p=%a\n  subst=%a")
                   C.pp info.active sc_a T.pp info.s T.pp info.t
                   C.pp info.passive sc_p Lit.pp info.passive_lit
                   Position.pp info.passive_pos S.pp info.subst;
@@ -337,10 +341,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         c [C.proof info.active; C.proof info.passive] in
       let parents = [info.active; info.passive] in
       let new_clause = C.create ~parents new_lits proof in
-      Util.debug 3 "... ok, conclusion %a" C.pp new_clause;
+      Util.debug ~section 3 "... ok, conclusion %a" C.pp new_clause;
       new_clause :: acc
     with ExitSuperposition reason ->
-      Util.debug 3 "... cancel, %s" reason;
+      Util.debug ~section 3 "... cancel, %s" reason;
       acc
 
   (* simultaneous superposition: when rewriting D with C \lor s=t,
@@ -352,7 +356,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.incr_stat stat_superposition_call;
     let sc_a = info.scope_active in
     let sc_p = info.scope_passive in
-    Util.debug 3 ("simultaneous sup\n  %a[%d] s=%a t=%a \n  %a[%d] passive_lit=%a p=%a\n  subst=%a")
+    Util.debug ~section 3 ("simultaneous sup\n  %a[%d] s=%a t=%a \n  %a[%d] passive_lit=%a p=%a\n  subst=%a")
                   C.pp info.active sc_a T.pp info.s T.pp info.t
                   C.pp info.passive sc_p Lit.pp info.passive_lit
                   Position.pp info.passive_pos S.pp info.subst;
@@ -401,10 +405,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         c [C.proof info.active; C.proof info.passive] in
       let parents = [info.active; info.passive] in
       let new_clause = C.create ~parents new_lits proof in
-      Util.debug 3 "... ok, conclusion %a" C.pp new_clause;
+      Util.debug ~section 3 "... ok, conclusion %a" C.pp new_clause;
       new_clause :: acc
     with ExitSuperposition reason ->
-      Util.debug 3 "... cancel, %s" reason;
+      Util.debug ~section 3 "... cancel, %s" reason;
       acc
 
   (* choose between regular and simultaneous superposition *)
@@ -491,7 +495,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               let new_lits = Util.array_except_idx (C.lits clause) pos in
               let new_lits = Lit.apply_subst_list ~renaming subst new_lits 0 in
               let new_clause = C.create ~parents:[clause] new_lits proof in
-              Util.debug 3 "equality resolution on %a yields %a"
+              Util.debug ~section 3 "equality resolution on %a yields %a"
                 C.pp clause C.pp new_clause;
               new_clause::acc
             ) else
@@ -542,7 +546,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         in
         let new_lits = lit' :: new_lits in
         let new_clause = C.create ~parents:[info.clause] new_lits proof in
-        Util.debug 3 "equality factoring on %a yields %a"
+        Util.debug ~section 3 "equality factoring on %a yields %a"
           C.pp info.clause C.pp new_clause;
         new_clause :: acc
       ) else
@@ -676,7 +680,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     find_components (C.lits c) 0;
     let components = ref [] in
     UF.iter cluster (fun _ l ->
-      Util.debug 4 "component %a" (Util.pp_list Lit.pp) l;
+      Util.debug ~section 4 "component %a" (Util.pp_list Lit.pp) l;
       components := l :: !components);
     let n = List.length !components in
     if n > 1 && List.for_all (fun l -> List.length l >= 2) !components then begin
@@ -701,7 +705,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (List.tl !components) symbols
       in
       let new_clauses = guard :: new_clauses in
-      Util.debug 3 "split on %a yields %a" C.pp c
+      Util.debug ~section 3 "split on %a yields %a" C.pp c
         (Util.pp_list C.pp) new_clauses;
       Util.exit_prof prof_split;
       new_clauses
@@ -743,7 +747,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   O.compare ord
                     (S.FO.apply_no_renaming subst l 1)
                     (S.FO.apply_no_renaming subst r 1) = Comp.Gt);
-                Util.debug 5 "demod: t=%a[0], l= %a[1], r=%a[1], subst=%a"
+                Util.debug ~section 5 "demod: t=%a[0], l= %a[1], r=%a[1], subst=%a"
                   T.pp t T.pp l T.pp r S.pp subst;
                 clauses := unit_clause :: !clauses;
                 Util.incr_stat stat_demodulate_step;
@@ -751,7 +755,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               end);
         t (* not found any match, normal form found *)
       with RewriteInto (t', subst) ->
-        Util.debug 5 "demod: rewrite %a into %a" T.pp t T.pp t';
+        Util.debug ~section 5 "demod: rewrite %a into %a" T.pp t T.pp t';
         normal_form ~restrict subst t' 1 (* done one rewriting step, continue *)
     (* rewrite innermost-leftmost of [subst(t,scope)]. The initial scope is
        0, but then we normal_form terms in which variables are really the variables
@@ -815,7 +819,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           (C.proof c :: List.map C.proof !clauses) in
         let parents = c :: C.parents c in
         let new_c = C.create_a ~parents lits proof in
-        Util.debug 3 "demodulate %a into %a using\n %a"
+        Util.debug ~section 3 "demodulate %a into %a using\n %a"
           C.pp c C.pp new_c (Util.pp_list C.pp) !clauses;
         (* return simplified clause *)
         Util.exit_prof prof_demodulate;
@@ -883,7 +887,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           triv || check lits (i+1)
     in
     let is_tauto = check (C.lits c) 0 || C.Trail.is_trivial (C.get_trail c) in
-    (if is_tauto then Util.debug 3 "%a is a tautology" C.pp c);
+    (if is_tauto then Util.debug ~section 3 "%a is a tautology" C.pp c);
     is_tauto
 
   (** semantic tautology deletion, using a congruence closure algorithm
@@ -912,7 +916,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     (if res then begin
       Util.incr_stat stat_semantic_tautology;
-      Util.debug 2 "%a is a semantic tautology" C.pp c;
+      Util.debug ~section 2 "%a is a semantic tautology" C.pp c;
       end);
     Util.exit_prof prof_semantic_tautology;
     res
@@ -965,7 +969,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ) else (
           let proof cc= Proof.mk_c_simp ~rule:"simplify" cc [C.proof c] in
           let new_clause = C.create ~parents:[c] new_lits proof in
-          Util.debug 3 "%a basic_simplifies into\n %a  with %a"
+          Util.debug ~section 3 "%a basic_simplifies into\n %a  with %a"
             C.pp c C.pp new_clause S.pp !subst;
           Util.incr_stat stat_basic_simplify;
           Util.exit_prof prof_basic_simplify;
@@ -1031,7 +1035,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           if Unif.FO.eq ~subst r 1 t2 0
           then begin
             (* t1!=t2 is refuted by l\sigma = r\sigma *)
-            Util.debug 4 "equate %a and %a using %a" T.pp t1 T.pp t2 C.pp c';
+            Util.debug ~section 4 "equate %a and %a using %a" T.pp t1 T.pp t2 C.pp c';
             raise (FoundMatch (r, c', subst)) (* success *)
           end
         );
@@ -1048,7 +1052,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           ~rule:"simplify_reflect+" c' (C.proof c::premises) in
         let parents = c :: C.parents c in
         let new_c = C.create ~parents lits proof in
-        Util.debug 3 "%a pos_simplify_reflect into %a" C.pp c C.pp new_c;
+        Util.debug ~section 3 "%a pos_simplify_reflect into %a" C.pp c C.pp new_c;
         Util.exit_prof prof_pos_simplify_reflect;
         new_c
 
@@ -1074,7 +1078,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           then begin
             (* TODO: useless? *)
             let subst = Unif.FO.matching ~subst ~pattern:r 1 t 0 in
-            Util.debug 3 "neg_reflect eliminates %a=%a with %a" T.pp s T.pp t C.pp c';
+            Util.debug ~section 3 "neg_reflect eliminates %a=%a with %a" T.pp s T.pp t C.pp c';
             raise (FoundMatch (r, c', subst)) (* success *)
           end
         );
@@ -1091,7 +1095,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           c' (C.proof c :: premises) in
         let parents = c :: C.parents c in
         let new_c = C.create ~parents lits proof in
-        Util.debug 3 "%a neg_simplify_reflect into %a" C.pp c C.pp new_c;
+        Util.debug ~section 3 "%a neg_simplify_reflect into %a" C.pp c C.pp new_c;
         Util.exit_prof prof_neg_simplify_reflect;
         new_c
 
@@ -1195,7 +1199,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let res = match subsumes_with a 0 b 1 with
     | None -> false
     | Some _ ->
-      Util.debug 2 "%a subsumes %a" Lits.pp a Lits.pp b;
+      Util.debug ~section 2 "%a subsumes %a" Lits.pp a Lits.pp b;
       true
     in
     Util.exit_prof prof_subsumption;
@@ -1240,7 +1244,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let res = match a with
     | [|Lit.Equation (s, t, true)|] ->
       let res = Util.array_exists (equate_lit_with s t) b in
-      (if res then Util.debug 3 "%a eq-subsumes %a"  Lits.pp a Lits.pp b);
+      (if res then Util.debug ~section 3 "%a eq-subsumes %a"  Lits.pp a Lits.pp b);
       res
     | _ -> false  (* only a positive unit clause unit-subsumes a clause *)
     in
@@ -1267,7 +1271,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Util.exit_prof prof_subsumption_set;
       false
     with Exit ->
-      Util.debug 3 "%a subsumed by active set" C.pp c;
+      Util.debug ~section 3 "%a subsumed by active set" C.pp c;
       Util.incr_stat stat_clauses_subsumed;
       Util.exit_prof prof_subsumption_set;
       true
@@ -1357,7 +1361,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let proof c'' = Proof.mk_c_inference ~rule:"clc" ~info c'' [C.proof c; C.proof c'] in
       let parents = c :: C.parents c in
       let new_c = C.create ~parents new_lits proof in
-      Util.debug 3 "contextual literal cutting in %a using %a gives\n\t%a"
+      Util.debug ~section 3 "contextual literal cutting in %a using %a gives\n\t%a"
         C.pp c C.pp c' C.pp new_c;
       Util.incr_stat stat_clc;
       (* try to cut another literal *)
@@ -1421,7 +1425,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~rule:"condensation" c' [C.proof c] in
       let parents = c :: C.parents c in
       let new_c = C.create_a ~parents new_lits proof in
-      Util.debug 3 "condensation in %a (with %a) gives\n\t %a"
+      Util.debug ~section 3 "condensation in %a (with %a) gives\n\t %a"
         C.pp c S.pp subst C.pp new_c;
       (* try to condense further *)
       Util.exit_prof prof_condensation;
@@ -1520,15 +1524,15 @@ let () =
   Params.add_opts
     [ "-semantic-tauto"
       , Arg.Set _enable_semantic_tauto
-      , "enable semantic tautology check"
+      , " enable semantic tautology check"
     ; "-dot-sup-into"
       , Arg.String (fun s -> _dot_sup_into := Some s)
-      , "print superposition-into index into file"
+      , " print superposition-into index into file"
     ; "-dot-sup-from"
       , Arg.String (fun s -> _dot_sup_from := Some s)
-      , "print superposition-from index into file"
+      , " print superposition-from index into file"
     ; "-simultaneous-sup"
       , Arg.Bool (fun b -> _use_simultaneous_sup := b)
-      , "enable/disable simultaneous superposition"
+      , " enable/disable simultaneous superposition"
     ]
 

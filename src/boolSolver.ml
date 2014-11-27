@@ -29,6 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 type 'a printer = Format.formatter -> 'a -> unit
 
+let section = Logtk.Util.Section.make ~parent:Const.section "bool_solver"
+
 (** {2 Type Definitions} *)
 
 module type SAT = BoolSolver_intf.SAT

@@ -156,7 +156,7 @@ let () =
   Params.add_opts
     [ "-clause-queue"
     , Arg.String set_profile
-    , "choose which set of clause queues to use \
+    , " choose which set of clause queues to use \
       (for selecting next active clause): choices: default,bfs,explore,ground"
     ]
 

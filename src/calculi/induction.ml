@@ -678,6 +678,6 @@ let add_ind_type_ str =
 
 let () =
   Params.add_opts
-    [ "-induction", Arg.String add_ind_type_, "enable Induction on the given type"
-    ; "-induction-depth", Arg.Set_int cover_set_depth_, "set default induction depth"
+    [ "-induction", Arg.String add_ind_type_, " enable Induction on the given type"
+    ; "-induction-depth", Arg.Set_int cover_set_depth_, " set default induction depth"
     ]

@@ -29,6 +29,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 type 'a printer = Format.formatter -> 'a -> unit
 
+val section : Logtk.Util.Section.t
+(** Section for debugging related to Boolean Solvers *)
+
 (** {2 Type Definitions} *)
 
 module type SAT = BoolSolver_intf.SAT

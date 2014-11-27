@@ -29,6 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module BS = BoolSolver
 
+let section = BS.section
+
 let rec _rev_append_map f l acc = match l with
   | [] -> acc
   | x::tail -> _rev_append_map f tail (f x :: acc)
@@ -140,7 +142,7 @@ module Make(X : sig end) : BS.QBF = struct
 
   let check () =
     let f = _mk_form () in
-    if Logtk.Util.get_debug() >= 5 then (
+    if Logtk.Util.Section.cur_level section >= 5 then (
       Format.printf "QBF formula: @[<hov>%a@]@."
         (Qbf.CNF.print_with ~pp_lit:!pp_) f
     );

@@ -38,6 +38,8 @@ let enable_depth_limit i =
   assert (i>0);
   _depth_limit := Some i
 
+let section = Util.Section.make ~parent:Const.section "heuristics"
+
 (** {2 Rules} *)
 
 module type S = sig
@@ -70,12 +72,12 @@ module Make(E : Env.S) = struct
       if depth > d
       then (
         Ctx.lost_completeness();
-        Util.debug 5 "clause dismissed (too deep at %d): %a" depth C.pp c;
+        Util.debug ~section 5 "clause dismissed (too deep at %d): %a" depth C.pp c;
         true
       ) else false
 
   let register () =
-    Util.debug 2 "register heuristics...";
+    Util.debug ~section 2 "register heuristics...";
     Env.add_is_trivial is_too_deep;
     ()
 end
@@ -92,7 +94,7 @@ let () =
   Params.add_opts
     [ "-depth-limit"
       , Arg.Int enable_depth_limit
-      , "set maximal term depth"
+      , " set maximal term depth"
     ];
   ()
 
