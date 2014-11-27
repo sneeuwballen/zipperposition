@@ -48,4 +48,8 @@ val global : t ref
   (** Global parameters, can be used as a mutable default *)
 
 val global_opts : (string * Arg.spec * string) list
-  (** Options that modify {!global} *)
+  (** Options that modify {!global}.
+      Caution, this might miss some options from modules that aren't registered yet.
+      @deprecated since NEXT_RELEASE , use {!mk_global_opts} instead*)
+
+val mk_global_opts : unit -> (string * Arg.spec * string) list

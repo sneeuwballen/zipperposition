@@ -39,7 +39,7 @@ module E = CCError
 (* result of checking the step: success or failure, with name of prover.
   The step may be unchecked. *)
 type check_result =
-  | Unchecked 
+  | Unchecked
   | Succeeded of string
   | Failed of string
 
@@ -111,7 +111,7 @@ let mk_proof_obligation proof =
     | TT.InferClause (c, lazy step) ->
       let c = F.to_prolog (F.close_forall (F.Base.or_ c)) in
       AU.FOF(step.TT.id, A.R_conjecture, c, []), step
-    | _ -> assert false 
+    | _ -> assert false
     in
     let premises = Util.list_fmap
       (fun parent -> match parent with
@@ -246,12 +246,13 @@ let progress = ref false
 
 (* TODO option to choose provers *)
 
-let options =
-  [ "-pp", Arg.Set print_problem, "print problem after parsing"
-  ; "-timeout", Arg.Set_int timeout, "timeout for subprovers (in seconds)"
-  ; "-minimum", Arg.Set_int minimum, "minimum number of checks to validate a step (1)"
-  ; "-progress", Arg.Set progress, "print progress"
-  ] @ Options.global_opts
+let options = Arg.align (
+  [ "-pp", Arg.Set print_problem, " print problem after parsing"
+  ; "-timeout", Arg.Set_int timeout, " timeout for subprovers (in seconds)"
+  ; "-minimum", Arg.Set_int minimum, " minimum number of checks to validate a step (1)"
+  ; "-progress", Arg.Set progress, " print progress"
+  ] @ Options.mk_global_opts ()
+  )
 
 (** parse_args returns parameters *)
 let parse_args () =

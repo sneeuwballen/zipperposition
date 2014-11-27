@@ -41,15 +41,16 @@ let flag_distribute_exists = ref false
 let flag_disable_renaming = ref false
 let def_limit = ref 24
 
-let options =
-  [ "-declare", Arg.Set declare_types, "declare types of symbols"
-  ; "-signature", Arg.Set print_sig, "print signature"
+let options = Arg.align (
+  [ "-declare", Arg.Set declare_types, " declare types of symbols"
+  ; "-signature", Arg.Set print_sig, " print signature"
   ; "-distribute-exist", Arg.Set flag_distribute_exists,
-    "distribute existential quantifiers during miniscoping"
-  ; "-disable-def", Arg.Set flag_disable_renaming, "disable definitional CNF"
-  ; "-def-limit", Arg.Set_int def_limit, "limit factor for definitional CNF"
-  ; "-time-limit", Arg.Int Util.set_time_limit, "hard time limit (in s)"
-  ] @ Options.global_opts
+    " distribute existential quantifiers during miniscoping"
+  ; "-disable-def", Arg.Set flag_disable_renaming, " disable definitional CNF"
+  ; "-def-limit", Arg.Set_int def_limit, " limit factor for definitional CNF"
+  ; "-time-limit", Arg.Int Util.set_time_limit, " hard time limit (in s)"
+  ] @ Options.mk_global_opts ()
+  )
 
 (* process the given file, converting it to CNF *)
 let process file =
