@@ -32,6 +32,7 @@ module S = Substs
 
 let prof_ordered_rewriting = Util.mk_profiler "rewriting.ordered"
 let stat_ordered_rewriting = Util.mk_stat "rewriting.ordered.steps"
+let section = Util.Section.(make ~parent:logtk "rewriting")
 
 (** {2 Ordered rewriting} *)
 
@@ -184,7 +185,7 @@ module MakeOrdered(E : Index.EQUATION with type rhs = T.t) = struct
                   else ()));
         t (* could not rewrite t *)
       with RewrittenInto t' ->
-        Util.debug 3 "rewrite %a into %a" T.pp t T.pp t';
+        Util.debug ~section 3 "rewrite %a into %a" T.pp t T.pp t';
         Util.incr_stat stat_ordered_rewriting;
         assert (Ordering.compare trs.ord t t' = Comparison.Gt);
         reduce reduce' t'  (* term is rewritten, reduce it again *)
@@ -314,7 +315,7 @@ struct
         Idx.retrieve ~allow_open:true ~sign:true trs 1 t 0 () rewrite_handler;
         t  (* normal form *)
       with (RewrittenIn (t', subst, rule)) ->
-        Util.debug 3 "rewrite %a into %a (with %a)" T.pp t T.pp t' S.pp subst;
+        Util.debug ~section 3 "rewrite %a into %a (with %a)" T.pp t T.pp t' S.pp subst;
         rules := rule :: !rules;
         compute_nf ~rules subst t' 1  (* rewritten into subst(t',1), continue *)
     (* attempt to use one of the rules to rewrite t *)
@@ -421,7 +422,7 @@ module FormRW = struct
         DT.retrieve ~sign:true frs 1 t 0 () rewrite_handler;
         F.Base.atom t  (* normal form is itself *)
       with (RewrittenIn (f, subst, rule)) ->
-        Util.debug 3 "rewrite %a into %a (with %a)" T.pp t F.pp f S.pp subst;
+        Util.debug ~section 3 "rewrite %a into %a (with %a)" T.pp t F.pp f S.pp subst;
         rules := rule :: !rules;
         compute_nf ~rules subst f 1  (* rewritten into subst(t',1), continue *)
     (* attempt to use one of the rules to rewrite t *)
@@ -430,8 +431,8 @@ module FormRW = struct
     in
     let rules = ref [] in
     let f' = compute_nf ~rules S.empty f 0 in
-    if not (F.eq f f') 
-      then Util.debug 3 "normal form of %a: %a" F.pp f F.pp f';
+    if not (F.eq f f')
+      then Util.debug ~section 3 "normal form of %a: %a" F.pp f F.pp f';
     f', !rules
 
   let rewrite frs f =

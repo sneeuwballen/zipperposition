@@ -42,24 +42,98 @@ let clear_line () =
     "\r                                                         \r";
   flush Pervasives.stdout
 
+(** Debug section *)
+module Section = struct
+  let null_level = -1 (* absence of level *)
+  type t = {
+    descr : descr;
+    mutable full_name : string;
+    mutable level : int;
+  }
+  and descr =
+    | Root
+    | Sub of string * t  (* name, parent *)
 
-let debug_level_ = ref 0
-let set_debug l = debug_level_ := l
-let get_debug () = !debug_level_
+  let root={descr=Root; full_name=""; level=0; }
+
+  (* computes full name of section *)
+  let compute_full_name s =
+    let buf = Buffer.create 15 in
+    let rec add s = match s.descr with
+      | Root -> true
+      | Sub (name, parent) ->
+          let parent_is_root = add parent in
+          if not parent_is_root then Buffer.add_char buf '.';
+          Buffer.add_string buf name;
+          false
+    in
+    ignore (add s);
+    Buffer.contents buf
+
+  let full_name s = s.full_name
+
+  (* full name -> section *)
+  let section_table = Hashtbl.create 15
+
+  let set_debug s i = assert (i>=0); s.level <- i
+  let clear_debug s = s.level <- null_level
+  let get_debug s =
+    if s.level=null_level then None else Some s.level
+
+  let make ?(parent=root) name =
+    if name="" then invalid_arg "Section.make: empty name";
+    let sec = {descr=Sub(name, parent); full_name=""; level=null_level; } in
+    let name' = compute_full_name sec in
+    try
+      Hashtbl.find section_table name'
+    with Not_found ->
+      (* new section! register it, add an option to set its level *)
+      sec.full_name <- name';
+      Hashtbl.add section_table name' sec;
+      sec
+
+  let logtk = make "logtk"
+
+  let iter yield =
+    yield ("", root);
+    Hashtbl.iter (fun name sec -> yield (name,sec)) section_table
+
+  (* recursive lookup, with inheritance from parent *)
+  let rec cur_level_rec s =
+    if s.level = null_level
+    then match s.descr with
+      | Root -> 0
+      | Sub (_, parent) -> cur_level_rec parent
+    else s.level
+
+  (* inlinable function *)
+  let cur_level s =
+    if s.level = null_level
+      then cur_level_rec s
+      else s.level
+end
+
+let set_debug = Section.set_debug Section.root
+let get_debug () = Section.root.Section.level
 let need_cleanup = ref false
 
-let __b = Buffer.create 0 (* unused buffer *)
-let debug l format =
-  if l <= !debug_level_
+let debug_buf_ = Buffer.create 32 (* shared buffer (not thread safe)  *)
+let debug ?(section=Section.root) l format =
+  if l <= Section.cur_level section
     then (
-      let b = Buffer.create 15 in
+      Buffer.clear debug_buf_;
       if !need_cleanup then clear_line ();
-      Printf.bprintf b "%% [%.3f] " (get_total_time ());
+      (* print header *)
+      let now = get_total_time () in
+      if section == Section.root
+        then Printf.bprintf debug_buf_ "%% [%.3f] " now
+        else Printf.bprintf debug_buf_ "%% [%.3f %s] "
+          now section.Section.full_name;
       Printf.kbprintf
-        (fun b -> print_endline (Buffer.contents b))
-        b format)
+        (fun b -> Buffer.output_buffer stdout b; print_char '\n')
+        debug_buf_ format)
     else
-      Printf.ifprintf __b format
+      Printf.ifprintf debug_buf_ format
 
 let pp_pos pos =
   let open Lexing in

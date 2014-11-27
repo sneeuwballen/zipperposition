@@ -34,13 +34,31 @@ val get_total_time : unit -> float
 val get_start_time : unit -> float
 
 (** {2 Misc} *)
- 
-val set_debug : int -> unit     (** Set debug level *)
-val get_debug : unit -> int     (** Current debug level *)
+
+(** Debug section *)
+module Section : sig
+  type t
+  val full_name : t -> string  (** Full path to the section *)
+  val set_debug : t -> int -> unit (** Debug level for section (and its descendants) *)
+  val clear_debug : t -> unit (** Clear debug level (will be same as parent's) *)
+  val get_debug : t -> int option (** Specific level of this section, if any *)
+  val cur_level : t -> int (** Current debug level, with parent inheritance *)
+  val iter : (string * t) Sequence.t  (** all registered sections *)
+
+  val root : t (** Default section, with no parent *)
+  val logtk : t (** Section for all Logtk-related things *)
+  val make : ?parent:t -> string -> t
+end
+
+val set_debug : int -> unit     (** Set debug level of [Section.root] *)
+val get_debug : unit -> int     (** Current debug level for [Section.root] *)
 val need_cleanup : bool ref     (** Cleanup line before printing? *)
 
-val debug : int -> ('a, Buffer.t, unit, unit) format4 -> 'a
-  (** debug message *)
+val debug : ?section:Section.t -> int ->
+            ('a, Buffer.t, unit, unit) format4 -> 'a
+(** Print a debug message, with the given section and verbosity level.
+    The message might be dropped if its level is too high.
+    {b NOTE}: non-thread safe *)
 
 val pp_pos : Lexing.position -> string
 

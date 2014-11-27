@@ -29,6 +29,8 @@ type symbol_status = Precedence_intf.symbol_status =
   | Multiset
   | Lexicographic
 
+let section = Util.Section.(make ~parent:logtk "precedence")
+
 (** {2 Signature} *)
 
 module type S = Precedence_intf.S
@@ -279,7 +281,7 @@ module Make(Sym : SYMBOL) = struct
     if List.for_all (fun s -> Tbl.mem p.index s) l
       then p  (* already present *)
       else begin
-        Util.debug 3 "add %a to the precedence" pp_snapshot l;
+        Util.debug ~section 3 "add %a to the precedence" pp_snapshot l;
         let c = Constr.of_precedence p in
         (* hashtable of symbols *)
         let symbols = Sequence.fold
@@ -291,7 +293,7 @@ module Make(Sym : SYMBOL) = struct
             of [p]. *)
         let snapshot = _order_symbols (c :: p.constr) symbols in
         let index = _mk_table snapshot in
-        Util.debug 3 "--> snapshot %a" pp_snapshot snapshot;
+        Util.debug ~section 3 "--> snapshot %a" pp_snapshot snapshot;
         { p with snapshot; index; }
       end
 

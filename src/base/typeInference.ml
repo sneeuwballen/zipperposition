@@ -36,6 +36,7 @@ module Loc = ParseLocation
 module Err = CCError
 
 let prof_infer = Util.mk_profiler "TypeInference.infer"
+let section = Util.Section.(make ~parent:logtk "ty_infer")
 
 type 'a or_error = [`Error of string | `Ok of 'a]
 
@@ -177,7 +178,7 @@ module Ctx = struct
             ty
         | Some ty -> ty
       in
-      (*Util.debug 5 "var %s now has number %d and type %a" name n Type.pp ty;*)
+      (*Util.debug ~section 5 "var %s now has number %d and type %a" name n Type.pp ty;*)
       Hashtbl.add ctx.vars name (n,ty);
       n, ty
 
@@ -217,7 +218,7 @@ module Ctx = struct
 
   (* same as {!unify}, but also updates the ctx's substitution *)
   let unify_and_set ctx ty1 ty2 =
-    Util.debug 5 "unify types %a and %a" Type.pp ty1 Type.pp ty2;
+    Util.debug ~section 5 "unify types %a and %a" Type.pp ty1 Type.pp ty2;
     let subst = unify ctx ty1 ty2 in
     ctx.subst <- subst
 
@@ -444,14 +445,14 @@ module FO = struct
         | None -> Ctx.__error ctx "expected type, got %a" PT.pp ty
       in
       let i, ty = Ctx._get_var ctx ~ty name in
-      Util.debug 5 "type of var %s: %a" name Type.pp ty;
+      Util.debug ~section 5 "type of var %s: %a" name Type.pp ty;
       ty, (fun ctx ->
         let ty = Ctx.apply_ty ctx ty in
         T.var ~ty i)
     | PT.Var name ->
       (* (possibly) untyped var *)
       let i, ty = Ctx._get_var ctx name in
-      Util.debug 5 "type of var %s: %a" name Type.pp ty;
+      Util.debug ~section 5 "type of var %s: %a" name Type.pp ty;
       ty, (fun ctx ->
         let ty = Ctx.apply_ty ctx ty in
         T.var ~ty i)
@@ -464,7 +465,7 @@ module FO = struct
         Ctx.apply_fo ctx (T.const ~ty x))
     | PT.Const s ->
       let ty_s = Ctx.type_of_fun ~arity:0 ctx s in
-      Util.debug 5 "type of symbol %a: %a" Sym.pp s Type.pp ty_s;
+      Util.debug ~section 5 "type of symbol %a: %a" Sym.pp s Type.pp ty_s;
       ty_s, (fun ctx ->
         let ty = Ctx.apply_ty ctx ty_s in
         T.const ~ty s)
@@ -472,7 +473,7 @@ module FO = struct
     | PT.App ({PT.term=PT.Const s}, l) ->
       (* use type of [s] *)
       let ty_s = Ctx.type_of_fun ~arity:(List.length l) ctx s in
-      Util.debug 5 "type of symbol %a: %a" Sym.pp s Type.pp ty_s;
+      Util.debug ~section 5 "type of symbol %a: %a" Sym.pp s Type.pp ty_s;
       let n_tyargs, n_args = match Type.arity ty_s with
         | Type.NoArity -> 0, List.length l
         | Type.Arity (a,b) -> a, b
@@ -545,7 +546,7 @@ module FO = struct
 
   let infer_exn ctx t =
     Util.enter_prof prof_infer;
-    Util.debug 5 "infer_term %a" PT.pp t;
+    Util.debug ~section 5 "infer_term %a" PT.pp t;
     try
       let ty, k = infer_rec ctx t in
       Util.exit_prof prof_infer;
@@ -656,7 +657,7 @@ module FO = struct
     | PT.Rat _ -> Ctx.__error ctx "expected formula, got %a" PT.pp f
 
   let infer_form_exn ctx f =
-    Util.debug 5 "infer_form %a" PT.pp f;
+    Util.debug ~section 5 "infer_form %a" PT.pp f;
     try
       let c_f = infer_form_rec ctx f in
       c_f
@@ -872,7 +873,7 @@ module HO = struct
         | Type.NoArity -> 0, List.length l
         | Type.Arity (a,b) -> a, b
       in
-      (*Util.debug 5 "fun %a : %a expects %d type args and %d args (applied to %a)"
+      (*Util.debug ~section 5 "fun %a : %a expects %d type args and %d args (applied to %a)"
         PT.pp t Type.pp ty_t n_tyargs n_args (Util.pp_list PT.pp) l; *)
       (* separation between type arguments and proper term arguments,
           based on the expected arity of the head [t].
@@ -909,7 +910,7 @@ module HO = struct
 
   let infer_exn ctx t =
     Util.enter_prof prof_infer;
-    Util.debug 5 "infer_term %a" PT.pp t;
+    Util.debug ~section 5 "infer_term %a" PT.pp t;
     try
       let ty, k = infer_rec ctx t in
       Util.exit_prof prof_infer;
