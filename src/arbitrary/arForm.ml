@@ -66,8 +66,6 @@ module PT = struct
         ]
       in
       retry (f fuel))
-
-  let default = QA.(int 50 >>= default_fuel)
 end
 
 let atom =
