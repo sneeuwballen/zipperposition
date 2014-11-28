@@ -40,6 +40,8 @@ module Sel = Selection
 let stat_redundant_given = Util.mk_stat "redundant given clauses"
 let stat_processed_given = Util.mk_stat "processed given clauses"
 
+let section = Const.section
+
 (** the status of a state *)
 type szs_status =
   | Unsat of Proof.t
@@ -76,7 +78,7 @@ module Make(E : Env.S) = struct
 
   (** One iteration of the main loop ("given clause loop") *)
   let given_clause_step ?(generating=true) num =
-    Util.debug 4 "env for next given loop: %a" Env.pp ();
+    Util.debug ~section 4 "env for next given loop: %a" Env.pp ();
     (* select next given clause *)
     match Env.next_passive () with
     | None ->
@@ -95,7 +97,7 @@ module Make(E : Env.S) = struct
         if clauses=[]
         then Sat
         else (
-          (if Util.get_debug () >= 2 then List.iter
+          (if Util.Section.cur_level section >= 2 then List.iter
             (fun new_c -> Util.debug 2 "    inferred new clause %a" Env.C.pp new_c) clauses);
           Env.add_passive (Sequence.of_list clauses);
           Unknown
@@ -104,7 +106,7 @@ module Make(E : Env.S) = struct
       begin match Env.all_simplify c with
       | [] ->
         Util.incr_stat stat_redundant_given;
-        Util.debug 2 "given clause %a is redundant" Env.C.pp c;
+        Util.debug ~section 2 "given clause %a is redundant" Env.C.pp c;
         Unknown
       | l when List.exists Env.C.is_empty l ->
         (* empty clause found *)
@@ -118,8 +120,8 @@ module Make(E : Env.S) = struct
         assert (not (Env.is_redundant c));
         (* process the given clause! *)
         Util.incr_stat stat_processed_given;
-        Util.debug 2 "================= step %5d  ===============" num;
-        Util.debug 1 "given: %a" Env.C.pp c;
+        Util.debug ~section 2 "================= step %5d  ===============" num;
+        Util.debug ~section 1 "given: %a" Env.C.pp c;
         (* find clauses that are subsumed by given in active_set *)
         let subsumed_active = Env.C.CSet.to_seq (Env.subsumed_by c) in
         Env.remove_active subsumed_active;
@@ -151,13 +153,13 @@ module Make(E : Env.S) = struct
             let c = Env.forward_simplify c in
             (* keep clauses  that are not redundant *)
             if Env.is_trivial c || Env.is_active c || Env.is_passive c
-              then (Util.debug 5 "clause %a is trivial, dump" Env.C.pp c; None)
+              then (Util.debug ~section 5 "clause %a is trivial, dump" Env.C.pp c; None)
               else Some c)
           inferred_clauses
         in
         CCVector.append_seq new_clauses inferred_clauses;
-        (if Util.get_debug () >= 2 then CCVector.to_seq new_clauses
-          (fun new_c -> Util.debug 2 "    inferred new clause %a" Env.C.pp new_c));
+        (if Util.Section.cur_level section >= 2 then CCVector.to_seq new_clauses
+          (fun new_c -> Util.debug ~section 2 "    inferred new clause %a" Env.C.pp new_c));
         (* add new clauses (including simplified active clauses) to passive set and simpl_set *)
         Env.add_passive (CCVector.to_seq new_clauses);
         (* test whether the empty clause has been found *)
@@ -187,7 +189,7 @@ module Make(E : Env.S) = struct
           (* some cleanup from time to time *)
           (if (num mod 1000 = 0)
             then begin
-              Util.debug 1 "perform cleanup of passive set";
+              Util.debug ~section 1 "perform cleanup of passive set";
               Env.clean_passive ();
             end);
           (* do one step *)
