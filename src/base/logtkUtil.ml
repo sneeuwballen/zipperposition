@@ -139,7 +139,7 @@ let debug ?(section=Section.root) l format =
         else Printf.bprintf debug_buf_ "%% [%.3f %s] "
           now section.Section.full_name;
       Printf.kbprintf
-        (fun b -> Buffer.output_buffer stdout b; print_char '\n')
+        (fun b -> Buffer.output_buffer stdout b; print_char '\n'; flush stdout)
         debug_buf_ format)
     else
       Printf.ifprintf debug_buf_ format
