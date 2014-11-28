@@ -479,11 +479,11 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
   (** {6 Encoding to QBF} *)
 
   let neg_ = BoolLit.neg
-  let valid_ = BoolLit.inject_name' "valid(%a)" T.pp
-  let cases_ = BoolLit.inject_name' "cases(%a)" T.pp
-  let pgraph_ = BoolLit.inject_name' "proofgraph(%a)" T.pp
-  let empty_ = BoolLit.inject_name' "empty(%a)" T.pp
-  let loop_ = BoolLit.inject_name' "loop(%a)" T.pp
+  let valid_ x = BoolLit.inject_name' "valid(%a)" T.pp x
+  let cases_ x = BoolLit.inject_name' "cases(%a)" T.pp x
+  let pgraph_ x = BoolLit.inject_name' "proofgraph(%a)" T.pp x
+  let empty_ x = BoolLit.inject_name' "empty(%a)" T.pp x
+  let loop_ x = BoolLit.inject_name' "loop(%a)" T.pp x
 
   (* TODO: encode proof relation into QBF, starting from the set of "roots"
       that are (applications of) clause contexts + false.
