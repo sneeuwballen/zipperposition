@@ -112,8 +112,8 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     *)
   end
 
-  let level0_ = Solver.level0
   let level1_ = Solver.push Qbf.Forall []
+  let level2_ = Solver.push Qbf.Exists []
 
   (* a candidate clause context *)
   type candidate_context = {
@@ -500,15 +500,20 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
   let base_ x = BoolLit.inject_name' "base(%a)" T.pp x
   let recf_ x = BoolLit.inject_name' "recf(%a)" T.pp x
   let init_ x = BoolLit.inject_name' "init(%a)" T.pp x
+  let recf_term_ t = BoolLit.inject_name' "recf_term(%a)" T.pp t
+  let recf_sub_term_ t = BoolLit.inject_name' "recf_subterm(%a)" T.pp t
 
-  (* is one trail in proofs of clause lits valid? *)
-  let trail_ok_ lits = BoolLit.inject_trail_ok lits
+  let is_true_ lits = BoolLit.inject_lits lits
+  let trail_ok_ lits = BoolLit.inject_lits_pred lits BoolLit.TrailOk
+  let provable_ lits cst = BoolLit.inject_lits_pred lits (BoolLit.Provable cst)
+  let provable_sub_ lits t = BoolLit.inject_lits_pred lits (BoolLit.ProvableForSubConstant t)
+  let in_loop_ ctx i = BoolLit.inject_ctx ctx i BoolLit.InLoop
 
   (* TODO: encode proof relation into QBF, starting from the set of "roots"
       that are (applications of) clause contexts + false.
 
       Plan:
-        non-backtrackable:
+        incremental:
           case splits
           bigAnd i:inductive_cst:
             def of [cases(i)]
@@ -540,6 +545,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
 
   (* encode (init(i) & base(i) & recf(i)) => loop(i) *)
   let qbf_encode_loop_ cst =
+    Solver.quantify_lits level2_ [init_ cst; base_ cst; recf_ cst; loop_ cst];
     Solver.add_clause
       [ neg_ (init_ cst); neg_ (base_ cst); neg_ (recf_ cst); loop_ (cst) ]
 
@@ -575,16 +581,130 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     in
     Solver.add_clauses (init_clause :: trail_ok_clauses)
 
-  (* TODO: encode base(cst) *)
+  (* definition of base(cst) *)
   let qbf_encode_base_ cst =
-    ()
+    let base_cases = CI.cover_sets cst
+      |> Sequence.map (fun set -> set.CI.base_cases)
+    in
+    match find_proofs_ [| |] with
+    | None -> ()
+    | Some proofs_of_empty ->
+        (* for each proof "p" of false:
+           for each coverset "set" of cst:
+            (bigand_{"t" a base case in "set"} not (t=cst)) => base(cst)
+        *)
+        let clauses = base_cases
+          |> Sequence.map
+            (fun base_cases ->
+              let guard = List.map
+                (fun t -> is_true_ [| Literal.mk_eq t cst |])
+                base_cases
+              in
+              base_ cst :: guard
+            )
+          |> Sequence.to_rev_list
+        in
+        Solver.add_clauses clauses
 
-  (* TODO: encode recf(cst) *)
+  (* encode recf(cst), that is:
+      for each coverset "set" of cst:
+      ( bigand_{"t" a recursive case of "set"}
+        (t=cst) =>
+          bigor_{"t'" strict subterm of "t" of same type}
+            bigand_{C in candidates(cst)} ([C in loop(cst)] => provable(C,cst))
+      ) => recf(cst)
+  *)
   let qbf_encode_recf_ cst =
+    let candidates = !(find_candidates_ cst) |> FV_cand.to_seq |> Sequence.map snd in
+    (* (bigand_{t recursive case} recf_term(t)) => recf(cst)  *)
+    let clauses_per_set = CI.cover_sets cst
+      |> Sequence.map (fun set -> set.CI.rec_cases)
+      |> Sequence.map
+        (fun rec_cases ->
+          recf_ cst ::
+          List.map
+            (fun t ->
+              Solver.quantify_lits level2_ [recf_term_ t];
+              neg_ (recf_term_ t)
+            ) rec_cases
+        )
+    and clauses_per_term = CI.cover_sets cst
+      |> Sequence.flat_map (fun set -> set.CI.sub_constants |> T.Set.to_seq)
+      |> Sequence.map
+        (fun t' ->
+          let _cst', t = CI.inductive_cst_of_sub_cst t' in
+          assert (T.eq cst _cst');
+          (* for every t' subterm of t:
+             recf_subterm(t') => recf_term(t) *)
+          Solver.quantify_lits level2_ [recf_sub_term_ t'];
+          [neg_ (recf_sub_term_ t'); recf_term_ t]
+        )
+    and clauses_per_subterm = CI.cover_sets cst
+      |> Sequence.flat_map (fun set -> T.Set.to_seq set.CI.sub_constants)
+      |> Sequence.flat_map
+        (fun t' ->
+          let _, t = CI.inductive_cst_of_sub_cst t' in
+          (* for every subterm t' of an inductive case of cst:
+                (t=cst &
+                  bigand_{C in candidates(cst)} provable_aux(C[t'], cst)
+                ) => recf_sub_term(t')
+          *)
+          let guard_big_and =
+            candidates
+            |> Sequence.map
+              (fun ctx ->
+                let ctx_at_t' = ClauseContext.apply ctx.cand_ctx t' in
+                neg_ (provable_ ctx_at_t' cst)
+              )
+            |> Sequence.to_rev_list
+          in
+          let clause1 =
+            recf_sub_term_ t' ::
+            neg_ (is_true_ [| Literal.mk_eq t cst |]) ::
+            guard_big_and
+          in
+          (* for every C in candidates(Cst):
+               ([C in loop(cst)] => provable(C[t'],cst)]) => provable_aux(C[t'],cst)
+          *)
+          let per_clause =
+            candidates
+            |> Sequence.flat_map
+              (fun ctx ->
+                let ctx_at_t' = ClauseContext.apply ctx.cand_ctx t' in
+                let provable_aux = provable_sub_ ctx_at_t' t' in
+                [ [ in_loop_ ctx.cand_ctx cst; provable_aux ]
+                ; [ neg_ (provable_ ctx_at_t' cst); provable_aux ]
+                ] |> Sequence.of_list
+              )
+          in
+          Sequence.cons clause1 per_clause
+        )
+    in
+    let all_clauses = Sequence.of_list
+      [ clauses_per_set
+      ; clauses_per_term
+      ; clauses_per_subterm
+      ]
+    in
+    Solver.add_clause_seq (Sequence.concat all_clauses);
     ()
 
-  (* TODO: encode empty(cst) *)
+  (* definition of empty(cst):
+    not (empty loop(cst)) => bigor_{C in candidates(cst)} [C in loop(cst)] *)
   let qbf_encode_empty_ cst =
+    let clause = !(find_candidates_ cst)
+      |> FV_cand.to_seq
+      |> Sequence.map snd
+      |> Sequence.map
+        (fun ctx ->
+          let inloop = in_loop_ ctx.cand_ctx cst in
+          Solver.quantify_lits level1_ [inloop];
+          inloop
+        )
+      |> Sequence.to_rev_list
+    in
+    let clause = neg_ (empty_ cst) :: clause in
+    Solver.add_clause clause;
     ()
 
   (* TODO: encode the whole proofgraph *)
@@ -596,7 +716,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     let big_xor =
       mk_xor_
         (List.map
-          (fun t -> BoolLit.inject_lits [|Literal.mk_eq cst t|])
+          (fun t -> is_true_ [|Literal.mk_eq cst t|])
           set.CI.cases
         )
     in
