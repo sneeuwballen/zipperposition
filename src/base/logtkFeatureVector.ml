@@ -86,7 +86,7 @@ module Make(C : LogtkIndex.CLAUSE) = struct
        is at depth 0) *)
     let sum_of_depths =
       { name = "sum_of_depths";
-        f = (fun lits -> 
+        f = (fun lits ->
           Sequence.fold
             (fun acc (_, terms) ->
               Sequence.fold (fun acc t -> acc + _depth_term 0 (t:T.t:>ST.t)) acc terms
@@ -174,7 +174,7 @@ module Make(C : LogtkIndex.CLAUSE) = struct
 
   (** get/add/remove the leaf for the given list of ints. The
       continuation k takes the leaf, and returns a leaf
-      that replaces the old leaf. 
+      that replaces the old leaf.
       This function returns the new trie. *)
   let goto_leaf trie t k =
     (* the root of the tree *)
@@ -297,7 +297,7 @@ module Make(C : LogtkIndex.CLAUSE) = struct
       IntMap.fold
         (fun j subnode acc -> if j <= i
           then fold_lower acc fv' subnode  (* go in the branch *)
-          else acc) 
+          else acc)
         map acc
     | _ -> failwith "number of features in feature vector changed"
     in
@@ -343,4 +343,18 @@ module Make(C : LogtkIndex.CLAUSE) = struct
 
   let retrieve_alpha_equiv_c idx c acc f =
     retrieve_alpha_equiv idx (C.to_lits c) acc f
+
+  let iter idx f =
+    let rec iter = function
+      | TrieLeaf set -> CSet.iter f set
+      | TrieNode map -> IntMap.iter (fun _ t' -> iter t') map
+    in
+    iter idx.trie
+
+  let fold f acc idx =
+    let rec fold acc = function
+      | TrieLeaf set -> CSet.fold (fun x acc -> f acc x) set acc
+      | TrieNode map -> IntMap.fold (fun _ t' acc -> fold acc t') map acc
+    in
+    fold acc idx.trie
 end

@@ -150,6 +150,10 @@ module type SUBSUMPTION_IDX = sig
         the given clause *)
 
   val retrieve_subsumed_c : t -> C.t -> 'a -> ('a -> C.t -> 'a) -> 'a
+
+  val iter : t -> (C.t -> unit) -> unit
+
+  val fold : ('a -> C.t -> 'a) -> 'a -> t -> 'a
 end
 
 (** {2 Specialized rewriting index} *)
@@ -190,7 +194,7 @@ module type UNIT_IDX = sig
   val empty : unit -> t
 
   val is_empty : t -> bool
-  
+
   val add : t -> E.t -> t
     (** LogtkIndex the given (in)equation *)
 
