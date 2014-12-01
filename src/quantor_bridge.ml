@@ -117,6 +117,8 @@ module Make(X : sig end) : BS.QBF = struct
 
   let add_clauses = List.iter add_clause
 
+  let add_clause_seq seq = seq add_clause
+
   let quant_at_level l = fst (CCVector.get _lits l)
 
   let lits_at_level l = snd (CCVector.get _lits l)
@@ -147,7 +149,7 @@ module Make(X : sig end) : BS.QBF = struct
   let check () =
     let f = _mk_form () in
     if Logtk.Util.Section.cur_level section >= 5 then (
-      Format.printf "QBF formula: @[<hov>%a@]@."
+      Format.printf "@[<hv2>QBF formula:@ %a@]@."
         (Qbf.CNF.print_with ~pp_lit:!pp_) f
     );
     let st = get_state_ () in

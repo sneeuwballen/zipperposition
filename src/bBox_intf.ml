@@ -42,10 +42,22 @@ module type S = sig
   val set_sign : bool -> bool_lit -> bool_lit
   (** Set the sign of the literal to the given boolean *)
 
+  (** Predicate attached to a set of literals *)
+  type lits_predicate =
+    | Provable of inductive_cst (** clause provable within loop(i) *)
+    | TrailOk (** Some trail that proves lits is true *)
+    | ProvableForSubConstant of inductive_cst
+
+  type ctx_predicate =
+    | InLoop  (** ctx in loop(i) *)
+
+  val eq_lits_predicate : lits_predicate -> lits_predicate -> bool
+  val eq_ctx_predicate : ctx_predicate -> ctx_predicate -> bool
+
   type injected = private
     | Clause_component of Literals.t
-    | Provable of Literals.t * inductive_cst  (* clause provable within loop(i) *)
-    | TrailOk of Literals.t (* some trail for proving lits is true *)
+    | Lits of Literals.t * lits_predicate
+    | Ctx of ClauseContext.t * inductive_cst * ctx_predicate
     | Name of string  (* name for CNF *)
 
   val inject_lits : Literals.t -> bool_lit
@@ -54,11 +66,11 @@ module type S = sig
       The boolean literal can be negative is the argument is a
       unary negative clause *)
 
-  val inject_provable : Literals.t -> inductive_cst -> bool_lit
-  (** Obtain the positive boolean literal such that [inject_provable lits n]
-      represents "(bigOr lits) provable from S_loop(n)" *)
+  val inject_lits_pred : Literals.t -> lits_predicate -> bool_lit
+  (** Inject the literals, predicate into a {!Lits} constructor *)
 
-  val inject_trail_ok : Literals.t -> bool_lit
+  val inject_ctx : ClauseContext.t -> inductive_cst -> ctx_predicate -> bool_lit
+  (** Inject into {!Ctx} *)
 
   val inject_name : string -> bool_lit
   val inject_name' : ('a, Buffer.t, unit, bool_lit) format4 -> 'a

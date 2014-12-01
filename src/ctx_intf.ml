@@ -179,7 +179,7 @@ module type S = sig
 
   (** {2 Booleans Literals} *)
 
-  module BoolLit : BBox.S
+  module BoolLit : BBox.S with type inductive_cst = FOTerm.t
 
   (** {2 Induction} *)
 

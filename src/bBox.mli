@@ -33,4 +33,4 @@ encapsulated values and boolean literals *)
 
 module type S = BBox_intf.S
 
-module Make(Any : sig end) : S
+module Make(Any : sig end) : S with type inductive_cst = Logtk.FOTerm.t

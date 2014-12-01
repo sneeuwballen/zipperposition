@@ -37,6 +37,7 @@ module type SAT = sig
 
   val add_clause : lit list -> unit
   val add_clauses : lit list list -> unit
+  val add_clause_seq : lit list Sequence.t -> unit
 
   val check : unit -> result
   (** Is the current problem satisfiable? *)

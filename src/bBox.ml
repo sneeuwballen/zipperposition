@@ -46,10 +46,30 @@ module Make(Any : sig end) = struct
   let set_sign sign i =
     if sign then (abs i) else - (abs i)
 
+  (** Predicate attached to a set of literals *)
+  type lits_predicate =
+    | Provable of inductive_cst (** clause provable within loop(i) *)
+    | TrailOk (** Some trail that proves lits is true *)
+    | ProvableForSubConstant of inductive_cst
+
+  type ctx_predicate =
+    | InLoop (** lits = ctx[i], where ctx in loop(i) *)
+
+  let eq_lits_predicate p1 p2 = match p1, p2 with
+    | TrailOk, TrailOk -> true
+    | Provable c1, Provable c2
+    | ProvableForSubConstant c1, ProvableForSubConstant c2 -> T.eq c1 c2
+    | TrailOk, _
+    | Provable _, _
+    | ProvableForSubConstant _, _ -> false
+
+  let eq_ctx_predicate p1 p2 = match p1, p2 with
+    | InLoop, InLoop -> true
+
   type injected =
     | Clause_component of Literals.t
-    | Provable of Literals.t * inductive_cst
-    | TrailOk of Literals.t
+    | Lits of Literals.t * lits_predicate
+    | Ctx of ClauseContext.t * inductive_cst * ctx_predicate
     | Name of string  (* name for CNF *)
 
   module FV = Logtk.FeatureVector.Make(struct
@@ -82,10 +102,12 @@ module Make(Any : sig end) = struct
     ITbl.add _lit2inj bool_lit injected;
     match injected with
     | Clause_component lits
-    | Provable (lits, _)
-    | TrailOk lits ->
+    | Lits (lits, _) ->
         (* also be able to retrieve by lits *)
         _clause_set := FV.add !_clause_set (lits, injected, bool_lit)
+    | Ctx (cc, cst, _) ->
+        _clause_set := FV.add !_clause_set
+          (ClauseContext.apply cc cst, injected, bool_lit)
     | Name s ->
         StringTbl.add _names s (injected, bool_lit)
 
@@ -117,13 +139,13 @@ module Make(Any : sig end) = struct
               _apply_sign sign i
           )
 
-  let inject_provable lits ind =
+  let inject_lits_pred lits pred =
     _retrieve_alpha_equiv lits
       |> Sequence.filter_map
         (function
-          | lits', Provable(_, ind'), blit
+          | lits', Lits (_, pred'), blit
             when Lits.are_variant lits lits'
-            && T.eq ind ind' -> Some blit
+            && eq_lits_predicate pred pred' -> Some blit
           | _ -> None
         )
       |> Sequence.head
@@ -133,16 +155,18 @@ module Make(Any : sig end) = struct
               let i = _fresh() in
               (* maintain mapping *)
               let lits_copy = Array.copy lits in
-              _save (Provable (lits_copy, ind)) i;
+              _save (Lits (lits_copy, pred)) i;
               i
           )
 
-  let inject_trail_ok lits =
+  let inject_ctx ctx t pred =
+    let lits = ClauseContext.apply ctx t in
     _retrieve_alpha_equiv lits
       |> Sequence.filter_map
         (function
-          | lits', TrailOk _, blit
-            when Lits.are_variant lits lits' -> Some blit
+          | lits', Ctx (_, t', pred'), blit
+            when Lits.are_variant lits lits'
+            && T.eq t t' && eq_ctx_predicate pred pred' -> Some blit
           | _ -> None
         )
       |> Sequence.head
@@ -151,8 +175,7 @@ module Make(Any : sig end) = struct
           | None ->
               let i = _fresh() in
               (* maintain mapping *)
-              let lits_copy = Array.copy lits in
-              _save (TrailOk (lits_copy)) i;
+              _save (Ctx (ctx, t, pred)) i;
               i
           )
 
@@ -175,6 +198,14 @@ module Make(Any : sig end) = struct
     try Some (ITbl.find _lit2inj i)
     with Not_found -> None
 
+  let string_of_lits_pred lits = function
+    | Provable t -> Util.sprintf "⟦loop(%a) ⊢ %a⟧" T.pp t Lits.pp lits
+    | TrailOk -> Util.sprintf "⟦trail_ok(%a)⟧" Lits.pp lits
+    | ProvableForSubConstant t -> Util.sprintf "provable_sub_cst(%a)" T.pp t
+
+  let string_of_ctx_pred ctx i = function
+    | InLoop -> Util.sprintf "%a ∈ loop(%a)" ClauseContext.pp ctx T.pp i
+
   let pp buf i =
     if i<0 then Buffer.add_string buf "¬";
     let i = abs i in
@@ -182,8 +213,12 @@ module Make(Any : sig end) = struct
     | None -> Printf.bprintf buf "L%d" i
     | Some (Clause_component lits) ->
         Printf.bprintf buf "⟦%a⟧" (Util.pp_array ~sep:"∨" Literal.pp) lits
-    | Some (Provable (lits,ind)) ->
-        Printf.bprintf buf "⟦loop(%a) ⊢ %a⟧" T.pp ind Lits.pp lits
+    | Some (Lits (lits, pred)) ->
+        let s = string_of_lits_pred lits pred in
+        Buffer.add_string buf s
+    | Some (Ctx (lits, ind, pred)) ->
+        let s = string_of_ctx_pred lits ind pred in
+        Buffer.add_string buf s
     | Some (Name s) ->
         Printf.bprintf buf "⟦%s⟧" s
 
@@ -195,8 +230,12 @@ module Make(Any : sig end) = struct
     | Some (Clause_component lits) ->
         Format.fprintf fmt "@[⟦%a⟧@]"
           (CCArray.print ~sep:"∨" Literal.fmt) lits
-    | Some (Provable (lits,ind)) ->
-        Format.fprintf fmt "⟦loop(%a) ⊢ %a⟧" T.fmt ind Lits.fmt lits
+    | Some (Lits (lits, pred)) ->
+        let s = string_of_lits_pred lits pred in
+        Format.pp_print_string fmt s
+    | Some (Ctx (lits, ind, pred)) ->
+        let s = string_of_ctx_pred lits ind pred in
+        Format.pp_print_string fmt s
     | Some (Name s) ->
         Format.fprintf fmt "⟦%s⟧" s
 end
