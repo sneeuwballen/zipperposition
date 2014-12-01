@@ -100,6 +100,8 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
         |> Sequence.filter
           (fun (lits', x) -> Sup.subsumes lits lits')
 
+    let to_seq = FV.iter
+
     (*
     (* find clauses in [fv] that subsume [lits] *)
     let find_subsuming fv lits =
@@ -126,8 +128,19 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
 
   (** {6 Proof Relation} *)
 
-  (* one way to prove a clause: parent clauses and the union of their trails *)
+  (* one way to prove a clause: parent clauses *)
   type proof = CompactClause.t list
+
+  (* given a proof (a set of parent clauses) extract the corresponding trail *)
+  let trail_of_proof l =
+    CCList.flat_map
+      (fun cc ->
+        let trail = CompactClause.trail cc in
+        List.map
+          (function (sign, `Box_clause lits) ->
+            BoolLit.set_sign sign (BoolLit.inject_lits lits)
+          ) trail
+      ) l
 
   (* a set of proofs *)
   type proof_set = {
@@ -484,6 +497,12 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
   let pgraph_ x = BoolLit.inject_name' "proofgraph(%a)" T.pp x
   let empty_ x = BoolLit.inject_name' "empty(%a)" T.pp x
   let loop_ x = BoolLit.inject_name' "loop(%a)" T.pp x
+  let base_ x = BoolLit.inject_name' "base(%a)" T.pp x
+  let recf_ x = BoolLit.inject_name' "recf(%a)" T.pp x
+  let init_ x = BoolLit.inject_name' "init(%a)" T.pp x
+
+  (* is one trail in proofs of clause lits valid? *)
+  let trail_ok_ lits = BoolLit.inject_trail_ok lits
 
   (* TODO: encode proof relation into QBF, starting from the set of "roots"
       that are (applications of) clause contexts + false.
@@ -506,23 +525,6 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
   (* current save level *)
   let save_level_ = ref Solver.root_save_level
 
-  (* the whole process of:
-      - adding non-backtracking constraints
-      - save state
-      - adding backtrackable constraints *)
-  let qbf_encode_enter_ () =
-    (* normal constraints should be added already *)
-    Util.debug ~section:section_qbf 4 "save QBF solver...";
-    save_level_ := Solver.save ();
-    (* TODO add backtrackable constraints *)
-    ()
-
-  (* restoring state *)
-  let qbf_encode_exit_ () =
-    Util.debug ~section:section_qbf 4 "...restore QBF solver";
-    Solver.restore !save_level_;
-    ()
-
   (* add
     - pathconditions(i) => [valid(i)]
     - valid(i) => [cases(i)] &
@@ -536,18 +538,92 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       ];
     ()
 
+  (* encode (init(i) & base(i) & recf(i)) => loop(i) *)
+  let qbf_encode_loop_ cst =
+    Solver.add_clause
+      [ neg_ (init_ cst); neg_ (base_ cst); neg_ (recf_ cst); loop_ (cst) ]
+
+  (* - for each candidate ctx C,
+        for each proof p in proofs(C[cst]), add:
+        "trail(p) & candidate(ctx) => trail_ok_(C[cst])"
+     - add "(bigand_{candidate ctx C} trail_ok(C[cst])) => init(cst)"
+  *)
+  let qbf_encode_init_ cst =
+    let candidates = !(find_candidates_ cst)
+      |> FV_cand.to_seq |> Sequence.map snd in
+    let trail_ok_clauses =
+      candidates
+      |> Sequence.flat_map
+        (fun ctx ->
+          (* proof of [ctx[cst]] *)
+          let proofs = match find_proofs_ ctx.cand_lits with
+            | None -> Sequence.empty
+            | Some {proofs} -> Sequence.of_list proofs
+          in
+          let trails = Sequence.map trail_of_proof proofs in
+          Sequence.map
+            (fun lits -> trail_ok_ ctx.cand_lits :: List.map neg_ lits)
+            trails
+        )
+      |> Sequence.to_rev_list
+    and init_clause =
+      let guard = Sequence.map
+        (fun ctx -> neg_ (trail_ok_ ctx.cand_lits)
+        ) candidates
+      in
+      init_ cst :: Sequence.to_rev_list guard
+    in
+    Solver.add_clauses (init_clause :: trail_ok_clauses)
+
+  (* TODO: encode base(cst) *)
+  let qbf_encode_base_ cst =
+    ()
+
+  (* TODO: encode recf(cst) *)
+  let qbf_encode_recf_ cst =
+    ()
+
+  (* TODO: encode empty(cst) *)
+  let qbf_encode_empty_ cst =
+    ()
+
+  (* TODO: encode the whole proofgraph *)
+  let qbf_encode_proofgraph_ () =
+    ()
+
   (* encode: cases(i) => bigAnd_{s in coversets(i) (xor_{t in s} i=t} *)
   let qbf_encode_cover_set cst set =
     let big_xor =
       mk_xor_
         (List.map
           (fun t -> BoolLit.inject_lits [|Literal.mk_eq cst t|])
-        set.CI.cases
-      )
+          set.CI.cases
+        )
     in
     (* guard every clause with "cases(i) => clause" *)
     let clauses = List.map (fun c -> neg_ (cases_ cst) :: c) big_xor in
     Solver.add_clauses clauses;
+    ()
+
+  (* the whole process of:
+      - adding non-backtracking constraints
+      - save state
+      - adding backtrackable constraints *)
+  let qbf_encode_enter_ () =
+    (* normal constraints should be added already *)
+    Util.debug ~section:section_qbf 4 "save QBF solver...";
+    save_level_ := Solver.save ();
+    CI.Seq.cst |> Sequence.iter qbf_encode_init_;
+    CI.Seq.cst |> Sequence.iter qbf_encode_recf_;
+    CI.Seq.cst |> Sequence.iter qbf_encode_base_;
+    CI.Seq.cst |> Sequence.iter qbf_encode_empty_;
+    qbf_encode_proofgraph_ ();
+    ()
+
+  (* restoring state *)
+  let qbf_encode_exit_ () =
+    Util.debug ~section:section_qbf 4 "...restore QBF solver";
+    Solver.restore !save_level_;
     ()
 
   (* add/remove constraints before/after satisfiability checking *)
@@ -559,6 +635,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     Signal.on CI.on_new_inductive
       (fun cst ->
         qbf_encode_valid_ cst;
+        qbf_encode_loop_ cst;
         Signal.ContinueListening
       );
     Signal.on CI.on_new_cover_set
