@@ -34,10 +34,18 @@ module type S = sig
   (** Abstract boolean literal *)
 
   val neg : bool_lit -> bool_lit
+  (** Negate the boolean literal *)
+
+  val sign : bool_lit -> bool
+  (** Current sign of the literal (positive or negative) *)
+
+  val set_sign : bool -> bool_lit -> bool_lit
+  (** Set the sign of the literal to the given boolean *)
 
   type injected = private
     | Clause_component of Literals.t
     | Provable of Literals.t * inductive_cst  (* clause provable within loop(i) *)
+    | TrailOk of Literals.t (* some trail for proving lits is true *)
     | Name of string  (* name for CNF *)
 
   val inject_lits : Literals.t -> bool_lit
@@ -49,6 +57,8 @@ module type S = sig
   val inject_provable : Literals.t -> inductive_cst -> bool_lit
   (** Obtain the positive boolean literal such that [inject_provable lits n]
       represents "(bigOr lits) provable from S_loop(n)" *)
+
+  val inject_trail_ok : Literals.t -> bool_lit
 
   val inject_name : string -> bool_lit
   val inject_name' : ('a, Buffer.t, unit, bool_lit) format4 -> 'a

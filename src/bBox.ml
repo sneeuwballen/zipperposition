@@ -42,10 +42,14 @@ module Make(Any : sig end) = struct
   type inductive_cst = T.t
 
   let neg i = -i
+  let sign i = i>=0
+  let set_sign sign i =
+    if sign then (abs i) else - (abs i)
 
   type injected =
     | Clause_component of Literals.t
     | Provable of Literals.t * inductive_cst
+    | TrailOk of Literals.t
     | Name of string  (* name for CNF *)
 
   module FV = Logtk.FeatureVector.Make(struct
@@ -78,7 +82,8 @@ module Make(Any : sig end) = struct
     ITbl.add _lit2inj bool_lit injected;
     match injected with
     | Clause_component lits
-    | Provable (lits, _) ->
+    | Provable (lits, _)
+    | TrailOk lits ->
         (* also be able to retrieve by lits *)
         _clause_set := FV.add !_clause_set (lits, injected, bool_lit)
     | Name s ->
@@ -129,6 +134,25 @@ module Make(Any : sig end) = struct
               (* maintain mapping *)
               let lits_copy = Array.copy lits in
               _save (Provable (lits_copy, ind)) i;
+              i
+          )
+
+  let inject_trail_ok lits =
+    _retrieve_alpha_equiv lits
+      |> Sequence.filter_map
+        (function
+          | lits', TrailOk _, blit
+            when Lits.are_variant lits lits' -> Some blit
+          | _ -> None
+        )
+      |> Sequence.head
+      |> (function
+          | Some blit -> blit
+          | None ->
+              let i = _fresh() in
+              (* maintain mapping *)
+              let lits_copy = Array.copy lits in
+              _save (TrailOk (lits_copy)) i;
               i
           )
 
