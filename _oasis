@@ -36,8 +36,8 @@ Library "libzipperposition"
                     calculi/EnumTypes, calculi/ArithInt, calculi/Heuristics
   InternalModules:  lib/LazyGraph, lib/SmallSet,
                     lib/UnionFind, lib/Choice, lib/Mixtbl, lib/Signal
-  BuildDepends:     containers,containers.advanced,sequence,unix,zarith,
-                    logtk,dynlink,qbf,qbf.quantor
+  BuildDepends:     containers, containers.advanced, sequence, unix, zarith,
+                    logtk, dynlink, qbf, qbf.quantor, ppx_deriving.std
 
 Library "libzipperposition_meta"
   Path:             src/meta/
