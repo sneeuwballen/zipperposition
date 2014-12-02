@@ -37,6 +37,8 @@ end)
 
 module type S = BBox_intf.S
 
+let section = Util.Section.make ~parent:Const.section "bbox"
+
 module Make(Any : sig end) = struct
   type bool_lit = int
   type inductive_cst = T.t
@@ -48,33 +50,46 @@ module Make(Any : sig end) = struct
 
   (** Predicate attached to a set of literals *)
   type lits_predicate =
-    | Provable of inductive_cst (** clause provable within loop(i) *)
+    | Provable of inductive_cst [@compare T.cmp] (** clause provable within loop(i) *)
     | TrailOk (** Some trail that proves lits is true *)
-    | ProvableForSubConstant of inductive_cst
+    | ProvableForSubConstant of inductive_cst [@compare T.cmp]
+    [@@deriving ord]
 
   type ctx_predicate =
     | InLoop (** lits = ctx[i], where ctx in loop(i) *)
-
-  let eq_lits_predicate p1 p2 = match p1, p2 with
-    | TrailOk, TrailOk -> true
-    | Provable c1, Provable c2
-    | ProvableForSubConstant c1, ProvableForSubConstant c2 -> T.eq c1 c2
-    | TrailOk, _
-    | Provable _, _
-    | ProvableForSubConstant _, _ -> false
-
-  let eq_ctx_predicate p1 p2 = match p1, p2 with
-    | InLoop, InLoop -> true
+    [@@deriving ord]
 
   type injected =
     | Clause_component of Literals.t
     | Lits of Literals.t * lits_predicate
-    | Ctx of ClauseContext.t * inductive_cst * ctx_predicate
+    | Ctx of ClauseContext.t * (inductive_cst [@compare T.cmp]) * ctx_predicate
     | Name of string  (* name for CNF *)
+    [@@deriving ord]
+
+  let string_of_lits_pred lits = function
+    | Provable t -> Util.sprintf "⟦loop(%a) ⊢ %a⟧" T.pp t Lits.pp lits
+    | TrailOk -> Util.sprintf "⟦trail_ok(%a)⟧" Lits.pp lits
+    | ProvableForSubConstant t -> Util.sprintf "⟦provable_sub_cst(%a)⟧" T.pp t
+
+  let string_of_ctx_pred ctx i = function
+    | InLoop -> Util.sprintf "⟦%a ∈ loop(%a)⟧" ClauseContext.pp ctx T.pp i
+
+  let pp_injected buf = function
+    | Clause_component lits ->
+        Printf.bprintf buf "⟦%a⟧" (Util.pp_array ~sep:"∨" Literal.pp) lits
+    | Lits (lits, pred) ->
+        let s = string_of_lits_pred lits pred in
+        Buffer.add_string buf s
+    | Ctx (lits, ind, pred) ->
+        let s = string_of_ctx_pred lits ind pred in
+        Buffer.add_string buf s
+    | Name s ->
+        Printf.bprintf buf "⟦%s⟧" s
 
   module FV = Logtk.FeatureVector.Make(struct
     type t = Lits.t * injected * bool_lit
-    let cmp (l1,_,_)(l2,_,_) = Lits.compare l1 l2
+    let cmp (l1,i1,j1)(l2,i2,j2) =
+      CCOrd.(Lits.compare l1 l2 <?> (compare_injected, i1, i2) <?> (int_, j1, j2))
     let to_lits (l,_,_) = Lits.Seq.abstract l
   end)
   module ITbl = Hashtbl.Make(CCInt)
@@ -100,6 +115,7 @@ module Make(Any : sig end) = struct
 
   let _save injected bool_lit =
     ITbl.add _lit2inj bool_lit injected;
+    Util.debug ~section 4 "save bool_lit %d = %a" bool_lit pp_injected injected;
     match injected with
     | Clause_component lits
     | Lits (lits, _) ->
@@ -145,7 +161,7 @@ module Make(Any : sig end) = struct
         (function
           | lits', Lits (_, pred'), blit
             when Lits.are_variant lits lits'
-            && eq_lits_predicate pred pred' -> Some blit
+            && compare_lits_predicate pred pred' = 0 -> Some blit
           | _ -> None
         )
       |> Sequence.head
@@ -166,7 +182,7 @@ module Make(Any : sig end) = struct
         (function
           | lits', Ctx (_, t', pred'), blit
             when Lits.are_variant lits lits'
-            && T.eq t t' && eq_ctx_predicate pred pred' -> Some blit
+            && T.eq t t' && compare_ctx_predicate pred pred' = 0 -> Some blit
           | _ -> None
         )
       |> Sequence.head
@@ -198,29 +214,12 @@ module Make(Any : sig end) = struct
     try Some (ITbl.find _lit2inj i)
     with Not_found -> None
 
-  let string_of_lits_pred lits = function
-    | Provable t -> Util.sprintf "⟦loop(%a) ⊢ %a⟧" T.pp t Lits.pp lits
-    | TrailOk -> Util.sprintf "⟦trail_ok(%a)⟧" Lits.pp lits
-    | ProvableForSubConstant t -> Util.sprintf "provable_sub_cst(%a)" T.pp t
-
-  let string_of_ctx_pred ctx i = function
-    | InLoop -> Util.sprintf "%a ∈ loop(%a)" ClauseContext.pp ctx T.pp i
-
   let pp buf i =
     if i<0 then Buffer.add_string buf "¬";
     let i = abs i in
     match extract i with
     | None -> Printf.bprintf buf "L%d" i
-    | Some (Clause_component lits) ->
-        Printf.bprintf buf "⟦%a⟧" (Util.pp_array ~sep:"∨" Literal.pp) lits
-    | Some (Lits (lits, pred)) ->
-        let s = string_of_lits_pred lits pred in
-        Buffer.add_string buf s
-    | Some (Ctx (lits, ind, pred)) ->
-        let s = string_of_ctx_pred lits ind pred in
-        Buffer.add_string buf s
-    | Some (Name s) ->
-        Printf.bprintf buf "⟦%s⟧" s
+    | Some inj -> pp_injected buf inj
 
   let print fmt i =
     if i<0 then Format.pp_print_string fmt "¬";

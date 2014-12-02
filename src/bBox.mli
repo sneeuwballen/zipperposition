@@ -31,6 +31,8 @@ This module defines a way to encapsulate clauses and some meta-level
 properties into boolean literals, and maintains a bijection between
 encapsulated values and boolean literals *)
 
+val section : Logtk.Util.Section.t
+
 module type S = BBox_intf.S
 
 module Make(Any : sig end) : S with type inductive_cst = Logtk.FOTerm.t

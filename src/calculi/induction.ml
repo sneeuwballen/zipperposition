@@ -46,7 +46,7 @@ let cover_set_depth_ = ref 1
 
 let section = Util.Section.make ~parent:Const.section "ind"
 let section_qbf = Util.Section.make
-  ~parent:section ~inheriting:[BoolSolver.section] "qbf"
+  ~parent:section ~inheriting:[BoolSolver.section; BBox.section] "qbf"
 
 (* is [s] a constructor symbol for some inductive type? *)
 let is_constructor_ s = match s with

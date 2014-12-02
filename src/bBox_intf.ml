@@ -47,18 +47,18 @@ module type S = sig
     | Provable of inductive_cst (** clause provable within loop(i) *)
     | TrailOk (** Some trail that proves lits is true *)
     | ProvableForSubConstant of inductive_cst
+    [@@deriving ord]
 
   type ctx_predicate =
     | InLoop  (** ctx in loop(i) *)
-
-  val eq_lits_predicate : lits_predicate -> lits_predicate -> bool
-  val eq_ctx_predicate : ctx_predicate -> ctx_predicate -> bool
+    [@@deriving ord]
 
   type injected = private
     | Clause_component of Literals.t
     | Lits of Literals.t * lits_predicate
     | Ctx of ClauseContext.t * inductive_cst * ctx_predicate
     | Name of string  (* name for CNF *)
+    [@@deriving ord]
 
   val inject_lits : Literals.t -> bool_lit
   (** Inject a clause into a boolean literal. No other clause will map
