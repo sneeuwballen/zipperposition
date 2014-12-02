@@ -37,6 +37,7 @@ let rec _rev_append_map f l acc = match l with
 
 module Make(X : sig end) : BS.QBF = struct
   module LitSet = Sequence.Set.Make(CCInt)
+  module ClauseSet = Sequence.Set.Make(LitSet)
 
   (* add a list of literals to the set *)
   let _add_list set l =
@@ -59,18 +60,20 @@ module Make(X : sig end) : BS.QBF = struct
 
   (* current (backtrackable) state  *)
   type state = {
-    mutable clauses : lit list list;
+    mutable clauses : ClauseSet.t;
     mutable result : Qbf.result;
   }
 
   (* stack of states *)
   let stack : state CCVector.vector =
     let v = CCVector.create () in
-    CCVector.push v {clauses=[]; result=Qbf.Unknown};
+    CCVector.push v {clauses=ClauseSet.empty; result=Qbf.Unknown};
     v
 
   let get_state_ () =
     CCVector.get stack (CCVector.length stack-1)
+
+  let clause_of_lits_ l = LitSet.of_list l
 
   let root_save_level = 0
 
@@ -101,7 +104,7 @@ module Make(X : sig end) : BS.QBF = struct
 
   let add_clause c =
     let st = get_state_ () in
-    st.clauses <- c :: st.clauses
+    st.clauses <- ClauseSet.add (clause_of_lits_ c) st.clauses
 
   let valuation l =
     if l<=0 then invalid_arg "valuation";
@@ -133,13 +136,18 @@ module Make(X : sig end) : BS.QBF = struct
     let set' = _add_list set lits in
     CCVector.set _lits l (q,set')
 
+  let to_cnf_ clauses =
+    ClauseSet.to_seq clauses
+    |> Sequence.map LitSet.to_list
+    |> Sequence.to_rev_list
+
   let _mk_form () =
     (* at quantifier level [i] *)
     let rec _recurse_quant i =
       if i = CCVector.length _lits
         then
           let st = get_state_ () in
-          Qbf.CNF.cnf st.clauses
+          Qbf.CNF.cnf (to_cnf_ st.clauses)
         else
           let q, lits = CCVector.get _lits i in
           Qbf.CNF.quantify q (LitSet.to_list lits) (_recurse_quant (i+1))
