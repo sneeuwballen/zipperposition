@@ -343,6 +343,14 @@ let estimate_num_clauses ~cache ~pos f =
   LogtkUtil.exit_prof prof_estimate;
   n
 
+(* atomic formula, or forall/exists/not an atomic formula (1 literal) *)
+let rec will_yield_lit f = match F.view f with
+  | F.Not f'
+  | F.ForallTy f'
+  | F.Exists (_, f')
+  | F.Forall (_, f') -> will_yield_lit f'
+  | _ -> F.is_atomic f
+
 (* introduce definitions for sub-formulas of [f], is needed. This might
    modify [ctx] by adding definitions to it, and it will {!NOT} introduce
    definitions in the definitions (that has to be done later). *)
@@ -391,7 +399,7 @@ let introduce_defs ~ctx ~cache f =
               (a +/ b +/ p true f +/ p false f)
             )
       in
-      if should_rename
+      if not (will_yield_lit f) && should_rename
         then _rename ~polarity f
         else f
   (* introduce definitions for subterms *)
