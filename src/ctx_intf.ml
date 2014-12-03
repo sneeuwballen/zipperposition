@@ -204,6 +204,10 @@ module type S = sig
     (** [is_inductive_type ty] holds iff [ty] is an instance of some
         registered type (registered with {!declare_ty}). *)
 
+    val contains_inductive_types : FOTerm.t -> bool
+    (** [true] iff the term contains at least one subterm with
+        an inductive type *)
+
     (** {6 Inductive Constants} *)
 
     type cst = FOTerm.t
