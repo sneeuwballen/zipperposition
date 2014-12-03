@@ -768,8 +768,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
           *)
           assert (not (LitsTbl.mem tbl cand.cand_lits));
           LitsTbl.add tbl cand.cand_lits ();
-          Solver.quantify_lits level2_
-            [provable_ cand.cand_lits cst; in_loop_ cand.cand_ctx cst];
+          Solver.quantify_lits level2_ [provable_ cand.cand_lits cst];
           Solver.add_clause [ neg_ (provable_ cand.cand_lits cst)
                             ; in_loop_ cand.cand_ctx cst];
           (* explore all sub-cases of this candidate context *)
