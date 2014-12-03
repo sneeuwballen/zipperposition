@@ -61,6 +61,8 @@ let hash = CCHash.apply hash_fun
 let cmp c1 c2 =
   CCOrd.(Lits.compare c1.lits c2.lits <?> (list_ _cmp_blit, c1.trail, c2.trail))
 
+let compare = cmp
+
 let make lits trail = {lits; trail; }
 
 let is_empty c = Array.length c.lits = 0 && List.length c.trail = 0
@@ -111,6 +113,7 @@ let to_forms c =
 let to_string c =
   Util.on_buffer pp c
 
+let lits c = c.lits
 let trail c = c.trail
 
 let fmt fmt c =

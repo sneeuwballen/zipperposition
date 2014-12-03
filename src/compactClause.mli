@@ -39,9 +39,10 @@ type t = {
   trail : bool_lit list;
 }
 
-val eq : t -> t -> bool
 val cmp : t -> t -> int
 include Interfaces.HASH with type t := t
+
+val compare : t -> t -> int
 
 val make : Literal.t array -> bool_lit list -> t
 (** Make a compact clause *)
@@ -54,6 +55,7 @@ val to_seq : t -> Literal.t Sequence.t
 
 val to_forms : t -> form array
 
+val lits : t -> Literal.t array
 val trail : t -> bool_lit list
 
 val pp : Buffer.t -> t -> unit
