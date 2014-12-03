@@ -128,23 +128,28 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
 
   (** {6 Proof Relation} *)
 
-  (* one way to prove a clause: parent clauses *)
-  type proof = CompactClause.t list
+  module CompactClauseSet = Sequence.Set.Make(CompactClause)
+
+  (* one way to prove a clause: set of parent clauses
+  type proof = CompactClauseSet.t
+  *)
 
   (* given a proof (a set of parent clauses) extract the corresponding trail *)
-  let trail_of_proof l =
-    CCList.flat_map
-      (fun cc ->
+  let trail_of_proof set =
+    CompactClauseSet.fold
+      (fun cc acc ->
         let trail = CompactClause.trail cc in
-        List.map
-          (function (sign, `Box_clause lits) ->
-            BoolLit.set_sign sign (BoolLit.inject_lits lits)
-          ) trail
-      ) l
+        List.fold_left
+          (fun acc (sign, `Box_clause lits) ->
+            BoolLit.set_sign sign (BoolLit.inject_lits lits) :: acc
+          ) acc trail
+      ) set []
+
+  module ProofSet = Sequence.Set.Make(CompactClauseSet)
 
   (* a set of proofs *)
   type proof_set = {
-    mutable proofs : proof list;
+    mutable proofs : ProofSet.t;
   }
 
   module FV_proofs = FVMap(struct
@@ -197,15 +202,16 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
           | Proof.Clause lits -> lits
         ) parents
       in
+      let parents = CompactClauseSet.of_list parents in
       (* all proofs of [lits] *)
       let set = match find_proofs_ lits with
         | None ->
-            let set = {proofs=[]} in
+            let set = {proofs=ProofSet.empty} in
             proofs_ := FV_proofs.add !proofs_ lits set;
             set
         | Some set -> set
       in
-      set.proofs <- parents :: set.proofs;
+      set.proofs <- ProofSet.add parents set.proofs;
       Util.debug ~section 4 "add proof: %a" Proof.pp_notrec p;
     with NonClausalProof ->
       ()  (* ignore the proof *)
@@ -509,7 +515,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
   let provable_sub_ lits t = BoolLit.inject_lits_pred lits (BoolLit.ProvableForSubConstant t)
   let in_loop_ ctx i = BoolLit.inject_ctx ctx i BoolLit.InLoop
 
-  (* TODO: encode proof relation into QBF, starting from the set of "roots"
+  (* encode proof relation into QBF, starting from the set of "roots"
       that are (applications of) clause contexts + false.
 
       Plan:
@@ -564,7 +570,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
           (* proof of [ctx[cst]] *)
           let proofs = match find_proofs_ ctx.cand_lits with
             | None -> Sequence.empty
-            | Some {proofs} -> Sequence.of_list proofs
+            | Some {proofs} -> ProofSet.to_seq proofs
           in
           let trails = Sequence.map trail_of_proof proofs in
           Sequence.map
@@ -707,9 +713,129 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     Solver.add_clause clause;
     ()
 
-  (* TODO: encode the whole proofgraph *)
-  let qbf_encode_proofgraph_ () =
+  module LitsTbl = Hashtbl.Make(struct
+    type t = Lits.t
+    let equal = Lits.eq
+    let hash = Lits.hash
+  end)
+
+  (* [lits] is pure iff it contains no inductive type. Its provability
+      status w.r.t some inductive constant is [true] (trail notwithstanding) *)
+  let pure_lits_ lits =
+    let impure = Lits.Seq.terms lits
+      |> Sequence.exists CI.contains_inductive_types
+    in
+    not impure
+
+  (* table from sets of compact clauses to 'a *)
+  module CompactClauseSetTbl = Hashtbl.Make(struct
+    type t = CompactClauseSet.t
+    let equal = CompactClauseSet.equal
+    let hash_fun set h =
+      let seq = CompactClauseSet.to_seq set in
+      CCHash.seq CompactClause.hash_fun seq h
+    let hash set = CCHash.apply hash_fun set
+  end)
+
+  (* encode the proofgraph of this constant, with literals [loop(cst) |- C]
+      and [C[<>] in loop(cst)] *)
+  let qbf_encode_proofgraph_of_ cst =
+    let sets = CI.cover_sets cst in
+    (* already encoded proofs *)
+    let tbl = LitsTbl.create 128 in
+    (* bool lit that encode the fact that a proof is true *)
+    let proof_is_true_ =
+      let blit_of_proof_tbl = CompactClauseSetTbl.create 128 in
+      let count = ref 0 in
+      fun proof ->
+        try CompactClauseSetTbl.find blit_of_proof_tbl proof
+        with Not_found ->
+          let blit = BoolLit.inject_name' "is_true(%d,%a)" !count T.pp cst in
+          Solver.quantify_lits level2_ [blit];
+          CompactClauseSetTbl.add blit_of_proof_tbl proof blit;
+          incr count;
+          blit
+    in
+    (* queue of nodes of the proof graph (1 node = array of lits) to explore *)
+    let q = Queue.create () in
+    !(find_candidates_ cst)
+      |> FV_cand.to_seq
+      |> Sequence.map snd
+      |> Sequence.iter
+        (fun cand ->
+          (* encode proof of [ctx[cst]]: It's
+              provable(ctx[cst]) => [ctx in loop(cst)]
+          *)
+          assert (not (LitsTbl.mem tbl cand.cand_lits));
+          LitsTbl.add tbl cand.cand_lits ();
+          Solver.quantify_lits level2_
+            [provable_ cand.cand_lits cst; in_loop_ cand.cand_ctx cst];
+          Solver.add_clause [ neg_ (provable_ cand.cand_lits cst)
+                            ; in_loop_ cand.cand_ctx cst];
+          (* explore all sub-cases of this candidate context *)
+          sets
+          |> Sequence.flat_map
+            (fun set ->
+              set.CI.sub_constants
+              |> T.Set.to_seq
+            )
+          |> Sequence.iter
+            (fun t' ->
+              (* we encode the proof graph "above" [ctx[t']] *)
+              let lits = ClauseContext.apply cand.cand_ctx t' in
+              Queue.push lits q;
+            )
+        );
+    (* breadth first traversal, from leaves [ctx[t']] where ctx is a
+      candidate context and t' an inductive sub-constant of
+      a recursive case of  [cst] *)
+    while not (Queue.is_empty q) do
+      let lits = Queue.pop q in
+      if not (LitsTbl.mem tbl lits) then (
+        LitsTbl.add tbl lits ();
+        Solver.quantify_lits level2_ [provable_ lits cst];
+        match find_proofs_ lits  with
+        | None ->
+            (* not provable *)
+            Solver.add_clause [neg_ (provable_ lits cst)]
+        | Some {proofs;_} ->
+            (* add provable(lits) => bigor_{p proof of lits} true_proof(p) *)
+            let c1 = ProofSet.fold
+              (fun proof l -> proof_is_true_ proof :: l)
+              proofs [neg_ (provable_ lits cst)]
+            in
+            Solver.add_clause c1;
+            (* define proofs:
+                  for p proof with premises [lits_1, lits_2, ..., lits_n]
+                  and trail [Gamma] add:
+                    true_proof(p) => bigand_i provable(lits_i) & Gamma
+                or: true_proof(p) => Gamma if pure(lits) *)
+            ProofSet.iter
+              (fun proof ->
+                let trail = trail_of_proof proof |> Sequence.of_list in
+                let sub_obligations =
+                  if pure_lits_ lits
+                    then Sequence.empty
+                    else CompactClauseSet.to_seq proof
+                      |> Sequence.map
+                        (fun cc -> provable_ (CompactClause.lits cc) cst)
+                in
+                let goals = Sequence.append sub_obligations trail in
+                (* "proof is true" implies "lit" is true *)
+                let clauses = Sequence.map
+                  (fun lit -> [neg_ (proof_is_true_ proof); lit])
+                  goals
+                in
+                Solver.add_clause_seq clauses
+              ) proofs
+      )
+    done;
     ()
+
+  (* encode the whole proofgraph for every inductive constant. *)
+  let qbf_encode_proofgraph_ () =
+    CI.Seq.cst
+      |> Sequence.iter qbf_encode_proofgraph_of_
 
   (* encode: cases(i) => bigAnd_{s in coversets(i) (xor_{t in s} i=t} *)
   let qbf_encode_cover_set cst set =
