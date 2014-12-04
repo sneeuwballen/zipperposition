@@ -281,6 +281,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
                   assert (T.is_ground t');
                   let lits = [| Literal.mk_eq t t' |] in
                   let bool_lit = BoolLit.inject_lits lits in
+                  Solver.quantify_lits Solver.level0 [bool_lit];
                   let proof cc = Proof.mk_c_trivial ~theories:["induction"] cc in
                   let trail = C.Trail.of_list [bool_lit] in
                   let clause = C.create_a ~trail lits proof in
@@ -502,7 +503,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
   let cases_ x = BoolLit.inject_name' "cases(%a)" T.pp x
   let pgraph_ x = BoolLit.inject_name' "proofgraph(%a)" T.pp x
   let empty_ x = BoolLit.inject_name' "empty(%a)" T.pp x
-  let loop_ x = BoolLit.inject_name' "loop(%a)" T.pp x
+  let is_loop_ x = BoolLit.inject_name' "is_loop(%a)" T.pp x
   let base_ x = BoolLit.inject_name' "base(%a)" T.pp x
   let recf_ x = BoolLit.inject_name' "recf(%a)" T.pp x
   let init_ x = BoolLit.inject_name' "init(%a)" T.pp x
@@ -542,18 +543,19 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     - (not [proofgraph] | [empty(i)] | not [loop(i)]) *)
   let qbf_encode_valid_ cst =
     let pc = CI.pc cst in
+    Solver.quantify_lits level2_ [valid_ cst; pgraph_ cst];
     Solver.add_clauses
       [ valid_ cst :: List.map (fun pc -> neg_ pc.CI.pc_lit) pc (* pc -> valid *)
       ; [ neg_ (valid_ cst); cases_ cst ]
-      ; [ neg_ (valid_ cst); neg_ (pgraph_ cst); empty_ cst; neg_ (loop_ cst) ]
+      ; [ neg_ (valid_ cst); neg_ (pgraph_ cst); empty_ cst; neg_ (is_loop_ cst) ]
       ];
     ()
 
   (* encode (init(i) & base(i) & recf(i)) => loop(i) *)
   let qbf_encode_loop_ cst =
-    Solver.quantify_lits level2_ [init_ cst; base_ cst; recf_ cst; loop_ cst];
+    Solver.quantify_lits level2_ [init_ cst; base_ cst; recf_ cst; is_loop_ cst];
     Solver.add_clause
-      [ neg_ (init_ cst); neg_ (base_ cst); neg_ (recf_ cst); loop_ (cst) ]
+      [ neg_ (init_ cst); neg_ (base_ cst); neg_ (recf_ cst); is_loop_ (cst) ]
 
   (* - for each candidate ctx C,
         for each proof p in proofs(C[cst]), add:
@@ -580,7 +582,9 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       |> Sequence.to_rev_list
     and init_clause =
       let guard = Sequence.map
-        (fun ctx -> neg_ (trail_ok_ ctx.cand_lits)
+        (fun ctx ->
+          Solver.quantify_lits level2_ [trail_ok_ ctx.cand_lits];
+          neg_ (trail_ok_ ctx.cand_lits)
         ) candidates
       in
       init_ cst :: Sequence.to_rev_list guard
@@ -603,8 +607,11 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
           |> Sequence.map
             (fun base_cases ->
               let guard = List.map
-                (fun t -> is_true_ [| Literal.mk_eq t cst |])
-                base_cases
+                (fun t ->
+                  let blit = is_true_ [| Literal.mk_eq t cst |] in
+                  Solver.quantify_lits Solver.level0 [blit];
+                  blit
+                ) base_cases
               in
               base_ cst :: guard
             )
@@ -741,20 +748,11 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       and [C[<>] in loop(cst)] *)
   let qbf_encode_proofgraph_of_ cst =
     let sets = CI.cover_sets cst in
-    (* already encoded proofs *)
+    (* set of lits for which proof is already encoded *)
     let tbl = LitsTbl.create 128 in
-    (* bool lit that encode the fact that a proof is true *)
-    let proof_is_true_ =
-      let blit_of_proof_tbl = CompactClauseSetTbl.create 128 in
-      let count = ref 0 in
-      fun proof ->
-        try CompactClauseSetTbl.find blit_of_proof_tbl proof
-        with Not_found ->
-          let blit = BoolLit.inject_name' "is_true(%d,%a)" !count T.pp cst in
-          Solver.quantify_lits level2_ [blit];
-          CompactClauseSetTbl.add blit_of_proof_tbl proof blit;
-          incr count;
-          blit
+    (* bool lit that encodes: provable(C) => bigor_{p in proofs(C)} p is true *)
+    let provable_is_inconsistent lits cst =
+      BoolLit.inject_lits_pred lits (BoolLit.ProvableIsInconsistent cst)
     in
     (* queue of nodes of the proof graph (1 node = array of lits) to explore *)
     let q = Queue.create () in
@@ -764,13 +762,18 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       |> Sequence.iter
         (fun cand ->
           (* encode proof of [ctx[cst]]: It's
+              provable_is_inconsistent_
               provable(ctx[cst]) => [ctx in loop(cst)]
           *)
           assert (not (LitsTbl.mem tbl cand.cand_lits));
           LitsTbl.add tbl cand.cand_lits ();
-          Solver.quantify_lits level2_ [provable_ cand.cand_lits cst];
-          Solver.add_clause [ neg_ (provable_ cand.cand_lits cst)
-                            ; in_loop_ cand.cand_ctx cst];
+          Solver.quantify_lits level1_ [provable_ cand.cand_lits cst];
+          Solver.add_clauses
+            [ [ neg_ (provable_is_inconsistent cand.cand_lits cst)
+              ; provable_ cand.cand_lits cst]
+            ; [ neg_ (provable_is_inconsistent cand.cand_lits cst)
+              ; neg_ (in_loop_ cand.cand_ctx cst)]
+            ];
           (* explore all sub-cases of this candidate context *)
           sets
           |> Sequence.flat_map
@@ -792,43 +795,49 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       let lits = Queue.pop q in
       if not (LitsTbl.mem tbl lits) then (
         LitsTbl.add tbl lits ();
-        Solver.quantify_lits level2_ [provable_ lits cst];
+        Solver.quantify_lits level1_ [provable_ lits cst];
+        Solver.quantify_lits level2_ [provable_is_inconsistent lits cst];
         match find_proofs_ lits  with
         | None ->
-            (* not provable *)
-            Solver.add_clause [neg_ (provable_ lits cst)]
+            (* not provable (otherwise provable_is_inconsistent) *)
+            Solver.add_clause
+              [neg_ (provable_is_inconsistent lits cst); provable_ lits cst]
         | Some {proofs;_} ->
-            (* add provable(lits) => bigor_{p proof of lits} true_proof(p) *)
-            let c1 = ProofSet.fold
-              (fun proof l -> proof_is_true_ proof :: l)
-              proofs [neg_ (provable_ lits cst)]
-            in
-            Solver.add_clause c1;
-            (* define proofs:
-                  for p proof with premises [lits_1, lits_2, ..., lits_n]
-                  and trail [Gamma] add:
-                    true_proof(p) => bigand_i provable(lits_i) & Gamma
-                or: true_proof(p) => Gamma if pure(lits) *)
+            (* add provable_is_inconsistent(lits) => provable(lits) *)
+            Solver.add_clause
+              [neg_ (provable_is_inconsistent lits cst); provable_ lits cst];
+            (* for each proof p of lits
+                with premises [lits_1, lits_2, ..., lits_n] and trail [Gamma]
+               add:
+                  "provable_is_inconsistent(lits) =>
+                    bigor_{l in [lit_1...lit_n] union Gamma} not l"  *)
             ProofSet.iter
               (fun proof ->
-                let trail = trail_of_proof proof |> Sequence.of_list in
+                let trail = trail_of_proof proof in
                 let sub_obligations =
                   if pure_lits_ lits
-                    then Sequence.empty
-                    else CompactClauseSet.to_seq proof
-                      |> Sequence.map
+                    then []
+                    else CompactClauseSet.to_list proof
+                      |> List.map
                         (fun cc -> provable_ (CompactClause.lits cc) cst)
                 in
-                let goals = Sequence.append sub_obligations trail in
-                (* "proof is true" implies "lit" is true *)
-                let clauses = Sequence.map
-                  (fun lit -> [neg_ (proof_is_true_ proof); lit])
-                  goals
+                let goals = sub_obligations @ trail in
+                (* "proof not valid" implies some goal not fullfilled *)
+                let goals_failed = List.map neg_ goals in
+                let clause =
+                  neg_ (provable_is_inconsistent lits cst)
+                  :: goals_failed
                 in
-                Solver.add_clause_seq clauses
+                Solver.add_clause clause
               ) proofs
       )
     done;
+    (* add "proofgraph or bigor_{lits} provable_is_inconsistent(lits)" *)
+    let l = LitsTbl.fold
+      (fun lits () acc -> provable_is_inconsistent lits cst :: acc)
+      tbl []
+    in
+    Solver.add_clause (pgraph_ cst :: l);
     ()
 
   (* encode the whole proofgraph for every inductive constant. *)
@@ -846,6 +855,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
         )
     in
     (* guard every clause with "cases(i) => clause" *)
+    Solver.quantify_lits level2_ [cases_ cst];
     let clauses = List.map (fun c -> neg_ (cases_ cst) :: c) big_xor in
     Solver.add_clauses clauses;
     ()

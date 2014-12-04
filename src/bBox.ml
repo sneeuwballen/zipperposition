@@ -51,6 +51,7 @@ module Make(Any : sig end) = struct
   (** Predicate attached to a set of literals *)
   type lits_predicate =
     | Provable of inductive_cst [@compare T.cmp] (** clause provable within loop(i) *)
+    | ProvableIsInconsistent of inductive_cst [@compare T.cmp]
     | TrailOk (** Some trail that proves lits is true *)
     | ProvableForSubConstant of inductive_cst [@compare T.cmp]
     [@@deriving ord]
@@ -68,6 +69,8 @@ module Make(Any : sig end) = struct
 
   let string_of_lits_pred lits = function
     | Provable t -> Util.sprintf "⟦loop(%a) ⊢ %a⟧" T.pp t Lits.pp lits
+    | ProvableIsInconsistent t ->
+        Util.sprintf "⟦\"loop(%a) ⊢ %a\" inconsistent⟧" T.pp t Lits.pp lits
     | TrailOk -> Util.sprintf "⟦trail_ok(%a)⟧" Lits.pp lits
     | ProvableForSubConstant t -> Util.sprintf "⟦provable_sub_cst(%a)⟧" T.pp t
 

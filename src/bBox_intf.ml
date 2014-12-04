@@ -45,6 +45,7 @@ module type S = sig
   (** Predicate attached to a set of literals *)
   type lits_predicate =
     | Provable of inductive_cst (** clause provable within loop(i) *)
+    | ProvableIsInconsistent of inductive_cst [@compare T.cmp]
     | TrailOk (** Some trail that proves lits is true *)
     | ProvableForSubConstant of inductive_cst
     [@@deriving ord]
