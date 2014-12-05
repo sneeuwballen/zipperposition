@@ -245,7 +245,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let _compact_trail trail =
     ISet.fold
       (fun i acc ->
-        let sign = i<0 in
+        let sign = i >= 0 in
         match Ctx.BoolLit.extract (abs i) with
         | None -> failwith "wrong trail"
         | Some (Ctx.BoolLit.Clause_component lits) -> (sign, `Box_clause lits) :: acc
