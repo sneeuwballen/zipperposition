@@ -195,12 +195,12 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
   (* add a proof to the set of proofs for [lits] *)
   let add_proof_ lits p =
     try
-      let parents = Array.to_list p.Proof.parents in
-      let parents = List.map
+      let parents = Array.to_list p.Proof.parents
+      |> List.map
         (fun p -> match p.Proof.result with
           | Proof.Form _ -> raise NonClausalProof
           | Proof.Clause lits -> lits
-        ) parents
+        )
       in
       let parents = CompactClauseSet.of_list parents in
       (* all proofs of [lits] *)
@@ -214,6 +214,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       set.proofs <- ProofSet.add parents set.proofs;
       Util.debug ~section 4 "add proof: %a" Proof.pp_notrec p;
     with NonClausalProof ->
+      Util.debug ~section 4 "ignore non-clausal proof: %a" Proof.pp_notrec p;
       ()  (* ignore the proof *)
 
   let () =
@@ -726,14 +727,25 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     let hash = Lits.hash
   end)
 
-  (* [lits] is pure iff it contains no inductive type. Its provability
-      status w.r.t some inductive constant is [true] (trail notwithstanding)
-      FIXME: the trail might depend on cst (this predicate should be on compact clauses) *)
-  let pure_lits_ lits =
-    let impure = Lits.Seq.terms lits
-      |> Sequence.exists CI.contains_inductive_types
+  (* [cc] is pure iff it contains no inductive type. Its provability
+      status w.r.t some inductive constant is [true] *)
+  let pure_ cc =
+    let terms_trail =
+      CompactClause.trail cc
+      |> Sequence.of_list
+      |> Sequence.flat_map
+        (function (_,`Box_clause lits) ->
+          Lits.Seq.terms lits
+        )
+    and terms_lits = Lits.Seq.terms (CompactClause.lits cc) in
+    let impure =
+      Sequence.exists CI.contains_inductive_types
+        (Sequence.append terms_lits terms_trail)
     in
     not impure
+
+  let pure_proof_ proof =
+    CompactClauseSet.for_all pure_ proof
 
   (* table from sets of compact clauses to 'a *)
   module CompactClauseSetTbl = Hashtbl.Make(struct
@@ -748,6 +760,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
   (* encode the proofgraph of this constant, with literals [loop(cst) |- C]
       and [C[<>] in loop(cst)] *)
   let qbf_encode_proofgraph_of_ cst =
+    let coversets = CI.cover_sets cst in
     (* set of lits for which proof is already encoded *)
     let tbl = LitsTbl.create 128 in
     (* bool lit that encodes: provable(C) => bigor_{p in proofs(C)} p is true *)
@@ -767,8 +780,17 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
             [ neg_ (provable_is_inconsistent cand.cand_lits cst)
             ; neg_ (in_loop_ cand.cand_ctx cst)
             ];
-          (* explore  *)
+          (* explore: ctx[cst], and ctx[t] for each sub-constant t of cst  *)
           Queue.push cand.cand_lits q;
+          coversets
+            |> Sequence.flat_map (fun set -> T.Set.to_seq set.CI.sub_constants)
+            |> Sequence.iter
+              (fun t ->
+                (* t is a subconstant. we will probably be interested
+                    in the provability of ctx[t]. *)
+                let lits = ClauseContext.apply cand.cand_ctx t in
+                Queue.push lits q
+              )
         );
     (* breadth first traversal, from leaves [ctx[t']] where ctx is a
       candidate context and t' an inductive sub-constant of
@@ -782,9 +804,12 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
         match find_proofs_ lits  with
         | None ->
             (* not provable (otherwise provable_is_inconsistent) *)
+            Util.debug ~section:section_qbf 4 "  no proofs for %a" Lits.pp lits;
             Solver.add_clause
               [neg_ (provable_is_inconsistent lits cst); provable_ lits cst]
         | Some {proofs;_} ->
+            Util.debug ~section:section_qbf 4 "  %d proofs for %a"
+              (ProofSet.cardinal proofs) Lits.pp lits;
             (* add provable_is_inconsistent(lits) => provable(lits) *)
             Solver.add_clause
               [neg_ (provable_is_inconsistent lits cst); provable_ lits cst];
@@ -795,9 +820,11 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
                     bigor_{l in [lit_1...lit_n] union Gamma} not l"  *)
             ProofSet.iter
               (fun proof ->
+                Util.debug ~section:section_qbf 4 "    > including proof %a"
+                  (Sequence.pp_buf CompactClause.pp) (CompactClauseSet.to_seq proof);
                 let trail = trail_of_proof proof in
                 let sub_obligations =
-                  if pure_lits_ lits
+                  if pure_proof_ proof
                     then []
                     else CompactClauseSet.to_list proof
                       |> List.map

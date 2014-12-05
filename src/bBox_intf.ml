@@ -27,6 +27,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Interface of BBox} *)
 
+open Logtk
+
 module type S = sig
   type inductive_cst
 
@@ -45,7 +47,7 @@ module type S = sig
   (** Predicate attached to a set of literals *)
   type lits_predicate =
     | Provable of inductive_cst (** clause provable within loop(i) *)
-    | ProvableIsInconsistent of inductive_cst [@compare T.cmp]
+    | ProvableIsInconsistent of inductive_cst
     | TrailOk (** Some trail that proves lits is true *)
     | ProvableForSubConstant of inductive_cst
     [@@deriving ord]
@@ -79,6 +81,13 @@ module type S = sig
   val extract : bool_lit -> injected option
   (** Recover the value that was injected into the literal, if any
       @raise Failure if the literal is <= 0 *)
+
+  val extract_exn : bool_lit -> injected
+  (** Recover the value that was injected into the literal
+      @raise Failure if the literal is <= 0 of it's not a proper boolean lit *)
+
+  val inductive_cst : bool_lit -> inductive_cst option
+  (** Obtain the inductive constant from this boolean lit, if any *)
 
   (** {2 Printers}
   Those printers print the content (injection) of a boolean literal, if any *)

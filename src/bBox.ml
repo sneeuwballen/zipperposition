@@ -217,6 +217,23 @@ module Make(Any : sig end) = struct
     try Some (ITbl.find _lit2inj i)
     with Not_found -> None
 
+  let extract_exn i =
+    if i<=0 then failwith "BBox.extract: require integer > 0";
+    try ITbl.find _lit2inj i
+    with Not_found -> failwith "BBox.extact: not a proper injected lit"
+
+  let inductive_cst b = match extract_exn b with
+    | Name _
+    | Clause_component _ -> None
+    | Lits (_, pred) ->
+        begin match pred with
+        | Provable t
+        | ProvableIsInconsistent t
+        | ProvableForSubConstant t -> Some t
+        | TrailOk -> None
+        end
+    | Ctx (_, t, _) -> Some t
+
   let pp buf i =
     if i<0 then Buffer.add_string buf "¬";
     let i = abs i in
