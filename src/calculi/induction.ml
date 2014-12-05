@@ -808,7 +808,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
             Solver.add_clause
               [neg_ (provable_is_inconsistent lits cst); provable_ lits cst]
         | Some {proofs;_} ->
-            Util.debug ~section:section_qbf 4 "  %d proofs for %a"
+            Util.debug ~section:section_qbf 4 "  %d proof(s) for %a"
               (ProofSet.cardinal proofs) Lits.pp lits;
             (* add provable_is_inconsistent(lits) => provable(lits) *)
             Solver.add_clause
@@ -820,7 +820,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
                     bigor_{l in [lit_1...lit_n] union Gamma} not l"  *)
             ProofSet.iter
               (fun proof ->
-                Util.debug ~section:section_qbf 4 "    > including proof %a"
+                Util.debug ~section:section_qbf 4 "    > including proof {%a}"
                   (Sequence.pp_buf CompactClause.pp) (CompactClauseSet.to_seq proof);
                 let trail = trail_of_proof proof in
                 let sub_obligations =
