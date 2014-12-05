@@ -623,7 +623,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     else begin
     Util.enter_prof prof_split;
     (* get a fresh split symbol *)
-    let next_split_term () = 
+    let next_split_term () =
       let s = "$$split_" ^ (string_of_int !split_count) in
       incr split_count;
       T.const ~ty:Type.TPTP.o (Symbol.of_string s)
@@ -727,7 +727,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let demod_nf ?(restrict=false) c clauses t =
     let ord = Ctx.ord () in
     (* compute normal form of subterm. If restrict is true, substitutions that
-       are variable renamings are forbidden (since we are at root of a max term) *) 
+       are variable renamings are forbidden (since we are at root of a max term) *)
     let rec reduce_at_root ~restrict t =
       (* find equations l=r that match subterm *)
       try
@@ -1125,7 +1125,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     if Lit.is_ground lita && not (Lit.is_ground litb) then 1
     else if not (Lit.is_ground lita) && Lit.is_ground litb then -1
     (* deep literal is smaller *)
-    else let deptha, depthb = Lit.depth lita, Lit.depth litb in 
+    else let deptha, depthb = Lit.depth lita, Lit.depth litb in
     if deptha <> depthb then depthb - deptha
     (* heavy literal is smaller *)
     else if Lit.weight lita <> Lit.weight litb
@@ -1217,7 +1217,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* make u and v equal using a = b (possibly several times) *)
     and equate_terms a b u v =
       match T.view u, T.view v with
-      | _ when T.eq u v -> true 
+      | _ when T.eq u v -> true
       | _ when equate_root a b u v -> true
       | T.TyApp(f, tyf), T.TyApp(g, tyg) ->
         Type.eq tyf tyg && equate_terms a b f g

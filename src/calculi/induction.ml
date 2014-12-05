@@ -557,9 +557,10 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     Solver.add_clause
       [ neg_ (init_ cst); neg_ (base_ cst); neg_ (recf_ cst); is_loop_ (cst) ]
 
+  (* TODO check CNF *)
   (* - for each candidate ctx C,
         for each proof p in proofs(C[cst]), add:
-        "trail(p) & candidate(ctx) => trail_ok_(C[cst])"
+        "trail(p) & (ctx in loop(cst)) => trail_ok_(C[cst])"
      - add "(bigand_{candidate ctx C} trail_ok(C[cst])) => init(cst)"
   *)
   let qbf_encode_init_ cst =
@@ -703,21 +704,20 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     ()
 
   (* definition of empty(cst):
-    not (empty loop(cst)) => bigor_{C in candidates(cst)} [C in loop(cst)] *)
+    empty(loop(cst)) => bigor_{C in candidates(cst)} [C in loop(cst)] *)
   let qbf_encode_empty_ cst =
-    let clause = !(find_candidates_ cst)
+    let guard = neg_ (empty_ cst) in
+    let clauses = !(find_candidates_ cst)
       |> FV_cand.to_seq
       |> Sequence.map snd
       |> Sequence.map
         (fun ctx ->
           let inloop = in_loop_ ctx.cand_ctx cst in
           Solver.quantify_lits level1_ [inloop];
-          inloop
+          [guard; neg_ inloop]
         )
-      |> Sequence.to_rev_list
     in
-    let clause = neg_ (empty_ cst) :: clause in
-    Solver.add_clause clause;
+    Solver.add_clause_seq clauses;
     ()
 
   module LitsTbl = Hashtbl.Make(struct
@@ -727,7 +727,8 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
   end)
 
   (* [lits] is pure iff it contains no inductive type. Its provability
-      status w.r.t some inductive constant is [true] (trail notwithstanding) *)
+      status w.r.t some inductive constant is [true] (trail notwithstanding)
+      FIXME: the trail might depend on cst (this predicate should be on compact clauses) *)
   let pure_lits_ lits =
     let impure = Lits.Seq.terms lits
       |> Sequence.exists CI.contains_inductive_types
@@ -747,7 +748,6 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
   (* encode the proofgraph of this constant, with literals [loop(cst) |- C]
       and [C[<>] in loop(cst)] *)
   let qbf_encode_proofgraph_of_ cst =
-    let sets = CI.cover_sets cst in
     (* set of lits for which proof is already encoded *)
     let tbl = LitsTbl.create 128 in
     (* bool lit that encodes: provable(C) => bigor_{p in proofs(C)} p is true *)
@@ -761,32 +761,14 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       |> Sequence.map snd
       |> Sequence.iter
         (fun cand ->
-          (* encode proof of [ctx[cst]]: It's
-              provable_is_inconsistent_
-              provable(ctx[cst]) => [ctx in loop(cst)]
-          *)
-          assert (not (LitsTbl.mem tbl cand.cand_lits));
-          LitsTbl.add tbl cand.cand_lits ();
-          Solver.quantify_lits level1_ [provable_ cand.cand_lits cst];
-          Solver.add_clauses
-            [ [ neg_ (provable_is_inconsistent cand.cand_lits cst)
-              ; provable_ cand.cand_lits cst]
-            ; [ neg_ (provable_is_inconsistent cand.cand_lits cst)
-              ; neg_ (in_loop_ cand.cand_ctx cst)]
+          (* add a proof for ctx[cst]: it's  [ctx in loop(cst)] *)
+          Solver.quantify_lits level1_ [in_loop_ cand.cand_ctx cst];
+          Solver.add_clause
+            [ neg_ (provable_is_inconsistent cand.cand_lits cst)
+            ; neg_ (in_loop_ cand.cand_ctx cst)
             ];
-          (* explore all sub-cases of this candidate context *)
-          sets
-          |> Sequence.flat_map
-            (fun set ->
-              set.CI.sub_constants
-              |> T.Set.to_seq
-            )
-          |> Sequence.iter
-            (fun t' ->
-              (* we encode the proof graph "above" [ctx[t']] *)
-              let lits = ClauseContext.apply cand.cand_ctx t' in
-              Queue.push lits q;
-            )
+          (* explore  *)
+          Queue.push cand.cand_lits q;
         );
     (* breadth first traversal, from leaves [ctx[t']] where ctx is a
       candidate context and t' an inductive sub-constant of
@@ -819,7 +801,11 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
                     then []
                     else CompactClauseSet.to_list proof
                       |> List.map
-                        (fun cc -> provable_ (CompactClause.lits cc) cst)
+                        (fun cc ->
+                          (* explore the premise recursively *)
+                          Queue.push (CompactClause.lits cc) q;
+                          provable_ (CompactClause.lits cc) cst
+                        )
                 in
                 let goals = sub_obligations @ trail in
                 (* "proof not valid" implies some goal not fullfilled *)
