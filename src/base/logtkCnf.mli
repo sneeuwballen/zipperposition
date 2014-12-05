@@ -54,7 +54,6 @@ type options =
   | InitialProcessing of (form -> form) (** any processing, at the beginning *)
   | PostNNF of (form -> form)  (** any processing that keeps negation at leaves *)
   | PostSkolem of (form -> form) (** must not introduce variables nor negations *)
-  | DefLimit of int  (* limit size above which names are used *)
 
 (** Options are used to tune the behavior of the CNF conversion.
 

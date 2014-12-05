@@ -534,12 +534,9 @@ type options =
   | InitialProcessing of (form -> form) (** any processing, at the beginning *)
   | PostNNF of (form -> form)  (** any processing that keeps negation at leaves *)
   | PostSkolem of (form -> form) (** must not introduce variables nor negations *)
-  | DefLimit of int  (* limit size above which names are used *)
-
-let default_def_limit = 24
 
 (* simplify formulas and rename them. May introduce new formulas *)
-let simplify_and_rename ~ctx ~cache ~disable_renaming ~preprocess ~limit l =
+let simplify_and_rename ~ctx ~cache ~disable_renaming ~preprocess l =
   LogtkUtil.enter_prof prof_simplify_rename;
   let l' = List.map
     (fun f ->
@@ -585,17 +582,10 @@ let cnf_of_list ?(opts=[]) ?(ctx=LogtkSkolem.create LogtkSignature.empty) l =
     (function PostSkolem f -> Some f | _ -> None)
     opts
   in
-  (* definition limit *)
-  let def_limit = List.fold_left
-    (fun acc opt -> match opt with
-      | DefLimit i -> i
-      | _ -> acc)
-    default_def_limit opts
-  in
   let cache = FPolTbl.create 128 in
   (* simplify and introduce definitions *)
   let l = simplify_and_rename ~ctx ~cache ~disable_renaming
-    ~preprocess ~limit:def_limit l in
+    ~preprocess l in
   (* reduce the new formulas to CNF *)
   List.iter (fun f ->
     LogtkUtil.debug ~section 4 "reduce %a to CNF..." F.pp f;
