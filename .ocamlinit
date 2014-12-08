@@ -2,8 +2,6 @@
 #require "zarith";;
 #require "containers";;
 #require "sequence";;
-#require "datalog";;
-#require "str";;
 #directory "_build/src/";;
 #directory "_build/src/base";;
 #directory "_build/src/extended";;
@@ -32,7 +30,6 @@ let (~<) = Symbol.of_string;;
 #install_printer Precedence.fmt;;
 #install_printer Ordering.fmt;;
 #install_printer Position.fmt;;
-open Logtk.Sequence.Infix;;
 module F = Logtk.Formula;;
 module HOT = Logtk.HOTerm;;
 
@@ -47,13 +44,13 @@ open Logtk_parsers;;
 let pterm s =
     let t = Parse_tptp.parse_term Lex_tptp.token (Lexing.from_string s) in
     let tyctx = TypeInference.Ctx.create Signature.TPTP.base in
-    let _, clos = TypeInference.FO.infer tyctx t in
+    let _, clos = TypeInference.FO.infer_exn tyctx t in
     clos tyctx
 ;;
 let pform s =
     let f = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s) in
     let tyctx = TypeInference.Ctx.create Signature.TPTP.base in
-    TypeInference.FO.convert_form ~ctx:tyctx f
+    TypeInference.FO.convert_form_exn ~ctx:tyctx f
 ;;
 
 (* optional part: extended *)
