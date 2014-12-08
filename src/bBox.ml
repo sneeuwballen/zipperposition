@@ -79,7 +79,7 @@ module Make(Any : sig end) = struct
 
   let pp_injected buf = function
     | Clause_component lits ->
-        Printf.bprintf buf "⟦%a⟧" (Util.pp_array ~sep:"∨" Literal.pp) lits
+        Printf.bprintf buf "⟦%a⟧" (Util.pp_array ~sep:" ∨ " Literal.pp) lits
     | Lits (lits, pred) ->
         let s = string_of_lits_pred lits pred in
         Buffer.add_string buf s
@@ -248,7 +248,7 @@ module Make(Any : sig end) = struct
     | None -> Format.fprintf fmt "L%d" i
     | Some (Clause_component lits) ->
         Format.fprintf fmt "@[⟦%a⟧@]"
-          (CCArray.print ~sep:"∨" Literal.fmt) lits
+          (CCArray.print ~sep:" ∨ " Literal.fmt) lits
     | Some (Lits (lits, pred)) ->
         let s = string_of_lits_pred lits pred in
         Format.pp_print_string fmt s

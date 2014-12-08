@@ -153,6 +153,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
           (i > 0) = (v j)  (* valuation match sign *)
         ) trail
 
+    let to_seq = ISet.to_seq
+
     let pp buf trail =
       if not (ISet.is_empty trail)
         then Printf.bprintf buf " ← %a"

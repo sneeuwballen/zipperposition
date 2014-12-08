@@ -44,6 +44,8 @@ end
 let ind_types_ = ref []
 let cover_set_depth_ = ref 1
 
+let prof_encode_qbf = Util.mk_profiler "ind.encode_qbf"
+
 let section = Util.Section.make ~parent:Const.section "ind"
 let section_qbf = Util.Section.make
   ~parent:section ~inheriting:[BoolSolver.section; BBox.section] "qbf"
@@ -212,9 +214,9 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
         | Some set -> set
       in
       set.proofs <- ProofSet.add parents set.proofs;
-      Util.debug ~section 4 "add proof: %a" Proof.pp_notrec p;
+      Util.debug ~section 5 "add proof: %a" Proof.pp_notrec p;
     with NonClausalProof ->
-      Util.debug ~section 4 "ignore non-clausal proof: %a" Proof.pp_notrec p;
+      Util.debug ~section 5 "ignore non-clausal proof: %a" Proof.pp_notrec p;
       ()  (* ignore the proof *)
 
   let () =
@@ -299,6 +301,38 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
               res := List.rev_append clauses !res
         );
     !res
+
+  (* checks whether the trail of [c] contains two literals [i = t1]
+      and [i = t2] with [t1], [t2] distinct cover set members *)
+  let has_trivial_trail c =
+    let trail = C.get_trail c |> C.Trail.to_seq in
+    (* all i=t where i is inductive *)
+    let inductive_cases = trail
+      |> Sequence.filter_map
+        (fun blit ->
+          let sign = blit >= 0 in
+          match BoolLit.extract (abs blit) with
+          | None -> None
+          | Some (BoolLit.Clause_component [| Literal.Equation (l, r, true) |]) ->
+              if sign && CI.is_inductive l then Some (l, r)
+              else if sign && CI.is_inductive r then Some (r, l)
+              else None
+          | Some (BoolLit.Clause_component _) -> None
+          | Some _ -> assert false
+        )
+    in
+    (* is there i such that   i=t1 and i=t2 can be found in the trail? *)
+    Sequence.product inductive_cases inductive_cases
+      |> Sequence.exists
+        (fun ((i1, t1), (i2, t2)) ->
+          let res = T.eq i1 i2 && not (T.eq t1 t2) in
+          if res
+          then Util.debug ~section 4
+            "clause %a redundant because of %a={%a,%a} in trail"
+            C.pp c T.pp i1 T.pp t1 T.pp t2;
+          res)
+
+  (* TODO: injectivity of constructors! s(a)!=s(b) ===> a!=b *)
 
   (** {6 Clause Contexts}
 
@@ -439,7 +473,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     let proof cc = Proof.mk_c_inference ~rule:"subsumes" cc [C.proof c] in
     let proof' = proof (CompactClause.make lits' (C.get_trail c |> C.compact_trail)) in
     add_proof_ lits' proof';
-    Util.debug ~section 2 "add proof of watched %a because of %a" Lits.pp lits' C.pp c;
+    Util.debug ~section 4 "add proof of watched %a because of %a" Lits.pp lits' C.pp c;
     (* check whether that makes some cand_ctx initialized *)
     List.fold_left
       (fun acc elt -> match elt with
@@ -456,7 +490,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
                 ~trail:(C.get_trail c) lits proof in
               (* disable subsumption for [clause] *)
               C.set_flag C.flag_persistent clause true;
-              Util.debug ~section 2 "initialized %a by subsumption from %a"
+              Util.debug ~section 4 "initialized %a by subsumption from %a"
                 C.pp clause C.pp c;
               clause :: acc
             ) else acc
@@ -804,11 +838,11 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
         match find_proofs_ lits  with
         | None ->
             (* not provable (otherwise provable_is_inconsistent) *)
-            Util.debug ~section:section_qbf 4 "  no proofs for %a" Lits.pp lits;
+            Util.debug ~section:section_qbf 5 "  no proofs for %a" Lits.pp lits;
             Solver.add_clause
               [neg_ (provable_is_inconsistent lits cst); provable_ lits cst]
         | Some {proofs;_} ->
-            Util.debug ~section:section_qbf 4 "  %d proof(s) for %a"
+            Util.debug ~section:section_qbf 5 "  %d proof(s) for %a"
               (ProofSet.cardinal proofs) Lits.pp lits;
             (* add provable_is_inconsistent(lits) => provable(lits) *)
             Solver.add_clause
@@ -820,7 +854,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
                     bigor_{l in [lit_1...lit_n] union Gamma} not l"  *)
             ProofSet.iter
               (fun proof ->
-                Util.debug ~section:section_qbf 4 "    > including proof {%a}"
+                Util.debug ~section:section_qbf 5 "    > including proof {%a}"
                   (Sequence.pp_buf CompactClause.pp) (CompactClauseSet.to_seq proof);
                 let trail = trail_of_proof proof in
                 let sub_obligations =
@@ -878,6 +912,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       - save state
       - adding backtrackable constraints *)
   let qbf_encode_enter_ () =
+    Util.enter_prof prof_encode_qbf;
     (* normal constraints should be added already *)
     Util.debug ~section:section_qbf 4 "save QBF solver...";
     save_level_ := Solver.save ();
@@ -886,6 +921,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     CI.Seq.cst |> Sequence.iter qbf_encode_base_;
     CI.Seq.cst |> Sequence.iter qbf_encode_empty_;
     qbf_encode_proofgraph_ ();
+    Util.exit_prof prof_encode_qbf;
     ()
 
   (* restoring state *)
@@ -963,6 +999,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     Env.add_generate "induction.scan_backward" scan_backward;
     Env.add_unary_inf "induction.scan_extrude" scan_given_for_context;
     Env.add_unary_inf "induction.scan_proof" scan_given_for_proof;
+    Env.add_is_trivial has_trivial_trail;
     (* XXX: ugly, but we must do case_split before scan_extrude/proof.
       Currently we depend on Env.generate_unary applying inferences in
       the reverse order of their addition *)

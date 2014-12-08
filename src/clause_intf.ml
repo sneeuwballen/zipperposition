@@ -116,6 +116,7 @@ module type S = sig
     val singleton : bool_lit -> t
     val of_list : bool_lit list -> t
     val to_list : t -> bool_lit list
+    val to_seq : t -> bool_lit Sequence.t
 
     val subsumes : t -> t -> bool
     (** [subsumes a b] is true iff [a] is a subset of [b] *)
