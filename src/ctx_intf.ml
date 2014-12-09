@@ -204,6 +204,9 @@ module type S = sig
     (** [is_inductive_type ty] holds iff [ty] is an instance of some
         registered type (registered with {!declare_ty}). *)
 
+    val is_constructor_sym : Symbol.t -> bool
+    (** true if the symbol is an inductive constructor (zero, successor...) *)
+
     val contains_inductive_types : FOTerm.t -> bool
     (** [true] iff the term contains at least one subterm with
         an inductive type *)

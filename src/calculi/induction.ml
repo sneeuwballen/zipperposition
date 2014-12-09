@@ -332,7 +332,55 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
             C.pp c T.pp i1 T.pp t1 T.pp t2;
           res)
 
-  (* TODO: injectivity of constructors! s(a)!=s(b) ===> a!=b *)
+  (* transform a lit a=b where a,b have different inductive constructors to false *)
+  let injectivity_simple lit = match lit with
+    | Literal.Equation (l, r, true) ->
+        begin match T.head l, T.head r with
+          | Some s1, Some s2
+            when CI.is_constructor_sym s1 && CI.is_constructor_sym s2 ->
+            (* two inductive constructors! *)
+            if Sym.eq s1 s2
+              then lit (* keep it *)
+              else Literal.mk_absurd
+          | _ -> lit
+        end
+    | Literal.Equation (_, _, false)
+    | Literal.True  | Literal.False  | Literal.Prop (_,_)
+    | Literal.Ineq _ | Literal.Arith _ -> lit
+
+  exception FoundInductiveLit of int * (T.t * T.t) list
+
+  (* if c is  f(t1,...,tn) != f(t1',...,tn') or d, with f inductive symbol, then
+      replace c with    t1 != t1' or ... or tn != tn' or d *)
+  let injectivity_destruct c =
+    try
+      let eligible = C.Eligible.(filter Literal.is_neq) in
+      Lits.fold_lits ~eligible (C.lits c) ()
+        (fun () lit i -> match lit with
+          | Literal.Equation (l, r, false) ->
+              begin match T.Classic.view l, T.Classic.view r with
+              | T.Classic.App (s1, _, l1), T.Classic.App (s2, _, l2)
+                when Sym.eq s1 s2
+                && CI.is_constructor_sym s1
+                && CI.is_constructor_sym s2 ->
+                  (* destruct *)
+                  assert (List.length l1 = List.length l2);
+                  let pairs = List.combine l1 l2 in
+                  raise (FoundInductiveLit (i, pairs))
+              | _ -> ()
+              end
+          | _ -> ()
+        );
+      c (* nothing happened *)
+    with FoundInductiveLit (idx, pairs) ->
+      let lits = Util.array_except_idx (C.lits c) idx in
+      let new_lits = List.map (fun (t1,t2) -> Literal.mk_neq t1 t2) pairs in
+      let proof cc = Proof.mk_c_inference ~theories:["induction"]
+        ~rule:"injectivity_destruct" cc [C.proof c]
+      in
+      let c' = C.create ~trail:(C.get_trail c) ~parents:[c] (new_lits @ lits) proof in
+      Util.debug ~section 3 "injectivity: simplify %a into %a" C.pp c C.pp c';
+      c'
 
   (** {6 Clause Contexts}
 
@@ -1000,6 +1048,8 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     Env.add_unary_inf "induction.scan_extrude" scan_given_for_context;
     Env.add_unary_inf "induction.scan_proof" scan_given_for_proof;
     Env.add_is_trivial has_trivial_trail;
+    Env.add_lit_rule "induction.injectivity1" injectivity_simple;
+    Env.add_simplify injectivity_destruct;
     (* XXX: ugly, but we must do case_split before scan_extrude/proof.
       Currently we depend on Env.generate_unary applying inferences in
       the reverse order of their addition *)

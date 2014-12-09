@@ -358,6 +358,11 @@ module Make(X : PARAMETERS) = struct
       _seq_inductive_types
         |> Sequence.exists (fun ity -> Unif.Ty.matches ~pattern:ity.pattern ty)
 
+    let is_constructor_sym s =
+      _seq_inductive_types
+        |> Sequence.flat_map (fun ity -> Sequence.of_list ity.constructors)
+        |> Sequence.exists (fun (s', _) -> Symbol.eq s s')
+
     let contains_inductive_types t =
       T.Seq.subterms t
       |> Sequence.exists (fun t -> is_inductive_type (T.ty t))
