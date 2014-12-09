@@ -1060,6 +1060,7 @@ end
 let extension =
   let action env =
     let module E = (val env : Env.S) in
+    E.Ctx.lost_completeness ();
     let sup = Mixtbl.find ~inj:Superposition.key E.mixtbl "superposition" in
     let module Sup = (val sup : Superposition.S) in
     let module Solver = (val BoolSolver.get_qbf() : BoolSolver.QBF) in
