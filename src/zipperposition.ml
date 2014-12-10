@@ -45,6 +45,8 @@ module Import = struct
   open! Quantor_bridge
 end
 
+let section = Const.section
+
 (** setup an alarm for abrupt stop *)
 let setup_alarm timeout =
   let handler s =
@@ -110,7 +112,7 @@ let load_plugins ~params =
       match Extensions.dyn_load filename with
       | `Error msg -> () (* Could not load plugin *)
       | `Ok ext ->
-        Util.debug 0 "loaded extension %s" ext.Extensions.name;
+        Util.debug ~section 0 "loaded extension %s" ext.Extensions.name;
         ()
     ) params.param_plugins;
   Extensions.extensions ()
@@ -132,17 +134,17 @@ end) = struct
   let print_stats () =
     Signal.send Signals.on_print_stats ();
     let print_hashcons_stats what (sz, num, sum_length, small, median, big) =
-      Util.debug 1 ("hashcons stats for %s: size %d, num %d, sum length %d, "
+      Util.debug ~section 1 ("hashcons stats for %s: size %d, num %d, sum length %d, "
                   ^^ "buckets: small %d, median %d, big %d")
         what sz num sum_length small median big
     and print_state_stats (num_active, num_passive, num_simpl) =
-      Util.debug 1 "proof state stats:";
-      Util.debug 1 "stat:  active clauses          %d" num_active;
-      Util.debug 1 "stat:  passive clauses         %d" num_passive;
-      Util.debug 1 "stat:  simplification clauses  %d" num_simpl
+      Util.debug ~section 1 "proof state stats:";
+      Util.debug ~section 1 "stat:  active clauses          %d" num_active;
+      Util.debug ~section 1 "stat:  passive clauses         %d" num_passive;
+      Util.debug ~section 1 "stat:  simplification clauses  %d" num_simpl
     and print_gc () =
       let stats = Gc.stat () in
-      Util.debug 1 ("GC: minor words %.0f; major_words: %.0f; max_heap: %d; "
+      Util.debug ~section 1 ("GC: minor words %.0f; major_words: %.0f; max_heap: %d; "
                   ^^ "minor collections %d; major collections %d")
         stats.Gc.minor_words stats.Gc.major_words stats.Gc.top_heap_words
         stats.Gc.minor_collections stats.Gc.major_collections
@@ -151,7 +153,7 @@ end) = struct
     print_hashcons_stats "terms" (ScopedTerm.hashcons_stats ());
     print_hashcons_stats "clauses" (C.CHashcons.stats ());
     print_state_stats (Env.stats ());
-    if Util.get_debug () > 0
+    if Util.Section.cur_level section > 0
       then Util.print_global_stats ()
       else ();
     ()
@@ -172,7 +174,7 @@ end) = struct
       (encode_hashcons (ScopedTerm.hashcons_stats ()))
       (encode_hashcons (C.CHashcons.stats ()))
     in
-    Util.debug 1 "json_stats: %s" o
+    Util.debug ~section 1 "json_stats: %s" o
 
   (** print the final state to given file in DOT, with
       clauses in result if needed *)
@@ -180,7 +182,7 @@ end) = struct
     match result with
     | Saturate.Unsat proof ->
       Proof.pp_dot_file ?name filename proof
-    | _ -> Util.debug 1 "no empty clause; do not print state"
+    | _ -> Util.debug ~section 1 "no empty clause; do not print state"
 
   (* TODO
   (** Make an optional meta-prover and parse its KB *)
@@ -191,14 +193,14 @@ end) = struct
       (* handle KB *)
       begin match MetaProverState.parse_kb_file meta params.param_kb with
       | Monad.Err.Ok () -> ()
-      | Monad.Err.Error msg -> Util.debug 0 "error: %s" msg
+      | Monad.Err.Error msg -> Util.debug ~section 0 "error: %s" msg
       end;
       (* read some theory files *)
       List.iter
         (fun file ->
           match MetaProverState.parse_theory_file meta file with
           | Monad.Err.Ok () -> ()
-          | Monad.Err.Error msg -> Util.debug 0 "%s" msg)
+          | Monad.Err.Error msg -> Util.debug ~section 0 "%s" msg)
         params.param_kb_load;
       Some meta
     end else
@@ -207,10 +209,10 @@ end) = struct
 
   (* pre-saturation *)
   let presaturate_clauses clauses =
-    Util.debug 1 "presaturate initial clauses";
+    Util.debug ~section 1 "presaturate initial clauses";
     Env.add_passive clauses;
     let result, num = Sat.presaturate () in
-    Util.debug 1 "initial presaturation in %d steps" num;
+    Util.debug ~section 1 "initial presaturation in %d steps" num;
     (* pre-saturated set of clauses *)
     let clauses = Env.get_active () in
     (* remove clauses from [env] *)
@@ -242,10 +244,10 @@ end) = struct
     (* print theories *)
     match Env.get_meta ~env with
     | Some meta ->
-      Util.debug 1 "meta-prover results (%d): %a"
+      Util.debug ~section 1 "meta-prover results (%d): %a"
         (Sequence.length (MetaProverState.results meta))
         (Util.pp_seq MetaProverState.pp_result) (MetaProverState.results meta);
-      Util.debug 1 "datalog contains %d clauses"
+      Util.debug ~section 1 "datalog contains %d clauses"
         (MetaReasoner.size (MetaProverState.reasoner meta))
     | None -> ()
   *)
@@ -262,7 +264,7 @@ end) = struct
       Printf.printf "%% SZS status ResourceOut for '%s'\n" file
     | Saturate.Error s ->
       Printf.printf "%% SZS status InternalError for '%s'\n" file;
-      Util.debug 1 "error is: %s" s
+      Util.debug ~section 1 "error is: %s" s
     | Saturate.Sat when Ctx.is_completeness_preserved () ->
       Printf.printf "%% SZS status %s for '%s'\n" (_sat ()) file
     | Saturate.Sat ->
@@ -270,10 +272,10 @@ end) = struct
       begin match params.param_proof with
         | "none" -> ()
         | "tstp" ->
-          Util.debug 1 "saturated set:\n  %a\n"
+          Util.debug ~section 1 "saturated set:\n  %a\n"
             (Util.pp_seq ~sep:"\n  " C.pp_tstp_full) (Env.get_active ())
         | "debug" ->
-          Util.debug 1 "saturated set:\n  %a\n"
+          Util.debug ~section 1 "saturated set:\n  %a\n"
             (Util.pp_seq ~sep:"\n  " C.pp) (Env.get_active ())
         | n -> failwith ("unknown proof format: " ^ n)
       end
@@ -304,10 +306,10 @@ end) = struct
      @return the result and final env. *)
   let try_to_refute ~env ~params result =
     let steps = if params.param_steps = 0
-      then None else (Util.debug 0 "run for %d steps" params.param_steps;
+      then None else (Util.debug ~section 0 "run for %d steps" params.param_steps;
                       Some params.param_steps)
     and timeout = if params.param_timeout = 0.
-      then None else (Util.debug 0 "run for %f s" params.param_timeout;
+      then None else (Util.debug ~section 0 "run for %f s" params.param_timeout;
                       ignore (setup_alarm params.param_timeout);
                       Some (Util.get_start_time () +. params.param_timeout -. 0.25))
     in
@@ -315,8 +317,8 @@ end) = struct
       | Saturate.Unsat _ -> result, 0  (* already found unsat during presaturation *)
       | _ -> Sat.given_clause ~generating:true ?steps ?timeout ()
     in
-    Util.debug 1 "done %d iterations" num;
-    Util.debug 1 "final precedence: %a" Precedence.pp (Env.precedence ());
+    Util.debug ~section 1 "done %d iterations" num;
+    Util.debug ~section 1 "final precedence: %a" Precedence.pp (Env.precedence ());
     result, env
 end
 
@@ -326,23 +328,23 @@ let _pp_weight prec buf s =
 
 (* preprocess formulas and choose signature,select,ord *)
 let preprocess ~signature ~params formulas =
-  Util.debug 2 "start preprocessing";
+  Util.debug ~section 2 "start preprocessing";
   (* penv *)
   let penv = PEnv.create ~base:signature params in
   setup_penv ~penv ();
   let formulas = PEnv.process ~penv formulas in
-  Util.debug 3 "formulas pre-processed into:\n  %a"
+  Util.debug ~section 3 "formulas pre-processed into:\n  %a"
     (Util.pp_seq ~sep:"\n  " PF.pp) (PF.Set.to_seq formulas);
   (* now build a context *)
   let precedence, constr_list = PEnv.mk_precedence ~penv formulas in
-  Util.debug 1 "precedence: %a" Precedence.pp precedence;
-  Util.debug 1 "weights: %a"
+  Util.debug ~section 1 "precedence: %a" Precedence.pp precedence;
+  Util.debug ~section 1 "weights: %a"
     (Sequence.pp_buf (_pp_weight precedence))
     (Signature.Seq.symbols signature);
   let ord = params.param_ord precedence in
   let select = Selection.selection_from_string ~ord params.param_select in
-  Util.debug 1 "selection function: %s" params.param_select;
-  Util.debug 1 "signature: %a" Signature.pp (Signature.diff signature !Params.signature);
+  Util.debug ~section 1 "selection function: %s" params.param_select;
+  Util.debug ~section 1 "signature: %a" Signature.pp (Signature.diff signature !Params.signature);
   let module Result = struct
     let signature = signature
     let select = select
@@ -367,12 +369,12 @@ let _has_conjecture decls =
 (** Process the given file (try to solve it) *)
 let process_file ?meta ~plugins ~params file =
   let open CCError in
-  Util.debug 1 "================ process file %s ===========" file;
+  Util.debug ~section 1 "================ process file %s ===========" file;
   (* parse formulas *)
   Util_tptp.parse_file ~recursive:true file
   >>= fun decls ->
   let has_conjecture = _has_conjecture decls in
-  Util.debug 1 "parsed %d declarations (%sconjecture)"
+  Util.debug ~section 1 "parsed %d declarations (%sconjecture)"
     (Sequence.length decls) (if has_conjecture then "" else "no ");
   (* obtain a typed AST *)
   Util_tptp.infer_types (`sign !Params.signature) decls
@@ -384,9 +386,9 @@ let process_file ?meta ~plugins ~params file =
     |> PF.Set.of_seq
   in
   (* obtain clauses + env *)
-  Util.debug 2 "input formulas:\n%%  %a" (Util.pp_seq ~sep:"\n%  " PF.pp)
+  Util.debug ~section 2 "input formulas:\n%%  %a" (Util.pp_seq ~sep:"\n%  " PF.pp)
     (PF.Set.to_seq formulas);
-    Util.debug 2 "input signature: %a"
+    Util.debug ~section 2 "input signature: %a"
       Signature.pp (Signature.diff signature !Params.signature);
   let res, signature = preprocess ~signature ~params formulas in
   let module Res = (val res : Ctx.PARAMETERS) in
@@ -399,9 +401,9 @@ let process_file ?meta ~plugins ~params file =
   let env = (module MyEnv : Env.S) in
   setup_env ~env;
   (* reduce to CNF *)
-  Util.debug 1 "reduce to CNF...";
+  Util.debug ~section 1 "reduce to CNF...";
   let clauses = MyEnv.cnf formulas in
-  Util.debug 3 "CNF:\n  %a"
+  Util.debug ~section 3 "CNF:\n  %a"
     (Util.pp_seq ~sep:"\n  " MyEnv.C.pp) (MyEnv.C.CSet.to_seq clauses);
   (* main workload *)
   let module Main = MakeNew(struct
@@ -415,15 +417,15 @@ let process_file ?meta ~plugins ~params file =
     then Main.presaturate_clauses (MyEnv.C.CSet.to_seq clauses)
     else Saturate.Unknown, MyEnv.C.CSet.to_seq clauses
   in
-  Util.debug 1 "signature: %a" Signature.pp
+  Util.debug ~section 1 "signature: %a" Signature.pp
     (Signature.diff (MyEnv.signature ()) !Params.signature);
-  Util.debug 2 "%d clauses processed into:\n%%  %a"
+  Util.debug ~section 2 "%d clauses processed into:\n%%  %a"
     num_clauses (Util.pp_seq ~sep:"\n%  " MyEnv.C.pp) clauses;
   (* add clauses to passive set of [env] *)
   MyEnv.add_passive clauses;
   (* saturate, possibly changing env *)
   let result, env = Main.try_to_refute ~env ~params result in
-  Util.debug 1 "=================================================";
+  Util.debug ~section 1 "=================================================";
   (* print some statistics *)
   if params.param_stats then begin
     Main.print_stats ();
@@ -431,11 +433,11 @@ let process_file ?meta ~plugins ~params file =
     end;
   Main.print_dots result;
   Main.print_szs_result ~file result;
-  Util.debug 1 "=================================================";
+  Util.debug ~section 1 "=================================================";
   return ()
 
 let () =
-  Util.debug 0 "setup GC and signal handler";
+  Util.debug ~section 0 "setup GC and signal handler";
   (* GC! increase max overhead because we want the GC to be faster, even if
       it implies more wasted memory. *)
   let gc = Gc.get () in
@@ -451,7 +453,7 @@ let () =
 let () =
   (* parse arguments *)
   let params = Params.parse_args () in
-  Util.debug 2 "extensions loaded: %a"
+  Util.debug ~section 2 "extensions loaded: %a"
     (Util.pp_list Buffer.add_string) (Extensions.names ());
   Random.init params.param_seed;
   print_version params;
@@ -472,5 +474,5 @@ let () =
 
 let _ =
   at_exit (fun () ->
-    Util.debug 1 "run time: %.3f" (Util.get_total_time ());
+    Util.debug ~section 1 "run time: %.3f" (Util.get_total_time ());
     Signal.send Signals.on_exit 0)
