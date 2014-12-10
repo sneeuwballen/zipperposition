@@ -1,0 +1,29 @@
+
+% lists of naturals
+
+include('nat.ax').
+
+tff(ty_cons, type, cons : (nat * list) > list).
+tff(ty_nil, type, nil : list).
+
+tff(ty_count, type, count : list > nat).
+tff(ty_take, type, take : (nat * list) > list).
+tff(ty_drop, type, drop : (nat * list) > list).
+tff(ty_append, type, append : (list * list) > list).
+tff(ty_rev, type, rev : list > list).
+tff(ty_mem, type, mem : (nat * list) > $o).
+tff(ty_last, type, last : list > nat).
+
+tff(count_1, axiom, count(nil) = 0).
+tff(count_2, axiom, ![X:nat, L:list]: count(cons(X,L)) = s(count(L))).
+
+tff(append_1, axiom, ![L:list]: append(nil,L) = L).
+tff(append_2, axiom, ![X:nat, L:list, L2:list]:
+    append(cons(X,L), L2) = cons(X,append(L,L2))).
+
+tff(rev_1, axiom, rev(nil) = nil).
+tff(rev_2, axiom, ![X:nat, L:list]: rev(cons(X,L)) = append(rev(L),cons(X,nil))).
+
+tff(mem_1, axiom, ![X:nat]: ~ mem(X,nil)).
+tff(mem_2, axiom, ![X:nat, L:list]: mem(X,cons(X,L))).
+tff(mem_3, axiom, ![X:nat, Y:nat, L:list]: (mem(X,L) => mem(X, cons(Y,L)))).

@@ -1,0 +1,18 @@
+
+tff(ty_s, type, s:nat > nat).
+tff(ty_z, type, z:nat).
+tff(ty_plus, type, plus : (nat*nat) > nat).
+tff(ty_minus, type, minus : (nat*nat) > nat).
+tff(ty_less, type, less : (nat*nat) > $o).
+tff(ty_leq, type, leq : (nat*nat) > $o).
+
+% tff(test, axiom, ![X:nat]: s(X) != z).
+
+tff(plus_1, axiom, ![X:nat]: plus(z,X) = X).
+tff(plus_2, axiom, ![X:nat, Y:nat]: plus(s(X),Y) = s(plus(X,Y))).
+tff(minus_1, axiom, ![X:nat]: minus(X,z) = X).
+tff(minus_2, axiom, ![X:nat, Y:nat]: minus(s(X),s(Y)) = minus(X,Y)).
+tff(less_1, axiom, ![X:nat]: less(z, s(X))).
+tff(less_2, axiom, ![X:nat, Y:nat]: (less(s(X),s(Y)) <=> less(X,Y))).
+tff(leq_1, axiom, ![X:nat]: leq(z, X)).
+tff(leq_2, axiom, ![X:nat, Y:nat]: (leq(s(X),s(Y)) <=> leq(X,Y))).
