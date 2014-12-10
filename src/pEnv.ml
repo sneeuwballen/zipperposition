@@ -37,6 +37,8 @@ module Sym = Symbol
 let prof_preprocess = Util.mk_profiler "preprocess"
 let prof_mk_prec = Util.mk_profiler "mk_precedence"
 
+let section = Util.Section.make ~parent:Const.section "penv"
+
 (** {2 Transformations} *)
 
 type operation_result =
@@ -60,7 +62,7 @@ let fix ops set =
   (* a new operation appeared, so we must process again all formulas
       to be sure that they are irreducible *)
   let restart () =
-    Util.debug 4 "restart fixpoint computation";
+    Util.debug ~section 4 "restart fixpoint computation";
     PF.Set.iter (fun f -> Queue.push f q) !ans;
     ans := PF.Set.empty
   in
@@ -79,23 +81,23 @@ let fix ops set =
           List.iter
             (function
             | Remove ->
-              Util.debug 5 "remove form %a" PF.pp pf;
+              Util.debug ~section 3 "remove form %a" PF.pp pf;
               keep := false
             | Esa [pf'] when PF.eq_noproof pf pf' -> ()
             | Esa l ->
               (* get rid of [f], but process [l] instead *)
-              Util.debug 5 "%a equisatisfiable with %a" PF.pp pf (Util.pp_list PF.pp) l;
+              Util.debug ~section 3 "%a equisatisfiable with %a" PF.pp pf (Util.pp_list PF.pp) l;
               add_forms l;
               keep := false
             | Add l ->
               (* continue processing [pf], but also [l] *)
-              Util.debug 5 "add forms %a" (Util.pp_list PF.pp) l;
+              Util.debug ~section 4 "add forms %a" (Util.pp_list PF.pp) l;
               add_forms l
             | AddOps [] -> assert false
             | AddOps l ->
               (* add those operations to the list of ops to perform, and keep [pf] *)
               ops := List.rev_append l !ops;
-              Util.debug 5 "restart after adding %d operations" (List.length l);
+              Util.debug ~section 4 "restart after adding %d operations" (List.length l);
               restart ()
             | SimplifyInto f' when F.ac_eq (PF.form pf) (PF.form f') ->
               () (* not really simplified *)
@@ -103,7 +105,7 @@ let fix ops set =
               (* ignore [f], process [f'] instead, and remember the
                   simplification step *)
               PF.simpl_to ~from:pf ~into:f';
-              Util.debug 5 "simplify %a into %a" PF.pp pf PF.pp f';
+              Util.debug ~section 3 "simplify %a into %a" PF.pp pf PF.pp f';
               Queue.push f' q;
               keep := false
             )
@@ -124,7 +126,7 @@ let remove_trivial set pf =
 
 (* reduce formulas to CNF *)
 let cnf _set pf =
-  Util.debug 3 "reduce %a to CNF..." PF.pp pf;
+  Util.debug ~section 3 "reduce %a to CNF..." PF.pp pf;
   (* reduce to CNF this formula *)
   let clauses = Cnf.cnf_of (PF.form pf) in
   (* now build "proper" clauses, with proof and all *)
@@ -175,9 +177,9 @@ let rw_term ?(rule="rw") ~premises trs =
 let rw_form ?(rule="rw") ~premises frs =
   fun set pf ->
     let f = PF.form pf  in
-    Util.debug 5 "start rewriting %a" PF.pp pf;
+    Util.debug ~section 5 "start rewriting %a" PF.pp pf;
     let f' = Rewriting.FormRW.rewrite frs f in
-    Util.debug 5 "done rewriting %a" PF.pp pf;
+    Util.debug ~section 5 "done rewriting %a" PF.pp pf;
     if F.eq f f'
       then []
       else
@@ -185,7 +187,7 @@ let rw_form ?(rule="rw") ~premises frs =
         let premises = Sequence.to_list (Sequence.map PF.proof premises) in
         let proof = Proof.mk_f_simp ~rule f' (PF.proof pf::premises) in
         let pf' = PF.create f' proof in
-        let _ = Util.debug 5 "rewritten %a in %a!" PF.pp pf PF.pp pf' in
+        let _ = Util.debug ~section 5 "rewritten %a in %a!" PF.pp pf PF.pp pf' in
         [SimplifyInto pf']
 
 let fmap_term ~rule func =
@@ -219,7 +221,7 @@ let expand_def set pf =
   if ops = []
     then []
     else
-      let _ = Util.debug 5 "detected def in %a" PF.pp pf in
+      let _ = Util.debug ~section 3 "detected def in %a" PF.pp pf in
       [Remove; AddOps ops]
 
 (** {2 Preprocessing} *)
@@ -330,7 +332,7 @@ let mk_precedence ~penv set =
   let constrs =
     penv.constrs @
     List.map (fun (p,rule) -> p, rule set) penv.constr_rules in
-  Util.debug 2 "penv: %d precedence constraints" (List.length constrs);
+  Util.debug ~section 2 "penv: %d precedence constraints" (List.length constrs);
   let signature = penv.base in
   let symbols = Signature.to_set signature in
   let symbols' = PFormula.Set.symbols set in
