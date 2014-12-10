@@ -74,7 +74,6 @@ let parse_args () =
   and dot_file = ref None
   and dot_sat = ref false
   and plugins = ref []
-  and stats = ref false
   and expand_def = ref false
   and select = ref "SelectComplex"
   and progress = ref false
@@ -86,9 +85,8 @@ let parse_args () =
     progress := true
   and add_plugin s = plugins := s :: !plugins
   and add_plugins s = plugins := (Util.str_split ~by:"," s) @ !plugins
-  and add_file s = CCVector.push files s 
-  in
-  (* options list *) 
+  and add_file s = CCVector.push files s in
+  (* options list *)
   let options = Arg.align (
     [ "-ord", Arg.Set_string ord, " choose ordering (rpo,kbo)"
     ; "-version", Arg.Set version, " print version"
@@ -121,7 +119,7 @@ let parse_args () =
   { param_ord; param_seed = !seed; param_steps = !steps;
     param_version= !version; param_timeout = !timeout;
     param_files = files; param_select = !select; param_theories = !theories;
-    param_progress = !progress; param_stats= !stats;
+    param_progress = !progress; param_stats= (!Options.global).Options.stats;
     param_proof = !proof; param_split = !split;
     param_presaturate = !presaturate;
     param_dot_file = !dot_file; param_plugins= !plugins;
