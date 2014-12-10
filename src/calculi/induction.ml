@@ -997,6 +997,52 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       );
     ()
 
+  (** {6 Summary}
+
+  How to print a summary of which contexts are available, which proofs can
+  they use, etc. *)
+
+  let print_summary () =
+    (* print a coverset *)
+    let print_coverset cst fmt set =
+      Format.fprintf fmt "@[<h>cover set {%a}@]"
+        (Sequence.pp_seq T.fmt) (set.CI.cases |> CCList.to_seq)
+    (* print a clause context; print for which terms it's provable *)
+    and print_cand cst fmt cand =
+      let has_proof lits =
+        match find_proofs_ lits with
+        | None -> false
+        | Some _ -> true
+      in
+      let lits = CI.cover_sets cst
+          |> Sequence.flat_map (fun set -> T.Set.to_seq set.CI.sub_constants)
+          |> Sequence.map
+            (fun t -> t, ClauseContext.apply cand.cand_ctx t)
+          |> Sequence.(cons (cand.cand_cst, cand.cand_lits))
+      in
+      let proofs =
+        Sequence.filter_map
+          (fun (t, lits) -> if has_proof lits then Some t else None)
+          lits
+      in
+      Format.fprintf fmt "@[<h>(%s) %a   (proofs: %a)@]"
+        (if cand.cand_initialized then "*" else " ")
+        ClauseContext.print cand.cand_ctx
+        (Sequence.pp_seq ~sep:", " T.fmt) proofs
+    in
+    (* print the loop for cst *)
+    let print_cst fmt cst =
+      Format.fprintf fmt "@[<hv2>for %a:@ %a@,%a@]" T.fmt cst
+        (Sequence.pp_seq ~sep:"" (print_coverset cst))
+        (CI.cover_sets cst)
+        (Sequence.pp_seq ~sep:"" (print_cand cst))
+        (!(find_candidates_ cst) |> FV_cand.to_seq |> Sequence.map snd)
+    in
+    Format.printf "@[<v2>inductive constants:@ %a@]@."
+      (Sequence.pp_seq ~sep:"" print_cst)
+      (T.Tbl.to_seq candidates_ |> Sequence.map fst);
+    ()
+
   (** {6 Registration} *)
 
   (* declare a list of inductive types *)
@@ -1055,7 +1101,15 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       the reverse order of their addition *)
     Env.add_unary_inf "induction.case_split" case_split_ind;
     ()
+
+  (* print info before exit, if asked to *)
+  let summary_on_exit () =
+    Signal.once Signals.on_exit
+      (fun _ -> print_summary ());
+    ()
 end
+
+let summary_ = ref false
 
 let extension =
   let action env =
@@ -1066,7 +1120,8 @@ let extension =
     let module Solver = (val BoolSolver.get_qbf() : BoolSolver.QBF) in
     Util.debug ~section:section_qbf 2 "created QBF solver \"%s\"" Solver.name;
     let module A = Make(E)(Sup)(Solver) in
-    A.register()
+    A.register();
+    if !summary_ then A.summary_on_exit()
   (* add an ordering constraint: ensure that constructors are smaller
     than other terms *)
   and add_constr penv =
@@ -1116,4 +1171,5 @@ let () =
   Params.add_opts
     [ "-induction", Arg.String add_ind_type_, " enable Induction on the given type"
     ; "-induction-depth", Arg.Set_int cover_set_depth_, " set default induction depth"
+    ; "-induction-summary", Arg.Set summary_, " show summary of induction before exit"
     ]

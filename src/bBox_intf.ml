@@ -27,8 +27,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Interface of BBox} *)
 
-open Logtk
-
 module type S = sig
   type inductive_cst
 
