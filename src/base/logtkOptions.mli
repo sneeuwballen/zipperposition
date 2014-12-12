@@ -50,6 +50,6 @@ val global : t ref
 val global_opts : (string * Arg.spec * string) list
   (** Options that modify {!global}.
       Caution, this might miss some options from modules that aren't registered yet.
-      @deprecated since NEXT_RELEASE , use {!mk_global_opts} instead*)
+      @deprecated since 0.6.1 , use {!mk_global_opts} instead*)
 
 val mk_global_opts : unit -> (string * Arg.spec * string) list

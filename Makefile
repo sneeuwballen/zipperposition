@@ -63,10 +63,11 @@ test-all: build
 	./run_tests.native
 	./tests/quick/all.sh
 
-VERSION=$(shell awk '/Version:/ {print $$2}' _oasis)
+VERSION=$(shell awk '/^Version:/ {print $$2}' _oasis)
 
 update_next_tag:
 	@echo "update version to $(VERSION)..."
 	sed -i "s/NEXT_VERSION/$(VERSION)/g" src/**/*.ml src/**/*.mli
+	sed -i "s/NEXT_RELEASE/$(VERSION)/g" src/**/*.ml src/**/*.mli
 
 .PHONY: push_doc tags rst_doc open_doc test-all

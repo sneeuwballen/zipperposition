@@ -129,7 +129,7 @@ module type S = sig
     (** Sort the list of constraints by {b increasing} priority, then
         call {!create} to build a precedence. The constraint with the smallest
         priority will be considered first.
-        @since NEXT_RELEASE *)
+        @since 0.6.1 *)
 
   val default : symbol list -> t
     (** default precedence. Default status for symbols is {!Lexicographic}. *)
@@ -139,11 +139,11 @@ module type S = sig
 
   val constr_list : t -> Constr.t list
     (** Obtain the list of constraints
-        @since NEXT_RELEASE *)
+        @since 0.6.1 *)
 
   val with_constr_list : t -> Constr.t list -> t
     (** Update the precedence by replacing its list of constraints.
         Caution, this can be dangerous (change the precedence totally, for instance)
-        @since NEXT_RELEASE *)
+        @since 0.6.1 *)
 end
 

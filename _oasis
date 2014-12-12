@@ -1,6 +1,6 @@
 OASISFormat: 0.4
 Name:        logtk
-Version:     dev
+Version:     0.6.1
 Homepage:    https://github.com/c-cube/logtk
 Authors:     Simon Cruanes
 License:     BSD-2-clause
@@ -11,7 +11,7 @@ BuildTools:  ocamlbuild
 AlphaFeatures: ocamlbuild_more_args, compiled_setup_ml
 
 Synopsis:    Logic toolkit, designed primarily for first-order automated reasoning.
-Description: 
+Description:
     Logic toolkit, designed primarily for first-order automated reasoning. It aims
     at providing basic types and algorithms (terms, unification, orderings,
     indexing, etc.) that can be factored out of several applications.
@@ -60,10 +60,10 @@ Library "logtk"
                     LogtkCongruence, LogtkFastFingerprint, LogtkFeatureVector,
                     LogtkRewriting, LogtkFormulaShape, LogtkTransform,
                     LogtkLambda, LogtkSourced, LogtkTypedPrologTerm,
-                    lib/LogtkHashcons, lib/LogtkCache, lib/LogtkParseLocation,
-                    lib/LogtkMultiset, lib/LogtkPartialOrder,
-                    lib/LogtkPartialOrder_intf, lib/LogtkLazyList,
-                    lib/LogtkIArray, lib/LogtkLazyGraph
+                    LogtkHashcons, LogtkCache, LogtkParseLocation,
+                    LogtkMultiset, LogtkPartialOrder,
+                    LogtkPartialOrder_intf, LogtkLazyList,
+                    LogtkIArray, LogtkLazyGraph
   CSources:         util_stubs.c, util_stubs.h
   CCOpt:            -Wextra -Wno-unused-parameter
   BuildDepends:     zarith,unix,sequence,containers,bytes
