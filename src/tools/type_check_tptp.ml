@@ -40,10 +40,11 @@ let cat_input = ref false  (* print input declarations? *)
 let stats = ref false
 let pp_base = ref false
 
-let options =
-  [ "-cat", Arg.Set cat_input, "print (annotated) declarations"
-  ; "-base", Arg.Set pp_base, "print signature of base symbols"
-  ] @ Options.global_opts
+let options = Arg.align (
+  [ "-cat", Arg.Set cat_input, " print (annotated) declarations"
+  ; "-base", Arg.Set pp_base, " print signature of base symbols"
+  ] @ Options.mk_global_opts ()
+  )
 
 let base_sign = Signature.TPTP.Arith.full
 

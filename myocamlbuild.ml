@@ -1,5 +1,5 @@
 (* OASIS_START *)
-(* DO NOT EDIT (digest: 8434de9066e51f0ab9d7d37c3cf18eb2) *)
+(* DO NOT EDIT (digest: a3d347575a1ee9d6aea1af53c0f90107) *)
 module OASISGettext = struct
 (* # 22 "src/oasis/OASISGettext.ml" *)
 
@@ -609,7 +609,7 @@ let package_default =
   {
      MyOCamlbuildBase.lib_ocaml =
        [
-          ("logtk", ["src/base"; "src/base/lib"], []);
+          ("logtk", ["src/base"], []);
           ("logtk_parsers", ["src/parsers"], []);
           ("logtk_meta", ["src/meta"], []);
           ("logtk_solving", ["src/solving"], []);
@@ -632,34 +632,16 @@ let package_default =
        ];
      includes =
        [
-          ("tests",
-            [
-               "src/arbitrary";
-               "src/base";
-               "src/base/lib";
-               "src/meta";
-               "src/parsers"
-            ]);
-          ("src/tools/orient",
-            ["src/base"; "src/base/lib"; "src/parsers"; "src/solving"]);
+          ("tests", ["src/arbitrary"; "src/base"; "src/meta"; "src/parsers"]);
+          ("src/tools/orient", ["src/base"; "src/parsers"; "src/solving"]);
           ("src/tools/hysteresis",
-            [
-               "src/base";
-               "src/base/lib";
-               "src/meta";
-               "src/parsers";
-               "src/solving"
-            ]);
-          ("src/tools",
-            ["src/base"; "src/base/lib"; "src/meta"; "src/parsers"]);
-          ("src/solving", ["src/base"; "src/base/lib"]);
-          ("src/parsers", ["src/base"; "src/base/lib"]);
-          ("src/meta", ["src/base"; "src/base/lib"; "src/parsers"]);
-          ("src/demo/resolution",
-            ["src/base"; "src/base/lib"; "src/parsers"]);
-          ("src/base/lib", ["src/base"]);
-          ("src/base", ["src/base/lib"]);
-          ("src/arbitrary", ["src/base"; "src/base/lib"; "src/meta"])
+            ["src/base"; "src/meta"; "src/parsers"; "src/solving"]);
+          ("src/tools", ["src/base"; "src/meta"; "src/parsers"]);
+          ("src/solving", ["src/base"]);
+          ("src/parsers", ["src/base"]);
+          ("src/meta", ["src/base"; "src/parsers"]);
+          ("src/demo/resolution", ["src/base"; "src/parsers"]);
+          ("src/arbitrary", ["src/base"; "src/meta"])
        ]
   }
   ;;
@@ -668,7 +650,7 @@ let conf = {MyOCamlbuildFindlib.no_automatic_syntax = false}
 
 let dispatch_default = MyOCamlbuildBase.dispatch_default conf package_default;;
 
-# 672 "myocamlbuild.ml"
+# 654 "myocamlbuild.ml"
 (* OASIS_STOP *)
 Ocamlbuild_plugin.dispatch dispatch_default;;
 

@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.6.1
+
+#### breaking
+
+- remove `-pack` for `Logtk`, renamed modules from
+  `<Foo>` to `Logtk<Foo>` (to use 4.02s module aliasing)
+- remove useless `-def-limit` argument to the CNF
+- use `-no-alias-deps` when compiling
+
+#### non-breaking
+
+- fix `parsers/Util_tptp.find_file` behavior w.r.t `$TPTP` env variable
+- do not rename atomic formulas in `CNF` (close #1)
+- `FeatureVector.{iter,fold}` implemented
+- flush `stdout` on debug
+- add `Options.mk_global_opts`, deprecating `Options.global_opts`
+- section mechanism for `Util.debug` (in `Util.Section`) with inheritance
+- bugfix in `Precedence.Constr.invfreq`
+- update arbitrary instances to use `qcheck-0.3`'s `fix_fuel` combinator
+- `PartialOrder` (and `Precedence`) give more details when the ordering is not total
+- new functions in the precedence
+- new modules `Precedence_intf`, `Ordering_intf`, `PartialOrder_intf`
+
 ## 0.6
 
 - do not depend on `CCError.t` arity

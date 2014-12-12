@@ -43,11 +43,12 @@ module Err = CCError
 
 let find_file name dir =
   (* check if the file exists *)
-  let rec file_exists name =
+  let file_exists name =
     try ignore (Unix.stat name); true
     with Unix.Unix_error (e, _, _) when e = Unix.ENOENT -> false
+  in
   (* search in [dir], and its parents recursively *)
-  and search dir =
+  let rec search dir =
     let cur_name = Filename.concat dir name in
     Util.debug 2 "search %s as %s" name cur_name;
     if file_exists cur_name
@@ -58,13 +59,17 @@ let find_file name dir =
         then None
         else search dir'
   in
+  let search_env () =
+    try
+      let dir' = Sys.getenv "TPTP" in
+      search dir'
+    with Not_found -> None
+  in
   if Filename.is_relative name
-    then try
-      search dir  (* search by relative path, in parent dirs *)
-    with (Failure _) as e ->
-      (try let dir' = Sys.getenv "TPTP" in
-        search dir'
-      with Not_found -> raise e)
+    (* search by relative path, in parent dirs *)
+    then match search dir with
+    | None -> search_env ()
+    | Some _ as res -> res
     else if file_exists name
       then Some name  (* found *)
       else None

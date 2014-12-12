@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 6825a8eb5a41ad0d3c40758016765bb4)
+# DO NOT EDIT (digest: 40c868c6ecc2a4a4e679b070a53674e1)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -16,50 +16,7 @@ true: annot, bin_annot
 "_darcs": not_hygienic
 # Library logtk
 "src/base/logtk.cmxs": use_logtk
-"src/base/symbol.cmx": for-pack(Logtk)
-"src/base/scopedTerm.cmx": for-pack(Logtk)
-"src/base/FOTerm.cmx": for-pack(Logtk)
-"src/base/type.cmx": for-pack(Logtk)
-"src/base/util.cmx": for-pack(Logtk)
-"src/base/prologTerm.cmx": for-pack(Logtk)
-"src/base/interfaces.cmx": for-pack(Logtk)
-"src/base/DBEnv.cmx": for-pack(Logtk)
-"src/base/position.cmx": for-pack(Logtk)
-"src/base/HOTerm.cmx": for-pack(Logtk)
-"src/base/formula.cmx": for-pack(Logtk)
-"src/base/substs.cmx": for-pack(Logtk)
-"src/base/unif.cmx": for-pack(Logtk)
-"src/base/signature.cmx": for-pack(Logtk)
-"src/base/typeInference.cmx": for-pack(Logtk)
-"src/base/options.cmx": for-pack(Logtk)
-"src/base/comparison.cmx": for-pack(Logtk)
-"src/base/precedence.cmx": for-pack(Logtk)
-"src/base/ordering.cmx": for-pack(Logtk)
-"src/base/skolem.cmx": for-pack(Logtk)
-"src/base/cnf.cmx": for-pack(Logtk)
-"src/base/HORewriting.cmx": for-pack(Logtk)
-"src/base/index.cmx": for-pack(Logtk)
-"src/base/dtree.cmx": for-pack(Logtk)
-"src/base/fingerprint.cmx": for-pack(Logtk)
-"src/base/NPDtree.cmx": for-pack(Logtk)
-"src/base/congruence.cmx": for-pack(Logtk)
-"src/base/fastFingerprint.cmx": for-pack(Logtk)
-"src/base/featureVector.cmx": for-pack(Logtk)
-"src/base/rewriting.cmx": for-pack(Logtk)
-"src/base/formulaShape.cmx": for-pack(Logtk)
-"src/base/transform.cmx": for-pack(Logtk)
-"src/base/lambda.cmx": for-pack(Logtk)
-"src/base/sourced.cmx": for-pack(Logtk)
-"src/base/lib/hashcons.cmx": for-pack(Logtk)
-"src/base/lib/cache.cmx": for-pack(Logtk)
-"src/base/lib/parseLocation.cmx": for-pack(Logtk)
-"src/base/lib/multiset.cmx": for-pack(Logtk)
-"src/base/lib/partialOrder.cmx": for-pack(Logtk)
-"src/base/lib/lazyList.cmx": for-pack(Logtk)
-"src/base/lib/iArray.cmx": for-pack(Logtk)
-"src/base/lib/lazyGraph.cmx": for-pack(Logtk)
 <src/base/*.ml{,i,y}>: oasis_library_logtk_ccopt
-<src/base/lib/*.ml{,i,y}>: oasis_library_logtk_ccopt
 "src/base/util_stubs.c": oasis_library_logtk_ccopt
 <src/base/logtk.{cma,cmxa}>: use_liblogtk_stubs
 <src/base/*.ml{,i,y}>: package(bytes)
@@ -67,11 +24,6 @@ true: annot, bin_annot
 <src/base/*.ml{,i,y}>: package(sequence)
 <src/base/*.ml{,i,y}>: package(unix)
 <src/base/*.ml{,i,y}>: package(zarith)
-<src/base/lib/*.ml{,i,y}>: package(bytes)
-<src/base/lib/*.ml{,i,y}>: package(containers)
-<src/base/lib/*.ml{,i,y}>: package(sequence)
-<src/base/lib/*.ml{,i,y}>: package(unix)
-<src/base/lib/*.ml{,i,y}>: package(zarith)
 "src/base/util_stubs.c": package(bytes)
 "src/base/util_stubs.c": package(containers)
 "src/base/util_stubs.c": package(sequence)
@@ -275,4 +227,4 @@ true: use_menhir
 <src/base/{scopedTerm,FOTerm,HOTerm,Type,lib/BV,lib/IArray,lib/Cache}.cmx>: inline(15)
 <src/base/{substs,unif}.cmx>: inline(8)
 #<src/**/*.cmx>: inline(10)
-true: bin_annot
+true: bin_annot, no_alias_deps

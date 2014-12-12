@@ -40,3 +40,4 @@ val clause : form list arbitrary
 val default : form arbitrary
   (** polymorphic formula with connectives (DB-closed) *)
 
+val default_fuel : int -> form arbitrary

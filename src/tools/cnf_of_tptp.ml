@@ -39,17 +39,16 @@ let declare_types = ref false
 let print_sig = ref false
 let flag_distribute_exists = ref false
 let flag_disable_renaming = ref false
-let def_limit = ref 24
 
-let options =
-  [ "-declare", Arg.Set declare_types, "declare types of symbols"
-  ; "-signature", Arg.Set print_sig, "print signature"
+let options = Arg.align (
+  [ "-declare", Arg.Set declare_types, " declare types of symbols"
+  ; "-signature", Arg.Set print_sig, " print signature"
   ; "-distribute-exist", Arg.Set flag_distribute_exists,
-    "distribute existential quantifiers during miniscoping"
-  ; "-disable-def", Arg.Set flag_disable_renaming, "disable definitional CNF"
-  ; "-def-limit", Arg.Set_int def_limit, "limit factor for definitional CNF"
-  ; "-time-limit", Arg.Int Util.set_time_limit, "hard time limit (in s)"
-  ] @ Options.global_opts
+    " distribute existential quantifiers during miniscoping"
+  ; "-disable-def", Arg.Set flag_disable_renaming, " disable definitional CNF"
+  ; "-time-limit", Arg.Int Util.set_time_limit, " hard time limit (in s)"
+  ] @ Options.mk_global_opts ()
+  )
 
 (* process the given file, converting it to CNF *)
 let process file =
@@ -64,7 +63,7 @@ let process file =
     let opts =
       (if !flag_distribute_exists then [Cnf.DistributeExists] else []) @
       (if !flag_disable_renaming then [Cnf.DisableRenaming] else []) @
-      [Cnf.DefLimit !def_limit]
+      []
     in
     let signature, decls = Util_tptp.to_cnf ~opts signature decls in
     let decls = if !declare_types

@@ -1,6 +1,6 @@
 OASISFormat: 0.4
 Name:        logtk
-Version:     0.6
+Version:     0.6.1
 Homepage:    https://github.com/c-cube/logtk
 Authors:     Simon Cruanes
 License:     BSD-2-clause
@@ -11,7 +11,7 @@ BuildTools:  ocamlbuild
 AlphaFeatures: ocamlbuild_more_args
 
 Synopsis:    Logic toolkit, designed primarily for first-order automated reasoning.
-Description: 
+Description:
     Logic toolkit, designed primarily for first-order automated reasoning. It aims
     at providing basic types and algorithms (terms, unification, orderings,
     indexing, etc.) that can be factored out of several applications.
@@ -48,17 +48,22 @@ Flag "demo"
 
 Library "logtk"
   Path:             src/base/
-  Pack:             true
-  Modules:          Symbol, ScopedTerm, FOTerm, Type, Util, PrologTerm,
-                    Interfaces, DBEnv, Position, HOTerm, Formula,
-                    Substs, Unif, Signature, TypeInference, Options,
-                    Comparison, Precedence, Ordering, Skolem, Cnf,
-                    HORewriting, Index, Dtree, Fingerprint, NPDtree,
-                    Congruence, FastFingerprint, FeatureVector, Rewriting,
-                    FormulaShape, Transform, Lambda, Sourced,
-                    lib/Hashcons, lib/Cache,
-                    lib/ParseLocation, lib/Multiset,
-                    lib/PartialOrder, lib/LazyList, lib/IArray, lib/LazyGraph
+  Pack:             false
+  Modules:          Logtk, LogtkSymbol, LogtkScopedTerm, LogtkFOTerm, LogtkType,
+                    LogtkUtil, LogtkPrologTerm, LogtkInterfaces, LogtkDBEnv,
+                    LogtkPosition, LogtkHOTerm, LogtkFormula, LogtkSubsts,
+                    LogtkUnif, LogtkSignature, LogtkTypeInference,
+                    LogtkOptions, LogtkComparison, LogtkPrecedence,
+                    LogtkPrecedence_intf, LogtkOrdering, LogtkOrdering_intf,
+                    LogtkSkolem, LogtkCnf, LogtkHORewriting, LogtkIndex,
+                    LogtkDtree, LogtkFingerprint, LogtkNPDtree,
+                    LogtkCongruence, LogtkFastFingerprint, LogtkFeatureVector,
+                    LogtkRewriting, LogtkFormulaShape, LogtkTransform,
+                    LogtkLambda, LogtkSourced, LogtkTypedPrologTerm,
+                    LogtkHashcons, LogtkCache, LogtkParseLocation,
+                    LogtkMultiset, LogtkPartialOrder,
+                    LogtkPartialOrder_intf, LogtkLazyList,
+                    LogtkIArray, LogtkLazyGraph
   CSources:         util_stubs.c, util_stubs.h
   CCOpt:            -Wextra -Wno-unused-parameter
   BuildDepends:     zarith,unix,sequence,containers,bytes
