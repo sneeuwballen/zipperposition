@@ -1033,6 +1033,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun () l r (_,_,_,c') subst ->
           assert (Unif.FO.eq ~subst l 1 t1 0);
           if Unif.FO.eq ~subst r 1 t2 0
+          && C.trail_subsumes c' c
           then begin
             (* t1!=t2 is refuted by l\sigma = r\sigma *)
             Util.debug ~section 4 "equate %a and %a using %a" T.pp t1 T.pp t2 C.pp c';
@@ -1075,6 +1076,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun () l r (_,_,_,c') subst ->
           assert (Unif.FO.eq ~subst l 1 s 0);
           if Unif.FO.eq ~subst r 1 t 0
+          && C.trail_subsumes c' c
           then begin
             (* TODO: useless? *)
             let subst = Unif.FO.matching ~subst ~pattern:r 1 t 0 in
