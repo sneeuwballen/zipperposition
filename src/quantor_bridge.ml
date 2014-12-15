@@ -87,7 +87,7 @@ module Make(X : sig end) : BS.QBF = struct
   let restore l =
     assert(l>=0);
     if l>= CCVector.length stack then failwith "restore: level too high";
-    CCVector.shrink stack (l+1)  (* so vec.(l) is the new state *)
+    CCVector.shrink stack l  (* so vec.(l-1) is the new state *)
 
   type quant_level = int
   type save_level = int
