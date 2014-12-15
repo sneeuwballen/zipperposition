@@ -665,27 +665,25 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       |> FV_cand.to_seq |> Sequence.map snd in
     let trail_ok_clauses =
       candidates
-      |> Sequence.flat_map
-        (fun ctx ->
+      |> Sequence.fold
+        (fun acc ctx ->
           (* proof of [ctx[cst]].
            TODO: find those proofs through regular subsumption w.r.t active
            set so we can stop storing all proofs *)
+          let acc = [ in_loop_ ctx.cand_ctx cst ; trail_ok_ ctx.cand_lits ] :: acc in
           match find_proofs_ ctx.cand_lits with
-            | None ->
-                Sequence.singleton
-                  [ neg_ (in_loop_ ctx.cand_ctx cst)
-                  ; neg_ (trail_ok_ ctx.cand_lits) ]
+            | None -> acc
             | Some {proofs} ->
                 ProofSet.to_seq proofs
                 |> Sequence.map trail_of_proof
-                |> Sequence.map
-                  (fun lits ->
-                    trail_ok_ ctx.cand_lits ::
-                    neg_ (in_loop_ ctx.cand_ctx cst) ::
-                    List.map neg_ lits
-                  )
-        )
-      |> Sequence.to_rev_list
+                |> Sequence.fold
+                  (fun acc lits ->
+                    ( trail_ok_ ctx.cand_lits ::
+                      neg_ (in_loop_ ctx.cand_ctx cst) ::
+                      List.map neg_ lits
+                    ) :: acc
+                  ) acc
+        ) []
     and init_clause =
       let guard = Sequence.map
         (fun ctx ->
