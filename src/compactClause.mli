@@ -53,6 +53,7 @@ val make : Literal.t array -> bool_lit list -> t
 (** Make a compact clause *)
 
 val is_empty : t -> bool
+val has_absurd_lits : t -> bool
 
 val iter : t -> (Literal.t -> unit) -> unit
 

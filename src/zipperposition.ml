@@ -178,14 +178,6 @@ end) = struct
     in
     Util.debug ~section 1 "json_stats: %s" o
 
-  (** print the final state to given file in DOT, with
-      clauses in result if needed *)
-  let print_state ?name filename (state, result) =
-    match result with
-    | Saturate.Unsat proof ->
-      Proof.pp_dot_file ?name filename proof
-    | _ -> Util.debug ~section 1 "no empty clause; do not print state"
-
   (* TODO
   (** Make an optional meta-prover and parse its KB *)
   let mk_meta ~params =
@@ -230,7 +222,15 @@ end) = struct
     | Some dot_f, Saturate.Unsat proof ->
       let name = "unsat_graph" in
       (* print proof of false *)
-      Proof.pp_dot_file ~name dot_f proof
+        let proof =
+          if X.params.param_dot_all_roots
+          then
+            Env.(Sequence.append (get_active()) (get_passive()))
+            |> Sequence.filter_map
+              (fun c -> if Literals.is_absurd (C.lits c) then Some (C.proof c) else None)
+          else Sequence.singleton proof
+        in
+        Proof.pp_dot_seq_file ~name dot_f proof
     | Some dot_f, (Saturate.Sat | Saturate.Unknown) when params.param_dot_sat ->
       (* print saturated set *)
       let name = "sat_set" in

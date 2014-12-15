@@ -325,7 +325,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let proof c = c.hcproof
 
   let is_empty c =
-    Array.length c.hclits = 0 && Trail.is_empty c.trail
+    Lits.is_absurd c.hclits && Trail.is_empty c.trail
 
   let length c = Array.length c.hclits
 

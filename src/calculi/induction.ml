@@ -826,7 +826,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
               ]
             in
             let proof cc = Proof.mk_c_trivial
-              ~info:[Util.sprintf "splitting %a" Lits.pp lits]
+              ~info:[Util.sprintf "splitting [%a]" Lits.pp cand.cand_lits]
               ~theories:["ind"] cc
             in
             let c = C.create ~trail [Literal.negate lit] proof in
@@ -1018,6 +1018,7 @@ let enable_ () =
     enabled_ := true;
     Util.debug ~section 1 "Induction: requires ord=rpo6; select=NoSelection";
     Params.ord := "rpo6";   (* new default! RPO is necessary*)
+    Params.dot_all_roots := true;  (* print proofs more clearly *)
     Params.select := "NoSelection";
     Extensions.register extension
   )

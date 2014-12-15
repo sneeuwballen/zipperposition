@@ -203,7 +203,10 @@ let is_max ~ord lits =
     MLI.is_max (_compare_lit_with_idx ~ord) (lit,i) m
 
 let is_trivial lits =
-  Util.array_exists Lit.is_trivial lits
+  CCArray.exists Lit.is_trivial lits
+
+let is_absurd lits =
+  CCArray.for_all Lit.is_absurd lits
 
 module Seq = struct
   let terms a =

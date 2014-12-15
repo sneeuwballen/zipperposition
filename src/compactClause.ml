@@ -75,7 +75,9 @@ let compare = cmp
 
 let make lits trail = {lits; trail; }
 
-let is_empty c = Array.length c.lits = 0 && List.length c.trail = 0
+let has_absurd_lits c = Lits.is_absurd c.lits
+
+let is_empty c = has_absurd_lits c && List.length c.trail = 0
 
 let iter c f = Array.iter f c.lits
 
