@@ -251,8 +251,9 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         match Ctx.BoolLit.extract (abs i) with
         | None -> failwith "wrong trail"
         | Some (Ctx.BoolLit.Clause_component lits) -> (sign, `Box_clause lits) :: acc
-        | Some _ ->
-            failwith "clause trail contains a non-Clause_component guard"
+        | Some lit ->
+            let repr = Util.on_buffer Ctx.BoolLit.pp_injected lit in
+            (sign, `Qbf_artifact (abs i, repr)) :: acc
       ) trail []
 
   let compact c = CompactClause.make c.hclits (compact_trail c.trail)

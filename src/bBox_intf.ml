@@ -44,14 +44,15 @@ module type S = sig
 
   (** Predicate attached to a set of literals *)
   type lits_predicate =
-    | Provable of inductive_cst (** clause provable within loop(i) *)
-    | ProvableIsInconsistent of inductive_cst
     | TrailOk (** Some trail that proves lits is true *)
-    | ProvableForSubConstant of inductive_cst
     [@@deriving ord]
 
   type ctx_predicate =
     | InLoop  (** ctx in loop(i) *)
+    | ExpressesMinimality
+        (** clause expresses the minimality of the model for S_loop(i) *)
+    | ExpressesMinimalityAux
+        (** helper for CNF, related to ExpressesMinimality *)
     [@@deriving ord]
 
   type injected = private
@@ -60,6 +61,8 @@ module type S = sig
     | Ctx of ClauseContext.t * inductive_cst * ctx_predicate
     | Name of string  (* name for CNF *)
     [@@deriving ord]
+
+  val pp_injected : Buffer.t -> injected -> unit
 
   val inject_lits : Literals.t -> bool_lit
   (** Inject a clause into a boolean literal. No other clause will map

@@ -130,6 +130,11 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
 
   (** {6 Proof Relation} *)
 
+  (* TODO: remove the whole proof relation stuff? In particular, we only
+      need to check whether a S_loop() is initialized; that could be done
+      by finding subsuming clauses (trails)
+      for each C[i] where C[_] in S_loop(i) *)
+
   module CompactClauseSet = Sequence.Set.Make(CompactClause)
 
   (* one way to prove a clause: set of parent clauses
@@ -142,8 +147,11 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       (fun cc acc ->
         let trail = CompactClause.trail cc in
         List.fold_left
-          (fun acc (sign, `Box_clause lits) ->
-            BoolLit.set_sign sign (BoolLit.inject_lits lits) :: acc
+          (fun acc lit -> match lit with
+            | (sign, `Box_clause lits) ->
+                BoolLit.set_sign sign (BoolLit.inject_lits lits) :: acc
+            | (sign, `Qbf_artifact (i, repr)) ->
+                BoolLit.set_sign sign i :: acc
           ) acc trail
       ) set []
 
@@ -261,7 +269,15 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     in
     at_least_one :: at_most_one
 
-  (* TODO: observe new cover sets, to split clauses again *)
+  let new_cover_sets : (CI.cst * CI.cover_set) list ref = ref []
+
+  let () =
+    Signal.on CI.on_new_cover_set
+      (fun (cst,set) ->
+        new_cover_sets := (cst,set) :: !new_cover_sets;
+        Signal.ContinueListening
+      );
+    ()
 
   (* detect ground terms of an inductive type, and perform a special
       case split with Xor on them. *)
@@ -317,8 +333,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
               if sign && CI.is_inductive l then Some (l, r)
               else if sign && CI.is_inductive r then Some (r, l)
               else None
-          | Some (BoolLit.Clause_component _) -> None
-          | Some _ -> assert false
+          | Some _ -> None
         )
     in
     (* is there i such that   i=t1 and i=t2 can be found in the trail? *)
@@ -409,11 +424,16 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       T.Tbl.add candidates_ t set;
       set
 
+  let new_contexts : candidate_context list ref = ref []
+
   let on_new_context =
     let s = Signal.create () in
     Signal.on s (fun ctx ->
-      (* new context: watch proofs of ctx[i]
-        and ctx[t] for all [t] that is a sub-constant of [i] *)
+      (* new context:
+        - watch proofs of ctx[i] and ctx[t] for all [t] that is
+          a sub-constant of [i]
+        - assert [not l] for all [t] a sub-constant of [i] and [l]
+            literal of [ctx[t]], to express the minimality *)
       watch_proofs_of_clause ctx.cand_lits (`Inductive_cst ctx);
       Util.debug ~section 2 "watch %a (initialization, %a)"
         Lits.pp ctx.cand_lits T.pp ctx.cand_cst;
@@ -425,6 +445,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
             Util.debug ~section 2 "watch %a (sub-cst %a)" Lits.pp c T.pp t;
             watch_proofs_of_clause c `Sub_cst
           );
+      new_contexts := ctx :: !new_contexts;
       Signal.ContinueListening
     );
     s
@@ -514,7 +535,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       ) terms []
     )
 
-  (* [c] (same as [lits] subsumes [lits'] which is watched with list
+  (* [c] (same as [lits]) subsumes [lits'] which is watched with list
     of contexts [l] *)
   let _process_clause_match_watched acc c lits lits' l =
     (* remember proof *)
@@ -584,19 +605,18 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
   let neg_ = BoolLit.neg
   let valid_ x = BoolLit.inject_name' "valid(%a)" T.pp x
   let cases_ x = BoolLit.inject_name' "cases(%a)" T.pp x
-  let pgraph_ x = BoolLit.inject_name' "proofgraph(%a)" T.pp x
   let empty_ x = BoolLit.inject_name' "empty(%a)" T.pp x
-  let is_loop_ x = BoolLit.inject_name' "is_loop(%a)" T.pp x
-  let base_ x = BoolLit.inject_name' "base(%a)" T.pp x
-  let recf_ x = BoolLit.inject_name' "recf(%a)" T.pp x
+  let minimal_ x = BoolLit.inject_name' "minimal(%a)" T.pp x
   let init_ x = BoolLit.inject_name' "init(%a)" T.pp x
-  let recf_term_ t = BoolLit.inject_name' "recf_term(%a)" T.pp t
-  let recf_sub_term_ t = BoolLit.inject_name' "recf_subterm(%a)" T.pp t
+
+  let expresses_minimality_ ctx cst =
+    BoolLit.inject_ctx ctx cst BoolLit.ExpressesMinimality
+
+  let expresses_minimality_aux_ ctx cst =
+    BoolLit.inject_ctx ctx cst BoolLit.ExpressesMinimalityAux
 
   let is_true_ lits = BoolLit.inject_lits lits
   let trail_ok_ lits = BoolLit.inject_lits_pred lits BoolLit.TrailOk
-  let provable_ lits cst = BoolLit.inject_lits_pred lits (BoolLit.Provable cst)
-  let provable_sub_ lits t = BoolLit.inject_lits_pred lits (BoolLit.ProvableForSubConstant t)
   let in_loop_ ctx i = BoolLit.inject_ctx ctx i BoolLit.InLoop
 
   (* encode proof relation into QBF, starting from the set of "roots"
@@ -608,12 +628,11 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
           bigAnd i:inductive_cst:
             def of [cases(i)]
             (path_constraint(i) => valid(i))
-            valid(i) = [cases(i)] & (not [proofgraph] | [empty(i)] | not [loop(i)])
+            valid(i) = [cases(i)] & ([empty(i)] | not [init(i)] | [minimal(i)])
         backtrackable:
           (bigAnd_coversets(i) (bigXOr_{t in coverset(i)} i=t)) => [valid(i)]
-          constraints of proofgraph => [proofgraph]
           bigAnd i:inductive_cst:
-            def of loop(i) => [loop(i)]
+            minimal(i) => def of minimal(i)
             empty(i) => def of empty(i)
         *)
 
@@ -626,19 +645,14 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     - (not [proofgraph] | [empty(i)] | not [loop(i)]) *)
   let qbf_encode_valid_ cst =
     let pc = CI.pc cst in
-    Solver.quantify_lits level2_ [valid_ cst; pgraph_ cst];
+    Solver.quantify_lits level2_
+      [valid_ cst; empty_ cst; init_ cst; minimal_ cst];
     Solver.add_clauses
       [ valid_ cst :: List.map (fun pc -> neg_ pc.CI.pc_lit) pc (* pc -> valid *)
       ; [ neg_ (valid_ cst); cases_ cst ]
-      ; [ neg_ (valid_ cst); neg_ (pgraph_ cst); empty_ cst; neg_ (is_loop_ cst) ]
+      ; [ neg_ (valid_ cst); neg_ (init_ cst); empty_ cst; minimal_ cst ]
       ];
     ()
-
-  (* encode (init(i) & base(i) & recf(i)) => loop(i) *)
-  let qbf_encode_loop_ cst =
-    Solver.quantify_lits level2_ [init_ cst; base_ cst; recf_ cst; is_loop_ cst];
-    Solver.add_clause
-      [ neg_ (init_ cst); neg_ (base_ cst); neg_ (recf_ cst); is_loop_ (cst) ]
 
   (* TODO check CNF *)
   (* - for each candidate ctx C,
@@ -653,15 +667,23 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       candidates
       |> Sequence.flat_map
         (fun ctx ->
-          (* proof of [ctx[cst]] *)
-          let proofs = match find_proofs_ ctx.cand_lits with
-            | None -> Sequence.empty
-            | Some {proofs} -> ProofSet.to_seq proofs
-          in
-          let trails = Sequence.map trail_of_proof proofs in
-          Sequence.map
-            (fun lits -> trail_ok_ ctx.cand_lits :: List.map neg_ lits)
-            trails
+          (* proof of [ctx[cst]].
+           TODO: find those proofs through regular subsumption w.r.t active
+           set so we can stop storing all proofs *)
+          match find_proofs_ ctx.cand_lits with
+            | None ->
+                Sequence.singleton
+                  [ neg_ (in_loop_ ctx.cand_ctx cst)
+                  ; neg_ (trail_ok_ ctx.cand_lits) ]
+            | Some {proofs} ->
+                ProofSet.to_seq proofs
+                |> Sequence.map trail_of_proof
+                |> Sequence.map
+                  (fun lits ->
+                    trail_ok_ ctx.cand_lits ::
+                    neg_ (in_loop_ ctx.cand_ctx cst) ::
+                    List.map neg_ lits
+                  )
         )
       |> Sequence.to_rev_list
     and init_clause =
@@ -675,115 +697,43 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     in
     Solver.add_clauses (init_clause :: trail_ok_clauses)
 
-  (* definition of base(cst) *)
-  let qbf_encode_base_ cst =
-    let base_cases = CI.cover_sets cst
-      |> Sequence.map (fun set -> set.CI.base_cases)
-    in
-    match find_proofs_ [| |] with
-    | None -> ()
-    | Some proofs_of_empty ->
-        (* for each proof "p" of false:
-           for each coverset "set" of cst:
-            (bigand_{"t" a base case in "set"} not (t=cst)) => base(cst)
-        *)
-        let clauses = base_cases
-          |> Sequence.map
-            (fun base_cases ->
-              let guard = List.map
-                (fun t ->
-                  let blit = is_true_ [| Literal.mk_eq t cst |] in
-                  Solver.quantify_lits Solver.level0 [blit];
-                  blit
-                ) base_cases
-              in
-              base_ cst :: guard
-            )
-          |> Sequence.to_rev_list
-        in
-        Solver.add_clauses clauses
+  (* encode [minimal(cst)]:
+    minimal(cst) =>
+      bigor{C[_] in candidates(cst)}
+       ( [C[_] in S_loop(cst)] and expresses_minimality(C[_],cst)
 
-  (* encode recf(cst), that is:
-      for each coverset "set" of cst:
-      ( bigand_{"t" a recursive case of "set"}
-        (t=cst) =>
-          bigor_{"t'" strict subterm of "t" of same type}
-            bigand_{C in candidates(cst)} ([C in loop(cst)] => provable(C,cst))
-      ) => recf(cst)
+    becomes:
+
+    minimal(cst) & [cst=t] => bigor_{C in cand(cst)} expresses_minimality_aux(C, t)
+    expresses_minimality_aux(C[_], t) =>
+      [C in_loop(cst)] & expresses_minimality(C[t])
   *)
-  let qbf_encode_recf_ cst =
+  let qbf_encode_minimal_ cst =
     let candidates = !(find_candidates_ cst) |> FV_cand.to_seq |> Sequence.map snd in
-    (* (bigand_{t recursive case} recf_term(t)) => recf(cst)  *)
-    let clauses_per_set = CI.cover_sets cst
-      |> Sequence.map (fun set -> set.CI.rec_cases)
-      |> Sequence.map
-        (fun rec_cases ->
-          recf_ cst ::
-          List.map
-            (fun t ->
-              Solver.quantify_lits level2_ [recf_term_ t];
-              neg_ (recf_term_ t)
-            ) rec_cases
-        )
-    and clauses_per_term = CI.cover_sets cst
-      |> Sequence.flat_map (fun set -> set.CI.sub_constants |> T.Set.to_seq)
-      |> Sequence.map
-        (fun t' ->
-          let _cst', t = CI.inductive_cst_of_sub_cst t' in
-          assert (T.eq cst _cst');
-          (* for every t' subterm of t:
-             recf_subterm(t') => recf_term(t) *)
-          Solver.quantify_lits level2_ [recf_sub_term_ t'];
-          [neg_ (recf_sub_term_ t'); recf_term_ t]
-        )
-    and clauses_per_subterm = CI.cover_sets cst
-      |> Sequence.flat_map (fun set -> T.Set.to_seq set.CI.sub_constants)
-      |> Sequence.flat_map
-        (fun t' ->
-          let _, t = CI.inductive_cst_of_sub_cst t' in
-          (* for every subterm t' of an inductive case of cst:
-                (t=cst &
-                  bigand_{C in candidates(cst)} provable_aux(C[t'], cst)
-                ) => recf_sub_term(t')
-          *)
-          let guard_big_and =
-            candidates
-            |> Sequence.map
-              (fun ctx ->
-                let ctx_at_t' = ClauseContext.apply ctx.cand_ctx t' in
-                neg_ (provable_ ctx_at_t' cst)
-              )
-            |> Sequence.to_rev_list
-          in
-          let clause1 =
-            recf_sub_term_ t' ::
-            neg_ (is_true_ [| Literal.mk_eq t cst |]) ::
-            guard_big_and
-          in
-          (* for every C in candidates(Cst):
-               ([C in loop(cst)] => provable(C[t'],cst)]) => provable_aux(C[t'],cst)
-          *)
-          let per_clause =
-            candidates
-            |> Sequence.flat_map
-              (fun ctx ->
-                let ctx_at_t' = ClauseContext.apply ctx.cand_ctx t' in
-                let provable_aux = provable_sub_ ctx_at_t' t' in
-                [ [ in_loop_ ctx.cand_ctx cst; provable_aux ]
-                ; [ neg_ (provable_ ctx_at_t' cst); provable_aux ]
-                ] |> Sequence.of_list
-              )
-          in
-          Sequence.cons clause1 per_clause
-        )
-    in
-    let all_clauses = Sequence.of_list
-      [ clauses_per_set
-      ; clauses_per_term
-      ; clauses_per_subterm
-      ]
-    in
-    Solver.add_clause_seq (Sequence.concat all_clauses);
+    (* Big_or, to choose which context is going to be the one
+      that expresses minimality *)
+    Solver.add_clause
+      ( neg_ (minimal_ cst)
+      :: (
+        candidates
+        |> Sequence.map
+          (fun cand -> expresses_minimality_aux_ cand.cand_ctx cst)
+        |> Sequence.to_rev_list
+      )
+    );
+    (* for each candidate, express what it means to be the one to
+        express minimality *)
+    candidates
+      |> Sequence.iter
+        (fun cand ->
+          let elit_aux = expresses_minimality_aux_ cand.cand_ctx cst
+          and elit = expresses_minimality_ cand.cand_ctx cst in
+          Solver.quantify_lits level2_ [elit_aux; elit];
+          Solver.add_clauses
+            [ [ neg_ elit_aux; in_loop_ cand.cand_ctx cst ]
+            ; [ neg_ elit_aux; elit ]
+            ]
+        );
     ()
 
   (* definition of empty(cst):
@@ -803,149 +753,12 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     Solver.add_clause_seq clauses;
     ()
 
-  module LitsTbl = Hashtbl.Make(struct
-    type t = Lits.t
-    let equal = Lits.eq
-    let hash = Lits.hash
-  end)
-
-  (* [cc] is pure iff it contains no inductive type. Its provability
-      status w.r.t some inductive constant is [true] *)
-  let pure_ cc =
-    let terms_trail =
-      CompactClause.trail cc
-      |> Sequence.of_list
-      |> Sequence.flat_map
-        (function (_,`Box_clause lits) ->
-          Lits.Seq.terms lits
-        )
-    and terms_lits = Lits.Seq.terms (CompactClause.lits cc) in
-    let impure =
-      Sequence.exists CI.contains_inductive_types
-        (Sequence.append terms_lits terms_trail)
-    in
-    not impure
-
-  let pure_proof_ proof =
-    CompactClauseSet.for_all pure_ proof
-
-  (* table from sets of compact clauses to 'a *)
-  module CompactClauseSetTbl = Hashtbl.Make(struct
-    type t = CompactClauseSet.t
-    let equal = CompactClauseSet.equal
-    let hash_fun set h =
-      let seq = CompactClauseSet.to_seq set in
-      CCHash.seq CompactClause.hash_fun seq h
-    let hash set = CCHash.apply hash_fun set
-  end)
-
-  (* encode the proofgraph of this constant, with literals [loop(cst) |- C]
-      and [C[<>] in loop(cst)] *)
-  let qbf_encode_proofgraph_of_ cst =
-    let coversets = CI.cover_sets cst in
-    (* set of lits for which proof is already encoded *)
-    let tbl = LitsTbl.create 128 in
-    (* bool lit that encodes: provable(C) => bigor_{p in proofs(C)} p is true *)
-    let provable_is_inconsistent lits cst =
-      BoolLit.inject_lits_pred lits (BoolLit.ProvableIsInconsistent cst)
-    in
-    (* queue of nodes of the proof graph (1 node = array of lits) to explore *)
-    let q = Queue.create () in
-    !(find_candidates_ cst)
-      |> FV_cand.to_seq
-      |> Sequence.map snd
-      |> Sequence.iter
-        (fun cand ->
-          (* add a proof for ctx[cst]: it's  [ctx in loop(cst)] *)
-          Solver.quantify_lits level1_ [in_loop_ cand.cand_ctx cst];
-          Solver.add_clause
-            [ neg_ (provable_is_inconsistent cand.cand_lits cst)
-            ; neg_ (in_loop_ cand.cand_ctx cst)
-            ];
-          (* explore: ctx[cst], and ctx[t] for each sub-constant t of cst  *)
-          Queue.push cand.cand_lits q;
-          coversets
-            |> Sequence.flat_map (fun set -> T.Set.to_seq set.CI.sub_constants)
-            |> Sequence.iter
-              (fun t ->
-                (* t is a subconstant. we will probably be interested
-                    in the provability of ctx[t]. *)
-                let lits = ClauseContext.apply cand.cand_ctx t in
-                Queue.push lits q
-              )
-        );
-    (* breadth first traversal, from leaves [ctx[t']] where ctx is a
-      candidate context and t' an inductive sub-constant of
-      a recursive case of  [cst] *)
-    while not (Queue.is_empty q) do
-      let lits = Queue.pop q in
-      if not (LitsTbl.mem tbl lits) then (
-        LitsTbl.add tbl lits ();
-        Solver.quantify_lits level1_ [provable_ lits cst];
-        Solver.quantify_lits level2_ [provable_is_inconsistent lits cst];
-        match find_proofs_ lits  with
-        | None ->
-            (* not provable (otherwise provable_is_inconsistent) *)
-            Util.debug ~section:section_qbf 5 "  no proofs for %a" Lits.pp lits;
-            Solver.add_clause
-              [neg_ (provable_is_inconsistent lits cst); provable_ lits cst]
-        | Some {proofs;_} ->
-            Util.debug ~section:section_qbf 5 "  %d proof(s) for %a"
-              (ProofSet.cardinal proofs) Lits.pp lits;
-            (* add provable_is_inconsistent(lits) => provable(lits) *)
-            Solver.add_clause
-              [neg_ (provable_is_inconsistent lits cst); provable_ lits cst];
-            (* for each proof p of lits
-                with premises [lits_1, lits_2, ..., lits_n] and trail [Gamma]
-               add:
-                  "provable_is_inconsistent(lits) =>
-                    bigor_{l in [lit_1...lit_n] union Gamma} not l"  *)
-            ProofSet.iter
-              (fun proof ->
-                Util.debug ~section:section_qbf 5 "    > including proof {%a}"
-                  (Sequence.pp_buf CompactClause.pp) (CompactClauseSet.to_seq proof);
-                let trail = trail_of_proof proof in
-                let sub_obligations =
-                  if pure_proof_ proof
-                    then []
-                    else CompactClauseSet.to_list proof
-                      |> List.map
-                        (fun cc ->
-                          (* explore the premise recursively *)
-                          Queue.push (CompactClause.lits cc) q;
-                          provable_ (CompactClause.lits cc) cst
-                        )
-                in
-                let goals = sub_obligations @ trail in
-                (* "proof not valid" implies some goal not fullfilled *)
-                let goals_failed = List.map neg_ goals in
-                let clause =
-                  neg_ (provable_is_inconsistent lits cst)
-                  :: goals_failed
-                in
-                Solver.add_clause clause
-              ) proofs
-      )
-    done;
-    (* add "proofgraph or bigor_{lits} provable_is_inconsistent(lits)" *)
-    let l = LitsTbl.fold
-      (fun lits () acc -> provable_is_inconsistent lits cst :: acc)
-      tbl []
-    in
-    Solver.add_clause (pgraph_ cst :: l);
-    ()
-
-  (* encode the whole proofgraph for every inductive constant. *)
-  let qbf_encode_proofgraph_ () =
-    CI.Seq.cst
-      |> Sequence.iter qbf_encode_proofgraph_of_
-
   (* encode: cases(i) => bigAnd_{s in coversets(i) (xor_{t in s} i=t} *)
   let qbf_encode_cover_set cst set =
     let big_xor =
       mk_xor_
         (List.map
-          (fun t -> is_true_ [|Literal.mk_eq cst t|])
+          (fun t -> is_true_ [|Literal.mk_eq t cst|])
           set.CI.cases
         )
     in
@@ -965,10 +778,8 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     Util.debug ~section:section_qbf 4 "save QBF solver...";
     save_level_ := Solver.save ();
     CI.Seq.cst |> Sequence.iter qbf_encode_init_;
-    CI.Seq.cst |> Sequence.iter qbf_encode_recf_;
-    CI.Seq.cst |> Sequence.iter qbf_encode_base_;
+    CI.Seq.cst |> Sequence.iter qbf_encode_minimal_;
     CI.Seq.cst |> Sequence.iter qbf_encode_empty_;
-    qbf_encode_proofgraph_ ();
     Util.exit_prof prof_encode_qbf;
     ()
 
@@ -987,7 +798,6 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     Signal.on CI.on_new_inductive
       (fun cst ->
         qbf_encode_valid_ cst;
-        qbf_encode_loop_ cst;
         Signal.ContinueListening
       );
     Signal.on CI.on_new_cover_set
@@ -996,6 +806,67 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
         Signal.ContinueListening
       );
     ()
+
+  (** {6 Expressing Minimality} *)
+
+  let split_for_minimality cand set cst =
+    T.Set.to_seq set.CI.sub_constants
+    |> Sequence.flat_map
+      (fun t' ->
+        let lits = ClauseContext.apply cand.cand_ctx t' in
+        let cst, t = CI.inductive_cst_of_sub_cst t' in
+        (* not l <- [expresses_minimality ctx cst], [cst = t]
+          for each l in cand[t'] *)
+        CCArray.to_seq lits
+        |> Sequence.map
+          (fun lit ->
+            let trail = C.Trail.of_list
+              [ expresses_minimality_ cand.cand_ctx cst
+              ; is_true_ [| Literal.mk_eq t cst |]
+              ]
+            in
+            let proof cc = Proof.mk_c_trivial
+              ~info:[Util.sprintf "splitting %a" Lits.pp lits]
+              ~theories:["ind"] cc
+            in
+            let c = C.create ~trail [Literal.negate lit] proof in
+            Util.debug ~section 2 "minimality of %a gives %a"
+              Lits.pp cand.cand_lits C.pp c;
+            c
+          )
+      )
+    |> Sequence.to_rev_list
+
+  (* for every new context [ctx[_]], express that [ctx[t']] can be the
+      witness of [not S_loop[t']] if [ctx[_] in S_loop[cst]] for
+      every coverset;
+      do the same for every new coverset and already existing context *)
+  let express_minimality_ctx () =
+    let clauses = List.fold_left
+      (fun acc cand ->
+        CI.cover_sets cand.cand_cst
+        |> Sequence.fold
+          (fun acc set ->
+            let clauses = split_for_minimality cand set cand.cand_cst in
+            List.rev_append clauses acc
+          ) acc
+      ) [] !new_contexts
+    in
+    new_contexts := [];
+    let clauses = List.fold_left
+      (fun acc (cst,set) ->
+        !(find_candidates_ cst)
+          |> FV_cand.to_seq
+          |> Sequence.map snd
+          |> Sequence.fold
+            (fun acc cand ->
+              let clauses = split_for_minimality cand set cst in
+              List.rev_append clauses acc
+            ) acc
+      ) clauses !new_cover_sets
+    in
+    new_cover_sets := [];
+    clauses
 
   (** {6 Summary}
 
@@ -1096,6 +967,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     Env.add_is_trivial has_trivial_trail;
     Env.add_lit_rule "induction.injectivity1" injectivity_simple;
     Env.add_simplify injectivity_destruct;
+    Env.add_generate "induction.express_minimality" express_minimality_ctx;
     (* XXX: ugly, but we must do case_split before scan_extrude/proof.
       Currently we depend on Env.generate_unary applying inferences in
       the reverse order of their addition *)

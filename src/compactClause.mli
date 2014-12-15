@@ -30,9 +30,14 @@ open Logtk
 
 type form = Formula.FO.t
 
-type bool_lit = bool * [`Box_clause of Literal.t array ]
+type bool_lit =
+  bool *
+  [ `Box_clause of Literal.t array
+  | `Qbf_artifact of int * string
+  ]
 (** A boolean literal, here, is a boxed (unsplittable) clause
-    with a sign *)
+    with a sign. The literal can be an explicit encoding of "lits are true"
+    or some other QBF artifact (lit number + repr) *)
 
 type t = {
   lits : Literal.t array;

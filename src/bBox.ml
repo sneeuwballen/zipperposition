@@ -50,14 +50,13 @@ module Make(Any : sig end) = struct
 
   (** Predicate attached to a set of literals *)
   type lits_predicate =
-    | Provable of inductive_cst [@compare T.cmp] (** clause provable within loop(i) *)
-    | ProvableIsInconsistent of inductive_cst [@compare T.cmp]
     | TrailOk (** Some trail that proves lits is true *)
-    | ProvableForSubConstant of inductive_cst [@compare T.cmp]
     [@@deriving ord]
 
   type ctx_predicate =
     | InLoop (** lits = ctx[i], where ctx in loop(i) *)
+    | ExpressesMinimality
+    | ExpressesMinimalityAux
     [@@deriving ord]
 
   type injected =
@@ -68,14 +67,14 @@ module Make(Any : sig end) = struct
     [@@deriving ord]
 
   let string_of_lits_pred lits = function
-    | Provable t -> Util.sprintf "⟦loop(%a) ⊢ %a⟧" T.pp t Lits.pp lits
-    | ProvableIsInconsistent t ->
-        Util.sprintf "⟦\"loop(%a) ⊢ %a\" inconsistent⟧" T.pp t Lits.pp lits
     | TrailOk -> Util.sprintf "⟦trail_ok(%a)⟧" Lits.pp lits
-    | ProvableForSubConstant t -> Util.sprintf "⟦provable_sub_cst(%a)⟧" T.pp t
 
   let string_of_ctx_pred ctx i = function
     | InLoop -> Util.sprintf "⟦%a ∈ loop(%a)⟧" ClauseContext.pp ctx T.pp i
+    | ExpressesMinimality ->
+        Util.sprintf "⟦loop(%a) minimal by %a⟧" T.pp i ClauseContext.pp ctx
+    | ExpressesMinimalityAux ->
+        Util.sprintf "⟦loop(%a) minimal by %a (aux)⟧" T.pp i ClauseContext.pp ctx
 
   let pp_injected buf = function
     | Clause_component lits ->
@@ -227,9 +226,6 @@ module Make(Any : sig end) = struct
     | Clause_component _ -> None
     | Lits (_, pred) ->
         begin match pred with
-        | Provable t
-        | ProvableIsInconsistent t
-        | ProvableForSubConstant t -> Some t
         | TrailOk -> None
         end
     | Ctx (_, t, _) -> Some t

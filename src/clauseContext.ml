@@ -52,6 +52,9 @@ type ctx=t
 let equal c1 c2 =
   T.eq c1.var c2.var && Lits.eq c1.lits c2.lits
 
+(* TODO: compare types of extruded variables;
+ if same type, instantiate with some specific "diamond" of that type
+ and check for alpha-equiv *)
 let compare c1 c2 =
   CCOrd.(T.cmp c1.var c2.var <?> (Lits.compare, c1.lits, c2.lits))
 

@@ -79,8 +79,9 @@ module Make(X : sig end) : BS.QBF = struct
 
   let save () =
     let state = get_state_ () in
+    let state' = {state with result=state.result} in (* copy *)
     let i = CCVector.length stack in
-    CCVector.push stack state;
+    CCVector.push stack state';
     i
 
   let restore l =
