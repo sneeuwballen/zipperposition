@@ -462,7 +462,7 @@ module AC(A : AC_SPEC) = struct
           else t
       | T.App (f, l) ->
         let l = List.map normalize l in
-        T.app ~kind:T.Kind.LogtkFOTerm ~ty:(T.ty_exn t) f l 
+        T.app ~kind:T.Kind.LogtkFOTerm ~ty:(T.ty_exn t) f l
       | _ -> assert false
     in
     let t' = normalize t in
