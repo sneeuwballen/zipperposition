@@ -128,6 +128,10 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
   (* if true, ignore clause when it comes to extracting contexts *)
   let flag_no_ctx = C.new_flag ()
 
+  (* if true, means the clause represents the possibility of another
+    clause being the witness of the minimality of the current model *)
+  let flag_expresses_minimality = C.new_flag ()
+
   (** {6 Proof Relation} *)
 
   (* TODO: remove the whole proof relation stuff? In particular, we only
@@ -456,11 +460,17 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
      - if [t] is a sub_cst and its constant also occurs in [lits] (similar),
         should we extrude context?
         e.g.  in [n = s(n')] no need to extract n' nor n *)
-  let subterms_candidates_for_context_ lits =
-    Lits.Seq.terms lits
+  let subterms_candidates_for_context_ c =
+    Lits.Seq.terms (C.lits c)
       |> Sequence.flat_map T.Seq.subterms
       |> Sequence.filter
-        (fun t -> CI.is_inductive t || CI.is_sub_constant t)
+        (fun t ->
+          CI.is_inductive t ||
+          (* if C is  a'=b where a!=b is minimal, no need to extract a' *)
+          ( CI.is_sub_constant t &&
+            not (C.get_flag flag_expresses_minimality c)
+          )
+        )
       |> T.Seq.add_set T.Set.empty
 
   (* ctx [c] is now initialized. Return [true] if it wasn't initialized before *)
@@ -523,7 +533,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
      of an inductive  term. This is pretty much the main heuristic. *)
   let scan_given_for_context c =
     if C.get_flag flag_no_ctx c then [] else (
-    let terms = subterms_candidates_for_context_ (C.lits c) in
+    let terms = subterms_candidates_for_context_ c in
     T.Set.fold
       (fun t acc ->
         (* extract a context [c = ctx[t]] *)
@@ -828,6 +838,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
               ~theories:["ind"] cc
             in
             let c = C.create ~trail [Literal.negate lit] proof in
+            C.set_flag flag_expresses_minimality c true;
             Util.debug ~section 2 "minimality of %a gives %a"
               Lits.pp cand.cand_lits C.pp c;
             c
