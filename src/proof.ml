@@ -461,9 +461,9 @@ let as_dot_graph =
     ~vertices:(fun p ->
       if is_proof_of_false p then `Color "red" ::
           `Label "[]" :: `Shape "box" :: attributes
-      else if has_absurd_lits p then `Color "orange" :: label p :: `Shape "box" :: attributes
-      else if is_file p then label p :: `Color "yellow" :: `Shape "box" :: attributes
-      else if is_conjecture p then label p :: `Color "green" :: `Shape "box" :: attributes
+      else if has_absurd_lits p then `Color "orange" :: label p :: shape p :: attributes
+      else if is_file p then label p :: `Color "yellow" :: shape p :: attributes
+      else if is_conjecture p then label p :: `Color "green" :: shape p :: attributes
       else if is_trivial p then label p :: `Color "cyan" :: shape p :: attributes
       else label p :: shape p :: attributes)
     ~edges:(fun e -> [`Label e])

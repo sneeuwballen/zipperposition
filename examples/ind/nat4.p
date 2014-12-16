@@ -1,3 +1,4 @@
+% double(X) = X+X
 
 include('nat.ax').
 
