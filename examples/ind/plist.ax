@@ -1,0 +1,42 @@
+
+% polymorphic lists
+
+tff(ty_cons, type, cons : !>[A:$tType]: (A * list(A)) > list(A)).
+tff(ty_nil, type, nil : !>[A:$tType]: list(A)).
+
+tff(ty_count, type, count : !>[A:$tType]: (A * list(A)) > nat).
+tff(ty_length, type, length : !>[A:$tType]: list(A) > nat).
+tff(ty_take, type, take : !>[A:$tType]: (A * list(A)) > list(A)).
+tff(ty_drop, type, drop : !>[A:$tType]: (A * list(A)) > list(A)).
+tff(ty_append, type, append : !>[A:$tType]: (list(A) * list(A)) > list(A)).
+tff(ty_rev, type, rev : !>[A:$tType]: list(A) > list(A)).
+tff(ty_mem, type, mem : !>[A:$tType]: (A * list(A)) > $o).
+tff(ty_last, type, last : !>[A:$tType]: list(A) > A).
+tff(ty_butlast, type, butlast : !>[A:$tType]: list(A) > list(A)).
+
+tff(length_1, axiom, ![A:$tType]: length(A,nil(A)) = z).
+tff(length_2, axiom, ![A:$tType, X:A, L:list(A)]:
+    length(A,cons(A,X,L)) = s(length(A,L))).
+
+tff(append_1, axiom, ![A:$tType, L:list(A)]: append(A,nil(A),L) = L).
+tff(append_2, axiom, ![A:$tType, X:A, L:list(A), L2:list(A)]:
+    append(A,cons(A,X,L), L2) = cons(A,X,append(A,L,L2))).
+
+tff(rev_1, axiom, ![A:$tType]: rev(A,nil(A)) = nil(A)).
+tff(rev_2, axiom, ![A:$tType, X:A, L:list(A)]:
+    rev(A,cons(A,X,L)) = append(A,rev(A,L),cons(A,X,nil(A)))).
+
+% TODO: axioms for count
+
+tff(mem_1, axiom, ![A:$tType, X:A]: ~ mem(A,X,nil(A))).
+tff(mem_2, axiom, ![A:$tType, X:A, L:list(A)]: mem(A,X,cons(A,X,L))).
+tff(mem_3, axiom, ![A:$tType, X:A, Y:A, L:list(A)]:
+    (mem(A,X,L) => mem(A,X, cons(A,Y,L)))).
+
+tff(last_1, axiom, ![A:$tType, X:A]: last(A,cons(A,X,nil(A))) = X).
+tff(last_2, axiom, ![A:$tType, X:A, L:list(A)]:
+    (L != nil(A) => last(A,cons(A,X,L)) = last(A,L))).
+
+tff(butlast_1, axiom, ![A:$tType, X:A]: butlast(A,cons(A,X,nil(A))) = nil(A)).
+tff(butlast_2, axiom, ![A:$tType, X:A, L:list(A)]:
+    (L != nil(A) => butlast(A,cons(A,X,L)) = cons(A,X,butlast(A,L)))).
