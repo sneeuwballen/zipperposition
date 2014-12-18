@@ -48,6 +48,8 @@ module Make(Any : sig end) = struct
   let set_sign sign i =
     if sign then (abs i) else - (abs i)
 
+  [@@@warning "-39"]
+
   (** Predicate attached to a set of literals *)
   type lits_predicate =
     | TrailOk (** Some trail that proves lits is true *)

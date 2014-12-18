@@ -40,7 +40,6 @@ type t = {
   param_dot_file : string option; (** file to print the final state in *)
   param_dot_sat : bool;           (** Print saturated set into DOT? *)
   param_dot_all_roots : bool;
-  param_plugins : string list;    (** plugins to load *)
   param_expand_def : bool;        (** expand definitions *)
   param_stats : bool;
   param_presaturate : bool;       (** initial interreduction of proof state? *)
@@ -68,7 +67,6 @@ and presaturate = ref false
 and dot_file = ref None
 and dot_sat = ref false
 and dot_all_roots = ref false
-and plugins = ref []
 and expand_def = ref false
 and select = ref "SelectComplex"
 and progress = ref false
@@ -86,8 +84,6 @@ let parse_args () =
   let set_progress () =
     Util.need_cleanup := true;
     progress := true
-  and add_plugin s = plugins := s :: !plugins
-  and add_plugins s = plugins := (Util.str_split ~by:"," s) @ !plugins
   and add_file s = CCVector.push files s in
   (* options list *)
   let options = Arg.align (
@@ -97,8 +93,6 @@ let parse_args () =
     ; "-timeout", Arg.Set_float timeout, " timeout (in seconds)"
     ; "-select", Arg.Set_string select, help_select
     ; "-split", Arg.Set split, " enable splitting"
-    ; "-plugin", Arg.String add_plugin, " load given plugin (.cmxs)"
-    ; "-plugins", Arg.String add_plugins, " load given plugin(s), comma-separated"
     ; "-expand-def", Arg.Set expand_def, " expand definitions"
     ; "-progress", Arg.Unit set_progress, " print progress"
     ; "-theories", Arg.Bool (fun b -> theories := b), " enable/disable theory detection"
@@ -126,6 +120,6 @@ let parse_args () =
     param_progress = !progress; param_stats= (!Options.global).Options.stats;
     param_proof = !proof; param_split = !split;
     param_presaturate = !presaturate; param_dot_all_roots= !dot_all_roots;
-    param_dot_file = !dot_file; param_plugins= !plugins;
+    param_dot_file = !dot_file;
     param_unary_depth= !unary_depth; param_dot_sat= !dot_sat;
     param_expand_def= !expand_def; }

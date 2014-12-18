@@ -62,6 +62,8 @@ let default = {
 
 (** {2 Registration} *)
 
+let section = Const.section
+
 let (__current : t or_error ref) = ref (`Error "could not load plugin")
 
 let _extensions = Hashtbl.create 11
@@ -72,7 +74,7 @@ let register self =
   (* register by name, if loading succeeded *)
   if not (Hashtbl.mem _extensions self.name)
   then begin
-    Util.debug 1 "register extension %s..." self.name;
+    Util.debug ~section 1 "register extension %s..." self.name;
     Hashtbl.replace _extensions self.name self
   end;
   __current := `Ok self
@@ -88,7 +90,7 @@ let dyn_load filename =
       !__current
     with Dynlink.Error e ->
       let s = Dynlink.error_message e in
-      Util.debug 0 "%% error loading plugin %s: %s" filename s;
+      Util.debug ~section 0 "error loading plugin %s: %s" filename s;
       let msg = "could not load " ^ filename ^ ": " ^ s in
       `Error msg
   in
@@ -102,7 +104,7 @@ let apply_penv ~penv ext =
   List.iter (fun (Penv_do f) -> f penv) ext.penv_actions
 
 let init ext =
-  Util.debug 5 "run init actions of %s" ext.name;
+  Util.debug ~section 5 "run init actions of %s" ext.name;
   List.iter (fun (Init_do f) -> f ()) ext.init_actions
 
 let extensions () =

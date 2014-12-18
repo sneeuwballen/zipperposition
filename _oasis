@@ -21,6 +21,14 @@ Flag "meta"
   Description:  Enable plugin for the meta-prover
   Default:      false
 
+Flag "depqbf"
+  Description:  Use depqbf solver
+  Default:      false
+
+Flag "quantor"
+  Description:  Use quantor solver
+  Default:      false
+
 Library "libzipperposition"
   Path:             src/
   Pack:             true
@@ -30,14 +38,16 @@ Library "libzipperposition"
                     PEnv, Params, Env, Monome, ArithLit, Signals, Multisets,
                     Ctx_intf, Clause_intf, Env_intf, ProofState_intf,
                     BBox, BBox_intf, ClauseContext,
-                    BoolSolver, BoolSolver_intf, Quantor_bridge,
+                    BoolSolver, BoolSolver_intf,
                     calculi/Avatar, calculi/Induction,
                     calculi/Superposition, calculi/Chaining,
                     calculi/EnumTypes, calculi/ArithInt, calculi/Heuristics
   InternalModules:  lib/LazyGraph, lib/SmallSet,
                     lib/UnionFind, lib/Choice, lib/Mixtbl, lib/Signal
-  BuildDepends:     containers, containers.advanced, sequence, unix, zarith,
-                    logtk, dynlink, qbf, qbf.quantor, ppx_deriving.std
+                    , quantor/Zipperposition_quantor  # TODO remove
+  BuildDepends:     containers, containers.advanced, sequence, gen, unix,
+                    zarith, containers.io, logtk, dynlink, qbf,
+                    ppx_deriving.std
 
 Library "libzipperposition_meta"
   Path:             src/meta/
@@ -48,6 +58,29 @@ Library "libzipperposition_meta"
   Build$:           flag(meta)
   Install$:         flag(meta)
   BuildDepends:     libzipperposition,logtk,logtk.meta
+
+# TODO
+Library "libzipperposition_quantor"
+  Path:             src/quantor/
+  Modules:          Zipperposition_quantor
+  BuildDepends:     libzipperposition, qbf, qbf.quantor
+  FindlibParent:    libzipperposition
+  FindlibName:      quantor
+  Build$:           flag(quantor)
+  Install$:         flag(quantor)
+
+if flag(quantor)
+    PostBuildCommand:     cp _build/src/quantor/*.cmxs .
+
+# TODO
+Library "libzipperposition_depqbf"
+  Path:             src/depqbf
+  Modules:          Zipperposition_depqbf
+  BuildDepends:     libzipperposition, qbf, qbf.depqbf
+  FindlibParent:    libzipperposition
+  FindlibName:      depqbf
+  Build$:           flag(depqbf)
+  Install$:         flag(depqbf)
 
 # main executable for the prover
 Executable zipperposition

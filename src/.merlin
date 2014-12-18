@@ -1,11 +1,15 @@
 S .
 S meta/
+S quantor
+S depqbf
 S arbitrary/
 S lib/
 S calculi
 S ../plugins/
 B ../_build/src/
 B ../_build/src/meta/
+B ../_build/src/quantor/
+B ../_build/src/depqbf/
 B ../_build/src/arbitrary/
 B ../_build/src/lib
 B ../_build/src/calculi
@@ -17,3 +21,4 @@ PKG qcheck
 PKG unix
 PKG qbf
 PKG qbf.quantor
+PKG qbf.depqbf

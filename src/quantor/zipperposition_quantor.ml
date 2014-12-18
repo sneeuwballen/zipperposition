@@ -184,6 +184,12 @@ let qbf_solver =
     );
   }
 
+(* register as an extension *)
 let () =
-  BS.register_qbf qbf_solver;
-  ()
+  let open Extensions in
+  let e = {
+    default with
+    name="quantor";
+    init_actions=[Init_do(fun () -> BS.register_qbf qbf_solver)]
+  } in
+  register e
