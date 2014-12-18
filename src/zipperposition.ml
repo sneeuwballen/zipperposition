@@ -42,9 +42,9 @@ module Import = struct
   open! Chaining
   open! ArithInt
   open! EnumTypes
-  open! Quantor_bridge
   open! Avatar
   open! Induction
+  open! Zipperposition_quantor  (* TODO: remove, should be a plugin *)
 end
 
 let section = Const.section
@@ -94,29 +94,23 @@ let setup_env ~env =
     |> List.iter (Extensions.apply_env ~env);
   ()
 
-(** Load plugins *)
+(** Load plugins (all "libzipperposition*.cmxs" in same path as main) *)
 let load_plugins ~params =
-  List.iter
-    (fun filename ->
-      let n = String.length filename in
-      let filename =  (* plugin name, or file? *)
-        if n > 4 && String.sub filename (n-5) 5 = ".cmxs"
-          then filename
-        else
-          let local_filename = Util.sprintf "plugins/std/ext_%s.cmxs" filename in
-          try
-            ignore (Unix.stat local_filename);
-            local_filename
-          with Unix.Unix_error _ ->
-            let home_filename = Util.sprintf "plugins/ext_%s.cmxs" filename in
-            Filename.concat Const.home home_filename
-      in
-      match Extensions.dyn_load filename with
-      | `Error msg -> () (* Could not load plugin *)
-      | `Ok ext ->
-        Util.debug ~section 0 "loaded extension %s" ext.Extensions.name;
-        ()
-    ) params.param_plugins;
+  let dir = Filename.dirname Sys.argv.(0) in
+  Gen.append (CCIO.File.read_dir dir) (CCIO.File.read_dir Const.home)
+    |> Gen.filter
+      (fun s -> CCString.prefix ~pre:"libzipperposition_" s
+       && CCString.suffix ~suf:".cmxs" s
+      )
+    |> Gen.iter
+      (fun filename ->
+        Util.debug ~section 1 "trying to load file %s..." filename;
+        match Extensions.dyn_load filename with
+        | `Error msg -> () (* Could not load plugin *)
+        | `Ok ext ->
+          Util.debug ~section 0 "loaded extension %s" ext.Extensions.name;
+          ()
+      );
   Extensions.extensions ()
 
 module MakeNew(X : sig
