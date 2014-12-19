@@ -33,7 +33,8 @@ Library "libzipperposition"
                     calculi/SetChaining
   InternalModules:  lib/LazyGraph, lib/SmallSet,
                     lib/UnionFind, lib/Choice, lib/Mixtbl, lib/Signal
-  BuildDepends:     containers,sequence,unix,zarith,logtk,dynlink
+  BuildDepends:     containers, containers.advanced, sequence, gen, unix,
+                    zarith, logtk
 
 Library "libzipperposition_meta"
   Path:             src/meta/
