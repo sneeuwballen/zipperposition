@@ -47,7 +47,7 @@ Library "libzipperposition"
                     , quantor/Zipperposition_quantor  # TODO remove
   BuildDepends:     containers, containers.advanced, sequence, gen, unix,
                     zarith, containers.io, logtk, dynlink, qbf,
-                    qbf.quantor, qbf.depqbf,
+                    qbf.quantor, # TODO qbf.depqbf,
                     ppx_deriving.std
 
 Library "libzipperposition_meta"
