@@ -45,8 +45,10 @@ Library "libzipperposition"
   InternalModules:  lib/LazyGraph, lib/SmallSet,
                     lib/UnionFind, lib/Choice, lib/Mixtbl, lib/Signal
                     , quantor/Zipperposition_quantor  # TODO remove
+                    , depqbf/Zipperposition_depqbf # TODO remove
   BuildDepends:     containers, containers.advanced, sequence, gen, unix,
                     zarith, containers.io, logtk, dynlink, qbf,
+                    qbf.quantor, qbf.depqbf,
                     ppx_deriving.std
 
 Library "libzipperposition_meta"
@@ -68,9 +70,6 @@ Library "libzipperposition_quantor"
   FindlibName:      quantor
   Build$:           flag(quantor)
   Install$:         flag(quantor)
-
-if flag(quantor)
-    PostBuildCommand:     cp _build/src/quantor/*.cmxs .
 
 # TODO
 Library "libzipperposition_depqbf"
