@@ -123,10 +123,6 @@ module Make(X : sig end) : BS.QBF = struct
 
   let add_clause_seq seq = seq add_clause
 
-  let quant_at_level l = fst (CCVector.get _lits l)
-
-  let lits_at_level l = snd (CCVector.get _lits l)
-
   let push q lits =
     let l = CCVector.length _lits in
     CCVector.push _lits (q, LitSet.of_list lits);

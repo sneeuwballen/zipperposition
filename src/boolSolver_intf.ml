@@ -87,12 +87,6 @@ module type QBF = sig
   val level0 : quant_level
   (** Level 0 is the outermost level, existentially quantified. *)
 
-  val quant_at_level : quant_level -> quantifier
-  (** Which quantifier is it at this level? *)
-
-  val lits_at_level : quant_level -> LitSet.t
-  (** Which literals are quantified at this level? *)
-
   val push : quantifier -> lit list -> quant_level
   (** Push a new level on top of the others *)
 
