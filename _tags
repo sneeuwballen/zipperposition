@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 40c868c6ecc2a4a4e679b070a53674e1)
+# DO NOT EDIT (digest: 75aa639adc8074d881bc3b1c6a05ff6e)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -21,11 +21,13 @@ true: annot, bin_annot
 <src/base/logtk.{cma,cmxa}>: use_liblogtk_stubs
 <src/base/*.ml{,i,y}>: package(bytes)
 <src/base/*.ml{,i,y}>: package(containers)
+<src/base/*.ml{,i,y}>: package(containers.data)
 <src/base/*.ml{,i,y}>: package(sequence)
 <src/base/*.ml{,i,y}>: package(unix)
 <src/base/*.ml{,i,y}>: package(zarith)
 "src/base/util_stubs.c": package(bytes)
 "src/base/util_stubs.c": package(containers)
+"src/base/util_stubs.c": package(containers.data)
 "src/base/util_stubs.c": package(sequence)
 "src/base/util_stubs.c": package(unix)
 "src/base/util_stubs.c": package(zarith)
@@ -42,6 +44,7 @@ true: annot, bin_annot
 "src/parsers/callProver.cmx": for-pack(Logtk_parsers)
 <src/parsers/*.ml{,i,y}>: package(bytes)
 <src/parsers/*.ml{,i,y}>: package(containers)
+<src/parsers/*.ml{,i,y}>: package(containers.data)
 <src/parsers/*.ml{,i,y}>: package(sequence)
 <src/parsers/*.ml{,i,y}>: package(unix)
 <src/parsers/*.ml{,i,y}>: package(zarith)
@@ -54,6 +57,7 @@ true: annot, bin_annot
 "src/meta/prover.cmx": for-pack(Logtk_meta)
 <src/meta/*.ml{,i,y}>: package(bytes)
 <src/meta/*.ml{,i,y}>: package(containers)
+<src/meta/*.ml{,i,y}>: package(containers.data)
 <src/meta/*.ml{,i,y}>: package(sequence)
 <src/meta/*.ml{,i,y}>: package(unix)
 <src/meta/*.ml{,i,y}>: package(zarith)
@@ -65,6 +69,7 @@ true: annot, bin_annot
 <src/solving/*.ml{,i,y}>: package(aez)
 <src/solving/*.ml{,i,y}>: package(bytes)
 <src/solving/*.ml{,i,y}>: package(containers)
+<src/solving/*.ml{,i,y}>: package(containers.data)
 <src/solving/*.ml{,i,y}>: package(sequence)
 <src/solving/*.ml{,i,y}>: package(unix)
 <src/solving/*.ml{,i,y}>: package(zarith)
@@ -78,6 +83,7 @@ true: annot, bin_annot
 "src/arbitrary/arSymbol.cmx": for-pack(Logtk_arbitrary)
 <src/arbitrary/*.ml{,i,y}>: package(bytes)
 <src/arbitrary/*.ml{,i,y}>: package(containers)
+<src/arbitrary/*.ml{,i,y}>: package(containers.data)
 <src/arbitrary/*.ml{,i,y}>: package(qcheck)
 <src/arbitrary/*.ml{,i,y}>: package(sequence)
 <src/arbitrary/*.ml{,i,y}>: package(unix)
@@ -89,6 +95,7 @@ true: annot, bin_annot
 "tests/run_bench.native": package(benchmark)
 "tests/run_bench.native": package(bytes)
 "tests/run_bench.native": package(containers)
+"tests/run_bench.native": package(containers.data)
 "tests/run_bench.native": package(qcheck)
 "tests/run_bench.native": package(sequence)
 "tests/run_bench.native": package(unix)
@@ -101,6 +108,7 @@ true: annot, bin_annot
 # Executable run_tests
 "tests/run_tests.native": package(bytes)
 "tests/run_tests.native": package(containers)
+"tests/run_tests.native": package(containers.data)
 "tests/run_tests.native": package(oUnit)
 "tests/run_tests.native": package(qcheck)
 "tests/run_tests.native": package(sequence)
@@ -112,6 +120,7 @@ true: annot, bin_annot
 "tests/run_tests.native": use_logtk_parsers
 <tests/*.ml{,i,y}>: package(bytes)
 <tests/*.ml{,i,y}>: package(containers)
+<tests/*.ml{,i,y}>: package(containers.data)
 <tests/*.ml{,i,y}>: package(oUnit)
 <tests/*.ml{,i,y}>: package(qcheck)
 <tests/*.ml{,i,y}>: package(sequence)
@@ -124,6 +133,7 @@ true: annot, bin_annot
 # Executable type_check_tptp
 "src/tools/type_check_tptp.native": package(bytes)
 "src/tools/type_check_tptp.native": package(containers)
+"src/tools/type_check_tptp.native": package(containers.data)
 "src/tools/type_check_tptp.native": package(sequence)
 "src/tools/type_check_tptp.native": package(unix)
 "src/tools/type_check_tptp.native": package(zarith)
@@ -132,6 +142,7 @@ true: annot, bin_annot
 # Executable cnf_of_tptp
 "src/tools/cnf_of_tptp.native": package(bytes)
 "src/tools/cnf_of_tptp.native": package(containers)
+"src/tools/cnf_of_tptp.native": package(containers.data)
 "src/tools/cnf_of_tptp.native": package(sequence)
 "src/tools/cnf_of_tptp.native": package(unix)
 "src/tools/cnf_of_tptp.native": package(zarith)
@@ -141,6 +152,7 @@ true: annot, bin_annot
 "src/tools/orient/orient.native": package(aez)
 "src/tools/orient/orient.native": package(bytes)
 "src/tools/orient/orient.native": package(containers)
+"src/tools/orient/orient.native": package(containers.data)
 "src/tools/orient/orient.native": package(sequence)
 "src/tools/orient/orient.native": package(unix)
 "src/tools/orient/orient.native": package(zarith)
@@ -150,6 +162,7 @@ true: annot, bin_annot
 <src/tools/orient/*.ml{,i,y}>: package(aez)
 <src/tools/orient/*.ml{,i,y}>: package(bytes)
 <src/tools/orient/*.ml{,i,y}>: package(containers)
+<src/tools/orient/*.ml{,i,y}>: package(containers.data)
 <src/tools/orient/*.ml{,i,y}>: package(sequence)
 <src/tools/orient/*.ml{,i,y}>: package(unix)
 <src/tools/orient/*.ml{,i,y}>: package(zarith)
@@ -159,6 +172,7 @@ true: annot, bin_annot
 # Executable proof_check_tstp
 "src/tools/proof_check_tstp.native": package(bytes)
 "src/tools/proof_check_tstp.native": package(containers)
+"src/tools/proof_check_tstp.native": package(containers.data)
 "src/tools/proof_check_tstp.native": package(sequence)
 "src/tools/proof_check_tstp.native": package(unix)
 "src/tools/proof_check_tstp.native": package(zarith)
@@ -167,6 +181,7 @@ true: annot, bin_annot
 # Executable detect_theories
 "src/tools/detect_theories.native": package(bytes)
 "src/tools/detect_theories.native": package(containers)
+"src/tools/detect_theories.native": package(containers.data)
 "src/tools/detect_theories.native": package(sequence)
 "src/tools/detect_theories.native": package(unix)
 "src/tools/detect_theories.native": package(zarith)
@@ -175,6 +190,7 @@ true: annot, bin_annot
 "src/tools/detect_theories.native": use_logtk_parsers
 <src/tools/*.ml{,i,y}>: package(bytes)
 <src/tools/*.ml{,i,y}>: package(containers)
+<src/tools/*.ml{,i,y}>: package(containers.data)
 <src/tools/*.ml{,i,y}>: package(sequence)
 <src/tools/*.ml{,i,y}>: package(unix)
 <src/tools/*.ml{,i,y}>: package(zarith)
@@ -185,6 +201,7 @@ true: annot, bin_annot
 "src/tools/hysteresis/hysteresis.native": package(aez)
 "src/tools/hysteresis/hysteresis.native": package(bytes)
 "src/tools/hysteresis/hysteresis.native": package(containers)
+"src/tools/hysteresis/hysteresis.native": package(containers.data)
 "src/tools/hysteresis/hysteresis.native": package(sequence)
 "src/tools/hysteresis/hysteresis.native": package(unix)
 "src/tools/hysteresis/hysteresis.native": package(zarith)
@@ -195,6 +212,7 @@ true: annot, bin_annot
 <src/tools/hysteresis/*.ml{,i,y}>: package(aez)
 <src/tools/hysteresis/*.ml{,i,y}>: package(bytes)
 <src/tools/hysteresis/*.ml{,i,y}>: package(containers)
+<src/tools/hysteresis/*.ml{,i,y}>: package(containers.data)
 <src/tools/hysteresis/*.ml{,i,y}>: package(sequence)
 <src/tools/hysteresis/*.ml{,i,y}>: package(unix)
 <src/tools/hysteresis/*.ml{,i,y}>: package(zarith)
@@ -205,6 +223,7 @@ true: annot, bin_annot
 # Executable logtk_resolution1
 "src/demo/resolution/resolution1.native": package(bytes)
 "src/demo/resolution/resolution1.native": package(containers)
+"src/demo/resolution/resolution1.native": package(containers.data)
 "src/demo/resolution/resolution1.native": package(sequence)
 "src/demo/resolution/resolution1.native": package(unix)
 "src/demo/resolution/resolution1.native": package(zarith)
@@ -212,6 +231,7 @@ true: annot, bin_annot
 "src/demo/resolution/resolution1.native": use_logtk_parsers
 <src/demo/resolution/*.ml{,i,y}>: package(bytes)
 <src/demo/resolution/*.ml{,i,y}>: package(containers)
+<src/demo/resolution/*.ml{,i,y}>: package(containers.data)
 <src/demo/resolution/*.ml{,i,y}>: package(sequence)
 <src/demo/resolution/*.ml{,i,y}>: package(unix)
 <src/demo/resolution/*.ml{,i,y}>: package(zarith)

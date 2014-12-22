@@ -1,9 +1,9 @@
 # OASIS_START
-# DO NOT EDIT (digest: 6c85f4900375aa3b9918a11cc96e7449)
+# DO NOT EDIT (digest: 012a7f72b7115033dad78af31b85ea94)
 version = "0.6.1"
 description =
 "Logic toolkit, designed primarily for first-order automated reasoning."
-requires = "zarith unix sequence containers bytes"
+requires = "zarith unix sequence containers containers.data bytes"
 archive(byte) = "logtk.cma"
 archive(byte, plugin) = "logtk.cma"
 archive(native) = "logtk.cmxa"

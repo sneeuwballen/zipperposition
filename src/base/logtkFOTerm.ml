@@ -462,7 +462,7 @@ module AC(A : AC_SPEC) = struct
           else t
       | T.App (f, l) ->
         let l = List.map normalize l in
-        T.app ~kind:T.Kind.LogtkFOTerm ~ty:(T.ty_exn t) f l 
+        T.app ~kind:T.Kind.LogtkFOTerm ~ty:(T.ty_exn t) f l
       | _ -> assert false
     in
     let t' = normalize t in
@@ -515,7 +515,7 @@ let pp_depth ?(hooks=[]) depth buf t =
     | TyApp (f, ty) ->
         pp_rec buf f;
         Buffer.add_char buf ' ';
-        LogtkType.pp buf ty
+        LogtkType.pp_depth !depth buf ty
     | App (f, args) ->
         assert (args <> []);
         pp_rec buf f;
@@ -524,12 +524,12 @@ let pp_depth ?(hooks=[]) depth buf t =
     | Const s -> LogtkSymbol.pp buf s
     | Var i ->
       if not !print_all_types && not (LogtkType.eq (ty t) LogtkType.TPTP.i)
-        then Printf.bprintf buf "X%d:%a" i LogtkType.pp (ty t)
+        then Printf.bprintf buf "X%d:%a" i (LogtkType.pp_depth !depth) (ty t)
         else Printf.bprintf buf "X%d" i
     end;
     (* print type of term? *)
     if !print_all_types
-      then Printf.bprintf buf ":%a" LogtkType.pp (ty t)
+      then Printf.bprintf buf ":%a" (LogtkType.pp_depth !depth) (ty t)
   and pp_inner buf t = match view t with
     | TyApp _
     | App _ -> Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
@@ -573,13 +573,13 @@ module TPTP = struct
         Printf.bprintf buf "Y%d" (!depth - i - 1);
         (* print type of term *)
         if !print_all_types || not (LogtkType.eq (ty t) LogtkType.TPTP.i)
-          then Printf.bprintf buf ":%a" LogtkType.TPTP.pp (ty t)
+          then Printf.bprintf buf ":%a" (LogtkType.TPTP.pp_depth !depth) (ty t)
     | Const s -> LogtkSymbol.TPTP.pp buf s
     | App _
     | TyApp _ ->
         let f, tyargs, args = open_app t in
         Printf.bprintf buf "%a(" pp_rec f;
-        LogtkUtil.pp_list LogtkType.TPTP.pp buf tyargs;
+        LogtkUtil.pp_list (LogtkType.TPTP.pp_depth !depth) buf tyargs;
         begin match tyargs, args with
           | _::_, _::_ -> Buffer.add_string buf ", "
           | _ -> ();
@@ -590,7 +590,7 @@ module TPTP = struct
         Printf.bprintf buf "X%d" i;
         (* print type of term *)
         if !print_all_types || not (LogtkType.eq (ty t) LogtkType.TPTP.i)
-          then Printf.bprintf buf ":%a" LogtkType.TPTP.pp (ty t)
+          then Printf.bprintf buf ":%a" (LogtkType.TPTP.pp_depth !depth) (ty t)
     in
     pp_rec buf t
 

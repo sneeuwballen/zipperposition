@@ -15,15 +15,20 @@ This project is licensed under the BSD2 license. See the `LICENSE` file.
 We recommand using [opam](http://opam.ocaml.org). Once you installed it,
 type
 
-    $ opam repository add deducteam https://gforge.inria.fr/git/opam-deducteam/opam-deducteam.git
+    $ opam repository add deducteam \
+        https://gforge.inria.fr/git/opam-deducteam/opam-deducteam.git
     $ opam install logtk
+
+If you want to try the development (unstable) version, try:
+
+    $ opam pin add logtk -k git https://github.com/c-cube/logtk.git#dev
 
 ### From sources
 
-You will need OCaml >= 4.00.1 or higher with ocamlbuild,
-[zarith](https://forge.ocamlcore.org/projects/zarith/),
-[ocaml-containers](https://github.com/c-cube/ocaml-containers/),
-[sequence](https://github.com/c-cube/sequence/)
+You will need OCaml >= 4.00.1 or higher with ocamlbuild
+ , [zarith](https://forge.ocamlcore.org/projects/zarith/)
+ , [ocaml-containers](https://github.com/c-cube/ocaml-containers/)
+ , [sequence](https://github.com/c-cube/sequence/)
 and the standard library.
 
 Additional sub-libraries can be built if their respective dependencies
