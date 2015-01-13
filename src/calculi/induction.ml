@@ -323,33 +323,46 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     !res
 
   (* checks whether the trail of [c] contains two literals [i = t1]
-      and [i = t2] with [t1], [t2] distinct cover set members *)
+      and [i = t2] with [t1], [t2] distinct cover set members, or two
+      literals [loop(i) minimal by a] and [loop(i) minimal by b]. *)
   let has_trivial_trail c =
     let trail = C.get_trail c |> C.Trail.to_seq in
     (* all i=t where i is inductive *)
-    let inductive_cases = trail
+    let relevant_cases = trail
       |> Sequence.filter_map
         (fun blit ->
           let sign = blit >= 0 in
           match BoolLit.extract (abs blit) with
           | None -> None
           | Some (BoolLit.Clause_component [| Literal.Equation (l, r, true) |]) ->
-              if sign && CI.is_inductive l then Some (l, r)
-              else if sign && CI.is_inductive r then Some (r, l)
+              if sign && CI.is_inductive l then Some (`Case (l, r))
+              else if sign && CI.is_inductive r then Some (`Case (r, l))
               else None
+          | Some (BoolLit.Ctx (ctx, n, BoolLit.ExpressesMinimality) as lit) ->
+              Some (`Minimal (ctx, n, lit))
           | Some _ -> None
         )
     in
     (* is there i such that   i=t1 and i=t2 can be found in the trail? *)
-    Sequence.product inductive_cases inductive_cases
+    Sequence.product relevant_cases relevant_cases
       |> Sequence.exists
-        (fun ((i1, t1), (i2, t2)) ->
-          let res = T.eq i1 i2 && not (T.eq t1 t2) in
-          if res
-          then Util.debug ~section 4
-            "clause %a redundant because of %a={%a,%a} in trail"
-            C.pp c T.pp i1 T.pp t1 T.pp t2;
-          res)
+        (function
+          | (`Case (i1, t1), `Case (i2, t2)) ->
+              let res = T.eq i1 i2 && not (T.eq t1 t2) in
+              if res
+              then Util.debug ~section 4
+                "clause %a redundant because of %a={%a,%a} in trail"
+                C.pp c T.pp i1 T.pp t1 T.pp t2;
+              res
+          | (`Minimal (ctx1, i1, lit1), `Minimal (ctx2, i2, lit2)) ->
+              let res = T.eq i1 i2 && not (ClauseContext.equal ctx1 ctx2) in
+              if res
+              then Util.debug ~section 4
+                "clause %a redundant because %a and %a both in trail"
+                C.pp c BoolLit.pp_injected lit1 BoolLit.pp_injected lit2;
+              res
+          | _ -> false
+        )
 
   (* transform a lit a=b where a,b have different inductive constructors to false *)
   let injectivity_simple lit = match lit with
