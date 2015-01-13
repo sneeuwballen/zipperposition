@@ -369,6 +369,16 @@ let _has_conjecture decls =
   in
   Sequence.exists (fun r -> r = Ast_tptp.R_conjecture) _roles
 
+let scan_for_inductive_types decls =
+  let pairs = decls
+    |> Sequence.filter_map
+      (function
+        | Ast_tptp.Untyped.NewType (_,ty,_,info) -> Some (ty, info)
+        | _ -> None
+      )
+  in
+  Induction.init_from_decls pairs
+
 (** Process the given file (try to solve it) *)
 let process_file ?meta ~plugins ~params file =
   let open CCError in
@@ -377,6 +387,7 @@ let process_file ?meta ~plugins ~params file =
   Util_tptp.parse_file ~recursive:true file
   >>= fun decls ->
   let has_conjecture = _has_conjecture decls in
+  scan_for_inductive_types decls; (* detect declarations of inductive types *)
   Util.debug ~section 1 "parsed %d declarations (%sconjecture)"
     (Sequence.length decls) (if has_conjecture then "" else "no ");
   (* obtain a typed AST *)

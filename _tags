@@ -114,4 +114,4 @@
 <src/const.cmx>: for-pack(Libzipperposition)
 <**/*.cmx>: inline(15)
 <plugins>: not_hygienic
-true: classic_display, no_alias_deps
+true: no_alias_deps

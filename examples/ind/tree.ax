@@ -1,5 +1,7 @@
 % Binary trees
 
+tff(tree_ind, type, tree : $tType, inductive(node, empty)).
+
 tff(ty_empty, type, empty:tree).
 tff(ty_node, type, node:(tree * $i * tree)> tree).
 

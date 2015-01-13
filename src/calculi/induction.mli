@@ -42,3 +42,9 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) : S
   and module Ctx = E.Ctx
 
 val extension : Extensions.t
+
+val init_from_decls :
+  (string * Logtk_parsers.Ast_tptp.optional_info) Sequence.t ->
+  unit
+(** Initialize from a bunch of declarations' optional info, if one takes
+    only pairs [(some_type_name : $tType, info)] *)

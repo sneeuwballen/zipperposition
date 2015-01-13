@@ -1032,10 +1032,17 @@ let enable_ () =
     Extensions.register extension
   )
 
+let declare_ ty cstors =
+  (* remember to declare this type as inductive *)
+  Util.debug ~section 1 "user declares inductive type %s = %a"
+    ty (CCList.pp CCString.pp) cstors;
+  ind_types_ := (ty, cstors) :: !ind_types_;
+  enable_();
+  ()
+
 (* [str] describes an inductive type, under the form "foo:c1|c2|c3" where
     "foo" is the type name and "c1", "c2", "c3" are the type constructors. *)
 let add_ind_type_ str =
-  enable_();
   let _fail() =
     failwith "expected \"type:c1|c2|c3\" where c1,... are constructors"
   in
@@ -1043,11 +1050,33 @@ let add_ind_type_ str =
   | [ty; cstors] ->
       let cstors = Util.str_split ~by:"|" cstors in
       if List.length cstors < 2 then _fail();
-      (* remember to declare this type as inductive *)
-      Util.debug ~section 2 "user declares inductive type %s = %a"
-        ty (CCList.pp CCString.pp) cstors;
-      ind_types_ := (ty, cstors) :: !ind_types_
+      declare_ ty cstors
   | _ -> _fail()
+
+module A = Logtk_parsers.Ast_tptp
+
+let init_from_decls pairs =
+  let get_str = function
+    | A.GNode (s, []) | A.GString s -> s
+    | _ -> raise Exit
+  in
+  (* search for "inductive(c1, c2, ...)" *)
+  let rec scan_for_constructors = function
+    | A.GNode ("inductive", l) :: tail when List.length l >= 2 ->
+        begin try
+          let constructors = List.map get_str l in
+          Some constructors
+        with Exit ->
+          scan_for_constructors tail
+        end
+    | _ :: tail -> scan_for_constructors tail
+    | []  -> None
+  in
+  Sequence.iter
+    (fun (ty, info) -> match scan_for_constructors info with
+      | None -> ()
+      | Some l -> declare_ ty l
+    ) pairs
 
 let () =
   Params.add_opts

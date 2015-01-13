@@ -3,6 +3,8 @@
 
 include('nat.ax').
 
+tff(list_ind, type, list : $tType, inductive(cons, nil)).
+
 tff(ty_cons, type, cons : (nat * list) > list).
 tff(ty_nil, type, nil : list).
 
