@@ -134,8 +134,8 @@ declaration:
       | PT.App ({PT.term=PT.Const (Sym.Conn Sym.Arrow)},
                ({PT.term=PT.Const (Sym.Conn Sym.TType)} :: _)) ->
         (* declare a new type symbol *)
-        A.NewType (name, s, ty)
-      | _ -> A.TypeDecl (name, s, ty)
+        A.NewType (name, s, ty, info)
+      | _ -> A.TypeDecl (name, s, ty, info)
     }
   | CNF LEFT_PAREN name=name COMMA role=role COMMA c=cnf_formula info=annotations RIGHT_PAREN DOT
     { A.CNF (name, role, c, info) }
