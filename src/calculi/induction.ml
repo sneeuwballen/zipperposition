@@ -123,6 +123,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     cand_cst : T.t;    (* the inductive constant *)
     cand_lits : Lits.t; (* literals of [ctx[t]] *)
     mutable cand_initialized : bool; (* is [ctx[i]] proved yet? *)
+    mutable cand_explanation : Proof.t option; (* justification of why it's initialized *)
   }
 
   (* if true, ignore clause when it comes to extracting contexts *)
@@ -241,7 +242,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
 
   (** {6 Split on Inductive Constants} *)
 
-  (* true if [t = c] where [c] is some inductive constructor *)
+  (* true if [t = c] where [c] is some inductive constructor such as "cons" or "node" *)
   let is_a_constructor_ t = match T.Classic.view t with
     | T.Classic.App (s, _, _) ->
         Sequence.exists (Sym.eq s) CI.Seq.constructors
@@ -256,7 +257,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
         |> Sequence.filter
           (fun t ->
             T.is_ground t
-            && T.is_const t  (* TODO: terms such as allow nil(alpha) *)
+            && T.is_const t
             && not (CI.is_blocked t)
             && CI.is_inductive_type (T.ty t)
             && not (is_a_constructor_ t)   (* 0 and nil: not inductive const *)
@@ -305,7 +306,8 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
                   let lits = [| Literal.mk_eq t t' |] in
                   let bool_lit = BoolLit.inject_lits lits in
                   Solver.quantify_lits Solver.level0 [bool_lit];
-                  let proof cc = Proof.mk_c_trivial ~theories:["induction"] cc in
+                  let proof cc = Proof.mk_c_trivial
+                    ~theories:["induction"] ~info:["boolean split"] cc in
                   let trail = C.Trail.of_list [bool_lit] in
                   let clause = C.create_a ~trail lits proof in
                   C.set_flag flag_no_ctx clause true; (* no context from split *)
@@ -487,10 +489,11 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       |> T.Seq.add_set T.Set.empty
 
   (* ctx [c] is now initialized. Return [true] if it wasn't initialized before *)
-  let cand_ctx_initialized_ c =
+  let cand_ctx_initialized_ c explanation =
     let is_new = not c.cand_initialized in
     if is_new then (
       c.cand_initialized <- true;
+      c.cand_explanation <- Some explanation;
       Util.debug ~section 2 "clause context %a[%a] now initialized"
         CCtx.pp c.cand_ctx T.pp c.cand_cst;
     );
@@ -509,6 +512,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
                 cand_ctx=ctx;
                 cand_cst=t;
                 cand_lits=C.lits c;
+                cand_explanation=Some(C.proof c);
               } in
               Util.debug ~section 2 "new (initialized) context for %a: %a"
                 T.pp t CCtx.pp ctx.cand_ctx;
@@ -516,7 +520,8 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
               Signal.send on_new_context ctx;
               None
           | Some ctx ->
-              let is_new = cand_ctx_initialized_ ctx in (* we just proved ctx[t] *)
+              let expl = C.proof c in
+              let is_new = cand_ctx_initialized_ ctx expl in (* we just proved ctx[t] *)
               if is_new
                 then Some c (* context initialized; we can assume it *)
                 else None
@@ -533,6 +538,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
                 cand_ctx=ctx;
                 cand_cst=cst;
                 cand_lits=lits'; (* ctx[cst] *)
+                cand_explanation=None;
               } in
               (* need to watch ctx[cst] until it is proved *)
               Util.debug ~section 2 "new context %a" CCtx.pp ctx;
@@ -575,7 +581,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
               clause context applied to the corresponding
               inductive constant (rather than a sub-case) *)
             assert (CI.is_inductive cand_ctx.cand_cst);
-            let is_new = cand_ctx_initialized_ cand_ctx in
+            let is_new = cand_ctx_initialized_ cand_ctx (C.proof c) in
             if is_new then (
               (* ctx[t] is now proved, deduce ctx[t] and add it to set of clauses *)
               let clause = C.create_a ~parents:[c]
@@ -846,9 +852,14 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
               ; is_true_ [| Literal.mk_eq t cst |]
               ]
             in
-            let proof cc = Proof.mk_c_trivial
-              ~info:[Util.sprintf "splitting [%a]" Lits.pp cand.cand_lits]
-              ~theories:["ind"] cc
+            let expl = match cand.cand_explanation with
+              | None -> assert false (* not initialized *)
+              | Some p -> [p]
+            in
+            let proof cc = Proof.mk_c_inference
+              ~info:[Util.sprintf "minimality of [%a]" ClauseContext.pp cand.cand_ctx]
+              ~rule:"minimality"
+              ~theories:["ind"] cc expl
             in
             let c = C.create ~trail [Literal.negate lit] proof in
             C.set_flag flag_expresses_minimality c true;
