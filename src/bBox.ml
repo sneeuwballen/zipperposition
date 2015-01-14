@@ -57,6 +57,7 @@ module Make(Any : sig end) = struct
 
   type ctx_predicate =
     | InLoop (** lits = ctx[i], where ctx in loop(i) *)
+    | InitOk (** Ctx is initialized *or* it's not in loop *)
     | ExpressesMinimality
     | ExpressesMinimalityAux
     [@@deriving ord]
@@ -73,6 +74,8 @@ module Make(Any : sig end) = struct
 
   let string_of_ctx_pred ctx i = function
     | InLoop -> Util.sprintf "⟦%a ∈ loop(%a)⟧" ClauseContext.pp ctx T.pp i
+    | InitOk ->
+        Util.sprintf "⟦%a initialized(%a)⟧" ClauseContext.pp ctx T.pp i
     | ExpressesMinimality ->
         Util.sprintf "⟦loop(%a) minimal by %a⟧" T.pp i ClauseContext.pp ctx
     | ExpressesMinimalityAux ->

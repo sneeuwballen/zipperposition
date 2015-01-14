@@ -658,6 +658,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
   let is_true_ lits = BoolLit.inject_lits lits
   let trail_ok_ lits = BoolLit.inject_lits_pred lits BoolLit.TrailOk
   let in_loop_ ctx i = BoolLit.inject_ctx ctx i BoolLit.InLoop
+  let init_ok_ ctx i = BoolLit.inject_ctx ctx i BoolLit.InitOk
 
   (* encode proof relation into QBF, starting from the set of "roots"
       that are (applications of) clause contexts + false.
@@ -694,23 +695,23 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       ];
     ()
 
-  (* TODO check CNF *)
   (* - for each candidate ctx C,
         for each proof p in proofs(C[cst]), add:
-        "trail(p) & (ctx in loop(cst)) => trail_ok_(C[cst])"
-     - add "(bigand_{candidate ctx C} trail_ok(C[cst])) => init(cst)"
+        "trail(p) => trail_ok_(C[cst])" and
+        "trail_ok(C,cst) => init_ok(C[cst])"
+        "not (C in loop(cst)) => init_ok(C[cst])"
+     - add "(bigand_{candidate ctx C} init_ok(C[cst])) => init(cst)"
   *)
   let qbf_encode_init_ cst =
     let candidates = !(find_candidates_ cst)
       |> FV_cand.to_seq |> Sequence.map snd in
-    let trail_ok_clauses =
+    let init_ok_clauses =
       candidates
       |> Sequence.fold
         (fun acc ctx ->
           (* proof of [ctx[cst]].
            TODO: find those proofs through regular subsumption w.r.t active
            set so we can stop storing all proofs *)
-          let acc = [ in_loop_ ctx.cand_ctx cst ; trail_ok_ ctx.cand_lits ] :: acc in
           match find_proofs_ ctx.cand_lits with
             | None -> acc
             | Some {proofs} ->
@@ -718,22 +719,31 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
                 |> Sequence.map trail_of_proof
                 |> Sequence.fold
                   (fun acc lits ->
-                    ( trail_ok_ ctx.cand_lits ::
-                      neg_ (in_loop_ ctx.cand_ctx cst) ::
+                    let c1 =
+                      trail_ok_ ctx.cand_lits ::
                       List.map neg_ lits
-                    ) :: acc
+                    and c2 =
+                      [ neg_ (trail_ok_ ctx.cand_lits)
+                      ; init_ok_ ctx.cand_ctx cst ]
+                    and c3 =
+                      [ in_loop_ ctx.cand_ctx cst
+                      ; init_ok_ ctx.cand_ctx cst ]
+                    in c1 :: c2 :: c3 :: acc
                   ) acc
         ) []
     and init_clause =
       let guard = Sequence.map
         (fun ctx ->
-          Solver.quantify_lits level2_ [trail_ok_ ctx.cand_lits];
-          neg_ (trail_ok_ ctx.cand_lits)
+          Solver.quantify_lits level2_
+            [ init_ok_ ctx.cand_ctx cst
+            ; trail_ok_ ctx.cand_lits
+            ];
+          neg_ (init_ok_ ctx.cand_ctx cst)
         ) candidates
       in
       init_ cst :: Sequence.to_rev_list guard
     in
-    Solver.add_clauses (init_clause :: trail_ok_clauses)
+    Solver.add_clauses (init_clause :: init_ok_clauses)
 
   (* encode [minimal(cst)]:
     minimal(cst) =>

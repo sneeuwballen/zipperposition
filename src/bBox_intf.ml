@@ -49,6 +49,7 @@ module type S = sig
 
   type ctx_predicate =
     | InLoop  (** ctx in loop(i) *)
+    | InitOk (** Ctx is initialized *or* it's not in loop *)
     | ExpressesMinimality
         (** clause expresses the minimality of the model for S_loop(i) *)
     | ExpressesMinimalityAux
