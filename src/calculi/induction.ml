@@ -30,6 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module Sym = Logtk.Symbol
 module T = Logtk.FOTerm
 module Ty = Logtk.Type
+module Su = Logtk.Substs
 module Util = Logtk.Util
 module Lits = Literals
 
@@ -836,17 +837,36 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
 
   (** {6 Expressing Minimality} *)
 
+  (* build a skolem term to replace [v] *)
+  let skolem_term v =
+    let sym = Logtk.Skolem.fresh_sym_with ~ctx:Ctx.skolem ~ty:(T.ty v) "#min" in
+    Ctx.declare sym (T.ty v);
+    T.const ~ty:(T.ty v) sym
+
+  let subst_of_seq l =
+    Sequence.fold (fun s (v,t) -> Su.FO.bind s v 1 t 0) Su.empty l
+
   let split_for_minimality cand set cst =
     T.Set.to_seq set.CI.sub_constants
     |> Sequence.flat_map
       (fun t' ->
         let lits = ClauseContext.apply cand.cand_ctx t' in
         let cst, t = CI.inductive_cst_of_sub_cst t' in
-        (* not l <- [expresses_minimality ctx cst], [cst = t]
-          for each l in cand[t'] *)
+        (* ground every variable of the clause, because of the negation
+            in front of "forall" *)
+        let subst = Lits.Seq.terms lits
+          |> Sequence.flat_map T.Seq.vars
+          |> Sequence.sort_uniq ~cmp:T.cmp
+          |> Sequence.map (fun v -> v, skolem_term v)
+          |> subst_of_seq
+        and renaming = Su.Renaming.create () in
+        (* not sigma(l) <- [expresses_minimality ctx cst], [cst = t]
+          for each l in cand[t'], where sigma is a grounding substitution
+          with fresh skolems *)
         CCArray.to_seq lits
         |> Sequence.map
           (fun lit ->
+            let lit = Literal.apply_subst ~renaming subst lit 1 in
             let trail = C.Trail.of_list
               [ expresses_minimality_ cand.cand_ctx cst
               ; is_true_ [| Literal.mk_eq t cst |]
