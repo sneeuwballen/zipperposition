@@ -2,6 +2,7 @@
 % Kersani & Peltier, commutativity of n-ary addition
 
 %include('nat.ax').
+tff(nat_ind, type, nat : $tType, inductive(s, z)).
 
 tff(ty_s, type, s:nat > nat).
 tff(ty_z, type, z:nat).
