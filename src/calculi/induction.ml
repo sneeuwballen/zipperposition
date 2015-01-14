@@ -470,22 +470,32 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     );
     s
 
+  (* [t] is an inductive const; this returns [true] iff some subconstant of [t]
+      occurs in [c] *)
+  let contains_any_sub_constant_of c t =
+    Lits.Seq.terms (Env.C.lits c)
+    |> Sequence.flat_map T.Seq.subterms
+    |> Sequence.exists
+      (fun t' ->
+        T.is_ground t
+        && CI.is_sub_constant t'
+        && T.eq t (fst (CI.inductive_cst_of_sub_cst t'))
+      )
+
   (* set of subterms of [lits] that could be extruded to form a context.
-   TODO: stronger restrictions? for instance:
-     - if clause contains several distinct terms of same inductive type, ignore
-     - if [t] is a sub_cst and its constant also occurs in [lits] (similar),
-        should we extrude context?
-        e.g.  in [n = s(n')] no need to extract n' nor n *)
+     restrictions:
+       - a context can be extracted only from an inductive constant
+         such that no sub-constant of it occurs in the clause; otherwise
+         it would be meaningless to express the minimality of the clause
+  *)
   let subterms_candidates_for_context_ c =
     Lits.Seq.terms (C.lits c)
       |> Sequence.flat_map T.Seq.subterms
       |> Sequence.filter
         (fun t ->
-          CI.is_inductive t ||
-          (* if C is  a'=b where a!=b is minimal, no need to extract a' *)
-          ( CI.is_sub_constant t &&
-            not (C.get_flag flag_expresses_minimality c)
-          )
+          T.is_ground t
+          && CI.is_inductive t
+          && not (contains_any_sub_constant_of c t)
         )
       |> T.Seq.add_set T.Set.empty
 
