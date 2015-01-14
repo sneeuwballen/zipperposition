@@ -409,13 +409,16 @@ module Make(X : PARAMETERS) = struct
     (* sub_constants -> cst * case in which the sub_constant occurs *)
     let _tbl_sub_cst : (cst * T.t) T.Tbl.t = T.Tbl.create 16
 
-    let _blocked = ref []
+    let _blocked = ref T.Set.empty
 
     let is_sub_constant t =
       T.Tbl.mem _tbl_sub_cst t
 
     let is_blocked t =
-      is_sub_constant t
+      is_sub_constant t || T.Set.mem t !_blocked
+
+    let set_blocked t =
+      _blocked := T.Set.add t !_blocked
 
     let declare ?(pc=[]) t =
       if T.is_ground t

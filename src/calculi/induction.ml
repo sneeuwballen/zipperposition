@@ -124,7 +124,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     cand_cst : T.t;    (* the inductive constant *)
     cand_lits : Lits.t; (* literals of [ctx[t]] *)
     mutable cand_initialized : bool; (* is [ctx[i]] proved yet? *)
-    mutable cand_explanation : Proof.t option; (* justification of why it's initialized *)
+    mutable cand_explanations : Proof.t list; (* justification(s) of why the context exists *)
   }
 
   (* if true, ignore clause when it comes to extracting contexts *)
@@ -504,7 +504,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
     let is_new = not c.cand_initialized in
     if is_new then (
       c.cand_initialized <- true;
-      c.cand_explanation <- Some explanation;
+      c.cand_explanations <- explanation :: c.cand_explanations;
       Util.debug ~section 2 "clause context %a[%a] now initialized"
         CCtx.pp c.cand_ctx T.pp c.cand_cst;
     );
@@ -523,7 +523,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
                 cand_ctx=ctx;
                 cand_cst=t;
                 cand_lits=C.lits c;
-                cand_explanation=Some(C.proof c);
+                cand_explanations=[C.proof c];
               } in
               Util.debug ~section 2 "new (initialized) context for %a: %a"
                 T.pp t CCtx.pp ctx.cand_ctx;
@@ -549,7 +549,7 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
                 cand_ctx=ctx;
                 cand_cst=cst;
                 cand_lits=lits'; (* ctx[cst] *)
-                cand_explanation=None;
+                cand_explanations=[C.proof c];
               } in
               (* need to watch ctx[cst] until it is proved *)
               Util.debug ~section 2 "new context %a" CCtx.pp ctx;
@@ -847,11 +847,14 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
 
   (** {6 Expressing Minimality} *)
 
+  (* TODO: move all this into CI? *)
   (* build a skolem term to replace [v] *)
   let skolem_term v =
     let sym = Logtk.Skolem.fresh_sym_with ~ctx:Ctx.skolem ~ty:(T.ty v) "#min" in
     Ctx.declare sym (T.ty v);
-    T.const ~ty:(T.ty v) sym
+    let t = T.const ~ty:(T.ty v) sym in
+    CI.set_blocked t; (* no induction on this witness! *)
+    t
 
   let subst_of_seq l =
     Sequence.fold (fun s (v,t) -> Su.FO.bind s v 1 t 0) Su.empty l
@@ -882,14 +885,10 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
               ; is_true_ [| Literal.mk_eq t cst |]
               ]
             in
-            let expl = match cand.cand_explanation with
-              | None -> assert false (* not initialized *)
-              | Some p -> [p]
-            in
             let proof cc = Proof.mk_c_inference
               ~info:[Util.sprintf "minimality of [%a]" ClauseContext.pp cand.cand_ctx]
               ~rule:"minimality"
-              ~theories:["ind"] cc expl
+              ~theories:["ind"] cc cand.cand_explanations
             in
             let c = C.create ~trail [Literal.negate lit] proof in
             C.set_flag flag_expresses_minimality c true;

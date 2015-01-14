@@ -224,6 +224,9 @@ module type S = sig
         particular, constructors, but also skolem constants introduced by
         calls to {!cover_set}. *)
 
+    val set_blocked : FOTerm.t -> unit
+    (** Declare that the given term cannot be candidate for induction *)
+
     type path_condition = {
       pc_cst : cst;
       pc_case : FOTerm.t;
