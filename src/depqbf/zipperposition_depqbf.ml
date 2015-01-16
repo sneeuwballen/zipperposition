@@ -142,6 +142,7 @@ module Make(X : sig end) : BS.QBF = struct
       lits
 
   let check () =
+    reset_ ();
     result_ := Depqbf.check solver;
     let res = match !result_ with
     | Qbf.Unsat -> Unsat
