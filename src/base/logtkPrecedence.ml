@@ -75,7 +75,7 @@ module Make(Sym : SYMBOL) = struct
   type precedence = t
 
   let eq p1 p2 =
-    try List.for_all2 (==) p1.snapshot p2.snapshot
+    try List.for_all2 Sym.eq p1.snapshot p2.snapshot
     with Invalid_argument _ -> false
 
   let snapshot p = p.snapshot
