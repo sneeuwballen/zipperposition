@@ -82,8 +82,8 @@ module type S = sig
     | FOF of name * role * form * optional_info
     | TFF of name * role * form * optional_info
     | THF of name * role * hoterm * optional_info  (* XXX not parsed yet *)
-    | TypeDecl of name * string * ty  (* type declaration for a symbol *)
-    | NewType of name * string * ty (* declare new type constant... *)
+    | TypeDecl of name * string * ty * optional_info  (* type declaration for a symbol *)
+    | NewType of name * string * ty * optional_info (* declare new type constant... *)
     | Include of string
     | IncludeOnly of string * name list   (* include a subset of names *)
     (** top level declaration *)

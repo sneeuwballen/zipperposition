@@ -303,7 +303,7 @@ module Untyped = struct
       (fun i (sym, ty) ->
         let s = Symbol.to_string sym in
         let name = name i s in
-        AU.TypeDecl (name, s, Type.Conv.to_prolog ty))
+        AU.TypeDecl (name, s, Type.Conv.to_prolog ty, []))
       seq
 end
 
@@ -409,7 +409,7 @@ module Typed = struct
       (fun i (sym, ty) ->
         let s = Symbol.to_string sym in
         let name = name i s in
-        AT.TypeDecl (name, s, ty))
+        AT.TypeDecl (name, s, ty, []))
       seq
 end
 
@@ -428,17 +428,17 @@ let infer_types init decls =
         match decl with
         | AU.Include f -> AT.Include f
         | AU.IncludeOnly (f,l) -> AT.IncludeOnly (f,l)
-        | AU.NewType (n,s,ty) ->
+        | AU.NewType (n,s,ty,g) ->
             begin match TI.Ctx.ty_of_prolog ctx ty with
             | None -> raise (Type.Error ("expected type, got " ^ PT.to_string ty))
-            | Some ty' -> AT.NewType (n,s, ty')
+            | Some ty' -> AT.NewType (n,s,ty',g)
             end
-        | AU.TypeDecl(n, s, ty) ->
+        | AU.TypeDecl(n, s, ty,g) ->
             begin match TI.Ctx.ty_of_prolog ctx ty with
             | None -> raise (Type.Error ("expected type, got " ^ PT.to_string ty))
             | Some ty' ->
                 TI.Ctx.declare ctx (Symbol.of_string s) ty';
-                AT.TypeDecl (n,s, ty')
+                AT.TypeDecl (n,s,ty',g)
             end
         | AU.CNF(n,r,c,i) ->
             let c' = TI.FO.convert_clause_exn ~ctx c in
@@ -492,10 +492,10 @@ let erase_types typed =
     (function
       | AT.Include f -> AU.Include f
       | AT.IncludeOnly (f,l) -> AU.IncludeOnly (f,l)
-      | AT.NewType (n,s,ty) ->
-          AU.NewType (n,s, Type.Conv.to_prolog ty)
-      | AT.TypeDecl(n, s, ty) ->
-          AU.TypeDecl (n,s, Type.Conv.to_prolog ty)
+      | AT.NewType (n,s,ty,g) ->
+          AU.NewType (n,s, Type.Conv.to_prolog ty, g)
+      | AT.TypeDecl(n, s, ty, g) ->
+          AU.TypeDecl (n,s, Type.Conv.to_prolog ty, g)
       | AT.CNF(n,r,c,i) ->
           let c' = List.map F.to_prolog c in
           AU.CNF(n,r,c',i)

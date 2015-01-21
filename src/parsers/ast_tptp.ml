@@ -134,8 +134,17 @@ let rec pp_general_debug buf d = match d with
 let fmt_general fmt d =
   Format.pp_print_string fmt (Util.sprintf "%a" pp_general d)
 
-let pp_generals buf l = CCList.pp pp_general buf l
-let fmt_generals fmt l = CCList.print fmt_general fmt l
+let pp_generals buf l = match l with
+  | [] -> ()
+  | _::_ ->
+      Buffer.add_string buf ", ";
+      CCList.pp ~start:"" ~stop:"" ~sep:", " pp_general buf l
+
+let fmt_generals fmt l = match l with
+  | [] -> ()
+  | _::_ ->
+      Format.pp_print_string fmt ", ";
+      CCList.print ~start:"" ~stop:"" ~sep:", " fmt_general fmt l
 
 module type S = sig
   type hoterm
@@ -147,8 +156,8 @@ module type S = sig
     | FOF of name * role * form * optional_info
     | TFF of name * role * form * optional_info
     | THF of name * role * hoterm * optional_info  (* XXX not parsed yet *)
-    | TypeDecl of name * string * ty  (* type declaration for a symbol *)
-    | NewType of name * string * ty (* declare new type constant... *)
+    | TypeDecl of name * string * ty * optional_info  (* type declaration for a symbol *)
+    | NewType of name * string * ty * optional_info (* declare new type constant... *)
     | Include of string
     | IncludeOnly of string * name list   (* include a subset of names *)
     (** top level declaration *)
@@ -198,8 +207,8 @@ module Untyped = struct
     | FOF of name * role * form * optional_info
     | TFF of name * role * form * optional_info
     | THF of name * role * hoterm * optional_info  (* XXX not parsed yet *)
-    | TypeDecl of name * string * ty  (* type declaration for a symbol *)
-    | NewType of name * string * ty (* declare new type constant... *)
+    | TypeDecl of name * string * ty * optional_info  (* type declaration for a symbol *)
+    | NewType of name * string * ty * optional_info (* declare new type constant... *)
     | Include of string
     | IncludeOnly of string * name list   (* include a subset of names *)
     (** top level declaration *)
@@ -211,8 +220,8 @@ module Untyped = struct
     | FOF (n, _, _, _) -> n
     | TFF (n, _, _, _) -> n
     | THF (n, _, _, _) -> n
-    | TypeDecl (n, _, _) -> n
-    | NewType (n, _, _) -> n
+    | TypeDecl (n, _, _, _) -> n
+    | NewType (n, _, _, i) -> n
     | IncludeOnly _
     | Include _ ->
       raise (Invalid_argument "Ast_tptp.name_of_decl: include directive has no name")
@@ -232,8 +241,8 @@ module Untyped = struct
       | FOF (_, r, f, _) -> self#any_form (self#fof acc r f) r f
       | TFF (_, r, f, _) -> self#any_form (self#tff acc r f) r f
       | THF (_, r, f, _) -> self#thf acc r f
-      | TypeDecl (_, s, ty) -> self#tydecl acc s ty
-      | NewType (_, s, ty) -> self#new_ty acc s ty
+      | TypeDecl (_, s, ty, _) -> self#tydecl acc s ty
+      | NewType (_, s, ty, _) -> self#new_ty acc s ty
       | Include f -> self#include_ acc f
       | IncludeOnly (f,names) -> self#include_only acc f names
   end
@@ -262,23 +271,19 @@ module Untyped = struct
   (** {2 IO} *)
 
   let __pp_formula buf pp (logic, name, role, f, generals) =
-    match generals with
-    | [] ->
-      Printf.bprintf buf "%s(%a, %a, (%a))."
-        logic pp_name name pp_role role pp f
-    | _::_ ->
-      Printf.bprintf buf "%s(%a, %a, (%a), %a)." logic pp_name name pp_role role
-        pp f pp_generals generals
+    Printf.bprintf buf "%s(%a, %a, (%a)%a)."
+      logic pp_name name pp_role role pp f pp_generals generals
 
   let pp buf = function
     | Include filename -> Printf.bprintf buf "include('%s')." filename
     | IncludeOnly (filename, names) ->
       Printf.bprintf buf "include('%s', [%a])." filename (Util.pp_list pp_name) names
-    | TypeDecl (name, s, ty) ->
-      Printf.bprintf buf "tff(%a, type, (%s : %a))."
-        pp_name name s PT.TPTP.pp ty
-    | NewType (name, s, kind) ->
-      Printf.bprintf buf "tff(%a, type, (%s: %a))." pp_name name s PT.TPTP.pp kind
+    | TypeDecl (name, s, ty, g) ->
+      Printf.bprintf buf "tff(%a, type, (%s : %a)%a)."
+        pp_name name s PT.TPTP.pp ty pp_generals g
+    | NewType (name, s, kind, g) ->
+      Printf.bprintf buf "tff(%a, type, (%s: %a)%a)."
+        pp_name name s PT.TPTP.pp kind pp_generals g
     | CNF (name, role, c, generals) ->
       __pp_formula buf (Util.pp_list ~sep:" | " PT.TPTP.pp) ("cnf", name, role, c, generals)
     | FOF (name, role, f, generals) ->
@@ -303,8 +308,8 @@ module Typed = struct
     | FOF of name * role * form * optional_info
     | TFF of name * role * form * optional_info
     | THF of name * role * hoterm * optional_info  (* XXX not parsed yet *)
-    | TypeDecl of name * string * ty  (* type declaration for a symbol *)
-    | NewType of name * string * ty (* declare new type constant... *)
+    | TypeDecl of name * string * ty * optional_info (* type declaration for a symbol *)
+    | NewType of name * string * ty * optional_info (* declare new type constant... *)
     | Include of string
     | IncludeOnly of string * name list   (* include a subset of names *)
     (** top level declaration *)
@@ -316,8 +321,8 @@ module Typed = struct
     | FOF (n, _, _, _) -> n
     | TFF (n, _, _, _) -> n
     | THF (n, _, _, _) -> n
-    | TypeDecl (n, _, _) -> n
-    | NewType (n, _, _) -> n
+    | TypeDecl (n, _, _, _) -> n
+    | NewType (n, _, _, _) -> n
     | IncludeOnly _
     | Include _ ->
       raise (Invalid_argument "Ast_tptp.name_of_decl: include directive has no name")
@@ -337,8 +342,8 @@ module Typed = struct
       | FOF (_, r, f, _) -> self#any_form (self#fof acc r f) r f
       | TFF (_, r, f, _) -> self#any_form (self#tff acc r f) r f
       | THF (_, r, f, _) -> self#thf acc r f
-      | TypeDecl (_, s, ty) -> self#tydecl acc s ty
-      | NewType (_, s, ty) -> self#new_ty acc s ty
+      | TypeDecl (_, s, ty, _) -> self#tydecl acc s ty
+      | NewType (_, s, ty, _) -> self#new_ty acc s ty
       | Include f -> self#include_ acc f
       | IncludeOnly (f,names) -> self#include_only acc f names
   end
@@ -367,23 +372,20 @@ module Typed = struct
   (** {2 IO} *)
 
   let __pp_formula buf pp (logic, name, role, f, generals) =
-    match generals with
-    | [] ->
-      Printf.bprintf buf "%s(%a, %a, (%a))."
-        logic pp_name name pp_role role pp f
-    | _::_ ->
-      Printf.bprintf buf "%s(%a, %a, (%a), %a)." logic pp_name name pp_role role
-        pp f pp_generals generals
+    Printf.bprintf buf "%s(%a, %a, (%a)%a)."
+      logic pp_name name pp_role role
+      pp f pp_generals generals
 
   let pp buf = function
     | Include filename -> Printf.bprintf buf "include('%s')." filename
     | IncludeOnly (filename, names) ->
       Printf.bprintf buf "include('%s', [%a])." filename (Util.pp_list pp_name) names
-    | TypeDecl (name, s, ty) ->
-      Printf.bprintf buf "tff(%a, type, (%s : %a))."
-        pp_name name s Type.TPTP.pp ty
-    | NewType (name, s, kind) ->
-      Printf.bprintf buf "tff(%a, type, (%s: %a))." pp_name name s Type.TPTP.pp kind
+    | TypeDecl (name, s, ty, g) ->
+      Printf.bprintf buf "tff(%a, type, (%s : %a)%a)."
+        pp_name name s Type.TPTP.pp ty pp_generals g
+    | NewType (name, s, kind, g) ->
+      Printf.bprintf buf "tff(%a, type, (%s: %a)%a)."
+        pp_name name s Type.TPTP.pp kind pp_generals g
     | CNF (name, role, c, generals) ->
       __pp_formula buf (Util.pp_list ~sep:" | " Formula.FO.TPTP.pp) ("cnf", name, role, c, generals)
     | FOF (name, role, f, generals) ->
@@ -429,10 +431,10 @@ module Map(From : S)(To : S) = struct
         To.TFF (n,r, form f, i)
     | From.THF (n,r, f, i) ->
         To.THF (n,r, ho f, i)
-    | From.TypeDecl (n, s, t) ->
-        To.TypeDecl (n, s, ty t)
-    | From.NewType (n, s, t) ->
-        To.NewType (n, s, ty t)
+    | From.TypeDecl (n, s, t, i) ->
+        To.TypeDecl (n, s, ty t, i)
+    | From.NewType (n, s, t, i) ->
+        To.NewType (n, s, ty t, i)
     | From.Include s -> To.Include s
     | From.IncludeOnly (s,l) -> To.IncludeOnly (s,l)
 
@@ -456,10 +458,10 @@ module Map(From : S)(To : S) = struct
           List.map
             (fun f' -> To.THF (n,r, f', i))
             (ho f)
-      | From.TypeDecl (n, s, t) ->
-          [To.TypeDecl (n, s, ty t)]
-      | From.NewType (n, s, t) ->
-          [To.NewType (n, s, ty t)]
+      | From.TypeDecl (n, s, t, i) ->
+          [To.TypeDecl (n, s, ty t, i)]
+      | From.NewType (n, s, t, i) ->
+          [To.NewType (n, s, ty t, i)]
       | From.Include s -> [To.Include s]
       | From.IncludeOnly (s,l) -> [To.IncludeOnly (s,l)]
       end

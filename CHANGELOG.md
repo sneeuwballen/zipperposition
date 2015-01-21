@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.2
+
+- fix the list of modules in API doc
+- fix in `Precedence`: use symbol equality
+- add general info in two cases of `parsers.ast_tptp`: `TypeDecl` and `NewType`
+- fix quick tests
+- more recent `opam` file
+- `Skolem`: instantiation functions
+- better printing of types (de Bruijn) in foterms
+- use `Sequence` rather than `CCSequence`
+
 ## 0.6.1
 
 #### breaking

@@ -28,6 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module ST = LogtkScopedTerm
 module T = LogtkFOTerm
+module Ty = LogtkType
 module F = LogtkFormula.FO
 module S = LogtkSubsts
 
@@ -87,6 +88,13 @@ let fresh_sym_with ~ctx ~ty prefix =
 
 let fresh_sym ~ctx ~ty = fresh_sym_with ~ctx ~ty ctx.sc_prefix
 
+let fresh_ty_const ?(prefix="__logtk_ty") ~ctx () =
+  let n = ctx.sc_gensym in
+  ctx.sc_gensym <- n+1;
+  let s = LogtkSymbol.of_string (prefix ^ string_of_int n) in
+  LogtkUtil.debug ~section 3 "new (type) skolem symbol %a" LogtkSymbol.pp s;
+  s
+
 (* update varindex in [ctx] so that it won't get captured in [t] *)
 let update_var ~ctx t =
   let m1 = T.Seq.vars t |> T.Seq.max_var in
@@ -101,6 +109,24 @@ let fresh_var ~ctx =
   let n = ctx.sc_var_index in
   ctx.sc_var_index <- n + 1;
   n
+
+let apply env f =
+  let t = ST.DB.eval env (f : F.t :> ST.t) in
+  let t = ST.DB.unshift 1 t in
+  match F.of_term t with
+  | Some f'' -> f''
+  | None ->
+      (* got an atom just under the quantifier *)
+      assert (T.is_term t);
+      F.Base.atom (T.of_term_exn t)
+
+let instantiate_ty f ty =
+  let env = LogtkDBEnv.singleton (ty : Ty.t :> ST.t) in
+  apply env f
+
+let instantiate f t =
+  let env = LogtkDBEnv.singleton (t : T.t :> ST.t) in
+  apply env f
 
 exception FoundFormVariant of F.t * F.t * S.t
 
@@ -124,14 +150,7 @@ let skolem_form ~ctx ~ty f =
     let const = T.const ~ty (fresh_sym ~ctx ~ty) in
     let skolem_term = T.app_full const tyargs vars in
     (* replace variable by skolem t*)
-    let env = LogtkDBEnv.singleton (skolem_term : T.t :> ST.t) in
-    let new_f =
-        ST.DB.eval env (f : F.t :> ST.t)
-      |> ST.DB.unshift 1
-      |> (fun t -> match F.of_term t with
-          | None -> assert (T.is_term t); F.Base.atom (T.of_term_exn t)
-          | Some f -> f)
-    in
+    let new_f = instantiate f skolem_term in
     ctx.sc_fcache <- (f, new_f) :: ctx.sc_fcache;
     LogtkUtil.debug ~section 5 "skolemize %a using new term %a" F.pp f T.pp skolem_term;
     new_f

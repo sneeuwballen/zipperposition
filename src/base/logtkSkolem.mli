@@ -24,7 +24,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 LogtkSkolem symbols} *)
+(** {1 Skolem symbols} *)
 
 type ctx
   (** Context needed to create new symbols *)
@@ -39,7 +39,7 @@ val create : ?ty_prop:LogtkType.t -> ?prefix:string -> ?prop_prefix:string ->
       @param signature initial signature the context holds. *)
 
 val to_signature : ctx -> LogtkSignature.t
-  (** LogtkSignature of all new skolem symbols that were created using this
+  (** Signature of all new skolem symbols that were created using this
       context. *)
 
 val fresh_sym : ctx:ctx -> ty:LogtkType.t -> LogtkSymbol.t
@@ -49,7 +49,16 @@ val fresh_sym : ctx:ctx -> ty:LogtkType.t -> LogtkSymbol.t
 val fresh_sym_with : ctx:ctx -> ty:LogtkType.t -> string -> LogtkSymbol.t
   (** Fresh symbol with a different name *)
 
-(** {2 LogtkSkolemization} *)
+val fresh_ty_const : ?prefix:string -> ctx:ctx -> unit -> LogtkSymbol.t
+  (** New symbol to be used as a type constant (no need to declare it) *)
+
+val instantiate_ty : LogtkFormula.FO.t -> LogtkType.t -> LogtkFormula.FO.t
+  (** Instantiate first open (type) variable with the given type *)
+
+val instantiate : LogtkFormula.FO.t -> LogtkFOTerm.t -> LogtkFormula.FO.t
+  (** Instantiate first open variable with the given term*)
+
+(** {2 Skolemization} *)
 
 val clear_var : ctx:ctx -> unit
   (** reset the variable counter (once a formula has been processed) *)
@@ -61,7 +70,7 @@ val update_var : ctx:ctx -> LogtkFOTerm.t -> unit
   (** Avoid collisions with variables of this term in calls to {!fresh_var}. *)
 
 val skolem_form : ctx:ctx -> ty:LogtkType.t -> LogtkFormula.FO.t -> LogtkFormula.FO.t
-  (** LogtkSkolemize the given formula at root (assumes it occurs just under an
+  (** Skolemize the given formula at root (assumes it occurs just under an
       existential quantifier, whose De Bruijn variable 0 is replaced
       by a fresh symbol applied to free variables). This also caches symbols,
       so that the same formula (modulo alpha-renaming) is always skolemized the
@@ -72,7 +81,7 @@ val skolem_form : ctx:ctx -> ty:LogtkType.t -> LogtkFormula.FO.t -> LogtkFormula
 
       @param ty the type of the De Bruijn variable to replace *)
 
-(** {2 Definitions of LogtkFormulas} *)
+(** {2 Definitions of Formulas} *)
 
 type polarity =
   [ `Pos
@@ -124,6 +133,6 @@ val has_new_definitions : ctx:ctx -> bool
   (** @return true if some new definitions were introduced. *)
 
 val skolem_ho : ctx:ctx -> ty:LogtkType.t -> LogtkHOTerm.t -> LogtkHOTerm.t
-  (** LogtkSkolemize a higher order term. Quite the same as {!skolem_form}.
+  (** Skolemize a higher order term. Quite the same as {!skolem_form}.
       {b Not implemented} *)
 

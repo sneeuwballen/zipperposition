@@ -1,25 +1,36 @@
-opam-version: "1"
+opam-version: "1.2"
+author: "Simon Cruanes"
 maintainer: "simon.cruanes@inria.fr"
 build: [
-    [make "setup.exe"]
-    ["./setup.exe" "-configure" "--%{menhir:enable}%-meta" "--%{qcheck:enable}%-qcheck" "--disable-docs" "--%{menhir:enable}%-parsers" "--%{aez:enable}%-solving" "--disable-tests" "--disable-tools" "--enable-meta"]
+    ["ocaml" "setup.ml" "-configure" "--%{menhir:enable}%-meta"
+        "--%{qcheck:enable}%-qcheck" "--disable-docs"
+        "--%{menhir:enable}%-parsers" "--%{aez:enable}%-solving"
+        "--disable-tests" "--disable-tools" "--enable-meta"]
     [make "all"]
+]
+install: [
     [make "install"]
 ]
 remove: [
     ["ocamlfind" "remove" "logtk"]
 ]
 depends: [
-    "ocamlfind"
+    "ocamlfind" { build }
     "base-unix"
     "zarith"
     "containers" { >= "0.3" }
     "sequence" { >= "0.4" }
+    "base-bytes"
 ]
 depopts: [
     "menhir"
     "qcheck"
-    "aez" { > "0.3" }
+    "aez"
+]
+conflicts: [
+    "aez" { <= "0.3" }
 ]
 tags: [ "logic" "unification" "term" ]
 homepage: "https://github.com/c-cube/logtk"
+dev-repo: "https://github.com/c-cube/logtk.git"
+bug-reports: "https://github.com/c-cube/logtk/issues"
