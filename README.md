@@ -170,8 +170,8 @@ and `src/demo/`.
 - handle existential type var
 - handle ite/let in TPTP
 
-- consider moving the proof-checking part of tools/proof_check_tstp.ml
-    to trace_tstp (can be used for embedded proof checking)
+- consider moving the proof-checking part of `tools/proof_check_tstp.ml`
+    to `trace_tstp` (can be used for embedded proof checking)
 
 - more functors (unif, but also CNF? rewriting? ordering? indexes)
 
