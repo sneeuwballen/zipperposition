@@ -473,20 +473,45 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
   (* [t] is an inductive const; this returns [true] iff some subconstant of [t]
       occurs in [c] *)
   let contains_any_sub_constant_of c t =
+    assert (CI.is_inductive t);
     Lits.Seq.terms (Env.C.lits c)
     |> Sequence.flat_map T.Seq.subterms
     |> Sequence.exists
       (fun t' ->
         T.is_ground t
         && CI.is_sub_constant t'
-        && T.eq t (fst (CI.inductive_cst_of_sub_cst t'))
+        && CI.is_sub_constant_of t' t
       )
+
+  (* [t] is a sub-constant; neither its parent nor its siblings must be
+      present in [c] *)
+  let contains_only_sub_constant_ c t =
+    assert (CI.is_sub_constant t);
+    let cst, _ = CI.inductive_cst_of_sub_cst t in
+    let others =
+      Lits.Seq.terms (Env.C.lits c)
+      |> Sequence.flat_map T.Seq.subterms
+      |> Sequence.exists
+        (fun t' ->
+          T.is_ground t
+          && (T.eq t' cst
+            ||
+            (CI.is_sub_constant t'
+            && not (T.eq t t')
+            && CI.is_sub_constant_of t' cst
+            )
+          )
+        )
+    in
+    not others
 
   (* set of subterms of [lits] that could be extruded to form a context.
      restrictions:
        - a context can be extracted only from an inductive constant
          such that no sub-constant of it occurs in the clause; otherwise
          it would be meaningless to express the minimality of the clause
+      - a context can also be extracted from a sub-constant if its parent
+        nor its siblings are present in the clause
   *)
   let subterms_candidates_for_context_ c =
     Lits.Seq.terms (C.lits c)
@@ -494,8 +519,16 @@ module Make(E : Env.S)(Sup : Superposition.S)(Solver : BoolSolver.QBF) = struct
       |> Sequence.filter
         (fun t ->
           T.is_ground t
-          && CI.is_inductive t
-          && not (contains_any_sub_constant_of c t)
+          && not (C.get_flag flag_expresses_minimality c)
+          &&
+          (
+            ( CI.is_inductive t
+              && not (contains_any_sub_constant_of c t)
+            ) ||
+            ( CI.is_sub_constant t
+              && contains_only_sub_constant_ c t
+            )
+          )
         )
       |> T.Seq.add_set T.Set.empty
 
