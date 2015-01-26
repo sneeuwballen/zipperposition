@@ -226,6 +226,12 @@ module Make(Any : sig end) = struct
     try ITbl.find _lit2inj i
     with Not_found -> failwith "BBox.extact: not a proper injected lit"
 
+  let keep_in_splitting l = match extract_exn (abs l) with
+    | Clause_component _ -> false
+    | Lits _
+    | Ctx _
+    | Name _ -> true
+
   let inductive_cst b = match extract_exn b with
     | Name _
     | Clause_component _ -> None

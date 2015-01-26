@@ -592,6 +592,9 @@ module Make(X : PARAMETERS) = struct
         IMap.to_seq cst.coversets |> Sequence.map snd
       with Not_found -> Sequence.empty
 
+    let is_sub_constant_of t cst =
+      T.eq cst (fst (inductive_cst_of_sub_cst t))
+
     (* true iff s2 is one of the sub-cases of s1 *)
     let dominates s1 s2 =
       assert (is_inductive_symbol s1);

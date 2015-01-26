@@ -114,6 +114,7 @@ module type S = sig
     type bool_lit = Ctx.BoolLit.bool_lit
 
     val singleton : bool_lit -> t
+    val add : bool_lit -> t -> t
     val of_list : bool_lit list -> t
     val to_list : t -> bool_lit list
     val to_seq : t -> bool_lit Sequence.t
@@ -129,6 +130,9 @@ module type S = sig
 
     val merge : t list -> t
     (** Merge several trails (e.g. from different clauses) *)
+
+    val filter : (bool_lit -> bool) -> t -> t
+    (** Only keep a subset of boolean literals *)
 
     type valuation = bool_lit -> bool
     (** A boolean valuation *)

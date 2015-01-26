@@ -80,6 +80,10 @@ module type S = sig
   val inject_name : string -> bool_lit
   val inject_name' : ('a, Buffer.t, unit, bool_lit) format4 -> 'a
 
+  val keep_in_splitting : bool_lit -> bool
+  (** Returns [true] iff the literal should survive in the trail even
+      after splitting (useful for special markers) *)
+
   val extract : bool_lit -> injected option
   (** Recover the value that was injected into the literal, if any
       @raise Failure if the literal is <= 0 *)

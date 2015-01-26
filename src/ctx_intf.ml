@@ -264,6 +264,9 @@ module type S = sig
     val is_sub_constant : FOTerm.t -> bool
     (** Is the term a constant that was created within a cover set? *)
 
+    val is_sub_constant_of : FOTerm.t -> cst -> bool
+    (** [is_sub_constant_of t cst] true iff [t] is a sub-constant of [cst] *)
+
     val dominates : Symbol.t -> Symbol.t -> bool
     (** [dominates s1 s2] true iff s2 is one of the sub-cases of s1 *)
 

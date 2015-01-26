@@ -126,6 +126,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     type bool_lit = Ctx.BoolLit.bool_lit
 
     let singleton = ISet.singleton
+    let add = ISet.add
     let of_list = ISet.of_list
     let to_list = ISet.to_list
     let is_empty = ISet.is_empty
@@ -142,6 +143,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       | [t] -> t
       | [t1;t2] -> ISet.union t1 t2
       | t::l -> List.fold_left ISet.union t l
+
+    let filter = ISet.filter
 
     type valuation = bool_lit -> bool
     (** A boolean valuation *)
