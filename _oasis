@@ -45,6 +45,7 @@ Library "libzipperposition"
   InternalModules:  lib/LazyGraph, lib/SmallSet,
                     lib/UnionFind, lib/Choice, lib/Mixtbl, lib/Signal
                     , quantor/Zipperposition_quantor  # TODO remove
+                    # TODO , depqbf/Zipperposition_depqbf
   BuildDepends:     containers, containers.advanced, sequence, gen, unix,
                     zarith, containers.io, logtk, dynlink, qbf,
                     qbf.quantor, # TODO qbf.depqbf,

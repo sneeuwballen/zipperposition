@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module BS = BoolSolver
 
-let section = BS.section
+let section = Logtk.Util.Section.make ~parent:BS.section "depqbf"
 
 module Make(X : sig end) : BS.QBF = struct
   module LitSet = Sequence.Set.Make(CCInt)
@@ -80,7 +80,6 @@ module Make(X : sig end) : BS.QBF = struct
       ignore (Depqbf.pop solver);
       decr level_;
     done;
-    Depqbf.gc solver;
     ()
 
   type quant_level = int
@@ -95,7 +94,7 @@ module Make(X : sig end) : BS.QBF = struct
     | Unsat -> Buffer.add_string buf "unsat"
 
   let set_printer p = pp_ := p
-  let name = "quantor"
+  let name = "depqbf"
 
   let add_clause_ c =
     List.iter (Depqbf.add solver) c;
@@ -137,6 +136,8 @@ module Make(X : sig end) : BS.QBF = struct
 
   let quantify_lits level lits =
     reset_ ();
+    Logtk.Util.debug ~section 3 "quantify at level %d lits %a"
+      level (CCList.pp CCInt.pp) lits;
     List.iter
       (fun lit -> Depqbf.add_var_to_scope solver (abs lit) level)
       lits
@@ -151,7 +152,7 @@ module Make(X : sig end) : BS.QBF = struct
     | Qbf.Spaceout -> assert false
     | Qbf.Unknown -> failwith "depqbf: return unknown"
     in
-    Logtk.Util.debug ~section 3 "depqbf check: %a" pp_result res;
+    Logtk.Util.debug ~section 3 "check: %a" pp_result res;
     res
 end
 

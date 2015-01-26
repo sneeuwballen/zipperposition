@@ -61,9 +61,11 @@ let _sort_list l =
   List.sort (fun s1 s2 -> CCInt.compare s2.strength s1.strength) l
 
 let register_sat s =
+  Logtk.Util.debug ~section 2 "register SAT %s (prio %d)" s.name s.strength;
   _sat_solvers := _sort_list (s :: !_sat_solvers)
 
 let register_qbf s =
+  Logtk.Util.debug ~section 2 "register QBF %s (prio %d)" s.name s.strength;
   register_sat (sat_of_qbf s);
   _qbf_solvers := _sort_list (s :: !_qbf_solvers);
   ()
@@ -75,3 +77,4 @@ let get_sat () = match !_sat_solvers with
 let get_qbf () = match !_qbf_solvers with
   | [] -> failwith "no QBF solver registered"
   | s :: _ -> s.create ()
+
