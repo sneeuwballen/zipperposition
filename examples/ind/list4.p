@@ -1,5 +1,6 @@
 
 include('list.ax').
+include('nat.ax').
 
 % count X L1 + count X L2 = count X (L1 @ L2)
 

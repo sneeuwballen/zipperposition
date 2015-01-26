@@ -1,5 +1,6 @@
 
 include('list.ax').
+include('nat.ax').
 
 % N <= length(L) => take N L @ drop N L = L
 

@@ -1,5 +1,6 @@
 
 include('list.ax').
+include('nat.ax').
 
 % very simple double-induction
 
