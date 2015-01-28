@@ -47,6 +47,9 @@ type 'a solver = {
   name: string;
 }
 
+type lit = BoolSolver_intf.lit
+val fresh_lit : unit -> lit
+
 type sat_solver = (module SAT) solver
 type qbf_solver = (module QBF) solver
 

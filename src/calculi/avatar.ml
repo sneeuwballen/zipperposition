@@ -114,12 +114,16 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
           ) !components
         in
         let clauses, bool_clause = List.split clauses_and_names in
-        Util.debug ~section 4 "split of %a yields %a" C.pp c (Util.pp_list C.pp) clauses;
+        Util.debug ~section 4 "split of %a yields %a"
+          C.pp c (Util.pp_list C.pp) clauses;
         (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
-        let bool_guard = C.get_trail c |> C.Trail.to_list |> List.map BoolLit.neg in
+        let bool_guard = C.get_trail c
+          |> C.Trail.to_list
+          |> List.map BoolLit.neg in
         let bool_clause = List.append bool_clause bool_guard in
         Sat.add_clauses [bool_clause];
-        Util.debug ~section 4 "constraint clause is %a" _pp_bclause bool_clause;
+        Util.debug ~section 4 "constraint clause is %a"
+          _pp_bclause bool_clause;
         (* return the clauses *)
         Some clauses
 

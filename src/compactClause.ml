@@ -34,10 +34,12 @@ module Lits = Literals
 
 type form = F.t
 
+module BLit = Qbf.Lit
+
 type bool_lit =
   bool *
   [ `Box_clause of Literal.t array
-  | `Qbf_artifact of int * string
+  | `Qbf_artifact of Qbf.Lit.t * string
   ]
 
 (* compare boolean literals *)
@@ -47,11 +49,11 @@ let _cmp_blit lit1 lit2 = match lit1, lit2 with
   | (s1,`Box_clause l1), (s2,`Box_clause l2) ->
       CCOrd.(bool_ s1 s2 <?> (Lits.compare, l1, l2))
   | (s1, `Qbf_artifact (i1,_)), (s2, `Qbf_artifact (i2,_)) ->
-      CCOrd.(bool_ s1 s2 <?> (CCInt.compare, i1, i2))
+      CCOrd.(bool_ s1 s2 <?> (BLit.compare, i1, i2))
 let _eq_blit l1 l2 = _cmp_blit l1 l2 = 0
 let _hash_blit lit h = match lit with
   | (s,`Box_clause l) -> h |> CCHash.bool_ s |> Lits.hash_fun l
-  | (s,`Qbf_artifact (i,_)) -> h |> CCHash.bool_ s |> CCHash.int_ i
+  | (s,`Qbf_artifact (i,_)) -> h |> CCHash.bool_ s |> BLit.hash_fun i
 
 type t = {
   lits : Literal.t array;

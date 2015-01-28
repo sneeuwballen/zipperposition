@@ -186,6 +186,8 @@ module type S = sig
   module Induction : sig
     (** {6 Inductive Types} *)
 
+    type bool_lit = BBox_intf.bool_lit
+
     type constructor = Symbol.t * Type.t
     (** Constructor for an inductive type *)
 
@@ -230,7 +232,7 @@ module type S = sig
     type path_condition = {
       pc_cst : cst;
       pc_case : FOTerm.t;
-      pc_lit : BoolLit.bool_lit;
+      pc_lit : bool_lit;
     }
 
     val declare : ?pc:path_condition list -> FOTerm.t -> unit

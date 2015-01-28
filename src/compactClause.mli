@@ -33,7 +33,7 @@ type form = Formula.FO.t
 type bool_lit =
   bool *
   [ `Box_clause of Literal.t array
-  | `Qbf_artifact of int * string
+  | `Qbf_artifact of Qbf.Lit.t * string
   ]
 (** A boolean literal, here, is a boxed (unsplittable) clause
     with a sign. The literal can be an explicit encoding of "lits are true"

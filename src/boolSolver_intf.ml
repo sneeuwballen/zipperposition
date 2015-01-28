@@ -27,9 +27,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 type 'a printer = Format.formatter -> 'a -> unit
 
+type lit = Qbf.Lit.t
+
+let fresh_lit () = Qbf.Lit.fresh()
+
 (** One instance of boolean solver. *)
 module type SAT = sig
-  type lit = int
 
   type result =
     | Sat
@@ -37,6 +40,7 @@ module type SAT = sig
 
   val add_clause : lit list -> unit
   val add_clauses : lit list list -> unit
+  val add_form : Qbf.Formula.t -> unit
   val add_clause_seq : lit list Sequence.t -> unit
 
   val check : unit -> result

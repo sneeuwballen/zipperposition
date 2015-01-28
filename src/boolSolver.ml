@@ -33,6 +33,9 @@ let section = Logtk.Util.Section.make ~parent:Const.section "bool_solver"
 
 (** {2 Type Definitions} *)
 
+type lit = BoolSolver_intf.lit
+let fresh_lit = Qbf.Lit.fresh
+
 module type SAT = BoolSolver_intf.SAT
 module type QBF = BoolSolver_intf.QBF
 

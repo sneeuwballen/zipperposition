@@ -91,18 +91,6 @@ module type S = sig
 
   (** {2 Boolean Abstraction} *)
 
-  val as_bool : t -> int option
-  (** Boolean atom for this clause (if any) *)
-
-  val as_bool_exn : t -> int
-  (** Unsafe version of {!as_bool}.
-      @raise Failure if the clause doesn't have a boolean name *)
-
-  val set_bool_name : t -> int -> unit
-  (** Set the boolean name of this clause.
-      Basically, [set_bool_name c i; as_bool i = Some i] holds.
-      @raise Failure if the clause already has a name *)
-
   module Trail : sig
     type t
 
@@ -111,10 +99,13 @@ module type S = sig
     val hash : t -> int
     val compare : t -> t -> int
 
-    type bool_lit = Ctx.BoolLit.bool_lit
+    type bool_lit = Ctx.BoolLit.t
 
+    val empty : t
     val singleton : bool_lit -> t
     val add : bool_lit -> t -> t
+    val remove : bool_lit -> t -> t
+    val map : (bool_lit -> bool_lit) -> t -> t
     val of_list : bool_lit list -> t
     val to_list : t -> bool_lit list
     val to_seq : t -> bool_lit Sequence.t
@@ -144,6 +135,18 @@ module type S = sig
     val pp : Buffer.t -> t -> unit
     val print : Format.formatter -> t -> unit
   end
+
+  val as_bool : t -> Trail.bool_lit option
+  (** Boolean atom for this clause (if any) *)
+
+  val as_bool_exn : t -> Trail.bool_lit
+  (** Unsafe version of {!as_bool}.
+      @raise Failure if the clause doesn't have a boolean name *)
+
+  val set_bool_name : t -> Trail.bool_lit -> unit
+  (** Set the boolean name of this clause.
+      Basically, [set_bool_name c i; as_bool i = Some i] holds.
+      @raise Failure if the clause already has a name *)
 
   val has_trail : t -> bool
   (** Has a non-empty trail? *)

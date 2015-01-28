@@ -27,19 +27,24 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Interface of BBox} *)
 
+type bool_lit = BoolSolver.lit
+(** Abstract boolean literal *)
+
 module type S = sig
   type inductive_cst
 
-  type bool_lit = int
-  (** Abstract boolean literal *)
+  type t = BoolSolver.lit
 
-  val neg : bool_lit -> bool_lit
+  val neg : t -> t
   (** Negate the boolean literal *)
 
-  val sign : bool_lit -> bool
+  val sign : t -> bool
   (** Current sign of the literal (positive or negative) *)
 
-  val set_sign : bool -> bool_lit -> bool_lit
+  val abs : t -> t
+  (** Literal without its sign *)
+
+  val set_sign : bool -> t -> t
   (** Set the sign of the literal to the given boolean *)
 
   (** Predicate attached to a set of literals *)
@@ -50,10 +55,8 @@ module type S = sig
   type ctx_predicate =
     | InLoop  (** ctx in loop(i) *)
     | InitOk (** Ctx is initialized *or* it's not in loop *)
-    | ExpressesMinimality
+    | ExpressesMinimality of Logtk.FOTerm.t
         (** clause expresses the minimality of the model for S_loop(i) *)
-    | ExpressesMinimalityAux
-        (** helper for CNF, related to ExpressesMinimality *)
     [@@deriving ord]
 
   type injected = private
@@ -61,43 +64,47 @@ module type S = sig
     | Lits of Literals.t * lits_predicate
     | Ctx of ClauseContext.t * inductive_cst * ctx_predicate
     | Name of string  (* name for CNF *)
+    | Input (** input marker *)
     [@@deriving ord]
 
   val pp_injected : Buffer.t -> injected -> unit
 
-  val inject_lits : Literals.t -> bool_lit
+  val inject_lits : Literals.t -> t
   (** Inject a clause into a boolean literal. No other clause will map
       to the same literal unless it is alpha-equivalent to this one.
       The boolean literal can be negative is the argument is a
       unary negative clause *)
 
-  val inject_lits_pred : Literals.t -> lits_predicate -> bool_lit
+  val inject_lits_pred : Literals.t -> lits_predicate -> t
   (** Inject the literals, predicate into a {!Lits} constructor *)
 
-  val inject_ctx : ClauseContext.t -> inductive_cst -> ctx_predicate -> bool_lit
+  val inject_ctx : ClauseContext.t -> inductive_cst -> ctx_predicate -> t
   (** Inject into {!Ctx} *)
 
-  val inject_name : string -> bool_lit
-  val inject_name' : ('a, Buffer.t, unit, bool_lit) format4 -> 'a
+  val inject_name : string -> t
+  val inject_name' : ('a, Buffer.t, unit, t) format4 -> 'a
 
-  val keep_in_splitting : bool_lit -> bool
+  val inject_input : t
+  (** The special literal "input" *)
+
+  val keep_in_splitting : t -> bool
   (** Returns [true] iff the literal should survive in the trail even
       after splitting (useful for special markers) *)
 
-  val extract : bool_lit -> injected option
+  val extract : t -> injected option
   (** Recover the value that was injected into the literal, if any
       @raise Failure if the literal is <= 0 *)
 
-  val extract_exn : bool_lit -> injected
+  val extract_exn : t -> injected
   (** Recover the value that was injected into the literal
       @raise Failure if the literal is <= 0 of it's not a proper boolean lit *)
 
-  val inductive_cst : bool_lit -> inductive_cst option
+  val inductive_cst : t -> inductive_cst option
   (** Obtain the inductive constant from this boolean lit, if any *)
 
   (** {2 Printers}
   Those printers print the content (injection) of a boolean literal, if any *)
 
-  val pp : Buffer.t -> bool_lit -> unit
-  val print : Format.formatter -> bool_lit -> unit
+  val pp : Buffer.t -> t -> unit
+  val print : Format.formatter -> t -> unit
 end

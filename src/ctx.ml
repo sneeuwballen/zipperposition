@@ -320,6 +320,8 @@ module Make(X : PARAMETERS) = struct
     type constructor = Symbol.t * Type.t
     (** constructor + its type *)
 
+    type bool_lit = BoolLit.t
+
     type inductive_type = {
       pattern : Type.t;
       constructors : constructor list;
@@ -387,7 +389,7 @@ module Make(X : PARAMETERS) = struct
     type path_condition = {
       pc_cst : cst;
       pc_case : FOTerm.t;
-      pc_lit : BoolLit.bool_lit;
+      pc_lit : bool_lit;
     }
 
     type cst_data = {

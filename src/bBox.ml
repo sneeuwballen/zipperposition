@@ -40,13 +40,14 @@ module type S = BBox_intf.S
 let section = Util.Section.make ~parent:Const.section "bbox"
 
 module Make(Any : sig end) = struct
-  type bool_lit = int
+  module BLit = Qbf.Lit
+  type t = BLit.t
   type inductive_cst = T.t
 
-  let neg i = -i
-  let sign i = i>=0
-  let set_sign sign i =
-    if sign then (abs i) else - (abs i)
+  let neg = BLit.neg
+  let sign = BLit.sign
+  let abs = BLit.abs
+  let set_sign = BLit.set_sign
 
   [@@@warning "-39"]
 
@@ -58,8 +59,7 @@ module Make(Any : sig end) = struct
   type ctx_predicate =
     | InLoop (** lits = ctx[i], where ctx in loop(i) *)
     | InitOk (** Ctx is initialized *or* it's not in loop *)
-    | ExpressesMinimality
-    | ExpressesMinimalityAux
+    | ExpressesMinimality of T.t [@compare T.cmp]
     [@@deriving ord]
 
   type injected =
@@ -67,6 +67,7 @@ module Make(Any : sig end) = struct
     | Lits of Literals.t * lits_predicate
     | Ctx of ClauseContext.t * (inductive_cst [@compare T.cmp]) * ctx_predicate
     | Name of string  (* name for CNF *)
+    | Input (** input marker *)
     [@@deriving ord]
 
   let string_of_lits_pred lits = function
@@ -76,10 +77,8 @@ module Make(Any : sig end) = struct
     | InLoop -> Util.sprintf "⟦%a ∈ loop(%a)⟧" ClauseContext.pp ctx T.pp i
     | InitOk ->
         Util.sprintf "⟦%a initialized(%a)⟧" ClauseContext.pp ctx T.pp i
-    | ExpressesMinimality ->
-        Util.sprintf "⟦loop(%a) minimal by %a⟧" T.pp i ClauseContext.pp ctx
-    | ExpressesMinimalityAux ->
-        Util.sprintf "⟦loop(%a) minimal by %a (aux)⟧" T.pp i ClauseContext.pp ctx
+    | ExpressesMinimality t ->
+        Util.sprintf "⟦minimal(%a,%a,%a)⟧" ClauseContext.pp ctx T.pp i T.pp t
 
   let pp_injected buf = function
     | Clause_component lits ->
@@ -90,50 +89,51 @@ module Make(Any : sig end) = struct
     | Ctx (lits, ind, pred) ->
         let s = string_of_ctx_pred lits ind pred in
         Buffer.add_string buf s
+    | Input -> Printf.bprintf buf "input"
     | Name s ->
         Printf.bprintf buf "⟦%s⟧" s
 
   module FV = Logtk.FeatureVector.Make(struct
-    type t = Lits.t * injected * bool_lit
+    type t = Lits.t * injected * BLit.t
     let cmp (l1,i1,j1)(l2,i2,j2) =
-      CCOrd.(Lits.compare l1 l2 <?> (compare_injected, i1, i2) <?> (int_, j1, j2))
+      CCOrd.(Lits.compare l1 l2
+        <?> (compare_injected, i1, i2)
+        <?> (BLit.compare, j1, j2))
     let to_lits (l,_,_) = Lits.Seq.abstract l
   end)
-  module ITbl = Hashtbl.Make(CCInt)
+  module ITbl = Hashtbl.Make(BLit)
 
-  let _next = ref 1 (* next lit *)
   let _clause_set = ref (FV.empty())
   let _lit2inj = ITbl.create 56
   let _names = StringTbl.create 15
 
-  let _fresh () =
-    let i = !_next in
-    incr _next;
-    i
-
-  let _apply_sign sign b =
-    if sign then b else neg b
+  let dummy_t = BLit.fresh()
 
   let _retrieve_alpha_equiv lits =
     let dummy_injected = Clause_component lits in
-    let dummy_bool_lit = 1 in
-    FV.retrieve_alpha_equiv_c !_clause_set (lits,dummy_injected,dummy_bool_lit) ()
+    FV.retrieve_alpha_equiv_c !_clause_set (lits,dummy_injected,dummy_t) ()
       |> Sequence.map2 (fun _ l -> l)
 
-  let _save injected bool_lit =
-    ITbl.add _lit2inj bool_lit injected;
-    Util.debug ~section 4 "save bool_lit %d = %a" bool_lit pp_injected injected;
+  let _input =
+    let i = BLit.fresh () in
+    ITbl.add _lit2inj i Input;
+    i
+
+  let _save injected t =
+    ITbl.add _lit2inj t injected;
+    Util.debug ~section 4 "save bool_lit %d = %a"
+      (t:t:>int) pp_injected injected;
     match injected with
     | Clause_component lits
     | Lits (lits, _) ->
         (* also be able to retrieve by lits *)
-        _clause_set := FV.add !_clause_set (lits, injected, bool_lit)
+        _clause_set := FV.add !_clause_set (lits, injected, t)
     | Ctx (cc, cst, _) ->
         _clause_set := FV.add !_clause_set
-          (ClauseContext.apply cc cst, injected, bool_lit)
+          (ClauseContext.apply cc cst, injected, t)
+    | Input -> ()
     | Name s ->
-        StringTbl.add _names s (injected, bool_lit)
-
+        StringTbl.add _names s (injected, t)
 
   (* clause -> boolean lit *)
   let inject_lits lits  =
@@ -153,13 +153,13 @@ module Make(Any : sig end) = struct
         )
       |> Sequence.head
       |> (function
-          | Some bool_lit -> _apply_sign sign bool_lit
+          | Some t -> BLit.apply_sign sign t
           | None ->
-              let i = _fresh() in
+              let i = BLit.fresh () in
               (* maintain mapping *)
               let lits_copy = Array.copy lits in
               _save (Clause_component lits_copy) i;
-              _apply_sign sign i
+              BLit.apply_sign sign i
           )
 
   let inject_lits_pred lits pred =
@@ -175,7 +175,7 @@ module Make(Any : sig end) = struct
       |> (function
           | Some blit -> blit
           | None ->
-              let i = _fresh() in
+              let i = BLit.fresh () in
               (* maintain mapping *)
               let lits_copy = Array.copy lits in
               _save (Lits (lits_copy, pred)) i;
@@ -196,16 +196,18 @@ module Make(Any : sig end) = struct
       |> (function
           | Some blit -> blit
           | None ->
-              let i = _fresh() in
+              let i = BLit.fresh() in
               (* maintain mapping *)
               _save (Ctx (ctx, t, pred)) i;
               i
           )
 
+  let inject_input = _input
+
   let inject_name s =
     try snd (StringTbl.find _names s)
     with Not_found ->
-      let i = _fresh () in
+      let i = BLit.fresh () in
       _save (Name s) i;
       i
 
@@ -217,23 +219,27 @@ module Make(Any : sig end) = struct
 
   (* boolean lit -> injected *)
   let extract i =
-    if i<=0 then failwith "BBox.extract: require integer > 0";
+    if not (BLit.sign i)
+      then failwith "BBox.extract: require absolute bool lit";
     try Some (ITbl.find _lit2inj i)
     with Not_found -> None
 
   let extract_exn i =
-    if i<=0 then failwith "BBox.extract: require integer > 0";
+    if not (BLit.sign i)
+      then failwith "BBox.extract: require absolute bool lit";
     try ITbl.find _lit2inj i
     with Not_found -> failwith "BBox.extact: not a proper injected lit"
 
-  let keep_in_splitting l = match extract_exn (abs l) with
+  let keep_in_splitting l = match extract_exn (BLit.abs l) with
     | Clause_component _ -> false
     | Lits _
     | Ctx _
+    | Input
     | Name _ -> true
 
   let inductive_cst b = match extract_exn b with
     | Name _
+    | Input
     | Clause_component _ -> None
     | Lits (_, pred) ->
         begin match pred with
@@ -242,17 +248,17 @@ module Make(Any : sig end) = struct
     | Ctx (_, t, _) -> Some t
 
   let pp buf i =
-    if i<0 then Buffer.add_string buf "¬";
-    let i = abs i in
+    if not (BLit.sign i) then Buffer.add_string buf "¬";
+    let i = BLit.abs i in
     match extract i with
-    | None -> Printf.bprintf buf "L%d" i
+    | None -> Printf.bprintf buf "L%d" (i:t:>int)
     | Some inj -> pp_injected buf inj
 
   let print fmt i =
-    if i<0 then Format.pp_print_string fmt "¬";
-    let i = abs i in
+    if not (BLit.sign i) then Format.pp_print_string fmt "¬";
+    let i = BLit.abs i in
     match extract i with
-    | None -> Format.fprintf fmt "L%d" i
+    | None -> Format.fprintf fmt "L%d" (i:t:>int)
     | Some (Clause_component lits) ->
         Format.fprintf fmt "@[⟦%a⟧@]"
           (CCArray.print ~sep:" ∨ " Literal.fmt) lits
@@ -262,6 +268,7 @@ module Make(Any : sig end) = struct
     | Some (Ctx (lits, ind, pred)) ->
         let s = string_of_ctx_pred lits ind pred in
         Format.pp_print_string fmt s
+    | Some Input -> Format.pp_print_string fmt "input"
     | Some (Name s) ->
         Format.fprintf fmt "⟦%s⟧" s
 end

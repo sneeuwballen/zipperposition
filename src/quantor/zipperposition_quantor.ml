@@ -35,13 +35,15 @@ let rec _rev_append_map f l acc = match l with
   | [] -> acc
   | x::tail -> _rev_append_map f tail (f x :: acc)
 
+type lit = Qbf.Lit.t
+
 module Make(X : sig end) : BS.QBF = struct
-  module LitSet = Sequence.Set.Make(CCInt)
+  module LitSet = Sequence.Set.Make(Qbf.Lit)
   module ClauseSet = Sequence.Set.Make(LitSet)
 
   (* add a list of literals to the set *)
   let _add_list set l =
-    List.fold_left (fun s x -> LitSet.add (abs x) s) set l
+    List.fold_left (fun s x -> LitSet.add (Qbf.Lit.abs x) s) set l
 
   type quantifier = Qbf.quantifier
 
@@ -53,8 +55,6 @@ module Make(X : sig end) : BS.QBF = struct
     v
 
   let level0 = 0
-
-  type lit = int
 
   let pp_ = ref Qbf.Lit.print
 
@@ -108,11 +108,11 @@ module Make(X : sig end) : BS.QBF = struct
     st.clauses <- ClauseSet.add (clause_of_lits_ c) st.clauses
 
   let valuation l =
-    if l<=0 then invalid_arg "valuation";
+    if not (Qbf.Lit.sign l) then invalid_arg "valuation";
     let st = get_state_ () in
     match st.result with
     | Qbf.Sat v ->
-        begin match v (abs l) with
+        begin match v (Qbf.Lit.abs l) with
           | Qbf.Undef -> failwith "literal not valued in the model"
           | Qbf.True -> true
           | Qbf.False -> false
@@ -120,6 +120,13 @@ module Make(X : sig end) : BS.QBF = struct
     | _ ->  failwith "QBF solver didn't return \"SAT\""
 
   let add_clauses = List.iter add_clause
+
+  let add_form f =
+    let clauses = Qbf.Formula.cnf
+      ~gensym:Qbf.Lit.fresh
+      f
+    in
+    add_clauses clauses
 
   let add_clause_seq seq = seq add_clause
 
@@ -144,10 +151,10 @@ module Make(X : sig end) : BS.QBF = struct
       if i = CCVector.length _lits
         then
           let st = get_state_ () in
-          Qbf.CNF.cnf (to_cnf_ st.clauses)
+          Qbf.QCNF.prop (to_cnf_ st.clauses)
         else
           let q, lits = CCVector.get _lits i in
-          Qbf.CNF.quantify q (LitSet.to_list lits) (_recurse_quant (i+1))
+          Qbf.QCNF.quantify q (LitSet.to_list lits) (_recurse_quant (i+1))
     in
     _recurse_quant 0
 
@@ -155,7 +162,7 @@ module Make(X : sig end) : BS.QBF = struct
     let f = _mk_form () in
     if Logtk.Util.Section.cur_level section >= 5 then (
       Format.printf "@[<hv2>QBF formula:@ %a@]@."
-        (Qbf.CNF.print_with ~pp_lit:!pp_) f
+        (Qbf.QCNF.print_with ~pp_lit:!pp_) f
     );
     let st = get_state_ () in
     st.result <- Quantor.solve f;
