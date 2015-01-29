@@ -313,7 +313,13 @@ module Make(X : PARAMETERS) = struct
   end
 
   (** Boolean Mapping *)
-  module BoolLit = BBox.Make(struct end)
+  module BoolLit = BBox.Make(struct
+    type t = FOTerm.t
+    let equal = FOTerm.eq
+    let compare = FOTerm.cmp
+    let pp = FOTerm.fmt
+    let to_term t = t
+  end)
 
   (** Induction *)
   module Induction = struct
@@ -376,6 +382,12 @@ module Make(X : PARAMETERS) = struct
         failwith (Util.sprintf "type %a is not inductive" Type.pp ty)
 
     type cst = FOTerm.t
+
+    let compare_cst = FOTerm.cmp
+    let equal_cst = FOTerm.eq
+    let pp_cst = FOTerm.fmt
+    let show_cst = FOTerm.to_string
+    let hash_cst = FOTerm.hash
 
     module IMap = Sequence.Map.Make(CCInt)
 
@@ -577,14 +589,16 @@ module Make(X : PARAMETERS) = struct
           let coverset = _make_coverset ~depth ity t in
           (* save coverset *)
           cst.coversets <- IMap.add depth coverset cst.coversets;
-          Util.debug 2 "new coverset for %a: %a" T.pp t (CCList.pp T.pp) coverset.cases;
+          Util.debug 2 "new coverset for %a: %a"
+            T.pp t (CCList.pp T.pp) coverset.cases;
           Signal.send on_new_cover_set (t, coverset);
           coverset, `New
         end
       with Not_found ->
         _failwith "term %a is not an inductive constant, no coverset" T.pp t
 
-    let is_inductive cst = T.Tbl.mem _tbl cst
+    let is_inductive cst =
+      if T.Tbl.mem _tbl cst then Some cst else None
 
     let is_inductive_symbol s = Symbol.Tbl.mem _tbl_sym s
 

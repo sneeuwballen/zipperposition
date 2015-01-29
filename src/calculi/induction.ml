@@ -127,7 +127,7 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
   (* a candidate clause context *)
   type candidate_context = {
     cand_ctx : CCtx.t; (* the ctx itself *)
-    cand_cst : T.t [@compare T.cmp];    (* the inductive constant *)
+    cand_cst : CI.cst;    (* the inductive constant *)
     cand_lits : Lits.t; (* literals of [ctx[t]] *)
     mutable cand_explanations : Proof.t list
       [@compare (fun _ _ -> 0)]; (* justification(s) of why the context exists *)
@@ -198,18 +198,18 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
     scan (Sequence.singleton c);
     Lits.Seq.terms (Env.C.lits c)
       |> Sequence.flat_map T.Seq.subterms
-      |> Sequence.filter CI.is_inductive
+      |> Sequence.filter_map CI.is_inductive
       |> Sequence.iter
         (fun t ->
           match CI.cover_set ~depth:!cover_set_depth_ t with
           | _, `Old -> ()
           | set, `New ->
               (* Make a case split on the cover set (one clause per literal) *)
-              Util.debug ~section 2 "make a case split on inductive %a" T.pp t;
+              Util.debugf ~section 2 "make a case split on inductive %a" CI.pp_cst t;
               let clauses_and_lits = List.map
                 (fun t' ->
                   assert (T.is_ground t');
-                  let lits = [| Literal.mk_eq t t' |] in
+                  let lits = [| Literal.mk_eq (t:CI.cst:>T.t) t' |] in
                   let bool_lit = BoolLit.inject_lits lits in
                   Solver.quantify_lits level2_ [bool_lit];
                   let proof cc = Proof.mk_c_trivial
@@ -224,8 +224,8 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
               (* add a boolean constraint: Xor of boolean lits *)
               Solver.add_clauses (mk_xor_ bool_lits);
               (* return clauses *)
-              Util.debug ~section 4 "split inference for %a: %a"
-                T.pp t (CCList.pp C.pp) clauses;
+              Util.debugf ~section 4 "split inference for %a: %a"
+                CI.pp_cst t (CCList.print C.fmt) clauses;
               res := List.rev_append clauses !res
         );
     !res
@@ -244,9 +244,11 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
           match BoolLit.extract (BoolLit.abs blit) with
           | None -> None
           | Some (BoolLit.Clause_component [| Literal.Equation (l, r, true) |]) ->
-              if sign && CI.is_inductive l then Some (`Case (l, r))
-              else if sign && CI.is_inductive r then Some (`Case (r, l))
-              else None
+              begin match CI.is_inductive l, CI.is_inductive r with
+              | Some l, _ when sign -> Some (`Case (l, r))
+              | None, Some r when sign -> Some (`Case (r, l))
+              | _ -> None
+              end
           | Some (BoolLit.Ctx (ctx, n, BoolLit.ExpressesMinimality t) as lit) ->
               Some (`Minimal (ctx, n, lit, t))
           | Some _ -> None
@@ -257,14 +259,14 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
       |> Sequence.exists
         (function
           | (`Case (i1, t1), `Case (i2, t2)) ->
-              let res = T.eq i1 i2 && not (T.eq t1 t2) in
+              let res = CI.equal_cst i1 i2 && not (T.eq t1 t2) in
               if res
-              then Util.debug ~section 4
+              then Util.debugf ~section 4
                 "clause %a redundant because of %a={%a,%a} in trail"
-                C.pp c T.pp i1 T.pp t1 T.pp t2;
+                C.fmt c CI.pp_cst i1 T.fmt t1 T.fmt t2;
               res
           | (`Minimal (ctx1, i1, lit1, t1), `Minimal (ctx2, i2, lit2, t2)) ->
-              let res = T.eq i1 i2
+              let res = CI.equal_cst i1 i2
               && not (ClauseContext.equal ctx1 ctx2)
               && T.eq t1 t2
               in
@@ -339,18 +341,25 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
     type t = CandidateCtxSet.t ref
   end)
   module ClauseContextMap = Sequence.Map.Make(ClauseContext)
+  module CstTbl = CCHashtbl.Make(struct
+    type t = CI.cst
+    let equal = CI.equal_cst
+    let hash = CI.hash_cst
+  end)
 
   (* maps each inductive constant to
       set(clause contexts that are candidate for induction on this constant) *)
-  let (candidates_by_icst_ : candidate_context ClauseContextMap.t ref T.Tbl.t) = T.Tbl.create 16
+  let candidates_by_icst_
+    : candidate_context ClauseContextMap.t ref CstTbl.t
+    = CstTbl.create 16
   let candidates_by_idx_ = ref (FV_cand.empty ())
 
   (* candidates for a term *)
-  let find_candidates_for_cst_ t =
-    try T.Tbl.find candidates_by_icst_ t
+  let find_candidates_for_cst_ (t:CI.cst) =
+    try CstTbl.find candidates_by_icst_ t
     with Not_found ->
       let set = ref ClauseContextMap.empty in
-      T.Tbl.add candidates_by_icst_ t set;
+      CstTbl.add candidates_by_icst_ t set;
       set
 
   (* candidates for some [lits] *)
@@ -370,8 +379,8 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
       (* new context:
         - assert [not l] for all [t] a sub-constant of [i] and [l]
             literal of [ctx[t]], to express the minimality *)
-      Util.debug ~section 3 "watch new context %a (for inductive %a)"
-        Lits.pp ctx.cand_lits T.pp ctx.cand_cst;
+      Util.debugf ~section 3 "watch new context %a@ (for inductive %a)"
+        Lits.fmt ctx.cand_lits CI.pp_cst ctx.cand_cst;
       new_contexts := ctx :: !new_contexts;
       Signal.ContinueListening
     );
@@ -388,13 +397,12 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
 
   (* [t] is an inductive const; this returns [true] iff some subconstant of [t]
       occurs in [c] *)
-  let contains_any_sub_constant_of c t =
-    assert (CI.is_inductive t);
+  let contains_any_sub_constant_of c (t:CI.cst) =
     Lits.Seq.terms (Env.C.lits c)
     |> Sequence.flat_map T.Seq.subterms
     |> Sequence.exists
       (fun t' ->
-        T.is_ground t
+        T.is_ground (t:>T.t)
         && CI.is_sub_constant t'
         && CI.is_sub_constant_of t' t
       )
@@ -410,10 +418,10 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
       |> Sequence.exists
         (fun t' ->
           T.is_ground t
-          && (T.eq t' cst
+          && (T.eq t' (cst:>T.t)
             ||
             (CI.is_sub_constant t'
-            && not (T.eq t t')
+            && not (T.eq t' t)
             && CI.is_sub_constant_of t' cst
             )
           )
@@ -438,12 +446,11 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
           && not (C.get_flag flag_expresses_minimality c)
           &&
           (
-            ( CI.is_inductive t
-              && not (contains_any_sub_constant_of c t)
-            ) ||
-            ( CI.is_sub_constant t
-              && contains_only_sub_constant_ c t
-            )
+            match CI.is_inductive t with
+            | Some t -> not (contains_any_sub_constant_of c t)
+            | None ->
+                CI.is_sub_constant t
+                && contains_only_sub_constant_ c t
           )
         )
       |> T.Seq.add_set T.Set.empty
@@ -452,10 +459,10 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
     clause being an induction hypothesis for the given context *)
   let process_ctx_ c ctx t =
     (* if [t] is an inductive constant, ctx is enabled! *)
-    let is_new = if CI.is_inductive t
-    then (
+    let is_new = match CI.is_inductive t with
+    | Some t ->
       let map = find_candidates_for_cst_ t in
-      try
+      begin try
         let cand = ClauseContextMap.find ctx !map in
         let expl = C.proof c in
         cand.cand_explanations <- expl :: cand.cand_explanations;
@@ -469,11 +476,12 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
         } in
         add_ctx cand;
         `New t
-    ) else (
+      end
+    | None ->
       (* [t] is a subterm of the case [t'] of an inductive [cst] *)
       let cst, t' = CI.inductive_cst_of_sub_cst t in
       let map = find_candidates_for_cst_ cst in
-      let lits' = CCtx.apply ctx cst in
+      let lits' = CCtx.apply ctx (cst:>T.t) in
       try
         let _ = ClauseContextMap.find ctx !map in
         `Old (* no new context *)
@@ -487,7 +495,7 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
         (* need to watch ctx[cst] until it is proved *)
         add_ctx cand_ctx;
         `New cst
-    ) in
+    in
     match is_new with
     | `New icst ->
         (* new clause for induction hypothesis (on inductive constant [icst]) *)
@@ -578,20 +586,20 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
 
   (** {6 Encoding to QBF} *)
 
-  let candidates_for_ cst =
+  let candidates_for_ cst : candidate_context Sequence.t =
     !(find_candidates_for_cst_ cst)
     |> ClauseContextMap.values
 
   let neg_ = BoolLit.neg
-  let valid_ x = BoolLit.inject_name' "valid(%a)" T.pp x
-  let empty_ x = BoolLit.inject_name' "empty(%a)" T.pp x
-  let minimal_ x y = BoolLit.inject_name' "minimal(%a,%a)" T.pp x T.pp y
+  let valid_ x = BoolLit.inject_name' "valid(%s)" (CI.show_cst x)
+  let empty_ x = BoolLit.inject_name' "empty(%s)" (CI.show_cst x)
+  let minimal_ x y = BoolLit.inject_name' "minimal(%s,%a)" (CI.show_cst x) T.pp y
 
   let expresses_minimality_ ctx cst t =
     BoolLit.inject_ctx ctx cst (BoolLit.ExpressesMinimality t)
 
   let is_true_ lits = BoolLit.inject_lits lits
-  let is_eq_ a b = is_true_ [| Literal.mk_eq a b |]
+  let is_eq_ a b = is_true_ [| Literal.mk_eq (a:CI.cst:>T.t) b |]
   let trail_ok_ lits = BoolLit.inject_lits_pred lits BoolLit.TrailOk
   let in_loop_ ctx i = BoolLit.inject_ctx ctx i BoolLit.InLoop
   let init_ok_ ctx i = BoolLit.inject_ctx ctx i BoolLit.InitOk
@@ -635,7 +643,7 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
         (QF.and_map (CI.cover_sets cst)
           ~f:(fun set -> QF.or_map (set.CI.cases |> CCList.to_seq)
             ~f:(fun t -> QF.or_l
-                [ QF.atom (is_eq_ t cst)
+                [ QF.atom (is_eq_ cst t)
                 ; QF.atom (minimal_ cst t)
                 ]
             )
@@ -684,7 +692,7 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
         Solver.add_form
           (QF.imply
             (QF.atom (minimal_ cst t))
-            (QF.and_map ( (* TODO iterate on sub-constants of t *)
+            (QF.and_map (assert false)) (* TODO iterate on sub-constants of t *)
             (assert false)
           )
       )

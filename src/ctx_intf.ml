@@ -177,10 +177,6 @@ module type S = sig
     end
   end
 
-  (** {2 Booleans Literals} *)
-
-  module BoolLit : BBox.S with type inductive_cst = FOTerm.t
-
   (** {2 Induction} *)
 
   module Induction : sig
@@ -215,11 +211,13 @@ module type S = sig
 
     (** {6 Inductive Constants} *)
 
-    type cst = FOTerm.t
+    type cst = private FOTerm.t [@@deriving ord,eq,show]
     (** A ground term of an inductive type. It must correspond to a
         term built with the corresponding {!inductive_type} only.
         For instance, a constant of type [nat] should be equal to
         [s^n(0)] in any model. *)
+
+    val hash_cst : cst -> int
 
     val is_blocked : FOTerm.t -> bool
     (** Some terms that could be inductive constants are {b blocked}. In
@@ -250,8 +248,9 @@ module type S = sig
     val on_new_inductive : cst Signal.t
     (** Triggered with new inductive constants *)
 
-    val is_inductive : FOTerm.t -> bool
-    (** Check whether the given constant is ready for induction *)
+    val is_inductive : FOTerm.t -> cst option
+    (** Check whether the given constant is ready for induction, and
+        downcast it if it's the case*)
 
     val is_inductive_symbol : Symbol.t -> bool
     (** Head symbol of some inductive (ground) term?*)
@@ -314,5 +313,9 @@ module type S = sig
       (** All known constructors *)
     end
   end
+
+  (** {2 Booleans Literals} *)
+
+  module BoolLit : BBox.S with type inductive_cst = Induction.cst
 end
 

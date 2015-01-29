@@ -39,10 +39,16 @@ module type S = BBox_intf.S
 
 let section = Util.Section.make ~parent:Const.section "bbox"
 
-module Make(Any : sig end) = struct
+module Make(X : sig
+  type t
+  val to_term : t -> T.t
+  val equal : t -> t -> bool
+  val compare : t -> t -> int
+  val pp : Format.formatter -> t -> unit
+end) = struct
   module BLit = Qbf.Lit
   type t = BLit.t
-  type inductive_cst = T.t
+  type inductive_cst = X.t
 
   let neg = BLit.neg
   let sign = BLit.sign
@@ -65,7 +71,10 @@ module Make(Any : sig end) = struct
   type injected =
     | Clause_component of Literals.t
     | Lits of Literals.t * lits_predicate
-    | Ctx of ClauseContext.t * (inductive_cst [@compare T.cmp]) * ctx_predicate
+    | Ctx of
+      ClauseContext.t
+      * (inductive_cst [@compare X.compare])
+      * ctx_predicate
     | Name of string  (* name for CNF *)
     | Input (** input marker *)
     [@@deriving ord]
@@ -74,11 +83,15 @@ module Make(Any : sig end) = struct
     | TrailOk -> Util.sprintf "⟦trail_ok(%a)⟧" Lits.pp lits
 
   let string_of_ctx_pred ctx i = function
-    | InLoop -> Util.sprintf "⟦%a ∈ loop(%a)⟧" ClauseContext.pp ctx T.pp i
+    | InLoop ->
+        CCFormat.sprintf "⟦%a ∈ loop(%a)⟧"
+          ClauseContext.print ctx X.pp i
     | InitOk ->
-        Util.sprintf "⟦%a initialized(%a)⟧" ClauseContext.pp ctx T.pp i
+        CCFormat.sprintf "⟦%a initialized(%a)⟧"
+          ClauseContext.print ctx X.pp i
     | ExpressesMinimality t ->
-        Util.sprintf "⟦minimal(%a,%a,%a)⟧" ClauseContext.pp ctx T.pp i T.pp t
+        CCFormat.sprintf "⟦minimal(%a,%a,%a)⟧"
+          ClauseContext.print ctx X.pp i T.fmt t
 
   let pp_injected buf = function
     | Clause_component lits ->
@@ -130,7 +143,7 @@ module Make(Any : sig end) = struct
         _clause_set := FV.add !_clause_set (lits, injected, t)
     | Ctx (cc, cst, _) ->
         _clause_set := FV.add !_clause_set
-          (ClauseContext.apply cc cst, injected, t)
+          (ClauseContext.apply cc (X.to_term cst), injected, t)
     | Input -> ()
     | Name s ->
         StringTbl.add _names s (injected, t)
@@ -182,14 +195,14 @@ module Make(Any : sig end) = struct
               i
           )
 
-  let inject_ctx ctx t pred =
-    let lits = ClauseContext.apply ctx t in
+  let inject_ctx ctx (t:X.t) pred =
+    let lits = ClauseContext.apply ctx (X.to_term t) in
     _retrieve_alpha_equiv lits
       |> Sequence.filter_map
         (function
           | lits', Ctx (_, t', pred'), blit
             when Lits.are_variant lits lits'
-            && T.eq t t' && compare_ctx_predicate pred pred' = 0 -> Some blit
+            && X.equal t t' && compare_ctx_predicate pred pred' = 0 -> Some blit
           | _ -> None
         )
       |> Sequence.head

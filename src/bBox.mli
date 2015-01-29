@@ -35,4 +35,10 @@ val section : Logtk.Util.Section.t
 
 module type S = BBox_intf.S
 
-module Make(Any : sig end) : S with type inductive_cst = Logtk.FOTerm.t
+module Make(X : sig
+  type t
+  val to_term : t -> Logtk.FOTerm.t
+  val equal : t -> t -> bool
+  val compare : t -> t -> int
+  val pp : Format.formatter -> t -> unit
+end) : S with type inductive_cst = X.t
