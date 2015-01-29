@@ -211,13 +211,23 @@ module type S = sig
 
     (** {6 Inductive Constants} *)
 
-    type cst = private FOTerm.t [@@deriving ord,eq,show]
+    type cst = private FOTerm.t
     (** A ground term of an inductive type. It must correspond to a
         term built with the corresponding {!inductive_type} only.
         For instance, a constant of type [nat] should be equal to
         [s^n(0)] in any model. *)
 
-    val hash_cst : cst -> int
+    module Cst : BBox_intf.TERM with type t = cst
+
+    type case = private FOTerm.t
+    (** A member of a coverset *)
+
+    module Case : BBox_intf.TERM with type t = case
+
+    type sub_cst = private FOTerm.t
+    (** A subterm of some {!case} that has the same (inductive) type *)
+
+    module Sub : BBox_intf.TERM with type t = sub_cst
 
     val is_blocked : FOTerm.t -> bool
     (** Some terms that could be inductive constants are {b blocked}. In
@@ -229,7 +239,7 @@ module type S = sig
 
     type path_condition = {
       pc_cst : cst;
-      pc_case : FOTerm.t;
+      pc_case : case;
       pc_lit : bool_lit;
     }
 
@@ -248,34 +258,51 @@ module type S = sig
     val on_new_inductive : cst Signal.t
     (** Triggered with new inductive constants *)
 
-    val is_inductive : FOTerm.t -> cst option
+    val as_inductive : FOTerm.t -> cst option
+    val is_inductive : FOTerm.t -> bool
     (** Check whether the given constant is ready for induction, and
-        downcast it if it's the case*)
+        downcast it if it's the case *)
 
     val is_inductive_symbol : Symbol.t -> bool
     (** Head symbol of some inductive (ground) term?*)
 
+    module SubCstSet : Set.S with type elt = sub_cst
+
     type cover_set = {
-      cases : FOTerm.t list; (* all cases *)
-      rec_cases : FOTerm.t list; (* recursive cases *)
-      base_cases : FOTerm.t list;  (* non-recursive (base) cases *)
-      sub_constants : FOTerm.Set.t;  (* leaves of recursive cases *)
+      cases : case list; (* all cases *)
+      rec_cases : case list; (* recursive cases *)
+      base_cases : case list;  (* non-recursive (base) cases *)
+      sub_constants : SubCstSet.t;  (* leaves of recursive cases *)
     }
 
+    val as_sub_constant : FOTerm.t -> sub_cst option
     val is_sub_constant : FOTerm.t -> bool
     (** Is the term a constant that was created within a cover set? *)
 
     val is_sub_constant_of : FOTerm.t -> cst -> bool
-    (** [is_sub_constant_of t cst] true iff [t] is a sub-constant of [cst] *)
+    val as_sub_constant_of : FOTerm.t -> cst -> sub_cst option
+    (** downcasts iff [t] is a sub-constant of [cst] *)
+
+    val is_case : FOTerm.t -> bool
+    val as_case : FOTerm.t -> case option
 
     val dominates : Symbol.t -> Symbol.t -> bool
     (** [dominates s1 s2] true iff s2 is one of the sub-cases of s1 *)
 
-    val inductive_cst_of_sub_cst : FOTerm.t -> cst * FOTerm.t
+    val inductive_cst_of_sub_cst : sub_cst -> cst * case
     (** [inductive_cst_of_sub_cst t] finds a pair [c, t'] such
         that [c] is an inductive const, [t'] belongs to a coverset
         of [c], and [t] is a sub-constant within [t'].
         @raise Not_found if [t] isn't an inductive constant *)
+
+    val cases : ?which:[`Rec|`Base|`All] -> cover_set -> case Sequence.t
+    (** Cases of the cover set *)
+
+    val sub_constants : cover_set -> sub_cst Sequence.t
+    (** All sub-constants of a given inductive constant *)
+
+    val sub_constants_case : case -> sub_cst Sequence.t
+    (** All sub-constants that are subterms of a specific case *)
 
     val cover_set : ?depth:int -> cst -> cover_set * [`New|`Old]
     (** [cover_set t] gives a set of ground terms [[t1,...,tn]] with fresh
@@ -316,6 +343,10 @@ module type S = sig
 
   (** {2 Booleans Literals} *)
 
-  module BoolLit : BBox.S with type inductive_cst = Induction.cst
+  module BoolLit
+    : BBox.S
+    with module I = Induction.Cst
+    and module Sub = Induction.Sub
+    and module Case = Induction.Case
 end
 

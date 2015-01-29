@@ -313,13 +313,17 @@ module Make(X : PARAMETERS) = struct
   end
 
   (** Boolean Mapping *)
-  module BoolLit = BBox.Make(struct
+  module TermArg = struct
     type t = FOTerm.t
     let equal = FOTerm.eq
     let compare = FOTerm.cmp
-    let pp = FOTerm.fmt
+    let hash = FOTerm.hash
+    let pp = FOTerm.pp
+    let print = FOTerm.fmt
     let to_term t = t
-  end)
+  end
+
+  module BoolLit = BBox.Make(TermArg)(TermArg)(TermArg)
 
   (** Induction *)
   module Induction = struct
@@ -381,26 +385,32 @@ module Make(X : PARAMETERS) = struct
       with Not_found ->
         failwith (Util.sprintf "type %a is not inductive" Type.pp ty)
 
-    type cst = FOTerm.t
+    type cst = T.t
 
-    let compare_cst = FOTerm.cmp
-    let equal_cst = FOTerm.eq
-    let pp_cst = FOTerm.fmt
-    let show_cst = FOTerm.to_string
-    let hash_cst = FOTerm.hash
+    module Cst = TermArg
 
     module IMap = Sequence.Map.Make(CCInt)
 
+    type case = T.t
+
+    module Case = TermArg
+
+    type sub_cst = T.t
+
+    module Sub = TermArg
+
+    module SubCstSet = T.Set
+
     type cover_set = {
-      cases : T.t list;
-      rec_cases : T.t list;  (* recursive cases *)
-      base_cases : T.t list;  (* base cases *)
-      sub_constants : T.Set.t;  (* all sub-constants *)
+      cases : case list;
+      rec_cases : case list;  (* recursive cases *)
+      base_cases : case list;  (* base cases *)
+      sub_constants : SubCstSet.t;  (* all sub-constants *)
     }
 
     type path_condition = {
       pc_cst : cst;
-      pc_case : FOTerm.t;
+      pc_case : case;
       pc_lit : bool_lit;
     }
 
@@ -420,13 +430,18 @@ module Make(X : PARAMETERS) = struct
     let _tbl : cst_data T.Tbl.t = T.Tbl.create 16
     let _tbl_sym : cst_data Symbol.Tbl.t = Symbol.Tbl.create 16
 
-    (* sub_constants -> cst * case in which the sub_constant occurs *)
-    let _tbl_sub_cst : (cst * T.t) T.Tbl.t = T.Tbl.create 16
+    (* case -> cst * coverset *)
+    let _tbl_case : (cst * cover_set) T.Tbl.t = T.Tbl.create 16
+
+    (* sub_constants -> cst * set * case in which the sub_constant occurs *)
+    let _tbl_sub_cst : (cst * cover_set * T.t) T.Tbl.t = T.Tbl.create 16
 
     let _blocked = ref T.Set.empty
 
-    let is_sub_constant t =
-      T.Tbl.mem _tbl_sub_cst t
+    let is_sub_constant t = T.Tbl.mem _tbl_sub_cst t
+
+    let as_sub_constant t =
+      if is_sub_constant t then Some t else None
 
     let is_blocked t =
       is_sub_constant t || T.Set.mem t !_blocked
@@ -455,7 +470,8 @@ module Make(X : PARAMETERS) = struct
           ()
         with Unif.Fail | Not_found ->
           _invalid_arg "term %a doesn't have an inductive type" T.pp t
-      else _invalid_arg "term %a is not ground, cannot be an inductive constant" T.pp t
+      else _invalid_arg
+        "term %a is not ground, cannot be an inductive constant" T.pp t
 
     (* monad over "lazy" values *)
     module FunM = CCFun.Monad(struct type t = unit end)
@@ -489,7 +505,8 @@ module Make(X : PARAMETERS) = struct
                   Symbol.pp f Type.pp ity.pattern
             | Type.Arity (0, 0) ->
                 if depth > 0
-                then [fun () -> T.const ~ty:ty_f f, T.Set.empty, T.Set.empty]  (* only one answer : f *)
+                then  (* only one answer : f *)
+                  [fun () -> T.const ~ty:ty_f f, T.Set.empty, T.Set.empty]
                 else []
             | Type.Arity (0, n) ->
                 let ty_args = Type.expected_args ty_f in
@@ -501,12 +518,15 @@ module Make(X : PARAMETERS) = struct
                 )
             | Type.Arity (m,_) ->
                 _failwith
-                  "inductive constructor %a requires %d type parameters, expected 0"
+                  ("inductive constructor %a requires %d type " ^^
+                  "parameters, expected 0")
                   Symbol.pp f m
           ) ity.constructors
       (* given a list of types [l], yield all lists of cover terms
           that have types [l] *)
-      and make_list depth l : (T.t list * T.Set.t * T.Set.t) FunM.t list = match l with
+      and make_list depth l
+        : (T.t list * T.Set.t * T.Set.t) FunM.t list
+        = match l with
         | [] -> [fun()->[],T.Set.empty,T.Set.empty]
         | ty :: tail ->
             let t_builders = if Unif.Ty.matches ~pattern:ity.pattern ty
@@ -555,14 +575,6 @@ module Make(X : PARAMETERS) = struct
           if T.Set.is_empty set then (t, `Base), set else (t, `Rec), set
         ) (make depth)
       in
-      (* declare sub-constants as such. They won't be candidate for induction
-        and will be smaller than [t] *)
-      List.iter
-        (fun ((t, _), set) ->
-          T.Set.iter
-            (fun sub_cst -> T.Tbl.replace _tbl_sub_cst sub_cst (cst, t))
-            set;
-        ) cases_and_subs;
       let cases, sub_constants = List.split cases_and_subs in
       let cases, rec_cases, base_cases = List.fold_left
         (fun (c,r,b) (t,is_base) -> match is_base with
@@ -570,10 +582,24 @@ module Make(X : PARAMETERS) = struct
           | `Rec -> t::c, t::r, b
         ) ([],[],[]) cases
       in
-      let sub_constants = List.fold_left T.Set.union T.Set.empty sub_constants in
-      {cases; rec_cases; base_cases; sub_constants; }
+      let sub_constants =
+        List.fold_left T.Set.union T.Set.empty sub_constants in
+      let coverset = {cases; rec_cases; base_cases; sub_constants; } in
+      (* declare sub-constants as such. They won't be candidate for induction
+        and will be smaller than [t] *)
+      List.iter
+        (fun ((t, _), set) ->
+          T.Tbl.add _tbl_case t (cst, coverset);
+          T.Set.iter
+            (fun sub_cst ->
+              T.Tbl.replace _tbl_sub_cst sub_cst (cst, coverset, t)
+            ) set
+        ) cases_and_subs;
+      coverset
 
-    let inductive_cst_of_sub_cst t = T.Tbl.find _tbl_sub_cst t
+    let inductive_cst_of_sub_cst t =
+      let cst, _set, case = T.Tbl.find _tbl_sub_cst t in
+      cst, case
 
     let on_new_cover_set = Signal.create ()
 
@@ -597,8 +623,10 @@ module Make(X : PARAMETERS) = struct
       with Not_found ->
         _failwith "term %a is not an inductive constant, no coverset" T.pp t
 
-    let is_inductive cst =
-      if T.Tbl.mem _tbl cst then Some cst else None
+    let is_inductive cst = T.Tbl.mem _tbl cst
+
+    let as_inductive cst =
+      if is_inductive cst then Some cst else None
 
     let is_inductive_symbol s = Symbol.Tbl.mem _tbl_sym s
 
@@ -609,7 +637,28 @@ module Make(X : PARAMETERS) = struct
       with Not_found -> Sequence.empty
 
     let is_sub_constant_of t cst =
-      T.eq cst (fst (inductive_cst_of_sub_cst t))
+      let cst', _ = inductive_cst_of_sub_cst t in
+      T.eq cst cst'
+
+    let as_sub_constant_of t cst =
+      if is_sub_constant_of t cst
+        then Some t
+        else None
+
+    let is_case t = T.Tbl.mem _tbl_case t
+
+    let as_case t = if is_case t then Some t else None
+
+    let cases ?(which=`All) set = match which with
+      | `All -> CCList.to_seq set.cases
+      | `Base -> CCList.to_seq set.base_cases
+      | `Rec -> CCList.to_seq set.rec_cases
+
+    let sub_constants set = SubCstSet.to_seq set.sub_constants
+
+    let sub_constants_case (t:case) =
+      let _, set = T.Tbl.find _tbl_case t in
+      sub_constants set
 
     (* true iff s2 is one of the sub-cases of s1 *)
     let dominates s1 s2 =

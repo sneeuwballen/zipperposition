@@ -30,8 +30,24 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 type bool_lit = BoolSolver.lit
 (** Abstract boolean literal *)
 
+module type TERM = sig
+  type t
+  val to_term : t -> Logtk.FOTerm.t
+  val equal : t -> t -> bool
+  val compare : t -> t -> int
+  val hash : t -> int
+  val pp : Buffer.t -> t -> unit
+  val print : Format.formatter -> t -> unit
+end
+
 module type S = sig
-  type inductive_cst
+  module I : TERM
+  module Case : TERM
+  module Sub : TERM
+
+  type inductive_cst = I.t
+  type inductive_sub_cst = Sub.t
+  type inductive_case = Case.t
 
   type t = BoolSolver.lit
 
@@ -55,8 +71,9 @@ module type S = sig
   type ctx_predicate =
     | InLoop  (** ctx in loop(i) *)
     | InitOk (** Ctx is initialized *or* it's not in loop *)
-    | ExpressesMinimality of Logtk.FOTerm.t
-        (** clause expresses the minimality of the model for S_loop(i) *)
+    | ExpressesMinimality of inductive_case
+        (** clause expresses the minimality of the model for S_loop(i)
+          in the case [t] *)
     [@@deriving ord]
 
   type injected = private

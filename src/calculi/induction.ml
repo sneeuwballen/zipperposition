@@ -124,12 +124,21 @@ struct
   let pp_bclause buf c =
     CCList.pp ~start:"[" ~stop:"]" ~sep:" ⊔ " BoolLit.pp buf c
 
+  let expresses_minimality_ ctx cst t =
+    BoolLit.inject_ctx ctx cst (BoolLit.ExpressesMinimality t)
+
+  let is_true_ lits = BoolLit.inject_lits lits
+  let is_eq_ a b = is_true_ [| Literal.mk_eq (a:CI.cst:>T.t) (b:CI.case:>T.t) |]
+  let trail_ok_ lits = BoolLit.inject_lits_pred lits BoolLit.TrailOk
+  let in_loop_ ctx i = BoolLit.inject_ctx ctx i BoolLit.InLoop
+  let init_ok_ ctx i = BoolLit.inject_ctx ctx i BoolLit.InitOk
+
   (* TODO: when discover new clause with inductive cst, add "input" to its trail *)
 
   (* a candidate clause context *)
   type candidate_context = {
     cand_ctx : CCtx.t; (* the ctx itself *)
-    cand_cst : CI.cst;    (* the inductive constant *)
+    cand_cst : CI.Cst.t;    (* the inductive constant *)
     cand_lits : Lits.t; (* literals of [ctx[t]] *)
     mutable cand_explanations : Proof.t list
       [@compare (fun _ _ -> 0)]; (* justification(s) of why the context exists *)
@@ -200,18 +209,18 @@ struct
     scan (Sequence.singleton c);
     Lits.Seq.terms (Env.C.lits c)
       |> Sequence.flat_map T.Seq.subterms
-      |> Sequence.filter_map CI.is_inductive
+      |> Sequence.filter_map CI.as_inductive
       |> Sequence.iter
-        (fun t ->
+        (fun (t:CI.cst) ->
           match CI.cover_set ~depth:!cover_set_depth_ t with
           | _, `Old -> ()
           | set, `New ->
               (* Make a case split on the cover set (one clause per literal) *)
-              Util.debugf ~section 2 "make a case split on inductive %a" CI.pp_cst t;
+              Util.debug ~section 2 "make a case split on inductive %a" CI.Cst.pp t;
               let clauses_and_lits = List.map
-                (fun t' ->
-                  assert (T.is_ground t');
-                  let lits = [| Literal.mk_eq (t:CI.cst:>T.t) t' |] in
+                (fun (t':CI.case) ->
+                  assert (T.is_ground (t' :> T.t));
+                  let lits = [| Literal.mk_eq (t:>T.t) (t':CI.case:>T.t) |] in
                   let bool_lit = BoolLit.inject_lits lits in
                   Solver.quantify_lits level2_ [bool_lit];
                   let proof cc = Proof.mk_c_trivial
@@ -226,13 +235,12 @@ struct
               (* add a boolean constraint: Xor of boolean lits *)
               Solver.add_clauses (mk_xor_ bool_lits);
               (* return clauses *)
-              Util.debugf ~section 4 "split inference for %a: %a"
-                CI.pp_cst t (CCList.print C.fmt) clauses;
+              Util.debugf ~section 4 "split inference for %a: @[<hv>%a@]"
+                CI.Cst.print t (CCList.print C.fmt) clauses;
               res := List.rev_append clauses !res
         );
     !res
 
-  (* TODO: add presence of "input" and "C[] in Sloop" as redundant *)
   (* checks whether the trail of [c] contains two literals [i = t1]
       and [i = t2] with [t1], [t2] distinct cover set members, or two
       literals [loop(i) minimal by a] and [loop(i) minimal by b]. *)
@@ -246,13 +254,17 @@ struct
           match BoolLit.extract (BoolLit.abs blit) with
           | None -> None
           | Some (BoolLit.Clause_component [| Literal.Equation (l, r, true) |]) ->
-              begin match CI.is_inductive l, CI.is_inductive r with
-              | Some l, _ when sign -> Some (`Case (l, r))
-              | None, Some r when sign -> Some (`Case (r, l))
+              begin match CI.as_inductive l, CI.as_inductive r,
+                          CI.as_case l, CI.as_case r with
+              | Some l, _, _, Some r when sign -> Some (`Case (l, r))
+              | None, Some r, Some l, _ when sign -> Some (`Case (r, l))
               | _ -> None
               end
           | Some (BoolLit.Ctx (ctx, n, BoolLit.ExpressesMinimality t) as lit) ->
               Some (`Minimal (ctx, n, lit, t))
+          | Some BoolLit.Input -> Some `Input
+          | Some (BoolLit.Ctx (ctx, n, BoolLit.InLoop) as lit) ->
+              Some (`InLoop (ctx, n, lit))
           | Some _ -> None
         )
     in
@@ -261,22 +273,28 @@ struct
       |> Sequence.exists
         (function
           | (`Case (i1, t1), `Case (i2, t2)) ->
-              let res = CI.equal_cst i1 i2 && not (T.eq t1 t2) in
+              let res = CI.Cst.equal i1 i2 && not (CI.Case.equal t1 t2) in
               if res
-              then Util.debugf ~section 4
+              then Util.debug ~section 4
                 "clause %a redundant because of %a={%a,%a} in trail"
-                C.fmt c CI.pp_cst i1 T.fmt t1 T.fmt t2;
+                C.pp c CI.Cst.pp i1 CI.Case.pp t1 CI.Case.pp t2;
               res
           | (`Minimal (ctx1, i1, lit1, t1), `Minimal (ctx2, i2, lit2, t2)) ->
-              let res = CI.equal_cst i1 i2
+              let res = CI.Cst.equal i1 i2
               && not (ClauseContext.equal ctx1 ctx2)
-              && T.eq t1 t2
+              && CI.Case.equal t1 t2
               in
               if res
               then Util.debug ~section 4
                 "clause %a redundant because %a and %a both in trail"
                 C.pp c BoolLit.pp_injected lit1 BoolLit.pp_injected lit2;
               res
+          | `Init, `InLoop _
+          | `InLoop _, `Init ->
+              Util.debug ~section 4
+                "clause %a redundant: \"init\" and \"in_loop\" combined"
+                C.pp c;
+              true
           | _ -> false
         )
 
@@ -343,11 +361,7 @@ struct
     type t = CandidateCtxSet.t ref
   end)
   module ClauseContextMap = Sequence.Map.Make(ClauseContext)
-  module CstTbl = CCHashtbl.Make(struct
-    type t = CI.cst
-    let equal = CI.equal_cst
-    let hash = CI.hash_cst
-  end)
+  module CstTbl = CCHashtbl.Make(CI.Cst)
 
   (* maps each inductive constant to
       set(clause contexts that are candidate for induction on this constant) *)
@@ -382,7 +396,7 @@ struct
         - assert [not l] for all [t] a sub-constant of [i] and [l]
             literal of [ctx[t]], to express the minimality *)
       Util.debugf ~section 3 "watch new context %a@ (for inductive %a)"
-        Lits.fmt ctx.cand_lits CI.pp_cst ctx.cand_cst;
+        Lits.fmt ctx.cand_lits CI.Cst.print ctx.cand_cst;
       new_contexts := ctx :: !new_contexts;
       Signal.ContinueListening
     );
@@ -411,19 +425,18 @@ struct
 
   (* [t] is a sub-constant; neither its parent nor its siblings must be
       present in [c] *)
-  let contains_only_sub_constant_ c t =
-    assert (CI.is_sub_constant t);
+  let contains_only_sub_constant_ c (t:CI.sub_cst) =
     let cst, _ = CI.inductive_cst_of_sub_cst t in
     let others =
       Lits.Seq.terms (Env.C.lits c)
       |> Sequence.flat_map T.Seq.subterms
       |> Sequence.exists
         (fun t' ->
-          T.is_ground t
-          && (T.eq t' (cst:>T.t)
+          T.is_ground (t:CI.sub_cst:>T.t)
+          && (T.eq (t':>T.t) (cst:>T.t)
             ||
             (CI.is_sub_constant t'
-            && not (T.eq t' t)
+            && not (T.eq (t':>T.t) (t:CI.sub_cst:>T.t))
             && CI.is_sub_constant_of t' cst
             )
           )
@@ -432,7 +445,7 @@ struct
     not others
 
   (* set of subterms of [lits] that could be extruded to form a context.
-     XXX restrictions:
+     restrictions:
        - a context can be extracted only from an inductive constant
          such that no sub-constant of it occurs in the clause; otherwise
          it would be meaningless to express the minimality of the clause
@@ -448,11 +461,10 @@ struct
           && not (C.get_flag flag_expresses_minimality c)
           &&
           (
-            match CI.is_inductive t with
-            | Some t -> not (contains_any_sub_constant_of c t)
-            | None ->
-                CI.is_sub_constant t
-                && contains_only_sub_constant_ c t
+            match CI.as_inductive t, CI.as_sub_constant t with
+            | Some t, _ -> not (contains_any_sub_constant_of c t)
+            | None, Some t -> contains_only_sub_constant_ c t
+            | None, None -> false
           )
         )
       |> T.Seq.add_set T.Set.empty
@@ -461,8 +473,8 @@ struct
     clause being an induction hypothesis for the given context *)
   let process_ctx_ c ctx t =
     (* if [t] is an inductive constant, ctx is enabled! *)
-    let is_new = match CI.is_inductive t with
-    | Some t ->
+    let is_new = match CI.as_inductive t, CI.as_sub_constant t with
+    | Some t, _ ->
       let map = find_candidates_for_cst_ t in
       begin try
         let cand = ClauseContextMap.find ctx !map in
@@ -479,12 +491,12 @@ struct
         add_ctx cand;
         `New t
       end
-    | None ->
+    | None, Some t ->
       (* [t] is a subterm of the case [t'] of an inductive [cst] *)
       let cst, t' = CI.inductive_cst_of_sub_cst t in
       let map = find_candidates_for_cst_ cst in
       let lits' = CCtx.apply ctx (cst:>T.t) in
-      try
+      begin try
         let _ = ClauseContextMap.find ctx !map in
         `Old (* no new context *)
       with Not_found ->
@@ -497,6 +509,11 @@ struct
         (* need to watch ctx[cst] until it is proved *)
         add_ctx cand_ctx;
         `New cst
+      end
+    | None, None ->
+        let msg = Util.sprintf
+          "expected inductive cst or sub_cst, got %a" T.pp t in
+        failwith msg
     in
     match is_new with
     | `New icst ->
@@ -596,22 +613,11 @@ struct
     !(find_candidates_for_cst_ cst)
     |> ClauseContextMap.values
 
-  (* sub-constants of a term *)
-  let sub_constants_ cst : T.t Sequence.t = assert false (* TODO *)
-
   let neg_ = BoolLit.neg
-  let valid_ x = BoolLit.inject_name' "valid(%s)" (CI.show_cst x)
-  let empty_ x = BoolLit.inject_name' "empty(%s)" (CI.show_cst x)
-  let minimal_ x y = BoolLit.inject_name' "minimal(%s,%a)" (CI.show_cst x) T.pp y
-
-  let expresses_minimality_ ctx cst t =
-    BoolLit.inject_ctx ctx cst (BoolLit.ExpressesMinimality t)
-
-  let is_true_ lits = BoolLit.inject_lits lits
-  let is_eq_ a b = is_true_ [| Literal.mk_eq (a:CI.cst:>T.t) b |]
-  let trail_ok_ lits = BoolLit.inject_lits_pred lits BoolLit.TrailOk
-  let in_loop_ ctx i = BoolLit.inject_ctx ctx i BoolLit.InLoop
-  let init_ok_ ctx i = BoolLit.inject_ctx ctx i BoolLit.InitOk
+  let valid_ x = BoolLit.inject_name' "valid(%a)" CI.Cst.pp x
+  let empty_ x = BoolLit.inject_name' "empty(%a)" CI.Cst.pp x
+  let minimal_ x y =
+    BoolLit.inject_name' "minimal(%a,%a)" CI.Cst.pp x CI.Case.pp y
 
   (* encode proof relation into QBF, starting from the set of "roots"
       that are (applications of) clause contexts + false.
@@ -753,10 +759,10 @@ struct
     Sequence.fold (fun s (v,t) -> Su.FO.bind s v 1 t 0) Su.empty l
 
   let split_for_minimality cand set cst =
-    T.Set.to_seq set.CI.sub_constants
+    CI.sub_constants set
     |> Sequence.flat_map
-      (fun t' ->
-        let lits = ClauseContext.apply cand.cand_ctx t' in
+      (fun (t':CI.sub_cst) ->
+        let lits = ClauseContext.apply cand.cand_ctx (t':>T.t) in
         let cst, t = CI.inductive_cst_of_sub_cst t' in
         (* ground every variable of the clause, because of the negation
             in front of "forall" *)
@@ -830,14 +836,14 @@ struct
     (* print a coverset *)
     let print_coverset cst fmt set =
       Format.fprintf fmt "@[<h>cover set {%a}@]"
-        (Sequence.pp_seq T.fmt) (set.CI.cases |> CCList.to_seq)
+        (Sequence.pp_seq CI.Case.print) (CI.cases set)
     (* print a clause context *)
     and print_cand cst fmt cand =
       Format.fprintf fmt "@[<h>%a@]" ClauseContext.print cand.cand_ctx
     in
     (* print the loop for cst *)
     let print_cst fmt cst =
-      Format.fprintf fmt "@[<hv2>for %a:@ %a@,%a@]" CI.pp_cst cst
+      Format.fprintf fmt "@[<hv2>for %a:@ %a@,%a@]" CI.Cst.print cst
         (Sequence.pp_seq ~sep:"" (print_coverset cst))
         (CI.cover_sets cst)
         (Sequence.pp_seq ~sep:"" (print_cand cst))
