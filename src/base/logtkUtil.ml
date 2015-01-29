@@ -310,37 +310,6 @@ let rec lexicograph_combine l = match l with
 
 let opposite_order ord a b = - (ord a b)
 
-(** {2 Array utils} *)
-
-let array_foldi f acc a =
-  let rec recurse acc i =
-    if i = Array.length a then acc else recurse (f acc i a.(i)) (i+1)
-  in recurse acc 0
-
-let array_forall p a =
-  let rec check i =
-    if i = Array.length a then true else p a.(i) && check (i+1)
-  in check 0
-
-let array_forall2 p a1 a2 =
-  let rec check i =
-    if i = Array.length a1 then true else p a1.(i) a2.(i) && check (i+1)
-  in
-  if Array.length a1 <> Array.length a2
-    then raise (Invalid_argument "array_forall2")
-    else check 0
-
-let array_exists p a =
-  let rec check i =
-    if i = Array.length a then false else p a.(i) || check (i+1)
-  in check 0
-
-(** all the elements of a, but the i-th, into a list *)
-let array_except_idx a i =
-  array_foldi
-    (fun acc j elt -> if i = j then acc else elt::acc)
-    [] a
-
 (** {2 String utils} *)
 
 let str_sub ~sub i s j =

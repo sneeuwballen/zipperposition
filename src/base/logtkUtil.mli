@@ -133,23 +133,6 @@ val lexicograph_combine : int list -> int
 (** the opposite order, that sorts elements the opposite way *)
 val opposite_order : ('a -> 'b -> int) -> 'a -> 'b -> int
 
-(** {2 Array utils} *)
-
-val array_foldi : ('b -> int -> 'a -> 'b) -> 'b -> 'a array -> 'b
-  (** fold left on array, with index *)
-
-val array_forall : ('a -> bool) -> 'a array -> bool
-  (** Forall on array *)
-
-val array_forall2 : ('a -> 'a -> bool) -> 'a array -> 'a array -> bool
-  (** Forall on pairs of arrays (Invalid_argument if they have distinct lengths) *)
-
-val array_exists : ('a -> bool) -> 'a array -> bool
-  (** exists on array *)
-
-val array_except_idx : 'a array -> int -> 'a list
-  (** Elements of array except the one at given index (reverse list) *)
-
 (** {2 String utils} *)
 
 val str_sub : sub:string -> int -> string -> int -> bool
