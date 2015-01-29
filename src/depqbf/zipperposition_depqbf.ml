@@ -32,13 +32,13 @@ module BS = BoolSolver
 let section = Logtk.Util.Section.make ~parent:BS.section "depqbf"
 
 module Make(X : sig end) : BS.QBF = struct
-  module LitSet = Sequence.Set.Make(CCInt)
+  module LitSet = Sequence.Set.Make(Qbf.Lit)
 
   type quantifier = Qbf.quantifier
 
   let level0 = 0
 
-  type lit = int
+  type lit = Qbf.Lit.t
 
   let pp_ = ref Qbf.Lit.print
 
@@ -98,19 +98,19 @@ module Make(X : sig end) : BS.QBF = struct
 
   let add_clause_ c =
     List.iter (Depqbf.add solver) c;
-    Depqbf.add solver 0
+    Depqbf.add0 solver
 
   let add_clause c =
     reset_ ();
     add_clause_ c
 
   let valuation l =
-    if l<=0 then invalid_arg "valuation";
+    if not (Qbf.Lit.sign l) then invalid_arg "valuation";
     match !result_ with
     | Qbf.Unsat
     | Qbf.Unknown -> failwith "QBF solver didn't return \"SAT\""
     | Qbf.Sat v ->
-        begin match v (abs l) with
+        begin match v (Qbf.Lit.abs l) with
           | Qbf.Undef -> failwith "literal not valued in the model"
           | Qbf.True -> true
           | Qbf.False -> false
@@ -121,6 +121,11 @@ module Make(X : sig end) : BS.QBF = struct
     reset_ ();
     List.iter add_clause_ l
 
+  let add_form f =
+    let clauses = Qbf.Formula.cnf ~gensym:Qbf.Lit.fresh f in
+    add_clauses clauses
+
+
   let add_clause_seq seq =
     reset_ ();
     seq add_clause_
@@ -129,17 +134,17 @@ module Make(X : sig end) : BS.QBF = struct
     reset_ ();
     let level = Depqbf.new_scope solver q in
     List.iter
-      (fun lit -> Depqbf.add solver (abs lit))
+      (fun lit -> Depqbf.add solver (Qbf.Lit.abs lit))
       lits;
-    Depqbf.add solver 0;
+    Depqbf.add0 solver;
     level
 
   let quantify_lits level lits =
     reset_ ();
-    Logtk.Util.debug ~section 3 "quantify at level %d lits %a"
-      level (CCList.pp CCInt.pp) lits;
+    Logtk.Util.debugf ~section 3 "quantify at level %d lits %a"
+      level (CCList.print Qbf.Lit.print) lits;
     List.iter
-      (fun lit -> Depqbf.add_var_to_scope solver (abs lit) level)
+      (fun lit -> Depqbf.add_var_to_scope solver (Qbf.Lit.abs lit) level)
       lits
 
   let check () =

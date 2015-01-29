@@ -44,7 +44,7 @@ let section =
 
 module type S = sig
   module Env : Env.S
-  module C : module type of Env.C
+  module C : module type of Env.C with type t = Env.C.t
   module PS : module type of Env.ProofState
 
   (** {6 Term Indices} *)

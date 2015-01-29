@@ -58,15 +58,17 @@ let is_constructor_ s = match s with
       List.exists (fun (_, cstors) -> List.mem name cstors) !ind_types_
   | _ -> false
 
-module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolSolver.QBF) = struct
-  module Env = E
+module Make(Sup : Superposition.S)
+           (Solver : BoolSolver.QBF) =
+struct
+  module Env = Sup.Env
   module Ctx = Env.Ctx
 
   module C = Env.C
   module CI = Ctx.Induction
   module CCtx = ClauseContext
   module BoolLit = Ctx.BoolLit
-  module Avatar = Avatar.Make(E)(Solver)  (* will use some inferences *)
+  module Avatar = Avatar.Make(Env)(Solver)  (* will use some inferences *)
 
   (** Map that is subsumption-aware *)
   module FVMap(X : sig type t end) = struct
@@ -558,12 +560,15 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
   let scan_given_for_proof c =
     let lits = C.lits c in
     if Array.length lits = 0
-    then () (* proofs from [false] aren't interesting *)
-    else FV_cand.find_subsumed_by !candidates_by_idx_ lits
+    then [] (* proofs from [false] aren't interesting *)
+    else (
+      FV_cand.find_subsumed_by !candidates_by_idx_ lits
       |> Sequence.iter
         (fun (lits', set) ->
           _process_clause_match_watched c lits' !set
-        )
+        );
+      []
+    )
 
   (* scan the set of active clauses, to see whether it proves some
       of the candidate contexts' initial form in [new_contexts] *)
@@ -582,13 +587,17 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
                 _process_clause_match_watched
                   c ctx.cand_lits (CandidateCtxSet.singleton ctx)
           )
-      ) l
+      ) l;
+    [] (* no new clause *)
 
   (** {6 Encoding to QBF} *)
 
   let candidates_for_ cst : candidate_context Sequence.t =
     !(find_candidates_for_cst_ cst)
     |> ClauseContextMap.values
+
+  (* sub-constants of a term *)
+  let sub_constants_ cst : T.t Sequence.t = assert false (* TODO *)
 
   let neg_ = BoolLit.neg
   let valid_ x = BoolLit.inject_name' "valid(%s)" (CI.show_cst x)
@@ -667,8 +676,6 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
     Solver.add_clause_seq clauses;
     ()
 
-  (* TODO: from here *)
-
   (* encode [minimal(cst,t)]:
     minimal(cst,t) =>
       bigand_{t' sub-constant of t}
@@ -692,39 +699,11 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
         Solver.add_form
           (QF.imply
             (QF.atom (minimal_ cst t))
-            (QF.and_map (assert false)) (* TODO iterate on sub-constants of t *)
-            (assert false)
+            (QF.and_map (assert false) (assert false)) (* TODO iterate on sub-constants of t *)
           )
       )
 
-  (* TODO: remove *)
-  let qbf_encode_minimal_ cst =
-    let candidates = !(find_candidates_ cst) |> FV_cand.to_seq |> Sequence.map snd in
-    (* Big_or, to choose which context is going to be the one
-      that expresses minimality *)
-    Solver.add_clause
-      ( neg_ (minimal_ cst)
-      :: (
-        candidates
-        |> Sequence.map
-          (fun cand -> expresses_minimality_aux_ cand.cand_ctx cst)
-        |> Sequence.to_rev_list
-      )
-    );
-    (* for each candidate, express what it means to be the one to
-        express minimality *)
-    candidates
-      |> Sequence.iter
-        (fun cand ->
-          let elit_aux = expresses_minimality_aux_ cand.cand_ctx cst
-          and elit = expresses_minimality_ cand.cand_ctx cst in
-          Solver.quantify_lits level2_ [elit_aux; elit];
-          Solver.add_clauses
-            [ [ neg_ elit_aux; in_loop_ cand.cand_ctx cst ]
-            ; [ neg_ elit_aux; elit ]
-            ]
-        );
-    ()
+  (* TODO: from here *)
 
   (* the whole process of:
       - adding non-backtracking constraints
@@ -795,8 +774,8 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
           (fun lit ->
             let lit = Literal.apply_subst ~renaming subst lit 1 in
             let trail = C.Trail.of_list
-              [ expresses_minimality_ cand.cand_ctx cst
-              ; is_true_ [| Literal.mk_eq t cst |]
+              [ expresses_minimality_ cand.cand_ctx cst t
+              ; is_eq_ cst t
               ]
             in
             let proof cc = Proof.mk_c_inference
@@ -831,14 +810,12 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
     new_contexts := [];
     let clauses = List.fold_left
       (fun acc (cst,set) ->
-        !(find_candidates_ cst)
-          |> FV_cand.to_seq
-          |> Sequence.map snd
-          |> Sequence.fold
-            (fun acc cand ->
-              let clauses = split_for_minimality cand set cst in
-              List.rev_append clauses acc
-            ) acc
+        candidates_for_ cst
+        |> Sequence.fold
+          (fun acc cand ->
+            let clauses = split_for_minimality cand set cst in
+            List.rev_append clauses acc
+          ) acc
       ) clauses !new_cover_sets
     in
     new_cover_sets := [];
@@ -854,40 +831,21 @@ module Make(E : Env.S)(Sup : Superposition.S with module Env = E)(Solver : BoolS
     let print_coverset cst fmt set =
       Format.fprintf fmt "@[<h>cover set {%a}@]"
         (Sequence.pp_seq T.fmt) (set.CI.cases |> CCList.to_seq)
-    (* print a clause context; print for which terms it's provable *)
+    (* print a clause context *)
     and print_cand cst fmt cand =
-      let has_proof lits =
-        match find_proofs_ lits with
-        | None -> false
-        | Some _ -> true
-      in
-      let lits = CI.cover_sets cst
-          |> Sequence.flat_map (fun set -> T.Set.to_seq set.CI.sub_constants)
-          |> Sequence.map
-            (fun t -> t, ClauseContext.apply cand.cand_ctx t)
-          |> Sequence.(cons (cand.cand_cst, cand.cand_lits))
-      in
-      let proofs =
-        Sequence.filter_map
-          (fun (t, lits) -> if has_proof lits then Some t else None)
-          lits
-      in
-      Format.fprintf fmt "@[<h>(%s) %a   (proofs: %a)@]"
-        (if cand.cand_initialized then "*" else " ")
-        ClauseContext.print cand.cand_ctx
-        (Sequence.pp_seq ~sep:", " T.fmt) proofs
+      Format.fprintf fmt "@[<h>%a@]" ClauseContext.print cand.cand_ctx
     in
     (* print the loop for cst *)
     let print_cst fmt cst =
-      Format.fprintf fmt "@[<hv2>for %a:@ %a@,%a@]" T.fmt cst
+      Format.fprintf fmt "@[<hv2>for %a:@ %a@,%a@]" CI.pp_cst cst
         (Sequence.pp_seq ~sep:"" (print_coverset cst))
         (CI.cover_sets cst)
         (Sequence.pp_seq ~sep:"" (print_cand cst))
-        (!(find_candidates_ cst) |> FV_cand.to_seq |> Sequence.map snd)
+        (candidates_for_ cst)
     in
     Format.printf "@[<v2>inductive constants:@ %a@]@."
       (Sequence.pp_seq ~sep:"" print_cst)
-      (T.Tbl.to_seq candidates_ |> Sequence.map fst);
+      (CstTbl.keys candidates_by_icst_);
     ()
 
   (** {6 Registration} *)
@@ -967,7 +925,7 @@ let extension =
     let module Sup = (val sup : Superposition.S) in
     let module Solver = (val BoolSolver.get_qbf() : BoolSolver.QBF) in
     Util.debug ~section:section_qbf 2 "created QBF solver \"%s\"" Solver.name;
-    let module A = Make(E)(Sup)(Solver) in
+    let module A = Make(Sup)(Solver) in
     A.register();
     if !summary_ then A.summary_on_exit()
   (* add an ordering constraint: ensure that constructors are smaller
@@ -1047,7 +1005,10 @@ let init_from_decls pairs =
 
 let () =
   Params.add_opts
-    [ "-induction", Arg.String add_ind_type_, " enable Induction on the given type"
-    ; "-induction-depth", Arg.Set_int cover_set_depth_, " set default induction depth"
-    ; "-induction-summary", Arg.Set summary_, " show summary of induction before exit"
+    [ "-induction", Arg.String add_ind_type_,
+      " enable Induction on the given type"
+    ; "-induction-depth", Arg.Set_int cover_set_depth_,
+      " set default induction depth"
+    ; "-induction-summary", Arg.Set summary_,
+      " show summary of induction before exit"
     ]

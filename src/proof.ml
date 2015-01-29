@@ -235,7 +235,7 @@ let traverse ?traversed proof k =
 let distance_to_conjecture p =
   let best_distance = ref None in
   traverse_depth p
-    (fun (p', depth) -> 
+    (fun (p', depth) ->
       if is_conjecture p'
       then
         let new_best = match !best_distance with
