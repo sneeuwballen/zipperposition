@@ -191,7 +191,7 @@ module Make(Sup : Superposition.S) = struct
         with Not_found | Unif.Fail | Exit | Invalid_argument _ ->
           pos_list, subst)
     in
-    let positions = Util.list_uniq Position.eq positions in
+    let positions = CCList.Set.uniq ~eq:Position.eq positions in
     positions, subst
 
   (* check ordering conditions for the active clause in equality chaining *)
@@ -301,7 +301,7 @@ module Make(Sup : Superposition.S) = struct
         (* now we can combine the two clauses *)
         let renaming = Ctx.renaming_clear () in
         (* literals of new clause: active... *)
-        let lits_a = Util.array_except_idx (C.lits active) (Lits.Pos.idx active_pos) in
+        let lits_a = CCArray.except_idx (C.lits active) (Lits.Pos.idx active_pos) in
         let lits_a = Lit.apply_subst_list ~renaming subst lits_a s_a in
         (* and passive (subst then replace subterms) *)
         let lits_p = Array.copy (C.lits passive) in
@@ -347,7 +347,7 @@ module Make(Sup : Superposition.S) = struct
         (* now we can combine the two clauses *)
         let renaming = Ctx.renaming_clear () in
         (* literals of new clause: active... *)
-        let lits_a = Util.array_except_idx (C.lits active) (Lits.Pos.idx active_pos) in
+        let lits_a = CCArray.except_idx (C.lits active) (Lits.Pos.idx active_pos) in
         let lits_a = Lit.apply_subst_list ~renaming subst lits_a s_a in
         (* and passive (subst then replace subterms) *)
         let lits_p = Array.copy (C.lits passive) in
@@ -560,7 +560,7 @@ module Make(Sup : Superposition.S) = struct
             let subst = Unif.FO.unification lit.TO.left 0 lit.TO.right 0 in
             (* remove lit and make a new clause after substitution *)
             let i = Lits.Pos.idx lit_pos in
-            let lits = Util.array_except_idx (C.lits c) i in
+            let lits = CCArray.except_idx (C.lits c) i in
             let renaming = Ctx.renaming_clear () in
             let lits = Lit.apply_subst_list ~renaming subst lits 0 in
             let premises = [C.proof c] (* lit.TO.instance.TO.proof *) in
@@ -659,7 +659,7 @@ module Make(Sup : Superposition.S) = struct
       then begin
         let lits = BV.select bv (C.lits c) in
         let theories = ["total_order"] in
-        instances := Util.list_uniq TO.eq !instances;
+        instances := CCList.Set.uniq ~eq:TO.eq !instances;
         (*
         let proofs = Util.list_flatmap (fun instance -> instance.TO.proof) !instances in
         *)

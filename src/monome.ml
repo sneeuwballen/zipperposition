@@ -126,7 +126,7 @@ let rec _merge ~num op l1 l2 = match l1, l2 with
 
 (* map [f] on all symbols of [e] *)
 let _fmap f e =
-  let terms = Util.list_fmap
+  let terms = CCList.filter_map
     (fun (s,t) ->
       let s' = f s in
       if e.num.cmp e.num.zero s' = 0
@@ -311,7 +311,7 @@ let is_ground m =
   List.for_all (fun (_, t) -> T.is_ground t) m.terms
 
 let fold f acc m =
-  Util.list_foldi
+  CCList.Idx.foldi
     (fun acc i (n, t) -> f acc i n t)
     acc m.terms
 
@@ -329,7 +329,7 @@ let fold_max ~ord f acc m =
     |> Sequence.map2 (fun t _ -> t)
     |> T.Seq.add_set T.Set.empty
   in
-  Util.list_foldi
+  CCList.Idx.foldi
     (fun acc i (c, t) -> if T.Set.mem t max then f acc i c t else acc)
     acc m.terms
 
@@ -378,14 +378,14 @@ let nth m n =
 
 let set m n (c,t) =
   try
-    let terms = Util.list_set m.terms n (c,t) in
+    let terms = CCList.Idx.set m.terms n (c,t) in
     {m with terms; }
   with _ -> _fail_idx m n
 
 let set_term m n t =
   try
     let (c, _) = List.nth m.terms n in
-    let terms = Util.list_set m.terms n (c,t) in
+    let terms = CCList.Idx.set m.terms n (c,t) in
     {m with terms; }
   with _ -> _fail_idx m n
 
@@ -400,7 +400,7 @@ module Focus = struct
     try
       let coeff, term = List.nth m.terms i in
       assert (m.num.sign coeff <> 0);
-      let rest = {m with terms=Util.list_remove m.terms i} in
+      let rest = {m with terms=CCList.Idx.remove m.terms i} in
       { term; coeff; rest; }
     with _ -> _fail_idx m i
 
@@ -468,10 +468,10 @@ module Focus = struct
       mf.rest.terms
 
   let fold_m ~pos m acc f =
-    Util.list_foldi
+    CCList.Idx.foldi
       (fun acc i (c,t) ->
         let pos = Position.(append pos (arg i stop)) in
-        let rest = {m with terms=Util.list_remove m.terms i} in
+        let rest = {m with terms=CCList.Idx.remove m.terms i} in
         let mf = {coeff=c; term=t; rest;} in
         f acc mf pos
       ) acc m.terms

@@ -279,7 +279,7 @@ module Make(C : Clause.S) = struct
   let goals =
     (* check whether a literal is a goal *)
     let is_goal_lit lit = Lit.is_neg lit in
-    let is_goal_clause c = Util.array_forall is_goal_lit (C.lits c) in
+    let is_goal_clause c = CCArray.for_all is_goal_lit (C.lits c) in
     let name = "prefer_goals" in
     mk_queue ~accept:is_goal_clause ~weight:WeightFun.default name
 
@@ -290,7 +290,7 @@ module Make(C : Clause.S) = struct
   let non_goals =
     (* check whether a literal is a goal *)
     let is_goal_lit lit = Lit.is_neg lit in
-    let is_non_goal_clause c = Util.array_forall
+    let is_non_goal_clause c = CCArray.for_all
       (fun x -> not (is_goal_lit x))
       (C.lits c) in
     let name = "prefer_non_goals" in

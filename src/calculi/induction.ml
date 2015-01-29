@@ -321,7 +321,7 @@ struct
         );
       c (* nothing happened *)
     with FoundInductiveLit (idx, pairs) ->
-      let lits = Util.array_except_idx (C.lits c) idx in
+      let lits = CCArray.except_idx (C.lits c) idx in
       let new_lits = List.map (fun (t1,t2) -> Literal.mk_neq t1 t2) pairs in
       let proof cc = Proof.mk_c_inference ~theories:["induction"]
         ~rule:"injectivity_destruct" cc [C.proof c]
