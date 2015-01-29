@@ -84,7 +84,7 @@ let rec apply tr f = match tr with
     let f' = transform f in
     match f' with
     | [f''] when F.eq f f'' -> f'
-    | _ -> LogtkUtil.list_flatmap (apply tr) f'
+    | _ -> CCList.flat_map (apply tr) f'
 
 let pp buf tr = match tr with
   | RwTerm trs -> Buffer.add_string buf "TRS"

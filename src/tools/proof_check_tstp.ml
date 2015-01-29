@@ -113,7 +113,7 @@ let mk_proof_obligation proof =
       AU.FOF(step.TT.id, A.R_conjecture, c, []), step
     | _ -> assert false
     in
-    let premises = Util.list_fmap
+    let premises = CCList.filter_map
       (fun parent -> match parent with
         | TT.InferClause (c, lazy step') ->
           let c = F.to_prolog (F.close_forall (F.Base.or_ c)) in

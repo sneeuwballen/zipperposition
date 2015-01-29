@@ -661,12 +661,12 @@ module Make(MyT : TERM) = struct
     open_one offset LogtkDBEnv.empty f
 
   let rec open_and f = match view f with
-    | And l -> LogtkUtil.list_flatmap open_and l
+    | And l -> CCList.flat_map open_and l
     | True -> []
     | _ -> [f]
 
   let rec open_or f = match view f with
-    | Or l -> LogtkUtil.list_flatmap open_or l
+    | Or l -> CCList.flat_map open_or l
     | False -> []
     | _ -> [f]
 

@@ -91,19 +91,6 @@ val set_memory_limit : int -> unit
 val set_time_limit : int -> unit
 (** Limit the CPU time available to the process (in seconds) *)
 
-(** {2 Infix operators} *)
-
-module Infix : sig
-  val (|>) : 'a -> ('a -> 'b) -> 'b
-    (** Application pipeline *)
-
-  val (%>) : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c
-    (** Function composition *)
-
-  val (%%) : ('b -> 'c) -> ('a -> 'b) -> 'a -> 'c
-    (** Function composition *)
-end
-
 (** {2 profiling facilities} *)
 
 type profiler
@@ -145,88 +132,6 @@ val lexicograph_combine : int list -> int
 
 (** the opposite order, that sorts elements the opposite way *)
 val opposite_order : ('a -> 'b -> int) -> 'a -> 'b -> int
-
-(** {2 List utils} *)
-
-val list_get : 'a list -> int -> 'a
-  (** get n-th element of list (linear), or Not_found *)
-
-val list_set : 'a list -> int -> 'a -> 'a list
-  (** set n-th element of list (linear) *)
-
-val list_mapi : 'a list -> (int -> 'a -> 'b) -> 'b list
-  (** map with index *)
-
-val list_iteri : 'a list -> (int -> 'a -> unit) -> unit
-  (** iter with index *)
-
-val list_remove : 'a list -> int -> 'a list
-  (** all the list but i-th element (linear) *)
-
-val list_pos : 'a list -> ('a * int) list
-  (** zip the list with positions (starting at 0) *)
-
-val list_mem : ('a -> 'a -> bool) -> 'a -> 'a list -> bool
-  (** test for membership using the given comparison function *)
-
-val list_subset : ('a -> 'a -> bool) -> 'a list -> 'a list -> bool
-  (** test for inclusion *)
-
-val list_uniq : ('a -> 'a -> bool) -> 'a list -> 'a list
-  (** list uniq: remove duplicates w.r.t the equality predicate *)
-
-val list_merge : ('a -> 'a -> int) -> 'a list -> 'a list -> 'a list
-  (** merges elements from both sorted list, removing duplicates *)
-
-val list_union : ('a -> 'a -> bool) -> 'a list -> 'a list -> 'a list
-  (** list union, given the comparison function *)
-
-val list_inter : ('a -> 'a -> bool) -> 'a list -> 'a list -> 'a list
-  (** list intersection, given the comparison function *)
-
-val list_split_at : int -> 'a list -> 'a list * 'a list
-  (** [split_at n l] returns [l1, l2] with [l1 @ l2 = l]
-      and [length l1 = min n (length l)] *)
-
-val list_find : ('a -> bool) -> 'a list -> (int * 'a) option
-  (** find the first index of element, elemnt s.t. the element satisfies the predicate *)
-
-val list_fmap : ('a -> 'b option) -> 'a list -> 'b list
-  (** filter map *)
-
-val list_flatmap : ('a -> 'b list) -> 'a list -> 'b list
-  (** flatten map *)
-
-val list_take : int -> 'a list -> 'a list
-  (** take n elements *)
-
-val list_drop : int -> 'a list -> 'a list
-  (** drop n elements *)
-
-val list_range : int -> int -> int list
-  (** range from i to j *)
-
-val list_foldi : ('b -> int -> 'a -> 'b) -> 'b -> 'a list -> 'b
-  (** fold on list, with index *)
-
-val times : int -> (unit -> 'a) -> 'a list
-  (** call the function n times with unit *)
-
-val list_product : 'a list -> 'b list -> ('a * 'b) list
-  (** Cartesian product *)
-
-val list_fold_product : 'a list -> 'b list -> 'c -> ('c -> 'a -> 'b -> 'c) -> 'c
-  (** Fold on the cartesian product *)
-
-val list_diagonal : 'a list -> ('a * 'a) list
-  (** All pairs of distinct positions of the list. [list_diagonal l] will
-      return the list of [List.nth i l, List.nth j l] if [i < j]. *)
-
-val array_shuffle : 'a array -> unit
-  (** shuffle randomly the array, in place *)
-
-val list_shuffle : 'a list -> 'a list
-  (** shuffle randomly the list *)
 
 (** {2 Array utils} *)
 
