@@ -22,3 +22,4 @@ PKG unix
 PKG qbf
 PKG qbf.quantor
 PKG qbf.depqbf
+PKG ppx_deriving.std
