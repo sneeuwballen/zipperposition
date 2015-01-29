@@ -127,6 +127,8 @@ let get_debug () = Section.root.Section.level
 let need_cleanup = ref false
 
 let debug_buf_ = Buffer.create 32 (* shared buffer (not thread safe)  *)
+let debug_fmt_ = Format.std_formatter
+
 let debug ?(section=Section.root) l format =
   if l <= Section.cur_level section
     then (
@@ -143,6 +145,21 @@ let debug ?(section=Section.root) l format =
         debug_buf_ format)
     else
       Printf.ifprintf debug_buf_ format
+
+let debugf ?(section=Section.root) l msg =
+  if l <= Section.cur_level section
+    then (
+      let now = get_total_time () in
+      if section == Section.root
+        then Format.fprintf debug_fmt_ "@[<hov>%% [%.3f] " now
+        else Format.fprintf debug_fmt_ "@[<hov>%% [%.3f %s] "
+          now section.Section.full_name;
+        Format.kfprintf
+          (fun fmt -> Format.fprintf fmt "@]@.")
+          debug_fmt_ msg
+    )
+    else
+      Format.ifprintf debug_fmt_ msg
 
 let pp_pos pos =
   let open Lexing in
