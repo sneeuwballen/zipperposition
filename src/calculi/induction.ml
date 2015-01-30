@@ -656,8 +656,8 @@ struct
       (QF.imply
         (QF.atom (valid_ cst))
         (QF.and_map (CI.cover_sets cst)
-          ~f:(fun set -> QF.or_map (set.CI.cases |> CCList.to_seq)
-            ~f:(fun t -> QF.or_l
+          ~f:(fun set -> QF.or_map (CI.cases set)
+            ~f:(fun t -> QF.and_l
                 [ QF.atom (is_eq_ cst t)
                 ; QF.atom (minimal_ cst t)
                 ]
@@ -700,16 +700,32 @@ struct
           |> Sequence.of_list
       )
     |> Sequence.iter
-      (fun (set, t) ->
-        (* now to define minimal(cst,t) *)
+      (fun (set, case) ->
+        (* now to define minimal(cst,case) *)
         Solver.add_form
           (QF.imply
-            (QF.atom (minimal_ cst t))
-            (QF.and_map (assert false) (assert false)) (* TODO iterate on sub-constants of t *)
+            (QF.atom (minimal_ cst case))
+            (QF.and_map
+              ( CI.sub_constants set
+               |> Sequence.filter
+                (fun t' ->
+                  let _, case' = CI.inductive_cst_of_sub_cst t' in
+                  CI.Case.equal case case'
+                )
+              )
+              ~f:(fun sub ->
+                QF.or_map
+                  (candidates_for_ cst)
+                  ~f:(fun ctx ->
+                      QF.or_l
+                      [ QF.atom (in_loop_ ctx.cand_ctx cst)
+                      ; QF.atom (expresses_minimality_ ctx.cand_ctx cst case)
+                      ]
+                  )
+                )
+              )
           )
       )
-
-  (* TODO: from here *)
 
   (* the whole process of:
       - adding non-backtracking constraints
@@ -746,7 +762,6 @@ struct
 
   (** {6 Expressing Minimality} *)
 
-  (* TODO: move all this into CI? *)
   (* build a skolem term to replace [v] *)
   let skolem_term v =
     let sym = Logtk.Skolem.fresh_sym_with ~ctx:Ctx.skolem ~ty:(T.ty v) "#min" in
