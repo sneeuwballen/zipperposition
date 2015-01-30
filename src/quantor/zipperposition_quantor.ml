@@ -39,7 +39,19 @@ type lit = Qbf.Lit.t
 
 module Make(X : sig end) : BS.QBF = struct
   module LitSet = Sequence.Set.Make(Qbf.Lit)
-  module ClauseSet = Sequence.Set.Make(LitSet)
+
+  type form =
+    | Clause of LitSet.t
+        [@printer fun fmt l -> CCFormat.seq Qbf.Lit.print fmt (LitSet.to_seq l)]
+
+    | Form of Qbf.Formula.t
+        [@printer Qbf.Formula.print]
+    [@@deriving ord,show]
+
+  module FormSet = Sequence.Set.Make(struct
+    type t = form
+    let compare = compare_form
+  end)
 
   (* add a list of literals to the set *)
   let _add_list set l =
@@ -60,14 +72,14 @@ module Make(X : sig end) : BS.QBF = struct
 
   (* current (backtrackable) state  *)
   type state = {
-    mutable clauses : ClauseSet.t;
+    mutable forms : FormSet.t;
     mutable result : Qbf.result;
   }
 
   (* stack of states *)
   let stack : state CCVector.vector =
     let v = CCVector.create () in
-    CCVector.push v {clauses=ClauseSet.empty; result=Qbf.Unknown};
+    CCVector.push v {forms=FormSet.empty; result=Qbf.Unknown};
     v
 
   let get_state_ () =
@@ -105,7 +117,7 @@ module Make(X : sig end) : BS.QBF = struct
 
   let add_clause c =
     let st = get_state_ () in
-    st.clauses <- ClauseSet.add (clause_of_lits_ c) st.clauses
+    st.forms <- FormSet.add (Clause (clause_of_lits_ c)) st.forms
 
   let valuation l =
     if not (Qbf.Lit.sign l) then invalid_arg "valuation";
@@ -122,11 +134,8 @@ module Make(X : sig end) : BS.QBF = struct
   let add_clauses = List.iter add_clause
 
   let add_form f =
-    let clauses = Qbf.Formula.cnf
-      ~gensym:Qbf.Lit.fresh
-      f
-    in
-    add_clauses clauses
+    let st = get_state_ () in
+    st.forms <- FormSet.add (Form f) st.forms
 
   let add_clause_seq seq = seq add_clause
 
@@ -141,17 +150,27 @@ module Make(X : sig end) : BS.QBF = struct
     CCVector.set _lits l (q,set')
 
   let to_cnf_ clauses =
-    ClauseSet.to_seq clauses
-    |> Sequence.map LitSet.to_list
+    FormSet.to_seq clauses
+    |> Sequence.flat_map
+        (function
+          | Clause lits -> Sequence.singleton (LitSet.to_list lits)
+          | Form f ->
+              let clauses = Qbf.Formula.cnf ~gensym:Qbf.Lit.fresh f in
+              Sequence.of_list clauses
+        )
     |> Sequence.to_rev_list
 
-  let _mk_form () =
+  let _get_form () =
+    let st = get_state_ () in
+    st.forms
+
+  let _mk_qcnf () =
     (* at quantifier level [i] *)
     let rec _recurse_quant i =
       if i = CCVector.length _lits
         then
           let st = get_state_ () in
-          Qbf.QCNF.prop (to_cnf_ st.clauses)
+          Qbf.QCNF.prop (to_cnf_ st.forms)
         else
           let q, lits = CCVector.get _lits i in
           Qbf.QCNF.quantify q (LitSet.to_list lits) (_recurse_quant (i+1))
@@ -159,10 +178,12 @@ module Make(X : sig end) : BS.QBF = struct
     _recurse_quant 0
 
   let check () =
-    let f = _mk_form () in
+    let f = _mk_qcnf () in
     if Logtk.Util.Section.cur_level section >= 5 then (
-      Format.printf "@[<hv2>QBF formula:@ %a@]@."
-        (Qbf.QCNF.print_with ~pp_lit:!pp_) f
+      Format.printf "@[<hv2>QCNF sent to solver:@ %a@]@."
+        (Qbf.QCNF.print_with ~pp_lit:!pp_) f;
+      Format.printf "@[<hv2>formula before CNF:@ %a@]@."
+        (CCFormat.seq pp_form) (FormSet.to_seq (_get_form ()))
     );
     let st = get_state_ () in
     st.result <- Quantor.solve f;
