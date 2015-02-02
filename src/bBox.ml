@@ -61,11 +61,6 @@ struct
 
   [@@@warning "-39"]
 
-  (** Predicate attached to a set of literals *)
-  type lits_predicate =
-    | TrailOk (** Some trail that proves lits is true *)
-    [@@deriving ord]
-
   type ctx_predicate =
     | InLoop (** lits = ctx[i], where ctx in loop(i) *)
     | InitOk (** Ctx is initialized *or* it's not in loop *)
@@ -74,7 +69,6 @@ struct
 
   type injected =
     | Clause_component of Literals.t
-    | Lits of Literals.t * lits_predicate
     | Ctx of
       ClauseContext.t
       * (inductive_cst [@compare I.compare])
@@ -82,9 +76,6 @@ struct
     | Name of string  (* name for CNF *)
     | Input (** input marker *)
     [@@deriving ord]
-
-  let string_of_lits_pred lits = function
-    | TrailOk -> Util.sprintf "⟦trail_ok(%a)⟧" Lits.pp lits
 
   let string_of_ctx_pred ctx i = function
     | InLoop ->
@@ -100,9 +91,6 @@ struct
   let pp_injected buf = function
     | Clause_component lits ->
         Printf.bprintf buf "⟦%a⟧" (Util.pp_array ~sep:" ∨ " Literal.pp) lits
-    | Lits (lits, pred) ->
-        let s = string_of_lits_pred lits pred in
-        Buffer.add_string buf s
     | Ctx (lits, ind, pred) ->
         let s = string_of_ctx_pred lits ind pred in
         Buffer.add_string buf s
@@ -141,8 +129,7 @@ struct
     Util.debug ~section 4 "save bool_lit %d = %a"
       (t:t:>int) pp_injected injected;
     match injected with
-    | Clause_component lits
-    | Lits (lits, _) ->
+    | Clause_component lits ->
         (* also be able to retrieve by lits *)
         _clause_set := FV.add !_clause_set (lits, injected, t)
     | Ctx (cc, cst, _) ->
@@ -177,26 +164,6 @@ struct
               let lits_copy = Array.copy lits in
               _save (Clause_component lits_copy) i;
               BLit.apply_sign sign i
-          )
-
-  let inject_lits_pred lits pred =
-    _retrieve_alpha_equiv lits
-      |> Sequence.filter_map
-        (function
-          | lits', Lits (_, pred'), blit
-            when Lits.are_variant lits lits'
-            && compare_lits_predicate pred pred' = 0 -> Some blit
-          | _ -> None
-        )
-      |> Sequence.head
-      |> (function
-          | Some blit -> blit
-          | None ->
-              let i = BLit.fresh () in
-              (* maintain mapping *)
-              let lits_copy = Array.copy lits in
-              _save (Lits (lits_copy, pred)) i;
-              i
           )
 
   let inject_ctx ctx (t:I.t) pred =
@@ -249,7 +216,6 @@ struct
 
   let keep_in_splitting l = match extract_exn (BLit.abs l) with
     | Clause_component _ -> false
-    | Lits _
     | Ctx _
     | Input
     | Name _ -> true
@@ -258,10 +224,6 @@ struct
     | Name _
     | Input
     | Clause_component _ -> None
-    | Lits (_, pred) ->
-        begin match pred with
-        | TrailOk -> None
-        end
     | Ctx (_, t, _) -> Some t
 
   let pp buf i =
@@ -279,9 +241,6 @@ struct
     | Some (Clause_component lits) ->
         Format.fprintf fmt "@[⟦%a⟧@]"
           (CCArray.print ~sep:" ∨ " Literal.fmt) lits
-    | Some (Lits (lits, pred)) ->
-        let s = string_of_lits_pred lits pred in
-        Format.pp_print_string fmt s
     | Some (Ctx (lits, ind, pred)) ->
         let s = string_of_ctx_pred lits ind pred in
         Format.pp_print_string fmt s

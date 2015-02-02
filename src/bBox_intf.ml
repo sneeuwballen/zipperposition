@@ -63,11 +63,6 @@ module type S = sig
   val set_sign : bool -> t -> t
   (** Set the sign of the literal to the given boolean *)
 
-  (** Predicate attached to a set of literals *)
-  type lits_predicate =
-    | TrailOk (** Some trail that proves lits is true *)
-    [@@deriving ord]
-
   type ctx_predicate =
     | InLoop  (** ctx in loop(i) *)
     | InitOk (** Ctx is initialized *or* it's not in loop *)
@@ -78,7 +73,6 @@ module type S = sig
 
   type injected = private
     | Clause_component of Literals.t
-    | Lits of Literals.t * lits_predicate
     | Ctx of ClauseContext.t * inductive_cst * ctx_predicate
     | Name of string  (* name for CNF *)
     | Input (** input marker *)
@@ -91,9 +85,6 @@ module type S = sig
       to the same literal unless it is alpha-equivalent to this one.
       The boolean literal can be negative is the argument is a
       unary negative clause *)
-
-  val inject_lits_pred : Literals.t -> lits_predicate -> t
-  (** Inject the literals, predicate into a {!Lits} constructor *)
 
   val inject_ctx : ClauseContext.t -> inductive_cst -> ctx_predicate -> t
   (** Inject into {!Ctx} *)
