@@ -105,8 +105,6 @@ struct
         |> Sequence.filter
           (fun (lits', x) -> Sup.subsumes lits lits')
 
-    let to_seq = FV.iter
-
     (*
     (* find clauses in [fv] that subsume [lits] *)
     let find_subsuming fv lits =
@@ -117,6 +115,8 @@ struct
     *)
   end
 
+  (** {6 Basics QBF literals} *)
+
   let level0_ = Solver.level0
   let level1_ = Solver.push Qbf.Forall []
   let level2_ = Solver.push Qbf.Exists []
@@ -124,16 +124,47 @@ struct
   let pp_bclause buf c =
     CCList.pp ~start:"[" ~stop:"]" ~sep:" ⊔ " BoolLit.pp buf c
 
+  let neg_ = BoolLit.neg
+
   let expresses_minimality_ ctx cst t =
-    BoolLit.inject_ctx ctx cst (BoolLit.ExpressesMinimality t)
+    let lit = BoolLit.inject_ctx ctx cst (BoolLit.ExpressesMinimality t) in
+    Solver.quantify_lit level2_ lit;
+    lit
 
-  let is_true_ lits = BoolLit.inject_lits lits
-  let is_eq_ a b = is_true_ [| Literal.mk_eq (a:CI.cst:>T.t) (b:CI.case:>T.t) |]
-  let trail_ok_ lits = BoolLit.inject_lits_pred lits BoolLit.TrailOk
-  let in_loop_ ctx i = BoolLit.inject_ctx ctx i BoolLit.InLoop
-  let init_ok_ ctx i = BoolLit.inject_ctx ctx i BoolLit.InitOk
+  let is_true_ lits =
+    let lit = BoolLit.inject_lits lits in
+    Solver.quantify_lit level0_ lit;
+    lit
 
-  (* TODO: when discover new clause with inductive cst, add "input" to its trail *)
+  let is_eq_ind_ a b =
+    let lit = BoolLit.inject_lits [| Literal.mk_eq (a:CI.cst:>T.t) (b:CI.case:>T.t) |] in
+    Solver.quantify_lit level2_ lit;
+    lit
+
+  let in_loop_ ctx i =
+    let lit = BoolLit.inject_ctx ctx i BoolLit.InLoop in
+    Solver.quantify_lit level1_ lit;
+    lit
+
+  let init_ok_ ctx i =
+    let lit = BoolLit.inject_ctx ctx i BoolLit.InitOk in
+    Solver.quantify_lit level2_ lit;
+    lit
+
+  let valid_ x =
+    let lit = BoolLit.inject_name' "valid(%a)" CI.Cst.pp x in
+    Solver.quantify_lit level2_ lit;
+    lit
+
+  let empty_ x =
+    let lit = BoolLit.inject_name' "empty(%a)" CI.Cst.pp x in
+    Solver.quantify_lit level2_ lit;
+    lit
+
+  let minimal_ x y =
+    let lit = BoolLit.inject_name' "minimal(%a,%a)" CI.Cst.pp x CI.Case.pp y in
+    Solver.quantify_lit level2_ lit;
+    lit
 
   (* a candidate clause context *)
   type candidate_context = {
@@ -165,9 +196,8 @@ struct
     | _ -> false
 
   (* find inductive constants in clauses of [seq] *)
-  let find_inductive_cst (seq:C.t Sequence.t) : T.t Sequence.t =
-    seq
-    |> Sequence.flat_map (fun c -> Lits.Seq.terms (Env.C.lits c))
+  let find_inductive_cst c : T.t Sequence.t =
+    C.Seq.terms c
     |> Sequence.flat_map T.Seq.subterms
     |> Sequence.filter
       (fun t ->
@@ -180,7 +210,21 @@ struct
 
   (* scan clauses for ground terms of an inductive type, and declare those terms *)
   let scan (seq:C.t Sequence.t) =
-    Sequence.iter CI.declare (find_inductive_cst seq)
+    Sequence.flat_map find_inductive_cst seq
+    |> Sequence.iter CI.declare
+
+  (* if the clause contains any inductive constant, add "input" to its trail *)
+  let scan_flag_input c : C.t =
+    if Sequence.is_empty (find_inductive_cst c)
+    then c
+    else (
+      let proof cc = Proof.mk_c_simp ~theories:["ind"] ~rule:"flag_input"
+        cc [C.proof c] in
+      let trail = C.Trail.add BoolLit.inject_input (C.get_trail c) in
+      let c' = C.create_a ~parents:(C.parents c) ~trail (C.lits c) proof in
+      Util.debugf ~section 4 "flag_input on %a" C.fmt c;
+      c'
+    )
 
   (* boolean xor *)
   let mk_xor_ l =
@@ -207,7 +251,7 @@ struct
     let res = ref [] in
     (* first scan for new inductive consts *)
     scan (Sequence.singleton c);
-    Lits.Seq.terms (Env.C.lits c)
+    C.Seq.terms c
       |> Sequence.flat_map T.Seq.subterms
       |> Sequence.filter_map CI.as_inductive
       |> Sequence.iter
@@ -222,7 +266,6 @@ struct
                   assert (T.is_ground (t' :> T.t));
                   let lits = [| Literal.mk_eq (t:>T.t) (t':CI.case:>T.t) |] in
                   let bool_lit = BoolLit.inject_lits lits in
-                  Solver.quantify_lits level2_ [bool_lit];
                   let proof cc = Proof.mk_c_trivial
                     ~theories:["induction"] ~info:["boolean split"] cc in
                   let trail = C.Trail.of_list [bool_lit] in
@@ -520,8 +563,9 @@ struct
         (* new clause for induction hypothesis (on inductive constant [icst]) *)
         let proof = Proof.mk_c_trivial ~info:["ind.hyp."] ~theories:["ind"] in
         let trail = C.Trail.of_list
-          [ BoolLit.inject_ctx ctx icst BoolLit.InLoop
-          ; BoolLit.inject_ctx ctx icst BoolLit.InitOk ]
+          [ in_loop_ ctx icst
+          ; init_ok_ ctx icst
+          ]
         in
         let c' = C.create_a ~trail (C.lits c) proof in
         Util.debug ~section 2 "new induction hyp. %a" C.pp c';
@@ -613,12 +657,6 @@ struct
     !(find_candidates_for_cst_ cst)
     |> ClauseContextMap.values
 
-  let neg_ = BoolLit.neg
-  let valid_ x = BoolLit.inject_name' "valid(%a)" CI.Cst.pp x
-  let empty_ x = BoolLit.inject_name' "empty(%a)" CI.Cst.pp x
-  let minimal_ x y =
-    BoolLit.inject_name' "minimal(%a,%a)" CI.Cst.pp x CI.Case.pp y
-
   (* encode proof relation into QBF, starting from the set of "roots"
       that are (applications of) clause contexts + false.
 
@@ -648,8 +686,6 @@ struct
   *)
   let qbf_encode_valid_ cst =
     let pc = CI.pc cst in (* path conditions *)
-    Solver.quantify_lits level2_
-      [valid_ cst; empty_ cst];
     Solver.add_clause
       (valid_ cst :: List.map (fun pc -> neg_ pc.CI.pc_lit) pc); (* pc -> valid *)
     Solver.add_form
@@ -658,7 +694,7 @@ struct
         (QF.and_map (CI.cover_sets cst)
           ~f:(fun set -> QF.or_map (CI.cases set)
             ~f:(fun t -> QF.and_l
-                [ QF.atom (is_eq_ cst t)
+                [ QF.atom (is_eq_ind_ cst t)
                 ; QF.atom (minimal_ cst t)
                 ]
             )
@@ -675,7 +711,6 @@ struct
       |> Sequence.map
         (fun ctx ->
           let inloop = in_loop_ ctx.cand_ctx cst in
-          Solver.quantify_lits level1_ [inloop];
           [guard; neg_ inloop]
         )
     in
@@ -773,7 +808,7 @@ struct
   let subst_of_seq l =
     Sequence.fold (fun s (v,t) -> Su.FO.bind s v 1 t 0) Su.empty l
 
-  let split_for_minimality cand set cst =
+  let split_for_minimality cand set =
     CI.sub_constants set
     |> Sequence.flat_map
       (fun (t':CI.sub_cst) ->
@@ -796,7 +831,8 @@ struct
             let lit = Literal.apply_subst ~renaming subst lit 1 in
             let trail = C.Trail.of_list
               [ expresses_minimality_ cand.cand_ctx cst t
-              ; is_eq_ cst t
+              ; in_loop_ cand.cand_ctx cst
+              ; is_eq_ind_ cst t
               ]
             in
             let proof cc = Proof.mk_c_inference
@@ -823,7 +859,7 @@ struct
         CI.cover_sets cand.cand_cst
         |> Sequence.fold
           (fun acc set ->
-            let clauses = split_for_minimality cand set cand.cand_cst in
+            let clauses = split_for_minimality cand set in
             List.rev_append clauses acc
           ) acc
       ) [] !new_contexts
@@ -834,7 +870,7 @@ struct
         candidates_for_ cst
         |> Sequence.fold
           (fun acc cand ->
-            let clauses = split_for_minimality cand set cst in
+            let clauses = split_for_minimality cand set in
             List.rev_append clauses acc
           ) acc
       ) clauses !new_cover_sets
@@ -916,6 +952,7 @@ struct
     Env.add_unary_inf "avatar.check_empty" Avatar.check_empty;
     Env.add_generate "avatar.check_sat" Avatar.check_satisfiability;
     (* induction rules *)
+    Env.add_simplify scan_flag_input;
     Env.add_generate "induction.scan_backward" scan_backward;
     Env.add_unary_inf "induction.scan_extrude" scan_given_for_context;
     Env.add_unary_inf "induction.scan_proof" scan_given_for_proof;
