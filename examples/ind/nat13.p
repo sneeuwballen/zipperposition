@@ -1,6 +1,5 @@
 
-tff(ty_s, type, s:nat > nat).
-tff(ty_z, type, z:nat).
+include('nat.ax').
 
 tff(1, axiom, ![X:nat]: (p(X) => p(s(X)))).
 tff(2, axiom, p(z)).
