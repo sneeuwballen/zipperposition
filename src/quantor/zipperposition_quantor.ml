@@ -42,11 +42,8 @@ module Make(X : sig end) : BS.QBF = struct
 
   type form =
     | Clause of LitSet.t
-        [@printer fun fmt l -> CCFormat.seq Qbf.Lit.print fmt (LitSet.to_seq l)]
-
     | Form of Qbf.Formula.t
-        [@printer Qbf.Formula.print]
-    [@@deriving ord,show]
+    [@@deriving ord]
 
   module FormSet = Sequence.Set.Make(struct
     type t = form
@@ -184,13 +181,19 @@ module Make(X : sig end) : BS.QBF = struct
     in
     _recurse_quant 0
 
+  let pp_form fmt = function
+    | Clause c ->
+        Format.fprintf fmt "@[<hv2>[%a]@]"
+        (Sequence.pp_seq ~sep:" ⊔ " !pp_) (LitSet.to_seq c)
+    | Form f -> Qbf.Formula.print_with ~pp_lit:!pp_ fmt (Qbf.Formula.simplify f)
+
   let check () =
     let f = _mk_qcnf () in
     if Logtk.Util.Section.cur_level section >= 5 then (
       Format.printf "@[<hv2>QCNF sent to solver:@ %a@]@."
         (Qbf.QCNF.print_with ~pp_lit:!pp_) f;
       Format.printf "@[<hv2>formula before CNF:@ %a@]@."
-        (CCFormat.seq pp_form) (FormSet.to_seq (_get_form ()))
+        (Sequence.pp_seq pp_form) (FormSet.to_seq (_get_form ()))
     );
     let st = get_state_ () in
     st.result <- Quantor.solve f;

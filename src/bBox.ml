@@ -82,10 +82,10 @@ struct
         CCFormat.sprintf "⟦%a ∈ loop(%a)⟧"
           ClauseContext.print ctx I.print i
     | InitOk ->
-        CCFormat.sprintf "⟦%a initialized(%a)⟧"
+        CCFormat.sprintf "⟦init(%a, %a)⟧"
           ClauseContext.print ctx I.print i
     | ExpressesMinimality t ->
-        CCFormat.sprintf "⟦minimal(%a,%a,%a)⟧"
+        CCFormat.sprintf "⟦min(%a,%a,%a)⟧"
           ClauseContext.print ctx I.print i Case.print t
 
   let pp_injected buf = function
@@ -151,7 +151,8 @@ struct
     _retrieve_alpha_equiv lits
       |> Sequence.filter_map
         (function
-          | lits', Clause_component _, blit when Lits.are_variant lits lits' ->
+          | lits', Clause_component _, blit
+            when Lits.are_variant lits lits' ->
               Some blit
           | _ -> None
         )
@@ -173,7 +174,8 @@ struct
         (function
           | lits', Ctx (_, t', pred'), blit
             when Lits.are_variant lits lits'
-            && I.equal t t' && compare_ctx_predicate pred pred' = 0 -> Some blit
+            && I.equal t t' && compare_ctx_predicate pred pred' = 0
+            -> Some blit
           | _ -> None
         )
       |> Sequence.head

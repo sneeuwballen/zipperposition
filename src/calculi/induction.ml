@@ -78,8 +78,6 @@ struct
       let to_lits (l,_) = Lits.Seq.abstract l
     end)
 
-    type t = FV.t
-
     let empty () = FV.empty ()
 
     let add fv lits x = FV.add fv (lits,x)
@@ -117,7 +115,6 @@ struct
 
   (** {6 Basics QBF literals} *)
 
-  let level0_ = Solver.level0
   let level1_ = Solver.push Qbf.Forall []
   let level2_ = Solver.push Qbf.Exists []
 
@@ -129,11 +126,6 @@ struct
   let expresses_minimality_ ctx cst t =
     let lit = BoolLit.inject_ctx ctx cst (BoolLit.ExpressesMinimality t) in
     Solver.quantify_lit level2_ lit;
-    lit
-
-  let is_true_ lits =
-    let lit = BoolLit.inject_lits lits in
-    Solver.quantify_lit level0_ lit;
     lit
 
   let is_eq_ind_ a b =
