@@ -94,6 +94,8 @@ module type QBF = sig
   val push : quantifier -> lit list -> quant_level
   (** Push a new level on top of the others *)
 
+  val quantify_lit : quant_level -> lit -> unit
+
   val quantify_lits : quant_level -> lit list -> unit
   (** Add some literals at the given quantification level *)
 

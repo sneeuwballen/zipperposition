@@ -53,6 +53,8 @@ module Make(X : sig end) : BS.QBF = struct
     let compare = compare_form
   end)
 
+  let _add set l = LitSet.add (Qbf.Lit.abs l) set
+
   (* add a list of literals to the set *)
   let _add_list set l =
     List.fold_left (fun s x -> LitSet.add (Qbf.Lit.abs x) s) set l
@@ -143,6 +145,11 @@ module Make(X : sig end) : BS.QBF = struct
     let l = CCVector.length _lits in
     CCVector.push _lits (q, LitSet.of_list lits);
     l
+
+  let quantify_lit l lit =
+    let q, set = CCVector.get _lits l in
+    let set' = _add set lit in
+    CCVector.set _lits l (q,set')
 
   let quantify_lits l lits =
     let q, set = CCVector.get _lits l in

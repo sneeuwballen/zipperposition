@@ -38,8 +38,6 @@ module Make(X : sig end) : BS.QBF = struct
 
   let level0 = 0
 
-  type lit = Qbf.Lit.t
-
   let pp_ = ref Qbf.Lit.print
 
   let root_save_level = 0
@@ -146,6 +144,8 @@ module Make(X : sig end) : BS.QBF = struct
     List.iter
       (fun lit -> Depqbf.add_var_to_scope solver (Qbf.Lit.abs lit) level)
       lits
+
+  let quantify_lit level lit = quantify_lits level [lit]
 
   let check () =
     reset_ ();
