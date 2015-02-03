@@ -64,7 +64,7 @@ struct
   type ctx_predicate =
     | InLoop (** lits = ctx[i], where ctx in loop(i) *)
     | InitOk (** Ctx is initialized *or* it's not in loop *)
-    | ExpressesMinimality of Case.t
+    | ExpressesMinimality of Sub.t
     [@@deriving ord]
 
   type injected =
@@ -86,7 +86,7 @@ struct
           ClauseContext.print ctx I.print i
     | ExpressesMinimality t ->
         CCFormat.sprintf "⟦min(%a,%a,%a)⟧"
-          ClauseContext.print ctx I.print i Case.print t
+          ClauseContext.print ctx I.print i Sub.print t
 
   let pp_injected buf = function
     | Clause_component lits ->

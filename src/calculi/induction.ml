@@ -296,9 +296,12 @@ struct
         );
     !res
 
-  (* checks whether the trail of [c] contains two literals [i = t1]
-      and [i = t2] with [t1], [t2] distinct cover set members, or two
-      literals [loop(i) minimal by a] and [loop(i) minimal by b]. *)
+  (* checks whether the trail of [c] is trivial, that is:
+    - contains two literals [i = t1] and [i = t2] with [t1], [t2]
+        distinct cover set members, or
+    - two literals [loop(i) minimal by a] and [loop(i) minimal by b], or
+    - two literals [C in loop(i)], [D in loop(j)] if i,j do not depend
+        on one another *)
   let has_trivial_trail c =
     let trail = C.get_trail c |> C.Trail.to_seq in
     (* all i=t where i is inductive *)
@@ -337,15 +340,23 @@ struct
           | (`Minimal (ctx1, i1, lit1, t1), `Minimal (ctx2, i2, lit2, t2)) ->
               let res = CI.Cst.equal i1 i2
               && not (ClauseContext.equal ctx1 ctx2)
-              && CI.Case.equal t1 t2
+              && CI.Sub.equal t1 t2
               in
               if res
               then Util.debug ~section 4
                 "clause %a redundant because %a and %a both in trail"
                 C.pp c BoolLit.pp_injected lit1 BoolLit.pp_injected lit2;
               res
-          | `Init, `InLoop _
-          | `InLoop _, `Init ->
+          | `InLoop (ctx1, n1, lit1), `InLoop (ctx2, n2, lit2)
+            when not (CI.Cst.equal n1 n2)
+            && not (CI.depends_on n1 n2)
+            && not (CI.depends_on n2 n1) ->
+              Util.debug ~section 4
+                "clause %a redundant because %a and %a both in trail"
+                C.pp c BoolLit.pp_injected lit1 BoolLit.pp_injected lit2;
+              true
+          | `Input, `InLoop _
+          | `InLoop _, `Input ->
               Util.debug ~section 4
                 "clause %a redundant: \"init\" and \"in_loop\" combined"
                 C.pp c;
@@ -779,7 +790,7 @@ struct
                   ~f:(fun ctx ->
                       QF.and_l
                       [ QF.atom (in_loop_ ctx.cand_ctx cst)
-                      ; QF.atom (expresses_minimality_ ctx.cand_ctx cst case)
+                      ; QF.atom (expresses_minimality_ ctx.cand_ctx cst sub)
                       ]
                   )
                 )
@@ -829,8 +840,6 @@ struct
   let subst_of_seq l =
     Sequence.fold (fun s (v,t) -> Su.FO.bind s v 1 t 0) Su.empty l
 
-  (* TODO: 3-rd argument of minimal() is sub-cst, not case *)
-
   let split_for_minimality cand set =
     CI.sub_constants set
     |> Sequence.flat_map
@@ -853,7 +862,7 @@ struct
           (fun lit ->
             let lit = Literal.apply_subst ~renaming subst lit 1 in
             let trail = C.Trail.of_list
-              [ expresses_minimality_ cand.cand_ctx cst t
+              [ expresses_minimality_ cand.cand_ctx cst t'
               ; in_loop_ cand.cand_ctx cst
               ; is_eq_ind_ cst t
               ]
