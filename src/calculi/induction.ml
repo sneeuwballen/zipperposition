@@ -70,6 +70,10 @@ struct
   module BoolLit = Ctx.BoolLit
   module Avatar = Avatar.Make(Env)(Solver)  (* will use some inferences *)
 
+  let () =
+    Avatar.filter_absurd_trails
+      (fun t -> not (C.Trail.mem BoolLit.inject_input t))
+
   (** Map that is subsumption-aware *)
   module FVMap(X : sig type t end) = struct
     module FV = Logtk.FeatureVector.Make(struct
@@ -158,6 +162,8 @@ struct
     Solver.quantify_lit level2_ lit;
     lit
 
+  [@@@warning "-39"]
+
   (* a candidate clause context *)
   type candidate_context = {
     cand_ctx : CCtx.t; (* the ctx itself *)
@@ -166,6 +172,8 @@ struct
     mutable cand_explanations : Proof.t list
       [@compare (fun _ _ -> 0)]; (* justification(s) of why the context exists *)
   } [@@deriving ord]
+
+  [@@@warning "+39"]
 
   module CandidateCtxSet = Sequence.Set.Make(struct
     type t = candidate_context
@@ -516,6 +524,17 @@ struct
         )
       |> T.Seq.add_set T.Set.empty
 
+  (* create the boolean clause that expresses that
+    [C.trail |= cand.ctx[cand.cst]] *)
+  let bclause_from_trail c cand =
+    (* the "guard": assume c.trail, but after "input" is removed *)
+    let trail_guard = C.get_trail c
+      |> C.Trail.remove BoolLit.inject_input
+      |> C.Trail.to_list
+      |> List.map BoolLit.neg
+    in
+    ( init_ok_ cand.cand_ctx cand.cand_cst) :: trail_guard
+
   (* see whether (ctx,t) is of interest. Returns a new clause if it is, the
     clause being an induction hypothesis for the given context *)
   let process_ctx_ c ctx t =
@@ -536,8 +555,15 @@ struct
           cand_explanations=[C.proof c];
         } in
         add_ctx cand;
+        if C.Trail.mem BoolLit.inject_input (C.get_trail c) then (
+          (* context C[] created from C[i]<-Gamma, add init(C[],i) <- Gamma
+          to QBF immediatly *)
+          let bclause = bclause_from_trail c cand in
+          Solver.add_clause bclause;
+          Util.debug ~section 4 "add bool clause %a" pp_bclause bclause;
+        );
         `New t
-      end
+      end;
     | None, Some t ->
       (* [t] is a subterm of the case [t'] of an inductive [cst] *)
       let cst, t' = CI.inductive_cst_of_sub_cst t in
@@ -573,8 +599,6 @@ struct
         in
         let c' = C.create_a ~trail (C.lits c) proof in
         Util.debug ~section 2 "new induction hyp. %a" C.pp c';
-        (* TODO: move clause creation in event handler? *)
-        (* TODO: put minimality witness here too? *)
         Some c'
     | `Old -> None
 
@@ -599,22 +623,14 @@ struct
       (remove "input" from c.trail first)
   *)
   let _process_clause_match_watched c lits' set =
+    if C.Trail.mem BoolLit.inject_input (C.get_trail c)
     (* check whether that makes some cand_ctx initialized *)
-    CandidateCtxSet.iter
+    then CandidateCtxSet.iter
       (fun cand ->
-        (* the "guard": assume c.trail, but after "input" is removed *)
-        let trail_guard = C.get_trail c
-          |> C.Trail.remove BoolLit.inject_input
-          |> C.Trail.to_list
-          |> List.map BoolLit.neg
-        in
-        let bclause = ( init_ok_ cand.cand_ctx cand.cand_cst) :: trail_guard in
+        let bclause = bclause_from_trail c cand in
         Solver.add_clause bclause;
         Util.debug ~section 3 "add bool constraint %a" pp_bclause bclause;
       ) set
-
-  (* TODO: if context C[] created from C[i]<-Gamma, add init(C[],i) <- Gamma
-    to QBF immediatly *)
 
   (* search whether [c] subsumes some watched clause
      if [C[i]] subsumed, where [i] is an inductive constant:
@@ -649,9 +665,13 @@ struct
         Sup.PS.SubsumptionIndex.retrieve_subsuming idx lits ()
           (fun () c ->
             if not (C.is_empty c) && Sup.subsumes (C.lits c) ctx.cand_lits
-              then
+              then (
+                Util.debugf ~section 3 "clause %a@ subsumes context %a[%a]"
+                  C.fmt c ClauseContext.print ctx.cand_ctx
+                  CI.Cst.print ctx.cand_cst;
                 _process_clause_match_watched
                   c ctx.cand_lits (CandidateCtxSet.singleton ctx)
+              )
           )
       ) l;
     [] (* no new clause *)
@@ -808,6 +828,8 @@ struct
 
   let subst_of_seq l =
     Sequence.fold (fun s (v,t) -> Su.FO.bind s v 1 t 0) Su.empty l
+
+  (* TODO: 3-rd argument of minimal() is sub-cst, not case *)
 
   let split_for_minimality cand set =
     CI.sub_constants set

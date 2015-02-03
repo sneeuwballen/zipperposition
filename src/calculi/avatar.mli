@@ -48,6 +48,11 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) : sig
   val before_check_sat : unit Signal.t
   val after_check_sat : unit Signal.t
 
+  val filter_absurd_trails : (E.C.Trail.t -> bool) -> unit
+  (** [filter_trails f] calls [f] on every trail associated with the empty
+      clause. If [f] returns [false], the trail is ignored, otherwise
+      it's negated and sent to the SAT solver *)
+
   val check_satisfiability : E.generate_rule
   (** Checks  that the SAT context is still valid *)
 
