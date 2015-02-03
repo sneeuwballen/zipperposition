@@ -78,7 +78,7 @@ module Make(E : Env.S) = struct
 
   (** One iteration of the main loop ("given clause loop") *)
   let given_clause_step ?(generating=true) num =
-    Util.debug ~section 4 "env for next given loop: %a" Env.pp ();
+    Util.debugf ~section 4 "@[env for next given loop: %a@]" Env.fmt ();
     (* select next given clause *)
     match Env.next_passive () with
     | None ->

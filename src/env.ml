@@ -204,11 +204,10 @@ end) : S with module Ctx = X.Ctx = struct
   let precedence () = Ordering.precedence (ord ())
   let signature () = Ctx.signature ()
 
-  let pp buf () =
-    Printf.bprintf buf "env(state: %a)" ProofState.debug ()
+  let pp buf () = Printf.bprintf buf "env"
 
-  let fmt fmt () =
-    Format.pp_print_string fmt (Util.on_buffer pp ())
+  let fmt out () =
+    Format.fprintf out "env(state:@ %a)" ProofState.debug ()
 
   (** {2 High level operations} *)
 

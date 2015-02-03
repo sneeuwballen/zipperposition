@@ -103,9 +103,12 @@ module type S = sig
 
     val empty : t
     val singleton : bool_lit -> t
+    val mem : bool_lit -> t -> bool
     val add : bool_lit -> t -> t
     val remove : bool_lit -> t -> t
     val map : (bool_lit -> bool_lit) -> t -> t
+    val for_all : (bool_lit -> bool) -> t -> bool
+    val exists : (bool_lit -> bool) -> t -> bool
     val of_list : bool_lit list -> t
     val to_list : t -> bool_lit list
     val to_seq : t -> bool_lit Sequence.t
@@ -424,5 +427,6 @@ module type S = sig
 
   val pp_set : Buffer.t -> CSet.t -> unit
   val pp_set_tstp : Buffer.t -> CSet.t -> unit
+  val fmt_set : Format.formatter -> CSet.t -> unit
 end
 

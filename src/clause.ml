@@ -63,6 +63,9 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     type bool_lit = Ctx.BoolLit.t
 
     let empty = ISet.empty
+    let mem = ISet.mem
+    let for_all = ISet.for_all
+    let exists = ISet.exists
     let singleton = ISet.singleton
     let add = ISet.add
     let remove = ISet.remove
@@ -698,4 +701,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     Sequence.iter
       (fun c -> pp_tstp buf c; Buffer.add_char buf '\n')
       (CSet.to_seq set)
+
+  let fmt_set out set = Sequence.pp_seq fmt out (CSet.to_seq set)
 end
