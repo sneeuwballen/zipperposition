@@ -39,6 +39,7 @@ type lit = Qbf.Lit.t
 
 module Make(X : sig end) : BS.QBF = struct
   module LitSet = Sequence.Set.Make(Qbf.Lit)
+  module IntMap = CCMap.Make(CCInt)
 
   type form =
     | Clause of LitSet.t
@@ -58,19 +59,13 @@ module Make(X : sig end) : BS.QBF = struct
 
   type quantifier = Qbf.quantifier
 
-  (* stack of quantified literals *)
-  let _lits : (quantifier * LitSet.t, CCVector.rw) CCVector.t =
-    let v = CCVector.create () in
-    (* create level 0 *)
-    CCVector.push v (Qbf.Exists, LitSet.empty);
-    v
-
   let level0 = 0
 
   let pp_ = ref Qbf.Lit.print
 
   (* current (backtrackable) state  *)
   type state = {
+    mutable lits : (quantifier * LitSet.t) IntMap.t; (* level -> literals *)
     mutable forms : FormSet.t;
     mutable result : Qbf.result;
   }
@@ -78,7 +73,11 @@ module Make(X : sig end) : BS.QBF = struct
   (* stack of states *)
   let stack : state CCVector.vector =
     let v = CCVector.create () in
-    CCVector.push v {forms=FormSet.empty; result=Qbf.Unknown};
+    CCVector.push v {
+      forms=FormSet.empty;
+      lits=IntMap.singleton 0 (Qbf.Exists, LitSet.empty);
+      result=Qbf.Unknown
+    };
     v
 
   let get_state_ () =
@@ -141,71 +140,71 @@ module Make(X : sig end) : BS.QBF = struct
   let add_clause_seq seq = seq add_clause
 
   let push q lits =
-    let l = CCVector.length _lits in
-    CCVector.push _lits (q, LitSet.of_list lits);
+    let st = get_state_ () in
+    let l = fst (IntMap.max_binding st.lits) + 1 in
+    st.lits <- IntMap.add l (q, LitSet.of_list lits) st.lits;
     l
 
   let quantify_lit l lit =
-    let q, set = CCVector.get _lits l in
+    let st = get_state_ () in
+    let q, set = IntMap.find l st.lits in
     let set' = _add set lit in
-    CCVector.set _lits l (q,set')
+    st.lits <- IntMap.add l (q,set') st.lits
 
   let quantify_lits l lits =
-    let q, set = CCVector.get _lits l in
+    let st = get_state_ () in
+    let q, set = IntMap.find l st.lits in
     let set' = _add_list set lits in
-    CCVector.set _lits l (q,set')
+    st.lits <- IntMap.add l (q,set') st.lits
 
   let to_cnf_ clauses =
-    FormSet.to_seq clauses
-    |> Sequence.flat_map
-        (function
-          | Clause lits -> Sequence.singleton (LitSet.to_list lits)
-          | Form (f, level) ->
-              let new_lits = ref [] in
-              (* generate fresh symbols and put them in [new_lits] *)
-              let gensym () =
-                let l = Qbf.Lit.fresh () in
-                CCList.Ref.push new_lits l;
-                l
-              in
-              let clauses = Qbf.Formula.cnf ~gensym f in
-              (* quantify fresh lits at [level] *)
-              quantify_lits level !new_lits;
-              Sequence.of_list clauses
-        )
-    |> Sequence.to_rev_list
+    let new_lits = ref [] in
+    let clauses =
+        FormSet.to_seq clauses
+        |> Sequence.flat_map
+            (function
+              | Clause lits -> Sequence.singleton (LitSet.to_list lits)
+              | Form (f, level) ->
+                  let clauses, new_lits' = Qbf.Formula.cnf ~gensym:Qbf.Lit.fresh f in
+                  CCList.Ref.push_list new_lits new_lits';
+                  Sequence.of_list clauses
+            )
+        |> Sequence.to_rev_list
+    in
+    Qbf.QCNF.quantify Qbf.Exists !new_lits (Qbf.QCNF.prop clauses)
 
-  let _get_form () =
+  let get_form_ () =
     let st = get_state_ () in
     st.forms
 
-  let _mk_qcnf () =
+  let mk_qcnf_ () =
     (* at quantifier level [i] *)
-    let rec _recurse_quant i =
-      if i = CCVector.length _lits
-        then
-          let st = get_state_ () in
-          Qbf.QCNF.prop (to_cnf_ st.forms)
+    let rec recurse st i max =
+      if i > max
+        then to_cnf_ st.forms
         else
-          let q, lits = CCVector.get _lits i in
-          Qbf.QCNF.quantify q (LitSet.to_list lits) (_recurse_quant (i+1))
+          let q, lits = IntMap.find i st.lits in
+          let sub = recurse st (i+1) max in
+          Qbf.QCNF.quantify q (LitSet.to_list lits) sub
     in
-    _recurse_quant 0
+    let st = get_state_ () in
+    let max, _ = IntMap.max_binding st.lits in
+    recurse st 0 max
 
   let pp_form fmt = function
     | Clause c ->
-        Format.fprintf fmt "@[<hv2>[%a]@]"
+        Format.fprintf fmt "@[<hv2>%a@]"
         (Sequence.pp_seq ~sep:" ⊔ " !pp_) (LitSet.to_seq c)
     | Form (f,_) ->
         Qbf.Formula.print_with ~pp_lit:!pp_ fmt (Qbf.Formula.simplify f)
 
   let check () =
-    let f = _mk_qcnf () in
+    let f = mk_qcnf_ () in
     if Logtk.Util.Section.cur_level section >= 5 then (
       Format.printf "@[<hv2>QCNF sent to solver:@ %a@]@."
         (Qbf.QCNF.print_with ~pp_lit:!pp_) f;
       Format.printf "@[<hv2>formula before CNF:@ %a@]@."
-        (Sequence.pp_seq pp_form) (FormSet.to_seq (_get_form ()))
+        (Sequence.pp_seq pp_form) (FormSet.to_seq (get_form_ ()))
     );
     let st = get_state_ () in
     st.result <- Quantor.solve f;

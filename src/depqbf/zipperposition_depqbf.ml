@@ -143,16 +143,9 @@ module Make(X : sig end) : BS.QBF = struct
   let quantify_lit level lit = quantify_lits level [lit]
 
   let add_qform ~quant_level f =
-    let new_lits = ref [] in
-    (* generate fresh symbols and put them in [new_lits] *)
-    let gensym () =
-      let l = Qbf.Lit.fresh () in
-      CCList.Ref.push new_lits l;
-      l
-    in
-    let clauses = Qbf.Formula.cnf ~gensym f in
+    let clauses, new_lits = Qbf.Formula.cnf ~gensym:Qbf.Lit.fresh f in
     (* quantify fresh lits at [level] *)
-    quantify_lits quant_level !new_lits;
+    quantify_lits quant_level new_lits;
     add_clauses clauses
 
   let add_form f = add_qform ~quant_level:level0 f
