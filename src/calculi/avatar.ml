@@ -137,14 +137,20 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
     Util.exit_prof prof_splits;
     res
 
+  let filter_absurd_trails_ = ref (fun _ -> true)
+  let filter_absurd_trails f = filter_absurd_trails_ := f
+
   (* if c.lits = [], negate c.trail *)
   let check_empty c =
-    if Array.length (C.lits c) = 0
+    if Array.length (C.lits c) = 0 && !filter_absurd_trails_ (C.get_trail c)
     then (
       assert (not (C.Trail.is_empty (C.get_trail c)));
-      let b_lits = C.get_trail c |> C.Trail.to_list  in
-      let b_clause = List.map BoolLit.neg b_lits in
-      Util.debug ~section 4 "negate trail of %a with %a" C.pp c _pp_bclause b_clause;
+      let b_clause = C.get_trail c
+        |> C.Trail.to_list
+        |> List.map BoolLit.neg
+      in
+      Util.debug ~section 4 "negate trail of %a with %a"
+        C.pp c _pp_bclause b_clause;
       Sat.add_clauses [b_clause];
     );
     [] (* never infers anything! *)
@@ -162,8 +168,10 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
         []
     | Sat.Unsat ->
         Util.debug ~section 1 "SAT-solver reports \"UNSAT\"";
-        (* TODO: proper proof handling (collect unsat core? collect all clauses?)*)
-        let proof cc = Proof.mk_c_inference ~rule:"avatar" ~theories:["sat"] cc [] in
+        (* TODO: proper proof handling (collect unsat core? collect
+            all clauses?)*)
+        let proof cc = Proof.mk_c_inference ~rule:"avatar"
+          ~theories:["sat"] cc [] in
         let c = C.create [] proof in
         [c]
     in
