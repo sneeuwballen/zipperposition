@@ -39,8 +39,12 @@ module type SAT = sig
     | Unsat
 
   val add_clause : lit list -> unit
+
   val add_clauses : lit list list -> unit
+
   val add_form : Qbf.Formula.t -> unit
+  (** Add the given boolean formula. *)
+
   val add_clause_seq : lit list Sequence.t -> unit
 
   val check : unit -> result
@@ -102,4 +106,10 @@ module type QBF = sig
   (** The functions from {!SAT}, such as {!SAT.check}, still work. They
       convert the current formulas to CNF and send the whole problem to
       the QBF solver. *)
+
+  val add_qform : quant_level:quant_level -> Qbf.Formula.t -> unit
+  (** Add the given boolean formula. Fresh boolean literals used for
+      reduction to CNF will be quantified at the given level.
+      @param quant_level the level of quantification for Skolems (default 0)
+      *)
 end

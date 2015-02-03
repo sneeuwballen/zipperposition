@@ -205,18 +205,30 @@ struct
     Sequence.flat_map find_inductive_cst seq
     |> Sequence.iter CI.declare
 
+  (* should be annotated with "input" *)
+  let is_input_clause c =
+    let blit_ok l = match BoolLit.extract (BoolLit.abs l) with
+      | Some BoolLit.Input
+      | Some (BoolLit.Ctx _) -> false
+      | Some (BoolLit.Clause_component [| Literal.Equation (a, b, true )|])
+        when CI.is_inductive a || CI.is_inductive b -> false (* [i = t] *)
+      | Some (BoolLit.Clause_component _)
+      | Some (BoolLit.Name _)
+      | None -> true
+    in
+    (C.get_trail c |> C.Trail.for_all blit_ok)
+    && not (Sequence.is_empty (find_inductive_cst c))
+
   (* if the clause contains any inductive constant, add "input" to its trail *)
   let scan_flag_input c : C.t =
-    if Sequence.is_empty (find_inductive_cst c)
-    then c
-    else (
+    if is_input_clause c then (
       let proof cc = Proof.mk_c_simp ~theories:["ind"] ~rule:"flag_input"
         cc [C.proof c] in
       let trail = C.Trail.add BoolLit.inject_input (C.get_trail c) in
       let c' = C.create_a ~parents:(C.parents c) ~trail (C.lits c) proof in
       Util.debugf ~section 4 "flag_input on %a" C.fmt c;
       c'
-    )
+    ) else c
 
   (* boolean xor *)
   let mk_xor_ l =
@@ -596,12 +608,13 @@ struct
           |> C.Trail.to_list
           |> List.map BoolLit.neg
         in
-        let bclause = (
-          BoolLit.inject_ctx cand.cand_ctx cand.cand_cst BoolLit.InitOk
-        ) :: trail_guard in
+        let bclause = ( init_ok_ cand.cand_ctx cand.cand_cst) :: trail_guard in
         Solver.add_clause bclause;
         Util.debug ~section 3 "add bool constraint %a" pp_bclause bclause;
       ) set
+
+  (* TODO: if context C[] created from C[i]<-Gamma, add init(C[],i) <- Gamma
+    to QBF immediatly *)
 
   (* search whether [c] subsumes some watched clause
      if [C[i]] subsumed, where [i] is an inductive constant:
@@ -680,7 +693,7 @@ struct
     let pc = CI.pc cst in (* path conditions *)
     Solver.add_clause
       (valid_ cst :: List.map (fun pc -> neg_ pc.CI.pc_lit) pc); (* pc -> valid *)
-    Solver.add_form
+    Solver.add_qform ~quant_level:level2_
       (QF.imply
         (QF.atom (valid_ cst))
         (QF.and_map (CI.cover_sets cst)
@@ -729,7 +742,7 @@ struct
     |> Sequence.iter
       (fun (set, case) ->
         (* now to define minimal(cst,case) *)
-        Solver.add_form
+        Solver.add_qform ~quant_level:level2_
           (QF.imply
             (QF.atom (minimal_ cst case))
             (QF.and_map
@@ -744,7 +757,7 @@ struct
                 QF.or_map
                   (candidates_for_ cst)
                   ~f:(fun ctx ->
-                      QF.or_l
+                      QF.and_l
                       [ QF.atom (in_loop_ ctx.cand_ctx cst)
                       ; QF.atom (expresses_minimality_ ctx.cand_ctx cst case)
                       ]
@@ -765,6 +778,7 @@ struct
     save_level_ := Solver.save ();
     CI.Seq.cst |> Sequence.iter qbf_encode_minimal_;
     CI.Seq.cst |> Sequence.iter qbf_encode_empty_;
+    CI.Seq.cst |> Sequence.iter qbf_encode_valid_;
     Util.exit_prof prof_encode_qbf;
     ()
 
@@ -780,11 +794,6 @@ struct
       (fun () -> qbf_encode_enter_ (); Signal.ContinueListening);
     Signal.on Avatar.after_check_sat
       (fun () -> qbf_encode_exit_ (); Signal.ContinueListening);
-    Signal.on CI.on_new_inductive
-      (fun cst ->
-        qbf_encode_valid_ cst;
-        Signal.ContinueListening
-      );
     ()
 
   (** {6 Expressing Minimality} *)

@@ -42,7 +42,7 @@ module Make(X : sig end) : BS.QBF = struct
 
   type form =
     | Clause of LitSet.t
-    | Form of Qbf.Formula.t
+    | Form of Qbf.Formula.t * int (* quantification level *)
     [@@deriving ord]
 
   module FormSet = Sequence.Set.Make(struct
@@ -132,9 +132,11 @@ module Make(X : sig end) : BS.QBF = struct
 
   let add_clauses = List.iter add_clause
 
-  let add_form f =
+  let add_qform ~quant_level f =
     let st = get_state_ () in
-    st.forms <- FormSet.add (Form f) st.forms
+    st.forms <- FormSet.add (Form (f, quant_level)) st.forms
+
+  let add_form f = add_qform ~quant_level:level0 f
 
   let add_clause_seq seq = seq add_clause
 
@@ -158,8 +160,17 @@ module Make(X : sig end) : BS.QBF = struct
     |> Sequence.flat_map
         (function
           | Clause lits -> Sequence.singleton (LitSet.to_list lits)
-          | Form f ->
-              let clauses = Qbf.Formula.cnf ~gensym:Qbf.Lit.fresh f in
+          | Form (f, level) ->
+              let new_lits = ref [] in
+              (* generate fresh symbols and put them in [new_lits] *)
+              let gensym () =
+                let l = Qbf.Lit.fresh () in
+                CCList.Ref.push new_lits l;
+                l
+              in
+              let clauses = Qbf.Formula.cnf ~gensym f in
+              (* quantify fresh lits at [level] *)
+              quantify_lits level !new_lits;
               Sequence.of_list clauses
         )
     |> Sequence.to_rev_list
@@ -185,7 +196,8 @@ module Make(X : sig end) : BS.QBF = struct
     | Clause c ->
         Format.fprintf fmt "@[<hv2>[%a]@]"
         (Sequence.pp_seq ~sep:" ⊔ " !pp_) (LitSet.to_seq c)
-    | Form f -> Qbf.Formula.print_with ~pp_lit:!pp_ fmt (Qbf.Formula.simplify f)
+    | Form (f,_) ->
+        Qbf.Formula.print_with ~pp_lit:!pp_ fmt (Qbf.Formula.simplify f)
 
   let check () =
     let f = _mk_qcnf () in
