@@ -740,7 +740,7 @@ struct
     ()
 
   (* definition of empty(cst):
-    empty(loop(cst)) => bigor_{C in candidates(cst)} [C in loop(cst)] *)
+    empty(loop(cst)) => bigand_{C in candidates(cst)} not [C in loop(cst)] *)
   let qbf_encode_empty_ cst =
     let guard = neg_ (empty_ cst) in
     let clauses = candidates_for_ cst
@@ -926,10 +926,10 @@ struct
     in
     (* print the loop for cst *)
     let print_cst fmt cst =
-      Format.fprintf fmt "@[<hv2>for %a:@ %a@,%a@]" CI.Cst.print cst
+      Format.fprintf fmt "@[<hv2>for %a:@ {%a}@,{%a}@]" CI.Cst.print cst
         (Sequence.pp_seq ~sep:"" (print_coverset cst))
         (CI.cover_sets cst)
-        (Sequence.pp_seq ~sep:"" (print_cand cst))
+        (Sequence.pp_seq ~sep:"," (print_cand cst))
         (candidates_for_ cst)
     in
     Format.printf "@[<v2>inductive constants:@ %a@]@."
