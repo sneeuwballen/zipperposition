@@ -31,6 +31,7 @@ module Sym = Logtk.Symbol
 module Util = Logtk.Util
 module Lits = Literals
 module T = Logtk.FOTerm
+module F = Logtk.Formula.FO
 module Ty = Logtk.Type
 module IH = Induction_helpers
 
@@ -38,21 +39,19 @@ module type S = sig
   module Env : Env.S
   module Ctx : module type of Env.Ctx
 
-  val scan : Env.C.t Sequence.t -> unit
-  (** Scan clauses (typically initial set) for inductive constants *)
-
   val register : unit -> unit
 end
 
 let section_bool = BoolSolver.section
 let section = Util.Section.make
-  ~inheriting:[section_bool] ~parent:Const.section "ind.lemma"
+  ~inheriting:[section_bool] ~parent:Const.section "ind"
 
 module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
   module Env = E
   module Ctx = E.Ctx
   module CI = Ctx.Induction
   module C = E.C
+  module Avatar = Avatar.Make(Env)(Solver)  (* will use some inferences *)
 
   module BoolLit = Ctx.BoolLit
 
@@ -60,23 +59,128 @@ module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
     CCList.pp ~start:"[" ~stop:"]" ~sep:" ⊔ " BoolLit.pp buf c
 
   module IH_ctx = IH.Make(Ctx)
+  module QF = Qbf.Formula
 
   (* scan clauses for ground terms of an inductive type,
     and declare those terms *)
-  let scan seq : unit =
+  let scan seq : CI.cst list =
     Sequence.map C.lits seq
     |> Sequence.flat_map IH_ctx.find_inductive_cst
-    |> Sequence.iter CI.declare
+    |> Sequence.map
+      (fun c ->
+        CI.declare c;
+        CCOpt.get_exn (CI.as_inductive c)
+      )
+    |> Sequence.to_rev_list
 
-  (* TODO: generic mechanism for adding a formula (with restricted shape?)
+  let is_eq_ (t1:CI.cst) (t2:CI.case) =
+    BoolLit.inject_lits [| Literal.mk_eq (t1:>T.t) (t2:>T.t) |]
+
+  let qform_of_trail t = QF.and_map (C.Trail.to_seq t) ~f:QF.atom
+
+  (* when a clause contains new inductive constants, assert minimality
+    of the clause for all those constants independently *)
+  let inf_assert_minimal c =
+    (* [cst] is the minimal term for which [ctx] holds *)
+    let assert_min acc ctx (cst:CI.cst) =
+      match CI.cover_set ~depth:(IH.cover_set_depth()) cst with
+      | _, `Old -> acc  (* already declared constant *)
+      | set, `New ->
+          (* for each member [t] of the cover set:
+            - add ctx[t] <- [cst=t]
+            - for each [t' subterm t] of same type, add ~[ctx[t']] <- [cst=t]
+          *)
+          let acc, b_lits = Sequence.fold
+            (fun (acc, b_lits) (case:CI.case) ->
+              let b_lit = is_eq_ cst case in
+              (* ctx[case] <- b_lit *)
+              let c_case = C.create_a ~parents:[c]
+                ~trail:C.Trail.(singleton b_lit)
+                (ClauseContext.apply ctx (case:>T.t))
+                (fun cc -> Proof.mk_c_inference ~theories:["ind"]
+                  ~rule:"split" cc [C.proof c]
+                )
+              in
+              (* ~ctx[t'] <- b_lit for each t' subterm case *)
+              let c_sub = Sequence.fold
+                (fun c_sub (sub:CI.sub_cst) ->
+                  (* ~[ctx[sub]] <- b_lit *)
+                  let clauses =
+                    let lits = ClauseContext.apply ctx (sub:>T.t) in
+                    let f = lits
+                      |> Literals.to_form
+                      |> F.close_forall
+                      |> F.Base.not_
+                    in
+                    let proof = Proof.mk_f_inference ~theories:["ind"]
+                      ~rule:"min" f [C.proof c]
+                    in
+                    PFormula.create f proof
+                    |> PFormula.Set.singleton
+                    |> Env.cnf
+                    |> C.CSet.to_list
+                    |> List.map (C.update_trail (C.Trail.add b_lit))
+                  in
+                  clauses @ c_sub
+                ) [] (CI.sub_constants_case case)
+              in
+              Util.debugf ~section 2
+                "@[<2>minimality of %a@ in case %a:@ @[<hv0>%a@]@]"
+                ClauseContext.print ctx CI.Case.print case
+                (CCList.print ~start:"" ~stop:"" C.fmt) (c_case :: c_sub);
+              (* return new clauses and b_lit *)
+              c_case :: c_sub @ acc, b_lit :: b_lits
+            ) (acc, []) (CI.cases set)
+          in
+          (* boolean constraint *)
+          let qform = (QF.imply
+              (qform_of_trail (C.get_trail c))
+              (QF.xor_l (List.map QF.atom b_lits))
+          ) in
+          Util.debugf ~section 2 "@[<2>add boolean constr@ @[%a@]@]"
+            (QF.print_with ~pp_lit:BoolLit.print) qform;
+          Solver.add_form qform;
+          acc
+    in
+    scan (Sequence.singleton c)
+    |> List.fold_left
+      (fun acc cst ->
+        let ctx = ClauseContext.extract_exn (C.lits c) (cst:CI.cst:>T.t) in
+        assert_min acc ctx cst
+      ) []
+
+  (* generic mechanism for adding a formula
       and make a lemma out of it, including Skolemization, etc. *)
+  let introduce_cut f proof : C.t list * BoolLit.t =
+    let box = BoolLit.inject_form f in
+    (* positive clauses *)
+    let c_pos = PFormula.create f proof
+      |> PFormula.Set.singleton
+      |> Env.cnf
+      |> C.CSet.to_list
+      |> List.map (C.update_trail (C.Trail.add box))
+    in
+    let c_neg = PFormula.create (F.Base.not_ f) proof
+      |> PFormula.Set.singleton
+      |> Env.cnf
+      |> C.CSet.to_list
+      |> List.map (C.update_trail (C.Trail.add (BoolLit.neg box)))
+    in
+    c_pos @ c_neg, box
 
   (* TODO: when a clause has inductive constants, take its negation
       and add it as a lemma *)
+  let inf_introduce_lemmas c =
+    []  (* TODO *)
 
   let register () =
+    Util.debug ~section 2 "register induction_lemmas";
     IH_ctx.declare_types ();
-    assert false
+    Avatar.register (); (* avatar inferences, too *)
+    Ctx.add_constr 20 IH_ctx.constr_sub_cst;  (* enforce new constraint *)
+    Env.add_unary_inf "induction_lemmas.lemmas" inf_introduce_lemmas;
+    Env.add_unary_inf "induction_lemmas.ind" inf_assert_minimal;
+    ()
 end
 
 let extension =

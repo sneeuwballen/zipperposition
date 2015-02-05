@@ -197,6 +197,7 @@ struct
       | Some (BoolLit.Clause_component [| Literal.Equation (a, b, true )|])
         when CI.is_inductive a || CI.is_inductive b -> false (* [i = t] *)
       | Some (BoolLit.Clause_component _)
+      | Some (BoolLit.Form _)
       | Some (BoolLit.Name _)
       | None -> true
     in
@@ -915,23 +916,11 @@ struct
 
   (** {6 Registration} *)
 
-  (* ensure s1 > s2 if s1 is an inductive constant
-      and s2 is a sub-case of s1 *)
-  let constr_sub_cst_ s1 s2 =
-    let module C = Logtk.Comparison in
-    let res =
-      if CI.is_inductive_symbol s1 && CI.dominates s1 s2
-        then C.Gt
-      else if CI.is_inductive_symbol s2 && CI.dominates s2 s1
-        then C.Lt
-      else C.Incomparable
-    in res
-
   let register() =
     Util.debug ~section 1 "register induction calculus";
     IH_ctx.declare_types ();
     Solver.set_printer BoolLit.print;
-    Ctx.add_constr 20 constr_sub_cst_;  (* enforce new constraint *)
+    Ctx.add_constr 20 IH_ctx.constr_sub_cst;  (* enforce new constraint *)
     (* avatar rules *)
     Env.add_multi_simpl_rule Avatar.split;
     Env.add_unary_inf "avatar.check_empty" Avatar.check_empty;

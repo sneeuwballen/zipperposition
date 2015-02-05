@@ -138,6 +138,17 @@ module Make(Ctx : Ctx.S) = struct
         && not (is_a_constructor t)   (* 0 and nil: not inductive const *)
           )
 
+  (* ensure s1 > s2 if s1 is an inductive constant
+      and s2 is a sub-case of s1 *)
+  let constr_sub_cst s1 s2 =
+    let module C = Logtk.Comparison in
+    let res =
+      if Ctx.Induction.is_inductive_symbol s1 && Ctx.Induction.dominates s1 s2
+        then C.Gt
+      else if Ctx.Induction.is_inductive_symbol s2 && Ctx.Induction.dominates s2 s1
+        then C.Lt
+      else C.Incomparable
+    in res
 end
 
 module A = Logtk_parsers.Ast_tptp

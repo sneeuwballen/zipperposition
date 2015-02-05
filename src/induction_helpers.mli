@@ -62,4 +62,7 @@ module Make(Ctx : Ctx_intf.S) : sig
 
   val find_inductive_cst : Literals.t -> term Sequence.t
   (** Potential inductive constants in those literals *)
+
+  val constr_sub_cst : sym -> sym -> Logtk.Comparison.t
+  (** constants are bigger than their sub-constants *)
 end
