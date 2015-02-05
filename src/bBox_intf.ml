@@ -90,6 +90,9 @@ module type S = sig
   val inject_form : Logtk.Formula.FO.t -> t
   (** Inject a formula *)
 
+  val exists_form : Logtk.Formula.FO.t -> bool
+  (** Is [inject_form f] already used? *)
+
   val inject_ctx : ClauseContext.t -> inductive_cst -> ctx_predicate -> t
   (** Inject into {!Ctx} *)
 
@@ -113,6 +116,9 @@ module type S = sig
 
   val inductive_cst : t -> inductive_cst option
   (** Obtain the inductive constant from this boolean lit, if any *)
+
+  val iter_injected : injected Sequence.t
+  (** All injected lits *)
 
   (** {2 Printers}
   Those printers print the content (injection) of a boolean literal, if any *)

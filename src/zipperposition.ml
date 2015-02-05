@@ -318,6 +318,7 @@ end) = struct
                       ignore (setup_alarm params.param_timeout);
                       Some (Util.get_start_time () +. params.param_timeout -. 0.25))
     in
+    Signal.send Env.on_start ();
     let result, num = match result with
       | Saturate.Unsat _ -> result, 0  (* already found unsat during presaturation *)
       | _ -> Sat.given_clause ~generating:true ?steps ?timeout ()

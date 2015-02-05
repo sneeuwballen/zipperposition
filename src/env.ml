@@ -101,6 +101,7 @@ end) : S with module Ctx = X.Ctx = struct
   let _multi_simpl_rule = ref []
   let _generate_rules = ref []
 
+  let on_start = Signal.create()
   let on_empty_clause = Signal.create ()
 
   (** {2 Basic operations} *)

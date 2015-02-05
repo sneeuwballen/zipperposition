@@ -44,8 +44,11 @@ module type S = sig
 end
 
 let section_bool = BoolSolver.section
+
 let section = Util.Section.make
   ~inheriting:[section_bool] ~parent:Const.section "ind"
+
+let show_lemmas_ = ref false
 
 module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
   module Env = E
@@ -147,22 +150,47 @@ module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
         assert_min acc ctx cst
       ) []
 
+  (* XXX Clear definitions introduced for Skolemization. This is necessary
+      to avoid the following case:
+
+        prove a+b != b+a
+        introduce lemma !X: !Y: X+Y = Y+X
+        to prove lemma, cnf(~ !X: !Y: X+Y = Y+X)
+        obtain a+b != b+a instead of fresh variables! *)
+  let clear_skolem_ctx () =
+    let module S = Logtk.Skolem in
+    Util.debug ~section 1 "forget Skolem definitions";
+    S.clear_skolem_cache ~ctx:Ctx.skolem;
+    S.all_definitions ~ctx:Ctx.skolem
+      |> Sequence.iter (S.remove_def ~ctx:Ctx.skolem)
+
   (* generic mechanism for adding a formula
       and make a lemma out of it, including Skolemization, etc. *)
   let introduce_cut f proof : C.t list * BoolLit.t =
+    let f = F.close_forall f in
     let box = BoolLit.inject_form f in
     (* positive clauses *)
-    let c_pos = PFormula.create f proof
+    let c_pos =
+      PFormula.create f (Proof.mk_f_trivial f) (* proof will be ignored *)
       |> PFormula.Set.singleton
       |> Env.cnf
       |> C.CSet.to_list
-      |> List.map (C.update_trail (C.Trail.add box))
+      |> List.map
+        (fun c ->
+          let trail = C.Trail.singleton box in
+          C.create_a ~trail (C.lits c) proof
+        )
     in
-    let c_neg = PFormula.create (F.Base.not_ f) proof
+    let c_neg =
+      PFormula.create (F.Base.not_ f) (Proof.mk_f_trivial f)
       |> PFormula.Set.singleton
       |> Env.cnf
       |> C.CSet.to_list
-      |> List.map (C.update_trail (C.Trail.add (BoolLit.neg box)))
+      |> List.map
+        (fun c ->
+          let trail = C.Trail.singleton (BoolLit.neg box) in
+          C.create_a ~trail (C.lits c) proof
+        )
     in
     c_pos @ c_neg, box
 
@@ -180,13 +208,24 @@ module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
       (fun t (old,by) -> T.replace t ~old ~by)
       t l
 
+  let flag_cut_introduced = C.new_flag()
+
+  let is_ind_conjecture_ c =
+    match C.distance_to_conjecture c with
+    | Some (0 | 1) -> true
+    | Some _
+    | None -> false
+
   (* when a clause has inductive constants, take its negation
       and add it as a lemma *)
   let inf_introduce_lemmas c =
     if C.is_ground c
+    && not (is_ind_conjecture_ c)
+    && not (C.get_flag flag_cut_introduced c)
     then
       let set = constants_or_sub c in
-      if T.Set.is_empty set then []
+      if T.Set.is_empty set || T.Set.for_all (CI.is_blocked) set
+      then [] (* no inductive, or already ongoing induction *)
       else (
         (* fresh var generator *)
         let mk_fvar =
@@ -211,23 +250,45 @@ module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
           |> F.Base.and_
           |> F.close_forall
         in
-        (* TODO: if [box f] already exists, no need to re-do inference *)
-        (* introduce cut now *)
-        let proof = Proof.mk_f_trivial ~theories:["ind"] f in
-        let clauses, _ = introduce_cut f proof in
-        Util.debugf ~section 2 "@[<2>introduce cut@ from %a@ @[<hv0>%a@]@]"
-          C.fmt c (CCList.print ~start:"" ~stop:"" C.fmt) clauses;
-        clauses
+        (* if [box f] already exists, no need to re-do inference *)
+        if BoolLit.exists_form f
+        then []
+        else (
+          (* introduce cut now *)
+          let proof cc = Proof.mk_c_trivial ~theories:["ind"] ~info:["cut"] cc in
+          let clauses, _ = introduce_cut f proof in
+          List.iter (fun c -> C.set_flag flag_cut_introduced c true) clauses;
+          Util.debugf ~section 2 "@[<2>introduce cut@ from %a@ @[<hv0>%a@]@]"
+            C.fmt c (CCList.print ~start:"" ~stop:"" C.fmt) clauses;
+          clauses
+        )
       )
     else []
+
+  let show_lemmas () =
+    if !show_lemmas_ then (
+      let forms = BoolLit.iter_injected
+        |> Sequence.filter_map
+          (function
+            | BoolLit.Form f -> Some f
+            | _ -> None
+          )
+        |> Sequence.to_rev_list
+      in
+      Util.debugf ~section 1 "@[<2>lemmas:@ @[<hv0>%a@]@]"
+        (CCList.print ~start:"" ~stop:"" F.fmt) forms
+    )
 
   let register () =
     Util.debug ~section 2 "register induction_lemmas";
     IH_ctx.declare_types ();
     Avatar.register (); (* avatar inferences, too *)
     Ctx.add_constr 20 IH_ctx.constr_sub_cst;  (* enforce new constraint *)
-    Env.add_unary_inf "induction_lemmas.lemmas" inf_introduce_lemmas;
+    Env.add_unary_inf "induction_lemmas.cut" inf_introduce_lemmas;
     Env.add_unary_inf "induction_lemmas.ind" inf_assert_minimal;
+    (* no collisions with Skolemization please *)
+    Signal.once Env.on_start clear_skolem_ctx;
+    Signal.once Signals.on_exit (fun _ -> show_lemmas ());
     ()
 end
 
@@ -254,3 +315,8 @@ let () =
       Extensions.register extension;
       Signal.ContinueListening
     )
+
+let () =
+  Params.add_opts
+    [ "-show-lemmas", Arg.Set show_lemmas_, " show inductive lemmas"
+    ]

@@ -110,7 +110,7 @@ struct
         <?> (BLit.compare, j1, j2))
     let to_lits (l,_,_) = Lits.Seq.abstract l
   end)
-  module ITbl = Hashtbl.Make(BLit)
+  module ITbl = CCHashtbl.Make(BLit)
 
   let _clause_set = ref (FV.empty())
   let _form_set = ref Form.Map.empty
@@ -173,6 +173,8 @@ struct
               _save (Clause_component lits_copy) i;
               BLit.apply_sign sign i
           )
+
+  let exists_form f = Form.Map.mem f !_form_set
 
   let inject_form f =
     try
@@ -246,6 +248,8 @@ struct
     | Input
     | Clause_component _ -> None
     | Ctx (_, t, _) -> Some t
+
+  let iter_injected k = ITbl.values _lit2inj k
 
   let pp buf i =
     if not (BLit.sign i) then Buffer.add_string buf "¬";
