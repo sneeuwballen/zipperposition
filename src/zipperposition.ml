@@ -44,6 +44,7 @@ module Import = struct
   open! EnumTypes
   open! Avatar
   open! Induction
+  open! Induction_lemmas
   open! Zipperposition_quantor  (* TODO: remove, should be a plugin *)
   (* FIXME open! Zipperposition_depqbf *)
 end
@@ -378,7 +379,7 @@ let scan_for_inductive_types decls =
         | _ -> None
       )
   in
-  Induction.init_from_decls pairs
+  Induction_helpers.init_from_decls pairs
 
 (** Process the given file (try to solve it) *)
 let process_file ?meta ~plugins ~params file =

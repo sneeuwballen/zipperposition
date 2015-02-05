@@ -38,7 +38,7 @@ Library "libzipperposition"
                     PEnv, Params, Env, Monome, ArithLit, Signals, Multisets,
                     Ctx_intf, Clause_intf, Env_intf, ProofState_intf,
                     BBox, BBox_intf, ClauseContext,
-                    BoolSolver, BoolSolver_intf,
+                    BoolSolver, BoolSolver_intf, Induction_helpers,
                     calculi/Avatar, calculi/Induction,
                     calculi/Superposition, calculi/Chaining,
                     calculi/EnumTypes, calculi/ArithInt, calculi/Heuristics
