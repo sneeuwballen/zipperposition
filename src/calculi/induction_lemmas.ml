@@ -54,18 +54,16 @@ module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
   module CI = Ctx.Induction
   module C = E.C
 
-  (* TODO: module BoolLit *)
+  module BoolLit = Ctx.BoolLit
 
-  (*
   let pp_bclause buf c =
     CCList.pp ~start:"[" ~stop:"]" ~sep:" ⊔ " BoolLit.pp buf c
-    *)
 
   module IH_ctx = IH.Make(Ctx)
 
   (* scan clauses for ground terms of an inductive type,
     and declare those terms *)
-  let scan (seq:C.t Sequence.t) =
+  let scan seq : unit =
     Sequence.map C.lits seq
     |> Sequence.flat_map IH_ctx.find_inductive_cst
     |> Sequence.iter CI.declare

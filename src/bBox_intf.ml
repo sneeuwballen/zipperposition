@@ -73,6 +73,7 @@ module type S = sig
 
   type injected = private
     | Clause_component of Literals.t
+    | Form of Logtk.Formula.FO.t
     | Ctx of ClauseContext.t * inductive_cst * ctx_predicate
     | Name of string  (* name for CNF *)
     | Input (** input marker *)
@@ -85,6 +86,9 @@ module type S = sig
       to the same literal unless it is alpha-equivalent to this one.
       The boolean literal can be negative is the argument is a
       unary negative clause *)
+
+  val inject_form : Logtk.Formula.FO.t -> t
+  (** Inject a formula *)
 
   val inject_ctx : ClauseContext.t -> inductive_cst -> ctx_predicate -> t
   (** Inject into {!Ctx} *)

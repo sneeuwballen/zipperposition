@@ -28,7 +28,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module T = Logtk.FOTerm
 module Util = Logtk.Util
+module Form = Logtk.Formula.FO
 module Lits = Literals
+
 module StringTbl = CCHashtbl.Make(struct
   type t = string
   let hash = CCString.hash
@@ -69,6 +71,7 @@ struct
 
   type injected =
     | Clause_component of Literals.t
+    | Form of Form.t [@compare Form.cmp]
     | Ctx of
       ClauseContext.t
       * (inductive_cst [@compare I.compare])
@@ -91,6 +94,7 @@ struct
   let pp_injected buf = function
     | Clause_component lits ->
         Printf.bprintf buf "⟦%a⟧" (Util.pp_array ~sep:" ∨ " Literal.pp) lits
+    | Form  f -> Printf.bprintf buf "⟦%a⟧" Form.pp f
     | Ctx (lits, ind, pred) ->
         let s = string_of_ctx_pred lits ind pred in
         Buffer.add_string buf s
@@ -109,6 +113,7 @@ struct
   module ITbl = Hashtbl.Make(BLit)
 
   let _clause_set = ref (FV.empty())
+  let _form_set = ref Form.Map.empty
   let _lit2inj = ITbl.create 56
   let _names = StringTbl.create 15
 
@@ -132,6 +137,8 @@ struct
     | Clause_component lits ->
         (* also be able to retrieve by lits *)
         _clause_set := FV.add !_clause_set (lits, injected, t)
+    | Form f ->
+        _form_set := Form.Map.add f (injected, t) !_form_set
     | Ctx (cc, cst, _) ->
         _clause_set := FV.add !_clause_set
           (ClauseContext.apply cc (I.to_term cst), injected, t)
@@ -166,6 +173,16 @@ struct
               _save (Clause_component lits_copy) i;
               BLit.apply_sign sign i
           )
+
+  let inject_form f =
+    try
+      let _, t = Form.Map.find f !_form_set in
+      t
+    with Not_found ->
+      let inj = Form f in
+      let i = BLit.fresh () in
+      _save inj i;
+      i
 
   let inject_ctx ctx (t:I.t) pred =
     let lits = ClauseContext.apply ctx (I.to_term t) in
@@ -217,6 +234,7 @@ struct
     with Not_found -> failwith "BBox.extact: not a proper injected lit"
 
   let keep_in_splitting l = match extract_exn (BLit.abs l) with
+    | Form _
     | Clause_component _ -> false
     | Ctx _
     | Input
@@ -224,6 +242,7 @@ struct
 
   let inductive_cst b = match extract_exn b with
     | Name _
+    | Form _
     | Input
     | Clause_component _ -> None
     | Ctx (_, t, _) -> Some t
@@ -243,6 +262,8 @@ struct
     | Some (Clause_component lits) ->
         Format.fprintf fmt "@[⟦%a⟧@]"
           (CCArray.print ~sep:" ∨ " Literal.fmt) lits
+    | Some (Form f) ->
+        Format.fprintf fmt "@[⟦%a⟧@]" Form.fmt f
     | Some (Ctx (lits, ind, pred)) ->
         let s = string_of_ctx_pred lits ind pred in
         Format.pp_print_string fmt s

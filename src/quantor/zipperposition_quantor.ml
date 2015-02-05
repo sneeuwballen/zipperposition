@@ -41,10 +41,14 @@ module Make(X : sig end) : BS.QBF = struct
   module LitSet = Sequence.Set.Make(Qbf.Lit)
   module IntMap = CCMap.Make(CCInt)
 
+  [@@@warning "-39"]
+
   type form =
     | Clause of LitSet.t
     | Form of Qbf.Formula.t * int (* quantification level *)
     [@@deriving ord]
+
+  [@@@warning "+39"]
 
   module FormSet = Sequence.Set.Make(struct
     type t = form
