@@ -597,7 +597,7 @@ module Make(X : PARAMETERS) = struct
         ) cases_and_subs;
       coverset
 
-    let inductive_cst_of_sub_cst t =
+    let inductive_cst_of_sub_cst t : cst * case =
       let cst, _set, case = T.Tbl.find _tbl_sub_cst t in
       cst, case
 
@@ -659,6 +659,8 @@ module Make(X : PARAMETERS) = struct
     let sub_constants_case (t:case) =
       let _, set = T.Tbl.find _tbl_case t in
       sub_constants set
+      |> Sequence.filter
+        (fun sub -> Case.equal t (snd (inductive_cst_of_sub_cst sub)))
 
     (* true iff s2 is one of the sub-cases of s1 *)
     let dominates s1 s2 =
