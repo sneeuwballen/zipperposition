@@ -43,7 +43,7 @@ module Import = struct
   open! ArithInt
   open! EnumTypes
   open! Avatar
-  open! Induction
+  (* open! Induction FIXME *)
   open! Induction_lemmas
   open! Zipperposition_quantor  (* TODO: remove, should be a plugin *)
   (* FIXME open! Zipperposition_depqbf *)
