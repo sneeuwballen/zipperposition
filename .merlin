@@ -17,6 +17,7 @@ PKG logtk
 PKG logtk.parsers
 PKG containers
 PKG sequence
+PKG gen
 PKG qcheck
 PKG unix
 PKG qbf
