@@ -325,7 +325,7 @@ module type S = sig
     val pc : cst -> path_condition list
     (** [pc c] returns the list of path conditions under which [c] is valid *)
 
-    module Set : Set.S with type elt = cst
+    module Set : Sequence.Set.S with type elt = cst
     (** Set of constants *)
 
     val is_max_among : cst -> Set.t -> bool

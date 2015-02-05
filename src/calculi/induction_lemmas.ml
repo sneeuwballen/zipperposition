@@ -32,6 +32,7 @@ module Util = Logtk.Util
 module Lits = Literals
 module T = Logtk.FOTerm
 module F = Logtk.Formula.FO
+module Su = Logtk.Substs
 module Ty = Logtk.Type
 module IH = Induction_helpers
 
@@ -54,9 +55,6 @@ module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
   module Avatar = Avatar.Make(Env)(Solver)  (* will use some inferences *)
 
   module BoolLit = Ctx.BoolLit
-
-  let pp_bclause buf c =
-    CCList.pp ~start:"[" ~stop:"]" ~sep:" ⊔ " BoolLit.pp buf c
 
   module IH_ctx = IH.Make(Ctx)
   module QF = Qbf.Formula
@@ -168,10 +166,60 @@ module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
     in
     c_pos @ c_neg, box
 
-  (* TODO: when a clause has inductive constants, take its negation
+  (* terms that are either inductive constants or sub-constants *)
+  let constants_or_sub c : T.Set.t =
+    C.Seq.terms c
+    |> Sequence.flat_map T.Seq.subterms
+    |> Sequence.filter
+      (fun t -> CI.is_inductive t || CI.is_sub_constant t)
+    |> T.Set.of_seq
+
+  (* apply the list of replacements [l] to the term [t] *)
+  let replace_many l t =
+    List.fold_left
+      (fun t (old,by) -> T.replace t ~old ~by)
+      t l
+
+  (* when a clause has inductive constants, take its negation
       and add it as a lemma *)
   let inf_introduce_lemmas c =
-    []  (* TODO *)
+    if C.is_ground c
+    then
+      let set = constants_or_sub c in
+      if T.Set.is_empty set then []
+      else (
+        (* fresh var generator *)
+        let mk_fvar =
+          let r = ref 0 in
+          fun ty ->
+            let v = T.var ~ty !r in
+            incr r;
+            v
+        in
+        (* abstract w.r.t all those constants *)
+        let replacements = T.Set.fold
+          (fun cst acc ->
+            (cst, mk_fvar (T.ty cst)) :: acc
+          ) set []
+        in
+        (* replace constants by variables in [c], then
+            let [f] be [forall... bigAnd_{l in c} not l] *)
+        let f = C.lits c
+          |> Literals.map (replace_many replacements)
+          |> Array.to_list
+          |> List.map (fun l -> Ctx.Lit.to_form (Literal.negate l))
+          |> F.Base.and_
+          |> F.close_forall
+        in
+        (* TODO: if [box f] already exists, no need to re-do inference *)
+        (* introduce cut now *)
+        let proof = Proof.mk_f_trivial ~theories:["ind"] f in
+        let clauses, _ = introduce_cut f proof in
+        Util.debugf ~section 2 "@[<2>introduce cut@ from %a@ @[<hv0>%a@]@]"
+          C.fmt c (CCList.print ~start:"" ~stop:"" C.fmt) clauses;
+        clauses
+      )
+    else []
 
   let register () =
     Util.debug ~section 2 "register induction_lemmas";
