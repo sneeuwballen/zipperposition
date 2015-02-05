@@ -132,6 +132,10 @@ val pop_new_definitions : ctx:ctx -> definition list
 val has_new_definitions : ctx:ctx -> bool
   (** @return true if some new definitions were introduced. *)
 
+val clear_skolem_cache : ctx:ctx -> unit
+  (** Forget already skolemized formulas, so that new formulas use different
+      Skolem symbols *)
+
 val skolem_ho : ctx:ctx -> ty:LogtkType.t -> LogtkHOTerm.t -> LogtkHOTerm.t
   (** Skolemize a higher order term. Quite the same as {!skolem_form}.
       {b Not implemented} *)
