@@ -157,6 +157,10 @@ module type S = sig
   val get_trail : t -> Trail.t
   (** Get the clause's trail *)
 
+  val update_trail : (Trail.t -> Trail.t) -> t -> t
+  (** Change the trail. The resulting clause has same parents, proof
+      and literals as the input one *)
+
   val trail_subsumes : t -> t -> bool
   (** [trail_subsumes c1 c2 = Trail.subsumes (get_trail c1) (get_trail c2)] *)
 

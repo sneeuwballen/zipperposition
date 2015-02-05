@@ -338,6 +338,11 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let proof c = Proof.mk_c_file ~role ~file ~name c in
     create lits proof
 
+  let update_trail f c =
+    let trail = f c.trail in
+    let proof cc = Proof.adapt_c c.hcproof cc in
+    create_a ~parents:c.hcparents ~trail c.hclits proof
+
   let proof c = c.hcproof
 
   let is_empty c =
