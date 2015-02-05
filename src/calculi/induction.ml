@@ -33,6 +33,7 @@ module Ty = Logtk.Type
 module Su = Logtk.Substs
 module Util = Logtk.Util
 module Lits = Literals
+module IH = Induction_helpers
 
 module type S = sig
   module Env : Env.S
@@ -42,21 +43,11 @@ module type S = sig
   val register : unit -> unit
 end
 
-let ind_types_ = ref []
-let cover_set_depth_ = ref 1
-
 let prof_encode_qbf = Util.mk_profiler "ind.encode_qbf"
 
 let section = Util.Section.make ~parent:Const.section "ind"
 let section_qbf = Util.Section.make
   ~parent:section ~inheriting:[BoolSolver.section; BBox.section] "qbf"
-
-(* is [s] a constructor symbol for some inductive type? *)
-let is_constructor_ s = match s with
-  | Sym.Cst info ->
-      let name = info.Sym.cs_name in
-      List.exists (fun (_, cstors) -> List.mem name cstors) !ind_types_
-  | _ -> false
 
 module Make(Sup : Superposition.S)
            (Solver : BoolSolver.QBF) =
@@ -189,28 +180,13 @@ struct
 
   (** {6 Split on Inductive Constants} *)
 
-  (* true if [t = c] where [c] is some inductive constructor such as "cons" or "node" *)
-  let is_a_constructor_ t = match T.Classic.view t with
-    | T.Classic.App (s, _, _) ->
-        Sequence.exists (Sym.eq s) CI.Seq.constructors
-    | _ -> false
+  module IH_ctx = IH.Make(Ctx)
 
-  (* find inductive constants in clauses of [seq] *)
-  let find_inductive_cst c : T.t Sequence.t =
-    C.Seq.terms c
-    |> Sequence.flat_map T.Seq.subterms
-    |> Sequence.filter
-      (fun t ->
-        T.is_ground t
-        && T.is_const t
-        && not (CI.is_blocked t)
-        && CI.is_inductive_type (T.ty t)
-        && not (is_a_constructor_ t)   (* 0 and nil: not inductive const *)
-          )
-
-  (* scan clauses for ground terms of an inductive type, and declare those terms *)
+  (* scan clauses for ground terms of an inductive type,
+    and declare those terms *)
   let scan (seq:C.t Sequence.t) =
-    Sequence.flat_map find_inductive_cst seq
+    Sequence.map C.lits seq
+    |> Sequence.flat_map IH_ctx.find_inductive_cst
     |> Sequence.iter CI.declare
 
   (* should be annotated with "input" *)
@@ -225,7 +201,7 @@ struct
       | None -> true
     in
     (C.get_trail c |> C.Trail.for_all blit_ok)
-    && not (Sequence.is_empty (find_inductive_cst c))
+    && not (Sequence.is_empty (IH_ctx.find_inductive_cst (C.lits c)))
 
   (* if the clause contains any inductive constant, add "input" to its trail *)
   let scan_flag_input c : C.t =
@@ -268,7 +244,7 @@ struct
       |> Sequence.filter_map CI.as_inductive
       |> Sequence.iter
         (fun (t:CI.cst) ->
-          match CI.cover_set ~depth:!cover_set_depth_ t with
+          match CI.cover_set ~depth:(IH.cover_set_depth ()) t with
           | _, `Old -> ()
           | set, `New ->
               (* Make a case split on the cover set (one clause per literal) *)
@@ -939,31 +915,8 @@ struct
 
   (** {6 Registration} *)
 
-  (* declare a list of inductive types *)
-  let declare_types_ l =
-    List.iter
-      (fun (ty,cstors) ->
-        (* TODO: support polymorphic types? *)
-        let pattern = Ty.const (Sym.of_string ty) in
-        let constructors = List.map
-          (fun str ->
-            let s = Sym.of_string str in
-            match Ctx.find_signature s with
-              | None ->
-                  let msg = Util.sprintf
-                    "cannot find the type of inductive constructor %s" str
-                  in failwith msg
-              | Some ty ->
-                  s, ty
-          ) cstors
-        in
-        (* declare type. *)
-        ignore (CI.declare_ty pattern constructors);
-        Util.debug ~section 1 "declare inductive type %a" Ty.pp pattern;
-        ()
-      ) l
-
-  (* ensure s1 > s2 if s1 is an inductive constant and s2 is a sub-case of s1 *)
+  (* ensure s1 > s2 if s1 is an inductive constant
+      and s2 is a sub-case of s1 *)
   let constr_sub_cst_ s1 s2 =
     let module C = Logtk.Comparison in
     let res =
@@ -976,7 +929,7 @@ struct
 
   let register() =
     Util.debug ~section 1 "register induction calculus";
-    declare_types_ !ind_types_;
+    IH_ctx.declare_types ();
     Solver.set_printer BoolLit.print;
     Ctx.add_constr 20 constr_sub_cst_;  (* enforce new constraint *)
     (* avatar rules *)
@@ -1020,85 +973,22 @@ let extension =
     if !summary_ then A.summary_on_exit()
   (* add an ordering constraint: ensure that constructors are smaller
     than other terms *)
-  and add_constr penv =
-    let module C = Logtk.Comparison in
-    let constr_cstor s1 s2 = match is_constructor_ s1, is_constructor_ s2 with
-      | true, true
-      | false, false -> if Sym.eq s1 s2 then C.Eq else C.Incomparable
-      | true, false -> C.Lt
-      | false, true -> C.Gt
-    in
-    PEnv.add_constr ~penv 15 constr_cstor
-  in
+  and add_constr penv = PEnv.add_constr ~penv 15 IH.constr_cstors in
   Extensions.({default with
     name="induction";
     actions=[Do action];
     penv_actions=[Penv_do add_constr];
   })
 
-let enabled_ = ref false
-let enable_ () =
-  if not !enabled_ then (
-    enabled_ := true;
-    Util.debug ~section 1 "Induction: requires ord=rpo6; select=NoSelection";
-    Params.ord := "rpo6";   (* new default! RPO is necessary*)
-    Params.dot_all_roots := true;  (* print proofs more clearly *)
-    Params.select := "NoSelection";
-    Extensions.register extension
-  )
-
-let declare_ ty cstors =
-  (* remember to declare this type as inductive *)
-  Util.debug ~section 1 "user declares inductive type %s = %a"
-    ty (CCList.pp CCString.pp) cstors;
-  ind_types_ := (ty, cstors) :: !ind_types_;
-  enable_();
-  ()
-
-(* [str] describes an inductive type, under the form "foo:c1|c2|c3" where
-    "foo" is the type name and "c1", "c2", "c3" are the type constructors. *)
-let add_ind_type_ str =
-  let _fail() =
-    failwith "expected \"type:c1|c2|c3\" where c1,... are constructors"
-  in
-  match Util.str_split ~by:":" str with
-  | [ty; cstors] ->
-      let cstors = Util.str_split ~by:"|" cstors in
-      if List.length cstors < 2 then _fail();
-      declare_ ty cstors
-  | _ -> _fail()
-
-module A = Logtk_parsers.Ast_tptp
-
-let init_from_decls pairs =
-  let get_str = function
-    | A.GNode (s, []) | A.GString s -> s
-    | _ -> raise Exit
-  in
-  (* search for "inductive(c1, c2, ...)" *)
-  let rec scan_for_constructors = function
-    | A.GNode ("inductive", l) :: tail when List.length l >= 2 ->
-        begin try
-          let constructors = List.map get_str l in
-          Some constructors
-        with Exit ->
-          scan_for_constructors tail
-        end
-    | _ :: tail -> scan_for_constructors tail
-    | []  -> None
-  in
-  Sequence.iter
-    (fun (ty, info) -> match scan_for_constructors info with
-      | None -> ()
-      | Some l -> declare_ ty l
-    ) pairs
+let () =
+  Signal.on IH.on_enable
+    (fun () ->
+      Extensions.register extension;
+      Signal.ContinueListening
+    )
 
 let () =
   Params.add_opts
-    [ "-induction", Arg.String add_ind_type_,
-      " enable Induction on the given type"
-    ; "-induction-depth", Arg.Set_int cover_set_depth_,
-      " set default induction depth"
-    ; "-induction-summary", Arg.Set summary_,
+    [ "-induction-summary", Arg.Set summary_,
       " show summary of induction before exit"
     ]

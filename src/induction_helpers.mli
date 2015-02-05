@@ -1,7 +1,7 @@
 
 (*
 Zipperposition: a functional superposition prover for prototyping
-Copyright (c) 2013, Simon Cruanes
+Copyright (c) 2013-2015, Simon Cruanes
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -25,22 +25,41 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Induction Through QBF} *)
+(** {1 Common stuff for Induction}
 
-module type S = sig
-  module Env : Env.S
-  module Ctx : module type of Env.Ctx
+Also registers some CLI options *)
 
-  val scan : Env.C.t Sequence.t -> unit
-  (** Scan clauses (typically initial set) for inductive constants *)
+type term = Logtk.FOTerm.t
+type sym = Logtk.Symbol.t
 
-  val register : unit -> unit
+val ind_types : unit -> (string * string list) list
+(** List of [ty, constructors] *)
+
+val cover_set_depth : unit -> int
+(** Depth for generating cover sets *)
+
+val is_constructor : sym -> bool
+(** Is this symbol a registered inductive constructor? *)
+
+val on_enable : unit Signal.t
+(** Triggered if induction is enabled *)
+
+val constr_cstors : sym -> sym -> Logtk.Comparison.t
+(** Partial order on symbols, where constructors are smaller than other
+    symbols *)
+
+val init_from_decls :
+  (string * Logtk_parsers.Ast_tptp.optional_info) Sequence.t -> unit
+(** Initialize from a bunch of declarations' optional info, if one takes
+    only pairs [(some_type_name : $tType, info)] *)
+
+module Make(Ctx : Ctx_intf.S) : sig
+  val declare_types : unit -> unit
+  (** Declare the list of [ind_types ()] to the given context's *)
+
+  val is_a_constructor : term -> bool
+  (** Is the term the application of a constructor? *)
+
+  val find_inductive_cst : Literals.t -> term Sequence.t
+  (** Potential inductive constants in those literals *)
 end
-
-module Make(Sup : Superposition.S)
-           (Solver : BoolSolver.QBF)
-  : S
-  with module Env = Sup.Env
-  and module Ctx = Sup.Env.Ctx
-
-val extension : Extensions.t
