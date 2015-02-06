@@ -224,7 +224,7 @@ module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
     && not (C.get_flag flag_cut_introduced c)
     then
       let set = constants_or_sub c in
-      if T.Set.is_empty set || T.Set.for_all (CI.is_blocked) set
+      if T.Set.is_empty set (* XXX ? || T.Set.for_all CI.is_inductive set *)
       then [] (* no inductive, or already ongoing induction *)
       else (
         (* fresh var generator *)
