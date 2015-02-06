@@ -98,7 +98,7 @@ module Make(X : sig end) : BS.QBF = struct
     List.iter (Depqbf.add solver) c;
     Depqbf.add0 solver
 
-  let add_clause c =
+  let add_clause ?tag c =
     reset_ ();
     add_clause_ c
 
@@ -115,11 +115,11 @@ module Make(X : sig end) : BS.QBF = struct
         end
     | _ ->  failwith "QBF solver didn't return \"SAT\""
 
-  let add_clauses l =
+  let add_clauses ?tag l =
     reset_ ();
     List.iter add_clause_ l
 
-  let add_clause_seq seq =
+  let add_clause_seq ?tag seq =
     reset_ ();
     seq add_clause_
 
@@ -148,7 +148,9 @@ module Make(X : sig end) : BS.QBF = struct
     quantify_lits quant_level new_lits;
     add_clauses clauses
 
-  let add_form f = add_qform ~quant_level:level0 f
+  let add_form ?tag f = add_qform ~quant_level:level0 f
+
+  let unsat_core = None  (* TODO? *)
 
   let check () =
     reset_ ();

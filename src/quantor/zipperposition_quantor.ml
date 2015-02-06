@@ -117,9 +117,11 @@ module Make(X : sig end) : BS.QBF = struct
   let set_printer p = pp_ := p
   let name = "quantor"
 
-  let add_clause c =
+  let add_clause_ c =
     let st = get_state_ () in
     st.forms <- FormSet.add (Clause (clause_of_lits_ c)) st.forms
+
+  let add_clause ?tag c = add_clause_ c
 
   let valuation l =
     if not (Qbf.Lit.sign l) then invalid_arg "valuation";
@@ -133,15 +135,15 @@ module Make(X : sig end) : BS.QBF = struct
         end
     | _ ->  failwith "QBF solver didn't return \"SAT\""
 
-  let add_clauses = List.iter add_clause
+  let add_clauses ?tag = List.iter add_clause_
 
   let add_qform ~quant_level f =
     let st = get_state_ () in
     st.forms <- FormSet.add (Form (f, quant_level)) st.forms
 
-  let add_form f = add_qform ~quant_level:level0 f
+  let add_form ?tag f = add_qform ~quant_level:level0 f
 
-  let add_clause_seq seq = seq add_clause
+  let add_clause_seq ?tag seq = seq add_clause_
 
   let push q lits =
     let st = get_state_ () in
@@ -180,6 +182,8 @@ module Make(X : sig end) : BS.QBF = struct
   let get_form_ () =
     let st = get_state_ () in
     st.forms
+
+  let unsat_core = None
 
   let mk_qcnf_ () =
     (* at quantifier level [i] *)

@@ -18,6 +18,7 @@ depends: [
   "logtk" { >= "0.7" }
   "containers" { >= "0.7" }
   "gen"
+  "msat"
   "qbf"
   "ppx_deriving"
 ]

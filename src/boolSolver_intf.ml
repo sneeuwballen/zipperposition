@@ -38,14 +38,14 @@ module type SAT = sig
     | Sat
     | Unsat
 
-  val add_clause : lit list -> unit
+  val add_clause : ?tag:int -> lit list -> unit
 
-  val add_clauses : lit list list -> unit
+  val add_clauses : ?tag:int -> lit list list -> unit
 
-  val add_form : Qbf.Formula.t -> unit
+  val add_form : ?tag:int -> Qbf.Formula.t -> unit
   (** Add the given boolean formula. *)
 
-  val add_clause_seq : lit list Sequence.t -> unit
+  val add_clause_seq : ?tag:int -> lit list Sequence.t -> unit
 
   val check : unit -> result
   (** Is the current problem satisfiable? *)
@@ -61,6 +61,11 @@ module type SAT = sig
 
   val name : string
   (** Name of the solver *)
+
+  val unsat_core : int Sequence.t option
+  (** If [Some seq], [seq] is a sequence of integers
+      that are the tags used to obtain [Unsat].
+      @raise Invalid_argument if the last result isn't [Unsat] *)
 
   (** {6 Incrementality}
   We manage a stack for backtracking to older states *)

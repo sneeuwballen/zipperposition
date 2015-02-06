@@ -43,11 +43,12 @@ Library "libzipperposition"
                     calculi/Superposition, calculi/Chaining,
                     calculi/EnumTypes, calculi/ArithInt, calculi/Heuristics
   InternalModules:  lib/LazyGraph, lib/SmallSet,
-                    lib/UnionFind, lib/Choice, lib/Mixtbl, lib/Signal
+                    lib/UnionFind, lib/Choice, lib/Mixtbl, lib/Signal,
+                    msat/Zipperposition_msat
                     , quantor/Zipperposition_quantor  # TODO remove
                     # TODO , depqbf/Zipperposition_depqbf
   BuildDepends:     containers, containers.advanced, sequence, gen, unix,
-                    zarith, containers.io, logtk, dynlink, qbf,
+                    zarith, containers.io, logtk, dynlink, qbf, msat,
                     qbf.quantor, # TODO qbf.depqbf,
                     ppx_deriving.std
 
