@@ -67,7 +67,7 @@ module Make(X : sig end) : BS.SAT = struct
   let update_ f = CCVector.push stack_ (f (CCVector.pop_exn stack_))
 
   let add_clause ?tag (c:clause) =
-    update_ (FormSet.add (Clauses ([c],tag)))
+    update_ (FormSet.add (Clauses ([c], tag)))
 
   let add_clauses ?tag l =
     update_ (FormSet.add (Clauses (l, tag)))
@@ -86,9 +86,30 @@ module Make(X : sig end) : BS.SAT = struct
   let unsat_core_ : int Sequence.t ref = ref unsat_core_fail_
   let pp_ = ref Qbf.Lit.print
 
+  let pp_clause fmt c =
+    Format.fprintf fmt "@[<hv2>%a@]"
+      (CCList.print ~sep:" ⊔ " !pp_) c
+
+  let tag_ = function
+    | Clauses (_, t)
+    | Form (_, t) -> t
+
+  let pp_form_simpl fmt = function
+    | Clauses (c,_) ->
+        CCList.print ~start:"" ~stop:"" ~sep:"" pp_clause fmt c
+    | Form (f,_) ->
+        Qbf.Formula.print_with ~pp_lit:!pp_ fmt (Qbf.Formula.simplify f)
+
+  let pp_form fmt f =
+    match tag_ f with
+    | None -> pp_form_simpl fmt f
+    | Some tag -> Format.fprintf fmt "%a/%d" pp_form_simpl f tag
+
   let check () =
     unsat_core_ := unsat_core_fail_;
     eval_ := eval_fail_;
+    Format.printf "@[<hv2>formula before CNF:@ %a@]@."
+      (Sequence.pp_seq pp_form) (FormSet.to_seq (get_()));
     (* Instantiate solver *)
     let module S = Msat.Sat.Make(struct end) in
     (* add problem *)
