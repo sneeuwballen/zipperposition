@@ -140,18 +140,22 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
   let filter_absurd_trails_ = ref (fun _ -> true)
   let filter_absurd_trails f = filter_absurd_trails_ := f
 
+  (* map ID -> empty clause *)
+  let empty_clauses_ = Hashtbl.create 24
+
   (* if c.lits = [], negate c.trail *)
   let check_empty c =
     if Array.length (C.lits c) = 0 && !filter_absurd_trails_ (C.get_trail c)
     then (
       assert (not (C.Trail.is_empty (C.get_trail c)));
+      Hashtbl.replace empty_clauses_ (C.id c) c;
       let b_clause = C.get_trail c
         |> C.Trail.to_list
         |> List.map BoolLit.neg
       in
-      Util.debug ~section 4 "negate trail of %a with %a"
-        C.pp c _pp_bclause b_clause;
-      Sat.add_clauses [b_clause];
+      Util.debug ~section 4 "negate trail of %a (id %d) with %a"
+        C.pp c (C.id c) _pp_bclause b_clause;
+      Sat.add_clause ~tag:(C.id c) b_clause;
     );
     [] (* never infers anything! *)
 
@@ -168,10 +172,17 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
         []
     | Sat.Unsat ->
         Util.debug ~section 1 "SAT-solver reports \"UNSAT\"";
-        (* TODO: proper proof handling (collect unsat core? collect
-            all clauses?)*)
-        let proof cc = Proof.mk_c_inference ~rule:"avatar"
-          ~theories:["sat"] cc [] in
+        let premises = match Sat.unsat_core with
+          | None -> []  (* too bad *)
+          | Some seq ->
+              let l = Sequence.to_rev_list seq in
+              Util.debugf ~section 3 "unsat core:@ @[%a@]" (CCList.print CCInt.print) l;
+              l
+                |> CCList.filter_map (CCHashtbl.get empty_clauses_)
+                |> List.map C.proof
+        in
+        let proof cc = Proof.mk_c_inference
+          ~rule:"avatar" ~theories:["sat"] cc premises in
         let c = C.create [] proof in
         [c]
     in
