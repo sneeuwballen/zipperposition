@@ -217,12 +217,16 @@ module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
     | Some _
     | None -> false
 
+  let has_pos_lit_ c =
+    CCArray.exists Literal.is_pos (C.lits c)
+
   (* when a clause has inductive constants, take its negation
       and add it as a lemma *)
   let inf_introduce_lemmas c =
     if C.is_ground c
     && not (is_ind_conjecture_ c)
     && not (C.get_flag flag_cut_introduced c)
+    && not (has_pos_lit_ c) (* XXX: only positive lemmas *)
     then
       let set = constants_or_sub c in
       if T.Set.is_empty set (* XXX ? || T.Set.for_all CI.is_inductive set *)
