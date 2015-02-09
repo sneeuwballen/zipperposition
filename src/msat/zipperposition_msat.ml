@@ -27,6 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Bridge to [MSat] prover} *)
 
+module Util = Logtk.Util
 module BS = BoolSolver
 
 let section = BS.section
@@ -130,6 +131,11 @@ module Make(X : sig end) : BS.SAT = struct
             S.get_proof ()
             |> S.unsat_core
             |> CCList.to_seq
+            |> CCFun.tap
+              (fun seq ->
+                Util.debugf ~section 4 "@[unsat_core:@ @[<hv>%a@]@]"
+                  (Sequence.pp_seq S.print_clause) seq
+              )
             |> Sequence.filter_map S.tag_clause
             |> Sequence.sort_uniq ~cmp:CCInt.compare
             |> Sequence.iter k
