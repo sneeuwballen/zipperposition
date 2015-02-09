@@ -121,7 +121,7 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
           |> C.Trail.to_list
           |> List.map BoolLit.neg in
         let bool_clause = List.append bool_clause bool_guard in
-        Sat.add_clauses [bool_clause];
+        Sat.add_clause ~tag:(C.id c) bool_clause;
         Util.debug ~section 4 "constraint clause is %a"
           _pp_bclause bool_clause;
         (* return the clauses *)

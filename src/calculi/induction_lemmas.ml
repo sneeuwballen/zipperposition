@@ -140,7 +140,7 @@ module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
           ) in
           Util.debugf ~section 2 "@[<2>add boolean constr@ @[%a@]@]"
             (QF.print_with ~pp_lit:BoolLit.print) qform;
-          Solver.add_form qform;
+          Solver.add_form ~tag:(C.id c) qform;
           acc
     in
     scan (Sequence.singleton c)
