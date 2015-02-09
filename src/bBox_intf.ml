@@ -75,6 +75,7 @@ module type S = sig
     | Clause_component of Literals.t
     | Form of Logtk.Formula.FO.t
     | Ctx of ClauseContext.t * inductive_cst * ctx_predicate
+    | Case of inductive_cst * inductive_case  (* [i = t] *)
     | Name of string  (* name for CNF *)
     | Input (** input marker *)
     [@@deriving ord]
@@ -95,6 +96,9 @@ module type S = sig
 
   val inject_ctx : ClauseContext.t -> inductive_cst -> ctx_predicate -> t
   (** Inject into {!Ctx} *)
+
+  val inject_case : inductive_cst -> inductive_case -> t
+  (** Inject [cst = case] *)
 
   val inject_name : string -> t
   val inject_name' : ('a, Buffer.t, unit, t) format4 -> 'a

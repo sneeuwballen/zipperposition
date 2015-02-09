@@ -237,21 +237,12 @@ module type S = sig
     val set_blocked : FOTerm.t -> unit
     (** Declare that the given term cannot be candidate for induction *)
 
-    type path_condition = {
-      pc_cst : cst;
-      pc_case : case;
-      pc_lit : bool_lit;
-    }
-
-    val declare : ?pc:path_condition list -> FOTerm.t -> unit
+    val declare : FOTerm.t -> unit
     (** Check whether the  given term can be an inductive constant,
         and if possible, adds it to the set of inductive constants.
         Requirements: it must be ground, and its type must be a
         known {!inductive type}.
 
-        @param pc if present, makes the term depend on the given
-          path condition (a list of literals that must hold
-          for the inductive literal to be "active")
         @raise Invalid_argument if the parent isn't inductive or the
           term is non-ground *)
 
@@ -318,19 +309,8 @@ module type S = sig
     val on_new_cover_set : (cst * cover_set) Signal.t
     (** triggered with [t, set] when [set] is a new cover set for [t] *)
 
-    val depends_on : cst -> cst -> bool
-    (** [depends_on a b] is [true] iff [a] depends on [b]. This forms a
-        partial strict order. *)
-
-    val pc : cst -> path_condition list
-    (** [pc c] returns the list of path conditions under which [c] is valid *)
-
     module Set : Sequence.Set.S with type elt = cst
     (** Set of constants *)
-
-    val is_max_among : cst -> Set.t -> bool
-    (** Checks whether the constant is maximal among the given ones, that is,
-        if no constant in the set depends on it *)
 
     module Seq : sig
       val ty : inductive_type Sequence.t

@@ -124,7 +124,7 @@ struct
     lit
 
   let is_eq_ind_ a b =
-    let lit = BoolLit.inject_lits [| Literal.mk_eq (a:CI.cst:>T.t) (b:CI.case:>T.t) |] in
+    let lit = BoolLit.inject_case a b in
     Solver.quantify_lit level2_ lit;
     lit
 
@@ -135,11 +135,6 @@ struct
 
   let init_ok_ ctx i =
     let lit = BoolLit.inject_ctx ctx i BoolLit.InitOk in
-    Solver.quantify_lit level2_ lit;
-    lit
-
-  let valid_ x =
-    let lit = BoolLit.inject_name' "valid(%a)" CI.Cst.pp x in
     Solver.quantify_lit level2_ lit;
     lit
 
@@ -193,9 +188,8 @@ struct
   let is_input_clause c =
     let blit_ok l = match BoolLit.extract (BoolLit.abs l) with
       | Some BoolLit.Input
-      | Some (BoolLit.Ctx _) -> false
-      | Some (BoolLit.Clause_component [| Literal.Equation (a, b, true )|])
-        when CI.is_inductive a || CI.is_inductive b -> false (* [i = t] *)
+      | Some (BoolLit.Ctx _)
+      | Some (BoolLit.Case _) -> false
       | Some (BoolLit.Clause_component _)
       | Some (BoolLit.Form _)
       | Some (BoolLit.Name _)
@@ -253,11 +247,11 @@ struct
               let clauses_and_lits = List.map
                 (fun (t':CI.case) ->
                   assert (T.is_ground (t' :> T.t));
-                  let lits = [| Literal.mk_eq (t:>T.t) (t':CI.case:>T.t) |] in
-                  let bool_lit = BoolLit.inject_lits lits in
+                  let bool_lit = is_eq_ind_ t t' in
                   let proof cc = Proof.mk_c_trivial
                     ~theories:["induction"] ~info:["boolean split"] cc in
                   let trail = C.Trail.of_list [bool_lit] in
+                  let lits = [| Literal.mk_eq (t:>T.t) (t':CI.case:>T.t) |] in
                   let clause = C.create_a ~trail lits proof in
                   C.set_flag flag_no_ctx clause true; (* no context from split *)
                   clause, bool_lit
@@ -288,13 +282,7 @@ struct
           let sign = BoolLit.sign blit in
           match BoolLit.extract (BoolLit.abs blit) with
           | None -> None
-          | Some (BoolLit.Clause_component [| Literal.Equation (l, r, true) |]) ->
-              begin match CI.as_inductive l, CI.as_inductive r,
-                          CI.as_case l, CI.as_case r with
-              | Some l, _, _, Some r when sign -> Some (`Case (l, r))
-              | None, Some r, Some l, _ when sign -> Some (`Case (r, l))
-              | _ -> None
-              end
+          | Some (BoolLit.Case (l, r)) -> Some (`Case (l, r))
           | Some (BoolLit.Ctx (ctx, n, BoolLit.ExpressesMinimality t) as lit) ->
               Some (`Minimal (ctx, n, lit, t))
           | Some BoolLit.Input -> Some `Input
@@ -308,7 +296,8 @@ struct
       |> Sequence.exists
         (function
           | (`Case (i1, t1), `Case (i2, t2)) ->
-              let res = CI.Cst.equal i1 i2 && not (CI.Case.equal t1 t2) in
+              let res = not (CI.Cst.equal i1 i2)
+                || (CI.Cst.equal i1 i2 && not (CI.Case.equal t1 t2)) in
               if res
               then Util.debug ~section 4
                 "clause %a redundant because of %a={%a,%a} in trail"
@@ -325,9 +314,7 @@ struct
                 C.pp c BoolLit.pp_injected lit1 BoolLit.pp_injected lit2;
               res
           | `InLoop (ctx1, n1, lit1), `InLoop (ctx2, n2, lit2)
-            when not (CI.Cst.equal n1 n2)
-            && not (CI.depends_on n1 n2)
-            && not (CI.depends_on n2 n1) ->
+            when not (CI.Cst.equal n1 n2) ->
               Util.debug ~section 4
                 "clause %a redundant because %a and %a both in trail"
                 C.pp c BoolLit.pp_injected lit1 BoolLit.pp_injected lit2;
@@ -698,19 +685,13 @@ struct
         ([i = t] & minimal(i, t))
   *)
   let qbf_encode_valid_ cst =
-    let pc = CI.pc cst in (* path conditions *)
-    Solver.add_clause
-      (valid_ cst :: List.map (fun pc -> neg_ pc.CI.pc_lit) pc); (* pc -> valid *)
     Solver.add_qform ~quant_level:level2_
-      (QF.imply
-        (QF.atom (valid_ cst))
-        (QF.and_map (CI.cover_sets cst)
-          ~f:(fun set -> QF.or_map (CI.cases set)
-            ~f:(fun t -> QF.and_l
-                [ QF.atom (is_eq_ind_ cst t)
-                ; QF.atom (minimal_ cst t)
-                ]
-            )
+      (QF.and_map (CI.cover_sets cst)
+        ~f:(fun set -> QF.or_map (CI.cases set)
+          ~f:(fun t -> QF.and_l
+              [ QF.atom (is_eq_ind_ cst t)
+              ; QF.atom (minimal_ cst t)
+              ]
           )
         )
       );

@@ -76,6 +76,9 @@ struct
       ClauseContext.t
       * (inductive_cst [@compare I.compare])
       * ctx_predicate
+    | Case of
+      (inductive_cst [@compare I.compare])
+      * (inductive_case [@compare Case.compare])
     | Name of string  (* name for CNF *)
     | Input (** input marker *)
     [@@deriving ord]
@@ -98,6 +101,7 @@ struct
     | Ctx (lits, ind, pred) ->
         let s = string_of_ctx_pred lits ind pred in
         Buffer.add_string buf s
+    | Case (c, t) -> Printf.bprintf buf "⟦%a=%a⟧" I.pp c Case.pp t
     | Input -> Printf.bprintf buf "input"
     | Name s ->
         Printf.bprintf buf "⟦%s⟧" s
@@ -111,9 +115,16 @@ struct
     let to_lits (l,_,_) = Lits.Seq.abstract l
   end)
   module ITbl = CCHashtbl.Make(BLit)
+  module ICaseTbl = CCHashtbl.Make(struct
+    type t = inductive_cst * inductive_case
+    let equal (c1,t1) (c2,t2) = I.equal c1 c2 && Case.equal t1 t2
+    let hash_fun (c,t) h = h |> CCHash.int_ (I.hash c) |> CCHash.int_ (Case.hash t)
+    let hash = CCHash.apply hash_fun
+  end)
 
   let _clause_set = ref (FV.empty())
   let _form_set = ref Form.Map.empty
+  let _case_set = ICaseTbl.create 15
   let _lit2inj = ITbl.create 56
   let _names = StringTbl.create 15
 
@@ -142,6 +153,8 @@ struct
     | Ctx (cc, cst, _) ->
         _clause_set := FV.add !_clause_set
           (ClauseContext.apply cc (I.to_term cst), injected, t)
+    | Case (c, case) ->
+        ICaseTbl.add _case_set (c,case) (injected, t)
     | Input -> ()
     | Name s ->
         StringTbl.add _names s (injected, t)
@@ -182,6 +195,16 @@ struct
       t
     with Not_found ->
       let inj = Form f in
+      let i = BLit.fresh () in
+      _save inj i;
+      i
+
+  let inject_case c t =
+    try
+      let _, i = ICaseTbl.find _case_set (c,t) in
+      i
+    with Not_found ->
+      let inj = Case (c, t) in
       let i = BLit.fresh () in
       _save inj i;
       i
@@ -240,6 +263,7 @@ struct
     | Clause_component _ -> false
     | Ctx _
     | Input
+    | Case _
     | Name _ -> true
 
   let inductive_cst b = match extract_exn b with
@@ -247,6 +271,7 @@ struct
     | Form _
     | Input
     | Clause_component _ -> None
+    | Case (t, _)
     | Ctx (_, t, _) -> Some t
 
   let iter_injected k = ITbl.values _lit2inj k
@@ -271,6 +296,8 @@ struct
     | Some (Ctx (lits, ind, pred)) ->
         let s = string_of_ctx_pred lits ind pred in
         Format.pp_print_string fmt s
+    | Some (Case (c, case)) ->
+        Format.fprintf fmt "⟦%a=%a⟧" I.print c Case.print case
     | Some Input -> Format.pp_print_string fmt "input"
     | Some (Name s) ->
         Format.fprintf fmt "⟦%s⟧" s
