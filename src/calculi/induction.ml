@@ -49,6 +49,8 @@ let section = Util.Section.make ~parent:Const.section "ind"
 let section_qbf = Util.Section.make
   ~parent:section ~inheriting:[BoolSolver.section; BBox.section] "qbf"
 
+let show_lemmas_ = ref false
+
 module Make(Sup : Superposition.S)
            (Solver : BoolSolver.QBF) =
 struct
@@ -60,6 +62,8 @@ struct
   module CCtx = ClauseContext
   module BoolLit = Ctx.BoolLit
   module Avatar = Avatar.Make(Env)(Solver)  (* will use some inferences *)
+
+  module IHA = IH.MakeAvatar(Avatar)
 
   let () =
     Avatar.filter_absurd_trails
@@ -279,7 +283,6 @@ struct
     let relevant_cases = trail
       |> Sequence.filter_map
         (fun blit ->
-          let sign = BoolLit.sign blit in
           match BoolLit.extract (BoolLit.abs blit) with
           | None -> None
           | Some (BoolLit.Case (l, r)) -> Some (`Case (l, r))
@@ -915,6 +918,9 @@ struct
     Env.add_lit_rule "induction.injectivity1" injectivity_simple;
     Env.add_simplify injectivity_destruct;
     Env.add_generate "induction.express_minimality" express_minimality_ctx;
+    Env.add_unary_inf "induction_lemmas.cut" IHA.inf_introduce_lemmas;
+    (* no collisions with Skolemization please *)
+    Signal.once Env.on_start IHA.clear_skolem_ctx;
     (* XXX: ugly, but we must do case_split before scan_extrude/proof.
       Currently we depend on Env.generate_unary applying inferences in
       the reverse order of their addition *)
@@ -952,7 +958,9 @@ let extension =
 
 let () =
   Signal.on IH.on_enable
-    (fun () ->
+    (function
+    | `Simple -> Signal.ContinueListening
+    | `Full ->
       Extensions.register extension;
       Signal.ContinueListening
     )
@@ -961,4 +969,5 @@ let () =
   Params.add_opts
     [ "-induction-summary", Arg.Set summary_,
       " show summary of induction before exit"
+    ; "-show-lemmas", Arg.Set show_lemmas_, " show inductive lemmas"
     ]

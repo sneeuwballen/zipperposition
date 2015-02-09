@@ -49,6 +49,7 @@ let section = Util.Section.make
   ~inheriting:[section_bool] ~parent:Const.section "ind"
 
 let show_lemmas_ = ref false
+let enable_induction_ = ref false
 
 module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
   module Env = E
@@ -60,6 +61,7 @@ module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
   module BoolLit = Ctx.BoolLit
 
   module IH_ctx = IH.Make(Ctx)
+  module IHA = IH.MakeAvatar(Avatar)
   module QF = Qbf.Formula
 
   (* scan clauses for ground terms of an inductive type,
@@ -74,8 +76,7 @@ module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
       )
     |> Sequence.to_rev_list
 
-  let is_eq_ (t1:CI.cst) (t2:CI.case) =
-    BoolLit.inject_lits [| Literal.mk_eq (t1:>T.t) (t2:>T.t) |]
+  let is_eq_ (t1:CI.cst) (t2:CI.case) = BoolLit.inject_case t1 t2
 
   let qform_of_trail t = QF.and_map (C.Trail.to_seq t) ~f:QF.atom
 
@@ -151,149 +152,19 @@ module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
         assert_min acc ctx cst
       ) []
 
-  (* XXX Clear definitions introduced for Skolemization. This is necessary
-      to avoid the following case:
-
-        prove a+b != b+a
-        introduce lemma !X: !Y: X+Y = Y+X
-        to prove lemma, cnf(~ !X: !Y: X+Y = Y+X)
-        obtain a+b != b+a instead of fresh variables! *)
-  let clear_skolem_ctx () =
-    let module S = Logtk.Skolem in
-    Util.debug ~section 1 "forget Skolem definitions";
-    S.clear_skolem_cache ~ctx:Ctx.skolem;
-    S.all_definitions ~ctx:Ctx.skolem
-      |> Sequence.iter (S.remove_def ~ctx:Ctx.skolem)
-
-  (* generic mechanism for adding a formula
-      and make a lemma out of it, including Skolemization, etc. *)
-  let introduce_cut f proof : C.t list * BoolLit.t =
-    let f = F.close_forall f in
-    let box = BoolLit.inject_form f in
-    (* positive clauses *)
-    let c_pos =
-      PFormula.create f (Proof.mk_f_trivial f) (* proof will be ignored *)
-      |> PFormula.Set.singleton
-      |> Env.cnf
-      |> C.CSet.to_list
-      |> List.map
-        (fun c ->
-          let trail = C.Trail.singleton box in
-          C.create_a ~trail (C.lits c) proof
-        )
-    in
-    let c_neg =
-      PFormula.create (F.Base.not_ f) (Proof.mk_f_trivial f)
-      |> PFormula.Set.singleton
-      |> Env.cnf
-      |> C.CSet.to_list
-      |> List.map
-        (fun c ->
-          let trail = C.Trail.singleton (BoolLit.neg box) in
-          C.create_a ~trail (C.lits c) proof
-        )
-    in
-    c_pos @ c_neg, box
-
-  (* terms that are either inductive constants or sub-constants *)
-  let constants_or_sub c : T.Set.t =
-    C.Seq.terms c
-    |> Sequence.flat_map T.Seq.subterms
-    |> Sequence.filter
-      (fun t -> CI.is_inductive t || CI.is_sub_constant t)
-    |> T.Set.of_seq
-
-  (* apply the list of replacements [l] to the term [t] *)
-  let replace_many l t =
-    List.fold_left
-      (fun t (old,by) -> T.replace t ~old ~by)
-      t l
-
-  let flag_cut_introduced = C.new_flag()
-
-  let is_ind_conjecture_ c =
-    match C.distance_to_conjecture c with
-    | Some (0 | 1) -> true
-    | Some _
-    | None -> false
-
-  let has_pos_lit_ c =
-    CCArray.exists Literal.is_pos (C.lits c)
-
-  (* when a clause has inductive constants, take its negation
-      and add it as a lemma *)
-  let inf_introduce_lemmas c =
-    if C.is_ground c
-    && not (is_ind_conjecture_ c)
-    && not (C.get_flag flag_cut_introduced c)
-    && not (has_pos_lit_ c) (* XXX: only positive lemmas *)
-    then
-      let set = constants_or_sub c in
-      if T.Set.is_empty set (* XXX ? || T.Set.for_all CI.is_inductive set *)
-      then [] (* no inductive, or already ongoing induction *)
-      else (
-        (* fresh var generator *)
-        let mk_fvar =
-          let r = ref 0 in
-          fun ty ->
-            let v = T.var ~ty !r in
-            incr r;
-            v
-        in
-        (* abstract w.r.t all those constants *)
-        let replacements = T.Set.fold
-          (fun cst acc ->
-            (cst, mk_fvar (T.ty cst)) :: acc
-          ) set []
-        in
-        (* replace constants by variables in [c], then
-            let [f] be [forall... bigAnd_{l in c} not l] *)
-        let f = C.lits c
-          |> Literals.map (replace_many replacements)
-          |> Array.to_list
-          |> List.map (fun l -> Ctx.Lit.to_form (Literal.negate l))
-          |> F.Base.and_
-          |> F.close_forall
-        in
-        (* if [box f] already exists, no need to re-do inference *)
-        if BoolLit.exists_form f
-        then []
-        else (
-          (* introduce cut now *)
-          let proof cc = Proof.mk_c_trivial ~theories:["ind"] ~info:["cut"] cc in
-          let clauses, _ = introduce_cut f proof in
-          List.iter (fun c -> C.set_flag flag_cut_introduced c true) clauses;
-          Util.debugf ~section 2 "@[<2>introduce cut@ from %a@ @[<hv0>%a@]@]"
-            C.fmt c (CCList.print ~start:"" ~stop:"" C.fmt) clauses;
-          clauses
-        )
-      )
-    else []
-
-  let show_lemmas () =
-    if !show_lemmas_ then (
-      let forms = BoolLit.iter_injected
-        |> Sequence.filter_map
-          (function
-            | BoolLit.Form f -> Some f
-            | _ -> None
-          )
-        |> Sequence.to_rev_list
-      in
-      Util.debugf ~section 1 "@[<2>lemmas:@ @[<hv0>%a@]@]"
-        (CCList.print ~start:"" ~stop:"" F.fmt) forms
-    )
-
   let register () =
     Util.debug ~section 2 "register induction_lemmas";
     IH_ctx.declare_types ();
     Avatar.register (); (* avatar inferences, too *)
     Ctx.add_constr 20 IH_ctx.constr_sub_cst;  (* enforce new constraint *)
-    Env.add_unary_inf "induction_lemmas.cut" inf_introduce_lemmas;
+    Env.add_unary_inf "induction_lemmas.cut" IHA.inf_introduce_lemmas;
     Env.add_unary_inf "induction_lemmas.ind" inf_assert_minimal;
     (* no collisions with Skolemization please *)
-    Signal.once Env.on_start clear_skolem_ctx;
-    Signal.once Signals.on_exit (fun _ -> show_lemmas ());
+    Signal.once Env.on_start IHA.clear_skolem_ctx;
+    Signal.once Signals.on_exit
+      (fun _ ->
+        if !show_lemmas_ then IHA.show_lemmas ()
+      );
     ()
 end
 
@@ -316,9 +187,11 @@ let extension =
 
 let () =
   Signal.on IH.on_enable
-    (fun () ->
-      Extensions.register extension;
-      Signal.ContinueListening
+    (function
+      | `Simple ->
+        Extensions.register extension;
+        Signal.ContinueListening
+      | `Full -> Signal.ContinueListening
     )
 
 let () =

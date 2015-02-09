@@ -31,6 +31,7 @@ Also registers some CLI options *)
 
 type term = Logtk.FOTerm.t
 type sym = Logtk.Symbol.t
+type formula = Logtk.Formula.FO.t
 
 val ind_types : unit -> (string * string list) list
 (** List of [ty, constructors] *)
@@ -41,8 +42,9 @@ val cover_set_depth : unit -> int
 val is_constructor : sym -> bool
 (** Is this symbol a registered inductive constructor? *)
 
-val on_enable : unit Signal.t
-(** Triggered if induction is enabled *)
+val on_enable : [`Simple | `Full] Signal.t
+(** Triggered if induction is enabled (either in "simple" mode, with
+    a mere SAT-solver, or "full" mode with QBF) *)
 
 val constr_cstors : sym -> sym -> Logtk.Comparison.t
 (** Partial order on symbols, where constructors are smaller than other
@@ -65,4 +67,18 @@ module Make(Ctx : Ctx_intf.S) : sig
 
   val constr_sub_cst : sym -> sym -> Logtk.Comparison.t
   (** constants are bigger than their sub-constants *)
+end
+
+module MakeAvatar(A : Avatar.S) : sig
+  val clear_skolem_ctx : unit -> unit
+
+  val introduce_cut : formula -> (CompactClause.t -> Proof.t) ->
+                      A.E.C.t list * A.E.Ctx.BoolLit.t
+  (** Introduce a new cut *)
+
+  val inf_introduce_lemmas : A.E.C.t -> A.E.C.t list
+  (** Introduce lemmas heuristically based on the given clause *)
+
+  val show_lemmas : unit -> unit
+  (** Print all lemmas that were added in debug mode *)
 end

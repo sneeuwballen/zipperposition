@@ -41,7 +41,39 @@ let prof_check = Util.mk_profiler "avatar.check"
 
 let stat_splits = Util.mk_stat "avatar.splits"
 
+module type S = sig
+  module E : Env.S
+
+  val split : E.multi_simpl_rule
+  (** Split a clause into components *)
+
+  val check_empty : E.unary_inf_rule
+  (** Forbid empty clauses with trails, i.e. adds the negation of their
+      trails to the SAT-solver *)
+
+  val before_check_sat : unit Signal.t
+  val after_check_sat : unit Signal.t
+
+  val filter_absurd_trails : (E.C.Trail.t -> bool) -> unit
+  (** [filter_trails f] calls [f] on every trail associated with the empty
+      clause. If [f] returns [false], the trail is ignored, otherwise
+      it's negated and sent to the SAT solver *)
+
+  val check_satisfiability : E.generate_rule
+  (** Checks  that the SAT context is still valid *)
+
+  val save_clause : tag:int -> E.C.t -> unit
+  (** Map the tag to the clause *)
+
+  val get_clause : tag:int -> E.C.t option
+  (** Recover clause from the tag, if any *)
+
+  val register : unit -> unit
+  (** Register inference rules to the environment *)
+end
+
 module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
+  module E = E
   module Ctx = E.Ctx
   module C = E.C
   module BoolLit = Ctx.BoolLit

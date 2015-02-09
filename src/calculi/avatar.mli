@@ -37,7 +37,9 @@ type 'a printer = Format.formatter -> 'a -> unit
 
 (** {2 Avatar: splitting+sat} *)
 
-module Make(E : Env.S)(Sat : BoolSolver.SAT) : sig
+module type S = sig
+  module E : Env.S
+
   val split : E.multi_simpl_rule
   (** Split a clause into components *)
 
@@ -65,6 +67,8 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) : sig
   val register : unit -> unit
   (** Register inference rules to the environment *)
 end
+
+module Make(E : Env.S)(Sat : BoolSolver.SAT) : S with module E = E
 
 val extension : Extensions.t
 (** Extension that enables Avatar splitting and create a new SAT-solver. *)

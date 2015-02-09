@@ -28,6 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Common stuff for Induction} *)
 
 module T = Logtk.FOTerm
+module F = Logtk.Formula.FO
 module Ty = Logtk.Type
 module Sym = Logtk.Symbol
 module Util = Logtk.Util
@@ -35,6 +36,7 @@ module Lits = Literals
 
 type term = Logtk.FOTerm.t
 type sym = Logtk.Symbol.t
+type formula = F.t
 
 let section = Const.section
 
@@ -53,15 +55,25 @@ let is_constructor s = match s with
 
 let on_enable = Signal.create()
 
+type kind = [`Full | `Simple]
+
+let show_kind : kind -> string
+  = function
+  | `Full -> "qbf"
+  | `Simple -> "sat"
+
+let kind_ : kind ref = ref `Full
+
 let enabled_ = ref false
 let enable_ () =
   if not !enabled_ then (
     enabled_ := true;
-    Util.debug ~section 1 "Induction: requires ord=rpo6; select=NoSelection";
+    Util.debugf ~section 1
+      "Induction(%s): requires ord=rpo6; select=NoSelection" (show_kind !kind_);
     Params.ord := "rpo6";   (* new default! RPO is necessary*)
     Params.dot_all_roots := true;  (* print proofs more clearly *)
     Params.select := "NoSelection";
-    Signal.send on_enable ();
+    Signal.send on_enable !kind_;
   )
 
 let declare_ ty cstors =
@@ -71,19 +83,6 @@ let declare_ ty cstors =
   ind_types_ := (ty, cstors) :: !ind_types_;
   enable_();
   ()
-
-(* [str] describes an inductive type, under the form "foo:c1|c2|c3" where
-    "foo" is the type name and "c1", "c2", "c3" are the type constructors. *)
-let add_ind_type_ str =
-  let _fail() =
-    failwith "expected \"type:c1|c2|c3\" where c1,... are constructors"
-  in
-  match Util.str_split ~by:":" str with
-  | [ty; cstors] ->
-      let cstors = Util.str_split ~by:"|" cstors in
-      if List.length cstors < 2 then _fail();
-      declare_ ty cstors
-  | _ -> _fail()
 
 let constr_cstors =
   let module C = Logtk.Comparison in
@@ -151,6 +150,147 @@ module Make(Ctx : Ctx.S) = struct
     in res
 end
 
+module MakeAvatar(A : Avatar.S) = struct
+  module Env = A.E
+  module Ctx = Env.Ctx
+  module BoolLit = Ctx.BoolLit
+  module C = Env.C
+  module CI = Ctx.Induction
+
+  (* XXX Clear definitions introduced for Skolemization. This is necessary
+      to avoid the following case:
+
+        prove a+b != b+a
+        introduce lemma !X: !Y: X+Y = Y+X
+        to prove lemma, cnf(~ !X: !Y: X+Y = Y+X)
+        obtain a+b != b+a instead of fresh variables! *)
+  let clear_skolem_ctx () =
+    let module S = Logtk.Skolem in
+    Util.debug ~section 1 "forget Skolem definitions";
+    S.clear_skolem_cache ~ctx:Ctx.skolem;
+    S.all_definitions ~ctx:Ctx.skolem
+      |> Sequence.iter (S.remove_def ~ctx:Ctx.skolem)
+
+  (* generic mechanism for adding a formula
+      and make a lemma out of it, including Skolemization, etc. *)
+  let introduce_cut f proof : C.t list * BoolLit.t =
+    let f = F.close_forall f in
+    let box = BoolLit.inject_form f in
+    (* positive clauses *)
+    let c_pos =
+      PFormula.create f (Proof.mk_f_trivial f) (* proof will be ignored *)
+      |> PFormula.Set.singleton
+      |> Env.cnf
+      |> C.CSet.to_list
+      |> List.map
+        (fun c ->
+          let trail = C.Trail.singleton box in
+          C.create_a ~trail (C.lits c) proof
+        )
+    in
+    let c_neg =
+      PFormula.create (F.Base.not_ f) (Proof.mk_f_trivial f)
+      |> PFormula.Set.singleton
+      |> Env.cnf
+      |> C.CSet.to_list
+      |> List.map
+        (fun c ->
+          let trail = C.Trail.singleton (BoolLit.neg box) in
+          C.create_a ~trail (C.lits c) proof
+        )
+    in
+    c_pos @ c_neg, box
+
+  (* terms that are either inductive constants or sub-constants *)
+  let constants_or_sub c : T.Set.t =
+    C.Seq.terms c
+    |> Sequence.flat_map T.Seq.subterms
+    |> Sequence.filter
+      (fun t -> CI.is_inductive t || CI.is_sub_constant t)
+    |> T.Set.of_seq
+
+  (* apply the list of replacements [l] to the term [t] *)
+  let replace_many l t =
+    List.fold_left
+      (fun t (old,by) -> T.replace t ~old ~by)
+      t l
+
+  let flag_cut_introduced = C.new_flag()
+
+  let is_ind_conjecture_ c =
+    match C.distance_to_conjecture c with
+    | Some (0 | 1) -> true
+    | Some _
+    | None -> false
+
+  let has_pos_lit_ c =
+    CCArray.exists Literal.is_pos (C.lits c)
+
+  (* when a clause has inductive constants, take its negation
+      and add it as a lemma *)
+  let inf_introduce_lemmas c =
+    if C.is_ground c
+    && not (is_ind_conjecture_ c)
+    && not (C.get_flag flag_cut_introduced c)
+    && not (has_pos_lit_ c) (* XXX: only positive lemmas *)
+    then
+      let set = constants_or_sub c in
+      if T.Set.is_empty set (* XXX ? || T.Set.for_all CI.is_inductive set *)
+      then [] (* no inductive, or already ongoing induction *)
+      else (
+        (* fresh var generator *)
+        let mk_fvar =
+          let r = ref 0 in
+          fun ty ->
+            let v = T.var ~ty !r in
+            incr r;
+            v
+        in
+        (* abstract w.r.t all those constants *)
+        let replacements = T.Set.fold
+          (fun cst acc ->
+            (cst, mk_fvar (T.ty cst)) :: acc
+          ) set []
+        in
+        (* replace constants by variables in [c], then
+            let [f] be [forall... bigAnd_{l in c} not l] *)
+        let f = C.lits c
+          |> Literals.map (replace_many replacements)
+          |> Array.to_list
+          |> List.map (fun l -> Ctx.Lit.to_form (Literal.negate l))
+          |> F.Base.and_
+          |> F.close_forall
+        in
+        (* if [box f] already exists, no need to re-do inference *)
+        if BoolLit.exists_form f
+        then []
+        else (
+          (* introduce cut now *)
+          let proof cc = Proof.mk_c_trivial ~theories:["ind"] ~info:["cut"] cc in
+          let clauses, _ = introduce_cut f proof in
+          List.iter (fun c -> C.set_flag flag_cut_introduced c true) clauses;
+          Util.debugf ~section 2 "@[<2>introduce cut@ from %a@ @[<hv0>%a@]@]"
+            C.fmt c (CCList.print ~start:"" ~stop:"" C.fmt) clauses;
+          clauses
+        )
+      )
+    else []
+
+  (* TODO: copy redundancy criteria from QBF ? *)
+
+  let show_lemmas () =
+    let forms = BoolLit.iter_injected
+      |> Sequence.filter_map
+        (function
+          | BoolLit.Form f -> Some f
+          | _ -> None
+        )
+      |> Sequence.to_rev_list
+    in
+    Util.debugf ~section 1 "@[<2>lemmas:@ @[<hv0>%a@]@]"
+      (CCList.print ~start:"" ~stop:"" F.fmt) forms
+end
+
 module A = Logtk_parsers.Ast_tptp
 
 let init_from_decls pairs =
@@ -176,10 +316,20 @@ let init_from_decls pairs =
       | Some l -> declare_ ty l
     ) pairs
 
+let setup_induction_ str = match str with
+  | "qbf" ->
+      kind_ := `Full;
+      enable_ ()
+  | "sat" ->
+      kind_ := `Simple;
+      enable_ ()
+  | _ ->
+      failwith ("unknown QBF kind: " ^ str ^ " (known: 'sat', 'qbf')")
+
 let () =
   Params.add_opts
-    [ "-induction", Arg.String add_ind_type_,
-      " enable Induction on the given type"
+    [ "-induction", Arg.String setup_induction_,
+      " enable induction with the given style ('qbf' | 'sat')"
     ; "-induction-depth", Arg.Set_int cover_set_depth_,
       " set default induction depth"
     ]
