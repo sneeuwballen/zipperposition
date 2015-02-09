@@ -112,7 +112,9 @@ module Make(X : sig end) : BS.SAT = struct
     Util.debugf ~section 4 "@[<hv2>formula before CNF:@ %a@]@."
       (Sequence.pp_seq pp_form) (FormSet.to_seq (get_()));
     (* Instantiate solver *)
-    let module S = Msat.Sat.Make(struct end) in
+    let module S = Msat.Sat.Make(struct
+      let debug lvl fmt = Util.debug ~section lvl fmt
+    end) in
     (* add problem *)
     FormSet.iter
       (function
