@@ -109,7 +109,7 @@ module Make(X : sig end) : BS.SAT = struct
   let check () =
     unsat_core_ := unsat_core_fail_;
     eval_ := eval_fail_;
-    Format.printf "@[<hv2>formula before CNF:@ %a@]@."
+    Util.debugf ~section 4 "@[<hv2>formula before CNF:@ %a@]@."
       (Sequence.pp_seq pp_form) (FormSet.to_seq (get_()));
     (* Instantiate solver *)
     let module S = Msat.Sat.Make(struct end) in

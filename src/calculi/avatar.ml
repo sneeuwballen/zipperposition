@@ -49,6 +49,12 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
   let _pp_bclause buf lits =
     Printf.bprintf buf "%a" (Util.pp_list ~sep:" ⊔ " BoolLit.pp) lits
 
+  (* map ID -> clause *)
+  let id_to_clause_ = Hashtbl.create 24
+
+  let save_clause ~tag c = Hashtbl.replace id_to_clause_ tag c
+  let get_clause ~tag = CCHashtbl.get id_to_clause_ tag
+
   (* union-find that maps terms to list of literals, used for splitting *)
   module UF = UnionFind.Make(struct
     type key = T.t
@@ -121,6 +127,7 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
           |> C.Trail.to_list
           |> List.map BoolLit.neg in
         let bool_clause = List.append bool_clause bool_guard in
+        save_clause ~tag:(C.id c) c;
         Sat.add_clause ~tag:(C.id c) bool_clause;
         Util.debug ~section 4 "constraint clause is %a"
           _pp_bclause bool_clause;
@@ -140,21 +147,18 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
   let filter_absurd_trails_ = ref (fun _ -> true)
   let filter_absurd_trails f = filter_absurd_trails_ := f
 
-  (* map ID -> empty clause *)
-  let empty_clauses_ = Hashtbl.create 24
-
   (* if c.lits = [], negate c.trail *)
   let check_empty c =
     if Array.length (C.lits c) = 0 && !filter_absurd_trails_ (C.get_trail c)
     then (
       assert (not (C.Trail.is_empty (C.get_trail c)));
-      Hashtbl.replace empty_clauses_ (C.id c) c;
       let b_clause = C.get_trail c
         |> C.Trail.to_list
         |> List.map BoolLit.neg
       in
       Util.debug ~section 4 "negate trail of %a (id %d) with %a"
         C.pp c (C.id c) _pp_bclause b_clause;
+      save_clause ~tag:(C.id c) c;
       Sat.add_clause ~tag:(C.id c) b_clause;
     );
     [] (* never infers anything! *)
@@ -178,11 +182,11 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
               let l = Sequence.to_rev_list seq in
               Util.debugf ~section 3 "unsat core:@ @[%a@]" (CCList.print CCInt.print) l;
               l
-                |> CCList.filter_map (CCHashtbl.get empty_clauses_)
+                |> CCList.filter_map (fun tag -> get_clause ~tag)
                 |> List.map C.proof
         in
         let proof cc = Proof.mk_c_inference
-          ~rule:"avatar" ~theories:["sat"] cc premises in
+          ~rule:"sat" ~theories:["sat"] cc premises in
         let c = C.create [] proof in
         [c]
     in
