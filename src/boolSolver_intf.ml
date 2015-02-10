@@ -111,10 +111,4 @@ module type QBF = sig
   (** The functions from {!SAT}, such as {!SAT.check}, still work. They
       convert the current formulas to CNF and send the whole problem to
       the QBF solver. *)
-
-  val add_qform : quant_level:quant_level -> Qbf.Formula.t -> unit
-  (** Add the given boolean formula. Fresh boolean literals used for
-      reduction to CNF will be quantified at the given level.
-      @param quant_level the level of quantification for Skolems (default 0)
-      *)
 end

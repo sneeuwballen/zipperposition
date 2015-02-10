@@ -45,7 +45,7 @@ module Make(X : sig end) : BS.QBF = struct
 
   type form =
     | Clause of LitSet.t
-    | Form of Qbf.Formula.t * int (* quantification level *)
+    | Form of Qbf.Formula.t
     [@@deriving ord]
 
   [@@@warning "+39"]
@@ -137,11 +137,9 @@ module Make(X : sig end) : BS.QBF = struct
 
   let add_clauses ?tag = List.iter add_clause_
 
-  let add_qform ~quant_level f =
+  let add_form ?tag f =
     let st = get_state_ () in
-    st.forms <- FormSet.add (Form (f, quant_level)) st.forms
-
-  let add_form ?tag f = add_qform ~quant_level:level0 f
+    st.forms <- FormSet.add (Form f) st.forms
 
   let add_clause_seq ?tag seq = seq add_clause_
 
@@ -166,16 +164,17 @@ module Make(X : sig end) : BS.QBF = struct
   let to_cnf_ clauses =
     let new_lits = ref [] in
     let clauses =
-        FormSet.to_seq clauses
-        |> Sequence.flat_map
-            (function
-              | Clause lits -> Sequence.singleton (LitSet.to_list lits)
-              | Form (f, level) ->
-                  let clauses, new_lits' = Qbf.Formula.cnf ~gensym:Qbf.Lit.fresh f in
-                  CCList.Ref.push_list new_lits new_lits';
-                  Sequence.of_list clauses
-            )
-        |> Sequence.to_rev_list
+      FormSet.to_seq clauses
+      |> Sequence.flat_map
+          (function
+            | Clause lits -> Sequence.singleton (LitSet.to_list lits)
+            | Form f ->
+                let clauses, new_lits' =
+                  Qbf.Formula.cnf ~gensym:Qbf.Lit.fresh f in
+                CCList.Ref.push_list new_lits new_lits';
+                Sequence.of_list clauses
+          )
+      |> Sequence.to_rev_list
     in
     Qbf.QCNF.quantify Qbf.Exists !new_lits (Qbf.QCNF.prop clauses)
 
@@ -203,7 +202,7 @@ module Make(X : sig end) : BS.QBF = struct
     | Clause c ->
         Format.fprintf fmt "@[<hv2>%a@]"
         (Sequence.pp_seq ~sep:" ⊔ " !pp_) (LitSet.to_seq c)
-    | Form (f,_) ->
+    | Form f ->
         Qbf.Formula.print_with ~pp_lit:!pp_ fmt (Qbf.Formula.simplify f)
 
   let check () =
