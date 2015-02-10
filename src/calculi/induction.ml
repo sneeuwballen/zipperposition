@@ -263,7 +263,8 @@ struct
               in
               let clauses, bool_lits = List.split clauses_and_lits in
               (* add a boolean constraint: Xor of boolean lits *)
-              Solver.add_clauses (mk_xor_ bool_lits);
+              Avatar.save_clause ~tag:(C.id c) c;
+              Solver.add_clauses ~tag:(C.id c) (mk_xor_ bool_lits);
               (* return clauses *)
               Util.debugf ~section 4 "split inference for %a: @[<hv>%a@]"
                 CI.Cst.print t (CCList.print C.fmt) clauses;
@@ -322,8 +323,8 @@ struct
                 "clause %a redundant because %a and %a both in trail"
                 C.pp c BoolLit.pp_injected lit1 BoolLit.pp_injected lit2;
               true
-          | `Input, `InLoop _
-          | `InLoop _, `Input ->
+          | `Input, (`InLoop _ | `Minimal _ | `Case _)
+          | (`InLoop _ | `Minimal _ | `Case _), `Input ->
               Util.debug ~section 4
                 "clause %a redundant: \"init\" and \"in_loop\" combined"
                 C.pp c;
@@ -537,7 +538,8 @@ struct
           (* context C[] created from C[i]<-Gamma, add init(C[],i) <- Gamma
           to QBF immediatly *)
           let bclause = bclause_from_trail c cand in
-          Solver.add_clause bclause;
+          Avatar.save_clause ~tag:(C.id c) c;
+          Solver.add_clause ~tag:(C.id c) bclause;
           Util.debug ~section 4 "add bool clause %a" pp_bclause bclause;
         );
         `New t
@@ -606,7 +608,8 @@ struct
     then CandidateCtxSet.iter
       (fun cand ->
         let bclause = bclause_from_trail c cand in
-        Solver.add_clause bclause;
+        Avatar.save_clause ~tag:(C.id c) c;
+        Solver.add_clause ~tag:(C.id c) bclause;
         Util.debug ~section 3 "add bool constraint %a" pp_bclause bclause;
       ) set
 
@@ -688,7 +691,7 @@ struct
         ([i = t] & minimal(i, t))
   *)
   let qbf_encode_valid_ cst =
-    Solver.add_qform ~quant_level:level2_
+    Solver.add_form
       (QF.and_map (CI.cover_sets cst)
         ~f:(fun set -> QF.or_map (CI.cases set)
           ~f:(fun t -> QF.and_l
@@ -734,7 +737,7 @@ struct
     |> Sequence.iter
       (fun (set, case) ->
         (* now to define minimal(cst,case) *)
-        Solver.add_qform ~quant_level:level2_
+        Solver.add_form
           (QF.imply
             (QF.atom (minimal_ cst case))
             (QF.and_map

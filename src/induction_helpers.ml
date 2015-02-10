@@ -71,7 +71,6 @@ let enable_ () =
     Util.debugf ~section 1
       "Induction(%s): requires ord=rpo6; select=NoSelection" (show_kind !kind_);
     Params.ord := "rpo6";   (* new default! RPO is necessary*)
-    Params.dot_all_roots := true;  (* print proofs more clearly *)
     Params.select := "NoSelection";
     Signal.send on_enable !kind_;
   )

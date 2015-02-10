@@ -49,7 +49,6 @@ let section = Util.Section.make
   ~inheriting:[section_bool] ~parent:Const.section "ind"
 
 let show_lemmas_ = ref false
-let enable_induction_ = ref false
 
 module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
   module Env = E
