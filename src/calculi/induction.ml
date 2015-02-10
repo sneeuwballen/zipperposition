@@ -65,9 +65,29 @@ struct
 
   module IHA = IH.MakeAvatar(Avatar)
 
+  (* no trail for false should be about several inductive constants *)
+  let check_trail_ok_ t =
+    let ok = C.Trail.for_all
+      (fun lit -> match BoolLit.inductive_cst (Qbf.Lit.abs lit) with
+        | None -> true
+        | Some c ->
+            C.Trail.for_all
+              (fun lit' -> match BoolLit.inductive_cst (Qbf.Lit.abs lit') with
+                | None -> true
+                | Some c' -> CI.Cst.equal c c'
+              ) t
+      ) t
+    in
+    if not ok
+      then Util.debugf ~section 5 "@[<2>faulty trail:@ %a@]" C.Trail.print t;
+    ok
+
   let () =
     Avatar.filter_absurd_trails
-      (fun t -> not (C.Trail.mem BoolLit.inject_input t))
+      (fun t ->
+        assert (check_trail_ok_ t);
+        not (C.Trail.mem BoolLit.inject_input t)
+      )
 
   (** Map that is subsumption-aware *)
   module FVMap(X : sig type t end) = struct
@@ -329,6 +349,11 @@ struct
                 "clause %a redundant: \"init\" and \"in_loop\" combined"
                 C.pp c;
               true
+          |   (`Case (c1, _) | `Minimal (_, c1, _, _) | `InLoop (_, c1, _))
+            , (`Case (c2, _) | `Minimal (_, c2, _, _) | `InLoop (_, c2, _))
+            ->
+              (* do not mix inductive loops *)
+              not (CI.Cst.equal c1 c2)
           | _ -> false
         )
 
