@@ -42,6 +42,7 @@ let section = Const.section
 
 let ind_types_ = ref []
 let cover_set_depth_ = ref 1
+let show_lemmas_ = ref false
 
 let ind_types () = !ind_types_
 let cover_set_depth () = !cover_set_depth_
@@ -288,6 +289,13 @@ module MakeAvatar(A : Avatar.S) = struct
     in
     Util.debugf ~section 1 "@[<2>lemmas:@ @[<hv0>%a@]@]"
       (CCList.print ~start:"" ~stop:"" F.fmt) forms
+
+  let () =
+    Signal.on Signals.on_exit
+      (fun _ ->
+        if !show_lemmas_ then show_lemmas ();
+        Signal.ContinueListening
+      );
 end
 
 module A = Logtk_parsers.Ast_tptp
@@ -331,4 +339,5 @@ let () =
       " enable induction with the given style ('qbf' | 'sat')"
     ; "-induction-depth", Arg.Set_int cover_set_depth_,
       " set default induction depth"
+    ; "-show-lemmas", Arg.Set show_lemmas_, " show inductive lemmas"
     ]

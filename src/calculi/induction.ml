@@ -49,8 +49,6 @@ let section = Util.Section.make ~parent:Const.section "ind"
 let section_qbf = Util.Section.make
   ~parent:section ~inheriting:[BoolSolver.section; BBox.section] "qbf"
 
-let show_lemmas_ = ref false
-
 module Make(Sup : Superposition.S)
            (Solver : BoolSolver.QBF) =
 struct
@@ -997,5 +995,4 @@ let () =
   Params.add_opts
     [ "-induction-summary", Arg.Set summary_,
       " show summary of induction before exit"
-    ; "-show-lemmas", Arg.Set show_lemmas_, " show inductive lemmas"
     ]

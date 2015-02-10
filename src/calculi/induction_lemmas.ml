@@ -48,8 +48,6 @@ let section_bool = BoolSolver.section
 let section = Util.Section.make
   ~inheriting:[section_bool] ~parent:Const.section "ind"
 
-let show_lemmas_ = ref false
-
 module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
   module Env = E
   module Ctx = E.Ctx
@@ -160,10 +158,6 @@ module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
     Env.add_unary_inf "induction_lemmas.ind" inf_assert_minimal;
     (* no collisions with Skolemization please *)
     Signal.once Env.on_start IHA.clear_skolem_ctx;
-    Signal.once Signals.on_exit
-      (fun _ ->
-        if !show_lemmas_ then IHA.show_lemmas ()
-      );
     ()
 end
 
@@ -192,8 +186,3 @@ let () =
         Signal.ContinueListening
       | `Full -> Signal.ContinueListening
     )
-
-let () =
-  Params.add_opts
-    [ "-show-lemmas", Arg.Set show_lemmas_, " show inductive lemmas"
-    ]
