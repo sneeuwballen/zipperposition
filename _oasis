@@ -39,7 +39,7 @@ Library "libzipperposition"
                     Ctx_intf, Clause_intf, Env_intf, ProofState_intf,
                     BBox, BBox_intf, ClauseContext,
                     BoolSolver, BoolSolver_intf, Induction_helpers,
-                    calculi/Avatar, calculi/Induction,
+                    calculi/Avatar, calculi/Induction, calculi/Induction_simple,
                     calculi/Superposition, calculi/Chaining,
                     calculi/EnumTypes, calculi/ArithInt, calculi/Heuristics
   InternalModules:  lib/LazyGraph, lib/SmallSet,

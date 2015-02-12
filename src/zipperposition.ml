@@ -44,7 +44,7 @@ module Import = struct
   open! EnumTypes
   open! Avatar
   open! Induction
-  open! Induction_lemmas
+  open! Induction_simple
   open! Zipperposition_msat
   open! Zipperposition_quantor  (* TODO: remove, should be a plugin *)
   open! Zipperposition_depqbf
