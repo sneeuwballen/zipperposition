@@ -792,7 +792,7 @@ struct
   let qbf_encode_enter_ () =
     Util.enter_prof prof_encode_qbf;
     (* normal constraints should be added already *)
-    Util.debug ~section:section_qbf 4 "save QBF solver...";
+    Util.debug ~section:section_qbf 5 "save QBF solver...";
     save_level_ := Solver.save ();
     CI.Seq.cst |> Sequence.iter qbf_encode_minimal_;
     CI.Seq.cst |> Sequence.iter qbf_encode_empty_;
@@ -802,7 +802,7 @@ struct
 
   (* restoring state *)
   let qbf_encode_exit_ () =
-    Util.debug ~section:section_qbf 4 "...restore QBF solver";
+    Util.debug ~section:section_qbf 5 "...restore QBF solver";
     Solver.restore !save_level_;
     ()
 

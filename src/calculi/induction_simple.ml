@@ -145,13 +145,12 @@ module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
     of the clause for all those constants independently *)
   let inf_assert_minimal c =
     let consts = scan (Sequence.singleton c) in
-    let clauses, bool_lits = List.fold_left
+    let clauses = List.fold_left
       (fun acc cst ->
         let ctx = ClauseContext.extract_exn (C.lits c) (cst:CI.cst:>T.t) in
         assert_min acc c ctx cst
-      ) ([], []) consts
+      ) [] consts
     in
-    Solver.add_form ~tag:(C.id c) (QF.or_l consts)
     clauses
 
   let register () =

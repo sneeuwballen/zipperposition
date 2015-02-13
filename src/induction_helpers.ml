@@ -226,6 +226,11 @@ module MakeAvatar(A : Avatar.S) = struct
   let has_pos_lit_ c =
     CCArray.exists Literal.is_pos (C.lits c)
 
+  let is_acceptable_lemma f =
+    (* not too deep *)
+    let depth = F.Seq.terms f |> Sequence.map T.depth |> Sequence.max in
+    CCOpt.maybe (fun d -> d < 5) true depth
+
   (* when a clause has inductive constants, take its negation
       and add it as a lemma *)
   let inf_introduce_lemmas c =
@@ -261,8 +266,8 @@ module MakeAvatar(A : Avatar.S) = struct
           |> F.Base.and_
           |> F.close_forall
         in
-        (* if [box f] already exists, no need to re-do inference *)
-        if BoolLit.exists_form f
+        (* if [box f] already exists or is too deep, no need to re-do inference *)
+        if BoolLit.exists_form f || not (is_acceptable_lemma f)
         then []
         else (
           (* introduce cut now *)
