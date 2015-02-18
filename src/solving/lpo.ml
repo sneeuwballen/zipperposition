@@ -175,6 +175,7 @@ module MakeSolver(X : sig end) = struct
 
   module AtomTbl = CCHashtbl.Make(Atom)
 
+  let num_ = ref 1
   let atom_to_int_ = AtomTbl.create 16
   let int_to_atom_ = Hashtbl.create 16
 
@@ -183,7 +184,8 @@ module MakeSolver(X : sig end) = struct
     try
       AtomTbl.find atom_to_int_ a
     with Not_found ->
-      let i = Msat.Sat.Fsat.fresh() in
+      let i = Solver.make !num_ in
+      incr num_;
       AtomTbl.add atom_to_int_ a i;
       Hashtbl.add int_to_atom_ i a;
       i
@@ -266,12 +268,12 @@ module MakeSolver(X : sig end) = struct
     sol
 
   let print_lit fmt i =
-    if i<0 then Format.fprintf fmt "¬";
+    if not (Solver.sign i) then Format.fprintf fmt "¬";
     try
-      let a = Hashtbl.find int_to_atom_ (abs i) in
+      let a = Hashtbl.find int_to_atom_ (Solver.abs i) in
       Atom.print fmt a
     with Not_found ->
-      Format.fprintf fmt "L%d" (abs i)  (* tseitin *)
+      Format.fprintf fmt "L%d" (abs (i : Solver.atom :> int))  (* tseitin *)
 
   let print_clause fmt c =
     Format.fprintf fmt "@[<hv2>%a@]"
