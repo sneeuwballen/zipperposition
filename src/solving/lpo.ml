@@ -28,6 +28,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+let section = Util.Section.make ~parent:Util.Section.logtk "solving"
+
 (** {6 Constraints} *)
 
 module Constraint = struct
@@ -147,35 +149,49 @@ end
 
 module C = Constraint
 
-(** Functor to use Sat, and encode/decode the solution *)
+(** Functor to use Sat, and encode/decode the solution.
+  Use "Solving Partial Order Constraints for LPO Termination", Codish & al *)
 module MakeSolver(X : sig end) = struct
+  module Solver = Msat.Sat.Make(struct
+    let debug l fmt = Util.debug ~section (l+3) fmt
+  end)
+
   (* propositional atoms map symbols to the binary digits of
      their index in the precedence *)
-  type atom =
-    | Digit_n of Symbol.t * int
+  module Atom : sig
+    type t
+    val make : Symbol.t -> int -> t
+    val equal : t -> t -> bool
+    val hash : t -> int
+    val print : Format.formatter -> t -> unit
+  end = struct
+    type t = Symbol.t * int
+    let make s i = s, i
+    let equal (s1,i1)(s2,i2) = Symbol.eq s1 s2 && i1 = i2
+    let hash_fun (s,i) h = h |> Symbol.hash_fun s |> CCHash.int_ i
+    let hash a = CCHash.apply hash_fun a
+    let print fmt (s,i) = Format.fprintf fmt "%a/%d" Symbol.fmt s i
+  end
 
-  let atom_to_hstring = function
-    | Digit_n (s, i) -> Aez.Hstring.make (Util.sprintf "prec_%a_%d" Symbol.pp s i)
+  module AtomTbl = CCHashtbl.Make(Atom)
 
-  (* sat solver *)
-  module S = Aez.Smt.Make(struct end)
+  let atom_to_int_ = AtomTbl.create 16
+  let int_to_atom_ = Hashtbl.create 16
 
-  let __declared = ref Aez.Hstring.HSet.empty
-
-  let atom_to_term a =
-    let s = atom_to_hstring a in
-    (* declare type, if needed *)
-    if not (Aez.Hstring.HSet.mem s !__declared) then begin
-      Aez.Smt.Symbol.declare s [] Aez.Smt.Type.type_proc;
-      __declared := Aez.Hstring.HSet.add s !__declared
-    end;
-    (* build constant *)
-    Aez.Smt.Term.make_app s []
+  (* unique "literal" (int) for this atom *)
+  let atom_to_lit a =
+    try
+      AtomTbl.find atom_to_int_ a
+    with Not_found ->
+      let i = Msat.Sat.Fsat.fresh() in
+      AtomTbl.add atom_to_int_ a i;
+      Hashtbl.add int_to_atom_ i a;
+      i
 
   (* get the propositional variable that represents the n-th bit of [s] *)
-  let digit s n = atom_to_term (Digit_n (s, n))
+  let digit s n = atom_to_lit (Atom.make s n)
 
-  module F = Aez.Smt.Formula
+  module F = Msat.Sat.Tseitin
 
   (* encode [a < b]_n where [n] is the number of digits.
       either the n-th digit of [a] is false and the one of [b] is true,
@@ -184,7 +200,8 @@ module MakeSolver(X : sig end) = struct
   let rec encode_lt ~n a b =
     if n = 0 then F.f_false
     else
-      let d_a = F.make_pred (digit a n) and d_b = F.make_pred (digit b n) in
+      let d_a = F.make_atom (digit a n)
+      and d_b = F.make_atom (digit b n) in
       F.make_or
         [ F.make_and [ F.make_not d_a; d_b ]
         ; F.make_and [ F.make_equiv d_a d_b; encode_lt ~n:(n-1) a b]
@@ -198,7 +215,8 @@ module MakeSolver(X : sig end) = struct
   let rec encode_eq ~n a b =
     if n = 0 then F.f_true
     else
-      let d_a = F.make_pred (digit a n) and d_b = F.make_pred (digit b n) in
+      let d_a = F.make_atom (digit a n)
+      and d_b = F.make_atom (digit b n) in
       F.make_and [ F.make_equiv d_a d_b; encode_eq ~n:(n-1) a b ]
 
   (* encode a constraint with [n] bits into a formula. *)
@@ -217,7 +235,7 @@ module MakeSolver(X : sig end) = struct
     let r = ref 0 in
     for i = n downto 1 do
       let lit = digit s i in
-      let is_true = S.eval lit in
+      let is_true = Solver.eval lit in
       if is_true
         then r := 2 * !r + 1
         else r := 2 * !r
@@ -247,6 +265,21 @@ module MakeSolver(X : sig end) = struct
     in
     sol
 
+  let print_lit fmt i =
+    if i<0 then Format.fprintf fmt "¬";
+    try
+      let a = Hashtbl.find int_to_atom_ (abs i) in
+      Atom.print fmt a
+    with Not_found ->
+      Format.fprintf fmt "L%d" (abs i)  (* tseitin *)
+
+  let print_clause fmt c =
+    Format.fprintf fmt "@[<hv2>%a@]"
+      (CCList.print ~sep:" or " print_lit) c
+
+  let print_clauses fmt c =
+    Format.fprintf fmt "@[<v>%a@]" (CCList.print ~sep:"" print_clause) c
+
   (* solve the given list of constraints *)
   let solve_list l =
     (* count the number of symbols *)
@@ -261,40 +294,39 @@ module MakeSolver(X : sig end) = struct
     let n = int_of_float (ceil (log (float_of_int num) /. log 2.)) in
     Util.debug 2 "constraints on %d symbols -> %d digits (%d bool vars)"
       num n (n * num);
-    try
-      List.iteri
-        (fun i c ->
-          Util.debug 5 "encode constr %a..." C.pp c;
-          let f = encode_constr ~n c in
-          Format.pp_print_flush Format.std_formatter ();
-          S.assume ~id:i f;
-          Util.debug 5 "form assumed")
-        l;
-      (* generator of solutions *)
-      let rec next () =
-        try
-          Util.debug 5 "check satisfiability";
-          S.check ();
-          Util.debug 5 "next solution exists, try to extract it...";
-          let solution = get_solution ~n symbols in
-          Util.debug 5 "... solution is %a" Solution.pp solution;
-          (* obtain another solution: negate current one and continue *)
-          let tl = lazy (negate ~n solution) in
-          LazyList.Cons (solution, tl)
-        with Aez.Smt.Unsat _ ->
-          LazyList.Nil
-      and negate ~n solution =
-        (* negate current solution to get the next one... if any *)
-        let c = Solution.neg_to_constraint solution in
-        let f = encode_constr ~n c in
-        try
-          S.assume ~id:0 f;
-          S.check ();
-          next()
-        with Aez.Smt.Unsat _ -> LazyList.Nil
-      in
-      lazy (next())
-    with Aez.Smt.Unsat _ -> LazyList.nil
+    let encode_constr c =
+      Util.debug 5 "encode constr %a..." C.pp c;
+      let f = encode_constr ~n c in
+      Util.debugf 5 " ... @[<2>%a@]" F.print f;
+      let clauses = F.make_cnf f in
+      Util.debugf 5 " ... @[<0>%a@]" print_clauses clauses;
+      Solver.assume clauses;
+      Util.debug 5 "form assumed"
+    in
+    List.iter encode_constr l;
+    (* generator of solutions *)
+    let rec next () =
+      Util.debug 5 "check satisfiability";
+      match Solver.solve () with
+      | Solver.Sat ->
+        Util.debug 5 "next solution exists, try to extract it...";
+        let solution = get_solution ~n symbols in
+        Util.debug 5 "... solution is %a" Solution.pp solution;
+        (* obtain another solution: negate current one and continue *)
+        let tl = lazy (negate ~n solution) in
+        LazyList.Cons (solution, tl)
+      | Solver.Unsat ->
+        Util.debug 5 "no solution";
+        LazyList.Nil
+    and negate ~n solution =
+      (* negate current solution to get the next one... if any *)
+      let c = Solution.neg_to_constraint solution in
+      encode_constr c;
+      match Solver.solve () with
+      | Solver.Sat -> next()
+      | Solver.Unsat -> LazyList.Nil
+    in
+    lazy (next())
 end
 
 let solve_multiple l =

@@ -376,7 +376,7 @@ let _tff_type_decls =
     |> Sequence.mapi
       (fun i (s,ty) ->
         let name = Ast_tptp.NameString (Util.sprintf "hyst_ty_decl_%d" i) in
-        Ast_tptp.Typed.TypeDecl(name, Symbol.TPTP.to_string s, ty))
+        Ast_tptp.Typed.TypeDecl(name, Symbol.TPTP.to_string s, ty, []))
 
 let _tff_type_decls_untyped =
   erase_types _tff_type_decls
@@ -437,7 +437,7 @@ let ty_declarations decls =
     |> Sequence.mapi
         (fun i (s,ty) ->
           let name = Ast_tptp.NameString (Util.sprintf "hyst_decl_%d" i) in
-          Ast_tptp.Typed.TypeDecl (name, Symbol.to_string s, ty))
+          Ast_tptp.Typed.TypeDecl (name, Symbol.to_string s, ty, []))
 
 (** PRINTERS *)
 
