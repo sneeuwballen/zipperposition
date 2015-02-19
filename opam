@@ -4,7 +4,7 @@ maintainer: "simon.cruanes@inria.fr"
 build: [
     ["ocaml" "setup.ml" "-configure" "--%{menhir:enable}%-meta"
         "--%{qcheck:enable}%-qcheck" "--disable-docs"
-        "--%{menhir:enable}%-parsers" "--%{aez:enable}%-solving"
+        "--%{menhir:enable}%-parsers" "--%{msat:enable}%-solving"
         "--disable-tests" "--disable-tools" "--enable-meta"]
     [make "all"]
 ]
@@ -25,10 +25,7 @@ depends: [
 depopts: [
     "menhir"
     "qcheck"
-    "aez"
-]
-conflicts: [
-    "aez" { <= "0.3" }
+    "msat"
 ]
 tags: [ "logic" "unification" "term" ]
 homepage: "https://github.com/c-cube/logtk"
