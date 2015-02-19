@@ -115,18 +115,24 @@ module Make(X : sig end) : BS.SAT = struct
     let module S = Msat.Sat.Make(struct
       let debug lvl fmt = Util.debug ~section lvl fmt
     end) in
+    let assume_ ?tag (l:lit list list) =
+      let l = (l :> int list list)
+        |> List.map (List.map S.make)
+      in
+      S.assume ?tag l
+    in
     (* add problem *)
     FormSet.iter
       (function
-        | Clauses (c,tag) -> S.assume ?tag (c :> int list list)
+        | Clauses (c,tag) -> assume_ ?tag c
         | Form (f,tag) ->
             let clauses, _ = Qbf.Formula.cnf ~gensym:Qbf.Lit.fresh f in
-            S.assume ?tag (clauses:>int list list)
+            assume_ ?tag clauses
       ) (get_ ());
     (* solve *)
     let res = match S.solve () with
       | S.Sat ->
-          eval_ := (fun (l:lit) -> S.eval (l:>int));
+          eval_ := (fun (l:lit) -> S.eval (S.make (l:>int)));
           Sat
       | S.Unsat ->
           unsat_core_ := (fun k ->
