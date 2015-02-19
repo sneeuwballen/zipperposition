@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 75aa639adc8074d881bc3b1c6a05ff6e)
+# DO NOT EDIT (digest: 2d424b819408ce5ebb5866f22d258837)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -66,10 +66,10 @@ true: annot, bin_annot
 # Library logtk_solving
 "src/solving/logtk_solving.cmxs": use_logtk_solving
 "src/solving/lpo.cmx": for-pack(Logtk_solving)
-<src/solving/*.ml{,i,y}>: package(aez)
 <src/solving/*.ml{,i,y}>: package(bytes)
 <src/solving/*.ml{,i,y}>: package(containers)
 <src/solving/*.ml{,i,y}>: package(containers.data)
+<src/solving/*.ml{,i,y}>: package(msat)
 <src/solving/*.ml{,i,y}>: package(sequence)
 <src/solving/*.ml{,i,y}>: package(unix)
 <src/solving/*.ml{,i,y}>: package(zarith)
@@ -149,20 +149,20 @@ true: annot, bin_annot
 "src/tools/cnf_of_tptp.native": use_logtk
 "src/tools/cnf_of_tptp.native": use_logtk_parsers
 # Executable orient
-"src/tools/orient/orient.native": package(aez)
 "src/tools/orient/orient.native": package(bytes)
 "src/tools/orient/orient.native": package(containers)
 "src/tools/orient/orient.native": package(containers.data)
+"src/tools/orient/orient.native": package(msat)
 "src/tools/orient/orient.native": package(sequence)
 "src/tools/orient/orient.native": package(unix)
 "src/tools/orient/orient.native": package(zarith)
 "src/tools/orient/orient.native": use_logtk
 "src/tools/orient/orient.native": use_logtk_parsers
 "src/tools/orient/orient.native": use_logtk_solving
-<src/tools/orient/*.ml{,i,y}>: package(aez)
 <src/tools/orient/*.ml{,i,y}>: package(bytes)
 <src/tools/orient/*.ml{,i,y}>: package(containers)
 <src/tools/orient/*.ml{,i,y}>: package(containers.data)
+<src/tools/orient/*.ml{,i,y}>: package(msat)
 <src/tools/orient/*.ml{,i,y}>: package(sequence)
 <src/tools/orient/*.ml{,i,y}>: package(unix)
 <src/tools/orient/*.ml{,i,y}>: package(zarith)
@@ -198,10 +198,10 @@ true: annot, bin_annot
 <src/tools/*.ml{,i,y}>: use_logtk_meta
 <src/tools/*.ml{,i,y}>: use_logtk_parsers
 # Executable hysteresis
-"src/tools/hysteresis/hysteresis.native": package(aez)
 "src/tools/hysteresis/hysteresis.native": package(bytes)
 "src/tools/hysteresis/hysteresis.native": package(containers)
 "src/tools/hysteresis/hysteresis.native": package(containers.data)
+"src/tools/hysteresis/hysteresis.native": package(msat)
 "src/tools/hysteresis/hysteresis.native": package(sequence)
 "src/tools/hysteresis/hysteresis.native": package(unix)
 "src/tools/hysteresis/hysteresis.native": package(zarith)
@@ -209,10 +209,10 @@ true: annot, bin_annot
 "src/tools/hysteresis/hysteresis.native": use_logtk_meta
 "src/tools/hysteresis/hysteresis.native": use_logtk_parsers
 "src/tools/hysteresis/hysteresis.native": use_logtk_solving
-<src/tools/hysteresis/*.ml{,i,y}>: package(aez)
 <src/tools/hysteresis/*.ml{,i,y}>: package(bytes)
 <src/tools/hysteresis/*.ml{,i,y}>: package(containers)
 <src/tools/hysteresis/*.ml{,i,y}>: package(containers.data)
+<src/tools/hysteresis/*.ml{,i,y}>: package(msat)
 <src/tools/hysteresis/*.ml{,i,y}>: package(sequence)
 <src/tools/hysteresis/*.ml{,i,y}>: package(unix)
 <src/tools/hysteresis/*.ml{,i,y}>: package(zarith)

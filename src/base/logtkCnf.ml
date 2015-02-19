@@ -497,7 +497,7 @@ let rec to_cnf_rec f = match F.view f with
       end
   | F.And l ->
     (* simply concat sub-CNF *)
-    LogtkUtil.list_flatmap to_cnf_rec l
+    CCList.flat_map to_cnf_rec l
   | F.Or (f'::l) ->
     (* cartesian products of sub-CNF *)
     List.fold_left
@@ -572,13 +572,13 @@ let cnf_of_list ?(opts=[]) ?(ctx=LogtkSkolem.create LogtkSignature.empty) l =
   let acc = ref [] in
   (* read options *)
   let disable_renaming = List.mem DisableRenaming opts in
-  let preprocess = LogtkUtil.list_fmap
+  let preprocess = CCList.filter_map
     (function InitialProcessing f -> Some f | _ -> None)
     opts
-  and post_nnf = LogtkUtil.list_fmap
+  and post_nnf = CCList.filter_map
     (function PostNNF f -> Some f | _ -> None)
     opts
-  and post_skolem = LogtkUtil.list_fmap
+  and post_skolem = CCList.filter_map
     (function PostSkolem f -> Some f | _ -> None)
     opts
   in

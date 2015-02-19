@@ -37,7 +37,7 @@ let is_empty env = env.size = 0
 
 let make size = {
   size;
-  stack = LogtkUtil.list_range 0 size |> List.map (fun _ -> None);
+  stack = CCList.range 0 size |> List.map (fun _ -> None);
 }
 
 let singleton x = { size=1; stack = [Some x]; }
@@ -71,7 +71,7 @@ let mem env n =
 
 let set env n x =
   if n<0 || n >= env.size then raise (Invalid_argument "LogtkDBEnv.set");
-  {env with stack= LogtkUtil.list_set env.stack n (Some x); }
+  {env with stack= CCList.Idx.set env.stack n (Some x); }
 
 let num_bindings db =
   let rec count acc l = match l with

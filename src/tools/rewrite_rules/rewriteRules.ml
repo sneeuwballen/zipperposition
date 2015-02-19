@@ -52,7 +52,7 @@ let parse_file filename ic =
     (* parse declarations *)
     let terms = Parse_ho.parse_decls Lex_ho.token lexbuf in
     (* keep the facts of the form  a --> b *)
-    let rules = Util.list_fmap
+    let rules = CCList.filter_map
       (function
         | Ast_ho.Clause (t, []) ->
             begin match PT.view t with
@@ -76,7 +76,7 @@ let rules_of_pairs signature pairs =
   try
     let ctx = TypeInference.Ctx.create signature in
     (* infer types *)
-    let pairs = Util.list_fmap
+    let pairs = CCList.filter_map
       (function
         | Rule (l,r) ->
           let ty_l, l' = TypeInference.FO.infer_exn ctx l in

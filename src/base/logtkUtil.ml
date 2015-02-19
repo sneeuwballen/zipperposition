@@ -127,6 +127,8 @@ let get_debug () = Section.root.Section.level
 let need_cleanup = ref false
 
 let debug_buf_ = Buffer.create 32 (* shared buffer (not thread safe)  *)
+let debug_fmt_ = Format.std_formatter
+
 let debug ?(section=Section.root) l format =
   if l <= Section.cur_level section
     then (
@@ -143,6 +145,21 @@ let debug ?(section=Section.root) l format =
         debug_buf_ format)
     else
       Printf.ifprintf debug_buf_ format
+
+let debugf ?(section=Section.root) l msg =
+  if l <= Section.cur_level section
+    then (
+      let now = get_total_time () in
+      if section == Section.root
+        then Format.fprintf debug_fmt_ "@[<hov>%% [%.3f] " now
+        else Format.fprintf debug_fmt_ "@[<hov>%% [%.3f %s] "
+          now section.Section.full_name;
+        Format.kfprintf
+          (fun fmt -> Format.fprintf fmt "@]@.")
+          debug_fmt_ msg
+    )
+    else
+      Format.ifprintf debug_fmt_ msg
 
 let pp_pos pos =
   let open Lexing in
@@ -161,17 +178,6 @@ let set_time_limit n =
   if n <= 0 then invalid_arg "set_time_limit: expect positive arg";
   debug 1 "limit time to %ds" n;
   set_time_limit_stub n
-
-
-(** {2 Infix operators} *)
-
-module Infix = struct
-  let (|>) x f = f x
-
-  let (%>) f g = fun x -> g (f x)
-
-  let (%%) f g = fun x -> f (g x)
-end
 
 (** {2 profiling facilities} *)
 
@@ -303,213 +309,6 @@ let rec lexicograph_combine l = match l with
   | cmp::l' -> if cmp = 0 then lexicograph_combine l' else cmp
 
 let opposite_order ord a b = - (ord a b)
-
-(** {2 List utils} *)
-
-let rec list_get l i = match l, i with
-  | [], i -> raise Not_found
-  | x::_, i when i = 0 -> x
-  | _::xs, i when i > 0 -> list_get xs (i-1)
-  | _ -> failwith "error in list_get"
-
-let rec list_set l i elem = match l, i with
-  | [], i -> invalid_arg "index too high"
-  | _::xs, i when i = 0 -> elem::xs
-  | x::xs, i when i > 0 -> x::(list_set xs (i-1) elem)
-  | _ -> failwith "error in list_set"
-
-let list_mapi l f =
-  let rec recurse l i =
-    match l with
-    | [] -> []
-    | x::l' -> f i x :: recurse l' (i+1)
-  in recurse l 0
-
-let list_iteri l f =
-  let rec recurse l i =
-    match l with
-    | [] -> ()
-    | x::l' -> f i x; recurse l' (i+1)
-  in recurse l 0
-
-let rec list_remove l i = match l, i with
-  | [], i -> invalid_arg "index too high"
-  | _::xs, i when i = 0 -> xs
-  | x::xs, i when i > 0 -> x::(list_remove xs (i-1))
-  | _ -> failwith "error in list_remove"
-
-let list_pos l =
-  let rec aux l idx = match l with
-  | [] -> []
-  | x::xs -> (x,idx) :: (aux xs (idx+1))
-  in
-  aux l 0
-
-let rec list_mem comp x l = match l with
-  | [] -> false
-  | y::ys when comp x y -> true
-  | _::ys -> list_mem comp x ys
-
-let list_subset cmp l1 l2 =
-  List.for_all
-    (fun t -> list_mem cmp t l2)
-    l1
-
-let rec list_uniq eq l = match l with
-  | [] -> []
-  | x::xs when List.exists (eq x) xs -> list_uniq eq xs
-  | x::xs -> x :: list_uniq eq xs
-
-let list_merge comp l1 l2 =
-  let rec recurse l1 l2 = match l1,l2 with
-  | [], _ -> l2
-  | _, [] -> l1
-  | x::l1', y::l2' ->
-    let cmp = comp x y in
-    if cmp < 0 then x::(recurse l1' l2)
-    else if cmp > 0 then y::(recurse l1 l2')
-    else x::(recurse l1' l2')
-  in
-  List.rev (recurse l1 l2)
-
-let rec list_union comp l1 l2 = match l1 with
-  | [] -> l2
-  | x::xs when list_mem comp x l2 -> list_union comp xs l2
-  | x::xs -> x::(list_union comp xs l2)
-
-let rec list_inter comp l1 l2 = match l1 with
-  | [] -> []
-  | x::xs when list_mem comp x l2 -> x::(list_inter comp xs l2)
-  | _::xs -> list_inter comp xs l2
-
-let list_split_at n l =
-  let rec iter acc n l = match l with
-  | _ when n=0 -> List.rev acc, l
-  | [] -> List.rev acc, l
-  | x::l' -> iter (x::acc) (n-1) l'
-  in iter [] n l
-
-let list_find p l =
-  let rec search i l = match l with
-  | [] -> None
-  | x::_ when p x -> Some (i, x)
-  | _::xs -> search (i+1) xs
-  in search 0 l
-
-let list_fmap f l =
-  let rec recurse acc l = match l with
-  | [] -> List.rev acc
-  | x::l' ->
-    let acc' = match f x with | None -> acc | Some y -> y::acc in
-    recurse acc' l'
-  in recurse [] l
-
-let list_flatmap f l =
-  let rec recurse acc l = match l with
-  | [] -> List.rev acc
-  | x::l' -> recurse (List.rev_append (f x) acc) l'
-  in recurse [] l
-
-let rec list_take n l = match n, l with
-  | 0, _ -> []
-  | _, [] -> []
-  | _, x::xs when n > 0 -> x :: (list_take (n-1) xs)
-  | _ -> assert false
-
-let rec list_drop n l = match n, l with
-  | 0, _ -> l
-  | n, [] -> []
-  | n, _::l' -> (assert (n > 0); list_drop (n-1) l')
-
-let rec list_range low high =
-  assert (low <= high);
-  match low, high with
-  | _, _ when low = high -> []
-  | _ -> low :: (list_range (low+1) high)
-
-let list_foldi f acc l =
-  let rec foldi f acc i l = match l with
-  | [] -> acc
-  | x::l' ->
-    let acc = f acc i x in
-    foldi f acc (i+1) l'
-  in
-  foldi f acc 0 l
-
-let rec times i f =
-  if i = 0 then []
-  else (f ()) :: (times (i-1) f)
-
-let list_product l1 l2 =
-  List.fold_left
-    (fun acc x1 -> List.fold_left
-      (fun acc x2 -> (x1,x2) :: acc)
-      acc l2)
-    [] l1
-
-let list_fold_product l1 l2 acc f =
-  List.fold_left
-    (fun acc x1 ->
-      List.fold_left
-        (fun acc x2 -> f acc x1 x2)
-        acc l2
-    ) acc l1
-
-let list_diagonal l =
-  let rec gen acc l = match l with
-  | [] -> acc
-  | x::l' ->
-    let acc = List.fold_left (fun acc y -> (x,y) :: acc) acc l' in
-    gen acc l'
-  in
-  gen [] l
-
-(** Randomly shuffle the array, in place.
-    See http://en.wikipedia.org/wiki/Fisher-Yates_shuffle *)
-let array_shuffle a = 
-  for i = 1 to Array.length a - 1 do
-    let j = Random.int i in
-    let tmp = a.(i) in
-    a.(i) <- a.(j);
-    a.(j) <- tmp;
-  done
-
-(** Randomly shuffle the list *)
-let list_shuffle l =
-  let a = Array.of_list l in
-  array_shuffle a;
-  Array.to_list a
-
-(** {2 Array utils} *)
-
-let array_foldi f acc a =
-  let rec recurse acc i =
-    if i = Array.length a then acc else recurse (f acc i a.(i)) (i+1)
-  in recurse acc 0
-
-let array_forall p a =
-  let rec check i =
-    if i = Array.length a then true else p a.(i) && check (i+1)
-  in check 0
-
-let array_forall2 p a1 a2 =
-  let rec check i =
-    if i = Array.length a1 then true else p a1.(i) a2.(i) && check (i+1)
-  in
-  if Array.length a1 <> Array.length a2
-    then raise (Invalid_argument "array_forall2")
-    else check 0
-
-let array_exists p a =
-  let rec check i =
-    if i = Array.length a then false else p a.(i) || check (i+1)
-  in check 0
-
-(** all the elements of a, but the i-th, into a list *)
-let array_except_idx a i =
-  array_foldi
-    (fun acc j elt -> if i = j then acc else elt::acc)
-    [] a
 
 (** {2 String utils} *)
 

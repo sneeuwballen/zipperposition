@@ -439,7 +439,7 @@ module Map(From : S)(To : S) = struct
     | From.IncludeOnly (s,l) -> To.IncludeOnly (s,l)
 
   let flat_map ~cnf ~form ~ho ~ty l =
-    Util.list_flatmap
+    CCList.flat_map
       begin function
       | From.CNF (n,r, l, i) ->
           let l' = cnf l in

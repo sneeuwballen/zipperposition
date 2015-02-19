@@ -230,6 +230,9 @@ let all_definitions ~ctx =
   F.Map.to_seq ctx.sc_defs
     |> Sequence.map snd
 
+let clear_skolem_cache ~ctx =
+  ctx.sc_fcache <- []
+
 let pop_new_definitions ~ctx =
   let l = ctx.sc_new_defs in
   List.iter (remove_def ~ctx) l;

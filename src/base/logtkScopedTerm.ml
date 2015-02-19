@@ -835,7 +835,7 @@ module Pos = struct
         app ~kind:t.kind ~ty (replace f subpos ~by) l
     | HasLogtkType ty, App (f, l), P.Arg (n,subpos) when n < List.length l ->
         let t' = replace (List.nth l n) subpos ~by in
-        let l' = LogtkUtil.list_set l n t' in
+        let l' = CCList.Idx.set l n t' in
         app ~kind:t.kind ~ty f l'
     | HasLogtkType ty, At (l,r), P.Left subpos ->
         mk_at ~kind:t.kind ~ty (replace l subpos ~by) r
@@ -843,11 +843,11 @@ module Pos = struct
         mk_at ~kind:t.kind ~ty l (replace r subpos ~by)
     | HasLogtkType ty, Multiset l, P.Arg (n,subpos) when n < List.length l ->
         let t' = replace (List.nth l n) subpos ~by in
-        let l' = LogtkUtil.list_set l n t' in
+        let l' = CCList.Idx.set l n t' in
         multiset ~kind:t.kind ~ty l'
     | HasLogtkType ty, SimpleApp (s,l), P.Arg (n,subpos) when n < List.length l ->
         let t' = replace (List.nth l n) subpos ~by in
-        let l' = LogtkUtil.list_set l n t' in
+        let l' = CCList.Idx.set l n t' in
         simple_app ~kind:t.kind ~ty s l'
     | HasLogtkType ty, Record (l, Some r), P.Record_rest subpos ->
         let rest = Some (replace r subpos ~by) in

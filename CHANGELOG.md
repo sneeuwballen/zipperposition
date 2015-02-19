@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7
+
+- breaking: remove array utils from `LogktUtil`, use `CCArray` instead
+- breaking: remove list utils from `LogktUtil`, use `CCList` instead
+- vim support for theory files
+- fix bug in `solving/Lpo` (fresh names collision)
+- fix logtk.solving, using Msat rather than (patched) aez
+- `Skolem.clear_skolem_cache`
+- `Util.debugf` for Format-based debugging
+- small fixes post-0.6.2
+
 ## 0.6.2
 
 - fix the list of modules in API doc
@@ -37,7 +48,7 @@
 ## 0.6
 
 - do not depend on `CCError.t` arity
-- require `bytes` to keep compatibility with < 4.02 (`String.init` too recent)
+- require `bytes` to keep compatibility with `< 4.02` (`String.init` too recent)
 - `Skolem`: at creation, now possible to specify prefix for Tseitin atoms
 - `Util`: removed a String.create deprecation warning
 - `FeatureVector.Make.retrieve_alpha_equiv`
@@ -53,7 +64,7 @@
 
 - `FOTerm.weight`
 - `Type.depth`
-- KBO checks that weights are > 0
+- KBO checks that weights are `> 0`
 - use a flag in `Formula.simplify`, for memoization; makes CNF fast again on some examples
 - expose `ScopedTerm.flags`
 - `Precedence`: make it possible to choose/change the weight fun
@@ -68,20 +79,20 @@
 - refactor:
     - unification now works with two (optional) DB environments in which bound variables of both terms live.
     - matching: parameter `?allow_open` is now used properly in rewriting and indexing
-- unif.res_head
+- `unif.res_head`
 - N-ary unification now uses `Sequence` (simpler, more efficient)
 
 ## 0.5.1
 
-- sort list of modules in doc/api_intro.txt
+- sort list of modules in `doc/api_intro.txt`
 - code cleanup in `ScopedTerm.Seq`, less closures, simpler
 - bugfix in `scopedTerm.DB.open_vars` (shift variables!)
 - profiling information in CNF
 - safety check in CNF: clauses must be closed (!)
-- bugfix: Formula.is_closed
+- bugfix: `Formula.is_closed`
 - fix printing of Type in TPTP
 - add `PrologTerm.Syntactic` constructor (in place of `SimpleApp` which doesn't make much sense)
-- cleanup: check i>=0 for bvar/var in ScopedTerm, share a common fresh_var generator
+- cleanup: check i>=0 for bvar/var in ScopedTerm, share a common `fresh_var generator`
 - simplified and factorized some code (share term containers)
 
 ## 0.5
@@ -91,7 +102,7 @@
 - simplify interface for **De Bruijn** in ScopedTerm;
   more compact implementation using iterators
 - safe API for type inference, using the error
-  monad `CCError.t`` everywhere (also in `Util_tptp`)
+  monad `CCError.t` everywhere (also in `Util_tptp`)
 
 ## 0.4
 
@@ -123,11 +134,11 @@
     * `Unif.Unary.eq`
     * `Comparison.@>>`
     * `FOTerm.head`
-    * arith_hook printer in `FOTerm`
-- enable bin_annot
+    * `arith_hook` printer in `FOTerm`
+- enable `bin_annot`
 - printer hooks in formulas
 - `Unif`: equality up to substitution implemented
-- in `NPDTree`, do not capture Not_found that could be raised by the user callback
+- in `NPDTree`, do not capture `Not_found` that could be raised by the user callback
 - lexicographic combinators in `Comparison`
 - module `lib/IArray` for immutable arrays (previously used in Multiset)
 - more abtract requirement for Clause index (feature vector...)

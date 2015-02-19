@@ -258,7 +258,7 @@ module Make(C : LogtkIndex.CLAUSE) = struct
                           @ !features);
     (* only take a limited number of features *)
     let features = List.sort (fun (s1,_) (s2,_) -> s2 - s1) !features in
-    let features = LogtkUtil.list_take max_features features in
+    let features = CCList.take max_features features in
     let features = List.map (fun (_, f) -> f) features in
     let features = default_features @ features in
     LogtkUtil.debug 2 "FV features: [%a]" (LogtkUtil.pp_list Feature.pp) features;

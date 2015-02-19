@@ -488,7 +488,7 @@ module FO = struct
         if List.length l = n_args
           then Ctx._new_ty_vars ctx n_tyargs, l (* hack *)
           else
-            let tyargs, args = LogtkUtil.list_split_at n_tyargs l in
+            let tyargs, args = CCList.split n_tyargs l in
             let tyargs = _convert_type_args ctx tyargs in
             tyargs, args
       in
@@ -879,7 +879,7 @@ module HO = struct
           based on the expected arity of the head [t].
           We split [l] into the list [tyargs], containing [n_tyargs] types,
           and [args], containing [n_args] terms. *)
-      let tyargs, args = LogtkUtil.list_split_at n_tyargs l in
+      let tyargs, args = CCList.split n_tyargs l in
       let tyargs = _convert_type_args ctx tyargs in
       let ty_t' = LogtkType.apply_list ty_t tyargs in
       (* create sub-closures, by inferring the type of [args] *)

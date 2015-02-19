@@ -1,6 +1,6 @@
 OASISFormat: 0.4
 Name:        logtk
-Version:     0.6.2
+Version:     0.7
 Homepage:    https://github.com/c-cube/logtk
 Authors:     Simon Cruanes
 License:     BSD-2-clause
@@ -35,7 +35,7 @@ Flag "parsers"
   Default:      false
 
 Flag "solving"
-  Description:  Build and install constraint solvers (requires "sat")
+  Description:  Build and install constraint solvers (requires "msat")
   Default:      false
 
 Flag "qcheck"
@@ -101,8 +101,7 @@ Library "logtk_solving"
   Modules:          Lpo
   Build$:           flag(solving)
   Install$:         flag(solving)
-  BuildDepends:     logtk,aez
-  XMETARequires:    logtk,aez
+  BuildDepends:     logtk, msat
 
 Library "logtk_arbitrary"
   Path:             src/arbitrary/
@@ -163,7 +162,7 @@ Executable run_tests
   CompiledObject:   native
   MainIs:           run_tests.ml
   Build$:           flag(tests) && flag(meta) && flag(qcheck) && flag(parsers)
-  BuildDepends:     logtk,logtk.parsers,oUnit,logtk.meta,logtk.arbitrary
+  BuildDepends:     logtk, logtk.parsers, oUnit, logtk.meta, logtk.arbitrary
 
 # TPTP syntax and type checking
 Executable type_check_tptp
@@ -172,7 +171,7 @@ Executable type_check_tptp
   Install$:         flag(tools) && flag(parsers)
   CompiledObject:   native
   MainIs:           type_check_tptp.ml
-  BuildDepends:     logtk,logtk.parsers
+  BuildDepends:     logtk, logtk.parsers
 
 # Conversion to CNF
 Executable cnf_of_tptp
@@ -181,7 +180,7 @@ Executable cnf_of_tptp
   Install$:         flag(tools) && flag(parsers)
   CompiledObject:   native
   MainIs:           cnf_of_tptp.ml
-  BuildDepends:     logtk,logtk.parsers
+  BuildDepends:     logtk, logtk.parsers
 
 # Orienting rewrite rules with LPO
 Executable orient
@@ -190,7 +189,7 @@ Executable orient
   Install$:         flag(tools) && flag(parsers) && flag(solving)
   CompiledObject:   native
   MainIs:           orient.ml
-  BuildDepends:     logtk,logtk.parsers,logtk.solving,aez
+  BuildDepends:     logtk, logtk.parsers, logtk.solving, msat
 
 # proof checking
 Executable proof_check_tstp
@@ -199,7 +198,7 @@ Executable proof_check_tstp
   Install$:         flag(tools) && flag(parsers)
   CompiledObject:   native
   MainIs:           proof_check_tstp.ml
-  BuildDepends:     logtk,logtk.parsers
+  BuildDepends:     logtk, logtk.parsers
 
 # detection of theories
 Executable detect_theories
@@ -208,7 +207,7 @@ Executable detect_theories
   Install$:         flag(meta) && flag(tools) && flag(parsers)
   CompiledObject:   native
   MainIs:           detect_theories.ml
-  BuildDepends:     logtk,logtk.parsers,logtk.meta
+  BuildDepends:     logtk, logtk.parsers, logtk.meta
 
 # Preprocessor to E
 Executable hysteresis
@@ -217,7 +216,7 @@ Executable hysteresis
   Install$:         flag(meta) && flag(tools) && flag(parsers) && flag(solving)
   CompiledObject:   native
   MainIs:           hysteresis.ml
-  BuildDepends:     logtk,logtk.parsers,logtk.meta,logtk.solving,aez
+  BuildDepends:     logtk, logtk.parsers, logtk.meta, logtk.solving, msat
 
 # Demo: resolution
 Executable logtk_resolution1
@@ -226,7 +225,7 @@ Executable logtk_resolution1
   Install:          false
   CompiledObject:   native
   MainIs:           resolution1.ml
-  BuildDepends:     logtk,logtk.parsers,sequence,containers
+  BuildDepends:     logtk, logtk.parsers, sequence, containers
 
 SourceRepository head
   Type: git

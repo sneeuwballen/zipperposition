@@ -134,7 +134,7 @@ module Make(Sym : SYMBOL) = struct
   (* build a table  symbol -> i. such as if
       [tbl s = i], then w[List.nth i l = s] *)
   let _mk_table l =
-    LogtkUtil.list_foldi
+    CCList.Idx.foldi
       (fun tbl i s -> Tbl.replace tbl s i)
       (Tbl.create 7) l
 
@@ -147,7 +147,7 @@ module Make(Sym : SYMBOL) = struct
 
     let cluster clusters =
       (* symbol -> index of cluster the symbol belongs to *)
-      let tbl = LogtkUtil.list_foldi
+      let tbl = CCList.Idx.foldi
         (fun acc i cluster ->
           List.fold_left (fun acc s -> Tbl.replace acc s i) acc cluster)
         (Tbl.create 7) clusters
