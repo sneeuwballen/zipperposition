@@ -3,8 +3,10 @@ maintainer: "simon.cruanes@inria.fr"
 author: "Simon Cruanes"
 homepage: "https://www.rocq.inria.fr/deducteam/Zipperposition/index.html"
 build: [
-    ["ocaml" "setup.ml" "-configure" "--bindir" "%{bin}%"
-        "--%{conf-depqbf:enable}%-depqbf" "--enable-quantor" ]
+    ["./configure"
+        "--bindir" "%{bin}%"
+        "--%{conf-depqbf:enable}%-depqbf"
+        "--enable-quantor" ]
     [make]
 ]
 install: [make "install"]
