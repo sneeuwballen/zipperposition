@@ -24,10 +24,14 @@ are:
 likely not complete. Please don't use it to drive your personal
 nuclear power plant, nor as a trusted tool for critical applications.
 
+**Second Disclaimer**: The code is currently not clean, the last research
+effort was requiring C dependencies and I did not take the time to
+make everything (in particular, plugins and meta-prover) work again. Some
+options or documentation may be plain wrong.
+
 ## License
 
-The license has changed from GPL to BSD2, since no code remains of
-what came from matita or Darwin .
+BSD2 (no code remains of what came from matita or Darwin).
 
 See file LICENSE.
 
@@ -56,7 +60,9 @@ To upgrade to more recent versions:
 If you really need to, you can download a release on the
 following [github page for releases](https://github.com/c-cube/zipperposition/releases).
 
-You first need to install `logtk`, `menhir`, `zarith`, `containers` and `sequence`.
+Look in the file `opam` to see which dependencies you need to install.
+They include `logtk`, `menhir`, `zarith`, `containers` and `sequence`, but
+maybe also other libraries. Consider using opam directly if possible.
 
     $ ./configure
 
@@ -70,6 +76,7 @@ Typical usage:
     $ zipperposition -help
     $ zipperposition problem_file [options]
     $ zipperposition -arith ARI114=1.p
+    $ zipperposition -dot /tmp/foo.dot examples/ind/nat1.p
 
 to run the prover. Help is available with the option *-help*.
 
