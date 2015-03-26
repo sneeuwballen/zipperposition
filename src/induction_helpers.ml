@@ -63,7 +63,7 @@ let show_kind : kind -> string
   | `Full -> "qbf"
   | `Simple -> "sat"
 
-let kind_ : kind ref = ref `Full
+let kind_ : kind ref = ref `Simple
 
 let enabled_ = ref false
 let enable_ () =
