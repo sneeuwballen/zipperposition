@@ -1,17 +1,29 @@
 # OASIS_START
-# DO NOT EDIT (digest: 369508ae7a195f1f1263e506cc9aca6b)
-version = "0.4.1"
+# DO NOT EDIT (digest: a05c2865111b6eee8f6cafc106ee6753)
+version = "0.5"
 description =
 "Superposition theorem prover, for first order logic with equality."
 requires =
-"containers containers.advanced sequence unix zarith logtk dynlink"
+"containers containers.advanced sequence gen unix zarith containers.io logtk dynlink qbf msat ppx_deriving.std"
 archive(byte) = "libzipperposition.cma"
 archive(byte, plugin) = "libzipperposition.cma"
 archive(native) = "libzipperposition.cmxa"
 archive(native, plugin) = "libzipperposition.cmxs"
 exists_if = "libzipperposition.cma"
+package "quantor" (
+ version = "0.5"
+ description =
+ "Superposition theorem prover, for first order logic with equality."
+ requires = "libzipperposition qbf qbf.quantor"
+ archive(byte) = "libzipperposition_quantor.cma"
+ archive(byte, plugin) = "libzipperposition_quantor.cma"
+ archive(native) = "libzipperposition_quantor.cmxa"
+ archive(native, plugin) = "libzipperposition_quantor.cmxs"
+ exists_if = "libzipperposition_quantor.cma"
+)
+
 package "meta" (
- version = "0.4.1"
+ version = "0.5"
  description =
  "Superposition theorem prover, for first order logic with equality."
  requires = "libzipperposition logtk logtk.meta"
@@ -20,6 +32,18 @@ package "meta" (
  archive(native) = "libzipperposition_meta.cmxa"
  archive(native, plugin) = "libzipperposition_meta.cmxs"
  exists_if = "libzipperposition_meta.cma"
+)
+
+package "depqbf" (
+ version = "0.5"
+ description =
+ "Superposition theorem prover, for first order logic with equality."
+ requires = "libzipperposition qbf qbf.depqbf"
+ archive(byte) = "libzipperposition_depqbf.cma"
+ archive(byte, plugin) = "libzipperposition_depqbf.cma"
+ archive(native) = "libzipperposition_depqbf.cmxa"
+ archive(native, plugin) = "libzipperposition_depqbf.cmxs"
+ exists_if = "libzipperposition_depqbf.cma"
 )
 # OASIS_STOP
 

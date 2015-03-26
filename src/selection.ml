@@ -41,7 +41,7 @@ let no_select _ = BV.empty ()
 
 (* does the clause belong to pure superposition, without other theories? *)
 let _pure_superposition lits =
-  Util.array_forall
+  CCArray.for_all
     (function
       | Lit.Prop _
       | Lit.Equation _

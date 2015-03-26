@@ -43,7 +43,12 @@ val compare : t -> t -> int
 include Interfaces.HASH with type t := t
 
 val variant : ?subst:Substs.t -> t -> scope -> t -> scope -> Substs.t Sequence.t
+(** Variant checking (alpha-equivalence). It can reorder literals to do its
+    check, so that might be computationnally expensive (a bit
+    like subsumption). *)
+
 val are_variant : t -> t -> bool
+(** Simple interface on top of {!variant} with distinc scopes *)
 
 val weight : t -> int
 val depth : t -> int
@@ -72,6 +77,9 @@ val is_max : ord:Ordering.t -> t -> int -> bool
 
 val is_trivial : t -> bool
   (** Tautology? (simple syntactic criterion only) *)
+
+val is_absurd : t -> bool
+  (** All literals are false, or there are no literals *)
 
 module Seq : sig
   val terms : t -> term Sequence.t

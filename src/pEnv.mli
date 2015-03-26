@@ -114,12 +114,13 @@ val add_operation : penv:t -> prio:int -> operation -> unit
 val add_operation_rule : penv:t -> prio:int -> (PFormula.Set.t -> operation) -> unit
   (** Add an operation that depends on the initial set of formulas to process *)
 
-val add_constr : penv:t -> Precedence.Constr.t -> unit
-  (** Add a precedence constraint *)
+val add_constr : penv:t -> int -> Precedence.Constr.t -> unit
+  (** Add a precedence constraint with its priority. The lower the
+      priority, the stronger influence the constraint will have. *)
 
-val add_constrs : penv:t -> Precedence.Constr.t list -> unit
+val add_constrs : penv:t -> (int * Precedence.Constr.t) list -> unit
 
-val add_constr_rule : penv:t -> (PFormula.Set.t -> Precedence.Constr.t) -> unit
+val add_constr_rule : penv:t -> int -> (PFormula.Set.t -> Precedence.Constr.t) -> unit
   (** Add a precedence constraint rule *)
 
 val set_weight_rule : penv:t -> (PFormula.Set.t -> Symbol.t -> int) -> unit
@@ -128,8 +129,10 @@ val set_weight_rule : penv:t -> (PFormula.Set.t -> Symbol.t -> int) -> unit
 val add_status : penv:t -> (Symbol.t * Precedence.symbol_status) list -> unit
   (** Specify explicitely the status of some symbols *)
 
-val mk_precedence : penv:t -> PFormula.Set.t -> Precedence.t
-  (** Make a precedence out of the formulas and constraints *)
+val mk_precedence : penv:t -> PFormula.Set.t ->
+                    Precedence.t * (int * Precedence.Constr.t) list
+  (** Make a precedence out of the formulas and constraints. Returns the
+      precedence and the list of constraints used to build it *)
 
 val process : penv:t -> PFormula.Set.t -> PFormula.Set.t
   (** Process the input formulas recursively *)

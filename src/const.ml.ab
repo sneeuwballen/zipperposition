@@ -32,5 +32,7 @@ let home = "$(datadir)/"
 
 let version = "$(pkg_version)"
 
+let section = Logtk.Util.Section.make "zip"
+
 (* vim:filetype=ocaml:
 *)

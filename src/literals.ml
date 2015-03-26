@@ -79,15 +79,31 @@ let hash_fun lits h =
 let hash lits = Hash.apply hash_fun lits
 
 let variant ?(subst=S.empty) a1 sc1 a2 sc2 k =
-  let rec iter2 subst i =
+  (* match a1.(i...) with a2\bv *)
+  let rec iter2 subst bv i =
     if i = Array.length a1
       then k subst
-      else
-        Lit.variant ~subst a1.(i) sc1 a2.(i) sc2
-          (fun subst -> iter2 subst (i+1))
+      else iter3 subst bv i 0
+  (* find a matching literal for a1.(i), within a2.(j...) *)
+  and iter3 subst bv i j =
+    if j = Array.length a2
+      then ()  (* stop *)
+    else (
+      if not (BV.get bv j)
+        then (
+          (* try to match i-th literal of a1 with j-th literal of a2 *)
+          BV.set bv j;
+          Lit.variant ~subst a1.(i) sc1 a2.(i) sc2
+            (fun subst -> iter2 subst bv (i+1));
+          BV.reset bv j
+        );
+      iter3 subst bv i (j+1)
+    )
   in
   if Array.length a1 = Array.length a2
-    then iter2 subst 0
+    then
+      let bv = BV.create ~size:(Array.length a1) false in
+      iter2 subst bv 0
 
 let are_variant a1 a2 =
   not (Sequence.is_empty (variant a1 0 a2 1))
@@ -106,7 +122,7 @@ let vars lits =
   T.Tbl.fold (fun t () acc -> t::acc) set []
 
 let is_ground lits =
-  Util.array_forall Lit.is_ground lits
+  CCArray.for_all Lit.is_ground lits
 
 let to_form lits =
   let lits = Array.map Lit.Conv.to_form lits in
@@ -151,7 +167,7 @@ let _compare_lit_with_idx ~ord (lit1,i1) (lit2,i2) =
     else Lit.Comp.compare ~ord lit1 lit2
 
 let _to_multiset_with_idx lits =
-  Util.array_foldi
+  CCArray.foldi
     (fun acc i x -> MLI.add acc (x,i))
     MLI.empty lits
 
@@ -187,7 +203,10 @@ let is_max ~ord lits =
     MLI.is_max (_compare_lit_with_idx ~ord) (lit,i) m
 
 let is_trivial lits =
-  Util.array_exists Lit.is_trivial lits
+  CCArray.exists Lit.is_trivial lits
+
+let is_absurd lits =
+  CCArray.for_all Lit.is_absurd lits
 
 module Seq = struct
   let terms a =
@@ -283,7 +302,7 @@ let order_instances lits =
       | Some olit -> olit.TO.order :: acc)
     [] lits
   in
-  Util.list_uniq TO.eq l
+  CCList.Set.uniq ~eq:TO.eq l
 
 let terms_under_ineq ~instance lits =
   Sequence.from_iter
@@ -386,7 +405,7 @@ let fold_arith_terms ~eligible ~which ~ord lits acc f =
         | `All -> (fun _ -> true)
         | `Max ->
           let max_terms = ArithLit.max_terms ~ord a_lit in
-          fun t -> Util.list_mem T.eq t max_terms
+          fun t -> CCList.Set.mem ~eq:T.eq t max_terms
       in
       ArithLit.Focus.fold_terms ~pos a_lit acc
         (fun acc foc_lit pos ->
@@ -417,11 +436,13 @@ let symbols ?(init=Symbol.Set.empty) lits =
 (** {3 IO} *)
 
 let pp buf lits =
+  if Array.length lits = 0 then Buffer.add_string buf "⊥";
   Util.pp_arrayi ~sep:" | "
     (fun buf i lit -> Printf.bprintf buf "%a" Lit.pp lit)
     buf lits
 
 let pp_tstp buf lits =
+  if Array.length lits = 0 then Buffer.add_string buf "$false";
   Util.pp_arrayi ~sep:" | "
     (fun buf i lit -> Printf.bprintf buf "%a" Lit.pp_tstp lit)
     buf lits

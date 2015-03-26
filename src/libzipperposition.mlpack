@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 2694817fb2aa5497f9acf811e06c3e14)
+# DO NOT EDIT (digest: de380bb6e1b310b7252d4a5fc0f8521c)
 ClauseQueue
 Clause
 Const
@@ -22,6 +22,19 @@ Monome
 ArithLit
 Signals
 Multisets
+Ctx_intf
+Clause_intf
+Env_intf
+ProofState_intf
+BBox
+BBox_intf
+ClauseContext
+BoolSolver
+BoolSolver_intf
+Induction_helpers
+calculi/Avatar
+calculi/Induction
+calculi/Induction_simple
 calculi/Superposition
 calculi/Chaining
 calculi/EnumTypes
@@ -33,4 +46,5 @@ lib/UnionFind
 lib/Choice
 lib/Mixtbl
 lib/Signal
+msat/Zipperposition_msat
 # OASIS_STOP

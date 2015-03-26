@@ -1,6 +1,6 @@
 OASISFormat: 0.4
 Name:        zipperposition
-Version:     0.4.1
+Version:     0.5
 Homepage:    https://github.com/c-cube/zipperposition
 Authors:     Simon Cruanes
 License:     BSD-3-clause
@@ -21,6 +21,14 @@ Flag "meta"
   Description:  Enable plugin for the meta-prover
   Default:      false
 
+Flag "depqbf"
+  Description:  Use depqbf solver
+  Default:      false
+
+Flag "quantor"
+  Description:  Use quantor solver
+  Default:      false
+
 Library "libzipperposition"
   Path:             src/
   Pack:             true
@@ -28,11 +36,21 @@ Library "libzipperposition"
                     Literal, Literals, CompactClause, Ctx, Proof, ProofState,
                     Saturate, Selection, PFormula, Theories, AC,
                     PEnv, Params, Env, Monome, ArithLit, Signals, Multisets,
+                    Ctx_intf, Clause_intf, Env_intf, ProofState_intf,
+                    BBox, BBox_intf, ClauseContext,
+                    BoolSolver, BoolSolver_intf, Induction_helpers,
+                    calculi/Avatar, calculi/Induction, calculi/Induction_simple,
                     calculi/Superposition, calculi/Chaining,
                     calculi/EnumTypes, calculi/ArithInt, calculi/Heuristics
   InternalModules:  lib/LazyGraph, lib/SmallSet,
-                    lib/UnionFind, lib/Choice, lib/Mixtbl, lib/Signal
-  BuildDepends:     containers,containers.advanced,sequence,unix,zarith,logtk,dynlink
+                    lib/UnionFind, lib/Choice, lib/Mixtbl, lib/Signal,
+                    msat/Zipperposition_msat
+                    # , quantor/Zipperposition_quantor  # TODO make plugins
+                    # , depqbf/Zipperposition_depqbf
+  BuildDepends:     containers, containers.advanced, sequence, gen, unix,
+                    zarith, containers.io, logtk, dynlink, qbf, msat,
+                    ppx_deriving.std
+                    #qbf.quantor, qbf.depqbf # TODO fix
 
 Library "libzipperposition_meta"
   Path:             src/meta/
@@ -44,15 +62,36 @@ Library "libzipperposition_meta"
   Install$:         flag(meta)
   BuildDepends:     libzipperposition,logtk,logtk.meta
 
+# TODO dynamic loading?
+Library "libzipperposition_quantor"
+  Path:             src/quantor/
+  Modules:          Zipperposition_quantor
+  BuildDepends:     libzipperposition, qbf, qbf.quantor
+  FindlibParent:    libzipperposition
+  FindlibName:      quantor
+  Build$:           flag(quantor)
+  Install$:         flag(quantor)
+
+# TODO dynamic loading?
+Library "libzipperposition_depqbf"
+  Path:             src/depqbf
+  Modules:          Zipperposition_depqbf
+  BuildDepends:     libzipperposition, qbf, qbf.depqbf
+  FindlibParent:    libzipperposition
+  FindlibName:      depqbf
+  Build$:           flag(depqbf)
+  Install$:         flag(depqbf)
+
 # main executable for the prover
 Executable zipperposition
   Path:             src/
   Install:          true
   CompiledObject:   native
   MainIs:           zipperposition.ml
-  BuildDepends:     containers,sequence,unix,logtk,logtk.parsers,dynlink,libzipperposition
+  BuildDepends:     containers, sequence, unix, logtk, logtk.parsers, dynlink,
+                    libzipperposition
 
-Document zipperposition
+Document libzipperposition
   Title:                Documentation for Zipperposition
   Type:                 ocamlbuild (0.3)
   BuildTools+:          ocamldoc
@@ -72,7 +111,7 @@ Executable run_tests
   MainIs:           run_tests.ml
   Build$:           flag(tests)
   BuildDepends:     containers, logtk, logtk.parsers, logtk.arbitrary,
-                    libzipperposition, libzipperposition.arbitrary, qcheck
+                    libzipperposition, qcheck
 
 SourceRepository head
   Type: git

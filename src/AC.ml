@@ -117,7 +117,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
 
   let is_trivial c =
-    let res = Util.array_exists is_trivial_lit (C.lits c) in
+    let res = CCArray.exists is_trivial_lit (C.lits c) in
     if res then Util.incr_stat stat_ac_redundant;
     res
 
@@ -141,7 +141,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       then begin
         let symbols = Ctx.Theories.AC.symbols_of_terms (C.Seq.terms c) in
         let symbols = Sequence.to_list (Symbol.Set.to_seq symbols) in
-        let ac_proof = Util.list_flatmap Ctx.Theories.AC.find_proof symbols in
+        let ac_proof = CCList.flat_map Ctx.Theories.AC.find_proof symbols in
         let premises = C.proof c :: ac_proof in
         let proof cc = Proof.mk_c_simp ~theories:["ac"]
           ~rule:"normalize" cc premises in
@@ -178,14 +178,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 end
 
 let extension =
-  let module DoIt(Env : Env.S) = struct
-    include Extensions.MakeAction(Env)
-    module AC = Make(Env)
-    let actions = [Ext_general AC.setup]
-  end in
+  let action env =
+    let module E = (val env : Env.S) in
+    let module AC = Make(E) in
+    AC.setup ()
+  in
   Extensions.({
     default with
     name="ac";
-    penv_actions = [];
-    make = (module DoIt : ENV_TO_S);
+    actions=[Do action];
   })
