@@ -6,7 +6,8 @@ build: [
     ["./configure"
         "--bindir" "%{bin}%"
         "--%{conf-depqbf:enable}%-depqbf"
-        "--enable-quantor" ]
+        "--disable-tests"
+    ]
     [make]
 ]
 install: [make "install"]
