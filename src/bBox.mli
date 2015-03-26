@@ -31,6 +31,14 @@ This module defines a way to encapsulate clauses and some meta-level
 properties into boolean literals, and maintains a bijection between
 encapsulated values and boolean literals *)
 
+val section : Logtk.Util.Section.t
+
 module type S = BBox_intf.S
 
-module Make(Any : sig end) : S
+module Make(I : BBox_intf.TERM)
+           (Case : BBox_intf.TERM)
+           (Sub : BBox_intf.TERM)
+  : S
+  with module I = I
+  and module Sub = Sub
+  and module Case = Case

@@ -146,6 +146,7 @@ module type S = sig
   val to_string : t -> string
   val pp_list : Buffer.t -> (t * int) list -> unit
   val fmt : Format.formatter -> t -> unit
+  val fmt_list : Format.formatter -> (t * int) list -> unit
 end
 
 let _profile = ref "default"
@@ -156,7 +157,7 @@ let () =
   Params.add_opts
     [ "-clause-queue"
     , Arg.String set_profile
-    , "choose which set of clause queues to use \
+    , " choose which set of clause queues to use \
       (for selecting next active clause): choices: default,bfs,explore,ground"
     ]
 
@@ -279,7 +280,7 @@ module Make(C : Clause.S) = struct
   let goals =
     (* check whether a literal is a goal *)
     let is_goal_lit lit = Lit.is_neg lit in
-    let is_goal_clause c = Util.array_forall is_goal_lit (C.lits c) in
+    let is_goal_clause c = CCArray.for_all is_goal_lit (C.lits c) in
     let name = "prefer_goals" in
     mk_queue ~accept:is_goal_clause ~weight:WeightFun.default name
 
@@ -290,7 +291,7 @@ module Make(C : Clause.S) = struct
   let non_goals =
     (* check whether a literal is a goal *)
     let is_goal_lit lit = Lit.is_neg lit in
-    let is_non_goal_clause c = Util.array_forall
+    let is_non_goal_clause c = CCArray.for_all
       (fun x -> not (is_goal_lit x))
       (C.lits c) in
     let name = "prefer_non_goals" in
@@ -380,4 +381,9 @@ module Make(C : Clause.S) = struct
 
   let fmt fmt q =
     Format.pp_print_string fmt (to_string q)
+
+  let fmt_list out qs =
+    let fmt_pair out (c, i) = Format.fprintf out "%a (w=%d)" fmt c i in
+    CCList.print ~start:"[" ~stop:"]" fmt_pair out qs;
+    ()
 end

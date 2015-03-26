@@ -34,14 +34,26 @@ module Lits = Literals
 
 type form = F.t
 
-type bool_lit = bool * [`Box_clause of Literal.t array ]
+module BLit = Qbf.Lit
+
+type bool_lit =
+  bool *
+  [ `Box_clause of Literal.t array
+  | `Qbf_artifact of Qbf.Lit.t * string
+  ]
 
 (* compare boolean literals *)
-let _cmp_blit (s1,`Box_clause l1)(s2,`Box_clause l2) =
-  CCOrd.(bool_ s1 s2 <?> (Lits.compare, l1, l2))
+let _cmp_blit lit1 lit2 = match lit1, lit2 with
+  | (_, `Box_clause _), (_, `Qbf_artifact _) -> 1
+  | (_, `Qbf_artifact _), (_, `Box_clause _) -> -1
+  | (s1,`Box_clause l1), (s2,`Box_clause l2) ->
+      CCOrd.(bool_ s1 s2 <?> (Lits.compare, l1, l2))
+  | (s1, `Qbf_artifact (i1,_)), (s2, `Qbf_artifact (i2,_)) ->
+      CCOrd.(bool_ s1 s2 <?> (BLit.compare, i1, i2))
 let _eq_blit l1 l2 = _cmp_blit l1 l2 = 0
-let _hash_blit (s,`Box_clause l) h =
-  h |> CCHash.bool_ s |> Lits.hash_fun l
+let _hash_blit lit h = match lit with
+  | (s,`Box_clause l) -> h |> CCHash.bool_ s |> Lits.hash_fun l
+  | (s,`Qbf_artifact (i,_)) -> h |> CCHash.bool_ s |> BLit.hash_fun i
 
 type t = {
   lits : Literal.t array;
@@ -61,17 +73,25 @@ let hash = CCHash.apply hash_fun
 let cmp c1 c2 =
   CCOrd.(Lits.compare c1.lits c2.lits <?> (list_ _cmp_blit, c1.trail, c2.trail))
 
+let compare = cmp
+
 let make lits trail = {lits; trail; }
 
-let is_empty c = Array.length c.lits = 0 && List.length c.trail = 0
+let has_absurd_lits c = Lits.is_absurd c.lits
+
+let is_empty c = has_absurd_lits c && List.length c.trail = 0
 
 let iter c f = Array.iter f c.lits
 
 let to_seq c = Sequence.of_array c.lits
 
-let _pp_blit buf (s, `Box_clause l) =
-  let prefix = if s then "" else "¬" in
-  Printf.bprintf buf "%s⟦%a⟧" prefix Lits.pp l
+let _pp_blit buf lit = match lit with
+  | (s, `Box_clause l) ->
+      let prefix = if s then "" else "¬" in
+      Printf.bprintf buf "%s⟦%a⟧" prefix Lits.pp l
+  | (s, `Qbf_artifact (_,n)) ->
+      let prefix = if s then "" else "¬" in
+      Printf.bprintf buf "%s%s" prefix n
 
 let _pp_trail buf = function
   | [] -> ()
@@ -87,9 +107,12 @@ let pp buf c =
 
 (* lits -> closed formula *)
 let _c2f lits = F.close_forall (Lits.to_form lits)
-let _blit2f (sign,`Box_clause lits) =
-  let f = _c2f lits in
-  if sign then F.Base.not_ f else f
+let _blit2f = function
+  | (sign,`Box_clause lits) ->
+      let f = _c2f lits in
+      if sign then F.Base.not_ f else f
+  | (_, `Qbf_artifact (_,n)) ->
+      failwith ("cannot encode QBF artifact " ^ n ^ " to TPTP")
 
 let _pp_trail_tstp buf = function
   | [] -> ()
@@ -111,6 +134,7 @@ let to_forms c =
 let to_string c =
   Util.on_buffer pp c
 
+let lits c = c.lits
 let trail c = c.trail
 
 let fmt fmt c =

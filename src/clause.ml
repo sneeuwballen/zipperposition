@@ -45,23 +45,100 @@ type scope = Substs.scope
 
 module type S = Clause_intf.S
 
-module ISet = Sequence.Set.Make(CCInt)
-
 (** {2 Type def} *)
 module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   module Ctx = Ctx
+
+  module Trail = struct
+    module BLit = Qbf.Lit
+    module ISet = Sequence.Set.Make(BLit)
+
+    type t = ISet.t
+
+    let equal = ISet.equal
+    let compare = ISet.compare
+    let hash_fun trail h = Hash.seq BLit.hash_fun (ISet.to_seq trail) h
+    let hash = Hash.apply hash_fun
+
+    type bool_lit = Ctx.BoolLit.t
+
+    let empty = ISet.empty
+    let mem = ISet.mem
+    let for_all = ISet.for_all
+    let exists = ISet.exists
+    let singleton = ISet.singleton
+    let add = ISet.add
+    let remove = ISet.remove
+    let map f set =
+      ISet.to_seq set
+      |> Sequence.map f
+      |> ISet.of_seq
+    let of_list = ISet.of_list
+    let to_list = ISet.to_list
+    let is_empty = ISet.is_empty
+
+    let subsumes t1 t2 = ISet.subset t1 t2
+
+    let is_trivial trail =
+      ISet.exists
+        (fun i -> ISet.mem (BLit.neg i) trail)
+        trail
+
+    let merge = function
+      | [] -> ISet.empty
+      | [t] -> t
+      | [t1;t2] -> ISet.union t1 t2
+      | t::l -> List.fold_left ISet.union t l
+
+    let filter = ISet.filter
+
+    type valuation = bool_lit -> bool
+    (** A boolean valuation *)
+
+    let compact trail =
+      ISet.fold
+        (fun i acc ->
+          let sign = BLit.sign i in
+          match Ctx.BoolLit.extract (BLit.abs i) with
+          | None -> failwith "wrong trail"
+          | Some (Ctx.BoolLit.Clause_component lits) ->
+              (sign, `Box_clause lits) :: acc
+          | Some lit ->
+              let repr = Util.on_buffer Ctx.BoolLit.pp_injected lit in
+              (sign, `Qbf_artifact (BLit.abs i, repr)) :: acc
+        ) trail []
+
+    let is_active trail ~v =
+      ISet.for_all
+        (fun i ->
+          let j = BLit.abs i in
+          (BLit.sign i) = (v j)  (* valuation match sign *)
+        ) trail
+
+    let to_seq = ISet.to_seq
+
+    let pp buf trail =
+      if not (ISet.is_empty trail)
+        then Printf.bprintf buf " ← %a"
+          (Sequence.pp_buf ~sep:" ⊓ " Ctx.BoolLit.pp) (ISet.to_seq trail)
+
+    let print fmt trail =
+      if not (ISet.is_empty trail)
+      then Format.fprintf fmt " ← @[<hov>%a@]"
+          (Sequence.pp_seq ~sep:" ⊓ " Ctx.BoolLit.print) (ISet.to_seq trail)
+  end
 
   type t = {
     hclits : Literal.t array;               (** the literals *)
     mutable hctag : int;                    (** unique ID of the clause *)
     mutable hcflags : int;                  (** boolean flags for the clause *)
-    mutable hcselected : BV.t;              (** bitvector for selected literals *)
+    mutable hcselected : BV.t;              (** bitvector for selected lits*)
     mutable hcproof : Proof.t;              (** Proof of the clause *)
     mutable hcparents : t list;             (** parents of the clause *)
-    mutable hcdescendants : int SmallSet.t ;(** the set of IDs of descendants of the clause *)
+    mutable hcdescendants : int SmallSet.t ;(** the set of IDs of descendants*)
     mutable hcsimplto : t option;           (** simplifies into the clause *)
-    mutable as_bool : int option;           (** boolean wrap *)
-    mutable trail : ISet.t;                 (** boolean trail *)
+    mutable as_bool : Ctx.BoolLit.t option; (** boolean wrap *)
+    mutable trail : Trail.t;                (** boolean trail *)
   }
 
   type clause = t
@@ -114,55 +191,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       | Some j -> if i<>j then failwith "C.set_bool_name"
     end;
     c.as_bool <- Some i
-
-  module Trail = struct
-    type t = ISet.t
-
-    let equal = ISet.equal
-    let compare = ISet.compare
-    let hash_fun trail h = Hash.seq Hash.int_ (ISet.to_seq trail) h
-    let hash = Hash.apply hash_fun
-
-    type bool_lit = Ctx.BoolLit.bool_lit
-
-    let singleton = ISet.singleton
-    let of_list = ISet.of_list
-    let to_list = ISet.to_list
-    let is_empty = ISet.is_empty
-
-    let subsumes t1 t2 = ISet.subset t1 t2
-
-    let is_trivial trail =
-      ISet.exists
-        (fun i -> ISet.mem (-i) trail)
-        trail
-
-    let merge = function
-      | [] -> ISet.empty
-      | [t] -> t
-      | [t1;t2] -> ISet.union t1 t2
-      | t::l -> List.fold_left ISet.union t l
-
-    type valuation = bool_lit -> bool
-    (** A boolean valuation *)
-
-    let is_active trail ~v =
-      ISet.for_all
-        (fun i ->
-          let j = abs i in
-          (i > 0) = (v j)  (* valuation match sign *)
-        ) trail
-
-    let pp buf trail =
-      if not (ISet.is_empty trail)
-        then Printf.bprintf buf " ← %a"
-          (Sequence.pp_buf ~sep:" ⊓ " Ctx.BoolLit.pp) (ISet.to_seq trail)
-
-    let print fmt trail =
-      if not (ISet.is_empty trail)
-      then Format.fprintf fmt " ← @[<hov>%a@]"
-          (Sequence.pp_seq ~sep:" ⊓ " Ctx.BoolLit.print) (ISet.to_seq trail)
-  end
 
   let get_trail c = c.trail
   let has_trail c = not (Trail.is_empty c.trail)
@@ -242,16 +270,9 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let on_proof = Signal.create ()
 
-  let _compact_trail trail =
-    ISet.fold
-      (fun i acc ->
-        let sign = i >= 0 in
-        match Ctx.BoolLit.extract (abs i) with
-        | None -> failwith "wrong trail"
-        | Some (Ctx.BoolLit.Clause_component lits) -> (sign, `Box_clause lits) :: acc
-      ) trail []
+  let compact_trail = Trail.compact
 
-  let compact c = CompactClause.make c.hclits (_compact_trail c.trail)
+  let compact c = CompactClause.make c.hclits (compact_trail c.trail)
 
   let create ?parents ?selected ?trail lits proof =
     Util.enter_prof prof_clause_create;
@@ -263,11 +284,11 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     (* trail *)
     let trail = match trail, parents with
       | Some t, _ -> t
-      | None, None -> ISet.empty
+      | None, None -> Trail.empty
       | None, Some parent_list -> Trail.merge (List.map get_trail parent_list)
     in
     (* proof *)
-    let cc = CompactClause.make lits (_compact_trail trail) in
+    let cc = CompactClause.make lits (compact_trail trail) in
     let proof' = proof cc in
     Signal.send on_proof (lits, proof');
     (* create the structure *)
@@ -317,10 +338,15 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let proof c = Proof.mk_c_file ~role ~file ~name c in
     create lits proof
 
+  let update_trail f c =
+    let trail = f c.trail in
+    let proof cc = Proof.adapt_c c.hcproof cc in
+    create_a ~parents:c.hcparents ~trail c.hclits proof
+
   let proof c = c.hcproof
 
   let is_empty c =
-    Array.length c.hclits = 0 && Trail.is_empty c.trail
+    Lits.is_absurd c.hclits && Trail.is_empty c.trail
 
   let length c = Array.length c.hclits
 
@@ -680,4 +706,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     Sequence.iter
       (fun c -> pp_tstp buf c; Buffer.add_char buf '\n')
       (CSet.to_seq set)
+
+  let fmt_set out set = Sequence.pp_seq fmt out (CSet.to_seq set)
 end

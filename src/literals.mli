@@ -78,6 +78,9 @@ val is_max : ord:Ordering.t -> t -> int -> bool
 val is_trivial : t -> bool
   (** Tautology? (simple syntactic criterion only) *)
 
+val is_absurd : t -> bool
+  (** All literals are false, or there are no literals *)
+
 module Seq : sig
   val terms : t -> term Sequence.t
   val abstract : t -> Index.lits

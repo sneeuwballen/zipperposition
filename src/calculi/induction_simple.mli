@@ -1,7 +1,7 @@
 
 (*
 Zipperposition: a functional superposition prover for prototyping
-Copyright (c) 2013, Simon Cruanes
+Copyright (c) 2013-2015, Simon Cruanes
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -25,47 +25,17 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Bridge to the Qbf.Quantor module} *)
+(** {1 Induction through Cut} *)
 
-module A = Avatar
+module type S = sig
+  module Env : Env.S
+  module Ctx : module type of Env.Ctx
 
-let rec _rev_append_map f l acc = match l with
-  | [] -> acc
-  | x::tail -> _rev_append_map f tail (f x :: acc)
+  val register : unit -> unit
+end
 
-module ISet = Sequence.Set.Make(CCInt)
+module Make(E: Env.S)(Solver : BoolSolver.SAT) :
+  S with module Env = E
+    and module Ctx = E.Ctx
 
-(* add a list of literals to the set *)
-let _add_list set l =
-  List.fold_left (fun s x -> ISet.add (abs x) s) set l
-
-(* make a new solver *)
-let solver_instance () =
-  let _lits = ref ISet.empty in
-  let _clauses = ref [] in
-  let _pp = ref Qbf.Lit.print in
-  A.({
-    add_lits=(fun l -> _lits := _add_list !_lits l);
-    add_clauses=(fun l -> _clauses := List.rev_append l !_clauses);
-    check=(fun () ->
-      let f = Qbf.CNF.exists (ISet.to_list !_lits) (Qbf.CNF.cnf !_clauses) in
-      if Logtk.Util.get_debug() >= 5 then (
-        Format.printf "QBF formula: @[<hov>%a@]@."
-          (Qbf.CNF.print_with ~pp_lit:!_pp) f
-      );
-      match Quantor.solve f with
-      | Qbf.Unsat -> `Unsat
-      | Qbf.Sat _ -> `Sat
-      | Qbf.Timeout
-      | Qbf.Spaceout -> assert false
-      | Qbf.Unknown -> failwith "quantor: return unknown"
-    );
-    set_printer=(fun p -> _pp := p);
-  })
-
-let sat_solver =
-  A.({create=solver_instance; name="quantor"; })
-
-let () =
-  A.register_solver sat_solver;
-  ()
+val extension : Extensions.t

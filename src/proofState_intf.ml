@@ -32,7 +32,7 @@ module type S = sig
   module Ctx : Ctx.S
   module C : Clause.S
 
-  module CQueue : ClauseQueue.S with module C = C
+  module CQueue : ClauseQueue.S with module C = C and type C.t = C.t
   (** Priority queues on clauses *)
 
   (** {6 Useful Index structures} *)
@@ -103,6 +103,6 @@ module type S = sig
   val pp : Buffer.t -> unit -> unit
     (** pretty print the content of the state *)
 
-  val debug : Buffer.t -> unit -> unit
+  val debug : Format.formatter -> unit -> unit
     (** debug functions: much more detailed printing *)
 end

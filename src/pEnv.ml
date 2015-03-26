@@ -208,7 +208,7 @@ let expand_def set pf =
     (Sequence.singleton (PF.form pf)) in
   (* make new operations on the set of formulas *)
   let premises = PF.Set.singleton pf in
-  let ops = Util.list_fmap
+  let ops = CCList.filter_map
     (function
       | Transform.RwForm frs ->
         Some (rw_form ~rule:"expand_pred_def" ~premises frs)

@@ -158,6 +158,9 @@ module type S = sig
   val has_empty_clause : unit -> bool
     (** Is there an empty clause? *)
 
+  val on_start : unit Signal.t
+    (** Triggered before starting saturation *)
+
   val on_empty_clause : C.t Signal.t
     (** Signal triggered when an empty clause is found *)
 

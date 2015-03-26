@@ -31,6 +31,7 @@ open Logtk
 
 module T = FOTerm
 module S = Substs
+module Unif = Logtk.Unif
 module TO = Theories.TotalOrder
 
 type scope = Substs.scope
@@ -94,16 +95,24 @@ module Make(X : PARAMETERS) = struct
     Util.exit_prof prof_add_signature;
     ()
 
-  let declare symb ty =
-    Util.enter_prof prof_declare_sym;
+  let _declare_symb symb ty =
     let is_new = not (Signature.mem !_signature symb) in
     _signature := Signature.declare !_signature symb ty;
     if is_new then (
       Signal.send on_signature_update !_signature;
       Signal.send on_new_symbol (symb,ty);
-    );
+    )
+
+  let declare symb ty =
+    Util.enter_prof prof_declare_sym;
+    _declare_symb symb ty;
     Util.exit_prof prof_declare_sym;
     ()
+
+  let update_prec symbs =
+    Util.debug 3 "update precedence...";
+    _ord := Ordering.update_precedence !_ord
+      (fun prec -> Precedence.add_seq prec symbs)
 
   let ad_hoc_symbols () = !_ad_hoc
   let add_ad_hoc_symbols seq =
@@ -304,5 +313,350 @@ module Make(X : PARAMETERS) = struct
   end
 
   (** Boolean Mapping *)
-  module BoolLit = BBox.Make(struct end)
+  module TermArg = struct
+    type t = FOTerm.t
+    let equal = FOTerm.eq
+    let compare = FOTerm.cmp
+    let hash = FOTerm.hash
+    let pp = FOTerm.pp
+    let print = FOTerm.fmt
+    let to_term t = t
+  end
+
+  module BoolLit = BBox.Make(TermArg)(TermArg)(TermArg)
+
+  (** Induction *)
+  module Induction = struct
+    type constructor = Symbol.t * Type.t
+    (** constructor + its type *)
+
+    type bool_lit = BoolLit.t
+
+    type inductive_type = {
+      pattern : Type.t;
+      constructors : constructor list;
+    }
+
+    let _raise f fmt =
+      let buf = Buffer.create 15 in
+      Printf.kbprintf (fun buf -> f (Buffer.contents buf))
+        buf fmt
+    let _failwith fmt = _raise failwith fmt
+    let _invalid_arg fmt = _raise invalid_arg fmt
+
+    let _tbl_ty : inductive_type Symbol.Tbl.t = Symbol.Tbl.create 16
+
+    let _extract_hd ty =
+      match Type.view (snd (Type.open_fun ty)) with
+      | Type.App (s, _) -> s
+      | _ ->
+          _invalid_arg "expected function type, got %a" Type.pp ty
+
+    let declare_ty ty constructors =
+      let name = _extract_hd ty in
+      if constructors = []
+        then invalid_arg "InductiveCst.declare_ty: no constructors provided";
+      try
+        Symbol.Tbl.find _tbl_ty name
+      with Not_found ->
+        let ity = { pattern=ty; constructors; } in
+        Symbol.Tbl.add _tbl_ty name ity;
+        ity
+
+    let _seq_inductive_types yield =
+      Symbol.Tbl.iter (fun _ ity -> yield ity) _tbl_ty
+
+    let is_inductive_type ty =
+      _seq_inductive_types
+        |> Sequence.exists (fun ity -> Unif.Ty.matches ~pattern:ity.pattern ty)
+
+    let is_constructor_sym s =
+      _seq_inductive_types
+        |> Sequence.flat_map (fun ity -> Sequence.of_list ity.constructors)
+        |> Sequence.exists (fun (s', _) -> Symbol.eq s s')
+
+    let contains_inductive_types t =
+      T.Seq.subterms t
+      |> Sequence.exists (fun t -> is_inductive_type (T.ty t))
+
+    let _get_ity ty =
+      let s = _extract_hd ty in
+      try Symbol.Tbl.find _tbl_ty s
+      with Not_found ->
+        failwith (Util.sprintf "type %a is not inductive" Type.pp ty)
+
+    type cst = T.t
+
+    module Cst = TermArg
+
+    module IMap = Sequence.Map.Make(CCInt)
+
+    type case = T.t
+
+    module Case = TermArg
+
+    type sub_cst = T.t
+
+    module Sub = TermArg
+
+    module SubCstSet = T.Set
+
+    type cover_set = {
+      cases : case list;
+      rec_cases : case list;  (* recursive cases *)
+      base_cases : case list;  (* base cases *)
+      sub_constants : SubCstSet.t;  (* all sub-constants *)
+    }
+
+    type cst_data = {
+      cst : cst;
+      ty : inductive_type;
+      subst : Substs.t; (* matched against [ty.pattern] *)
+      dominates : unit Symbol.Tbl.t;
+      mutable coversets : cover_set IMap.t;
+        (* depth-> exhaustive decomposition of given depth  *)
+    }
+
+    let on_new_inductive = Signal.create()
+
+    (* cst -> cst_data *)
+    let _tbl : cst_data T.Tbl.t = T.Tbl.create 16
+    let _tbl_sym : cst_data Symbol.Tbl.t = Symbol.Tbl.create 16
+
+    (* case -> cst * coverset *)
+    let _tbl_case : (cst * cover_set) T.Tbl.t = T.Tbl.create 16
+
+    (* sub_constants -> cst * set * case in which the sub_constant occurs *)
+    let _tbl_sub_cst : (cst * cover_set * T.t) T.Tbl.t = T.Tbl.create 16
+
+    let _blocked = ref T.Set.empty
+
+    let is_sub_constant t = T.Tbl.mem _tbl_sub_cst t
+
+    let as_sub_constant t =
+      if is_sub_constant t then Some t else None
+
+    let is_blocked t =
+      is_sub_constant t || T.Set.mem t !_blocked
+
+    let set_blocked t =
+      _blocked := T.Set.add t !_blocked
+
+    let declare t =
+      if T.is_ground t
+      then
+        if T.Tbl.mem _tbl t then ()
+        else try
+          Util.debug 2 "declare new inductive constant %a" T.pp t;
+          (* check that the type of [t] is inductive *)
+          let ty = T.ty t in
+          let name = _extract_hd ty in
+          let ity = Symbol.Tbl.find _tbl_ty name in
+          let subst = Unif.Ty.matching ~pattern:ity.pattern 1 ty 0 in
+          let cst_data = { cst=t; ty=ity; subst;
+                           dominates=Symbol.Tbl.create 16;
+                           coversets=IMap.empty } in
+          T.Tbl.add _tbl t cst_data;
+          let s = T.head_exn t in
+          Symbol.Tbl.replace _tbl_sym s cst_data;
+          Signal.send on_new_inductive t;
+          ()
+        with Unif.Fail | Not_found ->
+          _invalid_arg "term %a doesn't have an inductive type" T.pp t
+      else _invalid_arg
+        "term %a is not ground, cannot be an inductive constant" T.pp t
+
+    (* monad over "lazy" values *)
+    module FunM = CCFun.Monad(struct type t = unit end)
+    module FunT = CCList.Traverse(FunM)
+
+    (* coverset of given depth for this type and constant *)
+    let _make_coverset ~depth ity cst =
+      let cst_data = T.Tbl.find _tbl cst in
+      (* list of generators of:
+          - member of the coverset (one of the t such that cst=t)
+          - set of sub-constants of this term *)
+      let rec make depth =
+        (* leaves: fresh constants *)
+        if depth=0 then [fun () ->
+          let ty = ity.pattern in
+          let name = Util.sprintf "#%a" Symbol.pp (_extract_hd ty) in
+          let c = Skolem.fresh_sym_with ~ctx:skolem ~ty name in
+          let t = T.const ~ty c in
+          Symbol.Tbl.replace cst_data.dominates c ();
+          _declare_symb c ty;
+          set_blocked t;
+          t, T.Set.singleton t
+        ]
+        (* inner nodes or base cases: constructors *)
+        else CCList.flat_map
+          (fun (f, ty_f) ->
+            match Type.arity ty_f with
+            | Type.NoArity ->
+                _failwith "invalid constructor %a for inductive type %a"
+                  Symbol.pp f Type.pp ity.pattern
+            | Type.Arity (0, 0) ->
+                if depth > 0
+                then  (* only one answer : f *)
+                  [fun () -> T.const ~ty:ty_f f, T.Set.empty]
+                else []
+            | Type.Arity (0, n) ->
+                let ty_args = Type.expected_args ty_f in
+                CCList.(
+                  make_list (depth-1) ty_args >>= fun mk_args ->
+                  return (fun () ->
+                    let args, set = mk_args () in
+                    T.app (T.const f ~ty:ty_f) args, set)
+                )
+            | Type.Arity (m,_) ->
+                _failwith
+                  ("inductive constructor %a requires %d type " ^^
+                  "parameters, expected 0")
+                  Symbol.pp f m
+          ) ity.constructors
+      (* given a list of types [l], yield all lists of cover terms
+          that have types [l] *)
+      and make_list depth l
+        : (T.t list * T.Set.t) FunM.t list
+        = match l with
+        | [] -> [FunM.return ([], T.Set.empty)]
+        | ty :: tail ->
+            let t_builders = if Unif.Ty.matches ~pattern:ity.pattern ty
+              then make depth
+              else [fun () ->
+                (* not an inductive sub-case, just create a skolem symbol *)
+                let name = Util.sprintf "#%a" Symbol.pp (_extract_hd ty) in
+                let c = Skolem.fresh_sym_with ~ctx:skolem ~ty name in
+                let t = T.const ~ty c in
+                Symbol.Tbl.replace cst_data.dominates c ();
+                _declare_symb c ty;
+                t, T.Set.empty
+            ] in
+            let tail_builders = make_list depth tail in
+            CCList.(
+              t_builders >>= fun mk_t ->
+              tail_builders >>= fun mk_tail ->
+              [FunM.(mk_t >>= fun (t,set) ->
+                     mk_tail >>= fun (tail,set') ->
+                     return (t::tail, T.Set.union set set'))]
+            )
+      in
+      assert (depth>0);
+      (* make the cover set's cases, tagged with `Base or `Rec depending
+        on whether they contain sub-cases *)
+      let cases_and_subs = List.map
+        (fun gen ->
+          let t, set = gen() in
+          (* remember whether [t] is base or recursive case *)
+          if T.Set.is_empty set then (t, `Base), set else (t, `Rec), set
+        ) (make depth)
+      in
+      let cases, sub_constants = List.split cases_and_subs in
+      let cases, rec_cases, base_cases = List.fold_left
+        (fun (c,r,b) (t,is_base) -> match is_base with
+          | `Base -> t::c, r, t::b
+          | `Rec -> t::c, t::r, b
+        ) ([],[],[]) cases
+      in
+      let sub_constants =
+        List.fold_left T.Set.union T.Set.empty sub_constants in
+      let coverset = {cases; rec_cases; base_cases; sub_constants; } in
+      (* declare sub-constants as such. They won't be candidate for induction
+        and will be smaller than [t] *)
+      List.iter
+        (fun ((t, _), set) ->
+          T.Tbl.add _tbl_case t (cst, coverset);
+          T.Set.iter
+            (fun sub_cst ->
+              T.Tbl.replace _tbl_sub_cst sub_cst (cst, coverset, t)
+            ) set
+        ) cases_and_subs;
+      coverset
+
+    let inductive_cst_of_sub_cst t : cst * case =
+      let cst, _set, case = T.Tbl.find _tbl_sub_cst t in
+      cst, case
+
+    let on_new_cover_set = Signal.create ()
+
+    let cover_set ?(depth=1) t =
+      try
+        let cst = T.Tbl.find _tbl t in
+        begin try
+          (* is there already a cover set at this depth? *)
+          IMap.find depth cst.coversets, `Old
+        with Not_found ->
+          (* create a new cover set *)
+          let ity = _get_ity (T.ty t) in
+          let coverset = _make_coverset ~depth ity t in
+          (* save coverset *)
+          cst.coversets <- IMap.add depth coverset cst.coversets;
+          Util.debug 2 "new coverset for %a: %a"
+            T.pp t (CCList.pp T.pp) coverset.cases;
+          Signal.send on_new_cover_set (t, coverset);
+          coverset, `New
+        end
+      with Not_found ->
+        _failwith "term %a is not an inductive constant, no coverset" T.pp t
+
+    let is_inductive cst = T.Tbl.mem _tbl cst
+
+    let as_inductive cst =
+      if is_inductive cst then Some cst else None
+
+    let is_inductive_symbol s = Symbol.Tbl.mem _tbl_sym s
+
+    let cover_sets t =
+      try
+        let cst = T.Tbl.find _tbl t in
+        IMap.to_seq cst.coversets |> Sequence.map snd
+      with Not_found -> Sequence.empty
+
+    let is_sub_constant_of t cst =
+      let cst', _ = inductive_cst_of_sub_cst t in
+      T.eq cst cst'
+
+    let as_sub_constant_of t cst =
+      if is_sub_constant_of t cst
+        then Some t
+        else None
+
+    let is_case t = T.Tbl.mem _tbl_case t
+
+    let as_case t = if is_case t then Some t else None
+
+    let cases ?(which=`All) set = match which with
+      | `All -> CCList.to_seq set.cases
+      | `Base -> CCList.to_seq set.base_cases
+      | `Rec -> CCList.to_seq set.rec_cases
+
+    let sub_constants set = SubCstSet.to_seq set.sub_constants
+
+    let sub_constants_case (t:case) =
+      let _, set = T.Tbl.find _tbl_case t in
+      sub_constants set
+      |> Sequence.filter
+        (fun sub -> Case.equal t (snd (inductive_cst_of_sub_cst sub)))
+
+    (* true iff s2 is one of the sub-cases of s1 *)
+    let dominates s1 s2 =
+      assert (is_inductive_symbol s1);
+      let cst_data = Symbol.Tbl.find _tbl_sym s1 in
+      Symbol.Tbl.mem cst_data.dominates s2
+
+    let _seq_inductive_cst yield =
+      T.Tbl.iter (fun t _ -> yield t) _tbl
+
+    module Set = T.Set
+
+    module Seq = struct
+      let ty = _seq_inductive_types
+      let cst = _seq_inductive_cst
+
+      let constructors =
+        _seq_inductive_types
+        |> Sequence.flat_map (fun ity -> Sequence.of_list ity.constructors)
+        |> Sequence.map fst
+    end
+  end
 end

@@ -35,46 +35,11 @@ Future work may include locking clauses whose trails are unsatisfied. *)
 
 type 'a printer = Format.formatter -> 'a -> unit
 
-(** {2 Sat-Solvers} *)
-
-module BoolLit : sig
-  type t = int
-  val neg : t -> t
-  val to_int : t -> int
-  val of_int : int -> t
-end
-
-(** A running SAT-solver *)
-type sat_solver_instance = {
-  add_lits : BoolLit.t list -> unit;
-  add_clauses : BoolLit.t list list -> unit;
-  check : unit -> [`Sat | `Unsat];
-  set_printer : int printer -> unit;
-}
-
-(** A factory of SAT-solver instances *)
-type sat_solver = {
-  create : unit -> sat_solver_instance;
-  name : string;
-}
-
-val register_solver : sat_solver -> unit
-(** [register_solver s] adds a new solver to the list of known solvers.
-    @raise Failure if a solver is already registered with this name *)
-
-val solver_by_name : string -> sat_solver option
-(** Obtain the solver whose name corresponds, if any *)
-
-val current_solver : unit -> sat_solver option
-(** The current solver by-default *)
-
-val set_current_solver : sat_solver -> unit
-(** Set the current SAT-solver (obtained with {!current_solver}), also
-    registers the solver if it's not already the case. *)
-
 (** {2 Avatar: splitting+sat} *)
 
-module Make(E : Env.S) : sig
+module type S = sig
+  module E : Env.S
+
   val split : E.multi_simpl_rule
   (** Split a clause into components *)
 
@@ -82,11 +47,28 @@ module Make(E : Env.S) : sig
   (** Forbid empty clauses with trails, i.e. adds the negation of their
       trails to the SAT-solver *)
 
+  val before_check_sat : unit Signal.t
+  val after_check_sat : unit Signal.t
+
+  val filter_absurd_trails : (E.C.Trail.t -> bool) -> unit
+  (** [filter_trails f] calls [f] on every trail associated with the empty
+      clause. If [f] returns [false], the trail is ignored, otherwise
+      it's negated and sent to the SAT solver *)
+
   val check_satisfiability : E.generate_rule
   (** Checks  that the SAT context is still valid *)
+
+  val save_clause : tag:int -> E.C.t -> unit
+  (** Map the tag to the clause *)
+
+  val get_clause : tag:int -> E.C.t option
+  (** Recover clause from the tag, if any *)
 
   val register : unit -> unit
   (** Register inference rules to the environment *)
 end
 
+module Make(E : Env.S)(Sat : BoolSolver.SAT) : S with module E = E
+
 val extension : Extensions.t
+(** Extension that enables Avatar splitting and create a new SAT-solver. *)

@@ -101,6 +101,7 @@ end) : S with module Ctx = X.Ctx = struct
   let _multi_simpl_rule = ref []
   let _generate_rules = ref []
 
+  let on_start = Signal.create()
   let on_empty_clause = Signal.create ()
 
   (** {2 Basic operations} *)
@@ -204,11 +205,10 @@ end) : S with module Ctx = X.Ctx = struct
   let precedence () = Ordering.precedence (ord ())
   let signature () = Ctx.signature ()
 
-  let pp buf () =
-    Printf.bprintf buf "env(state: %a)" ProofState.debug ()
+  let pp buf () = Printf.bprintf buf "env"
 
-  let fmt fmt () =
-    Format.pp_print_string fmt (Util.on_buffer pp ())
+  let fmt out () =
+    Format.fprintf out "env(state:@ %a)" ProofState.debug ()
 
   (** {2 High level operations} *)
 

@@ -145,6 +145,7 @@ module type S = sig
   val to_string : t -> string
   val pp_list : Buffer.t -> (t * int) list -> unit
   val fmt : Format.formatter -> t -> unit
+  val fmt_list : Format.formatter -> (t * int) list -> unit
 end
 
 module Make(C : Clause.S) : S with module C = C

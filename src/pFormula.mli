@@ -33,8 +33,6 @@ type form = Formula.FO.t
 
 type t
 
-type pform = t
-
 val proof : t -> Proof.t
 val form : t -> form
 val id : t -> int
@@ -78,7 +76,7 @@ val fmt : Format.formatter -> t -> unit
     can contain at most one proof for a given formula. *)
 
 module Set : sig
-  include Sequence.Set.S with type elt = pform
+  include Sequence.Set.S with type elt = t
 
   val symbols : ?init:Symbol.Set.t -> t -> Symbol.Set.t
 end

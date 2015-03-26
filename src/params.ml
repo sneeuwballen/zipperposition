@@ -39,7 +39,7 @@ type t = {
   param_proof : string;           (** how to print proof? *)
   param_dot_file : string option; (** file to print the final state in *)
   param_dot_sat : bool;           (** Print saturated set into DOT? *)
-  param_plugins : string list;    (** plugins to load *)
+  param_dot_all_roots : bool;
   param_expand_def : bool;        (** expand definitions *)
   param_stats : bool;
   param_presaturate : bool;       (** initial interreduction of proof state? *)
@@ -55,36 +55,34 @@ let add_opts l = other_opts := l @ !other_opts
 (** Default signature *)
 let signature = ref Signature.TPTP.base
 
+let ord = ref "kbo"
+and seed = ref 1928575
+and steps = ref 0
+and version = ref false
+and timeout = ref 0.
+and proof = ref "debug"
+and split = ref false
+and theories = ref false
+and presaturate = ref false
+and dot_file = ref None
+and dot_sat = ref false
+and dot_all_roots = ref false
+and expand_def = ref false
+and select = ref "SelectComplex"
+and progress = ref false
+and unary_depth = ref 1
+and files = CCVector.create ()
+
 (** parse_args returns parameters *)
 let parse_args () =
   let help_select = Util.sprintf "selection function (%a)"
     (Util.pp_list ~sep:"," Buffer.add_string)
     (Selection.available_selections ())
   in
-  (* parameters *)
-  let ord = ref "kbo"
-  and seed = ref 1928575
-  and steps = ref 0
-  and version = ref false
-  and timeout = ref 0.
-  and proof = ref "debug"
-  and split = ref false
-  and theories = ref false
-  and presaturate = ref false
-  and dot_file = ref None
-  and dot_sat = ref false
-  and plugins = ref []
-  and expand_def = ref false
-  and select = ref "SelectComplex"
-  and progress = ref false
-  and unary_depth = ref 1
-  and files = CCVector.create () in
   (* special handlers *)
   let set_progress () =
     Util.need_cleanup := true;
     progress := true
-  and add_plugin s = plugins := s :: !plugins
-  and add_plugins s = plugins := (Util.str_split ~by:"," s) @ !plugins
   and add_file s = CCVector.push files s in
   (* options list *)
   let options = Arg.align (
@@ -94,8 +92,6 @@ let parse_args () =
     ; "-timeout", Arg.Set_float timeout, " timeout (in seconds)"
     ; "-select", Arg.Set_string select, help_select
     ; "-split", Arg.Set split, " enable splitting"
-    ; "-plugin", Arg.String add_plugin, " load given plugin (.cmxs)"
-    ; "-plugins", Arg.String add_plugins, " load given plugin(s), comma-separated"
     ; "-expand-def", Arg.Set expand_def, " expand definitions"
     ; "-progress", Arg.Unit set_progress, " print progress"
     ; "-theories", Arg.Bool (fun b -> theories := b), " enable/disable theory detection"
@@ -104,6 +100,7 @@ let parse_args () =
         " pre-saturate (interreduction of) the initial clause set"
     ; "-dot", Arg.String (fun s -> dot_file := Some s) , " print final state to file in DOT"
     ; "-dot-sat", Arg.Set dot_sat, " print saturated set into DOT"
+    ; "-dot-all-roots", Arg.Set dot_all_roots, " print all empty clauses into DOT"
     ; "-seed", Arg.Set_int seed, " set random seed"
     ; "-unary-depth", Arg.Set_int unary_depth, " maximum depth for successive unary inferences"
     ] @ !other_opts @ Options.mk_global_opts ()
@@ -121,7 +118,7 @@ let parse_args () =
     param_files = files; param_select = !select; param_theories = !theories;
     param_progress = !progress; param_stats= (!Options.global).Options.stats;
     param_proof = !proof; param_split = !split;
-    param_presaturate = !presaturate;
-    param_dot_file = !dot_file; param_plugins= !plugins;
+    param_presaturate = !presaturate; param_dot_all_roots= !dot_all_roots;
+    param_dot_file = !dot_file;
     param_unary_depth= !unary_depth; param_dot_sat= !dot_sat;
     param_expand_def= !expand_def; }

@@ -230,19 +230,21 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
   let pp buf state =
     let num_active, num_passive, num_simpl = stats state in
     Printf.bprintf buf
-      "state {%d active clauses; %d passive_clauses; %d simplification_rules; %a}"
+      ("state {%d active clauses; %d passive_clauses; " ^^
+        "%d simplification_rules; %a}")
       num_active num_passive num_simpl
       CQueue.pp_list (PassiveSet.queues |> Sequence.to_list)
 
-  let debug buf state =
+  let debug fmt state =
     let num_active, num_passive, num_simpl = stats state in
-    Printf.bprintf buf
-      ("state {%d active clauses; %d passive_clauses; %d simplification_rules; %a" ^^
-        "\nactive:%a\npassive:%a\n}")
+    Format.fprintf fmt
+      ("@[<v2>state {%d active clauses;@ %d passive_clauses;@ " ^^
+        "%d simplification_rules;@ queues@[<hv>%a@]" ^^
+        "@,active:@[<hv>%a@]@,passive:@[<hv>%a@]@,}@]@.")
       num_active num_passive num_simpl
-      CQueue.pp_list (PassiveSet.queues |> Sequence.to_list)
-      C.pp_set (ActiveSet.clauses ())
-      C.pp_set (PassiveSet.clauses ())
+      CQueue.fmt_list (PassiveSet.queues |> Sequence.to_list)
+      C.fmt_set (ActiveSet.clauses ())
+      C.fmt_set (PassiveSet.clauses ())
 
 end
 

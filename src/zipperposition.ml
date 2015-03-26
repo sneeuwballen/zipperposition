@@ -42,7 +42,12 @@ module Import = struct
   open! Chaining
   open! ArithInt
   open! EnumTypes
-  open! Quantor_bridge
+  open! Avatar
+  open! Induction
+  open! Induction_simple
+  open! Zipperposition_msat
+  open! Zipperposition_quantor  (* TODO: remove, should be a plugin *)
+  open! Zipperposition_depqbf
 end
 
 let section = Const.section
@@ -92,29 +97,23 @@ let setup_env ~env =
     |> List.iter (Extensions.apply_env ~env);
   ()
 
-(** Load plugins *)
+(** Load plugins (all "libzipperposition*.cmxs" in same path as main) *)
 let load_plugins ~params =
-  List.iter
-    (fun filename ->
-      let n = String.length filename in
-      let filename =  (* plugin name, or file? *)
-        if n > 4 && String.sub filename (n-5) 5 = ".cmxs"
-          then filename
-        else
-          let local_filename = Util.sprintf "plugins/std/ext_%s.cmxs" filename in
-          try
-            ignore (Unix.stat local_filename);
-            local_filename
-          with Unix.Unix_error _ ->
-            let home_filename = Util.sprintf "plugins/ext_%s.cmxs" filename in
-            Filename.concat Const.home home_filename
-      in
-      match Extensions.dyn_load filename with
-      | `Error msg -> () (* Could not load plugin *)
-      | `Ok ext ->
-        Util.debug ~section 0 "loaded extension %s" ext.Extensions.name;
-        ()
-    ) params.param_plugins;
+  let dir = Filename.dirname Sys.argv.(0) in
+  Gen.append (CCIO.File.read_dir dir) (CCIO.File.read_dir Const.home)
+    |> Gen.filter
+      (fun s -> CCString.prefix ~pre:"libzipperposition_" s
+       && CCString.suffix ~suf:".cmxs" s
+      )
+    |> Gen.iter
+      (fun filename ->
+        Util.debug ~section 1 "trying to load file %s..." filename;
+        match Extensions.dyn_load filename with
+        | `Error msg -> () (* Could not load plugin *)
+        | `Ok ext ->
+          Util.debug ~section 0 "loaded extension %s" ext.Extensions.name;
+          ()
+      );
   Extensions.extensions ()
 
 module MakeNew(X : sig
@@ -176,14 +175,6 @@ end) = struct
     in
     Util.debug ~section 1 "json_stats: %s" o
 
-  (** print the final state to given file in DOT, with
-      clauses in result if needed *)
-  let print_state ?name filename (state, result) =
-    match result with
-    | Saturate.Unsat proof ->
-      Proof.pp_dot_file ?name filename proof
-    | _ -> Util.debug ~section 1 "no empty clause; do not print state"
-
   (* TODO
   (** Make an optional meta-prover and parse its KB *)
   let mk_meta ~params =
@@ -228,7 +219,15 @@ end) = struct
     | Some dot_f, Saturate.Unsat proof ->
       let name = "unsat_graph" in
       (* print proof of false *)
-      Proof.pp_dot_file ~name dot_f proof
+        let proof =
+          if X.params.param_dot_all_roots
+          then
+            Env.(Sequence.append (get_active()) (get_passive()))
+            |> Sequence.filter_map
+              (fun c -> if Literals.is_absurd (C.lits c) then Some (C.proof c) else None)
+          else Sequence.singleton proof
+        in
+        Proof.pp_dot_seq_file ~name dot_f proof
     | Some dot_f, (Saturate.Sat | Saturate.Unknown) when params.param_dot_sat ->
       (* print saturated set *)
       let name = "sat_set" in
@@ -301,6 +300,13 @@ end) = struct
     let signature = TypeInference.Ctx.to_signature tyctx in
     formulas, signature
 
+  let setup_handlers() =
+    Signal.on Ctx.on_signature_update
+      (fun signature ->
+        Ctx.update_prec (Signature.Seq.symbols signature);
+        Signal.ContinueListening);
+    ()
+
   (* try to refute the set of clauses contained in the [env]. Parameters are
      used to influence how saturation is done, for how long it runs, etc.
      @return the result and final env. *)
@@ -313,6 +319,7 @@ end) = struct
                       ignore (setup_alarm params.param_timeout);
                       Some (Util.get_start_time () +. params.param_timeout -. 0.25))
     in
+    Signal.send Env.on_start ();
     let result, num = match result with
       | Saturate.Unsat _ -> result, 0  (* already found unsat during presaturation *)
       | _ -> Sat.given_clause ~generating:true ?steps ?timeout ()
@@ -366,6 +373,16 @@ let _has_conjecture decls =
   in
   Sequence.exists (fun r -> r = Ast_tptp.R_conjecture) _roles
 
+let scan_for_inductive_types decls =
+  let pairs = decls
+    |> Sequence.filter_map
+      (function
+        | Ast_tptp.Untyped.NewType (_,ty,_,info) -> Some (ty, info)
+        | _ -> None
+      )
+  in
+  Induction_helpers.init_from_decls pairs
+
 (** Process the given file (try to solve it) *)
 let process_file ?meta ~plugins ~params file =
   let open CCError in
@@ -374,6 +391,7 @@ let process_file ?meta ~plugins ~params file =
   Util_tptp.parse_file ~recursive:true file
   >>= fun decls ->
   let has_conjecture = _has_conjecture decls in
+  scan_for_inductive_types decls; (* detect declarations of inductive types *)
   Util.debug ~section 1 "parsed %d declarations (%sconjecture)"
     (Sequence.length decls) (if has_conjecture then "" else "no ");
   (* obtain a typed AST *)
@@ -411,6 +429,7 @@ let process_file ?meta ~plugins ~params file =
     let params = params
   end) in
   Main.has_conjecture := has_conjecture;
+  Main.setup_handlers();
   (* pre-saturation *)
   let num_clauses = MyEnv.C.CSet.size clauses in
   let result, clauses = if params.param_presaturate

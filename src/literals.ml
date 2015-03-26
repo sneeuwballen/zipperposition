@@ -122,7 +122,7 @@ let vars lits =
   T.Tbl.fold (fun t () acc -> t::acc) set []
 
 let is_ground lits =
-  Util.array_forall Lit.is_ground lits
+  CCArray.for_all Lit.is_ground lits
 
 let to_form lits =
   let lits = Array.map Lit.Conv.to_form lits in
@@ -167,7 +167,7 @@ let _compare_lit_with_idx ~ord (lit1,i1) (lit2,i2) =
     else Lit.Comp.compare ~ord lit1 lit2
 
 let _to_multiset_with_idx lits =
-  Util.array_foldi
+  CCArray.foldi
     (fun acc i x -> MLI.add acc (x,i))
     MLI.empty lits
 
@@ -203,7 +203,10 @@ let is_max ~ord lits =
     MLI.is_max (_compare_lit_with_idx ~ord) (lit,i) m
 
 let is_trivial lits =
-  Util.array_exists Lit.is_trivial lits
+  CCArray.exists Lit.is_trivial lits
+
+let is_absurd lits =
+  CCArray.for_all Lit.is_absurd lits
 
 module Seq = struct
   let terms a =
@@ -299,7 +302,7 @@ let order_instances lits =
       | Some olit -> olit.TO.order :: acc)
     [] lits
   in
-  Util.list_uniq TO.eq l
+  CCList.Set.uniq ~eq:TO.eq l
 
 let terms_under_ineq ~instance lits =
   Sequence.from_iter
@@ -402,7 +405,7 @@ let fold_arith_terms ~eligible ~which ~ord lits acc f =
         | `All -> (fun _ -> true)
         | `Max ->
           let max_terms = ArithLit.max_terms ~ord a_lit in
-          fun t -> Util.list_mem T.eq t max_terms
+          fun t -> CCList.Set.mem ~eq:T.eq t max_terms
       in
       ArithLit.Focus.fold_terms ~pos a_lit acc
         (fun acc foc_lit pos ->

@@ -91,18 +91,6 @@ module type S = sig
 
   (** {2 Boolean Abstraction} *)
 
-  val as_bool : t -> int option
-  (** Boolean atom for this clause (if any) *)
-
-  val as_bool_exn : t -> int
-  (** Unsafe version of {!as_bool}.
-      @raise Failure if the clause doesn't have a boolean name *)
-
-  val set_bool_name : t -> int -> unit
-  (** Set the boolean name of this clause.
-      Basically, [set_bool_name c i; as_bool i = Some i] holds.
-      @raise Failure if the clause already has a name *)
-
   module Trail : sig
     type t
 
@@ -111,11 +99,19 @@ module type S = sig
     val hash : t -> int
     val compare : t -> t -> int
 
-    type bool_lit = Ctx.BoolLit.bool_lit
+    type bool_lit = Ctx.BoolLit.t
 
+    val empty : t
     val singleton : bool_lit -> t
+    val mem : bool_lit -> t -> bool
+    val add : bool_lit -> t -> t
+    val remove : bool_lit -> t -> t
+    val map : (bool_lit -> bool_lit) -> t -> t
+    val for_all : (bool_lit -> bool) -> t -> bool
+    val exists : (bool_lit -> bool) -> t -> bool
     val of_list : bool_lit list -> t
     val to_list : t -> bool_lit list
+    val to_seq : t -> bool_lit Sequence.t
 
     val subsumes : t -> t -> bool
     (** [subsumes a b] is true iff [a] is a subset of [b] *)
@@ -129,6 +125,9 @@ module type S = sig
     val merge : t list -> t
     (** Merge several trails (e.g. from different clauses) *)
 
+    val filter : (bool_lit -> bool) -> t -> t
+    (** Only keep a subset of boolean literals *)
+
     type valuation = bool_lit -> bool
     (** A boolean valuation *)
 
@@ -140,14 +139,33 @@ module type S = sig
     val print : Format.formatter -> t -> unit
   end
 
+  val as_bool : t -> Trail.bool_lit option
+  (** Boolean atom for this clause (if any) *)
+
+  val as_bool_exn : t -> Trail.bool_lit
+  (** Unsafe version of {!as_bool}.
+      @raise Failure if the clause doesn't have a boolean name *)
+
+  val set_bool_name : t -> Trail.bool_lit -> unit
+  (** Set the boolean name of this clause.
+      Basically, [set_bool_name c i; as_bool i = Some i] holds.
+      @raise Failure if the clause already has a name *)
+
   val has_trail : t -> bool
   (** Has a non-empty trail? *)
 
   val get_trail : t -> Trail.t
   (** Get the clause's trail *)
 
+  val update_trail : (Trail.t -> Trail.t) -> t -> t
+  (** Change the trail. The resulting clause has same parents, proof
+      and literals as the input one *)
+
   val trail_subsumes : t -> t -> bool
   (** [trail_subsumes c1 c2 = Trail.subsumes (get_trail c1) (get_trail c2)] *)
+
+  val compact_trail : Trail.t -> CompactClause.bool_lit list
+  (** Compact the trail for use with {!CompactClause} *)
 
   val is_active : t -> v:Trail.valuation -> bool
   (** True if the clause's trail is active in this valuation *)
@@ -413,5 +431,6 @@ module type S = sig
 
   val pp_set : Buffer.t -> CSet.t -> unit
   val pp_set_tstp : Buffer.t -> CSet.t -> unit
+  val fmt_set : Format.formatter -> CSet.t -> unit
 end
 

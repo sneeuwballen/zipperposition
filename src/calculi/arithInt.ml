@@ -322,9 +322,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* the active literals *)
       let lit_a, lit_p = ALF.scale lit_a lit_p in
       (* other literals *)
-      let lits_a = Util.array_except_idx (C.lits info.active) idx_a in
+      let lits_a = CCArray.except_idx (C.lits info.active) idx_a in
       let lits_a = Lit.apply_subst_list ~renaming subst lits_a s_a in
-      let lits_p = Util.array_except_idx (C.lits info.passive) idx_p in
+      let lits_p = CCArray.except_idx (C.lits info.passive) idx_p in
       let lits_p = Lit.apply_subst_list ~renaming subst lits_p s_p in
       (* new literal: lit_a=[t+m1=m2], lit_p=[t'+m1' R m2'] for some
         relation R. Now let's replace t' by [m2-m1] in lit', ie,
@@ -611,7 +611,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 && MF.is_max ~ord mf1' && MF.is_max ~ord mf2'
                 then begin
                   (* do the inference *)
-                  let lits' = Util.array_except_idx (C.lits c) idx in
+                  let lits' = CCArray.except_idx (C.lits c) idx in
                   let lits' = Lit.apply_subst_list ~renaming subst lits' 0 in
                   let new_lit = Lit.mk_arith_op op (MF.rest mf1') (MF.rest mf2') in
                   let all_lits = new_lit :: lits' in
@@ -636,7 +636,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 if C.is_maxlit c 0 subst ~idx
                 && MF.is_max ~ord mf
                 then begin
-                  let lits' = Util.array_except_idx (C.lits c) idx in
+                  let lits' = CCArray.except_idx (C.lits c) idx in
                   let lits' = Lit.apply_subst_list ~renaming subst lits' 0 in
                   let new_lit = Lit.mk_divides
                     ~sign:d.AL.sign d.AL.num ~power:d.AL.power (MF.to_monome mf')
@@ -702,7 +702,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                       (M.sum m1 (MF.rest mf2))
                       (M.sum m2 (MF.rest mf1))
                     in
-                    let other_lits = Util.array_except_idx (C.lits c) idx1 in
+                    let other_lits = CCArray.except_idx (C.lits c) idx1 in
                     let other_lits = Lit.apply_subst_list
                       ~renaming subst other_lits 0 in
                     (* apply subst and build clause *)
@@ -780,9 +780,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           (M.sum m2 (MF.rest mf_1))
           (M.sum m1 (MF.rest mf_2))
         in
-        let lits_l = Util.array_except_idx (C.lits info.left) idx_l in
+        let lits_l = CCArray.except_idx (C.lits info.left) idx_l in
         let lits_l = Lit.apply_subst_list ~renaming subst lits_l s_l in
-        let lits_r = Util.array_except_idx (C.lits info.right) idx_r in
+        let lits_r = CCArray.except_idx (C.lits info.right) idx_r in
         let lits_r = Lit.apply_subst_list ~renaming subst lits_r s_r in
         let all_lits = new_lit :: lits_l @ lits_r in
         let proof cc = Proof.mk_c_inference ~theories
@@ -912,7 +912,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         then begin
           let k = Z.to_int (M.const diff) in
           (* build literals *)
-          let other_lits = Util.array_foldi
+          let other_lits = CCArray.foldi
             (fun acc i' lit -> if i' <> i && i' <> j then lit :: acc else acc)
             [] (C.lits c)
           in
@@ -991,7 +991,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         then begin
           let left = match lit1 with ALF.Left _ -> true | _ -> false in
           (* remove lit1, add the guard *)
-          let other_lits = Util.array_except_idx (C.lits c) i in
+          let other_lits = CCArray.except_idx (C.lits c) i in
           let other_lits = Lit.apply_subst_list ~renaming subst other_lits 0 in
           (* build new literal *)
           let new_lit =
@@ -1153,7 +1153,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let is_redundant_by_ineq c =
     Util.enter_prof prof_arith_trivial_ineq;
-    let res = !_enable_trivial_ineq && Util.array_exists
+    let res = !_enable_trivial_ineq && CCArray.exists
       (fun lit -> match _ineq_is_redundant_by_unit c lit with
         | None -> false
         | Some trace ->
@@ -1197,8 +1197,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         let new_lit = Lit.mk_divides ~sign n ~power
           (M.difference (MF.rest mf1') (MF.rest mf2'))
         in
-        let lits1 = Util.array_except_idx (C.lits c1) idx1
-        and lits2 = Util.array_except_idx (C.lits c2) idx2 in
+        let lits1 = CCArray.except_idx (C.lits c1) idx1
+        and lits2 = CCArray.except_idx (C.lits c2) idx2 in
         let lits1 = Lit.apply_subst_list ~renaming subst lits1 sc1
         and lits2 = Lit.apply_subst_list ~renaming subst lits2 sc2 in
         let all_lits = new_lit :: lits1 @ lits2 in
@@ -1288,7 +1288,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       []
     with ReplaceLitByLitsInSameClause (i, lits) ->
       (* replace lit number [i] with [lits] *)
-      let lits' = Util.array_except_idx (C.lits c) i in
+      let lits' = CCArray.except_idx (C.lits c) i in
       let all_lits = List.rev_append lits lits' in
       let proof cc = Proof.mk_c_inference ~rule:"div_case_switch"
         ~theories cc [C.proof c] in
@@ -1345,7 +1345,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       None
     with ReplaceLitByLitsInSameClause (i, lits) ->
       (* replace lit number [i] with [lits] *)
-      let lits' = Util.array_except_idx (C.lits c) i in
+      let lits' = CCArray.except_idx (C.lits c) i in
       let all_lits = List.rev_append lits lits' in
       let proof cc = Proof.mk_c_inference ~rule:"div_prime_decomposition"
         ~theories cc [C.proof c] in
@@ -1417,7 +1417,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     Lit.mk_divides n' ~power:power' (MF.rest d.AL.monome)
                 | _ -> assert false
               in
-              let lits' = Util.array_except_idx (C.lits c) idx in
+              let lits' = CCArray.except_idx (C.lits c) idx in
               let lits' = Lit.apply_subst_list ~renaming subst lits' 0 in
               let all_lits = new_lit :: lits' in
               let proof cc = Proof.mk_c_inference ~theories
@@ -1464,7 +1464,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   (** {3 Others} *)
 
   let _has_arith c =
-    Util.array_exists Lit.is_arith (C.lits c)
+    CCArray.exists Lit.is_arith (C.lits c)
 
   module Simp = Simplex.MakeHelp(struct
     type t = T.t
@@ -1555,7 +1555,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       );
       c  (* could not simplify *)
   with VarElim (i, subst) ->
-    let lits' = Util.array_except_idx (C.lits c) i in
+    let lits' = CCArray.except_idx (C.lits c) i in
     let renaming = Ctx.renaming_clear () in
     let lits' = Lit.apply_subst_list ~renaming subst lits' 0 in
     let proof cc = Proof.mk_c_inference ~theories ~info:[S.to_string subst]
@@ -1575,7 +1575,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             assert (eligible i lit);
             Util.debug ~section 5 "lit %a [%d] in %a" Lit.pp lit i C.pp c;
             assert (Lits.is_max ~ord (C.lits c) i);
-            let lits = Util.array_except_idx (C.lits c) i in
+            let lits = CCArray.except_idx (C.lits c) i in
             let new_lits =
               [ Lit.mk_arith_lesseq (M.succ m1) m2
               ; Lit.mk_arith_lesseq (M.succ m2) m1
@@ -2062,18 +2062,18 @@ let () =
   Params.add_opts
     [ "-arith-no-semantic-tauto"
       , Arg.Unit (fun () -> _enable_arith (); _enable_semantic_tauto := false)
-      , "disable arithmetic semantic tautology check"
+      , " disable arithmetic semantic tautology check"
     ; "-arith-no-trivial-ineq"
       , Arg.Unit (fun () -> _enable_arith (); _enable_trivial_ineq := false)
-      , "disable inequality triviality checking by rewriting"
+      , " disable inequality triviality checking by rewriting"
     ; "-arith"
       , Arg.Unit _enable_arith
-      , "enable axiomatic integer arithmetic"
+      , " enable axiomatic integer arithmetic"
     ; "-arith-ac"
       , Arg.Set _enable_ac
-      , "enable AC axioms for arithmetic (sum)"
+      , " enable AC axioms for arithmetic (sum)"
     ; "-dot-arith-unit"
       , Arg.String (fun s -> _dot_unit := Some s)
-      , "print arith-unit index into file"
+      , " print arith-unit index into file"
     ];
   ()
