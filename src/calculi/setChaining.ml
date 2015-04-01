@@ -441,9 +441,9 @@ module Make(E : Env.S) = struct
     let left_idx,left_pos = Lits.Pos.cut info.left_pos in
     let right_idx,right_pos = Lits.Pos.cut info.right_pos in
     (* apply the substitution on all the other literals *)
-    let lits_left = Util.array_except_idx (C.lits info.left) left_idx in
+    let lits_left = CCArray.except_idx (C.lits info.left) left_idx in
     let lits_left = Lit.apply_subst_list ~renaming subst lits_left sc_l in
-    let lits_right = Util.array_except_idx (C.lits info.right) right_idx in
+    let lits_right = CCArray.except_idx (C.lits info.right) right_idx in
     let lits_right = Lit.apply_subst_list ~renaming subst lits_right sc_r in
     (* new literal :
      * given lit_l = [A inter t subseteq B] and
@@ -549,9 +549,9 @@ module Make(E : Env.S) = struct
     let positive_idx,positive_pos = Lits.Pos.cut info.positive_pos in
     let negative_idx,negative_pos = Lits.Pos.cut info.negative_pos in
     (* apply the substitution to all other literals *)
-    let lits_positive = Util.array_except_idx (C.lits info.positive) positive_idx in
+    let lits_positive = CCArray.except_idx (C.lits info.positive) positive_idx in
     let lits_positive = Lit.apply_subst_list ~renaming subst lits_positive sc_p in
-    let lits_negative = Util.array_except_idx (C.lits info.negative) negative_idx in
+    let lits_negative = CCArray.except_idx (C.lits info.negative) negative_idx in
     let lits_negative = Lit.apply_subst_list ~renaming subst lits_negative sc_n in
     (* create the new literals *)
     let new_lits_list =
@@ -696,7 +696,7 @@ module Make(E : Env.S) = struct
               let renaming = Ctx.renaming_clear () in
               (* if a substitution is found, apply it and remove the literal,
                * as it is rendered useless *)
-              let lits = Util.array_except_idx (C.lits c) i in
+              let lits = CCArray.except_idx (C.lits c) i in
               let lits = Lit.apply_subst_list ~renaming subst lits 0 in
               (* generate a new clause *)
               let proof cc = Proof.mk_c_inference ~theories:["sets"]
@@ -720,7 +720,7 @@ module Make(E : Env.S) = struct
     let new_clauses = Lits.fold_subseteq ~sign:true ~eligible lits []
     (fun acc lit pos ->
       let idx = Lits.Pos.idx pos in
-      let lits = Util.array_except_idx lits idx in
+      let lits = CCArray.except_idx lits idx in
       Lits.fold_subseteq ~sign:true ~eligible (Array.of_list lits) []
       (fun acc lit' _ ->
         (* try the inference for each couple of positive subseteq literals *)
@@ -794,7 +794,7 @@ module Make(E : Env.S) = struct
             let new_lits =
               [Lit.mk_subseteq ~sets [a] [b];Lit.mk_subseteq ~sets [b] [a]]
             in
-            let context = Util.array_except_idx lits idx in
+            let context = CCArray.except_idx lits idx in
             let f lit =
               let proof cc = Proof.mk_c_inference ~theories:["sets"]
                 ~rule:"simplify_eq" cc [C.proof c] in
@@ -819,7 +819,7 @@ module Make(E : Env.S) = struct
         | Lit.Equation(a,b,sign) when not(sign) ->
           (* if A (and B) are sets, rewrite the clause *)
           if TS.is_set ~sets a then
-            let context = Util.array_except_idx lits idx in
+            let context = CCArray.except_idx lits idx in
             let new_lits =
               (Lit.mk_notsubseteq ~sets [a] [b])::(Lit.mk_notsubseteq ~sets [b] [a])::context
             in
@@ -858,7 +858,7 @@ module Make(E : Env.S) = struct
       Util.debug 2 "try positive singleton simplification in %a" Lit.pp lit;
       let sets,a,b,_ = Lit.View.get_subseteq_exn lit in
       let idx = Lits.Pos.idx pos in
-      let context = Util.array_except_idx lits idx in
+      let context = CCArray.except_idx lits idx in
       let sing,other = sing_partition ~sets a in
       match sing,other,b with
         (* don't rewrite the clause either if there is no singleton in it...*)
@@ -898,7 +898,7 @@ module Make(E : Env.S) = struct
       Util.debug 2 "try negative singleton simplification in %a" Lit.pp lit;
       let sets,a,b,_ = Lit.View.get_subseteq_exn lit in
       let idx = Lits.Pos.idx pos in
-      let context = Util.array_except_idx lits idx in
+      let context = CCArray.except_idx lits idx in
       let sing,other = sing_partition ~sets a in
       match sing,other,b with
         (* don't rewrite the clause either if there is no singleton in it...*)
@@ -937,7 +937,7 @@ module Make(E : Env.S) = struct
           in
           let new_clauses_A = List.map (create_clause_set ~sign:true) other in
           let new_clauses_B = List.map (create_clause_set ~sign:false) b in
-          let new_clauses_t = Util.list_flatmap create_clause_term t in
+          let new_clauses_t = CCList.flat_map create_clause_term t in
             new_clauses_A @ new_clauses_B @ new_clauses_t @ acc)
     in match new_clauses with
       | [] -> None
@@ -1052,7 +1052,7 @@ module Make(E : Env.S) = struct
                * context *)
               let a = List.filter (fun t -> not (FOTerm.eq sing_x t)) a in
               let idx = Lits.Pos.idx pos in
-              let cont = Util.array_except_idx (Array.of_list cont) idx in
+              let cont = CCArray.except_idx (Array.of_list cont) idx in
               cont,a@accl,b@accr
             else cont,accl,accr
           | _ -> assert false)
@@ -1069,7 +1069,7 @@ module Make(E : Env.S) = struct
                * context *)
               let a = List.filter (fun t -> not (FOTerm.eq sing_x t)) a in
               let idx = Lits.Pos.idx pos in
-              let cont = Util.array_except_idx (Array.of_list cont) idx in
+              let cont = CCArray.except_idx (Array.of_list cont) idx in
               cont,(a,b)::acc
             else cont,acc
           | _ -> assert false)
@@ -1084,12 +1084,12 @@ module Make(E : Env.S) = struct
             if FOTerm.eq t1 x then
               (* case x=t2 *)
               let idx = Lits.Pos.idx pos in
-              let cont = Util.array_except_idx (Array.of_list cont) idx in
+              let cont = CCArray.except_idx (Array.of_list cont) idx in
               cont,(TS.mk_singleton ~sets t2)::acc
             else if FOTerm.eq t2 x then
               (* case t1=x*)
               let idx = Lits.Pos.idx pos in
-              let cont = Util.array_except_idx (Array.of_list cont) idx in
+              let cont = CCArray.except_idx (Array.of_list cont) idx in
               cont,(TS.mk_singleton ~sets t1)::acc
             else cont,acc)
         in
@@ -1124,7 +1124,7 @@ module Make(E : Env.S) = struct
         (* remove x from the literal, and update the context *)
         let a' = List.filter (fun t -> not (FOTerm.eq t x)) a' in
         let idx = Lits.Pos.idx pos in
-        let ctx = Util.array_except_idx (Array.of_list ctx) idx in
+        let ctx = CCArray.except_idx (Array.of_list ctx) idx in
         ctx,(a',b')::acc'
       else ctx,acc'
     in
@@ -1137,7 +1137,7 @@ module Make(E : Env.S) = struct
         (* remove x from the literal, and update the context *)
         let a = List.filter (fun t -> not (FOTerm.eq t x)) a in
         let idx = Lits.Pos.idx pos in
-        let ctx = Util.array_except_idx (Array.of_list ctx) idx in
+        let ctx = CCArray.except_idx (Array.of_list ctx) idx in
         (* serach all the negative set literals that containt x *)
         let ctx,terms = Lits.fold_subseteq ~sign:false ~eligible
           (Array.of_list ctx) (ctx,[]) do_neg_lits
@@ -1238,7 +1238,7 @@ module Make(E : Env.S) = struct
       (fun res' lit' _ -> match lit,lit' with
         | Lit.Subseteq(_,l,r,_),Lit.Subseteq(_,l',r',_) ->
           res' ||
-          (Util.list_subset eq l l' && Util.list_subset eq r r')
+          (CCList.Set.subset ~eq l l' && CCList.Set.subset ~eq r r')
         | _ -> res'))
 
   (** reflexivity contradiction *)

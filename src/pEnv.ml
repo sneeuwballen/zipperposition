@@ -145,7 +145,7 @@ let meta_prover ~meta =
     (* scan formula *)
     let res  = MetaProverState.scan_formula meta pf in
     (* exploit result, adding lemmas to the set *)
-    let lemmas = Util.list_fmap
+    let lemmas = CCList.filter_map
       (function
         | MetaProverState.Deduced (pf', _) -> Some pf'
         | MetaProverState.Theory _ -> None)
@@ -203,7 +203,7 @@ let expand_def set pf =
     (Sequence.singleton (PF.form pf)) in
   (* make new operations on the set of formulas *)
   let premises = PF.Set.singleton pf in
-  let ops = Util.list_fmap
+  let ops = CCList.filter_map
     (function
       | Transform.RwForm frs ->
         Some (rw_form ~rule:"expand_pred_def" ~premises frs)

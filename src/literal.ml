@@ -755,13 +755,13 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ~which ~ord ~subterms lit
       acc
     end
   | Subseteq (_, l, r, _), _ ->
-    let acc = Util.list_foldi
+    let acc = CCList.Idx.foldi
       (fun acc i t ->
         let pos = P.(append position (left (arg i stop))) in
         at_term ~pos acc t
       ) acc l
     in
-    Util.list_foldi
+    CCList.Idx.foldi
       (fun acc i t ->
         let pos = P.(append position (right (arg i stop))) in
         at_term ~pos acc t

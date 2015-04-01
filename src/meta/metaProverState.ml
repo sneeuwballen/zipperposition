@@ -82,7 +82,7 @@ let map_lit_to_form p lit f =
 (* find which sources "explain" this fact *)
 let find_premises p lit =
   let lits = M.MetaReasoner.explain (M.MetaProver.reasoner p.prover) lit in
-  Util.list_fmap
+  CCList.filter_map
     (fun lit ->
       try Some (LitMap.find lit p.sources)
       with Not_found -> None)
