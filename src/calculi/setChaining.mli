@@ -64,6 +64,9 @@ module type S = sig
   val rewrite_set_neq: Env.multi_simpl_rule
     (* rewrite A!=B into A notsubseteq B or B notsubseteq A *)
 
+  val power_neg_left: Env.multi_simpl_rule
+    (* rewrite P(A) when at the left-hand side of a negative subset *)
+			 
   val singleton_pos: Env.rw_simplify_rule
     (* choice of a witness for all terms appearing in a singleton on the left
      * side of a subseteq *)

@@ -34,20 +34,21 @@ module F = Formula.FO
 module TS = Theories.Sets
 module S = Substs
 module Lits = Literals
-
+module Sko = Skolem
+		
 (** {2 Inference Rules} *)
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C
   module PS : module type of Env.ProofState
 
-  val idx_left : unit -> PS.TermIndex.t     (* terms at LHS of subseteq *)
-  val idx_right : unit -> PS.TermIndex.t    (* terms at RHS of subseteq *)
+  val idx_left : unit -> PS.TermIndex.t     (* terms at LHS of subset *)
+  val idx_right : unit -> PS.TermIndex.t    (* terms at RHS of subset *)
 
   val preprocess : Formula.FO.t -> Formula.FO.t
   (** Preprocessing of formula, during CNF, to remove most set operators,
       keeping only those of the form
-      a \cap b \cap ...  \subseteq a' \cup b' \cup ... *)
+      a \cap b \cap ...  subset a' \cup b' \cup ... *)
 
   val positive_chaining: Env.binary_inf_rule
     (* positive chaining *)
@@ -65,18 +66,25 @@ module type S = sig
     (* factoring terms that are on the left side of literals *)
 
   val rewrite_set_eq: Env.multi_simpl_rule
-    (* rewrite A=B into A subseteq B and B subseteq A *)
+    (* rewrite A=B into A subset B and B subset A *)
 
   val rewrite_set_neq: Env.multi_simpl_rule
-    (* rewrite A!=B into A notsubseteq B or B notsubseteq A *)
+    (* rewrite A!=B into A notsubset B or B notsubset A *)
+
+  val power_neg_left: Env.multi_simpl_rule
+    (* rewrite P(A) when at the left-hand side of a negative subset *)
+
+  val generate_rule: Symbol.t -> 
+
+
 
   val singleton_pos: Env.rw_simplify_rule
     (* choice of a witness for all terms appearing in a singleton on the left
-     * side of a subseteq *)
+     * side of a subset *)
 
   val singleton_neg: Env.multi_simpl_rule
     (* choice of a witness for all terms appearing in a singleton on the left
-     * side of a notsubseteq *)
+     * side of a notsubset *)
 
   val singleton_elim: Env.multi_simpl_rule
     (* eliminates a variable that appears in singletons only on the left side
@@ -91,7 +99,7 @@ module type S = sig
      * positive literal*)
 
   val is_tautology: Env.is_trivial_rule
-    (* finds tautologies of the form : A \subseteq B or A \not\subseteq B
+    (* finds tautologies of the form : A subset B or A notsubset B
      * the positive literal can have stronger constraints *)
 
   val is_absurd: Env.lit_rewrite_rule
@@ -123,9 +131,9 @@ module Make(E : Env.S) = struct
 
   let _update_idx f c =
     let ord = Ctx.ord () in
-    (* terms appearing under a subseteq *)
-    let left, right = Lits.fold_subseteq
-      ~eligible:(C.Eligible.(filter Lit.is_subseteq)) (C.lits c) (idx_left (), idx_right ())
+    (* terms appearing under a subset *)
+    let left, right = Lits.fold_subset
+      ~eligible:(C.Eligible.(filter Lit.is_subset)) (C.lits c) (idx_left (), idx_right ())
       (fun (left,right) lit position ->
         Lit.fold_terms ~position ~which:`All ~ord ~subterms:false lit (left,right)
         (fun (left,right) term pos ->
@@ -161,50 +169,55 @@ module Make(E : Env.S) = struct
     ty : Type.ty
   }
 
-  (** Preprocessing of set terms in both sides of a \subseteq
+  (** Preprocessing of set terms in both sides of a subset
       and returns a list of list of sets.
       If ~left, the result is considered as a list of intersections of sets;
       otherwise, it is a list of unions of sets
     *)
-  let rec preprocess_subseteq ~sets ~left s_list acc =
+  let rec preprocess_subset ~sets ~left s_list acc =
     match s_list with
       | s::l ->
         let vs = TS.view ~sets s in
         begin match vs with
-          | TS.Union s_list' ->
+        | TS.Power x ->
+          Util.debug 3 " --- P(x) --> P(x)";
+          preprocess_subset ~sets ~left l (List.map
+            (fun sr -> {sets = (s::sr.sets); comp = sr.comp;empty = false;
+                        ty = sr.ty}) acc)
+	| TS.Union s_list' ->
             if left then begin
-              Util.debug 3 " --- A inter (B union C) subseteq D --> %s"
-                "(A inter B subseteq D) and (A inter C subseteq D)";
+              Util.debug 3 " --- A inter (B union C) subset D --> %s"
+                "(A inter B subset D) and (A inter C subset D)";
               let rec aux l_aux acc_aux =
                 match l_aux with
-                  | h::t -> aux t ((preprocess_subseteq ~sets ~left (h::l) acc)@acc_aux)
+                  | h::t -> aux t ((preprocess_subset ~sets ~left (h::l) acc)@acc_aux)
                   | [] -> acc_aux
               in aux s_list' []
             end else begin
               Util.debug 3 " --- A union (B union C) --> A union B union C";
-              preprocess_subseteq ~sets ~left s_list' (preprocess_subseteq ~sets ~left l acc)
+              preprocess_subset ~sets ~left s_list' (preprocess_subset ~sets ~left l acc)
             end
           | TS.Inter s_list' ->
             if left then begin
               Util.debug 3 " --- A inter (B inter C) --> A inter B inter C";
-              preprocess_subseteq ~sets ~left s_list' (preprocess_subseteq ~sets ~left l acc)
+              preprocess_subset ~sets ~left s_list' (preprocess_subset ~sets ~left l acc)
             end else begin
-              Util.debug 3 " --- A subseteq B union (C inter D) --> %s"
-                "(A subseteq B union C) and (A subseteq B union D)";
+              Util.debug 3 " --- A subset B union (C inter D) --> %s"
+                "(A subset B union C) and (A subset B union D)";
               let rec aux l_aux acc_aux =
                 match l_aux with
-                  | h::t -> aux t ((preprocess_subseteq ~sets ~left (h::l) acc)@acc_aux)
+                  | h::t -> aux t ((preprocess_subset ~sets ~left (h::l) acc)@acc_aux)
                   | [] -> acc_aux
               in aux s_list' []
             end
           | TS.Diff (s1,s2) ->
             Util.debug 3 " --- A diff B --> A inter comp(B)";
-            preprocess_subseteq ~sets ~left
+            preprocess_subset ~sets ~left
               ((TS.mk_inter ~sets [s1;(TS.mk_complement ~sets s2)])::l)
               acc
           | TS.Singleton x ->
             Util.debug 3 " --- {x} --> {x}";
-            preprocess_subseteq ~sets ~left l
+            preprocess_subset ~sets ~left l
               (List.map
                 (fun sr -> {sets = (s::sr.sets);comp = sr.comp;empty = false; ty = sr.ty})
                 acc)
@@ -214,46 +227,51 @@ module Make(E : Env.S) = struct
               [{sets = []; comp = []; empty = true; ty = ty}]
             end else begin
               Util.debug 3 " --- A union empty --> A";
-              preprocess_subseteq ~sets ~left l acc
+              preprocess_subset ~sets ~left l acc
             end
           | TS.Complement s' ->
             let vs' = TS.view ~sets s' in
             begin match vs' with
+              | TS.Power x ->
+                Util.debug 3 " --- comp(P(x)) --> comp(P(x))";
+                preprocess_subset ~sets ~left l (List.map
+                 (fun sr -> {sets = (s::sr.sets); comp = sr.comp;empty = false;
+                             ty = sr.ty}) acc)
               | TS.Union s_list' ->
                 Util.debug 3 " --- comp(A union B) --> comp(A) inter comp(B)";
-                preprocess_subseteq ~sets ~left
+                preprocess_subset ~sets ~left
                   (TS.mk_inter ~sets (List.map (fun x -> TS.mk_complement ~sets x) s_list')::l)
                   acc
               | TS.Inter s_list' ->
                 Util.debug 3 " --- comp(A inter B) --> comp(A) union comp(B)";
-                preprocess_subseteq ~sets ~left
+                preprocess_subset ~sets ~left
                   (TS.mk_union ~sets (List.map (fun x -> TS.mk_complement ~sets x) s_list')::l)
                   acc
               | TS.Diff (s1,s2) ->
                 Util.debug 3 " --- comp(A diff B) --> comp(A) union B";
-                preprocess_subseteq ~sets ~left
+                preprocess_subset ~sets ~left
                   ((TS.mk_union ~sets [(TS.mk_complement ~sets s1);s2])::l)
                   acc
               | TS.Singleton x ->
                 Util.debug 3 " --- comp({x}) --> comp({x})";
-                preprocess_subseteq ~sets ~left l
+                preprocess_subset ~sets ~left l
                   (List.map
                     (fun sr -> {sets = sr.sets; comp = s'::(sr.comp); empty = false; ty = sr.ty})
                     acc)
               | TS.Emptyset ty ->
                 if left then begin
                   Util.debug 3 " --- A inter comp(empty) --> A";
-                  preprocess_subseteq ~sets ~left l acc
+                  preprocess_subset ~sets ~left l acc
                 end else begin
                   Util.debug 3 " --- A union comp(empty) --> comp(empty)";
                   [{sets = []; comp = []; empty = true; ty = ty}]
                 end
               | TS.Complement s'' ->
                 Util.debug 3 " --- comp(comp(A)) --> A";
-                preprocess_subseteq ~sets ~left (s''::l) acc
+                preprocess_subset ~sets ~left (s''::l) acc
               | TS.Other _ ->
                 Util.debug 3 " --- comp(A) --> comp(A)";
-                preprocess_subseteq ~sets ~left l
+                preprocess_subset ~sets ~left l
                   (List.map
                     (fun sr -> {sets = sr.sets; comp = s'::(sr.comp); empty = false; ty = sr.ty})
                     acc)
@@ -261,7 +279,7 @@ module Make(E : Env.S) = struct
             end
           | TS.Other _ ->
             Util.debug 3 " --- A --> A";
-            preprocess_subseteq ~sets ~left l
+            preprocess_subset ~sets ~left l
               (List.map
                 (fun sr -> {sets = s::(sr.sets); comp = sr.comp; empty = false; ty = sr.ty})
                 acc)
@@ -271,10 +289,10 @@ module Make(E : Env.S) = struct
 
   (** reconstructs the set terms
       returns a list of terms of the form
-      A \cap B \cap ... \subseteq A' \cup B' \cup ...
+      A \cap B \cap ... subset A' \cup B' \cup ...
       constructed by doing the cartesian product of left side terms and right side terms
     *)
-  let reform_subseteq ~sets left right =
+  let reform_subset ~sets left right =
     Util.debug 3 "Reconstruction...";
     let rec aux l r acc = match l,r with
       | [],_ -> acc
@@ -292,7 +310,7 @@ module Make(E : Env.S) = struct
             TS.mk_empty ~sets h.ty
           else
             TS.mk_union ~sets (h'.sets@h.comp)
-        in aux l t' (F.Base.atom ((TS.mk_subseteq ~sets h_inter h_union))::acc)
+        in aux l t' (F.Base.atom ((TS.mk_subset ~sets h_inter h_union))::acc)
     in aux left right []
 
   let rec preprocess f =
@@ -305,25 +323,25 @@ module Make(E : Env.S) = struct
         begin match vt with
           | TS.Member (x,s) ->
             Util.debug 3 "Found a set of type member -- %s"
-              "applying: x in A --> {x} subseteq A";
-            preprocess (F.Base.atom (TS.mk_subseteq ~sets (TS.mk_singleton ~sets x) s))
+              "applying: x in A --> {x} subset A";
+            preprocess (F.Base.atom (TS.mk_subset ~sets (TS.mk_singleton ~sets x) s))
+          | TS.Subsetnoteq (s1,s2) ->
+            Util.debug 3 "Found a set of type subset -- %s"
+              "applying: A subsetnoteq B --> A subset B and not(B subset A)";
+            preprocess (F.Base.and_
+                [(F.Base.atom (TS.mk_subset ~sets s1 s2));
+                 (F.Base.not_ (F.Base.atom (TS.mk_subset ~sets s2 s1)))
+                ])
           | TS.Subset (s1,s2) ->
             Util.debug 3 "Found a set of type subset -- %s"
-              "applying: A subset B --> A subseteq B and not(B subseteq A)";
-            preprocess (F.Base.and_
-                [(F.Base.atom (TS.mk_subseteq ~sets s1 s2));
-                 (F.Base.not_ (F.Base.atom (TS.mk_subseteq ~sets s2 s1)))
-                ])
-          | TS.Subseteq (s1,s2) ->
-            Util.debug 3 "Found a set of type subseteq -- %s"
-              "beginning transformation into a conjonction of subseteq clauses";
+              "beginning transformation into a conjonction of subset clauses";
             let preproc_left =
-              preprocess_subseteq ~sets ~left:true [s1]
+              preprocess_subset ~sets ~left:true [s1]
               [{sets = []; comp = []; empty = false; ty = TS.get_set_type_exn ~sets s1}]
             and preproc_right =
-              preprocess_subseteq ~sets ~left:false [s2]
+              preprocess_subset ~sets ~left:false [s2]
               [{sets = []; comp = []; empty = false; ty = TS.get_set_type_exn ~sets s2}] in
-              F.Base.and_ (reform_subseteq ~sets preproc_left preproc_right)
+              F.Base.and_ (reform_subset ~sets preproc_left preproc_right)
           | TS.Other _ -> f
           | _ -> f
         end
@@ -336,27 +354,27 @@ module Make(E : Env.S) = struct
             begin match vt with
               | TS.Member (x,s) ->
                 Util.debug 3 "Found a set of type not member -- %s"
-                  "applying x not in A --> not({x} subseteq A)";
-                let subseteq_new = TS.mk_subseteq ~sets (TS.mk_singleton ~sets x) s in
-                  preprocess (F.Base.not_ (F.Base.atom subseteq_new))
+                  "applying x not in A --> not({x} subset A)";
+                let subset_new = TS.mk_subset ~sets (TS.mk_singleton ~sets x) s in
+                  preprocess (F.Base.not_ (F.Base.atom subset_new))
+              | TS.Subsetnoteq (s1,s2) ->
+                Util.debug 3 "Found a set of type not subset -- %s"
+                  "applying not(A subsetnoteq B) --> (B subset A) or not(A subset B)";
+                preprocess (F.Base.or_
+                  [(F.Base.atom (TS.mk_subset ~sets s2 s1));
+                   (F.Base.not_ (F.Base.atom (TS.mk_subset ~sets s1 s2)))
+                  ])
               | TS.Subset (s1,s2) ->
                 Util.debug 3 "Found a set of type not subset -- %s"
-                  "applying not(A subset B) --> (B subseteq A) or not(A subseteq B)";
-                preprocess (F.Base.or_
-                  [(F.Base.atom (TS.mk_subseteq ~sets s2 s1));
-                   (F.Base.not_ (F.Base.atom (TS.mk_subseteq ~sets s1 s2)))
-                  ])
-              | TS.Subseteq (s1,s2) ->
-                Util.debug 3 "Found a set of type not subseteq -- %s"
-                  "beginning transformation into a disjonction of not subseteq clauses";
+                  "beginning transformation into a disjonction of not subset clauses";
                 let preproc_left =
-                  preprocess_subseteq ~sets ~left:true [s1]
+                  preprocess_subset ~sets ~left:true [s1]
                     [{sets = []; comp = []; empty = false; ty = TS.get_set_type_exn ~sets s1}]
                 and preproc_right =
-                  preprocess_subseteq ~sets ~left:false [s2]
+                  preprocess_subset ~sets ~left:false [s2]
                     [{sets = []; comp = []; empty = false; ty = TS.get_set_type_exn ~sets s1}] in
                   F.Base.or_ (List.map (fun x -> F.Base.not_ x)
-                    (reform_subseteq ~sets preproc_left preproc_right))
+                    (reform_subset ~sets preproc_left preproc_right))
               | TS.Other _ -> f
               | _ -> f
             end
@@ -370,49 +388,49 @@ module Make(E : Env.S) = struct
         if TS.is_set ~sets t1
         then begin
         Util.debug 3 "Found a set of type equals -- %s"
-          "applying A = B --> (A subseteq B) and (B subseteq A)";
+          "applying A = B --> (A subset B) and (B subset A)";
           preprocess (F.Base.and_
-            [(F.Base.atom (TS.mk_subseteq ~sets t1 t2));
-             (F.Base.atom (TS.mk_subseteq ~sets t2 t1))]
+            [(F.Base.atom (TS.mk_subset ~sets t1 t2));
+             (F.Base.atom (TS.mk_subset ~sets t2 t1))]
           )
         end else f
       | F.Neq (t1,t2) ->
         if TS.is_set ~sets t1
         then begin
           Util.debug 3 "Found a set of type not equals -- %s"
-            "applying A <> B --> not(A subseteq B) or not(B subseteq A)";
+            "applying A <> B --> not(A subset B) or not(B subset A)";
           preprocess (F.Base.or_
-            [(F.Base.not_ (F.Base.atom (TS.mk_subseteq ~sets t1 t2)));
-             (F.Base.not_ (F.Base.atom (TS.mk_subseteq ~sets t2 t1)))]
+            [(F.Base.not_ (F.Base.atom (TS.mk_subset ~sets t1 t2)));
+             (F.Base.not_ (F.Base.atom (TS.mk_subset ~sets t2 t1)))]
           )
         end else f
       | F.Forall (t,f') -> F.Base.__mk_forall t (preprocess f')
       | F.Exists (t,f') -> F.Base.__mk_exists t (preprocess f')
       | F.ForallTy f' -> F.Base.__mk_forall_ty (preprocess f')
 
-  (** remove the term at the given position of a subseteq literal *)
+  (** remove the term at the given position of a subset literal *)
   let remove_term_at lit pos =
     let module P = Position in
     match lit,pos with
-      | Lit.Subseteq(sets,l,r,sign), P.Left (P.Arg(i,P.Stop)) ->
+      | Lit.Subset(sets,l,r,sign), P.Left (P.Arg(i,P.Stop)) ->
         let seq = Sequence.of_list l in
-        Lit.mk_subseteq ~sign ~sets (Sequence.foldi
+        Lit.mk_subset ~sign ~sets (Sequence.foldi
           (fun l j elt -> if (i = j) then l else elt::l) [] seq) r
-      | Lit.Subseteq(sets,l,r,sign),P.Right (P.Arg(i,P.Stop)) ->
+      | Lit.Subset(sets,l,r,sign),P.Right (P.Arg(i,P.Stop)) ->
         let seq = Sequence.of_list r in
-        Lit.mk_subseteq ~sign ~sets l (Sequence.foldi
+        Lit.mk_subset ~sign ~sets l (Sequence.foldi
           (fun r j elt -> if (i = j) then r else elt::r) [] seq)
       | _,_ -> assert false
 
   let mk_eq ~sets left right =
     if TS.is_set ~sets left then
-      [Lit.mk_subseteq ~sets [left] [right];Lit.mk_subseteq ~sets [right] [left]]
+      [Lit.mk_subset ~sets [left] [right];Lit.mk_subset ~sets [right] [left]]
     else
       [Lit.mk_eq left right]
 
   let mk_neq ~sets left right =
     if TS.is_set ~sets left then
-      [Lit.mk_notsubseteq ~sets [left] [right];Lit.mk_notsubseteq ~sets [right] [left]]
+      [Lit.mk_notsubset ~sets [left] [right];Lit.mk_notsubset ~sets [right] [left]]
     else
       [Lit.mk_neq left right]
 
@@ -446,18 +464,18 @@ module Make(E : Env.S) = struct
     let lits_right = CCArray.except_idx (C.lits info.right) right_idx in
     let lits_right = Lit.apply_subst_list ~renaming subst lits_right sc_r in
     (* new literal :
-     * given lit_l = [A inter t subseteq B] and
-     *       lit_r = [A' subseteq B' union t],
+     * given lit_l = [A inter t subset B] and
+     *       lit_r = [A' subset B' union t],
      * we remove t in those literals, and then we merge them, obtaining
-     * [A inter A' subseteq B inter B'] *)
+     * [A inter A' subset B inter B'] *)
     let new_lit =
       let new_lit_left = Lit.apply_subst ~renaming subst
         (remove_term_at info.left_lit left_pos) sc_l in
       let new_lit_right = Lit.apply_subst ~renaming subst
         (remove_term_at info.right_lit right_pos) sc_r in
-      let sets,l1,r1,_ = Lit.View.get_subseteq_exn new_lit_left in
-      let _,l2,r2,_ = Lit.View.get_subseteq_exn new_lit_right in
-      Lit.mk_subseteq ~sets (l1 @ l2) (r1 @ r2) in
+      let sets,l1,r1,_ = Lit.View.get_subset_exn new_lit_left in
+      let _,l2,r2,_ = Lit.View.get_subset_exn new_lit_right in
+      Lit.mk_subset ~sets (l1 @ l2) (r1 @ r2) in
     (* construct the new clause *)
     let new_lits = new_lit :: (lits_left @ lits_right) in
     let proof cc = Proof.mk_c_inference ~theories:["sets"]
@@ -472,15 +490,15 @@ module Make(E : Env.S) = struct
   (** positive chaining on both sides of each literal of the given clause *)
   let positive_chaining c =
     let ord = Ctx.ord () in
-    let eligible = C.Eligible.(filter Lit.is_subseteq) in
-    let new_clauses = Lits.fold_subseteq ~sign:true ~eligible (C.lits c) []
+    let eligible = C.Eligible.(filter Lit.is_subset) in
+    let new_clauses = Lits.fold_subset ~sign:true ~eligible (C.lits c) []
     (fun acc lit position ->
       Util.debug 2 "try positive chaining in %a" Lit.pp lit;
       Lit.fold_terms ~position ~which:`All ~ord ~subterms:false
       lit acc
       (fun acc term pos -> match pos with
         | Position.Arg(_,Position.Left _) ->
-          (* search for all terms in the right (opposite) side of subseteq
+          (* search for all terms in the right (opposite) side of subset
            * literals that unify with the current term *)
           Util.debug 54 "current position: %a" Position.pp pos;
           I.retrieve_unifiables !_idx_right 0 term 1 acc
@@ -500,7 +518,7 @@ module Make(E : Env.S) = struct
               do_positive_chaining info acc)
             else acc)
         | Position.Arg (_,Position.Right _) ->
-          (* search for all terms in the left (opposite) side of subseteq
+          (* search for all terms in the left (opposite) side of subset
            * literals that unify with the current term *)
           Util.debug 5 "current position: %a" Position.pp pos;
           I.retrieve_unifiables !_idx_left 0 term 1 acc
@@ -559,17 +577,17 @@ module Make(E : Env.S) = struct
       let new_lit_positive = Lit.apply_subst ~renaming subst new_lit_positive sc_p in
       let new_lit_negative = remove_term_at info.negative_lit negative_pos in
       let new_lit_negative = Lit.apply_subst ~renaming subst new_lit_negative sc_n in
-      let sets,l_p,r_p,_ = Lit.View.get_subseteq_exn new_lit_positive in
-      let _,l_n,r_n,_ = Lit.View.get_subseteq_exn new_lit_negative in
+      let sets,l_p,r_p,_ = Lit.View.get_subset_exn new_lit_positive in
+      let _,l_n,r_n,_ = Lit.View.get_subset_exn new_lit_negative in
       match l_p,r_p with
-        (* if the positive literal is [t subseteq emptyset] or [universe subseteq t],
+        (* if the positive literal is [t subset emptyset] or [universe subset t],
          * we just remove t it in the negative literal *)
-        | [],[] -> [(Lit.mk_subseteq ~sign:false ~sets l_n r_n)]
+        | [],[] -> [(Lit.mk_subset ~sign:false ~sets l_n r_n)]
         (* else we perform the chaining and do the normalization on the fly *)
         | _,_ ->
           let f side_of_term acc' term =
-            if side_of_term then (Lit.mk_subseteq ~sign:false ~sets (term::l_n) r_n)::acc'
-            else (Lit.mk_subseteq ~sign:false ~sets l_n (term::r_n))::acc'
+            if side_of_term then (Lit.mk_subset ~sign:false ~sets (term::l_n) r_n)::acc'
+            else (Lit.mk_subset ~sign:false ~sets l_n (term::r_n))::acc'
           in
           List.fold_left (f true)  (List.fold_left (f false) [] l_p) r_p
     in
@@ -591,15 +609,15 @@ module Make(E : Env.S) = struct
   (** negative chaining on left side of each literal of the given clause *)
   let negative_chaining_left c =
     let ord = Ctx.ord () in
-    let eligible = C.Eligible.(filter Lit.is_subseteq) in
-    let new_clauses = Lits.fold_subseteq ~eligible (C.lits c) []
+    let eligible = C.Eligible.(filter Lit.is_subset) in
+    let new_clauses = Lits.fold_subset ~eligible (C.lits c) []
     (fun acc lit position ->
       Util.debug 2 "try negative chaining left in %a" Lit.pp lit;
       Lit.fold_terms ~position ~which:`All ~ord ~subterms:false
       lit acc
       (fun acc term pos -> match pos with
         | Position.Arg(_,Position.Left _) ->
-          (* search for all terms in the left (same) side of subseteq literals
+          (* search for all terms in the left (same) side of subset literals
            * that unify with the current term *)
           Util.debug 5 "current position: %a" Position.pp pos;
           I.retrieve_unifiables !_idx_left 0 term 1 acc
@@ -635,14 +653,14 @@ module Make(E : Env.S) = struct
   (** negative chaining on right side of each literal of the given clause *)
   let negative_chaining_right c =
     let ord = Ctx.ord () in
-    let eligible = C.Eligible.(filter Lit.is_subseteq) in
-    let new_clauses = Lits.fold_subseteq ~eligible (C.lits c) []
+    let eligible = C.Eligible.(filter Lit.is_subset) in
+    let new_clauses = Lits.fold_subset ~eligible (C.lits c) []
     (fun acc lit position ->
       Util.debug 2 "try negative chaining right in %a" Lit.pp lit;
       Lit.fold_terms ~position ~which:`All ~ord ~subterms:false
       lit acc
       (fun acc term pos -> match pos with
-      (* search for all terms in the right (same) side of subseteq literals
+      (* search for all terms in the right (same) side of subset literals
        * that unify with the current term *)
         | Position.Arg(_,Position.Right _) ->
           Util.debug 5 "current position: %a" Position.pp pos;
@@ -679,18 +697,18 @@ module Make(E : Env.S) = struct
   (** reflexivity resolution *)
   let reflexivity_res c =
     let module P = Position in
-    let eligible = C.Eligible.(filter Lit.is_subseteq) in
-    let new_clauses = Lits.fold_subseteq ~sign:false ~eligible (C.lits c) []
+    let eligible = C.Eligible.(filter Lit.is_subset) in
+    let new_clauses = Lits.fold_subset ~sign:false ~eligible (C.lits c) []
     (fun acc lit pos ->
       match lit with
-        | Lit.Subseteq(sets,l,r,_) ->
+        | Lit.Subset(sets,l,r,_) ->
           Util.debug 2 "try reflexivity res in %a" Lit.pp lit;
           let seq_l = Sequence.of_list l and seq_r = Sequence.of_list r in
           let seq = Sequence.product seq_l seq_r in
           let f acc (term_l,term_r) =
             try
               (* try to unify a term in the left side with another in the right
-               * side of a negative subseteq literal *)
+               * side of a negative subset literal *)
               let subst = Unif.FO.unification term_l 0 term_r 0 in
               let i = Lits.Pos.idx pos in
               let renaming = Ctx.renaming_clear () in
@@ -715,17 +733,17 @@ module Make(E : Env.S) = struct
   let factoring_left c =
     let module P = Position in
     let module Seq = Sequence in
-    let eligible = C.Eligible.(filter Lit.is_subseteq) in
+    let eligible = C.Eligible.(filter Lit.is_subset) in
     let lits = C.lits c in
-    let new_clauses = Lits.fold_subseteq ~sign:true ~eligible lits []
+    let new_clauses = Lits.fold_subset ~sign:true ~eligible lits []
     (fun acc lit pos ->
       let idx = Lits.Pos.idx pos in
       let lits = CCArray.except_idx lits idx in
       Lits.fold_subseteq ~sign:true ~eligible (Array.of_list lits) []
       (fun acc lit' _ ->
-        (* try the inference for each couple of positive subseteq literals *)
+        (* try the inference for each couple of positive subset literals *)
         match lit,lit' with
-        | Lit.Subseteq(sets,l,r,_),Lit.Subseteq(_,l',r',_)  ->
+        | Lit.Subset(sets,l,r,_),Lit.Subset(_,l',r',_)  ->
           Util.debug 2 "try factoring left in %a and %a" Lit.pp lit Lit.pp lit';
           let seq_l = Sequence.of_list l and seq_r = Sequence.of_list l' in
           let seq = Sequence.product seq_l seq_r in
@@ -744,18 +762,18 @@ module Make(E : Env.S) = struct
                   (* thoses cases are for when one of se sides of the considered
                    * literal is empty, to avoid not creating any literal *)
                   | [],[] ->
-                    let lit = Lit.mk_subseteq ~sign:false ~sets l' r' in
+                    let lit = Lit.mk_subset ~sign:false ~sets l' r' in
                       (Lit.apply_subst ~renaming subst lit 0)::lits
                   | [],_ ->
                     let seq = Seq.of_list r in
                     let f acc t_A =
-                      let lit = Lit.mk_subseteq ~sign:false ~sets l' (t_A::r') in
+                      let lit = Lit.mk_subset ~sign:false ~sets l' (t_A::r') in
                         (Lit.apply_subst ~renaming subst lit 0)::acc
                     in Seq.fold f lits seq
                   | _,[] ->
                     let seq = Seq.of_list l in
                     let f acc t_B =
-                      let lit = Lit.mk_subseteq ~sign:false ~sets (t_B::l') r' in
+                      let lit = Lit.mk_subset ~sign:false ~sets (t_B::l') r' in
                         (Lit.apply_subst ~renaming subst lit 0)::acc
                     in Seq.fold f lits seq
                   (* default case *)
@@ -763,7 +781,7 @@ module Make(E : Env.S) = struct
                     let seq_l = Seq.of_list l and seq_r = Seq.of_list r in
                     let seq =  Seq.product seq_l seq_r in
                     let f acc (t_A,t_B) =
-                      let lit = Lit.mk_subseteq ~sign:false ~sets (t_B::l') (t_A::r') in
+                      let lit = Lit.mk_subset ~sign:false ~sets (t_B::l') (t_A::r') in
                       (Lit.apply_subst ~renaming subst lit 0)::acc
                     in Seq.fold f lits seq
               in
@@ -780,7 +798,7 @@ module Make(E : Env.S) = struct
         | _ -> acc))
     in new_clauses
 
-  (** rewrite A=B where A and B are sets into (A subseteq B) and (B subseteq A) *)
+  (** rewrite A=B where A and B are sets into (A subset B) and (B subset A) *)
   let rewrite_set_eq c =
     let lits = C.lits c in
     let rec aux = fun lit_list idx -> match lit_list with
@@ -792,7 +810,7 @@ module Make(E : Env.S) = struct
           if TS.is_set ~sets a then begin
             Util.debug 2 "rewrite %a into:" C.pp c;
             let new_lits =
-              [Lit.mk_subseteq ~sets [a] [b];Lit.mk_subseteq ~sets [b] [a]]
+              [Lit.mk_subset ~sets [a] [b];Lit.mk_subset ~sets [b] [a]]
             in
             let context = CCArray.except_idx lits idx in
             let f lit =
@@ -809,7 +827,7 @@ module Make(E : Env.S) = struct
       end
     in aux (Array.to_list lits) 0
 
-  (** rewrite A!=B where A and B are sets into (A notsubseteq B) or (B notsubseteq A) *)
+  (** rewrite A!=B where A and B are sets into (A notsubset B) or (B notsubset A) *)
   let rewrite_set_neq c =
     let lits = C.lits c in
     let rec aux = fun lit_list idx -> match lit_list with
@@ -821,7 +839,7 @@ module Make(E : Env.S) = struct
           if TS.is_set ~sets a then
             let context = CCArray.except_idx lits idx in
             let new_lits =
-              (Lit.mk_notsubseteq ~sets [a] [b])::(Lit.mk_notsubseteq ~sets [b] [a])::context
+              (Lit.mk_notsubset ~sets [a] [b])::(Lit.mk_notsubset ~sets [b] [a])::context
             in
             let proof cc = Proof.mk_c_inference ~theories:["sets"]
               ~rule:"simplify_neq" cc [C.proof c] in
@@ -837,26 +855,78 @@ module Make(E : Env.S) = struct
 
   exception Found of Lit.t list
 
-  (** partition of a list of terms into those which are singletons (stocking only
-      the term in it) and other terms *)
+  (** extracts a powerset expression from a list of terms *)
+  let find_power ~sets terms =
+    List.fold_left
+    (fun (pow,acc) term ->
+       match TS.view ~sets term with
+       | TS.Power t ->
+	  if pow = None then (Some t,acc)
+	  else (pow,term::acc)
+       | _ -> (pow,term::acc))
+    (None,[]) terms
+			   
+  (** negative left power set rewrite rule *)
+  let power_neg_left c =
+    Util.debug 2 "try left negative powerset simplification in %a" C.pp c;
+    let lits = C.lits c in
+    let eligible = C.Eligible.(filter Lit.is_subset) in
+    let new_clauses = Lits.fold_subset ~sign:false ~eligible lits []
+    (fun acc lit pos ->
+     Util.debug 2 "try left negative powerset simplification in %a" Lit.pp lit;
+      let sets,a,b,_ = Lit.View.get_subset_exn lit in
+      let idx = Lits.Pos.idx pos in
+      let context = Util.array_except_idx lits idx in
+      let pow,other = find_power ~sets a in
+      match pow with
+      | Some t ->
+	 let ty = TS.get_set_type_exn ~sets (List.hd a) in
+	 let k = Sko.fresh_sym ~ctx:Ctx.skolem ~ty:ty in
+	 Ctx.declare k ty;
+	 (*	 Ctx.update_prec (Sequence.singleton k);*)
+	 let vars = Lit.vars lit in
+	 let k_term = FOTerm.const ~ty:ty k in
+	 let k_app = FOTerm.app k_term vars in
+	 let sing_k = TS.mk_singleton ~sets k_term in
+	 (* creates the first clause *)
+	 let proof cc = Proof.mk_c_inference ~theories:["sets"]
+           ~rule:"power_neg_left" cc [C.proof c] in
+         let lit1 = Lit.mk_subset ~sets ~sign:true [sing_k] other in
+	 let new_c1 = C.create ~parents:[c] [lit1] proof in
+	 let lit2 = Lit.mk_subset ~sets ~sign:true [k_app] [t] in
+	 let new_c2 = C.create ~parents:[c] [lit2] proof in
+	 let lit3 = Lit.mk_subset ~sets ~sign:false [sing_k] b in
+	 let new_c3 = C.create ~parents:[c] [lit3] proof in
+         Util.debug 2 "rewrite %a into the clauses:" C.pp c;
+	 Util.debug 2 "    %a" C.pp new_c1;
+	 Util.debug 2 "    %a" C.pp new_c2;
+	 Util.debug 2 "    %a" C.pp new_c3;
+         new_c1::new_c2::new_c3::acc
+      | None -> acc) in
+    match new_clauses with
+    | [] -> None
+    | _ -> Some new_clauses
+  
+  (** partition of a list of terms into those which are singletons (stocking
+      only the term in it) and other terms *)
   let sing_partition ~sets terms =
     List.fold_left
     (fun (acc_s,acc_o) term ->
        match TS.view ~sets term with
          | TS.Singleton t -> t::acc_s,acc_o
-         | TS.Other _ -> acc_s,term::acc_o
+         | TS.Power _ | TS.Other _ -> acc_s,term::acc_o
          | _ -> assert false)
     ([],[]) terms
 
   (** positive singleton rewriting rule *)
   let singleton_pos c =
     let lits = C.lits c in
-    let eligible = C.Eligible.(filter Lit.is_subseteq) in
+    let eligible = C.Eligible.(filter Lit.is_subset) in
     let module P = Position in
-    try Lits.fold_subseteq ~sign:true ~eligible lits c
+    try Lits.fold_subset ~sign:true ~eligible lits c
     (fun acc lit pos ->
       Util.debug 2 "try positive singleton simplification in %a" Lit.pp lit;
-      let sets,a,b,_ = Lit.View.get_subseteq_exn lit in
+      let sets,a,b,_ = Lit.View.get_subset_exn lit in
       let idx = Lits.Pos.idx pos in
       let context = CCArray.except_idx lits idx in
       let sing,other = sing_partition ~sets a in
@@ -867,10 +937,10 @@ module Make(E : Env.S) = struct
         | [_],[],[_] -> acc
         | h::t,_,_ ->
           let t_1 = TS.mk_singleton ~sets h in
-          (* construct the literals {t1} subseteq b, b in Bu
-           * and {t1} notsubseteq a, a in An *)
+          (* construct the literals {t1} subset b, b in Bu
+           * and {t1} notsubset a, a in An *)
           let create_lit_set ~sign acc term =
-            (Lit.mk_subseteq ~sets ~sign [t_1] [term])::acc
+            (Lit.mk_subset ~sets ~sign [t_1] [term])::acc
           in
           (* construct the literals t1 != tk *)
           let create_lit_term acc term = (mk_neq ~sets h term)@acc
@@ -891,12 +961,12 @@ module Make(E : Env.S) = struct
   (** negative singleton rewriting rule *)
   let singleton_neg c =
     let lits = C.lits c in
-    let eligible = C.Eligible.(filter Lit.is_subseteq) in
+    let eligible = C.Eligible.(filter Lit.is_subset) in
     let module P = Position in
-    let new_clauses = Lits.fold_subseteq ~sign:false ~eligible lits []
+    let new_clauses = Lits.fold_subset ~sign:false ~eligible lits []
     (fun acc lit pos ->
       Util.debug 2 "try negative singleton simplification in %a" Lit.pp lit;
-      let sets,a,b,_ = Lit.View.get_subseteq_exn lit in
+      let sets,a,b,_ = Lit.View.get_subset_exn lit in
       let idx = Lits.Pos.idx pos in
       let context = CCArray.except_idx lits idx in
       let sing,other = sing_partition ~sets a in
@@ -908,13 +978,13 @@ module Make(E : Env.S) = struct
         | h::t,_,_ ->
           Util.debug 2 "rewriting %a into :" C.pp c;
           let t_1 = TS.mk_singleton ~sets h in
-          (* construct the literals{t1} subseteq a, a in An
-           * and {t1} notsubseteq b, b in Bu
+          (* construct the literals{t1} subset a, a in An
+           * and {t1} notsubset b, b in Bu
            * and generate a clause for each literal *)
           let create_clause_set ~sign term =
             let new_lits =
-              if sign then (Lit.mk_subseteq ~sets ~sign [t_1] [term])::context
-              else (Lit.mk_subseteq ~sets ~sign [t_1] [term])::context
+              if sign then (Lit.mk_subset ~sets ~sign [t_1] [term])::context
+              else (Lit.mk_subset ~sets ~sign [t_1] [term])::context
             in
             let proof cc = Proof.mk_c_inference ~theories:["sets"]
               ~rule:"singleton_neg" cc [C.proof c] in
@@ -947,7 +1017,7 @@ module Make(E : Env.S) = struct
   let choose_var lits =
     let module Seq = Sequence in
     let ord = Ctx.ord () in
-    let eligible = C.Eligible.(filter Lit.is_subseteq) in
+    let eligible = C.Eligible.(filter Lit.is_subset) in
     (* list all variables that are not in a singleton *)
     let filter = (fun term -> match TS.view ~sets term with
       | TS.Singleton _ -> None
@@ -957,8 +1027,8 @@ module Make(E : Env.S) = struct
       Seq.fmap filter
       |> Seq.flatMap FOTerm.Seq.vars
     in
-    (* sequence of vars that appear in only one side of subseteq and
-     * notsubseteq *)
+    (* sequence of vars that appear in only one side of subset and
+     * notsubset *)
     let f (vars_l,vars_r) term pos =
       if FOTerm.is_var term then
         let neq t = not (FOTerm.eq term t) in
@@ -971,7 +1041,7 @@ module Make(E : Env.S) = struct
       else vars_l,vars_r
     in
     let vars_left,vars_right =
-      Lits.fold_subseteq_terms ~eligible ~ord lits (vars,vars) f
+      Lits.fold_subset_terms ~eligible ~ord lits (vars,vars) f
     in
     (* choose one var among the remaning ones *)
     let vars' = Seq.to_set (module FOTerm.Set) vars_left
@@ -986,7 +1056,7 @@ module Make(E : Env.S) = struct
   let choose_var_sing lits =
     let module Seq = Sequence in
     let ord = Ctx.ord () in
-    let eligible = C.Eligible.(filter Lit.is_subseteq) in
+    let eligible = C.Eligible.(filter Lit.is_subset) in
     (* list all variables that are in a singleton *)
     let filter = (fun term -> match TS.view ~sets term with
       | TS.Singleton t -> Some t
@@ -996,7 +1066,7 @@ module Make(E : Env.S) = struct
       Seq.fmap filter
       |> Seq.flatMap FOTerm.Seq.vars
     in
-    (* sequence of vars that appear in left side of subseteq and not subseteq
+    (* sequence of vars that appear in left side of subset and not subset
      * (and not in right side) *)
     let f acc term pos =
       let module P = Position in
@@ -1006,7 +1076,7 @@ module Make(E : Env.S) = struct
           Seq.filter neq acc
         | _ -> acc
     in
-    let vars = Lits.fold_subseteq_terms ~eligible ~ord lits vars f
+    let vars = Lits.fold_subset_terms ~eligible ~ord lits vars f
     in
     (* choose one var among the remaning ones *)
     let vars' = Seq.to_set (module FOTerm.Set) vars
@@ -1029,22 +1099,22 @@ module Make(E : Env.S) = struct
         List.iter (fun x -> mk_seq_sing t (accl,x::accr) k) hr;
         ()
 
-  (** eliminate variables occuring in singletons on the left side of subseteq *)
+  (** eliminate variables occuring in singletons on the left side of subset *)
   let singleton_elim c =
     Util.debug 2 "try singleton elimination in %a" C.pp c;
     let lits = C.lits c in
-    let eligible = C.Eligible.(filter Lit.is_subseteq) in
+    let eligible = C.Eligible.(filter Lit.is_subset) in
     let ord = Ctx.ord () in
     (* choose a variable that appear in a singleton, named x *)
     match choose_var_sing lits with
       | None -> None
       | Some x ->
         Util.debug 3 "variable to eliminate: %a" FOTerm.pp x;
-        (* search all the positive subseteq literals that contain {x} *)
-        let (context,posl,posr) = Lits.fold_subseteq ~sign:true ~eligible lits
+        (* search all the positive subset literals that contain {x} *)
+        let (context,posl,posr) = Lits.fold_subset ~sign:true ~eligible lits
         (Array.to_list lits,[],[])
         (fun (cont,accl,accr) lit pos -> match lit with
-          | Lit.Subseteq(sets,a,b,_) ->
+          | Lit.Subset(sets,a,b,_) ->
             let sing_x = TS.mk_singleton ~sets x in
             if List.exists (FOTerm.eq sing_x) a
             then
@@ -1057,11 +1127,11 @@ module Make(E : Env.S) = struct
             else cont,accl,accr
           | _ -> assert false)
         in
-        (* search all the negative subseteq literals that contain {x} *)
-        let context,terms_neg = Lits.fold_subseteq ~sign:false ~eligible lits
+        (* search all the negative subset literals that contain {x} *)
+        let context,terms_neg = Lits.fold_subset ~sign:false ~eligible lits
         (context,[])
         (fun (cont,acc) lit pos -> match lit with
-          | Lit.Subseteq(sets,a,b,_) ->
+          | Lit.Subset(sets,a,b,_) ->
             let sing_x = TS.mk_singleton ~sets x in
             if List.exists (FOTerm.eq sing_x) a
             then
@@ -1101,7 +1171,7 @@ module Make(E : Env.S) = struct
         (* generate the new clauses *)
         let new_clauses = Sequence.fold
         (fun new_clauses (left,right) ->
-          let new_lit = Lit.mk_subseteq ~sets left right in
+          let new_lit = Lit.mk_subset ~sets left right in
           let proof cc = Proof.mk_c_inference ~theories:["sets"]
           ~rule:"singleton_elim" ~info:[Util.sprintf "%a elimination" FOTerm.pp x]
           cc [C.proof c] in
@@ -1116,10 +1186,10 @@ module Make(E : Env.S) = struct
   (** perform the variable elimination, with the variable on the left side *)
   let do_var_elim x lits c =
     let module P = Position in
-    let eligible = C.Eligible.(filter Lit.is_subseteq) in
+    let eligible = C.Eligible.(filter Lit.is_subset) in
     (* function to treat the negative literals that contain x *)
     let do_neg_lits (ctx,acc') lit pos =
-      let _,a',b',_ = Lit.View.get_subseteq_exn lit in
+      let _,a',b',_ = Lit.View.get_subset_exn lit in
       if List.exists (FOTerm.eq x) a' then
         (* remove x from the literal, and update the context *)
         let a' = List.filter (fun t -> not (FOTerm.eq t x)) a' in
@@ -1129,17 +1199,17 @@ module Make(E : Env.S) = struct
       else ctx,acc'
     in
     (* search all the positive set literals that contain x *)
-    let context,new_lits_list = Lits.fold_subseteq ~sign:true ~eligible lits
+    let context,new_lits_list = Lits.fold_subset ~sign:true ~eligible lits
     (Array.to_list lits,[])
     (fun (ctx,acc) lit pos ->
-      let sets,a,b,_ = Lit.View.get_subseteq_exn lit in
+      let sets,a,b,_ = Lit.View.get_subset_exn lit in
       if List.exists (FOTerm.eq x) a then
         (* remove x from the literal, and update the context *)
         let a = List.filter (fun t -> not (FOTerm.eq t x)) a in
         let idx = Lits.Pos.idx pos in
         let ctx = CCArray.except_idx (Array.of_list ctx) idx in
         (* serach all the negative set literals that containt x *)
-        let ctx,terms = Lits.fold_subseteq ~sign:false ~eligible
+        let ctx,terms = Lits.fold_subset ~sign:false ~eligible
           (Array.of_list ctx) (ctx,[]) do_neg_lits
         in
         (* first step of normalization:
@@ -1149,7 +1219,7 @@ module Make(E : Env.S) = struct
         let seq = Sequence.from_iter (mk_seq_sing terms (a,b)) in
         let new_lits = Sequence.fold
           (fun acc' (left,right) ->
-            (Lit.mk_subseteq ~sets ~sign:true left right)::acc')
+            (Lit.mk_subset ~sets ~sign:true left right)::acc')
           [] seq
         in
         ctx,new_lits::acc
@@ -1157,13 +1227,13 @@ module Make(E : Env.S) = struct
     in
     let context,new_lits_list = match new_lits_list with
       | [] ->
-        let ctx,terms = Lits.fold_subseteq ~sign:false ~eligible
+        let ctx,terms = Lits.fold_subset ~sign:false ~eligible
           (lits) (Array.to_list lits,[]) do_neg_lits
         in
         let seq = Sequence.from_iter (mk_seq_sing terms ([],[])) in
         let new_lits = Sequence.fold
           (fun acc' (left,right) ->
-            (Lit.mk_subseteq ~sets ~sign:true left right)::acc')
+            (Lit.mk_subset ~sets ~sign:true left right)::acc')
           [] seq
         in
         ctx,[new_lits]
@@ -1186,14 +1256,14 @@ module Make(E : Env.S) = struct
       | [] -> None
       | _ -> Some new_clauses
 
-  (** eliminate variables occuring in subseteq;
+  (** eliminate variables occuring in subset;
       the variable must appear in the same side of each literal, and not in the
       other *)
   let var_elim c =
     Util.debug 2 "try variable elimination in %a" C.pp c;
     let module P = Position in
     let lits = C.lits c in
-    (* choose a variable that appears in a subseteq, named x *)
+    (* choose a variable that appears in a subset, named x *)
     match choose_var lits with
       | None -> None
       | Some (x,`Left) ->
@@ -1208,35 +1278,35 @@ module Make(E : Env.S) = struct
         Util.debug 3 "variable to eliminate : %a" FOTerm.pp x;
         let lits = Array.to_list lits |>
         List.map (fun lit -> match lit with
-          | Lit.Subseteq (sets,a,b,sign) when List.mem x b ->
+          | Lit.Subset (sets,a,b,sign) when List.mem x b ->
             let a = x::a in
             let b = List.filter (fun t -> not (FOTerm.eq t x)) b in
-              Lit.mk_subseteq ~sets ~sign a b
+              Lit.mk_subset ~sets ~sign a b
           | _ -> lit)
         in do_var_elim x (Array.of_list lits) c
 
   (** reflexivity tautology *)
   let reflexivity c =
     let module Seq = Sequence in
-    let eligible = C.Eligible.(filter Lit.is_subseteq) in
-    Lits.fold_subseteq ~sign:true ~eligible (C.lits c) false
+    let eligible = C.Eligible.(filter Lit.is_subset) in
+    Lits.fold_subset ~sign:true ~eligible (C.lits c) false
     (fun res lit _ ->
       res ||
       (match lit with
-        | Lit.Subseteq(_,l,r,_) ->
+        | Lit.Subset(_,l,r,_) ->
           let seq = Seq.product (Seq.of_list l) (Seq.of_list r) in
           Seq.exists (fun (a,b) -> FOTerm.eq a b) seq
         | _ -> false))
 
-  (** find the A subseteq B or A notsubseteq B tautologies *)
+  (** find the A subset B or A notsubset B tautologies *)
   let is_tautology c =
-    let eligible = C.Eligible.(filter Lit.is_subseteq) in
+    let eligible = C.Eligible.(filter Lit.is_subset) in
     let lits = C.lits c in
     let eq = FOTerm.eq in
-    Lits.fold_subseteq ~sign:false ~eligible lits false
-    (fun res lit _ -> Lits.fold_subseteq ~sign:true ~eligible lits res
+    Lits.fold_subset ~sign:false ~eligible lits false
+    (fun res lit _ -> Lits.fold_subset ~sign:true ~eligible lits res
       (fun res' lit' _ -> match lit,lit' with
-        | Lit.Subseteq(_,l,r,_),Lit.Subseteq(_,l',r',_) ->
+        | Lit.Subset(_,l,r,_),Lit.Subset(_,l',r',_) ->
           res' ||
           (CCList.Set.subset ~eq l l' && CCList.Set.subset ~eq r r')
         | _ -> res'))
@@ -1245,7 +1315,7 @@ module Make(E : Env.S) = struct
   let is_absurd lit =
     let module Seq = Sequence in
     match lit with
-      | Lit.Subseteq(_,l,r,sign) ->
+      | Lit.Subset(_,l,r,sign) ->
       if sign then lit
       else let seq = Seq.product (Seq.of_list l) (Seq.of_list r) in
         Seq.fold (fun lit (a,b) -> if FOTerm.eq a b then Lit.mk_absurd else lit)
@@ -1264,6 +1334,7 @@ module Make(E : Env.S) = struct
     Env.add_unary_inf "factoring_left" factoring_left;
     Env.add_multi_simpl_rule rewrite_set_eq;
     Env.add_multi_simpl_rule rewrite_set_neq;
+    Env.add_multi_simpl_rule power_neg_left;
     Env.add_rw_simplify singleton_pos;
     Env.add_multi_simpl_rule singleton_neg;
     Env.add_multi_simpl_rule singleton_elim;

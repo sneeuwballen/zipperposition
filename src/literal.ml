@@ -50,7 +50,7 @@ type t =
   | Prop of term * bool
   | Ineq of Theories.TotalOrder.lit
   | Arith of ArithLit.t
-  | Subseteq of Theories.Sets.t * term list * term list * bool
+  | Subset of Theories.Sets.t * term list * term list * bool
 
 let eq l1 l2 =
   match l1, l2 with
@@ -65,7 +65,7 @@ let eq l1 l2 =
       T.eq olit1.TO.left olit2.TO.left &&
       T.eq olit1.TO.right olit2.TO.right
   | Arith o1, Arith o2 -> ArithLit.eq o1 o2
-  | Subseteq (_,l1,r1,sign1), Subseteq (_,l2,r2,sign2) ->
+  | Subset (_,l1,r1,sign1), Subset (_,l2,r2,sign2) ->
       sign1 = sign2 &&
       CCList.equal T.eq l1 l2 &&
       CCList.equal T.eq r1 r2
@@ -75,7 +75,7 @@ let eq l1 l2 =
   | False, _
   | Ineq _, _
   | Arith _, _
-  | Subseteq _, _ -> false
+  | Subset _, _ -> false
 
 let eq_com l1 l2 =
   match l1, l2 with
@@ -98,7 +98,7 @@ let compare l1 l2 =
     | Prop _ -> 3
     | Ineq _ -> 4
     | Arith _ -> 5
-    | Subseteq _ -> 6
+    | Subset _ -> 6
   in
   match l1, l2 with
   | Equation (l1,r1,sign1), Equation (l2,r2,sign2) ->
@@ -113,7 +113,7 @@ let compare l1 l2 =
   | True, True
   | False, False -> 0
   | Arith o1, Arith o2 -> ArithLit.cmp o1 o2
-  | Subseteq (_,l1,r1,sign1), Subseteq (_,l2,r2,sign2) ->
+  | Subset (_,l1,r1,sign1), Subset (_,l2,r2,sign2) ->
       let c = CCList.compare T.cmp l1 l2 in
       if c <>0 then c
       else let c = CCList.compare T.cmp r1 r2 in
@@ -126,7 +126,7 @@ let fold f acc lit = match lit with
   | Prop (p, _) -> f acc p
   | Ineq olit -> f (f acc olit.TO.left) olit.TO.right
   | Arith o -> ArithLit.fold f acc o
-  | Subseteq (_, l, r, _) ->
+  | Subset (_, l, r, _) ->
       let acc = List.fold_left f acc l in
       List.fold_left f acc r
   | True
@@ -144,7 +144,7 @@ let hash_fun lit h =
   | Ineq olit ->
       h |> hash_sign olit.TO.strict
         |> T.hash_fun olit.TO.left |> T.hash_fun olit.TO.right
-  | Subseteq (_, l, r, sign) ->
+  | Subset (_, l, r, sign) ->
       h |> Hash.bool_ sign
         |> Hash.list_ T.hash_fun l
         |> Hash.list_ T.hash_fun r
@@ -165,7 +165,7 @@ let heuristic_weight weight = function
       AL.Seq.terms alit
         |> Sequence.filter (fun t -> not (T.is_var t))
         |> Sequence.fold (fun acc t -> acc + weight t) 0
-  | Subseteq (_, l, r, _) ->
+  | Subset (_, l, r, _) ->
       Sequence.(
         append (of_list l) (of_list r)
         |> fold (fun acc t -> acc+ weight t) 0
@@ -179,7 +179,7 @@ let sign = function
   | Equation (_, _, sign) -> sign
   | False -> false
   | Arith o -> ArithLit.sign o
-  | Subseteq (_, _, _, s) -> s
+  | Subset (_, _, _, s) -> s
   | Ineq _
   | True -> true
 
@@ -197,7 +197,7 @@ let is_eqn = function
   | Prop _ -> true
   | Ineq _
   | Arith _
-  | Subseteq _
+  | Subset _
   | True
   | False -> false
 
@@ -210,7 +210,7 @@ let is_prop = function
   | False -> true
   | Arith _
   | Equation _
-  | Subseteq _
+  | Subset _
   | Ineq _ -> false
 
 let is_ineq lit = match lit with
@@ -234,10 +234,13 @@ let is_arith = function
   | Arith _ -> true
   | _ -> false
 
-let is_subseteq = function
-  | Subseteq _ -> true
+let is_subset = function
+  | Subset _ -> true
+  | Arith _ -> Util.debug 2 " Arith !!!!"; false
+  | Prop _ -> Util.debug 2 " Prop !!!!"; false
   | _ -> false
 
+					     
 let _on_arith p lit = match lit with
   | Arith o -> p o
   | _ -> false
@@ -317,7 +320,7 @@ let mk_divides ?(sign=true) n ~power m =
 let mk_not_divides n ~power m = mk_divides ~sign:false n ~power m
 
 (* TODO: very basic simplifications *)
-let mk_subseteq ?(sign=true) ~sets l r =
+let mk_subset ?(sign=true) ~sets l r =
   (* sort and remove duplicates *)
   let l = List.sort T.cmp l |> CCList.Set.uniq ~eq:T.eq in
   let r =
@@ -329,9 +332,9 @@ let mk_subseteq ?(sign=true) ~sets l r =
         end
       | _ -> List.sort T.cmp r |> CCList.Set.uniq ~eq:T.eq
   in
-  Subseteq (sets, l, r, sign)
+  Subset (sets, l, r, sign)
 
-let mk_notsubseteq ~sets l r = mk_subseteq ~sign:false ~sets l r
+let mk_notsubset ~sets l r = mk_subset ~sign:false ~sets l r
 
 module Seq = struct
   let terms lit k = match lit with
@@ -339,7 +342,7 @@ module Seq = struct
     | Prop(p, _) -> k p
     | Ineq olit -> k olit.TO.left; k olit.TO.right
     | Arith o -> ArithLit.Seq.terms o k
-    | Subseteq (_, l, r, _) ->
+    | Subset (_, l, r, _) ->
         List.iter k l;
         List.iter k r
     | True
@@ -361,7 +364,7 @@ module Seq = struct
     | True -> true, Sequence.singleton T.TPTP.true_
     | False -> false, Sequence.singleton T.TPTP.true_
     | Ineq olit -> true, Sequence.of_list [olit.TO.left; olit.TO.right]
-    | Subseteq (_,l,r,sign) -> sign, (fun k -> List.iter k l; List.iter k r)
+    | Subset (_,l,r,sign) -> sign, (fun k -> List.iter k l; List.iter k r)
     | Arith o ->
       (* indexing won't really work... *)
       true, Sequence.singleton _arith_term
@@ -421,7 +424,7 @@ let unif_lits op ~subst lit1 sc1 lit2 sc2 k =
       (fun subst -> op.term ~subst olit1.TO.right sc1 olit2.TO.right sc2 k)
   | Arith o1, Arith o2 ->
     ArithLit.generic_unif op.monomes ~subst o1 sc1 o2 sc2 k
-  | Subseteq (_, l1, r1, sign1), Subseteq (_, l2, r2, sign2) ->
+  | Subset (_, l1, r1, sign1), Subset (_, l2, r2, sign2) ->
     if sign1=sign2
     then unif_lists op.term ~subst l1 sc1 l2 sc2
         (fun subst -> unif_lists op.term ~subst r1 sc1 r2 sc2 k)
@@ -431,7 +434,7 @@ let unif_lits op ~subst lit1 sc1 lit2 sc2 k =
   | False, _
   | Ineq _, _
   | Arith _, _
-  | Subseteq _, _ -> ()
+  | Subset _, _ -> ()
 
 let variant ?(subst=S.empty) lit1 sc1 lit2 sc2 k =
   let op = UnifOp.({
@@ -532,8 +535,8 @@ let map f = function
     mk_prop p' sign
   | Ineq olit -> Ineq (TO.map f olit)
   | Arith o -> Arith (ArithLit.map f o)
-  | Subseteq (sets, l, r, sign) ->
-    mk_subseteq ~sign ~sets (List.map f l) (List.map f r)
+  | Subset (sets, l, r, sign) ->
+    mk_subset ~sign ~sets (List.map f l) (List.map f r)
   | True -> True
   | False -> False
 
@@ -548,9 +551,9 @@ let apply_subst ~renaming subst lit scope =
     mk_prop p' sign
   | Ineq olit -> Ineq (TO.apply_subst ~renaming subst olit scope)
   | Arith o -> Arith (ArithLit.apply_subst ~renaming subst o scope)
-  | Subseteq (sets, l, r, sign) ->
+  | Subset (sets, l, r, sign) ->
       let f t = S.FO.apply ~renaming subst t scope in
-      mk_subseteq ~sign ~sets (List.map f l) (List.map f r)
+      mk_subset ~sign ~sets (List.map f l) (List.map f r)
   | True
   | False -> lit
 
@@ -578,7 +581,7 @@ let negate lit = match lit with
   | False -> True
   | Ineq olit -> Ineq (TO.neg olit)
   | Arith o -> Arith (ArithLit.negate o)
-  | Subseteq (sets, l, r, sign) -> Subseteq (sets, l, r, not sign)
+  | Subset (sets, l, r, sign) -> Subset (sets, l, r, not sign)
 
 let add_vars set lit = match lit with
   | Equation (l, r, _) ->
@@ -587,7 +590,7 @@ let add_vars set lit = match lit with
   | Prop (p, _) -> T.add_vars set p
   | Ineq _
   | Arith _
-  | Subseteq _ ->
+  | Subset _ ->
       Seq.terms lit (T.add_vars set)
   | True
   | False -> ()
@@ -602,7 +605,7 @@ let var_occurs v lit = match lit with
   | Equation (l,r,_) -> T.var_occurs v l || T.var_occurs v r
   | Ineq _
   | Arith _
-  | Subseteq _ -> Sequence.exists (T.var_occurs ~var:v) (Seq.terms lit)
+  | Subset _ -> Sequence.exists (T.var_occurs ~var:v) (Seq.terms lit)
   | True
   | False -> false
 
@@ -611,7 +614,7 @@ let is_ground lit = match lit with
   | Prop (p, _) -> T.is_ground p
   | Ineq _
   | Arith _
-  | Subseteq _ -> Sequence.for_all T.is_ground (Seq.terms lit)
+  | Subset _ -> Sequence.for_all T.is_ground (Seq.terms lit)
   | True
   | False -> true
 
@@ -627,7 +630,7 @@ let to_multiset lit = match lit with
   | Arith alit ->
       AL.Seq.to_multiset alit
         |> Multisets.MT.Seq.of_coeffs Multisets.MT.empty
-  | Subseteq _ ->
+  | Subset _ ->
       Seq.terms lit |> Multisets.MT.Seq.of_seq Multisets.MT.empty
 
 let is_trivial lit = match lit with
@@ -638,7 +641,7 @@ let is_trivial lit = match lit with
   | Ineq olit ->
       not olit.TO.strict && T.eq olit.TO.left olit.TO.right
   | Arith o -> ArithLit.is_trivial o
-  | Subseteq (sets, l, r, sign) ->
+  | Subset (sets, l, r, sign) ->
       if sign then
       begin match l with
         | [] -> false
@@ -677,7 +680,7 @@ let is_absurd lit = match lit with
   | Ineq olit ->
       olit.TO.strict && T.eq olit.TO.left olit.TO.right
   | Arith o -> ArithLit.is_absurd o
-  | Subseteq (sets, l, r, sign) ->
+  | Subset (sets, l, r, sign) ->
     if sign then
       begin match l with
         | [] ->
@@ -786,7 +789,7 @@ let pp_debug ?(hooks=[]) buf lit =
     Printf.bprintf buf "%a %s %a" T.pp olit.TO.left
       (if olit.TO.strict then "<" else "≤") T.pp olit.TO.right
   | Arith o -> ArithLit.pp buf o
-  | Subseteq (_, l, r, sign) ->
+  | Subset (_, l, r, sign) ->
       let _pp_inter buf l = match l with
         | [] -> Buffer.add_string buf "Ω"
         | _ -> CCList.pp ~start:"" ~stop:"" ~sep:" ∩ " T.pp buf l
@@ -797,7 +800,7 @@ let pp_debug ?(hooks=[]) buf lit =
       in
       Printf.bprintf buf "%a %s %a"
         _pp_inter l
-        (if sign then "⊆" else "⊊")
+        (if sign then "⊆" else "⊈")
         _pp_union r
 
 let pp_tstp buf lit =
@@ -815,7 +818,7 @@ let pp_tstp buf lit =
       (if olit.TO.strict then "$less" else "$lesseq")
       T.TPTP.pp olit.TO.left T.TPTP.pp olit.TO.right
   | Arith o -> ArithLit.pp_tstp buf o
-  | Subseteq _ -> failwith "cannot print set literals in TPTP"
+  | Subset _ -> failwith "cannot print set literals in TPTP"
 
 type print_hook = Buffer.t -> t -> bool
 let __hooks = ref []
@@ -847,7 +850,7 @@ module Comp = struct
     | Equation (l, r, _) -> _maxterms2 ~ord l r
     | Ineq olit -> _maxterms2 ~ord olit.TO.left olit.TO.right
     | Arith a -> ArithLit.max_terms ~ord a
-    | Subseteq _ ->
+    | Subset _ ->
       let m = to_multiset lit in
       Multisets.MT.max (Ordering.compare ord) m
         |> Multisets.MT.to_list
@@ -908,7 +911,7 @@ module Comp = struct
       | Arith (Binary (Less, _, _)) -> 5
       | Arith (Binary (Lesseq, _, _)) -> 6
       | Arith (Divides _) -> 7
-      | Subseteq _ -> 8
+      | Subset _ -> 8
       | Equation _
       | Prop _ -> 9  (* eqn and prop are really the same thing *)
     in
@@ -963,7 +966,7 @@ module Comp = struct
             C.Incomparable
             (* TODO: Bezout-normalize, then actually compare Monomes. *)
           else C.Incomparable
-    | Subseteq (_, l1,r1,sign1), Subseteq (_, l2,r2,sign2) ->
+    | Subset (_, l1,r1,sign1), Subset (_, l2,r2,sign2) ->
         assert (sign1 = sign2);
         (* l1 subset r1 < l2 subset r2, if some term of l2@r2 dominates
           all terms of l1@r1 *)
@@ -1030,10 +1033,10 @@ module Pos = struct
     | Arith(AL.Binary(_, _, m2)), P.Right (P.Arg (i, pos')) ->
         let term = try snd(Monome.nth m2 i) with _ -> _fail_lit lit pos in
         {lit_pos=P.(right @@ arg i stop); term_pos=pos'; term; }
-    | Subseteq (_, l, r, sign), P.Left (P.Arg (i, pos')) ->
+    | Subset (_, l, r, sign), P.Left (P.Arg (i, pos')) ->
         let term = try List.nth l i with _ -> _fail_lit lit pos in
         {lit_pos=P.(left (arg i stop)); term_pos=pos'; term; }
-    | Subseteq (_, l, r, sign), P.Right (P.Arg (i, pos')) ->
+    | Subset (_, l, r, sign), P.Right (P.Arg (i, pos')) ->
         let term = try List.nth r i with _ -> _fail_lit lit pos in
         {lit_pos=P.(right (arg i stop)); term_pos=pos'; term; }
     | _ -> _fail_lit lit pos
@@ -1075,12 +1078,12 @@ module Pos = struct
       let _, t = Monome.nth d.AL.monome i in
       let m' = Monome.set_term d.AL.monome i (T.Pos.replace t pos' ~by) in
       Arith (AL.mk_divides ~sign:d.AL.sign ~power:d.AL.power d.AL.num m')
-    | Subseteq (sets, l, r, sign), P.Left (P.Arg (i, pos')) ->
+    | Subset (sets, l, r, sign), P.Left (P.Arg (i, pos')) ->
       let l' = CCList.Idx.set l i (T.Pos.replace (CCList.Idx.get_exn l i) pos' ~by) in
-      mk_subseteq ~sign ~sets l' r
-    | Subseteq (sets, l, r, sign), P.Right (P.Arg (i, pos')) ->
+      mk_subset ~sign ~sets l' r
+    | Subset (sets, l, r, sign), P.Right (P.Arg (i, pos')) ->
       let r' = CCList.Idx.set r i (T.Pos.replace (CCList.Idx.get_exn r i) pos' ~by) in
-      mk_subseteq ~sign ~sets l r'
+      mk_subset ~sign ~sets l r'
     | _ -> _fail_lit lit at
 
   let root_term lit pos =
@@ -1111,7 +1114,7 @@ module Pos = struct
         Sequence.for_all
           (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
           (Monome.Seq.terms d.AL.monome)
-    | Subseteq _, _ ->
+    | Subset _, _ ->
         let t = root_term lit pos in
         Seq.terms lit
         |> Sequence.for_all
@@ -1188,9 +1191,10 @@ module Conv = struct
     let module TS = Theories.Sets in
     let (>>=) = CCOpt.(>>=) in
     let extract_lit t = match TS.view ~sets t with
-      | TS.Subseteq (a, b) ->
-          begin match TS.view ~sets a with
-          | TS.Inter l -> Some l
+      | TS.Subset (a, b) ->
+         begin match TS.view ~sets a with
+	  | TS.Inter l -> Some l
+	  | TS.Power _
           | TS.Singleton _
           | TS.Emptyset _
           | TS.Other _ -> Some [a]
@@ -1199,6 +1203,7 @@ module Conv = struct
           >>= fun l ->
           begin match TS.view ~sets b with
           | TS.Union l -> Some l
+	  | TS.Power _
           | TS.Singleton _
           | TS.Emptyset _
           | TS.Other _ -> Some [b]
@@ -1214,20 +1219,20 @@ module Conv = struct
         | F.Atom t ->
             extract_lit t
             >>= fun (l,r) ->
-            Some (mk_subseteq ~sign:false ~sets l r)
+            Some (mk_subset ~sign:false ~sets l r)
         | _ -> None
         end
     | F.Atom t ->
         extract_lit t
         >>= fun (l,r) ->
-        Some (mk_subseteq ~sets l r)
+        Some (mk_subset ~sets l r)
     | _ -> None
 
   let set_hook_to lit =
     let module TS = Theories.Sets in
     match lit with
-    | Subseteq (sets, l, r, sign) ->
-      let t = TS.mk_subseteq ~sets (TS.mk_inter ~sets l) (TS.mk_inter ~sets r) in
+    | Subset (sets, l, r, sign) ->
+      let t = TS.mk_subset ~sets (TS.mk_inter ~sets l) (TS.mk_inter ~sets r) in
       Some (F.Base.mk_atom sign t)
     | _ -> None
 
@@ -1278,7 +1283,7 @@ module Conv = struct
         in F.Base.atom p
       | Arith o ->
         ArithLit.to_form o
-      | Subseteq _ ->
+      | Subset _ ->
         failwith (Util.sprintf "cannot convert set lit %a back to a formula" pp lit)
 end
 
@@ -1290,7 +1295,7 @@ module View = struct
     | False
     | Ineq _
     | Arith _
-    | Subseteq _ -> None
+    | Subset _ -> None
 
   let get_eqn lit position =
     match lit, position with
@@ -1301,7 +1306,7 @@ module View = struct
     | False, _
     | Ineq _, _
     | Arith _, _
-    | Subseteq _, _ -> None
+    | Subset _, _ -> None
     | Equation _, _
     | Prop _, _ -> invalid_arg "get_eqn: wrong literal or position"
 
@@ -1326,11 +1331,11 @@ module View = struct
 
   let unfocus_arith x = Arith (ArithLit.Focus.unfocus x)
 
-  let get_subseteq = function
-    | Subseteq (sets, l, r, sign) -> Some (sets, l, r, sign)
+  let get_subset = function
+    | Subset (sets, l, r, sign) -> Some (sets, l, r, sign)
     | _ -> None
 
-  let get_subseteq_exn = function
-    | Subseteq (sets, l, r, sign) -> sets, l, r, sign
-    | _ -> failwith "not a subseteq"
+  let get_subset_exn = function
+    | Subset (sets, l, r, sign) -> sets, l, r, sign
+    | _ -> failwith "not a subset"
 end

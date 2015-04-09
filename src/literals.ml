@@ -261,9 +261,9 @@ module View = struct
       Lit.View.focus_arith lits.(idx) pos'
     | _ -> None
 
-  let get_subseteq lits pos = match pos with
+  let get_subset lits pos = match pos with
     | Position.Arg (idx, pos') when idx < Array.length lits ->
-      Lit.View.get_subseteq lits.(idx)
+      Lit.View.get_subset lits.(idx)
     | _ -> None
 
   let _unwrap2 ~msg f x y = match f x y with
@@ -279,8 +279,8 @@ module View = struct
   let get_arith_exn =
     _unwrap2 ~msg:"get_arith: improper position" get_arith
 
-  let get_subseteq_exn =
-    _unwrap2 ~msg:"get_subseteq: improper position" get_subseteq
+  let get_subset_exn =
+    _unwrap2 ~msg:"get_subset: improper position" get_subset
 end
 
 let order_instances lits =
@@ -304,7 +304,7 @@ let terms_under_ineq ~instance lits =
         | Lit.Equation (l, r, _) -> k l; k r
         | Lit.Prop (p, _) -> k p
         | Lit.Arith _
-        | Lit.Subseteq _
+        | Lit.Subset _
         | Lit.True
         | Lit.False -> ()
       done)
@@ -352,7 +352,7 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits acc f =
       | Lit.Equation _
       | Lit.Ineq _
       | Lit.Arith _
-      | Lit.Subseteq _
+      | Lit.Subset _
       | Lit.True
       | Lit.False -> acc
       in fold acc (i+1)
@@ -424,15 +424,16 @@ let symbols ?(init=Symbol.Set.empty) lits =
     |> Sequence.map Lit.Seq.symbols
     |> Sequence.fold Symbol.Seq.add_set Symbol.Set.empty
 
-let fold_subseteq ?sign ~eligible lits acc f =
+let fold_subset ?sign ~eligible lits acc f =
   let sign_ok = match sign with
     | None -> (fun _ -> true)
     | Some sign -> (fun sign' -> sign' = sign)
   in
   let rec fold acc i =
     if i = Array.length lits then acc
-    else if not(eligible i lits.(i)) then fold acc (i+1)
-    else match Literal.View.get_subseteq (lits.(i)) with
+    else if not(eligible i lits.(i)) then
+      fold acc (i+1)
+    else match Literal.View.get_subset (lits.(i)) with
       | None -> fold acc (i+1)
       | Some (_,_,_,s) ->
         if sign_ok s then
@@ -442,8 +443,8 @@ let fold_subseteq ?sign ~eligible lits acc f =
           fold acc (i+1)
   in fold acc 0
 
-let fold_subseteq_terms ?sign ~eligible ~ord lits acc f =
-  fold_subseteq ?sign ~eligible lits acc
+let fold_subset_terms ?sign ~eligible ~ord lits acc f =
+  fold_subset ?sign ~eligible lits acc
   (fun acc lit position ->
     Lit.fold_terms ~vars:true ~position ~which:`All ~ord ~subterms:false lit acc f)
 

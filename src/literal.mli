@@ -41,7 +41,7 @@ type t = private
   | Prop of term * bool
   | Ineq of Theories.TotalOrder.lit
   | Arith of ArithLit.t
-  | Subseteq of Theories.Sets.t * term list * term list * bool
+  | Subset of Theories.Sets.t * term list * term list * bool
 
 val eq : t -> t -> bool         (** equality of literals *)
 val eq_com : t -> t -> bool     (** commutative equality of lits *)
@@ -64,7 +64,7 @@ val is_neq : t -> bool            (** is the literal of the form a != b? *)
 val is_ineq : t -> bool
 val is_strict_ineq : t -> bool
 val is_nonstrict_ineq : t -> bool
-val is_subseteq : t -> bool
+val is_subset : t -> bool
 
 val is_ineq_of : instance:Theories.TotalOrder.t -> t -> bool
   (** [true] iff the literal is an inequation for the given total order *)
@@ -102,8 +102,8 @@ val mk_arith_lesseq : Z.t Monome.t -> Z.t Monome.t -> t
 val mk_divides : ?sign:bool -> Z.t -> power:int -> Z.t Monome.t -> t
 val mk_not_divides : Z.t -> power:int -> Z.t Monome.t -> t
 
-val mk_subseteq : ?sign:bool -> sets:Theories.Sets.t -> term list -> term list -> t
-val mk_notsubseteq : sets:Theories.Sets.t -> term list -> term list -> t
+val mk_subset : ?sign:bool -> sets:Theories.Sets.t -> term list -> term list -> t
+val mk_notsubset : sets:Theories.Sets.t -> term list -> term list -> t
 
 val matching : ?subst:Substs.t -> t -> scope -> t -> scope ->
                Substs.t Sequence.t
@@ -256,9 +256,9 @@ module View : sig
 
   val unfocus_arith : ArithLit.Focus.t -> t
 
-  val get_subseteq : t -> (Theories.Sets.t * term list * term list * bool) option
+  val get_subset : t -> (Theories.Sets.t * term list * term list * bool) option
 
-  val get_subseteq_exn : t -> Theories.Sets.t * term list * term list * bool
+  val get_subset_exn : t -> Theories.Sets.t * term list * term list * bool
 end
 
 (** {2 Conversions} *)

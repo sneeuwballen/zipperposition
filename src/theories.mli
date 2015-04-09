@@ -87,8 +87,9 @@ end
 module Sets : sig
   type t = {
     member : Symbol.t;
+    power : Symbol.t;
     subset : Symbol.t;
-    subseteq : Symbol.t;
+    subsetnoteq : Symbol.t;
     union : Symbol.t;
     inter : Symbol.t;
     diff : Symbol.t;
@@ -106,8 +107,9 @@ module Sets : sig
 
   type view = private
     | Member of term * term
+    | Power of term
     | Subset of term * term
-    | Subseteq of term * term
+    | Subsetnoteq of term * term
     | Union of term list
     | Inter of term list
     | Diff of term * term
@@ -128,7 +130,7 @@ module Sets : sig
   (** {4 constructors} *)
   val mk_member : sets:t -> term -> term -> term
   val mk_subset: sets:t -> term -> term -> term
-  val mk_subseteq: sets:t -> term -> term -> term
+  val mk_subsetnoteq: sets:t -> term -> term -> term
   val mk_union: sets:t -> term list -> term
   val mk_inter: sets:t -> term list -> term
   val mk_diff: sets:t -> term -> term -> term
