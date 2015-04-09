@@ -71,12 +71,16 @@ let is_conjecture t = Proof.is_conjecture t.proof
 let to_sourced t =
   let module F = Proof.FileInfo in
   match Proof.kind t.proof with
-  | Proof.File {F.filename=file; F.name=name} ->
+  | Proof.File {F.filename=file; F.name; } ->
       Some (Sourced.make ~file ~name ~is_conjecture:(is_conjecture t) t.form)
-  | _ -> None
+  | Proof.Inference _
+  | Proof.Simplification _
+  | Proof.Esa _
+  | Proof.Trivial  -> None
 
 let rec _follow_simpl n pf =
-  if n > 10_000 then failwith (Util.sprintf "follow_simpl loops on %a" F.pp pf.form);
+  if n > 10_000
+    then failwith (Util.sprintf "follow_simpl loops on %a" F.pp pf.form);
   match pf.simpl_to with
   | None -> pf
   | Some pf' -> _follow_simpl (n+1) pf'

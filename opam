@@ -1,0 +1,38 @@
+opam-version: "1.2"
+maintainer: "simon.cruanes@inria.fr"
+author: "Simon Cruanes"
+homepage: "https://www.rocq.inria.fr/deducteam/Zipperposition/index.html"
+build: [
+    ["./configure"
+        "--bindir" "%{bin}%"
+        "--%{conf-depqbf:enable}%-depqbf"
+        "--disable-tests"
+    ]
+    [make]
+]
+install: [make "install"]
+remove: [
+    ["ocamlfind" "remove" "libzipperposition"]
+    ["rm" "%{bin}%/zipperposition"]
+]
+depends: [
+  "ocamlfind"
+  "menhir"
+  "logtk" { >= "0.7" }
+  "containers" { >= "0.7" }
+  "gen"
+  "msat"
+  "qbf"
+  "ppx_deriving"
+]
+depopts: [
+  "conf-depqbf"
+]
+available: [
+    ocaml-version >= "4.02.1" &
+    ocaml-version < "4.03.0"
+]
+bug-reports: "https://github.com/c-cube/zipperposition/issues"
+dev-repo: "https://github.com/c-cube/zipperposition.git"
+
+

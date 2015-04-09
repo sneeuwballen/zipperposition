@@ -1,16 +1,16 @@
 # OASIS_START
-# DO NOT EDIT (digest: 6a75631cbbb24867adfa8aa23257105a)
-version = "0.4-set-dev"
+# DO NOT EDIT (digest: ffe578ae00f4b701b2d598c6bdb41e7f)
+version = "0.4-dev"
 description =
 "Superposition theorem prover, for first order logic with equality."
-requires = "unix zarith logtk dynlink"
+requires = "containers sequence unix zarith logtk dynlink"
 archive(byte) = "libzipperposition.cma"
 archive(byte, plugin) = "libzipperposition.cma"
 archive(native) = "libzipperposition.cmxa"
 archive(native, plugin) = "libzipperposition.cmxs"
 exists_if = "libzipperposition.cma"
 package "meta" (
- version = "0.4-set-dev"
+ version = "0.4-dev"
  description =
  "Superposition theorem prover, for first order logic with equality."
  requires = "libzipperposition logtk logtk.meta"

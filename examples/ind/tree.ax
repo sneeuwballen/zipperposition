@@ -1,0 +1,30 @@
+% Binary trees
+
+tff(tree_ind, type, tree : $tType, inductive(node, empty)).
+
+tff(ty_empty, type, empty:tree).
+tff(ty_node, type, node:(tree * $i * tree)> tree).
+
+tff(ty_rev, type, rev:tree > tree).
+tff(ty_size, type, size: tree>nat).
+tff(ty_subtree, type, subtree: (tree * tree) > $o).
+tff(ty_mem, type, mem: ($i * tree) > $o).
+
+tff(rev1, axiom, rev(empty) = empty).
+tff(rev2, axiom, ![L:tree, R:tree, X:$i]:
+    rev(node(L,X,R)) = node(rev(R),X,rev(L))).
+
+tff(size1, axiom, size(empty) = z).
+tff(size2, axiom, ![L:tree, R:tree, X:$i]:
+    size(node(L,X,R)) = plus(s(z), plus(size(L), size(R)))).
+
+tff(subtree1, axiom, ![T:tree]: subtree(T,T)).
+tff(subtree2, axiom, ![T:tree, X, L:tree, R:tree]:
+    (subtree(T, L) => subtree(T, node(L,X,R)))).
+tff(subtree3, axiom, ![T:tree, X, L:tree, R:tree]:
+    (subtree(T, R) => subtree(T, node(L,X,R)))).
+
+tff(mem1, axiom, ![X]: ~mem(X,empty)).
+tff(mem2, axiom, ![X, Y, L:tree, R:tree]:
+    ((mem(X,L) | mem(X,R)) => mem(X, node(L,Y,R)))).
+tff(mem3, axiom, ![X, L:tree, R:tree]: mem(X, node(L,X,R))).

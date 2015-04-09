@@ -35,7 +35,7 @@ module TS = Theories.Sets
 module S = Substs
 module Lits = Literals
 module Sko = Skolem
-		
+
 (** {2 Inference Rules} *)
 module type S = sig
   module Env : Env.S
@@ -73,10 +73,6 @@ module type S = sig
 
   val power_neg_left: Env.multi_simpl_rule
     (* rewrite P(A) when at the left-hand side of a negative subset *)
-
-  val generate_rule: Symbol.t -> 
-
-
 
   val singleton_pos: Env.rw_simplify_rule
     (* choice of a witness for all terms appearing in a singleton on the left
@@ -184,7 +180,7 @@ module Make(E : Env.S) = struct
           preprocess_subset ~sets ~left l (List.map
             (fun sr -> {sets = (s::sr.sets); comp = sr.comp;empty = false;
                         ty = sr.ty}) acc)
-	| TS.Union s_list' ->
+        | TS.Union s_list' ->
             if left then begin
               Util.debug 3 " --- A inter (B union C) subset D --> %s"
                 "(A inter B subset D) and (A inter C subset D)";
@@ -739,7 +735,7 @@ module Make(E : Env.S) = struct
     (fun acc lit pos ->
       let idx = Lits.Pos.idx pos in
       let lits = CCArray.except_idx lits idx in
-      Lits.fold_subseteq ~sign:true ~eligible (Array.of_list lits) []
+      Lits.fold_subset ~sign:true ~eligible (Array.of_list lits) []
       (fun acc lit' _ ->
         (* try the inference for each couple of positive subset literals *)
         match lit,lit' with
@@ -861,11 +857,11 @@ module Make(E : Env.S) = struct
     (fun (pow,acc) term ->
        match TS.view ~sets term with
        | TS.Power t ->
-	  if pow = None then (Some t,acc)
-	  else (pow,term::acc)
+          if pow = None then (Some t,acc)
+          else (pow,term::acc)
        | _ -> (pow,term::acc))
     (None,[]) terms
-			   
+
   (** negative left power set rewrite rule *)
   let power_neg_left c =
     Util.debug 2 "try left negative powerset simplification in %a" C.pp c;
@@ -876,37 +872,37 @@ module Make(E : Env.S) = struct
      Util.debug 2 "try left negative powerset simplification in %a" Lit.pp lit;
       let sets,a,b,_ = Lit.View.get_subset_exn lit in
       let idx = Lits.Pos.idx pos in
-      let context = Util.array_except_idx lits idx in
+      let context = CCArray.except_idx lits idx in
       let pow,other = find_power ~sets a in
       match pow with
       | Some t ->
-	 let ty = TS.get_set_type_exn ~sets (List.hd a) in
-	 let k = Sko.fresh_sym ~ctx:Ctx.skolem ~ty:ty in
-	 Ctx.declare k ty;
-	 (*	 Ctx.update_prec (Sequence.singleton k);*)
-	 let vars = Lit.vars lit in
-	 let k_term = FOTerm.const ~ty:ty k in
-	 let k_app = FOTerm.app k_term vars in
-	 let sing_k = TS.mk_singleton ~sets k_term in
-	 (* creates the first clause *)
-	 let proof cc = Proof.mk_c_inference ~theories:["sets"]
+         let ty = TS.get_set_type_exn ~sets (List.hd a) in
+         let k = Sko.fresh_sym ~ctx:Ctx.skolem ~ty:ty in
+         Ctx.declare k ty;
+         (*         Ctx.update_prec (Sequence.singleton k);*)
+         let vars = Lit.vars lit in
+         let k_term = FOTerm.const ~ty:ty k in
+         let k_app = FOTerm.app k_term vars in
+         let sing_k = TS.mk_singleton ~sets k_term in
+         (* creates the first clause *)
+         let proof cc = Proof.mk_c_inference ~theories:["sets"]
            ~rule:"power_neg_left" cc [C.proof c] in
          let lit1 = Lit.mk_subset ~sets ~sign:true [sing_k] other in
-	 let new_c1 = C.create ~parents:[c] [lit1] proof in
-	 let lit2 = Lit.mk_subset ~sets ~sign:true [k_app] [t] in
-	 let new_c2 = C.create ~parents:[c] [lit2] proof in
-	 let lit3 = Lit.mk_subset ~sets ~sign:false [sing_k] b in
-	 let new_c3 = C.create ~parents:[c] [lit3] proof in
+         let new_c1 = C.create ~parents:[c] [lit1] proof in
+         let lit2 = Lit.mk_subset ~sets ~sign:true [k_app] [t] in
+         let new_c2 = C.create ~parents:[c] [lit2] proof in
+         let lit3 = Lit.mk_subset ~sets ~sign:false [sing_k] b in
+         let new_c3 = C.create ~parents:[c] [lit3] proof in
          Util.debug 2 "rewrite %a into the clauses:" C.pp c;
-	 Util.debug 2 "    %a" C.pp new_c1;
-	 Util.debug 2 "    %a" C.pp new_c2;
-	 Util.debug 2 "    %a" C.pp new_c3;
+         Util.debug 2 "    %a" C.pp new_c1;
+         Util.debug 2 "    %a" C.pp new_c2;
+         Util.debug 2 "    %a" C.pp new_c3;
          new_c1::new_c2::new_c3::acc
       | None -> acc) in
     match new_clauses with
     | [] -> None
     | _ -> Some new_clauses
-  
+
   (** partition of a list of terms into those which are singletons (stocking
       only the term in it) and other terms *)
   let sing_partition ~sets terms =
@@ -1359,17 +1355,14 @@ let _initial_setup () =
   ()
 
 let extension =
-  let module DOIT(Env : Env.S) = struct
-    include Extensions.MakeAction(Env)
-    let actions =
-      let module Set = Make(Env) in
-      [Ext_general Set.setup]
-  end
+  let action (module Env : Env.S) =
+    let module Set = Make(Env) in
+    Set.setup ()
   in
   { Extensions.default with
     Extensions.name="set";
     Extensions.init_actions = [Extensions.Init_do _initial_setup];
-    Extensions.make=(module DOIT : Extensions.ENV_TO_S);
+    Extensions.actions = [Extensions.Do action];
   }
 
 let () =

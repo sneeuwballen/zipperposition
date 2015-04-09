@@ -178,14 +178,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 end
 
 let extension =
-  let module DoIt(Env : Env.S) = struct
-    include Extensions.MakeAction(Env)
-    module AC = Make(Env)
-    let actions = [Ext_general AC.setup]
-  end in
+  let action env =
+    let module E = (val env : Env.S) in
+    let module AC = Make(E) in
+    AC.setup ()
+  in
   Extensions.({
     default with
     name="ac";
-    penv_actions = [];
-    make = (module DoIt : ENV_TO_S);
+    actions=[Do action];
   })

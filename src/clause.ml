@@ -43,337 +43,102 @@ let prof_clause_create = Util.mk_profiler "clause_create"
 
 type scope = Substs.scope
 
-(** {2 Clauses that depend on a Context} *)
-module type S = sig
-  module Ctx : Ctx.S
-
-  (* TODO: maybe a global (weak) graph of parents/descendants
-   * would be leaner on memory? *)
-
-  type t
-  type clause = t
-
-  (** {2 Flags} *)
-
-  val flag_ground : int                       (** clause is ground *)
-  val flag_lemma : int                        (** clause is a lemma *)
-  val flag_persistent : int                   (** clause cannot be redundant *)
-
-  val set_flag : int -> t -> bool -> unit     (** set boolean flag *)
-  val get_flag : int -> t -> bool             (** get value of boolean flag *)
-  val new_flag : unit -> int                  (** new flag that can be used on clauses *)
-
-  (** {2 Basics} *)
-
-  include Interfaces.EQ with type t := t
-  include Interfaces.HASH with type t := t
-  val compare : t -> t -> int
-
-  val id : t -> int
-  val lits : t -> Literal.t array
-  val parents : t -> t list
-
-  val compact : t -> CompactClause.t (** Turn into a compact clause *)
-  val is_ground : t -> bool
-  val weight : t -> int
-
-  module CHashtbl : Hashtbl.S with type key = t
-
-  module CHashSet : sig
-    type t
-    val create : unit -> t
-    val is_empty : t -> bool
-    val member : t -> clause -> bool
-    val iter : t -> (clause -> unit) -> unit
-    val add : t -> clause -> unit
-    val to_list : t -> clause list
-  end
-
-  val is_child_of : child:t -> t -> unit
-    (** [is_child_of ~child c] is to be called to remember that [child] is a child
-        of [c], is has been infered/simplified from [c] *)
-
-  val follow_simpl : t -> t
-    (** Follow the "hcsimplto" links until the clause has None *)
-
-  val simpl_to : from:t -> into:t -> unit
-    (** [simpl_to ~from ~into] sets the link of [from] to [into], so that
-        the simplification of [from] into [into] is cached. *)
-
-  val is_conjecture : t -> bool
-    (** Looking at the clause's proof, return [true] iff the clause is an
-        initial conjecture from the problem *)
-
-  val distance_to_conjecture : t -> int option
-    (** [distance_to_conjecture c] returns [None] if [c] has no ancestor
-        that is a conjecture (including [c] itself). It returns [Some d]
-        if [d] is the distance, in the proof graph, to the closest
-        conjecture ancestor of [c] *)
-
-  module CHashcons : Hashcons.S with type elt = clause
-
-  val create : ?parents:t list -> ?selected:CCBV.t ->
-               Literal.t list ->
-               (CompactClause.t -> Proof.t) -> t
-    (** Build a new hclause from the given literals. *)
-
-  val create_a : ?parents:t list -> ?selected:CCBV.t ->
-                  Literal.t array ->
-                  (CompactClause.t -> Proof.t) -> t
-    (** Build a new hclause from the given literals. *)
-
-  val of_forms : ?parents:t list -> ?selected:CCBV.t ->
-                    Formula.FO.t list ->
-                    (CompactClause.t -> Proof.t) -> t
-    (** Directly from list of formulas *)
-
-  val of_forms_axiom : ?role:string -> file:string -> name:string ->
-                       Formula.FO.t list -> t
-    (** Construction from formulas as axiom (initial clause) *)
-
-  val proof : t -> Proof.t
-    (** Extract its proof from the clause *)
-
-  val stats : unit -> (int*int*int*int*int*int)
-    (** hashconsing stats *)
-
-  val is_empty : t -> bool
-    (** Is the clause an empty clause? *)
-
-  val length : t -> int
-    (** Number of literals *)
-
-  val descendants : t -> int SmallSet.t
-    (** set of ID of descendants of the clause *)
-
-  val apply_subst : renaming:Substs.Renaming.t -> Substs.t -> t -> scope -> t
-    (** apply the substitution to the clause *)
-
-  val maxlits : t -> scope -> Substs.t -> CCBV.t
-    (** List of maximal literals *)
-
-  val is_maxlit : t -> scope -> Substs.t -> idx:int -> bool
-    (** Is the i-th literal maximal in subst(clause)? Equivalent to
-        Bitvector.get (maxlits ~ord c subst) i *)
-
-  val eligible_res : t -> scope -> Substs.t -> CCBV.t
-    (** Bitvector that indicates which of the literals of [subst(clause)]
-        are eligible for resolution. THe literal has to be either maximal
-        among selected literals of the same sign, if some literal is selected,
-        or maximal if none is selected. *)
-
-  val eligible_param : t -> scope -> Substs.t -> CCBV.t
-    (** Bitvector that indicates which of the literals of [subst(clause)]
-        are eligible for paramodulation. That means the literal
-        is positive, no literal is selecteed, and the literal
-        is maximal among literals of [subst(clause)]. *)
-
-  val is_eligible_param : t -> scope -> Substs.t -> idx:int -> bool
-    (** Check whether the [idx]-th literal is eligible for paramodulation *)
-
-  val eligible_chaining : t -> scope -> Substs.t -> CCBV.t
-    (** Bitvector of literals of [subst(clause)] that are eligible
-        for equality chaining or inequality chaining. That amouns to being
-        a maximal, positive inequality literal within the clause,
-        and assume the clause has no selected literal. *)
-
-  val has_selected_lits : t -> bool
-    (** does the clause have some selected literals? *)
-
-  val is_selected : t -> int -> bool
-    (** check whether a literal is selected *)
-
-  val selected_lits : t -> (Literal.t * int) list
-    (** get the list of selected literals *)
-
-  val is_unit_clause : t -> bool
-    (** is the clause a unit clause? *)
-
-  val is_oriented_rule : t -> bool
-    (** Is the clause a positive oriented clause? *)
-
-  val symbols : ?init:Symbol.Set.t -> t Sequence.t -> Symbol.Set.t
-    (** symbols that occur in the clause *)
-
-  module Seq : sig
-    val lits : t -> Literal.t Sequence.t
-    val terms : t -> FOTerm.t Sequence.t
-    val vars : t -> FOTerm.t Sequence.t
-
-    val abstract : t -> (bool * FOTerm.t Sequence.t) Sequence.t
-      (** Easy iteration on an abstract view of literals *)
-  end
-
-  (** {2 Filter literals} *)
-
-  module Eligible : sig
-    type t = int -> Literal.t -> bool
-      (** Eligibility criterion for a literal *)
-
-    val res : clause -> t
-      (** Only literals that are eligible for resolution *)
-
-    val param : clause -> t
-      (** Only literals that are eligible for paramodulation *)
-
-    val chaining : clause -> t
-      (** Eligible for chaining *)
-
-    val eq : t
-      (** Equations *)
-
-    val ineq : clause -> t
-      (** Only literals that are inequations *)
-
-    val ineq_of : clause -> Theories.TotalOrder.t -> t
-      (** Only literals that are inequations for the given ordering *)
-
-    val arith : t
-
-    val filter : (Literal.t -> bool) -> t
-
-    val max : clause -> t
-      (** Maximal literals of the clause *)
-
-    val pos : t
-      (** Only positive literals *)
-
-    val neg : t
-      (** Only negative literals *)
-
-    val always : t
-      (** All literals *)
-
-    val combine : t list -> t
-      (** Logical "and" of the given eligibility criteria. A literal is
-          eligible only if all elements of the list say so. *)
-
-    val ( ** ) : t -> t -> t
-      (** Logical "and" *)
-
-    val ( ++ ) : t -> t -> t
-      (** Logical "or" *)
-
-    val ( ~~ ) : t -> t
-      (** Logical "not" *)
-  end
-
-  (** {2 Set of clauses} *)
-
-  (** Simple set *)
-  module ClauseSet : Set.S with type elt = t
-
-  (** Set with access by ID, bookeeping of maximal var... *)
-  module CSet : sig
-    (** Set of hashconsed clauses. *)
-    type t
-
-    val empty : t
-      (** the empty set *)
-
-    val is_empty : t -> bool
-      (** is the set empty? *)
-
-    val size : t -> int
-      (** number of clauses in the set *)
-
-    val add : t -> clause -> t
-      (** add the clause to the set *)
-
-    val add_list : t -> clause list -> t
-      (** add several clauses to the set *)
-
-    val remove_id : t -> int -> t
-      (** remove clause by ID *)
-
-    val remove : t -> clause -> t
-      (** remove hclause *)
-
-    val remove_list : t -> clause list -> t
-      (** remove hclauses *)
-
-    val get : t -> int -> clause
-      (** get a clause by its ID *)
-
-    val mem : t -> clause -> bool
-      (** membership test *)
-
-    val mem_id : t -> int -> bool
-      (** membership test by t ID *)
-
-    val choose : t -> clause option
-      (** Choose a clause in the set *)
-
-    val union : t -> t -> t
-      (** Union of sets *)
-
-    val inter : t -> t -> t
-      (** Intersection of sets *)
-
-    val iter : t -> (clause -> unit) -> unit
-      (** iterate on clauses in the set *)
-
-    val iteri : t -> (int -> clause -> unit) -> unit
-      (** iterate on clauses in the set with their ID *)
-
-    val fold : t -> 'b -> ('b -> int -> clause -> 'b) -> 'b
-      (** fold on clauses *)
-
-    val to_list : t -> clause list
-    val of_list : clause list -> t
-
-    val to_seq : t -> clause Sequence.t
-    val of_seq : t -> clause Sequence.t -> t
-    val remove_seq : t -> clause Sequence.t -> t
-    val remove_id_seq : t -> int Sequence.t -> t
-  end
-
-  (** {2 Position} *)
-
-  module Pos : sig
-    val at : t -> Position.t -> FOTerm.t
-  end
-
-  (** {2 Clauses with more data} *)
-
-  (** Clause within which a subterm (and its position) are hilighted *)
-  module WithPos : sig
-    type t = {
-      clause : clause;
-      pos : Position.t;
-      term : FOTerm.t;
-    }
-
-    val compare : t -> t -> int
-    val pp : Buffer.t -> t -> unit
-  end
-
-  (** {2 IO} *)
-
-  val pp : Buffer.t -> t -> unit
-  val pp_tstp : Buffer.t -> t -> unit
-  val pp_tstp_full : Buffer.t -> t -> unit  (** Print in a cnf() statement *)
-
-  val to_string : t -> string               (** Debug printing to a  string *)
-  val fmt : Format.formatter -> t -> unit   (** debug printing *)
-
-  val pp_set : Buffer.t -> CSet.t -> unit
-  val pp_set_tstp : Buffer.t -> CSet.t -> unit
-end
+module type S = Clause_intf.S
 
 (** {2 Type def} *)
 module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   module Ctx = Ctx
 
+  module Trail = struct
+    module BLit = Qbf.Lit
+    module ISet = Sequence.Set.Make(BLit)
+
+    type t = ISet.t
+
+    let equal = ISet.equal
+    let compare = ISet.compare
+    let hash_fun trail h = Hash.seq BLit.hash_fun (ISet.to_seq trail) h
+    let hash = Hash.apply hash_fun
+
+    type bool_lit = Ctx.BoolLit.t
+
+    let empty = ISet.empty
+    let mem = ISet.mem
+    let for_all = ISet.for_all
+    let exists = ISet.exists
+    let singleton = ISet.singleton
+    let add = ISet.add
+    let remove = ISet.remove
+    let map f set =
+      ISet.to_seq set
+      |> Sequence.map f
+      |> ISet.of_seq
+    let of_list = ISet.of_list
+    let to_list = ISet.to_list
+    let is_empty = ISet.is_empty
+
+    let subsumes t1 t2 = ISet.subset t1 t2
+
+    let is_trivial trail =
+      ISet.exists
+        (fun i -> ISet.mem (BLit.neg i) trail)
+        trail
+
+    let merge = function
+      | [] -> ISet.empty
+      | [t] -> t
+      | [t1;t2] -> ISet.union t1 t2
+      | t::l -> List.fold_left ISet.union t l
+
+    let filter = ISet.filter
+
+    type valuation = bool_lit -> bool
+    (** A boolean valuation *)
+
+    let compact trail =
+      ISet.fold
+        (fun i acc ->
+          let sign = BLit.sign i in
+          match Ctx.BoolLit.extract (BLit.abs i) with
+          | None -> failwith "wrong trail"
+          | Some (Ctx.BoolLit.Clause_component lits) ->
+              (sign, `Box_clause lits) :: acc
+          | Some lit ->
+              let repr = Util.on_buffer Ctx.BoolLit.pp_injected lit in
+              (sign, `Qbf_artifact (BLit.abs i, repr)) :: acc
+        ) trail []
+
+    let is_active trail ~v =
+      ISet.for_all
+        (fun i ->
+          let j = BLit.abs i in
+          (BLit.sign i) = (v j)  (* valuation match sign *)
+        ) trail
+
+    let to_seq = ISet.to_seq
+
+    let pp buf trail =
+      if not (ISet.is_empty trail)
+        then Printf.bprintf buf " ← %a"
+          (Sequence.pp_buf ~sep:" ⊓ " Ctx.BoolLit.pp) (ISet.to_seq trail)
+
+    let print fmt trail =
+      if not (ISet.is_empty trail)
+      then Format.fprintf fmt " ← @[<hov>%a@]"
+          (Sequence.pp_seq ~sep:" ⊓ " Ctx.BoolLit.print) (ISet.to_seq trail)
+  end
+
   type t = {
     hclits : Literal.t array;               (** the literals *)
     mutable hctag : int;                    (** unique ID of the clause *)
     mutable hcflags : int;                  (** boolean flags for the clause *)
-    mutable hcselected : BV.t;              (** bitvector for selected literals *)
+    mutable hcselected : BV.t;              (** bitvector for selected lits*)
     mutable hcproof : Proof.t;              (** Proof of the clause *)
     mutable hcparents : t list;             (** parents of the clause *)
-    mutable hcdescendants : int SmallSet.t ;(** the set of IDs of descendants of the clause *)
+    mutable hcdescendants : int SmallSet.t ;(** the set of IDs of descendants*)
     mutable hcsimplto : t option;           (** simplifies into the clause *)
+    mutable as_bool : Ctx.BoolLit.t option; (** boolean wrap *)
+    mutable trail : Trail.t;                (** boolean trail *)
   }
 
   type clause = t
@@ -408,11 +173,29 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let parents c = c.hcparents
 
-  let compact c = c.hclits
 
   let is_ground c = get_flag flag_ground c
 
   let weight c = Lits.weight c.hclits
+
+  let as_bool c = c.as_bool
+
+  let as_bool_exn c = match c.as_bool with
+    | None -> failwith "C.as_bool_exn"
+    | Some i -> i
+
+  let set_bool_name c i =
+    (* check consistency *)
+    begin match c.as_bool with
+      | None -> ()
+      | Some j -> if i<>j then failwith "C.set_bool_name"
+    end;
+    c.as_bool <- Some i
+
+  let get_trail c = c.trail
+  let has_trail c = not (Trail.is_empty c.trail)
+  let trail_subsumes c1 c2 = Trail.subsumes (get_trail c1) (get_trail c2)
+  let is_active c ~v = Trail.is_active c.trail ~v
 
   let lits c = c.hclits
 
@@ -471,24 +254,43 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let distance_to_conjecture c =
     Proof.distance_to_conjecture c.hcproof
 
+  (* hashconsing of clauses. Clauses are equal if they have the same literals
+      and the same trail *)
   module CHashcons = Hashcons.Make(struct
     type t = clause
-    let hash c = Lits.hash c.hclits
-    let equal c1 c2 = Lits.eq_com c1.hclits c2.hclits
+    let hash_fun c h =
+      h |> Lits.hash_fun c.hclits |> Trail.hash_fun c.trail
+    let hash c = Hash.apply hash_fun c
+    let equal c1 c2 =
+      Lits.eq_com c1.hclits c2.hclits && Trail.equal c1.trail c2.trail
     let tag i c = (assert (c.hctag = (-1)); c.hctag <- i)
   end)
 
   let __no_select = BV.empty ()
 
-  let create ?parents ?selected lits proof =
+  let on_proof = Signal.create ()
+
+  let compact_trail = Trail.compact
+
+  let compact c = CompactClause.make c.hclits (compact_trail c.trail)
+
+  let create ?parents ?selected ?trail lits proof =
     Util.enter_prof prof_clause_create;
     let lits = lits
       |> List.filter (function Lit.False -> false | _ -> true)
       |> List.sort Lit.compare
     in
     let lits = Array.of_list lits in
+    (* trail *)
+    let trail = match trail, parents with
+      | Some t, _ -> t
+      | None, None -> Trail.empty
+      | None, Some parent_list -> Trail.merge (List.map get_trail parent_list)
+    in
     (* proof *)
-    let proof' = proof lits in
+    let cc = CompactClause.make lits (compact_trail trail) in
+    let proof' = proof cc in
+    Signal.send on_proof (lits, proof');
     (* create the structure *)
     let c = {
       hclits = lits;
@@ -499,6 +301,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       hcparents = [];
       hcdescendants = SmallSet.empty ~cmp:(fun i j -> i-j);
       hcsimplto = None;
+      as_bool = None;
+      trail;
     } in
     let old_hc, c = c, CHashcons.hashcons c in
     if c == old_hc then begin
@@ -515,28 +319,34 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       | Some parents ->
         c.hcparents <- parents;
         List.iter (fun parent -> is_child_of ~child:c parent) parents
-      end
+      end;
     end;
     (* return clause *)
     Util.incr_stat stat_clause_create;
     Util.exit_prof prof_clause_create;
     c
 
-  let create_a ?parents ?selected lits proof =
-    create ?parents ?selected (Array.to_list lits) proof
+  let create_a ?parents ?selected ?trail lits proof =
+    create ?parents ?selected ?trail (Array.to_list lits) proof
 
-  let of_forms ?parents ?selected forms proof =
+  let of_forms ?parents ?selected ?trail forms proof =
     let lits = List.map Ctx.Lit.of_form forms in
-    create ?parents ?selected lits proof
+    create ?parents ?selected ?trail lits proof
 
   let of_forms_axiom ?(role="axiom") ~file ~name forms =
     let lits = List.map Lit.Conv.of_form forms in
     let proof c = Proof.mk_c_file ~role ~file ~name c in
     create lits proof
 
+  let update_trail f c =
+    let trail = f c.trail in
+    let proof cc = Proof.adapt_c c.hcproof cc in
+    create_a ~parents:c.hcparents ~trail c.hclits proof
+
   let proof c = c.hcproof
 
-  let is_empty c = Array.length c.hclits = 0
+  let is_empty c =
+    Lits.is_absurd c.hclits && Trail.is_empty c.trail
 
   let length c = Array.length c.hclits
 
@@ -862,6 +672,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let selected = c.hcselected in
     let max = maxlits c 0 S.empty in
     Buffer.add_char buf '[';
+    if Array.length c.hclits = 0 then Buffer.add_string buf "⊥";
     Util.pp_arrayi ~sep:" | "
       (fun buf i lit ->
         let annot = pp_annot selected max i in
@@ -869,6 +680,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         Buffer.add_string buf annot)
       buf c.hclits;
     Buffer.add_char buf ']';
+    Trail.pp buf c.trail;
     ()
 
   let pp_tstp buf c =
@@ -894,4 +706,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     Sequence.iter
       (fun c -> pp_tstp buf c; Buffer.add_char buf '\n')
       (CSet.to_seq set)
+
+  let fmt_set out set = Sequence.pp_seq fmt out (CSet.to_seq set)
 end

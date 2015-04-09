@@ -240,7 +240,7 @@ let is_subset = function
   | Prop _ -> Util.debug 2 " Prop !!!!"; false
   | _ -> false
 
-					     
+
 let _on_arith p lit = match lit with
   | Arith o -> p o
   | _ -> false
@@ -757,7 +757,7 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ~which ~ord ~subterms lit
       let acc = at_term ~pos:P.(append position (right stop)) acc olit.TO.right in
       acc
     end
-  | Subseteq (_, l, r, _), _ ->
+  | Subset (_, l, r, _), _ ->
     let acc = CCList.Idx.foldi
       (fun acc i t ->
         let pos = P.(append position (left (arg i stop))) in
@@ -1193,8 +1193,8 @@ module Conv = struct
     let extract_lit t = match TS.view ~sets t with
       | TS.Subset (a, b) ->
          begin match TS.view ~sets a with
-	  | TS.Inter l -> Some l
-	  | TS.Power _
+          | TS.Inter l -> Some l
+          | TS.Power _
           | TS.Singleton _
           | TS.Emptyset _
           | TS.Other _ -> Some [a]
@@ -1203,7 +1203,7 @@ module Conv = struct
           >>= fun l ->
           begin match TS.view ~sets b with
           | TS.Union l -> Some l
-	  | TS.Power _
+          | TS.Power _
           | TS.Singleton _
           | TS.Emptyset _
           | TS.Other _ -> Some [b]

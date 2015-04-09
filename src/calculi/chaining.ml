@@ -49,6 +49,8 @@ let prof_ineq_chaining_left = Util.mk_profiler "chaining.ineq_left"
 let prof_ineq_chaining_right = Util.mk_profiler "chaining.ineq_right"
 let prof_semantic_tautology = Util.mk_profiler "chaining.semantic_tauto"
 
+let section = Util.Section.make ~parent:Const.section "chaining"
+
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C
@@ -316,11 +318,11 @@ module Make(Sup : Superposition.S) = struct
         let proof cc = Proof.mk_c_inference ~theories ~rule:"eq_chain_left" cc premises in
         let parents = [active; passive] in
         let new_clause = C.create ~parents new_lits proof in
-        Util.debug 3 "eq chaining left --> %a" C.pp new_clause;
+        Util.debug ~section 3 "eq chaining left --> %a" C.pp new_clause;
         Util.incr_stat stat_eq_chaining;
         new_clause :: acc
       end else begin
-        Util.debug 3 "eq chaining left between %a at %a, and %a at %a redundant"
+        Util.debug ~section 3 "eq chaining left between %a at %a, and %a at %a redundant"
           C.pp active Position.pp active_pos C.pp passive Position.pp passive_pos;
         acc
       end
@@ -361,18 +363,18 @@ module Make(Sup : Superposition.S) = struct
         let proof cc = Proof.mk_c_inference ~theories ~rule:"eq_chain_right" cc premises in
         let parents = [active; passive] in
         let new_clause = C.create ~parents new_lits proof in
-        Util.debug 3 "eq chaining right --> %a" C.pp new_clause;
+        Util.debug ~section 3 "eq chaining right --> %a" C.pp new_clause;
         Util.incr_stat stat_eq_chaining;
         new_clause :: acc
       end else begin
-        Util.debug 3 "eq chaining right between %a at %a, and %a at %a redundant"
+        Util.debug ~section 3 "eq chaining right between %a at %a, and %a at %a redundant"
           C.pp active Position.pp active_pos C.pp passive Position.pp passive_pos;
         acc
       end
 
   (* perform equality chaining *)
   let do_eq_chaining active s_a active_pos passive s_p passive_pos subst acc =
-    Util.debug 5 "try eq chaining with %a at %a and %a at %a" C.pp active
+    Util.debug ~section 5 "try eq chaining with %a at %a and %a at %a" C.pp active
       Position.pp active_pos C.pp passive Position.pp passive_pos;
     match passive_pos with
     | Position.Arg(_, Position.Left _) ->
@@ -445,7 +447,7 @@ module Make(Sup : Superposition.S) = struct
 
   (* inequality chaining between two clauses *)
   let do_ineq_chaining left s_left left_pos right s_right right_pos subst acc =
-    Util.debug 5 "ineq_chaining between %a at %a and %a at %a" C.pp left
+    Util.debug ~section 5 "ineq_chaining between %a at %a and %a at %a" C.pp left
       Position.pp left_pos C.pp right Position.pp right_pos;
     let signature = Ctx.signature () in
     let instance = (Lits.View.get_ineq_exn (C.lits left) left_pos).TO.order in
@@ -460,8 +462,8 @@ module Make(Sup : Superposition.S) = struct
     let right_pos_list, subst =
       _gather_positions ~eligible:(eligible right) ~signature
       (C.lits right) s_right right_pos subst in
-    Util.debug 5 "positions for left: [%a]" (Util.pp_list Position.pp) left_pos_list;
-    Util.debug 5 "positions for right: [%a]" (Util.pp_list Position.pp) right_pos_list;
+    Util.debug ~section 5 "positions for left: [%a]" (Util.pp_list Position.pp) left_pos_list;
+    Util.debug ~section 5 "positions for right: [%a]" (Util.pp_list Position.pp) right_pos_list;
     (* check ordering conditions. Note that the conditions are inversed w.r.t
       equality chaining (ie, in left clause, right hand side terms must
       be maximal, and conversely *)
@@ -502,12 +504,12 @@ module Make(Sup : Superposition.S) = struct
         let premises = [C.proof left; C.proof right] in (* instance.TO.proof *)
         let proof cc = Proof.mk_c_inference ~theories ~rule cc premises in
         let new_clause = C.create ~parents:[left;right] lits proof in
-        Util.debug 3 "ineq_chaining of %a and %a gives %a"
+        Util.debug ~section 3 "ineq_chaining of %a and %a gives %a"
           C.pp left C.pp right C.pp new_clause;
         Util.incr_stat stat_ineq_chaining;
         new_clause :: acc
       end else
-        let () = Util.debug 5 "ordering conditions won't do." in
+        let () = Util.debug ~section 5 "ordering conditions won't do." in
         acc
 
   (* inequality chaining, where [c] is on the left (which means terms on
@@ -520,7 +522,7 @@ module Make(Sup : Superposition.S) = struct
       (fun acc ord_lit lit_pos ->
         let s1 = ord_lit.TO.right in
         let left_pos = Position.(append lit_pos (right stop)) in
-        Util.debug 5 "try left ineq chaining with %a at %a" C.pp c Position.pp left_pos;
+        Util.debug ~section 5 "try left ineq chaining with %a at %a" C.pp c Position.pp left_pos;
         I.retrieve_unifiables !_idx_ord_left 1 s1 0 acc
           (fun acc t1 with_pos subst ->
             let right = with_pos.C.WithPos.clause in
@@ -539,7 +541,7 @@ module Make(Sup : Superposition.S) = struct
       (fun acc ord_lit lit_pos ->
         let t1 = ord_lit.TO.left in
         let right_pos = Position.(append lit_pos (left stop)) in
-        Util.debug 5 "try right ineq chaining with %a at %a" C.pp c Position.pp right_pos;
+        Util.debug ~section 5 "try right ineq chaining with %a at %a" C.pp c Position.pp right_pos;
         I.retrieve_unifiables !_idx_ord_right 1 t1 0 acc
           (fun acc s1 with_pos subst ->
             let left = with_pos.C.WithPos.clause in
@@ -566,7 +568,7 @@ module Make(Sup : Superposition.S) = struct
             let rule = "reflexivity_res" in
             let proof cc = Proof.mk_c_inference ~theories ~rule cc premises in
             let new_c = C.create ~parents:[c] lits proof in
-            Util.debug 3 "reflexivity res of %a gives %a" C.pp c C.pp new_c;
+            Util.debug ~section 3 "reflexivity res of %a gives %a" C.pp c C.pp new_c;
             new_c :: acc
           with Unif.Fail -> acc
         else acc)
@@ -633,7 +635,7 @@ module Make(Sup : Superposition.S) = struct
     in
     if res then begin
       Util.incr_stat stat_semantic_tautology;
-      Util.debug 2 "%a is a chaining semantic tautology" C.pp c;
+      Util.debug ~section 2 "%a is a chaining semantic tautology" C.pp c;
       end;
     Util.exit_prof prof_semantic_tautology;
     res
@@ -665,7 +667,7 @@ module Make(Sup : Superposition.S) = struct
         let rule = "total_order_simplify" in
         let proof cc = Proof.mk_c_inference ~theories ~rule cc (C.proof c :: proofs) in
         let new_c = C.create ~parents:[c] lits proof in
-        Util.debug 3 "total_order_simplify %a into %a" C.pp c C.pp new_c;
+        Util.debug ~section 3 "total_order_simplify %a into %a" C.pp c C.pp new_c;
         new_c
       end else
         c
@@ -676,7 +678,7 @@ module Make(Sup : Superposition.S) = struct
   (** {2 Env} *)
 
   let _setup_rules () =
-    Util.debug 3 "setup chaining inferences";
+    Util.debug ~section 3 "setup chaining inferences";
     Env.add_is_trivial is_tautology;
     Env.add_is_trivial is_semantic_tautology;
     Env.add_simplify simplify;
@@ -695,7 +697,7 @@ module Make(Sup : Superposition.S) = struct
     ()
 
   let add_order ?proof ~less ~lesseq ~ty =
-    Util.debug 1 "enable chaining for order %a, %a (type %a)"
+    Util.debug ~section 1 "enable chaining for order %a, %a (type %a)"
       Symbol.pp less Symbol.pp lesseq Type.pp ty;
     (* declare instance *)
     let instance, is_new = Ctx.Theories.TotalOrder.add ?proof ~less ~lesseq ~ty in
@@ -707,7 +709,7 @@ module Make(Sup : Superposition.S) = struct
     ()
 
   let add_tstp_order () =
-    Util.debug 1 "enable chaining for TSTP order";
+    Util.debug ~section 1 "enable chaining for TSTP order";
     (* add instance *)
     _setup_rules_if_first ();
     let instance, is_new = Ctx.Theories.TotalOrder.add_tstp () in
@@ -719,7 +721,7 @@ module Make(Sup : Superposition.S) = struct
     ()
 
   let register () =
-    Util.debug 2 "register chaining...";
+    Util.debug ~section 2 "register chaining...";
     let signal = Ctx.Theories.TotalOrder.on_add in
     (* XXX: indexing active clauses upon signal? too late, probably
         (active set isn't fully saturated, and literals haven't been
@@ -740,33 +742,31 @@ let setup_penv penv =
   ()
 
 let extension =
-  let module DOIT(Env : Env.S) = struct
-    include Extensions.MakeAction(Env)
-    let actions =
-      try
-        let sup = Mixtbl.find ~inj:Superposition.key Env.mixtbl "superposition" in
-        let module Sup = (val sup : Superposition.S) in
-        let module Chaining = Make(Sup) in
-        [Ext_general Chaining.register]
-      with Not_found ->
-        Printf.eprintf "Chaining needs Superposition to work";
-        exit 1
-  end
+  let action env =
+    let module E = (val env : Env.S) in
+    try
+      let sup = Mixtbl.find ~inj:Superposition.key E.mixtbl "superposition" in
+      let module Sup = (val sup : Superposition.S) in
+      let module Chaining = Make(Sup) in
+      Chaining.register ()
+    with Not_found ->
+      Printf.eprintf "Chaining needs Superposition to work";
+      exit 1
   in
   { Extensions.default with
     Extensions.name="chaining";
-    Extensions.penv_actions = [Extensions.Ext_penv_do setup_penv];
-    Extensions.make=(module DOIT : Extensions.ENV_TO_S);
+    Extensions.penv_actions = [Extensions.Penv_do setup_penv];
+    Extensions.actions = [Extensions.Do action];
   }
 
 let () =
   Params.add_opts
     [ "-chaining"
     , Arg.Unit (fun () -> Extensions.register extension)
-    , "enable chaining"
+    , " enable chaining"
     ; "-chaining-tptp"
     , Arg.Unit (fun () -> Extensions.register extension; __add_tptp_order := true)
-    , "enable TPTP standard ordering $less,$lesseq"
+    , " enable TPTP standard ordering $less,$lesseq"
     ];
   ()
 

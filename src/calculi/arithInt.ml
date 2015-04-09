@@ -73,6 +73,7 @@ let prof_arith_trivial_ineq = Util.mk_profiler "arith.redundant_by_ineq"
 let prof_arith_reflexivity_resolution = Util.mk_profiler "arith.reflexivity_resolution"
 *)
 
+let section = Util.Section.make ~parent:Const.section "arith"
 
 module type S = sig
   module Env : Env.S
@@ -310,7 +311,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let s_a = info.active_scope and s_p = info.passive_scope in
     let lit_a = ALF.apply_subst ~renaming subst info.active_lit s_a in
     let lit_p = ALF.apply_subst ~renaming subst info.passive_lit s_p in
-    Util.debug 5 "arith superposition between %a[%d] and %a[%d] (subst %a)..."
+    Util.debug ~section 5 "arith superposition between %a[%d] and %a[%d] (subst %a)..."
       C.pp info.active s_a C.pp info.passive s_p Substs.pp subst;
     (* check ordering conditions *)
     if C.is_maxlit info.active s_a subst idx_a
@@ -351,11 +352,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         ~info:[Substs.to_string subst; Util.sprintf "lhs(%a)" MF.pp mf_a]
         ~rule:"canc_sup" cc [C.proof info.active; C.proof info.passive] in
       let new_c = C.create ~parents:[info.active;info.passive] all_lits proof in
-      Util.debug 5 "... gives %a" C.pp new_c;
+      Util.debug ~section 5 "... gives %a" C.pp new_c;
       Util.incr_stat stat_arith_sup;
       new_c :: acc
     end else begin
-      Util.debug 5 "... has bad ordering conditions";
+      Util.debug ~section 5 "... has bad ordering conditions";
       acc
     end
 
@@ -367,13 +368,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     let res = Lits.fold_arith_terms ~eligible ~which:`Max ~ord (C.lits c) []
       (fun acc t active_lit active_pos ->
         assert (ALF.op active_lit = `Binary AL.Equal);
-        Util.debug 5 "active canc. sup. with %a in %a" ALF.pp active_lit C.pp c;
+        Util.debug ~section 5 "active canc. sup. with %a in %a" ALF.pp active_lit C.pp c;
         PS.TermIndex.retrieve_unifiables !_idx_all sc_p t sc_a acc
           (fun acc t' with_pos subst ->
             let passive = with_pos.C.WithPos.clause in
             let passive_pos = with_pos.C.WithPos.pos in
             let passive_lit = Lits.View.get_arith_exn (C.lits passive) passive_pos in
-            Util.debug 5 "  possible match: %a in %a" ALF.pp passive_lit C.pp passive;
+            Util.debug ~section 5 "  possible match: %a in %a" ALF.pp passive_lit C.pp passive;
             (* now to unify active_lit and passive_lit further *)
             if T.is_var t || T.is_var t'
             then acc
@@ -399,7 +400,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let sc_a = 0 and sc_p = 1 in
     let res = Lits.fold_arith_terms ~eligible ~which:`All ~ord (C.lits c) []
       (fun acc t passive_lit passive_pos ->
-        Util.debug 5 "passive canc. sup. with %a in %a" ALF.pp passive_lit C.pp c;
+        Util.debug ~section 5 "passive canc. sup. with %a in %a" ALF.pp passive_lit C.pp c;
         PS.TermIndex.retrieve_unifiables !_idx_eq sc_a t sc_p acc
           (fun acc t' with_pos subst ->
             let active = with_pos.C.WithPos.clause in
@@ -408,7 +409,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             (* must have an equation as active lit *)
             match ALF.op active_lit with
             | `Binary AL.Equal when not (T.is_var t) && not (T.is_var t') ->
-              Util.debug 5 "  possible match: %a in %a" ALF.pp passive_lit C.pp c;
+              Util.debug ~section 5 "  possible match: %a in %a" ALF.pp passive_lit C.pp c;
               (* unify literals further *)
               ALF.unify ~subst active_lit sc_a passive_lit sc_p
               |> Sequence.fold
@@ -438,7 +439,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       - the rewriting term must be bigger than other terms
         (in other words, the inference is strictly decreasing)
       - all variables of active clause must be bound by subst
-      - must not rewrite itself (c != c') *)
+      - must not rewrite itself (c != c')
+      - trail(active) must subsume trail(passive) *)
     if ALF.is_strictly_max ~ord active_lit'
     && (C.Seq.vars c'
         |> Sequence.for_all (fun v -> S.mem subst (v:T.t:>ScopedTerm.t) s_a))
@@ -446,6 +448,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         || not(Lit.eq (C.lits c).(i) (C.lits c').(0))
         || not(ALF.is_max ~ord passive_lit && C.is_maxlit c 0 S.empty ~idx:i)
       )
+    && (C.trail_subsumes c' c)
     then (
       (* we know all variables of [active_lit] are bound, no need
         for a renaming *)
@@ -508,7 +511,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* lit ----> lit' *)
       add_premise c';
       (* recurse until the literal isn't reducible *)
-      Util.debug 4 "rewrite arith lit (%a) into (%a)\n%% using clause %a and subst %a"
+      Util.debug ~section 4 "rewrite arith lit (%a) into (%a)\n%% using clause %a and subst %a"
         AL.pp a_lit AL.pp a_lit' C.pp c' S.pp subst;
       _demod_lit_nf ~add_premise ~add_lit ~i c a_lit'
     end
@@ -542,7 +545,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           cc (C.proof c :: List.map C.proof !clauses) in
         let new_c = C.create ~parents:(c::!clauses) (List.rev !lits) proof in
         Util.incr_stat stat_arith_demod;
-        Util.debug 5 "arith demodulation of %a with [%a] gives %a"
+        Util.debug ~section 5 "arith demodulation of %a with [%a] gives %a"
           C.pp c (Util.pp_list C.pp) !clauses C.pp new_c;
         new_c
       ) else c
@@ -565,14 +568,15 @@ module Make(E : Env.S) : S with module Env = E = struct
           (fun acc t pos ->
             PS.TermIndex.retrieve_specializations !_idx_all 0 t 1 acc
               (fun acc _t' with_pos subst ->
+                let c' = with_pos.C.WithPos.clause in
                 (* check whether the term [t] is indeed maximal in
                   its literal (and clause) after substitution *)
                 let alit' = ALF.get_exn alit pos in
                 let alit' = ALF.apply_subst_no_renaming subst alit' 1 in
-                if ALF.is_max ~ord alit'
+                if C.trail_subsumes c' c && ALF.is_max ~ord alit'
                 then (
                   Util.incr_stat stat_arith_backward_demod;
-                  C.CSet.add acc with_pos.C.WithPos.clause
+                  C.CSet.add acc c'
                 ) else acc
               ))
       | [| Lit.Arith (AL.Binary (AL.Lesseq, m1, m2)) |] ->
@@ -594,7 +598,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         (* cancellation depends on what the literal looks like *)
         match a_lit with
         | AL.Binary (op, m1, m2) ->
-            Util.debug 5 "try cancellation in %a" AL.pp a_lit;
+            Util.debug ~section 5 "try cancellation in %a" AL.pp a_lit;
             (* try to unify terms in [m1] and [m2] *)
             MF.unify_mm m1 0 m2 0
             |> Sequence.fold
@@ -602,7 +606,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 let renaming = Ctx.renaming_clear () in
                 let mf1' = MF.apply_subst ~renaming subst mf1 0 in
                 let mf2' = MF.apply_subst ~renaming subst mf2 0 in
-                Util.debug 5 "... candidate: %a (max lit ? %B)" S.pp subst (C.is_maxlit c 0 subst ~idx);
+                Util.debug ~section 5 "... candidate: %a (max lit ? %B)" S.pp subst (C.is_maxlit c 0 subst ~idx);
                 if C.is_maxlit c 0 subst ~idx
                 && MF.is_max ~ord mf1' && MF.is_max ~ord mf2'
                 then begin
@@ -615,7 +619,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     ~info:[Substs.to_string subst] ~theories
                     ~rule:"cancellation" cc [C.proof c] in
                   let new_c = C.create ~parents:[c] all_lits proof in
-                  Util.debug 3 "cancellation of %a (with %a) into %a" C.pp c
+                  Util.debug ~section 3 "cancellation of %a (with %a) into %a" C.pp c
                     Substs.pp subst C.pp new_c;
                   Util.incr_stat stat_arith_cancellation;
                   new_c :: acc
@@ -623,7 +627,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   acc
               ) acc
         | AL.Divides d ->
-            Util.debug 5 "try cancellation in %a" AL.pp a_lit;
+            Util.debug ~section 5 "try cancellation in %a" AL.pp a_lit;
             MF.unify_self_monome d.AL.monome 0
             |> Sequence.fold
               (fun acc (mf, subst) ->
@@ -642,7 +646,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     ~info:[Substs.to_string subst] ~theories
                     ~rule:"cancellation" cc [C.proof c] in
                   let new_c = C.create ~parents:[c] all_lits proof in
-                  Util.debug 3 "cancellation of %a (with %a) into %a" C.pp c
+                  Util.debug ~section 3 "cancellation of %a (with %a) into %a" C.pp c
                     Substs.pp subst C.pp new_c;
                   Util.incr_stat stat_arith_cancellation;
                   new_c :: acc
@@ -672,7 +676,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             try
               if idx1 = idx2 then raise Unif.Fail;  (* exit *)
               let subst = Unif.FO.unification t1 0 t2 0 in
-              Util.debug 5
+              Util.debug ~section 5
                 "arith canc. eq. factoring: possible match in %a (at %d, %d)"
                 C.pp c idx1 idx2;
               MF.unify_ff ~subst mf1 0 mf2 0
@@ -708,7 +712,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                              Util.sprintf "idx(%d,%d)" idx1 idx2]
                       ~rule:"arith_eq_factoring" cc [C.proof c] in
                     let new_c = C.create all_lits proof in
-                    Util.debug 5 "arith_eq_factoring: %a gives %a" C.pp c C.pp new_c;
+                    Util.debug ~section 5 "arith_eq_factoring: %a gives %a" C.pp c C.pp new_c;
                     Util.incr_stat stat_arith_eq_factoring;
                     new_c :: acc
                   end else acc
@@ -756,7 +760,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let s_l = info.left_scope and s_r = info.right_scope in
     let lit_l = ALF.apply_subst ~renaming subst info.left_lit s_l in
     let lit_r = ALF.apply_subst ~renaming subst info.right_lit s_r in
-    Util.debug 5 "arith chaining between %a[%d] and %a[%d] (subst %a)..."
+    Util.debug ~section 5 "arith chaining between %a[%d] and %a[%d] (subst %a)..."
       C.pp info.left s_l C.pp info.right s_r Substs.pp subst;
     (* check ordering conditions *)
     if C.is_maxlit info.left s_l subst idx_l
@@ -787,7 +791,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 ; Util.sprintf "right(%a)" T.pp (MF.term mf_1)]
           ~rule:"canc_ineq_chaining" cc [C.proof info.left; C.proof info.right] in
         let new_c = C.create ~parents:[info.left; info.right] all_lits proof in
-        Util.debug 5 "ineq chaining of %a and %a gives %a"
+        Util.debug ~section 5 "ineq chaining of %a and %a gives %a"
           C.pp info.left C.pp info.right C.pp new_c;
         Util.incr_stat stat_arith_ineq_chaining;
         let acc = new_c :: acc in
@@ -812,7 +816,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             ~info:[Substs.to_string subst]
             ~rule:"canc_case_switch" cc [C.proof info.left; C.proof info.right] in
           let new_c = C.create ~parents:[info.left; info.right] all_lits proof in
-          Util.debug 5 "case switch of %a and %a gives %a"
+          Util.debug ~section 5 "case switch of %a and %a gives %a"
             C.pp info.left C.pp info.right C.pp new_c;
           Util.incr_stat stat_arith_case_switch;
           new_c :: acc
@@ -924,7 +928,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               ~info:[Substs.to_string subst]
               ~rule:"canc_inner_case_switch" cc [C.proof c] in
             let new_c = C.create ~parents:[c] lits proof in
-            Util.debug 5 "inner case switch of %a gives %a" C.pp c C.pp new_c;
+            Util.debug ~section 5 "inner case switch of %a gives %a" C.pp c C.pp new_c;
             Util.incr_stat stat_arith_inner_case_switch;
             acc := new_c :: !acc
           done
@@ -1007,7 +1011,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             ~info:[Substs.to_string subst]
             ~rule:"canc_ineq_factoring" cc [C.proof c] in
           let new_c = C.create ~parents:[c] lits proof in
-          Util.debug 5 "ineq factoring of %a gives %a" C.pp c C.pp new_c;
+          Util.debug ~section 5 "ineq factoring of %a gives %a" C.pp c C.pp new_c;
           Util.incr_stat stat_arith_ineq_factoring;
           acc := new_c :: !acc
         end
@@ -1058,7 +1062,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     transitive closure of this relation. If we obtain a trivial
     literal, then [l] is redundant (we keep a trace of literals used).
     We use continuations to deal with the multiple choices. *)
-  let rec _ineq_find_sufficient ~ord ~trace lit k = match lit with
+  let rec _ineq_find_sufficient ~ord ~trace c lit k = match lit with
     | _ when AL.is_trivial lit -> k (trace,lit)
     | AL.Binary _ when Sequence.exists T.is_var (AL.Seq.terms lit) ->
         ()  (* no way we rewrite this into a tautology *)
@@ -1080,7 +1084,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                 | None -> assert false
                 | Some (ALF.Left (AL.Lesseq, _, _) as alit') when is_left ->
                     let alit' = ALF.apply_subst_no_renaming subst alit' 1 in
-                    if ALF.is_strictly_max ~ord alit'
+                    if C.trail_subsumes active_clause c
+                    && ALF.is_strictly_max ~ord alit'
                     then
                       (* scale *)
                       let plit, alit' = ALF.scale plit alit' in
@@ -1099,11 +1104,12 @@ module Make(E : Env.S) : S with module Env = E = struct
                         (M.difference m2' (MF.rest mf1')) in
                       (* transitive closure *)
                       let trace = active_clause::trace in
-                      _ineq_find_sufficient ~ord ~trace new_plit k
+                      _ineq_find_sufficient ~ord ~trace c new_plit k
                 | Some (ALF.Right (AL.Lesseq, _, _) as alit') when not is_left ->
                     (* symmetric case *)
                     let alit' = ALF.apply_subst_no_renaming subst alit' 1 in
-                    if ALF.is_strictly_max ~ord alit'
+                    if C.trail_subsumes active_clause c
+                    && ALF.is_strictly_max ~ord alit'
                     then
                       (* scale *)
                       let plit, alit' = ALF.scale plit alit' in
@@ -1118,7 +1124,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                         (M.difference m1' (MF.rest mf2')) in
                       (* transitive closure *)
                       let trace = active_clause::trace in
-                      _ineq_find_sufficient ~ord ~trace new_plit k
+                      _ineq_find_sufficient ~ord ~trace c new_plit k
                 | Some _ ->
                     ()   (* cannot make a sufficient literal *)
               )
@@ -1126,13 +1132,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ -> ()
 
   (* is a literal redundant w.r.t the current set of unit clauses *)
-  let _ineq_is_redundant_by_unit lit =
+  let _ineq_is_redundant_by_unit c lit =
     match lit with
     | _ when Lit.is_trivial lit || Lit.is_absurd lit ->
         None  (* something more efficient will take care of it *)
     | Lit.Arith (AL.Binary (AL.Lesseq, m1, m2) as alit) ->
         let ord = Ctx.ord () in
-        let traces = _ineq_find_sufficient ~ord ~trace:[] alit
+        let traces = _ineq_find_sufficient ~ord ~trace:[] c alit
           |> Sequence.take 1  (* one is enough *)
           |> Sequence.to_list
         in
@@ -1148,10 +1154,10 @@ module Make(E : Env.S) : S with module Env = E = struct
   let is_redundant_by_ineq c =
     Util.enter_prof prof_arith_trivial_ineq;
     let res = !_enable_trivial_ineq && CCArray.exists
-      (fun lit -> match _ineq_is_redundant_by_unit lit with
+      (fun lit -> match _ineq_is_redundant_by_unit c lit with
         | None -> false
         | Some trace ->
-            Util.debug 3 "clause %a trivial by inequations %a"
+            Util.debug ~section 3 "clause %a trivial by inequations %a"
               C.pp c (CCList.pp C.pp) trace;
             Util.incr_stat stat_arith_trivial_ineq;
             true
@@ -1180,7 +1186,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let gcd = Z.gcd (MF.coeff mf1') (MF.coeff mf2') in
       (* check that we didn't "overflow", and that ordering conditions
         are good *)
-      Util.debug 5 "div. chaining with %a between\n%%  %a (at %a) and\n%%  %a (at %a)"
+      Util.debug ~section 5 "div. chaining with %a between\n%%  %a (at %a) and\n%%  %a (at %a)"
         Substs.pp subst C.pp c1 Position.pp pos1 C.pp c2 Position.pp pos2;
       if Z.lt gcd Z.(pow n power)
       && C.is_maxlit c1 sc1 subst ~idx:idx1
@@ -1199,11 +1205,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         let proof cc = Proof.mk_c_inference ~theories ~rule:"div_chaining"
           cc [C.proof c1; C.proof c2] in
         let new_c = C.create ~parents:[c1;c2] all_lits proof in
-        Util.debug 5 "... gives %a" C.pp new_c;
+        Util.debug ~section 5 "... gives %a" C.pp new_c;
         Util.incr_stat stat_arith_div_chaining;
         new_c :: acc
       end else begin
-        Util.debug 5 "... has bad ordering conditions";
+        Util.debug ~section 5 "... has bad ordering conditions";
         acc
       end
     in
@@ -1287,7 +1293,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof cc = Proof.mk_c_inference ~rule:"div_case_switch"
         ~theories cc [C.proof c] in
       let new_c = C.create ~parents:[c] all_lits proof in
-      Util.debug 5 "div_case_switch of %a into %a" C.pp c C.pp new_c;
+      Util.debug ~section 5 "div_case_switch of %a into %a" C.pp c C.pp new_c;
       [new_c]
 
   let _pp_z buf z = Buffer.add_string buf (Z.to_string z)
@@ -1307,7 +1313,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               let n' = Z.pow n d.AL.power in
               let idx = Lits.Pos.idx pos in
               let divisors = AL.Util.prime_decomposition n' in
-              Util.debug 5 "composite num: %a = %a"
+              Util.debug ~section 5 "composite num: %a = %a"
                 _pp_z n' (CCList.pp _pp_div) divisors;
               let lits = List.map
                 (fun div -> Lit.mk_divides ~sign:true
@@ -1324,7 +1330,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               let n' = Z.pow n d.AL.power in
               let idx = Lits.Pos.idx pos in
               let divisors = AL.Util.prime_decomposition n' in
-              Util.debug 5 "composite num: %a = %a"
+              Util.debug ~section 5 "composite num: %a = %a"
                 _pp_z n' (CCList.pp _pp_div) divisors;
               assert (List.length divisors >= 2);
               let lits = List.map
@@ -1344,7 +1350,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof cc = Proof.mk_c_inference ~rule:"div_prime_decomposition"
         ~theories cc [C.proof c] in
       let new_c = C.create ~parents:[c] all_lits proof in
-      Util.debug 5 "prime_decomposition- of %a into %a" C.pp c C.pp new_c;
+      Util.debug ~section 5 "prime_decomposition- of %a into %a" C.pp c C.pp new_c;
       Some [new_c]
     | ReplaceLitByLitsInManyClauses (i, lits) ->
       let clauses = List.map
@@ -1357,7 +1363,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           new_c)
         lits
       in
-      Util.debug 5 "prime_decomposition+ of %a into set {%a}"
+      Util.debug ~section 5 "prime_decomposition+ of %a into set {%a}"
         C.pp c (Util.pp_list C.pp) clauses;
       Some clauses
 
@@ -1392,7 +1398,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               end
             then begin
               (* do the inference *)
-              Util.debug 5 "divisibility on %a at %a with %a..."
+              Util.debug ~section 5 "divisibility on %a at %a with %a..."
                 C.pp c Position.pp pos Substs.pp subst;
               let new_lit = match lit' with
                 | ALF.Left (AL.Equal, mf, m)
@@ -1417,7 +1423,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               let proof cc = Proof.mk_c_inference ~theories
                 ~rule:"divisibility" cc [C.proof c] in
               let new_c = C.create ~parents:[c] all_lits proof in
-              Util.debug 5 "... gives %a" C.pp new_c;
+              Util.debug ~section 5 "... gives %a" C.pp new_c;
               Util.incr_stat stat_arith_divisibility;
               new_c :: acc
             end
@@ -1510,7 +1516,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let res = _has_arith c && _is_tautology c in
       C.set_flag flag_tauto c res;
       C.set_flag flag_computed_tauto c true;
-      if res then Util.debug 4 "clause %a is an arith tautology" C.pp c;
+      if res then Util.debug ~section 4 "clause %a is an arith tautology" C.pp c;
       Util.incr_stat stat_arith_semantic_tautology;
       res
     end
@@ -1555,7 +1561,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let proof cc = Proof.mk_c_inference ~theories ~info:[S.to_string subst]
       ~rule:"canc_eq_res" cc [C.proof c] in
     let c' = C.create ~parents:[c] lits' proof in
-    Util.debug 4 "arith_eq_res: simplify %a into %a" C.pp c C.pp c';
+    Util.debug ~section 4 "arith_eq_res: simplify %a into %a" C.pp c C.pp c';
     c'
 
   (* a != b ------> a+1 ≤ b | a ≥ b+1 *)
@@ -1567,7 +1573,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         match lit with
         | Lit.Arith (AL.Binary (AL.Different, m1, m2)) ->
             assert (eligible i lit);
-            Util.debug 5 "lit %a [%d] in %a" Lit.pp lit i C.pp c;
+            Util.debug ~section 5 "lit %a [%d] in %a" Lit.pp lit i C.pp c;
             assert (Lits.is_max ~ord (C.lits c) i);
             let lits = CCArray.except_idx (C.lits c) i in
             let new_lits =
@@ -1578,7 +1584,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             let proof cc = Proof.mk_c_inference
               ~theories ~rule:"arith_diff_to_lesseq" cc [C.proof c] in
             let c' = C.create ~parents:[c] (new_lits @ lits) proof in
-            Util.debug 5 "diff2less: %a ----> %a" C.pp c C.pp c';
+            Util.debug ~section 5 "diff2less: %a ----> %a" C.pp c C.pp c';
             c' :: acc
         | _ -> assert false
       )
@@ -1628,11 +1634,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       | TC.Var _ -> t
       | TC.App (Symbol.Int _, _, []) -> t  (* don't purify numbers *)
       | TC.App (s, _, l) when should_purify ~root s t ->
-        Util.debug 5 "need to purify term %a" T.pp t;
+        Util.debug ~section 5 "need to purify term %a" T.pp t;
         (* purify the term and add a constraint *)
         begin match M.Int.of_term t with
         | None ->
-          Util.debug 5 "could not purify %a (non linear; cache)" T.pp t;
+          Util.debug ~section 5 "could not purify %a (non linear; cache)" T.pp t;
           C.set_flag flag_no_purify c true;
           t  (* non linear, abort. *)
         | Some m -> replace t ~by:m
@@ -1660,7 +1666,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             let all_lits = !new_lits @ (Array.to_list lits') in
             let proof cc = Proof.mk_c_inference ~theories ~rule:"purify" cc [C.proof c] in
             let new_c = C.create ~parents:[c] all_lits proof in
-            Util.debug 5 "purify %a into %a" C.pp c C.pp new_c;
+            Util.debug ~section 5 "purify %a into %a" C.pp c C.pp new_c;
             Util.incr_stat stat_arith_purify;
             new_c
     in
@@ -1906,7 +1912,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     | [] -> None
     | x::_ ->
       (* eliminate v *)
-      Util.debug 3 "eliminate naked variable %a from %a" T.pp x C.pp c;
+      Util.debug ~section 3 "eliminate naked variable %a from %a" T.pp x C.pp c;
       (* split C into C' (not containing v) and 6 kinds of literals *)
       let view = NVE.of_lits (C.lits c) x in
       let delta, view = NVE.scale view in
@@ -1923,7 +1929,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let proof cc = Proof.mk_c_inference
             ~info ~theories ~rule:"var_elim" cc [C.proof c] in
           let new_c = C.create ~parents:[c] lits proof in
-          Util.debug 5 "elimination of %s×%a by %a (which:%s) in %a: gives %a"
+          Util.debug ~section 5 "elimination of %s×%a by %a (which:%s) in %a: gives %a"
             (Z.to_string view.NVE.lcm) T.pp x M.pp by which C.pp c C.pp new_c;
           acc := new_c :: !acc
         in
@@ -1931,7 +1937,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         if List.length a_set > List.length b_set
           then begin
             (* use B *)
-            Util.debug 5 "use the B elimination algorithm";
+            Util.debug ~section 5 "use the B elimination algorithm";
             (* first, the -infty part *)
             for i = 1 to delta do
               let x' = M.Int.const (Z.of_int i) in
@@ -1951,7 +1957,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             done;
           end else begin
             (* use A *)
-            Util.debug 5 "use the A elimination algorithm";
+            Util.debug ~section 5 "use the A elimination algorithm";
             (* first, the +infty part *)
             for i = 1 to delta do
               let x' = M.Int.const Z.(neg (of_int i)) in
@@ -1992,7 +1998,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     ()
 
   let register () =
-    Util.debug 2 "cancellative inf: setup env";
+    Util.debug ~section 2 "cancellative inf: setup env";
     Env.add_binary_inf "canc_sup_active" canc_sup_active;
     Env.add_binary_inf "canc_sup_passive" canc_sup_passive;
     Env.add_unary_inf "cancellation" cancellation;
@@ -2031,17 +2037,14 @@ module Make(E : Env.S) : S with module Env = E = struct
 end
 
 let extension =
-  let module DOIT(Env : Env.S) = struct
-    include Extensions.MakeAction(Env)
-    module I = Make(Env)
-    let actions =
-      [ Ext_general I.register
-      ]
-  end
+  let action env =
+    let module E = (val env : Env.S) in
+    let module I = Make(E) in
+    I.register ()
   in
   { Extensions.default with
     Extensions.name="arith_int";
-    Extensions.make=(module DOIT : Extensions.ENV_TO_S);
+    Extensions.actions=[Extensions.Do action];
   }
 
 let _enable_arith () =
@@ -2059,18 +2062,18 @@ let () =
   Params.add_opts
     [ "-arith-no-semantic-tauto"
       , Arg.Unit (fun () -> _enable_arith (); _enable_semantic_tauto := false)
-      , "disable arithmetic semantic tautology check"
+      , " disable arithmetic semantic tautology check"
     ; "-arith-no-trivial-ineq"
       , Arg.Unit (fun () -> _enable_arith (); _enable_trivial_ineq := false)
-      , "disable inequality triviality checking by rewriting"
+      , " disable inequality triviality checking by rewriting"
     ; "-arith"
       , Arg.Unit _enable_arith
-      , "enable axiomatic integer arithmetic"
+      , " enable axiomatic integer arithmetic"
     ; "-arith-ac"
       , Arg.Set _enable_ac
-      , "enable AC axioms for arithmetic (sum)"
+      , " enable AC axioms for arithmetic (sum)"
     ; "-dot-arith-unit"
       , Arg.String (fun s -> _dot_unit := Some s)
-      , "print arith-unit index into file"
+      , " print arith-unit index into file"
     ];
   ()

@@ -31,18 +31,29 @@ open Logtk
 
 (** {2 Inference rules} *)
 
+val section : Util.Section.t
+
 module type S = sig
   module Env : Env.S
-  module C : module type of Env.C
-  module PS : module type of Env.ProofState
+  module C : module type of Env.C with type t = Env.C.t
+  module PS : module type of Env.ProofState with type C.t = Env.C.t
 
   (** {6 Term Indices} *)
 
-  val idx_sup_into : unit -> PS.TermIndex.t    (** index for superposition into the set *)
-  val idx_sup_from : unit -> PS.TermIndex.t    (** index for superposition from the set *)
-  val idx_back_demod : unit -> PS.TermIndex.t  (** index for backward demodulation/simplifications *)
-  val idx_fv : unit -> PS.SubsumptionIndex.t   (** index for subsumption *)
-  val idx_simpl : unit -> PS.UnitIndex.t       (** index for forward simplifications *)
+  val idx_sup_into : unit -> PS.TermIndex.t
+  (** index for superposition into the set *)
+
+  val idx_sup_from : unit -> PS.TermIndex.t
+  (** index for superposition from the set *)
+
+  val idx_back_demod : unit -> PS.TermIndex.t
+  (** index for backward demodulation/simplifications *)
+
+  val idx_fv : unit -> PS.SubsumptionIndex.t
+  (** index for subsumption *)
+
+  val idx_simpl : unit -> PS.UnitIndex.t
+  (** index for forward simplifications *)
 
   (** {6 Inference Rules} *)
 

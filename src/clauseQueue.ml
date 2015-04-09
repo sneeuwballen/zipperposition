@@ -146,6 +146,7 @@ module type S = sig
   val to_string : t -> string
   val pp_list : Buffer.t -> (t * int) list -> unit
   val fmt : Format.formatter -> t -> unit
+  val fmt_list : Format.formatter -> (t * int) list -> unit
 end
 
 let _profile = ref "default"
@@ -156,7 +157,7 @@ let () =
   Params.add_opts
     [ "-clause-queue"
     , Arg.String set_profile
-    , "choose which set of clause queues to use \
+    , " choose which set of clause queues to use \
       (for selecting next active clause): choices: default,bfs,explore,ground"
     ]
 
@@ -380,4 +381,9 @@ module Make(C : Clause.S) = struct
 
   let fmt fmt q =
     Format.pp_print_string fmt (to_string q)
+
+  let fmt_list out qs =
+    let fmt_pair out (c, i) = Format.fprintf out "%a (w=%d)" fmt c i in
+    CCList.print ~start:"[" ~stop:"]" fmt_pair out qs;
+    ()
 end
