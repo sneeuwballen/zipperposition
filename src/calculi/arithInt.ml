@@ -879,6 +879,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.exit_prof prof_arith_ineq_chaining;
     res
 
+  (* TODO: remove, should be useless *)
   let canc_inner_case_switch c =
     Util.enter_prof prof_arith_inner_case_switch;
     let ord = Ctx.ord () in
