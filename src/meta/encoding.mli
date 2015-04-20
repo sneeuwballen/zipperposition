@@ -28,6 +28,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+type 'a printer = Format.formatter -> 'a -> unit
+
 (** {2 Base definitions} *)
 
 type 'a lit =
@@ -51,6 +53,9 @@ val foclause_of_clause : Formula.FO.t list -> foclause
   (** @raise Invalid_argument if the argument is not a proper clause *)
 
 val pp_clause : (Buffer.t -> 'a -> unit) -> Buffer.t -> 'a clause -> unit
+  (** Printer of clauses *)
+
+val print_clause : 'a printer -> 'a clause printer
   (** Printer of clauses *)
 
 (** {6 Encoding abstraction} *)

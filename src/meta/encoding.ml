@@ -32,6 +32,8 @@ module T = ScopedTerm
 module FOT = FOTerm
 module HOT = HOTerm
 
+type 'a printer = Format.formatter -> 'a -> unit
+
 (** {2 Base definitions} *)
 
 type 'a lit =
@@ -87,6 +89,16 @@ let pp_clause pp_t buf c =
       | Prop (a, false) -> Printf.bprintf buf "~ %a" pp_t a
       | Bool b -> Printf.bprintf buf "%B" b
     ) buf c
+
+let print_clause pp_t out c =
+  CCList.print ~start:"" ~stop:"" ~sep:" | "
+    (fun buf lit -> match lit with
+     | Eq (a, b, true) -> Format.fprintf buf "@[%a = %a@]" pp_t a pp_t b
+     | Eq (a, b, false) -> Format.fprintf buf "@[%a != %a@]" pp_t a pp_t b
+     | Prop (a, true) -> pp_t buf a
+     | Prop (a, false) -> Format.fprintf buf "@[~ %a@]" pp_t a
+     | Bool b -> Format.fprintf buf "%B" b
+    ) out c
 
 (** {6 Encoding abstraction} *)
 
