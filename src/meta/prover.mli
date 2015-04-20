@@ -73,3 +73,4 @@ val parse_file : t -> string ->
                 (t * Reasoner.consequence Sequence.t) or_error
   (** Attempt to parse file using {!Logtk_parsers.Parse_ho} and add the
       parsed content to the prover *)
+

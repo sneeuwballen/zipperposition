@@ -34,6 +34,8 @@ module HOT = HOTerm
 
 type 'a printer = Format.formatter -> 'a -> unit
 
+let section = Util.Section.make ~parent:Util.Section.logtk "meta"
+
 (** {2 Base definitions} *)
 
 type 'a lit =
@@ -65,7 +67,7 @@ type hoclause = hoterm clause
 (* convert a list of formulas into a clause *)
 let foclause_of_clause l =
   let module F = Formula.FO in
-  Util.debug 5 "foclause_of_clause %a" (Util.pp_list F.pp) l;
+  Util.debug ~section 5 "foclause_of_clause %a" (Util.pp_list F.pp) l;
   let term_of_form f = match F.view f with
     | F.Atom t -> t
     | _ -> raise (Invalid_argument (Util.sprintf "expected term, got formula %a" F.pp f))
