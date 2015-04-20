@@ -151,6 +151,7 @@ val __mk_lambda : varty:LogtkType.t -> t -> t    (** not documented *)
 val mk_lambda : t list -> t -> t   (** (lambda v1,...,vn. t). *)
 
 val is_var : t -> bool
+val is_rigid_var : t -> bool
 val is_bvar : t -> bool
 val is_at : t -> bool
 val is_tyat : t -> bool
@@ -163,6 +164,7 @@ val is_record : t -> bool
 
 module Seq : sig
   val vars : t -> t Sequence.t
+  val rigid_vars : t -> t Sequence.t
   val subterms : t -> t Sequence.t
   val subterms_depth : t -> (t * int) Sequence.t  (* subterms with their depth *)
   val symbols : t -> LogtkSymbol.t Sequence.t

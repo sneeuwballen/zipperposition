@@ -223,6 +223,7 @@ let mk_lambda vars t =
     vars t
 
 let is_var t = match T.view t with | T.Var _ -> true | _ -> false
+let is_rigid_var t = match T.view t with | T.RigidVar _ -> true | _ -> false
 let is_bvar t = match T.view t with | T.BVar _ -> true | _ -> false
 let is_const t = match T.view t with | T.Const _ -> true | _ -> false
 let is_at t = match view t with | At _ -> true | _ -> false
@@ -236,6 +237,7 @@ let is_record t = match T.view t with | T.Record _ -> true | _ -> false
 module Seq = struct
   let subterms t = T.Seq.subterms t |> Sequence.filter is_term
   let vars t = T.Seq.vars t |> Sequence.filter is_term
+  let rigid_vars t = T.Seq.rigid_vars t |> Sequence.filter is_term
   let subterms_depth = T.Seq.subterms_depth
   let symbols t =
     T.Seq.symbols t |>
