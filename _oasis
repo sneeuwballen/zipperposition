@@ -24,7 +24,7 @@ Flag "tools"
 
 Flag "meta"
   Description:  Build and install meta-prover
-  Default:      false
+  Default:      true
 
 Flag "bench"
   Description:  Build and run benchmarks
