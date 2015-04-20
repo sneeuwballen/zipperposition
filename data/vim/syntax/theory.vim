@@ -21,7 +21,7 @@ set expandtab
 
 syn case match
 
-syn keyword     theoryRole        axiom theory holds lemma
+syn keyword     theoryRole        axiom theory holds lemma rewrite pre_rewrite
 
 syn match       theoryDollar      "\<\$\w+\>"
 syn match       theoryDollarDollar "\<\$\$\w+\>"
@@ -34,13 +34,13 @@ syn match       theoryConnective  "|"
 syn match       theoryConnective  "&"
 syn match       theoryConnective  "="
 syn match       theoryConnective  "=>"
+syn match       theoryConnective  "-->"
 syn match       theoryConnective  "->"
 syn match       theoryConnective  "<-"
 syn match       theoryConnective  "<="
 syn match       theoryConnective  "<=>"
 syn match       theoryConnective  "<\~>"
 syn match       theoryConnective  "!"
-syn match       theoryConnective  "?"
 syn match       theoryConnective  "!>"
 syn match       theoryConnective  "!="
 syn match       theoryConnective  "\~"
@@ -49,6 +49,8 @@ syn match       theoryConnective  "\*"
 syn match       theoryConnective  ">"
 
 syn match       theoryVar         "\<\u\w*\>"
+
+syn match       theoryMetaVar     "?\w*\>"
 
 " errors
 
@@ -91,6 +93,7 @@ if version >= 508 || !exists("did_theory_syntax_inits")
   HiLink theoryDoubleQuote        String
 
   HiLink theoryVar                Constant
+  HiLink theoryMetaVar            Special
 
   HiLink theoryBraceError         Error
   HiLink theoryParenError         Error
