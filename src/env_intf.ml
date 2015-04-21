@@ -241,5 +241,5 @@ module type S = sig
   (** {2 Misc} *)
 
   val mixtbl : string Mixtbl.t
-    (** Global hashtable of "stuff" *)
+    (** Global hashtable of "stuff" for this particular env *)
 end

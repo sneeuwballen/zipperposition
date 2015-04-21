@@ -67,6 +67,7 @@ type t = {
 
 type proof = t
 
+let result p = p.result
 let kind p = p.kind
 let parents p = p.parents
 let theories p = p.theories
