@@ -52,6 +52,10 @@ type hoclause = hoterm clause
 val foclause_of_clause : Formula.FO.t list -> foclause
   (** @raise Invalid_argument if the argument is not a proper clause *)
 
+val clause_of_foclause : foclause -> Formula.FO.t list
+  (** Convert back to a list of formulas
+      @since NEXT_RELEASE *)
+
 val pp_clause : (Buffer.t -> 'a -> unit) -> Buffer.t -> 'a clause -> unit
   (** Printer of clauses *)
 

@@ -82,6 +82,16 @@ let foclause_of_clause l =
       | _ -> Prop (term_of_form f, true)
     ) l
 
+let clause_of_foclause l =
+  let module F = Formula.FO in
+  List.map
+    (function
+      | Eq (a, b, sign) -> F.Base.mk_eq sign a b
+      | Prop (a, sign) -> F.Base.mk_atom sign a
+      | Bool true -> F.Base.true_
+      | Bool false -> F.Base.false_
+    ) l
+
 let pp_clause pp_t buf c =
   Util.pp_list ~sep:" | "
     (fun buf lit -> match lit with
