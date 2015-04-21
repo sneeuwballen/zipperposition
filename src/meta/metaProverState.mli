@@ -30,59 +30,104 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open Logtk_meta
 
-type result =
-  | Deduced of PFormula.t * source list
-  | Theory of string * HOTerm.t list * source list
-  (** Feedback from the meta-prover *)
+type 'a or_error = [`Ok of 'a | `Error of string]
 
-and source =
-  | FromClause of Clause.t
-  | FromForm of PFormula.t
+type lemma = CompactClause.t * Proof.t (* a lemma *)
+type axiom = string * Type.t list * HOTerm.t
+type theory = string * Type.t list * HOTerm.t
+type rewrite = (FOTerm.t * FOTerm.t) list (** Rewrite system *)
+type pre_rewrite = HORewriting.t
+
+(** {2 Result: Feedback from the meta-prover} *)
+
+module Result : sig
+  type t
+
+  val lemmas : t -> lemma list
+  (** Discovered lemmas *)
+
+  val theories : t -> theory list
+  (** Detected theories *)
+
+  val axioms : t -> axiom list
+  (** Additional axioms *)
+
+  val rewrite : t -> rewrite list
+  (** List of term rewrite systems *)
+
+  val pre_rewrite : t -> pre_rewrite list
+  (** Pre-processing rules *)
+
+  val print : Format.formatter -> t -> unit
+end
+
+(** {2 Interface to the Meta-prover} *)
 
 type t
 
 val create : unit -> t
-  (** Fresh meta-prover *)
+(** Fresh meta-prover *)
 
-val has_new_patterns : t -> bool
-  (** Are there some new patterns that should be lookud up for in
-      the active set? *)
+val results : t -> Result.t
+(** Sum of all results obtained so far *)
 
-val scan_formula : t -> PFormula.t -> result list
-  (** Scan a formula for patterns *)
+val pop_new_results : t -> Result.t
+(** Obtain the difference between last call to [pop_new_results p]
+    and [results p], and pop this difference.
+    [ignore (pop_new_results p); pop_new_results p] always
+    returns the empty results *)
 
-val scan_clause : t -> Clause.t -> result list
-  (** Scan a clause for patterns *)
-
-val scan_set : t -> Clause.CSet.t -> result list
-  (** Scan the set of clauses for patterns that are new. This should
-      be called on the active set every time [has_new_patterns prover]
-      returns true. After this, [has_new_patterns prover] returns false
-      at least until the next call to [scan_clause]. *)
-
-val proof_of_source : source -> Proof.t
-  (** Extract the proof of a source *)
-
-val explain : t -> Logtk_meta.Reasoner.fact -> Proof.t list
-  (** Find why the given literal is true.
-      @raise Invalid_argument if the literal is not true in Datalog
-      @raise Not_found if the literal's premises are not explained by
-        previous scan_clause/scan_formula *)
-
-val theories : t -> (string * HOTerm.t list) Sequence.t
-  (** List of theories detected so far *)
-
-val results : t -> result Sequence.t
-  (** All results *)
+val theories : t -> theory Sequence.t
+(** List of theories detected so far *)
 
 val reasoner : t -> Logtk_meta.Reasoner.t
-  (** Datalog reasoner *)
+(** Meta-level reasoner (inference system) *)
 
 val prover : t -> Logtk_meta.Prover.t
-  (** meta-prover  *)
+(** meta-prover  *)
 
-val parse_theory_file : t -> string -> unit Monad.Err.t
-  (** Update KB with the content of this file *)
+val on_theory : t -> theory Signal.t
+val on_lemma : t -> lemma Signal.t
+val on_axiom : t -> axiom Signal.t
+val on_rewrite : t -> rewrite Signal.t
+val on_pre_rewrite : t -> pre_rewrite Signal.t
 
-val pp_result : Buffer.t -> result -> unit
-val pp_theory : Buffer.t -> (string * HOTerm.t list) -> unit
+(** {2 Interface to {!Env} *)
+
+val key : (string,t) Mixtbl.injection
+
+val get_global : unit -> t
+(** [get_global ()] returns the meta-prover saved in [Const.mixtbl],
+    or create one if this is the first call to [get_global ()] *)
+
+val clear_global : unit -> unit
+(** Resets the meta-prover accessed using [get_global()] *)
+
+module type S = sig
+  module E : Env.S
+  module C : module type of E.C
+
+  val parse_theory_file : t -> string -> Result.t or_error
+  (** Update prover with the content of this file, returns the new results
+      or an error *)
+
+  val parse_theory_files : t -> string list -> Result.t or_error
+  (** Parse several files *)
+
+  val scan_formula : t -> PFormula.t -> Result.t
+  (** Scan a formula for patterns, and save it *)
+
+  val scan_clause : t -> C.t -> Result.t
+  (** Scan a clause for axiom patterns, and save it *)
+
+  (** {2 Inference System} *)
+
+  val setup : unit -> unit
+  (** [setup ()] registers some inference rules to [E]
+      and adds a meta-prover  *)
+end
+
+module Make(E : Env.S) : S with module E = E
+
+val extension : Extensions.t
+(** Prover extension *)

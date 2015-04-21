@@ -1474,7 +1474,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   end)
 
   (* tautology check: take the linear system that is the negation
-    of all a!=b and a≤b, and check its (rational) satisfiability. If
+    of all a≠b and a≤b, and check its (rational) satisfiability. If
     it's unsat in Q, it's unsat in Z, and its negation (a subset of c)
     is tautological *)
   let _is_tautology c =

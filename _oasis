@@ -17,10 +17,6 @@ Description:
     superposition. It aims at being flexible and extensible while retaining
     decent performance (using indexing, for instance).
 
-Flag "meta"
-  Description:  Enable plugin for the meta-prover
-  Default:      false
-
 Flag "depqbf"
   Description:  Use depqbf solver
   Default:      false
@@ -41,26 +37,18 @@ Library "libzipperposition"
                     BoolSolver, BoolSolver_intf, Induction_helpers,
                     calculi/Avatar, calculi/Induction, calculi/Induction_simple,
                     calculi/Superposition, calculi/Chaining,
-                    calculi/EnumTypes, calculi/ArithInt, calculi/Heuristics
+                    calculi/EnumTypes, calculi/ArithInt, calculi/Heuristics,
+                    meta/MetaProverState
   InternalModules:  lib/LazyGraph, lib/SmallSet,
                     lib/UnionFind, lib/Choice, lib/Mixtbl, lib/Signal,
                     msat/Zipperposition_msat
                     # , quantor/Zipperposition_quantor  # TODO make plugins
                     # , depqbf/Zipperposition_depqbf
   BuildDepends:     containers, containers.advanced, sequence, gen, unix,
-                    zarith, containers.io, logtk, dynlink, qbf, msat,
+                    zarith, containers.io, logtk, logtk.meta, logtk.parsers,
+                    dynlink, qbf, msat,
                     ppx_deriving.std
                     #qbf.quantor, qbf.depqbf # TODO fix
-
-Library "libzipperposition_meta"
-  Path:             src/meta/
-  Pack:             false
-  Modules:          MetaProverState
-  FindlibName:      meta
-  FindlibParent:    libzipperposition
-  Build$:           flag(meta)
-  Install$:         flag(meta)
-  BuildDepends:     libzipperposition,logtk,logtk.meta
 
 # TODO dynamic loading?
 Library "libzipperposition_quantor"
