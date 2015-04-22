@@ -1,6 +1,7 @@
 #use "topfind";;
 #require "zarith";;
 #require "containers";;
+#require "containers.data";;
 #require "sequence";;
 #directory "_build/src/";;
 #directory "_build/src/base";;
@@ -51,6 +52,13 @@ let pform s =
     let f = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s) in
     let tyctx = TypeInference.Ctx.create Signature.TPTP.base in
     TypeInference.FO.convert_form_exn ~ctx:tyctx f
+;;
+let photerm s =
+    let t = Parse_ho.parse_term Lex_ho.token (Lexing.from_string s) in
+    let tyctx = TypeInference.Ctx.create Signature.TPTP.base in
+    let _, clos = TypeInference.HO.infer_exn tyctx t in
+    TypeInference.Ctx.generalize tyctx;
+    clos tyctx
 ;;
 
 (* optional part: extended *)
