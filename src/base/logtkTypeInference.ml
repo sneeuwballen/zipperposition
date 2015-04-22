@@ -182,10 +182,6 @@ module Ctx = struct
       Hashtbl.add ctx.vars name (n,ty);
       n, ty
 
-  (* a rigid variable starts with "?" *)
-  let _is_rigid_var_name name =
-    name <> "" && name.[0] = '?'
-
   (* enter new scope for the variable with this name *)
   let _enter_var_scope ctx name ty =
     let n = Hashtbl.length ctx.vars in
@@ -780,17 +776,13 @@ module HO = struct
       let i, ty = Ctx._get_var ctx ~ty name in
       ty, (fun ctx ->
         let ty' = Ctx.apply_ty ctx ty in
-        if Ctx._is_rigid_var_name name
-          then T.rigid_var ~ty:ty' i
-          else T.var ~ty:ty' i)
+        T.var ~ty:ty' i)
     | PT.Var name ->
       (* (possibly) untyped var *)
       let i, ty = Ctx._get_var ctx name in
       ty, (fun ctx ->
         let ty' = Ctx.apply_ty ctx ty in
-        if Ctx._is_rigid_var_name name
-          then T.rigid_var ~ty:ty' i
-          else T.var ~ty:ty' i)
+        T.var ~ty:ty' i)
     | PT.Const (Sym.Conn Sym.Wildcard) ->
       let ty = Ctx._new_ty_var ctx in
       (* generate fresh term variable *)
@@ -798,7 +790,7 @@ module HO = struct
       ty, (fun ctx ->
         let ty = Ctx.apply_ty ctx ty in
         Ctx.apply_ho ctx (T.const ~ty x))
-    | PT.Bind (Sym.Conn Sym.Lambda, [], t) ->
+    | PT.Bind (Sym.Conn (Sym.Lambda | Sym.Forall | Sym.Exists), [], t) ->
       infer_rec ~arity ctx t
     | PT.Bind (Sym.Conn Sym.Lambda, [v], t) ->
       let ty_v, clos_v = infer_var_scope ctx v in
@@ -811,10 +803,32 @@ module HO = struct
       ty, (fun ctx ->
         let t' = clos_t ctx in
         let v' = clos_v ctx in
-        T.mk_lambda [v'] t')
+        T.lambda [v'] t')
+    | PT.Bind (Sym.Conn ((Sym.Forall | Sym.Exists) as conn), [v], t) ->
+      let ty_v, clos_v = infer_var_scope ctx v in
+      let ty_t, clos_t = LogtkUtil.finally
+        ~f:(fun () -> infer_rec ctx t)
+        ~h:(fun () -> exit_var_scope ctx v)
+      in
+      (* XXX: relax this: type must be prop *)
+      (*Ctx.unify_and_set ctx ty_t ctx.Ctx.default.default_prop;*)
+      (* same type as ty_t *)
+      ty_t, (fun ctx ->
+          let t' = clos_t ctx in
+          let v' = clos_v ctx in
+          (match conn with
+           | Sym.Forall -> T.forall
+           | Sym.Exists -> T.exists
+           | _ -> assert false
+          ) [v'] t'
+      )
     | PT.Bind (Sym.Conn Sym.Lambda, v::vs, t) ->
       (* on-the-fly conversion to unary lambdas *)
       infer_rec ~arity ctx (PT.TPTP.lambda [v] (PT.TPTP.lambda vs t))
+    | PT.Bind (Sym.Conn Sym.Forall, v::vs, t) ->
+      infer_rec ~arity ctx (PT.TPTP.forall [v] (PT.TPTP.forall vs t))
+    | PT.Bind (Sym.Conn Sym.Exists, v::vs, t) ->
+      infer_rec ~arity ctx (PT.TPTP.exists [v] (PT.TPTP.exists vs t))
     | PT.List l ->
       let ty_l, l' = List.split (List.map (infer_rec ~arity ctx) l) in
       let l' = Closure.seq l' in

@@ -1007,8 +1007,8 @@ module FO = struct
     | Eq (t1, t2) -> T.TPTP.mk_eq (T.curry t1) (T.curry t2)
     | Neq (t1, t2) -> T.TPTP.mk_neq (T.curry t1) (T.curry t2)
     | Not f' -> T.TPTP.mk_not (to_hoterm f')
-    | Forall (ty,f') -> T.TPTP.__mk_forall ~varty:ty (to_hoterm f')
-    | Exists (ty,f') -> T.TPTP.__mk_exists ~varty:ty (to_hoterm f')
+    | Forall (ty,f') -> T.__mk_forall ~varty:ty (to_hoterm f')
+    | Exists (ty,f') -> T.__mk_exists ~varty:ty (to_hoterm f')
     | ForallTy f' -> failwith "LogtkHOTerm doesn't support dependent types"
     | Atom p -> T.curry p
 

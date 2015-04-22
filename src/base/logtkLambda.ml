@@ -59,7 +59,6 @@ let rec match_types ?(subst=LogtkSubsts.empty) ty s_ty args s_args =
 let rec beta_reduce_rec ~depth env t =
   let ty = T.ty t in
   match T.view t with
-  | T.RigidVar _
   | T.Var _
   | T.Const _ -> t
   | T.BVar n ->
@@ -75,6 +74,14 @@ let rec beta_reduce_rec ~depth env t =
     let env' = LogtkDBEnv.push_none env in
     let t'' = beta_reduce_rec ~depth:(depth+1) env' t' in
     T.__mk_lambda ~varty t''
+  | T.Forall (varty, t') ->
+    let env' = LogtkDBEnv.push_none env in
+    let t'' = beta_reduce_rec ~depth:(depth+1) env' t' in
+    T.__mk_forall ~varty t''
+  | T.Exists (varty, t') ->
+    let env' = LogtkDBEnv.push_none env in
+    let t'' = beta_reduce_rec ~depth:(depth+1) env' t' in
+    T.__mk_exists ~varty t''
   | T.At (l, r) ->
     begin match T.view l with
     | T.Lambda (_, l') ->
@@ -123,7 +130,7 @@ let beta_reduce ?(depth=0) t =
 
 let rec eta_reduce t =
   match T.view t with
-  | T.Var _ | T.BVar _ | T.RigidVar _ | T.Const _ -> t
+  | T.Var _ | T.BVar _ | T.Const _ -> t
   | T.At (l,r) ->
     T.at (eta_reduce l) (eta_reduce r)
   | T.TyAt (f, ty) -> T.tyat (eta_reduce f) ty
@@ -134,6 +141,8 @@ let rec eta_reduce t =
           eta_reduce t'
       | _ -> T.__mk_lambda ~varty (eta_reduce t')
     end
+  | T.Forall (varty, t') -> T.__mk_forall ~varty (eta_reduce t')
+  | T.Exists (varty, t') -> T.__mk_exists ~varty (eta_reduce t')
   | T.Record (l, rest) ->
     let rest = CCOpt.map eta_reduce rest in
     let l = List.map (fun (n,t) -> n, eta_reduce t) l in

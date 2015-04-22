@@ -51,10 +51,13 @@ let rec push_none_multiple env n =
 
 let size env = env.size
 
-let pop env =
-  match env.stack with
+let pop env = match env.stack with
   | [] -> raise (Invalid_argument "Env.pop: empty env")
   | _::tl -> {size=env.size-1; stack=tl; }
+
+let rec pop_many env n = match n with
+  | 0 -> env
+  | _ -> pop_many (pop env) (n-1)
 
 let find env n =
   if n < env.size then List.nth env.stack n else None
@@ -96,3 +99,11 @@ let of_list l =
     (fun env (db, v) -> set env db v)
     env l
 
+type 'a printer = Format.formatter -> 'a -> unit
+
+let print pp_x out e =
+  let pp_item out = function
+    | None -> Format.pp_print_string out "_"
+    | Some x -> Format.fprintf out "[%a]" pp_x x
+  in
+  Format.fprintf out "@[<hv2>%a@]" (CCList.print pp_item) e.stack

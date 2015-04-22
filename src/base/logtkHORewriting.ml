@@ -110,12 +110,17 @@ let normalize_collect trs t =
         let l' = List.map (fun (n,t) -> n, reduce ~trs ~rules t) l in
         let rest = CCOpt.map (reduce ~trs ~rules) rest in
         rewrite_here ~trs ~rules (T.record l' ~rest)
-    | T.RigidVar _
     | T.Var _
     | T.BVar _ -> t
     | T.Lambda (varty, t') ->
         let t' = reduce ~trs ~rules t' in
         T.__mk_lambda ~varty t'   (* no rules for lambda *)
+    | T.Forall (varty, t') ->
+        let t' = reduce ~trs ~rules t' in
+        T.__mk_forall ~varty t'
+    | T.Exists (varty, t') ->
+        let t' = reduce ~trs ~rules t' in
+        T.__mk_exists ~varty t'   (* no rules for lambda *)
     | T.Const _ ->
         rewrite_here ~trs ~rules t
   (* try to find a rewrite rules whose left-hand side matches [t]. In this
