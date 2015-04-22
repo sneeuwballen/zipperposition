@@ -2,10 +2,10 @@
 % vim:softtabstop=2:
 
 axiom (associative F) <-
-  holds [F ?x (F ?y ?z) = F (F ?x ?y) ?z].
+  holds (![X,Y,Z]: [F X (F Y Z) = F (F X Y) Z]).
 
 axiom (commutative F) <-
-  holds [F ?x ?y = F ?y ?x].
+  holds (![X,Y,Z]: [F X Y = F Y X]).
 
 theory (ac F) <-
   axiom (associative F),
@@ -19,60 +19,60 @@ axiom (commutative F) <-
 % a few general definitions (mostly form "rewriting, solving, proving")
 
 axiom (involutive F) <-
-  holds [F (F ?x) = ?x].
+  holds (![X]: [F (F X) = X]).
 
 axiom (idempotent F) <-
-  holds [F ?x ?x = ?x].
+  holds (![X]: [F X X = X]).
 
 axiom (endomorphism {fun=H, op=Mult}) <-
-  holds [H (Mult ?x ?y) = Mult (H ?x) (H ?y)].
+  holds (![X,Y]: [H (Mult X Y) = Mult (H X) (H Y)]).
 
 axiom (unit_endomorphism {fun=H, elem=E}) <-
   holds [H E = E].
 
 axiom (anti_endomorphism {fun=H, op=Mult}) <-
-  holds [H (Mult ?x ?y) = Mult (H ?y) (H ?x)].
+  holds (![X,Y]: [H (Mult X Y) = Mult (H Y) (H X)]).
 
 axiom (homomorphism {fun=H, op1=Mult, op2=Add}) <-
-  holds [H (Mult ?x ?y) = Add (H ?x) (H ?y)].
+  holds (![X,Y]: [H (Mult X Y) = Add (H X) (H Y)]).
 
 axiom (left_identity {op=Mult, elem=E}) <-
-  holds [Mult E ?x = ?x].
+  holds (![X]: [Mult E X = X]).
 
 axiom (right_identity {op=Mult, elem=E}) <-
-  holds [Mult ?x E = ?x].
+  holds (![X]: [Mult X E = X]).
 
 axiom (left_inverse {op=Mult, inverse=I, elem=E}) <-
-  holds [Mult (I ?x) ?x = E].
+  holds (![X]: [Mult (I X) X = E]).
 
 axiom (right_inverse {op=Mult, inverse=I, elem=E}) <-
-  holds [Mult ?x (I ?x) = E].
+  holds (![X]: [Mult X (I X) = E]).
 
 axiom (left_absorb {op=Mult, elem=E}) <-
-  holds [Mult E ?x = E].
+  holds (![X]: [Mult E X = E]).
 
 axiom (right_absorb {op=Mult, elem=E}) <-
-  holds [Mult ?x E = E].
+  holds (![X]: [Mult X E = E]).
 
 % functional relations
 
 axiom (functional1 P) <-
-  holds [~ (P ?x ?y), ~ (P ?x ?z), ?y = ?z].
+  holds (![X,Y,Z]: [~ (P X Y), ~ (P X Z), Y = Z]).
 
 axiom (total1 {pred=P, fun=F}) <-
-  holds [P ?x (F ?x)].
+  holds (![X]: [P X (F X)]).
 
 axiom (functional2 P) <-
-  holds [~ (P ?x ?y ?z), ~ (P ?x ?y ?z2), ?z = ?z2].
+  holds (![X,Y,Z]: [~ (P X Y Z), ~ (P X Y Z2), Z = Z2]).
 
 axiom (total2 {pred=P, fun=F}) <-
-  holds [P ?x ?y (F ?x ?y)].
+  holds (![X,Y]: [P X Y (F X Y)]).
 
-pre_rewrite [P ?x ?y --> (?y = F ?x)] <-
+pre_rewrite [![X,Y]: (P X Y --> (Y = F X))] <-
   axiom (functional1 P),
   axiom (total1 {pred=P, fun=F}).
 
-pre_rewrite [P ?x ?y ?z --> (?z = F ?x ?y)] <-
+pre_rewrite [![X,Y,Z]: (P X Y Z --> (Z = F X Y))] <-
   axiom (functional2 P),
   axiom (total2 {pred=P, fun=F}).
 
@@ -105,34 +105,36 @@ theory (abelian_group {op=Mult, neutral=E, inverse=I}) <-
 theory (group {op=Mult, neutral=E, inverse=I}) <-
   theory (abelian_group {op=Mult, neutral=E, inverse=I}).
 
-rewrite
-  [ Mult ?x E --> ?x
-  , Mult E ?x --> ?x
-  , Mult ?x (I ?x) --> E
-  , Mult (I ?x) ?x --> E
-  , I E --> E
-  , I (I ?x) --> ?x
-  , I (Mult ?x ?y) --> Mult (I ?y) (I ?x)
-  , Mult (Mult ?x ?y) ?z --> Mult ?x (Mult ?y ?z)
-  , Mult ?x (Mult (I ?x) ?y) --> ?y
-  , Mult (I ?x) (Mult ?x ?y) --> ?y
-  ] <- theory (group {op=Mult, neutral=E, inverse=I}).
+% FIXME
+%rewrite
+%  [ Mult ?x E --> ?x
+%  , Mult E ?x --> ?x
+%  , Mult ?x (I ?x) --> E
+%  , Mult (I ?x) ?x --> E
+%  , I E --> E
+%  , I (I ?x) --> ?x
+%  , I (Mult ?x ?y) --> Mult (I ?y) (I ?x)
+%  , Mult (Mult ?x ?y) ?z --> Mult ?x (Mult ?y ?z)
+%  , Mult ?x (Mult (I ?x) ?y) --> ?y
+%  , Mult (I ?x) (Mult ?x ?y) --> ?y
+%  ] <- theory (group {op=Mult, neutral=E, inverse=I}).
 
-rewrite
-  [ Mult ?x E --> ?x
-  , Mult ?x (I ?x) --> E
-  , I E --> E
-  , I (I ?x) --> ?x
-  , I (Mult ?x ?y) --> Mult (I ?x) (I ?y)
-  ] <- theory (abelian_group {op=Mult, neutral=E, inverse=I}).
+% FIXME
+%rewrite
+%  [ Mult ?x E --> ?x
+%  , Mult ?x (I ?x) --> E
+%  , I E --> E
+%  , I (I ?x) --> ?x
+%  , I (Mult ?x ?y) --> Mult (I ?x) (I ?y)
+%  ] <- theory (abelian_group {op=Mult, neutral=E, inverse=I}).
 
 % subgroup
 
 theory (subgroup {op=Mult, neutral=E, inverse=I, mem=P}) <-
   theory (group {op=Mult, neutral=E, inverse=I}),
   holds [ P Some_element ],       % non-empty
-  holds [ ~ (P ?x), P (I ?x) ],   % closed by inverse
-  holds [ ~ (P ?x), ~ (P ?y), P (Mult ?x ?y) ].  % closed by op
+  holds (![X]: [ ~ (P X), P (I X) ]),   % closed by inverse
+  holds (![X,Y]: [ ~ (P X), ~ (P Y), P (Mult X Y) ]).  % closed by op
 
 lemma [ P E ] <-
   theory (subgroup {mem=P, neutral=E | _}).
@@ -140,10 +142,10 @@ lemma [ P E ] <-
 % ring theory
 
 axiom (left_distributive {sum=Sum, prod=Prod}) <-
-  holds [ Prod ?x (Sum ?y ?z) = Sum (Prod ?x ?y) (Prod ?x ?z) ].
+  holds (![X,Y,Z]: [ Prod X (Sum Y Z) = Sum (Prod X Y) (Prod X Z) ]).
 
 axiom (right_distributive {sum=Sum, prod=Prod}) <-
-  holds [ Prod (Sum ?y ?z) ?x = Sum (Prod ?y ?x) (Prod ?z ?x) ].
+  holds (![X,Y,Z]: [ Prod (Sum Y Z) X = Sum (Prod Y X) (Prod Z X) ]).
 
 
 theory (ring {sum=Sum, prod=Prod, zero=Zero, one=One, minus=Minus}) <-
@@ -156,38 +158,39 @@ theory (commutative_ring {sum=Sum, prod=Prod, zero=Zero, one=One, minus=Minus}) 
   theory (ring {sum=Sum, prod=Prod, zero=Zero, one=One, minus=Minus}),
   axiom (commutative Prod).
 
-rewrite
-  [ Sum ?x Zero --> ?x
-  , Sum ?x (Minus ?x) --> Zero
-  , Minus Zero --> Zero
-  , Minus (Minus ?x) --> ?x
-  , Minus (Sum ?x ?y) --> Sum (Minus ?x) (Minus ?y) % abelian group
-  , Prod ?x (Sum ?y ?z) --> Sum (Prod ?x ?y) (Prod ?x ?z)
-  , Prod (Sum ?x ?y) ?z --> Sum (Prod ?x ?z) (Prod ?y ?z)
-  , Prod ?x Zero --> Zero
-  , Prod ?x (Minus ?y) --> Minus (Prod ?x ?y)
-  , Prod Zero ?x --> Zero
-  , Prod (Minus ?x) ?y --> Minus (Prod ?x ?y)
-  ] <- theory (ring {sum=Sum, prod=Prod, zero=Zero, one=One, minus=Minus}).
+% FIXME
+%rewrite
+%  [ Sum ?x Zero --> ?x
+%  , Sum ?x (Minus ?x) --> Zero
+%  , Minus Zero --> Zero
+%  , Minus (Minus ?x) --> ?x
+%  , Minus (Sum ?x ?y) --> Sum (Minus ?x) (Minus ?y) % abelian group
+%  , Prod ?x (Sum ?y ?z) --> Sum (Prod ?x ?y) (Prod ?x ?z)
+%  , Prod (Sum ?x ?y) ?z --> Sum (Prod ?x ?z) (Prod ?y ?z)
+%  , Prod ?x Zero --> Zero
+%  , Prod ?x (Minus ?y) --> Minus (Prod ?x ?y)
+%  , Prod Zero ?x --> Zero
+%  , Prod (Minus ?x) ?y --> Minus (Prod ?x ?y)
+%  ] <- theory (ring {sum=Sum, prod=Prod, zero=Zero, one=One, minus=Minus}).
 
 % XXX omitted: boolean algebras
 
 % basic relations
 
 axiom (reflexive R) <-
-  holds [ R ?x ?x ].
+  holds (![X]: [ R X X ]).
 
 axiom (irreflexive R) <-
-  holds [ ~ (R ?x ?x) ].
+  holds (![X]: [ ~ (R X X) ]).
 
 axiom (transitive R) <-
-  holds [ ~ (R ?x ?y), ~ (R ?y ?z), R ?x ?z ].
+  holds (![X,Y,Z]: [ ~ (R X Y), ~ (R Y Z), R X Z ]).
 
 axiom (antisymmetric R) <-
-  holds [ ~ (R ?x ?y), ~ (R ?y ?x), ?x = ?y ].
+  holds (![X,Y,Z]: [ ~ (R X Y), ~ (R Y X), X = Y ]).
 
 axiom (symmetric R) <-
-  holds [ ~ (R ?x ?y), R ?y ?x ].
+  holds (![X,Y]: [ ~ (R X Y), R Y X ]).
 
 % partial orders
 
@@ -204,23 +207,23 @@ theory (strict_partial_order R) <-
 
 theory (non_strict_total_order R) <-
   theory (partial_order R),
-  holds [ R ?x ?y, R ?y ?x ].
+  holds (![X,Y]: [ R X Y, R Y X ]).
 
 theory (strict_total_order R) <-
   theory (partial_order R),
-  holds [ R ?x ?y, ?x = ?y, R ?y ?x ].
+  holds (![X,Y]: [ R X Y, X = Y, R Y X ]).
 
 theory (total_order {less=Less, lesseq=Lesseq}) <-
   theory (strict_total_order Less),
-  holds [ ?x != ?y, Lesseq ?x ?y ],
-  holds [ ~ (Less ?x ?y), Lesseq ?x ?y ],
-  holds [ ~ (Lesseq ?x ?y), ?x = ?y, Less ?x ?y ].
+  holds (![X,Y]: [ X != Y, Lesseq X Y ]),
+  holds (![X,Y]: [ ~ (Less X Y), Lesseq X Y ]),
+  holds (![X,Y]: [ ~ (Lesseq X Y), X = Y, Less X Y ]).
 
 theory (total_order {less=Less, lesseq=Lesseq}) <-
   theory (non_strict_total_order Lesseq),
   axiom (irreflexive Less),
-  holds [ ~ (Less ?x ?y), Lesseq ?x ?y ],
-  holds [ ~ (Lesseq ?x ?y), ?x = ?y, Less ?x ?y ].
+  holds (![X,Y]: [ ~ (Less X Y), Lesseq X Y ]),
+  holds (![X,Y]: [ ~ (Lesseq X Y), X = Y, Less X Y ]).
 
 theory (strict_total_order Less) <-
   theory (total_order {less=Less | _}).
@@ -231,16 +234,22 @@ theory (non_strict_total_order Lesseq) <-
 % dense orders, orders without endpoints
 
 axiom (no_higher_bound R) <-
-  holds [ R ?x (Some_successor ?x) ].
+  holds (![X]: [ R X (Some_successor X) ]).
+
+axiom (no_higher_bound R) <-
+  holds (![X]: ?[Some_successor]: [ R X Some_successor ]).
 
 axiom (higher_bound {lesseq=Lesseq, high=High}) <-
-  holds [ Lesseq ?x High ].
+  holds (![X]: [ Lesseq X High ]).
 
 axiom (lower_bound {lesseq=Lesseq, low=Low}) <-
-  holds [ Lesseq Low ?x ].
+  holds (![X]: [ Lesseq Low X ]).
 
 axiom (no_lower_bound R) <-
-  holds [ R (Some_predecessor ?x) ?x ].
+  holds (![X]: [ R (Some_predecessor X) X ]).
+
+axiom (no_lower_bound R) <-
+  holds (![X]: ?[Some_predecessor]: [ R Some_predecessor X ]).
 
 theory (total_order_without_endpoints R) <-
   theory (strict_total_order R),
@@ -249,8 +258,8 @@ theory (total_order_without_endpoints R) <-
 
 theory (dense_total_order R) <-
   theory (strict_total_order R),
-  holds [ ~ (R ?x ?y), R ?x (Middle ?x ?y) ],
-  holds [ ~ (R ?x ?y), R (Middle ?x ?y) ?y ].
+  holds (![X,Y]: [ ~ (R X Y), R X (Middle X Y) ]),
+  holds (![X,Y]: [ ~ (R X Y), R (Middle X Y) Y ]).
 
 theory (dense_total_order_without_endpoints R) <-
   theory (total_order_without_endpoints R),
@@ -265,17 +274,17 @@ theory (semi_lattice Meet) <-
 theory (meet_semi_lattice {meet=Meet, order=Lesseq}) <-
   theory (semi_lattice Meet),
   theory (partial_order Lesseq),
-  holds [ Lesseq (Meet ?x ?y) ?x ],
-  holds [ Lesseq (Meet ?x ?y) ?y ].
+  holds (![X,Y]: [ Lesseq (Meet X Y) X ]),
+  holds (![X,Y]: [ Lesseq (Meet X Y) Y ]).
 
 theory (join_semi_lattice {join=Join, order=Lesseq}) <-
   theory (semi_lattice Join),
   theory (partial_order Lesseq),
-  holds [ Lesseq ?x (Join ?x ?y) ],
-  holds [ Lesseq ?y (Join ?x ?y) ].
+  holds (![X,Y]: [ Lesseq X (Join X Y) ]),
+  holds (![X,Y]: [ Lesseq Y (Join X Y) ]).
 
 axiom (absorption F1 F2) <-
-  holds [ F1 ?x (F2 ?x ?y) = ?x ].
+  holds (![X,Y]: [ F1 X (F2 X Y) = X ]).
 
 theory (lattice {meet=Meet, join=Join}) <-
   theory (semi_lattice Meet),

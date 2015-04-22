@@ -62,7 +62,7 @@ syn match       theoryMetaVar     "?\w*\>"
 syn region      theoryParen       matchgroup=theoryDelim start="("  end=")" contains=ALLBUT,theoryParenError keepend contained
 syn region      theoryParen       matchgroup=theoryDelim start="\[" end="\]" contains=ALLBUT,theoryBraceError keepend contained
 
-syn keyword	theoryTodo	contained TODO BUG FIX
+syn keyword	theoryTodo	containedin=theoryComment TODO FIXME BUG FIX
 
 syn region      theoryComment	start=+/\*+ end=+\*/+ contains=theoryTodo
 syn match       theoryComment     contains=TODO +%.*+

@@ -146,39 +146,6 @@ let currying =
       |> ListOpt.sequence_m
   end
 
-(** {6 Rigidifying variables}
-This step replaces free variables by rigid variables. It is needed for
-pattern detection to work correctly.
-
-At this step two encodings are available, one that actually rigidifies
-free variables (for encoding the problem's clauses) and one
-that should only be used for the theory declarations (where free vars
-are already rigid) *)
-
-module RigidTerm = struct
-  type t = HOT.t
-
-  let eq = HOT.eq
-  let hash_fun = HOT.hash_fun
-  let hash = HOT.hash
-  let cmp = HOT.cmp
-  let pp = HOT.pp
-  let to_string = HOT.to_string
-  let fmt = HOT.fmt
-
-  let __magic t = t
-end
-
-let rigidifying = object
-  method encode c = fmap_clause HOT.rigidify c
-  method decode c = Some (fmap_clause HOT.unrigidify c)
-end
-
-let already_rigid = object
-  method encode c = c
-  method decode c = Some c
-end
-
 (** {6 Clause encoding}
 
 Encode the whole clause into a {!Reasoner.Property.t}, ie a higher-order term
@@ -255,9 +222,10 @@ let __decode_lit t = match HOT.open_at t with
 let clause_prop = object
   method encode c =
     let lits = List.map __encode_lit c in
-    HOT.multiset ~ty:Type.TPTP.o lits
+    HOT.close_forall (HOT.multiset ~ty:Type.TPTP.o lits)
 
   method decode c =
+    let c = HOT.open_forall c in
     match HOT.view c with
     | HOT.Multiset (_,l) -> Some (List.map __decode_lit l)
     | _ -> None

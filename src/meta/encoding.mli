@@ -82,33 +82,6 @@ val (>>>) : ('a,'b) t -> ('b, 'c) t -> ('a, 'c) t
 
 val currying : (foterm clause, hoterm clause) t
 
-(** {6 Rigidifying variables}
-This step replaces free variables by rigid variables. It is needed for
-pattern detection to work correctly.
-
-At this step two encodings are available, one that actually rigidifies
-free variables (for encoding the problem's clauses) and one
-that should only be used for the theory declarations (where free vars
-are already rigid) *)
-
-module RigidTerm : sig
-  type t = private HOTerm.t
-
-  include Interfaces.PRINT with type t := t
-  include Interfaces.HASH with type t := t
-  include Interfaces.ORD with type t := t
-
-  val __magic : hoterm -> t
-    (** Don't use unless you know what you're doing. *)
-end
-
-val rigidifying : (hoterm clause, RigidTerm.t clause) t
-  (** Replaces free variables with rigid variables *)
-
-val already_rigid : (hoterm clause, RigidTerm.t clause) t
-  (** Keeps free variables untouched by assuming the variables
-      that must be rigid are already *)
-
 (** {6 Clause encoding}
 
 Encode the whole clause into a {!Reasoner.Property.t}, ie a higher-order term
@@ -128,5 +101,5 @@ end
 val signature : Signature.t
   (** Signature to use with this encoding *)
 
-val clause_prop : (RigidTerm.t clause, EncodedClause.t) t
+val clause_prop : (hoclause, EncodedClause.t) t
 
