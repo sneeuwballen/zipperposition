@@ -69,7 +69,6 @@ module Term = struct
   let wildcard = PT.wildcard
 
   let var = PT.var
-  let bind = PT.bind
   let const = PT.const
   let app = PT.app
   let record = PT.record
@@ -83,8 +82,9 @@ module Term = struct
   let imply ?loc a b = app ?loc (const Symbol.Base.imply) [a;b]
   let eq ?loc ?(ty=wildcard) a b = app ?loc (const Symbol.Base.eq) [ty; list_[a;b]]
   let neq ?loc ?(ty=wildcard) a b = app ?loc (const Symbol.Base.neq) [ty; list_[a;b]]
-  let forall ?loc vars f = bind ?loc Symbol.Base.forall vars f
-  let exists ?loc vars f = bind ?loc Symbol.Base.exists vars f
+  let forall ?loc vars f = PT.TPTP.forall ?loc vars f
+  let exists ?loc vars f = PT.TPTP.exists ?loc vars f
+  let lambda ?loc vars f = PT.TPTP.lambda ?loc vars f
 
   (* XXX: ad-hoc infix symbol constructor *)
   let app_infix ?loc o a b =
@@ -95,5 +95,5 @@ module Term = struct
 
   let mk_fun_ty = PT.TPTP.mk_fun_ty
   let tType = PT.TPTP.tType
-  let forall_ty ?loc vars t = bind ?loc Symbol.Base.forall_ty vars t 
+  let forall_ty ?loc vars t = PT.TPTP.forall_ty ?loc vars t
 end

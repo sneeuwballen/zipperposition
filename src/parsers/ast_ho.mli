@@ -53,7 +53,6 @@ module Term : sig
   val var : ?loc:location -> ?ty:term -> string -> term
   val const : ?loc:location -> Symbol.t -> term
   val app : ?loc:location -> term -> term list -> term
-  val bind : ?loc:location -> Symbol.t -> term list -> term -> term
   val record : ?loc:location -> (string * term) list -> rest:term option -> term
   val list_ : ?loc:location -> term list -> term
 
@@ -67,6 +66,7 @@ module Term : sig
   val neq : ?loc:location -> ?ty:term -> term -> term -> term
   val forall : ?loc:location -> term list -> term -> term
   val exists : ?loc:location -> term list -> term -> term
+  val lambda : ?loc:location -> term list -> term -> term
 
   val app_infix : ?loc:location -> string -> term -> term -> term
     (** Ad-hoc infix symbols constructor *)

@@ -53,6 +53,9 @@ A parser with a nice curried syntax. *)
 %token DOT
 %token VAL
 %token COLUMN
+%token FORALL
+%token EXISTS
+%token LAMBDA
 %token FORALL_TY
 
 %token EQ
@@ -115,7 +118,6 @@ declaration:
 %public record_body(BIND, TERM):
   | l=separated_list(COMMA, record_field(BIND, TERM)) { l }
 
-
 type_:
   | w=LOWER_WORD l=unary_type +
     {
@@ -167,11 +169,47 @@ unary_type:
       Term.record ~loc l ~rest
     }
 
-term:
+unary_term:
+  | LEFT_PAREN t=term RIGHT_PAREN { t }
+  | w=INTERROGATION_WORD
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      Term.var ~loc w
+    }
+  | v=var { v }
+  | WILDCARD
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      Term.const ~loc Sym.Base.wildcard
+    }
+  | w=LOWER_WORD
+  | w=DOLLAR_WORD
+  | w=DOLLAR_DOLLAR_WORD
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      Term.const ~loc (Sym.of_string w)
+    }
+  | LEFT_BRACKET l=separated_list(COMMA, term) RIGHT_BRACKET
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      Term.list_ ~loc l
+    }
+  | LEFT_BRACE l=record_body(EQ,term) rest=record_rest(term) RIGHT_BRACE
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      Term.record ~loc l ~rest
+    }
+
+app_term:
   | t=unary_term { t }
-  | t=formula_term { t }
+  | t=unary_term l=unary_term+
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      Term.app ~loc t l
+    }
 
 formula_term:
+  | t=app_term { t }
   | l=formula_term AND r=formula_term
     {
       let loc = L.mk_pos $startpos $endpos in
@@ -217,51 +255,34 @@ formula_term:
       let loc = L.mk_pos $startpos $endpos in
       Term.app_infix ~loc o l r
     }
-  | t=app_term{ t }
 
-app_term:
-  | t=unary_term { t }
-  | t=unary_term l=unary_term +
+term:
+  | t=formula_term { t }
+  | LAMBDA LEFT_BRACKET v=vars RIGHT_BRACKET COLUMN t=term
     {
       let loc = L.mk_pos $startpos $endpos in
-      Term.app ~loc t l
+      Term.lambda ~loc v t
     }
-
-unary_term:
-  | LEFT_PAREN t=term RIGHT_PAREN { t }
-  | w=INTERROGATION_WORD
+  | FORALL LEFT_BRACKET v=vars RIGHT_BRACKET COLUMN t=term
     {
       let loc = L.mk_pos $startpos $endpos in
-      Term.var ~loc w
+      Term.forall ~loc v t
     }
+  | EXISTS LEFT_BRACKET v=vars RIGHT_BRACKET COLUMN t=term
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      Term.exists ~loc v t
+    }
+
+var:
   | w=UPPER_WORD
     {
       let loc = L.mk_pos $startpos $endpos in
       Term.var ~loc w
     }
-  | WILDCARD
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      Term.const ~loc Sym.Base.wildcard
-    }
-  | w=LOWER_WORD
-  | w=DOLLAR_WORD
-  | w=DOLLAR_DOLLAR_WORD
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      Term.const ~loc (Sym.of_string w)
-    }
-  | LEFT_BRACKET l=separated_list(COMMA, term) RIGHT_BRACKET
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      Term.list_ ~loc l
-    }
-  | LEFT_BRACE l=record_body(EQ,term) rest=record_rest(term) RIGHT_BRACE
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      Term.record ~loc l ~rest
-    }
 
+vars:
+  | v=separated_nonempty_list(COMMA,var) { v }
 
 %%
 
