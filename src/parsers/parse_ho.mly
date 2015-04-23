@@ -134,14 +134,20 @@ type_:
   | t=app_type {t}
 
 app_type:
-  | w=LOWER_WORD args=unary_type*
+  | w=LOWER_WORD args=unary_type+
     {
       let loc = L.mk_pos $startpos $endpos in
-      Term.app ~loc (Term.const ~loc (Sym.of_string w)) args
+      let f = Term.const ~loc (Sym.of_string w) in
+      Term.app ~loc f args
     }
   | t=unary_type { t }
 
 unary_type:
+  | w=LOWER_WORD
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      Term.const ~loc (Sym.of_string w)
+    }
   | LEFT_PAREN t=type_ RIGHT_PAREN { t }
   | w=INTERROGATION_WORD
   | w=UPPER_WORD
@@ -188,7 +194,7 @@ unary_term:
       let loc = L.mk_pos $startpos $endpos in
       Term.const ~loc (Sym.of_string w)
     }
-  | AT ty=type_
+  | AT ty=unary_type
     {
       let loc = L.mk_pos $startpos $endpos in
       Term.lift_type ~loc ty
@@ -262,17 +268,17 @@ formula_term:
 
 term:
   | t=formula_term { t }
-  | LAMBDA LEFT_BRACKET v=vars RIGHT_BRACKET COLUMN t=term
+  | LAMBDA LEFT_BRACKET v=typed_vars RIGHT_BRACKET COLUMN t=term
     {
       let loc = L.mk_pos $startpos $endpos in
       Term.lambda ~loc v t
     }
-  | FORALL LEFT_BRACKET v=vars RIGHT_BRACKET COLUMN t=term
+  | FORALL LEFT_BRACKET v=typed_vars RIGHT_BRACKET COLUMN t=term
     {
       let loc = L.mk_pos $startpos $endpos in
       Term.forall ~loc v t
     }
-  | EXISTS LEFT_BRACKET v=vars RIGHT_BRACKET COLUMN t=term
+  | EXISTS LEFT_BRACKET v=typed_vars RIGHT_BRACKET COLUMN t=term
     {
       let loc = L.mk_pos $startpos $endpos in
       Term.exists ~loc v t
@@ -284,14 +290,17 @@ var:
       let loc = L.mk_pos $startpos $endpos in
       Term.var ~loc w
     }
+
+typed_var:
+  | v=var { v }
   | w=UPPER_WORD COLUMN ty=app_type
     {
       let loc = L.mk_pos $startpos $endpos in
       Term.var ~loc ~ty w
     }
 
-vars:
-  | v=separated_nonempty_list(COMMA,var) { v }
+typed_vars:
+  | v=separated_nonempty_list(COMMA,typed_var) { v }
 
 %%
 
