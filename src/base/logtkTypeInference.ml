@@ -30,6 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
 module Ty = LogtkType
+module PT = LogtkPrologTerm
 module S = LogtkSubsts
 module Sym = LogtkSymbol
 module Loc = LogtkParseLocation
@@ -132,8 +133,9 @@ module Ctx = struct
       else _new_ty_var ctx :: _new_ty_vars ctx (n-1)
 
   (* convert a prolog term into a type *)
-  let ty_of_prolog ctx ty =
-    LogtkType.Conv.of_prolog ~ctx:ctx.tyvars ty
+  let rec ty_of_prolog ctx ty = match PT.view ty with
+    | PT.Syntactic(Sym.Conn Sym.LiftType, [ty]) -> ty_of_prolog ctx ty
+    | _ -> LogtkType.Conv.of_prolog ~ctx:ctx.tyvars ty
 
   (* error-raising function *)
   let __error ctx msg =
@@ -410,7 +412,6 @@ let _err_wrap3 f x y z =
   with LogtkType.Error s -> Err.fail s
 
 module FO = struct
-  module PT = LogtkPrologTerm
   module T = LogtkFOTerm
   module F = LogtkFormula.FO
 
@@ -721,7 +722,6 @@ module FO = struct
 end
 
 module HO = struct
-  module PT = LogtkPrologTerm
   module T = LogtkHOTerm
 
   type untyped = PT.t
