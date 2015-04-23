@@ -148,7 +148,7 @@ let fmt out s =
   let pp_pair out (s,ty) =
     Format.fprintf out "@[%a:@ %a@]" LogtkSymbol.fmt s LogtkType.fmt ty
   in
-  Format.fprintf out "@[<hv2>{";
+  Format.fprintf out "@[<hv>{";
   Sequence.pp_seq pp_pair out (Seq.to_seq s);
   Format.fprintf out "}@]";
   ()

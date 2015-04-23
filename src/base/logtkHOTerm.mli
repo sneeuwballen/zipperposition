@@ -116,10 +116,10 @@ val at_list : t -> t list -> t
       @raise LogtkType.Error of types do not match. *)
 
 val tylift : LogtkType.t -> t
-  (** [tylift ty] makes a term out of [ty]. It has type [Type.type_] *)
+  (** [tylift ty] makes a term out of [ty]. It has type [ty] *)
 
 val tyat : t -> LogtkType.t -> t
-  (** [tyat t ty] is the same as [at t (lifty ty)] *)
+  (** [tyat t ty] is the same as [at t (tylift ty)] *)
 
 val tyat_list : t -> LogtkType.t list -> t
   (** Application to a list of types *)

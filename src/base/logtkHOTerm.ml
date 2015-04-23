@@ -163,9 +163,9 @@ let var ~(ty:LogtkType.t) i =
 let bvar ~(ty:LogtkType.t) i =
   T.bvar ~kind ~ty:(ty :> T.t) i
 
-let tylift ty =
-  T.simple_app ~kind ~ty:(LogtkType.type_ :> T.t)
-    LogtkSymbol.Base.lift_type [(ty:LogtkType.t:>T.t)]
+let tylift (ty:LogtkType.t) =
+  T.simple_app ~kind ~ty:(ty :> T.t)
+    LogtkSymbol.Base.lift_type [(ty:>T.t)]
 
 let at l r =
   let ty_ret = LogtkType.apply (ty l) (ty r) in

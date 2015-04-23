@@ -105,8 +105,6 @@ let (<==) ret args = arrow_list args ret
 let (<=.) ret a = arrow a ret
 let (@@) = app
 
-let type_ = const (LogtkSymbol.of_string "type")
-
 (* downcast *)
 let of_term_exn ty = match T.kind ty with
   | T.Kind.Type -> ty
