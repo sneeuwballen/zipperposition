@@ -72,6 +72,7 @@ module Term : sig
     (** Ad-hoc infix symbols constructor *)
 
   val mk_fun_ty : ?loc:location -> term list -> term -> term
+  val lift_type : ?loc:location -> term -> term
   val tType : term
   val forall_ty : ?loc:location -> term list -> term -> term
 end

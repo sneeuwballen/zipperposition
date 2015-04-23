@@ -57,6 +57,7 @@ A parser with a nice curried syntax. *)
 %token EXISTS
 %token LAMBDA
 %token FORALL_TY
+%token AT
 
 %token EQ
 %token NEQ
@@ -186,6 +187,11 @@ unary_term:
     {
       let loc = L.mk_pos $startpos $endpos in
       Term.const ~loc (Sym.of_string w)
+    }
+  | AT ty=type_
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      Term.lift_type ~loc ty
     }
   | LEFT_BRACKET l=separated_list(COMMA, term) RIGHT_BRACKET
     {

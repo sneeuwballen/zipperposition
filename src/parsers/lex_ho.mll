@@ -72,6 +72,7 @@ rule token = parse
   | "&&" { AND }
   | "||" { OR }
   | "=" { EQ }
+  | "@" { AT }
   | "/\\" { FORALL_TY }
   | "!=" { NEQ }
   | ":" { COLUMN }

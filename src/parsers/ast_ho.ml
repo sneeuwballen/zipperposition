@@ -95,5 +95,6 @@ module Term = struct
 
   let mk_fun_ty = PT.TPTP.mk_fun_ty
   let tType = PT.TPTP.tType
+  let lift_type ?loc ty = PT.syntactic ?loc Symbol.Base.lift_type [ty]
   let forall_ty ?loc vars t = PT.TPTP.forall_ty ?loc vars t
 end
