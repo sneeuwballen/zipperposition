@@ -21,7 +21,8 @@ set expandtab
 
 syn case match
 
-syn keyword     theoryRole        axiom theory holds lemma rewrite pre_rewrite
+syn keyword     theoryRole        val axiom theory holds
+syn keyword     theoryRole        lemma rewrite pre_rewrite
 
 syn match       theoryDollar      "\<\$\w+\>"
 syn match       theoryDollarDollar "\<\$\$\w+\>"

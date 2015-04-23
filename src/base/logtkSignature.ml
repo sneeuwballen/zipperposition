@@ -146,11 +146,11 @@ let to_string s =
 
 let fmt out s =
   let pp_pair out (s,ty) =
-    Format.fprintf out "@[%a:@ %a@]" LogtkSymbol.fmt s LogtkType.fmt ty
+    Format.fprintf out "@[<hov2>%a:@ %a@]" LogtkSymbol.fmt s LogtkType.fmt ty
   in
-  Format.fprintf out "@[<hv>{";
+  Format.fprintf out "{@[<hv>";
   Sequence.pp_seq pp_pair out (Seq.to_seq s);
-  Format.fprintf out "}@]";
+  Format.fprintf out "@]}";
   ()
 
   (* TODO
