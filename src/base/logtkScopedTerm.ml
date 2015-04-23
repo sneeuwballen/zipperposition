@@ -807,7 +807,7 @@ module Pos = struct
     | At (l,r), P.Left subpos -> at l subpos
     | At (l,r), P.Right subpos -> at r subpos
     | Multiset l, P.Arg (n,subpos) when n < List.length l ->
-        at (List.nth l n) subpos 
+        at (List.nth l n) subpos
     | Record (_, Some r), P.Record_rest subpos ->
         at r subpos
     | Record (l, _), P.Record_field (name, subpos) ->
@@ -1028,6 +1028,10 @@ let pp_depth ?(hooks=[]) depth buf t =
     Printf.bprintf buf "%a.%s <- %a" (_pp depth) r name (_pp depth) sub
   | Multiset l ->
     Printf.bprintf buf "{| %a |}" (LogtkUtil.pp_list (_pp depth)) l
+  | SimpleApp (s, [a]) when Sym.is_prefix s ->
+    Printf.bprintf buf "%a %a" Sym.pp s (_pp depth) a
+  | SimpleApp (s, [a;b]) when Sym.is_infix s ->
+    Printf.bprintf buf "(%a %a %a)" (_pp depth) a Sym.pp s (_pp depth) b
   | SimpleApp (s, l) ->
     Printf.bprintf buf "%a(%a)" Sym.pp s (LogtkUtil.pp_list (_pp depth)) l
   | At (l,r) ->

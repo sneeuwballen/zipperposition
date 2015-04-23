@@ -144,8 +144,14 @@ let pp buf s =
 let to_string s =
   LogtkUtil.sprintf "%a" pp s
 
-let fmt fmt s =
-  Format.pp_print_string fmt (to_string s)
+let fmt out s =
+  let pp_pair out (s,ty) =
+    Format.fprintf out "@[%a:@ %a@]" LogtkSymbol.fmt s LogtkType.fmt ty
+  in
+  Format.fprintf out "@[<hv2>{";
+  Sequence.pp_seq pp_pair out (Seq.to_seq s);
+  Format.fprintf out "}@]";
+  ()
 
   (* TODO
 let bij =

@@ -137,6 +137,24 @@ let pp buf s = Buffer.add_string buf (to_string s)
 
 let fmt fmt s = Format.pp_print_string fmt (to_string s)
 
+let is_prefix = function
+  | Conn (Not | LiftType) -> true
+  | Conn _ | Int _ | Rat _ -> false
+  | Cst _ -> false
+
+let is_infix = function
+  | Conn (And | Or | Imply | Equiv
+         | Xor | Eq | Neq | HasType | Arrow) -> true
+  | Conn _ | Int _ | Rat _ -> false
+  | Cst {cs_name=s} ->
+    Sequence.of_str s
+    |> Sequence.for_all
+      (function
+        | 'a'..'z'
+        | 'A'..'Z' -> false
+        | _ -> true
+      )
+
 let ty = function
   | Int _ -> `Int
   | Rat _ -> `Rat

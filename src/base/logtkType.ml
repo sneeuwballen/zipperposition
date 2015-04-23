@@ -39,7 +39,7 @@ type ty = t
 let kind = T.Kind.Type
 
 type view =
-  | Var of int              (** LogtkType variable *)
+  | Var of int              (** Type variable *)
   | BVar of int             (** Bound variable (De Bruijn index) *)
   | App of symbol * t list  (** parametrized type *)
   | Fun of t * t            (** Function type (left to right) *)
@@ -58,9 +58,9 @@ let view t = match T.kind t with
     | T.SimpleApp (LogtkSymbol.Conn LogtkSymbol.Arrow, [l;r]) -> Fun (l, r)
     | T.SimpleApp (s, l) -> App (s, l)
     | T.Record (l, rest) -> Record (l, rest)
-    | _ -> failwith "LogtkType.view"
+    | _ -> failwith "Type.view"
     end
-  | _ -> raise (Invalid_argument "LogtkType.view")
+  | _ -> raise (Invalid_argument "Type.view")
 
 let hash_fun = T.hash_fun
 let hash = T.hash

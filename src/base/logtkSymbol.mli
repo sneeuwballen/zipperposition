@@ -71,6 +71,14 @@ include LogtkInterfaces.SERIALIZABLE with type t := t
 include LogtkInterfaces.PRINT_OVERLOAD with type t := t
 *)
 
+val is_prefix : t -> bool
+(** [is_infix s] returns [true] if the way the symbol is printed should
+    be used in a prefix way if applied to 1 argument *)
+
+val is_infix : t -> bool
+(** [is_infix s] returns [true] if the way the symbol is printed should
+    be used in an infix way if applied to two arguments *)
+
 module Map : Sequence.Map.S with type key = t
 module Set : Sequence.Set.S with type elt = t
 module Tbl : Hashtbl.S with type key = t
