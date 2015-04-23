@@ -790,6 +790,15 @@ module HO = struct
       ty, (fun ctx ->
         let ty = Ctx.apply_ty ctx ty in
         Ctx.apply_ho ctx (T.const ~ty x))
+    | PT.Syntactic (Sym.Conn Sym.LiftType, [ty]) ->
+      let ty = match Ctx.ty_of_prolog ctx ty with
+        | Some ty -> ty
+        | None -> Ctx.__error ctx "expected type, got %a" PT.pp ty
+      in
+      ty, (fun ctx ->
+        let ty' = Ctx.apply_ty ctx ty in
+        T.tylift ty'
+      )
     | PT.Bind (Sym.Conn (Sym.Lambda | Sym.Forall | Sym.Exists), [], t) ->
       infer_rec ~arity ctx t
     | PT.Bind (Sym.Conn Sym.Lambda, [v], t) ->

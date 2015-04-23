@@ -38,7 +38,8 @@ type connective =
   | Xor
   | Eq
   | Neq
-  | HasLogtkType
+  | HasType
+  | LiftType (** @since NEXT_RELEASE *)
   | True
   | False
   | Exists
@@ -116,6 +117,8 @@ module Base : sig
   val forall_ty : t
   val arrow : t
   val tType : t
+  val has_type : t
+  val lift_type : t
 
   val wildcard : t    (** $_ for type inference *)
   val multiset : t    (** type of multisets *)

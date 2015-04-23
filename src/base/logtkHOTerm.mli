@@ -44,7 +44,7 @@ type view = private
   | Exists of LogtkType.t * t   (** Exists quantifier (commutes with other exists) *)
   | Const of symbol             (** LogtkTyped constant *)
   | At of t * t                 (** Curried application *)
-  | TyAt of t * LogtkType.t          (** Curried application to a type *)
+  | TyLift of LogtkType.t       (** Lift a type to a term *)
   | Multiset of LogtkType.t * t list (** a multiset of terms, and their common type *)
   | Record of (string*t) list * t option  (** Record of terms *)
 
@@ -115,9 +115,11 @@ val at_list : t -> t list -> t
   (** Curried application to several terms, left-parenthesing.
       @raise LogtkType.Error of types do not match. *)
 
+val tylift : LogtkType.t -> t
+  (** [tylift ty] makes a term out of [ty] *)
+
 val tyat : t -> LogtkType.t -> t
-  (** Curried type application.
-      @raise LogtkType.Error if types do not match. *)
+  (** [tyat t ty] is the same as [at t (lifty ty)] *)
 
 val tyat_list : t -> LogtkType.t list -> t
   (** Application to a list of types *)
@@ -156,7 +158,7 @@ val exists : t list -> t -> t
 val is_var : t -> bool
 val is_bvar : t -> bool
 val is_at : t -> bool
-val is_tyat : t -> bool
+val is_tylift : t -> bool
 val is_const : t -> bool
 val is_lambda : t -> bool
 val is_forall : t -> bool
@@ -227,7 +229,7 @@ class virtual ['a] any_visitor : object
   method virtual exists : LogtkType.t -> 'a -> 'a
   method virtual const : LogtkType.t -> LogtkSymbol.t -> 'a
   method virtual at : 'a -> 'a -> 'a
-  method virtual tyat : 'a -> LogtkType.t -> 'a
+  method virtual tylift : LogtkType.t -> 'a
   method virtual multiset : LogtkType.t -> 'a list -> 'a
   method virtual record : (string*'a) list -> 'a option -> 'a
   method visit : t -> 'a
@@ -241,7 +243,7 @@ class id_visitor : object
   method exists : LogtkType.t -> t -> t
   method const : LogtkType.t -> LogtkSymbol.t -> t
   method at : t -> t -> t
-  method tyat : t -> LogtkType.t -> t
+  method tylift : LogtkType.t -> t
   method multiset : LogtkType.t -> t list -> t
   method record : (string*t) list -> t option -> t
   method visit : t -> t

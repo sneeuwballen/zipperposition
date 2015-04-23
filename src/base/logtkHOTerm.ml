@@ -45,7 +45,7 @@ type view =
   | Exists of LogtkType.t * t   (** Exists quantifier (commutes with other exists) *)
   | Const of symbol             (** LogtkTyped constant *)
   | At of t * t                 (** Curried application *)
-  | TyAt of t * LogtkType.t          (** Curried application to a type *)
+  | TyLift of LogtkType.t       (** Lift a type to a term *)
   | Multiset of LogtkType.t * t list
   | Record of (string*t) list * t option (** Record of terms *)
 
@@ -73,17 +73,16 @@ let view t = match T.view t with
   | T.Bind (LogtkSymbol.Conn LogtkSymbol.Exists, varty, t') ->
     Exists (LogtkType.of_term_exn varty, t')
   | T.Const s -> Const s
-  | T.At (l,r) ->
-      begin match LogtkType.of_term r with
-      | None -> At (l, r)
-      | Some ty -> TyAt (l, ty)
-      end
+  | T.At (l,r) -> At (l, r)
   | T.Multiset l ->
       begin match LogtkType.view (ty t) with
         | LogtkType.App (LogtkSymbol.Conn LogtkSymbol.Multiset, [tau]) -> Multiset (tau, l)
         | _ -> assert false
       end
   | T.Record (l, rest) -> Record (l, rest)
+  | T.SimpleApp (LogtkSymbol.Conn LogtkSymbol.LiftType, [ty]) ->
+    let ty = LogtkType.of_term_exn ty in
+    TyLift ty
   | T.RecordGet _
   | T.RecordSet _
   | T.RigidVar _
@@ -164,17 +163,19 @@ let var ~(ty:LogtkType.t) i =
 let bvar ~(ty:LogtkType.t) i =
   T.bvar ~kind ~ty:(ty :> T.t) i
 
-let tyat t tyarg =
-  let ty = LogtkType.apply (ty t) tyarg in
-  T.at ~kind ~ty:(ty:>T.t) t (tyarg:LogtkType.t:>T.t)
-
-let rec tyat_list t l = match l with
-  | [] -> t
-  | ty::l' -> tyat_list (tyat t ty) l'
+let tylift ty =
+  T.simple_app ~kind ~ty:(LogtkType.tType :> T.t)
+    LogtkSymbol.Base.lift_type [(ty:LogtkType.t:>T.t)]
 
 let at l r =
   let ty_ret = LogtkType.apply (ty l) (ty r) in
   T.at ~kind ~ty:(ty_ret :>T.t) l r
+
+let tyat t tyarg = at t (tylift tyarg)
+
+let rec tyat_list t l = match l with
+  | [] -> t
+  | ty::l' -> tyat_list (tyat t ty) l'
 
 let rec at_list f l = match l with
   | [] -> f
@@ -240,7 +241,7 @@ let is_var t = match T.view t with | T.Var _ -> true | _ -> false
 let is_bvar t = match T.view t with | T.BVar _ -> true | _ -> false
 let is_const t = match T.view t with | T.Const _ -> true | _ -> false
 let is_at t = match view t with | At _ -> true | _ -> false
-let is_tyat t = match view t with | TyAt _ -> true | _ -> false
+let is_tylift t = match view t with | TyLift _ -> true | _ -> false
 let is_lambda t = match view t with | Lambda _ -> true | _ -> false
 let is_forall t = match view t with | Forall _ -> true | _ -> false
 let is_exists t = match view t with | Exists _ -> true | _ -> false
@@ -343,7 +344,7 @@ class virtual ['a] any_visitor = object (self)
   method virtual exists : LogtkType.t -> 'a -> 'a
   method virtual const : LogtkType.t -> LogtkSymbol.t -> 'a
   method virtual at : 'a -> 'a -> 'a
-  method virtual tyat : 'a -> LogtkType.t -> 'a
+  method virtual tylift : LogtkType.t -> 'a
   method virtual multiset : LogtkType.t -> 'a list -> 'a
   method virtual record : (string*'a) list -> 'a option -> 'a
   method visit t =
@@ -361,11 +362,10 @@ class virtual ['a] any_visitor = object (self)
         let varty = LogtkType.of_term_exn varty in
         self#exists varty (self#visit t')
     | T.Const s -> self#const ty s
-    | T.At (l,r) ->
-        begin match LogtkType.of_term r with
-        | Some ty -> self#tyat (self#visit l) ty
-        | None -> self#at (self#visit l) (self#visit r)
-        end
+    | T.At (l,r) -> self#at (self#visit l) (self#visit r)
+    | T.SimpleApp (LogtkSymbol.Conn LogtkSymbol.LiftType, [ty]) ->
+      let ty = LogtkType.of_term_exn ty in
+      self#tylift ty
     | T.Multiset l ->
         begin match LogtkType.view ty with
         | LogtkType.App (LogtkSymbol.Conn LogtkSymbol.Multiset, [ty]) ->
@@ -388,7 +388,7 @@ class id_visitor = object (self)
   method exists varty t' = __mk_exists ~varty t'
   method const ty s = const ~ty s
   method at l r = at l r
-  method tyat t ty = tyat t ty
+  method tylift ty = tylift ty
   method multiset ty l = multiset ~ty l
   method record l rest = record l ~rest
 end
@@ -502,9 +502,7 @@ let pp_depth ?(hooks=[]) depth buf t =
   | At (l,r) ->
     pp_rec buf l; Buffer.add_char buf ' ';
     pp_surrounded buf r
-  | TyAt (l,r) ->
-    pp_rec buf l; Buffer.add_char buf ' ';
-    LogtkType.pp buf r
+  | TyLift ty -> LogtkType.pp_surrounded buf ty
   | Record ([], None) ->
     Buffer.add_string buf "{}"
   | Record ([], Some r) ->
@@ -522,7 +520,7 @@ let pp_depth ?(hooks=[]) depth buf t =
   | Multiset (_, l) ->
     Printf.bprintf buf "[%a]" (LogtkUtil.pp_list pp_rec) l
   and pp_surrounded buf t = match view t with
-  | Lambda _ | At _ | TyAt _ ->
+  | Lambda _ | At _ ->
     Buffer.add_char buf '('; pp_rec buf t;  Buffer.add_char buf ')'
   | _ -> pp_rec buf t
   and pp_bvar buf () =  Printf.bprintf buf "Y%d" !depth in
@@ -548,8 +546,7 @@ let rec debug fmt t = match view t with
   | Exists (varty,t') ->
     Format.fprintf fmt "(exists %a %a)" LogtkType.fmt varty debug t'
   | Const s -> LogtkSymbol.fmt fmt s
-  | TyAt (l, r) ->
-    Format.fprintf fmt "(%a %a)" debug l LogtkType.fmt r
+  | TyLift ty -> LogtkType.fmt fmt ty
   | At (l, r) ->
     Format.fprintf fmt "(%a %a)" debug l debug r
   | Multiset (_, l) ->
@@ -658,13 +655,11 @@ module TPTP = struct
     | At (l,r) ->
       pp_surrounded buf l; Buffer.add_string buf " @ ";
       pp_rec buf r
-    | TyAt (l,r) ->
-      pp_surrounded buf l; Buffer.add_string buf " @ ";
-      LogtkType.pp buf r
+    | TyLift ty -> LogtkType.pp_depth !depth buf ty
     | Multiset _ -> failwith "cannot print multiset in TPTP"
     | Record _ -> failwith "cannot print records in TPTP"
     and pp_surrounded buf t = match view t with
-    | At _ | TyAt _ | Lambda _ ->
+    | At _ | Lambda _ ->
       Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
     | _ -> pp_rec buf t
     and pp_bvar buf () =  Printf.bprintf buf "Y%d" !depth in

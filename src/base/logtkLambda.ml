@@ -42,7 +42,7 @@ let rec match_types ?(subst=LogtkSubsts.empty) ty s_ty args s_args =
   | LogtkType.Fun (expected, ret), arg::args' ->
     (* match expected type with argument *)
     begin try
-      let subst = LogtkUnif.Ty.unification ~subst expected s_ty arg s_args in 
+      let subst = LogtkUnif.Ty.unification ~subst expected s_ty arg s_args in
       match_types ~subst ret s_ty args' s_args
     with LogtkUnif.Fail ->
       let msg = LogtkUtil.sprintf "error: could not unify expected type %a with %a"
@@ -95,9 +95,7 @@ let rec beta_reduce_rec ~depth env t =
       let r' = beta_reduce_rec ~depth env r in
       app_with_reduce ~depth env l' r'
     end
-  | T.TyAt (t, tyarg) ->
-    let t = beta_reduce_rec ~depth env t in
-    T.tyat t tyarg
+  | T.TyLift _ -> t
   | T.Record (l, rest) ->
     let rest = CCOpt.map (beta_reduce_rec ~depth env) rest in
     let l = List.map
@@ -133,7 +131,7 @@ let rec eta_reduce t =
   | T.Var _ | T.BVar _ | T.Const _ -> t
   | T.At (l,r) ->
     T.at (eta_reduce l) (eta_reduce r)
-  | T.TyAt (f, ty) -> T.tyat (eta_reduce f) ty
+  | T.TyLift _ -> t
   | T.Lambda (varty, t') ->
     begin match T.view t' with
       | T.BVar 0 when not (LogtkScopedTerm.DB.contains (t' :> LogtkScopedTerm.t) 0) ->

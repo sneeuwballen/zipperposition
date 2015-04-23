@@ -100,9 +100,7 @@ let normalize_collect trs t =
         let l' = reduce ~trs ~rules l in
         let r' = reduce ~trs ~rules r in
         rewrite_here ~trs ~rules (T.at l' r')
-    | T.TyAt (t, ty) ->
-        let t' = reduce ~trs ~rules t in
-        rewrite_here ~trs ~rules (T.tyat t' ty)
+    | T.TyLift _ -> t
     | T.Multiset (tau,l) ->
         let l' = List.map (reduce ~trs ~rules) l in
         rewrite_here ~trs ~rules (T.multiset ~ty:tau l')

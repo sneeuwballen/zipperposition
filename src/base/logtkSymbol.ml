@@ -36,7 +36,8 @@ type connective =
   | Xor
   | Eq
   | Neq
-  | HasLogtkType
+  | HasType
+  | LiftType
   | True
   | False
   | Exists
@@ -117,7 +118,8 @@ let to_string s = match s with
       | Xor -> "<~>"
       | Eq -> "="
       | Neq -> "≠"
-      | HasLogtkType -> ":"
+      | HasType -> ":"
+      | LiftType -> "@"
       | True -> "true"
       | False -> "false"
       | Exists -> "∃"
@@ -180,6 +182,8 @@ module Base = struct
   let lambda = Conn Lambda
   let forall_ty = Conn ForallTy
   let arrow = Conn Arrow
+  let has_type = Conn HasType
+  let lift_type = Conn LiftType
   let tType = Conn TType
   let multiset = Conn Multiset
 
@@ -236,7 +240,8 @@ module TPTP = struct
           | Imply -> "=>"
           | Equiv -> "<=>"
           | Xor -> "<~>"
-          | HasLogtkType -> ":"
+          | HasType -> ":"
+          | LiftType -> "@"
           | True -> "$true"
           | False -> "$false"
           | Exists -> "?"
