@@ -119,12 +119,7 @@ declaration:
   | l=separated_list(COMMA, record_field(BIND, TERM)) { l }
 
 type_:
-  | w=LOWER_WORD l=unary_type +
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      Term.app ~loc (Term.const ~loc (Sym.of_string w)) l
-    }
-  | l=unary_type RIGHT_ARROW r=type_
+  | l=app_type RIGHT_ARROW r=type_
     {
       let loc = L.mk_pos $startpos $endpos in
       Term.mk_fun_ty ~loc [l] r
@@ -135,21 +130,24 @@ type_:
       let v = Term.var ~loc v in
       Term.forall_ty ~loc [v] ty
     }
+  | t=app_type {t}
+
+app_type:
+  | w=LOWER_WORD args=unary_type*
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      Term.app ~loc (Term.const ~loc (Sym.of_string w)) args
+    }
   | t=unary_type { t }
 
 unary_type:
   | LEFT_PAREN t=type_ RIGHT_PAREN { t }
   | w=INTERROGATION_WORD
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      Term.var ~loc w
-    }
   | w=UPPER_WORD
     {
       let loc = L.mk_pos $startpos $endpos in
       Term.var ~loc w
     }
-  | w=LOWER_WORD
   | w=DOLLAR_WORD
   | w=DOLLAR_DOLLAR_WORD
     {
@@ -279,6 +277,11 @@ var:
     {
       let loc = L.mk_pos $startpos $endpos in
       Term.var ~loc w
+    }
+  | w=UPPER_WORD COLUMN ty=app_type
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      Term.var ~loc ~ty w
     }
 
 vars:
