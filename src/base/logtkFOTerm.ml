@@ -46,7 +46,7 @@ type view =
   | TyApp of t * LogtkType.t       (** Application to type *)
   | App of t  * t list        (** Application to a list of terms (cannot be left-nested) *)
 
-let kind = T.Kind.LogtkFOTerm
+let kind = T.Kind.FOTerm
 
 (* split list between types, terms *)
 let rec _split_types l = match l with
@@ -121,7 +121,7 @@ let hash_fun = T.hash_fun
 let hash = T.hash
 let cmp = T.cmp
 let ty t = match T.ty t with
-  | T.NoLogtkType -> assert false
+  | T.NoType -> assert false
   | T.HasLogtkType ty -> LogtkType.of_term_exn ty
 
 module TermHASH = struct
@@ -143,7 +143,7 @@ module T2LogtkCache = LogtkCache.Replacing2(TermHASH)(TermHASH)
 let cast ~(ty:LogtkType.t) t =
   match T.view t with
   | T.Var _ | T.BVar _ -> T.cast ~ty:(ty :> T.t) t
-  | T.App _ -> raise (Invalid_argument "LogtkFOTerm.cast")
+  | T.App _ -> raise (Invalid_argument "FOTerm.cast")
   | _ -> assert false
 
 (** {2 Smart constructors} *)
@@ -205,27 +205,27 @@ let is_tyapp t = match T.view t with
   | _ -> false
 
 let of_term t = match T.kind t with
-  | T.Kind.LogtkFOTerm -> Some t
+  | T.Kind.FOTerm -> Some t
   | _ -> None
 
 let of_term_exn t = match T.kind t with
-  | T.Kind.LogtkFOTerm -> t
+  | T.Kind.FOTerm -> t
   | _ -> raise (Invalid_argument "Term.of_term_exn")
 
 let is_term t = match T.kind t with
-  | T.Kind.LogtkFOTerm -> true
+  | T.Kind.FOTerm -> true
   | _ -> false
 
 module Seq = struct
   let rec vars t k =
     if T.ground t then ()
     else match T.kind t, T.view t with
-    | T.Kind.LogtkFOTerm, T.Var _ -> k t
-    | T.Kind.LogtkFOTerm, T.BVar _ -> ()
-    | T.Kind.LogtkFOTerm, T.App (f, l) ->
+    | T.Kind.FOTerm, T.Var _ -> k t
+    | T.Kind.FOTerm, T.BVar _ -> ()
+    | T.Kind.FOTerm, T.App (f, l) ->
         vars f k;
         List.iter (fun t -> vars t k) l
-    | T.Kind.LogtkFOTerm, T.At (l,r) -> vars l k; vars r k
+    | T.Kind.FOTerm, T.At (l,r) -> vars l k; vars r k
     | _ -> ()
   and _vars_list l k = match l with
     | [] -> ()
@@ -259,14 +259,14 @@ module Seq = struct
 
   let rec symbols t k =
     match T.kind t, T.view t with
-    | T.Kind.LogtkFOTerm, T.Const s -> k s
-    | T.Kind.LogtkFOTerm, T.Var _
-    | T.Kind.LogtkFOTerm, T.BVar _ -> ()
-    | T.Kind.LogtkFOTerm, T.App (f, l) ->
+    | T.Kind.FOTerm, T.Const s -> k s
+    | T.Kind.FOTerm, T.Var _
+    | T.Kind.FOTerm, T.BVar _ -> ()
+    | T.Kind.FOTerm, T.App (f, l) ->
         symbols f k;
         _symbols_list l k
-    | T.Kind.LogtkFOTerm, T.At (l,r) -> symbols l k; symbols r k
-    | T.Kind.LogtkType, _ -> ()
+    | T.Kind.FOTerm, T.At (l,r) -> symbols l k; symbols r k
+    | T.Kind.Type, _ -> ()
     | _ -> assert false
   and _symbols_list l k = match l with
     | [] -> ()
@@ -346,7 +346,7 @@ let rec head_exn t = match T.view t with
   | T.Const s -> s
   | T.At (hd, _)
   | T.App (hd,_) -> head_exn hd
-  | _ -> raise (Invalid_argument "LogtkFOTerm.head")
+  | _ -> raise (Invalid_argument "FOTerm.head")
 
 let head t =
   try Some (head_exn t)
@@ -449,7 +449,7 @@ module AC(A : AC_SPEC) = struct
             let ty = T.ty_exn t in
             let tyargs = (tyargs :> T.t list) in
             List.fold_left
-              (fun subt x -> T.app ~ty ~kind:T.Kind.LogtkFOTerm f (tyargs@[x;subt]))
+              (fun subt x -> T.app ~ty ~kind:T.Kind.FOTerm f (tyargs@[x;subt]))
               x l'
           | [] -> assert false
         end
@@ -458,11 +458,11 @@ module AC(A : AC_SPEC) = struct
         let a = normalize a in
         let b = normalize b in
         if cmp a b > 0
-          then T.app ~kind:T.Kind.LogtkFOTerm ~ty:(ty t :>T.t) f [b; a]
+          then T.app ~kind:T.Kind.FOTerm ~ty:(ty t :>T.t) f [b; a]
           else t
       | T.App (f, l) ->
         let l = List.map normalize l in
-        T.app ~kind:T.Kind.LogtkFOTerm ~ty:(T.ty_exn t) f l
+        T.app ~kind:T.Kind.FOTerm ~ty:(T.ty_exn t) f l
       | _ -> assert false
     in
     let t' = normalize t in

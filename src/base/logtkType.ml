@@ -36,7 +36,7 @@ type t = T.t
 
 type ty = t
 
-let kind = T.Kind.LogtkType
+let kind = T.Kind.Type
 
 type view =
   | Var of int              (** LogtkType variable *)
@@ -47,7 +47,7 @@ type view =
   | Forall of t             (** explicit quantification using De Bruijn index *)
 
 let view t = match T.kind t with
-  | T.Kind.LogtkType ->
+  | T.Kind.Type ->
     begin match T.view t with
     | T.Var i -> Var i
     | T.BVar i -> BVar i

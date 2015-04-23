@@ -24,7 +24,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 First-order LogtkFormulas} *)
+(** {1 First-order Formulas} *)
 
 module T = LogtkScopedTerm
 module Sym = LogtkSymbol
@@ -280,7 +280,7 @@ module Make(MyT : TERM) = struct
     | kind when kind = MyT.kind ->
       (* atoms aren't formulas! *)
       Atom (MyT.of_term_exn t)
-    | T.Kind.LogtkFormula subkind when subkind = MyT.kind ->
+    | T.Kind.Formula subkind when subkind = MyT.kind ->
       (* proper formula *)
       begin match T.view t with
       | T.Const (Sym.Conn Sym.True) -> True
@@ -307,20 +307,20 @@ module Make(MyT : TERM) = struct
       end
     | _ -> failwith "wrong kind for formula"
 
-  let kind = T.Kind.LogtkFormula MyT.kind
+  let kind = T.Kind.Formula MyT.kind
 
   let of_term t = match T.kind t with
     | kind when kind = MyT.kind -> Some t
-    | T.Kind.LogtkFormula kind when kind = MyT.kind -> Some t
+    | T.Kind.Formula kind when kind = MyT.kind -> Some t
     | _ -> None
 
   let of_term_exn t = match T.kind t with
     | kind when kind = MyT.kind -> t
-    | T.Kind.LogtkFormula kind when kind = MyT.kind -> t
-    | _ -> raise (Invalid_argument "LogtkFormula.of_term_exn")
+    | T.Kind.Formula kind when kind = MyT.kind -> t
+    | _ -> raise (Invalid_argument "Formula.of_term_exn")
 
   let is_form t = match T.kind t with
-    | T.Kind.LogtkFormula kind when kind = MyT.kind -> true
+    | T.Kind.Formula kind when kind = MyT.kind -> true
     | _ -> false
 
   (** {2 Containers} *)
@@ -358,7 +358,7 @@ module Make(MyT : TERM) = struct
       if not (LogtkType.eq ty1 ty2)
         then
           let msg = LogtkUtil.sprintf
-            "LogtkFormula.Base.eq: expect same types for %a and %a, got %a and %a"
+            "Formula.Base.eq: expect same types for %a and %a, got %a and %a"
             (MyT.pp_depth 0) t1 LogtkType.pp ty1 (MyT.pp_depth 0) t2 LogtkType.pp ty2
           in
           raise (LogtkType.Error msg)

@@ -60,10 +60,10 @@ module Kind : sig
       used *)
   type t =
     | Kind
-    | LogtkType
-    | LogtkFOTerm
-    | LogtkHOTerm
-    | LogtkFormula of t
+    | Type
+    | FOTerm
+    | HOTerm
+    | Formula of t
     | Untyped
     | Generic  (* other terms *)
 end
@@ -71,7 +71,7 @@ end
 val kind : t -> Kind.t
 
 type type_result =
-  | NoLogtkType
+  | NoType
   | HasLogtkType of t
 
 val ty : t -> type_result
@@ -79,7 +79,7 @@ val ty : t -> type_result
 
 val ty_exn : t -> t
   (** Same as {!ty}, but fails if the term has no type
-      @raise Invalid_argument if the type is [NoLogtkType] *)
+      @raise Invalid_argument if the type is [NoType] *)
 
 include LogtkInterfaces.HASH with type t := t
 include LogtkInterfaces.ORD with type t := t

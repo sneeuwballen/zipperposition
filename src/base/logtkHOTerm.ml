@@ -50,7 +50,7 @@ type view =
   | Record of (string*t) list * t option (** Record of terms *)
 
 let ty t = match T.ty t with
-  | T.NoLogtkType -> assert false
+  | T.NoType -> assert false
   | T.HasLogtkType ty -> LogtkType.of_term_exn ty
 
 let __get_ty = ty
@@ -90,9 +90,9 @@ let view t = match T.view t with
   | T.App _
   | T.SimpleApp _ -> assert false
 
-let kind = T.Kind.LogtkHOTerm
+let kind = T.Kind.HOTerm
 
-let is_term t = match T.kind t with T.Kind.LogtkHOTerm -> true | _ -> false
+let is_term t = match T.kind t with T.Kind.HOTerm -> true | _ -> false
 let of_term t =
   if is_term t then Some t else None
 let of_term_exn t =

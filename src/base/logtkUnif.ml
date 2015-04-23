@@ -145,7 +145,7 @@ let occurs_check ~env subst v sc_v t sc_t =
   let rec check ~env t sc_t =
     if T.ground t then false
     else match T.ty t with
-    | T.NoLogtkType -> false
+    | T.NoType -> false
     | T.HasLogtkType ty ->
       (* check type and subterms *)
       check ~env ty sc_t ||
@@ -201,7 +201,7 @@ module RecordLogtkUnif = struct
   let of_record t l rest =
     let r = {
       kind=T.kind t;
-      ty= (match T.ty t with T.NoLogtkType -> assert false | T.HasLogtkType ty -> ty);
+      ty= (match T.ty t with T.NoType -> assert false | T.HasLogtkType ty -> ty);
       fields = l;
       discarded = [];
       rest;
@@ -511,10 +511,10 @@ module Nary = struct
       and t, sc_t = S.get_var subst t sc_t in
       (* unify types. On success, unify terms. *)
       match T.ty s, T.ty t with
-        | T.NoLogtkType, T.NoLogtkType ->
+        | T.NoType, T.NoType ->
           unif_terms ~env subst s sc_s t sc_t k
-        | T.NoLogtkType, _
-        | _, T.NoLogtkType -> ()
+        | T.NoType, _
+        | _, T.NoType -> ()
         | T.HasLogtkType ty1, T.HasLogtkType ty2 ->
           unif ~env subst ty1 sc_s ty2 sc_t
             (fun ~env subst -> unif_terms ~env subst s sc_s t sc_t k)
@@ -586,10 +586,10 @@ module Nary = struct
       and t, sc_t = S.get_var subst t sc_t in
       (* unify types. On success, unify terms. *)
       match T.ty s, T.ty t with
-        | T.NoLogtkType, T.NoLogtkType ->
+        | T.NoType, T.NoType ->
           unif_terms ~env subst s sc_s t sc_t k
-        | T.NoLogtkType, _
-        | _, T.NoLogtkType -> ()
+        | T.NoType, _
+        | _, T.NoType -> ()
         | T.HasLogtkType ty1, T.HasLogtkType ty2 ->
           unif ~env subst ty1 sc_s ty2 sc_t
             (fun ~env subst -> unif_terms ~env subst s sc_s t sc_t k)
@@ -653,10 +653,10 @@ module Nary = struct
       and t, sc_t = S.get_var subst t sc_t in
       (* unify types. On success, unify terms. *)
       match T.ty s, T.ty t with
-        | T.NoLogtkType, T.NoLogtkType ->
+        | T.NoType, T.NoType ->
           unif_terms ~env subst s sc_s t sc_t k
-        | T.NoLogtkType, _
-        | _, T.NoLogtkType -> ()
+        | T.NoType, _
+        | _, T.NoType -> ()
         | T.HasLogtkType ty1, T.HasLogtkType ty2 ->
           unif ~env subst ty1 sc_s ty2 sc_t
             (fun ~env subst  -> unif_terms ~env subst s sc_s t sc_t k)
@@ -802,9 +802,9 @@ module Unary = struct
       and t, sc_t = S.get_var subst t sc_t in
       (* first, unify types *)
       let subst = match T.ty s, T.ty t with
-        | T.NoLogtkType, T.NoLogtkType -> subst
-        | T.NoLogtkType, _
-        | _, T.NoLogtkType -> raise Fail
+        | T.NoType, T.NoType -> subst
+        | T.NoType, _
+        | _, T.NoType -> raise Fail
         | T.HasLogtkType ty1, T.HasLogtkType ty2 ->
           unif ~env1 ~env2 subst ty1 sc_s ty2 sc_t
       in
@@ -867,9 +867,9 @@ module Unary = struct
       let s, sc_s = S.get_var subst s sc_s in
       let t, sc_t = S.get_var subst t sc_t in
       let subst = match T.ty s, T.ty t with
-        | T.NoLogtkType, T.NoLogtkType -> subst
-        | T.NoLogtkType, _
-        | _, T.NoLogtkType -> raise Fail
+        | T.NoType, T.NoType -> subst
+        | T.NoType, _
+        | _, T.NoType -> raise Fail
         | T.HasLogtkType ty1, T.HasLogtkType ty2 ->
           unif ~env1 ~env2 subst ty1 sc_s ty2 sc_t
       in
@@ -927,9 +927,9 @@ module Unary = struct
       let s, sc_s = S.get_var subst s scope in
       let t, sc_t = S.get_var subst t scope in
       let subst = match T.ty s, T.ty t with
-        | T.NoLogtkType, T.NoLogtkType -> subst
-        | T.NoLogtkType, _
-        | _, T.NoLogtkType -> raise Fail
+        | T.NoType, T.NoType -> subst
+        | T.NoType, _
+        | _, T.NoType -> raise Fail
         | T.HasLogtkType ty1, T.HasLogtkType ty2 ->
           unif ~env1 ~env2 ~blocked subst ty1 scope ty2 scope
       in
@@ -992,9 +992,9 @@ module Unary = struct
       let s, sc_s = S.get_var subst s sc_s in
       let t, sc_t = S.get_var subst t sc_t in
       let subst = match T.ty s, T.ty t with
-        | T.NoLogtkType, T.NoLogtkType -> subst
-        | T.NoLogtkType, _
-        | _, T.NoLogtkType -> raise Fail
+        | T.NoType, T.NoType -> subst
+        | T.NoType, _
+        | _, T.NoType -> raise Fail
         | T.HasLogtkType ty1, T.HasLogtkType ty2 ->
           unif ~env1 ~env2 subst ty1 sc_s ty2 sc_t
       in
@@ -1043,9 +1043,9 @@ module Unary = struct
     let t1, s1 = S.get_var subst t1 s1 in
     let t2, s2 = S.get_var subst t2 s2 in
     begin match T.ty t1, T.ty t2 with
-      | T.NoLogtkType, T.NoLogtkType -> true
-      | T.NoLogtkType, T.HasLogtkType _
-      | T.HasLogtkType _, T.NoLogtkType -> false
+      | T.NoType, T.NoType -> true
+      | T.NoType, T.HasLogtkType _
+      | T.HasLogtkType _, T.NoType -> false
       | T.HasLogtkType ty1, T.HasLogtkType ty2 -> _eq ~env1 ~env2 ~subst ty1 s1 ty2 s2
     end &&
     match T.view t1, T.view t2 with
