@@ -338,6 +338,7 @@ module Nary = struct
         DBE.set env offset (Perm perm')
       )
 
+    (*
     let print out env =
       let pp_perm out p =
         Format.fprintf out "@[<hv2>{perm%d:@,%a}@]" p.size
@@ -350,6 +351,7 @@ module Nary = struct
         | Perm p -> pp_perm out p
       in
       DBE.print pp_each out env
+    *)
   end
 
   (* do consecutive occurrences of the binder commute with one another?
@@ -388,7 +390,9 @@ module Nary = struct
     | None -> None
     | Some permutation' -> Some { env with permutation=permutation' }
 
+  (*
   let print_env out e = Permutation.print out e.permutation
+  *)
 
   (** {6 Multisets, Lists, Records} *)
 
@@ -505,8 +509,10 @@ module Nary = struct
 
   let unification ?(env1=DBE.empty) ?(env2=DBE.empty) ?(subst=S.empty) a sc_a b sc_b =
     let rec unif ~env subst s sc_s t sc_t k =
+      (*
       LogtkUtil.debugf 5 "unif: %a[%d] =?= %a[%d]@ with %a env=%a"
         T.fmt s sc_s T.fmt t sc_t S.fmt subst print_env env;
+     *)
       let s, sc_s = S.get_var subst s sc_s
       and t, sc_t = S.get_var subst t sc_t in
       (* unify types. On success, unify terms. *)
