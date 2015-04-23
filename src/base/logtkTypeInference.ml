@@ -172,7 +172,7 @@ module Ctx = struct
       let ty = match ty with
         | None ->
             (* for inferring polymorphic types! just be sure to bind it
-             * somewhere. *)
+               somewhere. *)
             let ty = _new_ty_var ctx in
             ctx.vars_ty <- ty :: ctx.vars_ty;
             ty
@@ -889,7 +889,7 @@ module HO = struct
       (* we are going to assume that the type of [t], as inferred, is a forall
           or a function (or a constant iff [l] is empty.
           We then evaluate the term to be sure to get its most precise
-          definition so far (e.g. if F = (f a), the type of F may be
+          definition so far (e.g. if [F = (f a)], the type of F may be
           more precise than just a type var. *)
       let ty_t, clos_t = infer_rec ~arity:(List.length l) ctx t in
       let n_tyargs, n_args = match LogtkType.arity (Ctx.eval_ty ctx ty_t) with

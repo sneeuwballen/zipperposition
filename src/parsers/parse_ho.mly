@@ -182,6 +182,11 @@ unary_term:
       Term.var ~loc w
     }
   | v=var { v }
+  | LEFT_PAREN v=UPPER_WORD COLUMN ty=type_ RIGHT_PAREN
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      Term.var ~loc ~ty v
+    }
   | WILDCARD
     {
       let loc = L.mk_pos $startpos $endpos in
