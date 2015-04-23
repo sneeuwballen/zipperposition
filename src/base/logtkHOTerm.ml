@@ -55,14 +55,6 @@ let ty t = match T.ty t with
 
 let __get_ty = ty
 
-(* split list between types, terms *)
-let rec _split_types l = match l with
-  | [] -> [], []
-  | x::l' when LogtkType.is_type x ->
-      let l1, l2 = _split_types l' in
-      (LogtkType.of_term_exn x)::l1, l2
-  | _ -> [], l
-
 let view t = match T.view t with
   | T.Var i -> Var i
   | T.BVar i -> BVar i
@@ -105,10 +97,10 @@ let open_at t =
   let rec collect types args t =
     match T.view t with
     | T.At (f, a) ->
-        begin match LogtkType.of_term a with
-        | None -> collect types (a::args) f
-        | Some ty -> collect (ty::types) args f
-        end
+      begin match view a with
+        | TyLift ty -> collect (ty::types) args f
+        | _ -> collect types (a::args) f
+      end
     | _ -> t, types, args
   in
   (* inline first call *)
