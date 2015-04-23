@@ -164,7 +164,7 @@ let bvar ~(ty:LogtkType.t) i =
   T.bvar ~kind ~ty:(ty :> T.t) i
 
 let tylift ty =
-  T.simple_app ~kind ~ty:(LogtkType.tType :> T.t)
+  T.simple_app ~kind ~ty:(LogtkType.type_ :> T.t)
     LogtkSymbol.Base.lift_type [(ty:LogtkType.t:>T.t)]
 
 let at l r =
@@ -502,7 +502,7 @@ let pp_depth ?(hooks=[]) depth buf t =
   | At (l,r) ->
     pp_rec buf l; Buffer.add_char buf ' ';
     pp_surrounded buf r
-  | TyLift ty -> LogtkType.pp_surrounded buf ty
+  | TyLift ty -> Printf.bprintf buf "@%a" LogtkType.pp_surrounded ty
   | Record ([], None) ->
     Buffer.add_string buf "{}"
   | Record ([], Some r) ->
@@ -655,7 +655,7 @@ module TPTP = struct
     | At (l,r) ->
       pp_surrounded buf l; Buffer.add_string buf " @ ";
       pp_rec buf r
-    | TyLift ty -> LogtkType.pp_depth !depth buf ty
+    | TyLift ty -> Printf.bprintf buf "@%a" (LogtkType.pp_depth !depth) ty
     | Multiset _ -> failwith "cannot print multiset in TPTP"
     | Record _ -> failwith "cannot print records in TPTP"
     and pp_surrounded buf t = match view t with

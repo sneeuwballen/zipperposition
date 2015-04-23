@@ -79,8 +79,8 @@ val is_forall : t -> bool
 
 (** {2 Constructors} *)
 
-val tType : t
-  (** Pseudo-type of types *)
+val type_ : t
+  (** Pseudo-type of types. Not the same as [ScopedTerm.tType] *)
 
 val var : int -> t
   (** Build a type variable.

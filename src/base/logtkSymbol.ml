@@ -111,8 +111,8 @@ let to_string s = match s with
   | Conn o ->
       begin match o with
       | Not -> "¬"
-      | And -> "∧" 
-      | Or -> "∨" 
+      | And -> "∧"
+      | Or -> "∨"
       | Imply -> "→"
       | Equiv -> "<=>"
       | Xor -> "<~>"

@@ -73,17 +73,15 @@ let is_app ty = match view ty with App _ -> true | _ -> false
 let is_fun ty = match view ty with | Fun _ -> true | _ -> false
 let is_forall ty = match view ty with | Forall _ -> true | _ -> false
 
-let tType = T.tType
-
 let var i =
-  T.var ~kind ~ty:tType i
+  T.var ~kind ~ty:T.tType i
 
-let app s l = T.simple_app ~kind ~ty:tType s l
+let app s l = T.simple_app ~kind ~ty:T.tType s l
 
-let const s = T.const ~kind ~ty:tType s
+let const s = T.const ~kind ~ty:T.tType s
 
 let arrow l r =
-  T.simple_app ~kind ~ty:tType LogtkSymbol.Base.arrow [l; r]
+  T.simple_app ~kind ~ty:T.tType LogtkSymbol.Base.arrow [l; r]
 
 let rec arrow_list l r = match l with
   | [] -> r
@@ -91,15 +89,15 @@ let rec arrow_list l r = match l with
   | x::l' -> arrow x (arrow_list l' r)
 
 let forall vars ty =
-  T.bind_vars ~kind ~ty:tType LogtkSymbol.Base.forall_ty vars ty
+  T.bind_vars ~kind ~ty:T.tType LogtkSymbol.Base.forall_ty vars ty
 
-let record l ~rest = T.record ~kind ~ty:tType l ~rest
+let record l ~rest = T.record ~kind ~ty:T.tType l ~rest
 
 let __bvar i =
-  T.bvar ~kind ~ty:tType i
+  T.bvar ~kind ~ty:T.tType i
 
 let __forall ty =
-  T.bind ~kind ~ty:tType ~varty:tType LogtkSymbol.Base.forall_ty ty
+  T.bind ~kind ~ty:T.tType ~varty:T.tType LogtkSymbol.Base.forall_ty ty
 
 let multiset ty = app LogtkSymbol.Base.multiset [ty]
 
@@ -107,22 +105,16 @@ let (<==) ret args = arrow_list args ret
 let (<=.) ret a = arrow a ret
 let (@@) = app
 
+let type_ = const (LogtkSymbol.of_string "type")
+
 (* downcast *)
-let of_term ty = match T.kind ty with
-  | T.Kind.LogtkType -> Some ty
-  | _ -> None
-
 let of_term_exn ty = match T.kind ty with
-  | T.Kind.LogtkType -> ty
-  | _ -> raise (Invalid_argument "LogtkType.of_term_exn")
+  | T.Kind.Type -> ty
+  | _ -> raise (Invalid_argument "Type.of_term_exn")
 
-let is_type t = match T.kind t with
-  | T.Kind.LogtkType -> true
-  | _ -> false
+let of_term ty = try Some (of_term_exn ty) with Invalid_argument _ -> None
 
-let () =
-  assert(not(is_type tType));
-  ()
+let is_type t = try ignore (of_term_exn t); true with Invalid_argument _ -> false
 
 (** {2 Containers} *)
 
@@ -207,13 +199,13 @@ let apply ty arg =
     then ret
     else
       let msg = LogtkUtil.sprintf
-        "LogtkType.apply: wrong argument type, expected %a but got %a" T.pp arg' T.pp arg
+        "Type.apply: wrong argument type, expected %a but got %a" T.pp arg' T.pp arg
       in _error msg
   | T.Bind (LogtkSymbol.Conn LogtkSymbol.ForallTy, _, ty') ->
       T.DB.eval (LogtkDBEnv.singleton arg) ty'
   | _ ->
       let msg = LogtkUtil.sprintf
-        "LogtkType.apply: expected quantified or function type, but got %a" T.pp ty
+        "Type.apply: expected quantified or function type, but got %a" T.pp ty
       in _error msg
 
 (* apply a type to arguments. *)
@@ -232,7 +224,7 @@ let __var =
   fun () ->
     let n = !r in
     decr r;
-    T.var ~ty:tType n
+    T.var ~ty:T.tType n
 
 type print_hook = int -> (Buffer.t -> t-> unit) -> Buffer.t -> t-> bool
 
@@ -335,7 +327,7 @@ let bij =
 
 (** {2 Misc} *)
 
-let fresh_var = T.fresh_var ~kind ~ty:tType
+let fresh_var = T.fresh_var ~kind ~ty:T.tType
 
 (** {2 Conversions} *)
 
