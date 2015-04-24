@@ -110,7 +110,7 @@ let init ext =
 let extensions () =
   Sequence.of_hashtbl _extensions
     |> Sequence.map snd
-    |> Sequence.to_rev_list
+    |> Sequence.to_list (* order matters *)
 
 let by_name name =
   try Some (Hashtbl.find _extensions name)
@@ -119,4 +119,4 @@ let by_name name =
 let names () =
   Sequence.of_hashtbl _extensions
     |> Sequence.map fst
-    |> Sequence.to_rev_list
+    |> Sequence.to_list
