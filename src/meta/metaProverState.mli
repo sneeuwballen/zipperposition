@@ -61,6 +61,21 @@ module Result : sig
   val print : Format.formatter -> t -> unit
 end
 
+(** {2 Induction} *)
+
+module Induction : sig
+  (** An inductive type *)
+  type ty = {
+    ty : Type.t;
+    cstors : (Symbol.t * Type.t) list;
+  }
+
+  val t : ty Plugin.t
+  (** Plugin that encodes the fact that a type is inductive, together
+      with the list of its constructor symbols.
+      Example: [nat, [succ; zero]] *)
+end
+
 (** {2 Interface to the Meta-prover} *)
 
 type t
@@ -119,6 +134,9 @@ module type S = sig
 
   val scan_clause : t -> C.t -> Result.t
   (** Scan a clause for axiom patterns, and save it *)
+
+  val declare_inductive : t -> E.Ctx.Induction.inductive_type -> Result.t
+  (** Declare the given inductive type *)
 
   (** {2 Inference System} *)
 

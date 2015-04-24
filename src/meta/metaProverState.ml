@@ -116,6 +116,74 @@ module Result = struct
     ()
 end
 
+(** {2 Induction} *)
+
+module Induction = struct
+  type ty = {
+    ty : Type.t;
+    cstors : (Symbol.t * Type.t) list;
+  }
+
+  let make ty cstors = {ty; cstors; }
+
+  let print out ity =
+    let pp_cstor out (s, ty) =
+      Format.fprintf out "@[%a:@,%a@]" Symbol.fmt s Type.fmt ty
+    in
+    Format.fprintf out "@[<hov2>ity{ty:@,%a,@ cstors:@,%a}@]"
+      Type.fmt ity.ty (CCList.print pp_cstor) ity.cstors
+
+  let const_cstor = Type.const (Symbol.of_string "inductive_constructor")
+
+  (* assert [τ] is inductive using
+     [inductive {ty=@τ, cstors=[cstor @ty1 c1, cstor @ty2 c2]}] *)
+  let sym_inductive = Symbol.of_string "inductive"
+  let ty_sym_inductive = Type.(forall [var 0] (
+      M.Reasoner.property_ty <=.
+      record ~rest:None [
+        "ty", var 0;
+        "cstors", multiset const_cstor
+      ]
+  ))
+
+  (* build a constructor with a term [cstor(sym)] *)
+  let sym_cstor = Symbol.of_string "cstor"
+  let ty_sym_cstor = Type.(forall [var 0] (const_cstor <== [var 0]))
+
+  let signature =
+    Signature.of_list
+      [ sym_inductive, ty_sym_inductive
+      ; sym_cstor, ty_sym_cstor
+      ]
+
+  let pred_inductive = T.const ~ty:ty_sym_inductive sym_inductive
+  let pred_cstor = T.const ~ty:ty_sym_cstor sym_cstor
+
+  let t : ty M.Plugin.t = object
+    method signature = signature
+    method owns t = match T.view t with
+      | T.At (hd, _) -> T.eq hd pred_inductive
+      | _ -> false
+    method clauses = []
+    method to_fact ity =
+      (* encode constructors *)
+      let arg = T.record ~rest:None
+        [ "ty", T.tylift ity.ty
+        ; "cstors", T.multiset ~ty:const_cstor
+            (List.map
+              (fun (s, ty_s) ->
+                (* term "cstor(ty_s, s)", roughly *)
+                T.at_full pred_cstor ~tyargs:[ty_s] [T.const ~ty:ty_s s]
+              ) ity.cstors
+            )
+        ]
+      in
+      T.at_full pred_inductive ~tyargs:[ity.ty] [arg]
+    method of_fact t =
+      None (* TODO: real implementation *)
+  end
+end
+
 (** {2 Interface to the Meta-prover} *)
 
 type t = {
@@ -130,8 +198,12 @@ type t = {
   on_pre_rewrite : pre_rewrite Signal.t;
 }
 
+let mk_prover_ =
+  let p = M.Prover.empty in
+  M.Prover.add_signature p Induction.t#signature
+
 let create () = {
-  prover = M.Prover.empty;
+  prover = mk_prover_;
   sources = LitMap.empty;
   results = Result.empty;
   new_results = Result.empty;
@@ -163,7 +235,8 @@ let on_pre_rewrite t = t.on_pre_rewrite
 
 let proof_of_explanation p exp =
   M.Reasoner.Proof.facts exp
-  |> Sequence.map (fun fact -> LitMap.find fact p.sources)
+  |> Sequence.filter_map
+    (fun fact -> try Some (LitMap.find fact p.sources) with Not_found -> None)
   |> Sequence.to_rev_list
 
 (* conversion back from meta-prover clauses *)
@@ -199,13 +272,17 @@ let get_global, clear_global =
 
 let theory_files = ref []
 let flag_print_rules = ref false
+let flag_print_signature = ref false
+let flag_print_rules_exit = ref false
 
 let add_theory f = theory_files := f :: !theory_files
 
 (* add options *)
 let () = Params.add_opts
   [ "-theory", Arg.String add_theory, " use given theory file for meta-prover"
-  ; "-print-rules", Arg.Set flag_print_rules, " print all rules of meta-prover"
+  ; "-meta-rules", Arg.Set flag_print_rules, " print all rules of meta-prover"
+  ; "-meta-summary", Arg.Set flag_print_rules_exit, " print all rules before exit"
+  ; "-meta-sig", Arg.Set flag_print_signature, " print meta signature"
   ]
 
 module type S = sig
@@ -225,6 +302,9 @@ module type S = sig
   val scan_clause : t -> C.t -> Result.t
   (** Scan a clause for axiom patterns, and save it *)
 
+  val declare_inductive : t -> E.Ctx.Induction.inductive_type -> Result.t
+  (** Declare the given inductive type *)
+
   (** {2 Inference System} *)
 
   val setup : unit -> unit
@@ -235,7 +315,7 @@ end
 (* TODO: handle ground convergent systems in Meta Prover, e.g. using
     a specific file... *)
 
-module Make(E : Env.S) = struct
+module Make(E : Env.S) : S with module E = E = struct
   module E = E
   module C = E.C
 
@@ -285,7 +365,7 @@ module Make(E : Env.S) = struct
 
   (* parse a theory file and update prover with it *)
   let parse_theory_file p filename =
-    Util.debug 1 "parse theory file %s" filename;
+    Util.debug ~section 1 "parse theory file %s" filename;
     CCError.(
       M.Prover.parse_file p.prover filename >|=
       fun (prover', consequences) ->
@@ -305,6 +385,11 @@ module Make(E : Env.S) = struct
       ) Result.empty files
     )
 
+  let add_fact_ p fact =
+    let prover', consequences = M.Prover.add_fact p.prover fact in
+    p.prover <- prover';
+    add_consequences p consequences
+
   (* scan the clause [c] with proof [proof] *)
   let scan_ p c proof =
     let fact =
@@ -313,9 +398,7 @@ module Make(E : Env.S) = struct
     in
     (* save proof for later *)
     p.sources <- LitMap.add fact proof p.sources;
-    let prover', consequences = M.Prover.add_fact p.prover fact in
-    p.prover <- prover';
-    add_consequences p consequences
+    add_fact_ p fact
 
   let scan_formula p f =
     Util.enter_prof prof_scan_formula;
@@ -336,19 +419,22 @@ module Make(E : Env.S) = struct
     Util.exit_prof prof_scan_clause;
     r
 
-  (** {6 Extension} *)
+  let declare_inductive p ity =
+    let module CI = E.Ctx.Induction in
+    let ity = Induction.make ity.CI.pattern ity.CI.constructors in
+    Util.debugf ~section 2 "@[<hv2>declare inductive type@ %a@]" Induction.print ity;
+    let fact = Induction.t#to_fact ity in
+    add_fact_ p fact
 
-  (* unary rule *)
-  let infer_lemmas p c =
+  (* be sure to scan clauses *)
+  let infer_scan p c =
     let r = scan_clause p c in
     Util.debugf ~section 3 "@[scan@ %a@ →@ %a@]" C.fmt c Result.print r;
-    List.map
-      (fun (cc, proof) ->
-         (* re-create a clause from lemma *)
-         let proof = Proof.adapt_c proof in
-         C.create_a (CompactClause.lits cc) proof
-      ) (Result.lemmas r)
+    []
 
+  (** {6 Extension} *)
+
+  (* global setup *)
   let setup () =
     clear_global ();
     let p = get_global () in
@@ -357,15 +443,37 @@ module Make(E : Env.S) = struct
          Util.debugf ~section 1 "detected theory %a" Result.pp_theory_axiom th;
          Signal.ContinueListening
       );
+    (* declare inductive types *)
+    E.Ctx.Induction.inductive_ty_seq
+      (fun ity -> ignore (declare_inductive p ity));
+    Signal.on E.Ctx.Induction.on_new_inductive_ty
+      (fun ity ->
+         ignore (declare_inductive p ity);
+         Signal.ContinueListening
+      );
     (* parse theory into [p] *)
     begin match parse_theory_files p !theory_files with
-      | `Error msg -> failwith msg
+      | `Error msg ->
+        Format.printf "error: %s@." msg;
+        raise Exit
       | `Ok r ->
         if !flag_print_rules
         then Util.debugf ~section 1 "@[<v2>rules:@ %a@]" print_rules (reasoner p)
     end;
     (* register inferences *)
-    E.add_unary_inf "meta.lemmas" (infer_lemmas p);
+    E.add_unary_inf "meta.scan" (infer_scan p);
+    (* printing *)
+    Signal.once E.on_start
+      (fun () ->
+         if !flag_print_signature then
+           Util.debugf ~section 1 "@[<hv2>signature:@,%a@]"
+             Signature.fmt (M.Prover.signature (prover p))
+      );
+    Signal.once Signals.on_exit
+      (fun _ ->
+         if !flag_print_rules_exit then
+         Util.debugf ~section 1 "@[<hv2>detected:@,%a@]" Result.print (results p)
+      );
     ()
 end
 

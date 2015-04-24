@@ -193,6 +193,12 @@ module type S = sig
     }
     (** An inductive type, along with its covering,disjoint constructors *)
 
+    val on_new_inductive_ty : inductive_type Signal.t
+    (** Triggered every time a new inductive type is declared *)
+
+    val inductive_ty_seq : inductive_type Sequence.t
+    (** Sequence of all inductive types declared so far *)
+
     val declare_ty : Type.t -> constructor list -> inductive_type
     (** Declare the given inductive type.
         @raise Failure if the type is already declared

@@ -352,6 +352,8 @@ module Make(X : PARAMETERS) = struct
       | _ ->
           _invalid_arg "expected function type, got %a" Type.pp ty
 
+    let on_new_inductive_ty = Signal.create()
+
     let declare_ty ty constructors =
       let name = _extract_hd ty in
       if constructors = []
@@ -361,17 +363,18 @@ module Make(X : PARAMETERS) = struct
       with Not_found ->
         let ity = { pattern=ty; constructors; } in
         Symbol.Tbl.add _tbl_ty name ity;
+        Signal.send on_new_inductive_ty ity;
         ity
 
-    let _seq_inductive_types yield =
+    let inductive_ty_seq yield =
       Symbol.Tbl.iter (fun _ ity -> yield ity) _tbl_ty
 
     let is_inductive_type ty =
-      _seq_inductive_types
+      inductive_ty_seq
         |> Sequence.exists (fun ity -> Unif.Ty.matches ~pattern:ity.pattern ty)
 
     let is_constructor_sym s =
-      _seq_inductive_types
+      inductive_ty_seq
         |> Sequence.flat_map (fun ity -> Sequence.of_list ity.constructors)
         |> Sequence.exists (fun (s', _) -> Symbol.eq s s')
 
@@ -650,11 +653,11 @@ module Make(X : PARAMETERS) = struct
     module Set = T.Set
 
     module Seq = struct
-      let ty = _seq_inductive_types
+      let ty = inductive_ty_seq
       let cst = _seq_inductive_cst
 
       let constructors =
-        _seq_inductive_types
+        inductive_ty_seq
         |> Sequence.flat_map (fun ity -> Sequence.of_list ity.constructors)
         |> Sequence.map fst
     end
