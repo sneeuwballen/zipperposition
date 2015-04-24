@@ -33,7 +33,6 @@ type t = {
   param_timeout : float;
   param_files : (string, CCVector.ro) CCVector.t;
   param_split : bool;             (** use splitting *)
-  param_theories : bool;          (** detect theories *)
   param_select : string;          (** name of the selection function *)
   param_progress : bool;          (** print progress during search *)
   param_proof : string;           (** how to print proof? *)
@@ -62,7 +61,6 @@ and version = ref false
 and timeout = ref 0.
 and proof = ref "debug"
 and split = ref false
-and theories = ref false
 and presaturate = ref false
 and dot_file = ref None
 and dot_sat = ref false
@@ -94,7 +92,6 @@ let parse_args () =
     ; "-split", Arg.Set split, " enable splitting"
     ; "-expand-def", Arg.Set expand_def, " expand definitions"
     ; "-progress", Arg.Unit set_progress, " print progress"
-    ; "-theories", Arg.Bool (fun b -> theories := b), " enable/disable theory detection"
     ; "-proof", Arg.Set_string proof, " choose proof printing (none, debug, or tstp)"
     ; "-presaturate", Arg.Set presaturate,
         " pre-saturate (interreduction of) the initial clause set"
@@ -115,7 +112,7 @@ let parse_args () =
   (* return parameter structure *)
   { param_ord; param_seed = !seed; param_steps = !steps;
     param_version= !version; param_timeout = !timeout;
-    param_files = files; param_select = !select; param_theories = !theories;
+    param_files = files; param_select = !select;
     param_progress = !progress; param_stats= (!Options.global).Options.stats;
     param_proof = !proof; param_split = !split;
     param_presaturate = !presaturate; param_dot_all_roots= !dot_all_roots;
