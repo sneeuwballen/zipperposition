@@ -56,6 +56,7 @@ and view = private
 type term = t
 
 val view : t -> view
+val loc : t -> location option
 
 include LogtkInterfaces.HASH with type t := t
 include LogtkInterfaces.ORD with type t := t
@@ -76,6 +77,7 @@ val at_loc : loc:location -> t -> t
 
 val wildcard : t
 
+val is_app : t -> bool
 val is_var : t -> bool
 
 module Set : Sequence.Set.S with type elt = term
