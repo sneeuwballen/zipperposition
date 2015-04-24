@@ -28,10 +28,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Basic Splitting à la Avatar} *)
 
 module T = Logtk.FOTerm
+module F = Logtk.Formula.FO
 module Lit = Literal
 module Util = Logtk.Util
 
 type 'a printer = Format.formatter -> 'a -> unit
+type formula = Logtk.Formula.FO.t
 
 let section = Logtk.Util.Section.make ~parent:Const.section "avatar"
 (** {2 Avatar} *)
@@ -43,6 +45,7 @@ let stat_splits = Util.mk_stat "avatar.splits"
 
 module type S = sig
   module E : Env.S
+  module Solver : BoolSolver.SAT
 
   val split : E.multi_simpl_rule
   (** Split a clause into components *)
@@ -68,6 +71,10 @@ module type S = sig
   val get_clause : tag:int -> E.C.t option
   (** Recover clause from the tag, if any *)
 
+  val introduce_cut : formula -> (CompactClause.t -> Proof.t) ->
+                      E.C.t list * E.Ctx.BoolLit.t
+  (** Introduce a cut on the given formula *)
+
   val register : unit -> unit
   (** Register inference rules to the environment *)
 end
@@ -77,6 +84,7 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
   module Ctx = E.Ctx
   module C = E.C
   module BoolLit = Ctx.BoolLit
+  module Solver = Sat
 
   let _pp_bclause buf lits =
     Printf.bprintf buf "%a" (Util.pp_list ~sep:" ⊔ " BoolLit.pp) lits
@@ -195,6 +203,54 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
     );
     [] (* never infers anything! *)
 
+  (* generic mechanism for adding a formula
+      and make a lemma out of it, including Skolemization, etc. *)
+  let introduce_cut f proof : C.t list * BoolLit.t =
+    let f = F.close_forall f in
+    let box = BoolLit.inject_form f in
+    (* positive clauses *)
+    let c_pos =
+      PFormula.create f (Proof.mk_f_trivial f) (* proof will be ignored *)
+      |> PFormula.Set.singleton
+      |> E.cnf
+      |> C.CSet.to_list
+      |> List.map
+        (fun c ->
+          let trail = C.Trail.singleton box in
+          C.create_a ~trail (C.lits c) proof
+        )
+    in
+    let c_neg =
+      PFormula.create (F.Base.not_ f) (Proof.mk_f_trivial f)
+      |> PFormula.Set.singleton
+      |> E.cnf
+      |> C.CSet.to_list
+      |> List.map
+        (fun c ->
+          let trail = C.Trail.singleton (BoolLit.neg box) in
+          C.create_a ~trail (C.lits c) proof
+        )
+    in
+    c_pos @ c_neg, box
+
+  (* introduce a cut for each lemma proposed by the meta-prover *)
+  let introduce_meta_lemmas (l:MetaProverState.lemma list ref) _given =
+    (* translate all new lemmas into cuts *)
+    let clauses =
+      CCList.flat_map
+        (fun (cc, proof) ->
+           assert (CompactClause.trail cc = []);
+           let f = CompactClause.to_form cc in
+           let proof = Proof.adapt_c proof in
+           let new_clauses, _box = introduce_cut f proof in
+           Util.debugf ~section 2 "@[<hv2>introduce cut from meta lemma:@,%a@]"
+             (CCList.print C.fmt) new_clauses;
+           new_clauses
+        ) !l
+    in
+    l := [];
+    clauses
+
   let before_check_sat = Signal.create()
   let after_check_sat = Signal.create()
 
@@ -232,6 +288,18 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
     E.add_multi_simpl_rule split;
     E.add_unary_inf "avatar_check_empty" check_empty;
     E.add_generate "avatar_check_sat" check_satisfiability;
+    (* meta lemmas *)
+    begin try
+      let meta = MetaProverState.get_global () in
+      Util.debug ~section 1 "found meta-prover, watch for lemmas";
+      let l = ref [] in
+      E.add_unary_inf "avatar_meta_lemmas" (introduce_meta_lemmas l);
+      Signal.on (MetaProverState.on_lemma meta)
+        (fun lemma -> l := lemma :: !l; Signal.ContinueListening)
+    with Not_found ->
+      Util.debug ~section 1 "could not find meta-prover";
+      ()
+    end;
     ()
 end
 

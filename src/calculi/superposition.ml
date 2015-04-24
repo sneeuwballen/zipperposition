@@ -311,6 +311,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | Lit.Equation (v, _, true), P.Arg(_, P.Right P.Stop) ->
             (* are we in the specific, but no that rare, case where we
                rewrite s=t using s=t (into a tautology t=t)? *)
+            (* TODO: use Unif.FO.eq? *)
             let v' = S.FO.apply ~renaming subst v sc_p in
             if T.eq t' v'
               then raise (ExitSuperposition "will yield a tautology");
@@ -1497,10 +1498,8 @@ let key = Mixtbl.access ()
 
 let register ~sup =
   let module Sup = (val sup : S) in
-  try
-    ignore (Mixtbl.find ~inj:key Sup.Env.mixtbl "superposition")
-  with Not_found ->
-    Mixtbl.set ~inj:key Sup.Env.mixtbl "superposition" sup
+  if not (Mixtbl.mem ~inj:key Sup.Env.mixtbl "superposition")
+  then Mixtbl.set ~inj:key Sup.Env.mixtbl "superposition" sup
 
 let setup_penv penv =
   let constr = Precedence.Constr.min [Symbol.Base.false_ ; Symbol.Base.true_ ] in

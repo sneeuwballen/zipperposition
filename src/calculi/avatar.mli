@@ -31,14 +31,20 @@ We don't implement all the stuff from Avatar, in particular all clauses are
 active whether or not their trail is satisfied in the current model.
 Trails are only used to make splits easier {b currently}.
 
-Future work may include locking clauses whose trails are unsatisfied. *)
+Future work may include locking clauses whose trails are unsatisfied.
+
+Depends on the "meta" extension.
+*)
 
 type 'a printer = Format.formatter -> 'a -> unit
+
+type formula = Logtk.Formula.FO.t
 
 (** {2 Avatar: splitting+sat} *)
 
 module type S = sig
   module E : Env.S
+  module Solver : BoolSolver.SAT
 
   val split : E.multi_simpl_rule
   (** Split a clause into components *)
@@ -64,11 +70,16 @@ module type S = sig
   val get_clause : tag:int -> E.C.t option
   (** Recover clause from the tag, if any *)
 
+  val introduce_cut : formula -> (CompactClause.t -> Proof.t) ->
+                      E.C.t list * E.Ctx.BoolLit.t
+  (** Introduce a cut on the given formula *)
+
   val register : unit -> unit
   (** Register inference rules to the environment *)
 end
 
-module Make(E : Env.S)(Sat : BoolSolver.SAT) : S with module E = E
+module Make(E : Env.S)(Sat : BoolSolver.SAT) : S
+  with module E = E and module Solver = Sat
 
 val extension : Extensions.t
 (** Extension that enables Avatar splitting and create a new SAT-solver. *)

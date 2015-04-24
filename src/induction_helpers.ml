@@ -171,36 +171,6 @@ module MakeAvatar(A : Avatar.S) = struct
     S.all_definitions ~ctx:Ctx.skolem
       |> Sequence.iter (S.remove_def ~ctx:Ctx.skolem)
 
-  (* generic mechanism for adding a formula
-      and make a lemma out of it, including Skolemization, etc. *)
-  let introduce_cut f proof : C.t list * BoolLit.t =
-    let f = F.close_forall f in
-    let box = BoolLit.inject_form f in
-    (* positive clauses *)
-    let c_pos =
-      PFormula.create f (Proof.mk_f_trivial f) (* proof will be ignored *)
-      |> PFormula.Set.singleton
-      |> Env.cnf
-      |> C.CSet.to_list
-      |> List.map
-        (fun c ->
-          let trail = C.Trail.singleton box in
-          C.create_a ~trail (C.lits c) proof
-        )
-    in
-    let c_neg =
-      PFormula.create (F.Base.not_ f) (Proof.mk_f_trivial f)
-      |> PFormula.Set.singleton
-      |> Env.cnf
-      |> C.CSet.to_list
-      |> List.map
-        (fun c ->
-          let trail = C.Trail.singleton (BoolLit.neg box) in
-          C.create_a ~trail (C.lits c) proof
-        )
-    in
-    c_pos @ c_neg, box
-
   (* terms that are either inductive constants or sub-constants *)
   let constants_or_sub c : T.Set.t =
     C.Seq.terms c
@@ -272,7 +242,7 @@ module MakeAvatar(A : Avatar.S) = struct
         else (
           (* introduce cut now *)
           let proof cc = Proof.mk_c_trivial ~theories:["ind"] ~info:["cut"] cc in
-          let clauses, _ = introduce_cut f proof in
+          let clauses, _ = A.introduce_cut f proof in
           List.iter (fun c -> C.set_flag flag_cut_introduced c true) clauses;
           Util.debugf ~section 2 "@[<2>introduce cut@ from %a@ @[<hv0>%a@]@]"
             C.fmt c (CCList.print ~start:"" ~stop:"" C.fmt) clauses;

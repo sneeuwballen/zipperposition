@@ -966,6 +966,7 @@ let extension =
   let action env =
     let module E = (val env : Env.S) in
     E.Ctx.lost_completeness ();
+    (* XXX use a specific Avatar because it needs QBF *)
     let sup = Mixtbl.find ~inj:Superposition.key E.mixtbl "superposition" in
     let module Sup = (val sup : Superposition.S) in
     let module Solver = (val BoolSolver.get_qbf() : BoolSolver.QBF) in

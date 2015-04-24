@@ -177,7 +177,7 @@ let extension =
     than other terms *)
   and add_constr penv = PEnv.add_constr ~penv 15 IH.constr_cstors in
   Extensions.({default with
-    name="induction_lemma";
+    name="induction_simple";
     actions=[Do action];
     penv_actions=[Penv_do add_constr];
   })

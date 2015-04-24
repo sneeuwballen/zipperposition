@@ -72,10 +72,6 @@ end
 module MakeAvatar(A : Avatar.S) : sig
   val clear_skolem_ctx : unit -> unit
 
-  val introduce_cut : formula -> (CompactClause.t -> Proof.t) ->
-                      A.E.C.t list * A.E.Ctx.BoolLit.t
-  (** Introduce a new cut *)
-
   val inf_introduce_lemmas : A.E.C.t -> A.E.C.t list
   (** Introduce lemmas heuristically based on the given clause *)
 

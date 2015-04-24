@@ -362,8 +362,8 @@ let process_file ?meta ~plugins ~params file =
   (* obtain clauses + env *)
   Util.debug ~section 2 "input formulas:\n%%  %a" (Util.pp_seq ~sep:"\n%  " PF.pp)
     (PF.Set.to_seq formulas);
-    Util.debug ~section 2 "input signature: %a"
-      Signature.pp (Signature.diff signature !Params.signature);
+  Util.debugf ~section 2 "@[<hv2>input signature:@ %a@]"
+    Signature.fmt (Signature.diff signature !Params.signature);
   let res, signature = preprocess ~signature ~params formulas in
   let module Res = (val res : Ctx.PARAMETERS) in
   (* build the context and env *)
