@@ -180,7 +180,7 @@ module Ctx = struct
             ty
         | Some ty -> ty
       in
-      (*LogtkUtil.debug ~section 5 "var %s now has number %d and type %a" name n LogtkType.pp ty;*)
+      LogtkUtil.debug ~section 5 "var %s now has number %d and type %a" name n LogtkType.pp ty;
       Hashtbl.add ctx.vars name (n,ty);
       n, ty
 
@@ -200,15 +200,11 @@ module Ctx = struct
       ~h:(fun () -> ctx.locs <- old_locs)
       ~f
 
-  (* unification of types, may raise LogtkUnif.Fail *)
-  let __unif ctx ty1 ty2 =
-    LogtkUnif.Ty.unification ~subst:ctx.subst ty1 0 ty2 0
-
-  (* unify within the context's substitution. Wraps {!__unif}
+  (* unify within the context's substitution. Wraps {!Unif.Ty.unification}
      by returning a nicer exception in case of failure *)
   let unify ctx ty1 ty2 =
     try
-      __unif ctx ty1 ty2
+      LogtkUnif.Ty.unification ~subst:ctx.subst ty1 0 ty2 0
     with LogtkUnif.Fail ->
       let ty1 = LogtkSubsts.Ty.apply_no_renaming ctx.subst ty1 0 in
       let ty2 = LogtkSubsts.Ty.apply_no_renaming ctx.subst ty2 0 in
@@ -266,14 +262,15 @@ module Ctx = struct
         (* generalize free vars, if any *)
         let ty = LogtkType.close_forall ty in
         (* add to signature *)
-        LogtkSignature.declare signature s ty)
-      ctx.symbols signature
+        LogtkSignature.declare signature s ty
+      ) ctx.symbols signature
 
+  (* only specialize variable if it's not bound *)
   let __specialize_ty_var ctx v =
-    try
-      let subst = __unif ctx v ctx.default.default_i in
-      ctx.subst <- subst
-    with LogtkUnif.Fail -> ()
+    if not (S.Ty.mem ctx.subst v 0) then (
+      LogtkUtil.debug ~section 5 "specialize type var %a" Ty.pp v;
+      ctx.subst <- S.Ty.bind ctx.subst v 0 ctx.default.default_i 0
+    )
 
   let bind_to_default ctx =
     (* try to bind the variable. Will fail if already bound to
@@ -296,7 +293,7 @@ module Ctx = struct
     LogtkSubsts.Renaming.clear ctx.renaming
 
   (* evaluate the type in the current substitution *)
-  let eval_ty ctx ty =
+  let apply_ty_no_renaming ctx ty =
     LogtkSubsts.Ty.apply_no_renaming ctx.subst ty 0
 
   (* apply substitution to type *)
@@ -736,6 +733,7 @@ module HO = struct
       | Some ty -> ty :: _convert_type_args ctx l'
       end
 
+  (* infer the type of a bound variable, and enter its scope *)
   let infer_var_scope ctx t = match t.PT.term with
     | PT.Column ({PT.term=PT.Var name}, ty) ->
       let ty = match Ctx.ty_of_prolog ctx ty with
@@ -747,7 +745,10 @@ module HO = struct
         let ty = Ctx.apply_ty ctx ty in
         T.var ~ty i)
     | PT.Var name ->
+      (* XXX be bold, allow polymorphic variables!
       let ty = ctx.Ctx.default.default_i in
+      *)
+      let ty = Ctx._new_ty_var ctx in
       let i = Ctx._enter_var_scope ctx name ty in
       ty, (fun ctx ->
         let ty = Ctx.apply_ty ctx ty in
@@ -892,12 +893,12 @@ module HO = struct
           definition so far (e.g. if [F = (f a)], the type of F may be
           more precise than just a type var. *)
       let ty_t, clos_t = infer_rec ~arity:(List.length l) ctx t in
-      let n_tyargs, n_args = match LogtkType.arity (Ctx.eval_ty ctx ty_t) with
+      let n_tyargs, n_args = match LogtkType.arity (Ctx.apply_ty_no_renaming ctx ty_t) with
         | LogtkType.NoArity -> 0, List.length l
         | LogtkType.Arity (a,b) -> a, b
       in
-      (*LogtkUtil.debug ~section 5 "fun %a : %a expects %d type args and %d args (applied to %a)"
-        PT.pp t LogtkType.pp ty_t n_tyargs n_args (LogtkUtil.pp_list PT.pp) l; *)
+      LogtkUtil.debug ~section 5 "fun %a : %a expects %d type args and %d args (applied to %a)"
+        PT.pp t LogtkType.pp ty_t n_tyargs n_args (LogtkUtil.pp_list PT.pp) l;
       (* separation between type arguments and proper term arguments,
           based on the expected arity of the head [t].
           We split [l] into the list [tyargs], containing [n_tyargs] types,
