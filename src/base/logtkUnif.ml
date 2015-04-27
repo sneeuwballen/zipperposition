@@ -440,7 +440,7 @@ module Nary = struct
          * and rest2 with { l1 | R } (t1) *)
         let r = T.const ~kind:r1.RU.kind ~ty:r1.RU.ty (LogtkSymbol.Base.fresh_var ()) in
         let t1 = RU.to_record (RU.set_rest r1 ~rest:(Some r)) in
-        let t2 = RU.to_record (RU.set_rest r1 ~rest:(Some r)) in
+        let t2 = RU.to_record (RU.set_rest r2 ~rest:(Some r)) in
         unif ~env subst rest1 sc1 t2 sc2
           (fun ~env subst -> unif ~env subst t1 sc1 rest2 sc2 k)
 
