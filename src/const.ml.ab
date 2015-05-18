@@ -27,7 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Configuration and Globals}
 
-{b DO NOT MODIFY "const.ml", IT IS GENERATED FROM "const.ml.ab" *)
+{b DO NOT MODIFY "const.ml", IT IS GENERATED FROM "const.ml.ab"} *)
 
 (* place for storage *)
 let home = "$(datadir)/"

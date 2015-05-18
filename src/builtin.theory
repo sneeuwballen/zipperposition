@@ -314,7 +314,7 @@ theory (peano_add {succ=S, zero=Z, plus=P}) <-
   holds (![X:N]: [P Z X = X]).
 
 lemma (![X:N,Y:N]: [P X (S Y) = S (P X Y)]) <-
-  theory (peano_add {succ=S, zero=_, plus=P}).
+  theory (peano_add {succ=S, zero=_, plus=P}).  % FIXME bug in record unif
 
 lemma (![X:N]: [P X Z = X]) <-
   theory (peano_add {succ=_, zero=Z, plus=P}).

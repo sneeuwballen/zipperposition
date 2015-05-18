@@ -107,7 +107,7 @@ val on_axiom : t -> axiom Signal.t
 val on_rewrite : t -> rewrite Signal.t
 val on_pre_rewrite : t -> pre_rewrite Signal.t
 
-(** {2 Interface to {!Env} *)
+(** {2 Interface to {!Env}} *)
 
 val key : (string,t) Mixtbl.injection
 
