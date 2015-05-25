@@ -266,7 +266,7 @@ let _default_weight ?(ignore_sym= !Params.signature) signature set =
     try snd (Signature.arity signature s) = 0
     with Not_found -> false
   in
-  let rank_to_symbols = Containers_advanced.CCLinq.(
+  let rank_to_symbols = Containers_advanced.(CCLinq.(
     PF.Set.to_seq set
       |> Sequence.map PF.form
       |> Sequence.flatMap F.Seq.symbols
@@ -276,7 +276,7 @@ let _default_weight ?(ignore_sym= !Params.signature) signature set =
       |> M.reverse ~cmp:CCInt.compare ()  (* frequency -> symbols *)
       |> M.iter
       |> L.run_exn
-  ) in
+  )) in
   (* map symbol -> inverse rank. We iterate on symbol equiv. classes by
     increasing frequency. *)
   let s_to_rank = Sym.Tbl.create 15 in
