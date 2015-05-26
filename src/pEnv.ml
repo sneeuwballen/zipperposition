@@ -266,7 +266,8 @@ let _default_weight ?(ignore_sym= !Params.signature) signature set =
     try snd (Signature.arity signature s) = 0
     with Not_found -> false
   in
-  let rank_to_symbols = Containers_advanced.CCLinq.(
+  let open! Containers_advanced in
+  let rank_to_symbols = CCLinq.(
     PF.Set.to_seq set
       |> Sequence.map PF.form
       |> Sequence.flatMap F.Seq.symbols
