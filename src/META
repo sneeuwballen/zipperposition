@@ -1,6 +1,6 @@
 # OASIS_START
-# DO NOT EDIT (digest: a05c2865111b6eee8f6cafc106ee6753)
-version = "0.5"
+# DO NOT EDIT (digest: d20333a4b3fa04e48699193351c46fd7)
+version = "0.5.0.1"
 description =
 "Superposition theorem prover, for first order logic with equality."
 requires =
@@ -11,7 +11,7 @@ archive(native) = "libzipperposition.cmxa"
 archive(native, plugin) = "libzipperposition.cmxs"
 exists_if = "libzipperposition.cma"
 package "quantor" (
- version = "0.5"
+ version = "0.5.0.1"
  description =
  "Superposition theorem prover, for first order logic with equality."
  requires = "libzipperposition qbf qbf.quantor"
@@ -23,7 +23,7 @@ package "quantor" (
 )
 
 package "meta" (
- version = "0.5"
+ version = "0.5.0.1"
  description =
  "Superposition theorem prover, for first order logic with equality."
  requires = "libzipperposition logtk logtk.meta"
@@ -35,7 +35,7 @@ package "meta" (
 )
 
 package "depqbf" (
- version = "0.5"
+ version = "0.5.0.1"
  description =
  "Superposition theorem prover, for first order logic with equality."
  requires = "libzipperposition qbf qbf.depqbf"
