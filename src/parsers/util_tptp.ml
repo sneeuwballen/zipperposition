@@ -109,7 +109,7 @@ let parse_lexbuf ?names buf =
     Err.fail (Printexc.to_string e)
 
 (* find file *)
-let _find_and_open filename dir = 
+let _find_and_open filename dir =
   match filename with
   | "stdin" -> stdin
   | _ ->
@@ -473,7 +473,7 @@ let signature init decls =
     method tydecl () s ty =
       begin match TypeInference.Ctx.ty_of_prolog ctx ty with
       | None -> raise (Type.Error ("expected type, got " ^ PT.to_string ty))
-      | Some ty' -> 
+      | Some ty' ->
         TypeInference.Ctx.declare ctx (Symbol.of_string s) ty'
       end
     method any_form () _ f =

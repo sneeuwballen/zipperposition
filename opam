@@ -27,6 +27,7 @@ depopts: [
     "qcheck"
     "msat"
 ]
+available: [ocaml-version >= "4.01.0"]
 tags: [ "logic" "unification" "term" ]
 homepage: "https://github.com/c-cube/logtk"
 dev-repo: "https://github.com/c-cube/logtk.git"

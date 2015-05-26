@@ -197,13 +197,15 @@ let apply ty arg =
     then ret
     else
       let msg = LogtkUtil.sprintf
-        "Type.apply: wrong argument type, expected %a but got %a" T.pp arg' T.pp arg
+          "Type.apply: wrong argument type, expected %a but got %a%a"
+            T.pp arg' T.pp arg LogtkUtil.Exn.pp_stack 30
       in _error msg
   | T.Bind (LogtkSymbol.Conn LogtkSymbol.ForallTy, _, ty') ->
       T.DB.eval (LogtkDBEnv.singleton arg) ty'
   | _ ->
       let msg = LogtkUtil.sprintf
-        "Type.apply: expected quantified or function type, but got %a" T.pp ty
+          "Type.apply: expected quantified or function type, but got %a%a"
+          T.pp ty LogtkUtil.Exn.pp_stack 30
       in _error msg
 
 (* apply a type to arguments. *)

@@ -179,6 +179,26 @@ let set_time_limit n =
   debug 1 "limit time to %ds" n;
   set_time_limit_stub n
 
+module Exn = struct
+  let pp_stack buf d =
+    Printf.bprintf buf "\nstack:\n%s"
+      (Printexc.raw_backtrace_to_string (Printexc.get_callstack d))
+
+  let fmt_stack out d =
+    Format.fprintf out "\nstack:\n%s"
+      (Printexc.raw_backtrace_to_string (Printexc.get_callstack d))
+
+  let pp_backtrace buf () =
+    if Printexc.backtrace_status () then (
+      Buffer.add_string buf "\nbacktrace:\n";
+      Buffer.add_string buf (Printexc.get_backtrace ())
+    )
+
+  let fmt_backtrace out () =
+    if Printexc.backtrace_status () then
+      Format.fprintf out "\nbacktrace:\n%s" (Printexc.get_backtrace ())
+end
+
 (** {2 profiling facilities} *)
 
 (** A profiler (do not call recursively) *)

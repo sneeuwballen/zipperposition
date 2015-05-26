@@ -396,17 +396,20 @@ let map_error_seq f seq =
   with ExitSequence s ->
     Err.fail s
 
+let _postfix_backtrace s =
+  s ^ "\nstack:\n" ^ Printexc.get_backtrace ()
+
 let _err_wrap1 f x =
   try Err.return (f x)
-  with LogtkType.Error s -> Err.fail s
+  with LogtkType.Error s -> Err.fail (_postfix_backtrace s)
 
 let _err_wrap2 f x y =
   try Err.return (f x y)
-  with LogtkType.Error s -> Err.fail s
+  with LogtkType.Error s -> Err.fail (_postfix_backtrace s)
 
 let _err_wrap3 f x y z =
   try Err.return (f x y z)
-  with LogtkType.Error s -> Err.fail s
+  with LogtkType.Error s -> Err.fail (_postfix_backtrace s)
 
 module FO = struct
   module T = LogtkFOTerm
