@@ -268,8 +268,9 @@ module Ctx = struct
   (* only specialize variable if it's not bound *)
   let __specialize_ty_var ctx v =
     if not (S.Ty.mem ctx.subst v 0) then (
-      LogtkUtil.debug ~section 5 "specialize type var %a" Ty.pp v;
-      ctx.subst <- S.Ty.bind ctx.subst v 0 ctx.default.default_i 0
+      let ty = ctx.default.default_i in
+      LogtkUtil.debug ~section 5 "specialize type var %a to %a" Ty.pp v Ty.pp ty;
+      ctx.subst <- S.Ty.bind ctx.subst v 0 ty 0
     )
 
   let bind_to_default ctx =
@@ -397,7 +398,7 @@ let map_error_seq f seq =
     Err.fail s
 
 let _postfix_backtrace s =
-  s ^ "\nstack:\n" ^ Printexc.get_backtrace ()
+  LogtkUtil.sprintf "%s%a" s LogtkUtil.Exn.pp_stack 40
 
 let _err_wrap1 f x =
   try Err.return (f x)
@@ -504,7 +505,11 @@ module FO = struct
       ty_ret, (fun ctx ->
         let args' = closure_args ctx in
         let tyargs' = List.map (Ctx.apply_ty ctx) tyargs in
-        let ty_s' = LogtkType.close_forall (Ctx.apply_ty ctx ty_s) in
+        let ty_s' = Ctx.apply_ty ctx ty_s in
+        (* XXX dangerous
+        let ty_s' = LogtkType.close_forall ty_s' in
+        LogtkUtil.debug ~section 5 "generalize type %a into %a" Ty.pp ty_s Ty.pp ty_s';
+        *)
         T.app_full (T.const ~ty:ty_s' s) tyargs' args')
     | PT.Int n ->
         let ty = ctx.Ctx.default.default_int in
