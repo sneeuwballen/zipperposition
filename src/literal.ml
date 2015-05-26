@@ -1283,8 +1283,11 @@ module Conv = struct
         in F.Base.atom p
       | Arith o ->
         ArithLit.to_form o
-      | Subset _ ->
-        failwith (Util.sprintf "cannot convert set lit %a back to a formula" pp lit)
+      | Subset (sets,a,b,sign) ->
+	 let inter = TS.mk_inter sets a
+	 and union = TS.mk_union sets b in
+	 let form = F.Base.atom (TS.mk_subset sets inter union) in
+	 if sign then form else F.Base.not_ form
 end
 
 module View = struct

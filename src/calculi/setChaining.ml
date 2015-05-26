@@ -28,9 +28,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Chaining on Sets} *)
 
 open Logtk
+open Logtk_parsers
 
+let theory_file = ref None
+let axiom_decls = ref Sequence.empty
+       
+module AT = Ast_tptp.Typed
 module Lit = Literal
 module F = Formula.FO
+module PF = PFormula
+module FT = FOTerm
 module TS = Theories.Sets
 module S = Substs
 module Lits = Literals
@@ -850,7 +857,8 @@ module Make(E : Env.S) = struct
     in aux (Array.to_list lits) 0
 
   exception Found of Lit.t list
-
+  exception Found_c of C.t list
+			   
   (** extracts a powerset expression from a list of terms *)
   let find_power ~sets terms =
     List.fold_left
@@ -862,7 +870,7 @@ module Make(E : Env.S) = struct
        | _ -> (pow,term::acc))
     (None,[]) terms
 
-  (** negative left power set rewrite rule *)
+  (** Negative left power set rewrite rule *)
   let power_neg_left c =
     Util.debug 2 "try left negative powerset simplification in %a" C.pp c;
     let lits = C.lits c in
@@ -1318,11 +1326,293 @@ module Make(E : Env.S) = struct
         lit seq
       | _ -> lit
 
+  let has_theory_file () =
+    match !theory_file with
+    | None -> false
+    | Some _ -> true
+
+  let theory_file_name () =
+    match !theory_file with
+    | Some n -> n
+    | None -> assert false
+
+  (** prepare a formula to be normalized *)
+  let cnf_form n form =
+    let sourced_form = Sourced.make ~name:(Ast_tptp.string_of_name n)
+				    ~file:(theory_file_name ()) form in
+    PF.Set.of_list [PF.of_sourced sourced_form]
+		     
+  let destruct_axiom decls =
+    let is_tff = function
+      | AT.TFF _ -> true
+      | _ -> false
+    and extract_tff = function
+      | AT.TFF (n,_,t,_) -> (n,t)
+      | _ -> assert false
+    and from_axiom (n,term) =
+      match F.view (F.open_forall term) with
+      | F.Equiv (at,t) ->
+	 (match F.view at with
+	  | F.Atom at ->
+	     (match FT.view at with
+	      | FT.App (_,[t1;t2]) -> (n,t1,t2,t)
+	      | _ -> assert false)
+	  | _ -> assert false)
+      | _ -> assert false in
+    let produce_cnf (n,t,pat,form) =
+      let cl1 = Env.cnf (cnf_form n form) in
+      let cl2 = Env.cnf (cnf_form n (F.Base.not_ form)) in
+      (n,t,pat,(cl1,cl2)) in
+    Util.debug 3 "extracting the axioms from the theory file";
+    let axioms = Sequence.filter is_tff decls in
+    let terms = Sequence.map extract_tff axioms in
+    let dest = Sequence.map from_axiom terms in
+    Sequence.iter (fun (n,t,pat,form) ->
+		   Util.debug 3 "Axiom %a: %a, %a, %a" Ast_tptp.pp_name n
+			      FT.pp t FT.pp pat F.pp form) dest;
+    Util.debug 3 "precooking the cnf forms of the axioms of the theory"; 
+    let cnfs = Sequence.map produce_cnf dest in
+    Sequence.iter (fun (n,_,_,(pos,neg)) ->
+		   Util.debug 3
+                     "Axiom %a:\npositive cnf:\n  %a\nnegative cnf: \n  %a"
+                     Ast_tptp.pp_name n
+		     (Util.pp_seq ~sep:"\n  " C.pp)
+		     (C.CSet.to_seq pos)
+		     (Util.pp_seq ~sep:"\n  " C.pp)
+		     (C.CSet.to_seq neg)) cnfs;
+    cnfs
+
+  (** try to find a term that matches the pattern pat *)
+  let rec find_matching acc pat = function
+    | [] -> raise Not_found
+    | a::tl ->
+       (try (Unif.FO.matching pat 0 a 1,acc@tl) with
+	| Unif.Fail -> find_matching (acc@[a]) pat tl)
+
+  (** create as Skolem symbols for the variables of the head term *)
+  let create_skolems t =
+    let subst = Substs.empty in
+    match FT.view t with
+    | FT.Var n ->
+       let ty = FT.ty t in
+       let k = Sko.fresh_sym ~ctx:Ctx.skolem ~ty:ty in
+       Ctx.declare k ty;
+       (*         Ctx.update_prec (Sequence.singleton k);*)
+       let k_term = FT.const ~ty:ty k in
+       let subst = Substs.FO.bind subst t 0 k_term 0 in
+       (k_term,subst)
+    | _ -> assert false
+
+  (** compute the cnf form of a clause (which needs to be normalized) *)
+  let cnf_clause n c =
+    let lits = C.lits c in
+    let form = Lits.to_form lits in
+    let psform = cnf_form n form in
+    Env.cnf psform
+
+
+  let debug_clause cset =
+    Util.debug 3 "Debug clauses:";
+    C.CSet.iter cset
+		(fun c ->
+		 let lits = C.lits c in
+		 Array.iter (fun lit ->
+			     Util.debug 3 "Literal : %a" Lit.pp lit;
+			     let (_,a,b,_) = Lit.View.get_subset_exn lit in
+			     let tya = FT.ty (List.hd a) in
+			     let tyb = FT.ty (List.hd b) in
+			     Util.debug 3 "Type de a : %a" Type.pp tya;
+			     Util.debug 3 "Type de b : %a" Type.pp tyb) lits)
+
+		
+  (** generator for negative left rules *)
+  let generate_rule_neg_left (n,t,pat,(cl1,cl2)) =
+    (fun c ->
+     Util.debug 2 "try left negative %a simplification in %a"
+		Ast_tptp.pp_name n C.pp c;
+     let lits = C.lits c in
+     let eligible = C.Eligible.(filter Lit.is_subset) in
+     let new_clauses =
+       (try Lits.fold_subset ~sign:false ~eligible lits []
+         (fun acc lit pos ->
+	  let clf = cl1 in
+	  Util.debug 3 "try left negative %a simplification in %a"
+		     Ast_tptp.pp_name n Lit.pp lit;
+	  let sets,a,b,_ = Lit.View.get_subset_exn lit in
+	  let idx = Lits.Pos.idx pos in
+	  let context = CCArray.except_idx lits idx in
+	  try
+	    (let subst,a = find_matching [] pat a in
+	     Util.debug 3 "matching found";
+	     let renaming = Ctx.renaming_clear () in
+	     let nt = Substs.FO.apply subst ~renaming t 0 in
+	     let clf = C.CSet.of_list 
+			 (List.map (fun c ->
+				    C.apply_subst ~renaming subst c 0)
+	 			   (C.CSet.to_list clf)) in
+	     let context = List.map (fun lit ->
+				     Lit.apply_subst ~renaming subst lit 0)
+				    context in
+	     Util.debug 3 "head term after substitution: %a" FT.pp nt;
+	     Util.debug 3 "positive cnf after substitution:";
+	     Util.debug 3 "%a" (Util.pp_seq ~sep:"\n  " C.pp)
+			(C.CSet.to_seq clf);
+	     let renaming = Ctx.renaming_clear () in
+	     let (k,subst) = create_skolems nt in
+	     let clf = C.CSet.of_list 
+			  (List.map (fun c ->
+				     C.apply_subst ~renaming subst c 0)
+				    (C.CSet.to_list clf)) in
+	     let context = List.map (fun lit ->
+				     Lit.apply_subst ~renaming subst lit 0)
+				    context in
+	     Util.debug 3 "positive cnf after substitution:";
+	     Util.debug 3 "%a" (Util.pp_seq ~sep:"\n  " C.pp)
+			(C.CSet.to_seq clf);
+	     let clf = C.CSet.fold clf C.CSet.empty
+				   (fun acc _ c ->
+				    C.CSet.union acc (cnf_clause n c)) in
+	     Util.debug 3 "positive cnf after normalization:";
+	     Util.debug 3 "%a" (Util.pp_seq ~sep:"\n  " C.pp)
+			(C.CSet.to_seq clf);
+	     Util.debug 3 "adding the context to the set of clauses";
+	     let name_rule = Ast_tptp.string_of_name n in
+             let proof cc = Proof.mk_c_inference
+			      ~theories:["sets"]
+			      ~rule:("left negative "^name_rule) cc
+			      [C.proof c] in
+	     let clf = C.CSet.of_list
+			 (List.map (fun c ->
+		           let lits = Array.to_list (C.lits c) in
+			   let c = C.create ~parents:[c] (lits@context)
+					    proof in
+			   Util.debug 3 "One clause generated: %a" C.pp c;
+			   c) (C.CSet.to_list clf)) in
+	     Util.debug 3 "generating the side clauses";
+	     let sing_k = TS.mk_singleton ~sets k in
+	     let clf =
+	       if a = [] then clf
+	       else
+		 (let lita = Lit.mk_subset ~sets ~sign:true [sing_k] a in
+		  let new_ca = C.create ~parents:[c] (lita::context) proof in
+		  Util.debug 3 "One clause generated: %a" C.pp new_ca;
+		  C.CSet.add clf new_ca) in
+	     let litb = Lit.mk_subset ~sets ~sign:false [sing_k] b in
+	     let new_cb = C.create ~parents:[c] (litb::context) proof in
+	     Util.debug 3 "One clause generated: %a" C.pp new_cb;
+	     let clf = C.CSet.add clf new_cb in
+	     raise (Found_c (C.CSet.to_list clf)))
+	  with
+	  | Not_found -> [])
+	 with
+	 | Found_c c -> c) in
+     match new_clauses with
+     | [] -> None
+     | _ -> Some new_clauses)
+		 
+
+  (** generator for negative right rules *)
+  let generate_rule_neg_right (n,t,pat,(cl1,cl2)) =
+    (fun c ->
+     Util.debug 2 "try right negative %a simplification in %a"
+		Ast_tptp.pp_name n C.pp c;
+     let lits = C.lits c in
+     let eligible = C.Eligible.(filter Lit.is_subset) in
+     let new_clauses =
+       (try Lits.fold_subset ~sign:false ~eligible lits []
+         (fun acc lit pos ->
+	  let clf = cl2 in
+	  Util.debug 3 "try right negative %a simplification in %a"
+		     Ast_tptp.pp_name n Lit.pp lit;
+	  let sets,a,b,_ = Lit.View.get_subset_exn lit in
+	  let idx = Lits.Pos.idx pos in
+	  let context = CCArray.except_idx lits idx in
+	  try
+	    (let subst,b = find_matching [] pat b in
+	     Util.debug 3 "matching found";
+	     let renaming = Ctx.renaming_clear () in
+	     let nt = Substs.FO.apply subst ~renaming t 0 in
+	     let clf = C.CSet.of_list 
+			 (List.map (fun c ->
+				    C.apply_subst ~renaming subst c 0)
+	 			   (C.CSet.to_list clf)) in
+	     let context = List.map (fun lit ->
+				     Lit.apply_subst ~renaming subst lit 0)
+				    context in
+	     Util.debug 3 "head term after substitution: %a" FT.pp nt;
+	     Util.debug 3 "negative cnf after substitution:";
+	     Util.debug 3 "%a" (Util.pp_seq ~sep:"\n  " C.pp)
+			(C.CSet.to_seq clf);
+	     let renaming = Ctx.renaming_clear () in
+	     let (k,subst) = create_skolems nt in
+	     let clf = C.CSet.of_list 
+			  (List.map (fun c ->
+				     C.apply_subst ~renaming subst c 0)
+				    (C.CSet.to_list clf)) in
+	     let context = List.map (fun lit ->
+				     Lit.apply_subst ~renaming subst lit 0)
+				    context in
+	     Util.debug 3 "positive cnf after substitution:";
+	     Util.debug 3 "%a" (Util.pp_seq ~sep:"\n  " C.pp)
+			(C.CSet.to_seq clf);
+	     let clf = C.CSet.fold clf C.CSet.empty
+				   (fun acc _ c ->
+				    C.CSet.union acc (cnf_clause n c)) in
+	     Util.debug 3 "positive cnf after normalization:";
+	     Util.debug 3 "%a" (Util.pp_seq ~sep:"\n  " C.pp)
+			(C.CSet.to_seq clf);
+	     Util.debug 3 "adding the context to the set of clauses";
+	     let name_rule = Ast_tptp.string_of_name n in
+             let proof cc = Proof.mk_c_inference
+			      ~theories:["sets"]
+			      ~rule:("right negative "^name_rule) cc
+			      [C.proof c] in
+	     let clf = C.CSet.of_list
+			 (List.map (fun c ->
+		           let lits = Array.to_list (C.lits c) in
+			   let c = C.create ~parents:[c] (lits@context)
+					    proof in
+			   Util.debug 3 "One clause generated: %a" C.pp c;
+			   c) (C.CSet.to_list clf)) in
+	     Util.debug 3 "generating the side clauses";
+	     let sing_k = TS.mk_singleton ~sets k in
+	     let clf =
+	       if a = [] then clf
+	       else
+		 (let lita = Lit.mk_subset ~sets ~sign:true [sing_k] a in
+		  let new_ca = C.create ~parents:[c] (lita::context) proof in
+		  Util.debug 3 "One clause generated: %a" C.pp new_ca;
+		  C.CSet.add clf new_ca) in
+	     let litb = Lit.mk_subset ~sets ~sign:false [sing_k] b in
+	     let new_cb = C.create ~parents:[c] (litb::context) proof in
+	     Util.debug 3 "One clause generated: %a" C.pp new_cb;
+	     let clf = C.CSet.add clf new_cb in
+	     raise (Found_c (C.CSet.to_list clf)))
+	  with
+	  | Not_found -> [])
+	 with
+	 | Found_c c -> c) in
+     match new_clauses with
+     | [] -> None
+     | _ -> Some new_clauses)
+      
+  (** generator for all the rules *)
+  let generate_rules cnfs =
+    Util.debug 3 "generating the rules from the theory file";
+    Sequence.iter (fun c ->
+		   Util.debug 3 "coucou left";
+		   Env.add_multi_simpl_rule (generate_rule_neg_left c);
+		   Util.debug 3 "coucou right";
+		   Env.add_multi_simpl_rule (generate_rule_neg_right c)) cnfs;
+    Util.debug 3 "Done"
+		  
   let setup () =
     Util.debug 1 "setup set chaining";
     Env.add_cnf_option (Cnf.PostNNF preprocess);
     Ctx.Lit.add_from_hook (Lit.Conv.set_hook_from ~sets);
     Ctx.Lit.add_to_hook (Lit.Conv.set_hook_to);
+    if (has_theory_file ()) then
+      (let cnfs = destruct_axiom !axiom_decls in generate_rules cnfs);
     Env.add_binary_inf "positive_chaining" positive_chaining;
     Env.add_binary_inf "negative_chaining_left" negative_chaining_left;
     Env.add_binary_inf "negative_chaining_right" negative_chaining_right;
@@ -1330,7 +1620,7 @@ module Make(E : Env.S) = struct
     Env.add_unary_inf "factoring_left" factoring_left;
     Env.add_multi_simpl_rule rewrite_set_eq;
     Env.add_multi_simpl_rule rewrite_set_neq;
-    Env.add_multi_simpl_rule power_neg_left;
+    (*    Env.add_multi_simpl_rule power_neg_left;*)
     Env.add_rw_simplify singleton_pos;
     Env.add_multi_simpl_rule singleton_neg;
     Env.add_multi_simpl_rule singleton_elim;
@@ -1344,12 +1634,36 @@ module Make(E : Env.S) = struct
     *)
     ()
 end
-
+			   
+let get_axioms_from_file file sign =
+  let open CCError in
+  match file with  
+  | None -> return (sign,Sequence.empty)
+  | Some file ->
+     Util.debug 3 "processing set theory file";
+     Util_tptp.parse_file ~recursive:false file
+     >>= fun decls ->
+     Util_tptp.infer_types (`sign sign) decls
+     >>= fun (signature,decls) ->
+     Util.debug 3 "input signature: %a" Signature.pp signature;
+     return (signature,decls)
+ 			   
 let _initial_setup () =
-  (* declare types for set operators *)
-  Util.debug 3 "declaring set types...";
+  (* introduce types for set operators *)
+  Util.debug 3 "introducing set types...";
   let set_signature = Theories.Sets.signature !_theory in
-  Params.signature := Signature.merge !Params.signature set_signature;
+  (* process the theory file if any *)
+  let (sign,decls) =
+    (match (get_axioms_from_file !theory_file set_signature) with
+     | `Error msg ->
+	print_endline msg;
+	exit 1
+     | `Ok (sign,decls) -> (sign,decls)) in
+  (* declare types for set operators (with types of the theory if any) *)
+  Util.debug 3 "declaring set types...";
+  Params.signature := Signature.merge !Params.signature sign;
+  (* declare the theory axioms if any (to be skolemized later) *)
+  axiom_decls := decls;
   (* add hooks (printing, lit conversion) *)
   FOTerm.add_hook (Theories.Sets.print_hook ~sets:!_theory);
   ()
@@ -1367,9 +1681,9 @@ let extension =
 
 let () =
   Params.add_opts
-    [ "-set"
-      , Arg.Unit (fun () -> Extensions.register extension)
-      , "enable set chaining"
+    [ "-set",Arg.Unit (fun () -> Extensions.register extension),
+      " enable set chaining";
+      "-set-theory", Arg.String (fun file -> theory_file := Some file),
+      " provide a file of axioms for set theory"
     ];
   ()
-
