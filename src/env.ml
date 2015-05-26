@@ -645,34 +645,3 @@ end) : S with module Ctx = X.Ctx = struct
 
   let mixtbl = Mixtbl.create 15
 end
-
-(* TODO: put meta-prover into its own Extension!
-(** Do one step of the meta-prover. The current given clause and active set
-    are provided. This returns a list of new clauses. *)
-let meta_step c =
-  let results = match (get_meta env) with
-  | None -> []
-  | Some prover -> begin
-    (* forward scanning *)
-    let results = MetaProverState.scan_clause prover c in
-    (* backward scanning, if needed *)
-    let results' =
-      if MetaProverState.has_new_patterns prover
-        then MetaProverState.scan_set prover env.state#active_set#clauses
-        else [] in
-    let results = List.rev_append results' results in
-    (* use results *)
-    Util.list_flatmap
-      begin fun result -> match result with
-        | MetaProverState.Deduced (f,parents) ->
-          (* reduce result in CNF *)
-          let cset = cnf (PF.Set.singleton f) in
-          C.CSet.to_list cset
-        | MetaProverState.Theory (th_name, th_args, lit) ->
-          []
-      end
-      results
-    end
-  in
-  Sequence.of_list results
-*)

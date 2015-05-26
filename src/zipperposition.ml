@@ -161,43 +161,12 @@ end) = struct
   let print_json_stats ~env =
     let encode_hashcons (x1,x2,x3,x4,x5,x6) =
       Util.sprintf "[%d, %d, %d, %d, %d, %d]" x1 x2 x3 x4 x5 x6 in
-    (*
-    let theories = match (Env.get_meta ~env) with
-      | None -> "[]"
-      | Some meta ->
-        let seq = MetaProverState.theories meta in
-        Util.sprintf "[%a]" (Util.pp_seq MetaProverState.pp_theory) seq
-    in
-    *)
     let o = Util.sprintf
       "{ \"terms\": %s, \"clauses\": %s }"
       (encode_hashcons (ScopedTerm.hashcons_stats ()))
       (encode_hashcons (C.CHashcons.stats ()))
     in
     Util.debug ~section 1 "json_stats: %s" o
-
-  (* TODO
-  (** Make an optional meta-prover and parse its KB *)
-  let mk_meta ~params =
-    if params.param_theories then begin
-      (* create meta *)
-      let meta = MetaProverState.create () in
-      (* handle KB *)
-      begin match MetaProverState.parse_kb_file meta params.param_kb with
-      | Monad.Err.Ok () -> ()
-      | Monad.Err.Error msg -> Util.debug ~section 0 "error: %s" msg
-      end;
-      (* read some theory files *)
-      List.iter
-        (fun file ->
-          match MetaProverState.parse_theory_file meta file with
-          | Monad.Err.Ok () -> ()
-          | Monad.Err.Error msg -> Util.debug ~section 0 "%s" msg)
-        params.param_kb_load;
-      Some meta
-    end else
-      None
-  *)
 
   (* pre-saturation *)
   let presaturate_clauses clauses =
@@ -239,26 +208,12 @@ end) = struct
     end;
     ()
 
-  (*
-  let print_meta ~env =
-    (* print theories *)
-    match Env.get_meta ~env with
-    | Some meta ->
-      Util.debug ~section 1 "meta-prover results (%d): %a"
-        (Sequence.length (MetaProverState.results meta))
-        (Util.pp_seq MetaProverState.pp_result) (MetaProverState.results meta);
-      Util.debug ~section 1 "datalog contains %d clauses"
-        (MetaReasoner.size (MetaProverState.reasoner meta))
-    | None -> ()
-  *)
-
   let _sat () =
     if !has_conjecture then "CounterSatisfiable" else "Satisfiable"
   let _unsat () =
     if !has_conjecture then "Theorem" else "Unsatisfiable"
 
-  let print_szs_result ~file result =
-    match result with
+  let print_szs_result ~file result = match result with
     | Saturate.Unknown
     | Saturate.Timeout ->
       Printf.printf "%% SZS status ResourceOut for '%s'\n" file

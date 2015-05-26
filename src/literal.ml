@@ -997,7 +997,6 @@ module Comp = struct
 end
 
 module Pos = struct
-
   type split = {
     lit_pos : Position.t;
     term_pos : Position.t;

@@ -345,6 +345,11 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let proof c = c.hcproof
 
+  let update_proof c f =
+    let new_proof = f c.hcproof (compact c) in
+    create_a ~parents:c.hcparents ~selected:c.hcselected
+      ~trail:c.trail c.hclits (fun _ -> new_proof)
+
   let is_empty c =
     Lits.is_absurd c.hclits && Trail.is_empty c.trail
 

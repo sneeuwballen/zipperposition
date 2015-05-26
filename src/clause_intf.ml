@@ -204,6 +204,11 @@ module type S = sig
   val proof : t -> Proof.t
     (** Extract its proof from the clause *)
 
+  val update_proof : t -> (Proof.t -> CompactClause.t -> Proof.t) -> t
+    (** [update_proof c f] creates a new clause that is
+        similar to [c] in all aspects, but with
+        the proof [f (proof c) (compact c)] *)
+
   val stats : unit -> (int*int*int*int*int*int)
     (** hashconsing stats *)
 
