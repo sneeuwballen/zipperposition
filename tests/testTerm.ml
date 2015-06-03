@@ -116,7 +116,7 @@ let check_ground_novar =
   let gen = ArTerm.default in
   let pp = T.to_string in
   let prop t =
-    T.is_ground t = Sequence.is_empty (T.Seq.vars t)  (* ground <=> no vars *)
+    not (T.is_ground t) || Sequence.is_empty (T.Seq.vars t)  (* ground => no vars *)
   in
   mk_test ~n:1000 ~pp ~name:"term_ground_has_no_var" gen prop
 
