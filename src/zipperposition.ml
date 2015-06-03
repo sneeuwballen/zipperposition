@@ -46,8 +46,6 @@ module Import = struct
   open! Induction
   open! Induction_simple
   open! Zipperposition_msat
-  open! Zipperposition_quantor  (* TODO: remove, should be a plugin *)
-  open! Zipperposition_depqbf
 end
 
 let section = Const.section
