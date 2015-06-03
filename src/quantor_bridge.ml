@@ -1,7 +1,7 @@
 
 (*
 Zipperposition: a functional superposition prover for prototyping
-Copyright (c) 2013, Simon Cruanes
+Copyright (c) 2013-2015, Simon Cruanes
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Bridge to the [Qbf.Quantor] module} *)
+(** {1 Interface to Quantor} *)
 
 module BS = BoolSolver
 
@@ -245,3 +245,4 @@ let () =
     init_actions=[Init_do(fun () -> BS.register_qbf qbf_solver)]
   } in
   register e
+

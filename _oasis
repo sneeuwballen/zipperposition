@@ -17,9 +17,13 @@ Description:
     superposition. It aims at being flexible and extensible while retaining
     decent performance (using indexing, for instance).
 
-Flag "depqbf"
-  Description:  Use depqbf solver
+Flag "meta"
+  Description:  Enable plugin for the meta-prover
   Default:      false
+
+#Flag "depqbf"
+#  Description:  Use depqbf solver
+#  Default:      false
 
 Flag "quantor"
   Description:  Use quantor solver
@@ -42,33 +46,19 @@ Library "libzipperposition"
   InternalModules:  lib/LazyGraph, lib/SmallSet,
                     lib/UnionFind, lib/Choice, lib/Mixtbl, lib/Signal,
                     msat/Zipperposition_msat
-                    # , quantor/Zipperposition_quantor  # TODO make plugins
-                    # , depqbf/Zipperposition_depqbf
   BuildDepends:     containers, containers.advanced, sequence, gen, unix,
                     zarith, containers.io, logtk, logtk.meta, logtk.parsers,
-                    dynlink, qbf, msat,
-                    ppx_deriving.std
-                    #qbf.quantor, qbf.depqbf # TODO fix
+                    dynlink, qbf, msat, ppx_deriving.std
 
-# TODO dynamic loading?
-Library "libzipperposition_quantor"
-  Path:             src/quantor/
-  Modules:          Zipperposition_quantor
-  BuildDepends:     libzipperposition, qbf, qbf.quantor
+Library "libzipperposition_meta"
+  Path:             src/meta/
+  Pack:             false
+  Modules:          MetaProverState
+  FindlibName:      meta
   FindlibParent:    libzipperposition
-  FindlibName:      quantor
-  Build$:           flag(quantor)
-  Install$:         flag(quantor)
-
-# TODO dynamic loading?
-Library "libzipperposition_depqbf"
-  Path:             src/depqbf
-  Modules:          Zipperposition_depqbf
-  BuildDepends:     libzipperposition, qbf, qbf.depqbf
-  FindlibParent:    libzipperposition
-  FindlibName:      depqbf
-  Build$:           flag(depqbf)
-  Install$:         flag(depqbf)
+  Build$:           flag(meta)
+  Install$:         flag(meta)
+  BuildDepends:     libzipperposition,logtk,logtk.meta
 
 # main executable for the prover
 Executable zipperposition
@@ -78,6 +68,17 @@ Executable zipperposition
   MainIs:           zipperposition.ml
   BuildDepends:     containers, sequence, unix, logtk, logtk.parsers, dynlink,
                     libzipperposition
+
+# prover with QBF
+Executable zipperposition_quantor
+  Path:             src/
+  Install:          true
+  CompiledObject:   native
+  MainIs:           zipperposition_quantor.ml
+  BuildDepends:     containers, sequence, unix, logtk, logtk.parsers, dynlink,
+                    libzipperposition, qbf.quantor
+  Build$:           flag(quantor)
+  Install$:         flag(quantor)
 
 Document libzipperposition
   Title:                Documentation for Zipperposition
