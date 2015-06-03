@@ -45,6 +45,7 @@ type init_action =
 
 type t = {
   name : string;
+  prio : int;  (** the lower, the more urgent, the earlier it is loaded *)
   penv_actions : penv_action list;
   init_actions : init_action list;
   actions : action list;
@@ -55,6 +56,7 @@ type t = {
 
 let default = {
   name="<no name>";
+  prio = 50;
   penv_actions = [];
   init_actions = [];
   actions = [];
@@ -107,10 +109,16 @@ let init ext =
   Util.debug ~section 5 "run init actions of %s" ext.name;
   List.iter (fun (Init_do f) -> f ()) ext.init_actions
 
+let cmp_prio_name a b =
+  if a.prio = b.prio
+  then String.compare a.name b.name
+  else compare a.prio b.prio
+
 let extensions () =
   Sequence.of_hashtbl _extensions
     |> Sequence.map snd
-    |> Sequence.to_list (* order matters *)
+    |> Sequence.sort_uniq ~cmp:cmp_prio_name  (* sort by increasing priority *)
+    |> Sequence.to_list
 
 let by_name name =
   try Some (Hashtbl.find _extensions name)

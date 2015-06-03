@@ -979,6 +979,7 @@ let extension =
   and add_constr penv = PEnv.add_constr ~penv 15 IH.constr_cstors in
   Extensions.({default with
     name="induction";
+    prio = Superposition.extension.prio + 10;
     actions=[Do action];
     penv_actions=[Penv_do add_constr];
   })
