@@ -95,7 +95,7 @@ val set_time_limit : int -> unit
 
     requires [ocaml >= 4.01]
 
-    @since NEXT_RELEASE *)
+    @since 0.8 *)
 
 module Exn : sig
   val pp_stack : Buffer.t -> int -> unit

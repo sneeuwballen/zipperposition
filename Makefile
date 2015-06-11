@@ -62,7 +62,7 @@ VERSION=$(shell awk '/^Version:/ {print $$2}' _oasis)
 
 update_next_tag:
 	@echo "update version to $(VERSION)..."
-	sed -i "s/NEXT_VERSION/$(VERSION)/g" src/**/*.ml src/**/*.mli
-	sed -i "s/NEXT_RELEASE/$(VERSION)/g" src/**/*.ml src/**/*.mli
+	zsh -c 'sed -i "s/NEXT_VERSION/$(VERSION)/g" src/**/*.ml{,i}(.)'
+	zsh -c 'sed -i "s/NEXT_RELEASE/$(VERSION)/g" src/**/*.ml{,i}(.)'
 
 .PHONY: push_doc tags rst_doc open_doc test-all

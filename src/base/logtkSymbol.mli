@@ -39,7 +39,7 @@ type connective =
   | Eq
   | Neq
   | HasType
-  | LiftType (** @since NEXT_RELEASE *)
+  | LiftType (** @since 0.8 *)
   | True
   | False
   | Exists

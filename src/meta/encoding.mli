@@ -54,7 +54,7 @@ val foclause_of_clause : Formula.FO.t list -> foclause
 
 val clause_of_foclause : foclause -> Formula.FO.t list
   (** Convert back to a list of formulas
-      @since NEXT_RELEASE *)
+      @since 0.8 *)
 
 val pp_clause : (Buffer.t -> 'a -> unit) -> Buffer.t -> 'a clause -> unit
   (** Printer of clauses *)

@@ -266,17 +266,17 @@ val is_fo : t -> bool
 
 val close_forall : t -> t
 (** Universally quantify all free variables
-    @since NEXT_RELEASE *)
+    @since 0.8 *)
 
 val close_exists : t -> t
 (** Existentially quantify all free variables
-    @since NEXT_RELEASE *)
+    @since 0.8 *)
 
 val open_forall : ?offset:int -> t -> t
 (** [open_forall t] removes all prenex "forall" quantifiers with fresh
     variables
     @param offset use this offset to generate fresh free variables
-    @since NEXT_RELEASE *)
+    @since 0.8 *)
 
 (* TODO: move Lambda-calculus operators here *)
 
