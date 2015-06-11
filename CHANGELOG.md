@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.8
+
+### breaking
+- breaking: remove `Type.tType`, makes no sense in the end
+- breaking: `HOterm`: replace `TyAt` with `TyLift` (lifts a type to a term)
+- breaking: add explicit `forall/exists` to `HOTerm`, remove rigid var case
+
+### non-breaking
+- fix bug in Type Inference
+- more error reporting using `Printexc` and backtraces (requires `ocaml >= 4.01`)
+- improve printers
+- fix bug in `HOterm.open_at`
+- convert `@τ` into `τ` in type inference, if required (application)
+- `parser_ho`:
+  * accept `(var:type)` as a term
+  * fix ambiguities, parse `@a` (type lifted to term)
+  * now lifts types to terms
+  * fix parser so it handles forall/exists and has no ambiguity
+- rename some constructors (prefixed with 'Logtk' because of overkill sed)
+- bugfix in builtin.theory
+- meta-prover: remove rigidification, use explicit quantifiers, udpdate builtin.theory
+- meta-prover: use sections for debug, forbid rigid vars in axioms/theories
+- add function in meta-prover encoding
+- update vim syntax for theory files
+- add a few functions to `HOTerm`
+- printer in meta/encoding
+- enable logtk.meta by default
+
 ## 0.7
 
 - breaking: remove array utils from `LogktUtil`, use `CCArray` instead
