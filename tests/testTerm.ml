@@ -46,9 +46,9 @@ let x = HOT.var ~ty 0
 let y = HOT.var ~ty 1
 
 let test_db_shift () =
-  let t = HOT.mk_lambda [x] (f x (g (HOT.bvar ~ty 0))) in
+  let t = HOT.lambda [x] (f x (g (HOT.bvar ~ty 0))) in
   let t' = HOT.of_term_exn (ScopedTerm.DB.shift 1 (t:HOT.t:>ScopedTerm.t)) in
-  let t1 = HOT.mk_lambda [x] (f x (g (HOT.bvar ~ty 1))) in
+  let t1 = HOT.lambda [x] (f x (g (HOT.bvar ~ty 1))) in
   assert_equal ~cmp:HOT.eq ~printer:HOT.to_string t1 t';
   ()
 
@@ -63,8 +63,8 @@ let test_beta_reduce () =
   let redex =
     let x' = HOT.var ~ty:Type.(ty <=. ty) 2 in
     HOT.at
-      (HOT.mk_lambda [x'] (f (HOT.at x' a) (HOT.at x' b)))
-      (HOT.mk_lambda [x] (g x))
+      (HOT.lambda [x'] (f (HOT.at x' a) (HOT.at x' b)))
+      (HOT.lambda [x] (g x))
   in
   let t' = Lambda.beta_reduce redex in
   let t1 = f (g a) (g b) in
@@ -116,7 +116,7 @@ let check_ground_novar =
   let gen = ArTerm.default in
   let pp = T.to_string in
   let prop t =
-    T.is_ground t = Sequence.is_empty (T.Seq.vars t)  (* ground <=> no vars *)
+    not (T.is_ground t) || Sequence.is_empty (T.Seq.vars t)  (* ground => no vars *)
   in
   mk_test ~n:1000 ~pp ~name:"term_ground_has_no_var" gen prop
 

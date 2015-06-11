@@ -32,6 +32,10 @@ module T = ScopedTerm
 module FOT = FOTerm
 module HOT = HOTerm
 
+type 'a printer = Format.formatter -> 'a -> unit
+
+let section = Util.Section.make ~parent:Util.Section.logtk "meta"
+
 (** {2 Base definitions} *)
 
 type 'a lit =
@@ -63,7 +67,7 @@ type hoclause = hoterm clause
 (* convert a list of formulas into a clause *)
 let foclause_of_clause l =
   let module F = Formula.FO in
-  Util.debug 5 "foclause_of_clause %a" (Util.pp_list F.pp) l;
+  Util.debug ~section 5 "foclause_of_clause %a" (Util.pp_list F.pp) l;
   let term_of_form f = match F.view f with
     | F.Atom t -> t
     | _ -> raise (Invalid_argument (Util.sprintf "expected term, got formula %a" F.pp f))
@@ -78,6 +82,16 @@ let foclause_of_clause l =
       | _ -> Prop (term_of_form f, true)
     ) l
 
+let clause_of_foclause l =
+  let module F = Formula.FO in
+  List.map
+    (function
+      | Eq (a, b, sign) -> F.Base.mk_eq sign a b
+      | Prop (a, sign) -> F.Base.mk_atom sign a
+      | Bool true -> F.Base.true_
+      | Bool false -> F.Base.false_
+    ) l
+
 let pp_clause pp_t buf c =
   Util.pp_list ~sep:" | "
     (fun buf lit -> match lit with
@@ -87,6 +101,16 @@ let pp_clause pp_t buf c =
       | Prop (a, false) -> Printf.bprintf buf "~ %a" pp_t a
       | Bool b -> Printf.bprintf buf "%B" b
     ) buf c
+
+let print_clause pp_t out c =
+  CCList.print ~start:"" ~stop:"" ~sep:" | "
+    (fun buf lit -> match lit with
+     | Eq (a, b, true) -> Format.fprintf buf "@[%a = %a@]" pp_t a pp_t b
+     | Eq (a, b, false) -> Format.fprintf buf "@[%a != %a@]" pp_t a pp_t b
+     | Prop (a, true) -> pp_t buf a
+     | Prop (a, false) -> Format.fprintf buf "@[~ %a@]" pp_t a
+     | Bool b -> Format.fprintf buf "%B" b
+    ) out c
 
 (** {6 Encoding abstraction} *)
 
@@ -121,39 +145,6 @@ let currying =
       |> List.map opt_seq_lit
       |> ListOpt.sequence_m
   end
-
-(** {6 Rigidifying variables}
-This step replaces free variables by rigid variables. It is needed for
-pattern detection to work correctly.
-
-At this step two encodings are available, one that actually rigidifies
-free variables (for encoding the problem's clauses) and one
-that should only be used for the theory declarations (where free vars
-are already rigid) *)
-
-module RigidTerm = struct
-  type t = HOT.t
-
-  let eq = HOT.eq
-  let hash_fun = HOT.hash_fun
-  let hash = HOT.hash
-  let cmp = HOT.cmp
-  let pp = HOT.pp
-  let to_string = HOT.to_string
-  let fmt = HOT.fmt
-
-  let __magic t = t
-end
-
-let rigidifying = object
-  method encode c = fmap_clause HOT.rigidify c
-  method decode c = Some (fmap_clause HOT.unrigidify c)
-end
-
-let already_rigid = object
-  method encode c = c
-  method decode c = Some c
-end
 
 (** {6 Clause encoding}
 
@@ -231,9 +222,10 @@ let __decode_lit t = match HOT.open_at t with
 let clause_prop = object
   method encode c =
     let lits = List.map __encode_lit c in
-    HOT.multiset ~ty:Type.TPTP.o lits
+    HOT.close_forall (HOT.multiset ~ty:Type.TPTP.o lits)
 
   method decode c =
+    let c = HOT.open_forall c in
     match HOT.view c with
     | HOT.Multiset (_,l) -> Some (List.map __decode_lit l)
     | _ -> None

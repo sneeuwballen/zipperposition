@@ -122,7 +122,7 @@ module Ctx : sig
         @raise LogtkType.Error if it is not possible *)
 end
 
-(** {2 Closures} 
+(** {2 Closures}
 A closure is a function that returns a ['a] value if provided with a proper
 type inference context. It is useful to delay the translation
 from untyped terms to typed terms, because locally we don't have applied all

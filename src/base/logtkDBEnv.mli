@@ -58,6 +58,9 @@ val pop : 'a t -> 'a t
   (** Exit a scope, removing the top binding.
       @raise Invalid_argument if the env is empty *)
 
+val pop_many : 'a t -> int -> 'a t
+  (** [pop_many env n] calls [pop env] [n] times *)
+
 val size : 'a t -> int
   (** Number of scopes (number of times {!push} or {!push_none} were
       called to produce the given environement) *)
@@ -87,3 +90,8 @@ val map : ('a -> 'b) -> 'a t -> 'b t
 
 val of_list : (int * 'a) list -> 'a t
   (** Map indices to objects *)
+
+type 'a printer = Format.formatter -> 'a -> unit
+
+val print : 'a printer -> 'a t printer
+

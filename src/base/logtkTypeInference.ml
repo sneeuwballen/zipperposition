@@ -30,6 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
 module Ty = LogtkType
+module PT = LogtkPrologTerm
 module S = LogtkSubsts
 module Sym = LogtkSymbol
 module Loc = LogtkParseLocation
@@ -132,8 +133,9 @@ module Ctx = struct
       else _new_ty_var ctx :: _new_ty_vars ctx (n-1)
 
   (* convert a prolog term into a type *)
-  let ty_of_prolog ctx ty =
-    LogtkType.Conv.of_prolog ~ctx:ctx.tyvars ty
+  let rec ty_of_prolog ctx ty = match PT.view ty with
+    | PT.Syntactic(Sym.Conn Sym.LiftType, [ty]) -> ty_of_prolog ctx ty
+    | _ -> LogtkType.Conv.of_prolog ~ctx:ctx.tyvars ty
 
   (* error-raising function *)
   let __error ctx msg =
@@ -172,19 +174,15 @@ module Ctx = struct
       let ty = match ty with
         | None ->
             (* for inferring polymorphic types! just be sure to bind it
-             * somewhere. *)
+               somewhere. *)
             let ty = _new_ty_var ctx in
             ctx.vars_ty <- ty :: ctx.vars_ty;
             ty
         | Some ty -> ty
       in
-      (*LogtkUtil.debug ~section 5 "var %s now has number %d and type %a" name n LogtkType.pp ty;*)
+      LogtkUtil.debug ~section 5 "var %s now has number %d and type %a" name n LogtkType.pp ty;
       Hashtbl.add ctx.vars name (n,ty);
       n, ty
-
-  (* a rigid variable starts with "?" *)
-  let _is_rigid_var_name name =
-    name <> "" && name.[0] = '?'
 
   (* enter new scope for the variable with this name *)
   let _enter_var_scope ctx name ty =
@@ -202,15 +200,11 @@ module Ctx = struct
       ~h:(fun () -> ctx.locs <- old_locs)
       ~f
 
-  (* unification of types, may raise LogtkUnif.Fail *)
-  let __unif ctx ty1 ty2 =
-    LogtkUnif.Ty.unification ~subst:ctx.subst ty1 0 ty2 0
-
-  (* unify within the context's substitution. Wraps {!__unif}
+  (* unify within the context's substitution. Wraps {!Unif.Ty.unification}
      by returning a nicer exception in case of failure *)
   let unify ctx ty1 ty2 =
     try
-      __unif ctx ty1 ty2
+      LogtkUnif.Ty.unification ~subst:ctx.subst ty1 0 ty2 0
     with LogtkUnif.Fail ->
       let ty1 = LogtkSubsts.Ty.apply_no_renaming ctx.subst ty1 0 in
       let ty2 = LogtkSubsts.Ty.apply_no_renaming ctx.subst ty2 0 in
@@ -268,14 +262,16 @@ module Ctx = struct
         (* generalize free vars, if any *)
         let ty = LogtkType.close_forall ty in
         (* add to signature *)
-        LogtkSignature.declare signature s ty)
-      ctx.symbols signature
+        LogtkSignature.declare signature s ty
+      ) ctx.symbols signature
 
+  (* only specialize variable if it's not bound *)
   let __specialize_ty_var ctx v =
-    try
-      let subst = __unif ctx v ctx.default.default_i in
-      ctx.subst <- subst
-    with LogtkUnif.Fail -> ()
+    if not (S.Ty.mem ctx.subst v 0) then (
+      let ty = ctx.default.default_i in
+      LogtkUtil.debug ~section 5 "specialize type var %a to %a" Ty.pp v Ty.pp ty;
+      ctx.subst <- S.Ty.bind ctx.subst v 0 ty 0
+    )
 
   let bind_to_default ctx =
     (* try to bind the variable. Will fail if already bound to
@@ -298,7 +294,7 @@ module Ctx = struct
     LogtkSubsts.Renaming.clear ctx.renaming
 
   (* evaluate the type in the current substitution *)
-  let eval_ty ctx ty =
+  let apply_ty_no_renaming ctx ty =
     LogtkSubsts.Ty.apply_no_renaming ctx.subst ty 0
 
   (* apply substitution to type *)
@@ -401,20 +397,22 @@ let map_error_seq f seq =
   with ExitSequence s ->
     Err.fail s
 
+let _postfix_backtrace s =
+  LogtkUtil.sprintf "%s%a" s LogtkUtil.Exn.pp_stack 40
+
 let _err_wrap1 f x =
   try Err.return (f x)
-  with LogtkType.Error s -> Err.fail s
+  with LogtkType.Error s -> Err.fail (_postfix_backtrace s)
 
 let _err_wrap2 f x y =
   try Err.return (f x y)
-  with LogtkType.Error s -> Err.fail s
+  with LogtkType.Error s -> Err.fail (_postfix_backtrace s)
 
 let _err_wrap3 f x y z =
   try Err.return (f x y z)
-  with LogtkType.Error s -> Err.fail s
+  with LogtkType.Error s -> Err.fail (_postfix_backtrace s)
 
 module FO = struct
-  module PT = LogtkPrologTerm
   module T = LogtkFOTerm
   module F = LogtkFormula.FO
 
@@ -507,7 +505,11 @@ module FO = struct
       ty_ret, (fun ctx ->
         let args' = closure_args ctx in
         let tyargs' = List.map (Ctx.apply_ty ctx) tyargs in
-        let ty_s' = LogtkType.close_forall (Ctx.apply_ty ctx ty_s) in
+        let ty_s' = Ctx.apply_ty ctx ty_s in
+        (* XXX dangerous
+        let ty_s' = LogtkType.close_forall ty_s' in
+        LogtkUtil.debug ~section 5 "generalize type %a into %a" Ty.pp ty_s Ty.pp ty_s';
+        *)
         T.app_full (T.const ~ty:ty_s' s) tyargs' args')
     | PT.Int n ->
         let ty = ctx.Ctx.default.default_int in
@@ -725,7 +727,6 @@ module FO = struct
 end
 
 module HO = struct
-  module PT = LogtkPrologTerm
   module T = LogtkHOTerm
 
   type untyped = PT.t
@@ -740,6 +741,7 @@ module HO = struct
       | Some ty -> ty :: _convert_type_args ctx l'
       end
 
+  (* infer the type of a bound variable, and enter its scope *)
   let infer_var_scope ctx t = match t.PT.term with
     | PT.Column ({PT.term=PT.Var name}, ty) ->
       let ty = match Ctx.ty_of_prolog ctx ty with
@@ -751,7 +753,10 @@ module HO = struct
         let ty = Ctx.apply_ty ctx ty in
         T.var ~ty i)
     | PT.Var name ->
+      (* XXX be bold, allow polymorphic variables!
       let ty = ctx.Ctx.default.default_i in
+      *)
+      let ty = Ctx._new_ty_var ctx in
       let i = Ctx._enter_var_scope ctx name ty in
       ty, (fun ctx ->
         let ty = Ctx.apply_ty ctx ty in
@@ -780,17 +785,13 @@ module HO = struct
       let i, ty = Ctx._get_var ctx ~ty name in
       ty, (fun ctx ->
         let ty' = Ctx.apply_ty ctx ty in
-        if Ctx._is_rigid_var_name name
-          then T.rigid_var ~ty:ty' i
-          else T.var ~ty:ty' i)
+        T.var ~ty:ty' i)
     | PT.Var name ->
       (* (possibly) untyped var *)
       let i, ty = Ctx._get_var ctx name in
       ty, (fun ctx ->
         let ty' = Ctx.apply_ty ctx ty in
-        if Ctx._is_rigid_var_name name
-          then T.rigid_var ~ty:ty' i
-          else T.var ~ty:ty' i)
+        T.var ~ty:ty' i)
     | PT.Const (Sym.Conn Sym.Wildcard) ->
       let ty = Ctx._new_ty_var ctx in
       (* generate fresh term variable *)
@@ -798,7 +799,16 @@ module HO = struct
       ty, (fun ctx ->
         let ty = Ctx.apply_ty ctx ty in
         Ctx.apply_ho ctx (T.const ~ty x))
-    | PT.Bind (Sym.Conn Sym.Lambda, [], t) ->
+    | PT.Syntactic (Sym.Conn Sym.LiftType, [ty]) ->
+      let ty = match Ctx.ty_of_prolog ctx ty with
+        | Some ty -> ty
+        | None -> Ctx.__error ctx "expected type, got %a" PT.pp ty
+      in
+      ty, (fun ctx ->
+        let ty' = Ctx.apply_ty ctx ty in
+        T.tylift ty'
+      )
+    | PT.Bind (Sym.Conn (Sym.Lambda | Sym.Forall | Sym.Exists), [], t) ->
       infer_rec ~arity ctx t
     | PT.Bind (Sym.Conn Sym.Lambda, [v], t) ->
       let ty_v, clos_v = infer_var_scope ctx v in
@@ -811,10 +821,32 @@ module HO = struct
       ty, (fun ctx ->
         let t' = clos_t ctx in
         let v' = clos_v ctx in
-        T.mk_lambda [v'] t')
+        T.lambda [v'] t')
+    | PT.Bind (Sym.Conn ((Sym.Forall | Sym.Exists) as conn), [v], t) ->
+      let ty_v, clos_v = infer_var_scope ctx v in
+      let ty_t, clos_t = LogtkUtil.finally
+        ~f:(fun () -> infer_rec ctx t)
+        ~h:(fun () -> exit_var_scope ctx v)
+      in
+      (* XXX: relax this: type must be prop *)
+      (*Ctx.unify_and_set ctx ty_t ctx.Ctx.default.default_prop;*)
+      (* same type as ty_t *)
+      ty_t, (fun ctx ->
+          let t' = clos_t ctx in
+          let v' = clos_v ctx in
+          (match conn with
+           | Sym.Forall -> T.forall
+           | Sym.Exists -> T.exists
+           | _ -> assert false
+          ) [v'] t'
+      )
     | PT.Bind (Sym.Conn Sym.Lambda, v::vs, t) ->
       (* on-the-fly conversion to unary lambdas *)
       infer_rec ~arity ctx (PT.TPTP.lambda [v] (PT.TPTP.lambda vs t))
+    | PT.Bind (Sym.Conn Sym.Forall, v::vs, t) ->
+      infer_rec ~arity ctx (PT.TPTP.forall [v] (PT.TPTP.forall vs t))
+    | PT.Bind (Sym.Conn Sym.Exists, v::vs, t) ->
+      infer_rec ~arity ctx (PT.TPTP.exists [v] (PT.TPTP.exists vs t))
     | PT.List l ->
       let ty_l, l' = List.split (List.map (infer_rec ~arity ctx) l) in
       let l' = Closure.seq l' in
@@ -866,15 +898,15 @@ module HO = struct
       (* we are going to assume that the type of [t], as inferred, is a forall
           or a function (or a constant iff [l] is empty.
           We then evaluate the term to be sure to get its most precise
-          definition so far (e.g. if F = (f a), the type of F may be
+          definition so far (e.g. if [F = (f a)], the type of F may be
           more precise than just a type var. *)
       let ty_t, clos_t = infer_rec ~arity:(List.length l) ctx t in
-      let n_tyargs, n_args = match LogtkType.arity (Ctx.eval_ty ctx ty_t) with
+      let n_tyargs, n_args = match LogtkType.arity (Ctx.apply_ty_no_renaming ctx ty_t) with
         | LogtkType.NoArity -> 0, List.length l
         | LogtkType.Arity (a,b) -> a, b
       in
-      (*LogtkUtil.debug ~section 5 "fun %a : %a expects %d type args and %d args (applied to %a)"
-        PT.pp t LogtkType.pp ty_t n_tyargs n_args (LogtkUtil.pp_list PT.pp) l; *)
+      LogtkUtil.debug ~section 5 "fun %a : %a expects %d type args and %d args (applied to %a)"
+        PT.pp t LogtkType.pp ty_t n_tyargs n_args (LogtkUtil.pp_list PT.pp) l;
       (* separation between type arguments and proper term arguments,
           based on the expected arity of the head [t].
           We split [l] into the list [tyargs], containing [n_tyargs] types,

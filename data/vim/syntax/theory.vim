@@ -21,7 +21,8 @@ set expandtab
 
 syn case match
 
-syn keyword     theoryRole        axiom theory holds lemma
+syn keyword     theoryRole        val axiom theory holds
+syn keyword     theoryRole        lemma rewrite pre_rewrite
 
 syn match       theoryDollar      "\<\$\w+\>"
 syn match       theoryDollarDollar "\<\$\$\w+\>"
@@ -34,13 +35,13 @@ syn match       theoryConnective  "|"
 syn match       theoryConnective  "&"
 syn match       theoryConnective  "="
 syn match       theoryConnective  "=>"
+syn match       theoryConnective  "-->"
 syn match       theoryConnective  "->"
 syn match       theoryConnective  "<-"
 syn match       theoryConnective  "<="
 syn match       theoryConnective  "<=>"
 syn match       theoryConnective  "<\~>"
 syn match       theoryConnective  "!"
-syn match       theoryConnective  "?"
 syn match       theoryConnective  "!>"
 syn match       theoryConnective  "!="
 syn match       theoryConnective  "\~"
@@ -49,6 +50,8 @@ syn match       theoryConnective  "\*"
 syn match       theoryConnective  ">"
 
 syn match       theoryVar         "\<\u\w*\>"
+
+syn match       theoryMetaVar     "?\w*\>"
 
 " errors
 
@@ -60,7 +63,7 @@ syn match       theoryVar         "\<\u\w*\>"
 syn region      theoryParen       matchgroup=theoryDelim start="("  end=")" contains=ALLBUT,theoryParenError keepend contained
 syn region      theoryParen       matchgroup=theoryDelim start="\[" end="\]" contains=ALLBUT,theoryBraceError keepend contained
 
-syn keyword	theoryTodo	contained TODO BUG FIX
+syn keyword	theoryTodo	containedin=theoryComment TODO FIXME BUG FIX
 
 syn region      theoryComment	start=+/\*+ end=+\*/+ contains=theoryTodo
 syn match       theoryComment     contains=TODO +%.*+
@@ -91,6 +94,7 @@ if version >= 508 || !exists("did_theory_syntax_inits")
   HiLink theoryDoubleQuote        String
 
   HiLink theoryVar                Constant
+  HiLink theoryMetaVar            Special
 
   HiLink theoryBraceError         Error
   HiLink theoryParenError         Error

@@ -135,7 +135,7 @@ module Make(T : TERM) = struct
     | Stop
 
   type t = {
-    tbl : node H.t;               (* table of nodes *)              
+    tbl : node H.t;               (* table of nodes *)
     stack : stack_cell Stack.t;   (* backtrack stack. Last element always=Stop *)
     mutable stack_size : int;     (* number of Checkpoint *)
   }
@@ -411,19 +411,20 @@ module HO = Make(struct
   let subterms t = match T.view t with
     | T.Const _
     | T.Var _
-    | T.RigidVar _
     | T.BVar _ -> []
-    | T.Lambda (_,t') -> [t']
+    | T.Lambda (_,t') | T.Forall (_, t') | T.Exists (_, t') -> [t']
     | T.At (t1, t2) -> [t1;t2]
-    | T.TyAt(t,_) -> [t]
+    | T.TyLift _ -> []
     | T.Multiset (_,l) -> l
     | T.Record _ -> assert false   (* TODO *)
 
   let update_subterms t l = match T.view t, l with
-    | (T.Const _ | T.Var _ | T.BVar _ | T.RigidVar _), [] -> t
+    | (T.Const _ | T.Var _ | T.BVar _), [] -> t
     | T.At _, [t1'; t2'] -> T.at t1' t2'
-    | T.TyAt(_,ty), [t'] -> T.tyat t' ty
+    | T.TyLift _, [] -> t
     | T.Lambda (varty, _), [t'] -> T.__mk_lambda ~varty t'
+    | T.Forall (varty, _), [t'] -> T.__mk_forall ~varty t'
+    | T.Exists (varty, _), [t'] -> T.__mk_exists ~varty t'
     | T.Multiset(ty,_), l -> T.multiset ~ty l
     | T.Record _, _ -> assert false (* TODO *)
     | _ -> assert false

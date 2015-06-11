@@ -30,6 +30,8 @@ open Logtk
 
 module HOT = HOTerm
 
+let section = Util.Section.make ~parent:Util.Section.logtk "meta"
+
 (** {2 Meta-level property}
 A meta-level statement is just a higher-order term. *)
 
@@ -257,7 +259,7 @@ let __process state =
     let c, proof = Queue.pop state.to_process in
     if not (Clause.Map.mem c state.db.all)
     then begin
-      Util.debug 5 "meta-reasoner: add clause %a" Clause.pp c;
+      Util.debug ~section 5 "meta-reasoner: add clause %a" Clause.pp c;
       (* new clause: insert its proof in state.db.all, then update fixpoint *)
       state.db <- {state.db with all=Clause.Map.add c proof state.db.all;};
       match c.Clause.body with

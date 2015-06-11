@@ -72,9 +72,13 @@ rule token = parse
   | "&&" { AND }
   | "||" { OR }
   | "=" { EQ }
+  | "@" { AT }
   | "/\\" { FORALL_TY }
   | "!=" { NEQ }
   | ":" { COLUMN }
+  | "!" { FORALL }
+  | "?" { EXISTS }
+  | "^" { LAMBDA }
   | "val" { VAL }
   | lower_word { LOWER_WORD(Lexing.lexeme lexbuf) }
   | dollar_word { DOLLAR_WORD(Lexing.lexeme lexbuf) }

@@ -34,10 +34,10 @@ type symbol = Sym.t
 module Kind = struct
   type t =
     | Kind
-    | LogtkType
-    | LogtkFOTerm
-    | LogtkHOTerm
-    | LogtkFormula of t
+    | Type
+    | FOTerm
+    | HOTerm
+    | Formula of t
     | Untyped
     | Generic  (* other terms *)
 end
@@ -65,7 +65,7 @@ and view =
   | At of t * t             (** Curried application *)
   | SimpleApp of symbol * t list  (** For representing special constructors *)
 and type_result =
-  | NoLogtkType
+  | NoType
   | HasLogtkType of t
 
 type term = t
@@ -73,7 +73,7 @@ type term = t
 let view t = t.term
 let ty t = t.ty
 let ty_exn t = match t.ty with
-  | NoLogtkType -> raise (Invalid_argument "LogtkScopedTerm.ty_exn")
+  | NoType -> raise (Invalid_argument "LogtkScopedTerm.ty_exn")
   | HasLogtkType ty -> ty
 let kind t = t.kind
 
@@ -84,7 +84,7 @@ let cmp t1 t2 = Pervasives.compare t1.id t2.id
 
 let _hash_ty t h =
   match t.ty with
-  | NoLogtkType -> h
+  | NoType -> h
   | HasLogtkType ty -> Hash.int_ ty.id (Hash.string_ "type" h)
 
 let _hash_norec t h =
@@ -135,7 +135,7 @@ let rec _eq_norec t1 t2 =
     Sym.eq s1 s2 && _eq_list l1 l2
   | _ -> false
 and _eq_ty t1 t2 = match t1.ty, t2.ty with
-  | NoLogtkType, NoLogtkType -> true
+  | NoType, NoType -> true
   | HasLogtkType ty1, HasLogtkType ty2 -> eq ty1 ty2
   | _ -> false
 and _eq_list l1 l2 = match l1, l2 with
@@ -345,7 +345,7 @@ let simple_app ~kind ~ty s l =
 let mk_at = at
 
 let tType =
-  let my_t = _make ~kind:Kind.Kind ~ty:NoLogtkType (Const (Sym.Conn Sym.TType)) in
+  let my_t = _make ~kind:Kind.Kind ~ty:NoType (Const (Sym.Conn Sym.TType)) in
   set_flag my_t flag_ground;
   H.hashcons my_t
 
@@ -415,7 +415,7 @@ module DB = struct
   (* sequence2 of [De Bruijn, depth] pairs *)
   let rec _to_seq ~depth t k =
     begin match t.ty with
-      | NoLogtkType -> ()
+      | NoType -> ()
       | HasLogtkType ty -> _to_seq ~depth ty k
     end;
     match view t with
@@ -482,7 +482,7 @@ module DB = struct
     bound variable. *)
   let _fold_map ~depth acc ~on_bvar ~on_binder t =
     let rec recurse ~depth acc t = match t.ty with
-    | NoLogtkType ->
+    | NoType ->
       assert (t == tType);
       t
     | HasLogtkType ty ->
@@ -563,7 +563,7 @@ module DB = struct
   (* recurse and replace [sub]. *)
   let rec _replace depth ~sub t =
     match t.ty with
-    | NoLogtkType ->
+    | NoType ->
       assert (t == tType);
       t
     | HasLogtkType ty ->
@@ -608,7 +608,7 @@ module DB = struct
 
   let rec _eval env t =
     match t.ty with
-    | NoLogtkType ->
+    | NoType ->
       assert (t == tType);
       t
     | HasLogtkType ty ->
@@ -656,7 +656,7 @@ let bind_vars ~kind ~ty s vars t =
       assert (is_var v);
       let t' = DB.replace (DB.shift 1 t) ~sub:v in
       let varty = match v.ty with
-        | NoLogtkType -> failwith "LogtkScopedTerm.bind_vars: variable has no type"
+        | NoType -> failwith "LogtkScopedTerm.bind_vars: variable has no type"
         | HasLogtkType ty -> ty
       in
       bind ~kind ~ty ~varty s t')
@@ -756,7 +756,7 @@ module Seq = struct
   let types t k =
     let rec types t =
       begin match t.ty with
-      | NoLogtkType -> ()
+      | NoType -> ()
       | HasLogtkType ty -> k ty
       end;
       match view t with
@@ -795,7 +795,7 @@ module Pos = struct
   let rec at t pos = match view t, pos with
     | _, P.LogtkType pos' ->
         begin match t.ty with
-        | NoLogtkType -> invalid_arg "wrong position: term has no type"
+        | NoType -> invalid_arg "wrong position: term has no type"
         | HasLogtkType ty -> at ty pos'
         end
     | _, P.Stop -> t
@@ -807,7 +807,7 @@ module Pos = struct
     | At (l,r), P.Left subpos -> at l subpos
     | At (l,r), P.Right subpos -> at r subpos
     | Multiset l, P.Arg (n,subpos) when n < List.length l ->
-        at (List.nth l n) subpos 
+        at (List.nth l n) subpos
     | Record (_, Some r), P.Record_rest subpos ->
         at r subpos
     | Record (l, _), P.Record_field (name, subpos) ->
@@ -824,7 +824,7 @@ module Pos = struct
 
   let rec replace t pos ~by = match t.ty, view t, pos with
     | _, _, P.Stop -> by
-    | NoLogtkType, _, P.LogtkType pos' -> invalid_arg "wrong position: term has no type"
+    | NoType, _, P.LogtkType pos' -> invalid_arg "wrong position: term has no type"
     | HasLogtkType ty, _, P.LogtkType pos' ->
         let ty = replace ty pos' ~by in
         cast ~ty t
@@ -894,7 +894,7 @@ let rec replace t ~old ~by = match t.ty, view t with
     record_get ~kind:t.kind ~ty (replace r ~old ~by) name
   | HasLogtkType ty, RecordSet (r, name, sub) ->
     record_set ~kind:t.kind ~ty (replace r ~old ~by) name (replace sub ~old ~by)
-  | NoLogtkType, _ -> t
+  | NoType, _ -> t
   | _, (Var _ | BVar _ | RigidVar _ | Const _) -> t
 
 (** {3 Variables} *)
@@ -1028,6 +1028,10 @@ let pp_depth ?(hooks=[]) depth buf t =
     Printf.bprintf buf "%a.%s <- %a" (_pp depth) r name (_pp depth) sub
   | Multiset l ->
     Printf.bprintf buf "{| %a |}" (LogtkUtil.pp_list (_pp depth)) l
+  | SimpleApp (s, [a]) when Sym.is_prefix s ->
+    Printf.bprintf buf "%a %a" Sym.pp s (_pp depth) a
+  | SimpleApp (s, [a;b]) when Sym.is_infix s ->
+    Printf.bprintf buf "(%a %a %a)" (_pp depth) a Sym.pp s (_pp depth) b
   | SimpleApp (s, l) ->
     Printf.bprintf buf "%a(%a)" Sym.pp s (LogtkUtil.pp_list (_pp depth)) l
   | At (l,r) ->

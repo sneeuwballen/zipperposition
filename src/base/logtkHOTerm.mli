@@ -38,12 +38,13 @@ type term = t
 
 type view = private
   | Var of int                  (** variable *)
-  | RigidVar of int             (** rigid variable, only targets other variables *)
   | BVar of int                 (** bound variable (De Bruijn index) *)
-  | Lambda of LogtkType.t * t        (** lambda abstraction over one variable. *)
+  | Lambda of LogtkType.t * t   (** lambda abstraction over one variable. *)
+  | Forall of LogtkType.t * t   (** Forall quantifier (commutes with other forall) *)
+  | Exists of LogtkType.t * t   (** Exists quantifier (commutes with other exists) *)
   | Const of symbol             (** LogtkTyped constant *)
   | At of t * t                 (** Curried application *)
-  | TyAt of t * LogtkType.t          (** Curried application to a type *)
+  | TyLift of LogtkType.t       (** Lift a type to a term *)
   | Multiset of LogtkType.t * t list (** a multiset of terms, and their common type *)
   | Record of (string*t) list * t option  (** Record of terms *)
 
@@ -100,10 +101,6 @@ val var : ty:LogtkType.t -> int -> t
       The index must be non-negative,
       @raise Invalid_argument otherwise. *)
 
-val rigid_var : ty:LogtkType.t -> int -> t
-  (** Rigid variable.
-      @raise Invalid_argument if the index is negative *)
-
 val bvar : ty:LogtkType.t -> int -> t
   (** Create a bound variable. Providing a type is mandatory.
       {b Warning}: be careful and try not to use this function directly*)
@@ -118,9 +115,11 @@ val at_list : t -> t list -> t
   (** Curried application to several terms, left-parenthesing.
       @raise LogtkType.Error of types do not match. *)
 
+val tylift : LogtkType.t -> t
+  (** [tylift ty] makes a term out of [ty]. It has type [ty] *)
+
 val tyat : t -> LogtkType.t -> t
-  (** Curried type application.
-      @raise LogtkType.Error if types do not match. *)
+  (** [tyat t ty] is the same as [at t (tylift ty)] *)
 
 val tyat_list : t -> LogtkType.t list -> t
   (** Application to a list of types *)
@@ -143,19 +142,27 @@ val multiset : ty:LogtkType.t -> t list -> t
       @raise LogtkType.Error if types mismatch *)
 
 val __mk_lambda : varty:LogtkType.t -> t -> t    (** not documented *)
+val __mk_forall : varty:LogtkType.t -> t -> t
+val __mk_exists : varty:LogtkType.t -> t -> t
 
 (** constructors with free variables. The first argument is the
     list of variables that is bound, then the quantified/abstracted
     term. *)
 
-val mk_lambda : t list -> t -> t   (** (lambda v1,...,vn. t). *)
+val lambda : t list -> t -> t   (** (lambda v1,...,vn. t). *)
+
+val forall : t list -> t -> t
+
+val exists : t list -> t -> t
 
 val is_var : t -> bool
 val is_bvar : t -> bool
 val is_at : t -> bool
-val is_tyat : t -> bool
+val is_tylift : t -> bool
 val is_const : t -> bool
 val is_lambda : t -> bool
+val is_forall : t -> bool
+val is_exists : t -> bool
 val is_multiset : t -> bool
 val is_record : t -> bool
 
@@ -216,12 +223,13 @@ val contains_symbol : LogtkSymbol.t -> t -> bool
 
 class virtual ['a] any_visitor : object
   method virtual var : LogtkType.t -> int -> 'a
-  method virtual rigid_var : LogtkType.t -> int -> 'a
   method virtual bvar : LogtkType.t -> int -> 'a
   method virtual lambda : LogtkType.t -> 'a -> 'a
+  method virtual forall : LogtkType.t -> 'a -> 'a
+  method virtual exists : LogtkType.t -> 'a -> 'a
   method virtual const : LogtkType.t -> LogtkSymbol.t -> 'a
   method virtual at : 'a -> 'a -> 'a
-  method virtual tyat : 'a -> LogtkType.t -> 'a
+  method virtual tylift : LogtkType.t -> 'a
   method virtual multiset : LogtkType.t -> 'a list -> 'a
   method virtual record : (string*'a) list -> 'a option -> 'a
   method visit : t -> 'a
@@ -229,12 +237,13 @@ end
 
 class id_visitor : object
   method var : LogtkType.t -> int -> t
-  method rigid_var : LogtkType.t -> int -> t
   method bvar : LogtkType.t -> int -> t
   method lambda : LogtkType.t -> t -> t
+  method forall : LogtkType.t -> t -> t
+  method exists : LogtkType.t -> t -> t
   method const : LogtkType.t -> LogtkSymbol.t -> t
   method at : t -> t -> t
-  method tyat : t -> LogtkType.t -> t
+  method tylift : LogtkType.t -> t
   method multiset : LogtkType.t -> t list -> t
   method record : (string*t) list -> t option -> t
   method visit : t -> t
@@ -255,11 +264,19 @@ val is_fo : t -> bool
 
 (** {2 Various operations} *)
 
-val rigidify : t -> t
-  (** Replace {!Var} occurrences with {!RigidVar} ones. *)
+val close_forall : t -> t
+(** Universally quantify all free variables
+    @since NEXT_RELEASE *)
 
-val unrigidify : t -> t
-  (** Converse of {!rigidify} *)
+val close_exists : t -> t
+(** Existentially quantify all free variables
+    @since NEXT_RELEASE *)
+
+val open_forall : ?offset:int -> t -> t
+(** [open_forall t] removes all prenex "forall" quantifiers with fresh
+    variables
+    @param offset use this offset to generate fresh free variables
+    @since NEXT_RELEASE *)
 
 (* TODO: move Lambda-calculus operators here *)
 
@@ -303,11 +320,6 @@ module TPTP : sig
 
   val eq : t
   val neq : t
-  val forall : t
-  val exists : t
-
-  val mk_forall : t list -> t -> t
-  val mk_exists : t list -> t -> t
 
   val mk_not : t -> t
   val mk_and : t -> t -> t
@@ -320,16 +332,7 @@ module TPTP : sig
 
   val mk_and_list : t list -> t
   val mk_or_list : t list -> t
-
-  val close_forall : t -> t
-    (** Bind all free variables with 'forall' *)
-
-  val close_exists : t -> t
-    (** Bind all free variables with 'exists' *)
-
-  val __mk_forall : varty:LogtkType.t -> t -> t
-  val __mk_exists : varty:LogtkType.t -> t -> t
 end
 
 val debug : Format.formatter -> t -> unit
-  (** debug printing, with sorts *)
+(** debug printing, with sorts *)

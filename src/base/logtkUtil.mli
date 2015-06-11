@@ -91,6 +91,24 @@ val set_memory_limit : int -> unit
 val set_time_limit : int -> unit
 (** Limit the CPU time available to the process (in seconds) *)
 
+(** {2 OCaml Stack}
+
+    requires [ocaml >= 4.01]
+
+    @since NEXT_RELEASE *)
+
+module Exn : sig
+  val pp_stack : Buffer.t -> int -> unit
+  (** printer for the stack with given depth *)
+
+  val fmt_stack : Format.formatter -> int -> unit
+
+  val pp_backtrace : Buffer.t -> unit -> unit
+  (** printer for backtraces, if enabled (print nothing otherwise) *)
+
+  val fmt_backtrace : Format.formatter -> unit -> unit
+end
+
 (** {2 profiling facilities} *)
 
 type profiler

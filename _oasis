@@ -24,7 +24,7 @@ Flag "tools"
 
 Flag "meta"
   Description:  Build and install meta-prover
-  Default:      false
+  Default:      true
 
 Flag "bench"
   Description:  Build and run benchmarks
@@ -133,6 +133,15 @@ Document logtk_meta
   Build$:               flag(docs) && flag(meta)
   XOCamlbuildPath:      .
   XOCamlbuildLibraries: logtk.meta
+
+Document logtk_parsers
+  Title:                Logtk_parsers documentation
+  Type:                 ocamlbuild (0.3)
+  BuildTools+:          ocamldoc
+  Install$:             flag(docs) && flag(parsers)
+  Build$:               flag(docs) && flag(parsers)
+  XOCamlbuildPath:      .
+  XOCamlbuildLibraries: logtk.parsers
 
 Document logtk_arbitrary
   Title:                Logtk_arbitrary documentation

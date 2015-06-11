@@ -79,9 +79,6 @@ val is_forall : t -> bool
 
 (** {2 Constructors} *)
 
-val tType : t
-  (** Pseudo-type of types *)
-
 val var : int -> t
   (** Build a type variable.
       @raise LogtkScopedTerm.IllFormedTerm if the integer is negative *)

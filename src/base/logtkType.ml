@@ -36,10 +36,10 @@ type t = T.t
 
 type ty = t
 
-let kind = T.Kind.LogtkType
+let kind = T.Kind.Type
 
 type view =
-  | Var of int              (** LogtkType variable *)
+  | Var of int              (** Type variable *)
   | BVar of int             (** Bound variable (De Bruijn index) *)
   | App of symbol * t list  (** parametrized type *)
   | Fun of t * t            (** Function type (left to right) *)
@@ -47,7 +47,7 @@ type view =
   | Forall of t             (** explicit quantification using De Bruijn index *)
 
 let view t = match T.kind t with
-  | T.Kind.LogtkType ->
+  | T.Kind.Type ->
     begin match T.view t with
     | T.Var i -> Var i
     | T.BVar i -> BVar i
@@ -58,9 +58,9 @@ let view t = match T.kind t with
     | T.SimpleApp (LogtkSymbol.Conn LogtkSymbol.Arrow, [l;r]) -> Fun (l, r)
     | T.SimpleApp (s, l) -> App (s, l)
     | T.Record (l, rest) -> Record (l, rest)
-    | _ -> failwith "LogtkType.view"
+    | _ -> failwith "Type.view"
     end
-  | _ -> raise (Invalid_argument "LogtkType.view")
+  | _ -> raise (Invalid_argument "Type.view")
 
 let hash_fun = T.hash_fun
 let hash = T.hash
@@ -73,17 +73,15 @@ let is_app ty = match view ty with App _ -> true | _ -> false
 let is_fun ty = match view ty with | Fun _ -> true | _ -> false
 let is_forall ty = match view ty with | Forall _ -> true | _ -> false
 
-let tType = T.tType
-
 let var i =
-  T.var ~kind ~ty:tType i
+  T.var ~kind ~ty:T.tType i
 
-let app s l = T.simple_app ~kind ~ty:tType s l
+let app s l = T.simple_app ~kind ~ty:T.tType s l
 
-let const s = T.const ~kind ~ty:tType s
+let const s = T.const ~kind ~ty:T.tType s
 
 let arrow l r =
-  T.simple_app ~kind ~ty:tType LogtkSymbol.Base.arrow [l; r]
+  T.simple_app ~kind ~ty:T.tType LogtkSymbol.Base.arrow [l; r]
 
 let rec arrow_list l r = match l with
   | [] -> r
@@ -91,15 +89,15 @@ let rec arrow_list l r = match l with
   | x::l' -> arrow x (arrow_list l' r)
 
 let forall vars ty =
-  T.bind_vars ~kind ~ty:tType LogtkSymbol.Base.forall_ty vars ty
+  T.bind_vars ~kind ~ty:T.tType LogtkSymbol.Base.forall_ty vars ty
 
-let record l ~rest = T.record ~kind ~ty:tType l ~rest
+let record l ~rest = T.record ~kind ~ty:T.tType l ~rest
 
 let __bvar i =
-  T.bvar ~kind ~ty:tType i
+  T.bvar ~kind ~ty:T.tType i
 
 let __forall ty =
-  T.bind ~kind ~ty:tType ~varty:tType LogtkSymbol.Base.forall_ty ty
+  T.bind ~kind ~ty:T.tType ~varty:T.tType LogtkSymbol.Base.forall_ty ty
 
 let multiset ty = app LogtkSymbol.Base.multiset [ty]
 
@@ -108,21 +106,13 @@ let (<=.) ret a = arrow a ret
 let (@@) = app
 
 (* downcast *)
-let of_term ty = match T.kind ty with
-  | T.Kind.LogtkType -> Some ty
-  | _ -> None
-
 let of_term_exn ty = match T.kind ty with
-  | T.Kind.LogtkType -> ty
-  | _ -> raise (Invalid_argument "LogtkType.of_term_exn")
+  | T.Kind.Type -> ty
+  | _ -> raise (Invalid_argument "Type.of_term_exn")
 
-let is_type t = match T.kind t with
-  | T.Kind.LogtkType -> true
-  | _ -> false
+let of_term ty = try Some (of_term_exn ty) with Invalid_argument _ -> None
 
-let () =
-  assert(not(is_type tType));
-  ()
+let is_type t = try ignore (of_term_exn t); true with Invalid_argument _ -> false
 
 (** {2 Containers} *)
 
@@ -207,13 +197,15 @@ let apply ty arg =
     then ret
     else
       let msg = LogtkUtil.sprintf
-        "LogtkType.apply: wrong argument type, expected %a but got %a" T.pp arg' T.pp arg
+          "Type.apply: wrong argument type, expected %a but got %a%a"
+            T.pp arg' T.pp arg LogtkUtil.Exn.pp_stack 30
       in _error msg
   | T.Bind (LogtkSymbol.Conn LogtkSymbol.ForallTy, _, ty') ->
       T.DB.eval (LogtkDBEnv.singleton arg) ty'
   | _ ->
       let msg = LogtkUtil.sprintf
-        "LogtkType.apply: expected quantified or function type, but got %a" T.pp ty
+          "Type.apply: expected quantified or function type, but got %a%a"
+          T.pp ty LogtkUtil.Exn.pp_stack 30
       in _error msg
 
 (* apply a type to arguments. *)
@@ -232,7 +224,7 @@ let __var =
   fun () ->
     let n = !r in
     decr r;
-    T.var ~ty:tType n
+    T.var ~ty:T.tType n
 
 type print_hook = int -> (Buffer.t -> t-> unit) -> Buffer.t -> t-> bool
 
@@ -335,7 +327,7 @@ let bij =
 
 (** {2 Misc} *)
 
-let fresh_var = T.fresh_var ~kind ~ty:tType
+let fresh_var = T.fresh_var ~kind ~ty:T.tType
 
 (** {2 Conversions} *)
 

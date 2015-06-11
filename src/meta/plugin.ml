@@ -37,6 +37,8 @@ to meta-prover-compatible types. *)
 
 open Logtk
 
+let section = Util.Section.make ~parent:Util.Section.logtk "meta"
+
 module T = HOTerm
 
 type term = T.t
@@ -89,7 +91,7 @@ let __sym_holds = Symbol.of_string "holds"
 let __sym_lemma = Symbol.of_string "lemma"
 let __ty_wrap = Type.(Reasoner.property_ty <=. Type.multiset Type.TPTP.o)
 let __encoding_wrap =
-  Encoding.(currying >>> rigidifying >>> clause_prop)
+  Encoding.(currying >>> clause_prop)
 
 (* clause that implies (holds c) whenever (lemma c) is true *)
 let __clause_lemma_imply_holds =
@@ -108,9 +110,9 @@ let wrap_fo_clause pred clauses : foclause t =
       with _ -> false
 
     method to_fact c =
-      Util.debug 5 "encode clause %a" (Encoding.pp_clause FOTerm.pp) c;
+      Util.debug ~section 5 "encode clause %a" (Encoding.pp_clause FOTerm.pp) c;
       let c' = (__encoding_wrap#encode c : Encoding.EncodedClause.t :> T.t) in
-      Util.debug 5 "... into %a" T.pp c';
+      Util.debug ~section 5 "... into %a" T.pp c';
       T.at hd c'
 
     method of_fact t =
@@ -139,7 +141,7 @@ let axiom_or_theory which : (string * Type.t list * term) t  =
           (T.const ~ty:Type.(ty_s <=. T.ty t) (Symbol.of_string name))
           [t])
     method of_fact t =
-      Util.debug 5 "%s.of_fact %a?" which T.pp t;
+      Util.debug ~section 5 "%s.of_fact %a?" which T.pp t;
       match T.open_at t with
       | hd', _, [f] when T.eq hd hd' ->
           begin match T.open_at f with
@@ -180,10 +182,7 @@ let pre_rewrite : HORewriting.t t =
 
     method to_fact rules =
       HORewriting.to_list rules
-        |> List.map (fun (l,r) ->
-            let l' = HOTerm.rigidify l in
-            let r' = HOTerm.rigidify r in
-            make_rule l' r')
+        |> List.map (fun (l,r) -> make_rule l r)
         |> T.multiset ~ty:__ty_rule
         |> T.at const_pre_rewrite
 
@@ -193,9 +192,8 @@ let pre_rewrite : HORewriting.t t =
         | T.Multiset (_, l) ->
             begin try
               let rules = List.map
-                (fun pair -> match T.open_at pair with
-                | hd, _, [l;r] when T.eq hd const_rule ->
-                    HOTerm.unrigidify l, HOTerm.unrigidify r
+                (fun pair -> match T.open_at (T.open_forall pair) with
+                | hd, _, [l;r] when T.eq hd const_rule -> l, r
                 | _ -> raise Exit) l
               in
               Some (HORewriting.of_list rules)
@@ -222,8 +220,8 @@ let rewrite : (FOTerm.t * FOTerm.t) list t =
     method to_fact rules =
       rules
         |> List.map (fun (l,r) ->
-            let l' = HOTerm.rigidify (HOTerm.curry l) in
-            let r' = HOTerm.rigidify (HOTerm.curry r) in
+            let l' = HOTerm.curry l in
+            let r' = HOTerm.curry r in
             make_rule l' r')
         |> T.multiset ~ty:__ty_rule
         |> T.at const_rewrite
@@ -234,9 +232,8 @@ let rewrite : (FOTerm.t * FOTerm.t) list t =
         | T.Multiset (_, l) ->
             begin try
               let rules = List.map
-                (fun pair -> match T.open_at pair with
+                (fun pair -> match T.open_at (T.open_forall pair) with
                 | hd, _, [l;r] when T.eq hd const_rule ->
-                    let l = HOTerm.unrigidify l and r = HOTerm.unrigidify r in
                     begin match HOTerm.uncurry l, HOTerm.uncurry r with
                       | Some l', Some r' -> l', r'
                       | _ -> raise Exit

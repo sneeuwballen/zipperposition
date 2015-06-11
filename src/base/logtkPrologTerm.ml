@@ -50,6 +50,7 @@ and view =
 type term = t
 
 let view t = t.term
+let loc t = t.loc
 
 let __to_int = function
   | Var _ -> 0
@@ -137,9 +138,8 @@ let at_loc ~loc t = {t with loc=Some loc; }
 
 let wildcard = const Sym.Base.wildcard
 
-let is_var = function
-  | {term=Var _} -> true
-  | _ -> false
+let is_app = function {term=App _} -> true | _ -> false
+let is_var = function | {term=Var _} -> true | _ -> false
 
 module Set = Sequence.Set.Make(struct
   type t = term

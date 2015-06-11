@@ -291,9 +291,9 @@ let of_list ?(init=empty) l = match l with
 let pp buf subst =
   let pp_term buf t =
     match T.kind t with
-    | T.Kind.LogtkFOTerm -> LogtkFOTerm.pp buf (LogtkFOTerm.of_term_exn t)
-    | T.Kind.LogtkType -> LogtkType.pp buf (LogtkType.of_term_exn t)
-    | T.Kind.LogtkHOTerm -> LogtkHOTerm.pp buf (LogtkHOTerm.of_term_exn t)
+    | T.Kind.FOTerm -> LogtkFOTerm.pp buf (LogtkFOTerm.of_term_exn t)
+    | T.Kind.Type -> LogtkType.pp buf (LogtkType.of_term_exn t)
+    | T.Kind.HOTerm -> LogtkHOTerm.pp buf (LogtkHOTerm.of_term_exn t)
     | _ -> T.pp buf t
   in
   let pp_binding buf (v,s_v,t,s_t) =
@@ -313,7 +313,7 @@ let fmt fmt subst =
 let apply subst ~renaming t s_t =
   let rec _apply t s_t =
     match T.ty t with
-    | T.NoLogtkType ->
+    | T.NoType ->
       assert(T.ground t);
       t
     | _ when T.ground t -> t
