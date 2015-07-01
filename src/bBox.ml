@@ -71,7 +71,7 @@ struct
 
   type injected =
     | Clause_component of Literals.t
-    | Form of Form.t [@compare Form.cmp]
+    | Form of (Form.t [@compare Form.cmp])
     | Ctx of
       ClauseContext.t
       * (inductive_cst [@compare I.compare])
