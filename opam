@@ -5,7 +5,6 @@ homepage: "https://www.rocq.inria.fr/deducteam/Zipperposition/index.html"
 build: [
     ["./configure"
         "--bindir" "%{bin}%"
-        "--%{conf-depqbf:enable}%-depqbf"
         "--disable-tests"
     ]
     [make]
