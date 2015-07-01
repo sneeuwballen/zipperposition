@@ -113,7 +113,7 @@ module Make(X : sig end) : BS.SAT = struct
       (Sequence.pp_seq pp_form) (FormSet.to_seq (get_()));
     (* Instantiate solver *)
     let module S = Msat.Sat.Make(struct
-      let debug lvl fmt = Util.debug ~section lvl fmt
+      let debug lvl fmt = Util.debug ~section (lvl+1) fmt
     end) in
     let assume_ ?tag (l:lit list list) =
       let l = (l :> int list list)
