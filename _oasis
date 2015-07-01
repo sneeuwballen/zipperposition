@@ -17,10 +17,6 @@ Description:
     superposition. It aims at being flexible and extensible while retaining
     decent performance (using indexing, for instance).
 
-Flag "meta"
-  Description:  Enable plugin for the meta-prover
-  Default:      false
-
 #Flag "depqbf"
 #  Description:  Use depqbf solver
 #  Default:      false
@@ -49,16 +45,6 @@ Library "libzipperposition"
   BuildDepends:     containers, containers.advanced, sequence, gen, unix,
                     zarith, containers.io, logtk, logtk.meta, logtk.parsers,
                     dynlink, qbf, msat, ppx_deriving.std
-
-Library "libzipperposition_meta"
-  Path:             src/meta/
-  Pack:             false
-  Modules:          MetaProverState
-  FindlibName:      meta
-  FindlibParent:    libzipperposition
-  Build$:           flag(meta)
-  Install$:         flag(meta)
-  BuildDepends:     libzipperposition,logtk,logtk.meta
 
 # main executable for the prover
 Executable zipperposition
