@@ -879,6 +879,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.exit_prof prof_arith_ineq_chaining;
     res
 
+  (* TODO: remove, should be useless *)
   let canc_inner_case_switch c =
     Util.enter_prof prof_arith_inner_case_switch;
     let ord = Ctx.ord () in
@@ -968,6 +969,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.exit_prof prof_arith_inner_case_switch;
     !acc
 
+  (* TODO: update with equality case, check that signs correct *)
   let canc_ineq_factoring c =
     Util.enter_prof prof_arith_ineq_factoring;
     let ord = Ctx.ord () in
@@ -1472,7 +1474,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   end)
 
   (* tautology check: take the linear system that is the negation
-    of all a!=b and a≤b, and check its (rational) satisfiability. If
+    of all a≠b and a≤b, and check its (rational) satisfiability. If
     it's unsat in Q, it's unsat in Z, and its negation (a subset of c)
     is tautological *)
   let _is_tautology c =
@@ -1564,30 +1566,35 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.debug ~section 4 "arith_eq_res: simplify %a into %a" C.pp c C.pp c';
     c'
 
+  exception DiffToLesseq of C.t
+
   (* a != b ------> a+1 ≤ b | a ≥ b+1 *)
   let canc_diff_to_lesseq c =
     let ord = Ctx.ord () in
     let eligible = C.Eligible.(filter Lit.is_arith_neq ** max c) in
-    Lits.fold_lits ~eligible (C.lits c) []
-      (fun acc lit i ->
-        match lit with
-        | Lit.Arith (AL.Binary (AL.Different, m1, m2)) ->
-            assert (eligible i lit);
-            Util.debug ~section 5 "lit %a [%d] in %a" Lit.pp lit i C.pp c;
-            assert (Lits.is_max ~ord (C.lits c) i);
-            let lits = CCArray.except_idx (C.lits c) i in
-            let new_lits =
-              [ Lit.mk_arith_lesseq (M.succ m1) m2
-              ; Lit.mk_arith_lesseq (M.succ m2) m1
-              ]
-            in
-            let proof cc = Proof.mk_c_inference
-              ~theories ~rule:"arith_diff_to_lesseq" cc [C.proof c] in
-            let c' = C.create ~parents:[c] (new_lits @ lits) proof in
-            Util.debug ~section 5 "diff2less: %a ----> %a" C.pp c C.pp c';
-            c' :: acc
-        | _ -> assert false
-      )
+    try
+      Lits.fold_lits ~eligible (C.lits c) ()
+        (fun acc lit i ->
+          match lit with
+          | Lit.Arith (AL.Binary (AL.Different, m1, m2)) ->
+              assert (eligible i lit);
+              Util.debug ~section 5 "lit %a [%d] in %a" Lit.pp lit i C.pp c;
+              assert (Lits.is_max ~ord (C.lits c) i);
+              let lits = CCArray.except_idx (C.lits c) i in
+              let new_lits =
+                [ Lit.mk_arith_lesseq (M.succ m1) m2
+                ; Lit.mk_arith_lesseq (M.succ m2) m1
+                ]
+              in
+              let proof cc = Proof.mk_c_inference
+                ~theories ~rule:"arith_diff_to_lesseq" cc [C.proof c] in
+              let c' = C.create ~parents:[c] (new_lits @ lits) proof in
+              Util.debug ~section 5 "diff2less: %a ----> %a" C.pp c C.pp c';
+              raise (DiffToLesseq c')
+          | _ -> assert false
+        );
+      c
+  with DiffToLesseq c -> c
 
   (* flag to be used to know when a clause cannot be purified *)
   let flag_no_purify = C.new_flag ()
@@ -2013,7 +2020,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_multi_simpl_rule eliminate_unshielded;
     Env.add_lit_rule "canc_lit_of_lit" canc_lit_of_lit;
     Env.add_lit_rule "less_to_lesseq" canc_less_to_lesseq;
-    Env.add_unary_inf "canc_diff_to_lesseq" canc_diff_to_lesseq;
+    Env.add_simplify canc_diff_to_lesseq;
     Env.add_simplify canc_eq_resolution;
     Env.add_simplify canc_demodulation;
     Env.add_backward_simplify canc_backward_demodulation;

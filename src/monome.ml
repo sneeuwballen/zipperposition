@@ -724,14 +724,16 @@ module Int = struct
     try Some (of_term_exn t)
     with NotLinear -> None
 
+  let ty2 = Type.(forall [var 0] (var 0 <== [var 0; var 0]))
+
   let mk_product a b =
     T.app_full
-      (T.const ~ty:num.ty SA.product) [num.ty]
+      (T.const ~ty:ty2 SA.product) [num.ty]
       [a; b]
 
   let mk_sum a b =
     T.app_full
-      (T.const ~ty:num.ty SA.sum) [num.ty]
+      (T.const ~ty:ty2 SA.sum) [num.ty]
       [a; b]
 
   let mk_const n = T.const ~ty:num.ty (Symbol.mk_int n)

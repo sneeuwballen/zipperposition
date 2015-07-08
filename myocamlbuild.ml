@@ -1,5 +1,5 @@
 (* OASIS_START *)
-(* DO NOT EDIT (digest: d5c3588fbf595d1b245bdab992f4a5b5) *)
+(* DO NOT EDIT (digest: a39fccb24790904eceb283a4722567ee) *)
 module OASISGettext = struct
 (* # 22 "src/oasis/OASISGettext.ml" *)
 
@@ -608,24 +608,17 @@ open Ocamlbuild_plugin;;
 let package_default =
   {
      MyOCamlbuildBase.lib_ocaml =
-       [
-          ("libzipperposition", ["src"; "src/calculi"], []);
-          ("libzipperposition_meta", ["src/meta"], []);
-          ("libzipperposition_quantor", ["src/quantor"], []);
-          ("libzipperposition_depqbf", ["src/depqbf"], [])
-       ];
+       [("libzipperposition", ["src"; "src/calculi"; "src/meta"], [])];
      lib_c = [];
      flags = [];
      includes =
        [
-          ("tests", ["src"; "src/calculi"]);
-          ("src/quantor", ["src"; "src/calculi"]);
-          ("src/msat", ["src"; "src/calculi"; "src/lib"]);
-          ("src/meta", ["src"; "src/calculi"]);
-          ("src/lib", ["src"; "src/calculi"; "src/msat"]);
-          ("src/depqbf", ["src"; "src/calculi"]);
-          ("src/calculi", ["src"; "src/lib"; "src/msat"]);
-          ("src", ["src/calculi"; "src/lib"; "src/msat"])
+          ("tests", ["src"; "src/calculi"; "src/meta"]);
+          ("src/msat", ["src"; "src/calculi"; "src/lib"; "src/meta"]);
+          ("src/meta", ["src"; "src/calculi"; "src/lib"; "src/msat"]);
+          ("src/lib", ["src"; "src/calculi"; "src/meta"; "src/msat"]);
+          ("src/calculi", ["src"; "src/lib"; "src/meta"; "src/msat"]);
+          ("src", ["src/calculi"; "src/lib"; "src/meta"; "src/msat"])
        ]
   }
   ;;
@@ -634,6 +627,6 @@ let conf = {MyOCamlbuildFindlib.no_automatic_syntax = false}
 
 let dispatch_default = MyOCamlbuildBase.dispatch_default conf package_default;;
 
-# 638 "myocamlbuild.ml"
+# 631 "myocamlbuild.ml"
 (* OASIS_STOP *)
 Ocamlbuild_plugin.dispatch dispatch_default;;

@@ -502,6 +502,12 @@ module Subsumption = struct
               (c1 * (M.const r1 - M.const l1))
               (c2 * (M.const r2 - M.const l2)))
             then k subst);
+    (* XXX: bad, because  2a = b will subsume 2|b but cannot participate
+       in some inferences 2|b will, e.g. in
+       2|b   2|b+1
+       -----------
+          false
+       so, it removes any chance of completeness
     | Binary (Equal, l1, r1), Divides d when d.sign ->
         let m1 = _normalize_in_div d.num ~power:d.power (M.difference l1 r1) in
         let protect = M.Seq.vars d.monome in
@@ -511,6 +517,7 @@ module Subsumption = struct
             if Z.(equal
               ((c1 * M.const m1) mod (d.num ** d.power))
               (c2 * M.const d.monome)) then k subst)
+      *)
     | Divides d1, Divides d2 when d1.sign = d2.sign
       && Z.equal d1.num d2.num &&
         ((d1.sign && d1.power >= d2.power)

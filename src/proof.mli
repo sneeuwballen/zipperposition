@@ -68,6 +68,7 @@ val eq : t -> t -> bool
 include Interfaces.HASH with type t := t
 val cmp : t -> t -> int
 
+val result : t -> step_result
 val kind : t -> step_kind
 val parents : t -> t array
 val theories : t -> string list

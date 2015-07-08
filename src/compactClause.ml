@@ -131,6 +131,10 @@ let pp_tstp buf c =
 let to_forms c =
   Array.map (fun l -> Lit.Conv.to_form l) c.lits
 
+let to_form c =
+  let l = to_forms c |> Array.to_list in
+  F.close_forall (F.Base.or_ l)
+
 let to_string c =
   Util.on_buffer pp c
 

@@ -60,6 +60,7 @@ val iter : t -> (Literal.t -> unit) -> unit
 val to_seq : t -> Literal.t Sequence.t
 
 val to_forms : t -> form array
+val to_form : t -> form
 
 val lits : t -> Literal.t array
 val trail : t -> bool_lit list

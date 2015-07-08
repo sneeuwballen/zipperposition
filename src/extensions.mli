@@ -44,6 +44,7 @@ type init_action =
 
 type t = {
   name : string;
+  prio : int;  (** the lower, the more urgent, the earlier it is loaded *)
   penv_actions : penv_action list;
   init_actions : init_action list;
   actions : action list;

@@ -3,6 +3,7 @@ S src/meta/
 S src/quantor
 S src/depqbf
 S src/msat
+S src/meta
 S src/arbitrary/
 S src/lib/
 S src/calculi
@@ -12,11 +13,13 @@ B _build/src/meta/
 B _build/src/quantor/
 B _build/src/depqbf/
 B _build/src/msat
+B _build/src/meta
 B _build/src/arbitrary/
 B _build/src/lib
 B _build/src/calculi
 PKG logtk
 PKG logtk.parsers
+PKG logtk.meta
 PKG containers
 PKG sequence
 PKG gen
