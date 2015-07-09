@@ -49,6 +49,8 @@ let section = Util.Section.make ~parent:Const.section "ind"
 let section_qbf = Util.Section.make
   ~parent:section ~inheriting:[BoolSolver.section; BBox.section] "qbf"
 
+let cross_context = ref true
+
 module Make(Sup : Superposition.S)
            (Solver : BoolSolver.QBF) =
 struct
@@ -459,13 +461,42 @@ struct
     );
     s
 
+  (* same as [ctx] but with the given [cst] (must have compatible type) *)
+  let adapt_ctx_ ~ctx (cst:CI.cst) =
+    assert (Ty.eq (T.ty (cst:>T.t)) (T.ty (ctx.cand_cst:>T.t)));
+    { ctx with
+      cand_cst=cst;
+      cand_lits=CCtx.apply ctx.cand_ctx (cst:CI.cst:>T.t)
+    }
+
+  (* if [!cross_context] enabled, copy context across all inductive consts
+     that have compatible type *)
+  let gen_ctx_ ctx =
+    if !cross_context
+    then
+      CI.Seq.cst
+      |> Sequence.filter_map
+        (fun c -> if Ty.eq (T.ty (c:CI.cst:>T.t)) (T.ty (ctx.cand_cst:>T.t))
+          then Some (adapt_ctx_ ~ctx c)
+          else None
+        )
+      |> Sequence.to_list
+    else [ctx]
+
   (* add a candidate context *)
   let add_ctx ctx =
-    let set = find_candidates_for_lits_ ctx.cand_lits in
-    set := CandidateCtxSet.add ctx !set;
-    let map = find_candidates_for_cst_ ctx.cand_cst in
-    map := ClauseContextMap.add ctx.cand_ctx ctx !map;
-    Signal.send on_new_context ctx;
+    Util.debugf ~section 5 "add context %a for %a"
+      CCtx.print ctx.cand_ctx CI.Cst.print ctx.cand_cst;
+    (* in fact, add the following list of contexts *)
+    let ctx_l = gen_ctx_ ctx in
+    List.iter
+      (fun ctx ->
+        let set = find_candidates_for_lits_ ctx.cand_lits in
+        set := CandidateCtxSet.add ctx !set;
+        let map = find_candidates_for_cst_ ctx.cand_cst in
+        map := ClauseContextMap.add ctx.cand_ctx ctx !map;
+        Signal.send on_new_context ctx;
+      ) ctx_l;
     ()
 
   (* [t] is an inductive const; this returns [true] iff some subconstant of [t]
@@ -565,7 +596,7 @@ struct
           Solver.add_clause ~tag:(C.id c) bclause;
           Util.debug ~section 4 "add bool clause %a" pp_bclause bclause;
         );
-        `New t
+        `New (cand,t)
       end;
     | None, Some t ->
       (* [t] is a subterm of the case [t'] of an inductive [cst] *)
@@ -584,7 +615,7 @@ struct
         } in
         (* need to watch ctx[cst] until it is proved *)
         add_ctx cand_ctx;
-        `New cst
+        `New (cand_ctx,cst)
       end
     | None, None ->
         let msg = Util.sprintf
@@ -592,7 +623,7 @@ struct
         failwith msg
     in
     match is_new with
-    | `New icst ->
+    | `New (ictx,icst) ->
         (* new clause for induction hypothesis (on inductive constant [icst]) *)
         let proof = Proof.mk_c_trivial ~info:["ind.hyp."] ~theories:["ind"] in
         let trail = C.Trail.of_list
@@ -600,7 +631,7 @@ struct
           ; init_ok_ ctx icst
           ]
         in
-        let c' = C.create_a ~trail (C.lits c) proof in
+        let c' = C.create_a ~trail ictx.cand_lits proof in
         Util.debug ~section 2 "new induction hyp. %a" C.pp c';
         Some c'
     | `Old -> None
@@ -658,9 +689,8 @@ struct
 
   (* scan the set of active clauses, to see whether it proves some
       of the candidate contexts' initial form in [new_contexts] *)
-  let scan_backward () =
+  let scan_backward new_ctx =
     let l = !new_contexts in
-    new_contexts := [];
     List.iter
       (fun ctx ->
         let idx = Sup.idx_fv () in
@@ -668,7 +698,9 @@ struct
         (* find whether some active clause subsumes [ctx] *)
         Sup.PS.SubsumptionIndex.retrieve_subsuming idx lits ()
           (fun () c ->
-            if not (C.is_empty c) && Sup.subsumes (C.lits c) ctx.cand_lits
+            if not (Lits.is_absurd (C.lits c))
+            && Sup.subsumes (C.lits c) ctx.cand_lits
+            && C.get_trail c |> C.Trail.mem BoolLit.inject_input
               then (
                 Util.debugf ~section 3 "clause %a@ subsumes context %a[%a]"
                   C.fmt c ClauseContext.print ctx.cand_ctx
@@ -883,7 +915,6 @@ struct
           ) acc
       ) [] !new_contexts
     in
-    new_contexts := [];
     let clauses = List.fold_left
       (fun acc (cst,set) ->
         candidates_for_ cst
@@ -894,7 +925,6 @@ struct
           ) acc
       ) clauses !new_cover_sets
     in
-    new_cover_sets := [];
     clauses
 
   (** {6 Summary}
@@ -945,6 +975,10 @@ struct
     Env.add_simplify injectivity_destruct;
     Env.add_generate "induction.express_minimality" express_minimality_ctx;
     Env.add_unary_inf "induction_lemmas.cut" IHA.inf_introduce_lemmas;
+    Env.add_step_init (fun () ->
+      new_contexts := [];
+      new_cover_sets := [];
+    );
     (* no collisions with Skolemization please *)
     Signal.once Env.on_start IHA.clear_skolem_ctx;
     (* XXX: ugly, but we must do case_split before scan_extrude/proof.
@@ -997,4 +1031,6 @@ let () =
   Params.add_opts
     [ "-induction-summary", Arg.Set summary_,
       " show summary of induction before exit"
+    ; "-induction-cc", Arg.Bool (fun b -> cross_context := b),
+      " (cross-context) enable/disable moving contexts between constants of same type"
     ]
