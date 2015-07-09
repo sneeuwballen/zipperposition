@@ -163,7 +163,7 @@ struct
   let inject_lits lits  =
     (* special case: one negative literal. *)
     let lits, sign =
-      if Array.length lits = 1 && Literal.is_neq lits.(0)
+      if Array.length lits = 1 && Literal.is_neq lits.(0) && Literal.is_ground lits.(0)
         then [| Literal.negate lits.(0) |], false
         else lits, true
     in
