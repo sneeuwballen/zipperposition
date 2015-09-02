@@ -239,9 +239,19 @@ module RecordUnif = struct
   (* remove next field *)
   let pop_field r = match r.fields with
     | [] -> assert false
-    | (n,t)::l -> { r with fields=l;  }
+    | _::l -> { r with fields=l;  }
 
   let fields r = r.fields
+
+  let _pp out r =
+    let pp_list = CCList.print (CCPair.print CCString.print T.fmt) in
+    let pp_rest out x = match x with
+      | None -> ()
+      | Some r -> Format.fprintf out "| %a" T.fmt r
+    in
+    Format.fprintf out
+      "@[<hov2>record_unif {@,fields=@[%a@],@ discarded=@[%a@]@ %a@,}@]"
+      pp_list r.fields pp_list r.discarded pp_rest r.rest
 end
 
 module RU = RecordUnif
@@ -429,6 +439,8 @@ module Nary = struct
   let __unify_record_rest ~env ~unif subst r1 sc1 r2 sc2 k =
     assert (r1.RU.fields = []);
     assert (r2.RU.fields = []);
+    (* LogtkUtil.debugf 5 "@[<hv2>unify_rec_rest@ %a and@ %a with@ %a@]"
+      RU._pp r1 RU._pp r2 S.fmt subst; *)
     (* LogtkUtil.debug 5 "unif_rest %a %a" T.pp (RU.to_record r1) T.pp (RU.to_record r2); *)
     match r1.RU.rest, r1.RU.discarded, r2.RU.rest, r2.RU.discarded with
     | None, [], None, [] ->
@@ -442,15 +454,16 @@ module Nary = struct
         (* no discarded fields in r1, so we only need to
            unify rest1 with { l2 | rest2 } *)
         let t2 = RU.to_record r2 in
-        unif ~env  subst rest1 sc1 t2 sc2 k
+        (* LogtkUtil.debugf 5 "@[--> unify %a and %a:@]" T.fmt rest1 T.fmt t2; *)
+        unif ~env subst rest1 sc1 t2 sc2 k
     | _, _, Some rest2, [] ->
         (* symmetric case of the previous one *)
         let t1 = RU.to_record r1 in
         unif ~env subst t1 sc1 rest2 sc2 k
-    | Some rest1, l1, Some rest2, l2 ->
+    | Some rest1, _, Some rest2, _ ->
         (* create fresh var R and unify rest1 with {l2 | R} (t2)
-         * and rest2 with { l1 | R } (t1) *)
-        let r = T.const ~kind:r1.RU.kind ~ty:r1.RU.ty (LogtkSymbol.Base.fresh_var ()) in
+           and rest2 with { l1 | R } (t1) *)
+        let r = T.fresh_var ~kind:r1.RU.kind ~ty:r1.RU.ty () in
         let t1 = RU.to_record (RU.set_rest r1 ~rest:(Some r)) in
         let t2 = RU.to_record (RU.set_rest r2 ~rest:(Some r)) in
         unif ~env subst rest1 sc1 t2 sc2
@@ -458,6 +471,8 @@ module Nary = struct
 
   (* unify the two records *)
   let rec __unify_records ~env ~unif subst r1 sc1 r2 sc2 k =
+    (* LogtkUtil.debugf 5 "@[<hv2>unify_rec@ %a and@ %a with@ %a@]"
+        RU._pp r1 RU._pp r2 S.fmt subst; *)
     match RU.fields r1, RU.fields r2 with
     | [], _
     | _, [] ->
@@ -543,7 +558,7 @@ module Nary = struct
       | _ when T.ground s && T.ground t && T.DB.closed s ->
         () (* terms are not equal, and ground. failure. *)
       | T.RigidVar i, T.RigidVar j when sc_s = sc_t && i = j -> k ~env subst
-      | T.RigidVar i, T.RigidVar j when sc_s <> sc_t ->
+      | T.RigidVar _, T.RigidVar _ when sc_s <> sc_t ->
           k ~env (S.bind subst s sc_s t sc_t)
       | T.RigidVar _, _
       | _, T.RigidVar _ -> ()  (* fail *)
@@ -595,7 +610,7 @@ module Nary = struct
       | _, _ -> ()  (* fail *)
     in
     let env = {env1; env2; permutation=DBE.empty; } in
-    fun k -> unif ~env subst a sc_a b sc_b (fun ~env subst -> k subst)
+    fun k -> unif ~env subst a sc_a b sc_b (fun ~env:_ subst -> k subst)
 
   let matching ?(allow_open=false)?(env1=DBE.empty) ?(env2=DBE.empty)
   ?(subst=S.empty) ~pattern sc_pattern b sc_b =
@@ -618,7 +633,7 @@ module Nary = struct
       | _ when T.ground s && T.ground t && T.DB.closed t ->
         () (* terms are not equal, and ground. failure. *)
       | T.RigidVar i, T.RigidVar j when sc_s = sc_t && i = j -> k ~env subst
-      | T.RigidVar i, T.RigidVar j when sc_s <> sc_t ->
+      | T.RigidVar _, T.RigidVar _ when sc_s <> sc_t ->
           k ~env (S.bind subst s sc_s t sc_t)
       | T.RigidVar _, _
       | _, T.RigidVar _ -> ()  (* fail *)
@@ -663,7 +678,7 @@ module Nary = struct
       | _, _ -> ()  (* fail *)
     in
     let env = {env1; env2; permutation=DBE.empty;} in
-    fun k -> unif ~env subst pattern sc_pattern b sc_b (fun ~env s -> k s)
+    fun k -> unif ~env subst pattern sc_pattern b sc_b (fun ~env:_ s -> k s)
 
   let variant ?(env1=DBE.empty) ?(env2=DBE.empty) ?(subst=S.empty) a sc_a b sc_b =
     let rec unif ~env subst s sc_s t sc_t k =
