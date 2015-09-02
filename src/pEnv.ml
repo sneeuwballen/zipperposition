@@ -258,6 +258,21 @@ let add_operation ~penv ~prio op =
 let add_operation_rule ~penv ~prio rule =
   penv.ops <- (prio, rule) :: penv.ops
 
+(* sequence of symbols -> sequence of (frequency, list of symbols with this freq) *)
+let by_freq_ s =
+  let tbl = Sym.Tbl.create 32 in
+  s (fun s ->
+    let n = try Sym.Tbl.find tbl s with Not_found -> 0 in
+    Sym.Tbl.replace tbl s (n+1)
+  );
+  let rev_tbl = Hashtbl.create (Sym.Tbl.length tbl) in
+  Sym.Tbl.iter
+    (fun s freq ->
+      let l = try Hashtbl.find rev_tbl freq with Not_found -> [] in
+      Hashtbl.replace rev_tbl freq (s :: l)
+    ) tbl;
+  Sequence.of_hashtbl rev_tbl
+
 (* default weight: symbols that occur often are heavier, except
   constants which have weight 1 *)
 let _default_weight ?(ignore_sym= !Params.signature) signature set =
@@ -266,18 +281,14 @@ let _default_weight ?(ignore_sym= !Params.signature) signature set =
     try snd (Signature.arity signature s) = 0
     with Not_found -> false
   in
-  let open! Containers_advanced in
-  let rank_to_symbols = CCLinq.(
+  let rank_to_symbols =
     PF.Set.to_seq set
       |> Sequence.map PF.form
-      |> Sequence.flatMap F.Seq.symbols
+      |> Sequence.flat_map F.Seq.symbols
       |> Sequence.filter (fun s -> not (Signature.mem ignore_sym s) && not (is_const s))
-      |> of_seq
-      |> count ~eq:Sym.eq ~hash:Sym.hash () (* symbol -> frequency *)
-      |> M.reverse ~cmp:CCInt.compare ()  (* frequency -> symbols *)
-      |> M.iter
-      |> L.run_exn
-  ) in
+      |> by_freq_
+      |> Sequence.to_rev_list
+  in
   (* map symbol -> inverse rank. We iterate on symbol equiv. classes by
     increasing frequency. *)
   let s_to_rank = Sym.Tbl.create 15 in
