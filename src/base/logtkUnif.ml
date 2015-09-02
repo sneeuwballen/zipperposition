@@ -201,7 +201,7 @@ module RecordUnif = struct
   let of_record t l rest =
     let r = {
       kind=T.kind t;
-      ty= (match T.ty t with T.NoType -> assert false | T.HasType ty -> ty);
+      ty=T.ty_exn t;
       fields = l;
       discarded = [];
       rest;
@@ -210,7 +210,19 @@ module RecordUnif = struct
 
   (* convert back to a record *)
   let to_record r =
-    T.record ~kind:r.kind ~ty:r.ty (r.fields @ r.discarded) ~rest:r.rest
+    let ty_fields = List.map (fun (name,t) -> name, T.ty_exn t) in
+    (* compute remaining type *)
+    let ty = if T.eq r.ty T.tType
+      then T.tType
+      else (
+        assert (T.is_record r.ty || T.is_var r.ty);
+        (* type of fields that remain *)
+        T.record ~kind:(T.kind r.ty) ~ty:T.tType
+          (ty_fields r.fields @ ty_fields r.discarded)
+          ~rest:(CCOpt.map T.ty_exn r.rest)
+      )
+    in
+    T.record ~kind:r.kind ~ty (r.fields @ r.discarded) ~rest:r.rest
 
   (* discard first field *)
   let discard r = match r.fields with
