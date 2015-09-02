@@ -66,7 +66,7 @@ and view =
   | SimpleApp of symbol * t list  (** For representing special constructors *)
 and type_result =
   | NoType
-  | HasLogtkType of t
+  | HasType of t
 
 type term = t
 
@@ -74,7 +74,7 @@ let view t = t.term
 let ty t = t.ty
 let ty_exn t = match t.ty with
   | NoType -> raise (Invalid_argument "LogtkScopedTerm.ty_exn")
-  | HasLogtkType ty -> ty
+  | HasType ty -> ty
 let kind t = t.kind
 
 let hash_fun t s = Hash.int_ t.id s
@@ -85,7 +85,7 @@ let cmp t1 t2 = Pervasives.compare t1.id t2.id
 let _hash_ty t h =
   match t.ty with
   | NoType -> h
-  | HasLogtkType ty -> Hash.int_ ty.id (Hash.string_ "type" h)
+  | HasType ty -> Hash.int_ ty.id (Hash.string_ "type" h)
 
 let _hash_norec t h =
   let h = match view t with
@@ -136,7 +136,7 @@ let rec _eq_norec t1 t2 =
   | _ -> false
 and _eq_ty t1 t2 = match t1.ty, t2.ty with
   | NoType, NoType -> true
-  | HasLogtkType ty1, HasLogtkType ty2 -> eq ty1 ty2
+  | HasType ty1, HasType ty2 -> eq ty1 ty2
   | _ -> false
 and _eq_list l1 l2 = match l1, l2 with
   | [], [] -> true
@@ -198,7 +198,7 @@ let _make_id ~id ~kind ~ty term = {
 }
 
 let const ~kind ~ty s =
-  let my_t = _make ~kind ~ty:(HasLogtkType ty) (Const s) in
+  let my_t = _make ~kind ~ty:(HasType ty) (Const s) in
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty then set_flag t flag_ground;
@@ -209,7 +209,7 @@ let app ~kind ~ty f l =
   match l with
   | [] -> f
   | _::_ ->
-      let my_t = _make ~kind ~ty:(HasLogtkType ty) (App (f,l)) in
+      let my_t = _make ~kind ~ty:(HasType ty) (App (f,l)) in
       let t = H.hashcons my_t in
       if t == my_t then begin
         if ground ty && ground f && List.for_all ground l
@@ -218,7 +218,7 @@ let app ~kind ~ty f l =
       t
 
 let _var ~kind ~ty i =
-  H.hashcons (_make ~kind ~ty:(HasLogtkType ty) (Var i))
+  H.hashcons (_make ~kind ~ty:(HasType ty) (Var i))
 
 let var ~kind ~ty i =
   if i<0 then raise (IllFormedTerm "var");
@@ -234,14 +234,14 @@ let fresh_var =
 
 let bvar ~kind ~ty i =
   if i<0 then raise (IllFormedTerm "bvar");
-  H.hashcons (_make ~kind ~ty:(HasLogtkType ty) (BVar i))
+  H.hashcons (_make ~kind ~ty:(HasType ty) (BVar i))
 
 let rigid_var ~kind ~ty i =
   if i<0 then raise (IllFormedTerm "rigid_var");
-  H.hashcons (_make ~kind ~ty:(HasLogtkType ty) (RigidVar i))
+  H.hashcons (_make ~kind ~ty:(HasType ty) (RigidVar i))
 
 let bind ~kind ~ty ~varty s t' =
-  H.hashcons (_make ~kind ~ty:(HasLogtkType ty) (Bind (s, varty, t')))
+  H.hashcons (_make ~kind ~ty:(HasType ty) (Bind (s, varty, t')))
 
 (* merge l1 and l2, which are both sorted. If the same key occurs with
  * distinct values, fail. *)
@@ -268,7 +268,7 @@ let rec __check_duplicates seen l = match l with
 
 (* actually build the record *)
 let __make_record ~kind ~ty l ~rest =
-  let my_t = _make ~kind ~ty:(HasLogtkType ty) (Record (l,rest)) in
+  let my_t = _make ~kind ~ty:(HasType ty) (Record (l,rest)) in
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty && List.for_all (fun (_,t) -> ground t) l
@@ -297,7 +297,7 @@ let record ~kind ~ty l ~rest =
   __flatten_record ~kind ~ty l ~rest
 
 let record_get ~kind ~ty r name =
-  let my_t = _make ~kind ~ty:(HasLogtkType ty) (RecordGet(r,name)) in
+  let my_t = _make ~kind ~ty:(HasType ty) (RecordGet(r,name)) in
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty && ground r
@@ -306,7 +306,7 @@ let record_get ~kind ~ty r name =
   t
 
 let record_set ~kind ~ty r name sub =
-  let my_t = _make ~kind ~ty:(HasLogtkType ty) (RecordSet(r,name,sub)) in
+  let my_t = _make ~kind ~ty:(HasType ty) (RecordSet(r,name,sub)) in
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty && ground r && ground sub
@@ -316,7 +316,7 @@ let record_set ~kind ~ty r name sub =
 
 let multiset ~kind ~ty l =
   let l = List.sort cmp l in
-  let my_t = _make ~kind ~ty:(HasLogtkType ty) (Multiset l) in
+  let my_t = _make ~kind ~ty:(HasType ty) (Multiset l) in
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty && List.for_all ground l
@@ -325,7 +325,7 @@ let multiset ~kind ~ty l =
   t
 
 let at ~kind ~ty l r =
-  let my_t = _make ~kind ~ty:(HasLogtkType ty) (At (l,r)) in
+  let my_t = _make ~kind ~ty:(HasType ty) (At (l,r)) in
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty && ground l && ground r
@@ -334,7 +334,7 @@ let at ~kind ~ty l r =
   t
 
 let simple_app ~kind ~ty s l =
-  let my_t = _make ~kind ~ty:(HasLogtkType ty) (SimpleApp (s,l)) in
+  let my_t = _make ~kind ~ty:(HasType ty) (SimpleApp (s,l)) in
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty && List.for_all ground l
@@ -416,7 +416,7 @@ module DB = struct
   let rec _to_seq ~depth t k =
     begin match t.ty with
       | NoType -> ()
-      | HasLogtkType ty -> _to_seq ~depth ty k
+      | HasType ty -> _to_seq ~depth ty k
     end;
     match view t with
     | BVar _ -> k t depth
@@ -485,7 +485,7 @@ module DB = struct
     | NoType ->
       assert (t == tType);
       t
-    | HasLogtkType ty ->
+    | HasType ty ->
       let ty = recurse ~depth acc ty in
       match view t with
         | Var i -> _var ~kind:t.kind ~ty i
@@ -566,7 +566,7 @@ module DB = struct
     | NoType ->
       assert (t == tType);
       t
-    | HasLogtkType ty ->
+    | HasType ty ->
       let ty = _replace depth ty ~sub in
       match view t with
         | _ when eq t sub ->
@@ -611,7 +611,7 @@ module DB = struct
     | NoType ->
       assert (t == tType);
       t
-    | HasLogtkType ty ->
+    | HasType ty ->
       let ty = _eval env ty in
       match view t with
         | _ when ground t -> t
@@ -657,7 +657,7 @@ let bind_vars ~kind ~ty s vars t =
       let t' = DB.replace (DB.shift 1 t) ~sub:v in
       let varty = match v.ty with
         | NoType -> failwith "LogtkScopedTerm.bind_vars: variable has no type"
-        | HasLogtkType ty -> ty
+        | HasType ty -> ty
       in
       bind ~kind ~ty ~varty s t')
     vars t
@@ -757,7 +757,7 @@ module Seq = struct
     let rec types t =
       begin match t.ty with
       | NoType -> ()
-      | HasLogtkType ty -> k ty
+      | HasType ty -> k ty
       end;
       match view t with
       | Var _ | BVar _ | RigidVar _ | Const _ -> ()
@@ -796,7 +796,7 @@ module Pos = struct
     | _, P.LogtkType pos' ->
         begin match t.ty with
         | NoType -> invalid_arg "wrong position: term has no type"
-        | HasLogtkType ty -> at ty pos'
+        | HasType ty -> at ty pos'
         end
     | _, P.Stop -> t
     | (Var _ | BVar _ | RigidVar _ ), _ -> invalid_arg "wrong position in term"
@@ -825,34 +825,34 @@ module Pos = struct
   let rec replace t pos ~by = match t.ty, view t, pos with
     | _, _, P.Stop -> by
     | NoType, _, P.LogtkType pos' -> invalid_arg "wrong position: term has no type"
-    | HasLogtkType ty, _, P.LogtkType pos' ->
+    | HasType ty, _, P.LogtkType pos' ->
         let ty = replace ty pos' ~by in
         cast ~ty t
     | _, (Var _ | BVar _ | RigidVar _ ), _ -> invalid_arg "wrong position in term"
-    | HasLogtkType ty, Bind(s, varty, t'), P.Right subpos ->
+    | HasType ty, Bind(s, varty, t'), P.Right subpos ->
         bind ~kind:t.kind ~ty ~varty s (replace t' subpos ~by)
-    | HasLogtkType ty, App (f, l), P.Head subpos ->
+    | HasType ty, App (f, l), P.Head subpos ->
         app ~kind:t.kind ~ty (replace f subpos ~by) l
-    | HasLogtkType ty, App (f, l), P.Arg (n,subpos) when n < List.length l ->
+    | HasType ty, App (f, l), P.Arg (n,subpos) when n < List.length l ->
         let t' = replace (List.nth l n) subpos ~by in
         let l' = CCList.Idx.set l n t' in
         app ~kind:t.kind ~ty f l'
-    | HasLogtkType ty, At (l,r), P.Left subpos ->
+    | HasType ty, At (l,r), P.Left subpos ->
         mk_at ~kind:t.kind ~ty (replace l subpos ~by) r
-    | HasLogtkType ty, At (l,r), P.Right subpos ->
+    | HasType ty, At (l,r), P.Right subpos ->
         mk_at ~kind:t.kind ~ty l (replace r subpos ~by)
-    | HasLogtkType ty, Multiset l, P.Arg (n,subpos) when n < List.length l ->
+    | HasType ty, Multiset l, P.Arg (n,subpos) when n < List.length l ->
         let t' = replace (List.nth l n) subpos ~by in
         let l' = CCList.Idx.set l n t' in
         multiset ~kind:t.kind ~ty l'
-    | HasLogtkType ty, SimpleApp (s,l), P.Arg (n,subpos) when n < List.length l ->
+    | HasType ty, SimpleApp (s,l), P.Arg (n,subpos) when n < List.length l ->
         let t' = replace (List.nth l n) subpos ~by in
         let l' = CCList.Idx.set l n t' in
         simple_app ~kind:t.kind ~ty s l'
-    | HasLogtkType ty, Record (l, Some r), P.Record_rest subpos ->
+    | HasType ty, Record (l, Some r), P.Record_rest subpos ->
         let rest = Some (replace r subpos ~by) in
         record ~kind:t.kind ~ty l ~rest
-    | HasLogtkType ty, Record (l, rest), P.Record_field (name, subpos) ->
+    | HasType ty, Record (l, rest), P.Record_field (name, subpos) ->
         begin try
           let t' = replace (List.assoc name l) subpos ~by in
           let l' = (name,t') :: (List.remove_assoc name l) in
@@ -868,31 +868,31 @@ end
     in [t] by the term [by]. *)
 let rec replace t ~old ~by = match t.ty, view t with
   | _ when eq t old -> by
-  | HasLogtkType ty, Bind (s, varty, t') ->
+  | HasType ty, Bind (s, varty, t') ->
     bind ~kind:t.kind ~ty ~varty s (replace t' ~old ~by)
-  | HasLogtkType ty, Record (l, rest) ->
+  | HasType ty, Record (l, rest) ->
       let rest = match rest with
       | None -> None
       | Some r -> Some (replace r ~old ~by)
       in
       let l = List.map (fun (s,t') -> s, replace t' ~old ~by) l in
       record ~kind:t.kind ~ty l ~rest
-  | HasLogtkType ty, App (f, l) ->
+  | HasType ty, App (f, l) ->
     let f' = replace f ~old ~by in
     let l' = List.map (fun t' -> replace t' ~old ~by) l in
     app ~kind:t.kind ~ty f' l'
-  | HasLogtkType ty, At(l,r) ->
+  | HasType ty, At(l,r) ->
     let l' = replace l ~old ~by and r' = replace r ~old ~by in
     at ~kind:t.kind ~ty l' r'
-  | HasLogtkType ty, Multiset l ->
+  | HasType ty, Multiset l ->
     let l' = List.map (fun t' -> replace t' ~old ~by) l in
     multiset ~kind:t.kind ~ty l'
-  | HasLogtkType ty, SimpleApp (s,l) ->
+  | HasType ty, SimpleApp (s,l) ->
     let l' = List.map (fun t' -> replace t' ~old ~by) l in
     simple_app ~kind:t.kind ~ty s l'
-  | HasLogtkType ty, RecordGet (r, name) ->
+  | HasType ty, RecordGet (r, name) ->
     record_get ~kind:t.kind ~ty (replace r ~old ~by) name
-  | HasLogtkType ty, RecordSet (r, name, sub) ->
+  | HasType ty, RecordSet (r, name, sub) ->
     record_set ~kind:t.kind ~ty (replace r ~old ~by) name (replace sub ~old ~by)
   | NoType, _ -> t
   | _, (Var _ | BVar _ | RigidVar _ | Const _) -> t
@@ -1046,7 +1046,7 @@ let pp_depth ?(hooks=[]) depth buf t =
         Buffer.add_char buf ' '; _pp_surrounded depth buf t')
       l
   and _pp_ty depth buf t = match t.ty, view t with
-    | HasLogtkType ty, (Var _ | BVar _) ->
+    | HasType ty, (Var _ | BVar _) ->
       Printf.bprintf buf ":%a" (_pp_surrounded depth) ty
     | _ -> ()
   and _pp_surrounded depth buf t = match view t with

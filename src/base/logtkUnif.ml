@@ -146,7 +146,7 @@ let occurs_check ~env subst v sc_v t sc_t =
     if T.ground t then false
     else match T.ty t with
     | T.NoType -> false
-    | T.HasLogtkType ty ->
+    | T.HasType ty ->
       (* check type and subterms *)
       check ~env ty sc_t ||
       match T.view t with
@@ -186,7 +186,7 @@ let occurs_check ~env subst v sc_v t sc_t =
   in
   check ~env t sc_t
 
-module RecordLogtkUnif = struct
+module RecordUnif = struct
   type t = {
     kind : T.Kind.t;
     ty : T.t;
@@ -201,7 +201,7 @@ module RecordLogtkUnif = struct
   let of_record t l rest =
     let r = {
       kind=T.kind t;
-      ty= (match T.ty t with T.NoType -> assert false | T.HasLogtkType ty -> ty);
+      ty= (match T.ty t with T.NoType -> assert false | T.HasType ty -> ty);
       fields = l;
       discarded = [];
       rest;
@@ -232,7 +232,7 @@ module RecordLogtkUnif = struct
   let fields r = r.fields
 end
 
-module RU = RecordLogtkUnif
+module RU = RecordUnif
 
 (** {2 Nary-unification} *)
 
@@ -521,7 +521,7 @@ module Nary = struct
           unif_terms ~env subst s sc_s t sc_t k
         | T.NoType, _
         | _, T.NoType -> ()
-        | T.HasLogtkType ty1, T.HasLogtkType ty2 ->
+        | T.HasType ty1, T.HasType ty2 ->
           unif ~env subst ty1 sc_s ty2 sc_t
             (fun ~env subst -> unif_terms ~env subst s sc_s t sc_t k)
     and unif_terms ~env subst s sc_s t sc_t k =
@@ -596,7 +596,7 @@ module Nary = struct
           unif_terms ~env subst s sc_s t sc_t k
         | T.NoType, _
         | _, T.NoType -> ()
-        | T.HasLogtkType ty1, T.HasLogtkType ty2 ->
+        | T.HasType ty1, T.HasType ty2 ->
           unif ~env subst ty1 sc_s ty2 sc_t
             (fun ~env subst -> unif_terms ~env subst s sc_s t sc_t k)
     and unif_terms ~env subst s sc_s t sc_t k =
@@ -663,7 +663,7 @@ module Nary = struct
           unif_terms ~env subst s sc_s t sc_t k
         | T.NoType, _
         | _, T.NoType -> ()
-        | T.HasLogtkType ty1, T.HasLogtkType ty2 ->
+        | T.HasType ty1, T.HasType ty2 ->
           unif ~env subst ty1 sc_s ty2 sc_t
             (fun ~env subst  -> unif_terms ~env subst s sc_s t sc_t k)
     and unif_terms ~env subst s sc_s t sc_t k =
@@ -811,7 +811,7 @@ module Unary = struct
         | T.NoType, T.NoType -> subst
         | T.NoType, _
         | _, T.NoType -> raise Fail
-        | T.HasLogtkType ty1, T.HasLogtkType ty2 ->
+        | T.HasType ty1, T.HasType ty2 ->
           unif ~env1 ~env2 subst ty1 sc_s ty2 sc_t
       in
       match T.view s, T.view t with
@@ -876,7 +876,7 @@ module Unary = struct
         | T.NoType, T.NoType -> subst
         | T.NoType, _
         | _, T.NoType -> raise Fail
-        | T.HasLogtkType ty1, T.HasLogtkType ty2 ->
+        | T.HasType ty1, T.HasType ty2 ->
           unif ~env1 ~env2 subst ty1 sc_s ty2 sc_t
       in
       match T.view s, T.view t with
@@ -936,7 +936,7 @@ module Unary = struct
         | T.NoType, T.NoType -> subst
         | T.NoType, _
         | _, T.NoType -> raise Fail
-        | T.HasLogtkType ty1, T.HasLogtkType ty2 ->
+        | T.HasType ty1, T.HasType ty2 ->
           unif ~env1 ~env2 ~blocked subst ty1 scope ty2 scope
       in
       match T.view s, T.view t with
@@ -1001,7 +1001,7 @@ module Unary = struct
         | T.NoType, T.NoType -> subst
         | T.NoType, _
         | _, T.NoType -> raise Fail
-        | T.HasLogtkType ty1, T.HasLogtkType ty2 ->
+        | T.HasType ty1, T.HasType ty2 ->
           unif ~env1 ~env2 subst ty1 sc_s ty2 sc_t
       in
       match T.view s, T.view t with
@@ -1050,9 +1050,9 @@ module Unary = struct
     let t2, s2 = S.get_var subst t2 s2 in
     begin match T.ty t1, T.ty t2 with
       | T.NoType, T.NoType -> true
-      | T.NoType, T.HasLogtkType _
-      | T.HasLogtkType _, T.NoType -> false
-      | T.HasLogtkType ty1, T.HasLogtkType ty2 -> _eq ~env1 ~env2 ~subst ty1 s1 ty2 s2
+      | T.NoType, T.HasType _
+      | T.HasType _, T.NoType -> false
+      | T.HasType ty1, T.HasType ty2 -> _eq ~env1 ~env2 ~subst ty1 s1 ty2 s2
     end &&
     match T.view t1, T.view t2 with
     | T.RigidVar i, T.RigidVar j

@@ -72,7 +72,7 @@ val kind : t -> Kind.t
 
 type type_result =
   | NoType
-  | HasLogtkType of t
+  | HasType of t
 
 val ty : t -> type_result
   (** LogtkType of the term, if any *)

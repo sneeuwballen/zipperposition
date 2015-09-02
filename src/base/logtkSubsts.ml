@@ -317,7 +317,7 @@ let apply subst ~renaming t s_t =
       assert(T.ground t);
       t
     | _ when T.ground t -> t
-    | T.HasLogtkType ty ->
+    | T.HasType ty ->
       let kind = T.kind t in
       let ty = _apply ty s_t in
       match T.view t with
