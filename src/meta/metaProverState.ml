@@ -63,6 +63,13 @@ module Result = struct
   }
 
   let empty = {lemmas=[]; theories=[]; axioms=[]; rewrite=[]; pre_rewrite=[]}
+  let is_empty r =
+    let aux = function [] -> true | _ -> false in
+    aux r.lemmas
+    && aux r.theories
+    && aux r.axioms
+    && aux r.rewrite
+    && aux r.pre_rewrite
 
   let lemmas t = t.lemmas
   let theories t = t.theories
@@ -429,7 +436,8 @@ module Make(E : Env.S) : S with module E = E = struct
   (* be sure to scan clauses *)
   let infer_scan p c =
     let r = scan_clause p c in
-    Util.debugf ~section 3 "@[scan@ %a@ →@ %a@]" C.fmt c Result.print r;
+    if not (Result.is_empty r)
+      then Util.debugf ~section 3 "@[scan@ %a@ →@ %a@]" C.fmt c Result.print r;
     []
 
   (** {6 Extension} *)
