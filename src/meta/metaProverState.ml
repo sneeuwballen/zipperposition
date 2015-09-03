@@ -191,6 +191,20 @@ module Induction = struct
   end
 end
 
+(** {2 Arithmetic} *)
+
+(* TODO: encode sum as a multiset *)
+
+module Arith = struct
+  let t : unit M.Plugin.t = object
+    method signature = Signature.TPTP.Arith.base
+    method owns _ = false
+    method clauses = []
+    method to_fact () = T.TPTP.true_
+    method of_fact _ = None
+  end
+end
+
 (** {2 Interface to the Meta-prover} *)
 
 type t = {
@@ -207,7 +221,9 @@ type t = {
 
 let mk_prover_ =
   let p = M.Prover.empty in
-  M.Prover.add_signature p Induction.t#signature
+  let p = M.Prover.add_signature p Induction.t#signature in
+  let p = M.Prover.add_signature p Arith.t#signature in
+  p
 
 let create () = {
   prover = mk_prover_;

@@ -39,6 +39,7 @@ type scope = Substs.scope
 (** Typeclass num *)
 type 'a num = {
   ty : Type.t;
+  equal : 'a -> 'a -> bool;
   sign : 'a -> int;
   abs : 'a -> 'a;
   cmp : 'a -> 'a -> int;
@@ -56,6 +57,7 @@ type 'a num = {
 
 let z = {
   ty = Type.TPTP.int;
+  equal = Z.equal;
   sign = Z.sign;
   abs = Z.abs;
   cmp = Z.compare;
@@ -726,33 +728,47 @@ module Int = struct
 
   let ty2 = Type.(forall [var 0] (var 0 <== [var 0; var 0]))
 
-  let mk_product a b =
-    T.app_full
-      (T.const ~ty:ty2 SA.product) [num.ty]
-      [a; b]
-
-  let mk_sum a b =
-    T.app_full
-      (T.const ~ty:ty2 SA.sum) [num.ty]
-      [a; b]
-
   let mk_const n = T.const ~ty:num.ty (Symbol.mk_int n)
+
+  (* a.t *)
+  let mk_product a t =
+    if num.equal a num.one then t
+    else T.app_full
+      (T.const ~ty:ty2 SA.product) [num.ty]
+      [mk_const a; t]
+
+  (* a.t + b *)
+  let mk_sum a t b =
+    if num.equal a num.zero then b
+    else
+      T.app_full
+        (T.const ~ty:ty2 SA.sum) [num.ty]
+        [mk_product a t; b]
+
+  (* a.1 + b *)
+  let mk_sum_const a b =
+    if num.equal a num.zero then b
+    else T.app_full
+      (T.const ~ty:ty2 SA.sum) [num.ty]
+      [mk_const a; b]
+
+  (* TODO: normalize as much as possible (simplfy ×1, +0, etc.) *)
 
   let to_term e =
     let t = match e.terms with
     | [] -> mk_const e.const
     | (c, t)::rest ->
       (* remove one coeff to make the basic sum *)
-      let sum = mk_sum (mk_const c) t in
+      let sum = mk_product c t in
       (* add coeff*term for the remaining terms *)
       let sum = List.fold_left
         (fun sum (coeff, t') ->
           assert (num.sign coeff <> 0);
-          mk_sum sum (mk_product (mk_const coeff) t))
-        sum rest
+          mk_sum coeff t sum
+        ) sum rest
       in
       (* add the constant (if needed) *)
-      mk_sum (mk_const e.const) sum
+      mk_sum_const e.const sum
     in
     t
 
