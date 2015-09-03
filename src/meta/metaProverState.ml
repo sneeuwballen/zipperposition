@@ -436,15 +436,15 @@ module Make(E : Env.S) : S with module E = E = struct
   (* be sure to scan clauses *)
   let infer_scan p c =
     let r = scan_clause p c in
-    if not (Result.is_empty r)
-      then Util.debugf ~section 3 "@[scan@ %a@ →@ %a@]" C.fmt c Result.print r;
+    if not (Result.is_empty r) then (
+      Util.debugf ~section 3 "@[scan@ %a@ →@ %a@]" C.fmt c Result.print r;
+    );
     []
 
   (** {6 Extension} *)
 
   (* global setup *)
   let setup () =
-    clear_global ();
     let p = get_global () in
     Signal.on p.on_theory
       (fun th ->
@@ -480,7 +480,8 @@ module Make(E : Env.S) : S with module E = E = struct
     Signal.once Signals.on_exit
       (fun _ ->
          if !flag_print_rules_exit then
-         Util.debugf ~section 1 "@[<hv2>detected:@,%a@]" Result.print (results p)
+           Util.debugf ~section 1 "@[<hv2>detected:@,%a@]" Result.print (results p);
+         clear_global ();
       );
     ()
 end
