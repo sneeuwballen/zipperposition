@@ -314,17 +314,51 @@ theory (peano_add {succ=S, zero=Z, plus=P}) <-
   holds (![X:N]: [P Z X = X]).
 
 lemma (![X:N,Y:N]: [P X (S Y) = S (P X Y)]) <-
-  theory (peano_add {succ=S, zero=_, plus=P}).  % FIXME bug in record unif
+  theory (peano_add {succ=S, plus=P | _}).
 
 lemma (![X:N]: [P X Z = X]) <-
   theory (peano_add {succ=_, zero=Z, plus=P}).
 
-theory (list_th {elt=@A, cons=(Cons:A -> L -> L), nil=(Nil:L)}) <-
+theory (list_th {elt=@A, lst=@L, cons=(Cons:A -> L -> L), nil=(Nil:L)}) <-
   inductive @L {ty=@L, cstors=[(cstor _ Cons), (cstor _ Nil)]}.
 
-theory (list_mem {elt=@A, cons=Cons, nil=Nil, mem=(Mem:A -> L -> $o)}) <-
-  theory (list_th {elt=@A, cons=Cons, nil=Nil}),
+theory (list_mem {elt=@A, cons=(Cons:A ->L ->L), nil=(Nil:L), mem=(Mem:A -> L -> $o)}) <-
+  theory (list_th {elt=@A, lst=@L, cons=Cons, nil=Nil}),
   holds (![X:A]: [~ Mem X Nil]),
-  holds (![X:A,Lst:L]: [Mem X (Cons X L)]),
-  holds (![X:A,Y:A,Lst:L]: [~ (Mem X L), Mem X (Cons Y L)]).
+  holds (![X:A,Lst:L]: [Mem X (Cons X Lst)]),
+  holds (![X:A,Y:A,Lst:L]: [~ (Mem X Lst), Mem X (Cons Y Lst)]).
+
+theory (list_append {elt=@A, lst=@L, cons=(Cons:A -> L ->L),
+                     nil=(Nil:L), append=(App:L ->L ->L)}) <-
+  theory (list_th {cons=(Cons:A ->L ->L), nil=(Nil:L), lst=@L, elt=@A}),
+  holds (![L1:L]: [App Nil L1 = L1]),
+  holds (![X:A, L1:L, L2:L]: [App (Cons X L1) L2 = Cons X (App L1 L2)]).
+
+axiom (len_sum {elt=@A, lst=@L, cons=(Cons:A ->L ->L), len=(Len:L -> $int)}) <-
+  holds (![X:A, L1:L]: [Len (Cons X L1) = $sum @$int 1 (Len L1)]).
+axiom (len_sum {elt=@A, lst=@L, cons=(Cons:A ->L ->L), len=(Len:L -> $int)}) <-
+  holds (![X:A, L1:L]: [Len (Cons X L1) = $sum @$int (Len L1) 1]).
+
+theory (list_len {cons=(Cons:A ->L ->L), nil=(Nil:L), len=(Len:L -> $int), elt=@A, lst=@L}) <-
+  theory (list_th {elt=@A, lst=@L, cons=(Cons:A ->L ->L), nil=(Nil:L)}),
+  holds [Len Nil = 0],
+  axiom (len_sum {elt=@A, lst=@L, cons=Cons, len=Len}).
+
+lemma (![L1:L]: [App L1 Nil = L1]) <-
+  theory (list_append {append=App, nil=Nil | _}).
+
+lemma (![X:A, L1:L, L2:L]:
+  [ Len (App L1 (Cons X L2))
+   = $sum @$int 1 ($sum @$int (Len L1) (Len L2))
+  ]) <-
+  theory (list_len {cons=Cons, len=Len, nil=Nil, elt=@A, lst=@L}),
+  theory (list_append {append=App, cons=Cons, nil=Nil, elt=@A, lst=@L}).
+
+%lemma (![X:A, L1:L, L2:L]:
+%  [ (Len:L -> $int) ((App:L ->L ->L) (L1:L) ((Cons:A ->L ->L) (X:A) (L2:L)))
+%   = $sum @$int 1 ($sum @$int ((Len:L -> $int) (L1:L)) ((Len:L -> $int) (L2:L)))
+%  ]) <-
+%  theory (list_len {cons=(Cons:A ->L ->L), len=(Len:L -> $int), nil=(Nil:L), elt=@A, lst=@L}),
+%  theory (list_append {append=(App:L ->L ->L), cons=(Cons:A ->L ->L), elt=@A, lst=@L, nil=(Nil:L)}).
+
 
