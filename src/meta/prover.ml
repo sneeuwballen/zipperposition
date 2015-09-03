@@ -99,6 +99,7 @@ let __clause_of_ast ~ctx ast =
       TypeInference.Ctx.generalize ctx;
       let head' = head' ctx in
       let body' = body' ctx in
+      (* forget types of free variables *)
       TypeInference.Ctx.exit_scope ctx;
       Some (Reasoner.Clause.rule head' body')
   | Ast_ho.Type (s, ty) ->
@@ -107,6 +108,7 @@ let __clause_of_ast ~ctx ast =
       | None -> None
       | Some ty ->
         TypeInference.Ctx.declare ctx (Symbol.of_string s) ty;
+        TypeInference.Ctx.exit_scope ctx;
         None
       end
   in

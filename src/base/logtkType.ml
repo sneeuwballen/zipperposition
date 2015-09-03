@@ -344,7 +344,8 @@ module Conv = struct
 
   let of_prolog ~ctx t =
     let rec of_prolog t = match t.PT.term with
-      | PT.Column ({PT.term=PT.Var name}, {PT.term=PT.Const (LogtkSymbol.Conn LogtkSymbol.TType)})
+      | PT.Column ({PT.term=PT.Var name; _},
+                   {PT.term=PT.Const (LogtkSymbol.Conn LogtkSymbol.TType); _})
       | PT.Var name ->
         assert (name <> "");
         begin try var (Hashtbl.find ctx name)
