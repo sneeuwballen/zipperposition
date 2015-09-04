@@ -363,11 +363,19 @@ lemma (![X:A, L1:L, L2:L]:
   theory (list_len @A @L {cons=Cons, len=Len, nil=Nil}),
   theory (list_append @A @L {append=App, cons=Cons, nil=Nil}).
 
-%lemma (![X:A, L1:L, L2:L]:
-%  [ (Len:L -> $int) ((App:L ->L ->L) (L1:L) ((Cons:A ->L ->L) (X:A) (L2:L)))
-%   = $sum @$int 1 ($sum @$int ((Len:L -> $int) (L1:L)) ((Len:L -> $int) (L2:L)))
-%  ]) <-
-%  theory (list_len {cons=(Cons:A ->L ->L), len=(Len:L -> $int), nil=(Nil:L), elt=@A, lst=@L}),
-%  theory (list_append {append=(App:L ->L ->L), cons=(Cons:A ->L ->L), elt=@A, lst=@L, nil=(Nil:L)}).
+val list_rev : /\A /\L {cons:A ->L ->L, nil:L, rev:L ->L, rev_append:L ->L ->L} -> theory.
 
+theory (list_rev @A @L {cons=Cons, nil=Nil, rev=Rev, rev_append=Rev_append}) <-
+  theory (list_th @A @L {cons=Cons, nil=Nil}),
+  holds (![Lst:L]: [Rev Lst = Rev_append Nil Lst]),
+  holds (![Lst:L]: [Rev_append Lst Nil = Lst]),
+  holds (![X:A, L1:L, L2:L]: [Rev_append L1 (Cons X L2) = Rev_append (Cons X L1) L2]).
+
+lemma (![Lst:L]: [Len (Rev Lst) = Len Lst]) <-
+  theory (list_rev @A @L {rev=Rev | _}),
+  theory (list_len @A @L {len=Len | _}).
+
+lemma (![L1:L,L2:L]: [Len (Rev_append L1 L2) = $sum @$int (Len L1) (Len L2)]) <-
+  theory (list_rev @A @L {rev_append=Rev_append | _}),
+  theory (list_len @A @L {len=Len | _}).
 
