@@ -752,8 +752,6 @@ module Int = struct
       (T.const ~ty:ty2 SA.sum) [num.ty]
       [mk_const a; b]
 
-  (* TODO: normalize as much as possible (simplfy ×1, +0, etc.) *)
-
   let to_term e =
     let t = match e.terms with
     | [] -> mk_const e.const
