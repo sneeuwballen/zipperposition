@@ -297,7 +297,7 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
       let q = Queue.create () in
       Signal.on (MetaProverState.on_lemma meta)
         (fun lemma ->
-          Util.debugf ~section 1 "obtained lemma @[%a@] from meta-prover"
+          Util.debugf ~section 2 "obtained lemma @[%a@] from meta-prover"
             CompactClause.fmt (fst lemma);
           Queue.push lemma q;
           Signal.ContinueListening
