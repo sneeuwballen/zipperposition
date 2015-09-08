@@ -319,6 +319,14 @@ lemma (![X:N,Y:N]: [P X (S Y) = S (P X Y)]) <-
 lemma (![X:N]: [P X Z = X]) <-
   theory (peano_add {succ=_, zero=Z, plus=P}).
 
+% commutativity
+lemma (![X:N, Y:N]: [P X Y = P Y X]) <-
+  theory (peano_add {succ=_, zero=_, plus=P}).
+
+% associativity
+lemma (![X:N, Y:N, Z:N]: [P (P X Y) Z = P X (P Y Z)]) <-
+  theory (peano_add {succ=_, zero=_, plus=P}).
+
 val list_th : /\ A /\ L {cons:A ->L ->L, nil:L} -> theory.
 
 theory (list_th @A @L {cons=Cons, nil=Nil}) <-
