@@ -148,6 +148,9 @@ module Make(Ctx : Ctx.S) = struct
         then C.Lt
       else C.Incomparable
     in res
+
+  let () =
+    Ctx.set_selection_fun Selection.no_select
 end
 
 module MakeAvatar(A : Avatar.S) = struct
