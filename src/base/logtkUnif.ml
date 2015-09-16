@@ -460,14 +460,20 @@ module Nary = struct
         (* symmetric case of the previous one *)
         let t1 = RU.to_record r1 in
         unif ~env subst t1 sc1 rest2 sc2 k
-    | Some rest1, _, Some rest2, _ ->
-        (* create fresh var R and unify rest1 with {l2 | R} (t2)
-           and rest2 with { l1 | R } (t1) *)
-        let r = T.fresh_var ~kind:r1.RU.kind ~ty:r1.RU.ty () in
-        let t1 = RU.to_record (RU.set_rest r1 ~rest:(Some r)) in
-        let t2 = RU.to_record (RU.set_rest r2 ~rest:(Some r)) in
-        unif ~env subst rest1 sc1 t2 sc2
-          (fun ~env subst -> unif ~env subst t1 sc1 rest2 sc2 k)
+    | Some rest1, d1, Some rest2, d2 ->
+        let rest1, sc1 = S.get_var subst rest1 sc1 in
+        let rest2, sc2 = S.get_var subst rest2 sc2 in
+        if T.is_var rest1 && T.eq rest1 rest2 && sc1 = sc2
+          then (* can only unify if common set of fields *)
+            if d1=[] && d2=[] then k ~env subst else ()
+        else
+          (* create fresh var R and unify rest1 with {l2 | R} (t2)
+             and rest2 with { l1 | R } (t1) *)
+          let r = T.fresh_var ~kind:r1.RU.kind ~ty:r1.RU.ty () in
+          let t1 = RU.to_record (RU.set_rest r1 ~rest:(Some r)) in
+          let t2 = RU.to_record (RU.set_rest r2 ~rest:(Some r)) in
+          unif ~env subst rest1 sc1 t2 sc2
+            (fun ~env subst -> unif ~env subst t1 sc1 rest2 sc2 k)
 
   (* unify the two records *)
   let rec __unify_records ~env ~unif subst r1 sc1 r2 sc2 k =
@@ -700,7 +706,7 @@ module Nary = struct
       | _ when T.ground s && T.ground t && T.DB.closed s ->
         () (* terms are not equal, and ground. failure. *)
       | T.RigidVar i, T.RigidVar j when sc_s = sc_t && i = j -> k ~env subst
-      | T.RigidVar i, T.RigidVar j when sc_s <> sc_t ->
+      | T.RigidVar _, T.RigidVar _ when sc_s <> sc_t ->
           k ~env (S.bind subst s sc_s t sc_t)
       | T.RigidVar _, _
       | _, T.RigidVar _ -> ()  (* fail *)
@@ -743,7 +749,7 @@ module Nary = struct
       | _, _ -> ()  (* fail *)
     in
     let env = {env1; env2; permutation=DBE.empty} in
-    fun k -> unif ~env subst a sc_a b sc_b (fun ~env s -> k s)
+    fun k -> unif ~env subst a sc_a b sc_b (fun ~env:_ s -> k s)
 
   let are_variant t1 t2 =
     not (Sequence.is_empty (variant t1 0 t2 1))
@@ -817,15 +823,22 @@ module Unary = struct
         (* symmetric case of the previous one *)
         let t1 = RU.to_record r1 in
         unif ~env1 ~env2 subst t1 sc1 rest2 sc2
-    | Some rest1, l1, Some rest2, l2 ->
-        (* create fresh var R and unify rest1 with {l2 | R}
-         * and rest2 with { l1 | R } *)
-        let r = T.const ~kind:r1.RU.kind ~ty:r1.RU.ty (LogtkSymbol.Base.fresh_var ()) in
-        let t1 = RU.to_record (RU.set_rest r1 ~rest:(Some r)) in
-        let t2 = RU.to_record (RU.set_rest r1 ~rest:(Some r)) in
-        let subst = unif ~env1 ~env2 subst rest1 sc1 t2 sc2 in
-        let subst = unif ~env1 ~env2 subst t1 sc1 rest2 sc2 in
-        subst
+    | Some rest1, d1, Some rest2, d2 ->
+        let rest1, sc1 = S.get_var subst rest1 sc1 in
+        let rest2, sc2 = S.get_var subst rest2 sc2 in
+        if T.is_var rest1 && T.eq rest1 rest2 && sc1=sc2
+          then if d1=[] && d2=[]
+            then subst
+            else raise Fail (* impossible to unify discarded fields *)
+        else
+          (* create fresh var R and unify rest1 with {l2 | R}
+           * and rest2 with { l1 | R } *)
+          let r = T.const ~kind:r1.RU.kind ~ty:r1.RU.ty (LogtkSymbol.Base.fresh_var ()) in
+          let t1 = RU.to_record (RU.set_rest r1 ~rest:(Some r)) in
+          let t2 = RU.to_record (RU.set_rest r1 ~rest:(Some r)) in
+          let subst = unif ~env1 ~env2 subst rest1 sc1 t2 sc2 in
+          let subst = unif ~env1 ~env2 subst t1 sc1 rest2 sc2 in
+          subst
 
   let unification ?(env1=DBE.empty) ?(env2=DBE.empty) ?(subst=S.empty) a sc_a b sc_b =
     LogtkUtil.enter_prof prof_unify;
