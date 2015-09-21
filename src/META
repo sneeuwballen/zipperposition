@@ -1,6 +1,6 @@
 # OASIS_START
-# DO NOT EDIT (digest: de6300d77ed9fe5684a545f758e0ccf8)
-version = "0.6"
+# DO NOT EDIT (digest: cc392bc4cc3ede4d6e80b97d932ecae2)
+version = "0.6.1"
 description =
 "Superposition theorem prover, for first order logic with equality."
 requires =
