@@ -48,6 +48,18 @@ let dollar_word = '$' lower_alpha alpha_numeric*
 let dollar_dollar_word = '$' '$' lower_alpha alpha_numeric*
 let interrogation_word = '?' alpha_numeric*
 
+let zero_numeric = '0'
+let non_zero_numeric = ['1' - '9']
+let numeric = ['0' - '9']
+let sign = ['+' '-']
+
+let dot_decimal = '.' numeric +
+let positive_decimal = non_zero_numeric numeric*
+let decimal = zero_numeric | positive_decimal
+let unsigned_integer = decimal
+let signed_integer = sign unsigned_integer
+let integer = signed_integer | unsigned_integer
+
 rule token = parse
   | eof { EOI }
   | '\n' { Lexing.new_line lexbuf; token lexbuf }
@@ -86,6 +98,7 @@ rule token = parse
   | upper_word { UPPER_WORD(Lexing.lexeme lexbuf) }
   | interrogation_word { INTERROGATION_WORD(Lexing.lexeme lexbuf) }
   | operator { OPERATOR(Lexing.lexeme lexbuf) }
+  | integer { INTEGER(Lexing.lexeme lexbuf) }
   | _ as c { raise (Error (Printf.sprintf "lexer fails on char '%c'" c)) }
 
 

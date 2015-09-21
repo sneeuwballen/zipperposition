@@ -21,3 +21,4 @@ B _build/tests/
 PKG zarith
 PKG sequence
 PKG containers
+FLG -w +a -w -4 -w -44

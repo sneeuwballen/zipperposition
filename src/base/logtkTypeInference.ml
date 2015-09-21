@@ -124,7 +124,7 @@ module Ctx = struct
     ctx.signature <- LogtkSignature.declare ctx.signature sym ty
 
   (* generate fresh type var. *)
-  let _new_ty_var ctx = LogtkType.fresh_var ()
+  let _new_ty_var _ctx = LogtkType.fresh_var ()
 
   (* generate [n] fresh type vars *)
   let rec _new_ty_vars ctx n =
@@ -180,7 +180,8 @@ module Ctx = struct
             ty
         | Some ty -> ty
       in
-      LogtkUtil.debug ~section 5 "var %s now has number %d and type %a" name n LogtkType.pp ty;
+      LogtkUtil.debug ~section 5 "var %s now has number %d and type %a"
+        name n LogtkType.pp ty;
       Hashtbl.add ctx.vars name (n,ty);
       n, ty
 
@@ -200,19 +201,22 @@ module Ctx = struct
       ~h:(fun () -> ctx.locs <- old_locs)
       ~f
 
+  let pp_ty_deref_ ctx out ty =
+    LogtkType.pp out (LogtkSubsts.Ty.apply_no_renaming ctx.subst ty 0)
+
   (* unify within the context's substitution. Wraps {!Unif.Ty.unification}
      by returning a nicer exception in case of failure *)
   let unify ctx ty1 ty2 =
     try
       LogtkUnif.Ty.unification ~subst:ctx.subst ty1 0 ty2 0
     with LogtkUnif.Fail ->
-      let ty1 = LogtkSubsts.Ty.apply_no_renaming ctx.subst ty1 0 in
-      let ty2 = LogtkSubsts.Ty.apply_no_renaming ctx.subst ty2 0 in
-      __error ctx "could not unify types %a and %a" LogtkType.pp ty1 LogtkType.pp ty2
+      __error ctx "could not unify types %a and %a"
+        (pp_ty_deref_ ctx) ty1 (pp_ty_deref_ ctx) ty2
 
   (* same as {!unify}, but also updates the ctx's substitution *)
   let unify_and_set ctx ty1 ty2 =
-    LogtkUtil.debug ~section 5 "unify types %a and %a" LogtkType.pp ty1 LogtkType.pp ty2;
+    LogtkUtil.debug ~section 5 "unify types %a and %a"
+      (pp_ty_deref_ ctx) ty1 (pp_ty_deref_ ctx) ty2;
     let subst = unify ctx ty1 ty2 in
     ctx.subst <- subst
 
@@ -244,8 +248,7 @@ module Ctx = struct
         (* give a new type variable to this symbol. The symbol will not
           be able to be polymorphic (need to declare it!). *)
         try
-          let ty = Sym.Tbl.find ctx.symbols s in
-          ty
+          Sym.Tbl.find ctx.symbols s
         with Not_found ->
           let ty = fresh_fun_ty ~arity ctx in
           Sym.Tbl.add ctx.symbols s ty;
@@ -436,7 +439,7 @@ module FO = struct
     | None -> infer_rec_view ctx t.PT.term
     | Some loc -> Ctx.with_loc ctx ~loc (fun () -> infer_rec_view ctx t.PT.term)
   and infer_rec_view ctx t = match t with
-    | PT.Column ({PT.term=PT.Var name}, ty) ->
+    | PT.Column ({PT.term=PT.Var name; _}, ty) ->
       (* typed var *)
       let ty = match Ctx.ty_of_prolog ctx ty with
         | Some ty -> ty
@@ -468,10 +471,9 @@ module FO = struct
         let ty = Ctx.apply_ty ctx ty_s in
         T.const ~ty s)
     | PT.Syntactic (s, l)
-    | PT.App ({PT.term=PT.Const s}, l) ->
+    | PT.App ({PT.term=PT.Const s; _}, l) ->
       (* use type of [s] *)
       let ty_s = Ctx.type_of_fun ~arity:(List.length l) ctx s in
-      LogtkUtil.debug ~section 5 "type of symbol %a: %a" Sym.pp s LogtkType.pp ty_s;
       let n_tyargs, n_args = match LogtkType.arity ty_s with
         | LogtkType.NoArity -> 0, List.length l
         | LogtkType.Arity (a,b) -> a, b
@@ -501,6 +503,7 @@ module FO = struct
           which is also the result. *)
       let ty_ret = Ctx._new_ty_var ctx in
       Ctx.unify_and_set ctx ty_s' (LogtkType.arrow_list ty_of_args ty_ret);
+      LogtkUtil.debug ~section 5 "type of symbol %a: %a" Sym.pp s (Ctx.pp_ty_deref_ ctx) ty_s;
       (* now to produce the closure, that first creates subterms *)
       ty_ret, (fun ctx ->
         let args' = closure_args ctx in
@@ -524,7 +527,7 @@ module FO = struct
     | PT.Bind _ -> Ctx.__error ctx "expected first-order term"
 
   let infer_var_scope ctx t = match t.PT.term with
-    | PT.Column ({PT.term=PT.Var name}, ty) ->
+    | PT.Column ({PT.term=PT.Var name; _}, ty) ->
       let ty = match Ctx.ty_of_prolog ctx ty with
         | Some ty -> ty
         | None -> Ctx.__error ctx "expected type, got %a" PT.pp ty
@@ -542,7 +545,7 @@ module FO = struct
     | _ -> assert false
 
   let exit_var_scope ctx t = match t.PT.term with
-    | PT.Column ({PT.term=PT.Var name}, _)
+    | PT.Column ({PT.term=PT.Var name; _}, _)
     | PT.Var name -> Ctx._exit_var_scope ctx name
     | _ -> assert false
 
@@ -632,7 +635,7 @@ module FO = struct
       fun ctx ->
         F.Base.forall_ty vars' (f' ctx)
     | PT.Syntactic (Sym.Conn ((Sym.Eq | Sym.Neq) as conn),
-      ([_;a;b] | [_; {PT.term=PT.List [a;b]}] | [a;b])) ->
+      ([_;a;b] | [_; {PT.term=PT.List [a;b]; _}] | [a;b])) ->
       (* a ?= b *)
       let tya, a = infer_exn ctx a in
       let tyb, b = infer_exn ctx b in
@@ -743,7 +746,7 @@ module HO = struct
 
   (* infer the type of a bound variable, and enter its scope *)
   let infer_var_scope ctx t = match t.PT.term with
-    | PT.Column ({PT.term=PT.Var name}, ty) ->
+    | PT.Column ({PT.term=PT.Var name; _}, ty) ->
       let ty = match Ctx.ty_of_prolog ctx ty with
         | Some ty -> ty
         | None -> Ctx.__error ctx "expected type, got %a" PT.pp ty
@@ -764,7 +767,7 @@ module HO = struct
     | _ -> assert false
 
   let exit_var_scope ctx t = match t.PT.term with
-    | PT.Column ({PT.term=PT.Var name}, _)
+    | PT.Column ({PT.term=PT.Var name; _}, _)
     | PT.Var name -> Ctx._exit_var_scope ctx name
     | _ -> assert false
 
@@ -773,10 +776,19 @@ module HO = struct
       @param arity expected number of arguments *)
   let rec infer_rec ?(arity=0) ctx t =
     match t.PT.loc with
-    | None -> infer_rec_view ~arity ctx t.PT.term
-    | Some loc -> Ctx.with_loc ctx ~loc (fun () -> infer_rec_view ~arity ctx t.PT.term)
+    | None ->
+        let ty, c = infer_rec_view ~arity ctx t.PT.term in
+        LogtkUtil.debug ~section 5 "infer term %a... : %a" PT.pp t (Ctx.pp_ty_deref_ ctx) ty;
+        ty, c
+    | Some loc ->
+        Ctx.with_loc ctx ~loc
+          (fun () ->
+            let ty, c = infer_rec_view ~arity ctx t.PT.term in
+            LogtkUtil.debug ~section 5 "infer term %a... : %a" PT.pp t (Ctx.pp_ty_deref_ ctx) ty;
+            ty, c
+          )
   and infer_rec_view ~arity ctx t = match t with
-    | PT.Column ({PT.term=PT.Var name}, ty) ->
+    | PT.Column ({PT.term=PT.Var name; _}, ty) ->
       (* typed var *)
       let ty = match Ctx.ty_of_prolog ctx ty with
         | Some ty -> ty
@@ -823,7 +835,7 @@ module HO = struct
         let v' = clos_v ctx in
         T.lambda [v'] t')
     | PT.Bind (Sym.Conn ((Sym.Forall | Sym.Exists) as conn), [v], t) ->
-      let ty_v, clos_v = infer_var_scope ctx v in
+      let _, clos_v = infer_var_scope ctx v in
       let ty_t, clos_t = LogtkUtil.finally
         ~f:(fun () -> infer_rec ctx t)
         ~h:(fun () -> exit_var_scope ctx v)
@@ -873,7 +885,7 @@ module HO = struct
       in
       let l' = Closure.seq l' in
       let ty_rest, rest' = match rest with
-        | None -> None, (fun ctx -> None)
+        | None -> None, (fun _ -> None)
         | Some r ->
             let ty_r, r' = infer_rec ctx r in
             (* force [ty_r] to be a record *)
@@ -906,7 +918,7 @@ module HO = struct
         | LogtkType.Arity (a,b) -> a, b
       in
       LogtkUtil.debug ~section 5 "fun %a : %a expects %d type args and %d args (applied to %a)"
-        PT.pp t LogtkType.pp ty_t n_tyargs n_args (LogtkUtil.pp_list PT.pp) l;
+        PT.pp t (Ctx.pp_ty_deref_ ctx) ty_t n_tyargs n_args (LogtkUtil.pp_list PT.pp) l;
       (* separation between type arguments and proper term arguments,
           based on the expected arity of the head [t].
           We split [l] into the list [tyargs], containing [n_tyargs] types,
@@ -924,6 +936,8 @@ module HO = struct
           which is also the result. *)
       let ty_ret = Ctx._new_ty_var ctx in
       Ctx.unify_and_set ctx ty_t' (LogtkType.arrow_list ty_of_args ty_ret);
+      LogtkUtil.debug ~section 5 "now fun %a : %a and args have type %a"
+        PT.pp t (Ctx.pp_ty_deref_ ctx) ty_t' (CCList.pp (Ctx.pp_ty_deref_ ctx)) ty_of_args;
       (* closure *)
       ty_ret, (fun ctx ->
         let args' = closure_args ctx in

@@ -51,7 +51,7 @@ type view =
 
 let ty t = match T.ty t with
   | T.NoType -> assert false
-  | T.HasLogtkType ty -> LogtkType.of_term_exn ty
+  | T.HasType ty -> LogtkType.of_term_exn ty
 
 let __get_ty = ty
 

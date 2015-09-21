@@ -74,6 +74,7 @@ A parser with a nice curried syntax. *)
 %token <string> UPPER_WORD
 %token <string> INTERROGATION_WORD
 %token <string> OPERATOR
+%token <string> INTEGER
 
 %nonassoc EQUIV
 %nonassoc XOR
@@ -198,6 +199,11 @@ unary_term:
     {
       let loc = L.mk_pos $startpos $endpos in
       Term.const ~loc (Sym.of_string w)
+    }
+  | w=INTEGER
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      Term.const ~loc (Sym.of_int (int_of_string w))
     }
   | AT ty=unary_type
     {

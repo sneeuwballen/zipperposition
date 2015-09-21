@@ -146,7 +146,7 @@ let occurs_check ~env subst v sc_v t sc_t =
     if T.ground t then false
     else match T.ty t with
     | T.NoType -> false
-    | T.HasLogtkType ty ->
+    | T.HasType ty ->
       (* check type and subterms *)
       check ~env ty sc_t ||
       match T.view t with
@@ -186,7 +186,7 @@ let occurs_check ~env subst v sc_v t sc_t =
   in
   check ~env t sc_t
 
-module RecordLogtkUnif = struct
+module RecordUnif = struct
   type t = {
     kind : T.Kind.t;
     ty : T.t;
@@ -201,7 +201,7 @@ module RecordLogtkUnif = struct
   let of_record t l rest =
     let r = {
       kind=T.kind t;
-      ty= (match T.ty t with T.NoType -> assert false | T.HasLogtkType ty -> ty);
+      ty=T.ty_exn t;
       fields = l;
       discarded = [];
       rest;
@@ -210,7 +210,19 @@ module RecordLogtkUnif = struct
 
   (* convert back to a record *)
   let to_record r =
-    T.record ~kind:r.kind ~ty:r.ty (r.fields @ r.discarded) ~rest:r.rest
+    let ty_fields = List.map (fun (name,t) -> name, T.ty_exn t) in
+    (* compute remaining type *)
+    let ty = if T.eq r.ty T.tType
+      then T.tType
+      else (
+        assert (T.is_record r.ty || T.is_var r.ty);
+        (* type of fields that remain *)
+        T.record ~kind:(T.kind r.ty) ~ty:T.tType
+          (ty_fields r.fields @ ty_fields r.discarded)
+          ~rest:(CCOpt.map T.ty_exn r.rest)
+      )
+    in
+    T.record ~kind:r.kind ~ty (r.fields @ r.discarded) ~rest:r.rest
 
   (* discard first field *)
   let discard r = match r.fields with
@@ -227,12 +239,22 @@ module RecordLogtkUnif = struct
   (* remove next field *)
   let pop_field r = match r.fields with
     | [] -> assert false
-    | (n,t)::l -> { r with fields=l;  }
+    | _::l -> { r with fields=l;  }
 
   let fields r = r.fields
+
+  let _pp out r =
+    let pp_list = CCList.print (CCPair.print CCString.print T.fmt) in
+    let pp_rest out x = match x with
+      | None -> ()
+      | Some r -> Format.fprintf out "| %a" T.fmt r
+    in
+    Format.fprintf out
+      "@[<hov2>record_unif {@,fields=@[%a@],@ discarded=@[%a@]@ %a@,}@]"
+      pp_list r.fields pp_list r.discarded pp_rest r.rest
 end
 
-module RU = RecordLogtkUnif
+module RU = RecordUnif
 
 (** {2 Nary-unification} *)
 
@@ -417,6 +439,8 @@ module Nary = struct
   let __unify_record_rest ~env ~unif subst r1 sc1 r2 sc2 k =
     assert (r1.RU.fields = []);
     assert (r2.RU.fields = []);
+    (* LogtkUtil.debugf 5 "@[<hv2>unify_rec_rest@ %a and@ %a with@ %a@]"
+      RU._pp r1 RU._pp r2 S.fmt subst; *)
     (* LogtkUtil.debug 5 "unif_rest %a %a" T.pp (RU.to_record r1) T.pp (RU.to_record r2); *)
     match r1.RU.rest, r1.RU.discarded, r2.RU.rest, r2.RU.discarded with
     | None, [], None, [] ->
@@ -430,22 +454,31 @@ module Nary = struct
         (* no discarded fields in r1, so we only need to
            unify rest1 with { l2 | rest2 } *)
         let t2 = RU.to_record r2 in
-        unif ~env  subst rest1 sc1 t2 sc2 k
+        (* LogtkUtil.debugf 5 "@[--> unify %a and %a:@]" T.fmt rest1 T.fmt t2; *)
+        unif ~env subst rest1 sc1 t2 sc2 k
     | _, _, Some rest2, [] ->
         (* symmetric case of the previous one *)
         let t1 = RU.to_record r1 in
         unif ~env subst t1 sc1 rest2 sc2 k
-    | Some rest1, l1, Some rest2, l2 ->
-        (* create fresh var R and unify rest1 with {l2 | R} (t2)
-         * and rest2 with { l1 | R } (t1) *)
-        let r = T.const ~kind:r1.RU.kind ~ty:r1.RU.ty (LogtkSymbol.Base.fresh_var ()) in
-        let t1 = RU.to_record (RU.set_rest r1 ~rest:(Some r)) in
-        let t2 = RU.to_record (RU.set_rest r2 ~rest:(Some r)) in
-        unif ~env subst rest1 sc1 t2 sc2
-          (fun ~env subst -> unif ~env subst t1 sc1 rest2 sc2 k)
+    | Some rest1, d1, Some rest2, d2 ->
+        let rest1, sc1 = S.get_var subst rest1 sc1 in
+        let rest2, sc2 = S.get_var subst rest2 sc2 in
+        if T.is_var rest1 && T.eq rest1 rest2 && sc1 = sc2
+          then (* can only unify if common set of fields *)
+            if d1=[] && d2=[] then k ~env subst else ()
+        else
+          (* create fresh var R and unify rest1 with {l2 | R} (t2)
+             and rest2 with { l1 | R } (t1) *)
+          let r = T.fresh_var ~kind:r1.RU.kind ~ty:r1.RU.ty () in
+          let t1 = RU.to_record (RU.set_rest r1 ~rest:(Some r)) in
+          let t2 = RU.to_record (RU.set_rest r2 ~rest:(Some r)) in
+          unif ~env subst rest1 sc1 t2 sc2
+            (fun ~env subst -> unif ~env subst t1 sc1 rest2 sc2 k)
 
   (* unify the two records *)
   let rec __unify_records ~env ~unif subst r1 sc1 r2 sc2 k =
+    (* LogtkUtil.debugf 5 "@[<hv2>unify_rec@ %a and@ %a with@ %a@]"
+        RU._pp r1 RU._pp r2 S.fmt subst; *)
     match RU.fields r1, RU.fields r2 with
     | [], _
     | _, [] ->
@@ -521,7 +554,7 @@ module Nary = struct
           unif_terms ~env subst s sc_s t sc_t k
         | T.NoType, _
         | _, T.NoType -> ()
-        | T.HasLogtkType ty1, T.HasLogtkType ty2 ->
+        | T.HasType ty1, T.HasType ty2 ->
           unif ~env subst ty1 sc_s ty2 sc_t
             (fun ~env subst -> unif_terms ~env subst s sc_s t sc_t k)
     and unif_terms ~env subst s sc_s t sc_t k =
@@ -531,7 +564,7 @@ module Nary = struct
       | _ when T.ground s && T.ground t && T.DB.closed s ->
         () (* terms are not equal, and ground. failure. *)
       | T.RigidVar i, T.RigidVar j when sc_s = sc_t && i = j -> k ~env subst
-      | T.RigidVar i, T.RigidVar j when sc_s <> sc_t ->
+      | T.RigidVar _, T.RigidVar _ when sc_s <> sc_t ->
           k ~env (S.bind subst s sc_s t sc_t)
       | T.RigidVar _, _
       | _, T.RigidVar _ -> ()  (* fail *)
@@ -583,7 +616,7 @@ module Nary = struct
       | _, _ -> ()  (* fail *)
     in
     let env = {env1; env2; permutation=DBE.empty; } in
-    fun k -> unif ~env subst a sc_a b sc_b (fun ~env subst -> k subst)
+    fun k -> unif ~env subst a sc_a b sc_b (fun ~env:_ subst -> k subst)
 
   let matching ?(allow_open=false)?(env1=DBE.empty) ?(env2=DBE.empty)
   ?(subst=S.empty) ~pattern sc_pattern b sc_b =
@@ -596,7 +629,7 @@ module Nary = struct
           unif_terms ~env subst s sc_s t sc_t k
         | T.NoType, _
         | _, T.NoType -> ()
-        | T.HasLogtkType ty1, T.HasLogtkType ty2 ->
+        | T.HasType ty1, T.HasType ty2 ->
           unif ~env subst ty1 sc_s ty2 sc_t
             (fun ~env subst -> unif_terms ~env subst s sc_s t sc_t k)
     and unif_terms ~env subst s sc_s t sc_t k =
@@ -606,7 +639,7 @@ module Nary = struct
       | _ when T.ground s && T.ground t && T.DB.closed t ->
         () (* terms are not equal, and ground. failure. *)
       | T.RigidVar i, T.RigidVar j when sc_s = sc_t && i = j -> k ~env subst
-      | T.RigidVar i, T.RigidVar j when sc_s <> sc_t ->
+      | T.RigidVar _, T.RigidVar _ when sc_s <> sc_t ->
           k ~env (S.bind subst s sc_s t sc_t)
       | T.RigidVar _, _
       | _, T.RigidVar _ -> ()  (* fail *)
@@ -651,7 +684,7 @@ module Nary = struct
       | _, _ -> ()  (* fail *)
     in
     let env = {env1; env2; permutation=DBE.empty;} in
-    fun k -> unif ~env subst pattern sc_pattern b sc_b (fun ~env s -> k s)
+    fun k -> unif ~env subst pattern sc_pattern b sc_b (fun ~env:_ s -> k s)
 
   let variant ?(env1=DBE.empty) ?(env2=DBE.empty) ?(subst=S.empty) a sc_a b sc_b =
     let rec unif ~env subst s sc_s t sc_t k =
@@ -663,7 +696,7 @@ module Nary = struct
           unif_terms ~env subst s sc_s t sc_t k
         | T.NoType, _
         | _, T.NoType -> ()
-        | T.HasLogtkType ty1, T.HasLogtkType ty2 ->
+        | T.HasType ty1, T.HasType ty2 ->
           unif ~env subst ty1 sc_s ty2 sc_t
             (fun ~env subst  -> unif_terms ~env subst s sc_s t sc_t k)
     and unif_terms ~env subst s sc_s t sc_t k =
@@ -673,7 +706,7 @@ module Nary = struct
       | _ when T.ground s && T.ground t && T.DB.closed s ->
         () (* terms are not equal, and ground. failure. *)
       | T.RigidVar i, T.RigidVar j when sc_s = sc_t && i = j -> k ~env subst
-      | T.RigidVar i, T.RigidVar j when sc_s <> sc_t ->
+      | T.RigidVar _, T.RigidVar _ when sc_s <> sc_t ->
           k ~env (S.bind subst s sc_s t sc_t)
       | T.RigidVar _, _
       | _, T.RigidVar _ -> ()  (* fail *)
@@ -716,7 +749,7 @@ module Nary = struct
       | _, _ -> ()  (* fail *)
     in
     let env = {env1; env2; permutation=DBE.empty} in
-    fun k -> unif ~env subst a sc_a b sc_b (fun ~env s -> k s)
+    fun k -> unif ~env subst a sc_a b sc_b (fun ~env:_ s -> k s)
 
   let are_variant t1 t2 =
     not (Sequence.is_empty (variant t1 0 t2 1))
@@ -790,15 +823,22 @@ module Unary = struct
         (* symmetric case of the previous one *)
         let t1 = RU.to_record r1 in
         unif ~env1 ~env2 subst t1 sc1 rest2 sc2
-    | Some rest1, l1, Some rest2, l2 ->
-        (* create fresh var R and unify rest1 with {l2 | R}
-         * and rest2 with { l1 | R } *)
-        let r = T.const ~kind:r1.RU.kind ~ty:r1.RU.ty (LogtkSymbol.Base.fresh_var ()) in
-        let t1 = RU.to_record (RU.set_rest r1 ~rest:(Some r)) in
-        let t2 = RU.to_record (RU.set_rest r1 ~rest:(Some r)) in
-        let subst = unif ~env1 ~env2 subst rest1 sc1 t2 sc2 in
-        let subst = unif ~env1 ~env2 subst t1 sc1 rest2 sc2 in
-        subst
+    | Some rest1, d1, Some rest2, d2 ->
+        let rest1, sc1 = S.get_var subst rest1 sc1 in
+        let rest2, sc2 = S.get_var subst rest2 sc2 in
+        if T.is_var rest1 && T.eq rest1 rest2 && sc1=sc2
+          then if d1=[] && d2=[]
+            then subst
+            else raise Fail (* impossible to unify discarded fields *)
+        else
+          (* create fresh var R and unify rest1 with {l2 | R}
+           * and rest2 with { l1 | R } *)
+          let r = T.const ~kind:r1.RU.kind ~ty:r1.RU.ty (LogtkSymbol.Base.fresh_var ()) in
+          let t1 = RU.to_record (RU.set_rest r1 ~rest:(Some r)) in
+          let t2 = RU.to_record (RU.set_rest r1 ~rest:(Some r)) in
+          let subst = unif ~env1 ~env2 subst rest1 sc1 t2 sc2 in
+          let subst = unif ~env1 ~env2 subst t1 sc1 rest2 sc2 in
+          subst
 
   let unification ?(env1=DBE.empty) ?(env2=DBE.empty) ?(subst=S.empty) a sc_a b sc_b =
     LogtkUtil.enter_prof prof_unify;
@@ -811,7 +851,7 @@ module Unary = struct
         | T.NoType, T.NoType -> subst
         | T.NoType, _
         | _, T.NoType -> raise Fail
-        | T.HasLogtkType ty1, T.HasLogtkType ty2 ->
+        | T.HasType ty1, T.HasType ty2 ->
           unif ~env1 ~env2 subst ty1 sc_s ty2 sc_t
       in
       match T.view s, T.view t with
@@ -876,7 +916,7 @@ module Unary = struct
         | T.NoType, T.NoType -> subst
         | T.NoType, _
         | _, T.NoType -> raise Fail
-        | T.HasLogtkType ty1, T.HasLogtkType ty2 ->
+        | T.HasType ty1, T.HasType ty2 ->
           unif ~env1 ~env2 subst ty1 sc_s ty2 sc_t
       in
       match T.view s, T.view t with
@@ -936,7 +976,7 @@ module Unary = struct
         | T.NoType, T.NoType -> subst
         | T.NoType, _
         | _, T.NoType -> raise Fail
-        | T.HasLogtkType ty1, T.HasLogtkType ty2 ->
+        | T.HasType ty1, T.HasType ty2 ->
           unif ~env1 ~env2 ~blocked subst ty1 scope ty2 scope
       in
       match T.view s, T.view t with
@@ -1001,7 +1041,7 @@ module Unary = struct
         | T.NoType, T.NoType -> subst
         | T.NoType, _
         | _, T.NoType -> raise Fail
-        | T.HasLogtkType ty1, T.HasLogtkType ty2 ->
+        | T.HasType ty1, T.HasType ty2 ->
           unif ~env1 ~env2 subst ty1 sc_s ty2 sc_t
       in
       match T.view s, T.view t with
@@ -1050,9 +1090,9 @@ module Unary = struct
     let t2, s2 = S.get_var subst t2 s2 in
     begin match T.ty t1, T.ty t2 with
       | T.NoType, T.NoType -> true
-      | T.NoType, T.HasLogtkType _
-      | T.HasLogtkType _, T.NoType -> false
-      | T.HasLogtkType ty1, T.HasLogtkType ty2 -> _eq ~env1 ~env2 ~subst ty1 s1 ty2 s2
+      | T.NoType, T.HasType _
+      | T.HasType _, T.NoType -> false
+      | T.HasType ty1, T.HasType ty2 -> _eq ~env1 ~env2 ~subst ty1 s1 ty2 s2
     end &&
     match T.view t1, T.view t2 with
     | T.RigidVar i, T.RigidVar j
