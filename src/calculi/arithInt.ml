@@ -166,6 +166,7 @@ let _enable_ac = ref false
 let _enable_semantic_tauto = ref true
 let _enable_trivial_ineq = ref true
 let _dot_unit = ref None
+let _diff_to_lesseq = ref `Simplify
 
 let case_switch_limit = ref 30
 let div_case_switch_limit = ref 100
@@ -1596,6 +1597,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       c
   with DiffToLesseq c -> c
 
+  (* inference rule corresponding to {!canc_diff_to_lesseq} *)
+  let canc_diff_imply_lesseq c =
+    let c' = canc_diff_to_lesseq c in
+    if C.eq c c' then [] else [c']
+
   (* flag to be used to know when a clause cannot be purified *)
   let flag_no_purify = C.new_flag ()
 
@@ -2020,7 +2026,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_multi_simpl_rule eliminate_unshielded;
     Env.add_lit_rule "canc_lit_of_lit" canc_lit_of_lit;
     Env.add_lit_rule "less_to_lesseq" canc_less_to_lesseq;
-    Env.add_simplify canc_diff_to_lesseq;
+    (* transformation ≠ to ≤ *)
+    begin match !_diff_to_lesseq with
+      | `Simplify -> Env.add_simplify canc_diff_to_lesseq
+      | `Inf -> Env.add_unary_inf "canc_diff_imply_lesseq" canc_diff_imply_lesseq
+    end;
     Env.add_simplify canc_eq_resolution;
     Env.add_simplify canc_demodulation;
     Env.add_backward_simplify canc_backward_demodulation;
@@ -2082,5 +2092,7 @@ let () =
     ; "-dot-arith-unit"
       , Arg.String (fun s -> _dot_unit := Some s)
       , " print arith-unit index into file"
+    ; "-arith-inf-diff-to-lesseq", Arg.Unit (fun () -> _diff_to_lesseq := `Inf), " ≠ → ≤ as inference"
+    ; "-arith-simp-diff-to-lesseq", Arg.Unit (fun () -> _diff_to_lesseq := `Simplify), " ≠ → ≤ as simplification"
     ];
   ()

@@ -114,11 +114,11 @@ let _blit2f = function
   | (_, `Qbf_artifact (_,n)) ->
       failwith ("cannot encode QBF artifact " ^ n ^ " to TPTP")
 
-let _pp_trail_tstp buf = function
+let pp_trail_tstp buf = function
   | [] -> ()
   | l ->
       let forms = List.map _blit2f l in
-      Printf.bprintf buf " <= (%a)" (Util.pp_list ~sep:" & " F.pp) forms
+      Printf.bprintf buf " <= (%a)" (Util.pp_list ~sep:" & " F.TPTP.pp) forms
 
 let pp_tstp buf c =
   begin match c.lits with
@@ -126,7 +126,7 @@ let pp_tstp buf c =
   | [| x |] -> Lit.pp_tstp buf x
   | l -> Printf.bprintf buf "(%a)" (Util.pp_array ~sep:" | " Lit.pp_tstp) l
   end;
-  _pp_trail_tstp buf c.trail
+  pp_trail_tstp buf c.trail
 
 let to_forms c =
   Array.map (fun l -> Lit.Conv.to_form l) c.lits

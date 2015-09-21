@@ -100,6 +100,7 @@ end) : S with module Ctx = X.Ctx = struct
   let _empty_clauses = ref C.CSet.empty
   let _multi_simpl_rule = ref []
   let _generate_rules = ref []
+  let _step_init = ref []
 
   let on_start = Signal.create()
   let on_empty_clause = Signal.create ()
@@ -189,6 +190,8 @@ end) : S with module Ctx = X.Ctx = struct
 
   let add_multi_simpl_rule rule =
     _multi_simpl_rule := rule :: !_multi_simpl_rule
+
+  let add_step_init f = _step_init := f :: !_step_init
 
   let params = X.params
 
@@ -659,6 +662,8 @@ end) : S with module Ctx = X.Ctx = struct
     let res = C.CSet.to_list !set in
     Util.exit_prof prof_all_simplify;
     res
+
+  let step_init () = List.iter (fun f -> f()) !_step_init
 
   (** {2 Misc} *)
 

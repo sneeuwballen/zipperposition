@@ -1,5 +1,8 @@
 % double(X) = X+X
 
+% NOTE: this is solvable using
+% ./zipperposition.native -theory src/builtin.theory examples/ind/nat4.p
+
 include('nat.ax').
 
 tff(ty_double, type, double : nat > nat).

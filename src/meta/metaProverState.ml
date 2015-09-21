@@ -63,6 +63,13 @@ module Result = struct
   }
 
   let empty = {lemmas=[]; theories=[]; axioms=[]; rewrite=[]; pre_rewrite=[]}
+  let is_empty r =
+    let aux = function [] -> true | _ -> false in
+    aux r.lemmas
+    && aux r.theories
+    && aux r.axioms
+    && aux r.rewrite
+    && aux r.pre_rewrite
 
   let lemmas t = t.lemmas
   let theories t = t.theories
@@ -184,6 +191,20 @@ module Induction = struct
   end
 end
 
+(** {2 Arithmetic} *)
+
+(* TODO: encode sum as a multiset *)
+
+module Arith = struct
+  let t : unit M.Plugin.t = object
+    method signature = Signature.TPTP.Arith.base
+    method owns _ = false
+    method clauses = []
+    method to_fact () = T.TPTP.true_
+    method of_fact _ = None
+  end
+end
+
 (** {2 Interface to the Meta-prover} *)
 
 type t = {
@@ -200,7 +221,9 @@ type t = {
 
 let mk_prover_ =
   let p = M.Prover.empty in
-  M.Prover.add_signature p Induction.t#signature
+  let p = M.Prover.add_signature p Induction.t#signature in
+  let p = M.Prover.add_signature p Arith.t#signature in
+  p
 
 let create () = {
   prover = mk_prover_;
@@ -429,14 +452,15 @@ module Make(E : Env.S) : S with module E = E = struct
   (* be sure to scan clauses *)
   let infer_scan p c =
     let r = scan_clause p c in
-    Util.debugf ~section 3 "@[scan@ %a@ →@ %a@]" C.fmt c Result.print r;
+    if not (Result.is_empty r) then (
+      Util.debugf ~section 3 "@[scan@ %a@ →@ %a@]" C.fmt c Result.print r;
+    );
     []
 
   (** {6 Extension} *)
 
   (* global setup *)
   let setup () =
-    clear_global ();
     let p = get_global () in
     Signal.on p.on_theory
       (fun th ->
@@ -472,7 +496,8 @@ module Make(E : Env.S) : S with module E = E = struct
     Signal.once Signals.on_exit
       (fun _ ->
          if !flag_print_rules_exit then
-         Util.debugf ~section 1 "@[<hv2>detected:@,%a@]" Result.print (results p)
+           Util.debugf ~section 1 "@[<hv2>detected:@,%a@]" Result.print (results p);
+         clear_global ();
       );
     ()
 end

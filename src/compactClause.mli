@@ -67,6 +67,7 @@ val trail : t -> bool_lit list
 
 val pp : Buffer.t -> t -> unit
 val pp_tstp : Buffer.t -> t -> unit
+val pp_trail_tstp : Buffer.t -> bool_lit list -> unit
 
 val to_string : t -> string
 val fmt : Format.formatter -> t -> unit

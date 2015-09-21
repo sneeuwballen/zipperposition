@@ -142,6 +142,9 @@ module type S = sig
 
   val add_generate : string -> generate_rule -> unit
 
+  val add_step_init : (unit -> unit) -> unit
+    (** add a function to call before each saturation step *)
+
   (** {2 Use the Env} *)
 
   val multi_simplify : C.t -> C.t list option
@@ -237,6 +240,9 @@ module type S = sig
   val all_simplify : C.t -> C.t list
     (** Use all simplification rules to convert a clause into a set
         of maximally simplified clause (or [[]] if they are all trivial). *)
+
+  val step_init : unit -> unit
+    (** call all functions registered with {!add_step_init} *)
 
   (** {2 Misc} *)
 

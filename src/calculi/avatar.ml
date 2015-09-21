@@ -234,10 +234,11 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
     c_pos @ c_neg, box
 
   (* introduce a cut for each lemma proposed by the meta-prover *)
-  let introduce_meta_lemmas (l:MetaProverState.lemma list ref) _given =
+  let introduce_meta_lemmas (q:MetaProverState.lemma Queue.t) _given =
     (* translate all new lemmas into cuts *)
     let clauses =
-      CCList.flat_map
+      Sequence.of_queue q
+      |> Sequence.flat_map
         (fun (cc, proof) ->
            assert (CompactClause.trail cc = []);
            let f = CompactClause.to_form cc in
@@ -245,10 +246,11 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
            let new_clauses, _box = introduce_cut f proof in
            Util.debugf ~section 2 "@[<hv2>introduce cut from meta lemma:@,%a@]"
              (CCList.print C.fmt) new_clauses;
-           new_clauses
-        ) !l
+           Sequence.of_list new_clauses
+        )
+      |> Sequence.to_rev_list
     in
-    l := [];
+    Queue.clear q;
     clauses
 
   let before_check_sat = Signal.create()
@@ -292,10 +294,15 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
     begin try
       let meta = MetaProverState.get_global () in
       Util.debug ~section 1 "found meta-prover, watch for lemmas";
-      let l = ref [] in
-      E.add_unary_inf "avatar_meta_lemmas" (introduce_meta_lemmas l);
+      let q = Queue.create () in
       Signal.on (MetaProverState.on_lemma meta)
-        (fun lemma -> l := lemma :: !l; Signal.ContinueListening)
+        (fun lemma ->
+          Util.debugf ~section 2 "obtained lemma @[%a@] from meta-prover"
+            CompactClause.fmt (fst lemma);
+          Queue.push lemma q;
+          Signal.ContinueListening
+        );
+      E.add_unary_inf "avatar_meta_lemmas" (introduce_meta_lemmas q);
     with Not_found ->
       Util.debug ~section 1 "could not find meta-prover";
       ()

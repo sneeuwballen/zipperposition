@@ -398,7 +398,7 @@ let _pp_kind_tstp buf (k,parents) =
 let pp_tstp buf proof =
   let namespace = ProofTbl.create 5 in
   traverse proof
-    begin fun p ->
+    (fun p ->
       let name = get_name ~namespace p in
       let parents =
         List.map (fun p -> `Name (get_name namespace p)) (Array.to_list p.parents) @
@@ -408,10 +408,16 @@ let pp_tstp buf proof =
       | Form f ->
         Printf.bprintf buf "tff(%d, %s, %a, %a).\n"
           name (role p) F.TPTP.pp f _pp_kind_tstp (p.kind,parents)
+      | Clause c when CC.trail c <> [] ->
+        Printf.bprintf buf "tff(%d, %s, (%a) %a, %a).\n"
+          name (role p)
+            F.TPTP.pp (CC.to_form c |> F.close_forall)
+            CC.pp_trail_tstp (CC.trail c)
+            _pp_kind_tstp (p.kind,parents)
       | Clause c ->
         Printf.bprintf buf "cnf(%d, %s, %a, %a).\n"
           name (role p) CC.pp_tstp c _pp_kind_tstp (p.kind,parents)
-    end
+    )
 
 (** Prints the proof according to the given input switch *)
 let pp switch buf proof = match switch with

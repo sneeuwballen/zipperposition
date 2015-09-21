@@ -134,7 +134,7 @@ val apply_subst_no_renaming : Substs.t -> 'a t -> Substs.scope -> 'a t
 val variant : ?subst:Substs.t -> 'a t -> scope -> 'a t -> scope -> Substs.t Sequence.t
 
 (** Matching and unification aren't complete in the presence of variables
-    occurring directly under the sum, for this would require the variable 
+    occurring directly under the sum, for this would require the variable
     to be bound to sums (monomes) itself in the general case.
     Instead, such variables are only bound to atomic terms, excluding
     constants (ie X+1 = a+1 will bind X to a without problem, but
