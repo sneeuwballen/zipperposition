@@ -1,0 +1,1 @@
+../../examples/modulo6.p

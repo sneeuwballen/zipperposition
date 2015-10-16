@@ -1,0 +1,1 @@
+../../examples/pelletier_problems/equivalence.p

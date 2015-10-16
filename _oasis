@@ -75,18 +75,8 @@ Document libzipperposition
   XOCamlbuildLibraries: libzipperposition
 
 Test all
-  Command:      $run_tests
-  TestTools:    run_tests
+  Command:      ./tests/run.ml
   Run$:         flag(tests)
-
-Executable run_tests
-  Path:             tests/
-  Install:          false
-  CompiledObject:   native
-  MainIs:           run_tests.ml
-  Build$:           flag(tests)
-  BuildDepends:     containers, logtk, logtk.parsers, logtk.arbitrary,
-                    libzipperposition, qcheck
 
 SourceRepository head
   Type: git
