@@ -234,7 +234,8 @@ let mk_lit a b sign =
   | _ when T.eq b T.TPTP.true_ -> Prop (a, sign)
   | _ when T.eq a T.TPTP.false_ -> Prop (b, not sign)
   | _ when T.eq b T.TPTP.false_ -> Prop (a, not sign)
-  | _ -> Equation (a, b, sign)
+  | _ ->
+      if T.cmp a b <= 0 then Equation (a, b, sign) else Equation (b, a, sign)
 
 let mk_eq a b = mk_lit a b true
 
