@@ -69,6 +69,10 @@ val apply_same_scope : t -> term -> Literals.t
 (** Same as {!apply}, but now variables from the context and variables
     from the term live in the same scope *)
 
+val raw_lits : t -> Literals.t
+(** give access to the underlying literals. Careful not to depend
+    on the variable's actual name. *)
+
 (*
 val matching : t -> Literals.t -> term option
 (** Match the context against a proper clause. On success, [matching ctx c]

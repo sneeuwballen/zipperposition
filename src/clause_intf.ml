@@ -107,6 +107,8 @@ module type S = sig
     val add : bool_lit -> t -> t
     val remove : bool_lit -> t -> t
     val map : (bool_lit -> bool_lit) -> t -> t
+    val fold : ('a -> bool_lit -> 'a) -> 'a -> t -> 'a
+    val length : t -> int
     val for_all : (bool_lit -> bool) -> t -> bool
     val exists : (bool_lit -> bool) -> t -> bool
     val of_list : bool_lit list -> t

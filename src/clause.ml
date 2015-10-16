@@ -69,6 +69,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let singleton = ISet.singleton
     let add = ISet.add
     let remove = ISet.remove
+    let fold f acc t = ISet.fold (fun x acc -> f acc x) t acc
+    let length = ISet.cardinal
     let map f set =
       ISet.to_seq set
       |> Sequence.map f

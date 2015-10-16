@@ -38,7 +38,7 @@ type term = Logtk.FOTerm.t
 type sym = Logtk.Symbol.t
 type formula = F.t
 
-let section = Const.section
+let section = Util.Section.make ~parent:Const.section "ind"
 
 let ind_types_ = ref []
 let cover_set_depth_ = ref 1
