@@ -33,7 +33,7 @@ Library "libzipperposition"
                     Saturate, Selection, PFormula, Theories, AC,
                     PEnv, Params, Env, Monome, ArithLit, Signals, Multisets,
                     Ctx_intf, Clause_intf, Env_intf, ProofState_intf,
-                    BBox, BBox_intf, ClauseContext,
+                    BBox, BBox_intf, ClauseContext, ClauseQueue_intf,
                     BoolSolver, BoolSolver_intf, Induction_helpers,
                     calculi/Avatar, calculi/Induction, calculi/Induction_simple,
                     calculi/Superposition, calculi/Chaining,
