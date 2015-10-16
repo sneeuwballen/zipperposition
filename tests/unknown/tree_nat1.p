@@ -1,0 +1,1 @@
+../../examples/ind/tree_nat1.p

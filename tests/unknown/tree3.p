@@ -1,0 +1,1 @@
+../../examples/ind/tree3.p

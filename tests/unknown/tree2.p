@@ -1,0 +1,1 @@
+../../examples/ind/tree2.p

@@ -1,0 +1,1 @@
+../../examples/ind/nat12_no_ax.p

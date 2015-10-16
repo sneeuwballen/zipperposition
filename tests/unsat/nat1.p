@@ -1,0 +1,1 @@
+../../examples/ind/nat1.p

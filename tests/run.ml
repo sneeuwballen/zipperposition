@@ -8,19 +8,24 @@
 #require "containers.string";;
 #require "containers.unix";;
 
+let timeout = ref 2
+
 type result =
   | Sat
   | Unsat
+  | Unknown
   | Error
 
 let pp_result out e =
   Format.fprintf out "%s"
-    (match e with Sat -> "sat" | Unsat -> "unsat" | Error -> "error")
+    (match e with Sat -> "sat" | Unsat -> "unsat"
+      | Error -> "error" | Unknown -> "unknown")
 
 (* what is expected? *)
 let find_expected f =
   if CCString.mem ~sub:"unsat" f then Unsat
   else if CCString.mem ~sub:"sat" f then Sat
+  else if CCString.mem ~sub:"unknown" f then Unknown
   else if CCString.mem ~sub:"error" f then Error
   else (* inline *)
     CCIO.with_in f
@@ -32,8 +37,9 @@ let find_expected f =
             (function
               | "# expect: sat" -> Some Sat
               | "# expect: unsat" -> Some Unsat
-              | "# expect: error"
-              | "# expect: fail" -> Some Error
+              | "# expect: error" -> Some Error
+              | "# expect: unknown" -> Some Unknown
+              | "# expect: fail" -> Some Unknown
               | _ -> None
             )
         in
@@ -52,7 +58,8 @@ let test_file f =
       then "-arith -arith-inf-diff-to-lesseq" else "")
   in
   let p = CCUnix.call
-    "./zipperposition.native -timeout 5 %s -theory src/builtin.theory %s" options f
+    "./zipperposition.native -timeout %d %s -theory src/builtin.theory %s"
+      !timeout options f
   in
   let actual =
     if p#errcode <> 0 then Error
@@ -61,15 +68,20 @@ let test_file f =
         || CCString.mem ~sub:"status Unsatisfiable" p#stdout then Unsat
       else if CCString.mem ~sub:"status CounterSatisfiable" p#stdout
         || CCString.mem ~sub:"status Satisfiable" p#stdout then Sat
+      else if CCString.mem ~sub:"GaveUp" p#stdout
+        || CCString.mem ~sub:"ResourceOut" p#stdout then Unknown
       else Error
   in
-  if expected = actual
-  then (Format.printf "\x1b[32;1mok\x1b[0m@."; true)
-  else (
+  match expected, actual with
+  | Unknown, (Sat | Unsat) ->
+      Format.printf "\x1b[34;1mok (better than expected)\x1b[0m@."; true
+  | _ when expected = actual ->
+      let color = match expected with Sat | Unsat -> 2 | Unknown | Error -> 3 in
+      Format.printf "\x1b[3%d;1mok\x1b[0m@." color; true
+  | _ ->
     Format.printf "\x1b[31;1mfailure\x1b[0m: expected `%a`, got `%a`@."
       pp_result expected pp_result actual;
     false
-  )
 
 (* find list of files to test *)
 let gather_files () =
@@ -79,7 +91,10 @@ let gather_files () =
   |> List.sort Pervasives.compare
 
 let () =
-  Arg.parse [] (fun _ -> failwith "no arguments") "./tests/run.ml";
+  let options = Arg.align [
+    "-timeout", Arg.Set_int timeout, " timeout of prover, in seconds"
+  ] in
+  Arg.parse options (fun _ -> failwith "no arguments") "./tests/run.ml";
   let files = gather_files () in
   Format.printf "run %d tests@." (List.length files);
   let num_failed = List.fold_left

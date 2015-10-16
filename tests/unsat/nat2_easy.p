@@ -1,0 +1,1 @@
+../../examples/ind/nat2_easy.p
