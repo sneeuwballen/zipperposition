@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 48f3b01735010c81c2817c63e29ee607)
+# DO NOT EDIT (digest: fa22f23065f069f5e76694f202e1ee01)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -45,6 +45,7 @@ true: annot, bin_annot
 "src/bBox.cmx": for-pack(Libzipperposition)
 "src/bBox_intf.cmx": for-pack(Libzipperposition)
 "src/clauseContext.cmx": for-pack(Libzipperposition)
+"src/clauseQueue_intf.cmx": for-pack(Libzipperposition)
 "src/boolSolver.cmx": for-pack(Libzipperposition)
 "src/boolSolver_intf.cmx": for-pack(Libzipperposition)
 "src/induction_helpers.cmx": for-pack(Libzipperposition)

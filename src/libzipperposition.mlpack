@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 86b480ab6c4e978f6a4bf495dfd6156f)
+# DO NOT EDIT (digest: 19133b73cf3fb6eaa9af37d5ac306ea9)
 ClauseQueue
 Clause
 Const
@@ -29,6 +29,7 @@ ProofState_intf
 BBox
 BBox_intf
 ClauseContext
+ClauseQueue_intf
 BoolSolver
 BoolSolver_intf
 Induction_helpers
