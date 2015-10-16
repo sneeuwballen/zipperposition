@@ -63,3 +63,9 @@ package: clean
 		Makefile pelletier_problems README.md src/ tests/ utils/
 
 .PHONY: tags dot package
+
+watch:
+	while find src/ -print0 | xargs -0 inotifywait -e delete_self -e modify ; do \
+		echo "============ at `date` ==========" ; \
+		make ; \
+	done
