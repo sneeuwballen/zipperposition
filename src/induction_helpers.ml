@@ -175,12 +175,31 @@ module MakeAvatar(A : Avatar.S) = struct
       |> Sequence.iter (S.remove_def ~ctx:Ctx.skolem)
 
   (* terms that are either inductive constants or sub-constants *)
-  let constants_or_sub c : T.Set.t =
+  let constants_or_sub c =
     C.Seq.terms c
     |> Sequence.flat_map T.Seq.subterms
     |> Sequence.filter
       (fun t -> CI.is_inductive t || CI.is_sub_constant t)
-    |> T.Set.of_seq
+    |> Sequence.sort_uniq ~cmp:T.cmp
+    |> Sequence.to_rev_list
+
+  (* sub-terms of an inductive type, that occur several times (candidate
+     for "subterm generalization" *)
+  let generalizable_subterms c =
+    let count = T.Tbl.create 16 in
+    C.Seq.terms c
+      |> Sequence.flat_map T.Seq.subterms
+      |> Sequence.filter
+        (fun t -> CI.is_inductive_type (T.ty t) && not (T.is_const t))
+      |> Sequence.iter
+        (fun t ->
+          let n = try T.Tbl.find count t with Not_found -> 0 in
+          T.Tbl.replace count t (n+1)
+        );
+    (* terms that occur more than once *)
+    T.Tbl.to_seq count
+      |> Sequence.filter_map (fun (t,n) -> if n>1 then Some t else None)
+      |> Sequence.to_rev_list
 
   (* apply the list of replacements [l] to the term [t] *)
   let replace_many l t =
@@ -207,51 +226,57 @@ module MakeAvatar(A : Avatar.S) = struct
   (* when a clause has inductive constants, take its negation
       and add it as a lemma (some restrictions apply) *)
   let inf_introduce_lemmas c =
+    let ind_csts = constants_or_sub c in
+    let generalize ~on () =
+      (* fresh var generator *)
+      let mk_fresh_var_ =
+        let r = ref 0 in
+        fun ty ->
+          let v = T.var ~ty !r in
+          incr r;
+          v
+      in
+      (* abstract w.r.t all those constants (including the term
+          being generalized). The latter must occur first, as it
+          might contain constants being replaced. *)
+      let replacements =
+        List.map (fun t -> t, mk_fresh_var_ (T.ty t)) (on @ ind_csts) in
+      (* replace constants by variables in [c], then
+          let [f] be [forall... bigAnd_{l in c} not l] *)
+      let f = C.lits c
+        |> Literals.map (replace_many replacements)
+        |> Array.to_list
+        |> List.map (fun l -> Ctx.Lit.to_form (Literal.negate l))
+        |> F.Base.and_
+        |> F.close_forall
+      in
+      (* if [box f] already exists or is too deep, no need to re-do inference *)
+      if BoolLit.exists_form f || not (is_acceptable_lemma f)
+      then []
+      else (
+        (* introduce cut now *)
+        let proof cc = Proof.mk_c_trivial ~theories:["ind"] ~info:["cut"] cc in
+        let clauses, _ = A.introduce_cut f proof in
+        List.iter (fun c -> C.set_flag flag_cut_introduced c true) clauses;
+        Util.debugf ~section 2
+          "@[<2>introduce cut@ from %a@ @[<hv0>%a@]@ generalizing on @[%a@]@]"
+          C.fmt c (CCList.print ~start:"" ~stop:"" C.fmt) clauses
+          (CCList.print T.fmt) on;
+        clauses
+      )
+    in
     if C.is_ground c
     && not (is_ind_conjecture_ c)
     && not (C.get_flag flag_cut_introduced c)
-    && not (has_pos_lit_ c) (* XXX: only positive lemmas *)
+    && not (has_pos_lit_ c) (* only positive lemmas, therefore C negative *)
+    && not (CCList.is_empty ind_csts) (* && not (T.Set.for_all CI.is_inductive set) *)
     then
-      let set = constants_or_sub c in
-      if T.Set.is_empty set (* XXX ? || T.Set.for_all CI.is_inductive set *)
-      then [] (* no inductive, or already ongoing induction *)
-      else (
-        (* fresh var generator *)
-        let mk_fvar =
-          let r = ref 0 in
-          fun ty ->
-            let v = T.var ~ty !r in
-            incr r;
-            v
-        in
-        (* abstract w.r.t all those constants *)
-        let replacements = T.Set.fold
-          (fun cst acc ->
-            (cst, mk_fvar (T.ty cst)) :: acc
-          ) set []
-        in
-        (* replace constants by variables in [c], then
-            let [f] be [forall... bigAnd_{l in c} not l] *)
-        let f = C.lits c
-          |> Literals.map (replace_many replacements)
-          |> Array.to_list
-          |> List.map (fun l -> Ctx.Lit.to_form (Literal.negate l))
-          |> F.Base.and_
-          |> F.close_forall
-        in
-        (* if [box f] already exists or is too deep, no need to re-do inference *)
-        if BoolLit.exists_form f || not (is_acceptable_lemma f)
-        then []
-        else (
-          (* introduce cut now *)
-          let proof cc = Proof.mk_c_trivial ~theories:["ind"] ~info:["cut"] cc in
-          let clauses, _ = A.introduce_cut f proof in
-          List.iter (fun c -> C.set_flag flag_cut_introduced c true) clauses;
-          Util.debugf ~section 2 "@[<2>introduce cut@ from %a@ @[<hv0>%a@]@]"
-            C.fmt c (CCList.print ~start:"" ~stop:"" C.fmt) clauses;
-          clauses
-        )
-      )
+      let terms = generalizable_subterms c in
+      (* first, lemma without generalization;
+          then, each possible way to generalize a subterm occurring multiple times *)
+      List.append
+        (generalize ~on:[] ())
+        (CCList.flat_map (fun t -> generalize ~on:[t] ()) terms)
     else []
 
   let show_lemmas () =
