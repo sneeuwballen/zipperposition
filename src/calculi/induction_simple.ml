@@ -141,6 +141,73 @@ module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
         Solver.add_form ~tag:(C.id c) qform;
         acc
 
+  (* checks whether the trail of [c] is trivial, that is:
+    - contains two literals [i = t1] and [i = t2] with [t1], [t2]
+        distinct cover set members, or
+    - two literals [loop(i) minimal by a] and [loop(i) minimal by b], or
+    - two literals [C in loop(i)], [D in loop(j)] if i,j do not depend
+        on one another *)
+  let has_trivial_trail c =
+    let trail = C.get_trail c |> C.Trail.to_seq in
+    (* all i=t where i is inductive *)
+    let relevant_cases = trail
+      |> Sequence.filter_map
+        (fun blit ->
+          match BoolLit.extract (BoolLit.abs blit) with
+          | None -> None
+          | Some (BoolLit.Case (l, r)) -> Some (`Case (l, r))
+          | Some _ -> None
+        )
+    in
+    (* is there i such that   i=t1 and i=t2 can be found in the trail? *)
+    Sequence.product relevant_cases relevant_cases
+      |> Sequence.exists
+        (function
+          | (`Case (i1, t1), `Case (i2, t2)) ->
+              let res = not (CI.Cst.equal i1 i2)
+                || (CI.Cst.equal i1 i2 && not (CI.Case.equal t1 t2)) in
+              if res
+              then Util.debug ~section 4
+                "clause %a redundant because of %a={%a,%a} in trail"
+                C.pp c CI.Cst.pp i1 CI.Case.pp t1 CI.Case.pp t2;
+              res
+          | _ -> false
+        )
+
+  exception FoundInductiveLit of int * (T.t * T.t) list
+
+  (* if c is  f(t1,...,tn) != f(t1',...,tn') or d, with f inductive symbol, then
+      replace c with    t1 != t1' or ... or tn != tn' or d *)
+  let injectivity_destruct c =
+    try
+      let eligible = C.Eligible.(filter Literal.is_neq) in
+      Lits.fold_lits ~eligible (C.lits c) ()
+        (fun () lit i -> match lit with
+          | Literal.Equation (l, r, false) ->
+              begin match T.Classic.view l, T.Classic.view r with
+              | T.Classic.App (s1, _, l1), T.Classic.App (s2, _, l2)
+                when Sym.eq s1 s2
+                && CI.is_constructor_sym s1
+                ->
+                  (* destruct *)
+                  assert (List.length l1 = List.length l2);
+                  let pairs = List.combine l1 l2 in
+                  raise (FoundInductiveLit (i, pairs))
+              | _ -> ()
+              end
+          | _ -> ()
+        );
+      c (* nothing happened *)
+    with FoundInductiveLit (idx, pairs) ->
+      let lits = CCArray.except_idx (C.lits c) idx in
+      let new_lits = List.map (fun (t1,t2) -> Literal.mk_neq t1 t2) pairs in
+      let proof cc = Proof.mk_c_inference ~theories:["induction"]
+        ~rule:"injectivity_destruct" cc [C.proof c]
+      in
+      let c' = C.create ~trail:(C.get_trail c) ~parents:[c] (new_lits @ lits) proof in
+      Util.debug ~section 3 "injectivity: simplify %a into %a" C.pp c C.pp c';
+      c'
+
   (* when a clause contains new inductive constants, assert minimality
     of the clause for all those constants independently *)
   let inf_assert_minimal c =
@@ -160,6 +227,8 @@ module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
     Ctx.add_constr 20 IH_ctx.constr_sub_cst;  (* enforce new constraint *)
     Env.add_unary_inf "induction_lemmas.cut" IHA.inf_introduce_lemmas;
     Env.add_unary_inf "induction_lemmas.ind" inf_assert_minimal;
+    Env.add_is_trivial has_trivial_trail;
+    Env.add_simplify injectivity_destruct;
     (* no collisions with Skolemization please *)
     Signal.once Env.on_start IHA.clear_skolem_ctx;
     ()

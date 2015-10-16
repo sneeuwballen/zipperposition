@@ -205,7 +205,7 @@ module MakeAvatar(A : Avatar.S) = struct
     CCOpt.maybe (fun d -> d < 5) true depth
 
   (* when a clause has inductive constants, take its negation
-      and add it as a lemma *)
+      and add it as a lemma (some restrictions apply) *)
   let inf_introduce_lemmas c =
     if C.is_ground c
     && not (is_ind_conjecture_ c)
@@ -253,8 +253,6 @@ module MakeAvatar(A : Avatar.S) = struct
         )
       )
     else []
-
-  (* TODO: copy redundancy criteria from QBF ? *)
 
   let show_lemmas () =
     let forms = BoolLit.iter_injected
