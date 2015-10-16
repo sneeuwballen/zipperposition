@@ -68,8 +68,8 @@ let test_file f =
         || CCString.mem ~sub:"status Unsatisfiable" p#stdout then Unsat
       else if CCString.mem ~sub:"status CounterSatisfiable" p#stdout
         || CCString.mem ~sub:"status Satisfiable" p#stdout then Sat
-      else if CCString.mem ~sub:"GaveUp" p#stdout
-        || CCString.mem ~sub:"ResourceOut" p#stdout then Unknown
+      else if CCString.mem ~sub:"status GaveUp" p#stdout
+        || CCString.mem ~sub:"status ResourceOut" p#stdout then Unknown
       else Error
   in
   match expected, actual with
