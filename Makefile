@@ -40,9 +40,6 @@ configure:
 
 # OASIS_STOP
 
-tags:
-	otags $(IMPLEMENTATION_FILES) $(INTERFACE_FILES)
-
 rst_doc:
 	@echo "build Sphinx documentation (into _build/doc)"
 	sphinx-build doc _build/doc
@@ -64,5 +61,11 @@ update_next_tag:
 	@echo "update version to $(VERSION)..."
 	zsh -c 'sed -i "s/NEXT_VERSION/$(VERSION)/g" src/**/*.ml{,i}(.)'
 	zsh -c 'sed -i "s/NEXT_RELEASE/$(VERSION)/g" src/**/*.ml{,i}(.)'
+
+watch:
+	while find src/ -print0 | xargs -0 inotifywait -e delete_self -e modify ; do \
+		echo "============ at `date` ==========" ; \
+		make ; \
+	done
 
 .PHONY: push_doc tags rst_doc open_doc test-all
