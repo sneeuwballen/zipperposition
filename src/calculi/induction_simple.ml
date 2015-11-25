@@ -208,6 +208,38 @@ module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
       Util.debug ~section 3 "injectivity: simplify %a into %a" C.pp c C.pp c';
       c'
 
+  let acyclicity_trivial c =
+    let res = C.Seq.lits c
+      |> Sequence.exists
+        (fun lit -> match IH_ctx.acyclicity lit with
+          | `No
+          | `Absurd -> false
+          | `Trivial -> true
+        )
+    in
+    if res then Util.debug ~section 3 "acyclicity: %a is trivial" C.pp c;
+    res
+
+  let acyclicity_simplify c =
+    let lits' = C.Seq.lits c
+      |> Sequence.filter
+        (fun lit -> match IH_ctx.acyclicity lit with
+          | `No
+          | `Trivial -> true
+          | `Absurd -> false (* remove lit *)
+        )
+      |> Sequence.to_array
+    in
+    if Array.length lits' = Array.length (C.lits c) then c
+    else (
+      let proof cc = Proof.mk_c_inference ~theories:["induction"]
+        ~rule:"acyclicity" cc [C.proof c]
+      in
+      let c' = C.create_a ~trail:(C.get_trail c) ~parents:[c] lits' proof in
+      Util.debug ~section 3 "acyclicity: simplify %a into %a" C.pp c C.pp c';
+      c'
+    )
+
   (* when a clause contains new inductive constants, assert minimality
     of the clause for all those constants independently *)
   let inf_assert_minimal c =
@@ -229,6 +261,8 @@ module Make(E : Env.S)(Solver : BoolSolver.SAT) = struct
     Env.add_unary_inf "induction_lemmas.ind" inf_assert_minimal;
     Env.add_is_trivial has_trivial_trail;
     Env.add_simplify injectivity_destruct;
+    Env.add_is_trivial acyclicity_trivial;
+    Env.add_simplify acyclicity_simplify;
     (* no collisions with Skolemization please *)
     Signal.once Env.on_start IHA.clear_skolem_ctx;
     ()

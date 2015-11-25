@@ -39,7 +39,7 @@ module type S = sig
 
   val declare_type : proof:Proof.t -> ty:Type.t -> var:term -> term list -> unit
   (** Declare that the given type's domain is the given list of cases
-      for the given variable [var] (whose type must be [ty].
+      for the given variable [var] (whose type must be [ty]).
       Will be ignored if the type already has a enum declaration. *)
 
   val instantiate_vars : Env.multi_simpl_rule

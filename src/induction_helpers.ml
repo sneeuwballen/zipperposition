@@ -124,6 +124,27 @@ module Make(Ctx : Ctx.S) = struct
         Sequence.exists (Sym.eq s) Ctx.Induction.Seq.constructors
     | _ -> false
 
+  let acyclicity lit =
+    (* check if [sub] occurs in [t] under a constructor *)
+    let rec occurs_in_ t ~sub =  match T.Classic.view t with
+      | T.Classic.App (s, _, l) ->
+          let is_cons = Ctx.Induction.is_constructor_sym s in
+          List.exists
+            (fun t' -> (is_cons && T.eq sub t') || occurs_in_ t' ~sub)
+            l
+      | T.Classic.Var _
+      | T.Classic.BVar _
+      | T.Classic.NonFO  -> false
+    in
+    match lit with
+    | Literal.Equation (l, r, b) ->
+        if
+          ( Ctx.Induction.is_inductive_type (T.ty l) && occurs_in_ ~sub:l r )
+          ||
+          ( Ctx.Induction.is_inductive_type (T.ty r) && occurs_in_ ~sub:r l )
+        then if b then `Absurd else `Trivial else `No
+    | _ -> `No
+
   (* find inductive constants in clauses of [seq] *)
   let find_inductive_cst lits : T.t Sequence.t =
     Lits.Seq.terms lits

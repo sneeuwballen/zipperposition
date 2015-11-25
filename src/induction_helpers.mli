@@ -62,6 +62,12 @@ module Make(Ctx : Ctx_intf.S) : sig
   val is_a_constructor : term -> bool
   (** Is the term the application of a constructor? *)
 
+  val acyclicity : Literal.t -> [`Trivial | `Absurd | `No]
+  (** Acyclicity check:
+    - [a = t] yields [`Absurd] if [a] occurs under a constructor in [t]
+    - [a != t] yields [`Trivial] (same)
+    - otherwise [`No] *)
+
   val find_inductive_cst : Literals.t -> term Sequence.t
   (** Potential inductive constants in those literals *)
 
