@@ -66,9 +66,9 @@ let peano_to_int t =
 
 (** print a term with a nice representation for Peano numbers *)
 let print_peano_nice buf t =
-  let hook _ pp buf t =
+  let hook _ _pp out t =
     try
-      Printf.bprintf buf "%d" (peano_to_int t); true
+      CCFormat.int out (peano_to_int t); true
     with _ -> false
   in T.pp_depth ~hooks:[hook] 0 buf t
 
@@ -91,11 +91,11 @@ let group_trs =
 
 (** check equality of normal forms *)
 let test trs t1 t2 =
-  Util.debug 5 "test with %a %a" T.pp t1 T.pp t2;
+  Util.debug 5 "test with %a %a" (fun k->k T.pp t1 T.pp t2);
   let t1' = Rw.rewrite trs t1 in
   let t2' = Rw.rewrite trs t2 in
   Util.debug 5 "normal form of %a = normal form of %a (ie %a)"
-                print_peano_nice t1 print_peano_nice t2 print_peano_nice t1';
+    (fun k->k print_peano_nice t1 print_peano_nice t2 print_peano_nice t1');
   OUnit.assert_equal ~printer:T.to_string ~cmp:T.eq t1' t2';
   ()
 
@@ -130,8 +130,9 @@ let benchmark ?(count=benchmark_count) trs a b =
   for _i = 1 to count do one_step () done;
   let stop = Unix.gettimeofday () in
   Util.debug 1 "%f seconds to do %d joins of %a and %a (%f each)\n"
-    (stop -. start) count print_peano_nice a print_peano_nice b
-    ((stop -. start) /. (float_of_int count))
+    (fun k->k 
+      (stop -. start) count print_peano_nice a print_peano_nice b
+      ((stop -. start) /. (float_of_int count)))
 
 let benchmark_peano n () =
   let a = plus (from_int n) (from_int n)

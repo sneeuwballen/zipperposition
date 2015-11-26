@@ -56,8 +56,8 @@ module TestUnit(I : UnitIndex) = struct
     return (Sequence.persistent seq))
 
   let pp seq =
-    let pp buf (t,i) = Printf.bprintf buf "%a -> %d" T.pp t i in
-    Util.on_buffer (Util.pp_seq pp) seq
+    let pp out (t,i) = Format.fprintf out "%a -> %d" T.pp t i in
+    CCFormat.to_string (CCFormat.seq pp) seq
 
   (* check that the size of index is correct *)
   let check_size_add =
@@ -65,7 +65,7 @@ module TestUnit(I : UnitIndex) = struct
       let idx = I.add_seq (I.empty ()) seq in
       Sequence.length seq = I.size idx
     in
-    let name = Util.sprintf "index(%s)_size_after_add" I.name in
+    let name = CCFormat.sprintf "index(%s)_size_after_add" I.name in
     mk_test ~name (gen 30 100) prop
 
   (* list of (term,int) that generalize [t] *)
@@ -84,7 +84,7 @@ module TestUnit(I : UnitIndex) = struct
           List.exists (fun (_, i') -> i=i') retrieved)
       seq
     in
-    let name = Util.sprintf "index(%s)_gen_retrieved_member" I.name in
+    let name = CCFormat.sprintf "index(%s)_gen_retrieved_member" I.name in
     mk_test ~name (gen 30 100) prop
 
   (* check that the retrieved terms match the query *)
@@ -92,7 +92,7 @@ module TestUnit(I : UnitIndex) = struct
     let prop seq =
       let idx = I.add_seq (I.empty ()) seq in
       Sequence.for_all
-        (fun (t,i) ->
+        (fun (t,_) ->
           let retrieved = find_all idx t in
           (* all terms must match [t] *)
           List.for_all
@@ -102,7 +102,7 @@ module TestUnit(I : UnitIndex) = struct
             retrieved)
       seq
     in
-    let name = Util.sprintf "index(%s)_gen_retrieved_match" I.name in
+    let name = CCFormat.sprintf "index(%s)_gen_retrieved_match" I.name in
     mk_test ~name (gen 50 150) prop
 
   (* check that all matching terms are retrieved *)
@@ -123,7 +123,7 @@ module TestUnit(I : UnitIndex) = struct
             seq)
         seq
     in
-    let name = Util.sprintf "index(%s)_all_retrieved" I.name in
+    let name = CCFormat.sprintf "index(%s)_all_retrieved" I.name in
     mk_test ~name (gen 50 150) prop
 
   (* check the matching of generalization *)
@@ -156,7 +156,7 @@ module TestTerm(I : TermIndex) = struct
       let idx = Sequence.fold (fun idx (t,i) -> I.add idx t i) (I.empty ()) seq in
       Sequence.length seq = I.size idx
     in
-    let name = Util.sprintf "index(%s)_size_after_add" I.name in
+    let name = CCFormat.sprintf "index(%s)_size_after_add" I.name in
     mk_test ~name (gen 10 100) prop
 
   (* list of (term,int) that can be retrieved using [retrieve] in [t] *)
@@ -175,21 +175,21 @@ module TestTerm(I : TermIndex) = struct
           List.exists (fun (_, i') -> i=i') retrieved)
       seq
     in
-    let name = Util.sprintf "index(%s)_gen_retrieved_member" I.name in
+    let name = CCFormat.sprintf "index(%s)_gen_retrieved_member" I.name in
     mk_test ~name (gen 10 100) prop
 
   (* check that the retrieved terms satisfy the given properry w.r.t the query *)
   let _check_all_retrieved_satisfy retrieve check seq =
     let idx = Sequence.fold (fun idx (t,i) -> I.add idx t i) (I.empty ()) seq in
     Sequence.for_all
-      (fun (t,i) ->
+      (fun (t,_) ->
         let retrieved = find_all retrieve idx 1 t 0 in
         (* all terms must match [t] *)
         List.for_all
           (fun (t',_) ->
             try ignore (check t 0 t' 1); true
             with Unif.Fail ->
-              Util.debug 1 "problem with %a and %a" T.pp t T.pp t';
+              Util.debug 1 "problem with %a and %a" (fun k->k T.pp t T.pp t');
               false)
           retrieved)
     seq
@@ -216,42 +216,42 @@ module TestTerm(I : TermIndex) = struct
 
   let size = Sequence.length
   let pp l =
-    Util.on_buffer
-      (fun buf l -> Util.pp_seq
-        (fun buf (t,i) -> Printf.bprintf buf "%a -> %d" T.pp t i) buf l) l
+    CCFormat.to_string
+      (fun out l -> CCFormat.seq
+        (fun out (t,i) -> Format.fprintf out "%a -> %d" T.pp t i) out l) l
 
   let _limit = 0
 
   let check_retrieved_unify =
     let prop = _check_all_retrieved_satisfy I.retrieve_unifiables Unif.FO.unification in
-    let name = Util.sprintf "index(%s)_retrieve_imply_unify" I.name in
+    let name = CCFormat.sprintf "index(%s)_retrieve_imply_unify" I.name in
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 
   let check_retrieved_specializations =
     let prop = _check_all_retrieved_satisfy (I.retrieve_specializations ~allow_open:false)
       (fun t1 s1 t2 s2 -> Unif.FO.matching ~pattern:t1 s1 t2 s2) in
-    let name = Util.sprintf "index(%s)_retrieve_imply_specializations" I.name in
+    let name = CCFormat.sprintf "index(%s)_retrieve_imply_specializations" I.name in
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 
   let check_retrieved_generalizations =
     let prop = _check_all_retrieved_satisfy (I.retrieve_generalizations ~allow_open:false) _match_flip in
-    let name = Util.sprintf "index(%s)_retrieve_imply_generalizations" I.name in
+    let name = CCFormat.sprintf "index(%s)_retrieve_imply_generalizations" I.name in
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 
   let check_retrieve_all_unify =
     let prop = _check_all_satisfying_are_retrieved I.retrieve_unifiables Unif.FO.unification in
-    let name = Util.sprintf "index(%s)_retrieve_imply_unify" I.name in
+    let name = CCFormat.sprintf "index(%s)_retrieve_imply_unify" I.name in
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 
   let check_retrieve_all_specializations =
     let prop = _check_all_satisfying_are_retrieved (I.retrieve_specializations ~allow_open:false)
       (fun t1 s1 t2 s2 -> Unif.FO.matching ~pattern:t1 s1 t2 s2) in
-    let name = Util.sprintf "index(%s)_retrieve_imply_specializations" I.name in
+    let name = CCFormat.sprintf "index(%s)_retrieve_imply_specializations" I.name in
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 
   let check_retrieve_all_generalizations =
     let prop = _check_all_satisfying_are_retrieved (I.retrieve_generalizations ~allow_open:false) _match_flip in
-    let name = Util.sprintf "index(%s)_retrieve_imply_generalizations" I.name in
+    let name = CCFormat.sprintf "index(%s)_retrieve_imply_generalizations" I.name in
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 
   (* check the matching of generalization *)

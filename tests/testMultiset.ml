@@ -46,7 +46,7 @@ let compare_and_partial =
     Comparison.to_total (M.compare_partial f m1 m2)
   in
   let pp =
-    let pp1 = Util.on_buffer (M.pp (fun b -> Printf.bprintf b "%d")) in
+    let pp1 = CCFormat.to_string (M.pp CCFormat.int) in
     Q.PP.pair pp1 pp1
   in
   let prop (m1,m2) =
@@ -61,7 +61,7 @@ let max_is_max =
     let l = M.max f m |> M.to_list |> List.map fst in
     List.for_all (fun x -> M.is_max f x m) l
   in
-  let pp = Util.sprintf "%a" (M.pp CCInt.pp) in
+  let pp = CCFormat.to_string (M.pp CCFormat.int) in
   Q.mk_test ~name:"multiset_max_l_is_max" ~pp ~n:1000 gen prop
 
 let suite =

@@ -51,12 +51,12 @@ let more_specific cmp1 cmp2 = Comparison.(match cmp1, cmp2 with
   )
 
 let check_ordering_inv_by_subst ord =
-  let name = Util.sprintf "ordering_%s_inv_by_subst" (O.name ord) in
+  let name = CCFormat.sprintf "ordering_%s_inv_by_subst" (O.name ord) in
   let pp = PP.triple T.to_string T.to_string Substs.to_string in
   (* generate pairs of terms, and grounding substitutions *)
   let gen = Arbitrary.((pair ArTerm.default ArTerm.default) >>= fun (t1, t2) ->
     let vars = Sequence.of_list [t1; t2]
-      |> Sequence.flatMap T.Seq.vars
+      |> Sequence.flat_map T.Seq.vars
       |> T.Seq.add_set T.Set.empty
     in
     (* grounding substitution *)
