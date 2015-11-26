@@ -83,7 +83,8 @@ let fresh_sym_with ~ctx ~ty prefix =
   let s = LogtkSymbol.of_string (prefix ^ string_of_int n) in
   (* declare type of the new symbol *)
   ctx.sc_signature <- LogtkSignature.declare ctx.sc_signature s ty;
-  LogtkUtil.debug ~section 3 "new skolem symbol %a with type %a" LogtkSymbol.pp s LogtkType.pp ty;
+  LogtkUtil.debug ~section 3 "new skolem symbol %a with type %a"
+    (fun k->k LogtkSymbol.pp s LogtkType.pp ty);
   s
 
 let fresh_sym ~ctx ~ty = fresh_sym_with ~ctx ~ty ctx.sc_prefix
@@ -92,7 +93,8 @@ let fresh_ty_const ?(prefix="__logtk_ty") ~ctx () =
   let n = ctx.sc_gensym in
   ctx.sc_gensym <- n+1;
   let s = LogtkSymbol.of_string (prefix ^ string_of_int n) in
-  LogtkUtil.debug ~section 3 "new (type) skolem symbol %a" LogtkSymbol.pp s;
+  LogtkUtil.debug ~section 3 "new (type) skolem symbol %a"
+    (fun k->k LogtkSymbol.pp s);
   s
 
 (* update varindex in [ctx] so that it won't get captured in [t] *)
@@ -136,7 +138,7 @@ let skolem_form ~ctx ~ty f =
   try
     List.iter
       (fun (f', new_f') ->
-        LogtkUtil.debug ~section 5 "check variant %a and %a" F.pp f F.pp f';
+        LogtkUtil.debug ~section 5 "check variant %a and %a" (fun k->k F.pp f F.pp f');
         match LogtkUnif.Form.variant f' 1 f 0 |> Sequence.take 1 |> Sequence.to_list with
         | [subst] -> raise (FoundFormVariant (f', new_f', subst))
         | _ -> ())
@@ -152,10 +154,12 @@ let skolem_form ~ctx ~ty f =
     (* replace variable by skolem t*)
     let new_f = instantiate f skolem_term in
     ctx.sc_fcache <- (f, new_f) :: ctx.sc_fcache;
-    LogtkUtil.debug ~section 5 "skolemize %a using new term %a" F.pp f T.pp skolem_term;
+    LogtkUtil.debug ~section 5 "skolemize %a using new term %a"
+      (fun k->k F.pp f T.pp skolem_term);
     new_f
   with FoundFormVariant(f',new_f',subst) ->
-    LogtkUtil.debug ~section 5 "form %a is variant of %a under %a" F.pp f' F.pp f S.pp subst;
+    LogtkUtil.debug ~section 5 "form %a is variant of %a under %a"
+      (fun k->k F.pp f' F.pp f S.pp subst);
     let new_f = S.Form.apply_no_renaming subst new_f' 1 in
     new_f
 
@@ -194,7 +198,7 @@ let get_definition ~ctx ~polarity f =
     let const = T.const ~ty (fresh_sym_with ~ctx ~ty ctx.sc_prop_prefix) in
     let p = F.Base.atom (T.app_full const ty_bvars all_vars) in
     (* introduce new name for [f] *)
-    LogtkUtil.debug ~section 5 "define formula %a with %a" F.pp f F.pp p;
+    LogtkUtil.debug ~section 5 "define formula %a with %a" (fun k->k F.pp f F.pp p);
     let def = {form=f; proxy=p; polarity=ref polarity; } in
     ctx.sc_defs <- F.Map.add f def ctx.sc_defs;
     (* map bvars to fresh vars and evaluate [p] and [f] to remove them! *)
@@ -212,15 +216,15 @@ let get_definition ~ctx ~polarity f =
       in
       LogtkDBEnv.of_list (l1 @ l2)
     in
-    LogtkUtil.debug ~section 5 "remember def...";
+    LogtkUtil.debug ~section 5 "remember def..." (fun _ -> ());
     let p' = ST.DB.eval env (p:F.t:>ST.t) |> F.of_term_exn in
     let f' = ST.DB.eval env (f:F.t:>ST.t) |> F.of_term_exn in
     (* the definition to introduce defines [p'] in function of [f'];
      * they are similar to [p] and [f] but don't have De Bruijn indices *)
     ctx.sc_new_defs <- {form=f'; proxy=p'; polarity=def.polarity; } :: ctx.sc_new_defs;
-    LogtkUtil.debug ~section 5 "... returning %a" F.pp p;
+    LogtkUtil.debug ~section 5 "... returning %a" (fun k->k F.pp p);
     (* return proxy *)
-    LogtkUtil.debug ~section 5 "return def.";
+    LogtkUtil.debug ~section 5 "return def." (fun _ -> ());
     p
 
 let remove_def ~ctx def =
@@ -243,4 +247,4 @@ let has_new_definitions ~ctx = match ctx.sc_new_defs with
   | [] -> false
   | _::_ -> true
 
-let skolem_ho ~ctx ~ty f = failwith "LogtkSkolem_ho: not implemented"
+let skolem_ho ~ctx:_ ~ty:_ _f = failwith "LogtkSkolem_ho: not implemented"

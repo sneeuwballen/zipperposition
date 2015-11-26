@@ -171,10 +171,12 @@ module type S = sig
   val max_l : (elt -> elt -> LogtkComparison.t) -> elt list -> elt list
   (** Maximal elements of a list *)
 
-  val compare_partial_l : (elt -> elt -> LogtkComparison.t) -> elt list -> elt list -> LogtkComparison.t
+  val compare_partial_l :
+    (elt -> elt -> LogtkComparison.t) ->
+    elt list -> elt list -> LogtkComparison.t
   (** Compare two multisets represented as list of elements *)
 
-  val pp : (Buffer.t -> elt -> unit) -> Buffer.t -> t -> unit
+  val pp : elt CCFormat.printer -> t CCFormat.printer
 end
 
 

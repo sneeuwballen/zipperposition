@@ -200,7 +200,7 @@ val apply_list : t -> t list -> t
 
 include LogtkInterfaces.PRINT_DE_BRUIJN with type term := t and type t := t
 include LogtkInterfaces.PRINT with type t := t
-val pp_surrounded : Buffer.t -> t -> unit
+val pp_surrounded : t CCFormat.printer
 
 (*
 include LogtkInterfaces.SERIALIZABLE with type t := t

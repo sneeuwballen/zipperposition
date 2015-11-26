@@ -84,7 +84,7 @@ let mk_f_axiom ~id f ~file ~name =
   InferForm (f, Lazy.from_val step)
 
 let mk_c_axiom ~id c ~file ~name =
-  let step = {id; rule="axiom"; parents = [| Axiom (file,name) |]; esa=false; } in 
+  let step = {id; rule="axiom"; parents = [| Axiom (file,name) |]; esa=false; } in
   InferClause (c, Lazy.from_val step)
 
 let mk_f_step ?(esa=false) ~id f ~rule parents =
@@ -231,7 +231,7 @@ let of_decls decls =
     try
       Hashtbl.find steps name
     with Not_found ->
-      failwith (Util.sprintf "proof step %a not found in derivation" A.pp_name name)
+      failwith (CCFormat.sprintf "proof step %a not found in derivation" A.pp_name name)
   in
   (* read information about the source of the clause/formula *)
   let read_info info = match info with
@@ -246,7 +246,7 @@ let of_decls decls =
             | A.GInt i -> find_step (A.NameInt i)
             | A.GString s -> find_step (A.NameString s)
             | A.GNode ("theory", [A.GString th]) -> Theory th
-            | _ -> failwith (Util.sprintf "not a valid parent: %a" A.pp_general data))
+            | _ -> failwith (CCFormat.sprintf "not a valid parent: %a" A.pp_general data))
           (Array.of_list parents))
       in
       let esa = status <> "thm" in
@@ -263,7 +263,7 @@ let of_decls decls =
         let parent = find_step (A.NameString s) in
         `Parents ("trivial", false, Lazy.from_val [|parent|])
     | _ ->
-      Util.debug 1 "not a valid proof step: %a" A.pp_general_debug info;
+      Util.debug 1 "not a valid proof step: %a" (fun k->k A.pp_general_debug info);
       `NoIdea
   in
   (* what to do if a step is read *)
@@ -272,7 +272,7 @@ let of_decls decls =
   | InferClause _ ->
     if is_proof_of_false step && !root = None
       then root := Some step;
-    Util.debug 3 "add step %a (root? %B)" A.pp_name id (is_proof_of_false step);
+    Util.debug 3 "add step %a (root? %B)" (fun k->k A.pp_name id (is_proof_of_false step));
     Hashtbl.replace steps id step;
   | Axiom _
   | Theory _ -> ()
@@ -280,8 +280,8 @@ let of_decls decls =
   (* traverse declarations *)
   Sequence.iter
     begin fun decl -> match decl with
-    | AT.CNF (name, role, c, info :: _) ->
-      Util.debug 3 "convert step %a" AT.pp decl;
+    | AT.CNF (name, _role, c, info :: _) ->
+      Util.debug 3 "convert step %a" (fun k->k AT.pp decl);
       begin match read_info info with
       | `Proof
       | `NoIdea -> ()
@@ -290,9 +290,9 @@ let of_decls decls =
         let p = InferClause (c, step) in
         add_step name p
       end
-    | AT.FOF(name, role, f, info :: _)
-    | AT.TFF (name, role, f, info :: _) ->
-      Util.debug 3 "convert step %a" AT.pp decl;
+    | AT.FOF(name, _role, f, info :: _)
+    | AT.TFF (name, _role, f, info :: _) ->
+      Util.debug 3 "convert step %a" (fun k->k AT.pp decl);
       begin match read_info info with
       | `Proof
       | `NoIdea -> ()
@@ -325,8 +325,8 @@ let parse ?(recursive=true) filename =
     Util_tptp.parse_file ~recursive filename
     >>= fun decls ->
     Util_tptp.infer_types (`sign Signature.TPTP.base) decls
-    >>= fun (signature, decls) ->
-    Util.debug 1 "decls:\n  %a" (Util.pp_seq ~sep:"\n  " AT.pp) decls;
+    >>= fun (_signature, decls) ->
+    Util.debug 1 "decls:\n  %a" (fun k->k (CCFormat.seq ~sep:"\n  " AT.pp) decls);
     of_decls decls
   )
 
@@ -334,75 +334,74 @@ let _extract_axiom proof = match proof with
   | Axiom (f,n) -> f,n
   | _ -> assert false
 
-let _pp_clause buf c = match c with
-  | [] -> Buffer.add_string buf "$false"
-  | _ -> Util.pp_list ~sep:" | "  F.TPTP.pp buf c
+let _pp_clause out c = match c with
+  | [] -> CCFormat.string out "$false"
+  | _ -> CCFormat.list ~sep:" | "  F.TPTP.pp out c
 
 let _print_parent p = match p with
   | InferForm _
-  | InferClause _ -> Util.on_buffer A.pp_name (get_id  p)
-  | Theory s -> Util.sprintf "theory(%s)" s
-  | Axiom (f,n) -> Util.sprintf "file('%s', %s)" f n
+  | InferClause _ -> CCFormat.to_string A.pp_name (get_id  p)
+  | Theory s -> CCFormat.sprintf "theory(%s)" s
+  | Axiom (f,n) -> CCFormat.sprintf "file('%s', %s)" f n
 
 (* pure fof? (no types but $i/$o) *)
 let _form_is_fof f =
   F.Seq.terms f |> Sequence.for_all FOTerm.monomorphic
 
-let pp_tstp buf proof =
+let pp_tstp out proof =
   traverse proof
     (fun p ->
       match p with
       | Axiom _ -> ()
-      | Theory s -> Printf.bprintf buf "theory(%s)" s
-      | InferClause(c, lazy ({rule="axiom"} as step)) when is_axiom step.parents.(0)->
+      | Theory s -> CCFormat.fprintf out "theory(%s)" s
+      | InferClause(c, lazy ({rule="axiom";_} as step)) when is_axiom step.parents.(0)->
         let id = get_id p in
         let f,n = _extract_axiom step.parents.(0) in
-        Printf.bprintf buf "cnf(%a, axiom, (%a), file('%s', %s)).\n"
+        Format.fprintf out "cnf(%a, axiom, (%a), file('%s', %s)).\n"
           A.pp_name id _pp_clause c f n
-      | InferForm(f, lazy ({rule="axiom"} as step)) when is_axiom step.parents.(0)->
+      | InferForm(f, lazy ({rule="axiom"; _} as step)) when is_axiom step.parents.(0)->
         let id = get_id p in
         let file,n = _extract_axiom step.parents.(0) in
-        Printf.bprintf buf "tff(%a, axiom, %a, file('%s', %s)).\n"
+        Format.fprintf out "tff(%a, axiom, %a, file('%s', %s)).\n"
           A.pp_name id F.TPTP.pp f file n
       | InferForm(f, lazy step) ->
         let id = get_id p in
         let ids = Array.map _print_parent step.parents in
         let status = if step.esa then "esa" else "thm" in
         let kind = if _form_is_fof f then "fof" else "tff" in
-        Printf.bprintf buf
+        Format.fprintf out
           "%s(%a, plain, %a, inference('%s', [status(%s)], [%a])).\n"
           kind A.pp_name id F.TPTP.pp (F.close_forall f) step.rule status
-          (Util.pp_array Buffer.add_string) ids
+          (CCFormat.array CCFormat.string) ids
       | InferClause(c, lazy step) ->
         let id = get_id p in
         let ids = Array.map _print_parent step.parents in
         let status = if step.esa then "esa" else "thm" in
-        Printf.bprintf buf
+        Format.fprintf out
           "cnf(%a, plain, %a, inference('%s', [status(%s)], [%a])).\n"
           A.pp_name id _pp_clause c step.rule status
-          (Util.pp_array Buffer.add_string) ids
+          (CCFormat.array CCFormat.string) ids
     )
 
-let pp0 buf proof = match proof with
-  | Axiom (f,n) -> Printf.bprintf buf "axiom(%s, %s)" f n
-  | Theory s -> Printf.bprintf buf "theory(%s)" s
+let pp0 out proof = match proof with
+  | Axiom (f,n) -> Format.fprintf out "axiom(%s, %s)" f n
+  | Theory s -> Format.fprintf out "theory(%s)" s
   | InferClause (c, _) ->
-    Printf.bprintf buf "proof for %a (id %a)" _pp_clause c A.pp_name (get_id proof)
+    Format.fprintf out "proof for %a (id %a)" _pp_clause c A.pp_name (get_id proof)
   | InferForm (f, _) ->
-    Printf.bprintf buf "proof for %a (id %a)" F.TPTP.pp f A.pp_name (get_id proof)
+    Format.fprintf out "proof for %a (id %a)" F.TPTP.pp f A.pp_name (get_id proof)
 
-let pp1 buf proof = match proof with
-  | Axiom (f,n) -> Printf.bprintf buf "axiom(%s, %s)" f n
-  | Theory s -> Printf.bprintf buf "theory(%s)" s
+let pp1 out proof = match proof with
+  | Axiom (f,n) -> Format.fprintf out "axiom(%s, %s)" f n
+  | Theory s -> Format.fprintf out "theory(%s)" s
   | InferClause (c, lazy step) ->
-    Printf.bprintf buf "proof for %a (id %a) from\n  %a"
+    Format.fprintf out "proof for %a (id %a) from\n  %a"
       _pp_clause c A.pp_name (get_id proof)
-      (Util.pp_array ~sep:"\n  " pp0) step.parents
+      (CCFormat.array ~sep:"\n  " pp0) step.parents
   | InferForm (f, lazy step) ->
-    Printf.bprintf buf "proof for %a (id %a) from\n %a"
+    Format.fprintf out "proof for %a (id %a) from\n %a"
       F.TPTP.pp f A.pp_name (get_id proof)
-      (Util.pp_array ~sep:"\n  " pp0) step.parents
+      (CCFormat.array ~sep:"\n  " pp0) step.parents
 
-let fmt fmt proof = Format.pp_print_string fmt (Util.on_buffer pp0 proof)
 let pp = pp0
-let to_string = Util.on_buffer pp
+let to_string = CCFormat.to_string pp

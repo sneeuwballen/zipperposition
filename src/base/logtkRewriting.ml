@@ -51,15 +51,15 @@ module type ORDERED = sig
   module E : LogtkIndex.EQUATION
 
   val empty : ord:LogtkOrdering.t -> t
-  
+
   val add : t -> E.t -> t
   val add_seq : t -> E.t Sequence.t -> t
   val add_list : t -> E.t list -> t
-  
+
   val to_seq : t -> E.t Sequence.t
 
   val size : t -> int
-  
+
   val mk_rewrite : t -> size:int -> (T.t -> T.t)
     (** Given a TRS and a cache size, build a memoized function that
         performs term rewriting *)
@@ -80,12 +80,11 @@ module MakeOrdered(E : LogtkIndex.EQUATION with type rhs = T.t) = struct
     if rule.rule_oriented then 1 else 2
 
   let cmp_rule r1 r2 =
-    LogtkUtil.lexicograph_combine
-      [ E.compare r1.rule_equation r2.rule_equation
-      ; T.cmp r1.rule_left r2.rule_left
-      ; T.cmp r1.rule_right r2.rule_right
-      ; Pervasives.compare r1.rule_oriented r2.rule_oriented
-      ]
+    let open CCOrd in
+    E.compare r1.rule_equation r2.rule_equation
+    <?> (T.cmp, r1.rule_left, r2.rule_left)
+    <?> (T.cmp, r1.rule_right, r2.rule_right)
+    <?> (Pervasives.compare, r1.rule_oriented, r2.rule_oriented)
 
   module DT = LogtkDtree.Make(struct
     type t = rule
@@ -143,7 +142,7 @@ module MakeOrdered(E : LogtkIndex.EQUATION with type rhs = T.t) = struct
         DT.iter rules (fun _ rule -> k rule.rule_equation))
 
   let size trs = DT.size trs.rules
-  
+
   exception RewrittenInto of T.t
 
   (** Given a TRS and a cache size, build a memoized function that
@@ -185,7 +184,7 @@ module MakeOrdered(E : LogtkIndex.EQUATION with type rhs = T.t) = struct
                   else ()));
         t (* could not rewrite t *)
       with RewrittenInto t' ->
-        LogtkUtil.debug ~section 3 "rewrite %a into %a" T.pp t T.pp t';
+        LogtkUtil.debug ~section 3 "rewrite %a into %a" (fun k->k T.pp t T.pp t');
         LogtkUtil.incr_stat stat_ordered_rewriting;
         assert (LogtkOrdering.compare trs.ord t t' = LogtkComparison.Gt);
         reduce reduce' t'  (* term is rewritten, reduce it again *)
@@ -210,7 +209,7 @@ module type SIG_TRS = sig
   type rule = LogtkFOTerm.t * LogtkFOTerm.t
     (** rewrite rule, from left to right *)
 
-  val empty : unit -> t 
+  val empty : unit -> t
 
   val add : t -> rule -> t
   val add_seq : t -> rule Sequence.t -> t
@@ -222,7 +221,7 @@ module type SIG_TRS = sig
 
   val size : t -> int
   val iter : t -> (rule -> unit) -> unit
-  
+
   val rule_to_form : rule -> LogtkFormula.FO.t
     (** Make a formula out of a rule (an equality) *)
 
@@ -243,7 +242,8 @@ struct
     type t = rule
     type rhs = T.t
     let compare (l1,r1) (l2,r2) =
-      LogtkUtil.lexicograph_combine [T.cmp l1 l2; T.cmp r1 r2]
+      let open CCOrd in
+      T.cmp l1 l2 <?> (T.cmp, r1, r2)
     let extract (l,r) = (l,r,true)
     let priority _ = 1
   end)
@@ -289,7 +289,7 @@ struct
   exception RewrittenIn of T.t * S.t * rule
 
   (** Compute normal form of the term, and set its binding to the normal form *)
-  let rewrite_collect trs t = 
+  let rewrite_collect trs t =
     (* compute normal form of [subst(t, offset)] *)
     let rec compute_nf ~rules subst t offset =
       match T.view t with
@@ -315,11 +315,12 @@ struct
         Idx.retrieve ~allow_open:true ~sign:true trs 1 t 0 () rewrite_handler;
         t  (* normal form *)
       with (RewrittenIn (t', subst, rule)) ->
-        LogtkUtil.debug ~section 3 "rewrite %a into %a (with %a)" T.pp t T.pp t' S.pp subst;
+        LogtkUtil.debug ~section 3 "rewrite %a into %a (with %a)"
+          (fun k->k T.pp t T.pp t' S.pp subst);
         rules := rule :: !rules;
         compute_nf ~rules subst t' 1  (* rewritten into subst(t',1), continue *)
     (* attempt to use one of the rules to rewrite t *)
-    and rewrite_handler () l r rule subst =
+    and rewrite_handler () _ r rule subst =
       let t' = r in
       raise (RewrittenIn (t', subst, rule))
     in
@@ -344,10 +345,11 @@ module FormRW = struct
   module DT = LogtkDtree.Make(struct
     type t = rule
     type rhs = F.t
-    let compare (l1,r1) (l2,r2) = 
-      LogtkUtil.lexicograph_combine [T.cmp l1 l2; F.cmp r1 r2]
+    let compare (l1,r1) (l2,r2) =
+      let open CCOrd in
+      T.cmp l1 l2 <?> (F.cmp, r1, r2)
     let extract (l,r) = (l,r,true)
-    let priority (l,r) = F.weight r
+    let priority (_,r) = F.weight r
   end)
 
   type t = DT.t
@@ -422,17 +424,18 @@ module FormRW = struct
         DT.retrieve ~sign:true frs 1 t 0 () rewrite_handler;
         F.Base.atom t  (* normal form is itself *)
       with (RewrittenIn (f, subst, rule)) ->
-        LogtkUtil.debug ~section 3 "rewrite %a into %a (with %a)" T.pp t F.pp f S.pp subst;
+        LogtkUtil.debug ~section 3 "rewrite `@[%a@]`@ into `@[%a@]`@ (with @[%a@])"
+          (fun k->k T.pp t F.pp f S.pp subst);
         rules := rule :: !rules;
         compute_nf ~rules subst f 1  (* rewritten into subst(t',1), continue *)
     (* attempt to use one of the rules to rewrite t *)
-    and rewrite_handler () l r rule subst =
+    and rewrite_handler () _ r rule subst =
       raise (RewrittenIn (r, subst, rule))
     in
     let rules = ref [] in
     let f' = compute_nf ~rules S.empty f 0 in
     if not (F.eq f f')
-      then LogtkUtil.debug ~section 3 "normal form of %a: %a" F.pp f F.pp f';
+    then LogtkUtil.debug ~section 3 "normal form of `@[%a@]`:@ `@[%a@]`" (fun k->k F.pp f F.pp f');
     f', !rules
 
   let rewrite frs f =

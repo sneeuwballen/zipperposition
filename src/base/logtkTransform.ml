@@ -86,13 +86,12 @@ let rec apply tr f = match tr with
     | [f''] when F.eq f f'' -> f'
     | _ -> CCList.flat_map (apply tr) f'
 
-let pp buf tr = match tr with
-  | RwTerm trs -> Buffer.add_string buf "TRS"
-  | RwForm trs -> Buffer.add_string buf "FormRW"
-  | Tr (name, _) -> Buffer.add_string buf name
+let pp out tr = match tr with
+  | RwTerm _ -> CCFormat.string out "TRS"
+  | RwForm _ -> CCFormat.string out "FormRW"
+  | Tr (name, _) -> CCFormat.string out name
 
-let fmt fmt tr =
-  Format.pp_print_string fmt (LogtkUtil.on_buffer pp tr)
+let to_string = CCFormat.to_string pp
 
 (** {2 LogtkTransformation DAG} *)
 
@@ -155,7 +154,7 @@ module MakeDAG(Form : FORM) = struct
       node
 
   (* add edge n1 -> n2 *)
-  let _add_edge dag n1 n2 =
+  let _add_edge _dag n1 n2 =
     n1.children <- n2 :: n1.children
 
   let transform dag forms =
@@ -205,7 +204,7 @@ end
 module FormDag = MakeDAG(struct
   type t = F.t
 
-  let of_form ~rule ~parents f = f
+  let of_form ~rule:_ ~parents:_ f = f
 
   let to_form f = f
 end)

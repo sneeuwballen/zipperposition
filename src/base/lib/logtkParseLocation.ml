@@ -85,30 +85,24 @@ let smaller p1 p2 =
   &&
   (p1.stop_line < p2.stop_line
    ||  (p1.stop_line = p2.stop_line && p1.stop_column <= p2.stop_column))
-  
 
-let pp buf pos =
+
+let pp out pos =
   if pos.start_line = pos.stop_line
   then
-    Printf.bprintf buf "file '%s': line %d, col %d to %d"
+    Format.fprintf out "@[file '%s': line %d, col %d to %d@]"
       pos.file pos.start_line pos.start_column pos.stop_column
   else
-    Printf.bprintf buf "file '%s': line %d, col %d to line %d, col %d"
+    Format.fprintf out "@[file '%s': line %d, col %d to line %d, col %d@]"
       pos.file
       pos.start_line pos.start_column
       pos.stop_line pos.stop_column
 
-let to_string pos =
-  let buf = Buffer.create 25 in
-  pp buf pos;
-  Buffer.contents buf
+let to_string = CCFormat.to_string pp
 
-let fmt fmt pos =
-  Format.pp_print_string fmt (to_string pos)
-
-let pp_opt buf o = match o with
-  | None -> Printf.bprintf buf "<no location>"
-  | Some pos -> pp buf pos
+let pp_opt out o = match o with
+  | None -> Format.fprintf out "<no location>"
+  | Some pos -> pp out pos
 
 let set_file buf filename =
   let open Lexing in

@@ -66,7 +66,7 @@ let to_cnf ~signature decls =
     let seq k =
       let a = object
         inherit [unit] Ast_tptp.Typed.visitor
-        method clause () _role c = k c
+        method! clause () _role c = k c
       end in
       Sequence.fold a#visit () clauses
     in
@@ -78,15 +78,15 @@ let parse_and_cnf ?(signature=Signature.TPTP.base) files =
   let res = E.(
     fold_l
     (fun () file ->
-      Util.debug 1 "parse input file %s" file;
+      Util.debug 1 "parse input file %s" (fun k->k file);
       (* parse *)
       Util_tptp.parse_file ~recursive:true file
       >>= fun decls ->
-      Util.debug 3 "parsed %d declarations..." (Sequence.length decls);
+      Util.debug 3 "parsed %d declarations..." (fun k->k (Sequence.length decls));
       (* CNF *)
       to_cnf ~signature decls
       >>= fun clauses ->
-      Util.debug 3 "obtained %d clauses..." (Sequence.length clauses);
+      Util.debug 3 "obtained %d clauses..." (fun k->k (Sequence.length clauses));
       (* convert clauses into Encoding.foclause *)
       let clauses = Sequence.map Encoding.foclause_of_clause clauses in
       Queue.add clauses q;
@@ -103,24 +103,27 @@ let parse_and_cnf ?(signature=Signature.TPTP.base) files =
 (* print content of the reasoner *)
 let print_theory r =
   Reasoner.Seq.to_seq r
-    |> Util.printf "theory:\n  %a\n" (Util.pp_seq ~sep:"\n  " Reasoner.Clause.pp);
+    |> Format.printf "theory:@.  %a@." (CCFormat.seq ~sep:"\n  " Reasoner.Clause.pp);
   ()
 
 let print_clauses c =
-  Util.printf "clauses:\n  %a\n"
-    (Util.pp_seq ~sep:"\n  " (Encoding.pp_clause FOTerm.pp)) c
+  Format.printf "clauses:@.  %a@."
+    (CCFormat.seq~sep:"\n  " (Encoding.pp_clause FOTerm.pp)) c
+
+let pppair ~sep pa pb out (a,b) =
+  Format.fprintf out "%a%s%a" pa a sep pb b
 
 let print_signature signature =
-  Util.printf "signature:\n  %a\n"
-    (Util.pp_seq ~sep:"\n  " (Util.pp_pair ~sep:" : " Symbol.pp Type.pp))
+  Format.printf "@[<2>signature:@,@[%a@]@]@."
+    (CCFormat.seq ~sep:"\n  " (pppair ~sep:" : " Symbol.pp Type.pp))
     (Signature.Seq.to_seq signature)
 
-let pp_theory_axiom buf (name, _, t) =
-  Printf.bprintf buf "%s %a" name HOT.pp t
+let pp_theory_axiom out (name, _, t) =
+  Format.fprintf out "%s %a" name HOT.pp t
 
-let pp_rewrite_system buf l =
-  Printf.bprintf buf "rewrite system\n    ";
-  Util.pp_list ~sep:"\n    " (Util.pp_pair ~sep:" --> " FOTerm.pp FOTerm.pp) buf l
+let pp_rewrite_system out l =
+  Format.fprintf out "@[<v2>rewrite system@ @[%a@]@]"
+    (CCFormat.list ~sep:"" (pppair ~sep:" --> " FOTerm.pp FOTerm.pp)) l
 
 let pp_pre_rewrite_system buf l =
   HORewriting.pp buf l
@@ -165,38 +168,38 @@ let main () =
   let res = E.(
     parse_files prover !theory_files
     >>= fun prover ->
-    Util.debug 3 "theory files parsed";
+    Util.debug 3 "theory files parsed" (fun _ -> ());
     if !flag_print_theory then print_theory (Prover.reasoner prover);
     if !flag_print_signature then print_signature (Prover.signature prover);
     (* parse CNF formulas *)
     parse_and_cnf !files
     >>= fun clauses ->
-    Util.debug 3 "input files parsed and translated to CNF";
+    Util.debug 3 "input files parsed and translated to CNF" (fun _ -> ());
     if !flag_print_cnf then print_clauses clauses;
     let results = detect_theories prover clauses in
-    Util.debug 3 "theory detection done";
+    Util.debug 3 "theory detection done" (fun _ -> ());
     E.return results
   ) in
   match res with
   | `Error msg ->
-      Util.debug 0 "error: %s" msg; exit 1
+      Util.debug 0 "error: %s" (fun k->k msg); exit 1
   | `Ok {theories; lemmas; axioms; rewrite; pre_rewrite; } ->
-      Util.debug 1 "success!";
-      Util.printf "axioms:\n  %a\n"
-        (Util.pp_seq ~sep:"\n  " pp_theory_axiom) axioms;
-      Util.printf "theories:\n  %a\n"
-        (Util.pp_seq ~sep:"\n  " pp_theory_axiom) theories;
-      Util.printf "lemmas:\n  %a\n"
-        (Util.pp_seq ~sep:"\n  " (Encoding.pp_clause FOTerm.pp)) lemmas;
-      Util.printf "rewrite systems:\n  %a\n"
-        (Util.pp_seq ~sep:"\n  " pp_rewrite_system) rewrite;
-      Util.printf "pre-rewrite systems:\n  %a\n"
-        (Util.pp_seq ~sep:"\n  " pp_pre_rewrite_system) pre_rewrite;
+      Util.debug 1 "success!" (fun _ -> ());
+      Format.printf "@[<2>axioms:@ @[%a@]@]@."
+        (CCFormat.seq ~sep:"\n  " pp_theory_axiom) axioms;
+      Format.printf "@[<2>theories:@ @[%a@]@]@."
+        (CCFormat.seq ~sep:"\n  " pp_theory_axiom) theories;
+      Format.printf "@[<2>lemmas:@ @[%a@]@]@."
+        (CCFormat.seq ~sep:"\n  " (Encoding.pp_clause FOTerm.pp)) lemmas;
+      Format.printf "@[<2>rewrite systems:@ @[%a@]@]@."
+        (CCFormat.seq~sep:"\n  " pp_rewrite_system) rewrite;
+      Format.printf "@[<2>pre-rewrite systems:@ @[%a@]@]@."
+        (CCFormat.seq ~sep:"\n  " pp_pre_rewrite_system) pre_rewrite;
       ()
 
 let _ =
   try
     main ()
   with Type.Error s ->
-    Util.printf "%s\n" s;
+    Format.printf "%s@." s;
     exit 1

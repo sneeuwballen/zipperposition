@@ -63,9 +63,7 @@ module type S = sig
 
   val clear_cache : t -> unit
 
-  val pp : Buffer.t -> t -> unit
-  val fmt : Format.formatter -> t -> unit
-  val to_string : t -> string
+  include LogtkInterfaces.PRINT with type t := t
 
   (** {2 LogtkOrdering implementations}
       An ordering is a partial ordering on terms. Several implementations

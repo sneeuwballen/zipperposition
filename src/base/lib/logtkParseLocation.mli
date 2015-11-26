@@ -55,11 +55,9 @@ val smaller : t -> t -> bool
   (** [smaller p1 p2] is true if [p1] is included in [p2], ie
       [p1] is a sub-location of [p2] (interval inclusion) *)
 
-val pp : Buffer.t -> t -> unit
-val fmt : Format.formatter -> t -> unit
-val to_string : t -> string
+include LogtkInterfaces.PRINT with type t := t
 
-val pp_opt : Buffer.t -> t option -> unit
+val pp_opt : t option CCFormat.printer
 
 (** {2 Lexbuf} *)
 

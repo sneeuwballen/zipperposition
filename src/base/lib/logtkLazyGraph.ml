@@ -284,33 +284,32 @@ module Heap = struct
     cmp : 'a -> 'a -> int;
   } (** A pairing tree heap with the given comparison function *)
   and 'a tree =
-    | Empty
-    | Node of 'a * 'a tree * 'a tree
+    | E
+    | N of 'a * 'a tree * 'a tree
 
   let empty ~cmp = {
-    tree = Empty;
+    tree = E;
     cmp;
   }
 
-  let is_empty h =
-    match h.tree with
-    | Empty -> true
-    | Node _ -> false
+  let is_empty h = match h.tree with
+    | E -> true
+    | N _ -> false
 
   let rec union ~cmp t1 t2 = match t1, t2 with
-  | Empty, _ -> t2
-  | _, Empty -> t1
-  | Node (x1, l1, r1), Node (x2, l2, r2) ->
+  | E, _ -> t2
+  | _, E -> t1
+  | N(x1, l1, r1), N(x2, l2, r2) ->
     if cmp x1 x2 <= 0
-      then Node (x1, union ~cmp t2 r1, l1)
-      else Node (x2, union ~cmp t1 r2, l2)
+      then N(x1, union ~cmp t2 r1, l1)
+      else N(x2, union ~cmp t1 r2, l2)
 
   let insert h x =
-    h.tree <- union ~cmp:h.cmp (Node (x, Empty, Empty)) h.tree
+    h.tree <- union ~cmp:h.cmp (N(x, E, E)) h.tree
 
   let pop h = match h.tree with
-    | Empty -> raise Not_found
-    | Node (x, l, r) ->
+    | E -> raise Not_found
+    | N(x, l, r) ->
       h.tree <- union ~cmp:h.cmp l r;
       x
 end
@@ -336,10 +335,10 @@ and ('id, 'e) came_from_edge =
     Both the distance and the heuristic must always
     be positive or null. *)
 let a_star graph
-  ?(on_explore=fun v -> ())
-  ?(ignore=fun v -> false)
-  ?(heuristic=(fun v -> 0.))
-  ?(distance=(fun v1 e v2 -> 1.))
+  ?(on_explore=fun _ -> ())
+  ?(ignore=fun _ -> false)
+  ?(heuristic=(fun _ -> 0.))
+  ?(distance=(fun _ _ _ -> 1.))
   ~goal
   start =
   Sequence.from_iter (fun k ->
@@ -374,7 +373,7 @@ let a_star graph
         cell.cf_explored <- true;
         match graph.force v' with
         | Empty -> ()
-        | Node (_, label, edges) ->
+        | Node (_, _label, edges) ->
           (* explore neighbors *)
           Sequence.iter
             (fun (e,v'') ->
@@ -403,12 +402,12 @@ let a_star graph
             then k (dist, mk_path nodes [] v')
         end
     done)
-    
+
 (** Shortest path from the first node to the second one, according
     to the given (positive!) distance function. The path is reversed,
     ie, from the destination to the source. The int is the distance. *)
-let dijkstra graph ?on_explore ?(ignore=fun v -> false)
-  ?(distance=fun v1 e v2 -> 1.) v1 v2 =
+let dijkstra graph ?on_explore ?(ignore=fun _ -> false)
+  ?(distance=fun _ _ _ -> 1.) v1 v2 =
   let paths =
     a_star graph ?on_explore ~ignore ~distance ~heuristic:(fun _ -> 0.)
        ~goal:(fun v -> graph.eq v v2) v1
@@ -471,7 +470,7 @@ let rev_path p =
 
 (** {2 Lazy transformations} *)
 
-let union ?(combine=fun x y -> x) g1 g2 =
+let union ?(combine=fun x _ -> x) g1 g2 =
   let force v =
     match g1.force v, g2.force v with
     | Empty, Empty -> Empty
@@ -504,7 +503,7 @@ let flatMap f g =
       Node (v, l, edges_enum')
   in { eq=g.eq; hash=g.hash; force; }
 
-let filter ?(vertices=(fun v l -> true)) ?(edges=fun v1 e v2 -> true) g =
+let filter ?(vertices=(fun _ _ -> true)) ?(edges=fun _ _ _ -> true) g =
   let force v =
     match g.force v with
     | Empty -> Empty
@@ -527,7 +526,7 @@ let product g1 g2 =
       Node ((v1,v2), (l1,l2), edges)
   and eq (v1,v2) (v1',v2') =
     g1.eq v1 v1' && g2.eq v2 v2'
-  and hash (v1,v2) = ((g1.hash v1) * 65599) + g2.hash v2 
+  and hash (v1,v2) = ((g1.hash v1) * 65599) + g2.hash v2
   in
   { eq; hash; force; }
 
@@ -546,16 +545,16 @@ module Dot = struct
   ] (** Dot attribute *)
 
   (** Print an enum of Full.traverse_event *)
-  let pp_enum ?(eq=(=)) ?(hash=Hashtbl.hash) ~name formatter events =
+  let pp_enum ?(eq=(=)) ?(hash=Hashtbl.hash) ~name out events =
     (* print an attribute *)
-    let print_attribute formatter attr =
+    let print_attribute out attr =
       match attr with
-      | `Color c -> Format.fprintf formatter "color=%s" c
-      | `Shape s -> Format.fprintf formatter "shape=%s" s
-      | `Weight w -> Format.fprintf formatter "weight=%d" w
-      | `Style s -> Format.fprintf formatter "style=%s" s
-      | `Label l -> Format.fprintf formatter "label=\"%s\"" l
-      | `Other (name, value) -> Format.fprintf formatter "%s=\"%s\"" name value
+      | `Color c -> Format.fprintf out "color=%s" c
+      | `Shape s -> Format.fprintf out "shape=%s" s
+      | `Weight w -> Format.fprintf out "weight=%d" w
+      | `Style s -> Format.fprintf out "style=%s" s
+      | `Label l -> Format.fprintf out "label=\"%s\"" l
+      | `Other (name, value) -> Format.fprintf out "%s=\"%s\"" name value
     (* map from vertices to integers *)
     and get_id =
       let count = ref 0 in
@@ -572,27 +571,27 @@ module Dot = struct
     let pp_vertex formatter v =
       Format.fprintf formatter "vertex_%d" (get_id v) in
     (* print preamble *)
-    Format.fprintf formatter "@[<v2>digraph %s {@;" name;
+    Format.fprintf out "@[<v2>digraph %s {@;" name;
     (* traverse *)
     Sequence.iter
       (function
         | Full.EnterVertex (v, attrs, _, _) ->
-          Format.fprintf formatter "  @[<h>%a %a;@]@." pp_vertex v
+          Format.fprintf out "  @[<h>%a %a;@]@." pp_vertex v
             (CCList.print ~start:"[" ~stop:"]" ~sep:"," print_attribute) attrs
         | Full.ExitVertex _ -> ()
         | Full.MeetEdge (v2, attrs, v1, _) ->
-          Format.fprintf formatter "  @[<h>%a -> %a %a;@]@."
+          Format.fprintf out "  @[<h>%a -> %a %a;@]@."
             pp_vertex v1 pp_vertex v2
             (CCList.print ~start:"[" ~stop:"]" ~sep:"," print_attribute)
             attrs)
       events;
     (* close *)
-    Format.fprintf formatter "}@]@;@?";
+    Format.fprintf out "}@]@;@?";
     ()
 
-  let pp ~name graph formatter vertices =
+  let pp ~name graph out vertices =
     let enum = Full.bfs_full graph vertices in
-    pp_enum ~eq:graph.eq ~hash:graph.hash ~name formatter enum
+    pp_enum ~eq:graph.eq ~hash:graph.hash ~name out enum
 end
 
 (** {2 Example of graphs} *)

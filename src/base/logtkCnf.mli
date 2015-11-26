@@ -48,28 +48,28 @@ val miniscope : ?distribute_exists:bool -> form -> form
 type clause = form list
   (** Basic clause representation, as list of literals *)
 
+(** Options are used to tune the behavior of the CNF conversion. *)
 type options =
   | DistributeExists
+    (** if enabled, will distribute existential quantifiers over
+      disjunctions. This can make skolem symbols smaller (smaller arity) but
+      introduce more of them. *)
+
   | DisableRenaming
-  | InitialProcessing of (form -> form) (** any processing, at the beginning *)
-  | PostNNF of (form -> form)  (** any processing that keeps negation at leaves *)
-  | PostSkolem of (form -> form) (** must not introduce variables nor negations *)
+    (** disables formula renaming. Can re-introduce the worst-case
+        exponential behavior of CNF. *)
 
-(** Options are used to tune the behavior of the CNF conversion.
+  | InitialProcessing of (form -> form)
+    (** any processing, at the beginning, before CNF starts  *)
 
-- DistributeExists if enabled, will distribute existential quantifiers over
-    disjunctions. This can make skolem symbols smaller (smaller arity) but
-    introduce more of them.
-- DisableRenaming disables formula renaming. Can re-introduce the worst-case
-    exponential behavior of CNF.
-- InitialProcessing a simplification function that is called before CNF starts.
-- PostNNF transformation applied just after reduction to NNF. Its output
-    must not break the NNF form (negation at root only).
-- PostSkolem transformation applied just after skolemization. It must not
-    break skolemization nor NNF (no quantifier, no non-leaf negation).
-- DefLimit number of expected clauses above which a sub-formula is
-    renamed (unless [DisableRenaming] is present).
-*)
+  | PostNNF of (form -> form)
+    (** any processing that keeps negation at leaves,
+        just after reduction to NNF. Its output
+        must not break the NNF form (negation at root only). *)
+
+  | PostSkolem of (form -> form)
+    (** transformation applied just after skolemization. It must not
+        break skolemization nor NNF (no quantifier, no non-leaf negation). *)
 
 val cnf_of : ?opts:options list -> ?ctx:LogtkSkolem.ctx ->
              form -> clause list

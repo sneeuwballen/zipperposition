@@ -101,8 +101,8 @@ val parse : ?recursive:bool -> string -> t or_error
 include Interfaces.PRINT with type t := t
   (** Debug printing, non recursive *)
 
-val pp1 : Buffer.t -> t -> unit
+val pp1 : t CCFormat.printer
   (** Print proof step, and its parents *)
 
-val pp_tstp : Buffer.t -> t -> unit
-  (** print the whole proofs on the given buffer *)
+val pp_tstp : t CCFormat.printer
+  (** print the whole proofs *)

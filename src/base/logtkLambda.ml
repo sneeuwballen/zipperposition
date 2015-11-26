@@ -45,13 +45,13 @@ let rec match_types ?(subst=LogtkSubsts.empty) ty s_ty args s_args =
       let subst = LogtkUnif.Ty.unification ~subst expected s_ty arg s_args in
       match_types ~subst ret s_ty args' s_args
     with LogtkUnif.Fail ->
-      let msg = LogtkUtil.sprintf "error: could not unify expected type %a with %a"
+      let msg = CCFormat.sprintf "error: could not unify expected type %a with %a"
         LogtkType.pp expected LogtkType.pp arg in
       raise (LogtkType.Error msg)
     end
   | _ ->
     (* raise some type error *)
-    let msg = LogtkUtil.sprintf "error: expected function type, got %a" LogtkType.pp ty in
+    let msg = CCFormat.sprintf "error: expected function type, got %a" LogtkType.pp ty in
     raise (LogtkType.Error msg)
 
 (* recursive reduction in call by value. [env] contains the environment for
@@ -86,7 +86,7 @@ let rec beta_reduce_rec ~depth env t =
     begin match T.view l with
     | T.Lambda (_, l') ->
       (* beta-reduction *)
-      LogtkUtil.debug 4 "beta-reduce: %a @ %a" T.pp l T.pp r;
+      LogtkUtil.debug 4 "beta-reduce: %a @ %a" (fun k->k T.pp l T.pp r);
       let r' = beta_reduce_rec ~depth env r in
       let env = LogtkDBEnv.push env r' in
       beta_reduce_rec ~depth env l'

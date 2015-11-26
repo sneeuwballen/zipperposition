@@ -61,9 +61,7 @@ val compare : t -> t -> int
 val eq : t -> t -> bool
 val hash : t -> int
 
-val pp : Buffer.t -> t -> unit
-val fmt : Format.formatter -> t -> unit
-val to_string : t -> string
+include LogtkInterfaces.PRINT with type t := t
 
 (** {2 LogtkPosition builder} *)
 
@@ -107,6 +105,5 @@ module Build : sig
   val arg : int -> t -> t
     (** Arg position at the end *)
 
-  val pp : Buffer.t -> t -> unit
-  val fmt : Format.formatter -> t -> unit
+  include LogtkInterfaces.PRINT with type t := t
 end

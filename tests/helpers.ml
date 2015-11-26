@@ -25,8 +25,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** helpers for tests *)
 
-open Logtk
-
 module R = Random
 
 let seed = 42   (* use a fixed seed for random, for repeatable tests *)
@@ -43,7 +41,7 @@ let choose l =
   let idx = random_in 0 len in
   List.nth l idx
 
-let random_list size mk_elem =
+let random_list _size mk_elem =
   let rec aux acc = function
   | 0 -> acc
   | size -> aux ((mk_elem ())::acc) (size-1)
@@ -69,10 +67,10 @@ let print_results ~name (num, success_count, failures, noprecond_count) pp_eleme
   | TestFail a -> pp_element formater a
   | _ -> assert false
   in
-  Util.printf "%d tests for %s : %d success, %d failures, %d preconditions failed\n"
+  Format.printf "%d tests for %s : %d success, %d failures, %d preconditions failed@."
     num name success_count (List.length failures) noprecond_count;
   if failures <> []
-    then Util.printf "failures %a\n" (Util.pp_list ~sep:"\n" print_failure) failures
+    then Format.printf "failures @[%a@]@." (CCFormat.list ~sep:"" print_failure) failures
     else ()
 
 (** check property and then print results *)

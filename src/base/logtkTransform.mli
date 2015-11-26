@@ -65,8 +65,7 @@ val remove_trivial : t
 val apply : t -> form -> form list
   (** Apply the transformations to a formula *)
 
-val pp : Buffer.t -> t -> unit
-val fmt : Format.formatter -> t -> unit
+include LogtkInterfaces.PRINT with type t := t
 
 (** {2 LogtkTransformation DAG} *)
 

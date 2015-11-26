@@ -108,7 +108,7 @@ let is_pred_rewrite_rule f =
     | T.Var _ | T.BVar _ | T.TyApp _ -> false
     | T.Const _ -> F.is_ground r
     | T.App (_, _) ->
-      Sequence.for_all (fun x -> T.var_occurs x l) (F.Seq.vars r)
+      Sequence.for_all (fun x -> T.var_occurs ~var:x l) (F.Seq.vars r)
   in
   let f = F.open_forall f in
   match F.view f with

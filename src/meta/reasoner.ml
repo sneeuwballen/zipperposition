@@ -58,8 +58,8 @@ module Clause = struct
 
   let rule head body =
     if not (safe head body) then
-      let msg = Util.sprintf "unsafe Horn clause: %a <- %a"
-        HOT.pp head (Util.pp_list HOT.pp) body in
+      let msg = CCFormat.sprintf "unsafe Horn clause:@ @[%a <- %a@]"
+        HOT.pp head (CCFormat.list HOT.pp) body in
       raise (Invalid_argument msg)
     else {head; body; }
 
@@ -92,15 +92,14 @@ module Clause = struct
   let cmp c1 c2 =
     let c = HOT.cmp c1.head c2.head in
     if c = 0
-      then Util.lexicograph HOT.cmp c1.body c2.body
+      then CCOrd.list_ HOT.cmp c1.body c2.body
       else c
 
-  let pp buf c = match c.body with
-    | [] -> Printf.bprintf buf "%a." HOT.pp c.head
+  let pp out c = match c.body with
+    | [] -> Format.fprintf out "%a." HOT.pp c.head
     | _::_ ->
-        Printf.bprintf buf "%a <- %a." HOT.pp c.head (Util.pp_list HOT.pp) c.body
-  let to_string = Util.on_buffer pp
-  let fmt fmt c = Format.pp_print_string fmt (to_string c)
+        Format.fprintf out "%a <- %a." HOT.pp c.head (CCFormat.list HOT.pp) c.body
+  let to_string = CCFormat.to_string pp
 
   module Set = Sequence.Set.Make(struct
     type t = clause
@@ -259,7 +258,7 @@ let __process state =
     let c, proof = Queue.pop state.to_process in
     if not (Clause.Map.mem c state.db.all)
     then begin
-      Util.debug ~section 5 "meta-reasoner: add clause %a" Clause.pp c;
+      Util.debug ~section 5 "meta-reasoner: add clause %a" (fun k->k Clause.pp c);
       (* new clause: insert its proof in state.db.all, then update fixpoint *)
       state.db <- {state.db with all=Clause.Map.add c proof state.db.all;};
       match c.Clause.body with

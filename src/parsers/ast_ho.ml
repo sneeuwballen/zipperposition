@@ -40,17 +40,16 @@ type t =
 
 type location = ParseLocation.t
 
-let pp buf t = match t with
+let pp out t = match t with
   | Clause (head, []) ->
-      Printf.bprintf buf "%a.\n" PT.pp head
+      Format.fprintf out "%a.\n" PT.pp head
   | Clause (head, body) ->
-      Printf.bprintf buf "%a <-\n  %a.\n"
-        PT.pp head (Util.pp_list ~sep:",\n  " PT.pp) body
+      Format.fprintf out "%a <-\n  %a.\n"
+        PT.pp head (CCFormat.list ~sep:",\n  " PT.pp) body
   | Type (s, ty) ->
-      Printf.bprintf buf "val %s : %a\n" s PT.pp ty
+      Format.fprintf out "val %s : %a\n" s PT.pp ty
 
-let to_string = Util.on_buffer pp
-let fmt fmt s = Format.pp_print_string fmt (to_string s)
+let to_string = CCFormat.to_string pp
 
 module Seq = struct
   let terms decl k = match decl with

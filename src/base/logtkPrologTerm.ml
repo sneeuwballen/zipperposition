@@ -72,12 +72,12 @@ let rec cmp t1 t2 = match t1.term, t2.term with
   | App (s1,l1), App (s2, l2) ->
     let c = cmp s1 s2 in
     if c = 0
-    then LogtkUtil.lexicograph cmp l1 l2
+    then CCOrd.list_ cmp l1 l2
     else c
   | Syntactic (s1,l1), Syntactic (s2,l2) ->
     let c = Sym.cmp s1 s2 in
     if c = 0
-    then LogtkUtil.lexicograph cmp l1 l2
+    then CCOrd.list_ cmp l1 l2
     else c
   | Bind (s1, v1, t1), Bind (s2, v2, t2) ->
     let c = Sym.cmp s1 s2 in
@@ -85,7 +85,7 @@ let rec cmp t1 t2 = match t1.term, t2.term with
     then
       let c' = cmp t1 t2 in
       if c' = 0
-      then LogtkUtil.lexicograph cmp v1 v2
+      then CCOrd.list_ cmp v1 v2
       else c'
     else c
   | Column (x1,y1), Column (x2,y2) ->
@@ -138,8 +138,8 @@ let at_loc ~loc t = {t with loc=Some loc; }
 
 let wildcard = const Sym.Base.wildcard
 
-let is_app = function {term=App _} -> true | _ -> false
-let is_var = function | {term=Var _} -> true | _ -> false
+let is_app = function {term=App _; _} -> true | _ -> false
+let is_var = function | {term=Var _; _} -> true | _ -> false
 
 module Set = Sequence.Set.Make(struct
   type t = term
@@ -207,8 +207,8 @@ module Seq = struct
 
   let symbols t = subterms t
       |> Sequence.fmap (function
-        | {term=Const s} -> Some s
-        | {term=Bind (s, _, _)} -> Some s
+        | {term=Const s; _} -> Some s
+        | {term=Bind (s, _, _); _} -> Some s
         | _ -> None)
 end
 
@@ -225,47 +225,46 @@ let subterm ~strict t ~sub =
   (not strict && eq t sub)
   || Sequence.exists (eq sub) (Seq.subterms t)
 
-let rec pp buf t = match t.term with
-  | Var s -> Buffer.add_string buf s
-  | Int i -> Buffer.add_string buf (Z.to_string i)
-  | Rat i -> Buffer.add_string buf (Q.to_string i)
-  | Const s -> Sym.pp buf s
+let rec pp out t = match t.term with
+  | Var s -> CCFormat.string out s
+  | Int i -> CCFormat.string out (Z.to_string i)
+  | Rat i -> CCFormat.string out (Q.to_string i)
+  | Const s -> Sym.pp out s
   | List l ->
-      Buffer.add_char buf '[';
-      LogtkUtil.pp_list ~sep:"," pp buf l;
-      Buffer.add_char buf ']'
+      CCFormat.char out '[';
+      CCFormat.list ~sep:"," pp out l;
+      CCFormat.char out ']'
   | Syntactic (Sym.Conn Sym.Arrow, [ret;a]) ->
-    Printf.bprintf buf "%a -> %a" pp a pp ret
+    Format.fprintf out "%a -> %a" pp a pp ret
   | Syntactic (Sym.Conn Sym.Arrow, ret::l) ->
-    Printf.bprintf buf "(%a) -> %a" (LogtkUtil.pp_list ~sep:" * " pp) l pp ret
+    Format.fprintf out "(%a) -> %a" (CCFormat.list ~sep:" * " pp) l pp ret
   | Syntactic (s, l) ->
-      Printf.bprintf buf "%a(%a)" Sym.pp s (LogtkUtil.pp_list ~sep:", " pp) l
+      Format.fprintf out "%a(%a)" Sym.pp s (CCFormat.list ~sep:", " pp) l
   | App (s, l) ->
-      pp buf s;
-      Buffer.add_char buf '(';
-      LogtkUtil.pp_list ~sep:"," pp buf l;
-      Buffer.add_char buf ')'
+      pp out s;
+      CCFormat.char out '(';
+      CCFormat.list ~sep:"," pp out l;
+      CCFormat.char out ')'
   | Bind (s, vars, t') ->
-      Sym.pp buf s;
-      Buffer.add_char buf '[';
-      LogtkUtil.pp_list ~sep:"," pp buf vars;
-      Buffer.add_string buf "]:";
-      pp buf t'
+      Sym.pp out s;
+      CCFormat.char out '[';
+      CCFormat.list ~sep:"," pp out vars;
+      CCFormat.string out "]:";
+      pp out t'
   | Record (l, None) ->
-    Buffer.add_char buf '{';
-    LogtkUtil.pp_list (fun buf (s,t') -> Printf.bprintf buf "%s:%a" s pp t') buf l;
-    Buffer.add_char buf '}'
+    CCFormat.char out '{';
+    CCFormat.list (fun buf (s,t') -> Format.fprintf buf "%s:%a" s pp t') out l;
+    CCFormat.char out '}'
   | Record (l, Some r) ->
-    Buffer.add_char buf '{';
-    LogtkUtil.pp_list (fun buf (s,t') -> Printf.bprintf buf "%s:%a" s pp t') buf l;
-    Printf.bprintf buf " | %a}" pp r
+    CCFormat.char out '{';
+    CCFormat.list (fun buf (s,t') -> Format.fprintf buf "%s:%a" s pp t') out l;
+    Format.fprintf out " | %a}" pp r
   | Column(x,y) ->
-      pp buf x;
-      Buffer.add_char buf ':';
-      pp buf y
+      pp out x;
+      CCFormat.char out ':';
+      pp out y
 
-let to_string = LogtkUtil.on_buffer pp
-let fmt fmt t = Format.pp_print_string fmt (to_string t)
+let to_string = CCFormat.to_string pp
 
 (** {2 Visitor} *)
 
@@ -302,8 +301,8 @@ end
 class id_visitor = object
   inherit [t] visitor
   method var ?loc s = var ?loc s
-  method int_ ?loc i = int_ i
-  method rat_ ?loc n = rat n
+  method int_ ?loc:_ i = int_ i
+  method rat_ ?loc:_ n = rat n
   method const ?loc s = const ?loc s
   method syntactic ?loc s l = syntactic ?loc s l
   method app ?loc f l = app ?loc f l
@@ -342,71 +341,70 @@ module TPTP = struct
   let tType = const Sym.Base.tType
   let forall_ty ?loc vars t = bind ?loc Sym.Base.forall_ty vars t
 
-  let rec pp buf t = match t.term with
-    | Var s -> Buffer.add_string buf s
-    | Int i -> Buffer.add_string buf (Z.to_string i)
-    | Rat i -> Buffer.add_string buf (Q.to_string i)
-    | Const s -> Sym.TPTP.pp buf s
+  let rec pp out t = match t.term with
+    | Var s -> CCFormat.string out s
+    | Int i -> CCFormat.string out (Z.to_string i)
+    | Rat i -> CCFormat.string out (Q.to_string i)
+    | Const s -> Sym.TPTP.pp out s
     | List l ->
-        Buffer.add_char buf '[';
-        LogtkUtil.pp_list ~sep:"," pp buf l;
-        Buffer.add_char buf ']'
+        CCFormat.char out '[';
+        CCFormat.list ~sep:"," pp out l;
+        CCFormat.char out ']'
     | Syntactic (Sym.Conn Sym.And, l) ->
-      LogtkUtil.pp_list ~sep:" & " pp_surrounded buf l
+      CCFormat.list ~sep:" & " pp_surrounded out l
     | Syntactic (Sym.Conn Sym.Or, l) ->
-      LogtkUtil.pp_list ~sep:" | " pp_surrounded buf l
+      CCFormat.list ~sep:" | " pp_surrounded out l
     | Syntactic (Sym.Conn Sym.Not, [a]) ->
-      Printf.bprintf buf "~%a" pp_surrounded a
+      Format.fprintf out "~%a" pp_surrounded a
     | Syntactic (Sym.Conn Sym.Imply, [a;b]) ->
-      Printf.bprintf buf "%a => %a" pp_surrounded a pp_surrounded b
+      Format.fprintf out "%a => %a" pp_surrounded a pp_surrounded b
     | Syntactic (Sym.Conn Sym.Xor, [a;b]) ->
-      Printf.bprintf buf "%a <~> %a" pp_surrounded a pp_surrounded b
+      Format.fprintf out "%a <~> %a" pp_surrounded a pp_surrounded b
     | Syntactic (Sym.Conn Sym.Equiv, [a;b]) ->
-      Printf.bprintf buf "%a <=> %a" pp_surrounded a pp_surrounded b
+      Format.fprintf out "%a <=> %a" pp_surrounded a pp_surrounded b
     | Syntactic (Sym.Conn Sym.Eq, [_;a;b]) ->
-      Printf.bprintf buf "%a = %a" pp_surrounded a pp_surrounded b
+      Format.fprintf out "%a = %a" pp_surrounded a pp_surrounded b
     | Syntactic (Sym.Conn Sym.Neq, [_;a;b]) ->
-      Printf.bprintf buf "%a != %a" pp_surrounded a pp_surrounded b
+      Format.fprintf out "%a != %a" pp_surrounded a pp_surrounded b
     | Syntactic (Sym.Conn Sym.Arrow, [ret;a]) ->
-      Printf.bprintf buf "%a > %a" pp a pp ret
+      Format.fprintf out "%a > %a" pp a pp ret
     | Syntactic (Sym.Conn Sym.Arrow, ret::l) ->
-      Printf.bprintf buf "(%a) > %a" (LogtkUtil.pp_list ~sep:" * " pp) l pp_surrounded ret
+      Format.fprintf out "(%a) > %a" (CCFormat.list~sep:" * " pp) l pp_surrounded ret
     | Syntactic (s, l) ->
-      Printf.bprintf buf "%a(%a)" Sym.pp s (LogtkUtil.pp_list ~sep:", " pp_surrounded) l
+      Format.fprintf out "%a(%a)" Sym.pp s (CCFormat.list ~sep:", " pp_surrounded) l
     | App (s, l) ->
-        pp buf s;
-        Buffer.add_char buf '(';
-        LogtkUtil.pp_list ~sep:"," pp buf l;
-        Buffer.add_char buf ')'
+        pp out s;
+        CCFormat.char out '(';
+        CCFormat.list ~sep:"," pp out l;
+        CCFormat.char out ')'
     | Bind (s, vars, t') ->
-        Sym.TPTP.pp buf s;
-        Buffer.add_char buf '[';
-        LogtkUtil.pp_list ~sep:"," pp_typed_var buf vars;
-        Buffer.add_string buf "]:";
-        pp_surrounded buf t'
+        Sym.TPTP.pp out s;
+        CCFormat.char out '[';
+        CCFormat.list ~sep:"," pp_typed_var out vars;
+        CCFormat.string out "]:";
+        pp_surrounded out t'
     | Record _ -> failwith "cannot print records in TPTP"
     | Column(x,y) ->
         begin match view y with
         | Const s when Sym.eq s Sym.TPTP.i ->
-          pp buf x  (* do not print X:$i *)
+          pp out x  (* do not print X:$i *)
         | _ ->
-          pp buf x;
-          Buffer.add_char buf ':';
-          pp buf y
+          pp out x;
+          CCFormat.char out ':';
+          pp out y
         end
-  and pp_typed_var buf t = match t.term with
-    | Column ({term=Var s}, {term=Const (Sym.Conn Sym.TType)})
-    | Var s -> Buffer.add_string buf s
-    | Column ({term=Var s}, {term=Const sy}) when Sym.eq sy Sym.TPTP.i ->
-        Buffer.add_string buf s
-    | Column ({term=Var s}, ty) ->
-      Printf.bprintf buf "%s:%a" s pp ty
+  and pp_typed_var out t = match t.term with
+    | Column ({term=Var s; _}, {term=Const (Sym.Conn Sym.TType); _})
+    | Var s -> CCFormat.string out s
+    | Column ({term=Var s; _}, {term=Const sy; _}) when Sym.eq sy Sym.TPTP.i ->
+        CCFormat.string out s
+    | Column ({term=Var s; _}, ty) ->
+      Format.fprintf out "%s:%a" s pp ty
     | _ -> assert false
-  and pp_surrounded buf t = match t.term with
-    | App ({term=Const (Sym.Conn _)}, _::_::_)
-    | Bind _ -> Buffer.add_char buf '('; pp buf t; Buffer.add_char buf ')'
-    | _ -> pp buf t
+  and pp_surrounded out t = match t.term with
+    | App ({term=Const (Sym.Conn _); _}, _::_::_)
+    | Bind _ -> CCFormat.char out '('; pp out t; CCFormat.char out ')'
+    | _ -> pp out t
 
-  let to_string = LogtkUtil.on_buffer pp
-  let fmt fmt t = Format.pp_print_string fmt (to_string t)
+  let to_string = CCFormat.to_string pp
 end

@@ -236,10 +236,9 @@ module Make(E : LogtkIndex.EQUATION) = struct
       ~edges:(fun e -> [`Label e])
       _as_graph
 
-  let to_dot buf t =
-    let fmt = Format.formatter_of_buffer buf in
-    LogtkLazyGraph.Dot.pp ~name:"NPLogtkDtree" _as_dot_graph fmt (Sequence.singleton t);
-    Format.pp_print_flush fmt ();
+  let to_dot out t =
+    LogtkLazyGraph.Dot.pp ~name:"NPLogtkDtree" _as_dot_graph out (Sequence.singleton t);
+    Format.pp_print_flush out ();
     ()
 end
 
@@ -489,13 +488,13 @@ module MakeTerm(X : Set.OrderedType) = struct
         and s2 = SIMap.to_seq t.map
           |> Sequence.map
               (fun ((sym,i), t') ->
-               LogtkUtil.sprintf "%a/%d" LogtkSymbol.pp sym i, t')
+               CCFormat.sprintf "%a/%d" LogtkSymbol.pp sym i, t')
         in
         LogtkLazyGraph.Node(t, t, Sequence.append s1 s2)
       )
 
   (* TODO: print leaf itself *)
-  let _as_dot_graph pp_elem =
+  let as_graph_ =
     LogtkLazyGraph.map
       ~vertices:(fun t ->
         let len = Leaf.size t.leaf in
@@ -504,9 +503,8 @@ module MakeTerm(X : Set.OrderedType) = struct
       ~edges:(fun e -> [`Label e])
       _as_graph
 
-  let to_dot pp_elem buf t =
-    let fmt = Format.formatter_of_buffer buf in
-    LogtkLazyGraph.Dot.pp ~name (_as_dot_graph pp_elem) fmt (Sequence.singleton t);
-    Format.pp_print_flush fmt ();
+  let to_dot _ out t =
+    LogtkLazyGraph.Dot.pp ~name as_graph_ out (Sequence.singleton t);
+    Format.pp_print_flush out ();
     ()
 end

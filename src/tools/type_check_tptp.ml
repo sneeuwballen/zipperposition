@@ -33,7 +33,7 @@ module PT = PrologTerm
 module Err = CCError
 
 let print_line () =
-  Printf.printf "%s\n" (Util.str_repeat "=" 60);
+  Printf.printf "%s\n" (CCString.repeat "=" 60);
   ()
 
 let cat_input = ref false  (* print input declarations? *)
@@ -62,17 +62,17 @@ let check file =
     Printf.printf "signature:\n";
     Signature.iter signature
       (fun s ty ->
-        Util.printf "  %a : %a\n" Symbol.pp s Type.pp ty);
+        Format.printf "  %a : %a@." Symbol.pp s Type.pp ty);
     (* print formulas *)
     if !cat_input then begin
       Printf.printf "formulas:\n";
       Sequence.iter
-        (fun decl -> Util.printf "  %a\n" Ast_tptp.Untyped.pp decl)
+        (fun decl -> Format.printf "  %a@." Ast_tptp.Untyped.pp decl)
         decls';
       end;
     if !stats then begin
-      Util.printf "number of symbols: %d\n" (Signature.cardinal signature);
-      Util.printf "number of input declarations: %d\n" (Sequence.length decls);
+      Format.printf "number of symbols: %d@." (Signature.cardinal signature);
+      Format.printf "number of input declarations: %d@." (Sequence.length decls);
       end;
     Err.return ()
   )

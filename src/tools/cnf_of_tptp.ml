@@ -52,7 +52,7 @@ let options = Arg.align (
 
 (* process the given file, converting it to CNF *)
 let process file =
-  Util.debug 1 "process file %s" file;
+  Util.debug 1 "process file %s" (fun k->k file);
   let res = Err.(
     (* parse *)
     Util_tptp.parse_file ~recursive:true file
@@ -71,10 +71,10 @@ let process file =
       else decls
     in
     if !print_sig
-      then Util.printf "signature: %a\n" Signature.pp signature;
+      then Format.printf "@[<2>signature: @[%a@]@]@." Signature.pp signature;
     (* print *)
     Sequence.iter
-      (fun d -> Util.printf "%a\n" AT.pp d)
+      (fun d -> Format.printf "%a@." AT.pp d)
       decls;
     Err.return ()
   )
@@ -91,7 +91,7 @@ let main () =
   (if !files = [] then files := ["stdin"]);
   files := List.rev !files;
   List.iter process !files;
-  Util.debug 1 "success!";
+  Util.debug 1 "success!" (fun _ ->());
   ()
 
 let _ =

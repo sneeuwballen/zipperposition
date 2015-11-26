@@ -432,8 +432,8 @@ module DB = struct
           | Some r -> _to_seq~depth r k
         end;
         List.iter (fun (_,t) -> _to_seq ~depth t k) l
-    | RecordGet (r, name) -> _to_seq ~depth r k
-    | RecordSet (r, name, sub) -> _to_seq ~depth r k; _to_seq ~depth sub k
+    | RecordGet (r, _) -> _to_seq ~depth r k
+    | RecordSet (r, _, sub) -> _to_seq ~depth r k; _to_seq ~depth sub k
     | SimpleApp (_, l)
     | Multiset l ->
         List.iter (fun t -> _to_seq ~depth t k) l
@@ -471,7 +471,7 @@ module DB = struct
   let contains t n =
     _to_seq ~depth:0 t
       |> Sequence.map2
-        (fun bvar depth -> match view bvar with
+        (fun bvar _ -> match view bvar with
           | BVar i -> i=n
           | _ -> assert false
         )
@@ -480,7 +480,7 @@ module DB = struct
   (* maps the term to another term, calling [on_binder acc t]
     when it meets a binder, and [on_bvar acc t] when it meets a
     bound variable. *)
-  let _fold_map ~depth acc ~on_bvar ~on_binder t =
+  let _fold_map acc ~on_bvar ~on_binder t =
     let rec recurse ~depth acc t = match t.ty with
     | NoType ->
       assert (t == tType);
@@ -526,7 +526,7 @@ module DB = struct
   (* shift the non-captured De Bruijn indexes in the term by n *)
   let shift n t =
     assert (n >= 0);
-    _fold_map ~depth:0 ()
+    _fold_map ()
       ~on_bvar:(
         fun ~kind ~ty ~depth () i ->
           if i >= depth
@@ -534,11 +534,11 @@ module DB = struct
               bvar ~kind ~ty (i + n)
             else bvar ~kind ~ty i
         )
-      ~on_binder:(fun ~kind ~ty ~depth () _ _ -> ())
+      ~on_binder:(fun ~kind:_ ~ty:_ ~depth:_ () _ _ -> ())
       t
 
   let unshift n t =
-    _fold_map ~depth:0 ()
+    _fold_map ()
       ~on_bvar:(
         fun ~kind ~ty ~depth () i ->
           if i >= depth
@@ -546,7 +546,7 @@ module DB = struct
               bvar ~kind ~ty (i - n)
             else bvar ~kind ~ty i
         )
-      ~on_binder:(fun ~kind ~ty ~depth () _ _ -> ())
+      ~on_binder:(fun ~kind:_ ~ty:_ ~depth:_ () _ _ -> ())
       t
 
   let open_vars t =
@@ -675,7 +675,7 @@ module Seq = struct
       | App (head, l) -> vars head; List.iter vars l
       | Record (l, rest) ->
           CCOpt.iter vars rest;
-          List.iter (fun (s,t') -> vars t') l
+          List.iter (fun (_,t') -> vars t') l
       | RecordGet (r, _) -> vars r
       | RecordSet (r, _, sub) -> vars r; vars sub
       | SimpleApp (_,l)
@@ -720,7 +720,7 @@ module Seq = struct
           begin match rest with
           | None -> () | Some r -> recurse (depth+1) r
           end;
-          List.iter (fun (s,t') -> recurse depth t') l
+          List.iter (fun (_,t') -> recurse depth t') l
       | RecordGet (r, _) -> recurse depth r
       | RecordSet (r, _, sub) -> recurse depth r; recurse depth sub
       | SimpleApp (_,l)
@@ -804,8 +804,8 @@ module Pos = struct
     | App (t, _), P.Head subpos -> at t subpos
     | App (_, l), P.Arg (n,subpos) when n < List.length l ->
       at (List.nth l n) subpos
-    | At (l,r), P.Left subpos -> at l subpos
-    | At (l,r), P.Right subpos -> at r subpos
+    | At (l,_), P.Left subpos -> at l subpos
+    | At (_,r), P.Right subpos -> at r subpos
     | Multiset l, P.Arg (n,subpos) when n < List.length l ->
         at (List.nth l n) subpos
     | Record (_, Some r), P.Record_rest subpos ->
@@ -820,11 +820,11 @@ module Pos = struct
     | SimpleApp (_, l), P.Arg(n,subpos) when n < List.length l ->
         at (List.nth l n) subpos
     | _ -> invalid_arg
-      (LogtkUtil.sprintf "position %a not valid in term" P.pp pos)
+      (CCFormat.sprintf "position %a not valid in term" P.pp pos)
 
   let rec replace t pos ~by = match t.ty, view t, pos with
     | _, _, P.Stop -> by
-    | NoType, _, P.LogtkType pos' -> invalid_arg "wrong position: term has no type"
+    | NoType, _, P.LogtkType _ -> invalid_arg "wrong position: term has no type"
     | HasType ty, _, P.LogtkType pos' ->
         let ty = replace ty pos' ~by in
         cast ~ty t
@@ -861,7 +861,7 @@ module Pos = struct
           raise (Invalid_argument ("wrong position: no such record field: " ^name))
         end
     | _ -> invalid_arg
-      (LogtkUtil.sprintf "position %a not valid in term" P.pp pos)
+      (CCFormat.sprintf "position %a not valid in term" P.pp pos)
 end
 
 (* [replace t ~old ~by] syntactically replaces all occurrences of [old]
@@ -946,7 +946,7 @@ let rec _all_pos_rec f vars acc pb t = match view t with
     let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
     let acc = _all_pos_rec f vars acc (PB.head pb) hd in
     _all_pos_rec_list f vars acc pb tl 0
-  | Record (l,rest) ->
+  | Record (l,_) ->
     let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
     let _, acc = List.fold_left
       (fun (i,acc) (_, t') ->
@@ -982,110 +982,83 @@ let all_positions ?(vars=false) ?(pos=LogtkPosition.stop) t acc f =
 
 (** {3 IO} *)
 
-type print_hook = int -> (Buffer.t -> t -> unit) -> Buffer.t -> t -> bool
+type print_hook = int -> (CCFormat.t -> t -> unit) -> CCFormat.t -> t -> bool
 
 let _hooks = ref []
 let add_default_hook h = _hooks := h :: !_hooks
 
-let pp_depth ?(hooks=[]) depth buf t =
-  let rec _pp depth buf t =
-    if List.exists (fun h -> h depth (_pp depth) buf t) hooks
+let pp_depth ?(hooks=[]) depth out t =
+  let rec _pp depth out t =
+    if List.exists (fun h -> h depth (_pp depth) out t) hooks
     then () (* hook took control *)
-    else _pp_root depth buf t; _pp_ty depth buf t
-  and _pp_root depth buf t = match view t with
-  | Var i -> Printf.bprintf buf "X%d" i
-  | RigidVar i -> Printf.bprintf buf "Z%d" i
-  | BVar i -> Printf.bprintf buf "Y%d" (depth-i-1)
-  | Const s -> Sym.pp buf s
+    else _pp_root depth out t; _pp_ty depth out t
+  and _pp_root depth out t = match view t with
+  | Var i -> Format.fprintf out "X%d" i
+  | RigidVar i -> Format.fprintf out "Z%d" i
+  | BVar i -> Format.fprintf out "Y%d" (depth-i-1)
+  | Const s -> Sym.pp out s
   | Bind (s, varty, t') ->
-    Printf.bprintf buf "%a Y%d:%a. %a" Sym.pp s depth
+    Format.fprintf out "%a Y%d:%a. %a" Sym.pp s depth
       (_pp depth) varty (_pp_surrounded (depth+1)) t'
   | Record ([], None) ->
-    Buffer.add_string buf "{}"
+    CCFormat.string out "{}"
   | Record ([], Some r) ->
-    Printf.bprintf buf "{ | %a}" (_pp depth) r
+    Format.fprintf out "{ | %a}" (_pp depth) r
   | Record (l, None) ->
-    Buffer.add_char buf '{';
+    CCFormat.char out '{';
     List.iteri
       (fun i (s, t') ->
-        if i>0 then Buffer.add_string buf ", ";
-        Printf.bprintf buf "%s: " s;
-        _pp depth buf t')
+        if i>0 then CCFormat.string out ", ";
+        Format.fprintf out "%s: " s;
+        _pp depth out t')
       l;
-    Buffer.add_char buf '}'
+    CCFormat.char out '}'
   | Record (l, Some r) ->
-    Buffer.add_char buf '{';
+    CCFormat.char out '{';
     List.iteri
       (fun i (s, t') ->
-        if i>0 then Buffer.add_string buf ", ";
-        Printf.bprintf buf "%s: " s;
-        _pp depth buf t')
+        if i>0 then CCFormat.string out ", ";
+        Format.fprintf out "%s: " s;
+        _pp depth out t')
       l;
-    Printf.bprintf buf " | %a}" (_pp depth) r
+    Format.fprintf out " | %a}" (_pp depth) r
   | RecordGet (r, name) ->
-    Printf.bprintf buf "%a.%s" (_pp depth) r name
+    Format.fprintf out "%a.%s" (_pp depth) r name
   | RecordSet (r, name,sub) ->
-    Printf.bprintf buf "%a.%s <- %a" (_pp depth) r name (_pp depth) sub
+    Format.fprintf out "%a.%s <- %a" (_pp depth) r name (_pp depth) sub
   | Multiset l ->
-    Printf.bprintf buf "{| %a |}" (LogtkUtil.pp_list (_pp depth)) l
+    Format.fprintf out "{| %a |}" (CCFormat.list (_pp depth)) l
   | SimpleApp (s, [a]) when Sym.is_prefix s ->
-    Printf.bprintf buf "%a %a" Sym.pp s (_pp depth) a
+    Format.fprintf out "%a %a" Sym.pp s (_pp depth) a
   | SimpleApp (s, [a;b]) when Sym.is_infix s ->
-    Printf.bprintf buf "(%a %a %a)" (_pp depth) a Sym.pp s (_pp depth) b
+    Format.fprintf out "(%a %a %a)" (_pp depth) a Sym.pp s (_pp depth) b
   | SimpleApp (s, l) ->
-    Printf.bprintf buf "%a(%a)" Sym.pp s (LogtkUtil.pp_list (_pp depth)) l
+    Format.fprintf out "%a(%a)" Sym.pp s (CCFormat.list (_pp depth)) l
   | At (l,r) ->
-    _pp_surrounded depth buf l;
-    Buffer.add_char buf ' ';
-    _pp depth buf r
+    _pp_surrounded depth out l;
+    CCFormat.char out ' ';
+    _pp depth out r
   | App (f, l) ->
     assert (l <> []);
-    _pp_surrounded depth buf f;
+    _pp_surrounded depth out f;
     List.iter
       (fun t' ->
-        Buffer.add_char buf ' '; _pp_surrounded depth buf t')
+        CCFormat.char out ' '; _pp_surrounded depth out t')
       l
-  and _pp_ty depth buf t = match t.ty, view t with
+  and _pp_ty depth out t = match t.ty, view t with
     | HasType ty, (Var _ | BVar _) ->
-      Printf.bprintf buf ":%a" (_pp_surrounded depth) ty
+      Format.fprintf out ":%a" (_pp_surrounded depth) ty
     | _ -> ()
-  and _pp_surrounded depth buf t = match view t with
+  and _pp_surrounded depth out t = match view t with
   | Bind _
   | At _
   | App _ ->
-    Buffer.add_char buf '(';
-    _pp depth buf t;
-    Buffer.add_char buf ')'
-  | _ -> _pp depth buf t
+    CCFormat.char out '(';
+    _pp depth out t;
+    CCFormat.char out ')'
+  | _ -> _pp depth out t
   in
-  _pp depth buf t
+  _pp depth out t
 
-let pp buf t = pp_depth ~hooks:!_hooks 0 buf t
-let to_string t = LogtkUtil.on_buffer pp t
-let fmt fmt t = Format.pp_print_string fmt (to_string t)
-
-(* FIXME
-let bij =
-  let open Bij in
-  let (!!!) = Lazy.force in
-  fix
-    (fun bij ->
-      let bij_bind = lazy (triple !!!bij Sym.bij !!!bij) in
-      let bij_var = lazy (pair !!!bij int_) in
-      let bij_cst = lazy (pair !!!bij Sym.bij) in
-      let bij_at = lazy (triple !!!bij !!!bij (list_ !!!bij)) in
-      switch
-        ~inject:(fun t -> match view t with
-        | BVar i -> "bv", BranchTo (!!!bij_var, (ty t, i))
-        | Var i -> "v", BranchTo (!!!bij_var, (ty t, i))
-        | Const s -> "c", BranchTo (!!!bij_cst, (ty t, s))
-        | Bind (s, t') -> "bind", BranchTo (!!!bij_bind, (ty t, s, t'))
-        | App (t, l) -> "a", BranchTo (!!!bij_at, (ty t, t, l)))
-        ~extract:(function
-        | "bv" -> BranchFrom (!!!bij_var, fun (ty,i) -> bvar ~ty i)
-        | "v" -> BranchFrom (!!!bij_var, fun (ty,i) -> var ~ty i)
-        | "c" -> BranchFrom (!!!bij_cst, fun (ty,s) -> const ~ty s)
-        | "bind" -> BranchFrom (!!!bij_bind, fun (ty,s,t') -> bind ~ty s t')
-        | "a" -> BranchFrom (!!!bij_at, fun (ty, t, l) -> app ~ty t l)
-        | _ -> raise (DecodingError "expected Term")))
-*)
+let pp out t = pp_depth ~hooks:!_hooks 0 out t
+let to_string t = CCFormat.to_string pp t

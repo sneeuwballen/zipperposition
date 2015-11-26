@@ -294,7 +294,7 @@ module TPTP : sig
     val arith_hook : print_hook
       (** hook to print arithmetic expressions *)
 
-    val pp_debug : Buffer.t -> t -> unit
+    val pp_debug : t CCFormat.printer
       (** use arith_hook with pp_debug *)
   end
 end

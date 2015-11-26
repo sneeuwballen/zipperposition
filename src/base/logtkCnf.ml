@@ -45,7 +45,7 @@ type symbol = LogtkSymbol.t
 (* check whether the formula is already in CNF *)
 let rec is_cnf f = match F.view f with
   | F.Or l -> List.for_all is_lit l
-  | F.Not f' -> is_lit f
+  | F.Not _ -> is_lit f
   | F.True
   | F.False
   | F.Atom _
@@ -153,7 +153,7 @@ let miniscope ?(distribute_exists=false) f =
 
 (* negation normal form (also remove equivalence and implications). *)
 let rec nnf f =
-  LogtkUtil.debug ~section 5 "nnf of %a..." F.pp f;
+  LogtkUtil.debug ~section 5 "nnf of %a..." (fun k->k F.pp f);
   match F.view f with
   | F.Atom _
   | F.Neq _
@@ -179,7 +179,7 @@ let rec nnf f =
         F.Base.__mk_exists ~varty (nnf (F.Base.not_ f''))
       | F.Exists (varty, f'') ->
         F.Base.__mk_forall ~varty (nnf (F.Base.not_ f''))
-      | F.ForallTy f' ->
+      | F.ForallTy _ ->
         failwith "quantification on type variables in contravariant position"
       | F.True -> F.Base.false_
       | F.False -> F.Base.true_
@@ -230,7 +230,7 @@ let skolemize ~ctx f =
   | F.Forall (ty,f') ->
     (* remove quantifier, replace by fresh variable *)
     F.iter (LogtkSkolem.update_var ~ctx) f';
-    LogtkUtil.debug ~section 5 "type of variable: %a" LogtkType.pp ty;
+    LogtkUtil.debug ~section 5 "type of variable: %a" (fun k->k LogtkType.pp ty);
     let v = T.var ~ty (LogtkSkolem.fresh_var ~ctx) in
     let env = LogtkDBEnv.singleton (v:T.t:>ST.t) in
     let new_f' = __eval_and_unshift env f' in
@@ -278,9 +278,9 @@ module Estimation = struct
     | Exactly e', Exactly e'' -> e' >= e''
     | Exactly _, TooBig -> false
 
-  let pp buf n = match n with
-    | TooBig -> Buffer.add_string buf "<too_big>"
-    | Exactly n -> Printf.bprintf buf "%d" n
+  let pp out n = match n with
+    | TooBig -> CCFormat.string out "<too_big>"
+    | Exactly n -> CCFormat.int out n
 end
 
 (* table (formula, polarity) -> int *)
@@ -329,7 +329,8 @@ let estimate_num_clauses ~cache ~pos f =
         | F.ForallTy f', _ -> num pos f'
       in
       (* memoize *)
-      LogtkUtil.debug ~section 5 "estimated %a clauses (sign %B) for %a" E.pp n pos F.pp f;
+      LogtkUtil.debug ~section 5 "estimated %a clauses (sign %B) for %a"
+        (fun k->k E.pp n pos F.pp f);
       FPolTbl.add cache (f,pos) n;
       n
   and sum_list pos l = match l with
@@ -365,7 +366,8 @@ let introduce_defs ~ctx ~cache f =
   (* rename formula *)
   and _rename ~polarity f =
     let p = LogtkSkolem.get_definition ~ctx ~polarity f in
-    LogtkUtil.debug ~section 4 "introduce def. %a for subformula %a" F.pp p F.pp f;
+    LogtkUtil.debug ~section 4 "introduce def. %a for subformula %a"
+      (fun k->k F.pp p F.pp f);
     p
   in
   (* recurse in sub-formulas, renaming as needed.
@@ -378,7 +380,7 @@ let introduce_defs ~ctx ~cache f =
     if LogtkSkolem.has_definition ~ctx f
     then (
       let atom = LogtkSkolem.get_definition ~ctx ~polarity f in
-      LogtkUtil.debug ~section 5 "use definition %a for %a" F.pp atom F.pp f;
+      LogtkUtil.debug ~section 5 "use definition %a for %a" (fun k->k F.pp atom F.pp f);
       atom
     )
     (* depending on polarity and subformulas, do renamings.
@@ -493,7 +495,7 @@ let rec to_cnf_rec f = match F.view f with
       | F.Eq (a,b) -> [[F.Base.neq a b]]
       | F.Neq (a,b) -> [[F.Base.eq a b]]
       | _ when F.is_atomic f' ->[[f]]
-      | _ -> failwith (LogtkUtil.sprintf "should be atomic: %a" F.pp f')
+      | _ -> failwith (CCFormat.sprintf "should be atomic: %a" F.pp f')
       end
   | F.And l ->
     (* simply concat sub-CNF *)
@@ -588,7 +590,7 @@ let cnf_of_list ?(opts=[]) ?(ctx=LogtkSkolem.create LogtkSignature.empty) l =
     ~preprocess l in
   (* reduce the new formulas to CNF *)
   List.iter (fun f ->
-    LogtkUtil.debug ~section 4 "reduce %a to CNF..." F.pp f;
+    LogtkUtil.debug ~section 4 "reduce %a to CNF..." (fun k->k F.pp f);
     let clauses = if is_cnf f
       then
         match F.view f with
@@ -603,7 +605,7 @@ let cnf_of_list ?(opts=[]) ?(ctx=LogtkSkolem.create LogtkSignature.empty) l =
           | F.Eq (a,b) -> [[F.Base.neq a b]]
           | F.Neq (a,b) -> [[F.Base.eq a b]]
           | _ when F.is_atomic f' ->[[f]]
-          | _ -> failwith (LogtkUtil.sprintf "should be atomic: %a" F.pp f')
+          | _ -> failwith (CCFormat.sprintf "should be atomic: %a" F.pp f')
           end
         | F.Equiv _
         | F.Imply _
@@ -614,24 +616,24 @@ let cnf_of_list ?(opts=[]) ?(ctx=LogtkSkolem.create LogtkSignature.empty) l =
         | F.ForallTy _ -> assert false
       else begin
         let f = F.simplify f in
-        LogtkUtil.debug ~section 4 "... simplified: %a" F.pp f;
+        LogtkUtil.debug ~section 4 "... simplified: %a" (fun k->k F.pp f);
         let f = nnf f in
         (* processing post-nnf *)
         let f = List.fold_left (|>) f post_nnf in
-        LogtkUtil.debug ~section 4 "... NNF: %a" F.pp f;
+        LogtkUtil.debug ~section 4 "... NNF: %a" (fun k->k F.pp f);
         let distribute_exists = List.mem DistributeExists opts in
         let f = miniscope ~distribute_exists f in
-        LogtkUtil.debug ~section 4 "... miniscoped: %a" F.pp f;
+        LogtkUtil.debug ~section 4 "... miniscoped: %a" (fun k->k F.pp f);
         (* adjust the variable counter to [f] before skolemizing *)
         LogtkSkolem.clear_var ~ctx;
         F.iter (LogtkSkolem.update_var ~ctx) f;
         let f = skolemize ~ctx f in
         (* processing post-skolemization *)
         let f = List.fold_left (|>) f post_skolem in
-        LogtkUtil.debug ~section 4 "... skolemized: %a" F.pp f;
+        LogtkUtil.debug ~section 4 "... skolemized: %a" (fun k->k F.pp f);
         let clauses = to_cnf f in
         LogtkUtil.debug ~section 4 "... CNF: %a"
-          (LogtkUtil.pp_list ~sep:", " (LogtkUtil.pp_list ~sep:" | " F.pp)) clauses;
+          (fun k->k (CCFormat.list ~sep:", " (CCFormat.list ~sep:" | " F.pp)) clauses);
         assert (List.for_all (List.for_all F.is_closed) clauses);
         clauses
       end

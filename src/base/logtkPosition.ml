@@ -80,24 +80,18 @@ let rec append p1 p2 = match p1 with
   | Head p1' -> Head (append p1' p2)
   | Arg(i, p1') -> Arg (i,append p1' p2)
 
-let rec pp buf pos = match pos with
-  | Stop -> Buffer.add_string buf "ε"
-  | Left p' -> Buffer.add_string buf "←."; pp buf p'
-  | Right p' -> Buffer.add_string buf "→."; pp buf p'
-  | LogtkType p' -> Buffer.add_string buf "τ."; pp buf p'
+let rec pp out pos = match pos with
+  | Stop -> CCFormat.string out "ε"
+  | Left p' -> CCFormat.string out "←."; pp out p'
+  | Right p' -> CCFormat.string out "→."; pp out p'
+  | LogtkType p' -> CCFormat.string out "τ."; pp out p'
   | Record_field (name,p') ->
-    Printf.bprintf buf "{%s}." name; pp buf p'
-  | Record_rest p' -> Buffer.add_string buf "{|}."; pp buf p'
-  | Head p' -> Buffer.add_string buf "@."; pp buf p'
-  | Arg (i,p') -> Printf.bprintf buf "%d." i; pp buf p'
+    Format.fprintf out "{%s}." name; pp out p'
+  | Record_rest p' -> CCFormat.string out "{|}."; pp out p'
+  | Head p' -> CCFormat.string out "@."; pp out p'
+  | Arg (i,p') -> Format.fprintf out "%d." i; pp out p'
 
-let to_string pos =
-  let b = Buffer.create 16 in
-  pp b pos;
-  Buffer.contents b
-
-let fmt fmt pos =
-  Format.pp_print_string fmt (to_string pos)
+let to_string = CCFormat.to_string pp
 
 (** {2 LogtkPosition builder}
 
@@ -112,11 +106,11 @@ module Build = struct
 
   let empty = E
 
-  let of_pos p = P (p, E) 
+  let of_pos p = P (p, E)
 
   (* how to apply a difference list to a tail list *)
   let rec __apply tail b = match b with
-    | E -> tail 
+    | E -> tail
     | P (pos0,b') -> __apply (append pos0 tail) b'
     | N (f, b') -> __apply (f tail) b'
 
@@ -139,6 +133,6 @@ module Build = struct
   let head b = N(head, b)
   let arg i b = N(arg i, b)
 
-  let pp buf t = pp buf (to_pos t)
-  let fmt formatter t = fmt formatter (to_pos t)
+  let pp out t = pp out (to_pos t)
+  let to_string t = to_string (to_pos t)
 end

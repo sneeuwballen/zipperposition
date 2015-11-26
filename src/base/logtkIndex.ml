@@ -173,7 +173,7 @@ module type TERM_IDX = sig
                                   t -> scope -> term -> scope -> 'a ->
                                  ('a -> term -> elt -> subst -> 'a) -> 'a
 
-  val to_dot : (Buffer.t -> elt -> unit) -> Buffer.t -> t -> unit
+  val to_dot : elt CCFormat.printer -> t CCFormat.printer
     (** print oneself in DOT into the given file *)
 end
 
@@ -288,7 +288,7 @@ module type UNIT_IDX = sig
           such that subst(l, si) = t.
           It therefore finds generalizations of the query term. *)
 
-  val to_dot : Buffer.t -> t -> unit
+  val to_dot : t CCFormat.printer
     (** print the index in the DOT format *)
 end
 

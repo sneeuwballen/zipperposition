@@ -80,14 +80,14 @@ end
 let to_list trs = Seq.to_seq trs |> Sequence.to_rev_list
 let of_list l = Sequence.of_list l |> Seq.of_seq empty
 
-let pp buf t =
-  Printf.bprintf buf
-  "rewriting{%a}"
-    (LogtkUtil.pp_seq ~sep:"; " (LogtkUtil.pp_pair ~sep:" --> " T.pp T.pp))
+let pp out t =
+  Format.fprintf out
+  "rewriting{@,@[%a@]@,}"
+    (CCFormat.seq ~sep:"; "
+      (fun out (t1, t2) -> Format.fprintf out "%a --> %a" T.pp t1 T.pp t2))
     (Seq.to_seq t)
 
-let to_string = LogtkUtil.on_buffer pp
-let fmt fmt s = Format.pp_print_string fmt (to_string s)
+let to_string = CCFormat.to_string pp
 
 (** {2 Normalize} *)
 

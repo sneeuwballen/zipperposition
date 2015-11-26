@@ -126,40 +126,19 @@ let set_debug = Section.set_debug Section.root
 let get_debug () = Section.root.Section.level
 let need_cleanup = ref false
 
-let debug_buf_ = Buffer.create 32 (* shared buffer (not thread safe)  *)
 let debug_fmt_ = Format.std_formatter
 
-let debug ?(section=Section.root) l format =
-  if l <= Section.cur_level section
-    then (
-      Buffer.clear debug_buf_;
-      if !need_cleanup then clear_line ();
-      (* print header *)
-      let now = get_total_time () in
-      if section == Section.root
-        then Printf.bprintf debug_buf_ "%% [%.3f] " now
-        else Printf.bprintf debug_buf_ "%% [%.3f %s] "
-          now section.Section.full_name;
-      Printf.kbprintf
-        (fun b -> Buffer.output_buffer stdout b; print_char '\n'; flush stdout)
-        debug_buf_ format)
-    else
-      Printf.ifprintf debug_buf_ format
-
-let debugf ?(section=Section.root) l msg =
-  if l <= Section.cur_level section
-    then (
-      let now = get_total_time () in
-      if section == Section.root
-        then Format.fprintf debug_fmt_ "@[<hov>%% [%.3f] " now
-        else Format.fprintf debug_fmt_ "@[<hov>%% [%.3f %s] "
-          now section.Section.full_name;
-        Format.kfprintf
+let debug ?(section=Section.root) l msg k =
+  if l <= Section.cur_level section then (
+    let now = get_total_time () in
+    if section == Section.root
+      then Format.fprintf debug_fmt_ "@[<hov>%.3f[]@ " now
+      else Format.fprintf debug_fmt_ "@[<hov>%.3f[%s]@ "
+        now section.Section.full_name;
+      k (Format.kfprintf
           (fun fmt -> Format.fprintf fmt "@]@.")
-          debug_fmt_ msg
+          debug_fmt_ msg)
     )
-    else
-      Format.ifprintf debug_fmt_ msg
 
 let pp_pos pos =
   let open Lexing in
@@ -169,14 +148,14 @@ external set_memory_limit_stub : int -> unit = "logtk_set_memory_limit"
 
 let set_memory_limit n =
   if n <= 0 then invalid_arg "set_memory_limit: expect positive arg";
-  debug 1 "limit memory to %d MB" n;
+  debug 1 "limit memory to %d MB" (fun k-> k n);
   set_memory_limit_stub n
 
 external set_time_limit_stub : int -> unit = "logtk_set_time_limit"
 
 let set_time_limit n =
   if n <= 0 then invalid_arg "set_time_limit: expect positive arg";
-  debug 1 "limit time to %ds" n;
+  debug 1 "limit time to %ds" (fun k->k n);
   set_time_limit_stub n
 
 module Exn = struct
@@ -278,7 +257,9 @@ let () =
 
 (** {2 Runtime statistics} *)
 
-type stat = string * int64 ref 
+(* TODO cleanup, make hierarchic *)
+
+type stat = string * int64 ref
 
 let mk_stat, print_global_stats =
   let stats = ref [] in
@@ -292,7 +273,7 @@ let mk_stat, print_global_stats =
     let stats = List.sort (fun (n1,_)(n2,_) -> String.compare n1 n2) !stats in
     List.iter
       (fun (name, cnt) ->
-        debug 0 "stat: %-30s ... %s" name (Int64.to_string !cnt))
+        debug 0 "stat: %-30s ... %Ld" (fun k -> k name !cnt))
       stats)
 
 let incr_stat (_, count) = count := Int64.add !count Int64.one  (** increment given statistics *)
@@ -307,151 +288,23 @@ module Flag = struct
 
   let get_new gen =
     let n = !gen in
-    if n < 0 then failwith "LogtkUtil.Flag.get_new: too many flags allocated";
+    if n < 0 then failwith "Flag.get_new: too many flags allocated";
     gen := 2*n;
     n
 end
 
-(** {2 LogtkOrdering utils} *)
-
-let rec lexicograph f l1 l2 =
-  match l1, l2 with
-  | [], [] -> 0
-  | x::xs, y::ys ->
-     let c = f x y in
-     if c <> 0 then c else lexicograph f xs ys
-  | [],_ -> (-1)
-  | _,[] -> 1
-
-(** combine comparisons by lexicographic order *)
-let rec lexicograph_combine l = match l with
-  | [] -> 0
-  | cmp::l' -> if cmp = 0 then lexicograph_combine l' else cmp
-
-let opposite_order ord a b = - (ord a b)
-
-(** {2 String utils} *)
-
-let str_sub ~sub i s j =
-  let rec check k =
-    if i + k = String.length sub
-      then true
-      else sub.[i + k] = s.[j+k] && check (k+1)
-  in
-  check 0
-
-(* note: quite inefficient *)
-let str_split ~by s =
-  let len_by = String.length by in
-  assert (len_by > 0);
-  let l = ref [] in
-  let n = String.length s in
-  let rec search prev i =
-    if i >= n
-      then List.rev (String.sub s prev (n-prev) :: !l)  (* done *)
-    else if is_prefix i 0
-      then begin
-        l := (String.sub s prev (i-prev)) :: !l;  (* save substring *)
-        search (i+len_by) (i+len_by)
-      end
-    else search prev (i+1)
-  and is_prefix i j =
-    if j = len_by
-      then true
-    else if i = n
-      then false
-    else s.[i] = by.[j] && is_prefix (i+1) (j+1)
-  in search 0 0
-
-(* note: inefficient *)
-let str_find ?(start=0) ~sub s =
-  let n = String.length sub in
-  let i = ref start in
-  try
-    while !i + n < String.length s do
-      (if str_sub sub 0 s !i then raise Exit);
-      incr i
-    done;
-    -1
-  with Exit ->
-    !i
-
-let str_repeat s n =
-  assert (n>=0);
-  let len = String.length s in
-  assert(len > 0);
-  let buf = Bytes.init (len*n) (fun i -> s.[i mod len]) in
-  Bytes.unsafe_to_string buf
-
-let str_prefix ~pre s =
-  String.length pre <= String.length s &&
-  (let i = ref 0 in
-    while !i < String.length pre && s.[!i] = pre.[!i] do incr i done;
-    !i = String.length pre)
-
 (** {2 Exceptions} *)
 
-let finally ~h ~f =
+let finally ~do_ f =
   try
     let x = f () in
-    h ();
+    do_ ();
     x
   with e ->
-    h ();
+    do_ ();
     raise e
 
 (** {2 File utils} *)
-
-let with_lock_file filename action =
-  let lock_file = Unix.openfile filename [Unix.O_CREAT; Unix.O_WRONLY] 0o644 in
-  Unix.lockf lock_file Unix.F_LOCK 0;
-  try
-    let x = action () in
-    Unix.lockf lock_file Unix.F_ULOCK 0;
-    Unix.close lock_file;
-    x
-  with e ->
-    Unix.lockf lock_file Unix.F_ULOCK 0;
-    Unix.close lock_file;
-    raise e
-
-let with_input filename action =
-  try
-    let ic = open_in filename in
-    (try
-      let res = Some (action ic) in
-      close_in ic;
-      res
-    with Sys_error _ ->
-      close_in ic;
-      None)
-  with Sys_error _ ->
-    None
-
-let with_output filename action =
-  try
-    let oc = open_out filename in
-    (try
-      let res = Some (action oc) in
-      close_out oc;
-      res
-    with Sys_error s ->
-      close_out oc;
-      None)
-  with Sys_error s ->
-    None
-
-(** slurp the entire content of the file_descr into a string *)
-let slurp i_chan =
-  let buf_size = 128 in
-  let content = Buffer.create 120
-  and buf = String.make 128 'a' in
-  let rec next () =
-    let num = input i_chan buf 0 buf_size in
-    if num = 0
-      then Buffer.contents content (* EOF *)
-      else (Buffer.add_substring content buf 0 num; next ())
-  in next ()
 
 type 'a or_error = [`Error of string | `Ok of 'a]
 
@@ -463,74 +316,10 @@ let popen ~cmd ~input =
     output_string into input;
     close_out into;
     (* read ouput from the subprocess *)
-    let output = slurp from in
+    let output = CCIO.read_all from in
     (* wait for subprocess to terminate *)
     ignore (Unix.close_process (from, into));
     CCError.return output
   with Unix.Unix_error (e, _, _) ->
     let msg = Unix.error_message e in
     CCError.fail msg
-
-(** {2 Printing utils} *)
-
-let sprintf format =
-  let buffer = Buffer.create 64 in
-  Printf.kbprintf
-    (fun fmt -> Buffer.contents buffer)
-    buffer
-    format
-
-let fprintf oc format =
-  let buffer = Buffer.create 64 in
-  Printf.kbprintf
-    (fun fmt -> Buffer.output_buffer oc buffer)
-  buffer
-  format
-
-let printf format = fprintf stdout format
-let eprintf format = fprintf stderr format
-
-let on_buffer pp x =
-  let buf = Buffer.create 24 in
-  pp buf x;
-  Buffer.contents buf
-
-let pp_pair ?(sep=" ") px py buf (x,y) =
-  px buf x;
-  Buffer.add_string buf sep;
-  py buf y
-
-let pp_opt pp buf x = match x with
-  | None -> Buffer.add_string buf "None"
-  | Some x -> Printf.bprintf buf "Some %a" pp x
-
-(** print a list of items using the printing function *)
-let rec pp_list ?(sep=", ") pp_item buf = function
-  | x::((y::xs) as l) ->
-    pp_item buf x;
-    Buffer.add_string buf sep;
-    pp_list ~sep pp_item buf l
-  | x::[] -> pp_item buf x
-  | [] -> ()
-
-(** print an array of items using the printing function *)
-let pp_array ?(sep=", ") pp_item buf a =
-  for i = 0 to Array.length a - 1 do
-    (if i > 0 then Buffer.add_string buf sep);
-    pp_item buf a.(i)
-  done
-
-(** print an array of items using the printing function *)
-let pp_arrayi ?(sep=", ") pp_item buf a =
-  for i = 0 to Array.length a - 1 do
-    (if i > 0 then Buffer.add_string buf sep);
-    pp_item buf i a.(i)
-  done
-
-(** Print the sequence *)
-let pp_seq ?(sep=", ") pp_item buf seq =
-  Sequence.iteri
-    (fun i x ->
-      (if i > 0 then Buffer.add_string buf sep);
-      pp_item buf x)
-    seq

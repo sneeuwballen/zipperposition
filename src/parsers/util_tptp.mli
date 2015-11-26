@@ -58,9 +58,8 @@ val parse_file : recursive:bool -> string ->
 module type S = sig
   module A : Ast_tptp.S
 
-  val print_into : out_channel -> A.t Sequence.t -> unit
+  val print_into : A.t Sequence.t CCFormat.printer
   val print_into_file : string -> A.t Sequence.t -> unit
-  val print_into_buf : Buffer.t -> A.t Sequence.t -> unit
 
   val has_includes : A.t Sequence.t -> bool
     (** Check whether some include declaration can be found in the sequence *)

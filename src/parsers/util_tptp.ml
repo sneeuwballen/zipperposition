@@ -50,7 +50,7 @@ let find_file name dir =
   (* search in [dir], and its parents recursively *)
   let rec search dir =
     let cur_name = Filename.concat dir name in
-    Util.debug 2 "search %s as %s" name cur_name;
+    Util.debug 2 "search %s as %s" (fun k->k name cur_name);
     if file_exists cur_name
     then Some cur_name
     else
@@ -167,9 +167,8 @@ let parse_file ~recursive f =
 module type S = sig
   module A : Ast_tptp.S
 
-  val print_into : out_channel -> A.t Sequence.t -> unit
+  val print_into : A.t Sequence.t CCFormat.printer
   val print_into_file : string -> A.t Sequence.t -> unit
-  val print_into_buf : Buffer.t -> A.t Sequence.t -> unit
 
   val has_includes : A.t Sequence.t -> bool
     (** Check whether some include declaration can be found in the sequence *)
@@ -202,23 +201,20 @@ module Untyped = struct
   module A = Ast_tptp.Untyped
   let print_into oc decls =
     Sequence.iter
-      (fun decl -> Util.fprintf oc "%a\n" AU.pp decl)
+      (fun decl -> Format.fprintf oc "%a\n" AU.pp decl)
       decls;
-    flush oc
+    Format.pp_print_flush oc ()
 
   let print_into_file filename decls =
     let oc = open_out filename in
+    let out = Format.formatter_of_out_channel oc in
     try
-      print_into oc decls;
+      print_into out decls;
+      Format.pp_print_flush out ();
       close_out oc
     with e ->
       close_out oc;
       raise e
-
-  let print_into_buf buf decls =
-    Sequence.iter
-      (fun decl -> Printf.bprintf buf "%a\n" AU.pp decl)
-      decls
 
   let has_includes decls =
     Sequence.exists
@@ -293,7 +289,7 @@ module Untyped = struct
     Sequence.fold a#visit Signature.empty decls
 
   let __name_symbol i sy =
-    let str = Util.sprintf "'ty_decl_%d_%s'" i sy in
+    let str = CCFormat.sprintf "'ty_decl_%d_%s'" i sy in
     Ast.NameString str
 
   let declare_symbols ?(name=__name_symbol) signature =
@@ -312,23 +308,20 @@ module Typed = struct
 
   let print_into oc decls =
     Sequence.iter
-      (fun decl -> Util.fprintf oc "%a\n" AT.pp decl)
+      (fun decl -> Format.fprintf oc "%a\n" AT.pp decl)
       decls;
-    flush oc
+    Format.pp_print_flush oc ()
 
   let print_into_file filename decls =
     let oc = open_out filename in
+    let out = Format.formatter_of_out_channel oc in
     try
-      print_into oc decls;
+      print_into out decls;
+      Format.pp_print_flush out ();
       close_out oc
     with e ->
       close_out oc;
       raise e
-
-  let print_into_buf buf decls =
-    Sequence.iter
-      (fun decl -> Printf.bprintf buf "%a\n" AT.pp decl)
-      decls
 
   let has_includes decls =
     Sequence.exists
@@ -399,7 +392,7 @@ module Typed = struct
     Sequence.fold a#visit Signature.empty decls
 
   let __name_symbol i sy =
-    let str = Util.sprintf "'ty_decl_%d_%s'" i sy in
+    let str = CCFormat.sprintf "'ty_decl_%d_%s'" i sy in
     Ast.NameString str
 
   let declare_symbols ?(name=__name_symbol) signature =
@@ -424,7 +417,7 @@ let infer_types init decls =
   try
     let s = Sequence.map
       (fun decl ->
-        Util.debug 3 "infer type for %a" AU.pp decl;
+        Util.debug 3 "infer type for %a" (fun k->k AU.pp decl);
         match decl with
         | AU.Include f -> AT.Include f
         | AU.IncludeOnly (f,l) -> AT.IncludeOnly (f,l)
@@ -505,7 +498,7 @@ let erase_types typed =
       | AT.TFF(n,r,f,i) ->
           let f' = F.to_prolog f in
           AU.TFF(n,r,f',i)
-      | AT.THF(n,r,f,i) ->
+      | AT.THF _ ->
           failwith "type conversion for HO Term: not implemented" (* TODO *)
     ) typed
 

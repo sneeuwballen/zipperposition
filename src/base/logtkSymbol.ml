@@ -133,9 +133,7 @@ let to_string s = match s with
       | TType -> "TType"
       end
 
-let pp buf s = Buffer.add_string buf (to_string s)
-
-let fmt fmt s = Format.pp_print_string fmt (to_string s)
+let pp out s = Format.pp_print_string out (to_string s)
 
 let is_prefix = function
   | Conn (Not | LiftType) -> true
@@ -146,7 +144,7 @@ let is_infix = function
   | Conn (And | Or | Imply | Equiv
          | Xor | Eq | Neq | HasType | Arrow) -> true
   | Conn _ | Int _ | Rat _ -> false
-  | Cst {cs_name=s} ->
+  | Cst {cs_name=s; _} ->
     Sequence.of_str s
     |> Sequence.for_all
       (function
@@ -244,12 +242,12 @@ let gensym =
     mk_const (prefix ^ string_of_int n')
 
 module TPTP = struct
-  let pp buf = function
-    | Cst s -> Buffer.add_string buf s.cs_name
-    | Int i -> Buffer.add_string buf (Z.to_string i)
-    | Rat n -> Buffer.add_string buf (Q.to_string n)
+  let pp out = function
+    | Cst s -> CCFormat.string out s.cs_name
+    | Int i -> CCFormat.string out (Z.to_string i)
+    | Rat n -> CCFormat.string out (Q.to_string n)
     | Conn o ->
-        Buffer.add_string buf (match o with
+        CCFormat.string out (match o with
           | Eq -> "="
           | Neq -> "!="
           | And -> "&"
@@ -273,8 +271,7 @@ module TPTP = struct
           | FreshVar _ -> failwith "cannot print this symbol in TPTP"
       )
 
-  let to_string = LogtkUtil.on_buffer pp
-  let fmt fmt s = Format.pp_print_string fmt (to_string s)
+  let to_string = CCFormat.to_string pp
 
   let i = mk_const "$i"
   let o = mk_const "$o"
@@ -350,11 +347,7 @@ module ArithOp = struct
 
   (* helper to raise errors *)
   let _ty_mismatch fmt =
-    let buf = Buffer.create 32 in
-    Printf.kbprintf
-      (fun _ -> raise (LogtkTypeMismatch (Buffer.contents buf)))
-      buf
-      fmt
+    CCFormat.ksprintf ~f:(fun msg -> raise (LogtkTypeMismatch  msg)) fmt
 
   let sign = function
     | Int n -> Z.sign n
@@ -412,18 +405,18 @@ module ArithOp = struct
 
   let ceiling s = match s with
   | Int _ -> s
-  | Rat n -> failwith "Q.ceiling: not implemented" (* TODO *)
+  | Rat _ -> failwith "Q.ceiling: not implemented" (* TODO *)
   | s -> _ty_mismatch "not a numeric constant: %a" pp s
 
   let truncate s = match s with
   | Int _ -> s
   | Rat n when Q.sign n >= 0 -> mk_int (Q.to_bigint n)
-  | Rat n -> failwith "Q.truncate: not implemented" (* TODO *)
+  | Rat _ -> failwith "Q.truncate: not implemented" (* TODO *)
   | s -> _ty_mismatch "not a numeric constant: %a" pp s
 
   let round s = match s with
   | Int _ -> s
-  | Rat n -> failwith "Q.round: not implemented" (* TODO *)
+  | Rat _ -> failwith "Q.round: not implemented" (* TODO *)
   | s -> _ty_mismatch "not a numeric constant: %a" pp s
 
   let prec s = match s with

@@ -86,14 +86,14 @@ let open_app t =
 module Classic = struct
   let rec _drop_types l = match l with
     | [] -> []
-    | t::l' when LogtkType.is_type t -> _drop_types l
+    | t::l' when LogtkType.is_type t -> _drop_types l'
     | _::_ -> l
 
   type view =
-  | Var of int
-  | BVar of int
-  | App of symbol * LogtkType.t list * t list  (** covers Const and App *)
-  | NonFO   (* any other case *)
+    | Var of int
+    | BVar of int
+    | App of symbol * LogtkType.t list * t list  (** covers Const and App *)
+    | NonFO   (* any other case *)
 
   let view t =
     let hd, tyargs, l = open_app t in
@@ -398,7 +398,7 @@ let rec _all_pos_rec f vars acc pb t =
   | Var _ | BVar _ ->
     if vars then f acc t (PB.to_pos pb) else acc
   | Const _ -> f acc t (PB.to_pos pb)
-  | TyApp (l, _) -> f acc t (PB.to_pos pb)
+  | TyApp (_, _) -> f acc t (PB.to_pos pb)
   | App (_, tl) ->
     let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
     _all_pos_rec_list f vars acc pb tl 0
@@ -487,8 +487,11 @@ let to_prolog ?(depth=0) t =
   let rec to_prolog t =
     let ty = ty t in
     match view t with
-    | Var i -> PT.column (PT.var (LogtkUtil.sprintf "X%d" i)) (LogtkType.Conv.to_prolog ~depth ty)
-    | BVar i -> PT.var (LogtkUtil.sprintf "Y%d" (depth-i-1))
+    | Var i ->
+        PT.column
+          (PT.var (CCFormat.sprintf "X%d" i))
+          (LogtkType.Conv.to_prolog ~depth ty)
+    | BVar i -> PT.var (CCFormat.sprintf "Y%d" (depth-i-1))
     | TyApp _
     | App _ -> gather_left [] t
     | Const f -> PT.const f
@@ -502,62 +505,60 @@ let to_prolog ?(depth=0) t =
 
 let print_all_types = ref false
 
-type print_hook = int -> (Buffer.t -> t -> unit) -> Buffer.t -> t -> bool
+type print_hook = int -> (CCFormat.t -> t -> unit) -> CCFormat.t -> t -> bool
 
 (* lightweight printing *)
-let pp_depth ?(hooks=[]) depth buf t =
+let pp_depth ?(hooks=[]) depth out t =
   let depth = ref depth in
   (* recursive printing *)
-  let rec pp_rec buf t =
-    if not (List.exists (fun hook -> hook !depth pp_rec buf t) hooks)
+  let rec pp_rec out t =
+    if not (List.exists (fun hook -> hook !depth pp_rec out t) hooks)
     then begin match view t with
-    | BVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
+    | BVar i -> Format.fprintf out "Y%d" (!depth - i - 1)
     | TyApp (f, ty) ->
-        pp_rec buf f;
-        Buffer.add_char buf ' ';
-        LogtkType.pp_depth !depth buf ty
+        pp_rec out f;
+        CCFormat.char out ' ';
+        LogtkType.pp_depth !depth out ty
     | App (f, args) ->
         assert (args <> []);
-        pp_rec buf f;
-        Buffer.add_char buf ' ';
-        LogtkUtil.pp_list ~sep:" " pp_inner buf args
-    | Const s -> LogtkSymbol.pp buf s
+        Format.fprintf out
+          "@[<2>%a@ %a@]" pp_rec f
+            (CCFormat.list ~start:"" ~stop:"" ~sep:" " pp_inner) args
+    | Const s -> LogtkSymbol.pp out s
     | Var i ->
       if not !print_all_types && not (LogtkType.eq (ty t) LogtkType.TPTP.i)
-        then Printf.bprintf buf "X%d:%a" i (LogtkType.pp_depth !depth) (ty t)
-        else Printf.bprintf buf "X%d" i
+        then Format.fprintf out "@[X%d:%a@]" i (LogtkType.pp_depth !depth) (ty t)
+        else Format.fprintf out "X%d" i
     end;
     (* print type of term? *)
     if !print_all_types
-      then Printf.bprintf buf ":%a" (LogtkType.pp_depth !depth) (ty t)
-  and pp_inner buf t = match view t with
+      then Format.fprintf out ":%a" (LogtkType.pp_depth !depth) (ty t)
+  and pp_inner out t = match view t with
     | TyApp _
-    | App _ -> Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
-    | _ -> pp_rec buf t
+    | App _ -> CCFormat.char out '('; pp_rec out t; CCFormat.char out ')'
+    | _ -> pp_rec out t
   in
-  pp_rec buf t
+  pp_rec out t
 
 let __hooks = ref []
 let add_hook h = __hooks := h :: !__hooks
 let default_hooks () = !__hooks
 
-let pp buf t = pp_depth ~hooks:!__hooks 0 buf t
+let pp out t = pp_depth ~hooks:!__hooks 0 out t
 
-let to_string = LogtkUtil.on_buffer pp
+let to_string = CCFormat.to_string pp
 
-let fmt fmt t = Format.pp_print_string fmt (to_string t)
-
-let rec debug fmt t =
+let rec debug out t =
   begin match view t with
-  | Var i -> Format.fprintf fmt "X%d" i
-  | BVar i -> Format.fprintf fmt "Y%d" i
-  | Const s -> LogtkSymbol.fmt fmt s
+  | Var i -> Format.fprintf out "X%d" i
+  | BVar i -> Format.fprintf out "Y%d" i
+  | Const s -> LogtkSymbol.pp out s
   | TyApp (f, ty) ->
-    Format.fprintf fmt "(%a %a)" debug f LogtkType.fmt ty
+    Format.fprintf out "(%a %a)" debug f LogtkType.pp ty
   | App (s, l) ->
-    Format.fprintf fmt "(%a %a)" debug s (CCList.print debug) l
+    Format.fprintf out "(%a %a)" debug s (CCFormat.list debug) l
   end;
-  Format.fprintf fmt ":%a" LogtkType.fmt (ty t)
+  Format.fprintf out ":%a" LogtkType.pp (ty t)
 
 (** {2 TPTP} *)
 
@@ -565,38 +566,38 @@ module TPTP = struct
   let true_ = const ~ty:LogtkType.TPTP.o LogtkSymbol.Base.true_
   let false_ = const ~ty:LogtkType.TPTP.o LogtkSymbol.Base.false_
 
-  let pp_depth ?(hooks=[]) depth buf t =
+  let pp_depth ?hooks:_ depth out t =
     let depth = ref depth in
     (* recursive printing *)
-    let rec pp_rec buf t = match view t with
+    let rec pp_rec out t = match view t with
     | BVar i ->
-        Printf.bprintf buf "Y%d" (!depth - i - 1);
+        Format.fprintf out "Y%d" (!depth - i - 1);
         (* print type of term *)
         if !print_all_types || not (LogtkType.eq (ty t) LogtkType.TPTP.i)
-          then Printf.bprintf buf ":%a" (LogtkType.TPTP.pp_depth !depth) (ty t)
-    | Const s -> LogtkSymbol.TPTP.pp buf s
+          then Format.fprintf out ":%a" (LogtkType.TPTP.pp_depth !depth) (ty t)
+    | Const s -> LogtkSymbol.TPTP.pp out s
     | App _
     | TyApp _ ->
         let f, tyargs, args = open_app t in
-        Printf.bprintf buf "%a(" pp_rec f;
-        LogtkUtil.pp_list (LogtkType.TPTP.pp_depth !depth) buf tyargs;
+        Format.fprintf out "@[<2>%a(@," pp_rec f;
+        CCFormat.list ~start:"" ~stop:"" ~sep:", "
+          (LogtkType.TPTP.pp_depth !depth) out tyargs;
         begin match tyargs, args with
-          | _::_, _::_ -> Buffer.add_string buf ", "
+          | _::_, _::_ -> CCFormat.string out ", "
           | _ -> ();
         end;
-        LogtkUtil.pp_list pp_rec buf args;
-        Buffer.add_string buf ")"
+        CCFormat.list ~start:"" ~stop:"" ~sep:"," pp_rec out args;
+        CCFormat.fprintf out ")@]"
     | Var i ->
-        Printf.bprintf buf "X%d" i;
+        Format.fprintf out "X%d" i;
         (* print type of term *)
         if !print_all_types || not (LogtkType.eq (ty t) LogtkType.TPTP.i)
-          then Printf.bprintf buf ":%a" (LogtkType.TPTP.pp_depth !depth) (ty t)
+          then Format.fprintf out ":%a" (LogtkType.TPTP.pp_depth !depth) (ty t)
     in
-    pp_rec buf t
+    pp_rec out t
 
   let pp buf t = pp_depth 0 buf t
-  let to_string = LogtkUtil.on_buffer pp
-  let fmt fmt t = Format.pp_print_string fmt (to_string t)
+  let to_string = CCFormat.to_string pp
 
   module Arith = struct
     let term_pp_depth = pp_depth
@@ -639,7 +640,7 @@ module TPTP = struct
     let greatereq = const ~ty:ty2o LogtkSymbol.TPTP.Arith.greatereq
 
     (* hook that prints arithmetic expressions *)
-    let arith_hook depth pp_rec buf t =
+    let arith_hook _depth pp_rec out t =
       let module SA = LogtkSymbol.TPTP.Arith in
       let pp_surrounded buf t = match Classic.view t with
       | Classic.App (s, _, [_;_]) when
@@ -647,64 +648,41 @@ module TPTP = struct
         LogtkSymbol.eq s SA.product ||
         LogtkSymbol.eq s SA.difference ||
         LogtkSymbol.eq s SA.quotient ->
-        Buffer.add_char buf '(';
+        CCFormat.char buf '(';
         pp_rec buf t;
-        Buffer.add_char buf ')'
+        CCFormat.char buf ')'
       | _ -> pp_rec buf t
       in
       match Classic.view t with
       | Classic.Var i when LogtkType.eq (ty t) LogtkType.TPTP.int ->
-        Printf.bprintf buf "I%d" i; true
+        Format.fprintf out "I%d" i; true
       | Classic.Var i when LogtkType.eq (ty t) LogtkType.TPTP.rat ->
-        Printf.bprintf buf "Q%d" i; true
+        Format.fprintf out "Q%d" i; true
       | Classic.App (s, _,[a; b]) when LogtkSymbol.eq s SA.less ->
-        Printf.bprintf buf "%a < %a" pp_surrounded a pp_surrounded b; true
+        Format.fprintf out "%a < %a" pp_surrounded a pp_surrounded b; true
       | Classic.App (s, _,[a; b]) when LogtkSymbol.eq s SA.lesseq ->
-        Printf.bprintf buf "%a ≤ %a" pp_surrounded a pp_surrounded b; true
+        Format.fprintf out "%a ≤ %a" pp_surrounded a pp_surrounded b; true
       | Classic.App (s, _,[a; b]) when LogtkSymbol.eq s SA.greater ->
-        Printf.bprintf buf "%a > %a" pp_surrounded a pp_surrounded b; true
+        Format.fprintf out "%a > %a" pp_surrounded a pp_surrounded b; true
       | Classic.App (s, _,[a; b]) when LogtkSymbol.eq s SA.greatereq ->
-        Printf.bprintf buf "%a ≥ %a" pp_surrounded a pp_surrounded b; true
+        Format.fprintf out "%a ≥ %a" pp_surrounded a pp_surrounded b; true
       | Classic.App (s, _,[a; b]) when LogtkSymbol.eq s SA.sum ->
-        Printf.bprintf buf "%a + %a" pp_surrounded a pp_surrounded b; true
+        Format.fprintf out "%a + %a" pp_surrounded a pp_surrounded b; true
       | Classic.App (s, _,[a; b]) when LogtkSymbol.eq s SA.difference ->
-        Printf.bprintf buf "%a - %a" pp_surrounded a pp_surrounded b; true
+        Format.fprintf out "%a - %a" pp_surrounded a pp_surrounded b; true
       | Classic.App (s, _,[a; b]) when LogtkSymbol.eq s SA.product ->
-        Printf.bprintf buf "%a × %a" pp_surrounded a pp_surrounded b; true
+        Format.fprintf out "%a × %a" pp_surrounded a pp_surrounded b; true
       | Classic.App (s, _,[a; b]) when LogtkSymbol.eq s SA.quotient ->
-        Printf.bprintf buf "%a / %a" pp_surrounded a pp_surrounded b; true
+        Format.fprintf out "%a / %a" pp_surrounded a pp_surrounded b; true
       | Classic.App (s, _,[a; b]) when LogtkSymbol.eq s SA.quotient_e ->
-        Printf.bprintf buf "%a // %a" pp_surrounded a pp_surrounded b; true
+        Format.fprintf out "%a // %a" pp_surrounded a pp_surrounded b; true
       | Classic.App (s, _,[a]) when LogtkSymbol.eq s SA.uminus ->
-        Printf.bprintf buf "-%a" pp_surrounded a; true;
+        Format.fprintf out "-%a" pp_surrounded a; true;
       | Classic.App (s, _,[a;b]) when LogtkSymbol.eq s SA.remainder_e ->
-        Printf.bprintf buf "%a mod %a" pp_surrounded a pp_surrounded b; true;
+        Format.fprintf out "%a mod %a" pp_surrounded a pp_surrounded b; true;
       | _ -> false  (* default *)
 
     let pp_debug buf t =
       term_pp_depth ~hooks:(arith_hook:: !__hooks) 0 buf t
   end
 end
-
-(** {2 Misc} *)
-
-
-(*
-let bij =
-  let open Bij in
-  let (!!!) = Lazy.force in
-  fix
-    (fun bij ->
-      let bij_node = lazy (triple LogtkSymbol.bij (list_ LogtkType.bij) (list_ !!!bij)) in
-      let bij_var = pair int_ LogtkType.bij in
-      switch
-        ~inject:(fun t -> match t.term with
-        | BoundVar i -> "bv", BranchTo (bij_var, (i,t.ty))
-        | Var i -> "v", BranchTo (bij_var, (i, t.ty))
-        | Node (s, tyargs, l) -> "n", BranchTo (!!!bij_node, (s, tyargs, l)))
-        ~extract:(function
-        | "bv" -> BranchFrom (bij_var, fun (i,ty) -> __mk_bound_var ~ty i)
-        | "v" -> BranchFrom (bij_var, fun (i,ty) -> mk_var ~ty i)
-        | "n" -> BranchFrom (!!!bij_node, fun (s,tyargs,l) -> mk_node ~tyargs s l)
-        | _ -> raise (DecodingError "expected Term")))
-*)

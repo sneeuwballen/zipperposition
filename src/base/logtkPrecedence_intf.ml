@@ -69,11 +69,9 @@ module type S = sig
     val symbols : t -> symbol Sequence.t
   end
 
-  val pp_snapshot : Buffer.t -> symbol list -> unit
-  val pp_debug : Buffer.t -> t -> unit
-  val pp : Buffer.t -> t -> unit
-  val fmt : Format.formatter -> t -> unit
-  val to_string : t -> string
+  val pp_snapshot : symbol list CCFormat.printer
+  val pp_debug : t CCFormat.printer
+  include LogtkInterfaces.PRINT with type t := t
 
   (** {2 Builtin constraints} *)
 

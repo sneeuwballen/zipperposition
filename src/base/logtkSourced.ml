@@ -44,13 +44,8 @@ let make ?(is_conjecture=false) ~name ~file content = {
 
 let map f x = {x with content=f x.content; }
 
-let pp pp_x buf x =
-  Printf.bprintf buf "%a [at %s in %s (conj: %B)]"
+let pp pp_x out x =
+  Format.fprintf out "@[`@[%a@]`@ [at %s in %s (conj: %B)]@]"
     pp_x x.content x.name x.file x.is_conjecture
 
-let to_string pp_x x =
-  CCPrint.to_string (pp pp_x) x
-
-let fmt pp_x fmt x =
-  Format.fprintf fmt "%a [at %s in %s (conj: %B)]"
-    pp_x x.content x.name x.file x.is_conjecture
+let to_string ppx = CCFormat.to_string (pp ppx)

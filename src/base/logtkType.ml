@@ -196,16 +196,16 @@ let apply ty arg =
     if eq arg arg'
     then ret
     else
-      let msg = LogtkUtil.sprintf
-          "Type.apply: wrong argument type, expected %a but got %a%a"
-            T.pp arg' T.pp arg LogtkUtil.Exn.pp_stack 30
+      let msg = CCFormat.sprintf
+          "Type.apply: wrong argument type, expected %a but got %a"
+            T.pp arg' T.pp arg
       in _error msg
   | T.Bind (LogtkSymbol.Conn LogtkSymbol.ForallTy, _, ty') ->
       T.DB.eval (LogtkDBEnv.singleton arg) ty'
   | _ ->
-      let msg = LogtkUtil.sprintf
-          "Type.apply: expected quantified or function type, but got %a%a"
-          T.pp ty LogtkUtil.Exn.pp_stack 30
+      let msg = CCFormat.sprintf
+        "Type.apply: expected quantified or function type, but got %a"
+        T.pp ty
       in _error msg
 
 (* apply a type to arguments. *)
@@ -226,7 +226,7 @@ let __var =
     decr r;
     T.var ~ty:T.tType n
 
-type print_hook = int -> (Buffer.t -> t-> unit) -> Buffer.t -> t-> bool
+type print_hook = int -> (CCFormat.t -> t-> unit) -> CCFormat.t -> t-> bool
 
 module TPTP = struct
   let i = const LogtkSymbol.TPTP.i
@@ -235,95 +235,66 @@ module TPTP = struct
   let rat = const LogtkSymbol.TPTP.rat
   let real = const LogtkSymbol.TPTP.real
 
-  let rec pp_tstp_rec depth buf t = match view t with
-    | Var i -> Printf.bprintf buf "T%d" i
-    | BVar i -> Printf.bprintf buf "Tb%d" (depth-i-1)
-    | App (p, []) -> LogtkSymbol.TPTP.pp buf p
-    | App (p, args) -> Printf.bprintf buf "%a(%a)" LogtkSymbol.TPTP.pp p
-      (LogtkUtil.pp_list (pp_tstp_rec depth)) args
+  let rec pp_tstp_rec depth out t = match view t with
+    | Var i -> Format.fprintf out "T%d" i
+    | BVar i -> Format.fprintf out "Tb%d" (depth-i-1)
+    | App (p, []) -> LogtkSymbol.TPTP.pp out p
+    | App (p, args) -> Format.fprintf out "%a(%a)" LogtkSymbol.TPTP.pp p
+      (CCFormat.list (pp_tstp_rec depth)) args
     | Fun (arg, ret) ->
       (* FIXME: uncurry? *)
-      Printf.bprintf buf "%a > %a" (pp_inner depth) arg (pp_tstp_rec depth) ret
+      Format.fprintf out "%a > %a" (pp_inner depth) arg (pp_tstp_rec depth) ret
     | Record _ -> failwith "cannot print record types in TPTP"
     | Forall ty' ->
-      Printf.bprintf buf "!>[Tb%d:$tType]: %a" depth (pp_inner (depth+1)) ty'
-  and pp_inner depth buf t = match view t with
+      Format.fprintf out "!>[Tb%d:$tType]: %a" depth (pp_inner (depth+1)) ty'
+  and pp_inner depth out t = match view t with
     | Fun _ ->
-      Buffer.add_char buf '('; pp_tstp_rec depth buf t; Buffer.add_char buf ')'
-    | _ -> pp_tstp_rec depth buf t
+      CCFormat.char out '('; pp_tstp_rec depth out t; CCFormat.char out ')'
+    | _ -> pp_tstp_rec depth out t
 
-  let pp buf t = pp_tstp_rec 0 buf t
+  let pp out t = pp_tstp_rec 0 out t
 
-  let pp_depth ?hooks depth buf t = pp_tstp_rec depth buf t
+  let pp_depth ?hooks depth out t = pp_tstp_rec depth out t
 
-  let to_string t =
-    let b = Buffer.create 15 in
-    pp b t;
-    Buffer.contents b
-
-  let fmt fmt t = Format.pp_print_string fmt (to_string t)
+  let to_string = CCFormat.to_string pp
 end
 
 (** {2 IO} *)
 
-let rec pp_rec depth buf t = match view t with
-  | Var i -> Printf.bprintf buf "A%d" i
-  | BVar i -> Printf.bprintf buf "T%i" (depth-i-1)
-  | App (p, []) -> Buffer.add_string buf (LogtkSymbol.to_string p)
+let rec pp_rec depth out t = match view t with
+  | Var i -> Format.fprintf out "A%d" i
+  | BVar i -> Format.fprintf out "T%i" (depth-i-1)
+  | App (p, []) -> CCFormat.string out (LogtkSymbol.to_string p)
   | App (LogtkSymbol.Conn LogtkSymbol.Multiset, l) ->
-      Printf.bprintf buf "[%a]" (LogtkUtil.pp_list (pp_rec depth)) l
+      Format.fprintf out "[%a]" (CCFormat.list (pp_rec depth)) l
   | App (p, args) ->
-    Printf.bprintf buf "%s(%a)"
-      (LogtkSymbol.to_string p) (LogtkUtil.pp_list (pp_rec depth)) args
+    Format.fprintf out "%s(%a)"
+      (LogtkSymbol.to_string p) (CCFormat.list (pp_rec depth)) args
   | Fun (arg, ret) ->
-    Printf.bprintf buf "%a → %a" (pp_inner depth) arg (pp_rec depth) ret
+    Format.fprintf out "%a → %a" (pp_inner depth) arg (pp_rec depth) ret
   | Record (l, None) ->
-    Buffer.add_char buf '{';
-    LogtkUtil.pp_list (fun buf (n, t) -> Printf.bprintf buf "%s: %a" n (pp_rec depth) t)
-      buf l;
-    Buffer.add_char buf '}'
+    CCFormat.char out '{';
+    CCFormat.list (fun buf (n, t) -> Format.fprintf buf "%s: %a" n (pp_rec depth) t)
+      out l;
+    CCFormat.char out '}'
   | Record (l, Some r) ->
-    Buffer.add_char buf '{';
-    LogtkUtil.pp_list (fun buf (n, t) -> Printf.bprintf buf "%s: %a" n (pp_rec depth) t)
-      buf l;
-    Printf.bprintf buf "| %a}" (pp_rec depth) r
+    CCFormat.char out '{';
+    CCFormat.list (fun buf (n, t) -> Format.fprintf buf "%s: %a" n (pp_rec depth) t)
+      out l;
+    Format.fprintf out "| %a}" (pp_rec depth) r
   | Forall ty' ->
-    Printf.bprintf buf "Λ T%i. %a" depth (pp_inner (depth+1)) ty'
-and pp_inner depth buf t = match view t with
+    Format.fprintf out "Λ T%i. %a" depth (pp_inner (depth+1)) ty'
+and pp_inner depth out t = match view t with
   | Fun _ ->
-    Buffer.add_char buf '('; pp_rec depth buf t; Buffer.add_char buf ')'
-  | _ -> pp_rec depth buf t
+    CCFormat.char out '('; pp_rec depth out t; CCFormat.char out ')'
+  | _ -> pp_rec depth out t
 
-let pp_depth ?hooks depth buf t = pp_rec depth buf t
+let pp_depth ?hooks:_ depth out t = pp_rec depth out t
 
 let pp buf t = pp_rec 0 buf t
 let pp_surrounded buf t = (pp_inner 0) buf t
 
-let to_string = LogtkUtil.on_buffer pp
-let fmt fmt ty = Format.pp_print_string fmt (to_string ty)
-
-(*
-let bij =
-  let (!!) = Lazy.force in
-  Bij.(fix (fun bij' ->
-    let bij_app = lazy (pair string_ (list_ (!! bij'))) in
-    let bij_fun = lazy (pair (!! bij') (list_ (!! bij'))) in
-    let bij_forall = bij' in
-    switch
-      ~inject:(fun ty -> match ty.ty with
-        | Var i -> "v", BranchTo (int_, i)
-        | BVar i -> "bv", BranchTo (int_, i)
-        | App (p, l) -> "at", BranchTo (!! bij_app, (p, l))
-        | Fun (ret, l) -> "fun", BranchTo (!! bij_fun, (ret, l))
-        | Forall ty -> "all", BranchTo(!! bij_forall, ty))
-      ~extract:(function
-        | "v" -> BranchFrom (int_, var)
-        | "bv" -> BranchFrom (int_, bvar)
-        | "at" -> BranchFrom (!! bij_app, fun (s,l) -> app s l)
-        | "fun" -> BranchFrom (!! bij_fun, fun (ret,l) -> mk_fun ret l)
-        | "all" -> BranchFrom (!! bij_forall, fun ty -> __forall ty)
-        | _ -> raise (DecodingError "expected LogtkType"))))
-*)
+let to_string = CCFormat.to_string pp
 
 (** {2 Misc} *)
 
@@ -367,7 +338,7 @@ module Conv = struct
         let ret = of_prolog ret in
         let l = List.map of_prolog l in
         arrow_list l ret
-      | PT.App ({PT.term=PT.Const hd}, l) ->
+      | PT.App ({PT.term=PT.Const hd; _}, l) ->
         let l = List.map of_prolog l in
         app hd l
       | PT.Bind (LogtkSymbol.Conn LogtkSymbol.ForallTy, vars, t') ->
@@ -389,8 +360,8 @@ module Conv = struct
 
   let to_prolog ?(curry=true) ?(depth=0) t =
     let rec to_prolog depth t = match view t with
-    | Var i -> PT.var (LogtkUtil.sprintf "A%d" i)
-    | BVar i -> PT.var (LogtkUtil.sprintf "B%d" (depth-i-1))
+    | Var i -> PT.var (CCFormat.sprintf "A%d" i)
+    | BVar i -> PT.var (CCFormat.sprintf "B%d" (depth-i-1))
     | App (s,l) -> PT.app (PT.const s) (List.map (to_prolog depth) l)
     | Fun (arg, ret) when curry ->
       PT.TPTP.mk_fun_ty [to_prolog depth arg] (to_prolog depth ret)
@@ -404,7 +375,7 @@ module Conv = struct
       PT.record (List.map (fun (n,ty) -> n, to_prolog depth ty) l) ~rest
     | Forall t' ->
       PT.bind LogtkSymbol.Base.forall_ty
-        [PT.var (LogtkUtil.sprintf "B%d" depth)]
+        [PT.var (CCFormat.sprintf "B%d" depth)]
         (to_prolog (depth+1) t')
     in
     to_prolog depth t

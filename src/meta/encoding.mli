@@ -56,10 +56,7 @@ val clause_of_foclause : foclause -> Formula.FO.t list
   (** Convert back to a list of formulas
       @since 0.8 *)
 
-val pp_clause : (Buffer.t -> 'a -> unit) -> Buffer.t -> 'a clause -> unit
-  (** Printer of clauses *)
-
-val print_clause : 'a printer -> 'a clause printer
+val pp_clause : 'a printer -> 'a clause printer
   (** Printer of clauses *)
 
 (** {6 Encoding abstraction} *)

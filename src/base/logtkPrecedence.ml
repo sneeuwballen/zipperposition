@@ -47,8 +47,8 @@ module type SYMBOL = sig
   val false_ : t
   val true_ : t
 
-  val pp : Buffer.t -> t -> unit
-  val pp_debug : Buffer.t -> t -> unit
+  val pp : t CCFormat.printer
+  val pp_debug : t CCFormat.printer
 end
 
 module Make(Sym : SYMBOL) = struct
@@ -62,6 +62,9 @@ module Make(Sym : SYMBOL) = struct
 
   (* used to complete orderings *)
   module PO = LogtkPartialOrder.Make(Sym)
+
+  (* TODO: make the [index] a lazy instance of [Tbl.t], to be computed
+    on demand, to simplify *)
 
   type t = {
     snapshot : symbol list; (* symbols by decreasing order *)
@@ -110,26 +113,23 @@ module Make(Sym : SYMBOL) = struct
     let symbols p = Sequence.of_list p.snapshot
   end
 
-  let pp_snapshot buf s =
-    LogtkUtil.pp_list ~sep:" > " Sym.pp buf s
+  let pp_snapshot out s = CCFormat.list ~sep:" > " Sym.pp out s
 
-  let pp buf prec =
-    LogtkUtil.pp_list ~sep:" > "
-      (fun buf s -> match status prec s with
-        | Multiset -> Printf.bprintf buf "%a[M]" Sym.pp s
-        | Lexicographic -> Sym.pp buf s)
-      buf prec.snapshot
+  let pp out prec =
+    CCFormat.list ~sep:" > "
+      (fun out s -> match status prec s with
+        | Multiset -> Format.fprintf out "%a[M]" Sym.pp s
+        | Lexicographic -> Sym.pp out s)
+      out prec.snapshot
 
-  let pp_debug buf prec =
-    LogtkUtil.pp_list ~sep:" > "
-      (fun buf s -> match status prec s with
-        | Multiset -> Printf.bprintf buf "%a[M]" Sym.pp_debug s
-        | Lexicographic -> Sym.pp_debug buf s)
-      buf prec.snapshot
+  let pp_debug out prec =
+    CCFormat.list ~sep:" > "
+      (fun out s -> match status prec s with
+        | Multiset -> Format.fprintf out "%a[M]" Sym.pp_debug s
+        | Lexicographic -> Sym.pp_debug out s)
+      out prec.snapshot
 
-  let to_string = LogtkUtil.on_buffer pp
-
-  let fmt fmt p = Format.pp_print_string fmt (to_string p)
+  let to_string = CCFormat.to_string pp
 
   (* build a table  symbol -> i. such as if
       [tbl s = i], then w[List.nth i l = s] *)
@@ -240,7 +240,7 @@ module Make(Sym : SYMBOL) = struct
   (** {2 Creation of a precedence from constraints} *)
 
   (* order the set of symbols using the constraints *)
-  let _order_symbols constrs symbols =
+  let order_symbols_ constrs symbols =
     let symbols = List.map fst (Tbl.to_list symbols) in
     let po = PO.create symbols in
     (* complete the partial order using constraints, starting with the
@@ -250,12 +250,12 @@ module Make(Sym : SYMBOL) = struct
       match PO.is_total_details po with
         | `total -> assert false
         | `eq (s1, s2) ->
-            let msg = LogtkUtil.sprintf
+            let msg = CCFormat.sprintf
               "LogtkPrecedence: symbols %a and %a made equal"
               Sym.pp s1 Sym.pp s2 in
             failwith msg
         | `unordered (s1, s2) ->
-            let msg = LogtkUtil.sprintf
+            let msg = CCFormat.sprintf
               "LogtkPrecedence: symbols %a and %a not ordered by constraints"
               Sym.pp s1 Sym.pp s2 in
             failwith msg
@@ -266,7 +266,7 @@ module Make(Sym : SYMBOL) = struct
     (* compute snapshot *)
     let symbols = List.fold_left
       (fun tbl s -> Tbl.replace tbl s ()) (Tbl.create 7) symbols in
-    let snapshot = _order_symbols constrs symbols in
+    let snapshot = order_symbols_ constrs symbols in
     let index = _mk_table snapshot in
     let status = Tbl.create 5 in
     { snapshot; index; weight; status; constr=constrs; }
@@ -281,7 +281,7 @@ module Make(Sym : SYMBOL) = struct
     if List.for_all (fun s -> Tbl.mem p.index s) l
       then p  (* already present *)
       else begin
-        LogtkUtil.debug ~section 3 "add %a to the precedence" pp_snapshot l;
+        LogtkUtil.debug ~section 3 "add %a to the precedence" (fun k->k pp_snapshot l);
         let c = Constr.of_precedence p in
         (* hashtable of symbols *)
         let symbols = Sequence.fold
@@ -291,9 +291,9 @@ module Make(Sym : SYMBOL) = struct
         in
         (* compute new ordering. First constraint is to be an extension
             of [p]. *)
-        let snapshot = _order_symbols (c :: p.constr) symbols in
+        let snapshot = order_symbols_ (c :: p.constr) symbols in
         let index = _mk_table snapshot in
-        LogtkUtil.debug ~section 3 "--> snapshot %a" pp_snapshot snapshot;
+        LogtkUtil.debug ~section 3 "--> snapshot %a" (fun k->k pp_snapshot snapshot);
         { p with snapshot; index; }
       end
 

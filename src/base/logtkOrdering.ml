@@ -70,7 +70,8 @@ module Make(P : LogtkPrecedence.S with type symbol = LogtkSymbol.t) = struct
 
   (* Check that new_prec is a compatible superset of old_prec *)
   let _check_precedence old_prec new_prec =
-    LogtkUtil.debug 3 "check compatibility of %a with %a" Prec.pp old_prec Prec.pp new_prec;
+    LogtkUtil.debug 3 "check compatibility of %a with %a"
+      (fun k->k Prec.pp old_prec Prec.pp new_prec);
     let rec check l = match l with
     | [] | [_] -> true
     | x::((y::_) as l') -> Prec.compare new_prec x y > 0 && check l'
@@ -93,13 +94,10 @@ module Make(P : LogtkPrecedence.S with type symbol = LogtkSymbol.t) = struct
   let clear_cache ord =
     LogtkCache.clear ord.cache
 
-  let pp buf ord =
-    Printf.bprintf buf "%s(%a)" ord.name Prec.pp ord.prec
+  let pp out ord =
+    Format.fprintf out "%s(@[%a@])" ord.name Prec.pp ord.prec
 
-  let to_string ord = LogtkUtil.on_buffer pp ord
-
-  let fmt fmt ord =
-    Format.pp_print_string fmt (to_string ord)
+  let to_string ord = CCFormat.to_string pp ord
 
   (** Common internal interface for orderings *)
 
@@ -240,10 +238,10 @@ module Make(P : LogtkPrecedence.S with type symbol = LogtkSymbol.t) = struct
         | TC.BVar i, TC.BVar j ->
           (wb, if i = j then Eq else Incomparable)
         (* node and something else *)
-        | TC.App (f, _, ss), TC.BVar _ ->
+        | TC.App (_, _, _), TC.BVar _ ->
           let wb', _ = balance_weight wb t1 0 true in
           wb'-1, LogtkComparison.Gt
-        | TC.BVar _, TC.App (g, _, ts) ->
+        | TC.BVar _, TC.App (_, _, _) ->
           let wb', _ = balance_weight wb t1 0 false in
           wb'+1, LogtkComparison.Lt
       (** tckbo, for composite terms (ie non variables). It takes a symbol
@@ -302,8 +300,8 @@ module Make(P : LogtkPrecedence.S with type symbol = LogtkSymbol.t) = struct
       if T.eq s t then Eq else  (* equality test is cheap *)
       match TC.view s, TC.view t with
       | TC.Var _, TC.Var _ -> Incomparable
-      | _, TC.Var _ -> if T.var_occurs t s then Gt else Incomparable
-      | TC.Var _, _ -> if T.var_occurs s t then Lt else Incomparable
+      | _, TC.Var _ -> if T.var_occurs ~var:t s then Gt else Incomparable
+      | TC.Var _, _ -> if T.var_occurs ~var:s t then Lt else Incomparable
       (* whatever *)
       | TC.NonFO, _
       | _, TC.NonFO -> LogtkComparison.Incomparable
@@ -312,8 +310,8 @@ module Make(P : LogtkPrecedence.S with type symbol = LogtkSymbol.t) = struct
       | TC.BVar i, TC.BVar j ->
         if i = j && LogtkType.eq (T.ty s) (T.ty t) then Eq else Incomparable
       (* node and something else *)
-      | TC.App (f, _, ss), TC.BVar _ -> LogtkComparison.Incomparable
-      | TC.BVar _, TC.App (g, _, ts) -> LogtkComparison.Incomparable
+      | TC.App (_, _, _), TC.BVar _ -> LogtkComparison.Incomparable
+      | TC.BVar _, TC.App (_, _, _) -> LogtkComparison.Incomparable
     (* handle the composite cases *)
     and rpo6_composite ~prec s t f g ss ts =
       match Prec.compare prec f g with

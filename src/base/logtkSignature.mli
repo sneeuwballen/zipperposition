@@ -113,7 +113,7 @@ module TPTP : sig
 
   val is_not_bool : t -> LogtkSymbol.t -> bool
 
-  val pp_no_base : Buffer.t -> t -> unit
+  val pp_no_base : t CCFormat.printer
     (** Print the signature, minus the base symbols *)
 
   (** {3 Arith} *)

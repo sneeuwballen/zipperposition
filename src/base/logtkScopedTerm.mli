@@ -272,10 +272,6 @@ val fresh_var : kind:Kind.t -> ty:t -> unit -> t
 val _var : kind:Kind.t -> ty:t -> int -> t
 (** Unsafe version of {!var} that accepts negative index *)
 
-(* FIXME
-include LogtkInterfaces.SERIALIZABLE with type t := t
-*)
-
 (* TODO: path-selection operation (for handling general-data in TPTP), see
         XSLT or CSS *)
 

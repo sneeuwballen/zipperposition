@@ -67,10 +67,11 @@ type hoclause = hoterm clause
 (* convert a list of formulas into a clause *)
 let foclause_of_clause l =
   let module F = Formula.FO in
-  Util.debug ~section 5 "foclause_of_clause %a" (Util.pp_list F.pp) l;
+  Util.debug ~section 5 "foclause_of_clause @[%a@]"
+    (fun k->k (CCFormat.list F.pp) l);
   let term_of_form f = match F.view f with
     | F.Atom t -> t
-    | _ -> raise (Invalid_argument (Util.sprintf "expected term, got formula %a" F.pp f))
+    | _ -> invalid_arg (CCFormat.sprintf "expected term, got formula %a" F.pp f)
   in
   List.map
     (fun f -> match F.view f with
@@ -92,17 +93,7 @@ let clause_of_foclause l =
       | Bool false -> F.Base.false_
     ) l
 
-let pp_clause pp_t buf c =
-  Util.pp_list ~sep:" | "
-    (fun buf lit -> match lit with
-      | Eq (a, b, true) -> Printf.bprintf buf "%a = %a" pp_t a pp_t b
-      | Eq (a, b, false) -> Printf.bprintf buf "%a != %a" pp_t a pp_t b
-      | Prop (a, true) -> pp_t buf a
-      | Prop (a, false) -> Printf.bprintf buf "~ %a" pp_t a
-      | Bool b -> Printf.bprintf buf "%B" b
-    ) buf c
-
-let print_clause pp_t out c =
+let pp_clause pp_t out c =
   CCList.print ~start:"" ~stop:"" ~sep:" | "
     (fun buf lit -> match lit with
      | Eq (a, b, true) -> Format.fprintf buf "@[%a = %a@]" pp_t a pp_t b
@@ -124,7 +115,7 @@ let id = object
   method decode x = Some x
 end
 
-let compose a b = object (self)
+let compose a b = object
   method encode x = b#encode (a#encode x)
   method decode y =
     match b#decode y with
@@ -160,7 +151,6 @@ module EncodedClause = struct
   let cmp = HOT.cmp
   let pp = HOT.pp
   let to_string = HOT.to_string
-  let fmt = HOT.fmt
 
   let __magic t = t
 end

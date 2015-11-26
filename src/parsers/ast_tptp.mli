@@ -59,18 +59,14 @@ and general_data =
 
 val role_of_string : string -> role
 val string_of_role : role -> string
-val pp_role : Buffer.t -> role -> unit
-val fmt_role : Format.formatter -> role -> unit
+val pp_role : role CCFormat.printer
 
 val string_of_name : name -> string
-val pp_name : Buffer.t -> name -> unit
-val fmt_name : Format.formatter -> name -> unit
+val pp_name : name CCFormat.printer
 
-val pp_general : Buffer.t -> general_data -> unit
-val pp_general_debug : Buffer.t -> general_data -> unit  (* ugly version *)
-val fmt_general : Format.formatter -> general_data -> unit
-val pp_generals : Buffer.t -> general_data list -> unit
-val fmt_generals : Format.formatter -> general_data list -> unit
+val pp_general : general_data CCFormat.printer
+val pp_general_debug : general_data CCFormat.printer  (* ugly version *)
+val pp_generals : general_data list CCFormat.printer
 
 module type S = sig
   type hoterm

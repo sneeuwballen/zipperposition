@@ -110,9 +110,9 @@ let wrap_fo_clause pred clauses : foclause t =
       with _ -> false
 
     method to_fact c =
-      Util.debug ~section 5 "encode clause %a" (Encoding.pp_clause FOTerm.pp) c;
+      Util.debug ~section 5 "encode clause %a" (fun k->k (Encoding.pp_clause FOTerm.pp) c);
       let c' = (__encoding_wrap#encode c : Encoding.EncodedClause.t :> T.t) in
-      Util.debug ~section 5 "... into %a" T.pp c';
+      Util.debug ~section 5 "... into %a" (fun k->k T.pp c');
       T.at hd c'
 
     method of_fact t =
@@ -141,7 +141,7 @@ let axiom_or_theory which : (string * Type.t list * term) t  =
           (T.const ~ty:Type.(ty_s <=. T.ty t) (Symbol.of_string name))
           [t])
     method of_fact t =
-      Util.debug ~section 5 "%s.of_fact %a?" which T.pp t;
+      Util.debug ~section 5 "%s.of_fact %a?" (fun k->k which T.pp t);
       match T.open_at t with
       | hd', _, [f] when T.eq hd hd' ->
           begin match T.open_at f with

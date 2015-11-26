@@ -112,33 +112,33 @@ let rec hash_fun t h = match t.term with
 
 let hash x = Hash.apply hash_fun x
 
-let _pp_list p buf l = CCList.pp ~start:"" ~stop:"" ~sep:", " p buf l
+let _pp_list p buf l = CCFormat.list ~start:"" ~stop:"" ~sep:", " p buf l
 
-let rec pp buf t = match view t with
+let rec pp out t = match view t with
   | Var s
   | BVar s ->
-      Buffer.add_string buf s;
+      CCFormat.string out s;
       begin match ty t with
       | None -> ()
-      | Some ty -> Printf.bprintf buf ":%a" _pp_inner ty
+      | Some ty -> Format.fprintf out ":%a" _pp_inner ty
       end
-  | Const s -> LogtkSymbol.pp buf s
-  | App (f, []) -> assert false
+  | Const s -> LogtkSymbol.pp out s
+  | App (_, []) -> assert false
   | App (f, l) ->
-      Printf.bprintf buf "%a(%a)" _pp_inner f (_pp_list pp) l
+      Format.fprintf out "%a(%a)" _pp_inner f (_pp_list pp) l
   | Bind (s, v, t) ->
-      Printf.bprintf buf "%a %a. %a" LogtkSymbol.pp s _pp_inner v _pp_inner t
+      Format.fprintf out "%a %a. %a" LogtkSymbol.pp s _pp_inner v _pp_inner t
   | Record (l, None) ->
-      Printf.bprintf buf "{%a}" (_pp_list _pp_field) l
+      Format.fprintf out "{%a}" (_pp_list _pp_field) l
   | Record (l, Some r) ->
-      Printf.bprintf buf "{%a | %a}" (_pp_list _pp_field) l pp r
+      Format.fprintf out "{%a | %a}" (_pp_list _pp_field) l pp r
   | Multiset l ->
-      Printf.bprintf buf "[%a]" (_pp_list _pp_inner) l
+      Format.fprintf out "[%a]" (_pp_list _pp_inner) l
 and _pp_inner buf t = match view t with
-  | Bind _ -> Printf.bprintf buf "(%a)" pp t  (* avoid ambiguities *)
+  | Bind _ -> Format.fprintf buf "(%a)" pp t  (* avoid ambiguities *)
   | _ -> pp buf t
 and _pp_field buf (name,t) =
-  Printf.bprintf buf "%s=%a" name _pp_inner t
+  Format.fprintf buf "%s=%a" name _pp_inner t
 
 exception IllFormedTerm of string
 
@@ -158,7 +158,7 @@ let bind ?loc ?ty s v l =
   match v.term with
   | BVar _ -> _make ?loc ?ty (Bind(s,v,l))
   | _ ->
-      let msg = CCPrint.sprintf "in binder, expected variable, got %a" pp v in
+      let msg = CCFormat.sprintf "in binder, expected variable, got %a" pp v in
       raise (IllFormedTerm msg)
 
 let bind_list ?loc ?ty s vars t =
@@ -169,14 +169,14 @@ let multiset ?loc ?ty l = _make ?loc ?ty (Multiset l)
 let record ?loc ?ty l ~rest =
   match rest with
   | None
-  | Some {term=Var _} ->
+  | Some {term=Var _; _} ->
       let l = List.sort cmp_field l in
       _make ?loc ?ty (Record (l, rest))
-  | Some {term=Record (l', rest')} ->
+  | Some {term=Record (l', rest'); _} ->
       let l = List.sort cmp_field (l@l') in
       _make ?loc ?ty (Record(l, rest'))
   | Some t' ->
-      let msg = CCPrint.sprintf "ill-formed record row: %a" pp t' in
+      let msg = CCFormat.sprintf "ill-formed record row: %a" pp t' in
       raise (IllFormedTerm msg)
 
 let at_loc ?loc t = {t with loc; }
@@ -206,8 +206,8 @@ let fresh_bvar ?loc ?ty () = bvar ?loc ?ty (_gensym ())
 
 (** {2 LogtkUtils} *)
 
-let is_var = function | {term=Var _} -> true | _ -> false
-let is_bvar = function | {term=BVar _} -> true | _ -> false
+let is_var = function | {term=Var _; _} -> true | _ -> false
+let is_bvar = function | {term=BVar _; _} -> true | _ -> false
 
 let rec ground t =
   CCOpt.maybe ground true t.ty
@@ -309,14 +309,14 @@ module Visitor = struct
 
   let _id x = x
   let _opt o = CCOpt.maybe _id true o
-  let _true _ ?loc ?ty _ = _opt ty
+  let _true _ ?loc:_ ?ty _ = _opt ty
 
   let for_all = {
     var=_true; const=_true; bvar=_true;
-    app=(fun _ ?loc ?ty f l -> _opt ty && f && List.for_all _id l);
-    bind=(fun _ ?loc ?ty _ v t -> _opt ty && v && t);
-    multiset=(fun _ ?loc ?ty l -> _opt ty && List.for_all _id l);
-    record=(fun _ ?loc ?ty l rest -> _opt ty && _opt rest
+    app=(fun _ ?loc:_ ?ty f l -> _opt ty && f && List.for_all _id l);
+    bind=(fun _ ?loc:_ ?ty _ v t -> _opt ty && v && t);
+    multiset=(fun _ ?loc:_ ?ty l -> _opt ty && List.for_all _id l);
+    record=(fun _ ?loc:_ ?ty l rest -> _opt ty && _opt rest
       && List.for_all snd l)
   }
 end
@@ -328,8 +328,7 @@ let closed t =
 
 let close_all ?ty s t = bind_list ?ty s (vars t) t
 
-let to_string = CCPrint.to_string pp
-let fmt fmt t = Format.pp_print_string fmt (to_string t)
+let to_string = CCFormat.to_string pp
 
 let _pp_term = pp
 
@@ -344,15 +343,14 @@ module Subst = struct
 
   let pp buf subst =
     Map.to_seq subst
-    |> CCPrint.seq ~start:"{" ~stop:"}" ~sep:"," (CCPair.pp _pp_term _pp_term) buf
-  let to_string = CCPrint.to_string pp
-  let fmt fmt t = Format.pp_print_string fmt (to_string t)
+    |> CCFormat.seq ~start:"{" ~stop:"}" ~sep:"," (CCFormat.pair _pp_term _pp_term) buf
+  let to_string = CCFormat.to_string pp
 
   let add subst v t =
     assert (is_var v);
     if Map.mem v subst
       then invalid_arg
-        (LogtkUtil.sprintf "var %a already bound in %a" _pp_term v pp subst);
+        (CCFormat.sprintf "var %a already bound in %a" _pp_term v pp subst);
     Map.add v t subst
 
   let rec eval_head subst t =
@@ -406,13 +404,13 @@ let rename t =
 
 exception LogtkUnifyFailure of term * term * Subst.t
 
-let _pp_failure buf (t1,t2,subst) =
-  Printf.bprintf buf "could not unify %a and %a (in context %a)"
+let _pp_failure out (t1,t2,subst) =
+  Format.fprintf out "could not unify %a and %a (in context %a)"
   pp t1 pp t2 Subst.pp subst
 
 let _fail_unif t1 t2 subst = raise (LogtkUnifyFailure (t1,t2,subst))
 
-let _occur_check ~subst v t =
+let occur_check_ ~subst v t =
   assert (is_var v);
   let rec check t =
     CCOpt.maybe check false t.ty ||
@@ -440,11 +438,11 @@ let rec _unify_exn subst t1 t2 =
   in
   match t1.term, t2.term with
   | Var _, _ ->
-      if _occur_check subst t1 t2 || not (closed t2)
+      if occur_check_ ~subst t1 t2 || not (closed t2)
         then _fail_unif t1 t2 subst
         else Subst.add subst t1 t2
   | _, Var _ ->
-      if _occur_check subst t2 t1 || not (closed t1)
+      if occur_check_ ~subst t2 t1 || not (closed t1)
         then _fail_unif t1 t2 subst
         else Subst.add subst t2 t1
   | BVar i, BVar j ->
@@ -507,9 +505,9 @@ and _unify_record_fields subst l1 l2 = match l1, l2 with
 and _unify_record_rest ~fail ?ty subst r rest = match r, rest with
   | None, [] -> subst
   | None, _::_ -> fail()
-  | Some ({term=Var _} as r), _ ->
+  | Some ({term=Var _;_} as r), _ ->
       let t' = record ?ty rest ~rest:None in
-      if _occur_check subst r t'
+      if occur_check_ ~subst r t'
         then fail()
         else Subst.add subst r t'
   | Some _, _ -> assert false
@@ -521,5 +519,5 @@ let unify ?(subst=Subst.empty) t1 t2 =
   try CCError.return (_unify_exn subst t1 t2)
   with LogtkUnifyFailure (t1,t2,subst) ->
     CCError.fail
-      (CCPrint.sprintf "could not unify %a and %a (in context %a)"
+      (CCFormat.sprintf "could not unify %a and %a (in context %a)"
         pp t1 pp t2 Subst.pp subst)

@@ -52,8 +52,8 @@ module Make(C : LogtkIndex.CLAUSE) = struct
 
     let name f = f.name
 
-    let pp buf f = Buffer.add_string buf f.name
-    let fmt fmt f = Format.pp_print_string fmt f.name
+    let pp out f = CCFormat.string out f.name
+    let to_string = CCFormat.to_string pp
 
     let size_plus =
       { name = "size+";
@@ -105,12 +105,12 @@ module Make(C : LogtkIndex.CLAUSE) = struct
         |> Sequence.flatMap T.Seq.symbols
 
     let count_symb_plus symb =
-      { name = LogtkUtil.sprintf "count+(%a)" LogtkSymbol.pp symb;
+      { name = CCFormat.sprintf "count+(%a)" LogtkSymbol.pp symb;
         f = (fun lits -> Sequence.length (_symbols ~sign:true lits));
       }
 
     let count_symb_minus symb =
-      { name = LogtkUtil.sprintf "count-(%a)" LogtkSymbol.pp symb;
+      { name = CCFormat.sprintf "count-(%a)" LogtkSymbol.pp symb;
         f = (fun lits -> Sequence.length (_symbols ~sign:false lits));
       }
 
@@ -138,12 +138,12 @@ module Make(C : LogtkIndex.CLAUSE) = struct
         0 lits
 
     let max_depth_plus symb =
-      { name = LogtkUtil.sprintf "max_depth+(%a)" LogtkSymbol.pp symb;
+      { name = CCFormat.sprintf "max_depth+(%a)" LogtkSymbol.pp symb;
         f = (_max_depth_lits ~sign:true symb);
       }
 
     let max_depth_minus symb =
-      { name = LogtkUtil.sprintf "max_depth-(%a)" LogtkSymbol.pp symb;
+      { name = CCFormat.sprintf "max_depth-(%a)" LogtkSymbol.pp symb;
         f = (_max_depth_lits ~sign:false symb);
       }
   end
@@ -261,7 +261,7 @@ module Make(C : LogtkIndex.CLAUSE) = struct
     let features = CCList.take max_features features in
     let features = List.map (fun (_, f) -> f) features in
     let features = default_features @ features in
-    LogtkUtil.debug 2 "FV features: [%a]" (LogtkUtil.pp_list Feature.pp) features;
+    LogtkUtil.debug 2 "FV features: [%a]" (fun k->k (CCFormat.list Feature.pp) features);
     features
 
   let of_signature signature =

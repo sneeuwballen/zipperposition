@@ -371,7 +371,7 @@ class virtual ['a] any_visitor = object (self)
     | _ -> assert false
 end
 
-class id_visitor = object (self)
+class id_visitor = object
   inherit [t] any_visitor
   method var ty i = var ~ty i
   method bvar ty i = bvar ~ty i
@@ -427,7 +427,7 @@ let rec is_fo t = match T.view t with
   | T.Var _
   | T.BVar _ -> true
   | T.At _ ->
-      let f, tyargs, l = open_at t in
+      let f, _, l = open_at t in
       is_fo f && List.for_all is_fo l
   | T.Const _ -> true
   | T.Record _
@@ -467,7 +467,7 @@ let open_forall ?(offset=0) f =
 
 let print_all_types = ref false
 
-type print_hook = int -> (Buffer.t -> t -> unit) -> Buffer.t -> t -> bool
+type print_hook = int -> (CCFormat.t -> t -> unit) -> CCFormat.t -> t -> bool
 
 let binder_to_str t = match view t with
   | Lambda _ -> "λ"
@@ -475,107 +475,79 @@ let binder_to_str t = match view t with
   | Exists _ -> "∃"
   | _ -> assert false
 
-let pp_depth ?(hooks=[]) depth buf t =
+let pp_depth ?hooks:_ depth out t =
   let depth = ref depth in
   (* recursive printing *)
-  let rec pp_rec buf t = match view t with
-  | BVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
+  let rec pp_rec out t = match view t with
+  | BVar i -> Format.fprintf out "Y%d" (!depth - i - 1)
   | Lambda (varty,t') | Forall (varty,t') | Exists (varty,t') ->
-    Printf.bprintf buf "%s%a:%a. "
+    Format.fprintf out "%s%a:%a. "
       (binder_to_str t) pp_bvar () LogtkType.pp_surrounded varty;
     incr depth;
-    pp_surrounded buf t';
+    pp_surrounded out t';
     decr depth
-  | Const s -> LogtkSymbol.pp buf s
+  | Const s -> LogtkSymbol.pp out s
   | Var i ->
       if not !print_all_types
-      then Printf.bprintf buf "X%d:%a" i LogtkType.pp_surrounded (ty t)
-      else Printf.bprintf buf "X%d" i
+      then Format.fprintf out "X%d:%a" i LogtkType.pp_surrounded (ty t)
+      else Format.fprintf out "X%d" i
   | At (l,r) ->
-    pp_rec buf l; Buffer.add_char buf ' ';
-    pp_surrounded buf r
-  | TyLift ty -> Printf.bprintf buf "@%a" LogtkType.pp_surrounded ty
+    pp_rec out l; CCFormat.char out ' ';
+    pp_surrounded out r
+  | TyLift ty -> Format.fprintf out "@%a" LogtkType.pp_surrounded ty
   | Record ([], None) ->
-    Buffer.add_string buf "{}"
+    CCFormat.string out "{}"
   | Record ([], Some r) ->
-    Printf.bprintf buf "{ | %a}" pp_rec r
+    Format.fprintf out "{ | %a}" pp_rec r
   | Record (l, None) ->
-    Buffer.add_char buf '{';
-    LogtkUtil.pp_list (fun buf (n, t) -> Printf.bprintf buf "%s=%a" n pp_rec t)
-      buf l;
-    Buffer.add_char buf '}'
+    CCFormat.char out '{';
+    CCFormat.list (fun buf (n, t) -> Format.fprintf buf "%s=%a" n pp_rec t)
+      out l;
+    CCFormat.char out '}'
   | Record (l, Some r) ->
-    Buffer.add_char buf '{';
-    LogtkUtil.pp_list (fun buf (n, t) -> Printf.bprintf buf "%s=%a" n pp_rec t)
-      buf l;
-    Printf.bprintf buf " | %a}" pp_rec r
+    CCFormat.char out '{';
+    CCFormat.list (fun buf (n, t) -> Format.fprintf buf "%s=%a" n pp_rec t)
+      out l;
+    Format.fprintf out " | %a}" pp_rec r
   | Multiset (_, l) ->
-    Printf.bprintf buf "[%a]" (LogtkUtil.pp_list pp_rec) l
+    Format.fprintf out "[%a]" (CCFormat.list pp_rec) l
   and pp_surrounded buf t = match view t with
   | Lambda _ | At _ ->
-    Buffer.add_char buf '('; pp_rec buf t;  Buffer.add_char buf ')'
+    CCFormat.char buf '('; pp_rec buf t;  CCFormat.char buf ')'
   | _ -> pp_rec buf t
-  and pp_bvar buf () =  Printf.bprintf buf "Y%d" !depth in
-  pp_rec buf t
+  and pp_bvar buf () =  Format.fprintf buf "Y%d" !depth in
+  pp_rec out t
 
 let __hooks = ref []
 let add_hook h = __hooks := h :: !__hooks
 
 let pp buf t = pp_depth ~hooks:!__hooks 0 buf t
 
-let to_string = LogtkUtil.on_buffer pp
+let to_string = CCFormat.to_string pp
 
-let fmt fmt t = Format.pp_print_string fmt (to_string t)
-
-let rec debug fmt t = match view t with
+let rec debug out t = match view t with
   | Var i ->
-    Format.fprintf fmt "X%d:%a" i LogtkType.fmt (ty t)
-  | BVar i -> Format.fprintf fmt "Y%d" i
+    Format.fprintf out "X%d:%a" i LogtkType.pp (ty t)
+  | BVar i -> Format.fprintf out "Y%d" i
   | Lambda (varty,t') ->
-    Format.fprintf fmt "(lambda %a %a)" LogtkType.fmt varty debug t'
+    Format.fprintf out "(lambda %a %a)" LogtkType.pp varty debug t'
   | Forall (varty,t') ->
-    Format.fprintf fmt "(forall %a %a)" LogtkType.fmt varty debug t'
+    Format.fprintf out "(forall %a %a)" LogtkType.pp varty debug t'
   | Exists (varty,t') ->
-    Format.fprintf fmt "(exists %a %a)" LogtkType.fmt varty debug t'
-  | Const s -> LogtkSymbol.fmt fmt s
-  | TyLift ty -> LogtkType.fmt fmt ty
+    Format.fprintf out "(exists %a %a)" LogtkType.pp varty debug t'
+  | Const s -> LogtkSymbol.pp out s
+  | TyLift ty -> LogtkType.pp out ty
   | At (l, r) ->
-    Format.fprintf fmt "(%a %a)" debug l debug r
+    Format.fprintf out "(%a %a)" debug l debug r
   | Multiset (_, l) ->
-    Format.fprintf fmt "{| %a |}" (CCList.print debug) l
+    Format.fprintf out "{| %a |}" (CCList.print debug) l
   | Record (l, None) ->
-    Format.fprintf fmt "{ %a }"
+    Format.fprintf out "{ %a }"
       (CCList.print (fun fmt (n,t) -> Format.fprintf fmt "%s: %a" n debug t)) l
   | Record (l, Some r) ->
-    Format.fprintf fmt "{ %a | %a }"
+    Format.fprintf out "{ %a | %a }"
       (CCList.print (fun fmt (n,t) -> Format.fprintf fmt "%s: %a" n debug t))
       l debug r
-
-(*
-let bij =
-  let open Bij in
-  let (!!!) = Lazy.force in
-  fix
-    (fun bij ->
-      let bij_lam = lazy (pair LogtkType.bij !!!bij) in
-      let bij_var = pair int_ LogtkType.bij in
-      let bij_cst = LogtkSymbol.bij in
-      let bij_at = lazy (triple !!!bij (list_ LogtkType.bij) (list_ !!!bij)) in
-      switch
-        ~inject:(fun t -> match t.term with
-        | BoundVar i -> "bv", BranchTo (bij_var, (i,t.ty))
-        | Var i -> "v", BranchTo (bij_var, (i, t.ty))
-        | Const s -> "c", BranchTo (bij_cst, s)
-        | Lambda t' -> "lam", BranchTo (!!!bij_lam, (lambda_var_ty t, t'))
-        | At (t, tyargs, l) -> "at", BranchTo (!!!bij_at, (t, tyargs, l)))
-        ~extract:(function
-        | "bv" -> BranchFrom (bij_var, fun (i,ty) -> __mk_bound_var ~ty i)
-        | "v" -> BranchFrom (bij_var, fun (i,ty) -> mk_var ~ty i)
-        | "c" -> BranchFrom (bij_cst, fun s -> const s)
-        | "lam" -> BranchFrom (!!!bij_lam, fun (varty,t') -> __mk_lambda ~varty t')
-        | "at" -> BranchFrom (!!!bij_at, fun (t, tyargs, l) -> app ~tyargs t l)
-        | _ -> raise (DecodingError "expected Term")))
-*)
 
 module TPTP = struct
   let true_ = const ~ty:LogtkType.TPTP.o LogtkSymbol.Base.true_
@@ -628,38 +600,36 @@ module TPTP = struct
     | Exists _ -> "?"
     | _ -> assert false
 
-  let pp_depth ?(hooks=[]) depth buf t =
+  let pp_depth ?hooks:_ depth out t =
     let depth = ref depth in
     (* recursive printing *)
-    let rec pp_rec buf t = match view t with
-    | BVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
+    let rec pp_rec out t = match view t with
+    | BVar i -> Format.fprintf out "Y%d" (!depth - i - 1)
     | Lambda (varty,t') | Forall (varty,t') | Exists (varty,t') ->
-      Printf.bprintf buf "%s[%a:%a]: " (tptp_binder_to_str t)
+      Format.fprintf out "%s[%a:%a]: " (tptp_binder_to_str t)
         pp_bvar () LogtkType.pp varty;
       incr depth;
-      pp_surrounded buf t';
+      pp_surrounded out t';
       decr depth
-    | Const s -> LogtkSymbol.pp buf s
+    | Const s -> LogtkSymbol.pp out s
     | Var i ->
         if not !print_all_types && not (LogtkType.eq (ty t) LogtkType.TPTP.i)
-        then Printf.bprintf buf "X%d" i
-        else Printf.bprintf buf "X%d:%a" i LogtkType.pp (ty t)
+        then Format.fprintf out "X%d" i
+        else Format.fprintf out "X%d:%a" i LogtkType.pp (ty t)
     | At (l,r) ->
-      pp_surrounded buf l; Buffer.add_string buf " @ ";
-      pp_rec buf r
-    | TyLift ty -> Printf.bprintf buf "@%a" (LogtkType.pp_depth !depth) ty
+      pp_surrounded out l; CCFormat.string out " @ ";
+      pp_rec out r
+    | TyLift ty -> Format.fprintf out "@%a" (LogtkType.pp_depth !depth) ty
     | Multiset _ -> failwith "cannot print multiset in TPTP"
     | Record _ -> failwith "cannot print records in TPTP"
     and pp_surrounded buf t = match view t with
     | At _ | Lambda _ ->
-      Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
+      CCFormat.char buf '('; pp_rec buf t; CCFormat.char buf ')'
     | _ -> pp_rec buf t
-    and pp_bvar buf () =  Printf.bprintf buf "Y%d" !depth in
-    pp_rec buf t
+    and pp_bvar buf () =  Format.fprintf buf "Y%d" !depth in
+    pp_rec out t
 
   let pp buf t = pp_depth 0 buf t
 
-  let to_string = LogtkUtil.on_buffer pp
-
-  let fmt fmt t = Format.pp_print_string fmt (to_string t)
+  let to_string = CCFormat.to_string pp
 end

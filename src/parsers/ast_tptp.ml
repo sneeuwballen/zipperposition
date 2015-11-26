@@ -95,56 +95,41 @@ let string_of_role = function
   | R_type -> "type"
   | R_unknown -> "unknown"
 
-let pp_role buf r =
-  Buffer.add_string buf (string_of_role r)
-
-let fmt_role fmt r =
-  Format.pp_print_string fmt (string_of_role r)
+let pp_role out r =
+  CCFormat.string out (string_of_role r)
 
 let string_of_name = function
   | NameInt i -> string_of_int i
   | NameString s -> s
 
-let pp_name buf n =
-  Buffer.add_string buf (string_of_name n)
+let pp_name out n =
+  CCFormat.string out (string_of_name n)
 
-let fmt_name fmt n =
-  Format.pp_print_string fmt (string_of_name n)
-
-let rec pp_general buf d = match d with
-  | GString s -> Buffer.add_string buf s
-  | GInt i -> Printf.bprintf buf "%d" i
-  | GVar s -> Buffer.add_string buf s
-  | GColumn (a, b) -> Printf.bprintf buf "%a: %a" pp_general a pp_general b
+let rec pp_general out d = match d with
+  | GString s -> CCFormat.string out s
+  | GInt i -> CCFormat.int out i
+  | GVar s -> CCFormat.string out s
+  | GColumn (a, b) -> Format.fprintf out "%a: %a" pp_general a pp_general b
   | GNode (f, l) ->
-    Printf.bprintf buf "%s(%a)" f (Util.pp_list pp_general) l
+    Format.fprintf out "%s(%a)" f (CCFormat.list pp_general) l
   | GList l ->
-    Printf.bprintf buf "[%a]" (Util.pp_list pp_general) l
+    Format.fprintf out "[%a]" (CCFormat.list pp_general) l
 
-let rec pp_general_debug buf d = match d with
-  | GString s -> Printf.bprintf buf "GSstr %s" s
-  | GInt i -> Printf.bprintf buf "GInt %d" i
-  | GVar s -> Printf.bprintf buf "GVar %s" s
-  | GColumn (a, b) -> Printf.bprintf buf "%a: %a" pp_general_debug a pp_general_debug b
+let rec pp_general_debug out d = match d with
+  | GString s -> Format.fprintf out "GSstr %s" s
+  | GInt i -> Format.fprintf out "GInt %d" i
+  | GVar s -> Format.fprintf out "GVar %s" s
+  | GColumn (a, b) -> Format.fprintf out "%a: %a" pp_general_debug a pp_general_debug b
   | GNode (f, l) ->
-    Printf.bprintf buf "GNode(%s[%a])" f (Util.pp_list pp_general_debug) l
+    Format.fprintf out "GNode(%s[%a])" f (CCFormat.list pp_general_debug) l
   | GList l ->
-    Printf.bprintf buf "[%a]" (Util.pp_list pp_general_debug) l
+    CCFormat.list pp_general_debug out l
 
-let fmt_general fmt d =
-  Format.pp_print_string fmt (Util.sprintf "%a" pp_general d)
-
-let pp_generals buf l = match l with
+let pp_generals out l = match l with
   | [] -> ()
   | _::_ ->
-      Buffer.add_string buf ", ";
-      CCList.pp ~start:"" ~stop:"" ~sep:", " pp_general buf l
-
-let fmt_generals fmt l = match l with
-  | [] -> ()
-  | _::_ ->
-      Format.pp_print_string fmt ", ";
-      CCList.print ~start:"" ~stop:"" ~sep:", " fmt_general fmt l
+      Format.fprintf out ",@ ";
+      CCFormat.list ~start:"" ~stop:"" ~sep:", " pp_general out l
 
 module type S = sig
   type hoterm
@@ -221,7 +206,7 @@ module Untyped = struct
     | TFF (n, _, _, _) -> n
     | THF (n, _, _, _) -> n
     | TypeDecl (n, _, _, _) -> n
-    | NewType (n, _, _, i) -> n
+    | NewType (n, _, _, _) -> n
     | IncludeOnly _
     | Include _ ->
       raise (Invalid_argument "Ast_tptp.name_of_decl: include directive has no name")
@@ -270,32 +255,32 @@ module Untyped = struct
 
   (** {2 IO} *)
 
-  let __pp_formula buf pp (logic, name, role, f, generals) =
-    Printf.bprintf buf "%s(%a, %a, (%a)%a)."
+  let pp_form_ out pp (logic, name, role, f, generals) =
+    Format.fprintf out "@[<2>%s(%a,@ %a,@ @[(%a)@]%a@])."
       logic pp_name name pp_role role pp f pp_generals generals
 
-  let pp buf = function
-    | Include filename -> Printf.bprintf buf "include('%s')." filename
+  let pp out = function
+    | Include filename -> Format.fprintf out "include('%s')." filename
     | IncludeOnly (filename, names) ->
-      Printf.bprintf buf "include('%s', [%a])." filename (Util.pp_list pp_name) names
+      Format.fprintf out "@[include('%s',2 [%a]@])." filename (CCFormat.list pp_name) names
     | TypeDecl (name, s, ty, g) ->
-      Printf.bprintf buf "tff(%a, type, (%s : %a)%a)."
+      Format.fprintf out "@[<2>tff(%a, type,@ (%s : %a)%a@])."
         pp_name name s PT.TPTP.pp ty pp_generals g
     | NewType (name, s, kind, g) ->
-      Printf.bprintf buf "tff(%a, type, (%s: %a)%a)."
+      Format.fprintf out "@[<2>tff(%a, type,@ (%s: %a)%a@])."
         pp_name name s PT.TPTP.pp kind pp_generals g
     | CNF (name, role, c, generals) ->
-      __pp_formula buf (Util.pp_list ~sep:" | " PT.TPTP.pp) ("cnf", name, role, c, generals)
+      pp_form_ out
+        (CCFormat.list ~start:"" ~stop:"" ~sep:" | " PT.TPTP.pp)
+        ("cnf", name, role, c, generals)
     | FOF (name, role, f, generals) ->
-      __pp_formula buf PT.TPTP.pp  ("fof", name, role, f, generals)
+      pp_form_ out PT.TPTP.pp  ("fof", name, role, f, generals)
     | TFF (name, role, f, generals) ->
-      __pp_formula buf PT.TPTP.pp ("tff", name, role, f, generals)
+      pp_form_ out PT.TPTP.pp ("tff", name, role, f, generals)
     | THF (name, role, f, generals) ->
-      __pp_formula buf PT.TPTP.pp ("thf", name, role, f, generals)
+      pp_form_ out PT.TPTP.pp ("thf", name, role, f, generals)
 
-  let to_string = Util.on_buffer pp
-
-  let fmt fmt d = Format.pp_print_string fmt (to_string d)
+  let to_string = CCFormat.to_string pp
 end
 
 module Typed = struct
@@ -371,33 +356,32 @@ module Typed = struct
 
   (** {2 IO} *)
 
-  let __pp_formula buf pp (logic, name, role, f, generals) =
-    Printf.bprintf buf "%s(%a, %a, (%a)%a)."
-      logic pp_name name pp_role role
-      pp f pp_generals generals
+  let pp_form_ out pp (logic, name, role, f, generals) =
+    Format.fprintf out "@[<2>%s(%a,@ %a,@ @[(%a)@]%a@])."
+      logic pp_name name pp_role role pp f pp_generals generals
 
-  let pp buf = function
-    | Include filename -> Printf.bprintf buf "include('%s')." filename
+  let pp out = function
+    | Include filename -> Format.fprintf out "include('%s')." filename
     | IncludeOnly (filename, names) ->
-      Printf.bprintf buf "include('%s', [%a])." filename (Util.pp_list pp_name) names
+      Format.fprintf out "@[include('%s',2 [%a]@])." filename (CCFormat.list pp_name) names
     | TypeDecl (name, s, ty, g) ->
-      Printf.bprintf buf "tff(%a, type, (%s : %a)%a)."
+      Format.fprintf out "@[<2>tff(%a, type,@ (%s : %a)%a@])."
         pp_name name s Type.TPTP.pp ty pp_generals g
     | NewType (name, s, kind, g) ->
-      Printf.bprintf buf "tff(%a, type, (%s: %a)%a)."
+      Format.fprintf out "@[<2>tff(%a, type,@ (%s: %a)%a@])."
         pp_name name s Type.TPTP.pp kind pp_generals g
     | CNF (name, role, c, generals) ->
-      __pp_formula buf (Util.pp_list ~sep:" | " Formula.FO.TPTP.pp) ("cnf", name, role, c, generals)
+      pp_form_ out
+        (CCFormat.list ~start:"" ~stop:"" ~sep:" | " Formula.FO.TPTP.pp)
+        ("cnf", name, role, c, generals)
     | FOF (name, role, f, generals) ->
-      __pp_formula buf Formula.FO.TPTP.pp ("fof", name, role, f, generals)
+      pp_form_ out Formula.FO.TPTP.pp  ("fof", name, role, f, generals)
     | TFF (name, role, f, generals) ->
-      __pp_formula buf Formula.FO.TPTP.pp ("tff", name, role, f, generals)
+      pp_form_ out Formula.FO.TPTP.pp ("tff", name, role, f, generals)
     | THF (name, role, f, generals) ->
-      __pp_formula buf HOTerm.TPTP.pp ("thf", name, role, f, generals)
+      pp_form_ out HOTerm.TPTP.pp ("thf", name, role, f, generals)
 
-  let to_string = Util.on_buffer pp
-
-  let fmt fmt d = Format.pp_print_string fmt (to_string d)
+  let to_string = CCFormat.to_string pp
 end
 
 module type MAP = sig

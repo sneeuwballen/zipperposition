@@ -69,7 +69,7 @@ module Lit = struct
   let compare = CCOrd.pair T.cmp CCOrd.bool_
   let equal a b = compare a b=0
 
-  let pp buf (t,b) = Printf.bprintf buf "%s%a" (if b then "" else "¬") T.pp t
+  let pp out (t,b) = Format.fprintf out "%s%a" (if b then "" else "¬") T.pp t
 end
 
 (** A clause is a disjunction ("or") of literals. We simply use a list
@@ -109,7 +109,7 @@ module Clause = struct
     make (List.map (fun (t,b) -> Substs.FO.apply ~renaming subst t s_c, b) c)
 
   (** printing a clause: print literals separated with "|" *)
-  let pp buf c = CCList.pp ~sep:" | " Lit.pp buf c
+  let pp out c = CCFormat.list ~sep:" | " Lit.pp out c
 
   (** Conversion from list of atomic formulas.
       type: [Formula.t list -> clause] *)
@@ -118,10 +118,10 @@ module Clause = struct
       | F.Not f' ->
           begin match F.view f' with
           | F.Atom t -> t,false
-          | _ -> failwith (CCPrint.sprintf "unsupported formula %a" F.pp f)
+          | _ -> failwith (CCFormat.sprintf "unsupported formula %a" F.pp f)
           end
       | F.Atom t -> t, true
-      | _ -> failwith (CCPrint.sprintf "unsupported formula %a" F.pp f)
+      | _ -> failwith (CCFormat.sprintf "unsupported formula %a" F.pp f)
     in
     make (List.map _atom c)
 end
@@ -167,11 +167,11 @@ let _add_passive c =
   if c = [] then raise Unsat
   else if Clause.is_trivial c
   then (
-    Util.debug 4 "clause %a is trivial" Clause. pp c;
+    Util.debug 4 "clause %a is trivial" (fun k->k Clause.pp c);
   )
   else if not (ClauseSet.mem c !_active_set)
   then (
-    Util.debug 4 "new passive clause %a" Clause.pp c;
+    Util.debug 4 "new passive clause %a" (fun k->k Clause.pp c);
     Queue.push c _passive_set
   )
 
@@ -218,7 +218,7 @@ let _factoring c =
             (** Build the conclusion of the inference (removing one
                 of the factored literals *)
             let c' = Clause.apply_subst ~renaming subst c' 0 in
-            Util.debug 3 "factoring of %a ----> %a" Clause.pp c Clause.pp c';
+            Util.debug 3 "factoring of %a ----> %a" (fun k->k Clause.pp c Clause.pp c');
             (** New clauses go into the passive set *)
             _add_passive c'
           with Unif.Fail -> ()
@@ -292,7 +292,7 @@ let _resolve_with c =
                 and add it into the passive set, to be processed later *)
             let concl = Clause.make concl in
             Util.debug 3 "resolution of %a and %a ---> %a"
-              Clause.pp c Clause.pp d Clause.pp concl;
+              (fun k->k Clause.pp c Clause.pp d Clause.pp concl);
             _add_passive concl
           )
         )
@@ -322,7 +322,7 @@ let _saturate clauses =
           yet and must not be trivial either. *)
       if not (Clause.is_trivial c) && not (ClauseSet.mem c !_active_set)
       then (
-        Util.debug 2 "given clause: %a" Clause.pp c;
+        Util.debug 2 "given clause: %a" (fun k->k Clause.pp c);
         _add_active c;
         _resolve_with c;
         _factoring c;
@@ -338,7 +338,7 @@ let _saturate clauses =
     and return the result. We use an error monad to make error
     handling easier (the function [>>=] is a {i monadic bind}). *)
 let process_file f =
-  Util.debug 2 "process file %s..." f;
+  Util.debug 2 "process file %s..." (fun k->k f);
   let res = Err.(
     (** parse the file in the TPTP format *)
     Logtk_parsers.Util_tptp.parse_file ~recursive:true f 

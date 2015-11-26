@@ -51,7 +51,7 @@ let declare signature symb ty =
     if LogtkType.eq ty ty'
       then signature  (* ok *)
       else
-        let msg = LogtkUtil.sprintf "type error for %a: %a and %a are incompatible"
+        let msg = CCFormat.sprintf "type error for %a: %a and %a are incompatible"
           LogtkSymbol.pp symb LogtkType.pp ty LogtkType.pp ty'
         in
         raise (LogtkType.Error msg)
@@ -66,7 +66,7 @@ let arity signature s =
   let ty = find_exn signature s in
   match LogtkType.arity ty with
   | LogtkType.NoArity ->
-    failwith (LogtkUtil.sprintf "symbol %a has ill-formed type %a" LogtkSymbol.pp s LogtkType.pp ty)
+    failwith (CCFormat.sprintf "symbol %a has ill-formed type %a" LogtkSymbol.pp s LogtkType.pp ty)
   | LogtkType.Arity (a,b) -> a, b
 
 let is_ground signature =
@@ -81,7 +81,7 @@ let merge s1 s2 =
           then Some ty1
           else
             let msg =
-              LogtkUtil.sprintf "LogtkSignature.merge: incompatible types for %a: %a and %a"
+              CCFormat.sprintf "Signature.merge: incompatible types for %a: %a and %a"
               LogtkSymbol.pp s LogtkType.pp ty1 LogtkType.pp ty2
             in
             raise (LogtkType.Error msg)
@@ -93,7 +93,7 @@ let filter s p = SMap.filter p s
 
 let diff s1 s2 =
   SMap.merge
-    (fun s ty1 ty2 -> match ty1, ty2 with
+    (fun _ ty1 ty2 -> match ty1, ty2 with
       | Some ty1, None -> Some ty1
       | Some _, Some _
       | None, Some _
@@ -133,34 +133,16 @@ let fold s acc f =
 
 (** {2 IO} *)
 
-let pp buf s =
-  let pp_pair buf (s,ty) =
-    Printf.bprintf buf "%a: %a" LogtkSymbol.pp s LogtkType.pp ty in
-  Printf.bprintf buf "{";
-  LogtkUtil.pp_seq pp_pair buf (Seq.to_seq s);
-  Printf.bprintf buf "}";
-  ()
-
-let to_string s =
-  LogtkUtil.sprintf "%a" pp s
-
-let fmt out s =
+let pp out s =
   let pp_pair out (s,ty) =
-    Format.fprintf out "@[<hov2>%a:@ %a@]" LogtkSymbol.fmt s LogtkType.fmt ty
+    Format.fprintf out "@[<hov2>%a:@ %a@]" LogtkSymbol.pp s LogtkType.pp ty
   in
   Format.fprintf out "{@[<hv>";
-  Sequence.pp_seq pp_pair out (Seq.to_seq s);
+  CCFormat.seq pp_pair out (Seq.to_seq s);
   Format.fprintf out "@]}";
   ()
 
-  (* TODO
-let bij =
-  let open Bij in
-  map
-    ~inject:(fun signature -> Sequence.to_list (to_seq signature))
-    ~extract:(fun l -> of_seq (Sequence.of_list l))
-    (list_ (pair string_ LogtkSymbol.bij))
-    *)
+let to_string = CCFormat.to_string pp
 
 module TPTP = struct
   let is_bool signature s =

@@ -230,13 +230,12 @@ module Dot : sig
   ] (** Dot attribute *)
 
   val pp_enum : ?eq:('id -> 'id -> bool) -> ?hash:('id -> int) ->
-                name:string -> Format.formatter ->
-                ('id,attribute list,attribute list) Full.traverse_event Sequence.t ->
-                unit
+                name:string ->
+                ('id,attribute list,attribute list)
+                  Full.traverse_event Sequence.t CCFormat.printer
 
   val pp : name:string -> ('id, attribute list, attribute list) t ->
-           Format.formatter ->
-           'id Sequence.t -> unit
+           'id Sequence.t CCFormat.printer
     (** Pretty print the given graph (starting from the given set of vertices)
         to the channel in DOT format *)
 end

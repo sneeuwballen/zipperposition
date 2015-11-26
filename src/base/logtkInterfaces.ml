@@ -45,30 +45,28 @@ end
 (** Print a type t *)
 module type PRINT = sig
   type t
-  val pp : Buffer.t -> t -> unit
+  val pp : t CCFormat.printer
   val to_string : t -> string
-  val fmt : Format.formatter -> t -> unit
 end
 
 module type PRINT1 = sig
   type 'a t
-  val pp : (Buffer.t -> 'a -> unit) -> Buffer.t -> 'a t -> unit
-  val to_string : (Buffer.t -> 'a -> unit) -> 'a t -> string
-  val fmt : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
+  val pp : 'a CCFormat.printer -> 'a t CCFormat.printer
+  val to_string : 'a CCFormat.printer -> 'a t -> string
 end
 
 (** Register printers by name *)
 module type PRINT_OVERLOAD = sig
   type t
-  val pp_with : string -> Buffer.t -> t -> unit
-  val add_printer : string -> (Buffer.t -> t -> unit) -> unit
+  val pp_with : string -> t CCFormat.printer
+  val add_printer : string -> t CCFormat.printer -> unit
   val set_default_printer : string -> unit   (** Used by PRINT.pp... *)
 end
 
 module type PRINT_DE_BRUIJN = sig
   type t
   type term
-  type print_hook = int -> (Buffer.t -> term -> unit) -> Buffer.t -> term -> bool
+  type print_hook = int -> term CCFormat.printer -> Format.formatter -> term -> bool
     (** User-provided hook that can be used to print terms (for composite cases)
         before the default printing occurs. The int argument is the De Bruijn
         depth in the term.
@@ -77,7 +75,7 @@ module type PRINT_DE_BRUIJN = sig
         A hook should return [true] if it fired, [false] to fall back
         on the default printing. *)
 
-  val pp_depth : ?hooks:print_hook list -> int -> Buffer.t -> t -> unit
+  val pp_depth : ?hooks:print_hook list -> int -> t CCFormat.printer
 end
 
 module type ITER = sig

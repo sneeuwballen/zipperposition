@@ -244,10 +244,10 @@ module RecordUnif = struct
   let fields r = r.fields
 
   let _pp out r =
-    let pp_list = CCList.print (CCPair.print CCString.print T.fmt) in
+    let pp_list = CCFormat.list (CCFormat.pair CCFormat.string T.pp) in
     let pp_rest out x = match x with
       | None -> ()
-      | Some r -> Format.fprintf out "| %a" T.fmt r
+      | Some r -> Format.fprintf out "| %a" T.pp r
     in
     Format.fprintf out
       "@[<hov2>record_unif {@,fields=@[%a@],@ discarded=@[%a@]@ %a@,}@]"
@@ -1298,7 +1298,7 @@ module Form = struct
       | F.Xor (f11, f12), F.Xor (f21, f22)
       | F.Equiv(f11, f12), F.Imply (f21, f22) ->
         unif ~env1 ~env2 subst f11 f21
-          (fun subst -> unif ~env1 ~env2 subst f21 f22 k)
+          (fun subst -> unif ~env1 ~env2 subst f12 f22 k)
       | F.And l1, F.And l2
       | F.Or l1, F.Or l2 ->
         if List.length l1 = List.length l2
@@ -1325,7 +1325,7 @@ module Form = struct
           (fun subst -> unif_ac ~env1 ~env2 subst l1' [] (left @ right') k);
         (* f1 against right', keep f2 for later *)
         unif_ac ~env1 ~env2 subst l1 (f2::left) right' k
-      | _::_, left, [] -> ()
+      | _::_, _left, [] -> ()
       | _ -> assert false
     in
     (* flattening (for and/or) *)

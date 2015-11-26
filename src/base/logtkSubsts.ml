@@ -162,7 +162,7 @@ let mem subst v s_v = match subst with
     that is not a variable or that is not bound *)
 let rec get_var subst v sc_v = match subst with
   | E -> v, sc_v
-  | M m ->
+  | M _ ->
     try let t, sc_t = lookup subst v sc_v in
         begin match T.view t with
         | (T.Var _ | T.RigidVar _) when (sc_t <> sc_v || not (T.eq t v)) ->
@@ -188,7 +188,7 @@ let bind subst v s_v t s_t =
         let m' = M.replace m (t', s_t') (t, s_t) in
         M m'
     | _ ->
-        let msg = LogtkUtil.sprintf
+        let msg = CCFormat.sprintf
           "Subst.bind: inconsistent binding for %a[%d]: %a[%d] and %a[%d]"
             T.pp v s_v T.pp t s_t T.pp t' s_t'
         in
@@ -210,7 +210,7 @@ let append s1 s2 = match s1, s2 with
           if T.eq t1 t2 && s1 = s2
             then Some (t1, s1)
             else
-              let msg = LogtkUtil.sprintf
+              let msg = CCFormat.sprintf
                 "Subst.bind: inconsistent binding for %a[%d]: %a[%d] and %a[%d]"
                   T.pp v s_v T.pp t1 s1 T.pp t2 s2
               in
@@ -288,25 +288,22 @@ let of_list ?(init=empty) l = match l with
   | _::_ ->
     List.fold_left (fun subst (v,s_v,t,s_t) -> bind subst v s_v t s_t) init l
 
-let pp buf subst =
-  let pp_term buf t =
+let pp out subst =
+  let pp_term out t =
     match T.kind t with
-    | T.Kind.FOTerm -> LogtkFOTerm.pp buf (LogtkFOTerm.of_term_exn t)
-    | T.Kind.Type -> LogtkType.pp buf (LogtkType.of_term_exn t)
-    | T.Kind.HOTerm -> LogtkHOTerm.pp buf (LogtkHOTerm.of_term_exn t)
-    | _ -> T.pp buf t
+    | T.Kind.FOTerm -> LogtkFOTerm.pp out (LogtkFOTerm.of_term_exn t)
+    | T.Kind.Type -> LogtkType.pp out (LogtkType.of_term_exn t)
+    | T.Kind.HOTerm -> LogtkHOTerm.pp out (LogtkHOTerm.of_term_exn t)
+    | _ -> T.pp out t
   in
-  let pp_binding buf (v,s_v,t,s_t) =
-    Printf.bprintf buf "%a[%d] → %a[%d]" pp_term v s_v pp_term t s_t
+  let pp_binding out (v,s_v,t,s_t) =
+    Format.fprintf out "%a[%d] → %a[%d]" pp_term v s_v pp_term t s_t
   in
   match to_list subst with
-  | [] -> Buffer.add_string buf "{}"
-  | l -> Printf.bprintf buf "{%a}" (LogtkUtil.pp_list ~sep:", " pp_binding) l
+  | [] -> CCFormat.string out "{}"
+  | l -> Format.fprintf out "{%a}" (CCFormat.list ~sep:", " pp_binding) l
 
-let to_string = LogtkUtil.on_buffer pp
-
-let fmt fmt subst =
-  Format.pp_print_string fmt (to_string subst)
+let to_string = CCFormat.to_string pp
 
 (** {2 Applying a substitution} *)
 

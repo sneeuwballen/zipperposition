@@ -232,7 +232,7 @@ module Make(X : Set.OrderedType) = struct
       else
         let feat = fingerprint.(i) in
         match feat with
-        | S s ->
+        | S _ ->
           let acc = try_feature retrieve trie acc i feat in
           let acc = try_feature retrieve trie acc i A in
           try_feature retrieve trie acc i B
@@ -259,7 +259,7 @@ module Make(X : Set.OrderedType) = struct
       else
         let feat = fingerprint.(i) in
         match feat with
-        | S s ->
+        | S _ ->
           let acc = try_feature retrieve trie acc i feat in
           let acc = try_feature retrieve trie acc i A in
           try_feature retrieve trie acc i B
@@ -281,7 +281,7 @@ module Make(X : Set.OrderedType) = struct
       else
         let feat = fingerprint.(i) in
         match feat with
-        | S s -> try_feature retrieve trie acc i feat
+        | S _ -> try_feature retrieve trie acc i feat
         | A ->
           let acc = try_feature retrieve trie acc i A in
           all_symbols retrieve trie acc i
@@ -294,6 +294,6 @@ module Make(X : Set.OrderedType) = struct
     in
     retrieve idx.trie acc 0
 
-  let to_dot buf t =
+  let to_dot _ _ =
     failwith "Fingerprint: to_dot not implemented"
 end

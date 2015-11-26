@@ -77,11 +77,11 @@ let term_to_char t =
   | T.Classic.App (f, _, _) -> LogtkSymbol f
   | T.Classic.NonFO -> NonFO
 
-let pp_char buf = function
-  | Variable t -> T.pp buf t
-  | BoundVariable i -> Printf.bprintf buf "Y%d" i
-  | LogtkSymbol f -> LogtkSymbol.pp buf f
-  | NonFO -> Buffer.add_string buf "<nonfo>"
+let pp_char out = function
+  | Variable t -> T.pp out t
+  | BoundVariable i -> Format.fprintf out "Y%d" i
+  | LogtkSymbol f -> LogtkSymbol.pp out f
+  | NonFO -> CCFormat.string out "<nonfo>"
 
 let open_term ~stack t =
   let cur_char = term_to_char t in
@@ -121,7 +121,8 @@ let to_list t =
   | None -> assert false
   | Some i ->
     let l = getnext [] i in
-    LogtkUtil.debug 5 "dtree.to_list %a = [%a]" T.pp t (LogtkUtil.pp_list pp_char) l;
+    LogtkUtil.debug 5 "dtree.to_list %a = [%a]"
+      (fun k->k T.pp t (CCFormat.list pp_char) l);
     l
 
 module CharMap = Map.Make(struct
@@ -226,7 +227,7 @@ module Make(E : LogtkIndex.EQUATION) = struct
       match trie, iter with
       | TrieLeaf l, None ->  (* yield all equations, they all match *)
         List.fold_left
-          (fun acc (t', eqn, _) ->
+          (fun acc (_, eqn, _) ->
             let l, r, sign' = E.extract eqn in
             if sign = sign'
               then k acc l r eqn subst
@@ -282,7 +283,7 @@ module Make(E : LogtkIndex.EQUATION) = struct
     iter dt (fun _ _ -> incr n);
     !n
 
-  let to_dot buf t =
+  let to_dot _out _t =
     failwith "DTree.to_dot: not implemented"
 end
 

@@ -142,13 +142,13 @@ module type S = sig
 
   val cancel : t -> t -> t * t
   (** Remove common elements from the multisets. For instance,
-    on [{1,1,2}] and [{1,2,2,3}], [cance] will return [({1}, {2,3})] *)
+    on [{1,1,2}] and [{1,2,2,3}], [cancel] will return [({1}, {2,3})] *)
 
   (** {6 LogtkComparisons}
 
   In the following, the comparison function must be equality-compatible
-  with [E.compare]. In other words, if [f x y = LogtkComparison.Eq] then
-  [E.compare x y = 0] should hold. *)
+  with [E.compare]. In other words, if [E.compare x y = 0] then
+  [f x y = LogtkComparison.Eq] must hold. *)
 
   val compare : t -> t -> int
   (** Compare two multisets with the multiset extension of {!E.compare} *)
@@ -171,10 +171,12 @@ module type S = sig
   val max_l : (elt -> elt -> LogtkComparison.t) -> elt list -> elt list
   (** Maximal elements of a list *)
 
-  val compare_partial_l : (elt -> elt -> LogtkComparison.t) -> elt list -> elt list -> LogtkComparison.t
+  val compare_partial_l :
+    (elt -> elt -> LogtkComparison.t) ->
+    elt list -> elt list -> LogtkComparison.t
   (** Compare two multisets represented as list of elements *)
 
-  val pp : (Buffer.t -> elt -> unit) -> Buffer.t -> t -> unit
+  val pp : elt CCFormat.printer -> t CCFormat.printer
 end
 
 module Make(E : Map.OrderedType) = struct
@@ -259,7 +261,7 @@ module Make(E : Map.OrderedType) = struct
 
   let product n m =
     if Z.sign n <= 0 then empty
-    else _map (fun x n' -> Z.mul n n') m
+    else _map (fun _ n' -> Z.mul n n') m
 
   let map f m =
     List.fold_left
@@ -280,7 +282,7 @@ module Make(E : Map.OrderedType) = struct
 
   let flat_map f m =
     List.fold_left
-      (fun m' (x,n) ->
+      (fun m' (x,_) ->
         let m'' = f x in
         union m' m''
       ) empty m
@@ -436,7 +438,7 @@ module Make(E : Map.OrderedType) = struct
 
   let is_max f x m =
     List.for_all
-      (fun (y,n) -> match f x y with
+      (fun (y,_) -> match f x y with
         | LogtkComparison.Lt -> false
         | _ -> true)
       m
@@ -481,11 +483,9 @@ module Make(E : Map.OrderedType) = struct
   let compare_partial_l f l1 l2 =
     compare_partial f (of_list l1) (of_list l2)
 
-  let pp pp_x buf l =
-    Buffer.add_string buf "{";
-    LogtkUtil.pp_list ~sep:", "
-      (fun buf (x,n) ->
-        Printf.bprintf buf "%a: %s" pp_x x (Z.to_string n)
-      ) buf l;
-    Buffer.add_string buf "}"
+  let pp pp_x out l =
+    Format.fprintf out "{@[%a@]}"
+      (CCFormat.list ~start:"" ~stop:"" ~sep:", "
+        (fun out (x,n) -> Format.fprintf out "%a: %s" pp_x x (Z.to_string n)))
+      l
 end

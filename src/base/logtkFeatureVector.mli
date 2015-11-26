@@ -42,8 +42,7 @@ module Make(C : LogtkIndex.CLAUSE) : sig
 
     val name : t -> string
     val compute : t -> LogtkIndex.lits -> int
-    val pp : Buffer.t -> t -> unit
-    val fmt : Format.formatter -> t -> unit
+    include LogtkInterfaces.PRINT with type t := t
 
     val sum_of_depths : t                 (** sum of depths of symbols *)
     val size_plus : t                     (** size of positive clause *)

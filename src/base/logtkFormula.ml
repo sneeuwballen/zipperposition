@@ -353,18 +353,18 @@ module Make(MyT : TERM) = struct
     let equiv f1 f2 = T.simple_app ~kind ~ty Sym.Base.equiv [f1; f2]
     let xor f1 f2 = T.simple_app ~kind ~ty Sym.Base.xor [f1; f2]
 
-    let __check_same t1 t2 =
+    let check_same_ t1 t2 =
       let ty1 = MyT.ty t1 and ty2 = MyT.ty t2 in
       if not (LogtkType.eq ty1 ty2)
         then
-          let msg = LogtkUtil.sprintf
+          let msg = CCFormat.sprintf
             "Formula.Base.eq: expect same types for %a and %a, got %a and %a"
             (MyT.pp_depth 0) t1 LogtkType.pp ty1 (MyT.pp_depth 0) t2 LogtkType.pp ty2
           in
           raise (LogtkType.Error msg)
 
     let eq t1 t2 =
-      __check_same t1 t2;
+      check_same_ t1 t2;
       T.simple_app ~kind ~ty Sym.Base.eq ([t1; t2] : term list :> T.t list)
 
     let neq t1 t2 =
@@ -674,11 +674,11 @@ module Make(MyT : TERM) = struct
 
   let rec flatten f =
     match view f with
-    | Or l ->
+    | Or _ ->
       let l' = open_or f in
       let l' = List.map flatten l' in
       Base.or_ l'
-    | And l ->
+    | And _ ->
       let l' = open_and f in
       let l' = List.map flatten l' in
       Base.and_ l'
@@ -772,9 +772,9 @@ module Make(MyT : TERM) = struct
     | Atom _ -> false
     | Eq (l,r) -> MyT.eq l r
     | False -> false
-    | Imply (a, b) when eq a Base.false_ -> true
+    | Imply (a, _) when eq a Base.false_ -> true
     | Equiv (l,r) -> eq l r
-    | Xor (l, r) -> false
+    | Xor (_, _) -> false
     | Or l -> List.exists is_trivial l
     | And _
     | Imply _
@@ -843,152 +843,144 @@ module Make(MyT : TERM) = struct
     | Forall (tyvar, f') ->
       PT.TPTP.forall
         [PT.column
-            (PT.var (LogtkUtil.sprintf "Y%d" depth))
+            (PT.var (CCFormat.sprintf "Y%d" depth))
             (LogtkType.Conv.to_prolog ~depth tyvar)]
         (to_prolog (depth+1) f')
     | Exists (tyvar, f') ->
       PT.TPTP.exists
         [PT.column
-            (PT.var (LogtkUtil.sprintf "Y%d" depth))
+            (PT.var (CCFormat.sprintf "Y%d" depth))
             (LogtkType.Conv.to_prolog ~depth tyvar)]
         (to_prolog (depth+1) f')
     | ForallTy f' ->
       PT.TPTP.forall_ty
-        [PT.var (LogtkUtil.sprintf "A%d" depth)]
+        [PT.var (CCFormat.sprintf "A%d" depth)]
         (to_prolog (depth+1) f')
     in to_prolog depth f
 
   (** {2 IO} *)
 
-  type print_hook = int -> (Buffer.t -> term -> unit) -> Buffer.t -> term -> bool
+  type print_hook = int -> (CCFormat.t -> term -> unit) -> CCFormat.t -> term -> bool
 
-  let pp_depth ?(hooks=[]) depth buf f =
+  let pp_depth ?(hooks=[]) depth out f =
     let depth = ref depth in
     (* outer formula *)
-    let rec pp_outer buf f = match view f with
-    | True -> Buffer.add_string buf "true"
-    | False -> Buffer.add_string buf "false"
-    | Atom t -> (MyT.pp_depth ~hooks !depth) buf t
+    let rec pp_outer out f = match view f with
+    | True -> CCFormat.string out "true"
+    | False -> CCFormat.string out "false"
+    | Atom t -> (MyT.pp_depth ~hooks !depth) out t
     | Neq (t1, t2) ->
-      MyT.pp_depth ~hooks !depth buf t1;
-      Buffer.add_string buf " ≠ ";
-      MyT.pp_depth ~hooks !depth buf t2
+      Format.fprintf out
+        "@[%a ≠ %a@]" (MyT.pp_depth ~hooks !depth) t1 (MyT.pp_depth ~hooks !depth) t2
     | Eq (t1, t2) ->
-      MyT.pp_depth ~hooks !depth buf t1;
-      Buffer.add_string buf " = ";
-      MyT.pp_depth ~hooks !depth buf t2
+      Format.fprintf out
+        "@[%a = %a@]" (MyT.pp_depth ~hooks !depth) t1 (MyT.pp_depth ~hooks !depth) t2
     | Xor(f1, f2) ->
-      pp_inner buf f1; Buffer.add_string buf " <~> "; pp_inner buf f2
+      Format.fprintf out "@[<hv>%a@ <~>@ %a@]" pp_inner f1 pp_inner f2
     | Equiv (f1, f2) ->
-      pp_inner buf f1; Buffer.add_string buf " <=> "; pp_inner buf f2
+      Format.fprintf out "@[<hv>%a@ <=>@ %a@]" pp_inner f1 pp_inner f2
     | Imply (f1, f2) ->
-      pp_inner buf f1; Buffer.add_string buf " => "; pp_inner buf f2
-    | Not f' -> Buffer.add_string buf "¬ "; pp_inner buf f'
+      Format.fprintf out "@[<hv>%a@ =>@ %a@]" pp_inner f1 pp_inner f2
+    | Not f' -> Format.fprintf out "@[¬ %a@]" pp_inner f'
     | Forall (ty,f') ->
       let v = !depth in
       incr depth;
-      Printf.bprintf buf "∀ Y%d: %a. %a" v LogtkType.pp ty pp_inner f';
+      Format.fprintf out "@[<2>∀ Y%d: %a.@ @[%a@]@]" v LogtkType.pp ty pp_inner f';
       decr depth
     | ForallTy f' ->
       let v = !depth in
       incr depth;
-      Printf.bprintf buf "∀ A%d. %a" v pp_inner f';
+      Format.fprintf out "@[<2>∀ A%d.@ @[%a@]@]" v pp_inner f';
       decr depth
     | Exists (ty, f') ->
       let v = !depth in
       incr depth;
-      Printf.bprintf buf "∃ Y%d: %a. %a" v LogtkType.pp ty pp_inner f';
+      Format.fprintf out "@[<2>∃ Y%d: %a.@ @[%a@]@]" v LogtkType.pp ty pp_inner f';
       decr depth
-    | And l -> LogtkUtil.pp_list ~sep:" ∧ " pp_inner buf l
-    | Or l -> LogtkUtil.pp_list ~sep:" ∨ " pp_inner buf l
-    and pp_inner buf f = match view f with
+    | And l ->
+        Format.fprintf out "@[<hv>%a@]"
+          (CCFormat.list ~start:"" ~stop:"" ~sep:" ∧ " pp_inner) l
+    | Or l ->
+        Format.fprintf out "@[<hv>%a@]"
+          (CCFormat.list ~start:"" ~stop:"" ~sep:" ∨ " pp_inner) l
+    and pp_inner out f = match view f with
     | And _
     | Or _
     | Equiv _
     | Xor _
     | Imply _ ->
-      (* cases where ambiguities could arise *)
-      Buffer.add_char buf '('; pp_outer buf f; Buffer.add_char buf ')';
-    | _ -> pp_outer buf f
+        (* cases where ambiguities could arise *)
+        Format.fprintf out "(@[%a@])" pp_outer f
+    | _ -> pp_outer out f
     in
-    pp_outer buf f
+    pp_outer out f
 
-  let pp buf f = pp_depth ~hooks:(MyT.default_hooks ()) 0 buf f
+  let pp out f = pp_depth ~hooks:(MyT.default_hooks ()) 0 out f
 
-  let to_string f = LogtkUtil.on_buffer pp f
-
-  let fmt fmt f = Format.pp_print_string fmt (to_string f)
+  let to_string f = CCFormat.to_string pp f
 
   module TPTP = struct
-    let pp_depth ?(hooks=[]) depth buf f =
+    let pp_depth ?hooks:_ _depth out f =
       let depth = ref 0 in
       (* outer formula *)
-      let rec pp_outer buf f = match view f with
-      | True -> Buffer.add_string buf "$true"
-      | False -> Buffer.add_string buf "$false"
-      | Atom t -> (MyT.TPTP.pp_depth !depth) buf t
+      let rec pp_outer out f = match view f with
+      | True -> CCFormat.string out "$true"
+      | False -> CCFormat.string out "$false"
+      | Atom t -> (MyT.TPTP.pp_depth !depth) out t
       | Neq (t1, t2) ->
-        (MyT.TPTP.pp_depth !depth) buf t1;
-        Buffer.add_string buf " != ";
-        (MyT.TPTP.pp_depth !depth) buf t2
+        Format.fprintf out
+          "@[%a != %a@]" (MyT.TPTP.pp_depth !depth) t1 (MyT.TPTP.pp_depth !depth) t2
       | Eq (t1, t2) ->
-        (MyT.TPTP.pp_depth !depth) buf t1;
-        Buffer.add_string buf " = ";
-        (MyT.TPTP.pp_depth !depth) buf t2
+        Format.fprintf out
+          "@[%a = %a@]" (MyT.TPTP.pp_depth !depth) t1 (MyT.TPTP.pp_depth !depth) t2
       | Xor (f1, f2) ->
-        pp_inner buf f1; Buffer.add_string buf " <~> "; pp_inner buf f2
+        Format.fprintf out "@[<hv>%a@ <~>@ %a@]" pp_inner f1 pp_inner f2
       | Equiv (f1, f2) ->
-        pp_inner buf f1; Buffer.add_string buf " <=> "; pp_inner buf f2
+        Format.fprintf out "@[<hv>%a@ <=>@ %a@]" pp_inner f1 pp_inner f2
       | Imply (f1, f2) ->
-        pp_inner buf f1; Buffer.add_string buf " => "; pp_inner buf f2
-      | Not f' -> Buffer.add_string buf "~ "; pp_inner buf f'
+        Format.fprintf out "@[<hv>%a@ =>@ %a@]" pp_inner f1 pp_inner f2
+      | Not f' -> CCFormat.string out "~ "; pp_inner out f'
       | Forall (ty,f') ->
         let v = !depth in
         incr depth;
         if LogtkType.eq ty LogtkType.TPTP.i
-          then Printf.bprintf buf "![Y%d]: %a" v pp_inner f'
-          else Printf.bprintf buf "![Y%d:%a]: %a" v LogtkType.pp ty pp_inner f';
+          then Format.fprintf out "@[<2>![Y%d]:@ %a@]" v pp_inner f'
+          else Format.fprintf out "@[<2>![Y%d:%a]:@ %a@]" v LogtkType.pp ty pp_inner f';
         decr depth
       | ForallTy f' ->
         let v = !depth in
         incr depth;
-        Printf.bprintf buf "![A%d:$tType]: %a" v pp_inner f';
+        Format.fprintf out "@[<2>![A%d:$tType]:@ %a@]" v pp_inner f';
         decr depth
       | Exists (ty, f') ->
         let v = !depth in
         incr depth;
         if LogtkType.eq ty LogtkType.TPTP.i
-          then Printf.bprintf buf "?[Y%d]: %a" v pp_inner f'
-          else Printf.bprintf buf "?[Y%d:%a]: %a" v LogtkType.pp ty pp_inner f';
+          then Format.fprintf out "@[<2>?[Y%d]:@ %a@]" v pp_inner f'
+          else Format.fprintf out "@[<2>?[Y%d:%a]:@ %a@]" v LogtkType.pp ty pp_inner f';
         decr depth
-      | And l -> LogtkUtil.pp_list ~sep:" & " pp_inner buf l
-      | Or l -> LogtkUtil.pp_list ~sep:" | " pp_inner buf l
-      and pp_inner buf f = match view f with
+      | And l ->
+        Format.fprintf out "(@[%a@])"
+          (CCFormat.list ~start:"" ~stop:"" ~sep:" & " pp_inner) l
+      | Or l ->
+        Format.fprintf out "(@[%a@])"
+          (CCFormat.list ~start:"" ~stop:"" ~sep:" | " pp_inner) l
+      and pp_inner out f = match view f with
       | And _
       | Or _
       | Equiv _
       | Xor _
       | Imply _ ->
         (* cases where ambiguities could arise *)
-        Buffer.add_char buf '('; pp_outer buf f; Buffer.add_char buf ')';
-      | _ -> pp_outer buf f
+        Format.fprintf out "(@[%a@])" pp_outer f
+      | _ -> pp_outer out f
       in
-      pp_outer buf f
+      pp_outer out f
 
     let pp = pp_depth 0
 
-    let to_string f = LogtkUtil.on_buffer pp f
-
-    let fmt fmt f = Format.pp_print_string fmt (to_string f)
+    let to_string f = CCFormat.to_string pp f
   end
-
-  (* FIXME
-  let bij =
-    Bij.(map
-      ~inject:to_term
-      ~extract:of_term
-      LogtkHOTerm.bij)
-  *)
 end
 
 module FO = struct
@@ -1009,7 +1001,7 @@ module FO = struct
     | Not f' -> T.TPTP.mk_not (to_hoterm f')
     | Forall (ty,f') -> T.__mk_forall ~varty:ty (to_hoterm f')
     | Exists (ty,f') -> T.__mk_exists ~varty:ty (to_hoterm f')
-    | ForallTy f' -> failwith "LogtkHOTerm doesn't support dependent types"
+    | ForallTy _ -> failwith "LogtkHOTerm doesn't support dependent types"
     | Atom p -> T.curry p
 
   let of_hoterm t =
@@ -1064,6 +1056,6 @@ module FO = struct
 end
 
 module Map(From : S)(To : S) = struct
-  let map f form = match From.view form with
+  let map _f form = match From.view form with
     | _ -> assert false (* TODO *)
 end
