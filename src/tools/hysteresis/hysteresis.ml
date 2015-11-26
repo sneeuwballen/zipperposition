@@ -375,7 +375,7 @@ let _tff_type_decls =
   ] |> Sequence.of_list
     |> Sequence.mapi
       (fun i (s,ty) ->
-        let name = Ast_tptp.NameString (Util.sprintf "hyst_ty_decl_%d" i) in
+        let name = Ast_tptp.NameString (CCFormat.sprintf "hyst_ty_decl_%d" i) in
         Ast_tptp.Typed.TypeDecl(name, Symbol.TPTP.to_string s, ty, []))
 
 let _tff_type_decls_untyped =
@@ -394,7 +394,7 @@ let precedence_to_E_arg prec =
   | _ ->
       let prec_str = String.concat ","
         (List.map
-          (fun (l,r) -> Util.sprintf "%a>%a" Symbol.pp l Symbol.pp r)
+          (fun (l,r) -> CCFormat.sprintf "%a>%a" Symbol.pp l Symbol.pp r)
           prec)
       in
       ["--term-ordering=LPO4"; "--precedence='" ^ prec_str ^ "'"; "-G"; "invfreq" ]
@@ -409,7 +409,7 @@ let axioms_to_decls axioms =
     |> Sequence.of_list
     |> Sequence.mapi
       (fun i f ->
-        let name = Ast_tptp.NameString (Util.sprintf "hyst_axiom_%d" i) in
+        let name = Ast_tptp.NameString (CCFormat.sprintf "hyst_axiom_%d" i) in
         Ast_tptp.Typed.TFF(name, Ast_tptp.R_axiom, f, []))
 
 (* is the type a boring FOF type? *)
@@ -436,7 +436,7 @@ let ty_declarations decls =
     |> Signature.Seq.to_seq
     |> Sequence.mapi
         (fun i (s,ty) ->
-          let name = Ast_tptp.NameString (Util.sprintf "hyst_decl_%d" i) in
+          let name = Ast_tptp.NameString (CCFormat.sprintf "hyst_decl_%d" i) in
           Ast_tptp.Typed.TypeDecl (name, Symbol.to_string s, ty, []))
 
 (** PRINTERS *)
@@ -444,43 +444,46 @@ let ty_declarations decls =
 (* print content of the reasoner *)
 let print_theory r =
   Reasoner.Seq.to_seq r
-    |> Util.printf "theory:\n  %a\n" (Util.pp_seq ~sep:"\n  " Reasoner.Clause.pp);
+    |> Format.printf "theory: @[%a@]@." (CCFormat.seq ~sep:" " Reasoner.Clause.pp);
   ()
 
-let pp_theory_axiom buf (name, _, t) =
-  Printf.bprintf buf "%s %a" name HOT.pp t
+let pp_theory_axiom out (name, _, t) =
+  Format.fprintf out "%s %a" name HOT.pp t
 
-let pp_rewrite_system buf l =
-  Printf.bprintf buf "rewrite system\n    ";
-  Util.pp_list ~sep:"\n    " (Util.pp_pair ~sep:" --> " FOTerm.pp FOTerm.pp) buf l
+let pp_rewrite_system out l =
+  Format.fprintf out "rewrite system\n    ";
+  CCFormat.list ~sep:" "
+    (fun out (a,b) -> Format.fprintf out "%a --> %a" FOTerm.pp a FOTerm.pp b)
+    out l
 
 let pp_pre_rewrite_system buf l =
   HORewriting.pp buf l
 
 let print_result {theories; lemmas; axioms; rewrite; pre_rewrite; } =
-  Util.printf "axioms:\n  %a\n"
-    (Util.pp_seq ~sep:"\n  " pp_theory_axiom) axioms;
-  Util.printf "theories:\n  %a\n"
-    (Util.pp_seq ~sep:"\n  " pp_theory_axiom) theories;
-  Util.printf "lemmas:\n  %a\n"
-    (Util.pp_seq ~sep:"\n  " (Encoding.pp_clause FOTerm.pp)) lemmas;
-  Util.printf "rewrite systems:\n  %a\n"
-    (Util.pp_seq ~sep:"\n  " pp_rewrite_system) rewrite;
-  Util.printf "pre-rewrite systems:\n  %a\n"
-    (Util.pp_seq ~sep:"\n  " pp_pre_rewrite_system) pre_rewrite;
+  Format.printf "axioms: @[%a@]@."
+    (CCFormat.seq ~sep:"  " pp_theory_axiom) axioms;
+  Format.printf "theories: @[%a@]@."
+    (CCFormat.seq ~sep:"\n  " pp_theory_axiom) theories;
+  Format.printf "lemmas: @[%a@]@."
+    (CCFormat.seq ~sep:"\n  " (Encoding.pp_clause FOTerm.pp)) lemmas;
+  Format.printf "rewrite systems: @[%a@]@."
+    (CCFormat.seq ~sep:"\n  " pp_rewrite_system) rewrite;
+  Format.printf "pre-rewrite systems: @[%a@]@."
+    (CCFormat.seq ~sep:"\n  " pp_pre_rewrite_system) pre_rewrite;
   ()
 
 let print_signature signature =
-  Util.printf "signature:\n  %a\n"
-    (Util.pp_seq ~sep:"\n  " (Util.pp_pair ~sep:" : " Symbol.pp Type.pp))
+  Format.printf "signature: @[%a@]@."
+    (CCFormat.seq ~sep:" "
+      (fun out (a,b) -> Format.fprintf out "%a : %a" Symbol.pp a Type.pp b))
     (Signature.Seq.to_seq signature)
 
 let print_problem decls =
-  Util.printf "problem:\n  %a\n"
-    (Util.pp_seq ~sep:"\n  " Ast_tptp.Untyped.pp) decls
+  Format.printf "problem: @[%a@]@."
+    (CCFormat.seq ~sep:"  " Ast_tptp.Untyped.pp) decls
 
 let print_precedence prec =
-  Util.printf "precedence: %a\n" Lpo.Solution.pp prec
+  Format.printf "precedence: @[%a@]@." Lpo.Solution.pp prec
 
 (** MAIN *)
 
@@ -494,13 +497,14 @@ let parse_args () =
 let reduce_to_cnf_with_E decls =
   (* use E to reduce to CNF, also declare types of TFF predicates *)
   let decls' = Sequence.append _tff_type_decls_untyped decls in
-  Util.debug 5 "cnf decls:\n  %a\n" (Util.pp_seq ~sep:"\n  " Ast_tptp.Untyped.pp) decls';
+  Util.debug 5 "cnf decls:\n  %a\n"
+    (fun k->k (CCFormat.seq ~sep:" " Ast_tptp.Untyped.pp) decls');
   CallProver.Eprover.cnf (* XXX ~opts:["--free-numbers"] *) decls'
 
 let main () =
   E.(
     (* parse theory, obtain a loaded meta-prover *)
-    Util.debug 2 "load theory files...";
+    Util.debug 2 "load theory files..." (fun _ ->());
     parse_theory_files Prover.empty !theory_files
     >>= fun prover ->
     if !flag_print_theory
@@ -508,16 +512,16 @@ let main () =
     if !flag_print_signature
       then print_signature (Prover.signature prover);
     (* parse problem *)
-    Util.debug 2 "read problem files...";
+    Util.debug 2 "read problem files..." (fun _ ->());
     parse_tptp_files !files
     >>= fun decls ->
     (* extract into typed clauses *)
-    Util.debug 2 "infer types...";
+    Util.debug 2 "infer types..." (fun _ ->());
     Util_tptp.infer_types (`sign Signature.TPTP.Arith.full) decls
     >>= fun (signature, decls) ->
-    Util.debug 2 "reduce to CNF...";
+    Util.debug 2 "reduce to CNF..." (fun _ ->());
     (* reduce to CNF *)
-    let signature, decls = Util_tptp.to_cnf signature decls in
+    let _signature, decls = Util_tptp.to_cnf signature decls in
     (* global state *)
     let state = State.of_prover prover in
     (* detect theories (selecting only clauses) *)
@@ -547,7 +551,7 @@ let main () =
     (* orient rewrite system to get a precedence (if flag enabled) *)
     let precedence_args =
       if !flag_use_ord then begin
-        Util.debug 2 "orient rewrite rules...";
+        Util.debug 2 "orient rewrite rules..." (fun _ ->());
         let orders =
           state.State.rewrite
             |> Lpo.FO.orient_lpo_list
@@ -571,25 +575,24 @@ let main () =
     let args = precedence_args @ ["--memory-limit=512"; "--proof-object"] in
     (* build final sequence of declarations: add rules/axioms, then add
       type declarations *)
-    Util.debug 5 "build prelude...";
+    Util.debug 5 "build prelude..." (fun _ ->());
     let prelude_decls =
       axioms_of_rules state.State.rewrite
       |> List.rev_append state.State.axioms
       |> axioms_to_decls
     in
-    Util.debug 5 "prelude built";
+    Util.debug 5 "prelude built" (fun _ ->());
     let decls = Sequence.append prelude_decls decls in
     Util.debug 5 "all decls:\n  %a\n"
-      (Util.pp_seq ~sep:"\n  " Ast_tptp.Typed.pp)
-      decls;
+      (fun k->k (CCFormat.seq ~sep:" " Ast_tptp.Typed.pp) decls);
     let decls = Sequence.append (ty_declarations decls) decls in
-    Util.debug 5 "erase types...";
+    Util.debug 5 "erase types..." (fun _ -> ());
     let final_decls = erase_types decls in
     (* yield to E *)
     if !flag_print_problem
       then print_problem final_decls;
     let final_decls = List.rev (Sequence.to_rev_list final_decls) in
-    Util.debug 1 "call prover now";
+    Util.debug 1 "call prover now" (fun _ -> ());
     flush stdout;
     CallProver.call_with_out ~args ?timeout:!timeout ~prover:CallProver.Prover.p_E final_decls
   )

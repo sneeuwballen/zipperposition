@@ -49,11 +49,12 @@ let options =
 type statement = RewriteRules.statement
 
 let print_solution solution =
-  Util.printf "solution: %a\n" Lpo.Solution.pp solution
+  Format.printf "solution: %a@." Lpo.Solution.pp solution
 
 let print_signature signature =
-  Util.printf "signature:\n  %a\n"
-    (Util.pp_seq ~sep:"\n  " (Util.pp_pair ~sep:" : " Symbol.pp Type.pp))
+  Format.printf "signature: @[%a@]@."
+    (CCFormat.seq ~sep:" "
+      (fun out (a,b) -> Format.fprintf out "%a : %a" Symbol.pp a Type.pp b))
     (Signature.Seq.to_seq signature)
 
 (* given a list of files, parse them into pairs of terms, and
@@ -91,7 +92,7 @@ let () =
     if !flag_print_signature
       then print_signature signature;
     if !flag_print_rules
-      then RewriteRules.print_rules stdout rules;
+      then RewriteRules.print_rules CCFormat.stdout rules;
     (* orient rules *)
     let constraints = Lpo.FO.orient_lpo_list rules in
     let solutions = Lpo.solve_multiple constraints in

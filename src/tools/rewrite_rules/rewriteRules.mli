@@ -27,7 +27,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Parse Rewrite Rules} *)
 
 open Logtk
-open Logtk_parsers
 
 type 'a or_error = [`Error of string | `Ok of 'a]
 
@@ -47,4 +46,4 @@ val rules_of_pairs : Signature.t ->
 (** Infer types and signature from a list of statements.
    @return typed rules and the new signature *)
 
-val print_rules : out_channel -> rule list -> unit
+val print_rules : rule list CCFormat.printer

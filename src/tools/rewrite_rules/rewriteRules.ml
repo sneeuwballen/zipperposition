@@ -56,8 +56,8 @@ let parse_file filename ic =
       (function
         | Ast_ho.Clause (t, []) ->
             begin match PT.view t with
-            | PT.App ({PT.term=PT.Const s}, [_;l;r]) when Symbol.eq s rule_arrow ->
-                Util.debug 5 "parsed rule %a --> %a" PT.pp l PT.pp r;
+            | PT.App ({PT.term=PT.Const s;_}, [_;l;r]) when Symbol.eq s rule_arrow ->
+                Util.debug 5 "parsed rule %a --> %a" (fun k->k PT.pp l PT.pp r);
                 Some (Rule (l, r))
             | _ -> None
             end
@@ -68,7 +68,7 @@ let parse_file filename ic =
     E.return rules
   with
   | Parse_ho.Error ->
-    let msg = Util.sprintf "parse error at %a" Loc.pp (Loc.of_lexbuf lexbuf) in
+    let msg = CCFormat.sprintf "parse error at %a" Loc.pp (Loc.of_lexbuf lexbuf) in
     E.fail msg
 
 (* list of pairs of terms --> list of pairs of FOTerms *)
@@ -101,9 +101,9 @@ let rules_of_pairs signature pairs =
   with Type.Error msg ->
     E.fail msg
 
-let print_rule buf (l,r) =
-  Printf.bprintf buf "%a --> %a" FOT.pp l FOT.pp r
+let print_rule out (l,r) =
+  Format.fprintf out "%a --> %a" FOT.pp l FOT.pp r
 
 let print_rules oc rules =
-  Util.fprintf oc "rules:\n  %a\n"
-    (Util.pp_list ~sep:"\n  " print_rule) rules
+  Format.fprintf oc "rules: @[%a@]@."
+    (CCFormat.list ~sep:" " print_rule) rules

@@ -72,18 +72,17 @@ module Constraint = struct
 
   let pp_expr = Symbol.pp
 
-  let rec pp buf t = match t with
-    | EQ (a,b) -> Printf.bprintf buf "(= %a %a)" pp_expr a pp_expr b
-    | LE (a,b) -> Printf.bprintf buf "(<= %a %a)" pp_expr a pp_expr b
-    | LT (a,b) -> Printf.bprintf buf "(< %a %a)" pp_expr a pp_expr b
-    | And l -> Printf.bprintf buf "(and %a)" (Util.pp_list ~sep:" " pp) l
-    | Or l -> Printf.bprintf buf "(or %a)" (Util.pp_list ~sep:" " pp) l
-    | Not t -> Printf.bprintf buf "(not %a)" pp t
-    | True -> Buffer.add_string buf "true"
-    | False -> Buffer.add_string buf "false"
+  let rec pp out t = match t with
+    | EQ (a,b) -> Format.fprintf out "(= %a %a)" pp_expr a pp_expr b
+    | LE (a,b) -> Format.fprintf out "(<= %a %a)" pp_expr a pp_expr b
+    | LT (a,b) -> Format.fprintf out "(< %a %a)" pp_expr a pp_expr b
+    | And l -> Format.fprintf out "(and %a)" (CCFormat.list ~start:"" ~stop:"" ~sep:" " pp) l
+    | Or l -> Format.fprintf out "(or %a)" (CCFormat.list ~start:"" ~stop:"" ~sep:" " pp) l
+    | Not t -> Format.fprintf out "(not %a)" pp t
+    | True -> CCFormat.string out "true"
+    | False -> CCFormat.string out "false"
 
-  let fmt fmt t =
-    Format.pp_print_string fmt (Util.on_buffer pp t)
+  let to_string = CCFormat.to_string pp
 
   (* simplify the constraints *)
   let rec simplify t =
@@ -137,14 +136,13 @@ module Solution = struct
     let l = List.map (fun (a,b) -> C.le a b) sol in
     C.or_ l
 
-  let pp buf s =
-    let pp_pair buf (a,b) =
-      Printf.bprintf buf "%a > %a" Symbol.pp a Symbol.pp b
+  let pp out s =
+    let pp_pair out (a,b) =
+      Format.fprintf out "%a > %a" Symbol.pp a Symbol.pp b
     in
-    Util.pp_list pp_pair buf s
+    CCFormat.list pp_pair out s
 
-  let fmt fmt s =
-    Format.pp_print_string fmt (Util.on_buffer pp s)
+  let to_string = CCFormat.to_string pp
 end
 
 module C = Constraint
@@ -153,7 +151,8 @@ module C = Constraint
   Use "Solving Partial Order Constraints for LPO Termination", Codish & al *)
 module MakeSolver(X : sig end) = struct
   module Solver = Msat.Sat.Make(struct
-    let debug l fmt = Util.debug ~section (l+3) fmt
+    let buf_ = Buffer.create 0
+    let debug _ fmt = Printf.ifprintf buf_ fmt
   end)
 
   (* propositional atoms map symbols to the binary digits of
@@ -170,7 +169,7 @@ module MakeSolver(X : sig end) = struct
     let equal (s1,i1)(s2,i2) = Symbol.eq s1 s2 && i1 = i2
     let hash_fun (s,i) h = h |> Symbol.hash_fun s |> CCHash.int_ i
     let hash a = CCHash.apply hash_fun a
-    let print fmt (s,i) = Format.fprintf fmt "%a/%d" Symbol.fmt s i
+    let print fmt (s,i) = Format.fprintf fmt "%a/%d" Symbol.pp s i
   end
 
   module AtomTbl = CCHashtbl.Make(Atom)
@@ -242,7 +241,7 @@ module MakeSolver(X : sig end) = struct
         then r := 2 * !r + 1
         else r := 2 * !r
     done;
-    Util.debug 3 "index of symbol %a in precedence is %d" Symbol.pp s !r;
+    Util.debug ~section 3 "index of symbol %a in precedence is %d" (fun k->k Symbol.pp s !r);
     !r
 
   (* extract a solution *)
@@ -294,33 +293,33 @@ module MakeSolver(X : sig end) = struct
     let num = List.length symbols in
     (* the number of digits required to map each symbol to a distinct int *)
     let n = int_of_float (ceil (log (float_of_int num) /. log 2.)) in
-    Util.debug 2 "constraints on %d symbols -> %d digits (%d bool vars)"
-      num n (n * num);
+    Util.debug ~section 2 "constraints on %d symbols -> %d digits (%d bool vars)"
+      (fun k->k num n (n * num));
     let encode_constr c =
-      Util.debug 5 "encode constr %a..." C.pp c;
+      Util.debug ~section 5 "encode constr %a..." (fun k->k C.pp c);
       let f = encode_constr ~n c in
-      Util.debugf 5 " ... @[<2>%a@]" F.print f;
+      Util.debug ~section 5 " ... @[<2>%a@]" (fun k->k F.print f);
       let clauses = F.make_cnf f in
-      Util.debugf 5 " ... @[<0>%a@]" print_clauses clauses;
+      Util.debug ~section 5 " ... @[<0>%a@]" (fun k->k print_clauses clauses);
       Solver.assume clauses;
-      Util.debug 5 "form assumed"
+      Util.debug ~section 5 "form assumed" (fun _ ->())
     in
     List.iter encode_constr l;
     (* generator of solutions *)
     let rec next () =
-      Util.debug 5 "check satisfiability";
+      Util.debug ~section 5 "check satisfiability" (fun _ ->());
       match Solver.solve () with
       | Solver.Sat ->
-        Util.debug 5 "next solution exists, try to extract it...";
+        Util.debug ~section 5 "next solution exists, try to extract it..." (fun _ ->());
         let solution = get_solution ~n symbols in
-        Util.debug 5 "... solution is %a" Solution.pp solution;
+        Util.debug ~section 5 "... solution is %a" (fun k->k Solution.pp solution);
         (* obtain another solution: negate current one and continue *)
         let tl = lazy (negate ~n solution) in
         LazyList.Cons (solution, tl)
       | Solver.Unsat ->
-        Util.debug 5 "no solution";
+        Util.debug ~section 5 "no solution" (fun _ -> ());
         LazyList.Nil
-    and negate ~n solution =
+    and negate ~n:_ solution =
       (* negate current solution to get the next one... if any *)
       let c = Solution.neg_to_constraint solution in
       encode_constr c;
@@ -333,7 +332,7 @@ end
 
 let solve_multiple l =
   let l = List.rev_map C.simplify l in
-  Util.debug 2 "lpo: solve constraints %a" (Util.pp_list C.pp) l;
+  Util.debug ~section 2 "lpo: solve constraints %a" (fun k->k (CCFormat.list C.pp) l);
   let module S = MakeSolver(struct end) in
   S.solve_list l
 
@@ -377,7 +376,7 @@ module FO = struct
     match TC.view a, TC.view b with
     | (TC.Var _ | TC.BVar _), _ ->
       C.false_  (* a variable cannot be > *)
-    | _, _ when T.subterm b a ->
+    | _, _ when T.subterm ~sub:b a ->
       C.true_  (* trivial subterm property --> ok! *)
     | TC.App (f, _, ((_::_) as l)), TC.App (g, _, l')
     when List.length l = List.length l' ->
@@ -405,7 +404,7 @@ module FO = struct
             ]  (* f>g and a > all subterms of b *)
         ; any_bigger ~orient_lpo l b  (* some subterm of a is > b *)
         ]
-    | TC.App (f, _, l), _ ->
+    | TC.App (_, _, l), _ ->
       (* only the subterm property can apply *)
       any_bigger ~orient_lpo l b
     | TC.NonFO, _ ->
@@ -417,7 +416,7 @@ module FO = struct
       (fun (l,r) ->
         let c = orient_lpo l r in
         let c' = C.simplify c in
-        Util.debug 2 "constr %a simplified into %a" C.pp c C.pp c';
+        Util.debug ~section 2 "constr %a simplified into %a" (fun k->k C.pp c C.pp c');
         c')
       l
 end
@@ -434,7 +433,8 @@ module Prolog = struct
     | _ when T.eq a b -> C.false_
     | _ when T.subterm ~strict:true a ~sub:b ->
       C.true_  (* trivial subterm property --> ok! *)
-    | T.App ({T.term=T.Const f}, ((_::_) as l)), T.App ({T.term=T.Const g}, l')
+    | T.App ({T.term=T.Const f; _}, ((_::_) as l)),
+      T.App ({T.term=T.Const g; _}, l')
     when List.length l = List.length l' ->
       (* three cases: either some element of [l] is > [r],
           or precedence of first symbol applies,
@@ -449,7 +449,8 @@ module Prolog = struct
             ]  (* f>g and a > all subterms of b *)
         ; any_bigger ~orient_lpo l b  (* some subterm of a is > b *)
         ]
-    | T.App ({T.term=T.Const f}, l), T.App ({T.term=T.Const g}, l') ->
+    | T.App ({T.term=T.Const f;_}, l),
+      T.App ({T.term=T.Const g;_}, l') ->
       (* two cases: either some element of [l] is > [r],
           or precedence of first symbol applies *)
       C.or_
@@ -459,7 +460,7 @@ module Prolog = struct
             ]  (* f>g and a > all subterms of b *)
         ; any_bigger ~orient_lpo l b  (* some subterm of a is > b *)
         ]
-    | T.App ({T.term=T.Const _}, l), _ ->
+    | T.App ({T.term=T.Const _;_}, l), _ ->
       (* only the subterm property can apply *)
       any_bigger ~orient_lpo l b
     | _ ->
@@ -471,7 +472,7 @@ module Prolog = struct
       (fun (l,r) ->
         let c = orient_lpo l r in
         let c' = C.simplify c in
-        Util.debug 2 "constr %a simplified into %a" C.pp c C.pp c';
+        Util.debug ~section 2 "constr %a simplified into %a" (fun k->k C.pp c C.pp c');
         c')
       l
 end
