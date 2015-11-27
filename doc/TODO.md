@@ -1,7 +1,9 @@
+# TODO
 
 - nettoyer le code.
   * avoir un second langage d'entrée qui permette de décrire les features
     au dessus (marre de TPTP), et qui soit accessoirement plus lisible.
+  * entrée SMTlib
   * écrire un système de tests directement lié à Sledgehammer
 - améliorer le support du polymorphisme (avec pleins de tests venant de
   Sledgehammer en entrée, ça devrait être naturel).
@@ -25,3 +27,16 @@
 - extensionalité (avec `@` on peut parler d'égalité entre fonctions)
 - implèm complète d'AVATAR (geler les clauses, etc.)
   * peut être plus simple en virant l'aspect QBF (et en spécialisant sur Msat)
+
+## Ideas
+
+- how to deal with definitions:
+  * Build a symbol dependency graph such that if `f x y := t[x,y]` is non-recursive,
+    then `f -> g` is in the graph for every symbol `g ∈ t`. Then, a DFS on
+    the graph gives us a _layer level_ for every symbol (it also breaks
+    cycles arbitrarily), such that `f -> g` implies `level(f) ≥ level(g)+1`
+    (except for cycles of course).
+    `compare(f,g) -> compare(level(f), level(g))` is then a proper order for
+    computing precedences.
+  * For inductive symbols, `n := 0 | succ(n2)` could be dealt with this way,
+    by using possibly negative levels and enforcing `level(n2) = level(n)-1`.
