@@ -26,6 +26,8 @@ type t =
   | TType (* type of types *)
   | Prop
   | Term
+  | TyInt
+  | TyRat
   | Int of Z.t
   | Rat of Q.t
 
@@ -71,6 +73,8 @@ val arrow : t
 val tType : t
 val prop : t
 val term : t
+val ty_int : t
+val ty_rat : t
 val has_type : t
 val lift_type : t
 

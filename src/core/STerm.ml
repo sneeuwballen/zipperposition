@@ -328,7 +328,7 @@ module TPTP = struct
     | Record _ -> failwith "cannot print records in TPTP"
     | Column(x,y) ->
         begin match view y with
-        | Const s when Sym.equal s Sym.TPTP.i ->
+        | AppBuiltin (Builtin.Term, []) ->
           pp out x  (* do not print X:$i *)
         | _ ->
           pp out x;
@@ -338,7 +338,7 @@ module TPTP = struct
   and pp_typed_var out t = match t.term with
     | Column ({term=Var s; _}, {term=AppBuiltin(Builtin.TType,[]); _})
     | Var s -> CCFormat.string out s
-    | Column ({term=Var s; _}, {term=Const sy; _}) when Sym.equal sy Sym.TPTP.i ->
+    | Column ({term=Var s; _}, {term=AppBuiltin (Builtin.Term,[]); _}) ->
         CCFormat.string out s
     | Column ({term=Var s; _}, ty) ->
       Format.fprintf out "%s:%a" s pp ty

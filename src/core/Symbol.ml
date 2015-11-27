@@ -51,10 +51,6 @@ module Seq = struct
 end
 
 module TPTP = struct
-  let i = of_string "$i"
-  let o = of_string "$o"
-  let int = of_string "$int"
-  let rat = of_string "$rat"
   let real = of_string "$real"
 
   let forall_fun = of_string "!!"

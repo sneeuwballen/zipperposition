@@ -34,10 +34,6 @@ module Seq : sig
 end
 
 module TPTP : sig
-  val i : t
-  val o : t
-  val int : t
-  val rat : t
   val real : t
 
   (** Higher-order *)

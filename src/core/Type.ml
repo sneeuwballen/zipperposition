@@ -75,8 +75,10 @@ let is_fun ty = match view ty with | Fun _ -> true | _ -> false
 let is_forall ty = match view ty with | Forall _ -> true | _ -> false
 
 let tType = T.tType
-
 let prop = T.builtin ~ty:tType Builtin.Prop
+let term = T.builtin ~ty:tType Builtin.Term
+let int = T.builtin ~ty:tType Builtin.TyInt
+let rat = T.builtin ~ty:tType Builtin.TyRat
 
 let var i =
   T.var ~ty:T.tType i
@@ -221,10 +223,10 @@ let __var =
 type print_hook = int -> (CCFormat.t -> t-> unit) -> CCFormat.t -> t-> bool
 
 module TPTP = struct
-  let i = const Symbol.TPTP.i
-  let o = const Symbol.TPTP.o
-  let int = const Symbol.TPTP.int
-  let rat = const Symbol.TPTP.rat
+  let i = term
+  let o = prop
+  let int = int
+  let rat = rat
   let real = const Symbol.TPTP.real
 
   let rec pp_tstp_rec depth out t = match view t with

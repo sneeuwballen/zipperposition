@@ -83,6 +83,9 @@ val is_forall : t -> bool
 
 val tType : t
 val prop : t
+val term : t
+val int : t
+val rat : t
 
 val var : int -> t
   (** Build a type variable.

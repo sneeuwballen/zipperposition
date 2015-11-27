@@ -445,15 +445,25 @@ let occur_check_ v t =
   in
   check t
 
+let are_same_meta_ r1 r2 = match r1, r2 with
+  | Some r1, Some r2 ->
+      begin match view r1, view r2 with
+        | Meta (v1, _), Meta (v2, _) -> Var.equal v1 v2
+        | _ -> false
+      end
+  | _ -> false
+
 let unify ?(st=UStack.create()) t1 t2 =
   let stack = ref [] in
   let fail_ msg = CCFormat.ksprintf msg ~f:(fail_unif_ !stack) in
   let rec unif_rec t1 t2 =
     if t1==t2 then ()
     else (
+      let old_stack = !stack in
       unify_tys t1 t2;
-      stack := (t1,t2):: !stack;
-      unify_terms t1 t2
+      stack := (t1,t2):: old_stack;
+      unify_terms t1 t2;
+      stack := old_stack; (* restore stack *)
     )
   and unify_tys t1 t2 = match t1.ty, t2.ty with
     | None, None -> ()
@@ -485,22 +495,15 @@ let unify ?(st=UStack.create()) t1 t2 =
         unif_multi l1 l2
     | Record (l1, r1), Record (l2, r2) ->
         (* check if r1=r2=var. If true, then fields must be the same *)
-        let are_same_meta_ r1 r2 = match r1, r2 with
-          | Some r1, Some r2 ->
-              begin match view r1, view r2 with
-                | Meta (v1, _), Meta (v2, _) -> Var.equal v1 v2
-                | _ -> false
-              end
-          | _ -> false
-        in
         if are_same_meta_ r1 r2
         then
           let _,_ = unif_record_fields `MustMatch l1 l2 in
           ()
-        else
+        else (
           let rest1, rest2 = unif_record_fields `Flexible l1 l2 in
           unif_record_rest ?ty:t1.ty r2 rest1;
           unif_record_rest ?ty:t2.ty r1 rest2
+        )
     | Var _, _
     | Const _, _
     | App _, _
@@ -518,14 +521,12 @@ let unify ?(st=UStack.create()) t1 t2 =
     | t2::l2' ->
         (* save current state, then try to unify t1 and t2 *)
         let snapshot = UStack.snapshot ~st in
-        let old_stack = !stack in
         begin try
           unif_rec t1 t2;
           unif_multi l1 (rest2@l2')
         with UnifyFailure _ ->
           (* backtrack *)
           UStack.restore ~st snapshot;
-          stack := old_stack;
           unif_multiset_with t1 l1 (t2::rest2) l2'
         end;
   and unif_record_fields kind l1 l2 = match l1, l2, kind with
