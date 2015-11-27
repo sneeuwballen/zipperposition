@@ -54,7 +54,7 @@ let make_other_opts () =
       (fun (name,sec) ->
         if name="" then None
         else Some
-          ("-debug." ^ name, Arg.Int (Util.Section.set_debug sec),
+          ("--debug." ^ name, Arg.Int (Util.Section.set_debug sec),
             " debug level for section " ^ name
           )
       )
