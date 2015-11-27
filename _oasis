@@ -40,7 +40,7 @@ Library "libzipperposition"
                     calculi/EnumTypes, calculi/ArithInt, calculi/Heuristics,
                     meta/MetaProverState
   InternalModules:  lib/LazyGraph, lib/SmallSet,
-                    lib/UnionFind, lib/Choice, lib/Mixtbl, lib/Signal,
+                    lib/UnionFind, lib/Mixtbl, lib/Signal,
                     msat/Zipperposition_msat
   BuildDepends:     containers, containers.advanced, sequence, gen, unix,
                     zarith, containers.io, logtk, logtk.meta, logtk.parsers,
