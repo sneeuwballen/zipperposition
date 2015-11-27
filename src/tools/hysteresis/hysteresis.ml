@@ -38,7 +38,7 @@ open Logtk_parsers
 open Logtk_meta
 open Logtk_solving
 
-module PT = PrologTerm
+module PT = STerm
 module HOT = HOTerm
 module E = CCError
 module Loc = ParseLocation

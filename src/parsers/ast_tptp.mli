@@ -119,7 +119,7 @@ module type S = sig
   include Interfaces.PRINT with type t := t
 end
 
-(** default is with prolog terms everywhere *)
+(** default is with simple terms everywhere *)
 module Untyped : S
   with type hoterm = STerm.t
   and type form = STerm.t

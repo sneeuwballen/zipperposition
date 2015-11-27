@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open Logtk_solving
 
-module PT = PrologTerm
+module PT = STerm
 module E = CCError
 module FOT = FOTerm
 module Loc = ParseLocation

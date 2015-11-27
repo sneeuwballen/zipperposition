@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open Logtk_parsers
 
-module PT = PrologTerm
+module PT = STerm
 module Err = CCError
 
 let print_line () =

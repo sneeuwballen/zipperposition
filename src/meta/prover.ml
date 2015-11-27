@@ -33,7 +33,7 @@ type 'a or_error = [`Error of string | `Ok of 'a]
 
 module P = Plugin
 module R = Reasoner
-module PT = PrologTerm
+module PT = STerm
 module Loc = ParseLocation
 module Err = CCError
 
