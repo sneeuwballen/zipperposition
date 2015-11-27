@@ -161,9 +161,6 @@ module type S = sig
 
   val free_vars_set : t -> term_set (** Set of free variables *)
   val free_vars : t -> term list (** Set of free vars *)
-  val de_bruijn_set : t -> Type.Set.t * term_set
-    (** Set of De Bruijn indices that are not bound for types and terms
-        @deprecated dangerous, use {!DBEnv} functions *)
 
   val close_forall : t -> t   (** Bind all free variables with forall *)
   val close_exists : t -> t   (** Bind all free variables with exists *)
@@ -212,8 +209,7 @@ end
 module type TERM = sig
   type t = private ScopedTerm.t
 
-  val of_term : ScopedTerm.t -> t option
-  val of_term_exn : ScopedTerm.t -> t
+  val of_term_unsafe : ScopedTerm.t -> t
 
   val ty : t -> type_
 

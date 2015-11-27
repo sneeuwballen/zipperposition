@@ -159,8 +159,6 @@ module type S = sig
 
   val free_vars_set : t -> term_set (** Set of free variables *)
   val free_vars : t -> term list (** Set of free vars *)
-  val de_bruijn_set : t -> Type.Set.t * term_set
-    (** Set of De Bruijn indices that are not bound for types and terms *)
 
   val close_forall : t -> t   (** Bind all free variables with forall *)
   val close_exists : t -> t   (** Bind all free variables with exists *)
@@ -209,8 +207,7 @@ end
 module type TERM = sig
   type t = private ScopedTerm.t
 
-  val of_term : ScopedTerm.t -> t option
-  val of_term_exn : ScopedTerm.t -> t
+  val of_term_unsafe : ScopedTerm.t -> t
 
   val ty : t -> Type.t
 
@@ -268,52 +265,30 @@ module Make(MyT : TERM) = struct
     | Exists of Type.t * t
     | ForallTy of t  (** quantification on type variable *)
 
-  let view t = match T.kind t with
-    | kind when kind = MyT.kind ->
-      (* atoms aren't formulas! *)
-      Atom (MyT.of_term_exn t)
-    | T.Kind.Formula subkind when subkind = MyT.kind ->
-      (* proper formula *)
-      begin match T.view t with
-      | T.Const (Sym.Conn Sym.True) -> True
-      | T.Const (Sym.Conn Sym.False) -> False
-      | T.AppBuiltin (Sym.Conn Sym.And, l) -> And l
-      | T.AppBuiltin (Sym.Conn Sym.Or, l) -> Or l
-      | T.AppBuiltin (Sym.Conn Sym.Not, [a]) -> Not a
-      | T.AppBuiltin (Sym.Conn conn, [a; b]) ->
-          begin match conn with
-          | Sym.Equiv -> Equiv (a,b)
-          | Sym.Xor -> Xor (a,b)
-          | Sym.Imply -> Imply (a,b)
-          | Sym.Eq -> Eq (MyT.of_term_exn a, MyT.of_term_exn b)
-          | Sym.Neq -> Neq (MyT.of_term_exn a, MyT.of_term_exn b)
-          | _ -> assert false
-          end
-      | T.Bind (Sym.Conn Sym.Forall, varty, f') ->
-          Forall (Type.of_term_exn varty, f')
-      | T.Bind (Sym.Conn Sym.Exists, varty, f') ->
-          Exists (Type.of_term_exn varty, f')
-      | T.Bind (Sym.Conn Sym.ForallTy, ty, f') when T.equal ty T.tType->
-          ForallTy f'
-      | _ -> assert false
-      end
-    | _ -> failwith "wrong kind for formula"
+  let view t = match T.view t with
+    | T.AppBuiltin (Builtin.True, []) -> True
+    | T.AppBuiltin (Builtin.False, []) -> False
+    | T.AppBuiltin (Builtin.And, l) -> And l
+    | T.AppBuiltin (Builtin.Or, l) -> Or l
+    | T.AppBuiltin (Builtin.Not, [a]) -> Not a
+    | T.AppBuiltin (conn, [a; b]) ->
+        begin match conn with
+        | Builtin.Equiv -> Equiv (a,b)
+        | Builtin.Xor -> Xor (a,b)
+        | Builtin.Imply -> Imply (a,b)
+        | Builtin.Eq -> Eq (MyT.of_term_unsafe a, MyT.of_term_unsafe b)
+        | Builtin.Neq -> Neq (MyT.of_term_unsafe a, MyT.of_term_unsafe b)
+        | _ -> assert false
+        end
+    | T.Bind (Binder.Forall, varty, f') ->
+        Forall (Type.of_term_unsafe varty, f')
+    | T.Bind (Binder.Exists, varty, f') ->
+        Exists (Type.of_term_unsafe varty, f')
+    | T.Bind (Binder.ForallTy, ty, f') when T.equal ty T.tType->
+        ForallTy f'
+    | _ -> assert false
 
-  let kind = T.Kind.Formula MyT.kind
-
-  let of_term t = match T.kind t with
-    | kind when kind = MyT.kind -> Some t
-    | T.Kind.Formula kind when kind = MyT.kind -> Some t
-    | _ -> None
-
-  let of_term_exn t = match T.kind t with
-    | kind when kind = MyT.kind -> t
-    | T.Kind.Formula kind when kind = MyT.kind -> t
-    | _ -> raise (Invalid_argument "Formula.of_term_exn")
-
-  let is_form t = match T.kind t with
-    | T.Kind.Formula kind when kind = MyT.kind -> true
-    | _ -> false
+  let of_term_unsafe t = t
 
   (** {2 Containers} *)
 
@@ -334,16 +309,16 @@ module Make(MyT : TERM) = struct
   end)
 
   (* "type" of a formula *)
-  let ty = T.const ~kind ~ty:T.tType (Sym.of_string "prop")
+  let ty = T.const ~ty:T.tType (Sym.of_string "prop")
 
   module Base = struct
-    let true_ = T.const ~kind ~ty Sym.Base.true_
-    let false_ = T.const ~kind ~ty Sym.Base.false_
+    let true_ = T.builtin ~ty Builtin.true_
+    let false_ = T.builtin ~ty Builtin.false_
     let atom (t:term) = (t:>T.t)
 
-    let imply f1 f2 = T.simple_app ~kind ~ty Sym.Base.imply [f1; f2]
-    let equiv f1 f2 = T.simple_app ~kind ~ty Sym.Base.equiv [f1; f2]
-    let xor f1 f2 = T.simple_app ~kind ~ty Sym.Base.xor [f1; f2]
+    let imply f1 f2 = T.app_builtin ~ty Builtin.imply [f1; f2]
+    let equiv f1 f2 = T.app_builtin ~ty Builtin.equiv [f1; f2]
+    let xor f1 f2 = T.app_builtin ~ty Builtin.xor [f1; f2]
 
     let check_same_ t1 t2 =
       let ty1 = MyT.ty t1 and ty2 = MyT.ty t2 in
@@ -357,10 +332,10 @@ module Make(MyT : TERM) = struct
 
     let eq t1 t2 =
       check_same_ t1 t2;
-      T.simple_app ~kind ~ty Sym.Base.eq ([t1; t2] : term list :> T.t list)
+      T.app_builtin ~ty Builtin.eq ([t1; t2] : term list :> T.t list)
 
     let neq t1 t2 =
-      T.simple_app ~kind ~ty Sym.Base.neq ([t1; t2] : term list :> T.t list)
+      T.app_builtin ~ty Builtin.neq ([t1; t2] : term list :> T.t list)
 
     let not_ f = match view f with
       | True -> false_
@@ -368,7 +343,7 @@ module Make(MyT : TERM) = struct
       | Eq(a,b) -> neq a b
       | Neq(a,b) -> eq a b
       | Not f' -> f'
-      | _ -> T.simple_app ~kind ~ty Sym.Base.not_ [f]
+      | _ -> T.app_builtin ~ty Builtin.not_ [f]
 
     let mk_eq sign t1 t2 =
       if sign then eq t1 t2 else neq t1 t2
@@ -379,21 +354,21 @@ module Make(MyT : TERM) = struct
     let and_ = function
       | [] -> true_
       | [f] -> f
-      | l -> T.simple_app ~kind ~ty Sym.Base.and_ l
+      | l -> T.app_builtin ~ty Builtin.and_ l
 
     let or_ = function
       | [] -> false_
       | [f] -> f
-      | l -> T.simple_app ~kind ~ty Sym.Base.or_ l
+      | l -> T.app_builtin ~ty Builtin.or_ l
 
     let __mk_forall ~(varty:Type.t) f =
-      T.bind ~kind ~ty ~varty:(varty:>T.t) Sym.Base.forall f
+      T.bind ~ty ~varty:(varty:>T.t) Binder.forall f
 
     let __mk_exists ~(varty:Type.t) f =
-      T.bind ~kind ~ty ~varty:(varty:>T.t) Sym.Base.exists f
+      T.bind ~ty ~varty:(varty:>T.t) Binder.exists f
 
     let __mk_forall_ty f =
-      T.bind ~kind ~ty ~varty:T.tType Sym.Base.forall_ty f
+      T.bind ~ty ~varty:T.tType Binder.forall_ty f
 
     let forall vars f =
       List.fold_right
@@ -611,16 +586,6 @@ module Make(MyT : TERM) = struct
 
   let free_vars f = free_vars_set f |> MyT.Set.elements
 
-  let de_bruijn_set f =
-    let seq = T.DB.open_vars (f : t :> T.t) in
-    let tvars = seq
-      |> Sequence.fmap MyT.of_term
-      |> Sequence.fold (fun acc t -> MyT.Set.add t acc) MyT.Set.empty
-    and tyvars = seq
-      |> Sequence.fmap Type.of_term
-      |> Sequence.fold (fun acc t -> Type.Set.add t acc) Type.Set.empty
-    in tyvars, tvars
-
   let is_closed f = T.DB.closed f
 
   let contains_symbol sy f =
@@ -644,11 +609,11 @@ module Make(MyT : TERM) = struct
     (* open next forall, replacing it with a fresh var *)
     let rec open_one offset env f = match view f with
     | Forall (varty,f') ->
-      let v = T.var ~kind:MyT.kind ~ty:(varty:>T.t) offset in
+      let v = T.var ~ty:(varty:>T.t) offset in
       let env' = DBEnv.push env v in
       open_one (offset+1) env' f'
     | _ ->
-      of_term_exn (T.DB.eval env f)  (* replace *)
+      of_term_unsafe (T.DB.eval env f)  (* replace *)
     in
     open_one offset DBEnv.empty f
 
@@ -707,7 +672,7 @@ module Make(MyT : TERM) = struct
         flatten (Base.or_ l')
       | Forall (_,f')
       | Exists (_,f') when not (T.DB.contains f' 0) ->
-        simplify ~depth (of_term_exn (T.DB.unshift 1 f'))
+        simplify ~depth (of_term_unsafe (T.DB.unshift 1 f'))
       | Forall (varty,f') -> Base.__mk_forall ~varty (simplify ~depth:(depth+1) f')
       | Exists (varty,f') -> Base.__mk_exists ~varty (simplify ~depth:(depth+1) f')
       | ForallTy f' -> Base.__mk_forall_ty (simplify ~depth:(depth+1) f')
