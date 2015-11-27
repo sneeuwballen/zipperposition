@@ -13,7 +13,6 @@ type term = t
 
 type view = private
   | Var of t Var.t            (** variable *)
-  | BVar of t Var.t           (** bound variable *)
   | Const of Symbol.t         (** constant *)
   | App of t * t list         (** apply term *)
   | Bind of Binder.t * t Var.t * t  (** bind variable in term *)
@@ -38,7 +37,6 @@ val tType : t
 val wildcard : t
 
 val var : ?loc:location -> t Var.t -> t
-val bvar : ?loc:location -> t Var.t -> t
 val app : ?loc:location -> ?ty:t -> t -> t list -> t
 val const : ?loc:location -> ?ty:t -> Symbol.t -> t
 val app_builtin : ?loc:location -> ?ty:t -> Builtin.t -> t list -> t
@@ -65,8 +63,6 @@ val with_ty : ?ty:t -> t -> t
 
 val fresh_var : ?loc:location -> ty:t -> unit -> t
 (** fresh free variable with the given type. *)
-
-val fresh_bvar : ?loc:location -> ty:t -> unit -> t
 
 (** {2 Utils} *)
 
@@ -128,7 +124,7 @@ val ty_apply : t -> t list -> t
 
 (** {2 Unification} *)
 
-exception UnifyFailure of term * term
+exception UnifyFailure of string * (term * term) list
 
 module UStack : sig
   type t
