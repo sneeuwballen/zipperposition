@@ -33,7 +33,7 @@ global parameters, and return a parameter type for other options.
 
 type t = {
   stats : bool;  (** statistics *) 
-  print_format : string; (** Printing format ("tstp", "debug"...) *)
+  print_format : string; (** Printing format ("tstp", "debugf"...) *)
 } (** Options that can be set by the user *)
 
 val default : t

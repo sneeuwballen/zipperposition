@@ -189,7 +189,7 @@ module TestTerm(I : TermIndex) = struct
           (fun (t',_) ->
             try ignore (check t 0 t' 1); true
             with Unif.Fail ->
-              Util.debug 1 "problem with %a and %a" (fun k->k T.pp t T.pp t');
+              Util.debugf 1 "problem with %a and %a" (fun k->k T.pp t T.pp t');
               false)
           retrieved)
     seq

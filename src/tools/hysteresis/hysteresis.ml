@@ -497,14 +497,14 @@ let parse_args () =
 let reduce_to_cnf_with_E decls =
   (* use E to reduce to CNF, also declare types of TFF predicates *)
   let decls' = Sequence.append _tff_type_decls_untyped decls in
-  Util.debug 5 "cnf decls:\n  %a\n"
+  Util.debugf 5 "cnf decls:\n  %a\n"
     (fun k->k (CCFormat.seq ~sep:" " Ast_tptp.Untyped.pp) decls');
   CallProver.Eprover.cnf (* XXX ~opts:["--free-numbers"] *) decls'
 
 let main () =
   E.(
     (* parse theory, obtain a loaded meta-prover *)
-    Util.debug 2 "load theory files..." (fun _ ->());
+    Util.debug 2 "load theory files...";
     parse_theory_files Prover.empty !theory_files
     >>= fun prover ->
     if !flag_print_theory
@@ -512,14 +512,14 @@ let main () =
     if !flag_print_signature
       then print_signature (Prover.signature prover);
     (* parse problem *)
-    Util.debug 2 "read problem files..." (fun _ ->());
+    Util.debug 2 "read problem files...";
     parse_tptp_files !files
     >>= fun decls ->
     (* extract into typed clauses *)
-    Util.debug 2 "infer types..." (fun _ ->());
+    Util.debug 2 "infer types...";
     Util_tptp.infer_types (`sign Signature.TPTP.Arith.full) decls
     >>= fun (signature, decls) ->
-    Util.debug 2 "reduce to CNF..." (fun _ ->());
+    Util.debug 2 "reduce to CNF...";
     (* reduce to CNF *)
     let _signature, decls = Util_tptp.to_cnf signature decls in
     (* global state *)
@@ -551,7 +551,7 @@ let main () =
     (* orient rewrite system to get a precedence (if flag enabled) *)
     let precedence_args =
       if !flag_use_ord then begin
-        Util.debug 2 "orient rewrite rules..." (fun _ ->());
+        Util.debug 2 "orient rewrite rules...";
         let orders =
           state.State.rewrite
             |> Lpo.FO.orient_lpo_list
@@ -575,24 +575,24 @@ let main () =
     let args = precedence_args @ ["--memory-limit=512"; "--proof-object"] in
     (* build final sequence of declarations: add rules/axioms, then add
       type declarations *)
-    Util.debug 5 "build prelude..." (fun _ ->());
+    Util.debug 5 "build prelude...";
     let prelude_decls =
       axioms_of_rules state.State.rewrite
       |> List.rev_append state.State.axioms
       |> axioms_to_decls
     in
-    Util.debug 5 "prelude built" (fun _ ->());
+    Util.debug 5 "prelude built";
     let decls = Sequence.append prelude_decls decls in
-    Util.debug 5 "all decls:\n  %a\n"
+    Util.debugf 5 "all decls:\n  %a\n"
       (fun k->k (CCFormat.seq ~sep:" " Ast_tptp.Typed.pp) decls);
     let decls = Sequence.append (ty_declarations decls) decls in
-    Util.debug 5 "erase types..." (fun _ -> ());
+    Util.debug 5 "erase types...";
     let final_decls = erase_types decls in
     (* yield to E *)
     if !flag_print_problem
       then print_problem final_decls;
     let final_decls = List.rev (Sequence.to_rev_list final_decls) in
-    Util.debug 1 "call prover now" (fun _ -> ());
+    Util.debug 1 "call prover now";
     flush stdout;
     CallProver.call_with_out ~args ?timeout:!timeout ~prover:CallProver.Prover.p_E final_decls
   )

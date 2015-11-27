@@ -525,29 +525,29 @@ let pp buf t = pp_depth ~hooks:!__hooks 0 buf t
 
 let to_string = CCFormat.to_string pp
 
-let rec debug out t = match view t with
+let rec debugf out t = match view t with
   | Var i ->
     Format.fprintf out "X%d:%a" i Type.pp (ty t)
   | BVar i -> Format.fprintf out "Y%d" i
   | Lambda (varty,t') ->
-    Format.fprintf out "(lambda %a %a)" Type.pp varty debug t'
+    Format.fprintf out "(lambda %a %a)" Type.pp varty debugf t'
   | Forall (varty,t') ->
-    Format.fprintf out "(forall %a %a)" Type.pp varty debug t'
+    Format.fprintf out "(forall %a %a)" Type.pp varty debugf t'
   | Exists (varty,t') ->
-    Format.fprintf out "(exists %a %a)" Type.pp varty debug t'
+    Format.fprintf out "(exists %a %a)" Type.pp varty debugf t'
   | Const s -> Symbol.pp out s
   | TyLift ty -> Type.pp out ty
   | At (l, r) ->
-    Format.fprintf out "(%a %a)" debug l debug r
+    Format.fprintf out "(%a %a)" debugf l debugf r
   | Multiset (_, l) ->
-    Format.fprintf out "{| %a |}" (CCList.print debug) l
+    Format.fprintf out "{| %a |}" (CCList.print debugf) l
   | Record (l, None) ->
     Format.fprintf out "{ %a }"
-      (CCList.print (fun fmt (n,t) -> Format.fprintf fmt "%s: %a" n debug t)) l
+      (CCList.print (fun fmt (n,t) -> Format.fprintf fmt "%s: %a" n debugf t)) l
   | Record (l, Some r) ->
     Format.fprintf out "{ %a | %a }"
-      (CCList.print (fun fmt (n,t) -> Format.fprintf fmt "%s: %a" n debug t))
-      l debug r
+      (CCList.print (fun fmt (n,t) -> Format.fprintf fmt "%s: %a" n debugf t))
+      l debugf r
 
 module TPTP = struct
   let true_ = const ~ty:Type.TPTP.o Symbol.Base.true_

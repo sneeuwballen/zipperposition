@@ -548,15 +548,15 @@ let pp out t = pp_depth ~hooks:!__hooks 0 out t
 
 let to_string = CCFormat.to_string pp
 
-let rec debug out t =
+let rec debugf out t =
   begin match view t with
   | Var i -> Format.fprintf out "X%d" i
   | BVar i -> Format.fprintf out "Y%d" i
   | Const s -> Symbol.pp out s
   | TyApp (f, ty) ->
-    Format.fprintf out "(%a %a)" debug f Type.pp ty
+    Format.fprintf out "(%a %a)" debugf f Type.pp ty
   | App (s, l) ->
-    Format.fprintf out "(%a %a)" debug s (CCFormat.list debug) l
+    Format.fprintf out "(%a %a)" debugf s (CCFormat.list debugf) l
   end;
   Format.fprintf out ":%a" Type.pp (ty t)
 
@@ -682,7 +682,7 @@ module TPTP = struct
         Format.fprintf out "%a mod %a" pp_surrounded a pp_surrounded b; true;
       | _ -> false  (* default *)
 
-    let pp_debug buf t =
+    let pp_debugf buf t =
       term_pp_depth ~hooks:(arith_hook:: !__hooks) 0 buf t
   end
 end

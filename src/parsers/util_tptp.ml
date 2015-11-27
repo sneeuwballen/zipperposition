@@ -50,7 +50,7 @@ let find_file name dir =
   (* search in [dir], and its parents recursively *)
   let rec search dir =
     let cur_name = Filename.concat dir name in
-    Util.debug 2 "search %s as %s" (fun k->k name cur_name);
+    Util.debugf 2 "search %s as %s" (fun k->k name cur_name);
     if file_exists cur_name
     then Some cur_name
     else
@@ -417,7 +417,7 @@ let infer_types init decls =
   try
     let s = Sequence.map
       (fun decl ->
-        Util.debug 3 "infer type for %a" (fun k->k AU.pp decl);
+        Util.debugf 3 "infer type for %a" (fun k->k AU.pp decl);
         match decl with
         | AU.Include f -> AT.Include f
         | AU.IncludeOnly (f,l) -> AT.IncludeOnly (f,l)

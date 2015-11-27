@@ -261,7 +261,7 @@ module Make(C : Index.CLAUSE) = struct
     let features = CCList.take max_features features in
     let features = List.map (fun (_, f) -> f) features in
     let features = default_features @ features in
-    Util.debug 2 "FV features: [%a]" (fun k->k (CCFormat.list Feature.pp) features);
+    Util.debugf 2 "FV features: [%a]" (fun k->k (CCFormat.list Feature.pp) features);
     features
 
   let of_signature signature =

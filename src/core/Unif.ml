@@ -439,9 +439,9 @@ module Nary = struct
   let __unify_record_rest ~env ~unif subst r1 sc1 r2 sc2 k =
     assert (r1.RU.fields = []);
     assert (r2.RU.fields = []);
-    (* Util.debugf 5 "@[<hv2>unify_rec_rest@ %a and@ %a with@ %a@]"
+    (* Util.debugff 5 "@[<hv2>unify_rec_rest@ %a and@ %a with@ %a@]"
       RU._pp r1 RU._pp r2 S.fmt subst; *)
-    (* Util.debug 5 "unif_rest %a %a" T.pp (RU.to_record r1) T.pp (RU.to_record r2); *)
+    (* Util.debugf 5 "unif_rest %a %a" T.pp (RU.to_record r1) T.pp (RU.to_record r2); *)
     match r1.RU.rest, r1.RU.discarded, r2.RU.rest, r2.RU.discarded with
     | None, [], None, [] ->
         k ~env subst (* no row, no remaining fields *)
@@ -454,7 +454,7 @@ module Nary = struct
         (* no discarded fields in r1, so we only need to
            unify rest1 with { l2 | rest2 } *)
         let t2 = RU.to_record r2 in
-        (* Util.debugf 5 "@[--> unify %a and %a:@]" T.fmt rest1 T.fmt t2; *)
+        (* Util.debugff 5 "@[--> unify %a and %a:@]" T.fmt rest1 T.fmt t2; *)
         unif ~env subst rest1 sc1 t2 sc2 k
     | _, _, Some rest2, [] ->
         (* symmetric case of the previous one *)
@@ -477,7 +477,7 @@ module Nary = struct
 
   (* unify the two records *)
   let rec __unify_records ~env ~unif subst r1 sc1 r2 sc2 k =
-    (* Util.debugf 5 "@[<hv2>unify_rec@ %a and@ %a with@ %a@]"
+    (* Util.debugff 5 "@[<hv2>unify_rec@ %a and@ %a with@ %a@]"
         RU._pp r1 RU._pp r2 S.fmt subst; *)
     match RU.fields r1, RU.fields r2 with
     | [], _
@@ -543,7 +543,7 @@ module Nary = struct
   let unification ?(env1=DBE.empty) ?(env2=DBE.empty) ?(subst=S.empty) a sc_a b sc_b =
     let rec unif ~env subst s sc_s t sc_t k =
       (*
-      Util.debugf 5 "unif: %a[%d] =?= %a[%d]@ with %a env=%a"
+      Util.debugff 5 "unif: %a[%d] =?= %a[%d]@ with %a env=%a"
         T.fmt s sc_s T.fmt t sc_t S.fmt subst print_env env;
      *)
       let s, sc_s = S.get_var subst s sc_s

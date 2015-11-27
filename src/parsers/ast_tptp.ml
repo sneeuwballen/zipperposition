@@ -115,15 +115,15 @@ let rec pp_general out d = match d with
   | GList l ->
     Format.fprintf out "[%a]" (CCFormat.list pp_general) l
 
-let rec pp_general_debug out d = match d with
+let rec pp_general_debugf out d = match d with
   | GString s -> Format.fprintf out "GSstr %s" s
   | GInt i -> Format.fprintf out "GInt %d" i
   | GVar s -> Format.fprintf out "GVar %s" s
-  | GColumn (a, b) -> Format.fprintf out "%a: %a" pp_general_debug a pp_general_debug b
+  | GColumn (a, b) -> Format.fprintf out "%a: %a" pp_general_debugf a pp_general_debugf b
   | GNode (f, l) ->
-    Format.fprintf out "GNode(%s[%a])" f (CCFormat.list pp_general_debug) l
+    Format.fprintf out "GNode(%s[%a])" f (CCFormat.list pp_general_debugf) l
   | GList l ->
-    CCFormat.list pp_general_debug out l
+    CCFormat.list pp_general_debugf out l
 
 let pp_generals out l = match l with
   | [] -> ()

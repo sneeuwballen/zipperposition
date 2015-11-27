@@ -128,7 +128,16 @@ let need_cleanup = ref false
 
 let debug_fmt_ = Format.std_formatter
 
-let debug ?(section=Section.root) l msg k =
+let debug ?(section=Section.root) l msg =
+  if l <= Section.cur_level section then (
+    let now = get_total_time () in
+    if section == Section.root
+      then Format.fprintf debug_fmt_ "@[<hov>%.3f[]@ %s@]@." now msg
+      else Format.fprintf debug_fmt_ "@[<hov>%.3f[%s]@ %s@]@."
+        now section.Section.full_name msg;
+    )
+
+let debugf ?(section=Section.root) l msg k =
   if l <= Section.cur_level section then (
     let now = get_total_time () in
     if section == Section.root
@@ -148,14 +157,14 @@ external set_memory_limit_stub : int -> unit = "logtk_set_memory_limit"
 
 let set_memory_limit n =
   if n <= 0 then invalid_arg "set_memory_limit: expect positive arg";
-  debug 1 "limit memory to %d MB" (fun k-> k n);
+  debugf 1 "limit memory to %d MB" (fun k-> k n);
   set_memory_limit_stub n
 
 external set_time_limit_stub : int -> unit = "logtk_set_time_limit"
 
 let set_time_limit n =
   if n <= 0 then invalid_arg "set_time_limit: expect positive arg";
-  debug 1 "limit time to %ds" (fun k->k n);
+  debugf 1 "limit time to %ds" (fun k->k n);
   set_time_limit_stub n
 
 module Exn = struct
@@ -273,7 +282,7 @@ let mk_stat, print_global_stats =
     let stats = List.sort (fun (n1,_)(n2,_) -> String.compare n1 n2) !stats in
     List.iter
       (fun (name, cnt) ->
-        debug 0 "stat: %-30s ... %Ld" (fun k -> k name !cnt))
+        debugf 0 "stat: %-30s ... %Ld" (fun k -> k name !cnt))
       stats)
 
 let incr_stat (_, count) = count := Int64.add !count Int64.one  (** increment given statistics *)

@@ -144,12 +144,12 @@ let check_step ~timeout ~prover step =
       let res = match res with
       | CallProver.Unsat -> Succeeded p_name
       | CallProver.Error e ->
-        Util.debug 1 "error trying to check %a: %s" (fun k->k TT.pp1 step e);
+        Util.debugf 1 "error trying to check %a: %s" (fun k->k TT.pp1 step e);
         Failed p_name
       | CallProver.Unknown
       | CallProver.Sat -> Failed p_name
       in
-      Util.debug 1 "step %a: %a" (fun k->k A.pp_name (TT.get_id step) pp_res res);
+      Util.debugf 1 "step %a: %a" (fun k->k A.pp_name (TT.get_id step) pp_res res);
       E.return res
     )
 
@@ -199,11 +199,11 @@ let all_paths_correct ~valid ~checked =
       then ()  (* ok *)
     else if StepTbl.mem current proof
       then
-        let _ = Util.debug 1 "step %a not valid, in a cycle" (fun k->k TT.pp proof) in
+        let _ = Util.debugf 1 "step %a not valid, in a cycle" (fun k->k TT.pp proof) in
         raise Exit  (* we followed a back link! *)
     else if not (valid proof)
       then
-        let _ = Util.debug 1 "step %a not validated" (fun k->k TT.pp proof) in
+        let _ = Util.debugf 1 "step %a not validated" (fun k->k TT.pp proof) in
         raise Exit  (* path leads to invalid step *)
     else begin
       StepTbl.add current proof ();
@@ -264,12 +264,12 @@ let main file =
     >>= fun trace ->
     if !print_problem
       then Format.printf "@[<2>derivation:@,@[%a@]@]@." TT.pp_tstp trace;
-    Util.debug 1 "trace of %d steps" (fun k->k (TT.size trace));
+    Util.debugf 1 "trace of %d steps" (fun k->k (TT.size trace));
     (* check that the steps form a DAG *)
     if not (TT.is_dag trace) then begin
-      Util.debug 0 "derivation is not a DAG, failure." (fun _ ->());
+      Util.debug 0 "derivation is not a DAG, failure.";
       exit 1
-    end else Util.debug 0 "derivation is a DAG" (fun _ ->());
+    end else Util.debugf 0 "derivation is a DAG";
     (* validate steps one by one *)
     let checked = CheckedTrace.create trace in
     check_all ~progress:!progress ~provers ~checked ~timeout:!timeout
@@ -278,13 +278,13 @@ let main file =
     List.iter
       (fun (proof, res) -> match res with
         | Failed prover ->
-          Util.debug 1 "trying to prove %a with %s failed" (fun k->k TT.pp1 proof prover)
+          Util.debugf 1 "trying to prove %a with %s failed" (fun k->k TT.pp1 proof prover)
         | _ -> assert false)
       (CheckedTrace.failures ~checked);
     (* check the global structure of the validated steps *)
     if check_structure ~minimum:!minimum ~checked
-      then Util.debug 0 "validated steps form a correct proof. success." (fun _ -> ())
-      else Util.debug 0 "proof structure incorrect. failure." (fun _ -> ());
+      then Util.debug 0 "validated steps form a correct proof. success."
+      else Util.debug 0 "proof structure incorrect. failure.";
     E.return ()
   )
 

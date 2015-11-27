@@ -91,10 +91,10 @@ let group_trs =
 
 (** check equality of normal forms *)
 let test trs t1 t2 =
-  Util.debug 5 "test with %a %a" (fun k->k T.pp t1 T.pp t2);
+  Util.debugf 5 "test with %a %a" (fun k->k T.pp t1 T.pp t2);
   let t1' = Rw.rewrite trs t1 in
   let t2' = Rw.rewrite trs t2 in
-  Util.debug 5 "normal form of %a = normal form of %a (ie %a)"
+  Util.debugf 5 "normal form of %a = normal form of %a (ie %a)"
     (fun k->k print_peano_nice t1 print_peano_nice t2 print_peano_nice t1');
   OUnit.assert_equal ~printer:T.to_string ~cmp:T.equal t1' t2';
   ()
@@ -129,7 +129,7 @@ let benchmark ?(count=benchmark_count) trs a b =
   let start = Unix.gettimeofday () in
   for _i = 1 to count do one_step () done;
   let stop = Unix.gettimeofday () in
-  Util.debug 1 "%f seconds to do %d joins of %a and %a (%f each)\n"
+  Util.debugf 1 "%f seconds to do %d joins of %a and %a (%f each)\n"
     (fun k->k
       (stop -. start) count print_peano_nice a print_peano_nice b
       ((stop -. start) /. (float_of_int count)))

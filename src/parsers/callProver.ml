@@ -121,15 +121,15 @@ let call_with_out ?(timeout=30) ?(args=[]) ~prover decls =
     prover.Prover.command;
   List.iter (fun arg -> Buffer.add_char buf ' '; Buffer.add_string buf arg) args;
   let cmd = Buffer.contents buf in
-  Util.debug 2 "run prover %s" (fun k->k prover.Prover.name);
-  Util.debug 4 "command is: \"%s\"" (fun k->k cmd);
-  Util.debug 4 "obligation is: \"%s\"" (fun k->k input);
+  Util.debugf 2 "run prover %s" (fun k->k prover.Prover.name);
+  Util.debugf 4 "command is: \"%s\"" (fun k->k cmd);
+  Util.debugf 4 "obligation is: \"%s\"" (fun k->k input);
   Err.(
     (* run the prover *)
     Util.popen ~cmd ~input
     >>= fun output ->
-    Util.debug 2 "prover %s done" (fun k->k prover.Prover.name);
-    Util.debug 4 "output: \"%s\"" (fun k->k output);
+    Util.debugf 2 "prover %s done" (fun k->k prover.Prover.name);
+    Util.debugf 4 "output: \"%s\"" (fun k->k output);
     (* parse output *)
     let result =
       if _find_mem prover.Prover.unsat output

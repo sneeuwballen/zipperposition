@@ -34,12 +34,12 @@ global parameters, and return a parameter type for other options.
 
 type t = {
   stats : bool;  (** statistics *)
-  print_format : string; (** Printing format ("tstp", "debug"...) *)
+  print_format : string; (** Printing format ("tstp", "debugf"...) *)
 }
 
 let default = {
   stats = false;
-  print_format = "debug";
+  print_format = "debugf";
 }
 
 let _print_types () =
@@ -48,7 +48,7 @@ let _print_types () =
   ()
 
 let make_other_opts () =
-  (* debug level for every section *)
+  (* debugf level for every section *)
   Util.Section.iter
   |> Sequence.filter_map
       (fun (name,sec) ->
@@ -71,7 +71,7 @@ let make opts =
     ; "-stats", Arg.Unit (fun () -> mod_opt (fun o -> {o with stats=true;})),
         " gather and print statistics"
     ; "-print", Arg.String (fun s -> mod_opt (fun o -> {o with print_format=s;} )),
-        " choose printing format for terms and formulas (default \"debug\")"
+        " choose printing format for terms and formulas (default \"debugf\")"
     ] @ make_other_opts ()
   in
   List.sort (fun (x,_,_)(y,_,_) -> String.compare x y) l

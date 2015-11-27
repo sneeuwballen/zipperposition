@@ -86,7 +86,7 @@ let rec beta_reduce_rec ~depth env t =
     begin match T.view l with
     | T.Lambda (_, l') ->
       (* beta-reduction *)
-      Util.debug 4 "beta-reduce: %a @ %a" (fun k->k T.pp l T.pp r);
+      Util.debugf 4 "beta-reduce: %a @ %a" (fun k->k T.pp l T.pp r);
       let r' = beta_reduce_rec ~depth env r in
       let env = DBEnv.push env r' in
       beta_reduce_rec ~depth env l'

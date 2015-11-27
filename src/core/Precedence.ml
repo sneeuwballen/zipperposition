@@ -48,7 +48,7 @@ module type SYMBOL = sig
   val true_ : t
 
   val pp : t CCFormat.printer
-  val pp_debug : t CCFormat.printer
+  val pp_debugf : t CCFormat.printer
 end
 
 module Make(Sym : SYMBOL) = struct
@@ -122,11 +122,11 @@ module Make(Sym : SYMBOL) = struct
         | Lexicographic -> Sym.pp out s)
       out prec.snapshot
 
-  let pp_debug out prec =
+  let pp_debugf out prec =
     CCFormat.list ~sep:" > "
       (fun out s -> match status prec s with
-        | Multiset -> Format.fprintf out "%a[M]" Sym.pp_debug s
-        | Lexicographic -> Sym.pp_debug out s)
+        | Multiset -> Format.fprintf out "%a[M]" Sym.pp_debugf s
+        | Lexicographic -> Sym.pp_debugf out s)
       out prec.snapshot
 
   let to_string = CCFormat.to_string pp
@@ -281,7 +281,7 @@ module Make(Sym : SYMBOL) = struct
     if List.for_all (fun s -> Tbl.mem p.index s) l
       then p  (* already present *)
       else begin
-        Util.debug ~section 3 "add %a to the precedence" (fun k->k pp_snapshot l);
+        Util.debugf ~section 3 "add %a to the precedence" (fun k->k pp_snapshot l);
         let c = Constr.of_precedence p in
         (* hashtable of symbols *)
         let symbols = Sequence.fold
@@ -293,7 +293,7 @@ module Make(Sym : SYMBOL) = struct
             of [p]. *)
         let snapshot = order_symbols_ (c :: p.constr) symbols in
         let index = _mk_table snapshot in
-        Util.debug ~section 3 "--> snapshot %a" (fun k->k pp_snapshot snapshot);
+        Util.debugf ~section 3 "--> snapshot %a" (fun k->k pp_snapshot snapshot);
         { p with snapshot; index; }
       end
 
@@ -326,7 +326,7 @@ module Default = Make(struct
   let true_ = Symbol.Base.true_
   let false_ = Symbol.Base.false_
   let pp = Symbol.pp
-  let pp_debug= Symbol.pp
+  let pp_debugf= Symbol.pp
 end)
 
 include Default

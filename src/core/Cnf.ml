@@ -153,7 +153,7 @@ let miniscope ?(distribute_exists=false) f =
 
 (* negation normal form (also remove equivalence and implications). *)
 let rec nnf f =
-  Util.debug ~section 5 "nnf of %a..." (fun k->k F.pp f);
+  Util.debugf ~section 5 "nnf of %a..." (fun k->k F.pp f);
   match F.view f with
   | F.Atom _
   | F.Neq _
@@ -230,7 +230,7 @@ let skolemize ~ctx f =
   | F.Forall (ty,f') ->
     (* remove quantifier, replace by fresh variable *)
     F.iter (Skolem.update_var ~ctx) f';
-    Util.debug ~section 5 "type of variable: %a" (fun k->k Type.pp ty);
+    Util.debugf ~section 5 "type of variable: %a" (fun k->k Type.pp ty);
     let v = T.var ~ty (Skolem.fresh_var ~ctx) in
     let env = DBEnv.singleton (v:T.t:>ST.t) in
     let new_f' = __eval_and_unshift env f' in
@@ -329,7 +329,7 @@ let estimate_num_clauses ~cache ~pos f =
         | F.ForallTy f', _ -> num pos f'
       in
       (* memoize *)
-      Util.debug ~section 5 "estimated %a clauses (sign %B) for %a"
+      Util.debugf ~section 5 "estimated %a clauses (sign %B) for %a"
         (fun k->k E.pp n pos F.pp f);
       FPolTbl.add cache (f,pos) n;
       n
@@ -366,7 +366,7 @@ let introduce_defs ~ctx ~cache f =
   (* rename formula *)
   and _rename ~polarity f =
     let p = Skolem.get_definition ~ctx ~polarity f in
-    Util.debug ~section 4 "introduce def. %a for subformula %a"
+    Util.debugf ~section 4 "introduce def. %a for subformula %a"
       (fun k->k F.pp p F.pp f);
     p
   in
@@ -380,7 +380,7 @@ let introduce_defs ~ctx ~cache f =
     if Skolem.has_definition ~ctx f
     then (
       let atom = Skolem.get_definition ~ctx ~polarity f in
-      Util.debug ~section 5 "use definition %a for %a" (fun k->k F.pp atom F.pp f);
+      Util.debugf ~section 5 "use definition %a for %a" (fun k->k F.pp atom F.pp f);
       atom
     )
     (* depending on polarity and subformulas, do renamings.
@@ -590,7 +590,7 @@ let cnf_of_list ?(opts=[]) ?(ctx=Skolem.create Signature.empty) l =
     ~preprocess l in
   (* reduce the new formulas to CNF *)
   List.iter (fun f ->
-    Util.debug ~section 4 "reduce %a to CNF..." (fun k->k F.pp f);
+    Util.debugf ~section 4 "reduce %a to CNF..." (fun k->k F.pp f);
     let clauses = if is_cnf f
       then
         match F.view f with
@@ -616,23 +616,23 @@ let cnf_of_list ?(opts=[]) ?(ctx=Skolem.create Signature.empty) l =
         | F.ForallTy _ -> assert false
       else begin
         let f = F.simplify f in
-        Util.debug ~section 4 "... simplified: %a" (fun k->k F.pp f);
+        Util.debugf ~section 4 "... simplified: %a" (fun k->k F.pp f);
         let f = nnf f in
         (* processing post-nnf *)
         let f = List.fold_left (|>) f post_nnf in
-        Util.debug ~section 4 "... NNF: %a" (fun k->k F.pp f);
+        Util.debugf ~section 4 "... NNF: %a" (fun k->k F.pp f);
         let distribute_exists = List.mem DistributeExists opts in
         let f = miniscope ~distribute_exists f in
-        Util.debug ~section 4 "... miniscoped: %a" (fun k->k F.pp f);
+        Util.debugf ~section 4 "... miniscoped: %a" (fun k->k F.pp f);
         (* adjust the variable counter to [f] before skolemizing *)
         Skolem.clear_var ~ctx;
         F.iter (Skolem.update_var ~ctx) f;
         let f = skolemize ~ctx f in
         (* processing post-skolemization *)
         let f = List.fold_left (|>) f post_skolem in
-        Util.debug ~section 4 "... skolemized: %a" (fun k->k F.pp f);
+        Util.debugf ~section 4 "... skolemized: %a" (fun k->k F.pp f);
         let clauses = to_cnf f in
-        Util.debug ~section 4 "... CNF: %a"
+        Util.debugf ~section 4 "... CNF: %a"
           (fun k->k (CCFormat.list ~sep:", " (CCFormat.list ~sep:" | " F.pp)) clauses);
         assert (List.for_all (List.for_all F.is_closed) clauses);
         clauses

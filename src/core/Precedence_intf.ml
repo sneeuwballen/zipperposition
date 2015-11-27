@@ -70,7 +70,7 @@ module type S = sig
   end
 
   val pp_snapshot : symbol list CCFormat.printer
-  val pp_debug : t CCFormat.printer
+  val pp_debugf : t CCFormat.printer
   include Interfaces.PRINT with type t := t
 
   (** {2 Builtin constraints} *)

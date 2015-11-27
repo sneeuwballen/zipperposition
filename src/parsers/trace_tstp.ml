@@ -263,7 +263,7 @@ let of_decls decls =
         let parent = find_step (A.NameString s) in
         `Parents ("trivial", false, Lazy.from_val [|parent|])
     | _ ->
-      Util.debug 1 "not a valid proof step: %a" (fun k->k A.pp_general_debug info);
+      Util.debugf 1 "not a valid proof step: %a" (fun k->k A.pp_general_debugf info);
       `NoIdea
   in
   (* what to do if a step is read *)
@@ -272,7 +272,7 @@ let of_decls decls =
   | InferClause _ ->
     if is_proof_of_false step && !root = None
       then root := Some step;
-    Util.debug 3 "add step %a (root? %B)" (fun k->k A.pp_name id (is_proof_of_false step));
+    Util.debugf 3 "add step %a (root? %B)" (fun k->k A.pp_name id (is_proof_of_false step));
     Hashtbl.replace steps id step;
   | Axiom _
   | Theory _ -> ()
@@ -281,7 +281,7 @@ let of_decls decls =
   Sequence.iter
     begin fun decl -> match decl with
     | AT.CNF (name, _role, c, info :: _) ->
-      Util.debug 3 "convert step %a" (fun k->k AT.pp decl);
+      Util.debugf 3 "convert step %a" (fun k->k AT.pp decl);
       begin match read_info info with
       | `Proof
       | `NoIdea -> ()
@@ -292,7 +292,7 @@ let of_decls decls =
       end
     | AT.FOF(name, _role, f, info :: _)
     | AT.TFF (name, _role, f, info :: _) ->
-      Util.debug 3 "convert step %a" (fun k->k AT.pp decl);
+      Util.debugf 3 "convert step %a" (fun k->k AT.pp decl);
       begin match read_info info with
       | `Proof
       | `NoIdea -> ()
@@ -326,7 +326,7 @@ let parse ?(recursive=true) filename =
     >>= fun decls ->
     Util_tptp.infer_types (`sign Signature.TPTP.base) decls
     >>= fun (_signature, decls) ->
-    Util.debug 1 "decls:\n  %a" (fun k->k (CCFormat.seq ~sep:"\n  " AT.pp) decls);
+    Util.debugf 1 "decls:\n  %a" (fun k->k (CCFormat.seq ~sep:"\n  " AT.pp) decls);
     of_decls decls
   )
 

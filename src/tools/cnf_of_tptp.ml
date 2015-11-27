@@ -52,7 +52,7 @@ let options = Arg.align (
 
 (* process the given file, converting it to CNF *)
 let process file =
-  Util.debug 1 "process file %s" (fun k->k file);
+  Util.debugf 1 "process file %s" (fun k->k file);
   let res = Err.(
     (* parse *)
     Util_tptp.parse_file ~recursive:true file
@@ -91,7 +91,7 @@ let main () =
   (if !files = [] then files := ["stdin"]);
   files := List.rev !files;
   List.iter process !files;
-  Util.debug 1 "success!" (fun _ ->());
+  Util.debug 1 "success!";
   ()
 
 let _ =

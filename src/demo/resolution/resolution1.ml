@@ -64,7 +64,7 @@ module Lit = struct
   (** We also define a few basic comparison and printing functions.
       Comparison functions are used by many data structures;
       Printing is useful for informing the user of results or
-      for debugging. *)
+      for debugfging. *)
 
   let compare = CCOrd.pair T.compare CCOrd.bool_
   let equal a b = compare a b=0
@@ -167,11 +167,11 @@ let _add_passive c =
   if c = [] then raise Unsat
   else if Clause.is_trivial c
   then (
-    Util.debug 4 "clause %a is trivial" (fun k->k Clause.pp c);
+    Util.debugf 4 "clause %a is trivial" (fun k->k Clause.pp c);
   )
   else if not (ClauseSet.mem c !_active_set)
   then (
-    Util.debug 4 "new passive clause %a" (fun k->k Clause.pp c);
+    Util.debugf 4 "new passive clause %a" (fun k->k Clause.pp c);
     Queue.push c _passive_set
   )
 
@@ -218,7 +218,7 @@ let _factoring c =
             (** Build the conclusion of the inference (removing one
                 of the factored literals *)
             let c' = Clause.apply_subst ~renaming subst c' 0 in
-            Util.debug 3 "factoring of %a ----> %a" (fun k->k Clause.pp c Clause.pp c');
+            Util.debugf 3 "factoring of %a ----> %a" (fun k->k Clause.pp c Clause.pp c');
             (** New clauses go into the passive set *)
             _add_passive c'
           with Unif.Fail -> ()
@@ -291,7 +291,7 @@ let _resolve_with c =
             (** Simplify the resulting clause (remove duplicate literals)
                 and add it into the passive set, to be processed later *)
             let concl = Clause.make concl in
-            Util.debug 3 "resolution of %a and %a ---> %a"
+            Util.debugf 3 "resolution of %a and %a ---> %a"
               (fun k->k Clause.pp c Clause.pp d Clause.pp concl);
             _add_passive concl
           )
@@ -322,7 +322,7 @@ let _saturate clauses =
           yet and must not be trivial either. *)
       if not (Clause.is_trivial c) && not (ClauseSet.mem c !_active_set)
       then (
-        Util.debug 2 "given clause: %a" (fun k->k Clause.pp c);
+        Util.debugf 2 "given clause: %a" (fun k->k Clause.pp c);
         _add_active c;
         _resolve_with c;
         _factoring c;
@@ -338,7 +338,7 @@ let _saturate clauses =
     and return the result. We use an error monad to make error
     handling easier (the function [>>=] is a {i monadic bind}). *)
 let process_file f =
-  Util.debug 2 "process file %s..." (fun k->k f);
+  Util.debugf 2 "process file %s..." (fun k->k f);
   let res = Err.(
     (** parse the file in the TPTP format *)
     Logtk_parsers.Util_tptp.parse_file ~recursive:true f

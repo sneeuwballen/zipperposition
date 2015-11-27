@@ -65,7 +65,7 @@ val string_of_name : name -> string
 val pp_name : name CCFormat.printer
 
 val pp_general : general_data CCFormat.printer
-val pp_general_debug : general_data CCFormat.printer  (* ugly version *)
+val pp_general_debugf : general_data CCFormat.printer  (* ugly version *)
 val pp_generals : general_data list CCFormat.printer
 
 module type S = sig

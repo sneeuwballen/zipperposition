@@ -334,5 +334,5 @@ module TPTP : sig
   val mk_or_list : t list -> t
 end
 
-val debug : Format.formatter -> t -> unit
-(** debug printing, with sorts *)
+val debugf : Format.formatter -> t -> unit
+(** debugf printing, with sorts *)

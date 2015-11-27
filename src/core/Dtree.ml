@@ -121,7 +121,7 @@ let to_list t =
   | None -> assert false
   | Some i ->
     let l = getnext [] i in
-    Util.debug 5 "dtree.to_list %a = [%a]"
+    Util.debugf 5 "dtree.to_list %a = [%a]"
       (fun k->k T.pp t (CCFormat.list pp_char) l);
     l
 

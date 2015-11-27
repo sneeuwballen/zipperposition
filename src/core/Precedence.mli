@@ -46,7 +46,7 @@ module type SYMBOL = sig
   val true_ : t
 
   val pp : t CCFormat.printer
-  val pp_debug : t CCFormat.printer
+  val pp_debugf : t CCFormat.printer
 end
 
 module Make(Sym : SYMBOL) : S with type symbol = Sym.t

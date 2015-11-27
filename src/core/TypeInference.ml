@@ -180,7 +180,7 @@ module Ctx = struct
           ty
         | Some ty -> ty
       in
-      Util.debug ~section 5 "var %s now has number %d and type %a"
+      Util.debugf ~section 5 "var %s now has number %d and type %a"
         (fun k->k name n Type.pp ty);
       Hashtbl.add ctx.vars name (n,ty);
       n, ty
@@ -214,7 +214,7 @@ module Ctx = struct
 
   (* same as {!unify}, but also updates the ctx's substitution *)
   let unify_and_set ctx ty1 ty2 =
-    Util.debug ~section 5 "unify types %a and %a"
+    Util.debugf ~section 5 "unify types %a and %a"
       (fun k-> k(pp_ty_deref_ ctx) ty1 (pp_ty_deref_ ctx) ty2);
     let subst = unify ctx ty1 ty2 in
     ctx.subst <- subst
@@ -271,7 +271,7 @@ module Ctx = struct
   let __specialize_ty_var ctx v =
     if not (S.Ty.mem ctx.subst v 0) then (
       let ty = ctx.default.default_i in
-      Util.debug ~section 5 "specialize type var %a to %a"
+      Util.debugf ~section 5 "specialize type var %a to %a"
         (fun k->k Ty.pp v Ty.pp ty);
       ctx.subst <- S.Ty.bind ctx.subst v 0 ty 0
     )
@@ -443,14 +443,14 @@ module FO = struct
         | None -> Ctx.error_ ctx "expected type, got %a" PT.pp ty
       in
       let i, ty = Ctx._get_var ctx ~ty name in
-      Util.debug ~section 5 "type of var %s: %a" (fun k->k name Type.pp ty);
+      Util.debugf ~section 5 "type of var %s: %a" (fun k->k name Type.pp ty);
       ty, (fun ctx ->
           let ty = Ctx.apply_ty ctx ty in
           T.var ~ty i)
     | PT.Var name ->
       (* (possibly) untyped var *)
       let i, ty = Ctx._get_var ctx name in
-      Util.debug ~section 5 "type of var %s: %a" (fun k->k name Type.pp ty);
+      Util.debugf ~section 5 "type of var %s: %a" (fun k->k name Type.pp ty);
       ty, (fun ctx ->
           let ty = Ctx.apply_ty ctx ty in
           T.var ~ty i)
@@ -463,7 +463,7 @@ module FO = struct
           Ctx.apply_fo ctx (T.const ~ty x))
     | PT.Const s ->
       let ty_s = Ctx.type_of_fun ~arity:0 ctx s in
-      Util.debug ~section 5 "type of symbol %a: %a" (fun k->k Sym.pp s Type.pp ty_s);
+      Util.debugf ~section 5 "type of symbol %a: %a" (fun k->k Sym.pp s Type.pp ty_s);
       ty_s, (fun ctx ->
           let ty = Ctx.apply_ty ctx ty_s in
           T.const ~ty s)
@@ -500,7 +500,7 @@ module FO = struct
           which is also the result. *)
       let ty_ret = Ctx._new_ty_var ctx in
       Ctx.unify_and_set ctx ty_s' (Type.arrow_list ty_of_args ty_ret);
-      Util.debug ~section 5 "type of symbol %a: %a"
+      Util.debugf ~section 5 "type of symbol %a: %a"
         (fun k->k Sym.pp s (Ctx.pp_ty_deref_ ctx) ty_s);
       (* now to produce the closure, that first creates subterms *)
       ty_ret, (fun ctx ->
@@ -509,7 +509,7 @@ module FO = struct
           let ty_s' = Ctx.apply_ty ctx ty_s in
           (* XXX dangerous
              let ty_s' = Type.close_forall ty_s' in
-             Util.debug ~section 5 "generalize type %a into %a" Ty.pp ty_s Ty.pp ty_s';
+             Util.debugf ~section 5 "generalize type %a into %a" Ty.pp ty_s Ty.pp ty_s';
           *)
           T.app_full (T.const ~ty:ty_s' s) tyargs' args')
     | PT.Int n ->
@@ -549,7 +549,7 @@ module FO = struct
 
   let infer_exn ctx t =
     Util.enter_prof prof_infer;
-    Util.debug ~section 5 "infer_term %a" (fun k->k PT.pp t);
+    Util.debugf ~section 5 "infer_term %a" (fun k->k PT.pp t);
     try
       let ty, k = infer_rec ctx t in
       Util.exit_prof prof_infer;
@@ -660,7 +660,7 @@ module FO = struct
     | PT.Rat _ -> Ctx.error_ ctx "expected formula, got %a" PT.pp f
 
   let infer_form_exn ctx f =
-    Util.debug ~section 5 "infer_form %a" (fun k->k PT.pp f);
+    Util.debugf ~section 5 "infer_form %a" (fun k->k PT.pp f);
     try
       let c_f = infer_form_rec ctx f in
       c_f
@@ -776,14 +776,14 @@ module HO = struct
     match t.PT.loc with
     | None ->
       let ty, c = infer_rec_view ~arity ctx t.PT.term in
-      Util.debug ~section 5 "infer term %a... : %a"
+      Util.debugf ~section 5 "infer term %a... : %a"
         (fun k->k PT.pp t (Ctx.pp_ty_deref_ ctx) ty);
       ty, c
     | Some loc ->
       Ctx.with_loc ctx ~loc
         (fun () ->
            let ty, c = infer_rec_view ~arity ctx t.PT.term in
-           Util.debug ~section 5 "infer term %a... : %a"
+           Util.debugf ~section 5 "infer term %a... : %a"
              (fun k->k PT.pp t (Ctx.pp_ty_deref_ ctx) ty);
            ty, c
         )
@@ -917,7 +917,7 @@ module HO = struct
         | Type.NoArity -> 0, List.length l
         | Type.Arity (a,b) -> a, b
       in
-      Util.debug ~section 5 "fun %a : %a expects %d type args and %d args (applied to %a)"
+      Util.debugf ~section 5 "fun %a : %a expects %d type args and %d args (applied to %a)"
         (fun k->k PT.pp t (Ctx.pp_ty_deref_ ctx)
             ty_t n_tyargs n_args (CCFormat.list PT.pp) l);
       (* separation between type arguments and proper term arguments,
@@ -937,7 +937,7 @@ module HO = struct
           which is also the result. *)
       let ty_ret = Ctx._new_ty_var ctx in
       Ctx.unify_and_set ctx ty_t' (Type.arrow_list ty_of_args ty_ret);
-      Util.debug ~section 5 "now fun %a : %a and args have type %a"
+      Util.debugf ~section 5 "now fun %a : %a and args have type %a"
         (fun k->k PT.pp t (Ctx.pp_ty_deref_ ctx) ty_t'
             (CCFormat.list (Ctx.pp_ty_deref_ ctx)) ty_of_args);
       (* closure *)
@@ -958,7 +958,7 @@ module HO = struct
 
   let infer_exn ctx t =
     Util.enter_prof prof_infer;
-    Util.debug ~section 5 "infer_term %a" (fun k->k PT.pp t);
+    Util.debugf ~section 5 "infer_term %a" (fun k->k PT.pp t);
     try
       let ty, k = infer_rec ctx t in
       Util.exit_prof prof_infer;

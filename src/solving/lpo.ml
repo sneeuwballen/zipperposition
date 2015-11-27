@@ -241,7 +241,7 @@ module MakeSolver(X : sig end) = struct
         then r := 2 * !r + 1
         else r := 2 * !r
     done;
-    Util.debug ~section 3 "index of symbol %a in precedence is %d" (fun k->k Symbol.pp s !r);
+    Util.debugf ~section 3 "index of symbol %a in precedence is %d" (fun k->k Symbol.pp s !r);
     !r
 
   (* extract a solution *)
@@ -293,31 +293,31 @@ module MakeSolver(X : sig end) = struct
     let num = List.length symbols in
     (* the number of digits required to map each symbol to a distinct int *)
     let n = int_of_float (ceil (log (float_of_int num) /. log 2.)) in
-    Util.debug ~section 2 "constraints on %d symbols -> %d digits (%d bool vars)"
+    Util.debugf ~section 2 "constraints on %d symbols -> %d digits (%d bool vars)"
       (fun k->k num n (n * num));
     let encode_constr c =
-      Util.debug ~section 5 "encode constr %a..." (fun k->k C.pp c);
+      Util.debugf ~section 5 "encode constr %a..." (fun k->k C.pp c);
       let f = encode_constr ~n c in
-      Util.debug ~section 5 " ... @[<2>%a@]" (fun k->k F.print f);
+      Util.debugf ~section 5 " ... @[<2>%a@]" (fun k->k F.print f);
       let clauses = F.make_cnf f in
-      Util.debug ~section 5 " ... @[<0>%a@]" (fun k->k print_clauses clauses);
+      Util.debugf ~section 5 " ... @[<0>%a@]" (fun k->k print_clauses clauses);
       Solver.assume clauses;
-      Util.debug ~section 5 "form assumed" (fun _ ->())
+      Util.debug ~section 5 "form assumed"
     in
     List.iter encode_constr l;
     (* generator of solutions *)
     let rec next () =
-      Util.debug ~section 5 "check satisfiability" (fun _ ->());
+      Util.debug ~section 5 "check satisfiability";
       match Solver.solve () with
       | Solver.Sat ->
-        Util.debug ~section 5 "next solution exists, try to extract it..." (fun _ ->());
+        Util.debug ~section 5 "next solution exists, try to extract it...";
         let solution = get_solution ~n symbols in
-        Util.debug ~section 5 "... solution is %a" (fun k->k Solution.pp solution);
+        Util.debugf ~section 5 "... solution is %a" (fun k->k Solution.pp solution);
         (* obtain another solution: negate current one and continue *)
         let tl = lazy (negate ~n solution) in
         LazyList.Cons (solution, tl)
       | Solver.Unsat ->
-        Util.debug ~section 5 "no solution" (fun _ -> ());
+        Util.debug ~section 5 "no solution";
         LazyList.Nil
     and negate ~n:_ solution =
       (* negate current solution to get the next one... if any *)
@@ -332,7 +332,7 @@ end
 
 let solve_multiple l =
   let l = List.rev_map C.simplify l in
-  Util.debug ~section 2 "lpo: solve constraints %a" (fun k->k (CCFormat.list C.pp) l);
+  Util.debugf ~section 2 "lpo: solve constraints %a" (fun k->k (CCFormat.list C.pp) l);
   let module S = MakeSolver(struct end) in
   S.solve_list l
 
@@ -416,7 +416,7 @@ module FO = struct
       (fun (l,r) ->
         let c = orient_lpo l r in
         let c' = C.simplify c in
-        Util.debug ~section 2 "constr %a simplified into %a" (fun k->k C.pp c C.pp c');
+        Util.debugf ~section 2 "constr %a simplified into %a" (fun k->k C.pp c C.pp c');
         c')
       l
 end
@@ -472,7 +472,7 @@ module STerm = struct
       (fun (l,r) ->
         let c = orient_lpo l r in
         let c' = C.simplify c in
-        Util.debug ~section 2 "constr %a simplified into %a" (fun k->k C.pp c C.pp c');
+        Util.debugf ~section 2 "constr %a simplified into %a" (fun k->k C.pp c C.pp c');
         c')
       l
 end

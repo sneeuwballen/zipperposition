@@ -258,7 +258,7 @@ let __process state =
     let c, proof = Queue.pop state.to_process in
     if not (Clause.Map.mem c state.db.all)
     then begin
-      Util.debug ~section 5 "meta-reasoner: add clause %a" (fun k->k Clause.pp c);
+      Util.debugf ~section 5 "meta-reasoner: add clause %a" (fun k->k Clause.pp c);
       (* new clause: insert its proof in state.db.all, then update fixpoint *)
       state.db <- {state.db with all=Clause.Map.add c proof state.db.all;};
       match c.Clause.body with

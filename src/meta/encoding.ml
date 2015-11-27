@@ -67,7 +67,7 @@ type hoclause = hoterm clause
 (* convert a list of formulas into a clause *)
 let foclause_of_clause l =
   let module F = Formula.FO in
-  Util.debug ~section 5 "foclause_of_clause @[%a@]"
+  Util.debugf ~section 5 "foclause_of_clause @[%a@]"
     (fun k->k (CCFormat.list F.pp) l);
   let term_of_form f = match F.view f with
     | F.Atom t -> t

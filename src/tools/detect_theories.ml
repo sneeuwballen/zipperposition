@@ -78,15 +78,15 @@ let parse_and_cnf ?(signature=Signature.TPTP.base) files =
   let res = E.(
     fold_l
     (fun () file ->
-      Util.debug 1 "parse input file %s" (fun k->k file);
+      Util.debugf 1 "parse input file %s" (fun k->k file);
       (* parse *)
       Util_tptp.parse_file ~recursive:true file
       >>= fun decls ->
-      Util.debug 3 "parsed %d declarations..." (fun k->k (Sequence.length decls));
+      Util.debugf 3 "parsed %d declarations..." (fun k->k (Sequence.length decls));
       (* CNF *)
       to_cnf ~signature decls
       >>= fun clauses ->
-      Util.debug 3 "obtained %d clauses..." (fun k->k (Sequence.length clauses));
+      Util.debugf 3 "obtained %d clauses..." (fun k->k (Sequence.length clauses));
       (* convert clauses into Encoding.foclause *)
       let clauses = Sequence.map Encoding.foclause_of_clause clauses in
       Queue.add clauses q;
@@ -168,23 +168,23 @@ let main () =
   let res = E.(
     parse_files prover !theory_files
     >>= fun prover ->
-    Util.debug 3 "theory files parsed" (fun _ -> ());
+    Util.debug 3 "theory files parsed";
     if !flag_print_theory then print_theory (Prover.reasoner prover);
     if !flag_print_signature then print_signature (Prover.signature prover);
     (* parse CNF formulas *)
     parse_and_cnf !files
     >>= fun clauses ->
-    Util.debug 3 "input files parsed and translated to CNF" (fun _ -> ());
+    Util.debug 3 "input files parsed and translated to CNF";
     if !flag_print_cnf then print_clauses clauses;
     let results = detect_theories prover clauses in
-    Util.debug 3 "theory detection done" (fun _ -> ());
+    Util.debug 3 "theory detection done";
     E.return results
   ) in
   match res with
   | `Error msg ->
-      Util.debug 0 "error: %s" (fun k->k msg); exit 1
+      Util.debugf 0 "error: %s" (fun k->k msg); exit 1
   | `Ok {theories; lemmas; axioms; rewrite; pre_rewrite; } ->
-      Util.debug 1 "success!" (fun _ -> ());
+      Util.debug 1 "success!";
       Format.printf "@[<2>axioms:@ @[%a@]@]@."
         (CCFormat.seq ~sep:"\n  " pp_theory_axiom) axioms;
       Format.printf "@[<2>theories:@ @[%a@]@]@."

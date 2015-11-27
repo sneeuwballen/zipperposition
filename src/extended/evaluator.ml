@@ -125,7 +125,7 @@ module FO = struct
         with
         | Not_found -> t
         | Type.Error _ as e ->
-          Util.debug 0 "type error when evaluating %a" T.pp t;
+          Util.debugf 0 "type error when evaluating %a" T.pp t;
           raise e
       in
       if T.eq t t'
@@ -215,7 +215,7 @@ module FO = struct
     | _ -> None
 
   let _ev_sum ~tyargs _ l =
-    Util.debug 5 "evaluate sum %a" (Util.pp_list T.pp) l;
+    Util.debugf 5 "evaluate sum %a" (Util.pp_list T.pp) l;
     match _binary l with
     | `Binary (`Const n1, _, `Const n2, _) when S.is_numeric n1 && S.is_numeric n2 ->
       Some (T.mk_const (S.Arith.Op.sum n1 n2))
@@ -250,7 +250,7 @@ module FO = struct
     | Some t' -> t'
 
   let rec _ev_product ~tyargs _ l =
-    Util.debug 5 "evaluate product %a" (Util.pp_list T.pp) l;
+    Util.debugf 5 "evaluate product %a" (Util.pp_list T.pp) l;
     match _binary l with
     | `Binary (`Const n1, _, `Const n2, _) when S.is_numeric n1 && S.is_numeric n2 ->
       Some (T.mk_const (S.Arith.Op.product n1 n2))

@@ -72,13 +72,16 @@ val set_debug : int -> unit     (** Set debug level of [Section.root] *)
 val get_debug : unit -> int     (** Current debug level for [Section.root] *)
 val need_cleanup : bool ref     (** Cleanup line before printing? *)
 
-val debug : ?section:Section.t ->
-            int ->
-            ('a, Format.formatter, unit, unit) format4 ->
-            ('a -> unit) ->
-            unit
+val debugf : ?section:Section.t ->
+             int ->
+             ('a, Format.formatter, unit, unit) format4 ->
+             ('a -> unit) ->
+             unit
 (** Print a debug message, with the given section and verbosity level.
     The message might be dropped if its level is too high. *)
+
+val debug : ?section:Section.t -> int -> string -> unit
+(** Cheap non-formatting version of {!debugf} *)
 
 val pp_pos : Lexing.position -> string
 

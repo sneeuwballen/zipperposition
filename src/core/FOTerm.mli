@@ -250,8 +250,8 @@ val default_hooks : unit -> print_hook list
 include Interfaces.SERIALIZABLE with type t := t
 *)
 
-val debug : Format.formatter -> t -> unit
-  (** debug printing, with sorts *)
+val debugf : Format.formatter -> t -> unit
+  (** debugf printing, with sorts *)
 
 (** {2 TPTP} *)
 
@@ -294,8 +294,8 @@ module TPTP : sig
     val arith_hook : print_hook
       (** hook to print arithmetic expressions *)
 
-    val pp_debug : t CCFormat.printer
-      (** use arith_hook with pp_debug *)
+    val pp_debugf : t CCFormat.printer
+      (** use arith_hook with pp_debugf *)
   end
 end
 

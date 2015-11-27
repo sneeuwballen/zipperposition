@@ -184,7 +184,7 @@ module MakeOrdered(E : Index.EQUATION with type rhs = T.t) = struct
                   else ()));
         t (* could not rewrite t *)
       with RewrittenInto t' ->
-        Util.debug ~section 3 "rewrite %a into %a" (fun k->k T.pp t T.pp t');
+        Util.debugf ~section 3 "rewrite %a into %a" (fun k->k T.pp t T.pp t');
         Util.incr_stat stat_ordered_rewriting;
         assert (Ordering.compare trs.ord t t' = Comparison.Gt);
         reduce reduce' t'  (* term is rewritten, reduce it again *)
@@ -315,7 +315,7 @@ struct
         Idx.retrieve ~allow_open:true ~sign:true trs 1 t 0 () rewrite_handler;
         t  (* normal form *)
       with (RewrittenIn (t', subst, rule)) ->
-        Util.debug ~section 3 "rewrite %a into %a (with %a)"
+        Util.debugf ~section 3 "rewrite %a into %a (with %a)"
           (fun k->k T.pp t T.pp t' S.pp subst);
         rules := rule :: !rules;
         compute_nf ~rules subst t' 1  (* rewritten into subst(t',1), continue *)
@@ -424,7 +424,7 @@ module FormRW = struct
         DT.retrieve ~sign:true frs 1 t 0 () rewrite_handler;
         F.Base.atom t  (* normal form is itself *)
       with (RewrittenIn (f, subst, rule)) ->
-        Util.debug ~section 3 "rewrite `@[%a@]`@ into `@[%a@]`@ (with @[%a@])"
+        Util.debugf ~section 3 "rewrite `@[%a@]`@ into `@[%a@]`@ (with @[%a@])"
           (fun k->k T.pp t F.pp f S.pp subst);
         rules := rule :: !rules;
         compute_nf ~rules subst f 1  (* rewritten into subst(t',1), continue *)
@@ -435,7 +435,7 @@ module FormRW = struct
     let rules = ref [] in
     let f' = compute_nf ~rules S.empty f 0 in
     if not (F.equal f f')
-    then Util.debug ~section 3 "normal form of `@[%a@]`:@ `@[%a@]`" (fun k->k F.pp f F.pp f');
+    then Util.debugf ~section 3 "normal form of `@[%a@]`:@ `@[%a@]`" (fun k->k F.pp f F.pp f');
     f', !rules
 
   let rewrite frs f =

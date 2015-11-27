@@ -70,7 +70,7 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
 
   (* Check that new_prec is a compatible superset of old_prec *)
   let _check_precedence old_prec new_prec =
-    Util.debug 3 "check compatibility of %a with %a"
+    Util.debugf 3 "check compatibility of %a with %a"
       (fun k->k Prec.pp old_prec Prec.pp new_prec);
     let rec check l = match l with
     | [] | [_] -> true
