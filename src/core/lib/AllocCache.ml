@@ -16,7 +16,7 @@ module Arr = struct
     Array.init (n-1)
       (fun _ ->  { size=0; cached=Array.make buck_size [||]})
 
-  let arr_make c i x =
+  let make c i x =
     if i<Array.length c then (
       let buck = c.(i) in
       if buck.size = 0 then Array.make i x
@@ -28,7 +28,7 @@ module Arr = struct
       )
     ) else Array.make i x
 
-  let arr_free c a =
+  let free c a =
     if Array.length a < Array.length c then (
       let buck = c.(Array.length a) in
       if buck.size < Array.length buck.cached then (
@@ -38,14 +38,14 @@ module Arr = struct
       )
     )
 
-  let with_arr c i x ~f =
-    let a = arr_make c i x in
+  let with_ c i x ~f =
+    let a = make c i x in
     try
       let ret = f a in
-      arr_free c a;
+      free c a;
       ret
     with e ->
-      arr_free c a;
+      free c a;
       raise e
 
 end
