@@ -98,7 +98,7 @@ module Clause = struct
   let pp out c = match c.body with
     | [] -> Format.fprintf out "@[%a@]." HOT.pp c.head
     | _::_ ->
-        Format.fprintf out "@[<hv2>%a@ <- %a@]." HOT.pp c.head (Util.pp_list HOT.pp) c.body
+        Format.fprintf out "@[<hv2>%a@ <- @[<hv>%a@]@]." HOT.pp c.head (Util.pp_list HOT.pp) c.body
   let to_string = CCFormat.to_string pp
 
   module Set = Sequence.Set.Make(struct
