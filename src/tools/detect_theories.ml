@@ -103,15 +103,16 @@ let parse_and_cnf ?(signature=Signature.TPTP.base) files =
 (* print content of the reasoner *)
 let print_theory r =
   Reasoner.Seq.to_seq r
-    |> Format.printf "theory:@.  %a@." (CCFormat.seq ~sep:"\n  " Reasoner.Clause.pp);
+    |> Format.printf "@[<v2>theory:@ %a@]@."
+      (CCFormat.seq ~start:"" ~stop:"" ~sep:" " Reasoner.Clause.pp);
   ()
 
 let print_clauses c =
-  Format.printf "clauses: @[%a@]@."
+  Format.printf "@[<v2>clauses:@ %a@]@."
     (CCFormat.seq ~sep:" " (Encoding.pp_clause FOTerm.pp)) c
 
 let print_signature signature =
-  Format.printf "@[<2>signature:@,@[%a@]@]@."
+  Format.printf "@[<v2>signature:@,@[%a@]@]@."
     (CCFormat.seq ~sep:" " (Util.pp_pair ~sep:" : " Symbol.pp Type.pp))
     (Signature.Seq.to_seq signature)
 
@@ -119,7 +120,7 @@ let pp_theory_axiom out (name, _, t) =
   Format.fprintf out "%s %a" name HOT.pp t
 
 let pp_rewrite_system out l =
-  Format.fprintf out "@[<v2>rewrite system@ @[%a@]@]"
+  Format.fprintf out "@[<v2>rewrite system@ %a@]"
     (Util.pp_list ~sep:"" (Util.pp_pair ~sep:" --> " FOTerm.pp FOTerm.pp)) l
 
 let pp_pre_rewrite_system buf l =

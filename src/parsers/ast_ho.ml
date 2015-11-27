@@ -44,7 +44,7 @@ let pp out t = match t with
   | Clause (head, []) ->
       Format.fprintf out "@[%a@]." PT.pp head
   | Clause (head, body) ->
-      Format.fprintf out "@[<hv2>%a <-@ %a.@]"
+      Format.fprintf out "@[<hv2>@[%a@]@ <-@ %a.@]"
         PT.pp head (Util.pp_list ~sep:", " PT.pp) body
   | Type (s, ty) ->
       Format.fprintf out "@[val @[<hv>%s@ : %a@]@]" s PT.pp ty

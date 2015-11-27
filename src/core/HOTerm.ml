@@ -481,36 +481,34 @@ let pp_depth ?hooks:_ depth out t =
   let rec pp_rec out t = match view t with
   | BVar i -> Format.fprintf out "Y%d" (!depth - i - 1)
   | Lambda (varty,t') | Forall (varty,t') | Exists (varty,t') ->
-    Format.fprintf out "%s%a:%a. "
+    Format.fprintf out "@[<2>%s%a:@[%a@].@ "
       (binder_to_str t) pp_bvar () Type.pp_surrounded varty;
     incr depth;
     pp_surrounded out t';
-    decr depth
+    decr depth;
+    Format.fprintf out "@]"
   | Const s -> Symbol.pp out s
   | Var i ->
       if not !print_all_types
-      then Format.fprintf out "X%d:%a" i Type.pp_surrounded (ty t)
+      then Format.fprintf out "X%d:@[%a@]" i Type.pp_surrounded (ty t)
       else Format.fprintf out "X%d" i
   | At (l,r) ->
-    pp_rec out l; CCFormat.char out ' ';
-    pp_surrounded out r
-  | TyLift ty -> Format.fprintf out "@%a" Type.pp_surrounded ty
+    Format.fprintf out "@[<2>@[%a@]@ @[%a@]@]" pp_rec l pp_surrounded r
+  | TyLift ty -> Format.fprintf out "@@%a" Type.pp_surrounded ty
   | Record ([], None) ->
     CCFormat.string out "{}"
   | Record ([], Some r) ->
-    Format.fprintf out "{ | %a}" pp_rec r
+    Format.fprintf out "@[{ | %a}@]" pp_rec r
   | Record (l, None) ->
-    CCFormat.char out '{';
-    CCFormat.list (fun buf (n, t) -> Format.fprintf buf "%s=%a" n pp_rec t)
-      out l;
-    CCFormat.char out '}'
+    Format.fprintf out "{@[<hv>%a@]}"
+      (Util.pp_list (fun buf (n, t) -> Format.fprintf buf "@[%s=%a@]" n pp_rec t))
+      l
   | Record (l, Some r) ->
-    CCFormat.char out '{';
-    CCFormat.list (fun buf (n, t) -> Format.fprintf buf "%s=%a" n pp_rec t)
-      out l;
-    Format.fprintf out " | %a}" pp_rec r
+    Format.fprintf out "{@[<hv>%a@ | %a@]}"
+      (Util.pp_list ~sep:", " (fun out (n, t) -> Format.fprintf out "@[%s=%a@]" n pp_rec t))
+      l pp_rec r
   | Multiset (_, l) ->
-    Format.fprintf out "[%a]" (CCFormat.list pp_rec) l
+    Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list pp_rec) l
   and pp_surrounded buf t = match view t with
   | Lambda _ | At _ ->
     CCFormat.char buf '('; pp_rec buf t;  CCFormat.char buf ')'
