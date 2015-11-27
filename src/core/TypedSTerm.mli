@@ -119,32 +119,26 @@ module Visitor : sig
   val for_all : bool t
 end
 
-(** {2 Substitutions, Unification} *)
+(** {2 Unification} *)
 
-type 'a or_error = [`Error of string | `Ok of 'a]
+exception UnifyFailure of term * term
 
-module Subst : sig
+module UStack : sig
   type t
+  (** Unification stack, for backtracking purposes *)
 
-  val empty : t
+  val create : unit -> t
 
-  val add : t -> term -> term -> t
+  type snapshot
+  (** A snapshot of bindings at a given moment *)
 
-  val eval : t -> term -> term
+  val snapshot : st:t -> snapshot
 
-  val eval_head : t -> term -> term
-
-  include Interfaces.PRINT with type t := t
+  val restore : st:t -> snapshot -> unit
 end
 
-val rename : term -> term
-(** Rename all free variables *)
-
-exception UnifyFailure of term * term * Subst.t
-
-val unify : ?subst:Subst.t -> term -> term -> Subst.t or_error
-(** Unify two terms, might fail *)
-
-val unify_exn : ?subst:Subst.t -> term -> term -> Subst.t
-(** Same as {!unify}, but can raise.
-    @raise UnifyFailure if the unification fails *)
+val unify : ?st:UStack.t-> term -> term -> unit
+(** unifies destructively the two given terms, by modifying references
+      that occur under {!Meta}. Regular variables are not modified.
+    @param unif_stack used for backtracking
+    @raise UnifyFailure if unification fails. *)

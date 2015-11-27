@@ -286,8 +286,7 @@ let vars t = Seq.vars t |> Set.of_seq |> Set.to_list
 
 let closed t =
   Seq.subterms_with_bound t
-  |> Sequence.filter (CCFun.compose fst is_bvar)
-  |> Sequence.for_all (fun (v,set) -> Set.mem v set)
+  |> Sequence.for_all (fun (v,set) -> not (is_bvar v) || Set.mem v set)
 
 let close_all ?ty s t = bind_list ?ty s (vars t) t
 
@@ -297,94 +296,60 @@ let _pp_term = pp
 
 (** {2 Substitutions, Unification} *)
 
-type 'a or_error = [`Error of string | `Ok of 'a]
+module UStack = struct
+  type t = {
+    mutable size: int;
+    mutable l: term option ref list;  (* list of bindings to undo *)
+  }
 
-module Subst = struct
-  type t = term Map.t
+  let create () = {
+    size=0;
+    l=[];
+  }
 
-  let empty = Map.empty
+  type snapshot = int
 
-  let pp buf subst =
-    Map.to_seq subst
-    |> CCFormat.seq ~start:"{" ~stop:"}" ~sep:"," (CCFormat.pair _pp_term _pp_term) buf
-  let to_string = CCFormat.to_string pp
+  let snapshot ~st:t = t.size
 
-  let add subst v t =
-    assert (is_var v);
-    if Map.mem v subst
-      then invalid_arg
-        (CCFormat.sprintf "var %a already bound in %a" _pp_term v pp subst);
-    Map.add v t subst
+  let restore ~st:t i =
+    let rec unwind l size i =
+      if size>i then
+        match l with
+        | [] -> assert false
+        | r :: l' -> r := None; unwind l' (size-1) i
+      else l
+    in
+    if i<t.size then (
+      let l = unwind t.l t.size i in
+      t.l <- l;
+      t.size <- i
+    )
 
-  let rec eval_head subst t =
-    let ty = CCOpt.map (eval_head subst) t.ty in
-    match view t with
-    | Var _ ->
-        begin try
-          let t' = Map.find t subst in
-          eval_head subst t'
-        with Not_found ->
-          with_ty ?ty t
-        end
-    | BVar _
-    | Const _
-    | App _
-    | AppBuiltin _
-    | Bind _
-    | Record _
-    | Meta _
-    | Multiset _ -> with_ty ?ty t
-
-  let rec eval subst t =
-    let ty = CCOpt.map (eval subst) t.ty in
-    match view t with
-    | Var _ ->
-        begin try
-          let t' = Map.find t subst in
-          eval subst t'
-        with Not_found ->
-          with_ty ?ty t
-        end
-    | BVar _
-    | Const _ -> with_ty ?ty t
-    | App (f, l) ->
-        app ?loc:t.loc ?ty (eval subst f) (eval_list subst l)
-    | Bind (s, v, t) ->
-        bind ?loc:t.loc ?ty s (eval subst v) (eval subst t)
-    | AppBuiltin (b,l) ->
-        app_builtin ?loc:t.loc ?ty b (eval_list subst l)
-    | Record (l, rest) ->
-        record ?loc:t.loc ?ty
-          (List.map (CCPair.map2 (eval subst)) l)
-          ~rest:(CCOpt.map (eval subst) rest)
-    | Multiset l ->
-        multiset ?loc:t.loc ?ty (eval_list subst l)
-    | Meta (id,r) ->
-        meta_full ?loc:t.loc ?ty id r
-  and eval_list subst l = List.map (eval subst) l
+  (* bind [r] to [x] *)
+  let bind ~st r x =
+    assert (!r = None);
+    st.l <- r :: st.l;
+    st.size <- st.size + 1;
+    r := Some x
 end
 
-let rename t =
-  let subst = List.fold_left
-    (fun s v -> Subst.add s v (fresh_var ?loc:v.loc ?ty:v.ty ()))
-    Subst.empty (vars t)
-  in
-  Subst.eval subst t
+exception UnifyFailure of term * term
 
-exception UnifyFailure of term * term * Subst.t
+let () = Printexc.register_printer
+  (function
+    | UnifyFailure (t1,t2) ->
+      Some (
+        CCFormat.sprintf "@[<2>could not unify `@[%a@]` and `@[%a@]`" pp t1 pp t2)
+    | _ -> None)
 
-let _pp_failure out (t1,t2,subst) =
-  Format.fprintf out "could not unify %a and %a (in context %a)"
-  pp t1 pp t2 Subst.pp subst
+let _fail_unif t1 t2 = raise (UnifyFailure (t1,t2))
 
-let _fail_unif t1 t2 subst = raise (UnifyFailure (t1,t2,subst))
-
-let occur_check_ ~subst v t =
-  assert (is_var v || is_meta v);
+let occur_check_ v t =
+  assert (is_meta v);
   let rec check t =
     v == t ||
     CCOpt.maybe check false t.ty ||
-    match view (Subst.eval_head subst t) with
+    match view t with
       | Meta _
       | Var _ -> equal v t
       | BVar _
@@ -399,105 +364,99 @@ let occur_check_ ~subst v t =
   in
   check t
 
-let rec _unify_exn subst t1 t2 =
-  let t1 = Subst.eval_head subst t1
-  and t2 = Subst.eval_head subst t2 in
-  let subst = match t1.ty, t2.ty with
-    | None, None -> subst
-    | Some ty1, Some ty2 -> _unify_exn subst ty1 ty2
+let unify ?(st=UStack.create()) t1 t2 =
+  let rec unif_rec t1 t2 =
+    if t1==t2 then ()
+    else (
+      unify_tys t1 t2;
+      unify_terms t1 t2
+    )
+  and unify_tys t1 t2 = match t1.ty, t2.ty with
+    | None, None -> ()
+    | Some ty1, Some ty2 -> unif_rec ty1 ty2
     | Some _, None
-    | None, Some _ -> _fail_unif t1 t2 subst
-  in
-  match view t1, view t2 with
-  | Var _, _ ->
-      if occur_check_ ~subst t1 t2 || not (closed t2)
-        then _fail_unif t1 t2 subst
-        else Subst.add subst t1 t2
-  | _, Var _ ->
-      if occur_check_ ~subst t2 t1 || not (closed t1)
-        then _fail_unif t1 t2 subst
-        else Subst.add subst t2 t1
-  | Meta (i1,_), Meta (i2,_) ->
-      if ID.equal i1 i2 then subst else _fail_unif t1 t2 subst
-  | BVar i, BVar j ->
-      if i=j then subst else _fail_unif t1 t2 subst
-  | App (f1,l1), App (f2,l2) when List.length l1=List.length l2 ->
-      let subst = _unify_exn subst f1 f2 in
-      _unify_list subst l1 l2
-  | AppBuiltin (b1,l1), AppBuiltin (b2,l2) when List.length l1=List.length l2 ->
-      if Builtin.equal b1 b2
-        then _unify_list subst l1 l2
-        else _fail_unif t1 t2 subst
-  | Multiset l1, Multiset l2 when List.length l1 = List.length l2 ->
-      (* unification is n-ary, so we choose the first satisfying subst, if any *)
-      _unify_multi subst l1 l2
-      |> Sequence.take 1
-      |> Sequence.to_list
-      |> (function
-        | [subst] -> subst
-        | _ -> _fail_unif t1 t2 subst
+    | None, Some _ -> _fail_unif t1 t2
+  and unify_terms t1 t2 = match view t1, view t2 with
+    | Meta (_, r), _ ->
+        assert (!r = None);
+        if occur_check_ t1 t2 || not (closed t2)
+          then _fail_unif t1 t2
+          else UStack.bind ~st r t2
+    | _, Meta (_, r) ->
+        assert (!r = None);
+        if occur_check_ t2 t1 || not (closed t1)
+          then _fail_unif t1 t2
+          else UStack.bind ~st r t1
+    | Var v1, Var v2
+    | BVar v1, BVar v2 ->
+        if not (ID.equal v1 v2) then _fail_unif t1 t2
+    | App (f1,l1), App (f2,l2) when List.length l1=List.length l2 ->
+        unif_rec f1 f2;
+        unif_l l1 l2
+    | AppBuiltin (b1,l1), AppBuiltin (b2,l2) when List.length l1=List.length l2 ->
+        if Builtin.equal b1 b2
+        then unif_l l1 l2
+        else _fail_unif t1 t2
+    | Multiset l1, Multiset l2 when List.length l1 = List.length l2 ->
+        (* unification is n-ary, so we choose the first satisfying, if any *)
+        _unify_multi l1 l2
+    | Record (l1, r1), Record (l2, r2) ->
+        let rest1, rest2 = _unify_record_fields l1 l2 in
+        let fail() = _fail_unif t1 t2 in
+        _unify_record_rest ~fail ?ty:t1.ty r2 rest1;
+        _unify_record_rest ~fail ?ty:t2.ty r1 rest2
+    | Var _, _
+    | BVar _, _
+    | Const _, _
+    | App _, _
+    | Bind _, _
+    | Multiset _, _
+    | Record _, _
+    | AppBuiltin _, _ -> _fail_unif t1 t2
+  and unif_l l1 l2 = List.iter2 unif_rec l1 l2
+  and _unify_multi l1 l2 = match l1 with
+    | [] -> assert (l2 = []); () (* success *)
+    | t1::l1' ->
+        _unify_multiset_with t1 l1' [] l2
+  and _unify_multiset_with t1 l1 rest2 l2 = match l2 with
+    | [] -> ()
+    | t2::l2' ->
+        (* save current state, then try to unify t1 and t2 *)
+        let snapshot = UStack.snapshot ~st in
+        begin try
+          unif_rec t1 t2;
+          _unify_multi l1 (rest2@l2')
+        with UnifyFailure _ ->
+          (* backtrack *)
+          UStack.restore ~st snapshot;
+          _unify_multiset_with t1 l1 (t2::rest2) l2'
+        end;
+  and _unify_record_fields l1 l2 = match l1, l2 with
+    | [], _
+    | _, [] -> l1, l2
+    | (n1,t1)::l1', (n2,t2)::l2' ->
+        if n1=n2
+        then (
+          unif_rec t1 t2;
+          _unify_record_fields l1' l2'
+        ) else if n1<n2 then (
+          let rest1, rest2 = _unify_record_fields l1' l2 in
+          (n1,t1)::rest1, rest2
+        ) else (
+          let rest1, rest2 = _unify_record_fields l1 l2' in
+          rest1, (n2,t2)::rest2
         )
-  | Record (l1, r1), Record (l2, r2) ->
-      let subst, rest1, rest2 = _unify_record_fields subst l1 l2 in
-      let fail() = _fail_unif t1 t2 subst in
-      let subst = _unify_record_rest subst ~fail ?ty:t1.ty r2 rest1 in
-      _unify_record_rest subst ~fail ?ty:t2.ty r1 rest2
-  | Meta _, _
-  | BVar _, _
-  | Const _, _
-  | App _, _
-  | Bind _, _
-  | Multiset _, _
-  | Record _, _
-  | AppBuiltin _, _ -> _fail_unif t1 t2 subst
-and _unify_list subst l1 l2 =
-  List.fold_left2 _unify_exn subst l1 l2
-and _unify_multi subst l1 l2 k = match l1 with
-  | [] ->
-      assert (l2 = []);
-      k subst
-  | t1::l1' ->
-      _unify_multiset_with subst t1 l1' [] l2 k
-and _unify_multiset_with subst t1 l1 rest2 l2 k = match l2 with
-  | [] -> ()
-  | t2::l2' ->
-      begin try
-        let subst = _unify_exn subst t1 t2 in
-        _unify_multi subst l1 (rest2@l2') k
-      with UnifyFailure _ -> ()
-      end;
-      _unify_multiset_with subst t1 l1 (t2::rest2) l2' k
-and _unify_record_fields subst l1 l2 = match l1, l2 with
-  | [], _
-  | _, [] -> subst, l1, l2
-  | (n1,t1)::l1', (n2,t2)::l2' ->
-      if n1=n2
-      then
-        let subst = _unify_exn subst t1 t2 in
-        _unify_record_fields subst l1' l2'
-      else if n1<n2
-      then
-        let subst, rest1, rest2 = _unify_record_fields subst l1' l2 in
-        subst, (n1,t1)::rest1, rest2
-      else
-        let subst, rest1, rest2 = _unify_record_fields subst l1 l2' in
-        subst, rest1, (n2,t2)::rest2
-and _unify_record_rest ~fail ?ty subst r rest = match r, rest with
-  | None, [] -> subst
-  | None, _::_ -> fail()
-  | Some ({term=Var _;_} as r), _ ->
-      let t' = record ?ty rest ~rest:None in
-      if occur_check_ ~subst r t'
-        then fail()
-        else Subst.add subst r t'
-  | Some _, _ -> assert false
-
-let unify_exn ?(subst=Subst.empty) t1 t2 =
-  _unify_exn subst t1 t2
-
-let unify ?(subst=Subst.empty) t1 t2 =
-  try CCError.return (_unify_exn subst t1 t2)
-  with UnifyFailure (t1,t2,subst) ->
-    CCError.fail
-      (CCFormat.sprintf "@[<2>could not unify@ `@[%a@]`@ and `@[%a@]`@ (in context @[%a@])"
-        pp t1 pp t2 Subst.pp subst)
+  and _unify_record_rest ~fail ?ty r rest = match r, rest with
+    | None, [] -> ()
+    | None, _::_ -> fail()
+    | Some t, _ ->
+        begin match view t with
+        | Meta (_, v) ->
+            let t' = record ?ty rest ~rest:None in
+            if occur_check_ t t'
+            then fail()
+            else UStack.bind ~st v t'
+        | _ -> fail()
+        end
+  in
+  unif_rec t1 t2
