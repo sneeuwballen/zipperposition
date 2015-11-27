@@ -63,12 +63,6 @@ module type S = sig
   val view : t -> view
     (** View of the formula *)
 
-  val kind : ScopedTerm.Kind.t
-  val of_term : ScopedTerm.t -> t option
-  val of_term_exn : ScopedTerm.t -> t
-    (** @raise Invalid_argument if the term isn't a formula *)
-  val is_form : ScopedTerm.t -> bool
-
   include Interfaces.HASH with type t := t
   include Interfaces.ORD with type t := t
 
@@ -224,8 +218,6 @@ module type TERM = sig
   val ty : t -> type_
 
   val size : t -> int
-
-  val kind : ScopedTerm.Kind.t
 
   include Interfaces.HASH with type t := t
   include Interfaces.ORD with type t := t

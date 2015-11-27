@@ -61,12 +61,6 @@ module type S = sig
   val view : t -> view
     (** View of the formula *)
 
-  val kind : ScopedTerm.Kind.t
-  val of_term : ScopedTerm.t -> t option
-  val of_term_exn : ScopedTerm.t -> t
-    (** @raise Invalid_argument if the term isn't a formula *)
-  val is_form : ScopedTerm.t -> bool
-
   include Interfaces.HASH with type t := t
   include Interfaces.ORD with type t := t
 
@@ -222,8 +216,6 @@ module type TERM = sig
 
   val size : t -> int
 
-  val kind : ScopedTerm.Kind.t
-
   include Interfaces.HASH with type t := t
   include Interfaces.ORD with type t := t
 
@@ -285,10 +277,10 @@ module Make(MyT : TERM) = struct
       begin match T.view t with
       | T.Const (Sym.Conn Sym.True) -> True
       | T.Const (Sym.Conn Sym.False) -> False
-      | T.SimpleApp (Sym.Conn Sym.And, l) -> And l
-      | T.SimpleApp (Sym.Conn Sym.Or, l) -> Or l
-      | T.SimpleApp (Sym.Conn Sym.Not, [a]) -> Not a
-      | T.SimpleApp (Sym.Conn conn, [a; b]) ->
+      | T.AppBuiltin (Sym.Conn Sym.And, l) -> And l
+      | T.AppBuiltin (Sym.Conn Sym.Or, l) -> Or l
+      | T.AppBuiltin (Sym.Conn Sym.Not, [a]) -> Not a
+      | T.AppBuiltin (Sym.Conn conn, [a; b]) ->
           begin match conn with
           | Sym.Equiv -> Equiv (a,b)
           | Sym.Xor -> Xor (a,b)

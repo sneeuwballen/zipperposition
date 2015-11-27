@@ -37,6 +37,7 @@ type t = private ScopedTerm.t
 type term = t
 
 type view = private
+  | Builtin of Builtin.t
   | Var of int                  (** variable *)
   | BVar of int                 (** bound variable (De Bruijn index) *)
   | Lambda of Type.t * t   (** lambda abstraction over one variable. *)
@@ -50,11 +51,10 @@ type view = private
 
 val view : t -> view
 val ty : t -> Type.t
-val kind : ScopedTerm.Kind.t
 
-val of_term : ScopedTerm.t -> t option
-val of_term_exn : ScopedTerm.t -> t
-val is_term : ScopedTerm.t -> bool
+val of_term_unsafe : ScopedTerm.t -> t
+(** {b NOTE}: caution, this can break invariants! Use only if you know what
+    you are doing. *)
 
 (** {2 Comparison, equality, containers} *)
 
@@ -126,6 +126,8 @@ val tyat_list : t -> Type.t list -> t
 
 val at_full : ?tyargs:Type.t list -> t -> t list -> t
   (** Combination of {!at_list} and {!tyat_list} *)
+
+val builtin : ty:Type.t -> Builtin.t -> t
 
 val const : ty:Type.t -> symbol -> t
   (** Create a typed constant. *)
@@ -218,36 +220,6 @@ val symbols : ?init:Symbol.Set.t -> t -> Symbol.Set.t (** Symbols of the term (k
 
 val contains_symbol : Symbol.t -> t -> bool
   (** Does the term contain this given symbol? *)
-
-(** {2 Visitor} *)
-
-class virtual ['a] any_visitor : object
-  method virtual var : Type.t -> int -> 'a
-  method virtual bvar : Type.t -> int -> 'a
-  method virtual lambda : Type.t -> 'a -> 'a
-  method virtual forall : Type.t -> 'a -> 'a
-  method virtual exists : Type.t -> 'a -> 'a
-  method virtual const : Type.t -> Symbol.t -> 'a
-  method virtual at : 'a -> 'a -> 'a
-  method virtual tylift : Type.t -> 'a
-  method virtual multiset : Type.t -> 'a list -> 'a
-  method virtual record : (string*'a) list -> 'a option -> 'a
-  method visit : t -> 'a
-end
-
-class id_visitor : object
-  method var : Type.t -> int -> t
-  method bvar : Type.t -> int -> t
-  method lambda : Type.t -> t -> t
-  method forall : Type.t -> t -> t
-  method exists : Type.t -> t -> t
-  method const : Type.t -> Symbol.t -> t
-  method at : t -> t -> t
-  method tylift : Type.t -> t
-  method multiset : Type.t -> t list -> t
-  method record : (string*t) list -> t option -> t
-  method visit : t -> t
-end (** Visitor that maps the subterms into themselves *)
 
 (** {2 Conversion with {!FOTerm}} *)
 

@@ -61,7 +61,7 @@ module Constraint : sig
       (** Expressions that occur in the constraint *)
   end
 
-  include LogtkInterfaces.PRINT with type t := t
+  include Interfaces.PRINT with type t := t
 
   val simplify : t -> t
     (** Basic simplifications *)
@@ -77,7 +77,7 @@ module Solution : sig
   val neg_to_constraint : t -> Constraint.t
     (** Constraint that explicitely eliminate this solution *)
 
-  include LogtkInterfaces.PRINT with type t := t
+  include Interfaces.PRINT with type t := t
 end
 
 val solve_multiple : Constraint.t list -> Solution.t LazyList.t

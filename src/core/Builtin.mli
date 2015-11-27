@@ -20,10 +20,6 @@ type t =
   | LiftType (** @since 0.8 *)
   | True
   | False
-  | Exists
-  | Forall
-  | ForallTy
-  | Lambda
   | Arrow
   | Wildcard
   | Multiset  (* type of multisets *)
@@ -57,33 +53,25 @@ val is_rat : t -> bool
 val is_numeric : t -> bool
 val is_not_numeric : t -> bool
 
-module Base : sig
-  val true_ : t
-  val false_ : t
-  val eq : t
-  val neq : t
-  val exists : t
-  val forall : t
-  val imply : t
-  val equiv : t
-  val xor : t
-  val lambda : t
+val true_ : t
+val false_ : t
+val eq : t
+val neq : t
+val imply : t
+val equiv : t
+val xor : t
 
-  val not_ : t
-  val and_ : t
-  val or_ : t
+val not_ : t
+val and_ : t
+val or_ : t
 
-  val forall_ty : t
-  val arrow : t
-  val tType : t
-  val has_type : t
-  val lift_type : t
+val arrow : t
+val tType : t
+val has_type : t
+val lift_type : t
 
-  val wildcard : t    (** $_ for type inference *)
-  val multiset : t    (** type of multisets *)
-
-  val fresh_var : unit -> t (** New, unique symbol (cycles after 2^63 calls...) *)
-end
+val wildcard : t    (** $_ for type inference *)
+val multiset : t    (** type of multisets *)
 
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t

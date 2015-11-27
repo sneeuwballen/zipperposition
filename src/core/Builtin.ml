@@ -18,10 +18,6 @@ type t =
   | LiftType (** @since 0.8 *)
   | True
   | False
-  | Exists
-  | Forall
-  | ForallTy
-  | Lambda
   | Arrow
   | Wildcard
   | Multiset  (* type of multisets *)
@@ -44,16 +40,12 @@ let to_int_ = function
   | LiftType -> 9
   | True -> 10
   | False -> 11
-  | Exists -> 12
-  | Forall -> 13
-  | ForallTy -> 14
-  | Lambda -> 15
-  | Arrow -> 16
-  | Wildcard -> 17
-  | Multiset -> 18
-  | TType -> 19
-  | Int _ -> 20
-  | Rat _ -> 21
+  | Arrow -> 12
+  | Wildcard -> 13
+  | Multiset -> 14
+  | TType -> 15
+  | Int _ -> 16
+  | Rat _ -> 17
 
 let compare a b = match a, b with
   | Int i, Int j -> Z.compare i j
@@ -97,10 +89,6 @@ let to_string s = match s with
   | LiftType -> "@"
   | True -> "true"
   | False -> "false"
-  | Exists -> "∃"
-  | Forall -> "∀"
-  | Lambda -> "λ"
-  | ForallTy -> "Π"
   | Arrow -> "->"
   | Wildcard -> "_"
   | Multiset -> "Ms"
@@ -122,10 +110,6 @@ let is_prefix = function
   | HasType
   | True
   | False
-  | Exists
-  | Forall
-  | ForallTy
-  | Lambda
   | Arrow
   | Wildcard
   | Multiset
@@ -133,8 +117,7 @@ let is_prefix = function
 
 let is_infix = function
   | And | Or | Imply | Equiv | Xor | Eq | Neq | HasType | Arrow -> true
-  | Not | LiftType | Int _ | Rat _ | True | False | Exists | Forall | ForallTy
-  | Lambda | Wildcard | Multiset | TType  -> false
+  | Not | LiftType | Int _ | Rat _ | True | False | Wildcard | Multiset | TType  -> false
 
 let ty = function
   | Int _ -> `Int
@@ -149,28 +132,22 @@ let mk_rat s = Rat s
 let of_rat i j = Rat (Q.of_ints i j)
 let rat_of_string s = Rat (Q.of_string s)
 
-module Base = struct
-  let true_ = True
-  let false_ = False
-  let wildcard = Wildcard
-  let and_ = And
-  let or_ = Or
-  let imply = Imply
-  let equiv = Equiv
-  let xor = Xor
-  let not_ = Not
-  let eq = Eq
-  let neq = Neq
-  let forall = Forall
-  let exists = Exists
-  let lambda = Lambda
-  let forall_ty = ForallTy
-  let arrow = Arrow
-  let has_type = HasType
-  let lift_type = LiftType
-  let tType = TType
-  let multiset = Multiset
-end
+let true_ = True
+let false_ = False
+let wildcard = Wildcard
+let and_ = And
+let or_ = Or
+let imply = Imply
+let equiv = Equiv
+let xor = Xor
+let not_ = Not
+let eq = Eq
+let neq = Neq
+let arrow = Arrow
+let has_type = HasType
+let lift_type = LiftType
+let tType = TType
+let multiset = Multiset
 
 module TPTP = struct
   let pp out = function
@@ -190,10 +167,6 @@ module TPTP = struct
         | LiftType -> "@"
         | True -> "$true"
         | False -> "$false"
-        | Exists -> "?"
-        | Forall -> "!"
-        | ForallTy -> "!>"
-        | Lambda -> "^"
         | Arrow -> ">"
         | Wildcard -> "$_"
         | TType -> "$tType"
@@ -205,7 +178,7 @@ module TPTP = struct
 
   (* TODO add the other ones *)
   let connectives = Set.of_seq
-  (Sequence.of_list [ Base.and_; Base.or_; Base.equiv; Base.imply; ])
+  (Sequence.of_list [ and_; or_; equiv; imply; ])
 
   let is_connective = function
     | Int _

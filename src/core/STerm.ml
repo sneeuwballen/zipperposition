@@ -40,9 +40,9 @@ and view =
   | Int of Z.t                      (** integer *)
   | Rat of Q.t                      (** rational *)
   | Const of Sym.t               (** constant *)
-  | Syntactic of Sym.t * t list  (** syntactic construct (operator...) *)
+  | AppBuiltin of Builtin.t * t list
   | App of t * t list               (** apply term *)
-  | Bind of Sym.t * t list * t   (** bind n variables *)
+  | Bind of Binder.t * t list * t   (** bind n variables *)
   | List of t list                  (** special constructor for lists *)
   | Record of (string * t) list * t option  (** extensible record *)
   | Column of t * t                 (** t:t (useful for typing, e.g.) *)
@@ -57,7 +57,7 @@ let __to_int = function
   | Int _ -> 1
   | Rat _ -> 2
   | Const _ -> 3
-  | Syntactic _ -> 4
+  | AppBuiltin _ -> 4
   | App _ -> 5
   | Bind _ -> 6
   | List _ -> 7
@@ -74,13 +74,13 @@ let rec compare t1 t2 = match t1.term, t2.term with
     if c = 0
     then CCOrd.list_ compare l1 l2
     else c
-  | Syntactic (s1,l1), Syntactic (s2,l2) ->
-    let c = Sym.compare s1 s2 in
+  | AppBuiltin (s1,l1), AppBuiltin (s2,l2) ->
+    let c = Builtin.compare s1 s2 in
     if c = 0
     then CCOrd.list_ compare l1 l2
     else c
   | Bind (s1, v1, t1), Bind (s2, v2, t2) ->
-    let c = Sym.compare s1 s2 in
+    let c = Binder.compare s1 s2 in
     if c = 0
     then
       let c' = compare t1 t2 in
@@ -100,11 +100,11 @@ let rec hash_fun t h = match t.term with
   | Int i -> Hash.int_ (Z.hash i) h
   | Rat n -> Hash.string_ (Q.to_string n) h  (* TODO: find better *)
   | Const s -> Sym.hash_fun s h
-  | Syntactic (s,l) -> Sym.hash_fun s (Hash.list_ hash_fun l h)
+  | AppBuiltin (s,l) -> Builtin.hash_fun s (Hash.list_ hash_fun l h)
   | App (s, l) -> Hash.list_ hash_fun l (hash_fun s h)
   | List l -> Hash.list_ hash_fun l (Hash.int_ 42 h)
   | Bind (s,v,t') ->
-    h |> Sym.hash_fun s |> hash_fun t' |> Hash.list_ hash_fun v
+    h |> Binder.hash_fun s |> hash_fun t' |> Hash.list_ hash_fun v
   | Record (l, rest) ->
     h |> Hash.opt hash_fun rest
       |> Hash.list_ (fun (n,t) h -> Hash.string_ n (hash_fun t h)) l
@@ -120,7 +120,8 @@ let var ?loc ?ty s = match ty with
 let int_ i = __make (Int i)
 let of_int i = __make (Int (Z.of_int i))
 let rat n = __make (Rat n)
-let syntactic ?loc s l = __make ?loc (Syntactic(s,l))
+let builtin ?loc s = __make ?loc (AppBuiltin (s,[]))
+let app_builtin ?loc s l = __make ?loc (AppBuiltin(s,l))
 let app ?loc s l = match l with
   | [] -> s
   | _::_ -> __make ?loc (App(s,l))
@@ -136,7 +137,7 @@ let record ?loc l ~rest =
 let column ?loc x y = __make ?loc (Column(x,y))
 let at_loc ~loc t = {t with loc=Some loc; }
 
-let wildcard = const Sym.Base.wildcard
+let wildcard = builtin Builtin.wildcard
 
 let is_app = function {term=App _; _} -> true | _ -> false
 let is_var = function | {term=Var _; _} -> true | _ -> false
@@ -163,7 +164,7 @@ module Seq = struct
       match t.term with
       | Var _ | Int _ | Rat _ | Const _ -> ()
       | List l
-      | Syntactic (_,l) -> List.iter iter l
+      | AppBuiltin (_,l) -> List.iter iter l
       | App (f, l) -> iter f; List.iter iter l
       | Bind (_, v, t') -> List.iter iter v; iter t'
       | Record (l, rest) ->
@@ -182,7 +183,7 @@ module Seq = struct
       k (t, bound);
       match t.term with
       | Var _ | Int _ | Rat _ | Const _ -> ()
-      | Syntactic (_, l)
+      | AppBuiltin (_, l)
       | List l -> List.iter (iter bound) l
       | App (f, l) -> iter bound f; List.iter (iter bound) l
       | Bind (_, v, t') ->
@@ -208,7 +209,6 @@ module Seq = struct
   let symbols t = subterms t
       |> Sequence.fmap (function
         | {term=Const s; _} -> Some s
-        | {term=Bind (s, _, _); _} -> Some s
         | _ -> None)
 end
 
@@ -231,158 +231,100 @@ let rec pp out t = match t.term with
   | Rat i -> CCFormat.string out (Q.to_string i)
   | Const s -> Sym.pp out s
   | List l ->
-      CCFormat.char out '[';
-      Util.pp_list ~sep:"," pp out l;
-      CCFormat.char out ']'
-  | Syntactic (Sym.Conn Sym.Arrow, [ret;a]) ->
-    Format.fprintf out "%a -> %a" pp a pp ret
-  | Syntactic (Sym.Conn Sym.Arrow, ret::l) ->
-    Format.fprintf out "(%a) -> %a" (Util.pp_list ~sep:" * " pp) l pp ret
-  | Syntactic (s, l) ->
-      Format.fprintf out "%a(%a)" Sym.pp s (Util.pp_list ~sep:", " pp) l
+      Format.fprintf out "[@[<hv>%a@]]"
+        (Util.pp_list ~sep:"," pp) l;
+  | AppBuiltin (Builtin.Arrow, [ret;a]) ->
+      Format.fprintf out "@[<2>%a@ -> %a@]" pp a pp ret
+  | AppBuiltin (Builtin.Arrow, ret::l) ->
+      Format.fprintf out "@[<2>(%a)@ -> %a@]" (Util.pp_list ~sep:" * " pp) l pp ret
+  | AppBuiltin (s, l) ->
+      Format.fprintf out "%a(@[<2>%a@])" Builtin.pp s (Util.pp_list ~sep:", " pp) l
   | App (s, l) ->
-      pp out s;
-      CCFormat.char out '(';
-      Util.pp_list ~sep:"," pp out l;
-      CCFormat.char out ')'
+      Format.fprintf out "@[<2>%a(%a)@]"
+        pp s (Util.pp_list ~sep:"," pp) l
   | Bind (s, vars, t') ->
-      Sym.pp out s;
-      CCFormat.char out '[';
-      Util.pp_list ~sep:"," pp out vars;
-      CCFormat.string out "]:";
-      pp out t'
+      Format.fprintf out "@[<2>%a[@[%a@]]:@ %a@]"
+        Binder.pp s
+        (Util.pp_list ~sep:"," pp) vars
+        pp t'
   | Record (l, None) ->
-    CCFormat.char out '{';
-    Util.pp_list (fun out (s,t') -> Format.fprintf out "%s:%a" s pp t') out l;
-    CCFormat.char out '}'
+      Format.fprintf out "{@[<hv>%a@]}"
+        (Util.pp_list (fun out (s,t') -> Format.fprintf out "%s:%a" s pp t')) l;
   | Record (l, Some r) ->
-    CCFormat.char out '{';
-    Util.pp_list (fun out (s,t') -> Format.fprintf out "%s:%a" s pp t') out l;
-    Format.fprintf out " | %a}" pp r
-  | Column(x,y) ->
-      pp out x;
-      CCFormat.char out ':';
-      pp out y
+      Format.fprintf out "{@[<hv>%a@ | %a@]}"
+        (Util.pp_list (fun out (s,t') -> Format.fprintf out "%s:%a" s pp t')) l
+        pp r
+  | Column(x,y) -> Format.fprintf out "@[%a:@,%a@]" pp x pp y
 
 let to_string = CCFormat.to_string pp
-
-(** {2 Visitor} *)
-
-class virtual ['a] visitor = object (self)
-  method virtual var : ?loc:location -> string -> 'a
-  method virtual int_ : ?loc:location -> Z.t -> 'a
-  method virtual rat_ : ?loc:location -> Q.t -> 'a
-  method virtual const : ?loc:location -> Sym.t -> 'a
-  method virtual syntactic : ?loc:location -> Sym.t -> 'a list -> 'a
-  method virtual app : ?loc:location -> 'a -> 'a list -> 'a
-  method virtual bind : ?loc:location -> Sym.t -> 'a list -> 'a -> 'a
-  method virtual list_ : ?loc:location -> 'a list -> 'a
-  method virtual record : ?loc:location -> (string*'a) list -> 'a option -> 'a
-  method virtual column : ?loc:location -> 'a -> 'a -> 'a
-  method visit t =
-    let loc = t.loc in
-    match t.term with
-    | Var s -> self#var ?loc s
-    | Int n -> self#int_ ?loc n
-    | Rat n -> self#rat_ ?loc n
-    | Const s -> self#const ?loc s
-    | Syntactic(s,l) -> self#syntactic ?loc s (List.map self#visit l)
-    | App(f,l) -> self#app ?loc (self#visit f) (List.map self#visit l)
-    | Bind (s, vars,t') ->
-        self#bind ?loc s (List.map self#visit vars) (self#visit t')
-    | List l -> self#list_ ?loc (List.map self#visit l)
-    | Record (l, rest) ->
-        let rest = CCOpt.map self#visit rest in
-        let l = List.map (fun (n,t) -> n, self#visit t) l in
-        self#record ?loc l rest
-    | Column (a,b) -> self#column ?loc (self#visit a) (self#visit b)
-end
-
-class id_visitor = object
-  inherit [t] visitor
-  method var ?loc s = var ?loc s
-  method int_ ?loc:_ i = int_ i
-  method rat_ ?loc:_ n = rat n
-  method const ?loc s = const ?loc s
-  method syntactic ?loc s l = syntactic ?loc s l
-  method app ?loc f l = app ?loc f l
-  method bind ?loc s vars t = bind ?loc s vars t
-  method list_ ?loc l = list_ ?loc l
-  method record ?loc l rest = record ?loc l ~rest
-  method column ?loc a b = column ?loc a b
-end (** Visitor that maps the subterms into themselves *)
 
 (** {2 TPTP} *)
 
 module TPTP = struct
-  let true_ = const Sym.Base.true_
-  let false_ = const Sym.Base.false_
+  let true_ = builtin Builtin.true_
+  let false_ = builtin Builtin.false_
 
   let var = var
   let bind = bind
   let const = const
   let app = app
 
-  let and_ ?loc l = syntactic ?loc Sym.Base.and_ l
-  let or_ ?loc l = syntactic ?loc Sym.Base.or_ l
-  let not_ ?loc a = syntactic ?loc Sym.Base.not_ [a]
-  let equiv ?loc a b = syntactic ?loc Sym.Base.equiv [a;b]
-  let xor ?loc a b = syntactic ?loc Sym.Base.xor [a;b]
-  let imply ?loc a b = syntactic ?loc Sym.Base.imply [a;b]
-  let eq ?loc ?(ty=wildcard) a b = syntactic ?loc Sym.Base.eq [ty;a;b]
-  let neq ?loc ?(ty=wildcard) a b = syntactic ?loc Sym.Base.neq [ty;a;b]
-  let forall ?loc vars f = bind ?loc Sym.Base.forall vars f
-  let exists ?loc vars f = bind ?loc Sym.Base.exists vars f
-  let lambda ?loc vars f = bind ?loc Sym.Base.lambda vars f
+  let and_ ?loc l = app_builtin ?loc Builtin.and_ l
+  let or_ ?loc l = app_builtin ?loc Builtin.or_ l
+  let not_ ?loc a = app_builtin ?loc Builtin.not_ [a]
+  let equiv ?loc a b = app_builtin ?loc Builtin.equiv [a;b]
+  let xor ?loc a b = app_builtin ?loc Builtin.xor [a;b]
+  let imply ?loc a b = app_builtin ?loc Builtin.imply [a;b]
+  let eq ?loc ?(ty=wildcard) a b = app_builtin ?loc Builtin.eq [ty;a;b]
+  let neq ?loc ?(ty=wildcard) a b = app_builtin ?loc Builtin.neq [ty;a;b]
+  let forall ?loc vars f = bind ?loc Binder.forall vars f
+  let exists ?loc vars f = bind ?loc Binder.exists vars f
+  let lambda ?loc vars f = bind ?loc Binder.lambda vars f
 
   let mk_fun_ty ?loc l ret = match l with
     | [] -> ret
-    | _::_ -> syntactic ?loc Sym.Base.arrow (ret :: l)
-  let tType = const Sym.Base.tType
-  let forall_ty ?loc vars t = bind ?loc Sym.Base.forall_ty vars t
+    | _::_ -> app_builtin ?loc Builtin.arrow (ret :: l)
+  let tType = builtin Builtin.tType
+  let forall_ty ?loc vars t = bind ?loc Binder.forall_ty vars t
 
   let rec pp out t = match t.term with
     | Var s -> CCFormat.string out s
     | Int i -> CCFormat.string out (Z.to_string i)
     | Rat i -> CCFormat.string out (Q.to_string i)
-    | Const s -> Sym.TPTP.pp out s
+    | Const s -> Sym.pp out s
     | List l ->
-        CCFormat.char out '[';
-        Util.pp_list ~sep:"," pp out l;
-        CCFormat.char out ']'
-    | Syntactic (Sym.Conn Sym.And, l) ->
+      Format.fprintf out "[@[<hv>%a@]]"
+        (Util.pp_list ~sep:"," pp) l;
+    | AppBuiltin (Builtin.And, l) ->
       Util.pp_list ~sep:" & " pp_surrounded out l
-    | Syntactic (Sym.Conn Sym.Or, l) ->
+    | AppBuiltin (Builtin.Or, l) ->
       Util.pp_list ~sep:" | " pp_surrounded out l
-    | Syntactic (Sym.Conn Sym.Not, [a]) ->
+    | AppBuiltin (Builtin.Not, [a]) ->
       Format.fprintf out "~%a" pp_surrounded a
-    | Syntactic (Sym.Conn Sym.Imply, [a;b]) ->
+    | AppBuiltin (Builtin.Imply, [a;b]) ->
       Format.fprintf out "%a => %a" pp_surrounded a pp_surrounded b
-    | Syntactic (Sym.Conn Sym.Xor, [a;b]) ->
+    | AppBuiltin (Builtin.Xor, [a;b]) ->
       Format.fprintf out "%a <~> %a" pp_surrounded a pp_surrounded b
-    | Syntactic (Sym.Conn Sym.Equiv, [a;b]) ->
+    | AppBuiltin (Builtin.Equiv, [a;b]) ->
       Format.fprintf out "%a <=> %a" pp_surrounded a pp_surrounded b
-    | Syntactic (Sym.Conn Sym.Eq, [_;a;b]) ->
+    | AppBuiltin (Builtin.Eq, [_;a;b]) ->
       Format.fprintf out "%a = %a" pp_surrounded a pp_surrounded b
-    | Syntactic (Sym.Conn Sym.Neq, [_;a;b]) ->
+    | AppBuiltin (Builtin.Neq, [_;a;b]) ->
       Format.fprintf out "%a != %a" pp_surrounded a pp_surrounded b
-    | Syntactic (Sym.Conn Sym.Arrow, [ret;a]) ->
+    | AppBuiltin (Builtin.Arrow, [ret;a]) ->
       Format.fprintf out "%a > %a" pp a pp ret
-    | Syntactic (Sym.Conn Sym.Arrow, ret::l) ->
+    | AppBuiltin (Builtin.Arrow, ret::l) ->
       Format.fprintf out "(%a) > %a" (Util.pp_list~sep:" * " pp) l pp_surrounded ret
-    | Syntactic (s, l) ->
-      Format.fprintf out "%a(%a)" Sym.pp s (Util.pp_list ~sep:", " pp_surrounded) l
+    | AppBuiltin (s, l) ->
+      Format.fprintf out "%a(%a)" Builtin.pp s (Util.pp_list ~sep:", " pp_surrounded) l
     | App (s, l) ->
-        pp out s;
-        CCFormat.char out '(';
-        Util.pp_list ~sep:"," pp out l;
-        CCFormat.char out ')'
+      Format.fprintf out "@[<2>%a(%a)@]"
+        pp s (Util.pp_list ~sep:"," pp) l
     | Bind (s, vars, t') ->
-        Sym.TPTP.pp out s;
-        CCFormat.char out '[';
-        Util.pp_list ~sep:"," pp_typed_var out vars;
-        CCFormat.string out "]:";
-        pp_surrounded out t'
+        Format.fprintf out "@[<2>%a[@[%a@]]:@ %a@]"
+          Binder.TPTP.pp s
+          (Util.pp_list ~sep:"," pp_typed_var) vars
+          pp_surrounded t'
     | Record _ -> failwith "cannot print records in TPTP"
     | Column(x,y) ->
         begin match view y with
@@ -394,7 +336,7 @@ module TPTP = struct
           pp out y
         end
   and pp_typed_var out t = match t.term with
-    | Column ({term=Var s; _}, {term=Const (Sym.Conn Sym.TType); _})
+    | Column ({term=Var s; _}, {term=AppBuiltin(Builtin.TType,[]); _})
     | Var s -> CCFormat.string out s
     | Column ({term=Var s; _}, {term=Const sy; _}) when Sym.equal sy Sym.TPTP.i ->
         CCFormat.string out s
@@ -402,7 +344,7 @@ module TPTP = struct
       Format.fprintf out "%s:%a" s pp ty
     | _ -> assert false
   and pp_surrounded out t = match t.term with
-    | App ({term=Const (Sym.Conn _); _}, _::_::_)
+    | AppBuiltin _
     | Bind _ -> CCFormat.char out '('; pp out t; CCFormat.char out ')'
     | _ -> pp out t
 

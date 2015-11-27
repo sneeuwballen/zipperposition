@@ -60,13 +60,12 @@ type view = private
   | App of symbol * t list  (** parametrized type *)
   | Fun of t * t            (** Function type (left to right) *)
   | Record of (string*t) list * t option  (** Record type *)
+  | Multiset of t
   | Forall of t             (** explicit quantification using De Bruijn index *)
 
 val view : t -> view
   (** Type-centric view of the head of this type.
       @raise Invalid_argument if the argument is not a type. *)
-
-val kind : ScopedTerm.Kind.t
 
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
@@ -122,15 +121,9 @@ val (<=.) : t -> t -> t
 val multiset : t -> t
   (** Type of multiset *)
 
-val of_term : ScopedTerm.t -> t option
-  (** Conversion from a term, if structure matches *)
-
-val of_term_exn : ScopedTerm.t -> t
-  (** Same as [of_term], but without option
-      @raise Invalid_argument if the term is not a type *)
-
-val is_type : ScopedTerm.t -> bool
-  (** Is the term a representation of a type? *)
+val of_term_unsafe : ScopedTerm.t -> t
+(** {b NOTE}: this can break the invariants and make {!view} fail. Only
+    apply with caution. *)
 
 (** {2 Containers} *)
 

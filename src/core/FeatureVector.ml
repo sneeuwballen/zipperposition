@@ -75,7 +75,7 @@ module Make(C : Index.CLAUSE) = struct
       | ST.Bind (_, _, t') -> _depth_term (depth+1) t'
       | ST.At (t1, t2) ->
           1 + max (_depth_term depth t1) (_depth_term depth t2)
-      | ST.SimpleApp (_, l)
+      | ST.AppBuiltin (_, l)
       | ST.Multiset l
       | ST.App (_, l) ->
         let depth' = depth + 1 in

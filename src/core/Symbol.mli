@@ -40,6 +40,10 @@ module TPTP : sig
   val rat : t
   val real : t
 
+  (** Higher-order *)
+  val forall_fun : t
+  val exists_fun : t
+
   (** {3 Arith Symbols} *)
 
   module Arith : sig

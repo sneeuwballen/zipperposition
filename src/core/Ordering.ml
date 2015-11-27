@@ -1,27 +1,5 @@
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Term Orderings} *)
 
@@ -38,7 +16,6 @@ module type S = Ordering_intf.S
 
 let prof_rpo6 = Util.mk_profiler "compare_rpo6"
 let prof_kbo = Util.mk_profiler "compare_kbo"
-
 
 module Make(P : Precedence.S with type symbol = Symbol.t) = struct
   module Prec = P
@@ -116,21 +93,25 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
   module KBO : ORD = struct
     let name = "kbo"
 
+    (* small cache for allocated arrays *)
+    let alloc_cache = AllocCache.Arr.create ~buck_size:2 10
+
     (** used to keep track of the balance of variables *)
     type var_balance = {
       offset : int;
       mutable pos_counter : int;
       mutable neg_counter : int;
-      balance : int array;
+      mutable balance : int array;
     }
 
     (** create a balance for the two terms *)
     let mk_balance t1 t2 =
       if T.is_ground t1 && T.is_ground t2
         then
-          { offset = 0; pos_counter = 0; neg_counter = 0; balance = Obj.magic None }
+          { offset = 0; pos_counter = 0; neg_counter = 0; balance = [||]; }
         else begin
           let vars = Sequence.of_list [t1; t2] |> Sequence.flatMap T.Seq.vars in
+          (* TODO: compute both at the same time *)
           let minvar = T.Seq.min_var vars in
           let maxvar = T.Seq.max_var vars in
           assert (minvar <= maxvar);
@@ -139,7 +120,7 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
             offset = minvar; (* offset of variables to 0 *)
             pos_counter = 0;
             neg_counter = 0;
-            balance = Array.make width 0;
+            balance = AllocCache.Arr.make alloc_cache width 0;
           } in
           Obj.set_tag (Obj.repr vb.balance) Obj.no_scan_tag;  (* no GC scan *)
           vb
@@ -280,7 +261,13 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
             let wb'', _ = balance_weight_rec wb' ts 0 false false in
             wb'', Incomparable
       in
-      let _, res = tckbo 0 t1 t2 in res  (* ignore the weight *)
+      try
+        let _, res = tckbo 0 t1 t2 in
+        AllocCache.Arr.free alloc_cache balance.balance;
+        res
+      with e ->
+        AllocCache.Arr.free alloc_cache balance.balance;
+        raise e
 
     let compare_terms ~prec x y =
       Util.enter_prof prof_kbo;

@@ -36,31 +36,26 @@ type t = T.t
 
 type ty = t
 
-let kind = T.Kind.Type
-
 type view =
   | Var of int              (** Type variable *)
   | BVar of int             (** Bound variable (De Bruijn index) *)
   | App of symbol * t list  (** parametrized type *)
   | Fun of t * t            (** Function type (left to right) *)
   | Record of (string*t) list * t option  (** Record type *)
+  | Multiset of t
   | Forall of t             (** explicit quantification using De Bruijn index *)
 
-let view t = match T.kind t with
-  | T.Kind.Type ->
-    begin match T.view t with
-    | T.Var i -> Var i
-    | T.BVar i -> BVar i
-    | T.Bind (Symbol.Conn Symbol.ForallTy, varty, t') ->
-      assert (T.equal varty T.tType);
-      Forall t'
-    | T.Const s -> App (s, [])
-    | T.SimpleApp (Symbol.Conn Symbol.Arrow, [l;r]) -> Fun (l, r)
-    | T.SimpleApp (s, l) -> App (s, l)
-    | T.Record (l, rest) -> Record (l, rest)
-    | _ -> failwith "Type.view"
-    end
-  | _ -> raise (Invalid_argument "Type.view")
+let view t = match T.view t with
+  | T.Var i -> Var i
+  | T.BVar i -> BVar i
+  | T.Bind (Binder.ForallTy, varty, t') ->
+    assert (T.equal varty T.tType);
+    Forall t'
+  | T.Const s -> App (s, [])
+  | T.AppBuiltin (Builtin.Arrow, [l;r]) -> Fun (l, r)
+  | T.AppBuiltin (Builtin.Multiset, [t]) -> Multiset t
+  | T.Record (l, rest) -> Record (l, rest)
+  | _ -> assert false
 
 let hash_fun = T.hash_fun
 let hash = T.hash
@@ -74,14 +69,15 @@ let is_fun ty = match view ty with | Fun _ -> true | _ -> false
 let is_forall ty = match view ty with | Forall _ -> true | _ -> false
 
 let var i =
-  T.var ~kind ~ty:T.tType i
+  T.var ~ty:T.tType i
 
-let app s l = T.simple_app ~kind ~ty:T.tType s l
+(* FIXME: ask for the arity instead? *)
+let app s l = T.app ~ty:T.tType (T.const ~ty:T.tType s) l
 
-let const s = T.const ~kind ~ty:T.tType s
+let const s = T.const ~ty:T.tType s
 
 let arrow l r =
-  T.simple_app ~kind ~ty:T.tType Symbol.Base.arrow [l; r]
+  T.app_builtin ~ty:T.tType Builtin.arrow [l; r]
 
 let rec arrow_list l r = match l with
   | [] -> r
@@ -89,30 +85,23 @@ let rec arrow_list l r = match l with
   | x::l' -> arrow x (arrow_list l' r)
 
 let forall vars ty =
-  T.bind_vars ~kind ~ty:T.tType Symbol.Base.forall_ty vars ty
+  T.bind_vars ~ty:T.tType Binder.forall_ty vars ty
 
-let record l ~rest = T.record ~kind ~ty:T.tType l ~rest
+let record l ~rest = T.record ~ty:T.tType l ~rest
 
 let __bvar i =
-  T.bvar ~kind ~ty:T.tType i
+  T.bvar ~ty:T.tType i
 
 let __forall ty =
-  T.bind ~kind ~ty:T.tType ~varty:T.tType Symbol.Base.forall_ty ty
+  T.bind ~ty:T.tType ~varty:T.tType Binder.forall_ty ty
 
-let multiset ty = app Symbol.Base.multiset [ty]
+let multiset ty = T.app_builtin ~ty:T.tType Builtin.multiset [ty]
 
 let (<==) ret args = arrow_list args ret
 let (<=.) ret a = arrow a ret
 let (@@) = app
 
-(* downcast *)
-let of_term_exn ty = match T.kind ty with
-  | T.Kind.Type -> ty
-  | _ -> raise (Invalid_argument "Type.of_term_exn")
-
-let of_term ty = try Some (of_term_exn ty) with Invalid_argument _ -> None
-
-let is_type t = try ignore (of_term_exn t); true with Invalid_argument _ -> false
+let of_term_unsafe t = t
 
 (** {2 Containers} *)
 
@@ -121,8 +110,8 @@ module Map = T.Map
 module Tbl = T.Tbl
 
 module Seq = struct
-  let vars ty = Sequence.fmap of_term (T.Seq.vars ty)
-  let sub ty = Sequence.fmap of_term (T.Seq.subterms ty)
+  let vars ty = T.Seq.vars ty
+  let sub ty = T.Seq.subterms ty
   let add_set = T.Seq.add_set
   let max_var = T.Seq.max_var
 end
@@ -139,23 +128,16 @@ type arity_result =
   | NoArity
 
 let arity ty =
-  let rec traverse i j ty = match T.view ty with
-    | T.SimpleApp (Symbol.Conn Symbol.Arrow, [_; ty']) ->
+  let rec traverse i j ty = match view ty with
+    | Fun (_,ty') ->
         traverse i (j+1) ty'
-    | T.Bind (Symbol.Conn Symbol.ForallTy, _, ty') ->
+    | Forall ty' ->
         traverse (i+1) j ty'
-    | T.Var _
-    | T.RigidVar _ -> NoArity
-    | T.Record _
-    | T.BVar _
-    | T.Const _
-    | T.SimpleApp _
-    | T.App _ -> Arity (i, j)
-    | T.RecordGet _
-    | T.RecordSet _
-    | T.Multiset _
-    | T.Bind _
-    | T.At _ -> assert false
+    | Multiset _
+    | Record _
+    | Var _ -> NoArity
+    | BVar _
+    | App _ -> Arity (i, j)
   in traverse 0 0 ty
 
 let rec expected_args ty = match view ty with
@@ -163,6 +145,7 @@ let rec expected_args ty = match view ty with
   | BVar _
   | Var _
   | Record _
+  | Multiset _
   | App _ -> []
   | Forall ty' -> expected_args ty'
 
@@ -173,14 +156,16 @@ let size = T.size
 let rec depth ty = match view ty with
   | Var _
   | BVar _ -> 1
-  | App (_, l) -> 1 + List.fold_left (fun d t -> max d (depth t)) 0 l
+  | App (_, l) -> 1 + depth_l l
   | Forall ty' -> 1 + depth ty'
   | Fun (t1,t2) -> 1 + max (depth t1) (depth t2)
+  | Multiset t -> 1 + depth t
   | Record (r,rest) ->
       let d = CCOpt.maybe depth 0 rest in
       List.fold_left
         (fun d (_,ty) -> max d (depth ty))
         d r
+and depth_l l = List.fold_left (fun d t -> max d (depth t)) 0 l
 
 let rec open_fun ty = match view ty with
   | Fun (x, ret) ->
@@ -192,7 +177,7 @@ let _error msg = raise (Error msg)
 
 let apply ty arg =
   match T.view ty with
-  | T.SimpleApp(Symbol.Conn Symbol.Arrow, [arg'; ret]) ->
+  | T.AppBuiltin(Builtin.Arrow, [arg'; ret]) ->
     if equal arg arg'
     then ret
     else
@@ -200,7 +185,7 @@ let apply ty arg =
           "Type.apply: wrong argument type, expected %a but got %a"
             T.pp arg' T.pp arg
       in _error msg
-  | T.Bind (Symbol.Conn Symbol.ForallTy, _, ty') ->
+  | T.Bind (Binder.ForallTy, _, ty') ->
       T.DB.eval (DBEnv.singleton arg) ty'
   | _ ->
       let msg = CCFormat.sprintf
@@ -238,13 +223,14 @@ module TPTP = struct
   let rec pp_tstp_rec depth out t = match view t with
     | Var i -> Format.fprintf out "T%d" i
     | BVar i -> Format.fprintf out "Tb%d" (depth-i-1)
-    | App (p, []) -> Symbol.TPTP.pp out p
-    | App (p, args) -> Format.fprintf out "%a(%a)" Symbol.TPTP.pp p
+    | App (p, []) -> Symbol.pp out p
+    | App (p, args) -> Format.fprintf out "%a(%a)" Symbol.pp p
       (Util.pp_list (pp_tstp_rec depth)) args
     | Fun (arg, ret) ->
       (* FIXME: uncurry? *)
       Format.fprintf out "%a > %a" (pp_inner depth) arg (pp_tstp_rec depth) ret
     | Record _ -> failwith "cannot print record types in TPTP"
+    | Multiset _ -> failwith "cannot print multiset types in TPTP"
     | Forall ty' ->
       Format.fprintf out "!>[Tb%d:$tType]: %a" depth (pp_inner (depth+1)) ty'
   and pp_inner depth out t = match view t with
@@ -265,8 +251,8 @@ let rec pp_rec depth out t = match view t with
   | Var i -> Format.fprintf out "A%d" i
   | BVar i -> Format.fprintf out "T%i" (depth-i-1)
   | App (p, []) -> CCFormat.string out (Symbol.to_string p)
-  | App (Symbol.Conn Symbol.Multiset, l) ->
-      Format.fprintf out "@[[%a]@]" (Util.pp_list (pp_rec depth)) l
+  | Multiset t ->
+      Format.fprintf out "@[<2>multiset@ %a@]" (pp_rec depth) t
   | App (p, args) ->
     Format.fprintf out "@[<2>%s(%a)@]"
       (Symbol.to_string p) (Util.pp_list (pp_rec depth)) args
@@ -297,7 +283,7 @@ let to_string = CCFormat.to_string pp
 
 (** {2 Misc} *)
 
-let fresh_var = T.fresh_var ~kind ~ty:T.tType
+let fresh_var = T.fresh_var ~ty:T.tType
 
 (** {2 Conversions} *)
 
@@ -315,7 +301,7 @@ module Conv = struct
   let of_simple_term ~ctx t =
     let rec aux t = match t.PT.term with
       | PT.Column ({PT.term=PT.Var name; _},
-                   {PT.term=PT.Const (Symbol.Conn Symbol.TType); _})
+                   {PT.term=PT.AppBuiltin (Builtin.TType, []); _})
       | PT.Var name ->
         assert (name <> "");
         begin try var (Hashtbl.find ctx name)
@@ -324,23 +310,23 @@ module Conv = struct
           Hashtbl.add ctx name n;
           var n
         end
-      | PT.Const (Symbol.Conn Symbol.Wildcard) ->
+      | PT.AppBuiltin (Builtin.Wildcard, []) ->
         fresh_var ()
       | PT.Int _
       | PT.Rat _ -> raise LocalExit
       | PT.Const s -> const s
-      | PT.Syntactic (Symbol.Conn Symbol.Arrow, [ret;arg]) ->
+      | PT.AppBuiltin (Builtin.Arrow, [ret;arg]) ->
         let ret = aux ret in
         let arg = aux arg in
         arrow arg ret
-      | PT.Syntactic (Symbol.Conn Symbol.Arrow, ret::l) ->
+      | PT.AppBuiltin (Builtin.Arrow, ret::l) ->
         let ret = aux ret in
         let l = List.map aux l in
         arrow_list l ret
       | PT.App ({PT.term=PT.Const hd; _}, l) ->
         let l = List.map aux l in
         app hd l
-      | PT.Bind (Symbol.Conn Symbol.ForallTy, vars, t') ->
+      | PT.Bind (Binder.ForallTy, vars, t') ->
         let vars = List.map aux vars in
         let t' = aux t' in
         forall vars t'
@@ -349,7 +335,7 @@ module Conv = struct
         let l = List.map (fun (n,t) -> n, aux t) l in
         record l ~rest
       | PT.Bind _
-      | PT.Syntactic _
+      | PT.AppBuiltin _
       | PT.App _
       | PT.Column _
       | PT.List _ -> raise LocalExit
@@ -372,8 +358,9 @@ module Conv = struct
     | Record (l, rest) ->
       let rest = CCOpt.map (aux depth) rest in
       PT.record (List.map (fun (n,ty) -> n, aux depth ty) l) ~rest
+    | Multiset t -> PT.app_builtin Builtin.multiset [aux depth t]
     | Forall t' ->
-      PT.bind Symbol.Base.forall_ty
+      PT.bind Binder.forall_ty
         [PT.var (CCFormat.sprintf "B%d" depth)]
         (aux (depth+1) t')
     in

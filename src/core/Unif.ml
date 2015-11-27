@@ -176,7 +176,7 @@ let occurs_check ~env subst v sc_v t sc_t =
           List.exists (fun (_,t') -> check ~env t' sc_t) l
       | T.RecordGet (r, _) -> check ~env r sc_t
       | T.RecordSet (r, _, sub) -> check ~env r sc_t || check ~env sub sc_t
-      | T.SimpleApp (_, l)
+      | T.AppBuiltin (_, l)
       | T.Multiset l ->
         List.exists (fun t' -> check ~env t' sc_t) l
       | T.At (l, r) -> check ~env l sc_t || check ~env r sc_t
@@ -606,7 +606,7 @@ module Nary = struct
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         unif ~env subst r1 sc_s r2 sc_t
           (fun ~env subst -> unif ~env subst sub1 sc_s sub2 sc_t k)
-      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when Symbol.equal s1 s2 ->
+      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Symbol.equal s1 s2 ->
         __unify_list ~env ~unif subst l1 sc_s l2 sc_t k
       | T.Multiset l1, T.Multiset l2 when List.length l1 = List.length l2 ->
         __unify_multiset ~env ~unif subst l1 sc_s l2 sc_t k
@@ -674,7 +674,7 @@ module Nary = struct
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         unif ~env subst r1 sc_s r2 sc_t
           (fun ~env subst -> unif ~env subst sub1 sc_s sub2 sc_t k)
-      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when Symbol.equal s1 s2 ->
+      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Symbol.equal s1 s2 ->
         __unify_list ~env ~unif subst l1 sc_s l2 sc_t k
       | T.Multiset l1, T.Multiset l2 when List.length l1 = List.length l2 ->
         __unify_multiset ~env ~unif subst l1 sc_s l2 sc_t k
@@ -739,7 +739,7 @@ module Nary = struct
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         unif ~env subst r1 sc_s r2 sc_t
           (fun ~env subst  -> unif ~env subst sub1 sc_s sub2 sc_t k)
-      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when Symbol.equal s1 s2 ->
+      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Symbol.equal s1 s2 ->
         __unify_list ~env ~unif subst l1 sc_s l2 sc_t k
       | T.Multiset l1, T.Multiset l2 when List.length l1 = List.length l2 ->
         __unify_multiset ~env ~unif subst l1 sc_s l2 sc_t k
@@ -889,7 +889,7 @@ module Unary = struct
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         let subst = unif ~env1 ~env2 subst r1 sc_s r2 sc_t in
         unif ~env1 ~env2 subst sub1 sc_s sub2 sc_t
-      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when Symbol.equal s1 s2 ->
+      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Symbol.equal s1 s2 ->
         unif_list ~unif ~env1 ~env2 subst l1 sc_s l2 sc_t
       | T.At (l1, r1), T.At (l2, r2) ->
         let subst = unif ~env1 ~env2 subst l1 sc_s l2 sc_t in
@@ -951,7 +951,7 @@ module Unary = struct
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         let subst = unif ~env1 ~env2 subst r1 sc_s r2 sc_t in
         unif ~env1 ~env2 subst sub1 sc_s sub2 sc_t
-      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when Symbol.equal s1 s2 ->
+      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Symbol.equal s1 s2 ->
         unif_list ~unif ~env1 ~env2 subst l1 sc_s l2 sc_t
       | T.At (l1, r1), T.At (l2, r2) ->
         let subst = unif ~env1 ~env2 subst l1 sc_s l2 sc_t in
@@ -1013,7 +1013,7 @@ module Unary = struct
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         let subst = unif ~env1 ~env2 ~blocked subst r1 sc_s r2 sc_t in
         unif ~env1 ~env2 ~blocked subst sub1 sc_s sub2 sc_t
-      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when Symbol.equal s1 s2 ->
+      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Symbol.equal s1 s2 ->
         unif_list ~env1 ~env2 ~unif:(unif ~blocked) subst l1 scope l2 scope
       | T.At (l1, r1), T.At (l2, r2) ->
         let subst = unif ~env1 ~env2 ~blocked subst l1 scope l2 scope in
@@ -1073,7 +1073,7 @@ module Unary = struct
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         let subst = unif ~env1 ~env2 subst r1 sc_s r2 sc_t in
         unif ~env1 ~env2 subst sub1 sc_s sub2 sc_t
-      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when Symbol.equal s1 s2 ->
+      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Symbol.equal s1 s2 ->
         unif_list ~unif ~env1 ~env2 subst l1 sc_s l2 sc_t
       | T.At (l1, r1), T.At (l2, r2) ->
         let subst = unif ~env1 ~env2 subst l1 sc_s l2 sc_t in
@@ -1113,7 +1113,7 @@ module Unary = struct
         _eq ~env1 ~env2 ~subst t1 s1 t2 s2
         &&
         List.for_all2 (fun t1 t2 -> _eq ~env1 ~env2 ~subst t1 s1 t2 s2) l1 l2
-    | T.SimpleApp (f1,l1), T.SimpleApp (f2, l2) when Symbol.equal f1 f2 ->
+    | T.AppBuiltin (f1,l1), T.AppBuiltin (f2, l2) when Symbol.equal f1 f2 ->
       begin try
         List.for_all2 (fun t1 t2 -> _eq ~env1 ~env2 ~subst t1 s1 t2 s2) l1 l2
       with Invalid_argument _ -> false

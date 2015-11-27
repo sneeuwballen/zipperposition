@@ -46,9 +46,9 @@ and view = private
   | Int of Z.t                      (** integer *)
   | Rat of Q.t                      (** rational *)
   | Const of Symbol.t               (** constant *)
-  | Syntactic of Symbol.t * t list  (** syntactic construct (operator...) *)
+  | AppBuiltin of Builtin.t * t list
   | App of t * t list               (** apply term *)
-  | Bind of Symbol.t * t list * t   (** bind n variables *)
+  | Bind of Binder.t * t list * t   (** bind n variables *)
   | List of t list                  (** special constructor for lists *)
   | Record of (string * t) list * t option  (** extensible record *)
   | Column of t * t                 (** t:t (useful for typing, e.g.) *)
@@ -66,9 +66,10 @@ val int_ : Z.t -> t
 val of_int : int -> t
 val rat : Q.t -> t
 val app : ?loc:location -> t -> t list -> t
-val syntactic : ?loc:location -> Symbol.t -> t list -> t
+val builtin : ?loc:location -> Builtin.t -> t
+val app_builtin : ?loc:location -> Builtin.t -> t list -> t
 val const : ?loc:location -> Symbol.t -> t
-val bind : ?loc:location -> Symbol.t -> t list -> t -> t
+val bind : ?loc:location -> Binder.t -> t list -> t -> t
 val list_ : ?loc:location -> t list -> t
 val nil : t
 val column : ?loc:location -> t -> t -> t
@@ -96,42 +97,11 @@ module Seq : sig
 end
 
 val ground : t -> bool
-val close_all : Symbol.t -> t -> t  (** Bind all free vars with the symbol *)
+val close_all : Binder.t -> t -> t  (** Bind all free vars with the symbol *)
 val subterm : strict:bool -> t -> sub:t -> bool
   (** is [sub] a (strict?) subterm of the other arg? *)
 
 include Interfaces.PRINT with type t := t
-
-(** {2 Visitor} *)
-
-class virtual ['a] visitor : object
-  method virtual var : ?loc:location -> string -> 'a
-  method virtual int_ : ?loc:location -> Z.t -> 'a
-  method virtual rat_ : ?loc:location -> Q.t -> 'a
-  method virtual const : ?loc:location -> Symbol.t -> 'a
-  method virtual syntactic : ?loc:location -> Symbol.t -> 'a list -> 'a
-  method virtual app : ?loc:location -> 'a -> 'a list -> 'a
-  method virtual bind : ?loc:location -> Symbol.t -> 'a list -> 'a -> 'a
-  method virtual list_ : ?loc:location -> 'a list -> 'a
-  method virtual record : ?loc:location -> (string*'a) list -> 'a option -> 'a
-  method virtual column : ?loc:location -> 'a -> 'a -> 'a
-  method visit : t -> 'a
-end
-
-class id_visitor : object
-  method var : ?loc:location -> string -> t
-  method int_ : ?loc:location -> Z.t -> t
-  method rat_ : ?loc:location -> Q.t -> t
-  method const : ?loc:location -> Symbol.t -> t
-  method syntactic : ?loc:location -> Symbol.t -> t list -> t
-  method app : ?loc:location -> t -> t list -> t
-  method bind : ?loc:location -> Symbol.t -> t list -> t -> t
-  method list_ : ?loc:location -> t list -> t
-  method record : ?loc:location -> (string*t) list -> t option -> t
-  method column : ?loc:location -> t -> t -> t
-  method visit : t -> t
-end (** Visitor that maps the subterms into themselves *)
-
 
 (** {2 TPTP constructors and printing}
 
@@ -145,7 +115,7 @@ module TPTP : sig
   val var : ?loc:location -> ?ty:t -> string -> t
   val const : ?loc:location -> Symbol.t -> t
   val app : ?loc:location -> t -> t list -> t
-  val bind : ?loc:location -> Symbol.t -> t list -> t -> t
+  val bind : ?loc:location -> Binder.t -> t list -> t -> t
 
   val and_ : ?loc:location -> t list -> t
   val or_ : ?loc:location -> t list -> t

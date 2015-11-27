@@ -38,6 +38,7 @@ type t = ScopedTerm.t
 type term = t
 
 type view =
+  | Builtin of Builtin.t
   | Var of int                  (** variable *)
   | BVar of int                 (** bound variable (De Bruijn index) *)
   | Lambda of Type.t * t   (** lambda abstraction over one variable. *)
@@ -51,45 +52,40 @@ type view =
 
 let ty t = match T.ty t with
   | T.NoType -> assert false
-  | T.HasType ty -> Type.of_term_exn ty
+  | T.HasType ty -> Type.of_term_unsafe ty
 
 let __get_ty = ty
 
 let view t = match T.view t with
   | T.Var i -> Var i
   | T.BVar i -> BVar i
-  | T.Bind (Symbol.Conn Symbol.Lambda, varty, t') ->
-    Lambda (Type.of_term_exn varty, t')
-  | T.Bind (Symbol.Conn Symbol.Forall, varty, t') ->
-    Forall (Type.of_term_exn varty, t')
-  | T.Bind (Symbol.Conn Symbol.Exists, varty, t') ->
-    Exists (Type.of_term_exn varty, t')
+  | T.Bind (Binder.Lambda, varty, t') ->
+    Lambda (Type.of_term_unsafe varty, t')
+  | T.Bind (Binder.Forall, varty, t') ->
+    Forall (Type.of_term_unsafe varty, t')
+  | T.Bind (Binder.Exists, varty, t') ->
+    Exists (Type.of_term_unsafe varty, t')
   | T.Const s -> Const s
   | T.At (l,r) -> At (l, r)
   | T.Multiset l ->
       begin match Type.view (ty t) with
-        | Type.App (Symbol.Conn Symbol.Multiset, [tau]) -> Multiset (tau, l)
+        | Type.Multiset tau -> Multiset (tau, l)
         | _ -> assert false
       end
   | T.Record (l, rest) -> Record (l, rest)
-  | T.SimpleApp (Symbol.Conn Symbol.LiftType, [ty]) ->
-    let ty = Type.of_term_exn ty in
+  | T.AppBuiltin (Builtin.LiftType, [ty]) ->
+    let ty = Type.of_term_unsafe ty in
     TyLift ty
+  | T.AppBuiltin (b, []) -> Builtin b
   | T.RecordGet _
   | T.RecordSet _
   | T.RigidVar _
   | T.Bind _
   | T.App _
-  | T.SimpleApp _ -> assert false
+  | T.SimpleApp _
+  | T.AppBuiltin _ -> assert false
 
-let kind = T.Kind.HOTerm
-
-let is_term t = match T.kind t with T.Kind.HOTerm -> true | _ -> false
-let of_term t =
-  if is_term t then Some t else None
-let of_term_exn t =
-  if not (is_term t) then raise (Invalid_argument "of_term_exn");
-  t
+let of_term_unsafe t = t
 
 (** {2 Comparison, equality, containers} *)
 
@@ -140,9 +136,9 @@ module Cache = Cache.Replacing(TermHASH)
 let cast ~ty t = T.cast ~ty:(ty : Type.t :> T.t) t
 
 let lambda_var_ty t = match T.view t with
-  | T.Bind (Symbol.Conn Symbol.Lambda, varty, _) ->
-      Type.of_term_exn varty
-  | _ -> raise (Invalid_argument "lambda_var_ty: expected lambda term")
+  | T.Bind (Binder.Lambda, varty, _) ->
+      Type.of_term_unsafe varty
+  | _ -> invalid_arg "lambda_var_ty: expected lambda term"
 
 (** {2 Smart constructors} *)
 
@@ -150,18 +146,17 @@ let lambda_var_ty t = match T.view t with
     hashconsing, and precompute some properties (flags) *)
 
 let var ~(ty:Type.t) i =
-  T.var ~kind ~ty:(ty :> T.t) i
+  T.var ~ty:(ty :> T.t) i
 
 let bvar ~(ty:Type.t) i =
-  T.bvar ~kind ~ty:(ty :> T.t) i
+  T.bvar ~ty:(ty :> T.t) i
 
 let tylift (ty:Type.t) =
-  T.simple_app ~kind ~ty:(ty :> T.t)
-    Symbol.Base.lift_type [(ty:>T.t)]
+  T.app_builtin ~ty:(ty :> T.t) Builtin.lift_type [(ty:>T.t)]
 
 let at l r =
   let ty_ret = Type.apply (ty l) (ty r) in
-  T.at ~kind ~ty:(ty_ret :>T.t) l r
+  T.at ~ty:(ty_ret :>T.t) l r
 
 let tyat t tyarg = at t (tylift tyarg)
 
@@ -179,14 +174,17 @@ let at_full ?(tyargs=[]) f l =
   | _::_ -> at_list (tyat_list f tyargs) l
 
 let const ~ty symbol =
-  T.const ~kind ~ty:(ty : Type.t :> T.t) symbol
+  T.const ~ty:(ty : Type.t :> T.t) symbol
+
+let builtin ~ty b =
+  T.builtin ~ty:(ty : Type.t :> T.t) b
 
 let multiset ~ty l =
   if List.exists (fun t -> not (Type.equal ty (__get_ty t))) l
     then raise (Type.Error "type mismatch when building a multiset");
   (* all elements are of type [ty], the result has type [multiset ty] *)
   let ty_res = Type.multiset ty in
-  T.multiset ~kind ~ty:(ty_res:>T.t) l
+  T.multiset ~ty:(ty_res:>T.t) l
 
 let record l ~rest =
   (* build record type! *)
@@ -204,19 +202,19 @@ let record l ~rest =
   in
   let ty = Type.record ty_l ~rest:ty_rest in
   (* flattening done by ScopedTerm. *)
-  T.record ~kind ~ty:(ty:>T.t) l ~rest
+  T.record ~ty:(ty:>T.t) l ~rest
 
 let __mk_lambda ~varty t' =
   let ty = Type.arrow varty (ty t') in
-  T.bind ~kind ~ty:(ty :> T.t) ~varty:(varty:Type.t:>T.t) Symbol.Base.lambda t'
+  T.bind ~ty:(ty :> T.t) ~varty:(varty:Type.t:>T.t) Binder.lambda t'
 
 let __mk_forall ~varty t' =
   let ty = ty t' in
-  T.bind ~kind ~ty:(ty :> T.t) ~varty:(varty:Type.t:>T.t) Symbol.Base.forall t'
+  T.bind ~ty:(ty :> T.t) ~varty:(varty:Type.t:>T.t) Binder.forall t'
 
 let __mk_exists ~varty t' =
   let ty = ty t' in
-  T.bind ~kind ~ty:(ty :> T.t) ~varty:(varty:Type.t:>T.t) Symbol.Base.exists t'
+  T.bind ~ty:(ty :> T.t) ~varty:(varty:Type.t:>T.t) Binder.exists t'
 
 let mk_binder_l f vars t =
   List.fold_right
@@ -243,12 +241,10 @@ let is_record t = match T.view t with | T.Record _ -> true | _ -> false
 (** {2 Sequences} *)
 
 module Seq = struct
-  let subterms t = T.Seq.subterms t |> Sequence.filter is_term
-  let vars t = T.Seq.vars t |> Sequence.filter is_term
+  let subterms t = T.Seq.subterms t
+  let vars t = T.Seq.vars t
   let subterms_depth = T.Seq.subterms_depth
-  let symbols t =
-    T.Seq.symbols t |>
-      Sequence.filter (fun s -> not (Symbol.equal s Symbol.Base.lambda))
+  let symbols t = T.Seq.symbols t
   let max_var = T.Seq.max_var
   let min_var = T.Seq.min_var
   let ty_vars t =
@@ -266,18 +262,21 @@ end
 
 let replace = T.replace
 
-let rec size t = match T.view t with
-  | T.Var _
-  | T.BVar _ -> 1
-  | T.Const _ -> 1
-  | T.Bind (_, _, t') -> 1+ size t'
-  | T.At (l,r) -> 1 + size l + size r
-  | T.Record (l, rest) ->
+let rec size t = match view t with
+  | Builtin _
+  | Var _
+  | BVar _ -> 1
+  | Const _ -> 1
+  | Forall (_, t')
+  | Exists (_, t')
+  | Lambda (_, t') -> 1+ size t'
+  | At (l,r) -> 1 + size l + size r
+  | Record (l, rest) ->
       let s = match rest with None -> 0 | Some r -> size r in
       List.fold_left (fun acc (_,t') -> acc+size t') s l
-  | T.App (f, l) -> List.fold_left (fun s t' -> s + size t') (1+size f) l
-  | T.RecordGet _ | T.RecordSet _
-  | T.RigidVar _ | T.Multiset _ | T.SimpleApp _ -> assert false
+  | TyLift _ -> 0
+  | Multiset (_,l) -> 1 + List.fold_left (fun acc t->acc + size t) 0 l
+
 
 let is_ground t = Seq.vars t |> Sequence.is_empty
 
@@ -303,20 +302,18 @@ let ty_vars t =
 
 let depth t = Seq.subterms_depth t |> Sequence.map snd |> Sequence.fold max 0
 
-let rec head t =
-  match T.view t with
-  | T.Const s -> s
-  | T.At (t,_) -> head t
-  | T.BVar _
-  | T.RigidVar _
-  | T.Var _ -> raise (Invalid_argument "Term.head: variable")
-  | T.Bind _ -> raise (Invalid_argument "Term.head: binder (λ/∀/∃)")
-  | T.Multiset _ -> raise (Invalid_argument "Term.head: record")
-  | T.Record _ -> raise (Invalid_argument "Term.head: record")
-  | T.RecordGet _
-  | T.RecordSet _
-  | T.App _
-  | T.SimpleApp _ -> assert false
+let rec head t = match view t with
+  | Const s -> s
+  | At (t,_) -> head t
+  | TyLift _
+  | Builtin _
+  | BVar _
+  | Var _
+  | Forall _
+  | Exists _
+  | Lambda _
+  | Multiset _
+  | Record _ -> invalid_arg "Term.head"
 
 (** {2 High-level operations} *)
 
@@ -325,65 +322,6 @@ let symbols ?(init=Symbol.Set.empty) t =
 
 let contains_symbol s t =
   Seq.symbols t |> Sequence.exists (Symbol.equal s)
-
-(** {2 Visitor} *)
-
-class virtual ['a] any_visitor = object (self)
-  method virtual var : Type.t -> int -> 'a
-  method virtual bvar : Type.t -> int -> 'a
-  method virtual lambda : Type.t -> 'a -> 'a
-  method virtual forall : Type.t -> 'a -> 'a
-  method virtual exists : Type.t -> 'a -> 'a
-  method virtual const : Type.t -> Symbol.t -> 'a
-  method virtual at : 'a -> 'a -> 'a
-  method virtual tylift : Type.t -> 'a
-  method virtual multiset : Type.t -> 'a list -> 'a
-  method virtual record : (string*'a) list -> 'a option -> 'a
-  method visit t =
-    let ty = ty t in
-    match T.view t with
-    | T.Var i -> self#var ty i
-    | T.BVar i -> self#bvar ty i
-    | T.Bind (Symbol.Conn Symbol.Lambda, varty, t') ->
-        let varty = Type.of_term_exn varty in
-        self#lambda varty (self#visit t')
-    | T.Bind (Symbol.Conn Symbol.Forall, varty, t') ->
-        let varty = Type.of_term_exn varty in
-        self#forall varty (self#visit t')
-    | T.Bind (Symbol.Conn Symbol.Exists, varty, t') ->
-        let varty = Type.of_term_exn varty in
-        self#exists varty (self#visit t')
-    | T.Const s -> self#const ty s
-    | T.At (l,r) -> self#at (self#visit l) (self#visit r)
-    | T.SimpleApp (Symbol.Conn Symbol.LiftType, [ty]) ->
-      let ty = Type.of_term_exn ty in
-      self#tylift ty
-    | T.Multiset l ->
-        begin match Type.view ty with
-        | Type.App (Symbol.Conn Symbol.Multiset, [ty]) ->
-            self#multiset ty (List.map self#visit l)
-        | _ -> assert false
-        end
-    | T.Record (l,rest) ->
-        let rest = CCOpt.map self#visit rest in
-        let l = List.map (fun (n,t) -> n, self#visit t) l in
-        self#record l rest
-    | _ -> assert false
-end
-
-class id_visitor = object
-  inherit [t] any_visitor
-  method var ty i = var ~ty i
-  method bvar ty i = bvar ~ty i
-  method lambda varty t' = __mk_lambda ~varty t'
-  method forall varty t' = __mk_forall ~varty t'
-  method exists varty t' = __mk_exists ~varty t'
-  method const ty s = const ~ty s
-  method at l r = at l r
-  method tylift ty = tylift ty
-  method multiset ty l = multiset ~ty l
-  method record l rest = record l ~rest
-end
 
 (** {2 FO conversion} *)
 
@@ -396,49 +334,44 @@ let rec curry t =
   | FOT.Const s -> const ~ty s
   | FOT.TyApp (f, ty) -> tyat (curry f) ty
   | FOT.App (f, l) -> at_list (curry f) (List.map curry l)
+  | FOT.Builtin b -> builtin ~ty b
 
 let uncurry t =
   let rec uncurry t =
     let ty = ty t in
-    match T.view t with
-    | T.Var i -> FOT.var ~ty i
-    | T.BVar i -> FOT.bvar ~ty i
-    | T.At _ ->
+    match view t with
+    | Builtin b -> FOT.builtin ~ty b
+    | Var i -> FOT.var ~ty i
+    | BVar i -> FOT.bvar ~ty i
+    | At _ ->
         let f, tyargs, l = open_at t in
         let f' = uncurry f in
         let l' = List.map uncurry l in
         FOT.app_full f' tyargs l'
-    | T.Const s -> FOT.const ~ty s
-    | T.Bind (Symbol.Conn
-                (Symbol.Lambda | Symbol.Forall | Symbol.Exists),
-              _, _)
-    | T.Record _
-    | T.Multiset _ -> raise Exit
-    | T.RecordGet _
-    | T.RecordSet _
-    | T.App _
-    | T.SimpleApp _
-    | T.RigidVar _
-    | T.Bind _ -> assert false
+    | Const s -> FOT.const ~ty s
+    | TyLift _
+    | Forall _
+    | Exists _
+    | Lambda _
+    | Record _
+    | Multiset _ -> raise Exit
   in try Some (uncurry t)
   with Exit -> None
 
-let rec is_fo t = match T.view t with
-  | T.Var _
-  | T.BVar _ -> true
-  | T.At _ ->
+let rec is_fo t = match view t with
+  | Builtin _
+  | Var _
+  | BVar _ -> true
+  | At _ ->
       let f, _, l = open_at t in
       is_fo f && List.for_all is_fo l
-  | T.Const _ -> true
-  | T.Record _
-  | T.Multiset _
-  | T.RigidVar _
-  | T.Bind (Symbol.Conn Symbol.Lambda, _, _) -> false
-  | T.RecordGet _
-  | T.RecordSet _
-  | T.App _
-  | T.SimpleApp _
-  | T.Bind _ -> assert false
+  | Const _ -> true
+  | Record _
+  | Multiset _
+  | TyLift _
+  | Forall _
+  | Exists _
+  | Lambda _ -> false
 
 (** {2 Various operations} *)
 
@@ -459,7 +392,7 @@ let open_forall ?(offset=0) f =
     let env' = DBEnv.push env v in
     open_one (offset+1) env' f'
   | _ ->
-    of_term_exn (T.DB.eval env f)  (* replace *)
+    of_term_unsafe (T.DB.eval env f)  (* replace *)
   in
   open_one offset DBEnv.empty f
 
@@ -479,6 +412,7 @@ let pp_depth ?hooks:_ depth out t =
   let depth = ref depth in
   (* recursive printing *)
   let rec pp_rec out t = match view t with
+  | Builtin b -> Builtin.pp out b
   | BVar i -> Format.fprintf out "Y%d" (!depth - i - 1)
   | Lambda (varty,t') | Forall (varty,t') | Exists (varty,t') ->
     Format.fprintf out "@[<2>%s%a:@[%a@].@ "
@@ -524,54 +458,55 @@ let pp buf t = pp_depth ~hooks:!__hooks 0 buf t
 let to_string = CCFormat.to_string pp
 
 let rec debugf out t = match view t with
+  | Builtin b -> Builtin.pp out b
   | Var i ->
-    Format.fprintf out "X%d:%a" i Type.pp (ty t)
+      Format.fprintf out "X%d:%a" i Type.pp (ty t)
   | BVar i -> Format.fprintf out "Y%d" i
   | Lambda (varty,t') ->
-    Format.fprintf out "(lambda %a %a)" Type.pp varty debugf t'
+      Format.fprintf out "(@[<2>lambda@ %a@ %a@])" Type.pp varty debugf t'
   | Forall (varty,t') ->
-    Format.fprintf out "(forall %a %a)" Type.pp varty debugf t'
+      Format.fprintf out "(@[<2>forall@ %a@ %a@])" Type.pp varty debugf t'
   | Exists (varty,t') ->
-    Format.fprintf out "(exists %a %a)" Type.pp varty debugf t'
+      Format.fprintf out "(@[<2>exists@ %a@ %a@])" Type.pp varty debugf t'
   | Const s -> Symbol.pp out s
   | TyLift ty -> Type.pp out ty
   | At (l, r) ->
-    Format.fprintf out "(%a %a)" debugf l debugf r
+      Format.fprintf out "(@[<2>%a@ %a@])" debugf l debugf r
   | Multiset (_, l) ->
-    Format.fprintf out "{| %a |}" (CCList.print debugf) l
+      Format.fprintf out "{| @[<hv>%a@] |}" (CCList.print debugf) l
   | Record (l, None) ->
-    Format.fprintf out "{ %a }"
-      (CCList.print (fun fmt (n,t) -> Format.fprintf fmt "%s: %a" n debugf t)) l
+      Format.fprintf out "{ @[<hv>%a@] }"
+        (Util.pp_list (fun fmt (n,t) -> Format.fprintf fmt "%s: %a" n debugf t)) l
   | Record (l, Some r) ->
-    Format.fprintf out "{ %a | %a }"
-      (CCList.print (fun fmt (n,t) -> Format.fprintf fmt "%s: %a" n debugf t))
-      l debugf r
+      Format.fprintf out "{ @[<hv>%a@ | %a@] }"
+        (Util.pp_list (fun fmt (n,t) -> Format.fprintf fmt "%s: %a" n debugf t))
+        l debugf r
 
 module TPTP = struct
-  let true_ = const ~ty:Type.TPTP.o Symbol.Base.true_
-  let false_ = const ~ty:Type.TPTP.o Symbol.Base.false_
+  let true_ = builtin ~ty:Type.TPTP.o Builtin.true_
+  let false_ = builtin ~ty:Type.TPTP.o Builtin.false_
 
   (** Easy constructors for formulas *)
 
-  let not_ = const ~ty:Type.(TPTP.o <=. TPTP.o) Symbol.Base.not_
-  let and_ = const ~ty:Type.(TPTP.o <== [TPTP.o; TPTP.o]) Symbol.Base.and_
-  let or_ = const ~ty:Type.(TPTP.o <== [TPTP.o; TPTP.o]) Symbol.Base.or_
-  let imply = const ~ty:Type.(TPTP.o <== [TPTP.o; TPTP.o]) Symbol.Base.imply
-  let equiv = const ~ty:Type.(TPTP.o <== [TPTP.o; TPTP.o]) Symbol.Base.equiv
-  let xor = const ~ty:Type.(TPTP.o <== [TPTP.o; TPTP.o]) Symbol.Base.xor
+  let not_ = builtin ~ty:Type.(TPTP.o <=. TPTP.o) Builtin.not_
+  let and_ = builtin ~ty:Type.(TPTP.o <== [TPTP.o; TPTP.o]) Builtin.and_
+  let or_ = builtin ~ty:Type.(TPTP.o <== [TPTP.o; TPTP.o]) Builtin.or_
+  let imply = builtin ~ty:Type.(TPTP.o <== [TPTP.o; TPTP.o]) Builtin.imply
+  let equiv = builtin ~ty:Type.(TPTP.o <== [TPTP.o; TPTP.o]) Builtin.equiv
+  let xor = builtin ~ty:Type.(TPTP.o <== [TPTP.o; TPTP.o]) Builtin.xor
 
-  let eq = const
+  let eq = builtin
     ~ty:Type.(forall [var 0] (TPTP.o <== [var 0; var 0]))
-    Symbol.Base.eq
-  let neq = const
+    Builtin.eq
+  let neq = builtin
     ~ty:Type.(forall [var 0] (TPTP.o <== [var 0; var 0]))
-    Symbol.Base.neq
+    Builtin.neq
   let forall = const
     ~ty:Type.(forall [var 0] (TPTP.o <=. (TPTP.o <=. var 0)))
-    Symbol.Base.forall
+    Symbol.TPTP.forall_fun
   let exists = const
     ~ty:Type.(forall [var 0] (TPTP.o <=. (TPTP.o <=. var 0)))
-    Symbol.Base.exists
+    Symbol.TPTP.exists_fun
 
   let mk_not t = at not_ t
   let mk_and a b = at_list and_ [a; b]
@@ -602,6 +537,7 @@ module TPTP = struct
     let depth = ref depth in
     (* recursive printing *)
     let rec pp_rec out t = match view t with
+    | Builtin b -> Builtin.TPTP.pp out b
     | BVar i -> Format.fprintf out "Y%d" (!depth - i - 1)
     | Lambda (varty,t') | Forall (varty,t') | Exists (varty,t') ->
       Format.fprintf out "%s[%a:%a]: " (tptp_binder_to_str t)

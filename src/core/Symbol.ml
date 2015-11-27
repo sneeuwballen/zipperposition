@@ -57,6 +57,9 @@ module TPTP = struct
   let rat = of_string "$rat"
   let real = of_string "$real"
 
+  let forall_fun = of_string "!!"
+  let exists_fun = of_string "??"
+
   (** {3 Arith} *)
 
   module Arith = struct

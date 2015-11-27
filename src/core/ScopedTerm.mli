@@ -42,7 +42,7 @@ type view = private
   | Var of int              (** Free variable (integer: mostly useless) *)
   | RigidVar of int         (** Variable that only unifies with other rigid variables *)
   | BVar of int             (** Bound variable (De Bruijn index) *)
-  | Bind of symbol * t * t  (** Type, sub-term *)
+  | Bind of Binder.t * t * t  (** Type, sub-term *)
   | Const of symbol         (** Constant *)
   | Record of (string * t) list * t option (** Extensible record *)
   | RecordGet of t * string       (** [get r name] is [r.name] *)
@@ -50,36 +50,22 @@ type view = private
   | Multiset of t list      (** Multiset of terms *)
   | App of t * t list       (** Uncurried application *)
   | At of t * t             (** Curried application *)
-  | SimpleApp of symbol * t list  (** For representing special constructors *)
+  | SimpleApp of symbol * t list
+  | AppBuiltin of Builtin.t * t list  (** For representing special constructors *)
 
 val view : t -> view
-  (** View on the term's head form *)
-
-module Kind : sig
-  (** "kind" of a term, i.e. what is its meaning, in which context is it
-      used *)
-  type t =
-    | Kind
-    | Type
-    | FOTerm
-    | HOTerm
-    | Formula of t
-    | Untyped
-    | Generic  (* other terms *)
-end
-
-val kind : t -> Kind.t
+(** View on the term's head form *)
 
 type type_result =
   | NoType
   | HasType of t
 
 val ty : t -> type_result
-  (** Type of the term, if any *)
+(** Type of the term, if any *)
 
 val ty_exn : t -> t
-  (** Same as {!ty}, but fails if the term has no type
-      @raise Invalid_argument if the type is [NoType] *)
+(** Same as {!ty}, but fails if the term has no type
+    @raise Invalid_argument if the type is [NoType] *)
 
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
@@ -93,20 +79,22 @@ a key), or, for variables, if the number is negative *)
 exception IllFormedTerm of string
 type nat = int
 
-val const : kind:Kind.t -> ty:t -> symbol -> t
-val app : kind:Kind.t -> ty:t -> t -> t list -> t
-val bind : kind:Kind.t -> ty:t -> varty:t -> symbol -> t -> t
-val var : kind:Kind.t -> ty:t -> nat -> t
-val rigid_var : kind:Kind.t -> ty:t -> nat -> t
-val bvar : kind:Kind.t -> ty:t -> nat -> t
-val record : kind:Kind.t -> ty:t -> (string * t) list -> rest:t option -> t
-val record_get : kind:Kind.t -> ty:t -> t -> string -> t
-val record_set : kind:Kind.t -> ty:t -> t -> string -> t -> t
-val multiset : kind:Kind.t -> ty:t -> t list -> t
-val at : kind:Kind.t -> ty:t -> t -> t -> t
-val simple_app : kind:Kind.t -> ty:t -> symbol -> t list -> t
+val const : ty:t -> symbol -> t
+val app : ty:t -> t -> t list -> t
+val bind : ty:t -> varty:t -> Binder.t -> t -> t
+val var : ty:t -> nat -> t
+val rigid_var : ty:t -> nat -> t
+val bvar : ty:t -> nat -> t
+val record : ty:t -> (string * t) list -> rest:t option -> t
+val record_get : ty:t -> t -> string -> t
+val record_set : ty:t -> t -> string -> t -> t
+val multiset : ty:t -> t list -> t
+val at : ty:t -> t -> t -> t
+val simple_app : ty:t -> symbol -> t list -> t
+val app_builtin : ty:t -> Builtin.t -> t list -> t
+val builtin: ty:t -> Builtin.t -> t
 
-val mk_at : kind:Kind.t -> ty:t -> t -> t -> t
+val mk_at :  ty:t -> t -> t -> t
   (** alias to {!at} *)
 
 val tType : t
@@ -116,7 +104,7 @@ val tType : t
 val cast : ty:t -> t -> t
   (** Change the type *)
 
-val change_kind : kind:Kind.t -> t -> t
+val change_kind :  t -> t
   (** Change the kind *)
 
 val is_var : t -> bool
@@ -195,7 +183,7 @@ end
 
 (** {3 High level constructors} *)
 
-val bind_vars : kind:Kind.t -> ty:t -> symbol -> t list -> t -> t
+val bind_vars :  ty:t -> Binder.t -> t list -> t -> t
   (** bind several free variables in the term, transforming it
       to use De Bruijn indices.
       @param ty return type of the term *)
@@ -231,7 +219,7 @@ val replace : t -> old:t -> by:t -> t
 
 (** {3 Variables} *)
 
-val close_vars : kind:Kind.t -> ty:t -> symbol -> t -> t
+val close_vars :  ty:t -> Binder.t -> t -> t
   (** Close all free variables of the term using the binding symbol *)
 
 val ground : t -> bool
@@ -265,11 +253,11 @@ val add_default_hook : print_hook -> unit
 
 (** {2 Misc} *)
 
-val fresh_var : kind:Kind.t -> ty:t -> unit -> t
+val fresh_var :  ty:t -> unit -> t
 (** [fresh_var ~kind ~ty ()] returns a fresh, unique, {b NOT HASHCONSED}
     variable that will therefore never be equal to any other variable. *)
 
-val _var : kind:Kind.t -> ty:t -> int -> t
+val _var :  ty:t -> int -> t
 (** Unsafe version of {!var} that accepts negative index *)
 
 (* TODO: path-selection operation (for handling general-data in TPTP), see

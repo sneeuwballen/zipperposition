@@ -36,15 +36,14 @@ type t = private ScopedTerm.t
 type term = t
 
 type view = private
+  | Builtin of Builtin.t
   | Var of int                (** Term variable *)
   | BVar of int               (** Bound variable (De Bruijn index) *)
   | Const of Symbol.t         (** Typed constant *)
   | TyApp of t * Type.t       (** Application to type *)
-  | App of t  * t list        (** Application to a list of terms (cannot be left-nested) *)
+  | App of t * t list        (** Application to a list of terms (cannot be left-nested) *)
 
 val view : t -> view
-
-val kind : ScopedTerm.Kind.t
 
 val open_app : t -> t * Type.t list * t list
   (** Open application recursively so as to gather all type arguments *)
@@ -95,6 +94,8 @@ val bvar : ty:Type.t -> int -> t
       {b Warning}: be careful and try not to use this function directly.
       @raise ScopedTerm.IllFormedTerm if the index is < 0 *)
 
+val builtin : ty:Type.t -> Builtin.t -> t
+
 val const : ty:Type.t -> symbol -> t
   (** Create a typed constant *)
 
@@ -112,15 +113,15 @@ val app_full : t -> Type.t list -> t list -> t
 val cast : ty:Type.t -> t -> t
   (** Change the type. Only works for variables and bound variables. *)
 
-val of_term : ScopedTerm.t -> t option
-val of_term_exn : ScopedTerm.t -> t
-val is_term : ScopedTerm.t -> bool
-
 val is_var : t -> bool
 val is_bvar : t -> bool
 val is_tyapp : t -> bool
 val is_app : t -> bool
 val is_const : t -> bool
+
+val of_term_unsafe : ScopedTerm.t -> t
+(** {b NOTE}: this can break the invariants and make {!view} fail. Only
+    apply with caution. *)
 
 (** {2 Sequences} *)
 
