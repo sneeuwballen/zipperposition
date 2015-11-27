@@ -41,9 +41,9 @@ let num_solutions = ref 1
 let add_file f = files := f :: !files
 
 let options =
-  [ "-print-signature", Arg.Set flag_print_signature, "print the signature of the theory"
-  ; "-print-rules", Arg.Set flag_print_rules, "print the rewrite rules"
-  ; "-num", Arg.Set_int num_solutions, "number of solutions to print"
+  [ "--print-signature", Arg.Set flag_print_signature, "print the signature of the theory"
+  ; "--print-rules", Arg.Set flag_print_rules, "print the rewrite rules"
+  ; "--num", Arg.Set_int num_solutions, "number of solutions to print"
   ] @ Options.global_opts
 
 type statement = RewriteRules.statement

@@ -45,10 +45,10 @@ let add_file f = files := f :: !files
 let add_theory f = theory_files := f :: !theory_files
 
 let options = Arg.align (
-  [ "-theory", Arg.String add_theory, " use given theory file"
-  ; "-print-theory", Arg.Set flag_print_theory, " print the whole theory"
-  ; "-print-cnf", Arg.Set flag_print_cnf, " print the clausal form of input files"
-  ; "-print-signature", Arg.Set flag_print_signature, " print initial theory signature"
+  [ "--theory", Arg.String add_theory, " use given theory file"
+  ; "--print-theory", Arg.Set flag_print_theory, " print the whole theory"
+  ; "--print-cnf", Arg.Set flag_print_cnf, " print the clausal form of input files"
+  ; "--print-signature", Arg.Set flag_print_signature, " print initial theory signature"
   ] @ Options.mk_global_opts ()
   )
 

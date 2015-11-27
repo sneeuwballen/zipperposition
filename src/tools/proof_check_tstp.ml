@@ -247,10 +247,10 @@ let progress = ref false
 (* TODO option to choose provers *)
 
 let options = Arg.align (
-  [ "-pp", Arg.Set print_problem, " print problem after parsing"
-  ; "-timeout", Arg.Set_int timeout, " timeout for subprovers (in seconds)"
-  ; "-minimum", Arg.Set_int minimum, " minimum number of checks to validate a step (1)"
-  ; "-progress", Arg.Set progress, " print progress"
+  [ "--pp", Arg.Set print_problem, " print problem after parsing"
+  ; "--timeout", Arg.Set_int timeout, " timeout for subprovers (in seconds)"
+  ; "--minimum", Arg.Set_int minimum, " minimum number of checks to validate a step (1)"
+  ; "--progress", Arg.Set progress, " print progress"
   ] @ Options.mk_global_opts ()
   )
 

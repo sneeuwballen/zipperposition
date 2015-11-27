@@ -63,19 +63,19 @@ let add_file f = files := f :: !files
 let add_theory f = theory_files := f :: !theory_files
 
 let options =
-  [ "-theory", Arg.String add_theory, "use given theory file"
-  ; "-balanced-arith", Arg.Set flag_balanced_arith, "enable balanced-int arith"
-  ; "-balanced-rules-file", Arg.Set_string balanced_int_file,
+  [ "--theory", Arg.String add_theory, "use given theory file"
+  ; "--balanced-arith", Arg.Set flag_balanced_arith, "enable balanced-int arith"
+  ; "--balanced-rules-file", Arg.Set_string balanced_int_file,
       "file storing the rewrite rule for balanced-int encoding"
-  ; "-timeout", Arg.Int (fun n -> timeout := Some n), "timeout (in seconds)"
-  ; "-print-problem", Arg.Set flag_print_problem, "print the final problem sent to E"
-  ; "-print-theory", Arg.Set flag_print_theory, "print the whole theory"
-  ; "-print-signature", Arg.Set flag_print_signature, "print the signature of the theory"
-  ; "-print-rules", Arg.Set flag_print_rules, "print the rewrite rules"
-  ; "-print-detected", Arg.Set flag_print_detected, "print the detected theories and others"
-  ; "-print-precedence", Arg.Set flag_print_precedence, "print precedence given to E"
-  ; "-print-e-output", Arg.Set flag_print_e_output, "print output of E"
-  ; "-no-ord", Arg.Clear flag_use_ord, "disable LPO ordering generation"
+  ; "--timeout", Arg.Int (fun n -> timeout := Some n), "timeout (in seconds)"
+  ; "--print-problem", Arg.Set flag_print_problem, "print the final problem sent to E"
+  ; "--print-theory", Arg.Set flag_print_theory, "print the whole theory"
+  ; "--print-signature", Arg.Set flag_print_signature, "print the signature of the theory"
+  ; "--print-rules", Arg.Set flag_print_rules, "print the rewrite rules"
+  ; "--print-detected", Arg.Set flag_print_detected, "print the detected theories and others"
+  ; "--print-precedence", Arg.Set flag_print_precedence, "print precedence given to E"
+  ; "--print-e-output", Arg.Set flag_print_e_output, "print output of E"
+  ; "--no-ord", Arg.Clear flag_use_ord, "disable LPO ordering generation"
   ] @ Options.global_opts
 
 (** MAIN OPERATIONS *)

@@ -41,8 +41,8 @@ let stats = ref false
 let pp_base = ref false
 
 let options = Arg.align (
-  [ "-cat", Arg.Set cat_input, " print (annotated) declarations"
-  ; "-base", Arg.Set pp_base, " print signature of base symbols"
+  [ "--cat", Arg.Set cat_input, " print (annotated) declarations"
+  ; "--base", Arg.Set pp_base, " print signature of base symbols"
   ] @ Options.mk_global_opts ()
   )
 
