@@ -32,5 +32,8 @@ val pp_full : t CCFormat.printer
 val gensym : unit -> t
 (** Generate a new ID with a new, unique name *)
 
+module Map : CCMap.S with type key = t
+module Set : CCSet.S with type elt = t
+module Tbl : CCHashtbl.S with type key = t
 
 

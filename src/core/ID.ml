@@ -7,6 +7,7 @@ type t = {
   id: int;
   name: string;
 }
+type t_ = t
 
 let make =
   let n = ref 0 in
@@ -39,3 +40,14 @@ let gensym =
     in
     incr r;
     name
+
+module O_ = struct
+  type t = t_
+  let equal = equal
+  let compare = compare
+  let hash = hash
+end
+
+module Map = CCMap.Make(O_)
+module Set = CCSet.Make(O_)
+module Tbl = CCHashtbl.Make(O_)

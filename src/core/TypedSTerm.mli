@@ -12,15 +12,15 @@ type t
 type term = t
 
 type view = private
-  | Var of ID.t               (** variable *)
-  | BVar of ID.t              (** bound variable *)
+  | Var of t Var.t            (** variable *)
+  | BVar of t Var.t           (** bound variable *)
   | Const of Symbol.t         (** constant *)
   | App of t * t list         (** apply term *)
-  | Bind of Binder.t * t * t  (** bind variable in term *)
+  | Bind of Binder.t * t Var.t * t  (** bind variable in term *)
   | AppBuiltin of Builtin.t * t list
   | Multiset of t list
   | Record of (string * t) list * t option  (** extensible record *)
-  | Meta of ID.t * t option ref (** Unification variable *)
+  | Meta of t Var.t * t option ref (** Unification variable *)
 
 val view : t -> view
 val loc : t -> location option
@@ -37,18 +37,18 @@ exception IllFormedTerm of string
 val tType : t
 val wildcard : t
 
-val var : ?loc:location -> ?ty:t -> string -> t
-val bvar : ?loc:location -> ?ty:t -> string -> t
+val var : ?loc:location -> t Var.t -> t
+val bvar : ?loc:location -> t Var.t -> t
 val app : ?loc:location -> ?ty:t -> t -> t list -> t
 val const : ?loc:location -> ?ty:t -> Symbol.t -> t
 val app_builtin : ?loc:location -> ?ty:t -> Builtin.t -> t list -> t
 val builtin : ?loc:location -> ?ty:t -> Builtin.t -> t
-val bind : ?loc:location -> ?ty:t -> Binder.t -> t -> t -> t
-val bind_list : ?loc:location -> ?ty:t -> Binder.t -> t list -> t -> t
+val bind : ?loc:location -> ?ty:t -> Binder.t -> t Var.t -> t -> t
+val bind_list : ?loc:location -> ?ty:t -> Binder.t -> t Var.t list -> t -> t
 val multiset : ?loc:location -> ?ty:t -> t list -> t
-val meta : ?loc:location -> ?ty:t -> ID.t -> t
-val meta_of_string : ?loc:location -> ?ty:t -> string -> t
-val meta_full : ?loc:location -> ?ty:t -> ID.t -> t option ref -> t
+val meta : ?loc:location -> t Var.t -> t
+val meta_of_string : ?loc:location -> ty:t -> string -> t
+val meta_full : ?loc:location -> t Var.t -> t option ref -> t
 val record : ?loc:location -> ?ty:t -> (string*t) list -> rest:t option -> t
 (** Build a record with possibly a row variable.
     @raise IllFormedTerm if the [rest] is not either a record or a variable. *)
@@ -63,10 +63,10 @@ val at_loc : ?loc:location -> t -> t
 
 val with_ty : ?ty:t -> t -> t
 
-val fresh_var : ?loc:location -> ?ty:t -> unit -> t
+val fresh_var : ?loc:location -> ty:t -> unit -> t
 (** fresh free variable with the given type. *)
 
-val fresh_bvar : ?loc:location -> ?ty:t -> unit -> t
+val fresh_bvar : ?loc:location -> ty:t -> unit -> t
 
 (** {2 Utils} *)
 
@@ -82,7 +82,7 @@ val closed : t -> bool
 
 val vars : t -> t list
 
-val close_all : ?ty:t -> Symbol.t -> t -> t
+val close_all : ?ty:t -> Binder.t -> t -> t
 (** Bind all free vars with the symbol *)
 
 include Interfaces.PRINT with type t := t
@@ -93,31 +93,38 @@ module Tbl : Hashtbl.S with type key = term
 
 module Seq : sig
   val subterms : t -> t Sequence.t
-  val subterms_with_bound : t -> (t * Set.t) Sequence.t
-  val vars : t -> t Sequence.t
-  val metas : t -> (ID.t * t option ref) Sequence.t
+  val subterms_with_bound : t -> (t * t Var.Set.t) Sequence.t
+  val vars : t -> t Var.t Sequence.t
+  val metas : t -> (t Var.t * t option ref) Sequence.t
 end
 
-(** {2 Visitor} *)
+(** {2 Substitutions} *)
 
-module Visitor : sig
-  type 'a t = {
-    var : term -> ?loc:location -> ?ty:'a -> string -> 'a;
-    bvar : term -> ?loc:location -> ?ty:'a -> string -> 'a;
-    app : term -> ?loc:location -> ?ty:'a -> 'a -> 'a list -> 'a;
-    const : term -> ?loc:location -> ?ty:'a -> Symbol.t -> 'a;
-    bind : term -> ?loc:location -> ?ty:'a -> Symbol.t -> 'a -> 'a -> 'a;
-    multiset : term -> ?loc:location -> ?ty:'a -> 'a list -> 'a;
-    record : term -> ?loc:location -> ?ty:'a ->
-            (string*'a) list -> 'a option -> 'a;
-  }
-  (** Fold-like operation that maps a term into a value of type 'a *)
 
-  val apply : visitor:'a t -> term -> 'a
+module Subst : sig
+  type t
 
-  val id : term t
-  val for_all : bool t
+  val empty : t
+
+  val add : t -> ID.t -> term -> t
+
+  val find : t -> ID.t -> t option
+
+  val find_exn : t -> ID.t -> t
+  (** @raise Not_found if the variable is not present *)
+
+  val eval : t -> term -> term
+
+  val eval_head : t -> term -> term
+
+  include Interfaces.PRINT with type t := t
 end
+
+exception TypeApplyError of t * t * string
+
+val ty_apply : t -> t list -> t
+(** Apply a (polymorphic) type to a list of arguments
+    @raise TypeApplyError if some mismatch occurs *)
 
 (** {2 Unification} *)
 

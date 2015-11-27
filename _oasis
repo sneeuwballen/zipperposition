@@ -50,7 +50,7 @@ Library "logtk"
   Path:             src/core/
   Pack:             true
   Modules:          Symbol, ScopedTerm, FOTerm, Type, Util, STerm, Interfaces,
-                    DBEnv, Position, HOTerm, Formula,
+                    DBEnv, Position, HOTerm, Formula, Var,
                     Formula_intf, Substs, Unif, Signature,
                     TypeInference, Options, Comparison, Precedence, Builtin,
                     Precedence_intf, Ordering, Ordering_intf, Skolem, Cnf, ID,
