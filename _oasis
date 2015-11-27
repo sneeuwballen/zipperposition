@@ -51,7 +51,7 @@ Library "logtk"
   Pack:             true
   Modules:          Symbol, ScopedTerm, FOTerm, Type, Util, STerm, Interfaces,
                     DBEnv, Position, HOTerm, Formula, Substs, Unif, Signature,
-                    TypeInference, Options, Comparison, Precedence,
+                    TypeInference, Options, Comparison, Precedence, Builtin,
                     Precedence_intf, Ordering, Ordering_intf, Skolem, Cnf,
                     HORewriting, Index, Dtree, Fingerprint, NPDtree,
                     Congruence, FastFingerprint, FeatureVector, Rewriting,
