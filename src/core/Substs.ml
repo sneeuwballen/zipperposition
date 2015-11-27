@@ -97,7 +97,7 @@ module Renaming = struct
       begin try
         HR.find tbl key
       with Not_found ->
-        let v' = T._var ~kind:(T.kind v) ~ty:(T.ty_exn v) (HR.length tbl) in
+        let v' = T._var ~ty:(T.ty_exn v) (HR.length tbl) in
         HR.add tbl key v';
         v'
       end
@@ -106,31 +106,13 @@ module Renaming = struct
       begin try
         HR.find tbl key
       with Not_found ->
-        let v' = T.rigid_var ~kind:(T.kind v) ~ty:(T.ty_exn v) (HR.length tbl) in
+        let v' = T.rigid_var ~ty:(T.ty_exn v) (HR.length tbl) in
         HR.add tbl key v';
         v'
       end
   | _ -> assert false
 
   let __var_count = ref ~-1
-
-  let rename_fresh_var r v = match r, T.view v with
-  | Dummy, _ ->
-      let ty = T.ty_exn v in
-      let n = !__var_count in
-      decr __var_count;
-      T._var ~kind:(T.kind v) ~ty n
-  | Tbl tbl, T.Const (Symbol.Conn (Symbol.FreshVar i)) ->
-      let ty = T.ty_exn v in
-      let key = FreshVar (i, ty) in
-      begin try
-        HR.find tbl key
-      with Not_found ->
-        let v' = T._var ~kind:(T.kind v) ~ty (HR.length tbl) in
-        HR.add tbl key v';
-        v'
-      end
-  | _ -> assert false
 end
 
 type t =
@@ -174,7 +156,6 @@ let rec get_var subst v sc_v = match subst with
 exception KindError
 
 let bind subst v s_v t s_t =
-  if T.kind v <> T.kind t then raise KindError;
   (*assert (T.DB.closed t); XXX: sometimes useful to allow it *)
   let t', s_t' = get_var subst v s_v in
   if s_t' = s_t && T.equal t' t
@@ -289,15 +270,8 @@ let of_list ?(init=empty) l = match l with
     List.fold_left (fun subst (v,s_v,t,s_t) -> bind subst v s_v t s_t) init l
 
 let pp out subst =
-  let pp_term out t =
-    match T.kind t with
-    | T.Kind.FOTerm -> FOTerm.pp out (FOTerm.of_term_exn t)
-    | T.Kind.Type -> Type.pp out (Type.of_term_exn t)
-    | T.Kind.HOTerm -> HOTerm.pp out (HOTerm.of_term_exn t)
-    | _ -> T.pp out t
-  in
   let pp_binding out (v,s_v,t,s_t) =
-    Format.fprintf out "%a[%d] → %a[%d]" pp_term v s_v pp_term t s_t
+    Format.fprintf out "%a[%d] → %a[%d]" T.pp v s_v T.pp t s_t
   in
   match to_list subst with
   | [] -> CCFormat.string out "{}"
@@ -315,17 +289,12 @@ let apply subst ~renaming t s_t =
       t
     | _ when T.ground t -> t
     | T.HasType ty ->
-      let kind = T.kind t in
       let ty = _apply ty s_t in
       match T.view t with
-      | T.Const (Symbol.Conn (Symbol.FreshVar _)) ->
-        (* special trick to generate new variables. It ignores the
-           original scope. *)
-        Renaming.rename_fresh_var renaming t
       | T.Const s ->
         (* regular constant *)
-        T.const ~kind ~ty s
-      | T.BVar i -> T.bvar ~kind ~ty i
+        T.const ~ty s
+      | T.BVar i -> T.bvar ~ty i
       | T.Var i ->
         (* the most interesting cases!
            switch depending on whether [t] is bound by [subst] or not *)
@@ -340,7 +309,7 @@ let apply subst ~renaming t s_t =
         with Not_found ->
           (* variable not bound by [subst], rename it
               (after specializing its type if needed) *)
-          let t = T._var ~kind ~ty i in
+          let t = T._var ~ty i in
           Renaming.rename renaming t s_t
         end
       | T.RigidVar i ->
@@ -354,38 +323,41 @@ let apply subst ~renaming t s_t =
         with Not_found ->
           (* variable not bound by [subst], rename it
               (after specializing its type if needed) *)
-          let t = T.rigid_var ~kind ~ty i in
+          let t = T.rigid_var ~ty i in
           Renaming.rename renaming t s_t
         end
       | T.Bind (s, varty, sub_t) ->
           let varty' = _apply varty s_t in
           let sub_t' = _apply sub_t s_t in
-          T.bind ~kind ~varty:varty' ~ty s sub_t'
+          T.bind ~varty:varty' ~ty s sub_t'
       | T.At (l, r) ->
           let l' = _apply l s_t in
           let r' = _apply r s_t in
-          T.at ~kind ~ty l' r'
+          T.at ~ty l' r'
       | T.App (hd, l) ->
           let hd' = _apply hd s_t in
           let l' = _apply_list l s_t in
-          T.app ~kind ~ty hd' l'
+          T.app ~ty hd' l'
       | T.Record (l, rest) ->
           let rest = match rest with
             | None -> None
             | Some r -> Some (_apply r s_t)
           in
           let l' = List.map (fun (s,t') -> s, _apply t' s_t) l in
-          T.record ~kind ~ty l' ~rest
+          T.record ~ty l' ~rest
       | T.RecordGet (r, name) ->
-          T.record_get ~kind ~ty (_apply r s_t) name
+          T.record_get ~ty (_apply r s_t) name
       | T.RecordSet (r, name, sub) ->
-          T.record_set ~kind ~ty (_apply r s_t) name (_apply sub s_t)
+          T.record_set ~ty (_apply r s_t) name (_apply sub s_t)
+      | T.SimpleApp (s, l) ->
+          let l' = _apply_list l s_t in
+          T.simple_app ~ty s l'
       | T.AppBuiltin (s, l) ->
           let l' = _apply_list l s_t in
-          T.simple_app ~kind ~ty s l'
+          T.app_builtin ~ty s l'
       | T.Multiset l ->
           let l' = _apply_list l s_t in
-          T.multiset ~kind ~ty l'
+          T.multiset ~ty l'
   and _apply_list l s_l = match l with
     | [] -> []
     | t::l' -> _apply t s_l :: _apply_list l' s_l
@@ -433,10 +405,10 @@ module Ty = struct
   let mem subst t s_t = mem subst (t:term:>T.t) s_t
 
   let apply subst ~renaming t s_t =
-    Type.of_term_exn (apply subst ~renaming (t : term :> T.t) s_t)
+    Type.of_term_unsafe (apply subst ~renaming (t : term :> T.t) s_t)
 
   let apply_no_renaming subst t s_t =
-    Type.of_term_exn (apply_no_renaming subst (t : term :> T.t) s_t)
+    Type.of_term_unsafe (apply_no_renaming subst (t : term :> T.t) s_t)
 
   let bind = (bind :> t -> term -> scope -> term -> scope -> t)
 end
@@ -448,10 +420,10 @@ module FO = struct
   let mem subst t s_t = mem subst (t:term:>T.t) s_t
 
   let apply subst ~renaming t s_t =
-    FOTerm.of_term_exn (apply subst ~renaming (t : term :> T.t) s_t)
+    FOTerm.of_term_unsafe (apply subst ~renaming (t : term :> T.t) s_t)
 
   let apply_no_renaming  subst t s_t =
-    FOTerm.of_term_exn (apply_no_renaming  subst (t : term :> T.t) s_t)
+    FOTerm.of_term_unsafe (apply_no_renaming  subst (t : term :> T.t) s_t)
 
   let bind = (bind :> t -> term -> scope -> term -> scope -> t)
 end
@@ -463,10 +435,10 @@ module HO = struct
   let mem subst t s_t = mem subst (t:term:>T.t) s_t
 
   let apply  subst ~renaming t s_t =
-    HOTerm.of_term_exn (apply  subst ~renaming (t : term :> T.t) s_t)
+    HOTerm.of_term_unsafe (apply  subst ~renaming (t : term :> T.t) s_t)
 
   let apply_no_renaming  subst t s_t =
-    HOTerm.of_term_exn (apply_no_renaming  subst (t : term :> T.t) s_t)
+    HOTerm.of_term_unsafe (apply_no_renaming  subst (t : term :> T.t) s_t)
 
   let bind = (bind :> t -> term -> scope -> term -> scope -> t)
 end
@@ -478,10 +450,10 @@ module Form = struct
   let mem subst t s_t = mem subst (t:term:>T.t) s_t
 
   let apply  subst ~renaming t s_t =
-    Formula.FO.of_term_exn (apply  subst ~renaming (t : term :> T.t) s_t)
+    Formula.FO.of_term_unsafe (apply  subst ~renaming (t : term :> T.t) s_t)
 
   let apply_no_renaming  subst t s_t =
-    Formula.FO.of_term_exn (apply_no_renaming  subst (t : term :> T.t) s_t)
+    Formula.FO.of_term_unsafe (apply_no_renaming  subst (t : term :> T.t) s_t)
 
   let bind = (bind :> t -> term -> scope -> term -> scope -> t)
 end

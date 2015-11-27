@@ -176,6 +176,7 @@ let occurs_check ~env subst v sc_v t sc_t =
           List.exists (fun (_,t') -> check ~env t' sc_t) l
       | T.RecordGet (r, _) -> check ~env r sc_t
       | T.RecordSet (r, _, sub) -> check ~env r sc_t || check ~env sub sc_t
+      | T.SimpleApp (_, l)
       | T.AppBuiltin (_, l)
       | T.Multiset l ->
         List.exists (fun t' -> check ~env t' sc_t) l
@@ -188,7 +189,6 @@ let occurs_check ~env subst v sc_v t sc_t =
 
 module RecordUnif = struct
   type t = {
-    kind : T.Kind.t;
     ty : T.t;
     fields : (string * T.t) list;
     discarded : (string * T.t) list;  (* discarded fields *)
@@ -200,7 +200,6 @@ module RecordUnif = struct
      The term must have a type. *)
   let of_record t l rest =
     let r = {
-      kind=T.kind t;
       ty=T.ty_exn t;
       fields = l;
       discarded = [];
@@ -217,12 +216,12 @@ module RecordUnif = struct
       else (
         assert (T.is_record r.ty || T.is_var r.ty);
         (* type of fields that remain *)
-        T.record ~kind:(T.kind r.ty) ~ty:T.tType
+        T.record ~ty:T.tType
           (ty_fields r.fields @ ty_fields r.discarded)
           ~rest:(CCOpt.map T.ty_exn r.rest)
       )
     in
-    T.record ~kind:r.kind ~ty (r.fields @ r.discarded) ~rest:r.rest
+    T.record ~ty (r.fields @ r.discarded) ~rest:r.rest
 
   (* discard first field *)
   let discard r = match r.fields with
@@ -379,8 +378,8 @@ module Nary = struct
   (* do consecutive occurrences of the binder commute with one another?
      e.g. [![X]: ![Y]: A]   is the same as  [![Y]: ![X]: A] *)
   let binder_commutes = function
-    | Symbol.Conn Symbol.Forall
-    | Symbol.Conn Symbol.Exists -> true
+    | Binder.Forall
+    | Binder.Exists -> true
     | _ -> false
 
   type combined_env = {
@@ -469,7 +468,7 @@ module Nary = struct
         else
           (* create fresh var R and unify rest1 with {l2 | R} (t2)
              and rest2 with { l1 | R } (t1) *)
-          let r = T.fresh_var ~kind:r1.RU.kind ~ty:r1.RU.ty () in
+          let r = T.fresh_var ~ty:r1.RU.ty () in
           let t1 = RU.to_record (RU.set_rest r1 ~rest:(Some r)) in
           let t2 = RU.to_record (RU.set_rest r2 ~rest:(Some r)) in
           unif ~env subst rest1 sc1 t2 sc2
@@ -525,7 +524,7 @@ module Nary = struct
   let rec __unif_commutating_binders ~env ~unif ~sym ~size subst t1 sc_s t2 sc_t k =
     match T.view t1, T.view t2 with
     | T.Bind (s1, _, t1'), T.Bind (s2, _, t2')
-      when Symbol.equal s1 sym && Symbol.equal s2 sym ->
+      when Binder.equal s1 sym && Binder.equal s2 sym ->
       (* recurse *)
       __unif_commutating_binders ~env ~unif ~sym
         ~size:(size+1) subst t1' sc_s t2' sc_t k
@@ -577,10 +576,10 @@ module Nary = struct
           then () (* occur check *)
           else k ~env (S.bind subst t sc_t s sc_s)
       | T.Bind (s1, _, _), T.Bind (s2, _, _)
-        when Symbol.equal s1 s2 && binder_commutes s1 ->
+        when Binder.equal s1 s2 && binder_commutes s1 ->
         (* forall or exists: they might swap *)
         __unif_commutating_binders ~env ~unif ~sym:s1 ~size:0 subst s sc_s t sc_t k
-      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Symbol.equal s1 s2 ->
+      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Binder.equal s1 s2 ->
         unif ~env subst varty1 sc_s varty2 sc_t
           (fun ~env subst -> unif ~env:(push_none env) subst t1' sc_s t2' sc_t
             (fun ~env subst -> k ~env:(pop_many env 1) subst))
@@ -606,7 +605,9 @@ module Nary = struct
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         unif ~env subst r1 sc_s r2 sc_t
           (fun ~env subst -> unif ~env subst sub1 sc_s sub2 sc_t k)
-      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Symbol.equal s1 s2 ->
+      | T.SimpleApp(s1,l1), T.SimpleApp (s2, l2) when Symbol.equal s1 s2 ->
+        __unify_list ~env ~unif subst l1 sc_s l2 sc_t k
+      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Builtin.equal s1 s2 ->
         __unify_list ~env ~unif subst l1 sc_s l2 sc_t k
       | T.Multiset l1, T.Multiset l2 when List.length l1 = List.length l2 ->
         __unify_multiset ~env ~unif subst l1 sc_s l2 sc_t k
@@ -649,10 +650,10 @@ module Nary = struct
           then ()
           else k ~env (S.bind subst s sc_s t sc_t)  (* bind s *)
       | T.Bind (s1, _, _), T.Bind (s2, _, _)
-        when Symbol.equal s1 s2 && binder_commutes s1 ->
+        when Binder.equal s1 s2 && binder_commutes s1 ->
         (* forall or exists: they might swap *)
         __unif_commutating_binders ~env ~unif ~sym:s1 ~size:0 subst s sc_s t sc_t k
-      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Symbol.equal s1 s2 ->
+      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Binder.equal s1 s2 ->
         unif ~env subst varty1 sc_s varty2 sc_t
           (fun ~env subst -> unif ~env:(push_none env) subst t1' sc_s t2' sc_t
             (fun ~env subst -> k ~env:(pop_many env 1) subst))
@@ -674,7 +675,9 @@ module Nary = struct
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         unif ~env subst r1 sc_s r2 sc_t
           (fun ~env subst -> unif ~env subst sub1 sc_s sub2 sc_t k)
-      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Symbol.equal s1 s2 ->
+      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when Symbol.equal s1 s2 ->
+        __unify_list ~env ~unif subst l1 sc_s l2 sc_t k
+      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Builtin.equal s1 s2 ->
         __unify_list ~env ~unif subst l1 sc_s l2 sc_t k
       | T.Multiset l1, T.Multiset l2 when List.length l1 = List.length l2 ->
         __unify_multiset ~env ~unif subst l1 sc_s l2 sc_t k
@@ -714,10 +717,10 @@ module Nary = struct
       | T.Var _, T.Var _ when sc_s <> sc_t ->
           k ~env (S.bind subst s sc_s t sc_t)  (* bind s *)
       | T.Bind (s1, _, _), T.Bind (s2, _, _)
-        when Symbol.equal s1 s2 && binder_commutes s1 ->
+        when Binder.equal s1 s2 && binder_commutes s1 ->
         (* forall or exists: they might swap *)
         __unif_commutating_binders ~env ~unif ~sym:s1 ~size:0 subst s sc_s t sc_t k
-      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Symbol.equal s1 s2 ->
+      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Binder.equal s1 s2 ->
         unif ~env subst varty1 sc_s varty2 sc_t
           (fun ~env subst -> unif ~env:(push_none env) subst t1' sc_s t2' sc_t
             (fun ~env subst -> k ~env:(pop_many env 1) subst))
@@ -739,7 +742,9 @@ module Nary = struct
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         unif ~env subst r1 sc_s r2 sc_t
           (fun ~env subst  -> unif ~env subst sub1 sc_s sub2 sc_t k)
-      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Symbol.equal s1 s2 ->
+      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when Symbol.equal s1 s2 ->
+        __unify_list ~env ~unif subst l1 sc_s l2 sc_t k
+      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Builtin.equal s1 s2 ->
         __unify_list ~env ~unif subst l1 sc_s l2 sc_t k
       | T.Multiset l1, T.Multiset l2 when List.length l1 = List.length l2 ->
         __unify_multiset ~env ~unif subst l1 sc_s l2 sc_t k
@@ -833,7 +838,7 @@ module Unary = struct
         else
           (* create fresh var R and unify rest1 with {l2 | R}
            * and rest2 with { l1 | R } *)
-          let r = T.const ~kind:r1.RU.kind ~ty:r1.RU.ty (Symbol.Base.fresh_var ()) in
+          let r = T.fresh_var ~ty:r1.RU.ty () in
           let t1 = RU.to_record (RU.set_rest r1 ~rest:(Some r)) in
           let t2 = RU.to_record (RU.set_rest r1 ~rest:(Some r)) in
           let subst = unif ~env1 ~env2 subst rest1 sc1 t2 sc2 in
@@ -867,7 +872,7 @@ module Unary = struct
         if occurs_check ~env:env1 subst t sc_t s sc_s || not (T.DB.closed s)
           then raise Fail (* occur check *)
           else S.bind subst t sc_t s sc_s (* bind s *)
-      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Symbol.equal s1 s2 ->
+      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Binder.equal s1 s2 ->
         let subst = unif ~env1 ~env2 subst varty1 sc_s varty2 sc_t in
         unif ~env1:(DBE.push_none env1) ~env2:(DBE.push_none env2)
           subst t1' sc_s t2' sc_t
@@ -889,7 +894,9 @@ module Unary = struct
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         let subst = unif ~env1 ~env2 subst r1 sc_s r2 sc_t in
         unif ~env1 ~env2 subst sub1 sc_s sub2 sc_t
-      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Symbol.equal s1 s2 ->
+      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when Symbol.equal s1 s2 ->
+        unif_list ~unif ~env1 ~env2 subst l1 sc_s l2 sc_t
+      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Builtin.equal s1 s2 ->
         unif_list ~unif ~env1 ~env2 subst l1 sc_s l2 sc_t
       | T.At (l1, r1), T.At (l2, r2) ->
         let subst = unif ~env1 ~env2 subst l1 sc_s l2 sc_t in
@@ -929,7 +936,7 @@ module Unary = struct
         || (not allow_open && not (T.DB.closed t))
           then raise Fail
           else S.bind subst s sc_s t sc_t (* bind s *)
-      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Symbol.equal s1 s2 ->
+      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Binder.equal s1 s2 ->
         let subst = unif ~env1 ~env2 subst varty1 sc_s varty2 sc_t in
         unif ~env1:(DBE.push_none env1) ~env2:(DBE.push_none env2)
           subst t1' sc_s t2' sc_t
@@ -951,7 +958,9 @@ module Unary = struct
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         let subst = unif ~env1 ~env2 subst r1 sc_s r2 sc_t in
         unif ~env1 ~env2 subst sub1 sc_s sub2 sc_t
-      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Symbol.equal s1 s2 ->
+      | T.SimpleApp(s1,l1), T.SimpleApp (s2, l2) when Symbol.equal s1 s2 ->
+        unif_list ~unif ~env1 ~env2 subst l1 sc_s l2 sc_t
+      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Builtin.equal s1 s2 ->
         unif_list ~unif ~env1 ~env2 subst l1 sc_s l2 sc_t
       | T.At (l1, r1), T.At (l2, r2) ->
         let subst = unif ~env1 ~env2 subst l1 sc_s l2 sc_t in
@@ -988,7 +997,7 @@ module Unary = struct
         if occurs_check ~env:env2 subst s scope t scope || T.Set.mem s blocked
           then raise Fail
           else S.bind subst s scope t scope (* bind s *)
-      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Symbol.equal s1 s2 ->
+      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Binder.equal s1 s2 ->
         let subst = unif ~env1 ~env2 ~blocked subst varty1 sc_s varty2 sc_t in
         unif
           ~env1:(DBE.push_none env1) ~env2:(DBE.push_none env2) ~blocked
@@ -1013,7 +1022,9 @@ module Unary = struct
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         let subst = unif ~env1 ~env2 ~blocked subst r1 sc_s r2 sc_t in
         unif ~env1 ~env2 ~blocked subst sub1 sc_s sub2 sc_t
-      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Symbol.equal s1 s2 ->
+      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when Symbol.equal s1 s2 ->
+        unif_list ~env1 ~env2 ~unif:(unif ~blocked) subst l1 scope l2 scope
+      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Builtin.equal s1 s2 ->
         unif_list ~env1 ~env2 ~unif:(unif ~blocked) subst l1 scope l2 scope
       | T.At (l1, r1), T.At (l2, r2) ->
         let subst = unif ~env1 ~env2 ~blocked subst l1 scope l2 scope in
@@ -1051,7 +1062,7 @@ module Unary = struct
         raise Fail (* terms are not equal, and ground. failure. *)
       | T.Var i, T.Var j when i <> j && sc_s = sc_t -> raise Fail
       | T.Var _, T.Var _ -> S.bind subst s sc_s t sc_t (* bind s *)
-      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Symbol.equal s1 s2 ->
+      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Binder.equal s1 s2 ->
         let subst = unif ~env1 ~env2 subst varty1 sc_s varty2 sc_t in
         unif ~env1:(DBE.push_none env1) ~env2:(DBE.push_none env2)
           subst t1' sc_s t2' sc_t
@@ -1073,7 +1084,9 @@ module Unary = struct
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         let subst = unif ~env1 ~env2 subst r1 sc_s r2 sc_t in
         unif ~env1 ~env2 subst sub1 sc_s sub2 sc_t
-      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Symbol.equal s1 s2 ->
+      | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Builtin.equal s1 s2 ->
+        unif_list ~unif ~env1 ~env2 subst l1 sc_s l2 sc_t
+      | T.SimpleApp(s1,l1), T.SimpleApp (s2, l2) when Symbol.equal s1 s2 ->
         unif_list ~unif ~env1 ~env2 subst l1 sc_s l2 sc_t
       | T.At (l1, r1), T.At (l2, r2) ->
         let subst = unif ~env1 ~env2 subst l1 sc_s l2 sc_t in
@@ -1103,7 +1116,7 @@ module Unary = struct
     | _, T.BVar j when DBE.mem env2 j ->
       _eq ~env1 ~env2:DBE.empty ~subst t1 s1 (DBE.find_exn env2 j) s2
     | T.BVar i, T.BVar j -> i=j
-    | T.Bind (f1, varty1, t1'), T.Bind (f2, varty2, t2') when Symbol.equal f1 f2 ->
+    | T.Bind (f1, varty1, t1'), T.Bind (f2, varty2, t2') when Binder.equal f1 f2 ->
         _eq ~env1 ~env2 ~subst varty1 s1 varty2 s2
         &&
         _eq
@@ -1113,7 +1126,12 @@ module Unary = struct
         _eq ~env1 ~env2 ~subst t1 s1 t2 s2
         &&
         List.for_all2 (fun t1 t2 -> _eq ~env1 ~env2 ~subst t1 s1 t2 s2) l1 l2
-    | T.AppBuiltin (f1,l1), T.AppBuiltin (f2, l2) when Symbol.equal f1 f2 ->
+    | T.SimpleApp (f1,l1), T.SimpleApp (f2, l2) when Symbol.equal f1 f2 ->
+      begin try
+        List.for_all2 (fun t1 t2 -> _eq ~env1 ~env2 ~subst t1 s1 t2 s2) l1 l2
+      with Invalid_argument _ -> false
+      end
+    | T.AppBuiltin (f1,l1), T.AppBuiltin (f2, l2) when Builtin.equal f1 f2 ->
       begin try
         List.for_all2 (fun t1 t2 -> _eq ~env1 ~env2 ~subst t1 s1 t2 s2) l1 l2
       with Invalid_argument _ -> false
