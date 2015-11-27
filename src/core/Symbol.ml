@@ -125,7 +125,7 @@ let to_string s = match s with
       | Exists -> "∃"
       | Forall -> "∀"
       | Lambda -> "λ"
-      | ForallTy -> "Λ"
+      | ForallTy -> "Π"
       | Arrow -> "->"
       | Wildcard -> "_"
       | Multiset -> "Ms"

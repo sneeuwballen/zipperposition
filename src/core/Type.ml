@@ -283,7 +283,7 @@ let rec pp_rec depth out t = match view t with
       out l;
     Format.fprintf out "| %a}" (pp_rec depth) r
   | Forall ty' ->
-    Format.fprintf out "Λ T%i. %a" depth (pp_inner (depth+1)) ty'
+    Format.fprintf out "Π T%i. %a" depth (pp_inner (depth+1)) ty'
 and pp_inner depth out t = match view t with
   | Fun _ ->
     CCFormat.char out '('; pp_rec depth out t; CCFormat.char out ')'
