@@ -47,7 +47,7 @@ Flag "demo"
   Default:      false
 
 Library "logtk"
-  Path:             src/base/
+  Path:             src/core/
   Pack:             false
   Modules:          Logtk, LogtkSymbol, LogtkScopedTerm, LogtkFOTerm, LogtkType,
                     LogtkUtil, LogtkPrologTerm, LogtkInterfaces, LogtkDBEnv,

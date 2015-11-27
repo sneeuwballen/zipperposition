@@ -1,6 +1,6 @@
 S src
-S src/base
-S src/base/lib
+S src/core
+S src/core/lib
 S src/extended/
 S src/parsers/
 S src/arbitrary/
@@ -9,8 +9,8 @@ S src/solving/
 S src/tools/
 S tests/
 B _build/src/
-B _build/src/base
-B _build/src/base/lib/
+B _build/src/core
+B _build/src/core/lib/
 B _build/src/extended
 B _build/src/parsers
 B _build/src/meta
