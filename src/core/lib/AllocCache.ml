@@ -4,37 +4,41 @@
 (** {1 Simple Cache for Allocations} *)
 
 module Arr = struct
-  type 'a bucket = {
-    mutable size: int;
-    cached: 'a array array;
+  type 'a t = {
+    caches: 'a array array array;
+      (* array of buckets, where each bucket is an array of arrays *)
+    max_buck_size: int;
+    sizes: int array; (* number of cached arrays in each bucket *)
   }
-
-  type 'a t = 'a bucket array
 
   let create ?(buck_size=16) n =
     if n<1 then invalid_arg "AllocCache.Arr.create";
-    Array.init (n-1)
-      (fun _ ->  { size=0; cached=Array.make buck_size [||]})
+    { max_buck_size=buck_size;
+      sizes=Array.make n 0;
+      caches=Array.init n (fun _ -> Array.make buck_size [||]);
+    }
 
   let make c i x =
-    if i<Array.length c then (
-      let buck = c.(i) in
-      if buck.size = 0 then Array.make i x
+    if i=0 then [||]
+    else if i<Array.length c.sizes then (
+      let bs = c.sizes.(i) in
+      if bs = 0 then Array.make i x
       else (
         (* remove last array *)
-        let ret = buck.cached.(buck.size-1) in
-        buck.size <- buck.size - 1;
+        let ret = c.caches.(i).(bs-1) in
+        c.sizes.(i) <- bs - 1;
         ret
       )
     ) else Array.make i x
 
   let free c a =
-    if Array.length a < Array.length c then (
-      let buck = c.(Array.length a) in
-      if buck.size < Array.length buck.cached then (
+    let n = Array.length a in
+    if n > 0 && n < Array.length c.sizes then (
+      let bs = c.sizes.(n) in
+      if bs < c.max_buck_size then (
         (* store [a] *)
-        buck.cached.(buck.size) <- a;
-        buck.size <- buck.size + 1
+        c.caches.(n).(bs) <- a;
+        c.sizes.(n) <- bs + 1
       )
     )
 
@@ -47,6 +51,22 @@ module Arr = struct
     with e ->
       free c a;
       raise e
-
 end
+
+(*$inject
+  let c = Arr.create ~buck_size:2 20
+
+*)
+
+(*$Q
+  Q.int (fun n -> Array.length (Arr.make c n '_') = n)
+*)
+
+(*$T
+  let a = Arr.make c 1 '_' in Array.length a = 1
+  let a = Arr.make c 2 '_' in Array.length a = 2
+  let a = Arr.make c 3 '_' in Array.length a = 3
+  let a = Arr.make c 4 '_' in Array.length a = 4
+*)
+
 
