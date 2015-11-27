@@ -59,7 +59,7 @@ module Clause = struct
   let rule head body =
     if not (safe head body) then
       let msg = CCFormat.sprintf "unsafe Horn clause:@ @[%a <- %a@]"
-        HOT.pp head (CCFormat.list HOT.pp) body in
+        HOT.pp head (Util.pp_list HOT.pp) body in
       raise (Invalid_argument msg)
     else {head; body; }
 
@@ -98,7 +98,7 @@ module Clause = struct
   let pp out c = match c.body with
     | [] -> Format.fprintf out "%a." HOT.pp c.head
     | _::_ ->
-        Format.fprintf out "%a <- %a." HOT.pp c.head (CCFormat.list HOT.pp) c.body
+        Format.fprintf out "%a <- %a." HOT.pp c.head (Util.pp_list HOT.pp) c.body
   let to_string = CCFormat.to_string pp
 
   module Set = Sequence.Set.Make(struct

@@ -232,32 +232,32 @@ let rec pp out t = match t.term with
   | Const s -> Sym.pp out s
   | List l ->
       CCFormat.char out '[';
-      CCFormat.list ~sep:"," pp out l;
+      Util.pp_list ~sep:"," pp out l;
       CCFormat.char out ']'
   | Syntactic (Sym.Conn Sym.Arrow, [ret;a]) ->
     Format.fprintf out "%a -> %a" pp a pp ret
   | Syntactic (Sym.Conn Sym.Arrow, ret::l) ->
-    Format.fprintf out "(%a) -> %a" (CCFormat.list ~sep:" * " pp) l pp ret
+    Format.fprintf out "(%a) -> %a" (Util.pp_list ~sep:" * " pp) l pp ret
   | Syntactic (s, l) ->
-      Format.fprintf out "%a(%a)" Sym.pp s (CCFormat.list ~sep:", " pp) l
+      Format.fprintf out "%a(%a)" Sym.pp s (Util.pp_list ~sep:", " pp) l
   | App (s, l) ->
       pp out s;
       CCFormat.char out '(';
-      CCFormat.list ~sep:"," pp out l;
+      Util.pp_list ~sep:"," pp out l;
       CCFormat.char out ')'
   | Bind (s, vars, t') ->
       Sym.pp out s;
       CCFormat.char out '[';
-      CCFormat.list ~sep:"," pp out vars;
+      Util.pp_list ~sep:"," pp out vars;
       CCFormat.string out "]:";
       pp out t'
   | Record (l, None) ->
     CCFormat.char out '{';
-    CCFormat.list (fun buf (s,t') -> Format.fprintf buf "%s:%a" s pp t') out l;
+    Util.pp_list (fun out (s,t') -> Format.fprintf out "%s:%a" s pp t') out l;
     CCFormat.char out '}'
   | Record (l, Some r) ->
     CCFormat.char out '{';
-    CCFormat.list (fun buf (s,t') -> Format.fprintf buf "%s:%a" s pp t') out l;
+    Util.pp_list (fun out (s,t') -> Format.fprintf out "%s:%a" s pp t') out l;
     Format.fprintf out " | %a}" pp r
   | Column(x,y) ->
       pp out x;
@@ -348,12 +348,12 @@ module TPTP = struct
     | Const s -> Sym.TPTP.pp out s
     | List l ->
         CCFormat.char out '[';
-        CCFormat.list ~sep:"," pp out l;
+        Util.pp_list ~sep:"," pp out l;
         CCFormat.char out ']'
     | Syntactic (Sym.Conn Sym.And, l) ->
-      CCFormat.list ~sep:" & " pp_surrounded out l
+      Util.pp_list ~sep:" & " pp_surrounded out l
     | Syntactic (Sym.Conn Sym.Or, l) ->
-      CCFormat.list ~sep:" | " pp_surrounded out l
+      Util.pp_list ~sep:" | " pp_surrounded out l
     | Syntactic (Sym.Conn Sym.Not, [a]) ->
       Format.fprintf out "~%a" pp_surrounded a
     | Syntactic (Sym.Conn Sym.Imply, [a;b]) ->
@@ -369,18 +369,18 @@ module TPTP = struct
     | Syntactic (Sym.Conn Sym.Arrow, [ret;a]) ->
       Format.fprintf out "%a > %a" pp a pp ret
     | Syntactic (Sym.Conn Sym.Arrow, ret::l) ->
-      Format.fprintf out "(%a) > %a" (CCFormat.list~sep:" * " pp) l pp_surrounded ret
+      Format.fprintf out "(%a) > %a" (Util.pp_list~sep:" * " pp) l pp_surrounded ret
     | Syntactic (s, l) ->
-      Format.fprintf out "%a(%a)" Sym.pp s (CCFormat.list ~sep:", " pp_surrounded) l
+      Format.fprintf out "%a(%a)" Sym.pp s (Util.pp_list ~sep:", " pp_surrounded) l
     | App (s, l) ->
         pp out s;
         CCFormat.char out '(';
-        CCFormat.list ~sep:"," pp out l;
+        Util.pp_list ~sep:"," pp out l;
         CCFormat.char out ')'
     | Bind (s, vars, t') ->
         Sym.TPTP.pp out s;
         CCFormat.char out '[';
-        CCFormat.list ~sep:"," pp_typed_var out vars;
+        Util.pp_list ~sep:"," pp_typed_var out vars;
         CCFormat.string out "]:";
         pp_surrounded out t'
     | Record _ -> failwith "cannot print records in TPTP"

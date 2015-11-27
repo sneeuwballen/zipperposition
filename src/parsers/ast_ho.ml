@@ -42,12 +42,12 @@ type location = ParseLocation.t
 
 let pp out t = match t with
   | Clause (head, []) ->
-      Format.fprintf out "%a.\n" PT.pp head
+      Format.fprintf out "@[%a@]." PT.pp head
   | Clause (head, body) ->
-      Format.fprintf out "%a <-\n  %a.\n"
-        PT.pp head (CCFormat.list ~sep:",\n  " PT.pp) body
+      Format.fprintf out "@[<hv2>%a <-@ %a.@]"
+        PT.pp head (Util.pp_list ~sep:", " PT.pp) body
   | Type (s, ty) ->
-      Format.fprintf out "val %s : %a\n" s PT.pp ty
+      Format.fprintf out "@[val @[<hv>%s@ : %a@]@]" s PT.pp ty
 
 let to_string = CCFormat.to_string pp
 

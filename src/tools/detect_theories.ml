@@ -107,15 +107,12 @@ let print_theory r =
   ()
 
 let print_clauses c =
-  Format.printf "clauses:@.  %a@."
-    (CCFormat.seq~sep:"\n  " (Encoding.pp_clause FOTerm.pp)) c
-
-let pppair ~sep pa pb out (a,b) =
-  Format.fprintf out "%a%s%a" pa a sep pb b
+  Format.printf "clauses: @[%a@]@."
+    (CCFormat.seq ~sep:" " (Encoding.pp_clause FOTerm.pp)) c
 
 let print_signature signature =
   Format.printf "@[<2>signature:@,@[%a@]@]@."
-    (CCFormat.seq ~sep:"\n  " (pppair ~sep:" : " Symbol.pp Type.pp))
+    (CCFormat.seq ~sep:" " (Util.pp_pair ~sep:" : " Symbol.pp Type.pp))
     (Signature.Seq.to_seq signature)
 
 let pp_theory_axiom out (name, _, t) =
@@ -123,7 +120,7 @@ let pp_theory_axiom out (name, _, t) =
 
 let pp_rewrite_system out l =
   Format.fprintf out "@[<v2>rewrite system@ @[%a@]@]"
-    (CCFormat.list ~sep:"" (pppair ~sep:" --> " FOTerm.pp FOTerm.pp)) l
+    (Util.pp_list ~sep:"" (Util.pp_pair ~sep:" --> " FOTerm.pp FOTerm.pp)) l
 
 let pp_pre_rewrite_system buf l =
   HORewriting.pp buf l

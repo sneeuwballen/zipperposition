@@ -240,7 +240,7 @@ module TPTP = struct
     | BVar i -> Format.fprintf out "Tb%d" (depth-i-1)
     | App (p, []) -> Symbol.TPTP.pp out p
     | App (p, args) -> Format.fprintf out "%a(%a)" Symbol.TPTP.pp p
-      (CCFormat.list (pp_tstp_rec depth)) args
+      (Util.pp_list (pp_tstp_rec depth)) args
     | Fun (arg, ret) ->
       (* FIXME: uncurry? *)
       Format.fprintf out "%a > %a" (pp_inner depth) arg (pp_tstp_rec depth) ret
@@ -266,24 +266,23 @@ let rec pp_rec depth out t = match view t with
   | BVar i -> Format.fprintf out "T%i" (depth-i-1)
   | App (p, []) -> CCFormat.string out (Symbol.to_string p)
   | App (Symbol.Conn Symbol.Multiset, l) ->
-      Format.fprintf out "[%a]" (CCFormat.list (pp_rec depth)) l
+      Format.fprintf out "@[[%a]@]" (Util.pp_list (pp_rec depth)) l
   | App (p, args) ->
-    Format.fprintf out "%s(%a)"
-      (Symbol.to_string p) (CCFormat.list (pp_rec depth)) args
+    Format.fprintf out "@[<2>%s(%a)@]"
+      (Symbol.to_string p) (Util.pp_list (pp_rec depth)) args
   | Fun (arg, ret) ->
-    Format.fprintf out "%a → %a" (pp_inner depth) arg (pp_rec depth) ret
+    Format.fprintf out "@[%a →@ %a@]" (pp_inner depth) arg (pp_rec depth) ret
   | Record (l, None) ->
     CCFormat.char out '{';
-    CCFormat.list (fun buf (n, t) -> Format.fprintf buf "%s: %a" n (pp_rec depth) t)
+    Util.pp_list (fun buf (n, t) -> Format.fprintf buf "@[%s: %a@]" n (pp_rec depth) t)
       out l;
     CCFormat.char out '}'
   | Record (l, Some r) ->
-    CCFormat.char out '{';
-    CCFormat.list (fun buf (n, t) -> Format.fprintf buf "%s: %a" n (pp_rec depth) t)
-      out l;
-    Format.fprintf out "| %a}" (pp_rec depth) r
+    Format.fprintf out "@[{%a | %a}@]"
+      (Util.pp_list (fun buf (n, t) -> Format.fprintf buf "@[%s: %a@]" n (pp_rec depth) t))
+      l (pp_rec depth) r
   | Forall ty' ->
-    Format.fprintf out "Π T%i. %a" depth (pp_inner (depth+1)) ty'
+    Format.fprintf out "@[Π T%i.@ %a@]" depth (pp_inner (depth+1)) ty'
 and pp_inner depth out t = match view t with
   | Fun _ ->
     CCFormat.char out '('; pp_rec depth out t; CCFormat.char out ')'

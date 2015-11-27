@@ -302,7 +302,7 @@ module Flag = struct
     n
 end
 
-(** {2 Exceptions} *)
+(** {2 Others} *)
 
 let finally ~do_ f =
   try
@@ -312,6 +312,11 @@ let finally ~do_ f =
   with e ->
     do_ ();
     raise e
+
+let pp_pair ?(sep=", ") pa pb out (a,b) =
+  Format.fprintf out "@[%a%s%a@]" pa a sep pb b
+
+let pp_list ?(sep=", ") pp = CCFormat.list ~start:"" ~stop:"" ~sep pp
 
 (** {2 File utils} *)
 

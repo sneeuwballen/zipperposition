@@ -76,8 +76,8 @@ module Constraint = struct
     | EQ (a,b) -> Format.fprintf out "(= %a %a)" pp_expr a pp_expr b
     | LE (a,b) -> Format.fprintf out "(<= %a %a)" pp_expr a pp_expr b
     | LT (a,b) -> Format.fprintf out "(< %a %a)" pp_expr a pp_expr b
-    | And l -> Format.fprintf out "(and %a)" (CCFormat.list ~start:"" ~stop:"" ~sep:" " pp) l
-    | Or l -> Format.fprintf out "(or %a)" (CCFormat.list ~start:"" ~stop:"" ~sep:" " pp) l
+    | And l -> Format.fprintf out "(and %a)" (Util.pp_list ~sep:" " pp) l
+    | Or l -> Format.fprintf out "(or %a)" (Util.pp_list ~sep:" " pp) l
     | Not t -> Format.fprintf out "(not %a)" pp t
     | True -> CCFormat.string out "true"
     | False -> CCFormat.string out "false"
@@ -137,10 +137,7 @@ module Solution = struct
     C.or_ l
 
   let pp out s =
-    let pp_pair out (a,b) =
-      Format.fprintf out "%a > %a" Symbol.pp a Symbol.pp b
-    in
-    CCFormat.list pp_pair out s
+    Util.pp_list (Util.pp_pair ~sep:" > " Symbol.pp Symbol.pp) out s
 
   let to_string = CCFormat.to_string pp
 end

@@ -140,12 +140,18 @@ module Flag : sig
     (** New flag from the generator (2*previous flag) *)
 end
 
-(** {2 Exceptions} *)
+(** {2 Others} *)
 
 val finally : do_:(unit -> unit) -> (unit -> 'a) -> 'a
   (** [finally ~do_ f] calls [f ()] and returns its result. If it raises, the
       same exception is raised; in {b any} case, [do_ ()] is called after
       [f ()] terminates. *)
+
+val pp_pair :
+  ?sep:string -> 'a CCFormat.printer -> 'b CCFormat.printer -> ('a * 'b) CCFormat.printer
+
+val pp_list : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
+(** Print a list without begin/end separators *)
 
 (** {2 File utils} *)
 

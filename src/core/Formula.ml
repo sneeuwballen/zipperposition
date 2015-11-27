@@ -899,10 +899,10 @@ module Make(MyT : TERM) = struct
       decr depth
     | And l ->
         Format.fprintf out "@[<hv>%a@]"
-          (CCFormat.list ~start:"" ~stop:"" ~sep:" ∧ " pp_inner) l
+          (Util.pp_list ~sep:" ∧ " pp_inner) l
     | Or l ->
         Format.fprintf out "@[<hv>%a@]"
-          (CCFormat.list ~start:"" ~stop:"" ~sep:" ∨ " pp_inner) l
+          (Util.pp_list ~sep:" ∨ " pp_inner) l
     and pp_inner out f = match view f with
     | And _
     | Or _
@@ -961,10 +961,10 @@ module Make(MyT : TERM) = struct
         decr depth
       | And l ->
         Format.fprintf out "(@[%a@])"
-          (CCFormat.list ~start:"" ~stop:"" ~sep:" & " pp_inner) l
+          (Util.pp_list ~sep:" & " pp_inner) l
       | Or l ->
         Format.fprintf out "(@[%a@])"
-          (CCFormat.list ~start:"" ~stop:"" ~sep:" | " pp_inner) l
+          (Util.pp_list ~sep:" | " pp_inner) l
       and pp_inner out f = match view f with
       | And _
       | Or _

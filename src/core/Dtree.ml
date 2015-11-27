@@ -122,7 +122,7 @@ let to_list t =
   | Some i ->
     let l = getnext [] i in
     Util.debugf 5 "dtree.to_list %a = [%a]"
-      (fun k->k T.pp t (CCFormat.list pp_char) l);
+      (fun k->k T.pp t (Util.pp_list pp_char) l);
     l
 
 module CharMap = Map.Make(struct

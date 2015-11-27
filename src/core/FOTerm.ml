@@ -523,7 +523,7 @@ let pp_depth ?(hooks=[]) depth out t =
         assert (args <> []);
         Format.fprintf out
           "@[<2>%a@ %a@]" pp_rec f
-            (CCFormat.list ~start:"" ~stop:"" ~sep:" " pp_inner) args
+            (Util.pp_list ~sep:" " pp_inner) args
     | Const s -> Symbol.pp out s
     | Var i ->
       if not !print_all_types && not (Type.equal (ty t) Type.TPTP.i)
@@ -556,7 +556,7 @@ let rec debugf out t =
   | TyApp (f, ty) ->
     Format.fprintf out "(%a %a)" debugf f Type.pp ty
   | App (s, l) ->
-    Format.fprintf out "(%a %a)" debugf s (CCFormat.list debugf) l
+    Format.fprintf out "(%a %a)" debugf s (Util.pp_list debugf) l
   end;
   Format.fprintf out ":%a" Type.pp (ty t)
 
@@ -580,13 +580,13 @@ module TPTP = struct
     | TyApp _ ->
         let f, tyargs, args = open_app t in
         Format.fprintf out "@[<2>%a(@," pp_rec f;
-        CCFormat.list ~start:"" ~stop:"" ~sep:", "
+        Util.pp_list ~sep:", "
           (Type.TPTP.pp_depth !depth) out tyargs;
         begin match tyargs, args with
           | _::_, _::_ -> CCFormat.string out ", "
           | _ -> ();
         end;
-        CCFormat.list ~start:"" ~stop:"" ~sep:"," pp_rec out args;
+        Util.pp_list ~sep:"," pp_rec out args;
         CCFormat.fprintf out ")@]"
     | Var i ->
         Format.fprintf out "X%d" i;

@@ -1005,46 +1005,48 @@ let pp_depth ?(hooks=[]) depth out t =
   | Record ([], Some r) ->
     Format.fprintf out "{ | %a}" (_pp depth) r
   | Record (l, None) ->
-    CCFormat.char out '{';
+    Format.fprintf out "@[{";
     List.iteri
       (fun i (s, t') ->
         if i>0 then CCFormat.string out ", ";
         Format.fprintf out "%s: " s;
         _pp depth out t')
       l;
-    CCFormat.char out '}'
+    Format.fprintf out "}@]"
   | Record (l, Some r) ->
-    CCFormat.char out '{';
+    Format.fprintf out "@[{";
     List.iteri
       (fun i (s, t') ->
         if i>0 then CCFormat.string out ", ";
         Format.fprintf out "%s: " s;
         _pp depth out t')
       l;
-    Format.fprintf out " | %a}" (_pp depth) r
+    Format.fprintf out " | %a}@]" (_pp depth) r
   | RecordGet (r, name) ->
     Format.fprintf out "%a.%s" (_pp depth) r name
   | RecordSet (r, name,sub) ->
-    Format.fprintf out "%a.%s <- %a" (_pp depth) r name (_pp depth) sub
+    Format.fprintf out "@[<2>%a.%s <-@ %a@]" (_pp depth) r name (_pp depth) sub
   | Multiset l ->
-    Format.fprintf out "{| %a |}" (CCFormat.list (_pp depth)) l
+    Format.fprintf out "@[{| %a |}@]" (Util.pp_list (_pp depth)) l
   | SimpleApp (s, [a]) when Sym.is_prefix s ->
-    Format.fprintf out "%a %a" Sym.pp s (_pp depth) a
+    Format.fprintf out "@[%a %a@]" Sym.pp s (_pp depth) a
   | SimpleApp (s, [a;b]) when Sym.is_infix s ->
-    Format.fprintf out "(%a %a %a)" (_pp depth) a Sym.pp s (_pp depth) b
+    Format.fprintf out "@[<2>(%a@ %a@ %a)@]" (_pp depth) a Sym.pp s (_pp depth) b
   | SimpleApp (s, l) ->
-    Format.fprintf out "%a(%a)" Sym.pp s (CCFormat.list (_pp depth)) l
+    Format.fprintf out "@[%a(%a)@]" Sym.pp s (Util.pp_list (_pp depth)) l
   | At (l,r) ->
-    _pp_surrounded depth out l;
-    CCFormat.char out ' ';
-    _pp depth out r
+    Format.fprintf out "@[%a %a@]"
+      (_pp_surrounded depth) l
+      (_pp depth) r
   | App (f, l) ->
     assert (l <> []);
+    Format.fprintf out "@[";
     _pp_surrounded depth out f;
     List.iter
       (fun t' ->
         CCFormat.char out ' '; _pp_surrounded depth out t')
-      l
+      l;
+    Format.fprintf out "@]"
   and _pp_ty depth out t = match t.ty, view t with
     | HasType ty, (Var _ | BVar _) ->
       Format.fprintf out ":%a" (_pp_surrounded depth) ty

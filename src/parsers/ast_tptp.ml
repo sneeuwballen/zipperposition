@@ -111,9 +111,9 @@ let rec pp_general out d = match d with
   | GVar s -> CCFormat.string out s
   | GColumn (a, b) -> Format.fprintf out "%a: %a" pp_general a pp_general b
   | GNode (f, l) ->
-    Format.fprintf out "%s(%a)" f (CCFormat.list pp_general) l
+    Format.fprintf out "%s(%a)" f (Util.pp_list pp_general) l
   | GList l ->
-    Format.fprintf out "[%a]" (CCFormat.list pp_general) l
+    Format.fprintf out "[%a]" (Util.pp_list pp_general) l
 
 let rec pp_general_debugf out d = match d with
   | GString s -> Format.fprintf out "GSstr %s" s
@@ -121,7 +121,7 @@ let rec pp_general_debugf out d = match d with
   | GVar s -> Format.fprintf out "GVar %s" s
   | GColumn (a, b) -> Format.fprintf out "%a: %a" pp_general_debugf a pp_general_debugf b
   | GNode (f, l) ->
-    Format.fprintf out "GNode(%s[%a])" f (CCFormat.list pp_general_debugf) l
+    Format.fprintf out "GNode(%s[%a])" f (Util.pp_list pp_general_debugf) l
   | GList l ->
     CCFormat.list pp_general_debugf out l
 
@@ -129,7 +129,7 @@ let pp_generals out l = match l with
   | [] -> ()
   | _::_ ->
       Format.fprintf out ",@ ";
-      CCFormat.list ~start:"" ~stop:"" ~sep:", " pp_general out l
+      Util.pp_list ~sep:", " pp_general out l
 
 module type S = sig
   type hoterm
@@ -262,7 +262,7 @@ module Untyped = struct
   let pp out = function
     | Include filename -> Format.fprintf out "include('%s')." filename
     | IncludeOnly (filename, names) ->
-      Format.fprintf out "@[include('%s',2 [%a]@])." filename (CCFormat.list pp_name) names
+      Format.fprintf out "@[include('%s',2 [%a]@])." filename (Util.pp_list pp_name) names
     | TypeDecl (name, s, ty, g) ->
       Format.fprintf out "@[<2>tff(%a, type,@ (%s : %a)%a@])."
         pp_name name s PT.TPTP.pp ty pp_generals g
@@ -271,7 +271,7 @@ module Untyped = struct
         pp_name name s PT.TPTP.pp kind pp_generals g
     | CNF (name, role, c, generals) ->
       pp_form_ out
-        (CCFormat.list ~start:"" ~stop:"" ~sep:" | " PT.TPTP.pp)
+        (Util.pp_list ~sep:" | " PT.TPTP.pp)
         ("cnf", name, role, c, generals)
     | FOF (name, role, f, generals) ->
       pp_form_ out PT.TPTP.pp  ("fof", name, role, f, generals)

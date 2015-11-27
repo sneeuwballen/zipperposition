@@ -485,7 +485,7 @@ module Make(E : Map.OrderedType) = struct
 
   let pp pp_x out l =
     Format.fprintf out "{@[%a@]}"
-      (CCFormat.list ~start:"" ~stop:"" ~sep:", "
+      (Util.pp_list ~sep:", "
         (fun out (x,n) -> Format.fprintf out "%a: %s" pp_x x (Z.to_string n)))
       l
 end

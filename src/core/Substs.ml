@@ -301,7 +301,7 @@ let pp out subst =
   in
   match to_list subst with
   | [] -> CCFormat.string out "{}"
-  | l -> Format.fprintf out "{%a}" (CCFormat.list ~sep:", " pp_binding) l
+  | l -> Format.fprintf out "{%a}" (Util.pp_list ~sep:", " pp_binding) l
 
 let to_string = CCFormat.to_string pp
 

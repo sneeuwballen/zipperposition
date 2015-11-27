@@ -616,24 +616,24 @@ let cnf_of_list ?(opts=[]) ?(ctx=Skolem.create Signature.empty) l =
         | F.ForallTy _ -> assert false
       else begin
         let f = F.simplify f in
-        Util.debugf ~section 4 "... simplified: %a" (fun k->k F.pp f);
+        Util.debugf ~section 4 "... simplified: @[%a@]" (fun k->k F.pp f);
         let f = nnf f in
         (* processing post-nnf *)
         let f = List.fold_left (|>) f post_nnf in
-        Util.debugf ~section 4 "... NNF: %a" (fun k->k F.pp f);
+        Util.debugf ~section 4 "... NNF: @[%a@]" (fun k->k F.pp f);
         let distribute_exists = List.mem DistributeExists opts in
         let f = miniscope ~distribute_exists f in
-        Util.debugf ~section 4 "... miniscoped: %a" (fun k->k F.pp f);
+        Util.debugf ~section 4 "... miniscoped: @[%a@]" (fun k->k F.pp f);
         (* adjust the variable counter to [f] before skolemizing *)
         Skolem.clear_var ~ctx;
         F.iter (Skolem.update_var ~ctx) f;
         let f = skolemize ~ctx f in
         (* processing post-skolemization *)
         let f = List.fold_left (|>) f post_skolem in
-        Util.debugf ~section 4 "... skolemized: %a" (fun k->k F.pp f);
+        Util.debugf ~section 4 "... skolemized: @[%a@]" (fun k->k F.pp f);
         let clauses = to_cnf f in
-        Util.debugf ~section 4 "... CNF: %a"
-          (fun k->k (CCFormat.list ~sep:", " (CCFormat.list ~sep:" | " F.pp)) clauses);
+        Util.debugf ~section 4 "... CNF: @[%a@]"
+          (fun k->k (Util.pp_list ~sep:", " (CCFormat.list ~sep:" | " F.pp)) clauses);
         assert (List.for_all (List.for_all F.is_closed) clauses);
         clauses
       end
