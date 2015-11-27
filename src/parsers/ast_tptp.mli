@@ -121,9 +121,9 @@ end
 
 (** default is with prolog terms everywhere *)
 module Untyped : S
-  with type hoterm = PrologTerm.t
-  and type form = PrologTerm.t
-  and type ty = PrologTerm.t
+  with type hoterm = STerm.t
+  and type form = STerm.t
+  and type ty = STerm.t
 
 (** Typed version *)
 module Typed : S

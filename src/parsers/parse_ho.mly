@@ -87,7 +87,7 @@ A parser with a nice curried syntax. *)
 
 %start <Ast_ho.t> parse_decl
 %start <Ast_ho.t list> parse_decls
-%start <Logtk.PrologTerm.t> parse_term
+%start <Logtk.STerm.t> parse_term
 
 %%
 

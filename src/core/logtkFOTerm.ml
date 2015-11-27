@@ -482,23 +482,23 @@ end
 
 (** {2 Conversions} *)
 
-let to_prolog ?(depth=0) t =
-  let module PT = LogtkPrologTerm in
+let to_simple_term ?(depth=0) t =
+  let module ST = LogtkSTerm in
   let rec to_prolog t =
     let ty = ty t in
     match view t with
     | Var i ->
-        PT.column
-          (PT.var (CCFormat.sprintf "X%d" i))
-          (LogtkType.Conv.to_prolog ~depth ty)
-    | BVar i -> PT.var (CCFormat.sprintf "Y%d" (depth-i-1))
+        ST.column
+          (ST.var (CCFormat.sprintf "X%d" i))
+          (LogtkType.Conv.to_simple_term ~depth ty)
+    | BVar i -> ST.var (CCFormat.sprintf "Y%d" (depth-i-1))
     | TyApp _
     | App _ -> gather_left [] t
-    | Const f -> PT.const f
+    | Const f -> ST.const f
   and gather_left acc t = match view t with
-    | TyApp (f, ty) -> gather_left (LogtkType.Conv.to_prolog ~depth ty :: acc) f
+    | TyApp (f, ty) -> gather_left (LogtkType.Conv.to_simple_term ~depth ty :: acc) f
     | App (f, l) -> gather_left (List.map to_prolog l @ acc) f
-    | _ -> PT.app (to_prolog t) acc
+    | _ -> ST.app (to_prolog t) acc
   in to_prolog t
 
 (** {2 Printing/parsing} *)

@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open Logtk_parsers
 
-module PT = PrologTerm
+module PT = STerm
 module E = CCError
 module FOT = FOTerm
 module Loc = ParseLocation
@@ -86,7 +86,7 @@ let rules_of_pairs signature pairs =
           Some (fun ctx -> l' ctx, r' ctx)
         | Type (s, ty) ->
           (* declare the type *)
-          begin match TypeInference.Ctx.ty_of_prolog ctx ty with
+          begin match TypeInference.Ctx.ty_of_simple_term ctx ty with
           | None -> ()
           | Some ty -> TypeInference.Ctx.declare ctx (Symbol.of_string s) ty
           end; None

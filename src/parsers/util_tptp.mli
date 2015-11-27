@@ -113,7 +113,7 @@ val signature : [`ctx of TypeInference.Ctx.t | `sign of Signature.t] ->
 val erase_types : Ast_tptp.Typed.t Sequence.t ->
                   Ast_tptp.Untyped.t Sequence.t
   (** Reverse operation of {!infer_types}, that erases types and converts
-      formulas and terms back to {!PrologTerm.t}. *)
+      formulas and terms back to {!STerm.t}. *)
 
 val annotate_types : [`ctx of TypeInference.Ctx.t | `sign of Signature.t] ->
                      Ast_tptp.Untyped.t Sequence.t ->

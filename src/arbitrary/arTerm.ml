@@ -37,7 +37,7 @@ module HOT = HOTerm
 type 'a arbitrary = 'a QA.t
 
 module PT = struct
-  module PT = PrologTerm
+  module PT = STerm
 
   let _const s = PT.const (Symbol.of_string s)
 

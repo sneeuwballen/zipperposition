@@ -52,15 +52,15 @@ module HO : sig
     (** HO polymorphic term *)
 end
 
-(** {2 Prolog Terms} *)
+(** {2 S Terms} *)
 
 module PT : sig
-  val default : PrologTerm.t arbitrary
+  val default : STerm.t arbitrary
     (** Default polymorphic prolog term *)
 
-  val ground : PrologTerm.t arbitrary
+  val ground : STerm.t arbitrary
     (** Default ground monomorphic term *)
 
-  val pred : PrologTerm.t arbitrary
+  val pred : STerm.t arbitrary
     (** predicates (type "o") *)
 end

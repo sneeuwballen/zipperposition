@@ -106,20 +106,20 @@ let mk_proof_obligation proof =
   else try
     let goal, step = match proof with
     | TT.InferForm (f, lazy step) ->
-      let f = F.to_prolog (F.close_forall f) in
+      let f = F.to_simple_term (F.close_forall f) in
       AU.FOF(step.TT.id, A.R_conjecture, f, []), step
     | TT.InferClause (c, lazy step) ->
-      let c = F.to_prolog (F.close_forall (F.Base.or_ c)) in
+      let c = F.to_simple_term (F.close_forall (F.Base.or_ c)) in
       AU.FOF(step.TT.id, A.R_conjecture, c, []), step
     | _ -> assert false
     in
     let premises = CCList.filter_map
       (fun parent -> match parent with
         | TT.InferClause (c, lazy step') ->
-          let c = F.to_prolog (F.close_forall (F.Base.or_ c)) in
+          let c = F.to_simple_term (F.close_forall (F.Base.or_ c)) in
           Some (AU.FOF(step'.TT.id, A.R_axiom, c, []))
         | TT.InferForm(f, lazy step') ->
-          let f = F.to_prolog (F.close_forall f) in
+          let f = F.to_simple_term (F.close_forall f) in
           Some (AU.FOF(step'.TT.id, A.R_axiom, f, []))
         | TT.Axiom _
         | TT.Theory _ -> None)

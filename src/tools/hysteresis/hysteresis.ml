@@ -133,9 +133,9 @@ let merge_detection_result a b =
 let erase_types decls =
   let module M = Ast_tptp.Map(Ast_tptp.Typed)(Ast_tptp.Untyped) in
   Sequence.map
-    (M.map ~form:(Formula.FO.to_prolog ~depth:0)
-      ~ho:(fun _ -> failwith "HOT.to_prolog missing")
-      ~ty:(Type.Conv.to_prolog ~curry:false ~depth:0))
+    (M.map ~form:(Formula.FO.to_simple_term ~depth:0)
+      ~ho:(fun _ -> failwith "HOT.to_simple_term missing")
+      ~ty:(Type.Conv.to_simple_term ~curry:false ~depth:0))
     decls
 
 (** STATE: STORE RULES, AXIOMS, PRE-REWRITE RULES *)

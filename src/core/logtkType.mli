@@ -232,8 +232,8 @@ module Conv : sig
   val copy : ctx -> ctx
   val clear : ctx -> unit
 
-  val of_prolog : ctx:ctx -> LogtkPrologTerm.t -> t option
-  val to_prolog : ?curry:bool -> ?depth:int -> t -> LogtkPrologTerm.t
+  val of_simple_term : ctx:ctx -> LogtkSTerm.t -> t option
+  val to_simple_term : ?curry:bool -> ?depth:int -> t -> LogtkSTerm.t
   (** convert a type to a prolog term.
       @param depth the number of surrounding De Bruijn binders
       @param curry if true, keep types curried (default true), otherwise uncurry *)

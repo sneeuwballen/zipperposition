@@ -195,7 +195,7 @@ module type S = sig
 
   (** {2 Conversions} *)
 
-  val to_prolog : ?depth:int -> t -> LogtkPrologTerm.t
+  val to_simple_term : ?depth:int -> t -> LogtkSTerm.t
 
   (** {2 IO} *)
 
@@ -236,7 +236,7 @@ module type TERM = sig
 
   module Set : Sequence.Set.S with type elt = t
 
-  val to_prolog : ?depth:int -> t -> LogtkPrologTerm.t
+  val to_simple_term : ?depth:int -> t -> LogtkSTerm.t
 
   include LogtkInterfaces.PRINT_DE_BRUIJN with type t := t
       and type term := t

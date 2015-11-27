@@ -50,7 +50,7 @@ Library "logtk"
   Path:             src/core/
   Pack:             false
   Modules:          Logtk, LogtkSymbol, LogtkScopedTerm, LogtkFOTerm, LogtkType,
-                    LogtkUtil, LogtkPrologTerm, LogtkInterfaces, LogtkDBEnv,
+                    LogtkUtil, LogtkSTerm, LogtkInterfaces, LogtkDBEnv,
                     LogtkPosition, LogtkHOTerm, LogtkFormula, LogtkSubsts,
                     LogtkUnif, LogtkSignature, LogtkTypeInference,
                     LogtkOptions, LogtkComparison, LogtkPrecedence,
@@ -59,7 +59,7 @@ Library "logtk"
                     LogtkDtree, LogtkFingerprint, LogtkNPDtree,
                     LogtkCongruence, LogtkFastFingerprint, LogtkFeatureVector,
                     LogtkRewriting, LogtkFormulaShape, LogtkTransform,
-                    LogtkLambda, LogtkSourced, LogtkTypedPrologTerm,
+                    LogtkLambda, LogtkSourced, LogtkTypedSTerm,
                     LogtkHashcons, LogtkCache, LogtkParseLocation,
                     LogtkMultiset, LogtkPartialOrder,
                     LogtkPartialOrder_intf, LogtkLazyList,

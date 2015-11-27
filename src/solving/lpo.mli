@@ -98,8 +98,8 @@ module FO : sig
     (** Orient a list of pairs *)
 end
 
-module Prolog : sig
-  type term = PrologTerm.t
+module STerm : sig
+  type term = STerm.t
 
   val orient_lpo : term -> term -> Constraint.t
     (** [orient a b] generates a constraint that is sufficient for [a]

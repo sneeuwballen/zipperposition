@@ -33,7 +33,7 @@ type 'a arbitrary = 'a QA.t
 type form = Formula.FO.t
 
 module PT = struct
-  module PT = PrologTerm
+  module PT = STerm
   module AT = ArTerm.PT
 
   let atom =

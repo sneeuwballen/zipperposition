@@ -104,7 +104,7 @@ let __clause_of_ast ~ctx ast =
       Some (Reasoner.Clause.rule head' body')
   | Ast_ho.Type (s, ty) ->
       (* declare the type *)
-      begin match TypeInference.Ctx.ty_of_prolog ctx ty with
+      begin match TypeInference.Ctx.ty_of_simple_term ctx ty with
       | None -> None
       | Some ty ->
         TypeInference.Ctx.declare ctx (Symbol.of_string s) ty;

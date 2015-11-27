@@ -31,8 +31,8 @@ open Logtk
 type 'a or_error = [`Error of string | `Ok of 'a]
 
 type statement =
-  | Rule of PrologTerm.t * PrologTerm.t
-  | Type of string * PrologTerm.t
+  | Rule of STerm.t * STerm.t
+  | Type of string * STerm.t
 
 type rule = FOTerm.t * FOTerm.t
 (** Rewrite rules on terms *)

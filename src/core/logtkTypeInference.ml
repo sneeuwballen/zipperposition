@@ -30,7 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
 module Ty = LogtkType
-module PT = LogtkPrologTerm
+module PT = LogtkSTerm
 module S = LogtkSubsts
 module Sym = LogtkSymbol
 module Loc = LogtkParseLocation
@@ -133,9 +133,9 @@ module Ctx = struct
     else _new_ty_var ctx :: _new_ty_vars ctx (n-1)
 
   (* convert a prolog term into a type *)
-  let rec ty_of_prolog ctx ty = match PT.view ty with
-    | PT.Syntactic(Sym.Conn Sym.LiftType, [ty]) -> ty_of_prolog ctx ty
-    | _ -> LogtkType.Conv.of_prolog ~ctx:ctx.tyvars ty
+  let rec ty_of_simple_term ctx ty = match PT.view ty with
+    | PT.Syntactic(Sym.Conn Sym.LiftType, [ty]) -> ty_of_simple_term ctx ty
+    | _ -> LogtkType.Conv.of_simple_term ~ctx:ctx.tyvars ty
 
   (* TODO: better explanations for errors *)
 
@@ -151,7 +151,7 @@ module Ctx = struct
 
   (* obtain a (possibly fresh) type var for this name *)
   let _get_ty_var ctx name =
-    match LogtkType.Conv.of_prolog ~ctx:ctx.tyvars name with
+    match LogtkType.Conv.of_simple_term ~ctx:ctx.tyvars name with
     | None -> assert false
     | Some v -> v
 
@@ -424,7 +424,7 @@ module FO = struct
   let rec _convert_type_args ctx l = match l with
     | [] -> []
     | t::l' ->
-      begin match Ctx.ty_of_prolog ctx t with
+      begin match Ctx.ty_of_simple_term ctx t with
         | None -> Ctx.error_ ctx "term %a is not a type" PT.pp t
         | Some ty -> ty :: _convert_type_args ctx l'
       end
@@ -438,7 +438,7 @@ module FO = struct
   and infer_rec_view ctx t = match t with
     | PT.Column ({PT.term=PT.Var name; _}, ty) ->
       (* typed var *)
-      let ty = match Ctx.ty_of_prolog ctx ty with
+      let ty = match Ctx.ty_of_simple_term ctx ty with
         | Some ty -> ty
         | None -> Ctx.error_ ctx "expected type, got %a" PT.pp ty
       in
@@ -526,7 +526,7 @@ module FO = struct
 
   let infer_var_scope ctx t = match t.PT.term with
     | PT.Column ({PT.term=PT.Var name; _}, ty) ->
-      let ty = match Ctx.ty_of_prolog ctx ty with
+      let ty = match Ctx.ty_of_simple_term ctx ty with
         | Some ty -> ty
         | None -> Ctx.error_ ctx "expected type, got %a" PT.pp ty
       in
@@ -737,7 +737,7 @@ module HO = struct
   let rec _convert_type_args ctx l = match l with
     | [] -> []
     | t::l' ->
-      begin match Ctx.ty_of_prolog ctx t with
+      begin match Ctx.ty_of_simple_term ctx t with
         | None -> Ctx.error_ ctx "term %a is not a type" PT.pp t
         | Some ty -> ty :: _convert_type_args ctx l'
       end
@@ -745,7 +745,7 @@ module HO = struct
   (* infer the type of a bound variable, and enter its scope *)
   let infer_var_scope ctx t = match t.PT.term with
     | PT.Column ({PT.term=PT.Var name; _}, ty) ->
-      let ty = match Ctx.ty_of_prolog ctx ty with
+      let ty = match Ctx.ty_of_simple_term ctx ty with
         | Some ty -> ty
         | None -> Ctx.error_ ctx "expected type, got %a" PT.pp ty
       in
@@ -790,7 +790,7 @@ module HO = struct
   and infer_rec_view ~arity ctx t = match t with
     | PT.Column ({PT.term=PT.Var name; _}, ty) ->
       (* typed var *)
-      let ty = match Ctx.ty_of_prolog ctx ty with
+      let ty = match Ctx.ty_of_simple_term ctx ty with
         | Some ty -> ty
         | None -> Ctx.error_ ctx "expected type, got %a" PT.pp ty
       in
@@ -812,7 +812,7 @@ module HO = struct
           let ty = Ctx.apply_ty ctx ty in
           Ctx.apply_ho ctx (T.const ~ty x))
     | PT.Syntactic (Sym.Conn Sym.LiftType, [ty]) ->
-      let ty = match Ctx.ty_of_prolog ctx ty with
+      let ty = match Ctx.ty_of_simple_term ctx ty with
         | Some ty -> ty
         | None -> Ctx.error_ ctx "expected type, got %a" PT.pp ty
       in

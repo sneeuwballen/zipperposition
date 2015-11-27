@@ -303,7 +303,7 @@ let fresh_var = T.fresh_var ~kind ~ty:T.tType
 (** {2 Conversions} *)
 
 module Conv = struct
-  module PT = LogtkPrologTerm
+  module PT = LogtkSTerm
 
   exception LocalExit
 
@@ -313,8 +313,8 @@ module Conv = struct
   let copy = Hashtbl.copy
   let clear = Hashtbl.clear
 
-  let of_prolog ~ctx t =
-    let rec of_prolog t = match t.PT.term with
+  let of_simple_term ~ctx t =
+    let rec aux t = match t.PT.term with
       | PT.Column ({PT.term=PT.Var name; _},
                    {PT.term=PT.Const (LogtkSymbol.Conn LogtkSymbol.TType); _})
       | PT.Var name ->
@@ -331,23 +331,23 @@ module Conv = struct
       | PT.Rat _ -> raise LocalExit
       | PT.Const s -> const s
       | PT.Syntactic (LogtkSymbol.Conn LogtkSymbol.Arrow, [ret;arg]) ->
-        let ret = of_prolog ret in
-        let arg = of_prolog arg in
+        let ret = aux ret in
+        let arg = aux arg in
         arrow arg ret
       | PT.Syntactic (LogtkSymbol.Conn LogtkSymbol.Arrow, ret::l) ->
-        let ret = of_prolog ret in
-        let l = List.map of_prolog l in
+        let ret = aux ret in
+        let l = List.map aux l in
         arrow_list l ret
       | PT.App ({PT.term=PT.Const hd; _}, l) ->
-        let l = List.map of_prolog l in
+        let l = List.map aux l in
         app hd l
       | PT.Bind (LogtkSymbol.Conn LogtkSymbol.ForallTy, vars, t') ->
-        let vars = List.map of_prolog vars in
-        let t' = of_prolog t' in
+        let vars = List.map aux vars in
+        let t' = aux t' in
         forall vars t'
       | PT.Record (l, rest) ->
-        let rest = CCOpt.map of_prolog rest in
-        let l = List.map (fun (n,t) -> n, of_prolog t) l in
+        let rest = CCOpt.map aux rest in
+        let l = List.map (fun (n,t) -> n, aux t) l in
         record l ~rest
       | PT.Bind _
       | PT.Syntactic _
@@ -355,28 +355,28 @@ module Conv = struct
       | PT.Column _
       | PT.List _ -> raise LocalExit
     in
-    try Some (of_prolog t)
+    try Some (aux t)
     with LocalExit -> None
 
-  let to_prolog ?(curry=true) ?(depth=0) t =
-    let rec to_prolog depth t = match view t with
+  let to_simple_term ?(curry=true) ?(depth=0) t =
+    let rec aux depth t = match view t with
     | Var i -> PT.var (CCFormat.sprintf "A%d" i)
     | BVar i -> PT.var (CCFormat.sprintf "B%d" (depth-i-1))
-    | App (s,l) -> PT.app (PT.const s) (List.map (to_prolog depth) l)
+    | App (s,l) -> PT.app (PT.const s) (List.map (aux depth) l)
     | Fun (arg, ret) when curry ->
-      PT.TPTP.mk_fun_ty [to_prolog depth arg] (to_prolog depth ret)
+      PT.TPTP.mk_fun_ty [aux depth arg] (aux depth ret)
     | Fun _ ->
       let args, ret = open_fun t in
-      let args = List.map (to_prolog depth) args in
-      let ret = to_prolog depth ret in
+      let args = List.map (aux depth) args in
+      let ret = aux depth ret in
       PT.TPTP.mk_fun_ty args ret
     | Record (l, rest) ->
-      let rest = CCOpt.map (to_prolog depth) rest in
-      PT.record (List.map (fun (n,ty) -> n, to_prolog depth ty) l) ~rest
+      let rest = CCOpt.map (aux depth) rest in
+      PT.record (List.map (fun (n,ty) -> n, aux depth ty) l) ~rest
     | Forall t' ->
       PT.bind LogtkSymbol.Base.forall_ty
         [PT.var (CCFormat.sprintf "B%d" depth)]
-        (to_prolog (depth+1) t')
+        (aux (depth+1) t')
     in
-    to_prolog depth t
+    aux depth t
 end

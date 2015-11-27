@@ -192,7 +192,7 @@ module type S = sig
 
   (** {2 Conversions} *)
 
-  val to_prolog : ?depth:int -> t -> LogtkPrologTerm.t
+  val to_simple_term : ?depth:int -> t -> LogtkSTerm.t
 
   (** {2 IO} *)
 
@@ -233,7 +233,7 @@ module type TERM = sig
 
   module Set : Sequence.Set.S with type elt = t
 
-  val to_prolog : ?depth:int -> t -> LogtkPrologTerm.t
+  val to_simple_term : ?depth:int -> t -> LogtkSTerm.t
 
   include LogtkInterfaces.PRINT_DE_BRUIJN with type t := t
       and type term := t
@@ -826,37 +826,37 @@ module Make(MyT : TERM) = struct
   (** {2 Conversion} *)
 
 
-  let to_prolog ?(depth=0) f =
-    let module PT = LogtkPrologTerm in
-    let rec to_prolog depth f = match view f with
+  let to_simple_term ?(depth=0) f =
+    let module PT = LogtkSTerm in
+    let rec to_simple_term depth f = match view f with
     | True -> PT.TPTP.true_
     | False -> PT.TPTP.false_
-    | Not f' -> PT.TPTP.not_ (to_prolog depth f')
-    | And l -> PT.TPTP.and_ (List.map (to_prolog depth) l)
-    | Or l -> PT.TPTP.or_ (List.map (to_prolog depth) l)
-    | Imply (a,b) -> PT.TPTP.imply (to_prolog depth a) (to_prolog depth b)
-    | Equiv (a,b) -> PT.TPTP.equiv (to_prolog depth a) (to_prolog depth b)
-    | Xor (a,b) -> PT.TPTP.xor (to_prolog depth a) (to_prolog depth b)
-    | Eq (a,b) -> PT.TPTP.eq (MyT.to_prolog ~depth a) (MyT.to_prolog ~depth b)
-    | Neq (a,b) -> PT.TPTP.neq (MyT.to_prolog ~depth a) (MyT.to_prolog ~depth b)
-    | Atom a -> MyT.to_prolog ~depth a
+    | Not f' -> PT.TPTP.not_ (to_simple_term depth f')
+    | And l -> PT.TPTP.and_ (List.map (to_simple_term depth) l)
+    | Or l -> PT.TPTP.or_ (List.map (to_simple_term depth) l)
+    | Imply (a,b) -> PT.TPTP.imply (to_simple_term depth a) (to_simple_term depth b)
+    | Equiv (a,b) -> PT.TPTP.equiv (to_simple_term depth a) (to_simple_term depth b)
+    | Xor (a,b) -> PT.TPTP.xor (to_simple_term depth a) (to_simple_term depth b)
+    | Eq (a,b) -> PT.TPTP.eq (MyT.to_simple_term ~depth a) (MyT.to_simple_term ~depth b)
+    | Neq (a,b) -> PT.TPTP.neq (MyT.to_simple_term ~depth a) (MyT.to_simple_term ~depth b)
+    | Atom a -> MyT.to_simple_term ~depth a
     | Forall (tyvar, f') ->
       PT.TPTP.forall
         [PT.column
             (PT.var (CCFormat.sprintf "Y%d" depth))
-            (LogtkType.Conv.to_prolog ~depth tyvar)]
-        (to_prolog (depth+1) f')
+            (LogtkType.Conv.to_simple_term ~depth tyvar)]
+        (to_simple_term (depth+1) f')
     | Exists (tyvar, f') ->
       PT.TPTP.exists
         [PT.column
             (PT.var (CCFormat.sprintf "Y%d" depth))
-            (LogtkType.Conv.to_prolog ~depth tyvar)]
-        (to_prolog (depth+1) f')
+            (LogtkType.Conv.to_simple_term ~depth tyvar)]
+        (to_simple_term (depth+1) f')
     | ForallTy f' ->
       PT.TPTP.forall_ty
         [PT.var (CCFormat.sprintf "A%d" depth)]
-        (to_prolog (depth+1) f')
-    in to_prolog depth f
+        (to_simple_term (depth+1) f')
+    in to_simple_term depth f
 
   (** {2 IO} *)
 

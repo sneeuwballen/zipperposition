@@ -30,7 +30,7 @@ open Logtk
 open Logtk_arbitrary
 open QCheck
 
-module PT = PrologTerm
+module PT = STerm
 
 let check_infer_all_symbs =
   let gen = Arbitrary.(list ArTerm.PT.default) in

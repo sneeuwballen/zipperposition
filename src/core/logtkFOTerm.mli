@@ -229,7 +229,7 @@ end
 
 (** {2 Conversions} *)
 
-val to_prolog : ?depth:int -> t -> LogtkPrologTerm.t
+val to_simple_term : ?depth:int -> t -> LogtkSTerm.t
 
 (** {2 Printing/parsing} *)
 

@@ -30,7 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
   module L = ParseLocation
   module Sym = Symbol
-  module PT = PrologTerm
+  module PT = STerm
   module A = Ast_tptp.Untyped
 
   let remove_quotes s =
@@ -101,11 +101,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %nonassoc NOTVLINE
 %nonassoc NOTAND
 
-%start <Logtk.PrologTerm.t> parse_term
-%start <Logtk.PrologTerm.t> parse_formula
+%start <Logtk.STerm.t> parse_term
+%start <Logtk.STerm.t> parse_formula
 %start <Ast_tptp.Untyped.declaration> parse_declaration
 %start <Ast_tptp.Untyped.declaration list> parse_declarations
-%start <Logtk.PrologTerm.t list list> parse_answer_tuple
+%start <Logtk.STerm.t list list> parse_answer_tuple
 
 %%
 

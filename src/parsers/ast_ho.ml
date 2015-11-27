@@ -30,7 +30,7 @@ AST that holds Horn Clauses and type declarations, nothing more. *)
 
 open Logtk
 
-module PT = PrologTerm
+module PT = STerm
 
 type term = PT.t
 

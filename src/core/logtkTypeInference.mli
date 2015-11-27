@@ -102,8 +102,8 @@ module Ctx : sig
         @raise LogtkType.Error if an inconsistency (with inferred types) is
           detected. *)
 
-  val ty_of_prolog : t -> LogtkPrologTerm.t -> LogtkType.t option
-    (** LogtkType conversion from LogtkPrologTerm *)
+  val ty_of_simple_term : t -> LogtkSTerm.t -> LogtkType.t option
+    (** LogtkType conversion from LogtkSTerm *)
 
   val bind_to_default : t -> unit
     (** Free constructor variables are bound to the [default] type provided
@@ -202,7 +202,7 @@ val map_error_seq : ('a -> 'b or_error) -> 'a Sequence.t -> 'b Sequence.t or_err
       Otherwise it returns the first encountered error. *)
 
 module FO : sig
-  include S with type untyped = LogtkPrologTerm.t and type typed = LogtkFOTerm.t
+  include S with type untyped = LogtkSTerm.t and type typed = LogtkFOTerm.t
 
   type typed_form = LogtkFormula.FO.t
 
@@ -269,7 +269,7 @@ module FO : sig
 end
 
 module HO : sig
-  include S with type untyped = LogtkPrologTerm.t and type typed= LogtkHOTerm.t
+  include S with type untyped = LogtkSTerm.t and type typed= LogtkHOTerm.t
 
   val constrain : ctx:Ctx.t -> untyped -> unit or_error
     (** Constrain the term to be well-typed and of boolean type *)

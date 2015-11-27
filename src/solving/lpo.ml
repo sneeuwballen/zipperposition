@@ -421,8 +421,8 @@ module FO = struct
       l
 end
 
-module Prolog = struct
-  module T = PrologTerm
+module STerm = struct
+  module T = STerm
   type term = T.t
 
   (* constraint for a > b *)

@@ -32,7 +32,7 @@ type 'a or_error = [`Error of string | `Ok of 'a]
 
 module T = FOTerm
 module F = Formula.FO
-module PT = PrologTerm
+module PT = STerm
 module Ast = Ast_tptp
 module AU = Ast.Untyped
 module AT = Ast.Typed
@@ -282,7 +282,7 @@ module Untyped = struct
     let a = object
       inherit [Signature.t] AU.visitor
       method tydecl signature s ty =
-        match Type.Conv.of_prolog ~ctx:tyctx ty with
+        match Type.Conv.of_simple_term ~ctx:tyctx ty with
         | None -> raise (Type.Error ("expected type, got " ^ PT.to_string ty))
         | Some ty' -> Signature.declare signature (Symbol.of_string s) ty'
     end in
@@ -299,7 +299,7 @@ module Untyped = struct
       (fun i (sym, ty) ->
         let s = Symbol.to_string sym in
         let name = name i s in
-        AU.TypeDecl (name, s, Type.Conv.to_prolog ty, []))
+        AU.TypeDecl (name, s, Type.Conv.to_simple_term ty, []))
       seq
 end
 
@@ -422,12 +422,12 @@ let infer_types init decls =
         | AU.Include f -> AT.Include f
         | AU.IncludeOnly (f,l) -> AT.IncludeOnly (f,l)
         | AU.NewType (n,s,ty,g) ->
-            begin match TI.Ctx.ty_of_prolog ctx ty with
+            begin match TI.Ctx.ty_of_simple_term ctx ty with
             | None -> raise (Type.Error ("expected type, got " ^ PT.to_string ty))
             | Some ty' -> AT.NewType (n,s,ty',g)
             end
         | AU.TypeDecl(n, s, ty,g) ->
-            begin match TI.Ctx.ty_of_prolog ctx ty with
+            begin match TI.Ctx.ty_of_simple_term ctx ty with
             | None -> raise (Type.Error ("expected type, got " ^ PT.to_string ty))
             | Some ty' ->
                 TI.Ctx.declare ctx (Symbol.of_string s) ty';
@@ -464,7 +464,7 @@ let signature init decls =
   let a = object
     inherit [unit] AU.visitor
     method tydecl () s ty =
-      begin match TypeInference.Ctx.ty_of_prolog ctx ty with
+      begin match TypeInference.Ctx.ty_of_simple_term ctx ty with
       | None -> raise (Type.Error ("expected type, got " ^ PT.to_string ty))
       | Some ty' ->
         TypeInference.Ctx.declare ctx (Symbol.of_string s) ty'
@@ -486,17 +486,17 @@ let erase_types typed =
       | AT.Include f -> AU.Include f
       | AT.IncludeOnly (f,l) -> AU.IncludeOnly (f,l)
       | AT.NewType (n,s,ty,g) ->
-          AU.NewType (n,s, Type.Conv.to_prolog ty, g)
+          AU.NewType (n,s, Type.Conv.to_simple_term ty, g)
       | AT.TypeDecl(n, s, ty, g) ->
-          AU.TypeDecl (n,s, Type.Conv.to_prolog ty, g)
+          AU.TypeDecl (n,s, Type.Conv.to_simple_term ty, g)
       | AT.CNF(n,r,c,i) ->
-          let c' = List.map F.to_prolog c in
+          let c' = List.map F.to_simple_term c in
           AU.CNF(n,r,c',i)
       | AT.FOF(n,r,f,i) ->
-          let f' = F.to_prolog f in
+          let f' = F.to_simple_term f in
           AU.FOF(n,r,f',i)
       | AT.TFF(n,r,f,i) ->
-          let f' = F.to_prolog f in
+          let f' = F.to_simple_term f in
           AU.TFF(n,r,f',i)
       | AT.THF _ ->
           failwith "type conversion for HO Term: not implemented" (* TODO *)

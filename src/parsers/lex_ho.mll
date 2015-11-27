@@ -120,7 +120,7 @@ rule token = parse
     | Parse_ho.Error -> E.fail "parse error"
     | Error msg -> E.fail msg
 
-  let term_of_string s : PrologTerm.t option =
+  let term_of_string s : STerm.t option =
     try
       Some (Parse_ho.parse_term token (Lexing.from_string s))
     with Parse_ho.Error | Error _ -> None
