@@ -63,14 +63,14 @@ let make_other_opts () =
 let make opts =
   let mod_opt f = opts := f !opts in
   let l =
-    [ "-debug", Arg.Int Util.set_debug, " logtk: debug level"
-    ; "-profile", Arg.Set Util.enable_profiling, " logtk: enable profiling"
-    ; "-print-types", Arg.Unit _print_types , " print type annotations everywhere"
-    ; "-bt", Arg.Bool Printexc.record_backtrace, " enable backtraces"
-    ; "-mem-limit", Arg.Int Util.set_memory_limit, " memory limit (in MB)"
-    ; "-stats", Arg.Unit (fun () -> mod_opt (fun o -> {o with stats=true;})),
+    [ "--debug", Arg.Int Util.set_debug, " logtk: debug level"
+    ; "--profile", Arg.Set Util.enable_profiling, " logtk: enable profiling"
+    ; "--print-types", Arg.Unit _print_types , " print type annotations everywhere"
+    ; "--bt", Arg.Bool Printexc.record_backtrace, " enable backtraces"
+    ; "--mem-limit", Arg.Int Util.set_memory_limit, " memory limit (in MB)"
+    ; "--stats", Arg.Unit (fun () -> mod_opt (fun o -> {o with stats=true;})),
         " gather and print statistics"
-    ; "-print", Arg.String (fun s -> mod_opt (fun o -> {o with print_format=s;} )),
+    ; "--print", Arg.String (fun s -> mod_opt (fun o -> {o with print_format=s;} )),
         " choose printing format for terms and formulas (default \"debugf\")"
     ] @ make_other_opts ()
   in
