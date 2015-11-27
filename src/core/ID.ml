@@ -1,0 +1,28 @@
+
+(* This file is free software, part of Logtk. See file "license" for more details. *)
+
+(** {1 Unique Identifiers} *)
+
+type t = {
+  id: int;
+  name: string;
+}
+
+let make =
+  let n = ref 0 in
+  fun name ->
+    let id = !n in
+    incr n;
+    {id; name; }
+
+let copy t = make t.name
+
+let hash t = t.id
+let hash_fun t h = CCHash.int t.id h
+let equal i1 i2 = i1.id = i2.id
+let compare i1 i2 = Pervasives.compare i1.id i2.id
+
+let pp out id = CCFormat.string out id.name
+let to_string = CCFormat.to_string pp
+
+let pp_full out id = Format.fprintf out "%s/%d" id.name id.id
