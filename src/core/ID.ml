@@ -26,3 +26,16 @@ let pp out id = CCFormat.string out id.name
 let to_string = CCFormat.to_string pp
 
 let pp_full out id = Format.fprintf out "%s/%d" id.name id.id
+
+let gensym =
+  let r = ref 0 in
+  let names = "abcdefghijklmopq" in
+  fun () ->
+    let i = !r / String.length names in
+    let j = !r mod String.length names in
+    let name = if i=0
+      then CCPrint.sprintf "'_%c" names.[j]
+      else CCPrint.sprintf "'_%c%d" names.[j] i
+    in
+    incr r;
+    name

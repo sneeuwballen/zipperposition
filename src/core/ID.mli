@@ -29,6 +29,8 @@ include Interfaces.PRINT with type t := t
 val pp_full : t CCFormat.printer
 (** Prints the ID with its internal number *)
 
+val gensym : unit -> t
+(** Generate a new ID with a new, unique name *)
 
 
 

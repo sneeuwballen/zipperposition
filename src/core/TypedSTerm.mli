@@ -12,13 +12,15 @@ type t
 type term = t
 
 type view = private
-  | Var of string             (** variable *)
-  | BVar of string            (** bound variable *)
+  | Var of ID.t               (** variable *)
+  | BVar of ID.t              (** bound variable *)
   | Const of Symbol.t         (** constant *)
   | App of t * t list         (** apply term *)
-  | Bind of Symbol.t * t * t  (** bind variable in term *)
+  | Bind of Binder.t * t * t  (** bind variable in term *)
+  | AppBuiltin of Builtin.t * t list
   | Multiset of t list
   | Record of (string * t) list * t option  (** extensible record *)
+  | Meta of ID.t * t option ref (** Unification variable *)
 
 val view : t -> view
 val loc : t -> location option
@@ -39,17 +41,26 @@ val var : ?loc:location -> ?ty:t -> string -> t
 val bvar : ?loc:location -> ?ty:t -> string -> t
 val app : ?loc:location -> ?ty:t -> t -> t list -> t
 val const : ?loc:location -> ?ty:t -> Symbol.t -> t
-val bind : ?loc:location -> ?ty:t -> Symbol.t -> t -> t -> t
-val bind_list : ?loc:location -> ?ty:t -> Symbol.t -> t list -> t -> t
+val app_builtin : ?loc:location -> ?ty:t -> Builtin.t -> t list -> t
+val builtin : ?loc:location -> ?ty:t -> Builtin.t -> t
+val bind : ?loc:location -> ?ty:t -> Binder.t -> t -> t -> t
+val bind_list : ?loc:location -> ?ty:t -> Binder.t -> t list -> t -> t
 val multiset : ?loc:location -> ?ty:t -> t list -> t
+val meta : ?loc:location -> ?ty:t -> ID.t -> t
+val meta_of_string : ?loc:location -> ?ty:t -> string -> t
+val meta_full : ?loc:location -> ?ty:t -> ID.t -> t option ref -> t
 val record : ?loc:location -> ?ty:t -> (string*t) list -> rest:t option -> t
 (** Build a record with possibly a row variable.
     @raise IllFormedTerm if the [rest] is not either a record or a variable. *)
 
 val of_string : ?loc:location -> ?ty:t -> string -> t
+(** Make a constant from this string *)
+
 val of_int : ?ty:t -> int -> t
+(** Make a builtin int *)
 
 val at_loc : ?loc:location -> t -> t
+
 val with_ty : ?ty:t -> t -> t
 
 val fresh_var : ?loc:location -> ?ty:t -> unit -> t
@@ -84,6 +95,7 @@ module Seq : sig
   val subterms : t -> t Sequence.t
   val subterms_with_bound : t -> (t * Set.t) Sequence.t
   val vars : t -> t Sequence.t
+  val metas : t -> (ID.t * t option ref) Sequence.t
 end
 
 (** {2 Visitor} *)

@@ -16,17 +16,22 @@ type t = {
   loc : location option;
 }
 and view =
-  | Var of string             (** variable *)
-  | BVar of string            (** bound variable *)
+  | Var of ID.t               (** variable *)
+  | BVar of ID.t              (** bound variable *)
   | Const of Symbol.t         (** constant *)
   | App of t * t list         (** apply term *)
-  | Bind of Symbol.t * t * t  (** bind variable in term *)
+  | Bind of Binder.t * t * t  (** bind variable in term *)
+  | AppBuiltin of Builtin.t * t list
   | Multiset of t list
   | Record of (string * t) list * t option  (** extensible record *)
+  | Meta of ID.t * t option ref (** Unification variable *)
 
 type term = t
 
-let view t = t.term
+let rec view t = match t.term with
+  | Meta (_, {contents=Some t'}) -> view t'
+  | _ -> t.term
+
 let loc t = t.loc
 let ty t = t.ty
 
@@ -42,10 +47,12 @@ let __to_int = function
   | Bind _ -> 5
   | Multiset _ -> 6
   | Record _ -> 7
+  | AppBuiltin _ -> 8
+  | Meta _ -> 9
 
-let rec compare t1 t2 = match t1.term, t2.term with
+let rec compare t1 t2 = match view t1, view t2 with
   | Var s1, Var s2
-  | BVar s1, BVar s2 -> String.compare s1 s2
+  | BVar s1, BVar s2 -> ID.compare s1 s2
   | Const s1, Const s2 -> Symbol.compare s1 s2
   | App (s1,l1), App (s2, l2) ->
       CCOrd.(
@@ -54,9 +61,14 @@ let rec compare t1 t2 = match t1.term, t2.term with
       )
   | Bind (s1, v1, t1), Bind (s2, v2, t2) ->
       CCOrd.(
-        Symbol.compare s1 s2
+        Binder.compare s1 s2
         <?> (compare, v1, v2)
         <?> (compare, t1, t2)
+      )
+  | AppBuiltin (b1,l1), AppBuiltin (b2,l2) ->
+      CCOrd.(
+        Builtin.compare b1 b2
+        <?> (CCOrd.list_ compare, l1, l2)
       )
   | Multiset l1, Multiset l2 ->
       let l1 = List.sort compare l1 and l2 = List.sort compare l2 in
@@ -66,12 +78,15 @@ let rec compare t1 t2 = match t1.term, t2.term with
         CCOpt.compare compare rest1 rest2
         <?> (cmp_fields, l1, l2)
       )
+  | Meta (id1,_), Meta (id2,_) -> ID.compare id1 id2
   | Var _, _
   | BVar _, _
   | Const _, _
   | App _, _
   | Bind _, _
   | Multiset _, _
+  | AppBuiltin _, _
+  | Meta _, _
   | Record _, _ -> __to_int t1.term - __to_int t2.term
 and cmp_field x y = CCOrd.pair String.compare compare x y
 and cmp_fields x y = CCOrd.list_ cmp_field x y
@@ -79,17 +94,20 @@ and cmp_fields x y = CCOrd.list_ cmp_field x y
 let equal t1 t2 = compare t1 t2 = 0
 
 let rec hash_fun t h = match t.term with
-  | Var s -> h |> Hash.string_ "var" |> Hash.string_ s
-  | BVar s -> h |> Hash.string_ "bvar" |> Hash.string_ s
+  | Var s -> h |> Hash.string_ "var" |> ID.hash_fun s
+  | BVar s -> h |> Hash.string_ "bvar" |> ID.hash_fun s
   | Const s -> h |> Hash.string_ "const" |> Symbol.hash_fun s
   | App (s, l) -> h |> Hash.string_ "app" |> hash_fun s |> Hash.list_ hash_fun l
   | Multiset l ->
     h |> Hash.string_ "multiset" |> Hash.list_ hash_fun l
+  | AppBuiltin (b,l) ->
+    h |> Builtin.hash_fun b |> Hash.list_ hash_fun l
   | Bind (s,v,t') ->
-    h |> Symbol.hash_fun s |> hash_fun t' |> hash_fun v
+    h |> Binder.hash_fun s |> hash_fun t' |> hash_fun v
   | Record (l, rest) ->
     h |> Hash.opt hash_fun rest
       |> Hash.list_ (fun (n,t) h -> Hash.string_ n (hash_fun t h)) l
+  | Meta (id,_) -> ID.hash_fun id h
 
 let hash x = Hash.apply hash_fun x
 
@@ -98,7 +116,7 @@ let _pp_list p buf l = CCFormat.list ~start:"" ~stop:"" ~sep:", " p buf l
 let rec pp out t = match view t with
   | Var s
   | BVar s ->
-      CCFormat.string out s;
+      ID.pp out s;
       begin match ty t with
       | None -> ()
       | Some ty -> Format.fprintf out ":%a" _pp_inner ty
@@ -106,16 +124,27 @@ let rec pp out t = match view t with
   | Const s -> Symbol.pp out s
   | App (_, []) -> assert false
   | App (f, l) ->
-      Format.fprintf out "%a(%a)" _pp_inner f (_pp_list pp) l
+      Format.fprintf out "@[<2>%a@ %a@]" _pp_inner f (Util.pp_list ~sep:" " pp) l
   | Bind (s, v, t) ->
-      Format.fprintf out "%a %a. %a" Symbol.pp s _pp_inner v _pp_inner t
+      Format.fprintf out "@[<2>%a %a.@ %a@]" Binder.pp s _pp_inner v _pp_inner t
   | Record (l, None) ->
       Format.fprintf out "{%a}" (_pp_list _pp_field) l
   | Record (l, Some r) ->
       Format.fprintf out "{%a | %a}" (_pp_list _pp_field) l pp r
+  | AppBuiltin (b, [a]) when Builtin.is_prefix b ->
+    Format.fprintf out "@[%a %a@]" Builtin.pp b pp a
+  | AppBuiltin (b, [t1;t2]) when Builtin.is_infix b ->
+    Format.fprintf out "@[<2>%a@ %a@ %a@]" pp t1 Builtin.pp b pp t2
+  | AppBuiltin (b, l) ->
+    Format.fprintf out "@[%a(%a)@]" Builtin.pp b (Util.pp_list pp) l
   | Multiset l ->
       Format.fprintf out "[%a]" (_pp_list _pp_inner) l
+  | Meta (id, r) ->
+      assert (!r = None);
+      Format.fprintf out "?%a" ID.pp id
 and _pp_inner buf t = match view t with
+  | AppBuiltin (_, _::_)
+  | App _
   | Bind _ -> Format.fprintf buf "(%a)" pp t  (* avoid ambiguities *)
   | _ -> pp buf t
 and _pp_field buf (name,t) =
@@ -126,10 +155,15 @@ exception IllFormedTerm of string
 let _make ?loc ?ty view = {term=view; loc; ty; }
 
 let var ?loc ?ty s = _make ?loc ?ty (Var s)
-
 let bvar ?loc ?ty s = _make ?loc ?ty (BVar s)
-
 let const ?loc ?ty s = _make ?loc ?ty (Const s)
+let app_builtin ?loc ?ty b l = _make ?loc ?ty (AppBuiltin (b,l))
+let builtin ?loc ?ty b = _make ?loc ?ty (AppBuiltin (b,[]))
+let meta ?loc ?ty id = _make ?loc ?ty (Meta (id, ref None))
+let meta_of_string ?loc ?ty name = _make ?loc ?ty (Meta (ID.make name, ref None))
+
+let meta_full ?loc ?ty id r =
+  _make ?loc ?ty (Meta (id,r))
 
 let app ?loc ?ty s l = match l with
   | [] -> s
@@ -163,32 +197,20 @@ let record ?loc ?ty l ~rest =
 let at_loc ?loc t = {t with loc; }
 let with_ty ?ty t = {t with ty; }
 
-let of_int ?ty i = const ?ty (Symbol.of_int i)
+let of_int ?ty i = builtin ?ty (Builtin.of_int i)
 let of_string ?loc ?ty s = const ?loc ?ty (Symbol.of_string s)
 
-let tType = const Symbol.Base.tType
-let wildcard = const Symbol.Base.wildcard
+let tType = builtin Builtin.tType
+let wildcard = builtin Builtin.wildcard
 
-let _gensym =
-  let r = ref 0 in
-  let names = "abcdefghijklmopq" in
-  fun () ->
-    let i = !r / String.length names in
-    let j = !r mod String.length names in
-    let name = if i=0
-      then CCPrint.sprintf "'_%c" names.[j]
-      else CCPrint.sprintf "'_%c%d" names.[j] i
-    in
-    incr r;
-    name
-
-let fresh_var ?loc ?ty () = var ?loc ?ty (_gensym ())
-let fresh_bvar ?loc ?ty () = bvar ?loc ?ty (_gensym ())
+let fresh_var ?loc ?ty () = var ?loc ?ty (ID.gensym ())
+let fresh_bvar ?loc ?ty () = bvar ?loc ?ty (ID.gensym ())
 
 (** {2 Utils} *)
 
 let is_var = function | {term=Var _; _} -> true | _ -> false
 let is_bvar = function | {term=BVar _; _} -> true | _ -> false
+let is_meta t = match view t with Meta _ -> true | _ -> false
 
 let rec ground t =
   CCOpt.maybe ground true t.ty
@@ -198,12 +220,14 @@ let rec ground t =
   | BVar _
   | Const _ -> true
   | App (f, l) -> ground f && List.for_all ground l
+  | AppBuiltin (_,l) -> List.for_all ground l
   | Bind (_, v, t') -> ground v && ground t'
   | Record (l, rest) ->
       CCOpt.maybe ground true rest
       &&
       List.for_all (fun (_,t') -> ground t') l
   | Multiset l -> List.for_all ground l
+  | Meta (_,_) -> false
 
 module Set = Sequence.Set.Make(struct type t = term let compare = compare end)
 module Map = Sequence.Map.Make(struct type t = term let compare = compare end)
@@ -215,6 +239,7 @@ module Seq = struct
       k t;
       CCOpt.iter iter t.ty;
       match t.term with
+      | Meta _
       | Var _
       | BVar _
       | Const _ -> ()
@@ -223,16 +248,25 @@ module Seq = struct
       | Record (l, rest) ->
           CCOpt.iter iter rest;
           List.iter (fun (_,t) -> iter t) l
+      | AppBuiltin (_,l)
       | Multiset l -> List.iter iter l
     in iter t
 
   let vars t = subterms t |> Sequence.filter is_var
+
+  let metas t =
+    subterms t
+      |> Sequence.filter_map
+        (fun t -> match view t with
+          | Meta (a,r) -> assert (!r=None); Some (a, r)
+          | _ -> None)
 
   let subterms_with_bound t k =
     let rec iter set t =
       k (t,set);
       CCOpt.iter (iter set) t.ty;
       match t.term with
+      | Meta _
       | Var _
       | BVar _
       | Const _ -> ()
@@ -243,64 +277,12 @@ module Seq = struct
       | Record (l, rest) ->
           CCOpt.iter (iter set) rest;
           List.iter (fun (_,t) -> iter set t) l
+      | AppBuiltin (_,l)
       | Multiset l -> List.iter (iter set) l
     in iter Set.empty t
 end
 
 let vars t = Seq.vars t |> Set.of_seq |> Set.to_list
-
-module Visitor = struct
-  type 'a t = {
-    var : term -> ?loc:location -> ?ty:'a -> string -> 'a;
-    bvar : term -> ?loc:location -> ?ty:'a -> string -> 'a;
-    app : term -> ?loc:location -> ?ty:'a -> 'a -> 'a list -> 'a;
-    const : term -> ?loc:location -> ?ty:'a -> Symbol.t -> 'a;
-    bind : term -> ?loc:location -> ?ty:'a -> Symbol.t -> 'a -> 'a -> 'a;
-    multiset : term -> ?loc:location -> ?ty:'a -> 'a list -> 'a;
-    record : term -> ?loc:location -> ?ty:'a ->
-            (string*'a) list -> 'a option -> 'a;
-  }
-
-  let apply ~visitor t =
-    let rec _apply t =
-      let ty = CCOpt.map _apply t.ty in
-      let loc = t.loc in
-      match t.term with
-      | Var s -> visitor.var t ?loc ?ty s
-      | BVar s -> visitor.bvar t ?loc ?ty s
-      | App (f,l) -> visitor.app t ?loc ?ty (_apply f) (_apply_list l)
-      | Const s -> visitor.const t ?loc ?ty s
-      | Bind (s, v, t) ->
-          visitor.bind t ?loc ?ty s (_apply v) (_apply t)
-      | Multiset l -> visitor.multiset t ?loc ?ty (_apply_list l)
-      | Record (l, rest) ->
-          visitor.record t ?loc ?ty
-            (List.map (fun (n,t) -> n, _apply t) l)
-            (CCOpt.map _apply rest)
-    and _apply_list l = List.map _apply l
-    in
-    _apply t
-
-  let id = {
-    var=CCFun.const var; bvar=CCFun.const bvar;
-    const=CCFun.const const; app=CCFun.const app; bind=CCFun.const bind;
-    multiset=CCFun.const multiset;
-    record=(fun _t ?loc ?ty l rest -> record ?loc ?ty l ~rest);
-  }
-
-  let _id x = x
-  let _opt o = CCOpt.maybe _id true o
-  let _true _ ?loc:_ ?ty _ = _opt ty
-
-  let for_all = {
-    var=_true; const=_true; bvar=_true;
-    app=(fun _ ?loc:_ ?ty f l -> _opt ty && f && List.for_all _id l);
-    bind=(fun _ ?loc:_ ?ty _ v t -> _opt ty && v && t);
-    multiset=(fun _ ?loc:_ ?ty l -> _opt ty && List.for_all _id l);
-    record=(fun _ ?loc:_ ?ty l rest -> _opt ty && _opt rest
-      && List.for_all snd l)
-  }
-end
 
 let closed t =
   Seq.subterms_with_bound t
@@ -336,7 +318,7 @@ module Subst = struct
 
   let rec eval_head subst t =
     let ty = CCOpt.map (eval_head subst) t.ty in
-    match t.term with
+    match view t with
     | Var _ ->
         begin try
           let t' = Map.find t subst in
@@ -347,13 +329,15 @@ module Subst = struct
     | BVar _
     | Const _
     | App _
+    | AppBuiltin _
     | Bind _
     | Record _
+    | Meta _
     | Multiset _ -> with_ty ?ty t
 
   let rec eval subst t =
     let ty = CCOpt.map (eval subst) t.ty in
-    match t.term with
+    match view t with
     | Var _ ->
         begin try
           let t' = Map.find t subst in
@@ -367,12 +351,16 @@ module Subst = struct
         app ?loc:t.loc ?ty (eval subst f) (eval_list subst l)
     | Bind (s, v, t) ->
         bind ?loc:t.loc ?ty s (eval subst v) (eval subst t)
+    | AppBuiltin (b,l) ->
+        app_builtin ?loc:t.loc ?ty b (eval_list subst l)
     | Record (l, rest) ->
         record ?loc:t.loc ?ty
           (List.map (CCPair.map2 (eval subst)) l)
           ~rest:(CCOpt.map (eval subst) rest)
     | Multiset l ->
         multiset ?loc:t.loc ?ty (eval_list subst l)
+    | Meta (id,r) ->
+        meta_full ?loc:t.loc ?ty id r
   and eval_list subst l = List.map (eval subst) l
 end
 
@@ -392,19 +380,22 @@ let _pp_failure out (t1,t2,subst) =
 let _fail_unif t1 t2 subst = raise (UnifyFailure (t1,t2,subst))
 
 let occur_check_ ~subst v t =
-  assert (is_var v);
+  assert (is_var v || is_meta v);
   let rec check t =
+    v == t ||
     CCOpt.maybe check false t.ty ||
     match view (Subst.eval_head subst t) with
-    | Var _
-    | BVar _
-    | Const _ -> false
-    | App (f, l) -> check f || List.exists check l
-    | Bind (_, v, t) -> check v || check t
-    | Multiset l -> List.exists check l
-    | Record (l, rest) ->
-        CCOpt.maybe check false rest ||
-        List.exists (fun (_,t) -> check t) l
+      | Meta _
+      | Var _ -> equal v t
+      | BVar _
+      | Const _ -> false
+      | App (f, l) -> check f || List.exists check l
+      | Bind (_, v, t) -> check v || check t
+      | AppBuiltin (_,l)
+      | Multiset l -> List.exists check l
+      | Record (l, rest) ->
+          CCOpt.maybe check false rest ||
+          List.exists (fun (_,t) -> check t) l
   in
   check t
 
@@ -417,7 +408,7 @@ let rec _unify_exn subst t1 t2 =
     | Some _, None
     | None, Some _ -> _fail_unif t1 t2 subst
   in
-  match t1.term, t2.term with
+  match view t1, view t2 with
   | Var _, _ ->
       if occur_check_ ~subst t1 t2 || not (closed t2)
         then _fail_unif t1 t2 subst
@@ -426,11 +417,17 @@ let rec _unify_exn subst t1 t2 =
       if occur_check_ ~subst t2 t1 || not (closed t1)
         then _fail_unif t1 t2 subst
         else Subst.add subst t2 t1
+  | Meta (i1,_), Meta (i2,_) ->
+      if ID.equal i1 i2 then subst else _fail_unif t1 t2 subst
   | BVar i, BVar j ->
       if i=j then subst else _fail_unif t1 t2 subst
   | App (f1,l1), App (f2,l2) when List.length l1=List.length l2 ->
       let subst = _unify_exn subst f1 f2 in
       _unify_list subst l1 l2
+  | AppBuiltin (b1,l1), AppBuiltin (b2,l2) when List.length l1=List.length l2 ->
+      if Builtin.equal b1 b2
+        then _unify_list subst l1 l2
+        else _fail_unif t1 t2 subst
   | Multiset l1, Multiset l2 when List.length l1 = List.length l2 ->
       (* unification is n-ary, so we choose the first satisfying subst, if any *)
       _unify_multi subst l1 l2
@@ -445,12 +442,14 @@ let rec _unify_exn subst t1 t2 =
       let fail() = _fail_unif t1 t2 subst in
       let subst = _unify_record_rest subst ~fail ?ty:t1.ty r2 rest1 in
       _unify_record_rest subst ~fail ?ty:t2.ty r1 rest2
+  | Meta _, _
   | BVar _, _
   | Const _, _
   | App _, _
   | Bind _, _
   | Multiset _, _
-  | Record _, _ -> _fail_unif t1 t2 subst
+  | Record _, _
+  | AppBuiltin _, _ -> _fail_unif t1 t2 subst
 and _unify_list subst l1 l2 =
   List.fold_left2 _unify_exn subst l1 l2
 and _unify_multi subst l1 l2 k = match l1 with
@@ -500,5 +499,5 @@ let unify ?(subst=Subst.empty) t1 t2 =
   try CCError.return (_unify_exn subst t1 t2)
   with UnifyFailure (t1,t2,subst) ->
     CCError.fail
-      (CCFormat.sprintf "could not unify %a and %a (in context %a)"
+      (CCFormat.sprintf "@[<2>could not unify@ `@[%a@]`@ and `@[%a@]`@ (in context @[%a@])"
         pp t1 pp t2 Subst.pp subst)
