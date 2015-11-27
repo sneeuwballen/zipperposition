@@ -30,6 +30,7 @@
 
 ## Ideas
 
+- merge definitional rewriting and demodulation
 - how to deal with definitions:
   * Build a symbol dependency graph such that if `f x y := t[x,y]` is non-recursive,
     then `f -> g` is in the graph for every symbol `g ∈ t`. Then, a DFS on
@@ -40,3 +41,13 @@
     computing precedences.
   * For inductive symbols, `n := 0 | succ(n2)` could be dealt with this way,
     by using possibly negative levels and enforcing `level(n2) = level(n)-1`.
+- AVATAR:
+  * store locks in each clause, and keep a map `b_lit -> clauses it locks`
+    for efficiently retrieving clauses that might be unlocked when this lit
+    changes
+  * store interpretation as a `b_lit set`
+  * compute difference between current and previous interpretation, and
+    check whether the corresponding clauses are unlocked.
+  * keep locked clauses in term indices! Makes model changes less costly
+    (maybe this should be an option, performance impact unclear)
+
