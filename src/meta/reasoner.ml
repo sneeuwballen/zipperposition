@@ -54,7 +54,7 @@ module Clause = struct
   let safe head body =
     let vars_body = Sequence.flatMap HOT.Seq.vars (Sequence.of_list body) in
     HOT.Seq.vars head
-      |> Sequence.for_all (fun v -> Sequence.exists (HOT.eq v) vars_body)
+      |> Sequence.for_all (fun v -> Sequence.exists (HOT.equal v) vars_body)
 
   let rule head body =
     if not (safe head body) then
@@ -67,9 +67,9 @@ module Clause = struct
 
   let is_fact t = t.body = []
 
-  let eq c1 c2 =
-    HOT.eq c1.head c2.head &&
-    (try List.for_all2 HOT.eq c1.body c2.body with Invalid_argument _ -> false)
+  let equal c1 c2 =
+    HOT.equal c1.head c2.head &&
+    (try List.for_all2 HOT.equal c1.body c2.body with Invalid_argument _ -> false)
 
   let pop_body c = match c.body with
     | [] -> failwith "Clause.pop_body"
@@ -89,10 +89,10 @@ module Clause = struct
   let hash_fun c h = CCHash.seq HOT.hash_fun (Seq.terms c) h
   let hash c = CCHash.apply hash_fun c
 
-  let cmp c1 c2 =
-    let c = HOT.cmp c1.head c2.head in
+  let compare c1 c2 =
+    let c = HOT.compare c1.head c2.head in
     if c = 0
-      then CCOrd.list_ HOT.cmp c1.body c2.body
+      then CCOrd.list_ HOT.compare c1.body c2.body
       else c
 
   let pp out c = match c.body with
@@ -103,12 +103,12 @@ module Clause = struct
 
   module Set = Sequence.Set.Make(struct
     type t = clause
-    let compare = cmp
+    let compare = compare
   end)
 
   module Map = Sequence.Map.Make(struct
     type t = clause
-    let compare = cmp
+    let compare = compare
   end)
 end
 

@@ -43,7 +43,7 @@ let check_unify_gives_unifier =
       let renaming = S.Renaming.create () in
       let t1' = S.FO.apply ~renaming subst t1 0 in
       let t2' = S.FO.apply ~renaming subst t2 1 in
-      T.eq t1' t2'
+      T.equal t1' t2'
     with Unif.Fail ->
       Prop.assume false;
       true
@@ -71,7 +71,7 @@ let check_matching =
       let renaming = S.Renaming.create () in
       let t1' = S.FO.apply ~renaming subst t1 0 in
       let t2' = S.FO.apply ~renaming subst t2 1 in
-      T.eq t1' t2' && Unif.FO.are_variant t2 t2'
+      T.equal t1' t2' && Unif.FO.are_variant t2 t2'
     with Unif.Fail ->
       Prop.assume false;
       true

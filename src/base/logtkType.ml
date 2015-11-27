@@ -52,7 +52,7 @@ let view t = match T.kind t with
     | T.Var i -> Var i
     | T.BVar i -> BVar i
     | T.Bind (LogtkSymbol.Conn LogtkSymbol.ForallTy, varty, t') ->
-      assert (T.eq varty T.tType);
+      assert (T.equal varty T.tType);
       Forall t'
     | T.Const s -> App (s, [])
     | T.SimpleApp (LogtkSymbol.Conn LogtkSymbol.Arrow, [l;r]) -> Fun (l, r)
@@ -64,8 +64,8 @@ let view t = match T.kind t with
 
 let hash_fun = T.hash_fun
 let hash = T.hash
-let eq = T.eq
-let cmp = T.cmp
+let equal = T.equal
+let compare = T.compare
 
 let is_var ty = match view ty with | Var _ -> true | _ -> false
 let is_bvar ty = match view ty with | BVar _ -> true | _ -> false
@@ -193,7 +193,7 @@ let _error msg = raise (Error msg)
 let apply ty arg =
   match T.view ty with
   | T.SimpleApp(LogtkSymbol.Conn LogtkSymbol.Arrow, [arg'; ret]) ->
-    if eq arg arg'
+    if equal arg arg'
     then ret
     else
       let msg = CCFormat.sprintf
@@ -254,7 +254,7 @@ module TPTP = struct
 
   let pp out t = pp_tstp_rec 0 out t
 
-  let pp_depth ?hooks depth out t = pp_tstp_rec depth out t
+  let pp_depth ?hooks:_ depth out t = pp_tstp_rec depth out t
 
   let to_string = CCFormat.to_string pp
 end

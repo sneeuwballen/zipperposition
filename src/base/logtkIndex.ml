@@ -185,7 +185,7 @@ type lits = (bool * term Sequence.t) Sequence.t
 module type CLAUSE = sig
   type t
 
-  val cmp : t -> t -> int
+  val compare : t -> t -> int
     (** Compare two clauses *)
 
   val to_lits : t -> lits
@@ -296,8 +296,8 @@ module BasicEquation = struct
   type t = T.t * T.t
   type rhs = T.t
   let compare (l1,r1)(l2,r2) =
-    let c = T.cmp l1 l2 in
-    if c <> 0 then c else T.cmp r1 r2
+    let c = T.compare l1 l2 in
+    if c <> 0 then c else T.compare r1 r2
   let extract (l,r) = l,r,true
   let priority _ = 1
 end

@@ -45,9 +45,9 @@ and step = {
   esa : bool;  (** Equisatisfiable step? *)
 }
 
-val eq : t -> t -> bool
+val equal : t -> t -> bool
 val hash : t -> int
-val cmp : t -> t -> int
+val compare : t -> t -> int
 
 val mk_f_axiom : id:id -> form -> file:string -> name:string -> t
 val mk_c_axiom : id:id -> clause -> file:string -> name:string -> t

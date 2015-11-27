@@ -119,7 +119,7 @@ module Make(C : LogtkIndex.CLAUSE) = struct
       let symbs_depths = T.Seq.subterms_depth t
         |> Sequence.fmap
           (fun (t,depth) -> match T.Classic.view t with
-            | T.Classic.App (s, _, _) when LogtkSymbol.eq s symb -> Some depth
+            | T.Classic.App (s, _, _) when LogtkSymbol.equal s symb -> Some depth
             | _ -> None)
       in
       match Sequence.max symbs_depths with
@@ -160,7 +160,7 @@ module Make(C : LogtkIndex.CLAUSE) = struct
 
   module CSet = Set.Make(struct
     type t = C.t
-    let compare = C.cmp
+    let compare = C.compare
   end)
 
   type trie =
@@ -246,7 +246,7 @@ module Make(C : LogtkIndex.CLAUSE) = struct
           | LogtkType.NoArity -> 0
           | LogtkType.Arity (_, i) -> i
           in
-          if LogtkType.eq ty LogtkType.TPTP.o
+          if LogtkType.equal ty LogtkType.TPTP.o
             then features := [1 + arity, Feature.count_symb_plus s;
                               1 + arity, Feature.count_symb_minus s]
                               @ !features

@@ -42,7 +42,7 @@ let check_cnf_idempotent =
     Prop.assume (Cnf.is_cnf f);
     match Cnf.cnf_of f with
     | [] -> F.is_trivial f
-    | [[f']] -> F.eq f f'
+    | [[f']] -> F.equal f f'
     | _ -> false
   in
   mk_test ~name ~pp gen prop

@@ -64,36 +64,36 @@ let __to_int = function
   | Record _ -> 8
   | Column _ -> 9
 
-let rec cmp t1 t2 = match t1.term, t2.term with
+let rec compare t1 t2 = match t1.term, t2.term with
   | Var s1, Var s2 -> String.compare s1 s2
   | Int i1, Int i2 -> Z.compare i1 i2
   | Rat n1, Rat n2 -> Q.compare n1 n2
-  | Const s1, Const s2 -> Sym.cmp s1 s2
+  | Const s1, Const s2 -> Sym.compare s1 s2
   | App (s1,l1), App (s2, l2) ->
-    let c = cmp s1 s2 in
+    let c = compare s1 s2 in
     if c = 0
-    then CCOrd.list_ cmp l1 l2
+    then CCOrd.list_ compare l1 l2
     else c
   | Syntactic (s1,l1), Syntactic (s2,l2) ->
-    let c = Sym.cmp s1 s2 in
+    let c = Sym.compare s1 s2 in
     if c = 0
-    then CCOrd.list_ cmp l1 l2
+    then CCOrd.list_ compare l1 l2
     else c
   | Bind (s1, v1, t1), Bind (s2, v2, t2) ->
-    let c = Sym.cmp s1 s2 in
+    let c = Sym.compare s1 s2 in
     if c = 0
     then
-      let c' = cmp t1 t2 in
+      let c' = compare t1 t2 in
       if c' = 0
-      then CCOrd.list_ cmp v1 v2
+      then CCOrd.list_ compare v1 v2
       else c'
     else c
   | Column (x1,y1), Column (x2,y2) ->
-    let c = cmp x1 x2 in
-    if c = 0 then cmp y1 y2 else c
+    let c = compare x1 x2 in
+    if c = 0 then compare y1 y2 else c
   | _ -> __to_int t1.term - __to_int t2.term
 
-let eq t1 t2 = cmp t1 t2 = 0
+let equal t1 t2 = compare t1 t2 = 0
 
 let rec hash_fun t h = match t.term with
   | Var s -> Hash.string_ s h
@@ -143,17 +143,17 @@ let is_var = function | {term=Var _; _} -> true | _ -> false
 
 module Set = Sequence.Set.Make(struct
   type t = term
-  let compare = cmp
+  let compare = compare
 end)
 module Map = Sequence.Map.Make(struct
   type t = term
-  let compare = cmp
+  let compare = compare
 end)
 
 module Tbl = Hashtbl.Make(struct
   type t = term
   let hash = hash
-  let equal = eq
+  let equal = equal
 end)
 
 module Seq = struct
@@ -222,8 +222,8 @@ let close_all s t =
   bind s vars t
 
 let subterm ~strict t ~sub =
-  (not strict && eq t sub)
-  || Sequence.exists (eq sub) (Seq.subterms t)
+  (not strict && equal t sub)
+  || Sequence.exists (equal sub) (Seq.subterms t)
 
 let rec pp out t = match t.term with
   | Var s -> CCFormat.string out s
@@ -386,7 +386,7 @@ module TPTP = struct
     | Record _ -> failwith "cannot print records in TPTP"
     | Column(x,y) ->
         begin match view y with
-        | Const s when Sym.eq s Sym.TPTP.i ->
+        | Const s when Sym.equal s Sym.TPTP.i ->
           pp out x  (* do not print X:$i *)
         | _ ->
           pp out x;
@@ -396,7 +396,7 @@ module TPTP = struct
   and pp_typed_var out t = match t.term with
     | Column ({term=Var s; _}, {term=Const (Sym.Conn Sym.TType); _})
     | Var s -> CCFormat.string out s
-    | Column ({term=Var s; _}, {term=Const sy; _}) when Sym.eq sy Sym.TPTP.i ->
+    | Column ({term=Var s; _}, {term=Const sy; _}) when Sym.equal sy Sym.TPTP.i ->
         CCFormat.string out s
     | Column ({term=Var s; _}, ty) ->
       Format.fprintf out "%s:%a" s pp ty

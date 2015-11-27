@@ -274,21 +274,21 @@ module BalancedInt = struct
   let rec convert_term t =
     let hd, tyargs, args = T.open_app t in
     match T.view hd, args with
-    | T.Const s, [a;b] when Symbol.eq s SA.sum ->
+    | T.Const s, [a;b] when Symbol.equal s SA.sum ->
         T.app __z_plus [convert_term a; convert_term b]
-    | T.Const s, [a;b] when Symbol.eq s SA.difference ->
+    | T.Const s, [a;b] when Symbol.equal s SA.difference ->
         T.app __z_minus [convert_term a; convert_term b]
-    | T.Const s, [a;b] when Symbol.eq s SA.product ->
+    | T.Const s, [a;b] when Symbol.equal s SA.product ->
         T.app __z_mult [convert_term a; convert_term b]
-    | T.Const s, [a] when Symbol.eq s SA.uminus ->
+    | T.Const s, [a] when Symbol.equal s SA.uminus ->
         T.app __z_opp [convert_term a]
-    | T.Const s, [a;b] when Symbol.eq s SA.less ->
+    | T.Const s, [a;b] when Symbol.equal s SA.less ->
         __mk_istrue (T.app __z_less [convert_term a; convert_term b])
-    | T.Const s, [a;b] when Symbol.eq s SA.lesseq ->
+    | T.Const s, [a;b] when Symbol.equal s SA.lesseq ->
         __mk_istrue (T.app __z_lesseq [convert_term a; convert_term b])
-    | T.Const s, [a;b] when Symbol.eq s SA.greater ->
+    | T.Const s, [a;b] when Symbol.equal s SA.greater ->
         __mk_istrue (T.app __z_greater [convert_term a; convert_term b])
-    | T.Const s, [a;b] when Symbol.eq s SA.greatereq ->
+    | T.Const s, [a;b] when Symbol.equal s SA.greatereq ->
         __mk_istrue (T.app __z_greatereq [convert_term a; convert_term b])
     | T.Const (Symbol.Int n), [] ->
         (* convert integer literal *)
@@ -417,7 +417,7 @@ let _standard_tptp_ty ty =
   Type.Seq.sub ty
     |> Sequence.for_all
       (fun ty -> match Type.view ty with
-        | Type.App (s, _) -> Symbol.eq s Symbol.TPTP.i || Symbol.eq s Symbol.TPTP.o
+        | Type.App (s, _) -> Symbol.equal s Symbol.TPTP.i || Symbol.equal s Symbol.TPTP.o
         | _ -> true)
 
 (* type declarations to pre-prend *)

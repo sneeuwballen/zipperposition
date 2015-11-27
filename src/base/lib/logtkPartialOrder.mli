@@ -37,7 +37,7 @@ module type S = LogtkPartialOrder_intf.S
 module type ELEMENT = sig
   type t
 
-  val eq : t -> t -> bool
+  val equal : t -> t -> bool
     (** Equality function on elements *)
 
   val hash : t -> int

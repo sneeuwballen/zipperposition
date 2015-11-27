@@ -48,7 +48,7 @@ let find_exn signature s =
 let declare signature symb ty =
   try
     let ty' = find_exn signature symb in
-    if LogtkType.eq ty ty'
+    if LogtkType.equal ty ty'
       then signature  (* ok *)
       else
         let msg = CCFormat.sprintf "type error for %a: %a and %a are incompatible"
@@ -77,7 +77,7 @@ let merge s1 s2 =
     (fun s t1 t2 -> match t1, t2 with
       | None, None -> None (* ?? *)
       | Some ty1, Some ty2 ->
-        if LogtkType.eq ty1 ty2
+        if LogtkType.equal ty1 ty2
           then Some ty1
           else
             let msg =
@@ -147,8 +147,8 @@ let to_string = CCFormat.to_string pp
 module TPTP = struct
   let is_bool signature s =
     let rec _is_bool_ty ty = match LogtkType.view ty with
-      | LogtkType.Fun (ret, _)  when LogtkType.eq ret LogtkType.TPTP.o -> true
-      | _ when LogtkType.eq ty LogtkType.TPTP.o -> true
+      | LogtkType.Fun (ret, _)  when LogtkType.equal ret LogtkType.TPTP.o -> true
+      | _ when LogtkType.equal ty LogtkType.TPTP.o -> true
       | LogtkType.Forall ty' -> _is_bool_ty ty'
       | _ -> false
     in _is_bool_ty (find_exn signature s)

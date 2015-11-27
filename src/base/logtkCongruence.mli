@@ -102,7 +102,7 @@ end
 module type TERM = sig
   type t
 
-  val eq : t -> t -> bool
+  val equal : t -> t -> bool
     (** Syntactic equality on terms *)
 
   val hash : t -> int

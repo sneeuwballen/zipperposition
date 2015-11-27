@@ -255,8 +255,8 @@ module Make(MyT : TERM) = struct
 
   type form = t
 
-  let eq = T.eq
-  let cmp = T.cmp
+  let equal = T.equal
+  let compare = T.compare
   let hash = T.hash
   let hash_fun = T.hash_fun
 
@@ -301,7 +301,7 @@ module Make(MyT : TERM) = struct
           Forall (LogtkType.of_term_exn varty, f')
       | T.Bind (Sym.Conn Sym.Exists, varty, f') ->
           Exists (LogtkType.of_term_exn varty, f')
-      | T.Bind (Sym.Conn Sym.ForallTy, ty, f') when T.eq ty T.tType->
+      | T.Bind (Sym.Conn Sym.ForallTy, ty, f') when T.equal ty T.tType->
           ForallTy f'
       | _ -> assert false
       end
@@ -327,18 +327,18 @@ module Make(MyT : TERM) = struct
 
   module Tbl = Hashtbl.Make(struct
     type t = form
-    let equal = eq
+    let equal = equal
     let hash = hash
   end)
 
   module Set = Sequence.Set.Make(struct
     type t = form
-    let compare = cmp
+    let compare = compare
   end)
 
   module Map = Sequence.Map.Make(struct
     type t = form
-    let compare = cmp
+    let compare = compare
   end)
 
   (* "type" of a formula *)
@@ -355,7 +355,7 @@ module Make(MyT : TERM) = struct
 
     let check_same_ t1 t2 =
       let ty1 = MyT.ty t1 and ty2 = MyT.ty t2 in
-      if not (LogtkType.eq ty1 ty2)
+      if not (LogtkType.equal ty1 ty2)
         then
           let msg = CCFormat.sprintf
             "Formula.Base.eq: expect same types for %a and %a, got %a and %a"
@@ -593,7 +593,7 @@ module Make(MyT : TERM) = struct
   end
 
   let subterm t f =
-    Sequence.exists (MyT.eq t) (Seq.terms f)
+    Sequence.exists (MyT.equal t) (Seq.terms f)
 
   let is_atomic f = match view f with
     | And _
@@ -632,7 +632,7 @@ module Make(MyT : TERM) = struct
   let is_closed f = T.DB.closed f
 
   let contains_symbol sy f =
-    Sequence.exists (LogtkSymbol.eq sy) (Seq.symbols f)
+    Sequence.exists (LogtkSymbol.equal sy) (Seq.symbols f)
 
   let symbols ?(init=LogtkSymbol.Set.empty) f =
     Sequence.fold (fun set s -> LogtkSymbol.Set.add s set) init (Seq.symbols f)
@@ -719,8 +719,8 @@ module Make(MyT : TERM) = struct
       | Forall (varty,f') -> Base.__mk_forall ~varty (simplify ~depth:(depth+1) f')
       | Exists (varty,f') -> Base.__mk_exists ~varty (simplify ~depth:(depth+1) f')
       | ForallTy f' -> Base.__mk_forall_ty (simplify ~depth:(depth+1) f')
-      | Neq (a, b) when MyT.eq a b -> Base.false_
-      | Eq (a,b) when MyT.eq a b -> Base.true_
+      | Neq (a, b) when MyT.equal a b -> Base.false_
+      | Eq (a,b) when MyT.equal a b -> Base.true_
       | Neq _
       | Eq _ -> f
       | Atom _
@@ -751,7 +751,7 @@ module Make(MyT : TERM) = struct
       | Equiv (a, b) ->
           let a = simplify ~depth a and b = simplify ~depth b in
           begin match view a, view b with
-          | _ when eq a b -> Base.true_
+          | _ when equal a b -> Base.true_
           | True, _ -> simplify ~depth b
           | _, True -> simplify ~depth a
           | False, _ -> simplify ~depth (Base.not_ b)
@@ -770,10 +770,10 @@ module Make(MyT : TERM) = struct
     | True -> true
     | Neq _
     | Atom _ -> false
-    | Eq (l,r) -> MyT.eq l r
+    | Eq (l,r) -> MyT.equal l r
     | False -> false
-    | Imply (a, _) when eq a Base.false_ -> true
-    | Equiv (l,r) -> eq l r
+    | Imply (a, _) when equal a Base.false_ -> true
+    | Equiv (l,r) -> equal l r
     | Xor (_, _) -> false
     | Or l -> List.exists is_trivial l
     | And _
@@ -794,13 +794,13 @@ module Make(MyT : TERM) = struct
     | Not f' -> Base.not_ (recurse f')
     | Eq (t1, t2) ->
       (* put bigger term first *)
-      begin match MyT.cmp t1 t2 with
+      begin match MyT.compare t1 t2 with
       | n when n >= 0 -> f
       | _ -> Base.eq t2 t1
       end
     | Neq (t1, t2) ->
       (* put bigger term first *)
-      begin match MyT.cmp t1 t2 with
+      begin match MyT.compare t1 t2 with
       | n when n >= 0 -> f
       | _ -> Base.neq t2 t1
       end
@@ -821,7 +821,7 @@ module Make(MyT : TERM) = struct
   let ac_eq f1 f2 =
     let f1 = ac_normal_form f1 in
     let f2 = ac_normal_form f2 in
-    eq f1 f2
+    equal f1 f2
 
   (** {2 Conversion} *)
 
@@ -943,7 +943,7 @@ module Make(MyT : TERM) = struct
       | Forall (ty,f') ->
         let v = !depth in
         incr depth;
-        if LogtkType.eq ty LogtkType.TPTP.i
+        if LogtkType.equal ty LogtkType.TPTP.i
           then Format.fprintf out "@[<2>![Y%d]:@ %a@]" v pp_inner f'
           else Format.fprintf out "@[<2>![Y%d:%a]:@ %a@]" v LogtkType.pp ty pp_inner f';
         decr depth
@@ -955,7 +955,7 @@ module Make(MyT : TERM) = struct
       | Exists (ty, f') ->
         let v = !depth in
         incr depth;
-        if LogtkType.eq ty LogtkType.TPTP.i
+        if LogtkType.equal ty LogtkType.TPTP.i
           then Format.fprintf out "@[<2>?[Y%d]:@ %a@]" v pp_inner f'
           else Format.fprintf out "@[<2>?[Y%d:%a]:@ %a@]" v LogtkType.pp ty pp_inner f';
         decr depth
@@ -1007,15 +1007,15 @@ module FO = struct
   let of_hoterm t =
     let module T = LogtkHOTerm in
     let rec recurse t = match T.view t with
-      | _ when T.eq t T.TPTP.true_ -> Base.true_
-      | _ when T.eq t T.TPTP.false_ -> Base.false_
-      | T.At (hd, lam) when T.eq hd T.TPTP.forall ->
+      | _ when T.equal t T.TPTP.true_ -> Base.true_
+      | _ when T.equal t T.TPTP.false_ -> Base.false_
+      | T.At (hd, lam) when T.equal hd T.TPTP.forall ->
           begin match T.view lam with
           | T.Lambda (varty, t') ->
               Base.__mk_forall ~varty (recurse t')
           | _ -> raise Exit
           end
-      | T.At (hd, lam) when T.eq hd T.TPTP.exists ->
+      | T.At (hd, lam) when T.equal hd T.TPTP.exists ->
           begin match T.view lam with
           | T.Lambda (varty, t') ->
               Base.__mk_exists ~varty (recurse t')
@@ -1027,20 +1027,20 @@ module FO = struct
       | _ ->
           (* unroll applications *)
           match T.open_at t with
-          | hd, _, l when T.eq hd T.TPTP.and_ -> Base.and_ (List.map recurse l)
-          | hd, _, l when T.eq hd T.TPTP.or_ -> Base.or_ (List.map recurse l)
-          | hd, _, [a;b] when T.eq hd T.TPTP.equiv ->
+          | hd, _, l when T.equal hd T.TPTP.and_ -> Base.and_ (List.map recurse l)
+          | hd, _, l when T.equal hd T.TPTP.or_ -> Base.or_ (List.map recurse l)
+          | hd, _, [a;b] when T.equal hd T.TPTP.equiv ->
               Base.equiv (recurse a) (recurse b)
-          | hd, _, [a;b] when T.eq hd T.TPTP.xor ->
+          | hd, _, [a;b] when T.equal hd T.TPTP.xor ->
               Base.xor (recurse a) (recurse b)
-          | hd, _, [a;b] when T.eq hd T.TPTP.imply ->
+          | hd, _, [a;b] when T.equal hd T.TPTP.imply ->
               Base.imply (recurse a) (recurse b)
-          | hd, _, [a;b] when T.eq hd T.TPTP.eq ->
+          | hd, _, [a;b] when T.equal hd T.TPTP.eq ->
               begin match T.uncurry a, T.uncurry b with
               | Some a, Some b -> Base.eq a b
               | _ -> raise Exit
               end
-          | hd, _, [a;b] when T.eq hd T.TPTP.neq ->
+          | hd, _, [a;b] when T.equal hd T.TPTP.neq ->
               begin match T.uncurry a, T.uncurry b with
               | Some a, Some b -> Base.neq a b
               | _ -> raise Exit

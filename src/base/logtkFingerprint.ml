@@ -93,13 +93,13 @@ let cmp_feature f1 f2 = match f1, f2 with
   | A, A
   | B, B
   | N, N -> 0
-  | S s1, S s2 -> LogtkSymbol.cmp s1 s2
+  | S s1, S s2 -> LogtkSymbol.compare s1 s2
   | _ -> __feat2int f1 - __feat2int f2
 
 (** check whether two features are compatible for unification. *)
 let compatible_features_unif f1 f2 =
   match f1, f2 with
-  | S s1, S s2 -> LogtkSymbol.eq s1 s2
+  | S s1, S s2 -> LogtkSymbol.equal s1 s2
   | B, _ | _, B -> true
   | A, N | N, A -> false
   | A, _ | _, A -> true
@@ -109,7 +109,7 @@ let compatible_features_unif f1 f2 =
 (** check whether two features are compatible for matching. *)
 let compatible_features_match f1 f2 =
   match f1, f2 with
-  | S s1, S s2 -> LogtkSymbol.eq s1 s2
+  | S s1, S s2 -> LogtkSymbol.equal s1 s2
   | B, _ -> true
   | N, N -> true
   | N, _ -> false
@@ -262,7 +262,7 @@ module Make(X : Set.OrderedType) = struct
         FeatureMap.fold
           (fun f' subtrie acc ->
             if compatible f f'
-              then recurse subtrie features' acc 
+              then recurse subtrie features' acc
               else acc)
           map acc
       | Node _, [] | Leaf _, _::_ ->
@@ -295,6 +295,6 @@ module Make(X : Set.OrderedType) = struct
     traverse ~compatible idx features acc
       (fun acc leaf -> Leaf.fold_matched ~allow_open ~subst leaf o_i t o_t acc f)
 
-  let to_dot buf t =
+  let to_dot _ _ =
     failwith "Fingerprint: to_dot not implemented"
 end

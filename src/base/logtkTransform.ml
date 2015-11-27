@@ -83,7 +83,7 @@ let rec apply tr f = match tr with
   | Tr (_, transform) ->
     let f' = transform f in
     match f' with
-    | [f''] when F.eq f f'' -> f'
+    | [f''] when F.equal f f'' -> f'
     | _ -> CCList.flat_map (apply tr) f'
 
 let pp out tr = match tr with
@@ -171,7 +171,7 @@ module MakeDAG(Form : FORM) = struct
       | (rule,tr)::tr_list' ->
         let f = Form.to_form node.form in
         begin match apply tr f with
-        | [f'] when F.eq f f' ->
+        | [f'] when F.equal f f' ->
           (* transformation failed *)
           try_trans tr_list' node
         | forms ->

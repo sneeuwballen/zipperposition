@@ -101,8 +101,8 @@ module type UNARY = sig
     (** Succeeds iff the first term is a variant of the second, ie
         if they are alpha-equivalent *)
 
-  val eq : ?env1:env -> ?env2:env -> subst:subst -> term -> scope -> term -> scope -> bool
-    (** [eq subst t1 s1 t2 s2] returns [true] iff the two terms
+  val equal : ?env1:env -> ?env2:env -> subst:subst -> term -> scope -> term -> scope -> bool
+    (** [equal subst t1 s1 t2 s2] returns [true] iff the two terms
         are equal under the given substitution, i.e. if applying the
         substitution will return the same term. *)
 
@@ -152,7 +152,7 @@ let occurs_check ~env subst v sc_v t sc_t =
       match T.view t with
       | T.Var _
       | T.RigidVar _->
-          if T.eq v t && sc_v = sc_t then true
+          if T.equal v t && sc_v = sc_t then true
           else
             (* if [t] is a var bound by [subst], check in its image *)
             begin try
@@ -212,7 +212,7 @@ module RecordUnif = struct
   let to_record r =
     let ty_fields = List.map (fun (name,t) -> name, T.ty_exn t) in
     (* compute remaining type *)
-    let ty = if T.eq r.ty T.tType
+    let ty = if T.equal r.ty T.tType
       then T.tType
       else (
         assert (T.is_record r.ty || T.is_var r.ty);
@@ -463,7 +463,7 @@ module Nary = struct
     | Some rest1, d1, Some rest2, d2 ->
         let rest1, sc1 = S.get_var subst rest1 sc1 in
         let rest2, sc2 = S.get_var subst rest2 sc2 in
-        if T.is_var rest1 && T.eq rest1 rest2 && sc1 = sc2
+        if T.is_var rest1 && T.equal rest1 rest2 && sc1 = sc2
           then (* can only unify if common set of fields *)
             if d1=[] && d2=[] then k ~env subst else ()
         else
@@ -525,7 +525,7 @@ module Nary = struct
   let rec __unif_commutating_binders ~env ~unif ~sym ~size subst t1 sc_s t2 sc_t k =
     match T.view t1, T.view t2 with
     | T.Bind (s1, _, t1'), T.Bind (s2, _, t2')
-      when LogtkSymbol.eq s1 sym && LogtkSymbol.eq s2 sym ->
+      when LogtkSymbol.equal s1 sym && LogtkSymbol.equal s2 sym ->
       (* recurse *)
       __unif_commutating_binders ~env ~unif ~sym
         ~size:(size+1) subst t1' sc_s t2' sc_t k
@@ -559,7 +559,7 @@ module Nary = struct
             (fun ~env subst -> unif_terms ~env subst s sc_s t sc_t k)
     and unif_terms ~env subst s sc_s t sc_t k =
       match T.view s, T.view t with
-      | _ when T.eq s t && (T.ground s || sc_s = sc_t) ->
+      | _ when T.equal s t && (T.ground s || sc_s = sc_t) ->
         k ~env subst (* the terms are equal under any substitution *)
       | _ when T.ground s && T.ground t && T.DB.closed s ->
         () (* terms are not equal, and ground. failure. *)
@@ -577,10 +577,10 @@ module Nary = struct
           then () (* occur check *)
           else k ~env (S.bind subst t sc_t s sc_s)
       | T.Bind (s1, _, _), T.Bind (s2, _, _)
-        when LogtkSymbol.eq s1 s2 && binder_commutes s1 ->
+        when LogtkSymbol.equal s1 s2 && binder_commutes s1 ->
         (* forall or exists: they might swap *)
         __unif_commutating_binders ~env ~unif ~sym:s1 ~size:0 subst s sc_s t sc_t k
-      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when LogtkSymbol.eq s1 s2 ->
+      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when LogtkSymbol.equal s1 s2 ->
         unif ~env subst varty1 sc_s varty2 sc_t
           (fun ~env subst -> unif ~env:(push_none env) subst t1' sc_s t2' sc_t
             (fun ~env subst -> k ~env:(pop_many env 1) subst))
@@ -593,7 +593,7 @@ module Nary = struct
           | None -> ()
           | Some env' -> k ~env:env' subst
         end
-      | T.Const f, T.Const g when LogtkSymbol.eq f g -> k ~env subst
+      | T.Const f, T.Const g when LogtkSymbol.equal f g -> k ~env subst
       | T.App (hd1, l1), T.App (hd2, l2) when List.length l1 = List.length l2 ->
         unif ~env subst hd1 sc_s hd2 sc_t
           (fun ~env subst -> __unify_list ~env ~unif subst l1 sc_s l2 sc_t k)
@@ -606,7 +606,7 @@ module Nary = struct
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         unif ~env subst r1 sc_s r2 sc_t
           (fun ~env subst -> unif ~env subst sub1 sc_s sub2 sc_t k)
-      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when LogtkSymbol.eq s1 s2 ->
+      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when LogtkSymbol.equal s1 s2 ->
         __unify_list ~env ~unif subst l1 sc_s l2 sc_t k
       | T.Multiset l1, T.Multiset l2 when List.length l1 = List.length l2 ->
         __unify_multiset ~env ~unif subst l1 sc_s l2 sc_t k
@@ -634,7 +634,7 @@ module Nary = struct
             (fun ~env subst -> unif_terms ~env subst s sc_s t sc_t k)
     and unif_terms ~env subst s sc_s t sc_t k =
       match T.view s, T.view t with
-      | _ when T.eq s t && (T.ground s || sc_s = sc_t) ->
+      | _ when T.equal s t && (T.ground s || sc_s = sc_t) ->
         k ~env subst  (* the terms are equal under any substitution *)
       | _ when T.ground s && T.ground t && T.DB.closed t ->
         () (* terms are not equal, and ground. failure. *)
@@ -649,10 +649,10 @@ module Nary = struct
           then ()
           else k ~env (S.bind subst s sc_s t sc_t)  (* bind s *)
       | T.Bind (s1, _, _), T.Bind (s2, _, _)
-        when LogtkSymbol.eq s1 s2 && binder_commutes s1 ->
+        when LogtkSymbol.equal s1 s2 && binder_commutes s1 ->
         (* forall or exists: they might swap *)
         __unif_commutating_binders ~env ~unif ~sym:s1 ~size:0 subst s sc_s t sc_t k
-      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when LogtkSymbol.eq s1 s2 ->
+      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when LogtkSymbol.equal s1 s2 ->
         unif ~env subst varty1 sc_s varty2 sc_t
           (fun ~env subst -> unif ~env:(push_none env) subst t1' sc_s t2' sc_t
             (fun ~env subst -> k ~env:(pop_many env 1) subst))
@@ -661,7 +661,7 @@ module Nary = struct
       | _, T.BVar j when DBE.mem env.env2 j ->
         unif ~env subst s sc_s (DBE.find_exn env.env2 j) sc_t k
       | T.BVar i, T.BVar j when i = j -> k ~env subst
-      | T.Const f, T.Const g when LogtkSymbol.eq f g -> k ~env subst
+      | T.Const f, T.Const g when LogtkSymbol.equal f g -> k ~env subst
       | T.App (hd1, l1), T.App (hd2, l2) when List.length l1 = List.length l2 ->
         unif ~env subst hd1 sc_s hd2 sc_t
           (fun ~env subst -> __unify_list ~env ~unif subst l1 sc_s l2 sc_t k)
@@ -674,7 +674,7 @@ module Nary = struct
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         unif ~env subst r1 sc_s r2 sc_t
           (fun ~env subst -> unif ~env subst sub1 sc_s sub2 sc_t k)
-      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when LogtkSymbol.eq s1 s2 ->
+      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when LogtkSymbol.equal s1 s2 ->
         __unify_list ~env ~unif subst l1 sc_s l2 sc_t k
       | T.Multiset l1, T.Multiset l2 when List.length l1 = List.length l2 ->
         __unify_multiset ~env ~unif subst l1 sc_s l2 sc_t k
@@ -701,7 +701,7 @@ module Nary = struct
             (fun ~env subst  -> unif_terms ~env subst s sc_s t sc_t k)
     and unif_terms ~env subst s sc_s t sc_t k =
       match T.view s, T.view t with
-      | _ when T.eq s t && (T.ground s || sc_s = sc_t) ->
+      | _ when T.equal s t && (T.ground s || sc_s = sc_t) ->
         k ~env subst  (* the terms are equal under any substitution *)
       | _ when T.ground s && T.ground t && T.DB.closed s ->
         () (* terms are not equal, and ground. failure. *)
@@ -714,10 +714,10 @@ module Nary = struct
       | T.Var _, T.Var _ when sc_s <> sc_t ->
           k ~env (S.bind subst s sc_s t sc_t)  (* bind s *)
       | T.Bind (s1, _, _), T.Bind (s2, _, _)
-        when LogtkSymbol.eq s1 s2 && binder_commutes s1 ->
+        when LogtkSymbol.equal s1 s2 && binder_commutes s1 ->
         (* forall or exists: they might swap *)
         __unif_commutating_binders ~env ~unif ~sym:s1 ~size:0 subst s sc_s t sc_t k
-      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when LogtkSymbol.eq s1 s2 ->
+      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when LogtkSymbol.equal s1 s2 ->
         unif ~env subst varty1 sc_s varty2 sc_t
           (fun ~env subst -> unif ~env:(push_none env) subst t1' sc_s t2' sc_t
             (fun ~env subst -> k ~env:(pop_many env 1) subst))
@@ -726,7 +726,7 @@ module Nary = struct
       | _, T.BVar j when DBE.mem env.env2 j ->
         unif ~env subst s sc_s (DBE.find_exn env.env2 j) sc_t k
       | T.BVar i, T.BVar j when i = j -> k ~env subst
-      | T.Const f, T.Const g when LogtkSymbol.eq f g -> k ~env subst
+      | T.Const f, T.Const g when LogtkSymbol.equal f g -> k ~env subst
       | T.App (hd1, l1), T.App (hd2, l2) when List.length l1 = List.length l2 ->
         unif ~env subst hd1 sc_s hd2 sc_t
           (fun ~env subst  -> __unify_list ~env ~unif subst l1 sc_s l2 sc_t k)
@@ -739,7 +739,7 @@ module Nary = struct
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         unif ~env subst r1 sc_s r2 sc_t
           (fun ~env subst  -> unif ~env subst sub1 sc_s sub2 sc_t k)
-      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when LogtkSymbol.eq s1 s2 ->
+      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when LogtkSymbol.equal s1 s2 ->
         __unify_list ~env ~unif subst l1 sc_s l2 sc_t k
       | T.Multiset l1, T.Multiset l2 when List.length l1 = List.length l2 ->
         __unify_multiset ~env ~unif subst l1 sc_s l2 sc_t k
@@ -826,7 +826,7 @@ module Unary = struct
     | Some rest1, d1, Some rest2, d2 ->
         let rest1, sc1 = S.get_var subst rest1 sc1 in
         let rest2, sc2 = S.get_var subst rest2 sc2 in
-        if T.is_var rest1 && T.eq rest1 rest2 && sc1=sc2
+        if T.is_var rest1 && T.equal rest1 rest2 && sc1=sc2
           then if d1=[] && d2=[]
             then subst
             else raise Fail (* impossible to unify discarded fields *)
@@ -855,7 +855,7 @@ module Unary = struct
           unif ~env1 ~env2 subst ty1 sc_s ty2 sc_t
       in
       match T.view s, T.view t with
-      | _ when T.eq s t && (T.ground s || sc_s = sc_t) ->
+      | _ when T.equal s t && (T.ground s || sc_s = sc_t) ->
         subst (* the terms are equal under any substitution *)
       | _ when T.ground s && T.ground t && T.DB.closed s ->
         raise Fail (* terms are not equal, and ground. failure. *)
@@ -867,7 +867,7 @@ module Unary = struct
         if occurs_check ~env:env1 subst t sc_t s sc_s || not (T.DB.closed s)
           then raise Fail (* occur check *)
           else S.bind subst t sc_t s sc_s (* bind s *)
-      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when LogtkSymbol.eq s1 s2 ->
+      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when LogtkSymbol.equal s1 s2 ->
         let subst = unif ~env1 ~env2 subst varty1 sc_s varty2 sc_t in
         unif ~env1:(DBE.push_none env1) ~env2:(DBE.push_none env2)
           subst t1' sc_s t2' sc_t
@@ -876,7 +876,7 @@ module Unary = struct
       | _, T.BVar j when DBE.mem env2 j ->
         unif ~env1 ~env2:DBE.empty subst s sc_s (DBE.find_exn env2 j) sc_t
       | T.BVar i, T.BVar j -> if i = j then subst else raise Fail
-      | T.Const f, T.Const g when LogtkSymbol.eq f g -> subst
+      | T.Const f, T.Const g when LogtkSymbol.equal f g -> subst
       | T.App (hd1, l1), T.App (hd2, l2) when List.length l1 = List.length l2 ->
         let subst = unif ~env1 ~env2 subst hd1 sc_s hd2 sc_t in
         unif_list ~unif ~env1 ~env2 subst l1 sc_s l2 sc_t
@@ -889,7 +889,7 @@ module Unary = struct
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         let subst = unif ~env1 ~env2 subst r1 sc_s r2 sc_t in
         unif ~env1 ~env2 subst sub1 sc_s sub2 sc_t
-      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when LogtkSymbol.eq s1 s2 ->
+      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when LogtkSymbol.equal s1 s2 ->
         unif_list ~unif ~env1 ~env2 subst l1 sc_s l2 sc_t
       | T.At (l1, r1), T.At (l2, r2) ->
         let subst = unif ~env1 ~env2 subst l1 sc_s l2 sc_t in
@@ -920,7 +920,7 @@ module Unary = struct
           unif ~env1 ~env2 subst ty1 sc_s ty2 sc_t
       in
       match T.view s, T.view t with
-      | _ when T.eq s t && (T.ground s || sc_s = sc_t) ->
+      | _ when T.equal s t && (T.ground s || sc_s = sc_t) ->
         subst (* the terms are equal under any substitution *)
       | _ when T.ground s && T.ground t && T.DB.closed s ->
         raise Fail (* terms are not equal, and ground. failure. *)
@@ -929,7 +929,7 @@ module Unary = struct
         || (not allow_open && not (T.DB.closed t))
           then raise Fail
           else S.bind subst s sc_s t sc_t (* bind s *)
-      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when LogtkSymbol.eq s1 s2 ->
+      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when LogtkSymbol.equal s1 s2 ->
         let subst = unif ~env1 ~env2 subst varty1 sc_s varty2 sc_t in
         unif ~env1:(DBE.push_none env1) ~env2:(DBE.push_none env2)
           subst t1' sc_s t2' sc_t
@@ -938,7 +938,7 @@ module Unary = struct
       | _, T.BVar j when DBE.mem env2 j ->
         unif ~env1 ~env2:DBE.empty subst s sc_s (DBE.find_exn env2 j) sc_t
       | T.BVar i, T.BVar j -> if i = j then subst else raise Fail
-      | T.Const f, T.Const g when LogtkSymbol.eq f g -> subst
+      | T.Const f, T.Const g when LogtkSymbol.equal f g -> subst
       | T.App (f1, l1), T.App (f2, l2) when List.length l1 = List.length l2 ->
         let subst = unif ~env1 ~env2 subst f1 sc_s f2 sc_t in
         unif_list ~unif ~env1 ~env2 subst l1 sc_s l2 sc_t
@@ -951,7 +951,7 @@ module Unary = struct
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         let subst = unif ~env1 ~env2 subst r1 sc_s r2 sc_t in
         unif ~env1 ~env2 subst sub1 sc_s sub2 sc_t
-      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when LogtkSymbol.eq s1 s2 ->
+      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when LogtkSymbol.equal s1 s2 ->
         unif_list ~unif ~env1 ~env2 subst l1 sc_s l2 sc_t
       | T.At (l1, r1), T.At (l2, r2) ->
         let subst = unif ~env1 ~env2 subst l1 sc_s l2 sc_t in
@@ -980,7 +980,7 @@ module Unary = struct
           unif ~env1 ~env2 ~blocked subst ty1 scope ty2 scope
       in
       match T.view s, T.view t with
-      | _ when T.eq s t ->
+      | _ when T.equal s t ->
         subst (* the terms are equal under any substitution *)
       | _ when T.ground s && T.ground t  && T.DB.closed s->
         raise Fail (* terms are not equal, and ground. failure. *)
@@ -988,7 +988,7 @@ module Unary = struct
         if occurs_check ~env:env2 subst s scope t scope || T.Set.mem s blocked
           then raise Fail
           else S.bind subst s scope t scope (* bind s *)
-      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when LogtkSymbol.eq s1 s2 ->
+      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when LogtkSymbol.equal s1 s2 ->
         let subst = unif ~env1 ~env2 ~blocked subst varty1 sc_s varty2 sc_t in
         unif
           ~env1:(DBE.push_none env1) ~env2:(DBE.push_none env2) ~blocked
@@ -1000,7 +1000,7 @@ module Unary = struct
         unif ~env1 ~env2:DBE.empty ~blocked
           subst s scope (DBE.find_exn env2 j) scope
       | T.BVar i, T.BVar j -> if i = j then subst else raise Fail
-      | T.Const f, T.Const g when LogtkSymbol.eq f g -> subst
+      | T.Const f, T.Const g when LogtkSymbol.equal f g -> subst
       | T.App (f1, l1), T.App (f2, l2) when List.length l1 = List.length l2 ->
         let subst = unif ~env1 ~env2 ~blocked subst f1 scope f2 scope in
         unif_list ~env1 ~env2 ~unif:(unif ~blocked) subst l1 scope l2 scope
@@ -1013,7 +1013,7 @@ module Unary = struct
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         let subst = unif ~env1 ~env2 ~blocked subst r1 sc_s r2 sc_t in
         unif ~env1 ~env2 ~blocked subst sub1 sc_s sub2 sc_t
-      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when LogtkSymbol.eq s1 s2 ->
+      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when LogtkSymbol.equal s1 s2 ->
         unif_list ~env1 ~env2 ~unif:(unif ~blocked) subst l1 scope l2 scope
       | T.At (l1, r1), T.At (l2, r2) ->
         let subst = unif ~env1 ~env2 ~blocked subst l1 scope l2 scope in
@@ -1051,7 +1051,7 @@ module Unary = struct
         raise Fail (* terms are not equal, and ground. failure. *)
       | T.Var i, T.Var j when i <> j && sc_s = sc_t -> raise Fail
       | T.Var _, T.Var _ -> S.bind subst s sc_s t sc_t (* bind s *)
-      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when LogtkSymbol.eq s1 s2 ->
+      | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when LogtkSymbol.equal s1 s2 ->
         let subst = unif ~env1 ~env2 subst varty1 sc_s varty2 sc_t in
         unif ~env1:(DBE.push_none env1) ~env2:(DBE.push_none env2)
           subst t1' sc_s t2' sc_t
@@ -1060,7 +1060,7 @@ module Unary = struct
       | _, T.BVar j when DBE.mem env2 j ->
         unif ~env1 ~env2:DBE.empty subst s sc_s (DBE.find_exn env2 j) sc_t
       | T.BVar i, T.BVar j -> if i = j then subst else raise Fail
-      | T.Const f, T.Const g when LogtkSymbol.eq f g -> subst
+      | T.Const f, T.Const g when LogtkSymbol.equal f g -> subst
       | T.App (t1, l1), T.App (t2, l2) when List.length l1 = List.length l2 ->
         let subst = unif ~env1 ~env2 subst t1 sc_s t2 sc_t in
         unif_list ~unif ~env1 ~env2 subst l1 sc_s l2 sc_t
@@ -1073,7 +1073,7 @@ module Unary = struct
       | T.RecordSet (r1,name1,sub1), T.RecordSet(r2,name2,sub2) when name1=name2 ->
         let subst = unif ~env1 ~env2 subst r1 sc_s r2 sc_t in
         unif ~env1 ~env2 subst sub1 sc_s sub2 sc_t
-      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when LogtkSymbol.eq s1 s2 ->
+      | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when LogtkSymbol.equal s1 s2 ->
         unif_list ~unif ~env1 ~env2 subst l1 sc_s l2 sc_t
       | T.At (l1, r1), T.At (l2, r2) ->
         let subst = unif ~env1 ~env2 subst l1 sc_s l2 sc_t in
@@ -1082,7 +1082,7 @@ module Unary = struct
     in
     if sc_a = sc_b
       then
-        if T.eq a b then subst else raise Fail
+        if T.equal a b then subst else raise Fail
       else unif ~env1 ~env2 subst a sc_a b sc_b
 
   let rec _eq ~env1 ~env2 ~subst t1 s1 t2 s2 =
@@ -1097,13 +1097,13 @@ module Unary = struct
     match T.view t1, T.view t2 with
     | T.RigidVar i, T.RigidVar j
     | T.Var i, T.Var j -> i=j && s1 = s2
-    | T.Const f, T.Const g -> LogtkSymbol.eq f g
+    | T.Const f, T.Const g -> LogtkSymbol.equal f g
     | T.BVar i, _ when DBE.mem env1 i ->
       _eq ~env1:DBE.empty ~env2 ~subst (DBE.find_exn env1 i) s1 t2 s2
     | _, T.BVar j when DBE.mem env2 j ->
       _eq ~env1 ~env2:DBE.empty ~subst t1 s1 (DBE.find_exn env2 j) s2
     | T.BVar i, T.BVar j -> i=j
-    | T.Bind (f1, varty1, t1'), T.Bind (f2, varty2, t2') when LogtkSymbol.eq f1 f2 ->
+    | T.Bind (f1, varty1, t1'), T.Bind (f2, varty2, t2') when LogtkSymbol.equal f1 f2 ->
         _eq ~env1 ~env2 ~subst varty1 s1 varty2 s2
         &&
         _eq
@@ -1113,7 +1113,7 @@ module Unary = struct
         _eq ~env1 ~env2 ~subst t1 s1 t2 s2
         &&
         List.for_all2 (fun t1 t2 -> _eq ~env1 ~env2 ~subst t1 s1 t2 s2) l1 l2
-    | T.SimpleApp (f1,l1), T.SimpleApp (f2, l2) when LogtkSymbol.eq f1 f2 ->
+    | T.SimpleApp (f1,l1), T.SimpleApp (f2, l2) when LogtkSymbol.equal f1 f2 ->
       begin try
         List.for_all2 (fun t1 t2 -> _eq ~env1 ~env2 ~subst t1 s1 t2 s2) l1 l2
       with Invalid_argument _ -> false
@@ -1139,7 +1139,7 @@ module Unary = struct
     | T.Multiset _, T.Multiset _   (* not unary *)
     | _, _ -> false
 
-  let eq ?(env1=DBE.empty) ?(env2=DBE.empty) ~subst t1 s1 t2 s2 =
+  let equal ?(env1=DBE.empty) ?(env2=DBE.empty) ~subst t1 s1 t2 s2 =
     _eq ~env1 ~env2 ~subst t1 s1 t2 s2
 
   let are_variant t1 t2 =
@@ -1189,8 +1189,8 @@ module Ty = struct
   let variant =
     (variant :> ?env1:env -> ?env2:env -> ?subst:subst -> term -> scope -> term -> scope -> subst)
 
-  let eq =
-    (eq :> ?env1:env -> ?env2:env -> subst:subst -> term -> scope -> term -> scope -> bool)
+  let equal =
+    (equal :> ?env1:env -> ?env2:env -> subst:subst -> term -> scope -> term -> scope -> bool)
 
   let are_unifiable =
     (are_unifiable :> term -> term -> bool)
@@ -1224,8 +1224,8 @@ module FO = struct
   let variant =
     (variant :> ?env1:env -> ?env2:env -> ?subst:subst -> term -> scope -> term -> scope -> subst)
 
-  let eq =
-    (eq :> ?env1:env -> ?env2:env -> subst:subst -> term -> scope -> term -> scope -> bool)
+  let equal =
+    (equal :> ?env1:env -> ?env2:env -> subst:subst -> term -> scope -> term -> scope -> bool)
 
   let are_unifiable =
     (are_unifiable :> term -> term -> bool)
@@ -1272,7 +1272,7 @@ module Form = struct
     (* CPS, with [k] the continuation that is given the answer
       substitutions *)
     let rec unif ~env1 ~env2 subst f1 f2 k = match F.view f1, F.view f2 with
-      | _ when F.eq f1 f2 -> k subst
+      | _ when F.equal f1 f2 -> k subst
       | F.Atom p1, F.Atom p2 ->
         begin try
           let subst = FO.variant ~subst p1 sc_1 p2 sc_2 in

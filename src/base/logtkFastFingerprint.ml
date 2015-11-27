@@ -90,14 +90,14 @@ let compare_features f1 f2 = match f1, f2 with
   | N, N
   | A, A
   | B, B -> 0
-  | S s1, S s2 -> LogtkSymbol.cmp s1 s2
+  | S s1, S s2 -> LogtkSymbol.compare s1 s2
   | _ -> __to_int f1 - __to_int f2
 
 let eq_features f1 f2 = match f1, f2 with
   | N, N
   | B, B
   | A, A -> true
-  | S s1, S s2 -> LogtkSymbol.eq s1 s2
+  | S s1, S s2 -> LogtkSymbol.equal s1 s2
   | _ -> false
 
 let hash_feature f = match f with
@@ -176,7 +176,7 @@ module Make(X : Set.OrderedType) = struct
         if is_empty_trie subtrie'
           then {trie with sub=M.remove feature trie.sub}
           else {trie with sub=M.add feature subtrie' trie.sub}
-  
+
   let add idx t data =
     let fingerprint = idx.fp t in
     let trie = goto_leaf idx.trie fingerprint 0
@@ -273,7 +273,7 @@ module Make(X : Set.OrderedType) = struct
     in
     retrieve idx.trie acc 0
 
-  let retrieve_specializations ?(allow_open=false) ?(subst=S.empty) idx o_i t o_t acc f = 
+  let retrieve_specializations ?(allow_open=false) ?(subst=S.empty) idx o_i t o_t acc f =
     let fingerprint = idx.fp t in
     let rec retrieve trie acc i =
       if i = Array.length fingerprint

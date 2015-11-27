@@ -62,27 +62,27 @@ let __to_int = function
   | Multiset _ -> 6
   | Record _ -> 7
 
-let rec cmp t1 t2 = match t1.term, t2.term with
+let rec compare t1 t2 = match t1.term, t2.term with
   | Var s1, Var s2
   | BVar s1, BVar s2 -> String.compare s1 s2
-  | Const s1, Const s2 -> LogtkSymbol.cmp s1 s2
+  | Const s1, Const s2 -> LogtkSymbol.compare s1 s2
   | App (s1,l1), App (s2, l2) ->
       CCOrd.(
-        cmp s1 s2
-        <?> (CCOrd.list_ cmp, l1, l2)
+        compare s1 s2
+        <?> (CCOrd.list_ compare, l1, l2)
       )
   | Bind (s1, v1, t1), Bind (s2, v2, t2) ->
       CCOrd.(
-        LogtkSymbol.cmp s1 s2
-        <?> (cmp, v1, v2)
-        <?> (cmp, t1, t2)
+        LogtkSymbol.compare s1 s2
+        <?> (compare, v1, v2)
+        <?> (compare, t1, t2)
       )
   | Multiset l1, Multiset l2 ->
-      let l1 = List.sort cmp l1 and l2 = List.sort cmp l2 in
-      CCOrd.list_ cmp l1 l2
+      let l1 = List.sort compare l1 and l2 = List.sort compare l2 in
+      CCOrd.list_ compare l1 l2
   | Record (l1, rest1), Record (l2, rest2) ->
       CCOrd.(
-        CCOpt.compare cmp rest1 rest2
+        CCOpt.compare compare rest1 rest2
         <?> (cmp_fields, l1, l2)
       )
   | Var _, _
@@ -92,10 +92,10 @@ let rec cmp t1 t2 = match t1.term, t2.term with
   | Bind _, _
   | Multiset _, _
   | Record _, _ -> __to_int t1.term - __to_int t2.term
-and cmp_field x y = CCOrd.pair String.compare cmp x y
+and cmp_field x y = CCOrd.pair String.compare compare x y
 and cmp_fields x y = CCOrd.list_ cmp_field x y
 
-let eq t1 t2 = cmp t1 t2 = 0
+let equal t1 t2 = compare t1 t2 = 0
 
 let rec hash_fun t h = match t.term with
   | Var s -> h |> Hash.string_ "var" |> Hash.string_ s
@@ -224,9 +224,9 @@ let rec ground t =
       List.for_all (fun (_,t') -> ground t') l
   | Multiset l -> List.for_all ground l
 
-module Set = Sequence.Set.Make(struct type t = term let compare = cmp end)
-module Map = Sequence.Map.Make(struct type t = term let compare = cmp end)
-module Tbl = Hashtbl.Make(struct type t = term let equal = eq let hash = hash end)
+module Set = Sequence.Set.Make(struct type t = term let compare = compare end)
+module Map = Sequence.Map.Make(struct type t = term let compare = compare end)
+module Tbl = Hashtbl.Make(struct type t = term let equal = equal let hash = hash end)
 
 module Seq = struct
   let subterms t k =
@@ -320,7 +320,7 @@ module Visitor = struct
       && List.for_all snd l)
   }
 end
-  
+
 let closed t =
   Seq.subterms_with_bound t
   |> Sequence.filter (CCFun.compose fst is_bvar)

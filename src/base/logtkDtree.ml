@@ -57,11 +57,11 @@ let compare_char c1 c2 =
   (* compare variables by index *)
   let compare_vars v1 v2 = match ST.view (v1:T.t:>ST.t), ST.view (v2:T.t:>ST.t) with
     | ST.Var i, ST.Var j ->
-      if i <> j then i - j else LogtkType.cmp (T.ty v1) (T.ty v2)
+      if i <> j then i - j else LogtkType.compare (T.ty v1) (T.ty v2)
     | _ -> assert false
   in
   match c1, c2 with
-  | LogtkSymbol s1, LogtkSymbol s2 -> LogtkSymbol.cmp s1 s2
+  | LogtkSymbol s1, LogtkSymbol s2 -> LogtkSymbol.compare s1 s2
   | BoundVariable i, BoundVariable j -> i - j
   | Variable v1, Variable v2 -> compare_vars v1 v2
   | NonFO, NonFO -> 0

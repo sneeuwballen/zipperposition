@@ -86,8 +86,8 @@ module type UNARY = sig
     (** Succeeds iff the first term is a variant of the second, ie
         if they are alpha-equivalent *)
 
-  val eq : ?env1:env -> ?env2:env -> subst:subst -> term -> scope -> term -> scope -> bool
-    (** [eq subst t1 s1 t2 s2] returns [true] iff the two terms
+  val equal : ?env1:env -> ?env2:env -> subst:subst -> term -> scope -> term -> scope -> bool
+    (** [equal subst t1 s1 t2 s2] returns [true] iff the two terms
         are equal under the given substitution, i.e. if applying the
         substitution will return the same term. *)
 

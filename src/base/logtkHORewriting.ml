@@ -40,8 +40,8 @@ exception IllFormedRule of rule
 module S = Sequence.Set.Make(struct
   type t = rule
   let compare (l1,r1) (l2,r2) =
-    let c = T.cmp l1 l2 in
-    if c <> 0 then c else T.cmp r1 r2
+    let c = T.compare l1 l2 in
+    if c <> 0 then c else T.compare r1 r2
 end)
 
 type t = S.t
@@ -52,7 +52,7 @@ let empty = S.empty
 let _validate_rule (l,r) =
   let cond1 =
     T.Seq.vars r
-    |> Sequence.for_all (fun v -> Sequence.mem ~eq:T.eq v (T.Seq.vars l))
+    |> Sequence.for_all (fun v -> Sequence.mem ~eq:T.equal v (T.Seq.vars l))
   and cond2 =
     T.Seq.subterms_depth r
     |> Sequence.filter (fun (v,_) -> T.is_var v)
@@ -67,8 +67,8 @@ let add trs rule =
 
 let merge t1 t2 = S.union t1 t2
 
-let eq = S.equal
-let cmp = S.compare
+let equal = S.equal
+let compare = S.compare
 let hash_fun s h = Hash.seq (Hash.pair T.hash_fun T.hash_fun) (S.to_seq s) h
 let hash s = Hash.apply hash_fun s
 

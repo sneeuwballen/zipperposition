@@ -87,9 +87,9 @@ module Constraint = struct
   (* simplify the constraints *)
   let rec simplify t =
     match t with
-    | EQ (a, b) when Symbol.eq a b -> true_
-    | LE (a, b) when Symbol.eq a b -> true_
-    | LT (a, b) when Symbol.eq a b -> false_
+    | EQ (a, b) when Symbol.equal a b -> true_
+    | LE (a, b) when Symbol.equal a b -> true_
+    | LT (a, b) when Symbol.equal a b -> false_
     | Not (Not t) -> simplify t
     | Not True -> true_
     | Not False -> true_
@@ -166,7 +166,7 @@ module MakeSolver(X : sig end) = struct
   end = struct
     type t = Symbol.t * int
     let make s i = s, i
-    let equal (s1,i1)(s2,i2) = Symbol.eq s1 s2 && i1 = i2
+    let equal (s1,i1)(s2,i2) = Symbol.equal s1 s2 && i1 = i2
     let hash_fun (s,i) h = h |> Symbol.hash_fun s |> CCHash.int_ i
     let hash a = CCHash.apply hash_fun a
     let print fmt (s,i) = Format.fprintf fmt "%a/%d" Symbol.pp s i
@@ -386,7 +386,7 @@ module FO = struct
       C.or_
         [ C.and_
             [ C.eq f g
-            ; lexico_order ~eq:T.eq ~orient_lpo l l' ]
+            ; lexico_order ~eq:T.equal ~orient_lpo l l' ]
               (* f=g, lexicographic order of subterms *)
         ; C.and_
             [ C.gt f g
@@ -430,7 +430,7 @@ module Prolog = struct
     match T.view a, T.view b with
     | T.Var _ , _ ->
       C.false_  (* a variable cannot be > *)
-    | _ when T.eq a b -> C.false_
+    | _ when T.equal a b -> C.false_
     | _ when T.subterm ~strict:true a ~sub:b ->
       C.true_  (* trivial subterm property --> ok! *)
     | T.App ({T.term=T.Const f; _}, ((_::_) as l)),
@@ -442,7 +442,7 @@ module Prolog = struct
       C.or_
         [ C.and_
             [ C.eq f g
-            ; lexico_order ~eq:T.eq ~orient_lpo l l' ]  (* f=g, lexicographic order of subterms *)
+            ; lexico_order ~eq:T.equal ~orient_lpo l l' ]  (* f=g, lexicographic order of subterms *)
         ; C.and_
             [ C.gt f g
             ; all_bigger ~orient_lpo a l'

@@ -69,14 +69,14 @@ let __to_int = function
   | Rat _ -> 2
   | Cst _ -> 3
 
-let cmp a b = match a, b with
+let compare a b = match a, b with
   | Cst s1, Cst s2 -> s1.cs_id - s2.cs_id
   | Int i, Int j -> Z.compare i j
   | Rat i, Rat j -> Q.compare i j
   | Conn c1, Conn c2 -> Pervasives.compare c1 c2
   | _ -> __to_int a - __to_int b
 
-let eq a b = cmp a b = 0
+let equal a b = compare a b = 0
 
 let hash_fun s h = match s with
   | Cst s -> Hash.int_ s.cs_id h
@@ -84,9 +84,9 @@ let hash_fun s h = match s with
   | c -> Hash.int_ (Hashtbl.hash c) h
 let hash s = Hash.apply hash_fun s
 
-module Map = Sequence.Map.Make(struct type t = sym let compare = cmp end)
-module Set = Sequence.Set.Make(struct type t = sym let compare = cmp end)
-module Tbl = Hashtbl.Make(struct type t = sym let equal = eq let hash = hash end)
+module Map = Sequence.Map.Make(struct type t = sym let compare = compare end)
+module Set = Sequence.Set.Make(struct type t = sym let compare = compare end)
+module Tbl = Hashtbl.Make(struct type t = sym let equal = equal let hash = hash end)
 
 let is_const = function | Cst _ -> true | _ -> false
 let is_int = function | Int _ -> true | _ -> false
@@ -209,28 +209,6 @@ module Base = struct
     fun () ->
       let n = !r in incr r; Conn (FreshVar n)
 end
-
-(* TODO
-  let __printers = Hashtbl.create 5
-
-  let add_printer name pp =
-    if Hashtbl.mem __printers name then failwith ("printer " ^ name ^ " already present");
-    Hashtbl.add __printers name pp
-
-  let _pp buf s = match s with
-    | HCst (s, _) -> Buffer.add_string buf s
-    | HInt n -> Buffer.add_string buf (Big_int.string_of_big_int n)
-    | HRat n -> Buffer.add_string buf (Ratio.string_of_ratio n)
-    | HReal f -> Buffer.add_string buf (string_of_float f)
-
-  let () =
-    add_printer "debug" _pp
-
-  let __default_pp = ref _pp
-
-  let pp buf s = !__default_pp buf s
-  let to_string = LogtkUtil.on_buffer pp
-*)
 
 (** {2 Generation of symbols} *)
 

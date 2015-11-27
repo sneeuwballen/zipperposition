@@ -43,7 +43,7 @@ let check_infer_all_symbs =
     let signature = TypeInference.Ctx.to_signature ctx in
     let symbols = terms
       |> Sequence.of_list
-      |> Sequence.flatMap PT.Seq.symbols 
+      |> Sequence.flatMap PT.Seq.symbols
       |> Symbol.Seq.add_set Symbol.Set.empty in
     Symbol.Set.for_all (Signature.mem signature) symbols
   in
@@ -56,8 +56,8 @@ let check_cmp =
   let size (ty1, ty2) = Type.size ty1 + Type.size ty2 in
   (* comparison of two types is 0 iff they are equal *)
   let prop (ty1, ty2) =
-    let c = Type.cmp ty1 ty2 in
-    (c = 0) = (Type.eq ty1 ty2)
+    let c = Type.compare ty1 ty2 in
+    (c = 0) = (Type.equal ty1 ty2)
   in
   mk_test ~name ~pp ~size gen prop
 

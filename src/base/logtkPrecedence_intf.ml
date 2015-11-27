@@ -39,7 +39,7 @@ module type S = sig
 
   type precedence = t
 
-  val eq : t -> t -> bool
+  val equal : t -> t -> bool
     (** Check whether the two precedences are equal (same snapshot) *)
 
   val snapshot : t -> symbol list

@@ -288,7 +288,7 @@ module FPolTbl = Hashtbl.Make(struct
   type t = F.t * bool
   let hash_fun (f,x) h = Hash.bool_ x (F.hash_fun f h)
   let hash it = Hash.apply hash_fun it
-  let equal (f1,x1)(f2,x2) = x1=x2 && F.eq f1 f2
+  let equal (f1,x1)(f2,x2) = x1=x2 && F.equal f1 f2
 end)
 
 (* estimate the number of clauses needed by this formula. *)

@@ -79,8 +79,8 @@ let kind t = t.kind
 
 let hash_fun t s = Hash.int_ t.id s
 let hash t = Hash.apply hash_fun t
-let eq t1 t2 = t1 == t2
-let cmp t1 t2 = Pervasives.compare t1.id t2.id
+let equal t1 t2 = t1 == t2
+let compare t1 t2 = Pervasives.compare t1.id t2.id
 
 let _hash_ty t h =
   match t.ty with
@@ -119,35 +119,35 @@ let rec _eq_norec t1 t2 =
   | Var i, Var j
   | RigidVar i, RigidVar j -> i = j
   | BVar i, BVar j -> i = j
-  | Const s1, Const s2 -> Sym.eq s1 s2
+  | Const s1, Const s2 -> Sym.equal s1 s2
   | Bind (s1, varty1, t1'), Bind (s2, varty2, t2') ->
-    Sym.eq s1 s2 && eq varty1 varty2 && eq t1' t2'
+    Sym.equal s1 s2 && equal varty1 varty2 && equal t1' t2'
   | App (f1, l1), App (f2, l2) ->
-    eq f1 f2 && _eq_list l1 l2
+    equal f1 f2 && _eq_list l1 l2
   | Multiset l1, Multiset l2 ->
     _eq_list l1 l2
   | Record (l1, None), Record (l2, None) ->
     _eq_record_list l1 l2
   | Record (l1, Some r1), Record (l2, Some r2) ->
-    eq r1 r2 && _eq_record_list l1 l2
-  | At (l1, r1), At (l2, r2) -> eq l1 l2 && eq r1 r2
+    equal r1 r2 && _eq_record_list l1 l2
+  | At (l1, r1), At (l2, r2) -> equal l1 l2 && equal r1 r2
   | SimpleApp (s1, l1), SimpleApp (s2, l2) ->
-    Sym.eq s1 s2 && _eq_list l1 l2
+    Sym.equal s1 s2 && _eq_list l1 l2
   | _ -> false
 and _eq_ty t1 t2 = match t1.ty, t2.ty with
   | NoType, NoType -> true
-  | HasType ty1, HasType ty2 -> eq ty1 ty2
+  | HasType ty1, HasType ty2 -> equal ty1 ty2
   | _ -> false
 and _eq_list l1 l2 = match l1, l2 with
   | [], [] -> true
   | [], _
   | _, [] -> false
-  | t1::l1', t2::l2' -> eq t1 t2 && _eq_list l1' l2'
+  | t1::l1', t2::l2' -> equal t1 t2 && _eq_list l1' l2'
 and _eq_record_list l1 l2 = match l1, l2 with
   | [], [] -> true
   | [], _
   | _, [] -> false
-  | (n1,t1)::l1', (n2,t2)::l2' -> n1=n2 && eq t1 t2 && _eq_record_list l1' l2'
+  | (n1,t1)::l1', (n2,t2)::l2' -> n1=n2 && equal t1 t2 && _eq_record_list l1' l2'
 
 (** {3 Flags} *)
 
@@ -252,7 +252,7 @@ let rec __merge_records l1 l2 = match l1, l2 with
   | (n1,t1)::l1', (n2,t2)::l2' ->
       match String.compare n1 n2 with
       | 0 ->
-        if eq t1 t2
+        if equal t1 t2
           then (n1,t1) :: __merge_records l1' l2'  (* compatible *)
           else failwith ("ill-formed record: field "^n1^" has distinct values")
       | n when n < 0 -> (n1,t1) :: __merge_records l1' l2
@@ -315,7 +315,7 @@ let record_set ~kind ~ty r name sub =
   t
 
 let multiset ~kind ~ty l =
-  let l = List.sort cmp l in
+  let l = List.sort compare l in
   let my_t = _make ~kind ~ty:(HasType ty) (Multiset l) in
   let t = H.hashcons my_t in
   if t == my_t then begin
@@ -383,9 +383,9 @@ let is_at t = match view t with | At _ -> true | _ -> false
 
 module T = struct
   type t = term
-  let equal = eq
+  let equal = equal
   let hash = hash
-  let compare = cmp
+  let compare = compare
 end
 
 module Set = Sequence.Set.Make(T)
@@ -569,7 +569,7 @@ module DB = struct
     | HasType ty ->
       let ty = _replace depth ty ~sub in
       match view t with
-        | _ when eq t sub ->
+        | _ when equal t sub ->
           bvar ~kind:t.kind ~ty depth  (* replace *)
         | Var i -> _var ~kind:t.kind ~ty i
         | RigidVar i -> rigid_var ~kind:t.kind ~ty i
@@ -867,7 +867,7 @@ end
 (* [replace t ~old ~by] syntactically replaces all occurrences of [old]
     in [t] by the term [by]. *)
 let rec replace t ~old ~by = match t.ty, view t with
-  | _ when eq t old -> by
+  | _ when equal t old -> by
   | HasType ty, Bind (s, varty, t') ->
     bind ~kind:t.kind ~ty ~varty s (replace t' ~old ~by)
   | HasType ty, Record (l, rest) ->

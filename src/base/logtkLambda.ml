@@ -66,7 +66,7 @@ let rec beta_reduce_rec ~depth env t =
     begin match LogtkDBEnv.find env n with
     | None -> t
     | Some t' ->
-      assert (LogtkType.eq ty (T.ty t'));
+      assert (LogtkType.equal ty (T.ty t'));
       assert (LogtkScopedTerm.DB.closed (t' : T.t :> LogtkScopedTerm.t));
       t'  (* must be closed, because it's already evaluated *)
     end

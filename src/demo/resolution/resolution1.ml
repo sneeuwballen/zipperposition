@@ -41,7 +41,7 @@ let _signature = ref Logtk.Signature.TPTP.base
 (** We do not have to do anything about terms, because they are already
     defined in {! Logtk.FOTerm}. Terms are either variables or
     applications of a constant (symbol) to a list of sub-terms.
-    
+
     Examples (capitalized letter are variables):
       - f(X, g(X,a))
       - age_of(grandmother_of(frida))
@@ -66,7 +66,7 @@ module Lit = struct
       Printing is useful for informing the user of results or
       for debugging. *)
 
-  let compare = CCOrd.pair T.cmp CCOrd.bool_
+  let compare = CCOrd.pair T.compare CCOrd.bool_
   let equal a b = compare a b=0
 
   let pp out (t,b) = Format.fprintf out "%s%a" (if b then "" else "¬") T.pp t
@@ -93,7 +93,7 @@ module Clause = struct
     List.exists
       (fun (t,b) ->
         b &&
-        List.exists (fun (t',b') -> not b' && T.eq t t') c
+        List.exists (fun (t',b') -> not b' && T.equal t t') c
       ) c
 
   (** A substitution maps some variables to terms. Here this function will
@@ -238,7 +238,7 @@ if sigma(A) = sigma(A')
     This rule is called "resolution" and it's one of the first automated proof
     technique ever. If "resolves" together two complementary literals in
     two clauses (assuming those clauses do not share variables).
-    
+
     Let us explain in the propositional case (ignoring variables), assuming
     [A = A']. The idea is, roughly:
       - we know that either [A] or either [not A] is true
@@ -301,7 +301,7 @@ let _resolve_with c =
 (** Main saturation algorithm, a simple "given clause" loop. This is
     the outer loop of the resolution procedure: given an initial
     set of [clauses], the algorithm does:
-      
+
     - add all the clauses into the passive set
     - while some passive clauses remain unprocessed, pick one of them,
         call it [c], and then do the following:
@@ -341,14 +341,14 @@ let process_file f =
   Util.debug 2 "process file %s..." (fun k->k f);
   let res = Err.(
     (** parse the file in the TPTP format *)
-    Logtk_parsers.Util_tptp.parse_file ~recursive:true f 
+    Logtk_parsers.Util_tptp.parse_file ~recursive:true f
     (** Perform type inference and type checking (possibly updating
         the signature) *)
     >>= Logtk_parsers.Util_tptp.infer_types (`sign !_signature)
     (** CNF ("clausal normal form"). We transform arbitrary first order
         formulas into a set of clauses (see the {!Clause} module)
         because resolution only works on clauses.
-        
+
         This algorithm is already implemented in {!Logtk}. *)
     >>= fun (signature, statements) ->
     let clauses = Logtk_parsers.Util_tptp.Typed.formulas statements in
@@ -371,7 +371,7 @@ let process_file f =
 (** Parse command-line arguments, including the file to process *)
 
 let _options = ref (
-  [ 
+  [
   ] @ Logtk.Options.global_opts
   )
 let _help = "usage: resolution file.p"

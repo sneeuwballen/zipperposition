@@ -106,7 +106,7 @@ let wrap_fo_clause pred clauses : foclause t =
     method signature = Signature.singleton pred __ty_wrap
     method clauses = clauses
     method owns t =
-      try Symbol.eq (T.head t) pred
+      try Symbol.equal (T.head t) pred
       with _ -> false
 
     method to_fact c =
@@ -117,7 +117,7 @@ let wrap_fo_clause pred clauses : foclause t =
 
     method of_fact t =
       match T.view t with
-      | T.At (hd', c) when T.eq hd hd' ->
+      | T.At (hd', c) when T.equal hd hd' ->
           __encoding_wrap#decode (Encoding.EncodedClause.__magic c)
       | _ -> None
   end
@@ -134,7 +134,7 @@ let axiom_or_theory which : (string * Type.t list * term) t  =
     method signature = Signature.singleton s ty
     method owns t =
       match T.open_at t with
-      | hd', _, _ -> T.eq hd hd'
+      | hd', _, _ -> T.equal hd hd'
     method to_fact (name,tyargs,t) =
       T.at hd
         (T.at_full ~tyargs
@@ -143,7 +143,7 @@ let axiom_or_theory which : (string * Type.t list * term) t  =
     method of_fact t =
       Util.debug ~section 5 "%s.of_fact %a?" (fun k->k which T.pp t);
       match T.open_at t with
-      | hd', _, [f] when T.eq hd hd' ->
+      | hd', _, [f] when T.equal hd hd' ->
           begin match T.open_at f with
           | name, tyargs, [arg] ->
               begin match T.view name with
@@ -177,7 +177,7 @@ let pre_rewrite : HORewriting.t t =
       ; __sym_pre_rewrite, __ty_rewrite ]
     method clauses = []
     method owns t =
-      try Symbol.eq (T.head t) __sym_pre_rewrite
+      try Symbol.equal (T.head t) __sym_pre_rewrite
       with _ -> false
 
     method to_fact rules =
@@ -187,13 +187,13 @@ let pre_rewrite : HORewriting.t t =
         |> T.at const_pre_rewrite
 
     method of_fact t = match T.view t with
-    | T.At (l, r) when T.eq l const_pre_rewrite ->
+    | T.At (l, r) when T.equal l const_pre_rewrite ->
         begin match T.view r with
         | T.Multiset (_, l) ->
             begin try
               let rules = List.map
                 (fun pair -> match T.open_at (T.open_forall pair) with
-                | hd, _, [l;r] when T.eq hd const_rule -> l, r
+                | hd, _, [l;r] when T.equal hd const_rule -> l, r
                 | _ -> raise Exit) l
               in
               Some (HORewriting.of_list rules)
@@ -214,7 +214,7 @@ let rewrite : (FOTerm.t * FOTerm.t) list t =
       ; __sym_rewrite, __ty_rewrite ]
     method clauses = []
     method owns t =
-      try Symbol.eq (T.head t) __sym_rewrite
+      try Symbol.equal (T.head t) __sym_rewrite
       with _ -> false
 
     method to_fact rules =
@@ -227,13 +227,13 @@ let rewrite : (FOTerm.t * FOTerm.t) list t =
         |> T.at const_rewrite
 
     method of_fact t = match T.view t with
-    | T.At (l, r) when T.eq l const_rewrite ->
+    | T.At (l, r) when T.equal l const_rewrite ->
         begin match T.view r with
         | T.Multiset (_, l) ->
             begin try
               let rules = List.map
                 (fun pair -> match T.open_at (T.open_forall pair) with
-                | hd, _, [l;r] when T.eq hd const_rule ->
+                | hd, _, [l;r] when T.equal hd const_rule ->
                     begin match HOTerm.uncurry l, HOTerm.uncurry r with
                       | Some l', Some r' -> l', r'
                       | _ -> raise Exit

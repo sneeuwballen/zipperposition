@@ -43,14 +43,14 @@ let pform s =
   TypeInference.FO.convert_form_exn ~ctx f
 
 let test_mk_not () =
-  assert_equal ~cmp:F.eq ~printer F.Base.true_ (F.Base.not_ F.Base.false_);
-  assert_equal ~cmp:F.eq ~printer F.Base.false_ (F.Base.not_ F.Base.true_);
+  assert_equal ~cmp:F.equal ~printer F.Base.true_ (F.Base.not_ F.Base.false_);
+  assert_equal ~cmp:F.equal ~printer F.Base.false_ (F.Base.not_ F.Base.true_);
   ()
 
 let test_simplify () =
   let f = pform "![X]: (p(a) <=> ($true => $false))" in
   let f' = pform "~ p(a)" in
-  assert_equal ~cmp:F.eq ~printer f' (F.simplify f);
+  assert_equal ~cmp:F.equal ~printer f' (F.simplify f);
   ()
 
 let suite =

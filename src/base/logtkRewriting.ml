@@ -82,8 +82,8 @@ module MakeOrdered(E : LogtkIndex.EQUATION with type rhs = T.t) = struct
   let cmp_rule r1 r2 =
     let open CCOrd in
     E.compare r1.rule_equation r2.rule_equation
-    <?> (T.cmp, r1.rule_left, r2.rule_left)
-    <?> (T.cmp, r1.rule_right, r2.rule_right)
+    <?> (T.compare, r1.rule_left, r2.rule_left)
+    <?> (T.compare, r1.rule_right, r2.rule_right)
     <?> (Pervasives.compare, r1.rule_oriented, r2.rule_oriented)
 
   module DT = LogtkDtree.Make(struct
@@ -243,7 +243,7 @@ struct
     type rhs = T.t
     let compare (l1,r1) (l2,r2) =
       let open CCOrd in
-      T.cmp l1 l2 <?> (T.cmp, r1, r2)
+      T.compare l1 l2 <?> (T.compare, r1, r2)
     let extract (l,r) = (l,r,true)
     let priority _ = 1
   end)
@@ -347,7 +347,7 @@ module FormRW = struct
     type rhs = F.t
     let compare (l1,r1) (l2,r2) =
       let open CCOrd in
-      T.cmp l1 l2 <?> (F.cmp, r1, r2)
+      T.compare l1 l2 <?> (F.compare, r1, r2)
     let extract (l,r) = (l,r,true)
     let priority (_,r) = F.weight r
   end)
@@ -434,7 +434,7 @@ module FormRW = struct
     in
     let rules = ref [] in
     let f' = compute_nf ~rules S.empty f 0 in
-    if not (F.eq f f')
+    if not (F.equal f f')
     then LogtkUtil.debug ~section 3 "normal form of `@[%a@]`:@ `@[%a@]`" (fun k->k F.pp f F.pp f');
     f', !rules
 

@@ -36,7 +36,7 @@ module T = FOTerm
 module E : Index.EQUATION with type rhs = int and type t = T.t * int = struct
   type t = T.t * int
   type rhs = int
-  let compare (t1,i1) (t2,i2) = if t1 == t2 then i1-i2 else T.cmp t1 t2
+  let compare (t1,i1) (t2,i2) = if t1 == t2 then i1-i2 else T.compare t1 t2
   let extract (t,i) = t, i, true
   let priority _ = 1
 end
@@ -117,7 +117,7 @@ module TestUnit(I : UnitIndex) = struct
               try
                 let _ = Unif.FO.matching ~pattern:t' 1 t 0 in
                 List.exists
-                  (fun (t'',_) -> T.eq t' t'')
+                  (fun (t'',_) -> T.equal t' t'')
                   retrieved
               with Unif.Fail -> true)
             seq)

@@ -71,7 +71,7 @@ end
 module type ELEMENT = sig
   type t
 
-  val eq : t -> t -> bool
+  val equal : t -> t -> bool
     (** Equality function on elements *)
 
   val hash : t -> int
@@ -84,7 +84,7 @@ module Make(E : ELEMENT) = struct
   (* hashtable on elements *)
   module H = Hashtbl.Make(struct
     type t = E.t
-    let equal = E.eq
+    let equal = E.equal
     let hash = E.hash
   end)
 

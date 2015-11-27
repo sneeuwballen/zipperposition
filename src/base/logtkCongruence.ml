@@ -97,7 +97,7 @@ end
 module type TERM = sig
   type t
 
-  val eq : t -> t -> bool
+  val equal : t -> t -> bool
 
   val hash : t -> int
 
@@ -125,7 +125,7 @@ module Make(T : TERM) = struct
 
   module H = Hashtbl.Make(struct
     type t = term
-    let equal = T.eq
+    let equal = T.equal
     let hash = T.hash
   end)
 
@@ -226,7 +226,7 @@ module Make(T : TERM) = struct
     try
       let t1 = T.update_subterms n1.term l1' in
       let t2 = T.update_subterms n2.term l2' in
-      T.eq t1 t2
+      T.equal t1 t2
     with LogtkType.Error _ ->
       false
 
@@ -387,7 +387,7 @@ module FO = Make(struct
   module T = LogtkFOTerm
 
   type t = T.t
-  let eq = T.eq
+  let equal = T.equal
   let hash = T.hash
 
   let subterms t = match T.Classic.view t with
@@ -405,7 +405,7 @@ module HO = Make(struct
   module T = LogtkHOTerm
 
   type t = T.t
-  let eq = T.eq
+  let equal = T.equal
   let hash = T.hash
 
   let subterms t = match T.view t with

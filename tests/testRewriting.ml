@@ -59,7 +59,7 @@ let rec from_int n =
 let peano_to_int t =
   let rec count t n =
     match T.open_app t with
-    | _ when T.eq t zero -> n
+    | _ when T.equal t zero -> n
     | f, _, [t2] when Symbol.to_string (T.head_exn f) = "s" -> count t2 (n+1)
     | _ -> failwith "not peano!"
   in count t 0
@@ -96,7 +96,7 @@ let test trs t1 t2 =
   let t2' = Rw.rewrite trs t2 in
   Util.debug 5 "normal form of %a = normal form of %a (ie %a)"
     (fun k->k print_peano_nice t1 print_peano_nice t2 print_peano_nice t1');
-  OUnit.assert_equal ~printer:T.to_string ~cmp:T.eq t1' t2';
+  OUnit.assert_equal ~printer:T.to_string ~cmp:T.equal t1' t2';
   ()
 
 (** compute normal form of (n+n) in peano TRS *)
@@ -123,14 +123,14 @@ let benchmark ?(count=benchmark_count) trs a b =
   let one_step () =
     let a' = Rw.rewrite trs a
     and b' = Rw.rewrite trs b in
-    OUnit.assert_equal ~printer:T.to_string ~cmp:T.eq a' b';
+    OUnit.assert_equal ~printer:T.to_string ~cmp:T.equal a' b';
   in
   Gc.major ();
   let start = Unix.gettimeofday () in
   for _i = 1 to count do one_step () done;
   let stop = Unix.gettimeofday () in
   Util.debug 1 "%f seconds to do %d joins of %a and %a (%f each)\n"
-    (fun k->k 
+    (fun k->k
       (stop -. start) count print_peano_nice a print_peano_nice b
       ((stop -. start) /. (float_of_int count)))
 

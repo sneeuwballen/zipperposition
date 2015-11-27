@@ -110,7 +110,7 @@ let open_at t =
 
 let subterm ~sub t =
   let rec check t =
-    T.eq sub t ||
+    T.equal sub t ||
     match T.view t with
     | T.Var _ | T.BVar _ | T.App (_, []) -> false
     | T.App (_, args) -> List.exists check args
@@ -118,14 +118,14 @@ let subterm ~sub t =
   in
   check t
 
-let eq = T.eq
-let cmp = T.cmp
+let equal = T.equal
+let compare = T.compare
 let hash_fun = T.hash_fun
 let hash = T.hash
 
 module TermHASH = struct
   type t = term
-  let equal = eq
+  let equal = equal
   let hash = hash
 end
 
@@ -182,7 +182,7 @@ let const ~ty symbol =
   T.const ~kind ~ty:(ty : LogtkType.t :> T.t) symbol
 
 let multiset ~ty l =
-  if List.exists (fun t -> not (LogtkType.eq ty (__get_ty t))) l
+  if List.exists (fun t -> not (LogtkType.equal ty (__get_ty t))) l
     then raise (LogtkType.Error "type mismatch when building a multiset");
   (* all elements are of type [ty], the result has type [multiset ty] *)
   let ty_res = LogtkType.multiset ty in
@@ -248,7 +248,7 @@ module Seq = struct
   let subterms_depth = T.Seq.subterms_depth
   let symbols t =
     T.Seq.symbols t |>
-      Sequence.filter (fun s -> not (LogtkSymbol.eq s LogtkSymbol.Base.lambda))
+      Sequence.filter (fun s -> not (LogtkSymbol.equal s LogtkSymbol.Base.lambda))
   let max_var = T.Seq.max_var
   let min_var = T.Seq.min_var
   let ty_vars t =
@@ -281,7 +281,7 @@ let rec size t = match T.view t with
 
 let is_ground t = Seq.vars t |> Sequence.is_empty
 
-let var_occurs ~var t = Seq.vars t |> Sequence.exists (eq var)
+let var_occurs ~var t = Seq.vars t |> Sequence.exists (equal var)
 
 let monomorphic t = Seq.ty_vars t |> Sequence.is_empty
 
@@ -324,7 +324,7 @@ let symbols ?(init=LogtkSymbol.Set.empty) t =
   Seq.symbols t |> LogtkSymbol.Seq.add_set init
 
 let contains_symbol s t =
-  Seq.symbols t |> Sequence.exists (LogtkSymbol.eq s)
+  Seq.symbols t |> Sequence.exists (LogtkSymbol.equal s)
 
 (** {2 Visitor} *)
 
@@ -613,7 +613,7 @@ module TPTP = struct
       decr depth
     | Const s -> LogtkSymbol.pp out s
     | Var i ->
-        if not !print_all_types && not (LogtkType.eq (ty t) LogtkType.TPTP.i)
+        if not !print_all_types && not (LogtkType.equal (ty t) LogtkType.TPTP.i)
         then Format.fprintf out "X%d" i
         else Format.fprintf out "X%d:%a" i LogtkType.pp (ty t)
     | At (l,r) ->

@@ -218,7 +218,7 @@ module AC(A : AC_SPEC) : sig
   val normal_form : t -> t
     (** normal form of the term modulo AC *)
 
-  val eq : t -> t -> bool
+  val equal : t -> t -> bool
     (** Check whether the two terms are AC-equal. Optional arguments specify
         which symbols are AC or commutative (by default by looking at
         attr_ac and attr_commut). *)

@@ -145,10 +145,10 @@ that represents a meta-level property. *)
 module EncodedClause = struct
   type t = Reasoner.term
 
-  let eq = HOT.eq
+  let equal = HOT.equal
   let hash = HOT.hash
   let hash_fun = HOT.hash_fun
-  let cmp = HOT.cmp
+  let compare = HOT.compare
   let pp = HOT.pp
   let to_string = HOT.to_string
 
@@ -200,11 +200,11 @@ let __encode_lit = function
   | Bool false -> HOT.TPTP.false_
 
 let __decode_lit t = match HOT.open_at t with
-  | hd, _, [r] when HOT.eq hd __not_conn -> Prop (r, false)
+  | hd, _, [r] when HOT.equal hd __not_conn -> Prop (r, false)
   | hd, _, [r] ->
       begin match HOT.view r with
-      | HOT.Multiset (_,[a;b]) when HOT.eq hd __eq_conn -> Eq (a, b, true)
-      | HOT.Multiset (_,[a;b]) when HOT.eq hd __neq_conn -> Eq (a, b, false)
+      | HOT.Multiset (_,[a;b]) when HOT.equal hd __eq_conn -> Eq (a, b, true)
+      | HOT.Multiset (_,[a;b]) when HOT.equal hd __neq_conn -> Eq (a, b, false)
       | _ -> Prop (t, true)
       end
   | _ -> Prop (t, true)

@@ -27,7 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module MT = LogtkMultiset.Make(struct
   type t = LogtkFOTerm.t
-  let compare = LogtkFOTerm.cmp
+  let compare = LogtkFOTerm.compare
 end)
 
 (** {2 LogtkType definitions} *)
@@ -218,7 +218,7 @@ module Make(P : LogtkPrecedence.S with type symbol = LogtkSymbol.t) = struct
       (** tupled version of kbo (kbo_5 of the paper) *)
       and tckbo wb t1 t2 =
         match TC.view t1, TC.view t2 with
-        | _ when T.eq t1 t2 -> (wb, Eq) (* do not update weight or var balance *)
+        | _ when T.equal t1 t2 -> (wb, Eq) (* do not update weight or var balance *)
         | TC.Var x, TC.Var y ->
           add_pos_var balance x;
           add_neg_var balance y;
@@ -284,9 +284,9 @@ module Make(P : LogtkPrecedence.S with type symbol = LogtkSymbol.t) = struct
 
     let compare_terms ~prec x y =
       LogtkUtil.enter_prof prof_kbo;
-      let cmp = kbo ~prec x y in
+      let compare = kbo ~prec x y in
       LogtkUtil.exit_prof prof_kbo;
-      cmp
+      compare
   end
 
   (** hopefully more efficient (polynomial) implementation of LPO,
@@ -297,7 +297,7 @@ module Make(P : LogtkPrecedence.S with type symbol = LogtkSymbol.t) = struct
 
     (** recursive path ordering *)
     let rec rpo6 ~prec s t =
-      if T.eq s t then Eq else  (* equality test is cheap *)
+      if T.equal s t then Eq else  (* equality test is cheap *)
       match TC.view s, TC.view t with
       | TC.Var _, TC.Var _ -> Incomparable
       | _, TC.Var _ -> if T.var_occurs ~var:t s then Gt else Incomparable
@@ -308,7 +308,7 @@ module Make(P : LogtkPrecedence.S with type symbol = LogtkSymbol.t) = struct
       (* node/node, De Bruijn/De Bruijn *)
       | TC.App (f, _, ss), TC.App (g, _, ts) -> rpo6_composite ~prec s t f g ss ts
       | TC.BVar i, TC.BVar j ->
-        if i = j && LogtkType.eq (T.ty s) (T.ty t) then Eq else Incomparable
+        if i = j && LogtkType.equal (T.ty s) (T.ty t) then Eq else Incomparable
       (* node and something else *)
       | TC.App (_, _, _), TC.BVar _ -> LogtkComparison.Incomparable
       | TC.BVar _, TC.App (_, _, _) -> LogtkComparison.Incomparable
@@ -364,9 +364,9 @@ module Make(P : LogtkPrecedence.S with type symbol = LogtkSymbol.t) = struct
 
     let compare_terms ~prec x y =
       LogtkUtil.enter_prof prof_rpo6;
-      let cmp = rpo6 ~prec x y in
+      let compare = rpo6 ~prec x y in
       LogtkUtil.exit_prof prof_rpo6;
-      cmp
+      compare
   end
 
   (** {2 Value interface} *)
@@ -388,12 +388,12 @@ module Make(P : LogtkPrecedence.S with type symbol = LogtkSymbol.t) = struct
   let __cache = LogtkCache.create 5
 
   let none =
-    let compare _ t1 t2 = if T.eq t1 t2 then Eq else Incomparable in
+    let compare _ t1 t2 = if T.equal t1 t2 then Eq else Incomparable in
     { cache=__cache; compare; prec=Prec.default []; name="none"; }
 
   let subterm =
     let compare _ t1 t2 =
-      if T.eq t1 t2 then Eq
+      if T.equal t1 t2 then Eq
       else if T.subterm ~sub:t1 t2 then Lt
       else if T.subterm ~sub:t2 t1 then Gt
       else Incomparable

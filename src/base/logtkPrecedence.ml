@@ -40,9 +40,9 @@ module type S = LogtkPrecedence_intf.S
 module type SYMBOL = sig
   type t
 
-  val eq : t -> t -> bool
+  val equal : t -> t -> bool
   val hash : t -> int
-  val cmp : t -> t -> int
+  val compare : t -> t -> int
 
   val false_ : t
   val true_ : t
@@ -56,7 +56,7 @@ module Make(Sym : SYMBOL) = struct
 
   module Tbl = CCPersistentHashtbl.Make(struct
     type t = Sym.t
-    let equal = Sym.eq
+    let equal = Sym.equal
     let hash = Sym.hash
   end)
 
@@ -77,8 +77,8 @@ module Make(Sym : SYMBOL) = struct
 
   type precedence = t
 
-  let eq p1 p2 =
-    try List.for_all2 Sym.eq p1.snapshot p2.snapshot
+  let equal p1 p2 =
+    try List.for_all2 Sym.equal p1.snapshot p2.snapshot
     with Invalid_argument _ -> false
 
   let snapshot p = p.snapshot
@@ -88,7 +88,7 @@ module Make(Sym : SYMBOL) = struct
     let i2 = try Tbl.find p.index s2 with Not_found -> -1 in
     let c = i2 - i1 in
     if c = 0
-      then Sym.cmp s1 s2
+      then Sym.compare s1 s2
       else c
 
   let mem p s = Tbl.mem p.index s
@@ -194,7 +194,7 @@ module Make(Sym : SYMBOL) = struct
           else if n1<n2 then C.Gt
           else C.Lt
         with Not_found ->
-          if Sym.eq s1 s2 then C.Eq else C.Incomparable
+          if Sym.equal s1 s2 then C.Eq else C.Incomparable
 
     let _find_noexc tbl s =
       try Some (Tbl.find tbl s)
@@ -222,7 +222,7 @@ module Make(Sym : SYMBOL) = struct
 
     (* regular string ordering *)
     let alpha a b =
-      C.of_total (Sym.cmp a b)
+      C.of_total (Sym.compare a b)
   end
 
   (** {3 Weight} *)
@@ -320,9 +320,9 @@ end
 
 module Default = Make(struct
   type t = LogtkSymbol.t
-  let eq = LogtkSymbol.eq
+  let equal = LogtkSymbol.equal
   let hash = LogtkSymbol.hash
-  let cmp = LogtkSymbol.cmp
+  let compare = LogtkSymbol.compare
   let true_ = LogtkSymbol.Base.true_
   let false_ = LogtkSymbol.Base.false_
   let pp = LogtkSymbol.pp

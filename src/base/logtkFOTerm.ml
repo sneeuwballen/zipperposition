@@ -108,7 +108,7 @@ end
 
 let subterm ~sub t =
   let rec check t =
-    T.eq sub t ||
+    T.equal sub t ||
     match T.view t with
     | T.Var _ | T.BVar _ -> false
     | T.App (f, l) -> check f || List.exists check l
@@ -116,17 +116,17 @@ let subterm ~sub t =
   in
   check t
 
-let eq = T.eq
+let equal = T.equal
 let hash_fun = T.hash_fun
 let hash = T.hash
-let cmp = T.cmp
+let compare = T.compare
 let ty t = match T.ty t with
   | T.NoType -> assert false
   | T.HasType ty -> LogtkType.of_term_exn ty
 
 module TermHASH = struct
   type t = term
-  let equal = eq
+  let equal = equal
   let hash = hash
 end
 
@@ -301,7 +301,7 @@ module Seq = struct
 end
 
 let var_occurs ~var t =
-  Sequence.exists (eq var) (Seq.vars t)
+  Sequence.exists (equal var) (Seq.vars t)
 
 let rec size t = match T.view t with
   | T.Var _
@@ -389,7 +389,7 @@ let symbols ?(init=LogtkSymbol.Set.empty) t =
 
 (** Does t contains the symbol f? *)
 let contains_symbol f t =
-  Sequence.exists (LogtkSymbol.eq f) (Seq.symbols t)
+  Sequence.exists (LogtkSymbol.equal f) (Seq.symbols t)
 
 (** {2 Fold} *)
 
@@ -428,7 +428,7 @@ module AC(A : AC_SPEC) = struct
     | x::l' when LogtkType.is_type x -> flatten acc l' (* ignore type args *)
     | x::l' -> flatten (deconstruct acc x) l'
     and deconstruct acc t = match T.view t with
-    | T.App (f', l') when LogtkSymbol.eq (head_exn f') f ->
+    | T.App (f', l') when LogtkSymbol.equal (head_exn f') f ->
       flatten acc l'
     | _ -> t::acc
     in flatten [] l
@@ -443,7 +443,7 @@ module AC(A : AC_SPEC) = struct
         let l = flatten (head_exn f) l in
         let tyargs, l = _split_types l in
         let l = List.map normalize l in
-        let l = List.sort cmp l in
+        let l = List.sort compare l in
         begin match l with
           | x::l' ->
             let ty = T.ty_exn t in
@@ -457,7 +457,7 @@ module AC(A : AC_SPEC) = struct
         (* FIXME: doesn't handle polymorphic commutative operators *)
         let a = normalize a in
         let b = normalize b in
-        if cmp a b > 0
+        if compare a b > 0
           then T.app ~kind:T.Kind.FOTerm ~ty:(ty t :>T.t) f [b; a]
           else t
       | T.App (f, l) ->
@@ -469,10 +469,10 @@ module AC(A : AC_SPEC) = struct
     LogtkUtil.exit_prof prof_ac_normal_form;
     t'
 
-  let eq t1 t2 =
+  let equal t1 t2 =
     let t1' = normal_form t1
     and t2' = normal_form t2 in
-    eq t1' t2'
+    equal t1' t2'
 
   let symbols seq =
     Sequence.flatMap Seq.symbols seq
@@ -526,7 +526,7 @@ let pp_depth ?(hooks=[]) depth out t =
             (CCFormat.list ~start:"" ~stop:"" ~sep:" " pp_inner) args
     | Const s -> LogtkSymbol.pp out s
     | Var i ->
-      if not !print_all_types && not (LogtkType.eq (ty t) LogtkType.TPTP.i)
+      if not !print_all_types && not (LogtkType.equal (ty t) LogtkType.TPTP.i)
         then Format.fprintf out "@[X%d:%a@]" i (LogtkType.pp_depth !depth) (ty t)
         else Format.fprintf out "X%d" i
     end;
@@ -573,7 +573,7 @@ module TPTP = struct
     | BVar i ->
         Format.fprintf out "Y%d" (!depth - i - 1);
         (* print type of term *)
-        if !print_all_types || not (LogtkType.eq (ty t) LogtkType.TPTP.i)
+        if !print_all_types || not (LogtkType.equal (ty t) LogtkType.TPTP.i)
           then Format.fprintf out ":%a" (LogtkType.TPTP.pp_depth !depth) (ty t)
     | Const s -> LogtkSymbol.TPTP.pp out s
     | App _
@@ -591,7 +591,7 @@ module TPTP = struct
     | Var i ->
         Format.fprintf out "X%d" i;
         (* print type of term *)
-        if !print_all_types || not (LogtkType.eq (ty t) LogtkType.TPTP.i)
+        if !print_all_types || not (LogtkType.equal (ty t) LogtkType.TPTP.i)
           then Format.fprintf out ":%a" (LogtkType.TPTP.pp_depth !depth) (ty t)
     in
     pp_rec out t
@@ -644,41 +644,41 @@ module TPTP = struct
       let module SA = LogtkSymbol.TPTP.Arith in
       let pp_surrounded buf t = match Classic.view t with
       | Classic.App (s, _, [_;_]) when
-        LogtkSymbol.eq s SA.sum ||
-        LogtkSymbol.eq s SA.product ||
-        LogtkSymbol.eq s SA.difference ||
-        LogtkSymbol.eq s SA.quotient ->
+        LogtkSymbol.equal s SA.sum ||
+        LogtkSymbol.equal s SA.product ||
+        LogtkSymbol.equal s SA.difference ||
+        LogtkSymbol.equal s SA.quotient ->
         CCFormat.char buf '(';
         pp_rec buf t;
         CCFormat.char buf ')'
       | _ -> pp_rec buf t
       in
       match Classic.view t with
-      | Classic.Var i when LogtkType.eq (ty t) LogtkType.TPTP.int ->
+      | Classic.Var i when LogtkType.equal (ty t) LogtkType.TPTP.int ->
         Format.fprintf out "I%d" i; true
-      | Classic.Var i when LogtkType.eq (ty t) LogtkType.TPTP.rat ->
+      | Classic.Var i when LogtkType.equal (ty t) LogtkType.TPTP.rat ->
         Format.fprintf out "Q%d" i; true
-      | Classic.App (s, _,[a; b]) when LogtkSymbol.eq s SA.less ->
+      | Classic.App (s, _,[a; b]) when LogtkSymbol.equal s SA.less ->
         Format.fprintf out "%a < %a" pp_surrounded a pp_surrounded b; true
-      | Classic.App (s, _,[a; b]) when LogtkSymbol.eq s SA.lesseq ->
+      | Classic.App (s, _,[a; b]) when LogtkSymbol.equal s SA.lesseq ->
         Format.fprintf out "%a ≤ %a" pp_surrounded a pp_surrounded b; true
-      | Classic.App (s, _,[a; b]) when LogtkSymbol.eq s SA.greater ->
+      | Classic.App (s, _,[a; b]) when LogtkSymbol.equal s SA.greater ->
         Format.fprintf out "%a > %a" pp_surrounded a pp_surrounded b; true
-      | Classic.App (s, _,[a; b]) when LogtkSymbol.eq s SA.greatereq ->
+      | Classic.App (s, _,[a; b]) when LogtkSymbol.equal s SA.greatereq ->
         Format.fprintf out "%a ≥ %a" pp_surrounded a pp_surrounded b; true
-      | Classic.App (s, _,[a; b]) when LogtkSymbol.eq s SA.sum ->
+      | Classic.App (s, _,[a; b]) when LogtkSymbol.equal s SA.sum ->
         Format.fprintf out "%a + %a" pp_surrounded a pp_surrounded b; true
-      | Classic.App (s, _,[a; b]) when LogtkSymbol.eq s SA.difference ->
+      | Classic.App (s, _,[a; b]) when LogtkSymbol.equal s SA.difference ->
         Format.fprintf out "%a - %a" pp_surrounded a pp_surrounded b; true
-      | Classic.App (s, _,[a; b]) when LogtkSymbol.eq s SA.product ->
+      | Classic.App (s, _,[a; b]) when LogtkSymbol.equal s SA.product ->
         Format.fprintf out "%a × %a" pp_surrounded a pp_surrounded b; true
-      | Classic.App (s, _,[a; b]) when LogtkSymbol.eq s SA.quotient ->
+      | Classic.App (s, _,[a; b]) when LogtkSymbol.equal s SA.quotient ->
         Format.fprintf out "%a / %a" pp_surrounded a pp_surrounded b; true
-      | Classic.App (s, _,[a; b]) when LogtkSymbol.eq s SA.quotient_e ->
+      | Classic.App (s, _,[a; b]) when LogtkSymbol.equal s SA.quotient_e ->
         Format.fprintf out "%a // %a" pp_surrounded a pp_surrounded b; true
-      | Classic.App (s, _,[a]) when LogtkSymbol.eq s SA.uminus ->
+      | Classic.App (s, _,[a]) when LogtkSymbol.equal s SA.uminus ->
         Format.fprintf out "-%a" pp_surrounded a; true;
-      | Classic.App (s, _,[a;b]) when LogtkSymbol.eq s SA.remainder_e ->
+      | Classic.App (s, _,[a;b]) when LogtkSymbol.equal s SA.remainder_e ->
         Format.fprintf out "%a mod %a" pp_surrounded a pp_surrounded b; true;
       | _ -> false  (* default *)
 

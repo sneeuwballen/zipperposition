@@ -28,7 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module type EQ = sig
   type t
-  val eq : t -> t -> bool
+  val equal : t -> t -> bool
 end
 
 module type HASH = sig
@@ -39,7 +39,7 @@ end
 
 module type ORD = sig
   type t
-  val cmp : t -> t -> int
+  val compare : t -> t -> int
 end
 
 (** Print a type t *)

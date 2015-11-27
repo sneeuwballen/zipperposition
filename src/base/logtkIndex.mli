@@ -110,7 +110,7 @@ type lits = (bool * term Sequence.t) Sequence.t
 module type CLAUSE = sig
   type t
 
-  val cmp : t -> t -> int
+  val compare : t -> t -> int
     (** Compare two clauses *)
 
   val to_lits : t -> lits

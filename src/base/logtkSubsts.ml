@@ -38,7 +38,7 @@ type term = T.t
 
 module TermInt = struct
   type t = (T.t * int)
-  let equal (t1,i1)(t2,i2) = i1 = i2 && T.eq t1 t2
+  let equal (t1,i1)(t2,i2) = i1 = i2 && T.equal t1 t2
   let hash = Hash.apply (fun (t,i) h -> Hash.int_ i (T.hash_fun t h))
 end
 
@@ -64,8 +64,8 @@ module Renaming = struct
   let hash_to_rename x = Hash.apply hash_to_rename_fun x
 
   let equal_to_rename tr1 tr2 = match tr1, tr2 with
-    | FreshVar (i1, ty1), FreshVar (i2, ty2) -> i1 = i2 && T.eq ty1 ty2
-    | Var (v1,sc1), Var (v2, sc2) -> sc1 = sc2 && T.eq v1 v2
+    | FreshVar (i1, ty1), FreshVar (i2, ty2) -> i1 = i2 && T.equal ty1 ty2
+    | Var (v1,sc1), Var (v2, sc2) -> sc1 = sc2 && T.equal v1 v2
     | _ -> false
 
   module HR = Hashtbl.Make(struct
@@ -165,7 +165,7 @@ let rec get_var subst v sc_v = match subst with
   | M _ ->
     try let t, sc_t = lookup subst v sc_v in
         begin match T.view t with
-        | (T.Var _ | T.RigidVar _) when (sc_t <> sc_v || not (T.eq t v)) ->
+        | (T.Var _ | T.RigidVar _) when (sc_t <> sc_v || not (T.equal t v)) ->
             get_var subst t sc_t  (* recurse *)
         | _ -> t, sc_t (* fixpoint of lookup *)
         end
@@ -177,7 +177,7 @@ let bind subst v s_v t s_t =
   if T.kind v <> T.kind t then raise KindError;
   (*assert (T.DB.closed t); XXX: sometimes useful to allow it *)
   let t', s_t' = get_var subst v s_v in
-  if s_t' = s_t && T.eq t' t
+  if s_t' = s_t && T.equal t' t
     then subst (* compatible (absence of) bindings *)
     else match T.view t' with
     | T.Var _ | T.RigidVar _ ->
@@ -207,7 +207,7 @@ let append s1 s2 = match s1, s2 with
         | None, _ -> b2
         | _, None -> b1
         | Some (t1, s1), Some (t2, s2) ->
-          if T.eq t1 t2 && s1 = s2
+          if T.equal t1 t2 && s1 = s2
             then Some (t1, s1)
             else
               let msg = CCFormat.sprintf

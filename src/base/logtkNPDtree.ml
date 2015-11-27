@@ -247,7 +247,7 @@ end
 module SIMap = Sequence.Map.Make(struct
   type t = LogtkSymbol.t * int
   let compare (s1,i1) (s2,i2) =
-    if i1 = i2 then LogtkSymbol.cmp s1 s2 else i1-i2
+    if i1 = i2 then LogtkSymbol.compare s1 s2 else i1-i2
 end)
 
 module MakeTerm(X : Set.OrderedType) = struct

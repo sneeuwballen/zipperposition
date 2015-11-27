@@ -49,14 +49,14 @@ let test_db_shift () =
   let t = HOT.lambda [x] (f x (g (HOT.bvar ~ty 0))) in
   let t' = HOT.of_term_exn (ScopedTerm.DB.shift 1 (t:HOT.t:>ScopedTerm.t)) in
   let t1 = HOT.lambda [x] (f x (g (HOT.bvar ~ty 1))) in
-  assert_equal ~cmp:HOT.eq ~printer:HOT.to_string t1 t';
+  assert_equal ~cmp:HOT.equal ~printer:HOT.to_string t1 t';
   ()
 
 let test_db_unshift () =
   let t = HOT.__mk_lambda ~varty:ty (f (HOT.bvar ~ty 0) (g (HOT.bvar ~ty 2))) in
   let t' = HOT.of_term_exn (ScopedTerm.DB.unshift 1 (t:HOT.t:>ScopedTerm.t)) in
   let t1 = HOT.__mk_lambda ~varty:ty (f (HOT.bvar ~ty 0) (g (HOT.bvar ~ty 1))) in
-  assert_equal ~cmp:HOT.eq ~printer:HOT.to_string t1 t';
+  assert_equal ~cmp:HOT.equal ~printer:HOT.to_string t1 t';
   ()
 
 let test_beta_reduce () =
@@ -68,7 +68,7 @@ let test_beta_reduce () =
   in
   let t' = Lambda.beta_reduce redex in
   let t1 = f (g a) (g b) in
-  assert_equal ~cmp:HOT.eq ~printer:HOT.to_string t1 t';
+  assert_equal ~cmp:HOT.equal ~printer:HOT.to_string t1 t';
   ()
 
 let suite =
@@ -108,7 +108,7 @@ let check_replace_id =
     let sub = T.Pos.at t pos in
     Prop.assume (ScopedTerm.DB.closed (sub : T.t :> ScopedTerm.t));
     let t' = T.Pos.replace t pos ~by:sub in
-    T.eq t t'
+    T.equal t t'
   in
   mk_test ~pp ~name:"term_replace_same_subterm" gen prop
 

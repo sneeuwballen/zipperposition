@@ -55,14 +55,14 @@ and step = {
 
 type proof = t
 
-let eq p1 p2 = match p1, p2 with
+let equal p1 p2 = match p1, p2 with
   | Axiom (f1, n1), Axiom (f2, n2) -> f1 = f2 && n1 = n2
   | Theory s1, Theory s2 -> s1 = s2
   | InferForm (f1, lazy step1), InferForm(f2, lazy step2) ->
-    F.eq f1 f2 && step1.id = step2.id
+    F.equal f1 f2 && step1.id = step2.id
   | InferClause (c1, lazy step1), InferClause(c2, lazy step2) ->
     begin try
-      List.for_all2 F.eq c1 c2 && step1.id = step2.id
+      List.for_all2 F.equal c1 c2 && step1.id = step2.id
     with Invalid_argument _ -> false
     end
   | _ -> false
@@ -75,7 +75,7 @@ let hash_fun p h = match p with
 
 let hash p = Hash.apply hash_fun p
 
-let cmp p1 p2 = Pervasives.compare p1 p2  (* FIXME *)
+let compare p1 p2 = Pervasives.compare p1 p2  (* FIXME *)
 
 (** {2 Constructors and utils} *)
 
@@ -112,9 +112,9 @@ let is_step = function
   | Theory _ -> false
 
 let is_proof_of_false = function
-  | InferForm (form, _) when F.eq form F.Base.false_ -> true
+  | InferForm (form, _) when F.equal form F.Base.false_ -> true
   | InferClause([],_) -> true
-  | InferClause(l,_) -> List.for_all (F.eq F.Base.false_) l
+  | InferClause(l,_) -> List.for_all (F.equal F.Base.false_) l
   | _ -> false
 
 let get_id = function
@@ -133,7 +133,7 @@ let force = function
 
 module StepTbl = Hashtbl.Make(struct
   type t = proof
-  let equal = eq
+  let equal = equal
   let hash = hash
 end)
 

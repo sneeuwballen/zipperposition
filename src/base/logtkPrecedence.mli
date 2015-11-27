@@ -38,9 +38,9 @@ module type S = LogtkPrecedence_intf.S
 module type SYMBOL = sig
   type t
 
-  val eq : t -> t -> bool
+  val equal : t -> t -> bool
   val hash : t -> int
-  val cmp : t -> t -> int
+  val compare : t -> t -> int
 
   val false_ : t
   val true_ : t

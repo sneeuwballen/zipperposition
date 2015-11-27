@@ -31,7 +31,7 @@ open QCheck
 
 module PO = PartialOrder.Make(struct
   type t = int
-  let eq i j = i = j
+  let equal i j = i = j
   let hash i = i
 end)
 
@@ -46,7 +46,7 @@ let ar_po = Arbitrary.(
       else if List.mem (j,i) pairs then Comparison.Lt
       else Comparison.Incomparable);
   return po)
-    
+
 
 (* check that complete gives a total order *)
 let check_complete =
@@ -63,15 +63,15 @@ let check_complete =
 (* check that completion gives an order that is the same as function *)
 let check_complete_same =
   let gen = ar_po in
-  let cmp i j = i - j in
+  let compare i j = i - j in
   let prop po =
-    PO.complete po cmp;
+    PO.complete po compare;
     List.for_all2
       (fun x y -> match PO.compare po x y with
         | Comparison.Eq
-        | Comparison.Incomparable -> cmp x y = 0
-        | Comparison.Lt -> cmp x y < 0
-        | Comparison.Gt -> cmp x y > 0)
+        | Comparison.Incomparable -> compare x y = 0
+        | Comparison.Lt -> compare x y < 0
+        | Comparison.Gt -> compare x y > 0)
 
       (PO.elements po) (PO.elements po)
   in
@@ -93,21 +93,21 @@ let check_extend =
 (* check that after PO.complete called, elements is a sorted list *)
 let check_elements_sorted =
   let gen = Arbitrary.(list small_int) in
-  let cmp i j = i - j in
+  let compare i j = i - j in
   let rec sorted l = match l with
     | [] | [_] -> true
     | x::((y::_) as l') -> x >= y && sorted l'
   in
   let prop l =
     let po = PO.create l in
-    PO.complete po cmp;
+    PO.complete po compare;
     sorted (PO.elements po)
   in
   let pp = PP.(list int) in
   let size = List.length in
   let name = "partial_order_elements_sorted_after_completion" in
   mk_test ~pp ~size ~name gen prop
-  
+
 let props =
   [ check_complete
   ; check_complete_same

@@ -164,7 +164,7 @@ module Ctx = struct
       | None -> n, ty'
       | Some ty ->
         (* check same type *)
-        if LogtkType.eq ty ty'
+        if LogtkType.equal ty ty'
           then n, ty'
           else failwith
             (CCFormat.sprintf "type mismatch for var %s: %a and %a"
