@@ -56,8 +56,9 @@ Library "logtk"
                     HORewriting, Index, Dtree, Fingerprint, NPDtree,
                     Congruence, FastFingerprint, FeatureVector, Rewriting,
                     FormulaShape, Transform, Lambda, Sourced, TypedSTerm,
-                    Hashcons, Cache, ParseLocation, Multiset, PartialOrder,
-                    PartialOrder_intf, LazyList, IArray, LazyGraph
+                    lib/Hashcons, lib/Cache, lib/ParseLocation, lib/Multiset,
+                    lib/PartialOrder, lib/PartialOrder_intf, lib/LazyList,
+                    lib/IArray, lib/LazyGraph, lib/AllocCache
   CSources:         util_stubs.c, util_stubs.h
   CCOpt:            -Wextra -Wno-unused-parameter
   BuildDepends:     zarith, unix, sequence, containers, containers.data, bytes
