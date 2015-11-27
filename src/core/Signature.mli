@@ -96,9 +96,20 @@ val iter : t -> (Symbol.t -> Type.t -> unit) -> unit
 
 val fold : t -> 'a -> ('a -> Symbol.t -> Type.t -> 'a) -> 'a
 
+val is_bool : t -> Symbol.t -> bool
+  (** Has the symbol a boolean return sort?
+      @raise Not_found if the symbol is not in the signature *)
+
+val is_not_bool : t -> Symbol.t -> bool
+
 (** {2 IO} *)
 
 include Interfaces.PRINT with type t := t
+
+module Builtin : sig
+  val ty : Builtin.t -> Type.t option
+  val ty_exn : Builtin.t -> Type.t
+end
 
 (** {2 Pre-defined signature in TPTP} *)
 
@@ -106,12 +117,6 @@ module TPTP : sig
   val base : t
   val is_base_symbol : Symbol.t -> bool
   val base_symbols : Symbol.Set.t
-
-  val is_bool : t -> Symbol.t -> bool
-    (** Has the symbol a boolean return sort?
-        @raise Not_found if the symbol is not in the signature *)
-
-  val is_not_bool : t -> Symbol.t -> bool
 
   val pp_no_base : t CCFormat.printer
     (** Print the signature, minus the base symbols *)
@@ -124,6 +129,5 @@ module TPTP : sig
     val is_operator : Symbol.t -> bool
 
     val base : t  (** arith op *)
-    val full : t  (** arith op + regular op *)
   end
 end

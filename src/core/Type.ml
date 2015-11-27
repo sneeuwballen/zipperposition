@@ -36,7 +36,10 @@ type t = T.t
 
 type ty = t
 
+type builtin = TType | Prop | Term
+
 type view =
+  | Builtin of builtin
   | Var of int              (** Type variable *)
   | BVar of int             (** Bound variable (De Bruijn index) *)
   | App of symbol * t list  (** parametrized type *)
@@ -54,6 +57,9 @@ let view t = match T.view t with
   | T.Const s -> App (s, [])
   | T.AppBuiltin (Builtin.Arrow, [l;r]) -> Fun (l, r)
   | T.AppBuiltin (Builtin.Multiset, [t]) -> Multiset t
+  | T.AppBuiltin (Builtin.Prop, []) -> Builtin Prop
+  | T.AppBuiltin (Builtin.TType, []) -> Builtin TType
+  | T.AppBuiltin (Builtin.Term, []) -> Builtin Term
   | T.Record (l, rest) -> Record (l, rest)
   | _ -> assert false
 
@@ -67,6 +73,10 @@ let is_bvar ty = match view ty with | BVar _ -> true | _ -> false
 let is_app ty = match view ty with App _ -> true | _ -> false
 let is_fun ty = match view ty with | Fun _ -> true | _ -> false
 let is_forall ty = match view ty with | Forall _ -> true | _ -> false
+
+let tType = T.tType
+
+let prop = T.builtin ~ty:tType Builtin.Prop
 
 let var i =
   T.var ~ty:T.tType i
@@ -135,25 +145,22 @@ let arity ty =
         traverse (i+1) j ty'
     | Multiset _
     | Record _
-    | Var _ -> NoArity
+    | Var _ | Builtin _ -> NoArity
     | BVar _
     | App _ -> Arity (i, j)
   in traverse 0 0 ty
 
 let rec expected_args ty = match view ty with
   | Fun (a, ret) -> a :: expected_args ret
-  | BVar _
-  | Var _
-  | Record _
-  | Multiset _
-  | App _ -> []
   | Forall ty' -> expected_args ty'
+  | BVar _ | Var _ | Builtin _ | Record _ | Multiset _ | App _ -> []
 
 let is_ground = T.ground
 
 let size = T.size
 
 let rec depth ty = match view ty with
+  | Builtin _
   | Var _
   | BVar _ -> 1
   | App (_, l) -> 1 + depth_l l
@@ -221,6 +228,9 @@ module TPTP = struct
   let real = const Symbol.TPTP.real
 
   let rec pp_tstp_rec depth out t = match view t with
+    | Builtin Prop -> CCFormat.string out "$o"
+    | Builtin TType -> CCFormat.string out "$tType"
+    | Builtin Term -> CCFormat.string out "$i"
     | Var i -> Format.fprintf out "T%d" i
     | BVar i -> Format.fprintf out "Tb%d" (depth-i-1)
     | App (p, []) -> Symbol.pp out p
@@ -248,6 +258,9 @@ end
 (** {2 IO} *)
 
 let rec pp_rec depth out t = match view t with
+  | Builtin Prop -> CCFormat.string out "prop"
+  | Builtin TType -> CCFormat.string out "type"
+  | Builtin Term -> CCFormat.string out "ι"
   | Var i -> Format.fprintf out "A%d" i
   | BVar i -> Format.fprintf out "T%i" (depth-i-1)
   | App (p, []) -> CCFormat.string out (Symbol.to_string p)
@@ -345,6 +358,9 @@ module Conv = struct
 
   let to_simple_term ?(curry=true) ?(depth=0) t =
     let rec aux depth t = match view t with
+    | Builtin Prop -> PT.builtin Builtin.Prop
+    | Builtin TType -> PT.builtin Builtin.TType
+    | Builtin Term -> PT.builtin Builtin.Term
     | Var i -> PT.var (CCFormat.sprintf "A%d" i)
     | BVar i -> PT.var (CCFormat.sprintf "B%d" (depth-i-1))
     | App (s,l) -> PT.app (PT.const s) (List.map (aux depth) l)

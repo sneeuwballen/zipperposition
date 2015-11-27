@@ -54,7 +54,10 @@ type t = private ScopedTerm.t
 
 type ty = t
 
+type builtin = TType | Prop | Term
+
 type view = private
+  | Builtin of builtin
   | Var of int              (** Type variable *)
   | BVar of int             (** Bound variable (De Bruijn index) *)
   | App of symbol * t list  (** parametrized type *)
@@ -77,6 +80,9 @@ val is_fun : t -> bool
 val is_forall : t -> bool
 
 (** {2 Constructors} *)
+
+val tType : t
+val prop : t
 
 val var : int -> t
   (** Build a type variable.

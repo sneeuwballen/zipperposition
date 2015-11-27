@@ -24,6 +24,8 @@ type t =
   | Wildcard
   | Multiset  (* type of multisets *)
   | TType (* type of types *)
+  | Prop
+  | Term
   | Int of Z.t
   | Rat of Q.t
 
@@ -67,6 +69,8 @@ val or_ : t
 
 val arrow : t
 val tType : t
+val prop : t
+val term : t
 val has_type : t
 val lift_type : t
 

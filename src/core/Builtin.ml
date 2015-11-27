@@ -22,6 +22,8 @@ type t =
   | Wildcard
   | Multiset  (* type of multisets *)
   | TType (* type of types *)
+  | Prop
+  | Term
   | Int of Z.t
   | Rat of Q.t
 
@@ -46,6 +48,8 @@ let to_int_ = function
   | TType -> 15
   | Int _ -> 16
   | Rat _ -> 17
+  | Prop -> 18
+  | Term -> 19
 
 let compare a b = match a, b with
   | Int i, Int j -> Z.compare i j
@@ -93,6 +97,8 @@ let to_string s = match s with
   | Wildcard -> "_"
   | Multiset -> "Ms"
   | TType -> "TType"
+  | Prop -> "prop"
+  | Term -> "ι"
 
 let pp out s = Format.pp_print_string out (to_string s)
 
@@ -113,11 +119,14 @@ let is_prefix = function
   | Arrow
   | Wildcard
   | Multiset
+  | Prop
+  | Term
   | TType  -> false
 
 let is_infix = function
   | And | Or | Imply | Equiv | Xor | Eq | Neq | HasType | Arrow -> true
-  | Not | LiftType | Int _ | Rat _ | True | False | Wildcard | Multiset | TType  -> false
+  | Not | LiftType | Int _ | Rat _ | True | False | Term
+  | Wildcard | Multiset | TType | Prop -> false
 
 let ty = function
   | Int _ -> `Int
@@ -148,6 +157,8 @@ let has_type = HasType
 let lift_type = LiftType
 let tType = TType
 let multiset = Multiset
+let prop = Prop
+let term = Term
 
 module TPTP = struct
   let pp out = function
@@ -170,6 +181,8 @@ module TPTP = struct
         | Arrow -> ">"
         | Wildcard -> "$_"
         | TType -> "$tType"
+        | Term -> "$i"
+        | Prop -> "$o"
         | Multiset -> failwith "cannot print this symbol in TPTP"
         | Int _ | Rat _ -> assert false
       )

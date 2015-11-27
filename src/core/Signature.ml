@@ -131,6 +131,17 @@ let iter s f =
 let fold s acc f =
   SMap.fold (fun s ty acc -> f acc s ty) s acc
 
+let is_bool signature s =
+  let rec _is_bool_ty ty = match Type.view ty with
+    | Type.Builtin Type.Prop -> true
+    | Type.Fun (ret, _) -> _is_bool_ty ret
+    | Type.Forall ty' -> _is_bool_ty ty'
+    | _ -> false
+  in _is_bool_ty (find_exn signature s)
+
+let is_not_bool signature s =
+  not (is_bool signature s)
+
 (** {2 IO} *)
 
 let pp out s =
@@ -144,22 +155,38 @@ let pp out s =
 
 let to_string = CCFormat.to_string pp
 
-module TPTP = struct
-  let is_bool signature s =
-    let rec _is_bool_ty ty = match Type.view ty with
-      | Type.Fun (ret, _)  when Type.equal ret Type.TPTP.o -> true
-      | _ when Type.equal ty Type.TPTP.o -> true
-      | Type.Forall ty' -> _is_bool_ty ty'
-      | _ -> false
-    in _is_bool_ty (find_exn signature s)
+module Builtin = struct
+  let o = Type.prop
+  let x = Type.var 0
 
-  let is_not_bool signature s =
-    not (is_bool signature s)
+  let ty_exn = function
+    | Builtin.True -> o
+    | Builtin.False -> o
+    | Builtin.Eq -> Type.(forall [x] (o <== [x;x]))
+    | Builtin.Neq -> Type.(forall [x] (o <== [x;x]))
+    | Builtin.Not -> Type.(o <=. o)
+    | Builtin.Imply -> Type.(o <== [o;o])
+    | Builtin.And -> Type.(o <== [o;o])
+    | Builtin.Or -> Type.(o <== [o;o])
+    | Builtin.Equiv -> Type.(o <== [o;o])
+    | Builtin.Xor -> Type.(o <== [o;o])
+    | _ -> invalid_arg "Sig.Builtin.ty_exn"
+
+  let ty x = try Some (ty_exn x) with _ -> None
+end
+
+module TPTP = struct
+  let table =
+    let x = Type.var 0 and o = Type.prop in
+    [ Symbol.TPTP.exists_fun, Type.(forall [x] (o <=. (o <=. x)))
+    ; Symbol.TPTP.forall_fun, Type.(forall [x] (o <=. (o <=. x)))
+    ]
+
+  let base = of_list table
 
   (** {2 Pre-defined symbols} *)
 
   let x = Type.var 0
-
   let ty_1_to_int = Type.(forall [x] (Type.TPTP.int <=. x))
   let ty2op = Type.(forall [x] (x <== [x;x]))
   let ty2op_to_i = Type.(TPTP.(int <== [int;int]))
@@ -191,31 +218,6 @@ module TPTP = struct
     ; Symbol.TPTP.Arith.is_int, Type.(forall [x] (o <=. x))
     ; Symbol.TPTP.Arith.is_rat, Type.(forall [x] (o <=. x))
     ]
-
-  let table =
-    let open Type.TPTP in
-    [ Symbol.Base.true_, o
-    ; Symbol.Base.false_, o
-    ; Symbol.Base.eq, Type.(forall [x] (o <== [x;x]))
-    ; Symbol.Base.neq, Type.(forall [x] (o <== [x;x]))
-    ; Symbol.Base.exists, Type.(forall [x] (o <=. (o <=. x)))
-    ; Symbol.Base.forall, Type.(forall [x] (o <=. (o <=. x)))
-    ; Symbol.Base.not_, Type.(o <=. o)
-    ; Symbol.Base.imply, Type.(o <== [o;o])
-    ; Symbol.Base.and_, Type.(o <== [o;o])
-    ; Symbol.Base.or_, Type.(o <== [o;o])
-    ; Symbol.Base.equiv, Type.(o <== [o;o])
-    ; Symbol.Base.xor, Type.(o <== [o;o])
-    ; Symbol.Base.wildcard, Type.(forall [x] x)
-    (* special symbols
-    ; Symbol.db_symbol
-    ; Symbol.split_symbol
-    ; Symbol.const_symbol
-    ; Symbol.num_symbol
-    ; *)
-    ]
-
-  let base = of_list table
 
   let base_symbols = to_set base
 
