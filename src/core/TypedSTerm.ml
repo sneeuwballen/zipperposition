@@ -27,9 +27,13 @@ and view =
 
 type term = t
 
-let rec view t = match t.term with
-  | Meta (_, {contents=Some t'}) -> view t'
-  | _ -> t.term
+let rec deref t = match t.term with
+  | Meta (_, {contents=Some t'}) -> deref t'
+  | _ -> t
+
+let view t = match t.term with
+  | Meta (_, {contents=Some t'}) -> (deref t').term
+  | v -> v
 
 let loc t = t.loc
 let ty t = t.ty
@@ -38,7 +42,7 @@ let ty_exn t = match t.ty with
   | None -> assert false
   | Some x -> x
 
-let __to_int = function
+let to_int_ = function
   | Var _ -> 0
   | Const _ -> 3
   | App _ -> 4
@@ -83,7 +87,7 @@ let rec compare t1 t2 = match view t1, view t2 with
   | Multiset _, _
   | AppBuiltin _, _
   | Meta _, _
-  | Record _, _ -> __to_int t1.term - __to_int t2.term
+  | Record _, _ -> to_int_ t1.term - to_int_ t2.term
 and cmp_field x y = CCOrd.pair String.compare compare x y
 and cmp_fields x y = CCOrd.list_ cmp_field x y
 
@@ -144,52 +148,56 @@ and pp_fields out f = Util.pp_list ~sep:", " pp_field out f
 
 exception IllFormedTerm of string
 
-let _make ?loc ?ty view = {term=view; loc; ty; }
+let make_ ?loc ~ty view = {term=view; loc; ty=Some ty; }
 
-let var ?loc v = _make ?loc ~ty:v.Var.ty (Var v)
-let const ?loc ?ty s = _make ?loc ?ty (Const s)
-let app_builtin ?loc ?ty b l = _make ?loc ?ty (AppBuiltin (b,l))
-let builtin ?loc ?ty b = _make ?loc ?ty (AppBuiltin (b,[]))
-let meta ?loc v = _make ?loc ~ty:v.Var.ty (Meta (v, ref None))
+let var ?loc v = make_ ?loc ~ty:v.Var.ty (Var v)
+let const ?loc ~ty s = make_ ?loc ~ty (Const s)
+let app_builtin ?loc ~ty b l = make_ ?loc ~ty (AppBuiltin (b,l))
+let builtin ?loc ~ty b = make_ ?loc ~ty (AppBuiltin (b,[]))
+let meta ?loc v = make_ ?loc ~ty:v.Var.ty (Meta (v, ref None))
 
 let meta_of_string ?loc ~ty name =
-  _make ?loc ~ty (Meta (Var.of_string ~ty name, ref None))
+  make_ ?loc ~ty (Meta (Var.of_string ~ty name, ref None))
 
 let meta_full ?loc v r =
-  _make ?loc ~ty:v.Var.ty (Meta (v,r))
+  make_ ?loc ~ty:v.Var.ty (Meta (v,r))
 
-let app ?loc ?ty s l = match l with
+let app ?loc ~ty s l = match l with
   | [] -> s
-  | _::_ -> _make ?loc ?ty (App(s,l))
+  | _::_ -> make_ ?loc ~ty (App(s,l))
 
-let bind ?loc ?ty s v l = _make ?loc ?ty (Bind(s,v,l))
+let bind ?loc ~ty s v l = make_ ?loc ~ty (Bind(s,v,l))
 
-let bind_list ?loc ?ty s vars t =
-  List.fold_right (fun v t -> bind ?loc ?ty s v t) vars t
+let bind_list ?loc ~ty s vars t =
+  List.fold_right (fun v t -> bind ?loc ~ty s v t) vars t
 
-let multiset ?loc ?ty l = _make ?loc ?ty (Multiset l)
+let multiset ?loc ~ty l = make_ ?loc ~ty (Multiset l)
 
-let record ?loc ?ty l ~rest =
-  match rest with
+let record ?loc ~ty l ~rest =
+  match CCOpt.map deref rest with
   | None
   | Some {term=(Var _ | Meta _); _} ->
       let l = List.sort cmp_field l in
-      _make ?loc ?ty (Record (l, rest))
+      make_ ?loc ~ty (Record (l, rest))
   | Some {term=Record (l', rest'); _} ->
       let l = List.sort cmp_field (l@l') in
-      _make ?loc ?ty (Record(l, rest'))
+      make_ ?loc ~ty (Record(l, rest'))
   | Some t' ->
       let msg = CCFormat.sprintf "ill-formed record row: @[%a@]" pp t' in
       raise (IllFormedTerm msg)
 
 let at_loc ?loc t = {t with loc; }
-let with_ty ?ty t = {t with ty; }
+let with_ty ~ty t = {t with ty=Some ty; }
+let map_ty t ~f =
+  {t with ty=match t.ty with
+    | None -> None
+    | Some x -> Some (f x)
+  }
 
-let of_int ?ty i = builtin ?ty (Builtin.of_int i)
-let of_string ?loc ?ty s = const ?loc ?ty (Symbol.of_string s)
+let of_string ?loc ~ty s = const ?loc ~ty (Symbol.of_string s)
 
-let tType = builtin Builtin.tType
-let wildcard = builtin Builtin.wildcard
+let tType = {ty=None; loc=None; term=AppBuiltin (Builtin.TType,[]); }
+let prop = builtin ~ty:tType Builtin.Prop
 
 let fresh_var ?loc ~ty () = var ?loc (Var.gensym ~ty ())
 
@@ -282,7 +290,7 @@ let closed t =
       | Var v -> Var.Set.mem set v
       | _ -> true)
 
-let close_all ?ty s t = bind_list ?ty s (vars t) t
+let close_all ~ty s t = bind_list ~ty s (vars t) t
 
 let to_string = CCFormat.to_string pp
 
@@ -311,14 +319,13 @@ module Subst = struct
   let find subst v = try Some (ID.Map.find v subst) with Not_found -> None
 
   let rec eval_head subst t =
-    let ty = CCOpt.map (eval_head subst) t.ty in
     match view t with
     | Var v ->
         begin try
           let t' = ID.Map.find v.Var.id subst in
           eval_head subst t'
         with Not_found ->
-          with_ty ?ty t
+          var ?loc:t.loc (Var.update_ty v ~f:(eval_head subst))
         end
     | Const _
     | App _
@@ -326,35 +333,41 @@ module Subst = struct
     | Bind _
     | Record _
     | Meta _
-    | Multiset _ -> with_ty ?ty t
+    | Multiset _ -> t
 
   let rec eval subst t =
-    let ty = CCOpt.map (eval subst) t.ty in
     match view t with
     | Var v ->
         begin try
           let t' = ID.Map.find v.Var.id subst in
           eval subst t'
         with Not_found ->
-          with_ty ?ty t
+          var ?loc:t.loc (Var.update_ty v ~f:(eval subst))
         end
-    | Const _ -> with_ty ?ty t
+    | Const _ -> t
     | App (f, l) ->
-        app ?loc:t.loc ?ty (eval subst f) (eval_list subst l)
+        let ty = eval subst (ty_exn t) in
+        app ?loc:t.loc ~ty (eval subst f) (eval_list subst l)
     | Bind (s, v, t) ->
+        let ty = eval subst (ty_exn t) in
         (* bind [v] to a fresh name to avoid collision *)
         let v' = Var.copy v in
         let subst = add subst v (var v') in
-        bind ?loc:t.loc ?ty s v' (eval subst t)
+        bind ?loc:t.loc ~ty s v' (eval subst t)
+    | AppBuiltin (Builtin.TType,_) -> t
     | AppBuiltin (b,l) ->
-        app_builtin ?loc:t.loc ?ty b (eval_list subst l)
+        let ty = eval subst (ty_exn t) in
+        app_builtin ?loc:t.loc ~ty b (eval_list subst l)
     | Record (l, rest) ->
-        record ?loc:t.loc ?ty
+        let ty = eval subst (ty_exn t) in
+        record ?loc:t.loc ~ty
           (List.map (CCPair.map2 (eval subst)) l)
           ~rest:(CCOpt.map (eval subst) rest)
     | Multiset l ->
-        multiset ?loc:t.loc ?ty (eval_list subst l)
+        let ty = eval subst (ty_exn t) in
+        multiset ?loc:t.loc ~ty (eval_list subst l)
     | Meta (v,r) ->
+        let v = Var.update_ty v ~f:(eval subst) in
         meta_full ?loc:t.loc v r
   and eval_list subst l = List.map (eval subst) l
 end
@@ -501,8 +514,8 @@ let unify ?(st=UStack.create()) t1 t2 =
           ()
         else (
           let rest1, rest2 = unif_record_fields `Flexible l1 l2 in
-          unif_record_rest ?ty:t1.ty r2 rest1;
-          unif_record_rest ?ty:t2.ty r1 rest2
+          unif_record_rest ~ty:(ty_exn t1) r2 rest1;
+          unif_record_rest ~ty:(ty_exn t2) r1 rest2
         )
     | Var _, _
     | Const _, _
@@ -554,13 +567,13 @@ let unify ?(st=UStack.create()) t1 t2 =
           unif_rec t1 t2;
           unif_record_fields kind l1' l2'
         ) else fail_ "fields %a and %a do not match" pp_fields l1 pp_fields l2
-  and unif_record_rest ?ty r rest = match r, rest with
+  and unif_record_rest ~ty r rest = match r, rest with
     | None, [] -> ()
     | None, _::_ -> fail_ "row is absent, cannot match %a" pp_fields rest
     | Some t, _ ->
         begin match view t with
         | Meta (_, v) ->
-            let t' = record ?ty rest ~rest:None in
+            let t' = record ~ty rest ~rest:None in
             if occur_check_ t t'
             then fail_ "occur-check of the row %a in @[%a@]" pp t pp t'
             else UStack.bind ~st v t'

@@ -26,6 +26,8 @@ val loc : t -> location option
 val ty : t -> t option
 val ty_exn : t -> t
 
+val deref : t -> t
+
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 
@@ -34,32 +36,30 @@ include Interfaces.ORD with type t := t
 exception IllFormedTerm of string
 
 val tType : t
-val wildcard : t
+val prop : t
 
 val var : ?loc:location -> t Var.t -> t
-val app : ?loc:location -> ?ty:t -> t -> t list -> t
-val const : ?loc:location -> ?ty:t -> Symbol.t -> t
-val app_builtin : ?loc:location -> ?ty:t -> Builtin.t -> t list -> t
-val builtin : ?loc:location -> ?ty:t -> Builtin.t -> t
-val bind : ?loc:location -> ?ty:t -> Binder.t -> t Var.t -> t -> t
-val bind_list : ?loc:location -> ?ty:t -> Binder.t -> t Var.t list -> t -> t
-val multiset : ?loc:location -> ?ty:t -> t list -> t
+val app : ?loc:location -> ty:t -> t -> t list -> t
+val const : ?loc:location -> ty:t -> Symbol.t -> t
+val app_builtin : ?loc:location -> ty:t -> Builtin.t -> t list -> t
+val builtin : ?loc:location -> ty:t -> Builtin.t -> t
+val bind : ?loc:location -> ty:t -> Binder.t -> t Var.t -> t -> t
+val bind_list : ?loc:location -> ty:t -> Binder.t -> t Var.t list -> t -> t
+val multiset : ?loc:location -> ty:t -> t list -> t
 val meta : ?loc:location -> t Var.t -> t
 val meta_of_string : ?loc:location -> ty:t -> string -> t
 val meta_full : ?loc:location -> t Var.t -> t option ref -> t
-val record : ?loc:location -> ?ty:t -> (string*t) list -> rest:t option -> t
+val record : ?loc:location -> ty:t -> (string*t) list -> rest:t option -> t
 (** Build a record with possibly a row variable.
     @raise IllFormedTerm if the [rest] is not either a record or a variable. *)
 
-val of_string : ?loc:location -> ?ty:t -> string -> t
+val of_string : ?loc:location -> ty:t -> string -> t
 (** Make a constant from this string *)
-
-val of_int : ?ty:t -> int -> t
-(** Make a builtin int *)
 
 val at_loc : ?loc:location -> t -> t
 
-val with_ty : ?ty:t -> t -> t
+val with_ty : ty:t -> t -> t
+val map_ty : t -> f:(t -> t) -> t
 
 val fresh_var : ?loc:location -> ty:t -> unit -> t
 (** fresh free variable with the given type. *)
@@ -78,7 +78,7 @@ val closed : t -> bool
 
 val vars : t -> t list
 
-val close_all : ?ty:t -> Binder.t -> t -> t
+val close_all : ty:t -> Binder.t -> t -> t
 (** Bind all free vars with the symbol *)
 
 include Interfaces.PRINT with type t := t
