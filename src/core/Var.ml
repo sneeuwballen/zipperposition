@@ -44,3 +44,20 @@ module Set = struct
   let pp out t =
     CCFormat.seq ~start:"" ~stop:"" ~sep:", " pp out (to_seq t)
 end
+
+module Subst = struct
+  type ('a,'b) t = ('a var * 'b) ID.Map.t
+  let empty = ID.Map.empty
+  let add t v x = ID.Map.add v.id (v,x) t
+  let mem t v = ID.Map.mem v.id t
+  let find_exn t v = snd (ID.Map.find v.id t)
+  let find t v = try Some (find_exn t v) with Not_found -> None
+  let of_seq s = s |> Sequence.map (fun (v,x)->v.id, (v,x)) |> ID.Map.of_seq
+  let to_seq t = ID.Map.to_seq t |> Sequence.map snd
+  let to_list t = ID.Map.fold (fun _ tup acc -> tup::acc) t []
+  let pp pp_v out t =
+    let pp_pair out (v,x) =
+      Format.fprintf out "@[%a → %a@]" pp v pp_v x
+    in
+    CCFormat.seq ~start:"" ~stop:"" ~sep:", " pp_pair out (to_seq t)
+end

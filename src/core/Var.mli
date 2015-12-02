@@ -51,3 +51,16 @@ module Set : sig
   val pp : _ t CCFormat.printer
 end
 
+module Subst : sig
+  type (+'a, +'b) t
+  val empty : (_,_) t
+  val add : ('a,'b) t -> 'a var -> 'b -> ('a,'b) t
+  val mem : ('a,_) t -> 'a var -> bool
+  val find : ('a,'b) t -> 'a var -> 'b option
+  val find_exn : ('a,'b) t -> 'a var -> 'b
+  val of_seq : ('a var * 'b) Sequence.t -> ('a,'b) t
+  val to_list : ('a,'b) t -> ('a var * 'b) list
+  val to_seq: ('a,'b) t -> ('a var * 'b) Sequence.t
+  val pp : 'b CCFormat.printer -> (_, 'b) t CCFormat.printer
+end
+
