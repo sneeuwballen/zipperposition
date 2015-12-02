@@ -31,27 +31,23 @@ a generic backend (implementing De Bruijn indices, subterms, substitutions,
 etc.) for other more specific representations like Type, FOTerm, FOFormula...
 *)
 
-type symbol = Symbol.t
-
 type t
   (** Abstract type of term *)
 
 type term = t
 
 type view = private
-  | Var of int              (** Free variable (integer: mostly useless) *)
-  | RigidVar of int         (** Variable that only unifies with other rigid variables *)
-  | BVar of int             (** Bound variable (De Bruijn index) *)
-  | Bind of Binder.t * t * t  (** Type, sub-term *)
-  | Const of symbol         (** Constant *)
+  | Var of int (** Free variable (integer: mostly useless) *)
+  | RigidVar of int (** Variable that only unifies with other rigid variables *)
+  | BVar of int (** Bound variable (De Bruijn index) *)
+  | Bind of Binder.t * t * t (** Type, sub-term *)
+  | Const of ID.t (** Constant *)
   | Record of (string * t) list * t option (** Extensible record *)
-  | RecordGet of t * string       (** [get r name] is [r.name] *)
-  | RecordSet of t * string * t   (** [set r name t] is [r.name <- t] *)
-  | Multiset of t list      (** Multiset of terms *)
-  | App of t * t list       (** Uncurried application *)
-  | At of t * t             (** Curried application *)
-  | SimpleApp of symbol * t list
-  | AppBuiltin of Builtin.t * t list  (** For representing special constructors *)
+  | Multiset of t list (** Multiset of terms *)
+  | App of t * t list (** Uncurried application *)
+  | At of t * t (** Curried application *)
+  | SimpleApp of ID.t * t list
+  | AppBuiltin of Builtin.t * t list (** For representing special constructors *)
 
 val view : t -> view
 (** View on the term's head form *)
@@ -79,18 +75,16 @@ a key), or, for variables, if the number is negative *)
 exception IllFormedTerm of string
 type nat = int
 
-val const : ty:t -> symbol -> t
+val const : ty:t -> ID.t -> t
 val app : ty:t -> t -> t list -> t
 val bind : ty:t -> varty:t -> Binder.t -> t -> t
 val var : ty:t -> nat -> t
 val rigid_var : ty:t -> nat -> t
 val bvar : ty:t -> nat -> t
 val record : ty:t -> (string * t) list -> rest:t option -> t
-val record_get : ty:t -> t -> string -> t
-val record_set : ty:t -> t -> string -> t -> t
 val multiset : ty:t -> t list -> t
 val at : ty:t -> t -> t -> t
-val simple_app : ty:t -> symbol -> t list -> t
+val simple_app : ty:t -> ID.t -> t list -> t
 val app_builtin : ty:t -> Builtin.t -> t list -> t
 val builtin: ty:t -> Builtin.t -> t
 
@@ -114,8 +108,6 @@ val is_const : t -> bool
 val is_bind : t -> bool
 val is_app : t -> bool
 val is_record : t -> bool
-val is_record_get : t -> bool
-val is_record_set : t -> bool
 val is_multiset : t -> bool
 val is_at : t -> bool
 
@@ -195,7 +187,7 @@ module Seq : sig
   val rigid_vars : t -> t Sequence.t
   val subterms : t -> t Sequence.t
   val subterms_depth : t -> (t * int) Sequence.t  (* subterms with their depth *)
-  val symbols : t -> symbol Sequence.t
+  val symbols : t -> ID.t Sequence.t
   val types : t -> t Sequence.t
   val max_var : t Sequence.t -> int
   val min_var : t Sequence.t -> int
@@ -231,7 +223,7 @@ val size : t -> int
 
 val depth : t -> int
 
-val head : t -> symbol option
+val head : t -> ID.t option
   (** Head symbol, or None if the term is a (bound) variable *)
 
 val all_positions : ?vars:bool -> ?pos:Position.t ->
