@@ -17,7 +17,7 @@ type t =
   | Eq
   | Neq
   | HasType
-  | LiftType (** @since 0.8 *)
+  | LiftType
   | True
   | False
   | Arrow
@@ -30,6 +30,31 @@ type t =
   | TyRat
   | Int of Z.t
   | Rat of Q.t
+  | Floor
+  | Ceiling
+  | Truncate
+  | Round
+  | Prec
+  | Succ
+  | Sum
+  | Difference
+  | Uminus
+  | Product
+  | Quotient
+  | Quotient_e
+  | Quotient_t
+  | Quotient_f
+  | Remainder_e
+  | Remainder_t
+  | Remainder_f
+  | Is_int
+  | Is_rat
+  | To_int
+  | To_rat
+  | Less
+  | Lesseq
+  | Greater
+  | Greatereq
 
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
@@ -80,6 +105,34 @@ val lift_type : t
 
 val wildcard : t    (** $_ for type inference *)
 val multiset : t    (** type of multisets *)
+
+module Arith : sig
+  val floor : t
+  val ceiling : t
+  val truncate : t
+  val round : t
+  val prec : t
+  val succ : t
+  val sum : t
+  val difference : t
+  val uminus : t
+  val product : t
+  val quotient : t
+  val quotient_e : t
+  val quotient_t : t
+  val quotient_f : t
+  val remainder_e : t
+  val remainder_t : t
+  val remainder_f : t
+  val is_int : t
+  val is_rat : t
+  val to_int : t
+  val to_rat : t
+  val less : t
+  val lesseq : t
+  val greater : t
+  val greatereq : t
+end
 
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t

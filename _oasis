@@ -49,7 +49,7 @@ Flag "demo"
 Library "logtk"
   Path:             src/core/
   Pack:             true
-  Modules:          Symbol, ScopedTerm, FOTerm, Type, Util, STerm, Interfaces,
+  Modules:          ScopedTerm, FOTerm, Type, Util, STerm, Interfaces,
                     DBEnv, Position, HOTerm, Formula, Var, HVar,
                     Formula_intf, Substs, Unif, Signature,
                     TypeInference, Options, Comparison, Precedence, Builtin,

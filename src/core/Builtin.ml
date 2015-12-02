@@ -28,6 +28,31 @@ type t =
   | TyRat
   | Int of Z.t
   | Rat of Q.t
+  | Floor
+  | Ceiling
+  | Truncate
+  | Round
+  | Prec
+  | Succ
+  | Sum
+  | Difference
+  | Uminus
+  | Product
+  | Quotient
+  | Quotient_e
+  | Quotient_t
+  | Quotient_f
+  | Remainder_e
+  | Remainder_t
+  | Remainder_f
+  | Is_int
+  | Is_rat
+  | To_int
+  | To_rat
+  | Less
+  | Lesseq
+  | Greater
+  | Greatereq
 
 type t_ = t
 
@@ -54,6 +79,31 @@ let to_int_ = function
   | Term -> 19
   | TyRat -> 20
   | TyInt -> 21
+  | Floor -> 22
+  | Ceiling -> 23
+  | Truncate -> 24
+  | Round -> 25
+  | Prec -> 26
+  | Succ -> 27
+  | Sum -> 28
+  | Difference -> 29
+  | Uminus -> 30
+  | Product -> 31
+  | Quotient -> 32
+  | Quotient_e -> 33
+  | Quotient_t -> 34
+  | Quotient_f -> 35
+  | Remainder_e -> 36
+  | Remainder_t -> 37
+  | Remainder_f -> 38
+  | Is_int -> 39
+  | Is_rat -> 40
+  | To_int -> 41
+  | To_rat -> 42
+  | Less -> 43
+  | Lesseq -> 44
+  | Greater -> 45
+  | Greatereq -> 46
 
 let compare a b = match a, b with
   | Int i, Int j -> Z.compare i j
@@ -105,17 +155,43 @@ let to_string s = match s with
   | Term -> "ι"
   | TyInt -> "int"
   | TyRat -> "rat"
+  | Floor -> "floor"
+  | Ceiling -> "ceiling"
+  | Truncate -> "truncate"
+  | Round -> "round"
+  | Prec -> "prec"
+  | Succ -> "succ"
+  | Sum -> "+"
+  | Difference -> "-"
+  | Uminus -> "uminus"
+  | Product -> "×"
+  | Quotient -> "/"
+  | Quotient_e -> "quotient_e"
+  | Quotient_t -> "quotient_t"
+  | Quotient_f -> "quotient_f"
+  | Remainder_e -> "remainder_e"
+  | Remainder_t -> "remainder_t"
+  | Remainder_f -> "remainder_f"
+  | Is_int -> "is_int"
+  | Is_rat -> "is_rat"
+  | To_int -> "to_int"
+  | To_rat -> "to_rat"
+  | Less -> "<"
+  | Lesseq -> "≤"
+  | Greater -> ">"
+  | Greatereq -> "≥"
 
 let pp out s = Format.pp_print_string out (to_string s)
 
-let is_prefix = function
-  | Not | LiftType -> true
+let is_infix = function
+  | And | Or | Imply | Equiv | Xor | Eq | Neq | HasType | Arrow
+  | Sum | Difference | Product
+  | Quotient | Quotient_e | Quotient_f | Quotient_t
+  | Remainder_e | Remainder_t | Remainder_f
+  | Less | Lesseq | Greater | Greatereq -> true
   | _ -> false
 
-let is_infix = function
-  | And | Or | Imply | Equiv | Xor | Eq | Neq | HasType | Arrow -> true
-  | Not | LiftType | Int _ | Rat _ | True | False | Term
-  | Wildcard | Multiset | TType | Prop | TyInt | TyRat -> false
+let is_prefix o = not (is_infix o)
 
 let ty = function
   | Int _ -> `Int
@@ -151,6 +227,34 @@ let term = Term
 let ty_int = TyInt
 let ty_rat = TyRat
 
+module Arith = struct
+  let floor = Floor
+  let ceiling = Ceiling
+  let truncate = Truncate
+  let round = Round
+  let prec = Prec
+  let succ = Succ
+  let sum = Sum
+  let difference = Difference
+  let uminus = Uminus
+  let product = Product
+  let quotient = Quotient
+  let quotient_e = Quotient_e
+  let quotient_t = Quotient_t
+  let quotient_f = Quotient_f
+  let remainder_e = Remainder_e
+  let remainder_t = Remainder_t
+  let remainder_f = Remainder_f
+  let is_int = Is_int
+  let is_rat = Is_rat
+  let to_int = To_int
+  let to_rat = To_rat
+  let less = Less
+  let lesseq = Lesseq
+  let greater = Greater
+  let greatereq = Greatereq
+end
+
 module TPTP = struct
   let pp out = function
     | Int i -> CCFormat.string out (Z.to_string i)
@@ -177,7 +281,33 @@ module TPTP = struct
         | Multiset -> failwith "cannot print this symbol in TPTP"
         | TyInt -> "$int"
         | TyRat -> "$rat"
-        | Int _ | Rat _ -> assert false
+        | Int _
+        | Rat _ -> assert false
+        | Floor -> "$floor"
+        | Ceiling -> "$ceiling"
+        | Truncate -> "$truncate"
+        | Round -> "$round"
+        | Prec -> "$prec"
+        | Succ -> "$succ"
+        | Sum -> "$sum"
+        | Difference -> "$diff"
+        | Uminus -> "$uminus"
+        | Product -> "$product"
+        | Quotient -> "$quotient"
+        | Quotient_e -> "$quotient_e"
+        | Quotient_t -> "$quotient_t"
+        | Quotient_f -> "$quotient_f"
+        | Remainder_e -> "$remainder_e"
+        | Remainder_t -> "$remainder_t"
+        | Remainder_f -> "$remainder_f"
+        | Is_int -> "$is_int"
+        | Is_rat -> "$is_rat"
+        | To_int -> "$to_int"
+        | To_rat -> "$to_rat"
+        | Less -> "$less"
+        | Lesseq -> "$lesseq"
+        | Greater -> "$greater"
+        | Greatereq -> "$greatereq"
       )
 
   let to_string = CCFormat.to_string pp
