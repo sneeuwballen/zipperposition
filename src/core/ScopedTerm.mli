@@ -37,12 +37,11 @@ type t
 type term = t
 
 type view = private
-  | Var of int (** Free variable (integer: mostly useless) *)
-  | RigidVar of int (** Variable that only unifies with other rigid variables *)
-  | BVar of int (** Bound variable (De Bruijn index) *)
+  | Var of HVar.t (** Free variable *)
+  | DB of int
   | Bind of Binder.t * t * t (** Type, sub-term *)
   | Const of ID.t (** Constant *)
-  | Record of (string * t) list * t option (** Extensible record *)
+  | Record of (string * t) list * HVar.t option (** Extensible record *)
   | Multiset of t list (** Multiset of terms *)
   | App of t * t list (** Uncurried application *)
   | At of t * t (** Curried application *)
@@ -79,9 +78,10 @@ val const : ty:t -> ID.t -> t
 val app : ty:t -> t -> t list -> t
 val bind : ty:t -> varty:t -> Binder.t -> t -> t
 val var : ty:t -> nat -> t
-val rigid_var : ty:t -> nat -> t
+val mk_var : ty:t -> HVar.t -> t
 val bvar : ty:t -> nat -> t
-val record : ty:t -> (string * t) list -> rest:t option -> t
+val record : ty:t -> (string * t) list -> rest:HVar.t option -> t
+val record_flatten : ty:t -> (string * t) list -> rest:t option -> t
 val multiset : ty:t -> t list -> t
 val at : ty:t -> t -> t -> t
 val simple_app : ty:t -> ID.t -> t list -> t
@@ -103,7 +103,6 @@ val change_kind :  t -> t
 
 val is_var : t -> bool
 val is_bvar : t -> bool
-val is_rigid_var : t -> bool
 val is_const : t -> bool
 val is_bind : t -> bool
 val is_app : t -> bool
@@ -149,10 +148,6 @@ module DB : sig
   val contains : t -> int -> bool
     (** Does t contains the De Bruijn variable of index n? *)
 
-  val open_vars : t -> t Sequence.t
-    (** List of "open" De Bruijn variables (with too high an index)
-        @deprecated since 0.5.2, dangerous, use DBEnv functions instead *)
-
   val shift : int -> t -> t
     (** shift the non-captured De Bruijn indexes in the term by n *)
 
@@ -173,24 +168,16 @@ module DB : sig
         replacing De Bruijn indices by their value in the environment. *)
 end
 
-(** {3 High level constructors} *)
-
-val bind_vars :  ty:t -> Binder.t -> t list -> t -> t
-  (** bind several free variables in the term, transforming it
-      to use De Bruijn indices.
-      @param ty return type of the term *)
-
 (** {3 Iterators} *)
 
 module Seq : sig
-  val vars : t -> t Sequence.t
-  val rigid_vars : t -> t Sequence.t
+  val vars : t -> HVar.t Sequence.t
   val subterms : t -> t Sequence.t
   val subterms_depth : t -> (t * int) Sequence.t  (* subterms with their depth *)
   val symbols : t -> ID.t Sequence.t
   val types : t -> t Sequence.t
-  val max_var : t Sequence.t -> int
-  val min_var : t Sequence.t -> int
+  val max_var : HVar.t Sequence.t -> int
+  val min_var : HVar.t Sequence.t -> int
   val add_set : Set.t -> t Sequence.t -> Set.t
   val add_tbl : unit Tbl.t -> t Sequence.t -> unit
 end

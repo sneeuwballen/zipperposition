@@ -28,6 +28,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module Hash = CCHash
 
+type record_row =
+  | RowNone
+  | RowDB of int
+  | RowVar of HVar.t
+
 (* term *)
 type t = {
   term : view;
@@ -38,12 +43,11 @@ type t = {
 
 (* head form *)
 and view =
-  | Var of int (** Free variable (integer: mostly useless) *)
-  | RigidVar of int (** Variable that only unifies with other rigid variables *)
-  | BVar of int (** Bound variable (De Bruijn index) *)
+  | Var of HVar.t (** Free or bound variable *)
+  | DB of int
   | Bind of Binder.t * t * t (** Type, sub-term *)
   | Const of ID.t (** Constant *)
-  | Record of (string * t) list * t option (** Extensible record *)
+  | Record of (string * t) list * HVar.t option (** Extensible record *)
   | Multiset of t list (** Multiset of terms *)
   | App of t * t list (** Uncurried application *)
   | At of t * t (** Curried application *)
@@ -74,9 +78,8 @@ let _hash_ty t h =
 
 let _hash_norec t h =
   let h = match view t with
-  | Var i -> h |> Hash.string_ "var" |> Hash.int_ i
-  | RigidVar i -> h |> Hash.string_ "rigid" |> Hash.int_ i
-  | BVar i -> h |> Hash.string_ "bvar" |> Hash.int_ i
+  | Var v -> h |> Hash.string_ "var" |> HVar.hash_fun v
+  | DB v -> Hash.int_ v h
   | Bind (b, varty, t') ->
       h |> Hash.string_ "bind" |> Binder.hash_fun b |> hash_fun varty |> hash_fun t'
   | Const s -> h |> Hash.string_ "const" |> ID.hash_fun s
@@ -84,7 +87,7 @@ let _hash_norec t h =
       h
       |> Hash.string_ "record"
       |> Hash.list_ (fun (s,t') h -> h |> Hash.string_ s |> hash_fun t') l
-      |> Hash.opt hash_fun rest
+      |> Hash.opt HVar.hash_fun rest
   | Multiset l -> h |> Hash.string_ "ms" |> Hash.list_ hash_fun l
   | App (f, l) -> h |> Hash.string_ "app" |> hash_fun f |> Hash.list_ hash_fun l
   | At (t1, t2) -> h |> Hash.string_ "at" |> hash_fun t1 |> hash_fun t2
@@ -98,9 +101,8 @@ let _hash_norec t h =
 let rec _eq_norec t1 t2 =
   _eq_ty t1 t2 &&
   match t1.term, t2.term with
-  | Var i, Var j
-  | RigidVar i, RigidVar j -> i = j
-  | BVar i, BVar j -> i = j
+  | Var i, Var j -> HVar.equal i j
+  | DB i, DB j -> i = j
   | Const s1, Const s2 -> ID.equal s1 s2
   | Bind (b1, varty1, t1'), Bind (b2, varty2, t2') ->
     Binder.equal b1 b2 && equal varty1 varty2 && equal t1' t2'
@@ -197,35 +199,29 @@ let app ~ty f l =
       end;
       t
 
-let _var ~ty i =
-  H.hashcons (_make ~ty:(HasType ty) (Var i))
+let mk_var ~ty v = H.hashcons (_make ~ty:(HasType ty) (Var v))
 
-let var ~ty i =
-  if i<0 then raise (IllFormedTerm "var");
-  _var ~ty i
+let var ~ty i = mk_var ~ty (HVar.make i)
 
 let fresh_var =
   let r = ref ~-1 in
   fun ~ty () ->
     if !r >= 0 then failwith "ScopedTerm.fresh_var: overflow";
-    let t = _var ~ty !r in
+    let t = mk_var ~ty (HVar.make !r) in
     decr r;
     t
 
 let bvar ~ty i =
   if i<0 then raise (IllFormedTerm "bvar");
-  H.hashcons (_make ~ty:(HasType ty) (BVar i))
-
-let rigid_var ~ty i =
-  if i<0 then raise (IllFormedTerm "rigid_var");
-  H.hashcons (_make ~ty:(HasType ty) (RigidVar i))
+  H.hashcons (_make ~ty:(HasType ty) (DB i))
 
 let bind ~ty ~varty s t' =
   H.hashcons (_make ~ty:(HasType ty) (Bind (s, varty, t')))
 
+(* TODO: move to Subst (only place where it can happen now) *)
 (* merge l1 and l2, which are both sorted. If the same key occurs with
- * distinct values, fail. *)
-let rec __merge_records l1 l2 = match l1, l2 with
+   distinct values, fail. *)
+let rec merge_records_ l1 l2 = match l1, l2 with
   | [], [] -> []
   | [], _ -> l2
   | _, [] -> l1
@@ -233,48 +229,58 @@ let rec __merge_records l1 l2 = match l1, l2 with
       match String.compare n1 n2 with
       | 0 ->
         if equal t1 t2
-          then (n1,t1) :: __merge_records l1' l2'  (* compatible *)
+          then (n1,t1) :: merge_records_ l1' l2'  (* compatible *)
           else failwith ("ill-formed record: field "^n1^" has distinct values")
-      | n when n < 0 -> (n1,t1) :: __merge_records l1' l2
-      | _ -> (n2,t2) :: __merge_records l1 l2'
+      | n when n < 0 -> (n1,t1) :: merge_records_ l1' l2
+      | _ -> (n2,t2) :: merge_records_ l1 l2'
 
 (* if any string of [l] appears in [seen], fail *)
-let rec __check_duplicates seen l = match l with
+let rec check_duplicates_ seen l = match l with
   | [] -> ()
   | (s,_) :: l' ->
       if List.mem s seen
       then failwith ("ill-formed record: field " ^ s ^ " appears twice")
-      else __check_duplicates (s::seen) l'
+      else check_duplicates_ (s::seen) l'
+
+(* TODO: remove computation of ground flag *)
 
 (* actually build the record *)
-let __make_record ~ty l ~rest =
+let make_record_ ~ty l ~rest =
   let my_t = _make ~ty:(HasType ty) (Record (l,rest)) in
   let t = H.hashcons my_t in
   if t == my_t then begin
     if ground ty && List.for_all (fun (_,t) -> ground t) l
-    && (match rest with None -> true | Some r -> ground r)
+    && (match rest with None -> true | Some _ -> false)
       then set_flag t flag_ground;
   end;
   t
 
 (* flatten record: if the rest is a record, merge its fields into [l].
- * precondition: [l] is sorted. *)
-let rec __flatten_record ~ty l ~rest =
+   precondition: [l] is sorted. *)
+let flatten_record_ ~ty l ~rest =
   match rest with
-  | None -> __make_record ~ty l ~rest
+  | None -> make_record_ ~ty l ~rest:None
   | Some r ->
       begin match view r with
       | Record (l', rest') ->
           (* here be flattening! *)
-          __flatten_record ~ty (__merge_records l l') ~rest:rest'
-      | _ -> __make_record ~ty l ~rest
+          make_record_ ~ty (merge_records_ l l') ~rest:rest'
+      | Var v -> make_record_ ~ty l ~rest:(Some v)
+      | _ -> invalid_arg "record_flatten: row must be record or variable"
       end
 
 let record ~ty l ~rest =
   let l = List.sort (fun (s1,_) (s2,_) -> String.compare s1 s2) l in
   (* check that [l] is well-formed *)
-  __check_duplicates [] l;
-  __flatten_record ~ty l ~rest
+  check_duplicates_ [] l;
+  make_record_ ~ty l ~rest
+
+let record_flatten ~ty l ~rest =
+  let l = List.sort (fun (s1,_) (s2,_) -> String.compare s1 s2) l in
+  (* check that [l] is well-formed *)
+  check_duplicates_ [] l;
+  (* merge with rest, if any *)
+  flatten_record_ ~ty l ~rest
 
 let multiset ~ty l =
   let l = List.sort compare l in
@@ -329,9 +335,8 @@ let tType =
   H.hashcons my_t
 
 let cast ~ty old = match old.term with
-  | Var i -> _var ~ty i
-  | RigidVar i -> rigid_var ~ty i
-  | BVar i -> bvar ~ty i
+  | Var i -> mk_var ~ty i
+  | DB i -> bvar ~ty i
   | Const s -> const ~ty s
   | Bind (s, varty, t') -> bind ~ty s ~varty t'
   | Record (l, rest) -> record ~ty l ~rest
@@ -346,8 +351,7 @@ let change_kind old =
   H.hashcons my_t
 
 let is_var t = match view t with | Var _ -> true | _ -> false
-let is_bvar t = match view t with | BVar _ -> true | _ -> false
-let is_rigid_var t = match view t with | RigidVar _ -> true | _ -> false
+let is_bvar t = match view t with | DB _ -> true | _ -> false
 let is_const t = match view t with | Const _ -> true | _ -> false
 let is_bind t = match view t with | Bind _ -> true | _ -> false
 let is_record t = match view t with | Record _ -> true | _ -> false
@@ -395,18 +399,13 @@ module DB = struct
       | HasType ty -> _to_seq ~depth ty k
     end;
     match view t with
-    | BVar _ -> k t depth
+    | DB v -> k v depth
     | Var _
-    | RigidVar _
     | Const _ -> ()
     | Bind (_, varty, t') ->
         _to_seq ~depth varty k;
         _to_seq ~depth:(depth+1) t' k
-    | Record (l, rest) ->
-        begin match rest with
-          | None -> ()
-          | Some r -> _to_seq~depth r k
-        end;
+    | Record (l, _rest) ->
         List.iter (fun (_,t) -> _to_seq ~depth t k) l
     | AppBuiltin (_, l)
     | SimpleApp (_,l)
@@ -424,10 +423,7 @@ module DB = struct
   let _closed t =
     _to_seq ~depth:0 t
       |> Sequence.map2
-        (fun bvar depth -> match view bvar with
-          | BVar i -> i<depth
-          | _ -> assert false
-        )
+        (fun bvar depth -> bvar < depth)
       |> Sequence.for_all _id
 
   let closed t =
@@ -446,10 +442,7 @@ module DB = struct
   let contains t n =
     _to_seq ~depth:0 t
       |> Sequence.map2
-        (fun bvar _ -> match view bvar with
-          | BVar i -> i=n
-          | _ -> assert false
-        )
+        (fun bvar _ -> bvar=n)
       |> Sequence.exists _id
 
   (* maps the term to another term, calling [on_binder acc t]
@@ -463,21 +456,15 @@ module DB = struct
     | HasType ty ->
       let ty = recurse ~depth acc ty in
       match view t with
-        | Var i -> _var ~ty i
-        | RigidVar i -> rigid_var ~ty i
+        | Var v -> mk_var ~ty v
+        | DB i -> bvar ~ty (on_bvar ~depth acc i)
         | Const s -> const ~ty s
-        | BVar i ->
-          on_bvar ~ty ~depth acc i
         | Bind (s, varty, t') ->
           let acc' = on_binder ~ty ~depth acc s varty in
           let varty' = recurse ~depth acc varty in
           let t' = recurse ~depth:(depth+1) acc' t' in
           bind ~ty ~varty:varty' s t'
         | Record (l, rest) ->
-          let rest = match rest with
-            | None -> None
-            | Some r -> Some (recurse ~depth acc r)
-          in
           let l = List.map (fun (s,t') -> s, recurse ~depth acc t') l in
           record ~ty l ~rest
         | Multiset l ->
@@ -499,11 +486,10 @@ module DB = struct
     assert (n >= 0);
     _fold_map ()
       ~on_bvar:(
-        fun ~ty ~depth () i ->
+        fun ~depth () i ->
           if i >= depth
-            then (* shift *)
-              bvar ~ty (i + n)
-            else bvar ~ty i
+            then i + n  (* shift *)
+            else i
         )
       ~on_binder:(fun ~ty:_ ~depth:_ () _ _ -> ())
       t
@@ -511,25 +497,13 @@ module DB = struct
   let unshift n t =
     _fold_map ()
       ~on_bvar:(
-        fun ~ty ~depth () i ->
+        fun ~depth () i ->
           if i >= depth
-            then (* ushift *)
-              bvar ~ty (i - n)
-            else bvar ~ty i
+            then i - n  (* ushift *)
+            else i
         )
       ~on_binder:(fun ~ty:_ ~depth:_ () _ _ -> ())
       t
-
-  let open_vars t =
-    _to_seq ~depth:0 t
-      |> Sequence.zip
-      |> Sequence.fmap
-        (fun (t,depth) -> match view t with
-          | BVar i when i>=depth ->
-              let ty = unshift depth (ty_exn t) in
-              Some (bvar ~ty (i-depth))
-          | _ -> None
-        )
 
   (* recurse and replace [sub]. *)
   let rec _replace depth ~sub t =
@@ -542,16 +516,14 @@ module DB = struct
       match view t with
         | _ when equal t sub ->
           bvar ~ty depth  (* replace *)
-        | Var i -> _var ~ty i
-        | RigidVar i -> rigid_var ~ty i
-        | BVar i -> bvar ~ty i
+        | Var i -> mk_var ~ty i
+        | DB i -> bvar ~ty i
         | Const s -> const ~ty s
         | Bind (s, varty, t') ->
           let varty' = _replace depth ~sub varty in
           let t' = _replace (depth+1) t' ~sub in
           bind ~ty ~varty:varty' s t'
         | Record (l, rest) ->
-          let rest = CCOpt.map (_replace depth ~sub) rest in
           let l = List.map (fun (s,t') -> s, _replace depth t' ~sub) l in
           record ~ty l ~rest
         | Multiset l ->
@@ -580,23 +552,24 @@ module DB = struct
     | HasType ty ->
       let ty = _eval env ty in
       match view t with
-        | _ when ground t -> t
-        | Var i -> _var ~ty i
-        | RigidVar i -> rigid_var ~ty i
+        | _ when ground t -> t (* TODO: when groundness flags removed, remove *)
+        | Var v -> mk_var ~ty v
+        | DB i ->
+            begin match DBEnv.find env i with
+              | None -> bvar ~ty i
+              | Some t' ->
+                (* TODO: we should shift [t'], and make sure shifting is
+                   efficient when [t'] is closed (e.g. storing in each
+                   term the number of binders it needs to be closed) *)
+                assert (closed t');
+                t'
+            end
         | Const s -> const ~ty s
-        | BVar i ->
-          begin match DBEnv.find env i with
-            | None -> bvar ~ty i
-            | Some t' ->
-              assert (closed t');
-              t'
-          end
         | Bind (s, varty, t') ->
           let varty' = _eval env varty in
           let t' = _eval (DBEnv.push_none env) t' in
           bind ~ty ~varty:varty' s t'
         | Record (l, rest) ->
-          let rest = CCOpt.map (_eval env) rest in
           let l = List.map (fun (s,t') -> s, _eval env t') l in
           record ~ty l ~rest
         | Multiset l ->
@@ -612,19 +585,64 @@ module DB = struct
           simple_app ~ty s (List.map (_eval env) l)
 
   let eval env t = _eval env t
+
+  let apply_subst_ t subst =
+    let rec aux depth t =
+      match t.ty with
+      | NoType ->
+        assert (t == tType);
+        t
+      | HasType ty ->
+        let ty = aux depth ty in
+        match view t with
+          | Var v ->
+              begin try
+                shift depth (HVar.Map.find v subst)
+              with Not_found -> mk_var ~ty v
+              end
+          | DB i -> bvar ~ty i
+          | Const s -> const ~ty s
+          | Bind (s, varty, t') ->
+            let varty' = aux depth varty in
+            let t' = aux (depth+1) t' in
+            bind ~ty ~varty:varty' s t'
+          | Record (l, rest) ->
+            let rest = match rest with
+              | None -> None
+              | Some v ->
+                  begin try
+                    Some (shift depth (HVar.Map.find v subst))
+                  with Not_found -> Some (mk_var ~ty v)
+                  end
+            in
+            let l = List.map (fun (s,t') -> s, aux depth t') l in
+            record_flatten ~ty l ~rest
+          | Multiset l ->
+            let l = List.map (aux depth) l in
+            multiset ~ty l
+          | App (f, l) ->
+            app ~ty (aux depth f) (List.map (aux depth) l)
+          | At (l,r) ->
+            at ~ty (aux depth l ) (aux depth r)
+          | SimpleApp (s,l) ->
+            simple_app ~ty s (List.map (aux depth) l)
+          | AppBuiltin (s,l) ->
+            app_builtin ~ty s (List.map (aux depth) l)
+    in
+    aux 0 t
 end
 
-let bind_vars ~ty s vars t =
+(* FIXME: HVar must contain type *)
+
+let bind_vars ~ty b vars t =
+  (* subst: bind vars_i to a De Bruijn (reverse list so that last element is 0) *)
+  let subst = CCList.Idx.foldi
+    (fun s i v -> HVar.Map.add v (bvar ~ty:(ty_exn v) i) s)
+    HVar.Map.empty (List.rev vars)
+  in
   List.fold_right
-    (fun v t ->
-      assert (is_var v);
-      let t' = DB.replace (DB.shift 1 t) ~sub:v in
-      let varty = match v.ty with
-        | NoType -> failwith "ScopedTerm.bind_vars: variable has no type"
-        | HasType ty -> ty
-      in
-      bind ~ty ~varty s t')
-    vars t
+    (fun v t -> bind ~ty ~varty:(ty_exn v) b t)
+    vars (DB.apply_subst_ t subst)
 
 (** {3 Iterators} *)
 
@@ -632,13 +650,12 @@ module Seq = struct
   let vars t k =
     let rec vars t = match view t with
       | _ when ground t -> ()
-      | Var _ -> k t
-      | RigidVar _
-      | BVar _
+      | Var v -> k v
+      | DB _
       | Const _ -> ()
       | App (head, l) -> vars head; List.iter vars l
       | Record (l, rest) ->
-          CCOpt.iter vars rest;
+          CCOpt.iter k rest;
           List.iter (fun (_,t') -> vars t') l
       | AppBuiltin (_,l)
       | SimpleApp (_,l)
@@ -653,12 +670,10 @@ module Seq = struct
       k t;
       match view t with
       | Var _
-      | RigidVar _
-      | BVar _
+      | DB _
       | Const _ -> ()
       | Bind (_, varty, t') -> subterms varty; subterms t'
-      | Record (l, rest) ->
-          CCOpt.iter subterms rest;
+      | Record (l, _) ->
           List.iter (fun (_,t') -> subterms t') l
       | SimpleApp (_,l)
       | AppBuiltin (_, l)
@@ -668,9 +683,6 @@ module Seq = struct
     in
     subterms t
 
-  let rigid_vars t =
-    subterms t |> Sequence.filter is_rigid_var
-
   let subterms_depth t k =
     let rec recurse depth t =
       k (t, depth);
@@ -678,10 +690,7 @@ module Seq = struct
       | App (_,l) ->
         let depth' = depth + 1 in
         List.iter (fun t' -> recurse depth' t') l
-      | Record (l,rest) ->
-          begin match rest with
-          | None -> () | Some r -> recurse (depth+1) r
-          end;
+      | Record (l,_) ->
           List.iter (fun (_,t') -> recurse depth t') l
       | AppBuiltin (_,l)
       | SimpleApp (_,l)
@@ -689,20 +698,19 @@ module Seq = struct
       | Bind (_, varty, t') -> recurse depth varty; recurse (depth+1) t'
       | At (l,r) -> recurse (depth+1) l; recurse (depth+1) r
       | Const _
-      | Var _
-      | BVar _
-      | RigidVar _ -> ()
+      | DB _
+      | Var _ -> ()
     in
     recurse 0 t
 
   let symbols t k =
     let rec symbols t = match view t with
-      | Var _ | BVar _ | RigidVar _ -> ()
+      | DB _
+      | Var _ -> ()
       | Const s -> k s
       | App (head, l) -> symbols head; List.iter symbols l
       | At (l,r) -> symbols l; symbols r
-      | Record (l, rest) ->
-          CCOpt.iter symbols rest;
+      | Record (l, _) ->
           List.iter (fun (_,t') -> symbols t') l
       | Multiset l
       | SimpleApp  (_,l)
@@ -718,10 +726,9 @@ module Seq = struct
       | HasType ty -> k ty
       end;
       match view t with
-      | Var _ | BVar _ | RigidVar _ | Const _ -> ()
+      | Var _ | DB _ | Const _ -> ()
       | App (head, l) -> types head; List.iter types l
-      | Record (l,rest) ->
-          CCOpt.iter types rest;
+      | Record (l,_) ->
           List.iter (fun (_,t') -> types t') l
       | SimpleApp (_,l)
       | AppBuiltin (_,l)
@@ -732,12 +739,12 @@ module Seq = struct
 
   let max_var seq =
     let r = ref 0 in
-    seq (fun t -> match view t with Var i -> r := max i !r | _ -> ());
+    seq (fun i -> r := max (HVar.id i) !r);
     !r
 
   let min_var seq =
     let r = ref max_int in
-    seq (fun t -> match view t with Var i -> r := min i !r | _ -> ());
+    seq (fun i -> r := min (HVar.id i) !r);
     !r
 
   let add_set = Sequence.fold (fun set t -> Set.add t set)
@@ -756,7 +763,7 @@ module Pos = struct
         | HasType ty -> at ty pos'
         end
     | _, P.Stop -> t
-    | (Var _ | BVar _ | RigidVar _ ), _ -> invalid_arg "wrong position in term"
+    | Var _ , _ -> invalid_arg "wrong position in term"
     | Bind(_, _, t'), P.Right subpos -> at t' subpos
     | App (t, _), P.Head subpos -> at t subpos
     | App (_, l), P.Arg (n,subpos) when n < List.length l ->
@@ -765,8 +772,6 @@ module Pos = struct
     | At (_,r), P.Right subpos -> at r subpos
     | Multiset l, P.Arg (n,subpos) when n < List.length l ->
         at (List.nth l n) subpos
-    | Record (_, Some r), P.Record_rest subpos ->
-        at r subpos
     | Record (l, _), P.Record_field (name, subpos) ->
         begin try
           let t' = List.assoc name l in
@@ -785,7 +790,7 @@ module Pos = struct
     | HasType ty, _, P.Type pos' ->
         let ty = replace ty pos' ~by in
         cast ~ty t
-    | _, (Var _ | BVar _ | RigidVar _ ), _ -> invalid_arg "wrong position in term"
+    | _, Var _, _ -> invalid_arg "wrong position in term"
     | HasType ty, Bind(s, varty, t'), P.Right subpos ->
         bind ~ty ~varty s (replace t' subpos ~by)
     | HasType ty, App (f, l), P.Head subpos ->
@@ -810,9 +815,6 @@ module Pos = struct
         let t' = replace (List.nth l n) subpos ~by in
         let l' = CCList.Idx.set l n t' in
         simple_app ~ty s l'
-    | HasType ty, Record (l, Some r), P.Record_rest subpos ->
-        let rest = Some (replace r subpos ~by) in
-        record ~ty l ~rest
     | HasType ty, Record (l, rest), P.Record_field (name, subpos) ->
         begin try
           let t' = replace (List.assoc name l) subpos ~by in
@@ -832,10 +834,6 @@ let rec replace t ~old ~by = match t.ty, view t with
   | HasType ty, Bind (s, varty, t') ->
     bind ~ty ~varty s (replace t' ~old ~by)
   | HasType ty, Record (l, rest) ->
-      let rest = match rest with
-      | None -> None
-      | Some r -> Some (replace r ~old ~by)
-      in
       let l = List.map (fun (s,t') -> s, replace t' ~old ~by) l in
       record ~ty l ~rest
   | HasType ty, App (f, l) ->
@@ -855,20 +853,19 @@ let rec replace t ~old ~by = match t.ty, view t with
     let l' = List.map (fun t' -> replace t' ~old ~by) l in
     simple_app ~ty s l'
   | NoType, _ -> t
-  | _, (Var _ | BVar _ | RigidVar _ | Const _) -> t
+  | _, (Var _ | DB _ | Const _) -> t
 
 (** {3 Variables} *)
 
 let close_vars ~ty s t =
-  let vars = Seq.add_set Set.empty (Seq.vars t) in
-  bind_vars ~ty s (Set.elements vars) t
+  let vars = HVar.Set.of_seq (Seq.vars t) in
+  bind_vars ~ty s (HVar.Set.elements vars) t
 
 (** {3 Misc} *)
 
 let rec size t = match view t with
   | Const _
   | Var _
-  | RigidVar _
   | BVar _ -> 1
   | Bind (_, _, t') -> 1 + size t'
   | Record (l, rest) ->
@@ -889,7 +886,7 @@ let depth t =
 let rec head t = match view t with
   | SimpleApp (s,_)
   | Const s -> Some s
-  | BVar _ | Var _ | RigidVar _ | Record _ | Multiset _
+  | BVar _ | Var _ | Record _ | Multiset _
   | Bind (_, _, _) | AppBuiltin (_, _) -> None
   | App (h, _) -> head h
   | At (l,_) -> head l
@@ -897,7 +894,7 @@ let rec head t = match view t with
 module PB = Position.Build
 
 let rec _all_pos_rec f vars acc pb t = match view t with
-  | Var _ | BVar _ | RigidVar _ ->
+  | Var _ | BVar _ ->
     if vars then f acc t (PB.to_pos pb) else acc
   | Const _ -> f acc t (PB.to_pos pb)
   | App (hd, tl) ->
@@ -946,7 +943,6 @@ let pp_depth ?(hooks=[]) depth out t =
     else _pp_root depth out t; _pp_ty depth out t
   and _pp_root depth out t = match view t with
   | Var i -> Format.fprintf out "X%d" i
-  | RigidVar i -> Format.fprintf out "Z%d" i
   | BVar i -> Format.fprintf out "Y%d" (depth-i-1)
   | Const s -> ID.pp out s
   | Bind (b, varty, t') ->
@@ -1007,10 +1003,7 @@ let pp_depth ?(hooks=[]) depth out t =
   | At _
   | SimpleApp (_,_::_)
   | AppBuiltin (_,_::_)
-  | App _ ->
-    CCFormat.char out '(';
-    _pp depth out t;
-    CCFormat.char out ')'
+  | App _ -> Format.fprintf out "(@[%a@])" (_pp depth) t
   | _ -> _pp depth out t
   in
   _pp depth out t

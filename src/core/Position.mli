@@ -32,7 +32,6 @@ type t =
   | Left of t       (** Left term in curried application *)
   | Right of t      (** Right term in curried application, and subterm of binder *)
   | Record_field of string * t  (** Field of a record *)
-  | Record_rest of t  (** Extension part of the record *)
   | Head of t       (** Head of uncurried term *)
   | Arg of int * t  (** argument term in uncurried term, or in multiset *)
   (** A position is a path in a tree *)
@@ -44,7 +43,6 @@ val left : t -> t
 val right : t -> t
 val type_ : t -> t
 val record_field : string -> t -> t
-val record_rest : t -> t
 val head : t -> t
 val arg : int -> t -> t
 
@@ -97,8 +95,6 @@ module Build : sig
   val type_ : t -> t
 
   val record_field : string -> t -> t
-
-  val record_rest : t -> t
 
   val head : t -> t
 
