@@ -21,6 +21,7 @@ FormulaShape
 HORewriting
 HOTerm
 Hashcons
+HVar
 IArray
 ID
 Index
