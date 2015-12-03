@@ -29,33 +29,21 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     https://en.wikipedia.org/wiki/Hindley-Milner
 *)
 
-module Ty = Type
 module PT = STerm
-module S = Substs
-module Sym = Symbol
+module T = TypedSTerm
 module Loc = ParseLocation
 module Err = CCError
+module Subst = Var.Subst
 
 let prof_infer = Util.mk_profiler "TypeInference.infer"
 let section = Util.Section.(make ~parent:logtk "ty_infer")
 
 type 'a or_error = [`Error of string | `Ok of 'a]
 
-(** {2 Default Types} *)
-
-type default_types = {
-  default_i : Type.t;
-  default_prop : Type.t;
-  default_int : Type.t;
-  default_rat : Type.t;
-}
-
-let tptp_default = {
-  default_i = Type.TPTP.i;
-  default_prop = Type.TPTP.o;
-  default_int = Type.TPTP.int;
-  default_rat = Type.TPTP.rat;
-}
+type type_ = TypedSTerm.t
+type signature = type_ ID.Tbl.t
+type untyped = STerm.t (** untyped term *)
+type typed = TypedSTerm.t (** typed term *)
 
 (** {2 Typing context}
 
@@ -65,66 +53,58 @@ let tptp_default = {
 
 module Ctx = struct
   type t = {
-    default : default_types;        (* default types *)
-    mutable signature : Signature.t;(* symbol -> type *)
-    mutable subst : S.t;            (* variable bindings *)
-    mutable vars_ty : Type.t list;  (* type variables of variables *)
-    mutable const_ty : Type.t list; (* type variables of constants *)
+    default: type_;
+    mutable signature : signature;(* symbol -> type *)
+    mutable vars_ty : type_ list;  (* type variables of variables *)
+    mutable const_ty : type_ list; (* type variables of constants *)
     mutable locs : Loc.t list; (* stack of locations *)
-    renaming : Substs.Renaming.t;
-    symbols : Type.t Symbol.Tbl.t;  (* symbol -> instantiated type *)
-    tyvars : Type.Conv.ctx;         (* type variable -> number *)
-    vars : (string, (int * Type.t)) Hashtbl.t;  (* var name -> number + type *)
+    symbols : type_ Symbol.Tbl.t; (* symbol -> instantiated type *)
+    vars : (string, type_ Var.t) Hashtbl.t;  (* var name -> var *)
   }
 
-  let create ?(default=tptp_default) signature =
+  let create ?(default=T.builtin ~ty:T.tType Builtin.term) signature =
     let ctx = {
       default;
       signature;
-      subst = S.empty;
       vars_ty = [];
       const_ty = [];
       locs = [];
-      renaming = Substs.Renaming.create ();
       symbols = Symbol.Tbl.create 7;
-      tyvars = Type.Conv.create ();
       vars = Hashtbl.create 7;
     } in
     ctx
 
   let copy t = { t with
-    renaming = Substs.Renaming.create ();
+    signature=ID.Tbl.copy t.signature;
     symbols = Symbol.Tbl.copy t.symbols;
-    tyvars = Type.Conv.copy t.tyvars;
     vars = Hashtbl.copy t.vars;
   }
 
-  let clear ctx =
-    ctx.subst <- S.empty;
-    ctx.const_ty <- [];
-    ctx.vars_ty <- [];
-    ctx.locs <- [];
-    Symbol.Tbl.clear ctx.symbols;
-    ctx.signature <- Signature.empty;
-    Type.Conv.clear ctx.tyvars;
-    Hashtbl.clear ctx.vars;
-    ()
+  (* enter new scope for the variable with this name *)
+  let with_var_ ctx v ~f =
+    let name = Var.name v in
+    Hashtbl.add ctx.vars name v;
+    try
+      let x = f () in
+      Hashtbl.remove ctx.vars name;
+      x
+    with e ->
+      Hashtbl.remove ctx.vars name;
+      raise e
+
+  let rec with_vars_ ctx vars ~f = match vars with
+    | [] -> f()
+    | v :: vars' -> with_var_ v ~f:(fun () -> with_vars_ ctx vars' ~f)
 
   let exit_scope ctx =
     Hashtbl.clear ctx.vars;
-    Type.Conv.clear ctx.tyvars;
-    Substs.Renaming.clear ctx.renaming;
-    ()
-
-  let add_signature ctx signature =
-    ctx.signature <- Signature.merge ctx.signature signature;
     ()
 
   let declare ctx sym ty =
-    ctx.signature <- Signature.declare ctx.signature sym ty
+    ID.Tbl.add ctx.signature sym ty
 
   (* generate fresh type var. *)
-  let _new_ty_var _ctx = Type.fresh_var ()
+  let _new_ty_var _ = T.var (Var.of_string ~ty:T.tType "α")
 
   (* generate [n] fresh type vars *)
   let rec _new_ty_vars ctx n =
@@ -132,22 +112,37 @@ module Ctx = struct
     then []
     else _new_ty_var ctx :: _new_ty_vars ctx (n-1)
 
-  (* convert a prolog term into a type *)
-  let rec ty_of_simple_term ctx ty = match PT.view ty with
-    | PT.Syntactic(Sym.Conn Sym.LiftType, [ty]) -> ty_of_simple_term ctx ty
-    | _ -> Type.Conv.of_simple_term ~ctx:ctx.tyvars ty
-
-  (* TODO: better explanations for errors *)
-
   (* error-raising function *)
   let error_ ctx msg =
     CCFormat.ksprintf msg
       ~f:(fun msg ->
-          let header = match ctx.locs with
-            | [] -> ""
-            | loc::_ -> CCFormat.sprintf "at %a: " Loc.pp loc
+          let msg = match ctx.locs with
+            | [] -> msg
+            | loc::_ -> CCFormat.sprintf "@[<2>at @[%a@]:@ %s@]" Loc.pp loc msg
           in
-          raise (Type.Error (header ^ msg)))
+          raise (Type.Error msg))
+
+  (* convert a prolog term into a type *)
+  let rec ty_of_simple_term ctx ty = match PT.view ty with
+    | PT.AppBuiltin(Builtin.LiftType, [ty]) -> ty_of_simple_term ctx ty
+    | PT.Var v ->
+        begin try T.var (Hashtbl.find ctx.vars v)
+        with Not_found ->
+          error_ ctx "variable %s not bound" v
+        end
+    | PT.App (f, l) ->
+        let f = ty_of_simple_term ctx f in
+        let l = List.map (ty_of_simple_term ctx) l in
+        T.app ~ty:T.tType f l
+    | PT.Bind (Binder.ForallTy, vars, ty') ->
+        let vars' = List.map (Var.of_string ~ty:T.tType) vars in
+        with_vars_ ctx vars'
+          ~f:(fun () ->
+            let ty' = ty_of_simple_term ctx ty' in
+            T.bind_list Binder.ForallTy vars' ty')
+    | _ -> error_ ctx "@[<2>`@[%a@]`@ is not a valid type@]" PT.pp ty
+
+  (* TODO: better explanations for errors *)
 
   (* obtain a (possibly fresh) type var for this name *)
   let _get_ty_var ctx name =
@@ -184,15 +179,6 @@ module Ctx = struct
         (fun k->k name n Type.pp ty);
       Hashtbl.add ctx.vars name (n,ty);
       n, ty
-
-  (* enter new scope for the variable with this name *)
-  let _enter_var_scope ctx name ty =
-    let n = Hashtbl.length ctx.vars in
-    Hashtbl.add ctx.vars name (n,ty);
-    n
-
-  let _exit_var_scope ctx name =
-    Hashtbl.remove ctx.vars name
 
   let with_loc ctx ~loc f =
     let old_locs = ctx.locs in
@@ -313,78 +299,7 @@ module Ctx = struct
     Substs.HO.apply ~renaming:ctx.renaming ctx.subst t 0
 end
 
-(** {2 Composition monad} *)
-
-module MonadFun(Domain : sig type t end) = struct
-  type domain = Domain.t
-  type 'a fun_ = domain -> 'a
-  type 'a t = 'a fun_
-  type 'a monad = 'a fun_
-
-  let return x _ = x
-
-  let (>>=) f1 f2 x =
-    f2 (f1 x) x
-
-  let map f f1 x = f1 (f x)
-
-  let fold (seq:'a Sequence.t) (acc:'b t) (f:'b -> 'a -> 'b t) =
-    Sequence.fold
-      (fun acc x ->
-         fun elt -> (f (acc elt) x) elt)
-      acc seq
-
-  let fold_l l = fold (Sequence.of_list l)
-
-  let map_l l f elt = List.map (fun x -> f x elt) l
-
-  let seq l elt =
-    List.map (fun f -> f elt) l
-end
-
-module Closure = MonadFun(Ctx)
-
 (** {2 Hindley-Milner} *)
-
-module type S = sig
-  type untyped (** untyped term *)
-  type typed   (** typed term *)
-
-  val infer_exn : Ctx.t -> untyped -> Type.t * typed Closure.t
-  (** Infer the type of this term under the given signature. This updates
-      the context's typing environment!
-
-      @param ctx the context
-      @param untyped the untyped term whose type must be inferred
-
-      @return the inferred type of the untyped term (possibly a type var)
-        along with a closure to produce a typed term once every
-        constraint has been solved
-      @raise Type.Error if the types are inconsistent *)
-
-  val infer : Ctx.t -> untyped -> (Type.t * typed Closure.t) or_error
-  (** Safe version of {!infer_exn}. It returns [`Error s] rather
-      than raising {!Type.Error} if the typechecking fails. *)
-
-  (** {3 Constraining types}
-
-      This section is mostly useful for inferring a signature without
-      converting untyped_terms into typed_terms. *)
-
-  val constrain_term_term_exn : Ctx.t -> untyped -> untyped -> unit
-  (** Force the two terms to have the same type in this context
-      @raise Type.Error if an inconsistency is detected *)
-
-  val constrain_term_type_exn : Ctx.t -> untyped -> Type.t -> unit
-  (** Force the term's type and the given type to be the same.
-      @raise Type.Error if an inconsistency is detected *)
-
-  val constrain_term_term : Ctx.t -> untyped -> untyped -> unit or_error
-  (** Safe version of {!constrain_term_term_exn} *)
-
-  val constrain_term_type : Ctx.t -> untyped -> Type.t -> unit or_error
-  (** Safe version of {!constrain_term_type_exn} *)
-end
 
 exception ExitSequence of string
 

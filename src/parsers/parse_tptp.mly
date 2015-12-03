@@ -286,6 +286,7 @@ plain_term:
 constant:
 | s=atomic_word { Sym.of_string s }
 | s=atomic_defined_word { s }
+
 functor_: f=atomic_word { PT.const (Sym.of_string f) }
 
 defined_term:
