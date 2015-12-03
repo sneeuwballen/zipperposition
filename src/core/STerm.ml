@@ -27,7 +27,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 S-like Terms}. *)
 
 module Hash = CCHash
-module Sym = Symbol
 
 type location = ParseLocation.t
 
@@ -36,39 +35,33 @@ type t = {
   loc : location option;
 }
 and view =
-  | Var of string                   (** variable *)
-  | Int of Z.t                      (** integer *)
-  | Rat of Q.t                      (** rational *)
-  | Const of Sym.t               (** constant *)
+  | Var of string (** variable *)
+  | Const of string (** constant *)
   | AppBuiltin of Builtin.t * t list
-  | App of t * t list               (** apply term *)
-  | Bind of Binder.t * t list * t   (** bind n variables *)
-  | List of t list                  (** special constructor for lists *)
-  | Record of (string * t) list * t option  (** extensible record *)
-  | Column of t * t                 (** t:t (useful for typing, e.g.) *)
+  | App of t * t list (** apply term *)
+  | Bind of Binder.t * typed_var list * t (** bind n variables *)
+  | List of t list (** special constructor for lists *)
+  | Record of (string * t) list * string option (** extensible record *)
+
+and typed_var = string * t option
 
 type term = t
 
 let view t = t.term
 let loc t = t.loc
 
-let __to_int = function
+let to_int_ = function
   | Var _ -> 0
-  | Int _ -> 1
-  | Rat _ -> 2
   | Const _ -> 3
   | AppBuiltin _ -> 4
   | App _ -> 5
   | Bind _ -> 6
   | List _ -> 7
   | Record _ -> 8
-  | Column _ -> 9
 
 let rec compare t1 t2 = match t1.term, t2.term with
   | Var s1, Var s2 -> String.compare s1 s2
-  | Int i1, Int i2 -> Z.compare i1 i2
-  | Rat n1, Rat n2 -> Q.compare n1 n2
-  | Const s1, Const s2 -> Sym.compare s1 s2
+  | Const s1, Const s2 -> String.compare s1 s2
   | App (s1,l1), App (s2, l2) ->
     let c = compare s1 s2 in
     if c = 0
@@ -85,56 +78,60 @@ let rec compare t1 t2 = match t1.term, t2.term with
     then
       let c' = compare t1 t2 in
       if c' = 0
-      then CCOrd.list_ compare v1 v2
+      then CCOrd.list_ compare_typed_var v1 v2
       else c'
     else c
-  | Column (x1,y1), Column (x2,y2) ->
-    let c = compare x1 x2 in
-    if c = 0 then compare y1 y2 else c
-  | _ -> __to_int t1.term - __to_int t2.term
+  | (Var _,_)
+  | (Const _,_)
+  | (AppBuiltin (_,_),_)
+  | (App (_,_),_)
+  | (Bind (_,_,_),_)
+  | (List _,_)
+  | (Record (_,_),_) -> to_int_ t1.term - to_int_ t2.term
+
+and compare_typed_var (v1,o1)(v2,o2) =
+  let cmp = compare in
+  CCOrd.( String.compare v1 v2 <?> (Util.ord_option cmp, o1, o2) )
 
 let equal t1 t2 = compare t1 t2 = 0
 
 let rec hash_fun t h = match t.term with
   | Var s -> Hash.string_ s h
-  | Int i -> Hash.int_ (Z.hash i) h
-  | Rat n -> Hash.string_ (Q.to_string n) h  (* TODO: find better *)
-  | Const s -> Sym.hash_fun s h
+  | Const s -> Hash.string_ s h
   | AppBuiltin (s,l) -> Builtin.hash_fun s (Hash.list_ hash_fun l h)
   | App (s, l) -> Hash.list_ hash_fun l (hash_fun s h)
   | List l -> Hash.list_ hash_fun l (Hash.int_ 42 h)
   | Bind (s,v,t') ->
-    h |> Binder.hash_fun s |> hash_fun t' |> Hash.list_ hash_fun v
+    h |> Binder.hash_fun s |> hash_fun t' |> Hash.list_ hash_ty_var v
   | Record (l, rest) ->
-    h |> Hash.opt hash_fun rest
+    h |> Hash.opt Hash.string_ rest
       |> Hash.list_ (fun (n,t) h -> Hash.string_ n (hash_fun t h)) l
-  | Column (x,y) -> hash_fun x (hash_fun y h)
+
+and hash_ty_var (v,ty) h =
+  Hash.string_ v h |> Hash.opt hash_fun ty
 
 let hash x = Hash.apply hash_fun x
 
-let __make ?loc view = {term=view; loc;}
+let make_ ?loc view = {term=view; loc;}
 
-let var ?loc ?ty s = match ty with
-  | None -> __make ?loc (Var s)
-  | Some ty -> __make ?loc (Column (__make (Var s), ty))
-let int_ i = __make (Int i)
-let of_int i = __make (Int (Z.of_int i))
-let rat n = __make (Rat n)
-let builtin ?loc s = __make ?loc (AppBuiltin (s,[]))
-let app_builtin ?loc s l = __make ?loc (AppBuiltin(s,l))
+let var ?loc s = Var s
+let builtin ?loc s = make_ ?loc (AppBuiltin (s,[]))
+let int_ i = builtin (Builtin.Int i)
+let of_int i = int_ (Z.of_int i)
+let rat n = builtin (Builtin.Rat n)
+let app_builtin ?loc s l = make_ ?loc (AppBuiltin(s,l))
 let app ?loc s l = match l with
   | [] -> s
-  | _::_ -> __make ?loc (App(s,l))
-let const ?loc s = __make ?loc (Const s)
+  | _::_ -> make_ ?loc (App(s,l))
+let const ?loc s = make_ ?loc (Const s)
 let bind ?loc s v l = match v with
   | [] -> l
-  | _::_ -> __make ?loc (Bind(s,v,l))
-let list_ ?loc l = __make ?loc (List l)
+  | _::_ -> make_ ?loc (Bind(s,v,l))
+let list_ ?loc l = make_ ?loc (List l)
 let nil = list_ []
 let record ?loc l ~rest =
   let l = List.sort (fun (n1,_)(n2,_) -> String.compare n1 n2) l in
-  __make ?loc (Record (l, rest))
-let column ?loc x y = __make ?loc (Column(x,y))
+  make_ ?loc (Record (l, rest))
 let at_loc ~loc t = {t with loc=Some loc; }
 
 let wildcard = builtin Builtin.wildcard

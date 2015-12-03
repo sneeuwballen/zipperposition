@@ -136,8 +136,11 @@ module UStack : sig
   (** A snapshot of bindings at a given moment *)
 
   val snapshot : st:t -> snapshot
+  (** Save current state *)
 
   val restore : st:t -> snapshot -> unit
+  (** Restore all references to their state at [snapshot]. Bindings
+      done since are undone. *)
 end
 
 val unify : ?st:UStack.t-> term -> term -> unit

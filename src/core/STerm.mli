@@ -41,17 +41,16 @@ type t = private {
   term : view;
   loc : location option;
 }
-and view = private
-  | Var of string                   (** variable *)
-  | Int of Z.t                      (** integer *)
-  | Rat of Q.t                      (** rational *)
-  | Const of Symbol.t               (** constant *)
+and view =
+  | Var of string (** variable *)
+  | Const of string (** constant *)
   | AppBuiltin of Builtin.t * t list
-  | App of t * t list               (** apply term *)
-  | Bind of Binder.t * t list * t   (** bind n variables *)
-  | List of t list                  (** special constructor for lists *)
-  | Record of (string * t) list * t option  (** extensible record *)
-  | Column of t * t                 (** t:t (useful for typing, e.g.) *)
+  | App of t * t list (** apply term *)
+  | Bind of Binder.t * typed_var list * t (** bind n variables *)
+  | List of t list (** special constructor for lists *)
+  | Record of (string * t) list * string option (** extensible record *)
+
+and typed_var = string * t option
 
 type term = t
 
@@ -61,19 +60,18 @@ val loc : t -> location option
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 
-val var : ?loc:location -> ?ty:t -> string -> t
+val var : ?loc:location -> string -> t
 val int_ : Z.t -> t
 val of_int : int -> t
 val rat : Q.t -> t
 val app : ?loc:location -> t -> t list -> t
 val builtin : ?loc:location -> Builtin.t -> t
 val app_builtin : ?loc:location -> Builtin.t -> t list -> t
-val const : ?loc:location -> Symbol.t -> t
+val const : ?loc:location -> string -> t
 val bind : ?loc:location -> Binder.t -> t list -> t -> t
 val list_ : ?loc:location -> t list -> t
 val nil : t
-val column : ?loc:location -> t -> t -> t
-val record : ?loc:location -> (string*t) list -> rest:t option -> t
+val record : ?loc:location -> (string*t) list -> rest:string option -> t
 val at_loc : loc:location -> t -> t
 
 val wildcard : t
@@ -92,7 +90,7 @@ module Seq : sig
   val subterms_with_bound : t -> (t * Set.t) Sequence.t
     (** subterm and variables bound at this subterm *)
 
-  val symbols : t -> Symbol.t Sequence.t
+  val symbols : t -> string Sequence.t
   val add_set : Set.t -> t Sequence.t -> Set.t
 end
 
@@ -113,7 +111,7 @@ module TPTP : sig
   val false_ : t
 
   val var : ?loc:location -> ?ty:t -> string -> t
-  val const : ?loc:location -> Symbol.t -> t
+  val const : ?loc:location -> string -> t
   val app : ?loc:location -> t -> t list -> t
   val bind : ?loc:location -> Binder.t -> t list -> t -> t
 

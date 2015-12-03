@@ -439,24 +439,29 @@ let () = Printexc.register_printer
 
 let fail_unif_ st msg = raise (UnifyFailure (msg, st))
 
+(* check that:
+  - v does not occur in t
+  - t is closed
+  *)
 let occur_check_ v t =
   assert (is_meta v);
-  let rec check t =
+  let rec check bound t =
     v == t ||
-    CCOpt.maybe check false t.ty ||
+    CCOpt.maybe (check bound) false t.ty ||
     match view t with
-      | Meta _
-      | Var _ -> equal v t
+      | Meta _ -> equal v t
+      | Var v' -> equal v t || not (Var.Set.mem bound v')
       | Const _ -> false
-      | App (f, l) -> check f || List.exists check l
-      | Bind (_, v, t) -> check v.Var.ty || check t
+      | App (f, l) -> check bound f || List.exists (check bound) l
+      | Bind (_, v, t) ->
+          check bound v.Var.ty || check (Var.Set.add bound v) t
       | AppBuiltin (_,l)
-      | Multiset l -> List.exists check l
+      | Multiset l -> List.exists (check bound) l
       | Record (l, rest) ->
-          CCOpt.maybe check false rest ||
-          List.exists (fun (_,t) -> check t) l
+          CCOpt.maybe (check bound) false rest ||
+          List.exists (fun (_,t) -> check bound t) l
   in
-  check t
+  check Var.Set.empty t
 
 let are_same_meta_ r1 r2 = match r1, r2 with
   | Some r1, Some r2 ->
