@@ -27,8 +27,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 Terms use ScopedTerm with kind "FOTerm".
 *)
 
-type symbol = Symbol.t
-
 (** {2 Term} *)
 
 type t = private ScopedTerm.t
@@ -36,12 +34,12 @@ type t = private ScopedTerm.t
 type term = t
 
 type view = private
-  | Builtin of Builtin.t
-  | Var of int                (** Term variable *)
-  | BVar of int               (** Bound variable (De Bruijn index) *)
-  | Const of Symbol.t         (** Typed constant *)
-  | TyApp of t * Type.t       (** Application to type *)
-  | App of t * t list        (** Application to a list of terms (cannot be left-nested) *)
+  | AppBuiltin of Builtin.t * t list
+  | Var of HVar.t (** Term variable *)
+  | DB of int (** Bound variable (De Bruijn index) *)
+  | Const of ID.t (** Typed constant *)
+  | TyApp of t * Type.t (** Application to type *)
+  | App of t * t list (** Application to a list of terms (cannot be left-nested) *)
 
 val view : t -> view
 
@@ -53,7 +51,8 @@ module Classic : sig
   type view = private
   | Var of int
   | BVar of int
-  | App of symbol * Type.t list * t list  (** covers Const and App *)
+  | App of ID.t * Type.t list * t list  (** covers Const and App *)
+  | AppBuiltin of Builtin.t * Type.t list * t list
   | NonFO   (* any other case *)
 
   val view : t -> view
@@ -96,7 +95,7 @@ val bvar : ty:Type.t -> int -> t
 
 val builtin : ty:Type.t -> Builtin.t -> t
 
-val const : ty:Type.t -> symbol -> t
+val const : ty:Type.t -> ID.t -> t
   (** Create a typed constant *)
 
 val tyapp : t -> Type.t -> t
@@ -129,11 +128,11 @@ module Seq : sig
   val vars : t -> t Sequence.t
   val subterms : t -> t Sequence.t
   val subterms_depth : t -> (t * int) Sequence.t  (* subterms with their depth *)
-  val symbols : t -> Symbol.t Sequence.t
+  val symbols : t -> ID.t Sequence.t
   val max_var : t Sequence.t -> int     (** max var, or 0 *)
   val min_var : t Sequence.t -> int     (** min var, or 0 *)
   val ty_vars : t -> Type.t Sequence.t
-  val typed_symbols : t -> (Symbol.t * Type.t) Sequence.t
+  val typed_symbols : t -> (ID.t * Type.t) Sequence.t
 
   val add_set : Set.t -> t Sequence.t -> Set.t
 end
@@ -147,15 +146,15 @@ val add_vars : unit Tbl.t -> t -> unit  (** add variables of the term to the set
 val vars : t Sequence.t -> Set.t        (** compute variables of the terms *)
 val vars_prefix_order : t -> t list     (** variables in prefix traversal order *)
 val depth : t -> int                    (** depth of the term *)
-val head : t -> Symbol.t option         (** head symbol *)
-val head_exn : t -> Symbol.t            (** head symbol (or Invalid_argument) *)
+val head : t -> ID.t option         (** head ID.t *)
+val head_exn : t -> ID.t            (** head ID.t (or Invalid_argument) *)
 val size : t -> int                     (** Size (number of nodes) *)
 
-val weight : ?var:int -> ?sym:(Symbol.t -> int) -> t -> int
+val weight : ?var:int -> ?sym:(ID.t -> int) -> t -> int
   (** Compute the weight of a term, given a weight for variables
-      and one for symbols.
+      and one for ID.ts.
       @param var unique weight for every variable (default 1)
-      @param sym function from symbols to their weight (default [const 1])
+      @param sym function from ID.ts to their weight (default [const 1])
       @since 0.5.3 *)
 
 val ty_vars : t -> Type.Set.t
@@ -186,11 +185,11 @@ val replace : t -> old:t -> by:t -> t
 
 (** {2 High-level operations} *)
 
-val symbols : ?init:Symbol.Set.t -> t -> Symbol.Set.t
+val symbols : ?init:ID.Set.t -> t -> ID.Set.t
   (** Symbols of the term (keys of signature) *)
 
-val contains_symbol : Symbol.t -> t -> bool
-  (** Does the term contain this given symbol? *)
+val contains_symbol : ID.t -> t -> bool
+  (** Does the term contain this given ID.t? *)
 
 (** {2 Fold} *)
 
@@ -206,14 +205,14 @@ val all_positions : ?vars:bool -> ?pos:Position.t ->
 (** {2 Some AC-utils} *)
 
 module type AC_SPEC = sig
-  val is_ac : Symbol.t -> bool
-  val is_comm : Symbol.t -> bool
+  val is_ac : ID.t -> bool
+  val is_comm : ID.t -> bool
 end
 
 module AC(A : AC_SPEC) : sig
-  val flatten : Symbol.t -> t list -> t list
+  val flatten : ID.t -> t list -> t list
     (** [flatten_ac f l] flattens the list of terms [l] by deconstructing all its
-        elements that have [f] as head symbol. For instance, if l=[1+2; 3+(4+5)]
+        elements that have [f] as head ID.t. For instance, if l=[1+2; 3+(4+5)]
         with f="+", this will return [1;2;3;4;5], perhaps in a different order *)
 
   val normal_form : t -> t
@@ -221,11 +220,11 @@ module AC(A : AC_SPEC) : sig
 
   val equal : t -> t -> bool
     (** Check whether the two terms are AC-equal. Optional arguments specify
-        which symbols are AC or commutative (by default by looking at
+        which ID.ts are AC or commutative (by default by looking at
         attr_ac and attr_commut). *)
 
-  val symbols : t Sequence.t -> Symbol.Set.t
-    (** Set of symbols occurring in the terms, that are AC *)
+  val symbols : t Sequence.t -> ID.Set.t
+    (** Set of ID.ts occurring in the terms, that are AC *)
 end
 
 (** {2 Conversions} *)

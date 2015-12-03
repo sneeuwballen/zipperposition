@@ -27,26 +27,24 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {2 Main Type representation}
 
-Types are represented using ScopedTerm, with kind Type. Therefore, they
-are hashconsed and scoped.
+    Types are represented using ScopedTerm, with kind Type. Therefore, they
+    are hashconsed and scoped.
 
-Common representation of types, including higher-order
-and polymorphic types. All type variables
-are assumed to be universally quantified in the outermost possible
-scope (outside any other quantifier).
+    Common representation of types, including higher-order
+    and polymorphic types. All type variables
+    are assumed to be universally quantified in the outermost possible
+    scope (outside any other quantifier).
 
-See {!TypeInference} for inferring types from terms and formulas,
-and {!Signature} to associate types with symbols.
+    See {!TypeInference} for inferring types from terms and formulas,
+    and {!Signature} to associate types with symbols.
 
-TODO: think of a good way of representating AC operators (+, ...)
+    TODO: think of a good way of representating AC operators (+, ...)
 *)
 
 exception Error of string
-  (** Generic error on types. *)
+(** Generic error on types. *)
 
 (** {2 Main signature} *)
-
-type symbol = Symbol.t
 
 type t = private ScopedTerm.t
 (** Type is a subtype of the general structure ScopedTerm.t,
@@ -58,17 +56,17 @@ type builtin = TType | Prop | Term
 
 type view = private
   | Builtin of builtin
-  | Var of int              (** Type variable *)
-  | BVar of int             (** Bound variable (De Bruijn index) *)
-  | App of symbol * t list  (** parametrized type *)
-  | Fun of t * t            (** Function type (left to right) *)
-  | Record of (string*t) list * t option  (** Record type *)
+  | Var of HVar.t
+  | DB of int
+  | App of ID.t * t list (** parametrized type *)
+  | Fun of t list * t (** Function type (left to right, no left-nesting) *)
+  | Record of (string*t) list * HVar.t option (** Record type (+ variable) *)
   | Multiset of t
-  | Forall of t             (** explicit quantification using De Bruijn index *)
+  | Forall of t (** explicit quantification using De Bruijn index *)
 
 val view : t -> view
-  (** Type-centric view of the head of this type.
-      @raise Invalid_argument if the argument is not a type. *)
+(** Type-centric view of the head of this type.
+    @raise Invalid_argument if the argument is not a type. *)
 
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
@@ -88,51 +86,48 @@ val int : t
 val rat : t
 
 val var : int -> t
-  (** Build a type variable.
-      @raise ScopedTerm.IllFormedTerm if the integer is negative *)
+(** Build a type variable.
+    @raise ScopedTerm.IllFormedTerm if the integer is negative *)
 
-val app : symbol -> t list -> t
-  (** Parametrized type *)
+val app : ID.t -> t list -> t
+(** Parametrized type *)
 
-val const : symbol -> t
-  (** Constant sort *)
+val const : ID.t -> t
+(** Constant sort *)
 
 val arrow : t -> t -> t
-  (** [arrow l r] is the type [l -> r]. *)
+(** [arrow l r] is the type [l -> r]. *)
 
 val arrow_list : t list -> t -> t
-  (** n-ary version of {!arrow} *)
+(** n-ary version of {!arrow} *)
 
-val forall : t list -> t -> t
-  (** [forall vars ty] quantifies [ty] over [vars].
-      If [vars] is the empty list, returns [ty].
-      @raise Invalid_argument if some element of [vars] is not a variable *)
-
-val record : (string*t) list -> rest:t option -> t
-  (** Record type, with an optional extension *)
+val record : (string*t) list -> rest:HVar.t option -> t
+(** Record type, with an optional extension *)
 
 val __forall : t -> t
-  (** not documented. *)
+(** not documented. *)
 
 val __bvar : int -> t
-  (** not documented. *)
+(** not documented. *)
 
-val (@@) : symbol -> t list -> t
-  (** [s @@ args] applies the sort [s] to arguments [args]. *)
+val (@@) : ID.t -> t list -> t
+(** [s @@ args] applies the sort [s] to arguments [args]. *)
 
 val (<==) : t -> t list -> t
-  (** General function type. [x <== l] is the same as [x] if [l]
-      is empty. Invariant: the return type is never a function type. *)
+(** General function type. [x <== l] is the same as [x] if [l]
+    is empty. Invariant: the return type is never a function type. *)
 
 val (<=.) : t -> t -> t
-  (** Unary function type. [x <=. y] is the same as [x <== [y]]. *)
+(** Unary function type. [x <=. y] is the same as [x <== [y]]. *)
 
 val multiset : t -> t
-  (** Type of multiset *)
+(** Type of multiset *)
 
 val of_term_unsafe : ScopedTerm.t -> t
 (** {b NOTE}: this can break the invariants and make {!view} fail. Only
     apply with caution. *)
+
+val of_terms_unsafe : ScopedTerm.t list -> t list
 
 (** {2 Containers} *)
 
@@ -150,53 +145,53 @@ end
 (** {2 Utils} *)
 
 val vars_set : Set.t -> t -> Set.t
-  (** Add the free variables to the given set *)
+(** Add the free variables to the given set *)
 
 val vars : t -> t list
-  (** List of free variables ({!Var}) *)
+(** List of free variables ({!Var}) *)
 
 val close_forall : t -> t
-  (** bind free variables *)
+(** bind free variables *)
 
 type arity_result =
   | Arity of int * int
   | NoArity
 
 val arity : t -> arity_result
-  (** Number of arguments the type expects.
-     If [arity ty] returns [Arity (a, b)] that means that it
-     expects [a] arguments to be used as arguments of Forall, and
-     [b] arguments to be used for function application. If
-     it returns [NoArity] then the arity is unknown (variable) *)
+(** Number of arguments the type expects.
+    If [arity ty] returns [Arity (a, b)] that means that it
+    expects [a] arguments to be used as arguments of Forall, and
+    [b] arguments to be used for function application. If
+    it returns [NoArity] then the arity is unknown (variable) *)
 
 val expected_args : t -> t list
-  (** Types expected as function argument by [ty]. The length of the
-      list [expected_args ty] is the same as [snd (arity ty)]. *)
+(** Types expected as function argument by [ty]. The length of the
+    list [expected_args ty] is the same as [snd (arity ty)]. *)
 
 val is_ground : t -> bool
-  (** Is the type ground? (means that no {!Var} not {!BVar} occurs in it) *)
+(** Is the type ground? (means that no {!Var} not {!BVar} occurs in it) *)
 
 val size : t -> int
-  (** Size of type, in number of "nodes" *)
+(** Size of type, in number of "nodes" *)
 
 val depth : t -> int
-  (** Depth of the type (length of the longest path to some leaf)
-      @since 0.5.3 *)
+(** Depth of the type (length of the longest path to some leaf)
+    @since 0.5.3 *)
 
 val open_fun : t -> (t list * t)
-  (** [open_fun ty] "unrolls" function arrows from the left, so that
-      [open_fun (a -> (b -> (c -> d)))] returns [[a;b;c], d].
-      @return the return type and the list of all its arguments *)
+(** [open_fun ty] "unrolls" function arrows from the left, so that
+    [open_fun (a -> (b -> (c -> d)))] returns [[a;b;c], d].
+    @return the return type and the list of all its arguments *)
 
 val apply : t -> t -> t
-  (** Given a function/forall type, and an argument, return the
-      type that results from applying the function/forall to the arguments.
-      No unification is done, types must check exactly.
-      @raise Error if the types do not match *)
+(** Given a function/forall type, and an argument, return the
+    type that results from applying the function/forall to the arguments.
+    No unification is done, types must check exactly.
+    @raise Error if the types do not match *)
 
 val apply_list : t -> t list -> t
-  (** List version of {!apply}
-      @raise Error if the types do not match *)
+(** List version of {!apply}
+    @raise Error if the types do not match *)
 
 (** {2 IO} *)
 
@@ -214,7 +209,7 @@ module TPTP : sig
   include Interfaces.PRINT with type t := t
   include Interfaces.PRINT_DE_BRUIJN
     with type term := t and type t := t
-    and type print_hook := print_hook
+                        and type print_hook := print_hook
 
   (** {2 Basic types} *)
 
@@ -227,6 +222,9 @@ module TPTP : sig
 end
 
 (** {2 Conversions} *)
+
+(* TODO: deprecate, at least {!Conv.of_simple_term}
+   now the proper way is through {!TypedSTerm} *)
 
 module Conv : sig
   type ctx
@@ -244,4 +242,4 @@ end
 (** {2 Misc} *)
 
 val fresh_var : unit -> t
-  (** Fresh var, with negative index *)
+(** Fresh var, with negative index *)
