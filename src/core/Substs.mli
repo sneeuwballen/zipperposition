@@ -25,29 +25,30 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Substitutions}
 
-Substitutions map variables to terms/types. They work on free variables (within
-a scope, so that the same variable can live within several scopes).
+    Substitutions map variables to terms/types. They work on free variables (within
+    a scope, so that the same variable can live within several scopes).
 
-The concept of scope is to allow the same free variable to be used in
-several contexts without being renamed. A scope is kind of a namespace,
-where variables from distinct namespaces are always distinct.
+    The concept of scope is to allow the same free variable to be used in
+    several contexts without being renamed. A scope is kind of a namespace,
+    where variables from distinct namespaces are always distinct.
 *)
 
 type scope = int
-  (** A scope is an integer. Variables can only be bound in one scope,
-      and variables from distinct scopes are distinct too. *)
+(** A scope is an integer. Variables can only be bound in one scope,
+    and variables from distinct scopes are distinct too. *)
 
 type 'a scoped = 'a * scope
 
 type term = ScopedTerm.t
+type var = HVar.t
 
 (** {2 Renamings}
-A renaming is used to disambiguate variables that come from distinct
-scopes but have the same index. It is used to merge together several scopes, in
-a sound way, by ensuring variables from those scopes are mapped to distinct
-variables of the new scope. For instance, a given renaming applied to (X,0) and
-(X,1) will return two different variables, as if one of the X had been renamed
-prior to unification/binding. *)
+    A renaming is used to disambiguate variables that come from distinct
+    scopes but have the same index. It is used to merge together several scopes, in
+    a sound way, by ensuring variables from those scopes are mapped to distinct
+    variables of the new scope. For instance, a given renaming applied to (X,0) and
+    (X,1) will return two different variables, as if one of the X had been renamed
+    prior to unification/binding. *)
 
 module Renaming : sig
   type t
@@ -58,55 +59,57 @@ end
 (** {3 Basics} *)
 
 type t
-  (** A substitution that binds term variables to other terms *)
+(** A substitution that binds term variables to other terms *)
 
 type subst = t
 
 val empty : t
-  (** The identity substitution *)
+(** The identity substitution *)
 
 val is_empty : t -> bool
-  (** Is the substitution empty? *)
+(** Is the substitution empty? *)
 
 (** {3 Operations on Substitutions} *)
 
-val lookup : t -> term -> scope -> term * scope
-  (** Lookup variable in substitution.
-      @raise Not_found if variable not bound. *)
+val find_exn : t -> var -> scope -> term * scope
+(** Lookup variable in substitution.
+    @raise Not_found if variable not bound. *)
 
-val get_var : t -> term -> scope -> term * scope
-  (** Lookup recursively the var in the substitution, until it is not a
-      variable anymore, or it is not bound *)
+val find : t -> var -> scope -> (term * scope) option
 
-val mem : t -> term -> scope -> bool
-  (** Check whether the variable is bound by the substitution *)
+val get_var : t -> var -> scope -> (term * scope) option
+(** Lookup recursively the var in the substitution, until it is not a
+    variable anymore, or it is not bound *)
+
+val mem : t -> var -> scope -> bool
+(** Check whether the variable is bound by the substitution *)
 
 exception KindError
 
-val bind : t -> term -> scope -> term -> scope -> t
-  (** Add [v] -> [t] to the substitution. Both terms have a context.
-      It is {b important} that the bound term is De-Bruijn-closed (assert).
-      @raise Invalid_argument if [v] is already bound in
-        the same context, to another term.
-      @raise KindError if a term of a given kind is bound to a term
-        of another kind (see {!ScopedTerm.Kind.t}) *)
+val bind : t -> var -> scope -> term -> scope -> t
+(** Add [v] -> [t] to the substitution. Both terms have a context.
+    It is {b important} that the bound term is De-Bruijn-closed (assert).
+    @raise Invalid_argument if [v] is already bound in
+      the same context, to another term.
+    @raise KindError if a term of a given kind is bound to a term
+      of another kind (see {!ScopedTerm.Kind.t}) *)
 
 val append : t -> t -> t
-  (** [append s1 s2] is the substitution that maps [t] to [s2 (s1 t)]. *)
+(** [append s1 s2] is the substitution that maps [t] to [s2 (s1 t)]. *)
 
-val remove : t -> term -> int -> t
-  (** Remove the given binding. No other variable should depend on it... *)
+val remove : t -> var -> int -> t
+(** Remove the given binding. No other variable should depend on it... *)
 
 (** {2 Set operations} *)
 
-val domain : t -> (term * scope) Sequence.t
-  (** Domain of substitution *)
+val domain : t -> (var * scope) Sequence.t
+(** Domain of substitution *)
 
 val codomain : t -> (term * scope) Sequence.t
-  (** Codomain (image terms) of substitution *)
+(** Codomain (image terms) of substitution *)
 
-val introduced : t -> (term * scope) Sequence.t
-  (** Variables introduced by the substitution (ie vars of codomain) *)
+val introduced : t -> (var * scope) Sequence.t
+(** Variables introduced by the substitution (ie vars of codomain) *)
 
 (*
 val compose : t -> t -> t
@@ -115,35 +118,35 @@ val compose : t -> t -> t
 *)
 
 val is_renaming : t -> bool
-  (** Check whether the substitution is a variable renaming *)
+(** Check whether the substitution is a variable renaming *)
 
 include Interfaces.PRINT with type t := t
 
-val fold : t -> 'a -> ('a -> term -> scope -> term -> scope -> 'a) -> 'a
-val iter : t -> (term -> scope -> term -> scope -> unit) -> unit
+val fold : t -> 'a -> ('a -> var -> scope -> term -> scope -> 'a) -> 'a
+val iter : t -> (var -> scope -> term -> scope -> unit) -> unit
 
-val to_seq : t -> (term * scope * term * scope) Sequence.t
-val to_list : t -> (term * scope * term * scope) list
-val of_seq : ?init:t -> (term * scope * term * scope) Sequence.t -> t
-val of_list : ?init:t -> (term * scope * term * scope) list -> t
+val to_seq : t -> (var * scope * term * scope) Sequence.t
+val to_list : t -> (var * scope * term * scope) list
+val of_seq : ?init:t -> (var * scope * term * scope) Sequence.t -> t
+val of_list : ?init:t -> (var * scope * term * scope) list -> t
 
 (** {2 Applying a substitution} *)
 
 val apply : t -> renaming:Renaming.t -> term -> scope -> term
-  (** Apply the substitution to the given term.
-      This function assumes that all terms in the substitution are closed,
-      and it will not perform De Bruijn indices shifting. For instance,
-      applying [{X -> f(db0)}] (with [db0] the De Bruijn index [0])
-      to the term [forall. p(X)] will yield [forall. p(f(db0))] (capturing)
-      and not [forall. p(f(db1))].
-      @param renaming used to desambiguate free variables from distinct scopes *)
+(** Apply the substitution to the given term.
+    This function assumes that all terms in the substitution are closed,
+    and it will not perform De Bruijn indices shifting. For instance,
+    applying [{X -> f(db0)}] (with [db0] the De Bruijn index [0])
+    to the term [forall. p(X)] will yield [forall. p(f(db0))] (capturing)
+    and not [forall. p(f(db1))].
+    @param renaming used to desambiguate free variables from distinct scopes *)
 
 val apply_no_renaming : t -> term -> scope -> term
-  (** Same as {!apply}, but performs no renaming of free variables.
-      {b Caution}, can entail collisions between scopes! *)
+(** Same as {!apply}, but performs no renaming of free variables.
+    {b Caution}, can entail collisions between scopes! *)
 
 (* TODO
-include Interfaces.SERIALIZABLE with type t := t
+   include Interfaces.SERIALIZABLE with type t := t
 *)
 
 (** {2 Specializations} *)
@@ -152,21 +155,18 @@ module type SPECIALIZED = sig
   type term
   type t = subst
 
-  val mem : t -> term -> scope -> bool
-    (** Variable is bound? *)
-
   val apply : t -> renaming:Renaming.t -> term -> scope -> term
-    (** Apply the substitution to the given term/type.
-        @param renaming used to desambiguate free variables from distinct scopes *)
+  (** Apply the substitution to the given term/type.
+      @param renaming used to desambiguate free variables from distinct scopes *)
 
   val apply_no_renaming : t -> term -> scope -> term
-    (** Same as {!apply}, but performs no renaming of free variables.
+  (** Same as {!apply}, but performs no renaming of free variables.
       {b Caution}, can entail collisions between scopes! *)
 
-  val bind : t -> term -> scope -> term -> scope -> t
-    (** Add [v] -> [t] to the substitution. Both terms have a context.
-        @raise Invalid_argument if [v] is already bound in
-          the same context, to another term. *)
+  val bind : t -> var -> scope -> term -> scope -> t
+  (** Add [v] -> [t] to the substitution. Both terms have a context.
+      @raise Invalid_argument if [v] is already bound in
+        the same context, to another term. *)
 end
 
 module Ty : SPECIALIZED with type term = Type.t

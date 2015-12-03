@@ -35,55 +35,32 @@ type scope = int
 type 'a scoped = 'a * scope
 
 type term = T.t
+type var = HVar.t
 
-module TermInt = struct
-  type t = (T.t * int)
-  let equal (t1,i1)(t2,i2) = i1 = i2 && T.equal t1 t2
-  let hash = Hash.apply (fun (t,i) h -> Hash.int_ i (T.hash_fun t h))
+module VarInt = struct
+  type t = (var * int)
+  let compare (t1,i1)(t2,i2) =
+    if i1=i2 then HVar.compare t1 t2 else CCOrd.int_ i1 i2
+  let equal (t1,i1)(t2,i2) = i1 = i2 && HVar.equal t1 t2
+  let hash = Hash.apply (fun (t,i) h -> Hash.int_ i (HVar.hash_fun t h))
 end
 
-module H = Hashtbl.Make(TermInt)
-
-module M = CCPersistentHashtbl.Make(TermInt)
+module H = Hashtbl.Make(VarInt)
+module M = CCMap.Make(VarInt)
 
 (** {2 Renaming} *)
 
 module Renaming = struct
-  (** Type used to distinguish between variables to rename. FreshVar is
-      a variable that, conceptually, already belongs to the new scope,
-      so its original scope doesn't matter *)
-  type to_rename =
-    | FreshVar of int * T.t
-        (* same in any scope. Comes from Symbol.FreshVar i *)
-    | Var of T.t * int
-
-  let hash_to_rename_fun it h = match it with
-    | FreshVar (i,ty) -> Hash.int_ i (T.hash_fun ty h)
-    | Var (t, sc) -> T.hash_fun t (Hash.int_ sc h)
-
-  let hash_to_rename x = Hash.apply hash_to_rename_fun x
-
-  let equal_to_rename tr1 tr2 = match tr1, tr2 with
-    | FreshVar (i1, ty1), FreshVar (i2, ty2) -> i1 = i2 && T.equal ty1 ty2
-    | Var (v1,sc1), Var (v2, sc2) -> sc1 = sc2 && T.equal v1 v2
-    | _ -> false
-
-  module HR = Hashtbl.Make(struct
-    type t = to_rename
-    let equal = equal_to_rename
-    let hash = hash_to_rename
-  end)
-
   type t =
     | Dummy
-    | Tbl of T.t HR.t
+    | Tbl of T.t H.t
 
-  let create () = Tbl (HR.create 5)
+  let create () = Tbl (H.create 8)
 
   let clear r = match r with
   | Dummy -> ()
   | Tbl r ->
-    HR.clear r;
+    H.clear r;
     ()
 
   (* special renaming that does nothing *)
@@ -92,169 +69,115 @@ module Renaming = struct
   (* rename variable *)
   let rename r v s_v = match r, T.view v with
   | Dummy, _ -> v  (* do not rename *)
-  | Tbl tbl, T.Var _ ->
-      let key = Var (v, s_v) in
+  | Tbl tbl, T.Var v ->
+      let key = v, s_v in
       begin try
-        HR.find tbl key
+        H.find tbl key
       with Not_found ->
-        let v' = T._var ~ty:(T.ty_exn v) (HR.length tbl) in
-        HR.add tbl key v';
-        v'
-      end
-  | Tbl tbl, T.RigidVar _ ->
-      let key = Var (v, s_v) in
-      begin try
-        HR.find tbl key
-      with Not_found ->
-        let v' = T.rigid_var ~ty:(T.ty_exn v) (HR.length tbl) in
-        HR.add tbl key v';
+        (* FIXME: use HVar.ty *)
+        let v' = T.var ~ty:(T.ty_exn v) (H.length tbl) in
+        H.add tbl key v';
         v'
       end
   | _ -> assert false
-
-  let __var_count = ref ~-1
 end
 
-type t =
-  | E
-  | M of (term * int) M.t
+type t = (term * int) M.t
 
 type subst = t
 
-let empty = E
+let empty = M.empty
 
-let is_empty = function
-  | E -> true
-  | M m -> M.is_empty m
+let is_empty = M.is_empty
 
-let lookup subst v s_v = match subst with
-  | E -> raise Not_found
-  | M m ->
-      begin match T.view v with
-      | T.Var _ | T.RigidVar _ ->
-          M.find m (v, s_v)
-      | _ -> raise Not_found
-      end
+let find_exn subst v s_v = M.find (v, s_v) subst
+let find subst v s_v = try Some (M.find (v,s_v) subst) with Not_found -> None
 
-let mem subst v s_v = match subst with
-  | E -> false
-  | M m -> M.mem m (v, s_v)
+let mem subst v s_v = M.mem (v, s_v) subst
 
 (** Recursively lookup a variable in the substitution, until we get a value
     that is not a variable or that is not bound *)
-let rec get_var subst v sc_v = match subst with
-  | E -> v, sc_v
-  | M _ ->
-    try let t, sc_t = lookup subst v sc_v in
-        begin match T.view t with
-        | (T.Var _ | T.RigidVar _) when (sc_t <> sc_v || not (T.equal t v)) ->
-            get_var subst t sc_t  (* recurse *)
-        | _ -> t, sc_t (* fixpoint of lookup *)
-        end
-    with Not_found -> v, sc_v
+let rec get_var subst v sc_v =
+  match find subst v sc_v with
+  | None -> None
+  | Some (t, sc_t) as res->
+      begin match T.view t with
+      | T.Var v' -> get_var subst v' sc_t
+      | _ -> res
+      end
 
 exception KindError
 
 let bind subst v s_v t s_t =
   (*assert (T.DB.closed t); XXX: sometimes useful to allow it *)
-  let t', s_t' = get_var subst v s_v in
-  if s_t' = s_t && T.equal t' t
-    then subst (* compatible (absence of) bindings *)
-    else match T.view t' with
-    | T.Var _ | T.RigidVar _ ->
-        let m = match subst with
-          | E -> M.create 11
-          | M m -> m
-        in
-        let m' = M.replace m (t', s_t') (t, s_t) in
-        M m'
-    | _ ->
-        let msg = CCFormat.sprintf
-          "Subst.bind: inconsistent binding for %a[%d]: %a[%d] and %a[%d]"
-            T.pp v s_v T.pp t s_t T.pp t' s_t'
-        in
-        raise (Invalid_argument msg)
-
-let remove subst v s_v = match subst with
-  | E -> E
-  | M m -> M (M.remove m (v, s_v))
-
-let append s1 s2 = match s1, s2 with
-  | E, _ -> s2
-  | _, E -> s1
-  | M m1, M m2 ->
-    let m = M.merge
-      (fun (v,s_v) b1 b2 -> match b1, b2 with
-        | None, _ -> b2
-        | _, None -> b1
-        | Some (t1, s1), Some (t2, s2) ->
-          if T.equal t1 t2 && s1 = s2
-            then Some (t1, s1)
-            else
-              let msg = CCFormat.sprintf
-                "Subst.bind: inconsistent binding for %a[%d]: %a[%d] and %a[%d]"
-                  T.pp v s_v T.pp t1 s1 T.pp t2 s2
-              in
-              raise (Invalid_argument msg))
-      m1 m2
+  try
+    let t', s_t' = M.find (v, s_v) subst in
+    let msg = CCFormat.sprintf
+      "@[<2>Subst.bind:@ inconsistent binding@ for %a[%d]: %a[%d]@ and %a[%d]@]"
+        HVar.pp v s_v T.pp t s_t T.pp t' s_t'
     in
-    M m
+    invalid_arg msg
+  with Not_found ->
+    M.add (v, s_v) (t, s_t) subst
+
+let remove subst v s_v = M.remove (v, s_v) subst
+
+let append s1 s2 =
+  M.merge
+    (fun (v,s_v) b1 b2 -> match b1, b2 with
+      | None, _ -> b2
+      | _, None -> b1
+      | Some (t1, s1), Some (t2, s2) ->
+        if T.equal t1 t2 && s1 = s2
+          then Some (t1, s1)
+          else
+            let msg = CCFormat.sprintf
+              "@[<2>Subst.append:@ inconsistent binding@ for %a[%d]: %a[%d]@ and %a[%d]@]"
+                HVar.pp v s_v T.pp t1 s1 T.pp t2 s2
+            in
+            invalid_arg msg)
+    s1 s2
 
 (*
 let compose s1 s2 = failwith "Subst.compose: not implemented"
 *)
 
-let fold subst acc f = match subst with
-  | E -> acc
-  | M m -> M.fold (fun acc (v,s_v) (t,s_t) -> f acc v s_v t s_t) acc m
+let fold subst acc f =
+  M.fold (fun acc (v,s_v) (t,s_t) -> f acc v s_v t s_t) acc subst
 
-let iter subst k = match subst with
-  | E -> ()
-  | M m -> M.iter m (fun (v,s_v) (t,s_t) -> k v s_v t s_t)
+let iter subst k = M.iter (fun (v,s_v) (t,s_t) -> k v s_v t s_t) subst
 
 (* is the substitution a renaming? *)
-let is_renaming subst = match subst with
-| E -> true
-| M m ->
-  begin try
-    let codomain = H.create 5 in
-    M.iter m
+let is_renaming subst =
+  try
+    let codomain = H.create 8 in
+    M.iter
       (fun _ (t,s_t) ->
-        (* is some var bound to a non-var term? *)
-        if not (T.is_var t) then raise Exit;
-        H.replace codomain (t,s_t) ());
+        match T.view t with
+        | T.Var v -> H.replace codomain (v,s_t) ()
+        | _ ->
+            raise Exit (* some var bound to a non-var term *)
+      )
+      subst;
     (* as many variables in codomain as variables in domain *)
-    H.length codomain = M.length m
+    H.length codomain = M.cardinal subst
   with Exit -> false
-  end
 
 (* set of variables bound by subst, with their scope *)
-let domain s k = match s with
-| E -> ()
-| M m ->
-  M.iter m (fun (v,s_v) _ -> k (v,s_v));
-  ()
+let domain s k = M.iter (fun (v,s_v) _ -> k (v,s_v)) s
 
 (* set of terms that some variables are bound to by the substitution *)
-let codomain s k = match s with
-| E -> ()
-| M m ->
-  M.iter m (fun _ (t,s_t) -> k (t,s_t));
-  ()
+let codomain s k = M.iter (fun _ (t,s_t) -> k (t,s_t)) s
 
 (* variables introduced by the subst *)
-let introduced subst k = match subst with
-| E -> ()
-| M m ->
-  M.iter m
+let introduced subst k =
+  M.iter
     (fun _ (t,s_t) ->
-      T.Seq.vars t (fun v -> k (v,s_t)));
-  ()
+      T.Seq.vars t (fun v -> k (v,s_t)))
+    subst
 
-let to_seq subst = match subst with
-| E -> Sequence.empty
-| M m ->
-  let seq = M.to_seq m in
+let to_seq subst =
+  let seq = M.to_seq subst in
   Sequence.map (fun ((v, s_v), (t, s_t)) -> v, s_v, t, s_t) seq
 
 let to_list subst =
@@ -271,11 +194,11 @@ let of_list ?(init=empty) l = match l with
 
 let pp out subst =
   let pp_binding out (v,s_v,t,s_t) =
-    Format.fprintf out "%a[%d] → %a[%d]" T.pp v s_v T.pp t s_t
+    Format.fprintf out "@[<2>%a[%d] →@ %a[%d]@]" HVar.pp v s_v T.pp t s_t
   in
-  match to_list subst with
-  | [] -> CCFormat.string out "{}"
-  | l -> Format.fprintf out "{%a}" (Util.pp_list ~sep:", " pp_binding) l
+  Format.fprintf out "{@[<hv>%a@]}"
+    (CCFormat.seq ~start:"" ~stop:"" ~sep:", " pp_binding)
+    (to_seq subst)
 
 let to_string = CCFormat.to_string pp
 
@@ -294,12 +217,12 @@ let apply subst ~renaming t s_t =
       | T.Const s ->
         (* regular constant *)
         T.const ~ty s
-      | T.BVar i -> T.bvar ~ty i
-      | T.Var i ->
+      | T.DB i -> T.bvar ~ty i
+      | T.Var v ->
         (* the most interesting cases!
            switch depending on whether [t] is bound by [subst] or not *)
         begin try
-          let t', s_t' = lookup subst t s_t in
+          let t', s_t' = find_exn subst v s_t in
           (* NOTE: we used to shift [t'], in case it contained free De
              Bruijn indices, but that shouldn't happen because only
              closed terms should appear in substitutions. *)
@@ -309,21 +232,7 @@ let apply subst ~renaming t s_t =
         with Not_found ->
           (* variable not bound by [subst], rename it
               (after specializing its type if needed) *)
-          let t = T._var ~ty i in
-          Renaming.rename renaming t s_t
-        end
-      | T.RigidVar i ->
-        (* variable is either bound or renamed, same as Var. However
-          it can only be bound to a variable, so it simplifies handling
-          De Bruijn indices. *)
-        begin try
-          let t', s_t' = lookup subst t s_t in
-          (* also apply [subst] to [t'] *)
-          _apply t' s_t'
-        with Not_found ->
-          (* variable not bound by [subst], rename it
-              (after specializing its type if needed) *)
-          let t = T.rigid_var ~ty i in
+          let t = T.mk_var ~ty v in
           Renaming.rename renaming t s_t
         end
       | T.Bind (s, varty, sub_t) ->
@@ -341,14 +250,17 @@ let apply subst ~renaming t s_t =
       | T.Record (l, rest) ->
           let rest = match rest with
             | None -> None
-            | Some r -> Some (_apply r s_t)
+            | Some v ->
+                begin try
+                  let t', s_t' = find_exn subst v s_t in
+                  Some (_apply t' s_t')
+                with Not_found ->
+                  (* FIXME: need ty *)
+                  Some (T.mk_var ~ty:(assert false) v)
+                end
           in
           let l' = List.map (fun (s,t') -> s, _apply t' s_t) l in
-          T.record ~ty l' ~rest
-      | T.RecordGet (r, name) ->
-          T.record_get ~ty (_apply r s_t) name
-      | T.RecordSet (r, name, sub) ->
-          T.record_set ~ty (_apply r s_t) name (_apply sub s_t)
+          T.record_flatten ~ty l' ~rest
       | T.SimpleApp (s, l) ->
           let l' = _apply_list l s_t in
           T.simple_app ~ty s l'
@@ -381,9 +293,6 @@ module type SPECIALIZED = sig
   type term
   type t = subst
 
-  val mem : t -> term -> scope -> bool
-    (** Variable is bound? *)
-
   val apply : t -> renaming:Renaming.t -> term -> scope -> term
     (** Apply the substitution to the given term/type.
         @param renaming used to desambiguate free variables from distinct scopes *)
@@ -392,7 +301,7 @@ module type SPECIALIZED = sig
     (** Same as {!apply}, but performs no renaming of free variables.
       {b Caution}, can entail collisions between scopes! *)
 
-  val bind : t -> term -> scope -> term -> scope -> t
+  val bind : t -> var -> scope -> term -> scope -> t
     (** Add [v] -> [t] to the substitution. Both terms have a context.
         @raise Invalid_argument if [v] is already bound in
           the same context, to another term. *)
@@ -402,22 +311,18 @@ module Ty = struct
   type term = Type.t
   type t = subst
 
-  let mem subst t s_t = mem subst (t:term:>T.t) s_t
-
   let apply subst ~renaming t s_t =
     Type.of_term_unsafe (apply subst ~renaming (t : term :> T.t) s_t)
 
   let apply_no_renaming subst t s_t =
     Type.of_term_unsafe (apply_no_renaming subst (t : term :> T.t) s_t)
 
-  let bind = (bind :> t -> term -> scope -> term -> scope -> t)
+  let bind = (bind :> t -> var -> scope -> term -> scope -> t)
 end
 
 module FO = struct
   type term = FOTerm.t
   type t = subst
-
-  let mem subst t s_t = mem subst (t:term:>T.t) s_t
 
   let apply subst ~renaming t s_t =
     FOTerm.of_term_unsafe (apply subst ~renaming (t : term :> T.t) s_t)
@@ -425,14 +330,12 @@ module FO = struct
   let apply_no_renaming  subst t s_t =
     FOTerm.of_term_unsafe (apply_no_renaming  subst (t : term :> T.t) s_t)
 
-  let bind = (bind :> t -> term -> scope -> term -> scope -> t)
+  let bind = (bind :> t -> var -> scope -> term -> scope -> t)
 end
 
 module HO = struct
   type term = HOTerm.t
   type t = subst
-
-  let mem subst t s_t = mem subst (t:term:>T.t) s_t
 
   let apply  subst ~renaming t s_t =
     HOTerm.of_term_unsafe (apply  subst ~renaming (t : term :> T.t) s_t)
@@ -440,14 +343,12 @@ module HO = struct
   let apply_no_renaming  subst t s_t =
     HOTerm.of_term_unsafe (apply_no_renaming  subst (t : term :> T.t) s_t)
 
-  let bind = (bind :> t -> term -> scope -> term -> scope -> t)
+  let bind = (bind :> t -> var -> scope -> term -> scope -> t)
 end
 
 module Form = struct
   type term = Formula.FO.t
   type t = subst
-
-  let mem subst t s_t = mem subst (t:term:>T.t) s_t
 
   let apply  subst ~renaming t s_t =
     Formula.FO.of_term_unsafe (apply  subst ~renaming (t : term :> T.t) s_t)
@@ -455,5 +356,5 @@ module Form = struct
   let apply_no_renaming  subst t s_t =
     Formula.FO.of_term_unsafe (apply_no_renaming  subst (t : term :> T.t) s_t)
 
-  let bind = (bind :> t -> term -> scope -> term -> scope -> t)
+  let bind = (bind :> t -> var -> scope -> term -> scope -> t)
 end
