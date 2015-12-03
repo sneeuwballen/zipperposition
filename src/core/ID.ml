@@ -18,6 +18,8 @@ let make =
 
 let copy t = make t.name
 
+let name t = t.name
+
 let hash t = t.id
 let hash_fun t h = CCHash.int t.id h
 let equal i1 i2 = i1.id = i2.id

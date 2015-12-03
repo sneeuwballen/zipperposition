@@ -20,6 +20,8 @@ val make : string -> t
 val copy : t -> t
 (** Copy with a new ID *)
 
+val name : t -> string
+
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 include Interfaces.PRINT with type t := t

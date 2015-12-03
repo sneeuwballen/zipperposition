@@ -28,6 +28,7 @@ val update_ty : 'a t -> f:('a -> 'b) -> 'b t
 
 val id : _ t -> ID.t
 val ty: 'a t -> 'a
+val name : _ t -> string
 
 val compare : _ t -> _ t -> int
 val equal : _ t -> _ t -> bool

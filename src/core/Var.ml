@@ -21,6 +21,7 @@ let update_ty v ~f = {v with ty=f v.ty; }
 
 let ty t = t.ty
 let id t = t.id
+let name t = t.id.ID.name
 
 let compare a b = ID.compare a.id b.id
 let equal a b = ID.equal a.id b.id

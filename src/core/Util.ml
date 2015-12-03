@@ -318,6 +318,15 @@ let pp_pair ?(sep=", ") pa pb out (a,b) =
 
 let pp_list ?(sep=", ") pp = CCFormat.list ~start:"" ~stop:"" ~sep pp
 
+
+let ord_option c o1 o2 = match o1, o2 with
+  | None, None -> 0
+  | None, Some _ -> -1
+  | Some _, None -> 1
+  | Some x1, Some x2 -> c x1 x2
+
+
+
 (** {2 File utils} *)
 
 type 'a or_error = [`Error of string | `Ok of 'a]

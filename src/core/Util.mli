@@ -153,6 +153,8 @@ val pp_pair :
 val pp_list : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
 (** Print a list without begin/end separators *)
 
+val ord_option : 'a CCOrd.t -> 'a option CCOpt.t
+
 (** {2 File utils} *)
 
 type 'a or_error = [`Error of string | `Ok of 'a]
