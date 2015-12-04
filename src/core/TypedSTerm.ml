@@ -17,7 +17,7 @@ type t = {
 }
 and view =
   | Var of t Var.t            (** variable *)
-  | Const of Symbol.t         (** constant *)
+  | Const of ID.t         (** constant *)
   | App of t * t list         (** apply term *)
   | Bind of Binder.t * t Var.t * t  (** bind variable in term *)
   | AppBuiltin of Builtin.t * t list
@@ -54,7 +54,7 @@ let to_int_ = function
 
 let rec compare t1 t2 = match view t1, view t2 with
   | Var s1, Var s2 -> Var.compare s1 s2
-  | Const s1, Const s2 -> Symbol.compare s1 s2
+  | Const s1, Const s2 -> ID.compare s1 s2
   | App (s1,l1), App (s2, l2) ->
       CCOrd.(
         compare s1 s2
@@ -95,7 +95,7 @@ let equal t1 t2 = compare t1 t2 = 0
 
 let rec hash_fun t h = match t.term with
   | Var s -> h |> Hash.string_ "var" |> Var.hash_fun s
-  | Const s -> h |> Hash.string_ "const" |> Symbol.hash_fun s
+  | Const s -> h |> Hash.string_ "const" |> ID.hash_fun s
   | App (s, l) -> h |> Hash.string_ "app" |> hash_fun s |> Hash.list_ hash_fun l
   | Multiset l ->
     h |> Hash.string_ "multiset" |> Hash.list_ hash_fun l
@@ -110,13 +110,11 @@ let rec hash_fun t h = match t.term with
 
 let hash x = Hash.apply hash_fun x
 
-let _pp_list p buf l = CCFormat.list ~start:"" ~stop:"" ~sep:", " p buf l
-
 let rec pp out t = match view t with
   | Var s ->
       Var.pp out s;
       Format.fprintf out ":%a" _pp_inner (ty_exn t)
-  | Const s -> Symbol.pp out s
+  | Const s -> ID.pp out s
   | App (_, []) -> assert false
   | App (f, l) ->
       Format.fprintf out "@[<2>%a@ %a@]" _pp_inner f (Util.pp_list ~sep:" " pp) l
@@ -128,23 +126,31 @@ let rec pp out t = match view t with
       Format.fprintf out "{%a | %a}" pp_fields l pp r
   | AppBuiltin (b, [a]) when Builtin.is_prefix b ->
     Format.fprintf out "@[%a %a@]" Builtin.pp b pp a
-  | AppBuiltin (b, [t1;t2]) when Builtin.is_infix b ->
-    Format.fprintf out "@[<2>%a@ %a@ %a@]" pp t1 Builtin.pp b pp t2
+  | AppBuiltin (Builtin.Arrow, ret::args) ->
+      pp_infix_ Builtin.Arrow out (args @ [ret])
+  | AppBuiltin (b, l) when Builtin.is_infix b && List.length l > 0 ->
+      pp_infix_ b out l
   | AppBuiltin (b, l) ->
-    Format.fprintf out "@[%a(%a)@]" Builtin.pp b (Util.pp_list pp) l
+    Format.fprintf out "(@[%a %a@])" Builtin.pp b (Util.pp_list pp) l
   | Multiset l ->
-      Format.fprintf out "[%a]" (_pp_list _pp_inner) l
+      Format.fprintf out "[@[%a@]]" (Util.pp_list ~sep:", " _pp_inner) l
   | Meta (id, r) ->
       assert (!r = None);
       Format.fprintf out "?%a" Var.pp id
 and _pp_inner buf t = match view t with
   | AppBuiltin (_, _::_)
   | App _
-  | Bind _ -> Format.fprintf buf "(%a)" pp t  (* avoid ambiguities *)
+  | Bind _ -> Format.fprintf buf "(@[%a@])" pp t  (* avoid ambiguities *)
   | _ -> pp buf t
 and pp_field out (name,t) =
   Format.fprintf out "%s=%a" name _pp_inner t
 and pp_fields out f = Util.pp_list ~sep:", " pp_field out f
+and pp_infix_ b out l = match l with
+  | [] -> assert false
+  | [t] -> pp out t
+  | t :: l' ->
+      Format.fprintf out "@[<hv>%a@ @[<hv%a@ %a@]@]"
+        pp t Builtin.pp b (pp_infix_ b) l'
 
 exception IllFormedTerm of string
 
@@ -194,10 +200,12 @@ let map_ty t ~f =
     | Some x -> Some (f x)
   }
 
-let of_string ?loc ~ty s = const ?loc ~ty (Symbol.of_string s)
+let of_string ?loc ~ty s = const ?loc ~ty (ID.make s)
 
 let tType = {ty=None; loc=None; term=AppBuiltin (Builtin.TType,[]); }
 let prop = builtin ~ty:tType Builtin.Prop
+
+let ty_arrow ?loc l r = app_builtin ?loc ~ty:tType Builtin.Arrow (r :: l)
 
 let fresh_var ?loc ~ty () = var ?loc (Var.gensym ~ty ())
 

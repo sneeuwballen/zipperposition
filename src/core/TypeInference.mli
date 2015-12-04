@@ -31,7 +31,7 @@ This module is used for two things that overlap:
 - converting {i untyped} terms or formulas into {i typed} formulas, by inferring
   the exact type of each subterm (and possibly inferring type parameters).
 
-In this context, {b generalizing} type variables means that if some symbol
+In this context, {b generalizing} type variables means that if some ID.t
 whose type was unknown and its type still contains variables after the
 type inference, those variables are quantified instead of being bound to
 a default type (typically {!.Type.i}).
@@ -83,9 +83,9 @@ module Ctx : sig
     (** Exit the current scope (formula, clause), meaning that all free
         variables' types are forgotten. *)
 
-  val declare : t -> Symbol.t -> type_ -> unit
-    (** Declare the type of a symbol. The type {b must} be equal to
-        the current type of the symbol, if any.
+  val declare : t -> ID.t -> type_ -> unit
+    (** Declare the type of a ID.t. The type {b must} be equal to
+        the current type of the ID.t, if any.
         @raise Type.Error if an inconsistency (with inferred types) is
           detected. *)
 

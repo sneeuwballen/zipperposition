@@ -26,14 +26,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Higher Order Terms} *)
 
-module T = ScopedTerm
+module T = InnerTerm
 module FOT = FOTerm
 
 (** {2 Type Definitions} *)
 
 type symbol = ID.t
 
-type t = ScopedTerm.t
+type t = InnerTerm.t
 
 type term = t
 
@@ -178,7 +178,7 @@ let record l ~rest =
         end
   in
   let ty = Type.record_flatten ty_l ~rest:ty_rest in
-  (* flattening done by ScopedTerm. *)
+  (* flattening done by InnerTerm. *)
   T.record ~ty:(ty:>T.t) l ~rest
 
 let lambda ~varty t' =

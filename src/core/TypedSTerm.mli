@@ -13,7 +13,7 @@ type term = t
 
 type view = private
   | Var of t Var.t            (** variable *)
-  | Const of Symbol.t         (** constant *)
+  | Const of ID.t         (** constant *)
   | App of t * t list         (** apply term *)
   | Bind of Binder.t * t Var.t * t  (** bind variable in term *)
   | AppBuiltin of Builtin.t * t list
@@ -40,7 +40,7 @@ val prop : t
 
 val var : ?loc:location -> t Var.t -> t
 val app : ?loc:location -> ty:t -> t -> t list -> t
-val const : ?loc:location -> ty:t -> Symbol.t -> t
+val const : ?loc:location -> ty:t -> ID.t -> t
 val app_builtin : ?loc:location -> ty:t -> Builtin.t -> t list -> t
 val builtin : ?loc:location -> ty:t -> Builtin.t -> t
 val bind : ?loc:location -> ty:t -> Binder.t -> t Var.t -> t -> t
@@ -63,6 +63,66 @@ val map_ty : t -> f:(t -> t) -> t
 
 val fresh_var : ?loc:location -> ty:t -> unit -> t
 (** fresh free variable with the given type. *)
+
+(** {2 Specific Views} *)
+
+module Ty : sig
+  type t = term
+
+  type builtin = Prop | TType | Term | Int | Rat
+
+  type view =
+    | Builtin of builtin
+    | Var of t Var.t
+    | App of ID.t * t list
+    | Fun of t list * t
+    | Forall of t Var.t * t
+    | Multiset of t
+    | Record of (string * t) list * t Var.t option
+
+  val view : t -> view
+
+  val tType : t
+  val var : ?loc:location -> t Var.t -> t
+  val fun_ : ?loc:location -> t list -> t -> t
+  val app : ?loc:location -> ID.t -> t list -> t
+  val const : ?loc:location -> ID.t -> t
+  val forall : ?loc:location -> t Var.t -> t -> t
+end
+
+module Form : sig
+  type t = term
+  type view =
+    | True
+    | False
+    | Atom of t
+    | Eq of t * t
+    | Neq of t * t
+    | Equiv of t * t
+    | Xor of t * t
+    | Imply of t * t
+    | And of t list
+    | Or of t list
+    | Not of t
+    | Forall of t Var.t * t
+    | Exists of t Var.t * t
+
+  val view : t -> view
+
+  val atom : ?loc:location -> t -> t
+  val eq : ?loc:location -> t -> t -> t
+  val neq : ?loc:location -> t -> t -> t
+  val equiv : ?loc:location -> t -> t -> t
+  val xor : ?loc:location -> t -> t -> t
+  val imply : ?loc:location -> t -> t -> t
+  val and_ : ?loc:location -> t list -> t
+  val or_ : ?loc:location -> t list -> t
+  val not_ : ?loc:location -> t -> t
+  val forall : ?loc:location -> t Var.t -> t -> t
+  val exists : ?loc:location -> t Var.t -> t -> t
+
+  val is_atomic : t -> bool
+end
 
 (** {2 Utils} *)
 

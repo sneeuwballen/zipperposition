@@ -25,7 +25,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Types} *)
 
-module T = ScopedTerm
+module T = InnerTerm
 
 type t = T.t
 
@@ -90,6 +90,8 @@ let arrow l r = match view r with
   | _ -> arrow_ l r
 
 let record l ~rest = T.record ~ty:T.tType l ~rest
+
+let record_flatten l ~rest = T.record_flatten ~ty:tType l ~rest
 
 let bvar i =
   T.bvar ~ty:T.tType i

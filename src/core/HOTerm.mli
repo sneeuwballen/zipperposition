@@ -30,7 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {2 Term} *)
 
-type t = private ScopedTerm.t
+type t = private InnerTerm.t
 
 type term = t
 
@@ -49,7 +49,7 @@ type view = private
 val view : t -> view
 val ty : t -> Type.t
 
-val of_term_unsafe : ScopedTerm.t -> t
+val of_term_unsafe : InnerTerm.t -> t
 (** {b NOTE}: caution, this can break invariants! Use only if you know what
     you are doing. *)
 
@@ -125,7 +125,7 @@ val is_exists : t -> bool
 val is_multiset : t -> bool
 val is_record : t -> bool
 
-val of_term_unsafe : ScopedTerm.t -> t
+val of_term_unsafe : InnerTerm.t -> t
 (** {b NOTE}: this can break the invariants and make {!view} fail. Only
     apply with caution. *)
 

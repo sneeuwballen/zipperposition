@@ -26,7 +26,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 First-order terms} *)
 
 module PB = Position.Build
-module T = ScopedTerm
+module T = InnerTerm
 
 let prof_app = Util.mk_profiler "Term.app"
 let prof_ac_normal_form = Util.mk_profiler "ac_normal_form"

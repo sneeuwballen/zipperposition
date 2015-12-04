@@ -54,11 +54,11 @@ type typed = TypedSTerm.t (** typed term *)
 module Ctx = struct
   type t = {
     default: type_;
-    mutable signature : signature;(* symbol -> type *)
+    mutable signature : signature;(* ID.t -> type *)
     mutable vars_ty : type_ list;  (* type variables of variables *)
     mutable const_ty : type_ list; (* type variables of constants *)
     mutable locs : Loc.t list; (* stack of locations *)
-    symbols : type_ Symbol.Tbl.t; (* symbol -> instantiated type *)
+    symbols : type_ ID.Tbl.t; (* ID.t -> instantiated type *)
     vars : (string, type_ Var.t) Hashtbl.t;  (* var name -> var *)
   }
 
@@ -69,14 +69,14 @@ module Ctx = struct
       vars_ty = [];
       const_ty = [];
       locs = [];
-      symbols = Symbol.Tbl.create 7;
+      symbols = ID.Tbl.create 7;
       vars = Hashtbl.create 7;
     } in
     ctx
 
   let copy t = { t with
     signature=ID.Tbl.copy t.signature;
-    symbols = Symbol.Tbl.copy t.symbols;
+    symbols = ID.Tbl.copy t.symbols;
     vars = Hashtbl.copy t.vars;
   }
 
@@ -217,8 +217,8 @@ module Ctx = struct
     ctx.const_ty <- ret :: ctx.const_ty;
     ty
 
-  (* If the function symbol has an unknown type, a fresh variable
-     is returned. Otherwise the known type of the symbol is returned.
+  (* If the function ID.t has an unknown type, a fresh variable
+     is returned. Otherwise the known type of the ID.t is returned.
      @param arity the expected arity (if not declared) *)
   let type_of_fun ~arity ctx s =
     match s with
@@ -230,7 +230,7 @@ module Ctx = struct
       begin match Signature.find ctx.signature s with
         | Some ty -> ty
         | None ->
-          (* give a new type variable to this symbol. The symbol will not
+          (* give a new type variable to this ID.t. The ID.t will not
              be able to be polymorphic (need to declare it!). *)
           try
             Sym.Tbl.find ctx.symbols s
@@ -378,7 +378,7 @@ module FO = struct
           Ctx.apply_fo ctx (T.const ~ty x))
     | PT.Const s ->
       let ty_s = Ctx.type_of_fun ~arity:0 ctx s in
-      Util.debugf ~section 5 "type of symbol %a: %a" (fun k->k Sym.pp s Type.pp ty_s);
+      Util.debugf ~section 5 "type of ID.t %a: %a" (fun k->k Sym.pp s Type.pp ty_s);
       ty_s, (fun ctx ->
           let ty = Ctx.apply_ty ctx ty_s in
           T.const ~ty s)
@@ -391,7 +391,7 @@ module FO = struct
         | Type.Arity (a,b) -> a, b
       in
       (* separation between type arguments and proper term arguments,
-          based on the expected arity of the symbol. The first
+          based on the expected arity of the ID.t. The first
           [n_tyargs] arguments are converted to types, the remaining
           [n_args] ones are inferred as terms.
           XXX hack: special case for FO, if n_args=length l then type
@@ -415,7 +415,7 @@ module FO = struct
           which is also the result. *)
       let ty_ret = Ctx._new_ty_var ctx in
       Ctx.unify_and_set ctx ty_s' (Type.arrow_list ty_of_args ty_ret);
-      Util.debugf ~section 5 "type of symbol %a: %a"
+      Util.debugf ~section 5 "type of ID.t %a: %a"
         (fun k->k Sym.pp s (Ctx.pp_ty_deref_ ctx) ty_s);
       (* now to produce the closure, that first creates subterms *)
       ty_ret, (fun ctx ->
@@ -429,10 +429,10 @@ module FO = struct
           T.app_full (T.const ~ty:ty_s' s) tyargs' args')
     | PT.Int n ->
       let ty = ctx.Ctx.default.default_int in
-      ty, (fun _ -> T.const ~ty (Symbol.mk_int n))
+      ty, (fun _ -> T.const ~ty (ID.mk_int n))
     | PT.Rat n ->
       let ty = ctx.Ctx.default.default_rat in
-      ty, (fun _ -> T.const ~ty (Symbol.mk_rat n))
+      ty, (fun _ -> T.const ~ty (ID.mk_rat n))
     | PT.List _
     | PT.Column _
     | PT.App _
@@ -863,10 +863,10 @@ module HO = struct
           T.at_full t' ~tyargs:tyargs' args')
     | PT.Int n ->
       let ty = ctx.Ctx.default.default_int in
-      ty, (fun _ -> T.const ~ty (Symbol.mk_int n))
+      ty, (fun _ -> T.const ~ty (ID.mk_int n))
     | PT.Rat n ->
       let ty = ctx.Ctx.default.default_rat in
-      ty, (fun _ -> T.const ~ty (Symbol.mk_rat n))
+      ty, (fun _ -> T.const ~ty (ID.mk_rat n))
     | PT.Column _
     | PT.Bind _ ->
       Ctx.error_ ctx "expected higher-order term"

@@ -36,7 +36,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {2 Term} *)
 
-type t = private ScopedTerm.t
+type t = private InnerTerm.t
 
 type term = t
 
@@ -84,7 +84,7 @@ val var_of_int : ty:Type.t -> int -> t
 val bvar : ty:Type.t -> int -> t
 (** Create a bound variable. Providing a type is mandatory.
     {b Warning}: be careful and try not to use this function directly.
-    @raise ScopedTerm.IllFormedTerm if the index is < 0 *)
+    @raise InnerTerm.IllFormedTerm if the index is < 0 *)
 
 val builtin : ty:Type.t -> Builtin.t -> t
 
@@ -109,7 +109,7 @@ val is_bvar : t -> bool
 val is_app : t -> bool
 val is_const : t -> bool
 
-val of_term_unsafe : ScopedTerm.t -> t
+val of_term_unsafe : InnerTerm.t -> t
 (** {b NOTE}: this can break the invariants and make {!view} fail. Only
     apply with caution. *)
 

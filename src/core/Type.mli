@@ -27,7 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {2 Main Type representation}
 
-    Types are represented using ScopedTerm, with kind Type. Therefore, they
+    Types are represented using InnerTerm, with kind Type. Therefore, they
     are hashconsed and scoped.
 
     Common representation of types, including higher-order
@@ -41,9 +41,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     TODO: think of a good way of representating AC operators (+, ...)
 *)
 
-type t = private ScopedTerm.t
+type t = private InnerTerm.t
 (** Type is a subtype of the term structure
-    (itself a subtype of ScopedTerm.t),
+    (itself a subtype of InnerTerm.t),
     with explicit conversion *)
 
 type ty = t
@@ -99,6 +99,11 @@ val arrow : t list -> t -> t
 val record : (string*t) list -> rest:t HVar.t option -> t
 (** Record type, with an optional extension *)
 
+val record_flatten : (string*t) list -> rest:t option -> t
+(** Record type with a possibly nested record type.
+    @raise InnerTerm.IllFormedTerm if the
+      row record [rest] contains some fields also present in the list *)
+
 val forall : t -> t
 (** Quantify over one type variable. Careful with the De Bruijn indices. *)
 
@@ -115,11 +120,11 @@ val (==>) : t list -> t -> t
 val multiset : t -> t
 (** Type of multiset *)
 
-val of_term_unsafe : ScopedTerm.t -> t
+val of_term_unsafe : InnerTerm.t -> t
 (** {b NOTE}: this can break the invariants and make {!view} fail. Only
     use with caution. *)
 
-val of_terms_unsafe : ScopedTerm.t list -> t list
+val of_terms_unsafe : InnerTerm.t list -> t list
 
 (** {2 Containers} *)
 
@@ -190,7 +195,7 @@ val apply : t -> t list -> t
 val apply1 : t -> t -> t
 (** [apply1 a b] is short for [apply a [b]]. *)
 
-val apply_unsafe : t -> ScopedTerm.t list -> t
+val apply_unsafe : t -> InnerTerm.t list -> t
 (** Similar to {!apply}, but assumes its arguments are well-formed
     types without more ado.
     @raise ApplyError if types do not match

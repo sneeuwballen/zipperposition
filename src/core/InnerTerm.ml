@@ -824,3 +824,4 @@ let rec debugf out t = match view t with
       Format.fprintf out "{ @[<hv>%a@ | %a@] }"
         (Util.pp_list (fun fmt (n,t) -> Format.fprintf fmt "%s: %a" n debugf t))
         l HVar.pp r
+

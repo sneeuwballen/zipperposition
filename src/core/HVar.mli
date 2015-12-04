@@ -30,3 +30,13 @@ val min : 'a t -> 'a t -> 'a t
 val pp : _ t CCFormat.printer
 val to_string : _ t -> string
 
+(**/**)
+val make_unsafe : ty:'a -> int -> 'a t
+(** skip checks *)
+
+val fresh : ty:'a -> unit -> 'a t
+(** Magic: create a variable with a negative index, mostly for
+    unification purpose *)
+
+(**/**)
+
