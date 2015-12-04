@@ -50,13 +50,13 @@ Library "logtk"
   Path:             src/core/
   Pack:             true
   Modules:          ScopedTerm, FOTerm, Type, Util, STerm, Interfaces,
-                    DBEnv, Position, HOTerm, Formula, Var, HVar,
-                    Formula_intf, Substs, Unif, Signature,
+                    DBEnv, Position, HOTerm, Var, HVar,
+                    Substs, Unif, Signature,
                     TypeInference, Options, Comparison, Precedence, Builtin,
                     Precedence_intf, Ordering, Ordering_intf, Skolem, Cnf, ID,
                     HORewriting, Index, Dtree, Fingerprint, NPDtree, Binder,
-                    Congruence, FastFingerprint, FeatureVector, Rewriting,
-                    FormulaShape, Transform, Lambda, Sourced, TypedSTerm,
+                    Congruence, FastFingerprint, FeatureVector,
+                    Lambda, Sourced, TypedSTerm,
                     lib/Hashcons, lib/Cache, lib/ParseLocation, lib/Multiset,
                     lib/PartialOrder, lib/PartialOrder_intf, lib/LazyList,
                     lib/IArray, lib/LazyGraph, lib/AllocCache
