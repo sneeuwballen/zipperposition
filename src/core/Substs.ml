@@ -1,27 +1,5 @@
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Substitutions} *)
 
@@ -89,21 +67,27 @@ let empty = M.empty
 
 let is_empty = M.is_empty
 
-let find_exn subst v s_v = M.find (v, s_v) subst
-let find subst v s_v = try Some (M.find (v,s_v) subst) with Not_found -> None
+let find_exn subst v = M.find v subst
+let find subst v = try Some (M.find v subst) with Not_found -> None
 
 let mem subst v s_v = M.mem (v, s_v) subst
 
+let rec deref subst ((t, sc_t) as pair) =
+  match T.view t with
+    | T.Var v ->
+        begin try
+          let t' = find_exn subst (v, sc_t) in
+          deref subst t'
+        with Not_found -> pair
+        end
+    | _ -> pair
+
 (** Recursively lookup a variable in the substitution, until we get a value
     that is not a variable or that is not bound *)
-let rec get_var subst v sc_v =
-  match find subst v sc_v with
+let get_var subst v =
+  match find subst v with
   | None -> None
-  | Some (t, sc_t) as res->
-      begin match T.view t with
-      | T.Var v' -> get_var subst v' sc_t
-      | _ -> res
-      end
+  | Some t -> Some (deref subst t)
 
 exception KindError
 
@@ -203,15 +187,15 @@ let to_string = CCFormat.to_string pp
 
 (** {2 Applying a substitution} *)
 
-let apply subst ~renaming t s_t =
-  let rec _apply t s_t =
+let apply subst ~renaming (t, s_t) =
+  let rec aux t s_t =
     match T.ty t with
     | T.NoType ->
       assert(T.ground t);
       t
     | _ when T.ground t -> t
     | T.HasType ty ->
-      let ty = _apply ty s_t in
+      let ty = aux ty s_t in
       match T.view t with
       | T.Const s ->
         (* regular constant *)
@@ -221,13 +205,13 @@ let apply subst ~renaming t s_t =
         (* the most interesting cases!
            switch depending on whether [t] is bound by [subst] or not *)
         begin try
-          let t', s_t' = find_exn subst v s_t in
+          let t', s_t' = find_exn subst (v, s_t) in
           (* NOTE: we used to shift [t'], in case it contained free De
              Bruijn indices, but that shouldn't happen because only
              closed terms should appear in substitutions. *)
           assert (T.DB.closed t');
           (* also apply [subst] to [t'] *)
-          _apply t' s_t'
+          aux t' s_t'
         with Not_found ->
           (* variable not bound by [subst], rename it
               (after specializing its type if needed) *)
@@ -235,51 +219,43 @@ let apply subst ~renaming t s_t =
           Renaming.rename renaming t s_t
         end
       | T.Bind (s, varty, sub_t) ->
-          let varty' = _apply varty s_t in
-          let sub_t' = _apply sub_t s_t in
+          let varty' = aux varty s_t in
+          let sub_t' = aux sub_t s_t in
           T.bind ~varty:varty' ~ty s sub_t'
       | T.App (hd, l) ->
-          let hd' = _apply hd s_t in
-          let l' = _apply_list l s_t in
+          let hd' = aux hd s_t in
+          let l' = aux_list l s_t in
           T.app ~ty hd' l'
       | T.Record (l, rest) ->
           let rest = match rest with
             | None -> None
             | Some v ->
                 begin try
-                  let t', s_t' = find_exn subst v s_t in
-                  Some (_apply t' s_t')
+                  let t', s_t' = find_exn subst (v, s_t) in
+                  Some (aux t' s_t')
                 with Not_found ->
                   Some (T.var v)
                 end
           in
-          let l' = List.map (fun (s,t') -> s, _apply t' s_t) l in
+          let l' = List.map (fun (s,t') -> s, aux t' s_t) l in
           T.record_flatten ~ty l' ~rest
       | T.SimpleApp (s, l) ->
-          let l' = _apply_list l s_t in
+          let l' = aux_list l s_t in
           T.simple_app ~ty s l'
       | T.AppBuiltin (s, l) ->
-          let l' = _apply_list l s_t in
+          let l' = aux_list l s_t in
           T.app_builtin ~ty s l'
       | T.Multiset l ->
-          let l' = _apply_list l s_t in
+          let l' = aux_list l s_t in
           T.multiset ~ty l'
-  and _apply_list l s_l = match l with
+  and aux_list l s_l = match l with
     | [] -> []
-    | t::l' -> _apply t s_l :: _apply_list l' s_l
+    | t::l' -> aux t s_l :: aux_list l' s_l
   in
-  _apply t s_t
+  aux t s_t
 
-let apply_no_renaming subst t s_t =
-  apply subst ~renaming:Renaming.dummy t s_t
-
-  (*
-let bij =
-  Bij.(map
-    ~inject:(fun s -> Sequence.to_list (to_seq s))
-    ~extract:(fun seq -> of_seq (Sequence.of_list seq))
-    (list_ (quad T.bij int_ T.bij int_)))
-*)
+let apply_no_renaming subst t =
+  apply subst ~renaming:Renaming.dummy t
 
 (** {2 Specializations} *)
 
@@ -305,11 +281,11 @@ module Ty = struct
   type term = Type.t
   type t = subst
 
-  let apply subst ~renaming t s_t =
-    Type.of_term_unsafe (apply subst ~renaming (t : term :> T.t) s_t)
+  let apply subst ~renaming t =
+    Type.of_term_unsafe (apply subst ~renaming (t : term scoped :> T.t scoped))
 
-  let apply_no_renaming subst t s_t =
-    Type.of_term_unsafe (apply_no_renaming subst (t : term :> T.t) s_t)
+  let apply_no_renaming subst t =
+    Type.of_term_unsafe (apply_no_renaming subst (t : term scoped :> T.t scoped))
 
   let bind = (bind :> t -> var -> scope -> term -> scope -> t)
 end
@@ -318,11 +294,11 @@ module FO = struct
   type term = FOTerm.t
   type t = subst
 
-  let apply subst ~renaming t s_t =
-    FOTerm.of_term_unsafe (apply subst ~renaming (t : term :> T.t) s_t)
+  let apply subst ~renaming t =
+    FOTerm.of_term_unsafe (apply subst ~renaming (t : term scoped :> T.t scoped))
 
-  let apply_no_renaming  subst t s_t =
-    FOTerm.of_term_unsafe (apply_no_renaming  subst (t : term :> T.t) s_t)
+  let apply_no_renaming  subst t =
+    FOTerm.of_term_unsafe (apply_no_renaming  subst (t : term scoped :> T.t scoped))
 
   let bind = (bind :> t -> var -> scope -> term -> scope -> t)
 end
@@ -331,11 +307,11 @@ module HO = struct
   type term = HOTerm.t
   type t = subst
 
-  let apply  subst ~renaming t s_t =
-    HOTerm.of_term_unsafe (apply  subst ~renaming (t : term :> T.t) s_t)
+  let apply  subst ~renaming t =
+    HOTerm.of_term_unsafe (apply  subst ~renaming (t : term scoped :> T.t scoped))
 
-  let apply_no_renaming  subst t s_t =
-    HOTerm.of_term_unsafe (apply_no_renaming  subst (t : term :> T.t) s_t)
+  let apply_no_renaming  subst t =
+    HOTerm.of_term_unsafe (apply_no_renaming  subst (t : term scoped :> T.t scoped))
 
   let bind = (bind :> t -> var -> scope -> term -> scope -> t)
 end

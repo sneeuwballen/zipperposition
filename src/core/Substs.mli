@@ -1,27 +1,5 @@
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Substitutions}
 
@@ -71,22 +49,28 @@ val is_empty : t -> bool
 
 (** {3 Operations on Substitutions} *)
 
-val find_exn : t -> var -> scope -> term * scope
+val find_exn : t -> var scoped -> term scoped
 (** Lookup variable in substitution.
     @raise Not_found if variable not bound. *)
 
-val find : t -> var -> scope -> (term * scope) option
+val find : t -> var scoped -> term scoped option
 
-val get_var : t -> var -> scope -> (term * scope) option
+val deref : t -> term scoped -> term scoped
+(** [deref t s_t] dereferences [t] as long as [t] is a variable bound
+    in [subst] *)
+
+val get_var : t -> var scoped -> term scoped option
 (** Lookup recursively the var in the substitution, until it is not a
-    variable anymore, or it is not bound *)
+    variable anymore, or it is not bound.
+    @return None if the variable is not bound, [Some (deref (t, sc_t))]
+      if [v] is bound to [t, sc_t] *)
 
-val mem : t -> var -> scope -> bool
+val mem : t -> var scoped -> bool
 (** Check whether the variable is bound by the substitution *)
 
 exception KindError
 
-val bind : t -> var -> scope -> term -> scope -> t
+val bind : t -> var scoped -> term scoped -> t
 (** Add [v] -> [t] to the substitution. Both terms have a context.
     It is {b important} that the bound term is De-Bruijn-closed (assert).
     @raise Invalid_argument if [v] is already bound in
@@ -102,13 +86,13 @@ val remove : t -> var -> int -> t
 
 (** {2 Set operations} *)
 
-val domain : t -> (var * scope) Sequence.t
+val domain : t -> (var scoped) Sequence.t
 (** Domain of substitution *)
 
-val codomain : t -> (term * scope) Sequence.t
+val codomain : t -> (term scoped) Sequence.t
 (** Codomain (image terms) of substitution *)
 
-val introduced : t -> (var * scope) Sequence.t
+val introduced : t -> (var scoped) Sequence.t
 (** Variables introduced by the substitution (ie vars of codomain) *)
 
 (*
@@ -122,17 +106,17 @@ val is_renaming : t -> bool
 
 include Interfaces.PRINT with type t := t
 
-val fold : t -> 'a -> ('a -> var -> scope -> term -> scope -> 'a) -> 'a
-val iter : t -> (var -> scope -> term -> scope -> unit) -> unit
+val fold : t -> 'a -> ('a -> var scoped -> term scoped -> 'a) -> 'a
+val iter : t -> (var scoped -> term scoped -> unit) -> unit
 
-val to_seq : t -> (var * scope * term * scope) Sequence.t
-val to_list : t -> (var * scope * term * scope) list
-val of_seq : ?init:t -> (var * scope * term * scope) Sequence.t -> t
-val of_list : ?init:t -> (var * scope * term * scope) list -> t
+val to_seq : t -> (var scoped * term scoped) Sequence.t
+val to_list : t -> (var scoped * term scoped) list
+val of_seq : ?init:t -> (var scoped * term scoped) Sequence.t -> t
+val of_list : ?init:t -> (var scoped * term scoped) list -> t
 
 (** {2 Applying a substitution} *)
 
-val apply : t -> renaming:Renaming.t -> term -> scope -> term
+val apply : t -> renaming:Renaming.t -> term scoped -> term
 (** Apply the substitution to the given term.
     This function assumes that all terms in the substitution are closed,
     and it will not perform De Bruijn indices shifting. For instance,
@@ -141,13 +125,9 @@ val apply : t -> renaming:Renaming.t -> term -> scope -> term
     and not [forall. p(f(db1))].
     @param renaming used to desambiguate free variables from distinct scopes *)
 
-val apply_no_renaming : t -> term -> scope -> term
+val apply_no_renaming : t -> term scoped -> term
 (** Same as {!apply}, but performs no renaming of free variables.
     {b Caution}, can entail collisions between scopes! *)
-
-(* TODO
-   include Interfaces.SERIALIZABLE with type t := t
-*)
 
 (** {2 Specializations} *)
 
@@ -155,15 +135,15 @@ module type SPECIALIZED = sig
   type term
   type t = subst
 
-  val apply : t -> renaming:Renaming.t -> term -> scope -> term
+  val apply : t -> renaming:Renaming.t -> term scoped -> term
   (** Apply the substitution to the given term/type.
       @param renaming used to desambiguate free variables from distinct scopes *)
 
-  val apply_no_renaming : t -> term -> scope -> term
+  val apply_no_renaming : t -> term scoped -> term
   (** Same as {!apply}, but performs no renaming of free variables.
       {b Caution}, can entail collisions between scopes! *)
 
-  val bind : t -> var -> scope -> term -> scope -> t
+  val bind : t -> var scoped -> term scoped -> t
   (** Add [v] -> [t] to the substitution. Both terms have a context.
       @raise Invalid_argument if [v] is already bound in
         the same context, to another term. *)
