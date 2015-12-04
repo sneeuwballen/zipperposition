@@ -41,9 +41,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     TODO: think of a good way of representating AC operators (+, ...)
 *)
 
-exception Error of string
-(** Generic error on types. *)
-
 type t = private ScopedTerm.t
 (** Type is a subtype of the term structure
     (itself a subtype of ScopedTerm.t),
@@ -182,15 +179,17 @@ val open_fun : t -> (t list * t)
     [open_fun (a -> (b -> (c -> d)))] returns [[a;b;c], d].
     @return the return type and the list of all its arguments *)
 
-val apply : t -> t -> t
-(** Given a function/forall type, and an argument, return the
+exception ApplyError of string
+(** Error raised when {!apply} fails *)
+
+val apply : t -> t list -> t
+(** Given a function/forall type, and arguments, return the
     type that results from applying the function/forall to the arguments.
     No unification is done, types must check exactly.
     @raise Error if the types do not match *)
 
-val apply_list : t -> t list -> t
-(** List version of {!apply}
-    @raise Error if the types do not match *)
+val apply1 : t -> t -> t
+(** [apply1 a b] is short for [apply a [b]]. *)
 
 (** {2 IO} *)
 

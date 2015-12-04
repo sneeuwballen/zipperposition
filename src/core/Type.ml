@@ -25,12 +25,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Types} *)
 
-exception Error of string
-(** Generic error on types. *)
-
-let error_ msg = raise (Error msg)
-let errorf_ msg = CCFormat.ksprintf msg ~f:error_
-
 module T = ScopedTerm
 
 type t = T.t
@@ -176,8 +170,13 @@ let rec open_fun ty = match view ty with
       x::xs, ret'
   | _ -> [], ty
 
+exception ApplyError of string
+
+let err_apply_ msg = raise (ApplyError msg)
+let err_applyf_ msg = CCFormat.ksprintf msg ~f:err_apply_
+
 (* apply a type to arguments. *)
-let apply_list ty args =
+let apply ty args =
   let rec aux ty args env = match T.view ty, args with
     | _, [] ->
         if DBEnv.is_empty env then ty else T.DB.eval env ty
@@ -185,19 +184,19 @@ let apply_list ty args =
         if equal arg arg'
         then aux ret args' env
         else
-          errorf_
+          err_applyf_
             "@[<2>Type.apply:@ wrong argument type, expected @[%a@]@ but got @%a@]"
             T.pp arg' T.pp arg
     | T.Bind (Binder.ForallTy, _, ty'), arg :: args' ->
         aux ty' args' (DBEnv.push env arg)
     | _ ->
-        errorf_
+        err_applyf_
           "@[<2>Type.apply:@ expected quantified or function type,@ but got @[%a@]"
           T.pp ty
   in
   aux ty args DBEnv.empty
 
-let apply ty a = apply_list ty [a]
+let apply1 ty a = apply ty [a]
 
 type print_hook = int -> (CCFormat.t -> t-> unit) -> CCFormat.t -> t-> bool
 
