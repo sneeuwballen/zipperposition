@@ -12,6 +12,9 @@ type scope = int
 
 type 'a scoped = 'a * scope
 
+let pp_scoped p out (x,sc) =
+  Format.fprintf out "@[%a[%d]@]" p x sc
+
 type term = T.t
 type var = term HVar.t
 
@@ -70,7 +73,7 @@ let is_empty = M.is_empty
 let find_exn subst v = M.find v subst
 let find subst v = try Some (M.find v subst) with Not_found -> None
 
-let mem subst v s_v = M.mem (v, s_v) subst
+let mem subst v = M.mem v subst
 
 let rec deref subst ((t, sc_t) as pair) =
   match T.view t with
@@ -91,19 +94,18 @@ let get_var subst v =
 
 exception KindError
 
-let bind subst v s_v t s_t =
-  (*assert (T.DB.closed t); XXX: sometimes useful to allow it *)
+let bind subst v t =
   try
-    let t', s_t' = M.find (v, s_v) subst in
+    let t' = M.find v subst in
     let msg = CCFormat.sprintf
-      "@[<2>Subst.bind:@ inconsistent binding@ for %a[%d]: %a[%d]@ and %a[%d]@]"
-        HVar.pp v s_v T.pp t s_t T.pp t' s_t'
+      "@[<2>Subst.bind:@ inconsistent binding@ for %a: %a@ and %a@]"
+        (pp_scoped HVar.pp) v (pp_scoped T.pp) t (pp_scoped T.pp) t'
     in
     invalid_arg msg
   with Not_found ->
-    M.add (v, s_v) (t, s_t) subst
+    M.add v t subst
 
-let remove subst v s_v = M.remove (v, s_v) subst
+let remove subst v = M.remove v subst
 
 let append s1 s2 =
   M.merge
@@ -125,10 +127,10 @@ let append s1 s2 =
 let compose s1 s2 = failwith "Subst.compose: not implemented"
 *)
 
-let fold subst acc f =
-  M.fold (fun acc (v,s_v) (t,s_t) -> f acc v s_v t s_t) acc subst
+let fold f acc subst =
+  M.fold (fun v t acc -> f acc v t) subst acc
 
-let iter subst k = M.iter (fun (v,s_v) (t,s_t) -> k v s_v t s_t) subst
+let iter f subst = M.iter (fun v t -> f v t) subst
 
 (* is the substitution a renaming? *)
 let is_renaming subst =
@@ -159,25 +161,22 @@ let introduced subst k =
       T.Seq.vars t (fun v -> k (v,s_t)))
     subst
 
-let to_seq subst =
-  let seq = M.to_seq subst in
-  Sequence.map (fun ((v, s_v), (t, s_t)) -> v, s_v, t, s_t) seq
+let to_seq subst k = M.iter (fun v t -> k (v,t)) subst
 
-let to_list subst =
-  let seq = to_seq subst in
-  Sequence.to_rev_list seq
+let to_list subst = M.fold (fun v t acc -> (v,t)::acc) subst []
 
 let of_seq ?(init=empty) seq =
-  Sequence.fold (fun subst (v,s_v,t,s_t) -> bind subst v s_v t s_t) init seq
+  Sequence.fold (fun subst (v,t) -> bind subst v t) init seq
 
 let of_list ?(init=empty) l = match l with
   | [] -> init
   | _::_ ->
-    List.fold_left (fun subst (v,s_v,t,s_t) -> bind subst v s_v t s_t) init l
+    List.fold_left (fun subst (v,t) -> bind subst v t) init l
 
 let pp out subst =
-  let pp_binding out (v,s_v,t,s_t) =
-    Format.fprintf out "@[<2>%a[%d] →@ %a[%d]@]" HVar.pp v s_v T.pp t s_t
+  let pp_binding out (v,t) =
+    Format.fprintf out "@[<2>%a →@ %a@]"
+      (pp_scoped HVar.pp) v (pp_scoped T.pp) t
   in
   Format.fprintf out "{@[<hv>%a@]}"
     (CCFormat.seq ~start:"" ~stop:"" ~sep:", " pp_binding)
@@ -191,9 +190,8 @@ let apply subst ~renaming (t, s_t) =
   let rec aux t s_t =
     match T.ty t with
     | T.NoType ->
-      assert(T.ground t);
+      assert(T.is_ground t);
       t
-    | _ when T.ground t -> t
     | T.HasType ty ->
       let ty = aux ty s_t in
       match T.view t with
@@ -263,18 +261,18 @@ module type SPECIALIZED = sig
   type term
   type t = subst
 
-  val apply : t -> renaming:Renaming.t -> term -> scope -> term
-    (** Apply the substitution to the given term/type.
-        @param renaming used to desambiguate free variables from distinct scopes *)
+  val apply : t -> renaming:Renaming.t -> term scoped -> term
+  (** Apply the substitution to the given term/type.
+      @param renaming used to desambiguate free variables from distinct scopes *)
 
-  val apply_no_renaming : t -> term -> scope -> term
-    (** Same as {!apply}, but performs no renaming of free variables.
+  val apply_no_renaming : t -> term scoped -> term
+  (** Same as {!apply}, but performs no renaming of free variables.
       {b Caution}, can entail collisions between scopes! *)
 
-  val bind : t -> var -> scope -> term -> scope -> t
-    (** Add [v] -> [t] to the substitution. Both terms have a context.
-        @raise Invalid_argument if [v] is already bound in
-          the same context, to another term. *)
+  val bind : t -> var scoped -> term scoped -> t
+  (** Add [v] -> [t] to the substitution. Both terms have a context.
+      @raise Invalid_argument if [v] is already bound in
+        the same context, to another term. *)
 end
 
 module Ty = struct
@@ -287,7 +285,7 @@ module Ty = struct
   let apply_no_renaming subst t =
     Type.of_term_unsafe (apply_no_renaming subst (t : term scoped :> T.t scoped))
 
-  let bind = (bind :> t -> var -> scope -> term -> scope -> t)
+  let bind = (bind :> t -> var scoped -> term scoped -> t)
 end
 
 module FO = struct
@@ -300,7 +298,7 @@ module FO = struct
   let apply_no_renaming  subst t =
     FOTerm.of_term_unsafe (apply_no_renaming  subst (t : term scoped :> T.t scoped))
 
-  let bind = (bind :> t -> var -> scope -> term -> scope -> t)
+  let bind = (bind :> t -> var scoped -> term scoped -> t)
 end
 
 module HO = struct
@@ -313,5 +311,5 @@ module HO = struct
   let apply_no_renaming  subst t =
     HOTerm.of_term_unsafe (apply_no_renaming  subst (t : term scoped :> T.t scoped))
 
-  let bind = (bind :> t -> var -> scope -> term -> scope -> t)
+  let bind = (bind :> t -> var scoped -> term scoped -> t)
 end

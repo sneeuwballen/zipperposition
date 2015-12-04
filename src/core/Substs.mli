@@ -17,6 +17,8 @@ type scope = int
 
 type 'a scoped = 'a * scope
 
+val pp_scoped : 'a CCFormat.printer -> 'a scoped CCFormat.printer
+
 type term = ScopedTerm.t
 type var = term HVar.t
 
@@ -81,7 +83,7 @@ val bind : t -> var scoped -> term scoped -> t
 val append : t -> t -> t
 (** [append s1 s2] is the substitution that maps [t] to [s2 (s1 t)]. *)
 
-val remove : t -> var -> int -> t
+val remove : t -> var scoped -> t
 (** Remove the given binding. No other variable should depend on it... *)
 
 (** {2 Set operations} *)
@@ -106,8 +108,8 @@ val is_renaming : t -> bool
 
 include Interfaces.PRINT with type t := t
 
-val fold : t -> 'a -> ('a -> var scoped -> term scoped -> 'a) -> 'a
-val iter : t -> (var scoped -> term scoped -> unit) -> unit
+val fold : ('a -> var scoped -> term scoped -> 'a) -> 'a -> t -> 'a
+val iter : (var scoped -> term scoped -> unit) -> t -> unit
 
 val to_seq : t -> (var scoped * term scoped) Sequence.t
 val to_list : t -> (var scoped * term scoped) list
