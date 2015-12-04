@@ -22,3 +22,7 @@ val compare : _ t -> _ t -> int
 val equal : _ t -> _ t -> bool
 val hash : _ t -> int
 val hash_fun : _ t CCHash.hash_fun
+
+val pp : _ t CCFormat.printer
+val to_string : _ t -> string
+
