@@ -1,143 +1,121 @@
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Signature} *)
 
-module SMap = Symbol.Map
+type t = Type.t ID.Map.t
+(** A signature maps symbols to their sort *)
 
-type t = Type.t SMap.t
-  (** A signature maps symbols to their sort *)
+let empty = ID.Map.empty
 
-let empty = SMap.empty
+let is_empty = ID.Map.is_empty
 
-let is_empty = SMap.is_empty
+let singleton = ID.Map.singleton
 
-let singleton = SMap.singleton
-
-let mem signature s = SMap.mem s signature
+let mem signature s = ID.Map.mem s signature
 
 let find signature s =
-  try Some (SMap.find s signature)
+  try Some (ID.Map.find s signature)
   with Not_found -> None
 
 let find_exn signature s =
-  SMap.find s signature
+  ID.Map.find s signature
 
-let declare signature symb ty =
+exception AlreadyDeclared of ID.t * Type.t * Type.t
+
+let () = Printexc.register_printer
+  (function
+    | AlreadyDeclared (id, old, new_) ->
+        Some (
+          CCFormat.sprintf
+          "@[<2>symbol %a@ is already declared with type @[%a@],@ \
+          which is not compatible with @[%a@]@]"
+          ID.pp id  Type.pp old Type.pp new_ )
+    | _ -> None)
+
+let declare signature id ty =
   try
-    let ty' = find_exn signature symb in
-    if Type.equal ty ty'
-      then signature  (* ok *)
-      else
-        let msg = CCFormat.sprintf "type error for %a: %a and %a are incompatible"
-          Symbol.pp symb Type.pp ty Type.pp ty'
-        in
-        raise (Type.Error msg)
+    let ty' = find_exn signature id in
+    raise (AlreadyDeclared (id, ty', ty))
   with Not_found ->
     if not (ScopedTerm.DB.closed (ty : Type.t :> ScopedTerm.t))
-      then raise (Invalid_argument "Signature.declare: non-closed type");
-    SMap.add symb ty signature
+    then raise (Invalid_argument "Signature.declare: non-closed type");
+    ID.Map.add id ty signature
 
-let cardinal signature = SMap.cardinal signature
+let cardinal signature = ID.Map.cardinal signature
 
 let arity signature s =
   let ty = find_exn signature s in
   match Type.arity ty with
   | Type.NoArity ->
-    failwith (CCFormat.sprintf "symbol %a has ill-formed type %a" Symbol.pp s Type.pp ty)
+      failwith (CCFormat.sprintf "symbol %a has ill-formed type %a" ID.pp s Type.pp ty)
   | Type.Arity (a,b) -> a, b
 
 let is_ground signature =
-  SMap.for_all (fun _ ty -> Type.is_ground ty) signature
+  ID.Map.for_all (fun _ ty -> Type.is_ground ty) signature
 
 let merge s1 s2 =
-  SMap.merge
+  ID.Map.merge
     (fun s t1 t2 -> match t1, t2 with
-      | None, None -> None (* ?? *)
-      | Some ty1, Some ty2 ->
-        if Type.equal ty1 ty2
-          then Some ty1
-          else
-            let msg =
-              CCFormat.sprintf "Signature.merge: incompatible types for %a: %a and %a"
-              Symbol.pp s Type.pp ty1 Type.pp ty2
-            in
-            raise (Type.Error msg)
-      | Some s1, None -> Some s1
-      | None, Some s2 -> Some s2)
+       | None, None -> assert false
+       | Some ty1, Some ty2 ->
+           if Type.equal ty1 ty2
+           then Some ty1
+           else raise (AlreadyDeclared (s, ty1, ty2))
+       | Some s1, None -> Some s1
+       | None, Some s2 -> Some s2)
     s1 s2
 
-let filter s p = SMap.filter p s
+let filter s p = ID.Map.filter p s
 
 let diff s1 s2 =
-  SMap.merge
+  ID.Map.merge
     (fun _ ty1 ty2 -> match ty1, ty2 with
-      | Some ty1, None -> Some ty1
-      | Some _, Some _
-      | None, Some _
-      | None, None -> None)
+       | Some ty1, None -> Some ty1
+       | Some _, Some _
+       | None, Some _
+       | None, None -> None)
     s1 s2
 
 let well_founded s =
-  SMap.exists
+  ID.Map.exists
     (fun _ ty -> match Type.arity ty with
-      | Type.Arity (_, 0) -> true
-      | _ -> false)
+       | Type.Arity (_, 0) -> true
+       | _ -> false)
     s
 
 module Seq = struct
   let symbols s =
-    SMap.to_seq s |> Sequence.map fst
+    ID.Map.to_seq s |> Sequence.map fst
 
   let types s =
-    SMap.to_seq s |> Sequence.map snd
+    ID.Map.to_seq s |> Sequence.map snd
 
-  let to_seq = SMap.to_seq
+  let to_seq = ID.Map.to_seq
 
-  let of_seq = SMap.of_seq
+  let of_seq = ID.Map.of_seq
 end
 
-let to_set s = Seq.symbols s |> Symbol.Set.of_seq
+let to_set s = Seq.symbols s |> ID.Set.of_seq
 
 let to_list s = Seq.to_seq s |> Sequence.to_rev_list
 
 let of_list s = Sequence.of_list s |> Seq.of_seq
 
 let iter s f =
-  SMap.iter f s
+  ID.Map.iter f s
 
 let fold s acc f =
-  SMap.fold (fun s ty acc -> f acc s ty) s acc
+  ID.Map.fold (fun s ty acc -> f acc s ty) s acc
 
 let is_bool signature s =
-  let rec _is_bool_ty ty = match Type.view ty with
+  let rec is_bool ty = match Type.view ty with
     | Type.Builtin Type.Prop -> true
-    | Type.Fun (ret, _) -> _is_bool_ty ret
-    | Type.Forall ty' -> _is_bool_ty ty'
+    | Type.Fun (_, ret) -> is_bool ret
+    | Type.Forall ty' -> is_bool ty'
     | _ -> false
-  in _is_bool_ty (find_exn signature s)
+  in
+  is_bool (find_exn signature s)
 
 let is_not_bool signature s =
   not (is_bool signature s)
@@ -146,7 +124,7 @@ let is_not_bool signature s =
 
 let pp out s =
   let pp_pair out (s,ty) =
-    Format.fprintf out "@[<hov2>%a:@ %a@]" Symbol.pp s Type.pp ty
+    Format.fprintf out "@[<hov2>%a:@ %a@]" ID.pp s Type.pp ty
   in
   Format.fprintf out "{@[<hv>";
   CCFormat.seq pp_pair out (Seq.to_seq s);
@@ -156,87 +134,49 @@ let pp out s =
 let to_string = CCFormat.to_string pp
 
 module Builtin = struct
-  let o = Type.prop
-  let x = Type.var 0
+  let prop2 = Type.([prop; prop] ==> prop)
+  let prop1 = Type.([prop] ==> prop)
+  let prop2poly = Type.(forall ([bvar 0; bvar 0] ==> prop))
+  let ty_1_to_int = Type.(forall ([bvar 0] ==> Type.int))
+  let ty2op = Type.(forall ([bvar 0; bvar 0] ==> bvar 0))
+  let ty1op = Type.(forall ([bvar 0] ==> bvar 0))
+  let ty2op_to_i = Type.([int;int] ==> int)
 
   let ty_exn = function
-    | Builtin.True -> o
-    | Builtin.False -> o
-    | Builtin.Eq -> Type.(forall [x] (o <== [x;x]))
-    | Builtin.Neq -> Type.(forall [x] (o <== [x;x]))
-    | Builtin.Not -> Type.(o <=. o)
-    | Builtin.Imply -> Type.(o <== [o;o])
-    | Builtin.And -> Type.(o <== [o;o])
-    | Builtin.Or -> Type.(o <== [o;o])
-    | Builtin.Equiv -> Type.(o <== [o;o])
-    | Builtin.Xor -> Type.(o <== [o;o])
+    | Builtin.True -> Type.prop
+    | Builtin.False -> Type.prop
+    | Builtin.Eq -> prop2poly
+    | Builtin.Neq -> prop2poly
+    | Builtin.Not -> prop1
+    | Builtin.Imply -> prop2
+    | Builtin.And -> prop2
+    | Builtin.Or -> prop2
+    | Builtin.Equiv -> prop2
+    | Builtin.Xor -> prop2
+    | Builtin.Less -> prop2poly
+    | Builtin.Lesseq -> prop2poly
+    | Builtin.Greater -> prop2poly
+    | Builtin.Greatereq -> prop2poly
+    | Builtin.Uminus -> ty1op
+    | Builtin.Sum -> ty2op
+    | Builtin.Difference -> ty2op
+    | Builtin.Product -> ty2op
+    | Builtin.Quotient -> ty2op
+    | Builtin.Quotient_e -> ty2op_to_i
+    | Builtin.Quotient_f -> ty2op_to_i
+    | Builtin.Quotient_t -> ty2op_to_i
+    | Builtin.Remainder_e -> ty2op_to_i
+    | Builtin.Remainder_f -> ty2op_to_i
+    | Builtin.Remainder_t -> ty2op_to_i
+    | Builtin.Floor -> ty_1_to_int
+    | Builtin.Ceiling -> ty_1_to_int
+    | Builtin.Round -> ty_1_to_int
+    | Builtin.Truncate -> ty_1_to_int
+    | Builtin.To_int -> Type.(forall ([bvar 0] ==> int))
+    | Builtin.To_rat -> Type.(forall ([bvar 0] ==> rat))
+    | Builtin.Is_int -> Type.(forall ([bvar 0] ==> prop))
+    | Builtin.Is_rat -> Type.(forall ([bvar 0] ==> prop))
     | _ -> invalid_arg "Sig.Builtin.ty_exn"
 
   let ty x = try Some (ty_exn x) with _ -> None
-end
-
-module TPTP = struct
-  let table =
-    let x = Type.var 0 and o = Type.prop in
-    [ Symbol.TPTP.exists_fun, Type.(forall [x] (o <=. (o <=. x)))
-    ; Symbol.TPTP.forall_fun, Type.(forall [x] (o <=. (o <=. x)))
-    ]
-
-  let base = of_list table
-
-  (** {2 Pre-defined symbols} *)
-
-  let x = Type.var 0
-  let ty_1_to_int = Type.(forall [x] (Type.TPTP.int <=. x))
-  let ty2op = Type.(forall [x] (x <== [x;x]))
-  let ty2op_to_i = Type.(TPTP.(int <== [int;int]))
-  let ty2op_to_o = Type.(forall [x] (TPTP.(o <== [x;x])))
-
-  let arith_table =
-    let open Type.TPTP in
-    [ Symbol.TPTP.Arith.less, ty2op_to_o
-    ; Symbol.TPTP.Arith.lesseq, ty2op_to_o
-    ; Symbol.TPTP.Arith.greater, ty2op_to_o
-    ; Symbol.TPTP.Arith.greatereq, ty2op_to_o
-    ; Symbol.TPTP.Arith.uminus, Type.(forall [x] (x <=. x))
-    ; Symbol.TPTP.Arith.sum, ty2op
-    ; Symbol.TPTP.Arith.difference, ty2op
-    ; Symbol.TPTP.Arith.product, ty2op
-    ; Symbol.TPTP.Arith.quotient, ty2op
-    ; Symbol.TPTP.Arith.quotient_e, ty2op_to_i
-    ; Symbol.TPTP.Arith.quotient_f, ty2op_to_i
-    ; Symbol.TPTP.Arith.quotient_t, ty2op_to_i
-    ; Symbol.TPTP.Arith.remainder_e, ty2op_to_i
-    ; Symbol.TPTP.Arith.remainder_f, ty2op_to_i
-    ; Symbol.TPTP.Arith.remainder_t, ty2op_to_i
-    ; Symbol.TPTP.Arith.floor, ty_1_to_int
-    ; Symbol.TPTP.Arith.ceiling, ty_1_to_int
-    ; Symbol.TPTP.Arith.round, ty_1_to_int
-    ; Symbol.TPTP.Arith.truncate, ty_1_to_int
-    ; Symbol.TPTP.Arith.to_int, Type.(forall [x] (int <=. x))
-    ; Symbol.TPTP.Arith.to_rat, Type.(forall [x] (rat <=. x))
-    ; Symbol.TPTP.Arith.is_int, Type.(forall [x] (o <=. x))
-    ; Symbol.TPTP.Arith.is_rat, Type.(forall [x] (o <=. x))
-    ]
-
-  let base_symbols = to_set base
-
-  let is_base_symbol s = Symbol.Set.mem s base_symbols
-
-  let pp_no_base buf s =
-    pp buf (diff s base)
-
-  (** {2 Arith} *)
-
-  module Arith = struct
-    let operators =
-      Sequence.of_list arith_table
-        |> Sequence.map fst
-        |> Symbol.Set.of_seq
-
-    let is_operator s = Symbol.Set.mem s operators
-
-    let base = of_list arith_table
-    let full = of_list (table @ arith_table)
-  end
 end
