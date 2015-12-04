@@ -35,7 +35,7 @@ type scope = int
 type 'a scoped = 'a * scope
 
 type term = T.t
-type var = HVar.t
+type var = term HVar.t
 
 module VarInt = struct
   type t = (var * int)
@@ -74,8 +74,7 @@ module Renaming = struct
       begin try
         H.find tbl key
       with Not_found ->
-        (* FIXME: use HVar.ty *)
-        let v' = T.var ~ty:(T.ty_exn v) (H.length tbl) in
+        let v' = T.var (HVar.make ~ty:(HVar.ty v) (H.length tbl)) in
         H.add tbl key v';
         v'
       end
@@ -232,17 +231,13 @@ let apply subst ~renaming t s_t =
         with Not_found ->
           (* variable not bound by [subst], rename it
               (after specializing its type if needed) *)
-          let t = T.mk_var ~ty v in
+          let t = T.var v in
           Renaming.rename renaming t s_t
         end
       | T.Bind (s, varty, sub_t) ->
           let varty' = _apply varty s_t in
           let sub_t' = _apply sub_t s_t in
           T.bind ~varty:varty' ~ty s sub_t'
-      | T.At (l, r) ->
-          let l' = _apply l s_t in
-          let r' = _apply r s_t in
-          T.at ~ty l' r'
       | T.App (hd, l) ->
           let hd' = _apply hd s_t in
           let l' = _apply_list l s_t in
@@ -255,8 +250,7 @@ let apply subst ~renaming t s_t =
                   let t', s_t' = find_exn subst v s_t in
                   Some (_apply t' s_t')
                 with Not_found ->
-                  (* FIXME: need ty *)
-                  Some (T.mk_var ~ty:(assert false) v)
+                  Some (T.var v)
                 end
           in
           let l' = List.map (fun (s,t') -> s, _apply t' s_t) l in
@@ -342,19 +336,6 @@ module HO = struct
 
   let apply_no_renaming  subst t s_t =
     HOTerm.of_term_unsafe (apply_no_renaming  subst (t : term :> T.t) s_t)
-
-  let bind = (bind :> t -> var -> scope -> term -> scope -> t)
-end
-
-module Form = struct
-  type term = Formula.FO.t
-  type t = subst
-
-  let apply  subst ~renaming t s_t =
-    Formula.FO.of_term_unsafe (apply  subst ~renaming (t : term :> T.t) s_t)
-
-  let apply_no_renaming  subst t s_t =
-    Formula.FO.of_term_unsafe (apply_no_renaming  subst (t : term :> T.t) s_t)
 
   let bind = (bind :> t -> var -> scope -> term -> scope -> t)
 end

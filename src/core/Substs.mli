@@ -40,7 +40,7 @@ type scope = int
 type 'a scoped = 'a * scope
 
 type term = ScopedTerm.t
-type var = HVar.t
+type var = term HVar.t
 
 (** {2 Renamings}
     A renaming is used to disambiguate variables that come from distinct
@@ -174,5 +174,3 @@ module Ty : SPECIALIZED with type term = Type.t
 module FO : SPECIALIZED with type term = FOTerm.t
 
 module HO : SPECIALIZED with type term = HOTerm.t
-
-module Form : SPECIALIZED with type term = Formula.FO.t
