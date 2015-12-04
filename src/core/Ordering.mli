@@ -33,7 +33,7 @@ module type S = Ordering_intf.S
 
 (** {2 Functor} *)
 
-module Make(P : Precedence.S with type symbol = Symbol.t) :
+module Make(P : Precedence.S with type symbol = ID.t) :
   S with module Prec = P and type term = FOTerm.t
 
 module Default : S with module Prec = Precedence.Default and type term = FOTerm.t

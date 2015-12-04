@@ -51,6 +51,6 @@ end
 
 module Make(Sym : SYMBOL) : S with type symbol = Sym.t
 
-module Default : S with type symbol = Symbol.t
+module Default : S with type symbol = ID.t
 
 include module type of Default with type t = Default.t
