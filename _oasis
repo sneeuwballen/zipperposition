@@ -54,7 +54,7 @@ Library "logtk"
                     Substs, Unif, Signature, Scoped,
                     TypeInference, Options, Comparison, Precedence, Builtin,
                     Precedence_intf, Ordering, Ordering_intf, Skolem, Cnf, ID,
-                    HORewriting, Index, Dtree, Fingerprint, NPDtree, Binder,
+                    HORewriting, Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,
                     Congruence, FastFingerprint, FeatureVector,
                     Lambda, Sourced, TypedSTerm,
                     lib/Hashcons, lib/ParseLocation, lib/Multiset,

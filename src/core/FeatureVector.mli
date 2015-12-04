@@ -6,6 +6,8 @@
 (** Feature Vector indexing (see Schulz 2004) for efficient forward
     and backward subsumption *)
 
+type lits = Index_intf.lits
+
 module Make(C : Index.CLAUSE) : sig
   type feature_vector = int list
   (** a vector of feature *)
@@ -15,11 +17,11 @@ module Make(C : Index.CLAUSE) : sig
   module Feature : sig
     type t = {
       name : string;
-      f : Index.lits -> int;
+      f : lits -> int;
     } (** a function that computes a given feature on clauses *)
 
     val name : t -> string
-    val compute : t -> Index.lits -> int
+    val compute : t -> lits -> int
     include Interfaces.PRINT with type t := t
 
     val sum_of_depths : t                 (** sum of depths of symbols *)
@@ -31,13 +33,13 @@ module Make(C : Index.CLAUSE) : sig
     val max_depth_minus : ID.t -> t   (** maximal depth of symb in negative clause *)
   end
 
-  val compute_fv : Feature.t list -> Index.lits -> feature_vector
+  val compute_fv : Feature.t list -> lits -> feature_vector
 
   (** {2 Index} *)
 
   include Index.SUBSUMPTION_IDX with module C = C
 
-  val retrieve_alpha_equiv : t -> Index.lits -> 'a -> ('a -> C.t -> 'a) -> 'a
+  val retrieve_alpha_equiv : t -> lits -> 'a -> ('a -> C.t -> 'a) -> 'a
   (** Retrieve clauses that are potentially alpha-equivalent to the given clause
       @since 0.6 *)
 

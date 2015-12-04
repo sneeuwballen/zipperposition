@@ -9,6 +9,8 @@
 module ST = ScopedTerm
 module T = FOTerm
 
+type lits = Index_intf.lits
+
 module Make(C : Index.CLAUSE) = struct
   module C = C
 
@@ -20,7 +22,7 @@ module Make(C : Index.CLAUSE) = struct
   module Feature = struct
     type t = {
       name : string;
-      f : Index.lits -> int;
+      f : lits -> int;
     } (** a function that computes a given feature on clauses *)
 
     let compute f c = f.f c
