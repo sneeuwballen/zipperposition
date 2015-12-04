@@ -44,7 +44,6 @@ type view = private
   | Record of (string * t) list * t HVar.t option (** Extensible record *)
   | Multiset of t list (** Multiset of terms *)
   | App of t * t list (** Uncurried application *)
-  | At of t * t (** Curried application *)
   | SimpleApp of ID.t * t list
   | AppBuiltin of Builtin.t * t list (** For representing special constructors *)
 
@@ -82,7 +81,6 @@ val bvar : ty:t -> nat -> t
 val record : ty:t -> (string * t) list -> rest:t HVar.t option -> t
 val record_flatten : ty:t -> (string * t) list -> rest:t option -> t
 val multiset : ty:t -> t list -> t
-val at : ty:t -> t -> t -> t
 val simple_app : ty:t -> ID.t -> t list -> t
 val app_builtin : ty:t -> Builtin.t -> t list -> t
 val builtin: ty:t -> Builtin.t -> t
@@ -107,7 +105,6 @@ val is_bind : t -> bool
 val is_app : t -> bool
 val is_record : t -> bool
 val is_multiset : t -> bool
-val is_at : t -> bool
 
 val hashcons_stats : unit -> int*int*int*int*int*int
 
@@ -136,6 +133,7 @@ end
 
 module VarMap : CCMap.S with type key = t HVar.t
 module VarSet : CCSet.S with type elt = t HVar.t
+module VarTbl : CCHashtbl.S with type key = t HVar.t
 
 (** {3 De Bruijn indices handling} *)
 
@@ -220,14 +218,6 @@ val depth : t -> int
 
 val head : t -> ID.t option
   (** Head symbol, or None if the term is a (bound) variable *)
-
-val all_positions : ?vars:bool -> ?pos:Position.t ->
-                    t -> 'a ->
-                    ('a -> t -> Position.t -> 'a) -> 'a
-  (** Fold on all subterms of the given term, with their position.
-      @param pos the initial position (prefix). Default: empty.
-      @param vars if true, also fold on variables Default: [false].
-      @return the accumulator *)
 
 (** {2 IO} *)
 

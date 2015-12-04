@@ -45,7 +45,6 @@ and view =
   | Record of (string * t) list * t HVar.t option (** Extensible record *)
   | Multiset of t list (** Multiset of terms *)
   | App of t * t list (** Uncurried application *)
-  | At of t * t (** Curried application *)
   | SimpleApp of ID.t * t list
   | AppBuiltin of Builtin.t * t list (** For representing special constructors *)
 
@@ -85,7 +84,6 @@ let _hash_norec t h =
       |> Hash.opt HVar.hash_fun rest
   | Multiset l -> h |> Hash.string_ "ms" |> Hash.list_ hash_fun l
   | App (f, l) -> h |> Hash.string_ "app" |> hash_fun f |> Hash.list_ hash_fun l
-  | At (t1, t2) -> h |> Hash.string_ "at" |> hash_fun t1 |> hash_fun t2
   | SimpleApp (b, l) ->
       h |> Hash.string_ "sapp" |> ID.hash_fun b |> Hash.list_ hash_fun l
   | AppBuiltin (b, l) ->
@@ -109,7 +107,6 @@ let rec _eq_norec t1 t2 =
     _eq_record_list l1 l2
   | Record (l1, Some r1), Record (l2, Some r2) ->
     equal r1 r2 && _eq_record_list l1 l2
-  | At (l1, r1), At (l2, r2) -> equal l1 l2 && equal r1 r2
   | AppBuiltin (b1, l1), AppBuiltin (b2, l2) ->
     Builtin.equal b1 b2 && _eq_list l1 l2
   | _ -> false
@@ -285,15 +282,6 @@ let multiset ~ty l =
   end;
   t
 
-let at ~ty l r =
-  let my_t = _make ~ty:(HasType ty) (At (l,r)) in
-  let t = H.hashcons my_t in
-  if t == my_t then begin
-    if ground ty && ground l && ground r
-      then set_flag t flag_ground;
-  end;
-  t
-
 let simple_app ~ty s l =
   let my_t = _make ~ty:(HasType ty) (SimpleApp (s,l)) in
   let t = H.hashcons my_t in
@@ -320,8 +308,6 @@ let app_builtin ~ty b l =
   end;
   t
 
-let mk_at = at
-
 let tType =
   let my_t = _make ~ty:NoType (AppBuiltin(Builtin.TType, [])) in
   set_flag my_t flag_ground;
@@ -335,7 +321,6 @@ let cast ~ty old = match old.term with
   | Record (l, rest) -> record ~ty l ~rest
   | Multiset l -> multiset ~ty l
   | App (f,l) -> app ~ty f l
-  | At (f,a) -> at ~ty f a
   | SimpleApp (s,l) -> simple_app ~ty s l
   | AppBuiltin (s,l) -> app_builtin ~ty s l
 
@@ -350,7 +335,6 @@ let is_bind t = match view t with | Bind _ -> true | _ -> false
 let is_record t = match view t with | Record _ -> true | _ -> false
 let is_multiset t = match view t with | Multiset _ -> true | _ -> false
 let is_app t = match view t with | App _ -> true | _ -> false
-let is_at t = match view t with | At _ -> true | _ -> false
 
 (** {3 Containers} *)
 
@@ -383,9 +367,12 @@ end
 module HVarKey = struct
   type t = term HVar.t
   let compare = HVar.compare
+  let equal = HVar.equal
+  let hash = HVar.hash
 end
 module VarMap = CCMap.Make(HVarKey)
 module VarSet = CCSet.Make(HVarKey)
+module VarTbl = CCHashtbl.Make(HVarKey)
 
 (** {3 De Bruijn} *)
 
@@ -414,9 +401,6 @@ module DB = struct
     | App (f, l) ->
         _to_seq ~depth f k;
         List.iter (fun t -> _to_seq ~depth t k) l
-    | At (l,r) ->
-        _to_seq ~depth l k;
-        _to_seq ~depth r k
 
   let _id x = x
 
@@ -472,8 +456,6 @@ module DB = struct
           multiset ~ty l
         | App (f, l) ->
           app ~ty (recurse ~depth acc f) (List.map (recurse ~depth acc) l)
-        | At (l,r) ->
-          at ~ty (recurse ~depth acc l) (recurse ~depth acc r)
         | SimpleApp (s,l) ->
           simple_app ~ty s (List.map (recurse ~depth acc) l)
         | AppBuiltin (s,l) ->
@@ -531,8 +513,6 @@ module DB = struct
           multiset ~ty l
         | App (f, l) ->
           app ~ty (_replace depth ~sub f) (List.map (_replace depth ~sub) l)
-        | At (l,r) ->
-          at ~ty (_replace depth l ~sub) (_replace depth r ~sub)
         | SimpleApp (s,l) ->
           simple_app ~ty s (List.map (_replace depth ~sub) l)
         | AppBuiltin (s,l) ->
@@ -577,8 +557,6 @@ module DB = struct
           multiset ~ty l
         | App (f, l) ->
           app ~ty (_eval env f) (List.map (_eval env) l)
-        | At (l,r) ->
-          at ~ty (_eval env l) (_eval env r)
         | AppBuiltin (s,l) ->
           app_builtin ~ty s (List.map (_eval env) l)
         | SimpleApp (s,l) ->
@@ -594,40 +572,39 @@ module DB = struct
         t
       | HasType ty ->
         let ty = aux depth ty in
-        match view t with
-          | Var v ->
+        aux' depth ty t
+    and aux' depth ty t = match view t with
+      | Var v ->
+          begin try
+            shift depth (VarMap.find v subst)
+          with Not_found -> var (HVar.cast ~ty v)
+          end
+      | DB i -> bvar ~ty i
+      | Const s -> const ~ty s
+      | Bind (s, varty, t') ->
+        let varty' = aux depth varty in
+        let t' = aux (depth+1) t' in
+        bind ~ty ~varty:varty' s t'
+      | Record (l, rest) ->
+        let rest = match rest with
+          | None -> None
+          | Some v ->
               begin try
-                shift depth (VarMap.find v subst)
-              with Not_found -> var (HVar.cast ~ty v)
+                Some (shift depth (VarMap.find v subst))
+              with Not_found -> Some (var (HVar.cast ~ty v))
               end
-          | DB i -> bvar ~ty i
-          | Const s -> const ~ty s
-          | Bind (s, varty, t') ->
-            let varty' = aux depth varty in
-            let t' = aux (depth+1) t' in
-            bind ~ty ~varty:varty' s t'
-          | Record (l, rest) ->
-            let rest = match rest with
-              | None -> None
-              | Some v ->
-                  begin try
-                    Some (shift depth (VarMap.find v subst))
-                  with Not_found -> Some (var (HVar.cast ~ty v))
-                  end
-            in
-            let l = List.map (fun (s,t') -> s, aux depth t') l in
-            record_flatten ~ty l ~rest
-          | Multiset l ->
-            let l = List.map (aux depth) l in
-            multiset ~ty l
-          | App (f, l) ->
-            app ~ty (aux depth f) (List.map (aux depth) l)
-          | At (l,r) ->
-            at ~ty (aux depth l ) (aux depth r)
-          | SimpleApp (s,l) ->
-            simple_app ~ty s (List.map (aux depth) l)
-          | AppBuiltin (s,l) ->
-            app_builtin ~ty s (List.map (aux depth) l)
+        in
+        let l = List.map (fun (s,t') -> s, aux depth t') l in
+        record_flatten ~ty l ~rest
+      | Multiset l ->
+        let l = List.map (aux depth) l in
+        multiset ~ty l
+      | App (f, l) ->
+        app ~ty (aux depth f) (List.map (aux depth) l)
+      | SimpleApp (s,l) ->
+        simple_app ~ty s (List.map (aux depth) l)
+      | AppBuiltin (s,l) ->
+        app_builtin ~ty s (List.map (aux depth) l)
     in
     aux 0 t
 end
@@ -660,7 +637,6 @@ module Seq = struct
       | SimpleApp (_,l)
       | Multiset l -> List.iter vars l
       | Bind (_, varty, t') -> vars varty; vars t'
-      | At (l,r) -> vars l; vars r
     in
     vars t
 
@@ -678,7 +654,6 @@ module Seq = struct
       | AppBuiltin (_, l)
       | Multiset l -> List.iter subterms l
       | App(f, l) -> subterms f; List.iter subterms l
-      | At (l,r) -> subterms l; subterms r
     in
     subterms t
 
@@ -695,7 +670,6 @@ module Seq = struct
       | SimpleApp (_,l)
       | Multiset l -> List.iter (recurse (depth+1)) l
       | Bind (_, varty, t') -> recurse depth varty; recurse (depth+1) t'
-      | At (l,r) -> recurse (depth+1) l; recurse (depth+1) r
       | Const _
       | DB _
       | Var _ -> ()
@@ -708,7 +682,6 @@ module Seq = struct
       | Var _ -> ()
       | Const s -> k s
       | App (head, l) -> symbols head; List.iter symbols l
-      | At (l,r) -> symbols l; symbols r
       | Record (l, _) ->
           List.iter (fun (_,t') -> symbols t') l
       | Multiset l
@@ -733,7 +706,6 @@ module Seq = struct
       | AppBuiltin (_,l)
       | Multiset l -> List.iter types l
       | Bind (_, _, t') -> types t'
-      | At (l,r) -> types l; types r
     in types t
 
   let max_var seq =
@@ -763,12 +735,10 @@ module Pos = struct
         end
     | _, P.Stop -> t
     | Var _ , _ -> invalid_arg "wrong position in term"
-    | Bind(_, _, t'), P.Right subpos -> at t' subpos
+    | Bind(_, _, t'), P.Body subpos -> at t' subpos
     | App (t, _), P.Head subpos -> at t subpos
     | App (_, l), P.Arg (n,subpos) when n < List.length l ->
       at (List.nth l n) subpos
-    | At (l,_), P.Left subpos -> at l subpos
-    | At (_,r), P.Right subpos -> at r subpos
     | Multiset l, P.Arg (n,subpos) when n < List.length l ->
         at (List.nth l n) subpos
     | Record (l, _), P.Record_field (name, subpos) ->
@@ -790,7 +760,7 @@ module Pos = struct
         let ty = replace ty pos' ~by in
         cast ~ty t
     | _, Var _, _ -> invalid_arg "wrong position in term"
-    | HasType ty, Bind(s, varty, t'), P.Right subpos ->
+    | HasType ty, Bind(s, varty, t'), P.Body subpos ->
         bind ~ty ~varty s (replace t' subpos ~by)
     | HasType ty, App (f, l), P.Head subpos ->
         app ~ty (replace f subpos ~by) l
@@ -798,10 +768,6 @@ module Pos = struct
         let t' = replace (List.nth l n) subpos ~by in
         let l' = CCList.Idx.set l n t' in
         app ~ty f l'
-    | HasType ty, At (l,r), P.Left subpos ->
-        mk_at ~ty (replace l subpos ~by) r
-    | HasType ty, At (l,r), P.Right subpos ->
-        mk_at ~ty l (replace r subpos ~by)
     | HasType ty, Multiset l, P.Arg (n,subpos) when n < List.length l ->
         let t' = replace (List.nth l n) subpos ~by in
         let l' = CCList.Idx.set l n t' in
@@ -839,9 +805,6 @@ let rec replace t ~old ~by = match t.ty, view t with
     let f' = replace f ~old ~by in
     let l' = List.map (fun t' -> replace t' ~old ~by) l in
     app ~ty f' l'
-  | HasType ty, At(l,r) ->
-    let l' = replace l ~old ~by and r' = replace r ~old ~by in
-    at ~ty l' r'
   | HasType ty, Multiset l ->
     let l' = List.map (fun t' -> replace t' ~old ~by) l in
     multiset ~ty l'
@@ -874,7 +837,6 @@ let rec size t = match view t with
   | SimpleApp (_,l)
   | Multiset l -> List.fold_left (fun s t -> s+size t) 1 l
   | App (head, l) -> _size_list (1 + size head) l
-  | At (l,r) -> size l + size r + 1
 and _size_list acc l = match l with
   | [] -> acc
   | t::l' -> _size_list (acc + size t) l'
@@ -888,45 +850,6 @@ let rec head t = match view t with
   | DB _ | Var _ | Record _ | Multiset _
   | Bind (_, _, _) | AppBuiltin (_, _) -> None
   | App (h, _) -> head h
-  | At (l,_) -> head l
-
-module PB = Position.Build
-
-let rec _all_pos_rec f vars acc pb t = match view t with
-  | Var _ | DB _ ->
-    if vars then f acc t (PB.to_pos pb) else acc
-  | Const _ -> f acc t (PB.to_pos pb)
-  | App (hd, tl) ->
-    let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
-    let acc = _all_pos_rec f vars acc (PB.head pb) hd in
-    _all_pos_rec_list f vars acc pb tl 0
-  | Record (l,_) ->
-    let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
-    let _, acc = List.fold_left
-      (fun (i,acc) (_, t') ->
-        i+1, _all_pos_rec f vars acc (PB.arg i pb) t')
-      (0, acc) l
-    in acc
-  | At (l,r) ->
-    let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
-    let acc = _all_pos_rec f vars acc (PB.left pb) l in
-    _all_pos_rec f vars acc (PB.right pb) r
-  | SimpleApp (_,l)
-  | AppBuiltin (_,l)
-  | Multiset l ->
-    let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
-    _all_pos_rec_list f vars acc pb l 0
-  | Bind (_, _, t') ->
-    let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
-    _all_pos_rec f vars acc (PB.right pb) t'
-and _all_pos_rec_list f vars acc pb l i = match l with
-  | [] -> acc
-  | t::l' ->
-    let acc = _all_pos_rec f vars acc (PB.arg i pb) t in
-    _all_pos_rec_list f vars acc pb l' (i+1)
-
-let all_positions ?(vars=false) ?(pos=Position.stop) t acc f =
-  _all_pos_rec f vars acc (PB.of_pos pos) t
 
 (** {3 IO} *)
 
@@ -952,14 +875,10 @@ let pp_depth ?(hooks=[]) depth out t =
   | Record ([], Some v) ->
     Format.fprintf out "{@[ | X%d@]}" (HVar.id v)
   | Record (l, None) ->
-    Format.fprintf out "@[{";
-    List.iteri
-      (fun i (s, t') ->
-        if i>0 then CCFormat.string out ", ";
-        Format.fprintf out "%s: " s;
-        _pp depth out t')
-      l;
-    Format.fprintf out "}@]"
+      Format.fprintf out "{@[<hv>%a@]}"
+        (Util.pp_list ~sep:", "
+           (Util.pp_pair ~sep:": " CCFormat.string (_pp depth)))
+        l
   | Record (l, Some v) ->
       Format.fprintf out "{@[<hv>%a@ | X%d@]}"
         (Util.pp_list ~sep:", "
@@ -976,26 +895,15 @@ let pp_depth ?(hooks=[]) depth out t =
     Format.fprintf out "(@[<2>%a@ %a@ %a@])" (_pp depth) t1 Builtin.pp b (_pp depth) t2
   | AppBuiltin (b, l) ->
     Format.fprintf out "@[%a(%a)@]" Builtin.pp b (Util.pp_list (_pp depth)) l
-  | At (l,r) ->
-    Format.fprintf out "@[%a %a@]"
-      (_pp_surrounded depth) l
-      (_pp depth) r
   | App (f, l) ->
-    assert (l <> []);
-    Format.fprintf out "@[";
-    _pp_surrounded depth out f;
-    List.iter
-      (fun t' ->
-        CCFormat.char out ' '; _pp_surrounded depth out t')
-      l;
-    Format.fprintf out "@]"
+      Format.fprintf out "(@[<2>%a@ %a@])"
+        (_pp_surrounded depth) f (Util.pp_list ~sep:" " (_pp_surrounded depth)) l
   and _pp_ty depth out t = match t.ty, view t with
     | HasType ty, (Var _ | DB _) ->
       Format.fprintf out ":%a" (_pp_surrounded depth) ty
     | _ -> ()
   and _pp_surrounded depth out t = match view t with
   | Bind _
-  | At _
   | SimpleApp (_,_::_)
   | AppBuiltin (_,_::_)
   | App _ -> Format.fprintf out "(@[%a@])" (_pp depth) t
