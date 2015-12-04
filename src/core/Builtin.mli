@@ -17,7 +17,6 @@ type t =
   | Eq
   | Neq
   | HasType
-  | LiftType
   | True
   | False
   | Arrow
@@ -26,6 +25,8 @@ type t =
   | TType (* type of types *)
   | Prop
   | Term
+  | ForallConst (** constant for simulating forall *)
+  | ExistsConst (** constant for simulating exists *)
   | TyInt
   | TyRat
   | Int of Z.t
@@ -101,7 +102,6 @@ val term : t
 val ty_int : t
 val ty_rat : t
 val has_type : t
-val lift_type : t
 
 val wildcard : t    (** $_ for type inference *)
 val multiset : t    (** type of multisets *)

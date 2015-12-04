@@ -799,3 +799,28 @@ let pp_depth ?(hooks=[]) depth out t =
 
 let pp out t = pp_depth ~hooks:!_hooks 0 out t
 let to_string t = CCFormat.to_string pp t
+
+let rec debugf out t = match view t with
+  | AppBuiltin (b,[]) -> Builtin.pp out b
+  | AppBuiltin (b,l) ->
+      Format.fprintf out "(@[<2>%a@ %a@])" Builtin.pp b (Util.pp_list debugf) l
+  | Var i -> HVar.pp out i
+  | DB i -> Format.fprintf out "Y%d" i
+  | Const s -> ID.pp out s
+  | App (_, []) -> assert false
+  | App (s, l) ->
+      Format.fprintf out "(@[<2>%a@ %a@])" debugf s (Util.pp_list debugf) l
+  | SimpleApp (s, l) ->
+      Format.fprintf out "@[<2>%a(@,%a)@]" ID.pp s (Util.pp_list debugf) l
+  | Bind (b, varty,t') ->
+      Format.fprintf out "(@[<2>%a@ %a@ %a@])"
+        Binder.pp b debugf varty debugf t'
+  | Multiset l ->
+      Format.fprintf out "{|@[<hv>%a@]|}" (Util.pp_list debugf) l
+  | Record (l, None) ->
+      Format.fprintf out "{ @[<hv>%a@] }"
+        (Util.pp_list (fun fmt (n,t) -> Format.fprintf fmt "%s: %a" n debugf t)) l
+  | Record (l, Some r) ->
+      Format.fprintf out "{ @[<hv>%a@ | %a@] }"
+        (Util.pp_list (fun fmt (n,t) -> Format.fprintf fmt "%s: %a" n debugf t))
+        l HVar.pp r

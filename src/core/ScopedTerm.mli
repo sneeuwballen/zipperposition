@@ -158,6 +158,11 @@ val replace : t -> old:t -> by:t -> t
 
 (** {3 Variables} *)
 
+val bind_vars : ty:t -> Binder.t -> t HVar.t list -> t -> t
+(** [bind_vars ~ty b vars t] binds each [v in vars] with the binder [b],
+    with body [t], and each intermediate result has type [ty]
+    (not suitable for functions) *)
+
 val close_vars :  ty:t -> Binder.t -> t -> t
 (** Close all free variables of the term using the binding symbol *)
 
@@ -181,6 +186,8 @@ include Interfaces.PRINT_DE_BRUIJN with type t := t
 
 val add_default_hook : print_hook -> unit
 (** Add a print hook that will be used from now on *)
+
+val debugf : t CCFormat.printer
 
 (* TODO: path-selection operation (for handling general-data in TPTP), see
         XSLT or CSS *)

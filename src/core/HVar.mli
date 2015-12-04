@@ -6,7 +6,7 @@
   A variable for hashconsed terms, paired with a type.
 *)
 
-type 'a t = private {
+type +'a t = private {
   id: int;
   ty: 'a;
 }
@@ -17,11 +17,15 @@ val id : _ t -> int
 val ty : 'a t -> 'a
 
 val cast : 'a t -> ty:'b -> 'b t
+val update_ty : 'a t -> f:('a -> 'b) -> 'b t
 
 val compare : _ t -> _ t -> int
 val equal : _ t -> _ t -> bool
 val hash : _ t -> int
 val hash_fun : _ t CCHash.hash_fun
+
+val max : 'a t -> 'a t -> 'a t
+val min : 'a t -> 'a t -> 'a t
 
 val pp : _ t CCFormat.printer
 val to_string : _ t -> string

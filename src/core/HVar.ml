@@ -3,7 +3,7 @@
 
 (** {1 Hashconsed Variable} *)
 
-type 'a t = {
+type +'a t = {
   id: int;
   ty: 'a;
 }
@@ -17,12 +17,16 @@ let make ~ty i =
   { id=i; ty; }
 
 let cast v ~ty = {v with ty; }
+let update_ty v ~f = {v with ty=f v.ty; }
 
 let compare a b = CCOrd.int_ a.id b.id
 let equal a b = a.id = b.id
 let hash_fun a = CCHash.int a.id
-let hash = CCHash.apply hash_fun
+let hash a = a.id land max_int
+
+let max a b = if a.id < b.id then b else a
+let min a b = if a.id < b.id then a else b
 
 let pp out v = Format.fprintf out "v%d" v.id
-let to_string = CCFormat.to_string pp
+let to_string v = CCFormat.to_string pp v
 

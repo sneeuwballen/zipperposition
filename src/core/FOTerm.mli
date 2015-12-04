@@ -88,6 +88,8 @@ val bvar : ty:Type.t -> int -> t
 
 val builtin : ty:Type.t -> Builtin.t -> t
 
+val app_builtin : ty:Type.t -> Builtin.t -> t list -> t
+
 val const : ty:Type.t -> ID.t -> t
 (** Create a typed constant *)
 
@@ -122,8 +124,8 @@ module Seq : sig
   val subterms : t -> t Sequence.t
   val subterms_depth : t -> (t * int) Sequence.t  (* subterms with their depth *)
   val symbols : t -> ID.t Sequence.t
-  val max_var : t HVar.t Sequence.t -> t HVar.t option (** max var *)
-  val min_var : t HVar.t Sequence.t -> t HVar.t option (** min var *)
+  val max_var : t HVar.t Sequence.t -> int (** max var *)
+  val min_var : t HVar.t Sequence.t -> int (** min var *)
   val ty_vars : t -> Type.t HVar.t Sequence.t
   val typed_symbols : t -> (ID.t * Type.t) Sequence.t
   val add_set : Set.t -> t Sequence.t -> Set.t
@@ -132,8 +134,8 @@ end
 val var_occurs : var:t HVar.t -> t -> bool (** [var_occurs ~var t] true iff [var] in t *)
 val is_ground : t -> bool (** is the term ground? (no free vars) *)
 val monomorphic : t -> bool (** true if the term contains no type var *)
-val max_var : VarSet.t -> t HVar.t option (** find the maximum variable *)
-val min_var : VarSet.t -> t HVar.t option (** minimum variable *)
+val max_var : VarSet.t -> int (** find the maximum variable *)
+val min_var : VarSet.t -> int (** minimum variable *)
 val add_vars : unit VarTbl.t -> t -> unit (** add variables of the term to the set *)
 val vars : t Sequence.t -> VarSet.t (** compute variables of the terms *)
 val vars_prefix_order : t -> t HVar.t list (** variables in prefix traversal order *)

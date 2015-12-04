@@ -141,6 +141,7 @@ module Builtin = struct
   let ty2op = Type.(forall ([bvar 0; bvar 0] ==> bvar 0))
   let ty1op = Type.(forall ([bvar 0] ==> bvar 0))
   let ty2op_to_i = Type.([int;int] ==> int)
+  let hobinder = Type.(forall ([[bvar 0] ==> prop] ==> prop))
 
   let ty_exn = function
     | Builtin.True -> Type.prop
@@ -153,6 +154,8 @@ module Builtin = struct
     | Builtin.Or -> prop2
     | Builtin.Equiv -> prop2
     | Builtin.Xor -> prop2
+    | Builtin.ForallConst -> hobinder
+    | Builtin.ExistsConst -> hobinder
     | Builtin.Less -> prop2poly
     | Builtin.Lesseq -> prop2poly
     | Builtin.Greater -> prop2poly

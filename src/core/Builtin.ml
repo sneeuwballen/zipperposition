@@ -15,7 +15,6 @@ type t =
   | Eq
   | Neq
   | HasType
-  | LiftType (** @since 0.8 *)
   | True
   | False
   | Arrow
@@ -24,6 +23,8 @@ type t =
   | TType (* type of types *)
   | Prop
   | Term
+  | ForallConst (** constant for simulating forall *)
+  | ExistsConst (** constant for simulating exists *)
   | TyInt
   | TyRat
   | Int of Z.t
@@ -66,7 +67,6 @@ let to_int_ = function
   | Eq -> 6
   | Neq -> 7
   | HasType -> 8
-  | LiftType -> 9
   | True -> 10
   | False -> 11
   | Arrow -> 12
@@ -104,6 +104,8 @@ let to_int_ = function
   | Lesseq -> 44
   | Greater -> 45
   | Greatereq -> 46
+  | ForallConst -> 47
+  | ExistsConst -> 48
 
 let compare a b = match a, b with
   | Int i, Int j -> Z.compare i j
@@ -144,7 +146,6 @@ let to_string s = match s with
   | Eq -> "="
   | Neq -> "≠"
   | HasType -> ":"
-  | LiftType -> "@"
   | True -> "true"
   | False -> "false"
   | Arrow -> "->"
@@ -153,6 +154,8 @@ let to_string s = match s with
   | TType -> "TType"
   | Prop -> "prop"
   | Term -> "ι"
+  | ForallConst -> "·∀"
+  | ExistsConst -> "·∃"
   | TyInt -> "int"
   | TyRat -> "rat"
   | Floor -> "floor"
@@ -184,7 +187,7 @@ let to_string s = match s with
 let pp out s = Format.pp_print_string out (to_string s)
 
 let is_infix = function
-  | And | Or | Imply | Equiv | Xor | Eq | Neq | HasType | Arrow
+  | And | Or | Imply | Equiv | Xor | Eq | Neq | HasType
   | Sum | Difference | Product
   | Quotient | Quotient_e | Quotient_f | Quotient_t
   | Remainder_e | Remainder_t | Remainder_f
@@ -219,7 +222,6 @@ let eq = Eq
 let neq = Neq
 let arrow = Arrow
 let has_type = HasType
-let lift_type = LiftType
 let tType = TType
 let multiset = Multiset
 let prop = Prop
@@ -256,61 +258,61 @@ module Arith = struct
 end
 
 module TPTP = struct
+  let to_string_tstp = function
+    | Eq -> "="
+    | Neq -> "!="
+    | And -> "&"
+    | Or -> "|"
+    | Not -> "~"
+    | Imply -> "=>"
+    | Equiv -> "<=>"
+    | Xor -> "<~>"
+    | HasType -> ":"
+    | True -> "$true"
+    | False -> "$false"
+    | Arrow -> ">"
+    | Wildcard -> "$_"
+    | TType -> "$tType"
+    | Term -> "$i"
+    | Prop -> "$o"
+    | Multiset -> failwith "cannot print this symbol in TPTP"
+    | ForallConst -> "!!"
+    | ExistsConst -> "??"
+    | TyInt -> "$int"
+    | TyRat -> "$rat"
+    | Int _
+    | Rat _ -> assert false
+    | Floor -> "$floor"
+    | Ceiling -> "$ceiling"
+    | Truncate -> "$truncate"
+    | Round -> "$round"
+    | Prec -> "$prec"
+    | Succ -> "$succ"
+    | Sum -> "$sum"
+    | Difference -> "$diff"
+    | Uminus -> "$uminus"
+    | Product -> "$product"
+    | Quotient -> "$quotient"
+    | Quotient_e -> "$quotient_e"
+    | Quotient_t -> "$quotient_t"
+    | Quotient_f -> "$quotient_f"
+    | Remainder_e -> "$remainder_e"
+    | Remainder_t -> "$remainder_t"
+    | Remainder_f -> "$remainder_f"
+    | Is_int -> "$is_int"
+    | Is_rat -> "$is_rat"
+    | To_int -> "$to_int"
+    | To_rat -> "$to_rat"
+    | Less -> "$less"
+    | Lesseq -> "$lesseq"
+    | Greater -> "$greater"
+    | Greatereq -> "$greatereq"
+
   let pp out = function
     | Int i -> CCFormat.string out (Z.to_string i)
     | Rat n -> CCFormat.string out (Q.to_string n)
     | o ->
-      CCFormat.string out (match o with
-        | Eq -> "="
-        | Neq -> "!="
-        | And -> "&"
-        | Or -> "|"
-        | Not -> "~"
-        | Imply -> "=>"
-        | Equiv -> "<=>"
-        | Xor -> "<~>"
-        | HasType -> ":"
-        | LiftType -> "@"
-        | True -> "$true"
-        | False -> "$false"
-        | Arrow -> ">"
-        | Wildcard -> "$_"
-        | TType -> "$tType"
-        | Term -> "$i"
-        | Prop -> "$o"
-        | Multiset -> failwith "cannot print this symbol in TPTP"
-        | TyInt -> "$int"
-        | TyRat -> "$rat"
-        | Int _
-        | Rat _ -> assert false
-        | Floor -> "$floor"
-        | Ceiling -> "$ceiling"
-        | Truncate -> "$truncate"
-        | Round -> "$round"
-        | Prec -> "$prec"
-        | Succ -> "$succ"
-        | Sum -> "$sum"
-        | Difference -> "$diff"
-        | Uminus -> "$uminus"
-        | Product -> "$product"
-        | Quotient -> "$quotient"
-        | Quotient_e -> "$quotient_e"
-        | Quotient_t -> "$quotient_t"
-        | Quotient_f -> "$quotient_f"
-        | Remainder_e -> "$remainder_e"
-        | Remainder_t -> "$remainder_t"
-        | Remainder_f -> "$remainder_f"
-        | Is_int -> "$is_int"
-        | Is_rat -> "$is_rat"
-        | To_int -> "$to_int"
-        | To_rat -> "$to_rat"
-        | Less -> "$less"
-        | Lesseq -> "$lesseq"
-        | Greater -> "$greater"
-        | Greatereq -> "$greatereq"
-      )
-
-  let to_string = CCFormat.to_string pp
+      CCFormat.string out (to_string_tstp o)  let to_string = CCFormat.to_string pp
 
   (* TODO add the other ones *)
   let connectives = Set.of_seq

@@ -3,7 +3,7 @@
 
 (** {1 Variable} *)
 
-type 'a t = {
+type +'a t = {
   id: ID.t;
   ty: 'a;
 }

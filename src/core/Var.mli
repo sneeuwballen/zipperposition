@@ -7,7 +7,7 @@
 
   @since NEXT_RELEASE *)
 
-type 'a t = private {
+type +'a t = private {
   id: ID.t;
   ty: 'a;
 }

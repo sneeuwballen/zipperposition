@@ -128,6 +128,8 @@ let var_of_int ~ty i =
 
 let builtin ~ty b = T.builtin ~ty:(ty : Type.t :> T.t) b
 
+let app_builtin ~ty b l = T.app_builtin ~ty:(ty : Type.t :> T.t) b l
+
 let bvar ~ty i =
   assert (i >= 0);
   T.bvar ~ty:(ty : Type.t :> T.t) i
@@ -223,11 +225,8 @@ module Seq = struct
     in
     aux t
 
-  let max_var seq =
-    Sequence.max ~lt:(fun a b -> HVar.id a < HVar.id b) seq
-
-  let min_var seq =
-    Sequence.min ~lt:(fun a b -> HVar.id a < HVar.id b) seq
+  let max_var = T.Seq.max_var
+  let min_var = T.Seq.min_var
 
   let add_set set xs =
     Sequence.fold (fun set x -> Set.add x set) set xs
@@ -469,19 +468,7 @@ let pp out t = pp_depth ~hooks:!__hooks 0 out t
 
 let to_string = CCFormat.to_string pp
 
-let rec debugf out t =
-  begin match view t with
-    | AppBuiltin (b,[]) -> Builtin.pp out b
-    | AppBuiltin (b,l) ->
-        Format.fprintf out "(@[<2>%a@ %a@])" Builtin.pp b (Util.pp_list debugf) l
-    | Var i -> HVar.pp out i
-    | DB i -> Format.fprintf out "Y%d" i
-    | Const s -> ID.pp out s
-    | App (_, []) -> assert false
-    | App (s, l) ->
-        Format.fprintf out "(@[<2>%a@ %a@])" debugf s (Util.pp_list debugf) l
-  end;
-  Format.fprintf out ":%a" Type.pp (ty t)
+let debugf = T.debugf
 
 (** {2 TPTP} *)
 
