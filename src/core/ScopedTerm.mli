@@ -37,11 +37,11 @@ type t
 type term = t
 
 type view = private
-  | Var of HVar.t (** Free variable *)
+  | Var of t HVar.t (** Free variable *)
   | DB of int
   | Bind of Binder.t * t * t (** Type, sub-term *)
   | Const of ID.t (** Constant *)
-  | Record of (string * t) list * HVar.t option (** Extensible record *)
+  | Record of (string * t) list * t HVar.t option (** Extensible record *)
   | Multiset of t list (** Multiset of terms *)
   | App of t * t list (** Uncurried application *)
   | At of t * t (** Curried application *)
@@ -77,10 +77,9 @@ type nat = int
 val const : ty:t -> ID.t -> t
 val app : ty:t -> t -> t list -> t
 val bind : ty:t -> varty:t -> Binder.t -> t -> t
-val var : ty:t -> nat -> t
-val mk_var : ty:t -> HVar.t -> t
+val var : t HVar.t -> t
 val bvar : ty:t -> nat -> t
-val record : ty:t -> (string * t) list -> rest:HVar.t option -> t
+val record : ty:t -> (string * t) list -> rest:t HVar.t option -> t
 val record_flatten : ty:t -> (string * t) list -> rest:t option -> t
 val multiset : ty:t -> t list -> t
 val at : ty:t -> t -> t -> t
@@ -124,8 +123,8 @@ val get_flag : t -> flag -> bool
 
 (** {3 Containers} *)
 
-module Map : Sequence.Map.S with type key = term
-module Set : Sequence.Set.S with type elt = term
+module Map : CCMap.S with type key = term
+module Set : CCSet.S with type elt = term
 
 module Tbl : sig
   include Hashtbl.S with type key = term
@@ -134,6 +133,9 @@ module Tbl : sig
   val to_seq : 'a t -> (key * 'a) Sequence.t
   val of_seq : ?init:'a t -> (key * 'a) Sequence.t -> 'a t
 end
+
+module VarMap : CCMap.S with type key = t HVar.t
+module VarSet : CCSet.S with type elt = t HVar.t
 
 (** {3 De Bruijn indices handling} *)
 
@@ -166,18 +168,24 @@ module DB : sig
   val eval : env -> t -> t
     (** Evaluate the term in the given De Bruijn environment, by
         replacing De Bruijn indices by their value in the environment. *)
+
+  val apply_subst : t VarMap.t -> t -> t
+  (** Apply the given simple substitution to variables in [t]; if some
+      variable [v] is bound to [t'], then [t'] can be open and will be
+      shifted as required.
+      Traverses the whole term. *)
 end
 
 (** {3 Iterators} *)
 
 module Seq : sig
-  val vars : t -> HVar.t Sequence.t
+  val vars : t -> t HVar.t Sequence.t
   val subterms : t -> t Sequence.t
   val subterms_depth : t -> (t * int) Sequence.t  (* subterms with their depth *)
   val symbols : t -> ID.t Sequence.t
   val types : t -> t Sequence.t
-  val max_var : HVar.t Sequence.t -> int
-  val min_var : HVar.t Sequence.t -> int
+  val max_var : t HVar.t Sequence.t -> int
+  val min_var : t HVar.t Sequence.t -> int
   val add_set : Set.t -> t Sequence.t -> Set.t
   val add_tbl : unit Tbl.t -> t Sequence.t -> unit
 end

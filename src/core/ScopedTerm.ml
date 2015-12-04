@@ -28,11 +28,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module Hash = CCHash
 
-type record_row =
-  | RowNone
-  | RowDB of int
-  | RowVar of HVar.t
-
 (* term *)
 type t = {
   term : view;
@@ -43,11 +38,11 @@ type t = {
 
 (* head form *)
 and view =
-  | Var of HVar.t (** Free or bound variable *)
+  | Var of t HVar.t (** Free or bound variable *)
   | DB of int
   | Bind of Binder.t * t * t (** Type, sub-term *)
   | Const of ID.t (** Constant *)
-  | Record of (string * t) list * HVar.t option (** Extensible record *)
+  | Record of (string * t) list * t HVar.t option (** Extensible record *)
   | Multiset of t list (** Multiset of terms *)
   | App of t * t list (** Uncurried application *)
   | At of t * t (** Curried application *)
@@ -199,15 +194,13 @@ let app ~ty f l =
       end;
       t
 
-let mk_var ~ty v = H.hashcons (_make ~ty:(HasType ty) (Var v))
-
-let var ~ty i = mk_var ~ty (HVar.make i)
+let var v = H.hashcons (_make ~ty:(HasType (HVar.ty v)) (Var v))
 
 let fresh_var =
   let r = ref ~-1 in
   fun ~ty () ->
     if !r >= 0 then failwith "ScopedTerm.fresh_var: overflow";
-    let t = mk_var ~ty (HVar.make !r) in
+    let t = var (HVar.make ~ty !r) in
     decr r;
     t
 
@@ -335,7 +328,7 @@ let tType =
   H.hashcons my_t
 
 let cast ~ty old = match old.term with
-  | Var i -> mk_var ~ty i
+  | Var v -> var (HVar.cast v ~ty)
   | DB i -> bvar ~ty i
   | Const s -> const ~ty s
   | Bind (s, varty, t') -> bind ~ty s ~varty t'
@@ -361,18 +354,18 @@ let is_at t = match view t with | At _ -> true | _ -> false
 
 (** {3 Containers} *)
 
-module T = struct
+module AsKey = struct
   type t = term
   let equal = equal
   let hash = hash
   let compare = compare
 end
 
-module Set = Sequence.Set.Make(T)
-module Map = Sequence.Map.Make(T)
+module Set = CCSet.Make(AsKey)
+module Map = CCMap.Make(AsKey)
 
 module Tbl = struct
-  include Hashtbl.Make(T)
+  include Hashtbl.Make(AsKey)
 
   let of_seq ?(init=create 7) seq =
     seq (fun (k,v) -> replace init k v);
@@ -386,6 +379,13 @@ module Tbl = struct
 
   let of_list ?init l = of_seq ?init (Sequence.of_list l)
 end
+
+module HVarKey = struct
+  type t = term HVar.t
+  let compare = HVar.compare
+end
+module VarMap = CCMap.Make(HVarKey)
+module VarSet = CCSet.Make(HVarKey)
 
 (** {3 De Bruijn} *)
 
@@ -456,7 +456,7 @@ module DB = struct
     | HasType ty ->
       let ty = recurse ~depth acc ty in
       match view t with
-        | Var v -> mk_var ~ty v
+        | Var v -> var (HVar.cast ~ty v)
         | DB i -> bvar ~ty (on_bvar ~depth acc i)
         | Const s -> const ~ty s
         | Bind (s, varty, t') ->
@@ -516,7 +516,7 @@ module DB = struct
       match view t with
         | _ when equal t sub ->
           bvar ~ty depth  (* replace *)
-        | Var i -> mk_var ~ty i
+        | Var v -> var (HVar.cast ~ty v)
         | DB i -> bvar ~ty i
         | Const s -> const ~ty s
         | Bind (s, varty, t') ->
@@ -553,7 +553,7 @@ module DB = struct
       let ty = _eval env ty in
       match view t with
         | _ when ground t -> t (* TODO: when groundness flags removed, remove *)
-        | Var v -> mk_var ~ty v
+        | Var v -> var (HVar.cast ~ty v)
         | DB i ->
             begin match DBEnv.find env i with
               | None -> bvar ~ty i
@@ -586,7 +586,7 @@ module DB = struct
 
   let eval env t = _eval env t
 
-  let apply_subst_ t subst =
+  let apply_subst t subst =
     let rec aux depth t =
       match t.ty with
       | NoType ->
@@ -597,8 +597,8 @@ module DB = struct
         match view t with
           | Var v ->
               begin try
-                shift depth (HVar.Map.find v subst)
-              with Not_found -> mk_var ~ty v
+                shift depth (VarMap.find v subst)
+              with Not_found -> var (HVar.cast ~ty v)
               end
           | DB i -> bvar ~ty i
           | Const s -> const ~ty s
@@ -611,8 +611,8 @@ module DB = struct
               | None -> None
               | Some v ->
                   begin try
-                    Some (shift depth (HVar.Map.find v subst))
-                  with Not_found -> Some (mk_var ~ty v)
+                    Some (shift depth (VarMap.find v subst))
+                  with Not_found -> Some (var (HVar.cast ~ty v))
                   end
             in
             let l = List.map (fun (s,t') -> s, aux depth t') l in
@@ -632,17 +632,16 @@ module DB = struct
     aux 0 t
 end
 
-(* FIXME: HVar must contain type *)
-
 let bind_vars ~ty b vars t =
   (* subst: bind vars_i to a De Bruijn (reverse list so that last element is 0) *)
   let subst = CCList.Idx.foldi
-    (fun s i v -> HVar.Map.add v (bvar ~ty:(ty_exn v) i) s)
-    HVar.Map.empty (List.rev vars)
+    (fun s i v -> VarMap.add v (bvar ~ty:(HVar.ty v) i) s)
+    VarMap.empty (List.rev vars)
   in
   List.fold_right
-    (fun v t -> bind ~ty ~varty:(ty_exn v) b t)
-    vars (DB.apply_subst_ t subst)
+    (fun v t -> bind ~ty ~varty:(HVar.ty v) b t)
+    vars
+    (DB.apply_subst t subst)
 
 (** {3 Iterators} *)
 
@@ -858,18 +857,18 @@ let rec replace t ~old ~by = match t.ty, view t with
 (** {3 Variables} *)
 
 let close_vars ~ty s t =
-  let vars = HVar.Set.of_seq (Seq.vars t) in
-  bind_vars ~ty s (HVar.Set.elements vars) t
+  let vars = VarSet.of_seq (Seq.vars t) in
+  bind_vars ~ty s (VarSet.elements vars) t
 
 (** {3 Misc} *)
 
 let rec size t = match view t with
   | Const _
   | Var _
-  | BVar _ -> 1
+  | DB _ -> 1
   | Bind (_, _, t') -> 1 + size t'
   | Record (l, rest) ->
-      let s = match rest with | None -> 0 | Some r -> size r in
+      let s = match rest with | None -> 0 | Some _ -> 1 in
       List.fold_left (fun acc (_,t') -> acc + size t') (1+s) l
   | AppBuiltin (_,l)
   | SimpleApp (_,l)
@@ -886,7 +885,7 @@ let depth t =
 let rec head t = match view t with
   | SimpleApp (s,_)
   | Const s -> Some s
-  | BVar _ | Var _ | Record _ | Multiset _
+  | DB _ | Var _ | Record _ | Multiset _
   | Bind (_, _, _) | AppBuiltin (_, _) -> None
   | App (h, _) -> head h
   | At (l,_) -> head l
@@ -894,7 +893,7 @@ let rec head t = match view t with
 module PB = Position.Build
 
 let rec _all_pos_rec f vars acc pb t = match view t with
-  | Var _ | BVar _ ->
+  | Var _ | DB _ ->
     if vars then f acc t (PB.to_pos pb) else acc
   | Const _ -> f acc t (PB.to_pos pb)
   | App (hd, tl) ->
@@ -942,16 +941,16 @@ let pp_depth ?(hooks=[]) depth out t =
     then () (* hook took control *)
     else _pp_root depth out t; _pp_ty depth out t
   and _pp_root depth out t = match view t with
-  | Var i -> Format.fprintf out "X%d" i
-  | BVar i -> Format.fprintf out "Y%d" (depth-i-1)
+  | Var v -> Format.fprintf out "X%d" (HVar.id v)
+  | DB i -> Format.fprintf out "Y%d" (depth-i-1)
   | Const s -> ID.pp out s
   | Bind (b, varty, t') ->
     Format.fprintf out "@[%a Y%d:%a.@ %a@]" Binder.pp b depth
       (_pp depth) varty (_pp_surrounded (depth+1)) t'
   | Record ([], None) ->
     CCFormat.string out "{}"
-  | Record ([], Some r) ->
-    Format.fprintf out "{ | %a}" (_pp depth) r
+  | Record ([], Some v) ->
+    Format.fprintf out "{@[ | X%d@]}" (HVar.id v)
   | Record (l, None) ->
     Format.fprintf out "@[{";
     List.iteri
@@ -961,24 +960,20 @@ let pp_depth ?(hooks=[]) depth out t =
         _pp depth out t')
       l;
     Format.fprintf out "}@]"
-  | Record (l, Some r) ->
-    Format.fprintf out "@[{";
-    List.iteri
-      (fun i (s, t') ->
-        if i>0 then CCFormat.string out ", ";
-        Format.fprintf out "%s: " s;
-        _pp depth out t')
-      l;
-    Format.fprintf out " | %a}@]" (_pp depth) r
+  | Record (l, Some v) ->
+      Format.fprintf out "{@[<hv>%a@ | X%d@]}"
+        (Util.pp_list ~sep:", "
+          (Util.pp_pair ~sep:": " CCFormat.string (_pp depth)))
+        l (HVar.id v)
   | Multiset l ->
-    Format.fprintf out "@[{| %a |}@]" (Util.pp_list (_pp depth)) l
+    Format.fprintf out "{|@[<hv>%a@]|}" (Util.pp_list (_pp depth)) l
   | SimpleApp (s,[]) -> ID.pp out s
   | SimpleApp (s,l) ->
     Format.fprintf out "@[%a@ %a@]" ID.pp s (Util.pp_list (_pp depth)) l
   | AppBuiltin (b, [a]) when Builtin.is_prefix b ->
-    Format.fprintf out "@[%a %a@]" Builtin.pp b (_pp depth) a
+    Format.fprintf out "@[<2>%a@ %a@]" Builtin.pp b (_pp depth) a
   | AppBuiltin (b, [t1;t2]) when Builtin.is_infix b ->
-    Format.fprintf out "@[<2>(%a@ %a@ %a)@]" (_pp depth) t1 Builtin.pp b (_pp depth) t2
+    Format.fprintf out "(@[<2>%a@ %a@ %a@])" (_pp depth) t1 Builtin.pp b (_pp depth) t2
   | AppBuiltin (b, l) ->
     Format.fprintf out "@[%a(%a)@]" Builtin.pp b (Util.pp_list (_pp depth)) l
   | At (l,r) ->
@@ -995,7 +990,7 @@ let pp_depth ?(hooks=[]) depth out t =
       l;
     Format.fprintf out "@]"
   and _pp_ty depth out t = match t.ty, view t with
-    | HasType ty, (Var _ | BVar _) ->
+    | HasType ty, (Var _ | DB _) ->
       Format.fprintf out ":%a" (_pp_surrounded depth) ty
     | _ -> ()
   and _pp_surrounded depth out t = match view t with

@@ -3,20 +3,22 @@
 
 (** {1 Hashconsed Variable}
 
-  A variable for hashconsed terms. It can be either a "free" variable with
-  a name (an integer, here, for efficiency), or a "bound" variable
-  using De Bruijn indices.
+  A variable for hashconsed terms, paired with a type.
 *)
 
-type t = private int
+type 'a t = private {
+  id: int;
+  ty: 'a;
+}
+type 'a hvar = 'a t
 
-val make : int -> t
-val id : t -> int
+val make : ty:'a -> int -> 'a t
+val id : _ t -> int
+val ty : 'a t -> 'a
 
-include Interfaces.HASH with type t := t
-include Interfaces.ORD with type t := t
-include Interfaces.PRINT with type t := t
+val cast : 'a t -> ty:'b -> 'b t
 
-module Set : CCSet.S with type elt = t
-module Map : CCMap.S with type key = t
-
+val compare : _ t -> _ t -> int
+val equal : _ t -> _ t -> bool
+val hash : _ t -> int
+val hash_fun : _ t CCHash.hash_fun

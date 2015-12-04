@@ -3,22 +3,26 @@
 
 (** {1 Hashconsed Variable} *)
 
-type t = int
+type 'a t = {
+  id: int;
+  ty: 'a;
+}
+type 'a hvar = 'a t
 
-type hvar = t
+let id t = t.id
+let ty t = t.ty
 
-let id i = i
-let make i =
+let make ~ty i =
   if i < 0 then invalid_arg "HVar.make";
-  i
+  { id=i; ty; }
 
-let compare = CCOrd.int_
-let equal (i:t) j = i=j
-let hash_fun = CCHash.int
+let cast v ~ty = {v with ty; }
+
+let compare a b = CCOrd.int_ a.id b.id
+let equal a b = a.id = b.id
+let hash_fun a = CCHash.int a.id
 let hash = CCHash.apply hash_fun
 
-module As_key = struct type t = hvar let compare = compare end
-module Set = CCSet.Make(As_key)
-module Map = CCMap.Make(As_key)
-
+let pp out v = Format.fprintf out "v%d" v.id
+let to_string = CCFormat.to_string pp
 
