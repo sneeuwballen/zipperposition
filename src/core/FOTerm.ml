@@ -174,45 +174,42 @@ let is_app t = match T.view t with
   | T.App _ -> true
   | _ -> false
 
-let is_tyapp t = match T.view t with
-  | T.At _ -> true
-  | _ -> false
-
 module Seq = struct
-  let rec vars t k =
-    if T.ground t then ()
-    else match T.view t with
-      | T.Var v -> k v
-      | T.DB _ -> ()
-      | T.App (f, l) ->
-          vars f k;
-          List.iter (fun t -> vars t k) l
-      | T.At (l,r) -> vars l k; vars r k
-      | _ -> ()
-  and _vars_list l k = match l with
-    | [] -> ()
-    | t::l' -> vars t k; _vars_list l' k
+  let vars t k =
+    let rec aux t = match view t with
+      | Var v -> k v
+      | Const _
+      | DB _ -> ()
+      | App (f, l) ->
+          aux f;
+          List.iter aux l
+      | AppBuiltin (_,l) -> List.iter aux l
+    in
+    aux t
 
-  let rec subterms t k =
-    k t;
-    match T.view t with
-    | T.AppBuiltin _
-    | T.Const _
-    | T.Var _
-    | T.DB _ -> ()
-    | T.App (f, l) -> subterms f k; List.iter (fun t' -> subterms t' k) l
-    | T.At (l,r) -> subterms l k; subterms r k
-    | _ -> assert false
+  let subterms t k =
+    let rec aux t =
+      k t;
+      match view t with
+      | AppBuiltin _
+      | Const _
+      | Var _
+      | DB _ -> ()
+      | App (f, l) -> aux f; List.iter aux l
+    in
+    aux t
 
   let subterms_depth t k =
     let rec recurse depth t =
       k (t, depth);
-      match T.view t with
-      | T.App (_, ((_::_) as l)) ->
+      match view t with
+      | Const _
+      | DB _
+      | Var _ -> ()
+      | AppBuiltin (_, l) -> List.iter (recurse (depth+1)) l
+      | App (_, l) ->
           let depth' = depth + 1 in
-          List.iter (fun t' -> recurse depth' t') l
-      | T.At (l, r) -> recurse depth l; recurse depth r
-      | _ -> ()
+          List.iter (recurse depth') l
     in
     recurse 0 t
 
@@ -266,7 +263,7 @@ let weight ?(var=1) ?(sym=fun _ -> 1) t =
     | Const s -> sym s
   in weight t
 
-let is_ground t = T.ground t
+let is_ground t = T.is_ground t
 
 let monomorphic t = Sequence.is_empty (Seq.ty_vars t)
 

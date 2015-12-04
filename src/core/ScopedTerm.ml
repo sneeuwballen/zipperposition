@@ -259,22 +259,7 @@ end
 
 module Set = CCSet.Make(AsKey)
 module Map = CCMap.Make(AsKey)
-
-module Tbl = struct
-  include Hashtbl.Make(AsKey)
-
-  let of_seq ?(init=create 7) seq =
-    seq (fun (k,v) -> replace init k v);
-    init
-
-  let to_seq tbl k =
-    iter (fun key v -> k (key,v)) tbl
-
-  let to_list tbl =
-    fold (fun k v acc -> (k,v)::acc) tbl []
-
-  let of_list ?init l = of_seq ?init (Sequence.of_list l)
-end
+module Tbl = CCHashtbl.Make(AsKey)
 
 module HVarKey = struct
   type t = term HVar.t
@@ -282,6 +267,7 @@ module HVarKey = struct
   let equal = HVar.equal
   let hash = HVar.hash
 end
+
 module VarMap = CCMap.Make(HVarKey)
 module VarSet = CCSet.Make(HVarKey)
 module VarTbl = CCHashtbl.Make(HVarKey)

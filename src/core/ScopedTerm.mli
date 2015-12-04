@@ -83,14 +83,7 @@ val hashcons_stats : unit -> int*int*int*int*int*int
 
 module Map : CCMap.S with type key = term
 module Set : CCSet.S with type elt = term
-
-module Tbl : sig
-  include Hashtbl.S with type key = term
-  val to_list : 'a t -> (key * 'a) list
-  val of_list : ?init:'a t -> (key * 'a) list -> 'a t
-  val to_seq : 'a t -> (key * 'a) Sequence.t
-  val of_seq : ?init:'a t -> (key * 'a) Sequence.t -> 'a t
-end
+module Tbl : CCHashtbl.S with type key = term
 
 module VarMap : CCMap.S with type key = t HVar.t
 module VarSet : CCSet.S with type elt = t HVar.t
