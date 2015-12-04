@@ -27,13 +27,21 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {2 Time facilities} *)
 
+let start_ = Oclock.gettime Oclock.monotonic
+
+let ns_to_s t = Int64.to_float t /. 1_000_000_000.
+
+let total_time_ns () = Int64.sub (Oclock.gettime Oclock.monotonic) start_
+let total_time_s () = ns_to_s (total_time_ns ())
+let start_time () = start_
+
 (** Time elapsed since initialization of the program, and time of start *)
 let get_total_time, get_start_time =
-  let start = Unix.gettimeofday () in
-  (function () ->
-    let stop = Unix.gettimeofday () in
-    stop -. start),
-  (function () -> start)
+  let start = Oclock.gettime Oclock.monotonic in
+  (fun () ->
+    let stop = Oclock.gettime Oclock.monotonic in
+    Int64.sub stop start),
+  (fun () -> start)
 
 (** {2 Misc} *)
 
@@ -118,8 +126,8 @@ module Section = struct
   (* inlinable function *)
   let cur_level s =
     if s.level = null_level
-      then cur_level_rec s
-      else s.level
+    then cur_level_rec s
+    else s.level
 end
 
 let set_debug = Section.set_debug Section.root
@@ -130,24 +138,24 @@ let debug_fmt_ = Format.std_formatter
 
 let debug ?(section=Section.root) l msg =
   if l <= Section.cur_level section then (
-    let now = get_total_time () in
+    let now = ns_to_s (get_total_time ()) in
     if section == Section.root
-      then Format.fprintf debug_fmt_ "@[<hov>%.3f[]@ %s@]@." now msg
-      else Format.fprintf debug_fmt_ "@[<hov>%.3f[%s]@ %s@]@."
+    then Format.fprintf debug_fmt_ "@[<hov>%.3f[]@ %s@]@." now msg
+    else Format.fprintf debug_fmt_ "@[<hov>%.3f[%s]@ %s@]@."
         now section.Section.full_name msg;
-    )
+  )
 
 let debugf ?(section=Section.root) l msg k =
   if l <= Section.cur_level section then (
-    let now = get_total_time () in
+    let now = total_time_s() in
     if section == Section.root
-      then Format.fprintf debug_fmt_ "@[<hov>%.3f[]@ " now
-      else Format.fprintf debug_fmt_ "@[<hov>%.3f[%s]@ "
+    then Format.fprintf debug_fmt_ "@[<hov>%.3f[]@ " now
+    else Format.fprintf debug_fmt_ "@[<hov>%.3f[%s]@ "
         now section.Section.full_name;
-      k (Format.kfprintf
-          (fun fmt -> Format.fprintf fmt "@]@.")
-          debug_fmt_ msg)
-    )
+    k (Format.kfprintf
+         (fun fmt -> Format.fprintf fmt "@]@.")
+         debug_fmt_ msg)
+  )
 
 let pp_pos pos =
   let open Lexing in
@@ -192,26 +200,23 @@ end
 (** A profiler (do not call recursively) *)
 type profiler = {
   prof_name : string;
-  mutable prof_total : float;   (** total time *)
-  mutable prof_calls : int;     (** number of calls *)
-  mutable prof_max : float;     (** max time in the profiled function *)
-  mutable prof_enter : float;   (** time at which we entered the profiler *)
+  mutable prof_total : int64; (* total time (ns) *)
+  mutable prof_calls : int; (* number of calls *)
+  mutable prof_max : int64; (* max time in the profiled function (ns) *)
+  mutable prof_enter : int64; (* time at which we entered the profiler (ns) *)
 }
 
-(** Global switch for profiling *)
 let enable_profiling = ref false
 
-(** all profilers *)
 let profilers = ref []
 
-(** create a named profiler *)
 let mk_profiler name =
   let prof = {
-    prof_enter = 0.;
     prof_name = name;
-    prof_total = 0.;
+    prof_enter = 0L;
+    prof_total = 0L;
     prof_calls = 0;
-    prof_max = 0.;
+    prof_max = 0L;
   } in
   (* register profiler *)
   profilers := prof :: !profilers;
@@ -219,50 +224,52 @@ let mk_profiler name =
 
 (** Enter the profiler *)
 let enter_prof profiler =
-  if !enable_profiling then profiler.prof_enter <- Unix.gettimeofday ()
+  if !enable_profiling
+  then profiler.prof_enter <- Oclock.gettime Oclock.monotonic
 
 (** Exit the profiled code with a value *)
 let exit_prof profiler =
-  if !enable_profiling then begin
-    let stop = Unix.gettimeofday () in
-    let delta = stop -. profiler.prof_enter in
-    profiler.prof_total <- profiler.prof_total +. delta;
+  if !enable_profiling then (
+    let stop = Oclock.gettime Oclock.monotonic in
+    let delta = Int64.sub stop profiler.prof_enter in
+    profiler.prof_total <- Int64.add profiler.prof_total delta;
     profiler.prof_calls <- profiler.prof_calls + 1;
-    (if delta > profiler.prof_max then profiler.prof_max <- delta);
-  end
+    if delta > profiler.prof_max then profiler.prof_max <- delta;
+  )
 
-(* difference with [exit_prof]: does not increment the total count *)
-let yield_prof profiler =
-  if !enable_profiling then begin
-    let stop = Unix.gettimeofday () in
-    let delta = stop -. profiler.prof_enter in
-    profiler.prof_total <- profiler.prof_total +. delta;
-    (if delta > profiler.prof_max then profiler.prof_max <- delta);
-  end
+let show_profilers out () =
+  Format.fprintf out "@[<v>";
+  Format.fprintf out
+    "@[%39s ---------- --------- --------- --------- ---------@]@,"
+      (String.make 39 '-');
+  Format.fprintf out
+    "@[%-39s %10s %9s %9s %9s %9s@]@,"
+      "function" "#calls" "total" "% total" "max" "average";
+  (* sort profilers by decreasing total time *)
+  let profilers =
+    List.sort
+      (fun p1 p2 -> - (Int64.compare p1.prof_total p2.prof_total))
+      !profilers
+  in
+  let tot = total_time_s ()in
+  List.iter
+    (fun profiler -> if profiler.prof_calls > 0 then
+        (* print content of the profiler *)
+      Format.fprintf out "@[%-39s %10d %9.4f %9.2f %9.4f %9.4f@]@,"
+        profiler.prof_name
+        profiler.prof_calls
+        (ns_to_s profiler.prof_total)
+        (ns_to_s profiler.prof_total *. 100. /. tot)
+        (ns_to_s profiler.prof_max)
+        ((ns_to_s profiler.prof_total) /. (float_of_int profiler.prof_calls))
+    )
+    profilers;
+  Format.fprintf out "@]";
+  ()
 
 (** Print profiling data upon exit *)
 let () =
-  at_exit (fun () ->
-    if !enable_profiling && List.exists (fun profiler -> profiler.prof_calls > 0) !profilers
-    then begin
-      Printf.printf "%% %39s ---------- --------- --------- --------- ---------\n"
-        (String.make 39 '-');
-      Printf.printf "%% %-39s %10s %9s %9s %9s %9s\n" "function" "#calls"
-        "total" "% total" "max" "average";
-      (* sort profilers by name *)
-      let profilers = List.sort
-        (fun p1 p2 -> String.compare p1.prof_name p2.prof_name)
-        !profilers in
-      let tot = get_total_time () in
-      List.iter
-        (fun profiler -> if profiler.prof_calls > 0 then
-          (* print content of the profiler *)
-          Printf.printf "%% %-39s %10d %9.4f %9.2f %9.4f %9.4f\n"
-            profiler.prof_name profiler.prof_calls profiler.prof_total
-            (profiler.prof_total *. 100. /. tot) profiler.prof_max
-            (profiler.prof_total /. (float_of_int profiler.prof_calls)))
-        profilers
-    end)
+  at_exit (fun () -> Format.printf "%a@." show_profilers ())
 
 (** {2 Runtime statistics} *)
 
@@ -274,16 +281,16 @@ let mk_stat, print_global_stats =
   let stats = ref [] in
   (* create a stat *)
   (fun name ->
-    let stat = (name, ref 0L) in
-    stats := stat :: !stats;
-    stat),
+     let stat = (name, ref 0L) in
+     stats := stat :: !stats;
+     stat),
   (* print stats *)
   (fun () ->
-    let stats = List.sort (fun (n1,_)(n2,_) -> String.compare n1 n2) !stats in
-    List.iter
-      (fun (name, cnt) ->
-        debugf 0 "stat: %-30s ... %Ld" (fun k -> k name !cnt))
-      stats)
+     let stats = List.sort (fun (n1,_)(n2,_) -> String.compare n1 n2) !stats in
+     List.iter
+       (fun (name, cnt) ->
+          debugf 0 "stat: %-30s ... %Ld" (fun k -> k name !cnt))
+       stats)
 
 let incr_stat (_, count) = count := Int64.add !count Int64.one  (** increment given statistics *)
 let add_stat (_, count) num = count := Int64.add !count (Int64.of_int num) (** add to stat *)

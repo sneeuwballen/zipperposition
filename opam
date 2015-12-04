@@ -20,6 +20,7 @@ depends: [
     "zarith"
     "containers" { >= "0.3" }
     "sequence" { >= "0.4" }
+    "oclock"
     "base-bytes"
 ]
 depopts: [

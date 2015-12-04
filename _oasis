@@ -62,7 +62,8 @@ Library "logtk"
                     lib/IArray, lib/LazyGraph, lib/AllocCache
   CSources:         util_stubs.c, util_stubs.h
   CCOpt:            -Wextra -Wno-unused-parameter
-  BuildDepends:     zarith, unix, sequence, containers, containers.data, bytes
+  BuildDepends:     zarith, unix, sequence, containers,
+                    containers.data, bytes, oclock
 
 Library "logtk_parsers"
   Path:             src/parsers

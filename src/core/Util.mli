@@ -27,11 +27,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {2 Time facilities} *)
 
-(** time elapsed since start of program *)
-val get_total_time : unit -> float
+val total_time_s : unit -> float
+(** time elapsed since start of program, in seconds *)
 
+val total_time_ns : unit -> int64
+
+val start_time : unit -> int64
 (** time at which the program started *)
-val get_start_time : unit -> float
+
+val ns_to_s : int64 -> float
+(** convert a nanosecond time to a time in seconds *)
 
 (** {2 Misc} *)
 
@@ -73,10 +78,10 @@ val get_debug : unit -> int     (** Current debug level for [Section.root] *)
 val need_cleanup : bool ref     (** Cleanup line before printing? *)
 
 val debugf : ?section:Section.t ->
-             int ->
-             ('a, Format.formatter, unit, unit) format4 ->
-             ('a -> unit) ->
-             unit
+  int ->
+  ('a, Format.formatter, unit, unit) format4 ->
+  ('a -> unit) ->
+  unit
 (** Print a debug message, with the given section and verbosity level.
     The message might be dropped if its level is too high. *)
 
@@ -97,6 +102,8 @@ val set_time_limit : int -> unit
 
     @since 0.8 *)
 
+(* TODO: remove? *)
+
 module Exn : sig
   val pp_stack : Buffer.t -> int -> unit
   (** printer for the stack with given depth *)
@@ -116,7 +123,6 @@ val enable_profiling : bool ref           (** Enable/disable profiling *)
 val mk_profiler : string -> profiler      (** Create a named profiler *)
 val enter_prof : profiler -> unit         (** Enter the profiler *)
 val exit_prof : profiler -> unit          (** Exit the profiler *)
-val yield_prof : profiler -> unit         (** Yield control to sub-call *)
 
 (** {2 Runtime statistics} *)
 
@@ -131,21 +137,21 @@ val add_stat : stat -> int -> unit
 
 module Flag : sig
   type gen = int ref
-    (** Generator of flags *)
+  (** Generator of flags *)
 
   val create : unit -> gen
-    (** New generator *)
+  (** New generator *)
 
   val get_new : gen -> int
-    (** New flag from the generator (2*previous flag) *)
+  (** New flag from the generator (2*previous flag) *)
 end
 
 (** {2 Others} *)
 
 val finally : do_:(unit -> unit) -> (unit -> 'a) -> 'a
-  (** [finally ~do_ f] calls [f ()] and returns its result. If it raises, the
-      same exception is raised; in {b any} case, [do_ ()] is called after
-      [f ()] terminates. *)
+(** [finally ~do_ f] calls [f ()] and returns its result. If it raises, the
+    same exception is raised; in {b any} case, [do_ ()] is called after
+    [f ()] terminates. *)
 
 val pp_pair :
   ?sep:string -> 'a CCFormat.printer -> 'b CCFormat.printer -> ('a * 'b) CCFormat.printer
@@ -160,5 +166,5 @@ val ord_option : 'a CCOrd.t -> 'a option CCOpt.t
 type 'a or_error = [`Error of string | `Ok of 'a]
 
 val popen : cmd:string -> input:string -> string or_error
-  (** Run the given command [cmd] with the given [input], wait for it
-      to terminate, and return its stdout. *)
+(** Run the given command [cmd] with the given [input], wait for it
+    to terminate, and return its stdout. *)
