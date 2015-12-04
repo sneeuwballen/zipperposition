@@ -1,38 +1,15 @@
 
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Scoped Terms}
 
-Those terms are not designed to be used directly, but rather to provide
-a generic backend (implementing De Bruijn indices, subterms, substitutions,
-etc.) for other more specific representations like Type, FOTerm, FOFormula...
+    Those terms are not designed to be used directly, but rather to provide
+    a generic backend (implementing De Bruijn indices, subterms, substitutions,
+    etc.) for other more specific representations like Type, FOTerm, FOFormula...
 *)
 
 type t
-  (** Abstract type of term *)
+(** Abstract type of term *)
 
 type term = t
 
@@ -66,9 +43,9 @@ include Interfaces.ORD with type t := t
 
 (** {3 Constructors}
 
-Some constructors, such as {!record}, may raise
-{!IllFormedTerm}if the arguments are ill-formed (several occurrences of
-a key), or, for variables, if the number is negative *)
+    Some constructors, such as {!record}, may raise
+    {!IllFormedTerm}if the arguments are ill-formed (several occurrences of
+    a key), or, for variables, if the number is negative *)
 
 exception IllFormedTerm of string
 type nat = int
@@ -85,18 +62,12 @@ val simple_app : ty:t -> ID.t -> t list -> t
 val app_builtin : ty:t -> Builtin.t -> t list -> t
 val builtin: ty:t -> Builtin.t -> t
 
-val mk_at :  ty:t -> t -> t -> t
-  (** alias to {!at} *)
-
 val tType : t
-  (** The root of the type system. It doesn't have a type.
-      It has kind [Kind.Type] *)
+(** The root of the type system. It doesn't have a type.
+    It has kind [Kind.Type] *)
 
 val cast : ty:t -> t -> t
-  (** Change the type *)
-
-val change_kind :  t -> t
-  (** Change the kind *)
+(** Change the type *)
 
 val is_var : t -> bool
 val is_bvar : t -> bool
@@ -107,16 +78,6 @@ val is_record : t -> bool
 val is_multiset : t -> bool
 
 val hashcons_stats : unit -> int*int*int*int*int*int
-
-(** {3 Flags}
-be {b VERY} careful with flags. Due to hashconsing, they will be shared
-between every instance of a term, so only use them for properties
-that are universal. Only {!Sys.word_size - 1} flags can exist in a program. *)
-
-type flag
-val new_flag: unit -> flag
-val set_flag : t -> flag -> unit
-val get_flag : t -> flag -> bool
 
 (** {3 Containers} *)
 
@@ -141,15 +102,15 @@ module DB : sig
   type env = t DBEnv.t
 
   val closed : t -> bool
-    (** check whether the term is closed (all DB vars are bound within the
-        term). If this returns [true] then the term doesn't depend on
-        its environment. *)
+  (** check whether the term is closed (all DB vars are bound within the
+      term). If this returns [true] then the term doesn't depend on
+      its environment. *)
 
   val contains : t -> int -> bool
-    (** Does t contains the De Bruijn variable of index n? *)
+  (** Does t contains the De Bruijn variable of index n? *)
 
   val shift : int -> t -> t
-    (** shift the non-captured De Bruijn indexes in the term by n *)
+  (** shift the non-captured De Bruijn indexes in the term by n *)
 
   val unshift : int -> t -> t
   (** [unshift n t] unshifts the term [t]'s bound variables by [n]. In
@@ -157,15 +118,15 @@ module DB : sig
       inside by [n]. Variables bound within [t] are left untouched. *)
 
   val replace : t -> sub:t -> t
-    (** [db_from_term t ~sub] replaces [sub] by a fresh De Bruijn index in [t]. *)
+  (** [db_from_term t ~sub] replaces [sub] by a fresh De Bruijn index in [t]. *)
 
   val from_var : t -> var:t -> t
-    (** [db_from_var t ~var] replace [var] by a De Bruijn symbol in t.
-        Same as {!replace}. *)
+  (** [db_from_var t ~var] replace [var] by a De Bruijn symbol in t.
+      Same as {!replace}. *)
 
   val eval : env -> t -> t
-    (** Evaluate the term in the given De Bruijn environment, by
-        replacing De Bruijn indices by their value in the environment. *)
+  (** Evaluate the term in the given De Bruijn environment, by
+      replacing De Bruijn indices by their value in the environment. *)
 
   val apply_subst : t VarMap.t -> t -> t
   (** Apply the given simple substitution to variables in [t]; if some
@@ -192,23 +153,23 @@ end
 
 module Pos : sig
   val at : t -> Position.t -> t
-    (** retrieve subterm at pos, or raise Invalid_argument*)
+  (** retrieve subterm at pos, or raise Invalid_argument*)
 
   val replace : t -> Position.t -> by:t -> t
-    (** replace t|_p by the second term *)
+  (** replace t|_p by the second term *)
 end
 
 val replace : t -> old:t -> by:t -> t
-  (** [replace t ~old ~by] syntactically replaces all occurrences of [old]
-      in [t] by the term [by]. *)
+(** [replace t ~old ~by] syntactically replaces all occurrences of [old]
+    in [t] by the term [by]. *)
 
 (** {3 Variables} *)
 
 val close_vars :  ty:t -> Binder.t -> t -> t
-  (** Close all free variables of the term using the binding symbol *)
+(** Close all free variables of the term using the binding symbol *)
 
-val ground : t -> bool
-  (** [true] if the term contains no free variables *)
+val is_ground : t -> bool
+(** [true] if the term contains no free variables *)
 
 (** {3 Misc} *)
 
@@ -217,25 +178,16 @@ val size : t -> int
 val depth : t -> int
 
 val head : t -> ID.t option
-  (** Head symbol, or None if the term is a (bound) variable *)
+(** Head symbol, or None if the term is a (bound) variable *)
 
 (** {2 IO} *)
 
 include Interfaces.PRINT with type t := t
 include Interfaces.PRINT_DE_BRUIJN with type t := t
-  and type term := t
+                                    and type term := t
 
 val add_default_hook : print_hook -> unit
-  (** Add a print hook that will be used from now on *)
-
-(** {2 Misc} *)
-
-val fresh_var :  ty:t -> unit -> t
-(** [fresh_var ~kind ~ty ()] returns a fresh, unique, {b NOT HASHCONSED}
-    variable that will therefore never be equal to any other variable. *)
-
-val _var :  ty:t -> int -> t
-(** Unsafe version of {!var} that accepts negative index *)
+(** Add a print hook that will be used from now on *)
 
 (* TODO: path-selection operation (for handling general-data in TPTP), see
         XSLT or CSS *)
