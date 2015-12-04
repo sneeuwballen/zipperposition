@@ -75,7 +75,9 @@ let term = T.builtin ~ty:tType Builtin.Term
 let int = T.builtin ~ty:tType Builtin.TyInt
 let rat = T.builtin ~ty:tType Builtin.TyRat
 
-let var i = T.var i
+let var v = T.var v
+
+let var_of_int i = T.var (HVar.make ~ty:tType i)
 
 let app s l = T.app ~ty:T.tType (T.const ~ty:T.tType s) l
 
@@ -110,8 +112,8 @@ module Map = T.Map
 module Tbl = T.Tbl
 
 module Seq = struct
-  let vars ty = T.Seq.vars ty
-  let sub ty = T.Seq.subterms ty
+  let vars = T.Seq.vars
+  let sub = T.Seq.subterms
   let add_set = T.Seq.add_set
   let max_var = T.Seq.max_var
 end
@@ -121,7 +123,11 @@ module VarSet = T.VarSet
 
 let vars_set set t = VarSet.add_seq set (Seq.vars t)
 
-let vars t = VarSet.elements (vars_set VarSet.empty t)
+let vars t = vars_set VarSet.empty t |> VarSet.elements
+
+let close_forall ty =
+  let vars = vars ty in
+  T.bind_vars ~ty:prop Binder.Forall vars ty
 
 type arity_result =
   | Arity of int * int
@@ -141,11 +147,11 @@ let arity ty =
   in traverse 0 0 ty
 
 let rec expected_args ty = match view ty with
-  | Fun (a, ret) -> a :: expected_args ret
+  | Fun (args, ret) -> args @ expected_args ret
   | Forall ty' -> expected_args ty'
   | DB _ | Var _ | Builtin _ | Record _ | Multiset _ | App _ -> []
 
-let is_ground = T.ground
+let is_ground = T.is_ground
 
 let size = T.size
 
@@ -165,9 +171,9 @@ let rec depth ty = match view ty with
 and depth_l l = List.fold_left (fun d t -> max d (depth t)) 0 l
 
 let rec open_fun ty = match view ty with
-  | Fun (x, ret) ->
+  | Fun (args, ret) ->
       let xs, ret' = open_fun ret in
-      x::xs, ret'
+      args @ xs, ret'
   | _ -> [], ty
 
 exception ApplyError of string
@@ -180,23 +186,35 @@ let apply ty args =
   let rec aux ty args env = match T.view ty, args with
     | _, [] ->
         if DBEnv.is_empty env then ty else T.DB.eval env ty
-    | T.AppBuiltin(Builtin.Arrow, [arg'; ret]), arg::args' ->
-        if equal arg arg'
-        then aux ret args' env
-        else
-          err_applyf_
-            "@[<2>Type.apply:@ wrong argument type, expected @[%a@]@ but got @%a@]"
-            T.pp arg' T.pp arg
+    | T.AppBuiltin(Builtin.Arrow, (ret :: exp_args)), _::_ ->
+        (* match expected types with actual types *)
+        aux_l ret exp_args args env
     | T.Bind (Binder.ForallTy, _, ty'), arg :: args' ->
         aux ty' args' (DBEnv.push env arg)
     | _ ->
         err_applyf_
           "@[<2>Type.apply:@ expected quantified or function type,@ but got @[%a@]"
           T.pp ty
+  and aux_l ty exp_args args env = match exp_args, args with
+  | _, [] ->
+      if DBEnv.is_empty env then ty else T.DB.eval env ty
+  | [], _ ->
+      err_applyf_ "@[<2>Type.apply:@ unexpected arguments @[%a@]@]"
+        (CCFormat.list T.pp) args
+  | exp :: exp_args', a :: args' ->
+      (* expected type: [exp];  [a]: actual value, whose type must match [exp] *)
+      if T.equal (T.DB.eval env exp) (T.ty_exn a)
+      then aux_l ty exp_args' args' env
+      else
+        err_applyf_
+          "@[<2>Type.apply:@ wrong argument type, expected @[%a@]@ but got @%a@]"
+          T.pp exp T.pp (T.ty_exn a)
   in
   aux ty args DBEnv.empty
 
 let apply1 ty a = apply ty [a]
+
+let apply_unsafe = apply
 
 type print_hook = int -> (CCFormat.t -> t-> unit) -> CCFormat.t -> t-> bool
 
@@ -206,6 +224,8 @@ module TPTP = struct
   let int = int
   let rat = rat
   let real = const (ID.make "$real")
+
+  type print_hook = int -> (CCFormat.t -> t -> unit) -> CCFormat.t -> t -> bool
 
   let rec pp_tstp_rec depth out t = match view t with
     | Builtin Prop -> CCFormat.string out "$o"
@@ -284,10 +304,6 @@ let pp_surrounded buf t = (pp_inner 0) buf t
 
 let to_string = CCFormat.to_string pp
 
-(** {2 Misc} *)
-
-let fresh_var = T.fresh_var ~ty:T.tType
-
 (** {2 Conversions} *)
 
 module Conv = struct
@@ -315,7 +331,7 @@ module Conv = struct
     ctx.n <- n+1;
     HVar.make ~ty:tType n
 
-  let of_simple_term ~ctx t =
+  let of_simple_term ctx t =
     let rec aux depth v2db t = match PT.view t with
       | PT.Var v ->
           begin match Var.Subst.find v2db v with
@@ -364,7 +380,7 @@ module Conv = struct
           ctx.vars <- Var.Subst.add ctx.vars v v';
           v'
     in
-    try Some (aux t)
+    try Some (aux 0 Var.Subst.empty t)
     with LocalExit -> None
 
   let to_simple_term ?(env=DBEnv.empty) t =
@@ -379,12 +395,12 @@ module Conv = struct
       | DB i -> PT.var (DBEnv.find_exn env i)
       | App (s,l) ->
           (* s : type -> type -> ... -> type *)
-          let ty_s = PT.ty_arrow (List.map (fun _ -> PT.tType) l) PT.tType in
+          let ty_s = PT.Ty.fun_ (List.map (fun _ -> PT.tType) l) PT.tType in
           PT.app ~ty:PT.tType (PT.const ~ty:ty_s s) (List.map (aux env) l)
       | Fun (args,ret) ->
           let args = List.map (aux env) args in
           let ret = aux env ret in
-          PT.ty_arrow args ret
+          PT.Ty.fun_ args ret
       | Record (l, rest) ->
           let rest = CCOpt.map (fun v -> PT.var (aux_var v)) rest in
           PT.record ~ty:PT.tType (List.map (fun (n,ty) -> n, aux env ty) l) ~rest

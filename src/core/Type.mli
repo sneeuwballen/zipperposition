@@ -82,9 +82,10 @@ val term : t
 val int : t
 val rat : t
 
-val var : int -> t
-(** Build a type variable.
-    @raise ScopedTerm.IllFormedTerm if the integer is negative *)
+val var : t HVar.t -> t
+
+val var_of_int : int -> t
+(** Build a type variable. *)
 
 val app : ID.t -> t list -> t
 (** Parametrized type *)
@@ -107,44 +108,42 @@ val bvar : int -> t
 val (@@) : ID.t -> t list -> t
 (** [s @@ args] applies the sort [s] to arguments [args]. *)
 
-val (<==) : t -> t list -> t
-(** General function type. [x <== l] is the same as [x] if [l]
+val (==>) : t list -> t -> t
+(** General function type. [l ==> x] is the same as [x] if [l]
     is empty. Invariant: the return type is never a function type. *)
-
-val (<=.) : t -> t -> t
-(** Unary function type. [x <=. y] is the same as [x <== [y]]. *)
 
 val multiset : t -> t
 (** Type of multiset *)
 
 val of_term_unsafe : ScopedTerm.t -> t
 (** {b NOTE}: this can break the invariants and make {!view} fail. Only
-    apply with caution. *)
+    use with caution. *)
 
 val of_terms_unsafe : ScopedTerm.t list -> t list
 
 (** {2 Containers} *)
 
-module Set : Sequence.Set.S with type elt = t
-module Map : Sequence.Map.S with type key = t
-module Tbl : Hashtbl.S with type key = t
+module Set : CCSet.S with type elt = t
+module Map : CCMap.S with type key = t
+module Tbl : CCHashtbl.S with type key = t
 
 module Seq : sig
-  val vars : t -> t Sequence.t
-  val sub : t -> t Sequence.t
+  val vars : t -> t HVar.t Sequence.t
+  val sub : t -> t Sequence.t (** Subterms *)
   val add_set : Set.t -> t Sequence.t -> Set.t
-  val max_var : t Sequence.t -> int
+  val max_var : t HVar.t Sequence.t -> int
 end
 
 (** {2 Utils} *)
 
-module VarSet = ScopedTerm.VarSet
+module VarSet : CCSet.S with type elt = t HVar.t
+module VarMap : CCMap.S with type key = t HVar.t
 
 val vars_set : VarSet.t -> t -> VarSet.t
 (** Add the free variables to the given set *)
 
-val vars : t -> t list
-(** List of free variables ({!Var}) *)
+val vars : t -> t HVar.t list
+(** List of free variables *)
 
 val close_forall : t -> t
 (** bind free variables *)
@@ -186,10 +185,16 @@ val apply : t -> t list -> t
 (** Given a function/forall type, and arguments, return the
     type that results from applying the function/forall to the arguments.
     No unification is done, types must check exactly.
-    @raise Error if the types do not match *)
+    @raise ApplyError if the types do not match *)
 
 val apply1 : t -> t -> t
 (** [apply1 a b] is short for [apply a [b]]. *)
+
+val apply_unsafe : t -> ScopedTerm.t list -> t
+(** Similar to {!apply}, but assumes its arguments are well-formed
+    types without more ado.
+    @raise ApplyError if types do not match
+    @raise Assert_failure if the arguments are not proper types *)
 
 (** {2 IO} *)
 
