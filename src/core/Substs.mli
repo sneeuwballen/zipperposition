@@ -11,10 +11,6 @@
     where variables from distinct namespaces are always distinct.
 *)
 
-type scope = int
-(** A scope is an integer. Variables can only be bound in one scope,
-    and variables from distinct scopes are distinct too. *)
-
 type term = InnerTerm.t
 type var = InnerTerm.t HVar.t
 

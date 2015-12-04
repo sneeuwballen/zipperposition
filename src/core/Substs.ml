@@ -141,13 +141,13 @@ let is_renaming subst =
 let domain s k = M.iter (fun v _ -> k v) s
 
 (* set of terms that some variables are bound to by the substitution *)
-let codomain s k = M.iter (fun _ (t,s_t) -> k (t,s_t)) s
+let codomain s k = M.iter (fun _ t -> k t) s
 
 (* variables introduced by the subst *)
 let introduced subst k =
   M.iter
-    (fun _ (t,s_t) ->
-      T.Seq.vars t (fun v -> k (v,s_t)))
+    (fun _ t ->
+      T.Seq.vars t.Scoped.value (fun v -> k (Scoped.set t v)))
     subst
 
 let to_seq subst k = M.iter (fun v t -> k (v,t)) subst
