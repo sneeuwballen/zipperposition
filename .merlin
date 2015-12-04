@@ -21,4 +21,6 @@ B _build/tests/
 PKG zarith
 PKG sequence
 PKG containers
+PKG containers.data
+PKG oclock
 FLG -w +a -w -4 -w -44
