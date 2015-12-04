@@ -28,7 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module PB = Position.Build
 module T = ScopedTerm
 
-let prof_mk_node = Util.mk_profiler "Term.mk_node"
+let prof_app = Util.mk_profiler "Term.app"
 let prof_ac_normal_form = Util.mk_profiler "ac_normal_form"
 
 (** {2 Term} *)
@@ -39,84 +39,19 @@ type term = t
 
 type view =
   | AppBuiltin of Builtin.t * t list
-  | Var of HVar.t (** Term variable *)
   | DB of int (** Bound variable (De Bruijn index) *)
+  | Var of t HVar.t (** Term variable *)
   | Const of ID.t (** Typed constant *)
-  | TyApp of t * Type.t list (** Application to types (cannot be left-nested) *)
   | App of t * t list (** Application to a list of terms (cannot be left-nested) *)
-
-let is_ty_ t = match T.view t with
-  | T.AppBuiltin (Builtin.LiftType, [_]) -> true
-  | _ -> false
-
-let as_ty_ t = match T.view t with
-  | T.AppBuiltin (Builtin.LiftType, [ty]) -> Some (Type.of_term_unsafe ty)
-  | _ -> None
-
-(* split list between types, terms *)
-let rec _split_types l = match l with
-  | [] -> [], []
-  | x::l' ->
-      match as_ty_ x with
-      | None -> [], l
-      | Some ty ->
-          let l1, l2 = _split_types l' in
-          ty::l1, l2
 
 let view t = match T.view t with
   | T.AppBuiltin (b,l) -> AppBuiltin (b,l)
-  | T.Var i -> Var i
+  | T.Var v -> Var v
   | T.DB i -> DB i
   | T.App (_, []) -> assert false
-  | T.App (f, l) ->
-      (* if [f] is polymorphic, arguments must be types *)
-      begin match Type.view (Type.of_term_unsafe (T.ty_exn f)) with
-      | Type.Forall _ ->
-          TyApp (f, Type.of_terms_unsafe l)
-      | Type.Fun _ ->
-          App (f, l)
-      | _ -> assert false
-      end
+  | T.App (f, l) -> App (f, l)
   | T.Const s -> Const s
   | _ -> assert false
-
-let open_app t =
-  let rec collect_head_tyargs acc t =
-    match T.view t with
-    | T.At (f, ty) -> collect_head_tyargs (Type.of_term_unsafe ty::acc) f
-    | _ -> t, acc
-  in
-  match T.view t with
-  | T.App (f, l) ->
-      let f', tyargs = collect_head_tyargs [] f in
-      f', tyargs, l
-  | T.At _ ->
-      let f', tyargs = collect_head_tyargs [] t in
-      f', tyargs, []
-  | _ -> t, [], []
-
-module Classic = struct
-  let rec _drop_types l = match l with
-    | [] -> []
-    | t::l' ->
-        if is_ty_ t then _drop_types l' else l
-
-  type view =
-    | Var of int
-    | DB of int
-    | App of ID.t * Type.t list * t list  (** covers Const and App *)
-    | AppBuiltin of Builtin.t * Type.t list * t list
-    | NonFO   (* any other case *)
-
-  let view t =
-    let hd, tyargs, l = open_app t in
-    match T.view hd, tyargs, l with
-    | T.Var i, [], [] -> Var i
-    | T.DB i, [], [] -> DB i
-    | T.Const s, _, _ -> App (s, tyargs, l)
-    | T.AppBuiltin 
-    | _ -> NonFO
-end
 
 (** {2 Comparison, equality, containers} *)
 
@@ -124,8 +59,9 @@ let subterm ~sub t =
   let rec check t =
     T.equal sub t ||
     match T.view t with
-    | T.Var _ | T.DB _ -> false
+    | T.Var _ | T.DB _ | T.Const _ -> false
     | T.App (f, l) -> check f || List.exists check l
+    | T.AppBuiltin (_,l) -> List.exists check l
     | _ -> false
   in
   check t
@@ -138,69 +74,88 @@ let ty t = match T.ty t with
   | T.NoType -> assert false
   | T.HasType ty -> Type.of_term_unsafe ty
 
-module TermHASH = struct
-  type t = term
-  let equal = equal
-  let hash = hash
+(* split list between types, terms.
+   [ty] is the type of the function, [l] the arguments *)
+let rec split_args_ ~ty l = match Type.view ty, l with
+  | Type.Forall ty', x :: l' ->
+      let l1, l2 = split_args_ ~ty:ty' l' in
+      x :: l1, l2
+  | _ -> [], l
+
+module Classic = struct
+  type view =
+    | Var of t HVar.t
+    | DB of int
+    | App of ID.t * Type.t list * t list (** covers Const and App *)
+    | AppBuiltin of Builtin.t * t list
+    | NonFO (** any other case *)
+
+  let view t : view = match T.view t with
+    | T.Var v -> Var v
+    | T.DB i -> DB i
+    | T.Const s -> App (s, [], [])
+    | T.AppBuiltin (b,l) -> AppBuiltin (b,l)
+    | T.App (f, l) ->
+        begin match T.view f with
+        | T.Const id ->
+            let tyargs, args = split_args_ ~ty:(ty f) l in
+            App (id, Type.of_terms_unsafe tyargs, args)
+        | _ -> NonFO
+        end
+    | _ -> assert false
 end
 
-module Tbl = T.Tbl
+(** {2 Containers} *)
 
+module Tbl = T.Tbl
 module Set = T.Set
 module Map = T.Map
 
-module TCache = Cache.Replacing(TermHASH)
-module T2Cache = Cache.Replacing2(TermHASH)(TermHASH)
-
-(** {2 Typing} *)
-
-let cast ~(ty:Type.t) t =
-  match T.view t with
-  | T.Var _ | T.DB _ -> T.cast ~ty:(ty :> T.t) t
-  | T.App _ -> raise (Invalid_argument "FOTerm.cast")
-  | _ -> assert false
+module VarSet = T.VarSet
+module VarMap = T.VarMap
+module VarTbl = T.VarTbl
 
 (** {2 Smart constructors} *)
 
 (** In this section, term smart constructors are defined. They perform
-    hashconsing, and precompute some properties (flags).
+    hashconsing, and precompute some properties (flags). *)
 
-    TODO: flag_monomorphic *)
+let var = T.var
 
-let var ~(ty:Type.t) i =
+let var_of_int ~ty i =
+  let ty = (ty : Type.t :> T.t) in
+  T.var (HVar.make ~ty i)
+
+let builtin ~ty b = T.builtin ~ty:(ty : Type.t :> T.t) b
+
+let bvar ~ty i =
   assert (i >= 0);
-  T.var ~ty:(ty :> T.t) i
+  T.bvar ~ty:(ty : Type.t :> T.t) i
 
-let builtin ~(ty:Type.t) b = T.builtin ~ty:(ty :> T.t) b
+let const ~ty s =
+  T.const ~ty:(ty : Type.t :> T.t) s
 
-let bvar ~(ty:Type.t) i =
-  assert (i >= 0);
-  T.bvar ~ty:(ty :> T.t) i
+let tyapp t args = match args with
+  | [] -> t
+  | _::_ ->
+      let args' = (args : Type.t list :> T.t list) in
+      let ty = (Type.apply (ty t) args : Type.t :> T.t) in
+      T.app ~ty t args'
 
-let const ~(ty:Type.t) s =
-  T.const ~ty:(ty :> T.t) s
-
-let tylift_ (t:Type.t) =
-  T.app_builtin ~ty:T.tType Builtin.LiftType [(t:>T.t)]
-
-let tyapp t tyarg =
-  let ty = Type.apply (ty t) tyarg in
-  T.at ~ty:(ty:>T.t) t (tylift_ tyarg)
-
-let app f l =
-  Util.enter_prof prof_mk_node;
-  (* first; compute type *)
-  let ty_result = List.fold_left
-    (fun ty_fun t -> Type.apply ty_fun (ty t))
-    (ty f) l
-  in
-  (* apply constant to type args and args *)
-  let res = T.app ~ty:(ty_result:>T.t) f l in
-  Util.exit_prof prof_mk_node;
-  res
+let app f l = match l with
+  | [] -> f
+  | _::_ ->
+      Util.enter_prof prof_app;
+      (* first; compute type *)
+      let ty_result = Type.apply_unsafe (ty f) l in
+      (* apply constant to type args and args *)
+      let res = T.app ~ty:(ty_result : Type.t :> T.t) f l in
+      Util.exit_prof prof_app;
+      res
 
 let app_full f tyargs l =
-  app (List.fold_left tyapp f tyargs) l
+  let l = (tyargs : Type.t list :> T.t list) @ l in
+  app f l
 
 let is_var t = match T.view t with
   | T.Var _ -> true
@@ -227,13 +182,13 @@ module Seq = struct
   let rec vars t k =
     if T.ground t then ()
     else match T.view t with
-    | T.Var _ -> k t
-    | T.DB _ -> ()
-    | T.App (f, l) ->
-        vars f k;
-        List.iter (fun t -> vars t k) l
-    | T.At (l,r) -> vars l k; vars r k
-    | _ -> ()
+      | T.Var v -> k v
+      | T.DB _ -> ()
+      | T.App (f, l) ->
+          vars f k;
+          List.iter (fun t -> vars t k) l
+      | T.At (l,r) -> vars l k; vars r k
+      | _ -> ()
   and _vars_list l k = match l with
     | [] -> ()
     | t::l' -> vars t k; _vars_list l' k
@@ -254,99 +209,85 @@ module Seq = struct
       k (t, depth);
       match T.view t with
       | T.App (_, ((_::_) as l)) ->
-        let depth' = depth + 1 in
-        List.iter (fun t' -> recurse depth' t') l
+          let depth' = depth + 1 in
+          List.iter (fun t' -> recurse depth' t') l
       | T.At (l, r) -> recurse depth l; recurse depth r
       | _ -> ()
     in
     recurse 0 t
 
-  let rec symbols t k =
-    match view t with
-    | Const s -> k s
-    | Builtin _
-    | Var _
-    | DB _ -> ()
-    | App (f, l) ->
-        symbols f k;
-        _symbols_list l k
-    | TyApp (l, _) -> symbols l k
-  and _symbols_list l k = match l with
-    | [] -> ()
-    | t::l' -> symbols t k; _symbols_list l' k
+  let symbols t k =
+    let rec aux t = match view t with
+      | AppBuiltin (_,l) -> List.iter aux l
+      | Const s -> k s
+      | Var _
+      | DB _ -> ()
+      | App (f, l) -> aux f; List.iter aux l
+    in
+    aux t
 
   let max_var seq =
-    let r = ref 0 in
-    seq (fun t -> match T.view t with
-      | T.Var i -> r := max i !r
-      | _ -> ());
-    !r
+    Sequence.max ~lt:(fun a b -> HVar.id a < HVar.id b) seq
 
   let min_var seq =
-    let r = ref 0 in
-    seq (fun t -> match T.view t with
-      | T.Var i -> r := min i !r
-      | _ -> ());
-    !r
+    Sequence.min ~lt:(fun a b -> HVar.id a < HVar.id b) seq
 
   let add_set set xs =
     Sequence.fold (fun set x -> Set.add x set) set xs
 
   let ty_vars t =
-    subterms t |> Sequence.flatMap (fun t -> Type.Seq.vars (ty t))
+    subterms t
+    |> Sequence.flat_map (fun t -> Type.Seq.vars (ty t))
 
   let typed_symbols t =
     subterms t
-      |> Sequence.fmap
-        (fun t -> match T.view t with
-          | T.Const s -> Some (s, ty t)
-          | _ -> None)
+    |> Sequence.filter_map
+      (fun t -> match T.view t with
+         | T.Const s -> Some (s, ty t)
+         | _ -> None)
 end
 
 let var_occurs ~var t =
-  Sequence.exists (equal var) (Seq.vars t)
+  Sequence.exists (HVar.equal var) (Seq.vars t)
 
 let rec size t = match view t with
-  | Builtin _
   | Var _
   | DB _ -> 1
+  | AppBuiltin (_,l)
   | App (_, l) -> List.fold_left (fun s t' -> s + size t') 1 l
   | Const _ -> 1
-  | TyApp (l,_) -> size l
 
 let weight ?(var=1) ?(sym=fun _ -> 1) t =
   let rec weight t = match view t with
     | Var _
     | DB _ -> var
+    | AppBuiltin (_,l)
     | App (_, l) -> List.fold_left (fun s t' -> s + weight t') 1 l
     | Const s -> sym s
-    | TyApp (l,_) -> weight l
-    | Builtin _ -> 1
   in weight t
 
 let is_ground t = T.ground t
 
 let monomorphic t = Sequence.is_empty (Seq.ty_vars t)
 
-let max_var set = Set.to_seq set |> Seq.max_var
+let max_var set = VarSet.to_seq set |> Seq.max_var
 
-let min_var set = Set.to_seq set |> Seq.min_var
+let min_var set = VarSet.to_seq set |> Seq.min_var
 
-let add_vars tbl t = Seq.vars t (fun x -> Tbl.replace tbl x ())
+let add_vars tbl t = Seq.vars t (fun v -> VarTbl.replace tbl v ())
 
-let vars ts = Sequence.flatMap Seq.vars ts |> Seq.add_set Set.empty
+let vars ts =
+  Sequence.flat_map Seq.vars ts |> VarSet.of_seq
 
 let vars_prefix_order t =
   Seq.vars t
-    |> Sequence.fold (fun l x -> if not (List.memq x l) then x::l else l) []
-    |> List.rev
-
+  |> Sequence.fold (fun l x -> if not (List.memq x l) then x::l else l) []
+  |> List.rev
 
 let depth t = Seq.subterms_depth t |> Sequence.map snd |> Sequence.fold max 0
 
 let rec head_exn t = match T.view t with
   | T.Const s -> s
-  | T.At (hd, _)
   | T.App (hd,_) -> head_exn hd
   | _ -> invalid_arg "FOTerm.head"
 
@@ -354,7 +295,7 @@ let head t =
   try Some (head_exn t)
   with Invalid_argument _-> None
 
-let ty_vars t = Seq.ty_vars t |> Type.Seq.add_set Type.Set.empty
+let ty_vars t = Seq.ty_vars t |> Type.VarSet.of_seq
 
 let of_term_unsafe t = t
 
@@ -377,8 +318,8 @@ module Pos = struct
       | t::l', _ ->
           let st = size t in
           if st > pos
-            then recurse t pos  (* search inside the term *)
-            else get_subpos l' (pos - st) (* continue to next term *)
+          then recurse t pos  (* search inside the term *)
+          else get_subpos l' (pos - st) (* continue to next term *)
       | [], _ -> assert false
     in recurse t pos
 
@@ -397,26 +338,18 @@ let contains_symbol f t =
 
 (** {2 Fold} *)
 
-let rec _all_pos_rec f vars acc pb t =
-  match view t with
-  | Var _ | DB _ ->
-    if vars then f acc t (PB.to_pos pb) else acc
-  | Builtin _
-  | Const _ -> f acc t (PB.to_pos pb)
-  | TyApp (_, _) -> f acc t (PB.to_pos pb)
-  | App (_, tl) ->
-    let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
-    _all_pos_rec_list f vars acc pb tl 0
-and _all_pos_rec_list f vars acc pb l i = match l with
-  | [] -> acc
-  | t::l' when is_ty_ t ->
-    _all_pos_rec_list f vars acc pb l' (i+1)
-  | t::l' ->
-    let acc = _all_pos_rec f vars acc (PB.arg i pb) t in
-    _all_pos_rec_list f vars acc pb l' (i+1)
-
-let all_positions ?(vars=false) ?(pos=Position.stop) t acc f =
-  _all_pos_rec f vars acc (PB.of_pos pos) t
+let all_positions ?(vars=false) ?(pos=Position.stop) t f =
+  let rec aux pb t = match view t with
+    | Var _ | DB _ -> if vars then f (t, PB.to_pos pb)
+    | Const _ -> f (t, PB.to_pos pb)
+    | AppBuiltin (_,tl)
+    | App (_, tl) ->
+        f (t, PB.to_pos pb);
+        List.iteri
+          (fun i t' -> aux (PB.arg i pb) t')
+          tl
+  in
+  aux (PB.of_pos pos) t
 
 (** {2 Some AC-utils} *)
 
@@ -426,47 +359,57 @@ module type AC_SPEC = sig
 end
 
 module AC(A : AC_SPEC) = struct
+  (* FIXME: do not flatten type arguments, by looking at the
+     type of [f] and ruling out as many arguments as the type has parameters *)
+
   let flatten f l =
     let rec flatten acc l = match l with
-    | [] -> acc
-    | x::l' when is_ty_ x -> flatten acc l' (* ignore type args *)
-    | x::l' -> flatten (deconstruct acc x) l'
+      | [] -> acc
+      | x::l' -> flatten (deconstruct acc x) l'
     and deconstruct acc t = match T.view t with
-    | T.App (f', l') when ID.equal (head_exn f') f ->
-      flatten acc l'
-    | _ -> t::acc
+      | T.App (f', l') ->
+          begin match head f' with
+          | Some id when ID.equal id f ->
+              let _, args = split_args_ ~ty:(ty f') l' in
+              flatten acc args
+          | Some _ | None -> t::acc
+          end
+      | _ -> t::acc
     in flatten [] l
 
   let normal_form t =
     Util.enter_prof prof_ac_normal_form;
     let rec normalize t = match T.view t with
-      | _ when is_ty_ t -> t
       | T.Var _ -> t
       | T.DB _ -> t
       | T.App (f, l) when A.is_ac (head_exn f) ->
-        let l = flatten (head_exn f) l in
-        let tyargs, l = _split_types l in
-        let l = List.map normalize l in
-        let l = List.sort compare l in
-        begin match l with
-          | x::l' ->
-            let ty = T.ty_exn t in
-            let tyargs = (tyargs :> T.t list) in
-            List.fold_left
-              (fun subt x -> T.app ~ty f (tyargs@[x;subt]))
-              x l'
-          | [] -> assert false
-        end
-      | T.App (f, [a;b]) when A.is_comm (head_exn f) ->
-        (* FIXME: doesn't handle polymorphic commutative operators *)
-        let a = normalize a in
-        let b = normalize b in
-        if compare a b > 0
-          then T.app ~ty:(ty t :>T.t) f [b; a]
-          else t
+          let l = flatten (head_exn f) l in
+          let tyargs, l = split_args_ ~ty:(ty f) l in
+          let l = List.map normalize l in
+          let l = List.sort compare l in
+          begin match l with
+            | x::l' ->
+                let ty = T.ty_exn t in
+                let tyargs = (tyargs :> T.t list) in
+                List.fold_left
+                  (fun subt x -> T.app ~ty f (tyargs@[x;subt]))
+                  x l'
+            | [] -> assert false
+          end
+      | T.App (f, l) when A.is_comm (head_exn f) ->
+          let tyargs, l = split_args_ ~ty:(ty f) l in
+          begin match l with
+          | [a;b] ->
+              let a = normalize a in
+              let b = normalize b in
+              if compare a b > 0
+              then T.app ~ty:(ty t :>T.t) f (tyargs @ [b; a])
+              else t
+          | _ -> t  (* partially applied *)
+          end
       | T.App (f, l) ->
-        let l = List.map normalize l in
-        T.app ~ty:(T.ty_exn t) f l
+          let l = List.map normalize l in
+          T.app ~ty:(T.ty_exn t) f l
       | _ -> assert false
     in
     let t' = normalize t in
@@ -479,28 +422,38 @@ module AC(A : AC_SPEC) = struct
     equal t1' t2'
 
   let symbols seq =
-    Sequence.flatMap Seq.symbols seq
-      |> Sequence.filter A.is_ac
-      |> ID.Set.add_seq ID.Set.empty
+    Sequence.flat_map Seq.symbols seq
+    |> Sequence.filter A.is_ac
+    |> ID.Set.add_seq ID.Set.empty
 end
 
 (** {2 Conversions} *)
 
-let to_simple_term ?(depth=0) t =
-  let module ST = STerm in
+let to_simple_term ?(env=DBEnv.empty) t =
+  let tbl = VarTbl.create 16 in
+  let module ST = TypedSTerm in
   let rec to_simple_term t =
     match view t with
-    | Var i -> ST.var (CCFormat.sprintf "X%d" i)
-    | DB i -> ST.var (CCFormat.sprintf "Y%d" (depth-i-1))
-    | TyApp _
-    | App _ -> gather_left [] t
-    | Builtin b -> ST.builtin b
-    | Const f -> ST.const (ID.to_string f)
-  and gather_left acc t = match view t with
-    | TyApp (f, ty) -> gather_left (Type.Conv.to_simple_term ~depth ty :: acc) f
-    | App (f, l) -> gather_left (List.map to_simple_term l @ acc) f
-    | _ -> ST.app (to_simple_term t) acc
-  in to_simple_term t
+    | Var i -> ST.var (aux_var i)
+    | DB i -> ST.var (DBEnv.find_exn env i)
+    | Const id -> ST.const ~ty:(aux_ty (ty t)) id
+    | App (f,l) ->
+        ST.app ~ty:(aux_ty (ty t))
+          (to_simple_term f) (List.map to_simple_term l)
+    | AppBuiltin (b,l) ->
+        ST.app_builtin ~ty:(aux_ty (ty t))
+          b (List.map to_simple_term l)
+  and aux_var v =
+    try VarTbl.find tbl v
+    with Not_found ->
+      let ty = Type.of_term_unsafe (HVar.ty v) in
+      let v' = Var.of_string ~ty:(aux_ty ty)
+        (CCFormat.sprintf "X%d" (HVar.id v)) in
+      VarTbl.add tbl v v';
+      v'
+  and aux_ty ty = Type.Conv.to_simple_term ~env ty
+  in
+  to_simple_term t
 
 (** {2 Printing/parsing} *)
 
@@ -509,38 +462,7 @@ let print_all_types = ref false
 type print_hook = int -> (CCFormat.t -> t -> unit) -> CCFormat.t -> t -> bool
 
 (* lightweight printing *)
-let pp_depth ?(hooks=[]) depth out t =
-  let depth = ref depth in
-  (* recursive printing *)
-  let rec pp_rec out t =
-    if not (List.exists (fun hook -> hook !depth pp_rec out t) hooks)
-    then begin match view t with
-    | Builtin b -> Builtin.pp out b
-    | DB i -> Format.fprintf out "Y%d" (!depth - i - 1)
-    | TyApp (f, ty) ->
-        pp_rec out f;
-        CCFormat.char out ' ';
-        Type.pp_depth !depth out ty
-    | App (f, args) ->
-        assert (args <> []);
-        Format.fprintf out
-          "@[<2>%a@ %a@]" pp_rec f
-            (Util.pp_list ~sep:" " pp_inner) args
-    | Const s -> ID.pp out s
-    | Var i ->
-      if not !print_all_types && not (Type.equal (ty t) Type.TPTP.i)
-        then Format.fprintf out "@[X%d:%a@]" i (Type.pp_depth !depth) (ty t)
-        else Format.fprintf out "X%d" i
-    end;
-    (* print type of term? *)
-    if !print_all_types
-      then Format.fprintf out ":%a" (Type.pp_depth !depth) (ty t)
-  and pp_inner out t = match view t with
-    | TyApp _
-    | App _ -> CCFormat.char out '('; pp_rec out t; CCFormat.char out ')'
-    | _ -> pp_rec out t
-  in
-  pp_rec out t
+let pp_depth = T.pp_depth
 
 let __hooks = ref []
 let add_hook h = __hooks := h :: !__hooks
@@ -552,16 +474,15 @@ let to_string = CCFormat.to_string pp
 
 let rec debugf out t =
   begin match view t with
-  | AppBuiltin (b,[]) -> Builtin.pp out b
-  | AppBuiltin (b,l) ->
-      Format.fprintf out "(@[<2>%a@ %a@])" Builtin.pp b (Util.pp_list debugf) l
-  | Var i -> HVar.pp out i
-  | DB i -> Format.fprintf out "Y%d" i
-  | Const s -> ID.pp out s
-  | TyApp (f, tys) ->
-      Format.fprintf out "(@[<2>%a@ %a@])" debugf f (Util.pp_list Type.pp) tys
-  | App (s, l) ->
-      Format.fprintf out "(@[<2>%a@ %a@])" debugf s (Util.pp_list debugf) l
+    | AppBuiltin (b,[]) -> Builtin.pp out b
+    | AppBuiltin (b,l) ->
+        Format.fprintf out "(@[<2>%a@ %a@])" Builtin.pp b (Util.pp_list debugf) l
+    | Var i -> HVar.pp out i
+    | DB i -> Format.fprintf out "Y%d" i
+    | Const s -> ID.pp out s
+    | App (_, []) -> assert false
+    | App (s, l) ->
+        Format.fprintf out "(@[<2>%a@ %a@])" debugf s (Util.pp_list debugf) l
   end;
   Format.fprintf out ":%a" Type.pp (ty t)
 
@@ -575,31 +496,22 @@ module TPTP = struct
     let depth = ref depth in
     (* recursive printing *)
     let rec pp_rec out t = match view t with
-    | DB i ->
-        Format.fprintf out "Y%d" (!depth - i - 1);
-        (* print type of term *)
-        if !print_all_types || not (Type.equal (ty t) Type.TPTP.i)
+      | DB i ->
+          Format.fprintf out "Y%d" (!depth - i - 1);
+          (* print type of term *)
+          if !print_all_types || not (Type.equal (ty t) Type.TPTP.i)
           then Format.fprintf out ":%a" (Type.TPTP.pp_depth !depth) (ty t)
-    | AppBuiltin (b,[]) -> Builtin.TPTP.pp out b
-    | AppBuiltin (b,l) ->
-        Format.fprintf out "(@[<2>%a@ %a@])" Builtin.TPTP.pp b (Util.pp_list pp_rec) l
-    | Const s -> ID.pp out s
-    | App _
-    | TyApp _ ->
-        let f, tyargs, args = open_app t in
-        Format.fprintf out "@[<2>%a(@," pp_rec f;
-        Util.pp_list ~sep:", "
-          (Type.TPTP.pp_depth !depth) out tyargs;
-        begin match tyargs, args with
-          | _::_, _::_ -> CCFormat.string out ", "
-          | _ -> ();
-        end;
-        Util.pp_list ~sep:"," pp_rec out args;
-        CCFormat.fprintf out ")@]"
-    | Var i ->
-        Format.fprintf out "X%d" (HVar.id i);
-        (* print type of term *)
-        if !print_all_types || not (Type.equal (ty t) Type.TPTP.i)
+      | AppBuiltin (b,[]) -> Builtin.TPTP.pp out b
+      | AppBuiltin (b,l) ->
+          Format.fprintf out "(@[<2>%a@ %a@])" Builtin.TPTP.pp b (Util.pp_list pp_rec) l
+      | Const s -> ID.pp out s
+      | App (f, l) ->
+          Format.fprintf out "@[<hv2>%a(@,%a)@]" pp_rec f
+            (Util.pp_list ~sep:", " pp_rec) l
+      | Var i ->
+          Format.fprintf out "X%d" (HVar.id i);
+          (* print type of term *)
+          if !print_all_types || not (Type.equal (ty t) Type.TPTP.i)
           then Format.fprintf out ":%a" (Type.TPTP.pp_depth !depth) (ty t)
     in
     pp_rec out t
@@ -612,20 +524,18 @@ module TPTP = struct
 
     open Type.TPTP
 
-    let x = Type.var 0
-
-    let ty1 = Type.(forall [x] (int <=. x))
+    let ty1 = Type.(forall ([int] ==> bvar 0))
 
     let floor = builtin ~ty:ty1 Builtin.Arith.floor
     let ceiling = builtin ~ty:ty1 Builtin.Arith.ceiling
     let truncate = builtin ~ty:ty1 Builtin.Arith.truncate
     let round = builtin ~ty:ty1 Builtin.Arith.round
 
-    let prec = builtin ~ty:Type.(int <=. int) Builtin.Arith.prec
-    let succ = builtin ~ty:Type.(int <=. int) Builtin.Arith.succ
+    let prec = builtin ~ty:Type.([int] ==> int) Builtin.Arith.prec
+    let succ = builtin ~ty:Type.([int] ==> int) Builtin.Arith.succ
 
-    let ty2 = Type.(forall [x] (x <== [x;x]))
-    let ty2i = Type.(int <== [int;int])
+    let ty2 = Type.(forall ([bvar 0; bvar 0] ==> bvar 0))
+    let ty2i = Type.([int;int] ==> int)
 
     let sum = builtin ~ty:ty2 Builtin.Arith.sum
     let difference = builtin ~ty:ty2 Builtin.Arith.difference
@@ -640,7 +550,7 @@ module TPTP = struct
     let remainder_t = builtin ~ty:ty2i Builtin.Arith.remainder_t
     let remainder_f = builtin ~ty:ty2i Builtin.Arith.remainder_f
 
-    let ty2o = Type.(forall [x] (o <== [x;x]))
+    let ty2o = Type.(forall ([bvar 0; bvar 0] ==> o))
 
     let less = builtin ~ty:ty2o Builtin.Arith.less
     let lesseq = builtin ~ty:ty2o Builtin.Arith.lesseq
@@ -649,39 +559,38 @@ module TPTP = struct
 
     (* hook that prints arithmetic expressions *)
     let arith_hook _depth pp_rec out t =
-      let module SA = Symbol.TPTP.Arith in
-      let pp_surrounded buf t = match Classic.view t with
-      | Classic.AppBuiltin (s, _, [_;_]) when Builtin.is_infix s
-        Format.fprintf buf "(@[<hv>%a@])" pp_rec t
-      | _ -> pp_rec buf t
+      let pp_surrounded buf t = match view t with
+        | AppBuiltin (s, [_;_]) when Builtin.is_infix s ->
+            Format.fprintf buf "(@[<hv>%a@])" pp_rec t
+        | _ -> pp_rec buf t
       in
       match Classic.view t with
-      | Classic.Var i when Type.equal (ty t) Type.TPTP.int ->
-        Format.fprintf out "I%d" i; true
-      | Classic.Var i when Type.equal (ty t) Type.TPTP.rat ->
-        Format.fprintf out "Q%d" i; true
-      | Classic.App (s, _,[a; b]) when Symbol.equal s SA.less ->
-        Format.fprintf out "%a < %a" pp_surrounded a pp_surrounded b; true
-      | Classic.App (s, _,[a; b]) when Symbol.equal s SA.lesseq ->
-        Format.fprintf out "%a ≤ %a" pp_surrounded a pp_surrounded b; true
-      | Classic.App (s, _,[a; b]) when Symbol.equal s SA.greater ->
-        Format.fprintf out "%a > %a" pp_surrounded a pp_surrounded b; true
-      | Classic.App (s, _,[a; b]) when Symbol.equal s SA.greatereq ->
-        Format.fprintf out "%a ≥ %a" pp_surrounded a pp_surrounded b; true
-      | Classic.App (s, _,[a; b]) when Symbol.equal s SA.sum ->
-        Format.fprintf out "%a + %a" pp_surrounded a pp_surrounded b; true
-      | Classic.App (s, _,[a; b]) when Symbol.equal s SA.difference ->
-        Format.fprintf out "%a - %a" pp_surrounded a pp_surrounded b; true
-      | Classic.App (s, _,[a; b]) when Symbol.equal s SA.product ->
-        Format.fprintf out "%a × %a" pp_surrounded a pp_surrounded b; true
-      | Classic.App (s, _,[a; b]) when Symbol.equal s SA.quotient ->
-        Format.fprintf out "%a / %a" pp_surrounded a pp_surrounded b; true
-      | Classic.App (s, _,[a; b]) when Symbol.equal s SA.quotient_e ->
-        Format.fprintf out "%a // %a" pp_surrounded a pp_surrounded b; true
-      | Classic.App (s, _,[a]) when Symbol.equal s SA.uminus ->
-        Format.fprintf out "-%a" pp_surrounded a; true;
-      | Classic.App (s, _,[a;b]) when Symbol.equal s SA.remainder_e ->
-        Format.fprintf out "%a mod %a" pp_surrounded a pp_surrounded b; true;
+      | Classic.Var v when Type.equal (ty t) Type.TPTP.int ->
+          Format.fprintf out "I%d" (HVar.id v); true
+      | Classic.Var v ->
+          Format.fprintf out "Q%d" (HVar.id v); true
+      | Classic.AppBuiltin (Builtin.Less, [_; a; b]) ->
+          Format.fprintf out "%a < %a" pp_surrounded a pp_surrounded b; true
+      | Classic.AppBuiltin (Builtin.Lesseq, [_;a; b]) ->
+          Format.fprintf out "%a ≤ %a" pp_surrounded a pp_surrounded b; true
+      | Classic.AppBuiltin (Builtin.Greater, [_;a; b]) ->
+          Format.fprintf out "%a > %a" pp_surrounded a pp_surrounded b; true
+      | Classic.AppBuiltin (Builtin.Greatereq, [_;a; b]) ->
+          Format.fprintf out "%a ≥ %a" pp_surrounded a pp_surrounded b; true
+      | Classic.AppBuiltin (Builtin.Sum, [_;a; b]) ->
+          Format.fprintf out "%a + %a" pp_surrounded a pp_surrounded b; true
+      | Classic.AppBuiltin (Builtin.Difference, [_;a; b]) ->
+          Format.fprintf out "%a - %a" pp_surrounded a pp_surrounded b; true
+      | Classic.AppBuiltin (Builtin.Product, [_;a; b]) ->
+          Format.fprintf out "%a × %a" pp_surrounded a pp_surrounded b; true
+      | Classic.AppBuiltin (Builtin.Quotient, [_;a; b]) ->
+          Format.fprintf out "%a / %a" pp_surrounded a pp_surrounded b; true
+      | Classic.AppBuiltin (Builtin.Quotient_e, [_;a; b]) ->
+          Format.fprintf out "%a // %a" pp_surrounded a pp_surrounded b; true
+      | Classic.AppBuiltin (Builtin.Uminus, [_;a]) ->
+          Format.fprintf out "-%a" pp_surrounded a; true;
+      | Classic.AppBuiltin (Builtin.Remainder_e, [_;a;b]) ->
+          Format.fprintf out "%a mod %a" pp_surrounded a pp_surrounded b; true;
       | _ -> false  (* default *)
 
     let pp_debugf buf t =
