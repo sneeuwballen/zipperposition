@@ -1,28 +1,5 @@
 
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Rewriting on HO terms} *)
 
@@ -52,7 +29,8 @@ let empty = S.empty
 let _validate_rule (l,r) =
   let cond1 =
     T.Seq.vars r
-    |> Sequence.for_all (fun v -> Sequence.mem ~eq:T.equal v (T.Seq.vars l))
+    |> Sequence.for_all
+      (fun v -> T.var_occurs ~var:v l)
   and cond2 =
     T.Seq.subterms_depth r
     |> Sequence.filter (fun (v,_) -> T.is_var v)
@@ -93,32 +71,34 @@ let to_string = CCFormat.to_string pp
 
 exception RewrittenIn of term * Substs.t * rule
 
+(* TODO: use a specific reprsentation (pair of  head+args)
+   for [rewrite_here] *)
+
 let normalize_collect trs t =
   (* reduce to normal form. *)
   let rec reduce ~trs ~rules t = match T.view t with
-    | T.At (l, r) ->
-        let l' = reduce ~trs ~rules l in
-        let r' = reduce ~trs ~rules r in
-        rewrite_here ~trs ~rules (T.at l' r')
-    | T.TyLift _ -> t
+    | T.App (f, l) ->
+        let f = reduce ~trs ~rules f in
+        let l = List.map (reduce ~trs ~rules) l in
+        rewrite_here ~trs ~rules (T.app f l)
     | T.Multiset (tau,l) ->
         let l' = List.map (reduce ~trs ~rules) l in
         rewrite_here ~trs ~rules (T.multiset ~ty:tau l')
     | T.Record (l, rest) ->
         let l' = List.map (fun (n,t) -> n, reduce ~trs ~rules t) l in
-        let rest = CCOpt.map (reduce ~trs ~rules) rest in
         rewrite_here ~trs ~rules (T.record l' ~rest)
     | T.Var _
-    | T.BVar _ -> t
+    | T.DB _ -> t
     | T.Lambda (varty, t') ->
         let t' = reduce ~trs ~rules t' in
-        T.__mk_lambda ~varty t'   (* no rules for lambda *)
+        T.lambda ~varty t'   (* no rules for lambda *)
     | T.Forall (varty, t') ->
         let t' = reduce ~trs ~rules t' in
-        T.__mk_forall ~varty t'
+        T.forall ~varty t'
     | T.Exists (varty, t') ->
         let t' = reduce ~trs ~rules t' in
-        T.__mk_exists ~varty t'   (* no rules for lambda *)
+        T.exists ~varty t'   (* no rules for lambda *)
+    | T.Builtin _ -> t
     | T.Const _ ->
         rewrite_here ~trs ~rules t
   (* try to find a rewrite rules whose left-hand side matches [t]. In this

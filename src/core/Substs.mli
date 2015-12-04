@@ -16,7 +16,7 @@ type scope = int
     and variables from distinct scopes are distinct too. *)
 
 type term = InnerTerm.t
-type var = term HVar.t
+type var = InnerTerm.t HVar.t
 
 (** {2 Renamings}
     A renaming is used to disambiguate variables that come from distinct

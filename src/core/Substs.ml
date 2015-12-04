@@ -7,7 +7,7 @@ module T = InnerTerm
 module Hash = CCHash
 
 type term = T.t
-type var = term HVar.t
+type var = T.t HVar.t
 
 module VarInt = struct
   type t = var Scoped.t

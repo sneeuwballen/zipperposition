@@ -42,9 +42,6 @@ module type SYMBOL = sig
   val hash : t -> int
   val compare : t -> t -> int
 
-  val false_ : t
-  val true_ : t
-
   val pp : t CCFormat.printer
   val pp_debugf : t CCFormat.printer
 end

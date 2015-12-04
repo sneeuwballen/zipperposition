@@ -25,8 +25,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Reduction to CNF and simplifications} *)
 
-type form = Formula.FO.t
-type symbol = Symbol.t
+type form = TypedSTerm.t
 
 (** See "computing small normal forms", in the handbook of automated reasoning.
     All transformations are made on curried terms and formulas. *)
@@ -76,5 +75,6 @@ val cnf_of : ?opts:options list -> ?ctx:Skolem.ctx ->
   (** Transform the clause into proper CNF; returns a list of clauses.
       Options are used to tune the behavior. *)
 
-val cnf_of_list : ?opts:options list -> ?ctx:Skolem.ctx ->
-                  form list -> clause list
+val cnf_of_list :
+  ?opts:options list -> ?ctx:Skolem.ctx ->
+  form list -> clause list
