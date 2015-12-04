@@ -25,6 +25,7 @@ HVar
 IArray
 ID
 Index
+InnerTerm
 Interfaces
 Lambda
 LazyGraph
@@ -42,7 +43,7 @@ Precedence
 Precedence_intf
 PrologTerm
 Rewriting
-ScopedTerm
+Scoped
 Signature
 Skolem
 Sourced
@@ -53,6 +54,7 @@ TypeInference
 TypedPrologTerm
 Unif
 Util
+Var
 }
 
 A description of modules can be found {{:rst/modules.html} here}.
