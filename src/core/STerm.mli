@@ -61,14 +61,11 @@ include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 
 val var : ?loc:location -> string -> t
-val int_ : Z.t -> t
-val of_int : int -> t
-val rat : Q.t -> t
 val app : ?loc:location -> t -> t list -> t
 val builtin : ?loc:location -> Builtin.t -> t
 val app_builtin : ?loc:location -> Builtin.t -> t list -> t
 val const : ?loc:location -> string -> t
-val bind : ?loc:location -> Binder.t -> t list -> t -> t
+val bind : ?loc:location -> Binder.t -> typed_var list -> t -> t
 val list_ : ?loc:location -> t list -> t
 val nil : t
 val record : ?loc:location -> (string*t) list -> rest:string option -> t
@@ -79,19 +76,42 @@ val wildcard : t
 val is_app : t -> bool
 val is_var : t -> bool
 
-module Set : Sequence.Set.S with type elt = term
-module Map : Sequence.Map.S with type key = term
-module Tbl : Hashtbl.S with type key = term
+val true_ : t
+val false_ : t
+
+val and_ : ?loc:location -> t list -> t
+val or_ : ?loc:location -> t list -> t
+val not_ : ?loc:location -> t -> t
+val equiv : ?loc:location -> t -> t -> t
+val xor : ?loc:location -> t -> t -> t
+val imply : ?loc:location -> t -> t -> t
+val eq : ?loc:location -> ?ty:t -> t -> t -> t
+val neq : ?loc:location -> ?ty:t -> t -> t -> t
+val forall : ?loc:location -> typed_var list -> t -> t
+val exists : ?loc:location -> typed_var list -> t -> t
+val lambda : ?loc:location -> typed_var list -> t -> t
+val int_ : Z.t -> t
+val of_int : int -> t
+val rat : Q.t -> t
+
+val tType : t
+val fun_ty : ?loc:location -> t list -> t -> t
+val forall_ty : ?loc:location -> typed_var list -> t -> t
+
+module Set : CCSet.S with type elt = term
+module Map : CCMap.S with type key = term
+module Tbl : CCHashtbl.S with type key = term
+
+module StringSet : CCSet.S with type elt = string
 
 module Seq : sig
-  val vars : t -> t Sequence.t
-  val free_vars : t -> t Sequence.t
+  val vars : t -> string Sequence.t
+  val free_vars : t -> string Sequence.t
   val subterms : t -> t Sequence.t
-  val subterms_with_bound : t -> (t * Set.t) Sequence.t
+  val subterms_with_bound : t -> (t * StringSet.t) Sequence.t
     (** subterm and variables bound at this subterm *)
 
   val symbols : t -> string Sequence.t
-  val add_set : Set.t -> t Sequence.t -> Set.t
 end
 
 val ground : t -> bool
@@ -101,35 +121,6 @@ val subterm : strict:bool -> t -> sub:t -> bool
 
 include Interfaces.PRINT with type t := t
 
-(** {2 TPTP constructors and printing}
-
-The constructors take the semantics of TPTP into consideration. In
-particular, wildcard (fresh variables) are inserted in front of
-ad-hoc polymorphic symbols such as [eq] or [neq]. *)
 module TPTP : sig
-  val true_ : t
-  val false_ : t
-
-  val var : ?loc:location -> ?ty:t -> string -> t
-  val const : ?loc:location -> string -> t
-  val app : ?loc:location -> t -> t list -> t
-  val bind : ?loc:location -> Binder.t -> t list -> t -> t
-
-  val and_ : ?loc:location -> t list -> t
-  val or_ : ?loc:location -> t list -> t
-  val not_ : ?loc:location -> t -> t
-  val equiv : ?loc:location -> t -> t -> t
-  val xor : ?loc:location -> t -> t -> t
-  val imply : ?loc:location -> t -> t -> t
-  val eq : ?loc:location -> ?ty:t -> t -> t -> t
-  val neq : ?loc:location -> ?ty:t -> t -> t -> t
-  val forall : ?loc:location -> t list -> t -> t
-  val exists : ?loc:location -> t list -> t -> t
-  val lambda : ?loc:location -> t list -> t -> t
-
-  val mk_fun_ty : ?loc:location -> t list -> t -> t
-  val tType : t
-  val forall_ty : ?loc:location -> t list -> t -> t
-
   include Interfaces.PRINT with type t := t
 end

@@ -114,11 +114,8 @@ let hash x = Hash.apply hash_fun x
 
 let make_ ?loc view = {term=view; loc;}
 
-let var ?loc s = Var s
+let var ?loc s = make_ ?loc (Var s)
 let builtin ?loc s = make_ ?loc (AppBuiltin (s,[]))
-let int_ i = builtin (Builtin.Int i)
-let of_int i = int_ (Z.of_int i)
-let rat n = builtin (Builtin.Rat n)
 let app_builtin ?loc s l = make_ ?loc (AppBuiltin(s,l))
 let app ?loc s l = match l with
   | [] -> s
@@ -139,72 +136,94 @@ let wildcard = builtin Builtin.wildcard
 let is_app = function {term=App _; _} -> true | _ -> false
 let is_var = function | {term=Var _; _} -> true | _ -> false
 
-module Set = Sequence.Set.Make(struct
-  type t = term
-  let compare = compare
-end)
-module Map = Sequence.Map.Make(struct
-  type t = term
-  let compare = compare
-end)
+let true_ = builtin Builtin.true_
+let false_ = builtin Builtin.false_
 
-module Tbl = Hashtbl.Make(struct
+let and_ ?loc l = app_builtin ?loc Builtin.and_ l
+let or_ ?loc l = app_builtin ?loc Builtin.or_ l
+let not_ ?loc a = app_builtin ?loc Builtin.not_ [a]
+let equiv ?loc a b = app_builtin ?loc Builtin.equiv [a;b]
+let xor ?loc a b = app_builtin ?loc Builtin.xor [a;b]
+let imply ?loc a b = app_builtin ?loc Builtin.imply [a;b]
+let eq ?loc ?(ty=wildcard) a b = app_builtin ?loc Builtin.eq [ty;a;b]
+let neq ?loc ?(ty=wildcard) a b = app_builtin ?loc Builtin.neq [ty;a;b]
+let forall ?loc vars f = bind ?loc Binder.forall vars f
+let exists ?loc vars f = bind ?loc Binder.exists vars f
+let lambda ?loc vars f = bind ?loc Binder.lambda vars f
+
+let int_ i = builtin (Builtin.Int i)
+let of_int i = int_ (Z.of_int i)
+let rat n = builtin (Builtin.Rat n)
+
+let fun_ty ?loc l ret = match l with
+  | [] -> ret
+  | _::_ -> app_builtin ?loc Builtin.arrow (ret :: l)
+let tType = builtin Builtin.tType
+let forall_ty ?loc vars t = bind ?loc Binder.forall_ty vars t
+
+
+module AsKey = struct
   type t = term
+  let compare = compare
   let hash = hash
   let equal = equal
-end)
+end
+
+module Set = CCSet.Make(AsKey)
+module Map = CCMap.Make(AsKey)
+module Tbl = CCHashtbl.Make(AsKey)
+
+module StringSet = CCSet.Make(String)
 
 module Seq = struct
   let subterms t k =
     let rec iter t =
       k t;
       match t.term with
-      | Var _ | Int _ | Rat _ | Const _ -> ()
+      | Var _ | Const _ -> ()
       | List l
       | AppBuiltin (_,l) -> List.iter iter l
       | App (f, l) -> iter f; List.iter iter l
-      | Bind (_, v, t') -> List.iter iter v; iter t'
-      | Record (l, rest) ->
-          begin match rest with | None -> () | Some r -> iter r end;
+      | Bind (_, _, t') -> iter t'
+      | Record (l, _) ->
           List.iter (fun (_,t') -> iter t') l
-      | Column(x,y) -> k x; k y
     in iter t
 
-  let vars t = subterms t |> Sequence.filter is_var
-
-  let add_set s seq =
-    Sequence.fold (fun set x -> Set.add x set) s seq
+  let vars t = subterms t
+    |> Sequence.filter_map
+      (fun t -> match t.term with
+        | Var v -> Some v
+        | _ -> None)
 
   let subterms_with_bound t k =
     let rec iter bound t =
       k (t, bound);
       match t.term with
-      | Var _ | Int _ | Rat _ | Const _ -> ()
+      | Var _ | Const _ -> ()
       | AppBuiltin (_, l)
       | List l -> List.iter (iter bound) l
       | App (f, l) -> iter bound f; List.iter (iter bound) l
       | Bind (_, v, t') ->
           (* add variables of [v] to the set *)
           let bound' = List.fold_left
-            (fun set v -> add_set set (vars v))
+            (fun set (v,_) -> StringSet.add v set)
             bound v
           in
           iter bound' t'
-      | Record (l, rest) ->
-          begin match rest with | None -> () | Some r -> iter bound r end;
+      | Record (l, _) ->
           List.iter (fun (_,t') -> iter bound t') l
-      | Column(x,y) -> k (x, bound); k (y, bound)
-    in iter Set.empty t
+    in iter StringSet.empty t
 
   let free_vars t =
     subterms_with_bound t
-      |> Sequence.fmap (fun (v,bound) ->
-          if is_var v && not (Set.mem v bound)
-          then Some v
-          else None)
+      |> Sequence.filter_map
+        (fun (t,bound) -> match t.term with
+          | Var v when not (StringSet.mem v bound) -> Some v
+          | _ -> None)
 
   let symbols t = subterms t
-      |> Sequence.fmap (function
+      |> Sequence.filter_map
+       (function
         | {term=Const s; _} -> Some s
         | _ -> None)
 end
@@ -213,8 +232,9 @@ let ground t = Seq.vars t |> Sequence.is_empty
 
 let close_all s t =
   let vars = Seq.free_vars t
-    |> Seq.add_set Set.empty
-    |> Set.elements
+    |> StringSet.of_seq
+    |> StringSet.elements
+    |> List.map (fun v->v,None)
   in
   bind s vars t
 
@@ -224,16 +244,14 @@ let subterm ~strict t ~sub =
 
 let rec pp out t = match t.term with
   | Var s -> CCFormat.string out s
-  | Int i -> CCFormat.string out (Z.to_string i)
-  | Rat i -> CCFormat.string out (Q.to_string i)
-  | Const s -> Sym.pp out s
+  | Const s -> CCFormat.string out s
   | List l ->
       Format.fprintf out "[@[<hv>%a@]]"
         (Util.pp_list ~sep:"," pp) l;
   | AppBuiltin (Builtin.Arrow, [ret;a]) ->
       Format.fprintf out "@[<2>%a@ -> %a@]" pp a pp ret
   | AppBuiltin (Builtin.Arrow, ret::l) ->
-      Format.fprintf out "@[<2>(%a)@ -> %a@]" (Util.pp_list ~sep:" * " pp) l pp ret
+      Format.fprintf out "@[<2>(%a)@ -> %a@]" (Util.pp_list ~sep:" × " pp) l pp ret
   | AppBuiltin (s, l) ->
       Format.fprintf out "%a(@[<2>%a@])" Builtin.pp s (Util.pp_list ~sep:", " pp) l
   | App (s, l) ->
@@ -242,53 +260,26 @@ let rec pp out t = match t.term with
   | Bind (s, vars, t') ->
       Format.fprintf out "@[<2>%a[@[%a@]]:@ %a@]"
         Binder.pp s
-        (Util.pp_list ~sep:"," pp) vars
+        (Util.pp_list ~sep:"," pp_typed_var) vars
         pp t'
   | Record (l, None) ->
       Format.fprintf out "{@[<hv>%a@]}"
         (Util.pp_list (fun out (s,t') -> Format.fprintf out "%s:%a" s pp t')) l;
   | Record (l, Some r) ->
-      Format.fprintf out "{@[<hv>%a@ | %a@]}"
-        (Util.pp_list (fun out (s,t') -> Format.fprintf out "%s:%a" s pp t')) l
-        pp r
-  | Column(x,y) -> Format.fprintf out "@[%a:@,%a@]" pp x pp y
+      Format.fprintf out "{@[<hv>%a@ | %s@]}"
+        (Util.pp_list (Util.pp_pair ~sep:":" CCFormat.string pp)) l r
+and pp_typed_var out = function
+  | v, None -> CCFormat.string out v
+  | v, Some ty -> Format.fprintf out "%s:%a" v pp ty
 
 let to_string = CCFormat.to_string pp
 
 (** {2 TPTP} *)
 
 module TPTP = struct
-  let true_ = builtin Builtin.true_
-  let false_ = builtin Builtin.false_
-
-  let var = var
-  let bind = bind
-  let const = const
-  let app = app
-
-  let and_ ?loc l = app_builtin ?loc Builtin.and_ l
-  let or_ ?loc l = app_builtin ?loc Builtin.or_ l
-  let not_ ?loc a = app_builtin ?loc Builtin.not_ [a]
-  let equiv ?loc a b = app_builtin ?loc Builtin.equiv [a;b]
-  let xor ?loc a b = app_builtin ?loc Builtin.xor [a;b]
-  let imply ?loc a b = app_builtin ?loc Builtin.imply [a;b]
-  let eq ?loc ?(ty=wildcard) a b = app_builtin ?loc Builtin.eq [ty;a;b]
-  let neq ?loc ?(ty=wildcard) a b = app_builtin ?loc Builtin.neq [ty;a;b]
-  let forall ?loc vars f = bind ?loc Binder.forall vars f
-  let exists ?loc vars f = bind ?loc Binder.exists vars f
-  let lambda ?loc vars f = bind ?loc Binder.lambda vars f
-
-  let mk_fun_ty ?loc l ret = match l with
-    | [] -> ret
-    | _::_ -> app_builtin ?loc Builtin.arrow (ret :: l)
-  let tType = builtin Builtin.tType
-  let forall_ty ?loc vars t = bind ?loc Binder.forall_ty vars t
-
   let rec pp out t = match t.term with
     | Var s -> CCFormat.string out s
-    | Int i -> CCFormat.string out (Z.to_string i)
-    | Rat i -> CCFormat.string out (Q.to_string i)
-    | Const s -> Sym.pp out s
+    | Const s -> CCFormat.string out s
     | List l ->
       Format.fprintf out "[@[<hv>%a@]]"
         (Util.pp_list ~sep:"," pp) l;
@@ -323,23 +314,11 @@ module TPTP = struct
           (Util.pp_list ~sep:"," pp_typed_var) vars
           pp_surrounded t'
     | Record _ -> failwith "cannot print records in TPTP"
-    | Column(x,y) ->
-        begin match view y with
-        | AppBuiltin (Builtin.Term, []) ->
-          pp out x  (* do not print X:$i *)
-        | _ ->
-          pp out x;
-          CCFormat.char out ':';
-          pp out y
-        end
-  and pp_typed_var out t = match t.term with
-    | Column ({term=Var s; _}, {term=AppBuiltin(Builtin.TType,[]); _})
-    | Var s -> CCFormat.string out s
-    | Column ({term=Var s; _}, {term=AppBuiltin (Builtin.Term,[]); _}) ->
-        CCFormat.string out s
-    | Column ({term=Var s; _}, ty) ->
-      Format.fprintf out "%s:%a" s pp ty
-    | _ -> assert false
+  and pp_typed_var out (v,o) = match o with
+    | None -> CCFormat.string out v
+    | Some {term=AppBuiltin ((Builtin.TType | Builtin.Term),[]); _} ->
+        CCFormat.string out v (* implicit type *)
+    | Some ty -> Format.fprintf out "%s:%a" v pp_surrounded ty
   and pp_surrounded out t = match t.term with
     | AppBuiltin _
     | Bind _ -> CCFormat.char out '('; pp out t; CCFormat.char out ')'
