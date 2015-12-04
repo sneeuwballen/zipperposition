@@ -1,35 +1,11 @@
 
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Skolem symbols} *)
 
 module ST = ScopedTerm
 module T = FOTerm
 module Ty = Type
-module F = Formula.FO
 module S = Substs
 
 let section = Util.Section.(make ~parent:logtk "skolem")
@@ -61,7 +37,7 @@ type ctx = {
 (* TODO: use a term index for the cache? *)
 
 let create ?(ty_prop=Type.TPTP.o)
-?(prefix="logtk_sk__") ?(prop_prefix="logtk_prop__") signature =
+    ?(prefix="logtk_sk__") ?(prop_prefix="logtk_prop__") signature =
   let ctx = {
     sc_prefix=prefix;
     sc_prop_prefix=prop_prefix;
@@ -138,10 +114,10 @@ let skolem_form ~ctx ~ty f =
   try
     List.iter
       (fun (f', new_f') ->
-        Util.debugf ~section 5 "check variant %a and %a" (fun k->k F.pp f F.pp f');
-        match Unif.Form.variant f' 1 f 0 |> Sequence.take 1 |> Sequence.to_list with
-        | [subst] -> raise (FoundFormVariant (f', new_f', subst))
-        | _ -> ())
+         Util.debugf ~section 5 "check variant %a and %a" (fun k->k F.pp f F.pp f');
+         match Unif.Form.variant f' 1 f 0 |> Sequence.take 1 |> Sequence.to_list with
+         | [subst] -> raise (FoundFormVariant (f', new_f', subst))
+         | _ -> ())
       ctx.sc_fcache;
     (* fresh symbol with the proper type *)
     let ty_of_vars = List.map T.ty vars in
@@ -204,15 +180,15 @@ let get_definition ~ctx ~polarity f =
     (* map bvars to fresh vars and evaluate [p] and [f] to remove them! *)
     let env =
       let l1 = List.map (fun db -> match T.view db with
-        | T.BVar i ->
-            let v = T.var ~ty:(T.ty db) (fresh_var ~ctx) in
-            i, (v : T.t :> ST.t)
-        | _ -> assert false) bvars
+          | T.BVar i ->
+              let v = T.var ~ty:(T.ty db) (fresh_var ~ctx) in
+              i, (v : T.t :> ST.t)
+          | _ -> assert false) bvars
       and l2 = List.map (fun db -> match Type.view db with
-        | Type.BVar i ->
-            let v = Type.var (fresh_var ~ctx) in
-            i, (v : Type.t :> ST.t)
-        | _ -> assert false) ty_bvars
+          | Type.BVar i ->
+              let v = Type.var (fresh_var ~ctx) in
+              i, (v : Type.t :> ST.t)
+          | _ -> assert false) ty_bvars
       in
       DBEnv.of_list (l1 @ l2)
     in
@@ -232,7 +208,7 @@ let remove_def ~ctx def =
 
 let all_definitions ~ctx =
   F.Map.to_seq ctx.sc_defs
-    |> Sequence.map snd
+  |> Sequence.map snd
 
 let clear_skolem_cache ~ctx =
   ctx.sc_fcache <- []

@@ -1,28 +1,5 @@
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
-
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Feature Vector indexing} *)
 
@@ -31,14 +8,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module ST = ScopedTerm
 module T = FOTerm
-module STbl = Symbol.Tbl
-module SMap = Symbol.Map
 
 module Make(C : Index.CLAUSE) = struct
   module C = C
 
   type feature_vector = int list
-    (** a vector of feature *)
+  (** a vector of feature *)
 
   (** {2 Features} *)
 
@@ -58,39 +33,33 @@ module Make(C : Index.CLAUSE) = struct
     let size_plus =
       { name = "size+";
         f = (fun lits ->
-          Sequence.filter (fun (sign, _) -> sign) lits |> Sequence.length);
+            Sequence.filter (fun (sign, _) -> sign) lits |> Sequence.length);
       }
 
     let size_minus =
       { name = "size-";
         f = (fun lits ->
-          Sequence.filter (fun (sign, _) -> not sign) lits |> Sequence.length);
+            Sequence.filter (fun (sign, _) -> not sign) lits |> Sequence.length);
       }
 
-    let rec _depth_term depth t = match ST.view t with
-      | ST.Var _
-      | ST.RigidVar _
-      | ST.Const _
-      | ST.BVar _ -> 0
-      | ST.Bind (_, _, t') -> _depth_term (depth+1) t'
-      | ST.At (t1, t2) ->
-          1 + max (_depth_term depth t1) (_depth_term depth t2)
-      | ST.AppBuiltin (_, l)
-      | ST.Multiset l
-      | ST.App (_, l) ->
-        let depth' = depth + 1 in
-        List.fold_left (fun acc t' -> acc + _depth_term depth' t') depth l
-      | _ -> assert false
+    let rec _depth_term depth t = match T.view t with
+      | T.Var _
+      | T.Const _
+      | T.DB _ -> 0
+      | T.AppBuiltin (_, l)
+      | T.App (_, l) ->
+          let depth' = depth + 1 in
+          List.fold_left (fun acc t' -> acc + _depth_term depth' t') depth l
 
     (* sum of depths at which symbols occur. Eg f(a, g(b)) will yield 4 (f
        is at depth 0) *)
     let sum_of_depths =
       { name = "sum_of_depths";
         f = (fun lits ->
-          Sequence.fold
-            (fun acc (_, terms) ->
-              Sequence.fold (fun acc t -> acc + _depth_term 0 (t:T.t:>ST.t)) acc terms
-            ) 0 lits);
+            Sequence.fold
+              (fun acc (_, terms) ->
+                 Sequence.fold (fun acc t -> acc + _depth_term 0 t) acc terms
+              ) 0 lits);
       }
 
     let _select_sign ~sign lits =
@@ -101,26 +70,26 @@ module Make(C : Index.CLAUSE) = struct
     (* sequence of symbols of clause, of given sign *)
     let _symbols ~sign lits =
       _select_sign ~sign lits
-        |> Sequence.flatMap _terms_of_lit
-        |> Sequence.flatMap T.Seq.symbols
+      |> Sequence.flatMap _terms_of_lit
+      |> Sequence.flatMap T.Seq.symbols
 
     let count_symb_plus symb =
-      { name = CCFormat.sprintf "count+(%a)" Symbol.pp symb;
+      { name = CCFormat.sprintf "count+(%a)" ID.pp symb;
         f = (fun lits -> Sequence.length (_symbols ~sign:true lits));
       }
 
     let count_symb_minus symb =
-      { name = CCFormat.sprintf "count-(%a)" Symbol.pp symb;
+      { name = CCFormat.sprintf "count-(%a)" ID.pp symb;
         f = (fun lits -> Sequence.length (_symbols ~sign:false lits));
       }
 
     (* max depth of the symbol in the term, or -1 *)
     let max_depth_term symb t =
       let symbs_depths = T.Seq.subterms_depth t
-        |> Sequence.fmap
-          (fun (t,depth) -> match T.Classic.view t with
-            | T.Classic.App (s, _, _) when Symbol.equal s symb -> Some depth
-            | _ -> None)
+                         |> Sequence.fmap
+                           (fun (t,depth) -> match T.Classic.view t with
+                              | T.Classic.App (s, _, _) when ID.equal s symb -> Some depth
+                              | _ -> None)
       in
       match Sequence.max symbs_depths with
       | None -> 0
@@ -129,21 +98,21 @@ module Make(C : Index.CLAUSE) = struct
     let _max_depth_lits ~sign symb lits =
       Sequence.fold
         (fun depth (sign', terms) ->
-          if sign = sign'
-          then Sequence.fold
-            (fun depth t -> max depth (max_depth_term symb t))
-            depth terms
-          else depth
+           if sign = sign'
+           then Sequence.fold
+               (fun depth t -> max depth (max_depth_term symb t))
+               depth terms
+           else depth
         )
         0 lits
 
     let max_depth_plus symb =
-      { name = CCFormat.sprintf "max_depth+(%a)" Symbol.pp symb;
+      { name = CCFormat.sprintf "max_depth+(%a)" ID.pp symb;
         f = (_max_depth_lits ~sign:true symb);
       }
 
     let max_depth_minus symb =
-      { name = CCFormat.sprintf "max_depth-(%a)" Symbol.pp symb;
+      { name = CCFormat.sprintf "max_depth-(%a)" ID.pp symb;
         f = (_max_depth_lits ~sign:false symb);
       }
   end
@@ -154,14 +123,14 @@ module Make(C : Index.CLAUSE) = struct
   (** {2 Feature Trie} *)
 
   module IntMap = Map.Make(struct
-    type t = int
-    let compare i j = i - j
-  end)
+      type t = int
+      let compare i j = i - j
+    end)
 
   module CSet = Set.Make(struct
-    type t = C.t
-    let compare = C.compare
-  end)
+      type t = C.t
+      let compare = C.compare
+    end)
 
   type trie =
     | TrieNode of trie IntMap.t   (** map feature -> trie *)
@@ -183,26 +152,26 @@ module Make(C : Index.CLAUSE) = struct
     let rec goto trie t rebuild =
       match trie, t with
       | (TrieLeaf set) as leaf, [] -> (* found leaf *)
-        (match k set with
-        | new_leaf when leaf == new_leaf -> root  (* no change, return same tree *)
-        | new_leaf -> rebuild new_leaf)           (* replace by new leaf *)
+          (match k set with
+           | new_leaf when leaf == new_leaf -> root  (* no change, return same tree *)
+           | new_leaf -> rebuild new_leaf)           (* replace by new leaf *)
       | TrieNode m, c::t' ->
-        (try  (* insert in subtrie *)
-          let subtrie = IntMap.find c m in
-          let rebuild' subtrie = match subtrie with
-            | _ when empty_trie subtrie -> rebuild (TrieNode (IntMap.remove c m))
-            | _ -> rebuild (TrieNode (IntMap.add c subtrie m))
-          in
-          goto subtrie t' rebuild'
-        with Not_found -> (* no subtrie found *)
-          let subtrie = if t' = []
-            then TrieLeaf CSet.empty
-            else TrieNode IntMap.empty
-          and rebuild' subtrie = match subtrie with
-            | _ when empty_trie subtrie -> rebuild (TrieNode (IntMap.remove c m))
-            | _ -> rebuild (TrieNode (IntMap.add c subtrie m))
-          in
-          goto subtrie t' rebuild')
+          (try  (* insert in subtrie *)
+             let subtrie = IntMap.find c m in
+             let rebuild' subtrie = match subtrie with
+               | _ when empty_trie subtrie -> rebuild (TrieNode (IntMap.remove c m))
+               | _ -> rebuild (TrieNode (IntMap.add c subtrie m))
+             in
+             goto subtrie t' rebuild'
+           with Not_found -> (* no subtrie found *)
+             let subtrie = if t' = []
+               then TrieLeaf CSet.empty
+               else TrieNode IntMap.empty
+             and rebuild' subtrie = match subtrie with
+               | _ when empty_trie subtrie -> rebuild (TrieNode (IntMap.remove c m))
+               | _ -> rebuild (TrieNode (IntMap.add c subtrie m))
+             in
+             goto subtrie t' rebuild')
       | TrieNode _, [] -> assert false (* ill-formed term *)
       | TrieLeaf _, _ -> assert false  (* wrong arity *)
     in
@@ -233,29 +202,29 @@ module Make(C : Index.CLAUSE) = struct
   (** maximam number of features in addition to basic ones *)
   let max_features = 25
 
-  let features_of_signature ?(ignore=Symbol.TPTP.is_connective) signature =
+  let features_of_signature ?(ignore=fun _ -> false) sigma =
     (* list of (salience: float, feature) *)
     let features = ref [] in
     (* create features for the symbols *)
-    Signature.iter signature
+    Signature.iter sigma
       (fun s ty ->
-        if ignore s
-          then ()  (* base symbols don't count *)
-        else
-          let arity = match Type.arity ty with
-          | Type.NoArity -> 0
-          | Type.Arity (_, i) -> i
-          in
-          if Type.equal ty Type.TPTP.o
-            then features := [1 + arity, Feature.count_symb_plus s;
-                              1 + arity, Feature.count_symb_minus s]
-                              @ !features
-            else
-              features := [0, Feature.max_depth_plus s;
-                           0, Feature.max_depth_minus s;
-                           1 + arity, Feature.count_symb_plus s;
-                           1 + arity, Feature.count_symb_minus s]
-                          @ !features);
+         if ignore s
+         then ()  (* base symbols don't count *)
+         else
+           let arity = match Type.arity ty with
+             | Type.NoArity -> 0
+             | Type.Arity (_, i) -> i
+           in
+           if Type.equal ty Type.TPTP.o
+           then features := [1 + arity, Feature.count_symb_plus s;
+                             1 + arity, Feature.count_symb_minus s]
+                            @ !features
+           else
+             features := [0, Feature.max_depth_plus s;
+                          0, Feature.max_depth_minus s;
+                          1 + arity, Feature.count_symb_plus s;
+                          1 + arity, Feature.count_symb_minus s]
+                         @ !features);
     (* only take a limited number of features *)
     let features = List.sort (fun (s1,_) (s2,_) -> s2 - s1) !features in
     let features = CCList.take max_features features in
@@ -292,14 +261,14 @@ module Make(C : Index.CLAUSE) = struct
     (* feature vector of [c] *)
     let fv = compute_fv idx.features lits in
     let rec fold_lower acc fv node = match fv, node with
-    | [], TrieLeaf set -> CSet.fold (fun c acc -> f acc c) set acc
-    | i::fv', TrieNode map ->
-      IntMap.fold
-        (fun j subnode acc -> if j <= i
-          then fold_lower acc fv' subnode  (* go in the branch *)
-          else acc)
-        map acc
-    | _ -> failwith "number of features in feature vector changed"
+      | [], TrieLeaf set -> CSet.fold (fun c acc -> f acc c) set acc
+      | i::fv', TrieNode map ->
+          IntMap.fold
+            (fun j subnode acc -> if j <= i
+              then fold_lower acc fv' subnode  (* go in the branch *)
+              else acc)
+            map acc
+      | _ -> failwith "number of features in feature vector changed"
     in
     fold_lower acc fv idx.trie
 
@@ -308,14 +277,14 @@ module Make(C : Index.CLAUSE) = struct
     (* feature vector of the hc *)
     let fv = compute_fv idx.features lits in
     let rec fold_higher acc fv node = match fv, node with
-    | [], TrieLeaf set -> CSet.fold (fun c acc -> f acc c) set acc
-    | i::fv', TrieNode map ->
-      IntMap.fold
-        (fun j subnode acc -> if j >= i
-          then fold_higher acc fv' subnode  (* go in the branch *)
-          else acc)
-        map acc
-    | _ -> failwith "number of features in feature vector changed"
+      | [], TrieLeaf set -> CSet.fold (fun c acc -> f acc c) set acc
+      | i::fv', TrieNode map ->
+          IntMap.fold
+            (fun j subnode acc -> if j >= i
+              then fold_higher acc fv' subnode  (* go in the branch *)
+              else acc)
+            map acc
+      | _ -> failwith "number of features in feature vector changed"
     in
     fold_higher acc fv idx.trie
 
@@ -324,14 +293,14 @@ module Make(C : Index.CLAUSE) = struct
     (* feature vector of the hc *)
     let fv = compute_fv idx.features lits in
     let rec fold_higher acc fv node = match fv, node with
-    | [], TrieLeaf set -> CSet.fold (fun c acc -> f acc c) set acc
-    | i::fv', TrieNode map ->
-      IntMap.fold
-        (fun j subnode acc -> if j = i
-          then fold_higher acc fv' subnode  (* go in the branch *)
-          else acc)
-        map acc
-    | _ -> failwith "number of features in feature vector changed"
+      | [], TrieLeaf set -> CSet.fold (fun c acc -> f acc c) set acc
+      | i::fv', TrieNode map ->
+          IntMap.fold
+            (fun j subnode acc -> if j = i
+              then fold_higher acc fv' subnode  (* go in the branch *)
+              else acc)
+            map acc
+      | _ -> failwith "number of features in feature vector changed"
     in
     fold_higher acc fv idx.trie
 

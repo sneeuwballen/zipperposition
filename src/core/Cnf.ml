@@ -26,10 +26,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Reduction to CNF and simplifications} *)
 
 module Hash = CCHash
-module T = FOTerm
-module ST = ScopedTerm
-module S = Symbol
-module F = Formula.FO
+module T = TypedSTerm
+module F = TypedSTerm.AsForm
 
 let prof_estimate = Util.mk_profiler "cnf.estimate_num_clauses"
 let prof_simplify_rename = Util.mk_profiler "cnf.simplify_rename"
@@ -39,8 +37,7 @@ let prof_skolemize = Util.mk_profiler "cnf.skolemize"
 
 let section = Util.Section.make ~parent:Util.Section.logtk "cnf"
 
-type form = Formula.FO.t
-type symbol = Symbol.t
+type form = F.t
 
 (* check whether the formula is already in CNF *)
 let rec is_cnf f = match F.view f with
@@ -56,8 +53,7 @@ let rec is_cnf f = match F.view f with
   | F.Xor _
   | F.Imply _
   | F.Forall _
-  | F.Exists _
-  | F.ForallTy _ -> false
+  | F.Exists _ -> false
 
 and is_lit f = match F.view f with
   | F.Not f' -> F.is_atomic f'

@@ -44,9 +44,6 @@ module type SYMBOL = sig
   val hash : t -> int
   val compare : t -> t -> int
 
-  val false_ : t
-  val true_ : t
-
   val pp : t CCFormat.printer
   val pp_debugf : t CCFormat.printer
 end
@@ -59,6 +56,13 @@ module Make(Sym : SYMBOL) = struct
     let equal = Sym.equal
     let hash = Sym.hash
   end)
+
+  (* TODO: remove PO, should be useless.
+    Instead, use the fact that a [[`total] Constr.t] is total to simply sort
+    or sorted-insert new symbols in the list.
+    Then ,compute a reverse lookup table for efficiency, but lazily *)
+
+  (* TODO: think about how to compare some builtins (true, false, numbers...) *)
 
   (* used to complete orderings *)
   module PO = PartialOrder.Make(Sym)
@@ -299,15 +303,7 @@ module Make(Sym : SYMBOL) = struct
 
   let add_seq p seq = add_list p (Sequence.to_rev_list seq)
 
-  let default l =
-    (* two constraints: false, true at end of precedence, and alpha constraint
-      to be sure that the ordering is total *)
-    let constrs =
-      [ Constr.min [ Sym.false_; Sym.true_ ]
-      ; Constr.alpha
-      ]
-    in
-    create constrs l
+  let default l = create Constr.alpha l
 
   let default_seq seq =
     default (Sequence.to_rev_list seq)
@@ -319,14 +315,12 @@ module Make(Sym : SYMBOL) = struct
 end
 
 module Default = Make(struct
-  type t = Symbol.t
-  let equal = Symbol.equal
-  let hash = Symbol.hash
-  let compare = Symbol.compare
-  let true_ = Symbol.Base.true_
-  let false_ = Symbol.Base.false_
-  let pp = Symbol.pp
-  let pp_debugf= Symbol.pp
+  type t = ID.t
+  let equal = ID.equal
+  let hash = ID.hash
+  let compare = ID.compare
+  let pp = ID.pp
+  let pp_debugf= ID.pp_full
 end)
 
 include Default
