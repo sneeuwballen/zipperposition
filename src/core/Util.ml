@@ -1,27 +1,5 @@
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Some helpers} *)
 
@@ -39,16 +17,11 @@ let start_time () = start_
 let get_total_time, get_start_time =
   let start = Oclock.gettime Oclock.monotonic in
   (fun () ->
-    let stop = Oclock.gettime Oclock.monotonic in
-    Int64.sub stop start),
+     let stop = Oclock.gettime Oclock.monotonic in
+     Int64.sub stop start),
   (fun () -> start)
 
 (** {2 Misc} *)
-
-let clear_line () =
-  output_string Pervasives.stdout
-    "\r                                                         \r";
-  flush Pervasives.stdout
 
 (** Debug section *)
 module Section = struct
@@ -132,7 +105,6 @@ end
 
 let set_debug = Section.set_debug Section.root
 let get_debug () = Section.root.Section.level
-let need_cleanup = ref false
 
 let debug_fmt_ = Format.std_formatter
 
@@ -241,10 +213,10 @@ let show_profilers out () =
   Format.fprintf out "@[<v>";
   Format.fprintf out
     "@[%39s ---------- --------- --------- --------- ---------@]@,"
-      (String.make 39 '-');
+    (String.make 39 '-');
   Format.fprintf out
     "@[%-39s %10s %9s %9s %9s %9s@]@,"
-      "function" "#calls" "total" "% total" "max" "average";
+    "function" "#calls" "total" "% total" "max" "average";
   (* sort profilers by decreasing total time *)
   let profilers =
     List.sort
@@ -255,13 +227,13 @@ let show_profilers out () =
   List.iter
     (fun profiler -> if profiler.prof_calls > 0 then
         (* print content of the profiler *)
-      Format.fprintf out "@[%-39s %10d %9.4f %9.2f %9.4f %9.4f@]@,"
-        profiler.prof_name
-        profiler.prof_calls
-        (ns_to_s profiler.prof_total)
-        (ns_to_s profiler.prof_total *. 100. /. tot)
-        (ns_to_s profiler.prof_max)
-        ((ns_to_s profiler.prof_total) /. (float_of_int profiler.prof_calls))
+        Format.fprintf out "@[%-39s %10d %9.4f %9.2f %9.4f %9.4f@]@,"
+          profiler.prof_name
+          profiler.prof_calls
+          (ns_to_s profiler.prof_total)
+          (ns_to_s profiler.prof_total *. 100. /. tot)
+          (ns_to_s profiler.prof_max)
+          ((ns_to_s profiler.prof_total) /. (float_of_int profiler.prof_calls))
     )
     profilers;
   Format.fprintf out "@]";
