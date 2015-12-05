@@ -38,7 +38,7 @@ let declare signature id ty =
     let ty' = find_exn signature id in
     raise (AlreadyDeclared (id, ty', ty))
   with Not_found ->
-    if not (ScopedTerm.DB.closed (ty : Type.t :> ScopedTerm.t))
+    if not (InnerTerm.DB.closed (ty : Type.t :> InnerTerm.t))
     then raise (Invalid_argument "Signature.declare: non-closed type");
     ID.Map.add id ty signature
 

@@ -32,10 +32,9 @@ let to_string v = CCFormat.to_string pp v
 
 let make_unsafe ~ty id = {ty; id; }
 
-let fresh =
-  let n = ref ~-1 in
-  fun ~ty () ->
-    if !n > 0 then failwith "HVar.fresh_var: underflow";
-    let v = make_unsafe ~ty !n in
-    decr n;
-    v
+let fresh_ = ref ~-1
+let fresh ~ty () =
+  if !fresh_ > 0 then failwith "HVar.fresh_var: underflow";
+  let v = make_unsafe ~ty !fresh_ in
+  decr fresh_;
+  v

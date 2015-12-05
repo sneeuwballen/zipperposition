@@ -194,12 +194,10 @@ let mk_profiler name =
   profilers := prof :: !profilers;
   prof
 
-(** Enter the profiler *)
 let enter_prof profiler =
   if !enable_profiling
   then profiler.prof_enter <- Oclock.gettime Oclock.monotonic
 
-(** Exit the profiled code with a value *)
 let exit_prof profiler =
   if !enable_profiling then (
     let stop = Oclock.gettime Oclock.monotonic in
@@ -208,6 +206,18 @@ let exit_prof profiler =
     profiler.prof_calls <- profiler.prof_calls + 1;
     if delta > profiler.prof_max then profiler.prof_max <- delta;
   )
+
+let with_prof p f =
+  if !enable_profiling then (
+    enter_prof p;
+    try
+      let x = f () in
+      exit_prof p;
+      x
+    with e ->
+      exit_prof p;
+      raise e
+  ) else f ()
 
 let show_profilers out () =
   Format.fprintf out "@[<v>";

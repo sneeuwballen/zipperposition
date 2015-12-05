@@ -105,8 +105,6 @@ module Set = T.Set
 module Map = T.Map
 module Tbl = T.Tbl
 
-module Cache = Cache.Replacing(TermHASH)
-
 (** {2 Typing} *)
 
 let cast ~ty t = T.cast ~ty:(ty : Type.t :> T.t) t
