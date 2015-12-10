@@ -12,13 +12,13 @@ type t
 type term = t
 
 type view = private
-  | Var of t Var.t            (** variable *)
-  | Const of ID.t         (** constant *)
-  | App of t * t list         (** apply term *)
-  | Bind of Binder.t * t Var.t * t  (** bind variable in term *)
+  | Var of t Var.t (** variable *)
+  | Const of ID.t (** constant *)
+  | App of t * t list (** apply term *)
+  | Bind of Binder.t * t Var.t * t (** bind variable in term *)
   | AppBuiltin of Builtin.t * t list
   | Multiset of t list
-  | Record of (string * t) list * t option  (** extensible record *)
+  | Record of (string * t) list * t option (** extensible record *)
   | Meta of meta_var (** Unification variable *)
 
 (* a variable with a one-shot binding *)
@@ -83,6 +83,7 @@ module Ty : sig
     | Forall of t Var.t * t
     | Multiset of t
     | Record of (string * t) list * t Var.t option
+    | Meta of meta_var
 
   val view : t -> view
 
@@ -209,12 +210,6 @@ module Subst : sig
 
   include Interfaces.PRINT with type t := t
 end
-
-exception TypeApplyError of t * t * string
-
-val ty_apply : t -> t list -> t
-(** Apply a (polymorphic) type to a list of arguments
-    @raise TypeApplyError if some mismatch occurs *)
 
 (** {2 Unification} *)
 

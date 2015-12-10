@@ -16,14 +16,16 @@ type t = {
   loc : location option;
 }
 and view =
-  | Var of t Var.t            (** variable *)
-  | Const of ID.t         (** constant *)
-  | App of t * t list         (** apply term *)
-  | Bind of Binder.t * t Var.t * t  (** bind variable in term *)
+  | Var of t Var.t (** variable *)
+  | Const of ID.t (** constant *)
+  | App of t * t list (** apply term *)
+  | Bind of Binder.t * t Var.t * t (** bind variable in term *)
   | AppBuiltin of Builtin.t * t list
   | Multiset of t list
-  | Record of (string * t) list * t option  (** extensible record *)
-  | Meta of t Var.t * t option ref (** Unification variable *)
+  | Record of (string * t) list * t option (** extensible record *)
+  | Meta of meta_var (** Unification variable *)
+
+and meta_var = t Var.t * t option ref
 
 type term = t
 
@@ -180,6 +182,10 @@ let bind_list ?loc ~ty s vars t =
 let multiset ?loc ~ty l = make_ ?loc ~ty (Multiset l)
 
 let record ?loc ~ty l ~rest =
+  let rest = CCOpt.map (var ?loc) rest in
+  make_ ?loc ~ty (Record (l,rest))
+
+let record_flatten ?loc ~ty l ~rest =
   match CCOpt.map deref rest with
   | None
   | Some {term=(Var _ | Meta _); _} ->
@@ -300,6 +306,123 @@ let closed t =
 
 let close_all ~ty s t = bind_list ~ty s (vars t) t
 
+(** {2 Specific Views} *)
+
+module Ty = struct
+  type t = term
+
+  type builtin = Prop | TType | Term | Int | Rat
+
+  type view =
+    | Builtin of builtin
+    | Var of t Var.t
+    | App of ID.t * t list
+    | Fun of t list * t
+    | Forall of t Var.t * t
+    | Multiset of t
+    | Record of (string * t) list * t option
+    | Meta of meta_var
+
+  let view (t:t) : view = match view t with
+    | Var v -> Var v
+    | App (f, l) ->
+        begin match view f with
+        | Const id -> App (id,l)
+        | _ -> assert false
+        end
+    | Const id -> App (id, [])
+    | Bind (Binder.ForallTy, v, t) -> Forall (v,t)
+    | Record (l,rest) -> Record (l, rest)
+    | Meta (v,o) -> Meta (v,o)
+    | AppBuiltin (Builtin.Prop, []) -> Builtin Prop
+    | AppBuiltin (Builtin.TType, []) -> Builtin TType
+    | AppBuiltin (Builtin.TyInt, []) -> Builtin Int
+    | AppBuiltin (Builtin.TyRat, []) -> Builtin Rat
+    | AppBuiltin (Builtin.Term, []) -> Builtin Term
+    | AppBuiltin (Builtin.Arrow, ret::args) -> Fun (args, ret)
+    | AppBuiltin (Builtin.Multiset, [t]) -> Multiset t
+    | Multiset _
+    | AppBuiltin _
+    | Bind _ -> assert false
+
+  let tType = tType
+  let var = var
+  let meta = meta
+  let fun_ ?loc args ret = app_builtin ?loc ~ty:tType Builtin.Arrow (ret::args)
+  let app ?loc id l =
+    let ty_id = fun_ (List.map (fun _ -> tType) l) tType in
+    app ?loc ~ty:tType (const ?loc ~ty:ty_id id) l
+  let const ?loc id = const ?loc ~ty:tType id
+  let forall ?loc v t = bind ~ty:tType ?loc Binder.ForallTy v t
+  let forall_l ?loc = List.fold_right (forall ?loc)
+  let multiset ?loc t = app_builtin ?loc ~ty:tType Builtin.Multiset [t]
+  let record ?loc l ~rest = record ?loc ~ty:tType l ~rest
+  let record_flatten ?loc l ~rest = record_flatten ?loc ~ty:tType l ~rest
+
+  let prop = builtin ~ty:tType Builtin.Prop
+  let int = builtin ~ty:tType Builtin.TyInt
+  let rat = builtin ~ty:tType Builtin.TyRat
+  let term = builtin ~ty:tType Builtin.Term
+
+  let close_forall t = close_all ~ty:tType Binder.ForallTy t
+
+  let is_tType t = match view t with
+    | Builtin TType -> true
+    | _ -> false
+
+  let rec returns t = match view t with
+    | Fun (_, ret) -> returns ret
+    | Forall (_,t') -> returns t'
+    | _ -> t
+
+  let returns_tType t = is_tType (returns t)
+end
+
+module Form = struct
+  type t = term
+  type view =
+    | True
+    | False
+    | Atom of t
+    | Eq of t * t
+    | Neq of t * t
+    | Equiv of t * t
+    | Xor of t * t
+    | Imply of t * t
+    | And of t list
+    | Or of t list
+    | Not of t
+    | Forall of t Var.t * t
+    | Exists of t Var.t * t
+
+  val view : t -> view
+
+  (** Smart constructors (perform simplifications) *)
+
+  val true_ : t
+  val false_ : t
+  val atom : ?loc:location -> t -> t
+  val eq : ?loc:location -> t -> t -> t
+  val neq : ?loc:location -> t -> t -> t
+  val equiv : ?loc:location -> t -> t -> t
+  val xor : ?loc:location -> t -> t -> t
+  val imply : ?loc:location -> t -> t -> t
+  val and_ : ?loc:location -> t list -> t
+  val or_ : ?loc:location -> t list -> t
+  val not_ : ?loc:location -> t -> t
+  val forall : ?loc:location -> t Var.t -> t -> t
+  val exists : ?loc:location -> t Var.t -> t -> t
+
+  val forall_l : ?loc:location -> t Var.t list -> t -> t
+  val exists_l : ?loc:location -> t Var.t list -> t -> t
+
+  val is_atomic : t -> bool
+
+  val arity : t -> (int * int) option
+  (** [arity ty] returns [Some (n,m)] if [ty] has [n] type parameters
+      and is a [m]-ary function *)
+end
+
 let to_string = CCFormat.to_string pp
 
 let _pp_term = pp
@@ -380,17 +503,6 @@ module Subst = struct
   and eval_list subst l = List.map (eval subst) l
 end
 
-exception TypeApplyError of t * t * string
-
-let () = Printexc.register_printer
-  (function
-    | TypeApplyError (t1,t2,msg) ->
-        Some (CCFormat.sprintf "@[<2>error applying `@[%a@]`@ to `@[%a@]`:@ %s@]"
-          pp t1 pp t2 msg)
-    | _ -> None)
-
-let ty_apply _ _ = assert false (* TODO *)
-
 (** {2 Substitutions, Unification} *)
 
 module UStack = struct
@@ -446,6 +558,7 @@ let () = Printexc.register_printer
     | _ -> None)
 
 let fail_unif_ st msg = raise (UnifyFailure (msg, st))
+let fail_uniff_ st msg = CCFormat.ksprintf msg ~f:(fail_unif_ st)
 
 (* check that:
   - v does not occur in t
@@ -481,7 +594,7 @@ let are_same_meta_ r1 r2 = match r1, r2 with
 
 let unify ?(st=UStack.create()) t1 t2 =
   let stack = ref [] in
-  let fail_ msg = CCFormat.ksprintf msg ~f:(fail_unif_ !stack) in
+  let fail_ msg = fail_uniff_ !stack msg in
   let rec unif_rec t1 t2 =
     if t1==t2 then ()
     else (
@@ -594,3 +707,24 @@ let unify ?(st=UStack.create()) t1 t2 =
         end
   in
   unif_rec t1 t2
+
+let apply_unify ?st ty l =
+  let rec aux subst ty l = match Ty.view ty, l with
+  | _, [] -> Subst.eval subst ty
+  | Ty.Forall (v,ty'), a :: l' ->
+      let ty_a = ty_exn a in
+      unify ?st ty_a tType;
+      aux (Subst.add subst v a) ty' l'
+  | Ty.Fun (exp, ret), _ ->
+      aux_l subst exp ret l
+  | (Ty.Meta _ | Ty.Var _ | Ty.App _ | Ty.Builtin _ | Ty.Multiset _ | Ty.Record _), _ ->
+      fail_uniff_ [] "cannot apply type @[%a@]" pp ty
+  and aux_l subst exp ret l = match exp, l with
+    | [], [] -> Subst.eval subst ret
+    | _, [] -> Subst.eval subst (Ty.fun_ exp ret)
+    | [], _ -> fail_uniff_ "cannot apply type @[%a@]" pp ret
+    | exp_a :: exp', a :: l' ->
+        unify ?st exp_a (ty_exn a);
+        aux_l subst exp' ret l'
+  in
+  aux Subst.empty ty l
