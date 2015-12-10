@@ -13,7 +13,6 @@ Congruence
 DBEnv
 Dtree
 FOTerm
-FastFingerprint
 FeatureVector
 Fingerprint
 Formula
@@ -36,13 +35,9 @@ Options
 Ordering
 Ordering_intf
 ParseLocation
-PartialOrder
-PartialOrder_intf
 Position
 Precedence
-Precedence_intf
 PrologTerm
-Rewriting
 Scoped
 Signature
 Skolem
