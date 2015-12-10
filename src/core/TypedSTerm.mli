@@ -19,7 +19,10 @@ type view = private
   | AppBuiltin of Builtin.t * t list
   | Multiset of t list
   | Record of (string * t) list * t option  (** extensible record *)
-  | Meta of t Var.t * t option ref (** Unification variable *)
+  | Meta of meta_var (** Unification variable *)
+
+(* a variable with a one-shot binding *)
+and meta_var = t Var.t * t option ref
 
 val view : t -> view
 val loc : t -> location option
@@ -27,6 +30,7 @@ val ty : t -> t option
 val ty_exn : t -> t
 
 val deref : t -> t
+(** While [t] is a bound [Meta] variable, follow its link *)
 
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
@@ -46,10 +50,10 @@ val builtin : ?loc:location -> ty:t -> Builtin.t -> t
 val bind : ?loc:location -> ty:t -> Binder.t -> t Var.t -> t -> t
 val bind_list : ?loc:location -> ty:t -> Binder.t -> t Var.t list -> t -> t
 val multiset : ?loc:location -> ty:t -> t list -> t
-val meta : ?loc:location -> t Var.t -> t
-val meta_of_string : ?loc:location -> ty:t -> string -> t
-val meta_full : ?loc:location -> t Var.t -> t option ref -> t
-val record : ?loc:location -> ty:t -> (string*t) list -> rest:t option -> t
+val meta : ?loc:location -> meta_var -> t
+val meta_of_string : ?loc:location -> ty:t -> string -> t (** Fresh meta *)
+val record : ?loc:location -> ty:t -> (string*t) list -> rest:t Var.t option -> t
+val record_flatten : ?loc:location -> ty:t -> (string*t) list -> rest:t option -> t
 (** Build a record with possibly a row variable.
     @raise IllFormedTerm if the [rest] is not either a record or a variable. *)
 
@@ -84,10 +88,26 @@ module Ty : sig
 
   val tType : t
   val var : ?loc:location -> t Var.t -> t
+  val meta : ?loc:location -> meta_var -> t
   val fun_ : ?loc:location -> t list -> t -> t
   val app : ?loc:location -> ID.t -> t list -> t
   val const : ?loc:location -> ID.t -> t
   val forall : ?loc:location -> t Var.t -> t -> t
+  val forall_l : ?loc:location -> t Var.t list -> t -> t
+  val multiset : ?loc:location -> t -> t
+  val record : ?loc:location -> (string * t) list -> rest:t Var.t option -> t
+  val record_flatten : ?loc:location -> (string * t) list -> rest:t option -> t
+
+  val prop : t
+  val int : t
+  val rat : t
+  val term : t
+
+  val close_forall : t -> t
+
+  val is_tType : t -> bool
+  val returns : t -> t
+  val returns_tType : t -> bool
 end
 
 module Form : sig
@@ -109,6 +129,8 @@ module Form : sig
 
   val view : t -> view
 
+  val true_ : t
+  val false_ : t
   val atom : ?loc:location -> t -> t
   val eq : ?loc:location -> t -> t -> t
   val neq : ?loc:location -> t -> t -> t
@@ -121,7 +143,14 @@ module Form : sig
   val forall : ?loc:location -> t Var.t -> t -> t
   val exists : ?loc:location -> t Var.t -> t -> t
 
+  val forall_l : ?loc:location -> t Var.t list -> t -> t
+  val exists_l : ?loc:location -> t Var.t list -> t -> t
+
   val is_atomic : t -> bool
+
+  val arity : t -> (int * int) option
+  (** [arity ty] returns [Some (n,m)] if [ty] has [n] type parameters
+      and is a [m]-ary function *)
 end
 
 (** {2 Utils} *)
@@ -186,6 +215,8 @@ val ty_apply : t -> t list -> t
 
 exception UnifyFailure of string * (term * term) list
 
+val pp_stack : (term * term) list CCFormat.printer
+
 module UStack : sig
   type t
   (** Unification stack, for backtracking purposes *)
@@ -208,3 +239,9 @@ val unify : ?st:UStack.t-> term -> term -> unit
       that occur under {!Meta}. Regular variables are not modified.
     @param unif_stack used for backtracking
     @raise UnifyFailure if unification fails. *)
+
+val apply_unify : ?st:UStack.t -> t -> t list -> t
+(** [apply_unify f_ty args] compute the type of a function of type [f_ty],
+    when applied to parameters [args]. The first elements of [args] might
+    be interpreted as types, the other ones as terms (whose types are unified
+    against expected types). *)
