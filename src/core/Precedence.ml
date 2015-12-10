@@ -25,302 +25,233 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Precedence (total ordering) on symbols} *)
 
-type symbol_status = Precedence_intf.symbol_status =
+type symbol_status =
   | Multiset
   | Lexicographic
 
 let section = Util.Section.(make ~parent:logtk "precedence")
 
-(** {2 Signature} *)
+(** {3 Constraints} *)
 
-module type S = Precedence_intf.S
+module Constr = struct
+  type 'a t = ID.t -> ID.t -> int
+  constraint 'a = [< `partial | `total]
 
-(** {2 Functor} *)
+  let arity arity_of s1 s2 =
+    (* bigger arity means bigger symbol *)
+    arity_of s1 - arity_of s2
 
-module type SYMBOL = sig
-  type t
+  let invfreq seq =
+    (* symbol -> number of occurrences of symbol in seq *)
+    let tbl = ID.Tbl.create 16 in
+    Sequence.iter
+      (fun s ->
+        try ID.Tbl.replace tbl s (ID.Tbl.find tbl s + 1)
+        with Not_found -> ID.Tbl.replace tbl s 1)
+      seq;
+    let find_freq s = try ID.Tbl.find tbl s with Not_found -> 0 in
+    (* compare by inverse frequency (higher frequency => smaller) *)
+    fun s1 s2 ->
+      let n1 = find_freq s1 in
+      let n2 = find_freq s2 in
+      CCInt.compare n2 n1
 
-  val equal : t -> t -> bool
-  val hash : t -> int
-  val compare : t -> t -> int
+  let max l =
+    let set = ID.Set.of_list l in
+    fun s1 s2 ->
+      let is_max1 = ID.Set.mem s1 set in
+      let is_max2 = ID.Set.mem s2 set in
+      match is_max1, is_max2 with
+      | true, true
+      | false, false -> 0
+      | true, false -> 1
+      | false, true -> -1
 
-  val pp : t CCFormat.printer
-  val pp_debugf : t CCFormat.printer
+  let min l =
+    let set = ID.Set.of_list l in
+    fun s1 s2 ->
+      let is_min1 = ID.Set.mem s1 set in
+      let is_min2 = ID.Set.mem s2 set in
+      match is_min1, is_min2 with
+      | true, true
+      | false, false -> 0
+      | true, false -> -1
+      | false, true -> 1
+
+  (* regular string ordering *)
+  let alpha a b =
+    let c = String.compare (ID.name a) (ID.name b) in
+    if c = 0
+      then ID.compare a b else c
+
+  let compose a b s1 s2 =
+    let c = a s1 s2 in
+    if c=0 then b s1 s2 else c
+
+  let compose_sort l =
+    if l=[] then invalid_arg "Precedence.Constr.compose_sort";
+    let l = List.sort
+      (fun (i1,_)(i2,_) -> CCInt.compare i2 i1) l
+    in
+    let rec mk = function
+      | [] -> assert false
+      | [_,o] -> o
+      | (_,o1) :: tail ->
+          let o2 = mk tail in
+          compose o1 o2
+    in
+    mk l
 end
 
-module Make(Sym : SYMBOL) = struct
-  type symbol = Sym.t
+(* TODO: think about how to compare some builtins (true, false, numbers...) *)
 
-  module Tbl = CCPersistentHashtbl.Make(struct
-    type t = Sym.t
-    let equal = Sym.equal
-    let hash = Sym.hash
-  end)
+exception Error of string
 
-  (* TODO: remove PO, should be useless.
-    Instead, use the fact that a [[`total] Constr.t] is total to simply sort
-    or sorted-insert new symbols in the list.
-    Then ,compute a reverse lookup table for efficiency, but lazily *)
+let () = Printexc.register_printer
+  (function
+    | Error msg -> Some (CCFormat.sprintf "@[<2>error in precedence:@ %s@]" msg)
+    | _ -> None)
 
-  (* TODO: think about how to compare some builtins (true, false, numbers...) *)
+let error_ msg = raise (Error msg)
+let errorf_ msg = CCFormat.ksprintf msg ~f:error_
 
-  (* used to complete orderings *)
-  module PO = PartialOrder.Make(Sym)
+type t = {
+  mutable snapshot : ID.t list;
+    (* symbols by decreasing order *)
+  mutable tbl: int ID.Tbl.t Lazy.t;
+    (* symbol -> index in precedence *)
+  status: symbol_status ID.Tbl.t;
+    (* symbol -> status *)
+  mutable weight: ID.t -> int;
+  constr : [`total] Constr.t;
+    (* constraint used to build and update the precedence *)
+}
 
-  (* TODO: make the [index] a lazy instance of [Tbl.t], to be computed
-    on demand, to simplify *)
+type precedence = t
 
-  type t = {
-    snapshot : symbol list; (* symbols by decreasing order *)
-    index : int Tbl.t;      (* symbol -> index in precedence *)
-    weight : symbol -> int; (* symbol -> weight *)
-    status : unit Tbl.t;    (* set of multiset-status symbols *)
-    constr : (symbol -> symbol -> Comparison.t) list;
-      (* constraints used to build the precedence *)
+let equal p1 p2 =
+  try List.for_all2 ID.equal p1.snapshot p2.snapshot
+  with Invalid_argument _ -> false
+
+let snapshot p = p.snapshot
+
+let compare p s1 s2 =
+  let lazy tbl = p.tbl in
+  let i1 = try ID.Tbl.find tbl s1 with Not_found -> -1 in
+  let i2 = try ID.Tbl.find tbl s2 with Not_found -> -1 in
+  let c = CCInt.compare i1 i2 in
+  if c = 0
+    then ID.compare s1 s2
+    else c
+
+let mem p s =
+  let lazy tbl = p.tbl in
+  ID.Tbl.mem tbl s
+
+let status p s =
+  try ID.Tbl.find p.status s
+  with Not_found -> Lexicographic
+
+let weight p s = p.weight s
+
+let declare_status p s status =
+  ID.Tbl.replace p.status s status
+
+module Seq = struct
+  let symbols p = Sequence.of_list p.snapshot
+end
+
+let pp_ pp_id out l =
+  Format.fprintf out "[@[<2>%a@]]" (Util.pp_list ~sep:" > " pp_id) l
+
+let pp_snapshot out l = pp_ ID.pp out l
+
+let pp out prec =
+  let pp_id out s = match status prec s with
+    | Multiset -> Format.fprintf out "%a[M]" ID.pp s
+    | Lexicographic -> ID.pp out s
+  in
+  pp_ pp_id out prec.snapshot
+
+let pp_debugf out prec =
+  let pp_id out s = match status prec s with
+    | Multiset -> Format.fprintf out "%a[M]" ID.pp_full s
+    | Lexicographic -> ID.pp_full out s
+  in
+  pp_ pp_id out prec.snapshot
+
+let to_string = CCFormat.to_string pp
+
+(* build a table  symbol -> i. such as if
+    [tbl s = i], then w[List.nth i l = s] *)
+let mk_tbl_ l =
+  let tbl = ID.Tbl.create 64 in
+  List.iteri
+    (fun i s -> ID.Tbl.add tbl s i)
+    l;
+  tbl
+
+(** {3 Weight} *)
+
+type weight_fun = ID.t -> int
+
+(* weight of f = arity of f + 4 *)
+let weight_modarity ~arity a = arity a + 4
+
+(* constant weight *)
+let weight_constant _ = 4
+
+let set_weight p f = p.weight <- f
+
+(** {2 Creation of a precedence from constraints} *)
+
+(* check invariant: the list is sorted w.r.t constraints *)
+let check_inv_ p =
+  let rec sorted_ = function
+    | [] | [_] -> true
+    | s :: ((s' :: _) as tail) ->
+        p.constr s s' > 0
+        &&
+        sorted_ tail
+  in
+  sorted_ p.snapshot
+
+let create ?(weight=weight_constant) c l =
+  let l = List.sort c l in
+  let tbl = lazy (mk_tbl_ l) in
+  { snapshot=l;
+    tbl;
+    weight;
+    status=ID.Tbl.create 16;
+    constr=c;
   }
 
-  type precedence = t
+let add p s =
+  (* sorted insertion in snapshot *)
+  let rec insert_ s l = match l with
+    | [] -> [s], true
+    | s' :: l' ->
+        let c = p.constr s s' in
+        if c=0 then l, false  (* not new *)
+        else if c<0 then s :: l, true
+        else
+          let l', ret = insert_ s l' in
+          s' :: l', ret
+  in
+  (* compute new snapshot, but only update precedence if the symbol is new *)
+  let snapshot, is_new = insert_ s p.snapshot in
+  if is_new then (
+    p.snapshot <- snapshot;
+    p.tbl <- lazy (mk_tbl_ snapshot);
+  )
 
-  let equal p1 p2 =
-    try List.for_all2 Sym.equal p1.snapshot p2.snapshot
-    with Invalid_argument _ -> false
+let add_list p l = List.iter (add p) l
 
-  let snapshot p = p.snapshot
+let add_seq p seq = Sequence.iter (add p) seq
 
-  let compare p s1 s2 =
-    let i1 = try Tbl.find p.index s1 with Not_found -> -1 in
-    let i2 = try Tbl.find p.index s2 with Not_found -> -1 in
-    let c = i2 - i1 in
-    if c = 0
-      then Sym.compare s1 s2
-      else c
+let default l = create Constr.alpha l
 
-  let mem p s = Tbl.mem p.index s
+let default_seq seq =
+  default (Sequence.to_rev_list seq)
 
-  let status p s =
-    if Tbl.mem p.status s
-      then Multiset
-      else Lexicographic
-
-  let weight p s = p.weight s
-
-  let declare_status p s status =
-    match status with
-    | Lexicographic when not (Tbl.mem p.status s) -> p
-    | Multiset when (Tbl.mem p.status s) -> p
-    | Lexicographic ->
-      { p with status = Tbl.remove p.status s; }
-    | Multiset ->
-      { p with status = Tbl.replace p.status s (); }
-
-  module Seq = struct
-    let symbols p = Sequence.of_list p.snapshot
-  end
-
-  let pp_snapshot out s = CCFormat.list ~sep:" > " Sym.pp out s
-
-  let pp out prec =
-    CCFormat.list ~sep:" > "
-      (fun out s -> match status prec s with
-        | Multiset -> Format.fprintf out "%a[M]" Sym.pp s
-        | Lexicographic -> Sym.pp out s)
-      out prec.snapshot
-
-  let pp_debugf out prec =
-    CCFormat.list ~sep:" > "
-      (fun out s -> match status prec s with
-        | Multiset -> Format.fprintf out "%a[M]" Sym.pp_debugf s
-        | Lexicographic -> Sym.pp_debugf out s)
-      out prec.snapshot
-
-  let to_string = CCFormat.to_string pp
-
-  (* build a table  symbol -> i. such as if
-      [tbl s = i], then w[List.nth i l = s] *)
-  let _mk_table l =
-    CCList.Idx.foldi
-      (fun tbl i s -> Tbl.replace tbl s i)
-      (Tbl.create 7) l
-
-  (** {3 Constraints} *)
-
-  module Constr = struct
-    module C = Comparison
-
-    type t = symbol -> symbol -> C.t
-
-    let cluster clusters =
-      (* symbol -> index of cluster the symbol belongs to *)
-      let tbl = CCList.Idx.foldi
-        (fun acc i cluster ->
-          List.fold_left (fun acc s -> Tbl.replace acc s i) acc cluster)
-        (Tbl.create 7) clusters
-      in
-      (* compare symbols by their index, if they have one.
-          Smaller numbers are bigger symbols *)
-      fun s1 s2 ->
-        try
-          let i1 = Tbl.find tbl s1 in
-          let i2 = Tbl.find tbl s2 in
-          C.of_total (i2 - i1)
-        with Not_found -> C.Incomparable
-
-    let of_list l =
-      let tbl = _mk_table l in
-      (* compare symbols by number. Smaller symbols have bigger number *)
-      fun s1 s2 ->
-        try
-          let i1 = Tbl.find tbl s1 in
-          let i2 = Tbl.find tbl s2 in
-          C.of_total (i2 - i1)
-        with Not_found -> C.Incomparable
-
-    let of_precedence p = of_list p.snapshot
-
-    let arity arity_of s1 s2 =
-      (* bigger arity means bigger symbol *)
-      C.of_total (arity_of s1 - arity_of s2)
-
-    let invfreq seq =
-      (* symbol -> number of occurrences of symbol in seq *)
-      let tbl = Sequence.fold
-        (fun tbl s ->
-          try Tbl.replace tbl s (Tbl.find tbl s + 1)
-          with Not_found -> Tbl.replace tbl s 1)
-        (Tbl.create 7) seq
-      in
-      (* compare by inverse frequency (higher frequency => smaller) *)
-      fun s1 s2 ->
-        try
-          let n1 = Tbl.find tbl s1 in
-          let n2 = Tbl.find tbl s2 in
-          if n1=n2 then C.Incomparable
-          else if n1<n2 then C.Gt
-          else C.Lt
-        with Not_found ->
-          if Sym.equal s1 s2 then C.Eq else C.Incomparable
-
-    let _find_noexc tbl s =
-      try Some (Tbl.find tbl s)
-      with Not_found -> None
-
-    let max symbols =
-      let tbl = _mk_table symbols in
-      (* not found implies the symbol is smaller than maximal symbols *)
-      fun s1 s2 ->
-        match _find_noexc tbl s1, _find_noexc tbl s2 with
-        | None, None -> C.Incomparable
-        | Some _, None -> C.Gt
-        | None, Some _ -> C.Lt
-        | Some i1, Some i2 -> C.of_total (i2 - i1)
-
-    let min symbols =
-      let tbl = _mk_table symbols in
-      (* not found implies the symbol is smaller than maximal symbols *)
-      fun s1 s2 ->
-        match _find_noexc tbl s1, _find_noexc tbl s2 with
-        | None, None -> C.Incomparable
-        | Some _, None -> C.Lt
-        | None, Some _ -> C.Gt
-        | Some i1, Some i2 -> C.of_total (i2 - i1)
-
-    (* regular string ordering *)
-    let alpha a b =
-      C.of_total (Sym.compare a b)
-  end
-
-  (** {3 Weight} *)
-
-  type weight_fun = symbol -> int
-
-  (* weight of f = arity of f + 4 *)
-  let weight_modarity ~arity a = arity a + 4
-
-  (* constant weight *)
-  let weight_constant _ = 4
-
-  let set_weight p weight = {p with weight; }
-
-  (** {2 Creation of a precedence from constraints} *)
-
-  (* order the set of symbols using the constraints *)
-  let order_symbols_ constrs symbols =
-    let symbols = List.map fst (Tbl.to_list symbols) in
-    let po = PO.create symbols in
-    (* complete the partial order using constraints, starting with the
-       strongest ones *)
-    List.iter (fun constr -> PO.enrich po constr) constrs;
-    if not (PO.is_total po) then (
-      match PO.is_total_details po with
-        | `total -> assert false
-        | `eq (s1, s2) ->
-            let msg = CCFormat.sprintf
-              "Precedence: symbols %a and %a made equal"
-              Sym.pp s1 Sym.pp s2 in
-            failwith msg
-        | `unordered (s1, s2) ->
-            let msg = CCFormat.sprintf
-              "Precedence: symbols %a and %a not ordered by constraints"
-              Sym.pp s1 Sym.pp s2 in
-            failwith msg
-    );
-    PO.elements po
-
-  let create ?(weight=weight_constant) constrs symbols =
-    (* compute snapshot *)
-    let symbols = List.fold_left
-      (fun tbl s -> Tbl.replace tbl s ()) (Tbl.create 7) symbols in
-    let snapshot = order_symbols_ constrs symbols in
-    let index = _mk_table snapshot in
-    let status = Tbl.create 5 in
-    { snapshot; index; weight; status; constr=constrs; }
-
-  let create_sort ?weight l symbols =
-    let l = List.sort (fun (p1,_)(p2,_) -> CCInt.compare p1 p2) l in
-    let l = List.map snd l in
-    create ?weight l symbols
-
-  (* how to add a list of symbols to a precedence *)
-  let add_list p l =
-    if List.for_all (fun s -> Tbl.mem p.index s) l
-      then p  (* already present *)
-      else begin
-        Util.debugf ~section 3 "add %a to the precedence" (fun k->k pp_snapshot l);
-        let c = Constr.of_precedence p in
-        (* hashtable of symbols *)
-        let symbols = Sequence.fold
-          (fun tbl s -> Tbl.replace tbl s ())
-          (Tbl.create 13)
-          Sequence.(append (of_list p.snapshot) (of_list l))
-        in
-        (* compute new ordering. First constraint is to be an extension
-            of [p]. *)
-        let snapshot = order_symbols_ (c :: p.constr) symbols in
-        let index = _mk_table snapshot in
-        Util.debugf ~section 3 "--> snapshot %a" (fun k->k pp_snapshot snapshot);
-        { p with snapshot; index; }
-      end
-
-  let add_seq p seq = add_list p (Sequence.to_rev_list seq)
-
-  let default l = create Constr.alpha l
-
-  let default_seq seq =
-    default (Sequence.to_rev_list seq)
-
-  let constr_list p = p.constr
-
-  let with_constr_list p constrs =
-    create ~weight:p.weight constrs (snapshot p)
-end
-
-module Default = Make(struct
-  type t = ID.t
-  let equal = ID.equal
-  let hash = ID.hash
-  let compare = ID.compare
-  let pp = ID.pp
-  let pp_debugf= ID.pp_full
-end)
-
-include Default
+let constr p = p.constr
