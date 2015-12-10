@@ -1,33 +1,11 @@
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Reduction to CNF and simplifications} *)
 
 module Hash = CCHash
 module T = TypedSTerm
-module F = TypedSTerm.AsForm
+module F = T.Form
 
 let prof_estimate = Util.mk_profiler "cnf.estimate_num_clauses"
 let prof_simplify_rename = Util.mk_profiler "cnf.simplify_rename"
@@ -37,119 +15,152 @@ let prof_skolemize = Util.mk_profiler "cnf.skolemize"
 
 let section = Util.Section.make ~parent:Util.Section.logtk "cnf"
 
+type term = T.t
 type form = F.t
 
-(* check whether the formula is already in CNF *)
-let rec is_cnf f = match F.view f with
-  | F.Or l -> List.for_all is_lit l
-  | F.Not _ -> is_lit f
-  | F.True
-  | F.False
-  | F.Atom _
-  | F.Neq _
-  | F.Eq _ -> true
-  | F.And _
-  | F.Equiv _
-  | F.Xor _
-  | F.Imply _
-  | F.Forall _
-  | F.Exists _ -> false
+exception Error of string
 
-and is_lit f = match F.view f with
-  | F.Not f' -> F.is_atomic f'
-  | F.Eq _
-  | F.Neq _
-  | F.Atom _
-  | F.True
-  | F.False -> true
+let () = Printexc.register_printer
+  (function
+    | Error msg -> Some (CCFormat.sprintf "@[<2>error in CNF:@ %s@]" msg)
+    | _ -> None)
+
+let error_ msg = raise (Error msg)
+let errorf_ msg = CCFormat.ksprintf msg ~f:error_
+
+type lit =
+  | True
+  | False
+  | Atom of term * bool
+  | Eq of term * term
+  | Neq of term * term
+
+type clause = lit list
+
+let fpf = Format.fprintf
+
+let pp_lit out = function
+  | True -> fpf out "true"
+  | False -> fpf out "false"
+  | Atom (t, true) -> T.pp out t
+  | Atom (t, false) -> fpf out "@[<2>¬@ @[%a@]@]" T.pp t
+  | Eq (t1,t2) -> fpf out "@[%a@ =@ %a@]" T.pp t1 T.pp t2
+  | Neq (t1,t2) -> fpf out "@[%a@ ≠@ %a@]" T.pp t1 T.pp t2
+
+let pp_clause out = Util.pp_list ~sep:" ∨ " pp_lit out
+
+exception NotCNF
+
+let as_lit f = match F.view f with
+  | F.Not f' ->
+      begin match F.view f' with
+      | F.Atom t -> Atom (t, false)
+      | _ -> raise NotCNF
+      end
+  | F.Eq (t1,t2) -> Eq (t1,t2)
+  | F.Neq (t1,t2) -> Neq (t1,t2)
+  | F.Atom t -> Atom (t,true)
+  | F.True -> True
+  | F.False -> False
   | F.Or _
   | F.And _
   | F.Equiv _
   | F.Xor _
   | F.Imply _
   | F.Forall _
-  | F.Exists _
-  | F.ForallTy _ -> false
+  | F.Exists _ -> raise NotCNF
 
-let is_clause l = List.for_all is_lit l
+(* check whether the formula is already in CNF *)
+let as_clause f = match F.view f with
+  | F.Or l -> List.map as_lit l
+  | F.Not _
+  | F.True
+  | F.False
+  | F.Atom _
+  | F.Neq _
+  | F.Eq _ -> [as_lit f]
+  | F.And _
+  | F.Equiv _
+  | F.Xor _
+  | F.Imply _
+  | F.Forall _
+  | F.Exists _ -> raise NotCNF
 
-let __reconvert t =
-  match F.of_term t with
-  | Some f -> f
-  | None ->
-      assert (T.is_term t);
-      F.Base.atom (T.of_term_exn t)
+let as_cnf f = match F.view f with
+  | F.Or _ -> [as_clause f]
+  | F.Not _
+  | F.True
+  | F.False
+  | F.Atom _
+  | F.Neq _
+  | F.Eq _ -> [[as_lit f]]
+  | F.And l -> List.map as_clause l
+  | F.Equiv _
+  | F.Xor _
+  | F.Imply _
+  | F.Forall _
+  | F.Exists _ -> raise NotCNF
 
-let __unshift n f =
-  __reconvert (ST.DB.unshift n (f : F.t :> ST.t))
-
-let __contains_db n f =
-  ST.DB.contains (f : F.t :> ST.t) n
+let is_lit f = try ignore (as_lit f); true with NotCNF -> false
+let is_clause f = try ignore (as_clause f); true with NotCNF -> false
+let is_cnf f = try ignore (as_cnf f); true with NotCNF -> false
 
 (* miniscoping (push quantifiers as deep as possible in the formula) *)
 let miniscope ?(distribute_exists=false) f =
   Util.enter_prof prof_miniscope;
   (* recursive miniscoping *)
   let rec miniscope f = match F.view f with
-  | F.Forall (varty, f') ->
-    begin match F.view f' with
-    | F.And l ->
-      (* forall x (and l) -> and (forall x f' \ f' in l) *)
-      let l = List.map miniscope l in
-      let with_v, without_v = List.partition (__contains_db 0) l in
-      F.Base.and_
-        ( List.map (F.Base.__mk_forall ~varty) with_v
-        @ List.map (__unshift 1) without_v)
-    | F.Or l ->
-      let l = List.map miniscope l in
-      let with_v, without_v = List.partition (__contains_db 0) l in
-      F.Base.or_
-        (  F.Base.__mk_forall ~varty (F.Base.or_ with_v)
-        :: List.map (__unshift 1) without_v)
-    | _ -> F.Base.__mk_forall ~varty (miniscope f')
-    end
-  | F.Exists (varty, f') ->
-    begin match F.view f' with
-    | F.And l ->
-      let l = List.map miniscope l in
-      let with_v, without_v = List.partition (fun f -> __contains_db 0 f) l in
-      F.Base.and_
-        (  F.Base.__mk_exists ~varty (F.Base.and_ with_v)
-        :: List.map (__unshift 1) without_v)
-    | F.Or l ->
-      let l = List.map miniscope l in
-      let with_v, without_v = List.partition (fun f -> __contains_db 0 f) l in
-      (* see whether we push the existential into the formulas [with_v], in
-          which the variable occurs, or whether we keep it outside *)
-      let with_v = if distribute_exists
-        then List.map (F.Base.__mk_exists ~varty) with_v
-        else [F.Base.__mk_exists ~varty (F.Base.or_ with_v)]
-      in
-      let without_v = List.map (__unshift 1) without_v in
-      F.Base.or_ (with_v @ without_v)
-    | _ -> F.Base.__mk_exists ~varty (miniscope f')
-    end
-  | F.ForallTy f' ->
-    F.Base.__mk_forall_ty (miniscope f')  (* do not bother *)
-  | F.And l -> F.Base.and_ (List.map miniscope l)
-  | F.Or l -> F.Base.or_ (List.map miniscope l)
-  | F.Imply (f1, f2) -> F.Base.imply (miniscope f1) (miniscope f2)
-  | F.Equiv (f1, f2) -> F.Base.equiv (miniscope f1) (miniscope f2)
-  | F.Xor (f1, f2) -> F.Base.xor (miniscope f1) (miniscope f2)
-  | F.Not f' -> F.Base.not_ (miniscope f')
-  | F.True
-  | F.False
-  | F.Neq _
-  | F.Eq _
-  | F.Atom _ -> f
+    | F.Forall (var, f') ->
+        begin match F.view f' with
+          | F.And l ->
+              (* forall x (and l) -> and (forall x f' \ f' in l) *)
+              let l = List.map miniscope l in
+              let with_v, without_v = List.partition (T.var_occurs ~var) l in
+              F.and_ (List.map (F.forall var) with_v @ without_v)
+          | F.Or l ->
+              let l = List.map miniscope l in
+              let with_v, without_v = List.partition (T.var_occurs ~var) l in
+              F.or_ (F.forall var (F.or_ with_v) :: without_v)
+          | _ -> F.forall var (miniscope f')
+        end
+    | F.Exists (var, f') ->
+        begin match F.view f' with
+          | F.And l ->
+              let l = List.map miniscope l in
+              let with_v, without_v = List.partition (T.var_occurs ~var) l in
+              F.and_
+                (F.exists var (F.and_ with_v) :: without_v)
+          | F.Or l ->
+              let l = List.map miniscope l in
+              let with_v, without_v = List.partition (T.var_occurs ~var) l in
+              (* see whether we push the existential into the formulas [with_v], in
+                  which the variable occurs, or whether we keep it outside *)
+              let with_v = if distribute_exists
+                then List.map (F.exists var) with_v
+                else [F.exists var (F.or_ with_v)]
+              in
+              F.or_ (with_v @ without_v)
+          | _ -> F.exists var (miniscope f')
+        end
+    | F.And l -> F.and_ (List.map miniscope l)
+    | F.Or l -> F.or_ (List.map miniscope l)
+    | F.Imply (f1, f2) -> F.imply (miniscope f1) (miniscope f2)
+    | F.Equiv (f1, f2) -> F.equiv (miniscope f1) (miniscope f2)
+    | F.Xor (f1, f2) -> F.xor (miniscope f1) (miniscope f2)
+    | F.Not f' -> F.not_ (miniscope f')
+    | F.True
+    | F.False
+    | F.Neq _
+    | F.Eq _
+    | F.Atom _ -> f
   in
-  let res = miniscope (F.simplify f) in
+  let res = miniscope f in
   Util.exit_prof prof_miniscope;
   res
 
 (* negation normal form (also remove equivalence and implications). *)
 let rec nnf f =
-  Util.debugf ~section 5 "nnf of %a..." (fun k->k F.pp f);
+  Util.debugf ~section 5 "@[<2>nnf of@ `@[%a@]`@]" (fun k->k T.pp f);
   match F.view f with
   | F.Atom _
   | F.Neq _
@@ -158,96 +169,78 @@ let rec nnf f =
   | F.False -> f
   | F.Not f' ->
       begin match F.view f' with
-      | F.Not f'' -> nnf f''
-      | F.Neq (a,b) -> F.Base.eq a b
-      | F.Eq (a,b) -> F.Base.neq a b
-      | F.And l ->
-        F.Base.or_ (List.map (fun f -> nnf (F.Base.not_ f)) l)
-      | F.Or l ->
-        F.Base.and_ (List.map (fun f -> nnf (F.Base.not_ f)) l)
-      | F.Xor (a,b) ->
-        nnf (F.Base.equiv a b)
-      | F.Equiv (a,b) ->
-        nnf (F.Base.xor a b)
-      | F.Imply (a,b) -> (* not (a=>b)  is a and not b *)
-        nnf (F.Base.and_ [a; F.Base.not_ b])
-      | F.Forall (varty, f'') ->
-        F.Base.__mk_exists ~varty (nnf (F.Base.not_ f''))
-      | F.Exists (varty, f'') ->
-        F.Base.__mk_forall ~varty (nnf (F.Base.not_ f''))
-      | F.ForallTy _ ->
-        failwith "quantification on type variables in contravariant position"
-      | F.True -> F.Base.false_
-      | F.False -> F.Base.true_
-      | F.Atom _ -> f
+        | F.Not f'' -> nnf f''
+        | F.Neq (a,b) -> F.eq a b
+        | F.Eq (a,b) -> F.neq a b
+        | F.And l ->
+            F.or_ (List.map (fun f -> nnf (F.not_ f)) l)
+        | F.Or l ->
+            F.and_ (List.map (fun f -> nnf (F.not_ f)) l)
+        | F.Xor (a,b) ->
+            nnf (F.equiv a b)
+        | F.Equiv (a,b) ->
+            nnf (F.xor a b)
+        | F.Imply (a,b) -> (* not (a=>b)  is a and not b *)
+            nnf (F.and_ [a; F.not_ b])
+        | F.Forall (var, f'') ->
+            F.exists var (nnf (F.not_ f''))
+        | F.Exists (var, f'') ->
+            F.forall var (nnf (F.not_ f''))
+        | F.True -> F.false_
+        | F.False -> F.true_
+        | F.Atom _ -> f
       end
-  | F.And l -> F.Base.and_ (List.map nnf l)
-  | F.Or l -> F.Base.or_ (List.map nnf l)
+  | F.And l -> F.and_ (List.map nnf l)
+  | F.Or l -> F.or_ (List.map nnf l)
   | F.Imply (f1, f2) ->
-    nnf (F.Base.or_ [ (F.Base.not_ f1); f2 ])
+      nnf (F.or_ [ (F.not_ f1); f2 ])
   | F.Equiv(f1,f2) ->
-    (* equivalence with positive polarity *)
-    nnf (F.Base.and_
-      [ F.Base.imply f1 f2; F.Base.imply f2 f1 ])
+      (* equivalence with positive polarity *)
+      nnf (F.and_
+             [ F.imply f1 f2; F.imply f2 f1 ])
   | F.Xor (f1,f2) ->
-    (* equivalence with negative polarity *)
-    nnf (F.Base.and_
-      [ F.Base.or_ [f1; f2]; F.Base.or_ [F.Base.not_ f1; F.Base.not_ f2] ])
-  | F.Forall (varty,f') -> F.Base.__mk_forall ~varty (nnf f')
-  | F.Exists (varty,f') -> F.Base.__mk_exists ~varty (nnf f')
-  | F.ForallTy f' -> F.Base.__mk_forall_ty (nnf f')
+      (* equivalence with negative polarity *)
+      nnf (F.and_
+             [ F.or_ [f1; f2]; F.or_ [F.not_ f1; F.not_ f2] ])
+  | F.Forall (var,f') -> F.forall var (nnf f')
+  | F.Exists (var,f') -> F.exists var (nnf f')
 
-(* evaluate [f] in the given [env], and then unshift remaining free DB vars *)
-let __eval_and_unshift env f =
-  __reconvert (ST.DB.unshift 1 (ST.DB.eval env (f : F.t :> ST.t)))
-
-(* TODO: replace universally quantified vars by free vars
-   only *after* the skolemization of the subformula is done.
-   Skolemization should proceed from the leaves (alpha-equiv checking
-   is trivial with De Bruijn indices) up to the root. *)
 let skolemize ~ctx f =
   Util.enter_prof prof_skolemize;
-  let rec skolemize f = match F.view f with
-  | F.And l -> F.Base.and_ (List.map skolemize l)
-  | F.Or l -> F.Base.or_ (List.map skolemize l)
-  | F.Not f' -> F.Base.not_ (skolemize f')
-  | F.Xor _
-  | F.Imply _
-  | F.Equiv _ -> failwith "can only skolemize a NNF formula"
-  | F.Atom _
-  | F.Eq _
-  | F.Neq _
-  | F.True
-  | F.False -> f
-  | F.Exists (ty,f') ->
-    (* replace [v] by a fresh skolem term *)
-    let new_f' = Skolem.skolem_form ~ctx ~ty f' in
-    skolemize new_f'
-  | F.Forall (ty,f') ->
-    (* remove quantifier, replace by fresh variable *)
-    F.iter (Skolem.update_var ~ctx) f';
-    Util.debugf ~section 5 "type of variable: %a" (fun k->k Type.pp ty);
-    let v = T.var ~ty (Skolem.fresh_var ~ctx) in
-    let env = DBEnv.singleton (v:T.t:>ST.t) in
-    let new_f' = __eval_and_unshift env f' in
-    skolemize new_f'
-  | F.ForallTy f' ->
-    F.iter (Skolem.update_var ~ctx) f';
-    let v = Type.var (Skolem.fresh_var ~ctx) in
-    let env = DBEnv.singleton (v:Type.t:> ST.t) in
-    let new_f' = __eval_and_unshift env f' in
-    skolemize new_f'
+  let rec skolemize subst f = match F.view f with
+    | F.And l -> F.and_ (List.map (skolemize subst) l)
+    | F.Or l -> F.or_ (List.map (skolemize subst) l)
+    | F.Not f' -> F.not_ (skolemize subst f')
+    | F.Xor _
+    | F.Imply _
+    | F.Equiv _ -> error_ "can only skolemize a NNF formula"
+    | F.Atom _
+    | F.Eq _
+    | F.Neq _
+    | F.True
+    | F.False -> f
+    | F.Exists (var,f') ->
+        (* replace [v] by a fresh skolem term *)
+        let t = Skolem.skolem_form ~ctx subst (Var.ty var) f' in
+        let subst = Var.Subst.add subst var t in
+        Util.debugf 2 ~section "@[<2>bind %a to@ @[%a@]@]"
+          (fun k->k Var.pp var T.pp t);
+        skolemize subst f'
+    | F.Forall (var,f') ->
+        let var' = Var.copy var in
+        let subst = Var.Subst.add subst var (T.var var') in
+        skolemize subst f'
   in
   let res = skolemize f in
   Util.exit_prof prof_skolemize;
   res
 
-(** For the following, we use "handbook of automated reasoning",
-  chapter "compute small clause normal forms". We use a naive computation
-  of clause sizes, but with a caching mechanism to block the exponential
-  re-computation of sizes.
-  The criterion for renaming is: if renaming makes less clauses, then
-  always do it *)
+(* For the following, we use "handbook of automated reasoning",
+   chapter "compute small clause normal forms". We use a naive computation
+   of clause sizes, but with a caching mechanism to block the exponential
+   re-computation of sizes.
+   The criterion for renaming is: if renaming makes less clauses, then
+   always do it *)
 
 (* estimation for a number of clauses *)
 module Estimation = struct
@@ -279,56 +272,36 @@ module Estimation = struct
     | Exactly n -> CCFormat.int out n
 end
 
-(* table (formula, polarity) -> int *)
-module FPolTbl = Hashtbl.Make(struct
-  type t = F.t * bool
-  let hash_fun (f,x) h = Hash.bool_ x (F.hash_fun f h)
-  let hash it = Hash.apply hash_fun it
-  let equal (f1,x1)(f2,x2) = x1=x2 && F.equal f1 f2
-end)
-
 (* estimate the number of clauses needed by this formula. *)
-let estimate_num_clauses ~cache ~pos f =
+let estimate_num_clauses ~pos f =
   Util.enter_prof prof_estimate;
   let module E = Estimation in
   (* recursive function.
      @param pos true if the formula is positive, false if it's negated *)
-  let rec num pos f =
-    try
-      FPolTbl.find cache (f,pos)
-    with Not_found ->
-      (* compute *)
-      let n = match F.view f, pos with
-        | F.Eq _, _
-        | F.Neq _, _
-        | F.Atom _, _
-        | F.True, _
-        | F.False, _ -> E.Exactly 1
-        | F.Not f', _ -> num (not pos) f'
-        | F.And l, true -> sum_list pos l
-        | F.And l, false -> prod_list pos l
-        | F.Or l, true -> prod_list pos l
-        | F.Or l, false -> sum_list pos l
-        | F.Imply (a,b), true -> E.(num false a */ num true b)
-        | F.Imply (a,b), false -> E.(num true a +/ num false b)
-        | F.Equiv(a,b), true ->
-            E.((num true a */ num false b) +/ (num false a */ num true b))
-        | F.Equiv(a,b), false ->
-            E.((num true a */ num true b) +/ (num false a */ num false b))
-        | F.Xor(a,b), true ->
-            (* a xor b is defined as  (not a) <=> b *)
-            E.((num false a */ num false b) +/ (num true a */ num true b))
-        | F.Xor(a,b), false ->
-            E.((num false a */ num true b) +/ (num true a */ num false b))
-        | F.Forall (_, f'), _
-        | F.Exists (_, f'), _
-        | F.ForallTy f', _ -> num pos f'
-      in
-      (* memoize *)
-      Util.debugf ~section 5 "estimated %a clauses (sign %B) for %a"
-        (fun k->k E.pp n pos F.pp f);
-      FPolTbl.add cache (f,pos) n;
-      n
+  let rec num pos f = match F.view f, pos with
+    | F.Eq _, _
+    | F.Neq _, _
+    | F.Atom _, _
+    | F.True, _
+    | F.False, _ -> E.Exactly 1
+    | F.Not f', _ -> num (not pos) f'
+    | F.And l, true -> sum_list pos l
+    | F.And l, false -> prod_list pos l
+    | F.Or l, true -> prod_list pos l
+    | F.Or l, false -> sum_list pos l
+    | F.Imply (a,b), true -> E.(num false a */ num true b)
+    | F.Imply (a,b), false -> E.(num true a +/ num false b)
+    | F.Equiv(a,b), true ->
+        E.((num true a */ num false b) +/ (num false a */ num true b))
+    | F.Equiv(a,b), false ->
+        E.((num true a */ num true b) +/ (num false a */ num false b))
+    | F.Xor(a,b), true ->
+        (* a xor b is defined as  (not a) <=> b *)
+        E.((num false a */ num false b) +/ (num true a */ num true b))
+    | F.Xor(a,b), false ->
+        E.((num false a */ num true b) +/ (num true a */ num false b))
+    | F.Forall (_, f'), _
+    | F.Exists (_, f'), _ -> num pos f'
   and sum_list pos l = match l with
     | [] -> E.Exactly 0
     | x :: tail -> E.(num pos x +/ sum_list pos tail)
@@ -343,7 +316,6 @@ let estimate_num_clauses ~cache ~pos f =
 (* atomic formula, or forall/exists/not an atomic formula (1 literal) *)
 let rec will_yield_lit f = match F.view f with
   | F.Not f'
-  | F.ForallTy f'
   | F.Exists (_, f')
   | F.Forall (_, f') -> will_yield_lit f'
   | _ -> F.is_atomic f
@@ -351,19 +323,19 @@ let rec will_yield_lit f = match F.view f with
 (* introduce definitions for sub-formulas of [f], is needed. This might
    modify [ctx] by adding definitions to it, and it will {!NOT} introduce
    definitions in the definitions (that has to be done later). *)
-let introduce_defs ~ctx ~cache f =
+let introduce_defs ~ctx f =
   let module E = Estimation in
   (* shortcut to compute the number of clauses *)
-  let p pos f = estimate_num_clauses ~cache ~pos f in
+  let p pos f = estimate_num_clauses ~pos f in
   let _neg = function
     | `Pos -> `Neg
     | `Neg -> `Pos
     | `Both -> `Both
   (* rename formula *)
   and _rename ~polarity f =
-    let p = Skolem.get_definition ~ctx ~polarity f in
-    Util.debugf ~section 4 "introduce def. %a for subformula %a"
-      (fun k->k F.pp p F.pp f);
+    let p = Skolem.define ~ctx ~polarity f in
+    Util.debugf ~section 4 "@[<2>introduce@ def. @[%a@]@ for subformula @[%a@]@]"
+      (fun k->k T.pp p T.pp f);
     p
   in
   (* recurse in sub-formulas, renaming as needed.
@@ -372,34 +344,26 @@ let introduce_defs ~ctx ~cache f =
      polarity is the polarity of f within the outermost formula *)
   let rec maybe_rename ~polarity a b f =
     let f = maybe_rename_subformulas ~polarity a b f in
-    (* check whether the formula is already defined! In which case, it's for free *)
-    if Skolem.has_definition ~ctx f
-    then (
-      let atom = Skolem.get_definition ~ctx ~polarity f in
-      Util.debugf ~section 5 "use definition %a for %a" (fun k->k F.pp atom F.pp f);
-      atom
-    )
     (* depending on polarity and subformulas, do renamings.
-      The condition is (where p is the expected number of clauses):
-      if pol=1,  a * p(F) >= a + p(F)
-      if pol=-1, b * p(~F) >= b + p(~F)
-      if pol=0, a * p(F) + b * p(~F) >= a + b + p(F) + p(~F)
+       The condition is (where p is the expected number of clauses):
+       if pol=1,  a * p(F) >= a + p(F)
+       if pol=-1, b * p(~F) >= b + p(~F)
+       if pol=0, a * p(F) + b * p(~F) >= a + b + p(F) + p(~F)
     *)
-    else
-      let should_rename = match polarity with
-        | `Pos ->
-            E.(geq_or_big (a */ p true f) (a +/ p true f))
-        | `Neg ->
-            E.(geq_or_big (b */ p false f) (b +/ p false f))
-        | `Both ->
-            E.(geq_or_big
-              (a */ p true f +/ b */ p false f)
-              (a +/ b +/ p true f +/ p false f)
+    let should_rename = match polarity with
+      | `Pos ->
+          E.(geq_or_big (a */ p true f) (a +/ p true f))
+      | `Neg ->
+          E.(geq_or_big (b */ p false f) (b +/ p false f))
+      | `Both ->
+          E.(geq_or_big
+               (a */ p true f +/ b */ p false f)
+               (a +/ b +/ p true f +/ p false f)
             )
-      in
-      if not (will_yield_lit f) && should_rename
-        then _rename ~polarity f
-        else f
+    in
+    if not (will_yield_lit f) && should_rename
+    then _rename ~polarity f
+    else f
   (* introduce definitions for subterms *)
   and maybe_rename_subformulas ~polarity a b f = match F.view f with
     | F.True
@@ -409,25 +373,25 @@ let introduce_defs ~ctx ~cache f =
     | F.Neq _ -> f
     | F.And l ->
         let l' = List.mapi
-          (fun i f' ->
-            let a' = a in
-            let b' = E.(b */ prod_p ~pos:false ~except:i l 0) in
-            maybe_rename ~polarity a' b' f'
-          ) l
+            (fun i f' ->
+               let a' = a in
+               let b' = E.(b */ prod_p ~pos:false ~except:i l 0) in
+               maybe_rename ~polarity a' b' f'
+            ) l
         in
-        F.Base.and_ l'
+        F.and_ l'
     | F.Or l ->
         let l' = List.mapi
-          (fun i f' ->
-            let a' = E.(a */ prod_p ~pos:true ~except:i l 0) in
-            let b' = b in
-            maybe_rename ~polarity a' b' f'
-          ) l
+            (fun i f' ->
+               let a' = E.(a */ prod_p ~pos:true ~except:i l 0) in
+               let b' = b in
+               maybe_rename ~polarity a' b' f'
+            ) l
         in
-        F.Base.or_ l'
+        F.or_ l'
     | F.Not f' ->
         let a' = b and b' = a in
-        F.Base.not_ (maybe_rename ~polarity:(_neg polarity) a' b' f')
+        F.not_ (maybe_rename ~polarity:(_neg polarity) a' b' f')
     | F.Imply (f1, f2) ->
         let f1' =
           let a' = b and b' = E.(a */ p true f2) in
@@ -436,7 +400,7 @@ let introduce_defs ~ctx ~cache f =
           let a' = E.(a */ p false f1) and b' = b in
           maybe_rename ~polarity a' b' f2
         in
-        F.Base.imply f1' f2'
+        F.imply f1' f2'
     | F.Equiv (f1, f2) ->
         let f1' =
           let a' = E.(a */ p false f2 +/ b */ p true f2) in
@@ -447,7 +411,7 @@ let introduce_defs ~ctx ~cache f =
           let b' = E.(a */ p true f1 +/ b */ p false f1) in
           maybe_rename ~polarity:`Both a' b' f2
         in
-        F.Base.equiv f1' f2'
+        F.equiv f1' f2'
     | F.Xor (f1, f2) ->
         (* we consider that f1 has reverted polarity *)
         let f1' =
@@ -459,13 +423,11 @@ let introduce_defs ~ctx ~cache f =
           let b' = E.(a */ p false f1 +/ b */ p true f1) in
           maybe_rename ~polarity:`Both a' b' f2
         in
-        F.Base.xor f1' f2'
-    | F.Forall (varty, f') ->
-        F.Base.__mk_forall ~varty (maybe_rename ~polarity a b f')
-    | F.Exists (varty, f') ->
-        F.Base.__mk_exists ~varty (maybe_rename ~polarity a b f')
-    | F.ForallTy f' ->
-        F.Base.__mk_forall_ty (maybe_rename ~polarity a b f')
+        F.xor f1' f2'
+    | F.Forall (var, f') ->
+        F.forall var (maybe_rename ~polarity a b f')
+    | F.Exists (var, f') ->
+        F.exists var (maybe_rename ~polarity a b f')
   (* product of all (p ~pos x) for x in l if idx(x) != except *)
   and prod_p ~pos l i ~except = match l with
     | [] -> E.Exactly 1
@@ -473,58 +435,54 @@ let introduce_defs ~ctx ~cache f =
         if i = except
         then prod_p ~pos tail (i+1) ~except
         else
-          let p_x = estimate_num_clauses ~cache ~pos x in
+          let p_x = estimate_num_clauses ~pos x in
           E.(p_x */ prod_p ~pos tail (i+1) ~except)
   in
   maybe_rename ~polarity:`Pos (E.Exactly 1) (E.Exactly 0) f
 
 (* helper: reduction to cnf using De Morgan laws. Returns a list of list of
-  atomic formulas *)
+   atomic formulas *)
 let rec to_cnf_rec f = match F.view f with
   | F.Eq _
   | F.Neq _
   | F.Atom _
   | F.True
-  | F.False -> [[f]]
-  | F.Not f' ->
-      begin match F.view f' with
-      | F.Eq (a,b) -> [[F.Base.neq a b]]
-      | F.Neq (a,b) -> [[F.Base.eq a b]]
-      | _ when F.is_atomic f' ->[[f]]
-      | _ -> failwith (CCFormat.sprintf "should be atomic: %a" F.pp f')
-      end
+  | F.False
+  | F.Not _ -> [[as_lit f]]
   | F.And l ->
-    (* simply concat sub-CNF *)
-    CCList.flat_map to_cnf_rec l
+      (* simply concat sub-CNF *)
+      CCList.flat_map to_cnf_rec l
   | F.Or (f'::l) ->
-    (* cartesian products of sub-CNF *)
-    List.fold_left
-      (fun cnf f' -> product (to_cnf_rec f') cnf)
-      (to_cnf_rec f')
-      l
+      (* cartesian products of sub-CNF *)
+      List.fold_left
+        (fun cnf f' -> product (to_cnf_rec f') cnf)
+        (to_cnf_rec f')
+        l
   | F.Forall _
-  | F.Exists _
-  | F.ForallTy _ -> failwith "Cnf.to_cnf_rec: can only clausify a skolemized formula"
+  | F.Exists _ ->
+      errorf_
+        "@[<2>Cnf.to_cnf_rec:@ can only clausify a skolemized formula,@ not @[%a@]@]"
+        T.pp f
   | F.Xor _
   | F.Imply _
-  | F.Equiv _ -> failwith "Cnf.to_cnf_rec: can only clausify a NNF formula"
+  | F.Equiv _ ->
+      errorf_
+        "@[<2>Cnf.to_cnf_rec:@ can only clausify a NNF formula,@ not @[%a@]@]"
+        T.pp f
   | F.Or [] -> assert false
 (* cartesian product of lists of lists *)
 and product a b =
   List.fold_left
     (fun acc litsa -> List.fold_left
-      (fun acc' litsb -> (litsa @ litsb) :: acc')
-      acc b)
+        (fun acc' litsb -> (litsa @ litsb) :: acc')
+        acc b)
     [] a
 
-let to_cnf l =
+let to_cnf f =
   Util.enter_prof prof_to_cnf;
-  let res = to_cnf_rec l in
+  let res = to_cnf_rec f in
   Util.exit_prof prof_to_cnf;
   res
-
-type clause = F.t list
-  (** Basic clause representation, as list of literals *)
 
 type options =
   | DistributeExists
@@ -534,109 +492,89 @@ type options =
   | PostSkolem of (form -> form) (** must not introduce variables nor negations *)
 
 (* simplify formulas and rename them. May introduce new formulas *)
-let simplify_and_rename ~ctx ~cache ~disable_renaming ~preprocess l =
+let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
   Util.enter_prof prof_simplify_rename;
-  let l' = List.map
-    (fun f ->
-      let f = F.flatten f in
-      (* preprocessing *)
-      let f = List.fold_left (|>) f preprocess in
-      (* simplification *)
-      let f = F.simplify f in
-      if disable_renaming || is_cnf f
-        then f
-        else introduce_defs ~ctx ~cache f)
-    l
+  let res = seq
+    |> Sequence.flat_map
+      (fun f ->
+         (* preprocessing *)
+         let f = List.fold_left (|>) f preprocess in
+         (* simplification *)
+         let f' =
+           if disable_renaming || is_clause f
+           then f
+           else introduce_defs ~ctx f
+         in
+         let defs = Skolem.pop_new_definitions ~ctx in
+         match defs with
+         | [] -> Sequence.return f'
+         | _::_ ->
+            let defs = List.map
+                (fun d ->
+                   (* introduce the required definition, with polarity as needed *)
+                   match d.Skolem.polarity with
+                     | `Pos -> F.imply d.Skolem.proxy d.Skolem.form
+                     | `Neg -> F.imply d.Skolem.form d.Skolem.proxy
+                     | `Both -> F.equiv d.Skolem.proxy d.Skolem.form
+                )
+                defs
+            in
+            Sequence.of_list (f' :: defs)
+      )
+    |> CCVector.of_seq ?init:None
   in
-  (* add the new definitions to the list of formulas to reduce to CNF *)
-  let defs = Skolem.pop_new_definitions ~ctx in
-  let defs = List.map
-    (fun d ->
-      (* introduce the required definition, with polarity as needed *)
-      let f = match !(d.Skolem.polarity) with
-        | `Pos -> F.Base.imply d.Skolem.proxy d.Skolem.form
-        | `Neg -> F.Base.imply d.Skolem.form d.Skolem.proxy
-        | `Both -> F.Base.equiv d.Skolem.proxy d.Skolem.form
-      in
-      F.simplify f)
-    defs
-  in
-  let res = List.rev_append defs l' in
   Util.exit_prof prof_simplify_rename;
   res
 
 (* Transform the clauses into proper CNF; returns a list of clauses *)
-let cnf_of_list ?(opts=[]) ?(ctx=Skolem.create Signature.empty) l =
-  let acc = ref [] in
+let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
   (* read options *)
   let disable_renaming = List.mem DisableRenaming opts in
-  let preprocess = CCList.filter_map
-    (function InitialProcessing f -> Some f | _ -> None)
-    opts
-  and post_nnf = CCList.filter_map
-    (function PostNNF f -> Some f | _ -> None)
-    opts
-  and post_skolem = CCList.filter_map
-    (function PostSkolem f -> Some f | _ -> None)
-    opts
+  let preprocess =
+    CCList.filter_map
+      (function InitialProcessing f -> Some f | _ -> None)
+      opts
+  and post_nnf =
+    CCList.filter_map
+      (function PostNNF f -> Some f | _ -> None)
+      opts
+  and post_skolem =
+    CCList.filter_map
+      (function PostSkolem f -> Some f | _ -> None)
+      opts
   in
-  let cache = FPolTbl.create 128 in
   (* simplify and introduce definitions *)
-  let l = simplify_and_rename ~ctx ~cache ~disable_renaming
-    ~preprocess l in
+  let v = simplify_and_rename ~ctx ~disable_renaming ~preprocess seq in
   (* reduce the new formulas to CNF *)
-  List.iter (fun f ->
-    Util.debugf ~section 4 "reduce %a to CNF..." (fun k->k F.pp f);
-    let clauses = if is_cnf f
-      then
-        match F.view f with
-        | F.Or l -> [l]  (* works because [f] flattened before *)
-        | F.False
-        | F.True
-        | F.Eq _
-        | F.Neq _
-        | F.Atom _ -> [[f]]
-        | F.Not f'  ->
-          begin match F.view f' with
-          | F.Eq (a,b) -> [[F.Base.neq a b]]
-          | F.Neq (a,b) -> [[F.Base.eq a b]]
-          | _ when F.is_atomic f' ->[[f]]
-          | _ -> failwith (CCFormat.sprintf "should be atomic: %a" F.pp f')
-          end
-        | F.Equiv _
-        | F.Imply _
-        | F.Xor _
-        | F.And _
-        | F.Forall _
-        | F.Exists _
-        | F.ForallTy _ -> assert false
-      else begin
-        let f = F.simplify f in
-        Util.debugf ~section 4 "... simplified: @[%a@]" (fun k->k F.pp f);
-        let f = nnf f in
-        (* processing post-nnf *)
-        let f = List.fold_left (|>) f post_nnf in
-        Util.debugf ~section 4 "... NNF: @[%a@]" (fun k->k F.pp f);
-        let distribute_exists = List.mem DistributeExists opts in
-        let f = miniscope ~distribute_exists f in
-        Util.debugf ~section 4 "... miniscoped: @[%a@]" (fun k->k F.pp f);
-        (* adjust the variable counter to [f] before skolemizing *)
-        Skolem.clear_var ~ctx;
-        F.iter (Skolem.update_var ~ctx) f;
-        let f = skolemize ~ctx f in
-        (* processing post-skolemization *)
-        let f = List.fold_left (|>) f post_skolem in
-        Util.debugf ~section 4 "... skolemized: @[%a@]" (fun k->k F.pp f);
-        let clauses = to_cnf f in
-        Util.debugf ~section 4 "... CNF: @[%a@]"
-          (fun k->k (Util.pp_list ~sep:", " (CCFormat.list ~sep:" | " F.pp)) clauses);
-        assert (List.for_all (List.for_all F.is_closed) clauses);
-        clauses
-      end
-    in
-    assert (List.for_all is_clause clauses);
-    acc := List.rev_append clauses !acc
-  ) l;
-  !acc
+  let res = CCVector.create () in
+  CCVector.iter
+    (fun f ->
+      Util.debugf ~section 4 "@[<2>reduce@ `@[%a@]`@ to CNF@]" (fun k->k T.pp f);
+      let clauses =
+        try as_cnf f
+        with NotCNF ->
+          let f = nnf f in
+          (* processing post-nnf *)
+          let f = List.fold_left (|>) f post_nnf in
+          Util.debugf ~section 4 "@[<2>... NNF:@ `@[%a@]`@]" (fun k->k T.pp f);
+          let distribute_exists = List.mem DistributeExists opts in
+          let f = miniscope ~distribute_exists f in
+          Util.debugf ~section 4 "@[<2>... miniscoped:@ `@[%a@]`@]" (fun k->k T.pp f);
+          (* adjust the variable counter to [f] before skolemizing *)
+          let f = skolemize ~ctx Var.Subst.empty f in
+          (* processing post-skolemization *)
+          let f = List.fold_left (|>) f post_skolem in
+          Util.debugf ~section 4 "@[<2>... skolemized:@ `@[%a@]`@]" (fun k->k T.pp f);
+          let clauses = to_cnf f in
+          Util.debugf ~section 4 "@[<2>... CNF:@ `@[%a@]`@]"
+            (fun k->k (Util.pp_list ~sep:", " pp_clause) clauses);
+          clauses
+      in
+      CCVector.append_list res clauses
+    )
+    v;
+  (* return final vector of clauses *)
+  CCVector.freeze res
 
-let cnf_of ?opts ?ctx f = cnf_of_list ?opts ?ctx [f]
+let cnf_of ?opts ?ctx f =
+  cnf_of_seq ?opts ?ctx (Sequence.return f)

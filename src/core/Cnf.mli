@@ -1,80 +1,63 @@
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Reduction to CNF and simplifications} *)
 
+type term = TypedSTerm.t
 type form = TypedSTerm.t
 
 (** See "computing small normal forms", in the handbook of automated reasoning.
     All transformations are made on curried terms and formulas. *)
 
-val is_cnf : form -> bool
-  (** Is the formula in CNF? *)
-
-val is_lit : form -> bool
-  (** Literal? *)
-
-val is_clause : form list -> bool
-  (** Is it a clause, ie a list of literals? *)
+exception Error of string
 
 val miniscope : ?distribute_exists:bool -> form -> form
-  (** Apply miniscoping transformation to the term.
-      @param distribute_exists see whether ?X:(p(X)|q(X)) should be
-        transformed into (?X: p(X) | ?X: q(X)). Default: [false] *)
+(** Apply miniscoping transformation to the term.
+    @param distribute_exists see whether ?X:(p(X)|q(X)) should be
+      transformed into (?X: p(X) | ?X: q(X)). Default: [false] *)
 
-type clause = form list
-  (** Basic clause representation, as list of literals *)
+type lit =
+  | True
+  | False
+  | Atom of term * bool
+  | Eq of term * term
+  | Neq of term * term
+
+type clause = lit list
+(** Basic clause representation, as list of literals *)
 
 (** Options are used to tune the behavior of the CNF conversion. *)
 type options =
   | DistributeExists
-    (** if enabled, will distribute existential quantifiers over
+  (** if enabled, will distribute existential quantifiers over
       disjunctions. This can make skolem symbols smaller (smaller arity) but
       introduce more of them. *)
 
   | DisableRenaming
-    (** disables formula renaming. Can re-introduce the worst-case
-        exponential behavior of CNF. *)
+  (** disables formula renaming. Can re-introduce the worst-case
+      exponential behavior of CNF. *)
 
   | InitialProcessing of (form -> form)
-    (** any processing, at the beginning, before CNF starts  *)
+  (** any processing, at the beginning, before CNF starts  *)
 
   | PostNNF of (form -> form)
-    (** any processing that keeps negation at leaves,
-        just after reduction to NNF. Its output
-        must not break the NNF form (negation at root only). *)
+  (** any processing that keeps negation at leaves,
+      just after reduction to NNF. Its output
+      must not break the NNF form (negation at root only). *)
 
   | PostSkolem of (form -> form)
-    (** transformation applied just after skolemization. It must not
-        break skolemization nor NNF (no quantifier, no non-leaf negation). *)
+  (** transformation applied just after skolemization. It must not
+      break skolemization nor NNF (no quantifier, no non-leaf negation). *)
 
-val cnf_of : ?opts:options list -> ?ctx:Skolem.ctx ->
-             form -> clause list
-  (** Transform the clause into proper CNF; returns a list of clauses.
-      Options are used to tune the behavior. *)
+val cnf_of :
+  ?opts:options list ->
+  ?ctx:Skolem.ctx ->
+  form ->
+  (clause, CCVector.ro) CCVector.t
+(** Transform the clause into proper CNF; returns a list of clauses.
+    Options are used to tune the behavior. *)
 
-val cnf_of_list :
+val cnf_of_seq :
   ?opts:options list -> ?ctx:Skolem.ctx ->
-  form list -> clause list
+  form Sequence.t ->
+  (clause, CCVector.ro) CCVector.t

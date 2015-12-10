@@ -135,7 +135,7 @@ let rec pp out t = match view t with
   | Multiset l ->
       Format.fprintf out "[@[%a@]]" (Util.pp_list ~sep:", " _pp_inner) l
   | Meta (id, r) ->
-      assert (!r = None);
+      assert (!r = None); (* we used {!view} *)
       Format.fprintf out "?%a" Var.pp id
 and _pp_inner buf t = match view t with
   | AppBuiltin (_, _::_)
@@ -432,7 +432,7 @@ end
 
 exception UnifyFailure of string * (term * term) list
 
-let pp_stack_ out l =
+let pp_stack out l =
   let pp_frame out (t1,t2) =
     Format.fprintf out "@[unifying `@[%a@]` and `@[%a@]`...@]" pp t1 pp t2
   in
@@ -442,7 +442,7 @@ let () = Printexc.register_printer
   (function
     | UnifyFailure (msg, st) ->
       Some (
-        CCFormat.sprintf "@[<2>unification error:@ %s@,%a@]" msg pp_stack_ st)
+        CCFormat.sprintf "@[<2>unification error:@ %s@,%a@]" msg pp_stack st)
     | _ -> None)
 
 let fail_unif_ st msg = raise (UnifyFailure (msg, st))

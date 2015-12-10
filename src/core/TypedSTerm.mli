@@ -129,6 +129,8 @@ module Form : sig
 
   val view : t -> view
 
+  (** Smart constructors (perform simplifications) *)
+
   val true_ : t
   val false_ : t
   val atom : ?loc:location -> t -> t
@@ -164,6 +166,9 @@ val ground : t -> bool
 val closed : t -> bool
 (** [closed t] is [true] iff all bound variables of [t] occur under a
     binder (i.e. they are actually bound in [t]) *)
+
+val var_occurs : var:t Var.t -> t -> bool
+(** [var_occurs ~var t] is [true] iff [var] occurs in [t] *)
 
 val vars : t -> t list
 
