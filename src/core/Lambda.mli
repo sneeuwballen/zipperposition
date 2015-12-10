@@ -8,10 +8,10 @@ type term = HOTerm.t
 val whnf : term -> term
 (** Beta-reduce the term into its weak head normal form *)
 
-val whnf_list : ?depth:int -> term -> term list -> term
+val whnf_list : term -> term list -> term
 (** Apply a lambda to a list of arguments.
     The type of the lambda must be a generalization of a function
     that takes the list's types as arguments.
 
-    @raise Type.Error if the first term doesn't have a function type or
+    @raise Type.ApplyError if the first term doesn't have a function type or
       if the types are not compatible *)

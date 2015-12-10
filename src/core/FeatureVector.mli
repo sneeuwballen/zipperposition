@@ -39,11 +39,11 @@ module Make(C : Index.CLAUSE) : sig
 
   include Index.SUBSUMPTION_IDX with module C = C
 
-  val retrieve_alpha_equiv : t -> lits -> 'a -> ('a -> C.t -> 'a) -> 'a
+  val retrieve_alpha_equiv : t -> lits -> C.t Sequence.t
   (** Retrieve clauses that are potentially alpha-equivalent to the given clause
       @since 0.6 *)
 
-  val retrieve_alpha_equiv_c : t -> C.t -> 'a -> ('a -> C.t -> 'a) -> 'a
+  val retrieve_alpha_equiv_c : t -> C.t -> C.t Sequence.t
   (** @since 0.6 *)
 
   val empty_with : Feature.t list -> t

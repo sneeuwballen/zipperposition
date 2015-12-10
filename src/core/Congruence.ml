@@ -227,7 +227,7 @@ module Make(T : TERM) = struct
       let t1 = T.update_subterms n1.term l1' in
       let t2 = T.update_subterms n2.term l2' in
       T.equal t1 t2
-    with Type.Error _ ->
+    with Type.ApplyError _ ->
       false
 
   (* check whether all congruences of [node] are computed, by
@@ -411,20 +411,20 @@ module HO = Make(struct
   let subterms t = match T.view t with
     | T.Const _
     | T.Var _
-    | T.BVar _ -> []
+    | T.DB _ -> []
     | T.Lambda (_,t') | T.Forall (_, t') | T.Exists (_, t') -> [t']
-    | T.At (t1, t2) -> [t1;t2]
-    | T.TyLift _ -> []
+    | T.AppBuiltin (_,l) -> l
+    | T.App (f,l) -> f::l
     | T.Multiset (_,l) -> l
     | T.Record _ -> assert false   (* TODO *)
 
   let update_subterms t l = match T.view t, l with
-    | (T.Const _ | T.Var _ | T.BVar _), [] -> t
-    | T.At _, [t1'; t2'] -> T.at t1' t2'
-    | T.TyLift _, [] -> t
-    | T.Lambda (varty, _), [t'] -> T.__mk_lambda ~varty t'
-    | T.Forall (varty, _), [t'] -> T.__mk_forall ~varty t'
-    | T.Exists (varty, _), [t'] -> T.__mk_exists ~varty t'
+    | (T.Const _ | T.Var _ | T.DB _), [] -> t
+    | T.App _, f::l -> T.app f l
+    | T.AppBuiltin (b,_), l -> T.app_builtin ~ty:(T.ty t) b l
+    | T.Lambda (varty, _), [t'] -> T.lambda ~varty t'
+    | T.Forall (varty, _), [t'] -> T.forall ~varty t'
+    | T.Exists (varty, _), [t'] -> T.exists ~varty t'
     | T.Multiset(ty,_), l -> T.multiset ~ty l
     | T.Record _, _ -> assert false (* TODO *)
     | _ -> assert false

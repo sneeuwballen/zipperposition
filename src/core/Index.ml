@@ -61,11 +61,11 @@ module MakeLeaf(X : Set.OrderedType) : LEAF with type elt = X.t = struct
          with Unif.Fail -> ())
       leaf.Scoped.value
 
-  let fold_match ?(allow_open=false) ?(subst=Substs.empty) leaf t k =
+  let fold_match ?(subst=Substs.empty) leaf t k =
     T.Map.iter
       (fun t' set ->
          try
-           let subst = Unif.FO.matching ~allow_open ~subst
+           let subst = Unif.FO.matching ~subst
              ~pattern:(Scoped.set leaf t') t in
            S.iter
              (fun data -> k (t', data, subst))
@@ -73,11 +73,11 @@ module MakeLeaf(X : Set.OrderedType) : LEAF with type elt = X.t = struct
          with Unif.Fail -> ())
       leaf.Scoped.value
 
-  let fold_matched ?(allow_open=false) ?(subst=Substs.empty) leaf t k =
+  let fold_matched ?(subst=Substs.empty) leaf t k =
     T.Map.iter
       (fun t' set ->
          try
-           let subst = Unif.FO.matching ~allow_open ~subst
+           let subst = Unif.FO.matching ~subst
              ~pattern:t (Scoped.set leaf t') in
            S.iter
              (fun data -> k (t', data, subst))

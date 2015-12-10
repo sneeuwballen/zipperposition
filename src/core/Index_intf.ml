@@ -21,13 +21,13 @@ module type LEAF = sig
     (term * elt * subst) Sequence.t
 
   val fold_match :
-    ?allow_open:bool -> ?subst:subst ->
+    ?subst:subst ->
     t Scoped.t -> term Scoped.t ->
     (term * elt * subst) Sequence.t
   (** Match the indexed terms against the given query term *)
 
   val fold_matched :
-    ?allow_open:bool -> ?subst:subst ->
+    ?subst:subst ->
     t Scoped.t -> term Scoped.t ->
     (term * elt * subst) Sequence.t
   (** Match the query term against the indexed terms *)
@@ -59,11 +59,11 @@ module type TERM_IDX = sig
     t Scoped.t -> term Scoped.t ->
     (term * elt * subst) Sequence.t
 
-  val retrieve_generalizations : ?allow_open:bool -> ?subst:subst ->
+  val retrieve_generalizations : ?subst:subst ->
     t Scoped.t -> term Scoped.t ->
     (term * elt * subst) Sequence.t
 
-  val retrieve_specializations : ?allow_open:bool -> ?subst:subst ->
+  val retrieve_specializations : ?subst:subst ->
     t Scoped.t -> term Scoped.t ->
     (term * elt * subst) Sequence.t
 
@@ -170,7 +170,7 @@ module type UNIT_IDX = sig
   (** Iterate on indexed equations *)
 
   val retrieve :
-    ?allow_open:bool -> ?subst:subst -> sign:bool ->
+    ?subst:subst -> sign:bool ->
     t Scoped.t -> term Scoped.t ->
     (term * rhs * E.t * subst) Sequence.t
   (** [retrieve ~sign (idx,si) (t,st) acc] iterates on

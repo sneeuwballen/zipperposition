@@ -41,7 +41,7 @@ let gensym =
       else CCPrint.sprintf "'_%c%d" names.[j] i
     in
     incr r;
-    name
+    make name
 
 module O_ = struct
   type t = t_

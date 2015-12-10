@@ -33,10 +33,10 @@ module S = Substs
 
 let prof_traverse = Util.mk_profiler "fingerprint.traverse"
 
-(** a feature *)
-type feature = A | B | N | S of Symbol.t
+(* a feature *)
+type feature = A | B | N | S of ID.t
 
-(** a fingerprint function, it computes several features of a term *)
+(* a fingerprint function, it computes several features of a term *)
 type fingerprint_fun = T.t -> feature list
 
 (* TODO: use a feature array, rather than a list *)
@@ -44,17 +44,18 @@ type fingerprint_fun = T.t -> feature list
 (* TODO: more efficient implem of traversal, only following branches that
   are useful instead of folding and filtering *)
 
-(** compute a feature for a given position *)
+(* compute a feature for a given position *)
 let rec gfpf pos t = match pos, T.Classic.view t with
   | [], T.Classic.Var _ -> A
-  | [], T.Classic.BVar _ -> S (Symbol.of_string "__de_bruijn")
+  | [], T.Classic.DB _ -> B
   | [], T.Classic.App (s, _, _) -> S s
   | i::pos', T.Classic.App (_, _, l) ->
     begin try gfpf pos' (List.nth l i)  (* recurse in subterm *)
     with Failure _ -> N  (* not a position in t *)
     end
-  | _::_, T.Classic.BVar _ -> N
+  | _::_, T.Classic.DB _ -> N
   | _::_, T.Classic.Var _ -> B  (* under variable *)
+  | _, T.Classic.AppBuiltin _
   | _, T.Classic.NonFO -> B (* don't filter! *)
 
 (* TODO more efficient way to compute a vector of features: if the fingerprint
@@ -83,7 +84,7 @@ let fp16 = fp [[]; [1]; [2]; [3]; [4]; [1;1]; [1;2]; [1;3]; [2;1];
 
 (** {2 Index construction} *)
 
-let __feat2int = function
+let feat_to_int_ = function
   | A -> 0
   | B -> 1
   | S _ -> 2
@@ -93,13 +94,13 @@ let cmp_feature f1 f2 = match f1, f2 with
   | A, A
   | B, B
   | N, N -> 0
-  | S s1, S s2 -> Symbol.compare s1 s2
-  | _ -> __feat2int f1 - __feat2int f2
+  | S s1, S s2 -> ID.compare s1 s2
+  | _ -> feat_to_int_ f1 - feat_to_int_ f2
 
 (** check whether two features are compatible for unification. *)
 let compatible_features_unif f1 f2 =
   match f1, f2 with
-  | S s1, S s2 -> Symbol.equal s1 s2
+  | S s1, S s2 -> ID.equal s1 s2
   | B, _ | _, B -> true
   | A, N | N, A -> false
   | A, _ | _, A -> true
@@ -109,7 +110,7 @@ let compatible_features_unif f1 f2 =
 (** check whether two features are compatible for matching. *)
 let compatible_features_match f1 f2 =
   match f1, f2 with
-  | S s1, S s2 -> Symbol.equal s1 s2
+  | S s1, S s2 -> ID.equal s1 s2
   | B, _ -> true
   | N, N -> true
   | N, _ -> false
@@ -249,51 +250,48 @@ module Make(X : Set.OrderedType) = struct
     !n
 
   (** fold on parts of the trie that are compatible with features *)
-  let traverse ~compatible idx features acc k =
+  let traverse ~compatible idx features k =
     Util.enter_prof prof_traverse;
     (* fold on the trie *)
-    let rec recurse trie features acc =
+    let rec recurse trie features =
       match trie, features with
-      | Empty, _ -> acc
+      | Empty, _ -> ()
       | Leaf leaf, [] ->
-        k acc leaf  (* give the leaf to [k] *)
+        k leaf  (* give the leaf to [k] *)
       | Node map, f::features' ->
         (* fold on any subtrie that is compatible with current feature *)
-        FeatureMap.fold
-          (fun f' subtrie acc ->
-            if compatible f f'
-              then recurse subtrie features' acc
-              else acc)
-          map acc
+        FeatureMap.iter
+          (fun f' subtrie ->
+            if compatible f f' then recurse subtrie features')
+          map
       | Node _, [] | Leaf _, _::_ ->
         failwith "different feature length in fingerprint trie"
     in
     try
-      let acc = recurse idx.trie features acc in
+      recurse idx.trie features;
       Util.exit_prof prof_traverse;
-      acc
     with e ->
       Util.exit_prof prof_traverse;
       raise e
 
-  let retrieve_unifiables ?(subst=S.empty) idx o_i t o_t acc f =
-    let features = idx.fp t in
+  let retrieve_unifiables ?(subst=S.empty) idx t k =
+    let features = idx.Scoped.value.fp t.Scoped.value in
     let compatible = compatible_features_unif in
-    traverse ~compatible idx features acc
-      (fun acc leaf -> Leaf.fold_unify ~subst leaf o_i t o_t acc f)
+    traverse ~compatible idx.Scoped.value features
+      (fun leaf -> Leaf.fold_unify ~subst (Scoped.set idx leaf) t k)
 
-  let retrieve_generalizations ?(allow_open=false) ?(subst=S.empty) idx o_i t o_t acc f =
-    let features = idx.fp t in
+  let retrieve_generalizations ?(subst=S.empty) idx t k =
+    let features = idx.Scoped.value.fp t.Scoped.value in
     (* compatible t1 t2 if t2 can match t1 *)
     let compatible f1 f2 = compatible_features_match f2 f1 in
-    traverse ~compatible idx features acc
-      (fun acc leaf -> Leaf.fold_match ~allow_open ~subst leaf o_i t o_t acc f)
+    traverse ~compatible idx.Scoped.value features
+      (fun leaf -> Leaf.fold_match ~subst (Scoped.set idx leaf) t k)
 
-  let retrieve_specializations ?(allow_open=false) ?(subst=S.empty) idx o_i t o_t acc f =
-    let features = idx.fp t in
+  let retrieve_specializations ?(subst=S.empty) idx t k =
+    let features = idx.Scoped.value.fp t.Scoped.value in
     let compatible = compatible_features_match in
-    traverse ~compatible idx features acc
-      (fun acc leaf -> Leaf.fold_matched ~allow_open ~subst leaf o_i t o_t acc f)
+    traverse ~compatible idx.Scoped.value features
+      (fun leaf -> Leaf.fold_matched ~subst (Scoped.set idx leaf) t k)
 
   let to_dot _ _ =
     failwith "Fingerprint: to_dot not implemented"

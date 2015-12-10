@@ -27,7 +27,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module T = FOTerm
 module S = Substs
-module SMap = Symbol.Map
 
 let prof_npdtree_retrieve = Util.mk_profiler "NPDtree_retrieve"
 let prof_npdtree_term_unify = Util.mk_profiler "NPDtree_term_unify"
@@ -48,8 +47,8 @@ type iterator = {
 
 let open_term ~stack t = match T.view t with
   | T.Var _
-  | T.BVar _
-  | T.TyApp _
+  | T.DB _
+  | T.AppBuiltin _
   | T.Const _ ->
       Some {cur_term=t; stack=[]::stack;}
   | T.App (_, l) ->
@@ -80,18 +79,18 @@ module Make(E : Index.EQUATION) = struct
 
   type t = {
     star : t option;  (* by variable *)
-    map : t SMap.t;   (* by symbol *)
+    map : t ID.Map.t;   (* by symbol *)
     leaf : Leaf.t;    (* leaves *)
   }  (** The discrimination tree *)
 
-  let empty () = {map=SMap.empty; star=None; leaf=Leaf.empty;}
+  let empty () = {map=ID.Map.empty; star=None; leaf=Leaf.empty;}
 
-  let is_empty n = n.star = None && SMap.is_empty n.map && Leaf.is_empty n.leaf
+  let is_empty n = n.star = None && ID.Map.is_empty n.map && Leaf.is_empty n.leaf
 
   exception NoSuchTrie
 
   let find_sub map key =
-    try SMap.find key map
+    try ID.Map.find key map
     with Not_found -> raise NoSuchTrie
 
   (** get/add/remove the leaf for the given term. The
@@ -112,7 +111,7 @@ module Make(E : Index.EQUATION) = struct
         end
       | Some i ->
         match T.Classic.view i.cur_term with
-          | (T.Classic.Var _ | T.Classic.BVar _) ->
+          | (T.Classic.Var _ | T.Classic.DB _) ->
             let subtrie = match trie.star with
               | None -> empty ()
               | Some trie' -> trie'
@@ -130,11 +129,12 @@ module Make(E : Index.EQUATION) = struct
             in
             let rebuild subtrie =
               if is_empty subtrie
-                then rebuild {trie with map=SMap.remove s trie.map; }
-                else rebuild {trie with map=SMap.add s subtrie trie.map ;}
+                then rebuild {trie with map=ID.Map.remove s trie.map; }
+                else rebuild {trie with map=ID.Map.add s subtrie trie.map ;}
             in
             goto subtrie (next i) rebuild
-          | T.Classic.NonFO -> assert false (* TODO *)
+          | T.Classic.AppBuiltin _
+          | T.Classic.NonFO -> assert false (* TODO: consider like a var *)
   in
   goto trie (iterate t) (fun t -> t)
 
@@ -154,47 +154,45 @@ module Make(E : Index.EQUATION) = struct
   let remove_seq dt seq =
     Sequence.fold remove dt seq
 
-  let retrieve ?(allow_open=false) ?(subst=S.empty) ~sign dt sc_dt t sc_t acc k =
+  let retrieve ?(subst=S.empty) ~sign dt t k =
     Util.enter_prof prof_npdtree_retrieve;
     (* extended callback *)
-    let k' acc t' eqn subst =
+    let k' (t', eqn, subst) =
       let _, r, sign' = E.extract eqn in
-      if sign = sign' then k acc t' r eqn subst else acc
+      if sign = sign' then k (t', r, eqn, subst)
     in
     (* recursive traversal of the trie, following paths compatible with t *)
-    let rec traverse trie acc iter =
+    let rec traverse trie iter =
       match iter with
       | None ->
           Util.exit_prof prof_npdtree_retrieve;
-          let acc = Leaf.fold_match ~allow_open ~subst trie.leaf sc_dt t sc_t acc k' in
+          Leaf.fold_match ~subst (Scoped.set dt trie.leaf) t k';
           Util.enter_prof prof_npdtree_retrieve;
-          acc
       | Some i ->
         match T.Classic.view i.cur_term with
-          | (T.Classic.Var _ | T.Classic.BVar _) ->
+          | (T.Classic.Var _ | T.Classic.DB _) ->
             begin match trie.star with
-            | None -> acc
+            | None -> ()
             | Some subtrie ->
-              traverse subtrie acc (next i)  (* match "*" against "*" *)
+              traverse subtrie (next i)  (* match "*" against "*" *)
             end
           | T.Classic.App (s, _, _) ->
-            let acc =
-              try
-                let subtrie = find_sub trie.map s in
-                traverse subtrie acc (next i)
-              with NoSuchTrie -> acc
-            in
+            begin try
+              let subtrie = find_sub trie.map s in
+              traverse subtrie (next i)
+            with NoSuchTrie -> ()
+            end;
             begin match trie.star with
-              | None -> acc
+              | None -> ()
               | Some subtrie ->
-                traverse subtrie acc (skip i)  (* skip subterm *)
+                traverse subtrie (skip i)  (* skip subterm *)
             end
-          | T.Classic.NonFO -> assert false
+          | T.Classic.AppBuiltin _
+          | T.Classic.NonFO -> assert false (* TODO: consder like a var? *)
     in
     try
-      let acc = traverse dt acc (iterate t) in
+      traverse dt.Scoped.value (iterate t.Scoped.value);
       Util.exit_prof prof_npdtree_retrieve;
-      acc
     with e ->
       Util.exit_prof prof_npdtree_retrieve;
       raise e
@@ -206,7 +204,7 @@ module Make(E : Index.EQUATION) = struct
     | None -> ()
     | Some trie' -> iter trie' k
     end;
-    SMap.iter (fun _ trie' -> iter trie' k) dt.map
+    ID.Map.iter (fun _ trie' -> iter trie' k) dt.map
 
   let size dt =
     let n = ref 0 in
@@ -221,8 +219,8 @@ module Make(E : Index.EQUATION) = struct
             | None -> Sequence.empty
             | Some t' -> Sequence.singleton ("*", t')
           )
-        and s2 = SMap.to_seq t.map
-          |> Sequence.map (fun (sym, t') -> Symbol.to_string sym, t')
+        and s2 = ID.Map.to_seq t.map
+          |> Sequence.map (fun (sym, t') -> ID.to_string sym, t')
         in
         LazyGraph.Node(t, t, Sequence.append s1 s2)
       )
@@ -245,9 +243,9 @@ end
 (** {2 General purpose index} *)
 
 module SIMap = Sequence.Map.Make(struct
-  type t = Symbol.t * int
+  type t = ID.t * int
   let compare (s1,i1) (s2,i2) =
-    if i1 = i2 then Symbol.compare s1 s2 else i1-i2
+    if i1 = i2 then ID.compare s1 s2 else i1-i2
 end)
 
 module MakeTerm(X : Set.OrderedType) = struct
@@ -287,7 +285,7 @@ module MakeTerm(X : Set.OrderedType) = struct
         end
       | Some i ->
         match T.Classic.view i.cur_term with
-          | (T.Classic.Var _ | T.Classic.BVar _) ->
+          | (T.Classic.Var _ | T.Classic.DB _) ->
             let subtrie = match trie.star with
               | None -> empty ()
               | Some trie' -> trie'
@@ -310,6 +308,7 @@ module MakeTerm(X : Set.OrderedType) = struct
                 else rebuild {trie with map=SIMap.add (s,arity) subtrie trie.map ;}
             in
             goto subtrie (next i) rebuild
+          | T.Classic.AppBuiltin _
           | T.Classic.NonFO -> assert false
   in
   goto trie (iterate t) (fun t -> t)
@@ -324,131 +323,124 @@ module MakeTerm(X : Set.OrderedType) = struct
 
   (* skip one term in the tree. Calls [k] with [acc] on corresponding
     subtries. *)
-  let skip_tree trie acc k =
+  let skip_tree trie k =
     (* [n]: number of branches to skip (corresponding to subterms) *)
-    let rec skip trie n acc k =
+    let rec skip trie n k =
       if n = 0
-        then k acc trie
+        then k trie
         else
-          let acc = match trie.star with
-          | None -> acc
-          | Some trie' -> skip trie' (n-1) acc k
-          in
-          SIMap.fold
-            (fun (_,arity) trie' acc -> skip trie' (n+arity-1) acc k)
-            trie.map acc
+          begin match trie.star with
+          | None -> ()
+          | Some trie' -> skip trie' (n-1) k
+          end;
+          SIMap.iter
+            (fun (_,arity) trie' -> skip trie' (n+arity-1) k)
+            trie.map
     in
-    skip trie 1 acc k
+    skip trie 1 k
 
-  let retrieve_unifiables ?(subst=S.empty) dt sc_dt t sc_t acc k =
+  let retrieve_unifiables ?(subst=S.empty) dt t k =
     Util.enter_prof prof_npdtree_term_unify;
     (* recursive traversal of the trie, following paths compatible with t *)
-    let rec traverse trie acc iter = match iter with
+    let rec traverse trie iter = match iter with
       | None ->
-        Util.yield_prof prof_npdtree_term_unify;
-        let acc = Leaf.fold_unify ~subst trie.leaf sc_dt t sc_t acc k in
+        Util.exit_prof prof_npdtree_term_unify;
+        Leaf.fold_unify ~subst (Scoped.set dt trie.leaf) t k;
         Util.enter_prof prof_npdtree_term_unify;
-        acc
       | Some i ->
         match T.Classic.view i.cur_term with
-          | (T.Classic.Var _ | T.Classic.BVar _) ->
+          | (T.Classic.Var _ | T.Classic.DB _) ->
             (* skip one term in all branches of the trie *)
-            skip_tree trie acc
-              (fun acc subtrie -> traverse subtrie acc (next i))
+            skip_tree trie
+              (fun subtrie -> traverse subtrie (next i))
           | T.Classic.App (s, _, l) ->
             let arity = List.length l in
-            let acc =
-              try
-                let subtrie = SIMap.find (s,arity) trie.map in
-                traverse subtrie acc (next i)
-              with Not_found -> acc
-            in
+            begin try
+              let subtrie = SIMap.find (s,arity) trie.map in
+              traverse subtrie (next i)
+            with Not_found -> ()
+            end;
             begin match trie.star with
-              | None -> acc
+              | None -> ()
               | Some subtrie ->
-                traverse subtrie acc (skip i)  (* skip subterm of [t] *)
+                traverse subtrie (skip i)  (* skip subterm of [t] *)
             end
+          | T.Classic.AppBuiltin _
           | T.Classic.NonFO -> assert false
     in
     try
-      let acc = traverse dt acc (iterate t) in
+      traverse dt.Scoped.value (iterate t.Scoped.value);
       Util.exit_prof prof_npdtree_term_unify;
-      acc
     with e ->
       Util.exit_prof prof_npdtree_term_unify;
       raise e
 
-  let retrieve_generalizations ?(allow_open=false) ?(subst=S.empty)
-  dt sc_dt t sc_t acc k =
+  let retrieve_generalizations ?(subst=S.empty) dt t k =
     Util.enter_prof prof_npdtree_term_generalizations;
     (* recursive traversal of the trie, following paths compatible with t *)
-    let rec traverse trie acc iter = match iter with
+    let rec traverse trie iter = match iter with
       | None ->
-        Util.yield_prof prof_npdtree_term_generalizations;
-        let acc = Leaf.fold_match ~allow_open ~subst trie.leaf sc_dt t sc_t acc k in
+        Util.exit_prof prof_npdtree_term_generalizations;
+        Leaf.fold_match ~subst (Scoped.set dt trie.leaf) t k;
         Util.enter_prof prof_npdtree_term_generalizations;
-        acc
       | Some i ->
           match T.Classic.view i.cur_term with
-          | (T.Classic.Var _ | T.Classic.BVar _) ->
+          | (T.Classic.Var _ | T.Classic.DB _) ->
             begin match trie.star with
-            | None -> acc
+            | None -> ()
             | Some subtrie ->
-              traverse subtrie acc (next i) (* match "*" against "*" only *)
+              traverse subtrie (next i) (* match "*" against "*" only *)
             end
           | T.Classic.App (s, _, l) ->
             let arity = List.length l in
-            let acc =
-              try
-                let subtrie = SIMap.find (s,arity) trie.map in
-                traverse subtrie acc (next i)
-              with Not_found -> acc
-            in
+            begin try
+              let subtrie = SIMap.find (s,arity) trie.map in
+              traverse subtrie (next i)
+            with Not_found -> ()
+            end;
             begin match trie.star with
-              | None -> acc
+              | None -> ()
               | Some subtrie ->
-                traverse subtrie acc (skip i)  (* skip subterm *)
+                traverse subtrie (skip i)  (* skip subterm *)
             end
+          | T.Classic.AppBuiltin _
           | T.Classic.NonFO -> assert false
     in
     try
-      let acc = traverse dt acc (iterate t) in
+      traverse dt.Scoped.value (iterate t.Scoped.value);
       Util.exit_prof prof_npdtree_term_generalizations;
-      acc
     with e ->
       Util.exit_prof prof_npdtree_term_generalizations;
       raise e
 
-  let retrieve_specializations ?(allow_open=false) ?(subst=S.empty)
-  dt sc_dt t sc_t acc k =
+  let retrieve_specializations ?(subst=S.empty) dt t k =
     Util.enter_prof prof_npdtree_term_specializations;
     (* recursive traversal of the trie, following paths compatible with t *)
-    let rec traverse trie acc iter = match iter with
+    let rec traverse trie iter = match iter with
       | None ->
-        Util.yield_prof prof_npdtree_term_specializations;
-        let acc = Leaf.fold_matched ~allow_open ~subst trie.leaf sc_dt t sc_t acc k in
+        Util.exit_prof prof_npdtree_term_specializations;
+        Leaf.fold_matched ~subst (Scoped.set dt trie.leaf) t k;
         Util.enter_prof prof_npdtree_term_specializations;
-        acc
       | Some i ->
           match T.Classic.view i.cur_term with
-          | (T.Classic.Var _ | T.Classic.BVar _) ->
+          | (T.Classic.Var _ | T.Classic.DB _) ->
             (* match * against any subterm *)
-            skip_tree trie acc
-              (fun acc subtrie -> traverse subtrie acc (next i))
+            skip_tree trie
+              (fun subtrie -> traverse subtrie (next i))
           | T.Classic.App (s, _, l) ->
             (* only same symbol *)
             let arity = List.length l in
             begin try
               let subtrie = SIMap.find (s,arity) trie.map in
-              traverse subtrie acc (next i)
-            with Not_found -> acc
+              traverse subtrie (next i)
+            with Not_found -> ()
             end
+          | T.Classic.AppBuiltin _
           | T.Classic.NonFO -> assert false
     in
     try
-      let acc = traverse dt acc (iterate t) in
+      traverse dt.Scoped.value (iterate t.Scoped.value);
       Util.exit_prof prof_npdtree_term_specializations;
-      acc
     with e ->
       Util.exit_prof prof_npdtree_term_specializations;
       raise e
@@ -488,7 +480,7 @@ module MakeTerm(X : Set.OrderedType) = struct
         and s2 = SIMap.to_seq t.map
           |> Sequence.map
               (fun ((sym,i), t') ->
-               CCFormat.sprintf "%a/%d" Symbol.pp sym i, t')
+               CCFormat.sprintf "%a/%d" ID.pp sym i, t')
         in
         LazyGraph.Node(t, t, Sequence.append s1 s2)
       )

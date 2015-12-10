@@ -25,7 +25,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Perfect Discrimination Tree} *)
 
-module ST = ScopedTerm
+module ST = InnerTerm
 module T = FOTerm
 module S = Substs
 
@@ -36,9 +36,9 @@ Term traversal in prefix order. This is akin to lazy transformation
 to a flatterm. *)
 
 type character =
-  | Symbol of Symbol.t
+  | Symbol of ID.t
   | BoundVariable of int
-  | Variable of T.t
+  | Variable of Type.t HVar.t
   | NonFO
 
 type iterator = {
@@ -47,7 +47,7 @@ type iterator = {
   stack : T.t list list; (* skip: drop head, next: first of head *)
 }
 
-let __char2int = function
+let char_to_int_ = function
   | Symbol _ -> 0
   | BoundVariable _ -> 1
   | Variable _ -> 2
@@ -55,40 +55,40 @@ let __char2int = function
 
 let compare_char c1 c2 =
   (* compare variables by index *)
-  let compare_vars v1 v2 = match ST.view (v1:T.t:>ST.t), ST.view (v2:T.t:>ST.t) with
-    | ST.Var i, ST.Var j ->
-      if i <> j then i - j else Type.compare (T.ty v1) (T.ty v2)
-    | _ -> assert false
+  let compare_vars v1 v2 =
+    let c = HVar.compare v1 v2 in
+    if c=0 then Type.compare (HVar.ty v1) (HVar.ty v2) else c
   in
   match c1, c2 with
-  | Symbol s1, Symbol s2 -> Symbol.compare s1 s2
+  | Symbol s1, Symbol s2 -> ID.compare s1 s2
   | BoundVariable i, BoundVariable j -> i - j
   | Variable v1, Variable v2 -> compare_vars v1 v2
   | NonFO, NonFO -> 0
-  | _ -> __char2int c1 - __char2int c2
+  | _ -> char_to_int_ c1 - char_to_int_ c2
 
 let eq_char c1 c2 = compare_char c1 c2 = 0
 
 (** first symbol of t, or variable *)
 let term_to_char t =
   match T.Classic.view t with
-  | T.Classic.Var _ -> Variable t
-  | T.Classic.BVar i -> BoundVariable i
+  | T.Classic.Var v -> Variable v
+  | T.Classic.DB i -> BoundVariable i
   | T.Classic.App (f, _, _) -> Symbol f
+  | T.Classic.AppBuiltin _
   | T.Classic.NonFO -> NonFO
 
 let pp_char out = function
-  | Variable t -> T.pp out t
+  | Variable v -> HVar.pp out v
   | BoundVariable i -> Format.fprintf out "Y%d" i
-  | Symbol f -> Symbol.pp out f
+  | Symbol f -> ID.pp out f
   | NonFO -> CCFormat.string out "<nonfo>"
 
 let open_term ~stack t =
   let cur_char = term_to_char t in
   match T.view t with
   | T.Var _
-  | T.BVar _
-  | T.TyApp _
+  | T.DB _
+  | T.AppBuiltin _
   | T.Const _ ->
       Some {cur_char; cur_term=t; stack=[]::stack;}
   | T.App (_, l) ->
@@ -105,10 +105,10 @@ let skip iter = match iter.stack with
   | _next::stack' -> next_rec stack'
 and next iter = next_rec iter.stack
 
-(** Iterate on a term *)
+(* Iterate on a term *)
 let iterate term = open_term ~stack:[] term
 
-(** convert term to list of var/symbol *)
+(* convert term to list of var/symbol *)
 let to_list t =
   let rec getnext acc iter =
     let acc' = iter.cur_char :: acc in
@@ -220,55 +220,48 @@ module Make(E : Index.EQUATION) = struct
   let remove_seq dt seq =
     Sequence.fold remove dt seq
 
-  let retrieve ?(allow_open=false) ?(subst=S.empty) ~sign dt sc_dt t sc_t acc k =
+  let retrieve ?(subst=S.empty) ~sign dt t k =
     Util.enter_prof prof_dtree_retrieve;
     (* recursive traversal of the trie, following paths compatible with t *)
-    let rec traverse trie acc iter subst =
+    let rec traverse trie iter subst =
       match trie, iter with
       | TrieLeaf l, None ->  (* yield all equations, they all match *)
-        List.fold_left
-          (fun acc (_, eqn, _) ->
+        List.iter
+          (fun (_, eqn, _) ->
             let l, r, sign' = E.extract eqn in
-            if sign = sign'
-              then k acc l r eqn subst
-              else acc)
-          acc l
+            if sign = sign' then k (l, r, eqn, subst))
+          l
       | TrieNode m, Some i ->
         (* "lazy" transformation to flatterm *)
         let t_pos = i.cur_term in
         let c1 = i.cur_char in
-        CharMap.fold
-          (fun c2 subtrie acc ->
+        CharMap.iter
+          (fun c2 subtrie ->
             (* explore branch that has the same symbol, if any *)
-            let acc = if eq_char c2 c1 && not (T.is_var t_pos)
-              then traverse subtrie acc (next i) subst
-              else acc
-            in
+            if eq_char c2 c1 && not (T.is_var t_pos)
+              then traverse subtrie (next i) subst;
             match c2 with
-            | Variable v2 when S.mem subst (v2:>ST.t) sc_dt ->
-               (* already bound, check consistency *)
-              begin try
-                let subst = Unif.FO.matching ~allow_open ~subst
-                  ~pattern:v2 sc_dt t_pos sc_t in
-                traverse subtrie acc (skip i) subst
-              with Unif.Fail -> acc (* incompatible binding *)
-              end
+            | Variable v2 when S.mem subst (Scoped.set t (v2:>ST.t HVar.t)) ->
+              (* already bound, check consistency *)
+              let t' = S.FO.find_exn subst (Scoped.set t (v2:>ST.t HVar.t)) in
+              if Unif.FO.equal ~subst t t'
+              then traverse subtrie (skip i) subst
             | Variable v2 ->
               (* try to bind and continue *)
               begin try
-                let subst = Unif.FO.matching ~allow_open ~subst
-                  ~pattern:v2 sc_dt t_pos sc_t in
-                traverse subtrie acc (skip i) subst
-              with Unif.Fail -> acc (* incompatible binding *)
+                let subst = Unif.FO.bind subst
+                  (Scoped.set dt v2) (Scoped.set t t_pos) in
+                traverse subtrie (skip i) subst
+              with Unif.Fail -> () (* incompatible binding *)
               end
-            | _ -> acc)
-          m acc
+            | _ -> ())
+          m
       | TrieNode _, None
-      | TrieLeaf _, Some _ -> acc
+      | TrieLeaf _, Some _ -> ()
     in
-    let acc = traverse dt acc (iterate t) subst in
+    traverse dt.Scoped.value (iterate t.Scoped.value) subst;
     Util.exit_prof prof_dtree_retrieve;
-    acc
+    ()
 
   (** iterate on all (term -> value) in the tree *)
   let iter dt k =

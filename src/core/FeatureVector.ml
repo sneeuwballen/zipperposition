@@ -259,61 +259,61 @@ module Make(C : Index.CLAUSE) = struct
   let remove_seq idx seq = Sequence.fold remove idx seq
 
   (* clauses that subsume (potentially) the given clause *)
-  let retrieve_subsuming idx lits acc f =
+  let retrieve_subsuming idx lits f =
     (* feature vector of [c] *)
     let fv = compute_fv idx.features lits in
-    let rec fold_lower acc fv node = match fv, node with
-      | [], TrieLeaf set -> CSet.fold (fun c acc -> f acc c) set acc
+    let rec fold_lower fv node = match fv, node with
+      | [], TrieLeaf set -> CSet.iter f set
       | i::fv', TrieNode map ->
-          IntMap.fold
-            (fun j subnode acc -> if j <= i
-              then fold_lower acc fv' subnode  (* go in the branch *)
-              else acc)
-            map acc
+          IntMap.iter
+            (fun j subnode -> if j <= i
+              then fold_lower fv' subnode  (* go in the branch *)
+              else ())
+            map
       | _ -> failwith "number of features in feature vector changed"
     in
-    fold_lower acc fv idx.trie
+    fold_lower fv idx.trie
 
   (** clauses that are subsumed (potentially) by the given clause *)
-  let retrieve_subsumed idx lits acc f =
+  let retrieve_subsumed idx lits f =
     (* feature vector of the hc *)
     let fv = compute_fv idx.features lits in
-    let rec fold_higher acc fv node = match fv, node with
-      | [], TrieLeaf set -> CSet.fold (fun c acc -> f acc c) set acc
+    let rec fold_higher fv node = match fv, node with
+      | [], TrieLeaf set -> CSet.iter f set
       | i::fv', TrieNode map ->
-          IntMap.fold
-            (fun j subnode acc -> if j >= i
-              then fold_higher acc fv' subnode  (* go in the branch *)
-              else acc)
-            map acc
+          IntMap.iter
+            (fun j subnode -> if j >= i
+              then fold_higher fv' subnode  (* go in the branch *)
+              else ())
+            map
       | _ -> failwith "number of features in feature vector changed"
     in
-    fold_higher acc fv idx.trie
+    fold_higher fv idx.trie
 
   (** clauses that are potentially alpha-equivalent to the given clause*)
-  let retrieve_alpha_equiv idx lits acc f =
+  let retrieve_alpha_equiv idx lits f =
     (* feature vector of the hc *)
     let fv = compute_fv idx.features lits in
-    let rec fold_higher acc fv node = match fv, node with
-      | [], TrieLeaf set -> CSet.fold (fun c acc -> f acc c) set acc
+    let rec fold_higher fv node = match fv, node with
+      | [], TrieLeaf set -> CSet.iter f set
       | i::fv', TrieNode map ->
-          IntMap.fold
-            (fun j subnode acc -> if j = i
-              then fold_higher acc fv' subnode  (* go in the branch *)
-              else acc)
-            map acc
+          IntMap.iter
+            (fun j subnode -> if j = i
+              then fold_higher fv' subnode  (* go in the branch *)
+              else ())
+            map
       | _ -> failwith "number of features in feature vector changed"
     in
-    fold_higher acc fv idx.trie
+    fold_higher fv idx.trie
 
-  let retrieve_subsuming_c idx c acc f =
-    retrieve_subsuming idx (C.to_lits c) acc f
+  let retrieve_subsuming_c idx c f =
+    retrieve_subsuming idx (C.to_lits c) f
 
-  let retrieve_subsumed_c idx c acc f =
-    retrieve_subsumed idx (C.to_lits c) acc f
+  let retrieve_subsumed_c idx c f =
+    retrieve_subsumed idx (C.to_lits c) f
 
-  let retrieve_alpha_equiv_c idx c acc f =
-    retrieve_alpha_equiv idx (C.to_lits c) acc f
+  let retrieve_alpha_equiv_c idx c f =
+    retrieve_alpha_equiv idx (C.to_lits c) f
 
   let iter idx f =
     let rec iter = function

@@ -71,9 +71,6 @@ let to_string = CCFormat.to_string pp
 
 exception RewrittenIn of term * Substs.t * rule
 
-(* TODO: use a specific reprsentation (pair of  head+args)
-   for [rewrite_here] *)
-
 let normalize_collect trs t =
   (* reduce to normal form. *)
   let rec reduce ~trs ~rules t = match T.view t with
@@ -98,7 +95,10 @@ let normalize_collect trs t =
     | T.Exists (varty, t') ->
         let t' = reduce ~trs ~rules t' in
         T.exists ~varty t'   (* no rules for lambda *)
-    | T.Builtin _ -> t
+    | T.AppBuiltin (_,[]) -> t
+    | T.AppBuiltin (b,l) ->
+        let l = List.map (reduce ~trs ~rules) l in
+        T.app_builtin ~ty:(T.ty t) b l
     | T.Const _ ->
         rewrite_here ~trs ~rules t
   (* try to find a rewrite rules whose left-hand side matches [t]. In this
@@ -107,11 +107,12 @@ let normalize_collect trs t =
     try
       S.iter
         (fun (l,r) ->
-          let substs = Unif.HO.matching ~allow_open:true ~pattern:l 1 t 0 in
+          let substs = Unif.HO.matching
+            ~pattern:(Scoped.make l 1) (Scoped.make t 0) in
           match substs |> Sequence.take 1 |> Sequence.to_list with
           | [subst] ->
               (* l\subst = t, rewrite into r\subst *)
-              let r = Substs.HO.apply_no_renaming subst r 1 in
+              let r = Substs.HO.apply_no_renaming subst (Scoped.make r 1) in
               raise (RewrittenIn (r, subst, (l,r)))
           | _ -> ()   (* failure, try next rule *)
         ) trs;
