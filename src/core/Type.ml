@@ -106,6 +106,7 @@ let (@@) = app
 
 let of_term_unsafe t = t
 let of_terms_unsafe l = l
+let cast_var_unsafe v = v
 
 (** {2 Containers} *)
 
@@ -118,10 +119,12 @@ module Seq = struct
   let sub = T.Seq.subterms
   let add_set = T.Seq.add_set
   let max_var = T.Seq.max_var
+  let min_var = T.Seq.min_var
 end
 
 module VarMap = T.VarMap
 module VarSet = T.VarSet
+module VarTbl = T.VarTbl
 
 let vars_set set t = VarSet.add_seq set (Seq.vars t)
 
@@ -404,7 +407,7 @@ module Conv = struct
           let ret = aux env ret in
           PT.Ty.fun_ args ret
       | Record (l, rest) ->
-          let rest = CCOpt.map (fun v -> PT.var (aux_var v)) rest in
+          let rest = CCOpt.map (fun v -> aux_var v) rest in
           PT.record ~ty:PT.tType (List.map (fun (n,ty) -> n, aux env ty) l) ~rest
       | Multiset t ->
           PT.app_builtin ~ty:PT.tType Builtin.multiset [aux env t]

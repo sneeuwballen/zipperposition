@@ -4,7 +4,13 @@
 type subst = Substs.t
 
 module type UNARY = sig
+  type ty
   type term
+
+  val bind : subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst
+  (** [bind subst v t] binds [v] to [t], but fails if [v] occurs in [t]
+      (performs an occur-check first)
+      @raise Fail if occurs-check fires *)
 
   val unification : ?subst:subst ->
     term Scoped.t -> term Scoped.t -> subst

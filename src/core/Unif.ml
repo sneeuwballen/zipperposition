@@ -555,6 +555,7 @@ end
 (** {2 Unary Unification} *)
 
 module Unary = struct
+  type ty = T.t
   type term = T.t
 
   (* unify lists using the given "unificator" and continuation [k] *)
@@ -641,6 +642,10 @@ module Unary = struct
     | O_match of T.VarSet.t option (* blocked variables *)
     | O_variant
     | O_equal
+
+  let bind subst v t =
+    if occurs_check ~depth:0 subst v t then fail()
+    else S.bind subst v t
 
   let rec unif_rec ~op subst t1 t2 =
     let t1 = S.deref subst t1
@@ -768,7 +773,11 @@ end
 
 module Ty = struct
   open Unary
+  type ty = Type.t
   type term = Type.t
+
+  let bind =
+    (bind :> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst)
 
   let unification =
     (unification :> ?subst:subst -> term Scoped.t -> term Scoped.t -> subst)
@@ -804,7 +813,11 @@ end
 
 module FO = struct
   open Unary
+  type ty = Type.t
   type term = FOTerm.t
+
+  let bind =
+    (bind :> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst)
 
   let unification =
     (unification :> ?subst:subst -> term Scoped.t -> term Scoped.t -> subst)

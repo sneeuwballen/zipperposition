@@ -125,6 +125,7 @@ val of_term_unsafe : InnerTerm.t -> t
     use with caution. *)
 
 val of_terms_unsafe : InnerTerm.t list -> t list
+val cast_var_unsafe : InnerTerm.t HVar.t -> t HVar.t
 
 (** {2 Containers} *)
 
@@ -137,12 +138,14 @@ module Seq : sig
   val sub : t -> t Sequence.t (** Subterms *)
   val add_set : Set.t -> t Sequence.t -> Set.t
   val max_var : t HVar.t Sequence.t -> int
+  val min_var : t HVar.t Sequence.t -> int
 end
 
 (** {2 Utils} *)
 
 module VarSet : CCSet.S with type elt = t HVar.t
 module VarMap : CCMap.S with type key = t HVar.t
+module VarTbl : CCHashtbl.S with type key = t HVar.t
 
 val vars_set : VarSet.t -> t -> VarSet.t
 (** Add the free variables to the given set *)

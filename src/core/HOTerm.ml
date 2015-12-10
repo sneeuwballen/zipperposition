@@ -33,13 +33,15 @@ module FOT = FOTerm
 
 type symbol = ID.t
 
+type var = Type.t HVar.t
+
 type t = InnerTerm.t
 
 type term = t
 
 type view =
   | AppBuiltin of Builtin.t * t list
-  | Var of t HVar.t (** variable *)
+  | Var of var (** variable *)
   | DB of int (** bound variable (De Bruijn index) *)
   | Lambda of Type.t * t (** lambda abstraction over one variable. *)
   | Forall of Type.t * t (** Forall quantifier (commutes with other forall) *)
@@ -47,7 +49,7 @@ type view =
   | Const of ID.t (** Typed constant *)
   | App of t * t list (** curried application *)
   | Multiset of Type.t * t list (** a multiset of terms, and their common type *)
-  | Record of (string*t) list * t HVar.t option (** Record of terms *)
+  | Record of (string*t) list * var option (** Record of terms *)
 
 let ty t = match T.ty t with
   | T.NoType -> assert false
@@ -56,7 +58,7 @@ let ty t = match T.ty t with
 let __get_ty = ty
 
 let view t = match T.view t with
-  | T.Var v -> Var v
+  | T.Var v -> Var (Type.cast_var_unsafe v)
   | T.DB i -> DB i
   | T.Bind (Binder.Lambda, varty, t') ->
       Lambda (Type.of_term_unsafe varty, t')
@@ -71,7 +73,7 @@ let view t = match T.view t with
         | _ -> assert false
       end
   | T.App (f,l) -> App(f,l)
-  | T.Record (l, rest) -> Record (l, rest)
+  | T.Record (l, rest) -> Record (l, CCOpt.map Type.cast_var_unsafe rest)
   | T.AppBuiltin (b, l) -> AppBuiltin (b,l)
   | T.Bind _
   | T.SimpleApp _ -> assert false
@@ -119,7 +121,7 @@ let lambda_var_ty t = match T.view t with
 (** In this section, term smart constructors are defined. They perform
     hashconsing, and precompute some properties (flags) *)
 
-let var = T.var
+let var = (T.var :> var -> T.t)
 
 let var_of_int ~ty i =
   T.var (HVar.make i ~ty:(ty : Type.t :> T.t))
@@ -168,7 +170,7 @@ let record l ~rest =
   let ty_rest = match rest with
     | None -> None
     | Some v ->
-        let ty_v = Type.of_term_unsafe (HVar.ty v) in
+        let ty_v = HVar.ty v in
         begin match Type.view ty_v with
           | Type.Record _ -> Some ty_v
           | _ ->
@@ -177,7 +179,7 @@ let record l ~rest =
   in
   let ty = Type.record_flatten ty_l ~rest:ty_rest in
   (* flattening done by InnerTerm. *)
-  T.record ~ty:(ty:>T.t) l ~rest
+  T.record ~ty:(ty:>T.t) l ~rest:(rest : var option :> T.t HVar.t option)
 
 let lambda ~varty t' =
   let ty = Type.arrow [varty] (ty t') in
@@ -208,19 +210,19 @@ let is_exists t = match view t with | Exists _ -> true | _ -> false
 let is_multiset t = match T.view t with | T.Multiset _ -> true | _ -> false
 let is_record t = match T.view t with | T.Record _ -> true | _ -> false
 
-module VarSet = T.VarSet
-module VarMap = T.VarMap
-module VarTbl = T.VarTbl
+module VarSet = Type.VarSet
+module VarMap = Type.VarMap
+module VarTbl = Type.VarTbl
 
 (** {2 Sequences} *)
 
 module Seq = struct
   let subterms t = T.Seq.subterms t
-  let vars t = T.Seq.vars t
+  let vars t = T.Seq.vars t |> Sequence.map Type.cast_var_unsafe
   let subterms_depth = T.Seq.subterms_depth
   let symbols t = T.Seq.symbols t
-  let max_var = T.Seq.max_var
-  let min_var = T.Seq.min_var
+  let max_var = Type.Seq.max_var
+  let min_var = Type.Seq.min_var
   let ty_vars t =
     subterms t |> Sequence.flatMap (fun t -> Type.Seq.vars (ty t))
   let add_set set ts =
@@ -258,9 +260,9 @@ let var_occurs ~var t =
 
 let monomorphic t = Seq.ty_vars t |> Sequence.is_empty
 
-let max_var set = VarSet.to_seq set |> Seq.max_var
+let max_var set = VarSet.to_seq set |> Type.Seq.max_var
 
-let min_var set = VarSet.to_seq set |> T.Seq.min_var
+let min_var set = VarSet.to_seq set |> Type.Seq.min_var
 
 let add_vars tbl t = Seq.vars t (fun x -> VarTbl.replace tbl x ())
 
@@ -304,7 +306,7 @@ let contains_symbol s t =
 let rec of_fo t =
   let ty = FOT.ty t in
   match FOT.view t with
-  | FOT.Var v -> var (HVar.update_ty v ~f:of_fo)
+  | FOT.Var v -> var v
   | FOT.DB i -> bvar ~ty i
   | FOT.Const s -> const ~ty s
   | FOT.App (f, l) -> app (of_fo f) (List.map of_fo l)
@@ -315,7 +317,7 @@ let to_fo t =
     let ty = ty t in
     match view t with
     | AppBuiltin (b,l) -> FOT.app_builtin ~ty b (List.map aux l)
-    | Var v -> FOT.var (HVar.update_ty v ~f:aux)
+    | Var v -> FOT.var v
     | DB i -> FOT.bvar ~ty i
     | App (f,l) ->
         let f = aux f in
@@ -348,12 +350,12 @@ let rec is_fo t = match view t with
 let prop = T.builtin ~ty:T.tType Builtin.prop
 
 let close_forall t =
-  let vars = Seq.vars t |> T.VarSet.of_seq |> T.VarSet.elements in
-  T.bind_vars ~ty:prop Binder.Forall vars t
+  let vars = Seq.vars t |> VarSet.of_seq |> VarSet.elements in
+  T.bind_vars ~ty:prop Binder.Forall (vars:>T.t HVar.t list) t
 
 let close_exists t =
-  let vars = Seq.vars t |> T.VarSet.of_seq |> T.VarSet.elements in
-  T.bind_vars ~ty:prop Binder.Forall vars t
+  let vars = Seq.vars t |> VarSet.of_seq |> VarSet.elements in
+  T.bind_vars ~ty:prop Binder.Forall (vars:>T.t HVar.t list) t
 
 let open_forall ?(offset=0) f =
   let offset = max offset (Seq.max_var (Seq.vars f)) + 1 in

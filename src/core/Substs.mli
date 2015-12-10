@@ -129,6 +129,8 @@ module type SPECIALIZED = sig
   type term
   type t = subst
 
+  val find_exn : t -> var Scoped.t -> term Scoped.t
+
   val apply : t -> renaming:Renaming.t -> term Scoped.t -> term
   (** Apply the substitution to the given term/type.
       @param renaming used to desambiguate free variables from distinct scopes *)

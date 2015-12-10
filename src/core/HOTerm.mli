@@ -34,9 +34,11 @@ type t = private InnerTerm.t
 
 type term = t
 
+type var = Type.t HVar.t
+
 type view = private
   | AppBuiltin of Builtin.t * t list
-  | Var of t HVar.t (** variable *)
+  | Var of var (** variable *)
   | DB of int (** bound variable (De Bruijn index) *)
   | Lambda of Type.t * t (** lambda abstraction over one variable. *)
   | Forall of Type.t * t (** Forall quantifier (commutes with other forall) *)
@@ -44,7 +46,7 @@ type view = private
   | Const of ID.t (** Typed constant *)
   | App of t * t list (** curried application *)
   | Multiset of Type.t * t list (** a multiset of terms, and their common type *)
-  | Record of (string*t) list * t HVar.t option (** Record of terms *)
+  | Record of (string*t) list * var option (** Record of terms *)
 
 val view : t -> view
 val ty : t -> Type.t
@@ -71,7 +73,7 @@ module Tbl : CCHashtbl.S with type key = t
     They may raise {!Type.ApplyError} in case of type error.
 *)
 
-val var : t HVar.t -> t
+val var : var -> t
 
 val var_of_int : ty:Type.t -> int -> t
 (** Create a variable. Providing a type is mandatory.
@@ -98,7 +100,7 @@ val app_builtin : ty:Type.t -> Builtin.t -> t list -> t
 val const : ty:Type.t -> ID.t -> t
 (** Create a typed constant. *)
 
-val record : (string*t) list -> rest:t HVar.t option -> t
+val record : (string*t) list -> rest:var option -> t
 (** Build a record. All terms in the list must have the
     same type, and the rest (if present) must have a record() type.
     @param rest if present, must be either a variable, or a record.
@@ -129,31 +131,31 @@ val of_term_unsafe : InnerTerm.t -> t
 (** {b NOTE}: this can break the invariants and make {!view} fail. Only
     apply with caution. *)
 
-module VarSet : CCSet.S with type elt = t HVar.t
-module VarMap : CCMap.S with type key = t HVar.t
-module VarTbl : CCHashtbl.S with type key = t HVar.t
+module VarSet : CCSet.S with type elt = var
+module VarMap : CCMap.S with type key = var
+module VarTbl : CCHashtbl.S with type key = var
 
 (** {2 Sequences} *)
 
 module Seq : sig
-  val vars : t -> t HVar.t Sequence.t
+  val vars : t -> var Sequence.t
   val subterms : t -> t Sequence.t
   val subterms_depth : t -> (t * int) Sequence.t  (* subterms with their depth *)
   val symbols : t -> ID.t Sequence.t
-  val max_var : t HVar.t Sequence.t -> int (** max var *)
-  val min_var : t HVar.t Sequence.t -> int (** min var *)
-  val ty_vars : t -> Type.t HVar.t Sequence.t
+  val max_var : var Sequence.t -> int (** max var *)
+  val min_var : var Sequence.t -> int (** min var *)
+  val ty_vars : t -> var Sequence.t
   val add_set : Set.t -> t Sequence.t -> Set.t
 end
 
-val var_occurs : var:t HVar.t -> t -> bool (** [var_occurs ~var t] true iff [var] in t *)
+val var_occurs : var:var -> t -> bool (** [var_occurs ~var t] true iff [var] in t *)
 val is_ground : t -> bool (** is the term ground? (no free vars) *)
 val monomorphic : t -> bool (** true if the term contains no type var *)
 val max_var : VarSet.t -> int (** find the maximum variable index, or 0 *)
 val min_var : VarSet.t -> int (** minimum variable, or 0 if ground *)
 val add_vars : unit VarTbl.t -> t -> unit (** add variables of the term to the set *)
 val vars : t Sequence.t -> VarSet.t (** compute variables of the terms *)
-val vars_prefix_order : t -> t HVar.t list (** variables in prefix traversal order *)
+val vars_prefix_order : t -> var list (** variables in prefix traversal order *)
 val depth : t -> int (** depth of the term *)
 val head : t -> ID.t option (** head sym *)
 val head_exn : t -> ID.t (** head sym (or Not_found) *)

@@ -36,17 +36,18 @@ let prof_ac_normal_form = Util.mk_profiler "ac_normal_form"
 type t = T.t
 
 type term = t
+type var = Type.t HVar.t
 
 type view =
   | AppBuiltin of Builtin.t * t list
   | DB of int (** Bound variable (De Bruijn index) *)
-  | Var of t HVar.t (** Term variable *)
+  | Var of var (** Term variable *)
   | Const of ID.t (** Typed constant *)
   | App of t * t list (** Application to a list of terms (cannot be left-nested) *)
 
 let view t = match T.view t with
   | T.AppBuiltin (b,l) -> AppBuiltin (b,l)
-  | T.Var v -> Var v
+  | T.Var v -> Var (Type.cast_var_unsafe v)
   | T.DB i -> DB i
   | T.App (_, []) -> assert false
   | T.App (f, l) -> App (f, l)
@@ -84,14 +85,14 @@ let rec split_args_ ~ty l = match Type.view ty, l with
 
 module Classic = struct
   type view =
-    | Var of t HVar.t
+    | Var of var
     | DB of int
     | App of ID.t * Type.t list * t list (** covers Const and App *)
     | AppBuiltin of Builtin.t * t list
     | NonFO (** any other case *)
 
   let view t : view = match T.view t with
-    | T.Var v -> Var v
+    | T.Var v -> Var (Type.cast_var_unsafe v)
     | T.DB i -> DB i
     | T.Const s -> App (s, [], [])
     | T.AppBuiltin (b,l) -> AppBuiltin (b,l)
@@ -111,16 +112,16 @@ module Tbl = T.Tbl
 module Set = T.Set
 module Map = T.Map
 
-module VarSet = T.VarSet
-module VarMap = T.VarMap
-module VarTbl = T.VarTbl
+module VarSet = Type.VarSet
+module VarMap = Type.VarMap
+module VarTbl = Type.VarTbl
 
 (** {2 Smart constructors} *)
 
 (** In this section, term smart constructors are defined. They perform
     hashconsing, and precompute some properties (flags). *)
 
-let var = T.var
+let var = (T.var :> var -> T.t)
 
 let var_of_int ~ty i =
   let ty = (ty : Type.t :> T.t) in
@@ -225,8 +226,8 @@ module Seq = struct
     in
     aux t
 
-  let max_var = T.Seq.max_var
-  let min_var = T.Seq.min_var
+  let max_var = Type.Seq.max_var
+  let min_var = Type.Seq.min_var
 
   let add_set set xs =
     Sequence.fold (fun set x -> Set.add x set) set xs
@@ -442,7 +443,7 @@ let to_simple_term ?(env=DBEnv.empty) t =
   and aux_var v =
     try VarTbl.find tbl v
     with Not_found ->
-      let ty = Type.of_term_unsafe (HVar.ty v) in
+      let ty = HVar.ty v in
       let v' = Var.of_string ~ty:(aux_ty ty)
         (CCFormat.sprintf "X%d" (HVar.id v)) in
       VarTbl.add tbl v v';
