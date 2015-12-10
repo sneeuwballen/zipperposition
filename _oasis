@@ -55,10 +55,9 @@ Library "logtk"
                     TypeInference, Options, Comparison, Precedence, Builtin,
                     Precedence_intf, Ordering, Ordering_intf, Skolem, Cnf, ID,
                     HORewriting, Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,
-                    Congruence, FastFingerprint, FeatureVector,
+                    Congruence, FeatureVector,
                     Lambda, Sourced, TypedSTerm,
-                    lib/Hashcons, lib/ParseLocation, lib/Multiset,
-                    lib/PartialOrder, lib/PartialOrder_intf, lib/LazyList,
+                    lib/Hashcons, lib/ParseLocation, lib/Multiset, lib/LazyList,
                     lib/IArray, lib/LazyGraph, lib/AllocCache, lib/Multiset_intf
   CSources:         util_stubs.c, util_stubs.h
   CCOpt:            -Wextra -Wno-unused-parameter
