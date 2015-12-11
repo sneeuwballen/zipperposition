@@ -75,7 +75,7 @@ let skolem_form ~ctx subst ty form =
   let vars_t = List.map (fun v->T.var v) vars in
   let tyvars_t = List.map (fun v->T.Ty.var v) vars in
   (* type of the symbol: quantify over type vars, apply to vars' types *)
-  let ty = T.Ty.forall_l tyvars (T.Ty.fun_ vars_t ty) in
+  let ty = T.Ty.forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) ty) in
   let f = fresh_sym ~ctx ~ty in
   T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t)
 
@@ -91,8 +91,8 @@ let define ~ctx ~polarity form =
   let vars_t = List.map (fun v->T.var v) vars in
   let tyvars_t = List.map (fun v->T.Ty.var v) vars in
   (* similar to {!skolem_form}, but always return [prop] *)
-  let ty = T.Ty.forall_l tyvars (T.Ty.fun_ vars_t T.Ty.prop) in
-  let f = fresh_sym ~ctx ~ty in
+  let ty = T.Ty.forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) T.Ty.prop) in
+  let f = fresh_sym_with ~ctx ~ty "_tseitin" in
   let proxy = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
   (* register the new definition *)
   ctx.sc_new_defs <- {form; proxy; polarity; } :: ctx.sc_new_defs;

@@ -45,10 +45,11 @@ let process file =
     let sigma = Cnf.type_declarations
       (CCVector.to_seq decls) in
     if !print_sig
-    then Format.printf "@[<hv2>signature:@ @[<v>%a@]@]@."
+    then Format.printf "@[<hv2>signature:@ (@[<v>%a@]@])@."
       (ID.Map.print ~start:"" ~stop:"" ~sep:"" ~arrow:" : " ID.pp T.pp) sigma;
     (* print *)
-    Format.printf "@[<v>%a@]@."
+    Format.printf "@[<v2>%d statements:@ %a@]@."
+      (CCVector.length decls)
       (CCVector.print ~start:"" ~stop:"" ~sep:"" Cnf.pp_statement)
       decls;
     Err.return ()
