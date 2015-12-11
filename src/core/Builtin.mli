@@ -151,6 +151,8 @@ module TPTP : sig
 
   include Interfaces.PRINT with type t := t
   (** printer for TPTP *)
+
+  (* TODO: parser from "$i" to "term", the reverse of printer *)
 end
 
 (** The module {!ArithOp} deals only with numeric constants, i.e., all symbols
