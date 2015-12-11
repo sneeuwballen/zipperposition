@@ -160,6 +160,9 @@ val is_meta : t -> bool
 val is_ground : t -> bool
 (** [true] iff there is no free variable *)
 
+val is_monomorphic : t -> bool
+(** [true] if there are no type variables *)
+
 val closed : t -> bool
 (** [closed t] is [true] iff all bound variables of [t] occur under a
     binder (i.e. they are actually bound in [t]) *)

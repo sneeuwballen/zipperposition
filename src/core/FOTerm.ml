@@ -160,6 +160,9 @@ let app_full f tyargs l =
   let l = (tyargs : Type.t list :> T.t list) @ l in
   app f l
 
+let true_ = builtin ~ty:Type.tType Builtin.True
+let false_ = builtin ~ty:Type.tType Builtin.False
+
 let is_var t = match T.view t with
   | T.Var _ -> true
   | _ -> false

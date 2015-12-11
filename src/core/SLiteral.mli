@@ -25,4 +25,9 @@ val to_form : term t -> form
 
 val map : f:('a -> 'b) -> 'a t -> 'b t
 
+val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+
+val is_true : _ t -> bool
+val is_false : _ t -> bool
+
 include Interfaces.PRINT1 with type 'a t := 'a t

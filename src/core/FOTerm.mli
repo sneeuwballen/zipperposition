@@ -107,6 +107,9 @@ val app : t -> t list -> t
 val app_full : t -> Type.t list -> t list -> t
 (** Apply the term to types, then to terms *)
 
+val true_ : t
+val false_ : t
+
 val is_var : t -> bool
 val is_bvar : t -> bool
 val is_app : t -> bool

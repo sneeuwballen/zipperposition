@@ -34,6 +34,23 @@ let map ~f = function
   | Eq (a,b) -> Eq (f a, f b)
   | Neq (a,b) -> Neq (f a, f b)
 
+let equal eq a b = match a, b with
+  | True, True
+  | False, False -> true
+  | Atom (t1,b1), Atom (t2,b2) -> b1=b2 && eq t1 t2
+  | Eq (a1,a2), Eq (b1,b2)
+  | Neq (a1,a2), Neq (b1,b2) ->
+      (eq a1 b1 && eq a2 b2) ||
+      (eq a1 b2 && eq a2 b1)
+  | True, _
+  | False, _
+  | Atom _, _
+  | Eq _, _
+  | Neq _, _ -> false
+
+let is_true = function True -> true | _ -> false
+let is_false = function False -> true | _ -> false
+
 let fpf = Format.fprintf
 
 let to_form = function

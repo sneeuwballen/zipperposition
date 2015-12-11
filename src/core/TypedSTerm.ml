@@ -389,6 +389,17 @@ module Ty = struct
     | _ -> t
 
   let returns_tType t = is_tType (returns t)
+
+  let rec is_mono t = match view t with
+    | Builtin _ -> true
+    | App (_,l) -> List.for_all is_mono l
+    | Fun (l,ret) -> List.for_all is_mono l && is_mono ret
+    | Multiset t -> is_mono t
+    | Record (l,rest) ->
+        List.for_all CCFun.(compose snd is_mono) l && rest = None
+    | Meta _
+    | Var _
+    | Forall (_,_) -> false
 end
 
 module Form = struct
@@ -487,9 +498,17 @@ module Form = struct
     forall_l ?loc tyvars (forall_l ?loc vars f)
 end
 
+let is_monomorphic t =
+  Seq.subterms t
+  |> Sequence.for_all (fun t -> Ty.is_mono (ty_exn t))
+
+(** {2 IO} *)
+
 let to_string = CCFormat.to_string pp
 
 let _pp_term = pp
+
+(** {2 Subst} *)
 
 module Subst = struct
   type t = term ID.Map.t
