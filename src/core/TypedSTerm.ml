@@ -132,10 +132,10 @@ let rec pp out t = match view t with
   | AppBuiltin (b, [a]) when Builtin.is_prefix b ->
       Format.fprintf out "@[%a %a@]" Builtin.pp b pp_inner a
   | AppBuiltin (Builtin.Arrow, ret::args) ->
-      pp_infix_ Builtin.Arrow out (args @ [ret])
+      Format.fprintf out "@[<hv>%a@]" (pp_infix_ Builtin.Arrow) (args @ [ret])
   | AppBuiltin (Builtin.Not, [f]) -> Format.fprintf out "@[¬@ %a@]" pp f
   | AppBuiltin (b, l) when Builtin.is_infix b && List.length l > 0 ->
-      pp_infix_ b out l
+      Format.fprintf out "@[<hv>%a@]" (pp_infix_ b) l
   | AppBuiltin (b, []) -> Builtin.pp out b
   | AppBuiltin (b, l) ->
       Format.fprintf out "@[<2>%a@ %a@]" Builtin.pp b (Util.pp_list pp_inner) l
@@ -156,7 +156,7 @@ and pp_infix_ b out l = match l with
   | [] -> assert false
   | [t] -> pp_inner out t
   | t :: l' ->
-      Format.fprintf out "@[<hv>%a@ @[<hv>%a@ %a@]@]"
+      Format.fprintf out "@[%a@]@ %a %a"
         pp_inner t Builtin.pp b (pp_infix_ b) l'
 and pp_var_ty out v =
   let ty = Var.ty v in
