@@ -30,6 +30,7 @@ let hash_fun a = ID.hash_fun a.id
 
 let pp out a = ID.pp out a.id
 let to_string a = ID.to_string a.id
+let pp_full out a = ID.pp_full out a.id
 
 module Set = struct
   type 'a t = 'a var ID.Map.t

@@ -171,6 +171,7 @@ val var_occurs : var:t Var.t -> t -> bool
 (** [var_occurs ~var t] is [true] iff [var] occurs in [t] *)
 
 val vars : t -> t Var.t list
+val free_vars : t -> t Var.t list
 
 val close_all : ty:t -> Binder.t -> t -> t
 (** Bind all free vars with the symbol *)
@@ -185,6 +186,7 @@ module Seq : sig
   val subterms : t -> t Sequence.t
   val subterms_with_bound : t -> (t * t Var.Set.t) Sequence.t
   val vars : t -> t Var.t Sequence.t
+  val free_vars : t -> t Var.t Sequence.t
   val metas : t -> (t Var.t * t option ref) Sequence.t
 end
 

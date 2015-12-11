@@ -113,15 +113,14 @@ let rec hash_fun t h = match t.term with
 let hash x = Hash.apply hash_fun x
 
 let rec pp out t = match view t with
-  | Var s ->
-      Var.pp out s;
-      Format.fprintf out ":%a" pp_inner (ty_exn t)
+  | Var s -> Var.pp_full out s
   | Const s -> ID.pp out s
   | App (_, []) -> assert false
   | App (f, l) ->
       Format.fprintf out "@[<2>%a@ %a@]" pp_inner f (Util.pp_list ~sep:" " pp) l
   | Bind (s, v, t) ->
-      Format.fprintf out "@[<2>%a %a.@ %a@]" Binder.pp s Var.pp v pp_inner t
+      Format.fprintf out "@[<2>%a %a%a.@ %a@]"
+        Binder.pp s Var.pp_full v pp_var_ty v pp_inner t
   | Record (l, None) ->
       Format.fprintf out "{%a}" pp_fields l
   | Record (l, Some r) ->
@@ -133,8 +132,9 @@ let rec pp out t = match view t with
   | AppBuiltin (Builtin.Not, [f]) -> Format.fprintf out "@[¬@ %a@]" pp f
   | AppBuiltin (b, l) when Builtin.is_infix b && List.length l > 0 ->
       pp_infix_ b out l
+  | AppBuiltin (b, []) -> Builtin.pp out b
   | AppBuiltin (b, l) ->
-    Format.fprintf out "(@[%a %a@])" Builtin.pp b (Util.pp_list pp_inner) l
+      Format.fprintf out "@[<2>%a@ %a@]" Builtin.pp b (Util.pp_list pp_inner) l
   | Multiset l ->
       Format.fprintf out "[@[%a@]]" (Util.pp_list ~sep:", " pp_inner) l
   | Meta (id, r) ->
@@ -154,6 +154,11 @@ and pp_infix_ b out l = match l with
   | t :: l' ->
       Format.fprintf out "@[<hv>%a@ @[<hv>%a@ %a@]@]"
         pp_inner t Builtin.pp b (pp_infix_ b) l'
+and pp_var_ty out v =
+  let ty = Var.ty v in
+  match view ty with
+  | AppBuiltin (Builtin.Term, []) -> ()
+  | _ -> Format.fprintf out ":%a" pp_inner ty
 
 exception IllFormedTerm of string
 
@@ -170,9 +175,10 @@ let meta ?loc (v, r) =
 let meta_of_string ?loc ~ty name =
   make_ ?loc ~ty (Meta (Var.of_string ~ty name, ref None))
 
-let app ?loc ~ty s l = match l with
-  | [] -> s
-  | _::_ -> make_ ?loc ~ty (App(s,l))
+let app ?loc ~ty s l = match view s, l with
+  | _, [] -> s
+  | App (f, l'), _ -> make_ ?loc ~ty (App (f, l' @ l))
+  | _ -> make_ ?loc ~ty (App(s,l))
 
 let bind ?loc ~ty s v l = make_ ?loc ~ty (Bind(s,v,l))
 
@@ -267,7 +273,7 @@ module Seq = struct
       | App (f, l) -> iter set f; List.iter (iter set) l
       | Bind (_, v, t') ->
           let set' = Var.Set.add set v in
-          iter set' (Var.ty v); iter set' t'
+          iter set (Var.ty v); iter set' t'
       | Record (l, rest) ->
           CCOpt.iter (iter set) rest;
           List.iter (fun (_,t) -> iter set t) l
@@ -275,6 +281,13 @@ module Seq = struct
       | Multiset l -> List.iter (iter set) l
     in
     iter Var.Set.empty t
+
+  let free_vars t =
+    subterms_with_bound t
+    |> Sequence.filter_map
+      (fun (t,set) -> match view t with
+        | Var v when not (Var.Set.mem set v) -> Some v
+        | _ -> None)
 end
 
 let rec is_ground t =
@@ -299,14 +312,13 @@ let var_occurs ~var t =
 
 let vars t = Seq.vars t |> Var.Set.of_seq |> Var.Set.to_list
 
-let closed t =
-  Seq.subterms_with_bound t
-  |> Sequence.for_all
-    (fun (t,set) -> match view t with
-      | Var v -> Var.Set.mem set v
-      | _ -> true)
+let free_vars t = Seq.free_vars t |> Var.Set.of_seq |> Var.Set.to_list
 
-let close_all ~ty s t = bind_list ~ty s (vars t) t
+let closed t = Seq.free_vars t |> Sequence.is_empty
+
+let close_all ~ty s t =
+  let vars = free_vars t in
+  bind_list ~ty s vars t
 
 (** {2 Specific Views} *)
 
@@ -495,7 +507,7 @@ module Form = struct
     let tyvars, vars =
       List.partition
         (fun v -> Ty.returns_tType (Var.ty v))
-        (vars f)
+        (free_vars f)
     in
     forall_l ?loc tyvars (forall_l ?loc vars f)
 end
@@ -639,7 +651,7 @@ let () = Printexc.register_printer
   (function
     | UnifyFailure (msg, st) ->
       Some (
-        CCFormat.sprintf "@[<2>unification error:@ %s@,%a@]" msg pp_stack st)
+        CCFormat.sprintf "@[<2>unification error:@ %s@ %a@]" msg pp_stack st)
     | _ -> None)
 
 let fail_unif_ st msg = raise (UnifyFailure (msg, st))
@@ -695,6 +707,7 @@ let unify ?(st=UStack.create()) t1 t2 =
     | Some _, None
     | None, Some _ -> fail_ "type do not match"
   and unify_terms t1 t2 = match view t1, view t2 with
+    | Meta (v1,_), Meta (v2,_) when Var.equal v1 v2 -> ()
     | Meta (_, r), _ ->
         assert (!r = None);
         if occur_check_ t1 t2 || not (closed t2)
