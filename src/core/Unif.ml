@@ -75,6 +75,12 @@ let pair_lists_ f1 l1 f2 l2 =
     let l1_1, l1_2 = CCList.take_drop (len1 - len2) l1 in
     (T.app ~ty:(T.ty_exn f2) f1 l1_1) :: l1_2, f2 :: l2
 
+type op =
+  | O_unify
+  | O_match of T.VarSet.t option (* blocked variables *)
+  | O_variant
+  | O_equal
+
 module RecordUnif = struct
   type t = {
     ty : T.t;
@@ -310,11 +316,6 @@ module Nary = struct
 
   (** {6 Multisets, Lists, Records} *)
 
-  type unif =
-    env:env -> S.t -> T.t Scoped.t -> T.t Scoped.t ->
-    (env:env -> subst -> unit) ->
-    unit
-
   (* unify lists pairwise *)
   let rec unify_list_ ~env ~unif subst l1 l2 k =
     match l1.Scoped.value, l2.Scoped.value with
@@ -440,12 +441,6 @@ module Nary = struct
 
   (** {6 Unification, Matching, Comparison} *)
 
-  type op =
-    | O_unify
-    | O_match
-    | O_variant
-    | O_equal
-
   let rec unif_rec_ ~env ~op subst t1 t2 k : unit =
     Util.debugf 5 "@[<hv2>unif:@ @[%a@]@ =?=@ @[%a@]@ with @[%a@]@]"
       (fun k->k (Scoped.pp T.pp) t1 (Scoped.pp T.pp) t2 S.pp subst);
@@ -473,11 +468,11 @@ module Nary = struct
         | T.Var v1, T.Var v2, O_equal ->
             if HVar.equal v1 v2 && Scoped.same_scope t1 t2
             then k ~env subst
-        | T.Var v1, T.Var v2, (O_unify | O_match | O_variant) ->
+        | T.Var v1, T.Var v2, (O_unify | O_match _ | O_variant) ->
             if HVar.equal v1 v2 && Scoped.same_scope t1 t2
             then k ~env subst
             else k ~env (S.bind subst (Scoped.set t1 v1) t2)
-        | T.Var v1, _, (O_unify | O_match) ->
+        | T.Var v1, _, (O_unify | O_match _) ->
             if occurs_check ~depth:env.depth subst (Scoped.set t1 v1) t2
             then () (* occur check or t2 is open *)
             else k ~env (S.bind subst (Scoped.set t1 v1) t2)
@@ -536,7 +531,7 @@ module Nary = struct
   let matching ?(subst=S.empty) ~pattern t =
     if Scoped.same_scope pattern t then invalid_arg "Unif.matching: same scopes";
     let env = {depth=0; permutation=DBEnv.empty; } in
-    fun k -> unif_rec_ ~env ~op:O_match subst pattern t (fun ~env:_ subst -> k subst)
+    fun k -> unif_rec_ ~env ~op:(O_match None) subst pattern t (fun ~env:_ subst -> k subst)
 
   let variant ?(subst=S.empty) a b =
     let env = {depth=0; permutation=DBEnv.empty; } in
@@ -636,12 +631,6 @@ module Unary = struct
             subst
           )
         )
-
-  type op =
-    | O_unify
-    | O_match of T.VarSet.t option (* blocked variables *)
-    | O_variant
-    | O_equal
 
   let bind subst v t =
     if occurs_check ~depth:0 subst v t then fail()

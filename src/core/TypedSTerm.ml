@@ -162,13 +162,12 @@ let var ?loc v = make_ ?loc ~ty:v.Var.ty (Var v)
 let const ?loc ~ty s = make_ ?loc ~ty (Const s)
 let app_builtin ?loc ~ty b l = make_ ?loc ~ty (AppBuiltin (b,l))
 let builtin ?loc ~ty b = make_ ?loc ~ty (AppBuiltin (b,[]))
-let meta ?loc v = make_ ?loc ~ty:v.Var.ty (Meta (v, ref None))
+
+let meta ?loc (v, r) =
+  make_ ?loc ~ty:v.Var.ty (Meta (v,r))
 
 let meta_of_string ?loc ~ty name =
   make_ ?loc ~ty (Meta (Var.of_string ~ty name, ref None))
-
-let meta_full ?loc v r =
-  make_ ?loc ~ty:v.Var.ty (Meta (v,r))
 
 let app ?loc ~ty s l = match l with
   | [] -> s
@@ -211,30 +210,12 @@ let of_string ?loc ~ty s = const ?loc ~ty (ID.make s)
 let tType = {ty=None; loc=None; term=AppBuiltin (Builtin.TType,[]); }
 let prop = builtin ~ty:tType Builtin.Prop
 
-let ty_arrow ?loc l r = app_builtin ?loc ~ty:tType Builtin.Arrow (r :: l)
-
 let fresh_var ?loc ~ty () = var ?loc (Var.gensym ~ty ())
 
 (** {2 Utils} *)
 
 let is_var = function | {term=Var _; _} -> true | _ -> false
 let is_meta t = match view t with Meta _ -> true | _ -> false
-
-let rec ground t =
-  CCOpt.maybe ground true t.ty
-  &&
-  match t.term with
-  | Var _ -> false
-  | Const _ -> true
-  | App (f, l) -> ground f && List.for_all ground l
-  | AppBuiltin (_,l) -> List.for_all ground l
-  | Bind (_, v, t') -> ground (Var.ty v) && ground t'
-  | Record (l, rest) ->
-      CCOpt.maybe ground true rest
-      &&
-      List.for_all (fun (_,t') -> ground t') l
-  | Multiset l -> List.for_all ground l
-  | Meta (_,_) -> false
 
 module Set = Sequence.Set.Make(struct type t = term let compare = compare end)
 module Map = Sequence.Map.Make(struct type t = term let compare = compare end)
@@ -295,6 +276,26 @@ module Seq = struct
     iter Var.Set.empty t
 end
 
+let rec is_ground t =
+  CCOpt.maybe is_ground true t.ty
+  &&
+  match t.term with
+  | Var _ -> false
+  | Const _ -> true
+  | App (f, l) -> is_ground f && List.for_all is_ground l
+  | AppBuiltin (_,l) -> List.for_all is_ground l
+  | Bind (_, v, t') -> is_ground (Var.ty v) && is_ground t'
+  | Record (l, rest) ->
+      CCOpt.maybe is_ground true rest
+      &&
+      List.for_all (fun (_,t') -> is_ground t') l
+  | Multiset l -> List.for_all is_ground l
+  | Meta (_,_) -> false
+
+let var_occurs ~var t =
+  Seq.vars t
+  |> Sequence.mem ~eq:Var.equal var
+
 let vars t = Seq.vars t |> Var.Set.of_seq |> Var.Set.to_list
 
 let closed t =
@@ -320,7 +321,7 @@ module Ty = struct
     | Fun of t list * t
     | Forall of t Var.t * t
     | Multiset of t
-    | Record of (string * t) list * t option
+    | Record of (string * t) list * t Var.t option
     | Meta of meta_var
 
   let view (t:t) : view = match view t with
@@ -332,7 +333,12 @@ module Ty = struct
         end
     | Const id -> App (id, [])
     | Bind (Binder.ForallTy, v, t) -> Forall (v,t)
-    | Record (l,rest) -> Record (l, rest)
+    | Record (l,None) -> Record (l, None)
+    | Record (l, Some r) ->
+        begin match view r with
+          | Var r -> Record (l, Some r)
+          | _ -> assert false
+        end
     | Meta (v,o) -> Meta (v,o)
     | AppBuiltin (Builtin.Prop, []) -> Builtin Prop
     | AppBuiltin (Builtin.TType, []) -> Builtin TType
@@ -348,10 +354,17 @@ module Ty = struct
   let tType = tType
   let var = var
   let meta = meta
-  let fun_ ?loc args ret = app_builtin ?loc ~ty:tType Builtin.Arrow (ret::args)
+
+  let mk_fun_ ?loc args ret = app_builtin ?loc ~ty:tType Builtin.Arrow (ret::args)
+
+  let fun_ ?loc args ret = match view ret with
+    | Fun (args', ret') -> mk_fun_ ?loc (args @ args') ret'
+    | _ -> mk_fun_ ?loc args ret
+
   let app ?loc id l =
     let ty_id = fun_ (List.map (fun _ -> tType) l) tType in
     app ?loc ~ty:tType (const ?loc ~ty:ty_id id) l
+
   let const ?loc id = const ?loc ~ty:tType id
   let forall ?loc v t = bind ~ty:tType ?loc Binder.ForallTy v t
   let forall_l ?loc = List.fold_right (forall ?loc)
@@ -395,32 +408,74 @@ module Form = struct
     | Forall of t Var.t * t
     | Exists of t Var.t * t
 
-  val view : t -> view
+  let view t = match view t with
+    | AppBuiltin (Builtin.True, []) -> True
+    | AppBuiltin (Builtin.False, []) -> False
+    | AppBuiltin (Builtin.And, l) -> And l
+    | AppBuiltin (Builtin.Or, l) -> Or l
+    | AppBuiltin (Builtin.Not, [f]) -> Not f
+    | AppBuiltin (Builtin.Imply, [a;b]) -> Imply(a,b)
+    | AppBuiltin (Builtin.Equiv, [a;b]) -> Equiv(a,b)
+    | AppBuiltin (Builtin.Xor, [a;b]) -> Xor(a,b)
+    | AppBuiltin (Builtin.Eq, [a;b]) -> Eq(a,b)
+    | AppBuiltin (Builtin.Neq, [a;b]) -> Neq(a,b)
+    | Bind(Binder.Forall, v, t) -> Forall (v,t)
+    | Bind(Binder.Exists, v, t) -> Exists (v,t)
+    | Bind((Binder.ForallTy | Binder.Lambda), _, _) -> assert false
+    | Multiset _
+    | Record _
+    | Meta _
+    | Var _
+    | Const _
+    | App _
+    | AppBuiltin _ -> Atom t
 
   (** Smart constructors (perform simplifications) *)
 
-  val true_ : t
-  val false_ : t
-  val atom : ?loc:location -> t -> t
-  val eq : ?loc:location -> t -> t -> t
-  val neq : ?loc:location -> t -> t -> t
-  val equiv : ?loc:location -> t -> t -> t
-  val xor : ?loc:location -> t -> t -> t
-  val imply : ?loc:location -> t -> t -> t
-  val and_ : ?loc:location -> t list -> t
-  val or_ : ?loc:location -> t list -> t
-  val not_ : ?loc:location -> t -> t
-  val forall : ?loc:location -> t Var.t -> t -> t
-  val exists : ?loc:location -> t Var.t -> t -> t
+  let true_ = builtin ~ty:Ty.prop Builtin.True
+  let false_ = builtin ~ty:Ty.prop Builtin.False
+  let atom t = t
+  let eq ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Eq [a;b]
+  let neq ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Neq [a;b]
+  let equiv ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Equiv [a;b]
+  let xor ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Xor [a;b]
+  let imply ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Imply [a;b]
 
-  val forall_l : ?loc:location -> t Var.t list -> t -> t
-  val exists_l : ?loc:location -> t Var.t list -> t -> t
+  let rec flatten_ (k:[<`And|`Or]) acc l = match l with
+    | [] -> acc
+    | t::l' ->
+        let acc = match view t, k with
+          | False, `Or
+          | True, `And -> acc
+          | And l, `And
+          | Or l, `Or -> List.rev_append l acc
+          | _ -> t :: acc
+        in
+        flatten_ k acc l'
 
-  val is_atomic : t -> bool
+  let and_ ?loc = function
+    | [] -> true_
+    | [t] -> t
+    | l -> app_builtin ?loc ~ty:Ty.prop Builtin.And (flatten_ `And [] l)
 
-  val arity : t -> (int * int) option
-  (** [arity ty] returns [Some (n,m)] if [ty] has [n] type parameters
-      and is a [m]-ary function *)
+  let or_ ?loc = function
+    | [] -> true_
+    | [t] -> t
+    | l -> app_builtin ?loc ~ty:Ty.prop Builtin.Or (flatten_ `Or [] l)
+
+  let not_ ?loc f = match view f with
+    | Not f' -> f'
+    | Eq (a,b) -> neq ?loc a b
+    | Neq (a,b) -> eq ?loc a b
+    | True -> false_
+    | False -> true_
+    | _ -> app_builtin ?loc ~ty:Ty.prop Builtin.Not [f]
+
+  let forall ?loc v t = bind ?loc ~ty:Ty.prop Binder.Forall v t
+  let exists ?loc v t = bind ?loc ~ty:Ty.prop Binder.Exists v t
+
+  let forall_l ?loc = List.fold_right (forall ?loc)
+  let exists_l ?loc = List.fold_right (exists ?loc)
 end
 
 let to_string = CCFormat.to_string pp
@@ -446,8 +501,8 @@ module Subst = struct
           "@[<2>var `@[%a@]` already bound in `@[%a@]`@]" Var.pp v pp subst);
     ID.Map.add v.Var.id t subst
 
-  let find_exn subst v = ID.Map.find v subst
-  let find subst v = try Some (ID.Map.find v subst) with Not_found -> None
+  let find_exn subst v = ID.Map.find v.Var.id subst
+  let find subst v = try Some (ID.Map.find v.Var.id subst) with Not_found -> None
 
   let rec eval_head subst t =
     match view t with
@@ -491,7 +546,7 @@ module Subst = struct
         app_builtin ?loc:t.loc ~ty b (eval_list subst l)
     | Record (l, rest) ->
         let ty = eval subst (ty_exn t) in
-        record ?loc:t.loc ~ty
+        record_flatten ?loc:t.loc ~ty
           (List.map (CCPair.map2 (eval subst)) l)
           ~rest:(CCOpt.map (eval subst) rest)
     | Multiset l ->
@@ -499,7 +554,7 @@ module Subst = struct
         multiset ?loc:t.loc ~ty (eval_list subst l)
     | Meta (v,r) ->
         let v = Var.update_ty v ~f:(eval subst) in
-        meta_full ?loc:t.loc v r
+        meta ?loc:t.loc (v, r)
   and eval_list subst l = List.map (eval subst) l
 end
 
@@ -722,7 +777,7 @@ let apply_unify ?st ty l =
   and aux_l subst exp ret l = match exp, l with
     | [], [] -> Subst.eval subst ret
     | _, [] -> Subst.eval subst (Ty.fun_ exp ret)
-    | [], _ -> fail_uniff_ "cannot apply type @[%a@]" pp ret
+    | [], _ -> fail_uniff_ [] "@[<2>cannot apply type@ @[%a@]@]" pp ret
     | exp_a :: exp', a :: l' ->
         unify ?st exp_a (ty_exn a);
         aux_l subst exp' ret l'

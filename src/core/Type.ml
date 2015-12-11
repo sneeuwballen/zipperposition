@@ -45,6 +45,7 @@ type view =
 
 let view t = match T.view t with
   | T.Var v -> Var v
+  | T.DB i -> DB i
   | T.Bind (Binder.ForallTy, varty, t') ->
       assert (T.equal varty T.tType);
       Forall t'

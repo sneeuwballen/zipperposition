@@ -108,7 +108,7 @@ val forall : t -> t
 (** Quantify over one type variable. Careful with the De Bruijn indices. *)
 
 val bvar : int -> t
-(** not documented. *)
+(** bound variable *)
 
 val (@@) : ID.t -> t list -> t
 (** [s @@ args] applies the sort [s] to arguments [args]. *)

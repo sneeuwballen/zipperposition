@@ -101,9 +101,7 @@ let as_cnf f = match F.view f with
   | F.Forall _
   | F.Exists _ -> raise NotCNF
 
-let is_lit f = try ignore (as_lit f); true with NotCNF -> false
 let is_clause f = try ignore (as_clause f); true with NotCNF -> false
-let is_cnf f = try ignore (as_cnf f); true with NotCNF -> false
 
 (* miniscoping (push quantifiers as deep as possible in the formula) *)
 let miniscope ?(distribute_exists=false) f =
@@ -318,7 +316,16 @@ let rec will_yield_lit f = match F.view f with
   | F.Not f'
   | F.Exists (_, f')
   | F.Forall (_, f') -> will_yield_lit f'
-  | _ -> F.is_atomic f
+  | F.Eq _
+  | F.Neq _
+  | F.Atom _
+  | F.True
+  | F.False -> true
+  | F.And _
+  | F.Or _
+  | F.Imply _
+  | F.Equiv _
+  | F.Xor _ -> false
 
 (* introduce definitions for sub-formulas of [f], is needed. This might
    modify [ctx] by adding definitions to it, and it will {!NOT} introduce

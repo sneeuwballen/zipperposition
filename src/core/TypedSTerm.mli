@@ -134,7 +134,7 @@ module Form : sig
 
   val true_ : t
   val false_ : t
-  val atom : ?loc:location -> t -> t
+  val atom : t -> t
   val eq : ?loc:location -> t -> t -> t
   val neq : ?loc:location -> t -> t -> t
   val equiv : ?loc:location -> t -> t -> t
@@ -148,20 +148,14 @@ module Form : sig
 
   val forall_l : ?loc:location -> t Var.t list -> t -> t
   val exists_l : ?loc:location -> t Var.t list -> t -> t
-
-  val is_atomic : t -> bool
-
-  val arity : t -> (int * int) option
-  (** [arity ty] returns [Some (n,m)] if [ty] has [n] type parameters
-      and is a [m]-ary function *)
 end
 
 (** {2 Utils} *)
 
 val is_var : t -> bool
-val is_bvar : t -> bool
+val is_meta : t -> bool
 
-val ground : t -> bool
+val is_ground : t -> bool
 (** [true] iff there is no free variable *)
 
 val closed : t -> bool
@@ -171,7 +165,7 @@ val closed : t -> bool
 val var_occurs : var:t Var.t -> t -> bool
 (** [var_occurs ~var t] is [true] iff [var] occurs in [t] *)
 
-val vars : t -> t list
+val vars : t -> t Var.t list
 
 val close_all : ty:t -> Binder.t -> t -> t
 (** Bind all free vars with the symbol *)
@@ -197,11 +191,11 @@ module Subst : sig
 
   val empty : t
 
-  val add : t -> ID.t -> term -> t
+  val add : t -> term Var.t -> term -> t
 
-  val find : t -> ID.t -> t option
+  val find : t -> term Var.t -> term option
 
-  val find_exn : t -> ID.t -> t
+  val find_exn : t -> term Var.t -> term
   (** @raise Not_found if the variable is not present *)
 
   val eval : t -> term -> term

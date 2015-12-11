@@ -53,7 +53,7 @@ Library "logtk"
                     DBEnv, Position, HOTerm, Var, HVar,
                     Substs, Unif, Signature, Scoped, Unif_intf,
                     TypeInference, Options, Comparison, Precedence, Builtin,
-                    Precedence_intf, Ordering, Ordering_intf, Skolem, Cnf, ID,
+                    Ordering, Skolem, Cnf, ID,
                     HORewriting, Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,
                     Congruence, FeatureVector,
                     Lambda, Sourced, TypedSTerm,
