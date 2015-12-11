@@ -48,7 +48,7 @@ val type_declarations : typed A.t Sequence.t -> typed ID.Map.t
 (** Initial signature obtained by only considering the type declarations. *)
 
 val declare_symbols :
-  ?name:(int -> ID.t -> A.name) ->
+  ?name:(ID.t -> A.name) ->
   typed ID.Map.t ->
   typed A.t Sequence.t
 (** Declare the symbols of the signature. A custom function
@@ -97,7 +97,8 @@ val erase_types :
 val to_cnf :
   ?opts:Cnf.options list ->
   typed A.t Sequence.t ->
-  (typed A.t, CCVector.ro) CCVector.t
+  (A.role Cnf.statement, CCVector.ro) CCVector.t
 (** [to_cnf decls] reduces declarations to CNF, and returns the new
-    declarations (including type declarations for Skolem symbols).
+    declarations (including type declarations for Skolem symbols)
+    in the form of {!Cnf.statement}.
     @param opts options for CNF *)

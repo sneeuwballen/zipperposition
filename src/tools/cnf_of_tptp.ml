@@ -42,14 +42,14 @@ let process file =
       []
     in
     let decls = Util_tptp.to_cnf ~opts decls in
-    let sigma = Util_tptp.type_declarations
+    let sigma = Cnf.type_declarations
       (CCVector.to_seq decls) in
     if !print_sig
     then Format.printf "@[<hv2>signature:@ @[<v>%a@]@]@."
       (ID.Map.print ~start:"" ~stop:"" ~sep:"" ~arrow:" : " ID.pp T.pp) sigma;
     (* print *)
     Format.printf "@[<v>%a@]@."
-      (CCVector.print ~start:"" ~stop:"" ~sep:"" (A.pp T.pp))
+      (CCVector.print ~start:"" ~stop:"" ~sep:"" Cnf.pp_statement)
       decls;
     Err.return ()
   )

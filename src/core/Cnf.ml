@@ -16,6 +16,7 @@ let prof_skolemize = Util.mk_profiler "cnf.skolemize"
 let section = Util.Section.make ~parent:Util.Section.logtk "cnf"
 
 type term = T.t
+type type_ = T.t
 type form = F.t
 type lit = term SLiteral.t
 
@@ -235,10 +236,6 @@ module Estimation = struct
     | TooBig, _ -> true
     | Exactly e', Exactly e'' -> e' >= e''
     | Exactly _, TooBig -> false
-
-  let pp out n = match n with
-    | TooBig -> CCFormat.string out "<too_big>"
-    | Exactly n -> CCFormat.int out n
 end
 
 (* estimate the number of clauses needed by this formula. *)
@@ -474,7 +471,7 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
   Util.enter_prof prof_simplify_rename;
   let res = seq
     |> Sequence.flat_map
-      (fun f ->
+      (fun (f,annot) ->
          (* preprocessing *)
          let f = List.fold_left (|>) f preprocess in
          (* simplification *)
@@ -485,24 +482,36 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
          in
          let defs = Skolem.pop_new_definitions ~ctx in
          match defs with
-         | [] -> Sequence.return f'
+         | [] -> Sequence.return (f',annot)
          | _::_ ->
             let defs = List.map
                 (fun d ->
-                   (* introduce the required definition, with polarity as needed *)
-                   match d.Skolem.polarity with
+                  (* introduce the required definition, with polarity as needed *)
+                  let f' = match d.Skolem.polarity with
                      | `Pos -> F.imply d.Skolem.proxy d.Skolem.form
                      | `Neg -> F.imply d.Skolem.form d.Skolem.proxy
                      | `Both -> F.equiv d.Skolem.proxy d.Skolem.form
+                  in
+                  f', annot
                 )
                 defs
             in
-            Sequence.of_list (f' :: defs)
+            Sequence.of_list ((f', annot) :: defs)
       )
     |> CCVector.of_seq ?init:None
   in
   Util.exit_prof prof_simplify_rename;
   res
+
+type 'a statement =
+  | TyDecl of ID.t * type_ * 'a
+  | Assert of clause * 'a
+
+let pp_statement out = function
+  | Assert (c,_) ->
+      Format.fprintf out "@[<2>assert@ (@[%a@])@]." pp_clause c
+  | TyDecl (id, ty, _) ->
+      Format.fprintf out "@[<2>val %a :@ %a@]." ID.pp id T.pp ty
 
 (* Transform the clauses into proper CNF; returns a list of clauses *)
 let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
@@ -526,7 +535,7 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
   (* reduce the new formulas to CNF *)
   let res = CCVector.create () in
   CCVector.iter
-    (fun f ->
+    (fun (f, annot) ->
       Util.debugf ~section 4 "@[<2>reduce@ `@[%a@]`@ to CNF@]" (fun k->k T.pp f);
       let clauses =
         try as_cnf f
@@ -548,11 +557,25 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
             (fun k->k (Util.pp_list ~sep:", " pp_clause) clauses);
           clauses
       in
-      CCVector.append_list res clauses
+      let new_ids = Skolem.pop_new_symbols ~ctx in
+      List.iter
+        (fun (id,ty) -> CCVector.push res (TyDecl (id,ty,annot)))
+        new_ids;
+      List.iter
+        (fun c -> CCVector.push res (Assert (c,annot)))
+        clauses;
     )
     v;
   (* return final vector of clauses *)
   CCVector.freeze res
 
-let cnf_of ?opts ?ctx f =
-  cnf_of_seq ?opts ?ctx (Sequence.return f)
+let cnf_of ?opts ?ctx f annot =
+  cnf_of_seq ?opts ?ctx (Sequence.return (f,annot))
+
+let type_declarations seq =
+  Sequence.fold
+    (fun acc st -> match st with
+      | TyDecl (id, ty, _) -> ID.Map.add id ty acc
+      | Assert _ -> acc)
+    ID.Map.empty seq
+

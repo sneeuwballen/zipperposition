@@ -226,14 +226,15 @@ let type_declarations decls =
   end in
   Sequence.fold a#visit ID.Map.empty decls
 
-let name_sym_ i sy =
-  let str = CCFormat.sprintf "'ty_decl_%d_%a'" i ID.pp sy in
+(* default function for giving a name to the declaration of a symbol *)
+let name_sym_ sy =
+  let str = CCFormat.sprintf "'ty_decl_%d_%a'" (ID.id sy) ID.pp sy in
   A.NameString str
 
 let declare_symbols_seq ?(name=name_sym_) seq =
-  Sequence.mapi
-    (fun i (s, ty) ->
-       let name = name i s in
+  Sequence.map
+    (fun (s, ty) ->
+       let name = name s in
        A.TypeDecl (name, s, ty, []))
     seq
 
@@ -329,22 +330,20 @@ let to_cnf ?opts decls =
   let ctx = Skolem.create () in
   let res = CCVector.create() in
   Sequence.iter
-    (fun decl -> match decl with
-       | A.TFF(n,r,f,info)
-       | A.FOF(n,r,f,info) ->
-           let f, role = match r with
-             | A.R_conjecture -> F.not_ f, A.R_negated_conjecture
-             | _ -> f, r
-           in
-           let clauses =
-             Cnf.cnf_of ?opts ~ctx f
-             |> CCVector.to_seq
-             |> Sequence.map
-                 (fun c -> A.CNF(n,role, List.map SLiteral.to_form c, info))
-           in
-           CCVector.append_seq res clauses
-       | A.THF _ -> failwith "cnf_of_tptp cannot deal with HO terms right now."
-       | _ -> CCVector.push res decl)
+    (function
+     | A.TFF(_,r,f,_)
+     | A.FOF(_,r,f,_) ->
+         let f, role = match r with
+           | A.R_conjecture -> F.not_ f, A.R_negated_conjecture
+           | _ -> f, r
+         in
+         let stmts = Cnf.cnf_of ?opts ~ctx f role in
+         CCVector.append res stmts
+     | A.NewType (_, id, ty, _)
+     | A.TypeDecl (_, id, ty, _) ->
+         CCVector.push res (Cnf.TyDecl (id, ty, A.R_type));
+     | A.THF _ -> failwith "cnf_of_tptp cannot deal with HO terms right now."
+     | _ -> ())
     decls;
   CCVector.freeze res
 

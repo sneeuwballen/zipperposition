@@ -20,6 +20,7 @@ val make : string -> t
 val copy : t -> t
 (** Copy with a new ID *)
 
+val id : t -> int
 val name : t -> string
 
 include Interfaces.HASH with type t := t

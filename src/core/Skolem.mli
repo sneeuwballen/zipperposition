@@ -28,6 +28,9 @@ val fresh_sym : ctx:ctx -> ty:type_ -> ID.t
 val fresh_sym_with : ctx:ctx -> ty:type_ -> string -> ID.t
 (** Fresh symbol with a different name *)
 
+val pop_new_symbols : ctx:ctx -> (ID.t * type_) list
+(** Remove and return the list of newly created symbols *)
+
 (** {2 Skolemization} *)
 
 val skolem_form : ctx:ctx -> (type_, term) Var.Subst.t -> type_ -> form -> term

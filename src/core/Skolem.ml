@@ -33,6 +33,7 @@ type ctx = {
   sc_prop_prefix : string;
   mutable sc_gensym: int;
   mutable sc_new_defs : definition list; (* "new" definitions *)
+  mutable sc_new_ids: (ID.t * type_) list; (* "new" symbols *)
   sc_on_new : ID.t -> type_ -> unit;
 }
 
@@ -43,6 +44,7 @@ let create
     sc_prop_prefix=prop_prefix;
     sc_new_defs = [];
     sc_gensym = 0;
+    sc_new_ids = [];
     sc_on_new = on_new;
   } in
   ctx
@@ -51,6 +53,7 @@ let fresh_sym_with ~ctx ~ty prefix =
   let n = ctx.sc_gensym in
   ctx.sc_gensym <- n+1;
   let s = ID.make (prefix ^ string_of_int n) in
+  ctx.sc_new_ids <- (s,ty) :: ctx.sc_new_ids;
   ctx.sc_on_new s ty;
   Util.debugf ~section 3 "@[<2>new skolem symbol %a@ with type @[%a@]@]"
     (fun k->k ID.pp s T.pp ty);
@@ -75,6 +78,11 @@ let skolem_form ~ctx subst ty form =
   let ty = T.Ty.forall_l tyvars (T.Ty.fun_ vars_t ty) in
   let f = fresh_sym ~ctx ~ty in
   T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t)
+
+let pop_new_symbols ~ctx =
+  let l = ctx.sc_new_ids in
+  ctx.sc_new_ids <- [];
+  l
 
 (** {2 Definitions} *)
 

@@ -18,6 +18,7 @@ let make =
 
 let copy t = make t.name
 
+let id t = t.id
 let name t = t.name
 
 let hash t = t.id

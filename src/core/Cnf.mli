@@ -5,10 +5,8 @@
 
 type term = TypedSTerm.t
 type form = TypedSTerm.t
+type type_ = TypedSTerm.t
 type lit = term SLiteral.t
-
-type clause = lit list
-(** Basic clause representation, as list of literals *)
 
 (** See "computing small normal forms", in the handbook of automated reasoning.
     All transformations are made on curried terms and formulas. *)
@@ -45,15 +43,33 @@ type options =
   (** transformation applied just after skolemization. It must not
       break skolemization nor NNF (no quantifier, no non-leaf negation). *)
 
+type clause = lit list
+(** Basic clause representation, as list of literals *)
+
+(** A toplevel statement, declaring a symbol or asserting a clause.
+    A user-provided annotation of type ['a] is kept for all clauses. *)
+type 'a statement =
+  | TyDecl of ID.t * type_ * 'a
+  | Assert of clause * 'a
+
+val pp_statement : _ statement CCFormat.printer
+
 val cnf_of :
   ?opts:options list ->
   ?ctx:Skolem.ctx ->
   form ->
-  (clause, CCVector.ro) CCVector.t
-(** Transform the clause into proper CNF; returns a list of clauses.
+  'a ->
+  ('a statement, CCVector.ro) CCVector.t
+(** Transform the clause into proper CNF; returns a list of statements,
+    including type declarations for new Skolem symbols or formulas proxys.
     Options are used to tune the behavior. *)
 
 val cnf_of_seq :
   ?opts:options list -> ?ctx:Skolem.ctx ->
-  form Sequence.t ->
-  (clause, CCVector.ro) CCVector.t
+  (form * 'a) Sequence.t ->
+  ('a statement, CCVector.ro) CCVector.t
+
+val type_declarations :
+  _ statement Sequence.t ->
+  type_ ID.Map.t
+(** Compute the types declared in the statement sequence *)
