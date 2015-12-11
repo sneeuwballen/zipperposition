@@ -38,6 +38,13 @@ exception Error of string
 
 val section : Util.Section.t
 
+(** {2 Types for Builtins} *)
+
+module TyBuiltin : sig
+  val ty : Builtin.t -> type_ option
+  val ty_exn : Builtin.t -> type_
+end
+
 (** {2 Typing context}
 
     This module provides a typing context, with an applicative interface.

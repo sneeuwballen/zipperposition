@@ -50,6 +50,59 @@ let unify ?loc ty1 ty2 =
   with T.UnifyFailure _ as e ->
     error_ ?loc "@[%s@]" (Printexc.to_string e)
 
+module TyBuiltin = struct
+  let a = Var.of_string ~ty:T.Ty.tType "α"
+  let a_ = T.Ty.var a
+  let prop2 = T.Ty.([prop; prop] ==> prop)
+  let prop1 = T.Ty.([prop] ==> prop)
+  let prop2poly = T.Ty.(forall a ([a_; a_] ==> prop))
+  let ty_1_to_int = T.Ty.(forall a ([a_] ==> int))
+  let ty2op = T.Ty.(forall a ([a_; a_] ==> a_))
+  let ty1op = T.Ty.(forall a ([a_] ==> a_))
+  let ty2op_to_i = T.Ty.([int;int] ==> int)
+  let hobinder = T.Ty.(forall a ([[a_] ==> prop] ==> prop))
+
+  let ty_exn = function
+    | Builtin.True -> T.Ty.prop
+    | Builtin.False -> T.Ty.prop
+    | Builtin.Eq -> prop2poly
+    | Builtin.Neq -> prop2poly
+    | Builtin.Not -> prop1
+    | Builtin.Imply -> prop2
+    | Builtin.And -> prop2
+    | Builtin.Or -> prop2
+    | Builtin.Equiv -> prop2
+    | Builtin.Xor -> prop2
+    | Builtin.ForallConst -> hobinder
+    | Builtin.ExistsConst -> hobinder
+    | Builtin.Less -> prop2poly
+    | Builtin.Lesseq -> prop2poly
+    | Builtin.Greater -> prop2poly
+    | Builtin.Greatereq -> prop2poly
+    | Builtin.Uminus -> ty1op
+    | Builtin.Sum -> ty2op
+    | Builtin.Difference -> ty2op
+    | Builtin.Product -> ty2op
+    | Builtin.Quotient -> ty2op
+    | Builtin.Quotient_e -> ty2op_to_i
+    | Builtin.Quotient_f -> ty2op_to_i
+    | Builtin.Quotient_t -> ty2op_to_i
+    | Builtin.Remainder_e -> ty2op_to_i
+    | Builtin.Remainder_f -> ty2op_to_i
+    | Builtin.Remainder_t -> ty2op_to_i
+    | Builtin.Floor -> ty_1_to_int
+    | Builtin.Ceiling -> ty_1_to_int
+    | Builtin.Round -> ty_1_to_int
+    | Builtin.Truncate -> ty_1_to_int
+    | Builtin.To_int -> T.Ty.(forall a ([a_] ==> int))
+    | Builtin.To_rat -> T.Ty.(forall a ([a_] ==> rat))
+    | Builtin.Is_int -> T.Ty.(forall a ([a_] ==> prop))
+    | Builtin.Is_rat -> T.Ty.(forall a ([a_] ==> prop))
+    | _ -> invalid_arg "TyBuiltin.ty_exn"
+
+  let ty x = try Some (ty_exn x) with _ -> None
+end
+
 (** {2 Typing context}
 
     The scope maintained by the typing context starts at 1.
@@ -384,9 +437,23 @@ let rec infer_rec ctx t =
         ~f:(fun vars' ->
             let t' = infer_rec ctx t' in
             T.Ty.forall_l ?loc vars' t')
-  | PT.AppBuiltin _ ->
-      error_ ?loc
-        "@[<2>unexpected builtin in@ `@[%a@]`, expected term@]" PT.pp t
+  | PT.AppBuiltin (Builtin.Int _ as b, []) -> T.builtin ~ty:T.Ty.int b
+  | PT.AppBuiltin (Builtin.Rat _ as b, []) -> T.builtin ~ty:T.Ty.rat b
+  | PT.AppBuiltin (Builtin.TyInt, []) -> T.Ty.int
+  | PT.AppBuiltin (Builtin.TyRat, []) -> T.Ty.rat
+  | PT.AppBuiltin (Builtin.Term, []) -> T.Ty.term
+  | PT.AppBuiltin (Builtin.Prop, []) -> T.Ty.prop
+  | PT.AppBuiltin (Builtin.TType, []) -> T.Ty.tType
+  | PT.AppBuiltin (b,l) ->
+      begin match TyBuiltin.ty b with
+      | Some ty_b ->
+          let l = List.map (infer_rec ctx) l in
+          let ty = T.apply_unify ~allow_open:true ?loc ty_b l in
+          T.app_builtin ?loc ~ty b l
+      | None ->
+          error_ ?loc
+            "@[<2>unexpected builtin in@ `@[%a@]`, expected term@]" PT.pp t
+      end
 
 (* infer a term, and force its type to [prop] *)
 and infer_prop_ ctx t =

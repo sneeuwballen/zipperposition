@@ -240,8 +240,8 @@ module TPTP : sig
   include Interfaces.PRINT_DE_BRUIJN
     with type t := t and type term := t and type print_hook := print_hook
 
-  val true_ : t   (** tautology term *)
-  val false_ : t  (** antilogy term *)
+  val true_ : t (** tautology term *)
+  val false_ : t (** antilogy term *)
 
   val not_ : t
   val and_ : t

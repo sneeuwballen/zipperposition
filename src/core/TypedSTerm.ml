@@ -395,6 +395,8 @@ module Ty = struct
   let rat = builtin ~ty:tType Builtin.TyRat
   let term = builtin ~ty:tType Builtin.Term
 
+  let (==>) args ret = fun_ args ret
+
   let close_forall t = close_all ~ty:tType Binder.ForallTy t
 
   let is_tType t = match view t with

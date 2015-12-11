@@ -83,8 +83,3 @@ val is_not_bool : t -> ID.t -> bool
 (** {2 IO} *)
 
 include Interfaces.PRINT with type t := t
-
-module Builtin : sig
-  val ty : Builtin.t -> Type.t option
-  val ty_exn : Builtin.t -> Type.t
-end

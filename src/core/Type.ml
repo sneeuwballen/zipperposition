@@ -361,6 +361,11 @@ module Conv = struct
           let ret = aux depth v2db ret in
           let args = List.map (aux depth v2db) args in
           arrow args ret
+      | PT.AppBuiltin (Builtin.Term,[]) -> term
+      | PT.AppBuiltin (Builtin.Prop,[]) -> prop
+      | PT.AppBuiltin (Builtin.TType,[]) -> tType
+      | PT.AppBuiltin (Builtin.TyInt,[]) -> int
+      | PT.AppBuiltin (Builtin.TyRat,[]) -> rat
       | PT.App (f, l) ->
           begin match PT.view f with
           | PT.Const hd ->

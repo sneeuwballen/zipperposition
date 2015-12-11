@@ -399,8 +399,16 @@ module TPTP = struct
 
   (** Easy constructors for formulas *)
 
+  let ty_builtin =
+    let ctx = Type.Conv.create() in
+    fun b ->
+      let ty = TypeInference.TyBuiltin.ty_exn b in
+      match Type.Conv.of_simple_term ctx ty with
+        | None -> assert false
+        | Some ty -> ty
+
   let builtin_ b =
-    let ty = Signature.Builtin.ty_exn b in
+    let ty = ty_builtin b in
     builtin ~ty b
 
   let not_ = builtin_ Builtin.not_
