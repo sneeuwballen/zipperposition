@@ -73,7 +73,7 @@ let skolem_form ~ctx subst ty form =
   let tyvars, vars = collect_vars form
     ~filter:(fun v -> not (Var.Subst.mem subst v)) in
   let vars_t = List.map (fun v->T.var v) vars in
-  let tyvars_t = List.map (fun v->T.Ty.var v) vars in
+  let tyvars_t = List.map (fun v->T.Ty.var v) tyvars in
   (* type of the symbol: quantify over type vars, apply to vars' types *)
   let ty = T.Ty.forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) ty) in
   let f = fresh_sym ~ctx ~ty in
@@ -89,7 +89,7 @@ let pop_new_symbols ~ctx =
 let define ~ctx ~polarity form =
   let tyvars, vars = collect_vars form in
   let vars_t = List.map (fun v->T.var v) vars in
-  let tyvars_t = List.map (fun v->T.Ty.var v) vars in
+  let tyvars_t = List.map (fun v->T.Ty.var v) tyvars in
   (* similar to {!skolem_form}, but always return [prop] *)
   let ty = T.Ty.forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) T.Ty.prop) in
   let f = fresh_sym_with ~ctx ~ty "_tseitin" in
