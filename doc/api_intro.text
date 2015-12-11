@@ -42,6 +42,8 @@ Scoped
 Signature
 Skolem
 Sourced
+SLiteral
+STerm
 Substs
 Transform
 Type

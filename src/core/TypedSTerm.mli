@@ -148,6 +148,8 @@ module Form : sig
 
   val forall_l : ?loc:location -> t Var.t list -> t -> t
   val exists_l : ?loc:location -> t Var.t list -> t -> t
+
+  val close_forall : ?loc:location -> t -> t
 end
 
 (** {2 Utils} *)
@@ -184,7 +186,6 @@ module Seq : sig
 end
 
 (** {2 Substitutions} *)
-
 
 module Subst : sig
   type t
@@ -239,3 +240,8 @@ val apply_unify : ?st:UStack.t -> t -> t list -> t
     when applied to parameters [args]. The first elements of [args] might
     be interpreted as types, the other ones as terms (whose types are unified
     against expected types). *)
+
+(** {2 Conversion} *)
+
+val erase : t -> STerm.t
+

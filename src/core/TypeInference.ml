@@ -210,7 +210,7 @@ end
 (** {2 Hindley-Milner} *)
 
 (* convert a prolog term into a type *)
-let infer_ty_exn ?loc ctx ty =
+let infer_ty_ ?loc ctx ty =
   let rec aux ty = match PT.view ty with
     | PT.AppBuiltin (Builtin.TyInt, []) -> T.Ty.int
     | PT.AppBuiltin (Builtin.TyRat, []) -> T.Ty.rat
@@ -264,6 +264,8 @@ let infer_ty_exn ?loc ctx ty =
   in
   aux ty
 
+let infer_ty_exn ctx ty = infer_ty_ ctx ty
+
 let infer_ty ctx ty =
   try Err.return (infer_ty_exn ctx ty)
   with e -> Err.of_exn_trace e
@@ -273,7 +275,7 @@ let infer_ty ctx ty =
 let var_of_typed_var ?loc ctx (v,o) =
   let ty = match o with
     | None -> T.Ty.meta (Ctx.fresh_ty_meta_var ())
-    | Some ty -> infer_ty_exn ?loc ctx ty
+    | Some ty -> infer_ty_ ?loc ctx ty
   in
   Var.of_string ~ty v
 
@@ -341,14 +343,14 @@ let rec infer_rec ctx t =
   | PT.AppBuiltin (Builtin.True, []) -> T.Form.true_
   | PT.AppBuiltin (Builtin.False, []) -> T.Form.false_
   | PT.AppBuiltin (Builtin.And, l) ->
-      let l = List.map (infer_prop ctx) l in
+      let l = List.map (infer_prop_exn ctx) l in
       T.Form.and_ ?loc l
   | PT.AppBuiltin (Builtin.Or, l) ->
-      let l = List.map (infer_prop ctx) l in
+      let l = List.map (infer_prop_exn ctx) l in
       T.Form.or_ ?loc l
   | PT.AppBuiltin (((Builtin.Equiv | Builtin.Xor | Builtin.Imply) as conn), [a;b]) ->
-      let a = infer_prop ctx a
-      and b = infer_prop ctx b in
+      let a = infer_prop_exn ctx a
+      and b = infer_prop_exn ctx b in
       begin match conn with
         | Builtin.Equiv -> T.Form.equiv ?loc a b
         | Builtin.Xor -> T.Form.xor ?loc a b
@@ -356,7 +358,7 @@ let rec infer_rec ctx t =
         | _ -> assert false
       end
   | PT.AppBuiltin (Builtin.Not, [a]) ->
-      let a = infer_prop ctx a in
+      let a = infer_prop_exn ctx a in
       T.Form.not_ ?loc a
   | PT.AppBuiltin ((Builtin.Eq | Builtin.Neq) as conn, [a;b]) ->
       (* a ?= b *)
@@ -371,7 +373,7 @@ let rec infer_rec ctx t =
   | PT.Bind(((Binder.Forall | Binder.Exists) as binder), vars, f') ->
       let vars = List.map (var_of_typed_var ?loc ctx) vars in
       let f' = Ctx.with_vars ctx vars
-        ~f:(fun () -> infer_prop ctx f') in
+        ~f:(fun () -> infer_prop_exn ctx f') in
       begin match binder with
         | Binder.Forall -> T.Form.forall_l vars f'
         | Binder.Exists -> T.Form.exists_l vars f'
@@ -395,7 +397,7 @@ let rec infer_rec ctx t =
         "@[<2>unexpected builtin in@ `@[%a@]`, expected term@]" PT.pp t
 
 (* infer a term, and force its type to [prop] *)
-and infer_prop ctx t =
+and infer_prop_exn ctx t =
   let t = infer_rec ctx t in
   unify (T.ty_exn t) T.Ty.prop;
   t
@@ -415,6 +417,11 @@ let infer ctx t =
   try Err.return (infer_exn ctx t)
   with e ->
     Err.of_exn_trace e
+
+let infer_clause_exn ctx c =
+  let c = List.map (infer_prop_exn ctx) c in
+  Ctx.exit_scope ctx;
+  c
 
 let constrain_term_term_exn ctx t1 t2 =
   let t1 = infer_exn ctx t1 in

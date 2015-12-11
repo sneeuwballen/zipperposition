@@ -17,58 +17,27 @@ let section = Util.Section.make ~parent:Util.Section.logtk "cnf"
 
 type term = T.t
 type form = F.t
+type lit = term SLiteral.t
 
 exception Error of string
+
+exception NotCNF of form
 
 let () = Printexc.register_printer
   (function
     | Error msg -> Some (CCFormat.sprintf "@[<2>error in CNF:@ %s@]" msg)
+    | NotCNF f -> Some (CCFormat.sprintf "@[<2>error:@ @[%a@]@ is not in CNF@]" T.pp f)
     | _ -> None)
 
 let error_ msg = raise (Error msg)
 let errorf_ msg = CCFormat.ksprintf msg ~f:error_
-
-type lit =
-  | True
-  | False
-  | Atom of term * bool
-  | Eq of term * term
-  | Neq of term * term
+let not_cnf_ f = raise (NotCNF f)
 
 type clause = lit list
 
-let fpf = Format.fprintf
+let pp_clause out = Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp) out
 
-let pp_lit out = function
-  | True -> fpf out "true"
-  | False -> fpf out "false"
-  | Atom (t, true) -> T.pp out t
-  | Atom (t, false) -> fpf out "@[<2>¬@ @[%a@]@]" T.pp t
-  | Eq (t1,t2) -> fpf out "@[%a@ =@ %a@]" T.pp t1 T.pp t2
-  | Neq (t1,t2) -> fpf out "@[%a@ ≠@ %a@]" T.pp t1 T.pp t2
-
-let pp_clause out = Util.pp_list ~sep:" ∨ " pp_lit out
-
-exception NotCNF
-
-let as_lit f = match F.view f with
-  | F.Not f' ->
-      begin match F.view f' with
-      | F.Atom t -> Atom (t, false)
-      | _ -> raise NotCNF
-      end
-  | F.Eq (t1,t2) -> Eq (t1,t2)
-  | F.Neq (t1,t2) -> Neq (t1,t2)
-  | F.Atom t -> Atom (t,true)
-  | F.True -> True
-  | F.False -> False
-  | F.Or _
-  | F.And _
-  | F.Equiv _
-  | F.Xor _
-  | F.Imply _
-  | F.Forall _
-  | F.Exists _ -> raise NotCNF
+let as_lit = SLiteral.of_form
 
 (* check whether the formula is already in CNF *)
 let as_clause f = match F.view f with
@@ -84,7 +53,7 @@ let as_clause f = match F.view f with
   | F.Xor _
   | F.Imply _
   | F.Forall _
-  | F.Exists _ -> raise NotCNF
+  | F.Exists _ -> not_cnf_ f
 
 let as_cnf f = match F.view f with
   | F.Or _ -> [as_clause f]
@@ -99,9 +68,11 @@ let as_cnf f = match F.view f with
   | F.Xor _
   | F.Imply _
   | F.Forall _
-  | F.Exists _ -> raise NotCNF
+  | F.Exists _ -> not_cnf_ f
 
-let is_clause f = try ignore (as_clause f); true with NotCNF -> false
+let is_clause f =
+  try ignore (as_clause f); true
+  with NotCNF _ | SLiteral.NotALit _ -> false
 
 (* miniscoping (push quantifiers as deep as possible in the formula) *)
 let miniscope ?(distribute_exists=false) f =
@@ -559,7 +530,7 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
       Util.debugf ~section 4 "@[<2>reduce@ `@[%a@]`@ to CNF@]" (fun k->k T.pp f);
       let clauses =
         try as_cnf f
-        with NotCNF ->
+        with NotCNF _ | SLiteral.NotALit _ ->
           let f = nnf f in
           (* processing post-nnf *)
           let f = List.fold_left (|>) f post_nnf in

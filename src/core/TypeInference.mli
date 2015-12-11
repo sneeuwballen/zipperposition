@@ -37,6 +37,8 @@ type typed = TypedSTerm.t (** typed term *)
 
 exception Error of string
 
+val section : Util.Section.t
+
 (** {2 Typing context}
 
     This module provides a typing context, with an applicative interface.
@@ -89,6 +91,9 @@ end
     a signature and an {b untyped term}, and updates the typing context
     so that the {b untyped term} can be converted into a {b typed term}. *)
 
+val infer_ty_exn : Ctx.t -> untyped -> type_
+(** Type conversion from {!untyped}. *)
+
 val infer_ty : Ctx.t -> untyped -> type_ or_error
 (** Type conversion from {!untyped}. *)
 
@@ -104,6 +109,14 @@ val infer_exn : Ctx.t -> untyped -> typed
 val infer : Ctx.t -> untyped -> typed or_error
 (** Safe version of {!infer_exn}. It returns [`Error s] rather
     than raising {!Error} if the typechecking fails. *)
+
+val infer_prop_exn : Ctx.t -> untyped -> typed
+(** Same as {!infer_exn} but forces the type of its result
+    to be {!TypedSTerm.prop} *)
+
+val infer_clause_exn : Ctx.t -> untyped list -> typed list
+(** Convert a clause. Free variables in each of the list's elements
+    are shared *)
 
 (** {3 Constraining types}
 

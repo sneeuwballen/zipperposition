@@ -5,26 +5,22 @@
 
 type term = TypedSTerm.t
 type form = TypedSTerm.t
+type lit = term SLiteral.t
+
+type clause = lit list
+(** Basic clause representation, as list of literals *)
 
 (** See "computing small normal forms", in the handbook of automated reasoning.
     All transformations are made on curried terms and formulas. *)
 
 exception Error of string
 
+exception NotCNF of form
+
 val miniscope : ?distribute_exists:bool -> form -> form
 (** Apply miniscoping transformation to the term.
     @param distribute_exists see whether ?X:(p(X)|q(X)) should be
       transformed into (?X: p(X) | ?X: q(X)). Default: [false] *)
-
-type lit =
-  | True
-  | False
-  | Atom of term * bool
-  | Eq of term * term
-  | Neq of term * term
-
-type clause = lit list
-(** Basic clause representation, as list of literals *)
 
 (** Options are used to tune the behavior of the CNF conversion. *)
 type options =

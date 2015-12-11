@@ -4,7 +4,6 @@
 (** {1 Lambda-Calculus} *)
 
 let prof_beta_reduce = Util.mk_profiler "HO.beta_reduce"
-let prof_lambda_abstract = Util.mk_profiler "HO.lambda_abstract"
 
 type term = HOTerm.t
 

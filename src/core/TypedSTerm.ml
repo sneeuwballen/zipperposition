@@ -476,6 +476,15 @@ module Form = struct
 
   let forall_l ?loc = List.fold_right (forall ?loc)
   let exists_l ?loc = List.fold_right (exists ?loc)
+
+  let close_forall ?loc f =
+    (* quantification over types: outermost *)
+    let tyvars, vars =
+      List.partition
+        (fun v -> Ty.returns_tType (Var.ty v))
+        (vars f)
+    in
+    forall_l ?loc tyvars (forall_l ?loc vars f)
 end
 
 let to_string = CCFormat.to_string pp
@@ -783,3 +792,7 @@ let apply_unify ?st ty l =
         aux_l subst exp' ret l'
   in
   aux Subst.empty ty l
+
+(** {2 Conversion} *)
+
+let erase _ = assert false (* TODO *)
