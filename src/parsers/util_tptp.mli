@@ -50,7 +50,7 @@ val type_declarations : typed A.t Sequence.t -> typed ID.Map.t
 val declare_symbols :
   ?name:(int -> ID.t -> A.name) ->
   typed ID.Map.t ->
-    typed A.t Sequence.t
+  typed A.t Sequence.t
 (** Declare the symbols of the signature. A custom function
     to name the [i]-th symbol declaration can be provided. *)
 

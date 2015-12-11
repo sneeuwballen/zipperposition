@@ -45,7 +45,8 @@ let process file =
     let sigma = Util_tptp.type_declarations
       (CCVector.to_seq decls) in
     if !print_sig
-      then Format.printf "@[<2>signature: @[%a@]@]@." (ID.Map.print ID.pp T.pp) sigma;
+    then Format.printf "@[<hv2>signature:@ @[<v>%a@]@]@."
+      (ID.Map.print ~start:"" ~stop:"" ~sep:"" ~arrow:" : " ID.pp T.pp) sigma;
     (* print *)
     Format.printf "@[<v>%a@]@."
       (CCVector.print ~start:"" ~stop:"" ~sep:"" (A.pp T.pp))

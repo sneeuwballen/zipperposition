@@ -230,27 +230,28 @@ let name_sym_ i sy =
   let str = CCFormat.sprintf "'ty_decl_%d_%a'" i ID.pp sy in
   A.NameString str
 
-let declare_symbols ?(name=name_sym_) sigma =
-  let seq = ID.Map.to_seq sigma in
+let declare_symbols_seq ?(name=name_sym_) seq =
   Sequence.mapi
     (fun i (s, ty) ->
        let name = name i s in
        A.TypeDecl (name, s, ty, []))
     seq
 
-(** {2 Type inference} *)
+let declare_symbols ?name sigma =
+  let seq = ID.Map.to_seq sigma in
+  declare_symbols_seq ?name seq
 
-(* TODO: types of symbols that are not declared should be declared explicitely *)
+(** {2 Type inference} *)
 
 let infer_types_exn ?(ctx=TypeInference.Ctx.create ()) decls =
   let module TI = TypeInference in
   let section = TI.section in
-  let s =
-    Sequence.map
+  let v =
+    Sequence.flat_map
       (fun decl ->
          Util.debugf 3 ~section "@[<2>infer type for@ @[%a@]@]"
            (fun k->k (A.pp PT.pp) decl);
-         match decl with
+         let d = match decl with
          | A.Include f -> A.Include f
          | A.IncludeOnly (f,l) -> A.IncludeOnly (f,l)
          | A.NewType (n,s,ty,g) ->
@@ -264,6 +265,7 @@ let infer_types_exn ?(ctx=TypeInference.Ctx.create ()) decls =
              A.TypeDecl (n,s,ty,g)
          | A.CNF(n,r,c,i) ->
              let c = TI.infer_clause_exn ctx c in
+             TI.Ctx.exit_scope ctx;
              A.CNF(n,r,c,i)
          | A.FOF(n,r,f,i) ->
              let f = TI.infer_prop_exn ctx f in
@@ -280,14 +282,20 @@ let infer_types_exn ?(ctx=TypeInference.Ctx.create ()) decls =
              let f = T.Form.close_forall f in
              TI.Ctx.exit_scope ctx;
              A.THF(n,r,f,i)
+         in
+         let tys =
+           TI.Ctx.pop_new_types ctx
+           |> Sequence.of_list
+           |> declare_symbols_seq ?name:None
+         in
+         Sequence.append tys (Sequence.return d)
       )
       decls
+    |> CCVector.of_seq ?init:None
   in
   (* be sure to traverse the list of declarations *)
-  let s = Sequence.persistent s in
   TypeInference.Ctx.bind_to_default ctx;
-  (* success *)
-  s
+  CCVector.to_seq v
 
 let infer_types ?ctx seq =
   try Err.return (infer_types_exn ?ctx seq)

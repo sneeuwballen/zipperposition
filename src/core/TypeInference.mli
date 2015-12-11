@@ -31,7 +31,6 @@
 type 'a or_error = [`Error of string | `Ok of 'a]
 
 type type_ = TypedSTerm.t
-type signature = type_ ID.Tbl.t
 type untyped = STerm.t (** untyped term *)
 type typed = TypedSTerm.t (** typed term *)
 
@@ -53,9 +52,8 @@ val section : Util.Section.t
 module Ctx : sig
   type t
 
-  val create : ?default:type_ -> ?sigma:signature -> unit -> t
+  val create : ?default:type_ -> unit -> t
   (** New context with a signature and default types.
-      @param sigma initial signature
       @param default which types are inferred by default (if not provided
         then {!type_erm} will be used) *)
 
@@ -67,10 +65,7 @@ module Ctx : sig
       variables' types are forgotten. *)
 
   val declare : t -> ID.t -> type_ -> unit
-  (** Declare the type of a ID.t. The type {b must} be equal to
-      the current type of the ID.t, if any.
-      @raise Type.Error if an inconsistency (with inferred types) is
-        detected. *)
+  (** Declare the type of a symbol, possibly shadowing a previous version  *)
 
   val bind_to_default : t -> unit
   (** Free constructor variables are bound to the [default] type provided
@@ -79,10 +74,9 @@ module Ctx : sig
   val generalize : t -> unit
   (** Free constructor variables will be generalized, i.e., kept as (free) variables *)
 
-  val to_signature : t -> signature
-  (** Obtain the type of all symbols whose type has been inferred.
-      If some instantiated variables remain, they are bound to the
-      context's [default] parameter. *)
+  val pop_new_types : t -> (ID.t * type_) list
+  (** Obtain the list of symbols whose type has been inferred recently,
+      and reset it. *)
 end
 
 (** {2 Hindley-Milner Type Inference}

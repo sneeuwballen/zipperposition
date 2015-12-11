@@ -19,7 +19,6 @@ let section = Util.Section.(make ~parent:logtk "ty_infer")
 type 'a or_error = [`Error of string | `Ok of 'a]
 
 type type_ = TypedSTerm.t
-type signature = type_ ID.Tbl.t
 type untyped = STerm.t (** untyped term *)
 type typed = TypedSTerm.t (** typed term *)
 
@@ -44,7 +43,7 @@ let error_ ?loc msg =
 (* unify within the context's substitution. Wraps {!Unif.Ty.unification}
    by returning a nicer exception in case of failure *)
 let unify ?loc ty1 ty2 =
-  Util.debugf ~section 5 "@[<hv2>unify types@ @[%a@] and@ @[%a@]@]"
+  Util.debugf ~section 5 "@[<hv2>unify types@ `@[%a@]`@ and `@[%a@]`@]"
     (fun k-> k T.pp ty1 T.pp ty2);
   try
     T.unify ty1 ty2
@@ -64,34 +63,31 @@ module Ctx = struct
     default: type_;
     env : env;
       (* map names to variables or IDs *)
-    sigma : signature;
-      (* ID.t -> instantiated type *)
     mutable to_set_to_default : T.meta_var list;
       (* variables that should be set to [default] is they are not bound *)
     mutable to_generalize : T.meta_var list;
       (* variables that should be generalized in the global scope *)
     mutable local_vars: T.t Var.t list;
       (* free variables in the local scope *)
+    mutable new_types: (ID.t * type_) list;
+      (* list of symbols whose type has been inferred recently *)
   }
 
-  let create ?(default=T.Ty.term) ?(sigma=ID.Tbl.create 32) () =
+  let create ?(default=T.Ty.term) () =
     let ctx = {
       default;
       env = Hashtbl.create 32;
-      sigma;
       to_set_to_default = [];
       to_generalize = [];
       local_vars = [];
+      new_types = [];
     } in
     ctx
 
   let copy t =
     { t with
-      sigma =ID.Tbl.copy t.sigma;
       env = Hashtbl.copy t.env;
     }
-
-  let to_signature t = t.sigma
 
   (* enter new scope for the variable with this name *)
   let with_var ctx v ~f =
@@ -114,33 +110,38 @@ module Ctx = struct
     ctx.local_vars <- [];
     ()
 
-  let declare ctx sym ty =
-    if ID.Tbl.mem ctx.sigma sym
-    then error_ "@[<2>symbol %a is already declared@]" ID.pp sym;
-    ID.Tbl.add ctx.sigma sym ty
-
-  (* generate fresh type var. *)
-  let fresh_ty_meta_var () : T.meta_var =
-    Var.gensym ~ty:T.tType (), ref None
-
-  (* generate [n] fresh type meta vars *)
-  let rec fresh_ty_meta_vars n =
-    if n = 0
-    then []
-    else fresh_ty_meta_var () :: fresh_ty_meta_vars (n-1)
+  let declare ctx s ty =
+    let name = ID.name s in
+    if Hashtbl.mem ctx.env name
+    then Util.debugf ~section 1
+      "@[<2>warning: shadowing identifier %s@]" (fun k->k name);
+    Hashtbl.add ctx.env name (`ID (s,ty))
 
   let add_to_set_to_default ctx v =
     ctx.to_set_to_default <- v :: ctx.to_set_to_default
 
+  (* generate fresh type var. *)
+  let fresh_ty_meta_var ?(dest=`ToDefault) ctx : T.meta_var =
+    let v = Var.gensym ~ty:T.tType () in
+    let r = ref None in
+    begin match dest with
+      | `ToDefault -> add_to_set_to_default ctx (v,r);
+      | `ToGeneralize -> ctx.to_generalize <- (v,r) :: ctx.to_generalize;
+      | `ToNowhere -> ()
+    end;
+    v, r
+
+  (* generate [n] fresh type meta vars *)
+  let rec fresh_ty_meta_vars ?dest ctx n =
+    if n = 0
+    then []
+    else fresh_ty_meta_var ?dest ctx :: fresh_ty_meta_vars ?dest ctx (n-1)
+
   (* Fresh function type with [arity] arguments *)
-  let fresh_fun_ty ~arity ctx =
-    let ret = fresh_ty_meta_var () in
-    let new_vars =
-      List.map (fun v -> T.Ty.meta v) (fresh_ty_meta_vars arity) in
-    let ty = T.Ty.fun_ new_vars (T.Ty.meta ret) in
-    (* only need to specialize the return type, because arguments will be
-       unified to other types *)
-    add_to_set_to_default ctx ret;
+  let fresh_fun_ty ?(dest=`ToDefault) ~arity ctx =
+    let ret = fresh_ty_meta_var ~dest ctx in
+    let new_vars = fresh_ty_meta_vars ~dest ctx arity in
+    let ty = T.Ty.fun_ (List.map (fun v->T.Ty.meta v) new_vars) (T.Ty.meta ret) in
     ty
 
   (* find identifier in env *)
@@ -159,7 +160,7 @@ module Ctx = struct
       let ty = fresh_fun_ty ~arity ctx in
       let id = ID.make name in
       Hashtbl.add ctx.env name (`ID (id, ty));
-      ID.Tbl.add ctx.sigma id ty;
+      ctx.new_types <- (id, ty) :: ctx.new_types;
       id, ty
 
   let get_var_ ?loc ctx v =
@@ -168,8 +169,7 @@ module Ctx = struct
           error_ ?loc "@[<2>expected %s to be a variable,@ not a constant@]" v
       | `Var v -> v
     with Not_found ->
-      let ty_v = fresh_ty_meta_var() in
-      add_to_set_to_default ctx ty_v;
+      let ty_v = fresh_ty_meta_var ~dest:`ToDefault ctx in
       let v' = Var.of_string ~ty:(T.Ty.meta ty_v) v in
       ctx.local_vars <- v' :: ctx.local_vars;
       Hashtbl.add ctx.env v (`Var v');
@@ -205,6 +205,11 @@ module Ctx = struct
     List.iter generalize_meta ctx.to_generalize;
     ctx.to_generalize <- [];
     ()
+
+  let pop_new_types ctx =
+    let l = ctx.new_types in
+    ctx.new_types <- [];
+    l
 end
 
 (** {2 Hindley-Milner} *)
@@ -274,7 +279,7 @@ let infer_ty ctx ty =
    To be used for binders *)
 let var_of_typed_var ?loc ctx (v,o) =
   let ty = match o with
-    | None -> T.Ty.meta (Ctx.fresh_ty_meta_var ())
+    | None -> T.Ty.meta (Ctx.fresh_ty_meta_var ~dest:`ToDefault ctx)
     | Some ty -> infer_ty_ ?loc ctx ty
   in
   Var.of_string ~ty v
@@ -306,7 +311,7 @@ let rec infer_rec ctx t =
       let ty = T.apply_unify (T.ty_exn f) l in
       T.app ?loc ~ty f l
   | PT.List [] ->
-      let v = Ctx.fresh_ty_meta_var () in
+      let v = Ctx.fresh_ty_meta_var ~dest:`ToDefault ctx in
       let ty = T.Ty.multiset (T.Ty.meta v) in
       Ctx.add_to_set_to_default ctx v;
       T.multiset ?loc ~ty []
@@ -334,7 +339,7 @@ let rec infer_rec ctx t =
       T.record ~ty ?loc l ~rest
   | PT.AppBuiltin (Builtin.Wildcard, []) ->
       (* make a new TYPE variable *)
-      let v = Ctx.fresh_ty_meta_var () in
+      let v = Ctx.fresh_ty_meta_var ~dest:`ToDefault ctx in
       T.Ty.meta v
   | PT.AppBuiltin (Builtin.Arrow, ret :: args) ->
       let ret = infer_ty_exn ctx ret in

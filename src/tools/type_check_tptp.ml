@@ -34,11 +34,11 @@ let check file =
     Util_tptp.infer_types decls
     >>= fun decls' ->
     let sigma = Util_tptp.type_declarations decls' in
-    Format.printf "@[<hv2>signature:@ %a@]@."
-      (ID.Map.print ID.pp T.pp) sigma;
+    Format.printf "@[<hv2>signature:@ @[<v>%a@]@]@."
+      (ID.Map.print ~start:"" ~stop:"" ~sep:"" ~arrow:" : " ID.pp T.pp) sigma;
     (* print formulas *)
     if !cat_input then
-      Format.printf "@[<2>formulas:@ %a@]@."
+      Format.printf "@[<v2>formulas:@ %a@]@."
         (CCFormat.seq ~start:"" ~stop:"" ~sep:"" (A.pp T.pp))
         decls';
     if !stats then begin
