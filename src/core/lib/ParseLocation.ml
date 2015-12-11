@@ -101,8 +101,8 @@ let pp out pos =
 let to_string = CCFormat.to_string pp
 
 let pp_opt out o = match o with
-  | None -> Format.fprintf out "<no location>"
-  | Some pos -> pp out pos
+  | None -> ()
+  | Some pos -> Format.fprintf out "@[at %a@]" pp pos
 
 let set_file buf filename =
   let open Lexing in

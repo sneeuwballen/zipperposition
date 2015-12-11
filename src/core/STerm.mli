@@ -85,8 +85,8 @@ val not_ : ?loc:location -> t -> t
 val equiv : ?loc:location -> t -> t -> t
 val xor : ?loc:location -> t -> t -> t
 val imply : ?loc:location -> t -> t -> t
-val eq : ?loc:location -> ?ty:t -> t -> t -> t
-val neq : ?loc:location -> ?ty:t -> t -> t -> t
+val eq : ?loc:location -> t -> t -> t
+val neq : ?loc:location -> t -> t -> t
 val forall : ?loc:location -> typed_var list -> t -> t
 val exists : ?loc:location -> typed_var list -> t -> t
 val lambda : ?loc:location -> typed_var list -> t -> t

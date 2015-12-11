@@ -46,7 +46,7 @@ let unify ?loc ty1 ty2 =
   Util.debugf ~section 5 "@[<hv2>unify types@ `@[%a@]`@ and `@[%a@]`@]"
     (fun k-> k T.pp ty1 T.pp ty2);
   try
-    T.unify ty1 ty2
+    T.unify ~allow_open:true ?loc ty1 ty2
   with T.UnifyFailure _ as e ->
     error_ ?loc "@[%s@]" (Printexc.to_string e)
 
@@ -101,10 +101,6 @@ module Ctx = struct
       Hashtbl.remove ctx.env name;
       raise e
 
-  let rec with_vars ctx vars ~f = match vars with
-    | [] -> f()
-    | v :: vars' -> with_var ctx v ~f:(fun () -> with_vars ctx vars' ~f)
-
   let exit_scope ctx =
     List.iter (fun v -> Hashtbl.remove ctx.env (Var.name v)) ctx.local_vars;
     ctx.local_vars <- [];
@@ -144,27 +140,22 @@ module Ctx = struct
     let ty = T.Ty.fun_ (List.map (fun v->T.Ty.meta v) new_vars) (T.Ty.meta ret) in
     ty
 
-  (* find identifier in env *)
-  let find_env_ ?loc ctx name =
-    try Hashtbl.find ctx.env name
-    with Not_found ->
-      error_ ?loc "@[<2>unknown identifier %s" name
-
   let get_id_ ?loc ~arity ctx name =
     try match Hashtbl.find ctx.env name with
       | `ID (id, ty) -> id, ty
       | `Var _ -> error_ ?loc "@[<2>expected %s to be a constant, not a variable@]" name
     with Not_found ->
-      Util.debugf ~section 2
-        "@[<2>unknown constant %s,@ will infer a default type@]" (fun k->k name);
       let ty = fresh_fun_ty ~arity ctx in
+      Util.debugf ~section 2
+        "@[<2>unknown constant %s,@ will infer a default type @[%a@]@]"
+        (fun k->k name T.pp ty);
       let id = ID.make name in
       Hashtbl.add ctx.env name (`ID (id, ty));
       ctx.new_types <- (id, ty) :: ctx.new_types;
       id, ty
 
   let get_var_ ?loc ctx v =
-    try match find_env_ ?loc ctx v with
+    try match Hashtbl.find ctx.env v with
       | `ID _ ->
           error_ ?loc "@[<2>expected %s to be a variable,@ not a constant@]" v
       | `Var v -> v
@@ -214,8 +205,13 @@ end
 
 (** {2 Hindley-Milner} *)
 
+(* TODO: check, afterwards, that types:
+  - do not contain metas variables
+  - are closed
+*)
+
 (* convert a prolog term into a type *)
-let infer_ty_ ?loc ctx ty =
+let rec infer_ty_ ?loc ctx ty =
   let rec aux ty = match PT.view ty with
     | PT.AppBuiltin (Builtin.TyInt, []) -> T.Ty.int
     | PT.AppBuiltin (Builtin.TyRat, []) -> T.Ty.rat
@@ -227,14 +223,13 @@ let infer_ty_ ?loc ctx ty =
         let args = List.map aux args in
         T.Ty.fun_ ?loc args ret
     | PT.Var v ->
-        begin match Ctx.find_env_ ?loc ctx v with
-          | `ID (id, ty) -> T.const ~ty id
-          | `Var v -> T.Ty.var v
-        end
+        let v = Ctx.get_var_ ?loc ctx v in
+        unify ?loc (Var.ty v) T.Ty.tType;
+        T.Ty.var ?loc v
     | PT.Const f ->
         (* constant type *)
         let id, ty = Ctx.get_id_ ctx ~arity:0 f in
-        unify ty T.Ty.tType;
+        unify ?loc ty T.Ty.tType;
         T.Ty.const id
     | PT.App (f, l) ->
         begin match PT.view f with
@@ -246,28 +241,31 @@ let infer_ty_ ?loc ctx ty =
         | _ -> error_ ?loc "@[<2>cannot apply non-constant@ `@[%a@]`@]" PT.pp f
         end
     | PT.Bind (Binder.ForallTy, vars, body) ->
-        (* create new variables for each element of [vars] *)
-        let vars' = List.map
-          (fun (v,o) ->
-            CCOpt.iter
-              (fun ty ->
-                let ty = aux ty in
-                if not (T.Ty.is_tType ty)
-                  then error_ ?loc "@[<2>variable %s should have type TType@]" v)
-              o;
-            Var.of_string ~ty:T.tType v)
-          vars
-        in
-        (* convert [body] to a type, in a scope where [vars] are
-           available. *)
-        Ctx.with_vars ctx vars'
-          ~f:(fun () ->
+        with_typed_vars ?loc ctx vars
+          ~f:(fun vars' ->
+              (* be sure those are type variables *)
+              List.iter (fun v -> unify T.tType (Var.ty v)) vars';
               let body' = aux body in
               T.Ty.forall_l vars' body')
     | _ ->
         error_ ?loc "@[<2>`@[%a@]`@ is not a valid type@]" PT.pp ty
   in
   aux ty
+
+(* convert the typed variables into proper variables [vars'], call [f vars'],
+   and then exit the scope of [vars'] *)
+and with_typed_vars ?loc ctx vars ~f =
+  let rec aux acc l = match l with
+    | [] -> f (List.rev acc)
+    | (v,o) :: l' ->
+        let ty = match o with
+          | None -> T.Ty.meta (Ctx.fresh_ty_meta_var ~dest:`ToDefault ctx)
+          | Some ty -> infer_ty_ ?loc ctx ty
+        in
+        let v = Var.of_string ~ty v in
+        Ctx.with_var ctx v ~f:(fun () -> aux (v :: acc) l')
+  in
+  aux [] vars
 
 let infer_ty_exn ctx ty = infer_ty_ ctx ty
 
@@ -300,15 +298,16 @@ let rec infer_rec ctx t =
       let id, ty_s = Ctx.get_id_ ?loc ~arity:(List.length l) ctx s in
       (* infer types for arguments *)
       let l = List.map (infer_rec ctx) l in
-      let ty = T.apply_unify ty_s l in
-      Util.debugf ~section 5 "type of symbol %a: %a"
-        (fun k->k ID.pp id T.pp ty_s);
+      Util.debugf ~section 5 "@[apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
+        (fun k->k ID.pp id T.pp ty_s (Util.pp_list T.pp) l
+         (Util.pp_list T.pp) (List.map T.ty_exn l));
+      let ty = T.apply_unify ?loc ~allow_open:true ty_s l in
       T.app ?loc ~ty (T.const ?loc ~ty:ty_s id) l
   | PT.App (f,l) ->
       (* higher order application *)
       let f = infer_rec ctx f in
       let l = List.map (infer_rec ctx) l in
-      let ty = T.apply_unify (T.ty_exn f) l in
+      let ty = T.apply_unify ?loc ~allow_open:true (T.ty_exn f) l in
       T.app ?loc ~ty f l
   | PT.List [] ->
       let v = Ctx.fresh_ty_meta_var ~dest:`ToDefault ctx in
@@ -376,27 +375,24 @@ let rec infer_rec ctx t =
         | _ -> assert false
       end
   | PT.Bind(((Binder.Forall | Binder.Exists) as binder), vars, f') ->
-      let vars = List.map (var_of_typed_var ?loc ctx) vars in
-      let f' = Ctx.with_vars ctx vars
-        ~f:(fun () -> infer_prop_exn ctx f') in
-      begin match binder with
-        | Binder.Forall -> T.Form.forall_l vars f'
-        | Binder.Exists -> T.Form.exists_l vars f'
-        | _ -> assert false
-      end
+      with_typed_vars ?loc ctx vars
+        ~f:(fun vars' ->
+            let f' = infer_prop_exn ctx f' in
+            match binder with
+              | Binder.Forall -> T.Form.forall_l vars' f'
+              | Binder.Exists -> T.Form.exists_l vars' f'
+              | _ -> assert false)
   | PT.Bind(Binder.Lambda, vars, t') ->
-      let vars = List.map (var_of_typed_var ?loc ctx) vars in
-      let t' = Ctx.with_vars ctx vars
-        ~f:(fun () -> infer_rec ctx t') in
-      let ty = T.Ty.fun_ ?loc (List.map Var.ty vars) (T.ty_exn t') in
-      T.bind_list ?loc ~ty Binder.Lambda vars t'
+      with_typed_vars ?loc ctx vars
+        ~f:(fun vars' ->
+            let t' = infer_rec ctx t' in
+            let ty = T.Ty.fun_ ?loc (List.map Var.ty vars') (T.ty_exn t') in
+            T.bind_list ?loc ~ty Binder.Lambda vars' t')
   | PT.Bind (Binder.ForallTy, vars, t') ->
-      let vars = List.map (var_of_typed_var ?loc ctx) vars in
-      List.iter (fun v -> unify T.Ty.tType (Var.ty v)) vars;
-      let t' = Ctx.with_vars ctx vars
-        ~f:(fun () -> infer_rec ctx t') in
-      unify T.Ty.tType (T.ty_exn t');
-      T.Ty.forall_l ?loc vars t'
+      with_typed_vars ?loc ctx vars
+        ~f:(fun vars' ->
+            let t' = infer_rec ctx t' in
+            T.Ty.forall_l ?loc vars' t')
   | PT.AppBuiltin _ ->
       error_ ?loc
         "@[<2>unexpected builtin in@ `@[%a@]`, expected term@]" PT.pp t

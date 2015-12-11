@@ -197,6 +197,8 @@ module Subst : sig
 
   val empty : t
 
+  val mem : t -> term Var.t -> bool
+
   val add : t -> term Var.t -> term -> t
 
   val find : t -> term Var.t -> term option
@@ -213,7 +215,7 @@ end
 
 (** {2 Unification} *)
 
-exception UnifyFailure of string * (term * term) list
+exception UnifyFailure of string * (term * term) list * location option
 
 val pp_stack : (term * term) list CCFormat.printer
 
@@ -234,13 +236,20 @@ module UStack : sig
       done since are undone. *)
 end
 
-val unify : ?st:UStack.t-> term -> term -> unit
+val unify :
+  ?allow_open:bool -> ?loc:location -> ?st:UStack.t -> ?subst:Subst.t ->
+  term -> term -> unit
 (** unifies destructively the two given terms, by modifying references
       that occur under {!Meta}. Regular variables are not modified.
-    @param unif_stack used for backtracking
+    @param allow_open if true, metas can be unified to terms
+      with free variables (default false)
+    @param st used for backtracking
+    @param subst substitution for bound variables
     @raise UnifyFailure if unification fails. *)
 
-val apply_unify : ?st:UStack.t -> t -> t list -> t
+val apply_unify :
+  ?allow_open:bool -> ?loc:location -> ?st:UStack.t -> ?subst:Subst.t ->
+  t -> t list -> t
 (** [apply_unify f_ty args] compute the type of a function of type [f_ty],
     when applied to parameters [args]. The first elements of [args] might
     be interpreted as types, the other ones as terms (whose types are unified

@@ -16,7 +16,6 @@ let print_line () =
   ()
 
 let cat_input = ref false  (* print input declarations? *)
-let stats = ref false
 let pp_base = ref false
 
 let options = Arg.align (
@@ -28,7 +27,7 @@ let options = Arg.align (
 let check file =
   Err.(
     print_line ();
-    Printf.printf "checking file %s...\n" file;
+    Format.printf "checking file `%s`...@." file;
     Util_tptp.parse_file ~recursive:true file
     >>= fun decls ->
     Util_tptp.infer_types decls
@@ -41,10 +40,6 @@ let check file =
       Format.printf "@[<v2>formulas:@ %a@]@."
         (CCFormat.seq ~start:"" ~stop:"" ~sep:"" (A.pp T.pp))
         decls';
-    if !stats then begin
-      Format.printf "number of symbols: %d@." (ID.Map.cardinal sigma);
-      Format.printf "number of input declarations: %d@." (Sequence.length decls);
-    end;
     Err.return ()
   )
 
@@ -52,9 +47,10 @@ let main () =
   let files = ref [] in
   let add_file f = files := f :: !files in
   Arg.parse options add_file "check_tptp [options] [file1|stdin] file2...";
-  (if !files = [] then files := ["stdin"]);
+  if !files = [] then files := ["stdin"];
   files := List.rev !files;
-  let res = Err.fold_l
+  let res =
+    Err.fold_l
       (fun () file -> check file)
       () !files;
   in

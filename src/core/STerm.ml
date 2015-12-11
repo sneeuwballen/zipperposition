@@ -145,8 +145,8 @@ let not_ ?loc a = app_builtin ?loc Builtin.not_ [a]
 let equiv ?loc a b = app_builtin ?loc Builtin.equiv [a;b]
 let xor ?loc a b = app_builtin ?loc Builtin.xor [a;b]
 let imply ?loc a b = app_builtin ?loc Builtin.imply [a;b]
-let eq ?loc ?(ty=wildcard) a b = app_builtin ?loc Builtin.eq [ty;a;b]
-let neq ?loc ?(ty=wildcard) a b = app_builtin ?loc Builtin.neq [ty;a;b]
+let eq ?loc a b = app_builtin ?loc Builtin.eq [a;b]
+let neq ?loc a b = app_builtin ?loc Builtin.neq [a;b]
 let forall ?loc vars f = bind ?loc Binder.forall vars f
 let exists ?loc vars f = bind ?loc Binder.exists vars f
 let lambda ?loc vars f = bind ?loc Binder.lambda vars f
@@ -253,6 +253,7 @@ let rec pp out t = match t.term with
       Format.fprintf out "@[<2>%a@ → %a@]" pp_inner a pp_inner ret
   | AppBuiltin (Builtin.Arrow, ret::l) ->
       Format.fprintf out "@[<2>(%a)@ → %a@]" (Util.pp_list ~sep:" × " pp_inner) l pp_inner ret
+  | AppBuiltin (b, []) -> Builtin.pp out b
   | AppBuiltin (Builtin.Not, [f]) -> Format.fprintf out "@[¬@ %a@]" pp_inner f
   | AppBuiltin (b, l) when Builtin.is_infix b && List.length l > 0 ->
       pp_infix_ b out l
