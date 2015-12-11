@@ -164,7 +164,6 @@ answer_tuple:
 type_decl:
   | LEFT_PAREN tydecl=type_decl RIGHT_PAREN { tydecl }
   | s=atomic_word COLUMN ty=tff_quantified_type { s, ty }
-  | s=DOLLAR_WORD COLUMN ty=tff_quantified_type { s, ty }
 
 cnf_formula:
   | LEFT_PAREN c=disjunction RIGHT_PAREN { c }
@@ -365,7 +364,7 @@ tff_ty_var:
 type_const:
   | WILDCARD { PT.wildcard }
   | w=LOWER_WORD { PT.const w }
-  | w=DOLLAR_WORD { PT.const w }
+  | t=defined_ty { t }
 
 arguments: separated_nonempty_list(COMMA, term) { $1 }
 
@@ -382,7 +381,18 @@ atomic_word:
 
 atomic_defined_word:
   | WILDCARD { PT.wildcard }
-  | w=DOLLAR_WORD { PT.const w }
+  | t=defined_ty { t }
+
+defined_ty:
+  | w=DOLLAR_WORD
+    { match w with
+      | "$i" -> PT.term
+      | "$o" -> PT.prop
+      | "$tType" -> PT.tType
+      | "$int" -> PT.ty_int
+      | "$rat" -> PT.ty_rat
+      | _ -> PT.const w
+    }
 
 atomic_system_word:
   | w=DOLLAR_DOLLAR_WORD { PT.const w }

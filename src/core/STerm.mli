@@ -95,6 +95,10 @@ val of_int : int -> t
 val rat : Q.t -> t
 
 val tType : t
+val term : t
+val prop : t
+val ty_int : t
+val ty_rat : t
 val fun_ty : ?loc:location -> t list -> t -> t
 val forall_ty : ?loc:location -> typed_var list -> t -> t
 

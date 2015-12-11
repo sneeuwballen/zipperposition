@@ -160,6 +160,10 @@ let fun_ty ?loc l ret = match l with
   | _::_ -> app_builtin ?loc Builtin.arrow (ret :: l)
 
 let tType = builtin Builtin.tType
+let term = builtin Builtin.Term
+let prop = builtin Builtin.Prop
+let ty_int = builtin Builtin.TyInt
+let ty_rat = builtin Builtin.TyRat
 let forall_ty ?loc vars t = bind ?loc Binder.forall_ty vars t
 
 
