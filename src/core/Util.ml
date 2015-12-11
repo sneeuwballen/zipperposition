@@ -253,7 +253,7 @@ let show_profilers out () =
 let () =
   at_exit
     (fun () ->
-      if !enable_profiling then Format.printf "%a@." show_profilers ())
+      if !enable_profiling then Format.eprintf "%a@." show_profilers ())
 
 (** {2 Runtime statistics} *)
 
