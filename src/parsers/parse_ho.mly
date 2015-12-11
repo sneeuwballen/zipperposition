@@ -30,10 +30,9 @@ A parser with a nice curried syntax. *)
 %{
   open Logtk
 
-  module Sym = Symbol
   module L = ParseLocation
   module A = Ast_ho
-  module Term = Ast_ho.Term
+  module Term = STerm
 %}
 
 %token EOI
@@ -57,7 +56,6 @@ A parser with a nice curried syntax. *)
 %token EXISTS
 %token LAMBDA
 %token FORALL_TY
-%token AT
 
 %token EQ
 %token NEQ
@@ -124,12 +122,11 @@ type_:
   | l=app_type RIGHT_ARROW r=type_
     {
       let loc = L.mk_pos $startpos $endpos in
-      Term.mk_fun_ty ~loc [l] r
+      Term.fun_ty ~loc [l] r
     }
-  | FORALL_TY v=UPPER_WORD ty=type_
+  | FORALL_TY v=typed_var ty=type_
     {
       let loc = L.mk_pos $startpos $endpos in
-      let v = Term.var ~loc v in
       Term.forall_ty ~loc [v] ty
     }
   | t=app_type {t}
@@ -138,7 +135,7 @@ app_type:
   | w=LOWER_WORD args=unary_type+
     {
       let loc = L.mk_pos $startpos $endpos in
-      let f = Term.const ~loc (Sym.of_string w) in
+      let f = Term.const ~loc w in
       Term.app ~loc f args
     }
   | t=unary_type { t }
@@ -147,7 +144,7 @@ unary_type:
   | w=LOWER_WORD
     {
       let loc = L.mk_pos $startpos $endpos in
-      Term.const ~loc (Sym.of_string w)
+      Term.const ~loc w
     }
   | LEFT_PAREN t=type_ RIGHT_PAREN { t }
   | w=INTERROGATION_WORD
@@ -160,7 +157,7 @@ unary_type:
   | w=DOLLAR_DOLLAR_WORD
     {
       let loc = L.mk_pos $startpos $endpos in
-      Term.const ~loc (Sym.of_string w)
+      Term.const ~loc w
     }
   | WILDCARD
     { Term.wildcard }
@@ -169,7 +166,7 @@ unary_type:
       let loc = L.mk_pos $startpos $endpos in
       Term.list_ ~loc l
     }
-  | LEFT_BRACE l=record_body(COLUMN, type_) rest=record_rest(type_) RIGHT_BRACE
+  | LEFT_BRACE l=record_body(COLUMN, type_) rest=record_rest(UPPER_WORD) RIGHT_BRACE
     {
       let loc = L.mk_pos $startpos $endpos in
       Term.record ~loc l ~rest
@@ -183,39 +180,25 @@ unary_term:
       Term.var ~loc w
     }
   | v=var { v }
-  | LEFT_PAREN v=UPPER_WORD COLUMN ty=type_ RIGHT_PAREN
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      Term.var ~loc ~ty v
-    }
   | WILDCARD
     {
       let loc = L.mk_pos $startpos $endpos in
-      Term.const ~loc Sym.Base.wildcard
+      Term.wildcard
     }
   | w=LOWER_WORD
   | w=DOLLAR_WORD
   | w=DOLLAR_DOLLAR_WORD
     {
       let loc = L.mk_pos $startpos $endpos in
-      Term.const ~loc (Sym.of_string w)
+      Term.const ~loc w
     }
-  | w=INTEGER
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      Term.const ~loc (Sym.of_int (int_of_string w))
-    }
-  | AT ty=unary_type
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      Term.lift_type ~loc ty
-    }
+  | w=INTEGER { Term.int_ (Z.of_string w) }
   | LEFT_BRACKET l=separated_list(COMMA, term) RIGHT_BRACKET
     {
       let loc = L.mk_pos $startpos $endpos in
       Term.list_ ~loc l
     }
-  | LEFT_BRACE l=record_body(EQ,term) rest=record_rest(term) RIGHT_BRACE
+  | LEFT_BRACE l=record_body(EQ,term) rest=record_rest(UPPER_WORD) RIGHT_BRACE
     {
       let loc = L.mk_pos $startpos $endpos in
       Term.record ~loc l ~rest
@@ -274,7 +257,7 @@ formula_term:
   | l=app_term o=OPERATOR r=app_term
     {
       let loc = L.mk_pos $startpos $endpos in
-      Term.app_infix ~loc o l r
+      A.app_infix ~loc o l r
     }
 
 term:
@@ -303,12 +286,8 @@ var:
     }
 
 typed_var:
-  | v=var { v }
-  | w=UPPER_WORD COLUMN ty=app_type
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      Term.var ~loc ~ty w
-    }
+  | v=UPPER_WORD { v, None }
+  | v=UPPER_WORD COLUMN ty=app_type { v, Some ty }
 
 typed_vars:
   | v=separated_nonempty_list(COMMA,typed_var) { v }

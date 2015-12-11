@@ -84,7 +84,6 @@ rule token = parse
   | "&&" { AND }
   | "||" { OR }
   | "=" { EQ }
-  | "@" { AT }
   | "/\\" { FORALL_TY }
   | "!=" { NEQ }
   | ":" { COLUMN }
@@ -125,10 +124,12 @@ rule token = parse
       Some (Parse_ho.parse_term token (Lexing.from_string s))
     with Parse_ho.Error | Error _ -> None
 
-  let pterm (s:string): HOTerm.t option =
+  let pterm (s:string): TypedSTerm.t option =
     CCOpt.(
       term_of_string s >>= fun t ->
-      let ctx = TypeInference.Ctx.create Signature.TPTP.base in
-      CCError.to_opt (TypeInference.HO.convert ~generalize:true ~ctx t)
+      let ctx = TypeInference.Ctx.create () in
+      (* FIXME: generalization? *)
+      try Some (TypeInference.infer_prop_exn ctx t)
+      with _ -> None
     )
 }

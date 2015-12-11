@@ -1,38 +1,17 @@
 
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Call external provers with TSTP} *)
 
 open Logtk
 
-type 'a or_error = [`Error of string | `Ok of 'a]
-
 module A = Ast_tptp
 module TT = Trace_tstp
 module Err = CCError
+module ST = STerm
+
+type 'a or_error = [`Error of string | `Ok of 'a]
+type untyped = STerm.t
 
 (** {2 Description of provers} *)
 
@@ -59,8 +38,8 @@ module Prover = struct
 
   let register name prover =
     if Hashtbl.mem __table name
-      then invalid_arg ("prover already registered: "^ name)
-      else Hashtbl.add __table name prover
+    then invalid_arg ("prover already registered: "^ name)
+    else Hashtbl.add __table name prover
 
   let p_E = {
     name = "E";
@@ -110,8 +89,9 @@ let _find_mem patterns s =
 
 let call_with_out ?(timeout=30) ?(args=[]) ~prover decls =
   (* compute input to give to the prover *)
-  let input = CCFormat.to_string
-    (CCFormat.list ~start:"" ~stop:"" ~sep:"\n" A.Untyped.pp) decls in
+  let input =
+    CCFormat.sprintf "@[<v>%a@]"
+      (Util.pp_list ~sep:"" (A.pp ST.pp)) decls in
   (* build command (add arguments to the end) *)
   let buf = Buffer.create 15 in
   Buffer.add_substitute buf
@@ -133,10 +113,10 @@ let call_with_out ?(timeout=30) ?(args=[]) ~prover decls =
     (* parse output *)
     let result =
       if _find_mem prover.Prover.unsat output
-        then Unsat
+      then Unsat
       else if _find_mem prover.Prover.sat output
-        then Sat
-        else Unknown
+      then Sat
+      else Unknown
     in
     Err.return (result, output)
   )
@@ -156,10 +136,10 @@ let decls_of_string ~source str =
 (* try to parse a proof. Returns a proof option *)
 let proof_of_decls decls =
   let res = Err.(
-    Util_tptp.infer_types (`sign Signature.TPTP.base) decls
-    >>= fun (_, decls') ->
-    Trace_tstp.of_decls decls'
-  ) in
+      Util_tptp.infer_types decls
+      >>= fun decls' ->
+      Trace_tstp.of_decls decls'
+    ) in
   match res with
   | `Error _ -> None
   | `Ok proof -> Some proof
@@ -170,8 +150,8 @@ let call_proof ?timeout ?args ~prover decls =
     >>= fun (res, output) ->
     decls_of_string ~source:("output of prover "^ prover.Prover.name) output
     >>= fun decls ->
-    Util_tptp.infer_types (`sign Signature.TPTP.base) decls
-    >>= fun (_sign,decls') ->
+    Util_tptp.infer_types decls
+    >>= fun decls' ->
     Trace_tstp.of_decls decls'
     >>= fun proof ->
     return (res, proof)
@@ -181,7 +161,7 @@ module Eprover = struct
   type result = {
     answer : szs_answer;
     output : string;
-    decls : Ast_tptp.Untyped.t Sequence.t option;
+    decls : untyped Ast_tptp.t Sequence.t option;
     proof : Trace_tstp.t option;
   }
   and szs_answer =
@@ -196,11 +176,11 @@ module Eprover = struct
 
   (* parse SZS answer *)
   let parse_answer output =
-  if CCString.mem ~sub:"SZS status Theorem" output
+    if CCString.mem ~sub:"SZS status Theorem" output
     then Theorem
-  else if CCString.mem ~sub:"SZS status CounterSatisfiable" output
+    else if CCString.mem ~sub:"SZS status CounterSatisfiable" output
     then CounterSatisfiable
-  else Unknown
+    else Unknown
 
   (* run eproof_ram on the given input. returns a result *)
   let _run_either ?(opts=[]) ?(level=1) ~prover ~steps ~input () =
@@ -240,15 +220,17 @@ module Eprover = struct
     _run_either ~prover:"eprover" ?opts ?level ~steps ~input ()
 
   (* explore the surrounding of this list of formulas, returning a
-    list of terms (clausal form) *)
+     list of terms (clausal form) *)
   let discover ?(opts=[]) ~steps decls =
     let command = [ "eprover"; "--tstp-in"; "--tstp-out";
                     "-S"; "--restrict-literal-comparisons";
                     "-C"; string_of_int steps ] @ opts in
     let cmd = String.concat " " command in
     (* build stdin *)
-    let input = CCFormat.to_string
-      (CCFormat.seq ~sep:"\n" Ast_tptp.Untyped.pp) decls in
+    let input =
+      CCFormat.sprintf "@[%a@]"
+        (CCFormat.seq ~start:"" ~stop:"" ~sep:"" (A.pp ST.pp)) decls
+    in
     Err.(
       (* call E *)
       Util.popen ~cmd ~input
@@ -261,8 +243,10 @@ module Eprover = struct
     let command = [ "eprover"; "--tstp-in"; "--tstp-out"; "--cnf" ] @ opts in
     let cmd = String.concat " " command in
     (* build stdin *)
-    let input = CCFormat.to_string
-      (CCFormat.seq~sep:"\n" Ast_tptp.Untyped.pp) decls in
+    let input =
+      CCFormat.sprintf "@[%a@]"
+        (CCFormat.seq ~start:"" ~stop:"" ~sep:"" (A.pp ST.pp)) decls
+    in
     Err.(
       (* call E *)
       Util.popen ~cmd ~input

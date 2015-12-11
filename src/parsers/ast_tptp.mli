@@ -1,27 +1,5 @@
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 TPTP Ast} *)
 
@@ -47,7 +25,7 @@ and role =
   | R_question    (* existential question *)
   | R_type        (* type declaration *)
   | R_unknown     (* error *)
-  (** formula role *)
+(** formula role *)
 and optional_info = general_data list
 and general_data =
   | GString of string
@@ -68,88 +46,56 @@ val pp_general : general_data CCFormat.printer
 val pp_general_debugf : general_data CCFormat.printer  (* ugly version *)
 val pp_generals : general_data list CCFormat.printer
 
-module type S = sig
-  type hoterm
-  type form
-  type ty
+type 'a t =
+  | CNF of name * role * 'a list * optional_info
+  | FOF of name * role * 'a * optional_info
+  | TFF of name * role * 'a * optional_info
+  | THF of name * role * 'a * optional_info (* XXX not parsed yet *)
+  | TypeDecl of name * ID.t * 'a * optional_info  (* type declaration for a symbol *)
+  | NewType of name * ID.t * 'a * optional_info (* declare new type constant... *)
+  | Include of string
+  | IncludeOnly of string * name list   (* include a subset of names *)
+(** top level declaration *)
 
-  type t =
-    | CNF of name * role * form list * optional_info
-    | FOF of name * role * form * optional_info
-    | TFF of name * role * form * optional_info
-    | THF of name * role * hoterm * optional_info  (* XXX not parsed yet *)
-    | TypeDecl of name * string * ty * optional_info  (* type declaration for a symbol *)
-    | NewType of name * string * ty * optional_info (* declare new type constant... *)
-    | Include of string
-    | IncludeOnly of string * name list   (* include a subset of names *)
-    (** top level declaration *)
+type 'a declaration = 'a t
 
-  type declaration = t
+val get_name : _ t -> name
+(** Find the name of the declaration, or
+    @raise Invalid_argument if the declaration is an include directive *)
 
-  val get_name : t -> name
-    (** Find the name of the declaration, or
-        @raise Invalid_argument if the declaration is an include directive *)
-
-  class ['a] visitor : object
-    method clause : 'a -> role -> form list -> 'a
-    method fof : 'a -> role -> form -> 'a
-    method tff : 'a -> role -> form -> 'a
-    method thf : 'a -> role -> hoterm -> 'a
-    method any_form : 'a -> role -> form -> 'a
-    method tydecl : 'a -> string -> ty -> 'a
-    method new_ty : 'a -> string -> ty -> 'a
-    method include_ : 'a -> string -> 'a
-    method include_only : 'a -> string -> name list -> 'a
-    method visit : 'a -> t -> 'a
-  end
-
-  val map :
-    ?form:(form -> form) ->
-    ?hoterm:(hoterm -> hoterm) ->
-    t -> t
-  (** Map terms to other terms *)
-
-  module Seq : sig
-    val forms : t -> form Sequence.t
-    val hoterms : t -> hoterm Sequence.t
-  end
-
-  (** {2 IO} *)
-
-  include Interfaces.PRINT with type t := t
+class ['a, 't] visitor : object
+  method clause : 'a -> role -> 't list -> 'a
+  method fof : 'a -> role -> 't -> 'a
+  method tff : 'a -> role -> 't -> 'a
+  method thf : 'a -> role -> 't -> 'a
+  method any_form : 'a -> role -> 't -> 'a
+  method tydecl : 'a -> ID.t -> 't -> 'a
+  method new_ty : 'a -> ID.t -> 't -> 'a
+  method include_ : 'a -> string -> 'a
+  method include_only : 'a -> string -> name list -> 'a
+  method visit : 'a -> 't t -> 'a
 end
 
-(** default is with simple terms everywhere *)
-module Untyped : S
-  with type hoterm = STerm.t
-  and type form = STerm.t
-  and type ty = STerm.t
+val map :
+  form:('a -> 'b) ->
+  ho:('a -> 'b) ->
+  ty:('a -> 'b) ->
+  'a t -> 'b t
+(** Map terms to other terms *)
 
-(** Typed version *)
-module Typed : S
-  with type hoterm = HOTerm.t
-  and type form = Formula.FO.t
-  and type ty = Type.t
+val flat_map :
+  cnf:('a list -> 'b list list) ->
+  form:('a -> 'b list) ->
+  ho:('a -> 'b list) ->
+  ty:('a -> 'b) ->
+  ('a t, CCVector.ro) CCVector.t ->
+  ('b t, CCVector.ro) CCVector.t
 
-module type MAP = sig
-  module From : S
-  module To : S
-
-  val map :
-    form:(From.form -> To.form) ->
-    ho:(From.hoterm -> To.hoterm) ->
-    ty:(From.ty -> To.ty) ->
-    From.t -> To.t
-
-  val flat_map :
-    cnf:(From.form list -> To.form list list) ->
-    form:(From.form -> To.form list) ->
-    ho:(From.hoterm -> To.hoterm list) ->
-    ty:(From.ty -> To.ty) ->
-    From.t list -> To.t list
+module Seq : sig
+  val forms : 'a t -> 'a Sequence.t
+  val hoterms : 'a t -> 'a Sequence.t
 end
 
-(** Mappings! *)
-module Map(From:S)(To:S) : MAP
-  with module From = From
-  and module To = To
+(** {2 IO} *)
+
+include Interfaces.PRINT1 with type 'a t := 'a t
