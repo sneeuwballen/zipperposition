@@ -1,28 +1,5 @@
 
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 TPTP Syntax and types checking} *)
 
@@ -30,7 +7,9 @@ open Logtk
 open Logtk_parsers
 
 module PT = STerm
+module T = TypedSTerm
 module Err = CCError
+module A = Ast_tptp
 
 let print_line () =
   Printf.printf "%s\n" (CCString.repeat "=" 60);
@@ -41,12 +20,9 @@ let stats = ref false
 let pp_base = ref false
 
 let options = Arg.align (
-  [ "--cat", Arg.Set cat_input, " print (annotated) declarations"
-  ; "--base", Arg.Set pp_base, " print signature of base symbols"
-  ] @ Options.mk_global_opts ()
+    [ "--cat", Arg.Set cat_input, " print (annotated) declarations"
+    ] @ Options.mk_global_opts ()
   )
-
-let base_sign = Signature.TPTP.Arith.full
 
 (* check the given file *)
 let check file =
@@ -55,25 +31,20 @@ let check file =
     Printf.printf "checking file %s...\n" file;
     Util_tptp.parse_file ~recursive:true file
     >>= fun decls ->
-    Util_tptp.infer_types (`sign base_sign) decls
-    >>= fun (signature, decls') ->
-    let decls' = Util_tptp.erase_types decls' in
-    let signature = Signature.diff signature base_sign in
-    Printf.printf "signature:\n";
-    Signature.iter signature
-      (fun s ty ->
-        Format.printf "  %a : %a@." Symbol.pp s Type.pp ty);
+    Util_tptp.infer_types decls
+    >>= fun decls' ->
+    let sigma = Util_tptp.type_declarations decls' in
+    Format.printf "@[<hv2>signature:@ %a@]@."
+      (ID.Map.print ID.pp T.pp) sigma;
     (* print formulas *)
-    if !cat_input then begin
-      Printf.printf "formulas:\n";
-      Sequence.iter
-        (fun decl -> Format.printf "  %a@." Ast_tptp.Untyped.pp decl)
+    if !cat_input then
+      Format.printf "@[<2>formulas:@ %a@]@."
+        (CCFormat.seq ~start:"" ~stop:"" ~sep:"" (A.pp T.pp))
         decls';
-      end;
     if !stats then begin
-      Format.printf "number of symbols: %d@." (Signature.cardinal signature);
+      Format.printf "number of symbols: %d@." (ID.Map.cardinal sigma);
       Format.printf "number of input declarations: %d@." (Sequence.length decls);
-      end;
+    end;
     Err.return ()
   )
 
@@ -84,15 +55,15 @@ let main () =
   (if !files = [] then files := ["stdin"]);
   files := List.rev !files;
   let res = Err.fold_l
-    (fun () file -> check file)
-    () !files;
+      (fun () file -> check file)
+      () !files;
   in
   match res with
   | `Ok () ->
-    print_line ();
-    Printf.printf "success!\n"
+      print_line ();
+      Format.printf "success!@."
   | `Error msg ->
-    print_endline msg
+      print_endline msg
 
 let _ =
   main ()

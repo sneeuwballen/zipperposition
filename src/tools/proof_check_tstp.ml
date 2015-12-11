@@ -1,28 +1,5 @@
 
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {6 Simple Proof checker for TSTP} *)
 
@@ -30,14 +7,14 @@ open Logtk
 open Logtk_parsers
 
 module A = Ast_tptp
-module AU = Ast_tptp.Untyped
-module F = Formula.FO
+module T = TypedSTerm
+module F = T.Form
 module TT = Trace_tstp
 module StepTbl = TT.StepTbl
 module E = CCError
 
 (* result of checking the step: success or failure, with name of prover.
-  The step may be unchecked. *)
+   The step may be unchecked. *)
 type check_result =
   | Unchecked
   | Succeeded of string
@@ -93,41 +70,45 @@ let _do_not_check proof = match proof with
   | TT.Theory _ -> true
   | TT.InferClause (_, lazy step)
   | TT.InferForm (_, lazy step) ->
-    step.TT.esa ||
-    match step.TT.parents with
-    | [| a |] when TT.is_axiom a -> true  (* axiom *)
-    | _ -> false
+      step.TT.esa ||
+      match step.TT.parents with
+      | [| a |] when TT.is_axiom a -> true  (* axiom *)
+      | _ -> false
 
 (* make a proof obligation (TSTP declarations list) out of a proof step.
-  May return none in case the proof obligation is trivial *)
+   May return none in case the proof obligation is trivial *)
 let mk_proof_obligation proof =
   if _do_not_check proof
-    then None  (* no need to check *)
+  then None  (* no need to check *)
   else try
-    let goal, step = match proof with
-    | TT.InferForm (f, lazy step) ->
-      let f = F.to_simple_term (F.close_forall f) in
-      AU.FOF(step.TT.id, A.R_conjecture, f, []), step
-    | TT.InferClause (c, lazy step) ->
-      let c = F.to_simple_term (F.close_forall (F.Base.or_ c)) in
-      AU.FOF(step.TT.id, A.R_conjecture, c, []), step
-    | _ -> assert false
-    in
-    let premises = CCList.filter_map
-      (fun parent -> match parent with
-        | TT.InferClause (c, lazy step') ->
-          let c = F.to_simple_term (F.close_forall (F.Base.or_ c)) in
-          Some (AU.FOF(step'.TT.id, A.R_axiom, c, []))
-        | TT.InferForm(f, lazy step') ->
-          let f = F.to_simple_term (F.close_forall f) in
-          Some (AU.FOF(step'.TT.id, A.R_axiom, f, []))
-        | TT.Axiom _
-        | TT.Theory _ -> None)
-      (Array.to_list step.TT.parents)
-    in
-    Some (goal :: premises)
-  with Exit ->
-    None
+      let goal, step = match proof with
+        | TT.InferForm (f, lazy step) ->
+            let f = F.close_forall f |> T.erase in
+            A.FOF(step.TT.id, A.R_conjecture, f, []), step
+        | TT.InferClause (c, lazy step) ->
+            let c = List.map (SLiteral.map ~f:FOTerm.to_simple_term) c in
+            let c = List.map SLiteral.to_form c in
+            let c = F.close_forall (F.or_ c) |> T.erase in
+            A.FOF(step.TT.id, A.R_conjecture, c, []), step
+        | _ -> assert false
+      in
+      let premises = CCList.filter_map
+          (fun parent -> match parent with
+             | TT.InferClause (c, lazy step') ->
+                 let c = List.map (SLiteral.map ~f:FOTerm.to_simple_term) c in
+                 let c = List.map SLiteral.to_form c in
+                 let c = F.close_forall (F.or_ c) |> T.erase in
+                 Some (A.FOF(step'.TT.id, A.R_axiom, c, []))
+             | TT.InferForm(f, lazy step') ->
+                 let f = F.close_forall f |> T.erase in
+                 Some (A.FOF(step'.TT.id, A.R_axiom, f, []))
+             | TT.Axiom _
+             | TT.Theory _ -> None)
+          (Array.to_list step.TT.parents)
+      in
+      Some (goal :: premises)
+    with Exit ->
+      None
 
 (* check a proof step using a prover *)
 let check_step ~timeout ~prover step =
@@ -136,22 +117,22 @@ let check_step ~timeout ~prover step =
   match obligation with
   | None -> E.return Unchecked  (* nothing to check, no obligation! *)
   | Some decls ->
-    E.(
-      CallProver.call ~timeout ~prover decls
-      >>= fun res ->
-      let p_name = CallProver.name prover in
-      (* interpret result of the subprover *)
-      let res = match res with
-      | CallProver.Unsat -> Succeeded p_name
-      | CallProver.Error e ->
-        Util.debugf 1 "error trying to check %a: %s" (fun k->k TT.pp1 step e);
-        Failed p_name
-      | CallProver.Unknown
-      | CallProver.Sat -> Failed p_name
-      in
-      Util.debugf 1 "step %a: %a" (fun k->k A.pp_name (TT.get_id step) pp_res res);
-      E.return res
-    )
+      E.(
+        CallProver.call ~timeout ~prover decls
+        >>= fun res ->
+        let p_name = CallProver.name prover in
+        (* interpret result of the subprover *)
+        let res = match res with
+          | CallProver.Unsat -> Succeeded p_name
+          | CallProver.Error e ->
+              Util.debugf 1 "error trying to check %a: %s" (fun k->k TT.pp1 step e);
+              Failed p_name
+          | CallProver.Unknown
+          | CallProver.Sat -> Failed p_name
+        in
+        Util.debugf 1 "step %a: %a" (fun k->k A.pp_name (TT.get_id step) pp_res res);
+        E.return res
+      )
 
 (* print progress in proof checking *)
 let pp_progress num total =
@@ -168,18 +149,18 @@ let check_all ~progress ~provers ~timeout ~checked =
   try
     TT.traverse trace
       (fun step ->
-        (* print progress *)
-        incr n;
-        if progress then pp_progress !n len;
-        List.iter
-          (fun prover ->
-            (* check step with prover *)
-            match  check_step ~timeout ~prover step with
-            | `Ok res ->
-              CheckedTrace.add ~checked step res
-            | `Error msg ->
-                failwith msg)
-          provers);
+         (* print progress *)
+         incr n;
+         if progress then pp_progress !n len;
+         List.iter
+           (fun prover ->
+              (* check step with prover *)
+              match  check_step ~timeout ~prover step with
+              | `Ok res ->
+                  CheckedTrace.add ~checked step res
+              | `Error msg ->
+                  failwith msg)
+           provers);
     (* clean line of progress *)
     if progress then Printf.printf "                                      \n";
     E.return ()
@@ -196,23 +177,23 @@ let all_paths_correct ~valid ~checked =
   (* recursive DFS traversal *)
   let rec check_proof proof =
     if StepTbl.mem closed proof
-      then ()  (* ok *)
+    then ()  (* ok *)
     else if StepTbl.mem current proof
-      then
-        let _ = Util.debugf 1 "step %a not valid, in a cycle" (fun k->k TT.pp proof) in
-        raise Exit  (* we followed a back link! *)
+    then
+      let _ = Util.debugf 1 "step %a not valid, in a cycle" (fun k->k TT.pp proof) in
+      raise Exit  (* we followed a back link! *)
     else if not (valid proof)
-      then
-        let _ = Util.debugf 1 "step %a not validated" (fun k->k TT.pp proof) in
-        raise Exit  (* path leads to invalid step *)
+    then
+      let _ = Util.debugf 1 "step %a not validated" (fun k->k TT.pp proof) in
+      raise Exit  (* path leads to invalid step *)
     else begin
       StepTbl.add current proof ();
       begin match proof with
-      | TT.InferClause (_, lazy step)
-      | TT.InferForm (_, lazy step) ->
-        Array.iter check_proof step.TT.parents
-      | TT.Axiom _
-      | TT.Theory _ -> ()
+        | TT.InferClause (_, lazy step)
+        | TT.InferForm (_, lazy step) ->
+            Array.iter check_proof step.TT.parents
+        | TT.Axiom _
+        | TT.Theory _ -> ()
       end;
       (* proof is now totally explored *)
       StepTbl.remove current proof;
@@ -247,11 +228,11 @@ let progress = ref false
 (* TODO option to choose provers *)
 
 let options = Arg.align (
-  [ "--pp", Arg.Set print_problem, " print problem after parsing"
-  ; "--timeout", Arg.Set_int timeout, " timeout for subprovers (in seconds)"
-  ; "--minimum", Arg.Set_int minimum, " minimum number of checks to validate a step (1)"
-  ; "--progress", Arg.Set progress, " print progress"
-  ] @ Options.mk_global_opts ()
+    [ "--pp", Arg.Set print_problem, " print problem after parsing"
+    ; "--timeout", Arg.Set_int timeout, " timeout for subprovers (in seconds)"
+    ; "--minimum", Arg.Set_int minimum, " minimum number of checks to validate a step (1)"
+    ; "--progress", Arg.Set progress, " print progress"
+    ] @ Options.mk_global_opts ()
   )
 
 (** parse_args returns parameters *)
@@ -263,7 +244,7 @@ let main file =
     TT.parse ~recursive:true file
     >>= fun trace ->
     if !print_problem
-      then Format.printf "@[<2>derivation:@,@[%a@]@]@." TT.pp_tstp trace;
+    then Format.printf "@[<2>derivation:@,@[%a@]@]@." TT.pp_tstp trace;
     Util.debugf 1 "trace of %d steps" (fun k->k (TT.size trace));
     (* check that the steps form a DAG *)
     if not (TT.is_dag trace) then begin
@@ -277,14 +258,14 @@ let main file =
     (* print failures *)
     List.iter
       (fun (proof, res) -> match res with
-        | Failed prover ->
-          Util.debugf 1 "trying to prove %a with %s failed" (fun k->k TT.pp1 proof prover)
-        | _ -> assert false)
+         | Failed prover ->
+             Util.debugf 1 "trying to prove %a with %s failed" (fun k->k TT.pp1 proof prover)
+         | _ -> assert false)
       (CheckedTrace.failures ~checked);
     (* check the global structure of the validated steps *)
     if check_structure ~minimum:!minimum ~checked
-      then Util.debug 0 "validated steps form a correct proof. success."
-      else Util.debug 0 "proof structure incorrect. failure.";
+    then Util.debug 0 "validated steps form a correct proof. success."
+    else Util.debug 0 "proof structure incorrect. failure.";
     E.return ()
   )
 

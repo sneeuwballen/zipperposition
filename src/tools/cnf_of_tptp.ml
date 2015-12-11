@@ -1,38 +1,14 @@
 
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Reduction to CNF of TPTP file} *)
 
 open Logtk
 open Logtk_parsers
 
-module F = Formula.FO
+module T = TypedSTerm
+module F = T.Form
 module A = Ast_tptp
-module AU = Ast_tptp.Untyped
-module AT = Ast_tptp.Typed
 module Err = CCError
 
 let declare_types = ref false
@@ -58,23 +34,21 @@ let process file =
     Util_tptp.parse_file ~recursive:true file
     >>= fun decls ->
     (* to CNF *)
-    Util_tptp.infer_types (`sign Signature.TPTP.base) decls
-    >>= fun (signature, decls) ->
+    Util_tptp.infer_types decls
+    >>= fun decls ->
     let opts =
       (if !flag_distribute_exists then [Cnf.DistributeExists] else []) @
       (if !flag_disable_renaming then [Cnf.DisableRenaming] else []) @
       []
     in
-    let signature, decls = Util_tptp.to_cnf ~opts signature decls in
-    let decls = if !declare_types
-      then Sequence.append (Util_tptp.Typed.declare_symbols signature) decls
-      else decls
-    in
+    let decls = Util_tptp.to_cnf ~opts decls in
+    let sigma = Util_tptp.type_declarations
+      (CCVector.to_seq decls) in
     if !print_sig
-      then Format.printf "@[<2>signature: @[%a@]@]@." Signature.pp signature;
+      then Format.printf "@[<2>signature: @[%a@]@]@." (ID.Map.print ID.pp T.pp) sigma;
     (* print *)
-    Sequence.iter
-      (fun d -> Format.printf "%a@." AT.pp d)
+    Format.printf "@[<v>%a@]@."
+      (CCVector.print ~start:"" ~stop:"" ~sep:"" (A.pp T.pp))
       decls;
     Err.return ()
   )
