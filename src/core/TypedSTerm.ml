@@ -115,44 +115,45 @@ let hash x = Hash.apply hash_fun x
 let rec pp out t = match view t with
   | Var s ->
       Var.pp out s;
-      Format.fprintf out ":%a" _pp_inner (ty_exn t)
+      Format.fprintf out ":%a" pp_inner (ty_exn t)
   | Const s -> ID.pp out s
   | App (_, []) -> assert false
   | App (f, l) ->
-      Format.fprintf out "@[<2>%a@ %a@]" _pp_inner f (Util.pp_list ~sep:" " pp) l
+      Format.fprintf out "@[<2>%a@ %a@]" pp_inner f (Util.pp_list ~sep:" " pp) l
   | Bind (s, v, t) ->
-      Format.fprintf out "@[<2>%a %a.@ %a@]" Binder.pp s Var.pp v _pp_inner t
+      Format.fprintf out "@[<2>%a %a.@ %a@]" Binder.pp s Var.pp v pp_inner t
   | Record (l, None) ->
       Format.fprintf out "{%a}" pp_fields l
   | Record (l, Some r) ->
       Format.fprintf out "{%a | %a}" pp_fields l pp r
   | AppBuiltin (b, [a]) when Builtin.is_prefix b ->
-    Format.fprintf out "@[%a %a@]" Builtin.pp b pp a
+      Format.fprintf out "@[%a %a@]" Builtin.pp b pp_inner a
   | AppBuiltin (Builtin.Arrow, ret::args) ->
       pp_infix_ Builtin.Arrow out (args @ [ret])
+  | AppBuiltin (Builtin.Not, [f]) -> Format.fprintf out "@[¬@ %a@]" pp f
   | AppBuiltin (b, l) when Builtin.is_infix b && List.length l > 0 ->
       pp_infix_ b out l
   | AppBuiltin (b, l) ->
-    Format.fprintf out "(@[%a %a@])" Builtin.pp b (Util.pp_list pp) l
+    Format.fprintf out "(@[%a %a@])" Builtin.pp b (Util.pp_list pp_inner) l
   | Multiset l ->
-      Format.fprintf out "[@[%a@]]" (Util.pp_list ~sep:", " _pp_inner) l
+      Format.fprintf out "[@[%a@]]" (Util.pp_list ~sep:", " pp_inner) l
   | Meta (id, r) ->
       assert (!r = None); (* we used {!view} *)
       Format.fprintf out "?%a" Var.pp id
-and _pp_inner buf t = match view t with
+and pp_inner out t = match view t with
   | AppBuiltin (_, _::_)
   | App _
-  | Bind _ -> Format.fprintf buf "(@[%a@])" pp t  (* avoid ambiguities *)
-  | _ -> pp buf t
+  | Bind _ -> Format.fprintf out "(@[%a@])" pp t  (* avoid ambiguities *)
+  | _ -> pp out t
 and pp_field out (name,t) =
-  Format.fprintf out "%s=%a" name _pp_inner t
+  Format.fprintf out "%s=%a" name pp_inner t
 and pp_fields out f = Util.pp_list ~sep:", " pp_field out f
 and pp_infix_ b out l = match l with
   | [] -> assert false
-  | [t] -> pp out t
+  | [t] -> pp_inner out t
   | t :: l' ->
-      Format.fprintf out "@[<hv>%a@ @[<hv%a@ %a@]@]"
-        pp t Builtin.pp b (pp_infix_ b) l'
+      Format.fprintf out "@[<hv>%a@ @[<hv>%a@ %a@]@]"
+        pp_inner t Builtin.pp b (pp_infix_ b) l'
 
 exception IllFormedTerm of string
 
@@ -357,8 +358,9 @@ module Ty = struct
 
   let mk_fun_ ?loc args ret = app_builtin ?loc ~ty:tType Builtin.Arrow (ret::args)
 
-  let fun_ ?loc args ret = match view ret with
-    | Fun (args', ret') -> mk_fun_ ?loc (args @ args') ret'
+  let fun_ ?loc args ret = match args, view ret with
+    | [], _ -> ret
+    | _, Fun (args', ret') -> mk_fun_ ?loc (args @ args') ret'
     | _ -> mk_fun_ ?loc args ret
 
   let app ?loc id l =

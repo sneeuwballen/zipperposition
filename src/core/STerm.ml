@@ -158,6 +158,7 @@ let rat n = builtin (Builtin.Rat n)
 let fun_ty ?loc l ret = match l with
   | [] -> ret
   | _::_ -> app_builtin ?loc Builtin.arrow (ret :: l)
+
 let tType = builtin Builtin.tType
 let forall_ty ?loc vars t = bind ?loc Binder.forall_ty vars t
 
@@ -249,14 +250,18 @@ let rec pp out t = match t.term with
       Format.fprintf out "[@[<hv>%a@]]"
         (Util.pp_list ~sep:"," pp) l;
   | AppBuiltin (Builtin.Arrow, [ret;a]) ->
-      Format.fprintf out "@[<2>%a@ -> %a@]" pp a pp ret
+      Format.fprintf out "@[<2>%a@ → %a@]" pp_inner a pp_inner ret
   | AppBuiltin (Builtin.Arrow, ret::l) ->
-      Format.fprintf out "@[<2>(%a)@ -> %a@]" (Util.pp_list ~sep:" × " pp) l pp ret
+      Format.fprintf out "@[<2>(%a)@ → %a@]" (Util.pp_list ~sep:" × " pp_inner) l pp_inner ret
+  | AppBuiltin (Builtin.Not, [f]) -> Format.fprintf out "@[¬@ %a@]" pp_inner f
+  | AppBuiltin (b, l) when Builtin.is_infix b && List.length l > 0 ->
+      pp_infix_ b out l
   | AppBuiltin (s, l) ->
-      Format.fprintf out "%a(@[<2>%a@])" Builtin.pp s (Util.pp_list ~sep:", " pp) l
+      Format.fprintf out "%a(@[<2>%a@])"
+        Builtin.pp s (Util.pp_list ~sep:", " pp_inner) l
   | App (s, l) ->
-      Format.fprintf out "@[<2>%a(%a)@]"
-        pp s (Util.pp_list ~sep:"," pp) l
+      Format.fprintf out "@[<2>%a %a@]"
+        pp s (Util.pp_list ~sep:" " pp_inner) l
   | Bind (s, vars, t') ->
       Format.fprintf out "@[<2>%a[@[%a@]]:@ %a@]"
         Binder.pp s
@@ -268,9 +273,20 @@ let rec pp out t = match t.term with
   | Record (l, Some r) ->
       Format.fprintf out "{@[<hv>%a@ | %s@]}"
         (Util.pp_list (Util.pp_pair ~sep:":" CCFormat.string pp)) l r
+and pp_inner out t = match view t with
+  | AppBuiltin (_, _::_)
+  | App _
+  | Bind _ -> Format.fprintf out "(@[%a@])" pp t  (* avoid ambiguities *)
+  | _ -> pp out t
 and pp_typed_var out = function
   | v, None -> CCFormat.string out v
   | v, Some ty -> Format.fprintf out "%s:%a" v pp ty
+and pp_infix_ b out l = match l with
+  | [] -> assert false
+  | [t] -> pp_inner out t
+  | t :: l' ->
+      Format.fprintf out "@[<hv>%a@ @[<hv>%a@ %a@]@]"
+        pp_inner t Builtin.pp b (pp_infix_ b) l'
 
 let to_string = CCFormat.to_string pp
 

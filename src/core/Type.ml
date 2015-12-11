@@ -31,7 +31,7 @@ type t = T.t
 
 type ty = t
 
-type builtin = TType | Prop | Term
+type builtin = TType | Prop | Term | Rat | Int
 
 type view =
   | Builtin of builtin
@@ -55,6 +55,8 @@ let view t = match T.view t with
   | T.AppBuiltin (Builtin.Prop, []) -> Builtin Prop
   | T.AppBuiltin (Builtin.TType, []) -> Builtin TType
   | T.AppBuiltin (Builtin.Term, []) -> Builtin Term
+  | T.AppBuiltin (Builtin.TyInt, []) -> Builtin Int
+  | T.AppBuiltin (Builtin.TyRat, []) -> Builtin Rat
   | T.Record (l, rest) -> Record (l, rest)
   | _ -> assert false
 
@@ -237,6 +239,8 @@ module TPTP = struct
     | Builtin Prop -> CCFormat.string out "$o"
     | Builtin TType -> CCFormat.string out "$tType"
     | Builtin Term -> CCFormat.string out "$i"
+    | Builtin Int -> CCFormat.string out "$int"
+    | Builtin Rat -> CCFormat.string out "$rat"
     | Var v -> Format.fprintf out "X%d" (HVar.id v)
     | DB i -> Format.fprintf out "Tb%d" (depth-i-1)
     | App (p, []) -> ID.pp out p
@@ -272,6 +276,8 @@ let rec pp_rec depth out t = match view t with
   | Builtin Prop -> CCFormat.string out "prop"
   | Builtin TType -> CCFormat.string out "type"
   | Builtin Term -> CCFormat.string out "ι"
+  | Builtin Int -> CCFormat.string out "int"
+  | Builtin Rat -> CCFormat.string out "rat"
   | Var v -> HVar.pp out v
   | DB i -> Format.fprintf out "T%i" (depth-i-1)
   | App (p, []) -> ID.pp out p
@@ -395,6 +401,8 @@ module Conv = struct
       | Builtin Prop -> PT.builtin ~ty:PT.tType Builtin.Prop
       | Builtin TType -> PT.builtin ~ty:PT.tType Builtin.TType
       | Builtin Term -> PT.builtin ~ty:PT.tType Builtin.Term
+      | Builtin Int -> PT.builtin ~ty:PT.tType Builtin.TyInt
+      | Builtin Rat -> PT.builtin ~ty:PT.tType Builtin.TyRat
       | Var v ->
           let v = aux_var v in
           PT.var v

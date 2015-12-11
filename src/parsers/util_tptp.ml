@@ -28,7 +28,7 @@ let find_file name dir =
   (* search in [dir], and its parents recursively *)
   let rec search dir =
     let cur_name = Filename.concat dir name in
-    Util.debugf 2 "search %s as %s" (fun k->k name cur_name);
+    Util.debugf 2 "search `%s`@ as `%s`" (fun k->k name cur_name);
     if file_exists cur_name
     then Some cur_name
     else

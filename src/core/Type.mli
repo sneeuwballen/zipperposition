@@ -48,7 +48,7 @@ type t = private InnerTerm.t
 
 type ty = t
 
-type builtin = TType | Prop | Term
+type builtin = TType | Prop | Term | Rat | Int
 
 type view = private
   | Builtin of builtin

@@ -112,8 +112,8 @@ let debug ?(section=Section.root) l msg =
   if l <= Section.cur_level section then (
     let now = ns_to_s (get_total_time ()) in
     if section == Section.root
-    then Format.fprintf debug_fmt_ "@[<hov>%.3f[]@ %s@]@." now msg
-    else Format.fprintf debug_fmt_ "@[<hov>%.3f[%s]@ %s@]@."
+    then Format.fprintf debug_fmt_ "@[<4>%.3f[]@ %s@]@." now msg
+    else Format.fprintf debug_fmt_ "@[<4>%.3f[%s]@ %s@]@."
         now section.Section.full_name msg;
   )
 
@@ -121,8 +121,8 @@ let debugf ?(section=Section.root) l msg k =
   if l <= Section.cur_level section then (
     let now = total_time_s() in
     if section == Section.root
-    then Format.fprintf debug_fmt_ "@[<hov>%.3f[]@ " now
-    else Format.fprintf debug_fmt_ "@[<hov>%.3f[%s]@ "
+    then Format.fprintf debug_fmt_ "@[<4>%.3f[]@ " now
+    else Format.fprintf debug_fmt_ "@[<4>%.3f[%s]@ "
         now section.Section.full_name;
     k (Format.kfprintf
          (fun fmt -> Format.fprintf fmt "@]@.")
@@ -251,7 +251,9 @@ let show_profilers out () =
 
 (** Print profiling data upon exit *)
 let () =
-  at_exit (fun () -> Format.printf "%a@." show_profilers ())
+  at_exit
+    (fun () ->
+      if !enable_profiling then Format.printf "%a@." show_profilers ())
 
 (** {2 Runtime statistics} *)
 
