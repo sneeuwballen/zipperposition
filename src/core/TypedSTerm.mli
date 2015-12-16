@@ -262,3 +262,9 @@ val apply_unify :
 
 val erase : t -> STerm.t
 
+(** {2 TPTP} *)
+
+module TPTP : sig
+  include Interfaces.PRINT with type t := t
+end
+

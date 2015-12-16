@@ -861,4 +861,27 @@ let apply_unify ?allow_open ?loc ?st ?(subst=Subst.empty) ty l =
 
 (** {2 Conversion} *)
 
-let erase _ = assert false (* TODO *)
+let rec erase t = match view t with
+  | Var v -> STerm.var (Var.to_string v)
+  | Const s -> STerm.const (ID.to_string s)
+  | App (f, l) -> STerm.app (erase f) (List.map erase l)
+  | Bind (b,v,t) -> STerm.bind b [Var.to_string v, Some (erase (Var.ty v))] (erase t)
+  | AppBuiltin (b, l) -> STerm.app_builtin b (List.map erase l)
+  | Multiset l -> STerm.list_ (List.map erase l)
+  | Record (l, rest) ->
+      let rest = CCOpt.map
+        (fun t -> match view t with
+          | Var v -> Var.to_string v
+          | _ -> failwith "cannot erase non-variable record raw")
+        rest
+      in
+      STerm.record
+        (List.map (fun (n,t) -> n, erase t) l)
+        ~rest
+  | Meta _ -> failwith "cannot erase meta"
+
+module TPTP = struct
+  let pp out t = STerm.TPTP.pp out (erase t)
+  let to_string t = STerm.TPTP.to_string (erase t)
+end
+
