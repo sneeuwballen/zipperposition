@@ -146,7 +146,6 @@ let bvar ~ty i =
 let bind ~ty ~varty s t' =
   H.hashcons (make_ ~ty:(HasType ty) (Bind (s, varty, t')))
 
-(* TODO: move to Subst (only place where it can happen now) *)
 (* merge l1 and l2, which are both sorted. If the same key occurs with
    distinct values, fail. *)
 let rec merge_records_ l1 l2 = match l1, l2 with
@@ -169,8 +168,6 @@ let rec check_duplicates_ seen l = match l with
       if List.mem s seen
       then failwith ("ill-formed record: field " ^ s ^ " appears twice")
       else check_duplicates_ (s::seen) l'
-
-(* TODO: remove computation of ground flag *)
 
 (* actually build the record *)
 let make_record_ ~ty l ~rest =
