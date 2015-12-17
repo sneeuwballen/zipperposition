@@ -24,6 +24,5 @@ PKG gen
 PKG qcheck
 PKG unix
 PKG qbf
-PKG qbf.quantor
 PKG ppx_deriving.std
 PKG msat

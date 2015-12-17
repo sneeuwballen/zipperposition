@@ -1,24 +1,7 @@
-(*
-Zipperposition: a functional superposition prover for prototyping
-Copyright (C) 2012 Simon Cruanes
 
-This is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-This is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-02110-1301 USA.
-*)
-
-(** Parameters for the prover, etc. *)
+(** {1 Parameters for the prover, etc.} *)
 
 open Logtk
 
@@ -51,9 +34,6 @@ let other_opts = ref []
 let add_opt o = other_opts := o :: !other_opts
 let add_opts l = other_opts := l @ !other_opts
 
-(** Default signature *)
-let signature = ref Signature.TPTP.base
-
 let ord = ref "kbo"
 and seed = ref 1928575
 and steps = ref 0
@@ -73,33 +53,31 @@ and files = CCVector.create ()
 
 (** parse_args returns parameters *)
 let parse_args () =
-  let help_select = Util.sprintf "selection function (%a)"
-    (Util.pp_list ~sep:"," Buffer.add_string)
+  let help_select = CCFormat.sprintf "selection function (%a)"
+    (Util.pp_list ~sep:"," CCFormat.string)
     (Selection.available_selections ())
   in
   (* special handlers *)
-  let set_progress () =
-    Util.need_cleanup := true;
-    progress := true
+  let set_progress () = progress := true
   and add_file s = CCVector.push files s in
   (* options list *)
   let options = Arg.align (
-    [ "-ord", Arg.Set_string ord, " choose ordering (rpo,kbo)"
-    ; "-version", Arg.Set version, " print version"
-    ; "-steps", Arg.Set_int steps, " maximal number of steps of given clause loop"
-    ; "-timeout", Arg.Set_float timeout, " timeout (in seconds)"
-    ; "-select", Arg.Set_string select, help_select
-    ; "-split", Arg.Set split, " enable splitting"
-    ; "-expand-def", Arg.Set expand_def, " expand definitions"
-    ; "-progress", Arg.Unit set_progress, " print progress"
-    ; "-proof", Arg.Set_string proof, " choose proof printing (none, debug, or tstp)"
-    ; "-presaturate", Arg.Set presaturate,
+    [ "--ord", Arg.Set_string ord, " choose ordering (rpo,kbo)"
+    ; "--version", Arg.Set version, " print version"
+    ; "--steps", Arg.Set_int steps, " maximal number of steps of given clause loop"
+    ; "--timeout", Arg.Set_float timeout, " timeout (in seconds)"
+    ; "--select", Arg.Set_string select, help_select
+    ; "--split", Arg.Set split, " enable splitting"
+    ; "--expand-def", Arg.Set expand_def, " expand definitions"
+    ; "--progress", Arg.Unit set_progress, " print progress"
+    ; "--proof", Arg.Set_string proof, " choose proof printing (none, debug, or tstp)"
+    ; "--presaturate", Arg.Set presaturate,
         " pre-saturate (interreduction of) the initial clause set"
-    ; "-dot", Arg.String (fun s -> dot_file := Some s) , " print final state to file in DOT"
-    ; "-dot-sat", Arg.Set dot_sat, " print saturated set into DOT"
-    ; "-dot-all-roots", Arg.Set dot_all_roots, " print all empty clauses into DOT"
-    ; "-seed", Arg.Set_int seed, " set random seed"
-    ; "-unary-depth", Arg.Set_int unary_depth, " maximum depth for successive unary inferences"
+    ; "--dot", Arg.String (fun s -> dot_file := Some s) , " print final state to file in DOT"
+    ; "--dot-sat", Arg.Set dot_sat, " print saturated set into DOT"
+    ; "--dot-all-roots", Arg.Set dot_all_roots, " print all empty clauses into DOT"
+    ; "--seed", Arg.Set_int seed, " set random seed"
+    ; "--unary-depth", Arg.Set_int unary_depth, " maximum depth for successive unary inferences"
     ] @ !other_opts @ Options.mk_global_opts ()
   ) in
   let options = List.sort (fun (a1,_,_)(a2,_,_)->String.compare a1 a2) options in

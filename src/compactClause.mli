@@ -1,35 +1,13 @@
-(*
-Zipperposition: a functional superposition prover for prototyping
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Compact clause representation} *)
 
 open Logtk
 
-type form = Formula.FO.t
+type term = FOTerm.t
 
+(* TODO: simplfy, only one case now *)
 type bool_lit =
   bool *
   [ `Box_clause of Literal.t array
@@ -59,15 +37,13 @@ val iter : t -> (Literal.t -> unit) -> unit
 
 val to_seq : t -> Literal.t Sequence.t
 
-val to_forms : t -> form array
-val to_form : t -> form
+val to_forms : t -> term SLiteral.t array
 
 val lits : t -> Literal.t array
 val trail : t -> bool_lit list
 
-val pp : Buffer.t -> t -> unit
-val pp_tstp : Buffer.t -> t -> unit
-val pp_trail_tstp : Buffer.t -> bool_lit list -> unit
+val pp : t CCFormat.printer
+val pp_tstp : t CCFormat.printer
+val pp_trail_tstp : bool_lit list CCFormat.printer
 
 val to_string : t -> string
-val fmt : Format.formatter -> t -> unit

@@ -1,39 +1,14 @@
 
-(*
-Zipperposition: a functional superposition prover for prototyping
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Manipulate proofs} *)
 
 open Logtk
 
 module Hash = CCHash
-module F = Formula.FO
 module CC = CompactClause
 
-type form = F.t
+type form = TypedSTerm.t
 type 'a sequence = ('a -> unit) -> unit
 
 module FileInfo = struct
@@ -78,27 +53,27 @@ let eq p1 p2 =
   p1.additional_info = p2.additional_info &&
   p1.theories = p2.theories &&
   match p1.result, p2.result with
-  | Form f1, Form f2 -> F.eq f1 f2
-  | Clause c1, Clause c2 -> CC.eq c1 c2
+  | Form f1, Form f2 -> TypedSTerm.equal f1 f2
+  | Clause c1, Clause c2 -> CC.equal c1 c2
   | _ -> false
 
 let hash_fun p h =
   h |> Hash.int_ (Hashtbl.hash p.kind)
-    |> (fun h -> match p.result with
-        | Form f -> F.hash_fun f h
-        | Clause c -> CC.hash_fun c h)
+  |> (fun h -> match p.result with
+      | Form f -> TypedSTerm.hash_fun f h
+      | Clause c -> CC.hash_fun c h)
 
 let hash p = Hash.apply hash_fun p
 
 let cmp p1 p2 =
   let c = Pervasives.compare p1.kind p2.kind in
   if c = 0
-    then match p1.result, p2.result with
-      | Form f1, Form f2 -> F.cmp f1 f2
-      | Clause c1, Clause c2 -> CC.cmp c1 c2
-      | Form _, Clause _ -> 1
-      | Clause _, Form _ -> ~-1
-    else c
+  then match p1.result, p2.result with
+    | Form f1, Form f2 -> F.compare f1 f2
+    | Clause c1, Clause c2 -> CC.cmp c1 c2
+    | Form _, Clause _ -> 1
+    | Clause _, Form _ -> ~-1
+  else c
 
 (** {2 Constructors and utils} *)
 
@@ -164,7 +139,7 @@ let is_axiom = function
 
 let is_proof_of_false p =
   match p.result with
-  | Form f when F.eq f F.Base.false_ -> true
+  | Form f when F.equal f F.Base.false_ -> true
   | Clause c when CC.is_empty c -> true
   | _ -> false
 
@@ -198,10 +173,10 @@ end
 (** {2 Proof traversal} *)
 
 module ProofTbl = Hashtbl.Make(struct
-  type t = proof
-  let equal = eq
-  let hash = hash
-end)
+    type t = proof
+    let equal = eq
+    let hash = hash
+  end)
 
 type proof_set = unit ProofTbl.t
 
@@ -237,13 +212,13 @@ let distance_to_conjecture p =
   let best_distance = ref None in
   traverse_depth p
     (fun (p', depth) ->
-      if is_conjecture p'
-      then
-        let new_best = match !best_distance with
-          | None -> depth
-          | Some depth' -> max depth depth'
-        in
-        best_distance := Some new_best
+       if is_conjecture p'
+       then
+         let new_best = match !best_distance with
+           | None -> depth
+           | Some depth' -> max depth depth'
+         in
+         best_distance := Some new_best
     );
   !best_distance
 
@@ -268,8 +243,8 @@ let depth proof =
     if ProofTbl.mem explored proof then () else begin
       ProofTbl.add explored proof ();
       begin match p.kind with
-      | File _ | Trivial -> depth := max d !depth
-      | Inference _ | Esa _ | Simplification _ -> ()
+        | File _ | Trivial -> depth := max d !depth
+        | Inference _ | Esa _ | Simplification _ -> ()
       end;
       (* explore parents *)
       Array.iter (fun p -> Queue.push (p, d+1) q) p.parents
@@ -282,8 +257,8 @@ let share t =
   let h = ProofTbl.create 15 in
   let rec share t =
     let t' = { t with
-      parents = Array.map share t.parents;
-    } in
+               parents = Array.map share t.parents;
+             } in
     try ProofTbl.find h t'
     with Not_found ->
       ProofTbl.add h t' t';
@@ -356,8 +331,8 @@ let pp_debug buf proof =
       | File {F.role=role; F.filename=file; F.name=name; F.conjecture=c} ->
         Printf.bprintf buf "%a <--- %a, theories [%a]%s\n"
           pp_result p.result pp_kind p.kind
-            (Util.pp_list Buffer.add_string) p.theories
-            (if c then " (conjecture)" else "")
+          (Util.pp_list Buffer.add_string) p.theories
+          (if c then " (conjecture)" else "")
       | Trivial ->
         Printf.bprintf buf "%a <--- trivial, theories [%a]\n"
           pp_result p.result (Util.pp_list Buffer.add_string) p.theories;
@@ -399,24 +374,24 @@ let pp_tstp buf proof =
   let namespace = ProofTbl.create 5 in
   traverse proof
     (fun p ->
-      let name = get_name ~namespace p in
-      let parents =
-        List.map (fun p -> `Name (get_name namespace p)) (Array.to_list p.parents) @
-        List.map (fun s -> `Theory s) p.theories
-      in
-      match p.result with
-      | Form f ->
-        Printf.bprintf buf "tff(%d, %s, %a, %a).\n"
-          name (role p) F.TPTP.pp f _pp_kind_tstp (p.kind,parents)
-      | Clause c when CC.trail c <> [] ->
-        Printf.bprintf buf "tff(%d, %s, (%a) %a, %a).\n"
-          name (role p)
-            F.TPTP.pp (CC.to_form c |> F.close_forall)
-            CC.pp_trail_tstp (CC.trail c)
-            _pp_kind_tstp (p.kind,parents)
-      | Clause c ->
-        Printf.bprintf buf "cnf(%d, %s, %a, %a).\n"
-          name (role p) CC.pp_tstp c _pp_kind_tstp (p.kind,parents)
+       let name = get_name ~namespace p in
+       let parents =
+         List.map (fun p -> `Name (get_name namespace p)) (Array.to_list p.parents) @
+         List.map (fun s -> `Theory s) p.theories
+       in
+       match p.result with
+       | Form f ->
+         Printf.bprintf buf "tff(%d, %s, %a, %a).\n"
+           name (role p) F.TPTP.pp f _pp_kind_tstp (p.kind,parents)
+       | Clause c when CC.trail c <> [] ->
+         Printf.bprintf buf "tff(%d, %s, (%a) %a, %a).\n"
+           name (role p)
+           F.TPTP.pp (CC.to_form c |> F.close_forall)
+           CC.pp_trail_tstp (CC.trail c)
+           _pp_kind_tstp (p.kind,parents)
+       | Clause c ->
+         Printf.bprintf buf "cnf(%d, %s, %a, %a).\n"
+           name (role p) CC.pp_tstp c _pp_kind_tstp (p.kind,parents)
     )
 
 (** Prints the proof according to the given input switch *)
@@ -432,11 +407,11 @@ let _escape_dot s =
   let b = Buffer.create (String.length s + 5) in
   String.iter
     (fun c ->
-      begin match c with
-      | '|' | '\\' | '{' | '}' | '<' | '>' | '"' -> Buffer.add_char b '\\';
-      | _ -> ()
-      end;
-      Buffer.add_char b c)
+       begin match c with
+         | '|' | '\\' | '{' | '}' | '<' | '>' | '"' -> Buffer.add_char b '\\';
+         | _ -> ()
+       end;
+       Buffer.add_char b c)
     s;
   Buffer.contents b
 
@@ -455,9 +430,9 @@ let as_dot_graph =
     let s = if no_other_info proof
       then _to_str_escape "%a" pp_result_of proof
       else Util.sprintf "{%s|{theories:%s|info:%s}}"
-        (_to_str_escape "%a" pp_result_of proof)
-        (_to_str_escape "%a" _pp_list_str proof.theories)
-        (_to_str_escape "%a" _pp_list_str proof.additional_info)
+          (_to_str_escape "%a" pp_result_of proof)
+          (_to_str_escape "%a" _pp_list_str proof.theories)
+          (_to_str_escape "%a" _pp_list_str proof.additional_info)
     in
     (* let s = Util.sprintf "%a" pp_result_of proof in *)
     `Label s
@@ -466,26 +441,26 @@ let as_dot_graph =
   let attributes = [`Style "filled"] in
   LazyGraph.map
     ~vertices:(fun p ->
-      if is_proof_of_false p then `Color "red" ::
-          `Label "[]" :: `Shape "box" :: attributes
-      else if has_absurd_lits p then `Color "orange" :: label p :: shape p :: attributes
-      else if is_file p then label p :: `Color "yellow" :: shape p :: attributes
-      else if is_conjecture p then label p :: `Color "green" :: shape p :: attributes
-      else if is_trivial p then label p :: `Color "cyan" :: shape p :: attributes
-      else label p :: shape p :: attributes)
+        if is_proof_of_false p then `Color "red" ::
+                                    `Label "[]" :: `Shape "box" :: attributes
+        else if has_absurd_lits p then `Color "orange" :: label p :: shape p :: attributes
+        else if is_file p then label p :: `Color "yellow" :: shape p :: attributes
+        else if is_conjecture p then label p :: `Color "green" :: shape p :: attributes
+        else if is_trivial p then label p :: `Color "cyan" :: shape p :: attributes
+        else label p :: shape p :: attributes)
     ~edges:(fun e -> [`Label e])
     as_graph
 
 let pp_dot_seq ~name buf seq =
   let fmt = Format.formatter_of_buffer buf in
   Sequence.iter (fun proof ->
-    if not (LazyGraph.is_dag as_graph proof) then begin
-      (* output warning, cyclic proof *)
-      let cycle = LazyGraph.find_cycle as_graph proof in
-      let cycle = List.map (fun (v,_,_) -> v) cycle in
-      let pp_squared buf pf = Printf.bprintf buf "[%a]" pp_notrec pf in
-      Util.debug 0 "warning: proof is not a DAG (cycle %a)"
-        (Util.pp_list pp_squared) cycle;
+      if not (LazyGraph.is_dag as_graph proof) then begin
+        (* output warning, cyclic proof *)
+        let cycle = LazyGraph.find_cycle as_graph proof in
+        let cycle = List.map (fun (v,_,_) -> v) cycle in
+        let pp_squared buf pf = Printf.bprintf buf "[%a]" pp_notrec pf in
+        Util.debug 0 "warning: proof is not a DAG (cycle %a)"
+          (Util.pp_list pp_squared) cycle;
       end)
     seq;
   LazyGraph.Dot.pp ~name as_dot_graph fmt seq;

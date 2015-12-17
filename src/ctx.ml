@@ -1,29 +1,5 @@
 
-(*
-Zipperposition: a functional superposition prover for prototyping
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Basic context for literals, clauses...} *)
 
@@ -33,8 +9,6 @@ module T = FOTerm
 module S = Substs
 module Unif = Logtk.Unif
 module TO = Theories.TotalOrder
-
-type scope = Substs.scope
 
 (** {2 Context for a Proof} *)
 module type S = Ctx_intf.S
@@ -46,7 +20,7 @@ module type PARAMETERS = sig
   val signature : Signature.t
   val ord : Ordering.t
   val select : Selection.t
-  val constr_list : (int * Precedence.Constr.t) list
+  val constr_list : (int * [`partial] Precedence.Constr.t) list
 end
 
 module Make(X : PARAMETERS) = struct
@@ -54,7 +28,7 @@ module Make(X : PARAMETERS) = struct
   let _select = ref X.select
   let _signature = ref X.signature
   let _complete = ref true
-  let _ad_hoc = ref (Symbol.Set.singleton Symbol.Base.eq)
+  let _ad_hoc = ref (ID.Set.singleton ID.Base.eq)
   let _constrs = ref X.constr_list
 
   let skolem = Skolem.create ~prefix:"zsk" Signature.empty
@@ -89,9 +63,9 @@ module Make(X : PARAMETERS) = struct
     Signal.send on_signature_update !_signature;
     Signature.iter _diff (fun s ty -> Signal.send on_new_symbol (s,ty));
     _ord := !_signature
-      |> Signature.Seq.to_seq
-      |> Sequence.map fst
-      |> Ordering.add_seq !_ord;
+            |> Signature.Seq.to_seq
+            |> Sequence.map fst
+            |> Ordering.add_seq !_ord;
     Util.exit_prof prof_add_signature;
     ()
 
@@ -112,23 +86,23 @@ module Make(X : PARAMETERS) = struct
   let update_prec symbs =
     Util.debug 3 "update precedence...";
     _ord := Ordering.update_precedence !_ord
-      (fun prec -> Precedence.add_seq prec symbs)
+        (fun prec -> Precedence.add_seq prec symbs)
 
   let ad_hoc_symbols () = !_ad_hoc
   let add_ad_hoc_symbols seq =
-    _ad_hoc := Sequence.fold (fun set s -> Symbol.Set.add s set) !_ad_hoc seq
+    _ad_hoc := Sequence.fold (fun set s -> ID.Set.add s set) !_ad_hoc seq
 
   let add_constr p c =
     Util.debug 2 "update precedence using a *new* constraint!";
     _constrs := (p,c) :: !_constrs;
     _ord := Ordering.update_precedence !_ord
-      (fun p ->
-        let constr = !_constrs
-          |> List.sort (fun (p1,_)(p2,_) -> CCInt.compare p1 p2)
-          |> List.map snd
-        in
-        Precedence.with_constr_list p constr
-      )
+        (fun p ->
+           let constr = !_constrs
+                        |> List.sort (fun (p1,_)(p2,_) -> CCInt.compare p1 p2)
+                        |> List.map snd
+           in
+           Precedence.with_constr_list p constr
+        )
 
   let renaming_clear () =
     S.Renaming.clear renaming;
@@ -149,7 +123,7 @@ module Make(X : PARAMETERS) = struct
   end
 
   module Theories = struct
-    module STbl = Symbol.Tbl
+    module STbl = ID.Tbl
     module PF = PFormula
 
     module AC = struct
@@ -159,28 +133,28 @@ module Make(X : PARAMETERS) = struct
 
       let axioms s =
         (* FIXME: need to recover type of [f]
-        let x = T.mk_var 0 in
-        let y = T.mk_var 1 in
-        let z = T.mk_var 2 in
-        let f x y = T.mk_node s [x; y] in
-        let mk_eq x y = F.mk_eq x y in
-        let mk_pform name f =
-          let f = F.close_forall f in
-          let name = Util.sprintf "%s_%a" name Symbol.pp s in
-          let proof = Proof.mk_f_axiom f ~file:"/dev/ac" ~name in
-          PF.create f proof
-        in
-        [ mk_pform "associative" (mk_eq (f (f x y) z) (f x (f y z)))
-        ; mk_pform "commutative" (mk_eq (f x y) (f y x))
-        ]
+           let x = T.mk_var 0 in
+           let y = T.mk_var 1 in
+           let z = T.mk_var 2 in
+           let f x y = T.mk_node s [x; y] in
+           let mk_eq x y = F.mk_eq x y in
+           let mk_pform name f =
+           let f = F.close_forall f in
+           let name = Util.sprintf "%s_%a" name ID.pp s in
+           let proof = Proof.mk_f_axiom f ~file:"/dev/ac" ~name in
+           PF.create f proof
+           in
+           [ mk_pform "associative" (mk_eq (f (f x y) z) (f x (f y z)))
+           ; mk_pform "commutative" (mk_eq (f x y) (f y x))
+           ]
         *)
         []
 
       let add ?proof ~ty s =
         let proof = match proof with
-        | Some p -> p
-        | None -> (* new axioms *)
-          List.map PF.proof (axioms s)
+          | Some p -> p
+          | None -> (* new axioms *)
+              List.map PF.proof (axioms s)
         in
         if not (STbl.mem tbl s)
         then begin
@@ -198,14 +172,14 @@ module Make(X : PARAMETERS) = struct
 
       let symbols () =
         STbl.fold
-          (fun s _ set -> Symbol.Set.add s set)
-          tbl Symbol.Set.empty
+          (fun s _ set -> ID.Set.add s set)
+          tbl ID.Set.empty
 
       let symbols_of_terms seq =
         let module A = T.AC(struct
-          let is_ac = is_ac
-          let is_comm _ = false
-        end) in
+            let is_ac = is_ac
+            let is_comm _ = false
+          end) in
         A.symbols seq
 
       let symbols_of_forms f =
@@ -219,10 +193,10 @@ module Make(X : PARAMETERS) = struct
 
     module TotalOrder = struct
       module InstanceTbl = Hashtbl.Make(struct
-        type t = TO.t
-        let equal = TO.eq
-        let hash = TO.hash
-      end)
+          type t = TO.t
+          let equal = TO.eq
+          let hash = TO.hash
+        end)
 
       let less_tbl = STbl.create 3
       let lesseq_tbl = STbl.create 3
@@ -247,61 +221,61 @@ module Make(X : PARAMETERS) = struct
 
       let axioms ~less ~lesseq =
         (* FIXME: need to recover type of less's arguments
-        let x = T.mk_var 0 in
-        let y = T.mk_var 1 in
-        let z = T.mk_var 2 in
-        let mk_less x y = F.mk_atom (T.mk_node ~ty:Type.o less [x;y]) in
-        let mk_lesseq x y = F.mk_atom (T.mk_node ~ty:Type.o lesseq [ x;y]) in
-        let mk_eq x y = F.mk_eq x y in
-        let mk_pform name f =
-          let f = F.close_forall f in
-          let name = Util.sprintf "%s_%a_%a" name Symbol.pp less Symbol.pp lesseq in
-          let proof = Proof.mk_f_axiom f ~file:"/dev/order" ~name in
-          PF.create f proof
-        in
-        [ mk_pform "total" (F.mk_or [mk_less x y; mk_eq x y; mk_less y x])
-        ; mk_pform "irreflexive" (F.mk_not (mk_less x x))
-        ; mk_pform "transitive" (F.mk_imply (F.mk_and [mk_less x y; mk_less y z]) (mk_less x z))
-        ; mk_pform "nonstrict" (F.mk_equiv (mk_lesseq x y) (F.mk_or [mk_less x y; mk_eq x y]))
-        ]
+           let x = T.mk_var 0 in
+           let y = T.mk_var 1 in
+           let z = T.mk_var 2 in
+           let mk_less x y = F.mk_atom (T.mk_node ~ty:Type.o less [x;y]) in
+           let mk_lesseq x y = F.mk_atom (T.mk_node ~ty:Type.o lesseq [ x;y]) in
+           let mk_eq x y = F.mk_eq x y in
+           let mk_pform name f =
+           let f = F.close_forall f in
+           let name = Util.sprintf "%s_%a_%a" name ID.pp less ID.pp lesseq in
+           let proof = Proof.mk_f_axiom f ~file:"/dev/order" ~name in
+           PF.create f proof
+           in
+           [ mk_pform "total" (F.mk_or [mk_less x y; mk_eq x y; mk_less y x])
+           ; mk_pform "irreflexive" (F.mk_not (mk_less x x))
+           ; mk_pform "transitive" (F.mk_imply (F.mk_and [mk_less x y; mk_less y z]) (mk_less x z))
+           ; mk_pform "nonstrict" (F.mk_equiv (mk_lesseq x y) (F.mk_or [mk_less x y; mk_eq x y]))
+           ]
         *)
         []
 
       let add ?proof ~less ~lesseq ~ty =
         let proof = match proof with
-        | Some p -> p
-        | None ->
-          List.map PF.proof (axioms ~less ~lesseq)
+          | Some p -> p
+          | None ->
+              List.map PF.proof (axioms ~less ~lesseq)
         in
         let instance =
           try Some (STbl.find lesseq_tbl lesseq)
           with Not_found ->
             if STbl.mem less_tbl less
-              then raise (Invalid_argument "ordering instances overlap")
-              else None
+            then raise (Invalid_argument "ordering instances overlap")
+            else None
         in
         match instance with
         | None ->
-          (* new instance *)
-          let instance = Theories.TotalOrder.({ less; lesseq; ty; }) in
-          STbl.add less_tbl less instance;
-          STbl.add lesseq_tbl lesseq instance;
-          InstanceTbl.add proofs instance proof;
-          Signal.send on_add instance;
-          instance, `New
+            (* new instance *)
+            let instance = Theories.TotalOrder.({ less; lesseq; ty; }) in
+            STbl.add less_tbl less instance;
+            STbl.add lesseq_tbl lesseq instance;
+            InstanceTbl.add proofs instance proof;
+            Signal.send on_add instance;
+            instance, `New
         | Some instance ->
-          if not (Unif.Ty.are_variant ty instance.TO.ty)
-          then raise (Invalid_argument "incompatible types")
-          else if not (Symbol.eq less instance.TO.less)
-          then raise (Invalid_argument "incompatible symbol for lesseq")
-          else instance, `Old
+            if not (Unif.Ty.are_variant ty instance.TO.ty)
+            then raise (Invalid_argument "incompatible types")
+            else if not (ID.eq less instance.TO.less)
+            then raise (Invalid_argument "incompatible symbol for lesseq")
+            else instance, `Old
 
       let add_tstp () =
         try
-          find Symbol.TPTP.Arith.less, `Old
+          find ID.TPTP.Arith.less, `Old
         with Not_found ->
-          let less = Symbol.TPTP.Arith.less in
-          let lesseq = Symbol.TPTP.Arith.lesseq in
+          let less = ID.TPTP.Arith.less in
+          let lesseq = ID.TPTP.Arith.lesseq in
           (* add instance *)
           add ?proof:None
             ~ty:Type.(forall [var 0] (TPTP.o <== [var 0; var 0])) ~less ~lesseq
@@ -327,7 +301,7 @@ module Make(X : PARAMETERS) = struct
 
   (** Induction *)
   module Induction = struct
-    type constructor = Symbol.t * Type.t
+    type constructor = ID.t * Type.t
     (** constructor + its type *)
 
     type bool_lit = BoolLit.t
@@ -344,7 +318,7 @@ module Make(X : PARAMETERS) = struct
     let _failwith fmt = _raise failwith fmt
     let _invalid_arg fmt = _raise invalid_arg fmt
 
-    let _tbl_ty : inductive_type Symbol.Tbl.t = Symbol.Tbl.create 16
+    let _tbl_ty : inductive_type ID.Tbl.t = ID.Tbl.create 16
 
     let _extract_hd ty =
       match Type.view (snd (Type.open_fun ty)) with
@@ -357,26 +331,26 @@ module Make(X : PARAMETERS) = struct
     let declare_ty ty constructors =
       let name = _extract_hd ty in
       if constructors = []
-        then invalid_arg "InductiveCst.declare_ty: no constructors provided";
+      then invalid_arg "InductiveCst.declare_ty: no constructors provided";
       try
-        Symbol.Tbl.find _tbl_ty name
+        ID.Tbl.find _tbl_ty name
       with Not_found ->
         let ity = { pattern=ty; constructors; } in
-        Symbol.Tbl.add _tbl_ty name ity;
+        ID.Tbl.add _tbl_ty name ity;
         Signal.send on_new_inductive_ty ity;
         ity
 
     let inductive_ty_seq yield =
-      Symbol.Tbl.iter (fun _ ity -> yield ity) _tbl_ty
+      ID.Tbl.iter (fun _ ity -> yield ity) _tbl_ty
 
     let is_inductive_type ty =
       inductive_ty_seq
-        |> Sequence.exists (fun ity -> Unif.Ty.matches ~pattern:ity.pattern ty)
+      |> Sequence.exists (fun ity -> Unif.Ty.matches ~pattern:ity.pattern ty)
 
     let is_constructor_sym s =
       inductive_ty_seq
-        |> Sequence.flat_map (fun ity -> Sequence.of_list ity.constructors)
-        |> Sequence.exists (fun (s', _) -> Symbol.eq s s')
+      |> Sequence.flat_map (fun ity -> Sequence.of_list ity.constructors)
+      |> Sequence.exists (fun (s', _) -> ID.eq s s')
 
     let contains_inductive_types t =
       T.Seq.subterms t
@@ -384,7 +358,7 @@ module Make(X : PARAMETERS) = struct
 
     let _get_ity ty =
       let s = _extract_hd ty in
-      try Symbol.Tbl.find _tbl_ty s
+      try ID.Tbl.find _tbl_ty s
       with Not_found ->
         failwith (Util.sprintf "type %a is not inductive" Type.pp ty)
 
@@ -415,16 +389,16 @@ module Make(X : PARAMETERS) = struct
       cst : cst;
       ty : inductive_type;
       subst : Substs.t; (* matched against [ty.pattern] *)
-      dominates : unit Symbol.Tbl.t;
+      dominates : unit ID.Tbl.t;
       mutable coversets : cover_set IMap.t;
-        (* depth-> exhaustive decomposition of given depth  *)
+      (* depth-> exhaustive decomposition of given depth  *)
     }
 
     let on_new_inductive = Signal.create()
 
     (* cst -> cst_data *)
     let _tbl : cst_data T.Tbl.t = T.Tbl.create 16
-    let _tbl_sym : cst_data Symbol.Tbl.t = Symbol.Tbl.create 16
+    let _tbl_sym : cst_data ID.Tbl.t = ID.Tbl.create 16
 
     (* case -> cst * coverset *)
     let _tbl_case : (cst * cover_set) T.Tbl.t = T.Tbl.create 16
@@ -450,24 +424,24 @@ module Make(X : PARAMETERS) = struct
       then
         if T.Tbl.mem _tbl t then ()
         else try
-          Util.debug 2 "declare new inductive constant %a" T.pp t;
-          (* check that the type of [t] is inductive *)
-          let ty = T.ty t in
-          let name = _extract_hd ty in
-          let ity = Symbol.Tbl.find _tbl_ty name in
-          let subst = Unif.Ty.matching ~pattern:ity.pattern 1 ty 0 in
-          let cst_data = { cst=t; ty=ity; subst;
-                           dominates=Symbol.Tbl.create 16;
-                           coversets=IMap.empty } in
-          T.Tbl.add _tbl t cst_data;
-          let s = T.head_exn t in
-          Symbol.Tbl.replace _tbl_sym s cst_data;
-          Signal.send on_new_inductive t;
-          ()
-        with Unif.Fail | Not_found ->
-          _invalid_arg "term %a doesn't have an inductive type" T.pp t
+            Util.debug 2 "declare new inductive constant %a" T.pp t;
+            (* check that the type of [t] is inductive *)
+            let ty = T.ty t in
+            let name = _extract_hd ty in
+            let ity = ID.Tbl.find _tbl_ty name in
+            let subst = Unif.Ty.matching ~pattern:ity.pattern 1 ty 0 in
+            let cst_data = { cst=t; ty=ity; subst;
+                             dominates=ID.Tbl.create 16;
+                             coversets=IMap.empty } in
+            T.Tbl.add _tbl t cst_data;
+            let s = T.head_exn t in
+            ID.Tbl.replace _tbl_sym s cst_data;
+            Signal.send on_new_inductive t;
+            ()
+          with Unif.Fail | Not_found ->
+            _invalid_arg "term %a doesn't have an inductive type" T.pp t
       else _invalid_arg
-        "term %a is not ground, cannot be an inductive constant" T.pp t
+          "term %a is not ground, cannot be an inductive constant" T.pp t
 
     (* monad over "lazy" values *)
     module FunM = CCFun.Monad(struct type t = unit end)
@@ -482,41 +456,41 @@ module Make(X : PARAMETERS) = struct
       let rec make depth =
         (* leaves: fresh constants *)
         if depth=0 then [fun () ->
-          let ty = ity.pattern in
-          let name = Util.sprintf "#%a" Symbol.pp (_extract_hd ty) in
-          let c = Skolem.fresh_sym_with ~ctx:skolem ~ty name in
-          let t = T.const ~ty c in
-          Symbol.Tbl.replace cst_data.dominates c ();
-          _declare_symb c ty;
-          set_blocked t;
-          t, T.Set.singleton t
-        ]
+            let ty = ity.pattern in
+            let name = Util.sprintf "#%a" ID.pp (_extract_hd ty) in
+            let c = Skolem.fresh_sym_with ~ctx:skolem ~ty name in
+            let t = T.const ~ty c in
+            ID.Tbl.replace cst_data.dominates c ();
+            _declare_symb c ty;
+            set_blocked t;
+            t, T.Set.singleton t
+          ]
         (* inner nodes or base cases: constructors *)
         else CCList.flat_map
-          (fun (f, ty_f) ->
-            match Type.arity ty_f with
-            | Type.NoArity ->
-                _failwith "invalid constructor %a for inductive type %a"
-                  Symbol.pp f Type.pp ity.pattern
-            | Type.Arity (0, 0) ->
-                if depth > 0
-                then  (* only one answer : f *)
-                  [fun () -> T.const ~ty:ty_f f, T.Set.empty]
-                else []
-            | Type.Arity (0, n) ->
-                let ty_args = Type.expected_args ty_f in
-                CCList.(
-                  make_list (depth-1) ty_args >>= fun mk_args ->
-                  return (fun () ->
-                    let args, set = mk_args () in
-                    T.app (T.const f ~ty:ty_f) args, set)
-                )
-            | Type.Arity (m,_) ->
-                _failwith
-                  ("inductive constructor %a requires %d type " ^^
-                  "parameters, expected 0")
-                  Symbol.pp f m
-          ) ity.constructors
+            (fun (f, ty_f) ->
+               match Type.arity ty_f with
+               | Type.NoArity ->
+                   _failwith "invalid constructor %a for inductive type %a"
+                     ID.pp f Type.pp ity.pattern
+               | Type.Arity (0, 0) ->
+                   if depth > 0
+                   then  (* only one answer : f *)
+                     [fun () -> T.const ~ty:ty_f f, T.Set.empty]
+                   else []
+               | Type.Arity (0, n) ->
+                   let ty_args = Type.expected_args ty_f in
+                   CCList.(
+                     make_list (depth-1) ty_args >>= fun mk_args ->
+                     return (fun () ->
+                         let args, set = mk_args () in
+                         T.app (T.const f ~ty:ty_f) args, set)
+                   )
+               | Type.Arity (m,_) ->
+                   _failwith
+                     ("inductive constructor %a requires %d type " ^^
+                      "parameters, expected 0")
+                     ID.pp f m
+            ) ity.constructors
       (* given a list of types [l], yield all lists of cover terms
           that have types [l] *)
       and make_list depth l
@@ -527,14 +501,14 @@ module Make(X : PARAMETERS) = struct
             let t_builders = if Unif.Ty.matches ~pattern:ity.pattern ty
               then make depth
               else [fun () ->
-                (* not an inductive sub-case, just create a skolem symbol *)
-                let name = Util.sprintf "#%a" Symbol.pp (_extract_hd ty) in
-                let c = Skolem.fresh_sym_with ~ctx:skolem ~ty name in
-                let t = T.const ~ty c in
-                Symbol.Tbl.replace cst_data.dominates c ();
-                _declare_symb c ty;
-                t, T.Set.empty
-            ] in
+                  (* not an inductive sub-case, just create a skolem symbol *)
+                  let name = Util.sprintf "#%a" ID.pp (_extract_hd ty) in
+                  let c = Skolem.fresh_sym_with ~ctx:skolem ~ty name in
+                  let t = T.const ~ty c in
+                  ID.Tbl.replace cst_data.dominates c ();
+                  _declare_symb c ty;
+                  t, T.Set.empty
+                ] in
             let tail_builders = make_list depth tail in
             CCList.(
               t_builders >>= fun mk_t ->
@@ -546,33 +520,33 @@ module Make(X : PARAMETERS) = struct
       in
       assert (depth>0);
       (* make the cover set's cases, tagged with `Base or `Rec depending
-        on whether they contain sub-cases *)
+         on whether they contain sub-cases *)
       let cases_and_subs = List.map
-        (fun gen ->
-          let t, set = gen() in
-          (* remember whether [t] is base or recursive case *)
-          if T.Set.is_empty set then (t, `Base), set else (t, `Rec), set
-        ) (make depth)
+          (fun gen ->
+             let t, set = gen() in
+             (* remember whether [t] is base or recursive case *)
+             if T.Set.is_empty set then (t, `Base), set else (t, `Rec), set
+          ) (make depth)
       in
       let cases, sub_constants = List.split cases_and_subs in
       let cases, rec_cases, base_cases = List.fold_left
-        (fun (c,r,b) (t,is_base) -> match is_base with
-          | `Base -> t::c, r, t::b
-          | `Rec -> t::c, t::r, b
-        ) ([],[],[]) cases
+          (fun (c,r,b) (t,is_base) -> match is_base with
+             | `Base -> t::c, r, t::b
+             | `Rec -> t::c, t::r, b
+          ) ([],[],[]) cases
       in
       let sub_constants =
         List.fold_left T.Set.union T.Set.empty sub_constants in
       let coverset = {cases; rec_cases; base_cases; sub_constants; } in
       (* declare sub-constants as such. They won't be candidate for induction
-        and will be smaller than [t] *)
+         and will be smaller than [t] *)
       List.iter
         (fun ((t, _), set) ->
-          T.Tbl.add _tbl_case t (cst, coverset);
-          T.Set.iter
-            (fun sub_cst ->
-              T.Tbl.replace _tbl_sub_cst sub_cst (cst, coverset, t)
-            ) set
+           T.Tbl.add _tbl_case t (cst, coverset);
+           T.Set.iter
+             (fun sub_cst ->
+                T.Tbl.replace _tbl_sub_cst sub_cst (cst, coverset, t)
+             ) set
         ) cases_and_subs;
       coverset
 
@@ -586,18 +560,18 @@ module Make(X : PARAMETERS) = struct
       try
         let cst = T.Tbl.find _tbl t in
         begin try
-          (* is there already a cover set at this depth? *)
-          IMap.find depth cst.coversets, `Old
-        with Not_found ->
-          (* create a new cover set *)
-          let ity = _get_ity (T.ty t) in
-          let coverset = _make_coverset ~depth ity t in
-          (* save coverset *)
-          cst.coversets <- IMap.add depth coverset cst.coversets;
-          Util.debug 2 "new coverset for %a: %a"
-            T.pp t (CCList.pp T.pp) coverset.cases;
-          Signal.send on_new_cover_set (t, coverset);
-          coverset, `New
+            (* is there already a cover set at this depth? *)
+            IMap.find depth cst.coversets, `Old
+          with Not_found ->
+            (* create a new cover set *)
+            let ity = _get_ity (T.ty t) in
+            let coverset = _make_coverset ~depth ity t in
+            (* save coverset *)
+            cst.coversets <- IMap.add depth coverset cst.coversets;
+            Util.debug 2 "new coverset for %a: %a"
+              T.pp t (CCList.pp T.pp) coverset.cases;
+            Signal.send on_new_cover_set (t, coverset);
+            coverset, `New
         end
       with Not_found ->
         _failwith "term %a is not an inductive constant, no coverset" T.pp t
@@ -607,7 +581,7 @@ module Make(X : PARAMETERS) = struct
     let as_inductive cst =
       if is_inductive cst then Some cst else None
 
-    let is_inductive_symbol s = Symbol.Tbl.mem _tbl_sym s
+    let is_inductive_symbol s = ID.Tbl.mem _tbl_sym s
 
     let cover_sets t =
       try
@@ -621,8 +595,8 @@ module Make(X : PARAMETERS) = struct
 
     let as_sub_constant_of t cst =
       if is_sub_constant_of t cst
-        then Some t
-        else None
+      then Some t
+      else None
 
     let is_case t = T.Tbl.mem _tbl_case t
 
@@ -644,8 +618,8 @@ module Make(X : PARAMETERS) = struct
     (* true iff s2 is one of the sub-cases of s1 *)
     let dominates s1 s2 =
       assert (is_inductive_symbol s1);
-      let cst_data = Symbol.Tbl.find _tbl_sym s1 in
-      Symbol.Tbl.mem cst_data.dominates s2
+      let cst_data = ID.Tbl.find _tbl_sym s1 in
+      ID.Tbl.mem cst_data.dominates s2
 
     let _seq_inductive_cst yield =
       T.Tbl.iter (fun t _ -> yield t) _tbl

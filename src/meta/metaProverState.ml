@@ -1,29 +1,5 @@
 
-(*
-Zipperposition: a functional superposition prover for prototyping
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Meta Prover for zipperposition} *)
 
@@ -35,7 +11,6 @@ let prof_scan_clause = Util.mk_profiler "meta.scan_clause"
 let prof_scan_formula = Util.mk_profiler "meta.scan_formula"
 
 module T = HOTerm
-module F = Formula.FO
 module PF = PFormula
 module M = Logtk_meta
 module Lit = Literal
@@ -92,15 +67,15 @@ module Result = struct
     |> add_pre_rewrite r.pre_rewrite
 
   let pp_theory_axiom out (name, _, t) =
-    Format.fprintf out "%s %a" name T.fmt t
+    Format.fprintf out "%s %a" name T.pp t
 
   let pp_rewrite_system out l =
     Format.fprintf out "@[<hov2>rewrite system@ %a@]"
       (CCList.print
-         (fun out (a,b) -> Format.fprintf out "%a --> %a" FOTerm.fmt a FOTerm.fmt b))
+         (fun out (a,b) -> Format.fprintf out "%a --> %a" FOTerm.pp a FOTerm.pp b))
       l
 
-  let pp_pre_rewrite_system out l = HORewriting.fmt out l
+  let pp_pre_rewrite_system out l = HORewriting.pp out l
 
   let print out r =
     Format.fprintf out "@[<hv2>results{@ ";
@@ -112,7 +87,7 @@ module Result = struct
       (CCList.print pp_theory_axiom) r.theories;
     if r.lemmas <> []
     then Format.fprintf out "@[<hv2>lemmas:@ %a@]@,"
-      (CCList.print (fun fmt (c,_) -> CompactClause.fmt fmt c)) r.lemmas;
+      (Util.pp_list (fun out (c,_) -> CompactClause.pp out c)) r.lemmas;
     if r.rewrite <> []
     then Format.fprintf out "@[<hv2>rewrite systems:@ %a@]@,"
       (CCList.print pp_rewrite_system) r.rewrite;
@@ -128,34 +103,33 @@ end
 module Induction = struct
   type ty = {
     ty : Type.t;
-    cstors : (Symbol.t * Type.t) list;
+    cstors : (ID.t * Type.t) list;
   }
 
   let make ty cstors = {ty; cstors; }
 
   let print out ity =
     let pp_cstor out (s, ty) =
-      Format.fprintf out "@[%a:@,%a@]" Symbol.fmt s Type.fmt ty
+      Format.fprintf out "@[%a:@,%a@]" ID.pp s Type.pp ty
     in
     Format.fprintf out "@[<hov2>ity{ty:@,%a,@ cstors:@,%a}@]"
-      Type.fmt ity.ty (CCList.print pp_cstor) ity.cstors
+      Type.pp ity.ty (CCList.print pp_cstor) ity.cstors
 
-  let const_cstor = Type.const (Symbol.of_string "inductive_constructor")
+  let const_cstor = Type.const (ID.make"inductive_constructor")
 
   (* assert [τ] is inductive using
      [inductive {ty=@τ, cstors=[cstor @ty1 c1, cstor @ty2 c2]}] *)
-  let sym_inductive = Symbol.of_string "inductive"
-  let ty_sym_inductive = Type.(forall [var 0] (
-      M.Reasoner.property_ty <=.
-      record ~rest:None [
-        "ty", var 0;
+  let sym_inductive = ID.make "inductive"
+  let ty_sym_inductive = Type.(forall (
+      [record ~rest:None [
+        "ty", bvar 0;
         "cstors", multiset const_cstor
-      ]
+      ]] ==> M.Reasoner.property_ty
   ))
 
   (* build a constructor with a term [cstor(sym)] *)
-  let sym_cstor = Symbol.of_string "cstor"
-  let ty_sym_cstor = Type.(forall [var 0] (const_cstor <== [var 0]))
+  let sym_cstor = ID.make "cstor"
+  let ty_sym_cstor = Type.(forall ([bvar 0] ==> const_cstor))
 
   let signature =
     Signature.of_list
@@ -169,23 +143,23 @@ module Induction = struct
   let t : ty M.Plugin.t = object
     method signature = signature
     method owns t = match T.view t with
-      | T.At (hd, _) -> T.eq hd pred_inductive
+      | T.App (hd, _) -> T.equal hd pred_inductive
       | _ -> false
     method clauses = []
     method to_fact ity =
       (* encode constructors *)
       let arg = T.record ~rest:None
-        [ "ty", T.tylift ity.ty
+        [ "ty", T.of_ty ity.ty
         ; "cstors", T.multiset ~ty:const_cstor
             (List.map
               (fun (s, ty_s) ->
                 (* term "cstor(ty_s, s)", roughly *)
-                T.at_full pred_cstor ~tyargs:[ty_s] [T.const ~ty:ty_s s]
+                T.app pred_cstor [T.of_ty ty_s; T.const ~ty:ty_s s]
               ) ity.cstors
             )
         ]
       in
-      T.at_full pred_inductive ~tyargs:[ity.ty] [arg]
+      T.app pred_inductive [T.of_ty ity.ty; arg]
     method of_fact t =
       None (* TODO: real implementation *)
   end
@@ -197,7 +171,7 @@ end
 
 module Arith = struct
   let t : unit M.Plugin.t = object
-    method signature = Signature.TPTP.Arith.base
+    method signature = Signature.empty
     method owns _ = false
     method clauses = []
     method to_fact () = T.TPTP.true_
@@ -275,7 +249,7 @@ let clause_of_foclause_ l =
 
 (* print content of the reasoner *)
 let print_rules out r =
-  Sequence.pp_seq M.Reasoner.Clause.fmt out (M.Reasoner.Seq.to_seq r)
+  Sequence.pp_seq M.Reasoner.Clause.pp out (M.Reasoner.Seq.to_seq r)
 
 (** {2 Interface to {!Env} *)
 
@@ -453,7 +427,7 @@ module Make(E : Env.S) : S with module E = E = struct
   let infer_scan p c =
     let r = scan_clause p c in
     if not (Result.is_empty r) then (
-      Util.debugf ~section 3 "@[scan@ %a@ →@ %a@]" C.fmt c Result.print r;
+      Util.debugf ~section 3 "@[scan@ %a@ →@ %a@]" C.pp c Result.print r;
     );
     []
 
@@ -491,7 +465,7 @@ module Make(E : Env.S) : S with module E = E = struct
       (fun () ->
          if !flag_print_signature then
            Util.debugf ~section 1 "@[<hv2>signature:@,%a@]"
-             Signature.fmt (M.Prover.signature (prover p))
+             Signature.pp (M.Prover.signature (prover p))
       );
     Signal.once Signals.on_exit
       (fun _ ->

@@ -1,28 +1,5 @@
-(*
-Zipperposition: a functional superposition prover for prototyping
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 open Logtk
 
@@ -67,30 +44,30 @@ module type S = sig
   val add_signature : Signature.t -> unit
   (** Merge  the given signature with the context's one *)
 
-  val find_signature : Symbol.t -> Type.t option
+  val find_signature : ID.t -> Type.t option
   (** Find the type of the given symbol *)
 
-  val find_signature_exn : Symbol.t -> Type.t
+  val find_signature_exn : ID.t -> Type.t
   (** Unsafe version of {!find_signature}.
       @raise Not_found for unknown symbols *)
 
-  val update_prec : Symbol.t Sequence.t -> unit
+  val update_prec : ID.t Sequence.t -> unit
   (** Update the precedence of the ordering {!ord} *)
 
-  val declare : Symbol.t -> Type.t -> unit
+  val declare : ID.t -> Type.t -> unit
   (** Declare the type of a symbol (updates signature) *)
 
-  val on_new_symbol : (Symbol.t * Type.t) Signal.t
+  val on_new_symbol : (ID.t * Type.t) Signal.t
   val on_signature_update : Signature.t Signal.t
 
-  val ad_hoc_symbols : unit -> Symbol.Set.t
+  val ad_hoc_symbols : unit -> ID.Set.t
   (** Current set of ad-hoc symbols *)
 
-  val add_ad_hoc_symbols : Symbol.t Sequence.t -> unit
+  val add_ad_hoc_symbols : ID.t Sequence.t -> unit
   (** Declare that some symbols are "ad hoc", ie they are not really
       polymorphic and should not be considered as such *)
 
-  val add_constr : int -> Precedence.Constr.t -> unit
+  val add_constr : int -> [`partial] Precedence.Constr.t -> unit
   (** XXX caution, dangerous: add a new constraint to the precedence.
       If you don't know what you are doing, it might change the precedence
       into an incompatible one. *)
@@ -104,10 +81,10 @@ module type S = sig
     val to_hooks : unit -> Literal.Conv.hook_to list
     val add_to_hook : Literal.Conv.hook_to -> unit
 
-    val of_form : Formula.FO.t -> Literal.t
-      (** @raise Invalid_argument if the formula is not atomic *)
+    val of_form : FOTerm.t SLiteral.t -> Literal.t
+    (** @raise Invalid_argument if the formula is not atomic *)
 
-    val to_form : Literal.t -> Formula.FO.t
+    val to_form : Literal.t -> FOTerm.t SLiteral.t
   end
 
   (** {2 Theories} *)
@@ -116,75 +93,38 @@ module type S = sig
     module AC : sig
       val on_add : Theories.AC.t Signal.t
 
-      val add : ?proof:Proof.t list -> ty:Type.t -> Symbol.t -> unit
+      val add : ?proof:Proof.t list -> ty:Type.t -> ID.t -> unit
 
-      val is_ac : Symbol.t -> bool
+      val is_ac : ID.t -> bool
 
-      val find_proof : Symbol.t -> Proof.t list
-        (** Recover the proof for the AC-property of this symbol.
-            @raise Not_found if the symbol is not AC *)
+      val find_proof : ID.t -> Proof.t list
+      (** Recover the proof for the AC-property of this symbol.
+          @raise Not_found if the symbol is not AC *)
 
-      val symbols : unit -> Symbol.Set.t
-        (** set of AC symbols *)
+      val symbols : unit -> ID.Set.t
+      (** set of AC symbols *)
 
-      val symbols_of_terms : FOTerm.t Sequence.t -> Symbol.Set.t
-        (** set of AC symbols occurring in the given term *)
-
-      val symbols_of_forms : Formula.FO.t Sequence.t -> Symbol.Set.t
-        (** Set of AC symbols occurring in the given formula *)
+      val symbols_of_terms : FOTerm.t Sequence.t -> ID.Set.t
+      (** set of AC symbols occurring in the given term *)
 
       val proofs : unit -> Proof.t list
-        (** All proofs for all AC axioms *)
+      (** All proofs for all AC axioms *)
 
       val exists_ac : unit -> bool
-        (** Is there any AC symbol? *)
-    end
-
-    module TotalOrder : sig
-      val on_add : Theories.TotalOrder.t Signal.t
-
-      val is_less : Symbol.t -> bool
-
-      val is_lesseq : Symbol.t -> bool
-
-      val find : Symbol.t -> Theories.TotalOrder.t
-        (** Find the instance that corresponds to this symbol.
-            @raise Not_found if the symbol is not part of any instance. *)
-
-      val find_proof : Theories.TotalOrder.t -> Proof.t list
-        (** Recover the proof for the given total ordering
-            @raise Not_found if the instance cannot be found*)
-
-      val is_order_symbol : Symbol.t -> bool
-        (** Is less or lesseq of some instance? *)
-
-      val axioms : less:Symbol.t -> lesseq:Symbol.t -> PFormula.t list
-        (** Axioms that correspond to the given symbols being a total ordering.
-            The proof of the axioms will be "axiom" *)
-
-      val exists_order : unit -> bool
-        (** Are there some known ordering instances? *)
-
-      val add : ?proof:Proof.t list ->
-                less:Symbol.t -> lesseq:Symbol.t -> ty:Type.t ->
-                Theories.TotalOrder.t * [`New | `Old]
-        (** Pair of symbols that constitute an ordering.
-            @return the corresponding instance and a flag to indicate
-              whether the instance was already present. *)
-
-      val add_tstp : unit -> Theories.TotalOrder.t * [`New | `Old]
-        (** Specific version of {!add_order} for $less and $lesseq *)
+      (** Is there any AC symbol? *)
     end
   end
 
   (** {2 Induction} *)
+
+  (* TODO: move most information into [ID.payload] *)
 
   module Induction : sig
     (** {6 Inductive Types} *)
 
     type bool_lit = BBox_intf.bool_lit
 
-    type constructor = Symbol.t * Type.t
+    type constructor = ID.t * Type.t
     (** Constructor for an inductive type *)
 
     type inductive_type = private {
@@ -208,7 +148,7 @@ module type S = sig
     (** [is_inductive_type ty] holds iff [ty] is an instance of some
         registered type (registered with {!declare_ty}). *)
 
-    val is_constructor_sym : Symbol.t -> bool
+    val is_constructor_sym : ID.t -> bool
     (** true if the symbol is an inductive constructor (zero, successor...) *)
 
     val contains_inductive_types : FOTerm.t -> bool
@@ -260,7 +200,7 @@ module type S = sig
     (** Check whether the given constant is ready for induction, and
         downcast it if it's the case *)
 
-    val is_inductive_symbol : Symbol.t -> bool
+    val is_inductive_symbol : ID.t -> bool
     (** Head symbol of some inductive (ground) term?*)
 
     module SubCstSet : Set.S with type elt = sub_cst
@@ -283,7 +223,7 @@ module type S = sig
     val is_case : FOTerm.t -> bool
     val as_case : FOTerm.t -> case option
 
-    val dominates : Symbol.t -> Symbol.t -> bool
+    val dominates : ID.t -> ID.t -> bool
     (** [dominates s1 s2] true iff s2 is one of the sub-cases of s1 *)
 
     val inductive_cst_of_sub_cst : sub_cst -> cst * case
@@ -322,7 +262,7 @@ module type S = sig
       val ty : inductive_type Sequence.t
       val cst : cst Sequence.t
 
-      val constructors : Symbol.t Sequence.t
+      val constructors : ID.t Sequence.t
       (** All known constructors *)
     end
   end
@@ -331,8 +271,8 @@ module type S = sig
 
   module BoolLit
     : BBox.S
-    with module I = Induction.Cst
-    and module Sub = Induction.Sub
-    and module Case = Induction.Case
+      with module I = Induction.Cst
+       and module Sub = Induction.Sub
+       and module Case = Induction.Case
 end
 

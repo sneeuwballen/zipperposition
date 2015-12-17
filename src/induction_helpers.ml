@@ -1,42 +1,16 @@
 
-(*
-Zipperposition: a functional superposition prover for prototyping
-Copyright (c) 2013-2015, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Common stuff for Induction} *)
 
-module T = Logtk.FOTerm
-module F = Logtk.Formula.FO
-module Ty = Logtk.Type
-module Sym = Logtk.Symbol
-module Util = Logtk.Util
+open Logtk
+
+module T = FOTerm
+module Ty = Type
 module Lits = Literals
 
-type term = Logtk.FOTerm.t
-type sym = Logtk.Symbol.t
-type formula = F.t
+type term = FOTerm.t
+type formula = TypedSTerm.t
 
 let section = Util.Section.make ~parent:Const.section "ind"
 
@@ -48,38 +22,30 @@ let ind_types () = !ind_types_
 let cover_set_depth () = !cover_set_depth_
 
 (* is [s] a constructor symbol for some inductive type? *)
-let is_constructor s = match s with
-  | Sym.Cst info ->
-      let name = info.Sym.cs_name in
-      List.exists (fun (_, cstors) -> List.mem name cstors) !ind_types_
-  | _ -> false
+let is_constructor s = 
+  List.exists
+    (fun (_, cstors) -> CCList.Set.mem ~eq:ID.equal s cstors)
+    !ind_types_
 
 let on_enable = Signal.create()
 
 type kind = [`Full | `Simple]
-
-let show_kind : kind -> string
-  = function
-  | `Full -> "qbf"
-  | `Simple -> "sat"
-
-let kind_ : kind ref = ref `Simple
 
 let enabled_ = ref false
 let enable_ () =
   if not !enabled_ then (
     enabled_ := true;
     Util.debugf ~section 1
-      "Induction(%s): requires ord=rpo6; select=NoSelection" (show_kind !kind_);
+      "@[Induction: requires ord=rpo6; select=NoSelection@]" (fun k->k);
     Params.ord := "rpo6";   (* new default! RPO is necessary*)
     Params.select := "NoSelection";
-    Signal.send on_enable !kind_;
+    Signal.send on_enable ();
   )
 
 let declare_ ty cstors =
   (* remember to declare this type as inductive *)
-  Util.debug ~section 1 "user declares inductive type %s = %a"
-    ty (CCList.pp CCString.pp) cstors;
+  Util.debugf ~section 1 "@[user declares inductive type %s = %a@]"
+    (fun k->k ty (Util.pp_list ID.pp) cstors);
   ind_types_ := (ty, cstors) :: !ind_types_;
   enable_();
   ()
@@ -88,7 +54,7 @@ let constr_cstors =
   let module C = Logtk.Comparison in
   fun s1 s2 -> match is_constructor s1, is_constructor s2 with
     | true, true
-    | false, false -> if Sym.eq s1 s2 then C.Eq else C.Incomparable
+    | false, false -> if ID.equal s1 s2 then C.Eq else C.Incomparable
     | true, false -> C.Lt
     | false, true -> C.Gt
 
@@ -98,14 +64,13 @@ module Make(Ctx : Ctx.S) = struct
     List.iter
       (fun (ty,cstors) ->
         (* TODO: support polymorphic types? *)
-        let pattern = Ty.const (Sym.of_string ty) in
+        let pattern = Ty.const ty in
         let constructors = List.map
-          (fun str ->
-            let s = Sym.of_string str in
+          (fun s ->
             match Ctx.find_signature s with
               | None ->
-                  let msg = Util.sprintf
-                    "cannot find the type of inductive constructor %s" str
+                  let msg = CCFormat.sprintf
+                    "cannot find the type of inductive constructor %a" ID.pp s
                   in failwith msg
               | Some ty ->
                   s, ty
@@ -113,7 +78,7 @@ module Make(Ctx : Ctx.S) = struct
         in
         (* declare type. *)
         ignore (Ctx.Induction.declare_ty pattern constructors);
-        Util.debug ~section 1 "declare inductive type %a" Ty.pp pattern;
+        Util.debugf ~section 1 "declare inductive type %a" (fun k->k Ty.pp pattern);
         ()
       ) !ind_types_
 
@@ -121,7 +86,7 @@ module Make(Ctx : Ctx.S) = struct
       such as "cons" or "node" *)
   let is_a_constructor t = match T.Classic.view t with
     | T.Classic.App (s, _, _) ->
-        Sequence.exists (Sym.eq s) Ctx.Induction.Seq.constructors
+        Sequence.mem ~eq:ID.equal s Ctx.Induction.Seq.constructors
     | _ -> false
 
   (* find inductive constants in clauses of [seq] *)

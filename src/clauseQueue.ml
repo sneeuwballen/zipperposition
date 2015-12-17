@@ -1,29 +1,5 @@
 
-(*
-Zipperposition: a functional superposition prover for prototyping
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Priority Queue of clauses} *)
 
@@ -46,10 +22,10 @@ let set_profile s = _profile := s
 
 let () =
   Params.add_opts
-    [ "-clause-queue"
-    , Arg.String set_profile
-    , " choose which set of clause queues to use \
-      (for selecting next active clause): choices: default,bfs,explore,ground"
+    [ "--clause-queue"
+      , Arg.String set_profile
+      , " choose which set of clause queues to use \
+         (for selecting next active clause): choices: default,bfs,explore,ground"
     ]
 
 module Make(C : Clause.S) = struct
@@ -79,15 +55,14 @@ module Make(C : Clause.S) = struct
       let trail = C.get_trail c in
       let w_lits = weight_lits_ (C.lits c) in
       let w_trail = C.Trail.fold
-        (fun acc t -> match C.Ctx.BoolLit.extract_exn (C.Ctx.BoolLit.abs t) with
-          | C.Ctx.BoolLit.Clause_component lits -> acc + weight_lits_ lits
-          | C.Ctx.BoolLit.Form f -> acc + Formula.FO.weight f
-          | C.Ctx.BoolLit.Ctx (c,_,_) -> acc + weight_lits_ (ClauseContext.raw_lits c)
-          | C.Ctx.BoolLit.Case (_,_) ->
-              acc + 10 (* generic penalty for each inductive hypothesis *)
-          | C.Ctx.BoolLit.Name _
-          | C.Ctx.BoolLit.Input  -> acc (* mere markers *)
-        ) 0 trail 
+          (fun acc t -> match C.Ctx.BoolLit.extract_exn (C.Ctx.BoolLit.abs t) with
+             | C.Ctx.BoolLit.Clause_component lits -> acc + weight_lits_ lits
+             | C.Ctx.BoolLit.Ctx (c,_,_) -> acc + weight_lits_ (ClauseContext.raw_lits c)
+             | C.Ctx.BoolLit.Case (_,_) ->
+                 acc + 10 (* generic penalty for each inductive hypothesis *)
+             | C.Ctx.BoolLit.Name _
+             | C.Ctx.BoolLit.Input  -> acc (* mere markers *)
+          ) 0 trail
       in
       w_lits * Array.length (C.lits c) + w_trail * (C.Trail.length trail) + _depth_ty
 
@@ -116,9 +91,9 @@ module Make(C : Clause.S) = struct
   end
 
   module H = CCHeap.Make(struct
-    type t = (int * C.t)
-    let leq (i1, c1) (i2, c2) = i1 <= i2 || (i1 = i2 && C.id c1 <= C.id c2)
-  end)
+      type t = (int * C.t)
+      let leq (i1, c1) (i2, c2) = i1 <= i2 || (i1 = i2 && C.id c1 <= C.id c2)
+    end)
 
   type t = {
     heap : H.t;
@@ -145,21 +120,21 @@ module Make(C : Clause.S) = struct
 
   let add q c =
     if q.functions.accept c
-      then
-        let w = q.functions.weight c in
-        let heap = H.insert (w, c) q.heap in
-        { q with heap; }
-      else q
+    then
+      let w = q.functions.weight c in
+      let heap = H.insert (w, c) q.heap in
+      { q with heap; }
+    else q
 
   let adds q hcs =
     let heap =
       Sequence.fold
         (fun heap c ->
-          if q.functions.accept c
-            then
-              let w = q.functions.weight c in
-              H.insert (w,c) heap
-            else heap)
+           if q.functions.accept c
+           then
+             let w = q.functions.weight c in
+             H.insert (w,c) heap
+           else heap)
         q.heap hcs in
     { q with heap; }
 
@@ -199,15 +174,15 @@ module Make(C : Clause.S) = struct
     (* check whether a literal is a goal *)
     let is_goal_lit lit = Lit.is_neg lit in
     let is_non_goal_clause c = CCArray.for_all
-      (fun x -> not (is_goal_lit x))
-      (C.lits c) in
+        (fun x -> not (is_goal_lit x))
+        (C.lits c) in
     let name = "prefer_non_goals" in
     mk_queue ~accept:is_non_goal_clause ~weight:WeightFun.default name
 
   let pos_unit_clauses =
     let is_unit_pos c = match C.lits c with
-    | [| lit |] when Lit.is_pos lit -> true
-    | _ -> false
+      | [| lit |] when Lit.is_pos lit -> true
+      | _ -> false
     in
     let name = "prefer_pos_unit_clauses" in
     mk_queue ~accept:is_unit_pos ~weight:WeightFun.default name
@@ -271,26 +246,11 @@ module Make(C : Clause.S) = struct
     | "why3" -> Profiles.why3
     | n -> failwith ("no such profile: " ^ n)
 
-  let pp buf q =
-    Printf.bprintf buf "queue %s" (name q)
+  let pp out q = CCFormat.fprintf out "queue %s" (name q)
+  let to_string = CCFormat.to_string pp
 
-  let to_string q =
-    let buf = Buffer.create 15 in
-    pp buf q;
-    Buffer.contents buf
-
-  let pp_list buf qs =
-    let pp_pair buf (c, i) = Printf.bprintf buf "%a (w=%d)" pp c i in
-    Buffer.add_char buf '[';
-    Util.pp_list pp_pair buf qs;
-    Buffer.add_char buf ']';
-    ()
-
-  let fmt fmt q =
-    Format.pp_print_string fmt (to_string q)
-
-  let fmt_list out qs =
-    let fmt_pair out (c, i) = Format.fprintf out "%a (w=%d)" fmt c i in
-    CCList.print ~start:"[" ~stop:"]" fmt_pair out qs;
+  let pp_list out qs =
+    let pp_pair out (c, i) = Format.fprintf out "@[%a (w=%d)@]" pp c i in
+    CCFormat.list ~start:"[" ~stop:"]" pp_pair out qs;
     ()
 end

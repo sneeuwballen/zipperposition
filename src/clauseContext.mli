@@ -1,44 +1,19 @@
 
-(*
-Zipperposition: a functional superposition prover for prototyping
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Clause context}
 
-A clause with a "hole" in it. Filling the whole with a term [t] is called
-"applying the context to [t]".
+    A clause with a "hole" in it. Filling the whole with a term [t] is called
+    "applying the context to [t]".
 
-The point is to relate different applications of the same context. *)
+    The point is to relate different applications of the same context. *)
 
 type term = Logtk.FOTerm.t
-type scope = Logtk.Substs.scope
 type subst = Logtk.Substs.t
 
 (** A context is represented as a regular array of literals, containing
-at least one specific variable [x], paired with this variable [x].
-Applying the context is a mere substitution *)
+    at least one specific variable [x], paired with this variable [x].
+    Applying the context is a mere substitution *)
 type t = private {
   lits : Literals.t;
   var : term;
@@ -80,8 +55,7 @@ val matching : t -> Literals.t -> term option
     and [apply ctx t = c] *)
 FIXME: is this even doable?*)
 
-val pp : Buffer.t -> t -> unit
-val print : Format.formatter -> t -> unit
+val pp : t CCFormat.printer
 
 (** {2 Sets of contexts} *)
 

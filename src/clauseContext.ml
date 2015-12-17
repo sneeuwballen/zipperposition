@@ -1,48 +1,23 @@
 
-(*
-Zipperposition: a functional superposition prover for prototyping
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Clause context}
 
-A clause with a "hole" in it. Filling the whole with a term [t] is called
-"applying the context to [t]".
+    A clause with a "hole" in it. Filling the whole with a term [t] is called
+    "applying the context to [t]".
 
-The point is to relate different applications of the same context. *)
+    The point is to relate different applications of the same context. *)
 
 module T = Logtk.FOTerm
 module Subst = Logtk.Substs
 module Lits = Literals
 
 type term = T.t
-type scope = Logtk.Substs.scope
 type subst = Logtk.Substs.t
 
 (** A context is represented as a regular array of literals, containing
-at least one specific variable [x], paired with this variable [x].
-Applying the context is a mere substitution *)
+    at least one specific variable [x], paired with this variable [x].
+    Applying the context is a mere substitution *)
 type t = {
   lits : Literals.t;
   var : T.t;
@@ -55,15 +30,15 @@ let equal c1 c2 =
 let raw_lits t = t.lits
 
 (* TODO: compare types of extruded variables;
- if same type, instantiate with some specific "diamond" of that type
- and check for alpha-equiv *)
+   if same type, instantiate with some specific "diamond" of that type
+   and check for alpha-equiv *)
 let compare c1 c2 =
   CCOrd.(T.cmp c1.var c2.var <?> (Lits.compare, c1.lits, c2.lits))
 
 let make lits ~var =
   assert (Lits.Seq.terms lits
-    |> Sequence.exists (T.var_occurs ~var)
-  );
+          |> Sequence.exists (T.var_occurs ~var)
+         );
   {lits;var}
 
 let extract lits t =
@@ -71,14 +46,14 @@ let extract lits t =
   then
     (* create fresh var to replace [t] *)
     let i = Lits.Seq.terms lits
-      |> Sequence.flat_map T.Seq.vars
-      |> T.Seq.max_var
+            |> Sequence.flat_map T.Seq.vars
+            |> T.Seq.max_var
     in
     let var = T.var ~ty:(T.ty t) (i+1) in
     (* replace [t] with [var] *)
     let lits = Array.map
-      (Literal.map (fun root_t -> T.replace root_t ~old:t ~by:var))
-      lits
+        (Literal.map (fun root_t -> T.replace root_t ~old:t ~by:var))
+        lits
     in
     Some {lits;var}
   else None
@@ -112,6 +87,6 @@ let print fmt c =
   Lits.fmt fmt lits
 
 module Set = Sequence.Set.Make(struct
-  type t = ctx
-  let compare = compare
-end)
+    type t = ctx
+    let compare = compare
+  end)
