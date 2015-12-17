@@ -3,8 +3,12 @@ author: "Simon Cruanes"
 maintainer: "simon.cruanes@inria.fr"
 build: [
     ["ocaml" "setup.ml" "-configure" "--%{menhir:enable}%-meta"
-        "--%{qcheck:enable}%-qcheck" "--disable-docs"
-        "--%{menhir:enable}%-parsers" "--%{msat:enable}%-solving"
+        "--disable-docs"
+        "--%{menhir:enable}%-parsers"
+        "--disable-solving"
+        "--disable-qcheck"
+        # "--%{qcheck:enable}%-qcheck"
+        # "--%{msat:enable}%-solving"
         "--disable-tests" "--disable-tools" "--enable-meta"]
     [make "all"]
 ]
