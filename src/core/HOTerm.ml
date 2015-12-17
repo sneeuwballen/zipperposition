@@ -80,6 +80,8 @@ let view t = match T.view t with
 
 let of_term_unsafe t = t
 
+let of_ty t = (t : Type.t :> t)
+
 (** {2 Comparison, equality, containers} *)
 
 let subterm ~sub t =

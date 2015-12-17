@@ -55,6 +55,9 @@ val of_term_unsafe : InnerTerm.t -> t
 (** {b NOTE}: caution, this can break invariants! Use only if you know what
     you are doing. *)
 
+val of_ty : Type.t -> t
+(** Upcast from type *)
+
 (** {2 Comparison, equality, containers} *)
 
 val subterm : sub:t -> t -> bool

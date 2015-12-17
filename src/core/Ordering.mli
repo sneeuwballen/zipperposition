@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {2 Type definitions} *)
 
-type term
+type term = FOTerm.t
 
 type t
 (** Partial ordering on terms *)
