@@ -1,28 +1,5 @@
 
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Meta-Level reasoner} *)
 
@@ -33,16 +10,17 @@ module HOT = HOTerm
 let section = Util.Section.make ~parent:Util.Section.logtk "meta"
 
 (** {2 Meta-level property}
-A meta-level statement is just a higher-order term. *)
+    A meta-level statement is just a higher-order term. *)
 
 type term = HOTerm.t
 type property = term
 type fact = term
 
-let property_ty = Type.const (Symbol.of_string "property")
+let property_id = ID.make "property"
+let property_ty = Type.const property_id
 
 (** {2 Meta-Level clause}
-A Horn clause about meta-level properties *)
+    A Horn clause about meta-level properties *)
 
 module Clause = struct
   type t = {
@@ -52,14 +30,14 @@ module Clause = struct
   type clause = t
 
   let safe head body =
-    let vars_body = Sequence.flatMap HOT.Seq.vars (Sequence.of_list body) in
+    let vars_body = Sequence.flat_map HOT.Seq.vars (Sequence.of_list body) in
     HOT.Seq.vars head
-      |> Sequence.for_all (fun v -> Sequence.exists (HOT.equal v) vars_body)
+    |> Sequence.for_all (fun v -> Sequence.exists (HVar.equal v) vars_body)
 
   let rule head body =
     if not (safe head body) then
       let msg = CCFormat.sprintf "unsafe Horn clause:@ @[%a <- %a@]"
-        HOT.pp head (Util.pp_list HOT.pp) body in
+          HOT.pp head (Util.pp_list HOT.pp) body in
       raise (Invalid_argument msg)
     else {head; body; }
 
@@ -75,9 +53,12 @@ module Clause = struct
     | [] -> failwith "Clause.pop_body"
     | _::body' -> {c with body=body'; }
 
-  let apply_subst subst ~renaming c s_c =
-    let head = Substs.HO.apply subst ~renaming c.head s_c in
-    let body = List.map (fun t -> Substs.HO.apply subst ~renaming t s_c) c.body in
+  let apply_subst subst ~renaming c =
+    let head = Substs.HO.apply subst ~renaming (Scoped.set c c.Scoped.value.head) in
+    let body =
+      List.map
+        (fun t -> Substs.HO.apply subst ~renaming (Scoped.set c t))
+        c.Scoped.value.body in
     { head; body; }
 
   module Seq = struct
@@ -92,8 +73,8 @@ module Clause = struct
   let compare c1 c2 =
     let c = HOT.compare c1.head c2.head in
     if c = 0
-      then CCOrd.list_ HOT.compare c1.body c2.body
-      else c
+    then CCOrd.list_ HOT.compare c1.body c2.body
+    else c
 
   let pp out c = match c.body with
     | [] -> Format.fprintf out "@[%a@]." HOT.pp c.head
@@ -102,21 +83,21 @@ module Clause = struct
   let to_string = CCFormat.to_string pp
 
   module Set = Sequence.Set.Make(struct
-    type t = clause
-    let compare = compare
-  end)
+      type t = clause
+      let compare = compare
+    end)
 
   module Map = Sequence.Map.Make(struct
-    type t = clause
-    let compare = compare
-  end)
+      type t = clause
+      let compare = compare
+    end)
 end
 
 type clause = Clause.t
 
 (** {2 Proofs}
 
-Unit-resolution proofs *)
+    Unit-resolution proofs *)
 
 module Proof = struct
   type t =
@@ -150,15 +131,15 @@ type proof = Proof.t
 
 
 (** {2 Consequences}
-What can be deduced when the Database is updated with new rules
-and facts. *)
+    What can be deduced when the Database is updated with new rules
+    and facts. *)
 
 type consequence = fact * proof
 
 (** Index.
 
-For now we don't use indexing, but still use an Index module so that
-the change to a proper indexing structure is easier later *)
+    For now we don't use indexing, but still use an Index module so that
+    the change to a proper indexing structure is easier later *)
 
 module Index = struct
   module M = HOT.Map
@@ -174,21 +155,21 @@ module Index = struct
     M.add t set idx
 
   (* fold on unifiable terms and their associated clause *)
-  let retrieve_unify ?(subst=Substs.empty) idx s_idx t s_t acc k =
+  let retrieve_unify ?(subst=Substs.empty) idx t acc k =
     M.fold
       (fun t' set acc ->
-        let res = Unif.HO.unification ~subst t' s_idx t s_t in
-        Sequence.fold
-          (fun acc subst ->
-            S.fold (fun clause acc -> k acc clause subst) set acc)
-          acc res)
-      idx acc
+         let res = Unif.HO.unification ~subst (Scoped.set idx t') t in
+         Sequence.fold
+           (fun acc subst ->
+              S.fold (fun clause acc -> k acc clause subst) set acc)
+           acc res)
+      idx.Scoped.value acc
 end
 
 (** {2 Fact and Rules Database}
 
-A database contains a set of Horn-clauses about properties, that allow
-to reason about them by forward-chaining. *)
+    A database contains a set of Horn-clauses about properties, that allow
+    to reason about them by forward-chaining. *)
 
 type t = {
   facts : Index.t;
@@ -223,34 +204,36 @@ let __consequences state =
 
 (* add a fact to the DB *)
 let __add_fact ~state ~proof fact =
-  Index.retrieve_unify state.db.rules 0 fact 1 ()
+  Index.retrieve_unify (Scoped.make state.db.rules 0) (Scoped.make fact 1) ()
     (fun () clause subst ->
-      (* compute resolvent *)
-      Substs.Renaming.clear state.renaming;
-      let clause' = Clause.apply_subst subst ~renaming:state.renaming
-        (Clause.pop_body clause) 0 in
-      (* build proof *)
-      let proof_clause = Clause.Map.find clause state.db.all in
-      let proof' = Proof.make fact proof clause proof_clause in
-      Queue.push (clause', proof') state.to_process)
+       (* compute resolvent *)
+       Substs.Renaming.clear state.renaming;
+       let clause' =
+         Clause.apply_subst subst ~renaming:state.renaming
+           (Scoped.make (Clause.pop_body clause) 0) in
+       (* build proof *)
+       let proof_clause = Clause.Map.find clause state.db.all in
+       let proof' = Proof.make fact proof clause proof_clause in
+       Queue.push (clause', proof') state.to_process)
 
 (* add a rule (non unit Horn clause) to the DB *)
 let __add_rule ~state ~proof clause =
   match clause.Clause.body with
   | [] -> assert false
   | lit::_ ->
-    Index.retrieve_unify state.db.facts 1 lit 0 ()
-      (fun () fact_clause subst ->
-        assert (Clause.is_fact fact_clause);
-        let fact = fact_clause.Clause.head in
-        (* compute resolvent *)
-        Substs.Renaming.clear state.renaming;
-        let clause' = Clause.apply_subst subst ~renaming:state.renaming
-          (Clause.pop_body clause) 0 in
-        (* build proof *)
-        let proof_fact = Clause.Map.find fact_clause state.db.all in
-        let proof' = Proof.make fact proof_fact clause proof in
-        Queue.push (clause', proof') state.to_process)
+      Index.retrieve_unify (Scoped.make state.db.facts 1) (Scoped.make lit 0) ()
+        (fun () fact_clause subst ->
+           assert (Clause.is_fact fact_clause);
+           let fact = fact_clause.Clause.head in
+           (* compute resolvent *)
+           Substs.Renaming.clear state.renaming;
+           let clause' =
+             Clause.apply_subst subst ~renaming:state.renaming
+               (Scoped.make (Clause.pop_body clause) 0) in
+           (* build proof *)
+           let proof_fact = Clause.Map.find fact_clause state.db.all in
+           let proof' = Proof.make fact proof_fact clause proof in
+           Queue.push (clause', proof') state.to_process)
 
 (* deal with state.to_process until no clause is to be processed *)
 let __process state =
@@ -266,7 +249,7 @@ let __process state =
           let fact = c.Clause.head in
           (* add fact to consequence if it's not an axiom *)
           if proof <> Proof.Axiom
-            then Queue.push (fact,proof) state.consequences;
+          then Queue.push (fact,proof) state.consequences;
           (* update fixpoint *)
           __add_fact ~state ~proof c.Clause.head;
           (* add to index *)
@@ -297,8 +280,8 @@ module Seq = struct
   let to_seq db k =
     Clause.Map.iter
       (fun c proof -> match proof with
-        | Proof.Axiom -> k c
-        | Proof.Resolved _ -> ())
+         | Proof.Axiom -> k c
+         | Proof.Resolved _ -> ())
       db.all
 
   (* efficient *)
@@ -311,8 +294,8 @@ module Seq = struct
   let facts db =
     to_seq db
     |> Sequence.fmap
-        (fun c ->
-          match c.Clause.body with
-          | [] -> Some c.Clause.head
-          | _::_ -> None)
+      (fun c ->
+         match c.Clause.body with
+         | [] -> Some c.Clause.head
+         | _::_ -> None)
 end

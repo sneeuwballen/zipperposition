@@ -1,28 +1,5 @@
 
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Encoding of clauses} *)
 
@@ -64,43 +41,37 @@ type hoterm = HOT.t
 type foclause = foterm clause
 type hoclause = hoterm clause
 
-(* convert a list of formulas into a clause *)
+(* convert a list of literals into a clause *)
 let foclause_of_clause l =
-  let module F = Formula.FO in
   Util.debugf ~section 5 "foclause_of_clause @[%a@]"
-    (fun k->k (CCFormat.list F.pp) l);
-  let term_of_form f = match F.view f with
-    | F.Atom t -> t
-    | _ -> invalid_arg (CCFormat.sprintf "expected term, got formula %a" F.pp f)
-  in
-  List.map
-    (fun f -> match F.view f with
-      | F.Not f' -> Prop (term_of_form f', false)
-      | F.Eq (a,b) -> Eq (a, b, true)
-      | F.Neq (a,b) -> Eq (a, b, false)
-      | F.True -> Bool true
-      | F.False -> Bool false
-      | _ -> Prop (term_of_form f, true)
-    ) l
-
-let clause_of_foclause l =
-  let module F = Formula.FO in
+    (fun k->k (Util.pp_list (SLiteral.pp FOT.pp)) l);
   List.map
     (function
-      | Eq (a, b, sign) -> F.Base.mk_eq sign a b
-      | Prop (a, sign) -> F.Base.mk_atom sign a
-      | Bool true -> F.Base.true_
-      | Bool false -> F.Base.false_
-    ) l
+      | SLiteral.Atom (t, b) -> Prop (t, b)
+      | SLiteral.True -> Bool true
+      | SLiteral.False -> Bool false
+      | SLiteral.Eq (a,b) -> Eq (a,b,true)
+      | SLiteral.Neq (a,b) -> Eq (a,b,false))
+    l
+
+let clause_of_foclause l =
+  List.map
+    (function
+      | Eq (a, b, true) -> SLiteral.eq a b
+      | Eq (a, b, false) -> SLiteral.neq a b
+      | Prop (a, sign) -> SLiteral.atom a sign
+      | Bool true -> SLiteral.true_
+      | Bool false -> SLiteral.false_)
+    l
 
 let pp_clause pp_t out c =
   CCList.print ~start:"" ~stop:"" ~sep:" | "
     (fun buf lit -> match lit with
-     | Eq (a, b, true) -> Format.fprintf buf "@[%a = %a@]" pp_t a pp_t b
-     | Eq (a, b, false) -> Format.fprintf buf "@[%a != %a@]" pp_t a pp_t b
-     | Prop (a, true) -> pp_t buf a
-     | Prop (a, false) -> Format.fprintf buf "@[~ %a@]" pp_t a
-     | Bool b -> Format.fprintf buf "%B" b
+       | Eq (a, b, true) -> Format.fprintf buf "@[%a = %a@]" pp_t a pp_t b
+       | Eq (a, b, false) -> Format.fprintf buf "@[%a != %a@]" pp_t a pp_t b
+       | Prop (a, true) -> pp_t buf a
+       | Prop (a, false) -> Format.fprintf buf "@[~ %a@]" pp_t a
+       | Bool b -> Format.fprintf buf "%B" b
     ) out c
 
 (** {6 Encoding abstraction} *)
@@ -130,17 +101,17 @@ let (>>>) a b = compose a b
 let currying =
   let module ListOpt = CCList.Traverse(CCOpt) in
   object
-  method encode c = fmap_clause HOT.curry c
-  method decode c =
-    fmap_clause HOT.uncurry c
+    method encode c = fmap_clause HOT.of_fo c
+    method decode c =
+    fmap_clause HOT.to_fo c
       |> List.map opt_seq_lit
       |> ListOpt.sequence_m
   end
 
 (** {6 Clause encoding}
 
-Encode the whole clause into a {!Reasoner.Property.t}, ie a higher-order term
-that represents a meta-level property. *)
+    Encode the whole clause into a {!Reasoner.Property.t}, ie a higher-order term
+    that represents a meta-level property. *)
 
 module EncodedClause = struct
   type t = Reasoner.term
@@ -159,53 +130,32 @@ end
     terms are already curried and rigidified, so we only need to replace
     connectives by their multiset versions. *)
 
-let __ty_or = Type.(TPTP.o <=. multiset TPTP.o)
-let __ty_eq = Type.(forall [var 0] (TPTP.o <=. multiset (var 0)))
-let __ty_not = Type.(TPTP.o <=. TPTP.o)
-
-let __or_conn =
-  HOT.const ~ty:__ty_or Symbol.Base.or_
-let __and__conn =
-  HOT.const ~ty:__ty_or Symbol.Base.and_
-let __xor_conn =
-  HOT.const ~ty:__ty_or Symbol.Base.xor
-let __equiv_conn =
-  HOT.const ~ty:__ty_or Symbol.Base.equiv
-let __eq_conn =
-  HOT.const ~ty:__ty_eq Symbol.Base.eq
-let __neq_conn =
-  HOT.const ~ty:__ty_eq Symbol.Base.neq
-let __not_conn =
-  HOT.const ~ty:__ty_not Symbol.Base.not_
-
-let signature = Signature.of_list
-  [ Symbol.Base.or_, __ty_or
-  ; Symbol.Base.and_, __ty_or
-  ; Symbol.Base.xor, __ty_or
-  ; Symbol.Base.equiv, __ty_or
-  ; Symbol.Base.eq, __ty_eq
-  ; Symbol.Base.neq, __ty_eq
-  ; Symbol.Base.not_, __ty_not
-  ]
+let __or_conn = HOT.TPTP.or_
+let __and__conn = HOT.TPTP.and_
+let __xor_conn = HOT.TPTP.xor
+let __equiv_conn = HOT.TPTP.equiv
+let __eq_conn = HOT.TPTP.eq
+let __neq_conn = HOT.TPTP.neq
+let __not_conn = HOT.TPTP.not_
 
 let __encode_lit = function
   | Eq (a, b, truth) ->
       let ty = HOT.ty a in
       if truth
-        then HOT.at (HOT.tyat __eq_conn ty) (HOT.multiset ~ty [a; b])
-        else HOT.at (HOT.tyat __neq_conn ty) (HOT.multiset ~ty [a; b])
+      then HOT.app (HOT.app_ty __eq_conn [ty]) [HOT.multiset ~ty [a; b]]
+      else HOT.app (HOT.app_ty __neq_conn [ty]) [HOT.multiset ~ty [a; b]]
   | Prop (p, true) -> p
-  | Prop (p, false) -> HOT.at __not_conn p
+  | Prop (p, false) -> HOT.app __not_conn [p]
   | Bool true -> HOT.TPTP.true_
   | Bool false -> HOT.TPTP.false_
 
-let __decode_lit t = match HOT.open_at t with
-  | hd, _, [r] when HOT.equal hd __not_conn -> Prop (r, false)
-  | hd, _, [r] ->
+let __decode_lit t = match HOT.view t with
+  | HOT.App (hd, [r]) when HOT.equal hd __not_conn -> Prop (r, false)
+  | HOT.App (hd, [r]) ->
       begin match HOT.view r with
-      | HOT.Multiset (_,[a;b]) when HOT.equal hd __eq_conn -> Eq (a, b, true)
-      | HOT.Multiset (_,[a;b]) when HOT.equal hd __neq_conn -> Eq (a, b, false)
-      | _ -> Prop (t, true)
+        | HOT.Multiset (_,[a;b]) when HOT.equal hd __eq_conn -> Eq (a, b, true)
+        | HOT.Multiset (_,[a;b]) when HOT.equal hd __neq_conn -> Eq (a, b, false)
+        | _ -> Prop (t, true)
       end
   | _ -> Prop (t, true)
 

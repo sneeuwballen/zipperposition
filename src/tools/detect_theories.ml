@@ -1,28 +1,5 @@
 
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Check presence of theories in files} *)
 
@@ -31,7 +8,6 @@ open Logtk_parsers
 open Logtk_meta
 
 module HOT = HOTerm
-module F = Formula.FO
 module A = Ast_ho
 module E = CCError
 
@@ -58,22 +34,22 @@ let parse_files prover files =
     (fun p file -> E.map fst (Prover.parse_file p file))
     prover files
 
-let to_cnf ~signature decls =
+let to_cnf decls =
   E.(
-    Util_tptp.infer_types (`sign signature) decls
-    >>= fun (signature, decls) ->
-    let _sign, clauses = Util_tptp.to_cnf signature decls in
-    let seq k =
-      let a = object
-        inherit [unit] Ast_tptp.Typed.visitor
-        method! clause () _role c = k c
-      end in
-      Sequence.fold a#visit () clauses
+    Util_tptp.infer_types decls
+    >>= fun decls ->
+    let stmts = Util_tptp.to_cnf decls in
+    let seq =
+      CCVector.to_seq stmts
+      |> Sequence.filter_map
+        (function
+          | Cnf.Assert (c,_) -> Some c
+          | Cnf.TyDecl _ -> None)
     in
     return seq
   )
 
-let parse_and_cnf ?(signature=Signature.TPTP.base) files =
+let parse_and_cnf files =
   let q = Queue.create () in
   let res = E.(
     fold_l
@@ -84,11 +60,15 @@ let parse_and_cnf ?(signature=Signature.TPTP.base) files =
       >>= fun decls ->
       Util.debugf 3 "parsed %d declarations..." (fun k->k (Sequence.length decls));
       (* CNF *)
-      to_cnf ~signature decls
+      to_cnf decls
       >>= fun clauses ->
       Util.debugf 3 "obtained %d clauses..." (fun k->k (Sequence.length clauses));
       (* convert clauses into Encoding.foclause *)
-      let clauses = Sequence.map Encoding.foclause_of_clause clauses in
+      let clauses =
+        clauses
+        |> Sequence.map (List.map (SLiteral.map ~f:FOTerm.of_simple_term))
+        |> Sequence.map Encoding.foclause_of_clause 
+      in
       Queue.add clauses q;
       return ()
     ) () files
@@ -113,11 +93,11 @@ let print_clauses c =
 
 let print_signature signature =
   Format.printf "@[<v2>signature:@,@[%a@]@]@."
-    (CCFormat.seq ~sep:" " (Util.pp_pair ~sep:" : " Symbol.pp Type.pp))
+    (CCFormat.seq ~sep:" " (Util.pp_pair ~sep:" : " ID.pp Type.pp))
     (Signature.Seq.to_seq signature)
 
-let pp_theory_axiom out (name, _, t) =
-  Format.fprintf out "%s %a" name HOT.pp t
+let pp_theory_axiom out (name, terms) =
+  Format.fprintf out "@[<hv>%a@ %a@]" ID.pp name (Util.pp_list ~sep:" " HOT.pp) terms
 
 let pp_rewrite_system out l =
   Format.fprintf out "@[<v2>rewrite system@ %a@]"
@@ -128,8 +108,8 @@ let pp_pre_rewrite_system buf l =
 
 type result = {
   lemmas : Plugin.foclause Sequence.t;
-  theories : (string * Type.t list * HOT.t) Sequence.t;
-  axioms : (string * Type.t list * HOT.t) Sequence.t;
+  theories : (ID.t * HOT.t list) Sequence.t;
+  axioms : (ID.t * HOT.t list) Sequence.t;
   rewrite : (FOTerm.t * FOTerm.t) list Sequence.t;
   pre_rewrite : HORewriting.t Sequence.t;
 }
@@ -198,6 +178,6 @@ let main () =
 let _ =
   try
     main ()
-  with Type.Error s ->
-    Format.printf "%s@." s;
+  with e ->
+    Format.printf "%s@." (Printexc.to_string e);
     exit 1
