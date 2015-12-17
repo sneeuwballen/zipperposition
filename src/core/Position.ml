@@ -7,8 +7,8 @@
 type t =
   | Stop
   | Type of t (** Switch to type *)
-  | Left of t
-  | Right of t
+  | Left of t (** Left term in curried application *)
+  | Right of t (** Right term in curried application, and subterm of binder *)
   | Record_field of string * t (** Field of a record *)
   | Head of t (** Head of uncurried term *)
   | Arg of int * t (** argument term in uncurried term, or in multiset *)
@@ -18,8 +18,8 @@ type position = t
 
 let stop = Stop
 let type_ pos = Type pos
-let left p = Left p
-let right p = Right p
+let left pos = Left pos
+let right pos = Right pos
 let record_field name pos = Record_field (name, pos)
 let head pos = Head pos
 let arg i pos = Arg (i, pos)
@@ -42,12 +42,17 @@ let rev pos =
   in
   aux Stop pos
 
+let opp = function
+  | Left p -> Right p
+  | Right p -> Left p
+  | pos -> pos
+
 (* Recursive append *)
 let rec append p1 p2 = match p1 with
   | Stop -> p2
   | Type p1' -> Type (append p1' p2)
-  | Left p1' -> left (append p1' p2)
-  | Right p1' -> right (append p1' p2)
+  | Left p1' -> Left (append p1' p2)
+  | Right p1' -> Right (append p1' p2)
   | Record_field(name, p1') -> Record_field(name,append p1' p2)
   | Head p1' -> Head (append p1' p2)
   | Arg(i, p1') -> Arg (i,append p1' p2)
@@ -55,9 +60,9 @@ let rec append p1 p2 = match p1 with
 
 let rec pp out pos = match pos with
   | Stop -> CCFormat.string out "ε"
+  | Type p' -> CCFormat.string out "τ."; pp out p'
   | Left p' -> CCFormat.string out "←."; pp out p'
   | Right p' -> CCFormat.string out "→."; pp out p'
-  | Type p' -> CCFormat.string out "τ."; pp out p'
   | Record_field (name,p') ->
       Format.fprintf out "{%s}." name; pp out p'
   | Head p' -> CCFormat.string out "@."; pp out p'

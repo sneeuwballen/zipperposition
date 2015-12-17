@@ -6,8 +6,8 @@
 type t =
   | Stop
   | Type of t (** Switch to type *)
-  | Left of t
-  | Right of t
+  | Left of t (** Left term in curried application *)
+  | Right of t (** Right term in curried application, and subterm of binder *)
   | Record_field of string * t (** Field of a record *)
   | Head of t (** Head of uncurried term *)
   | Arg of int * t (** argument term in uncurried term, or in multiset *)
@@ -16,13 +16,17 @@ type t =
 type position = t
 
 val stop : t
+val left : t -> t
+val right : t -> t
 val type_ : t -> t
 val left : t -> t
 val right : t -> t
 val record_field : string -> t -> t
 val head : t -> t
 val arg : int -> t -> t
-val body : t -> t
+
+val opp : t -> t
+(** Opposite position, when it makes sense (left/right) *)
 
 val rev : t -> t
 (** Reverse the position *)
@@ -61,11 +65,13 @@ module Build : sig
       positions of subterms are needed, since positions are
       easier to build in the wrong order (leaf-to-root). *)
 
+  val type_ : t -> t
+
   val left : t -> t
+  (** Add [left] at the end *)
 
   val right : t -> t
-
-  val type_ : t -> t
+  (** Add [left] at the end *)
 
   val body : t -> t
 
