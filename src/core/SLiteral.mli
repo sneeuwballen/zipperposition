@@ -11,7 +11,7 @@ type term = TypedSTerm.t
 
 exception NotALit of form
 
-type 't t =
+type +'t t =
   | True
   | False
   | Atom of 't * bool
@@ -26,6 +26,12 @@ val to_form : term t -> form
 val map : f:('a -> 'b) -> 'a t -> 'b t
 
 val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+
+val true_ : _ t
+val false_ : _ t
+val eq : 'a -> 'a -> 'a t
+val neq : 'a -> 'a -> 'a t
+val atom : 'a -> bool -> 'a t
 
 val is_true : _ t -> bool
 val is_false : _ t -> bool

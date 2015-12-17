@@ -489,3 +489,7 @@ module TPTP = struct
 
   let to_string = CCFormat.to_string pp
 end
+
+let of_simple_term t = assert false (* TODO *)
+
+let to_simple_term t = assert false (* TODO *)

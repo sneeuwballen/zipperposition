@@ -321,8 +321,6 @@ let to_string = CCFormat.to_string pp
 module Conv = struct
   module PT = TypedSTerm
 
-  exception LocalExit
-
   (* context used to map free variables to free variables *)
   type ctx = {
     mutable vars: (PT.t, t HVar.t) Var.Subst.t;
@@ -343,7 +341,9 @@ module Conv = struct
     ctx.n <- n+1;
     HVar.make ~ty:tType n
 
-  let of_simple_term ctx t =
+  exception Error
+
+  let of_simple_term_exn ctx t =
     let rec aux depth v2db t = match PT.view t with
       | PT.Var v ->
           begin match Var.Subst.find v2db v with
@@ -371,7 +371,7 @@ module Conv = struct
           | PT.Const hd ->
               let l = List.map (aux depth v2db) l in
               app hd l
-          | _ -> raise LocalExit
+          | _ -> raise Error
           end
       | PT.Bind (Binder.ForallTy, v, t') ->
           let v2db = Var.Subst.add v2db v depth in
@@ -381,14 +381,14 @@ module Conv = struct
           let rest = CCOpt.map
             (fun t -> match PT.view t with
               | PT.Var v -> aux_var v
-              | _ -> raise LocalExit) rest
+              | _ -> raise Error) rest
           in
           let l = List.map (fun (n,t) -> n, aux depth v2db t) l in
           record l ~rest
       | PT.Bind _
       | PT.AppBuiltin _
       | PT.Meta _
-      | PT.Multiset _ -> raise LocalExit
+      | PT.Multiset _ -> raise Error
     and aux_var v = match Var.Subst.find ctx.vars v with
       | Some v -> v
       | None ->
@@ -397,8 +397,11 @@ module Conv = struct
           ctx.vars <- Var.Subst.add ctx.vars v v';
           v'
     in
-    try Some (aux 0 Var.Subst.empty t)
-    with LocalExit -> None
+    aux 0 Var.Subst.empty t
+
+  let of_simple_term ctx t =
+    try Some (of_simple_term_exn ctx t)
+    with Error -> None
 
   let to_simple_term ?(env=DBEnv.empty) t =
     let tbl = ref VarMap.empty in

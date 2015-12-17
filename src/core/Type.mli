@@ -240,6 +240,11 @@ module Conv : sig
       @return an error message if the term is not a type
       @param ctx context used to map {!Var} to {!HVar} *)
 
+  exception Error
+
+  val of_simple_term_exn : ctx -> TypedSTerm.t -> t
+  (** @raise Invalid_argument if conversion is impossible *)
+
   val to_simple_term :
     ?env:TypedSTerm.t Var.t DBEnv.t ->
     t -> TypedSTerm.t

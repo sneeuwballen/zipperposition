@@ -301,3 +301,5 @@ module TPTP : sig
   end
 end
 
+val of_simple_term : TypedSTerm.t -> t
+val to_simple_term : t -> TypedSTerm.t

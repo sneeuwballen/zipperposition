@@ -270,3 +270,6 @@ end
 
 val debugf : Format.formatter -> t -> unit
 (** debugf printing, with sorts *)
+
+val of_simple_term : TypedSTerm.t -> t
+val to_simple_term : t -> TypedSTerm.t

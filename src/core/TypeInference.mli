@@ -86,6 +86,8 @@ module Ctx : sig
       and reset it. *)
 end
 
+val unify : ?loc:ParseLocation.t -> type_ -> type_ -> unit
+
 (** {2 Hindley-Milner Type Inference}
 
     This module, abstract in the exact kind of term it types, takes as input

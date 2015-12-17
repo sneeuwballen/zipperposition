@@ -18,7 +18,7 @@ let () = Printexc.register_printer
 
 let not_lit f = raise (NotALit f)
 
-type 't t =
+type +'t t =
   | True
   | False
   | Atom of 't * bool
@@ -47,6 +47,12 @@ let equal eq a b = match a, b with
   | Atom _, _
   | Eq _, _
   | Neq _, _ -> false
+
+let true_ = True
+let false_ = False
+let eq a b = Eq (a,b)
+let neq a b = Neq (a,b)
+let atom a b = Atom (a,b)
 
 let is_true = function True -> true | _ -> false
 let is_false = function False -> true | _ -> false

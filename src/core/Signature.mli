@@ -62,12 +62,14 @@ module Seq : sig
   val types : t -> Type.t Sequence.t
   val to_seq : t -> (ID.t * Type.t) Sequence.t
   val of_seq : (ID.t * Type.t) Sequence.t -> t
+  val add_seq : t -> (ID.t * Type.t) Sequence.t -> t
 end
 
 val to_set : t -> ID.Set.t
 (** Set of symbols of the signature *)
 
 val to_list : t -> (ID.t * Type.t) list
+val add_list : t -> (ID.t * Type.t) list -> t
 val of_list : (ID.t * Type.t) list -> t
 
 val iter : t -> (ID.t -> Type.t -> unit) -> unit

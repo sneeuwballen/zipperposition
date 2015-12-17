@@ -92,15 +92,15 @@ module Seq = struct
     ID.Map.to_seq s |> Sequence.map snd
 
   let to_seq = ID.Map.to_seq
-
+  let add_seq = ID.Map.add_seq
   let of_seq = ID.Map.of_seq
 end
 
 let to_set s = Seq.symbols s |> ID.Set.of_seq
 
-let to_list s = Seq.to_seq s |> Sequence.to_rev_list
-
-let of_list s = Sequence.of_list s |> Seq.of_seq
+let to_list = ID.Map.to_list
+let add_list = ID.Map.add_list
+let of_list = ID.Map.of_list
 
 let iter s f =
   ID.Map.iter f s

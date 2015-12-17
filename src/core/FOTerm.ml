@@ -585,3 +585,7 @@ module TPTP = struct
       term_pp_depth ~hooks:(arith_hook:: !__hooks) 0 buf t
   end
 end
+
+let of_simple_term t = assert false (* TODO *)
+
+let to_simple_term t = assert false (* TODO *)
