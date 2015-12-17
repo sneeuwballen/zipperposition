@@ -71,7 +71,7 @@ module type TERM_IDX = sig
   (** print oneself in DOT into the given file *)
 end
 
-type lits = (bool * term Sequence.t) Sequence.t
+type lits = term SLiteral.t Sequence.t
 (** Sequence of literals, as a cheap abstraction on query clauses *)
 
 module type CLAUSE = sig

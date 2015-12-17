@@ -34,6 +34,20 @@ let map ~f = function
   | Eq (a,b) -> Eq (f a, f b)
   | Neq (a,b) -> Neq (f a, f b)
 
+let fold f acc = function
+  | True
+  | False -> acc
+  | Atom (t, _) -> f acc t
+  | Eq (a,b)
+  | Neq (a,b) -> f (f acc a) b
+
+let to_seq l f = match l with
+  | True
+  | False -> ()
+  | Atom (t, _) -> f t
+  | Eq (a,b)
+  | Neq (a,b) -> f a; f b
+
 let equal eq a b = match a, b with
   | True, True
   | False, False -> true
@@ -56,6 +70,16 @@ let atom a b = Atom (a,b)
 
 let is_true = function True -> true | _ -> false
 let is_false = function False -> true | _ -> false
+
+let sign = function
+  | True
+  | Eq _ -> true
+  | Atom (_, b) -> b
+  | Neq _
+  | False -> false
+
+let is_pos l = sign l
+let is_neg l = not (sign l)
 
 let fpf = Format.fprintf
 

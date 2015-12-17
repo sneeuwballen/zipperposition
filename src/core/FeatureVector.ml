@@ -34,14 +34,16 @@ module Make(C : Index.CLAUSE) = struct
 
     let size_plus =
       { name = "size+";
-        f = (fun lits ->
-            Sequence.filter (fun (sign, _) -> sign) lits |> Sequence.length);
+        f =
+          (fun lits ->
+            Sequence.filter SLiteral.is_pos lits |> Sequence.length);
       }
 
     let size_minus =
       { name = "size-";
-        f = (fun lits ->
-            Sequence.filter (fun (sign, _) -> not sign) lits |> Sequence.length);
+        f =
+          (fun lits ->
+            Sequence.filter SLiteral.is_neg lits |> Sequence.length);
       }
 
     let rec _depth_term depth t = match T.view t with
@@ -59,21 +61,19 @@ module Make(C : Index.CLAUSE) = struct
       { name = "sum_of_depths";
         f = (fun lits ->
             Sequence.fold
-              (fun acc (_, terms) ->
-                 Sequence.fold (fun acc t -> acc + _depth_term 0 t) acc terms
+              (fun acc lit ->
+                SLiteral.fold (fun acc t -> acc + _depth_term 0 t) acc lit
               ) 0 lits);
       }
 
     let _select_sign ~sign lits =
-      lits |> Sequence.filter (fun (sign', _) -> sign = sign')
-
-    let _terms_of_lit (_, t) k = t k
+      lits |> Sequence.filter (fun l -> SLiteral.sign l = sign)
 
     (* sequence of symbols of clause, of given sign *)
     let _symbols ~sign lits =
       _select_sign ~sign lits
-      |> Sequence.flatMap _terms_of_lit
-      |> Sequence.flatMap T.Seq.symbols
+      |> Sequence.flat_map SLiteral.to_seq
+      |> Sequence.flat_map T.Seq.symbols
 
     let count_symb_plus symb =
       { name = CCFormat.sprintf "count+(%a)" ID.pp symb;
@@ -99,11 +99,12 @@ module Make(C : Index.CLAUSE) = struct
 
     let _max_depth_lits ~sign symb lits =
       Sequence.fold
-        (fun depth (sign', terms) ->
-           if sign = sign'
-           then Sequence.fold
+        (fun depth lit  ->
+           if sign = SLiteral.sign lit
+           then
+             SLiteral.fold
                (fun depth t -> max depth (max_depth_term symb t))
-               depth terms
+               depth lit
            else depth
         )
         0 lits
@@ -124,15 +125,12 @@ module Make(C : Index.CLAUSE) = struct
 
   (** {2 Feature Trie} *)
 
-  module IntMap = Map.Make(struct
-      type t = int
-      let compare i j = i - j
-    end)
+  module IntMap = Map.Make(CCInt)
 
   module CSet = Set.Make(struct
-      type t = C.t
-      let compare = C.compare
-    end)
+    type t = C.t
+    let compare = C.compare
+  end)
 
   type trie =
     | TrieNode of trie IntMap.t   (** map feature -> trie *)
