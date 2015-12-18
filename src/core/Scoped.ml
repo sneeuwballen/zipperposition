@@ -3,35 +3,32 @@
 
 (** {1 Scoped Value} *)
 
-type +'a t = {
-  value: 'a;
-  scope: int;
-}
+type +'a t = 'a * int
 
-let make x i = { value=x; scope=i; }
+let make x i = x, i
 
-let get v = v.value
-let scope v = v.scope
+let get = fst
+let scope = snd
 
-let set v x = {v with value=x; }
+let set (_,s) x = x, s
 
-let same_scope v1 v2 = v1.scope = v2.scope
+let same_scope v1 v2 = scope v1 = scope v2
 
-let on f v = f v.value
-let on2 f v1 v2 = f v1.value v2.value
+let on f v = f (get v)
+let on2 f v1 v2 = f (get v1) (get v2)
 
-let map f v = {v with value = f v.value; }
+let map f (v,i) = (f v, i)
 
-let equal eq v1 v2 = v1.scope = v2.scope && eq v1.value v2.value
+let equal eq v1 v2 = scope v1 = scope v2 && eq (get v1) (get v2)
 let compare c v1 v2 =
-  if v1.scope = v2.scope then c v1.value v2.value
-  else Pervasives.compare v1.scope v2.scope
+  if scope v1 = scope v2 then c (get v1) (get v2)
+  else Pervasives.compare (scope v1) (scope v2)
 
-let hash_fun f v h = CCHash.int v.scope h |> f v.value
+let hash_fun f v h = CCHash.int (scope v) h |> f (get v)
 let hash f v = CCHash.apply (hash_fun f) v
 
 let pp p out v =
-  Format.fprintf out "@[%a[%d]@]" p v.value v.scope
+  Format.fprintf out "@[%a[%d]@]" p (get v) (scope v)
 
 let to_string p v = CCFormat.to_string (pp p) v
 

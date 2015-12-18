@@ -10,10 +10,7 @@
 
 *)
 
-type +'a t = private {
-  value: 'a;
-  scope: int;
-}
+type +'a t = 'a * int
 
 val make : 'a -> int -> 'a t
 
