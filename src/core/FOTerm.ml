@@ -588,6 +588,11 @@ module TPTP = struct
   end
 end
 
-let of_simple_term t = assert false (* TODO *)
+module Conv = struct
+  type ctx = Type.Conv.ctx
+  let create = Type.Conv.create
 
-let to_simple_term t = assert false (* TODO *)
+  let of_simple_term _ _ = assert false (* TODO *)
+
+  let to_simple_term _ = assert false (* TODO *)
+end

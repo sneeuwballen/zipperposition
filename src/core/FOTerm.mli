@@ -304,5 +304,9 @@ module TPTP : sig
   end
 end
 
-val of_simple_term : TypedSTerm.t -> t
-val to_simple_term : t -> TypedSTerm.t
+module Conv : sig
+  type ctx
+  val create : unit -> ctx
+  val of_simple_term : ctx -> TypedSTerm.t -> t
+  val to_simple_term : t -> TypedSTerm.t
+end
