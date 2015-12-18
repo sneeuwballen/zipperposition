@@ -1,34 +1,8 @@
 
-(*
-Zipperposition: a functional superposition prover for prototyping
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
-
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 module T = Logtk.FOTerm
 module Util = Logtk.Util
-module Form = Logtk.Formula.FO
 module Lits = Literals
 
 module StringTbl = CCHashtbl.Make(struct
@@ -45,76 +19,45 @@ module Make(I : BBox_intf.TERM)
            (Case : BBox_intf.TERM)
            (Sub : BBox_intf.TERM) =
 struct
-  module BLit = Qbf.Lit
-  type t = BLit.t
+  type t = Sat_solver.Lit.t
+  type lit = t
 
   module I = I
   module Case = Case
-  module Sub = Sub
 
   type inductive_cst = I.t
-  type inductive_sub_cst = Sub.t
   type inductive_case = Case.t
-
-  let neg = BLit.neg
-  let sign = BLit.sign
-  let abs = BLit.abs
-  let set_sign = BLit.set_sign
 
   [@@@warning "-39"]
 
-  type ctx_predicate =
-    | InLoop (** lits = ctx[i], where ctx in loop(i) *)
-    | InitOk (** Ctx is initialized *or* it's not in loop *)
-    | ExpressesMinimality of Sub.t
-    [@@deriving ord]
-
   type injected =
     | Clause_component of Literals.t
-    | Form of (Form.t [@compare Form.cmp])
-    | Ctx of
-      ClauseContext.t
-      * (inductive_cst [@compare I.compare])
-      * ctx_predicate
     | Case of
       (inductive_cst [@compare I.compare])
       * (inductive_case [@compare Case.compare])
-    | Name of string  (* name for CNF *)
-    | Input (** input marker *)
-    [@@deriving ord]
 
-  let string_of_ctx_pred ctx i = function
-    | InLoop ->
-        CCFormat.sprintf "⟦%a ∈ loop(%a)⟧"
-          ClauseContext.print ctx I.print i
-    | InitOk ->
-        CCFormat.sprintf "⟦init(%a, %a)⟧"
-          ClauseContext.print ctx I.print i
-    | ExpressesMinimality t ->
-        CCFormat.sprintf "⟦min(%a,%a,%a)⟧"
-          ClauseContext.print ctx I.print i Sub.print t
+  let compare_injected l1 l2 = match l1, l2 with
+    | Clause_component l1, Clause_component l2 -> Lits.compare l1 l2
+    | Case (l1,r1), Case (l2,r2) ->
+        CCOrd.(I.compare l1 l2 <?> (Case.compare, r1, r2))
+    | Clause_component _, Case _ -> 1
+    | Case _, Clause_component _ -> -1
 
-  let pp_injected buf = function
+  let pp_injected out = function
     | Clause_component lits ->
-        Printf.bprintf buf "⟦%a⟧" (Util.pp_array ~sep:" ∨ " Literal.pp) lits
-    | Form  f -> Printf.bprintf buf "⟦%a⟧" Form.pp f
-    | Ctx (lits, ind, pred) ->
-        let s = string_of_ctx_pred lits ind pred in
-        Buffer.add_string buf s
-    | Case (c, t) -> Printf.bprintf buf "⟦%a=%a⟧" I.pp c Case.pp t
-    | Input -> Printf.bprintf buf "input"
-    | Name s ->
-        Printf.bprintf buf "⟦%s⟧" s
+        Format.fprintf out "⟦%a⟧" (CCFormat.array ~sep:" ∨ " Literal.pp) lits
+    | Case (c, t) ->
+        Format.fprintf out "⟦%a=%a⟧" I.pp c Case.pp t
 
   module FV = Logtk.FeatureVector.Make(struct
-    type t = Lits.t * injected * BLit.t
-    let cmp (l1,i1,j1)(l2,i2,j2) =
+    type t = Lits.t * injected * lit
+    let compare (l1,i1,j1)(l2,i2,j2) =
       CCOrd.(Lits.compare l1 l2
         <?> (compare_injected, i1, i2)
-        <?> (BLit.compare, j1, j2))
-    let to_lits (l,_,_) = Lits.Seq.abstract l
+        <?> (Sat_solver.Lit.compare, j1, j2))
+    let to_lits (l,_,_) = Lits.to_form l
   end)
-  module ITbl = CCHashtbl.Make(BLit)
+  module ITbl = CCHashtbl.Make(Sat_solver.Lit)
   module ICaseTbl = CCHashtbl.Make(struct
     type t = inductive_cst * inductive_case
     let equal (c1,t1) (c2,t2) = I.equal c1 c2 && Case.equal t1 t2

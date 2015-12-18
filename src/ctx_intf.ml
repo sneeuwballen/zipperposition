@@ -51,26 +51,11 @@ module type S = sig
   (** Unsafe version of {!find_signature}.
       @raise Not_found for unknown symbols *)
 
-  val update_prec : ID.t Sequence.t -> unit
-  (** Update the precedence of the ordering {!ord} *)
-
   val declare : ID.t -> Type.t -> unit
   (** Declare the type of a symbol (updates signature) *)
 
   val on_new_symbol : (ID.t * Type.t) Signal.t
   val on_signature_update : Signature.t Signal.t
-
-  val ad_hoc_symbols : unit -> ID.Set.t
-  (** Current set of ad-hoc symbols *)
-
-  val add_ad_hoc_symbols : ID.t Sequence.t -> unit
-  (** Declare that some symbols are "ad hoc", ie they are not really
-      polymorphic and should not be considered as such *)
-
-  val add_constr : int -> [`partial] Precedence.Constr.t -> unit
-  (** XXX caution, dangerous: add a new constraint to the precedence.
-      If you don't know what you are doing, it might change the precedence
-      into an incompatible one. *)
 
   (** {2 Literals} *)
 
@@ -89,30 +74,28 @@ module type S = sig
 
   (** {2 Theories} *)
 
-  module Theories : sig
-    module AC : sig
-      val on_add : Theories.AC.t Signal.t
+  module AC : sig
+    val on_add : Theories.AC.t Signal.t
 
-      val add : ?proof:Proof.t list -> ty:Type.t -> ID.t -> unit
+    val add : ?proof:Proof.t list -> ty:Type.t -> ID.t -> unit
 
-      val is_ac : ID.t -> bool
+    val is_ac : ID.t -> bool
 
-      val find_proof : ID.t -> Proof.t list
-      (** Recover the proof for the AC-property of this symbol.
-          @raise Not_found if the symbol is not AC *)
+    val find_proof : ID.t -> Proof.t list
+    (** Recover the proof for the AC-property of this symbol.
+        @raise Not_found if the symbol is not AC *)
 
-      val symbols : unit -> ID.Set.t
-      (** set of AC symbols *)
+    val symbols : unit -> ID.Set.t
+    (** set of AC symbols *)
 
-      val symbols_of_terms : FOTerm.t Sequence.t -> ID.Set.t
-      (** set of AC symbols occurring in the given term *)
+    val symbols_of_terms : FOTerm.t Sequence.t -> ID.Set.t
+    (** set of AC symbols occurring in the given term *)
 
-      val proofs : unit -> Proof.t list
-      (** All proofs for all AC axioms *)
+    val proofs : unit -> Proof.t list
+    (** All proofs for all AC axioms *)
 
-      val exists_ac : unit -> bool
-      (** Is there any AC symbol? *)
-    end
+    val exists_ac : unit -> bool
+    (** Is there any AC symbol? *)
   end
 
   (** {2 Induction} *)
@@ -122,7 +105,7 @@ module type S = sig
   module Induction : sig
     (** {6 Inductive Types} *)
 
-    type bool_lit = BBox_intf.bool_lit
+    type bool_lit = Bool_lit.t
 
     type constructor = ID.t * Type.t
     (** Constructor for an inductive type *)
@@ -172,8 +155,6 @@ module type S = sig
 
     type sub_cst = private FOTerm.t
     (** A subterm of some {!case} that has the same (inductive) type *)
-
-    module Sub : BBox_intf.TERM with type t = sub_cst
 
     val is_blocked : FOTerm.t -> bool
     (** Some terms that could be inductive constants are {b blocked}. In
@@ -272,7 +253,6 @@ module type S = sig
   module BoolLit
     : BBox.S
       with module I = Induction.Cst
-       and module Sub = Induction.Sub
        and module Case = Induction.Case
 end
 

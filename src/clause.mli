@@ -12,9 +12,6 @@ open Logtk
 val stat_fresh : Util.stat
 val stat_clause_create : Util.stat
 
-(* TODO: maybe a global (weak) graph of parents/descendants
-   would be leaner on memory? *)
-
 module type S = Clause_intf.S
 
 (** {2 Clauses that depend on a Context} *)

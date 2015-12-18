@@ -7,25 +7,17 @@ open Logtk
 
 type term = FOTerm.t
 
-(* TODO: simplfy, only one case now *)
-type bool_lit =
-  bool *
-  [ `Box_clause of Literal.t array
-  | `Qbf_artifact of Qbf.Lit.t * string
-  ]
+type bool_lit = bool * Literal.t array
 (** A boolean literal, here, is a boxed (unsplittable) clause
-    with a sign. The literal can be an explicit encoding of "lits are true"
-    or some other QBF artifact (lit number + repr) *)
+    with a sign. *)
 
 type t = {
   lits : Literal.t array;
   trail : bool_lit list;
 }
 
-val cmp : t -> t -> int
-include Interfaces.HASH with type t := t
-
 val compare : t -> t -> int
+include Interfaces.HASH with type t := t
 
 val make : Literal.t array -> bool_lit list -> t
 (** Make a compact clause *)

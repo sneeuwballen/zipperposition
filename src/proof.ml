@@ -48,7 +48,7 @@ let parents p = p.parents
 let theories p = p.theories
 let additional_info p = p.additional_info
 
-let eq p1 p2 =
+let equal p1 p2 =
   p1.kind = p2.kind &&
   p1.additional_info = p2.additional_info &&
   p1.theories = p2.theories &&
@@ -65,12 +65,12 @@ let hash_fun p h =
 
 let hash p = Hash.apply hash_fun p
 
-let cmp p1 p2 =
+let compare p1 p2 =
   let c = Pervasives.compare p1.kind p2.kind in
   if c = 0
   then match p1.result, p2.result with
-    | Form f1, Form f2 -> F.compare f1 f2
-    | Clause c1, Clause c2 -> CC.cmp c1 c2
+    | Form f1, Form f2 -> TypedSTerm.compare f1 f2
+    | Clause c1, Clause c2 -> CC.compare c1 c2
     | Form _, Clause _ -> 1
     | Clause _, Form _ -> ~-1
   else c
@@ -139,7 +139,7 @@ let is_axiom = function
 
 let is_proof_of_false p =
   match p.result with
-  | Form f when F.equal f F.Base.false_ -> true
+  | Form f when TypedSTerm.equal f TypedSTerm.Form.false_ -> true
   | Clause c when CC.is_empty c -> true
   | _ -> false
 
@@ -174,7 +174,7 @@ end
 
 module ProofTbl = Hashtbl.Make(struct
     type t = proof
-    let equal = eq
+    let equal = equal
     let hash = hash
   end)
 
@@ -274,103 +274,99 @@ let as_graph =
     match rule p with
     | None -> LazyGraph.Node(p, p, Sequence.empty)
     | Some rule ->
-      let parents = Sequence.of_array p.parents in
-      let parents = Sequence.map (fun p' -> (rule, p')) parents in
-      LazyGraph.Node (p, p, parents)
+        let parents = Sequence.of_array p.parents in
+        let parents = Sequence.map (fun p' -> (rule, p')) parents in
+        LazyGraph.Node (p, p, parents)
   in
-  LazyGraph.make ~eq:eq ~hash:hash f
+  LazyGraph.make ~eq:equal ~hash:hash f
 
 (** {2 IO} *)
 
-let pp_kind_tstp buf k =
+let pp_kind_tstp out k =
   let module F = FileInfo in
   match k with
   | File {F.role=role; F.filename=file; F.name=name} ->
-    Printf.bprintf buf "file('%s', '%s')" file name
+      Format.fprintf out "file('%s', '%s')" file name
   | Inference rule ->
-    Printf.bprintf buf "inference(%s, [status(thm)])" rule
+      Format.fprintf out "inference(%s, [status(thm)])" rule
   | Simplification rule ->
-    Printf.bprintf buf "inference(%s, [status(thm)])" rule
+      Format.fprintf out "inference(%s, [status(thm)])" rule
   | Esa rule ->
-    Printf.bprintf buf "inference(%s, [status(esa)])" rule
+      Format.fprintf out "inference(%s, [status(esa)])" rule
   | Trivial ->
-    Printf.bprintf buf "trivial([status(thm)])"
+      Format.fprintf out "trivial([status(thm)])"
 
-let pp_kind buf k =
+let pp_kind out k =
   let module F = FileInfo in
   match k with
   | File {F.role=role; F.filename=file; F.name=name; F.conjecture=c} ->
-    Printf.bprintf buf "%s '%s' in '%s'%s" role name file
-      (if c then " (conjecture)" else "")
+      Format.fprintf out "%s '%s' in '%s'%s" role name file
+        (if c then " (conjecture)" else "")
   | Inference rule ->
-    Printf.bprintf buf "inf %s" rule
+      Format.fprintf out "inf %s" rule
   | Simplification rule ->
-    Printf.bprintf buf "simp %s" rule
+      Format.fprintf out "simp %s" rule
   | Esa rule ->
-    Printf.bprintf buf "esa %s" rule
-  | Trivial -> Buffer.add_string buf "trivial"
+      Format.fprintf out "esa %s" rule
+  | Trivial -> CCFormat.string out "trivial"
 
-let pp_result buf = function
-  | Form f -> F.pp buf f
-  | Clause c -> CC.pp buf c
+let pp_result out = function
+  | Form f -> TypedSTerm.pp out f
+  | Clause c -> CC.pp out c
 
 let pp_result_of buf proof = pp_result buf proof.result
 
 let pp_notrec buf p =
-  Printf.bprintf buf "%a <-- %a [%a]"
+  Format.fprintf buf "%a <-- %a [%a]"
     pp_result_of p pp_kind p.kind
-    (Util.pp_list Buffer.add_string) p.theories
+    (Util.pp_list CCFormat.string) p.theories
 
-let fmt fmt proof =
-  Format.pp_print_string fmt (Util.on_buffer pp_notrec proof)
-
-let pp_debug buf proof =
+let pp_debug out proof =
   let module F = FileInfo in
   traverse proof
     begin fun p -> match p.kind with
       | File {F.role=role; F.filename=file; F.name=name; F.conjecture=c} ->
-        Printf.bprintf buf "%a <--- %a, theories [%a]%s\n"
-          pp_result p.result pp_kind p.kind
-          (Util.pp_list Buffer.add_string) p.theories
-          (if c then " (conjecture)" else "")
+          Format.fprintf out "@[%a <---@ %a,@ theories [%a]%s@]"
+            pp_result p.result pp_kind p.kind
+            (Util.pp_list CCFormat.string) p.theories
+            (if c then " (conjecture)" else "")
       | Trivial ->
-        Printf.bprintf buf "%a <--- trivial, theories [%a]\n"
-          pp_result p.result (Util.pp_list Buffer.add_string) p.theories;
+          Format.fprintf out "@[<2>%a <---@ trivial,@ theories [%a]@]"
+            pp_result p.result (Util.pp_list CCFormat.string) p.theories;
       | Inference _
       | Simplification _
       | Esa _ ->
-        Printf.bprintf buf "%a <--- %a, theories [%a] with\n"
-          pp_result p.result pp_kind p.kind
-          (Util.pp_list Buffer.add_string) p.theories;
-        Array.iter
-          (fun premise -> Printf.bprintf buf "    %a\n" pp_result premise.result)
-          p.parents
+          Format.fprintf out "@[%a <---@ %a,@ theories [%a] with %a@]"
+            pp_result p.result pp_kind p.kind
+            (Util.pp_list CCFormat.string) p.theories
+            (CCFormat.array pp_result)
+            (Array.map (fun p->p.result) p.parents)
     end
 
-let _pp_parent buf = function
-  | `Name i -> Printf.bprintf buf "%d" i
-  | `Theory s -> Printf.bprintf buf "theory(%s)" s
+let _pp_parent out = function
+  | `Name i -> Format.fprintf out "%d" i
+  | `Theory s -> Format.fprintf out "theory(%s)" s
 
-let _pp_kind_tstp buf (k,parents) =
+let _pp_kind_tstp out (k,parents) =
   let module F = FileInfo in
   match k with
   | Trivial ->
-    Printf.bprintf buf "trivial([%a])"
-      (Util.pp_list _pp_parent) parents
+      Format.fprintf out "trivial([%a])"
+        (Util.pp_list _pp_parent) parents
   | File {F.role=role; F.filename=file; F.name=name} ->
-    Printf.bprintf buf "file('%s', '%s', [%a])"
-      file name (Util.pp_list _pp_parent) parents
+      Format.fprintf out "file('%s', '%s', [%a])"
+        file name (Util.pp_list _pp_parent) parents
   | Inference rule ->
-    Printf.bprintf buf "inference('%s', [status(thm)], [%a])"
-      rule (Util.pp_list _pp_parent) parents
+      Format.fprintf out "inference('%s', [status(thm)], [%a])"
+        rule (Util.pp_list _pp_parent) parents
   | Simplification rule ->
-    Printf.bprintf buf "inference('%s', [status(thm)], [%a])"
-      rule (Util.pp_list _pp_parent) parents
+      Format.fprintf out "inference('%s', [status(thm)], [%a])"
+        rule (Util.pp_list _pp_parent) parents
   | Esa rule ->
-    Printf.bprintf buf "inference('%s', [status(esa)], [%a])"
-      rule (Util.pp_list _pp_parent) parents
+      Format.fprintf out "inference('%s', [status(esa)], [%a])"
+        rule (Util.pp_list _pp_parent) parents
 
-let pp_tstp buf proof =
+let pp_tstp out proof =
   let namespace = ProofTbl.create 5 in
   traverse proof
     (fun p ->
@@ -381,17 +377,23 @@ let pp_tstp buf proof =
        in
        match p.result with
        | Form f ->
-         Printf.bprintf buf "tff(%d, %s, %a, %a).\n"
-           name (role p) F.TPTP.pp f _pp_kind_tstp (p.kind,parents)
+           Format.fprintf out "tff(%d, %s, %a, %a).\n"
+             name (role p) TypedSTerm.TPTP.pp f _pp_kind_tstp (p.kind,parents)
        | Clause c when CC.trail c <> [] ->
-         Printf.bprintf buf "tff(%d, %s, (%a) %a, %a).\n"
-           name (role p)
-           F.TPTP.pp (CC.to_form c |> F.close_forall)
-           CC.pp_trail_tstp (CC.trail c)
-           _pp_kind_tstp (p.kind,parents)
+           Format.fprintf out "tff(%d, %s, (%a) %a, %a).\n"
+             name (role p)
+             TypedSTerm.TPTP.pp
+               (CC.to_forms c
+                  |> Array.map (SLiteral.map ~f:FOTerm.to_simple_term)
+                  |> Array.map SLiteral.to_form
+                  |> Array.to_list
+                  |> TypedSTerm.Form.or_
+                  |> TypedSTerm.Form.close_forall)
+             CC.pp_trail_tstp (CC.trail c)
+             _pp_kind_tstp (p.kind,parents)
        | Clause c ->
-         Printf.bprintf buf "cnf(%d, %s, %a, %a).\n"
-           name (role p) CC.pp_tstp c _pp_kind_tstp (p.kind,parents)
+           Format.fprintf out "cnf(%d, %s, %a, %a).\n"
+             name (role p) CC.pp_tstp c _pp_kind_tstp (p.kind,parents)
     )
 
 (** Prints the proof according to the given input switch *)
@@ -401,7 +403,7 @@ let pp switch buf proof = match switch with
   | "debug" -> pp_debug buf proof
   | _ -> failwith ("unknown proof-printing format: " ^ switch)
 
-let _pp_list_str = Util.pp_list Buffer.add_string
+let _pp_list_str = Util.pp_list CCFormat.string
 
 let _escape_dot s =
   let b = Buffer.create (String.length s + 5) in
@@ -416,10 +418,7 @@ let _escape_dot s =
   Buffer.contents b
 
 let _to_str_escape fmt =
-  Printf.kbprintf
-    (fun b -> _escape_dot (Buffer.contents b))
-    (Buffer.create 15)
-    fmt
+  CCFormat.ksprintf ~f:_escape_dot fmt
 
 let as_dot_graph =
   let no_other_info proof = match proof.theories, proof.additional_info with
@@ -429,7 +428,8 @@ let as_dot_graph =
   let label proof =
     let s = if no_other_info proof
       then _to_str_escape "%a" pp_result_of proof
-      else Util.sprintf "{%s|{theories:%s|info:%s}}"
+      else
+        CCFormat.sprintf "{%s|{theories:%s|info:%s}}"
           (_to_str_escape "%a" pp_result_of proof)
           (_to_str_escape "%a" _pp_list_str proof.theories)
           (_to_str_escape "%a" _pp_list_str proof.additional_info)
@@ -451,20 +451,19 @@ let as_dot_graph =
     ~edges:(fun e -> [`Label e])
     as_graph
 
-let pp_dot_seq ~name buf seq =
-  let fmt = Format.formatter_of_buffer buf in
+let pp_dot_seq ~name out seq =
   Sequence.iter (fun proof ->
       if not (LazyGraph.is_dag as_graph proof) then begin
         (* output warning, cyclic proof *)
         let cycle = LazyGraph.find_cycle as_graph proof in
         let cycle = List.map (fun (v,_,_) -> v) cycle in
-        let pp_squared buf pf = Printf.bprintf buf "[%a]" pp_notrec pf in
-        Util.debug 0 "warning: proof is not a DAG (cycle %a)"
-          (Util.pp_list pp_squared) cycle;
+        let pp_squared out pf = Format.fprintf out "[%a]" pp_notrec pf in
+        Util.debugf 0 "warning: proof is not a DAG (cycle %a)"
+          (fun k->k (Util.pp_list pp_squared) cycle);
       end)
     seq;
-  LazyGraph.Dot.pp ~name as_dot_graph fmt seq;
-  Format.pp_print_flush fmt ();
+  LazyGraph.Dot.pp ~name as_dot_graph out seq;
+  Format.pp_print_flush out ();
   ()
 
 (** Add the proof to the given graph *)
@@ -474,15 +473,14 @@ let pp_dot ~name buf proof =
 (** print to dot into a file *)
 let pp_dot_seq_file ?(name="proof") filename seq =
   (* print graph on file *)
-  let out = open_out filename in
+  Util.debugf 1 "print proof graph to %s" (fun k->k filename);
   try
-    Util.debug 1 "print proof graph to %s" filename;
-    Util.fprintf out "%a\n" (pp_dot_seq ~name) seq;
-    flush out;
-    close_out out
+    CCIO.with_out filename
+      (fun oc ->
+        let out = Format.formatter_of_out_channel oc in
+        Format.fprintf out "%a@." (pp_dot_seq ~name) seq)
   with e ->
-    Util.debug 1 "error: %s" (Printexc.to_string e);
-    close_out out
+    Util.debugf 1 "error: %s" (fun k->k (Printexc.to_string e))
 
 let pp_dot_file ?name filename proof =
   pp_dot_seq_file ?name filename (Sequence.singleton proof)

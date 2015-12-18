@@ -54,17 +54,14 @@ module Make(C : Clause.S) = struct
       in
       let trail = C.get_trail c in
       let w_lits = weight_lits_ (C.lits c) in
-      let w_trail = C.Trail.fold
-          (fun acc t -> match C.Ctx.BoolLit.extract_exn (C.Ctx.BoolLit.abs t) with
+      let w_trail = Trail.fold
+          (fun acc t -> match C.Ctx.BoolLit.extract_exn (Sat_solver.Lit.abs t) with
              | C.Ctx.BoolLit.Clause_component lits -> acc + weight_lits_ lits
-             | C.Ctx.BoolLit.Ctx (c,_,_) -> acc + weight_lits_ (ClauseContext.raw_lits c)
              | C.Ctx.BoolLit.Case (_,_) ->
                  acc + 10 (* generic penalty for each inductive hypothesis *)
-             | C.Ctx.BoolLit.Name _
-             | C.Ctx.BoolLit.Input  -> acc (* mere markers *)
           ) 0 trail
       in
-      w_lits * Array.length (C.lits c) + w_trail * (C.Trail.length trail) + _depth_ty
+      w_lits * Array.length (C.lits c) + w_trail * (Trail.length trail) + _depth_ty
 
     let age c =
       if C.is_empty c then 0

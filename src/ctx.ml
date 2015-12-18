@@ -8,7 +8,6 @@ open Logtk
 module T = FOTerm
 module S = Substs
 module Unif = Logtk.Unif
-module TO = Theories.TotalOrder
 
 (** {2 Context for a Proof} *)
 module type S = Ctx_intf.S
@@ -28,10 +27,9 @@ module Make(X : PARAMETERS) = struct
   let _select = ref X.select
   let _signature = ref X.signature
   let _complete = ref true
-  let _ad_hoc = ref (ID.Set.singleton ID.Base.eq)
   let _constrs = ref X.constr_list
 
-  let skolem = Skolem.create ~prefix:"zsk" Signature.empty
+  let skolem = Skolem.create ~prefix:"zsk" ()
   let renaming = S.Renaming.create ()
   let ord () = !_ord
   let set_ord o = _ord := o
@@ -62,10 +60,10 @@ module Make(X : PARAMETERS) = struct
     _signature := Signature.merge !_signature signature;
     Signal.send on_signature_update !_signature;
     Signature.iter _diff (fun s ty -> Signal.send on_new_symbol (s,ty));
-    _ord := !_signature
-            |> Signature.Seq.to_seq
-            |> Sequence.map fst
-            |> Ordering.add_seq !_ord;
+    !_signature
+    |> Signature.Seq.to_seq
+    |> Sequence.map fst
+    |> Ordering.add_seq !_ord;
     Util.exit_prof prof_add_signature;
     ()
 
@@ -82,27 +80,6 @@ module Make(X : PARAMETERS) = struct
     _declare_symb symb ty;
     Util.exit_prof prof_declare_sym;
     ()
-
-  let update_prec symbs =
-    Util.debug 3 "update precedence...";
-    _ord := Ordering.update_precedence !_ord
-        (fun prec -> Precedence.add_seq prec symbs)
-
-  let ad_hoc_symbols () = !_ad_hoc
-  let add_ad_hoc_symbols seq =
-    _ad_hoc := Sequence.fold (fun set s -> ID.Set.add s set) !_ad_hoc seq
-
-  let add_constr p c =
-    Util.debug 2 "update precedence using a *new* constraint!";
-    _constrs := (p,c) :: !_constrs;
-    _ord := Ordering.update_precedence !_ord
-        (fun p ->
-           let constr = !_constrs
-                        |> List.sort (fun (p1,_)(p2,_) -> CCInt.compare p1 p2)
-                        |> List.map snd
-           in
-           Precedence.with_constr_list p constr
-        )
 
   let renaming_clear () =
     S.Renaming.clear renaming;
@@ -122,201 +99,95 @@ module Make(X : PARAMETERS) = struct
     let to_form f = Literal.Conv.to_form ~hooks:!_to f
   end
 
-  module Theories = struct
-    module STbl = ID.Tbl
+  module AC = struct
     module PF = PFormula
+    let tbl = ID.Tbl.create 3
+    let proofs = ID.Tbl.create 3
+    let on_add = Signal.create ()
 
-    module AC = struct
-      let tbl = STbl.create 3
-      let proofs = STbl.create 3
-      let on_add = Signal.create ()
+    let axioms s =
+      (* FIXME: need to recover type of [f]
+         let x = T.mk_var 0 in
+         let y = T.mk_var 1 in
+         let z = T.mk_var 2 in
+         let f x y = T.mk_node s [x; y] in
+         let mk_eq x y = F.mk_eq x y in
+         let mk_pform name f =
+         let f = F.close_forall f in
+         let name = Util.sprintf "%s_%a" name ID.pp s in
+         let proof = Proof.mk_f_axiom f ~file:"/dev/ac" ~name in
+         PF.create f proof
+         in
+         [ mk_pform "associative" (mk_eq (f (f x y) z) (f x (f y z)))
+         ; mk_pform "commutative" (mk_eq (f x y) (f y x))
+         ]
+      *)
+      []
 
-      let axioms s =
-        (* FIXME: need to recover type of [f]
-           let x = T.mk_var 0 in
-           let y = T.mk_var 1 in
-           let z = T.mk_var 2 in
-           let f x y = T.mk_node s [x; y] in
-           let mk_eq x y = F.mk_eq x y in
-           let mk_pform name f =
-           let f = F.close_forall f in
-           let name = Util.sprintf "%s_%a" name ID.pp s in
-           let proof = Proof.mk_f_axiom f ~file:"/dev/ac" ~name in
-           PF.create f proof
-           in
-           [ mk_pform "associative" (mk_eq (f (f x y) z) (f x (f y z)))
-           ; mk_pform "commutative" (mk_eq (f x y) (f y x))
-           ]
-        *)
-        []
+    let add ?proof ~ty s =
+      let proof = match proof with
+        | Some p -> p
+        | None -> (* new axioms *)
+            List.map PF.proof (axioms s)
+      in
+      if not (ID.Tbl.mem tbl s)
+      then begin
+        let instance = Theories.AC.({ty; sym=s}) in
+        ID.Tbl.replace tbl s instance;
+        ID.Tbl.replace proofs s proof;
+        Signal.send on_add instance
+      end
 
-      let add ?proof ~ty s =
-        let proof = match proof with
-          | Some p -> p
-          | None -> (* new axioms *)
-              List.map PF.proof (axioms s)
-        in
-        if not (STbl.mem tbl s)
-        then begin
-          let instance = Theories.AC.({ty; sym=s}) in
-          STbl.replace tbl s instance;
-          STbl.replace proofs s proof;
-          Signal.send on_add instance
-        end
+    let is_ac s = ID.Tbl.mem tbl s
 
-      let is_ac s = STbl.mem tbl s
+    let exists_ac () = ID.Tbl.length tbl > 0
 
-      let exists_ac () = STbl.length tbl > 0
+    let find_proof s = ID.Tbl.find proofs s
 
-      let find_proof s = STbl.find proofs s
+    let symbols () =
+      ID.Tbl.fold
+        (fun s _ set -> ID.Set.add s set)
+        tbl ID.Set.empty
 
-      let symbols () =
-        STbl.fold
-          (fun s _ set -> ID.Set.add s set)
-          tbl ID.Set.empty
+    let symbols_of_terms seq =
+      let module A = T.AC(struct
+          let is_ac = is_ac
+          let is_comm _ = false
+        end) in
+      A.symbols seq
 
-      let symbols_of_terms seq =
-        let module A = T.AC(struct
-            let is_ac = is_ac
-            let is_comm _ = false
-          end) in
-        A.symbols seq
-
-      let symbols_of_forms f =
-        Sequence.flatMap Formula.FO.Seq.terms f |> symbols_of_terms
-
-      let proofs () =
-        STbl.fold
-          (fun _ proofs acc -> List.rev_append proofs acc)
-          proofs []
-    end
-
-    module TotalOrder = struct
-      module InstanceTbl = Hashtbl.Make(struct
-          type t = TO.t
-          let equal = TO.eq
-          let hash = TO.hash
-        end)
-
-      let less_tbl = STbl.create 3
-      let lesseq_tbl = STbl.create 3
-      let proofs = InstanceTbl.create 3
-      let on_add = Signal.create ()
-
-      let is_less s = STbl.mem less_tbl s
-
-      let is_lesseq s = STbl.mem lesseq_tbl s
-
-      let find s =
-        try
-          STbl.find less_tbl s
-        with Not_found ->
-          STbl.find lesseq_tbl s
-
-      let is_order_symbol s =
-        STbl.mem less_tbl s || STbl.mem lesseq_tbl s
-
-      let find_proof instance =
-        InstanceTbl.find proofs instance
-
-      let axioms ~less ~lesseq =
-        (* FIXME: need to recover type of less's arguments
-           let x = T.mk_var 0 in
-           let y = T.mk_var 1 in
-           let z = T.mk_var 2 in
-           let mk_less x y = F.mk_atom (T.mk_node ~ty:Type.o less [x;y]) in
-           let mk_lesseq x y = F.mk_atom (T.mk_node ~ty:Type.o lesseq [ x;y]) in
-           let mk_eq x y = F.mk_eq x y in
-           let mk_pform name f =
-           let f = F.close_forall f in
-           let name = Util.sprintf "%s_%a_%a" name ID.pp less ID.pp lesseq in
-           let proof = Proof.mk_f_axiom f ~file:"/dev/order" ~name in
-           PF.create f proof
-           in
-           [ mk_pform "total" (F.mk_or [mk_less x y; mk_eq x y; mk_less y x])
-           ; mk_pform "irreflexive" (F.mk_not (mk_less x x))
-           ; mk_pform "transitive" (F.mk_imply (F.mk_and [mk_less x y; mk_less y z]) (mk_less x z))
-           ; mk_pform "nonstrict" (F.mk_equiv (mk_lesseq x y) (F.mk_or [mk_less x y; mk_eq x y]))
-           ]
-        *)
-        []
-
-      let add ?proof ~less ~lesseq ~ty =
-        let proof = match proof with
-          | Some p -> p
-          | None ->
-              List.map PF.proof (axioms ~less ~lesseq)
-        in
-        let instance =
-          try Some (STbl.find lesseq_tbl lesseq)
-          with Not_found ->
-            if STbl.mem less_tbl less
-            then raise (Invalid_argument "ordering instances overlap")
-            else None
-        in
-        match instance with
-        | None ->
-            (* new instance *)
-            let instance = Theories.TotalOrder.({ less; lesseq; ty; }) in
-            STbl.add less_tbl less instance;
-            STbl.add lesseq_tbl lesseq instance;
-            InstanceTbl.add proofs instance proof;
-            Signal.send on_add instance;
-            instance, `New
-        | Some instance ->
-            if not (Unif.Ty.are_variant ty instance.TO.ty)
-            then raise (Invalid_argument "incompatible types")
-            else if not (ID.eq less instance.TO.less)
-            then raise (Invalid_argument "incompatible symbol for lesseq")
-            else instance, `Old
-
-      let add_tstp () =
-        try
-          find ID.TPTP.Arith.less, `Old
-        with Not_found ->
-          let less = ID.TPTP.Arith.less in
-          let lesseq = ID.TPTP.Arith.lesseq in
-          (* add instance *)
-          add ?proof:None
-            ~ty:Type.(forall [var 0] (TPTP.o <== [var 0; var 0])) ~less ~lesseq
-
-      let exists_order () =
-        assert (STbl.length lesseq_tbl = STbl.length less_tbl);
-        STbl.length less_tbl > 0
-    end
+    let proofs () =
+      ID.Tbl.fold
+        (fun _ proofs acc -> List.rev_append proofs acc)
+        proofs []
   end
 
   (** Boolean Mapping *)
   module TermArg = struct
     type t = FOTerm.t
-    let equal = FOTerm.eq
-    let compare = FOTerm.cmp
+    let equal = FOTerm.equal
+    let compare = FOTerm.compare
     let hash = FOTerm.hash
     let pp = FOTerm.pp
-    let print = FOTerm.fmt
     let to_term t = t
   end
 
-  module BoolLit = BBox.Make(TermArg)(TermArg)(TermArg)
+  module BoolLit = BBox.Make(TermArg)(TermArg)
 
   (** Induction *)
   module Induction = struct
     type constructor = ID.t * Type.t
     (** constructor + its type *)
 
-    type bool_lit = BoolLit.t
+    type bool_lit = Bool_lit.t
 
     type inductive_type = {
       pattern : Type.t;
       constructors : constructor list;
     }
 
-    let _raise f fmt =
-      let buf = Buffer.create 15 in
-      Printf.kbprintf (fun buf -> f (Buffer.contents buf))
-        buf fmt
-    let _failwith fmt = _raise failwith fmt
-    let _invalid_arg fmt = _raise invalid_arg fmt
+    let _failwith fmt = CCFormat.ksprintf fmt ~f:failwith
+    let _invalid_arg fmt = CCFormat.ksprintf fmt ~f:invalid_arg
 
     let _tbl_ty : inductive_type ID.Tbl.t = ID.Tbl.create 16
 
@@ -350,7 +221,7 @@ module Make(X : PARAMETERS) = struct
     let is_constructor_sym s =
       inductive_ty_seq
       |> Sequence.flat_map (fun ity -> Sequence.of_list ity.constructors)
-      |> Sequence.exists (fun (s', _) -> ID.eq s s')
+      |> Sequence.exists (fun (s', _) -> ID.equal s s')
 
     let contains_inductive_types t =
       T.Seq.subterms t
@@ -360,7 +231,7 @@ module Make(X : PARAMETERS) = struct
       let s = _extract_hd ty in
       try ID.Tbl.find _tbl_ty s
       with Not_found ->
-        failwith (Util.sprintf "type %a is not inductive" Type.pp ty)
+        failwith (CCFormat.sprintf "type %a is not inductive" Type.pp ty)
 
     type cst = T.t
 
@@ -373,8 +244,6 @@ module Make(X : PARAMETERS) = struct
     module Case = TermArg
 
     type sub_cst = T.t
-
-    module Sub = TermArg
 
     module SubCstSet = T.Set
 
@@ -424,15 +293,19 @@ module Make(X : PARAMETERS) = struct
       then
         if T.Tbl.mem _tbl t then ()
         else try
-            Util.debug 2 "declare new inductive constant %a" T.pp t;
+            Util.debugf 2 "declare new inductive constant %a" (fun k->k T.pp t);
             (* check that the type of [t] is inductive *)
             let ty = T.ty t in
             let name = _extract_hd ty in
             let ity = ID.Tbl.find _tbl_ty name in
-            let subst = Unif.Ty.matching ~pattern:ity.pattern 1 ty 0 in
-            let cst_data = { cst=t; ty=ity; subst;
-                             dominates=ID.Tbl.create 16;
-                             coversets=IMap.empty } in
+            let subst = Unif.Ty.matching
+                ~pattern:(Scoped.make ity.pattern 1) (Scoped.make ty 0) in
+            let cst_data = {
+              cst=t; ty=ity;
+              subst;
+              dominates=ID.Tbl.create 16;
+              coversets=IMap.empty
+            } in
             T.Tbl.add _tbl t cst_data;
             let s = T.head_exn t in
             ID.Tbl.replace _tbl_sym s cst_data;
@@ -457,8 +330,8 @@ module Make(X : PARAMETERS) = struct
         (* leaves: fresh constants *)
         if depth=0 then [fun () ->
             let ty = ity.pattern in
-            let name = Util.sprintf "#%a" ID.pp (_extract_hd ty) in
-            let c = Skolem.fresh_sym_with ~ctx:skolem ~ty name in
+            let name = CCFormat.sprintf "#%a" ID.pp (_extract_hd ty) in
+            let c = ID.make name in
             let t = T.const ~ty c in
             ID.Tbl.replace cst_data.dominates c ();
             _declare_symb c ty;
@@ -502,8 +375,8 @@ module Make(X : PARAMETERS) = struct
               then make depth
               else [fun () ->
                   (* not an inductive sub-case, just create a skolem symbol *)
-                  let name = Util.sprintf "#%a" ID.pp (_extract_hd ty) in
-                  let c = Skolem.fresh_sym_with ~ctx:skolem ~ty name in
+                  let name = CCFormat.sprintf "#%a" ID.pp (_extract_hd ty) in
+                  let c = ID.make name in
                   let t = T.const ~ty c in
                   ID.Tbl.replace cst_data.dominates c ();
                   _declare_symb c ty;
@@ -568,8 +441,8 @@ module Make(X : PARAMETERS) = struct
             let coverset = _make_coverset ~depth ity t in
             (* save coverset *)
             cst.coversets <- IMap.add depth coverset cst.coversets;
-            Util.debug 2 "new coverset for %a: %a"
-              T.pp t (CCList.pp T.pp) coverset.cases;
+            Util.debugf 2 "@[<2>new coverset for @[%a@]:@ {@[%a@]}@]"
+              (fun k->k T.pp t (Util.pp_list T.pp) coverset.cases);
             Signal.send on_new_cover_set (t, coverset);
             coverset, `New
         end
@@ -591,7 +464,7 @@ module Make(X : PARAMETERS) = struct
 
     let is_sub_constant_of t cst =
       let cst', _ = inductive_cst_of_sub_cst t in
-      T.eq cst cst'
+      T.equal cst cst'
 
     let as_sub_constant_of t cst =
       if is_sub_constant_of t cst

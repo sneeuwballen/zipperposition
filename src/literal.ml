@@ -515,9 +515,6 @@ let pp buf lit = pp_debug ~hooks:!__hooks buf lit
 
 let to_string t = CCFormat.to_string pp t
 
-let fmt fmt lit =
-  Format.pp_print_string fmt (to_string lit)
-
 (* comparison should live in its scope *)
 module Comp = struct
   module O = Ordering
