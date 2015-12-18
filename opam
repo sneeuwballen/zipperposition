@@ -21,11 +21,9 @@ depends: [
   "containers" { >= "0.7" }
   "gen"
   "msat"
-  "ppx_deriving"
 ]
 available: [
-    ocaml-version >= "4.02.1" &
-    ocaml-version < "4.03.0"
+    ocaml-version >= "4.00.1"
 ]
 bug-reports: "https://github.com/c-cube/zipperposition/issues"
 dev-repo: "https://github.com/c-cube/zipperposition.git"

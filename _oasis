@@ -23,12 +23,11 @@ Library "libzipperposition"
   Modules:          ClauseQueue, Clause, Const, Extensions,
                     Literal, Literals, CompactClause, Ctx, Proof, ProofState,
                     Saturate, Selection, Theories, AC,
-                    PEnv, Params, Env, Monome, ArithLit, Signals, Multisets,
+                    Compute_prec, Params, Env, Monome, ArithLit, Signals, Multisets,
                     Ctx_intf, Clause_intf, Env_intf, ProofState_intf,
                     BBox, BBox_intf, ClauseContext, ClauseQueue_intf,
-                    BoolSolver, BoolSolver_intf, Induction_helpers,
+                    Bool_lit, Sat_solver, Sat_solver_intf, Induction_helpers,
                     calculi/Avatar,
-                    calculi/Induction,
                     calculi/Induction_simple,
                     calculi/Superposition,
                     calculi/EnumTypes,
@@ -36,11 +35,10 @@ Library "libzipperposition"
                     calculi/Heuristics,
                     meta/MetaProverState
   InternalModules:  lib/LazyGraph, lib/SmallSet,
-                    lib/UnionFind, lib/Mixtbl, lib/Signal,
-                    msat/Zipperposition_msat
+                    lib/UnionFind, lib/Mixtbl, lib/Signal
   BuildDepends:     containers, containers.advanced, sequence, gen, unix,
                     zarith, containers.io, logtk, logtk.meta, logtk.parsers,
-                    dynlink, msat, ppx_deriving.std
+                    dynlink, msat
 
 # main executable for the prover
 Executable zipperposition
