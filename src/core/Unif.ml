@@ -776,12 +776,12 @@ module Ty = struct
      pattern:term Scoped.t -> term Scoped.t -> subst)
 
   let matching_same_scope =
-    (matching_same_scope :> ?protect:(term HVar.t Sequence.t) -> ?subst:subst ->
+    (matching_same_scope :> ?protect:(Type.t HVar.t Sequence.t) -> ?subst:subst ->
      scope:int -> pattern:term -> term -> subst)
 
   let matching_adapt_scope =
     (matching_adapt_scope :>
-     ?protect:(term HVar.t Sequence.t) -> ?subst:subst ->
+     ?protect:(Type.t HVar.t Sequence.t) -> ?subst:subst ->
      pattern:term Scoped.t -> term Scoped.t -> subst)
 
   let variant =
@@ -816,11 +816,11 @@ module FO = struct
      pattern:term Scoped.t -> term Scoped.t -> subst)
 
   let matching_same_scope =
-    (matching_same_scope :> ?protect:(term HVar.t Sequence.t) -> ?subst:subst ->
+    (matching_same_scope :> ?protect:(Type.t HVar.t Sequence.t) -> ?subst:subst ->
      scope:int -> pattern:term -> term -> subst)
 
   let matching_adapt_scope =
-    (matching_adapt_scope :> ?protect:(term HVar.t Sequence.t) -> ?subst:subst ->
+    (matching_adapt_scope :> ?protect:(Type.t HVar.t Sequence.t) -> ?subst:subst ->
      pattern:term Scoped.t -> term Scoped.t -> subst)
 
   let variant =
