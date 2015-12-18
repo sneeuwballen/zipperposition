@@ -129,6 +129,13 @@ let is_rat = function | Rat _ -> true | _ -> false
 let is_numeric = function | Int _ | Rat _ | _ -> false
 let is_not_numeric x = not (is_numeric x)
 
+let is_arith = function
+  | Int _ | Rat _ | Floor | Ceiling | Truncate | Round | Prec | Succ | Sum
+  | Difference | Uminus | Product | Quotient | Quotient_e | Quotient_t
+  | Quotient_f | Remainder_e | Remainder_t | Remainder_f | Is_int | Is_rat
+  | To_int | To_rat | Less | Lesseq | Greater | Greatereq -> true
+  | _ -> false
+
 module Seq = struct
   let add_set set =
     Sequence.fold (fun set s -> Set.add s set) set
