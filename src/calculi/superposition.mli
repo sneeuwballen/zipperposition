@@ -43,11 +43,6 @@ module type S = sig
 
   val infer_equality_factoring: Env.unary_inf_rule
 
-  val infer_split : Env.unary_inf_rule
-  (** hyper-splitting *)
-
-  (* TODO branch rewriting? *)
-
   (** {6 Simplifications rules} *)
 
   val is_tautology : C.t -> bool
