@@ -191,7 +191,7 @@ module Make(E : Index.EQUATION) = struct
           | T.Classic.NonFO -> assert false (* TODO: consder like a var? *)
     in
     try
-      traverse dt.Scoped.value (iterate t.Scoped.value);
+      traverse (fst dt) (iterate (fst t));
       Util.exit_prof prof_npdtree_retrieve;
     with e ->
       Util.exit_prof prof_npdtree_retrieve;
@@ -369,7 +369,7 @@ module MakeTerm(X : Set.OrderedType) = struct
           | T.Classic.NonFO -> assert false
     in
     try
-      traverse dt.Scoped.value (iterate t.Scoped.value);
+      traverse (fst dt) (iterate (fst t));
       Util.exit_prof prof_npdtree_term_unify;
     with e ->
       Util.exit_prof prof_npdtree_term_unify;
@@ -407,7 +407,7 @@ module MakeTerm(X : Set.OrderedType) = struct
           | T.Classic.NonFO -> assert false
     in
     try
-      traverse dt.Scoped.value (iterate t.Scoped.value);
+      traverse (fst dt) (iterate (fst t));
       Util.exit_prof prof_npdtree_term_generalizations;
     with e ->
       Util.exit_prof prof_npdtree_term_generalizations;
@@ -439,7 +439,7 @@ module MakeTerm(X : Set.OrderedType) = struct
           | T.Classic.NonFO -> assert false
     in
     try
-      traverse dt.Scoped.value (iterate t.Scoped.value);
+      traverse (fst dt) (iterate (fst t));
       Util.exit_prof prof_npdtree_term_specializations;
     with e ->
       Util.exit_prof prof_npdtree_term_specializations;

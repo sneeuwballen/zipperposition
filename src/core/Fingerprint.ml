@@ -274,24 +274,24 @@ module Make(X : Set.OrderedType) = struct
       Util.exit_prof prof_traverse;
       raise e
 
-  let retrieve_unifiables ?(subst=S.empty) idx t k =
-    let features = idx.Scoped.value.fp t.Scoped.value in
+  let retrieve_unifiables ?(subst=S.empty) (idx,sc_idx) t k =
+    let features = idx.fp (fst t) in
     let compatible = compatible_features_unif in
-    traverse ~compatible idx.Scoped.value features
-      (fun leaf -> Leaf.fold_unify ~subst (Scoped.set idx leaf) t k)
+    traverse ~compatible idx features
+      (fun leaf -> Leaf.fold_unify ~subst (leaf,sc_idx) t k)
 
-  let retrieve_generalizations ?(subst=S.empty) idx t k =
-    let features = idx.Scoped.value.fp t.Scoped.value in
+  let retrieve_generalizations ?(subst=S.empty) (idx,sc_idx) t k =
+    let features = idx.fp (fst t) in
     (* compatible t1 t2 if t2 can match t1 *)
     let compatible f1 f2 = compatible_features_match f2 f1 in
-    traverse ~compatible idx.Scoped.value features
-      (fun leaf -> Leaf.fold_match ~subst (Scoped.set idx leaf) t k)
+    traverse ~compatible idx features
+      (fun leaf -> Leaf.fold_match ~subst (leaf,sc_idx) t k)
 
-  let retrieve_specializations ?(subst=S.empty) idx t k =
-    let features = idx.Scoped.value.fp t.Scoped.value in
+  let retrieve_specializations ?(subst=S.empty) (idx,sc_idx) t k =
+    let features = idx.fp (fst t) in
     let compatible = compatible_features_match in
-    traverse ~compatible idx.Scoped.value features
-      (fun leaf -> Leaf.fold_matched ~subst (Scoped.set idx leaf) t k)
+    traverse ~compatible idx features
+      (fun leaf -> Leaf.fold_matched ~subst (leaf,sc_idx) t k)
 
   let to_dot _ _ =
     failwith "Fingerprint: to_dot not implemented"

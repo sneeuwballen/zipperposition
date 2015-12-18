@@ -38,14 +38,14 @@ module Renaming = struct
   let dummy = Dummy
 
   (* rename variable *)
-  let rename r v = match r with
-  | Dummy -> Scoped.get v  (* do not rename *)
+  let rename r ((v,_) as var) = match r with
+  | Dummy -> v  (* do not rename *)
   | Tbl tbl ->
       begin try
-        H.find tbl v
+        H.find tbl var
       with Not_found ->
-        let v' = HVar.make ~ty:(HVar.ty v.Scoped.value) (H.length tbl) in
-        H.add tbl v v';
+        let v' = HVar.make ~ty:(HVar.ty v) (H.length tbl) in
+        H.add tbl var v';
         v'
       end
 end
@@ -64,15 +64,15 @@ let find subst v = try Some (M.find v subst) with Not_found -> None
 
 let mem subst v = M.mem v subst
 
-let rec deref subst t =
-  match T.view t.Scoped.value with
+let rec deref subst ((t,sc_t) as term) =
+  match T.view t with
     | T.Var v ->
         begin try
-          let t' = find_exn subst (Scoped.set t v) in
+          let t' = find_exn subst (v,sc_t) in
           deref subst t'
-        with Not_found -> t
+        with Not_found -> term
         end
-    | _ -> t
+    | _ -> term
 
 (** Recursively lookup a variable in the substitution, until we get a value
     that is not a variable or that is not bound *)
@@ -126,9 +126,9 @@ let is_renaming subst =
   try
     let codomain = H.create 8 in
     M.iter
-      (fun _ t ->
-        match T.view t.Scoped.value with
-        | T.Var v -> H.replace codomain (Scoped.set t v) ()
+      (fun _ (t,sc_t) ->
+        match T.view t with
+        | T.Var v -> H.replace codomain (v,sc_t) ()
         | _ ->
             raise Exit (* some var bound to a non-var term *)
       )
@@ -146,8 +146,8 @@ let codomain s k = M.iter (fun _ t -> k t) s
 (* variables introduced by the subst *)
 let introduced subst k =
   M.iter
-    (fun _ t ->
-      T.Seq.vars t.Scoped.value (fun v -> k (Scoped.set t v)))
+    (fun _ (t,sc_t) ->
+      T.Seq.vars t (fun v -> k (v,sc_t)))
     subst
 
 let to_seq subst k = M.iter (fun v t -> k (v,t)) subst
@@ -176,14 +176,14 @@ let to_string = CCFormat.to_string pp
 (** {2 Applying a substitution} *)
 
 let apply subst ~renaming t =
-  let rec aux t =
-    match T.ty t.Scoped.value with
+  let rec aux (t,sc_t) =
+    match T.ty t with
     | T.NoType ->
-      assert(T.is_ground t.Scoped.value);
-      t.Scoped.value
+      assert(T.is_ground t);
+      t
     | T.HasType ty ->
-      let ty = aux (Scoped.set t ty) in
-      match T.view t.Scoped.value with
+      let ty = aux (ty,sc_t) in
+      match T.view t with
       | T.Const s ->
         (* regular constant *)
         T.const ~ty s
@@ -192,53 +192,52 @@ let apply subst ~renaming t =
         (* the most interesting cases!
            switch depending on whether [t] is bound by [subst] or not *)
         begin try
-          let t'  = find_exn subst (Scoped.set t v) in
+          let (t', _) as term'  = find_exn subst (v,sc_t) in
           (* NOTE: we used to shift [t'], in case it contained free De
              Bruijn indices, but that shouldn't happen because only
              closed terms should appear in substitutions. *)
-          assert (T.DB.closed t'.Scoped.value);
+          assert (T.DB.closed t');
           (* also apply [subst] to [t'] *)
-          aux t'
+          aux term'
         with Not_found ->
           (* variable not bound by [subst], rename it
               (after specializing its type if needed) *)
-          let t = Scoped.set t v in
-          T.var (Renaming.rename renaming t)
+          T.var (Renaming.rename renaming (v,sc_t))
         end
       | T.Bind (s, varty, sub_t) ->
-          let varty' = aux (Scoped.set t varty) in
-          let sub_t' = aux (Scoped.set t sub_t) in
+          let varty' = aux (varty,sc_t) in
+          let sub_t' = aux (sub_t,sc_t) in
           T.bind ~varty:varty' ~ty s sub_t'
       | T.App (hd, l) ->
-          let hd' = aux (Scoped.set t hd) in
-          let l' = aux_list t l in
+          let hd' = aux (hd,sc_t) in
+          let l' = aux_list l sc_t in
           T.app ~ty hd' l'
       | T.Record (l, rest) ->
           let rest = match rest with
             | None -> None
             | Some v ->
                 begin try
-                  let t' = find_exn subst (Scoped.set t v) in
+                  let t' = find_exn subst (v,sc_t) in
                   Some (aux t')
                 with Not_found ->
                   Some (T.var v)
                 end
           in
-          let l' = List.map (fun (s,t') -> s, aux (Scoped.set t t')) l in
+          let l' = List.map (fun (s,t') -> s, aux (t',sc_t)) l in
           T.record_flatten ~ty l' ~rest
       | T.SimpleApp (s, l) ->
-          let l' = aux_list t l in
+          let l' = aux_list l sc_t in
           T.simple_app ~ty s l'
       | T.AppBuiltin (s, l) ->
-          let l' = aux_list t l in
+          let l' = aux_list l sc_t in
           T.app_builtin ~ty s l'
       | T.Multiset l ->
-          let l' = aux_list t l in
+          let l' = aux_list l sc_t in
           T.multiset ~ty l'
-  and aux_list s l = match l with
+  and aux_list l sc = match l with
     | [] -> []
     | t::l' ->
-        aux (Scoped.set s t) :: aux_list s l'
+        aux (t,sc) :: aux_list l' sc
   in
   aux t
 

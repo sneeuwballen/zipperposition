@@ -25,36 +25,36 @@ module type NARY = Unif_intf.NARY
 
 (* Does [v] appear in [t] if we apply the substitution,
    or is [t] open? *)
-let occurs_check ~depth subst v t =
-  let rec check ~depth t = match T.ty t.Scoped.value with
+let occurs_check ~depth subst (v,sc_v) t =
+  let rec check ~depth (t,sc_t) = match T.ty t with
     | T.NoType -> false
     | T.HasType ty ->
         (* check type and subterms *)
-        check ~depth (Scoped.set t ty) ||
-        match T.view t.Scoped.value with
+        check ~depth (ty, sc_t) ||
+        match T.view t with
         | T.Var v' ->
-            (HVar.equal (Scoped.get v) v' && Scoped.same_scope v t)
+            (HVar.equal v v' && sc_v = sc_t)
             ||
-            begin match Substs.find subst (Scoped.set t v') with
+            begin match Substs.find subst (v',sc_t) with
               | None -> false
               | Some t' -> check ~depth t'
             end
         | T.DB i -> i>=depth (* not closed! *)
         | T.Const _ -> false
         | T.Bind (_, varty, t') ->
-            check ~depth (Scoped.set t varty) ||
-            check ~depth:(depth+1) (Scoped.set t t')
+            check ~depth (varty,sc_t) ||
+            check ~depth:(depth+1) (t',sc_t)
         | T.Record (l, rest) ->
-            CCOpt.maybe (HVar.equal v.Scoped.value) false rest
+            CCOpt.maybe (HVar.equal v) false rest
             ||
-            List.exists (fun (_,t') -> check ~depth (Scoped.set t t')) l
+            List.exists (fun (_,t') -> check ~depth (t',sc_t)) l
         | T.SimpleApp (_, l)
         | T.AppBuiltin (_, l)
         | T.Multiset l ->
-            List.exists (fun t' -> check ~depth (Scoped.set t t')) l
+            List.exists (fun t' -> check ~depth (t',sc_t)) l
         | T.App (hd, l) ->
-            check ~depth (Scoped.set t hd) ||
-            List.exists (fun t' -> check ~depth (Scoped.set t t')) l  (* TODO: unroll *)
+            check ~depth (hd,sc_t) ||
+            List.exists (fun t' -> check ~depth (t',sc_t)) l  (* TODO: unroll *)
   in
   check ~depth t
 
@@ -129,15 +129,15 @@ module RecordUnif = struct
 
   let set_rest r ~rest = { r with rest; }
 
-  let occurs_check ~depth subst v r =
+  let occurs_check ~depth subst (v,sc_v) (r,sc_r) =
     let check_l l =
-      List.exists (fun (_,t) -> occurs_check ~depth subst v (Scoped.set r t)) l
+      List.exists (fun (_,t) -> occurs_check ~depth subst (v,sc_v) (t,sc_r)) l
     in
-    begin match r.Scoped.value.rest with
-      | Some v' -> HVar.equal v.Scoped.value v' && Scoped.same_scope v r
+    begin match r.rest with
+      | Some v' -> HVar.equal v v' && sc_v = sc_r
       | None -> false
     end
-    || check_l r.Scoped.value.fields || check_l r.Scoped.value.discarded
+    || check_l r.fields || check_l r.discarded
 
   (* remove next field *)
   let pop_field r = match r.fields with
@@ -317,27 +317,26 @@ module Nary = struct
   (** {6 Multisets, Lists, Records} *)
 
   (* unify lists pairwise *)
-  let rec unify_list_ ~env ~unif subst l1 l2 k =
-    match l1.Scoped.value, l2.Scoped.value with
+  let rec unify_list_ ~env ~unif subst (l1,sc1) (l2,sc2) k =
+    match l1, l2 with
     | [], [] -> k ~env subst
     | [], _
     | _, [] -> ()
     | t1::l1', t2::l2' ->
-        unif ~env subst (Scoped.set l1 t1) (Scoped.set l1 t2)
+        unif ~env subst (t1,sc1) (t2,sc2)
           (fun ~env subst ->
-            unify_list_ ~env ~unif subst (Scoped.set l1 l1') (Scoped.set l2 l2') k)
+            unify_list_ ~env ~unif subst (l1',sc1) (l2',sc2) k)
 
   (* unify the row variables, if any, with the unmatched columns of each term.
       we first unify the record composed of discard fields of r1, with
       the row of r2, and then conversely.*)
-  let unify_record_rest_ ~env subst r1 r2 k =
-    assert (r1.Scoped.value.RU.fields = []);
-    assert (r2.Scoped.value.RU.fields = []);
+  let unify_record_rest_ ~env subst (r1,sc1) (r2,sc2) k =
+    assert (r1.RU.fields = []);
+    assert (r2.RU.fields = []);
     (* Util.debugff 5 "@[<hv2>unify_rec_rest@ %a and@ %a with@ %a@]"
        RU._pp r1 RU._pp r2 S.fmt subst; *)
     (* Util.debugf 5 "unif_rest %a %a" T.pp (RU.to_record r1) T.pp (RU.to_record r2); *)
-    let rv1 = r1.Scoped.value and rv2 = r2.Scoped.value in
-    match rv1.RU.rest, rv1.RU.discarded, rv2.RU.rest, rv2.RU.discarded with
+    match r1.RU.rest, r1.RU.discarded, r2.RU.rest, r2.RU.discarded with
     | None, [], None, [] ->
         k ~env subst (* no row, no remaining fields *)
     | None, _, _, _::_
@@ -348,117 +347,116 @@ module Nary = struct
     | Some rest1, [], _, _ ->
         (* no discarded fields in r1, so we only need to
            unify rest1 with { l2 | rest2 } *)
-        if not (RU.occurs_check ~depth:env.depth subst (Scoped.set r1 rest1) r2)
+        if not (RU.occurs_check ~depth:env.depth subst (rest1,sc1) (r2,sc2))
         then
-          let subst = S.bind subst (Scoped.set r1 rest1) (Scoped.map RU.to_record r2) in
+          let subst = S.bind subst (rest1,sc1) (RU.to_record r2,sc2) in
           k ~env subst
     | _, _, Some rest2, [] ->
         (* symmetric case of the previous one *)
-        if not (RU.occurs_check ~depth:env.depth subst (Scoped.set r2 rest2) r1)
+        if not (RU.occurs_check ~depth:env.depth subst (rest2,sc2) (r1,sc1))
         then
-          let subst = S.bind subst (Scoped.set r2 rest2) (Scoped.map RU.to_record r1) in
+          let subst = S.bind subst (rest2,sc2) (RU.to_record r1,sc1) in
           k ~env subst
     | Some rest1, d1, Some rest2, d2 ->
-        if HVar.equal rest1 rest2 && Scoped.same_scope r1 r2
+        if HVar.equal rest1 rest2 && sc1 = sc2
         then (* can only unify if common set of fields --> no discarded *)
           if d1=[] && d2=[] then k ~env subst else ()
         else
           (* create fresh var R and unify rest1 with {l2 | R} (t2)
              and rest2 with { l1 | R } (t1) *)
-          let r = HVar.fresh ~ty:rv1.RU.ty () in
-          let t1 = Scoped.set r1 (RU.set_rest rv1 ~rest:(Some r)) in
-          let t2 = Scoped.set r2 (RU.set_rest rv2 ~rest:(Some r)) in
-          if RU.occurs_check ~depth:env.depth subst (Scoped.set r1 rest1) t2
-          || RU.occurs_check ~depth:env.depth subst (Scoped.set r2 rest2) t1 then ()
+          let r = HVar.fresh ~ty:r1.RU.ty () in
+          let t1 = RU.set_rest r1 ~rest:(Some r) in
+          let t2 = RU.set_rest r2 ~rest:(Some r) in
+          if RU.occurs_check ~depth:env.depth subst (rest1,sc1) (t2,sc2)
+          || RU.occurs_check ~depth:env.depth subst (rest2,sc2) (t1,sc1) then ()
           else (
-            let subst = S.bind subst (Scoped.set r1 rest1) (Scoped.map RU.to_record t2) in
-            let subst = S.bind subst (Scoped.set r2 rest2) (Scoped.map RU.to_record t1) in
+            let subst = S.bind subst (rest1,sc1) (RU.to_record t2,sc2) in
+            let subst = S.bind subst (rest2,sc2) (RU.to_record t1,sc1) in
             k ~env subst
           )
 
   (* unify the two records *)
-  let rec unify_records_ ~env ~unif subst r1 r2 k =
+  let rec unify_records_ ~env ~unif subst (r1,sc1) (r2,sc2) k =
     (* Util.debugff 5 "@[<hv2>unify_rec@ %a and@ %a with@ %a@]"
         RU._pp r1 RU._pp r2 S.fmt subst; *)
-    match RU.fields r1.Scoped.value, RU.fields r2.Scoped.value with
+    match RU.fields r1, RU.fields r2 with
     | [], _
     | _, [] ->
-        let r1 = Scoped.map RU.discard_all r1 in
-        let r2 = Scoped.map RU.discard_all r2 in
-        unify_record_rest_ ~env subst r1 r2 k
+        let r1 = RU.discard_all r1 in
+        let r2 = RU.discard_all r2 in
+        unify_record_rest_ ~env subst (r1,sc1) (r2,sc2) k
     | (n1,t1)::_, (n2,t2)::_ ->
         begin match String.compare n1 n2 with
           | 0 ->
-              unif ~env subst (Scoped.set r1 t1) (Scoped.set r2 t2)
+              unif ~env subst (t1,sc1) (t2,sc2)
                 (fun ~env subst ->
-                   let r1' = Scoped.map RU.pop_field r1 in
-                   let r2' = Scoped.map RU.pop_field r2 in
-                   unify_records_ ~env ~unif subst r1' r2' k)
+                   let r1' = RU.pop_field r1 in
+                   let r2' = RU.pop_field r2 in
+                   unify_records_ ~env ~unif subst (r1',sc1) (r2',sc2) k)
           | n when n < 0 ->
               (* n1 too small, ditch it into l1' *)
-              let r1' = Scoped.map RU.discard r1 in
-              unify_records_ ~env ~unif subst r1' r2 k
+              let r1' = RU.discard r1 in
+              unify_records_ ~env ~unif subst (r1',sc1) (r2,sc2) k
           | _ ->
               (* n2 too small, ditch it into l2' *)
-              let r2' = Scoped.map RU.discard r2 in
-              unify_records_ ~env ~unif subst r1 r2' k
+              let r2' = RU.discard r2 in
+              unify_records_ ~env ~unif subst (r1,sc1) (r2',sc2) k
         end
 
   (* unify multisets pairwise. Precondition: l1 and l2 have the same length. *)
-  let rec unify_multiset_ ~env ~unif subst l1 l2 k =
-    match l2.Scoped.value with
+  let rec unify_multiset_ ~env ~unif subst (l1,sc1) (l2,sc2) k =
+    match l2 with
     | [] -> k ~env subst (* success! *)
     | t2::l2' ->
         (* need to unify some element of [l1] with [t2] first *)
-        cnoose_pair_ ~env ~unif subst [] l1 (Scoped.set l2 t2) (Scoped.set l2 l2') k
+        cnoose_pair_ ~env ~unif subst [] l1 sc1 t2 l2' sc2 k
   (* choose an element of [l1] to unify with the head of [l2] *)
-  and cnoose_pair_ ~env ~unif subst left right t2 l2' k =
-    match right.Scoped.value with
+  and cnoose_pair_ ~env ~unif subst left right sc1 t2 l2' sc2 k =
+    match right with
     | [] -> ()   (* exhausted all possibilities *)
     | t1::right' ->
-        unif ~env subst (Scoped.set right t1) t2
+        unif ~env subst (t1,sc1) (t2,sc2)
           (fun ~env subst ->
              (* upon success, unify remaining pairs *)
-             unify_multiset_ ~env ~unif subst
-              (Scoped.set right (left@right')) l2' k);
+             unify_multiset_ ~env ~unif subst (left@right',sc1) (l2',sc2) k);
         (* also try to unify [t2] with another term of [right] *)
         cnoose_pair_ ~env ~unif
-          subst (t1::left) (Scoped.set right right') t2 l2' k
+          subst (t1::left) right' sc1 t2 l2' sc2 k
 
-  let rec unif_commutating_binders_ ~env ~unif ~sym ~size subst t1 t2 k =
-    match T.view t1.Scoped.value, T.view t2.Scoped.value with
+  let rec unif_commutating_binders_ ~env ~unif ~sym ~size subst (t1,sc1) (t2,sc2) k =
+    match T.view t1, T.view t2 with
     | T.Bind (s1, _, t1'), T.Bind (s2, _, t2')
       when Binder.equal s1 sym && Binder.equal s2 sym ->
         (* recurse *)
         unif_commutating_binders_ ~env ~unif ~sym
-          ~size:(size+1) subst (Scoped.set t1 t1') (Scoped.set t2 t2') k
+          ~size:(size+1) subst (t1',sc1) (t2',sc2) k
     | _ ->
         assert (size > 0);
         (* push permutation *)
         let env = push_many env size in
-        unif ~env subst t1 t2
+        unif ~env subst (t1,sc1) (t2,sc2)
           (fun ~env subst -> k ~env:(pop_many env size) subst)
 
   (** {6 Unification, Matching, Comparison} *)
 
-  let rec unif_rec_ ~env ~op subst t1 t2 k : unit =
+  let rec unif_rec_ ~env ~op subst t1s t2s k : unit =
     Util.debugf 5 "@[<hv2>unif:@ @[%a@]@ =?=@ @[%a@]@ with @[%a@]@]"
-      (fun k->k (Scoped.pp T.pp) t1 (Scoped.pp T.pp) t2 S.pp subst);
-    let t1 = S.deref subst t1
-    and t2 = S.deref subst t2 in
+      (fun k->k (Scoped.pp T.pp) t1s (Scoped.pp T.pp) t2s S.pp subst);
+    let t1,sc1 = S.deref subst t1s
+    and t2,sc2 = S.deref subst t2s in
     (* unify types. On success, unify terms. *)
-    match T.ty t1.Scoped.value, T.ty t2.Scoped.value with
-    | T.NoType, T.NoType -> unif_terms_rec_ ~env ~op subst t1 t2 k
+    match T.ty t1, T.ty t2 with
+    | T.NoType, T.NoType -> unif_terms_rec_ ~env ~op subst t1 sc1 t2 sc2 k
     | T.NoType, _
     | _, T.NoType -> ()
     | T.HasType ty1, T.HasType ty2 ->
-        unif_rec_ ~env ~op subst (Scoped.set t1 ty1) (Scoped.set t2 ty2)
-          (fun ~env subst -> unif_terms_rec_ ~env ~op subst t1 t2 k)
-  and unif_terms_rec_ ~env ~op subst t1 t2 k =
-    let view1 = T.view t1.Scoped.value and view2 = T.view t2.Scoped.value in
+        unif_rec_ ~env ~op subst (ty1,sc1) (ty2,sc2)
+          (fun ~env subst -> unif_terms_rec_ ~env ~op subst t1 sc1 t2 sc2 k)
+  and unif_terms_rec_ ~env ~op subst t1 sc1 t2 sc2 k =
+    let view1 = T.view t1 and view2 = T.view t2 in
     match view1, view2 with
-    | _ when T.equal t1.Scoped.value t2.Scoped.value
-     && (Scoped.same_scope t1 t2 || T.is_ground t1.Scoped.value) ->
+    | _ when T.equal t1 t2
+     && (sc1 = sc2 || T.is_ground t1) ->
         k ~env subst (* the terms are equal under any substitution *)
     | T.Var _, _
     | _, T.Var _ ->
@@ -466,30 +464,31 @@ module Nary = struct
            some combinations are not allowed *)
         begin match view1, view2, op with
         | T.Var v1, T.Var v2, O_equal ->
-            if HVar.equal v1 v2 && Scoped.same_scope t1 t2
+            if HVar.equal v1 v2 && sc1 = sc2
             then k ~env subst
         | T.Var v1, T.Var v2, (O_unify | O_match _ | O_variant) ->
-            if HVar.equal v1 v2 && Scoped.same_scope t1 t2
+            if HVar.equal v1 v2 && sc1 = sc2
             then k ~env subst
-            else k ~env (S.bind subst (Scoped.set t1 v1) t2)
+            else k ~env (S.bind subst (v1,sc1) (t2,sc2))
         | T.Var v1, _, (O_unify | O_match _) ->
-            if occurs_check ~depth:env.depth subst (Scoped.set t1 v1) t2
+            if occurs_check ~depth:env.depth subst (v1,sc1) (t2,sc2)
             then () (* occur check or t2 is open *)
-            else k ~env (S.bind subst (Scoped.set t1 v1) t2)
+            else k ~env (S.bind subst (v1,sc1) (t2,sc2))
         | _, T.Var v2, O_unify ->
-            if occurs_check ~depth:env.depth subst (Scoped.set t2 v2) t1
+            if occurs_check ~depth:env.depth subst (v2,sc2) (t1,sc1)
             then () (* occur check *)
-            else k ~env (S.bind subst (Scoped.set t2 v2) t1)
+            else k ~env (S.bind subst (v2,sc2) (t1,sc1))
         | _ -> ()  (* fail *)
         end
     | T.Bind (s1, _, _), T.Bind (s2, _, _)
       when Binder.equal s1 s2 && binder_commutes s1 ->
         (* forall or exists: they might swap *)
-        unif_commutating_binders_ ~env ~unif:(unif_rec_ ~op) ~sym:s1 ~size:0 subst t1 t2 k
+        unif_commutating_binders_
+          ~env ~unif:(unif_rec_ ~op) ~sym:s1 ~size:0 subst (t1, sc1) (t2, sc2) k
     | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Binder.equal s1 s2 ->
-        unif_rec_ ~env ~op subst (Scoped.set t1 varty1) (Scoped.set t2 varty2)
+        unif_rec_ ~env ~op subst (varty1,sc1) (varty2,sc2)
           (fun ~env subst ->
-            unif_rec_ ~op ~env:(push_none env) subst (Scoped.set t1 t1') (Scoped.set t2 t2')
+            unif_rec_ ~op ~env:(push_none env) subst (t1',sc1) (t2',sc2)
               (fun ~env subst -> k ~env:(pop_many env 1) subst))
     | T.DB i, T.DB j ->
         begin match make_db_equal env i j with
@@ -502,26 +501,21 @@ module Nary = struct
         | T.Const id1, T.Const id2 ->
             if ID.equal id1 id2 && List.length l1 = List.length l2
             then unify_list_ ~env ~unif:(unif_rec_ ~op) subst
-              (Scoped.set t1 l1) (Scoped.set t2 l2) k
+              (l1,sc1) (l2,sc2) k
         | _ ->
             let l1, l2 = pair_lists_ f1 l1 f2 l2 in
-            unify_list_ ~env ~unif:(unif_rec_ ~op) subst
-              (Scoped.set t1 l1) (Scoped.set t2 l2) k
+            unify_list_ ~env ~unif:(unif_rec_ ~op) subst (l1,sc1) (l2,sc2) k
         end
     | T.Record (l1, rest1), T.Record (l2, rest2) ->
-        let r1 = RU.of_record t1.Scoped.value l1 rest1 in
-        let r2 = RU.of_record t2.Scoped.value l2 rest2 in
-        unify_records_ ~env ~unif:(unif_rec_ ~op)
-          subst (Scoped.set t1 r1) (Scoped.set t2 r2) k
+        let r1 = RU.of_record t1 l1 rest1 in
+        let r2 = RU.of_record t2 l2 rest2 in
+        unify_records_ ~env ~unif:(unif_rec_ ~op) subst (r1,sc1) (r2,sc2) k
     | T.SimpleApp(s1,l1), T.SimpleApp (s2, l2) when ID.equal s1 s2 ->
-        unify_list_ ~env ~unif:(unif_rec_ ~op) subst
-          (Scoped.set t1 l1) (Scoped.set t2 l2) k
+        unify_list_ ~env ~unif:(unif_rec_ ~op) subst (l1,sc1) (l2,sc2) k
     | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Builtin.equal s1 s2 ->
-        unify_list_ ~env ~unif:(unif_rec_ ~op) subst
-          (Scoped.set t1 l1) (Scoped.set t2 l2) k
+        unify_list_ ~env ~unif:(unif_rec_ ~op) subst (l1,sc1) (l2,sc2) k
     | T.Multiset l1, T.Multiset l2 when List.length l1 = List.length l2 ->
-        unify_multiset_ ~env ~unif:(unif_rec_ ~op) subst
-          (Scoped.set t1 l1) (Scoped.set t2 l2) k
+        unify_multiset_ ~env ~unif:(unif_rec_ ~op) subst (l1,sc1) (l2,sc2) k
     | _, _ -> ()  (* fail *)
 
   let unification ?(subst=S.empty) a b =
@@ -554,49 +548,48 @@ module Unary = struct
   type term = T.t
 
   (* unify lists using the given "unificator" and continuation [k] *)
-  let rec unif_list ~unif subst l1 l2 = match l1.Scoped.value, l2.Scoped.value with
+  let rec unif_list ~unif subst l1 sc1 l2 sc2 = match l1, l2 with
     | [], [] -> subst
     | _, []
     | [], _ -> fail ()
     | t1::l1', t2::l2' ->
-        let subst = unif subst (Scoped.set l1 t1) (Scoped.set l2 t2) in
-        unif_list ~unif subst (Scoped.set l1 l1') (Scoped.set l2 l2')
+        let subst = unif subst (t1,sc1) (t2,sc2) in
+        unif_list ~unif subst l1' sc1 l2' sc2
 
   (* unify/match records together.
      l1, l2: to unify; l1', l2': to unify with rest1, rest2.
      we use the fact that l1 and l2 are sorted w.r.t keys. *)
-  let rec unif_records ~unif subst r1 r2 =
-    match RU.fields r1.Scoped.value, RU.fields r2.Scoped.value with
+  let rec unif_records ~unif subst r1 sc1 r2 sc2 =
+    match RU.fields r1, RU.fields r2 with
     | [], _
     | _, [] ->
-        let r1 = Scoped.map RU.discard_all r1 in
-        let r2 = Scoped.map RU.discard_all r2 in
-        unif_rest_ subst r1 r2
+        let r1 = RU.discard_all r1 in
+        let r2 = RU.discard_all r2 in
+        unif_rest_ subst r1 sc1 r2 sc2
     | (n1,t1)::_, (n2,t2)::_ ->
         begin match String.compare n1 n2 with
           | 0 ->
-              let subst = unif subst (Scoped.set r1 t1) (Scoped.set r2 t2) in
-              let r1 = Scoped.map RU.pop_field r1 in
-              let r2 = Scoped.map RU.pop_field r2 in
-              unif_records ~unif subst r1 r2
+              let subst = unif subst (t1,sc1) (t2,sc2) in
+              let r1 = RU.pop_field r1 in
+              let r2 = RU.pop_field r2 in
+              unif_records ~unif subst r1 sc1 r2 sc2
           | n when n < 0 ->
               (* n1 too small, ditch it into l1' *)
-              let r1 = Scoped.map RU.discard r1 in
-              unif_records ~unif subst r1 r2
+              let r1 = RU.discard r1 in
+              unif_records ~unif subst r1 sc1 r2 sc2
           | _ ->
               (* n2 too small, ditch it into l1' *)
-              let r2 = Scoped.map RU.discard r2 in
-              unif_records ~unif subst r1 r2
+              let r2 = RU.discard r2 in
+              unif_records ~unif subst r1 sc1 r2 sc2
         end
 
   (* unify the row variables, if any, with the unmatched columns of each term.
       we first unify the record composed of discard fields of r1, with
       the row of r2, and then conversely. *)
-  and unif_rest_ subst r1 r2 =
-    let rv1 = r1.Scoped.value and rv2 = r2.Scoped.value in
-    assert (rv1.RU.fields = []);
-    assert (rv2.RU.fields = []);
-    match rv1.RU.rest, rv1.RU.discarded, rv2.RU.rest, rv2.RU.discarded with
+  and unif_rest_ subst r1 sc1 r2 sc2 =
+    assert (r1.RU.fields = []);
+    assert (r2.RU.fields = []);
+    match r1.RU.rest, r1.RU.discarded, r2.RU.rest, r2.RU.discarded with
     | None, [], None, [] -> subst  (* no row, no remaining fields *)
     | None, _, _, _::_
     | _, _::_, None, _ ->
@@ -606,28 +599,28 @@ module Unary = struct
     | Some rest1, [], _, _ ->
         (* no discarded fields in r1, so we only need to
            unify rest1 with { l2 | rest2 } *)
-        if RU.occurs_check ~depth:0 subst (Scoped.set r1 rest1) r2 then fail();
-        S.bind subst (Scoped.set r1 rest1) (Scoped.map RU.to_record r2)
+        if RU.occurs_check ~depth:0 subst (rest1,sc1) (r2,sc2) then fail();
+        S.bind subst (rest1,sc1) (RU.to_record r2,sc2)
     | _, _, Some rest2, [] ->
         (* symmetric case of the previous one *)
-        if RU.occurs_check ~depth:0 subst (Scoped.set r2 rest2) r1 then fail();
-        S.bind subst (Scoped.set r2 rest2) (Scoped.map RU.to_record r1)
+        if RU.occurs_check ~depth:0 subst (rest2,sc2) (r1,sc1) then fail();
+        S.bind subst (rest2,sc2) (RU.to_record r1,sc1)
     | Some rest1, d1, Some rest2, d2 ->
-        if HVar.equal rest1 rest2 && Scoped.same_scope r1 r2
+        if HVar.equal rest1 rest2 && sc1 = sc2
         then
           if d1=[] && d2=[] then subst
           else raise Fail (* impossible to unify discarded fields *)
         else (
           (* create fresh var R and unify rest1 with {l2 | R}
              and rest2 with { l1 | R } *)
-          let r = HVar.fresh ~ty:rv1.RU.ty () in
-          let t1 = Scoped.set r1 (RU.set_rest rv1 ~rest:(Some r)) in
-          let t2 = Scoped.set r2 (RU.set_rest rv2 ~rest:(Some r)) in
-          if RU.occurs_check ~depth:0 subst (Scoped.set r1 rest1) t2
-          || RU.occurs_check ~depth:0 subst (Scoped.set r2 rest2) t1 then fail()
+          let r = HVar.fresh ~ty:r1.RU.ty () in
+          let t1 = RU.set_rest r1 ~rest:(Some r) in
+          let t2 = RU.set_rest r2 ~rest:(Some r) in
+          if RU.occurs_check ~depth:0 subst (rest1,sc1) (t2,sc2)
+          || RU.occurs_check ~depth:0 subst (rest2,sc2) (t1,sc1) then fail()
           else (
-            let subst = S.bind subst (Scoped.set r1 rest1) (Scoped.map RU.to_record t2) in
-            let subst = S.bind subst (Scoped.set r2 rest2) (Scoped.map RU.to_record t1) in
+            let subst = S.bind subst (rest1,sc1) (RU.to_record t2,sc2) in
+            let subst = S.bind subst (rest2,sc2) (RU.to_record t1,sc1) in
             subst
           )
         )
@@ -636,70 +629,67 @@ module Unary = struct
     if occurs_check ~depth:0 subst v t then fail()
     else S.bind subst v t
 
-  let rec unif_rec ~op subst t1 t2 =
-    let t1 = S.deref subst t1
-    and t2 = S.deref subst t2 in
+  let rec unif_rec ~op subst t1s t2s =
+    let t1,sc1 = S.deref subst t1s
+    and t2,sc2 = S.deref subst t2s in
     (* first, unify types *)
-    let subst = match T.ty t1.Scoped.value, T.ty t2.Scoped.value with
+    let subst = match T.ty t1, T.ty t2 with
       | T.NoType, T.NoType -> subst
       | T.NoType, _
       | _, T.NoType -> raise Fail
       | T.HasType ty1, T.HasType ty2 ->
-          unif_rec ~op subst (Scoped.set t1 ty1) (Scoped.set t2 ty2)
+          unif_rec ~op subst (ty1,sc1) (ty2,sc2)
     in
-    unif_term ~op subst t1 t2
-  and unif_term ~op subst t1 t2 =
-    let view1 = T.view t1.Scoped.value and view2 = T.view t2.Scoped.value in
+    unif_term ~op subst t1 sc1 t2 sc2
+  and unif_term ~op subst t1 sc1 t2 sc2 =
+    let view1 = T.view t1 and view2 = T.view t2 in
     match view1, view2 with
-    | _ when T.equal t1.Scoped.value t2.Scoped.value
-     && (Scoped.same_scope t1 t2 || T.is_ground t1.Scoped.value) ->
+    | _ when T.equal t1 t2
+     && (sc1=sc2 || T.is_ground t1) ->
         subst (* the terms are equal under any substitution *)
     | T.Var _, _
     | _, T.Var _ ->
         begin match view1, view2, op with
         | T.Var v1, T.Var v2, O_equal ->
-            if HVar.equal v1 v2 && Scoped.same_scope t1 t2
+            if HVar.equal v1 v2 && sc1=sc2
             then subst else fail()
         | T.Var v1, T.Var v2, (O_unify | O_variant | O_match _)
-          when HVar.equal v1 v2 && Scoped.same_scope t1 t2 -> subst
+          when HVar.equal v1 v2 && sc1=sc2 -> subst
         | T.Var v1, _, O_match (Some s) when T.VarSet.mem v1 s ->
             fail() (* blocked variable *)
         | T.Var v1, _, (O_unify | O_match _) ->
-            if occurs_check ~depth:0 subst (Scoped.set t1 v1) t2
+            if occurs_check ~depth:0 subst (v1,sc1) (t2,sc2)
             then fail () (* occur check or t2 is open *)
-            else S.bind subst (Scoped.set t1 v1) t2
+            else S.bind subst (v1,sc1) (t2,sc2)
         | _, T.Var v2, O_unify ->
-            if occurs_check ~depth:0 subst (Scoped.set t2 v2) t1
+            if occurs_check ~depth:0 subst (v2,sc2) (t1,sc1)
             then fail() (* occur check *)
-            else S.bind subst (Scoped.set t2 v2) t1
+            else S.bind subst (v2,sc2) (t1,sc1)
         | _ -> fail ()  (* fail *)
         end
     | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Binder.equal s1 s2 ->
-        let subst = unif_rec ~op subst (Scoped.set t1 varty1) (Scoped.set t2 varty2) in
-        unif_rec ~op subst (Scoped.set t1 t1') (Scoped.set t2 t2')
+        let subst = unif_rec ~op subst (varty1,sc1) (varty2,sc2) in
+        unif_rec ~op subst (t1',sc1) (t2',sc2)
     | T.DB i, T.DB j -> if i = j then subst else raise Fail
     | T.Const f, T.Const g when ID.equal f g -> subst
     | T.App (f1, l1), T.App (f2, l2) ->
         begin match T.view f1, T.view f2 with
         | T.Const id1, T.Const id2 ->
             if ID.equal id1 id2 && List.length l1 = List.length l2
-            then unif_list ~unif:(unif_rec ~op) subst
-              (Scoped.set t1 l1) (Scoped.set t2 l2)
+            then unif_list ~unif:(unif_rec ~op) subst l1 sc1 l2 sc2
             else fail()
         | _ ->
             let l1, l2 = pair_lists_ f1 l1 f2 l2 in
-            unif_list ~unif:(unif_rec ~op) subst
-              (Scoped.set t1 l1) (Scoped.set t2 l2)
+            unif_list ~unif:(unif_rec ~op) subst l1 sc1 l2 sc2
         end
     | T.Record (l1, rest1), T.Record (l2, rest2) ->
-        let r1 = RU.of_record t1.Scoped.value l1 rest1 in
-        let r2 = RU.of_record t2.Scoped.value l2 rest2 in
-        unif_records ~unif:(unif_rec ~op) subst
-          (Scoped.set t1 r1)(Scoped.set t2 r2)
+        let r1 = RU.of_record t1 l1 rest1 in
+        let r2 = RU.of_record t2 l2 rest2 in
+        unif_records ~unif:(unif_rec ~op) subst r1 sc1 r2 sc2
     | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when ID.equal s1 s2 ->
-        unif_list ~unif:(unif_rec ~op) subst (Scoped.set t1 l1)(Scoped.set t2 l2)
+        unif_list ~unif:(unif_rec ~op) subst l1 sc1 l2 sc2
     | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Builtin.equal s1 s2 ->
-        unif_list ~unif:(unif_rec ~op) subst (Scoped.set t1 l1)(Scoped.set t2 l2)
+        unif_list ~unif:(unif_rec ~op) subst l1 sc1 l2 sc2
     | _, _ -> raise Fail
 
   let unification ?(subst=Substs.empty) a b =
@@ -724,7 +714,7 @@ module Unary = struct
   let matching_adapt_scope ?protect ?subst ~pattern t =
     if Scoped.same_scope pattern t
     then matching_same_scope ?protect ?subst
-      ~scope:t.Scoped.scope ~pattern:pattern.Scoped.value t.Scoped.value
+      ~scope:(Scoped.scope t) ~pattern:(Scoped.get pattern) (Scoped.get t)
     else matching ?subst ~pattern t
 
   let variant ?(subst=Substs.empty) a b =

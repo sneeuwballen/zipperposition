@@ -53,12 +53,12 @@ module Clause = struct
     | [] -> failwith "Clause.pop_body"
     | _::body' -> {c with body=body'; }
 
-  let apply_subst subst ~renaming c =
-    let head = Substs.HO.apply subst ~renaming (Scoped.set c c.Scoped.value.head) in
+  let apply_subst subst ~renaming (c,sc) =
+    let head = Substs.HO.apply subst ~renaming (c.head,sc) in
     let body =
       List.map
-        (fun t -> Substs.HO.apply subst ~renaming (Scoped.set c t))
-        c.Scoped.value.body in
+        (fun t -> Substs.HO.apply subst ~renaming (t,sc))
+        c.body in
     { head; body; }
 
   module Seq = struct
@@ -155,15 +155,15 @@ module Index = struct
     M.add t set idx
 
   (* fold on unifiable terms and their associated clause *)
-  let retrieve_unify ?(subst=Substs.empty) idx t acc k =
+  let retrieve_unify ?(subst=Substs.empty) (idx,sc_idx) t acc k =
     M.fold
       (fun t' set acc ->
-         let res = Unif.HO.unification ~subst (Scoped.set idx t') t in
+         let res = Unif.HO.unification ~subst (t',sc_idx) t in
          Sequence.fold
            (fun acc subst ->
               S.fold (fun clause acc -> k acc clause subst) set acc)
            acc res)
-      idx.Scoped.value acc
+      idx acc
 end
 
 (** {2 Fact and Rules Database}

@@ -259,7 +259,7 @@ module Make(E : Index.EQUATION) = struct
       | TrieNode _, None
       | TrieLeaf _, Some _ -> ()
     in
-    traverse dt.Scoped.value (iterate t.Scoped.value) subst;
+    traverse (fst dt) (iterate (fst t)) subst;
     Util.exit_prof prof_dtree_retrieve;
     ()
 

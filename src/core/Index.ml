@@ -52,38 +52,36 @@ module MakeLeaf(X : Set.OrderedType) : LEAF with type elt = X.t = struct
   let size leaf =
     T.Map.fold (fun _ set acc -> S.cardinal set + acc) leaf 0
 
-  let fold_unify ?(subst=Substs.empty) leaf t k =
+  let fold_unify ?(subst=Substs.empty) (leaf,sc_l) t k =
     T.Map.iter
       (fun t' set ->
          try
-           let subst = Unif.FO.unification ~subst (Scoped.set leaf t') t in
+           let subst = Unif.FO.unification ~subst (t',sc_l) t in
            S.iter (fun data -> k (t', data, subst)) set
          with Unif.Fail -> ())
-      leaf.Scoped.value
+      leaf
 
-  let fold_match ?(subst=Substs.empty) leaf t k =
+  let fold_match ?(subst=Substs.empty) (leaf,sc_l) t k =
     T.Map.iter
       (fun t' set ->
          try
-           let subst = Unif.FO.matching ~subst
-             ~pattern:(Scoped.set leaf t') t in
+           let subst = Unif.FO.matching ~subst ~pattern:(t',sc_l) t in
            S.iter
              (fun data -> k (t', data, subst))
              set
          with Unif.Fail -> ())
-      leaf.Scoped.value
+      leaf
 
-  let fold_matched ?(subst=Substs.empty) leaf t k =
+  let fold_matched ?(subst=Substs.empty) (leaf,sc_l) t k =
     T.Map.iter
       (fun t' set ->
          try
-           let subst = Unif.FO.matching ~subst
-             ~pattern:t (Scoped.set leaf t') in
+           let subst = Unif.FO.matching ~subst ~pattern:t (t',sc_l) in
            S.iter
              (fun data -> k (t', data, subst))
              set
          with Unif.Fail -> ())
-      leaf.Scoped.value
+      leaf
 end
 
 (** {2 Term index} *)
