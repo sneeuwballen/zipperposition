@@ -48,8 +48,8 @@ type fingerprint_fun = T.t -> feature list
 let rec gfpf pos t = match pos, T.Classic.view t with
   | [], T.Classic.Var _ -> A
   | [], T.Classic.DB _ -> B
-  | [], T.Classic.App (s, _, _) -> S s
-  | i::pos', T.Classic.App (_, _, l) ->
+  | [], T.Classic.App (s, _) -> S s
+  | i::pos', T.Classic.App (_, l) ->
     begin try gfpf pos' (List.nth l i)  (* recurse in subterm *)
     with Failure _ -> N  (* not a position in t *)
     end

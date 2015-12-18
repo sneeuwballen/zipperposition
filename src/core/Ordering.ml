@@ -144,7 +144,7 @@ module KBO : ORD = struct
           then (add_pos_var balance x; (wb + 1, x = y))
           else (add_neg_var balance x; (wb - 1, x = y))
       | TC.DB _ -> (if pos then wb + 1 else wb - 1), false
-      | TC.App (s, _, l) ->
+      | TC.App (s, l) ->
           let wb' = if pos
             then wb + _weight prec s
             else wb - _weight prec s in
@@ -197,14 +197,14 @@ module KBO : ORD = struct
           let wb', contains = balance_weight wb t1 (HVar.id y) true in
           (wb' - 1, if contains then Gt else Incomparable)
       (* node/node, De Bruijn/De Bruijn *)
-      | TC.App (f, _, ss), TC.App (g, _, ts) -> tckbo_composite wb f g ss ts
+      | TC.App (f, ss), TC.App (g, ts) -> tckbo_composite wb f g ss ts
       | TC.DB i, TC.DB j ->
           (wb, if i = j then Eq else Incomparable)
       (* node and something else *)
-      | TC.App (_, _, _), TC.DB _ ->
+      | TC.App (_, _), TC.DB _ ->
           let wb', _ = balance_weight wb t1 0 true in
           wb'-1, Comparison.Gt
-      | TC.DB _, TC.App (_, _, _) ->
+      | TC.DB _, TC.App (_, _) ->
           let wb', _ = balance_weight wb t1 0 false in
           wb'+1, Comparison.Lt
     (** tckbo, for composite terms (ie non variables). It takes a ID.t
@@ -275,12 +275,12 @@ module RPO6 : ORD = struct
       | TC.NonFO, _
       | _, TC.NonFO -> Comparison.Incomparable
       (* node/node, De Bruijn/De Bruijn *)
-      | TC.App (f, _, ss), TC.App (g, _, ts) -> rpo6_composite ~prec s t f g ss ts
+      | TC.App (f, ss), TC.App (g, ts) -> rpo6_composite ~prec s t f g ss ts
       | TC.DB i, TC.DB j ->
           if i = j && Type.equal (T.ty s) (T.ty t) then Eq else Incomparable
       (* node and something else *)
-      | TC.App (_, _, _), TC.DB _ -> Comparison.Incomparable
-      | TC.DB _, TC.App (_, _, _) -> Comparison.Incomparable
+      | TC.App (_, _), TC.DB _ -> Comparison.Incomparable
+      | TC.DB _, TC.App (_, _) -> Comparison.Incomparable
   (* handle the composite cases *)
   and rpo6_composite ~prec s t f g ss ts =
     match Prec.compare prec f g with

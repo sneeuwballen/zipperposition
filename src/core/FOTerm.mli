@@ -58,7 +58,7 @@ module Classic : sig
   type view = private
     | Var of var
     | DB of int
-    | App of ID.t * Type.t list * t list (** covers Const and App *)
+    | App of ID.t * t list (** covers Const and App *)
     | AppBuiltin of Builtin.t * t list
     | NonFO (** any other case *)
 

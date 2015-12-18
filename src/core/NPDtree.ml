@@ -122,7 +122,7 @@ module Make(E : Index.EQUATION) = struct
                 else rebuild {trie with star=Some subtrie ;}
             in
             goto subtrie (next i) rebuild
-          | T.Classic.App (s, _, _) ->
+          | T.Classic.App (s, _) ->
             let subtrie =
               try find_sub trie.map s
               with NoSuchTrie -> empty ()
@@ -176,7 +176,7 @@ module Make(E : Index.EQUATION) = struct
             | Some subtrie ->
               traverse subtrie (next i)  (* match "*" against "*" *)
             end
-          | T.Classic.App (s, _, _) ->
+          | T.Classic.App (s, _) ->
             begin try
               let subtrie = find_sub trie.map s in
               traverse subtrie (next i)
@@ -296,7 +296,7 @@ module MakeTerm(X : Set.OrderedType) = struct
                 else rebuild {trie with star=Some subtrie ;}
             in
             goto subtrie (next i) rebuild
-          | T.Classic.App (s, _, l) ->
+          | T.Classic.App (s, l) ->
             let arity = List.length l in
             let subtrie =
               try find_sub trie.map (s,arity)
@@ -353,7 +353,7 @@ module MakeTerm(X : Set.OrderedType) = struct
             (* skip one term in all branches of the trie *)
             skip_tree trie
               (fun subtrie -> traverse subtrie (next i))
-          | T.Classic.App (s, _, l) ->
+          | T.Classic.App (s, l) ->
             let arity = List.length l in
             begin try
               let subtrie = SIMap.find (s,arity) trie.map in
@@ -391,7 +391,7 @@ module MakeTerm(X : Set.OrderedType) = struct
             | Some subtrie ->
               traverse subtrie (next i) (* match "*" against "*" only *)
             end
-          | T.Classic.App (s, _, l) ->
+          | T.Classic.App (s, l) ->
             let arity = List.length l in
             begin try
               let subtrie = SIMap.find (s,arity) trie.map in
@@ -427,7 +427,7 @@ module MakeTerm(X : Set.OrderedType) = struct
             (* match * against any subterm *)
             skip_tree trie
               (fun subtrie -> traverse subtrie (next i))
-          | T.Classic.App (s, _, l) ->
+          | T.Classic.App (s, l) ->
             (* only same symbol *)
             let arity = List.length l in
             begin try

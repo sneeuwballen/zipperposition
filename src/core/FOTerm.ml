@@ -87,20 +87,18 @@ module Classic = struct
   type view =
     | Var of var
     | DB of int
-    | App of ID.t * Type.t list * t list (** covers Const and App *)
+    | App of ID.t * t list (** covers Const and App *)
     | AppBuiltin of Builtin.t * t list
     | NonFO (** any other case *)
 
   let view t : view = match T.view t with
     | T.Var v -> Var (Type.cast_var_unsafe v)
     | T.DB i -> DB i
-    | T.Const s -> App (s, [], [])
+    | T.Const s -> App (s,[])
     | T.AppBuiltin (b,l) -> AppBuiltin (b,l)
     | T.App (f, l) ->
         begin match T.view f with
-        | T.Const id ->
-            let tyargs, args = split_args_ ~ty:(ty f) l in
-            App (id, Type.of_terms_unsafe tyargs, args)
+        | T.Const id -> App (id, l)
         | _ -> NonFO
         end
     | _ -> assert false

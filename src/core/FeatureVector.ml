@@ -36,14 +36,14 @@ module Make(C : Index.CLAUSE) = struct
       { name = "size+";
         f =
           (fun lits ->
-            Sequence.filter SLiteral.is_pos lits |> Sequence.length);
+             Sequence.filter SLiteral.is_pos lits |> Sequence.length);
       }
 
     let size_minus =
       { name = "size-";
         f =
           (fun lits ->
-            Sequence.filter SLiteral.is_neg lits |> Sequence.length);
+             Sequence.filter SLiteral.is_neg lits |> Sequence.length);
       }
 
     let rec _depth_term depth t = match T.view t with
@@ -62,7 +62,7 @@ module Make(C : Index.CLAUSE) = struct
         f = (fun lits ->
             Sequence.fold
               (fun acc lit ->
-                SLiteral.fold (fun acc t -> acc + _depth_term 0 t) acc lit
+                 SLiteral.fold (fun acc t -> acc + _depth_term 0 t) acc lit
               ) 0 lits);
       }
 
@@ -87,11 +87,12 @@ module Make(C : Index.CLAUSE) = struct
 
     (* max depth of the symbol in the term, or -1 *)
     let max_depth_term symb t =
-      let symbs_depths = T.Seq.subterms_depth t
-                         |> Sequence.fmap
-                           (fun (t,depth) -> match T.Classic.view t with
-                              | T.Classic.App (s, _, _) when ID.equal s symb -> Some depth
-                              | _ -> None)
+      let symbs_depths =
+        T.Seq.subterms_depth t
+        |> Sequence.fmap
+          (fun (t,depth) -> match T.Classic.view t with
+             | T.Classic.App (s, _) when ID.equal s symb -> Some depth
+             | _ -> None)
       in
       match Sequence.max symbs_depths with
       | None -> 0
@@ -128,9 +129,9 @@ module Make(C : Index.CLAUSE) = struct
   module IntMap = Map.Make(CCInt)
 
   module CSet = Set.Make(struct
-    type t = C.t
-    let compare = C.compare
-  end)
+      type t = C.t
+      let compare = C.compare
+    end)
 
   type trie =
     | TrieNode of trie IntMap.t   (** map feature -> trie *)
