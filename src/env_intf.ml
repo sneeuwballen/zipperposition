@@ -147,8 +147,8 @@ module type S = sig
   val precedence : unit -> Precedence.t
   val signature : unit -> Signature.t
 
-  val pp : Buffer.t -> unit -> unit
-  val fmt : Format.formatter -> unit -> unit
+  val pp : unit CCFormat.printer
+  val pp_full : unit CCFormat.printer
 
   (** {2 High level operations} *)
 
@@ -158,8 +158,7 @@ module type S = sig
   val stats : unit -> stats
   (** Compute stats *)
 
-  (* FIXME *)
-  val cnf : TypedSTerm.t Sequence.t -> C.CSet.t
+  val cnf : PFormula.t Sequence.t -> C.CSet.t
   (** Reduce formulas to CNF *)
 
   val next_passive : unit  -> C.t option

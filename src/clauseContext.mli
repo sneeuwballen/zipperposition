@@ -8,21 +8,23 @@
 
     The point is to relate different applications of the same context. *)
 
-type term = Logtk.FOTerm.t
-type subst = Logtk.Substs.t
+open Logtk
+
+type term = FOTerm.t
+type subst = Substs.t
 
 (** A context is represented as a regular array of literals, containing
     at least one specific variable [x], paired with this variable [x].
     Applying the context is a mere substitution *)
 type t = private {
   lits : Literals.t;
-  var : term;
+  var : FOTerm.var;
 }
 
 val compare : t -> t -> int
 val equal : t -> t -> bool
 
-val make : Literals.t -> var:term -> t
+val make : Literals.t -> var:FOTerm.var -> t
 (** Make a context from a var and literals containing this var.
     @raise Assert_failure if the variable isn't present in any literal *)
 
@@ -59,4 +61,4 @@ val pp : t CCFormat.printer
 
 (** {2 Sets of contexts} *)
 
-module Set : Set.S with type elt = t
+module Set : CCSet.S with type elt = t

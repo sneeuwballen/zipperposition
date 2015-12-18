@@ -15,17 +15,16 @@ type t = {
   param_version : bool;
   param_timeout : float;
   param_files : (string, CCVector.ro) CCVector.t;
-  param_split : bool;             (** use splitting *)
-  param_select : string;          (** name of the selection function *)
-  param_progress : bool;          (** print progress during search *)
-  param_proof : string;           (** how to print proof? *)
+  param_split : bool; (** use splitting *)
+  param_select : string; (** name of the selection function *)
+  param_proof : string; (** how to print proof? *)
   param_dot_file : string option; (** file to print the final state in *)
-  param_dot_sat : bool;           (** Print saturated set into DOT? *)
+  param_dot_sat : bool; (** Print saturated set into DOT? *)
   param_dot_all_roots : bool;
-  param_expand_def : bool;        (** expand definitions *)
+  param_expand_def : bool; (** expand definitions *)
   param_stats : bool;
-  param_presaturate : bool;       (** initial interreduction of proof state? *)
-  param_unary_depth : int;        (** Maximum successive levels of unary inferences *)
+  param_presaturate : bool; (** initial interreduction of proof state? *)
+  param_unary_depth : int; (** Maximum successive levels of unary inferences *)
 }
 
 (** Options that can be added by plugins *)
@@ -47,7 +46,6 @@ and dot_sat = ref false
 and dot_all_roots = ref false
 and expand_def = ref false
 and select = ref "SelectComplex"
-and progress = ref false
 and unary_depth = ref 1
 and files = CCVector.create ()
 
@@ -58,8 +56,7 @@ let parse_args () =
     (Selection.available_selections ())
   in
   (* special handlers *)
-  let set_progress () = progress := true
-  and add_file s = CCVector.push files s in
+  let add_file s = CCVector.push files s in
   (* options list *)
   let options = Arg.align (
     [ "--ord", Arg.Set_string ord, " choose ordering (rpo,kbo)"
@@ -69,7 +66,6 @@ let parse_args () =
     ; "--select", Arg.Set_string select, help_select
     ; "--split", Arg.Set split, " enable splitting"
     ; "--expand-def", Arg.Set expand_def, " expand definitions"
-    ; "--progress", Arg.Unit set_progress, " print progress"
     ; "--proof", Arg.Set_string proof, " choose proof printing (none, debug, or tstp)"
     ; "--presaturate", Arg.Set presaturate,
         " pre-saturate (interreduction of) the initial clause set"
@@ -91,7 +87,7 @@ let parse_args () =
   { param_ord; param_seed = !seed; param_steps = !steps;
     param_version= !version; param_timeout = !timeout;
     param_files = files; param_select = !select;
-    param_progress = !progress; param_stats= (!Options.global).Options.stats;
+    param_stats= (!Options.global).Options.stats;
     param_proof = !proof; param_split = !split;
     param_presaturate = !presaturate; param_dot_all_roots= !dot_all_roots;
     param_dot_file = !dot_file;

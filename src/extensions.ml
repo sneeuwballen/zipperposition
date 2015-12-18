@@ -13,8 +13,8 @@ type 'a or_error = [ `Ok of 'a | `Error of string ]
 type action =
   | Do of ((module Env.S) -> unit)
 
-type penv_action =
-  | Penv_do of (PEnv.t -> unit)
+type prec_action =
+  | Prec_do of (Compute_prec.t -> unit)
 
 type init_action =
   | Init_do of (unit -> unit)
@@ -22,7 +22,7 @@ type init_action =
 type t = {
   name : string;
   prio : int;  (** the lower, the more urgent, the earlier it is loaded *)
-  penv_actions : penv_action list;
+  prec_actions : prec_action list;
   init_actions : init_action list;
   actions : action list;
 }
@@ -33,7 +33,7 @@ type t = {
 let default = {
   name="<no name>";
   prio = 50;
-  penv_actions = [];
+  prec_actions= [];
   init_actions = [];
   actions = [];
 }
@@ -78,8 +78,8 @@ let dyn_load filename =
 let apply_env ~env ext =
   List.iter (fun (Do f) -> f env) ext.actions
 
-let apply_penv ~penv ext =
-  List.iter (fun (Penv_do f) -> f penv) ext.penv_actions
+let apply_prec c ext =
+  List.iter (fun (Prec_do f) -> f c) ext.prec_actions
 
 let init ext =
   Util.debugf ~section 5 "run init actions of %s" (fun k->k ext.name);

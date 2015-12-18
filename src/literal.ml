@@ -253,17 +253,17 @@ let unif4 op ~subst x1 y1 sc1 x2 y2 sc2 k =
   ()
 
 (* generic unification structure *)
-let unif_lits op ~subst lit1 lit2 k =
+let unif_lits op ~subst (lit1,sc1) (lit2,sc2) k =
   let open UnifOp in
-  match lit1.Scoped.value, lit2.Scoped.value with
+  match lit1, lit2 with
   | Prop (p1, sign1), Prop (p2, sign2) when sign1 = sign2 ->
-      op.term ~subst (Scoped.set lit1 p1) (Scoped.set lit2 p2) k
+      op.term ~subst (p1,sc1) (p2,sc2) k
   | True, True
   | False, False -> k subst
   | Equation (l1, r1, sign1), Equation (l2, r2, sign2) when sign1 = sign2 ->
-      unif4 op.term ~subst l1 r1 lit1.Scoped.scope l2 r2 lit2.Scoped.scope k
+      unif4 op.term ~subst l1 r1 sc1 l2 r2 sc2 k
   | Arith o1, Arith o2 ->
-      ArithLit.generic_unif op.monomes ~subst (Scoped.set lit1 o1) (Scoped.set lit2 o2) k
+      ArithLit.generic_unif op.monomes ~subst (o1,sc1) (o2,sc2) k
   | _, _ -> ()
 
 let variant ?(subst=S.empty) lit1 lit2 k =
@@ -331,18 +331,18 @@ let _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k =
   in
   equate_terms ~subst l2 r2 k
 
-let subsumes ?(subst=Substs.empty) lit1 lit2 k =
-  match lit1.Scoped.value, lit2.Scoped.value with
+let subsumes ?(subst=Substs.empty) (lit1,sc1) (lit2,sc2) k =
+  match lit1, lit2 with
   | Arith o1, Arith o2 ->
       (* use the more specific subsumption mechanism *)
       Util.debugf 5 "@[<2>subsumption check:@ @[%a@]@ for @[%a@]@]"
         (fun k->k
-          (Scoped.pp ArithLit.pp) (Scoped.set lit1 o1)
-          (Scoped.pp ArithLit.pp) (Scoped.set lit2 o2));
-      ArithLit.subsumes ~subst (Scoped.set lit1 o1) (Scoped.set lit2 o2) k
+          (Scoped.pp ArithLit.pp) (o1,sc1)
+          (Scoped.pp ArithLit.pp) (o2,sc2));
+      ArithLit.subsumes ~subst (o1,sc1) (o2,sc2) k
   | Equation (l1, r1, true), Equation (l2, r2, true) ->
-      _eq_subsumes ~subst l1 r1 lit1.Scoped.scope l2 r2 lit2.Scoped.scope k
-  | _ -> matching ~subst lit1 lit2 k
+      _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k
+  | _ -> matching ~subst (lit1,sc1) (lit2,sc2) k
 
 let unify ?(subst=Substs.empty) lit1 lit2 k =
   let op = UnifOp.({
@@ -366,34 +366,34 @@ let map f = function
   | True -> True
   | False -> False
 
-let apply_subst ~renaming subst lit =
-  match lit.Scoped.value with
+let apply_subst ~renaming subst (lit,sc) =
+  match lit with
   | Equation (l,r,sign) ->
-      let new_l = S.FO.apply ~renaming subst (Scoped.set lit l)
-      and new_r = S.FO.apply ~renaming subst (Scoped.set lit r) in
+      let new_l = S.FO.apply ~renaming subst (l,sc)
+      and new_r = S.FO.apply ~renaming subst (r,sc) in
       mk_lit new_l new_r sign
   | Prop (p, sign) ->
-      let p' = S.FO.apply ~renaming subst (Scoped.set lit p) in
+      let p' = S.FO.apply ~renaming subst (p,sc) in
       mk_prop p' sign
-  | Arith o -> Arith (ArithLit.apply_subst ~renaming subst (Scoped.set lit o))
+  | Arith o -> Arith (ArithLit.apply_subst ~renaming subst (o,sc))
   | True
-  | False -> lit.Scoped.value
+  | False -> lit
 
-let apply_subst_no_simp ~renaming subst lit =
-  match lit.Scoped.value with
-  | Arith o -> Arith (ArithLit.apply_subst_no_simp ~renaming subst (Scoped.set lit o))
+let apply_subst_no_simp ~renaming subst (lit,sc) =
+  match lit with
+  | Arith o -> Arith (ArithLit.apply_subst_no_simp ~renaming subst (o,sc))
   | Equation (l,r,sign) ->
-      Equation (S.FO.apply ~renaming subst (Scoped.set lit l),
-                S.FO.apply ~renaming subst (Scoped.set lit r), sign)
+      Equation (S.FO.apply ~renaming subst (l,sc),
+                S.FO.apply ~renaming subst (r,sc), sign)
   | Prop (p, sign) ->
-      Prop (S.FO.apply ~renaming subst (Scoped.set lit p), sign)
+      Prop (S.FO.apply ~renaming subst (p,sc), sign)
   | True
-  | False -> lit.Scoped.value
+  | False -> lit
 
-let apply_subst_list ~renaming subst lits =
+let apply_subst_list ~renaming subst (lits,sc) =
   List.map
-    (fun lit -> apply_subst ~renaming subst (Scoped.set lits lit))
-    lits.Scoped.value
+    (fun lit -> apply_subst ~renaming subst (lit,sc))
+    lits
 
 let negate lit = match lit with
   | Equation (l,r,sign) -> Equation (l,r,not sign)

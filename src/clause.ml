@@ -278,45 +278,45 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   (** Apply substitution to the clause. Note that using the same renaming for all
       literals is important. *)
-  let apply_subst ~renaming subst c =
+  let apply_subst ~renaming subst (c,sc) =
     let lits =
       Array.map
-        (fun lit -> Lit.apply_subst ~renaming subst (Scoped.set c lit))
-        c.Scoped.value.hclits in
-    let descendants = c.Scoped.value.hcdescendants in
-    let proof = Proof.adapt_c c.Scoped.value.hcproof in
-    let new_hc = create_a ~parents:[c.Scoped.value] lits proof in
+        (fun lit -> Lit.apply_subst ~renaming subst (lit,sc))
+        c.hclits in
+    let descendants = c.hcdescendants in
+    let proof = Proof.adapt_c c.hcproof in
+    let new_hc = create_a ~parents:[c] lits proof in
     new_hc.hcdescendants <- descendants;
     new_hc
 
-  let _apply_subst_no_simpl subst lits =
+  let _apply_subst_no_simpl subst (lits,sc) =
     if Substs.is_empty subst
-    then lits.Scoped.value  (* id *)
+    then lits (* id *)
     else
       let renaming = S.Renaming.create () in
       Array.map
-        (fun l -> Lit.apply_subst_no_simp ~renaming subst (Scoped.set lits l))
-        lits.Scoped.value
+        (fun l -> Lit.apply_subst_no_simp ~renaming subst (l,sc))
+        lits
 
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are maximal under [ord] *)
-  let maxlits c subst =
+  let maxlits (c,sc) subst =
     let ord = Ctx.ord () in
-    let lits' = _apply_subst_no_simpl subst (Scoped.map lits c) in
+    let lits' = _apply_subst_no_simpl subst (lits c,sc) in
     Lits.maxlits ~ord lits'
 
   (** Check whether the literal is maximal *)
-  let is_maxlit c subst ~idx =
+  let is_maxlit (c,sc) subst ~idx =
     let ord = Ctx.ord () in
-    let lits' = _apply_subst_no_simpl subst (Scoped.map lits c) in
+    let lits' = _apply_subst_no_simpl subst (lits c,sc) in
     Lits.is_max ~ord lits' idx
 
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for resolution. *)
-  let eligible_res c subst =
+  let eligible_res (c,sc) subst =
     let ord = Ctx.ord () in
-    let lits' = _apply_subst_no_simpl subst (Scoped.map lits c) in
-    let selected = c.Scoped.value.hcselected in
+    let lits' = _apply_subst_no_simpl subst (lits c,sc) in
+    let selected = c.hcselected in
     if BV.is_empty selected
     then (
       (* maximal literals *)
@@ -347,10 +347,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for paramodulation. *)
-  let eligible_param c subst =
+  let eligible_param (c,sc) subst =
     let ord = Ctx.ord () in
-    if BV.is_empty c.Scoped.value.hcselected then begin
-      let lits' = _apply_subst_no_simpl subst (Scoped.map lits c) in
+    if BV.is_empty c.hcselected then begin
+      let lits' = _apply_subst_no_simpl subst (lits c,sc) in
       (* maximal ones *)
       let bv = Lits.maxlits ~ord lits' in
       (* only keep literals that are positive equations *)
@@ -358,12 +358,12 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       bv
     end else BV.empty ()  (* no eligible literal when some are selected *)
 
-  let is_eligible_param c subst ~idx =
-    Lit.is_pos c.Scoped.value.hclits.(idx)
+  let is_eligible_param (c,sc) subst ~idx =
+    Lit.is_pos c.hclits.(idx)
     &&
-    BV.is_empty c.Scoped.value.hcselected
+    BV.is_empty c.hcselected
     &&
-    is_maxlit c subst ~idx
+    is_maxlit (c,sc) subst ~idx
 
   (** are there selected literals in the clause? *)
   let has_selected_lits c = not (BV.is_empty c.hcselected)

@@ -81,10 +81,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (** {2 Rules} *)
 
   let is_trivial_lit lit =
-    if not (Ctx.Theories.AC.exists_ac ())
+    if not (Ctx.AC.exists_ac ())
     then false
     else
-      let is_ac = Ctx.Theories.AC.is_ac  in
+      let is_ac = Ctx.AC.is_ac  in
       let module A = T.AC(struct let is_ac = is_ac let is_comm _ = false end) in
       match Lit.View.as_eqn lit with
       | Some (l, r, true) -> A.equal l r
@@ -100,9 +100,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (* simplify: remove literals that are redundant modulo AC *)
   let simplify c =
     Util.enter_prof prof_simplify;
-    if not (Ctx.Theories.AC.exists_ac ()) then c else
+    if not (Ctx.AC.exists_ac ()) then c else
       let n = Array.length (C.lits c) in
-      let is_ac = Ctx.Theories.AC.is_ac in
+      let is_ac = Ctx.AC.is_ac in
       let module A = T.AC(struct let is_ac = is_ac let is_comm _ = false end) in
       let lits = Array.to_list (C.lits c) in
       let lits = List.filter
@@ -115,9 +115,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let n' = List.length lits in
       if n' < n && not (C.get_flag C.flag_persistent c)
       then begin
-        let symbols = Ctx.Theories.AC.symbols_of_terms (C.Seq.terms c) in
+        let symbols = Ctx.AC.symbols_of_terms (C.Seq.terms c) in
         let symbols = Sequence.to_list (ID.Set.to_seq symbols) in
-        let ac_proof = CCList.flat_map Ctx.Theories.AC.find_proof symbols in
+        let ac_proof = CCList.flat_map Ctx.AC.find_proof symbols in
         let premises = C.proof c :: ac_proof in
         let proof cc = Proof.mk_c_simp ~theories:["ac"]
             ~rule:"normalize" cc premises in
@@ -134,7 +134,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let setup () =
     (* enable AC inferences if needed *)
-    if Ctx.Theories.AC.exists_ac ()
+    if Ctx.AC.exists_ac ()
     then begin
       Env.add_is_trivial is_trivial;
       Env.add_simplify simplify;
@@ -144,10 +144,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let add_ac ?proof s ty =
     Util.debugf 1 "@[enable AC redundancy criterion for %a@]" (fun k->k ID.pp s);
     (* is this the first case of AC symbols? If yes, then add inference rules *)
-    let first = not (Ctx.Theories.AC.exists_ac ()) in
+    let first = not (Ctx.AC.exists_ac ()) in
     if first then setup ();
     (* remember that the symbols is AC *)
-    Ctx.Theories.AC.add ?proof ~ty s;
+    Ctx.AC.add ?proof ~ty s;
     (* add clauses *)
     let clauses = axioms s ty in
     Env.add_passive (Sequence.of_list clauses);

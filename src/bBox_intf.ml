@@ -3,7 +3,7 @@
 
 (** {1 Interface of BBox} *)
 
-type bool_lit = BoolSolver.lit
+type bool_lit = Bool_lit.t
 (** Abstract boolean literal *)
 
 module type TERM = sig

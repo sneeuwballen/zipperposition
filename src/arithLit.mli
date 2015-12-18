@@ -119,7 +119,7 @@ val to_form : t -> FOTerm.t SLiteral.t
 
 module Seq : sig
   val terms : t -> term Sequence.t
-  val vars : t -> term Sequence.t
+  val vars : t -> FOTerm.var Sequence.t
   val to_multiset : t -> (term * Z.t) Sequence.t
 end
 
@@ -214,7 +214,6 @@ module Focus : sig
 
   val pp : t CCFormat.printer
   val to_string : t -> string
-  val fmt : Format.formatter -> t -> unit
 end
 
 (** {2 Some Utils for arith} *)

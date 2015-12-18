@@ -13,8 +13,8 @@ type 'a or_error = [ `Ok of 'a | `Error of string ]
 type action =
   | Do of ((module Env.S) -> unit)
 
-type penv_action =
-  | Penv_do of (PEnv.t -> unit)
+type prec_action =
+  | Prec_do of (Compute_prec.t -> unit)
 
 type init_action =
   | Init_do of (unit -> unit)
@@ -22,7 +22,7 @@ type init_action =
 type t = {
   name : string;
   prio : int;  (** the lower, the more urgent, the earlier it is loaded *)
-  penv_actions : penv_action list;
+  prec_actions : prec_action list;
   init_actions : init_action list;
   actions : action list;
 }
@@ -46,8 +46,8 @@ val apply_env : env:(module Env.S) -> t -> unit
 (** Apply the extension to the Env, adding rules, modifying the env
     in place. *)
 
-val apply_penv : penv:PEnv.t -> t -> unit
-(** Apply the extension to the PEnv *)
+val apply_prec : Compute_prec.t -> t -> unit
+(** Apply the extension to the precedence settings *)
 
 val init : t -> unit
 (** Apply all initialization functions of the given extension *)

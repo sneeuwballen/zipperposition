@@ -7,15 +7,9 @@ open Logtk
 
 let section = Util.Section.make ~parent:Const.section "msat"
 
-module Lit = Bool_lit
-
-type clause = Lit.t list
+include Sat_solver_intf
 
 type form = clause list * int option
-
-type result =
-  | Sat
-  | Unsat
 
 let compare_form (c1,o1) (c2,o2) =
   let open CCOrd in

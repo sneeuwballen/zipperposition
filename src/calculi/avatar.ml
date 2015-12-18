@@ -10,7 +10,6 @@ module Lit = Literal
 module Util = Logtk.Util
 
 type 'a printer = Format.formatter -> 'a -> unit
-type formula = TypedSTerm.t
 
 let section = Logtk.Util.Section.make ~parent:Const.section "avatar"
 (** {2 Avatar} *)
@@ -22,7 +21,7 @@ let stat_splits = Util.mk_stat "avatar.splits"
 
 module type S = sig
   module E : Env.S
-  module Solver : BoolSolver.SAT
+  module Solver : Sat_solver.S
 
   val split : E.multi_simpl_rule
   (** Split a clause into components *)
@@ -34,7 +33,7 @@ module type S = sig
   val before_check_sat : unit Signal.t
   val after_check_sat : unit Signal.t
 
-  val filter_absurd_trails : (E.C.Trail.t -> bool) -> unit
+  val filter_absurd_trails : (Trail.t -> bool) -> unit
   (** [filter_trails f] calls [f] on every trail associated with the empty
       clause. If [f] returns [false], the trail is ignored, otherwise
       it's negated and sent to the SAT solver *)
@@ -48,7 +47,9 @@ module type S = sig
   val get_clause : tag:int -> E.C.t option
   (** Recover clause from the tag, if any *)
 
-  val introduce_cut : formula -> (CompactClause.t -> Proof.t) ->
+  val introduce_cut :
+    Literals.t ->
+    (CompactClause.t -> Proof.t) ->
     E.C.t list * E.Ctx.BoolLit.t
   (** Introduce a cut on the given formula *)
 
@@ -56,7 +57,7 @@ module type S = sig
   (** Register inference rules to the environment *)
 end
 
-module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
+module Make(E : Env.S)(Sat : Sat_solver.S) = struct
   module E = E
   module Ctx = E.Ctx
   module C = E.C
@@ -72,12 +73,12 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
   let save_clause ~tag c = Hashtbl.replace id_to_clause_ tag c
   let get_clause ~tag = CCHashtbl.get id_to_clause_ tag
 
-  (* union-find that maps terms to list of literals, used for splitting *)
+  (* union-find that maps vars to list of literals, used for splitting *)
   module UF = UnionFind.Make(struct
-      type key = T.t
+      type key = T.var
       type value = Lit.t list
-      let equal = T.eq
-      let hash = T.hash
+      let equal = HVar.equal
+      let hash = HVar.hash
       let zero = []
       let merge = List.rev_append
     end)
@@ -89,7 +90,10 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
     (* maps each variable to a list of literals. Sets can be merged whenever
        two variables occur in the same literal.  *)
     let uf_vars =
-      C.Seq.vars c |> T.Seq.add_set T.Set.empty |> T.Set.elements |> UF.create
+      C.Seq.vars c
+      |> T.VarSet.of_seq
+      |> T.VarSet.to_list
+      |> UF.create
     (* set of ground literals (each one is its own component) *)
     and cluster_ground = ref LitSet.empty in
 
@@ -127,9 +131,9 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
                let proof cc = Proof.mk_c_esa ~rule:"split" cc [C.proof c] in
                let lits = Array.of_list lits in
                let bool_name = BoolLit.inject_lits lits in
-               let trail = C.get_trail c
-                           |> C.Trail.filter BoolLit.keep_in_splitting
-                           |> C.Trail.add bool_name
+               let trail =
+                 C.get_trail c
+                 |> Trail.add bool_name
                in
                let c = C.create_a ~parents:[c] ~trail lits proof in
                C.set_bool_name c bool_name;
@@ -137,17 +141,18 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
             ) !components
         in
         let clauses, bool_clause = List.split clauses_and_names in
-        Util.debug ~section 4 "split of %a yields %a"
-          C.pp c (Util.pp_list C.pp) clauses;
+        Util.debugf ~section 4 "@[split of @[%a@]@ yields @[%a@]@]"
+          (fun k->k C.pp c (Util.pp_list C.pp) clauses);
         (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
-        let bool_guard = C.get_trail c
-                         |> C.Trail.to_list
-                         |> List.map BoolLit.neg in
+        let bool_guard =
+          C.get_trail c
+          |> Trail.to_list
+          |> List.map Bool_lit.neg in
         let bool_clause = List.append bool_clause bool_guard in
         save_clause ~tag:(C.id c) c;
         Sat.add_clause ~tag:(C.id c) bool_clause;
-        Util.debug ~section 4 "constraint clause is %a"
-          _pp_bclause bool_clause;
+        Util.debugf ~section 4 "@[constraint clause is @[%a@]@]"
+          (fun k->k _pp_bclause bool_clause);
         (* return the clauses *)
         Some clauses
 
@@ -168,36 +173,35 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
   let check_empty c =
     if Array.length (C.lits c) = 0 && !filter_absurd_trails_ (C.get_trail c)
     then (
-      assert (not (C.Trail.is_empty (C.get_trail c)));
-      let b_clause = C.get_trail c
-                     |> C.Trail.to_list
-                     |> List.map BoolLit.neg
+      assert (not (Trail.is_empty (C.get_trail c)));
+      let b_clause =
+        C.get_trail c
+        |> Trail.to_list
+        |> List.map Bool_lit.neg
       in
-      Util.debug ~section 4 "negate trail of %a (id %d) with %a"
-        C.pp c (C.id c) _pp_bclause b_clause;
+      Util.debugf ~section 4 "@[negate trail of @[%a@] (id %d)@ with @[%a@]@]"
+        (fun k->k C.pp c (C.id c) _pp_bclause b_clause);
       save_clause ~tag:(C.id c) c;
       Sat.add_clause ~tag:(C.id c) b_clause;
     );
     [] (* never infers anything! *)
 
-  (* generic mechanism for adding a formula
+  (* generic mechanism for adding a clause
       and make a lemma out of it, including Skolemization, etc. *)
-  let introduce_cut f proof : C.t list * BoolLit.t =
-    let f = F.close_forall f in
-    let box = BoolLit.inject_form f in
-    (* positive clauses *)
+  let introduce_cut lits proof : C.t list * BoolLit.t =
+    let box = BoolLit.inject_lits lits in
+    (* positive clause *)
     let c_pos =
-      PFormula.create f (Proof.mk_f_trivial f) (* proof will be ignored *)
-      |> PFormula.Set.singleton
-      |> E.cnf
-      |> C.CSet.to_list
-      |> List.map
-        (fun c ->
-           let trail = C.Trail.singleton box in
-           C.create_a ~trail (C.lits c) proof
-        )
+      C.create_a ~trail:(Trail.singleton box) lits proof
     in
-    let c_neg =
+    let c_neg = assert false
+    (* FIXME:
+      - gather variables
+      - skolemize them with fresh (inductive?) constants
+      - map each [lit] to [negate subst(lit) <- [not box]]
+
+      Array.map
+        (fun lit ->
       PFormula.create (F.Base.not_ f) (Proof.mk_f_trivial f)
       |> PFormula.Set.singleton
       |> E.cnf
@@ -207,8 +211,9 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
            let trail = C.Trail.singleton (BoolLit.neg box) in
            C.create_a ~trail (C.lits c) proof
         )
+    *)
     in
-    c_pos @ c_neg, box
+    c_pos :: c_neg, box
 
   (* introduce a cut for each lemma proposed by the meta-prover *)
   let introduce_meta_lemmas (q:MetaProverState.lemma Queue.t) _given =
@@ -218,11 +223,10 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
       |> Sequence.flat_map
         (fun (cc, proof) ->
            assert (CompactClause.trail cc = []);
-           let f = CompactClause.to_form cc in
            let proof = Proof.adapt_c proof in
-           let new_clauses, _box = introduce_cut f proof in
+           let new_clauses, _box = introduce_cut (CompactClause.lits cc) proof in
            Util.debugf ~section 2 "@[<hv2>introduce cut from meta lemma:@,%a@]"
-             (CCList.print C.fmt) new_clauses;
+             (fun k->k (CCList.print C.pp) new_clauses);
            Sequence.of_list new_clauses
         )
       |> Sequence.to_rev_list
@@ -238,19 +242,17 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
     Util.enter_prof prof_check;
     Signal.send before_check_sat ();
     let res = match Sat.check ()  with
-      | Sat.Sat ->
+      | Sat_solver.Sat ->
           Util.debug ~section 3 "SAT-solver reports \"SAT\"";
           []
-      | Sat.Unsat ->
+      | Sat_solver.Unsat ->
           Util.debug ~section 1 "SAT-solver reports \"UNSAT\"";
-          let premises = match Sat.unsat_core with
-            | None -> []  (* too bad *)
-            | Some seq ->
-                let l = Sequence.to_rev_list seq in
-                Util.debugf ~section 3 "unsat core:@ @[%a@]" (CCList.print CCInt.print) l;
-                l
-                |> CCList.filter_map (fun tag -> get_clause ~tag)
-                |> List.map C.proof
+          let premises =
+            let l = Sequence.to_rev_list Sat.unsat_core in
+            Util.debugf ~section 3 "unsat core:@ @[%a@]" (fun k->k (CCList.print CCInt.print) l);
+            l
+            |> CCList.filter_map (fun tag -> get_clause ~tag)
+            |> List.map C.proof
           in
           let proof cc = Proof.mk_c_inference
               ~rule:"sat" ~theories:["sat"] cc premises in
@@ -263,7 +265,7 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
 
   let register () =
     Util.debug ~section:Const.section 2 "register extension Avatar";
-    Sat.set_printer BoolLit.print;
+    Sat.set_printer BoolLit.pp;
     E.add_multi_simpl_rule split;
     E.add_unary_inf "avatar_check_empty" check_empty;
     E.add_generate "avatar_check_sat" check_satisfiability;
@@ -274,8 +276,8 @@ module Make(E : Env.S)(Sat : BoolSolver.SAT) = struct
         let q = Queue.create () in
         Signal.on (MetaProverState.on_lemma meta)
           (fun lemma ->
-             Util.debugf ~section 2 "obtained lemma @[%a@] from meta-prover"
-               CompactClause.fmt (fst lemma);
+             Util.debugf ~section 2 "@[obtained lemma @[%a@]@ from meta-prover@]"
+               (fun k->k CompactClause.pp (fst lemma));
              Queue.push lemma q;
              Signal.ContinueListening
           );
@@ -290,8 +292,8 @@ end
 let extension =
   let action env =
     let module E = (val env : Env.S) in
-    let module Sat = (val BoolSolver.get_sat() : BoolSolver.SAT) in
-    Util.debug 1 "create new SAT solver: \"%s\"" Sat.name;
+    Util.debug 1 "create new SAT solver";
+    let module Sat = Sat_solver.Make(struct end) in
     let module A = Make(E)(Sat) in
     A.register()
   in
@@ -306,5 +308,7 @@ let _enable_avatar () =
 
 let () =
   Params.add_opts
-    [ "-avatar", Arg.Unit _enable_avatar, " enable Avatar-like splitting (based on SAT)"
+    [ "--avatar",
+        Arg.Unit _enable_avatar,
+        " enable Avatar-like splitting (based on SAT)"
     ]

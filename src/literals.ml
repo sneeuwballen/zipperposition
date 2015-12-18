@@ -50,33 +50,31 @@ let hash_fun lits h =
 
 let hash lits = Hash.apply hash_fun lits
 
-let variant ?(subst=S.empty) a1 a2 k =
+let variant ?(subst=S.empty) (a1,sc1) (a2,sc2) k =
   (* match a1.(i...) with a2\bv *)
   let rec iter2 subst bv i =
-    if i = Array.length a1.Scoped.value
+    if i = Array.length a1
       then k subst
       else iter3 subst bv i 0
   (* find a matching literal for a1.(i), within a2.(j...) *)
   and iter3 subst bv i j =
-    if j = Array.length a2.Scoped.value
+    if j = Array.length a2
       then ()  (* stop *)
     else (
       if not (BV.get bv j)
         then (
           (* try to match i-th literal of a1 with j-th literal of a2 *)
           BV.set bv j;
-          Lit.variant ~subst
-            (Scoped.set a1 a1.Scoped.value.(i))
-            (Scoped.set a2 a2.Scoped.value.(i))
+          Lit.variant ~subst (a1.(i),sc1) (a2.(i),sc2)
             (fun subst -> iter2 subst bv (i+1));
           BV.reset bv j
         );
       iter3 subst bv i (j+1)
     )
   in
-  if Array.length a1.Scoped.value = Array.length a2.Scoped.value
+  if Array.length a1 = Array.length a2
     then
-      let bv = BV.create ~size:(Array.length a1.Scoped.value) false in
+      let bv = BV.create ~size:(Array.length a1) false in
       iter2 subst bv 0
 
 let are_variant a1 a2 =
@@ -102,10 +100,10 @@ let to_form lits =
   Array.to_list lits
 
 (** Apply the substitution to the array of literals, with scope *)
-let apply_subst ~renaming subst lits =
+let apply_subst ~renaming subst (lits,sc) =
   Array.map
-    (fun lit -> Lit.apply_subst ~renaming subst (Scoped.set lits lit))
-    lits.Scoped.value
+    (fun lit -> Lit.apply_subst ~renaming subst (lit,sc))
+    lits
 
 let map f lits =
   Array.map (fun lit -> Lit.map f lit) lits

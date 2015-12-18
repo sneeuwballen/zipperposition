@@ -15,13 +15,12 @@
 open Logtk
 
 type 'a printer = Format.formatter -> 'a -> unit
-type formula = TypedSTerm.t
 
 (** {2 Avatar: splitting+sat} *)
 
 module type S = sig
   module E : Env.S
-  module Solver : BoolSolver.SAT
+  module Solver : Sat_solver.S
 
   val split : E.multi_simpl_rule
   (** Split a clause into components *)
@@ -47,16 +46,19 @@ module type S = sig
   val get_clause : tag:int -> E.C.t option
   (** Recover clause from the tag, if any *)
 
-  val introduce_cut : formula -> (CompactClause.t -> Proof.t) ->
+  val introduce_cut :
+    Literals.t ->
+    (CompactClause.t -> Proof.t) ->
     E.C.t list * E.Ctx.BoolLit.t
-  (** Introduce a cut on the given formula *)
+  (** Introduce a cut on the given clause *)
 
   val register : unit -> unit
   (** Register inference rules to the environment *)
 end
 
-module Make(E : Env.S)(Sat : BoolSolver.SAT) : S
-  with module E = E and module Solver = Sat
+module Make(E : Env.S)(Sat : Sat_solver.S) : S
+  with module E = E
+   and module Solver = Sat
 
 val extension : Extensions.t
 (** Extension that enables Avatar splitting and create a new SAT-solver. *)
