@@ -101,6 +101,8 @@ module Constr = struct
           compose o1 o2
     in
     mk l
+
+  let make c = c
 end
 
 (* TODO: think about how to compare some builtins (true, false, numbers...) *)

@@ -64,6 +64,10 @@ module Constr : sig
   val compose_sort : (int * [`partial] t) list -> [`partial] t
   (** [compose_sort l] sorts the list by decreasing priority (the higher,
       the earlier an ordering is applied) before composing *)
+
+  val make : (ID.t -> ID.t -> int) -> [`partial] t
+  (** Create a new partial order.
+      {b CAUTION}, this order must respect some properties (see {!'a t}) *)
 end
 
 exception Error of string
