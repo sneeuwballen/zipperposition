@@ -66,7 +66,7 @@ let parse_and_cnf files =
       (* convert clauses into Encoding.foclause *)
       let clauses =
         clauses
-        |> Sequence.map (List.map (SLiteral.map ~f:FOTerm.of_simple_term))
+        |> Sequence.map Cnf.clause_to_fo
         |> Sequence.map Encoding.foclause_of_clause 
       in
       Queue.add clauses q;

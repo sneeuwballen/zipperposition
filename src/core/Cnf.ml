@@ -38,6 +38,10 @@ type clause = lit list
 
 let pp_clause out = Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp) out
 
+let clause_to_fo c =
+  let ctx = FOTerm.Conv.create() in
+  List.map (SLiteral.map ~f:(FOTerm.Conv.of_simple_term ctx)) c
+
 let as_lit = SLiteral.of_form
 
 (* check whether the formula is already in CNF *)

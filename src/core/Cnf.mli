@@ -46,6 +46,8 @@ type options =
 type clause = lit list
 (** Basic clause representation, as list of literals *)
 
+val clause_to_fo : clause -> FOTerm.t SLiteral.t list
+
 (** A toplevel statement, declaring a symbol or asserting a clause.
     A user-provided annotation of type ['a] is kept for all clauses. *)
 type 'a statement =
