@@ -7,6 +7,8 @@
 type t =
   | Stop
   | Type of t (** Switch to type *)
+  | Left of t
+  | Right of t
   | Record_field of string * t (** Field of a record *)
   | Head of t (** Head of uncurried term *)
   | Arg of int * t (** argument term in uncurried term, or in multiset *)
@@ -16,6 +18,8 @@ type position = t
 
 let stop = Stop
 let type_ pos = Type pos
+let left p = Left p
+let right p = Right p
 let record_field name pos = Record_field (name, pos)
 let head pos = Head pos
 let arg i pos = Arg (i, pos)
@@ -29,6 +33,8 @@ let rev pos =
   let rec aux acc pos = match pos with
     | Stop -> acc
     | Type pos' -> aux (Type acc) pos'
+    | Left pos' -> aux (Left acc) pos'
+    | Right pos' -> aux (Right acc) pos'
     | Record_field (n,pos') -> aux (Record_field (n,acc)) pos'
     | Head pos' -> aux (Head acc) pos'
     | Arg (i, pos') -> aux (Arg (i,acc)) pos'
@@ -40,6 +46,8 @@ let rev pos =
 let rec append p1 p2 = match p1 with
   | Stop -> p2
   | Type p1' -> Type (append p1' p2)
+  | Left p1' -> left (append p1' p2)
+  | Right p1' -> right (append p1' p2)
   | Record_field(name, p1') -> Record_field(name,append p1' p2)
   | Head p1' -> Head (append p1' p2)
   | Arg(i, p1') -> Arg (i,append p1' p2)
@@ -47,6 +55,8 @@ let rec append p1 p2 = match p1 with
 
 let rec pp out pos = match pos with
   | Stop -> CCFormat.string out "ε"
+  | Left p' -> CCFormat.string out "←."; pp out p'
+  | Right p' -> CCFormat.string out "→."; pp out p'
   | Type p' -> CCFormat.string out "τ."; pp out p'
   | Record_field (name,p') ->
       Format.fprintf out "{%s}." name; pp out p'
@@ -88,6 +98,8 @@ module Build = struct
         need to first apply b totally, then pre-prend pos *)
     N ((fun pos1 -> append pos (__apply pos1 b)), E)
 
+  let left b = N (left, b)
+  let right b = N (right, b)
   let type_ b = N (type_, b)
   let record_field n b = N (record_field n, b)
   let head b = N(head, b)

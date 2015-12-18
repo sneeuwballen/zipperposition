@@ -6,6 +6,8 @@
 type t =
   | Stop
   | Type of t (** Switch to type *)
+  | Left of t
+  | Right of t
   | Record_field of string * t (** Field of a record *)
   | Head of t (** Head of uncurried term *)
   | Arg of int * t (** argument term in uncurried term, or in multiset *)
@@ -15,6 +17,8 @@ type position = t
 
 val stop : t
 val type_ : t -> t
+val left : t -> t
+val right : t -> t
 val record_field : string -> t -> t
 val head : t -> t
 val arg : int -> t -> t
@@ -56,6 +60,10 @@ module Build : sig
       of the builder. This is useful when a term is traversed and
       positions of subterms are needed, since positions are
       easier to build in the wrong order (leaf-to-root). *)
+
+  val left : t -> t
+
+  val right : t -> t
 
   val type_ : t -> t
 
