@@ -299,6 +299,8 @@ let ty_vars t = Seq.ty_vars t |> Type.VarSet.of_seq
 
 let of_term_unsafe t = t
 
+let of_ty t = (t : Type.t :> T.t)
+
 (** {2 Subterms and positions} *)
 
 module Pos = struct

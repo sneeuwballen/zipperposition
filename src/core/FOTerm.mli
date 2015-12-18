@@ -119,6 +119,9 @@ val of_term_unsafe : InnerTerm.t -> t
 (** {b NOTE}: this can break the invariants and make {!view} fail. Only
     apply with caution. *)
 
+val of_ty : Type.t -> t
+(** Upcast from type *)
+
 module VarSet : CCSet.S with type elt = var
 module VarMap : CCMap.S with type key = var
 module VarTbl : CCHashtbl.S with type key = var
