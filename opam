@@ -21,11 +21,7 @@ depends: [
   "containers" { >= "0.7" }
   "gen"
   "msat"
-  "qbf"
   "ppx_deriving"
-]
-depopts: [
-  "conf-depqbf"
 ]
 available: [
     ocaml-version >= "4.02.1" &
