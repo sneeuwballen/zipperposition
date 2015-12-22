@@ -35,6 +35,6 @@ TODO.md
 TAGS
 src/man/
 src/const.ml
-setup.data
+setup.*
 examples
 benchs
