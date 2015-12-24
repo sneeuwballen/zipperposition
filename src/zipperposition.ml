@@ -18,9 +18,8 @@ module Import = struct
   open! ArithInt
   open! EnumTypes
   open! Avatar
-  open! Induction
   open! Induction_simple
-  open! Zipperposition_msat
+  open! Msat
 end
 
 let section = Const.section
@@ -28,17 +27,17 @@ let section = Const.section
 (** setup an alarm for abrupt stop *)
 let setup_alarm timeout =
   let handler s =
-    begin
-      Printf.printf "%% SZS Status ResourceOut\n";
-      Unix.kill (Unix.getpid ()) Sys.sigterm
-    end
+    Format.printf "%% SZS Status ResourceOut@.";
+    Unix.kill (Unix.getpid ()) Sys.sigterm
   in
   ignore (Sys.signal Sys.sigalrm (Sys.Signal_handle handler));
   Unix.alarm (max 1 (int_of_float timeout))
 
 let print_version ~params =
-  if params.param_version
-    then (Printf.printf "zipperposition %s\n" Const.version; exit 0)
+  if params.param_version then (
+    Format.printf "zipperposition %s@." Const.version;
+    exit 0
+  )
 
 (* load default extensions *)
 let () =
@@ -48,52 +47,58 @@ let () =
   Extensions.register MetaProverState.extension;
   ()
 
-let setup_penv ~penv () =
-  Extensions.extensions ()
-    |> List.iter (Extensions.apply_penv ~penv);
-  if (PEnv.get_params ~penv).param_expand_def then
-    PEnv.add_operation ~penv ~prio:1 PEnv.expand_def;
-  (* use "invfreq" *)
-  PEnv.add_constr_rule ~penv 50
-    (fun set ->
-      let symbols = PF.Set.to_seq set
-        |> Sequence.map PF.form
-        |> Sequence.flatMap Formula.FO.Seq.symbols
-      in
-      Precedence.Constr.invfreq symbols
-    );
-  (* be sure to get a total order on symbols, as last resort *)
-  PEnv.add_constr ~penv 99 Precedence.Constr.alpha;
-  ()
+(* compute a precedence *)
+let compute_prec () =
+  assert false (* TODO *)
+
+(* FIXME
+   let setup_penv ~penv () =
+   Extensions.extensions ()
+   |> List.iter (Extensions.apply_penv ~penv);
+   if (PEnv.get_params ~penv).param_expand_def then
+   PEnv.add_operation ~penv ~prio:1 PEnv.expand_def;
+   (* use "invfreq" *)
+   PEnv.add_constr_rule ~penv 50
+   (fun set ->
+    let symbols = PF.Set.to_seq set
+      |> Sequence.map PF.form
+      |> Sequence.flatMap Formula.FO.Seq.symbols
+    in
+    Precedence.Constr.invfreq symbols
+   );
+   (* be sure to get a total order on symbols, as last resort *)
+   PEnv.add_constr ~penv 99 Precedence.Constr.alpha;
+   ()
+*)
 
 let setup_env ~env =
   Extensions.extensions ()
-    |> List.iter (Extensions.apply_env ~env);
+  |> List.iter (Extensions.apply_env ~env);
   ()
 
 (** Load plugins (all "libzipperposition*.cmxs" in same path as main) *)
 let load_plugins ~params =
   let dir = Filename.dirname Sys.argv.(0) in
   Gen.append (CCIO.File.read_dir dir) (CCIO.File.read_dir Const.home)
-    |> Gen.filter
-      (fun s -> CCString.prefix ~pre:"libzipperposition_" s
-       && CCString.suffix ~suf:".cmxs" s
-      )
-    |> Gen.iter
-      (fun filename ->
-        Util.debug ~section 1 "trying to load file %s..." filename;
-        match Extensions.dyn_load filename with
-        | `Error msg -> () (* Could not load plugin *)
-        | `Ok ext ->
-          Util.debug ~section 0 "loaded extension %s" ext.Extensions.name;
-          ()
-      );
+  |> Gen.filter
+    (fun s -> CCString.prefix ~pre:"libzipperposition_" s
+              && CCString.suffix ~suf:".cmxs" s
+    )
+  |> Gen.iter
+    (fun filename ->
+       Util.debugf ~section 1 "trying to load file `%s`…" (fun k->k filename);
+       match Extensions.dyn_load filename with
+       | `Error msg -> () (* Could not load plugin *)
+       | `Ok ext ->
+           Util.debugf ~section 1 "loaded extension `%s`" (fun k->k ext.Extensions.name);
+           ()
+    );
   Extensions.extensions ()
 
 module MakeNew(X : sig
-  module Env : Env.S
-  val params : Params.t
-end) = struct
+    module Env : Env.S
+    val params : Params.t
+  end) = struct
   module Ctx = X.Env.Ctx
   module Env = X.Env
   module C = Env.C
@@ -107,46 +112,39 @@ end) = struct
   let print_stats () =
     Signal.send Signals.on_print_stats ();
     let print_hashcons_stats what (sz, num, sum_length, small, median, big) =
-      Util.debug ~section 1 ("hashcons stats for %s: size %d, num %d, sum length %d, "
-                  ^^ "buckets: small %d, median %d, big %d")
-        what sz num sum_length small median big
+      Util.debugf ~section 1
+        "@[<2>hashcons stats for %s: size %d, num %d, sum length %d, \
+         buckets: small %d, median %d, big %d@]"
+        (fun k->k what sz num sum_length small median big)
     and print_state_stats (num_active, num_passive, num_simpl) =
       Util.debug ~section 1 "proof state stats:";
-      Util.debug ~section 1 "stat:  active clauses          %d" num_active;
-      Util.debug ~section 1 "stat:  passive clauses         %d" num_passive;
-      Util.debug ~section 1 "stat:  simplification clauses  %d" num_simpl
+      Util.debugf ~section 1 "stat:  active clauses          %d" (fun k->k num_active);
+      Util.debugf ~section 1 "stat:  passive clauses         %d" (fun k->k num_passive);
+      Util.debugf ~section 1 "stat:  simplification clauses  %d" (fun k->k num_simpl);
     and print_gc () =
       let stats = Gc.stat () in
-      Util.debug ~section 1 ("GC: minor words %.0f; major_words: %.0f; max_heap: %d; "
-                  ^^ "minor collections %d; major collections %d")
-        stats.Gc.minor_words stats.Gc.major_words stats.Gc.top_heap_words
-        stats.Gc.minor_collections stats.Gc.major_collections
+      Util.debugf ~section 1
+        "GC: minor words %.0f; major_words: %.0f; max_heap: %d; \
+         minor collections %d; major collections %d"
+        (fun k->k
+            stats.Gc.minor_words stats.Gc.major_words stats.Gc.top_heap_words
+            stats.Gc.minor_collections stats.Gc.major_collections);
     in
     print_gc ();
-    print_hashcons_stats "terms" (ScopedTerm.hashcons_stats ());
+    print_hashcons_stats "terms" (InnerTerm.hashcons_stats ());
     print_hashcons_stats "clauses" (C.CHashcons.stats ());
     print_state_stats (Env.stats ());
     if Util.Section.cur_level section > 0
-      then Util.print_global_stats ()
-      else ();
+    then Util.print_global_stats ()
+    else ();
     ()
-
-  let print_json_stats ~env =
-    let encode_hashcons (x1,x2,x3,x4,x5,x6) =
-      Util.sprintf "[%d, %d, %d, %d, %d, %d]" x1 x2 x3 x4 x5 x6 in
-    let o = Util.sprintf
-      "{ \"terms\": %s, \"clauses\": %s }"
-      (encode_hashcons (ScopedTerm.hashcons_stats ()))
-      (encode_hashcons (C.CHashcons.stats ()))
-    in
-    Util.debug ~section 1 "json_stats: %s" o
 
   (* pre-saturation *)
   let presaturate_clauses clauses =
     Util.debug ~section 1 "presaturate initial clauses";
     Env.add_passive clauses;
     let result, num = Sat.presaturate () in
-    Util.debug ~section 1 "initial presaturation in %d steps" num;
+    Util.debugf ~section 1 "initial presaturation in %d steps" (fun k->k num);
     (* pre-saturated set of clauses *)
     let clauses = Env.get_active () in
     (* remove clauses from [env] *)
@@ -159,25 +157,25 @@ end) = struct
     Signal.send Signals.on_dot_output ();
     (* see if we need to print proof state *)
     begin match params.param_dot_file, result with
-    | Some dot_f, Saturate.Unsat proof ->
-      let name = "unsat_graph" in
-      (* print proof of false *)
-        let proof =
-          if X.params.param_dot_all_roots
-          then
-            Env.(Sequence.append (get_active()) (get_passive()))
-            |> Sequence.filter_map
-              (fun c -> if Literals.is_absurd (C.lits c) then Some (C.proof c) else None)
-          else Sequence.singleton proof
-        in
-        Proof.pp_dot_seq_file ~name dot_f proof
-    | Some dot_f, (Saturate.Sat | Saturate.Unknown) when params.param_dot_sat ->
-      (* print saturated set *)
-      let name = "sat_set" in
-      let seq = Sequence.append (Env.get_active ()) (Env.get_passive ()) in
-      let seq = Sequence.map C.proof seq in
-      Proof.pp_dot_seq_file ~name dot_f seq
-    | _ -> ()
+      | Some dot_f, Saturate.Unsat proof ->
+          let name = "unsat_graph" in
+          (* print proof of false *)
+          let proof =
+            if X.params.param_dot_all_roots
+            then
+              Env.(Sequence.append (get_active()) (get_passive()))
+              |> Sequence.filter_map
+                (fun c -> if Literals.is_absurd (C.lits c) then Some (C.proof c) else None)
+            else Sequence.singleton proof
+          in
+          Proof.pp_dot_seq_file ~name dot_f proof
+      | Some dot_f, (Saturate.Sat | Saturate.Unknown) when params.param_dot_sat ->
+          (* print saturated set *)
+          let name = "sat_set" in
+          let seq = Sequence.append (Env.get_active ()) (Env.get_passive ()) in
+          let seq = Sequence.map C.proof seq in
+          Proof.pp_dot_seq_file ~name dot_f seq
+      | _ -> ()
     end;
     ()
 
@@ -189,40 +187,40 @@ end) = struct
   let print_szs_result ~file result = match result with
     | Saturate.Unknown
     | Saturate.Timeout ->
-      Printf.printf "%% SZS status ResourceOut for '%s'\n" file
+        Format.printf "%% SZS status ResourceOut for '%s'@." file
     | Saturate.Error s ->
-      Printf.printf "%% SZS status InternalError for '%s'\n" file;
-      Util.debug ~section 1 "error is: %s" s
+        Format.printf "%% SZS status InternalError for '%s'@." file;
+        Util.debugf ~section 1 "error is:@ %s" (fun k->k s);
     | Saturate.Sat when Ctx.is_completeness_preserved () ->
-      Printf.printf "%% SZS status %s for '%s'\n" (_sat ()) file
+        Format.printf "%% SZS status %s for '%s'@." (_sat ()) file
     | Saturate.Sat ->
-      Printf.printf "%% SZS status GaveUp for '%s'\n" file;
-      begin match params.param_proof with
-        | "none" -> ()
-        | "tstp" ->
-          Util.debug ~section 1 "saturated set:\n  %a\n"
-            (Util.pp_seq ~sep:"\n  " C.pp_tstp_full) (Env.get_active ())
-        | "debug" ->
-          Util.debug ~section 1 "saturated set:\n  %a\n"
-            (Util.pp_seq ~sep:"\n  " C.pp) (Env.get_active ())
-        | n -> failwith ("unknown proof format: " ^ n)
-      end
+        Format.printf "%% SZS status GaveUp for '%s'@." file;
+        begin match params.param_proof with
+          | "none" -> ()
+          | "tstp" ->
+              Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
+                (fun k->k (CCFormat.seq ~sep:" " C.pp_tstp_full) (Env.get_active ()))
+          | "debug" ->
+              Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
+                (fun k->k (CCFormat.seq ~sep:" " C.pp) (Env.get_active ()))
+          | n -> failwith ("unknown proof format: " ^ n)
+        end
     | Saturate.Unsat proof ->
-      (* print status then proof *)
-      Printf.printf "%% SZS status %s for '%s'\n" (_unsat ()) file;
-      Util.printf "%% SZS output start Refutation\n";
-      Util.printf "%a" (Proof.pp params.param_proof) proof;
-      Printf.printf "%% SZS output end Refutation\n";
-      ()
+        (* print status then proof *)
+        Format.printf "%% SZS status %s for '%s'@." (_unsat ()) file;
+        Format.printf "%% SZS output start Refutation@.";
+        Format.printf "%a@." (Proof.pp params.param_proof) proof;
+        Format.printf "%% SZS output end Refutation@.";
+        ()
 
   (* perform type inference on those formulas *)
   let annotate_formulas ~signature formulas =
     let tyctx = TypeInference.Ctx.create signature in
     let formulas = Sequence.map
-      (fun (f, file,name) ->
-        let f = TypeInference.FO.convert_form ~ctx:tyctx f in
-        f, file, name)
-      formulas
+        (fun (f, file,name) ->
+           let f = TypeInference.FO.convert_form ~ctx:tyctx f in
+           f, file, name)
+        formulas
     in
     (* caution: evaluate formulas BEFORE *)
     let formulas = Sequence.persistent formulas in
@@ -232,8 +230,8 @@ end) = struct
   let setup_handlers() =
     Signal.on Ctx.on_signature_update
       (fun signature ->
-        Ctx.update_prec (Signature.Seq.symbols signature);
-        Signal.ContinueListening);
+         Ctx.update_prec (Signature.Seq.symbols signature);
+         Signal.ContinueListening);
     ()
 
   (* try to refute the set of clauses contained in the [env]. Parameters are
@@ -296,7 +294,7 @@ let _has_conjecture decls =
       inherit [unit] Ast_tptp.Untyped.visitor
       method clause () role _ = k role
       method any_form () role _ = k role
-      end
+    end
     in
     decls (visitor#visit ())
   in
@@ -304,11 +302,11 @@ let _has_conjecture decls =
 
 let scan_for_inductive_types decls =
   let pairs = decls
-    |> Sequence.filter_map
-      (function
-        | Ast_tptp.Untyped.NewType (_,ty,_,info) -> Some (ty, info)
-        | _ -> None
-      )
+              |> Sequence.filter_map
+                (function
+                  | Ast_tptp.Untyped.NewType (_,ty,_,info) -> Some (ty, info)
+                  | _ -> None
+                )
   in
   Induction_helpers.init_from_decls pairs
 
@@ -342,9 +340,9 @@ let process_file ?meta ~plugins ~params file =
   (* build the context and env *)
   let module Ctx = Ctx.Make(Res) in
   let module MyEnv = Env.Make(struct
-    module Ctx = Ctx
-    let params = params
-  end) in
+      module Ctx = Ctx
+      let params = params
+    end) in
   let env = (module MyEnv : Env.S) in
   setup_env ~env;
   (* reduce to CNF *)
@@ -354,9 +352,9 @@ let process_file ?meta ~plugins ~params file =
     (Util.pp_seq ~sep:"\n  " MyEnv.C.pp) (MyEnv.C.CSet.to_seq clauses);
   (* main workload *)
   let module Main = MakeNew(struct
-    module Env = MyEnv
-    let params = params
-  end) in
+      module Env = MyEnv
+      let params = params
+    end) in
   Main.has_conjecture := has_conjecture;
   Main.setup_handlers();
   (* pre-saturation *)
@@ -378,7 +376,7 @@ let process_file ?meta ~plugins ~params file =
   if params.param_stats then begin
     Main.print_stats ();
     Main.print_json_stats ();
-    end;
+  end;
   Main.print_dots result;
   Main.print_szs_result ~file result;
   Util.debug ~section 1 "=================================================";
@@ -392,10 +390,10 @@ let () =
   Gc.set { gc with Gc.space_overhead=150; };
   (* signal handler. Re-raise, bugs shouldn't keep hidden *)
   Signal.set_exn_handler (fun e ->
-    let msg = Printexc.to_string e in
-    output_string stderr ("exception raised in signal: " ^ msg ^ "\n");
-    flush stderr;
-    raise e);
+      let msg = Printexc.to_string e in
+      output_string stderr ("exception raised in signal: " ^ msg ^ "\n");
+      flush stderr;
+      raise e);
   ()
 
 let () =
@@ -412,15 +410,15 @@ let () =
   (* master process: process files *)
   CCVector.iter
     (fun file ->
-      match process_file ~plugins ~params file with
-      | `Error msg ->
-          print_endline msg;
-          exit 1
-      | `Ok () -> ()
+       match process_file ~plugins ~params file with
+       | `Error msg ->
+           print_endline msg;
+           exit 1
+       | `Ok () -> ()
     ) params.param_files;
   ()
 
 let _ =
   at_exit (fun () ->
-    Util.debug ~section 1 "run time: %.3f" (Util.get_total_time ());
-    Signal.send Signals.on_exit 0)
+      Util.debug ~section 1 "run time: %.3f" (Util.get_total_time ());
+      Signal.send Signals.on_exit 0)

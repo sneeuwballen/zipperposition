@@ -14,15 +14,16 @@ val form : t -> form
 val id : t -> int
 val is_conjecture : t -> bool
 
-val eq : t -> t -> bool
-val cmp : t -> t -> int
+val equal : t -> t -> bool
+val compare : t -> t -> int
 include Interfaces.HASH with type t := t
 
-val eq_noproof : t -> t -> bool
-val cmp_noproof : t -> t -> int
+val equal_noproof : t -> t -> bool
+val compare_noproof : t -> t -> int
 (** Compare only by formula, not by proof *)
 
-val create : ?is_conjecture:bool -> ?follow:bool ->
+val create :
+  ?is_conjecture:bool -> ?follow:bool ->
   form -> Proof.t -> t
 (** Create a formula from a proof. If the formula already has a proof,
     then the old proof is kept. PFormulas are hashconsed.

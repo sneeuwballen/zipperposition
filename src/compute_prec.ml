@@ -20,21 +20,6 @@ type t = {
   mutable status : (ID.t * Precedence.symbol_status) list;
 }
 
-(* sequence of symbols -> sequence of (frequency, list of symbols with this freq) *)
-let by_freq_ s =
-  let tbl = ID.Tbl.create 32 in
-  s (fun s ->
-      let n = try ID.Tbl.find tbl s with Not_found -> 0 in
-      ID.Tbl.replace tbl s (n+1)
-    );
-  let rev_tbl = Hashtbl.create (ID.Tbl.length tbl) in
-  ID.Tbl.iter
-    (fun s freq ->
-       let l = try Hashtbl.find rev_tbl freq with Not_found -> [] in
-       Hashtbl.replace rev_tbl freq (s :: l))
-    tbl;
-  Sequence.of_hashtbl rev_tbl
-
 (* uniform weight *)
 let _default_weight _ _ = 1
 

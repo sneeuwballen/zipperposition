@@ -23,8 +23,8 @@ let section = Util.Section.make ~parent:Const.section "meta"
 module LitMap = HOTerm.Map
 
 type lemma = CompactClause.t * Proof.t (** Lemma *)
-type axiom = string * Type.t list * HOTerm.t
-type theory = string * Type.t list * HOTerm.t
+type axiom = ID.t * HOTerm.t list
+type theory = ID.t * HOTerm.t list
 type rewrite = (FOTerm.t * FOTerm.t) list (** Rewrite system *)
 type pre_rewrite = HORewriting.t
 
@@ -37,7 +37,14 @@ module Result = struct
     pre_rewrite : pre_rewrite list;
   }
 
-  let empty = {lemmas=[]; theories=[]; axioms=[]; rewrite=[]; pre_rewrite=[]}
+  let empty = {
+    lemmas=[];
+    theories=[];
+    axioms=[];
+    rewrite=[];
+    pre_rewrite=[];
+  }
+
   let is_empty r =
     let aux = function [] -> true | _ -> false in
     aux r.lemmas
@@ -59,20 +66,21 @@ module Result = struct
   let add_pre_rewrite l t = {t with pre_rewrite=l@t.pre_rewrite}
 
   (** Merge [r] into [into] *)
-  let merge_into r ~into = into
+  let merge_into r ~into =
+    into
     |> add_lemmas r.lemmas
     |> add_theories r.theories
     |> add_axioms r.axioms
     |> add_rewrite r.rewrite
     |> add_pre_rewrite r.pre_rewrite
 
-  let pp_theory_axiom out (name, _, t) =
-    Format.fprintf out "%s %a" name T.pp t
+  let pp_theory_axiom out (name, args) =
+    Format.fprintf out "%a %a" ID.pp name (Util.pp_list ~sep:" " T.pp) args
 
   let pp_rewrite_system out l =
-    Format.fprintf out "@[<hov2>rewrite system@ %a@]"
-      (CCList.print
-         (fun out (a,b) -> Format.fprintf out "%a --> %a" FOTerm.pp a FOTerm.pp b))
+    Format.fprintf out "@[<hov2>rewrite system@ @[<hv>%a@]@]"
+      (Util.pp_list
+        (fun out (a,b) -> Format.fprintf out "@[%a@]@ --> @[%a@]" FOTerm.pp a FOTerm.pp b))
       l
 
   let pp_pre_rewrite_system out l = HORewriting.pp out l
@@ -80,20 +88,21 @@ module Result = struct
   let print out r =
     Format.fprintf out "@[<hv2>results{@ ";
     if r.axioms <> []
-    then Format.fprintf out "@[<hv2>axioms:@,%a@]@,"
-      (CCList.print pp_theory_axiom) r.axioms;
+    then
+      Format.fprintf out "@[<hv2>axioms:@,%a@]@,"
+        (Util.pp_list pp_theory_axiom) r.axioms;
     if r.theories <> []
     then Format.fprintf out "@[<hv2>theories:@ %a@]@,"
-      (CCList.print pp_theory_axiom) r.theories;
+        (Util.pp_list pp_theory_axiom) r.theories;
     if r.lemmas <> []
     then Format.fprintf out "@[<hv2>lemmas:@ %a@]@,"
-      (Util.pp_list (fun out (c,_) -> CompactClause.pp out c)) r.lemmas;
+        (Util.pp_list (fun out (c,_) -> CompactClause.pp out c)) r.lemmas;
     if r.rewrite <> []
     then Format.fprintf out "@[<hv2>rewrite systems:@ %a@]@,"
-      (CCList.print pp_rewrite_system) r.rewrite;
+        (CCList.print pp_rewrite_system) r.rewrite;
     if r.pre_rewrite <> []
     then Format.fprintf out "@[<hv2>pre-rewrite systems:@ %a@]@,"
-      (CCList.print pp_pre_rewrite_system) r.pre_rewrite;
+        (CCList.print pp_pre_rewrite_system) r.pre_rewrite;
     Format.fprintf out "@]}";
     ()
 end
@@ -122,10 +131,10 @@ module Induction = struct
   let sym_inductive = ID.make "inductive"
   let ty_sym_inductive = Type.(forall (
       [record ~rest:None [
-        "ty", bvar 0;
-        "cstors", multiset const_cstor
-      ]] ==> M.Reasoner.property_ty
-  ))
+          "ty", bvar 0;
+          "cstors", multiset const_cstor
+        ]] ==> M.Reasoner.property_ty
+    ))
 
   (* build a constructor with a term [cstor(sym)] *)
   let sym_cstor = ID.make "cstor"
@@ -149,15 +158,15 @@ module Induction = struct
     method to_fact ity =
       (* encode constructors *)
       let arg = T.record ~rest:None
-        [ "ty", T.of_ty ity.ty
-        ; "cstors", T.multiset ~ty:const_cstor
-            (List.map
-              (fun (s, ty_s) ->
-                (* term "cstor(ty_s, s)", roughly *)
-                T.app pred_cstor [T.of_ty ty_s; T.const ~ty:ty_s s]
-              ) ity.cstors
-            )
-        ]
+          [ "ty", T.of_ty ity.ty
+          ; "cstors", T.multiset ~ty:const_cstor
+              (List.map
+                 (fun (s, ty_s) ->
+                    (* term "cstor(ty_s, s)", roughly *)
+                    T.app pred_cstor [T.of_ty ty_s; T.const ~ty:ty_s s]
+                 ) ity.cstors
+              )
+          ]
       in
       T.app pred_inductive [T.of_ty ity.ty; arg]
     method of_fact t =
@@ -195,8 +204,10 @@ type t = {
 
 let mk_prover_ =
   let p = M.Prover.empty in
+  (* FIXME
   let p = M.Prover.add_signature p Induction.t#signature in
   let p = M.Prover.add_signature p Arith.t#signature in
+  *)
   p
 
 let create () = {
@@ -238,14 +249,14 @@ let proof_of_explanation p exp =
 
 (* conversion back from meta-prover clauses *)
 let clause_of_foclause_ l =
-  let module F = Formula.FO in
   List.map
     (function
-      | M.Encoding.Eq (a, b, sign) -> F.Base.mk_eq sign a b
-      | M.Encoding.Prop (a, sign) -> F.Base.mk_atom sign a
-      | M.Encoding.Bool true -> F.Base.true_
-      | M.Encoding.Bool false -> F.Base.false_
-    ) l
+      | M.Encoding.Eq (a, b, true) -> SLiteral.eq a b
+      | M.Encoding.Eq (a, b, false) -> SLiteral.neq a b
+      | M.Encoding.Prop (a, sign) -> SLiteral.atom a sign
+      | M.Encoding.Bool true -> SLiteral.true_
+      | M.Encoding.Bool false -> SLiteral.false_)
+    l
 
 (* print content of the reasoner *)
 let print_rules out r =
@@ -258,11 +269,11 @@ let key = Mixtbl.access ()
 let get_global, clear_global =
   let global_ = ref None in
   (fun () -> match !global_ with
-    | Some p -> p
-    | None ->
-      let p = create () in
-      global_ := Some p;
-      p
+     | Some p -> p
+     | None ->
+         let p = create () in
+         global_ := Some p;
+         p
   ), (fun () -> global_ := None)
 
 (** {2 CLI Options} *)
@@ -276,11 +287,11 @@ let add_theory f = theory_files := f :: !theory_files
 
 (* add options *)
 let () = Params.add_opts
-  [ "-theory", Arg.String add_theory, " use given theory file for meta-prover"
-  ; "-meta-rules", Arg.Set flag_print_rules, " print all rules of meta-prover"
-  ; "-meta-summary", Arg.Set flag_print_rules_exit, " print all rules before exit"
-  ; "-meta-sig", Arg.Set flag_print_signature, " print meta signature"
-  ]
+    [ "-theory", Arg.String add_theory, " use given theory file for meta-prover"
+    ; "-meta-rules", Arg.Set flag_print_rules, " print all rules of meta-prover"
+    ; "-meta-summary", Arg.Set flag_print_rules_exit, " print all rules before exit"
+    ; "-meta-sig", Arg.Set flag_print_signature, " print meta signature"
+    ]
 
 module type S = sig
   module E : Env.S
@@ -326,17 +337,16 @@ module Make(E : Env.S) : S with module E = E = struct
     and lemmas =
       Sequence.filter_map
         (fun (fact, explanation) ->
-          CCOpt.(
-            M.Plugin.lemma#of_fact fact
-            >|= clause_of_foclause_
-            >|= List.map E.Ctx.Lit.of_form
-            >|= fun lits ->
-                let cc = CompactClause.make (Array.of_list lits) [] in
-                let proofs = proof_of_explanation p explanation in
-                let proof = Proof.mk_c_inference ~rule:"lemma" cc proofs in
-                cc, proof
-           )
-        ) consequences
+           CCOpt.(
+             M.Plugin.lemma#of_fact fact
+             >|= clause_of_foclause_
+             >|= List.map E.Ctx.Lit.of_form
+             >|= fun lits ->
+             let cc = CompactClause.make (Array.of_list lits) [] in
+             let proofs = proof_of_explanation p explanation in
+             let proof = Proof.mk_c_inference ~rule:"lemma" cc proofs in
+             cc, proof))
+        consequences
       |> Sequence.to_list
     and axioms =
       Sequence.filter_map M.Plugin.axiom#of_fact facts
@@ -362,7 +372,7 @@ module Make(E : Env.S) : S with module E = E = struct
 
   (* parse a theory file and update prover with it *)
   let parse_theory_file p filename =
-    Util.debug ~section 1 "parse theory file %s" filename;
+    Util.debugf ~section 1 "@[<2>parse theory file@ `%s`@]" (fun k->k filename);
     CCError.(
       M.Prover.parse_file p.prover filename >|=
       fun (prover', consequences) ->
@@ -375,12 +385,12 @@ module Make(E : Env.S) : S with module E = E = struct
   (* parse the given theory files into the prover *)
   let parse_theory_files p files =
     CCError.(fold_l
-      (fun r f ->
-        parse_theory_file p f
-        >|= fun r' ->
-        Result.merge_into r' ~into:r
-      ) Result.empty files
-    )
+               (fun r f ->
+                  parse_theory_file p f
+                  >|= fun r' ->
+                  Result.merge_into r' ~into:r
+               ) Result.empty files
+            )
 
   let add_fact_ p fact =
     let prover', consequences = M.Prover.add_fact p.prover fact in
@@ -398,12 +408,15 @@ module Make(E : Env.S) : S with module E = E = struct
     add_fact_ p fact
 
   let scan_formula p f =
+    assert false
+    (* FIXME
     Util.enter_prof prof_scan_formula;
     let form = PF.form f in
     let proof = PF.proof f in
     let r = scan_ p [form] proof in
     Util.exit_prof prof_scan_formula;
     r
+    *)
 
   let scan_clause p c =
     Util.enter_prof prof_scan_clause;
@@ -419,7 +432,7 @@ module Make(E : Env.S) : S with module E = E = struct
   let declare_inductive p ity =
     let module CI = E.Ctx.Induction in
     let ity = Induction.make ity.CI.pattern ity.CI.constructors in
-    Util.debugf ~section 2 "@[<hv2>declare inductive type@ %a@]" Induction.print ity;
+    Util.debugf ~section 2 "@[<hv2>declare inductive type@ %a@]" (fun k->k Induction.print ity);
     let fact = Induction.t#to_fact ity in
     add_fact_ p fact
 
@@ -427,7 +440,7 @@ module Make(E : Env.S) : S with module E = E = struct
   let infer_scan p c =
     let r = scan_clause p c in
     if not (Result.is_empty r) then (
-      Util.debugf ~section 3 "@[scan@ %a@ →@ %a@]" C.pp c Result.print r;
+      Util.debugf ~section 3 "@[scan@ %a@ →@ %a@]" (fun k->k C.pp c Result.print r);
     );
     []
 
@@ -438,8 +451,9 @@ module Make(E : Env.S) : S with module E = E = struct
     let p = get_global () in
     Signal.on p.on_theory
       (fun th ->
-         Util.debugf ~section 1 "detected theory %a" Result.pp_theory_axiom th;
-         Signal.ContinueListening
+        Util.debugf ~section 1 "@[detected theory@ @[%a@]@]"
+          (fun k->k Result.pp_theory_axiom th);
+        Signal.ContinueListening
       );
     (* declare inductive types *)
     E.Ctx.Induction.inductive_ty_seq
@@ -452,11 +466,12 @@ module Make(E : Env.S) : S with module E = E = struct
     (* parse theory into [p] *)
     begin match parse_theory_files p !theory_files with
       | `Error msg ->
-        Format.printf "error: %s@." msg;
-        raise Exit
+          Format.printf "error: %s@." msg;
+          raise Exit
       | `Ok r ->
-        if !flag_print_rules
-        then Util.debugf ~section 1 "@[<v2>rules:@ %a@]" print_rules (reasoner p)
+          if !flag_print_rules
+          then
+            Util.debugf ~section 1 "@[<v2>rules:@ %a@]" (fun k->k print_rules (reasoner p))
     end;
     (* register inferences *)
     E.add_unary_inf "meta.scan" (infer_scan p);
@@ -465,12 +480,14 @@ module Make(E : Env.S) : S with module E = E = struct
       (fun () ->
          if !flag_print_signature then
            Util.debugf ~section 1 "@[<hv2>signature:@,%a@]"
-             Signature.pp (M.Prover.signature (prover p))
+             (fun k->k Signature.pp (M.Prover.signature (prover p)))
       );
     Signal.once Signals.on_exit
       (fun _ ->
-         if !flag_print_rules_exit then
-           Util.debugf ~section 1 "@[<hv2>detected:@,%a@]" Result.print (results p);
+         if !flag_print_rules_exit
+         then
+           Util.debugf ~section 1 "@[<hv2>detected:@,%a@]"
+            (fun k->k Result.print (results p));
          clear_global ();
       );
     ()
@@ -484,7 +501,7 @@ let extension =
     M.setup()
   in
   Extensions.( {
-    default with
-    name = "meta";
-    actions=[Do action];
-  })
+      default with
+      name = "meta";
+      actions=[Do action];
+    })

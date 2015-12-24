@@ -58,6 +58,7 @@ val is_absurd : t -> bool
 module Seq : sig
   val vars : t -> Type.t HVar.t Sequence.t
   val terms : t -> term Sequence.t
+  val to_form : t -> term SLiteral.t Sequence.t
 end
 
 (** {3 High order combinators} *)

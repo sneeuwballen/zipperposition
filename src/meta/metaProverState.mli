@@ -9,8 +9,8 @@ open Logtk_meta
 type 'a or_error = [`Ok of 'a | `Error of string]
 
 type lemma = CompactClause.t * Proof.t (* a lemma *)
-type axiom = string * Type.t list * HOTerm.t
-type theory = string * Type.t list * HOTerm.t
+type axiom = ID.t * HOTerm.t list
+type theory = ID.t * HOTerm.t list
 type rewrite = (FOTerm.t * FOTerm.t) list (** Rewrite system *)
 type pre_rewrite = HORewriting.t
 

@@ -5,7 +5,6 @@
     It uses inference rules and simplification rules from Superposition. *)
 
 open Logtk
-open Params
 
 module C = Clause
 module O = Ordering

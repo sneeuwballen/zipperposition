@@ -183,6 +183,7 @@ module Seq = struct
     Sequence.of_array lits |> Sequence.flat_map Lit.Seq.vars
   let terms a =
     Sequence.of_array a |> Sequence.flat_map Lit.Seq.terms
+  let to_form a = Sequence.of_array a |> Sequence.map Lit.Conv.to_form
 end
 
 (** {3 High Order combinators} *)

@@ -22,11 +22,12 @@ Library "libzipperposition"
   Pack:             true
   Modules:          ClauseQueue, Clause, Const, Extensions,
                     Literal, Literals, CompactClause, Ctx, Proof, ProofState,
-                    Saturate, Selection, Theories, AC,
+                    Saturate, Selection, Theories, AC, PFormula,
                     Compute_prec, Params, Env, Monome, ArithLit, Signals, Multisets,
                     Ctx_intf, Clause_intf, Env_intf, ProofState_intf,
                     BBox, BBox_intf, ClauseContext, ClauseQueue_intf,
                     Bool_lit, Sat_solver, Sat_solver_intf, Induction_helpers,
+                    Trail,
                     calculi/Avatar,
                     calculi/Induction_simple,
                     calculi/Superposition,

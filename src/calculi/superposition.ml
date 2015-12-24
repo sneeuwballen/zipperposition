@@ -17,15 +17,24 @@ let section = Util.Section.make ~parent:Const.section "sup"
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C with type t = Env.C.t
-  module PS : module type of Env.ProofState
+  module PS : module type of Env.ProofState with type C.t = Env.C.t
 
   (** {6 Term Indices} *)
 
-  val idx_sup_into : unit -> PS.TermIndex.t    (** index for superposition into the set *)
-  val idx_sup_from : unit -> PS.TermIndex.t    (** index for superposition from the set *)
-  val idx_back_demod : unit -> PS.TermIndex.t  (** index for backward demodulation/simplifications *)
-  val idx_fv : unit -> PS.SubsumptionIndex.t   (** index for subsumption *)
-  val idx_simpl : unit -> PS.UnitIndex.t       (** index for forward simplifications *)
+  val idx_sup_into : unit -> PS.TermIndex.t
+  (** index for superposition into the set *)
+
+  val idx_sup_from : unit -> PS.TermIndex.t
+  (** index for superposition from the set *)
+
+  val idx_back_demod : unit -> PS.TermIndex.t
+  (** index for backward demodulation/simplifications *)
+
+  val idx_fv : unit -> PS.SubsumptionIndex.t
+  (** index for subsumption *)
+
+  val idx_simpl : unit -> PS.UnitIndex.t
+  (** index for forward simplifications *)
 
   (** {6 Inference Rules} *)
 
@@ -38,11 +47,6 @@ module type S = sig
   val infer_equality_resolution: Env.unary_inf_rule
 
   val infer_equality_factoring: Env.unary_inf_rule
-
-  val infer_split : Env.unary_inf_rule
-  (** hyper-splitting *)
-
-  (* TODO branch rewriting? *)
 
   (** {6 Simplifications rules} *)
 
@@ -141,7 +145,7 @@ let _use_simultaneous_sup = ref true
 let _dot_sup_into = ref None
 let _dot_sup_from = ref None
 
-module Make(Env : Env.S) (* : S with module Env = Env *) = struct
+module Make(Env : Env.S) : S with module Env = Env = struct
   module Env = Env
   module Ctx = Env.Ctx
   module C = Env.C
@@ -996,15 +1000,18 @@ module Make(Env : Env.S) (* : S with module Env = Env *) = struct
       | lit::lits' -> iterate_lits (lit::acc) lits' clauses
     (** try to remove the literal using a negative unit clause *)
     and can_refute s t =
-      try UnitIdx.retrieve ~sign:false !_idx_simpl 1 s 0 ()
-            (fun () l r (_,_,_,c') subst ->
-               assert (Unif.FO.equal ~subst l 1 s 0);
-               if Unif.FO.equal ~subst r 1 t 0
+      try
+        UnitIdx.retrieve ~sign:false (!_idx_simpl,1) (s,0)
+        |> Sequence.iter
+            (fun (l, r, (_,_,_,c'), subst) ->
+               assert (Unif.FO.equal ~subst (l, 1) (s, 0));
+               if Unif.FO.equal ~subst (r, 1) (t, 0)
                && C.trail_subsumes c' c
                then begin
                  (* TODO: useless? *)
-                 let subst = Unif.FO.matching ~subst ~pattern:r 1 t 0 in
-                 Util.debug ~section 3 "neg_reflect eliminates %a=%a with %a" T.pp s T.pp t C.pp c';
+                 let subst = Unif.FO.matching ~subst ~pattern:(r, 1) (t, 0) in
+                 Util.debugf ~section 3 "@[neg_reflect eliminates@ @[%a=%a@]@ with @[%a@]@]"
+                   (fun k->k T.pp s T.pp t C.pp c');
                  raise (FoundMatch (r, c', subst)) (* success *)
                end
             );
@@ -1021,7 +1028,8 @@ module Make(Env : Env.S) (* : S with module Env = Env *) = struct
           c' (C.proof c :: premises) in
       let parents = c :: C.parents c in
       let new_c = C.create ~parents lits proof in
-      Util.debug ~section 3 "%a neg_simplify_reflect into %a" C.pp c C.pp new_c;
+      Util.debugf ~section 3 "@[@[%a@]@ neg_simplify_reflect into @[%a@]@]"
+        (fun k->k C.pp c C.pp new_c);
       Util.exit_prof prof_neg_simplify_reflect;
       new_c
 
@@ -1038,7 +1046,7 @@ module Make(Env : Env.S) (* : S with module Env = Env *) = struct
       (fun lita ->
          CCArray.exists
            (fun litb ->
-              not (Sequence.is_empty (Lit.subsumes ~subst:S.empty lita sc_a litb sc_b)))
+              not (Sequence.is_empty (Lit.subsumes (lita, sc_a) (litb, sc_b))))
            b)
       a
 
@@ -1065,7 +1073,7 @@ module Make(Env : Env.S) (* : S with module Env = Env *) = struct
 
   (** Check whether [a] subsumes [b], and if it does, return the
       corresponding substitution *)
-  let subsumes_with a sc_a b sc_b =
+  let subsumes_with (a,sc_a) (b,sc_b) =
     Util.incr_stat stat_subsumption_call;
     (* a must not have more literals, and it must be possible to bind
         all its vars during subsumption *)
@@ -1090,7 +1098,7 @@ module Make(Env : Env.S) (* : S with module Env = Env *) = struct
           BV.set bv j;
           (* match lita and litb, then flag litb as used, and try with next literal of a *)
           let n_subst = ref 0 in
-          Lit.subsumes ~subst lita sc_a litb sc_b
+          Lit.subsumes ~subst (lita, sc_a) (litb, sc_b)
             (fun subst' -> incr n_subst; try_permutations (i+1) subst' bv);
           BV.reset bv j;
           (* some variable of lita occur in a[j+1...], try another literal of b *)
@@ -1122,10 +1130,11 @@ module Make(Env : Env.S) (* : S with module Env = Env *) = struct
 
   let subsumes a b =
     Util.enter_prof prof_subsumption;
-    let res = match subsumes_with a 0 b 1 with
+    let res = match subsumes_with (a,0) (b,1) with
       | None -> false
       | Some _ ->
-          Util.debug ~section 2 "%a subsumes %a" Lits.pp a Lits.pp b;
+          Util.debugf ~section 2 "@[<2>@[%a@]@ subsumes @[%a@]@]"
+            (fun k->k Lits.pp a Lits.pp b);
           true
     in
     Util.exit_prof prof_subsumption;
@@ -1145,8 +1154,6 @@ module Make(Env : Env.S) (* : S with module Env = Env *) = struct
       match T.view u, T.view v with
       | _ when T.equal u v -> true
       | _ when equate_root a b u v -> true
-      | T.TyApp(f, tyf), T.TyApp(g, tyg) ->
-          Type.equal tyf tyg && equate_terms a b f g
       | T.App (f, ss), T.App (g, ts) when List.length ss = List.length ts ->
           equate_terms a b f g &&
           List.for_all2 (equate_terms a b) ss ts
@@ -1155,14 +1162,19 @@ module Make(Env : Env.S) (* : S with module Env = Env *) = struct
     and equate_root a b u v =
       let sc1 = !a_scope in
       incr a_scope;
-      (try let subst = Unif.FO.matching ~pattern:a sc1 u 0 in
-         let _ = Unif.FO.matching ~subst ~pattern:b sc1 v 0 in
-         true
-       with Unif.Fail -> false)
-      ||  (try let subst = Unif.FO.matching ~pattern:b sc1 u 0 in
-             let _ = Unif.FO.matching ~subst ~pattern:a sc1 v 0 in
-             true
-           with Unif.Fail -> false)
+      begin try
+        let subst = Unif.FO.matching ~pattern:(a, sc1) (u, 0) in
+        let _ = Unif.FO.matching ~subst ~pattern:(b, sc1) (v, 0) in
+        true
+       with Unif.Fail -> false
+      end
+      ||
+      begin try
+        let subst = Unif.FO.matching ~pattern:(b, sc1) (u, 0) in
+        let _ = Unif.FO.matching ~subst ~pattern:(a, sc1) (v, 0) in
+        true
+      with Unif.Fail -> false
+      end
     in
     (* check for each literal *)
     Util.enter_prof prof_eq_subsumption;
@@ -1170,7 +1182,8 @@ module Make(Env : Env.S) (* : S with module Env = Env *) = struct
     let res = match a with
       | [|Lit.Equation (s, t, true)|] ->
           let res = CCArray.exists (equate_lit_with s t) b in
-          (if res then Util.debug ~section 3 "%a eq-subsumes %a"  Lits.pp a Lits.pp b);
+          if res then Util.debugf ~section 3 "@[<2>@[%a@]@ eq-subsumes @[%a@]@]"
+            (fun k->k Lits.pp a Lits.pp b);
           res
       | _ -> false  (* only a positive unit clause unit-subsumes a clause *)
     in
@@ -1183,24 +1196,23 @@ module Make(Env : Env.S) (* : S with module Env = Env *) = struct
     (* if there is an equation in c, try equality subsumption *)
     let try_eq_subsumption = CCArray.exists Lit.is_eqn (C.lits c) in
     (* use feature vector indexing *)
-    try
-      SubsumIdx.retrieve_subsuming_c !_idx_fv c ()
-        (fun () c' ->
-           if C.trail_subsumes c' c
-           then
-             let redundant =
-               (try_eq_subsumption && eq_subsumes (C.lits c') (C.lits c))
-               ||
-               subsumes (C.lits c') (C.lits c)
-             in if redundant then raise Exit
-        );
-      Util.exit_prof prof_subsumption_set;
-      false
-    with Exit ->
-      Util.debug ~section 3 "%a subsumed by active set" C.pp c;
+    let res =
+      SubsumIdx.retrieve_subsuming_c !_idx_fv c
+      |> Sequence.exists
+        (fun c' ->
+           C.trail_subsumes c' c
+           &&
+           ( (try_eq_subsumption && eq_subsumes (C.lits c') (C.lits c))
+             ||
+             subsumes (C.lits c') (C.lits c)
+           ))
+    in
+    Util.exit_prof prof_subsumption_set;
+    if res then (
+      Util.debugf ~section 3 "@[<2>@[%a@]@ subsumed by active set@]" (fun k->k C.pp c);
       Util.incr_stat stat_clauses_subsumed;
-      Util.exit_prof prof_subsumption_set;
-      true
+    );
+    res
 
   let subsumed_in_active_set c =
     Util.enter_prof prof_subsumption_in_set;
@@ -1210,7 +1222,9 @@ module Make(Env : Env.S) (* : S with module Env = Env *) = struct
       C.is_unit_clause c && Lit.is_pos (C.lits c).(0)
     in
     (* use feature vector indexing *)
-    let res = SubsumIdx.retrieve_subsumed_c !_idx_fv c C.CSet.empty
+    let res =
+      SubsumIdx.retrieve_subsumed_c !_idx_fv c
+      |> Sequence.fold
         (fun res c' ->
            if C.trail_subsumes c c'
            then
@@ -1222,6 +1236,7 @@ module Make(Env : Env.S) (* : S with module Env = Env *) = struct
                C.CSet.add res c'
              ) else res
            else res)
+        C.CSet.empty
     in
     Util.exit_prof prof_subsumption_in_set;
     res
@@ -1257,8 +1272,9 @@ module Make(Env : Env.S) (* : S with module Env = Env *) = struct
             (* negate literal *)
             lits.(i) <- Lit.negate lits.(i);
             (* test for subsumption *)
-            SubsumIdx.retrieve_subsuming !_idx_fv (Lits.Seq.abstract lits) ()
-              (fun () c' ->
+            SubsumIdx.retrieve_subsuming !_idx_fv (Lits.Seq.to_form lits)
+            |> Sequence.iter
+              (fun c' ->
                  let redundant =
                    (try_eq_subsumption && eq_subsumes (C.lits c') lits)
                    || subsumes (C.lits c') lits
@@ -1283,12 +1299,13 @@ module Make(Env : Env.S) (* : S with module Env = Env *) = struct
       | Some (new_lits, i, c') ->
           (* hc' allowed us to cut a literal *)
           assert (List.length new_lits + 1 = Array.length (C.lits c));
-          let info = [Util.sprintf "cut lit %a" Lit.pp (C.lits c).(i)] in
+          let info = [CCFormat.sprintf "cut lit %a" Lit.pp (C.lits c).(i)] in
           let proof c'' = Proof.mk_c_inference ~rule:"clc" ~info c'' [C.proof c; C.proof c'] in
           let parents = c :: C.parents c in
           let new_c = C.create ~parents new_lits proof in
-          Util.debug ~section 3 "contextual literal cutting in %a using %a gives\n\t%a"
-            C.pp c C.pp c' C.pp new_c;
+          Util.debugf ~section 3
+            "@[<2>contextual literal cutting@ in @[%a@]@ using @[%a@]@ gives @[%a@]@]"
+            (fun k->k C.pp c C.pp c' C.pp new_c);
           Util.incr_stat stat_clc;
           (* try to cut another literal *)
           Util.exit_prof prof_clc;
@@ -1323,10 +1340,10 @@ module Make(Env : Env.S) (* : S with module Env = Env *) = struct
             (* see whether lit=>lit', and if removing __lit__ gives a clause
                that subsumes c. Also do the symmetric operation *)
             let subst_remove_lit =
-              Lit.subsumes ~subst:S.empty lit 0 lit' 0
+              Lit.subsumes (lit, 0) (lit', 0)
               |> Sequence.map (fun s -> s, i)
             and subst_remove_lit' =
-              Lit.subsumes ~subst:S.empty lit' 0 lit 0
+              Lit.subsumes (lit', 0) (lit, 0)
               |> Sequence.map (fun s -> s, j)
             in
             let substs = Sequence.append subst_remove_lit subst_remove_lit' in
@@ -1336,7 +1353,7 @@ module Make(Env : Env.S) (* : S with module Env = Env *) = struct
                  if idx_to_remove <> n-1
                  then new_lits.(idx_to_remove) <- lits.(n-1);  (* remove lit *)
                  let renaming = Ctx.renaming_clear () in
-                 let new_lits = Lits.apply_subst ~renaming subst new_lits 0 in
+                 let new_lits = Lits.apply_subst ~renaming subst (new_lits,0) in
                  (* check subsumption *)
                  if subsumes new_lits lits
                  then raise (CondensedInto (new_lits, subst)))
@@ -1351,8 +1368,8 @@ module Make(Env : Env.S) (* : S with module Env = Env *) = struct
             ~rule:"condensation" c' [C.proof c] in
         let parents = c :: C.parents c in
         let new_c = C.create_a ~parents new_lits proof in
-        Util.debug ~section 3 "condensation in %a (with %a) gives\n\t %a"
-          C.pp c S.pp subst C.pp new_c;
+        Util.debugf ~section 3 "@[<2>condensation@ in @[%a@] (with @[%a@])@ gives @[%a@]@]"
+          (fun k->k C.pp c S.pp subst C.pp new_c);
         (* try to condense further *)
         Util.exit_prof prof_condensation;
         Util.incr_stat stat_condensation;
@@ -1362,10 +1379,11 @@ module Make(Env : Env.S) (* : S with module Env = Env *) = struct
 
   (* print index into file *)
   let _print_idx file idx =
-    Util.with_output file
+    CCIO.with_out file
       (fun oc ->
-         let pp_leaf buf v = () in
-         Util.fprintf oc "%a" (TermIndex.to_dot pp_leaf) idx;
+         let pp_leaf out v = () in
+         let out = Format.formatter_of_out_channel oc in
+         Format.fprintf out "@[%a@]@." (TermIndex.to_dot pp_leaf) idx;
          flush oc)
 
   let setup_dot_printers () =
@@ -1424,13 +1442,6 @@ let register ~sup =
   if not (Mixtbl.mem ~inj:key Sup.Env.mixtbl "superposition")
   then Mixtbl.set ~inj:key Sup.Env.mixtbl "superposition" sup
 
-let setup_penv penv =
-  let constr = Precedence.Constr.min [ID.Base.false_ ; ID.Base.true_ ] in
-  let rule_remove_trivial = PEnv.remove_trivial in
-  PEnv.add_constr ~penv 0 constr;
-  PEnv.add_operation ~penv ~prio:1 rule_remove_trivial;
-  ()
-
 let extension =
   let action env =
     let module E = (val env : Env.S) in
@@ -1440,7 +1451,6 @@ let extension =
   in
   { Extensions.default with
     Extensions.name="superposition";
-    Extensions.penv_actions = [Extensions.Penv_do setup_penv];
     Extensions.actions = [Extensions.Do action];
   }
 

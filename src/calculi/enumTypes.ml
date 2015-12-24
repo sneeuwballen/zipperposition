@@ -1,29 +1,5 @@
 
-(*
-Zipperposition: a functional superposition prover for prototyping
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Inference and simplification rules for Algebraic types} *)
 
@@ -51,7 +27,7 @@ module type S = sig
   module Env : Env.S
   module C : module type of Env.C
 
-  val declare_type : proof:Proof.t -> ty:Type.t -> var:term -> term list -> unit
+  val declare_type : proof:Proof.t -> ty:Type.t -> var:Type.t HVar.t -> term list -> unit
   (** Declare that the given type's domain is the given list of cases
       for the given variable [var] (whose type must be [ty].
       Will be ignored if the type already has a enum declaration. *)
@@ -78,10 +54,10 @@ module Make(E : Env.S) = struct
 
   type decl = {
     decl_ty : Type.t;
-    decl_var : term;
+    decl_var : Type.t HVar.t;
     decl_cases : term list;
     decl_proof : Proof.t;
-    mutable decl_symbols : Symbol.Set.t; (* set of declared symbols *)
+    mutable decl_symbols : ID.Set.t; (* set of declared symbols *)
   }
 
   (* set of enumerated types *)
@@ -93,40 +69,40 @@ module Make(E : Env.S) = struct
   let _find_match ?(subst=S.empty) s_decl ty s_ty =
     CCList.find
       (fun decl ->
-        try
-          let subst = Unif.Ty.matching ~subst ~pattern:decl.decl_ty s_decl ty s_ty in
-          Some (decl, subst)
-        with Unif.Fail -> None
+         try
+           let subst = Unif.Ty.matching ~subst ~pattern:(decl.decl_ty,s_decl) (ty,s_ty) in
+           Some (decl, subst)
+         with Unif.Fail -> None
       ) !_decls
 
   (* check that [var] is the only free variable in all cases *)
   let _check_uniq_var_cond ~var cases =
     List.for_all
-      (fun t -> T.Seq.vars t |> Sequence.for_all (T.eq var))
+      (fun t -> T.Seq.vars t |> Sequence.for_all (HVar.equal var))
       cases
 
   (* declare an enumerated type *)
   let _declare ~ty ~var ~proof cases =
-    if List.exists (fun t -> not (Type.eq ty (T.ty t))) cases
-      then failwith "EnumTypes: invalid declaration (type mismatch)";
+    if List.exists (fun t -> not (Type.equal ty (T.ty t))) cases
+    then failwith "EnumTypes: invalid declaration (type mismatch)";
     if Type.is_var ty
-      then failwith "EnumTypes: cannot declare enum for type variable";
+    then failwith "EnumTypes: cannot declare enum for type variable";
     if not (_check_uniq_var_cond ~var cases)
-      then failwith "EnumTypes: invalid declaration (free variables)";
+    then failwith "EnumTypes: invalid declaration (free variables)";
     if List.exists (fun decl -> Unif.Ty.are_variant ty decl.decl_ty) !_decls
     then (
-      Util.debug ~section 3 "an enum is already declared for type %a" Type.pp ty;
+      Util.debugf ~section 3 "@[an enum is already declared for type %a@]" (fun k->k Type.pp ty);
       false
     ) else (
-      Util.debug ~section 1 "declare new enum type %a (cases %a = %a)"
-        Type.pp ty T.pp var (CCList.pp ~sep:"|" T.pp) cases;
+      Util.debugf ~section 1 "@[<2>declare new enum type @[%a@]@ @[(cases %a = %a)@]"
+        (fun k->k Type.pp ty HVar.pp var (Util.pp_list ~sep:"|" T.pp) cases);
       Util.incr_stat stat_declare;
       (* set of already declared symbols *)
       let decl_symbols = List.fold_left
-        (fun set t -> match T.head t with
-          | None -> failwith "EnumTypes: non-symbolic case?"
-          | Some s -> Symbol.Set.add s set
-        ) Symbol.Set.empty cases
+          (fun set t -> match T.head t with
+             | None -> failwith "EnumTypes: non-symbolic case?"
+             | Some s -> ID.Set.add s set
+          ) ID.Set.empty cases
       in
       let decl = {
         decl_ty=ty;
@@ -144,36 +120,45 @@ module Make(E : Env.S) = struct
     ignore (_declare ~proof ~ty ~var enum)
 
   (* TODO: require that the type is as general as possible: either
-    a constant, or a polymorphic type that has only type variables as
-    arguments. Enum types for things like [list(int)] are dangerous
-    because if we remove the clause, since instantiation is a
-    simplification, we won't deal properly with [list(rat)] (no unification
-    whatsoever) *)
+     a constant, or a polymorphic type that has only type variables as
+     arguments. Enum types for things like [list(int)] are dangerous
+     because if we remove the clause, since instantiation is a
+     simplification, we won't deal properly with [list(rat)] (no unification
+     whatsoever) *)
 
   (* detect whether the clause [c] is a declaration of enum type *)
   let _detect_declaration c =
+    let eq_var_ ~var t = match T.view t with
+      | T.Var v' -> HVar.equal var v'
+      | _ -> false
+    and get_var_ t = match T.view t with
+      | T.Var v -> v
+      | _ -> assert false
+    in
     Util.enter_prof prof_detect;
     (* loop over literals checking whether they are all of the form
-      [var = t] for some [t] *)
+       [var = t] for some [t] *)
     let rec _check_all_vars ~ty ~var acc lits = match lits with
       | [] ->
           (* now also check that no case has free variables other than [var],
               and that there are at least 2 cases *)
           if _check_uniq_var_cond ~var acc
           && (!_accept_unary_types || List.length acc >= 2)
-            then Some (ty, var, acc)
-            else None
-      | Lit.Equation (l, r, true) :: lits' when T.eq l var ->
+          then Some (ty, var, acc)
+          else None
+      | Lit.Equation (l, r, true) :: lits' when eq_var_ ~var l ->
           _check_all_vars ~ty ~var (r::acc) lits'
-      | Lit.Equation (l, r, true) :: lits' when T.eq r var ->
+      | Lit.Equation (l, r, true) :: lits' when eq_var_ ~var r ->
           _check_all_vars ~ty ~var (l::acc) lits'
       | _ -> None
     in
     let res = match Array.to_list (C.lits c) with
       | Lit.Equation (l,r,true) :: lits when T.is_var l && not (Type.is_var (T.ty l))->
-          _check_all_vars ~ty:(T.ty l) ~var:l [r] lits
+          let var = get_var_ l in
+          _check_all_vars ~ty:(T.ty l) ~var [r] lits
       | Lit.Equation (l,r,true) :: lits when T.is_var r && not (Type.is_var (T.ty r))->
-          _check_all_vars ~ty:(T.ty r) ~var:r [l] lits
+          let var = get_var_ r in
+          _check_all_vars ~ty:(T.ty r) ~var [l] lits
       | _ -> None
     in
     Util.exit_prof prof_detect;
@@ -182,20 +167,20 @@ module Make(E : Env.S) = struct
   (* retrieve variables that are directly under a positive equation *)
   let _vars_under_eq lits =
     Sequence.of_array lits
-      |> Sequence.filter Lit.is_eq
-      |> Sequence.flatMap Lit.Seq.terms
-      |> Sequence.filter T.is_var
+    |> Sequence.filter Lit.is_eq
+    |> Sequence.flatMap Lit.Seq.terms
+    |> Sequence.filter T.is_var
 
   (* variables occurring under some function symbol (at non-0 depth) *)
   let _shielded_vars lits =
     Sequence.of_array lits
-      |> Sequence.flatMap Lit.Seq.terms
-      |> Sequence.flatMap T.Seq.subterms_depth
-      |> Sequence.fmap
-        (fun (v,depth) ->
-          if depth>0 && T.is_var v then Some v else None
-        )
-      |> T.Seq.add_set T.Set.empty
+    |> Sequence.flatMap Lit.Seq.terms
+    |> Sequence.flatMap T.Seq.subterms_depth
+    |> Sequence.fmap
+      (fun (v,depth) ->
+         if depth>0 && T.is_var v then Some v else None
+      )
+    |> T.Seq.add_set T.Set.empty
 
   let _naked_vars lits =
     let v =
@@ -203,7 +188,7 @@ module Make(E : Env.S) = struct
       |> T.Seq.add_set T.Set.empty
     in
     T.Set.diff v (_shielded_vars lits)
-      |> T.Set.elements
+    |> T.Set.elements
 
   let instantiate_vars c =
     Util.enter_prof prof_instantiate;
@@ -215,30 +200,31 @@ module Make(E : Env.S) = struct
     in
     let s_c = 0 and s_decl = 1 in
     let res = CCList.find
-      (fun v ->
-        match _find_match s_decl (T.ty v) s_c with
-        | None -> None
-        | Some (decl, subst) ->
-            (* we found an enum type declaration for [v], replace it
-              with each case for the enum type *)
-            Util.incr_stat stat_simplify;
-            Some (
-              List.map
-                (fun case ->
-                  (* replace [v] with [case] now *)
-                  let subst = Unif.FO.unification v s_c case s_decl in
-                  let renaming = S.Renaming.create () in
-                  let lits' = Lits.apply_subst ~renaming subst (C.lits c) s_c in
-                  let proof cc = Proof.mk_c_inference ~info:[S.to_string subst]
-                    ~rule:"enum_type_case_switch" cc [C.proof c]
-                  in
-                  let c' = C.create_a ~parents:[c] lits' proof in
-                  Util.debug ~section 3 "deduce %a\n   from %a (enum_type switch on %a)"
-                    C.pp c' C.pp c Type.pp decl.decl_ty;
-                  c'
-                ) decl.decl_cases
-            )
-      ) vars
+        (fun v ->
+           match _find_match s_decl (T.ty v) s_c with
+           | None -> None
+           | Some (decl, subst) ->
+               (* we found an enum type declaration for [v], replace it
+                  with each case for the enum type *)
+               Util.incr_stat stat_simplify;
+               Some (
+                 List.map
+                   (fun case ->
+                      (* replace [v] with [case] now *)
+                      let subst = Unif.FO.unification (v,s_c) (case,s_decl) in
+                      let renaming = S.Renaming.create () in
+                      let lits' = Lits.apply_subst ~renaming subst (C.lits c,s_c) in
+                      let proof cc = Proof.mk_c_inference ~info:[S.to_string subst]
+                          ~rule:"enum_type_case_switch" cc [C.proof c]
+                      in
+                      let c' = C.create_a ~parents:[c] lits' proof in
+                      Util.debugf ~section 3
+                        "@[<2>deduce @[%a@]@ from @[%a@]@ @[(enum_type switch on %a)@]@]"
+                        (fun k->k C.pp c' C.pp c Type.pp decl.decl_ty);
+                      c'
+                   ) decl.decl_cases
+               )
+        ) vars
     in
     Util.exit_prof prof_instantiate;
     res
@@ -249,65 +235,63 @@ module Make(E : Env.S) = struct
     | Type.NoArity ->
         T.const ~ty s
     | Type.Arity (i,j) ->
-        let ty_vars = if i>0 then CCList.range 1 i |> List.map Type.var else [] in
-        let ty' = Type.apply_list ty ty_vars in
+        let ty_vars = if i>0 then CCList.range 1 i |> List.map Type.var_of_int else [] in
+        let ty' = Type.apply ty ty_vars in
         let ty_args = Type.expected_args ty' in
-        let vars = List.mapi (fun i ty -> T.var ~ty i) ty_args in
+        let vars = List.mapi (fun i ty -> T.var_of_int ~ty i) ty_args in
         T.app_full (T.const ~ty s) ty_vars vars
 
   (* check whether the given symbol's return type unifies with the declaration.
-    If it does, return a new clause (instance) *)
-  let _check_symbol_decl ~ty s decl =
-    match s with
-    | Symbol.Cst _ ->
-      let t = _make_term_of_sym s ty in
-      begin try
-        (* ignore ad-hoc polymorphic symbols *)
-        if Symbol.Set.mem s (Ctx.ad_hoc_symbols ()) then raise Exit;
-        (* can we unify a generic instancez of [s] (the term [t]) with
-          the declaration's variable? *)
-        let subst = Unif.FO.unification t 0 decl.decl_var 1 in
-        if Symbol.Set.mem s decl.decl_symbols then None
-        else (
-          (* need to add an axiom instance for this symbol and declaration *)
-          decl.decl_symbols <- Symbol.Set.add s decl.decl_symbols;
-          (* create the axiom *)
-          let renaming = S.Renaming.create () in
-          let lits = List.map
-            (fun case -> Lit.mk_eq
-              (S.FO.apply ~renaming subst t 0)
-              (S.FO.apply ~renaming subst case 1)
-            ) decl.decl_cases
-          in
-          let proof cc = Proof.mk_c_inference
+     If it does, return a new clause (instance) *)
+  let check_decl_ ~ty s decl =
+    let t = _make_term_of_sym s ty in
+    try
+      (* can we unify a generic instancez of [s] (the term [t]) with
+         the declaration's variable? *)
+      (* TODO call occur-check instead and bind variable *)
+      let subst = Unif.FO.unification (t,0) (T.var decl.decl_var,1) in
+      if ID.Set.mem s decl.decl_symbols then None
+      else (
+        (* need to add an axiom instance for this symbol and declaration *)
+        decl.decl_symbols <- ID.Set.add s decl.decl_symbols;
+        (* create the axiom *)
+        let renaming = S.Renaming.create () in
+        let lits =
+          List.map
+            (fun case ->
+              Lit.mk_eq
+                (S.FO.apply ~renaming subst (t,0))
+                (S.FO.apply ~renaming subst (case,1)))
+            decl.decl_cases
+        in
+        let proof cc = Proof.mk_c_inference
             ~rule:"axiom_enum_types" cc [decl.decl_proof] in
-          let c' = C.create lits proof in
-          Util.debug ~section  3"declare enum type for %a: clause %a" Symbol.pp s C.pp c';
-          Util.incr_stat stat_instantiate;
-          Some c'
-        )
-      with Unif.Fail | Exit ->
-        None
-      end
-    | Symbol.Int _
-    | Symbol.Rat _
-    | Symbol.Conn _ -> None
+        let c' = C.create lits proof in
+        Util.debugf ~section 3 "@[<2>declare enum type for @[%a@]:@ clause @[%a@]@]"
+          (fun k->k ID.pp s C.pp c');
+        Util.incr_stat stat_instantiate;
+        Some c'
+      )
+    with Unif.Fail | Exit ->
+      None
 
   (* add axioms for new symbol [s] with type [ty], if needed *)
   let _on_new_symbol s ~ty =
-    let clauses = CCList.filter_map
-      (fun decl -> _check_symbol_decl ~ty s decl)
-      !_decls
+    let clauses =
+      CCList.filter_map
+        (fun decl -> check_decl_ ~ty s decl)
+        !_decls
     in
     PS.PassiveSet.add (Sequence.of_list clauses)
 
   let _on_new_decl decl =
-    let clauses = Signature.fold (Ctx.signature ()) []
-      (fun acc s ty ->
-        match _check_symbol_decl s ~ty decl with
-        | None -> acc
-        | Some c -> c::acc
-      )
+    let clauses =
+      Signature.fold (Ctx.signature ()) []
+        (fun acc s ty ->
+           match check_decl_ s ~ty decl with
+           | None -> acc
+           | Some c -> c::acc
+        )
     in
     PS.PassiveSet.add (Sequence.of_list clauses)
 
@@ -326,26 +310,26 @@ module Make(E : Env.S) = struct
           declarations are added *)
       Signal.on Ctx.on_new_symbol
         (fun (s, ty) ->
-          _on_new_symbol s ~ty;
-          Signal.ContinueListening
+           _on_new_symbol s ~ty;
+           Signal.ContinueListening
         );
       Signal.on on_new_decl
         (fun decl ->
-          _on_new_decl decl;
-          (* need to simplify (instantiate) active clauses that have naked
-            variables of the given type *)
-          Env.simplify_active_with instantiate_vars;
-          Signal.ContinueListening);
+           _on_new_decl decl;
+           (* need to simplify (instantiate) active clauses that have naked
+              variables of the given type *)
+           Env.simplify_active_with instantiate_vars;
+           Signal.ContinueListening);
       Signature.iter (Ctx.signature ()) (fun s ty -> _on_new_symbol s ~ty);
       (* detect whether the clause is a declaration of enum type, and if it
           is, declare the type! *)
       let _detect_and_declare c =
         begin match _detect_declaration c with
-        | None -> ()
-        | Some (ty,var,cases) ->
-            let is_new = _declare ~ty ~var ~proof:(C.proof c) cases in
-            (* clause becomes redundant if it's a new declaration *)
-            if is_new then C.set_flag flag_enumeration_clause c true
+          | None -> ()
+          | Some (ty,var,cases) ->
+              let is_new = _declare ~ty ~var ~proof:(C.proof c) cases in
+              (* clause becomes redundant if it's a new declaration *)
+              if is_new then C.set_flag flag_enumeration_clause c true
         end; Signal.ContinueListening
       in
       Signal.on PS.PassiveSet.on_add_clause _detect_and_declare;
@@ -372,12 +356,12 @@ let () =
   Extensions.register extension;
   Params.add_opts
     [ "-enum-types"
-      , Arg.Bool (fun b -> _enable := b)
-      , " enable/disable special handling for enumerated types"
+    , Arg.Bool (fun b -> _enable := b)
+    , " enable/disable special handling for enumerated types"
     ; "-enum-shielded"
-      , Arg.Bool (fun b -> _instantiate_shielded := b)
-      , " enable/disable instantiation of shielded variables of enum type"
+    , Arg.Bool (fun b -> _instantiate_shielded := b)
+    , " enable/disable instantiation of shielded variables of enum type"
     ; "-enum-unary"
-      , Arg.Bool (fun b -> _accept_unary_types := b)
-      , " enable/disable support for unary enum types (one case)"
+    , Arg.Bool (fun b -> _accept_unary_types := b)
+    , " enable/disable support for unary enum types (one case)"
     ]
