@@ -245,7 +245,7 @@ let scan_for_inductive_types decls =
 (* Process the given file (try to solve it) *)
 let process_file ?meta:_ ~params file =
   let open CCError in
-  Util.debugf ~section 1 "================ process file %s ===========" (fun k->k file);
+  Util.debugf ~section 1 "@[@{<Yellow>### process file@ `%s` ###@}@]" (fun k->k file);
   (* parse formulas *)
   Util_tptp.parse_file ~recursive:true file
   >>= fun decls ->
@@ -310,12 +310,10 @@ let process_file ?meta:_ ~params file =
   MyEnv.add_passive clauses;
   (* saturate, possibly changing env *)
   let result = Main.try_to_refute ~params result in
-  Util.debug ~section 1 "=================================================";
   (* print some statistics *)
   if params.param_stats then Main.print_stats ();
   Main.print_dots result;
   Main.print_szs_result ~file result;
-  Util.debug ~section 1 "=================================================";
   return ()
 
 let () =
@@ -325,7 +323,8 @@ let () =
   let gc = Gc.get () in
   Gc.set { gc with Gc.space_overhead=150; };
   (* signal handler. Re-raise, bugs shouldn't keep hidden *)
-  Signal.set_exn_handler (fun e ->
+  Signal.set_exn_handler
+    (fun e ->
       let msg = Printexc.to_string e in
       output_string stderr ("exception raised in signal: " ^ msg ^ "\n");
       flush stderr;
@@ -333,6 +332,7 @@ let () =
   ()
 
 let () =
+  CCFormat.set_color_default true;
   (* parse arguments *)
   let params = Params.parse_args () in
   Util.debugf ~section 2 "@[extensions loaded:@ @[%a@]@]"

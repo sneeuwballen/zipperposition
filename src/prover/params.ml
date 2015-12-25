@@ -72,6 +72,7 @@ let parse_args () =
     ; "--dot", Arg.String (fun s -> dot_file := Some s) , " print final state to file in DOT"
     ; "--dot-sat", Arg.Set dot_sat, " print saturated set into DOT"
     ; "--dot-all-roots", Arg.Set dot_all_roots, " print all empty clauses into DOT"
+    ; "--color", Arg.Bool CCFormat.set_color_default, " enable/disable ANSI color codes"
     ; "--seed", Arg.Set_int seed, " set random seed"
     ; "--unary-depth", Arg.Set_int unary_depth, " maximum depth for successive unary inferences"
     ] @ !other_opts @ Options.mk_global_opts ()
