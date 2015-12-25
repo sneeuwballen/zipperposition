@@ -1,38 +1,101 @@
 #use "topfind";;
-#require "datalog";;
-#require "num";;
 #require "unix";;
-#require "dynlink";;
-#require "logtk";;
-#require "logtk.meta";;
-#directory "_build/containers/"
+#require "zarith";;
+#require "containers";;
+#require "containers.data";;
+#require "sequence";;
+#require "gen";;
 #directory "_build/src/"
+#directory "_build/src/core";;
+#directory "_build/src/prover";;
+#directory "_build/src/parsers";;
+#directory "_build/src/meta/";;
+#directory "_build/src/arbitrary/";;
+#directory "_build/tests/";;
+
+print_endline "load base lib....";;
 #load "libzipperposition.cma";;
-(* TODO: find a way to source logtk's ocamlinit *)
-(* pretty printing *)
-open Logtk;;
 open Libzipperposition;;
-open Logtk.Sequence.Infix;;
-open Logtk.Type;;
-module T = Logtk.FOTerm;;
-module F = Logtk.Formula.FO;;
+module ST = InnerTerm;;
+module T = FOTerm;;
+module PT = STerm;;
+let (~<) = ID.make;;
+#install_printer ID.pp;;
+#install_printer Type.pp;;
+#install_printer FOTerm.pp;;
+#install_printer PrologTerm.pp;;
+#install_printer Formula.FO.pp;;
+#install_printer HOTerm.pp;;
+#install_printer Substs.pp;;
+#install_printer Signature.pp;;
+#install_printer ParseLocation.pp;;
+#install_printer Precedence.pp;;
+#install_printer Ordering.pp;;
+#install_printer Position.pp;;
+module HOT = Logtk.HOTerm;;
+
+(* optional part: parser *)
+print_endline "load parser lib...";;
+#load "libzipperposition_parsers.cma";;
+open Libzipperposition_parsers;;
+#install_printer Ast_tptp.Untyped.fmt;;
+#install_printer Ast_tptp.Typed.fmt;;
+#install_printer Ast_tptp.fmt_general;;
+#install_printer Ast_tptp.fmt_role;;
+let pterm s =
+    let t = Parse_tptp.parse_term Lex_tptp.token (Lexing.from_string s) in
+    let tyctx = TypeInference.Ctx.create Signature.TPTP.base in
+    let _, clos = TypeInference.FO.infer_exn tyctx t in
+    clos tyctx
+;;
+let pform s =
+    let f = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s) in
+    let tyctx = TypeInference.Ctx.create Signature.TPTP.base in
+    TypeInference.FO.convert_form_exn ~ctx:tyctx f
+;;
+let photerm s =
+    let t = Parse_ho.parse_term Lex_ho.token (Lexing.from_string s) in
+    let tyctx = TypeInference.Ctx.create Signature.TPTP.base in
+    let _, clos = TypeInference.HO.infer_exn tyctx t in
+    TypeInference.Ctx.generalize tyctx;
+    clos tyctx
+;;
+
+(* optional part: meta *)
+print_endline "load meta prover....";;
+#load "libzipperposition_meta.cma";;
+#install_printer Logtk_meta.MetaPattern.pp;;
+#install_printer Logtk_meta.MetaPattern.EncodedForm.pp;;
+#install_printer Logtk_meta.MetaPattern.Set.pp;;
+#install_printer Logtk_meta.MetaKB.pp;;
+open Libzipperposition_meta;;
+let ppat s =
+    let f = pform s in
+    let f = MetaPattern.EncodedForm.encode f in
+    MetaPattern.create f;;
+
+(* optional part: arbitrary *)
+#require "qcheck";;
+#load "libzipperposition_arbitrary.cma";;
+open Libzipperposition_arbitrary;;
+open QCheck;;
+
+print_endline "load prover lib...";;
+#load "libzipperposition_prover.cma";;
 module M = Monome;;
 module MF = Monome.Focus;;
-#install_printer FOTerm.fmt;;
-#install_printer HOTerm.fmt;;
-#install_printer Literal.fmt;;
-#install_printer Clause.fmt;;
-#install_printer FOFormula.fmt;;
-#install_printer PrologTerm.fmt;;
-#install_printer Substs.FO.fmt;;
-#install_printer Substs.HO.fmt;;
-#install_printer Proof.fmt;;
-#install_printer Symbol.fmt;;
-#install_printer Signature.fmt;;
-#install_printer Type.fmt;;
-#install_printer Monome.fmt;;
-let pterm s = Logtk.Parse_tptp.parse_term Logtk.Lex_tptp.token (Lexing.from_string s);;
-let pform s = Logtk.Parse_tptp.parse_formula Logtk.Lex_tptp.token (Lexing.from_string s);;
+#install_printer FOTerm.pp;;
+#install_printer HOTerm.pp;;
+#install_printer Literal.pp;;
+#install_printer Clause.pp;;
+#install_printer FOFormula.pp;;
+#install_printer PrologTerm.pp;;
+#install_printer Substs.FO.pp;;
+#install_printer Substs.HO.pp;;
+#install_printer Proof.pp;;
+#install_printer Signature.pp;;
+#install_printer Type.pp;;
+#install_printer Monome.pp;;
+let pterm s = Parse_tptp.parse_term Lex_tptp.token (Lexing.from_string s);;
+let pform s = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s);;
 Printf.printf "finished loading\n";;
-(* vim:syntax=ocaml
-*)

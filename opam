@@ -6,6 +6,12 @@ build: [
     ["./configure"
         "--bindir" "%{bin}%"
         "--disable-tests"
+        "--disable-docs"
+        "--%{menhir:enable}%-parsers"
+        "--disable-solving"
+        "--disable-qcheck"
+        "--disable-tools"
+        "--enable-meta"
     ]
     [make]
 ]
@@ -15,17 +21,24 @@ remove: [
     ["rm" "%{bin}%/zipperposition"]
 ]
 depends: [
-  "ocamlfind"
-  "menhir"
-  "logtk" { >= "0.7" }
+  "ocamlfind" { build }
+  "base-bytes"
+  "base-unix"
+  "zarith"
   "containers" { >= "0.7" }
+  "sequence" { >= "0.4" }
   "gen"
+  "oclock"
+]
+depopts: [
+  "menhir" {build}
+  "qcheck" {test}
   "msat"
 ]
 available: [
     ocaml-version >= "4.00.1"
 ]
+tags: [ "logic" "unification" "term" "superposition" "prover" ]
 bug-reports: "https://github.com/c-cube/zipperposition/issues"
 dev-repo: "https://github.com/c-cube/zipperposition.git"
-
 

@@ -1,0 +1,8 @@
+# OASIS_START
+# DO NOT EDIT (digest: 800f92b06f36c31e002def83a2f1776c)
+src/arbitrary/ArTerm
+src/arbitrary/ArForm
+src/arbitrary/ArType
+src/arbitrary/ArSignature
+src/arbitrary/ArSymbol
+# OASIS_STOP

@@ -1,6 +1,9 @@
 # Zipperposition
 
-Automated theorem prover for first-order logic with equality and theories.
+- Automated theorem prover for first-order logic with equality and theories.
+- Logic toolkit, designed primarily for first-order automated reasoning. It aims
+  at providing basic types and algorithms (terms, unification, orderings,
+  indexing, etc.) that can be factored out of several applications.
 
 ## Short summary
 
@@ -31,9 +34,7 @@ options or documentation may be plain wrong.
 
 ## License
 
-BSD2 (no code remains of what came from matita or Darwin).
-
-See file LICENSE.
+This project is licensed under the BSD2 license. See the `LICENSE` file.
 
 ## Build
 
@@ -55,32 +56,92 @@ To upgrade to more recent versions:
 
     $ opam upgrade
 
+If you want to try the development (unstable) version, try:
+
+    $ opam pin add zipperposition -k git https://github.com/c-cube/zipperposition.git#dev
+
 ### Manually
 
 If you really need to, you can download a release on the
 following [github page for releases](https://github.com/c-cube/zipperposition/releases).
 
 Look in the file `opam` to see which dependencies you need to install.
-They include `logtk`, `menhir`, `zarith`, `containers` and `sequence`, but
+They include `menhir`, `zarith`, `containers` and `sequence`, but
 maybe also other libraries. Consider using opam directly if possible.
 
     $ ./configure
 
     $ make install
 
+Additional sub-libraries can be built if their respective dependencies
+are met, and the appropriate `./configure --enable-foobar` flag was set.
+For instance, to build the *meta-prover* library (used to detect axiomatic
+theories), you should run
+
+    $ ./configure --enable-meta
+
+If [menhir](http://cristal.inria.fr/~fpottier/menhir/) is installed, the
+parsers library `Logtk_parsers` can be built with
+
+    $ ./configure --enable-parsers
+
+If you have installed [qcheck](https://github.com/c-cube/qcheck/), for instance
+via `opam install qcheck`, you can enable the property-based testing and
+random term generators with
+
+    $ ./configure --enable-qcheck --enable-tests
+    $ make tests
+
 
 ## Use
 
 Typical usage:
 
-    $ zipperposition -help
+    $ zipperposition --help
     $ zipperposition problem_file [options]
-    $ zipperposition -arith ARI114=1.p
-    $ zipperposition -dot /tmp/foo.dot examples/ind/nat1.p
+    $ zipperposition --arith ARI114=1.p
+    $ zipperposition --dot /tmp/foo.dot examples/ind/nat1.p
 
 to run the prover. Help is available with the option *-help*.
 
 For instance,
 
-    $ zipperposition pelletier_problems/pb47.p -ord rpo6 -progress -timeout 30
+    $ zipperposition pelletier_problems/pb47.p --ord rpo6 --timeout 30
+
+Several tools are shipped with `Logtk`, including a CNF converter, a type-checker,
+etc. They are built if the flag `--enable-tools` is set. Documentation
+will be built provided `--enable-docs` is set.
+
+After the configuration is done, to build the library, documentation and tools
+(given the appropriate flags are set), type in a terminal located in the root
+directory of the project:
+
+    $ make
+
+If you use `ocamlfind` (which is strongly recommended),
+installation/uninstallation are just:
+
+    $ make install
+    $ make uninstall
+
+### Library
+
+Zipperposition's library provides several useful
+parts for logic-related implementations:
+
+- a library packed in a module `Logtk`, with terms, formulas, etc.;
+- small tools (see directory `src/tools/`) to illustrate how to use the library
+    and provide basic services (type-checking, reduction to CNF, etc.);
+- an optional library in a module `Logtk_meta`,
+    to provide reasoning at the problem level, about the presence of axiomatic
+    theories. A small file describing a few theories can be found in
+    `data/builtin.theory` and one of the tools, `detect_theories`, can be
+    used straightforwardly.
+
+## Documentation
+
+See [this page](http://cedeela.fr/~simon/software/logtk/).
+
+There are some examples of how to use the code in `src/tools/`
+and `src/demo/`.
 

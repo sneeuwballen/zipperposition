@@ -1,25 +1,122 @@
-OASISFormat: 0.4
-Name:        zipperposition
-Version:     dev
-Homepage:    https://github.com/c-cube/zipperposition
-Authors:     Simon Cruanes
-License:     BSD-3-clause
-LicenseFile: LICENSE
-Plugins:     META (0.3), DevFiles (0.3)
-OCamlVersion: >= 4.00.1
-BuildTools: ocamlbuild
-FilesAB: src/const.ml.ab
-AlphaFeatures: compiled_setup_ml
+OASISFormat:    0.4
+Name:           zipperposition
+Version:        dev
+Homepage:       https://github.com/c-cube/zipperposition
+Authors:        Simon Cruanes
+License:        BSD-3-clause
+LicenseFile:    LICENSE
+Plugins:        META (0.3), DevFiles (0.3)
+OCamlVersion:   >= 4.00.1
+BuildTools:     ocamlbuild
+FilesAB:        src/prover/const.ml.ab
+AlphaFeatures:  compiled_setup_ml, ocamlbuild_more_args
+
+XOCamlbuildExtraArgs: "-menhir 'menhir --dump --explain'"
 
 Synopsis:  Superposition theorem prover, for first order logic with equality.
 Description:
     Zipperposition is an experimental theorem prover based on
     superposition. It aims at being flexible and extensible while retaining
     decent performance (using indexing, for instance).
+    It ships with a logic toolkit, designed primarily for
+    first-order automated reasoning. It aims
+    at providing basic types and algorithms (terms, unification, orderings,
+    indexing, etc.) that can be factored out of several applications.
+
+Flag "tools"
+  Description:  Build and install basic tools (CNF, etc.)
+  Default:      false
+
+Flag "meta"
+  Description:  Build and install meta-prover
+  Default:      true
+
+Flag "bench"
+  Description:  Build and run benchmarks
+  Default:      false
+
+Flag "parsers"
+  Description:  Build and install parsers (requires menhir)
+  Default:      false
+
+Flag "solving"
+  Description:  Build and install constraint solvers (requires "msat")
+  Default:      false
+
+Flag "qcheck"
+  Description:  Build and install QCheck random generators
+  Default:      false
+
+Flag "demo"
+  Description:  Build and install demo programs
+  Default:      false
 
 Library "libzipperposition"
-  Path:             src/
+  Path:             src/core/
   Pack:             true
+  Modules:          InnerTerm, FOTerm, Type, Util, STerm, Interfaces,
+                    DBEnv, Position, HOTerm, Var, HVar,
+                    Substs, Unif, Signature, Scoped, Unif_intf,
+                    TypeInference, Options, Comparison, Precedence, Builtin,
+                    Ordering, Skolem, Cnf, ID, SLiteral,
+                    HORewriting, Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,
+                    Congruence, FeatureVector,
+                    Lambda, Sourced, TypedSTerm,
+                    lib/Hashcons, lib/ParseLocation, lib/Multiset, lib/LazyList,
+                    lib/IArray, lib/LazyGraph, lib/AllocCache, lib/Multiset_intf
+  CSources:         util_stubs.c, util_stubs.h
+  CCOpt:            -Wextra -Wno-unused-parameter
+  BuildDepends:     zarith, unix, sequence, containers,
+                    containers.data, bytes, oclock
+
+Library "libzipperposition_parsers"
+  Path:             src/parsers
+  Pack:             true
+  Modules:          Parse_tptp, Lex_tptp, Ast_tptp, Util_tptp,
+                    Ast_ho, Lex_ho, Parse_ho, Trace_tstp, CallProver
+  Build$:           flag(parsers)
+  Install$:         flag(parsers)
+  FindlibName:      parsers
+  FindlibParent:    libzipperposition
+  BuildDepends:     libzipperposition
+  BuildTools:       menhir
+  XMETARequires:    libzipperposition
+
+Library "libzipperposition_meta"
+  Path:             src/meta/
+  Pack:             true
+  FindlibName:      meta
+  FindlibParent:    libzipperposition
+  Modules:          Encoding, Reasoner, Plugin, Prover
+  BuildDepends:     libzipperposition, libzipperposition.parsers
+  Build$:           flag(meta) && flag(parsers)
+  Install$:         flag(meta) && flag(parsers)
+
+Library "libzipperposition_solving"
+  Path:             src/solving
+  Pack:             true
+  FindlibParent:    libzipperposition
+  FindlibName:      solving
+  Modules:          Lpo
+  Build$:           flag(solving)
+  Install$:         flag(solving)
+  BuildDepends:     libzipperposition, msat
+
+Library "libzipperposition_arbitrary"
+  Path:             src/arbitrary/
+  Pack:             true
+  FindlibName:      arbitrary
+  FindlibParent:    libzipperposition
+  Modules:          ArTerm, ArForm, ArType, ArSignature, ArSymbol
+  BuildDepends:     libzipperposition, qcheck, libzipperposition.meta
+  Build$:           flag(qcheck)
+  Install$:         flag(qcheck)
+
+Library "libzipperposition_prover"
+  Path:             src/prover/
+  Pack:             true
+  FindlibName:      prover
+  FindlibParent:    libzipperposition
   Modules:          ClauseQueue, Clause, Const, Extensions,
                     Literal, Literals, CompactClause, Ctx, Proof, ProofState,
                     Saturate, Selection, Theories, AC, PFormula,
@@ -37,30 +134,151 @@ Library "libzipperposition"
                     meta/MetaProverState
   InternalModules:  lib/LazyGraph, lib/SmallSet,
                     lib/UnionFind, lib/Mixtbl, lib/Signal
+  Build$:           flag(meta) && flag(parsers)
+  Install$:         flag(meta) && flag(parsers)
   BuildDepends:     containers, containers.advanced, sequence, gen, unix,
-                    zarith, containers.io, logtk, logtk.meta, logtk.parsers,
-                    dynlink, msat
+                    zarith, msat,
+                    libzipperposition, libzipperposition.meta,
+                    libzipperposition.parsers
 
 # main executable for the prover
 Executable zipperposition
-  Path:             src/
+  Path:             src/main/
   Install:          true
   CompiledObject:   native
   MainIs:           zipperposition.ml
-  BuildDepends:     containers, sequence, unix, logtk, logtk.parsers, dynlink,
-                    libzipperposition
+  Build$:           flag(meta) && flag(parsers)
+  Install$:         flag(meta) && flag(parsers)
+  BuildDepends:     containers, sequence, unix,
+                    libzipperposition,
+                    libzipperposition.parsers,
+                    libzipperposition.prover
 
 Document libzipperposition
-  Title:                Documentation for Zipperposition
+  Title:                Documentation for Libzipperposition
+  Abstract:             Main API documentation for Libzipperposition.
   Type:                 ocamlbuild (0.3)
   BuildTools+:          ocamldoc
-  Install$:             true
+  Install$:             flag(docs)
+  Build$:               flag(docs)
   XOCamlbuildPath:      .
   XOCamlbuildLibraries: libzipperposition
+  XOCamlbuildExtraArgs: "-docflags '-keep-code -colorize-code -short-functors -charset utf-8'"
+
+Document libzipperposition_meta
+  Title:                Libzipperposition_meta documentation
+  Type:                 ocamlbuild (0.3)
+  BuildTools+:          ocamldoc
+  Install$:             flag(docs) && flag(meta)
+  Build$:               flag(docs) && flag(meta)
+  XOCamlbuildPath:      .
+  XOCamlbuildLibraries: libzipperposition.meta
+
+Document libzipperposition_parsers
+  Title:                Libzipperposition_parsers documentation
+  Type:                 ocamlbuild (0.3)
+  BuildTools+:          ocamldoc
+  Install$:             flag(docs) && flag(parsers)
+  Build$:               flag(docs) && flag(parsers)
+  XOCamlbuildPath:      .
+  XOCamlbuildLibraries: libzipperposition.parsers
+
+Document libzipperposition_arbitrary
+  Title:                Libzipperposition_arbitrary documentation
+  Type:                 ocamlbuild (0.3)
+  BuildTools+:          ocamldoc
+  Install$:             flag(docs) && flag(qcheck)
+  Build$:               flag(docs) && flag(qcheck)
+  XOCamlbuildPath:      .
+  XOCamlbuildLibraries: libzipperposition.arbitrary
+
+Document libzipperposition_prover
+  Title:                Libzipperposition_prover documentation
+  Type:                 ocamlbuild (0.3)
+  BuildTools+:          ocamldoc
+  Install$:             flag(docs)
+  Build$:               flag(docs)
+  XOCamlbuildPath:      .
+  XOCamlbuildLibraries: libzipperposition.prover
+
+Executable run_bench
+  Path:             tests/
+  Install:          false
+  CompiledObject:   native
+  MainIs:           run_bench.ml
+  Build$:           flag(bench) && flag(tests)
+  BuildDepends:     libzipperposition, benchmark, qcheck, libzipperposition.arbitrary
 
 Test all
+  Command:          make test-all
+  TestTools:        run_tests
+  Run$:             flag(tests) && flag(qcheck)
+
+Test run
   Command:      ./tests/run.ml
   Run$:         flag(tests)
+
+Executable run_tests
+  Path:             tests/
+  Install:          false
+  CompiledObject:   native
+  MainIs:           run_tests.ml
+  Build$:           flag(tests) && flag(meta) && flag(qcheck) && flag(parsers)
+  BuildDepends:     libzipperposition, libzipperposition.parsers, oUnit, libzipperposition.meta, libzipperposition.arbitrary
+
+# TPTP syntax and type checking
+Executable type_check_tptp
+  Path:             src/tools/
+  Build$:           flag(tools) && flag(parsers)
+  Install$:         flag(tools) && flag(parsers)
+  CompiledObject:   native
+  MainIs:           type_check_tptp.ml
+  BuildDepends:     libzipperposition, libzipperposition.parsers
+
+# Conversion to CNF
+Executable cnf_of_tptp
+  Path:             src/tools/
+  Build$:           flag(tools) && flag(parsers)
+  Install$:         flag(tools) && flag(parsers)
+  CompiledObject:   native
+  MainIs:           cnf_of_tptp.ml
+  BuildDepends:     libzipperposition, libzipperposition.parsers
+
+# Orienting rewrite rules with LPO
+Executable orient
+  Path:             src/tools/orient/
+  Build$:           flag(tools) && flag(parsers) && flag(solving)
+  Install$:         flag(tools) && flag(parsers) && flag(solving)
+  CompiledObject:   native
+  MainIs:           orient.ml
+  BuildDepends:     libzipperposition, libzipperposition.parsers, libzipperposition.solving, msat
+
+# proof checking
+Executable proof_check_tstp
+  Path:             src/tools/
+  Build$:           flag(tools) && flag(parsers)
+  Install$:         flag(tools) && flag(parsers)
+  CompiledObject:   native
+  MainIs:           proof_check_tstp.ml
+  BuildDepends:     libzipperposition, libzipperposition.parsers
+
+# detection of theories
+Executable detect_theories
+  Path:             src/tools/
+  Build$:           flag(meta) && flag(tools) && flag(parsers)
+  Install$:         flag(meta) && flag(tools) && flag(parsers)
+  CompiledObject:   native
+  MainIs:           detect_theories.ml
+  BuildDepends:     libzipperposition, libzipperposition.parsers, libzipperposition.meta
+
+# Demo: resolution
+Executable resolution1
+  Path:             src/demo/resolution
+  Build$:           flag(parsers) && flag(demo)
+  Install:          false
+  CompiledObject:   native
+  MainIs:           resolution1.ml
+  BuildDepends:     libzipperposition, libzipperposition.parsers, sequence, containers
 
 SourceRepository head
   Type: git

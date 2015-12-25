@@ -45,8 +45,29 @@ setup.exe: setup.ml
 
 # OASIS_STOP
 
+rst_doc:
+	@echo "build Sphinx documentation (into _build/doc)"
+	sphinx-build doc _build/doc
+
+open_doc: rst_doc
+	firefox _build/doc/contents.html
+
+push_doc: doc rst_doc
+	rsync -tavu logtk.docdir/* cedeela.fr:~/simon/root/software/logtk/
+	rsync -tavu _build/doc/* cedeela.fr:~/simon/root/software/logtk/rst/
+
+test-all: build
+	./run_tests.native
+	./tests/quick/all.sh
+
 INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
+VERSION=$(shell awk '/^Version:/ {print $$2}' _oasis)
+
+update_next_tag:
+	@echo "update version to $(VERSION)..."
+	zsh -c 'sed -i "s/NEXT_VERSION/$(VERSION)/g" src/**/*.ml{,i}(.)'
+	zsh -c 'sed -i "s/NEXT_RELEASE/$(VERSION)/g" src/**/*.ml{,i}(.)'
 
 tags:
 	otags $(IMPLEMENTATION_FILES) $(INTERFACE_FILES)
@@ -62,10 +83,11 @@ package: clean
 	tar cavf $(TARBALL) _oasis setup.ml configure myocamlbuild.ml _tags \
 		Makefile pelletier_problems README.md src/ tests/ utils/
 
-.PHONY: tags dot package
-
 watch:
-	while find src/ -name '*.ml*' -print0 | xargs -0 inotifywait -e delete_self -e modify ; do \
+	while find src/ tests/ -print0 | xargs -0 inotifywait -e delete_self -e modify ; do \
 		echo "============ at `date` ==========" ; \
 		make ; \
 	done
+
+.PHONY: push_doc dot package tags rst_doc open_doc test-all
+
