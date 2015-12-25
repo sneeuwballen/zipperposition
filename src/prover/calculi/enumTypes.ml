@@ -355,13 +355,13 @@ let extension =
 let () =
   Extensions.register extension;
   Params.add_opts
-    [ "-enum-types"
-    , Arg.Bool (fun b -> _enable := b)
-    , " enable/disable special handling for enumerated types"
-    ; "-enum-shielded"
-    , Arg.Bool (fun b -> _instantiate_shielded := b)
-    , " enable/disable instantiation of shielded variables of enum type"
-    ; "-enum-unary"
-    , Arg.Bool (fun b -> _accept_unary_types := b)
-    , " enable/disable support for unary enum types (one case)"
+    [ "--enum-types"
+      , Arg.Bool (fun b -> _enable := b)
+      , " enable/disable special handling for enumerated types"
+    ; "--enum-shielded"
+      , Arg.Bool (fun b -> _instantiate_shielded := b)
+      , " enable/disable instantiation of shielded variables of enum type"
+    ; "--enum-unary"
+      , Arg.Bool (fun b -> _accept_unary_types := b)
+      , " enable/disable support for unary enum types (one case)"
     ]

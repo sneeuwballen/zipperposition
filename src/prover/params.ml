@@ -51,7 +51,7 @@ and files = CCVector.create ()
 
 (** parse_args returns parameters *)
 let parse_args () =
-  let help_select = CCFormat.sprintf "selection function (%a)"
+  let help_select = CCFormat.sprintf " selection function (@[<h>%a@])"
     (Util.pp_list ~sep:"," CCFormat.string)
     (Selection.available_selections ())
   in

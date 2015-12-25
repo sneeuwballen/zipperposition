@@ -1,5 +1,5 @@
 (* OASIS_START *)
-(* DO NOT EDIT (digest: a3d347575a1ee9d6aea1af53c0f90107) *)
+(* DO NOT EDIT (digest: 5c5fd5907eb8672fa739632c8e4521b1) *)
 module OASISGettext = struct
 (* # 22 "src/oasis/OASISGettext.ml" *)
 
@@ -609,16 +609,19 @@ let package_default =
   {
      MyOCamlbuildBase.lib_ocaml =
        [
-          ("logtk", ["src/base"], []);
-          ("logtk_parsers", ["src/parsers"], []);
-          ("logtk_meta", ["src/meta"], []);
-          ("logtk_solving", ["src/solving"], []);
-          ("logtk_arbitrary", ["src/arbitrary"], [])
+          ("libzipperposition", ["src/core"; "src/core/lib"], []);
+          ("libzipperposition_parsers", ["src/parsers"], []);
+          ("libzipperposition_meta", ["src/meta"], []);
+          ("libzipperposition_solving", ["src/solving"], []);
+          ("libzipperposition_arbitrary", ["src/arbitrary"], []);
+          ("libzipperposition_prover",
+            ["src/prover"; "src/prover/calculi"; "src/prover/meta"],
+            [])
        ];
-     lib_c = [("logtk", "src/base/", ["src/base/util_stubs.h"])];
+     lib_c = [("libzipperposition", "src/core/", ["src/core/util_stubs.h"])];
      flags =
        [
-          (["oasis_library_logtk_ccopt"; "compile"],
+          (["oasis_library_libzipperposition_ccopt"; "compile"],
             [
                (OASISExpr.EBool true,
                  S
@@ -632,16 +635,75 @@ let package_default =
        ];
      includes =
        [
-          ("tests", ["src/arbitrary"; "src/base"; "src/meta"; "src/parsers"]);
-          ("src/tools/orient", ["src/base"; "src/parsers"; "src/solving"]);
-          ("src/tools/hysteresis",
-            ["src/base"; "src/meta"; "src/parsers"; "src/solving"]);
-          ("src/tools", ["src/base"; "src/meta"; "src/parsers"]);
-          ("src/solving", ["src/base"]);
-          ("src/parsers", ["src/base"]);
-          ("src/meta", ["src/base"; "src/parsers"]);
-          ("src/demo/resolution", ["src/base"; "src/parsers"]);
-          ("src/arbitrary", ["src/base"; "src/meta"])
+          ("tests",
+            [
+               "src/arbitrary";
+               "src/core";
+               "src/core/lib";
+               "src/meta";
+               "src/parsers"
+            ]);
+          ("src/tools/orient",
+            ["src/core"; "src/core/lib"; "src/parsers"; "src/solving"]);
+          ("src/tools",
+            ["src/core"; "src/core/lib"; "src/meta"; "src/parsers"]);
+          ("src/solving", ["src/core"; "src/core/lib"]);
+          ("src/prover/meta",
+            [
+               "src/core";
+               "src/core/lib";
+               "src/meta";
+               "src/parsers";
+               "src/prover";
+               "src/prover/calculi";
+               "src/prover/lib"
+            ]);
+          ("src/prover/lib",
+            [
+               "src/core";
+               "src/core/lib";
+               "src/meta";
+               "src/parsers";
+               "src/prover";
+               "src/prover/calculi";
+               "src/prover/meta"
+            ]);
+          ("src/prover/calculi",
+            [
+               "src/core";
+               "src/core/lib";
+               "src/meta";
+               "src/parsers";
+               "src/prover";
+               "src/prover/lib";
+               "src/prover/meta"
+            ]);
+          ("src/prover",
+            [
+               "src/core";
+               "src/core/lib";
+               "src/meta";
+               "src/parsers";
+               "src/prover/calculi";
+               "src/prover/lib";
+               "src/prover/meta"
+            ]);
+          ("src/parsers", ["src/core"; "src/core/lib"]);
+          ("src/meta", ["src/core"; "src/core/lib"; "src/parsers"]);
+          ("src/main",
+            [
+               "src/core";
+               "src/core/lib";
+               "src/parsers";
+               "src/prover";
+               "src/prover/calculi";
+               "src/prover/meta"
+            ]);
+          ("src/demo/resolution",
+            ["src/core"; "src/core/lib"; "src/parsers"]);
+          ("src/core/lib", ["src/core"]);
+          ("src/core", ["src/core/lib"]);
+          ("src/arbitrary", ["src/core"; "src/core/lib"; "src/meta"])
        ]
   }
   ;;
@@ -650,7 +712,7 @@ let conf = {MyOCamlbuildFindlib.no_automatic_syntax = false}
 
 let dispatch_default = MyOCamlbuildBase.dispatch_default conf package_default;;
 
-# 654 "myocamlbuild.ml"
+# 716 "myocamlbuild.ml"
 (* OASIS_STOP *)
 Ocamlbuild_plugin.dispatch dispatch_default;;
 

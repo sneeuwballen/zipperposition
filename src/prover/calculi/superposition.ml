@@ -186,7 +186,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Lits.fold_eqn ~ord ~both:true ~sign:true
         ~eligible:(C.Eligible.param c) (C.lits c)
       |> Sequence.fold
-        (fun tree (l, r,sign, pos) ->
+        (fun tree (l, _, sign, pos) ->
            assert sign;
            let with_pos = C.WithPos.({term=l; pos; clause=c;}) in
            f tree l with_pos)
@@ -451,7 +451,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               and that are potentially unifiable with u_p (u at position p) *)
            I.retrieve_unifiables (!_idx_sup_from, 1) (u_p,0)
            |> Sequence.fold
-             (fun acc (s, with_pos, subst) ->
+             (fun acc (_, with_pos, subst) ->
                 let active = with_pos.C.WithPos.clause in
                 let s_pos = with_pos.C.WithPos.pos in
                 match Lits.View.get_eqn (C.lits active) s_pos with
@@ -553,7 +553,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let eligible = C.Eligible.(filter Lit.is_eq) in
     (* find root terms that are unifiable with s and are not in the
        literal at s_pos. Calls [k] with a position and substitution *)
-    let find_unifiable_lits idx s s_pos k =
+    let find_unifiable_lits idx s _s_pos k =
       Array.iteri
         (fun i lit ->
            match lit with
@@ -705,7 +705,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           fun t ->
             (* restrict max terms in literals eligible for resolution *)
             CCList.Set.mem ~eq:T.equal t max_terms
-        else fun t -> false
+        else (fun _ -> false)
       in
       Lit.map
         (fun t -> demod_nf ~restrict:(restrict_term t) c clauses t)
@@ -740,7 +740,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let recurse ~oriented set l r =
       I.retrieve_specializations (!_idx_back_demod,1) (l,0)
       |> Sequence.fold
-        (fun set (t',with_pos,subst) ->
+        (fun set (_t',with_pos,subst) ->
            let c = with_pos.C.WithPos.clause in
            (* subst(l) matches t' and is > subst(r), very likely to rewrite! *)
            if ((oriented ||
@@ -966,7 +966,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                end
             );
         None (* no match *)
-      with FoundMatch (r, c', subst) ->
+      with FoundMatch (_r, c', _subst) ->
         Some (C.proof c' :: clauses)  (* success *)
     in
     (* fold over literals *)
@@ -1014,7 +1014,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                end
             );
         None (* no match *)
-      with FoundMatch (r, c', subst) ->
+      with FoundMatch (_r, c', _subst) ->
         Some (C.proof c') (* success *)
     in
     (* fold over literals *)
@@ -1379,7 +1379,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let _print_idx file idx =
     CCIO.with_out file
       (fun oc ->
-         let pp_leaf out v = () in
+         let pp_leaf _ _ = () in
          let out = Format.formatter_of_out_channel oc in
          Format.fprintf out "@[%a@]@." (TermIndex.to_dot pp_leaf) idx;
          flush oc)
@@ -1454,17 +1454,17 @@ let extension =
 
 let () =
   Params.add_opts
-    [ "-semantic-tauto"
-    , Arg.Set _enable_semantic_tauto
-    , " enable semantic tautology check"
-    ; "-dot-sup-into"
-    , Arg.String (fun s -> _dot_sup_into := Some s)
-    , " print superposition-into index into file"
-    ; "-dot-sup-from"
-    , Arg.String (fun s -> _dot_sup_from := Some s)
-    , " print superposition-from index into file"
-    ; "-simultaneous-sup"
-    , Arg.Bool (fun b -> _use_simultaneous_sup := b)
-    , " enable/disable simultaneous superposition"
+    [ "--semantic-tauto"
+      , Arg.Set _enable_semantic_tauto
+      , " enable semantic tautology check"
+    ; "--dot-sup-into"
+      , Arg.String (fun s -> _dot_sup_into := Some s)
+      , " print superposition-into index into file"
+    ; "--dot-sup-from"
+      , Arg.String (fun s -> _dot_sup_from := Some s)
+      , " print superposition-from index into file"
+    ; "--simultaneous-sup"
+      , Arg.Bool (fun b -> _use_simultaneous_sup := b)
+      , " enable/disable simultaneous superposition"
     ]
 

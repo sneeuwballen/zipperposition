@@ -287,10 +287,10 @@ let add_theory f = theory_files := f :: !theory_files
 
 (* add options *)
 let () = Params.add_opts
-    [ "-theory", Arg.String add_theory, " use given theory file for meta-prover"
-    ; "-meta-rules", Arg.Set flag_print_rules, " print all rules of meta-prover"
-    ; "-meta-summary", Arg.Set flag_print_rules_exit, " print all rules before exit"
-    ; "-meta-sig", Arg.Set flag_print_signature, " print meta signature"
+    [ "--theory", Arg.String add_theory, " use given theory file for meta-prover"
+    ; "--meta-rules", Arg.Set flag_print_rules, " print all rules of meta-prover"
+    ; "--meta-summary", Arg.Set flag_print_rules_exit, " print all rules before exit"
+    ; "--meta-sig", Arg.Set flag_print_signature, " print meta signature"
     ]
 
 module type S = sig
