@@ -19,7 +19,6 @@ module type PARAMETERS = sig
   val signature : Signature.t
   val ord : Ordering.t
   val select : Selection.t
-  val constr_list : (int * [`partial] Precedence.Constr.t) list
 end
 
 module Make(X : PARAMETERS) = struct
@@ -27,7 +26,6 @@ module Make(X : PARAMETERS) = struct
   let _select = ref X.select
   let _signature = ref X.signature
   let _complete = ref true
-  let _constrs = ref X.constr_list
 
   let skolem = Skolem.create ~prefix:"zsk" ()
   let renaming = S.Renaming.create ()
@@ -36,7 +34,6 @@ module Make(X : PARAMETERS) = struct
   let selection_fun () = !_select
   let set_selection_fun s = _select := s
   let signature () = !_signature
-  let complete () = !_complete
 
   let on_new_symbol = Signal.create()
   let on_signature_update = Signal.create()
@@ -52,7 +49,7 @@ module Make(X : PARAMETERS) = struct
     if !_complete then Util.debug 1 "completeness is lost";
     _complete := false
 
-  let is_completeness_preserved = complete
+  let is_completeness_preserved () = !_complete
 
   let add_signature signature =
     Util.enter_prof prof_add_signature;
@@ -61,9 +58,9 @@ module Make(X : PARAMETERS) = struct
     Signal.send on_signature_update !_signature;
     Signature.iter _diff (fun s ty -> Signal.send on_new_symbol (s,ty));
     !_signature
-    |> Signature.Seq.to_seq
-    |> Sequence.map fst
-    |> Ordering.add_seq !_ord;
+      |> Signature.Seq.to_seq
+      |> Sequence.map fst
+      |> Ordering.add_seq !_ord;
     Util.exit_prof prof_add_signature;
     ()
 

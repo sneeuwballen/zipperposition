@@ -117,7 +117,6 @@ let stat_subsumed_by_active_set_call = Util.mk_stat "subsumed_by_active_set call
 let stat_clauses_subsumed = Util.mk_stat "clauses subsumed"
 let stat_demodulate_call = Util.mk_stat "demodulate calls"
 let stat_demodulate_step = Util.mk_stat "demodulate steps"
-let stat_splits = Util.mk_stat "splits"
 let stat_semantic_tautology = Util.mk_stat "semantic_tautologies"
 let stat_condensation = Util.mk_stat "condensation"
 let stat_clc = Util.mk_stat "clc"
@@ -138,7 +137,6 @@ let prof_infer_active = Util.mk_profiler "infer_active"
 let prof_infer_passive = Util.mk_profiler "infer_passive"
 let prof_infer_equality_resolution = Util.mk_profiler "infer_equality_resolution"
 let prof_infer_equality_factoring = Util.mk_profiler "infer_equality_factoring"
-let prof_split = Util.mk_profiler "infer_split"
 
 let _enable_semantic_tauto = ref false
 let _use_simultaneous_sup = ref true

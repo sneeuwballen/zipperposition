@@ -19,9 +19,6 @@ module type S = sig
   val signature : unit -> Signature.t
   (** Current signature *)
 
-  val complete : unit -> bool
-  (** Is completeness preserved? *)
-
   val renaming : Substs.Renaming.t
 
   (** {2 Utils} *)
@@ -100,7 +97,7 @@ module type S = sig
 
   (** {2 Induction} *)
 
-  (* TODO: move most information into [ID.payload] *)
+  (* TODO: move most information into [ID.payload] and induction modules *)
 
   module Induction : sig
     (** {6 Inductive Types} *)

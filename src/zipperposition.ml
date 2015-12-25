@@ -48,28 +48,18 @@ let () =
   ()
 
 (* compute a precedence *)
-let compute_prec () =
-  assert false (* TODO *)
-
-(* FIXME
-   let setup_penv ~penv () =
-   Extensions.extensions ()
-   |> List.iter (Extensions.apply_penv ~penv);
-   if (PEnv.get_params ~penv).param_expand_def then
-   PEnv.add_operation ~penv ~prio:1 PEnv.expand_def;
-   (* use "invfreq" *)
-   PEnv.add_constr_rule ~penv 50
-   (fun set ->
-    let symbols = PF.Set.to_seq set
-      |> Sequence.map PF.form
-      |> Sequence.flatMap Formula.FO.Seq.symbols
-    in
-    Precedence.Constr.invfreq symbols
-   );
-   (* be sure to get a total order on symbols, as last resort *)
-   PEnv.add_constr ~penv 99 Precedence.Constr.alpha;
-   ()
-*)
+let compute_prec terms =
+  let cp = Compute_prec.create() in
+  (* use extensions *)
+  Extensions.extensions ()
+    |> List.iter (Extensions.apply_prec cp);
+  (* use "invfreq" *)
+  Compute_prec.add_constr_rule cp 50
+   (fun seq ->
+     seq
+     |> Sequence.flat_map FOTerm.Seq.symbols
+     |> Precedence.Constr.invfreq);
+  Compute_prec.mk_precedence cp terms
 
 let setup_env ~env =
   Extensions.extensions ()
@@ -81,9 +71,9 @@ let load_plugins ~params =
   let dir = Filename.dirname Sys.argv.(0) in
   Gen.append (CCIO.File.read_dir dir) (CCIO.File.read_dir Const.home)
   |> Gen.filter
-    (fun s -> CCString.prefix ~pre:"libzipperposition_" s
-              && CCString.suffix ~suf:".cmxs" s
-    )
+    (fun s ->
+       CCString.prefix ~pre:"libzipperposition_" s
+       && CCString.suffix ~suf:".cmxs" s)
   |> Gen.iter
     (fun filename ->
        Util.debugf ~section 1 "trying to load file `%s`…" (fun k->k filename);
@@ -91,14 +81,14 @@ let load_plugins ~params =
        | `Error msg -> () (* Could not load plugin *)
        | `Ok ext ->
            Util.debugf ~section 1 "loaded extension `%s`" (fun k->k ext.Extensions.name);
-           ()
-    );
+           ());
   Extensions.extensions ()
 
 module MakeNew(X : sig
     module Env : Env.S
     val params : Params.t
-  end) = struct
+  end)
+= struct
   module Ctx = X.Env.Ctx
   module Env = X.Env
   module C = Env.C
@@ -213,85 +203,73 @@ module MakeNew(X : sig
         Format.printf "%% SZS output end Refutation@.";
         ()
 
-  (* perform type inference on those formulas *)
-  let annotate_formulas ~signature formulas =
-    let tyctx = TypeInference.Ctx.create signature in
-    let formulas = Sequence.map
-        (fun (f, file,name) ->
-           let f = TypeInference.FO.convert_form ~ctx:tyctx f in
-           f, file, name)
-        formulas
-    in
-    (* caution: evaluate formulas BEFORE *)
-    let formulas = Sequence.persistent formulas in
-    let signature = TypeInference.Ctx.to_signature tyctx in
-    formulas, signature
-
-  let setup_handlers() =
-    Signal.on Ctx.on_signature_update
-      (fun signature ->
-         Ctx.update_prec (Signature.Seq.symbols signature);
-         Signal.ContinueListening);
-    ()
-
   (* try to refute the set of clauses contained in the [env]. Parameters are
      used to influence how saturation is done, for how long it runs, etc.
      @return the result and final env. *)
   let try_to_refute ~env ~params result =
     let steps = if params.param_steps = 0
-      then None else (Util.debug ~section 0 "run for %d steps" params.param_steps;
-                      Some params.param_steps)
+      then None
+      else (
+        Util.debugf ~section 0 "run for %d steps" (fun k->k params.param_steps);
+        Some params.param_steps
+      )
     and timeout = if params.param_timeout = 0.
-      then None else (Util.debug ~section 0 "run for %f s" params.param_timeout;
-                      ignore (setup_alarm params.param_timeout);
-                      Some (Util.get_start_time () +. params.param_timeout -. 0.25))
+      then None
+      else (
+        Util.debugf ~section 0 "run for %f s" (fun k->k params.param_timeout);
+        ignore (setup_alarm params.param_timeout);
+        Some (Util.total_time_s () +. params.param_timeout -. 0.25)
+      )
     in
     Signal.send Env.on_start ();
     let result, num = match result with
       | Saturate.Unsat _ -> result, 0  (* already found unsat during presaturation *)
       | _ -> Sat.given_clause ~generating:true ?steps ?timeout ()
     in
-    Util.debug ~section 1 "done %d iterations" num;
-    Util.debug ~section 1 "final precedence: %a" Precedence.pp (Env.precedence ());
+    Util.debugf ~section 1 "done %d iterations" (fun k->k num);
+    Util.debugf ~section 1 "@[<2>final precedence:@ @[%a@]@]"
+      (fun k->k Precedence.pp (Env.precedence ()));
     result, env
 end
 
 (* print weight of [s] within precedence [prec] *)
-let _pp_weight prec buf s =
-  Printf.bprintf buf "w(%a)=%d" Symbol.pp s (Precedence.weight prec s)
+let _pp_weight prec out s =
+  Format.fprintf out "w(%a)=%d" ID.pp s (Precedence.weight prec s)
 
-(* preprocess formulas and choose signature,select,ord *)
-let preprocess ~signature ~params formulas =
-  Util.debug ~section 2 "start preprocessing";
-  (* penv *)
-  let penv = PEnv.create ~base:signature params in
-  setup_penv ~penv ();
-  let formulas = PEnv.process ~penv formulas in
-  Util.debug ~section 3 "formulas pre-processed into:\n  %a"
+(* FIXME
+   (* preprocess formulas and choose signature,select,ord *)
+   let preprocess ~signature ~params formulas =
+   Util.debug ~section 2 "start preprocessing";
+   (* penv *)
+   let penv = PEnv.create ~base:signature params in
+   setup_penv ~penv ();
+   let formulas = PEnv.process ~penv formulas in
+   Util.debug ~section 3 "formulas pre-processed into:\n  %a"
     (Util.pp_seq ~sep:"\n  " PF.pp) (PF.Set.to_seq formulas);
-  (* now build a context *)
-  let precedence, constr_list = PEnv.mk_precedence ~penv formulas in
-  Util.debug ~section 1 "precedence: %a" Precedence.pp precedence;
-  Util.debug ~section 1 "weights: %a"
+   (* now build a context *)
+   let precedence, constr_list = PEnv.mk_precedence ~penv formulas in
+   Util.debug ~section 1 "precedence: %a" Precedence.pp precedence;
+   Util.debug ~section 1 "weights: %a"
     (Sequence.pp_buf (_pp_weight precedence))
     (Signature.Seq.symbols signature);
-  let ord = params.param_ord precedence in
-  let select = Selection.selection_from_string ~ord params.param_select in
-  Util.debug ~section 1 "selection function: %s" params.param_select;
-  Util.debug ~section 1 "signature: %a" Signature.pp (Signature.diff signature !Params.signature);
-  let module Result = struct
+   let ord = params.param_ord precedence in
+   let select = Selection.selection_from_string ~ord params.param_select in
+   Util.debug ~section 1 "selection function: %s" params.param_select;
+   Util.debug ~section 1 "signature: %a" Signature.pp (Signature.diff signature !Params.signature);
+   let module Result = struct
     let signature = signature
     let select = select
     let ord = ord
     let constr_list = constr_list
-  end in
-  (module Result : Ctx.PARAMETERS), formulas
+   end in
+   (module Result : Ctx.PARAMETERS), formulas
+*)
 
 (* does the sequence of declarations contain at least one conjecture? *)
 let _has_conjecture decls =
   let _roles k =
     let visitor = object
-      inherit [unit] Ast_tptp.Untyped.visitor
+      inherit [unit,STerm.t] Ast_tptp.visitor
       method clause () role _ = k role
       method any_form () role _ = k role
     end
@@ -301,40 +279,36 @@ let _has_conjecture decls =
   Sequence.exists (fun r -> r = Ast_tptp.R_conjecture) _roles
 
 let scan_for_inductive_types decls =
-  let pairs = decls
-              |> Sequence.filter_map
-                (function
-                  | Ast_tptp.Untyped.NewType (_,ty,_,info) -> Some (ty, info)
-                  | _ -> None
-                )
+  let pairs =
+    decls
+    |> Sequence.filter_map
+      (function
+        | Ast_tptp.NewType (_,ty,_,info) -> Some (ty, info)
+        | _ -> None
+      )
   in
   Induction_helpers.init_from_decls pairs
 
-(** Process the given file (try to solve it) *)
+(* Process the given file (try to solve it) *)
 let process_file ?meta ~plugins ~params file =
   let open CCError in
-  Util.debug ~section 1 "================ process file %s ===========" file;
+  Util.debugf ~section 1 "================ process file %s ===========" (fun k->k file);
   (* parse formulas *)
   Util_tptp.parse_file ~recursive:true file
   >>= fun decls ->
   let has_conjecture = _has_conjecture decls in
   scan_for_inductive_types decls; (* detect declarations of inductive types *)
-  Util.debug ~section 1 "parsed %d declarations (%sconjecture)"
-    (Sequence.length decls) (if has_conjecture then "" else "no ");
+  Util.debugf ~section 1 "parsed %d declarations (%sconjecture(s))"
+    (fun k->k (Sequence.length decls) (if has_conjecture then "" else "no "));
   (* obtain a typed AST *)
-  Util_tptp.infer_types (`sign !Params.signature) decls
-  >>= fun (signature,decls) ->
-  (* obtain a set of proved formulas *)
-  let formulas =
-    Util_tptp.Typed.sourced_formulas ~file decls
-    |> Sequence.map PF.of_sourced
-    |> PF.Set.of_seq
-  in
+  Util_tptp.infer_types decls
+  >>= fun decls ->
   (* obtain clauses + env *)
-  Util.debug ~section 2 "input formulas:\n%%  %a" (Util.pp_seq ~sep:"\n%  " PF.pp)
-    (PF.Set.to_seq formulas);
-  Util.debugf ~section 2 "@[<hv2>input signature:@ %a@]"
-    Signature.fmt (Signature.diff signature !Params.signature);
+  let stmts =
+    Util_tptp.to_cnf decls
+    |> CCVector.map Cnf.clause_to_fo
+  in
+  let signature = Cnf.type_declarations (CCVector.to_seq stmts) in 
   let res, signature = preprocess ~signature ~params formulas in
   let module Res = (val res : Ctx.PARAMETERS) in
   (* build the context and env *)

@@ -12,7 +12,6 @@ module type PARAMETERS = sig
   val signature : Signature.t
   val ord : Ordering.t
   val select : Selection.t
-  val constr_list : (int * [`partial] Precedence.Constr.t) list
 end
 
 (** {2 Create a new context} *)

@@ -32,7 +32,7 @@ val constr_cstors : [`partial] Precedence.Constr.t
     ID.tbols *)
 
 val init_from_decls :
-  (string * Logtk_parsers.Ast_tptp.optional_info) Sequence.t -> unit
+  (ID.t * Logtk_parsers.Ast_tptp.optional_info) Sequence.t -> unit
 (** Initialize from a bunch of declarations' optional info, if one takes
     only pairs [(some_type_name : $tType, info)] *)
 
