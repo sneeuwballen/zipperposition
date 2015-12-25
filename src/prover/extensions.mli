@@ -3,8 +3,6 @@
 
 (** {1 Dynamic extensions} *)
 
-open Libzipperposition
-
 type 'a or_error = [ `Ok of 'a | `Error of string ]
 
 (** {2 Type Definitions} *)
@@ -38,9 +36,6 @@ val default : t
 val register : t -> unit
 (** Register an extension to the (current) prover. Plugins should call this
     when they are loaded. *)
-
-val dyn_load : string -> t or_error
-(** Try to load the extension located in the given file *)
 
 val apply_env : env:(module Env.S) -> t -> unit
 (** Apply the extension to the Env, adding rules, modifying the env

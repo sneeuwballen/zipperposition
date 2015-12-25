@@ -27,7 +27,7 @@ let section = Const.section
 
 (** setup an alarm for abrupt stop *)
 let setup_alarm timeout =
-  let handler s =
+  let handler _ =
     Format.printf "%% SZS Status ResourceOut@.";
     Unix.kill (Unix.getpid ()) Sys.sigterm
   in
@@ -66,24 +66,6 @@ let setup_env ~env =
   Extensions.extensions ()
   |> List.iter (Extensions.apply_env ~env);
   ()
-
-(** Load plugins (all "libzipperposition*.cmxs" in same path as main) *)
-let load_plugins ~params =
-  let dir = Filename.dirname Sys.argv.(0) in
-  Gen.append (CCIO.File.read_dir dir) (CCIO.File.read_dir Const.home)
-  |> Gen.filter
-    (fun s ->
-       CCString.prefix ~pre:"libzipperposition_" s
-       && CCString.suffix ~suf:".cmxs" s)
-  |> Gen.iter
-    (fun filename ->
-       Util.debugf ~section 1 "trying to load file `%s`…" (fun k->k filename);
-       match Extensions.dyn_load filename with
-       | `Error msg -> () (* Could not load plugin *)
-       | `Ok ext ->
-           Util.debugf ~section 1 "loaded extension `%s`" (fun k->k ext.Extensions.name);
-           ());
-  Extensions.extensions ()
 
 module MakeNew(X : sig
     module Env : Env.S
@@ -205,9 +187,8 @@ module MakeNew(X : sig
         ()
 
   (* try to refute the set of clauses contained in the [env]. Parameters are
-     used to influence how saturation is done, for how long it runs, etc.
-     @return the result and final env. *)
-  let try_to_refute ~env ~params result =
+     used to influence how saturation is done, for how long it runs, etc. *)
+  let try_to_refute ~params result =
     let steps = if params.param_steps = 0
       then None
       else (
@@ -230,49 +211,20 @@ module MakeNew(X : sig
     Util.debugf ~section 1 "done %d iterations" (fun k->k num);
     Util.debugf ~section 1 "@[<2>final precedence:@ @[%a@]@]"
       (fun k->k Precedence.pp (Env.precedence ()));
-    result, env
+    result
 end
 
 (* print weight of [s] within precedence [prec] *)
 let _pp_weight prec out s =
   Format.fprintf out "w(%a)=%d" ID.pp s (Precedence.weight prec s)
 
-(* FIXME
-   (* preprocess formulas and choose signature,select,ord *)
-   let preprocess ~signature ~params formulas =
-   Util.debug ~section 2 "start preprocessing";
-   (* penv *)
-   let penv = PEnv.create ~base:signature params in
-   setup_penv ~penv ();
-   let formulas = PEnv.process ~penv formulas in
-   Util.debug ~section 3 "formulas pre-processed into:\n  %a"
-    (Util.pp_seq ~sep:"\n  " PF.pp) (PF.Set.to_seq formulas);
-   (* now build a context *)
-   let precedence, constr_list = PEnv.mk_precedence ~penv formulas in
-   Util.debug ~section 1 "precedence: %a" Precedence.pp precedence;
-   Util.debug ~section 1 "weights: %a"
-    (Sequence.pp_buf (_pp_weight precedence))
-    (Signature.Seq.symbols signature);
-   let ord = params.param_ord precedence in
-   let select = Selection.selection_from_string ~ord params.param_select in
-   Util.debug ~section 1 "selection function: %s" params.param_select;
-   Util.debug ~section 1 "signature: %a" Signature.pp (Signature.diff signature !Params.signature);
-   let module Result = struct
-    let signature = signature
-    let select = select
-    let ord = ord
-    let constr_list = constr_list
-   end in
-   (module Result : Ctx.PARAMETERS), formulas
-*)
-
 (* does the sequence of declarations contain at least one conjecture? *)
 let _has_conjecture decls =
   let _roles k =
     let visitor = object
       inherit [unit,STerm.t] Ast_tptp.visitor
-      method clause () role _ = k role
-      method any_form () role _ = k role
+      method! clause () role _ = k role
+      method! any_form () role _ = k role
     end
     in
     decls (visitor#visit ())
@@ -291,7 +243,7 @@ let scan_for_inductive_types decls =
   Induction_helpers.init_from_decls pairs
 
 (* Process the given file (try to solve it) *)
-let process_file ?meta ~plugins ~params file =
+let process_file ?meta:_ ~params file =
   let open CCError in
   Util.debugf ~section 1 "================ process file %s ===========" (fun k->k file);
   (* parse formulas *)
@@ -299,19 +251,32 @@ let process_file ?meta ~plugins ~params file =
   >>= fun decls ->
   let has_conjecture = _has_conjecture decls in
   scan_for_inductive_types decls; (* detect declarations of inductive types *)
-  Util.debugf ~section 1 "parsed %d declarations (%sconjecture(s))"
-    (fun k->k (Sequence.length decls) (if has_conjecture then "" else "no "));
+  Util.debugf ~section 1 "parsed %d declarations (%s conjecture(s))"
+    (fun k->k (Sequence.length decls) (if has_conjecture then "some" else "no"));
   (* obtain a typed AST *)
   Util_tptp.infer_types decls
   >>= fun decls ->
   (* obtain clauses + env *)
   let stmts =
     Util_tptp.to_cnf decls
-    |> CCVector.map Cnf.clause_to_fo
+    |> CCVector.map (Statement.of_cnf_tptp ~file)
   in
-  let signature = Cnf.type_declarations (CCVector.to_seq stmts) in 
-  let res, signature = preprocess ~signature ~params formulas in
-  let module Res = (val res : Ctx.PARAMETERS) in
+  (* compute signature, precedence, ordering *)
+  let signature = Statement.signature (CCVector.to_seq stmts) in
+  let precedence =
+    CCVector.to_seq stmts
+    |> Sequence.flat_map Statement.Seq.terms
+    |> compute_prec
+  in
+  let ord = params.param_ord precedence in
+  let select = Selection.selection_from_string ~ord params.param_select in
+  Util.debugf ~section 1 "@[<2>selection function:@ %s@]" (fun k->k params.param_select);
+  Util.debugf ~section 1 "@[<2>signature:@ @[<hv>%a@]@]" (fun k->k Signature.pp signature);
+  let module Res = struct
+    let signature = signature
+    let ord = ord
+    let select = select
+  end in
   (* build the context and env *)
   let module Ctx = Ctx.Make(Res) in
   let module MyEnv = Env.Make(struct
@@ -320,38 +285,34 @@ let process_file ?meta ~plugins ~params file =
     end) in
   let env = (module MyEnv : Env.S) in
   setup_env ~env;
-  (* reduce to CNF *)
-  Util.debug ~section 1 "reduce to CNF...";
-  let clauses = MyEnv.cnf formulas in
-  Util.debug ~section 3 "CNF:\n  %a"
-    (Util.pp_seq ~sep:"\n  " MyEnv.C.pp) (MyEnv.C.CSet.to_seq clauses);
+  (* extract clauses *)
+  let clauses = CCVector.filter_map MyEnv.C.of_statement stmts in
+  Util.debugf ~section 3 "@[<2>clauses:@ @[<hv>%a@]@]"
+    (fun k->k (CCFormat.seq ~sep:" " MyEnv.C.pp) (CCVector.to_seq clauses));
   (* main workload *)
   let module Main = MakeNew(struct
       module Env = MyEnv
       let params = params
     end) in
   Main.has_conjecture := has_conjecture;
-  Main.setup_handlers();
   (* pre-saturation *)
-  let num_clauses = MyEnv.C.CSet.size clauses in
-  let result, clauses = if params.param_presaturate
-    then Main.presaturate_clauses (MyEnv.C.CSet.to_seq clauses)
-    else Saturate.Unknown, MyEnv.C.CSet.to_seq clauses
+  let num_clauses = CCVector.length clauses in
+  let result, clauses =
+    if params.param_presaturate
+    then (
+      let result, clauses = Main.presaturate_clauses (CCVector.to_seq clauses) in
+      Util.debugf ~section 2 "@[<2>%d clauses pre-saturated into:@ @[<hv>%a@]@]"
+        (fun k->k num_clauses (CCFormat.seq ~sep:" " MyEnv.C.pp) clauses);
+      result, clauses
+    ) else Saturate.Unknown, CCVector.to_seq clauses
   in
-  Util.debug ~section 1 "signature: %a" Signature.pp
-    (Signature.diff (MyEnv.signature ()) !Params.signature);
-  Util.debug ~section 2 "%d clauses processed into:\n%%  %a"
-    num_clauses (Util.pp_seq ~sep:"\n%  " MyEnv.C.pp) clauses;
   (* add clauses to passive set of [env] *)
   MyEnv.add_passive clauses;
   (* saturate, possibly changing env *)
-  let result, env = Main.try_to_refute ~env ~params result in
+  let result = Main.try_to_refute ~params result in
   Util.debug ~section 1 "=================================================";
   (* print some statistics *)
-  if params.param_stats then begin
-    Main.print_stats ();
-    Main.print_json_stats ();
-  end;
+  if params.param_stats then Main.print_stats ();
   Main.print_dots result;
   Main.print_szs_result ~file result;
   Util.debug ~section 1 "=================================================";
@@ -374,18 +335,14 @@ let () =
 let () =
   (* parse arguments *)
   let params = Params.parse_args () in
-  Util.debug ~section 2 "extensions loaded: %a"
-    (Util.pp_list Buffer.add_string) (Extensions.names ());
+  Util.debugf ~section 2 "@[extensions loaded:@ @[%a@]@]"
+    (fun k->k (Util.pp_list CCFormat.string) (Extensions.names ()));
   Random.init params.param_seed;
-  print_version params;
-  (* plugins *)
-  let plugins = load_plugins ~params in
-  (* initialize plugins *)
-  List.iter Extensions.init plugins;
+  print_version ~params;
   (* master process: process files *)
   CCVector.iter
     (fun file ->
-       match process_file ~plugins ~params file with
+       match process_file ~params file with
        | `Error msg ->
            print_endline msg;
            exit 1
@@ -394,6 +351,7 @@ let () =
   ()
 
 let _ =
-  at_exit (fun () ->
-      Util.debug ~section 1 "run time: %.3f" (Util.get_total_time ());
+  at_exit
+    (fun () ->
+      Util.debugf ~section 1 "run time: %.3f" (fun k->k (Util.total_time_s ()));
       Signal.send Signals.on_exit 0)

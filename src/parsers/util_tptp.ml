@@ -193,31 +193,6 @@ let formulas ?(negate=is_conjecture_) decls =
       | A.THF _ -> None)
     decls
 
-let sourced_formulas
-    ?(negate=is_conjecture_) ?(file="<unknown_file>") decls =
-  Sequence.filter_map
-    (function
-      | A.TypeDecl _
-      | A.NewType _
-      | A.Include _
-      | A.IncludeOnly _ -> None
-      | A.CNF(name, role, c, _) ->
-          let name = A.string_of_name name in
-          let is_conjecture = is_conjecture_ role in
-          let form = if negate role
-            then F.not_ (F.or_ c)
-            else F.or_ c
-          in
-          Some (Sourced.make ~file ~name ~is_conjecture form)
-      | A.FOF(name, role, f, _)
-      | A.TFF(name, role, f, _) ->
-          let name = A.string_of_name name in
-          let is_conjecture = is_conjecture_ role in
-          let form = if negate role then F.not_ f else f in
-          Some (Sourced.make ~file ~name ~is_conjecture form)
-      | A.THF _ -> None)
-    decls
-
 let type_declarations decls =
   (* traverse the declarations, updating the signature when a type decl is met *)
   let a = object
@@ -331,17 +306,17 @@ let to_cnf ?opts decls =
   let res = CCVector.create() in
   Sequence.iter
     (function
-     | A.TFF(_,r,f,_)
-     | A.FOF(_,r,f,_) ->
+     | A.TFF(name,r,f,_)
+     | A.FOF(name,r,f,_) ->
          let f, role = match r with
            | A.R_conjecture -> F.not_ f, A.R_negated_conjecture
            | _ -> f, r
          in
-         let stmts = Cnf.cnf_of ?opts ~ctx f role in
+         let stmts = Cnf.cnf_of ?opts ~ctx f (role, A.string_of_name name) in
          CCVector.append res stmts
-     | A.NewType (_, id, ty, _)
-     | A.TypeDecl (_, id, ty, _) ->
-         CCVector.push res (Cnf.TyDecl (id, ty, A.R_type));
+     | A.NewType (name, id, ty, _)
+     | A.TypeDecl (name, id, ty, _) ->
+         CCVector.push res (Cnf.TyDecl (id, ty, (A.R_type, A.string_of_name name)));
      | A.THF _ -> failwith "cnf_of_tptp cannot deal with HO terms right now."
      | _ -> ())
     decls;

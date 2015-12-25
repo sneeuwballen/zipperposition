@@ -61,15 +61,6 @@ val formulas :
     a role that satisfies [negate] are negated.
     [negate] is true, by default, only for {!A.R_conjecture})*)
 
-val sourced_formulas :
-  ?negate:(A.role -> bool) ->
-  ?file:string ->
-  typed A.t Sequence.t ->
-  typed Sourced.t Sequence.t
-  (** Same as {!formulas}, but keeps a source attached to formulas.
-      A [file] name has to be provided for the source to be accurate,
-      the default is "unknown_file". *)
-
 (** {2 Type inference and erasure}
     The following functions can raise Type.Error if the declarations
     are not consistent. *)
@@ -97,8 +88,11 @@ val erase_types :
 val to_cnf :
   ?opts:Cnf.options list ->
   typed A.t Sequence.t ->
-  (A.role Cnf.statement, CCVector.ro) CCVector.t
+  ((A.role * string) Cnf.statement, CCVector.ro) CCVector.t
 (** [to_cnf decls] reduces declarations to CNF, and returns the new
     declarations (including type declarations for Skolem symbols)
     in the form of {!Cnf.statement}.
+
+    Each statement is labelled with the role and name of the declaration
+    is comes from.
     @param opts options for CNF *)

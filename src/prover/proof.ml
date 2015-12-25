@@ -11,21 +11,12 @@ module CC = CompactClause
 type form = TypedSTerm.t
 type 'a sequence = ('a -> unit) -> unit
 
-module FileInfo = struct
-  type t = {
-    filename : string;  (* file name *)
-    name : string;      (* statement name *)
-    role : string;
-    conjecture : bool;  (* conjecture/negated conjecture? *)
-  }
-end
-
 (** Classification of proof steps *)
 type step_kind =
   | Inference of string
   | Simplification of string
   | Esa of string
-  | File of FileInfo.t
+  | File of StatementSrc.t
   | Trivial  (* trivial, or trivial within theories *)
 
 type step_result =
@@ -81,9 +72,9 @@ let mk_f_trivial ?(info=[]) ?(theories=[]) f =
   { result=Form f; kind=Trivial; theories;
     parents = [| |]; additional_info=info; }
 
-let mk_f_file ?(conjecture=false) ?(info=[]) ?(theories=[]) ~role ~file ~name f =
-  let file_info = FileInfo.( {conjecture; name;filename=file; role; } ) in
-  { result=Form f; kind=File file_info; theories;
+let mk_f_file ?(conjecture=false) ?(info=[]) ?(theories=[]) ~file ~name f =
+  let src = StatementSrc.make ~is_conjecture:conjecture ~name file in
+  { result=Form f; kind=File src; theories;
     parents = [| |]; additional_info=info; }
 
 let mk_f_inference ?(info=[]) ?(theories=[]) ~rule f parents =
@@ -102,10 +93,13 @@ let mk_c_trivial ?(info=[]) ?(theories=[]) c =
   { result=Clause c; kind=Trivial; theories;
     parents = [| |]; additional_info=info; }
 
-let mk_c_file ?(conjecture=false) ?(info=[]) ?(theories=[]) ~role ~file ~name c =
-  let file_info = FileInfo.( {conjecture; name;filename=file; role; } ) in
-  { result=Clause c; kind=File file_info; theories;
+let mk_c_src ?(info=[]) ?(theories=[]) ~src c =
+  { result=Clause c; kind=File src; theories;
     parents = [| |]; additional_info=info; }
+
+let mk_c_file ?(conjecture=false) ?(info=[]) ?(theories=[]) ~file ~name c =
+  let src = StatementSrc.make ~is_conjecture:conjecture ~name file in
+  mk_c_src ~info ~theories ~src c
 
 let mk_c_inference ?(info=[]) ?(theories=[]) ~rule c parents =
   { result=Clause c; theories; kind=Inference(rule);
@@ -126,15 +120,11 @@ let adapt_f p f =
   { p with result=Form f; }
 
 let is_file = function
-  | {kind=File _} -> true
+  | {kind=File _; _} -> true
   | _ -> false
 
 let is_trivial = function
-  | {kind=Trivial} -> true
-  | _ -> false
-
-let is_axiom = function
-  | {kind=File {FileInfo.role="axiom"}} -> true
+  | {kind=Trivial; _} -> true
   | _ -> false
 
 let is_proof_of_false p =
@@ -154,15 +144,8 @@ let rule p = match p.kind with
   | Simplification rule
   | Inference rule -> Some rule
 
-let role p = match p.kind with
-  | Trivial
-  | Inference _
-  | Esa _
-  | Simplification _ -> "plain"
-  | File {FileInfo.role=role} -> role
-
 let is_conjecture p = match p.kind with
-  | File {FileInfo.conjecture=true} -> true
+  | File {StatementSrc.is_conjecture=true; _} -> true
   | _ -> false
 
 module Theories = struct
@@ -283,10 +266,11 @@ let as_graph =
 (** {2 IO} *)
 
 let pp_kind_tstp out k =
-  let module F = FileInfo in
   match k with
-  | File {F.role=role; F.filename=file; F.name=name} ->
+  | File {StatementSrc.file; name=Some name; _} ->
       Format.fprintf out "file('%s', '%s')" file name
+  | File {StatementSrc.file; name=None; _} ->
+      Format.fprintf out "file('%s')" file
   | Inference rule ->
       Format.fprintf out "inference(%s, [status(thm)])" rule
   | Simplification rule ->
@@ -297,11 +281,12 @@ let pp_kind_tstp out k =
       Format.fprintf out "trivial([status(thm)])"
 
 let pp_kind out k =
-  let module F = FileInfo in
   match k with
-  | File {F.role=role; F.filename=file; F.name=name; F.conjecture=c} ->
-      Format.fprintf out "%s '%s' in '%s'%s" role name file
+  | File {StatementSrc.file; name=Some name; is_conjecture=c; _} ->
+      Format.fprintf out "'%s' in '%s'%s" name file
         (if c then " (conjecture)" else "")
+  | File {StatementSrc.file; name=None; is_conjecture=c; _} ->
+      Format.fprintf out "'%s'%s" file (if c then " (conjecture)" else "")
   | Inference rule ->
       Format.fprintf out "inf %s" rule
   | Simplification rule ->
@@ -322,10 +307,9 @@ let pp_notrec buf p =
     (Util.pp_list CCFormat.string) p.theories
 
 let pp_debug out proof =
-  let module F = FileInfo in
   traverse proof
     begin fun p -> match p.kind with
-      | File {F.role=role; F.filename=file; F.name=name; F.conjecture=c} ->
+      | File {StatementSrc.is_conjecture=c; _} ->
           Format.fprintf out "@[%a <---@ %a,@ theories [%a]%s@]"
             pp_result p.result pp_kind p.kind
             (Util.pp_list CCFormat.string) p.theories
@@ -348,23 +332,23 @@ let _pp_parent out = function
   | `Theory s -> Format.fprintf out "theory(%s)" s
 
 let _pp_kind_tstp out (k,parents) =
-  let module F = FileInfo in
+  let pp_parents = Util.pp_list _pp_parent in
   match k with
   | Trivial ->
-      Format.fprintf out "trivial([%a])"
-        (Util.pp_list _pp_parent) parents
-  | File {F.role=role; F.filename=file; F.name=name} ->
-      Format.fprintf out "file('%s', '%s', [%a])"
-        file name (Util.pp_list _pp_parent) parents
+      Format.fprintf out "trivial([%a])" pp_parents parents
+  | File {StatementSrc.file; name=Some name; _} ->
+      Format.fprintf out "file('%s', '%s', [%a])" file name pp_parents parents
+  | File {StatementSrc.file; name=None; _} ->
+      Format.fprintf out "file('%s', [%a])" file pp_parents parents
   | Inference rule ->
       Format.fprintf out "inference('%s', [status(thm)], [%a])"
-        rule (Util.pp_list _pp_parent) parents
+        rule pp_parents parents
   | Simplification rule ->
       Format.fprintf out "inference('%s', [status(thm)], [%a])"
-        rule (Util.pp_list _pp_parent) parents
+        rule pp_parents parents
   | Esa rule ->
       Format.fprintf out "inference('%s', [status(esa)], [%a])"
-        rule (Util.pp_list _pp_parent) parents
+        rule pp_parents parents
 
 let pp_tstp out proof =
   let namespace = ProofTbl.create 5 in
@@ -372,16 +356,18 @@ let pp_tstp out proof =
     (fun p ->
        let name = get_name ~namespace p in
        let parents =
-         List.map (fun p -> `Name (get_name namespace p)) (Array.to_list p.parents) @
+         List.map (fun p -> `Name (get_name ~namespace p)) (Array.to_list p.parents) @
          List.map (fun s -> `Theory s) p.theories
        in
+       let role = "plain" in (* TODO *)
        match p.result with
        | Form f ->
            Format.fprintf out "tff(%d, %s, %a, %a).\n"
-             name (role p) TypedSTerm.TPTP.pp f _pp_kind_tstp (p.kind,parents)
+             name role TypedSTerm.TPTP.pp f _pp_kind_tstp (p.kind,parents)
        | Clause c when CC.trail c <> [] ->
+           (* FIXME: proper conversion of clauses *)
            Format.fprintf out "tff(%d, %s, (%a) %a, %a).\n"
-             name (role p)
+             name role
              TypedSTerm.TPTP.pp
                (CC.to_forms c
                   |> Array.map (SLiteral.map ~f:FOTerm.to_simple_term)
@@ -393,7 +379,7 @@ let pp_tstp out proof =
              _pp_kind_tstp (p.kind,parents)
        | Clause c ->
            Format.fprintf out "cnf(%d, %s, %a, %a).\n"
-             name (role p) CC.pp_tstp c _pp_kind_tstp (p.kind,parents)
+             name role CC.pp_tstp c _pp_kind_tstp (p.kind,parents)
     )
 
 (** Prints the proof according to the given input switch *)

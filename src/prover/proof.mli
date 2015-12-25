@@ -8,21 +8,12 @@ open Libzipperposition
 type form = TypedSTerm.t
 type 'a sequence = ('a -> unit) -> unit
 
-module FileInfo : sig
-  type t = {
-    filename : string;  (* file name *)
-    name : string;      (* statement name *)
-    role : string;
-    conjecture : bool;  (* conjecture/negated conjecture? *)
-  }
-end
-
 (** Classification of proof steps *)
 type step_kind =
   | Inference of string
   | Simplification of string
   | Esa of string
-  | File of FileInfo.t
+  | File of StatementSrc.t
   | Trivial (** trivial, or trivial within theories *)
 
 type step_result =
@@ -57,7 +48,7 @@ val additional_info : t -> string list
 val mk_f_trivial : ?info:string list -> ?theories:string list -> form -> t
 
 val mk_f_file : ?conjecture:bool -> ?info:string list -> ?theories:string list ->
-  role:string -> file:string -> name:string ->
+  file:string -> name:string ->
   form -> t
 
 val mk_f_inference : ?info:string list -> ?theories:string list -> rule:string ->
@@ -72,7 +63,11 @@ val mk_f_esa : ?info:string list -> ?theories:string list -> rule:string ->
 val mk_c_trivial : ?info:string list -> ?theories:string list -> CompactClause.t -> t
 
 val mk_c_file : ?conjecture:bool -> ?info:string list -> ?theories:string list ->
-  role:string -> file:string -> name:string ->
+  file:string -> name:string ->
+  CompactClause.t -> t
+
+val mk_c_src : ?info:string list -> ?theories:string list ->
+  src:StatementSrc.t ->
   CompactClause.t -> t
 
 val mk_c_inference : ?info:string list -> ?theories:string list -> rule:string ->
@@ -89,14 +84,10 @@ val adapt_c : t -> CompactClause.t -> t
 
 val is_trivial : t -> bool
 val is_file : t -> bool
-val is_axiom : t -> bool
 val is_proof_of_false : t -> bool
 
 val rule : t -> string option
 (** Rule name for Esa/Simplification/Inference steps *)
-
-val role : t -> string
-(** TSTP role of the proof step ("plain" for inferences/simp/esa) *)
 
 val is_conjecture : t -> bool
 (** Is the proof a conjecture from a file? *)

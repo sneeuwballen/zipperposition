@@ -248,10 +248,20 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let lits = List.map Ctx.Lit.of_form forms in
     create ?parents ?selected ?trail lits proof
 
-  let of_forms_axiom ?(role="axiom") ~file ~name forms =
-    let lits = List.map Lit.Conv.of_form forms in
-    let proof c = Proof.mk_c_file ~role ~file ~name c in
+  let of_forms_axiom ~file ~name forms =
+    let lits = List.map Ctx.Lit.of_form forms in
+    let proof c = Proof.mk_c_file ~file ~name c in
     create lits proof
+
+  let of_statement st = match Statement.view st with
+    | Statement.TyDecl _ -> None
+    | Statement.Assert lits ->
+        (* convert literals *)
+        let lits = List.map Ctx.Lit.of_form lits in
+        let src = Statement.src st in
+        let proof cc = Proof.mk_c_src ~src cc in
+        let c = create lits proof in
+        Some c
 
   let update_trail f c =
     let trail = f c.trail in

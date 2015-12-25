@@ -8,7 +8,7 @@ true: use_menhir
 "tests/quick/": -traverse
 "tests/quick/": not_hygienic
 
-<src/**/*.ml>: warn(+a), warn(-4), warn(-44), warn(-50)
+<src/**/*.ml>: warn(+a-4-44-50)
 
 <src/const.cmx>: for-pack(Libzipperposition)
 

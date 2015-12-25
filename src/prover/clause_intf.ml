@@ -128,9 +128,12 @@ module type S = sig
     (CompactClause.t -> Proof.t) -> t
   (** Directly from list of formulas *)
 
-  val of_forms_axiom : ?role:string -> file:string -> name:string ->
+  val of_forms_axiom : file:string -> name:string ->
     FOTerm.t SLiteral.t list -> t
   (** Construction from formulas as axiom (initial clause) *)
+
+  val of_statement : Statement.t -> t option
+  (** Extract a clause from a statement, if any *)
 
   val proof : t -> Proof.t
   (** Extract its proof from the clause *)

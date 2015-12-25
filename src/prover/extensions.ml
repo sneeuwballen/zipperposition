@@ -57,23 +57,6 @@ let register self =
   );
   __current := `Ok self
 
-let dyn_load filename =
-  let filename = Dynlink.adapt_filename filename in
-  (* be sure no previous plugin remains *)
-  __current := `Error ("could not load file " ^ filename);
-  (* load the plugin, that should have called [register] *)
-  let current =
-    try
-      Dynlink.loadfile filename;
-      !__current
-    with Dynlink.Error e ->
-      let s = Dynlink.error_message e in
-      Util.debugf ~section 0 "@[error loading plugin `%s`:@ %s@]" (fun k->k filename s);
-      let msg = "could not load " ^ filename ^ ": " ^ s in
-      `Error msg
-  in
-  current
-
 (** Apply the extension to the Env.t *)
 let apply_env ~env ext =
   List.iter (fun (Do f) -> f env) ext.actions

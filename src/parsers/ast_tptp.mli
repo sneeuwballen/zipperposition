@@ -3,6 +3,8 @@
 
 (** {1 TPTP Ast} *)
 
+(* TODO: keep parsing locations? *)
+
 open Libzipperposition
 
 exception ParseError of ParseLocation.t
