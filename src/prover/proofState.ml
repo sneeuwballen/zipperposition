@@ -21,6 +21,8 @@ let prof_clean_passive = Util.mk_profiler "proofState.clean_passive"
 
 let stat_passive_cleanup = Util.mk_stat "cleanup of passive set"
 
+let section = Util.Section.(make ~parent:zip "clause_queue")
+
 (** {2 Set of active clauses} *)
 module type S = ProofState_intf.S
 
@@ -167,7 +169,7 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
           (!_queues).(idx) <- new_q, w;
           if C.CSet.mem !_clauses c
           then begin (* done, found a still-valid clause *)
-            Util.debugf 3 "taken clause from %s" (fun k->k (CQueue.name q));
+            Util.debugf ~section 3 "taken clause from %s" (fun k->k (CQueue.name q));
             remove (Sequence.singleton c);
             _state := (idx, weight+1);
             Some c
@@ -216,9 +218,9 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
   let debug out state =
     let num_active, num_passive, num_simpl = stats state in
     Format.fprintf out
-      ("@[<v2>state {%d active clauses;@ %d passive_clauses;@ " ^^
-       "%d simplification_rules;@ queues@[<hv>%a@]" ^^
-       "@,active:@[<hv>%a@]@,passive:@[<hv>%a@]@,}@]@.")
+      "@[<v2>state {%d active clauses;@ %d passive_clauses;@ \
+       %d simplification_rules;@ queues@[<hv>%a@] \
+       @,active:@[<hv>%a@]@,passive:@[<hv>%a@]@,}@]"
       num_active num_passive num_simpl
       CQueue.pp_list (PassiveSet.queues |> Sequence.to_list)
       C.pp_set (ActiveSet.clauses ())

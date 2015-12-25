@@ -59,7 +59,7 @@ let mk_precedence t seq =
     t.constrs @
     List.map (fun (p,rule) -> p, rule seq) t.constr_rules
   in
-  Util.debugf ~section 2 "@[<2>%d precedence constraints@]"
+  Util.debugf ~section 2 "@[<2>%d precedence constraint(s)@]"
     (fun k->k(List.length constrs));
   let weight = t.weight_rule seq in
   let constr = Precedence.Constr.compose_sort constrs in

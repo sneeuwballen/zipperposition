@@ -80,7 +80,7 @@ val tyapp : t -> Type.t list -> t
 
 val app : t -> t list -> t
 (** Apply a term to a list of terms
-    @raise {!Type.ApplyError} if types do not match. *)
+    @raise Type.ApplyError if types do not match. *)
 
 val app_full : t -> Type.t list -> t list -> t
 (** Apply the term to types, then to terms *)

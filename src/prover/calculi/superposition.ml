@@ -341,7 +341,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let sc_a = info.scope_active in
     let sc_p = info.scope_passive in
     Util.debugf ~section 3
-      "@[<2>simultaneous sup@ @[%a[%d] s=%a t=%a@]@ @[%a[%d] passive_lit=%a p=%a@]@ with subst=%a@]"
+      "@[<hv2>simultaneous sup@ @[%a[%d] s=%a t=%a@]@ @[%a[%d] passive_lit=%a p=%a@]@ with subst=%a@]"
       (fun k->k C.pp info.active sc_a T.pp info.s T.pp info.t
       C.pp info.passive sc_p Lit.pp info.passive_lit
       Position.pp info.passive_pos S.pp info.subst);
@@ -491,7 +491,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                let new_lits = CCArray.except_idx (C.lits clause) pos in
                let new_lits = Lit.apply_subst_list ~renaming subst (new_lits,0) in
                let new_clause = C.create ~parents:[clause] new_lits proof in
-               Util.debugf ~section 3 "@[equality resolution on@ @[%a@]@ yields @[%a@]@]"
+               Util.debugf ~section 3 "@[<hv2>equality resolution on@ @[%a@]@ yields @[%a@]@]"
                  (fun k->k C.pp clause C.pp new_clause);
                new_clause::acc
              ) else
@@ -542,7 +542,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let new_lits = lit' :: new_lits in
       let new_clause = C.create ~parents:[info.clause] new_lits proof in
-      Util.debugf ~section 3 "@[equality factoring on@ @[%a@]@ yields @[%a@]@]"
+      Util.debugf ~section 3 "@[<hv2>equality factoring on@ @[%a@]@ yields @[%a@]@]"
         (fun k->k C.pp info.clause C.pp new_clause);
       new_clause :: acc
     ) else
@@ -650,7 +650,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                    (S.FO.apply_no_renaming subst (l,1))
                    (S.FO.apply_no_renaming subst (r,1)) = Comp.Gt);
                Util.debugf ~section 5
-                "@[demod:@ @[t=%a[0], l= %a[1], r=%a[1]@],@ subst=%a@]"
+                "@[<hv2>demod:@ @[t=%a[0], l= %a[1], r=%a[1]@],@ subst=%a@]"
                  (fun k->k T.pp t T.pp l T.pp r S.pp subst);
                clauses := unit_clause :: !clauses;
                Util.incr_stat stat_demodulate_step;
@@ -658,7 +658,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              end);
         t (* not found any match, normal form found *)
       with RewriteInto (t', subst) ->
-        Util.debugf ~section 5 "@[demod:@ rewrite @[%a@]@ into @[%a@]@]"
+        Util.debugf ~section 5 "@[<2>demod:@ rewrite @[%a@]@ into @[%a@]@]"
           (fun k->k T.pp t T.pp t');
         normal_form ~restrict subst t' 1 (* done one rewriting step, continue *)
     (* rewrite innermost-leftmost of [subst(t,scope)]. The initial scope is

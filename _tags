@@ -10,7 +10,7 @@ true: use_menhir
 
 <src/**/*.ml>: warn(+a-4-44-50)
 
-<src/const.cmx>: for-pack(Libzipperposition)
+<src/prover/const.cmx>: for-pack(Libzipperposition)
 
 <src/base/{InnerTerm,FOTerm,HOTerm,Type,lib/BV,lib/IArray,lib/Cache}.cmx>: inline(15)
 <src/base/{substs,unif}.cmx>: inline(8)
