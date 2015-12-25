@@ -1,27 +1,5 @@
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Types} *)
 
@@ -336,7 +314,7 @@ module Conv = struct
     ctx.n <- 0;
     ()
 
-  let fresh_var_ ctx =
+  let fresh_ty_var ctx =
     let n = ctx.n in
     ctx.n <- n+1;
     HVar.make ~ty:tType n
@@ -355,7 +333,7 @@ module Conv = struct
           end
       | PT.AppBuiltin (Builtin.Wildcard, []) ->
           (* make a fresh variable, but do not remember it *)
-          var (fresh_var_ ctx)
+          var (fresh_ty_var ctx)
       | PT.Const id -> const id
       | PT.AppBuiltin (Builtin.Arrow, ret::args) ->
           let ret = aux depth v2db ret in
@@ -393,11 +371,19 @@ module Conv = struct
       | Some v -> v
       | None ->
           (* free variable *)
-          let v' = fresh_var_ ctx in
+          let v' = fresh_ty_var ctx in
           ctx.vars <- Var.Subst.add ctx.vars v v';
           v'
     in
     aux 0 Var.Subst.empty t
+
+  let var_of_simple_term ctx v = match Var.Subst.find ctx.vars v with
+    | Some v' -> v'
+    | None ->
+        let ty = of_simple_term_exn ctx (Var.ty v) in
+        let v' = HVar.make ~ty ctx.n in
+        ctx.vars <- Var.Subst.add ctx.vars v v';
+        v'
 
   let of_simple_term ctx t =
     try Some (of_simple_term_exn ctx t)
