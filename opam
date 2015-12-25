@@ -29,11 +29,11 @@ depends: [
   "sequence" { >= "0.4" }
   "gen"
   "oclock"
+  "msat"
 ]
 depopts: [
   "menhir" {build}
   "qcheck" {test}
-  "msat"
 ]
 available: [
     ocaml-version >= "4.00.1"
