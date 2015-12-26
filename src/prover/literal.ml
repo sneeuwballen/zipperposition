@@ -156,36 +156,35 @@ let is_arith_less = _on_arith ArithLit.is_less
 let is_arith_lesseq = _on_arith ArithLit.is_lesseq
 let is_arith_divides = _on_arith ArithLit.is_divides
 
-let __ty_error a b =
+let ty_error_ a b =
   let msg =
     CCFormat.sprintf
-      "Literal: incompatible types in equational lit for %a : %a and %a : %a"
+      "@[<2>Literal: incompatible types in equational lit@ for %a : %a@ and %a : %a@]"
       T.pp a Type.pp (T.ty a) T.pp b Type.pp (T.ty b)
   in
   raise (Type.ApplyError msg)
 
 (* primary constructor for equations and predicates *)
 let mk_lit a b sign =
-  if not (Type.equal (T.ty a) (T.ty b)) then __ty_error a b;
-  match a, b with
-  | _ when T.equal a T.TPTP.true_ && T.equal b T.TPTP.false_ -> if sign then False else True
-  | _ when T.equal a T.TPTP.false_ && T.equal b T.TPTP.true_ -> if sign then False else True
-  | _ when T.equal a T.TPTP.true_ -> Prop (b, sign)
-  | _ when T.equal b T.TPTP.true_ -> Prop (a, sign)
-  | _ when T.equal a T.TPTP.false_ -> Prop (b, not sign)
-  | _ when T.equal b T.TPTP.false_ -> Prop (a, not sign)
+  if not (Type.equal (T.ty a) (T.ty b)) then ty_error_ a b;
+  match T.view a, T.view b with
+  | T.AppBuiltin (Builtin.True, []), T.AppBuiltin (Builtin.False, []) -> if sign then False else True
+  | T.AppBuiltin (Builtin.False, []), T.AppBuiltin (Builtin.True, []) -> if sign then False else True
+  | T.AppBuiltin (Builtin.True, []), _ -> Prop (b, sign)
+  | _, _ when T.equal a T.TPTP.true_ -> Prop (a, sign)
+  | T.AppBuiltin (Builtin.False, []), _ -> Prop (b, not sign)
+  | _, T.AppBuiltin (Builtin.False, []) -> Prop (a, not sign)
   | _ -> Equation (a, b, sign)
 
 let mk_eq a b = mk_lit a b true
 
 let mk_neq a b = mk_lit a b false
 
-let mk_prop p sign = match p with
-  | _ when p == T.TPTP.true_ -> if sign then True else False
-  | _ when p == T.TPTP.false_ -> if sign then False else True
+let mk_prop p sign = match T.view p with
+  | T.AppBuiltin (Builtin.True, []) -> if sign then True else False
+  | T.AppBuiltin (Builtin.False, []) -> if sign then False else True
   | _ ->
-      if not (Type.equal (T.ty p) Type.TPTP.o)
-      then __ty_error p T.TPTP.true_;
+      if not (Type.equal (T.ty p) Type.prop) then ty_error_ p T.true_;
       Prop (p, sign)
 
 let mk_true p = mk_prop p true
@@ -406,8 +405,8 @@ let vars lit =
   Seq.vars lit |> T.VarSet.of_seq |> T.VarSet.to_list
 
 let var_occurs v lit = match lit with
-  | Prop (p,_) -> T.var_occurs v p
-  | Equation (l,r,_) -> T.var_occurs v l || T.var_occurs v r
+  | Prop (p,_) -> T.var_occurs ~var:v p
+  | Equation (l,r,_) -> T.var_occurs ~var:v l || T.var_occurs ~var:v r
   | Arith _ -> Sequence.exists (T.var_occurs ~var:v) (Seq.terms lit)
   | True
   | False -> false
@@ -435,7 +434,7 @@ let is_trivial lit = match lit with
   | True -> true
   | False -> false
   | Equation (l, r, true) -> T.equal l r
-  | Equation (l, r, false) -> false
+  | Equation (_, _, false) -> false
   | Arith o -> ArithLit.is_trivial o
   | Prop (_, _) -> false
 
@@ -457,11 +456,11 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ~which ~ord ~subterms lit
     else k (t, pos)
   in
   match lit, which with
-  | Equation (l,r,sign), `All ->
+  | Equation (l, r, _), `All ->
       (* visit both sides of the equation *)
       at_term ~pos:P.(append position (left stop)) l;
       at_term ~pos:P.(append position (right stop)) r;
-  | Equation (l, r, sign), `Max ->
+  | Equation (l, r, _), `Max ->
       begin match Ordering.compare ord l r with
         | Comparison.Gt ->
             at_term ~pos:P.(append position (left stop)) l
@@ -730,7 +729,7 @@ module Pos = struct
     | Equation (l, r, _), P.Right _ ->
         Ordering.compare ord r l <> Comparison.Lt
     | Prop _, _ -> true
-    | Arith (AL.Binary(_, m1, m2)), _ ->
+    | Arith (AL.Binary(_, _m1, _m2)), _ ->
         (* [t] dominates all atomic terms? *)
         let t = root_term lit pos in
         Sequence.for_all
