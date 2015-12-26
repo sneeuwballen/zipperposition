@@ -370,7 +370,7 @@ let pp_tstp out proof =
              name role
              TypedSTerm.TPTP.pp
                (CC.to_forms c
-                  |> Array.map (SLiteral.map ~f:FOTerm.to_simple_term)
+                  |> Array.map (SLiteral.map ~f:FOTerm.Conv.to_simple_term)
                   |> Array.map SLiteral.to_form
                   |> Array.to_list
                   |> TypedSTerm.Form.or_

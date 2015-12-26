@@ -405,34 +405,6 @@ module AC(A : AC_SPEC) = struct
     |> ID.Set.add_seq ID.Set.empty
 end
 
-(** {2 Conversions} *)
-
-let to_simple_term ?(env=DBEnv.empty) t =
-  let tbl = VarTbl.create 16 in
-  let module ST = TypedSTerm in
-  let rec to_simple_term t =
-    match view t with
-    | Var i -> ST.var (aux_var i)
-    | DB i -> ST.var (DBEnv.find_exn env i)
-    | Const id -> ST.const ~ty:(aux_ty (ty t)) id
-    | App (f,l) ->
-        ST.app ~ty:(aux_ty (ty t))
-          (to_simple_term f) (List.map to_simple_term l)
-    | AppBuiltin (b,l) ->
-        ST.app_builtin ~ty:(aux_ty (ty t))
-          b (List.map to_simple_term l)
-  and aux_var v =
-    try VarTbl.find tbl v
-    with Not_found ->
-      let ty = HVar.ty v in
-      let v' = Var.of_string ~ty:(aux_ty ty)
-        (CCFormat.sprintf "X%d" (HVar.id v)) in
-      VarTbl.add tbl v v';
-      v'
-  and aux_ty ty = Type.Conv.to_simple_term ~env ty
-  in
-  to_simple_term t
-
 (** {2 Printing/parsing} *)
 
 let print_all_types = ref false
@@ -564,6 +536,8 @@ module TPTP = struct
   end
 end
 
+(** {2 Conversions} *)
+
 module Conv = struct
   module PT = TypedSTerm
 
@@ -603,5 +577,29 @@ module Conv = struct
     in
     aux t
 
-  let to_simple_term _ = assert false (* TODO *)
+  let to_simple_term ?(env=DBEnv.empty) t =
+    let tbl = VarTbl.create 16 in
+    let module ST = TypedSTerm in
+    let rec to_simple_term t =
+      match view t with
+      | Var i -> ST.var (aux_var i)
+      | DB i -> ST.var (DBEnv.find_exn env i)
+      | Const id -> ST.const ~ty:(aux_ty (ty t)) id
+      | App (f,l) ->
+          ST.app ~ty:(aux_ty (ty t))
+            (to_simple_term f) (List.map to_simple_term l)
+      | AppBuiltin (b,l) ->
+          ST.app_builtin ~ty:(aux_ty (ty t))
+            b (List.map to_simple_term l)
+    and aux_var v =
+      try VarTbl.find tbl v
+      with Not_found ->
+        let ty = HVar.ty v in
+        let v' = Var.of_string ~ty:(aux_ty ty)
+          (CCFormat.sprintf "X%d" (HVar.id v)) in
+        VarTbl.add tbl v v';
+        v'
+    and aux_ty ty = Type.Conv.to_simple_term ~env ty
+    in
+    to_simple_term t
 end

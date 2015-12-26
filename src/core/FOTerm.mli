@@ -208,12 +208,6 @@ module AC(A : AC_SPEC) : sig
   (** Set of ID.ts occurring in the terms, that are AC *)
 end
 
-(** {2 Conversions} *)
-
-val to_simple_term :
-  ?env:TypedSTerm.t Var.t DBEnv.t ->
-  t -> TypedSTerm.t
-
 (** {2 Printing/parsing} *)
 
 val print_all_types : bool ref
@@ -286,5 +280,7 @@ module Conv : sig
   type ctx
   val create : unit -> ctx
   val of_simple_term : ctx -> TypedSTerm.t -> t
-  val to_simple_term : t -> TypedSTerm.t
+  val to_simple_term :
+    ?env:TypedSTerm.t Var.t DBEnv.t ->
+    t -> TypedSTerm.t
 end

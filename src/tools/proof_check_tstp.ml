@@ -86,7 +86,7 @@ let mk_proof_obligation proof =
             let f = F.close_forall f |> T.erase in
             A.FOF(step.TT.id, A.R_conjecture, f, []), step
         | TT.InferClause (c, lazy step) ->
-            let c = List.map (SLiteral.map ~f:FOTerm.to_simple_term) c in
+            let c = List.map (SLiteral.map ~f:FOTerm.Conv.to_simple_term) c in
             let c = List.map SLiteral.to_form c in
             let c = F.close_forall (F.or_ c) |> T.erase in
             A.FOF(step.TT.id, A.R_conjecture, c, []), step
@@ -95,7 +95,7 @@ let mk_proof_obligation proof =
       let premises = CCList.filter_map
           (fun parent -> match parent with
              | TT.InferClause (c, lazy step') ->
-                 let c = List.map (SLiteral.map ~f:FOTerm.to_simple_term) c in
+                 let c = List.map (SLiteral.map ~f:FOTerm.Conv.to_simple_term) c in
                  let c = List.map SLiteral.to_form c in
                  let c = F.close_forall (F.or_ c) |> T.erase in
                  Some (A.FOF(step'.TT.id, A.R_axiom, c, []))
@@ -247,10 +247,10 @@ let main file =
     then Format.printf "@[<2>derivation:@,@[%a@]@]@." TT.pp_tstp trace;
     Util.debugf 1 "trace of %d steps" (fun k->k (TT.size trace));
     (* check that the steps form a DAG *)
-    if not (TT.is_dag trace) then begin
+    if not (TT.is_dag trace) then (
       Util.debug 0 "derivation is not a DAG, failure.";
       exit 1
-    end else Util.debugf 0 "derivation is a DAG";
+    ) else Util.debugf 0 "derivation is a DAG";
     (* validate steps one by one *)
     let checked = CheckedTrace.create trace in
     check_all ~progress:!progress ~provers ~checked ~timeout:!timeout
