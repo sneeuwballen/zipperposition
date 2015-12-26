@@ -11,6 +11,8 @@ module CC = CompactClause
 type form = TypedSTerm.t
 type 'a sequence = ('a -> unit) -> unit
 
+let section = Util.Section.make ~parent:Const.section "proof"
+
 (** Classification of proof steps *)
 type step_kind =
   | Inference of string
@@ -312,18 +314,17 @@ let pp_debug out proof =
   Format.fprintf out "@[<v>";
   traverse proof
     (fun p -> match p.kind with
-      | File {StatementSrc.is_conjecture=c; _} ->
-          Format.fprintf out "@[@[%a@] <---@ %a,@ theories [%a]%s@]@,"
+      | File _ ->
+          Format.fprintf out "@[<hv2>@[%a@] <--@ %a,@ theories [%a]@]@,"
             pp_result p.result pp_kind p.kind
             (Util.pp_list CCFormat.string) p.theories
-            (if c then " (conjecture)" else "")
       | Trivial ->
-          Format.fprintf out "@[<2>@[%a@] <---@ trivial,@ theories [%a]@]@,"
+          Format.fprintf out "@[<hv2>@[%a@] <--@ trivial,@ theories [%a]@]@,"
             pp_result p.result (Util.pp_list CCFormat.string) p.theories;
       | Inference _
       | Simplification _
       | Esa _ ->
-          Format.fprintf out "@[@[%a@] <---@ %a,@ theories [%a] with %a@]@,"
+          Format.fprintf out "@[<hv2>@[%a@] <--@ %a,@ theories [%a]@ with @[<hv>%a@]@]@,"
             pp_result p.result pp_kind p.kind
             (Util.pp_list CCFormat.string) p.theories
             (CCFormat.array pp_result)
@@ -391,7 +392,7 @@ let pp_tstp out proof =
 
 (** Prints the proof according to the given input switch *)
 let pp switch buf proof = match switch with
-  | "none" -> Util.debug 1 "proof printing disabled"
+  | "none" -> Util.debug ~section 1 "proof printing disabled"
   | "tstp" -> pp_tstp buf proof
   | "debug" -> pp_debug buf proof
   | _ -> failwith ("unknown proof-printing format: " ^ switch)
@@ -449,14 +450,14 @@ let pp_dot ~name out proof = pp_dot_seq ~name out (Sequence.singleton proof)
 
 let pp_dot_seq_file ?(name="proof") filename seq =
   (* print graph on file *)
-  Util.debugf 1 "print proof graph to@ `%s`" (fun k->k filename);
+  Util.debugf ~section 1 "print proof graph to@ `%s`" (fun k->k filename);
   try
     CCIO.with_out filename
       (fun oc ->
         let out = Format.formatter_of_out_channel oc in
         Format.fprintf out "%a@." (pp_dot_seq ~name) seq)
   with e ->
-    Util.debugf 1 "error: %s" (fun k->k (Printexc.to_string e))
+    Util.debugf ~section 1 "error: %s" (fun k->k (Printexc.to_string e))
 
 let pp_dot_file ?name filename proof =
   pp_dot_seq_file ?name filename (Sequence.singleton proof)
