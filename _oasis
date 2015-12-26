@@ -58,7 +58,7 @@ Library "libzipperposition"
                     DBEnv, Position, HOTerm, Var, HVar,
                     Substs, Unif, Signature, Scoped, Unif_intf,
                     TypeInference, Options, Comparison, Precedence, Builtin,
-                    Ordering, Skolem, Cnf, ID, SLiteral,
+                    Ordering, Skolem, Cnf, ID, IDOrBuiltin, SLiteral,
                     HORewriting, Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,
                     Congruence, FeatureVector,
                     Lambda, TypedSTerm,

@@ -67,8 +67,8 @@ let to_int_ = function
   | Eq -> 6
   | Neq -> 7
   | HasType -> 8
-  | True -> 10
-  | False -> 11
+  | False -> 10
+  | True -> 11 (* bigger than false *)
   | Arrow -> 12
   | Wildcard -> 13
   | Multiset -> 14

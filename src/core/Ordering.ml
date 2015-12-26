@@ -7,6 +7,7 @@ module Prec = Precedence
 module MT = Multiset.Make(FOTerm)
 
 open Comparison
+open IDOrBuiltin
 
 let prof_rpo6 = Util.mk_profiler "compare_rpo6"
 let prof_kbo = Util.mk_profiler "compare_kbo"
@@ -43,8 +44,7 @@ let add_seq ord seq = Prec.add_seq ord.prec seq
 
 let name ord = ord.name
 
-let clear_cache ord =
-  CCCache.clear ord.cache
+let clear_cache ord = CCCache.clear ord.cache
 
 let pp out ord =
   Format.fprintf out "%s(@[%a@])" ord.name Prec.pp ord.prec
@@ -65,7 +65,17 @@ end
 
 (** {2 Ordering implementations} *)
 
-(* FIXME: deal with missing cases (AppBuiltin...) *)
+(* compare the two symbols (ID or builtin) using the precedence *)
+let prec_compare prec a b = match a, b with
+  | I a, I b -> Prec.compare prec a b
+  | I _, B _ -> 1
+  | B _, I _ -> -1
+  | B a, B b -> Builtin.compare a b
+
+let prec_status prec = function
+  | I s -> Prec.status prec s
+  | B Builtin.Eq -> Prec.Multiset
+  | B _ -> Prec.Lexicographic
 
 module KBO : ORD = struct
   let name = "kbo"
@@ -124,10 +134,12 @@ module KBO : ORD = struct
     );
     balance.balance.(idx) <- n - 1
 
-  let _weight prec s =
-    let x = Prec.weight prec s in
-    assert (x>0);
-    x
+  let _weight prec = function
+    | B _ -> 1
+    | I s ->
+        let x = Prec.weight prec s in
+        assert (x>0);
+        x
 
   (** the KBO ordering itself. The implementation is borrowed from
       the kbo_5 version of "things to know when implementing KBO".
@@ -146,10 +158,14 @@ module KBO : ORD = struct
       | TC.DB _ -> (if pos then wb + 1 else wb - 1), false
       | TC.App (s, l) ->
           let wb' = if pos
-            then wb + _weight prec s
-            else wb - _weight prec s in
+            then wb + _weight prec (I s)
+            else wb - _weight prec (I s) in
           balance_weight_rec wb' l y pos false
-      | TC.AppBuiltin _
+      | TC.AppBuiltin (b,l) ->
+          let wb' = if pos
+            then wb + _weight prec (B b)
+            else wb - _weight prec (B b) in
+          balance_weight_rec wb' l y pos false
       | TC.NonFO -> assert false
     (** list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms y pos res = match terms with
@@ -197,14 +213,17 @@ module KBO : ORD = struct
           let wb', contains = balance_weight wb t1 (HVar.id y) true in
           (wb' - 1, if contains then Gt else Incomparable)
       (* node/node, De Bruijn/De Bruijn *)
-      | TC.App (f, ss), TC.App (g, ts) -> tckbo_composite wb f g ss ts
+      | TC.App (f, ss), TC.App (g, ts) -> tckbo_composite wb (I f) (I g) ss ts
+      | TC.AppBuiltin (f, ss), TC.App (g, ts) -> tckbo_composite wb (B f) (I g) ss ts
+      | TC.App (f, ss), TC.AppBuiltin (g, ts) -> tckbo_composite wb (I f) (B g) ss ts
+      | TC.AppBuiltin (f, ss), TC.AppBuiltin (g, ts) -> tckbo_composite wb (B f) (B g) ss ts
       | TC.DB i, TC.DB j ->
           (wb, if i = j then Eq else Incomparable)
       (* node and something else *)
-      | TC.App (_, _), TC.DB _ ->
+      | (TC.App (_, _) | TC.AppBuiltin _), TC.DB _ ->
           let wb', _ = balance_weight wb t1 0 true in
           wb'-1, Comparison.Gt
-      | TC.DB _, TC.App (_, _) ->
+      | TC.DB _, (TC.App (_, _) | TC.AppBuiltin _) ->
           let wb', _ = balance_weight wb t1 0 false in
           wb'+1, Comparison.Lt
     (** tckbo, for composite terms (ie non variables). It takes a ID.t
@@ -219,7 +238,7 @@ module KBO : ORD = struct
       (* lexicographic product of weight and precedence *)
       if wb'' > 0 then wb'', g_or_n
       else if wb'' < 0 then wb'', l_or_n
-      else (match Prec.compare prec f g with
+      else match prec_compare prec f g with
           | n when n > 0 -> wb'', g_or_n
           | n when n < 0 ->  wb'', l_or_n
           | _ ->
@@ -227,15 +246,15 @@ module KBO : ORD = struct
               if recursive = Eq then wb'', Eq
               else if recursive = Lt then wb'', l_or_n
               else if recursive = Gt then wb'', g_or_n
-              else wb'', Incomparable)
+              else wb'', Incomparable
     (** recursive comparison *)
     and tckbo_rec wb f g ss ts =
       if f = g
-      then match Prec.status prec f with
-        | Precedence.Multiset ->
+      then match prec_status prec f with
+        | Prec.Multiset ->
             (* use multiset or lexicographic comparison *)
             tckbocommute wb ss ts
-        | Precedence.Lexicographic ->
+        | Prec.Lexicographic ->
             tckbolex wb ss ts
       else
         (* just compute variable and weight balances *)
@@ -275,17 +294,20 @@ module RPO6 : ORD = struct
       | TC.NonFO, _
       | _, TC.NonFO -> Comparison.Incomparable
       (* node/node, De Bruijn/De Bruijn *)
-      | TC.App (f, ss), TC.App (g, ts) -> rpo6_composite ~prec s t f g ss ts
+      | TC.App (f, ss), TC.App (g, ts) -> rpo6_composite ~prec s t (I f) (I g) ss ts
+      | TC.AppBuiltin (f, ss), TC.App (g, ts) -> rpo6_composite ~prec s t (B f) (I g) ss ts
+      | TC.App (f, ss), TC.AppBuiltin (g, ts) -> rpo6_composite ~prec s t (I f) (B g) ss ts
+      | TC.AppBuiltin (f, ss), TC.AppBuiltin (g, ts) -> rpo6_composite ~prec s t (B f) (B g) ss ts
       | TC.DB i, TC.DB j ->
           if i = j && Type.equal (T.ty s) (T.ty t) then Eq else Incomparable
       (* node and something else *)
-      | TC.App (_, _), TC.DB _ -> Comparison.Incomparable
-      | TC.DB _, TC.App (_, _) -> Comparison.Incomparable
+      | (TC.App _ | TC.AppBuiltin _), TC.DB _ -> Comparison.Incomparable
+      | TC.DB _, (TC.App _ | TC.AppBuiltin _) -> Comparison.Incomparable
   (* handle the composite cases *)
   and rpo6_composite ~prec s t f g ss ts =
-    match Prec.compare prec f g with
+    match prec_compare prec f g with
     | 0 ->
-        begin match Prec.status prec f with
+        begin match prec_status prec f with
           | Precedence.Multiset ->
               cMultiset ~prec ss ts (* multiset subterm comparison *)
           | Precedence.Lexicographic ->

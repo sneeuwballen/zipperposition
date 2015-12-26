@@ -258,12 +258,12 @@ let rec pp_rec depth out t = match view t with
   | Builtin Rat -> CCFormat.string out "rat"
   | Var v -> HVar.pp out v
   | DB i -> Format.fprintf out "T%i" (depth-i-1)
-  | App (p, []) -> ID.pp out p
   | Multiset t ->
       Format.fprintf out "@[<2>multiset@ %a@]" (pp_rec depth) t
+  | App (p, []) -> ID.pp out p
   | App (p, args) ->
-      Format.fprintf out "@[<2>%a(%a)@]"
-        ID.pp p (Util.pp_list (pp_rec depth)) args
+      Format.fprintf out "@[<2>%a %a@]"
+        ID.pp p (Util.pp_list ~sep:" " (pp_rec depth)) args
   | Fun (args, ret) ->
       Format.fprintf out "@[%a →@ %a@]" (pp_l depth) args (pp_rec depth) ret
   | Record (l, None) ->
