@@ -203,7 +203,7 @@ let apply ty args =
       then aux_l ty exp_args' args' env
       else
         err_applyf_
-          "@[<2>Type.apply:@ wrong argument type, expected @[%a@]@ but got @%a@]"
+          "@[<2>Type.apply:@ wrong argument type,@ expected `@[%a@]`@ but got `@[%a@]`@]"
           T.pp exp T.pp (T.ty_exn a)
   in
   aux ty args DBEnv.empty
@@ -299,8 +299,8 @@ and pp_l depth out l = match l with
 
 let pp_depth ?hooks:_ depth out t = pp_rec depth out t
 
-let pp buf t = pp_rec 0 buf t
-let pp_surrounded buf t = (pp_inner 0) buf t
+let pp out t = pp_rec 0 out t
+let pp_surrounded out t = (pp_inner 0) out t
 
 let to_string = CCFormat.to_string pp
 

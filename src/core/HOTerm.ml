@@ -352,12 +352,14 @@ let rec is_fo t = match view t with
 let prop = T.builtin ~ty:T.tType Builtin.prop
 
 let close_forall t =
+  let ty = (ty t : Type.t :> T.t) in
   let vars = Seq.vars t |> VarSet.of_seq |> VarSet.elements in
-  T.bind_vars ~ty:prop Binder.Forall (vars:>T.t HVar.t list) t
+  T.bind_vars ~ty Binder.Forall (vars:>T.t HVar.t list) t
 
 let close_exists t =
+  let ty = (ty t : Type.t :> T.t) in
   let vars = Seq.vars t |> VarSet.of_seq |> VarSet.elements in
-  T.bind_vars ~ty:prop Binder.Forall (vars:>T.t HVar.t list) t
+  T.bind_vars ~ty Binder.Forall (vars:>T.t HVar.t list) t
 
 let open_forall ?(offset=0) f =
   let offset = max offset (Seq.max_var (Seq.vars f)) + 1 in
