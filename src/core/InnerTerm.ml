@@ -776,8 +776,10 @@ let pp_depth ?(hooks=[]) depth out t =
         Format.fprintf out "@[<2>%a@ %a@]" Builtin.pp b (_pp depth) a
     | AppBuiltin (b, [t1;t2]) when Builtin.is_infix b ->
         Format.fprintf out "(@[<2>%a@ %a@ %a@])" (_pp depth) t1 Builtin.pp b (_pp depth) t2
+    | AppBuiltin (b, []) -> Builtin.pp out b
     | AppBuiltin (b, l) ->
         Format.fprintf out "@[%a(%a)@]" Builtin.pp b (Util.pp_list (_pp depth)) l
+    | App (f, []) -> _pp depth out f
     | App (f, l) ->
         Format.fprintf out "(@[<2>%a@ %a@])"
           (_pp_surrounded depth) f (Util.pp_list ~sep:" " (_pp_surrounded depth)) l
@@ -789,7 +791,7 @@ let pp_depth ?(hooks=[]) depth out t =
     | Bind _
     | SimpleApp (_,_::_)
     | AppBuiltin (_,_::_)
-    | App _ -> Format.fprintf out "(@[%a@])" (_pp depth) t
+    | App (_,_::_) -> Format.fprintf out "(@[%a@])" (_pp depth) t
     | _ -> _pp depth out t
   in
   _pp depth out t
