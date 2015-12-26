@@ -164,6 +164,11 @@ let rec open_fun ty = match view ty with
 
 exception ApplyError of string
 
+let () = Printexc.register_printer
+  (function
+    | ApplyError msg -> Some (CCFormat.sprintf "@[<2>Type.ApplyError:@ %s@]" msg)
+    | _ -> None)
+
 let err_apply_ msg = raise (ApplyError msg)
 let err_applyf_ msg = CCFormat.ksprintf msg ~f:err_apply_
 

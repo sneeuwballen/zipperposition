@@ -127,7 +127,7 @@ let pp out s =
     Format.fprintf out "@[<hov2>%a:@ %a@]" ID.pp s Type.pp ty
   in
   Format.fprintf out "{@[<hv>";
-  CCFormat.seq pp_pair out (Seq.to_seq s);
+  CCFormat.seq ~start:"" ~stop:"" ~sep:", " pp_pair out (Seq.to_seq s);
   Format.fprintf out "@]}";
   ()
 
