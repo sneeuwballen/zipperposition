@@ -63,7 +63,7 @@ Library "libzipperposition"
                     Congruence, FeatureVector,
                     Lambda, TypedSTerm,
                     lib/Hashcons, lib/ParseLocation, lib/Multiset, lib/LazyList,
-                    lib/IArray, lib/LazyGraph, lib/AllocCache, lib/Multiset_intf
+                    lib/IArray, lib/AllocCache, lib/Multiset_intf
   CSources:         util_stubs.c, util_stubs.h
   CCOpt:            -Wextra -Wno-unused-parameter
   BuildDepends:     zarith, unix, sequence, containers,
@@ -132,8 +132,7 @@ Library "libzipperposition_prover"
                     calculi/ArithInt,
                     calculi/Heuristics,
                     meta/MetaProverState
-  InternalModules:  lib/LazyGraph, lib/SmallSet,
-                    lib/UnionFind, lib/Mixtbl, lib/Signal
+  InternalModules:  lib/SmallSet, lib/UnionFind, lib/Mixtbl, lib/Signal
   Build$:           flag(meta) && flag(parsers)
   Install$:         flag(meta) && flag(parsers)
   BuildDepends:     containers, containers.advanced, sequence, gen, unix,

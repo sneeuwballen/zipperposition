@@ -253,15 +253,17 @@ let share t =
 
 (** Get a graph of the proof *)
 let as_graph =
-  let f p =
-    match rule p with
-    | None -> LazyGraph.Node(p, p, Sequence.empty)
-    | Some rule ->
-        let parents = Sequence.of_array p.parents in
-        let parents = Sequence.map (fun p' -> (rule, p')) parents in
-        LazyGraph.Node (p, p, parents)
-  in
-  LazyGraph.make ~eq:equal ~hash:hash f
+  {CCGraph.
+    origin=fst;
+    dest=(fun (_,(_,n)) -> n);
+    children=(fun p ->
+      match rule p with
+      | None -> Sequence.empty
+      | Some rule ->
+          let parents = Sequence.of_array p.parents in
+          Sequence.map (fun p' -> p,(rule, p')) parents
+    );
+  }
 
 (** {2 IO} *)
 
@@ -299,33 +301,35 @@ let pp_result out = function
   | Form f -> TypedSTerm.pp out f
   | Clause c -> CC.pp out c
 
-let pp_result_of buf proof = pp_result buf proof.result
+let pp_result_of out proof = pp_result out proof.result
 
-let pp_notrec buf p =
-  Format.fprintf buf "%a <-- %a [%a]"
+let pp_notrec out p =
+  Format.fprintf out "%a <-- %a [%a]"
     pp_result_of p pp_kind p.kind
     (Util.pp_list CCFormat.string) p.theories
 
 let pp_debug out proof =
+  Format.fprintf out "@[<v>";
   traverse proof
-    begin fun p -> match p.kind with
+    (fun p -> match p.kind with
       | File {StatementSrc.is_conjecture=c; _} ->
-          Format.fprintf out "@[%a <---@ %a,@ theories [%a]%s@]"
+          Format.fprintf out "@[@[%a@] <---@ %a,@ theories [%a]%s@]@,"
             pp_result p.result pp_kind p.kind
             (Util.pp_list CCFormat.string) p.theories
             (if c then " (conjecture)" else "")
       | Trivial ->
-          Format.fprintf out "@[<2>%a <---@ trivial,@ theories [%a]@]"
+          Format.fprintf out "@[<2>@[%a@] <---@ trivial,@ theories [%a]@]@,"
             pp_result p.result (Util.pp_list CCFormat.string) p.theories;
       | Inference _
       | Simplification _
       | Esa _ ->
-          Format.fprintf out "@[%a <---@ %a,@ theories [%a] with %a@]"
+          Format.fprintf out "@[@[%a@] <---@ %a,@ theories [%a] with %a@]@,"
             pp_result p.result pp_kind p.kind
             (Util.pp_list CCFormat.string) p.theories
             (CCFormat.array pp_result)
             (Array.map (fun p->p.result) p.parents)
-    end
+    );
+  Format.fprintf out "@]"
 
 let _pp_parent out = function
   | `Name i -> Format.fprintf out "%d" i
@@ -352,6 +356,7 @@ let _pp_kind_tstp out (k,parents) =
 
 let pp_tstp out proof =
   let namespace = ProofTbl.create 5 in
+  Format.fprintf out "@[<v>";
   traverse proof
     (fun p ->
        let name = get_name ~namespace p in
@@ -362,11 +367,11 @@ let pp_tstp out proof =
        let role = "plain" in (* TODO *)
        match p.result with
        | Form f ->
-           Format.fprintf out "tff(%d, %s, %a, %a).\n"
+           Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@], %a).@]@,"
              name role TypedSTerm.TPTP.pp f _pp_kind_tstp (p.kind,parents)
        | Clause c when CC.trail c <> [] ->
            (* FIXME: proper conversion of clauses *)
-           Format.fprintf out "tff(%d, %s, (%a) %a, %a).\n"
+           Format.fprintf out "@[<2>tff(%d, %s,@ @[(%a)@] %a, %a).@]@,"
              name role
              TypedSTerm.TPTP.pp
                (CC.to_forms c
@@ -378,9 +383,11 @@ let pp_tstp out proof =
              CC.pp_trail_tstp (CC.trail c)
              _pp_kind_tstp (p.kind,parents)
        | Clause c ->
-           Format.fprintf out "cnf(%d, %s, %a, %a).\n"
+           Format.fprintf out "@[<2>cnf(%d, %s,@ @[%a@], %a).@]@,"
              name role CC.pp_tstp c _pp_kind_tstp (p.kind,parents)
-    )
+    );
+  Format.fprintf out "@]";
+  ()
 
 (** Prints the proof according to the given input switch *)
 let pp switch buf proof = match switch with
@@ -406,60 +413,43 @@ let _escape_dot s =
 let _to_str_escape fmt =
   CCFormat.ksprintf ~f:_escape_dot fmt
 
-let as_dot_graph =
+let pp_dot_seq ~name out seq =
   let no_other_info proof = match proof.theories, proof.additional_info with
     | [], [] -> true
     | _ -> false
   in
-  let label proof =
-    let s = if no_other_info proof
-      then _to_str_escape "%a" pp_result_of proof
+  (* TODO: check proof is a DAG *)
+  CCGraph.Dot.pp_seq
+    ~name ~graph:as_graph
+    ~attrs_v:(fun p ->
+      let label = if no_other_info p
+      then _to_str_escape "@[<2>%a@]" pp_result_of p
       else
         CCFormat.sprintf "{%s|{theories:%s|info:%s}}"
-          (_to_str_escape "%a" pp_result_of proof)
-          (_to_str_escape "%a" _pp_list_str proof.theories)
-          (_to_str_escape "%a" _pp_list_str proof.additional_info)
-    in
-    (* let s = Util.sprintf "%a" pp_result_of proof in *)
-    `Label s
-  in
-  let shape proof = if no_other_info proof then `Shape "box" else `Shape "record" in
-  let attributes = [`Style "filled"] in
-  LazyGraph.map
-    ~vertices:(fun p ->
-        if is_proof_of_false p then `Color "red" ::
-                                    `Label "[]" :: `Shape "box" :: attributes
-        else if has_absurd_lits p then `Color "orange" :: label p :: shape p :: attributes
-        else if is_file p then label p :: `Color "yellow" :: shape p :: attributes
-        else if is_conjecture p then label p :: `Color "green" :: shape p :: attributes
-        else if is_trivial p then label p :: `Color "cyan" :: shape p :: attributes
-        else label p :: shape p :: attributes)
-    ~edges:(fun e -> [`Label e])
-    as_graph
-
-let pp_dot_seq ~name out seq =
-  Sequence.iter (fun proof ->
-      if not (LazyGraph.is_dag as_graph proof) then begin
-        (* output warning, cyclic proof *)
-        let cycle = LazyGraph.find_cycle as_graph proof in
-        let cycle = List.map (fun (v,_,_) -> v) cycle in
-        let pp_squared out pf = Format.fprintf out "[%a]" pp_notrec pf in
-        Util.debugf 0 "warning: proof is not a DAG (cycle %a)"
-          (fun k->k (Util.pp_list pp_squared) cycle);
-      end)
+          (_to_str_escape "@[<2>%a@]" pp_result_of p)
+          (_to_str_escape "%a" _pp_list_str p.theories)
+          (_to_str_escape "%a" _pp_list_str p.additional_info)
+      in
+      let attrs = [`Label label; `Style "filled"] in
+      let shape = if no_other_info p then `Shape "box" else `Shape "record" in
+      if is_proof_of_false p then [`Color "red"; `Label "[]"; `Shape "box"; `Style "filled"]
+      else if has_absurd_lits p then `Color "orange" :: shape :: attrs
+      else if is_file p then `Color "yellow" :: shape :: attrs
+      else if is_conjecture p then `Color "green" :: shape :: attrs
+      else if is_trivial p then `Color "cyan" :: shape :: attrs
+      else shape :: attrs
+    )
+    ~attrs_e:(fun (_,(e,_)) -> [`Label e])
+    out
     seq;
-  LazyGraph.Dot.pp ~name as_dot_graph out seq;
   Format.pp_print_flush out ();
   ()
 
-(** Add the proof to the given graph *)
-let pp_dot ~name buf proof =
-  pp_dot_seq ~name buf (Sequence.singleton proof)
+let pp_dot ~name out proof = pp_dot_seq ~name out (Sequence.singleton proof)
 
-(** print to dot into a file *)
 let pp_dot_seq_file ?(name="proof") filename seq =
   (* print graph on file *)
-  Util.debugf 1 "print proof graph to %s" (fun k->k filename);
+  Util.debugf 1 "print proof graph to@ `%s`" (fun k->k filename);
   try
     CCIO.with_out filename
       (fun oc ->

@@ -1,27 +1,5 @@
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Non-Perfect Discrimination Tree} *)
 
@@ -212,30 +190,30 @@ module Make(E : Index.EQUATION) = struct
     !n
 
   let _as_graph =
-    LazyGraph.make ~eq:(==)
-      (fun t ->
+    {CCGraph.
+      origin=fst;
+      dest=(fun (_,(_,n)) -> n);
+      children=(fun t ->
         let s1 =
           (match t.star with
             | None -> Sequence.empty
-            | Some t' -> Sequence.singleton ("*", t')
+            | Some t' -> Sequence.singleton (t,("*", t'))
           )
         and s2 = ID.Map.to_seq t.map
-          |> Sequence.map (fun (sym, t') -> ID.to_string sym, t')
+          |> Sequence.map (fun (sym, t') -> t, (ID.to_string sym, t'))
         in
-        LazyGraph.Node(t, t, Sequence.append s1 s2)
-      )
-
-  let _as_dot_graph =
-    LazyGraph.map
-      ~vertices:(fun t ->
-        let len = Leaf.size t.leaf in
-        [`Shape "circle"; `Label (string_of_int len)]
-      )
-      ~edges:(fun e -> [`Label e])
-      _as_graph
+        Sequence.append s1 s2
+      );
+    }
 
   let to_dot out t =
-    LazyGraph.Dot.pp ~name:"NPDtree" _as_dot_graph out (Sequence.singleton t);
+    CCGraph.Dot.pp
+      ~attrs_v:(fun t ->
+        let len = Leaf.size t.leaf in
+        [`Shape "circle"; `Label (string_of_int len)])
+      ~attrs_e:(fun (_, (e,_)) -> [`Label e])
+      ~name:"NPDtree" ~graph:_as_graph
+      out t;
     Format.pp_print_flush out ();
     ()
 end
@@ -470,33 +448,35 @@ module MakeTerm(X : Set.OrderedType) = struct
   let name = "npdtree"
 
   let _as_graph =
-    LazyGraph.make ~eq:(==)
-      (fun t ->
+    {CCGraph.
+      origin=fst;
+      dest=(fun (_,(_,n)) -> n);
+      children=(fun t ->
         let s1 =
           (match t.star with
             | None -> Sequence.empty
-            | Some t' -> Sequence.singleton ("*", t')
+            | Some t' -> Sequence.singleton (t,("*", t'))
           )
         and s2 = SIMap.to_seq t.map
           |> Sequence.map
-              (fun ((sym,i), t') ->
-               CCFormat.sprintf "%a/%d" ID.pp sym i, t')
+            (fun ((sym,i), t') ->
+              let label = CCFormat.sprintf "%a/%d" ID.pp sym i in
+              t, (label, t'))
         in
-        LazyGraph.Node(t, t, Sequence.append s1 s2)
-      )
+        Sequence.append s1 s2
+      );
+    }
 
   (* TODO: print leaf itself *)
-  let as_graph_ =
-    LazyGraph.map
-      ~vertices:(fun t ->
-        let len = Leaf.size t.leaf in
-        [`Shape "circle"; `Label (string_of_int len)]
-      )
-      ~edges:(fun e -> [`Label e])
-      _as_graph
 
   let to_dot _ out t =
-    LazyGraph.Dot.pp ~name as_graph_ out (Sequence.singleton t);
+    CCGraph.Dot.pp
+      ~attrs_v:(fun t ->
+        let len = Leaf.size t.leaf in
+        [`Shape "circle"; `Label (string_of_int len)])
+      ~attrs_e:(fun (_, (e,_)) -> [`Label e])
+      ~name:"NPDtree" ~graph:_as_graph
+      out t;
     Format.pp_print_flush out ();
     ()
 end

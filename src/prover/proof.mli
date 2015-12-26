@@ -134,7 +134,7 @@ val share : t -> t
 
 (** {2 Conversion to a graph of proofs} *)
 
-val as_graph : (t, t, string) LazyGraph.t
+val as_graph : (t, t * (string * t)) CCGraph.t
 (** Get a graph of the proof *)
 
 (** {2 IO} *)
@@ -152,9 +152,6 @@ val pp_debug : t CCFormat.printer
 val pp : string -> t CCFormat.printer
 (** Prints the proof according to the given input switch *)
 (* TODO use variant *)
-
-val as_dot_graph : (t, LazyGraph.Dot.attribute list,
-                    LazyGraph.Dot.attribute list) LazyGraph.t
 
 val pp_dot : name:string -> t CCFormat.printer
 (** Pretty print the proof as a DOT graph *)
