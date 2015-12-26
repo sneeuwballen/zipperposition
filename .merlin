@@ -35,4 +35,4 @@ PKG qcheck
 PKG unix
 PKG msat
 PKG oclock
-FLG -w +a-4-44
+FLG -w +a-4-44-48
