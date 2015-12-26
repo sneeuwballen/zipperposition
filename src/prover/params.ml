@@ -15,7 +15,6 @@ type t = {
   param_version : bool;
   param_timeout : float;
   param_files : (string, CCVector.ro) CCVector.t;
-  param_split : bool; (** use splitting *)
   param_select : string; (** name of the selection function *)
   param_proof : string; (** how to print proof? *)
   param_dot_file : string option; (** file to print the final state in *)
@@ -39,7 +38,6 @@ and steps = ref 0
 and version = ref false
 and timeout = ref 0.
 and proof = ref "debug"
-and split = ref false
 and presaturate = ref false
 and dot_file = ref None
 and dot_sat = ref false
@@ -64,7 +62,6 @@ let parse_args () =
     ; "--steps", Arg.Set_int steps, " maximal number of steps of given clause loop"
     ; "--timeout", Arg.Set_float timeout, " timeout (in seconds)"
     ; "--select", Arg.Set_string select, help_select
-    ; "--split", Arg.Set split, " enable splitting"
     ; "--expand-def", Arg.Set expand_def, " expand definitions"
     ; "--proof", Arg.Set_string proof, " choose proof printing (none, debug, or tstp)"
     ; "--presaturate", Arg.Set presaturate,
@@ -89,7 +86,7 @@ let parse_args () =
     param_version= !version; param_timeout = !timeout;
     param_files = files; param_select = !select;
     param_stats= (!Options.global).Options.stats;
-    param_proof = !proof; param_split = !split;
+    param_proof = !proof;
     param_presaturate = !presaturate; param_dot_all_roots= !dot_all_roots;
     param_dot_file = !dot_file;
     param_unary_depth= !unary_depth; param_dot_sat= !dot_sat;
