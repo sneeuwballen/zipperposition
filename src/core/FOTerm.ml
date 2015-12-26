@@ -305,7 +305,7 @@ module Pos = struct
 end
 
 let replace t ~old ~by =
-  of_term_unsafe (T.replace (t:>T.t) ~old:(old:>T.t) ~by:(by:>T.t))
+  of_term_unsafe (T.replace (t:t:>T.t) ~old:(old:t:>T.t) ~by:(by:t:>T.t))
 
 let symbols ?(init=ID.Set.empty) t =
   ID.Set.add_seq init (Seq.symbols t)

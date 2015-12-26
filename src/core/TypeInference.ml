@@ -103,11 +103,7 @@ module TyBuiltin = struct
   let ty x = try Some (ty_exn x) with _ -> None
 end
 
-(** {2 Typing context}
-
-    The scope maintained by the typing context starts at 1.
-    Scope 0 should be used for ground types.
-*)
+(** {2 Typing context} *)
 
 module Ctx = struct
   type env = (string, [`Var of type_ Var.t | `ID of ID.t * type_]) Hashtbl.t
