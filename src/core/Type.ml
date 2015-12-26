@@ -28,6 +28,11 @@ let view t = match T.view t with
       assert (T.equal varty T.tType);
       Forall t'
   | T.Const s -> App (s, [])
+  | T.App (f, l) ->
+      begin match T.view f with
+      | T.Const id -> App (id, l)
+      | _ -> assert false
+      end
   | T.AppBuiltin (Builtin.Arrow, (ret :: l)) -> Fun (l, ret)
   | T.AppBuiltin (Builtin.Multiset, [t]) -> Multiset t
   | T.AppBuiltin (Builtin.Prop, []) -> Builtin Prop
