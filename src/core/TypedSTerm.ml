@@ -531,34 +531,31 @@ let _pp_term = pp
 (** {2 Subst} *)
 
 module Subst = struct
-  type t = term ID.Map.t
+  type t = (term, term) Var.Subst.t
 
-  let empty = ID.Map.empty
+  let empty = Var.Subst.empty
 
-  let mem subst v = ID.Map.mem v.Var.id subst
+  let mem = Var.Subst.mem
 
-  let pp out subst =
-    CCFormat.seq ~start:"{" ~stop:"}" ~sep:", "
-      (Util.pp_pair ~sep:" → " ID.pp _pp_term) out
-      (ID.Map.to_seq subst)
+  let pp = Var.Subst.pp _pp_term
 
   let to_string = CCFormat.to_string pp
 
   let add subst v t =
-    if ID.Map.mem v.Var.id subst
+    if mem subst v
       then invalid_arg
         (CCFormat.sprintf
           "@[<2>var `@[%a@]` already bound in `@[%a@]`@]" Var.pp v pp subst);
-    ID.Map.add v.Var.id t subst
+    Var.Subst.add subst v t
 
-  let find_exn subst v = ID.Map.find v.Var.id subst
-  let find subst v = try Some (ID.Map.find v.Var.id subst) with Not_found -> None
+  let find_exn = Var.Subst.find_exn
+  let find = Var.Subst.find
 
   let rec eval_head subst t =
     match view t with
     | Var v ->
         begin try
-          let t' = ID.Map.find v.Var.id subst in
+          let t' = Var.Subst.find_exn subst v in
           eval_head subst t'
         with Not_found ->
           var ?loc:t.loc (Var.update_ty v ~f:(eval_head subst))
@@ -575,7 +572,7 @@ module Subst = struct
     match view t with
     | Var v ->
         begin try
-          let t' = ID.Map.find v.Var.id subst in
+          let t' = Var.Subst.find_exn subst v in
           eval subst t'
         with Not_found ->
           var ?loc:t.loc (Var.update_ty v ~f:(eval subst))

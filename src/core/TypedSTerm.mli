@@ -196,7 +196,7 @@ end
 (** {2 Substitutions} *)
 
 module Subst : sig
-  type t
+  type t = (term, term) Var.Subst.t
 
   val empty : t
 
