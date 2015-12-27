@@ -138,8 +138,8 @@ module Make(E : Env.S) = struct
                   inferred_clauses
               in
               CCVector.append_seq new_clauses inferred_clauses;
-              Util.debugf ~section 2 "@[<2>inferred new clauses:@ @[<v>%a@]@]"
-                (fun k->k (CCFormat.seq Env.C.pp) (CCVector.to_seq new_clauses));
+              Util.debugf ~section 2 "inferred new clauses:@ [@[<v>%a@]]"
+                (fun k->k (CCVector.print ~start:"" ~stop:"" Env.C.pp) new_clauses);
               (* add new clauses (including simplified active clauses) to passive set and simpl_set *)
               Env.add_passive (CCVector.to_seq new_clauses);
               (* test whether the empty clause has been found *)

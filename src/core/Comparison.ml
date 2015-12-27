@@ -14,6 +14,8 @@ let to_string = function
   | Eq -> "==="
   | Incomparable -> "=?="
 
+let pp out c = CCFormat.string out (to_string c)
+
 let combine cmp1 cmp2 = match cmp1, cmp2 with
   | Eq, Eq
   | Eq, Incomparable | Incomparable, Eq -> Eq

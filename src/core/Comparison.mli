@@ -8,8 +8,7 @@ type t = Lt | Eq | Gt | Incomparable
 
 type comparison = t
 
-val to_string : t -> string
-(** Infix Representation *)
+include Interfaces.PRINT with type t := t
 
 val combine : t -> t -> t
 (** combine two partial comparisons, that are assumed to be

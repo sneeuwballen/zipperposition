@@ -644,18 +644,19 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                    (S.FO.apply_no_renaming subst (l,1))
                    (S.FO.apply_no_renaming subst (r,1)) = Comp.Gt)
              (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
-             then begin
+             then (
+               Util.debugf ~section 5
+                "@[<hv2>demod:@ @[t=%a[0],@ l=%a[1],@ r=%a[1]@],@ subst=@[%a@]@]"
+                 (fun k->k T.pp t T.pp l T.pp r S.pp subst);
+               (* sanity check *)
                assert (
                  O.compare ord
                    (S.FO.apply_no_renaming subst (l,1))
                    (S.FO.apply_no_renaming subst (r,1)) = Comp.Gt);
-               Util.debugf ~section 5
-                "@[<hv2>demod:@ @[t=%a[0], l= %a[1], r=%a[1]@],@ subst=%a@]"
-                 (fun k->k T.pp t T.pp l T.pp r S.pp subst);
                clauses := unit_clause :: !clauses;
                Util.incr_stat stat_demodulate_step;
                raise (RewriteInto (r, subst))
-             end);
+             ));
         t (* not found any match, normal form found *)
       with RewriteInto (t', subst) ->
         Util.debugf ~section 5 "@[<2>demod:@ rewrite @[%a@]@ into @[%a@]@]"

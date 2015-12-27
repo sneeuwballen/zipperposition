@@ -27,7 +27,7 @@ let hash a = a.id land max_int
 let max a b = if a.id < b.id then b else a
 let min a b = if a.id < b.id then a else b
 
-let pp out v = Format.fprintf out "v%d" v.id
+let pp out v = Format.fprintf out "X%d" v.id
 let to_string v = CCFormat.to_string pp v
 
 let make_unsafe ~ty id = {ty; id; }

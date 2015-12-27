@@ -162,7 +162,7 @@ let of_list ?(init=empty) l = match l with
 
 let pp out subst =
   let pp_binding out (v,t) =
-    Format.fprintf out "@[<2>@[%a@] →@ @[%a@]a@]"
+    Format.fprintf out "@[<2>@[%a@] →@ @[%a@]@]"
       (Scoped.pp HVar.pp) v (Scoped.pp T.pp) t
   in
   Format.fprintf out "{@[<hv>%a@]}"

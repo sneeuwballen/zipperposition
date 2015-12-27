@@ -747,7 +747,7 @@ let pp_depth ?(hooks=[]) depth out t =
     then () (* hook took control *)
     else _pp_root depth out t; _pp_ty depth out t
   and _pp_root depth out t = match view t with
-    | Var v -> Format.fprintf out "X%d" (HVar.id v)
+    | Var v -> HVar.pp out v
     | DB i -> Format.fprintf out "Y%d" (depth-i-1)
     | Const s -> ID.pp out s
     | Bind (b, varty, t') ->

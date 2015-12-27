@@ -272,6 +272,7 @@ let process_file ?meta:_ ~params file =
   let select = Selection.selection_from_string ~ord params.param_select in
   Util.debugf ~section 1 "@[<2>selection function:@ %s@]" (fun k->k params.param_select);
   Util.debugf ~section 1 "@[<2>signature:@ @[<hv>%a@]@]" (fun k->k Signature.pp signature);
+  Util.debugf ~section 1 "@[<2>precedence:@ @[%a@]@]" (fun k->k Precedence.pp precedence);
   let module Res = struct
     let signature = signature
     let ord = ord
@@ -287,7 +288,7 @@ let process_file ?meta:_ ~params file =
   setup_env ~env;
   (* extract clauses *)
   let clauses = CCVector.filter_map MyEnv.C.of_statement stmts in
-  Util.debugf ~section 3 "@[<2>clauses:@ @[<hv>%a@]@]"
+  Util.debugf ~section 2 "@[<2>clauses:@ @[<hv>%a@]@]"
     (fun k->k (CCFormat.seq ~sep:" " MyEnv.C.pp) (CCVector.to_seq clauses));
   (* main workload *)
   let module Main = MakeNew(struct

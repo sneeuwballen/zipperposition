@@ -178,12 +178,13 @@ module KBO : ORD = struct
       match terms1, terms2 with
       | [], [] -> wb, Eq
       | t1::terms1', t2::terms2' ->
-          (match tckbo wb t1 t2 with
+          begin match tckbo wb t1 t2 with
            | (wb', Eq) -> tckbolex wb' terms1' terms2'
            | (wb', res) -> (* just compute the weights and return result *)
                let wb'', _ = balance_weight_rec wb' terms1' 0 true false in
                let wb''', _ = balance_weight_rec wb'' terms2' 0 false false in
-               wb''', res)
+               wb''', res
+          end
       | [], _ | _, [] -> failwith "different arities in lexicographic comparison"
     (** commutative comparison. Not linear, must call kbo to
         avoid breaking the weight computing invariants *)
