@@ -270,9 +270,9 @@ let process_file ?meta:_ ~params file =
   in
   let ord = params.param_ord precedence in
   let select = Selection.selection_from_string ~ord params.param_select in
-  Util.debugf ~section 1 "@[<2>selection function:@ %s@]" (fun k->k params.param_select);
-  Util.debugf ~section 1 "@[<2>signature:@ @[<hv>%a@]@]" (fun k->k Signature.pp signature);
-  Util.debugf ~section 1 "@[<2>precedence:@ @[%a@]@]" (fun k->k Precedence.pp precedence);
+  Util.debugf ~section 2 "@[<2>selection function:@ %s@]" (fun k->k params.param_select);
+  Util.debugf ~section 2 "@[<2>signature:@ @[<hv>%a@]@]" (fun k->k Signature.pp signature);
+  Util.debugf ~section 2 "@[<2>precedence:@ @[%a@]@]" (fun k->k Precedence.pp precedence);
   let module Res = struct
     let signature = signature
     let ord = ord
@@ -318,7 +318,7 @@ let process_file ?meta:_ ~params file =
   return ()
 
 let () =
-  Util.debug ~section 0 "setup GC and signal handler";
+  Util.debug ~section 2 "setup GC and signal handler";
   (* GC! increase max overhead because we want the GC to be faster, even if
       it implies more wasted memory. *)
   let gc = Gc.get () in
