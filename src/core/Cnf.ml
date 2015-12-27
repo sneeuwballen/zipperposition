@@ -36,7 +36,8 @@ let not_cnf_ f = raise (NotCNF f)
 
 type clause = lit list
 
-let pp_clause out = Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp) out
+let pp_clause out =
+  Format.fprintf out "@[<2>%a@]" (Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp))
 
 let clause_to_fo c =
   let ctx = FOTerm.Conv.create() in
@@ -313,8 +314,9 @@ let introduce_defs ~ctx f =
   (* rename formula *)
   and _rename ~polarity f =
     let p = Skolem.define ~ctx ~polarity f in
-    Util.debugf ~section 4 "@[<2>introduce@ def. @[%a@]@ for subformula @[%a@]@]"
-      (fun k->k T.pp p T.pp f);
+    Util.debugf ~section 4
+      "@[<2>introduce@ def. @[%a@]@ for subformula @[%a@]@ with pol %a@]"
+      (fun k->k T.pp p T.pp f Skolem.pp_polarity polarity);
     p
   in
   (* recurse in sub-formulas, renaming as needed.
@@ -476,6 +478,7 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
   let res = seq
     |> Sequence.flat_map
       (fun (f,annot) ->
+         Util.debugf ~section 4 "@[<2>simplify and rename@ `@[%a@]`@]" (fun k->k T.pp f);
          (* preprocessing *)
          let f = List.fold_left (|>) f preprocess in
          (* simplification *)

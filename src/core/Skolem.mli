@@ -50,6 +50,8 @@ type polarity =
   | `Both
   ]
 
+val pp_polarity : polarity CCFormat.printer
+
 type definition = {
   form : form;
   proxy : form;
