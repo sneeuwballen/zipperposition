@@ -70,8 +70,16 @@ let collect_vars ?(filter=fun _->true) f =
     |> List.partition is_ty_var
 
 let skolem_form ~ctx subst ty form =
-  let tyvars, vars = collect_vars form
-    ~filter:(fun v -> not (Var.Subst.mem subst v)) in
+  (* only free variables we are interested in, are those bound to actual
+     free variables (the universal variables), not the existential ones
+     (bound to Skolem symbols) *)
+  let filter v =
+    try match T.view (Var.Subst.find_exn subst v) with
+      | T.Var _ -> true
+      | _ -> false
+    with Not_found -> true
+  in
+  let tyvars, vars = collect_vars form ~filter in
   let vars_t = List.map (fun v->T.var v) vars in
   let tyvars_t = List.map (fun v->T.Ty.var v) tyvars in
   (* type of the symbol: quantify over type vars, apply to vars' types *)
