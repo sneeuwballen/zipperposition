@@ -23,7 +23,7 @@ let options = Arg.align (
       " distribute existential quantifiers during miniscoping"
     ; "--disable-def", Arg.Set flag_disable_renaming, " disable definitional CNF"
     ; "--time-limit", Arg.Int Util.set_time_limit, " hard time limit (in s)"
-    ] @ Options.mk_global_opts ()
+    ] @ Options.make ()
   )
 
 (* TODO: choose between TPTP and regular printer *)

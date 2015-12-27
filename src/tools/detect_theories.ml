@@ -25,7 +25,7 @@ let options = Arg.align (
   ; "--print-theory", Arg.Set flag_print_theory, " print the whole theory"
   ; "--print-cnf", Arg.Set flag_print_cnf, " print the clausal form of input files"
   ; "--print-signature", Arg.Set flag_print_signature, " print initial theory signature"
-  ] @ Options.mk_global_opts ()
+  ] @ Options.make ()
   )
 
 (* parse the given theory files into the prover *)

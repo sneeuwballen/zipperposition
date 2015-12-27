@@ -232,7 +232,7 @@ let options = Arg.align (
     ; "--timeout", Arg.Set_int timeout, " timeout for subprovers (in seconds)"
     ; "--minimum", Arg.Set_int minimum, " minimum number of checks to validate a step (1)"
     ; "--progress", Arg.Set progress, " print progress"
-    ] @ Options.mk_global_opts ()
+    ] @ Options.make ()
   )
 
 (** parse_args returns parameters *)

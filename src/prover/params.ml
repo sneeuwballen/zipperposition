@@ -72,9 +72,8 @@ let parse_args () =
     ; "--color", Arg.Bool CCFormat.set_color_default, " enable/disable ANSI color codes"
     ; "--seed", Arg.Set_int seed, " set random seed"
     ; "--unary-depth", Arg.Set_int unary_depth, " maximum depth for successive unary inferences"
-    ] @ !other_opts @ Options.mk_global_opts ()
+    ] @ !other_opts @ Options.make ()
   ) in
-  let options = List.sort (fun (a1,_,_)(a2,_,_)->String.compare a1 a2) options in
   Util.set_debug 1;  (* default *)
   Arg.parse options add_file "solve problems in files";
   if CCVector.is_empty files
@@ -85,7 +84,7 @@ let parse_args () =
   { param_ord; param_seed = !seed; param_steps = !steps;
     param_version= !version; param_timeout = !timeout;
     param_files = files; param_select = !select;
-    param_stats= (!Options.global).Options.stats;
+    param_stats= ! Options.stats;
     param_proof = !proof;
     param_presaturate = !presaturate; param_dot_all_roots= !dot_all_roots;
     param_dot_file = !dot_file;

@@ -8,25 +8,13 @@
     global parameters, and return a parameter type for other options.
 *)
 
-type t = {
-  stats : bool;  (** statistics *)
-  print_format : [`Debug | `Normal | `TPTP]; (** Printing format *)
-} (** Options that can be set by the user *)
+val stats : bool ref
+(** Enable printing of statistics? *)
 
-val default : t
-(** Default options *)
+val output : [`Normal | `TPTP] ref
+(** Output format *)
 
-val make : t ref -> (string * Arg.spec * string) list
+val make : unit -> (string * Arg.spec * string) list
 (** Produce of list of options suitable for {!Arg.parse}, that may
-    modify global parameters and the given option reference.
-    After parsing, the reference content will reflect CLI options *)
+    modify global parameters and the given option reference. *)
 
-val global : t ref
-(** Global parameters, can be used as a mutable default *)
-
-val global_opts : (string * Arg.spec * string) list
-(** Options that modify {!global}.
-    Caution, this might miss some options from modules that aren't registered yet.
-    @deprecated since 0.6.1 , use {!mk_global_opts} instead*)
-
-val mk_global_opts : unit -> (string * Arg.spec * string) list

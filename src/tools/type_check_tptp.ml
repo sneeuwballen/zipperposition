@@ -20,7 +20,7 @@ let pp_base = ref false
 
 let options = Arg.align (
     [ "--cat", Arg.Set cat_input, " print (annotated) declarations"
-    ] @ Options.mk_global_opts ()
+    ] @ Options.make ()
   )
 
 (* check the given file *)
