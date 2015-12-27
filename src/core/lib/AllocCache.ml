@@ -27,6 +27,7 @@ module Arr = struct
         (* remove last array *)
         let ret = c.caches.(i).(bs-1) in
         c.sizes.(i) <- bs - 1;
+        Array.fill ret 0 i x;
         ret
       )
     ) else Array.make i x
