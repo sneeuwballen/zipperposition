@@ -1,28 +1,5 @@
 
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Simple and Lightweight Congruence and order} *)
 
@@ -30,66 +7,66 @@ module type S = sig
   type term
 
   type t
-    (** Represents a congruence *)
+  (** Represents a congruence *)
 
   val create : ?size:int -> unit -> t
-    (** New congruence.
-        @param size a hint for the initial size of the hashtable. *)
+  (** New congruence.
+      @param size a hint for the initial size of the hashtable. *)
 
   val clear : t -> unit
-    (** Clear the content of the congruence. It is now equivalent to
-        the empty congruence. *)
+  (** Clear the content of the congruence. It is now equivalent to
+      the empty congruence. *)
 
   val push : t -> unit
-    (** Push a checkpoint on the stack of the congruence. An equivalent call
-        to {!pop} will restore the congruence to its current state. *)
+  (** Push a checkpoint on the stack of the congruence. An equivalent call
+      to {!pop} will restore the congruence to its current state. *)
 
   val pop : t -> unit
-    (** Restore to the previous checkpoint.
-        @raise Invalid_argument if there is no checkpoint to restore to
-          (ie if no call to {!push} matches this call to {!pop}) *)
+  (** Restore to the previous checkpoint.
+      @raise Invalid_argument if there is no checkpoint to restore to
+        (ie if no call to {!push} matches this call to {!pop}) *)
 
   val stack_size : t -> int
-    (** Number of calls to {!push} that lead to the current state of the
-        congruence. Also, how many times {!pop} can be called. *)
+  (** Number of calls to {!push} that lead to the current state of the
+      congruence. Also, how many times {!pop} can be called. *)
 
   val find : t -> term -> term
-    (** Current representative of this term *)
+  (** Current representative of this term *)
 
   val iter : t -> (mem:term -> repr:term -> unit) -> unit
-    (** Iterate on terms that are explicitely present in the congruence.
-        The callback is given [mem], the term itself, and [repr],
-        the current representative of the term [mem].
+  (** Iterate on terms that are explicitely present in the congruence.
+      The callback is given [mem], the term itself, and [repr],
+      the current representative of the term [mem].
 
-        Invariant: when calling [iter cc f], if [f ~mem ~repr] is called,
-        then [find cc mem == repr] holds.
-    *)
+      Invariant: when calling [iter cc f], if [f ~mem ~repr] is called,
+      then [find cc mem == repr] holds.
+  *)
 
   val iter_roots : t -> (term -> unit) -> unit
-    (** Iterate on the congruence classes' representative elements.
-        Exactly one term per congruence class will be passed to the
-        function. *)
+  (** Iterate on the congruence classes' representative elements.
+      Exactly one term per congruence class will be passed to the
+      function. *)
 
   val mk_eq : t -> term -> term -> unit
-    (** [mk_eq congruence t1 t2] asserts that [t1 = t2] belongs to
-        the congruence *)
+  (** [mk_eq congruence t1 t2] asserts that [t1 = t2] belongs to
+      the congruence *)
 
   val mk_less : t -> term -> term -> unit
-    (** [mk_less congruence t1 t2] asserts that [t1 < t2] belongs to
-        the congruence *)
+  (** [mk_less congruence t1 t2] asserts that [t1 < t2] belongs to
+      the congruence *)
 
   val is_eq : t -> term -> term -> bool
-    (** Returns true if the two terms are equal in the congruence. This
-        updates the congruence, because the two terms need to be added. *)
+  (** Returns true if the two terms are equal in the congruence. This
+      updates the congruence, because the two terms need to be added. *)
 
   val is_less : t -> term -> term -> bool
-    (** Returns true if the first term is strictly lower than the second
-        one in the congruence *)
+  (** Returns true if the first term is strictly lower than the second
+      one in the congruence *)
 
   val cycles : t -> bool
-    (** Checks whether there are cycles in inequalities.
-        @return true if calls to [mk_eq] and [mk_less] entail a cycle in
-        the ordering (hence contradicting irreflexivity/transitivity of less) *)
+  (** Checks whether there are cycles in inequalities.
+      @return true if calls to [mk_eq] and [mk_less] entail a cycle in
+      the ordering (hence contradicting irreflexivity/transitivity of less) *)
 end
 
 (** The graph used for the congruence *)
@@ -102,11 +79,11 @@ module type TERM = sig
   val hash : t -> int
 
   val subterms : t -> t list
-    (** Subterms of the term (possibly empty list) *)
+  (** Subterms of the term (possibly empty list) *)
 
   val update_subterms : t -> t list -> t
-    (** Replace immediate subterms by the given list.
-        This is used to test for equality *)
+  (** Replace immediate subterms by the given list.
+      This is used to test for equality *)
 end
 
 module Make(T : TERM) = struct
@@ -120,14 +97,14 @@ module Make(T : TERM) = struct
     mutable lower : node list; (* only for representative *)
     mutable next : node;  (* union-find representative *)
     mutable waiters : (int * int * node) list
-      (* (arity,position, waiter) list, only for representative *)
+    (* (arity,position, waiter) list, only for representative *)
   } (** node of the graph *)
 
   module H = Hashtbl.Make(struct
-    type t = term
-    let equal = T.equal
-    let hash = T.hash
-  end)
+      type t = term
+      let equal = T.equal
+      let hash = T.hash
+    end)
 
   type stack_cell =
     | Checkpoint
@@ -164,13 +141,13 @@ module Make(T : TERM) = struct
   let rec pop h = match Stack.top h.stack with
     | Stop -> raise (Invalid_argument "Congruence.pop")
     | Checkpoint ->
-      ignore (Stack.pop h.stack);
-      h.stack_size <- h.stack_size - 1;
-      assert (h.stack_size >= 0);
+        ignore (Stack.pop h.stack);
+        h.stack_size <- h.stack_size - 1;
+        assert (h.stack_size >= 0);
     | Undo f ->
-      ignore (Stack.pop h.stack);
-      f ();
-      pop h
+        ignore (Stack.pop h.stack);
+        f ();
+        pop h
 
   let stack_size cc = cc.stack_size
 
@@ -208,13 +185,13 @@ module Make(T : TERM) = struct
   (* find representative *)
   let rec _find cc node =
     if node.next == node
-      then node  (* root *)
-      else begin
-        let root = _find cc node.next in
-        (* path compression *)
-        if root != node.next then _set_next cc node root;
-        root
-      end
+    then node  (* root *)
+    else begin
+      let root = _find cc node.next in
+      (* path compression *)
+      if root != node.next then _set_next cc node root;
+      root
+    end
 
   (* are two nodes, with their subterm lists, congruent? To
       check this, we compute the representative of subnodes
@@ -238,8 +215,8 @@ module Make(T : TERM) = struct
       let subnode = _find cc node.subnodes.(i) in
       List.iter
         (fun (arity', i', node') ->
-          if i = i' && arity = arity' && _are_congruent cc node node'
-            then _merge cc node node')
+           if i = i' && arity = arity' && _are_congruent cc node node'
+           then _merge cc node node')
         subnode.waiters
     done
 
@@ -259,11 +236,11 @@ module Make(T : TERM) = struct
       (* check congruence of waiters of n1 and n2 *)
       List.iter
         (fun (arity1, i1, n1') ->
-          List.iter
-            (fun (arity2, i2, n2') ->
-              if arity1 = arity2 && i1 = i2 && _are_congruent cc n1' n2'
+           List.iter
+             (fun (arity2, i2, n2') ->
+                if arity1 = arity2 && i1 = i2 && _are_congruent cc n1' n2'
                 then _merge cc n1' n2')
-            right)
+             right)
         left
     end
 
@@ -291,8 +268,8 @@ module Make(T : TERM) = struct
       (* register to future merges of subnodes *)
       Array.iteri
         (fun i subnode ->
-          let subnode = _find cc subnode in
-          _set_waiters cc subnode ((arity, i, node) :: subnode.waiters))
+           let subnode = _find cc subnode in
+           _set_waiters cc subnode ((arity, i, node) :: subnode.waiters))
         subnodes;
       (* return node *)
       node
@@ -305,14 +282,14 @@ module Make(T : TERM) = struct
   let iter cc f =
     H.iter
       (fun mem node ->
-        let repr = (_find cc node).term in
-        f ~mem ~repr)
+         let repr = (_find cc node).term in
+         f ~mem ~repr)
       cc.tbl
 
   let _iter_roots_node cc f =
     H.iter
       (fun _ node ->
-        if node == node.next then f node)
+         if node == node.next then f node)
       cc.tbl
 
   let iter_roots cc f = _iter_roots_node cc (fun node -> f node.term)
@@ -326,7 +303,7 @@ module Make(T : TERM) = struct
     let n1 = _find cc (_get cc t1) in
     let n2 = _find cc (_get cc t2) in
     if not (List.memq n1 n2.lower)
-      then _set_lower cc n2 (n1 :: n2.lower);
+    then _set_lower cc n2 (n1 :: n2.lower);
     ()
 
   let is_eq cc t1 t2 =
@@ -341,9 +318,9 @@ module Make(T : TERM) = struct
         [explored] is used to break cycles, if any *)
     let rec search explored target current =
       if List.memq current explored
-        then false
+      then false
       else if target == current
-        then true
+      then true
       else
         let explored = current :: explored in
         List.exists
@@ -359,73 +336,73 @@ module Make(T : TERM) = struct
       (* starting from each root, explore "less" graph in DFS *)
       _iter_roots_node cc
         (fun root ->
-          H.clear explored;
-          let s = Stack.create () in
-          (* initial step *)
-          H.add explored root.term ();
-          List.iter (fun node' -> Stack.push (node', [root]) s) root.lower;
-          (* explore *)
-          while not (Stack.is_empty s) do
-            let node, path = Stack.pop s in
-            if not (H.mem explored node.term) then begin
-              H.add explored node.term ();
-              (* explore children *)
-              List.iter
-                (fun node' ->
-                  if List.memq node' path
+           H.clear explored;
+           let s = Stack.create () in
+           (* initial step *)
+           H.add explored root.term ();
+           List.iter (fun node' -> Stack.push (node', [root]) s) root.lower;
+           (* explore *)
+           while not (Stack.is_empty s) do
+             let node, path = Stack.pop s in
+             if not (H.mem explored node.term) then begin
+               H.add explored node.term ();
+               (* explore children *)
+               List.iter
+                 (fun node' ->
+                    if List.memq node' path
                     then raise Exit (* found cycle *)
                     else Stack.push (node', node::path) s)
-                node.lower
-            end;
-          done);
+                 node.lower
+             end;
+           done);
       false
     with Exit ->
       true
 end
 
 module FO = Make(struct
-  module T = FOTerm
+    module T = FOTerm
 
-  type t = T.t
-  let equal = T.equal
-  let hash = T.hash
+    type t = T.t
+    let equal = T.equal
+    let hash = T.hash
 
-  let subterms t = match T.Classic.view t with
-    | T.Classic.App (_, l) -> l
-    | _ -> []
+    let subterms t = match T.Classic.view t with
+      | T.Classic.App (_, l) -> l
+      | _ -> []
 
-  let update_subterms t l = match T.view t, l with
-    | T.App (hd, l), l' when List.length l = List.length l' ->
-      T.app hd l'
-    | _, [] -> t
-    | _ -> assert false
-end)
+    let update_subterms t l = match T.view t, l with
+      | T.App (hd, l), l' when List.length l = List.length l' ->
+          T.app hd l'
+      | _, [] -> t
+      | _ -> assert false
+  end)
 
 module HO = Make(struct
-  module T = HOTerm
+    module T = HOTerm
 
-  type t = T.t
-  let equal = T.equal
-  let hash = T.hash
+    type t = T.t
+    let equal = T.equal
+    let hash = T.hash
 
-  let subterms t = match T.view t with
-    | T.Const _
-    | T.Var _
-    | T.DB _ -> []
-    | T.Lambda (_,t') | T.Forall (_, t') | T.Exists (_, t') -> [t']
-    | T.AppBuiltin (_,l) -> l
-    | T.App (f,l) -> f::l
-    | T.Multiset (_,l) -> l
-    | T.Record _ -> assert false   (* TODO *)
+    let subterms t = match T.view t with
+      | T.Const _
+      | T.Var _
+      | T.DB _ -> []
+      | T.Lambda (_,t') | T.Forall (_, t') | T.Exists (_, t') -> [t']
+      | T.AppBuiltin (_,l) -> l
+      | T.App (f,l) -> f::l
+      | T.Multiset (_,l) -> l
+      | T.Record _ -> assert false   (* TODO *)
 
-  let update_subterms t l = match T.view t, l with
-    | (T.Const _ | T.Var _ | T.DB _), [] -> t
-    | T.App _, f::l -> T.app f l
-    | T.AppBuiltin (b,_), l -> T.app_builtin ~ty:(T.ty t) b l
-    | T.Lambda (varty, _), [t'] -> T.lambda ~varty t'
-    | T.Forall (varty, _), [t'] -> T.forall ~varty t'
-    | T.Exists (varty, _), [t'] -> T.exists ~varty t'
-    | T.Multiset(ty,_), l -> T.multiset ~ty l
-    | T.Record _, _ -> assert false (* TODO *)
-    | _ -> assert false
-end)
+    let update_subterms t l = match T.view t, l with
+      | (T.Const _ | T.Var _ | T.DB _), [] -> t
+      | T.App _, f::l -> T.app f l
+      | T.AppBuiltin (b,_), l -> T.app_builtin ~ty:(T.ty t) b l
+      | T.Lambda (varty, _), [t'] -> T.lambda ~varty t'
+      | T.Forall (varty, _), [t'] -> T.forall ~varty t'
+      | T.Exists (varty, _), [t'] -> T.exists ~varty t'
+      | T.Multiset(ty,_), l -> T.multiset ~ty l
+      | T.Record _, _ -> assert false (* TODO *)
+      | _ -> assert false
+  end)
