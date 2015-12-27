@@ -392,6 +392,7 @@ module Conv = struct
     | None ->
         let ty = of_simple_term_exn ctx (Var.ty v) in
         let v' = HVar.make ~ty ctx.n in
+        ctx.n <- ctx.n + 1;
         ctx.vars <- Var.Subst.add ctx.vars v v';
         v'
 
