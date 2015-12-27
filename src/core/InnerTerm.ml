@@ -781,11 +781,14 @@ let pp_depth ?(hooks=[]) depth out t =
         Format.fprintf out "@[%a(%a)@]" Builtin.pp b (Util.pp_list (_pp depth)) l
     | App (f, []) -> _pp depth out f
     | App (f, l) ->
-        Format.fprintf out "(@[<2>%a@ %a@])"
+        Format.fprintf out "@[<2>%a@ %a@]"
           (_pp_surrounded depth) f (Util.pp_list ~sep:" " (_pp_surrounded depth)) l
   and _pp_ty depth out t = match t.ty, view t with
     | HasType ty, (Var _ | DB _) ->
-        Format.fprintf out ":%a" (_pp_surrounded depth) ty
+        begin match view ty with
+        | AppBuiltin (Builtin.Term, _) -> () (* default type *)
+        | _ -> Format.fprintf out ":%a" (_pp_surrounded depth) ty
+        end
     | _ -> ()
   and _pp_surrounded depth out t = match view t with
     | Bind _

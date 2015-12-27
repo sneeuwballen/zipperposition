@@ -130,31 +130,28 @@ end
     terms are already curried and rigidified, so we only need to replace
     connectives by their multiset versions. *)
 
-let __or_conn = HOT.TPTP.or_
-let __and__conn = HOT.TPTP.and_
-let __xor_conn = HOT.TPTP.xor
-let __equiv_conn = HOT.TPTP.equiv
-let __eq_conn = HOT.TPTP.eq
-let __neq_conn = HOT.TPTP.neq
-let __not_conn = HOT.TPTP.not_
+let ty_ms = Type.(forall ([multiset (bvar 0)] ==> prop))
+let eq_conn = HOT.const ~ty:ty_ms (ID.make "=")
+let neq_conn = HOT.const ~ty:ty_ms (ID.make "≠")
+let not_conn = HOT.TPTP.not_
 
 let __encode_lit = function
   | Eq (a, b, truth) ->
       let ty = HOT.ty a in
       if truth
-      then HOT.app (HOT.app_ty __eq_conn [ty]) [HOT.multiset ~ty [a; b]]
-      else HOT.app (HOT.app_ty __neq_conn [ty]) [HOT.multiset ~ty [a; b]]
+      then HOT.app (HOT.app_ty eq_conn [ty]) [HOT.multiset ~ty [a; b]]
+      else HOT.app (HOT.app_ty neq_conn [ty]) [HOT.multiset ~ty [a; b]]
   | Prop (p, true) -> p
-  | Prop (p, false) -> HOT.app __not_conn [p]
+  | Prop (p, false) -> HOT.app not_conn [p]
   | Bool true -> HOT.TPTP.true_
   | Bool false -> HOT.TPTP.false_
 
 let __decode_lit t = match HOT.view t with
-  | HOT.App (hd, [r]) when HOT.equal hd __not_conn -> Prop (r, false)
+  | HOT.App (hd, [r]) when HOT.equal hd not_conn -> Prop (r, false)
   | HOT.App (hd, [r]) ->
       begin match HOT.view r with
-        | HOT.Multiset (_,[a;b]) when HOT.equal hd __eq_conn -> Eq (a, b, true)
-        | HOT.Multiset (_,[a;b]) when HOT.equal hd __neq_conn -> Eq (a, b, false)
+        | HOT.Multiset (_,[a;b]) when HOT.equal hd eq_conn -> Eq (a, b, true)
+        | HOT.Multiset (_,[a;b]) when HOT.equal hd neq_conn -> Eq (a, b, false)
         | _ -> Prop (t, true)
       end
   | _ -> Prop (t, true)
