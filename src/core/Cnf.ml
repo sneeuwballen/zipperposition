@@ -190,15 +190,15 @@ let skolemize ~ctx f =
     | F.Equiv _ -> error_ "can only skolemize a NNF formula"
     | F.Atom _
     | F.Eq _
-    | F.Neq _
+    | F.Neq _ -> T.Subst.eval subst f
     | F.True
     | F.False -> f
     | F.Exists (var,f') ->
         (* replace [v] by a fresh skolem term *)
-        let t = Skolem.skolem_form ~ctx subst (Var.ty var) f' in
+        let t = Skolem.skolem_form ~ctx subst (Var.ty var) f in
         let subst = Var.Subst.add subst var t in
         Util.debugf 2 ~section "@[<2>bind %a to@ @[%a@]@]"
-          (fun k->k Var.pp var T.pp t);
+          (fun k->k Var.pp_full var T.pp t);
         skolemize subst f'
     | F.Forall (var,f') ->
         let var' = Var.copy var in

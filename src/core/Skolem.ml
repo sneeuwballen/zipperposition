@@ -63,7 +63,7 @@ let fresh_sym ~ctx ~ty = fresh_sym_with ~ctx ~ty ctx.sc_prefix
 
 let collect_vars ?(filter=fun _->true) f =
   let is_ty_var v = T.Ty.is_tType (Var.ty v) in
-  T.Seq.vars f
+  T.Seq.free_vars f
     |> Sequence.filter filter
     |> Var.Set.of_seq
     |> Var.Set.to_list
