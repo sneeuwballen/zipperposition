@@ -1064,9 +1064,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     )
 
   (* replace the bitvector system by some backtracking scheme?
-   * XXX: maybe not a good idea. the algorithm is actually quite subtle
-   * and needs tight control over the traversal (lookahead of free
-   * variables in next literals, see [check_vars]...) *)
+     XXX: maybe not a good idea. the algorithm is actually quite subtle
+     and needs tight control over the traversal (lookahead of free
+     variables in next literals, see [check_vars]...) *)
 
   (** Check whether [a] subsumes [b], and if it does, return the
       corresponding substitution *)
@@ -1082,7 +1082,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let a = Array.copy a in
       (* try to subsumes literals of b whose index are not in bv, with [subst] *)
       let rec try_permutations i subst bv =
-        if i = Array.length a then raise (SubsumptionFound subst) else
+        if i = Array.length a
+        then raise (SubsumptionFound subst)
+        else
           let lita = a.(i) in
           find_matched lita i subst bv 0
       (* find literals of b that are not bv and that are matched by lita *)
@@ -1090,7 +1092,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         if j = Array.length b then ()
         (* if litb is already matched, continue *)
         else if BV.get bv j then find_matched lita i subst bv (j+1)
-        else begin
+        else (
           let litb = b.(j) in
           BV.set bv j;
           (* match lita and litb, then flag litb as used, and try with next literal of a *)
@@ -1102,7 +1104,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           if !n_subst > 0 && not (check_vars lita (i+1))
           then () (* no backtracking for litb *)
           else find_matched lita i subst bv (j+1)
-        end
+        )
       (* does some literal in a[j...] contain a variable in l or r? *)
       and check_vars lit j =
         let vars = Lit.vars lit in
@@ -1130,7 +1132,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let res = match subsumes_with (a,0) (b,1) with
       | None -> false
       | Some _ ->
-          Util.debugf ~section 2 "@[<2>@[%a@]@ subsumes @[%a@]@]"
+          Util.debugf ~section 2 "@[<hv>@[%a@]@ subsumes @[%a@]@]"
             (fun k->k Lits.pp a Lits.pp b);
           true
     in
@@ -1334,8 +1336,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           let lit = lits.(i) in
           for j = i+1 to n - 1 do
             let lit' = lits.(j) in
-            (* see whether lit=>lit', and if removing __lit__ gives a clause
-               that subsumes c. Also do the symmetric operation *)
+            (* see whether [lit |= lit'], and if removing [lit] gives a clause
+               that subsumes c. Also try to swap [lit] and [lit']. *)
             let subst_remove_lit =
               Lit.subsumes (lit, 0) (lit', 0)
               |> Sequence.map (fun s -> s, i)
@@ -1343,6 +1345,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               Lit.subsumes (lit', 0) (lit, 0)
               |> Sequence.map (fun s -> s, j)
             in
+            (* potential condensing substitutions *)
             let substs = Sequence.append subst_remove_lit subst_remove_lit' in
             Sequence.iter
               (fun (subst,idx_to_remove) ->
@@ -1365,7 +1368,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             ~rule:"condensation" c' [C.proof c] in
         let parents = c :: C.parents c in
         let new_c = C.create_a ~parents new_lits proof in
-        Util.debugf ~section 3 "@[<2>condensation@ in @[%a@] (with @[%a@])@ gives @[%a@]@]"
+        Util.debugf ~section 3 "@[<2>condensation@ of @[%a@] (with @[%a@])@ gives @[%a@]@]"
           (fun k->k C.pp c S.pp subst C.pp new_c);
         (* try to condense further *)
         Util.exit_prof prof_condensation;

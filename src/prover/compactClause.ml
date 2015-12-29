@@ -64,7 +64,9 @@ let pp out c =
   begin match c.lits with
     | [| |] -> CCFormat.string out "⊥"
     | [| x |] -> Lit.pp out x
-    | l -> Format.fprintf out "%a" (CCFormat.array ~sep:" ∨ " Lit.pp) l
+    | l ->
+        Format.fprintf out "[@[%a@]]"
+          (CCFormat.array ~start:"" ~stop:"" ~sep:" ∨ " Lit.pp) l
   end;
   _pp_trail out c.trail
 

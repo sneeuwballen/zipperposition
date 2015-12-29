@@ -54,7 +54,6 @@ module Make(E : Env.S) = struct
 
   (** One iteration of the main loop ("given clause loop") *)
   let given_clause_step ?(generating=true) num =
-    Util.debugf ~section 4 "@[env for next given loop: %a@]" (fun k->k Env.pp ());
     E.step_init();
     (* select next given clause *)
     match Env.next_passive () with
@@ -74,7 +73,7 @@ module Make(E : Env.S) = struct
         if clauses=[]
         then Sat
         else (
-          Util.debugf 2 ~section "@[<2>inferred new clauses@ @[<v>%a@]@]"
+          Util.debugf 2 ~section "@[<2>inferred @{<green>new clauses@}@ @[<v>%a@]@]"
             (fun k->k (CCFormat.list Env.C.pp) clauses);
           Env.add_passive (Sequence.of_list clauses);
           Unknown
@@ -83,7 +82,8 @@ module Make(E : Env.S) = struct
         begin match Env.all_simplify c with
           | [] ->
               Util.incr_stat stat_redundant_given;
-              Util.debugf ~section 2 "@[<2>given clause @[%a@]@ is redundant@]" (fun k->k Env.C.pp c);
+              Util.debugf ~section 2 "@[<2>given clause @[%a@]@ is redundant@]"
+                (fun k->k Env.C.pp c);
               Unknown
           | l when List.exists Env.C.is_empty l ->
               (* empty clause found *)
@@ -138,9 +138,10 @@ module Make(E : Env.S) = struct
                   inferred_clauses
               in
               CCVector.append_seq new_clauses inferred_clauses;
-              Util.debugf ~section 2 "inferred new clauses:@ [@[<v>%a@]]"
+              Util.debugf ~section 2 "@[<2>inferred @{<green>new clauses@}:@ [@[<v>%a@]]@]"
                 (fun k->k (CCVector.print ~start:"" ~stop:"" Env.C.pp) new_clauses);
-              (* add new clauses (including simplified active clauses) to passive set and simpl_set *)
+              (* add new clauses (including simplified active clauses)
+                 to passive set and simpl_set *)
               Env.add_passive (CCVector.to_seq new_clauses);
               (* test whether the empty clause has been found *)
               match Env.get_some_empty_clause () with
