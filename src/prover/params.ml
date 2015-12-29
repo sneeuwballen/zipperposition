@@ -74,7 +74,6 @@ let parse_args () =
     ; "--unary-depth", Arg.Set_int unary_depth, " maximum depth for successive unary inferences"
     ] @ !other_opts @ Options.make ()
   ) in
-  Util.set_debug 1;  (* default *)
   Arg.parse options add_file "solve problems in files";
   if CCVector.is_empty files
     then CCVector.push files "stdin";
