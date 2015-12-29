@@ -283,25 +283,6 @@ module Pos = struct
   let at t pos = of_term_unsafe (T.Pos.at (t :> T.t) pos)
 
   let replace t pos ~by = of_term_unsafe (T.Pos.replace (t:>T.t) pos ~by:(by:>T.t))
-
-  (** get subterm by its compact position *)
-  let at_cpos t pos =
-    let rec recurse t pos =
-      match T.view t, pos with
-      | _, 0 -> t
-      | T.App (_, l), _ -> get_subpos l (pos - 1)
-      | _ -> failwith "bad compact position"
-    and get_subpos l pos =
-      match l, pos with
-      | t::l', _ ->
-          let st = size t in
-          if st > pos
-          then recurse t pos  (* search inside the term *)
-          else get_subpos l' (pos - st) (* continue to next term *)
-      | [], _ -> assert false
-    in recurse t pos
-
-  let max_cpos t = size t - 1
 end
 
 let replace t ~old ~by =

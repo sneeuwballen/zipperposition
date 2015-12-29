@@ -152,12 +152,6 @@ module Pos : sig
   (** [replace t pos ~by] replaces the subterm at position [pos]
       in [t] by the term [by]. The two terms should have the same type.
       @raise Invalid_argument if the position is not valid *)
-
-  val at_cpos : t -> int -> t
-  (** retrieve subterm at the compact pos, or raise Invalid_argument*)
-
-  val max_cpos : t -> int
-  (** maximum compact position in the term *)
 end
 
 val replace : t -> old:t -> by:t -> t
