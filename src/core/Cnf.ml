@@ -510,15 +510,7 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
   Util.exit_prof prof_simplify_rename;
   res
 
-type 'a statement =
-  | TyDecl of ID.t * type_ * 'a
-  | Assert of clause * 'a
-
-let pp_statement out = function
-  | Assert (c,_) ->
-      Format.fprintf out "@[<2>assert@ (@[%a@])@]." pp_clause c
-  | TyDecl (id, ty, _) ->
-      Format.fprintf out "@[<2>val %a :@ %a@]." ID.pp id T.pp ty
+type 'a statement = (clause, type_, 'a) Statement.t
 
 (* Transform the clauses into proper CNF; returns a list of clauses *)
 let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
@@ -566,10 +558,10 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
       in
       let new_ids = Skolem.pop_new_symbols ~ctx in
       List.iter
-        (fun (id,ty) -> CCVector.push res (TyDecl (id,ty,annot)))
+        (fun (id,ty) -> CCVector.push res (Statement.ty_decl ~src:annot id ty))
         new_ids;
       List.iter
-        (fun c -> CCVector.push res (Assert (c,annot)))
+        (fun c -> CCVector.push res (Statement.assert_ ~src:annot c))
         clauses;
     )
     v;
@@ -579,10 +571,15 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
 let cnf_of ?opts ?ctx f annot =
   cnf_of_seq ?opts ?ctx (Sequence.return (f,annot))
 
+let pp_statement out st =
+  Statement.pp
+    (Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp))
+    T.pp out st
+
 let type_declarations seq =
   Sequence.fold
-    (fun acc st -> match st with
-      | TyDecl (id, ty, _) -> ID.Map.add id ty acc
-      | Assert _ -> acc)
+    (fun acc st -> match Statement.view st with
+      | Statement.TyDecl (id, ty) -> ID.Map.add id ty acc
+      | Statement.Assert _ -> acc)
     ID.Map.empty seq
 

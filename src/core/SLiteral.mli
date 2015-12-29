@@ -43,3 +43,7 @@ val is_pos : _ t -> bool
 val is_neg : _ t -> bool
 
 include Interfaces.PRINT1 with type 'a t := 'a t
+
+module TPTP : sig
+  include Interfaces.PRINT1 with type 'a t := 'a t
+end

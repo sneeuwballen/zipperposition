@@ -301,8 +301,9 @@ module TPTP = struct
       Format.fprintf out "%a > %a" pp a pp ret
     | AppBuiltin (Builtin.Arrow, ret::l) ->
       Format.fprintf out "(%a) > %a" (Util.pp_list~sep:" * " pp) l pp_surrounded ret
+    | AppBuiltin (s, []) -> Builtin.TPTP.pp out s
     | AppBuiltin (s, l) ->
-      Format.fprintf out "%a(%a)" Builtin.pp s (Util.pp_list ~sep:", " pp_surrounded) l
+      Format.fprintf out "%a(%a)" Builtin.TPTP.pp s (Util.pp_list ~sep:", " pp_surrounded) l
     | App (s, l) ->
       Format.fprintf out "@[<2>%a(%a)@]"
         pp s (Util.pp_list ~sep:"," pp) l
@@ -318,8 +319,8 @@ module TPTP = struct
         CCFormat.string out v (* implicit type *)
     | Some ty -> Format.fprintf out "%s:%a" v pp_surrounded ty
   and pp_surrounded out t = match t.term with
-    | AppBuiltin _
-    | Bind _ -> CCFormat.char out '('; pp out t; CCFormat.char out ')'
+    | AppBuiltin (_, _::_)
+    | Bind _ -> Format.fprintf out "(@[%a@])" pp t
     | _ -> pp out t
 
   let to_string = CCFormat.to_string pp

@@ -48,6 +48,8 @@ val pp_general : general_data CCFormat.printer
 val pp_general_debugf : general_data CCFormat.printer  (* ugly version *)
 val pp_generals : general_data list CCFormat.printer
 
+val to_src : file:string -> (role * string) -> StatementSrc.t
+
 type 'a t =
   | CNF of name * role * 'a list * optional_info
   | FOF of name * role * 'a * optional_info

@@ -11,22 +11,39 @@ module F = T.Form
 module A = Ast_tptp
 module Err = CCError
 
-let declare_types = ref false
 let print_sig = ref false
 let flag_distribute_exists = ref false
 let flag_disable_renaming = ref false
 
 let options = Arg.align (
-    [ "--declare", Arg.Set declare_types, " declare types of symbols"
-    ; "--signature", Arg.Set print_sig, " print signature"
-    ; "--distribute-exist", Arg.Set flag_distribute_exists,
-      " distribute existential quantifiers during miniscoping"
+    [ "--signature", Arg.Set print_sig, " print signature"
+    ; "--distribute-exist"
+        , Arg.Set flag_distribute_exists
+        , " distribute existential quantifiers during miniscoping"
     ; "--disable-def", Arg.Set flag_disable_renaming, " disable definitional CNF"
     ; "--time-limit", Arg.Int Util.set_time_limit, " hard time limit (in s)"
     ] @ Options.make ()
   )
 
-(* TODO: choose between TPTP and regular printer *)
+let print_res decls = match !Options.output with
+  | `Normal ->
+      let ppst =
+        Statement.pp
+          (Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp)) T.pp
+      in
+      Format.printf "@[<v2>%d statements:@ %a@]@."
+        (CCVector.length decls)
+        (CCVector.print ~start:"" ~stop:"" ~sep:"" ppst)
+        decls
+  | `TPTP ->
+      let ppst out st =
+        Statement.TPTP.pp
+          (Util.pp_list ~sep:" | " (SLiteral.TPTP.pp T.TPTP.pp)) T.TPTP.pp
+          out st
+      in
+      Format.printf "@[<v>%a@]@."
+        (CCVector.print ~start:"" ~stop:"" ~sep:"" ppst)
+        decls
 
 (* process the given file, converting it to CNF *)
 let process file =
@@ -52,10 +69,8 @@ let process file =
           (ID.Map.print ~start:"" ~stop:"" ~sep:"" ~arrow:" : " ID.pp T.pp) sigma
       );
       (* print *)
-      Format.printf "@[<v2>%d statements:@ %a@]@."
-        (CCVector.length decls)
-        (CCVector.print ~start:"" ~stop:"" ~sep:"" Cnf.pp_statement)
-        decls;
+      let decls = CCVector.map (Statement.map_src ~f:(Ast_tptp.to_src ~file)) decls in
+      print_res decls;
       Err.return ()
     )
   in match res with

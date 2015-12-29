@@ -427,8 +427,8 @@ let debugf = T.debugf
 (** {2 TPTP} *)
 
 module TPTP = struct
-  let true_ = builtin ~ty:Type.TPTP.o Builtin.true_
-  let false_ = builtin ~ty:Type.TPTP.o Builtin.false_
+  let true_ = builtin ~ty:Type.prop Builtin.true_
+  let false_ = builtin ~ty:Type.prop Builtin.false_
 
   let pp_depth ?hooks:_ depth out t =
     let depth = ref depth in

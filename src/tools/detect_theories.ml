@@ -41,10 +41,7 @@ let to_cnf decls =
     let stmts = Util_tptp.to_cnf decls in
     let seq =
       CCVector.to_seq stmts
-      |> Sequence.filter_map
-        (function
-          | Cnf.Assert (c,_) -> Some c
-          | Cnf.TyDecl _ -> None)
+      |> Sequence.flat_map Statement.Seq.forms
     in
     return seq
   )

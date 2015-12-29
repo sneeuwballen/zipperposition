@@ -3,8 +3,6 @@
 
 (** {1 Statement Source} *)
 
-open Libzipperposition
-
 type t = {
   file : string;
   name : string option;

@@ -132,7 +132,7 @@ module type S = sig
     FOTerm.t SLiteral.t list -> t
   (** Construction from formulas as axiom (initial clause) *)
 
-  val of_statement : Statement.t -> t option
+  val of_statement : Statement.clause_t -> t option
   (** Extract a clause from a statement, if any *)
 
   val proof : t -> Proof.t

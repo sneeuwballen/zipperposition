@@ -221,12 +221,12 @@ module Make(X : sig
          let stmts = Cnf.cnf_of ~ctx:Ctx.skolem f () in
          let proof cc = Proof.mk_c_esa ~rule:"cnf" cc [PF.proof pf] in
          CCVector.fold
-           (fun cset st -> match st with
-            | Cnf.Assert (c, ()) ->
+           (fun cset st -> match Statement.view st with
+            | Statement.Assert c ->
                 let c = Cnf.clause_to_fo c in
                 let c = C.of_forms c proof in
                 C.CSet.add cset c
-            | Cnf.TyDecl (s, ty, ()) ->
+            | Statement.TyDecl (s, ty) ->
                 let ctx = Type.Conv.create() in
                 let ty = Type.Conv.of_simple_term_exn ctx ty in
                 Util.debugf ~section 5 "declare skolem %a : %a"

@@ -32,6 +32,12 @@ module type PRINT1 = sig
   val to_string : 'a CCFormat.printer -> 'a t -> string
 end
 
+module type PRINT2 = sig
+  type ('a, 'b) t
+  val pp : 'a CCFormat.printer -> 'b CCFormat.printer -> ('a,'b) t CCFormat.printer
+  val to_string : 'a CCFormat.printer -> 'b CCFormat.printer -> ('a,'b) t -> string
+end
+
 (** Register printers by name *)
 module type PRINT_OVERLOAD = sig
   type t

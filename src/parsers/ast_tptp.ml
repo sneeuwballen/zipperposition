@@ -108,6 +108,15 @@ let pp_generals out l = match l with
       Format.fprintf out ",@ ";
       Util.pp_list ~sep:", " pp_general out l
 
+let to_src ~file (role, name) =
+  let role_is_conj_ = function
+    | R_conjecture
+    | R_negated_conjecture -> true
+    | _ -> false
+  in
+  let is_conjecture = role_is_conj_ role in
+  StatementSrc.make ~is_conjecture ~name file
+
 type 'a t =
   | CNF of name * role * 'a list * optional_info
   | FOF of name * role * 'a * optional_info

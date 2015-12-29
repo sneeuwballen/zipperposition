@@ -242,6 +242,17 @@ let scan_for_inductive_types decls =
   in
   Induction_helpers.init_from_decls pairs
 
+let conv_statement ~file st =
+  let src = Ast_tptp.to_src ~file (Statement.src st) in
+  match Statement.view st with
+  | Statement.Assert c ->
+      let c = Cnf.clause_to_fo c in
+      Statement.assert_ ~src c
+  | Statement.TyDecl (id, ty) ->
+      let ctx = Type.Conv.create() in
+      let ty = Type.Conv.of_simple_term_exn ctx ty in
+      Statement.ty_decl ~src id ty
+
 (* Process the given file (try to solve it) *)
 let process_file ?meta:_ ~params file =
   let open CCError in
@@ -259,7 +270,7 @@ let process_file ?meta:_ ~params file =
   (* obtain clauses + env *)
   let stmts =
     Util_tptp.to_cnf decls
-    |> CCVector.map (Statement.of_cnf_tptp ~file)
+    |> CCVector.map (conv_statement ~file)
   in
   (* compute signature, precedence, ordering *)
   let signature = Statement.signature (CCVector.to_seq stmts) in

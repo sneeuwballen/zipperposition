@@ -316,9 +316,9 @@ let to_cnf ?opts decls =
          CCVector.append res stmts
      | A.NewType (name, id, ty, _)
      | A.TypeDecl (name, id, ty, _) ->
-         CCVector.push res (Cnf.TyDecl (id, ty, (A.R_type, A.string_of_name name)));
+         let st = Statement.ty_decl ~src:(A.R_type, A.string_of_name name) id ty in
+         CCVector.push res st;
      | A.THF _ -> failwith "cnf_of_tptp cannot deal with HO terms right now."
      | _ -> ())
     decls;
   CCVector.freeze res
-

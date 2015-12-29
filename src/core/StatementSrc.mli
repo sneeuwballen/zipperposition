@@ -4,8 +4,6 @@
 
     Where a statement originally comes from (file, location, named statement, etc.) *)
 
-open Libzipperposition
-
 type t = {
   file : string;
   name : string option;

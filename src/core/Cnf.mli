@@ -48,11 +48,8 @@ type clause = lit list
 
 val clause_to_fo : clause -> FOTerm.t SLiteral.t list
 
-(** A toplevel statement, declaring a symbol or asserting a clause.
-    A user-provided annotation of type ['a] is kept for all clauses. *)
-type 'a statement =
-  | TyDecl of ID.t * type_ * 'a
-  | Assert of clause * 'a
+(** A toplevel statement, declaring a symbol or asserting a clause. *)
+type 'a statement = (clause, type_, 'a) Statement.t
 
 val pp_statement : _ statement CCFormat.printer
 
