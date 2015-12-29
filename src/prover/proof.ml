@@ -368,11 +368,11 @@ let pp_tstp out proof =
        let role = "plain" in (* TODO *)
        match p.result with
        | Form f ->
-           Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@], %a).@]@,"
+           Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]).@]@,"
              name role TypedSTerm.TPTP.pp f _pp_kind_tstp (p.kind,parents)
        | Clause c when CC.trail c <> [] ->
            (* FIXME: proper conversion of clauses *)
-           Format.fprintf out "@[<2>tff(%d, %s,@ @[(%a)@] %a, %a).@]@,"
+           Format.fprintf out "@[<2>tff(%d, %s,@ @[<2>@[(%a)@]@ %a@],@ @[%a@]).@]@,"
              name role
              TypedSTerm.TPTP.pp
                (CC.to_forms c
@@ -384,17 +384,17 @@ let pp_tstp out proof =
              CC.pp_trail_tstp (CC.trail c)
              _pp_kind_tstp (p.kind,parents)
        | Clause c ->
-           Format.fprintf out "@[<2>cnf(%d, %s,@ @[%a@], %a).@]@,"
+           Format.fprintf out "@[<2>cnf(%d, %s,@ @[%a@],@ @[%a@]).@]@,"
              name role CC.pp_tstp c _pp_kind_tstp (p.kind,parents)
     );
   Format.fprintf out "@]";
   ()
 
 (** Prints the proof according to the given input switch *)
-let pp switch buf proof = match switch with
+let pp switch out proof = match switch with
   | "none" -> Util.debug ~section 1 "proof printing disabled"
-  | "tstp" -> pp_tstp buf proof
-  | "debug" -> pp_debug buf proof
+  | "tstp" -> pp_tstp out proof
+  | "debug" -> pp_debug out proof
   | _ -> failwith ("unknown proof-printing format: " ^ switch)
 
 let _pp_list_str = Util.pp_list CCFormat.string

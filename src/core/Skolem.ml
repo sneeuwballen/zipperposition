@@ -38,7 +38,7 @@ type ctx = {
 }
 
 let create
-?(prefix="_sk_") ?(prop_prefix="_prop") ?(on_new=fun _ _->()) () =
+?(prefix="zip_sk_") ?(prop_prefix="zip_prop") ?(on_new=fun _ _->()) () =
   let ctx = {
     sc_prefix=prefix;
     sc_prop_prefix=prop_prefix;
@@ -100,7 +100,7 @@ let define ~ctx ~polarity form =
   let tyvars_t = List.map (fun v->T.Ty.var v) tyvars in
   (* similar to {!skolem_form}, but always return [prop] *)
   let ty = T.Ty.forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) T.Ty.prop) in
-  let f = fresh_sym_with ~ctx ~ty "_tseitin" in
+  let f = fresh_sym_with ~ctx ~ty "zip_tseitin" in
   let proxy = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
   (* register the new definition *)
   ctx.sc_new_defs <- {form; proxy; polarity; } :: ctx.sc_new_defs;

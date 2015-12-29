@@ -74,14 +74,16 @@ let pp_trail_tstp out = function
   | [] -> ()
   | l ->
       (* TODO: gather all variables, print them quantified, prints lits *)
-      let pp_blit out (_,_) = assert false in
+      let pp_blit _ (_,_) = assert false in
       Format.fprintf out " <= (%a)" (Util.pp_list ~sep:" & " pp_blit) l
 
 let pp_tstp out c =
   begin match c.lits with
     | [| |] -> CCFormat.string out "$false"
     | [| x |] -> Lit.pp_tstp out x
-    | l -> Format.fprintf out "(%a)" (CCFormat.array ~sep:" | " Lit.pp_tstp) l
+    | l ->
+        Format.fprintf out "(%a)"
+          (CCFormat.array ~start:"" ~stop:"" ~sep:" | " Lit.pp_tstp) l
   end;
   pp_trail_tstp out c.trail
 
