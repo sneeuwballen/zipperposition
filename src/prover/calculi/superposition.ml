@@ -1054,16 +1054,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       We sort by increasing order, so non-ground, deep, heavy literals are
       smaller (thus tested early) *)
   let compare_literals_subsumption lita litb =
-    (* ground literal is bigger *)
-    if Lit.is_ground lita && not (Lit.is_ground litb) then 1
-    else if not (Lit.is_ground lita) && Lit.is_ground litb then -1
-    (* deep literal is smaller *)
-    else let deptha, depthb = Lit.depth lita, Lit.depth litb in
-      if deptha <> depthb then depthb - deptha
+    CCOrd.(
+      (* ground literal is bigger *)
+      bool_ (Lit.is_ground lita) (Lit.is_ground litb)
+      (* deep literal is smaller *)
+      <?> (map Lit.depth (opp int_), lita, litb)
       (* heavy literal is smaller *)
-      else if Lit.weight lita <> Lit.weight litb
-      then Lit.weight litb - Lit.weight lita
-      else 0
+      <?> (map Lit.weight (opp int_), lita, litb)
+    )
 
   (* replace the bitvector system by some backtracking scheme?
    * XXX: maybe not a good idea. the algorithm is actually quite subtle
