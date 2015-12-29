@@ -77,7 +77,10 @@ let pair_lists_ f1 l1 f2 l2 =
 
 type op =
   | O_unify
-  | O_match of T.VarSet.t option (* blocked variables *)
+  | O_match_protect of
+    [ `Vars of T.VarSet.t (* blocked variables *)
+    | `Scope of int  (* blocked scope *)
+    ]
   | O_variant
   | O_equal
 
@@ -466,11 +469,17 @@ module Nary = struct
         | T.Var v1, T.Var v2, O_equal ->
             if HVar.equal v1 v2 && sc1 = sc2
             then k ~env subst
-        | T.Var v1, T.Var v2, (O_unify | O_match _ | O_variant) ->
-            if HVar.equal v1 v2 && sc1 = sc2
-            then k ~env subst
-            else k ~env (S.bind subst (v1,sc1) (t2,sc2))
-        | T.Var v1, _, (O_unify | O_match _) ->
+        | T.Var v1, T.Var v2, (O_unify | O_variant | O_match_protect _)
+          when HVar.equal v1 v2 && sc1=sc2 ->
+            k ~env subst
+        | T.Var v1, _, O_match_protect (`Vars s) when T.VarSet.mem v1 s ->
+            () (* blocked variable *)
+        | T.Var _, _, O_match_protect (`Scope sc) when sc1 = sc ->
+            () (* variable blocked by its scope *)
+        | T.Var v1, T.Var _, O_variant ->
+            let subst = S.bind subst (v1,sc1) (t2,sc2) in
+            k ~env subst
+        | T.Var v1, _, (O_unify | O_match_protect _) ->
             if occurs_check ~depth:env.depth subst (v1,sc1) (t2,sc2)
             then () (* occur check or t2 is open *)
             else k ~env (S.bind subst (v1,sc1) (t2,sc2))
@@ -525,7 +534,10 @@ module Nary = struct
   let matching ?(subst=S.empty) ~pattern t =
     if Scoped.same_scope pattern t then invalid_arg "Unif.matching: same scopes";
     let env = {depth=0; permutation=DBEnv.empty; } in
-    fun k -> unif_rec_ ~env ~op:(O_match None) subst pattern t (fun ~env:_ subst -> k subst)
+    let scope = Scoped.scope t in
+    fun k ->
+      unif_rec_ ~env ~op:(O_match_protect (`Scope scope))
+        subst pattern t (fun ~env:_ subst -> k subst)
 
   let variant ?(subst=S.empty) a b =
     let env = {depth=0; permutation=DBEnv.empty; } in
@@ -636,7 +648,7 @@ module Unary = struct
     let subst = match T.ty t1, T.ty t2 with
       | T.NoType, T.NoType -> subst
       | T.NoType, _
-      | _, T.NoType -> raise Fail
+      | _, T.NoType -> fail()
       | T.HasType ty1, T.HasType ty2 ->
           unif_rec ~op subst (ty1,sc1) (ty2,sc2)
     in
@@ -653,14 +665,18 @@ module Unary = struct
         | T.Var v1, T.Var v2, O_equal ->
             if HVar.equal v1 v2 && sc1=sc2
             then subst else fail()
-        | T.Var v1, T.Var v2, (O_unify | O_variant | O_match _)
+        | T.Var v1, T.Var v2, (O_unify | O_variant | O_match_protect _)
           when HVar.equal v1 v2 && sc1=sc2 -> subst
-        | T.Var v1, _, O_match (Some s) when T.VarSet.mem v1 s ->
+        | T.Var v1, _, O_match_protect (`Vars s) when T.VarSet.mem v1 s ->
             fail() (* blocked variable *)
-        | T.Var v1, _, (O_unify | O_match _) ->
+        | T.Var _, _, O_match_protect (`Scope sc) when sc1 = sc ->
+            fail() (* variable blocked by its scope *)
+        | T.Var v1, _, (O_unify | O_match_protect _) ->
             if occurs_check ~depth:0 subst (v1,sc1) (t2,sc2)
             then fail () (* occur check or t2 is open *)
             else S.bind subst (v1,sc1) (t2,sc2)
+        | T.Var v1, T.Var _, O_variant ->
+            S.bind subst (v1,sc1) (t2,sc2)
         | _, T.Var v2, O_unify ->
             if occurs_check ~depth:0 subst (v2,sc2) (t1,sc1)
             then fail() (* occur check *)
@@ -698,8 +714,9 @@ module Unary = struct
 
   let matching ?(subst=Substs.empty) ~pattern b =
     if Scoped.same_scope pattern b then invalid_arg "Unif.matching: same scopes";
+    let scope = Scoped.scope b in
     Util.with_prof prof_matching
-      (fun () -> unif_rec ~op:(O_match None) subst pattern b)
+      (fun () -> unif_rec ~op:(O_match_protect (`Scope scope)) subst pattern b)
 
   let matching_same_scope
   ?(protect=Sequence.empty) ?(subst=S.empty) ~scope ~pattern b =
@@ -708,7 +725,7 @@ module Unary = struct
     let protect = Sequence.append protect (T.Seq.vars b) in
     let blocked = T.VarSet.of_seq protect in
     Util.with_prof prof_matching
-      (fun () -> unif_rec ~op:(O_match (Some blocked)) subst
+      (fun () -> unif_rec ~op:(O_match_protect (`Vars blocked)) subst
         (Scoped.make pattern scope) (Scoped.make b scope))
 
   let matching_adapt_scope ?protect ?subst ~pattern t =
