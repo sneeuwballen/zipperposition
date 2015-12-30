@@ -444,7 +444,8 @@ module DB = struct
         | SimpleApp (s,l) ->
             simple_app ~ty s (List.map (_eval env) l)
 
-  let eval env t = _eval env t
+  let eval env t =
+    if DBEnv.is_empty env then t else _eval env t
 
   let apply_subst subst t =
     let rec aux depth t =

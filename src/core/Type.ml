@@ -180,31 +180,31 @@ let err_applyf_ msg = CCFormat.ksprintf msg ~f:err_apply_
 (* apply a type to arguments. *)
 let apply ty args =
   let rec aux ty args env = match T.view ty, args with
-    | _, [] ->
-        if DBEnv.is_empty env then ty else T.DB.eval env ty
+    | _, [] -> T.DB.eval env ty
     | T.AppBuiltin(Builtin.Arrow, (ret :: exp_args)), _::_ ->
         (* match expected types with actual types *)
         aux_l ret exp_args args env
     | T.Bind (Binder.ForallTy, _, ty'), arg :: args' ->
+        let arg = T.DB.eval env arg in
         aux ty' args' (DBEnv.push env arg)
     | _ ->
         err_applyf_
           "@[<2>Type.apply:@ expected quantified or function type,@ but got @[%a@]"
           T.pp ty
   and aux_l ty exp_args args env = match exp_args, args with
-  | _, [] ->
-      if DBEnv.is_empty env then ty else T.DB.eval env ty
+  | _, [] -> T.DB.eval env ty
   | [], _ ->
       err_applyf_ "@[<2>Type.apply:@ unexpected arguments @[%a@]@]"
         (CCFormat.list T.pp) args
   | exp :: exp_args', a :: args' ->
       (* expected type: [exp];  [a]: actual value, whose type must match [exp] *)
-      if T.equal (T.DB.eval env exp) (T.ty_exn a)
+      let exp' = T.DB.eval env exp in
+      if T.equal exp' (T.ty_exn a)
       then aux_l ty exp_args' args' env
       else
         err_applyf_
           "@[<2>Type.apply:@ wrong argument type,@ expected `@[%a@]`@ but got `@[%a@]`@]"
-          T.pp exp T.pp (T.ty_exn a)
+          T.pp exp' T.pp (T.ty_exn a)
   in
   aux ty args DBEnv.empty
 
@@ -338,7 +338,7 @@ module Conv = struct
             | Some i ->
                 (* i was the level when [v] was bound, [depth] is the current
                    level, therefore there are [depth-i] binders in between *)
-                bvar (depth - i)
+                bvar (depth - i - 1)
             | None -> var (aux_var v)
           end
       | PT.AppBuiltin (Builtin.Wildcard, []) ->
