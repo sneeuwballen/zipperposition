@@ -315,7 +315,7 @@ let fold_arith ~eligible lits k =
   let rec aux i =
     if i = Array.length lits then ()
     else if not (eligible i lits.(i)) then aux (i+1)
-    else
+    else (
       begin match Lit.View.get_arith lits.(i) with
       | None -> ()
       | Some x ->
@@ -323,6 +323,7 @@ let fold_arith ~eligible lits k =
           k (x, pos)
       end;
       aux (i+1)
+    )
   in aux 0
 
 let fold_arith_terms ~eligible ~which ~ord lits k =
