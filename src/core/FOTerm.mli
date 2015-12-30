@@ -227,9 +227,6 @@ val debugf : Format.formatter -> t -> unit
 (** {2 TPTP} *)
 
 module TPTP : sig
-  val true_ : t     (** tautology term *)
-  val false_ : t    (** antilogy term *)
-
   include Interfaces.PRINT with type t := t
   include Interfaces.PRINT_DE_BRUIJN with type t := t
                                       and type term := t

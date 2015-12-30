@@ -136,8 +136,8 @@ let app_full f tyargs l =
   let l = (tyargs : Type.t list :> T.t list) @ l in
   app f l
 
-let true_ = builtin ~ty:Type.tType Builtin.True
-let false_ = builtin ~ty:Type.tType Builtin.False
+let true_ = builtin ~ty:Type.prop Builtin.True
+let false_ = builtin ~ty:Type.prop Builtin.False
 
 let is_var t = match T.view t with
   | T.Var _ -> true
@@ -408,9 +408,6 @@ let debugf = T.debugf
 (** {2 TPTP} *)
 
 module TPTP = struct
-  let true_ = builtin ~ty:Type.prop Builtin.true_
-  let false_ = builtin ~ty:Type.prop Builtin.false_
-
   let pp_depth ?hooks:_ depth out t =
     let depth = ref depth in
     (* recursive printing *)

@@ -222,7 +222,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | [| Lit.Equation (l,r,false) |] ->
           f idx (l,r,false,c)
       | [| Lit.Prop (p, sign) |] ->
-          f idx (p,T.TPTP.true_,sign,c)
+          f idx (p,T.true_,sign,c)
       | _ -> idx
     in
     _idx_simpl := idx';
@@ -288,7 +288,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let t' = S.FO.apply ~renaming subst (info.t, sc_a) in
       begin match info.passive_lit, info.passive_pos with
         | Lit.Prop (_, true), P.Arg(_, P.Left P.Stop) ->
-            if T.equal t' T.TPTP.true_
+            if T.equal t' T.true_
             then raise (ExitSuperposition "will yield a bool tautology")
         | Lit.Equation (_, v, true), P.Arg(_, P.Left P.Stop)
         | Lit.Equation (v, _, true), P.Arg(_, P.Right P.Stop) ->
@@ -356,7 +356,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let t' = S.FO.apply ~renaming subst (info.t, sc_a) in
       begin match info.passive_lit, info.passive_pos with
         | Lit.Prop (_, true), P.Arg(_, P.Left P.Stop) ->
-            if T.equal t' T.TPTP.true_
+            if T.equal t' T.true_
             then raise (ExitSuperposition "will yield a bool tautology")
         | Lit.Equation (_, v, true), P.Arg(_, P.Left P.Stop)
         | Lit.Equation (v, _, true), P.Arg(_, P.Right P.Stop) ->
@@ -562,7 +562,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                (* positive proposition *)
                begin try
                    let subst = Unif.FO.unification (s,0) (p,0) in
-                   k (p, T.TPTP.true_, subst)
+                   k (p, T.true_, subst)
                  with Unif.Fail -> ()
                end
            | Lit.Equation (u, v, true) ->
@@ -809,7 +809,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | Lit.Equation (l, r, false) ->
             Congruence.FO.mk_eq cc l r
         | Lit.Prop (p, false) ->
-            Congruence.FO.mk_eq cc p T.TPTP.true_
+            Congruence.FO.mk_eq cc p T.true_
         | _ -> ()
       ) (C.lits c);
     let res = CCArray.exists
@@ -818,7 +818,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               (* if l=r is implied by the congruence, then the clause is redundant *)
               Congruence.FO.is_eq cc l r
           | Lit.Prop (p, true) ->
-              Congruence.FO.is_eq cc p T.TPTP.true_
+              Congruence.FO.is_eq cc p T.true_
           | _ -> false
         ) (C.lits c);
     in

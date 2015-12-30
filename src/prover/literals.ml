@@ -400,6 +400,6 @@ let is_horn lits =
 let is_pos_eq lits =
   match lits with
   | [| Lit.Equation (l,r,true) |] -> Some (l,r)
-  | [| Lit.Prop(p,true) |] -> Some (p, T.TPTP.true_)
-  | [| Lit.True |] -> Some (T.TPTP.true_, T.TPTP.true_)
+  | [| Lit.Prop(p,true) |] -> Some (p, T.true_)
+  | [| Lit.True |] -> Some (T.true_, T.true_)
   | _ -> None

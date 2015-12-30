@@ -171,7 +171,7 @@ let mk_lit a b sign =
   | T.AppBuiltin (Builtin.True, []), T.AppBuiltin (Builtin.False, []) -> if sign then False else True
   | T.AppBuiltin (Builtin.False, []), T.AppBuiltin (Builtin.True, []) -> if sign then False else True
   | T.AppBuiltin (Builtin.True, []), _ -> Prop (b, sign)
-  | _, _ when T.equal a T.TPTP.true_ -> Prop (a, sign)
+  | _, T.AppBuiltin (Builtin.True, []) -> Prop (a, sign)
   | T.AppBuiltin (Builtin.False, []), _ -> Prop (b, not sign)
   | _, T.AppBuiltin (Builtin.False, []) -> Prop (a, not sign)
   | _ -> Equation (a, b, sign)
@@ -426,7 +426,7 @@ let to_multiset lit = match lit with
   | Prop (p,_) -> Multisets.MT.singleton p
   | Equation (l, r, _) -> Multisets.MT.doubleton l r
   | True
-  | False -> Multisets.MT.singleton T.TPTP.true_
+  | False -> Multisets.MT.singleton T.true_
   | Arith alit ->
       AL.Seq.to_multiset alit
       |> Multisets.MT.Seq.of_coeffs Multisets.MT.empty
@@ -441,8 +441,8 @@ let is_trivial lit = match lit with
 
 let is_absurd lit = match lit with
   | Equation (l, r, false) when T.equal l r -> true
-  | Prop (p, false) when T.equal p T.TPTP.true_ -> true
-  | Prop (p, true) when T.equal p T.TPTP.false_ -> true
+  | Prop (p, false) when T.equal p T.true_ -> true
+  | Prop (p, true) when T.equal p T.false_ -> true
   | False -> true
   | Arith o -> ArithLit.is_absurd o
   | _ -> false
@@ -666,7 +666,7 @@ module Pos = struct
     let module AL = ArithLit in
     match lit, pos with
     | (True | False), P.Stop ->
-        {lit_pos=P.stop; term_pos=P.stop; term=T.TPTP.true_; }
+        {lit_pos=P.stop; term_pos=P.stop; term=T.true_; }
     | Equation (l,_,_), P.Left pos' ->
         {lit_pos=P.(left stop); term_pos=pos'; term=l; }
     | Equation (_,r,_), P.Right pos' ->
@@ -824,7 +824,7 @@ end
 module View = struct
   let as_eqn lit = match lit with
     | Equation (l,r,sign) -> Some (l, r, sign)
-    | Prop (p, sign) -> Some (p, T.TPTP.true_, sign)
+    | Prop (p, sign) -> Some (p, T.true_, sign)
     | True
     | False
     | Arith _ -> None
@@ -833,7 +833,7 @@ module View = struct
     match lit, position with
     | Equation (l,r,sign), P.Left _ -> Some (l, r, sign)
     | Equation (l,r,sign), P.Right _ -> Some (r, l, sign)
-    | Prop (p, sign), P.Left _ -> Some (p, T.TPTP.true_, sign)
+    | Prop (p, sign), P.Left _ -> Some (p, T.true_, sign)
     | True, _
     | False, _
     | Arith _, _ -> None
