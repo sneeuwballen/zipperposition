@@ -123,16 +123,16 @@ Library "libzipperposition_prover"
                     Compute_prec, Params, Env, Monome, ArithLit, Signals, Multisets,
                     Ctx_intf, Clause_intf, Env_intf, ProofState_intf,
                     BBox, BBox_intf, ClauseContext, ClauseQueue_intf,
-                    Bool_lit, Sat_solver, Sat_solver_intf, Induction_helpers,
+                    Bool_lit, Sat_solver, Sat_solver_intf,
                     Trail,
-                    calculi/Avatar,
-                    calculi/Induction_simple,
+                    calculi/Avatar, calculi/Avatar_intf,
+                    calculi/Induction, calculi/Induction_intf,
                     calculi/Superposition,
                     calculi/EnumTypes,
                     calculi/ArithInt,
                     calculi/Heuristics,
                     meta/MetaProverState
-  InternalModules:  lib/SmallSet, lib/UnionFind, lib/Mixtbl, lib/Signal
+  InternalModules:  lib/SmallSet, lib/UnionFind, lib/Signal
   Build$:           flag(meta) && flag(parsers)
   Install$:         flag(meta) && flag(parsers)
   BuildDepends:     containers, containers.advanced, sequence, gen, unix,

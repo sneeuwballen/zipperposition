@@ -4,7 +4,6 @@
 (** {1 Meta Prover for zipperposition} *)
 
 open Libzipperposition
-open Libzipperposition_meta
 
 type 'a or_error = [`Ok of 'a | `Error of string]
 
@@ -35,21 +34,6 @@ module Result : sig
   (** Pre-processing rules *)
 
   val print : Format.formatter -> t -> unit
-end
-
-(** {2 Induction} *)
-
-module Induction : sig
-  (** An inductive type *)
-  type ty = {
-    ty : Type.t;
-    cstors : (ID.t * Type.t) list;
-  }
-
-  val t : ty Plugin.t
-  (** Plugin that encodes the fact that a type is inductive, together
-      with the list of its constructor symbols.
-      Example: [nat, [succ; zero]] *)
 end
 
 (** {2 Interface to the Meta-prover} *)
@@ -85,14 +69,12 @@ val on_pre_rewrite : t -> pre_rewrite Signal.t
 
 (** {2 Interface to {!Env}} *)
 
-val key : (string,t) Mixtbl.injection
+val key : t CCMixtbl.injection
 
-val get_global : unit -> t
-(** [get_global ()] returns the meta-prover saved in [Const.mixtbl],
-    or create one if this is the first call to [get_global ()] *)
-
-val clear_global : unit -> unit
-(** Resets the meta-prover accessed using [get_global()] *)
+val get_env : (module Env.S) -> t
+(** [get_env (module Env)] returns the meta-prover saved in [Env],
+    assuming the extension has been loaded in [Env].
+    @raise Not_found if the extension was not loaded already. *)
 
 module type S = sig
   module E : Env.S
@@ -110,9 +92,6 @@ module type S = sig
 
   val scan_clause : t -> C.t -> Result.t
   (** Scan a clause for axiom patterns, and save it *)
-
-  val declare_inductive : t -> E.Ctx.Induction.inductive_type -> Result.t
-  (** Declare the given inductive type *)
 
   (** {2 Inference System} *)
 

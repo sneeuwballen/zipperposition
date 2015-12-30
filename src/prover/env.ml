@@ -633,5 +633,5 @@ module Make(X : sig
 
   (** {2 Misc} *)
 
-  let mixtbl = Mixtbl.create 15
+  let mixtbl = CCMixtbl.create 16
 end

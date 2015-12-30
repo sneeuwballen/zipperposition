@@ -3,14 +3,9 @@
 
 (** {1 Induction through Cut} *)
 
-module type S = sig
-  module Env : Env.S
-  module Ctx : module type of Env.Ctx
+module type S = Induction_intf.S
 
-  val register : unit -> unit
-end
-
-module Make(E: Env.S)(Solver : Sat_solver.S) :
+module Make(E: Env.S)(A : Avatar_intf.S) :
   S with module Env = E
      and module Ctx = E.Ctx
 
