@@ -458,8 +458,8 @@ module DB = struct
           aux' depth ty t
     and aux' depth ty t = match view t with
       | Var v ->
-          begin try
-              shift depth (VarMap.find v subst)
+          begin
+            try shift depth (VarMap.find v subst)
             with Not_found -> var (HVar.cast ~ty v)
           end
       | DB i -> bvar ~ty i
@@ -494,12 +494,15 @@ end
 
 let bind_vars ~ty b vars t =
   (* subst: bind vars_i to a De Bruijn (reverse list so that last element is 0) *)
-  let subst = CCList.Idx.foldi
+  let subst =
+    CCList.Idx.foldi
       (fun s i v -> VarMap.add v (bvar ~ty:(HVar.ty v) i) s)
       VarMap.empty (List.rev vars)
   in
   List.fold_right
-    (fun v t -> bind ~ty ~varty:(HVar.ty v) b t)
+    (fun v t ->
+      let varty = HVar.ty v |> DB.apply_subst subst in
+      bind ~ty ~varty b t)
     vars
     (DB.apply_subst subst t)
 
@@ -701,9 +704,11 @@ let rec replace t ~old ~by = match t.ty, view t with
 
 (** {3 Variables} *)
 
+(* TODO: sort variables, so that type  variables come first *)
+
 let close_vars ~ty s t =
-  let vars = VarSet.of_seq (Seq.vars t) in
-  bind_vars ~ty s (VarSet.elements vars) t
+  let vars = Seq.vars t |> VarSet.of_seq |> VarSet.elements in
+  bind_vars ~ty s vars t
 
 let is_ground t = Sequence.is_empty (Seq.vars t)
 
