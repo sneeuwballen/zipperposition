@@ -37,7 +37,7 @@ let ty_exn t = match t.ty with
 
 let hash_fun t s = Hash.int_ t.id s
 let hash t = Hash.apply hash_fun t
-let equal t1 t2 = t1 == t2
+let equal : t -> t -> bool = fun t1 t2 -> t1 == t2
 let compare t1 t2 = Pervasives.compare t1.id t2.id
 
 let _hash_ty t h =
@@ -81,7 +81,7 @@ let rec _eq_norec t1 t2 =
   | Record (l1, None), Record (l2, None) ->
       _eq_record_list l1 l2
   | Record (l1, Some r1), Record (l2, Some r2) ->
-      equal r1 r2 && _eq_record_list l1 l2
+      HVar.equal r1 r2 && _eq_record_list l1 l2
   | AppBuiltin (b1, l1), AppBuiltin (b2, l2) ->
       Builtin.equal b1 b2 && _eq_list l1 l2
   | _ -> false
