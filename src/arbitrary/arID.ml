@@ -4,14 +4,15 @@
 (** {1 Arbitrary generation of symbols} *)
 
 open Libzipperposition
+open QCheck
 
 type 'a arbitrary = 'a QCheck.Arbitrary.t
 
-val base : Type.t arbitrary
-  (** Random base symbol *)
+let default =
+  let l = List.map ID.make ["f"; "g"; "h"; "a"; "b"; "c"; "d"] in
+  QCheck.Arbitrary.among l
 
-val ground : Type.t arbitrary
-  (** Ground type *)
-
-val default : Type.t arbitrary
-  (** Any type (polymorphic) *)
+let set =
+  Arbitrary.(
+    list default >|= ID.Set.of_list
+  )

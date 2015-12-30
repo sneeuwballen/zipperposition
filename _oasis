@@ -107,7 +107,7 @@ Library "libzipperposition_arbitrary"
   Pack:             true
   FindlibName:      arbitrary
   FindlibParent:    libzipperposition
-  Modules:          ArTerm, ArForm, ArType, ArSignature, ArSymbol
+  Modules:          ArTerm, ArForm, ArType, ArID
   BuildDepends:     libzipperposition, qcheck, libzipperposition.meta
   Build$:           flag(qcheck)
   Install$:         flag(qcheck)

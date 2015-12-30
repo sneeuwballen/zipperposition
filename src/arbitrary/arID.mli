@@ -7,11 +7,8 @@ open Libzipperposition
 
 type 'a arbitrary = 'a QCheck.Arbitrary.t
 
-val base : Type.t arbitrary
-  (** Random base symbol *)
+val default : ID.t arbitrary
+(** Set of symbols *)
 
-val ground : Type.t arbitrary
-  (** Ground type *)
-
-val default : Type.t arbitrary
-  (** Any type (polymorphic) *)
+val set : ID.Set.t arbitrary
+(** Arbitrary set of various symbols *)
