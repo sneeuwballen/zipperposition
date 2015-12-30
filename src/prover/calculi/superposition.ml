@@ -1412,13 +1412,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     CCOpt.iter
       (fun f ->
          Signal.once Signals.on_dot_output
-           (fun () -> _print_idx f !_idx_sup_into)
-      ) !_dot_sup_into;
+           (fun () -> _print_idx f !_idx_sup_into))
+      !_dot_sup_into;
     CCOpt.iter
       (fun f ->
          Signal.once Signals.on_dot_output
-           (fun () -> _print_idx f !_idx_sup_from)
-      ) !_dot_sup_from;
+           (fun () -> _print_idx f !_idx_sup_from))
+      !_dot_sup_from;
     ()
 
   let register () =
@@ -1455,12 +1455,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ()
 end
 
-let key = Mixtbl.access ()
+let key = CCMixtbl.create_inj ()
 
 let register ~sup =
   let module Sup = (val sup : S) in
-  if not (Mixtbl.mem ~inj:key Sup.Env.mixtbl "superposition")
-  then Mixtbl.set ~inj:key Sup.Env.mixtbl "superposition" sup
+  if not (CCMixtbl.mem ~inj:key Sup.Env.mixtbl "superposition")
+  then CCMixtbl.set ~inj:key Sup.Env.mixtbl "superposition" sup
 
 let extension =
   let action env =

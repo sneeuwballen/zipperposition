@@ -19,7 +19,7 @@ module Import = struct
   open! ArithInt
   open! EnumTypes
   open! Avatar
-  open! Induction_simple
+  open! Induction
   open! Msat
 end
 
@@ -235,7 +235,7 @@ let scan_for_inductive_types decls =
         | Ast_tptp.NewType (_,ty,_,info) -> Some (ty, info)
         | _ -> None)
   in
-  Induction_helpers.init_from_decls pairs
+  Induction.init_from_decls pairs
 
 let conv_statement ~file st =
   let src = Ast_tptp.to_src ~file (Statement.src st) in

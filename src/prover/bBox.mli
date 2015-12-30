@@ -11,9 +11,4 @@ val section : Libzipperposition.Util.Section.t
 
 module type S = BBox_intf.S
 
-module Make
-    (I : BBox_intf.TERM)
-    (Case : BBox_intf.TERM)
-  : S
-    with module I = I
-     and module Case = Case
+module Make(Dummy : sig end) : S

@@ -224,6 +224,6 @@ module type S = sig
 
   (** {2 Misc} *)
 
-  val mixtbl : string Mixtbl.t
+  val mixtbl : string CCMixtbl.t
   (** Global hashtable of "stuff" for this particular env *)
 end

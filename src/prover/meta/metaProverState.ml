@@ -264,17 +264,7 @@ let print_rules out r =
 
 (** {2 Interface to {!Env} *)
 
-let key = Mixtbl.access ()
-
-let get_global, clear_global =
-  let global_ = ref None in
-  (fun () -> match !global_ with
-     | Some p -> p
-     | None ->
-         let p = create () in
-         global_ := Some p;
-         p
-  ), (fun () -> global_ := None)
+let key = CCMixtbl.create_inj ()
 
 (** {2 CLI Options} *)
 
@@ -309,9 +299,6 @@ module type S = sig
 
   val scan_clause : t -> C.t -> Result.t
   (** Scan a clause for axiom patterns, and save it *)
-
-  val declare_inductive : t -> E.Ctx.Induction.inductive_type -> Result.t
-  (** Declare the given inductive type *)
 
   (** {2 Inference System} *)
 
@@ -384,13 +371,14 @@ module Make(E : Env.S) : S with module E = E = struct
 
   (* parse the given theory files into the prover *)
   let parse_theory_files p files =
-    CCError.(fold_l
-               (fun r f ->
-                  parse_theory_file p f
-                  >|= fun r' ->
-                  Result.merge_into r' ~into:r
-               ) Result.empty files
-            )
+    CCError.(
+      fold_l
+        (fun r f ->
+          parse_theory_file p f
+           >|= fun r' ->
+             Result.merge_into r' ~into:r)
+        Result.empty files
+    )
 
   let add_fact_ p fact =
     let prover', consequences = M.Prover.add_fact p.prover fact in
@@ -429,13 +417,6 @@ module Make(E : Env.S) : S with module E = E = struct
     Util.exit_prof prof_scan_clause;
     r
 
-  let declare_inductive p ity =
-    let module CI = E.Ctx.Induction in
-    let ity = Induction.make ity.CI.pattern ity.CI.constructors in
-    Util.debugf ~section 2 "@[<hv2>declare inductive type@ %a@]" (fun k->k Induction.print ity);
-    let fact = Induction.t#to_fact ity in
-    add_fact_ p fact
-
   (* be sure to scan clauses *)
   let infer_scan p c =
     let r = scan_clause p c in
@@ -448,20 +429,14 @@ module Make(E : Env.S) : S with module E = E = struct
 
   (* global setup *)
   let setup () =
-    let p = get_global () in
+    let p = create() in
+    (* register in Env *)
+    CCMixtbl.set ~inj:key E.mixtbl "meta" p;
     Signal.on p.on_theory
       (fun th ->
         Util.debugf ~section 1 "@[detected theory@ @[%a@]@]"
           (fun k->k Result.pp_theory_axiom th);
         Signal.ContinueListening
-      );
-    (* declare inductive types *)
-    E.Ctx.Induction.inductive_ty_seq
-      (fun ity -> ignore (declare_inductive p ity));
-    Signal.on E.Ctx.Induction.on_new_inductive_ty
-      (fun ity ->
-         ignore (declare_inductive p ity);
-         Signal.ContinueListening
       );
     (* parse theory into [p] *)
     begin match parse_theory_files p !theory_files with
@@ -488,10 +463,11 @@ module Make(E : Env.S) : S with module E = E = struct
          then
            Util.debugf ~section 1 "@[<hv2>detected:@,%a@]"
             (fun k->k Result.print (results p));
-         clear_global ();
       );
     ()
 end
+
+let get_env (module E : Env.S) = CCMixtbl.find ~inj:key E.mixtbl "meta"
 
 (** {2 Extension} *)
 
@@ -500,8 +476,8 @@ let extension =
     let module M = Make(E) in
     M.setup()
   in
-  Extensions.( {
-      default with
-      name = "meta";
-      actions=[Do action];
-    })
+  { Extensions.default with Extensions.
+    prio = 10;
+    name = "meta";
+    actions=[Extensions.Do action];
+  }

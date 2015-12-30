@@ -19,53 +19,19 @@ let prof_check = Util.mk_profiler "avatar.check"
 
 let stat_splits = Util.mk_stat "avatar.splits"
 
-module type S = sig
-  module E : Env.S
-  module Solver : Sat_solver.S
+module type S = Avatar_intf.S
 
-  val split : E.multi_simpl_rule
-  (** Split a clause into components *)
-
-  val check_empty : E.unary_inf_rule
-  (** Forbid empty clauses with trails, i.e. adds the negation of their
-      trails to the SAT-solver *)
-
-  val before_check_sat : unit Signal.t
-  val after_check_sat : unit Signal.t
-
-  val filter_absurd_trails : (Trail.t -> bool) -> unit
-  (** [filter_trails f] calls [f] on every trail associated with the empty
-      clause. If [f] returns [false], the trail is ignored, otherwise
-      it's negated and sent to the SAT solver *)
-
-  val check_satisfiability : E.generate_rule
-  (** Checks  that the SAT context is still valid *)
-
-  val save_clause : tag:int -> E.C.t -> unit
-  (** Map the tag to the clause *)
-
-  val get_clause : tag:int -> E.C.t option
-  (** Recover clause from the tag, if any *)
-
-  val introduce_cut :
-    Literals.t ->
-    (CompactClause.t -> Proof.t) ->
-    E.C.t list * E.Ctx.BoolLit.t
-  (** Introduce a cut on the given formula *)
-
-  val register : unit -> unit
-  (** Register inference rules to the environment *)
-end
+let key = CCMixtbl.create_inj()
 
 module Make(E : Env.S)(Sat : Sat_solver.S) = struct
   module E = E
   module Ctx = E.Ctx
   module C = E.C
-  module BoolLit = Ctx.BoolLit
+  module BoolBox = Ctx.BoolBox
   module Solver = Sat
 
   let _pp_bclause out lits =
-    Format.fprintf out "%a" (Util.pp_list ~sep:" ⊔ " BoolLit.pp) lits
+    Format.fprintf out "%a" (Util.pp_list ~sep:" ⊔ " BoolBox.pp) lits
 
   (* map ID -> clause *)
   let id_to_clause_ = Hashtbl.create 24
@@ -130,7 +96,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
             (fun lits ->
                let proof cc = Proof.mk_c_esa ~rule:"split" cc [C.proof c] in
                let lits = Array.of_list lits in
-               let bool_name = BoolLit.inject_lits lits in
+               let bool_name = BoolBox.inject_lits lits in
                let trail =
                  C.trail c
                  |> Trail.add bool_name
@@ -188,8 +154,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
 
   (* generic mechanism for adding a clause
       and make a lemma out of it, including Skolemization, etc. *)
-  let introduce_cut lits proof : C.t list * BoolLit.t =
-    let box = BoolLit.inject_lits lits in
+  let introduce_cut lits proof : C.t list * BoolBox.t =
+    let box = BoolBox.inject_lits lits in
     (* positive clause *)
     let c_pos =
       C.create_a ~trail:(Trail.singleton box) lits proof
@@ -208,7 +174,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
       |> C.CSet.to_list
       |> List.map
         (fun c ->
-           let trail = C.Trail.singleton (BoolLit.neg box) in
+           let trail = C.Trail.singleton (BoolBox.neg box) in
            C.create_a ~trail (C.lits c) proof
         )
     *)
@@ -265,13 +231,14 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
 
   let register () =
     Util.debug ~section:Const.section 2 "register extension Avatar";
-    Sat.set_printer BoolLit.pp;
+    Sat.set_printer BoolBox.pp;
     E.add_multi_simpl_rule split;
     E.add_unary_inf "avatar_check_empty" check_empty;
     E.add_generate "avatar_check_sat" check_satisfiability;
     (* meta lemmas *)
-    begin try
-        let meta = MetaProverState.get_global () in
+    begin
+      try
+        let meta = MetaProverState.get_env (module E) in
         Util.debug ~section 1 "found meta-prover, watch for lemmas";
         let q = Queue.create () in
         Signal.on (MetaProverState.on_lemma meta)
@@ -289,26 +256,16 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
     ()
 end
 
+let get_env (module E : Env.S) : (module S) =
+  CCMixtbl.find ~inj:key E.mixtbl "avatar"
+
 let extension =
   let action env =
     let module E = (val env : Env.S) in
     Util.debug 1 "create new SAT solver";
     let module Sat = Sat_solver.Make(struct end) in
     let module A = Make(E)(Sat) in
+    CCMixtbl.set ~inj:key E.mixtbl "avatar" (module A : S);
     A.register()
   in
   Extensions.({default with name="avatar"; actions=[Do action]})
-
-let _enabled = ref false
-let _enable_avatar () =
-  if not !_enabled then (
-    _enabled := true;
-    Extensions.register extension
-  )
-
-let () =
-  Params.add_opts
-    [ "--avatar",
-        Arg.Unit _enable_avatar,
-        " enable Avatar-like splitting (based on SAT)"
-    ]

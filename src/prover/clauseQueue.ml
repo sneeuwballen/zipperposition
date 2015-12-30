@@ -54,10 +54,11 @@ module Make(C : Clause.S) = struct
       in
       let trail = C.trail c in
       let w_lits = weight_lits_ (C.lits c) in
-      let w_trail = Trail.fold
-          (fun acc t -> match C.Ctx.BoolLit.extract_exn (Sat_solver.Lit.abs t) with
-             | C.Ctx.BoolLit.Clause_component lits -> acc + weight_lits_ lits
-             | C.Ctx.BoolLit.Case (_,_) ->
+      let w_trail =
+        Trail.fold
+          (fun acc t -> match C.Ctx.BoolBox.extract_exn (Sat_solver.Lit.abs t) with
+             | C.Ctx.BoolBox.Clause_component lits -> acc + weight_lits_ lits
+             | C.Ctx.BoolBox.Case (_,_) ->
                  acc + 10 (* generic penalty for each inductive hypothesis *)
           ) 0 trail
       in
