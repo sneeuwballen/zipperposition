@@ -166,6 +166,14 @@ and pp_var_ty out v =
 
 exception IllFormedTerm of string
 
+let ill_formed m = raise (IllFormedTerm m)
+let ill_formedf m = CCFormat.ksprintf m ~f:ill_formed
+
+let () = Printexc.register_printer
+  (function
+    | IllFormedTerm msg -> Some ("ill formed term: " ^ msg)
+    | _ -> None)
+
 let make_ ?loc ~ty view = {term=view; loc; ty=Some ty; }
 
 let var ?loc v = make_ ?loc ~ty:v.Var.ty (Var v)
@@ -191,8 +199,15 @@ let bind_list ?loc ~ty s vars t =
 
 let multiset ?loc ~ty l = make_ ?loc ~ty (Multiset l)
 
+let rec check_no_dup_ seen l = match l with
+  | [] -> ()
+  | (n,_) :: l' ->
+      if List.mem n seen then ill_formedf "name %s occurs twice" n;
+      check_no_dup_ (n::seen) l'
+
 let record ?loc ~ty l ~rest =
   let rest = CCOpt.map (var ?loc) rest in
+  check_no_dup_ [] l;
   make_ ?loc ~ty (Record (l,rest))
 
 let record_flatten ?loc ~ty l ~rest =
@@ -203,10 +218,10 @@ let record_flatten ?loc ~ty l ~rest =
       make_ ?loc ~ty (Record (l, rest))
   | Some {term=Record (l', rest'); _} ->
       let l = List.sort cmp_field (l@l') in
+      check_no_dup_ [] l;
       make_ ?loc ~ty (Record(l, rest'))
   | Some t' ->
-      let msg = CCFormat.sprintf "ill-formed record row: @[%a@]" pp t' in
-      raise (IllFormedTerm msg)
+      ill_formedf "ill-formed record row: @[%a@]" pp t'
 
 let at_loc ?loc t = {t with loc; }
 let with_ty ~ty t = {t with ty=Some ty; }
@@ -751,10 +766,12 @@ let unify ?(allow_open=false) ?loc ?(st=UStack.create()) ?(subst=Subst.empty) t1
     | Record (l1, r1), Record (l2, r2) ->
         (* check if r1=r2=var. If true, then fields must be the same *)
         if are_same_meta_ r1 r2
-        then
-          let _,_ = unif_record_fields `MustMatch subst l1 l2 in
+        then (
+          let rest1, rest2 = unif_record_fields `MustMatch subst l1 l2 in
+          assert (rest1 = []);
+          assert (rest2 = []);
           ()
-        else (
+        ) else (
           let rest1, rest2 = unif_record_fields `Flexible subst l1 l2 in
           unif_record_rest ~ty:(ty_exn t1) subst r2 rest1;
           unif_record_rest ~ty:(ty_exn t2) subst r1 rest2
@@ -821,12 +838,14 @@ let unify ?(allow_open=false) ?loc ?(st=UStack.create()) ?(subst=Subst.empty) t1
     | None, [] -> ()
     | None, _::_ -> fail_ "row is absent, cannot match %a" pp_fields rest
     | Some t, _ ->
-        begin match view t with
-        | Meta (_, v) ->
+        begin match view t, rest with
+        | Meta (_, v), _ ->
             let t' = record ~ty rest ~rest:None in
             if occur_check_ ~allow_open ~subst t t'
             then fail_ "occur-check of the row %a in @[%a@]" pp t pp t'
             else UStack.bind ~st v t'
+        | Record ([], None), [] ->
+            () (* if the meta was already bound, somehow *)
         | _ -> fail_ "record row @[%a@] is not a unification variable" pp t
         end
   in
