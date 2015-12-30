@@ -286,6 +286,9 @@ let rec infer_ty_ ?loc ctx ty =
             let id, ty = Ctx.get_id_ ctx ~arity:(List.length l) name in
             unify ?loc (T.Ty.returns ty) T.Ty.tType;
             let l = List.map aux l in
+            (* ensure that the type is well-typed (!) *)
+            let ty_res = T.apply_unify ?loc ~allow_open:false ty l in
+            unify ?loc ty_res T.Ty.tType;
             T.Ty.app id l
         | _ -> error_ ?loc "@[<2>cannot apply non-constant@ `@[%a@]`@]" PT.pp f
         end
@@ -338,7 +341,7 @@ let rec infer_rec ctx t =
       let id, ty_s = Ctx.get_id_ ?loc ~arity:(List.length l) ctx s in
       (* infer types for arguments *)
       let l = List.map (infer_rec ctx) l in
-      Util.debugf ~section 5 "@[apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
+      Util.debugf ~section 5 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
         (fun k->k ID.pp id T.pp ty_s (Util.pp_list T.pp) l
          (Util.pp_list T.pp) (List.map T.ty_exn l));
       let ty = T.apply_unify ?loc ~allow_open:true ty_s l in
@@ -347,6 +350,9 @@ let rec infer_rec ctx t =
       (* higher order application *)
       let f = infer_rec ctx f in
       let l = List.map (infer_rec ctx) l in
+      Util.debugf ~section 5 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
+        (fun k->k T.pp f T.pp (T.ty_exn f) (Util.pp_list T.pp) l
+         (Util.pp_list T.pp) (List.map T.ty_exn l));
       let ty = T.apply_unify ?loc ~allow_open:true (T.ty_exn f) l in
       T.app ?loc ~ty f l
   | PT.List [] ->
