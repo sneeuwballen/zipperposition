@@ -41,10 +41,10 @@ let find env n =
 
 let find_exn env n =
   if n < env.size
-    then match List.nth env.stack n with
-      | None -> failwith "DBEnv.find_exn"
-      | Some x -> x
-    else failwith "DBEnv.find_exn"
+  then match List.nth env.stack n with
+    | None -> failwith "DBEnv.find_exn"
+    | Some x -> x
+  else failwith "DBEnv.find_exn"
 
 let mem env n =
   if n < env.size then List.nth env.stack n <> None else false
@@ -62,10 +62,10 @@ let num_bindings db =
 
 let map f db =
   let stack = List.map
-    (function
-       | None -> None
-       | Some x -> Some (f x))
-    db.stack
+      (function
+        | None -> None
+        | Some x -> Some (f x))
+      db.stack
   in
   { db with stack; }
 
@@ -76,11 +76,11 @@ let of_list l =
     (fun env (db, v) -> set env db v)
     env l
 
-type 'a printer = Format.formatter -> 'a -> unit
-
-let print pp_x out e =
+let pp pp_x out e =
   let pp_item out = function
-    | None -> Format.pp_print_string out "_"
-    | Some x -> Format.fprintf out "[%a]" pp_x x
+    | None -> CCFormat.string out "_"
+    | Some x -> Format.fprintf out "[@[%a@]]" pp_x x
   in
-  Format.fprintf out "@[<hv2>%a@]" (CCList.print pp_item) e.stack
+  Format.fprintf out "@[<hv2>%a@]" (Util.pp_list ~sep:"," pp_item) e.stack
+
+let to_string ppx = CCFormat.to_string (pp ppx)
