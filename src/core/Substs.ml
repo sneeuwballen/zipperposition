@@ -200,6 +200,7 @@ let apply subst ~renaming t =
         with Not_found ->
           (* variable not bound by [subst], rename it
               (after specializing its type if needed) *)
+          let v = HVar.cast v ~ty in
           T.var (Renaming.rename renaming (v,sc_t))
         end
       | T.Bind (s, varty, sub_t) ->
@@ -218,6 +219,7 @@ let apply subst ~renaming t =
                   let t' = find_exn subst (v,sc_t) in
                   Some (aux t')
                 with Not_found ->
+                  let v = HVar.cast v ~ty in
                   Some (T.var v)
                 end
           in
