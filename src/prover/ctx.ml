@@ -96,69 +96,6 @@ module Make(X : PARAMETERS) = struct
     let to_form f = Literal.Conv.to_form ~hooks:!_to f
   end
 
-  module AC = struct
-    module PF = PFormula
-    let tbl = ID.Tbl.create 3
-    let proofs = ID.Tbl.create 3
-    let on_add = Signal.create ()
-
-    let axioms s =
-      (* FIXME: need to recover type of [f]
-         let x = T.mk_var 0 in
-         let y = T.mk_var 1 in
-         let z = T.mk_var 2 in
-         let f x y = T.mk_node s [x; y] in
-         let mk_eq x y = F.mk_eq x y in
-         let mk_pform name f =
-         let f = F.close_forall f in
-         let name = Util.sprintf "%s_%a" name ID.pp s in
-         let proof = Proof.mk_f_axiom f ~file:"/dev/ac" ~name in
-         PF.create f proof
-         in
-         [ mk_pform "associative" (mk_eq (f (f x y) z) (f x (f y z)))
-         ; mk_pform "commutative" (mk_eq (f x y) (f y x))
-         ]
-      *)
-      []
-
-    let add ?proof ~ty s =
-      let proof = match proof with
-        | Some p -> p
-        | None -> (* new axioms *)
-            List.map PF.proof (axioms s)
-      in
-      if not (ID.Tbl.mem tbl s)
-      then begin
-        let instance = Theories.AC.({ty; sym=s}) in
-        ID.Tbl.replace tbl s instance;
-        ID.Tbl.replace proofs s proof;
-        Signal.send on_add instance
-      end
-
-    let is_ac s = ID.Tbl.mem tbl s
-
-    let exists_ac () = ID.Tbl.length tbl > 0
-
-    let find_proof s = ID.Tbl.find proofs s
-
-    let symbols () =
-      ID.Tbl.fold
-        (fun s _ set -> ID.Set.add s set)
-        tbl ID.Set.empty
-
-    let symbols_of_terms seq =
-      let module A = T.AC(struct
-          let is_ac = is_ac
-          let is_comm _ = false
-        end) in
-      A.symbols seq
-
-    let proofs () =
-      ID.Tbl.fold
-        (fun _ proofs acc -> List.rev_append proofs acc)
-        proofs []
-  end
-
   (** Boolean Mapping *)
   module TermArg = struct
     type t = FOTerm.t
@@ -347,7 +284,7 @@ module Make(X : PARAMETERS) = struct
                    then  (* only one answer : f *)
                      [fun () -> T.const ~ty:ty_f f, T.Set.empty]
                    else []
-               | Type.Arity (0, n) ->
+               | Type.Arity (0, _) ->
                    let ty_args = Type.expected_args ty_f in
                    CCList.(
                      make_list (depth-1) ty_args >>= fun mk_args ->

@@ -69,32 +69,6 @@ module type S = sig
     val to_form : Literal.t -> FOTerm.t SLiteral.t
   end
 
-  (** {2 Theories} *)
-
-  module AC : sig
-    val on_add : Theories.AC.t Signal.t
-
-    val add : ?proof:Proof.t list -> ty:Type.t -> ID.t -> unit
-
-    val is_ac : ID.t -> bool
-
-    val find_proof : ID.t -> Proof.t list
-    (** Recover the proof for the AC-property of this symbol.
-        @raise Not_found if the symbol is not AC *)
-
-    val symbols : unit -> ID.Set.t
-    (** set of AC symbols *)
-
-    val symbols_of_terms : FOTerm.t Sequence.t -> ID.Set.t
-    (** set of AC symbols occurring in the given term *)
-
-    val proofs : unit -> Proof.t list
-    (** All proofs for all AC axioms *)
-
-    val exists_ac : unit -> bool
-    (** Is there any AC symbol? *)
-  end
-
   (** {2 Induction} *)
 
   (* TODO: move most information into [ID.payload] and induction modules *)

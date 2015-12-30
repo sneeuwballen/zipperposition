@@ -119,7 +119,7 @@ Library "libzipperposition_prover"
   FindlibParent:    libzipperposition
   Modules:          ClauseQueue, Clause, Const, Extensions,
                     Literal, Literals, CompactClause, Ctx, Proof, ProofState,
-                    Saturate, Selection, Theories, AC, PFormula,
+                    Saturate, Selection, AC, AC_intf, PFormula,
                     Compute_prec, Params, Env, Monome, ArithLit, Signals, Multisets,
                     Ctx_intf, Clause_intf, Env_intf, ProofState_intf,
                     BBox, BBox_intf, ClauseContext, ClauseQueue_intf,
