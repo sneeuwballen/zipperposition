@@ -1,15 +1,16 @@
 #!/usr/bin/env ocaml
 #use "tests/quick/.common.ml";;
 
-let ty = Type.(forall [var 0] (var 0 <== [var 0; record ["x",var 0] ~rest:None]));;
-let ty2 = Type.(const ~< "a" <== [const ~< "a"; record ["x", const ~< "a"] ~rest:None]);;
-let s = Unif.Ty.unification Type.(apply ty (var 1)) 0 ty2 1;;
-let ty3 = Substs.Ty.apply ~renaming:(Substs.Renaming.create ()) s Type.(apply ty (var 1)) 0;;
-Util.debugf 1 "types: %a (%d) and %a (%d)\n"
-  (fun k->k
-  Type.pp ty2 (ST.hash (ty2:Type.t:>ST.t))
-  Type.pp ty3 (ST.hash (ty3:Type.t:>ST.t)));;
-assert (Type.eq ty2 ty3);;
+let a_ = Type.const (ID.make "a")
+
+let ty = Type.(forall ([bvar 0; record ["x", bvar 0] ~rest:None] ==> bvar 0));;
+let ty2 = Type.([a_; record ["x", a_] ~rest:None] ==> a_);;
+let s = Unif.Ty.unification (Type.(apply ty [var_of_int 1]),0) (ty2,1);;
+let ty3 =
+  Substs.Ty.apply ~renaming:(Substs.Renaming.create ()) s (Type.(apply ty [var_of_int 1]),0);;
+Util.debugf 1 "types: %a and %a"
+  (fun k->k Type.pp ty2 Type.pp ty3);;
+assert (Type.equal ty2 ty3);;
 
 ok ();;
 

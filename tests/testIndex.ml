@@ -1,33 +1,10 @@
 
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Test indexing structures} *)
 
-open Logtk
-open Logtk_arbitrary
+open Libzipperposition
+open Libzipperposition_arbitrary
 open QCheck
 
 module T = FOTerm
@@ -70,8 +47,10 @@ module TestUnit(I : UnitIndex) = struct
 
   (* list of (term,int) that generalize [t] *)
   let find_all idx t =
-    I.retrieve ~sign:true idx 1 t 0 []
-      (fun acc t' i _ _ -> (t', i) :: acc)
+    I.retrieve ~sign:true (idx,1) (t,0)
+    |> Sequence.fold
+      (fun acc (t',i,_,_) -> (t', i) :: acc)
+      []
 
   (* check that at least the terms are retrieved *)
   let check_gen_retrieved_member =
@@ -97,7 +76,7 @@ module TestUnit(I : UnitIndex) = struct
           (* all terms must match [t] *)
           List.for_all
             (fun (t',_) ->
-              try ignore (Unif.FO.matching ~pattern:t' 0 t 1); true
+              try ignore (Unif.FO.matching ~pattern:(t',0) (t,1)); true
               with Unif.Fail -> false)
             retrieved)
       seq
@@ -115,7 +94,7 @@ module TestUnit(I : UnitIndex) = struct
           Sequence.for_all
             (fun (t',_) ->
               try
-                let _ = Unif.FO.matching ~pattern:t' 1 t 0 in
+                let _ = Unif.FO.matching ~pattern:(t',1) (t,0) in
                 List.exists
                   (fun (t'',_) -> T.equal t' t'')
                   retrieved
@@ -161,8 +140,10 @@ module TestTerm(I : TermIndex) = struct
 
   (* list of (term,int) that can be retrieved using [retrieve] in [t] *)
   let find_all retrieve idx s_idx t s_t =
-    retrieve ?subst:None idx s_idx t s_t []
-      (fun acc t' i _ -> (t', i) :: acc)
+    retrieve ?subst:None (idx,s_idx) (t,s_t)
+    |> Sequence.fold
+      (fun acc (t',i,_) -> (t', i) :: acc)
+      []
 
   (* check that at least the terms are retrieved *)
   let check_gen_retrieved_member =
@@ -187,7 +168,7 @@ module TestTerm(I : TermIndex) = struct
         (* all terms must match [t] *)
         List.for_all
           (fun (t',_) ->
-            try ignore (check t 0 t' 1); true
+            try ignore (check (t,0) (t',1)); true
             with Unif.Fail ->
               Util.debugf 1 "problem with %a and %a" (fun k->k T.pp t T.pp t');
               false)
@@ -203,7 +184,7 @@ module TestTerm(I : TermIndex) = struct
         Sequence.for_all
           (fun (t',i') ->
             try
-              let _ = check t 0 t' 1 in
+              let _ = check (t,0) (t',1) in
               List.exists
                 (fun (_,i'') -> i' = i'')
                 retrieved
@@ -211,14 +192,19 @@ module TestTerm(I : TermIndex) = struct
           seq)
       seq
 
-  let _match_flip ?subst t1 s_1 t2 s_2 =
-    Unif.FO.matching ?subst ~pattern:t2 s_2 t1 s_1
+  let _match_flip ?subst t1 t2 =
+    Unif.FO.matching ?subst ~pattern:t2 t1
 
   let size = Sequence.length
   let pp l =
     CCFormat.to_string
-      (fun out l -> CCFormat.seq
-        (fun out (t,i) -> Format.fprintf out "%a -> %d" T.pp t i) out l) l
+      (fun out l ->
+        Format.fprintf out "@[<hv>%a@]"
+          (CCFormat.seq
+            (fun out (t,i) ->
+              Format.fprintf out "@[<1>@[%a@] ->@ %d@]" T.pp t i))
+          l)
+      l
 
   let _limit = 0
 
@@ -228,13 +214,13 @@ module TestTerm(I : TermIndex) = struct
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 
   let check_retrieved_specializations =
-    let prop = _check_all_retrieved_satisfy (I.retrieve_specializations ~allow_open:false)
-      (fun t1 s1 t2 s2 -> Unif.FO.matching ~pattern:t1 s1 t2 s2) in
+    let prop = _check_all_retrieved_satisfy I.retrieve_specializations
+      (fun t1 t2 -> Unif.FO.matching ~pattern:t1 t2) in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_specializations" I.name in
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 
   let check_retrieved_generalizations =
-    let prop = _check_all_retrieved_satisfy (I.retrieve_generalizations ~allow_open:false) _match_flip in
+    let prop = _check_all_retrieved_satisfy I.retrieve_generalizations _match_flip in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_generalizations" I.name in
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 
@@ -244,13 +230,13 @@ module TestTerm(I : TermIndex) = struct
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 
   let check_retrieve_all_specializations =
-    let prop = _check_all_satisfying_are_retrieved (I.retrieve_specializations ~allow_open:false)
-      (fun t1 s1 t2 s2 -> Unif.FO.matching ~pattern:t1 s1 t2 s2) in
+    let prop = _check_all_satisfying_are_retrieved I.retrieve_specializations
+      (fun t1 t2 -> Unif.FO.matching ~pattern:t1 t2) in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_specializations" I.name in
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 
   let check_retrieve_all_generalizations =
-    let prop = _check_all_satisfying_are_retrieved (I.retrieve_generalizations ~allow_open:false) _match_flip in
+    let prop = _check_all_satisfying_are_retrieved I.retrieve_generalizations _match_flip in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_generalizations" I.name in
     mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
 
@@ -277,14 +263,11 @@ let props =
   let module TestNPDtree = TestUnit(NPDT) in
   let module IntFingerprint = Fingerprint.Make(OrderedInt) in
   let module TestFingerprint = TestTerm(IntFingerprint) in
-  let module IntFastFingerprint = FastFingerprint.Make(OrderedInt) in
-  let module TestFastFingerprint = TestTerm(IntFastFingerprint) in
   let module IntNPDtree = NPDtree.MakeTerm(OrderedInt) in
   let module TestIntNPDTree = TestTerm(IntNPDtree) in
   QCheck.flatten
     [ TestDtree.props
     ; TestNPDtree.props
     ; TestFingerprint.props
-    ; TestFastFingerprint.props
     ; TestIntNPDTree.props
     ]

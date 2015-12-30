@@ -1,5 +1,5 @@
 
-open Logtk
+open Libzipperposition
 open OUnit
 module Q = QCheck
 

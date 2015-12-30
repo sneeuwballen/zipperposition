@@ -2,5 +2,5 @@
 
 for i in tests/quick/*.ml ; do
     echo -n "${i}..."
-    $i
+    "$i"
 done

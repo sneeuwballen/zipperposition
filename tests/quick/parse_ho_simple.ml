@@ -1,8 +1,6 @@
 #!/usr/bin/env ocaml
 #use "tests/quick/.common.ml";;
 
-open Logtk_parsers;;
-
 let l = Lex_ho.decls_of_string
   "p X ?y <-
       axiom (foo (bar yolo) Y),

@@ -1,33 +1,10 @@
 
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** Test unification *)
 
-open Logtk
-open Logtk_arbitrary
+open Libzipperposition
+open Libzipperposition_arbitrary
 open QCheck
 
 module T = FOTerm
@@ -39,10 +16,10 @@ let check_unify_gives_unifier =
   let name = "unify_gives_unifier" in
   let prop (t1, t2) =
     try
-      let subst = Unif.FO.unification t1 0 t2 1 in
+      let subst = Unif.FO.unification (t1,0) (t2,1) in
       let renaming = S.Renaming.create () in
-      let t1' = S.FO.apply ~renaming subst t1 0 in
-      let t2' = S.FO.apply ~renaming subst t2 1 in
+      let t1' = S.FO.apply ~renaming subst (t1,0) in
+      let t2' = S.FO.apply ~renaming subst (t2,1) in
       T.equal t1' t2'
     with Unif.Fail ->
       Prop.assume false;
@@ -56,7 +33,7 @@ let check_variant =
   let pp = T.to_string in
   let prop t =
     let renaming = S.Renaming.create () in
-    let t' = S.FO.apply ~renaming S.empty t 0 in
+    let t' = S.FO.apply ~renaming S.empty (t,0) in
     Unif.FO.are_variant t t'
   in
   mk_test ~pp ~name gen prop
@@ -67,10 +44,10 @@ let check_matching =
   let pp = PP.(pair T.to_string T.to_string) in
   let prop (t1, t2) =
     try
-      let subst = Unif.FO.matching ~pattern:t1 0 t2 1 in
+      let subst = Unif.FO.matching ~pattern:(t1,0) (t2,1) in
       let renaming = S.Renaming.create () in
-      let t1' = S.FO.apply ~renaming subst t1 0 in
-      let t2' = S.FO.apply ~renaming subst t2 1 in
+      let t1' = S.FO.apply ~renaming subst (t1,0) in
+      let t2' = S.FO.apply ~renaming subst (t2,1) in
       T.equal t1' t2' && Unif.FO.are_variant t2 t2'
     with Unif.Fail ->
       Prop.assume false;

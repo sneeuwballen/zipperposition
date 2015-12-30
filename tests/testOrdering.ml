@@ -1,32 +1,10 @@
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** test orderings *)
 
-open Logtk
-open Logtk_arbitrary
+open Libzipperposition
+open Libzipperposition_arbitrary
 open OUnit
 
 module T = FOTerm
@@ -35,7 +13,7 @@ module O = Ordering
 
 let suite =
   "test_ordering" >:::
-    [] 
+    []
 
 open QCheck
 
@@ -57,25 +35,28 @@ let check_ordering_inv_by_subst ord =
   let gen = Arbitrary.((pair ArTerm.default ArTerm.default) >>= fun (t1, t2) ->
     let vars = Sequence.of_list [t1; t2]
       |> Sequence.flat_map T.Seq.vars
-      |> T.Seq.add_set T.Set.empty
+      |> T.VarSet.of_seq
     in
     (* grounding substitution *)
-    let subst st = T.Set.fold
-      (fun v subst -> S.bind subst v 1 (ArTerm.ground st) 0) vars Substs.empty in
+    let subst st = T.VarSet.fold
+      (fun v subst ->
+        let v = (v : Type.t HVar.t :> InnerTerm.t HVar.t) in
+        S.bind subst (v,1) (ArTerm.ground st,0))
+      vars Substs.empty in
     triple (return t1) (return t2) subst)
   in
   let size (t1, t2, s) =
     T.size t1 + T.size t2 +
-      (Substs.fold s 0 (fun n _ _ t _ -> n + T.size (T.of_term_exn t)))
+      (Substs.fold (fun n _ (t,_) -> n + T.size (T.of_term_unsafe t)) 0 s)
   in
-  (* do type inference on the fly 
+  (* do type inference on the fly
   let tyctx = TypeInference.Ctx.create () in
   let signature = ref Signature.empty in
   *)
   let ord = ref ord in
   let prop (t1, t2, subst) =
-    let t1' = S.apply_no_renaming subst t1 0 in
-    let t2' = S.apply_no_renaming subst t2 0 in
+    let t1' = S.apply_no_renaming subst (t1,0) in
+    let t2' = S.apply_no_renaming subst (t2,0) in
     (* FIXME use a fixed signature?
     ignore (TypeInference.FO.infer tyctx t1 0);
     ignore (TypeInference.FO.infer tyctx t2 0);

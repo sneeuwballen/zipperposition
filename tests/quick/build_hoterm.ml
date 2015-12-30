@@ -1,8 +1,12 @@
 #!/usr/bin/env ocaml
 #use "tests/quick/.common.ml";;
 
-let t = HOT.(at_list (var ~ty:Type.(TPTP.i <== [TPTP.i;TPTP.o]) 0) [var
-~ty:Type.TPTP.i 1; const ~ty:Type.TPTP.o ~< "b"]);;
-
+let t =
+  let open HOT in
+  app
+    (var_of_int ~ty:Type.([term; prop] ==> term)  0)
+    [ var_of_int ~ty:Type.term 1
+    ; const ~ty:Type.prop (ID.make "b")]
+;;
 
 ok ();;

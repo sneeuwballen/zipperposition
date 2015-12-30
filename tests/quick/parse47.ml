@@ -5,15 +5,15 @@ module E = CCError
 
 let () =
   let res = E.(
-    Util_tptp.parse_file ~recursive:true "pelletier_problems/pb47.p"
+    Util_tptp.parse_file ~recursive:true "examples/pelletier_problems/pb47.p"
     >>= fun s ->
-    Util_tptp.infer_types (`sign Signature.empty) s
-    >>= fun (signature, s') ->
-    let forms = Util_tptp.Typed.formulas s' in
-    E.return (Sequence.for_all F.FO.is_closed forms)
+    Util_tptp.infer_types s
+    >>= fun s' ->
+    let forms = Util_tptp.formulas s' in
+    E.return (Sequence.for_all TT.closed forms)
   ) in
   match res with
   | `Ok true -> ok ()
-  | `Ok false -> print_endline "assertion failure, ERROR"
-  | `Error msg -> print_endline msg
+  | `Ok false -> fail "test failed"
+  | `Error msg -> fail msg
 ;;
