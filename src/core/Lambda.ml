@@ -19,15 +19,23 @@ let st_of_term ~env t = match T.view t  with
   | T.App (f, l) -> { head=f; args=l; env; }
   | _ -> {head=t; args=[]; env; }
 
+let eval_ env t =
+  let t =
+    InnerTerm.DB.eval
+      (env : T.t DBEnv.t :> InnerTerm.t DBEnv.t)
+      (t : T.t :> InnerTerm.t)
+  in
+  T.of_term_unsafe t
+
 let set_head st t = match T.view t with
-  | T.App (f, l) -> { st with head=f; args= l @ st.args; }
+  | T.App (f, l) ->
+      (* the arguments in [l] might contain variables *)
+      let l = List.rev_map (eval_ st.env) l in
+      { st with head=f; args= List.rev_append l st.args; }
   | _ -> {st with head=t; }
 
 let term_of_st st =
-  let f = InnerTerm.DB.eval
-    (st.env : T.t DBEnv.t :> InnerTerm.t DBEnv.t)
-    (st.head : T.t :> InnerTerm.t) in
-  let f = T.of_term_unsafe f in
+  let f = eval_ st.env st.head in
   T.app f st.args
 
 (* recursive reduction in call by value. [env] contains the environment for
@@ -62,6 +70,7 @@ let rec whnf_rec st =
         env=DBEnv.push st.env a;
         args=args';
       } in
+      (* use smart constructor, in case [body] is an application *)
       let st' = set_head st' body in
       whnf_rec st'
 
