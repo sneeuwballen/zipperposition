@@ -22,6 +22,13 @@ let property_ty = Type.const property_id
 (** {2 Meta-Level clause}
     A Horn clause about meta-level properties *)
 
+exception Error of string
+
+let () = Printexc.register_printer
+  (function
+    | Error msg -> Some msg
+    | _ -> None)
+
 module Clause = struct
   type t = {
     head : term;
@@ -29,17 +36,27 @@ module Clause = struct
   }
   type clause = t
 
-  let safe head body =
-    let vars_body = Sequence.flat_map HOT.Seq.vars (Sequence.of_list body) in
+  (* find a variable occurring in [head] and not in [body] *)
+  let find_unsafe_var head body =
+    let vars_body =
+      Sequence.of_list body
+      |> Sequence.flat_map HOT.Seq.vars
+      |> HOT.VarSet.of_seq
+    in
     HOT.Seq.vars head
-    |> Sequence.for_all (fun v -> Sequence.exists (HVar.equal v) vars_body)
+      |> Sequence.find
+        (fun v -> if HOT.VarSet.mem v vars_body then None else Some v)
 
   let rule head body =
-    if not (safe head body) then
-      let msg = CCFormat.sprintf "unsafe Horn clause:@ @[%a <- %a@]"
-          HOT.pp head (Util.pp_list HOT.pp) body in
-      raise (Invalid_argument msg)
-    else {head; body; }
+    match find_unsafe_var head body with
+    | None -> {head; body; }
+    | Some v ->
+        let msg =
+          CCFormat.sprintf
+            "@[<2>unsafe Horn clause (var %a):@ @[<2>@[%a@] <-@ @[<hv>%a@]@]@]"
+            HVar.pp v HOT.pp head (Util.pp_list HOT.pp) body
+        in
+        raise (Error msg)
 
   let fact head = rule head []
 

@@ -68,6 +68,9 @@ let pp ppf ppty out st = match st.view with
 
 let to_string ppf ppty = CCFormat.to_string (pp ppf ppty)
 
+let pp_clause =
+  pp (Util.pp_list ~sep:" ∨ " (SLiteral.pp FOTerm.pp)) Type.pp
+
 module TPTP = struct
   let pp ppf ppty out st =
     let name = match StatementSrc.name st.src with

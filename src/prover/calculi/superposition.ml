@@ -341,7 +341,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let sc_a = info.scope_active in
     let sc_p = info.scope_passive in
     Util.debugf ~section 3
-      "@[<hv2>simultaneous sup@ @[%a[%d] s=%a t=%a@]@ @[%a[%d] passive_lit=%a p=%a@]@ with subst=%a@]"
+      "@[<hv2>simultaneous sup@ \
+        @[<2>active@ %a[%d]@ s=@[%a@]@ t=@[%a@]@]@ \
+        @[<2>passive@ %a[%d]@ passive_lit=@[%a@]@ p=@[%a@]@]@ with subst=@[%a@]@]"
       (fun k->k C.pp info.active sc_a T.pp info.s T.pp info.t
       C.pp info.passive sc_p Lit.pp info.passive_lit
       Position.pp info.passive_pos S.pp info.subst);

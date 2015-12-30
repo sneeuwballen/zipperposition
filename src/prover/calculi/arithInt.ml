@@ -291,8 +291,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       "@[<2>arith superposition@ between @[%a[%d]@]@ and @[%a[%d]@]@ (subst @[%a@])...@]"
       (fun k->k C.pp info.active s_a C.pp info.passive s_p Substs.pp subst);
     (* check ordering conditions *)
-    if C.is_maxlit (info.active,s_a) subst idx_a
-    && C.is_maxlit (info.passive,s_p) subst idx_p
+    if C.is_maxlit (info.active,s_a) subst ~idx:idx_a
+    && C.is_maxlit (info.passive,s_p) subst ~idx:idx_p
     && ALF.is_max ~ord lit_a
     (* && ALF.is_max ~ord lit_p *)
     then begin
@@ -320,7 +320,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             Lit.mk_arith_op op
               (M.sum m_p (MF.rest mf_a))
               (M.sum (MF.rest mf_p) m_a)
-        | ALF.Div d ->
+        | ALF.Div _ ->
             Lit.mk_arith (ALF.replace lit_p (M.difference m_a (MF.rest mf_a)))
       in
       let all_lits = new_lit :: lits_a @ lits_p in
@@ -418,7 +418,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   exception SimplifyInto of ArithLit.t * C.t * S.t
 
   (* how to simplify the passive lit with the active lit, in one step *)
-  let _try_demod_step ~subst passive_lit s_p c pos active_lit s_a c' pos' =
+  let _try_demod_step ~subst passive_lit _s_p c pos active_lit s_a c' _pos' =
     let ord = Ctx.ord () in
     let i = Lits.Pos.idx pos in
     let renaming = S.Renaming.create () in
@@ -485,7 +485,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                (fun index ->
                   PS.TermIndex.retrieve_generalizations (index,s_a) (t,s_p)
                   |> Sequence.iter
-                    (fun (t',with_pos,subst) ->
+                    (fun (_t',with_pos,subst) ->
                        let c' = with_pos.C.WithPos.clause in
                        let pos' = with_pos.C.WithPos.pos in
                        assert (C.is_unit_clause c');
@@ -572,7 +572,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     ) else acc)
                  acc)
             C.CSet.empty
-      | [| Lit.Arith (AL.Binary (AL.Lesseq, m1, m2)) |] ->
+      | [| Lit.Arith (AL.Binary (AL.Lesseq, _m1, _m2)) |] ->
           res (* TODO *)
       | [| Lit.Arith (AL.Divides d) |] when d.AL.sign ->
           res (* TODO *)
@@ -771,8 +771,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       "@[<2>arith chaining@ between @[%a[%d]@]@ and @[%a[%d]@]@ (subst @[%a@])...@]"
       (fun k->k C.pp info.left s_l C.pp info.right s_r Substs.pp subst);
     (* check ordering conditions *)
-    if C.is_maxlit (info.left,s_l) subst idx_l
-    && C.is_maxlit (info.right,s_r) subst idx_r
+    if C.is_maxlit (info.left,s_l) subst ~idx:idx_l
+    && C.is_maxlit (info.right,s_r) subst ~idx:idx_r
     && ALF.is_max ~ord lit_l
     && ALF.is_max ~ord lit_r
     then (
@@ -912,7 +912,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              so we deduce that if  m1-mf1.rest ≤ m2 - mf2.rest
              then the first literal implies the second, so we only
              keep the second one *)
-          if (C.is_maxlit (c,0) subst i || C.is_maxlit (c,0) subst j)
+          if (C.is_maxlit (c,0) subst ~idx:i || C.is_maxlit (c,0) subst ~idx:j)
           && (ALF.is_max ~ord lit1 || ALF.is_max ~ord lit2)
           then (
             let left = match lit1 with ALF.Left _ -> true | _ -> false in
@@ -1011,7 +1011,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              (* try to eliminate [t] in passive lit [plit]*)
              PS.TermIndex.retrieve_generalizations (!_idx_unit_ineq,1) (t,0)
              |> Sequence.iter
-               (fun (t',with_pos,subst) ->
+               (fun (_t',with_pos,subst) ->
                   let active_clause = with_pos.C.WithPos.clause in
                   let active_pos = with_pos.C.WithPos.pos in
                   match Lits.View.get_arith (C.lits active_clause) active_pos with
@@ -1022,7 +1022,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                       && ALF.is_strictly_max ~ord alit'
                       then
                         (* scale *)
-                        let plit, alit' = ALF.scale plit alit' in
+                        let plit, _alit' = ALF.scale plit alit' in
                         let mf1', m2' =
                           match Lits.View.get_arith (C.lits active_clause) active_pos with
                           | Some (ALF.Left (_, mf1', m2')) -> mf1', m2'
@@ -1046,7 +1046,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                       && ALF.is_strictly_max ~ord alit'
                       then
                         (* scale *)
-                        let plit, alit' = ALF.scale plit alit' in
+                        let plit, _alit' = ALF.scale plit alit' in
                         let m1', mf2' =
                           match Lits.View.get_arith (C.lits active_clause) active_pos with
                           | Some (ALF.Right (_, m1', mf2')) -> m1', mf2'
@@ -1070,11 +1070,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     match lit with
     | _ when Lit.is_trivial lit || Lit.is_absurd lit ->
         None  (* something more efficient will take care of it *)
-    | Lit.Arith (AL.Binary (AL.Lesseq, m1, m2) as alit) ->
+    | Lit.Arith (AL.Binary (AL.Lesseq, _m1, _m2) as alit) ->
         let ord = Ctx.ord () in
-        let traces = _ineq_find_sufficient ~ord ~trace:[] c alit
-                     |> Sequence.take 1  (* one is enough *)
-                     |> Sequence.to_list
+        let traces =
+          _ineq_find_sufficient ~ord ~trace:[] c alit
+          |> Sequence.take 1  (* one is enough *)
+          |> Sequence.to_list
         in
         begin match traces with
           | [trace, _lit'] ->
@@ -1161,7 +1162,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                let n = d1.AL.num in
                PS.TermIndex.retrieve_unifiables (!_idx_div,sc2) (t,sc1)
                |> Sequence.fold
-                 (fun acc (t',with_pos,subst) ->
+                 (fun acc (_t',with_pos,subst) ->
                     (* [subst t = subst t'], see whether they belong to the same group *)
                     let c2 = with_pos.C.WithPos.clause in
                     let pos2 = with_pos.C.WithPos.pos in
@@ -1324,7 +1325,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let res =
       Lits.fold_arith_terms ~eligible ~which:`Max ~ord (C.lits c)
       |> Sequence.fold
-        (fun acc (t,lit,pos) ->
+        (fun acc (_t,lit,pos) ->
            let mf = ALF.focused_monome lit in
            let idx = Lits.Pos.idx pos in
            MF.unify_self (mf,0)
@@ -1611,7 +1612,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | TC.DB _
       | TC.Var _ -> t
       | TC.AppBuiltin (Builtin.Int _, []) -> t  (* don't purify numbers *)
-      | TC.AppBuiltin (b, l) when should_purify ~root b t ->
+      | TC.AppBuiltin (b, _l) when should_purify ~root b t ->
           Util.debugf ~section 5 "@[<2>need to purify term@ @[%a@]@]" (fun k->k T.pp t);
           (* purify the term and add a constraint *)
           begin match M.Int.of_term t with
@@ -1971,7 +1972,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let _print_idx file idx =
     CCIO.with_out file
       (fun oc ->
-         let pp_leaf out v = () in
+         let pp_leaf _ _ = () in
          let out = Format.formatter_of_out_channel oc in
          Format.fprintf out "@[<2>%a@]@." (PS.TermIndex.to_dot pp_leaf) idx;
          flush oc)

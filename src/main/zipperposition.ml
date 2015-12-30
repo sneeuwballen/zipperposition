@@ -85,18 +85,18 @@ module MakeNew(X : sig
   let print_stats () =
     Signal.send Signals.on_print_stats ();
     let print_hashcons_stats what (sz, num, sum_length, small, median, big) =
-      Util.debugf ~section 1
+      Util.debugf ~section 0
         "@[<2>hashcons stats for %s: size %d, num %d, sum length %d, \
          buckets: small %d, median %d, big %d@]"
         (fun k->k what sz num sum_length small median big)
     and print_state_stats (num_active, num_passive, num_simpl) =
-      Util.debug ~section 1 "proof state stats:";
-      Util.debugf ~section 1 "stat:  active clauses          %d" (fun k->k num_active);
-      Util.debugf ~section 1 "stat:  passive clauses         %d" (fun k->k num_passive);
-      Util.debugf ~section 1 "stat:  simplification clauses  %d" (fun k->k num_simpl);
+      Util.debug ~section 0 "proof state stats:";
+      Util.debugf ~section 0 "stat:  active clauses          %d" (fun k->k num_active);
+      Util.debugf ~section 0 "stat:  passive clauses         %d" (fun k->k num_passive);
+      Util.debugf ~section 0 "stat:  simplification clauses  %d" (fun k->k num_simpl);
     and print_gc () =
       let stats = Gc.stat () in
-      Util.debugf ~section 1
+      Util.debugf ~section 0
         "GC: minor words %.0f; major_words: %.0f; max_heap: %d; \
          minor collections %d; major collections %d"
         (fun k->k
@@ -107,9 +107,7 @@ module MakeNew(X : sig
     print_hashcons_stats "terms" (InnerTerm.hashcons_stats ());
     print_hashcons_stats "clauses" (C.CHashcons.stats ());
     print_state_stats (Env.stats ());
-    if Util.Section.cur_level section > 0
-    then Util.print_global_stats ()
-    else ();
+    Util.print_global_stats ();
     ()
 
   (* pre-saturation *)
@@ -237,14 +235,16 @@ let scan_for_inductive_types decls =
     |> Sequence.filter_map
       (function
         | Ast_tptp.NewType (_,ty,_,info) -> Some (ty, info)
-        | _ -> None
-      )
+        | _ -> None)
   in
   Induction_helpers.init_from_decls pairs
 
 let conv_statement ~file st =
   let src = Ast_tptp.to_src ~file (Statement.src st) in
-  match Statement.view st with
+  (* TODO remove *)
+  Util.debugf ~section 5
+    "@[<2>convert@ `@[%a@]`@]" (fun k->k Cnf.pp_statement st);
+  let res = match Statement.view st with
   | Statement.Assert c ->
       let c = Cnf.clause_to_fo c in
       Statement.assert_ ~src c
@@ -252,6 +252,11 @@ let conv_statement ~file st =
       let ctx = Type.Conv.create() in
       let ty = Type.Conv.of_simple_term_exn ctx ty in
       Statement.ty_decl ~src id ty
+  in
+  Util.debugf ~section 3
+    "@[@[<2>convert@ `@[%a@]`@]@ @[<2>into `@[%a@]`@]@]"
+    (fun k->k Cnf.pp_statement st Statement.pp_clause res);
+  res
 
 (* Process the given file (try to solve it) *)
 let process_file ?meta:_ ~params file =

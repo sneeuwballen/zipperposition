@@ -120,12 +120,6 @@ let make_ ~ty term = {
   id = ~-1;
 }
 
-let make_id_ ~id ~ty term = {
-  term;
-  ty;
-  id;
-}
-
 let const ~ty s =
   let my_t = make_ ~ty:(HasType ty) (Const s) in
   H.hashcons my_t
@@ -751,13 +745,20 @@ let pp_depth ?(hooks=[]) depth out t =
   let rec _pp depth out t =
     if List.exists (fun h -> h depth (_pp depth) out t) hooks
     then () (* hook took control *)
-    else _pp_root depth out t; _pp_ty depth out t
+    else _pp_root depth out t
   and _pp_root depth out t = match view t with
-    | Var v -> HVar.pp out v
+    | Var v ->
+        let ty = HVar.ty v in
+        begin match view ty with
+        | AppBuiltin (Builtin.TType, []) -> Format.fprintf out "A%d" (HVar.id v)
+        | AppBuiltin (Builtin.Term, []) -> HVar.pp out v
+        | _ ->
+            Format.fprintf out "%a:@[%a@]" HVar.pp v (_pp_surrounded depth) ty
+        end
     | DB i -> Format.fprintf out "Y%d" (depth-i-1)
     | Const s -> ID.pp out s
     | Bind (b, varty, t') ->
-        Format.fprintf out "@[%a Y%d:%a.@ %a@]" Binder.pp b depth
+        Format.fprintf out "@[<1>%a@ Y%d:@[%a@].@ %a@]" Binder.pp b depth
           (_pp depth) varty (_pp_surrounded (depth+1)) t'
     | Record ([], None) ->
         CCFormat.string out "{}"
@@ -789,13 +790,6 @@ let pp_depth ?(hooks=[]) depth out t =
     | App (f, l) ->
         Format.fprintf out "@[<2>%a@ %a@]"
           (_pp_surrounded depth) f (Util.pp_list ~sep:" " (_pp_surrounded depth)) l
-  and _pp_ty depth out t = match t.ty, view t with
-    | HasType ty, (Var _ | DB _) ->
-        begin match view ty with
-        | AppBuiltin (Builtin.Term, _) -> () (* default type *)
-        | _ -> Format.fprintf out ":%a" (_pp_surrounded depth) ty
-        end
-    | _ -> ()
   and _pp_surrounded depth out t = match view t with
     | Bind _
     | SimpleApp (_,_::_)

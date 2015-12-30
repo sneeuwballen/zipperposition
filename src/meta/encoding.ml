@@ -43,7 +43,7 @@ type hoclause = hoterm clause
 
 (* convert a list of literals into a clause *)
 let foclause_of_clause l =
-  Util.debugf ~section 5 "foclause_of_clause @[%a@]"
+  Util.debugf ~section 5 "@[<2>foclause_of_clause@ `@[%a@]`@]"
     (fun k->k (Util.pp_list (SLiteral.pp FOT.pp)) l);
   List.map
     (function
@@ -67,8 +67,8 @@ let clause_of_foclause l =
 let pp_clause pp_t out c =
   CCList.print ~start:"" ~stop:"" ~sep:" | "
     (fun buf lit -> match lit with
-       | Eq (a, b, true) -> Format.fprintf buf "@[%a = %a@]" pp_t a pp_t b
-       | Eq (a, b, false) -> Format.fprintf buf "@[%a != %a@]" pp_t a pp_t b
+       | Eq (a, b, true) -> Format.fprintf buf "@[<1>%a@ = %a@]" pp_t a pp_t b
+       | Eq (a, b, false) -> Format.fprintf buf "@[<1>%a@ != %a@]" pp_t a pp_t b
        | Prop (a, true) -> pp_t buf a
        | Prop (a, false) -> Format.fprintf buf "@[~ %a@]" pp_t a
        | Bool b -> Format.fprintf buf "%B" b
@@ -159,7 +159,7 @@ let __decode_lit t = match HOT.view t with
 let clause_prop = object
   method encode c =
     let lits = List.map __encode_lit c in
-    HOT.close_forall (HOT.multiset ~ty:Type.TPTP.o lits)
+    HOT.close_forall (HOT.multiset ~ty:Type.prop lits)
 
   method decode c =
     let c = HOT.open_forall c in

@@ -421,33 +421,32 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
     let res c =
       let bv = eligible_res (Scoped.make c 0) S.empty in
-      fun i lit -> BV.get bv i
+      fun i _lit -> BV.get bv i
 
     let param c =
       let bv = eligible_param (Scoped.make c 0) S.empty in
-      fun i lit -> BV.get bv i
+      fun i _lit -> BV.get bv i
 
-    let eq i lit = match lit with
+    let eq _ lit = match lit with
       | Lit.Equation (_, _, true) -> true
       | _ -> false
 
-    let arith i lit = Lit.is_arith lit
+    let arith _ lit = Lit.is_arith lit
 
-    let filter f i lit = f lit
+    let filter f _ lit = f lit
 
     let max c =
       let bv = lazy (Lits.maxlits ~ord:(Ctx.ord ()) c.hclits) in
-      fun i lit ->
-        BV.get (Lazy.force bv) i
+      fun i _ -> BV.get (Lazy.force bv) i
 
-    let pos i lit = Lit.is_pos lit
+    let pos _ lit = Lit.is_pos lit
 
-    let neg i lit = Lit.is_neg lit
+    let neg _ lit = Lit.is_neg lit
 
-    let always i lit = true
+    let always _ _ = true
 
     let combine l = match l with
-      | [] -> (fun i lit -> true)
+      | [] -> (fun _ _ -> true)
       | [x] -> x
       | [x; y] -> (fun i lit -> x i lit && y i lit)
       | [x; y; z] -> (fun i lit -> x i lit && y i lit && z i lit)

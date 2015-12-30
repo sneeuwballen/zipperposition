@@ -56,7 +56,7 @@ let parse_args () =
   (* special handlers *)
   let add_file s = CCVector.push files s in
   (* options list *)
-  let options = Arg.align (
+  let options = (
     [ "--ord", Arg.Set_string ord, " choose ordering (rpo,kbo)"
     ; "--version", Arg.Set version, " print version"
     ; "--steps", Arg.Set_int steps, " maximal number of steps of given clause loop"
@@ -73,7 +73,9 @@ let parse_args () =
     ; "--seed", Arg.Set_int seed, " set random seed"
     ; "--unary-depth", Arg.Set_int unary_depth, " maximum depth for successive unary inferences"
     ] @ !other_opts @ Options.make ()
-  ) in
+  ) |> List.sort (fun (s1,_,_)(s2,_,_) -> String.compare s1 s2)
+    |> Arg.align
+  in
   Arg.parse options add_file "solve problems in files";
   if CCVector.is_empty files
     then CCVector.push files "stdin";

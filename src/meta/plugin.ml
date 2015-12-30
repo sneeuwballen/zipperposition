@@ -89,9 +89,10 @@ let wrap_fo_clause pred clauses : foclause t =
       with _ -> false
 
     method to_fact c =
-      Util.debugf ~section 5 "encode clause %a" (fun k->k (Encoding.pp_clause FOTerm.pp) c);
+      Util.debugf ~section 5 "@[<2>encode clause@ `@[%a@]`@]"
+        (fun k->k (Encoding.pp_clause FOTerm.pp) c);
       let c' = (__encoding_wrap#encode c : Encoding.EncodedClause.t :> T.t) in
-      Util.debugf ~section 5 "... into %a" (fun k->k T.pp c');
+      Util.debugf ~section 5 "@[<4>... into@ `@[%a@]`@]" (fun k->k T.pp c');
       T.app hd [c']
 
     method of_fact t =

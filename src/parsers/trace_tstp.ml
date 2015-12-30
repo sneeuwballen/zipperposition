@@ -256,12 +256,12 @@ let of_decls decls =
   (* traverse declarations *)
   Sequence.iter
     begin fun decl -> match decl with
-      | A.CNF (name, _role, c, info :: _) ->
+      | A.CNF (_name, _role, _c, info :: _) ->
           Util.debugf 3 "@[<2>convert step@ @[%a@]@]" (fun k->k (A.pp TT.pp) decl);
           begin match read_info info with
             | `Proof
             | `NoIdea -> ()
-            | `Parents (rule, esa, parents) ->
+            | `Parents (_rule, _esa, _parents) ->
                 assert false
                 (* FIXME
                 let step = lazy {id=name; esa; rule; parents=Lazy.force parents} in

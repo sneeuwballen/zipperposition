@@ -21,6 +21,8 @@ val property_id : ID.t
 (** {2 Meta-Level clause}
     A Horn clause about meta-level properties *)
 
+exception Error of string
+
 module Clause : sig
   type t = {
     head : term;
@@ -29,8 +31,8 @@ module Clause : sig
 
   val rule : term -> term list -> t
   (** Build a rule.
-      @raise Invalid_argument if the rule is unsafe, ie if some free variables
-      occur in the consequence but not in the body *)
+      @raise Error if the rule is unsafe, i.e. if some free variables
+        occur in the consequence but not in the body *)
 
   val fact : term -> t
   (** [fact t] is a shortcut for [rule t []] *)

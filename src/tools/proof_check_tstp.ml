@@ -250,7 +250,7 @@ let main file =
     if not (TT.is_dag trace) then (
       Util.debug 0 "derivation is not a DAG, failure.";
       exit 1
-    ) else Util.debugf 0 "derivation is a DAG";
+    ) else Util.debug 0 "derivation is a DAG";
     (* validate steps one by one *)
     let checked = CheckedTrace.create trace in
     check_all ~progress:!progress ~provers ~checked ~timeout:!timeout

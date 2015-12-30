@@ -486,13 +486,13 @@ let pp_debug ?(hooks=[]) out lit =
   if List.for_all (fun h -> not (h out lit)) hooks
   then match lit with
     | Prop (p, true) -> T.pp out p
-    | Prop (p, false) -> Format.fprintf out "¬%a" T.pp p
-    | True -> CCFormat.string out "true"
-    | False -> CCFormat.string out "false"
+    | Prop (p, false) -> Format.fprintf out "¬@[%a@]" T.pp p
+    | True -> CCFormat.string out "Τ"
+    | False -> CCFormat.string out "⊥"
     | Equation (l, r, true) ->
-        Format.fprintf out "%a = %a" T.pp l T.pp r
+        Format.fprintf out "@[<1>%a@ = %a@]" T.pp l T.pp r
     | Equation (l, r, false) ->
-        Format.fprintf out "%a ≠ %a" T.pp l T.pp r
+        Format.fprintf out "@[<1>%a@ ≠ %a@]" T.pp l T.pp r
     | Arith o -> ArithLit.pp out o
 
 let pp_tstp buf lit =
@@ -502,9 +502,9 @@ let pp_tstp buf lit =
   | True -> CCFormat.string buf "$true"
   | False -> CCFormat.string buf "$false"
   | Equation (l, r, true) ->
-      Format.fprintf buf "%a = %a" T.TPTP.pp l T.TPTP.pp r
+      Format.fprintf buf "@[<1>%a@ = %a@]" T.TPTP.pp l T.TPTP.pp r
   | Equation (l, r, false) ->
-      Format.fprintf buf "%a != %a" T.TPTP.pp l T.TPTP.pp r
+      Format.fprintf buf "@[<1>%a@ != %a@]" T.TPTP.pp l T.TPTP.pp r
   | Arith o -> ArithLit.pp_tstp buf o
 
 type print_hook = CCFormat.t -> t -> bool

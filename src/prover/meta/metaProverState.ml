@@ -169,7 +169,7 @@ module Induction = struct
           ]
       in
       T.app pred_inductive [T.of_ty ity.ty; arg]
-    method of_fact t =
+    method of_fact _ =
       None (* TODO: real implementation *)
   end
 end
@@ -407,7 +407,7 @@ module Make(E : Env.S) : S with module E = E = struct
     p.sources <- LitMap.add fact proof p.sources;
     add_fact_ p fact
 
-  let scan_formula p f =
+  let scan_formula _ _ =
     assert false
     (* FIXME
     Util.enter_prof prof_scan_formula;
@@ -468,7 +468,7 @@ module Make(E : Env.S) : S with module E = E = struct
       | `Error msg ->
           Format.printf "error: %s@." msg;
           raise Exit
-      | `Ok r ->
+      | `Ok _ ->
           if !flag_print_rules
           then
             Util.debugf ~section 1 "@[<v2>rules:@ %a@]" (fun k->k print_rules (reasoner p))

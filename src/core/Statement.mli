@@ -49,6 +49,8 @@ end
 val pp : 'a CCFormat.printer -> 'b CCFormat.printer -> ('a,'b,_) t CCFormat.printer
 val to_string : 'a CCFormat.printer -> 'b CCFormat.printer -> ('a,'b,_) t -> string
 
+val pp_clause : clause_t CCFormat.printer
+
 module TPTP : sig
   include Interfaces.PRINT2 with type ('a, 'b) t := ('a, 'b) sourced_t
 end

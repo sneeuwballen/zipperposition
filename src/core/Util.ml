@@ -272,8 +272,7 @@ let mk_stat, print_global_stats =
   (fun () ->
      let stats = List.sort (fun (n1,_)(n2,_) -> String.compare n1 n2) !stats in
      List.iter
-       (fun (name, cnt) ->
-          debugf 0 "stat: %-30s ... %Ld" (fun k -> k name !cnt))
+       (fun (name, cnt) -> Format.printf "stat: %-30s ... %Ld" name !cnt)
        stats)
 
 let incr_stat (_, count) = count := Int64.add !count Int64.one  (** increment given statistics *)

@@ -8,8 +8,6 @@ module FOT = FOTerm
 
 (** {2 Type Definitions} *)
 
-type symbol = ID.t
-
 type var = Type.t HVar.t
 
 type t = InnerTerm.t
@@ -76,24 +74,9 @@ let compare = T.compare
 let hash_fun = T.hash_fun
 let hash = T.hash
 
-module TermHASH = struct
-  type t = term
-  let equal = equal
-  let hash = hash
-end
-
 module Set = T.Set
 module Map = T.Map
 module Tbl = T.Tbl
-
-(** {2 Typing} *)
-
-let cast ~ty t = T.cast ~ty:(ty : Type.t :> T.t) t
-
-let lambda_var_ty t = match T.view t with
-  | T.Bind (Binder.Lambda, varty, _) ->
-      Type.of_term_unsafe varty
-  | _ -> invalid_arg "lambda_var_ty: expected lambda term"
 
 (** {2 Smart constructors} *)
 
@@ -172,13 +155,6 @@ let exists ~varty t' =
   let ty = ty t' in
   T.bind ~ty:(ty :> T.t) ~varty:(varty:Type.t:>T.t) Binder.exists t'
 
-let mk_binder_l f vars t =
-  List.fold_right
-    (fun v t ->
-       let t' = T.DB.replace (T.DB.shift 1 t) ~sub:v in
-       f ~varty:(ty v) t')
-    vars t
-
 let is_var t = match T.view t with | T.Var _ -> true | _ -> false
 let is_bvar t = match T.view t with | T.DB _ -> true | _ -> false
 let is_const t = match T.view t with | T.Const _ -> true | _ -> false
@@ -203,7 +179,7 @@ module Seq = struct
   let max_var = Type.Seq.max_var
   let min_var = Type.Seq.min_var
   let ty_vars t =
-    subterms t |> Sequence.flatMap (fun t -> Type.Seq.vars (ty t))
+    subterms t |> Sequence.flat_map (fun t -> Type.Seq.vars (ty t))
   let add_set set ts =
     Sequence.fold (fun set t -> Set.add t set) set ts
 end
@@ -326,8 +302,6 @@ let rec is_fo t = match view t with
 
 (** {2 Various operations} *)
 
-let prop = T.builtin ~ty:T.tType Builtin.prop
-
 let close_forall t =
   let ty = (ty t : Type.t :> T.t) in
   T.close_vars ~ty Binder.Forall t
@@ -354,12 +328,6 @@ let open_forall ?(offset=0) f =
 let print_all_types = ref false
 
 type print_hook = int -> (CCFormat.t -> t -> unit) -> CCFormat.t -> t -> bool
-
-let binder_to_str t = match view t with
-  | Lambda _ -> "λ"
-  | Forall _ -> "∀"
-  | Exists _ -> "∃"
-  | _ -> assert false
 
 let pp_depth = T.pp_depth
 
@@ -469,6 +437,6 @@ module TPTP = struct
   let to_string = CCFormat.to_string pp
 end
 
-let of_simple_term t = assert false (* TODO *)
+let of_simple_term _ = assert false (* TODO *)
 
-let to_simple_term t = assert false (* TODO *)
+let to_simple_term _ = assert false (* TODO *)

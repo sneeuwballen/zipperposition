@@ -72,8 +72,8 @@ module Make(E : Env.S) = struct
          try
            let subst = Unif.Ty.matching ~subst ~pattern:(decl.decl_ty,s_decl) (ty,s_ty) in
            Some (decl, subst)
-         with Unif.Fail -> None
-      ) !_decls
+         with Unif.Fail -> None)
+      !_decls
 
   (* check that [var] is the only free variable in all cases *)
   let _check_uniq_var_cond ~var cases =
@@ -211,7 +211,7 @@ module Make(E : Env.S) = struct
                  List.map
                    (fun case ->
                       (* replace [v] with [case] now *)
-                      let subst = Unif.FO.unification (v,s_c) (case,s_decl) in
+                      let subst = Unif.FO.unification ~subst (v,s_c) (case,s_decl) in
                       let renaming = S.Renaming.create () in
                       let lits' = Lits.apply_subst ~renaming subst (C.lits c,s_c) in
                       let proof cc = Proof.mk_c_inference ~info:[S.to_string subst]
@@ -234,7 +234,7 @@ module Make(E : Env.S) = struct
     | Type.Arity(0,0)
     | Type.NoArity ->
         T.const ~ty s
-    | Type.Arity (i,j) ->
+    | Type.Arity (i,_) ->
         let ty_vars = if i>0 then CCList.range 1 i |> List.map Type.var_of_int else [] in
         let ty' = Type.apply ty ty_vars in
         let ty_args = Type.expected_args ty' in
