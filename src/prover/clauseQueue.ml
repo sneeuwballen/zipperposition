@@ -83,7 +83,7 @@ module Make(C : Clause.S) = struct
       assert (List.for_all (fun (_,c) -> c > 0) ws);
       fun c ->
         List.fold_left
-          (fun sum (w,coeff) -> coeff * w c)
+          (fun sum (w,coeff) -> sum + coeff * w c)
           0 ws
   end
 
