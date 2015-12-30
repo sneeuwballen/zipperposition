@@ -62,10 +62,12 @@ val get_var : t -> var Scoped.t -> term Scoped.t option
 val mem : t -> var Scoped.t -> bool
 (** Check whether the variable is bound by the substitution *)
 
+exception InconsistentBinding of var Scoped.t * term Scoped.t * term Scoped.t
+
 val bind : t -> var Scoped.t -> term Scoped.t -> t
 (** Add [v] -> [t] to the substitution. Both terms have a context.
     It is {b important} that the bound term is De-Bruijn-closed (assert).
-    @raise Invalid_argument if [v] is already bound in
+    @raise InconsistentBinding if [v] is already bound in
       the same context, to another term. *)
 
 val append : t -> t -> t
@@ -137,7 +139,7 @@ module type SPECIALIZED = sig
 
   val bind : t -> var Scoped.t -> term Scoped.t -> t
   (** Add [v] -> [t] to the substitution. Both terms have a context.
-      @raise Invalid_argument if [v] is already bound in
+      @raise InconsistentBinding if [v] is already bound in
         the same context, to another term. *)
 end
 

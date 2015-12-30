@@ -80,6 +80,10 @@ let is_clause f =
   try ignore (as_clause f); true
   with NotCNF _ | SLiteral.NotALit _ -> false
 
+let is_cnf f =
+  try ignore (as_cnf f); true
+  with NotCNF _ | SLiteral.NotALit _ -> false
+
 (* miniscoping (push quantifiers as deep as possible in the formula) *)
 let miniscope ?(distribute_exists=false) f =
   Util.enter_prof prof_miniscope;

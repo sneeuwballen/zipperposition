@@ -53,6 +53,9 @@ type 'a statement = (clause, type_, 'a) Statement.t
 
 val pp_statement : _ statement CCFormat.printer
 
+val is_clause : form -> bool
+val is_cnf : form -> bool
+
 val cnf_of :
   ?opts:options list ->
   ?ctx:Skolem.ctx ->

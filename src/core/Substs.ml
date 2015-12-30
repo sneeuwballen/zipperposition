@@ -81,14 +81,23 @@ let get_var subst v =
   | None -> None
   | Some t -> Some (deref subst t)
 
+exception InconsistentBinding of var Scoped.t * term Scoped.t * term Scoped.t
+
+let () = Printexc.register_printer
+  (function
+    | InconsistentBinding (v, t1, t2) ->
+        let msg = CCFormat.sprintf
+          "@[<2>inconsistent binding@ for %a: %a@ and %a@]"
+            (Scoped.pp HVar.pp) v (Scoped.pp T.pp) t1 (Scoped.pp T.pp) t2
+        in
+        Some msg
+    | _ -> None)
+
 let bind subst v t =
   try
     let t' = M.find v subst in
-    let msg = CCFormat.sprintf
-      "@[<2>Subst.bind:@ inconsistent binding@ for %a: %a@ and %a@]"
-        (Scoped.pp HVar.pp) v (Scoped.pp T.pp) t (Scoped.pp T.pp) t'
-    in
-    invalid_arg msg
+    if T.equal (fst t) (fst t') then subst
+    else raise (InconsistentBinding (v, t, t'))
   with Not_found ->
     M.add v t subst
 
@@ -102,12 +111,7 @@ let append s1 s2 =
       | Some t1, Some t2 ->
           if Scoped.equal T.equal t1 t2
           then Some t1
-          else
-            let msg = CCFormat.sprintf
-              "@[<2>Subst.append:@ inconsistent bindings for @[%a@]:@ @[%a@]@ and @[%a@]@]"
-                (Scoped.pp HVar.pp) v (Scoped.pp T.pp) t1 (Scoped.pp T.pp) t2
-            in
-            invalid_arg msg)
+          else raise (InconsistentBinding (v, t1, t2)))
     s1 s2
 
 (*
@@ -262,7 +266,7 @@ module type SPECIALIZED = sig
 
   val bind : t -> var Scoped.t -> term Scoped.t -> t
   (** Add [v] -> [t] to the substitution. Both terms have a context.
-      @raise Invalid_argument if [v] is already bound in
+      @raise InconsistentBinding if [v] is already bound in
         the same context, to another term. *)
 end
 
