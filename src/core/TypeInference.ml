@@ -448,13 +448,27 @@ let rec infer_rec ctx t =
   | PT.AppBuiltin (Builtin.TType, []) -> T.Ty.tType
   | PT.AppBuiltin (b,l) ->
       begin match TyBuiltin.ty b with
-      | Some ty_b ->
-          let l = List.map (infer_rec ctx) l in
-          let ty = T.apply_unify ~allow_open:true ?loc ty_b l in
-          T.app_builtin ?loc ~ty b l
       | None ->
           error_ ?loc
             "@[<2>unexpected builtin in@ `@[%a@]`, expected term@]" PT.pp t
+      | Some ty_b ->
+          let i,j = T.Ty.arity ty_b in
+          (* some builtin are ad-hoc polymorphic (eq, $less, ...) so
+             we need to add wildcards *)
+          let l = List.map (infer_rec ctx) l in
+          let l =
+            if i>0 && List.length l = j
+            then (
+              Util.debugf ~section 5
+                "@[<2>add %d implicit type arguments to@ `@[<1>%a@ (%a)@]`@]"
+                (fun k->k i Builtin.pp b (Util.pp_list T.pp) l);
+              let metas = Ctx.fresh_ty_meta_vars ~dest:`ToGeneralize ctx i in
+              let metas = List.map (T.Ty.meta ?loc) metas in
+              metas @ l
+            ) else l
+          in
+          let ty = T.apply_unify ~allow_open:true ?loc ty_b l in
+          T.app_builtin ?loc ~ty b l
       end
 
 (* infer a term, and force its type to [prop] *)

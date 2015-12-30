@@ -265,7 +265,7 @@ module Arith = struct
 end
 
 module TPTP = struct
-  let to_string_tstp = function
+  let to_string = function
     | Eq -> "="
     | Neq -> "!="
     | And -> "&"
@@ -287,8 +287,8 @@ module TPTP = struct
     | ExistsConst -> "??"
     | TyInt -> "$int"
     | TyRat -> "$rat"
-    | Int _
-    | Rat _ -> assert false
+    | Int x -> Z.to_string x
+    | Rat x -> Q.to_string x
     | Floor -> "$floor"
     | Ceiling -> "$ceiling"
     | Truncate -> "$truncate"
@@ -315,11 +315,51 @@ module TPTP = struct
     | Greater -> "$greater"
     | Greatereq -> "$greatereq"
 
-  let pp out = function
-    | Int i -> CCFormat.string out (Z.to_string i)
-    | Rat n -> CCFormat.string out (Q.to_string n)
-    | o ->
-      CCFormat.string out (to_string_tstp o)  let to_string = CCFormat.to_string pp
+  let pp out b = CCFormat.string out (to_string b)
+
+  exception NotABuiltin
+
+  let of_string_exn = function
+    | "$true" -> True
+    | "$false" -> False
+    | "$_" -> Wildcard
+    | "$tType" -> TType
+    | "$i" -> Term
+    | "$o" -> Prop
+    | "!!" -> ForallConst
+    | "??" -> ExistsConst
+    | "$int" -> TyInt
+    | "$rat" -> TyRat
+    | "$floor" -> Floor
+    | "$ceiling" -> Ceiling
+    | "$truncate" -> Truncate
+    | "$round" -> Round
+    | "$prec" -> Prec
+    | "$succ" -> Succ
+    | "$sum" -> Sum
+    | "$diff" -> Difference
+    | "$uminus" -> Uminus
+    | "$product" -> Product
+    | "$quotient" -> Quotient
+    | "$quotient_e" -> Quotient_e
+    | "$quotient_t" -> Quotient_t
+    | "$quotient_f" -> Quotient_f
+    | "$remainder_e" -> Remainder_e
+    | "$remainder_t" -> Remainder_t
+    | "$remainder_f" -> Remainder_f
+    | "$is_int" -> Is_int
+    | "$is_rat" -> Is_rat
+    | "$to_int" -> To_int
+    | "$to_rat" -> To_rat
+    | "$less" -> Less
+    | "$lesseq" -> Lesseq
+    | "$greater" -> Greater
+    | "$greatereq" -> Greatereq
+    | _ -> raise NotABuiltin
+
+  let of_string b =
+    try Some (of_string_exn b)
+    with NotABuiltin -> None
 
   (* TODO add the other ones *)
   let connectives = Set.of_seq

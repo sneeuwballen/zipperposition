@@ -414,6 +414,13 @@ module Ty = struct
 
   let close_forall t = close_all ~ty:tType Binder.ForallTy t
 
+  let rec arity t = match view t with
+    | Forall (_, t') ->
+        let a,b = arity t' in
+        a+1, b
+    | Fun (args, _) -> 0, List.length args
+    | _ -> 0, 0
+
   let is_tType t = match view t with
     | Builtin TType -> true
     | _ -> false

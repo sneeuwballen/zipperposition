@@ -109,6 +109,9 @@ module Ty : sig
 
   val close_forall : t -> t
 
+  val arity : t -> int * int
+  (** [arity ty] returns [(n,m)] where [ty = forall x1..xn (a1 ... am -> ret)] *)
+
   val is_tType : t -> bool
   val returns : t -> t
   val returns_tType : t -> bool
