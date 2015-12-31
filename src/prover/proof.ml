@@ -48,7 +48,7 @@ let equal p1 p2 =
   match p1.result, p2.result with
   | Form f1, Form f2 -> TypedSTerm.equal f1 f2
   | Clause c1, Clause c2 -> CC.equal c1 c2
-  | _ -> false
+  | (Form _ | Clause _), _ -> false
 
 let hash_fun p h =
   h |> Hash.int_ (Hashtbl.hash p.kind)
@@ -422,15 +422,18 @@ let pp_dot_seq ~name out seq =
   (* TODO: check proof is a DAG *)
   CCGraph.Dot.pp_seq
     ~tbl:(CCGraph.mk_table ~eq:equal ~hash:hash 64)
-    ~name ~graph:as_graph
+    ~eq:equal
+    ~name
+    ~graph:as_graph
     ~attrs_v:(fun p ->
-      let label = if no_other_info p
-      then _to_str_escape "@[<2>%a@]" pp_result_of p
-      else
-        CCFormat.sprintf "{%s|{theories:%s|info:%s}}"
-          (_to_str_escape "@[<2>%a@]" pp_result_of p)
-          (_to_str_escape "%a" _pp_list_str p.theories)
-          (_to_str_escape "%a" _pp_list_str p.additional_info)
+      let label =
+        if no_other_info p
+        then _to_str_escape "@[<2>%a@]" pp_result_of p
+        else
+          CCFormat.sprintf "{%s|{theories:%s|info:%s}}"
+            (_to_str_escape "@[<2>%a@]" pp_result_of p)
+            (_to_str_escape "%a" _pp_list_str p.theories)
+            (_to_str_escape "%a" _pp_list_str p.additional_info)
       in
       let attrs = [`Label label; `Style "filled"] in
       let shape = if no_other_info p then `Shape "box" else `Shape "record" in
@@ -444,7 +447,7 @@ let pp_dot_seq ~name out seq =
     ~attrs_e:(fun (_,(e,_)) -> [`Label e])
     out
     seq;
-  Format.pp_print_flush out ();
+  Format.pp_print_newline out ();
   ()
 
 let pp_dot ~name out proof = pp_dot_seq ~name out (Sequence.singleton proof)
@@ -452,13 +455,10 @@ let pp_dot ~name out proof = pp_dot_seq ~name out (Sequence.singleton proof)
 let pp_dot_seq_file ?(name="proof") filename seq =
   (* print graph on file *)
   Util.debugf ~section 1 "print proof graph to@ `%s`" (fun k->k filename);
-  try
-    CCIO.with_out filename
-      (fun oc ->
-        let out = Format.formatter_of_out_channel oc in
-        Format.fprintf out "%a@." (pp_dot_seq ~name) seq)
-  with e ->
-    Util.debugf ~section 1 "error: %s" (fun k->k (Printexc.to_string e))
+  CCIO.with_out filename
+    (fun oc ->
+      let out = Format.formatter_of_out_channel oc in
+      Format.fprintf out "%a@." (pp_dot_seq ~name) seq)
 
 let pp_dot_file ?name filename proof =
   pp_dot_seq_file ?name filename (Sequence.singleton proof)
