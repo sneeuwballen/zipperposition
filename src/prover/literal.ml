@@ -334,11 +334,6 @@ let subsumes ?(subst=Substs.empty) (lit1,sc1) (lit2,sc2) k =
   match lit1, lit2 with
   | Arith o1, Arith o2 ->
       (* use the more specific subsumption mechanism *)
-      Util.debugf ~section:Const.section 5
-        "@[<2>subsumption check:@ @[%a@]@ for @[%a@]@]"
-        (fun k->k
-          (Scoped.pp ArithLit.pp) (o1,sc1)
-          (Scoped.pp ArithLit.pp) (o2,sc2));
       ArithLit.subsumes ~subst (o1,sc1) (o2,sc2) k
   | Equation (l1, r1, true), Equation (l2, r2, true) ->
       _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k

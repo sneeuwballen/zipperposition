@@ -139,8 +139,8 @@ let __encode_lit = function
   | Eq (a, b, truth) ->
       let ty = HOT.ty a in
       if truth
-      then HOT.app (HOT.app_ty eq_conn [ty]) [HOT.multiset ~ty [a; b]]
-      else HOT.app (HOT.app_ty neq_conn [ty]) [HOT.multiset ~ty [a; b]]
+      then HOT.app eq_conn [HOT.of_ty ty; HOT.multiset ~ty [a; b]]
+      else HOT.app neq_conn [HOT.of_ty ty; HOT.multiset ~ty [a; b]]
   | Prop (p, true) -> p
   | Prop (p, false) -> HOT.app not_conn [p]
   | Bool true -> HOT.TPTP.true_

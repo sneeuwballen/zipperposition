@@ -196,7 +196,7 @@ module MakeNew(X : sig
     and timeout = if params.param_timeout = 0.
       then None
       else (
-        Util.debugf ~section 0 "run for %f s" (fun k->k params.param_timeout);
+        Util.debugf ~section 0 "run for %.2f s" (fun k->k params.param_timeout);
         ignore (setup_alarm params.param_timeout);
         Some (Util.total_time_s () +. params.param_timeout -. 0.25)
       )
