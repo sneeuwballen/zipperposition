@@ -421,6 +421,7 @@ let pp_dot_seq ~name out seq =
   in
   (* TODO: check proof is a DAG *)
   CCGraph.Dot.pp_seq
+    ~tbl:(CCGraph.mk_table ~eq:equal ~hash:hash 64)
     ~name ~graph:as_graph
     ~attrs_v:(fun p ->
       let label = if no_other_info p
