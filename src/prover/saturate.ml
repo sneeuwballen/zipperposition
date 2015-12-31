@@ -27,7 +27,7 @@ type szs_status =
 
 let check_timeout = function
   | None -> false
-  | Some timeout -> Unix.gettimeofday () > timeout
+  | Some timeout -> Util.total_time_s () > timeout
 
 module type S = sig
   module Env : Env.S
