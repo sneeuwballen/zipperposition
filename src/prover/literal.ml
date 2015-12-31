@@ -763,19 +763,19 @@ module Conv = struct
     | SLiteral.Atom (t, b) ->
         let post lit = if b then lit else negate lit in
         let res = match T.view t with
-          | T.AppBuiltin (Builtin.Less, [l; r]) when type_ok l ->
+          | T.AppBuiltin (Builtin.Less, [_; l; r]) when type_ok l ->
               Monome.Int.of_term l >>= fun m1 ->
               Monome.Int.of_term r >>= fun m2 ->
               return (Arith (AL.mk_less m1 m2))
-          | T.AppBuiltin (Builtin.Lesseq, [l; r]) when type_ok l ->
+          | T.AppBuiltin (Builtin.Lesseq, [_; l; r]) when type_ok l ->
               Monome.Int.of_term l >>= fun m1 ->
               Monome.Int.of_term r >>= fun m2 ->
               return (Arith (AL.mk_lesseq m1 m2))
-          | T.AppBuiltin (Builtin.Greater, [l; r]) when type_ok l ->
+          | T.AppBuiltin (Builtin.Greater, [_; l; r]) when type_ok l ->
               Monome.Int.of_term l >>= fun m1 ->
               Monome.Int.of_term r >>= fun m2 ->
               return (Arith (AL.mk_less m2 m1))
-          | T.AppBuiltin (Builtin.Greatereq, [l; r]) when type_ok l ->
+          | T.AppBuiltin (Builtin.Greatereq, [_; l; r]) when type_ok l ->
               Monome.Int.of_term l >>= fun m1 ->
               Monome.Int.of_term r >>= fun m2 ->
               return (Arith (AL.mk_lesseq m2 m1))
