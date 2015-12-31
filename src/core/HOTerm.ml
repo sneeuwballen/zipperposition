@@ -265,7 +265,7 @@ let rec of_fo t =
   | FOT.DB i -> bvar ~ty i
   | FOT.Const s -> const ~ty s
   | FOT.App (f, l) -> app (of_fo f) (List.map of_fo l)
-  | FOT.AppBuiltin (b,l) -> app (builtin ~ty b) (List.map of_fo l)
+  | FOT.AppBuiltin (b,l) -> app_builtin ~ty b (List.map of_fo l)
 
 let to_fo t =
   let rec aux t =
