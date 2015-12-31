@@ -85,23 +85,22 @@ module MakeNew(X : sig
   let print_stats () =
     Signal.send Signals.on_print_stats ();
     let print_hashcons_stats what (sz, num, sum_length, small, median, big) =
-      Util.debugf ~section 0
+      Format.printf
         "@[<2>hashcons stats for %s: size %d, num %d, sum length %d, \
-         buckets: small %d, median %d, big %d@]"
-        (fun k->k what sz num sum_length small median big)
+         buckets: small %d, median %d, big %d@]@."
+        what sz num sum_length small median big
     and print_state_stats (num_active, num_passive, num_simpl) =
-      Util.debug ~section 0 "proof state stats:";
-      Util.debugf ~section 0 "stat:  active clauses          %d" (fun k->k num_active);
-      Util.debugf ~section 0 "stat:  passive clauses         %d" (fun k->k num_passive);
-      Util.debugf ~section 0 "stat:  simplification clauses  %d" (fun k->k num_simpl);
+      Format.printf "proof state stats:@.";
+      Format.printf "stat:  active clauses          %d@." num_active;
+      Format.printf "stat:  passive clauses         %d@." num_passive;
+      Format.printf "stat:  simplification clauses  %d@." num_simpl;
     and print_gc () =
       let stats = Gc.stat () in
-      Util.debugf ~section 0
+      Format.printf
         "GC: minor words %.0f; major_words: %.0f; max_heap: %d; \
-         minor collections %d; major collections %d"
-        (fun k->k
-            stats.Gc.minor_words stats.Gc.major_words stats.Gc.top_heap_words
-            stats.Gc.minor_collections stats.Gc.major_collections);
+         minor collections %d; major collections %d@."
+        stats.Gc.minor_words stats.Gc.major_words stats.Gc.top_heap_words
+        stats.Gc.minor_collections stats.Gc.major_collections;
     in
     print_gc ();
     print_hashcons_stats "terms" (InnerTerm.hashcons_stats ());
@@ -190,13 +189,13 @@ module MakeNew(X : sig
     let steps = if params.param_steps = 0
       then None
       else (
-        Util.debugf ~section 0 "run for %d steps" (fun k->k params.param_steps);
+        Util.debugf ~section 1 "run for %d steps" (fun k->k params.param_steps);
         Some params.param_steps
       )
     and timeout = if params.param_timeout = 0.
       then None
       else (
-        Util.debugf ~section 0 "run for %.2f s" (fun k->k params.param_timeout);
+        Util.debugf ~section 1 "run for %.2f s" (fun k->k params.param_timeout);
         ignore (setup_alarm params.param_timeout);
         Some (Util.total_time_s () +. params.param_timeout -. 0.25)
       )
