@@ -46,7 +46,7 @@ module Make(X : PARAMETERS) = struct
   let select lits = !_select lits
 
   let lost_completeness () =
-    if !_complete then Util.debug 1 "completeness is lost";
+    if !_complete then Util.debug ~section:Const.section 1 "completeness is lost";
     _complete := false
 
   let is_completeness_preserved () = !_complete
