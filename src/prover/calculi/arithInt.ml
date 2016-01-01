@@ -1391,8 +1391,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     match lit with
     | Lit.Equation (l, r, sign) when Type.equal Type.int (T.ty l) ->
         begin match T.view l, T.view r with
-          | T.AppBuiltin (Builtin.Remainder_e, [_; l'; r']), opp
-          | opp, T.AppBuiltin (Builtin.Remainder_e, [_; l'; r']) ->
+          | T.AppBuiltin (Builtin.Remainder_e, [l'; r']), opp
+          | opp, T.AppBuiltin (Builtin.Remainder_e, [l'; r']) ->
               begin match Monome.Int.of_term l', T.view r', opp with
                 | Some m,
                   T.AppBuiltin (Builtin.Int n,[]),
