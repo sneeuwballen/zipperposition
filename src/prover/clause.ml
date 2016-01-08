@@ -46,16 +46,13 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         (Trail.to_seq trail)
 
   type t = {
-    hclits : Literal.t array;               (** the literals *)
-    mutable hctag : int;                    (** unique ID of the clause *)
-    mutable hcflags : int;                  (** boolean flags for the clause *)
-    mutable hcselected : BV.t;              (** bitvector for selected lits*)
-    mutable hcproof : Proof.t;              (** Proof of the clause *)
-    mutable hcparents : t list;             (** parents of the clause *)
-    mutable hcdescendants : int SmallSet.t ;(** the set of IDs of descendants*)
-    mutable hcsimplto : t option;           (** simplifies into the clause *)
-    mutable as_bool : Ctx.BoolLit.t option; (** boolean wrap *)
-    mutable trail : Trail.t;                (** boolean trail *)
+    lits : Literal.t array; (** the literals *)
+    mutable tag : int; (** unique ID of the clause *)
+    mutable flags : int; (** boolean flags for the clause *)
+    mutable selected : BV.t Lazy.t; (** bitvector for selected lits*)
+    mutable proof : Proof.t; (** Proof of the clause *)
+    mutable as_bool : Ctx.BoolLit.t option; (** boolean box *)
+    mutable trail : Trail.t; (** boolean trail *)
   }
 
   type clause = t
@@ -66,34 +63,30 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let flag_gen = Util.Flag.create () in
     fun () -> Util.Flag.get_new flag_gen
 
-  let flag_ground = new_flag ()
   let flag_lemma = new_flag ()
   let flag_persistent = new_flag ()
 
   let set_flag flag c truth =
     if truth
-    then c.hcflags <- c.hcflags lor flag
-    else c.hcflags <- c.hcflags land (lnot flag)
+    then c.flags <- c.flags lor flag
+    else c.flags <- c.flags land (lnot flag)
 
-  let get_flag flag c = (c.hcflags land flag) != 0
+  let get_flag flag c = (c.flags land flag) != 0
 
   (** {2 Hashcons} *)
 
-  let equal hc1 hc2 = hc1.hctag = hc2.hctag
+  let equal c1 c2 = c1.tag = c2.tag
 
-  let compare hc1 hc2 = hc1.hctag - hc2.hctag
+  let compare c1 c2 = c1.tag - c2.tag
 
-  let hash_fun c h = Lits.hash_fun c.hclits h
+  let hash_fun c h = Lits.hash_fun c.lits h
   let hash c = Hash.apply hash_fun c
 
-  let id c = c.hctag
+  let id c = c.tag
 
-  let parents c = c.hcparents
+  let is_ground c = Literals.is_ground c.lits
 
-
-  let is_ground c = get_flag flag_ground c
-
-  let weight c = Lits.weight c.hclits
+  let weight c = Lits.weight c.lits
 
   let as_bool c = c.as_bool
 
@@ -109,12 +102,18 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     end;
     c.as_bool <- Some i
 
-  let get_trail c = c.trail
+  let trail c = c.trail
   let has_trail c = not (Trail.is_empty c.trail)
-  let trail_subsumes c1 c2 = Trail.subsumes (get_trail c1) (get_trail c2)
+  let trail_subsumes c1 c2 = Trail.subsumes c1.trail c2.trail
   let is_active c ~v = Trail.is_active c.trail ~v
 
-  let lits c = c.hclits
+  let trail_l = function
+    | [] -> Trail.empty
+    | [c] -> c.trail
+    | [c1; c2] -> Trail.merge c1.trail c2.trail
+    | l -> Trail.merge_l (List.map trail l)
+
+  let lits c = c.lits
 
   module CHashtbl = Hashtbl.Make(struct
       type t = clause
@@ -137,121 +136,54 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   (** {2 Utils} *)
 
-  (** [is_child_of ~child c] is to be called to remember that [child] is a child
-      of [c], is has been infered/simplified from [c] *)
-  let is_child_of ~child c =
-    (* update the parent clauses' sets of descendants by adding [child] *)
-    let descendants = SmallSet.add c.hcdescendants child.hctag in
-    c.hcdescendants <- descendants
-
-  (* see if [c] is known to simplify into some other clause *)
-  let rec _follow_simpl n c =
-    if n > 10_000 then
-      failwith (CCFormat.sprintf "follow_simpl loops on %a" Lits.pp c.hclits);
-    match c.hcsimplto with
-    | None -> c
-    | Some c' ->
-        Util.debugf 3 "@[<2>clause @[%a@]@ already simplified to @[%a@]@]"
-          (fun k->k Lits.pp c.hclits Lits.pp c'.hclits);
-        _follow_simpl (n+1) c'
-
-  let follow_simpl c = _follow_simpl 0 c
-
-  (* [from] simplifies into [into] *)
-  let simpl_to ~from ~into =
-    let from = follow_simpl from in
-    assert (from.hcsimplto = None);
-    let into' = follow_simpl into in
-    (* avoid cycles *)
-    if from != into' then
-      from.hcsimplto <- Some into
-
-  let is_conjecture c = Proof.is_conjecture c.hcproof
+  let is_conjecture c = Proof.is_conjecture c.proof
 
   let distance_to_conjecture c =
-    Proof.distance_to_conjecture c.hcproof
+    Proof.distance_to_conjecture c.proof
 
-  (* hashconsing of clauses. Clauses are equal if they have the same literals
-      and the same trail *)
-  module CHashcons = Hashcons.Make(struct
-      type t = clause
-      let hash_fun c h =
-        h |> Lits.hash_fun c.hclits |> Trail.hash_fun c.trail
-      let hash c = Hash.apply hash_fun c
-      let equal c1 c2 =
-        Lits.equal_com c1.hclits c2.hclits && Trail.equal c1.trail c2.trail
-      let tag i c = (assert (c.hctag = (-1)); c.hctag <- i)
-    end)
-
-  let __no_select = BV.empty ()
+  let id_count_ = ref 0
 
   let on_proof = Signal.create ()
 
-  let compact c = CompactClause.make c.hclits (compact_trail c.trail)
+  let compact c = CompactClause.make c.lits (compact_trail c.trail)
 
-  let create ?parents ?selected ?trail lits proof =
+  let create_inner ~selected ~trail lits proof =
     Util.enter_prof prof_clause_create;
-    let lits = lits
-               |> List.filter (function Lit.False -> false | _ -> true)
-               |> List.sort Lit.compare
-    in
-    let lits = Array.of_list lits in
-    (* trail *)
-    let trail = match trail, parents with
-      | Some t, _ -> t
-      | None, None -> Trail.empty
-      | None, Some parent_list -> Trail.merge (List.map get_trail parent_list)
-    in
     (* proof *)
     let cc = CompactClause.make lits (compact_trail trail) in
     let proof' = proof cc in
     Signal.send on_proof (lits, proof');
     (* create the structure *)
     let c = {
-      hclits = lits;
-      hcflags = 0;
-      hctag = (-1);
-      hcselected = __no_select;
-      hcproof = proof';
-      hcparents = [];
-      hcdescendants = SmallSet.empty ~cmp:(fun i j -> i-j);
-      hcsimplto = None;
+      lits = lits;
+      flags = 0;
+      tag = ! id_count_;
+      selected;
+      proof = proof';
       as_bool = None;
       trail;
     } in
-    let old_hc, c = c, CHashcons.hashcons c in
-    if c == old_hc then begin
-      (* select literals, if not already done *)
-      begin c.hcselected <- match selected with
-          | Some bv -> bv
-          | None -> Ctx.select lits
-      end;
-      (* compute flags *)
-      if Lits.is_ground lits then set_flag flag_ground c true;
-      (* parents *)
-      begin match parents with
-        | None -> ()
-        | Some parents ->
-            c.hcparents <- parents;
-            List.iter (fun parent -> is_child_of ~child:c parent) parents
-      end;
-    end;
+    incr id_count_;
     (* return clause *)
     Util.incr_stat stat_clause_create;
     Util.exit_prof prof_clause_create;
     c
 
-  let create_a ?parents ?selected ?trail lits proof =
-    create ?parents ?selected ?trail (Array.to_list lits) proof
+  let create_a ~trail lits proof =
+    let selected = lazy (Ctx.select lits) in
+    create_inner ~trail ~selected lits proof
 
-  let of_forms ?parents ?selected ?trail forms proof =
-    let lits = List.map Ctx.Lit.of_form forms in
-    create ?parents ?selected ?trail lits proof
+  let create ~trail lits proof =
+    create_a ~trail (Array.of_list lits) proof
+
+  let of_forms ~trail forms proof =
+    let lits = List.map Ctx.Lit.of_form forms |> Array.of_list in
+    create_a ~trail lits proof
 
   let of_forms_axiom ~file ~name forms =
     let lits = List.map Ctx.Lit.of_form forms in
     let proof c = Proof.mk_c_file ~file ~name c in
-    create lits proof
+    create ~trail:Trail.empty lits proof
 
   let of_statement st = match Statement.view st with
     | Statement.TyDecl _ -> None
@@ -260,43 +192,32 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         let lits = List.map Ctx.Lit.of_form lits in
         let src = Statement.src st in
         let proof cc = Proof.mk_c_src ~src cc in
-        let c = create lits proof in
+        let c = create ~trail:Trail.empty lits proof in
         Some c
 
   let update_trail f c =
     let trail = f c.trail in
-    let proof cc = Proof.adapt_c c.hcproof cc in
-    create_a ~parents:c.hcparents ~trail c.hclits proof
+    let proof cc = Proof.adapt_c c.proof cc in
+    create_inner ~trail ~selected:c.selected c.lits proof
 
-  let proof c = c.hcproof
+  let proof c = c.proof
 
   let update_proof c f =
-    let new_proof = f c.hcproof (compact c) in
-    create_a ~parents:c.hcparents ~selected:c.hcselected
-      ~trail:c.trail c.hclits (fun _ -> new_proof)
+    let new_proof = f c.proof (compact c) in
+    create_a ~trail:c.trail c.lits (fun _ -> new_proof)
 
   let is_empty c =
-    Lits.is_absurd c.hclits && Trail.is_empty c.trail
+    Lits.is_absurd c.lits && Trail.is_empty c.trail
 
-  let length c = Array.length c.hclits
-
-  let stats () = CHashcons.stats ()
-
-  (** descendants of the clause *)
-  let descendants c = c.hcdescendants
+  let length c = Array.length c.lits
 
   (** Apply substitution to the clause. Note that using the same renaming for all
       literals is important. *)
   let apply_subst ~renaming subst (c,sc) =
-    let lits =
-      Array.map
-        (fun lit -> Lit.apply_subst ~renaming subst (lit,sc))
-        c.hclits in
-    let descendants = c.hcdescendants in
-    let proof = Proof.adapt_c c.hcproof in
-    let new_hc = create_a ~parents:[c] lits proof in
-    new_hc.hcdescendants <- descendants;
-    new_hc
+    let lits = Literals.apply_subst ~renaming subst (c.lits,sc) in
+    let proof = Proof.adapt_c c.proof in
+    let new_c = create_a ~trail:c.trail lits proof in
+    new_c
 
   let _apply_subst_no_simpl subst (lits,sc) =
     if Substs.is_empty subst
@@ -325,7 +246,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let eligible_res (c,sc) subst =
     let ord = Ctx.ord () in
     let lits' = _apply_subst_no_simpl subst (lits c,sc) in
-    let selected = c.hcselected in
+    let selected = Lazy.force c.selected in
     if BV.is_empty selected
     then (
       (* maximal literals *)
@@ -358,39 +279,40 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       are eligible for paramodulation. *)
   let eligible_param (c,sc) subst =
     let ord = Ctx.ord () in
-    if BV.is_empty c.hcselected then begin
+    if BV.is_empty (Lazy.force c.selected) then (
       let lits' = _apply_subst_no_simpl subst (lits c,sc) in
       (* maximal ones *)
       let bv = Lits.maxlits ~ord lits' in
       (* only keep literals that are positive equations *)
       BV.filter bv (fun i -> Lit.is_eq lits'.(i));
       bv
-    end else BV.empty ()  (* no eligible literal when some are selected *)
+    ) else
+      BV.empty () (* no eligible literal when some are selected *)
 
   let is_eligible_param (c,sc) subst ~idx =
-    Lit.is_pos c.hclits.(idx)
+    Lit.is_pos c.lits.(idx)
     &&
-    BV.is_empty c.hcselected
+    BV.is_empty (Lazy.force c.selected)
     &&
     is_maxlit (c,sc) subst ~idx
 
   (** are there selected literals in the clause? *)
-  let has_selected_lits c = not (BV.is_empty c.hcselected)
+  let has_selected_lits c = not (BV.is_empty (Lazy.force c.selected))
 
   (** Check whether the literal is selected *)
-  let is_selected c i = BV.get c.hcselected i
+  let is_selected c i = BV.get (Lazy.force c.selected) i
 
   (** Indexed list of selected literals *)
-  let selected_lits c = BV.selecti c.hcselected c.hclits
+  let selected_lits c = BV.selecti (Lazy.force c.selected) c.lits
 
   (** is the clause a unit clause? *)
-  let is_unit_clause c = match c.hclits with
+  let is_unit_clause c = match c.lits with
     | [|_|] -> true
     | _ -> false
 
   let is_oriented_rule c =
     let ord = Ctx.ord () in
-    match c.hclits with
+    match c.lits with
     | [| Lit.Equation (l, r, true) |] ->
         begin match Ordering.compare ord l r with
           | Comparison.Gt
@@ -403,13 +325,13 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let symbols ?(init=ID.Set.empty) seq =
     Sequence.fold
-      (fun set c -> Lits.symbols ~init:set c.hclits)
+      (fun set c -> Lits.symbols ~init:set c.lits)
       init seq
 
-  let to_forms c = Lits.Conv.to_forms c.hclits
+  let to_forms c = Lits.Conv.to_forms c.lits
 
   module Seq = struct
-    let lits c = Sequence.of_array c.hclits
+    let lits c = Sequence.of_array c.lits
     let terms c = lits c |> Sequence.flatMap Lit.Seq.terms
     let vars c = terms c |> Sequence.flatMap T.Seq.vars
   end
@@ -436,7 +358,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let filter f _ lit = f lit
 
     let max c =
-      let bv = lazy (Lits.maxlits ~ord:(Ctx.ord ()) c.hclits) in
+      let bv = lazy (Lits.maxlits ~ord:(Ctx.ord ()) c.lits) in
       fun i _ -> BV.get (Lazy.force bv) i
 
     let pos _ lit = Lit.is_pos lit
@@ -462,7 +384,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   (** Simple set *)
   module ClauseSet = Set.Make(struct
       type t = clause
-      let compare hc1 hc2 = hc1.hctag - hc2.hctag
+      let compare hc1 hc2 = hc1.tag - hc2.tag
     end)
 
   (** Set with access by ID, bookeeping of maximal var... *)
@@ -481,21 +403,21 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
     let size set = IntMap.fold (fun _ _ b -> b + 1) set 0
 
-    let add set c = IntMap.add c.hctag c set
+    let add set c = IntMap.add c.tag c set
 
     let add_list set hcs =
       List.fold_left add set hcs
 
     let remove_id set i = IntMap.remove i set
 
-    let remove set c = remove_id set c.hctag
+    let remove set c = remove_id set c.tag
 
     let remove_list set hcs =
       List.fold_left remove set hcs
 
     let get set i = IntMap.find i set
 
-    let mem set c = IntMap.mem c.hctag set
+    let mem set c = IntMap.mem c.tag set
 
     let mem_id set i = IntMap.mem i set
 
@@ -503,9 +425,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       try Some (snd (IntMap.choose set))
       with Not_found -> None
 
-    let union s1 s2 = IntMap.merge
+    let union s1 s2 =
+      IntMap.merge
         (fun _ c1 c2 -> match c1, c2 with
-           | Some c1, Some c2 -> assert (c1 == c2); Some c1
+           | Some c1, Some c2 -> assert (equal c1 c2); Some c1
            | Some c, None
            | None, Some c -> Some c
            | None, None -> None)
@@ -513,7 +436,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
     let inter s1 s2 = IntMap.merge
         (fun _ c1 c2 -> match c1, c2 with
-           | Some c1, Some c2 -> assert (c1 == c2); Some c1
+           | Some c1, Some c2 -> assert (equal c1 c2); Some c1
            | Some _, None
            | None, Some _
            | None, None -> None)
@@ -548,7 +471,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   (** {2 Positions in clauses} *)
 
   module Pos = struct
-    let at c pos = Lits.Pos.at c.hclits pos
+    let at c pos = Lits.Pos.at c.lits pos
   end
 
   module WithPos = struct
@@ -557,8 +480,9 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       pos : Position.t;
       term : T.t;
     }
+
     let compare t1 t2 =
-      let c = t1.clause.hctag - t2.clause.hctag in
+      let c = t1.clause.tag - t2.clause.tag in
       if c <> 0 then c else
         let c = T.compare t1.term t2.term in
         if c <> 0 then c else
@@ -566,7 +490,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
     let pp out t =
       Format.fprintf out "@[clause @[%a@]@ at pos @[%a@]@]"
-        Lits.pp t.clause.hclits Position.pp t.pos
+        Lits.pp t.clause.lits Position.pp t.pos
   end
 
 
@@ -578,28 +502,28 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       ^(if BV.get maxlits i then "*" else "")
     in
     (* print literals with a '*' for maximal, and '+' for selected *)
-    let selected = c.hcselected in
+    let selected = Lazy.force c.selected in
     let max = maxlits (Scoped.make c 0) S.empty in
-    if Array.length c.hclits = 0 then CCFormat.string out "⊥"
+    if Array.length c.lits = 0 then CCFormat.string out "⊥"
     else (
       let pp_lit out (i,lit) =
         Format.fprintf out "@[%a%s@]" Lit.pp lit (pp_annot selected max i)
       in
       Format.fprintf out "[@[%a@]]"
         (CCFormat.arrayi ~start:"" ~stop:"" ~sep:" ∨ " pp_lit)
-        c.hclits
+        c.lits
     );
     pp_trail out c.trail;
     ()
 
   let pp_tstp out c =
-    match c.hclits with
+    match c.lits with
     | [| |] -> CCFormat.string out "$false"
     | [| l |] -> Lit.pp_tstp out l
-    | _ -> Format.fprintf out "(%a)" Lits.pp_tstp c.hclits
+    | _ -> Format.fprintf out "(%a)" Lits.pp_tstp c.lits
 
   let pp_tstp_full out c =
-    Format.fprintf out "@[<2>cnf(%d, plain,@ %a).@]" c.hctag pp_tstp c
+    Format.fprintf out "@[<2>cnf(%d, plain,@ %a).@]" c.tag pp_tstp c
 
   let to_string = CCFormat.to_string pp
 

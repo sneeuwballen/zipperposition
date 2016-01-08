@@ -11,9 +11,6 @@ module type S = sig
 
   (** {2 Flags} *)
 
-  (* TODO remove ground flag? *)
-
-  val flag_ground : int (** clause is ground *)
   val flag_lemma : int (** clause is a lemma *)
   val flag_persistent : int (** clause cannot be redundant *)
 
@@ -29,7 +26,6 @@ module type S = sig
 
   val id : t -> int
   val lits : t -> Literal.t array
-  val parents : t -> t list
 
   val compact : t -> CompactClause.t (** Turn into a compact clause *)
   val is_ground : t -> bool
@@ -46,17 +42,6 @@ module type S = sig
     val add : t -> clause -> unit
     val to_list : t -> clause list
   end
-
-  val is_child_of : child:t -> t -> unit
-  (** [is_child_of ~child c] is to be called to remember that [child] is a child
-      of [c], is has been infered/simplified from [c] *)
-
-  val follow_simpl : t -> t
-  (** Follow the "hcsimplto" links until the clause has None *)
-
-  val simpl_to : from:t -> into:t -> unit
-  (** [simpl_to ~from ~into] sets the link of [from] to [into], so that
-      the simplification of [from] into [into] is cached. *)
 
   val is_conjecture : t -> bool
   (** Looking at the clause's proof, return [true] iff the clause is an
@@ -85,8 +70,11 @@ module type S = sig
   val has_trail : t -> bool
   (** Has a non-empty trail? *)
 
-  val get_trail : t -> Trail.t
+  val trail : t -> Trail.t
   (** Get the clause's trail *)
+
+  val trail_l : t list -> Trail.t
+  (** Merge the trails of several clauses *)
 
   val update_trail : (Trail.t -> Trail.t) -> t -> t
   (** Change the trail. The resulting clause has same parents, proof
@@ -103,32 +91,32 @@ module type S = sig
 
   (** {2 Constructors} *)
 
-  module CHashcons : Hashcons.S with type elt = clause
-
   val on_proof : (Literal.t array * Proof.t) Signal.t
   (** signal triggered with [c, p] whenever a proof [p]  is associated with
       the clause [c], even if the proof is dumped *)
 
-  val create : ?parents:t list -> ?selected:CCBV.t -> ?trail:Trail.t ->
+  val create :
+    trail:Trail.t ->
     Literal.t list ->
     (CompactClause.t -> Proof.t) -> t
   (** Build a new clause from the given literals.
-      @param parents parent clauses (if none, should be a tautology or axiom)
-      @param selected selected literals (can be computed later)
       @param trail boolean trail (default [[]])
       also takes a list of literals and a proof builder *)
 
-  val create_a : ?parents:t list -> ?selected:CCBV.t -> ?trail:Trail.t ->
+  val create_a :
+    trail:Trail.t ->
     Literal.t array ->
     (CompactClause.t -> Proof.t) -> t
   (** Build a new clause from the given literals. *)
 
-  val of_forms : ?parents:t list -> ?selected:CCBV.t -> ?trail:Trail.t ->
+  val of_forms :
+    trail:Trail.t ->
     FOTerm.t SLiteral.t list ->
     (CompactClause.t -> Proof.t) -> t
   (** Directly from list of formulas *)
 
-  val of_forms_axiom : file:string -> name:string ->
+  val of_forms_axiom :
+    file:string -> name:string ->
     FOTerm.t SLiteral.t list -> t
   (** Construction from formulas as axiom (initial clause) *)
 
@@ -143,17 +131,11 @@ module type S = sig
       similar to [c] in all aspects, but with
       the proof [f (proof c) (compact c)] *)
 
-  val stats : unit -> (int*int*int*int*int*int)
-  (** hashconsing stats *)
-
   val is_empty : t -> bool
   (** Is the clause an empty clause? *)
 
   val length : t -> int
   (** Number of literals *)
-
-  val descendants : t -> int SmallSet.t
-  (** set of ID of descendants of the clause *)
 
   val apply_subst : renaming:Substs.Renaming.t -> Substs.t -> t Scoped.t -> t
   (** apply the substitution to the clause *)
