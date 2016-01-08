@@ -12,10 +12,8 @@
 type t = private {
   id: int;
   name: string;
-  mutable payload: exn; (** Use [exn] as an open type for user-defined payload *)
+  mutable payload: exn list; (** Use [exn] as an open type for user-defined payload *)
 }
-
-exception NoPayload
 
 val make : string -> t
 (** Makes a fresh ID *)
@@ -25,9 +23,9 @@ val copy : t -> t
 
 val id : t -> int
 val name : t -> string
-val payload : t -> exn
+val payload : t -> exn list
 
-val set_payload : t -> exn -> unit
+val add_payload : t -> exn -> unit
 
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
