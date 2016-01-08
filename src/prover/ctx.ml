@@ -96,15 +96,5 @@ module Make(X : PARAMETERS) = struct
     let to_form f = Literal.Conv.to_form ~hooks:!_to f
   end
 
-  (* Boolean Mapping *)
-  module TermArg = struct
-    type t = FOTerm.t
-    let equal = FOTerm.equal
-    let compare = FOTerm.compare
-    let hash = FOTerm.hash
-    let pp = FOTerm.pp
-    let to_term t = t
-  end
-
-  module BoolLit = BBox.Make(TermArg)(TermArg)
+  module BoolBox = BBox.Make(struct end)
 end

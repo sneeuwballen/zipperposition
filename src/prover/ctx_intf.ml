@@ -71,6 +71,6 @@ module type S = sig
 
   (** {2 Booleans Literals} *)
 
-  module BoolLit : BBox.S
+  module BoolBox: BBox.S
 end
 

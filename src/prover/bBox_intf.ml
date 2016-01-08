@@ -3,24 +3,14 @@
 
 (** {1 Interface of BBox} *)
 
+open Libzipperposition
+
 type bool_lit = Bool_lit.t
 (** Abstract boolean literal *)
 
-module type TERM = sig
-  type t
-  val to_term : t -> Libzipperposition.FOTerm.t
-  val equal : t -> t -> bool
-  val compare : t -> t -> int
-  val hash : t -> int
-  val pp : t CCFormat.printer
-end
-
 module type S = sig
-  module I : TERM
-  module Case : TERM
-
-  type inductive_cst = I.t
-  type inductive_case = Case.t
+  type inductive_cst = FOTerm.t
+  type inductive_case = FOTerm.t
 
   type t = Sat_solver.Lit.t
 

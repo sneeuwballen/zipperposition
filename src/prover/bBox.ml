@@ -15,20 +15,12 @@ module type S = BBox_intf.S
 
 let section = Util.Section.make ~parent:Const.section "bbox"
 
-module Make(I : BBox_intf.TERM)
-    (Case : BBox_intf.TERM)
-  : S
-    with module I = I
-     and module Case = Case
-= struct
+module Make(Dummy : sig end) = struct
   type t = Sat_solver.Lit.t
   type lit = t
 
-  module I = I
-  module Case = Case
-
-  type inductive_cst = I.t
-  type inductive_case = Case.t
+  type inductive_cst = T.t
+  type inductive_case = T.t
 
   type injected =
     | Clause_component of Literals.t
@@ -37,7 +29,7 @@ module Make(I : BBox_intf.TERM)
   let compare_injected l1 l2 = match l1, l2 with
     | Clause_component l1, Clause_component l2 -> Lits.compare l1 l2
     | Case (l1,r1), Case (l2,r2) ->
-        CCOrd.(I.compare l1 l2 <?> (Case.compare, r1, r2))
+        CCOrd.(T.compare l1 l2 <?> (T.compare, r1, r2))
     | Clause_component _, Case _ -> 1
     | Case _, Clause_component _ -> -1
 
@@ -45,7 +37,7 @@ module Make(I : BBox_intf.TERM)
     | Clause_component lits ->
         Format.fprintf out "⟦%a⟧" (CCFormat.array ~sep:" ∨ " Literal.pp) lits
     | Case (c, t) ->
-        Format.fprintf out "⟦%a=%a⟧" I.pp c Case.pp t
+        Format.fprintf out "⟦%a=%a⟧" T.pp c T.pp t
 
   module FV = Libzipperposition.FeatureVector.Make(struct
       type t = Lits.t * injected * lit
@@ -58,8 +50,8 @@ module Make(I : BBox_intf.TERM)
   module ITbl = CCHashtbl.Make(Sat_solver.Lit)
   module ICaseTbl = CCHashtbl.Make(struct
       type t = inductive_cst * inductive_case
-      let equal (c1,t1) (c2,t2) = I.equal c1 c2 && Case.equal t1 t2
-      let hash_fun (c,t) h = h |> CCHash.int_ (I.hash c) |> CCHash.int_ (Case.hash t)
+      let equal (c1,t1) (c2,t2) = T.equal c1 c2 && T.equal t1 t2
+      let hash_fun (c,t) h = h |> CCHash.int_ (T.hash c) |> CCHash.int_ (T.hash t)
       let hash = CCHash.apply hash_fun
     end)
 
@@ -147,8 +139,6 @@ module Make(I : BBox_intf.TERM)
     | Clause_component _ -> None
     | Case (t, _) -> Some t
 
-  let iter_injected k = ITbl.values _lit2inj k
-
   let pp out i =
     if not (Bool_lit.sign i) then Format.pp_print_string out "¬";
     let i = Bool_lit.abs i in
@@ -158,5 +148,5 @@ module Make(I : BBox_intf.TERM)
         Format.fprintf out "@[⟦%a⟧@]"
           (CCArray.print ~sep:" ∨ " Literal.pp) lits
     | Some (Case (c, case)) ->
-        Format.fprintf out "⟦%a=%a⟧" I.pp c Case.pp case
+        Format.fprintf out "⟦%a=%a⟧" T.pp c T.pp case
 end

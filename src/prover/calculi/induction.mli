@@ -3,10 +3,23 @@
 
 (** {1 Induction through Cut} *)
 
+open Libzipperposition_parsers
+
 module type S = Induction_intf.S
 
-module Make(E: Env.S)(A : Avatar_intf.S) :
-  S with module Env = E
-     and module Ctx = E.Ctx
+module Make
+(E: Env.S)
+(A : Avatar_intf.S with module E = E)
+  : S
+  with module Env = E
+   and module Ctx = E.Ctx
+
+val on_enable : unit Signal.t
+(** Triggered if induction is enabled  *)
+
+val init_from_decls :
+  (ID.t * Ast_tptp.optional_info) Sequence.t -> unit
+(** Initialize from a bunch of declarations' optional info, if one takes
+    only pairs [(some_type_name : $tType, info)] *)
 
 val extension : Extensions.t
