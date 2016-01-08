@@ -6,18 +6,16 @@
 type t = {
   id: int;
   name: string;
-  mutable payload: exn; (** Use [exn] as an open type for user-defined payload *)
+  mutable payload: exn list; (** Use [exn] as an open type for user-defined payload *)
 }
 type t_ = t
-
-exception NoPayload
 
 let make =
   let n = ref 0 in
   fun name ->
     let id = !n in
     incr n;
-    {id; name; payload=NoPayload; }
+    {id; name; payload=[]; }
 
 let copy t = make t.name
 
@@ -25,7 +23,7 @@ let id t = t.id
 let name t = t.name
 let payload t = t.payload
 
-let set_payload t e = t.payload <- e
+let add_payload t e = t.payload <- e :: t.payload
 
 let hash t = t.id
 let hash_fun t h = CCHash.int t.id h
