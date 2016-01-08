@@ -304,21 +304,29 @@ let to_cnf ?opts decls =
   (* formulas with correct negation sign *)
   let ctx = Skolem.create () in
   let res = CCVector.create() in
+  (* how to process a given formula *)
+  let process_form name role f =
+    let f, role = match role with
+     | A.R_conjecture -> F.not_ f, A.R_negated_conjecture
+     | _ -> f, role
+   in
+   let stmts = Cnf.cnf_of ?opts ~ctx f (role, A.string_of_name name) in
+   CCVector.append res stmts
+  in
   Sequence.iter
     (function
      | A.TFF(name,r,f,_)
      | A.FOF(name,r,f,_) ->
-         let f, role = match r with
-           | A.R_conjecture -> F.not_ f, A.R_negated_conjecture
-           | _ -> f, r
-         in
-         let stmts = Cnf.cnf_of ?opts ~ctx f (role, A.string_of_name name) in
-         CCVector.append res stmts
+         process_form name r f
+     | A.CNF (name,r,f,_) ->
+         let f = F.or_ f in
+         process_form name r f
      | A.NewType (name, id, ty, _)
      | A.TypeDecl (name, id, ty, _) ->
          let st = Statement.ty_decl ~src:(A.R_type, A.string_of_name name) id ty in
          CCVector.push res st;
      | A.THF _ -> failwith "cnf_of_tptp cannot deal with HO terms right now."
-     | _ -> ())
+     | A.Include _
+     | A.IncludeOnly (_,_) -> ())
     decls;
   CCVector.freeze res
