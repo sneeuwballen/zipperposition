@@ -710,13 +710,14 @@ module Unary = struct
 
   let unification ?(subst=Substs.empty) a b =
     Util.with_prof prof_unify
-      (fun () -> unif_rec ~op:O_unify subst a b)
+      (fun () -> unif_rec ~op:O_unify subst a b) ()
 
   let matching ?(subst=Substs.empty) ~pattern b =
     if Scoped.same_scope pattern b then invalid_arg "Unif.matching: same scopes";
     let scope = Scoped.scope b in
     Util.with_prof prof_matching
       (fun () -> unif_rec ~op:(O_match_protect (`Scope scope)) subst pattern b)
+      ()
 
   let matching_same_scope
   ?(protect=Sequence.empty) ?(subst=S.empty) ~scope ~pattern b =
@@ -725,8 +726,10 @@ module Unary = struct
     let protect = Sequence.append protect (T.Seq.vars b) in
     let blocked = T.VarSet.of_seq protect in
     Util.with_prof prof_matching
-      (fun () -> unif_rec ~op:(O_match_protect (`Vars blocked)) subst
-        (Scoped.make pattern scope) (Scoped.make b scope))
+      (fun () ->
+        unif_rec ~op:(O_match_protect (`Vars blocked)) subst
+          (Scoped.make pattern scope) (Scoped.make b scope))
+      ()
 
   let matching_adapt_scope ?protect ?subst ~pattern t =
     if Scoped.same_scope pattern t

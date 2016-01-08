@@ -207,17 +207,17 @@ let exit_prof profiler =
     if delta > profiler.prof_max then profiler.prof_max <- delta;
   )
 
-let with_prof p f =
+let with_prof p f x =
   if !enable_profiling then (
     enter_prof p;
     try
-      let x = f () in
+      let y = f x in
       exit_prof p;
-      x
+      y
     with e ->
       exit_prof p;
       raise e
-  ) else f ()
+  ) else f x
 
 let show_profilers out () =
   Format.fprintf out "@[<v>";
