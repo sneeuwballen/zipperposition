@@ -132,7 +132,7 @@ Library "libzipperposition_prover"
                     calculi/ArithInt,
                     calculi/Heuristics,
                     meta/MetaProverState
-  InternalModules:  lib/SmallSet, lib/UnionFind, lib/Mixtbl, lib/Signal
+  InternalModules:  lib/UnionFind, lib/Signal
   Build$:           flag(meta) && flag(parsers)
   Install$:         flag(meta) && flag(parsers)
   BuildDepends:     containers, containers.advanced, sequence, gen, unix,

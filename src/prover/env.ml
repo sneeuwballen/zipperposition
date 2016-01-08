@@ -301,10 +301,12 @@ module Make(X : sig
   let is_passive c =
     C.CSet.mem (ProofState.PassiveSet.clauses ()) c
 
+  module StrSet = Set.Make(String)
+
   (** Apply rewrite rules AND evaluation functions *)
   let rewrite c =
     Util.debugf ~section 5 "rewrite clause@ @[%a@]..." (fun k->k C.pp c);
-    let applied_rules = ref (SmallSet.empty ~cmp:String.compare) in
+    let applied_rules = ref StrSet.empty in
     let rec reduce_term rules t =
       match rules with
       | [] -> t
@@ -312,7 +314,7 @@ module Make(X : sig
           begin match r t with
           | None -> reduce_term rules' t (* try next rules *)
           | Some t' ->
-              applied_rules := SmallSet.add !applied_rules name;
+              applied_rules := StrSet.add name !applied_rules;
               Util.debugf ~section 5 "@[rewrite @[%a@]@ into @[%a@]@]"
                 (fun k->k T.pp t T.pp t');
               reduce_term !_rewrite_rules t'  (* re-apply all rules *)
@@ -324,10 +326,10 @@ module Make(X : sig
         (fun lit -> Lit.map (reduce_term !_rewrite_rules) lit)
         (C.lits c)
     in
-    if SmallSet.is_empty !applied_rules
+    if StrSet.is_empty !applied_rules
     then SimplM.return_same c (* no simplification *)
     else (
-      let rule = "rw_" ^ (String.concat "_" (SmallSet.to_list !applied_rules)) in
+      let rule = "rw_" ^ (String.concat "_" (StrSet.elements !applied_rules)) in
       let proof c' = Proof.mk_c_simp ~rule c' [C.proof c] in
       let c' = C.create_a ~trail:(C.trail c) lits' proof in
       Util.debugf ~section 3 "@[term rewritten clause @[%a@]@ into @[%a@]"
@@ -337,7 +339,7 @@ module Make(X : sig
 
   (** Apply literal rewrite rules *)
   let rewrite_lits c =
-    let applied_rules = ref (SmallSet.empty ~cmp:String.compare) in
+    let applied_rules = ref StrSet.empty in
     let rec rewrite_lit rules lit = match rules with
       | [] -> lit
       | (name,r)::rules' ->
@@ -345,7 +347,7 @@ module Make(X : sig
           if Lit.equal_com lit lit'
           then rewrite_lit rules' lit
           else begin
-            applied_rules := SmallSet.add !applied_rules name;
+            applied_rules := StrSet.add name !applied_rules;
             Util.debugf ~section 5 "@[rewritten lit @[%a@]@ into @[%a@]@ (using %s)@]"
               (fun k->k Lit.pp lit Lit.pp lit' name);
             rewrite_lit !_lit_rules lit'
@@ -357,7 +359,7 @@ module Make(X : sig
     then SimplM.return_same c
     else (
       (* simplifications occurred! *)
-      let rule = "lit_rw_" ^ (String.concat "_" (SmallSet.to_list !applied_rules)) in
+      let rule = "lit_rw_" ^ (String.concat "_" (StrSet.elements !applied_rules)) in
       let proof c' = Proof.mk_c_simp ~rule c' [C.proof c]  in
       let c' = C.create_a ~trail:(C.trail c) lits proof in
       Util.debugf ~section 3 "@[lit rewritten @[%a@]@ into @[%a@]@]"
