@@ -26,16 +26,21 @@ module Make(X : sig
   module C = Clause.Make(Ctx)
   module ProofState = ProofState.Make(C)
 
+
   type inf_rule = C.t -> C.t list
   (** An inference returns a list of conclusions *)
 
   type generate_rule = unit -> C.t list
+  (** Generation of clauses regardless of current clause *)
 
   type binary_inf_rule = inf_rule
   type unary_inf_rule = inf_rule
 
-  type simplify_rule = C.t -> C.t
-  (** Simplify the clause structurally (basic simplifications) *)
+  type simplify_rule = C.t -> C.t SimplM.t
+  (** Simplify the clause structurally (basic simplifications),
+      in the simplification monad.
+      [(c, `Same)] means the clause has not been simplified;
+      [(c, `New)] means the clause has been simplified at least once *)
 
   type active_simplify_rule = simplify_rule
   type rw_simplify_rule = simplify_rule
@@ -49,13 +54,15 @@ module Make(X : sig
   type redundant_rule = C.t -> bool
   (** check whether the clause is redundant w.r.t the set *)
 
-  type backward_redundant_rule = C.t -> C.CSet.t
-  (** find redundant clauses in [ProofState.ActiveSet] w.r.t the clause *)
+  type backward_redundant_rule = C.CSet.t -> C.t -> C.CSet.t
+  (** find redundant clauses in [ProofState.ActiveSet] w.r.t the clause.
+       first param is the set of already known redundant clause, the rule
+       should add clauses to it *)
 
   type is_trivial_rule = C.t -> bool
   (** Rule that checks whether the clause is trivial (a tautology) *)
 
-  type term_rewrite_rule = FOTerm.t -> FOTerm.t
+  type term_rewrite_rule = FOTerm.t -> FOTerm.t option
   (** Rewrite rule on terms *)
 
   type lit_rewrite_rule = Literal.t -> Literal.t
@@ -65,20 +72,20 @@ module Make(X : sig
   (** (maybe) rewrite a clause to a set of clauses.
       Must return [None] if the clause is unmodified *)
 
-  let _binary_rules = ref []
-  let _unary_rules = ref []
-  let _rewrite_rules = ref []
-  let _lit_rules = ref []
-  let _basic_simplify = ref []
+  let _binary_rules : (string * binary_inf_rule) list ref = ref []
+  let _unary_rules : (string * unary_inf_rule) list ref = ref []
+  let _rewrite_rules : (string * term_rewrite_rule) list ref = ref []
+  let _lit_rules : (string * lit_rewrite_rule) list ref = ref []
+  let _basic_simplify : simplify_rule list ref = ref []
   let _rw_simplify = ref []
   let _active_simplify = ref []
   let _backward_simplify = ref []
   let _redundant = ref []
-  let _backward_redundant = ref []
-  let _is_trivial = ref []
+  let _backward_redundant : backward_redundant_rule list ref = ref []
+  let _is_trivial : is_trivial_rule list ref = ref []
   let _empty_clauses = ref C.CSet.empty
-  let _multi_simpl_rule = ref []
-  let _generate_rules = ref []
+  let _multi_simpl_rule : multi_simpl_rule list ref = ref []
+  let _generate_rules : (string * generate_rule) list ref = ref []
   let _step_init = ref []
 
   let on_start = Signal.create()
@@ -203,11 +210,9 @@ module Make(X : sig
   let prof_is_redundant = Util.mk_profiler "is_redundant"
   let prof_subsumed_by = Util.mk_profiler "subsumed_by"
 
-  let stat_killed_orphans = Util.mk_stat "orphan clauses removed"
   let stat_inferred = Util.mk_stat "inferred clauses"
 
   type stats = int * int * int
-  (** statistics on clauses : num active, num passive, num simplification *)
 
   let stats () = ProofState.stats ()
 
@@ -224,7 +229,7 @@ module Make(X : sig
            (fun cset st -> match Statement.view st with
             | Statement.Assert c ->
                 let c = Cnf.clause_to_fo c in
-                let c = C.of_forms c proof in
+                let c = C.of_forms ~trail:Trail.empty c proof in
                 C.CSet.add cset c
             | Statement.TyDecl (s, ty) ->
                 let ctx = Type.Conv.create() in
@@ -304,32 +309,31 @@ module Make(X : sig
       match rules with
       | [] -> t
       | (name, r)::rules' ->
-          let t' = r t in
-          if t != t'
-          then (
-            applied_rules := SmallSet.add !applied_rules name;
-            Util.debugf ~section 5 "@[rewrite @[%a@]@ into @[%a@]@]"
-              (fun k->k T.pp t T.pp t');
-            reduce_term !_rewrite_rules t'  (* re-apply all rules *)
-          ) else
-            reduce_term rules' t  (* try next rule *)
+          begin match r t with
+          | None -> reduce_term rules' t (* try next rules *)
+          | Some t' ->
+              applied_rules := SmallSet.add !applied_rules name;
+              Util.debugf ~section 5 "@[rewrite @[%a@]@ into @[%a@]@]"
+                (fun k->k T.pp t T.pp t');
+              reduce_term !_rewrite_rules t'  (* re-apply all rules *)
+          end
     in
     (* reduce every literal *)
-    let lits' = Array.map
+    let lits' =
+      Array.map
         (fun lit -> Lit.map (reduce_term !_rewrite_rules) lit)
         (C.lits c)
     in
     if SmallSet.is_empty !applied_rules
-    then c (* no simplification *)
-    else begin
+    then SimplM.return_same c (* no simplification *)
+    else (
       let rule = "rw_" ^ (String.concat "_" (SmallSet.to_list !applied_rules)) in
       let proof c' = Proof.mk_c_simp ~rule c' [C.proof c] in
-      let parents = [c] in
-      let new_clause = C.create_a ~parents lits' proof in
+      let c' = C.create_a ~trail:(C.trail c) lits' proof in
       Util.debugf ~section 3 "@[term rewritten clause @[%a@]@ into @[%a@]"
-        (fun k->k C.pp c C.pp new_clause);
-      new_clause
-    end
+        (fun k->k C.pp c C.pp c');
+      SimplM.return_new c'
+    )
 
   (** Apply literal rewrite rules *)
   let rewrite_lits c =
@@ -348,102 +352,102 @@ module Make(X : sig
           end
     in
     (* apply lit rules *)
-    let c = C.follow_simpl c in
     let lits = Array.map (fun lit -> rewrite_lit !_lit_rules lit) (C.lits c) in
-    if Lits.equal_com lits (C.lits c) then c
-    else begin  (* simplifications occurred! *)
+    if Lits.equal_com lits (C.lits c)
+    then SimplM.return_same c
+    else (
+      (* simplifications occurred! *)
       let rule = "lit_rw_" ^ (String.concat "_" (SmallSet.to_list !applied_rules)) in
       let proof c' = Proof.mk_c_simp ~rule c' [C.proof c]  in
-      let parents = [c] in
-      let new_clause = C.create_a ~parents lits proof in
+      let c' = C.create_a ~trail:(C.trail c) lits proof in
       Util.debugf ~section 3 "@[lit rewritten @[%a@]@ into @[%a@]@]"
-        (fun k->k C.pp c C.pp new_clause);
-      new_clause
-    end
-
-  (** All basic simplification of the clause itself *)
-  let rec basic_simplify c =
-    (* first, rewrite terms *)
-    let c = rewrite c in
-    let c = C.follow_simpl c in
-    (* rewrite literals (if needed) *)
-    let c = match !_lit_rules with
-      | [] -> c
-      | l -> rewrite_lits c
-    in
-    let c = C.follow_simpl c in
-    (* apply simplifications *)
-    let c' = match !_basic_simplify with
-      | [] -> c
-      | [f] -> f c
-      | [f;g] -> g (f c)
-      | l -> List.fold_left (fun c f -> f c) c l
-    in
-    (* fixpoint *)
-    if C.equal c c'
-    then c'
-    else (
-      C.simpl_to ~from:c ~into:c';
-      basic_simplify c'  (* fixpoint *)
+        (fun k->k C.pp c C.pp c');
+      SimplM.return_new c'
     )
 
+  (* apply simplification in a fixpoint *)
+  let rec fix_simpl
+  : (C.t -> C.t SimplM.t) -> C.t -> C.t SimplM.t
+  = fun f c ->
+    let open SimplM.Infix in
+    let new_c = f c in
+    if C.equal c (SimplM.get new_c)
+      then new_c (* fixpoint reached *)
+      else new_c >>= fix_simpl f (* some progress was made *)
+
+  (* All basic simplification of the clause itself *)
+  let basic_simplify c =
+    let open SimplM.Infix in
+    fix_simpl
+      (fun c ->
+        (* first, rewrite terms *)
+        rewrite c >>= fun c ->
+        (* rewrite literals (if needed) *)
+        begin match !_lit_rules with
+          | [] -> SimplM.return_same c
+          | _::_ -> rewrite_lits c
+        end
+        >>= fun c ->
+        (* apply simplifications *)
+        begin match !_basic_simplify with
+          | [] -> SimplM.return_same c
+          | [f] -> f c
+          | [f;g] -> f c >>= g
+          | l -> SimplM.app_list l c
+        end)
+      c
+
   (* rewrite clause with simpl_set *)
-  let rec rw_simplify c =
-    if C.get_flag C.flag_persistent c then c else
-      let c = C.follow_simpl c in
-      let c' = match !_rw_simplify with
-        | [] -> c
-        | [f] -> f c
-        | [f;g] -> g (f c)
-        | l -> List.fold_left (fun c f -> f c) c l
-      in
-      if C.equal c c'
-      then c'
-      else
-        let _ = C.simpl_to ~from:c ~into:c' in
-        rw_simplify c'
+  let rw_simplify c =
+    let open SimplM.Infix in
+    fix_simpl
+      (fun c ->
+        if C.get_flag C.flag_persistent c
+        then SimplM.return_same c
+        else match !_rw_simplify with
+          | [] -> SimplM.return_same c
+          | [f] -> f c
+          | [f;g] -> f c >>= g
+          | l -> SimplM.app_list l c)
+      c
 
   (* simplify clause w.r.t. active set *)
-  let rec active_simplify c =
-    if C.get_flag C.flag_persistent c then c else
-      let c' = match !_active_simplify with
-        | [] -> c
-        | [f] -> f c
-        | [f;g] -> f (g c)
-        | l -> List.fold_left (fun c f -> f c) c l
-      in
-      if C.equal c c'
-      then c'
-      else
-        let _ = C.simpl_to ~from:c ~into:c' in
-        active_simplify c'
+  let active_simplify c =
+    let open SimplM.Infix in
+    fix_simpl
+      (fun c ->
+        if C.get_flag C.flag_persistent c
+        then SimplM.return_same c
+        else match !_active_simplify with
+          | [] -> SimplM.return_same c
+          | [f] -> f c
+          | [f;g] -> f c >>= g
+          | l -> SimplM.app_list l c)
+      c
 
-  (** Simplify the hclause. Returns both the hclause and its simplification. *)
-  let simplify old_c =
-    (* fixpoint *)
-    let rec fix old_c =
-      let c = old_c in
-      let c = basic_simplify c in
-      (* simplify with unit clauses, then all active clauses *)
-      let c = rewrite c in
-      let c = rw_simplify c in
-      let c = basic_simplify c in
-      let c = active_simplify c in
-      if Lits.equal_com (C.lits c) (C.lits old_c)
-      then c
-      else (
-        Util.debugf ~section 2 "@[clause @[%a@]@ simplified into @[%a@]@]"
-          (fun k->k C.pp old_c C.pp c);
-        C.simpl_to old_c c;
-        fix c
-      )
-    in
+  let simplify c =
+    let open SimplM.Infix in
     Util.enter_prof prof_simplify;
-    let c = fix old_c in
+    let res = fix_simpl
+      (fun c ->
+        let old_c = c in
+        basic_simplify c >>=
+        (* simplify with unit clauses, then all active clauses *)
+        rewrite >>=
+        rw_simplify >>=
+        basic_simplify >>=
+        active_simplify >>= fun c ->
+        if not (Lits.equal_com (C.lits c) (C.lits old_c))
+        then
+          Util.debugf ~section 2 "@[clause @[%a@]@ simplified into @[%a@]@]"
+            (fun k->k C.pp old_c C.pp c);
+        SimplM.return_same c)
+      c
+    in
     Util.exit_prof prof_simplify;
-    old_c, c
+    res
 
-  let multi_simplify c =
+  let multi_simplify c : C.t list option =
     let did_something = ref false in
     (* try rules one by one until some of them succeeds *)
     let rec try_next c rules = match rules with
@@ -459,8 +463,9 @@ module Make(X : sig
     Queue.push c q;
     while not (Queue.is_empty q) do
       let c = Queue.pop q in
-      if not (C.CSet.mem !set c) then begin
-        let c = basic_simplify c in
+      if not (C.CSet.mem !set c) then (
+        let c, st = basic_simplify c in
+        if st = `New then did_something := true;
         match try_next c !_multi_simpl_rule with
         | None ->
             (* keep the clause! *)
@@ -468,7 +473,7 @@ module Make(X : sig
         | Some l ->
             did_something := true;
             List.iter (fun c -> Queue.push c q) l;
-      end
+      )
     done;
     if !did_something
     then Some (C.CSet.to_list !set)
@@ -482,7 +487,7 @@ module Make(X : sig
     | [f;g] -> C.CSet.union (f given) (g given)
     | l -> List.fold_left (fun set f -> C.CSet.union set (f given)) C.CSet.empty l
 
-  (** Perform backward simplification with the given clause *)
+  (* Perform backward simplification with the given clause *)
   let backward_simplify given =
     Util.enter_prof prof_back_simplify;
     (* set of candidate clauses, that may be unit-simplifiable *)
@@ -492,32 +497,32 @@ module Make(X : sig
     let before, after =
       C.CSet.fold candidates (C.CSet.empty, [])
         (fun (before, after) _ c ->
-           let c' = rw_simplify c in
-           if not (Lits.equal (C.lits c) (C.lits c'))
-           (* the active clause has been simplified! *)
-           then (
-             Util.debugf ~section 2
-               "@[active clause @[%a@]@ simplified into @[%a@]@]"
-               (fun k->k C.pp c C.pp c');
-             C.CSet.add before c, c' :: after
-           ) else
-             before, after)
+           let c', is_new = rw_simplify c in
+           match is_new with
+           | `Same -> before, after
+           | `New ->
+               (* the active clause has been simplified! *)
+               Util.debugf ~section 2
+                 "@[active clause @[%a@]@ simplified into @[%a@]@]"
+                 (fun k->k C.pp c C.pp c');
+               C.CSet.add before c, c' :: after)
     in
     Util.exit_prof prof_back_simplify;
     before, Sequence.of_list after
 
   let simplify_active_with f =
-    let set = C.CSet.fold
+    let set =
+      C.CSet.fold
         (ProofState.ActiveSet.clauses ()) []
         (fun set _id c ->
            match f c with
            | None -> set
-           | Some c'_list ->
-               let c''_list = List.map basic_simplify c'_list in
+           | Some clauses ->
+               let clauses = List.map (fun c -> SimplM.get (basic_simplify c)) clauses in
                Util.debugf ~section 3
                 "@[active clause @[%a@]@ simplified into clauses @[%a@]@]"
-                 (fun k->k C.pp c (CCFormat.list C.pp) c''_list);
-               (c, c''_list) :: set
+                 (fun k->k C.pp c (CCFormat.list C.pp) clauses);
+               (c, clauses) :: set
         )
     in
     (* remove clauses from active set, put their simplified version into
@@ -525,18 +530,14 @@ module Make(X : sig
     ProofState.ActiveSet.remove (Sequence.of_list set |> Sequence.map fst);
     Sequence.of_list set
     |> Sequence.map snd
-    |> Sequence.map Sequence.of_list
-    |> Sequence.flatten
+    |> Sequence.flat_map Sequence.of_list
     |> ProofState.PassiveSet.add;
     ()
 
   (** Simplify the clause w.r.t to the active set *)
   let forward_simplify c =
-    let c = C.follow_simpl c in
-    let c = rewrite c in
-    let c = rw_simplify c in
-    let c = basic_simplify c in
-    c
+    let open SimplM.Infix in
+    rewrite c >>= rw_simplify >>= basic_simplify
 
   (** generate all clauses from inferences *)
   let generate given =
@@ -549,7 +550,7 @@ module Make(X : sig
     Queue.push (given, 0) unary_queue;
     while not (Queue.is_empty unary_queue) do
       let c, depth = Queue.pop unary_queue in
-      let c = basic_simplify c in (* simplify a bit the clause *)
+      let c, _ = basic_simplify c in (* simplify a bit the clause *)
       if not (is_trivial c) then (
         (* add the clause to set of inferred clauses, if it's not the original clause *)
         (if depth > 0 then unary_clauses := c :: !unary_clauses);
@@ -575,21 +576,6 @@ module Make(X : sig
     Util.exit_prof prof_generate;
     result
 
-  (** remove direct descendants of the clauses from the passive set *)
-  let remove_orphans removed_clauses =
-    (* remove descendants of the clause. If the descendants are redundant
-       (cf C.flag_redundant) their descendants are also removed *)
-    let remove_descendants c =
-      let orphans = C.descendants c in
-      (* remove orphans from passive set *)
-      SmallSet.to_seq orphans
-      |> ProofState.PassiveSet.remove_by_id;
-      for _i=1 to SmallSet.size orphans do
-        Util.incr_stat stat_killed_orphans
-      done;
-    in
-    Sequence.iter remove_descendants removed_clauses
-
   (** check whether the clause is redundant w.r.t the current active_set *)
   let is_redundant c =
     Util.enter_prof prof_is_redundant;
@@ -605,11 +591,11 @@ module Make(X : sig
   (** find redundant clauses in current active_set *)
   let subsumed_by c =
     Util.enter_prof prof_subsumed_by;
-    let res = match !_backward_redundant with
-      | [] -> C.CSet.empty
-      | [f] -> f c
-      | [f;g] -> C.CSet.union (f c) (g c)
-      | l -> List.fold_left (fun set f -> C.CSet.union set (f c)) C.CSet.empty l
+    let res =
+      List.fold_left
+        (fun set rule -> rule set c)
+        C.CSet.empty
+        !_backward_redundant
     in
     Util.exit_prof prof_subsumed_by;
     res
@@ -618,24 +604,30 @@ module Make(X : sig
       maximally simplified clauses *)
   let all_simplify c =
     Util.enter_prof prof_all_simplify;
+    let did_simplify = ref false in
     let set = ref C.CSet.empty in
     let q = Queue.create () in
     Queue.push c q;
     while not (Queue.is_empty q) do
       let c = Queue.pop q in
-      let _, c' = simplify c in
-      if is_trivial c' || is_redundant c'
+      let c, st = simplify c in
+      if st=`New then did_simplify := true;
+      if is_trivial c || is_redundant c
       then ()
-      else match multi_simplify c' with
+      else match multi_simplify c with
         | None ->
             (* clause has reached fixpoint *)
-            set := C.CSet.add !set c'
+            set := C.CSet.add !set c
         | Some l ->
+            (* continue processing *)
+            did_simplify := true;
             List.iter (fun c -> Queue.push c q) l
     done;
     let res = C.CSet.to_list !set in
     Util.exit_prof prof_all_simplify;
-    res
+    if !did_simplify
+    then SimplM.return_new res
+    else SimplM.return_same res
 
   let step_init () = List.iter (fun f -> f()) !_step_init
 

@@ -17,8 +17,11 @@ module type S = sig
   type binary_inf_rule = inf_rule
   type unary_inf_rule = inf_rule
 
-  type simplify_rule = C.t -> C.t
-  (** Simplify the clause structurally (basic simplifications) *)
+  type simplify_rule = C.t -> C.t SimplM.t
+  (** Simplify the clause structurally (basic simplifications),
+      in the simplification monad.
+      [(c, `Same)] means the clause has not been simplified;
+      [(c, `New)] means the clause has been simplified at least once *)
 
   type active_simplify_rule = simplify_rule
   type rw_simplify_rule = simplify_rule
@@ -32,13 +35,15 @@ module type S = sig
   type redundant_rule = C.t -> bool
   (** check whether the clause is redundant w.r.t the set *)
 
-  type backward_redundant_rule = C.t -> C.CSet.t
-  (** find redundant clauses in [ProofState.ActiveSet] w.r.t the clause *)
+  type backward_redundant_rule = C.CSet.t -> C.t -> C.CSet.t
+  (** find redundant clauses in [ProofState.ActiveSet] w.r.t the clause.
+       first param is the set of already known redundant clause, the rule
+       should add clauses to it *)
 
   type is_trivial_rule = C.t -> bool
   (** Rule that checks whether the clause is trivial (a tautology) *)
 
-  type term_rewrite_rule = FOTerm.t -> FOTerm.t
+  type term_rewrite_rule = FOTerm.t -> FOTerm.t option
   (** Rewrite rule on terms *)
 
   type lit_rewrite_rule = Literal.t -> Literal.t
@@ -182,8 +187,8 @@ module type S = sig
   val is_passive : C.t -> bool
   (** Is the clause a passive clause? *)
 
-  val simplify : C.t -> C.t * C.t
-  (** Simplify the hclause. Returns both the hclause and its simplification. *)
+  val simplify : simplify_rule
+  (** Simplify the clause. *)
 
   val backward_simplify : C.t -> C.CSet.t * C.t Sequence.t
   (** Perform backward simplification with the given clause. It returns the
@@ -198,11 +203,8 @@ module type S = sig
       with the given function. Simplified clauses will be put back in the
       passive set. *)
 
-  val forward_simplify : C.t -> C.t
+  val forward_simplify : simplify_rule
   (** Simplify the clause w.r.t to the active set and experts *)
-
-  val remove_orphans : C.t Sequence.t -> unit
-  (** remove orphans of the (now redundant) clauses *)
 
   val generate : C.t -> C.t Sequence.t
   (** Perform all generating inferences *)
@@ -213,7 +215,7 @@ module type S = sig
   val subsumed_by : C.t -> C.CSet.t
   (** List of active clauses subsumed by the given clause *)
 
-  val all_simplify : C.t -> C.t list
+  val all_simplify : C.t -> C.t list SimplM.t
   (** Use all simplification rules to convert a clause into a set
       of maximally simplified clause (or [[]] if they are all trivial). *)
 
