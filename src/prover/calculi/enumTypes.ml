@@ -217,7 +217,8 @@ module Make(E : Env.S) = struct
                       let proof cc = Proof.mk_c_inference ~info:[S.to_string subst]
                           ~rule:"enum_type_case_switch" cc [C.proof c]
                       in
-                      let c' = C.create_a ~parents:[c] lits' proof in
+                      let trail = C.trail c in
+                      let c' = C.create_a ~trail lits' proof in
                       Util.debugf ~section 3
                         "@[<2>deduce @[%a@]@ from @[%a@]@ @[(enum_type switch on %a)@]@]"
                         (fun k->k C.pp c' C.pp c Type.pp decl.decl_ty);
@@ -266,7 +267,8 @@ module Make(E : Env.S) = struct
         in
         let proof cc = Proof.mk_c_inference
             ~rule:"axiom_enum_types" cc [decl.decl_proof] in
-        let c' = C.create lits proof in
+        let trail = Trail.empty in
+        let c' = C.create ~trail lits proof in
         Util.debugf ~section 3 "@[<2>declare enum type for @[%a@]:@ clause @[%a@]@]"
           (fun k->k ID.pp s C.pp c');
         Util.incr_stat stat_instantiate;

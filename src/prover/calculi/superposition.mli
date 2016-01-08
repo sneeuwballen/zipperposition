@@ -56,25 +56,26 @@ module type S = sig
   val handle_distinct_constants : Literal.t -> Literal.t
   (** Decide on "quoted" "symbols" (which are all distinct) *)
 
-  val basic_simplify : C.t -> C.t
+  val basic_simplify : Env.simplify_rule
   (** basic simplifications (remove duplicate literals, trivial literals,
       destructive equality resolution...) *)
 
-  val demodulate : C.t -> C.t
+  val demodulate : Env.simplify_rule
   (** rewrite clause using orientable unit equations *)
 
   val backward_demodulate : C.CSet.t -> C.t -> C.CSet.t
   (** backward version of demodulation: add to the set active clauses that
       can potentially be rewritten by the given clause *)
 
-  val positive_simplify_reflect : C.t -> C.t
-  val negative_simplify_reflect : C.t -> C.t
+  val positive_simplify_reflect : Env.simplify_rule
+  val negative_simplify_reflect : Env.simplify_rule
 
   val subsumes : Literal.t array -> Literal.t array -> bool
   (** subsumes c1 c2 iff c1 subsumes c2 *)
 
-  val subsumes_with : Literal.t array Scoped.t ->
-    Literal.t array Scoped.t ->
+  val subsumes_with :
+    Literals.t Scoped.t ->
+    Literals.t Scoped.t ->
     Substs.FO.t option
   (** returns subsuming subst if the first clause subsumes the second one *)
 
@@ -84,13 +85,13 @@ module type S = sig
   val subsumed_by_active_set : C.t -> bool
   (** check whether the clause is subsumed by any clause in the set *)
 
-  val subsumed_in_active_set : C.t -> C.CSet.t
+  val subsumed_in_active_set : Env.backward_redundant_rule
   (** list of clauses in the active set that are subsumed by the clause *)
 
-  val contextual_literal_cutting : C.t -> C.t
+  val contextual_literal_cutting : Env.simplify_rule
   (** contexual Literal.t cutting of the given clause by the active set  *)
 
-  val condensation : C.t -> C.t
+  val condensation : Env.simplify_rule
   (** condensation *)
 
   (** {6 Registration} *)

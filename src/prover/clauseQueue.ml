@@ -52,7 +52,7 @@ module Make(C : Clause.S) = struct
         |> Sequence.max ?lt:None
         |> CCOpt.maybe CCFun.id 0
       in
-      let trail = C.get_trail c in
+      let trail = C.trail c in
       let w_lits = weight_lits_ (C.lits c) in
       let w_trail = Trail.fold
           (fun acc t -> match C.Ctx.BoolLit.extract_exn (Sat_solver.Lit.abs t) with

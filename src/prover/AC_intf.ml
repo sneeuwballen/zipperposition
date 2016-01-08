@@ -49,7 +49,7 @@ module type S = sig
   val is_trivial : C.t -> bool
   (** Check whether the clause is AC-trivial *)
 
-  val simplify : C.t -> C.t
+  val simplify : Env.simplify_rule
   (** Simplify the clause modulo AC *)
 
   val setup : unit -> unit

@@ -68,7 +68,8 @@ module Make(E : Env.S)(Solver : Sat_solver.S) = struct
             (fun (acc, b_lits) (case:CI.case) ->
                let b_lit = is_eq_ cst case in
                (* ctx[case] <- b_lit *)
-               let c_case = C.create_a ~parents:[c]
+               let c_case =
+                 C.create_a
                    ~trail:Trail.(singleton b_lit)
                    (ClauseContext.apply ctx (case:>T.t))
                    (fun cc -> Proof.mk_c_inference ~theories:["ind"]
@@ -131,7 +132,7 @@ module Make(E : Env.S)(Solver : Sat_solver.S) = struct
      - two literals [C in loop(i)], [D in loop(j)] if i,j do not depend
         on one another *)
   let has_trivial_trail c =
-    let trail = C.get_trail c |> Trail.to_seq in
+    let trail = C.trail c |> Trail.to_seq in
     (* all i=t where i is inductive *)
     let relevant_cases =
       trail
@@ -184,17 +185,17 @@ module Make(E : Env.S)(Solver : Sat_solver.S) = struct
                end
            | _ -> ()
         );
-      c (* nothing happened *)
+      SimplM.return_same c (* nothing happened *)
     with FoundInductiveLit (idx, pairs) ->
       let lits = CCArray.except_idx (C.lits c) idx in
       let new_lits = List.map (fun (t1,t2) -> Literal.mk_neq t1 t2) pairs in
       let proof cc = Proof.mk_c_inference ~theories:["induction"]
           ~rule:"injectivity_destruct" cc [C.proof c]
       in
-      let c' = C.create ~trail:(C.get_trail c) ~parents:[c] (new_lits @ lits) proof in
+      let c' = C.create ~trail:(C.trail c) (new_lits @ lits) proof in
       Util.debugf ~section 3 "@[<hv2>injectivity:@ simplify @[%a@]@ into @[%a@]@]"
         (fun k->k C.pp c C.pp c');
-      c'
+      SimplM.return_new c'
 
   (* when a clause contains new inductive constants, assert minimality
      of the clause for all those constants independently *)

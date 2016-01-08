@@ -35,7 +35,10 @@ val is_empty : t -> bool
 val is_trivial : t -> bool
 (** returns [true] iff the trail contains both [i] and [-i]. *)
 
-val merge : t list -> t
+val merge : t -> t -> t
+(** Merge several trails (e.g. from different clauses) *)
+
+val merge_l : t list -> t
 (** Merge several trails (e.g. from different clauses) *)
 
 val filter : (bool_lit -> bool) -> t -> t

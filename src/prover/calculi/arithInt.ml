@@ -295,7 +295,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     && C.is_maxlit (info.passive,s_p) subst ~idx:idx_p
     && ALF.is_max ~ord lit_a
     (* && ALF.is_max ~ord lit_p *)
-    then begin
+    then (
       (* the active literals *)
       let lit_a, lit_p = ALF.scale lit_a lit_p in
       (* other literals *)
@@ -325,17 +325,19 @@ module Make(E : Env.S) : S with module Env = E = struct
       in
       let all_lits = new_lit :: lits_a @ lits_p in
       (* build clause *)
-      let proof cc = Proof.mk_c_inference ~theories
+      let proof cc =
+        Proof.mk_c_inference ~theories
           ~info:[Substs.to_string subst; CCFormat.sprintf "lhs(%a)" MF.pp mf_a]
           ~rule:"canc_sup" cc [C.proof info.active; C.proof info.passive] in
-      let new_c = C.create ~parents:[info.active;info.passive] all_lits proof in
+      let trail = C.trail_l [info.active;info.passive] in
+      let new_c = C.create ~trail all_lits proof in
       Util.debugf ~section 5 "@[<2>... gives@ @[%a@]@]" (fun k->k C.pp new_c);
       Util.incr_stat stat_arith_sup;
       new_c :: acc
-    end else begin
+    ) else (
       Util.debug ~section 5 "... has bad ordering conditions";
       acc
-    end
+    )
 
   let canc_sup_active c =
     Util.enter_prof prof_arith_sup;
@@ -530,16 +532,19 @@ module Make(E : Env.S) : S with module Env = E = struct
              add_lit lit (* keep non-arith literals *)
       );
     (* build result clause (if it was simplified) *)
-    let res = if !did_simplify then (
+    let res =
+      if !did_simplify then (
         clauses := CCList.Set.uniq ~eq:C.equal !clauses;
         let proof cc = Proof.mk_c_inference ~theories ~rule:"canc_demod"
             cc (C.proof c :: List.map C.proof !clauses) in
-        let new_c = C.create ~parents:(c::!clauses) (List.rev !lits) proof in
+        let trail = C.trail c in
+        let new_c = C.create ~trail (List.rev !lits) proof in
         Util.incr_stat stat_arith_demod;
         Util.debugf ~section 5 "@[<2>arith demodulation@ of @[%a@]@ with [@[%a@]]@ gives @[%a@]@]"
           (fun k->k C.pp c (Util.pp_list C.pp) !clauses C.pp new_c);
-        new_c
-      ) else c
+        SimplM.return_new new_c
+      ) else
+        SimplM.return_same c
     in
     Util.exit_prof prof_arith_demod;
     res
@@ -615,7 +620,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                       let proof cc = Proof.mk_c_inference
                           ~info:[Substs.to_string subst] ~theories
                           ~rule:"cancellation" cc [C.proof c] in
-                      let new_c = C.create ~parents:[c] all_lits proof in
+                      let trail = C.trail c in
+                      let new_c = C.create ~trail all_lits proof in
                       Util.debugf ~section 3
                         "@[<2>cancellation@ of @[%a@]@ (with %a)@ into @[%a@]@]"
                         (fun k->k C.pp c Substs.pp subst C.pp new_c);
@@ -645,7 +651,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                         Proof.mk_c_inference
                           ~info:[Substs.to_string subst] ~theories
                           ~rule:"cancellation" cc [C.proof c] in
-                      let new_c = C.create ~parents:[c] all_lits proof in
+                      let trail = C.trail c in
+                      let new_c = C.create ~trail all_lits proof in
                       Util.debugf ~section 3
                         "@[<2>cancellation@ of @[%a@]@ (with %a)@ into @[%a@]@]"
                         (fun k->k C.pp c Substs.pp subst C.pp new_c);
@@ -712,11 +719,12 @@ module Make(E : Env.S) : S with module Env = E = struct
                              ~renaming subst (other_lits,0) in
                          (* apply subst and build clause *)
                          let all_lits = new_lit :: other_lits in
-                         let proof cc = Proof.mk_c_inference ~theories
+                         let proof cc =
+                           Proof.mk_c_inference ~theories
                              ~info:[Substs.to_string subst;
                                     CCFormat.sprintf "idx(%d,%d)" idx1 idx2]
                              ~rule:"arith_eq_factoring" cc [C.proof c] in
-                         let new_c = C.create all_lits proof in
+                         let new_c = C.create ~trail:(C.trail c) all_lits proof in
                          Util.debugf ~section 5
                            "@[<2>arith_eq_factoring:@ @[%a@]@ gives @[%a@]@]"
                            (fun k->k C.pp c C.pp new_c);
@@ -799,7 +807,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                     ; CCFormat.sprintf "left(%a)" T.pp (MF.term mf_2)
                     ; CCFormat.sprintf "right(%a)" T.pp (MF.term mf_1)]
               ~rule:"canc_ineq_chaining" cc [C.proof info.left; C.proof info.right] in
-          let new_c = C.create ~parents:[info.left; info.right] all_lits proof in
+          let trail = C.trail_l [info.left; info.right] in
+          let new_c = C.create ~trail all_lits proof in
           Util.debugf ~section 5 "@[<2>ineq chaining@ of @[%a@]@ and @[%a@]@ gives @[%a@]@]"
             (fun k->k C.pp info.left C.pp info.right C.pp new_c);
           Util.incr_stat stat_arith_ineq_chaining;
@@ -824,7 +833,8 @@ module Make(E : Env.S) : S with module Env = E = struct
             let proof cc = Proof.mk_c_inference ~theories
                 ~info:[Substs.to_string subst]
                 ~rule:"canc_case_switch" cc [C.proof info.left; C.proof info.right] in
-            let new_c = C.create ~parents:[info.left; info.right] all_lits proof in
+            let trail = C.trail_l [info.left; info.right] in
+            let new_c = C.create ~trail all_lits proof in
             Util.debugf ~section 5 "@[<2>case switch@ of @[%a@]@ and @[%a@]@ gives @[%a@]@]"
               (fun k->k C.pp info.left C.pp info.right C.pp new_c);
             Util.incr_stat stat_arith_case_switch;
@@ -939,7 +949,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               Proof.mk_c_inference ~theories
                 ~info:[Substs.to_string subst]
                 ~rule:"canc_ineq_factoring" cc [C.proof c] in
-            let new_c = C.create ~parents:[c] lits proof in
+            let new_c = C.create ~trail:(C.trail c) lits proof in
             Util.debugf ~section 5 "@[<2>ineq factoring@ of @[%a@]@ gives @[%a@]@"
               (fun k->k C.pp c C.pp new_c);
             Util.incr_stat stat_arith_ineq_factoring;
@@ -1143,7 +1153,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         let proof cc =
           Proof.mk_c_inference ~theories ~rule:"div_chaining"
             cc [C.proof c1; C.proof c2] in
-        let new_c = C.create ~parents:[c1;c2] all_lits proof in
+        let trail = C.trail_l [c1; c2] in
+        let new_c = C.create ~trail all_lits proof in
         Util.debugf ~section 5 "@[<4>... gives@ @[%a@]@]" (fun k->k C.pp new_c);
         Util.incr_stat stat_arith_div_chaining;
         new_c :: acc
@@ -1235,7 +1246,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof cc =
         Proof.mk_c_inference ~rule:"div_case_switch"
           ~theories cc [C.proof c] in
-      let new_c = C.create ~parents:[c] all_lits proof in
+      let new_c = C.create ~trail:(C.trail c) all_lits proof in
       Util.debugf ~section 5 "@[<2>div_case_switch@ of @[%a@]@ into @[%a@]@]"
         (fun k->k C.pp c C.pp new_c);
       [new_c]
@@ -1295,7 +1306,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let all_lits = List.rev_append lits lits' in
         let proof cc = Proof.mk_c_inference ~rule:"div_prime_decomposition"
             ~theories cc [C.proof c] in
-        let new_c = C.create ~parents:[c] all_lits proof in
+        let new_c = C.create ~trail:(C.trail c) all_lits proof in
         Util.debugf ~section 5
           "@[<2>prime_decomposition- of@ @[%a@]@ into @[%a@]@]"
           (fun k->k C.pp c C.pp new_c);
@@ -1307,7 +1318,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                all_lits.(i) <- lit;
                let proof cc = Proof.mk_c_inference ~theories
                    ~rule:"div_prime_decomposition" cc [C.proof c] in
-               let new_c = C.create_a ~parents:[c] all_lits proof in
+               let new_c = C.create_a ~trail:(C.trail c) all_lits proof in
                new_c)
             lits
         in
@@ -1375,7 +1386,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   let proof cc =
                     Proof.mk_c_inference ~theories
                       ~rule:"divisibility" cc [C.proof c] in
-                  let new_c = C.create ~parents:[c] all_lits proof in
+                  let new_c = C.create ~trail:(C.trail c) all_lits proof in
                   Util.debugf ~section 5 "@[<4>... gives@ @[%a@]@]" (fun k->k C.pp new_c);
                   Util.incr_stat stat_arith_divisibility;
                   new_c :: acc
@@ -1513,7 +1524,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                end
            | _ -> ()
         );
-      c  (* could not simplify *)
+      SimplM.return_same c (* could not simplify *)
     with VarElim (i, subst) ->
       let lits' = CCArray.except_idx (C.lits c) i in
       let renaming = Ctx.renaming_clear () in
@@ -1521,11 +1532,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof cc =
         Proof.mk_c_inference ~theories ~info:[S.to_string subst]
           ~rule:"canc_eq_res" cc [C.proof c] in
-      let c' = C.create ~parents:[c] lits' proof in
+      let c' = C.create ~trail:(C.trail c) lits' proof in
       Util.debugf ~section 4
         "@[<2>arith_eq_res:@ simplify @[%a@]@ into @[%a@]@]"
         (fun k->k C.pp c C.pp c');
-      c'
+      SimplM.return_new c'
 
   exception DiffToLesseq of C.t
 
@@ -1552,19 +1563,22 @@ module Make(E : Env.S) : S with module Env = E = struct
                let proof cc =
                  Proof.mk_c_inference
                    ~theories ~rule:"arith_diff_to_lesseq" cc [C.proof c] in
-               let c' = C.create ~parents:[c] (new_lits @ lits) proof in
+               let c' = C.create ~trail:(C.trail c) (new_lits @ lits) proof in
                Util.debugf ~section 5 "@[<2>diff2less:@ @[%a@]@ into @[%a@]@]"
                  (fun k->k C.pp c C.pp c');
                raise (DiffToLesseq c')
            | _ -> assert false
         );
-      c
-    with DiffToLesseq c -> c
+      SimplM.return_same c
+    with DiffToLesseq c ->
+      SimplM.return_new c
 
   (* inference rule corresponding to {!canc_diff_to_lesseq} *)
   let canc_diff_imply_lesseq c =
-    let c' = canc_diff_to_lesseq c in
-    if C.equal c c' then [] else [c']
+    let c, st = canc_diff_to_lesseq c in
+    match st with
+    | `New -> [c]
+    | `Same -> []
 
   (* flag to be used to know when a clause cannot be purified *)
   let flag_no_purify = C.new_flag ()
@@ -1639,19 +1653,19 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* replace! *)
     let res =
       if C.get_flag flag_no_purify c
-      then c
+      then SimplM.return_same c
       else
         let lits' = Lits.map (purify_term ~root:true) (C.lits c) in
         match !new_lits with
-        | [] -> c (* no change *)
+        | [] -> SimplM.return_same c (* no change *)
         | _::_ ->
             let all_lits = !new_lits @ (Array.to_list lits') in
             let proof cc = Proof.mk_c_inference ~theories ~rule:"purify" cc [C.proof c] in
-            let new_c = C.create ~parents:[c] all_lits proof in
+            let new_c = C.create ~trail:(C.trail c) all_lits proof in
             Util.debugf ~section 5 "@[<2>purify@ @[%a@]@ into @[%a@]@]"
               (fun k->k C.pp c C.pp new_c);
             Util.incr_stat stat_arith_purify;
-            new_c
+            SimplM.return_new new_c
     in
     Util.exit_prof prof_arith_purify;
     res
@@ -1914,7 +1928,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             let proof cc =
               Proof.mk_c_inference
                 ~info ~theories ~rule:"var_elim" cc [C.proof c] in
-            let new_c = C.create ~parents:[c] lits proof in
+            let new_c = C.create ~trail:(C.trail c) lits proof in
             Util.debugf ~section 5
               "@[<2>elimination of %s×%a@ by %a (which:%s)@ in @[%a@]:@ gives @[%a@]@]"
               (fun k->k (Z.to_string view.NVE.lcm) HVar.pp x M.pp by which C.pp c C.pp new_c);

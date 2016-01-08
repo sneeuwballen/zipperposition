@@ -61,25 +61,26 @@ module type S = sig
   val handle_distinct_constants : Literal.t -> Literal.t
   (** Decide on "quoted" "symbols" (which are all distinct) *)
 
-  val basic_simplify : C.t -> C.t
+  val basic_simplify : Env.simplify_rule
   (** basic simplifications (remove duplicate literals, trivial literals,
       destructive equality resolution...) *)
 
-  val demodulate : C.t -> C.t
+  val demodulate : Env.simplify_rule
   (** rewrite clause using orientable unit equations *)
 
   val backward_demodulate : C.CSet.t -> C.t -> C.CSet.t
   (** backward version of demodulation: add to the set active clauses that
       can potentially be rewritten by the given clause *)
 
-  val positive_simplify_reflect : C.t -> C.t
-  val negative_simplify_reflect : C.t -> C.t
+  val positive_simplify_reflect : Env.simplify_rule
+  val negative_simplify_reflect : Env.simplify_rule
 
   val subsumes : Literal.t array -> Literal.t array -> bool
   (** subsumes c1 c2 iff c1 subsumes c2 *)
 
-  val subsumes_with : Literal.t array Scoped.t ->
-    Literal.t array Scoped.t ->
+  val subsumes_with :
+    Literals.t Scoped.t ->
+    Literals.t Scoped.t ->
     Substs.FO.t option
   (** returns subsuming subst if the first clause subsumes the second one *)
 
@@ -89,13 +90,13 @@ module type S = sig
   val subsumed_by_active_set : C.t -> bool
   (** check whether the clause is subsumed by any clause in the set *)
 
-  val subsumed_in_active_set : C.t -> C.CSet.t
+  val subsumed_in_active_set : Env.backward_redundant_rule
   (** list of clauses in the active set that are subsumed by the clause *)
 
-  val contextual_literal_cutting : C.t -> C.t
+  val contextual_literal_cutting : Env.simplify_rule
   (** contexual Literal.t cutting of the given clause by the active set  *)
 
-  val condensation : C.t -> C.t
+  val condensation : Env.simplify_rule
   (** condensation *)
 
   (** {6 Registration} *)
@@ -323,8 +324,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let proof c = Proof.mk_c_inference
           ~info:[S.to_string subst] ~rule
           c [C.proof info.active; C.proof info.passive] in
-      let parents = [info.active; info.passive] in
-      let new_clause = C.create ~parents new_lits proof in
+      let trail = C.trail_l [info.active; info.passive] in
+      let new_clause = C.create ~trail new_lits proof in
       Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       new_clause :: acc
     with ExitSuperposition reason ->
@@ -390,8 +391,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let proof c = Proof.mk_c_inference
           ~info:[S.to_string subst] ~rule
           c [C.proof info.active; C.proof info.passive] in
-      let parents = [info.active; info.passive] in
-      let new_clause = C.create ~parents new_lits proof in
+      let trail = C.trail_l [info.active; info.passive] in
+      let new_clause = C.create ~trail new_lits proof in
       Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       new_clause :: acc
     with ExitSuperposition reason ->
@@ -492,7 +493,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                    ~info:[S.to_string subst] ~rule:"eq_res" c [C.proof clause] in
                let new_lits = CCArray.except_idx (C.lits clause) pos in
                let new_lits = Lit.apply_subst_list ~renaming subst (new_lits,0) in
-               let new_clause = C.create ~parents:[clause] new_lits proof in
+               let new_clause = C.create ~trail:(C.trail clause) new_lits proof in
                Util.debugf ~section 3 "@[<hv2>equality resolution on@ @[%a@]@ yields @[%a@]@]"
                  (fun k->k C.pp clause C.pp new_clause);
                new_clause::acc
@@ -543,7 +544,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           (S.FO.apply ~renaming subst (v, info.scope))
       in
       let new_lits = lit' :: new_lits in
-      let new_clause = C.create ~parents:[info.clause] new_lits proof in
+      let new_clause = C.create ~trail:(C.trail info.clause) new_lits proof in
       Util.debugf ~section 3 "@[<hv2>equality factoring on@ @[%a@]@ yields @[%a@]@]"
         (fun k->k C.pp info.clause C.pp new_clause);
       new_clause :: acc
@@ -717,21 +718,23 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* demodulate every literal *)
     let lits = Array.mapi demod_lit (C.lits c) in
     if Lits.equal_com (C.lits c) lits
-    then ( (* no rewriting performed *)
+    then (
+      (* no rewriting performed *)
       Util.exit_prof prof_demodulate;
-      c
+      SimplM.return_same c
     ) else (
       (* construct new clause *)
       clauses := CCList.Set.uniq ~eq:C.equal !clauses;
-      let proof c' = Proof.mk_c_simp ~rule:"demod" c'
+      let proof c' =
+        Proof.mk_c_simp ~rule:"demod" c'
           (C.proof c :: List.map C.proof !clauses) in
-      let parents = c :: C.parents c in
-      let new_c = C.create_a ~parents lits proof in
+      let trail = C.trail c in (* we know that demodulating rules have smaller trail *)
+      let new_c = C.create_a ~trail lits proof in
       Util.debugf ~section 3 "@[<hv2>demodulate@ @[%a@]@ into @[%a@]@ using @[%a@]@]"
         (fun k->k C.pp c C.pp new_c (Util.pp_list C.pp) !clauses);
       (* return simplified clause *)
       Util.exit_prof prof_demodulate;
-      new_c
+      SimplM.return_new new_c
     )
 
   (** Find clauses that [given] may demodulate, add them to set *)
@@ -796,7 +799,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         in
         triv || check lits (i+1)
     in
-    let is_tauto = check (C.lits c) 0 || Trail.is_trivial (C.get_trail c) in
+    let is_tauto = check (C.lits c) 0 || Trail.is_trivial (C.trail c) in
     if is_tauto then Util.debugf ~section 3 "@[@[%a@]@ is a tautology@]" (fun k->k C.pp c);
     is_tauto
 
@@ -838,7 +841,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let basic_simplify c =
     if C.get_flag flag_simplified c
-    then c
+    then SimplM.return_same c
     else (
       Util.enter_prof prof_basic_simplify;
       Util.incr_stat stat_basic_simplify_calls;
@@ -884,16 +887,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       then (
         Util.exit_prof prof_basic_simplify;
         C.set_flag flag_simplified c true;
-        c  (* no simplification *)
+        SimplM.return_same c  (* no simplification *)
       ) else (
         let proof cc= Proof.mk_c_simp ~rule:"simplify" cc [C.proof c] in
-        let new_clause = C.create ~parents:[c] new_lits proof in
+        let new_clause = C.create ~trail:(C.trail c) new_lits proof in
         Util.debugf ~section 3
           "@[<2>@[%a@]@ basic_simplifies into @[%a@]@ with @[%a@]@]"
           (fun k->k C.pp c C.pp new_clause S.pp !subst);
         Util.incr_stat stat_basic_simplify;
         Util.exit_prof prof_basic_simplify;
-        new_clause
+        SimplM.return_new new_clause
       )
     )
 
@@ -975,16 +978,20 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* fold over literals *)
     let lits, premises = iterate_lits [] (C.lits c |> Array.to_list) [] in
     if List.length lits = Array.length (C.lits c)
-    then (Util.exit_prof prof_pos_simplify_reflect; c) (* no literal removed, keep c *)
-    else
+    then (
+      (* no literal removed, keep c *)
+      Util.exit_prof prof_pos_simplify_reflect;
+      SimplM.return_same c
+    ) else (
       let proof c' = Proof.mk_c_simp
           ~rule:"simplify_reflect+" c' (C.proof c::premises) in
-      let parents = c :: C.parents c in
-      let new_c = C.create ~parents lits proof in
+      let trail = C.trail c in
+      let new_c = C.create ~trail lits proof in
       Util.debugf ~section 3 "@[@[%a@]@ pos_simplify_reflect into @[%a@]@]"
         (fun k->k C.pp c C.pp new_c);
       Util.exit_prof prof_pos_simplify_reflect;
-      new_c
+      SimplM.return_new new_c
+    )
 
   let negative_simplify_reflect c =
     Util.enter_prof prof_neg_simplify_reflect;
@@ -1023,16 +1030,19 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* fold over literals *)
     let lits, premises = iterate_lits [] (C.lits c |> Array.to_list) [] in
     if List.length lits = Array.length (C.lits c)
-    then (Util.exit_prof prof_neg_simplify_reflect; c) (* no literal removed *)
-    else
+    then (
+      (* no literal removed *)
+      Util.exit_prof prof_neg_simplify_reflect;
+      SimplM.return_same c
+    ) else (
       let proof c' = Proof.mk_c_simp ~rule:"simplify_reflect-"
           c' (C.proof c :: premises) in
-      let parents = c :: C.parents c in
-      let new_c = C.create ~parents lits proof in
+      let new_c = C.create ~trail:(C.trail c) lits proof in
       Util.debugf ~section 3 "@[@[%a@]@ neg_simplify_reflect into @[%a@]@]"
         (fun k->k C.pp c C.pp new_c);
       Util.exit_prof prof_neg_simplify_reflect;
-      new_c
+      SimplM.return_new new_c
+    )
 
   (* ----------------------------------------------------------------------
    * subsumption
@@ -1215,7 +1225,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     );
     res
 
-  let subsumed_in_active_set c =
+  let subsumed_in_active_set acc c =
     Util.enter_prof prof_subsumption_in_set;
     Util.incr_stat stat_subsumed_in_active_set_call;
     (* if c is a single unit clause *)
@@ -1232,12 +1242,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              let redundant =
                (try_eq_subsumption && eq_subsumes (C.lits c) (C.lits c'))
                || subsumes (C.lits c) (C.lits c')
-             in if redundant then (
+             in
+             if redundant then (
                Util.incr_stat stat_clauses_subsumed;
                C.CSet.add res c'
              ) else res
            else res)
-        C.CSet.empty
+        acc
     in
     Util.exit_prof prof_subsumption_in_set;
     res
@@ -1258,12 +1269,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   exception RemoveLit of int * C.t
 
   (** Performs successive contextual literal cuttings *)
-  let rec contextual_literal_cutting c =
-    Util.enter_prof prof_clc;
+  let rec contextual_literal_cutting_rec c =
+    let open SimplM.Infix in
     if Array.length (C.lits c) <= 1
-    || num_equational (C.lits c) > 3
-    || Array.length (C.lits c) > 8
-    then (Util.exit_prof prof_clc; c) else
+      || num_equational (C.lits c) > 3
+      || Array.length (C.lits c) > 8
+    then SimplM.return_same c
+    else
       (* do we need to try to use equality subsumption? *)
       let try_eq_subsumption = CCArray.exists Lit.is_eqn (C.lits c) in
       (* try to remove one literal from the literal array *)
@@ -1296,21 +1308,26 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           Some (CCArray.except_idx lits i, i, c')
       in
       match remove_one_lit (Array.copy (C.lits c)) with
-      | None -> (Util.exit_prof prof_clc; c) (* no literal removed *)
+      | None ->
+          SimplM.return_same c (* no literal removed *)
       | Some (new_lits, i, c') ->
           (* hc' allowed us to cut a literal *)
           assert (List.length new_lits + 1 = Array.length (C.lits c));
           let info = [CCFormat.sprintf "cut lit %a" Lit.pp (C.lits c).(i)] in
           let proof c'' = Proof.mk_c_inference ~rule:"clc" ~info c'' [C.proof c; C.proof c'] in
-          let parents = c :: C.parents c in
-          let new_c = C.create ~parents new_lits proof in
+          let new_c = C.create ~trail:(C.trail c) new_lits proof in
           Util.debugf ~section 3
             "@[<2>contextual literal cutting@ in @[%a@]@ using @[%a@]@ gives @[%a@]@]"
             (fun k->k C.pp c C.pp c' C.pp new_c);
           Util.incr_stat stat_clc;
           (* try to cut another literal *)
-          Util.exit_prof prof_clc;
-          contextual_literal_cutting new_c
+          SimplM.return_new new_c >>= contextual_literal_cutting_rec
+
+  let contextual_literal_cutting c =
+    Util.enter_prof prof_clc;
+    let res = contextual_literal_cutting_rec c in
+    Util.exit_prof prof_clc;
+    res
 
   (* ----------------------------------------------------------------------
    * contraction (condensation)
@@ -1324,12 +1341,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       If there are too many equational literals, the simplification is disabled to
       avoid pathologically expensive subsumption checks.
       TODO remove this limitation after an efficient subsumption check is implemented. *)
-  let rec condensation c =
-    Util.enter_prof prof_condensation;
+  let rec condensation_rec c =
+    let open SimplM.Infix in
     if Array.length (C.lits c) <= 1
-    || num_equational (C.lits c) > 3
-    || Array.length (C.lits c) > 8
-    then (Util.exit_prof prof_condensation; c) else
+      || num_equational (C.lits c) > 3
+      || Array.length (C.lits c) > 8
+    then SimplM.return_same c
+    else
       (* scope is used to rename literals for subsumption *)
       let lits = C.lits c in
       let n = Array.length lits in
@@ -1362,20 +1380,22 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               substs
           done;
         done;
-        Util.exit_prof prof_condensation;
-        c
+        SimplM.return_same c
       with CondensedInto (new_lits, subst) ->
         (* clause is simplified *)
-        let proof c' = Proof.mk_c_simp ~info:[S.to_string subst]
+        let proof c' =
+          Proof.mk_c_simp ~info:[S.to_string subst]
             ~rule:"condensation" c' [C.proof c] in
-        let parents = c :: C.parents c in
-        let new_c = C.create_a ~parents new_lits proof in
-        Util.debugf ~section 3 "@[<2>condensation@ of @[%a@] (with @[%a@])@ gives @[%a@]@]"
-          (fun k->k C.pp c S.pp subst C.pp new_c);
+        let c' = C.create_a ~trail:(C.trail c) new_lits proof in
+        Util.debugf ~section 3
+          "@[<2>condensation@ of @[%a@] (with @[%a@])@ gives @[%a@]@]"
+          (fun k->k C.pp c S.pp subst C.pp c');
         (* try to condense further *)
-        Util.exit_prof prof_condensation;
         Util.incr_stat stat_condensation;
-        condensation new_c
+        SimplM.return_new c' >>= condensation_rec
+
+  let condensation c =
+    Util.with_prof prof_condensation condensation_rec c
 
   (** {2 Registration} *)
 
@@ -1402,17 +1422,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ()
 
   let register () =
+    let open SimplM.Infix in
     let rw_simplify c =
-      let c = basic_simplify (demodulate c) in
-      let c = positive_simplify_reflect c in
-      let c = negative_simplify_reflect c in
-      c
+      demodulate c
+      >>= basic_simplify
+      >>= positive_simplify_reflect
+      >>= negative_simplify_reflect
     and active_simplify c =
-      (* condensation *)
-      let c = condensation c in
-      (* contextual literal cutting *)
-      let c = contextual_literal_cutting c in
-      c
+      condensation c
+      >>= contextual_literal_cutting
     and backward_simplify c =
       let set = C.CSet.empty in
       backward_demodulate set c

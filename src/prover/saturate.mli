@@ -4,8 +4,6 @@
 (** {1 Main saturation algorithm.}
     It uses inference rules and simplification rules from Superposition. *)
 
-open Libzipperposition
-
 (** The SZS status of a state *)
 type szs_status =
   | Unsat of Proof.t
@@ -25,8 +23,9 @@ module type S = sig
       It performs generating inferences only if [generating] is true (default);
       other parameters are the iteration number and the environment *)
 
-  val given_clause: ?generating:bool -> ?steps:int -> ?timeout:float ->
-                    unit -> szs_status * int
+  val given_clause:
+    ?generating:bool -> ?steps:int -> ?timeout:float ->
+    unit -> szs_status * int
   (** run the given clause until a timeout occurs or a result
       is found. It returns a tuple (new state, result, number of steps done).
       It performs generating inferences only if [generating] is true (default) *)

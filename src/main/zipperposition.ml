@@ -104,7 +104,6 @@ module MakeNew(X : sig
     in
     print_gc ();
     print_hashcons_stats "terms" (InnerTerm.hashcons_stats ());
-    print_hashcons_stats "clauses" (C.CHashcons.stats ());
     print_state_stats (Env.stats ());
     Util.print_global_stats ();
     ()

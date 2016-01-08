@@ -38,7 +38,9 @@ let is_trivial trail =
     (fun i -> BLit.Set.mem (BLit.neg i) trail)
     trail
 
-let merge = function
+let merge = BLit.Set.union
+
+let merge_l = function
   | [] -> BLit.Set.empty
   | [t] -> t
   | [t1;t2] -> BLit.Set.union t1 t2
@@ -53,7 +55,7 @@ let is_active trail ~v =
   BLit.Set.for_all
     (fun i ->
        let j = BLit.abs i in
-       (BLit.sign i) = (v j)  (* valuation match sign *)
-    ) trail
+       (BLit.sign i) = (v j))  (* valuation match sign *)
+    trail
 
 let to_seq = BLit.Set.to_seq

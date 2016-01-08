@@ -132,10 +132,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
                let lits = Array.of_list lits in
                let bool_name = BoolLit.inject_lits lits in
                let trail =
-                 C.get_trail c
+                 C.trail c
                  |> Trail.add bool_name
                in
-               let c = C.create_a ~parents:[c] ~trail lits proof in
+               let c = C.create_a ~trail lits proof in
                C.set_bool_name c bool_name;
                c, bool_name
             ) !components
@@ -145,7 +145,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
           (fun k->k C.pp c (Util.pp_list C.pp) clauses);
         (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
         let bool_guard =
-          C.get_trail c
+          C.trail c
           |> Trail.to_list
           |> List.map Bool_lit.neg in
         let bool_clause = List.append bool_clause bool_guard in
@@ -171,11 +171,11 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
 
   (* if c.lits = [], negate c.trail *)
   let check_empty c =
-    if Array.length (C.lits c) = 0 && !filter_absurd_trails_ (C.get_trail c)
+    if Array.length (C.lits c) = 0 && !filter_absurd_trails_ (C.trail c)
     then (
-      assert (not (Trail.is_empty (C.get_trail c)));
+      assert (not (Trail.is_empty (C.trail c)));
       let b_clause =
-        C.get_trail c
+        C.trail c
         |> Trail.to_list
         |> List.map Bool_lit.neg
       in
@@ -256,7 +256,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
           in
           let proof cc = Proof.mk_c_inference
               ~rule:"sat" ~theories:["sat"] cc premises in
-          let c = C.create [] proof in
+          let c = C.create ~trail:Trail.empty [] proof in
           [c]
     in
     Signal.send after_check_sat ();

@@ -47,7 +47,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let add_clause l r =
       let theories = [CCFormat.sprintf "ac(%a)" ID.pp s] in
       let proof cc = Proof.mk_c_trivial ~theories cc in
-      let c = C.create [ Lit.mk_eq l r ] proof in
+      let c = C.create ~trail:Trail.empty [ Lit.mk_eq l r ] proof in
       C.set_flag C.flag_persistent c true;
       res := c :: !res
     in
@@ -117,7 +117,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let simplify c =
     Util.enter_prof prof_simplify;
     if exists_ac ()
-    then
+    then (
       let n = Array.length (C.lits c) in
       let module A = T.AC(struct let is_ac = is_ac let is_comm _ = false end) in
       let lits = Array.to_list (C.lits c) in
@@ -132,23 +132,25 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let n' = List.length lits in
       if n' < n && not (C.get_flag C.flag_persistent c)
       then (
+        (* did some simplification *)
         let symbols = symbols_of_terms (C.Seq.terms c) in
         let symbols = Sequence.to_list (ID.Set.to_seq symbols) in
         let ac_proof = CCList.flat_map find_proof symbols in
         let premises = C.proof c :: ac_proof in
         let proof cc = Proof.mk_c_simp ~theories:["ac"]
             ~rule:"normalize" cc premises in
-        let parents = c :: C.parents c in
-        let new_c = C.create ~parents lits proof in
+        let new_c = C.create ~trail:(C.trail c) lits proof in
         Util.exit_prof prof_simplify;
         Util.incr_stat stat_ac_simplify;
         Util.debugf 3 "@[<2>@[%a@]@ AC-simplify into @[%a@]@]"
           (fun k->k C.pp c C.pp new_c);
-        new_c
-      ) else
-        let _ = Util.exit_prof prof_simplify in
-        c (* no simplification *)
-    else c
+        SimplM.return_new new_c
+      ) else (
+        (* no simplification *)
+        Util.exit_prof prof_simplify;
+        SimplM.return_same c
+      )
+    ) else SimplM.return_same c
 
   let setup () =
     (* enable AC inferences if needed *)

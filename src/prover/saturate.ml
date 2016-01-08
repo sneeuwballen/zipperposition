@@ -59,16 +59,16 @@ module Make(E : Env.S) = struct
     match Env.next_passive () with
     | None ->
         (* final check: might generate other clauses *)
-        let clauses = Env.do_generate() in
-        let clauses = clauses
-                      |> Sequence.filter_map
-                        (fun c ->
-                           let _, c = Env.simplify c in
-                           if Env.is_trivial c || Env.is_active c || Env.is_passive c
-                           then None
-                           else Some c
-                        )
-                      |> Sequence.to_list
+        let clauses =
+          Env.do_generate()
+          |> Sequence.filter_map
+            (fun c ->
+               let c, _ = Env.simplify c in
+               if Env.is_trivial c || Env.is_active c || Env.is_passive c
+               then None
+               else Some c
+            )
+          |> Sequence.to_list
         in
         if clauses=[]
         then Sat
@@ -80,16 +80,16 @@ module Make(E : Env.S) = struct
         )
     | Some c ->
         begin match Env.all_simplify c with
-          | [] ->
+          | [], _ ->
               Util.incr_stat stat_redundant_given;
               Util.debugf ~section 2 "@[<2>given clause @[%a@]@ is redundant@]"
                 (fun k->k Env.C.pp c);
               Unknown
-          | l when List.exists Env.C.is_empty l ->
+          | l, _ when List.exists Env.C.is_empty l ->
               (* empty clause found *)
               let proof = Env.C.proof (List.find Env.C.is_empty l) in
               Unsat proof
-          | c :: l' ->
+          | c :: l', _ ->
               (* put clauses of [l'] back in passive set *)
               Env.add_passive (Sequence.of_list l');
               (* process the clause [c] *)
@@ -103,7 +103,6 @@ module Make(E : Env.S) = struct
               let subsumed_active = Env.C.CSet.to_seq (Env.subsumed_by c) in
               Env.remove_active subsumed_active;
               Env.remove_simpl subsumed_active;
-              Env.remove_orphans subsumed_active; (* orphan criterion *)
               (* add given clause to simpl_set *)
               Env.add_simpl (Sequence.singleton c);
               (* simplify active set using c *)
@@ -114,7 +113,6 @@ module Make(E : Env.S) = struct
                  from passive set *)
               Env.remove_active simplified_actives;
               Env.remove_simpl simplified_actives;
-              Env.remove_orphans simplified_actives;
               CCVector.append_seq new_clauses newly_simplified;
               (* add given clause to active set *)
               Env.add_active (Sequence.singleton c);
@@ -125,9 +123,10 @@ module Make(E : Env.S) = struct
                 else Sequence.empty in
               (* simplification of inferred clauses w.r.t active set; only the non-trivial ones
                  are kept (by list-simplify) *)
-              let inferred_clauses = Sequence.fmap
+              let inferred_clauses =
+                Sequence.filter_map
                   (fun c ->
-                     let c = Env.forward_simplify c in
+                     let c, _ = Env.forward_simplify c in
                      (* keep clauses  that are not redundant *)
                      if Env.is_trivial c || Env.is_active c || Env.is_passive c
                      then (
