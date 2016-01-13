@@ -148,6 +148,12 @@ type case = {
 
 type cover_set = case list
 
+let case_equal a b = FOTerm.equal a.case_term b.case_term
+let case_compare a b = FOTerm.compare a.case_term b.case_term
+let case_hash a = FOTerm.hash a.case_term
+
+let pp_case out c = FOTerm.pp out c.case_term
+
 let case_is_rec c = c.case_kind = `Rec
 let case_is_base c = c.case_kind = `Base
 
@@ -162,7 +168,13 @@ type cst = {
 
 exception Payload_cst of cst
 
+let cst_to_term c = FOTerm.const ~ty:c.cst_ty c.cst_id
+
 let cst_equal a b = ID.equal a.cst_id b.cst_id
+let cst_compare a b = ID.compare a.cst_id b.cst_id
+let cst_hash a = ID.hash a.cst_id
+
+let pp_cst out c = ID.pp out c.cst_id
 
 let on_new_cst = Signal.create()
 
@@ -189,8 +201,8 @@ let cases ?(which=`All) set =
   | `Rec -> Sequence.filter case_is_rec seq
 
 (* find inductive constants in terms *)
-let find_cst_in_terms seq =
-  Sequence.flat_map T.Seq.subterms seq
+let find_cst_in_term t =
+  T.Seq.subterms t
   |> Sequence.filter_map
     (fun t -> match T.view t with
       | T.Const id ->
@@ -225,6 +237,10 @@ let as_sub_cst id =
 let as_sub_cst_exn id = match as_sub_cst id with
   | None -> raise (NotAnInductiveSubConstant id)
   | Some x -> x
+
+let case_sub c =
+  ID.Set.to_seq c.case_sub
+  |> Sequence.map as_sub_cst_exn
 
 let is_sub_cst id = match as_sub_cst id with Some _ -> true | _ -> false
 
@@ -410,7 +426,7 @@ let classify id =
   | None -> Other
   | Some x -> x
 
-let prec_constr a b =
+let prec_constr_ a b =
   let to_int_ = function
     | Ty _ -> 0
     | Cstor _ -> 1
@@ -431,3 +447,5 @@ let prec_constr a b =
   | Cst _, _
   | Sub _, _
   | Other, _ -> CCInt.compare (to_int_ c_a) (to_int_ c_b)
+
+let prec_constr = Precedence.Constr.make prec_constr_

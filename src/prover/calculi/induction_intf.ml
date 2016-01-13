@@ -5,7 +5,6 @@
 
 module type S = sig
   module Env : Env.S
-  module Ctx = Env.Ctx
 
   module Meta : sig
     val t : Ind_types.t Plugin.t

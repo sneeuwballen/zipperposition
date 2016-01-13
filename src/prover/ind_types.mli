@@ -23,7 +23,8 @@ type t = private {
        no other type variables than [ty_vars] *)
 }
 
-exception AlreadyDeclared of ID.t
+exception AlreadyDeclaredType of ID.t
+exception AlreadyDeclaredConstant of ID.t
 exception NotAnInductiveType of ID.t
 exception NotAnInductiveConstructor of ID.t
 exception NotAnInductiveConstant of ID.t
@@ -85,6 +86,12 @@ type case = private {
 
 type cover_set
 
+val case_equal : case -> case -> bool
+val case_compare : case -> case -> int
+val case_hash : case -> int
+
+val pp_case : case CCFormat.printer
+
 val case_is_rec : case -> bool
 val case_is_base : case -> bool
 
@@ -111,7 +118,7 @@ val as_cst_exn : ID.t -> cst
 val is_cst : ID.t -> bool
 (** Check whether the given constant is an inductive skolem *)
 
-val declare_cst : ?cover_set_depth:int -> ID.t -> ty:Type.t -> unit
+val declare_cst : ?cover_set_depth:int -> ID.t -> ty:Type.t -> cst
 (** Adds the constant to the set of inductive constants.
     @param cover_set_depth depth of cover_set terms; the deeper, the
       larger the cover set will be
@@ -120,7 +127,15 @@ val declare_cst : ?cover_set_depth:int -> ID.t -> ty:Type.t -> unit
 val on_new_cst : cst Signal.t
 (** Triggered with new inductive constants *)
 
-val cover_set : cst -> FOTerm.Set.t
+val cst_equal : cst -> cst -> bool
+val cst_compare : cst -> cst -> int
+val cst_hash : cst -> int
+
+val cst_to_term : cst -> FOTerm.t
+
+val pp_cst : cst CCFormat.printer
+
+val cover_set : cst -> cover_set
 (** Get the cover set of this constant:
 
     a set of ground terms [[t1,...,tn]] with fresh
@@ -131,8 +146,8 @@ val cover_set : cst -> FOTerm.Set.t
 val cases : ?which:[`Rec|`Base|`All] -> cover_set -> case Sequence.t
 (** Cases of the cover set *)
 
-val find_cst_in_terms : FOTerm.t Sequence.t -> (ID.t * t * Type.t) Sequence.t
-(** [find_cst_in_lits terms] searches subterms of [terms] for constants
+val find_cst_in_term : FOTerm.t -> (ID.t * t * Type.t) Sequence.t
+(** [find_cst_in_lits term] searches subterms of [term] for constants
     that are of an inductive type, that are not constructors nor already
     declared *)
 
@@ -156,9 +171,9 @@ val as_sub_cst_exn : ID.t -> sub_cst
 val is_sub_cst : ID.t -> bool
 (** Is the term a constant that was created within a cover set? *)
 
-val is_sub_constant_of : ID.t -> cst -> bool
+val is_sub_cst_of : ID.t -> cst -> bool
 
-val as_sub_constant_of : ID.t -> cst -> sub_cst option
+val as_sub_cst_of : ID.t -> cst -> sub_cst option
 (** downcasts iff [t] is a sub-constant of [cst] *)
 
 val inductive_cst_of_sub_cst : sub_cst -> cst * case

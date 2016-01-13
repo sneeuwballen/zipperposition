@@ -3,6 +3,7 @@
 
 (** {1 Induction through Cut} *)
 
+open Libzipperposition
 open Libzipperposition_parsers
 
 module type S = Induction_intf.S
@@ -12,7 +13,6 @@ module Make
 (A : Avatar_intf.S with module E = E)
   : S
   with module Env = E
-   and module Ctx = E.Ctx
 
 val on_enable : unit Signal.t
 (** Triggered if induction is enabled  *)

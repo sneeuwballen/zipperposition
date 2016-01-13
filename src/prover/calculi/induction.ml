@@ -4,6 +4,7 @@
 (** {1 Induction through Cut} *)
 
 open Libzipperposition
+open Libzipperposition_parsers
 
 module Lits = Literals
 module T = FOTerm
@@ -26,6 +27,7 @@ module Make
   module Env = E
   module Ctx = E.Ctx
   module C = E.C
+  module BoolBox = Ctx.BoolBox
 
   let lemmas_ = ref []
 
@@ -51,10 +53,12 @@ module Make
   (* terms that are either inductive constants or sub-constants *)
   let constants_or_sub c =
     C.Seq.terms c
-    |> Sequence.flat_map T.Seq.symbols
+    |> Sequence.flat_map T.Seq.subterms
     |> Sequence.filter
-      (fun id -> Ind_types.is_cst id || Ind_types.is_sub_cst id)
-    |> Sequence.sort_uniq ~cmp:ID.compare
+      (fun t -> match T.view t with
+        | T.Const id -> Ind_types.is_cst id || Ind_types.is_sub_cst id
+        | _ -> false)
+    |> Sequence.sort_uniq ~cmp:T.compare
     |> Sequence.to_rev_list
 
   (* sub-terms of an inductive type, that occur several times (candidate
@@ -116,7 +120,7 @@ module Make
       else (
         (* introduce cut now *)
         let proof cc = Proof.mk_c_trivial ~theories:["ind"] ~info:["cut"] cc in
-        let clauses, _ = Avatar.introduce_cut lits proof in
+        let clauses, _ = A.introduce_cut lits proof in
         List.iter (fun c -> C.set_flag flag_cut_introduced c true) clauses;
         Util.debugf ~section 2
           "@[<2>introduce cut@ from %a@ @[<hv0>%a@]@ generalizing on @[%a@]@]"
@@ -148,24 +152,22 @@ module Make
       (fun k->k (Util.pp_list C.pp) !lemmas_)
 
   let () =
-    Signal.on Signals.on_exit
-      (fun _ ->
-         if !show_lemmas_ then show_lemmas ();
-         Signal.ContinueListening
-      );
+    Signal.on_every Signals.on_exit
+      (fun _ -> if !show_lemmas_ then show_lemmas ())
 
   (* scan clauses for ground terms of an inductive type,
      and declare those terms *)
   let scan seq : Ind_types.cst list =
     Sequence.map C.lits seq
-    |> Sequence.flat_map find_inductive_cst
+    |> Sequence.flat_map Lits.Seq.terms
+    |> Sequence.flat_map Ind_types.find_cst_in_term
     |> Sequence.map
-      (fun c ->
-         declare c;
-         CCOpt.get_exn (as_inductive c)
-      )
+      (fun (id,_,ty) -> Ind_types.declare_cst id ~ty)
     |> Sequence.to_rev_list
-    |> CCList.sort_uniq ~cmp:Cst.compare
+    |> CCList.sort_uniq ~cmp:Ind_types.cst_compare
+
+  let is_eq_ (t1:Ind_types.cst) (t2:Ind_types.case) =
+    BoolBox.inject_case t1 t2
 
   (* TODO (similar to Avatar.introduce_lemma, should factorize this)
      - gather vars of c
@@ -175,74 +177,73 @@ module Make
 
   (* [cst] is the minimal term for which [ctx] holds, returns clauses
      expressing that (prepended to [acc]), and a boolean literal. *)
-  let assert_min acc c ctx (cst:Cst.t) =
-    match cover_set ~depth:(cover_set_depth()) cst with
-    | _, `Old -> acc  (* already declared constant *)
-    | set, `New ->
-        (* for each member [t] of the cover set:
-           - add ctx[t] <- [cst=t]
-           - for each [t' subterm t] of same type, add ~[ctx[t']] <- [cst=t]
-        *)
-        let acc, b_lits =
-          Sequence.fold
-            (fun (acc, b_lits) (case:CI.case) ->
-               let b_lit = is_eq_ cst case in
-               (* ctx[case] <- b_lit *)
-               let c_case = C.create_a ~parents:[c]
-                   ~trail:Trail.(singleton b_lit)
-                   (ClauseContext.apply ctx (case:>T.t))
-                   (fun cc -> Proof.mk_c_inference ~theories:["ind"]
-                       ~rule:"split" cc [C.proof c]
-                   )
-               in
-               (* ~ctx[t'] <- b_lit for each t' subterm case *)
-               let c_sub =
-                 Sequence.fold
-                   (fun c_sub (sub:CI.sub_cst) ->
-                      (* ~[ctx[sub]] <- b_lit *)
-                      let clauses = assert false
-                      (* FIXME
-                         let lits = ClauseContext.apply ctx (sub:>T.t) in
-                         let f =
-                         lits
-                         |> Literals.to_form
-                         |> F.close_forall
-                         |> F.Base.not_
-                         in
-                         let proof = Proof.mk_f_inference ~theories:["ind"]
-                          ~rule:"min" f [C.proof c]
-                         in
-                         PFormula.create f proof
-                         |> PFormula.Set.singleton
-                         |> Env.cnf
-                         |> C.CSet.to_list
-                         |> List.map (C.update_trail (C.Trail.add b_lit))
-                      *)
-                      in
-                      clauses @ c_sub
-                   ) [] (CI.sub_constants_case case)
-               in
-               Util.debugf ~section 2
-                 "@[<2>minimality of %a@ in case %a:@ @[<hv>%a@]@]"
-                 (fun k->k ClauseContext.pp ctx CI.Case.pp case
-                     (Util.pp_list C.pp) (c_case :: c_sub));
-               (* return new clauses and b_lit *)
-               c_case :: c_sub @ acc, b_lit :: b_lits
-            ) (acc, []) (CI.cases set)
-        in
-        (* boolean constraint *)
-        (* FIXME: generate boolean clause(s) instead
-           let qform = (QF.imply
-                       (qform_of_trail (C.get_trail c))
-                       (QF.xor_l (List.map QF.atom b_lits))
-                    ) in
+  let assert_min acc c ctx (cst:Ind_types.cst) =
+    let set = Ind_types.cover_set cst in
+    (* for each member [t] of the cover set:
+       - add ctx[t] <- [cst=t]
+       - for each [t' subterm t] of same type, add ~[ctx[t']] <- [cst=t]
+    *)
+    let acc, b_lits =
+      Sequence.fold
+        (fun (acc, b_lits) (case:Ind_types.case) ->
+           let b_lit = is_eq_ cst case in
+           (* ctx[case] <- b_lit *)
+           let c_case =
+             C.create_a
+               ~trail:Trail.(singleton b_lit)
+               (ClauseContext.apply ctx case.Ind_types.case_term)
+               (fun cc -> Proof.mk_c_inference ~theories:["ind"]
+                   ~rule:"split" cc [C.proof c])
+           in
+           (* ~ctx[t'] <- b_lit for each t' subterm case *)
+           let c_sub =
+             Sequence.fold
+               (fun c_sub (sub:Ind_types.sub_cst) ->
+                  (* ~[ctx[sub]] <- b_lit *)
+                  let clauses = assert false
+                  (* FIXME
+                     let lits = ClauseContext.apply ctx (sub:>T.t) in
+                     let f =
+                     lits
+                     |> Literals.to_form
+                     |> F.close_forall
+                     |> F.Base.not_
+                     in
+                     let proof = Proof.mk_f_inference ~theories:["ind"]
+                      ~rule:"min" f [C.proof c]
+                     in
+                     PFormula.create f proof
+                     |> PFormula.Set.singleton
+                     |> Env.cnf
+                     |> C.CSet.to_list
+                     |> List.map (C.update_trail (C.Trail.add b_lit))
+                  *)
+                  in
+                  clauses @ c_sub)
+               [] (Ind_types.sub_constants_case case)
+           in
+           Util.debugf ~section 2
+             "@[<2>minimality of %a@ in case %a:@ @[<hv>%a@]@]"
+             (fun k->k ClauseContext.pp ctx T.pp case.Ind_types.case_term
+                 (Util.pp_list C.pp) (c_case :: c_sub));
+           (* return new clauses and b_lit *)
+           c_case :: c_sub @ acc, b_lit :: b_lits)
+        (acc, [])
+        (Ind_types.cases set)
+    in
+    (* boolean constraint *)
+    (* FIXME: generate boolean clause(s) instead
+    let qform = (QF.imply
+                (qform_of_trail (C.get_trail c))
+                (QF.xor_l (List.map QF.atom b_lits))
+             ) in
 
-           Util.debugf ~section 2 "@[<2>add boolean constr@ @[%a@]@]"
-           (fun k->k (QF.print_with ~pp_lit:BoolLit.print) qform);
-           Solver.add_form ~tag:(C.id c) qform;
-        *)
-        Avatar.save_clause ~tag:(C.id c) c;
-        acc
+        Util.debugf ~section 2 "@[<2>add boolean constr@ @[%a@]@]"
+        (fun k->k (QF.print_with ~pp_lit:BoolLit.print) qform);
+        Solver.add_form ~tag:(C.id c) qform;
+     *)
+    A.save_clause ~tag:(C.id c) c;
+    acc
 
   (* checks whether the trail of [c] is trivial, that is:
      - contains two literals [i = t1] and [i = t2] with [t1], [t2]
@@ -257,9 +258,9 @@ module Make
       trail
       |> Sequence.filter_map
         (fun blit ->
-           match BoolLit.extract (Bool_lit.abs blit) with
+           match BoolBox.extract (Bool_lit.abs blit) with
            | None -> None
-           | Some (BoolLit.Case (l, r)) -> Some (`Case (l, r))
+           | Some (BoolBox.Case (l, r)) -> Some (`Case (l, r))
            | Some _ -> None
         )
     in
@@ -269,13 +270,14 @@ module Make
       (function
         | (`Case (i1, t1), `Case (i2, t2)) ->
             let res =
-              not (Cst.equal i1 i2)
-                  || (Cst.equal i1 i2 && not (Case.equal t1 t2)) in
+              not (Ind_types.cst_equal i1 i2)
+                  || (Ind_types.cst_equal i1 i2
+                      && not (Ind_types.case_equal t1 t2)) in
             if res
             then (
               Util.debugf ~section 4
                 "@[<2>clause@ @[%a@]@ redundant because of @[%a={%a,%a}@] in trail@]"
-                (fun k->k C.pp c Cst.pp i1 Case.pp t1 Case.pp t2)
+                (fun k->k C.pp c Ind_types.pp_cst i1 Ind_types.pp_case t1 Ind_types.pp_case t2)
             );
             res
         | _ -> false)
@@ -294,7 +296,7 @@ module Make
                begin match T.Classic.view l, T.Classic.view r with
                  | T.Classic.App (s1, l1), T.Classic.App (s2, l2)
                    when ID.equal s1 s2
-                     && CI.is_constructor_sym s1
+                     && Ind_types.is_constructor s1
                    ->
                      (* destruct *)
                      assert (List.length l1 = List.length l2);
@@ -304,25 +306,26 @@ module Make
                end
            | _ -> ()
         );
-      c (* nothing happened *)
+      SimplM.return_same c (* nothing happened *)
     with FoundInductiveLit (idx, pairs) ->
       let lits = CCArray.except_idx (C.lits c) idx in
       let new_lits = List.map (fun (t1,t2) -> Literal.mk_neq t1 t2) pairs in
       let proof cc = Proof.mk_c_inference ~theories:["induction"]
           ~rule:"injectivity_destruct" cc [C.proof c]
       in
-      let c' = C.create ~trail:(C.get_trail c) ~parents:[c] (new_lits @ lits) proof in
+      let c' = C.create ~trail:(C.trail c) (new_lits @ lits) proof in
       Util.debugf ~section 3 "@[<hv2>injectivity:@ simplify @[%a@]@ into @[%a@]@]"
         (fun k->k C.pp c C.pp c');
-      c'
+      SimplM.return_new c'
 
   (* when a clause contains new inductive constants, assert minimality
      of the clause for all those constants independently *)
   let inf_assert_minimal c =
     let consts = scan (Sequence.singleton c) in
-    let clauses = List.fold_left
+    let clauses =
+      List.fold_left
         (fun acc cst ->
-           let ctx = ClauseContext.extract_exn (C.lits c) (cst:CI.cst:>T.t) in
+           let ctx = ClauseContext.extract_exn (C.lits c) (Ind_types.cst_to_term cst) in
            assert_min acc c ctx cst)
         [] consts
     in
@@ -330,23 +333,29 @@ module Make
 
   let register () =
     Util.debug ~section 2 "register induction_lemmas";
-    IH_ctx.declare_types ();
-    Avatar.register (); (* avatar inferences, too *)
     (* FIXME: move to Extension, probably, so it can be added
        to {!Compute_prec} before computing precedence
        Ctx.add_constr 20 IH_ctx.constr_sub_cst;  (* enforce new constraint *)
     *)
-    Env.add_unary_inf "induction_lemmas.cut" IHA.inf_introduce_lemmas;
+    Env.add_unary_inf "induction_lemmas.cut" inf_introduce_lemmas;
     Env.add_unary_inf "induction_lemmas.ind" inf_assert_minimal;
     Env.add_is_trivial has_trivial_trail;
     Env.add_simplify injectivity_destruct;
     ()
 
 
-  (*
   module Meta = struct
+    (* TODO *)
+    let t : _ Plugin.t = object
+      method signature = Signature.empty
+      method clauses = []
+      method owns _ = false
+      method to_fact _ = assert false
+      method of_fact _ = None (* TODO *)
+    end
+
+    (* TODO
     let declare_inductive p ity =
-      let module CI = E.Ctx.Induction in
       let ity = Induction.make ity.CI.pattern ity.CI.constructors in
       Util.debugf ~section 2
         "@[<hv2>declare inductive type@ %a@]"
@@ -362,16 +371,19 @@ module Make
            ignore (declare_inductive p ity);
            Signal.ContinueListening
         );
-  end
   *)
+  end
 end
 
 let extension =
   let action (module E : Env.S) =
+    let (module A) = Avatar.get_env (module E) in
+    (* XXX here we do not use E anymore, because we do not know
+       that A.E = E. Therefore, it is simpler to use A.E. *)
+    let module E = A.E in
     E.Ctx.lost_completeness ();
     E.Ctx.set_selection_fun Selection.no_select;
-    let (module A) = Avatar.get_env (module E) in
-    let module M = Make(E)(A) in
+    let module M = Make(A.E)(A) in
     M.register ();
   and add_constr c =
     (* add an ordering constraint: ensure that constructors are smaller
@@ -386,12 +398,12 @@ let extension =
 
 let init_from_decls pairs =
   let get_str = function
-    | A.GNode (s, []) | A.GString s -> s
+    | Ast_tptp.GNode (s, []) | Ast_tptp.GString s -> s
     | _ -> raise Exit
   in
   (* search for "inductive(c1, c2, ...)" *)
   let rec scan_for_constructors = function
-    | A.GNode ("inductive", l) :: tail when List.length l >= 2 ->
+    | Ast_tptp.GNode ("inductive", l) :: tail when List.length l >= 2 ->
         begin try
             let constructors = List.map get_str l in
             Some constructors
@@ -431,7 +443,5 @@ let () =
     ]
 
 let () =
-  Signal.on IH.on_enable
-    (fun () ->
-      Extensions.register extension;
-      Signal.ContinueListening)
+  Signal.once on_enable
+    (fun () -> Extensions.register extension)

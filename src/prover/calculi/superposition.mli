@@ -100,7 +100,7 @@ module type S = sig
   (** Register rules in the environment *)
 end
 
-val key : (string, (module S)) Mixtbl.injection
+val key : (module S) CCMixtbl.injection
 (** key to access the Env's Mixtbl. After registration (after
     calling [register]), the Env's mixtbl contains
     a mapping from "superposition" to the packed module. *)

@@ -28,13 +28,13 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     Trail.fold
       (fun acc i ->
          let sign = BLit.sign i in
-         match Ctx.BoolLit.extract (BLit.abs i) with
+         match Ctx.BoolBox.extract (BLit.abs i) with
          | None -> failwith "wrong trail"
-         | Some (Ctx.BoolLit.Clause_component lits) ->
+         | Some (Ctx.BoolBox.Clause_component lits) ->
              (sign, lits) :: acc
-         | Some (Ctx.BoolLit.Case (l,r)) ->
-             let l = Ctx.BoolLit.I.to_term l in
-             let r = Ctx.BoolLit.Case.to_term r in
+         | Some (Ctx.BoolBox.Case (l,r)) ->
+             let l = Ind_types.cst_to_term l in
+             let r = r.Ind_types.case_term in
              (sign, [| Lit.mk_eq l r |]) :: acc
       ) [] trail
 
@@ -42,7 +42,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     if not (Trail.is_empty trail)
     then
       Format.fprintf out " ← @[<hov>%a@]"
-        (CCFormat.seq ~start:"" ~stop:"" ~sep:" ⊓ " Ctx.BoolLit.pp)
+        (CCFormat.seq ~start:"" ~stop:"" ~sep:" ⊓ " Ctx.BoolBox.pp)
         (Trail.to_seq trail)
 
   type t = {
@@ -51,7 +51,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     mutable flags : int; (** boolean flags for the clause *)
     mutable selected : BV.t Lazy.t; (** bitvector for selected lits*)
     mutable proof : Proof.t; (** Proof of the clause *)
-    mutable as_bool : Ctx.BoolLit.t option; (** boolean box *)
+    mutable as_bool : Ctx.BoolBox.t option; (** boolean box *)
     mutable trail : Trail.t; (** boolean trail *)
   }
 

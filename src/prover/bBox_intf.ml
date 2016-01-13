@@ -3,14 +3,12 @@
 
 (** {1 Interface of BBox} *)
 
-open Libzipperposition
-
 type bool_lit = Bool_lit.t
 (** Abstract boolean literal *)
 
 module type S = sig
-  type inductive_cst = FOTerm.t
-  type inductive_case = FOTerm.t
+  type inductive_cst = Ind_types.cst
+  type inductive_case = Ind_types.case
 
   type t = Sat_solver.Lit.t
 
