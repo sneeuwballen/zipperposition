@@ -13,6 +13,7 @@ module StringTbl = CCHashtbl.Make(struct
 module type S = BBox_intf.S
 
 let section = Util.Section.make ~parent:Const.section "bbox"
+let prof_inject_lits = Util.mk_profiler "bbox.inject_lits"
 
 module Make(Dummy : sig end) = struct
   type t = Sat_solver.Lit.t
@@ -86,7 +87,7 @@ module Make(Dummy : sig end) = struct
         ICaseTbl.add _case_set (c,case) (injected, t)
 
   (* clause -> boolean lit *)
-  let inject_lits lits  =
+  let inject_lits_ lits  =
     (* special case: one negative literal. *)
     let lits, sign =
       if Array.length lits = 1 && Literal.is_neq lits.(0) && Literal.is_ground lits.(0)
@@ -110,8 +111,10 @@ module Make(Dummy : sig end) = struct
             (* maintain mapping *)
             let lits_copy = Array.copy lits in
             _save (Clause_component lits_copy) i;
-            Bool_lit.apply_sign sign i
-      )
+            Bool_lit.apply_sign sign i)
+
+  let inject_lits lits =
+    Util.with_prof prof_inject_lits inject_lits_ lits
 
   let inject_case c t =
     try
