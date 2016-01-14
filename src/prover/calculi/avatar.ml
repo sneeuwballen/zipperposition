@@ -152,6 +152,17 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
     );
     [] (* never infers anything! *)
 
+  let skolem_count_ = ref 0
+
+  (* make a new skolem symbol *)
+  let skolem_ ~ty =
+    let name = CCFormat.sprintf "_avatar_%d" !skolem_count_ in
+    incr skolem_count_;
+    let id = ID.make name in
+    Ctx.declare id ty;
+    Ordering.add_list (Ctx.ord ()) [id];
+    id
+
   (* generic mechanism for adding a clause
       and make a lemma out of it, including Skolemization, etc. *)
   let introduce_cut lits proof : C.t list * BoolBox.t =
@@ -160,24 +171,34 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
     let c_pos =
       C.create_a ~trail:(Trail.singleton box) lits proof
     in
-    let c_neg = assert false
-    (* FIXME:
+    (* negative component:
       - gather variables
       - skolemize them with fresh (inductive?) constants
-      - map each [lit] to [negate subst(lit) <- [not box]]
-
+      - map each [lit] to [negate subst(lit) <- [not box]] *)
+    let c_neg =
+      let vars = Literals.Seq.vars lits
+        |> T.VarSet.of_seq
+        |> T.VarSet.to_list
+      in
+      let subst =
+        List.fold_left
+          (fun subst v ->
+            let ty = HVar.ty v in
+            let id = skolem_ ~ty in
+            Substs.FO.bind subst ((v:T.var:>Substs.var),0) (T.const ~ty id,0))
+          Substs.empty
+          vars
+      in
+      let renaming = Ctx.renaming_clear() in
       Array.map
         (fun lit ->
-      PFormula.create (F.Base.not_ f) (Proof.mk_f_trivial f)
-      |> PFormula.Set.singleton
-      |> E.cnf
-      |> C.CSet.to_list
-      |> List.map
-        (fun c ->
-           let trail = C.Trail.singleton (BoolBox.neg box) in
-           C.create_a ~trail (C.lits c) proof
-        )
-    *)
+          (* negate, apply subst (to use the Skolem symbols) *)
+          let lit = Lit.negate lit in
+          let lit = Lit.apply_subst ~renaming subst (lit,0) in
+          let trail = Trail.singleton (Bool_lit.neg box) in
+          C.create_a ~trail [| lit |] proof)
+        lits
+      |> Array.to_list
     in
     c_pos :: c_neg, box
 
@@ -241,13 +262,11 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
         let meta = MetaProverState.get_env (module E) in
         Util.debug ~section 1 "found meta-prover, watch for lemmas";
         let q = Queue.create () in
-        Signal.on (MetaProverState.on_lemma meta)
+        Signal.on_every (MetaProverState.on_lemma meta)
           (fun lemma ->
              Util.debugf ~section 2 "@[obtained lemma @[%a@]@ from meta-prover@]"
                (fun k->k CompactClause.pp (fst lemma));
-             Queue.push lemma q;
-             Signal.ContinueListening
-          );
+             Queue.push lemma q);
         E.add_unary_inf "avatar_meta_lemmas" (introduce_meta_lemmas q);
       with Not_found ->
         Util.debug ~section 1 "could not find meta-prover";
