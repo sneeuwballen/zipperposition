@@ -369,7 +369,7 @@ let symbols ?(init=ID.Set.empty) lits =
 let pp out lits =
   if Array.length lits = 0 then CCFormat.string out "⊥"
   else
-    Format.fprintf out "[@[%a@]]"
+    Format.fprintf out "@[<hv>%a@]"
       (CCFormat.array ~start:"" ~stop:"" ~sep:" ∨ " Lit.pp) lits
 
 let pp_tstp out lits =

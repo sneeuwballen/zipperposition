@@ -34,9 +34,10 @@ module Make(Dummy : sig end) = struct
 
   let pp_injected out = function
     | Clause_component lits ->
-        Format.fprintf out "⟦%a⟧" (CCFormat.array ~sep:" ∨ " Literal.pp) lits
+        Format.fprintf out "⟦%a⟧" Lits.pp lits
     | Case (c, t) ->
-        Format.fprintf out "⟦%a=%a⟧" Ind_types.pp_cst c Ind_types.pp_case t
+        Format.fprintf out "⟦@[<hv>%a@ = %a@]⟧"
+          Ind_types.pp_cst c Ind_types.pp_case t
 
   module FV = Libzipperposition.FeatureVector.Make(struct
       type t = Lits.t * injected * lit
@@ -144,9 +145,5 @@ module Make(Dummy : sig end) = struct
     let i = Bool_lit.abs i in
     match extract i with
     | None -> Format.fprintf out "L%d" (i:t:>int)
-    | Some (Clause_component lits) ->
-        Format.fprintf out "@[⟦%a⟧@]"
-          (CCArray.print ~sep:" ∨ " Literal.pp) lits
-    | Some (Case (c, case)) ->
-        Format.fprintf out "⟦%a=%a⟧" Ind_types.pp_cst c Ind_types.pp_case case
+    | Some inj -> pp_injected out inj
 end

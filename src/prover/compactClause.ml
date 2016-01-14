@@ -58,17 +58,17 @@ let _pp_blit out (s,l) =
 
 let _pp_trail out = function
   | [] -> ()
-  | l -> Format.fprintf out " ← %a" (Util.pp_list ~sep:" ⊓ " _pp_blit) l
+  | l -> Format.fprintf out "@ ← @[<hv>%a@]" (Util.pp_list ~sep:" ⊓ " _pp_blit) l
 
 let pp out c =
-  begin match c.lits with
+  let pp_lits out = function
     | [| |] -> CCFormat.string out "⊥"
     | [| x |] -> Lit.pp out x
     | l ->
         Format.fprintf out "[@[%a@]]"
           (CCFormat.array ~start:"" ~stop:"" ~sep:" ∨ " Lit.pp) l
-  end;
-  _pp_trail out c.trail
+  in
+  Format.fprintf out "@[<2>%a%a@]" pp_lits c.lits _pp_trail c.trail
 
 let to_string c = CCFormat.to_string pp c
 

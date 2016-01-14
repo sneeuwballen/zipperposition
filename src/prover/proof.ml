@@ -311,23 +311,24 @@ let pp_notrec out p =
     (Util.pp_list CCFormat.string) p.theories
 
 let pp_debug out proof =
+  let sep = "by" in
   Format.fprintf out "@[<v>";
   traverse proof
     (fun p -> match p.kind with
       | File _ ->
-          Format.fprintf out "@[<hv2>@[%a@] <--@ %a,@ theories [%a]@]@,"
-            pp_result p.result pp_kind p.kind
+          Format.fprintf out "@[<hv2>@[%a@]@ %s@ %a,@ theories [%a]@]@,"
+            pp_result p.result sep pp_kind p.kind
             (Util.pp_list CCFormat.string) p.theories
       | Trivial ->
-          Format.fprintf out "@[<hv2>@[%a@] <--@ trivial,@ theories [%a]@]@,"
-            pp_result p.result (Util.pp_list CCFormat.string) p.theories;
+          Format.fprintf out "@[<hv2>@[%a@]@ %s@ trivial,@ theories [%a]@]@,"
+            pp_result p.result sep (Util.pp_list CCFormat.string) p.theories;
       | Inference _
       | Simplification _
       | Esa _ ->
-          Format.fprintf out "@[<hv2>@[%a@] <--@ %a,@ theories [%a]@ with @[<hv>%a@]@]@,"
-            pp_result p.result pp_kind p.kind
+          Format.fprintf out "@[<hv2>@[%a@]@ %s@ %a,@ theories [%a]@ with @[<hv>%a@]@]@,"
+            pp_result p.result sep pp_kind p.kind
             (Util.pp_list CCFormat.string) p.theories
-            (CCFormat.array pp_result)
+            (CCFormat.array ~start:"" ~stop:"" pp_result)
             (Array.map (fun p->p.result) p.parents)
     );
   Format.fprintf out "@]"
