@@ -10,6 +10,7 @@ S src/tools/
 S src/prover
 S src/prover/lib
 S src/prover/calculi
+S src/prover/meta
 S src/main/
 S tests/
 B _build/src
@@ -24,6 +25,7 @@ B _build/src/tools/
 B _build/src/prover
 B _build/src/prover/lib
 B _build/src/prover/calculi
+B _build/src/prover/meta
 B _build/src/main/
 B _build/tests/
 PKG zarith
