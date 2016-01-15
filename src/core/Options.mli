@@ -11,7 +11,11 @@
 val stats : bool ref
 (** Enable printing of statistics? *)
 
-val output : [`Normal | `TPTP] ref
+type print_format =
+  | Print_normal
+  | Print_tptp
+
+val output : print_format ref
 (** Output format *)
 
 val make : unit -> (string * Arg.spec * string) list

@@ -10,12 +10,16 @@
 
 let stats = ref false
 
-let output = ref `Normal
+type print_format =
+  | Print_normal
+  | Print_tptp
+
+let output = ref Print_normal
 
 let print_format_of_string s =
-  match String.lowercase (String.trim s) with
-  | "tptp" | "tstp" -> `TPTP
-  | "default" | "normal" -> `Normal
+  match s |> String.trim |> String.lowercase with
+  | "tptp" | "tstp" -> Print_tptp
+  | "default" | "normal" -> Print_normal
   | _ -> failwith ("unknown print format " ^ s)
 
 let _print_types () =
@@ -31,9 +35,7 @@ let make_other_opts () =
        if name="" then None
        else Some
            ("--debug." ^ name, Arg.Int (Util.Section.set_debug sec),
-            " debug level for section " ^ name
-           )
-    )
+            " debug level for section " ^ name))
   |> Sequence.to_list
 
 let make () =

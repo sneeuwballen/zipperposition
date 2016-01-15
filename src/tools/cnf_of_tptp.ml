@@ -26,7 +26,7 @@ let options = Arg.align (
   )
 
 let print_res decls = match !Options.output with
-  | `Normal ->
+  | Options.Print_normal ->
       let ppst =
         Statement.pp
           (Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp)) T.pp
@@ -35,7 +35,7 @@ let print_res decls = match !Options.output with
         (CCVector.length decls)
         (CCVector.print ~start:"" ~stop:"" ~sep:"" ppst)
         decls
-  | `TPTP ->
+  | Options.Print_tptp ->
       let ppst out st =
         Statement.TPTP.pp
           (Util.pp_list ~sep:" | " (SLiteral.TPTP.pp T.TPTP.pp)) T.TPTP.pp
