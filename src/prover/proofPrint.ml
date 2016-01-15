@@ -89,19 +89,20 @@ module Make(C : CLAUSE) = struct
   let pp_debug out proof =
     let sep = "by" in
     Format.fprintf out "@[<v>";
+    let pp_bullet out () = Format.fprintf out "@<1>@{<Green>*@}" in
     traverse proof
       (fun p -> match p.step.kind with
         | File _ ->
-            Format.fprintf out "@[<hv2>@[%a@]@ %s %a@]@,"
-              pp_result p.result sep pp_kind p.step.kind
+            Format.fprintf out "@[<hv2>%a @[%a@]@ %s %a@]@,"
+              pp_bullet () pp_result p.result sep pp_kind p.step.kind
         | Trivial ->
-            Format.fprintf out "@[<hv2>@[%a@]@ %s trivial@]@,"
-              pp_result p.result sep
+            Format.fprintf out "@[<hv2>%a @[%a@]@ %s trivial@]@,"
+              pp_bullet () pp_result p.result sep
         | Inference _
         | Simplification _
         | Esa _ ->
-            Format.fprintf out "@[<hv2>@[%a@]@ %s %a@ with @[<hv>%a@]@]@,"
-              pp_result p.result sep pp_kind p.step.kind
+            Format.fprintf out "@[<hv2>%a @[%a@]@ %s %a@ with @[<hv>%a@]@]@,"
+              pp_bullet () pp_result p.result sep pp_kind p.step.kind
               (CCFormat.list ~start:"" ~stop:"" pp_result)
               (List.map (fun p->p.result) p.step.parents));
     Format.fprintf out "@]"
