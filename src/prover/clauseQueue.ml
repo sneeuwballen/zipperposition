@@ -3,11 +3,6 @@
 
 (** {1 Priority Queue of clauses} *)
 
-(** Heuristic selection of clauses, using queues. Note that some
-    queues do not need accept all clauses, as long as one of them does
-    (for completeness). Anyway, a fifo queue should always be present,
-    and presents this property. *)
-
 open Libzipperposition
 
 module O = Ordering
@@ -16,16 +11,29 @@ module Lits = Literals
 
 module type S = ClauseQueue_intf.S
 
-let _profile = ref "default"
-let profile () = !_profile
-let set_profile s = _profile := s
+type profile = ClauseQueue_intf.profile
+
+let profile_of_string s =
+  let open ClauseQueue_intf in
+  match s |> String.trim |> String.lowercase with
+  | "default" -> P_default
+  | "bfs" -> P_bfs
+  | "explore" -> P_explore
+  | "ground" -> P_ground
+  | "goal" -> P_goal
+  | s -> invalid_arg ("unknown queue profile: " ^ s)
+
+let _profile = ref ClauseQueue_intf.P_default
+let get_profile () = !_profile
+let set_profile p = _profile := p
+let parse_profile s = _profile := (profile_of_string s)
 
 let () =
   Params.add_opts
     [ "--clause-queue"
-      , Arg.String set_profile
+      , Arg.String parse_profile
       , " choose which set of clause queues to use \
-         (for selecting next active clause): choices: default,bfs,explore,ground"
+         (for selecting next active clause): choices: default,bfs,explore,ground,goal"
     ]
 
 module Make(C : Clause.S) = struct
@@ -59,10 +67,23 @@ module Make(C : Clause.S) = struct
           (fun acc t -> match C.Ctx.BoolBox.extract_exn (Sat_solver.Lit.abs t) with
              | C.Ctx.BoolBox.Clause_component lits -> acc + weight_lits_ lits
              | C.Ctx.BoolBox.Case (_,_) ->
-                 acc + 10 (* generic penalty for each inductive hypothesis *)
-          ) 0 trail
+                 (* generic penalty for each inductive hypothesis *)
+                 acc + 10)
+          0 trail
       in
       w_lits * Array.length (C.lits c) + w_trail * (Trail.length trail) + _depth_ty
+
+    let penalty_coeff_ = 20
+
+    let favor_pos_unit c =
+      let is_unit_pos c = match C.lits c with
+        | [| lit |] when Lit.is_pos lit -> true
+        | _ -> false
+      in
+      if is_unit_pos c then 0 else penalty_coeff_
+
+    let favor_horn c =
+      if Lits.is_horn (C.lits c) then 0 else penalty_coeff_
 
     let age c =
       if C.is_empty c then 0
@@ -79,6 +100,24 @@ module Make(C : Clause.S) = struct
         in
         1+d
 
+    let favor_goal c =
+      (* check whether a literal is a goal *)
+      let is_goal_lit lit = Lit.is_neg lit in
+      let is_goal_clause c = CCArray.for_all is_goal_lit (C.lits c) in
+      if is_goal_clause c then 0 else penalty_coeff_
+
+    let favor_ground c = if C.is_ground c then 0 else penalty_coeff_
+
+    let favor_non_goal c =
+      (* check whether a literal is a goal *)
+      let is_goal_lit lit = Lit.is_neg lit in
+      let is_non_goal_clause c =
+        CCArray.for_all
+          (fun x -> not (is_goal_lit x))
+          (C.lits c)
+      in
+      if is_non_goal_clause c then 0 else penalty_coeff_
+
     let combine ws =
       assert (ws <> []);
       assert (List.for_all (fun (_,c) -> c > 0) ws);
@@ -90,25 +129,24 @@ module Make(C : Clause.S) = struct
 
   module H = CCHeap.Make(struct
       type t = (int * C.t)
-      let leq (i1, c1) (i2, c2) = i1 <= i2 || (i1 = i2 && C.id c1 <= C.id c2)
+      let leq (i1, c1) (i2, c2) = i1 <= i2 || (i1 = i2 && C.compare c1 c2 <= 0)
     end)
 
+  (** A priority queue of clauses, purely functional *)
   type t = {
     heap : H.t;
     functions : functions;
-  } (** A priority queue of clauses, purely functional *)
+  }
   and functions = {
     weight : C.t -> int;
-    accept : C.t -> bool;
     name : string;
   }
 
   (** generic clause queue based on some ordering on clauses, given
       by a weight function *)
-  let mk_queue ?(accept=(fun _ -> true)) ~weight name =
+  let make ~weight name =
     let functions = {
       weight;
-      accept;
       name;
     } in
     { heap = H.empty; functions; }
@@ -117,138 +155,70 @@ module Make(C : Clause.S) = struct
     H.is_empty q.heap
 
   let add q c =
-    if q.functions.accept c
-    then
-      let w = q.functions.weight c in
-      let heap = H.insert (w, c) q.heap in
-      { q with heap; }
-    else q
+    let w = q.functions.weight c in
+    let heap = H.insert (w, c) q.heap in
+    { q with heap; }
 
   let adds q hcs =
     let heap =
       Sequence.fold
         (fun heap c ->
-           if q.functions.accept c
-           then
-             let w = q.functions.weight c in
-             H.insert (w,c) heap
-           else heap)
+           let w = q.functions.weight c in
+           H.insert (w,c) heap)
         q.heap hcs in
     { q with heap; }
 
   let take_first q =
-    (if is_empty q then raise Not_found);
+    if is_empty q then raise Not_found;
     let new_h, (_, c) = H.take_exn q.heap in
     let q' = { q with heap=new_h; } in
     q', c
 
-  (** Keep only the clauses that are in the set *)
-  let clean q set =
-    let new_heap = H.filter (fun (_, c) -> C.CSet.mem set c) q.heap in
-    { q with heap=new_heap; }
-
   let name q = q.functions.name
-
-  let fifo =
-    let name = "fifo_queue" in
-    mk_queue ~weight:(fun c -> C.id c) name
-
-  let clause_weight =
-    let name = "clause_weight" in
-    mk_queue ~weight:WeightFun.default name
-
-  let goals =
-    (* check whether a literal is a goal *)
-    let is_goal_lit lit = Lit.is_neg lit in
-    let is_goal_clause c = CCArray.for_all is_goal_lit (C.lits c) in
-    let name = "prefer_goals" in
-    mk_queue ~accept:is_goal_clause ~weight:WeightFun.default name
-
-  let ground =
-    let name = "prefer_ground" in
-    mk_queue ~accept:C.is_ground ~weight:WeightFun.default name
-
-  let non_goals =
-    (* check whether a literal is a goal *)
-    let is_goal_lit lit = Lit.is_neg lit in
-    let is_non_goal_clause c = CCArray.for_all
-        (fun x -> not (is_goal_lit x))
-        (C.lits c) in
-    let name = "prefer_non_goals" in
-    mk_queue ~accept:is_non_goal_clause ~weight:WeightFun.default name
-
-  let pos_unit_clauses =
-    let is_unit_pos c = match C.lits c with
-      | [| lit |] when Lit.is_pos lit -> true
-      | _ -> false
-    in
-    let name = "prefer_pos_unit_clauses" in
-    mk_queue ~accept:is_unit_pos ~weight:WeightFun.default name
-
-  let horn =
-    let accept c = Lits.is_horn (C.lits c) in
-    let name = "prefer_horn" in
-    mk_queue ~accept ~weight:WeightFun.default name
-
-  let lemmas =
-    let name = "lemmas" in
-    let accept c = C.get_flag C.flag_lemma c in
-    (* use a fifo on lemmas *)
-    mk_queue ~accept ~weight:WeightFun.default name
-
-  let goal_oriented =
-    let weight = WeightFun.(combine [age, 1; default, 4; favor_conjecture, 1]) in
-    let name = "goal_oriented" in
-    let accept _ = true in
-    mk_queue ~accept ~weight name
 
   (** {6 Combination of queues} *)
 
   type queues = (t * int) list
 
-  module Profiles = struct
-    let bfs =
-      [ fifo, 5
-      ; clause_weight, 1
-      ]
+  let goal_oriented =
+    let open WeightFun in
+    let weight = combine [age, 1; default, 4; favor_conjecture, 1; favor_goal, 1] in
+    let name = "goal_oriented" in
+    make ~weight name
 
-    let explore =
-      [ fifo, 1
-      ; clause_weight, 4
-      ; goals, 1
-      ]
+  let bfs =
+    let open WeightFun in
+    let weight = combine [age, 5; default, 1] in
+    make ~weight "bfs"
 
-    let ground =
-      [ fifo, 1
-      ; pos_unit_clauses, 1
-      ; ground, 2
-      ]
+  let explore =
+    let open WeightFun in
+    let weight = combine [age, 1; default, 4; favor_goal, 1] in
+    make ~weight "explore"
 
-    let why3 =
-      [ goal_oriented, 3
-      ; fifo, 1
-      ]
-  end
+  let ground =
+    let open WeightFun in
+    let weight = combine [age, 1; favor_pos_unit, 1; favor_ground, 2] in
+    make ~weight "ground"
 
-  let default_queues =
-    match !_profile with
-    | "default" ->
-        [ fifo, 4
-        ; clause_weight, 3
-        ; goals, 1
-        ; pos_unit_clauses, 1
-        ]
-    | "bfs" -> Profiles.bfs
-    | "explore" -> Profiles.explore
-    | "ground" -> Profiles.ground
-    | "why3" -> Profiles.why3
-    | n -> failwith ("no such profile: " ^ n)
+  let default =
+    let open WeightFun in
+    let weight =
+      combine
+      [ age, 4; default, 3; favor_goal, 1
+      ; favor_conjecture, 1; favor_pos_unit, 1]
+    in
+    make ~weight "default"
+
+  let of_profile p =
+    let open ClauseQueue_intf in
+    match p with
+    | P_default -> default
+    | P_bfs -> bfs
+    | P_explore -> explore
+    | P_ground -> ground
+    | P_goal -> goal_oriented
 
   let pp out q = CCFormat.fprintf out "queue %s" (name q)
   let to_string = CCFormat.to_string pp
-
-  let pp_list out qs =
-    let pp_pair out (c, i) = Format.fprintf out "@[%a (w=%d)@]" pp c i in
-    CCFormat.list ~start:"[" ~stop:"]" pp_pair out qs;
-    ()
 end

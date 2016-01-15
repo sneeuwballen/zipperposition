@@ -1,6 +1,13 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
+type profile =
+  | P_default
+  | P_bfs
+  | P_explore
+  | P_ground
+  | P_goal
+
 (** {1 A priority queue of clauses, purely functional} *)
 module type S = sig
   module C : Clause.S
@@ -17,6 +24,14 @@ module type S = sig
 
     val age : t
     (** Returns the age of the clause (or 0 for the empty clause) *)
+
+    val favor_non_goal : t
+
+    val favor_goal : t
+
+    val favor_ground : t
+
+    val favor_horn : t
 
     val favor_conjecture : t
     (** The closest a clause is from conjectures, the lowest its weight.
@@ -43,70 +58,39 @@ module type S = sig
   val take_first : t -> (t * C.t)
   (** Take first element of the queue, or raise Not_found *)
 
-  val clean : t -> C.CSet.t -> t
-  (** remove all clauses that are not in the set *)
-
   val name : t -> string
   (** Name of the implementation/role of the queue *)
 
   (** {6 Available Queues} *)
 
-  val fifo : t
-  (** select by increasing age (for fairness) *)
+  val make : weight:(C.t -> int) -> string -> t
+  (** Bring your own implementation of queue. The [weight] function
+      should be fair, i.e. for any clause [c], the weight of [c] should
+      eventually be the smallest one in the queue (e.g., using the age
+      of clauses in the weight somewhere should be enough) *)
 
-  val clause_weight : t
-  (** select by increasing weight of clause *)
+  val bfs : t
+  (** Strong orientation toward FIFO *)
 
-  val goals : t
-  (** only select goals (clauses with only negative lits) *)
-
-  val non_goals : t
-  (** only select non-goals *)
+  val explore : t
+  (** Use heuristics for selecting "small" clauses *)
 
   val ground : t
-  (** only select ground clauses *)
-
-  val pos_unit_clauses : t
-  (** only select positive unit clauses *)
-
-  val horn : t
-  (** select horn clauses *)
-
-  val lemmas : t
-  (** only select lemmas *)
+  (** Favor positive unit clauses and ground clauses *)
 
   val goal_oriented : t
   (** custom weight function that favors clauses that are "close" to
       initial conjectures. It is fair.  *)
 
-  val mk_queue : ?accept:(C.t -> bool) -> weight:(C.t -> int) -> string -> t
-  (** Bring your own implementation of queue *)
+  val default : t
+  (** Obtain the default queue *)
 
-  (** {6 Combination of queues} *)
-
-  type queues = (t * int) list
-
-  module Profiles : sig
-    val bfs : queues
-    (** Strong orientation toward FIFO *)
-
-    val explore : queues
-    (** Use heuristics for selecting "small" clauses *)
-
-    val ground : queues
-    (** Favor positive unit clauses and ground clauses *)
-
-    val why3 : queues
-    (** Optimized for why3 *)
-  end
-
-  val default_queues : queues
-  (** default combination of heuristics *)
+  val of_profile : profile -> t
+  (** Select the queue corresponding to the given profile *)
 
   (** {6 IO} *)
 
   val pp : t CCFormat.printer
   val to_string : t -> string
-  val pp_list : (t * int) list CCFormat.printer
 end
 
