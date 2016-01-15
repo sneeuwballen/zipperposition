@@ -34,7 +34,9 @@ module type S = sig
       @raise Invalid_argument if the last result isn't [Unsat] *)
 
   (** {6 Incrementality}
-  We manage a stack for backtracking to older states *)
+      We manage a stack for backtracking to older states *)
+
+  (* TODO fix this *)
 
   type save_level
 
