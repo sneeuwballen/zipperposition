@@ -11,6 +11,7 @@
 let stats = ref false
 
 type print_format =
+  | Print_none
   | Print_normal
   | Print_tptp
 
@@ -18,6 +19,7 @@ let output = ref Print_normal
 
 let print_format_of_string s =
   match s |> String.trim |> String.lowercase with
+  | "none" -> Print_none
   | "tptp" | "tstp" -> Print_tptp
   | "default" | "normal" -> Print_normal
   | _ -> failwith ("unknown print format " ^ s)

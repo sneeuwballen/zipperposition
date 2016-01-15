@@ -119,7 +119,7 @@ module Make
       then []
       else (
         (* introduce cut now *)
-        let proof cc = Proof.mk_c_trivial ~theories:["ind"] ~info:["cut"] cc in
+        let proof = ProofStep.mk_trivial in
         let clauses, _ = A.introduce_cut lits proof in
         List.iter (fun c -> C.set_flag flag_cut_introduced c true) clauses;
         Util.debugf ~section 2
@@ -192,8 +192,8 @@ module Make
              C.create_a
                ~trail:Trail.(singleton b_lit)
                (ClauseContext.apply ctx case.Ind_types.case_term)
-               (fun cc -> Proof.mk_c_inference ~theories:["ind"]
-                   ~rule:"split" cc [C.proof c])
+               (ProofStep.mk_inference [C.proof c]
+                  ~rule:(ProofStep.mk_rule ~comment:["ind"] "split"))
            in
            (* ~ctx[t'] <- b_lit for each t' subterm case *)
            let c_sub =
@@ -310,9 +310,8 @@ module Make
     with FoundInductiveLit (idx, pairs) ->
       let lits = CCArray.except_idx (C.lits c) idx in
       let new_lits = List.map (fun (t1,t2) -> Literal.mk_neq t1 t2) pairs in
-      let proof cc = Proof.mk_c_inference ~theories:["induction"]
-          ~rule:"injectivity_destruct" cc [C.proof c]
-      in
+      let rule = ProofStep.mk_rule ~comment:["induction"] "injectivity_destruct" in
+      let proof = ProofStep.mk_inference ~rule [C.proof c] in
       let c' = C.create ~trail:(C.trail c) (new_lits @ lits) proof in
       Util.debugf ~section 3 "@[<hv2>injectivity:@ simplify @[%a@]@ into @[%a@]@]"
         (fun k->k C.pp c C.pp c');

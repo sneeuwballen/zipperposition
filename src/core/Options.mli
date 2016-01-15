@@ -12,8 +12,12 @@ val stats : bool ref
 (** Enable printing of statistics? *)
 
 type print_format =
+  | Print_none
   | Print_normal
   | Print_tptp
+
+val print_format_of_string : string -> print_format
+(** @raise Failure if it could not parse *)
 
 val output : print_format ref
 (** Output format *)

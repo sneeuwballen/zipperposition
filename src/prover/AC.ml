@@ -45,8 +45,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let res = ref [] in
     (* build clause l=r *)
     let add_clause l r =
-      let theories = [CCFormat.sprintf "ac(%a)" ID.pp s] in
-      let proof cc = Proof.mk_c_trivial ~theories cc in
+      let proof = ProofStep.mk_trivial in
       let c = C.create ~trail:Trail.empty [ Lit.mk_eq l r ] proof in
       C.set_flag C.flag_persistent c true;
       res := c :: !res
@@ -137,8 +136,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let symbols = Sequence.to_list (ID.Set.to_seq symbols) in
         let ac_proof = CCList.flat_map find_proof symbols in
         let premises = C.proof c :: ac_proof in
-        let proof cc = Proof.mk_c_simp ~theories:["ac"]
-            ~rule:"normalize" cc premises in
+        let proof =
+          ProofStep.mk_simp premises
+          ~rule:(ProofStep.mk_rule ~comment:["ac"] "normalize")
+        in
         let new_c = C.create ~trail:(C.trail c) lits proof in
         Util.exit_prof prof_simplify;
         Util.incr_stat stat_ac_simplify;

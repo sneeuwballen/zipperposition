@@ -14,13 +14,13 @@ module type S = sig
 
   val on_add : spec Signal.t
 
-  val add : ?proof:Proof.t list -> ID.t -> Type.t -> unit
+  val add : ?proof:C.t ProofStep.of_ list -> ID.t -> Type.t -> unit
   (** Declare that the given symbol is AC, and update the Env subsequently
       by adding clauses, etc. *)
 
   val is_ac : ID.t -> bool
 
-  val find_proof : ID.t -> Proof.t list
+  val find_proof : ID.t -> C.t ProofStep.of_ list
   (** Recover the proof for the AC-property of this symbol.
       @raise Not_found if the symbol is not AC *)
 
@@ -30,7 +30,7 @@ module type S = sig
   val symbols_of_terms : FOTerm.t Sequence.t -> ID.Set.t
   (** set of AC symbols occurring in the given term *)
 
-  val proofs : unit -> Proof.t list
+  val proofs : unit -> C.t ProofStep.of_ list
   (** All proofs for all AC axioms *)
 
   val exists_ac : unit -> bool

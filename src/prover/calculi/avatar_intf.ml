@@ -31,7 +31,7 @@ module type S = sig
 
   val introduce_cut :
     Literals.t ->
-    (CompactClause.t -> Proof.t) ->
+    E.C.t ProofStep.t ->
     E.C.t list * E.Ctx.BoolBox.t
   (** Introduce a cut on the given clause *)
 

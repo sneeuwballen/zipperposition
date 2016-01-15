@@ -312,7 +312,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
       let lits_p = CCArray.except_idx (C.lits info.passive) passive_idx in
       (* replace s\sigma by t\sigma in u|_p\sigma *)
-      let new_passive_lit = Lit.Pos.replace passive_lit'
+      let new_passive_lit =
+        Lit.Pos.replace passive_lit'
           ~at:passive_lit_pos ~by:t' in
       (* apply substitution to other literals *)
       let new_lits =
@@ -320,10 +321,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Lit.apply_subst_list ~renaming subst (lits_a, sc_a) @
         Lit.apply_subst_list ~renaming subst (lits_p, sc_p)
       in
-      let rule = if Lit.sign passive_lit' then "sup+" else "sup-" in
-      let proof c = Proof.mk_c_inference
-          ~info:[S.to_string subst] ~rule
-          c [C.proof info.active; C.proof info.passive] in
+      let rule =
+        let name = if Lit.sign passive_lit' then "sup+" else "sup-" in
+        ProofStep.mk_rule ~subst:[subst] name
+      in
+      let proof =
+        ProofStep.mk_inference ~rule [C.proof info.active; C.proof info.passive] in
       let trail = C.trail_l [info.active; info.passive] in
       let new_clause = C.create ~trail new_lits proof in
       Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
@@ -387,10 +390,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let lits_p = List.map (Lit.map (fun t-> T.replace t ~old:u' ~by:t')) lits_p in
       (* build clause *)
       let new_lits = lits_a @ lits_p in
-      let rule = if Lit.sign passive_lit' then "s_sup+" else "s_sup-" in
-      let proof c = Proof.mk_c_inference
-          ~info:[S.to_string subst] ~rule
-          c [C.proof info.active; C.proof info.passive] in
+      let rule =
+        let name = if Lit.sign passive_lit' then "s_sup+" else "s_sup-" in
+        ProofStep.mk_rule ~subst:[subst] name
+      in
+      let proof =
+        ProofStep.mk_inference ~rule [C.proof info.active; C.proof info.passive] in
       let trail = C.trail_l [info.active; info.passive] in
       let new_clause = C.create ~trail new_lits proof in
       Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
@@ -489,8 +494,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              then (
                Util.incr_stat stat_equality_resolution_call;
                let renaming = Ctx.renaming_clear () in
-               let proof c = Proof.mk_c_inference
-                   ~info:[S.to_string subst] ~rule:"eq_res" c [C.proof clause] in
+               let rule = ProofStep.mk_rule ~subst:[subst] "eq_res" in
+               let proof = ProofStep.mk_inference ~rule [C.proof clause] in
                let new_lits = CCArray.except_idx (C.lits clause) pos in
                let new_lits = Lit.apply_subst_list ~renaming subst (new_lits,0) in
                let new_clause = C.create ~trail:(C.trail clause) new_lits proof in
@@ -533,8 +538,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
        C.is_eligible_param (info.clause,info.scope) subst ~idx:info.active_idx
     then (
       Util.incr_stat stat_equality_factoring_call;
-      let proof c = Proof.mk_c_inference
-          ~info:[S.to_string subst] ~rule:"eq_fact" c [C.proof info.clause]
+      let proof =
+        ProofStep.mk_inference
+          ~rule:(ProofStep.mk_rule ~subst:[subst] "eq_fact")
+          [C.proof info.clause]
       (* new_lits: literals of the new clause. remove active literal
          and replace it by a t!=v one, and apply subst *)
       and new_lits = CCArray.except_idx (C.lits info.clause) info.active_idx in
@@ -725,8 +732,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ) else (
       (* construct new clause *)
       clauses := CCList.Set.uniq ~eq:C.equal !clauses;
-      let proof c' =
-        Proof.mk_c_simp ~rule:"demod" c'
+      let proof =
+        ProofStep.mk_simp
+          ~rule:(ProofStep.mk_rule "demod")
           (C.proof c :: List.map C.proof !clauses) in
       let trail = C.trail c in (* we know that demodulating rules have smaller trail *)
       let new_c = C.create_a ~trail lits proof in
@@ -889,7 +897,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         C.set_flag flag_simplified c true;
         SimplM.return_same c  (* no simplification *)
       ) else (
-        let proof cc= Proof.mk_c_simp ~rule:"simplify" cc [C.proof c] in
+        let proof =
+          ProofStep.mk_simp ~rule:(ProofStep.mk_rule "simplify") [C.proof c] in
         let new_clause = C.create ~trail:(C.trail c) new_lits proof in
         Util.debugf ~section 3
           "@[<2>@[%a@]@ basic_simplifies into @[%a@]@ with @[%a@]@]"
@@ -983,8 +992,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Util.exit_prof prof_pos_simplify_reflect;
       SimplM.return_same c
     ) else (
-      let proof c' = Proof.mk_c_simp
-          ~rule:"simplify_reflect+" c' (C.proof c::premises) in
+      let proof =
+        ProofStep.mk_simp ~rule:(ProofStep.mk_rule "simplify_reflect+")
+        (C.proof c::premises) in
       let trail = C.trail c in
       let new_c = C.create ~trail lits proof in
       Util.debugf ~section 3 "@[@[%a@]@ pos_simplify_reflect into @[%a@]@]"
@@ -1035,8 +1045,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Util.exit_prof prof_neg_simplify_reflect;
       SimplM.return_same c
     ) else (
-      let proof c' = Proof.mk_c_simp ~rule:"simplify_reflect-"
-          c' (C.proof c :: premises) in
+      let proof =
+        ProofStep.mk_simp
+          ~rule:(ProofStep.mk_rule "simplify_reflect-")
+          (C.proof c :: premises) in
       let new_c = C.create ~trail:(C.trail c) lits proof in
       Util.debugf ~section 3 "@[@[%a@]@ neg_simplify_reflect into @[%a@]@]"
         (fun k->k C.pp c C.pp new_c);
@@ -1310,11 +1322,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       match remove_one_lit (Array.copy (C.lits c)) with
       | None ->
           SimplM.return_same c (* no literal removed *)
-      | Some (new_lits, i, c') ->
+      | Some (new_lits, _, c') ->
           (* hc' allowed us to cut a literal *)
           assert (List.length new_lits + 1 = Array.length (C.lits c));
-          let info = [CCFormat.sprintf "cut lit %a" Lit.pp (C.lits c).(i)] in
-          let proof c'' = Proof.mk_c_inference ~rule:"clc" ~info c'' [C.proof c; C.proof c'] in
+          let proof =
+            ProofStep.mk_inference
+            ~rule:(ProofStep.mk_rule "clc")
+            [C.proof c; C.proof c'] in
           let new_c = C.create ~trail:(C.trail c) new_lits proof in
           Util.debugf ~section 3
             "@[<2>contextual literal cutting@ in @[%a@]@ using @[%a@]@ gives @[%a@]@]"
@@ -1383,9 +1397,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         SimplM.return_same c
       with CondensedInto (new_lits, subst) ->
         (* clause is simplified *)
-        let proof c' =
-          Proof.mk_c_simp ~info:[S.to_string subst]
-            ~rule:"condensation" c' [C.proof c] in
+        let proof =
+          ProofStep.mk_simp
+            ~rule:(ProofStep.mk_rule ~subst:[subst] "condensation")
+            [C.proof c] in
         let c' = C.create_a ~trail:(C.trail c) new_lits proof in
         Util.debugf ~section 3
           "@[<2>condensation@ of @[%a@] (with @[%a@])@ gives @[%a@]@]"

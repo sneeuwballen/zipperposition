@@ -17,36 +17,36 @@ let stat_processed_given = Util.mk_stat "processed given clauses"
 
 let section = Const.section
 
-(** the status of a state *)
-type szs_status =
-  | Unsat of Proof.t
+let check_timeout = function
+  | None -> false
+  | Some timeout -> Util.total_time_s () > timeout
+
+(** The SZS status of a state *)
+type 'c szs_status =
+  | Unsat of 'c ProofStep.of_
   | Sat
   | Unknown
   | Error of string
   | Timeout
 
-let check_timeout = function
-  | None -> false
-  | Some timeout -> Util.total_time_s () > timeout
-
 module type S = sig
   module Env : Env.S
 
-  val given_clause_step : ?generating:bool -> int -> szs_status
+  val given_clause_step : ?generating:bool -> int -> Env.C.t szs_status
   (** Perform one step of the given clause algorithm.
       It performs generating inferences only if [generating] is true (default);
       other parameters are the iteration number and the environment *)
 
-  val given_clause :
+  val given_clause:
     ?generating:bool -> ?steps:int -> ?timeout:float ->
-    unit -> szs_status * int
+    unit -> Env.C.t szs_status * int
   (** run the given clause until a timeout occurs or a result
       is found. It returns a tuple (new state, result, number of steps done).
       It performs generating inferences only if [generating] is true (default) *)
 
+  val presaturate : unit -> Env.C.t szs_status * int
   (** Interreduction of the given state, without generating inferences. Returns
       the number of steps done for presaturation, with status of the set. *)
-  val presaturate : unit -> szs_status * int
 end
 
 module Make(E : Env.S) = struct
@@ -66,8 +66,7 @@ module Make(E : Env.S) = struct
                let c, _ = Env.simplify c in
                if Env.is_trivial c || Env.is_active c || Env.is_passive c
                then None
-               else Some c
-            )
+               else Some c)
           |> Sequence.to_list
         in
         if clauses=[]
@@ -132,8 +131,7 @@ module Make(E : Env.S) = struct
                      then (
                        Util.debugf ~section 5 "clause %a is trivial, dump" (fun k->k Env.C.pp c);
                        None
-                     ) else
-                       Some c)
+                     ) else Some c)
                   inferred_clauses
               in
               CCVector.append_seq new_clauses inferred_clauses;

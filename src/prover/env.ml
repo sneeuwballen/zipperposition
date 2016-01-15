@@ -211,32 +211,6 @@ module Make(X : sig
 
   let stats () = ProofState.stats ()
 
-  let cnf seq =
-    Sequence.fold
-      (fun cset pf ->
-         let f = PF.form pf in
-         Util.debugf ~section 3 "@[<2>reduce@ @[%a@]@ to CNF...@]"
-           (fun k->k TypedSTerm.pp f);
-         (* reduce to CNF this clause *)
-         let stmts = Cnf.cnf_of ~ctx:Ctx.skolem f () in
-         let proof cc = Proof.mk_c_esa ~rule:"cnf" cc [PF.proof pf] in
-         CCVector.fold
-           (fun cset st -> match Statement.view st with
-            | Statement.Assert c ->
-                let c = Cnf.clause_to_fo c in
-                let c = C.of_forms ~trail:Trail.empty c proof in
-                C.ClauseSet.add c cset
-            | Statement.TyDecl (s, ty) ->
-                let ctx = Type.Conv.create() in
-                let ty = Type.Conv.of_simple_term_exn ctx ty in
-                Util.debugf ~section 5 "declare skolem %a : %a"
-                  (fun k->k ID.pp s Type.pp ty);
-                Ctx.declare s ty;
-                cset)
-           cset stmts)
-      C.ClauseSet.empty
-      seq
-
   let next_passive () =
     ProofState.PassiveSet.next ()
 
@@ -296,7 +270,7 @@ module Make(X : sig
   let is_passive c =
     C.ClauseSet.mem c (ProofState.PassiveSet.clauses ())
 
-  module StrSet = Set.Make(String)
+  module StrSet = CCSet.Make(String)
 
   (** Apply rewrite rules AND evaluation functions *)
   let rewrite c =
@@ -324,8 +298,8 @@ module Make(X : sig
     if StrSet.is_empty !applied_rules
     then SimplM.return_same c (* no simplification *)
     else (
-      let rule = "rw_" ^ (String.concat "_" (StrSet.elements !applied_rules)) in
-      let proof c' = Proof.mk_c_simp ~rule c' [C.proof c] in
+      let rule = ProofStep.mk_rule ~comment:(StrSet.to_list !applied_rules) "rw" in
+      let proof = ProofStep.mk_simp ~rule [C.proof c] in
       let c' = C.create_a ~trail:(C.trail c) lits' proof in
       Util.debugf ~section 3 "@[term rewritten clause @[%a@]@ into @[%a@]"
         (fun k->k C.pp c C.pp c');
@@ -354,8 +328,8 @@ module Make(X : sig
     then SimplM.return_same c
     else (
       (* simplifications occurred! *)
-      let rule = "lit_rw_" ^ (String.concat "_" (StrSet.elements !applied_rules)) in
-      let proof c' = Proof.mk_c_simp ~rule c' [C.proof c]  in
+      let rule = ProofStep.mk_rule ~comment:(StrSet.to_list !applied_rules) "rw_lit" in
+      let proof = ProofStep.mk_simp ~rule [C.proof c]  in
       let c' = C.create_a ~trail:(C.trail c) lits proof in
       Util.debugf ~section 3 "@[lit rewritten @[%a@]@ into @[%a@]@]"
         (fun k->k C.pp c C.pp c');

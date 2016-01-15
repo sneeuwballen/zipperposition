@@ -27,7 +27,6 @@ module type S = sig
   val id : t -> int
   val lits : t -> Literal.t array
 
-  val compact : t -> CompactClause.t (** Turn into a compact clause *)
   val is_ground : t -> bool
   val weight : t -> int
 
@@ -61,36 +60,32 @@ module type S = sig
   val trail_subsumes : t -> t -> bool
   (** [trail_subsumes c1 c2 = Trail.subsumes (get_trail c1) (get_trail c2)] *)
 
-  val compact_trail : Trail.t -> CompactClause.bool_lit list
-  (** Compact the trail for use with {!CompactClause} *)
-
   val is_active : t -> v:Trail.valuation -> bool
   (** True if the clause's trail is active in this valuation *)
 
   (** {2 Constructors} *)
 
-  val on_proof : (Literal.t array * Proof.t) Signal.t
-  (** signal triggered with [c, p] whenever a proof [p]  is associated with
-      the clause [c], even if the proof is dumped *)
-
   val create :
     trail:Trail.t ->
     Literal.t list ->
-    (CompactClause.t -> Proof.t) -> t
+    t ProofStep.t ->
+    t
   (** Build a new clause from the given literals.
-      @param trail boolean trail (default [[]])
+      @param trail boolean trail
       also takes a list of literals and a proof builder *)
 
   val create_a :
     trail:Trail.t ->
     Literal.t array ->
-    (CompactClause.t -> Proof.t) -> t
+    t ProofStep.t ->
+    t
   (** Build a new clause from the given literals. *)
 
   val of_forms :
     trail:Trail.t ->
     FOTerm.t SLiteral.t list ->
-    (CompactClause.t -> Proof.t) -> t
+    t ProofStep.t ->
+    t
   (** Directly from list of formulas *)
 
   val of_forms_axiom :
@@ -101,13 +96,16 @@ module type S = sig
   val of_statement : Statement.clause_t -> t option
   (** Extract a clause from a statement, if any *)
 
-  val proof : t -> Proof.t
+  val proof_step : t -> t ProofStep.t
   (** Extract its proof from the clause *)
 
-  val update_proof : t -> (Proof.t -> CompactClause.t -> Proof.t) -> t
+  val proof : t -> t ProofStep.of_
+  (** Obtain the pair [conclusion, step] *)
+
+  val update_proof : t -> (t ProofStep.t -> t ProofStep.t) -> t
   (** [update_proof c f] creates a new clause that is
       similar to [c] in all aspects, but with
-      the proof [f (proof c) (compact c)] *)
+      the proof [f (proof_step c)] *)
 
   val is_empty : t -> bool
   (** Is the clause an empty clause? *)

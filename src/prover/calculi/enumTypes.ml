@@ -27,7 +27,7 @@ module type S = sig
   module Env : Env.S
   module C : module type of Env.C
 
-  val declare_type : proof:Proof.t -> ty:Type.t -> var:Type.t HVar.t -> term list -> unit
+  val declare_type : proof:C.t ProofStep.of_ -> ty:Type.t -> var:Type.t HVar.t -> term list -> unit
   (** Declare that the given type's domain is the given list of cases
       for the given variable [var] (whose type must be [ty].
       Will be ignored if the type already has a enum declaration. *)
@@ -46,7 +46,7 @@ let _enable = ref true
 let _instantiate_shielded = ref false
 let _accept_unary_types = ref false
 
-module Make(E : Env.S) = struct
+module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module C = Env.C
   module PS = Env.ProofState
@@ -56,7 +56,7 @@ module Make(E : Env.S) = struct
     decl_ty : Type.t;
     decl_var : Type.t HVar.t;
     decl_cases : term list;
-    decl_proof : Proof.t;
+    decl_proof : C.t ProofStep.of_;
     mutable decl_symbols : ID.Set.t; (* set of declared symbols *)
   }
 
@@ -214,8 +214,9 @@ module Make(E : Env.S) = struct
                       let subst = Unif.FO.unification ~subst (v,s_c) (case,s_decl) in
                       let renaming = S.Renaming.create () in
                       let lits' = Lits.apply_subst ~renaming subst (C.lits c,s_c) in
-                      let proof cc = Proof.mk_c_inference ~info:[S.to_string subst]
-                          ~rule:"enum_type_case_switch" cc [C.proof c]
+                      let proof =
+                        ProofStep.mk_inference [C.proof c]
+                          ~rule:(ProofStep.mk_rule ~subst:[subst] "enum_type_case_switch")
                       in
                       let trail = C.trail c in
                       let c' = C.create_a ~trail lits' proof in
@@ -265,8 +266,9 @@ module Make(E : Env.S) = struct
                 (S.FO.apply ~renaming subst (case,1)))
             decl.decl_cases
         in
-        let proof cc = Proof.mk_c_inference
-            ~rule:"axiom_enum_types" cc [decl.decl_proof] in
+        let proof =
+          ProofStep.mk_inference
+            ~rule:(ProofStep.mk_rule "axiom_enum_types") [decl.decl_proof] in
         let trail = Trail.empty in
         let c' = C.create ~trail lits proof in
         Util.debugf ~section 3 "@[<2>declare enum type for @[%a@]:@ clause @[%a@]@]"

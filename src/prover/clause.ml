@@ -21,22 +21,7 @@ module type S = Clause_intf.S
 (** {2 Type def} *)
 module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   module Ctx = Ctx
-
   module BLit = Bool_lit
-
-  let compact_trail trail =
-    Trail.fold
-      (fun acc i ->
-         let sign = BLit.sign i in
-         match Ctx.BoolBox.extract (BLit.abs i) with
-         | None -> failwith "wrong trail"
-         | Some (Ctx.BoolBox.Clause_component lits) ->
-             (sign, lits) :: acc
-         | Some (Ctx.BoolBox.Case (l,r)) ->
-             let l = Ind_types.cst_to_term l in
-             let r = r.Ind_types.case_term in
-             (sign, [| Lit.mk_eq l r |]) :: acc)
-      [] trail
 
   let pp_trail out trail =
     if not (Trail.is_empty trail)
@@ -50,7 +35,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     tag : int; (** unique ID of the clause *)
     mutable flags : int; (** boolean flags for the clause *)
     mutable selected : BV.t Lazy.t; (** bitvector for selected lits*)
-    mutable proof : Proof.t; (** Proof of the clause *)
+    mutable proof : t ProofStep.t; (** Proof of the clause *)
     mutable trail : Trail.t; (** boolean trail *)
   }
 
@@ -108,30 +93,21 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   (** {2 Utils} *)
 
-  let is_conjecture c = Proof.is_conjecture c.proof
+  let is_conjecture c = ProofStep.is_conjecture c.proof
 
-  let distance_to_conjecture c =
-    Proof.distance_to_conjecture c.proof
+  let distance_to_conjecture c = ProofStep.distance_to_conjecture c.proof
 
   let id_count_ = ref 0
 
-  let on_proof = Signal.create ()
-
-  let compact c = CompactClause.make c.lits (compact_trail c.trail)
-
   let create_inner ~selected ~trail lits proof =
     Util.enter_prof prof_clause_create;
-    (* proof *)
-    let cc = CompactClause.make lits (compact_trail trail) in
-    let proof' = proof cc in
-    Signal.send on_proof (lits, proof');
     (* create the structure *)
     let c = {
       lits = lits;
       flags = 0;
       tag = ! id_count_;
       selected;
-      proof = proof';
+      proof;
       trail;
     } in
     incr id_count_;
@@ -153,7 +129,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let of_forms_axiom ~file ~name forms =
     let lits = List.map Ctx.Lit.of_form forms in
-    let proof c = Proof.mk_c_file ~file ~name c in
+    let proof = ProofStep.mk_file ~file ~name () in
     create ~trail:Trail.empty lits proof
 
   let of_statement st = match Statement.view st with
@@ -162,20 +138,21 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         (* convert literals *)
         let lits = List.map Ctx.Lit.of_form lits in
         let src = Statement.src st in
-        let proof cc = Proof.mk_c_src ~src cc in
+        let proof = ProofStep.mk_src ~src in
         let c = create ~trail:Trail.empty lits proof in
         Some c
 
   let update_trail f c =
     let trail = f c.trail in
-    let proof cc = Proof.adapt_c c.proof cc in
-    create_inner ~trail ~selected:c.selected c.lits proof
+    create_inner ~trail ~selected:c.selected c.lits c.proof
 
-  let proof c = c.proof
+  let proof_step c = c.proof
+
+  let proof c = ProofStep.mk_c c.proof c
 
   let update_proof c f =
-    let new_proof = f c.proof (compact c) in
-    create_a ~trail:c.trail c.lits (fun _ -> new_proof)
+    let new_proof = f c.proof in
+    create_a ~trail:c.trail c.lits new_proof
 
   let is_empty c =
     Lits.is_absurd c.lits && Trail.is_empty c.trail
@@ -186,8 +163,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       literals is important. *)
   let apply_subst ~renaming subst (c,sc) =
     let lits = Literals.apply_subst ~renaming subst (c.lits,sc) in
-    let proof = Proof.adapt_c c.proof in
-    let new_c = create_a ~trail:c.trail lits proof in
+    let new_c = create_a ~trail:c.trail lits c.proof in
     new_c
 
   let _apply_subst_no_simpl subst (lits,sc) =

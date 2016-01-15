@@ -46,7 +46,6 @@ let () =
   Extensions.register AC.extension;
   Extensions.register Heuristics.extension;
   Extensions.register Avatar.extension;
-  Extensions.register MetaProverState.extension;
   ()
 
 (* compute a precedence *)
@@ -122,6 +121,8 @@ module MakeNew(X : sig
     Env.remove_passive clauses;
     result, clauses
 
+  module PProof = ProofPrint.Make(C)
+
   (** Print some content of the state, based on environment variables *)
   let print_dots result =
     Signal.send Signals.on_dot_output ();
@@ -138,13 +139,13 @@ module MakeNew(X : sig
                 (fun c -> if Literals.is_absurd (C.lits c) then Some (C.proof c) else None)
             else Sequence.singleton proof
           in
-          Proof.pp_dot_seq_file ~name dot_f proof
+          PProof.pp_dot_seq_file ~name dot_f proof
       | Some dot_f, (Saturate.Sat | Saturate.Unknown) when params.param_dot_sat ->
           (* print saturated set *)
           let name = "sat_set" in
           let seq = Sequence.append (Env.get_active ()) (Env.get_passive ()) in
           let seq = Sequence.map C.proof seq in
-          Proof.pp_dot_seq_file ~name dot_f seq
+          PProof.pp_dot_seq_file ~name dot_f seq
       | _ -> ()
     end;
     ()
@@ -165,21 +166,21 @@ module MakeNew(X : sig
         Format.printf "%% SZS status %s for '%s'@." (_sat ()) file
     | Saturate.Sat ->
         Format.printf "%% SZS status GaveUp for '%s'@." file;
+        let open Options in
         begin match params.param_proof with
-          | "none" -> ()
-          | "tstp" ->
+          | Print_none -> ()
+          | Print_tptp ->
               Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
                 (fun k->k (CCFormat.seq ~sep:" " C.pp_tstp_full) (Env.get_active ()))
-          | "debug" ->
+          | Print_normal ->
               Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
                 (fun k->k (CCFormat.seq ~sep:" " C.pp) (Env.get_active ()))
-          | n -> failwith ("unknown proof format: " ^ n)
         end
     | Saturate.Unsat proof ->
         (* print status then proof *)
         Format.printf "%% SZS status %s for '%s'@." (_unsat ()) file;
         Format.printf "%% SZS output start Refutation@.";
-        Format.printf "%a@." (Proof.pp params.param_proof) proof;
+        Format.printf "%a@." (PProof.pp params.param_proof) proof;
         Format.printf "%% SZS output end Refutation@.";
         ()
 

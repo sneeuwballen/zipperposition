@@ -118,8 +118,8 @@ Library "libzipperposition_prover"
   FindlibName:      prover
   FindlibParent:    libzipperposition
   Modules:          ClauseQueue, Clause, Const, Extensions,
-                    Literal, Literals, CompactClause, Ctx, Proof, ProofState,
-                    Saturate, Selection, AC, AC_intf, PFormula, SimplM,
+                    Literal, Literals, Ctx, ProofStep, ProofPrint, ProofState,
+                    Saturate, Selection, AC, AC_intf, SimplM,
                     Compute_prec, Params, Env, Monome, ArithLit, Signals, Multisets,
                     Ctx_intf, Clause_intf, Env_intf, ProofState_intf,
                     BBox, BBox_intf, ClauseContext, ClauseQueue_intf,
@@ -131,7 +131,7 @@ Library "libzipperposition_prover"
                     calculi/EnumTypes,
                     calculi/ArithInt,
                     calculi/Heuristics,
-                    meta/MetaProverState
+                    meta/MetaProverState, meta/MetaProverState_intf
   InternalModules:  lib/UnionFind, lib/Signal
   Build$:           flag(meta) && flag(parsers)
   Install$:         flag(meta) && flag(parsers)

@@ -157,9 +157,6 @@ module type S = sig
   val stats : unit -> stats
   (** Compute stats *)
 
-  val cnf : PFormula.t Sequence.t -> C.ClauseSet.t
-  (** Reduce formulas to CNF *)
-
   val next_passive : unit  -> C.t option
   (** Extract next passive clause *)
 

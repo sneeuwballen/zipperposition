@@ -13,7 +13,7 @@ module type S = sig
   module Env : Env.S
   module C : module type of Env.C
 
-  val declare_type : proof:Proof.t -> ty:Type.t -> var:Type.t HVar.t -> term list -> unit
+  val declare_type : proof:C.t ProofStep.of_ -> ty:Type.t -> var:Type.t HVar.t -> term list -> unit
   (** Declare that the given type's domain is the given list of cases
       for the given variable [var] (whose type must be [ty].
       Will be ignored if the type already has a enum declaration. *)

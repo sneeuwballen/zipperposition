@@ -77,8 +77,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
              |> Sequence.iter
                (fun v' ->
                   UF.add uf_vars v' [lit];  (* lit is in the equiv class of [v'] *)
-                  UF.union uf_vars v v'
-               );
+                  UF.union uf_vars v v');
       ) lits;
 
     (* now gather all the components as a literal list list *)
@@ -92,9 +91,11 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
     | _::_ ->
         (* do a simplification! *)
         Util.incr_stat stat_splits;
-        let clauses_and_names = List.map
+        let clauses_and_names =
+          List.map
             (fun lits ->
-               let proof cc = Proof.mk_c_esa ~rule:"split" cc [C.proof c] in
+               let proof =
+                 ProofStep.mk_esa ~rule:(ProofStep.mk_rule "split") [C.proof c] in
                let lits = Array.of_list lits in
                let bool_name = BoolBox.inject_lits lits in
                let trail =
@@ -102,9 +103,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
                  |> Trail.add bool_name
                in
                let c = C.create_a ~trail lits proof in
-               C.set_bool_name c bool_name;
-               c, bool_name
-            ) !components
+               c, bool_name)
+            !components
         in
         let clauses, bool_clause = List.split clauses_and_names in
         Util.debugf ~section 4 "@[split of @[%a@]@ yields @[%a@]@]"
@@ -202,24 +202,29 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
     in
     c_pos :: c_neg, box
 
-  (* introduce a cut for each lemma proposed by the meta-prover *)
-  let introduce_meta_lemmas (q:MetaProverState.lemma Queue.t) _given =
-    (* translate all new lemmas into cuts *)
-    let clauses =
-      Sequence.of_queue q
-      |> Sequence.flat_map
-        (fun (cc, proof) ->
-           assert (CompactClause.trail cc = []);
-           let proof = Proof.adapt_c proof in
-           let new_clauses, _box = introduce_cut (CompactClause.lits cc) proof in
-           Util.debugf ~section 2 "@[<hv2>introduce cut from meta lemma:@,%a@]"
-             (fun k->k (CCList.print C.pp) new_clauses);
-           Sequence.of_list new_clauses
-        )
-      |> Sequence.to_rev_list
-    in
-    Queue.clear q;
-    clauses
+  module Meta(M : MetaProverState.S) = struct
+
+    (* XXX ugly, but I could not find a way to prove M.E.C.t = C.t *)
+    external c_of_lemma : M.lemma -> C.t = "%identity"
+
+    (* introduce a cut for each lemma proposed by the meta-prover *)
+    let introduce_meta_lemmas (q:M.lemma Queue.t) _given =
+      (* translate all new lemmas into cuts *)
+      let clauses =
+        Sequence.of_queue q
+        |> Sequence.flat_map
+          (fun c ->
+            let c = c_of_lemma c in
+            assert (C.trail c |> Trail.is_empty);
+            let new_clauses, _box = introduce_cut (C.lits c) (C.proof_step c) in
+            Util.debugf ~section 2 "@[<hv2>introduce cut from meta lemma:@,%a@]"
+              (fun k->k (CCList.print C.pp) new_clauses);
+            Sequence.of_list new_clauses)
+        |> Sequence.to_rev_list
+      in
+      Queue.clear q;
+      clauses
+  end
 
   let before_check_sat = Signal.create()
   let after_check_sat = Signal.create()
@@ -241,8 +246,9 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
             |> CCList.filter_map (fun tag -> get_clause ~tag)
             |> List.map C.proof
           in
-          let proof cc = Proof.mk_c_inference
-              ~rule:"sat" ~theories:["sat"] cc premises in
+          let proof =
+            ProofStep.mk_inference ~rule:(ProofStep.mk_rule "sat") premises
+          in
           let c = C.create ~trail:Trail.empty [] proof in
           [c]
     in
@@ -259,15 +265,16 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
     (* meta lemmas *)
     begin
       try
-        let meta = MetaProverState.get_env (module E) in
+        let (module M) = MetaProverState.get_env (module E) in
         Util.debug ~section 1 "found meta-prover, watch for lemmas";
+        let module M2 = Meta(M) in
         let q = Queue.create () in
-        Signal.on_every (MetaProverState.on_lemma meta)
+        Signal.on_every M.on_lemma
           (fun lemma ->
              Util.debugf ~section 2 "@[obtained lemma @[%a@]@ from meta-prover@]"
-               (fun k->k CompactClause.pp (fst lemma));
+               (fun k->k M.C.pp lemma);
              Queue.push lemma q);
-        E.add_unary_inf "avatar_meta_lemmas" (introduce_meta_lemmas q);
+        E.add_unary_inf "avatar_meta_lemmas" (M2.introduce_meta_lemmas q);
       with Not_found ->
         Util.debug ~section 1 "could not find meta-prover";
         ()
