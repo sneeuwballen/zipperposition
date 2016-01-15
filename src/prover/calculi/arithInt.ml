@@ -556,7 +556,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let canc_backward_demodulation c =
     Util.enter_prof prof_arith_backward_demod;
     let ord = Ctx.ord () in
-    let res = C.CSet.empty in
+    let res = C.ClauseSet.empty in
     let res = match C.lits c with
       | [| Lit.Arith (AL.Binary (AL.Equal, _, _) as alit) |] ->
           AL.fold_terms ~vars:false ~which:`Max ~subterms:false ~ord alit
@@ -573,10 +573,10 @@ module Make(E : Env.S) : S with module Env = E = struct
                     if C.trail_subsumes c' c && ALF.is_max ~ord alit'
                     then (
                       Util.incr_stat stat_arith_backward_demod;
-                      C.CSet.add acc c'
+                      C.ClauseSet.add c' acc
                     ) else acc)
                  acc)
-            C.CSet.empty
+            C.ClauseSet.empty
       | [| Lit.Arith (AL.Binary (AL.Lesseq, _m1, _m2)) |] ->
           res (* TODO *)
       | [| Lit.Arith (AL.Divides d) |] when d.AL.sign ->

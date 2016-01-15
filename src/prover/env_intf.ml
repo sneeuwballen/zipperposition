@@ -26,7 +26,7 @@ module type S = sig
   type active_simplify_rule = simplify_rule
   type rw_simplify_rule = simplify_rule
 
-  type backward_simplify_rule = C.t -> C.CSet.t
+  type backward_simplify_rule = C.t -> C.ClauseSet.t
   (** backward simplification by a unit clause. It returns a set of
       active clauses that can potentially be simplified by the given clause.
       [backward_simplify c] therefore returns a subset of
@@ -35,7 +35,7 @@ module type S = sig
   type redundant_rule = C.t -> bool
   (** check whether the clause is redundant w.r.t the set *)
 
-  type backward_redundant_rule = C.CSet.t -> C.t -> C.CSet.t
+  type backward_redundant_rule = C.ClauseSet.t -> C.t -> C.ClauseSet.t
   (** find redundant clauses in [ProofState.ActiveSet] w.r.t the clause.
        first param is the set of already known redundant clause, the rule
        should add clauses to it *)
@@ -67,17 +67,11 @@ module type S = sig
   val remove_passive : C.t Sequence.t -> unit
   (** Remove passive clauses *)
 
-  val remove_passive_id : int Sequence.t -> unit
-  (** Remove passive clauses by their ID *)
-
   val remove_active : C.t Sequence.t -> unit
   (** Remove active clauses *)
 
   val remove_simpl  : C.t Sequence.t -> unit
   (** Remove simplification clauses *)
-
-  val clean_passive : unit  -> unit
-  (** Clean passive set (remove old clauses from clause queues) *)
 
   val get_passive : unit -> C.t Sequence.t
   (** Passive clauses *)
@@ -133,7 +127,7 @@ module type S = sig
 
   val params : Params.t
 
-  val get_empty_clauses : unit -> C.CSet.t
+  val get_empty_clauses : unit -> C.ClauseSet.t
   (** Set of known empty clauses *)
 
   val get_some_empty_clause : unit -> C.t option
@@ -163,7 +157,7 @@ module type S = sig
   val stats : unit -> stats
   (** Compute stats *)
 
-  val cnf : PFormula.t Sequence.t -> C.CSet.t
+  val cnf : PFormula.t Sequence.t -> C.ClauseSet.t
   (** Reduce formulas to CNF *)
 
   val next_passive : unit  -> C.t option
@@ -190,7 +184,7 @@ module type S = sig
   val simplify : simplify_rule
   (** Simplify the clause. *)
 
-  val backward_simplify : C.t -> C.CSet.t * C.t Sequence.t
+  val backward_simplify : C.t -> C.ClauseSet.t * C.t Sequence.t
   (** Perform backward simplification with the given clause. It returns the
       CSet of clauses that become redundant, and the sequence of those
       very same clauses after simplification. *)
@@ -212,7 +206,7 @@ module type S = sig
   val is_redundant : C.t -> bool
   (** Is the given clause redundant w.r.t the active set? *)
 
-  val subsumed_by : C.t -> C.CSet.t
+  val subsumed_by : C.t -> C.ClauseSet.t
   (** List of active clauses subsumed by the given clause *)
 
   val all_simplify : C.t -> C.t list SimplM.t

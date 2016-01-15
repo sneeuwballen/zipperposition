@@ -17,9 +17,6 @@ module PB = Position.Build
 module CQ = ClauseQueue
 
 let prof_next_passive = Util.mk_profiler "proofState.next_passive"
-let prof_clean_passive = Util.mk_profiler "proofState.clean_passive"
-
-let stat_passive_cleanup = Util.mk_stat "cleanup of passive set"
 
 let section = Util.Section.(make ~parent:zip "clause_queue")
 
@@ -83,30 +80,31 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
   end
 
   module MakeClauseSet(X : sig end) = struct
-    let _clauses = ref C.CSet.empty
+    let clauses_ = ref C.ClauseSet.empty
 
     let on_add_clause = Signal.create ()
 
     let on_remove_clause = Signal.create ()
 
-    let clauses () = !_clauses
+    let clauses () = !clauses_
 
     let add seq =
-      seq (fun c ->
-          if not (C.CSet.mem !_clauses c)
-          then begin
-            _clauses := C.CSet.add !_clauses c;
+      seq
+        (fun c ->
+          if not (C.ClauseSet.mem c !clauses_)
+          then (
+            clauses_ := C.ClauseSet.add c !clauses_;
             Signal.send on_add_clause c
-          end);
+          ));
       ()
 
     let remove seq =
       seq (fun c ->
-          if C.CSet.mem !_clauses c
-          then begin
-            _clauses := C.CSet.remove !_clauses c;
+          if C.ClauseSet.mem c !clauses_
+          then (
+            clauses_ := C.ClauseSet.remove c !clauses_;
             Signal.send on_remove_clause c
-          end);
+          ));
       ()
   end
 
@@ -126,76 +124,27 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
   module PassiveSet = struct
     include MakeClauseSet(struct end)
 
-    let _queues = ref (Array.of_list CQueue.default_queues)
-    let _state = ref (0,0)
+    let queue_ = ref (
+      let p = ClauseQueue.get_profile () in
+      CQueue.of_profile p)
 
-    let () =
-      assert (Array.length !_queues > 0);
-      ()
+    let queue () = !queue_
 
-    let remove_by_id seq =
-      _clauses := C.CSet.remove_id_seq !_clauses seq;
-      ()
+    let next_ () =
+      if CQueue.is_empty !queue_
+      then None
+      else (
+        let q', x = CQueue.take_first !queue_ in
+        queue_ := q';
+        Some x
+      )
 
-    let queues k =
-      Array.iter (fun (q,coeff) -> k (q,coeff)) !_queues
-
-    let add_queue q coeff =
-      (* add all clauses to the queue *)
-      let q = C.CSet.fold !_clauses q (fun q _ c -> CQueue.add q c) in
-      _queues := Array.of_list ((q, coeff) :: Array.to_list !_queues)
-
-    let clean () =
-      Util.enter_prof prof_clean_passive;
-      Util.incr_stat stat_passive_cleanup;
-      for i = 0 to Array.length (!_queues) - 1 do
-        let q, w = (!_queues).(i) in
-        (!_queues).(i) <- CQueue.clean q !_clauses, w
-      done;
-      Util.exit_prof prof_clean_passive
-
-    let next () =
-      Util.enter_prof prof_next_passive;
-      let first_idx, w = !_state in
-      (* search in the idx-th queue *)
-      let rec search idx weight =
-        let q, w = (!_queues).(idx) in
-        if Array.length !_queues=1 && CQueue.is_empty q then None
-        else
-        if (Array.length !_queues > 1 && weight >= w) || CQueue.is_empty q
-        then next_idx (idx+1) (* empty queue, go to the next one *)
-        else begin
-          let new_q, c = CQueue.take_first q in (* pop from this queue *)
-          (!_queues).(idx) <- new_q, w;
-          if C.CSet.mem !_clauses c
-          then begin (* done, found a still-valid clause *)
-            Util.debugf ~section 3 "taken clause from %s" (fun k->k (CQueue.name q));
-            remove (Sequence.singleton c);
-            _state := (idx, weight+1);
-            Some c
-          end
-          else search idx weight
-        end
-      (* search the next non-empty queue *)
-      and next_idx idx =
-        if idx = first_idx then None (* all queues are empty *)
-        else if idx = Array.length !_queues then next_idx 0 (* cycle *)
-        else search idx 0 (* search in this queue *)
-      in
-      let res = search first_idx w in
-      Util.exit_prof prof_next_passive;
-      res
+    let next () = Util.with_prof prof_next_passive next_ ()
 
     (* register to signal *)
     let () =
-      Signal.on on_add_clause
-        (fun c ->
-           for i = 0 to Array.length (!_queues) - 1 do
-             (* add to i-th queue *)
-             let q, w = !_queues.(i) in
-             (!_queues).(i) <- (CQueue.add q c, w)
-           done;
-           Signal.ContinueListening);
+      Signal.on_every on_add_clause
+        (fun c -> queue_ := CQueue.add !queue_ c);
       ()
   end
 
@@ -203,28 +152,27 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
   (* num passive, num active, num simplification *)
 
   let stats () =
-    ( C.CSet.size (ActiveSet.clauses ())
-    , C.CSet.size (PassiveSet.clauses ())
-    , 0)
+    C.ClauseSet.cardinal (ActiveSet.clauses ()),
+    C.ClauseSet.cardinal (PassiveSet.clauses ()),
+    0
 
   let pp out state =
     let num_active, num_passive, num_simpl = stats state in
     Format.fprintf out
-      ("state {%d active clauses; %d passive_clauses; " ^^
-       "%d simplification_rules; %a}")
+      "state {%d active clauses; %d passive clauses; \
+       %d simplification_rules; %a}"
       num_active num_passive num_simpl
-      CQueue.pp_list (PassiveSet.queues |> Sequence.to_list)
+      CQueue.pp (PassiveSet.queue ())
 
   let debug out state =
     let num_active, num_passive, num_simpl = stats state in
     Format.fprintf out
-      "@[<v2>state {%d active clauses;@ %d passive_clauses;@ \
+      "@[<v2>state {%d active clauses;@ %d passive clauses;@ \
        %d simplification_rules;@ queues@[<hv>%a@] \
        @,active:@[<hv>%a@]@,passive:@[<hv>%a@]@,}@]"
       num_active num_passive num_simpl
-      CQueue.pp_list (PassiveSet.queues |> Sequence.to_list)
+      CQueue.pp (PassiveSet.queue ())
       C.pp_set (ActiveSet.clauses ())
       C.pp_set (PassiveSet.clauses ())
-
 end
 

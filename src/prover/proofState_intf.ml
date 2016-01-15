@@ -38,7 +38,7 @@ module type S = sig
   module ActiveSet : sig
     include CLAUSE_SET
 
-    val clauses : unit -> C.CSet.t
+    val clauses : unit -> C.ClauseSet.t
     (** Current set of clauses *)
   end
 
@@ -47,22 +47,11 @@ module type S = sig
   module PassiveSet : sig
     include CLAUSE_SET
 
-    val remove_by_id : int Sequence.t -> unit
-    (** Remove clauses by their ID. This will {b NOT} trigger
-        the signal {!on_remove_clause}. *)
-
-    val clauses : unit -> C.CSet.t
+    val clauses : unit -> C.ClauseSet.t
     (** Current set of clauses *)
 
-    val queues : (CQueue.t * int) Sequence.t
-    (** Current state of the clause queues *)
-
-    val add_queue : CQueue.t -> int -> unit
-    (** Add a new queue to the set of queues *)
-
-    val clean : unit -> unit
-    (** Clean clause queues (remove clauses that are no longer passive, but
-        still in the queue) *)
+    val queue : unit -> CQueue.t
+    (** Current state of the clause queue *)
 
     val next : unit -> C.t option
     (** Get-and-remove the next passive clause to process *)

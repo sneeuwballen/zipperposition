@@ -100,14 +100,14 @@ module Make(E : Env.S) = struct
               Util.debugf ~section 2 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
               Util.debugf ~section 1 "@[<2>given: @[%a@]@]" (fun k->k Env.C.pp c);
               (* find clauses that are subsumed by given in active_set *)
-              let subsumed_active = Env.C.CSet.to_seq (Env.subsumed_by c) in
+              let subsumed_active = Env.C.ClauseSet.to_seq (Env.subsumed_by c) in
               Env.remove_active subsumed_active;
               Env.remove_simpl subsumed_active;
               (* add given clause to simpl_set *)
               Env.add_simpl (Sequence.singleton c);
               (* simplify active set using c *)
               let simplified_actives, newly_simplified = Env.backward_simplify c in
-              let simplified_actives = Env.C.CSet.to_seq simplified_actives in
+              let simplified_actives = Env.C.ClauseSet.to_seq simplified_actives in
               (* the simplified active clauses are removed from active set and
                  added to the set of new clauses. Their descendants are also removed
                  from passive set *)
@@ -154,19 +154,12 @@ module Make(E : Env.S) = struct
       else match steps with
         | Some i when num >= i -> Unknown, num
         | _ ->
-            begin
-              (* some cleanup from time to time *)
-              if num mod 1000 = 0 then (
-                Util.debug ~section 1 "perform cleanup of passive set";
-                Env.clean_passive ();
-              );
-              (* do one step *)
-              let status = given_clause_step ~generating num in
-              match status with
-              | Sat | Unsat _ | Error _ -> status, num (* finished *)
-              | Timeout -> assert false
-              | Unknown -> do_step (num+1)
-            end
+            (* do one step *)
+            let status = given_clause_step ~generating num in
+            match status with
+            | Sat | Unsat _ | Error _ -> status, num (* finished *)
+            | Timeout -> assert false
+            | Unknown -> do_step (num+1)
     in
     do_step 0
 

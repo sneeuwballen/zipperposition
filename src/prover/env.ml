@@ -45,7 +45,7 @@ module Make(X : sig
   type active_simplify_rule = simplify_rule
   type rw_simplify_rule = simplify_rule
 
-  type backward_simplify_rule = C.t -> C.CSet.t
+  type backward_simplify_rule = C.t -> C.ClauseSet.t
   (** backward simplification by a unit clause. It returns a set of
       active clauses that can potentially be simplified by the given clause.
       [backward_simplify c] therefore returns a subset of
@@ -54,7 +54,7 @@ module Make(X : sig
   type redundant_rule = C.t -> bool
   (** check whether the clause is redundant w.r.t the set *)
 
-  type backward_redundant_rule = C.CSet.t -> C.t -> C.CSet.t
+  type backward_redundant_rule = C.ClauseSet.t -> C.t -> C.ClauseSet.t
   (** find redundant clauses in [ProofState.ActiveSet] w.r.t the clause.
        first param is the set of already known redundant clause, the rule
        should add clauses to it *)
@@ -83,7 +83,7 @@ module Make(X : sig
   let _redundant = ref []
   let _backward_redundant : backward_redundant_rule list ref = ref []
   let _is_trivial : is_trivial_rule list ref = ref []
-  let _empty_clauses = ref C.CSet.empty
+  let _empty_clauses = ref C.ClauseSet.empty
   let _multi_simpl_rule : multi_simpl_rule list ref = ref []
   let _generate_rules : (string * generate_rule) list ref = ref []
   let _step_init = ref []
@@ -95,7 +95,7 @@ module Make(X : sig
 
   let add_empty c =
     assert (C.is_empty c);
-    _empty_clauses := C.CSet.add !_empty_clauses c;
+    _empty_clauses := C.ClauseSet.add c !_empty_clauses;
     Signal.send on_empty_clause c;
     ()
 
@@ -120,20 +120,14 @@ module Make(X : sig
   let remove_passive cs =
     ProofState.PassiveSet.remove cs
 
-  let remove_passive_id ids =
-    ProofState.PassiveSet.remove_by_id ids
-
   let remove_simpl cs =
     ProofState.SimplSet.remove cs
 
-  let clean_passive () =
-    ProofState.PassiveSet.clean ()
-
   let get_passive () =
-    ProofState.PassiveSet.clauses () |> C.CSet.to_seq
+    ProofState.PassiveSet.clauses () |> C.ClauseSet.to_seq
 
   let get_active () =
-    ProofState.ActiveSet.clauses () |> C.CSet.to_seq
+    ProofState.ActiveSet.clauses () |> C.ClauseSet.to_seq
 
   let add_binary_inf name rule =
     if not (List.mem_assoc name !_binary_rules)
@@ -185,10 +179,11 @@ module Make(X : sig
     !_empty_clauses
 
   let get_some_empty_clause () =
-    C.CSet.choose !_empty_clauses
+    try Some (C.ClauseSet.choose !_empty_clauses)
+    with Not_found -> None
 
   let has_empty_clause () =
-    not (C.CSet.is_empty !_empty_clauses)
+    not (C.ClauseSet.is_empty !_empty_clauses)
 
   let ord () = Ctx.ord ()
   let precedence () = Ordering.precedence (ord ())
@@ -230,7 +225,7 @@ module Make(X : sig
             | Statement.Assert c ->
                 let c = Cnf.clause_to_fo c in
                 let c = C.of_forms ~trail:Trail.empty c proof in
-                C.CSet.add cset c
+                C.ClauseSet.add c cset
             | Statement.TyDecl (s, ty) ->
                 let ctx = Type.Conv.create() in
                 let ty = Type.Conv.of_simple_term_exn ctx ty in
@@ -239,7 +234,7 @@ module Make(X : sig
                 Ctx.declare s ty;
                 cset)
            cset stmts)
-      C.CSet.empty
+      C.ClauseSet.empty
       seq
 
   let next_passive () =
@@ -296,10 +291,10 @@ module Make(X : sig
       | l -> List.exists (fun f -> f c) l
 
   let is_active c =
-    C.CSet.mem (ProofState.ActiveSet.clauses ()) c
+    C.ClauseSet.mem c (ProofState.ActiveSet.clauses ())
 
   let is_passive c =
-    C.CSet.mem (ProofState.PassiveSet.clauses ()) c
+    C.ClauseSet.mem c (ProofState.PassiveSet.clauses ())
 
   module StrSet = Set.Make(String)
 
@@ -460,34 +455,34 @@ module Make(X : sig
           | None -> try_next c rules'
     in
     (* fixpoint of [try_next] *)
-    let set = ref C.CSet.empty in
+    let set = ref C.ClauseSet.empty in
     let q = Queue.create () in
     Queue.push c q;
     while not (Queue.is_empty q) do
       let c = Queue.pop q in
-      if not (C.CSet.mem !set c) then (
+      if not (C.ClauseSet.mem c !set) then (
         let c, st = basic_simplify c in
         if st = `New then did_something := true;
         match try_next c !_multi_simpl_rule with
         | None ->
             (* keep the clause! *)
-            set := C.CSet.add !set c;
+            set := C.ClauseSet.add c !set;
         | Some l ->
             did_something := true;
             List.iter (fun c -> Queue.push c q) l;
       )
     done;
     if !did_something
-    then Some (C.CSet.to_list !set)
+    then Some (C.ClauseSet.to_list !set)
     else None
 
   (* find candidates for backward simplification in active set *)
   let backward_simplify_find_candidates given =
     match !_backward_simplify with
-    | [] -> C.CSet.empty
+    | [] -> C.ClauseSet.empty
     | [f] -> f given
-    | [f;g] -> C.CSet.union (f given) (g given)
-    | l -> List.fold_left (fun set f -> C.CSet.union set (f given)) C.CSet.empty l
+    | [f;g] -> C.ClauseSet.union (f given) (g given)
+    | l -> List.fold_left (fun set f -> C.ClauseSet.union set (f given)) C.ClauseSet.empty l
 
   (* Perform backward simplification with the given clause *)
   let backward_simplify given =
@@ -497,8 +492,8 @@ module Make(X : sig
     (* try to simplify the candidates. Before is the set of clauses that
        are simplified, after is the list of those clauses after simplification *)
     let before, after =
-      C.CSet.fold candidates (C.CSet.empty, [])
-        (fun (before, after) _ c ->
+      C.ClauseSet.fold
+        (fun c (before, after) ->
            let c', is_new = rw_simplify c in
            match is_new with
            | `Same -> before, after
@@ -507,16 +502,16 @@ module Make(X : sig
                Util.debugf ~section 2
                  "@[active clause @[%a@]@ simplified into @[%a@]@]"
                  (fun k->k C.pp c C.pp c');
-               C.CSet.add before c, c' :: after)
+               C.ClauseSet.add c before, c' :: after)
+        candidates (C.ClauseSet.empty, [])
     in
     Util.exit_prof prof_back_simplify;
     before, Sequence.of_list after
 
   let simplify_active_with f =
     let set =
-      C.CSet.fold
-        (ProofState.ActiveSet.clauses ()) []
-        (fun set _id c ->
+      C.ClauseSet.fold
+        (fun c set ->
            match f c with
            | None -> set
            | Some clauses ->
@@ -524,8 +519,8 @@ module Make(X : sig
                Util.debugf ~section 3
                 "@[active clause @[%a@]@ simplified into clauses @[%a@]@]"
                  (fun k->k C.pp c (CCFormat.list C.pp) clauses);
-               (c, clauses) :: set
-        )
+               (c, clauses) :: set)
+        (ProofState.ActiveSet.clauses ()) []
     in
     (* remove clauses from active set, put their simplified version into
         the passive set for further processing *)
@@ -596,7 +591,7 @@ module Make(X : sig
     let res =
       List.fold_left
         (fun set rule -> rule set c)
-        C.CSet.empty
+        C.ClauseSet.empty
         !_backward_redundant
     in
     Util.exit_prof prof_subsumed_by;
@@ -607,7 +602,7 @@ module Make(X : sig
   let all_simplify c =
     Util.enter_prof prof_all_simplify;
     let did_simplify = ref false in
-    let set = ref C.CSet.empty in
+    let set = ref C.ClauseSet.empty in
     let q = Queue.create () in
     Queue.push c q;
     while not (Queue.is_empty q) do
@@ -619,13 +614,13 @@ module Make(X : sig
       else match multi_simplify c with
         | None ->
             (* clause has reached fixpoint *)
-            set := C.CSet.add !set c
+            set := C.ClauseSet.add c !set
         | Some l ->
             (* continue processing *)
             did_simplify := true;
             List.iter (fun c -> Queue.push c q) l
     done;
-    let res = C.CSet.to_list !set in
+    let res = C.ClauseSet.to_list !set in
     Util.exit_prof prof_all_simplify;
     if !did_simplify
     then SimplM.return_new res

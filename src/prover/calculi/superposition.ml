@@ -68,7 +68,7 @@ module type S = sig
   val demodulate : Env.simplify_rule
   (** rewrite clause using orientable unit equations *)
 
-  val backward_demodulate : C.CSet.t -> C.t -> C.CSet.t
+  val backward_demodulate : C.ClauseSet.t -> C.t -> C.ClauseSet.t
   (** backward version of demodulation: add to the set active clauses that
       can potentially be rewritten by the given clause *)
 
@@ -756,7 +756,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                ) && C.trail_subsumes c given
               )
            then  (* add the clause to the set, it may be rewritten by l -> r *)
-             C.CSet.add set c
+             C.ClauseSet.add c set
            else set)
         set
     in
@@ -1245,7 +1245,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              in
              if redundant then (
                Util.incr_stat stat_clauses_subsumed;
-               C.CSet.add res c'
+               C.ClauseSet.add c' res
              ) else res
            else res)
         acc
@@ -1268,7 +1268,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   exception RemoveLit of int * C.t
 
-  (** Performs successive contextual literal cuttings *)
+  (* Performs successive contextual literal cuttings *)
   let rec contextual_literal_cutting_rec c =
     let open SimplM.Infix in
     if Array.length (C.lits c) <= 1
@@ -1432,7 +1432,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       condensation c
       >>= contextual_literal_cutting
     and backward_simplify c =
-      let set = C.CSet.empty in
+      let set = C.ClauseSet.empty in
       backward_demodulate set c
     and redundant = subsumed_by_active_set
     and backward_redundant = subsumed_in_active_set

@@ -5,8 +5,6 @@
     a set of passive clauses (to be processed), and an ordering
     that is used for redundancy elimination.} *)
 
-open Libzipperposition
-
 module type S = ProofState_intf.S
 
 (** {2 Create a Proof State} *)

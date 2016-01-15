@@ -63,7 +63,7 @@ module type S = sig
   val demodulate : Env.simplify_rule
   (** rewrite clause using orientable unit equations *)
 
-  val backward_demodulate : C.CSet.t -> C.t -> C.CSet.t
+  val backward_demodulate : C.ClauseSet.t -> C.t -> C.ClauseSet.t
   (** backward version of demodulation: add to the set active clauses that
       can potentially be rewritten by the given clause *)
 
