@@ -35,8 +35,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
          | Some (Ctx.BoolBox.Case (l,r)) ->
              let l = Ind_types.cst_to_term l in
              let r = r.Ind_types.case_term in
-             (sign, [| Lit.mk_eq l r |]) :: acc
-      ) [] trail
+             (sign, [| Lit.mk_eq l r |]) :: acc)
+      [] trail
 
   let pp_trail out trail =
     if not (Trail.is_empty trail)
@@ -47,11 +47,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   type t = {
     lits : Literal.t array; (** the literals *)
-    mutable tag : int; (** unique ID of the clause *)
+    tag : int; (** unique ID of the clause *)
     mutable flags : int; (** boolean flags for the clause *)
     mutable selected : BV.t Lazy.t; (** bitvector for selected lits*)
     mutable proof : Proof.t; (** Proof of the clause *)
-    mutable as_bool : Ctx.BoolBox.t option; (** boolean box *)
     mutable trail : Trail.t; (** boolean trail *)
   }
 
@@ -88,20 +87,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let weight c = Lits.weight c.lits
 
-  let as_bool c = c.as_bool
-
-  let as_bool_exn c = match c.as_bool with
-    | None -> failwith "C.as_bool_exn"
-    | Some i -> i
-
-  let set_bool_name c i =
-    (* check consistency *)
-    begin match c.as_bool with
-      | None -> ()
-      | Some j -> if i<>j then failwith "C.set_bool_name"
-    end;
-    c.as_bool <- Some i
-
   let trail c = c.trail
   let has_trail c = not (Trail.is_empty c.trail)
   let trail_subsumes c1 c2 = Trail.subsumes c1.trail c2.trail
@@ -115,24 +100,11 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let lits c = c.lits
 
-  module CHashtbl = Hashtbl.Make(struct
+  module CHashtbl = CCHashtbl.Make(struct
       type t = clause
       let hash = hash
       let equal = equal
     end)
-
-  module CHashSet = struct
-    type t = unit CHashtbl.t
-    let create () = CHashtbl.create 13
-    let is_empty t = CHashtbl.length t = 0
-    let member t c = CHashtbl.mem t c
-    let iter t f = CHashtbl.iter (fun c _ -> f c) t
-    let add t c = CHashtbl.replace t c ()
-    let to_list t =
-      let l = ref [] in
-      iter t (fun c -> l := c :: !l);
-      !l
-  end
 
   (** {2 Utils} *)
 
@@ -160,7 +132,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       tag = ! id_count_;
       selected;
       proof = proof';
-      as_bool = None;
       trail;
     } in
     incr id_count_;

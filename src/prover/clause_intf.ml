@@ -31,17 +31,7 @@ module type S = sig
   val is_ground : t -> bool
   val weight : t -> int
 
-  module CHashtbl : Hashtbl.S with type key = t
-
-  module CHashSet : sig
-    type t
-    val create : unit -> t
-    val is_empty : t -> bool
-    val member : t -> clause -> bool
-    val iter : t -> (clause -> unit) -> unit
-    val add : t -> clause -> unit
-    val to_list : t -> clause list
-  end
+  module CHashtbl : CCHashtbl.S with type key = t
 
   val is_conjecture : t -> bool
   (** Looking at the clause's proof, return [true] iff the clause is an
@@ -54,18 +44,6 @@ module type S = sig
 
   val pp_trail : Trail.t CCFormat.printer
   (** Printer for boolean trails, that uses {!Ctx} to display boxes *)
-
-  val as_bool : t -> Trail.bool_lit option
-  (** Boolean atom for this clause (if any) *)
-
-  val as_bool_exn : t -> Trail.bool_lit
-  (** Unsafe version of {!as_bool}.
-      @raise Failure if the clause doesn't have a boolean name *)
-
-  val set_bool_name : t -> Trail.bool_lit -> unit
-  (** Set the boolean name of this clause.
-      Basically, [set_bool_name c i; as_bool i = Some i] holds.
-      @raise Failure if the clause already has a name *)
 
   val has_trail : t -> bool
   (** Has a non-empty trail? *)
