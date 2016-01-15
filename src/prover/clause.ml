@@ -382,91 +382,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   (** {2 Set of clauses} *)
 
   (** Simple set *)
-  module ClauseSet = Set.Make(struct
+  module ClauseSet = CCSet.Make(struct
       type t = clause
-      let compare hc1 hc2 = hc1.tag - hc2.tag
+      let compare hc1 hc2 = CCInt.compare hc1.tag hc2.tag
     end)
-
-  (** Set with access by ID, bookeeping of maximal var... *)
-  module CSet = struct
-    module IntMap = Map.Make(struct
-        type t = int
-        let compare i j = i - j
-      end)
-
-    type t = clause IntMap.t
-    (** Set of hashconsed clauses. Clauses are indexable by their ID. *)
-
-    let empty = IntMap.empty
-
-    let is_empty = IntMap.is_empty
-
-    let size set = IntMap.fold (fun _ _ b -> b + 1) set 0
-
-    let add set c = IntMap.add c.tag c set
-
-    let add_list set hcs =
-      List.fold_left add set hcs
-
-    let remove_id set i = IntMap.remove i set
-
-    let remove set c = remove_id set c.tag
-
-    let remove_list set hcs =
-      List.fold_left remove set hcs
-
-    let get set i = IntMap.find i set
-
-    let mem set c = IntMap.mem c.tag set
-
-    let mem_id set i = IntMap.mem i set
-
-    let choose set =
-      try Some (snd (IntMap.choose set))
-      with Not_found -> None
-
-    let union s1 s2 =
-      IntMap.merge
-        (fun _ c1 c2 -> match c1, c2 with
-           | Some c1, Some c2 -> assert (equal c1 c2); Some c1
-           | Some c, None
-           | None, Some c -> Some c
-           | None, None -> None)
-        s1 s2
-
-    let inter s1 s2 = IntMap.merge
-        (fun _ c1 c2 -> match c1, c2 with
-           | Some c1, Some c2 -> assert (equal c1 c2); Some c1
-           | Some _, None
-           | None, Some _
-           | None, None -> None)
-        s1 s2
-
-    let iter set k = IntMap.iter (fun _ c -> k c) set
-
-    let iteri set k = IntMap.iter k set
-
-    let fold set acc f =
-      let acc = ref acc in
-      iteri set (fun i c -> acc := f !acc i c);
-      !acc
-
-    let to_list set =
-      IntMap.fold (fun _ c acc -> c :: acc) set []
-
-    let of_list l =
-      add_list empty l
-
-    let to_seq set =
-      Sequence.from_iter
-        (fun k -> iter set k)
-
-    let of_seq set seq = Sequence.fold add set seq
-
-    let remove_seq set seq = Sequence.fold remove set seq
-
-    let remove_id_seq set seq = Sequence.fold remove_id set seq
-  end
 
   (** {2 Positions in clauses} *)
 
@@ -504,18 +423,22 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     (* print literals with a '*' for maximal, and '+' for selected *)
     let selected = Lazy.force c.selected in
     let max = maxlits (Scoped.make c 0) S.empty in
-    if Array.length c.lits = 0 then CCFormat.string out "⊥"
-    else (
-      let pp_lit out (i,lit) =
-        Format.fprintf out "@[%a%s@]" Lit.pp lit (pp_annot selected max i)
-      in
-      Format.fprintf out "[@[%a@]]"
-        (CCFormat.arrayi ~start:"" ~stop:"" ~sep:" ∨ " pp_lit)
-        c.lits
-    );
-    pp_trail out c.trail;
+    let pp_lits out lits =
+      if Array.length lits = 0
+      then CCFormat.string out "⊥"
+      else (
+        let pp_lit out (i,lit) =
+          Format.fprintf out "@[%a%s@]" Lit.pp lit (pp_annot selected max i)
+        in
+        Format.fprintf out "[@[%a@]]"
+          (CCFormat.arrayi ~start:"" ~stop:"" ~sep:" ∨ " pp_lit)
+          lits
+      )
+    in
+    Format.fprintf out "@[<2>%a%a@]" pp_lits c.lits pp_trail c.trail;
     ()
 
+  (* TODO print trail?! *)
   let pp_tstp out c =
     match c.lits with
     | [| |] -> CCFormat.string out "$false"
@@ -530,10 +453,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let pp_set out set =
     Format.fprintf out "{@[<hv>%a@]}"
       (CCFormat.seq ~start:"" ~stop:"" ~sep:"," pp)
-      (CSet.to_seq set)
+      (ClauseSet.to_seq set)
 
   let pp_set_tstp out set =
     Format.fprintf out "@[<v>%a@]"
       (CCFormat.seq ~start:"" ~stop:"" ~sep:"," pp_tstp)
-      (CSet.to_seq set)
+      (ClauseSet.to_seq set)
 end

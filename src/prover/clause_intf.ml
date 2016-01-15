@@ -239,72 +239,7 @@ module type S = sig
   (** {2 Set of clauses} *)
 
   (** Simple set *)
-  module ClauseSet : Set.S with type elt = t
-
-  (** Set with access by ID, bookeeping of maximal var... *)
-  module CSet : sig
-    (** Set of hashconsed clauses. *)
-    type t
-
-    val empty : t
-    (** the empty set *)
-
-    val is_empty : t -> bool
-    (** is the set empty? *)
-
-    val size : t -> int
-    (** number of clauses in the set *)
-
-    val add : t -> clause -> t
-    (** add the clause to the set *)
-
-    val add_list : t -> clause list -> t
-    (** add several clauses to the set *)
-
-    val remove_id : t -> int -> t
-    (** remove clause by ID *)
-
-    val remove : t -> clause -> t
-    (** remove hclause *)
-
-    val remove_list : t -> clause list -> t
-    (** remove hclauses *)
-
-    val get : t -> int -> clause
-    (** get a clause by its ID *)
-
-    val mem : t -> clause -> bool
-    (** membership test *)
-
-    val mem_id : t -> int -> bool
-    (** membership test by t ID *)
-
-    val choose : t -> clause option
-    (** Choose a clause in the set *)
-
-    val union : t -> t -> t
-    (** Union of sets *)
-
-    val inter : t -> t -> t
-    (** Intersection of sets *)
-
-    val iter : t -> (clause -> unit) -> unit
-    (** iterate on clauses in the set *)
-
-    val iteri : t -> (int -> clause -> unit) -> unit
-    (** iterate on clauses in the set with their ID *)
-
-    val fold : t -> 'b -> ('b -> int -> clause -> 'b) -> 'b
-    (** fold on clauses *)
-
-    val to_list : t -> clause list
-    val of_list : clause list -> t
-
-    val to_seq : t -> clause Sequence.t
-    val of_seq : t -> clause Sequence.t -> t
-    val remove_seq : t -> clause Sequence.t -> t
-    val remove_id_seq : t -> int Sequence.t -> t
-  end
+  module ClauseSet : CCSet.S with type elt = t
 
   (** {2 Position} *)
 
@@ -332,9 +267,9 @@ module type S = sig
   val pp_tstp : t CCFormat.printer
   val pp_tstp_full : t CCFormat.printer  (** Print in a cnf() statement *)
 
-  val to_string : t -> string               (** Debug printing to a  string *)
+  val to_string : t -> string (** Debug printing to a  string *)
 
-  val pp_set : CSet.t CCFormat.printer
-  val pp_set_tstp : CSet.t CCFormat.printer
+  val pp_set : ClauseSet.t CCFormat.printer
+  val pp_set_tstp : ClauseSet.t CCFormat.printer
 end
 
