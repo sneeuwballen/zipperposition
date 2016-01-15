@@ -41,7 +41,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let pp_trail out trail =
     if not (Trail.is_empty trail)
     then
-      Format.fprintf out " ← @[<hov>%a@]"
+      Format.fprintf out "@ @<2>← @[<hv>%a@]"
         (CCFormat.seq ~start:"" ~stop:"" ~sep:" ⊓ " Ctx.BoolBox.pp)
         (Trail.to_seq trail)
 

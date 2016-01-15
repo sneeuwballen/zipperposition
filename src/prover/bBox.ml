@@ -35,9 +35,9 @@ module Make(Dummy : sig end) = struct
 
   let pp_injected out = function
     | Clause_component lits ->
-        Format.fprintf out "⟦%a⟧" Lits.pp lits
+        Format.fprintf out "⟦@[<hv>%a@]⟧" Lits.pp lits
     | Case (c, t) ->
-        Format.fprintf out "⟦@[<hv>%a@ = %a@]⟧"
+        Format.fprintf out "⟦@[<hv1>%a@ = @[%a@]@]⟧"
           Ind_types.pp_cst c Ind_types.pp_case t
 
   module FV = Libzipperposition.FeatureVector.Make(struct

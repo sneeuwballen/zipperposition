@@ -31,7 +31,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
   module Solver = Sat
 
   let _pp_bclause out lits =
-    Format.fprintf out "%a" (Util.pp_list ~sep:" ⊔ " BoolBox.pp) lits
+    Format.fprintf out "@[<hv>%a@]" (Util.pp_list ~sep:" ⊔ " BoolBox.pp) lits
 
   (* map ID -> clause *)
   let id_to_clause_ = Hashtbl.create 24
