@@ -7,7 +7,7 @@
 (B) 2016-01-15 repair induction p:1
 (B) 2016-01-15 add better generalization in induction id:1
 (A) 2016-01-15 add locked storage for Avatar
-(A) 2016-01-15 cleanup proof representation
 (A) 2016-01-15 replace active/passive sets by double-linked lists in clauses?
 (B) 2016-01-15 efficient term rewriting for deduction modulo
 (B) 2016-01-15 efficient (polarized) literal->clause rewriting for deduction modulo
+(B) 2016-01-15 question answering
