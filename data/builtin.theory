@@ -301,3 +301,89 @@ theory (complete_lattice {meet=Meet, join=Join, order=Lesseq, top=Top, bottom=Bo
   theory (ordered_lattice {meet=Meet, join=Join, order=Lesseq}),
   axiom (lower_bound {lesseq=Lesseq, low=Bottom}),
   axiom (higher_bound {lesseq=Lesseq, high=Top}).
+
+
+% inductive types
+
+theory (nat_th {succ=(S:N ->N), zero=(Z:N)}) <-
+  inductive @N {ty=@N, cstors=[(cstor _ S), (cstor _ Z)]}.
+
+theory (peano_add {succ=S, zero=Z, plus=P}) <-
+  theory (nat_th {succ=S, zero=Z}),
+  holds (![X:N,Y:N]: [P (S X) Y = S (P X Y)]),
+  holds (![X:N]: [P Z X = X]).
+
+lemma (![X:N,Y:N]: [P X (S Y) = S (P X Y)]) <-
+  theory (peano_add {succ=S, plus=P | _}).
+
+lemma (![X:N]: [P X Z = X]) <-
+  theory (peano_add {succ=_, zero=Z, plus=P}).
+
+% commutativity
+lemma (![X:N, Y:N]: [P X Y = P Y X]) <-
+  theory (peano_add {succ=_, zero=_, plus=P}).
+
+% associativity
+lemma (![X:N, Y:N, Z:N]: [P (P X Y) Z = P X (P Y Z)]) <-
+  theory (peano_add {succ=_, zero=_, plus=P}).
+
+val list_th : /\ A /\ L {cons:A ->L ->L, nil:L} -> theory.
+
+theory (list_th @A @L {cons=Cons, nil=Nil}) <-
+  inductive @L {ty=@L, cstors=[(cstor _ Cons), (cstor _ Nil)]}.
+
+val list_mem : /\ A /\ L {cons:A -> L -> L, nil: L, mem: A -> L -> $o} -> theory.
+
+theory (list_mem @A @L {cons=Cons, nil=Nil, mem=Mem}) <-
+  theory (list_th @A @L {cons=Cons, nil=Nil}),
+  holds (![X:A]: [~ Mem X Nil]),
+  holds (![X:A,Lst:L]: [Mem X (Cons X Lst)]),
+  holds (![X:A,Y:A,Lst:L]: [~ (Mem X Lst), Mem X (Cons Y Lst)]).
+
+val list_append : /\ A /\ L {cons:A ->L ->L, nil:L, append:L ->L ->L} -> theory.
+
+theory (list_append @A @L {cons=Cons, nil=Nil, append=App}) <-
+  theory (list_th @A @L {cons=Cons, nil=Nil}),
+  holds (![L1:L]: [App Nil L1 = L1]),
+  holds (![X:A, L1:L, L2:L]: [App (Cons X L1) L2 = Cons X (App L1 L2)]).
+
+val len_sum : /\ A /\ L {cons:A ->L ->L, len:L -> $int} -> axiom.
+
+axiom (len_sum @A @L {cons=Cons, len=Len}) <-
+  holds (![X:A, L1:L]: [Len (Cons X L1) = $sum @$int 1 (Len L1)]).
+axiom (len_sum @A @L {cons=Cons, len=Len}) <-
+  holds (![X:A, L1:L]: [Len (Cons X L1) = $sum @$int (Len L1) 1]).
+
+val list_len : /\A /\L {cons:A ->L ->L, nil:L, len:L -> $int} -> theory.
+
+theory (list_len @A @L {cons=Cons, nil=Nil, len=Len}) <-
+  theory (list_th @A @L {cons=Cons, nil=Nil}),
+  holds [Len Nil = 0],
+  axiom (len_sum @A @L {cons=Cons, len=Len}).
+
+lemma (![L1:L]: [App L1 Nil = L1]) <-
+  theory (list_append @A @L {append=App, nil=Nil | _}).
+
+lemma (![X:A, L1:L, L2:L]:
+  [ Len (App L1 (Cons X L2))
+   = $sum @$int 1 ($sum @$int (Len L1) (Len L2))
+  ]) <-
+  theory (list_len @A @L {cons=Cons, len=Len, nil=Nil}),
+  theory (list_append @A @L {append=App, cons=Cons, nil=Nil}).
+
+val list_rev : /\A /\L {cons:A ->L ->L, nil:L, rev:L ->L, rev_append:L ->L ->L} -> theory.
+
+theory (list_rev @A @L {cons=Cons, nil=Nil, rev=Rev, rev_append=Rev_append}) <-
+  theory (list_th @A @L {cons=Cons, nil=Nil}),
+  holds (![Lst:L]: [Rev Lst = Rev_append Nil Lst]),
+  holds (![Lst:L]: [Rev_append Lst Nil = Lst]),
+  holds (![X:A, L1:L, L2:L]: [Rev_append L1 (Cons X L2) = Rev_append (Cons X L1) L2]).
+
+lemma (![Lst:L]: [Len (Rev Lst) = Len Lst]) <-
+  theory (list_rev @A @L {rev=Rev | _}),
+  theory (list_len @A @L {len=Len | _}).
+
+lemma (![L1:L,L2:L]: [Len (Rev_append L1 L2) = $sum @$int (Len L1) (Len L2)]) <-
+  theory (list_rev @A @L {rev_append=Rev_append | _}),
+  theory (list_len @A @L {len=Len | _}).
+
