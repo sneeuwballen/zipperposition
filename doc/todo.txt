@@ -2,12 +2,13 @@
 (B) 2016-01-15 have some basic definitional equality (non recursive?)
 (B) 2016-01-15 rewrite rules on TypedSTerm, for preprocessing (e.g. set rewrite rules in CNF)
 (B) 2016-01-15 curried application `@` in FOTerm + indices + orderings + syntax
-(B) 2016-01-15 add inductive types in intermediate AST(s), added by preprocessing from TPTP
-(B) 2016-01-15 new ML-like syntax with explicit type decls, ind types, rewrite rules
+(A) 2016-01-15 add inductive types in intermediate AST(s), added by preprocessing from TPTP
+(A) 2016-01-15 new ML-like syntax with explicit type decls, ind types, rewrite rules
 (B) 2016-01-15 repair induction p:1
 (B) 2016-01-15 add better generalization in induction id:1
-(A) 2016-01-15 add locked storage for Avatar
-(A) 2016-01-15 replace active/passive sets by double-linked lists in clauses?
+(B) 2016-01-15 add locked storage for Avatar
 (B) 2016-01-15 efficient term rewriting for deduction modulo
 (B) 2016-01-15 efficient (polarized) literal->clause rewriting for deduction modulo
 (B) 2016-01-15 question answering
+(B) 2016-01-16 proper calculus for (co)data
+(A) 2016-01-16 benchmarks from sledgehammer in new syntax, large scale test script
