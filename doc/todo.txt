@@ -10,5 +10,5 @@
 (B) 2016-01-15 efficient term rewriting for deduction modulo
 (B) 2016-01-15 efficient (polarized) literal->clause rewriting for deduction modulo
 (B) 2016-01-15 question answering
-(B) 2016-01-16 proper calculus for (co)data
+(A) 2016-01-16 proper calculus for (co)data
 (A) 2016-01-16 benchmarks from sledgehammer in new syntax, large scale test script
