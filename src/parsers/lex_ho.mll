@@ -99,7 +99,7 @@ rule token = parse
   | _ as c
     {
       let loc = ParseLocation.of_lexbuf lexbuf in
-      Parsing_utils.errorf loc "lexer fails on char '%c'" c
+      UntypedAST.errorf loc "lexer fails on char '%c'" c
     }
 
 
@@ -112,14 +112,14 @@ rule token = parse
       E.return (Parse_ho.parse_decl token (Lexing.from_string s))
     with
     | Parse_ho.Error -> E.fail "parse error"
-    | Parsing_utils.Parse_error _ as e -> E.fail (Printexc.to_string e)
+    | UntypedAST.Parse_error _ as e -> E.fail (Printexc.to_string e)
 
   let decls_of_string s : Ast_ho.t list or_error =
     try
       E.return (Parse_ho.parse_decls token (Lexing.from_string s))
     with
     | Parse_ho.Error -> E.fail "parse error"
-    | Parsing_utils.Parse_error _ as e ->
+    | UntypedAST.Parse_error _ as e ->
         E.fail (Printexc.to_string e)
 
   let term_of_string s : STerm.t option =

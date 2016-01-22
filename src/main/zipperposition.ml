@@ -171,6 +171,7 @@ module MakeNew(X : sig
         let open Options in
         begin match params.param_proof with
           | Print_none -> ()
+          | Print_zf -> failwith "not implemented: printing in ZF" (* TODO *)
           | Print_tptp ->
               Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
                 (fun k->k (CCFormat.seq ~sep:" " C.pp_tstp_full) (Env.get_active ()))
@@ -226,24 +227,11 @@ let has_goal_ decls =
       | _ -> false)
     decls
 
-let parse_file file =
-  let parse_tptp file = 
-    Util_tptp.parse_file ~recursive:true file
-    >|= Sequence.map Util_tptp.to_ast
-  in
-  match !Options.input with
-  | Options.I_tptp -> parse_tptp file
-  | Options.I_zf -> Util_zf.parse_file file
-  | Options.I_guess ->
-      if CCString.suffix ~suf:".p" file
-      then parse_tptp file
-      else Util_zf.parse_file file
-
 (* Process the given file (try to solve it) *)
 let process_file ?meta:_ ~params file =
   Util.debugf ~section 1 "@[@{<Yellow>### process file@ `%s` ###@}@]" (fun k->k file);
   (* parse formulas *)
-  parse_file file
+  Parsing_utils.parse file
   >>= TypeInference.infer_statements ?ctx:None
   >|= fun decls ->
   let has_goal = has_goal_ decls in

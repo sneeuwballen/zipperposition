@@ -9,7 +9,8 @@ open Libzipperposition_parsers
 module T = TypedSTerm
 module F = T.Form
 module A = Ast_tptp
-module Err = CCError
+
+open CCError.Infix
 
 let print_sig = ref false
 let flag_distribute_exists = ref false
@@ -45,39 +46,45 @@ let print_res decls = match !Options.output with
       Format.printf "@[<v>%a@]@."
         (CCVector.print ~start:"" ~stop:"" ~sep:"" ppst)
         decls
+  | Options.Print_zf ->
+      let ppst out st =
+        Statement.pp
+          (Util.pp_list ~sep:" || " (SLiteral.ZF.pp T.ZF.pp)) T.ZF.pp T.ZF.pp
+          out st
+      in
+      Format.printf "@[<v>%a@]@."
+        (CCVector.print ~start:"" ~stop:"" ~sep:"" ppst)
+        decls
 
 (* process the given file, converting it to CNF *)
 let process file =
   Util.debugf 1 "process file %s" (fun k->k file);
   let res =
-    Err.(
-      (* parse *)
-      Util_tptp.parse_file ~recursive:true file
-      >|= Sequence.map Util_tptp.to_ast
-      >>= TypeInference.infer_statements ?ctx:None
-      >|= fun st ->
-      let opts =
-        (if !flag_distribute_exists then [Cnf.DistributeExists] else []) @
-        (if !flag_disable_renaming then [Cnf.DisableRenaming] else []) @
-        []
-      in
-      let decls = Cnf.cnf_of_seq ~opts ?ctx:None (CCVector.to_seq st) in
-      let sigma = Cnf.type_declarations (CCVector.to_seq decls) in
-      if !print_sig
-      then (
-        Format.printf "@[<hv2>signature:@ (@[<v>%a@]@])@."
-          (ID.Map.print ~start:"" ~stop:"" ~sep:"" ~arrow:" : " ID.pp T.pp) sigma
-      );
-      (* print *)
-      let decls =
-        CCVector.map
-          (Statement.map_src
-            ~f:(fun {UntypedAST.name;_} -> StatementSrc.make ?name file))
-          decls
-      in
-      print_res decls;
-      ()
-    )
+    (* parse *)
+    Parsing_utils.parse file
+    >>= TypeInference.infer_statements ?ctx:None
+    >|= fun st ->
+    let opts =
+      (if !flag_distribute_exists then [Cnf.DistributeExists] else []) @
+      (if !flag_disable_renaming then [Cnf.DisableRenaming] else []) @
+      []
+    in
+    let decls = Cnf.cnf_of_seq ~opts ?ctx:None (CCVector.to_seq st) in
+    let sigma = Cnf.type_declarations (CCVector.to_seq decls) in
+    if !print_sig
+    then (
+      Format.printf "@[<hv2>signature:@ (@[<v>%a@]@])@."
+        (ID.Map.print ~start:"" ~stop:"" ~sep:"" ~arrow:" : " ID.pp T.pp) sigma
+    );
+    (* print *)
+    let decls =
+      CCVector.map
+        (Statement.map_src
+          ~f:(fun {UntypedAST.name;_} -> StatementSrc.make ?name file))
+        decls
+    in
+    print_res decls;
+    ()
   in match res with
   | `Ok () -> ()
   | `Error msg ->

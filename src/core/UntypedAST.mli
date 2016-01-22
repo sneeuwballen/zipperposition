@@ -48,3 +48,9 @@ val goal : ?loc:Loc.t -> ?attrs:attrs -> term -> statement
 
 val pp_statement : statement CCFormat.printer
 
+(** {2 Errors} *)
+
+exception Parse_error of Loc.t * string
+
+val error : Loc.t -> string -> 'a
+val errorf : Loc.t -> ('a, Format.formatter, unit, 'b) format4 -> 'a

@@ -4,17 +4,17 @@
 (** {1 Utils for Parsing} *)
 
 open Libzipperposition
+open CCError.Infix
 
-module Loc = ParseLocation
+let parse_tptp file =
+  Util_tptp.parse_file ~recursive:true file
+  >|= Sequence.map Util_tptp.to_ast
 
-exception Parse_error of Loc.t * string
-
-let () = Printexc.register_printer
-  (function
-    | Parse_error (loc, msg) ->
-        Some 
-          (CCFormat.sprintf "@[<2>parse error:@ @[%s@]@ %a@]" msg Loc.pp loc)
-    | _ -> None)
-
-let error loc msg = raise (Parse_error (loc,msg))
-let errorf loc msg = CCFormat.ksprintf msg ~f:(error loc)
+(** Parse file using the input format chosen by the user *)
+let parse file = match !Options.input with
+  | Options.I_tptp -> parse_tptp file
+  | Options.I_zf -> Util_zf.parse_file file
+  | Options.I_guess ->
+      if CCString.suffix ~suf:".p" file
+      then parse_tptp file
+      else Util_zf.parse_file file

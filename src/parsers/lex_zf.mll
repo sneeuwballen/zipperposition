@@ -4,6 +4,7 @@
 (** {1 Lexer for Zipperposition Formulas} *)
 
 {
+  open Libzipperposition
   open Parse_zf
 }
 
@@ -71,6 +72,6 @@ rule token = parse
   | upper_word { UPPER_WORD(Lexing.lexeme lexbuf) }
   | _ as c
     {
-      let loc = Parsing_utils.Loc.of_lexbuf lexbuf in
-      Parsing_utils.errorf loc "unexpected char '%c'" c
+      let loc = UntypedAST.Loc.of_lexbuf lexbuf in
+      UntypedAST.errorf loc "unexpected char '%c'" c
     }

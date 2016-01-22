@@ -176,7 +176,7 @@ term:
   | error
     {
       let loc = L.mk_pos $startpos $endpos in
-      Parsing_utils.error loc "expected term"
+      UntypedAST.error loc "expected term"
     }
 
 constructor:
@@ -228,7 +228,7 @@ statement:
   | error
     {
       let loc = L.mk_pos $startpos $endpos in
-      Parsing_utils.error loc "expected statement"
+      UntypedAST.error loc "expected statement"
     }
 
 %%

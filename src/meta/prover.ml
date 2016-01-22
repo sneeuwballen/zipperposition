@@ -109,7 +109,7 @@ let parse_file p filename =
         close_in ic;
         res
       with
-      | Parsing_utils.Parse_error _ as e ->
+      | UntypedAST.Parse_error _ as e ->
           close_in ic;
           let msg = Printexc.to_string e in
           Err.fail msg

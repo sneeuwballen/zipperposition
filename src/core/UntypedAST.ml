@@ -68,4 +68,16 @@ let pp_statement out st =
   | Goal f ->
       fpf out "@[<2>goal@ (@[%a@])@]." T.pp f
 
+(** {2 Errors} *)
 
+exception Parse_error of Loc.t * string
+
+let () = Printexc.register_printer
+  (function
+    | Parse_error (loc, msg) ->
+        Some
+          (CCFormat.sprintf "@[<2>parse error:@ @[%s@]@ %a@]" msg Loc.pp loc)
+    | _ -> None)
+
+let error loc msg = raise (Parse_error (loc,msg))
+let errorf loc msg = CCFormat.ksprintf msg ~f:(error loc)

@@ -4,6 +4,7 @@
 (** {1 TPTP Lexer} *)
 
 {
+  open Libzipperposition
   open Parse_tptp
 }
 
@@ -103,7 +104,11 @@ rule token = parse
   | integer { INTEGER(Lexing.lexeme lexbuf) }
   | rational { RATIONAL(Lexing.lexeme lexbuf) }
   | real { REAL(Lexing.lexeme lexbuf) }
-  | _ as c { failwith (Printf.sprintf "lexer fails on char %c\n" c) }
+  | _ as c
+    {
+      let loc = ParseLocation.of_lexbuf lexbuf in
+      UntypedAST.errorf loc "lexer fails on char %c\n" c
+    }
 
 {
 

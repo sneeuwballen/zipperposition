@@ -124,7 +124,7 @@ declaration:
   | error
     {
       let loc = L.mk_pos $startpos $endpos in
-      Parsing_utils.error loc "expected declaration"
+      UntypedAST.error loc "expected declaration"
     }
 
 role: w=LOWER_WORD { Ast_tptp.role_of_string w }
@@ -267,7 +267,7 @@ defined_atom:
   | n=RATIONAL { PT.rat (Q.of_string n) }
   | REAL {
       let loc = L.mk_pos $startpos $endpos in
-      Parsing_utils.error loc "expected `defined_atom`"
+      UntypedAST.error loc "expected `defined_atom`"
     }
   | s=DISTINCT_OBJECT
     {
@@ -286,7 +286,7 @@ defined_plain_term:
       let loc = L.mk_pos $startpos $endpos in
       match Builtin.TPTP.of_string s with
       | None ->
-          Parsing_utils.errorf loc "unknown builtin `%s`" s
+          UntypedAST.errorf loc "unknown builtin `%s`" s
       | Some b -> PT.builtin ~loc b
     }
   | f=defined_functor LEFT_PAREN args=arguments RIGHT_PAREN
@@ -299,7 +299,7 @@ defined_plain_term:
       let loc = L.mk_pos $startpos $endpos in
       match Builtin.TPTP.of_string s with
       | None ->
-          Parsing_utils.errorf loc "unknown builtin function `%s`" s
+          UntypedAST.errorf loc "unknown builtin function `%s`" s
       | Some b -> PT.app_builtin ~loc b args
     }
 
@@ -388,7 +388,7 @@ defined_ty:
       | "$rat" -> PT.ty_rat
       | _ ->
           let loc = L.mk_pos $startpos $endpos in
-          Parsing_utils.errorf loc "expected defined_type, not `%s`" w
+          UntypedAST.errorf loc "expected defined_type, not `%s`" w
     }
 
 atomic_system_word:

@@ -177,6 +177,7 @@ module Make(C : CLAUSE) = struct
     | Options.Print_none -> Util.debug ~section 1 "proof printing disabled"
     | Options.Print_tptp -> pp_tstp out proof
     | Options.Print_normal -> pp_debug out proof
+    | Options.Print_zf -> failwith "proof printing in ZF not implemented" (* TODO *)
 
   let _pp_list_str = Util.pp_list CCFormat.string
 

@@ -47,3 +47,7 @@ include Interfaces.PRINT1 with type 'a t := 'a t
 module TPTP : sig
   include Interfaces.PRINT1 with type 'a t := 'a t
 end
+
+module ZF : sig
+  include Interfaces.PRINT1 with type 'a t := 'a t
+end

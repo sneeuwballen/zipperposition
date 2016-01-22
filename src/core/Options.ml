@@ -25,12 +25,14 @@ type print_format =
   | Print_none
   | Print_normal
   | Print_tptp
+  | Print_zf
 
 let print_format_of_string s =
   match s |> String.trim |> String.lowercase with
   | "none" -> Print_none
   | "tptp" | "tstp" -> Print_tptp
   | "default" | "normal" -> Print_normal
+  | "zf" -> Print_zf
   | _ -> failwith ("unknown print format " ^ s)
 
 let input = ref I_guess
@@ -64,9 +66,7 @@ let make () =
     ; "--stats", Arg.Set stats, " gather and print statistics"
     ; "--input", Arg.String set_in, " set input format (zf or tptp)"
     ; "-i", Arg.String set_in, " alias for --input"
-    ; "--output"
-        , Arg.String set_out
-        , " choose printing format for terms and formulas (default \"default\")"
+    ; "--output" , Arg.String set_out , " choose printing format (zf, tptp, default, none)"
     ; "-o", Arg.String set_out, " alias for --output"
     ]
     (make_other_opts ())

@@ -22,6 +22,7 @@ type print_format =
   | Print_none
   | Print_normal
   | Print_tptp
+  | Print_zf
 
 val print_format_of_string : string -> print_format
 (** @raise Failure if it could not parse *)
