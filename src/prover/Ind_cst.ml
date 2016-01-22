@@ -1,38 +1,14 @@
 
-(* This file is free software, part of Zipperposition. See file "license" for more details. *)
+(** {1 Inductive Constants and Cases}
 
-(** {1 Inductive Types} *)
+    Skolem constants of an inductive type, coversets, etc. required for
+    inductive reasoning. *)
 
 open Libzipperposition
 
 module T = FOTerm
 
-let section = Util.Section.make ~parent:Const.section "ind"
-
-type constructor = {
-  cstor_name: ID.t;
-  cstor_ty: Type.t;
-}
-
-(** {6 Inductive Types} *)
-
-(** An inductive type, along with its set of constructors *)
-type t = {
-  id: ID.t; (* name *)
-  ty_vars: Type.t HVar.t list; (* list of variables *)
-  ty_pattern: Type.t; (* equal to  [id ty_vars] *)
-  constructors : constructor list;
-    (* constructors, all returning [pattern] and containing
-       no other type variables than [ty_vars] *)
-}
-
-let fail_ fmt = CCFormat.ksprintf fmt ~f:failwith
-let invalid_argf_ fmt = CCFormat.ksprintf fmt ~f:invalid_arg
-
-exception AlreadyDeclaredType of ID.t
 exception AlreadyDeclaredConstant of ID.t
-exception NotAnInductiveType of ID.t
-exception NotAnInductiveConstructor of ID.t
 exception NotAnInductiveConstant of ID.t
 exception NotAnInductiveCase of FOTerm.t
 exception NotAnInductiveSubConstant of ID.t
@@ -41,14 +17,8 @@ let () =
   let spf = CCFormat.sprintf in
   Printexc.register_printer
   (function
-    | AlreadyDeclaredType id ->
-        Some (spf "%a already declared as an inductive type" ID.pp id)
     | AlreadyDeclaredConstant id ->
         Some (spf "%a already declared as an inductive constant" ID.pp id)
-    | NotAnInductiveType id ->
-        Some (spf "%a is not an inductive type" ID.pp id)
-    | NotAnInductiveConstructor id ->
-        Some (spf "%a is not an inductive constructor" ID.pp id)
     | NotAnInductiveConstant id ->
         Some (spf "%a is not an inductive constant" ID.pp id)
     | NotAnInductiveCase t ->
@@ -56,87 +26,6 @@ let () =
     | NotAnInductiveSubConstant id ->
         Some (spf "%a is not an inductive sub-constant" ID.pp id)
     | _ -> None)
-
-exception Payload_ind_type of t
-exception Payload_ind_cstor of constructor * t
-
-let type_hd_exn ty =
-  let _, ret = Type.open_fun ty in
-  match Type.view ret with
-  | Type.App (s, _) -> s
-  | _ ->
-      invalid_argf_ "expected function type, got %a" Type.pp ty
-
-let on_new_inductive_ty = Signal.create()
-
-let as_inductive_ty id =
-  CCList.find
-    (function
-      | Payload_ind_type ty -> Some ty
-      | _ -> None)
-    (ID.payload id)
-
-let as_inductive_ty_exn id = match as_inductive_ty id with
-  | Some ty -> ty
-  | None -> raise (NotAnInductiveType id)
-
-let is_inductive_ty id =
-  match as_inductive_ty id with Some _ -> true | None -> false
-
-let is_inductive_type ty =
-  let id = type_hd_exn ty in
-  is_inductive_ty id
-
-let as_inductive_type ty =
-  let id = type_hd_exn ty in
-  as_inductive_ty id
-
-(* declare that the given type is inductive *)
-let declare_ty id ~ty_vars constructors =
-  Util.debugf ~section 1 "declare inductive type %a" (fun k->k ID.pp id);
-  if constructors = []
-  then invalid_argf_ "Ind_types.declare_ty %a: no constructors provided" ID.pp id;
-  (* check that [ty] is not declared already *)
-  List.iter
-    (function
-      | Payload_ind_type _ -> fail_ "inductive type %a already declared" ID.pp id;
-      | _ -> ())
-    (ID.payload id);
-  let ity = {
-    id;
-    ty_vars;
-    ty_pattern=Type.app id (List.map Type.var ty_vars);
-    constructors;
-  } in
-  (* map the constructors to [ity] too *)
-  List.iter
-    (fun c ->
-      ID.add_payload c.cstor_name (Payload_ind_cstor (c, ity)))
-    constructors;
-  (* map [id] to [ity] *)
-  ID.add_payload id (Payload_ind_type ity);
-  Signal.send on_new_inductive_ty ity;
-  ity
-
-(** {6 Constructors} *)
-
-let as_constructor id =
-  CCList.find
-    (function
-      | Payload_ind_cstor (cstor,ity) -> Some (cstor,ity)
-      | _ -> None)
-    (ID.payload id)
-
-let as_constructor_exn id = match as_constructor id with
-  | None -> raise (NotAnInductiveConstructor id)
-  | Some x -> x
-
-let is_constructor s =
-  match as_constructor s with Some _ -> true | None -> false
-
-let contains_inductive_types t =
-  T.Seq.subterms t
-  |> Sequence.exists (fun t -> is_inductive_type (T.ty t))
 
 (** {6 Inductive Case} *)
 
@@ -162,7 +51,7 @@ let case_is_base c = c.case_kind = `Base
 type cst = {
   cst_id: ID.t;
   cst_ty: Type.t;
-  cst_ity: t; (* the corresponding inductive type *)
+  cst_ity: Ind_ty.t; (* the corresponding inductive type *)
   cst_coverset: cover_set; (* the coverset for this constant *)
 }
 
@@ -207,9 +96,9 @@ let find_cst_in_term t =
     (fun t -> match T.view t with
       | T.Const id ->
           let ty = T.ty t in
-          begin match as_inductive_type ty with
+          begin match Ind_ty.as_inductive_type ty with
           | Some ity ->
-              if not (is_cst id) && not (is_constructor id)
+              if not (is_cst id) && not (Ind_ty.is_constructor id)
               then Some (id, ity, ty) (* bingo *)
               else None
           | _ -> None
@@ -387,9 +276,16 @@ let make_coverset_ ~depth:_ _ity _cst : cover_set =
   coverset
   *)
 
+let type_hd_exn ty =
+  let _, ret = Type.open_fun ty in
+  match Type.view ret with
+  | Type.App (s, _) -> s
+  | _ ->
+      CCFormat.ksprintf ~f:invalid_arg "expected function type, got %a" Type.pp ty
+
 let declare_cst ?(cover_set_depth=1) id ~ty =
   if is_cst id then raise (AlreadyDeclaredConstant id);
-  let ity = as_inductive_ty_exn (type_hd_exn ty) in
+  let ity = Ind_ty.as_inductive_ty_exn (type_hd_exn ty) in
   let cst_coverset = make_coverset_ ~depth:cover_set_depth ity id in
   Util.debugf 2 "declare new inductive constant %a" (fun k->k ID.pp id);
   let cst = {
@@ -405,8 +301,8 @@ let declare_cst ?(cover_set_depth=1) id ~ty =
    to avoid a constructor to be also declared as sub-constant, etc. *)
 
 type classify_res =
-  | Ty of t
-  | Cstor of constructor * t
+  | Ty of Ind_ty.t
+  | Cstor of Ind_ty.constructor * Ind_ty.t
   | Cst of cst
   | Sub of sub_cst
   | Other
@@ -416,8 +312,8 @@ let classify id =
     CCList.find
       (function
         | Payload_cst c -> Some (Cst c)
-        | Payload_ind_cstor (c,t) -> Some (Cstor (c,t))
-        | Payload_ind_type x -> Some (Ty x)
+        | Ind_ty.Payload_ind_cstor (c,t) -> Some (Cstor (c,t))
+        | Ind_ty.Payload_ind_type x -> Some (Ty x)
         | Payload_sub_cst s -> Some (Sub s)
         | _ -> None)
       (ID.payload id)
