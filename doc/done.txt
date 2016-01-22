@@ -1,1 +1,2 @@
 x 2016-01-15 2016-01-15 cleanup proof representation
+x 2016-01-22 2016-01-22 tool tptp_to_zf

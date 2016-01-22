@@ -4,11 +4,14 @@
 (B) 2016-01-15 curried application `@` in FOTerm + indices + orderings + syntax
 (A) 2016-01-15 add inductive types in intermediate AST(s), added by preprocessing from TPTP
 (A) 2016-01-15 new ML-like syntax with explicit type decls, ind types, rewrite rules
-(B) 2016-01-15 repair induction p:1
+(B) 2016-01-15 repair induction, improve it with mutual/nested induction  p:1
 (B) 2016-01-15 add better generalization in induction id:1
 (B) 2016-01-15 add locked storage for Avatar
 (B) 2016-01-15 efficient term rewriting for deduction modulo
 (B) 2016-01-15 efficient (polarized) literal->clause rewriting for deduction modulo
 (B) 2016-01-15 question answering
-(A) 2016-01-16 proper calculus for (co)data
+(A) 2016-01-16 proper calculus for (co)data with mutual types
 (A) 2016-01-16 benchmarks from sledgehammer in new syntax, large scale test script
+(B) 2016-01-22 update doc/api_intro.txt
+(A) 2016-01-22 put unique exn as payload in ID, at construction time only
+(A) 2016-01-22 add arithmetic into ZF
