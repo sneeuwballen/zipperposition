@@ -92,7 +92,8 @@ module Make(C : CLAUSE) = struct
     let pp_bullet out () = Format.fprintf out "@<1>@{<Green>*@}" in
     traverse proof
       (fun p -> match p.step.kind with
-        | File _ ->
+        | Assert _
+        | Goal _ ->
             Format.fprintf out "@[<hv2>%a @[%a@]@ %s %a@]@,"
               pp_bullet () pp_result p.result sep pp_kind p.step.kind
         | Trivial ->
@@ -111,24 +112,29 @@ module Make(C : CLAUSE) = struct
     | `Name i -> Format.fprintf out "%d" i
     | `Theory s -> Format.fprintf out "theory(%s)" s
 
-  let _pp_kind_tstp out (k,parents) =
+
+  let pp_kind_tstp out (k,parents) =
     let pp_parents = Util.pp_list _pp_parent in
+    let pp_step status out (rule,parents) =
+      match parents with
+      | [] ->
+        Format.fprintf out "inference(%a, [status(%s)])" pp_rule rule status
+      | _::_ ->
+        Format.fprintf out "inference(%a, [status(%s)], [%a])"
+          pp_rule rule status pp_parents parents
+    in
     match k with
-    | Trivial ->
-        Format.fprintf out "trivial([%a])" pp_parents parents
-    | File {StatementSrc.file; name=Some name; _} ->
-        Format.fprintf out "file('%s', '%s', [%a])" file name pp_parents parents
-    | File {StatementSrc.file; name=None; _} ->
-        Format.fprintf out "file('%s', [%a])" file pp_parents parents
-    | Inference rule ->
-        Format.fprintf out "inference('%a', [status(thm)], [%a])"
-          pp_rule rule pp_parents parents
-    | Simplification rule ->
-        Format.fprintf out "inference('%a', [status(thm)], [%a])"
-          pp_rule rule pp_parents parents
-    | Esa rule ->
-        Format.fprintf out "inference('%a', [status(esa)], [%a])"
-          pp_rule rule pp_parents parents
+    | Assert src
+    | Goal src ->
+        let file = src.StatementSrc.file in
+        begin match src.StatementSrc.name with
+        | None -> Format.fprintf out "file('%s')" file
+        | Some name -> Format.fprintf out "file('%s', '%s')" file name
+        end
+    | Inference rule
+    | Simplification rule -> pp_step "thm" out (rule,parents)
+    | Esa rule -> pp_step "esa" out (rule,parents)
+    | Trivial -> assert(parents=[]); Format.fprintf out "trivial([status(thm)])"
 
   let pp_tstp out proof =
     let namespace = Tbl.create 5 in
@@ -143,7 +149,7 @@ module Make(C : CLAUSE) = struct
          match p.result with
          | Form f ->
              Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]).@]@,"
-               name role TypedSTerm.TPTP.pp f _pp_kind_tstp (p.step.kind,parents)
+               name role TypedSTerm.TPTP.pp f pp_kind_tstp (p.step.kind,parents)
          | Clause c when not (Trail.is_empty (C.trail c)) ->
              assert false
              (* FIXME: proper conversion of clauses
@@ -161,7 +167,7 @@ module Make(C : CLAUSE) = struct
               *)
          | Clause c ->
              Format.fprintf out "@[<2>cnf(%d, %s,@ @[%a@],@ @[%a@]).@]@,"
-               name role C.pp_tstp c _pp_kind_tstp (p.step.kind,parents)
+               name role C.pp_tstp c pp_kind_tstp (p.step.kind,parents)
       );
     Format.fprintf out "@]";
     ()
@@ -204,8 +210,8 @@ module Make(C : CLAUSE) = struct
         let shape = `Shape "box" in
         if is_proof_of_false p then [`Color "red"; `Label "[]"; `Shape "box"; `Style "filled"]
         else if has_absurd_lits p then `Color "orange" :: shape :: attrs
-        else if is_file p.step then `Color "yellow" :: shape :: attrs
-        else if is_conjecture p.step then `Color "green" :: shape :: attrs
+        else if is_assert p.step then `Color "yellow" :: shape :: attrs
+        else if is_goal p.step then `Color "green" :: shape :: attrs
         else if is_trivial p.step then `Color "cyan" :: shape :: attrs
         else shape :: attrs
       )

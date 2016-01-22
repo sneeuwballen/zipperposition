@@ -5,6 +5,8 @@
 
 open Libzipperposition
 
+module Loc = ParseLocation
+
 type form = TypedSTerm.t
 type 'a sequence = ('a -> unit) -> unit
 
@@ -32,7 +34,8 @@ type kind =
   | Inference of rule
   | Simplification of rule
   | Esa of rule
-  | File of StatementSrc.t
+  | Assert of StatementSrc.t
+  | Goal of StatementSrc.t
   | Trivial (** trivial, or trivial within theories *)
 
 type 'clause result =
@@ -68,12 +71,13 @@ val result_as_form : _ of_ -> form
 
 val mk_trivial : 'c t
 
-val mk_file :
-  ?conjecture:bool -> file:string -> name:string ->
-  unit ->
-  'c t
+val mk_assert : StatementSrc.t -> 'c t
 
-val mk_src : src:StatementSrc.t -> 'c t
+val mk_goal : StatementSrc.t -> 'c t
+
+val mk_assert' : ?loc:Loc.t -> file:string -> name:string -> unit -> 'c t
+
+val mk_goal' : ?loc:Loc.t -> file:string -> name:string -> unit -> 'c t
 
 val mk_inference : rule:rule -> 'c of_ list -> 'c t
 
@@ -82,10 +86,6 @@ val mk_simp : rule:rule -> 'c of_ list -> 'c t
 val mk_esa : rule:rule -> 'c of_ list -> 'c t
 
 val mk_f_trivial : form -> _ of_
-
-val mk_f_file :
-  ?conjecture:bool -> file:string -> name:string ->
-  form -> _ of_
 
 val mk_f_inference : rule:rule -> form -> 'c of_ list -> 'c of_
 
@@ -100,13 +100,14 @@ val adapt_c : 'c of_ -> 'c -> 'c of_
 
 val is_trivial : _ t -> bool
 
-val is_file : _ t -> bool
+val is_assert : _ t -> bool
+(** Proof: the statement was asserted in some file *)
+
+val is_goal : _ t -> bool
+(** The statement comes from the negation of a goal in some file *)
 
 val rule : _ t -> rule option
 (** Rule name for Esa/Simplification/Inference steps *)
-
-val is_conjecture : _ t -> bool
-(** Is the proof a conjecture from a file? *)
 
 val equal : _ t -> _ t -> bool
 val hash : _ t -> int
@@ -125,7 +126,7 @@ val traverse_depth : ?traversed:unit Tbl.t -> 'c t -> ('c t * int) sequence
     depth from the initial proof. Each proof node is traversed only once,
     using the set to recognize already traversed proofs. *)
 
-val distance_to_conjecture : 'c t -> int option
+val distance_to_goal : 'c t -> int option
 (** [distance_to_conjecture p] returns [None] if [p] has no ancestor
     that is a conjecture (including [p] itself). It returns [Some d]
     if [d] is the distance, in the proof graph, to the closest

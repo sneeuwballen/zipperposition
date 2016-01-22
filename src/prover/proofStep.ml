@@ -5,6 +5,7 @@
 
 open Libzipperposition
 
+module Loc = ParseLocation
 module Hash = CCHash
 
 type form = TypedSTerm.t
@@ -40,7 +41,8 @@ type kind =
   | Inference of rule
   | Simplification of rule
   | Esa of rule
-  | File of StatementSrc.t
+  | Assert of StatementSrc.t
+  | Goal of StatementSrc.t
   | Trivial (** trivial, or trivial within theories *)
 
 type 'clause result =
@@ -88,11 +90,17 @@ let mk_trivial = {id=get_id_(); parents=[]; kind=Trivial; }
 let mk_step_ kind parents =
   { id=get_id_(); kind; parents; }
 
-let mk_src ~src = mk_step_ (File src) []
+let mk_assert src = mk_step_ (Assert src) []
 
-let mk_file ?(conjecture=false) ~file ~name () =
-  let src = StatementSrc.make ~is_conjecture:conjecture ~name file in
-  mk_step_ (File src) []
+let mk_goal src = mk_step_ (Goal src) []
+
+let mk_assert' ?loc ~file ~name () =
+  let src = StatementSrc.make ?loc ~name file in
+  mk_assert src
+
+let mk_goal' ?loc ~file ~name () =
+  let src = StatementSrc.make ?loc ~name file in
+  mk_goal src
 
 let mk_inference ~rule parents =
   mk_step_ (Inference rule) parents
@@ -106,10 +114,6 @@ let mk_esa ~rule parents =
 let mk_f_ step res = {step; result=Form res; }
 
 let mk_f_trivial = mk_f_ mk_trivial
-
-let mk_f_file ?conjecture ~file ~name f =
-  let step = mk_file ?conjecture ~file ~name () in
-  mk_f_ step f
 
 let mk_f_inference ~rule f parents =
   let step = mk_inference ~rule parents in
@@ -131,24 +135,20 @@ let adapt_c p c =
 let adapt_f p f =
   { p with result=Form f; }
 
-let is_file = function
-  | {kind=File _; _} -> true
-  | _ -> false
-
 let is_trivial = function
   | {kind=Trivial; _} -> true
   | _ -> false
 
 let rule p = match p.kind with
   | Trivial
-  | File _ -> None
+  | Assert _
+  | Goal _-> None
   | Esa rule
   | Simplification rule
   | Inference rule -> Some rule
 
-let is_conjecture p = match p.kind with
-  | File {StatementSrc.is_conjecture=true; _} -> true
-  | _ -> false
+let is_assert p = match p.kind with Assert _ -> true | _ -> false
+let is_goal p = match p.kind with Goal _ -> true  | _ -> false
 
 let equal p1 p2 = p1.id=p2.id
 let compare p1 p2 = CCInt.compare p1.id p2.id
@@ -184,11 +184,11 @@ let traverse_depth ?(traversed=Tbl.create 16) proof k =
 let traverse ?traversed proof k =
   traverse_depth ?traversed proof (fun (p, _depth) -> k p)
 
-let distance_to_conjecture p =
+let distance_to_goal p =
   let best_distance = ref None in
   traverse_depth p
     (fun (p', depth) ->
-       if is_conjecture p'
+       if is_goal p'
        then
          let new_best = match !best_distance with
            | None -> depth
@@ -210,7 +210,7 @@ let depth proof =
     if Tbl.mem explored proof.id then () else begin
       Tbl.add explored proof.id ();
       begin match p.kind with
-        | File _ | Trivial -> depth := max d !depth
+        | Assert _ | Goal _ | Trivial -> depth := max d !depth
         | Inference _ | Esa _ | Simplification _ -> ()
       end;
       (* explore parents *)
@@ -233,10 +233,13 @@ let pp_rule out r =
 
 let pp_kind_tstp out k =
   match k with
-  | File {StatementSrc.file; name=Some name; _} ->
-      Format.fprintf out "file('%s', '%s')" file name
-  | File {StatementSrc.file; name=None; _} ->
-      Format.fprintf out "file('%s')" file
+  | Assert src
+  | Goal src ->
+      let file = src.StatementSrc.file in
+      begin match src.StatementSrc.name with
+      | None -> Format.fprintf out "file('%s')" file
+      | Some name -> Format.fprintf out "file('%s', '%s')" file name
+      end
   | Inference rule ->
       Format.fprintf out "inference(%a, [status(thm)])" pp_rule rule
   | Simplification rule ->
@@ -248,11 +251,17 @@ let pp_kind_tstp out k =
 
 let pp_kind out k =
   match k with
-  | File {StatementSrc.file; name=Some name; is_conjecture=c; _} ->
-      Format.fprintf out "'%s' in '%s'%s" name file
-        (if c then " (conjecture)" else "")
-  | File {StatementSrc.file; name=None; is_conjecture=c; _} ->
-      Format.fprintf out "'%s'%s" file (if c then " (conjecture)" else "")
+  | Assert src
+  | Goal src ->
+      let is_goal = match k with Goal _ -> true | _ -> false in
+      let file = src.StatementSrc.file in
+      begin match src.StatementSrc.name with
+      | None ->
+          Format.fprintf out "'%s'%s" file (if is_goal then " (goal)" else "")
+      | Some name ->
+          Format.fprintf out "'%s' in '%s'%s" name file
+            (if is_goal then " (goal)" else "")
+      end
   | Inference rule ->
       Format.fprintf out "inf %a" pp_rule rule
   | Simplification rule ->
