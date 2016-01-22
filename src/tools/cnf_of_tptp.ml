@@ -26,10 +26,11 @@ let options = Arg.align (
   )
 
 let print_res decls = match !Options.output with
+  | Options.Print_none -> ()
   | Options.Print_normal ->
       let ppst =
         Statement.pp
-          (Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp)) T.pp
+          (Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp)) T.pp T.pp
       in
       Format.printf "@[<v2>%d statements:@ %a@]@."
         (CCVector.length decls)
@@ -38,7 +39,7 @@ let print_res decls = match !Options.output with
   | Options.Print_tptp ->
       let ppst out st =
         Statement.TPTP.pp
-          (Util.pp_list ~sep:" | " (SLiteral.TPTP.pp T.TPTP.pp)) T.TPTP.pp
+          (Util.pp_list ~sep:" | " (SLiteral.TPTP.pp T.TPTP.pp)) T.TPTP.pp T.TPTP.pp
           out st
       in
       Format.printf "@[<v>%a@]@."

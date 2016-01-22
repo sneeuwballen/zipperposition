@@ -514,7 +514,7 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
   Util.exit_prof prof_simplify_rename;
   res
 
-type 'a statement = (clause, type_, 'a) Statement.t
+type 'a statement = (clause, term, type_, 'a) Statement.t
 
 (* Transform the clauses into proper CNF; returns a list of clauses *)
 let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
@@ -576,14 +576,20 @@ let cnf_of ?opts ?ctx f annot =
   cnf_of_seq ?opts ?ctx (Sequence.return (f,annot))
 
 let pp_statement out st =
-  Statement.pp
-    (Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp))
-    T.pp out st
+  let pp_clause out c =
+    Format.fprintf out "@[<hv>%a@]" (Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp)) c
+  in
+  Statement.pp pp_clause T.pp T.pp out st
 
 let type_declarations seq =
+  let open Statement in
   Sequence.fold
     (fun acc st -> match Statement.view st with
+      | Statement.Def (id, ty, _)
       | Statement.TyDecl (id, ty) -> ID.Map.add id ty acc
+      | Statement.Data d ->
+          let acc = ID.Map.add d.data_id d.data_ty acc in
+          ID.Map.add_list acc d.data_cstors
       | Statement.Assert _ -> acc)
     ID.Map.empty seq
 
