@@ -60,7 +60,7 @@ Library "libzipperposition"
                     TypeInference, Options, Comparison, Precedence, Builtin,
                     Ordering, Skolem, Cnf, ID, IDOrBuiltin, SLiteral,
                     HORewriting, Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,
-                    Congruence, FeatureVector,
+                    Congruence, FeatureVector, UntypedAST, Ind_ty,
                     Lambda, TypedSTerm, Statement, StatementSrc,
                     lib/Hashcons, lib/ParseLocation, lib/Multiset, lib/LazyList,
                     lib/IArray, lib/AllocCache, lib/Multiset_intf
@@ -73,7 +73,8 @@ Library "libzipperposition_parsers"
   Path:             src/parsers
   Pack:             true
   Modules:          Parse_tptp, Lex_tptp, Ast_tptp, Util_tptp,
-                    Ast_ho, Lex_ho, Parse_ho, Trace_tstp, CallProver
+                    Ast_ho, Lex_ho, Parse_ho, Trace_tstp,
+                    Parse_zf, Lex_zf, Parsing_utils, CallProver
   Build$:           flag(parsers)
   Install$:         flag(parsers)
   FindlibName:      parsers
@@ -123,8 +124,7 @@ Library "libzipperposition_prover"
                     Compute_prec, Params, Env, Monome, ArithLit, Signals, Multisets,
                     Ctx_intf, Clause_intf, Env_intf, ProofState_intf,
                     BBox, BBox_intf, ClauseContext, ClauseQueue_intf,
-                    Bool_lit, Sat_solver, Sat_solver_intf,
-                    Trail, Ind_types,
+                    Bool_lit, Sat_solver, Sat_solver_intf, Trail, Ind_cst,
                     calculi/Avatar, calculi/Avatar_intf,
                     calculi/Induction, calculi/Induction_intf,
                     calculi/Superposition,
