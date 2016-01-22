@@ -3,12 +3,21 @@
 
 (** {1 Utils for ZF} *)
 
+let parse_lexbuf lex =
+  Parse_zf.parse_statement_list Lex_zf.token lex
+  |> Sequence.of_list (* hide *)
+  |> CCError.return
+
+let parse_stdin () =
+  let lexbuf = Lexing.from_channel stdin in
+  parse_lexbuf lexbuf
+
 let parse_file file =
-  try
+  if file="stdin"
+  then parse_stdin()
+  else try
     CCIO.with_in file
       (fun ic ->
         let lexbuf = Lexing.from_channel ic in
-        Parse_zf.parse_statement_list Lex_zf.token lexbuf)
-    |> Sequence.of_list (* hide *)
-    |> CCError.return
+        parse_lexbuf lexbuf)
   with e -> CCError.of_exn e
