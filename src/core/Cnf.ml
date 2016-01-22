@@ -627,7 +627,9 @@ let convert ~file seq =
     let name = st.Statement.src.UntypedAST.name in
     let src = StatementSrc.make ?name file in
     let res = match Statement.view st with
-      | Statement.Goal c
+      | Statement.Goal c ->
+          let c = clause_to_fo ~ctx:t_ctx c in
+          Statement.goal ~src c
       | Statement.Assert c ->
           let c = clause_to_fo ~ctx:t_ctx c in
           Statement.assert_ ~src c
