@@ -24,9 +24,10 @@ type 'ty data = {
 
 type ('f, 't, 'ty) view =
   | TyDecl of ID.t * 'ty (** id: ty *)
-  | Data of 'ty data
+  | Data of 'ty data list
   | Def of ID.t * 'ty * 't
   | Assert of 'f (** assert form *)
+  | Goal of 'f (** goal to prove *)
 
 type ('f, 't, 'ty, 'meta) t = {
   view: ('f, 't, 'ty) view;
@@ -45,11 +46,17 @@ val mk_data : ID.t -> args:'ty Var.t list -> 'ty -> (ID.t * 'ty) list -> 'ty dat
 
 val ty_decl : src:'src -> ID.t -> 'ty -> (_, _, 'ty, 'src) t
 val def : src:'src -> ID.t -> 'ty -> 't -> (_, 't, 'ty, 'src) t
-val data : src:'src -> 'ty data -> (_, _, 'ty, 'src) t
+val data : src:'src -> 'ty data list -> (_, _, 'ty, 'src) t
 val assert_ : src:'src -> 'f -> ('f, _, _, 'src) t
+val goal : src:'src -> 'f -> ('f, _, _, 'src) t
 
 val signature : ?init:Signature.t -> (_, _, Type.t, _) t Sequence.t -> Signature.t
 (** Compute signature when the types are using {!Type} *)
+
+val add_src :
+  file:string ->
+  ('f, 't, 'ty, UntypedAST.attrs) t ->
+  ('f, 't, 'ty, StatementSrc.t) t
 
 val map :
   form:('f1 -> 'f2) ->

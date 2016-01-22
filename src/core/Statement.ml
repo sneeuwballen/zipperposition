@@ -19,9 +19,10 @@ type 'ty data = {
 
 type ('f, 't, 'ty) view =
   | TyDecl of ID.t * 'ty (** id: ty *)
-  | Data of 'ty data
+  | Data of 'ty data list (** Mutally recursive types *)
   | Def of ID.t * 'ty * 't
   | Assert of 'f (** assert form *)
+  | Goal of 'f (** goal to prove *)
 
 type ('f, 't, 'ty, 'meta) t = {
   view: ('f, 't, 'ty) view;
@@ -41,33 +42,26 @@ let mk_data id ~args ty cstors =
 
 let ty_decl ~src id ty = {src; view=TyDecl (id,ty); }
 let def ~src id ty t = {src; view=Def (id,ty,t); }
-let data ~src d = {src; view=Data d; }
+let data ~src l = {src; view=Data l; }
 let assert_ ~src c = {src; view=Assert c; }
-
-let signature ?(init=Signature.empty) seq =
-  Sequence.fold
-    (fun sigma st -> match view st with
-      | TyDecl (id, ty)
-      | Def (id, ty, _) -> Signature.declare sigma id ty
-      | Data d ->
-          let sigma = Signature.declare sigma d.data_id d.data_ty in
-          List.fold_left
-            (fun sigma (id, ty_cstor) -> Signature.declare sigma id ty_cstor)
-            sigma d.data_cstors
-      | Assert _ -> sigma)
-    init seq
+let goal ~src c = {src; view=Goal c; }
 
 let map ~form ~term ~ty st =
   let map_view ~form ~term ~ty:fty = function
     | Def (id, ty, t) -> Def (id, fty ty, term t)
-    | Data d ->
-        let d = {
-          d with
-          data_args = List.map (Var.update_ty ~f:fty) d.data_args;
-          data_ty = fty d.data_ty;
-          data_cstors = List.map (fun (id,ty) -> id, fty ty) d.data_cstors;
-        } in
-        Data d
+    | Data l ->
+        let l =
+          List.map
+            (fun d ->
+              { d with
+                data_args = List.map (Var.update_ty ~f:fty) d.data_args;
+                data_ty = fty d.data_ty;
+                data_cstors = List.map (fun (id,ty) -> id, fty ty) d.data_cstors;
+              })
+            l
+        in
+        Data l
+    | Goal f -> Goal (form f)
     | Assert f -> Assert (form f)
     | TyDecl (id, ty) -> TyDecl (id, fty ty)
   in
@@ -81,21 +75,35 @@ module Seq = struct
   let ty_decls st k = match view st with
     | Def (id, ty, _)
     | TyDecl (id, ty) -> k (id,ty)
-    | Data d ->
-        k (d.data_id, d.data_ty);
-        List.iter k d.data_cstors
+    | Data l ->
+        List.iter
+          (fun d ->
+            k (d.data_id, d.data_ty);
+            List.iter k d.data_cstors)
+          l
+    | Goal _
     | Assert _ -> ()
 
   let forms st k = match view st with
     | Def _
     | Data _
     | TyDecl _ -> ()
+    | Goal c -> k c
     | Assert c -> k c
 
   let lits st = forms st |> Sequence.flat_map Sequence.of_list
 
   let terms st = lits st |> Sequence.flat_map SLiteral.to_seq
 end
+
+let signature ?(init=Signature.empty) seq =
+  seq
+  |> Sequence.flat_map Seq.ty_decls
+  |> Sequence.fold (fun sigma (id,ty) -> Signature.declare sigma id ty) init
+
+let add_src ~file st =
+  map_src st
+    ~f:(fun {UntypedAST.name;_} -> StatementSrc.make ?name file)
 
 (** {2 IO} *)
 
@@ -106,13 +114,18 @@ let pp ppf ppt ppty out st = match st.view with
       fpf out "@[<2>val %a :@ @[%a@]@]." ID.pp id ppty ty
   | Def (id,ty,t) ->
       fpf out "@[<2>def %a :@ @[%a@]@ := @[%a@]@]." ID.pp id ppty ty ppt t
-  | Data d ->
+  | Data l ->
       let pp_cstor out (id,ty) =
         fpf out "@[<2>| %a :@ @[%a@]@]" ID.pp id ppty ty in
-      fpf out "@[<2>data @[%a : %a@] :=@ @[<v>%a@]."
-        ID.pp d.data_id ppty d.data_ty (Util.pp_list ~sep:"" pp_cstor) d.data_cstors
+      let pp_data out d =
+        fpf out "@[%a : %a@] :=@ @[<v>%a@]"
+          ID.pp d.data_id ppty d.data_ty (Util.pp_list ~sep:"" pp_cstor) d.data_cstors
+      in
+      fpf out "@[<v>data %a@]" (Util.pp_list ~sep:" and " pp_data) l
   | Assert f ->
       fpf out "@[<2>assert@ (@[%a@])@]." ppf f
+  | Goal f ->
+      fpf out "@[<2>goal@ (@[%a@])@]." ppf f
 
 let to_string ppf ppt ppty = CCFormat.to_string (pp ppf ppt ppty)
 
@@ -131,14 +144,11 @@ module TPTP = struct
     match st.view with
     | TyDecl (id,ty) -> pp_decl out (id,ty)
     | Assert f ->
-        let role =
-          if StatementSrc.is_conjecture st.src
-          then "negated_conjecture" else "axiom"
-        in
-        fpf out "@[<2>tff(%s, %s,@ (@[%a@])@]."
-          name role
-          ppf
-          f
+        let role = "axiom" in
+        fpf out "@[<2>tff(%s, %s,@ (@[%a@])@]." name role ppf f
+    | Goal f ->
+        let role = "conjecture" in
+        fpf out "@[<2>tff(%s, %s,@ (@[%a@])@]." name role ppf f
     | Def (id, ty, t) ->
         pp_decl out (id,ty);
         fpf out "@[<2>tff(%s, axiom,@ %a =@ @[%a@])@]." name ID.pp id ppt t
