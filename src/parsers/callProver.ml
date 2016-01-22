@@ -135,11 +135,7 @@ let decls_of_string ~source str =
 
 (* try to parse a proof. Returns a proof option *)
 let proof_of_decls decls =
-  let res = Err.(
-      Util_tptp.infer_types decls
-      >>= fun decls' ->
-      Trace_tstp.of_decls decls'
-    ) in
+  let res = Trace_tstp.of_decls decls in
   match res with
   | `Error _ -> None
   | `Ok proof -> Some proof
@@ -149,10 +145,7 @@ let call_proof ?timeout ?args ~prover decls =
     call_with_out ?timeout ?args ~prover decls
     >>= fun (res, output) ->
     decls_of_string ~source:("output of prover "^ prover.Prover.name) output
-    >>= fun decls ->
-    Util_tptp.infer_types decls
-    >>= fun decls' ->
-    Trace_tstp.of_decls decls'
+    >>= Trace_tstp.of_decls
     >>= fun proof ->
     return (res, proof)
   )

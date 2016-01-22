@@ -8,6 +8,8 @@ open Libzipperposition
 type 'a or_error = [`Error of string | `Ok of 'a]
 type untyped = STerm.t
 
+module A = Ast_tptp
+
 (** {2 Description of provers} *)
 
 module Prover : sig
@@ -57,21 +59,21 @@ type result =
 
 val call : ?timeout:int -> ?args:string list ->
   prover:Prover.t ->
-  untyped Ast_tptp.t list ->
+  untyped A.t list ->
   result or_error
 (** Call the prover (if present) on the given problem, and
     return a result. Default timeout is 30. *)
 
 val call_proof : ?timeout:int -> ?args:string list ->
   prover:Prover.t ->
-  untyped Ast_tptp.t list ->
+  untyped A.t list ->
   (result * Trace_tstp.t) or_error
 (** Call the prover, and also tries to parse a TSTP derivation,
     if the prover succeeded *)
 
 val call_with_out : ?timeout:int -> ?args:string list ->
   prover:Prover.t ->
-  untyped Ast_tptp.t list ->
+  untyped A.t list ->
   (result * string) or_error
 (** Same as {!call}, but also returns the raw output of the prover *)
 
@@ -81,7 +83,7 @@ module Eprover : sig
   type result = {
     answer : szs_answer;
     output : string;
-    decls : untyped Ast_tptp.t Sequence.t option;
+    decls : untyped A.t Sequence.t option;
     proof : Trace_tstp.t option;
   }
   and szs_answer =
@@ -102,13 +104,13 @@ module Eprover : sig
       given to E. *)
 
   val discover : ?opts:string list -> steps:int ->
-    untyped Ast_tptp.t Sequence.t ->
-    untyped Ast_tptp.t Sequence.t or_error
+    untyped A.t Sequence.t ->
+    untyped A.t Sequence.t or_error
   (** explore the surrounding of this list of declarations, returning the
       TPTP output of E *)
 
   val cnf : ?opts:string list ->
-    untyped Ast_tptp.t Sequence.t ->
-    untyped Ast_tptp.t Sequence.t or_error
+    untyped A.t Sequence.t ->
+    untyped A.t Sequence.t or_error
     (** Use E to convert a set of statements into CNF *)
 end

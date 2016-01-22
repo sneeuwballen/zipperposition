@@ -46,32 +46,49 @@ type options =
 type clause = lit list
 (** Basic clause representation, as list of literals *)
 
-val clause_to_fo : clause -> FOTerm.t SLiteral.t list
+val clause_to_fo :
+  ?ctx:FOTerm.Conv.ctx ->
+  clause ->
+  FOTerm.t SLiteral.t list
 
-(** A toplevel statement, declaring a symbol or asserting a clause. *)
-type 'a statement = (clause, term, type_, 'a) Statement.t
+type 'a f_statement = (term, term, type_, 'a) Statement.t
+(** A statement before CNF *)
 
-val pp_statement : _ statement CCFormat.printer
+type 'a c_statement = (clause, term, type_, 'a) Statement.t
+(** A statement after CNF *)
+
+val pp_f_statement : _ f_statement CCFormat.printer
+val pp_c_statement : _ c_statement CCFormat.printer
 
 val is_clause : form -> bool
 val is_cnf : form -> bool
 
+(** {2 Main Interface} *)
+
 val cnf_of :
   ?opts:options list ->
   ?ctx:Skolem.ctx ->
-  form ->
-  'a ->
-  ('a statement, CCVector.ro) CCVector.t
+  'a f_statement ->
+  'a c_statement CCVector.ro_vector
 (** Transform the clause into proper CNF; returns a list of statements,
     including type declarations for new Skolem symbols or formulas proxys.
     Options are used to tune the behavior. *)
 
 val cnf_of_seq :
   ?opts:options list -> ?ctx:Skolem.ctx ->
-  (form * 'a) Sequence.t ->
-  ('a statement, CCVector.ro) CCVector.t
+  'a f_statement Sequence.t ->
+  'a c_statement CCVector.ro_vector
 
 val type_declarations :
-  _ statement Sequence.t ->
+  _ c_statement Sequence.t ->
   type_ ID.Map.t
 (** Compute the types declared in the statement sequence *)
+
+(** {2 Conversions} *)
+
+val convert :
+  file:string ->
+  UntypedAST.attrs c_statement Sequence.t ->
+  Statement.clause_t CCVector.ro_vector
+(** Converts statements based on {!TypedSTerm} into statements
+    based on {!FOTerm} and {!Type} *)

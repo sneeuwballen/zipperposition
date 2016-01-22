@@ -112,8 +112,8 @@ declaration:
           (Builtin.Arrow,
            {PT.term=PT.AppBuiltin (Builtin.TType,[]);_} :: _) ->
              (* declare a new type symbol *)
-             A.NewType (name, ID.make s, ty, info)
-      | _ -> A.TypeDecl (name, ID.make s, ty, info)
+             A.NewType (name, s, ty, info)
+      | _ -> A.TypeDecl (name, s, ty, info)
     }
   | CNF LEFT_PAREN name=name COMMA role=role COMMA c=cnf_formula info=annotations RIGHT_PAREN DOT
     { A.CNF (name, role, c, info) }
@@ -124,7 +124,7 @@ declaration:
   | error
     {
       let loc = L.mk_pos $startpos $endpos in
-      raise (Ast_tptp.ParseError loc)
+      Parsing_utils.error loc "expected declaration"
     }
 
 role: w=LOWER_WORD { Ast_tptp.role_of_string w }
@@ -267,7 +267,7 @@ defined_atom:
   | n=RATIONAL { PT.rat (Q.of_string n) }
   | REAL {
       let loc = L.mk_pos $startpos $endpos in
-      raise (Ast_tptp.ParseError loc)
+      Parsing_utils.error loc "expected `defined_atom`"
     }
   | s=DISTINCT_OBJECT
     {
@@ -285,7 +285,8 @@ defined_plain_term:
     {
       let loc = L.mk_pos $startpos $endpos in
       match Builtin.TPTP.of_string s with
-      | None -> raise (Ast_tptp.ParseError loc)
+      | None ->
+          Parsing_utils.errorf loc "unknown builtin `%s`" s
       | Some b -> PT.builtin ~loc b
     }
   | f=defined_functor LEFT_PAREN args=arguments RIGHT_PAREN
@@ -297,7 +298,8 @@ defined_plain_term:
     {
       let loc = L.mk_pos $startpos $endpos in
       match Builtin.TPTP.of_string s with
-      | None -> raise (Ast_tptp.ParseError loc)
+      | None ->
+          Parsing_utils.errorf loc "unknown builtin function `%s`" s
       | Some b -> PT.app_builtin ~loc b args
     }
 
@@ -386,7 +388,7 @@ defined_ty:
       | "$rat" -> PT.ty_rat
       | _ ->
           let loc = L.mk_pos $startpos $endpos in
-          raise (Ast_tptp.ParseError loc)
+          Parsing_utils.errorf loc "expected defined_type, not `%s`" w
     }
 
 atomic_system_word:

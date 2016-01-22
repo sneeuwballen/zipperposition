@@ -7,8 +7,6 @@
 
 open Libzipperposition
 
-exception ParseError of ParseLocation.t
-
 type name =
   | NameInt of int
   | NameString of string
@@ -48,15 +46,13 @@ val pp_general : general_data CCFormat.printer
 val pp_general_debugf : general_data CCFormat.printer  (* ugly version *)
 val pp_generals : general_data list CCFormat.printer
 
-val to_src : file:string -> (role * string) -> StatementSrc.t
-
 type 'a t =
   | CNF of name * role * 'a list * optional_info
   | FOF of name * role * 'a * optional_info
   | TFF of name * role * 'a * optional_info
   | THF of name * role * 'a * optional_info (* XXX not parsed yet *)
-  | TypeDecl of name * ID.t * 'a * optional_info  (* type declaration for a symbol *)
-  | NewType of name * ID.t * 'a * optional_info (* declare new type constant... *)
+  | TypeDecl of name * string * 'a * optional_info  (* type declaration for a symbol *)
+  | NewType of name * string * 'a * optional_info (* declare new type constant... *)
   | Include of string
   | IncludeOnly of string * name list   (* include a subset of names *)
 (** top level declaration *)
@@ -66,39 +62,6 @@ type 'a declaration = 'a t
 val get_name : _ t -> name
 (** Find the name of the declaration, or
     @raise Invalid_argument if the declaration is an include directive *)
-
-class ['a, 't] visitor : object
-  method clause : 'a -> role -> 't list -> 'a
-  method fof : 'a -> role -> 't -> 'a
-  method tff : 'a -> role -> 't -> 'a
-  method thf : 'a -> role -> 't -> 'a
-  method any_form : 'a -> role -> 't -> 'a
-  method tydecl : 'a -> ID.t -> 't -> 'a
-  method new_ty : 'a -> ID.t -> 't -> 'a
-  method include_ : 'a -> string -> 'a
-  method include_only : 'a -> string -> name list -> 'a
-  method visit : 'a -> 't t -> 'a
-end
-
-val map :
-  form:('a -> 'b) ->
-  ho:('a -> 'b) ->
-  ty:('a -> 'b) ->
-  'a t -> 'b t
-(** Map terms to other terms *)
-
-val flat_map :
-  cnf:('a list -> 'b list list) ->
-  form:('a -> 'b list) ->
-  ho:('a -> 'b list) ->
-  ty:('a -> 'b) ->
-  ('a t, CCVector.ro) CCVector.t ->
-  ('b t, CCVector.ro) CCVector.t
-
-module Seq : sig
-  val forms : 'a t -> 'a Sequence.t
-  val hoterms : 'a t -> 'a Sequence.t
-end
 
 (** {2 IO} *)
 

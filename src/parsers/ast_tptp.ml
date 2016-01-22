@@ -9,8 +9,6 @@ module PT = STerm
 module HOT = HOTerm
 module Loc = ParseLocation
 
-exception ParseError of ParseLocation.t
-
 type name =
   | NameInt of int
   | NameString of string
@@ -108,22 +106,13 @@ let pp_generals out l = match l with
       Format.fprintf out ",@ ";
       Util.pp_list ~sep:", " pp_general out l
 
-let to_src ~file (role, name) =
-  let role_is_conj_ = function
-    | R_conjecture
-    | R_negated_conjecture -> true
-    | _ -> false
-  in
-  let is_conjecture = role_is_conj_ role in
-  StatementSrc.make ~is_conjecture ~name file
-
 type 'a t =
   | CNF of name * role * 'a list * optional_info
   | FOF of name * role * 'a * optional_info
   | TFF of name * role * 'a * optional_info
   | THF of name * role * 'a * optional_info  (* XXX not parsed yet *)
-  | TypeDecl of name * ID.t * 'a * optional_info  (* type declaration for a symbol *)
-  | NewType of name * ID.t * 'a * optional_info (* declare new type constant... *)
+  | TypeDecl of name * string * 'a * optional_info  (* type declaration for a symbol *)
+  | NewType of name * string * 'a * optional_info (* declare new type constant... *)
   | Include of string
   | IncludeOnly of string * name list   (* include a subset of names *)
 (** top level declaration *)
@@ -141,86 +130,6 @@ let get_name = function
   | Include _ ->
       invalid_arg "Ast_tptp.name_of_decl: include directive has no name"
 
-class ['a,'t] visitor = object (self)
-  method clause (acc:'a) _r _c = acc
-  method fof (acc:'a) _r _f = acc
-  method tff (acc:'a) _r _f = acc
-  method thf (acc:'a) _r _f = acc
-  method any_form (acc:'a) _r _f = acc
-  method tydecl (acc:'a) _s _ty = acc
-  method new_ty (acc:'a) _s _ty = acc
-  method include_ (acc:'a) _file = acc
-  method include_only (acc:'a) _file _names = acc
-  method visit (acc:'a) (decl:'t t) = match decl with
-    | CNF (_, r, c, _) -> self#clause acc r c
-    | FOF (_, r, f, _) -> self#any_form (self#fof acc r f) r f
-    | TFF (_, r, f, _) -> self#any_form (self#tff acc r f) r f
-    | THF (_, r, f, _) -> self#thf acc r f
-    | TypeDecl (_, s, ty, _) -> self#tydecl acc s ty
-    | NewType (_, s, ty, _) -> self#new_ty acc s ty
-    | Include f -> self#include_ acc f
-    | IncludeOnly (f,names) -> self#include_only acc f names
-end
-
-module Seq = struct
-  let forms decl k = match decl with
-    | FOF (_,_,f,_)
-    | TFF (_,_,f,_) -> k f
-    | CNF (_,_,c,_) -> List.iter k c
-    | _ -> ()
-
-  let hoterms decl k = match decl with
-    | THF (_,_,f,_) -> k f
-    | _ -> ()
-end
-
-let map ~form ~ho ~ty = function
-  | CNF (n,r, l, i) ->
-      CNF (n,r, List.map form l, i)
-  | FOF (n,r, f, i) ->
-      FOF (n,r, form f, i)
-  | TFF (n,r, f, i) ->
-      TFF (n,r, form f, i)
-  | THF (n,r, f, i) ->
-      THF (n,r, ho f, i)
-  | TypeDecl (n, s, t, i) ->
-      TypeDecl (n, s, ty t, i)
-  | NewType (n, s, t, i) ->
-      NewType (n, s, ty t, i)
-  | Include s -> Include s
-  | IncludeOnly (s,l) -> IncludeOnly (s,l)
-
-let flat_map ~cnf ~form ~ho ~ty v =
-  let res = CCVector.create() in
-  CCVector.iter
-    (function
-      | CNF (n,r, l, i) ->
-          let l' = cnf l in
-          List.iter
-            (fun clause -> CCVector.push res (CNF(n,r, clause, i)))
-            l'
-      | FOF (n,r, f, i) ->
-          List.iter
-            (fun f' -> CCVector.push res (FOF (n,r, f', i)))
-            (form f)
-      | TFF (n,r, f, i) ->
-          List.iter
-            (fun f' -> CCVector.push res (TFF (n,r, f', i)))
-            (form f)
-      | THF (n,r, f, i) ->
-          List.iter
-            (fun f' -> CCVector.push res (THF (n,r, f', i)))
-            (ho f)
-      | TypeDecl (n, s, t, i) ->
-          CCVector.push res (TypeDecl (n, s, ty t, i))
-      | NewType (n, s, t, i) ->
-          CCVector.push res (NewType (n, s, ty t, i))
-      | Include s -> CCVector.push res (Include s)
-      | IncludeOnly (s,l) -> CCVector.push res (IncludeOnly (s,l))
-    )
-    v;
-  CCVector.freeze res
-
 (** {2 IO} *)
 
 let fpf = Format.fprintf
@@ -234,11 +143,11 @@ let pp pp_t out = function
   | IncludeOnly (filename, names) ->
       fpf out "@[<2>include('%s',@ [@[%a@]]@])." filename (Util.pp_list pp_name) names
   | TypeDecl (name, s, ty, g) ->
-      fpf out "@[<2>tff(%a, type,@ (@[%a : %a@])%a@])."
-        pp_name name ID.pp s pp_t ty pp_generals g
+      fpf out "@[<2>tff(%a, type,@ (@[%s : %a@])%a@])."
+        pp_name name s pp_t ty pp_generals g
   | NewType (name, s, kind, g) ->
-      fpf out "@[<2>tff(%a, type,@ (@[%a : %a@])%a@])."
-        pp_name name ID.pp s pp_t kind pp_generals g
+      fpf out "@[<2>tff(%a, type,@ (@[%s : %a@])%a@])."
+        pp_name name s pp_t kind pp_generals g
   | CNF (name, role, c, generals) ->
       pp_form_
         (Util.pp_list ~sep:" | " pp_t) out

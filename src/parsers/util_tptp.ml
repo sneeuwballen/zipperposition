@@ -17,6 +17,11 @@ type 'a or_error = [`Error of string | `Ok of 'a]
 type typed = T.t
 type untyped = PT.t
 
+exception Error of string
+
+let error msg = raise (Error msg)
+let errorf msg = CCFormat.ksprintf msg ~f:error
+
 (** {2 Printing/Parsing} *)
 
 let find_file name dir =
@@ -52,21 +57,10 @@ let find_file name dir =
   then Some name  (* found *)
   else None
 
-(* raise a readable parse error *)
-let _raise_error msg lexbuf =
-  let loc = Loc.of_lexbuf lexbuf in
-  failwith (msg^ Loc.to_string loc)
-
 let parse_lexbuf ?names buf =
   try
     (* parse declarations from file *)
-    let decls =
-      try Parse_tptp.parse_declarations Lex_tptp.token buf
-      with
-      | Parse_tptp.Error -> _raise_error "parse error at " buf
-      | Failure msg -> _raise_error msg buf
-      | Ast_tptp.ParseError loc -> failwith ("parse error at "^Loc.to_string loc)
-    in
+    let decls = Parse_tptp.parse_declarations Lex_tptp.token buf in
     let q = Queue.create () in
     List.iter
       (fun decl -> match decl, names with
@@ -81,7 +75,7 @@ let parse_lexbuf ?names buf =
       decls;
     Err.return (Sequence.of_queue q)
   with
-  | Failure msg | Sys_error msg ->
+  | Error msg | Sys_error msg ->
       Err.fail msg
   | e ->
       Err.fail (Printexc.to_string e)
@@ -95,9 +89,9 @@ let _find_and_open filename dir =
       | Some filename ->
           begin try open_in filename
             with Sys_error msg ->
-              failwith ("error when opening file " ^ filename ^ " : " ^ msg)
+              errorf "error when opening file `%s`: %s" filename msg
           end
-      | None -> failwith ("could not find file " ^ filename)
+      | None -> errorf "could not find file `%s`" filename
 
 let parse_file ~recursive f =
   let dir = Filename.dirname f in
@@ -110,12 +104,7 @@ let parse_file ~recursive f =
       let buf = Lexing.from_channel input in
       Loc.set_file buf filename;
       (* parse declarations from file *)
-      let decls =
-        try Parse_tptp.parse_declarations Lex_tptp.token buf
-        with
-        | Parse_tptp.Error -> _raise_error "parse error at " buf
-        | Ast_tptp.ParseError loc -> failwith ("parse error at "^Loc.to_string loc)
-      in
+      let decls = Parse_tptp.parse_declarations Lex_tptp.token buf in
       List.iter
         (fun decl -> match decl, names with
            | (A.CNF _ | A.FOF _ | A.TFF _ | A.THF _ | A.TypeDecl _ | A.NewType _), None ->
@@ -139,7 +128,7 @@ let parse_file ~recursive f =
     parse_this_file ?names:None f;
     Err.return (Sequence.of_queue result_decls)
   with
-  | Failure msg | Sys_error msg -> Err.fail msg
+  | Error msg | Sys_error msg -> Err.fail msg
   | e -> Err.fail (Printexc.to_string e)
 
 let fpf = Format.fprintf
@@ -154,8 +143,7 @@ let print_into_file ppt file decls =
     (fun oc ->
        let out = Format.formatter_of_out_channel oc in
        print_into ppt out decls;
-       Format.pp_print_flush out ();
-    )
+       Format.pp_print_flush out ())
 
 let has_includes decls =
   Sequence.exists
@@ -170,163 +158,53 @@ let has_includes decls =
       | A.TypeDecl _ -> false)
     decls
 
+(** {2 Bridge to UntypedAST} *)
+
+module UA = UntypedAST
+
 let is_conjecture_ = function
   | A.R_conjecture -> true
   | _ -> false
 
-let formulas ?(negate=is_conjecture_) decls =
-  Sequence.filter_map
-    (function
-      | A.TypeDecl _
-      | A.NewType _
-      | A.Include _
-      | A.IncludeOnly _ -> None
-      | A.CNF(_, role, c, _) ->
-          if negate role
-          then Some (F.not_ (F.or_ c))
-          else Some (F.or_ c)
-      | A.FOF(_, role, f, _)
-      | A.TFF(_, role, f, _) ->
-          if negate role
-          then Some (F.not_ f)
-          else Some f
-      | A.THF _ -> None)
-    decls
-
-let type_declarations decls =
-  (* traverse the declarations, updating the signature when a type decl is met *)
-  let a = object
-    inherit [typed ID.Map.t, typed] A.visitor
-    method! tydecl sigma s ty = ID.Map.add s ty sigma
-  end in
-  Sequence.fold a#visit ID.Map.empty decls
+let to_ast st =
+  let conv_form name role f =
+    let name = A.string_of_name name in
+    let attrs = {UA.name=Some name; } in
+    if is_conjecture_ role
+    then UA.goal ~attrs f
+    else UA.assert_ ~attrs f
+  in
+  match st with
+  | A.Include _
+  | A.IncludeOnly _ -> error "cannot convert `Include` to UntypedAST"
+  | A.TypeDecl (_,s,ty,_)
+  | A.NewType (_,s,ty,_) ->
+      UA.decl s ty
+  | A.TFF (name,role,f,_)
+  | A.THF (name,role,f,_)
+  | A.FOF (name,role,f,_) ->
+      conv_form name role f
+  | A.CNF (name,role,f,_) ->
+      let f = PT.or_ f in
+      conv_form name role f
 
 (* default function for giving a name to the declaration of a symbol *)
 let name_sym_ sy =
-  let str = CCFormat.sprintf "'ty_decl_%d_%a'" (ID.id sy) ID.pp sy in
+  let str = CCFormat.sprintf "'ty_decl_%s'" sy in
   A.NameString str
 
-let declare_symbols_seq ?(name=name_sym_) seq =
-  Sequence.map
-    (fun (s, ty) ->
-       let name = name s in
-       A.TypeDecl (name, s, ty, []))
-    seq
-
-let declare_symbols ?name sigma =
-  let seq = ID.Map.to_seq sigma in
-  declare_symbols_seq ?name seq
-
-(** {2 Type inference} *)
-
-let infer_types_exn ?(ctx=TypeInference.Ctx.create ()) decls =
-  let module TI = TypeInference in
-  let section = TI.section in
-  let v =
-    Sequence.flat_map
-      (fun decl ->
-         Util.debugf 3 ~section "@[<2>infer type for@ @[%a@]@]"
-           (fun k->k (A.pp PT.pp) decl);
-         let d = match decl with
-         | A.Include f -> A.Include f
-         | A.IncludeOnly (f,l) -> A.IncludeOnly (f,l)
-         | A.NewType (n,s,ty,g) ->
-             (* convert [ty], then declare it *)
-             let ty = TI.infer_ty_exn ctx ty in
-             TI.Ctx.declare ctx s ty;
-             A.NewType (n,s,ty,g)
-         | A.TypeDecl(n, s, ty,g) ->
-             let ty = TI.infer_ty_exn ctx ty in
-             TI.Ctx.declare ctx s ty;
-             A.TypeDecl (n,s,ty,g)
-         | A.CNF(n,r,c,i) ->
-             let c = TI.infer_clause_exn ctx c in
-             TI.Ctx.exit_scope ctx;
-             A.CNF(n,r,c,i)
-         | A.FOF(n,r,f,i) ->
-             let f = TI.infer_prop_exn ctx f in
-             let f = T.Form.close_forall f in
-             TI.Ctx.exit_scope ctx;
-             A.FOF(n,r,f,i)
-         | A.TFF(n,r,f,i) ->
-             let f = TI.infer_prop_exn ctx f in
-             let f = T.Form.close_forall f in
-             TI.Ctx.exit_scope ctx;
-             A.TFF(n,r,f,i)
-         | A.THF(n,r,f,i) ->
-             let f = TI.infer_prop_exn ctx f in
-             let f = T.Form.close_forall f in
-             TI.Ctx.exit_scope ctx;
-             A.THF(n,r,f,i)
-         in
-         let tys =
-           TI.Ctx.pop_new_types ctx
-           |> Sequence.of_list
-           |> declare_symbols_seq ?name:None
-         in
-         Sequence.append tys (Sequence.return d)
-      )
-      decls
-    |> CCVector.of_seq ?init:None
+let of_ast st =
+  let name = match st.UA.attrs.UA.name with
+    | None -> A.NameString "no_name"
+    | Some s -> A.NameString s
   in
-  (* be sure to traverse the list of declarations *)
-  TypeInference.Ctx.bind_to_default ctx;
-  CCVector.to_seq v
+  match st.UA.stmt with
+  | UA.Decl (s,ty) ->
+      let name = name_sym_ s in
+      (* XXX we should look if [ty] returns tType or not *)
+      A.TypeDecl (name, s, ty, [])
+  | UA.Def (_,_,_) -> error "cannot convert `def` statement into TPTP"
+  | UA.Data _ -> error "cannot convert `data` statement into TPTP"
+  | UA.Goal f -> A.TFF (name, A.R_conjecture, f, [])
+  | UA.Assert f -> A.TFF (name, A.R_axiom, f, [])
 
-let infer_types ?ctx seq =
-  try Err.return (infer_types_exn ?ctx seq)
-  with e -> Err.of_exn_trace e
-
-let erase_types typed =
-  Sequence.map
-    (function
-      | A.Include f -> A.Include f
-      | A.IncludeOnly (f,l) -> A.IncludeOnly (f,l)
-      | A.NewType (n,s,ty,g) ->
-          A.NewType (n,s, T.erase ty, g)
-      | A.TypeDecl(n, s, ty, g) ->
-          A.TypeDecl (n,s, T.erase ty, g)
-      | A.CNF(n,r,c,i) ->
-          let c' = List.map T.erase c in
-          A.CNF(n,r,c',i)
-      | A.FOF(n,r,f,i) ->
-          let f' = T.erase f in
-          A.FOF(n,r,f',i)
-      | A.TFF(n,r,f,i) ->
-          let f' = T.erase f in
-          A.TFF(n,r,f',i)
-      | A.THF(n,r,f,i) ->
-          let f' = T.erase f in
-          A.THF(n,r,f',i)
-    ) typed
-
-let to_cnf ?opts decls =
-  (* formulas with correct negation sign *)
-  let ctx = Skolem.create () in
-  let res = CCVector.create() in
-  (* how to process a given formula *)
-  let process_form name role f =
-    let f, role = match role with
-     | A.R_conjecture -> F.not_ f, A.R_negated_conjecture
-     | _ -> f, role
-   in
-   let stmts = Cnf.cnf_of ?opts ~ctx f (role, A.string_of_name name) in
-   CCVector.append res stmts
-  in
-  Sequence.iter
-    (function
-     | A.TFF(name,r,f,_)
-     | A.FOF(name,r,f,_) ->
-         process_form name r f
-     | A.CNF (name,r,f,_) ->
-         let f = F.or_ f in
-         process_form name r f
-     | A.NewType (name, id, ty, _)
-     | A.TypeDecl (name, id, ty, _) ->
-         let st = Statement.ty_decl ~src:(A.R_type, A.string_of_name name) id ty in
-         CCVector.push res st;
-     | A.THF _ -> failwith "cnf_of_tptp cannot deal with HO terms right now."
-     | A.Include _
-     | A.IncludeOnly (_,_) -> ())
-    decls;
-  CCVector.freeze res

@@ -525,3 +525,67 @@ let constrain_term_type_exn ctx t ty =
 let constrain_term_type ctx t ty =
   try Err.return (constrain_term_type_exn ctx t ty)
   with e -> Err.of_exn_trace e
+
+(** {2 Statements} *)
+
+type typed_statement = (typed, typed, type_, UntypedAST.attrs) Statement.t
+
+module A = UntypedAST
+module Stmt = Statement
+
+let infer_statement_exn ctx st =
+  (* auxiliary statements *)
+  let src = st.A.attrs in
+  let st =
+    match st.A.stmt with
+    | A.Decl (s,ty) ->
+        (* new type
+           TODO: warning if it shadows? *)
+        let id = ID.make s in
+        let ty = infer_ty_exn ctx ty in
+        Ctx.declare ctx id ty;
+        Stmt.ty_decl ~src id ty
+    | A.Def (s,ty,t) ->
+        let id = ID.make s in
+        let ty = infer_ty_exn ctx ty in
+        let t = infer_exn ctx t in
+        Ctx.declare ctx id ty;
+        Stmt.def ~src id ty t
+    | A.Data _ ->
+        assert false
+        (* TODO:
+          - declare all the variables (and type variables)
+          - infer types for all constructors (+ check return type)
+          - check consistency (no other type variable than the ones quantified)
+          - output Stmt.data
+          - also use Ind_types? *)
+    | A.Assert t ->
+        let t = infer_prop_exn ctx t in
+        Stmt.assert_ ~src t
+    | A.Goal t ->
+        let t = infer_prop_exn ctx t in
+        Stmt.goal ~src t
+  in
+  (* be sure to bind the remaining meta variables *)
+  Ctx.bind_to_default ctx;
+  let aux =
+    Ctx.pop_new_types ctx
+    |> List.map (fun (id,ty) -> Stmt.ty_decl ~src:A.default_attrs id ty)
+  in
+  st, aux
+
+let infer_statements_exn ?(ctx=Ctx.create ()) seq =
+  let res = CCVector.create () in
+  Sequence.iter
+    (fun st ->
+      (* add declarations first *)
+      let st, aux = infer_statement_exn ctx st in
+      List.iter (CCVector.push res) aux;
+      CCVector.push res st)
+    seq;
+  CCVector.freeze res
+
+let infer_statements ?ctx seq =
+  try CCError.return (infer_statements_exn ?ctx seq)
+  with e -> CCError.of_exn_trace e
+

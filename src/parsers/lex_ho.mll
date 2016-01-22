@@ -29,8 +29,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 {
   open Libzipperposition
   open Parse_ho
-
-  exception Error of string
 }
 
 let printable_char = [^ '\n']
@@ -98,7 +96,11 @@ rule token = parse
   | interrogation_word { INTERROGATION_WORD(Lexing.lexeme lexbuf) }
   | operator { OPERATOR(Lexing.lexeme lexbuf) }
   | integer { INTEGER(Lexing.lexeme lexbuf) }
-  | _ as c { raise (Error (Printf.sprintf "lexer fails on char '%c'" c)) }
+  | _ as c
+    {
+      let loc = ParseLocation.of_lexbuf lexbuf in
+      Parsing_utils.errorf loc "lexer fails on char '%c'" c
+    }
 
 
 {
@@ -110,14 +112,15 @@ rule token = parse
       E.return (Parse_ho.parse_decl token (Lexing.from_string s))
     with
     | Parse_ho.Error -> E.fail "parse error"
-    | Error msg -> E.fail msg
+    | Parsing_utils.Parse_error _ as e -> E.fail (Printexc.to_string e)
 
   let decls_of_string s : Ast_ho.t list or_error =
     try
       E.return (Parse_ho.parse_decls token (Lexing.from_string s))
     with
     | Parse_ho.Error -> E.fail "parse error"
-    | Error msg -> E.fail msg
+    | Parsing_utils.Parse_error _ as e ->
+        E.fail (Printexc.to_string e)
 
   let term_of_string s : STerm.t option =
     try

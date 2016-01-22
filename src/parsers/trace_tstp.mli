@@ -7,8 +7,8 @@ open Libzipperposition
 
 type id = Ast_tptp.name
 
-type term = FOTerm.t
-type form = TypedSTerm.t
+type term = STerm.t
+type form = STerm.t
 type clause = term SLiteral.t list
 
 type t =

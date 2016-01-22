@@ -139,3 +139,26 @@ val constrain_term_term : Ctx.t -> untyped -> untyped -> unit or_error
 
 val constrain_term_type : Ctx.t -> untyped -> type_ -> unit or_error
 (** Safe version of {!constrain_term_type_exn} *)
+
+(** {2 Statements} *)
+
+type typed_statement = (typed, typed, type_, UntypedAST.attrs) Statement.t
+
+val infer_statement_exn :
+  Ctx.t ->
+  UntypedAST.statement ->
+  typed_statement * typed_statement list
+(** [infer_statement ctx ~f st] checks and convert [st] into a
+    typed statements, and a list of auxiliary type declarations for symbols
+    that were inferred implicitely. *)
+
+val infer_statements_exn :
+  ?ctx:Ctx.t ->
+  UntypedAST.statement Sequence.t ->
+  typed_statement CCVector.ro_vector
+(** Infer all statements *)
+
+val infer_statements :
+  ?ctx:Ctx.t ->
+  UntypedAST.statement Sequence.t ->
+  typed_statement CCVector.ro_vector or_error

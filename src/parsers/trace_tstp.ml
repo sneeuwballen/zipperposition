@@ -7,16 +7,14 @@ open Libzipperposition
 
 type id = Ast_tptp.name
 
-module T = FOTerm
-module TT = TypedSTerm
-module F = TT.Form
+module T = STerm
 module S = Substs
 module A = Ast_tptp
 module Hash = CCHash
 module Err = CCError
 
-type term = FOTerm.t
-type form = TypedSTerm.t
+type term = STerm.t
+type form = STerm.t
 type clause = term SLiteral.t list
 
 type t =
@@ -37,7 +35,7 @@ let equal p1 p2 = match p1, p2 with
   | Axiom (f1, n1), Axiom (f2, n2) -> f1 = f2 && n1 = n2
   | Theory s1, Theory s2 -> s1 = s2
   | InferForm (f1, lazy step1), InferForm(f2, lazy step2) ->
-      step1.id = step2.id && TT.equal f1 f2
+      step1.id = step2.id && T.equal f1 f2
   | InferClause (c1, lazy step1), InferClause(c2, lazy step2) ->
       begin try
           step1.id = step2.id && List.for_all2 (SLiteral.equal T.equal) c1 c2
@@ -88,7 +86,7 @@ let is_step = function
   | Theory _ -> false
 
 let is_proof_of_false = function
-  | InferForm (form, _) when TT.equal form F.false_ -> true
+  | InferForm (form, _) when T.equal form T.false_ -> true
   | InferClause([],_) -> true
   | InferClause(l,_) -> List.for_all SLiteral.is_false l
   | _ -> false
@@ -257,7 +255,7 @@ let of_decls decls =
   Sequence.iter
     begin fun decl -> match decl with
       | A.CNF (_name, _role, _c, info :: _) ->
-          Util.debugf 3 "@[<2>convert step@ @[%a@]@]" (fun k->k (A.pp TT.pp) decl);
+          Util.debugf 3 "@[<2>convert step@ @[%a@]@]" (fun k->k (A.pp T.pp) decl);
           begin match read_info info with
             | `Proof
             | `NoIdea -> ()
@@ -272,7 +270,7 @@ let of_decls decls =
           end
       | A.FOF(name, _role, f, info :: _)
       | A.TFF (name, _role, f, info :: _) ->
-          Util.debugf 3 "convert step %a" (fun k->k (A.pp TT.pp) decl);
+          Util.debugf 3 "convert step %a" (fun k->k (A.pp T.pp) decl);
           begin match read_info info with
             | `Proof
             | `NoIdea -> ()
@@ -304,10 +302,8 @@ let parse ?(recursive=true) filename =
   Err.(
     Util_tptp.parse_file ~recursive filename
     >>= fun decls ->
-    Util_tptp.infer_types decls
-    >>= fun decls ->
     Util.debugf 1 "@[<2>decls:@ @[<hv>%a@]@]"
-      (fun k->k (CCFormat.seq ~sep:"" (A.pp TT.pp)) decls);
+      (fun k->k (CCFormat.seq ~sep:"" (A.pp T.pp)) decls);
     of_decls decls
   )
 
@@ -328,8 +324,7 @@ let _print_parent p = match p with
   | Axiom (f,n) -> CCFormat.sprintf "file('%s', %s)" f n
 
 (* pure fof? (no types but $i/$o) *)
-let _form_is_fof f =
-  TT.Seq.subterms f |> Sequence.for_all TT.is_monomorphic
+let _form_is_fof _f = false (* FIXME *)
 
 let pp_tstp out proof =
   traverse proof
@@ -346,7 +341,7 @@ let pp_tstp out proof =
            let id = get_id p in
            let file,n = _extract_axiom step.parents.(0) in
            Format.fprintf out "tff(%a, axiom, %a, file('%s', %s)).\n"
-             A.pp_name id TT.pp f file n
+             A.pp_name id T.pp f file n
        | InferForm(f, lazy step) ->
            let id = get_id p in
            let ids = Array.map _print_parent step.parents in
@@ -354,7 +349,7 @@ let pp_tstp out proof =
            let kind = if _form_is_fof f then "fof" else "tff" in
            Format.fprintf out
              "%s(%a, plain, %a, inference('%s', [status(%s)], [%a])).\n"
-             kind A.pp_name id TT.pp (F.close_forall f) step.rule status
+             kind A.pp_name id T.pp (T.close_all Binder.Forall f) step.rule status
              (CCFormat.array CCFormat.string) ids
        | InferClause(c, lazy step) ->
            let id = get_id p in
@@ -372,7 +367,7 @@ let pp0 out proof = match proof with
   | InferClause (c, _) ->
       Format.fprintf out "proof for %a (id %a)" _pp_clause c A.pp_name (get_id proof)
   | InferForm (f, _) ->
-      Format.fprintf out "proof for %a (id %a)" TT.pp f A.pp_name (get_id proof)
+      Format.fprintf out "proof for %a (id %a)" T.pp f A.pp_name (get_id proof)
 
 let pp1 out proof = match proof with
   | Axiom (f,n) -> Format.fprintf out "axiom(%s, %s)" f n
@@ -383,7 +378,7 @@ let pp1 out proof = match proof with
         (CCFormat.array ~sep:"\n  " pp0) step.parents
   | InferForm (f, lazy step) ->
       Format.fprintf out "proof for %a (id %a) from\n %a"
-        TT.pp f A.pp_name (get_id proof)
+        T.pp f A.pp_name (get_id proof)
         (CCFormat.array ~sep:"\n  " pp0) step.parents
 
 let pp = pp0

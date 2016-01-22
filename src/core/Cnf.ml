@@ -6,6 +6,7 @@
 module Hash = CCHash
 module T = TypedSTerm
 module F = T.Form
+module Stmt = Statement
 
 let prof_estimate = Util.mk_profiler "cnf.estimate_num_clauses"
 let prof_simplify_rename = Util.mk_profiler "cnf.simplify_rename"
@@ -39,8 +40,7 @@ type clause = lit list
 let pp_clause out =
   Format.fprintf out "@[<2>%a@]" (Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp))
 
-let clause_to_fo c =
-  let ctx = FOTerm.Conv.create() in
+let clause_to_fo ?(ctx=FOTerm.Conv.create()) c =
   List.map (SLiteral.map ~f:(FOTerm.Conv.of_simple_term ctx)) c
 
 let as_lit = SLiteral.of_form
@@ -306,8 +306,9 @@ let rec will_yield_lit f = match F.view f with
 
 (* introduce definitions for sub-formulas of [f], is needed. This might
    modify [ctx] by adding definitions to it, and it will {!NOT} introduce
-   definitions in the definitions (that has to be done later). *)
-let introduce_defs ~ctx f =
+   definitions in the definitions (that has to be done later).
+   @param is_pos if true, polarity=pos, else polarity=false *)
+let introduce_defs ~ctx ~is_pos f =
   let module E = Estimation in
   (* shortcut to compute the number of clauses *)
   let p pos f = estimate_num_clauses ~pos f in
@@ -423,7 +424,8 @@ let introduce_defs ~ctx f =
           let p_x = estimate_num_clauses ~pos x in
           E.(p_x */ prod_p ~pos tail (i+1) ~except)
   in
-  maybe_rename ~polarity:`Pos (E.Exactly 1) (E.Exactly 0) f
+  let polarity = if is_pos then `Pos else `Neg in
+  maybe_rename ~polarity (E.Exactly 1) (E.Exactly 0) f
 
 (* helper: reduction to cnf using De Morgan laws. Returns a list of list of
    atomic formulas *)
@@ -479,42 +481,55 @@ type options =
 (* simplify formulas and rename them. May introduce new formulas *)
 let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
   Util.enter_prof prof_simplify_rename;
+  (* add new declarations before [stmt] *)
+  let add_decls src =
+    let defs = Skolem.pop_new_definitions ~ctx in
+    List.map
+      (fun d ->
+        (* introduce the required definition, with polarity as needed *)
+        let f' = match d.Skolem.polarity with
+           | `Pos -> F.imply d.Skolem.proxy d.Skolem.form
+           | `Neg -> F.imply d.Skolem.form d.Skolem.proxy
+           | `Both -> F.equiv d.Skolem.proxy d.Skolem.form
+        in
+        Stmt.assert_ ~src f')
+      defs
+  in
+  (* convert a formula *)
+  let conv_form ~is_goal f =
+    Util.debugf ~section 4 "@[<2>simplify and rename@ `@[%a@]`@]" (fun k->k T.pp f);
+    (* preprocessing *)
+    let f = List.fold_left (|>) f preprocess in
+    (* simplification *)
+    if disable_renaming || is_clause f
+     then f
+     else introduce_defs ~is_pos:(not is_goal) ~ctx f
+  in
   let res = seq
     |> Sequence.flat_map
-      (fun (f,annot) ->
-         Util.debugf ~section 4 "@[<2>simplify and rename@ `@[%a@]`@]" (fun k->k T.pp f);
-         (* preprocessing *)
-         let f = List.fold_left (|>) f preprocess in
-         (* simplification *)
-         let f' =
-           if disable_renaming || is_clause f
-           then f
-           else introduce_defs ~ctx f
-         in
-         let defs = Skolem.pop_new_definitions ~ctx in
-         match defs with
-         | [] -> Sequence.return (f',annot)
-         | _::_ ->
-            let defs = List.map
-                (fun d ->
-                  (* introduce the required definition, with polarity as needed *)
-                  let f' = match d.Skolem.polarity with
-                     | `Pos -> F.imply d.Skolem.proxy d.Skolem.form
-                     | `Neg -> F.imply d.Skolem.form d.Skolem.proxy
-                     | `Both -> F.equiv d.Skolem.proxy d.Skolem.form
-                  in
-                  f', annot
-                )
-                defs
-            in
-            Sequence.of_list ((f', annot) :: defs)
+      (fun st ->
+        let src = st.Stmt.src in
+        let new_st = match st.Stmt.view with
+          | Stmt.Data _
+          | Stmt.Def _
+          | Stmt.TyDecl _ -> st
+          | Stmt.Assert f -> Stmt.assert_ ~src (conv_form ~is_goal:false f)
+          | Stmt.Goal f -> Stmt.goal ~src (conv_form ~is_goal:true f)
+        in
+        match add_decls src with
+        | [] -> Sequence.return new_st
+        | l -> Sequence.of_list (new_st :: l)
       )
     |> CCVector.of_seq ?init:None
   in
   Util.exit_prof prof_simplify_rename;
   res
 
-type 'a statement = (clause, term, type_, 'a) Statement.t
+type 'a f_statement = (term, term, type_, 'a) Statement.t
+(** A statement before CNF *)
+
+type 'a c_statement = (clause, term, type_, 'a) Statement.t
+(** A statement after CNF *)
 
 (* Transform the clauses into proper CNF; returns a list of clauses *)
 let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
@@ -537,45 +552,60 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
   let v = simplify_and_rename ~ctx ~disable_renaming ~preprocess seq in
   (* reduce the new formulas to CNF *)
   let res = CCVector.create () in
+  let conv_form ~src f =
+    Util.debugf ~section 4 "@[<2>reduce@ `@[%a@]`@ to CNF@]" (fun k->k T.pp f);
+    let clauses =
+      try as_cnf f
+      with NotCNF _ | SLiteral.NotALit _ ->
+        let f = nnf f in
+        (* processing post-nnf *)
+        let f = List.fold_left (|>) f post_nnf in
+        Util.debugf ~section 4 "@[<2>... NNF:@ `@[%a@]`@]" (fun k->k T.pp f);
+        let distribute_exists = List.mem DistributeExists opts in
+        let f = miniscope ~distribute_exists f in
+        Util.debugf ~section 4 "@[<2>... miniscoped:@ `@[%a@]`@]" (fun k->k T.pp f);
+        (* adjust the variable counter to [f] before skolemizing *)
+        let f = skolemize ~ctx Var.Subst.empty f in
+        (* processing post-skolemization *)
+        let f = List.fold_left (|>) f post_skolem in
+        Util.debugf ~section 4 "@[<2>... skolemized:@ `@[%a@]`@]" (fun k->k T.pp f);
+        let clauses = to_cnf f in
+        Util.debugf ~section 4 "@[<2>... CNF:@ `@[%a@]`@]"
+          (fun k->k (Util.pp_list ~sep:", " pp_clause) clauses);
+        clauses
+    in
+    let new_ids = Skolem.pop_new_symbols ~ctx in
+    List.iter
+      (fun (id,ty) -> CCVector.push res (Stmt.ty_decl ~src id ty))
+      new_ids;
+    List.iter
+      (fun c -> CCVector.push res (Stmt.assert_ ~src c))
+      clauses;
+  in
   CCVector.iter
-    (fun (f, annot) ->
-      Util.debugf ~section 4 "@[<2>reduce@ `@[%a@]`@ to CNF@]" (fun k->k T.pp f);
-      let clauses =
-        try as_cnf f
-        with NotCNF _ | SLiteral.NotALit _ ->
-          let f = nnf f in
-          (* processing post-nnf *)
-          let f = List.fold_left (|>) f post_nnf in
-          Util.debugf ~section 4 "@[<2>... NNF:@ `@[%a@]`@]" (fun k->k T.pp f);
-          let distribute_exists = List.mem DistributeExists opts in
-          let f = miniscope ~distribute_exists f in
-          Util.debugf ~section 4 "@[<2>... miniscoped:@ `@[%a@]`@]" (fun k->k T.pp f);
-          (* adjust the variable counter to [f] before skolemizing *)
-          let f = skolemize ~ctx Var.Subst.empty f in
-          (* processing post-skolemization *)
-          let f = List.fold_left (|>) f post_skolem in
-          Util.debugf ~section 4 "@[<2>... skolemized:@ `@[%a@]`@]" (fun k->k T.pp f);
-          let clauses = to_cnf f in
-          Util.debugf ~section 4 "@[<2>... CNF:@ `@[%a@]`@]"
-            (fun k->k (Util.pp_list ~sep:", " pp_clause) clauses);
-          clauses
-      in
-      let new_ids = Skolem.pop_new_symbols ~ctx in
-      List.iter
-        (fun (id,ty) -> CCVector.push res (Statement.ty_decl ~src:annot id ty))
-        new_ids;
-      List.iter
-        (fun c -> CCVector.push res (Statement.assert_ ~src:annot c))
-        clauses;
+    (fun st ->
+      let src = st.Stmt.src in
+      match st.Stmt.view with
+      | Stmt.Def (id,ty,t) ->
+        (* TODO: if prop, convert with <=>, otherwise with = *)
+          CCVector.push res (Stmt.def ~src id ty t)
+      | Stmt.Data l ->
+          CCVector.push res (Stmt.data ~src l)
+      | Stmt.TyDecl (id,ty) ->
+          CCVector.push res (Stmt.ty_decl ~src id ty)
+      | Stmt.Assert f -> conv_form ~src f
+      | Stmt.Goal f -> conv_form ~src (F.not_ f)
     )
     v;
   (* return final vector of clauses *)
   CCVector.freeze res
 
-let cnf_of ?opts ?ctx f annot =
-  cnf_of_seq ?opts ?ctx (Sequence.return (f,annot))
+let cnf_of ?opts ?ctx st =
+  cnf_of_seq ?opts ?ctx (Sequence.return st)
 
-let pp_statement out st =
+let pp_f_statement out st = Statement.pp T.pp T.pp T.pp out st
+
+let pp_c_statement out st =
   let pp_clause out c =
     Format.fprintf out "@[<hv>%a@]" (Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp)) c
   in
@@ -583,13 +613,40 @@ let pp_statement out st =
 
 let type_declarations seq =
   let open Statement in
-  Sequence.fold
-    (fun acc st -> match Statement.view st with
-      | Statement.Def (id, ty, _)
-      | Statement.TyDecl (id, ty) -> ID.Map.add id ty acc
-      | Statement.Data d ->
-          let acc = ID.Map.add d.data_id d.data_ty acc in
-          ID.Map.add_list acc d.data_cstors
-      | Statement.Assert _ -> acc)
-    ID.Map.empty seq
+  seq
+  |> Sequence.flat_map Seq.ty_decls
+  |> ID.Map.of_seq
+
+let convert ~file seq =
+  (* used for conversion *)
+  let t_ctx = FOTerm.Conv.create() in
+  let ty_ctx = Type.Conv.create() in
+  let conv_statement st =
+    Util.debugf ~section 5
+      "@[<2>convert@ `@[%a@]`@]" (fun k->k pp_c_statement st);
+    let name = st.Statement.src.UntypedAST.name in
+    let src = StatementSrc.make ?name file in
+    let res = match Statement.view st with
+      | Statement.Goal c
+      | Statement.Assert c ->
+          let c = clause_to_fo ~ctx:t_ctx c in
+          Statement.assert_ ~src c
+      | Statement.Data _ ->
+          assert false (* TODO: convert? or maybe it's here taht *)
+      | Statement.Def (id, ty, t) ->
+          let ty = Type.Conv.of_simple_term_exn ty_ctx ty in
+          let t = FOTerm.Conv.of_simple_term  t_ctx t in
+          Statement.def ~src id ty t
+      | Statement.TyDecl (id, ty) ->
+          let ty = Type.Conv.of_simple_term_exn ty_ctx ty in
+          Statement.ty_decl ~src id ty
+    in
+    Util.debugf ~section 3
+      "@[@[<2>convert@ `@[%a@]`@]@ @[<2>into `@[%a@]`@]@]"
+      (fun k->k pp_c_statement st Statement.pp_clause res);
+    res
+  in
+  Sequence.map conv_statement seq
+  |> CCVector.of_seq
+  |> CCVector.freeze
 
