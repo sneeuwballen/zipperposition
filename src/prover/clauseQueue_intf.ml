@@ -25,16 +25,18 @@ module type S = sig
     val age : t
     (** Returns the age of the clause (or 0 for the empty clause) *)
 
-    val favor_non_goal : t
+    val favor_all_neg : t
+    (** Favor clauses with only negative ground lits *)
 
-    val favor_goal : t
+    val favor_non_all_neg : t
+    (** Favor clauses that have at least one non-(ground negative) lit *)
 
     val favor_ground : t
 
     val favor_horn : t
 
-    val favor_conjecture : t
-    (** The closest a clause is from conjectures, the lowest its weight.
+    val favor_goal : t
+    (** The closest a clause is from the initial goal, the lowest its weight.
         Some threshold is used for clauses that are too far away *)
 
     val combine : (t * int) list -> t

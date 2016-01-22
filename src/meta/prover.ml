@@ -109,13 +109,10 @@ let parse_file p filename =
         close_in ic;
         res
       with
-      | Parse_ho.Error ->
+      | Parsing_utils.Parse_error _ as e ->
           close_in ic;
-          let loc = Loc.of_lexbuf lexbuf in
-          Err.fail ("parse error at "^Loc.to_string loc)
-      | Lex_ho.Error msg ->
-          close_in ic;
-          Err.fail ("lexing error: " ^ msg)
+          let msg = Printexc.to_string e in
+          Err.fail msg
     end
   with Sys_error msg ->
     let msg = Printf.sprintf "could not open file %s: %s" filename msg in

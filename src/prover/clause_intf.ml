@@ -32,12 +32,12 @@ module type S = sig
 
   module CHashtbl : CCHashtbl.S with type key = t
 
-  val is_conjecture : t -> bool
+  val is_goal : t -> bool
   (** Looking at the clause's proof, return [true] iff the clause is an
-      initial conjecture from the problem *)
+      initial (negated) goal from the problem *)
 
-  val distance_to_conjecture : t -> int option
-  (** See {!Proof.distance_to_conjecture}, applied to the clause's proof *)
+  val distance_to_goal : t -> int option
+  (** See {!Proof.distance_to_goal}, applied to the clause's proof *)
 
   (** {2 Boolean Abstraction} *)
 

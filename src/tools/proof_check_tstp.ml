@@ -7,8 +7,7 @@ open Libzipperposition
 open Libzipperposition_parsers
 
 module A = Ast_tptp
-module T = TypedSTerm
-module F = T.Form
+module T = STerm
 module TT = Trace_tstp
 module StepTbl = TT.StepTbl
 module E = CCError
@@ -75,32 +74,39 @@ let _do_not_check proof = match proof with
       | [| a |] when TT.is_axiom a -> true  (* axiom *)
       | _ -> false
 
+let slit_to_form = function
+  | SLiteral.Atom (t, true) -> t
+  | SLiteral.Atom (t, false) -> T.not_ t
+  | SLiteral.Eq (a,b) -> T.eq a b
+  | SLiteral.Neq (a,b) -> T.neq a b
+  | SLiteral.True -> T.true_
+  | SLiteral.False -> T.false_
+
 (* make a proof obligation (TSTP declarations list) out of a proof step.
    May return none in case the proof obligation is trivial *)
 let mk_proof_obligation proof =
   if _do_not_check proof
   then None  (* no need to check *)
-  else try
+  else
+    try
       let goal, step = match proof with
         | TT.InferForm (f, lazy step) ->
-            let f = F.close_forall f |> T.erase in
+            let f = T.close_all Binder.Forall f in
             A.FOF(step.TT.id, A.R_conjecture, f, []), step
         | TT.InferClause (c, lazy step) ->
-            let c = List.map (SLiteral.map ~f:FOTerm.Conv.to_simple_term) c in
-            let c = List.map SLiteral.to_form c in
-            let c = F.close_forall (F.or_ c) |> T.erase in
+            let c = List.map slit_to_form c in
+            let c = T.close_all Binder.Forall (T.or_ c) in
             A.FOF(step.TT.id, A.R_conjecture, c, []), step
         | _ -> assert false
       in
       let premises = CCList.filter_map
           (fun parent -> match parent with
              | TT.InferClause (c, lazy step') ->
-                 let c = List.map (SLiteral.map ~f:FOTerm.Conv.to_simple_term) c in
-                 let c = List.map SLiteral.to_form c in
-                 let c = F.close_forall (F.or_ c) |> T.erase in
+                 let c = List.map slit_to_form c in
+                 let c = T.close_all Binder.Forall (T.or_ c) in
                  Some (A.FOF(step'.TT.id, A.R_axiom, c, []))
              | TT.InferForm(f, lazy step') ->
-                 let f = F.close_forall f |> T.erase in
+                 let f = T.close_all Binder.Forall f in
                  Some (A.FOF(step'.TT.id, A.R_axiom, f, []))
              | TT.Axiom _
              | TT.Theory _ -> None)

@@ -93,9 +93,9 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   (** {2 Utils} *)
 
-  let is_conjecture c = ProofStep.is_conjecture c.proof
+  let is_goal c = ProofStep.is_goal c.proof
 
-  let distance_to_conjecture c = ProofStep.distance_to_conjecture c.proof
+  let distance_to_goal c = ProofStep.distance_to_goal c.proof
 
   let id_count_ = ref 0
 
@@ -129,18 +129,26 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let of_forms_axiom ~file ~name forms =
     let lits = List.map Ctx.Lit.of_form forms in
-    let proof = ProofStep.mk_file ~file ~name () in
+    let proof = ProofStep.mk_assert' ~file ~name () in
     create ~trail:Trail.empty lits proof
 
-  let of_statement st = match Statement.view st with
+  let of_statement st =
+    let of_lits ~is_goal lits =
+      (* convert literals *)
+      let lits = List.map Ctx.Lit.of_form lits in
+      let src = Statement.src st in
+      let proof = if is_goal then ProofStep.mk_goal src else ProofStep.mk_assert src in
+      let c = create ~trail:Trail.empty lits proof in
+      Some c
+    in
+    match Statement.view st with
+    | Statement.Data _
     | Statement.TyDecl _ -> None
-    | Statement.Assert lits ->
-        (* convert literals *)
-        let lits = List.map Ctx.Lit.of_form lits in
-        let src = Statement.src st in
-        let proof = ProofStep.mk_src ~src in
-        let c = create ~trail:Trail.empty lits proof in
-        Some c
+    | Statement.Def (id, ty, t) ->
+        let lit = SLiteral.eq (T.const ~ty id) t in
+        of_lits ~is_goal:false [lit]
+    | Statement.Assert lits -> of_lits ~is_goal:false lits
+    | Statement.Goal lits -> of_lits ~is_goal:true lits
 
   let update_trail f c =
     let trail = f c.trail in

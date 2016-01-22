@@ -89,34 +89,28 @@ module Make(C : Clause.S) = struct
       if C.is_empty c then 0
       else C.id c
 
-    let _conjecture_threshold = 15
+    let goal_threshold_ = 15
 
-    let favor_conjecture c =
+    let favor_goal c =
       if C.is_empty c then 0
       else
-        let d = match C.distance_to_conjecture c with
-          | Some d -> min d _conjecture_threshold
-          | None -> _conjecture_threshold
+        let d = match C.distance_to_goal c with
+          | Some d -> min d goal_threshold_
+          | None -> goal_threshold_
         in
         1+d
 
-    let favor_goal c =
-      (* check whether a literal is a goal *)
-      let is_goal_lit lit = Lit.is_neg lit in
-      let is_goal_clause c = CCArray.for_all is_goal_lit (C.lits c) in
-      if is_goal_clause c then 0 else penalty_coeff_
+    (* check whether a literal is a ground neg lit *)
+    let is_ground_neg lit = Lit.is_neg lit && Lit.is_ground lit
+    let all_ground_neg c = CCArray.for_all is_ground_neg (C.lits c)
+
+    let favor_all_neg c =
+      if all_ground_neg c then 0 else penalty_coeff_
 
     let favor_ground c = if C.is_ground c then 0 else penalty_coeff_
 
-    let favor_non_goal c =
-      (* check whether a literal is a goal *)
-      let is_goal_lit lit = Lit.is_neg lit in
-      let is_non_goal_clause c =
-        CCArray.for_all
-          (fun x -> not (is_goal_lit x))
-          (C.lits c)
-      in
-      if is_non_goal_clause c then 0 else penalty_coeff_
+    let favor_non_all_neg c =
+      if not (all_ground_neg c) then 0 else penalty_coeff_
 
     let combine ws =
       assert (ws <> []);
@@ -182,7 +176,7 @@ module Make(C : Clause.S) = struct
 
   let goal_oriented =
     let open WeightFun in
-    let weight = combine [age, 1; default, 4; favor_conjecture, 1; favor_goal, 1] in
+    let weight = combine [age, 1; default, 4; favor_goal, 1; favor_all_neg, 1] in
     let name = "goal_oriented" in
     make ~weight name
 
@@ -193,7 +187,7 @@ module Make(C : Clause.S) = struct
 
   let explore =
     let open WeightFun in
-    let weight = combine [age, 1; default, 4; favor_goal, 1] in
+    let weight = combine [age, 1; default, 4; favor_all_neg, 1] in
     make ~weight "explore"
 
   let ground =
@@ -205,8 +199,8 @@ module Make(C : Clause.S) = struct
     let open WeightFun in
     let weight =
       combine
-      [ age, 4; default, 3; favor_goal, 1
-      ; favor_conjecture, 1; favor_pos_unit, 1]
+      [ age, 4; default, 3; favor_all_neg, 1
+      ; favor_goal, 1; favor_pos_unit, 1]
     in
     make ~weight "default"
 

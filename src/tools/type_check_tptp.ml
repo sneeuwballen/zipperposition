@@ -29,18 +29,23 @@ let check file =
     print_line ();
     Format.printf "checking file `%s`...@." file;
     Util_tptp.parse_file ~recursive:true file
-    >>= fun decls ->
-    Util_tptp.infer_types decls
-    >>= fun decls' ->
-    let sigma = Util_tptp.type_declarations decls' in
+    >|= Sequence.map Util_tptp.to_ast
+    >>= TypeInference.infer_statements ?ctx:None
+    >|= fun decls ->
+    let sigma =
+      CCVector.to_seq decls
+      |> Sequence.flat_map Statement.Seq.ty_decls
+      |> ID.Map.of_seq
+    in
     Format.printf "@[<hv2>signature:@ @[<v>%a@]@]@."
       (ID.Map.print ~start:"" ~stop:"" ~sep:"" ~arrow:" : " ID.pp T.pp) sigma;
     (* print formulas *)
     if !cat_input then
-      Format.printf "@[<v2>formulas:@ %a@]@."
-        (CCFormat.seq ~start:"" ~stop:"" ~sep:"" (A.pp T.pp))
-        decls';
-    Err.return ()
+      let pp_stmt = Statement.pp T.pp T.pp T.pp in
+      Format.printf "@[<v2>statements:@ %a@]@."
+        (CCVector.print ~start:"" ~stop:"" ~sep:"" pp_stmt)
+        decls;
+    ()
   )
 
 let main () =

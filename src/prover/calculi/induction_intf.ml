@@ -7,7 +7,7 @@ module type S = sig
   module Env : Env.S
 
   module Meta : sig
-    val t : Ind_types.t Plugin.t
+    val t : Ind_ty.t Plugin.t
     (** Plugin that encodes the fact that a type is inductive, together
         with the list of its constructor symbols.
         Example: [nat, [succ; zero]] *)

@@ -227,10 +227,6 @@ let cast ~ty old = match old.term with
   | SimpleApp (s,l) -> simple_app ~ty s l
   | AppBuiltin (s,l) -> app_builtin ~ty s l
 
-let change_kind old =
-  let my_t = { old with id= ~-1; } in
-  H.hashcons my_t
-
 let is_var t = match view t with | Var _ -> true | _ -> false
 let is_bvar t = match view t with | DB _ -> true | _ -> false
 let is_const t = match view t with | Const _ -> true | _ -> false

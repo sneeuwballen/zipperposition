@@ -7,8 +7,8 @@ type bool_lit = Bool_lit.t
 (** Abstract boolean literal *)
 
 module type S = sig
-  type inductive_cst = Ind_types.cst
-  type inductive_case = Ind_types.case
+  type inductive_cst = Ind_cst.cst
+  type inductive_case = Ind_cst.case
 
   type t = Sat_solver.Lit.t
 

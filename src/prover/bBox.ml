@@ -1,7 +1,8 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-module Util = Libzipperposition.Util
+open Libzipperposition
+
 module Lits = Literals
 
 module StringTbl = CCHashtbl.Make(struct
@@ -19,8 +20,8 @@ module Make(Dummy : sig end) = struct
   type t = Sat_solver.Lit.t
   type lit = t
 
-  type inductive_cst = Ind_types.cst
-  type inductive_case = Ind_types.case
+  type inductive_cst = Ind_cst.cst
+  type inductive_case = Ind_cst.case
 
   type injected =
     | Clause_component of Literals.t
@@ -29,7 +30,7 @@ module Make(Dummy : sig end) = struct
   let compare_injected l1 l2 = match l1, l2 with
     | Clause_component l1, Clause_component l2 -> Lits.compare l1 l2
     | Case (l1,r1), Case (l2,r2) ->
-        CCOrd.(Ind_types.cst_compare l1 l2 <?> (Ind_types.case_compare, r1, r2))
+        CCOrd.(Ind_cst.cst_compare l1 l2 <?> (Ind_cst.case_compare, r1, r2))
     | Clause_component _, Case _ -> 1
     | Case _, Clause_component _ -> -1
 
@@ -38,7 +39,7 @@ module Make(Dummy : sig end) = struct
         Format.fprintf out "⟦@[<hv>%a@]⟧" Lits.pp lits
     | Case (c, t) ->
         Format.fprintf out "⟦@[<hv1>%a@ = @[%a@]@]⟧"
-          Ind_types.pp_cst c Ind_types.pp_case t
+          Ind_cst.pp_cst c Ind_cst.pp_case t
 
   module FV = Libzipperposition.FeatureVector.Make(struct
       type t = Lits.t * injected * lit
@@ -51,9 +52,9 @@ module Make(Dummy : sig end) = struct
   module ITbl = CCHashtbl.Make(Sat_solver.Lit)
   module ICaseTbl = CCHashtbl.Make(struct
       type t = inductive_cst * inductive_case
-      let equal (c1,t1) (c2,t2) = Ind_types.cst_equal c1 c2 && Ind_types.case_equal t1 t2
+      let equal (c1,t1) (c2,t2) = Ind_cst.cst_equal c1 c2 && Ind_cst.case_equal t1 t2
       let hash_fun (c,t) h =
-        h |> CCHash.int_ (Ind_types.cst_hash c) |> CCHash.int_ (Ind_types.case_hash t)
+        h |> CCHash.int_ (Ind_cst.cst_hash c) |> CCHash.int_ (Ind_cst.case_hash t)
       let hash = CCHash.apply hash_fun
     end)
 

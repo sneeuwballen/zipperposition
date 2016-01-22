@@ -53,16 +53,15 @@ let process file =
     Err.(
       (* parse *)
       Util_tptp.parse_file ~recursive:true file
-      >>= fun decls ->
-      (* to CNF *)
-      Util_tptp.infer_types decls
-      >>= fun decls ->
+      >|= Sequence.map Util_tptp.to_ast
+      >>= TypeInference.infer_statements ?ctx:None
+      >|= fun st ->
       let opts =
         (if !flag_distribute_exists then [Cnf.DistributeExists] else []) @
         (if !flag_disable_renaming then [Cnf.DisableRenaming] else []) @
         []
       in
-      let decls = Util_tptp.to_cnf ~opts decls in
+      let decls = Cnf.cnf_of_seq ~opts ?ctx:None (CCVector.to_seq st) in
       let sigma = Cnf.type_declarations (CCVector.to_seq decls) in
       if !print_sig
       then (
@@ -70,9 +69,14 @@ let process file =
           (ID.Map.print ~start:"" ~stop:"" ~sep:"" ~arrow:" : " ID.pp T.pp) sigma
       );
       (* print *)
-      let decls = CCVector.map (Statement.map_src ~f:(Ast_tptp.to_src ~file)) decls in
+      let decls =
+        CCVector.map
+          (Statement.map_src
+            ~f:(fun {UntypedAST.name;_} -> StatementSrc.make ?name file))
+          decls
+      in
       print_res decls;
-      Err.return ()
+      ()
     )
   in match res with
   | `Ok () -> ()

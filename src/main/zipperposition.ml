@@ -79,7 +79,7 @@ module MakeNew(X : sig
 
   let params = X.params
 
-  let has_conjecture = ref false
+  let has_goal = ref false
 
   (** print stats *)
   let print_stats () =
@@ -151,9 +151,9 @@ module MakeNew(X : sig
     ()
 
   let _sat () =
-    if !has_conjecture then "CounterSatisfiable" else "Satisfiable"
+    if !has_goal then "CounterSatisfiable" else "Satisfiable"
   let _unsat () =
-    if !has_conjecture then "Theorem" else "Unsatisfiable"
+    if !has_goal then "Theorem" else "Unsatisfiable"
 
   let print_szs_result ~file result = match result with
     | Saturate.Unknown
@@ -217,46 +217,12 @@ let _pp_weight prec out s =
   Format.fprintf out "w(%a)=%d" ID.pp s (Precedence.weight prec s)
 
 (* does the sequence of declarations contain at least one conjecture? *)
-let _has_conjecture decls =
-  let _roles k =
-    let visitor = object
-      inherit [unit,STerm.t] Ast_tptp.visitor
-      method! clause () role _ = k role
-      method! any_form () role _ = k role
-    end
-    in
-    decls (visitor#visit ())
-  in
-  Sequence.exists (fun r -> r = Ast_tptp.R_conjecture) _roles
-
-let scan_for_inductive_types decls =
-  let pairs =
+let has_goal_ decls =
+  CCVector.exists
+    (fun st -> match Statement.view st with
+      | Statement.Goal _ -> true
+      | _ -> false)
     decls
-    |> Sequence.filter_map
-      (function
-        | Ast_tptp.NewType (_,ty,_,info) -> Some (ty, info)
-        | _ -> None)
-  in
-  Induction.init_from_decls pairs
-
-let conv_statement ~file st =
-  let src = Ast_tptp.to_src ~file (Statement.src st) in
-  (* TODO remove *)
-  Util.debugf ~section 5
-    "@[<2>convert@ `@[%a@]`@]" (fun k->k Cnf.pp_statement st);
-  let res = match Statement.view st with
-  | Statement.Assert c ->
-      let c = Cnf.clause_to_fo c in
-      Statement.assert_ ~src c
-  | Statement.TyDecl (id, ty) ->
-      let ctx = Type.Conv.create() in
-      let ty = Type.Conv.of_simple_term_exn ctx ty in
-      Statement.ty_decl ~src id ty
-  in
-  Util.debugf ~section 3
-    "@[@[<2>convert@ `@[%a@]`@]@ @[<2>into `@[%a@]`@]@]"
-    (fun k->k Cnf.pp_statement st Statement.pp_clause res);
-  res
 
 (* Process the given file (try to solve it) *)
 let process_file ?meta:_ ~params file =
@@ -264,18 +230,20 @@ let process_file ?meta:_ ~params file =
   Util.debugf ~section 1 "@[@{<Yellow>### process file@ `%s` ###@}@]" (fun k->k file);
   (* parse formulas *)
   Util_tptp.parse_file ~recursive:true file
+  >|= Sequence.map Util_tptp.to_ast
+  >>= TypeInference.infer_statements ?ctx:None
   >>= fun decls ->
-  let has_conjecture = _has_conjecture decls in
+  let has_goal = has_goal_ decls in
+  (* FIXME: use [Statement.Data] to declare new inductive types using Ind_ty
   scan_for_inductive_types decls; (* detect declarations of inductive types *)
-  Util.debugf ~section 1 "parsed %d declarations (%s conjecture(s))"
-    (fun k->k (Sequence.length decls) (if has_conjecture then "some" else "no"));
-  (* obtain a typed AST *)
-  Util_tptp.infer_types decls
-  >>= fun decls ->
-  (* obtain clauses + env *)
+  *)
+  Util.debugf ~section 1 "parsed %d declarations (%s goal(s))"
+    (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
+  (* obtain clauses  *)
   let stmts =
-    Util_tptp.to_cnf decls
-    |> CCVector.map (conv_statement ~file)
+    Cnf.cnf_of_seq (CCVector.to_seq decls)
+    |> CCVector.to_seq
+    |> Cnf.convert ~file
   in
   (* compute signature, precedence, ordering *)
   let signature = Statement.signature (CCVector.to_seq stmts) in
@@ -311,7 +279,7 @@ let process_file ?meta:_ ~params file =
       module Env = MyEnv
       let params = params
     end) in
-  Main.has_conjecture := has_conjecture;
+  Main.has_goal := has_goal;
   (* pre-saturation *)
   let num_clauses = CCVector.length clauses in
   let result, clauses =

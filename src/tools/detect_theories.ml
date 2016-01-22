@@ -36,15 +36,17 @@ let parse_files prover files =
 
 let to_cnf decls =
   E.(
-    Util_tptp.infer_types decls
-    >>= fun decls ->
-    let stmts = Util_tptp.to_cnf decls in
-    let seq =
-      CCVector.to_seq stmts
-      |> Sequence.flat_map Statement.Seq.forms
-    in
-    return seq
+    TypeInference.infer_statements ?ctx:None decls
+    >|= fun decls -> Cnf.cnf_of_seq (CCVector.to_seq decls)
   )
+
+let count_clauses v =
+  CCVector.fold
+    (fun acc st -> match Statement.view st with
+      | Statement.Assert _
+      | Statement.Goal _ -> acc+1
+      | _ -> acc)
+    0 v
 
 let parse_and_cnf files =
   let q = Queue.create () in
@@ -54,19 +56,22 @@ let parse_and_cnf files =
       Util.debugf 1 "parse input file %s" (fun k->k file);
       (* parse *)
       Util_tptp.parse_file ~recursive:true file
+      >|= Sequence.map Util_tptp.to_ast
       >>= fun decls ->
       Util.debugf 3 "parsed %d declarations..." (fun k->k (Sequence.length decls));
       (* CNF *)
       to_cnf decls
-      >>= fun clauses ->
-      Util.debugf 3 "obtained %d clauses..." (fun k->k (Sequence.length clauses));
+      >>= fun stmts ->
+      Util.debugf 3 "obtained %d clauses..." (fun k->k (count_clauses stmts));
       (* convert clauses into Encoding.foclause *)
-      let clauses =
-        clauses
-        |> Sequence.map Cnf.clause_to_fo
-        |> Sequence.map Encoding.foclause_of_clause 
+      let stmts =
+        CCVector.to_seq stmts
+        |> Cnf.convert ~file
+        |> CCVector.to_seq
+        |> Sequence.flat_map Statement.Seq.forms
+        |> Sequence.map Encoding.foclause_of_clause
       in
-      Queue.add clauses q;
+      Queue.add stmts q;
       return ()
     ) () files
   )
