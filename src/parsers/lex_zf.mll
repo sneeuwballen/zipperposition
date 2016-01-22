@@ -45,6 +45,7 @@ rule token = parse
   | '_' { WILDCARD }
   | ':' { COLON }
   | "=" { LOGIC_EQ }
+  | "!=" { LOGIC_NEQ }
   | ":=" { EQDEF }
   | "->" { ARROW }
   | "val" { VAL }
@@ -61,10 +62,11 @@ rule token = parse
   | "&&" { LOGIC_AND }
   | "||" { LOGIC_OR }
   | "|" { VERTICAL_BAR }
-  | '~' { LOGIC_NOT }
+  | "~" { LOGIC_NOT }
   | "forall" { LOGIC_FORALL }
   | "exists" { LOGIC_EXISTS }
   | "=>" { LOGIC_IMPLY }
+  | "<=>" { LOGIC_EQUIV }
   | lower_word { LOWER_WORD(Lexing.lexeme lexbuf) }
   | upper_word { UPPER_WORD(Lexing.lexeme lexbuf) }
   | _ as c

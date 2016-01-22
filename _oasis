@@ -74,7 +74,7 @@ Library "libzipperposition_parsers"
   Pack:             true
   Modules:          Parse_tptp, Lex_tptp, Ast_tptp, Util_tptp,
                     Ast_ho, Lex_ho, Parse_ho, Trace_tstp,
-                    Parse_zf, Lex_zf, Parsing_utils, CallProver
+                    Parse_zf, Lex_zf, Util_zf, Parsing_utils, CallProver
   Build$:           flag(parsers)
   Install$:         flag(parsers)
   FindlibName:      parsers
@@ -241,6 +241,15 @@ Executable cnf_of_tptp
   Install$:         flag(tools) && flag(parsers)
   CompiledObject:   native
   MainIs:           cnf_of_tptp.ml
+  BuildDepends:     libzipperposition, libzipperposition.parsers
+
+# proof checking
+Executable tptp_to_zf
+  Path:             src/tools/
+  Build$:           flag(tools) && flag(parsers)
+  Install$:         flag(tools) && flag(parsers)
+  CompiledObject:   native
+  MainIs:           tptp_to_zf.ml
   BuildDepends:     libzipperposition, libzipperposition.parsers
 
 # Orienting rewrite rules with LPO
