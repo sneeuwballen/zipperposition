@@ -235,3 +235,8 @@ module ArithOp : sig
           for prime numbers, obviously. *)
 end
 
+(** {2 ZF} *)
+
+module ZF : sig
+  include Interfaces.PRINT with type t := t
+end

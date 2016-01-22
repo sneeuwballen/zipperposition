@@ -34,3 +34,12 @@ module TPTP = struct
     | Lambda -> "^"
   let pp out t = CCFormat.string out (to_string t)
 end
+
+module ZF = struct
+  let to_string = function
+    | Exists -> "exists"
+    | Forall -> "forall"
+    | ForallTy -> "pi"
+    | Lambda -> "fun "
+  let pp out t = CCFormat.string out (to_string t)
+end

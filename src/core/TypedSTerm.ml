@@ -908,3 +908,8 @@ module TPTP = struct
   let to_string t = STerm.TPTP.to_string (erase t)
 end
 
+module ZF = struct
+  let pp out t = STerm.ZF.pp out (erase t)
+  let to_string t = STerm.ZF.to_string (erase t)
+end
+

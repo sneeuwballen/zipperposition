@@ -325,3 +325,62 @@ module TPTP = struct
 
   let to_string = CCFormat.to_string pp
 end
+
+(** {2 ZF} *)
+
+module ZF = struct
+  let rec pp out t = match t.term with
+    | Var s -> CCFormat.string out s
+    | Const s -> CCFormat.string out s
+    | List l ->
+        Format.fprintf out "[@[<hv>%a@]]"
+          (Util.pp_list ~sep:"," pp) l;
+    | AppBuiltin (Builtin.And, l) ->
+        Format.fprintf out "@[<hv>%a@]"
+          (Util.pp_list ~sep:" && " pp_surrounded) l
+    | AppBuiltin (Builtin.Or, l) ->
+        Format.fprintf out "@[<hv>%a@]"
+          (Util.pp_list ~sep:" || " pp_surrounded) l
+    | AppBuiltin (Builtin.Not, [a]) ->
+        Format.fprintf out "@[<2>~@ @[%a@]@]" pp_surrounded a
+    | AppBuiltin (Builtin.Imply, [a;b]) ->
+        Format.fprintf out "@[@[%a@]@ => @[%a@]@]" pp_surrounded a pp_surrounded b
+    | AppBuiltin (Builtin.Xor, [a;b]) ->
+        Format.fprintf out "@[<3>~ (@[%a@]@ <=> @[%a@])@]" pp_surrounded a pp_surrounded b
+    | AppBuiltin (Builtin.Equiv, [a;b]) ->
+        Format.fprintf out "@[@[%a@]@ <=> @[%a@]@]" pp_surrounded a pp_surrounded b
+    | AppBuiltin (Builtin.Eq, [_;a;b]) ->
+        Format.fprintf out "@[@[%a@]@ = @[%a@]@]" pp_surrounded a pp_surrounded b
+    | AppBuiltin (Builtin.Neq, [_;a;b]) ->
+        Format.fprintf out "@[@[%a@]@ != @[%a@]@]" pp_surrounded a pp_surrounded b
+    | AppBuiltin (Builtin.Arrow, [ret;a]) ->
+        Format.fprintf out "@[@[%a@] ->@ @[%a@]@]" pp a pp ret
+    | AppBuiltin (Builtin.Arrow, ret::l) ->
+        Format.fprintf out "@[%a ->@ %a@]"
+          (Util.pp_list~sep:" -> " pp_surrounded)
+          l pp_surrounded ret
+    | AppBuiltin (s, []) -> Builtin.ZF.pp out s
+    | AppBuiltin (s, l) ->
+        Format.fprintf out "@[%a@ %a@]"
+          Builtin.ZF.pp s (Util.pp_list ~sep:", " pp_surrounded) l
+    | App (s, l) ->
+        Format.fprintf out "@[<2>%a@ %a@]"
+          pp s (Util.pp_list ~sep:" " pp) l
+    | Bind (s, vars, t') ->
+        Format.fprintf out "@[<2>%a @[%a@].@ @[%a@]@]"
+          Binder.ZF.pp s
+          (Util.pp_list ~sep:" " pp_typed_var) vars
+          pp_surrounded t'
+    | Record _ -> failwith "cannot print records in ZF"
+  and pp_typed_var out (v,o) = match o with
+    | None -> CCFormat.string out v
+    | Some {term=AppBuiltin (Builtin.TType ,[]); _} ->
+        CCFormat.string out v (* implicit type *)
+    | Some ty -> Format.fprintf out "%s:%a" v pp_surrounded ty
+  and pp_surrounded out t = match t.term with
+    | AppBuiltin (_, _::_)
+    | Bind _ -> Format.fprintf out "(@[%a@])" pp t
+    | _ -> pp out t
+
+  let to_string = CCFormat.to_string pp
+end

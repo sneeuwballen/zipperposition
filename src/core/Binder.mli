@@ -22,5 +22,8 @@ val forall_ty : t
 
 module TPTP : sig
   include Interfaces.PRINT with type t := t
-  (** printer for TPTP *)
+end
+
+module ZF : sig
+  include Interfaces.PRINT with type t := t
 end

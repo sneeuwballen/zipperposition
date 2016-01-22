@@ -582,3 +582,58 @@ module ArithOp = struct
       List.rev_map Z.of_int !l
     with Z.Overflow -> []  (* too big *)
 end
+
+module ZF = struct
+  let to_string = function
+    | Eq -> "="
+    | Neq -> "!="
+    | And -> "&&"
+    | Or -> "||"
+    | Not -> "~"
+    | Imply -> "=>"
+    | Equiv -> "<=>"
+    | HasType -> ":"
+    | True -> "true"
+    | False -> "false"
+    | Arrow -> ">"
+    | Wildcard -> "_"
+    | TType -> "type"
+    | Prop -> "prop"
+    | Term -> "term" (* XXX needs to be declared! *)
+    | Xor
+    | Multiset -> failwith "cannot print this symbol in ZF"
+    | ForallConst -> "!!"
+    | ExistsConst -> "??"
+    | TyInt -> "int"
+    | TyRat -> "rat"
+    | Int x -> Z.to_string x
+    | Rat x -> Q.to_string x
+    (* FIXME: update *)
+    | Floor -> "$floor"
+    | Ceiling -> "$ceiling"
+    | Truncate -> "$truncate"
+    | Round -> "$round"
+    | Prec -> "$prec"
+    | Succ -> "$succ"
+    | Sum -> "$sum"
+    | Difference -> "$diff"
+    | Uminus -> "$uminus"
+    | Product -> "$product"
+    | Quotient -> "$quotient"
+    | Quotient_e -> "$quotient_e"
+    | Quotient_t -> "$quotient_t"
+    | Quotient_f -> "$quotient_f"
+    | Remainder_e -> "$remainder_e"
+    | Remainder_t -> "$remainder_t"
+    | Remainder_f -> "$remainder_f"
+    | Is_int -> "$is_int"
+    | Is_rat -> "$is_rat"
+    | To_int -> "$to_int"
+    | To_rat -> "$to_rat"
+    | Less -> "$less"
+    | Lesseq -> "$lesseq"
+    | Greater -> "$greater"
+    | Greatereq -> "$greatereq"
+
+  let pp out b = CCFormat.string out (to_string b)
+end
