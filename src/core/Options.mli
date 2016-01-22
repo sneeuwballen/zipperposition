@@ -11,6 +11,13 @@
 val stats : bool ref
 (** Enable printing of statistics? *)
 
+type input_format =
+  | I_tptp
+  | I_zf
+  | I_guess (* based on the file extension *)
+
+val input_format_of_string : string -> input_format
+
 type print_format =
   | Print_none
   | Print_normal
@@ -18,6 +25,8 @@ type print_format =
 
 val print_format_of_string : string -> print_format
 (** @raise Failure if it could not parse *)
+
+val input : input_format ref
 
 val output : print_format ref
 (** Output format *)

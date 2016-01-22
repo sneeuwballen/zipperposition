@@ -11,6 +11,8 @@ module T = TypedSTerm
 module Err = CCError
 module A = Ast_tptp
 
+open Err.Infix
+
 let print_line () =
   Printf.printf "%s\n" (CCString.repeat "=" 60);
   ()
@@ -23,30 +25,39 @@ let options = Arg.align (
     ] @ Options.make ()
   )
 
+let parse_tptp file =
+  Util_tptp.parse_file ~recursive:true file
+  >|= Sequence.map Util_tptp.to_ast
+
+let parse file = match !Options.input with
+  | Options.I_tptp -> parse_tptp file
+  | Options.I_zf -> Util_zf.parse_file file
+  | Options.I_guess ->
+      if CCString.suffix ~suf:".p" file
+      then parse_tptp file
+      else Util_zf.parse_file file
+
 (* check the given file *)
 let check file =
-  Err.(
-    print_line ();
-    Format.printf "checking file `%s`...@." file;
-    Util_tptp.parse_file ~recursive:true file
-    >|= Sequence.map Util_tptp.to_ast
-    >>= TypeInference.infer_statements ?ctx:None
-    >|= fun decls ->
-    let sigma =
-      CCVector.to_seq decls
-      |> Sequence.flat_map Statement.Seq.ty_decls
-      |> ID.Map.of_seq
-    in
-    Format.printf "@[<hv2>signature:@ @[<v>%a@]@]@."
-      (ID.Map.print ~start:"" ~stop:"" ~sep:"" ~arrow:" : " ID.pp T.pp) sigma;
-    (* print formulas *)
-    if !cat_input then
-      let pp_stmt = Statement.pp T.pp T.pp T.pp in
-      Format.printf "@[<v2>statements:@ %a@]@."
-        (CCVector.print ~start:"" ~stop:"" ~sep:"" pp_stmt)
-        decls;
-    ()
-  )
+  print_line ();
+  Format.printf "checking file `%s`...@." file;
+  parse file
+  >>= TypeInference.infer_statements ?ctx:None
+  >|= fun decls ->
+  let sigma =
+    CCVector.to_seq decls
+    |> Sequence.flat_map Statement.Seq.ty_decls
+    |> ID.Map.of_seq
+  in
+  Format.printf "@[<hv2>signature:@ @[<v>%a@]@]@."
+    (ID.Map.print ~start:"" ~stop:"" ~sep:"" ~arrow:" : " ID.pp T.pp) sigma;
+  (* print formulas *)
+  if !cat_input then
+    let pp_stmt = Statement.pp T.pp T.pp T.pp in
+    Format.printf "@[<v2>statements:@ %a@]@."
+      (CCVector.print ~start:"" ~stop:"" ~sep:"" pp_stmt)
+      decls;
+  ()
 
 let main () =
   let files = ref [] in
