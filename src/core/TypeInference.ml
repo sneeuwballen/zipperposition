@@ -203,17 +203,15 @@ module Ctx = struct
       ctx.new_types <- (id, ty) :: ctx.new_types;
       id, ty
 
-  let get_var_ ?loc ctx v =
-    try match Hashtbl.find ctx.env v with
-      | `ID _ ->
-          error_ ?loc "@[<2>expected %s to be a variable,@ not a constant@]" v
-      | `Var v -> v
+  (* in ZF, variables might be constant, there is no syntactic difference *)
+  let get_var_ ctx v =
+    try Hashtbl.find ctx.env v
     with Not_found ->
       let ty_v = fresh_ty_meta_var ~dest:`ToDefault ctx in
       let v' = Var.of_string ~ty:(T.Ty.meta ty_v) v in
       ctx.local_vars <- v' :: ctx.local_vars;
       Hashtbl.add ctx.env v (`Var v');
-      v'
+      `Var v'
 
   (* only specialize variable if it's not bound *)
   let specialize_meta ctx (v, r) =
@@ -272,9 +270,14 @@ let rec infer_ty_ ?loc ctx ty =
         let args = List.map aux args in
         T.Ty.fun_ ?loc args ret
     | PT.Var v ->
-        let v = Ctx.get_var_ ?loc ctx v in
-        unify ?loc (Var.ty v) T.Ty.tType;
-        T.Ty.var ?loc v
+        begin match Ctx.get_var_ ctx v with
+        | `Var v ->
+            unify ?loc (Var.ty v) T.Ty.tType;
+            T.Ty.var ?loc v
+        | `ID (id, ty) ->
+            unify ?loc ty T.Ty.tType;
+            T.Ty.const id
+        end
     | PT.Const f ->
         (* constant type *)
         let id, ty = Ctx.get_id_ ctx ~arity:0 f in
@@ -331,9 +334,10 @@ let rec infer_rec ctx t =
   let loc = PT.loc t in
   match PT.view t with
   | PT.Var name ->
-      (* var or const, actually *)
-      let v = Ctx.get_var_ ?loc ctx name in
-      T.var v
+      begin match Ctx.get_var_ ctx name with
+      | `Var v -> T.var v
+      | `ID (id, ty) -> T.const ~ty id
+      end
   | PT.Const s ->
       let id, ty = Ctx.get_id_ ?loc ~arity:0 ctx s in
       T.const ~ty id
@@ -377,7 +381,9 @@ let rec infer_rec ctx t =
       in
       let rest =
         CCOpt.map
-          (fun s -> Ctx.get_var_ ?loc ctx s)
+          (fun s -> match Ctx.get_var_ ctx s with
+            | `Var v -> v
+            | `ID (id,_) -> error_ ?loc "row variable cannot be a constant %a" ID.pp id)
           rest
       in
       let ty = T.Ty.record_flatten ty_l ~rest:(CCOpt.map Var.ty rest) in
@@ -534,6 +540,8 @@ module A = UntypedAST
 module Stmt = Statement
 
 let infer_statement_exn ctx st =
+  Util.debugf ~section 3 "@[<2>infer types for statement@ @[%a@]@]"
+    (fun k->k A.pp_statement st);
   (* auxiliary statements *)
   let src = st.A.attrs in
   let st =

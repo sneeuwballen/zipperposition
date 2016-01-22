@@ -45,3 +45,6 @@ val def : ?loc:Loc.t -> string -> ty -> term -> statement
 val data : ?loc:Loc.t -> data list -> statement
 val assert_ : ?loc:Loc.t -> ?attrs:attrs -> term -> statement
 val goal : ?loc:Loc.t -> ?attrs:attrs -> term -> statement
+
+val pp_statement : statement CCFormat.printer
+

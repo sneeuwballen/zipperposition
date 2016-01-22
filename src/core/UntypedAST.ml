@@ -46,5 +46,26 @@ let data ?loc l = make_ ?loc (Data l)
 let assert_ ?loc ?attrs t = make_ ?attrs ?loc (Assert t)
 let goal ?loc ?attrs t = make_ ?attrs ?loc (Goal t)
 
+let pp_statement out st =
+  let fpf = Format.fprintf in
+  match st.stmt with
+  | Decl (id,ty) ->
+      fpf out "@[<2>val %s :@ @[%a@]@]." id T.pp ty
+  | Def (id,ty,t) ->
+      fpf out "@[<2>def %s :@ @[%a@]@ := @[%a@]@]." id T.pp ty T.pp t
+  | Data l ->
+      let pp_cstor out (id,args) =
+        fpf out "@[<2>| @[%s@ %a@]@]" id (Util.pp_list ~sep:" " T.pp) args in
+      let pp_data out d =
+        fpf out "@[%s %a@] :=@ @[<v>%a@]"
+          d.data_name
+          (Util.pp_list ~sep:" " CCFormat.string) d.data_vars
+          (Util.pp_list ~sep:"" pp_cstor) d.data_cstors
+      in
+      fpf out "@[<v>data %a@]" (Util.pp_list ~sep:" and " pp_data) l
+  | Assert f ->
+      fpf out "@[<2>assert@ (@[%a@])@]." T.pp f
+  | Goal f ->
+      fpf out "@[<2>goal@ (@[%a@])@]." T.pp f
 
 
