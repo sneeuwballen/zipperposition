@@ -365,7 +365,7 @@ module ZF = struct
           Builtin.ZF.pp s (Util.pp_list ~sep:", " pp_surrounded) l
     | App (s, l) ->
         Format.fprintf out "@[<2>%a@ %a@]"
-          pp s (Util.pp_list ~sep:" " pp) l
+          pp_surrounded s (Util.pp_list ~sep:" " pp_surrounded) l
     | Bind (s, vars, t') ->
         Format.fprintf out "@[<2>%a @[%a@].@ @[%a@]@]"
           Binder.ZF.pp s
@@ -376,9 +376,10 @@ module ZF = struct
     | None -> CCFormat.string out v
     | Some {term=AppBuiltin (Builtin.TType ,[]); _} ->
         CCFormat.string out v (* implicit type *)
-    | Some ty -> Format.fprintf out "%s:%a" v pp_surrounded ty
+    | Some ty -> Format.fprintf out "(@[%s:%a@])" v pp_surrounded ty
   and pp_surrounded out t = match t.term with
     | AppBuiltin (_, _::_)
+    | App _
     | Bind _ -> Format.fprintf out "(@[%a@])" pp t
     | _ -> pp out t
 
