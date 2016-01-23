@@ -64,9 +64,9 @@ let pp_statement out st =
       in
       fpf out "@[<v>data %a@]" (Util.pp_list ~sep:" and " pp_data) l
   | Assert f ->
-      fpf out "@[<2>assert@ (@[%a@])@]." T.pp f
+      fpf out "@[<2>assert@ @[%a@]@]." T.pp f
   | Goal f ->
-      fpf out "@[<2>goal@ (@[%a@])@]." T.pp f
+      fpf out "@[<2>goal@ @[%a@]@]." T.pp f
 
 (** {2 Errors} *)
 

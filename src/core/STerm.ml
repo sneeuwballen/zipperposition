@@ -360,6 +360,10 @@ module ZF = struct
           (Util.pp_list~sep:" -> " pp_surrounded)
           l pp_surrounded ret
     | AppBuiltin (s, []) -> Builtin.ZF.pp out s
+    | AppBuiltin (s, [a;b])
+    | AppBuiltin (s, [_;a;b]) when Builtin.is_infix s ->
+        Format.fprintf out "@[@[%a@]@ %a @[%a@]@]"
+          pp_surrounded a Builtin.ZF.pp s pp_surrounded b
     | AppBuiltin (s, l) ->
         Format.fprintf out "@[%a@ %a@]"
           Builtin.ZF.pp s (Util.pp_list ~sep:", " pp_surrounded) l

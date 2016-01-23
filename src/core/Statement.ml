@@ -123,9 +123,9 @@ let pp ppf ppt ppty out st = match st.view with
       in
       fpf out "@[<v>data %a@]" (Util.pp_list ~sep:" and " pp_data) l
   | Assert f ->
-      fpf out "@[<2>assert@ (@[%a@])@]." ppf f
+      fpf out "@[<2>assert@ @[%a@]@]." ppf f
   | Goal f ->
-      fpf out "@[<2>goal@ (@[%a@])@]." ppf f
+      fpf out "@[<2>goal@ @[%a@]@]." ppf f
 
 let to_string ppf ppt ppty = CCFormat.to_string (pp ppf ppt ppty)
 
