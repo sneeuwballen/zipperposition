@@ -53,6 +53,7 @@ type 'clause result =
 type +'a t = {
   id: int; (* unique ID *)
   kind: kind;
+  dist_to_goal: int option; (* distance to goal *)
   parents: 'a of_ list;
 }
 
@@ -85,10 +86,25 @@ let get_id_ () =
   incr id_;
   n
 
-let mk_trivial = {id=get_id_(); parents=[]; kind=Trivial; }
+let mk_trivial = {id=get_id_(); parents=[]; kind=Trivial; dist_to_goal=None; }
+
+let combine_dist o p = match o, p.step.dist_to_goal with
+  | None, None -> None
+  | (Some _ as res), None
+  | None, (Some _ as res) -> res
+  | Some x, Some y -> Some (max x y)
 
 let mk_step_ kind parents =
-  { id=get_id_(); kind; parents; }
+  (* distance to goal *)
+  let dist_to_goal = match parents with
+    | [] -> None
+    | [p] -> CCOpt.map succ p.step.dist_to_goal
+    | [p1;p2] ->
+        CCOpt.map succ (combine_dist p1.step.dist_to_goal p2)
+    | p::l ->
+        CCOpt.map succ (List.fold_left combine_dist p.step.dist_to_goal l)
+  in
+  { id=get_id_(); kind; parents; dist_to_goal; }
 
 let mk_assert src = mk_step_ (Assert src) []
 
@@ -184,18 +200,7 @@ let traverse_depth ?(traversed=Tbl.create 16) proof k =
 let traverse ?traversed proof k =
   traverse_depth ?traversed proof (fun (p, _depth) -> k p)
 
-let distance_to_goal p =
-  let best_distance = ref None in
-  traverse_depth p
-    (fun (p', depth) ->
-       if is_goal p'
-       then
-         let new_best = match !best_distance with
-           | None -> depth
-           | Some depth' -> max depth depth'
-         in
-         best_distance := Some new_best);
-  !best_distance
+let distance_to_goal p = p.dist_to_goal
 
 let to_seq proof = Sequence.from_iter (fun k -> traverse proof k)
 

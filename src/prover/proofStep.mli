@@ -46,6 +46,7 @@ type 'clause result =
 type +'a t = private {
   id: int; (* unique ID *)
   kind: kind;
+  dist_to_goal: int option; (* distance to goal *)
   parents: 'a of_ list;
 }
 
