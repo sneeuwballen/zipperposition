@@ -9,6 +9,27 @@ type term = FOTerm.t
 
 (** {2 Inference rules} *)
 
+(* TODO: rename and make this a calculus on Ind_types (and Ind_cst), with:
+
+  - exhaustivity (inference):
+    if some term [t : tau] is maximal in a clause, [tau] is inductive,
+    and [t] was never split on, then introduce
+    [t = c1(...) or t = c2(...) or ... or t = ck(...)] where the [ci] are
+    constructors of [tau], and [...] are new Skolems of [t];
+    if [t] is ground then Avatar splitting (with xor) should apply directly
+      instead, as an optimization, with [k] unary clauses and 1 bool clause
+
+  - disjointness (simplification):
+    * an equation [c1(...) = c2(...)] becomes false;
+    * a disequation [c1(...) != c2(...)] becomes true
+
+  - injectivity (simplification):
+    * an equation [c(t1...tn) = c(u1...un)] simplifies into
+      [t1 = u1 & ... & tn = un]
+    * a disequation [c(t1...tn) != c(u1...un)] simplifies into
+      [t1 != u1 || ... || tn != un] (XXX is it really needed?)
+*)
+
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C

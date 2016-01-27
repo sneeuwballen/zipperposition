@@ -58,6 +58,11 @@ type precedence = t
 val equal : t -> t -> bool
 (** Check whether the two precedences are equal (same snapshot) *)
 
+(* TODO: use a set of IDs, in increasing order w.r.t precedence, internally,
+   and [snapshot] should return a sequence to hide it.
+   The rationale is that this way, inserting a new symbol is [O(ln n)] rather
+   than [O(n)] of number of symbols. *)
+
 val snapshot : t -> ID.t list
 (** Current list of symbols, in increasing order *)
 
