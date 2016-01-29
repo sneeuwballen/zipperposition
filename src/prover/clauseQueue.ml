@@ -63,10 +63,12 @@ module Make(C : Clause.S) = struct
       let trail = C.trail c in
       let w_lits = weight_lits_ (C.lits c) in
       let w_trail =
+        let module B = C.Ctx.BoolBox in
         C.Trail.fold
-          (fun acc t -> match C.Ctx.BoolBox.payload (C.Ctx.BoolBox.Lit.abs t) with
-             | C.Ctx.BoolBox.Clause_component lits -> acc + weight_lits_ lits
-             | C.Ctx.BoolBox.Case (_,_) ->
+          (fun acc t -> match B.payload (B.Lit.abs t) with
+             | B.Fresh -> acc
+             | B.Clause_component lits -> acc + weight_lits_ lits
+             | B.Case (_,_) ->
                  (* generic penalty for each inductive hypothesis *)
                  acc + 10)
           0 trail
@@ -171,8 +173,6 @@ module Make(C : Clause.S) = struct
   let name q = q.functions.name
 
   (** {6 Combination of queues} *)
-
-  type queues = (t * int) list
 
   let goal_oriented =
     let open WeightFun in

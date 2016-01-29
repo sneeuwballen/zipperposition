@@ -316,7 +316,7 @@ module Subsumption = struct
         end;
         (* ignore [t1] for now *)
         match_lists ~protect ~subst l1' ((c1,t1)::rest1) sc1 l2 sc2 k
-    | (c1,t1)::l1', (c2,t2)::l2' ->
+    | (c1,t1)::l1', (c2,_t2)::_l2' ->
         (* cannot match, c1 too high *)
         assert Z.(gt c1 zero);
         assert Z.(gt c2 zero);
@@ -615,7 +615,7 @@ let fold_terms ?(pos=P.stop) ?(vars=false) ~which ~ord ~subterms lit k =
     | `Max -> M.fold_max ~ord
   in
   match lit with
-  | Binary (op, m1, m2) ->
+  | Binary (_op, m1, m2) ->
       fold_monome
         (fun () i _ t -> at_term ~pos:P.(append pos (left (arg i stop))) t k)
         () m1;

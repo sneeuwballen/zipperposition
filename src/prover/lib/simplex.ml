@@ -235,7 +235,7 @@ module Make(Var: OrderedType) = struct
         with Failure _ ->
             raise NoneSuitable
 
-    let rec find_and_replace x l1 l2 =
+    let find_and_replace x l1 l2 =
         let res = ref zero in
         let l = List.map2
         (fun a y -> if Var.compare x y = 0 then begin res := a; zero end else a) l1 l2 in
@@ -252,7 +252,7 @@ module Make(Var: OrderedType) = struct
 
     let subst x y l = List.map (fun z -> if Var.compare x z = 0 then y else z) l
 
-    let rec solve_aux debug t =
+    let solve_aux debug t =
         debug t;
         M.iter (fun x (l, u) -> if gt l u then raise (AbsurdBounds x)) t.bounds;
         try

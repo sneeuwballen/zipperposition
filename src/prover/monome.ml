@@ -7,7 +7,6 @@ open Libzipperposition
 
 module Hash = CCHash
 module T = FOTerm
-module S = Symbol
 
 type term = FOTerm.t
 
@@ -428,9 +427,6 @@ module Focus = struct
     then Format.fprintf out "[%a]" pp_focused t
     else Format.fprintf out "[%a] + %a" pp_focused t pp t.rest
 
-  let to_string m = CCFormat.to_string pp m
-  let fmt fmt t = Format.pp_print_string fmt (to_string t)
-
   let is_max ~ord mf =
     List.for_all
       (fun (_, t) -> match Ordering.compare ord mf.term t with
@@ -730,7 +726,7 @@ module Int = struct
           let sum = mk_product c t in
           (* add coeff*term for the remaining terms *)
           let sum = List.fold_left
-              (fun sum (coeff, t') ->
+              (fun sum (coeff, _t') ->
                  assert (num.sign coeff <> 0);
                  mk_sum coeff t sum
               ) sum rest
@@ -896,7 +892,7 @@ module Int = struct
           the last element of which is [_, 1]; In addition we also keep
           the quotients.
           We assume that a and b are > 0 and that a >= b. *)
-      let solve a b const =
+      let solve a b _const =
         let rec recurse a b acc =
           let q, r = Z.div_rem a b in
           if Z.equal r Z.zero
@@ -909,10 +905,10 @@ module Int = struct
         assert (Z.geq a b);
         let u, v = match recurse a b [] with
           | [] -> assert false
-          | (a,b,_) :: l ->
+          | (_a,b,_) :: l ->
               let u, v = Z.zero, b in
               List.fold_left
-                (fun (u, v) (a, b, q) ->
+                (fun (u, v) (_a, _b, q) ->
                    let u' = Z.sub u (Z.mul v q) in
                    v, u')
                 (u, v) l
@@ -979,7 +975,7 @@ module Int = struct
       Z.div (Z.abs (Z.mul a b)) gcd
 
     (* find solutions that equate zero *)
-    let coeffs_n l gcd =
+    let coeffs_n l _gcd =
       let n = List.length l in
       if n < 2 then failwith "coeffs_n: expected list of at least 2 elements";
       (* array, for faster lookup of coefficient i *)
@@ -1028,7 +1024,7 @@ module Int = struct
     (* default generator of fresh variables *)
     let __fresh_var m =
       let count = ref (T.Seq.max_var (Seq.vars m) + 1) in
-      fun ty ->
+      fun _ty ->
         let n = !count in
         incr count;
         T.var_of_int ~ty:num.ty n

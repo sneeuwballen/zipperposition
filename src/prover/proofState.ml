@@ -18,8 +18,6 @@ module CQ = ClauseQueue
 
 let prof_next_passive = Util.mk_profiler "proofState.next_passive"
 
-let section = Util.Section.(make ~parent:zip "clause_queue")
-
 (** {2 Set of active clauses} *)
 module type S = ProofState_intf.S
 

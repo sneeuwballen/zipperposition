@@ -136,11 +136,6 @@ let is_arith = function
   | To_int | To_rat | Less | Lesseq | Greater | Greatereq -> true
   | _ -> false
 
-module Seq = struct
-  let add_set set =
-    Sequence.fold (fun set s -> Set.add s set) set
-end
-
 let to_string s = match s with
   | Int n -> Z.to_string n
   | Rat n -> Q.to_string n
