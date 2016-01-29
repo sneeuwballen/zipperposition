@@ -162,12 +162,18 @@ end
 
 val is_var : t -> bool
 val is_meta : t -> bool
+val is_const : t -> bool
 
 val is_ground : t -> bool
 (** [true] iff there is no free variable *)
 
 val is_monomorphic : t -> bool
 (** [true] if there are no type variables *)
+
+val is_subterm : strict:bool -> t -> of_:t -> bool
+(** [is_subterm a ~of_:b] is true if [a] is a subterm of [b].
+    @param strict if true, [a] must be a strict subterm of [b],
+      that is, not [b] itself *)
 
 val closed : t -> bool
 (** [closed t] is [true] iff all bound variables of [t] occur under a

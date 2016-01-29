@@ -242,6 +242,7 @@ let fresh_var ?loc ~ty () = var ?loc (Var.gensym ~ty ())
 
 let is_var = function | {term=Var _; _} -> true | _ -> false
 let is_meta t = match view t with Meta _ -> true | _ -> false
+let is_const = function {term=Const _; _} -> true | _ -> false
 
 module Set = Sequence.Set.Make(struct type t = term let compare = compare end)
 module Map = Sequence.Map.Make(struct type t = term let compare = compare end)
@@ -543,6 +544,12 @@ end
 let is_monomorphic t =
   Seq.subterms t
   |> Sequence.for_all (fun t -> Ty.is_mono (ty_exn t))
+
+let is_subterm ~strict a ~of_:b =
+  let subs = Seq.subterms b in
+  (* drop the first element ([b]) if [strict] *)
+  let subs = if strict then Sequence.drop 1 subs else subs in
+  Sequence.exists (equal a) subs
 
 (** {2 IO} *)
 
