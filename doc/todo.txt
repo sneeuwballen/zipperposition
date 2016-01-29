@@ -14,7 +14,7 @@
 (D) 2016-01-22 update doc/api_intro.txt
 (A) 2016-01-22 put unique exn as payload in ID, at construction time only
 (A) 2016-01-22 add arithmetic into ZF
-(A) 2016-01-20 use msat.eval_level to prune clauses in Avatar (if trail false forever)
 (A) 2016-01-23 distinguish goal/negated goal?
 (B) 2016-01-23 def foo : bar := rw_rule1 and rw_rule2
 (A) 2016-01-29 see if can improve featureVector (no translation overhead, adaptability, trail)
+(A) 2016-01-29 in avatar, use simplify_trail as backward simplification too (filter active set)
