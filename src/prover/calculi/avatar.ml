@@ -18,6 +18,8 @@ let prof_splits = Util.mk_profiler "avatar.split"
 let prof_check = Util.mk_profiler "avatar.check"
 
 let stat_splits = Util.mk_stat "avatar.splits"
+let stat_trail_trivial = Util.mk_stat "avatar.trivial_trail"
+let stat_trail_simplify = Util.mk_stat "avatar.simplify_trail"
 
 module type S = Avatar_intf.S
 
@@ -41,7 +43,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
   let get_clause ~tag = CCHashtbl.get id_to_clause_ tag
 
   (* union-find that maps vars to list of literals, used for splitting *)
-  module UF = UnionFind.Make(struct
+  module UF =
+    UnionFind.Make(struct
       type key = T.var
       type value = Lit.t list
       let equal = HVar.equal
@@ -52,7 +55,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
 
   module LitSet = Sequence.Set.Make(Lit)
 
-  let _infer_split c =
+  let infer_split_ c =
     let lits = C.lits c in
     (* maps each variable to a list of literals. Sets can be merged whenever
        two variables occur in the same literal.  *)
@@ -123,12 +126,12 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
         (* return the clauses *)
         Some clauses
 
-  (* Hyper-splitting *)
+  (* Avatar splitting *)
   let split c =
     Util.enter_prof prof_splits;
     let res = if Array.length (C.lits c) <= 1
       then None
-      else _infer_split c
+      else infer_split_ c
     in
     Util.exit_prof prof_splits;
     res
@@ -152,6 +155,61 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
       Sat.add_clause ~tag:(C.id c) b_clause;
     );
     [] (* never infers anything! *)
+
+  (* check whether the trail of [c] is false and will remain so *)
+  let trail_is_trivial_ c =
+    let trail = C.trail c in
+    let res =
+      C.Trail.exists
+        (fun lit ->
+          try match Sat.valuation_level lit with
+            | false, 0 -> true (* false at level 0: proven false *)
+            | _ -> false
+          with Sat.UndecidedLit -> false)
+        trail
+    in
+    if res then (
+      Util.incr_stat stat_trail_trivial;
+      Util.debugf ~section 3 "@[<2>clause @[%a@]@ has a trivial trail@]" (fun k->k C.pp c);
+    );
+    res
+
+  let trail_is_trivial c =
+    Sat.last_result () = Sat_solver.Sat && trail_is_trivial_ c
+
+  (* simplify the trail of [c] using boolean literals that have been proven *)
+  let simplify_trail_ c =
+    let trail = C.trail c in
+    let n_simpl = ref 0 in
+    let trail =
+      C.Trail.filter
+        (fun lit ->
+          try match Sat.valuation_level lit with
+            | true, 0 ->
+                (* [lit] is proven true, it is therefore not necessary to depend on it *)
+                incr n_simpl;
+                false
+            | _ -> true
+          with Sat.UndecidedLit -> true)
+        trail
+    in
+    if !n_simpl > 0 then (
+      Util.incr_stat stat_trail_simplify;
+      let proof =
+        ProofStep.mk_simp ~rule:(ProofStep.mk_rule "simpl_trail") [C.proof c] in
+      let c' = C.create_a ~trail (C.lits c) proof in
+      Util.debugf ~section 3 "@[<2>clause @[%a@]@ trail-simplifies into @[%a@]@]"
+        (fun k->k C.pp c C.pp c');
+      SimplM.return_new c'
+    )
+    else SimplM.return_same c
+
+  (* only simplify if SAT *)
+  let simplify_trail c =
+    if Sat.last_result () = Sat_solver.Sat
+    then simplify_trail_ c
+    else SimplM.return_same c
+
 
   let skolem_count_ = ref 0
 
@@ -204,7 +262,6 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
     c_pos :: c_neg, box
 
   module Meta(M : MetaProverState.S) = struct
-
     (* XXX ugly, but I could not find a way to prove M.E.C.t = C.t *)
     external c_of_lemma : M.lemma -> C.t = "%identity"
 
@@ -263,6 +320,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
     E.add_multi_simpl_rule split;
     E.add_unary_inf "avatar_check_empty" check_empty;
     E.add_generate "avatar_check_sat" check_satisfiability;
+    E.add_is_trivial trail_is_trivial;
+    E.add_simplify simplify_trail;
+    (* be sure there is an initial valuation *)
+    ignore (Sat.check());
     (* meta lemmas *)
     begin
       try

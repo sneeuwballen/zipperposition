@@ -9,7 +9,7 @@
 
     Future work may include locking clauses whose trails are unsatisfied.
 
-    Depends on the "meta" extension.
+    Depends optionally on the "meta" extension.
 *)
 
 type 'a printer = Format.formatter -> 'a -> unit
