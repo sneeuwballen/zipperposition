@@ -10,6 +10,8 @@ exception WrongState of string
 module type S = sig
   module Lit : Bool_lit_intf.S
 
+  exception UndecidedLit
+
   type clause = Lit.t list
 
   val add_clause : ?tag:int -> Lit.t list -> unit
@@ -21,11 +23,13 @@ module type S = sig
   val check : unit -> result
   (** Is the current problem satisfiable? *)
 
+  val last_result : unit -> result
+  (** Last computed result. This does not compute a new result *)
+
   val valuation : Lit.t -> bool
   (** Assuming the last call to {!check} returned {!Sat}, get the boolean
       valuation for this (positive) literal in the current model.
-      @raise Invalid_argument if [lit <= 0]
-      @raise Failure if the last result wasn't {!Sat} *)
+      @raise WrongState if the last result wasn't {!Sat} *)
 
   val valuation_level : Lit.t -> bool * int
   (** Gives the value of a literal in the model, as well as its
