@@ -1,27 +1,5 @@
-(*
-Copyright (c) 2013, Simon Cruanes
-All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*)
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Hashconsing} *)
 
@@ -34,68 +12,72 @@ end
 
 module type S = sig
   type elt
-    (** Hashconsed objects *)
+  (** Hashconsed objects *)
 
-  module H : Weak.S with type data = elt
+  val hashcons : elt -> elt
+  (** Hashcons the elements *)
 
-  type t
-    (** Hashconsing table *)
+  val mem : elt -> bool
+  (** Is the element present in this table? *)
 
-  val default : t
-    (** default hashconsing table *)
+  val fresh_unique_id : unit -> int
+  (** Unique ID that will never occur again in this table (modulo 2^63...) *)
 
-  val weak_of : t -> H.t
-    (** Get the underlying weak table *)
-
-  val hashcons : ?table:t -> elt -> elt
-    (** Hashcons the elements *)
-
-  val mem : ?table:t -> elt -> bool
-    (** Is the element present in this table? *)
-
-  val fresh_unique_id : ?table:t -> unit -> int
-    (** Unique ID that will never occur again in this table (modulo 2^63...) *)
-
-  val stats : ?table:t -> unit -> int*int*int*int*int*int
+  val stats : unit -> int*int*int*int*int*int
 end
 
 module Make(X : HashedType) = struct
   module H = Weak.Make(X)
-
-  type t = {
-    mutable count : int;
-    tbl : H.t
-  } (** Hashconsing table *)
-
   type elt = X.t
-    (** Hashconsed objects *)
 
-  (** default hashconsing table *)
-  let default = {
-    count = 0;
-    tbl = H.create 1024
-  }
+  let count_ = ref 0
+  let tbl : H.t = H.create 1024
 
-  let weak_of t = t.tbl
-
-  (** Hashcons the elements *)
-  let hashcons ?(table=default) x =
-    let x' = H.merge table.tbl x in
-    (if x == x'
-      then begin
-        X.tag table.count x;
-        table.count <- table.count + 1
-      end);
+  let hashcons x =
+    let x' = H.merge tbl x in
+    if x == x' then (
+      X.tag !count_ x;
+      incr count_;
+    );
     x'
 
-  let mem ?(table=default) x =
-    H.mem table.tbl x
+  let mem x = H.mem tbl x
 
-  let fresh_unique_id ?(table=default) () =
-    let x = table.count in
-    table.count <- x+1;
+  let fresh_unique_id () =
+    let x = !count_ in
+    incr count_;
     x
 
-  let stats ?(table=default) () =
-    H.stats table.tbl
+  let stats () = H.stats tbl
+end
+
+module MakeNonWeak(X : HashedType) = struct
+  module H = Hashtbl.Make(X)
+  type elt = X.t
+
+  let count_ = ref 0
+  let tbl : elt H.t = H.create 1024
+
+  let hashcons x =
+    try H.find tbl x
+    with Not_found ->
+      X.tag !count_ x;
+      incr count_;
+      H.add tbl x x;
+      x
+
+  let mem x = H.mem tbl x
+
+  let fresh_unique_id () =
+    let x = !count_ in
+    incr count_;
+    x
+
+  let stats () =
+    let stat = H.stats tbl in
+    let open Hashtbl in
+    let sum_buck = Array.fold_left (+) 0 stat.bucket_histogram in
+    let min_buck = Array.fold_left min max_int stat.bucket_histogram in
+    stat.num_buckets, stat.num_bindings, sum_buck,
+    min_buck, 0, stat.max_bucket_length
 end

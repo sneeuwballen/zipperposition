@@ -102,6 +102,9 @@ and _eq_record_list l1 l2 = match l1, l2 with
 
 (** {3 Constructors} *)
 
+(* XXX: use cppo?
+module H = Hashcons.MakeNonWeak(struct
+*)
 module H = Hashcons.Make(struct
     type t = term
     let equal = _eq_norec
