@@ -5,7 +5,6 @@ open Libzipperposition
 
 module BV = CCBV
 module T = FOTerm
-module PF = PFormula
 module O = Ordering
 module S = Substs
 module Lit = Literal
@@ -807,7 +806,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         in
         triv || check lits (i+1)
     in
-    let is_tauto = check (C.lits c) 0 || Trail.is_trivial (C.trail c) in
+    let is_tauto = check (C.lits c) 0 || C.Trail.is_trivial (C.trail c) in
     if is_tauto then Util.debugf ~section 3 "@[@[%a@]@ is a tautology@]" (fun k->k C.pp c);
     is_tauto
 

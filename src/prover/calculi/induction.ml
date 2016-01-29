@@ -190,7 +190,7 @@ module Make
            (* ctx[case] <- b_lit *)
            let c_case =
              C.create_a
-               ~trail:Trail.(singleton b_lit)
+               ~trail:(C.Trail.singleton b_lit)
                (ClauseContext.apply ctx case.Ind_cst.case_term)
                (ProofStep.mk_inference [C.proof c]
                   ~rule:(ProofStep.mk_rule ~comment:["ind"] "split"))
@@ -252,16 +252,15 @@ module Make
      - two literals [C in loop(i)], [D in loop(j)] if i,j do not depend
         on one another *)
   let has_trivial_trail c =
-    let trail = C.trail c |> Trail.to_seq in
+    let trail = C.trail c |> C.Trail.to_seq in
     (* all i=t where i is inductive *)
     let relevant_cases =
       trail
       |> Sequence.filter_map
         (fun blit ->
-           match BoolBox.extract (Bool_lit.abs blit) with
-           | None -> None
-           | Some (BoolBox.Case (l, r)) -> Some (`Case (l, r))
-           | Some _ -> None
+           match BoolBox.payload (BoolBox.Lit.abs blit) with
+           | BoolBox.Case (l, r) -> Some (`Case (l, r))
+           | _ -> None
         )
     in
     (* is there i such that   i=t1 and i=t2 can be found in the trail? *)

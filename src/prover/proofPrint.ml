@@ -9,6 +9,7 @@ open ProofStep
 let section = ProofStep.section
 
 module type CLAUSE = sig
+  module Trail : Trail_intf.S
   type t
   val lits : t -> Literals.t
   val trail : t -> Trail.t
@@ -27,7 +28,7 @@ module Make(C : CLAUSE) = struct
     match p.result with
     | Form f when TypedSTerm.equal f TypedSTerm.Form.false_ -> true
     | Clause c ->
-        Literals.is_absurd (C.lits c) && Trail.is_empty (C.trail c)
+        Literals.is_absurd (C.lits c) && C.Trail.is_empty (C.trail c)
     | _ -> false
 
   let get_name ~namespace p =
@@ -150,7 +151,7 @@ module Make(C : CLAUSE) = struct
          | Form f ->
              Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]).@]@,"
                name role TypedSTerm.TPTP.pp f pp_kind_tstp (p.step.kind,parents)
-         | Clause c when not (Trail.is_empty (C.trail c)) ->
+         | Clause c when not (C.Trail.is_empty (C.trail c)) ->
              assert false
              (* FIXME: proper conversion of clauses
              Format.fprintf out "@[<2>tff(%d, %s,@ @[<2>@[(%a)@]@ %a@],@ @[%a@]).@]@,"

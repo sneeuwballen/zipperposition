@@ -3,20 +3,22 @@
 
 (** {1 Interface of BBox} *)
 
-type bool_lit = Bool_lit.t
-(** Abstract boolean literal *)
-
 module type S = sig
   type inductive_cst = Ind_cst.cst
   type inductive_case = Ind_cst.case
 
-  type t = Sat_solver.Lit.t
-
-  type injected = private
+  type payload = private
+    | Fresh (* fresh literal with no particular payload *)
     | Clause_component of Literals.t
     | Case of inductive_cst * inductive_case  (* [i = t] *)
 
-  val pp_injected : injected CCFormat.printer
+  module Lit : Bool_lit_intf.S with type payload = payload
+
+  type t = Lit.t
+
+  val dummy : t
+
+  val pp_payload : payload CCFormat.printer
 
   val inject_lits : Literals.t -> t
   (** Inject a clause into a boolean literal. No other clause will map
@@ -27,13 +29,7 @@ module type S = sig
   val inject_case : inductive_cst -> inductive_case -> t
   (** Inject [cst = case] *)
 
-  val extract : t -> injected option
-  (** Recover the value that was injected into the literal, if any
-      @raise Failure if the literal is <= 0 *)
-
-  val extract_exn : t -> injected
-  (** Recover the value that was injected into the literal
-      @raise Failure if the literal is <= 0 of it's not a proper boolean lit *)
+  val payload : t -> payload
 
   val inductive_cst : t -> inductive_cst option
   (** Obtain the inductive constant from this boolean lit, if any *)

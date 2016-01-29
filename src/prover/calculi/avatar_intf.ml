@@ -3,7 +3,7 @@
 
 module type S = sig
   module E : Env.S
-  module Solver : Sat_solver.S
+  module Solver : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit
 
   val split : E.multi_simpl_rule
   (** Split a clause into components *)
@@ -15,7 +15,7 @@ module type S = sig
   val before_check_sat : unit Signal.t
   val after_check_sat : unit Signal.t
 
-  val filter_absurd_trails : (Trail.t -> bool) -> unit
+  val filter_absurd_trails : (E.C.Trail.t -> bool) -> unit
   (** [filter_trails f] calls [f] on every trail associated with the empty
       clause. If [f] returns [false], the trail is ignored, otherwise
       it's negated and sent to the SAT solver *)

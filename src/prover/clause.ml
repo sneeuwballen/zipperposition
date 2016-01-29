@@ -21,7 +21,8 @@ module type S = Clause_intf.S
 (** {2 Type def} *)
 module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   module Ctx = Ctx
-  module BLit = Bool_lit
+  module BLit = Ctx.BoolBox.Lit
+  module Trail = Trail.Make(BLit)
 
   let pp_trail out trail =
     if not (Trail.is_empty trail)

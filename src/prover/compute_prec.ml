@@ -6,7 +6,6 @@
 open Libzipperposition
 
 module T = FOTerm
-module PF = PFormula
 
 let prof_mk_prec = Util.mk_profiler "mk_precedence"
 

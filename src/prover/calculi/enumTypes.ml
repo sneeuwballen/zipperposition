@@ -269,7 +269,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let proof =
           ProofStep.mk_inference
             ~rule:(ProofStep.mk_rule "axiom_enum_types") [decl.decl_proof] in
-        let trail = Trail.empty in
+        let trail = C.Trail.empty in
         let c' = C.create ~trail lits proof in
         Util.debugf ~section 3 "@[<2>declare enum type for @[%a@]:@ clause @[%a@]@]"
           (fun k->k ID.pp s C.pp c');

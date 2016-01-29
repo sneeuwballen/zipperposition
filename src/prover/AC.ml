@@ -46,7 +46,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* build clause l=r *)
     let add_clause l r =
       let proof = ProofStep.mk_trivial in
-      let c = C.create ~trail:Trail.empty [ Lit.mk_eq l r ] proof in
+      let c = C.create ~trail:C.Trail.empty [ Lit.mk_eq l r ] proof in
       C.set_flag C.flag_persistent c true;
       res := c :: !res
     in

@@ -3,59 +3,65 @@
 
 (** {1 Boolean Trail} *)
 
-module BLit = Bool_lit
+module type S = Trail_intf.S
 
-type bool_lit = Bool_lit.t
+module Make(L : Bool_lit_intf.S)
+: S with module Lit = L
+= struct
+  module Lit = L
 
-type t = BLit.Set.t
+  type bool_lit = Lit.t
 
-let equal = BLit.Set.equal
-let compare = BLit.Set.compare
-let hash_fun trail h = CCHash.seq BLit.hash_fun (BLit.Set.to_seq trail) h
-let hash = CCHash.apply hash_fun
+  type t = Lit.Set.t
 
-let empty = BLit.Set.empty
-let mem = BLit.Set.mem
-let for_all = BLit.Set.for_all
-let exists = BLit.Set.exists
-let singleton = BLit.Set.singleton
-let add = BLit.Set.add
-let remove = BLit.Set.remove
-let fold f acc t = BLit.Set.fold (fun x acc -> f acc x) t acc
-let length = BLit.Set.cardinal
-let map f set =
-  BLit.Set.to_seq set
-  |> Sequence.map f
-  |> BLit.Set.of_seq
-let of_list = BLit.Set.of_list
-let to_list = BLit.Set.to_list
-let is_empty = BLit.Set.is_empty
+  let equal = Lit.Set.equal
+  let compare = Lit.Set.compare
+  let hash_fun trail h = CCHash.seq Lit.hash_fun (Lit.Set.to_seq trail) h
+  let hash = CCHash.apply hash_fun
 
-let subsumes t1 t2 = BLit.Set.subset t1 t2
+  let empty = Lit.Set.empty
+  let mem = Lit.Set.mem
+  let for_all = Lit.Set.for_all
+  let exists = Lit.Set.exists
+  let singleton = Lit.Set.singleton
+  let add = Lit.Set.add
+  let remove = Lit.Set.remove
+  let fold f acc t = Lit.Set.fold (fun x acc -> f acc x) t acc
+  let length = Lit.Set.cardinal
+  let map f set =
+    Lit.Set.to_seq set
+    |> Sequence.map f
+    |> Lit.Set.of_seq
+  let of_list = Lit.Set.of_list
+  let to_list = Lit.Set.to_list
+  let is_empty = Lit.Set.is_empty
 
-let is_trivial trail =
-  BLit.Set.exists
-    (fun i -> BLit.Set.mem (BLit.neg i) trail)
-    trail
+  let subsumes t1 t2 = Lit.Set.subset t1 t2
 
-let merge = BLit.Set.union
+  let is_trivial trail =
+    Lit.Set.exists
+      (fun i -> Lit.Set.mem (Lit.neg i) trail)
+      trail
 
-let merge_l = function
-  | [] -> BLit.Set.empty
-  | [t] -> t
-  | [t1;t2] -> BLit.Set.union t1 t2
-  | t::l -> List.fold_left BLit.Set.union t l
+  let merge = Lit.Set.union
 
-let filter = BLit.Set.filter
+  let merge_l = function
+    | [] -> Lit.Set.empty
+    | [t] -> t
+    | [t1;t2] -> Lit.Set.union t1 t2
+    | t::l -> List.fold_left Lit.Set.union t l
 
-type valuation = BLit.t -> bool
-(** A boolean valuation *)
+  let filter = Lit.Set.filter
 
-let is_active trail ~v =
-  BLit.Set.for_all
-    (fun i ->
-       let j = BLit.abs i in
-       (BLit.sign i) = (v j))  (* valuation match sign *)
-    trail
+  type valuation = Lit.t -> bool
+  (** A boolean valuation *)
 
-let to_seq = BLit.Set.to_seq
+  let is_active trail ~v =
+    Lit.Set.for_all
+      (fun i ->
+         let j = Lit.abs i in
+         (Lit.sign i) = (v j))  (* valuation match sign *)
+      trail
+
+  let to_seq = Lit.Set.to_seq
+end

@@ -6,7 +6,6 @@
 open Libzipperposition
 
 module T = FOTerm
-module PF = PFormula
 module Lit = Literal
 module Lits = Literals
 

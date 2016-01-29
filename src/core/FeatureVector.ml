@@ -13,6 +13,7 @@ type lits = Index_intf.lits
 module Make(C : Index.CLAUSE) = struct
   module C = C
 
+  (* TODO use array? *)
   type feature_vector = int list
   (** a vector of feature *)
 
@@ -132,6 +133,7 @@ module Make(C : Index.CLAUSE) = struct
       let compare = C.compare
     end)
 
+  (* TODO: replace intmap by RAL? or simply a list? or dynamic array *)
   type trie =
     | TrieNode of trie IntMap.t   (** map feature -> trie *)
     | TrieLeaf of CSet.t          (** leaf with a set of clauses *)

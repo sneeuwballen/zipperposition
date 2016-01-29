@@ -23,7 +23,8 @@ module type S = Avatar_intf.S
 
 let key = CCMixtbl.create_inj()
 
-module Make(E : Env.S)(Sat : Sat_solver.S) = struct
+module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
+= struct
   module E = E
   module Ctx = E.Ctx
   module C = E.C
@@ -100,7 +101,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
                let bool_name = BoolBox.inject_lits lits in
                let trail =
                  C.trail c
-                 |> Trail.add bool_name
+                 |> C.Trail.add bool_name
                in
                let c = C.create_a ~trail lits proof in
                c, bool_name)
@@ -112,8 +113,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
         (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
         let bool_guard =
           C.trail c
-          |> Trail.to_list
-          |> List.map Bool_lit.neg in
+          |> C.Trail.to_list
+          |> List.map C.Trail.Lit.neg in
         let bool_clause = List.append bool_clause bool_guard in
         save_clause ~tag:(C.id c) c;
         Sat.add_clause ~tag:(C.id c) bool_clause;
@@ -139,11 +140,11 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
   let check_empty c =
     if Array.length (C.lits c) = 0 && !filter_absurd_trails_ (C.trail c)
     then (
-      assert (not (Trail.is_empty (C.trail c)));
+      assert (not (C.Trail.is_empty (C.trail c)));
       let b_clause =
         C.trail c
-        |> Trail.to_list
-        |> List.map Bool_lit.neg
+        |> C.Trail.to_list
+        |> List.map C.Trail.Lit.neg
       in
       Util.debugf ~section 4 "@[negate trail of @[%a@] (id %d)@ with @[%a@]@]"
         (fun k->k C.pp c (C.id c) _pp_bclause b_clause);
@@ -169,7 +170,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
     let box = BoolBox.inject_lits lits in
     (* positive clause *)
     let c_pos =
-      C.create_a ~trail:(Trail.singleton box) lits proof
+      C.create_a ~trail:(C.Trail.singleton box) lits proof
     in
     (* negative component:
       - gather variables
@@ -195,7 +196,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
           (* negate, apply subst (to use the Skolem symbols) *)
           let lit = Lit.negate lit in
           let lit = Lit.apply_subst ~renaming subst (lit,0) in
-          let trail = Trail.singleton (Bool_lit.neg box) in
+          let trail = C.Trail.singleton (C.Trail.Lit.neg box) in
           C.create_a ~trail [| lit |] proof)
         lits
       |> Array.to_list
@@ -215,7 +216,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
         |> Sequence.flat_map
           (fun c ->
             let c = c_of_lemma c in
-            assert (C.trail c |> Trail.is_empty);
+            assert (C.trail c |> C.Trail.is_empty);
             let new_clauses, _box = introduce_cut (C.lits c) (C.proof_step c) in
             Util.debugf ~section 2 "@[<hv2>introduce cut from meta lemma:@,%a@]"
               (fun k->k (CCList.print C.pp) new_clauses);
@@ -249,7 +250,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S) = struct
           let proof =
             ProofStep.mk_inference ~rule:(ProofStep.mk_rule "sat") premises
           in
-          let c = C.create ~trail:Trail.empty [] proof in
+          let c = C.create ~trail:C.Trail.empty [] proof in
           [c]
     in
     Signal.send after_check_sat ();
@@ -289,7 +290,7 @@ let extension =
   let action env =
     let module E = (val env : Env.S) in
     Util.debug 1 "create new SAT solver";
-    let module Sat = Sat_solver.Make(struct end) in
+    let module Sat = Sat_solver.Make(E.Ctx.BoolBox.Lit) in
     let module A = Make(E)(Sat) in
     CCMixtbl.set ~inj:key E.mixtbl "avatar" (module A : S);
     A.register()

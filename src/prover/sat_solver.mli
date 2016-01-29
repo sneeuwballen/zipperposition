@@ -5,4 +5,4 @@
 
 include module type of Sat_solver_intf
 
-module Make(X : sig end) : S
+module Make(Lit : Bool_lit_intf.S) : S with module Lit = Lit

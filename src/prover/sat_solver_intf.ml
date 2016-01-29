@@ -1,15 +1,17 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-module Lit = Bool_lit
-
-type clause = Lit.t list
-
 type result =
   | Sat
   | Unsat
 
+exception WrongState of string
+
 module type S = sig
+  module Lit : Bool_lit_intf.S
+
+  type clause = Lit.t list
+
   val add_clause : ?tag:int -> Lit.t list -> unit
 
   val add_clauses : ?tag:int -> Lit.t list list -> unit
@@ -25,13 +27,18 @@ module type S = sig
       @raise Invalid_argument if [lit <= 0]
       @raise Failure if the last result wasn't {!Sat} *)
 
+  val valuation_level : Lit.t -> bool * int
+  (** Gives the value of a literal in the model, as well as its
+      decision level. If decision level is 0, the literal has been proved,
+      rather than decided/propagated *)
+
   val set_printer : Lit.t CCFormat.printer -> unit
   (** How to print literals? *)
 
   val unsat_core : int Sequence.t
   (** If [Some seq], [seq] is a sequence of integers
       that are the tags used to obtain [Unsat].
-      @raise Invalid_argument if the last result isn't [Unsat] *)
+      @raise WrongState if the last result isn't [Unsat] *)
 
   (** {6 Incrementality}
       We manage a stack for backtracking to older states *)

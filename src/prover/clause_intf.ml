@@ -5,6 +5,7 @@ open Libzipperposition
 
 module type S = sig
   module Ctx : Ctx.S
+  module Trail : Trail_intf.S with module Lit = Ctx.BoolBox.Lit
 
   type t
   type clause = t

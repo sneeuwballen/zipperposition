@@ -1,30 +1,15 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Boolean Literal} *)
+(** {1 Boolean Literal}
 
-type t = private int
+    The boolean literal carries a payload of type ['a] *)
 
-include Libzipperposition.Interfaces.ORD with type t := t
-include Libzipperposition.Interfaces.HASH with type t := t
+module type S = Bool_lit_intf.S
 
-val neg : t -> t
-(** Negate the boolean literal *)
+module type PAYLOAD = sig
+  type t
+  val dummy : t
+end
 
-val sign : t -> bool
-(** Current sign of the literal (positive or negative) *)
-
-val abs : t -> t
-(** Literal without its sign *)
-
-val set_sign : bool -> t -> t
-(** Set the sign of the literal to the given boolean *)
-
-val apply_sign : bool -> t -> t
-(** [apply_sign s lit] is [lit] if [s], [neg lit] otherwise *)
-
-val make : int -> t
-
-val pp : t CCFormat.printer
-
-module Set : CCSet.S with type elt = t
+module Make(Payload : PAYLOAD) : S with type payload = Payload.t

@@ -18,7 +18,8 @@ type 'a printer = Format.formatter -> 'a -> unit
 
 module type S = Avatar_intf.S
 
-module Make(E : Env.S)(Sat : Sat_solver.S) : S
+module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
+  : S
   with module E = E
    and module Solver = Sat
 

@@ -6,6 +6,7 @@
 open Libzipperposition
 
 module type CLAUSE = sig
+  module Trail : Trail_intf.S
   type t
   val lits : t -> Literals.t
   val trail : t -> Trail.t

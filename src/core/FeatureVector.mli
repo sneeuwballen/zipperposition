@@ -8,6 +8,15 @@
 
 type lits = Index_intf.lits
 
+(* TODO: mutable version? *)
+
+(* TODO:
+  keep a pool of all possible features (with functions to register new symbols),
+  and maintain an histogram of possible values for each feature.
+  Then, regularly, replace the [n] currently used features by the [n] top useful
+    features. See paper.
+*)
+
 module Make(C : Index.CLAUSE) : sig
   type feature_vector = int list
   (** a vector of feature *)

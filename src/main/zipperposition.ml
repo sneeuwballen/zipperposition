@@ -11,7 +11,6 @@ open Params
 open CCError.Infix
 
 module T = FOTerm
-module PF = PFormula
 module O = Ordering
 module Lit = Literal
 module S = Substs
@@ -209,7 +208,7 @@ module MakeNew(X : sig
       | Saturate.Unsat _ -> result, 0  (* already found unsat during presaturation *)
       | _ -> Sat.given_clause ~generating:true ?steps ?timeout ()
     in
-    Util.debugf ~section 1 "done %d iterations" (fun k->k num);
+    Format.printf "%% done %d iterations@." num;
     Util.debugf ~section 1 "@[<2>final precedence:@ @[%a@]@]"
       (fun k->k Precedence.pp (Env.precedence ()));
     result

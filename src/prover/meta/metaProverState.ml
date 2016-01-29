@@ -286,7 +286,7 @@ module Make(E : Env.S) : S with module E = E = struct
              let proofs = proof_of_explanation p explanation in
              let proof =
                ProofStep.mk_inference ~rule:(ProofStep.mk_rule "lemma") proofs in
-             let c = C.create lits ~trail:Trail.empty proof in
+             let c = C.create lits ~trail:C.Trail.empty proof in
              c))
         consequences
       |> Sequence.to_list
