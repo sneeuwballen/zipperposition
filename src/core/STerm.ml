@@ -236,6 +236,8 @@ let rec pp out t = match t.term with
       Format.fprintf out "@[<2>(%a)@ → %a@]" (Util.pp_list ~sep:" × " pp_inner) l pp_inner ret
   | AppBuiltin (b, []) -> Builtin.pp out b
   | AppBuiltin (Builtin.Not, [f]) -> Format.fprintf out "@[¬@ %a@]" pp_inner f
+  | AppBuiltin (b, ([t1;t2] | [_;t1;t2])) when Builtin.fixity b = Builtin.Infix_binary ->
+      Format.fprintf out "@[%a %a@ %a@]"  pp_inner t1 Builtin.pp b pp_inner t2
   | AppBuiltin (b, l) when Builtin.is_infix b && List.length l > 0 ->
       pp_infix_ b out l
   | AppBuiltin (s, l) ->

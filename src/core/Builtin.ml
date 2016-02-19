@@ -188,15 +188,24 @@ let to_string s = match s with
 
 let pp out s = Format.pp_print_string out (to_string s)
 
-let is_infix = function
-  | And | Or | Imply | Equiv | Xor | Eq | Neq | HasType
+type fixity =
+  | Infix_binary
+  | Infix_nary
+  | Prefix
+
+let fixity = function
+  | And | Or ->
+      Infix_nary
+  | Imply | Equiv | Xor | Eq | Neq | HasType
   | Sum | Difference | Product
   | Quotient | Quotient_e | Quotient_f | Quotient_t
   | Remainder_e | Remainder_t | Remainder_f
-  | Less | Lesseq | Greater | Greatereq -> true
-  | _ -> false
+  | Less | Lesseq | Greater | Greatereq ->
+      Infix_binary
+  | _ -> Prefix
 
-let is_prefix o = not (is_infix o)
+let is_prefix o = fixity o = Prefix
+let is_infix o = match fixity o with Infix_nary | Infix_binary -> true | Prefix -> false
 
 let ty = function
   | Int _ -> `Int

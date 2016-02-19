@@ -61,6 +61,13 @@ include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 include Interfaces.PRINT with type t := t
 
+type fixity =
+  | Infix_binary
+  | Infix_nary
+  | Prefix
+
+val fixity : t -> fixity
+
 val is_prefix : t -> bool
 (** [is_infix s] returns [true] if the way the symbol is printed should
     be used in a prefix way if applied to 1 argument *)

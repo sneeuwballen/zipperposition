@@ -134,6 +134,8 @@ let rec pp out t = match view t with
   | AppBuiltin (Builtin.Arrow, ret::args) ->
       Format.fprintf out "@[<hv>%a@]" (pp_infix_ Builtin.Arrow) (args @ [ret])
   | AppBuiltin (Builtin.Not, [f]) -> Format.fprintf out "@[¬@ %a@]" pp f
+  | AppBuiltin (b, ([t1;t2] | [_;t1;t2])) when Builtin.fixity b = Builtin.Infix_binary ->
+      Format.fprintf out "@[%a %a@ %a@]"  pp_inner t1 Builtin.pp b pp_inner t2
   | AppBuiltin (b, l) when Builtin.is_infix b && List.length l > 0 ->
       Format.fprintf out "@[<hv>%a@]" (pp_infix_ b) l
   | AppBuiltin (b, []) -> Builtin.pp out b
