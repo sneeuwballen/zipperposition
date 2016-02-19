@@ -687,7 +687,7 @@ let () = Printexc.register_printer
   (function
     | UnifyFailure (msg, st,loc) ->
       Some (
-        CCFormat.sprintf "@[<2>unification error:@ %s@ %a@,%a@]"
+        CCFormat.sprintf "@[<2>@{<Red>unification error@}:@ %s@ %a@,%a@]"
           msg pp_stack st Loc.pp_opt loc)
     | _ -> None)
 
@@ -760,14 +760,15 @@ let unify ?(allow_open=false) ?loc ?(st=UStack.create()) ?(subst=Subst.empty) t1
         assert (!r = None);
         if occur_check_ ~allow_open ~subst t1 t2
           then fail_ "occur check"
-          else UStack.bind ~st r t2
+          else UStack.bind ~st r (Subst.eval subst t2)
     | _, Meta (_, r) ->
         assert (!r = None);
         if occur_check_ ~allow_open ~subst t2 t1
           then fail_ "occur check"
-          else UStack.bind ~st r t1
+          else UStack.bind ~st r (Subst.eval subst t1)
     | Var v1, Var v2 ->
-        if not (Var.equal v1 v2) then fail_ "incompatible variables"
+        if not (Var.equal v1 v2)
+        then fail_ "incompatible variables@ (subst {@[%a@]})" Subst.pp subst
     | Const id1, Const id2 when ID.equal id1 id2 -> ()
     | App (f1,l1), App (f2,l2) when List.length l1=List.length l2 ->
         unif_rec subst f1 f2;
@@ -775,7 +776,8 @@ let unify ?(allow_open=false) ?loc ?(st=UStack.create()) ?(subst=Subst.empty) t1
     | AppBuiltin (b1,l1), AppBuiltin (b2,l2) when List.length l1=List.length l2 ->
         if Builtin.equal b1 b2
         then unif_l subst l1 l2
-        else fail_ "%a and %a are not compatible" Builtin.pp b1 Builtin.pp b2
+        else fail_ "%a and %a are not compatible (subst {@[%a@]})"
+          Builtin.pp b1 Builtin.pp b2 Subst.pp subst
     | Multiset l1, Multiset l2 when List.length l1 = List.length l2 ->
         (* unification is n-ary, so we choose the first satisfying, if any *)
         unif_multi subst l1 l2
@@ -806,7 +808,8 @@ let unify ?(allow_open=false) ?loc ?(st=UStack.create()) ?(subst=Subst.empty) t1
     | Bind _, _
     | Multiset _, _
     | Record _, _
-    | AppBuiltin _, _ -> fail_ "incompatible shape of terms"
+    | AppBuiltin _, _ ->
+        fail_ "incompatible shape of terms (subst {@[%a@]})" Subst.pp subst
   and unif_l subst l1 l2 = List.iter2 (unif_rec subst) l1 l2
   and unif_multi subst l1 l2 = match l1 with
     | [] -> assert (l2 = []); () (* success *)
@@ -880,7 +883,8 @@ let apply_unify ?allow_open ?loc ?st ?(subst=Subst.empty) ty l =
   | Ty.Fun (exp, ret), _ ->
       aux_l subst exp ret l
   | (Ty.Meta _ | Ty.Var _ | Ty.App _ | Ty.Builtin _ | Ty.Multiset _ | Ty.Record _), _ ->
-      fail_uniff_ ?loc [] "cannot apply type @[%a@]" pp ty
+      fail_uniff_ ?loc [] "cannot apply type @[%a@]@ to @[%a@]"
+        pp ty (Util.pp_list pp) l
   and aux_l subst exp ret l = match exp, l with
     | [], [] -> Subst.eval subst ret
     | _, [] -> Subst.eval subst (Ty.fun_ exp ret)
