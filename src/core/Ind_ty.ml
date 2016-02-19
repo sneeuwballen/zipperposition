@@ -4,6 +4,7 @@
 (** {1 Inductive Types} *)
 
 module T = FOTerm
+module Stmt = Statement
 
 let section = Util.Section.(make ~parent:zip "ind")
 
@@ -100,6 +101,20 @@ let declare_ty id ~ty_vars constructors =
   (* map [id] to [ity] *)
   ID.add_payload id (Payload_ind_type ity);
   ity
+
+let declare_stmt st = match Stmt.view st with
+  | Stmt.Data l ->
+      List.iter
+        (fun d ->
+          let ty_vars =
+            List.mapi (fun i v -> HVar.make ~ty:(Var.ty v) i) d.Stmt.data_args
+          and cstors =
+            List.map (fun (c,ty) -> {cstor_name=c; cstor_ty=ty;}) d.Stmt.data_cstors
+          in
+          let _ = declare_ty d.Stmt.data_id ~ty_vars cstors in
+          ())
+        l
+  | _ -> ()
 
 (** {6 Constructors} *)
 

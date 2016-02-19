@@ -30,6 +30,10 @@ val declare_ty : ID.t -> ty_vars:Type.t HVar.t list -> constructor list -> t
     @raise Failure if the type is already declared
     @raise Invalid_argument if the list of constructors is empty. *)
 
+val declare_stmt : (_, _, Type.t, _) Statement.t -> unit
+(** [declare_stmt stmt] examines [stmt], and, if the statement is a
+    declaration of inductive types, it declares them using {!declare_ty}. *)
+
 val as_inductive_ty : ID.t -> t option
 
 val as_inductive_ty_exn : ID.t -> t
