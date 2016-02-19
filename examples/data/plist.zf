@@ -1,0 +1,32 @@
+
+# Example to exercize data
+# polymorphic list: specialized map on list
+
+data list a :=
+  | Nil
+  | Cons a (list a).
+
+data nat :=
+  | Z
+  | S nat.
+
+val f : nat -> nat.
+
+val map_f : list nat -> list nat.
+
+assert forall n. f n = S n.
+
+assert map_f (Nil _) = Nil _.
+assert forall x l. map_f (Cons _ x l) = Cons _ (f x) (map_f l).
+
+def two : nat := S (S Z).
+def three : nat := S two.
+def four : nat := S three.
+def five: nat := S four.
+def six : nat := S five.
+
+goal
+  map_f (Cons _ two (Cons _ three (Cons _ four (Nil _)))) =
+  Cons _ three (Cons _ four (Cons _ five (Nil _))).
+
+
