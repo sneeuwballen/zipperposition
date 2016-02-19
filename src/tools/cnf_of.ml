@@ -13,18 +13,21 @@ module A = Ast_tptp
 open CCError.Infix
 
 let print_sig = ref false
+let print_in = ref false
 let flag_distribute_exists = ref false
 let flag_disable_renaming = ref false
 
-let options = Arg.align (
-    [ "--signature", Arg.Set print_sig, " print signature"
-    ; "--distribute-exist"
-        , Arg.Set flag_distribute_exists
-        , " distribute existential quantifiers during miniscoping"
-    ; "--disable-def", Arg.Set flag_disable_renaming, " disable definitional CNF"
-    ; "--time-limit", Arg.Int Util.set_time_limit, " hard time limit (in s)"
-    ] @ Options.make ()
-  )
+let options =
+  [ "--signature", Arg.Set print_sig, " print signature"
+  ; "--distribute-exist"
+      , Arg.Set flag_distribute_exists
+      , " distribute existential quantifiers during miniscoping"
+  ; "--disable-def", Arg.Set flag_disable_renaming, " disable definitional CNF"
+  ; "--time-limit", Arg.Int Util.set_time_limit, " hard time limit (in s)"
+  ; "--print-input", Arg.Set print_in, " print input problem"
+  ] @ Options.make ()
+  |> List.sort Pervasives.compare
+  |> Arg.align
 
 let print_res decls = match !Options.output with
   | Options.Print_none -> ()
@@ -64,6 +67,10 @@ let process file =
     Parsing_utils.parse file
     >>= TypeInference.infer_statements ?ctx:None
     >|= fun st ->
+    if !print_in
+    then Format.printf "@[<v2>input:@ %a@]@."
+      (CCVector.print ~start:"" ~stop:"" ~sep:""
+        (Statement.pp T.pp T.pp T.pp)) st;
     let opts =
       (if !flag_distribute_exists then [Cnf.DistributeExists] else []) @
       (if !flag_disable_renaming then [Cnf.DisableRenaming] else []) @
