@@ -231,12 +231,12 @@ Executable run_tests
   BuildDepends:     libzipperposition, libzipperposition.parsers, oUnit, libzipperposition.meta, libzipperposition.arbitrary
 
 # TPTP syntax and type checking
-Executable type_check_tptp
+Executable type_check
   Path:             src/tools/
   Build$:           flag(tools) && flag(parsers)
   Install$:         flag(tools) && flag(parsers)
   CompiledObject:   native
-  MainIs:           type_check_tptp.ml
+  MainIs:           type_check.ml
   BuildDepends:     libzipperposition, libzipperposition.parsers
 
 # Conversion to CNF

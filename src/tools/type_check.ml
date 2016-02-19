@@ -62,7 +62,7 @@ let main () =
   match res with
   | `Ok () ->
       print_line ();
-      Format.printf "success!@."
+      Format.printf "@{<Green>success!@}@."
   | `Error msg ->
       print_endline msg
 

@@ -99,7 +99,7 @@ let main () =
   (if !files = [] then files := ["stdin"]);
   files := List.rev !files;
   List.iter process !files;
-  Util.debug 1 "success!";
+  Util.debug 1 "@{<Green>success!@}";
   ()
 
 let _ =
