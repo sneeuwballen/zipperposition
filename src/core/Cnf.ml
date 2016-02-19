@@ -235,7 +235,8 @@ module Estimation = struct
     | _, TooBig -> TooBig
     | Exactly a, Exactly b ->
         let c = op a b in
-        if c < a || c < b || c > limit then TooBig else Exactly c
+        if (a>0 && b>0 && (c < a || c < b)) (* overflow *)
+          || c > limit then TooBig else Exactly c
 
   let ( +/ ) = lift2 (+)
   let ( */ ) = lift2 ( * )
@@ -245,6 +246,10 @@ module Estimation = struct
     | TooBig, _ -> true
     | Exactly e', Exactly e'' -> e' >= e''
     | Exactly _, TooBig -> false
+
+  let pp out = function
+    | TooBig -> CCFormat.string out "<too big>"
+    | Exactly n -> CCFormat.int out n
 end
 
 (* estimate the number of clauses needed by this formula. *)
@@ -320,7 +325,7 @@ let introduce_defs ~ctx ~is_pos f =
   and _rename ~polarity f =
     let p = Skolem.define ~ctx ~polarity f in
     Util.debugf ~section 4
-      "@[<2>introduce@ def. @[%a@]@ for subformula @[%a@]@ with pol %a@]"
+      "@[<2>introduce@ def. @[%a@]@ for subformula `@[%a@]`@ with pol %a@]"
       (fun k->k T.pp p T.pp f Skolem.pp_polarity polarity);
     p
   in
@@ -336,20 +341,21 @@ let introduce_defs ~ctx ~is_pos f =
        if pol=-1, b * p(~F) >= b + p(~F)
        if pol=0, a * p(F) + b * p(~F) >= a + b + p(F) + p(~F)
     *)
-    let should_rename = match polarity with
-      | `Pos ->
-          E.(geq_or_big (a */ p true f) (a +/ p true f))
-      | `Neg ->
-          E.(geq_or_big (b */ p false f) (b +/ p false f))
+    let c1, c2 = match polarity with
+      | `Pos -> E.(a */ p true f, a +/ p true f)
+      | `Neg -> E.(b */ p false f, b +/ p false f)
       | `Both ->
-          E.(geq_or_big
-               (a */ p true f +/ b */ p false f)
-               (a +/ b +/ p true f +/ p false f)
-            )
+          E.( a */ p true f +/ b */ p false f
+            , a +/ b +/ p true f +/ p false f)
     in
+    let should_rename = E.geq_or_big c1 c2 in
     if not (will_yield_lit f) && should_rename
-    then _rename ~polarity f
-    else f
+    then (
+      let f' = _rename ~polarity f in
+      Util.debugf ~section 5 "rename because pol=%a, a=%a, b=%a, c1=%a, c2=%a"
+        (fun k->k Skolem.pp_polarity polarity E.pp a E.pp b E.pp c1 E.pp c2);
+      f'
+    ) else f
   (* introduce definitions for subterms *)
   and maybe_rename_subformulas ~polarity a b f = match F.view f with
     | F.True
@@ -358,21 +364,23 @@ let introduce_defs ~ctx ~is_pos f =
     | F.Eq _
     | F.Neq _ -> f
     | F.And l ->
-        let l' = List.mapi
+        let l' =
+          List.mapi
             (fun i f' ->
                let a' = a in
                let b' = E.(b */ prod_p ~pos:false ~except:i l 0) in
-               maybe_rename ~polarity a' b' f'
-            ) l
+               maybe_rename ~polarity a' b' f')
+            l
         in
         F.and_ l'
     | F.Or l ->
-        let l' = List.mapi
+        let l' =
+          List.mapi
             (fun i f' ->
                let a' = E.(a */ prod_p ~pos:true ~except:i l 0) in
                let b' = b in
-               maybe_rename ~polarity a' b' f'
-            ) l
+               maybe_rename ~polarity a' b' f')
+            l
         in
         F.or_ l'
     | F.Not f' ->
