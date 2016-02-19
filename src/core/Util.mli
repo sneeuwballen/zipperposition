@@ -65,6 +65,11 @@ val debugf : ?section:Section.t ->
 val debug : ?section:Section.t -> int -> string -> unit
 (** Cheap non-formatting version of {!debugf} *)
 
+val ksprintf_noc :
+  f:(string -> 'a) ->
+  ('b, Format.formatter, unit, 'a) format4 -> 'b
+(** Same as [CCFormat.ksprintf], but without colors *)
+
 val warn : string -> unit
 (** Emit warning *)
 

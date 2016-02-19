@@ -195,7 +195,7 @@ module Make(C : CLAUSE) = struct
     Buffer.contents b
 
   let _to_str_escape fmt =
-    CCFormat.ksprintf ~f:_escape_dot fmt
+    Util.ksprintf_noc ~f:_escape_dot fmt
 
   let pp_dot_seq ~name out seq =
     (* TODO: check proof is a DAG *)

@@ -122,6 +122,12 @@ let debugf ?(section=Section.root) l msg k =
 
 let debug ?section l msg = debugf ?section l "%s" (fun k->k msg)
 
+let ksprintf_noc ~f fmt =
+  let buf = Buffer.create 32 in
+  let out = Format.formatter_of_buffer buf in
+  Format.kfprintf
+    (fun _ -> Format.pp_print_flush out (); f (Buffer.contents buf)) out fmt
+
 let warn_fmt_ = Format.err_formatter
 
 let warnf msg =
@@ -311,14 +317,11 @@ let pp_pair ?(sep=", ") pa pb out (a,b) =
 
 let pp_list ?(sep=", ") pp = CCFormat.list ~start:"" ~stop:"" ~sep pp
 
-
 let ord_option c o1 o2 = match o1, o2 with
   | None, None -> 0
   | None, Some _ -> -1
   | Some _, None -> 1
   | Some x1, Some x2 -> c x1 x2
-
-
 
 (** {2 File utils} *)
 
