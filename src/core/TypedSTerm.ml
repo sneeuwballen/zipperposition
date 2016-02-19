@@ -116,7 +116,7 @@ let rec hash_fun t h = match t.term with
 let hash x = Hash.apply hash_fun x
 
 let rec pp out t = match view t with
-  | Var s -> Var.pp_full out s
+  | Var s -> Var.pp_fullc out s
   | Const s -> ID.pp out s
   | App (_, []) -> assert false
   | App (f, l) ->
@@ -124,7 +124,7 @@ let rec pp out t = match view t with
         pp_inner f (Util.pp_list ~sep:" " pp_inner) l
   | Bind (s, v, t) ->
       Format.fprintf out "@[<2>%a %a%a.@ %a@]"
-        Binder.pp s Var.pp_full v pp_var_ty v pp_inner t
+        Binder.pp s Var.pp_fullc v pp_var_ty v pp_inner t
   | Record (l, None) ->
       Format.fprintf out "{%a}" pp_fields l
   | Record (l, Some r) ->
@@ -878,7 +878,7 @@ let apply_unify ?allow_open ?loc ?st ?(subst=Subst.empty) ty l =
   | Ty.Forall (v,ty'), a :: l' ->
       let ty_a = ty_exn a in
       unify ?allow_open ?loc ?st ~subst ty_a tType;
-      Util.debugf ~section 5 "@[bind %a to @[%a@]@]" (fun k->k Var.pp_full v pp a);
+      Util.debugf ~section 5 "@[bind %a to @[%a@]@]" (fun k->k Var.pp_fullc v pp a);
       aux (Subst.add subst v a) ty' l'
   | Ty.Fun (exp, ret), _ ->
       aux_l subst exp ret l

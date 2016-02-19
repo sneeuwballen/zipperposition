@@ -38,6 +38,7 @@ val hash_fun : _ t CCHash.hash_fun
 val pp : _ t CCFormat.printer
 val to_string : _ t -> string
 val pp_full : _ t CCFormat.printer
+val pp_fullc : _ t CCFormat.printer (** With color *)
 
 module Set : sig
   type +'a t
