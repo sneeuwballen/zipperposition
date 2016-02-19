@@ -13,8 +13,8 @@ assert forall x y. plus (S x) y = S (plus x y).
 
 val mult : nat -> nat -> nat.
 
-assert forall x. plus Z x = x.
-assert forall x y. plus (S x) y = S (plus x y).
+assert forall x. mult Z x = Z.
+assert forall x y. mult (S x) y = plus y (mult x y).
 
 def two : nat := S (S Z).
 def three : nat := S two.
