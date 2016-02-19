@@ -92,26 +92,23 @@ module Make(L : Bool_lit_intf.S)
     unsat_core_ := unsat_core_fail_;
     eval_ := eval_fail_;
     eval_level_ := eval_fail_;
-    begin try
-      (* add pending clauses *)
-      while not (Queue.is_empty queue_) do
-        let c, tag = Queue.pop queue_ in
-        Util.debugf ~section 4 "@[<hv2>assume@ @[%a@]@]" (fun k->k pp_form (c,tag));
-        S.assume ?tag c
-      done;
-      (* solve *)
-      S.solve ();
+    (* add pending clauses *)
+    while not (Queue.is_empty queue_) do
+      let c, tag = Queue.pop queue_ in
+      Util.debugf ~section 4 "@[<hv2>assume@ @[%a@]@]" (fun k->k pp_form (c,tag));
+      S.assume ?tag c
+    done;
+    (* solve *)
+    begin match S.solve () with
+    | S.Sat ->
       eval_ := S.eval;
       eval_level_ := S.eval_level;
       result_ := Sat;
-    with S.Unsat ->
+    | S.Unsat ->
       result_ := Unsat;
       unsat_core_ := begin
         (* compute Unsat core *)
-        let us = match S.unsat_conflict () with
-          | None -> assert false
-          | Some c -> S.Proof.prove_unsat c |> S.Proof.unsat_core
-        in
+        let us = S.get_proof () |> S.unsat_core in
         (fun k ->
           us
           |> CCList.to_seq
@@ -119,7 +116,7 @@ module Make(L : Bool_lit_intf.S)
             (fun seq ->
               Util.debugf ~section 4 "@[unsat_core:@ @[<hv>%a@]@]"
                 (fun k->k (CCFormat.seq S.Proof.print_clause) seq))
-          |> Sequence.filter_map S.tag_clause
+          |> Sequence.filter_map S.get_tag
           |> Sequence.sort_uniq ~cmp:CCInt.compare
           |> Sequence.iter k)
       end;
