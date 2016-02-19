@@ -33,7 +33,7 @@ let compare i1 i2 = Pervasives.compare i1.id i2.id
 let pp out id = CCFormat.string out id.name
 let to_string = CCFormat.to_string pp
 
-let pp_full out id = Format.fprintf out "%s/%d" id.name id.id
+let pp_full out id = Format.fprintf out "%s/@{<Black>%d@}" id.name id.id
 
 let gensym =
   let r = ref 0 in
