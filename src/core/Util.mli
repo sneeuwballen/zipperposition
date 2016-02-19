@@ -65,6 +65,12 @@ val debugf : ?section:Section.t ->
 val debug : ?section:Section.t -> int -> string -> unit
 (** Cheap non-formatting version of {!debugf} *)
 
+val warn : string -> unit
+(** Emit warning *)
+
+val warnf : ('a, Format.formatter, unit, unit) format4 -> 'a
+(** Emit warning, with formatting *)
+
 val pp_pos : Lexing.position -> string
 
 val set_memory_limit : int -> unit
