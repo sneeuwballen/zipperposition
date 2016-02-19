@@ -1,0 +1,21 @@
+
+# example with most features, including polymorphism
+
+val i : type.
+val foo : i.
+
+data nat :=
+  | Z
+  | S nat
+and list a :=
+  | Nil
+  | Cons a (list a).  # note: polymorphisme explicite, pas de @
+
+def three : nat := S (S (S Z)).
+
+val length : pi a. list a -> nat.
+
+assert forall a. length a (Nil _) = Z.
+assert forall a x l. length a (Cons _ x l) = S (length _ l).
+
+goal exists a l. length a l = three.
