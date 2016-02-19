@@ -45,6 +45,8 @@ let _print_types () =
   FOTerm.print_all_types := true;
   ()
 
+let switch_opt b f = Arg.Unit (fun () -> f b)
+
 let make_other_opts () =
   (* debugf level for every section *)
   Util.Section.iter
@@ -56,17 +58,15 @@ let make_other_opts () =
             " debug level for section " ^ name))
   |> Sequence.to_list
 
-let call_with b f = fun () -> f b
-
 let make () =
   List.rev_append
     [ "--debug", Arg.Int Util.set_debug, " debug level (int)"
     ; "--profile", Arg.Set Util.enable_profiling, " enable profiling"
     ; "--print-types", Arg.Unit _print_types , " print type annotations everywhere"
-    ; "--backtrace", Arg.Unit (call_with true Printexc.record_backtrace), " enable backtraces"
-    ; "--no-backtrace", Arg.Unit (call_with false Printexc.record_backtrace), " disable backtraces"
-    ; "--color", Arg.Unit (call_with true CCFormat.set_color_default), " enable colors"
-    ; "--no-color", Arg.Unit (call_with false CCFormat.set_color_default), " disable colors"
+    ; "--backtrace", switch_opt true Printexc.record_backtrace, " enable backtraces"
+    ; "--no-backtrace", switch_opt false Printexc.record_backtrace, " disable backtraces"
+    ; "--color", switch_opt true CCFormat.set_color_default, " enable colors"
+    ; "--no-color", switch_opt false CCFormat.set_color_default, " disable colors"
     ; "--mem-limit", Arg.Int Util.set_memory_limit, " memory limit (in MB)"
     ; "--stats", Arg.Set stats, " gather and print statistics"
     ; "--input", Arg.String set_in, " set input format (zf or tptp)"

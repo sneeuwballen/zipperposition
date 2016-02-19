@@ -32,6 +32,13 @@ val input : input_format ref
 val output : print_format ref
 (** Output format *)
 
+val switch_opt : bool -> (bool -> unit) -> Arg.spec
+(** [switch_opt b f] is an option that, when parsed, will call [f b]. Useful
+    for
+    {[ [ ("--foo", switch_opt true set_foo, " enable foo"
+       ; ("--no-foo", switch_opt false set_foo, " disable foo"]
+     ]} *)
+
 val make : unit -> (string * Arg.spec * string) list
 (** Produce of list of options suitable for {!Arg.parse}, that may
     modify global parameters and the given option reference. *)
