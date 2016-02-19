@@ -55,8 +55,10 @@ let compute_prec terms =
   (* use extensions *)
   Extensions.extensions ()
     |> List.iter (Extensions.apply_prec cp);
-  (* use "invfreq" *)
-  Compute_prec.add_constr_rule cp 50
+  (* add constraint about inductive constructors *)
+  Compute_prec.add_constr cp 10 Ind_cst.prec_constr;
+  (* use "invfreq", with low priority *)
+  Compute_prec.add_constr_rule cp 90
    (fun seq ->
      seq
      |> Sequence.flat_map FOTerm.Seq.symbols
@@ -245,6 +247,8 @@ let process_file ?meta:_ ~params file =
     |> CCVector.to_seq
     |> Cnf.convert ~file
   in
+  (* declare inductive types *)
+  CCVector.iter Ind_ty.declare_stmt stmts;
   (* compute signature, precedence, ordering *)
   let signature = Statement.signature (CCVector.to_seq stmts) in
   let precedence =
