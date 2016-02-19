@@ -5,12 +5,12 @@ module E = CCError
 
 let () =
   let res = E.(
-    Util_tptp.parse_file ~recursive:true "examples/pelletier_problems/pb47.p"
-    >>= fun s ->
-    Util_tptp.infer_types s
-    >>= fun s' ->
-    let forms = Util_tptp.formulas s' in
-    E.return (Sequence.for_all TT.closed forms)
+    Parsing_utils.parse "examples/pelletier_problems/pb47.p"
+    >>= TypeInference.infer_statements ?ctx:None
+    >|= CCVector.to_seq
+    >|= fun s' ->
+    let forms = Sequence.flat_map Statement.Seq.forms s' in
+    Sequence.for_all TT.closed forms
   ) in
   match res with
   | `Ok true -> ok ()
