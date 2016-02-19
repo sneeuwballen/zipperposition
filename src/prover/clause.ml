@@ -372,9 +372,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   (** {2 IO} *)
 
   let pp out c =
-    let pp_annot selected maxlits i =
-      ""^(if BV.get selected i then "+" else "")
-      ^(if BV.get maxlits i then "*" else "")
+    let pp_selected selected out i =
+      if BV.get selected i then Format.fprintf out "@{<Black>+@}"
+    and pp_maxlit maxlits out i =
+      if BV.get maxlits i then Format.fprintf out "@{<Black>*@}"
     in
     (* print literals with a '*' for maximal, and '+' for selected *)
     let selected = Lazy.force c.selected in
@@ -384,7 +385,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       then CCFormat.string out "⊥"
       else (
         let pp_lit out (i,lit) =
-          Format.fprintf out "@[%a%s@]" Lit.pp lit (pp_annot selected max i)
+          Format.fprintf out "@[%a%a%a@]"
+            Lit.pp lit (pp_selected selected) i (pp_maxlit max) i
         in
         Format.fprintf out "[@[%a@]]"
           (CCFormat.arrayi ~start:"" ~stop:"" ~sep:" ∨ " pp_lit)

@@ -216,7 +216,7 @@ module Make(X : sig
   (** do binary inferences that involve the given clause *)
   let do_binary_inferences c =
     Util.enter_prof prof_generate_binary;
-    Util.debugf ~section 3 "@[<2>do binary inferences with current active set:@ @[%a@]@]"
+    Util.debugf ~section 5 "@[<2>do binary inferences with current active set:@ `@[%a@]`@]"
       (fun k->k C.pp_set (ProofState.ActiveSet.clauses ()));
     (* apply every inference rule *)
     let clauses =
@@ -273,7 +273,7 @@ module Make(X : sig
 
   (** Apply rewrite rules AND evaluation functions *)
   let rewrite c =
-    Util.debugf ~section 5 "rewrite clause@ @[%a@]..." (fun k->k C.pp c);
+    Util.debugf ~section 5 "rewrite clause@ `@[%a@]`..." (fun k->k C.pp c);
     let applied_rules = ref StrSet.empty in
     let rec reduce_term rules t =
       match rules with
@@ -283,7 +283,7 @@ module Make(X : sig
           | None -> reduce_term rules' t (* try next rules *)
           | Some t' ->
               applied_rules := StrSet.add name !applied_rules;
-              Util.debugf ~section 5 "@[rewrite @[%a@]@ into @[%a@]@]"
+              Util.debugf ~section 5 "@[rewrite `@[%a@]`@ into `@[%a@]`@]"
                 (fun k->k T.pp t T.pp t');
               reduce_term !_rewrite_rules t'  (* re-apply all rules *)
           end
@@ -300,7 +300,7 @@ module Make(X : sig
       let rule = ProofStep.mk_rule ~comment:(StrSet.to_list !applied_rules) "rw" in
       let proof = ProofStep.mk_simp ~rule [C.proof c] in
       let c' = C.create_a ~trail:(C.trail c) lits' proof in
-      Util.debugf ~section 3 "@[term rewritten clause @[%a@]@ into @[%a@]"
+      Util.debugf ~section 3 "@[term rewritten clause `@[%a@]`@ into `@[%a@]`"
         (fun k->k C.pp c C.pp c');
       SimplM.return_new c'
     )
@@ -316,7 +316,7 @@ module Make(X : sig
           then rewrite_lit rules' lit
           else begin
             applied_rules := StrSet.add name !applied_rules;
-            Util.debugf ~section 5 "@[rewritten lit @[%a@]@ into @[%a@]@ (using %s)@]"
+            Util.debugf ~section 5 "@[rewritten lit `@[%a@]`@ into `@[%a@]`@ (using %s)@]"
               (fun k->k Lit.pp lit Lit.pp lit' name);
             rewrite_lit !_lit_rules lit'
           end
@@ -330,7 +330,7 @@ module Make(X : sig
       let rule = ProofStep.mk_rule ~comment:(StrSet.to_list !applied_rules) "rw_lit" in
       let proof = ProofStep.mk_simp ~rule [C.proof c]  in
       let c' = C.create_a ~trail:(C.trail c) lits proof in
-      Util.debugf ~section 3 "@[lit rewritten @[%a@]@ into @[%a@]@]"
+      Util.debugf ~section 3 "@[lit rewritten `@[%a@]`@ into `@[%a@]`@]"
         (fun k->k C.pp c C.pp c');
       SimplM.return_new c'
     )
@@ -409,7 +409,7 @@ module Make(X : sig
         active_simplify >>= fun c ->
         if not (Lits.equal_com (C.lits c) (C.lits old_c))
         then
-          Util.debugf ~section 2 "@[clause @[%a@]@ simplified into @[%a@]@]"
+          Util.debugf ~section 2 "@[clause `@[%a@]`@ simplified into `@[%a@]`@]"
             (fun k->k C.pp old_c C.pp c);
         SimplM.return_same c)
       c
@@ -473,7 +473,7 @@ module Make(X : sig
            | `New ->
                (* the active clause has been simplified! *)
                Util.debugf ~section 2
-                 "@[active clause @[%a@]@ simplified into @[%a@]@]"
+                 "@[active clause `@[%a@]@ simplified into `@[%a@]`@]"
                  (fun k->k C.pp c C.pp c');
                C.ClauseSet.add c before, c' :: after)
         candidates (C.ClauseSet.empty, [])
@@ -490,7 +490,7 @@ module Make(X : sig
            | Some clauses ->
                let clauses = List.map (fun c -> SimplM.get (basic_simplify c)) clauses in
                Util.debugf ~section 3
-                "@[active clause @[%a@]@ simplified into clauses @[%a@]@]"
+                "@[active clause `@[%a@]`@ simplified into clauses `@[%a@]`@]"
                  (fun k->k C.pp c (CCFormat.list C.pp) clauses);
                (c, clauses) :: set)
         (ProofState.ActiveSet.clauses ()) []

@@ -97,7 +97,7 @@ module Make(E : Env.S) = struct
               (* process the given clause! *)
               Util.incr_stat stat_processed_given;
               Util.debugf ~section 2 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
-              Util.debugf ~section 1 "@[<2>given: @[%a@]@]" (fun k->k Env.C.pp c);
+              Util.debugf ~section 1 "@[<2>given: `@[%a@]`@]" (fun k->k Env.C.pp c);
               (* find clauses that are subsumed by given in active_set *)
               let subsumed_active = Env.C.ClauseSet.to_seq (Env.subsumed_by c) in
               Env.remove_active subsumed_active;
@@ -129,7 +129,7 @@ module Make(E : Env.S) = struct
                      (* keep clauses  that are not redundant *)
                      if Env.is_trivial c || Env.is_active c || Env.is_passive c
                      then (
-                       Util.debugf ~section 5 "clause %a is trivial, dump" (fun k->k Env.C.pp c);
+                       Util.debugf ~section 5 "clause `@[%a@]` is trivial, dump" (fun k->k Env.C.pp c);
                        None
                      ) else Some c)
                   inferred_clauses
