@@ -39,8 +39,9 @@ module Constr : sig
       then we use [b]. *)
 
   val compose_sort : (int * [`partial] t) list -> [`partial] t
-  (** [compose_sort l] sorts the list by decreasing priority (the higher,
-      the earlier an ordering is applied) before composing *)
+  (** [compose_sort l] sorts the list by increasing priority (the lower,
+      the earlier an ordering is applied, and therefore the more
+      impact it has) before composing *)
 
   val make : (ID.t -> ID.t -> int) -> [`partial] t
   (** Create a new partial order.

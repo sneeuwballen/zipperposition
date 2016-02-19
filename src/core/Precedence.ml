@@ -68,9 +68,7 @@ module Constr = struct
 
   let compose_sort l =
     if l=[] then invalid_arg "Precedence.Constr.compose_sort";
-    let l = List.sort
-      (fun (i1,_)(i2,_) -> CCInt.compare i2 i1) l
-    in
+    let l = List.sort (CCFun.compose_binop fst CCInt.compare) l in
     let rec mk = function
       | [] -> assert false
       | [_,o] -> o
@@ -97,7 +95,7 @@ let errorf_ msg = CCFormat.ksprintf msg ~f:error_
 
 type t = {
   mutable snapshot : ID.t list;
-    (* symbols by decreasing order *)
+    (* symbols by increasing order *)
   mutable tbl: int ID.Tbl.t Lazy.t;
     (* symbol -> index in precedence *)
   status: symbol_status ID.Tbl.t;
@@ -143,7 +141,7 @@ module Seq = struct
 end
 
 let pp_ pp_id out l =
-  Format.fprintf out "[@[<2>%a@]]" (Util.pp_list ~sep:" > " pp_id) l
+  Format.fprintf out "[@[<2>%a@]]" (Util.pp_list ~sep:" < " pp_id) l
 
 let pp_snapshot out l = pp_ ID.pp out l
 
@@ -191,7 +189,7 @@ let check_inv_ p =
   let rec sorted_ = function
     | [] | [_] -> true
     | s :: ((s' :: _) as tail) ->
-        p.constr s s' > 0
+        p.constr s s' < 0
         &&
         sorted_ tail
   in
@@ -222,6 +220,7 @@ let add p s =
   (* compute new snapshot, but only update precedence if the symbol is new *)
   let snapshot, is_new = insert_ s p.snapshot in
   if is_new then (
+    assert (check_inv_ p);
     p.snapshot <- snapshot;
     p.tbl <- lazy (mk_tbl_ snapshot);
   )
