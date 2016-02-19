@@ -2,3 +2,5 @@ x 2016-01-15 2016-01-15 cleanup proof representation
 x 2016-01-22 2016-01-22 tool tptp_to_zf
 x 2016-01-22 2016-01-15 new ML-like syntax with explicit type decls, ind types, rewrite rules
 x 2016-01-29 2016-01-20 use msat.eval_level to prune clauses in Avatar (if trail false forever)
+x 2016-02-19 2016-01-15 add inductive types in intermediate AST(s), added by preprocessing from TPTP
+x 2016-02-19 2016-01-29 in avatar, use simplify_trail as backward simplification too (filter active set)
