@@ -33,6 +33,7 @@ type 'a or_error = [`Error of string | `Ok of 'a]
 type type_ = TypedSTerm.t
 type untyped = STerm.t (** untyped term *)
 type typed = TypedSTerm.t (** typed term *)
+type loc = ParseLocation.t
 
 exception Error of string
 
@@ -86,7 +87,7 @@ module Ctx : sig
       and reset it. *)
 end
 
-val unify : ?loc:ParseLocation.t -> type_ -> type_ -> unit
+val unify : ?loc:loc -> type_ -> type_ -> unit
 
 (** {2 Hindley-Milner Type Inference}
 
@@ -126,18 +127,18 @@ val infer_clause_exn : Ctx.t -> untyped list -> typed list
     This section is mostly useful for inferring a signature without
     converting untyped_terms into typed_terms. *)
 
-val constrain_term_term_exn : Ctx.t -> untyped -> untyped -> unit
+val constrain_term_term_exn : ?loc:loc -> Ctx.t -> untyped -> untyped -> unit
 (** Force the two terms to have the same type in this context
     @raise Error if an inconsistency is detected *)
 
-val constrain_term_type_exn : Ctx.t -> untyped -> type_ -> unit
+val constrain_term_type_exn : ?loc:loc -> Ctx.t -> untyped -> type_ -> unit
 (** Force the term's type and the given type to be the same.
     @raise Error if an inconsistency is detected *)
 
-val constrain_term_term : Ctx.t -> untyped -> untyped -> unit or_error
+val constrain_term_term : ?loc:loc -> Ctx.t -> untyped -> untyped -> unit or_error
 (** Safe version of {!constrain_term_term_exn} *)
 
-val constrain_term_type : Ctx.t -> untyped -> type_ -> unit or_error
+val constrain_term_type : ?loc:loc -> Ctx.t -> untyped -> type_ -> unit or_error
 (** Safe version of {!constrain_term_type_exn} *)
 
 (** {2 Statements} *)

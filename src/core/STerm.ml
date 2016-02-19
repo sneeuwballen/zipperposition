@@ -247,9 +247,9 @@ let rec pp out t = match t.term with
       Format.fprintf out "@[<2>%a %a@]"
         pp s (Util.pp_list ~sep:" " pp_inner) l
   | Bind (s, vars, t') ->
-      Format.fprintf out "@[<2>%a[@[%a@]]:@ %a@]"
+      Format.fprintf out "@[<2>%a @[%a@].@ %a@]"
         Binder.pp s
-        (Util.pp_list ~sep:"," pp_typed_var) vars
+        (Util.pp_list ~sep:" " pp_typed_var) vars
         pp t'
   | Record (l, None) ->
       Format.fprintf out "{@[<hv>%a@]}"

@@ -21,13 +21,14 @@ type 'a or_error = [`Error of string | `Ok of 'a]
 type type_ = TypedSTerm.t
 type untyped = STerm.t (** untyped term *)
 type typed = TypedSTerm.t (** typed term *)
+type loc = ParseLocation.t
 
 exception Error of string
 
 let () = Printexc.register_printer
   (function
     | Error msg ->
-        Some (CCFormat.sprintf "@[<2>type inference error:@ %s@]" msg)
+        Some (CCFormat.sprintf "@[<2>@{<Red>type inference error@}:@ %s@]" msg)
     | _ -> None)
 
 (* error-raising function *)
@@ -138,17 +139,25 @@ module Ctx = struct
       env = Hashtbl.copy t.env;
     }
 
-  (* enter new scope for the variable with this name *)
-  let with_var ctx v ~f =
-    let name = Var.name v in
-    Hashtbl.add ctx.env name (`Var v);
+  (* enter new scope for the variables with those names *)
+  let with_vars ctx vs ~f =
+    let names =
+      List.map
+        (fun v ->
+          let name = Var.name v in
+          Hashtbl.add ctx.env name (`Var v);
+          name)
+        vs
+    in
     try
       let x = f () in
-      Hashtbl.remove ctx.env name;
+      List.iter (Hashtbl.remove ctx.env) names;
       x
     with e ->
-      Hashtbl.remove ctx.env name;
+      List.iter (Hashtbl.remove ctx.env) names;
       raise e
+
+  let with_var ctx v ~f = with_vars ctx [v] ~f
 
   let exit_scope ctx =
     List.iter (fun v -> Hashtbl.remove ctx.env (Var.name v)) ctx.local_vars;
@@ -157,9 +166,9 @@ module Ctx = struct
 
   let declare ctx s ty =
     let name = ID.name s in
+    Util.debugf ~section 3 "@{<yellow>declare@} %a:@ @[%a@]" (fun k->k ID.pp s T.pp ty);
     if Hashtbl.mem ctx.env name
-    then Util.debugf ~section 1
-      "@[<2>warning: shadowing identifier %s@]" (fun k->k name);
+    then Util.warnf "@[<2>shadowing identifier %s@]" name;
     Hashtbl.add ctx.env name (`ID (s,ty))
 
   let add_to_set_to_default ctx v =
@@ -257,6 +266,23 @@ end
   - are closed
 *)
 
+(* convert the typed variables into proper variables [vars'], call [f vars'],
+   and then exit the scope of [vars'] *)
+let with_typed_vars_ ?loc ~infer_ty ctx vars ~f =
+  let rec aux acc l = match l with
+    | [] -> f (List.rev acc)
+    | (v,o) :: l' ->
+        let ty = match o with
+          | None -> T.Ty.meta (Ctx.fresh_ty_meta_var ~dest:`ToDefault ctx)
+          | Some ty -> infer_ty ?loc ctx ty
+        in
+        let v = Var.of_string ~ty v in
+        (* enter [v] before dealing with next variables, for they might depend
+           on it (e.g. [forall (a:type)(l:list a). ...]) *)
+        Ctx.with_var ctx v ~f:(fun () -> aux (v :: acc) l')
+  in
+  aux [] vars
+
 (* convert a prolog term into a type *)
 let rec infer_ty_ ?loc ctx ty =
   let rec aux ty = match PT.view ty with
@@ -285,6 +311,7 @@ let rec infer_ty_ ?loc ctx ty =
         T.Ty.const id
     | PT.App (f, l) ->
         begin match PT.view f with
+        | PT.Var name
         | PT.Const name ->
             let id, ty = Ctx.get_id_ ctx ~arity:(List.length l) name in
             unify ?loc (T.Ty.returns ty) T.Ty.tType;
@@ -296,7 +323,7 @@ let rec infer_ty_ ?loc ctx ty =
         | _ -> error_ ?loc "@[<2>cannot apply non-constant@ `@[%a@]`@]" PT.pp f
         end
     | PT.Bind (Binder.ForallTy, vars, body) ->
-        with_typed_vars ?loc ctx vars
+        with_typed_vars_ ?loc ~infer_ty:infer_ty_ ctx vars
           ~f:(fun vars' ->
               (* be sure those are type variables *)
               List.iter (fun v -> unify T.tType (Var.ty v)) vars';
@@ -307,22 +334,12 @@ let rec infer_ty_ ?loc ctx ty =
   in
   aux ty
 
-(* convert the typed variables into proper variables [vars'], call [f vars'],
-   and then exit the scope of [vars'] *)
-and with_typed_vars ?loc ctx vars ~f =
-  let rec aux acc l = match l with
-    | [] -> f (List.rev acc)
-    | (v,o) :: l' ->
-        let ty = match o with
-          | None -> T.Ty.meta (Ctx.fresh_ty_meta_var ~dest:`ToDefault ctx)
-          | Some ty -> infer_ty_ ?loc ctx ty
-        in
-        let v = Var.of_string ~ty v in
-        Ctx.with_var ctx v ~f:(fun () -> aux (v :: acc) l')
-  in
-  aux [] vars
+(* XXX: hack: need to define {!with_typed_vars_} before {!infer_ty_}
+   so that it generalizes return type properly *)
+let with_typed_vars ?loc ctx vars ~f =
+  with_typed_vars_ ?loc ~infer_ty:infer_ty_ ctx vars ~f
 
-let infer_ty_exn ctx ty = infer_ty_ ctx ty
+let infer_ty_exn ctx ty = infer_ty_ ?loc:(PT.loc ty) ctx ty
 
 let infer_ty ctx ty =
   try Err.return (infer_ty_exn ctx ty)
@@ -332,7 +349,7 @@ let infer_ty ctx ty =
    continuation to build a typed term. *)
 let rec infer_rec ctx t =
   let loc = PT.loc t in
-  match PT.view t with
+  let t' = match PT.view t with
   | PT.Var name ->
       begin match Ctx.get_var_ ctx name with
       | `Var v -> T.var v
@@ -476,6 +493,10 @@ let rec infer_rec ctx t =
           let ty = T.apply_unify ~allow_open:true ?loc ty_b l in
           T.app_builtin ?loc ~ty b l
       end
+  in
+  Util.debugf ~section 5 "@[<hv2>typing of@ `@[%a@]`@ yields `@[%a@]`@ : `@[%a@]`@]"
+    (fun k->k PT.pp t T.pp t' T.pp (T.ty_exn t'));
+  t'
 
 (* infer a term, and force its type to [prop] *)
 and infer_prop_ ctx t =
@@ -511,25 +532,25 @@ let infer_clause_exn ctx c =
     raise e
 
 let infer_prop_exn ctx t =
-  let t = infer_exn ctx t in
-  unify (T.ty_exn t) T.prop;
-  t
+  let t' = infer_exn ctx t in
+  unify ?loc:(PT.loc t) (T.ty_exn t') T.prop;
+  t'
 
-let constrain_term_term_exn ctx t1 t2 =
+let constrain_term_term_exn ?loc ctx t1 t2 =
   let t1 = infer_exn ctx t1 in
   let t2 = infer_exn ctx t2 in
-  unify (T.ty_exn t1) (T.ty_exn t2)
+  unify ?loc (T.ty_exn t1) (T.ty_exn t2)
 
-let constrain_term_term ctx t1 t2 =
-  try Err.return (constrain_term_term_exn ctx t1 t2)
+let constrain_term_term ?loc ctx t1 t2 =
+  try Err.return (constrain_term_term_exn ?loc ctx t1 t2)
   with e -> Err.of_exn_trace e
 
-let constrain_term_type_exn ctx t ty =
+let constrain_term_type_exn ?loc ctx t ty =
   let t = infer_exn ctx t in
-  unify ty (T.ty_exn t)
+  unify ?loc ty (T.ty_exn t)
 
-let constrain_term_type ctx t ty =
-  try Err.return (constrain_term_type_exn ctx t ty)
+let constrain_term_type ?loc ctx t ty =
+  try Err.return (constrain_term_type_exn ?loc ctx t ty)
   with e -> Err.of_exn_trace e
 
 (** {2 Statements} *)
@@ -540,12 +561,12 @@ module A = UntypedAST
 module Stmt = Statement
 
 let infer_statement_exn ctx st =
-  Util.debugf ~section 3 "@[<2>infer types for statement@ @[%a@]@]"
+  Util.debugf ~section 3 "@[<2>infer types for @{<yellow>statement@}@ `@[%a@]`@]"
     (fun k->k A.pp_statement st);
   (* auxiliary statements *)
   let src = st.A.attrs in
-  let st =
-    match st.A.stmt with
+  let loc = st.A.loc in
+  let st = match st.A.stmt with
     | A.Decl (s,ty) ->
         (* new type
            TODO: warning if it shadows? *)
@@ -559,14 +580,54 @@ let infer_statement_exn ctx st =
         let t = infer_exn ctx t in
         Ctx.declare ctx id ty;
         Stmt.def ~src id ty t
-    | A.Data _ ->
-        assert false
-        (* TODO:
-          - declare all the variables (and type variables)
-          - infer types for all constructors (+ check return type)
-          - check consistency (no other type variable than the ones quantified)
-          - output Stmt.data
-          - also use Ind_types? *)
+    | A.Data l ->
+        (* declare the inductive types *)
+        let data_types =
+          List.map
+            (fun d ->
+              let data_ty = ID.make d.A.data_name in
+              (* the type [data_ty : type -> type -> ... -> type] *)
+              let ty_of_data_ty =
+                T.Ty.fun_ (List.map (fun _ -> T.Ty.tType) d.A.data_vars) T.Ty.tType
+              in
+              Ctx.declare ctx data_ty ty_of_data_ty;
+              data_ty, ty_of_data_ty)
+            l
+        in
+        (* now we can infer the types of each constructor *)
+        let l' =
+          List.map2
+            (fun d (data_ty,ty_of_data_ty) ->
+              (* locally, declare type variables *)
+              with_typed_vars ?loc ctx
+                (List.map (fun v->v, Some PT.tType) d.A.data_vars)
+                ~f:(fun ty_vars ->
+                  (* return type of every constructor: [data_ty ty_vars] *)
+                  let ty_ret =
+                    T.Ty.app data_ty (List.map (T.Ty.var ?loc:None) ty_vars)
+                  in
+                  (* infer type of constructors *)
+                  let cstors =
+                    List.map
+                      (fun (name, args) ->
+                        let c_id = ID.make name in
+                        (* type of c: forall ty_vars. ty_args -> ty_ret *)
+                        let ty_args = List.map (infer_ty_exn ctx) args in
+                        let ty_c =
+                          T.Ty.forall_l ty_vars (T.Ty.fun_ ty_args ty_ret)
+                        in
+                        Ctx.declare ctx c_id ty_c;
+                        (* TODO: check absence of other type variables in ty_c *)
+                        c_id, ty_c)
+                      d.A.data_cstors
+                  in
+                  Stmt.mk_data data_ty ty_of_data_ty ~args:ty_vars cstors
+                ))
+            l
+            data_types
+        in
+        Ctx.exit_scope ctx;
+        Stmt.data ~src l'
     | A.Assert t ->
         let t = infer_prop_exn ctx t in
         Stmt.assert_ ~src t
