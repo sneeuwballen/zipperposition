@@ -28,16 +28,16 @@ and view =
   | Record of (string * t) list * t option (** extensible record *)
   | Meta of meta_var (** Unification variable *)
 
-and meta_var = t Var.t * t option ref
+and meta_var = t Var.t * t option ref * [`Generalize | `BindDefault]
 
 type term = t
 
 let rec deref t = match t.term with
-  | Meta (_, {contents=Some t'}) -> deref t'
+  | Meta (_, {contents=Some t'}, _) -> deref t'
   | _ -> t
 
 let view t = match t.term with
-  | Meta (_, {contents=Some t'}) -> (deref t').term
+  | Meta (_, {contents=Some t'}, _) -> (deref t').term
   | v -> v
 
 let loc t = t.loc
@@ -84,7 +84,7 @@ let rec compare t1 t2 = match view t1, view t2 with
         CCOpt.compare compare rest1 rest2
         <?> (cmp_fields, l1, l2)
       )
-  | Meta (id1,_), Meta (id2,_) -> Var.compare id1 id2
+  | Meta (id1,_,_), Meta (id2,_,_) -> Var.compare id1 id2
   | Var _, _
   | Const _, _
   | App _, _
@@ -111,7 +111,7 @@ let rec hash_fun t h = match t.term with
   | Record (l, rest) ->
     h |> Hash.opt hash_fun rest
       |> Hash.list_ (fun (n,t) h -> Hash.string_ n (hash_fun t h)) l
-  | Meta (id,_) -> Var.hash_fun id h
+  | Meta (id,_,_) -> Var.hash_fun id h
 
 let hash x = Hash.apply hash_fun x
 
@@ -143,7 +143,7 @@ let rec pp out t = match view t with
       Format.fprintf out "@[<2>%a@ %a@]" Builtin.pp b (Util.pp_list pp_inner) l
   | Multiset l ->
       Format.fprintf out "[@[%a@]]" (Util.pp_list ~sep:", " pp_inner) l
-  | Meta (id, r) ->
+  | Meta (id, r, _) ->
       assert (!r = None); (* we used {!view} *)
       Format.fprintf out "?%a" Var.pp id
 and pp_inner out t = match view t with
@@ -183,11 +183,8 @@ let const ?loc ~ty s = make_ ?loc ~ty (Const s)
 let app_builtin ?loc ~ty b l = make_ ?loc ~ty (AppBuiltin (b,l))
 let builtin ?loc ~ty b = make_ ?loc ~ty (AppBuiltin (b,[]))
 
-let meta ?loc (v, r) =
-  make_ ?loc ~ty:v.Var.ty (Meta (v,r))
-
-let meta_of_string ?loc ~ty name =
-  make_ ?loc ~ty (Meta (Var.of_string ~ty name, ref None))
+let meta ?loc (v, r, k) =
+  make_ ?loc ~ty:v.Var.ty (Meta (v,r,k))
 
 let app ?loc ~ty s l = match view s, l with
   | _, [] -> s
@@ -279,9 +276,9 @@ module Seq = struct
     subterms t
       |> Sequence.filter_map
         (fun t -> match view t with
-          | Meta (a,r) ->
+          | Meta (a,r,k) ->
               assert (!r=None);
-              Some (a, r)
+              Some (a, r, k)
           | _ -> None)
 
   let subterms_with_bound t k =
@@ -326,7 +323,7 @@ let rec is_ground t =
       &&
       List.for_all (fun (_,t') -> is_ground t') l
   | Multiset l -> List.for_all is_ground l
-  | Meta (_,_) -> false
+  | Meta _ -> false
 
 let var_occurs ~var t =
   Seq.vars t
@@ -374,7 +371,7 @@ module Ty = struct
           | Var r -> Record (l, Some r)
           | _ -> assert false
         end
-    | Meta (v,o) -> Meta (v,o)
+    | Meta (v,o,k) -> Meta (v,o,k)
     | AppBuiltin (Builtin.Prop, []) -> Builtin Prop
     | AppBuiltin (Builtin.TType, []) -> Builtin TType
     | AppBuiltin (Builtin.TyInt, []) -> Builtin Int
@@ -630,9 +627,9 @@ module Subst = struct
     | Multiset l ->
         let ty = eval subst (ty_exn t) in
         multiset ?loc:t.loc ~ty (eval_list subst l)
-    | Meta (v,r) ->
+    | Meta (v,r,k) ->
         let v = Var.update_ty v ~f:(eval subst) in
-        meta ?loc:t.loc (v, r)
+        meta ?loc:t.loc (v, r, k)
   and eval_list subst l = List.map (eval subst) l
 end
 
@@ -726,7 +723,7 @@ let occur_check_ ~allow_open ~subst v t =
 let are_same_meta_ r1 r2 = match r1, r2 with
   | Some r1, Some r2 ->
       begin match view r1, view r2 with
-        | Meta (v1, _), Meta (v2, _) -> Var.equal v1 v2
+        | Meta (v1, _, _), Meta (v2, _, _) -> Var.equal v1 v2
         | _ -> false
       end
   | _ -> false
@@ -755,13 +752,20 @@ let unify ?(allow_open=false) ?loc ?(st=UStack.create()) ?(subst=Subst.empty) t1
         unif_rec subst (Subst.find_exn subst v) t2
     | _, Var v when Subst.mem subst v ->
         unif_rec subst t1 (Subst.find_exn subst v)
-    | Meta (v1,_), Meta (v2,_) when Var.equal v1 v2 -> ()
-    | Meta (_, r), _ ->
+    | Meta (v1,r1,k1), Meta (v2,r2,_) ->
+        if Var.equal v1 v2 then ()
+        else (
+          (* if some meta is [`BindDefault] and the other is [`Generalize],
+             the former remains unbound, to avoid scope escaping *)
+          let r, t = if k1=`BindDefault then r2, t1 else r1, t2 in
+          UStack.bind ~st r (Subst.eval subst t)
+        )
+    | Meta (_, r, _), _ ->
         assert (!r = None);
         if occur_check_ ~allow_open ~subst t1 t2
           then fail_ "occur check"
           else UStack.bind ~st r (Subst.eval subst t2)
-    | _, Meta (_, r) ->
+    | _, Meta (_, r, _) ->
         assert (!r = None);
         if occur_check_ ~allow_open ~subst t2 t1
           then fail_ "occur check"
@@ -858,7 +862,7 @@ let unify ?(allow_open=false) ?loc ?(st=UStack.create()) ?(subst=Subst.empty) t1
     | None, _::_ -> fail_ "row is absent, cannot match %a" pp_fields rest
     | Some t, _ ->
         begin match view t, rest with
-        | Meta (_, v), _ ->
+        | Meta (_, v, _), _ ->
             let t' = record ~ty rest ~rest:None in
             if occur_check_ ~allow_open ~subst t t'
             then fail_ "occur-check of the row %a in @[%a@]" pp t pp t'

@@ -70,17 +70,13 @@ module Ctx : sig
 
   val exit_scope : t -> unit
   (** Exit the current scope (formula, clause), meaning that all free
-      variables' types are forgotten. *)
+      variables' types are forgotten.
+      Some free variables are bound to the [default] type provided
+      at creation of the context.
+      Some ree variables will be generalized, i.e., kept as (free) variables *)
 
   val declare : t -> ID.t -> type_ -> unit
   (** Declare the type of a symbol, possibly shadowing a previous version  *)
-
-  val bind_to_default : t -> unit
-  (** Free constructor variables are bound to the [default] type provided
-      at creation of the context. *)
-
-  val generalize : t -> unit
-  (** Free constructor variables will be generalized, i.e., kept as (free) variables *)
 
   val pop_new_types : t -> (ID.t * type_) list
   (** Obtain the list of symbols whose type has been inferred recently,

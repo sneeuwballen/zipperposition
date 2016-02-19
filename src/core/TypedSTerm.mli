@@ -21,8 +21,9 @@ type view = private
   | Record of (string * t) list * t option (** extensible record *)
   | Meta of meta_var (** Unification variable *)
 
-(* a variable with a one-shot binding *)
-and meta_var = t Var.t * t option ref
+(* a variable with a one-shot binding, and some annotation about
+   whether it can be generalized *)
+and meta_var = t Var.t * t option ref * [`Generalize | `BindDefault]
 
 val view : t -> view
 val loc : t -> location option
@@ -51,7 +52,6 @@ val bind : ?loc:location -> ty:t -> Binder.t -> t Var.t -> t -> t
 val bind_list : ?loc:location -> ty:t -> Binder.t -> t Var.t list -> t -> t
 val multiset : ?loc:location -> ty:t -> t list -> t
 val meta : ?loc:location -> meta_var -> t
-val meta_of_string : ?loc:location -> ty:t -> string -> t (** Fresh meta *)
 val record : ?loc:location -> ty:t -> (string*t) list -> rest:t Var.t option -> t
 val record_flatten : ?loc:location -> ty:t -> (string*t) list -> rest:t option -> t
 (** Build a record with possibly a row variable.
@@ -199,7 +199,7 @@ module Seq : sig
   val subterms_with_bound : t -> (t * t Var.Set.t) Sequence.t
   val vars : t -> t Var.t Sequence.t
   val free_vars : t -> t Var.t Sequence.t
-  val metas : t -> (t Var.t * t option ref) Sequence.t
+  val metas : t -> meta_var Sequence.t
 end
 
 (** {2 Substitutions} *)

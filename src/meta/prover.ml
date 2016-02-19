@@ -67,8 +67,6 @@ let __clause_of_ast ~ctx ast =
                t')
             body
         in
-        (* generalize *)
-        TypeInference.Ctx.generalize ctx;
         (* forget types of free variables *)
         TypeInference.Ctx.exit_scope ctx;
         let head' = HOTerm.of_simple_term head' in

@@ -113,10 +113,9 @@ module Ctx = struct
     default: type_;
     env : env;
       (* map names to variables or IDs *)
-    mutable to_set_to_default : T.meta_var list;
-      (* variables that should be set to [default] is they are not bound *)
-    mutable to_generalize : T.meta_var list;
-      (* variables that should be generalized in the global scope *)
+    mutable new_metas: T.meta_var list;
+      (* variables that should be generalized in the global scope
+         or bound to [default], if they are not bound *)
     mutable local_vars: T.t Var.t list;
       (* free variables in the local scope *)
     mutable new_types: (ID.t * type_) list;
@@ -127,8 +126,7 @@ module Ctx = struct
     let ctx = {
       default;
       env = Hashtbl.create 32;
-      to_set_to_default = [];
-      to_generalize = [];
+      new_metas=[];
       local_vars = [];
       new_types = [];
     } in
@@ -159,9 +157,28 @@ module Ctx = struct
 
   let with_var ctx v ~f = with_vars ctx [v] ~f
 
+  (* only specialize/generalize variable if it's not bound *)
+  let bind_meta ctx (v, r, k) =
+    match !r, k with
+    | None, `BindDefault ->
+        let ty = ctx.default in
+        Util.debugf ~section 5 "@[<2>specialize type meta_var %a to@ @[%a@]@]"
+          (fun k->k Var.pp v T.pp ty);
+        r := Some ty
+    | None, `Generalize ->
+        let v' = Var.copy v in
+        Util.debugf ~section 5 "@[<2>generalize type meta_var %a@]"
+          (fun k->k Var.pp v);
+        r := Some (T.var v')
+    | Some _, _ -> ()
+
   let exit_scope ctx =
     List.iter (fun v -> Hashtbl.remove ctx.env (Var.name v)) ctx.local_vars;
     ctx.local_vars <- [];
+    (* try to bind the variable (generalizing or binding to default).
+       Will fail if already bound to something else, which is fine. *)
+    List.iter (bind_meta ctx) ctx.new_metas;
+    ctx.new_metas <- [];
     ()
 
   let declare ctx s ty =
@@ -171,19 +188,13 @@ module Ctx = struct
     then Util.warnf "@[<2>shadowing identifier %s@]" name;
     Hashtbl.add ctx.env name (`ID (s,ty))
 
-  let add_to_set_to_default ctx v =
-    ctx.to_set_to_default <- v :: ctx.to_set_to_default
-
   (* generate fresh type var. *)
-  let fresh_ty_meta_var ?(dest=`ToDefault) ctx : T.meta_var =
+  let fresh_ty_meta_var ?(dest=`BindDefault) ctx : T.meta_var =
     let v = Var.gensym ~ty:T.tType () in
     let r = ref None in
-    begin match dest with
-      | `ToDefault -> add_to_set_to_default ctx (v,r);
-      | `ToGeneralize -> ctx.to_generalize <- (v,r) :: ctx.to_generalize;
-      | `ToNowhere -> ()
-    end;
-    v, r
+    let meta = v, r, dest in
+    ctx.new_metas <- meta :: ctx.new_metas;
+    meta
 
   (* generate [n] fresh type meta vars *)
   let rec fresh_ty_meta_vars ?dest ctx n =
@@ -191,8 +202,9 @@ module Ctx = struct
     then []
     else fresh_ty_meta_var ?dest ctx :: fresh_ty_meta_vars ?dest ctx (n-1)
 
-  (* Fresh function type with [arity] arguments *)
-  let fresh_fun_ty ?(dest=`ToDefault) ~arity ctx =
+  (* Fresh function type with [arity] arguments. Type meta-vars should
+     not be generalized but bound to default. *)
+  let fresh_fun_ty ?(dest=`BindDefault) ~arity ctx =
     let ret = fresh_ty_meta_var ~dest ctx in
     let new_vars = fresh_ty_meta_vars ~dest ctx arity in
     let ty = T.Ty.fun_ (List.map (fun v->T.Ty.meta v) new_vars) (T.Ty.meta ret) in
@@ -216,42 +228,11 @@ module Ctx = struct
   let get_var_ ctx v =
     try Hashtbl.find ctx.env v
     with Not_found ->
-      let ty_v = fresh_ty_meta_var ~dest:`ToDefault ctx in
+      let ty_v = fresh_ty_meta_var ~dest:`Generalize ctx in
       let v' = Var.of_string ~ty:(T.Ty.meta ty_v) v in
       ctx.local_vars <- v' :: ctx.local_vars;
       Hashtbl.add ctx.env v (`Var v');
       `Var v'
-
-  (* only specialize variable if it's not bound *)
-  let specialize_meta ctx (v, r) =
-    match !r with
-    | None ->
-        let ty = ctx.default in
-        Util.debugf ~section 5 "@[<2>specialize type meta_var %a to@ @[%a@]@]"
-          (fun k->k Var.pp v T.pp ty);
-        r := Some ty
-    | Some _ -> ()
-
-  let bind_to_default ctx =
-    (* try to bind the variable. Will fail if already bound to
-       something else, which is fine. *)
-    List.iter (specialize_meta ctx) ctx.to_set_to_default;
-    ctx.to_set_to_default <- [];
-    ()
-
-  let generalize_meta (v, r) =
-    match !r with
-    | None ->
-        let v' = Var.copy v in
-        Util.debugf ~section 5 "@[<2>generalize type meta_var %a@]"
-          (fun k->k Var.pp v);
-        r := Some (T.var v')
-    | Some _ -> ()
-
-  let generalize ctx =
-    List.iter generalize_meta ctx.to_generalize;
-    ctx.to_generalize <- [];
-    ()
 
   let pop_new_types ctx =
     let l = ctx.new_types in
@@ -273,7 +254,7 @@ let with_typed_vars_ ?loc ~infer_ty ctx vars ~f =
     | [] -> f (List.rev acc)
     | (v,o) :: l' ->
         let ty = match o with
-          | None -> T.Ty.meta (Ctx.fresh_ty_meta_var ~dest:`ToDefault ctx)
+          | None -> T.Ty.meta (Ctx.fresh_ty_meta_var ~dest:`Generalize ctx)
           | Some ty -> infer_ty ?loc ctx ty
         in
         let v = Var.of_string ~ty v in
@@ -377,9 +358,8 @@ let rec infer_rec ctx t =
       let ty = T.apply_unify ?loc ~allow_open:true (T.ty_exn f) l in
       T.app ?loc ~ty f l
   | PT.List [] ->
-      let v = Ctx.fresh_ty_meta_var ~dest:`ToDefault ctx in
+      let v = Ctx.fresh_ty_meta_var ~dest:`Generalize ctx in
       let ty = T.Ty.multiset (T.Ty.meta v) in
-      Ctx.add_to_set_to_default ctx v;
       T.multiset ?loc ~ty []
   | PT.List (t::l) ->
       let t = infer_rec ctx t in
@@ -407,7 +387,7 @@ let rec infer_rec ctx t =
       T.record ~ty ?loc l ~rest
   | PT.AppBuiltin (Builtin.Wildcard, []) ->
       (* make a new TYPE variable *)
-      let v = Ctx.fresh_ty_meta_var ~dest:`ToDefault ctx in
+      let v = Ctx.fresh_ty_meta_var ~dest:`Generalize ctx in
       T.Ty.meta v
   | PT.AppBuiltin (Builtin.Arrow, ret :: args) ->
       let ret = infer_ty_exn ctx ret in
@@ -485,7 +465,7 @@ let rec infer_rec ctx t =
               Util.debugf ~section 5
                 "@[<2>add %d implicit type arguments to@ `@[<1>%a@ (%a)@]`@]"
                 (fun k->k i Builtin.pp b (Util.pp_list T.pp) l);
-              let metas = Ctx.fresh_ty_meta_vars ~dest:`ToGeneralize ctx i in
+              let metas = Ctx.fresh_ty_meta_vars ~dest:`Generalize ctx i in
               let metas = List.map (T.Ty.meta ?loc) metas in
               metas @ l
             ) else l
@@ -636,7 +616,7 @@ let infer_statement_exn ctx st =
         Stmt.goal ~src t
   in
   (* be sure to bind the remaining meta variables *)
-  Ctx.bind_to_default ctx;
+  Ctx.exit_scope ctx;
   let aux =
     Ctx.pop_new_types ctx
     |> List.map (fun (id,ty) -> Stmt.ty_decl ~src:A.default_attrs id ty)

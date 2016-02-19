@@ -15,7 +15,7 @@ def three : nat := S (S (S Z)).
 
 val length : pi a. list a -> nat.
 
-assert forall a. length a (Nil _) = Z.
-assert forall a x l. length a (Cons _ x l) = S (length _ l).
+assert length _ (Nil _) = Z.
+assert forall x l. length _ (Cons _ x l) = S (length _ l).
 
 goal exists a l. length a l = three.
