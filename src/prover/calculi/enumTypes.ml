@@ -21,6 +21,15 @@ let stat_instantiate = Util.mk_stat "enum_types.instantiate_axiom"
 
 let section = Util.Section.make ~parent:Const.section "enum_ty"
 
+exception Error of string
+
+let () = Printexc.register_printer
+  (function Error s -> Some ("error in enum_types: " ^s)
+  | _ -> None)
+
+let error_ s = raise (Error s)
+let errorf_ msg = CCFormat.ksprintf msg ~f:error_
+
 (** {2 Inference rules} *)
 
 module type S = sig
@@ -85,11 +94,11 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* declare an enumerated type *)
   let _declare ~ty ~var ~proof cases =
     if List.exists (fun t -> not (Type.equal ty (T.ty t))) cases
-    then failwith "EnumTypes: invalid declaration (type mismatch)";
+    then errorf_ "invalid declaration @[%a@]@ (type mismatch)" (Util.pp_list T.pp) cases;
     if Type.is_var ty
-    then failwith "EnumTypes: cannot declare enum for type variable";
+    then errorf_ "cannot declare enum for type variable %a" Type.pp ty;
     if not (_check_uniq_var_cond ~var cases)
-    then failwith "EnumTypes: invalid declaration (free variables)";
+    then errorf_ "invalid declaration %a (free variables)" (Util.pp_list T.pp) cases;
     if List.exists (fun decl -> Unif.Ty.are_variant ty decl.decl_ty) !_decls
     then (
       Util.debugf ~section 3 "@[an enum is already declared for type %a@]" (fun k->k Type.pp ty);
@@ -99,11 +108,12 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k->k Type.pp ty HVar.pp var (Util.pp_list ~sep:"|" T.pp) cases);
       Util.incr_stat stat_declare;
       (* set of already declared symbols *)
-      let decl_symbols = List.fold_left
+      let decl_symbols =
+        List.fold_left
           (fun set t -> match T.head t with
-             | None -> failwith "EnumTypes: non-symbolic case?"
-             | Some s -> ID.Set.add s set
-          ) ID.Set.empty cases
+             | None -> errorf_ "non-symbolic case @[%a@]" T.pp t
+             | Some s -> ID.Set.add s set)
+          ID.Set.empty cases
       in
       let decl = {
         decl_ty=ty;
@@ -178,9 +188,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> Sequence.flatMap Lit.Seq.terms
     |> Sequence.flatMap T.Seq.subterms_depth
     |> Sequence.fmap
-      (fun (v,depth) ->
-         if depth>0 && T.is_var v then Some v else None
-      )
+      (fun (v,depth) -> if depth>0 && T.is_var v then Some v else None)
     |> T.Seq.add_set T.Set.empty
 
   let _naked_vars lits =
@@ -200,7 +208,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       else _naked_vars (C.lits c)
     in
     let s_c = 0 and s_decl = 1 in
-    let res = CCList.find
+    let res =
+      CCList.find
         (fun v ->
            match _find_match s_decl (T.ty v) s_c with
            | None -> None
@@ -224,10 +233,10 @@ module Make(E : Env.S) : S with module Env = E = struct
                       Util.debugf ~section 3
                         "@[<2>deduce @[%a@]@ from @[%a@]@ @[(enum_type switch on %a)@]@]"
                         (fun k->k C.pp c' C.pp c Type.pp decl.decl_ty);
-                      c'
-                   ) decl.decl_cases
-               )
-        ) vars
+                      c')
+                   decl.decl_cases
+               ))
+        vars
     in
     Util.exit_prof prof_instantiate;
     res
@@ -295,8 +304,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun acc s ty ->
            match check_decl_ s ~ty decl with
            | None -> acc
-           | Some c -> c::acc
-        )
+           | Some c -> c::acc)
     in
     PS.PassiveSet.add (Sequence.of_list clauses)
 
@@ -313,32 +321,27 @@ module Make(E : Env.S) : S with module Env = E = struct
       Env.add_is_trivial is_trivial;
       (* signals: instantiate axioms upon new symbols, or when new
           declarations are added *)
-      Signal.on Ctx.on_new_symbol
-        (fun (s, ty) ->
-           _on_new_symbol s ~ty;
-           Signal.ContinueListening
-        );
-      Signal.on on_new_decl
+      Signal.on_every Ctx.on_new_symbol
+        (fun (s, ty) -> _on_new_symbol s ~ty);
+      Signal.on_every on_new_decl
         (fun decl ->
            _on_new_decl decl;
            (* need to simplify (instantiate) active clauses that have naked
               variables of the given type *)
-           Env.simplify_active_with instantiate_vars;
-           Signal.ContinueListening);
+           Env.simplify_active_with instantiate_vars);
       Signature.iter (Ctx.signature ()) (fun s ty -> _on_new_symbol s ~ty);
       (* detect whether the clause is a declaration of enum type, and if it
           is, declare the type! *)
       let _detect_and_declare c =
-        begin match _detect_declaration c with
+        match _detect_declaration c with
           | None -> ()
           | Some (ty,var,cases) ->
               let is_new = _declare ~ty ~var ~proof:(C.proof c) cases in
               (* clause becomes redundant if it's a new declaration *)
               if is_new then C.set_flag flag_enumeration_clause c true
-        end; Signal.ContinueListening
       in
-      Signal.on PS.PassiveSet.on_add_clause _detect_and_declare;
-      Signal.on PS.ActiveSet.on_add_clause _detect_and_declare;
+      Signal.on_every PS.PassiveSet.on_add_clause _detect_and_declare;
+      Signal.on_every PS.ActiveSet.on_add_clause _detect_and_declare;
     end
 end
 

@@ -28,6 +28,11 @@ type term = FOTerm.t
       [t1 = u1 & ... & tn = un]
     * a disequation [c(t1...tn) != c(u1...un)] simplifies into
       [t1 != u1 || ... || tn != un] (XXX is it really needed?)
+
+  XXX actually this is less specific.
+  Keep this as "enum types" and add inductive-specific rules for
+  disjointness. Inductive types should be declared as enum types
+    and get their own rules (exhaustivity + disjointness)
 *)
 
 module type S = sig
