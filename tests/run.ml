@@ -58,7 +58,8 @@ let test_file f =
       then "-arith -arith-inf-diff-to-lesseq" else "")
   in
   let p = CCUnix.call
-    "./zipperposition.native -timeout %d %s -theory src/builtin.theory %s"
+    (* "./zipperposition.native --timeout %d %s --theory src/builtin.theory %s" *)
+    "./zipperposition.native --timeout %d %s %s"
       !timeout options f
   in
   let actual =
@@ -74,12 +75,15 @@ let test_file f =
   in
   match expected, actual with
   | Unknown, (Sat | Unsat) ->
-      Format.printf "\x1b[34;1mok (better than expected)\x1b[0m@."; true
+      Format.printf "@{<Blue>ok (better than expected)@}@."; true
   | _ when expected = actual ->
-      let color = match expected with Sat | Unsat -> 2 | Unknown | Error -> 3 in
-      Format.printf "\x1b[3%d;1mok\x1b[0m@." color; true
+      let pp_color out () =
+        match expected with
+          | Sat | Unsat -> Format.fprintf out "@{<Green>"
+          | Unknown | Error -> Format.fprintf out "@{<yellow>" in
+      Format.printf "%aok@}@." pp_color (); true
   | _ ->
-    Format.printf "\x1b[31;1mfailure\x1b[0m: expected `%a`, got `%a`@."
+      Format.printf "@{<Red>failure@}: expected `%a`, got `%a`@."
       pp_result expected pp_result actual;
     false
 
@@ -91,6 +95,7 @@ let gather_files () =
   |> List.sort Pervasives.compare
 
 let () =
+  CCFormat.set_color_default true;
   let options = Arg.align [
     "-timeout", Arg.Set_int timeout, " timeout of prover, in seconds"
   ] in
