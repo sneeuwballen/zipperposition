@@ -58,6 +58,8 @@ val add_src :
   ('f, 't, 'ty, UntypedAST.attrs) t ->
   ('f, 't, 'ty, StatementSrc.t) t
 
+val map_data : ty:('ty1 -> 'ty2) -> 'ty1 data -> 'ty2 data
+
 val map :
   form:('f1 -> 'f2) ->
   term:('t1 -> 't2) ->

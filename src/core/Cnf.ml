@@ -641,8 +641,13 @@ let convert ~file seq =
       | Statement.Assert c ->
           let c = clause_to_fo ~ctx:t_ctx c in
           Statement.assert_ ~src c
-      | Statement.Data _ ->
-          assert false (* TODO: convert? or maybe it's here taht *)
+      | Statement.Data l ->
+          let l =
+            List.map
+              (Statement.map_data ~ty:(Type.Conv.of_simple_term_exn ty_ctx))
+              l
+          in
+          Statement.data ~src l
       | Statement.Def (id, ty, t) ->
           let ty = Type.Conv.of_simple_term_exn ty_ctx ty in
           let t = FOTerm.Conv.of_simple_term  t_ctx t in

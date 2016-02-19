@@ -46,20 +46,18 @@ let data ~src l = {src; view=Data l; }
 let assert_ ~src c = {src; view=Assert c; }
 let goal ~src c = {src; view=Goal c; }
 
+let map_data ~ty:fty d =
+  { d with
+    data_args = List.map (Var.update_ty ~f:fty) d.data_args;
+    data_ty = fty d.data_ty;
+    data_cstors = List.map (fun (id,ty) -> id, fty ty) d.data_cstors;
+  }
+
 let map ~form ~term ~ty st =
   let map_view ~form ~term ~ty:fty = function
     | Def (id, ty, t) -> Def (id, fty ty, term t)
     | Data l ->
-        let l =
-          List.map
-            (fun d ->
-              { d with
-                data_args = List.map (Var.update_ty ~f:fty) d.data_args;
-                data_ty = fty d.data_ty;
-                data_cstors = List.map (fun (id,ty) -> id, fty ty) d.data_cstors;
-              })
-            l
-        in
+        let l = List.map (map_data ~ty:fty) l in
         Data l
     | Goal f -> Goal (form f)
     | Assert f -> Assert (form f)
