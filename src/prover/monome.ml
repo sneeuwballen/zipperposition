@@ -17,7 +17,7 @@ type 'a num = {
   sign : 'a -> int;
   abs : 'a -> 'a;
   cmp : 'a -> 'a -> int;
-  hash : 'a -> int64 -> int64;
+  hash : 'a CCHash.hash_fun;
   zero : 'a;
   one : 'a;
   add : 'a -> 'a -> 'a;

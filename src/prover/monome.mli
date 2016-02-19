@@ -21,7 +21,7 @@ type 'a monome = 'a t
 val eq : 'n t -> 'n t -> bool       (* structural equality *)
 val compare : 'n t -> 'n t -> int   (* arbitrary total order on monomes *)
 val hash : _ t -> int
-val hash_fun : _ t -> int64 -> int64
+val hash_fun : _ t CCHash.hash_fun
 
 val ty : _ t -> Type.t   (** type of the monome (int or rat) *)
 
