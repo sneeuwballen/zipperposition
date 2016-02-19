@@ -1,0 +1,15 @@
+
+# Example for exercizing `data`
+# Here, 2+2=4
+
+data nat :=
+  | Z
+  | S nat.
+
+val plus : nat -> nat -> nat.
+
+assert forall x. plus Z x = x.
+assert forall x y. plus (S x) y = S (plus x y).
+
+goal plus (S (S Z)) (S (S Z)) = S (S (S (S Z))).
+
