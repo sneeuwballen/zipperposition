@@ -43,6 +43,7 @@ module type S = sig
 end
 
 let _enable = ref true
+let _set_enable = (:=) _enable
 let _instantiate_shielded = ref false
 let _accept_unary_types = ref false
 
@@ -360,8 +361,11 @@ let () =
   Extensions.register extension;
   Params.add_opts
     [ "--enum-types"
-      , Arg.Bool (fun b -> _enable := b)
-      , " enable/disable special handling for enumerated types"
+      , Options.switch_opt true _set_enable
+      , " enable inferences for enumerated/inductive types"
+    ; "--no-enum-types"
+      , Options.switch_opt false _set_enable
+      , " disable inferences for enumerated/inductive types"
     ; "--enum-shielded"
       , Arg.Bool (fun b -> _instantiate_shielded := b)
       , " enable/disable instantiation of shielded variables of enum type"

@@ -47,6 +47,7 @@ let () =
   Extensions.register AC.extension;
   Extensions.register Heuristics.extension;
   Extensions.register Avatar.extension;
+  Extensions.register EnumTypes.extension;
   ()
 
 (* compute a precedence *)
