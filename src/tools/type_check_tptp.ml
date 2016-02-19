@@ -48,6 +48,7 @@ let check file =
   ()
 
 let main () =
+  CCFormat.set_color_default true;
   let files = ref [] in
   let add_file f = files := f :: !files in
   Arg.parse options add_file "check_tptp [options] [file1|stdin] file2...";

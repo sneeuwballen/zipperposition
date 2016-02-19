@@ -277,6 +277,7 @@ let main file =
 
 (** main entry point *)
 let () =
+  CCFormat.set_color_default true;
   parse_args ();
   match main !file with
   | `Ok () -> ()

@@ -32,6 +32,7 @@ let process file =
 let options = Options.make()
 
 let () =
+  CCFormat.set_color_default true;
   let files = ref [] in
   let add_file f = files := f :: !files in
   Arg.parse options add_file "tptp_to_zf [options] [file|stdin]";
