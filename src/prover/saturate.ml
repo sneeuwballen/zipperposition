@@ -15,7 +15,7 @@ module Sel = Selection
 let stat_redundant_given = Util.mk_stat "redundant given clauses"
 let stat_processed_given = Util.mk_stat "processed given clauses"
 
-let section = Const.section
+let section = Util.Section.make ~parent:Const.section "saturate"
 
 let check_timeout = function
   | None -> false

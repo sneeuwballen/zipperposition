@@ -5,9 +5,9 @@
 
 module Prec = Precedence
 module MT = Multiset.Make(FOTerm)
+module IOB = IDOrBuiltin
 
 open Comparison
-open IDOrBuiltin
 
 let prof_rpo6 = Util.mk_profiler "compare_rpo6"
 let prof_kbo = Util.mk_profiler "compare_kbo"
@@ -67,15 +67,15 @@ end
 
 (* compare the two symbols (ID or builtin) using the precedence *)
 let prec_compare prec a b = match a, b with
-  | I a, I b -> Prec.compare prec a b
-  | I _, B _ -> 1
-  | B _, I _ -> -1
-  | B a, B b -> Builtin.compare a b
+  | IOB.I a, IOB.I b -> Prec.compare prec a b
+  | IOB.I _, IOB.B _ -> 1
+  | IOB.B _, IOB.I _ -> -1
+  | IOB.B a, IOB.B b -> Builtin.compare a b
 
 let prec_status prec = function
-  | I s -> Prec.status prec s
-  | B Builtin.Eq -> Prec.Multiset
-  | B _ -> Prec.Lexicographic
+  | IOB.I s -> Prec.status prec s
+  | IOB.B Builtin.Eq -> Prec.Multiset
+  | IOB.B _ -> Prec.Lexicographic
 
 module KBO : ORD = struct
   let name = "kbo"
@@ -135,8 +135,8 @@ module KBO : ORD = struct
     balance.balance.(idx) <- n - 1
 
   let _weight prec = function
-    | B _ -> 1
-    | I s ->
+    | IOB.B _ -> 1
+    | IOB.I s ->
         let x = Prec.weight prec s in
         assert (x>0);
         x
@@ -158,13 +158,13 @@ module KBO : ORD = struct
       | TC.DB _ -> (if pos then wb + 1 else wb - 1), false
       | TC.App (s, l) ->
           let wb' = if pos
-            then wb + _weight prec (I s)
-            else wb - _weight prec (I s) in
+            then wb + _weight prec (IOB.I s)
+            else wb - _weight prec (IOB.I s) in
           balance_weight_rec wb' l y pos false
       | TC.AppBuiltin (b,l) ->
           let wb' = if pos
-            then wb + _weight prec (B b)
-            else wb - _weight prec (B b) in
+            then wb + _weight prec (IOB.B b)
+            else wb - _weight prec (IOB.B b) in
           balance_weight_rec wb' l y pos false
       | TC.NonFO -> assert false
     (** list version of the previous one, threaded with the check result *)
@@ -214,10 +214,10 @@ module KBO : ORD = struct
           let wb', contains = balance_weight wb t1 (HVar.id y) true in
           (wb' - 1, if contains then Gt else Incomparable)
       (* node/node, De Bruijn/De Bruijn *)
-      | TC.App (f, ss), TC.App (g, ts) -> tckbo_composite wb (I f) (I g) ss ts
-      | TC.AppBuiltin (f, ss), TC.App (g, ts) -> tckbo_composite wb (B f) (I g) ss ts
-      | TC.App (f, ss), TC.AppBuiltin (g, ts) -> tckbo_composite wb (I f) (B g) ss ts
-      | TC.AppBuiltin (f, ss), TC.AppBuiltin (g, ts) -> tckbo_composite wb (B f) (B g) ss ts
+      | TC.App (f, ss), TC.App (g, ts) -> tckbo_composite wb (IOB.I f) (IOB.I g) ss ts
+      | TC.AppBuiltin (f, ss), TC.App (g, ts) -> tckbo_composite wb (IOB.B f) (IOB.I g) ss ts
+      | TC.App (f, ss), TC.AppBuiltin (g, ts) -> tckbo_composite wb (IOB.I f) (IOB.B g) ss ts
+      | TC.AppBuiltin (f, ss), TC.AppBuiltin (g, ts) -> tckbo_composite wb (IOB.B f) (IOB.B g) ss ts
       | TC.DB i, TC.DB j ->
           (wb, if i = j then Eq else Incomparable)
       (* node and something else *)
@@ -250,7 +250,7 @@ module KBO : ORD = struct
               else wb'', Incomparable
     (** recursive comparison *)
     and tckbo_rec wb f g ss ts =
-      if f = g
+      if IOB.equal f g
       then match prec_status prec f with
         | Prec.Multiset ->
             (* use multiset or lexicographic comparison *)
@@ -295,10 +295,10 @@ module RPO6 : ORD = struct
       | TC.NonFO, _
       | _, TC.NonFO -> Comparison.Incomparable
       (* node/node, De Bruijn/De Bruijn *)
-      | TC.App (f, ss), TC.App (g, ts) -> rpo6_composite ~prec s t (I f) (I g) ss ts
-      | TC.AppBuiltin (f, ss), TC.App (g, ts) -> rpo6_composite ~prec s t (B f) (I g) ss ts
-      | TC.App (f, ss), TC.AppBuiltin (g, ts) -> rpo6_composite ~prec s t (I f) (B g) ss ts
-      | TC.AppBuiltin (f, ss), TC.AppBuiltin (g, ts) -> rpo6_composite ~prec s t (B f) (B g) ss ts
+      | TC.App (f, ss), TC.App (g, ts) -> rpo6_composite ~prec s t (IOB.I f) (IOB.I g) ss ts
+      | TC.AppBuiltin (f, ss), TC.App (g, ts) -> rpo6_composite ~prec s t (IOB.B f) (IOB.I g) ss ts
+      | TC.App (f, ss), TC.AppBuiltin (g, ts) -> rpo6_composite ~prec s t (IOB.I f) (IOB.B g) ss ts
+      | TC.AppBuiltin (f, ss), TC.AppBuiltin (g, ts) -> rpo6_composite ~prec s t (IOB.B f) (IOB.B g) ss ts
       | TC.DB i, TC.DB j ->
           if i = j && Type.equal (T.ty s) (T.ty t) then Eq else Incomparable
       (* node and something else *)
