@@ -43,6 +43,10 @@ Flag "solving"
   Description:  Build and install constraint solvers (requires "msat")
   Default:      false
 
+Flag "prover"
+  Description:  Build and install the main prover and its library
+  Default:      true
+
 Flag "qcheck"
   Description:  Build and install QCheck random generators
   Default:      false
@@ -134,8 +138,8 @@ Library "libzipperposition_prover"
                     calculi/Heuristics,
                     meta/MetaProverState, meta/MetaProverState_intf
   InternalModules:  lib/UnionFind, lib/Signal, lib/Simplex
-  Build$:           flag(meta) && flag(parsers)
-  Install$:         flag(meta) && flag(parsers)
+  Build$:           flag(meta) && flag(parsers) && flag(prover)
+  Install$:         flag(meta) && flag(parsers) && flag(prover)
   BuildDepends:     containers, containers.advanced, sequence, gen, unix,
                     zarith, msat,
                     libzipperposition, libzipperposition.meta,
@@ -147,8 +151,8 @@ Executable zipperposition
   Install:          true
   CompiledObject:   native
   MainIs:           zipperposition.ml
-  Build$:           flag(meta) && flag(parsers)
-  Install$:         flag(meta) && flag(parsers)
+  Build$:           flag(meta) && flag(parsers) && flag(prover)
+  Install$:         flag(meta) && flag(parsers) && flag(prover)
   BuildDepends:     containers, sequence, unix,
                     libzipperposition,
                     libzipperposition.parsers,
