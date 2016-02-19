@@ -49,9 +49,9 @@ module Make(Fresh : sig end) = struct
   let pp_payload out = function
     | Fresh -> CCFormat.string out "<dummy>"
     | Clause_component lits ->
-        Format.fprintf out "⟦@[<hv>%a@]⟧" Lits.pp lits
+        Format.fprintf out "@<1>⟦@[<hv>%a@]@<1>⟧" Lits.pp lits
     | Case (c, t) ->
-        Format.fprintf out "⟦@[<hv1>%a@ = @[%a@]@]⟧"
+        Format.fprintf out "@<1>⟦@[<hv1>%a@ = @[%a@]@]@<1>⟧"
           Ind_cst.pp_cst c Ind_cst.pp_case t
 
   module FV = Libzipperposition.FeatureVector.Make(struct
