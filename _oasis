@@ -11,7 +11,7 @@ BuildTools:     ocamlbuild
 FilesAB:        src/prover/const.ml.ab
 AlphaFeatures:  compiled_setup_ml, ocamlbuild_more_args
 
-XOCamlbuildExtraArgs: "-menhir 'menhir --dump --explain'"
+XOCamlbuildExtraArgs: "-menhir 'menhir --dump --explain' -j 0"
 
 Synopsis:  Superposition theorem prover, for first order logic with equality.
 Description:
