@@ -113,11 +113,13 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let on_new_decl = Signal.create ()
 
-  (* check that [var] is the only free variable in all cases *)
+  (* check that [var] is the only free (term) variable in all cases *)
   let check_uniq_var_is_ ~var cases =
-    List.for_all
-      (fun t -> T.Seq.vars t |> Sequence.for_all (HVar.equal var))
-      cases
+    cases
+    |> Sequence.of_list
+    |> Sequence.flat_map T.Seq.vars
+    |> Sequence.filter (fun v -> not (Type.equal Type.tType (HVar.ty v)))
+    |> Sequence.for_all (HVar.equal var)
 
   (* if [ty = id(v1,....,vn)] with the variables pairwise distinct,
      return [id, [v1;...;vn]] else fail *)
@@ -149,7 +151,10 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let can_extract_ty ty =
     try ignore (extract_ty_ ty); true
-    with Error _ -> false
+    with Error msg ->
+      Util.debugf ~section 5
+        "@[<2>type @[%a@] not a proper enum type:@ %s@]" (fun k->k Type.pp ty msg);
+      false
 
   type declare_result =
     | New of decl
@@ -168,8 +173,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k->k pp_id_or_builtin id);
       AlreadyDeclared decl
     with Not_found ->
-      Util.debugf ~section 1 "@[<2>declare new enum type @[%a@]@ @[(cases %a = %a)@]"
-        (fun k->k Type.pp ty HVar.pp var (Util.pp_list ~sep:"|" T.pp) cases);
+      Util.debugf ~section 1 "@[<2>declare new enum type `@[%a@]`@ (@[cases %a = @[<hv>%a@]@])@]"
+        (fun k->k Type.pp ty HVar.pp var (Util.pp_list ~sep:"; " T.pp) cases);
       Util.incr_stat stat_declare;
       (* set of already declared symbols *)
       let decl_symbols =
