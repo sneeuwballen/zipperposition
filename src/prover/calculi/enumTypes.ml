@@ -30,6 +30,14 @@ let () = Printexc.register_printer
 let error_ s = raise (Error s)
 let errorf_ msg = CCFormat.ksprintf msg ~f:error_
 
+type id_or_ty_builtin =
+  | I of ID.t
+  | B of Type.builtin
+
+let pp_id_or_builtin out = function
+  | I id -> ID.pp out id
+  | B b -> Type.pp_builtin out b
+
 (** {2 Inference rules} *)
 
 module type S = sig
@@ -78,7 +86,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* one particular enum type. The return type has the shape [id(vars)],
     such as [list(a)] or [map(a,b)] *)
   type decl = {
-    decl_ty_id : ID.t;
+    decl_ty_id : id_or_ty_builtin;
     decl_ty_vars : Type.t HVar.t list;
     decl_ty : Type.t;  (* id applied to ty_vars (shortcut) *)
     decl_var : Type.t HVar.t; (* x = ... *)
@@ -92,7 +100,16 @@ module Make(E : Env.S) : S with module Env = E = struct
       Type.pp d.decl_ty (Util.pp_list T.pp) d.decl_cases
 
   (* set of enumerated types (indexed by [decl_ty_id]) *)
-  let decls_ = ID.Tbl.create 16
+  let decls_by_id = ID.Tbl.create 16
+  let decls_builtin = ref []
+
+  let find_decl_ = function
+    | I i -> ID.Tbl.find decls_by_id i
+    | B b -> List.assoc b !decls_builtin
+
+  let add_decl_ id decl = match id with
+    | I id -> ID.Tbl.add decls_by_id id decl
+    | B b -> decls_builtin := (b,decl) :: !decls_builtin
 
   let on_new_decl = Signal.create ()
 
@@ -113,14 +130,15 @@ module Make(E : Env.S) : S with module Env = E = struct
           && check_all_distinct_ (v :: acc) l'
     in
     match Type.view ty with
-    | Type.App (id, []) -> id, []
+    | Type.Builtin i -> B i, []
+    | Type.App (id, []) -> I id, []
     | Type.App (id, l) ->
         begin try
           let l =
             List.map
               (fun a -> match Type.view a with Type.Var v -> v | _ -> raise Exit) l
           in
-          if check_all_distinct_ [] l then id,l
+          if check_all_distinct_ [] l then I id, l
           else errorf_ "need variables @[%a@] to be pairwise distinct"
             (Util.pp_list HVar.pp) l;
         with Exit ->
@@ -145,9 +163,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     if not (check_uniq_var_is_ ~var cases)
       then errorf_ "invalid declaration %a (free variables)" (Util.pp_list T.pp) cases;
     try
-      let decl = ID.Tbl.find decls_ id in
+      let decl = find_decl_ id in
       Util.debugf ~section 3 "@[an enum is already declared for type %a@]"
-        (fun k->k ID.pp id);
+        (fun k->k pp_id_or_builtin id);
       AlreadyDeclared decl
     with Not_found ->
       Util.debugf ~section 1 "@[<2>declare new enum type @[%a@]@ @[(cases %a = %a)@]"
@@ -170,7 +188,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         decl_symbols;
         decl_proof=proof;
       } in
-      ID.Tbl.add decls_ id decl;
+      add_decl_ id decl;
       Signal.send on_new_decl decl;
       New decl
 
@@ -247,17 +265,20 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* given a type [ty], find whether it's an enum type, and if it is the
      case return [Some (decl, subst)] *)
-  let find_ty_ sc_decl ty sc_ty = match Type.view ty with
-    | Type.App (id, l) ->
-        begin try
-          let d = ID.Tbl.find decls_ id in
-          if List.length l = List.length d.decl_ty_vars
-          then
-            let subst = bind_vars_ (d,sc_decl) (l,sc_ty) in
-            Some (d, subst)
-          else None
-        with Not_found -> None
-        end
+  let find_ty_ sc_decl ty sc_ty =
+    let find_aux i l =
+      try
+        let d = find_decl_ i in
+        if List.length l = List.length d.decl_ty_vars
+        then
+          let subst = bind_vars_ (d,sc_decl) (l,sc_ty) in
+          Some (d, subst)
+        else None
+      with Not_found -> None
+    in
+    match Type.view ty with
+    | Type.Builtin b -> find_aux (B b) []
+    | Type.App (id, l) -> find_aux (I id) l
     | _ -> None
 
   (* instantiate variables that belong to an enum case *)
@@ -342,22 +363,26 @@ module Make(E : Env.S) : S with module Env = E = struct
      [forall x1:a1...xn:an, id(x1...xn) = t_1[x := id(x1..xn)] or ... or t_m[...]]
      where the [t_i] are the cases of [decl] *)
   let check_decl_ ~ty s decl =
-    match Type.view ty with
-    | Type.App (c, args)
-      when ID.equal c decl.decl_ty_id
+    match Type.view ty, decl.decl_ty_id with
+    | Type.Builtin b, B b' when b=b' ->
+        instantiate_axiom_ ~ty_s:ty s [] decl
+    | Type.App (c, args), I i
+      when ID.equal c i
       && List.length args = List.length decl.decl_ty_vars->
         instantiate_axiom_ ~ty_s:ty s args decl
     | _ -> None
 
   (* add axioms for new symbol [s] with type [ty], if needed *)
   let _on_new_symbol s ~ty =
+    let aux i =
+      try
+        let decl = find_decl_ i in
+        check_decl_ ~ty s decl |> CCOpt.to_list
+      with Not_found -> []
+    in
     let clauses = match Type.view ty with
-      | Type.App (id, _) ->
-          begin try
-            let decl = ID.Tbl.find decls_ id in
-            check_decl_ ~ty s decl |> CCOpt.to_list
-          with Not_found -> []
-          end
+      | Type.Builtin b -> aux (B b)
+      | Type.App (id, _) -> aux (I id)
       | _ -> []
     in
     PS.PassiveSet.add (Sequence.of_list clauses)

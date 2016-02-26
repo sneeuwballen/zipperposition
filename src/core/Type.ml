@@ -11,6 +11,13 @@ type ty = t
 
 type builtin = TType | Prop | Term | Rat | Int
 
+let pp_builtin out = function
+  | Prop -> CCFormat.string out "prop"
+  | TType -> CCFormat.string out "type"
+  | Term -> CCFormat.string out "ι"
+  | Int -> CCFormat.string out "int"
+  | Rat -> CCFormat.string out "rat"
+
 type view =
   | Builtin of builtin
   | Var of t HVar.t
@@ -261,11 +268,7 @@ end
 (** {2 IO} *)
 
 let rec pp_rec depth out t = match view t with
-  | Builtin Prop -> CCFormat.string out "prop"
-  | Builtin TType -> CCFormat.string out "type"
-  | Builtin Term -> CCFormat.string out "ι"
-  | Builtin Int -> CCFormat.string out "int"
-  | Builtin Rat -> CCFormat.string out "rat"
+  | Builtin b -> pp_builtin out b
   | Var v -> HVar.pp out v
   | DB i -> Format.fprintf out "T%i" (depth-i-1)
   | Multiset t ->

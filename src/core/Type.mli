@@ -28,6 +28,8 @@ type ty = t
 
 type builtin = TType | Prop | Term | Rat | Int
 
+val pp_builtin : builtin CCFormat.printer
+
 type view = private
   | Builtin of builtin
   | Var of t HVar.t
