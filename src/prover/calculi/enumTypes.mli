@@ -1,7 +1,7 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Inference and simplification rules for Algebraic types} *)
+(** {1 Inference and simplification rules for "Enum Types"} *)
 
 open Libzipperposition
 
@@ -9,48 +9,80 @@ type term = FOTerm.t
 
 (** {2 Inference rules} *)
 
-(* TODO: rename and make this a calculus on Ind_types (and Ind_cst), with:
+(** An Enum Type is a possibly parametrized type
+    [c : type -> type -> ... -> type] with an exhaustiveness axiom
+    [forall a1....an:type,
+       forall x:(c a1...an),
+         x = t_1 or x = t_2 or ... or x = t_m]
+    where the [t_i] are non-variable terms that contain
+      only [x] as a variable.
 
-  - exhaustivity (inference):
-    if some term [t : tau] is maximal in a clause, [tau] is inductive,
-    and [t] was never split on, then introduce
-    [t = c1(...) or t = c2(...) or ... or t = ck(...)] where the [ci] are
-    constructors of [tau], and [...] are new Skolems of [t];
-    if [t] is ground then Avatar splitting (with xor) should apply directly
-      instead, as an optimization, with [k] unary clauses and 1 bool clause
 
-  - disjointness (simplification):
-    * an equation [c1(...) = c2(...)] becomes false;
-    * a disequation [c1(...) != c2(...)] becomes true
+    This calculus is designed to remove the axiom (which is very prolific
+    in superposition) and do its job more efficiently.
 
-  - injectivity (simplification):
-    * an equation [c(t1...tn) = c(u1...un)] simplifies into
-      [t1 = u1 & ... & tn = un]
-    * a disequation [c(t1...tn) != c(u1...un)] simplifies into
-      [t1 != u1 || ... || tn != un] (XXX is it really needed?)
+    Inductive types (algebraic types) belong to this category of types,
+    and have additional axioms that are dealt with elsewhere.
 
-  XXX actually this is less specific.
-  Keep this as "enum types" and add inductive-specific rules for
-  disjointness. Inductive types should be declared as enum types
-    and get their own rules (exhaustivity + disjointness)
+    We require that the type is as general as possible: either
+    a constant, or a polymorphic type that has only type variables as
+    arguments. Enum types for things like [list(int)] would be dangerous
+    because if we remove the axiom, because instantiation is a
+    simplification, we won't deal properly with [list(rat)] (no unification
+    whatsoever)
+
+    The rules are:
+
+
+    instantiation of variables:
+
+       C[x] where x:tau unshielded     enum(tau, x in t1....tm)
+    -----------------------------------------------------------
+                   C[t_1] or ... or C[tm]
+
+    specialization of exhaustiveness for f:
+
+       f : a1 -> ... -> ak -> tau      enum(tau, x in t1....tm)
+    ------------------------------------------------------------
+        forall x1:a1, ... xk:ak,
+           f(x1...xk)=t1\sigma or .... or f(x1...xk) = tm\sigma
+    where sigma = {x -> f(x1...xk)}
+
 *)
+
+exception Error of string
 
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C
 
-  val declare_type : proof:C.t ProofStep.of_ -> ty:Type.t -> var:Type.t HVar.t -> term list -> unit
+  type decl
+
+  val pp_decl : decl CCFormat.printer
+
+  type declare_result =
+    | New of decl
+    | AlreadyDeclared of decl
+
+  val declare_ty :
+    proof:C.t ProofStep.of_ ->
+    ty:Type.t ->
+    var:Type.t HVar.t ->
+    term list ->
+    declare_result
   (** Declare that the given type's domain is the given list of cases
-      for the given variable [var] (whose type must be [ty].
-      Will be ignored if the type already has a enum declaration. *)
+      for the given variable [var] (whose type must be [ty]).
+      Will be ignored if the type already has a enum declaration.
+      @return either the new declaration, or the already existing one if any
+      @raise Error if the type is not of the form [id(var_1,...,var_n)] *)
 
   val instantiate_vars : Env.multi_simpl_rule
   (** Instantiate variables whose type is a known enumerated type,
-      with all variables of this type. *)
+      with all cases of this type. *)
 
   (** {6 Registration} *)
 
-  val register : unit -> unit
+  val setup : unit -> unit
   (** Register rules in the environment *)
 end
 
