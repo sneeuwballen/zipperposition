@@ -46,6 +46,7 @@ let _print_types () =
   ()
 
 let switch_opt b f = Arg.Unit (fun () -> f b)
+let switch_set b r = Arg.Unit (fun () -> r := b)
 
 let make_other_opts () =
   (* debugf level for every section *)
