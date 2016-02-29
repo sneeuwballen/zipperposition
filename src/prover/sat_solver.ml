@@ -18,7 +18,7 @@ let wrong_state_ msg = raise (WrongState msg)
 
 module type S = Sat_solver_intf.S
 
-module Make(L : Bool_lit_intf.S)
+module Make(L : Bool_lit_intf.S)(Dummy : sig end)
 : Sat_solver_intf.S with module Lit = L
 = struct
   module Lit = L
@@ -82,7 +82,7 @@ module Make(L : Bool_lit_intf.S)
   end
 
   (* Instantiate solver *)
-  module S = Msat.Solver.Make(SatForm)(Msat.Solver.DummyTheory(SatForm))
+  module S = Msat.Solver.Make(SatForm)(Msat.Solver.DummyTheory(SatForm))(struct end)
 
   exception UndecidedLit = S.UndecidedLit
 

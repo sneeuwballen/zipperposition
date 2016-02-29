@@ -351,7 +351,7 @@ let extension =
   let action env =
     let module E = (val env : Env.S) in
     Util.debug 1 "create new SAT solver";
-    let module Sat = Sat_solver.Make(E.Ctx.BoolBox.Lit) in
+    let module Sat = Sat_solver.Make(E.Ctx.BoolBox.Lit)(struct end) in
     let module A = Make(E)(Sat) in
     CCMixtbl.set ~inj:key E.mixtbl "avatar" (module A : S);
     A.register()

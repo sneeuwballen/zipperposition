@@ -29,7 +29,7 @@ depends: [
   "sequence" { >= "0.4" }
   "gen"
   "oclock"
-  "msat"
+  "msat" { >= "0.2" }
 ]
 depopts: [
   "menhir" {build}
