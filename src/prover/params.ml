@@ -16,7 +16,6 @@ type t = {
   param_timeout : float;
   param_files : (string, CCVector.ro) CCVector.t;
   param_select : string; (** name of the selection function *)
-  param_proof : Options.print_format; (** how to print proof? *)
   param_dot_file : string option; (** file to print the final state in *)
   param_dot_sat : bool; (** Print saturated set into DOT? *)
   param_dot_all_roots : bool;
@@ -89,7 +88,6 @@ let parse_args () =
     param_version= !version; param_timeout = !timeout;
     param_files = files; param_select = !select;
     param_stats= ! Options.stats;
-    param_proof = !proof;
     param_presaturate = !presaturate; param_dot_all_roots= !dot_all_roots;
     param_dot_file = !dot_file;
     param_unary_depth= !unary_depth; param_dot_sat= !dot_sat;

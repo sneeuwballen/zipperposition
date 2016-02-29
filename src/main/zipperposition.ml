@@ -170,14 +170,13 @@ module MakeNew(X : sig
         Format.printf "%% SZS status %s for '%s'@." (_sat ()) file
     | Saturate.Sat ->
         Format.printf "%% SZS status GaveUp for '%s'@." file;
-        let open Options in
-        begin match params.param_proof with
-          | Print_none -> ()
-          | Print_zf -> failwith "not implemented: printing in ZF" (* TODO *)
-          | Print_tptp ->
+        begin match !Options.output with
+          | Options.Print_none -> ()
+          | Options.Print_zf -> failwith "not implemented: printing in ZF" (* TODO *)
+          | Options.Print_tptp ->
               Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
                 (fun k->k (CCFormat.seq ~sep:" " C.pp_tstp_full) (Env.get_active ()))
-          | Print_normal ->
+          | Options.Print_normal ->
               Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
                 (fun k->k (CCFormat.seq ~sep:" " C.pp) (Env.get_active ()))
         end
@@ -185,7 +184,7 @@ module MakeNew(X : sig
         (* print status then proof *)
         Format.printf "%% SZS status %s for '%s'@." (_unsat ()) file;
         Format.printf "%% SZS output start Refutation@.";
-        Format.printf "%a@." (PProof.pp params.param_proof) proof;
+        Format.printf "%a@." (PProof.pp !Options.output) proof;
         Format.printf "%% SZS output end Refutation@.";
         ()
 
