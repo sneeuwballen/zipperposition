@@ -1,20 +1,20 @@
-(B) 2016-01-15 improve polymorphism using benchmarks from sledgehammer @bench @optim
-(B) 2016-01-15 have some basic definitional equality (non recursive?)
-(B) 2016-01-15 rewrite rules on TypedSTerm, for preprocessing (e.g. set rewrite rules in CNF) @refactor
-(B) 2016-01-15 curried application `@` in FOTerm + indices + orderings + syntax @refactor @zf
-(B) 2016-01-15 repair induction, improve it with mutual/nested induction  p:1
-(B) 2016-01-15 add better generalization in induction id:1 @calculus
-(B) 2016-01-15 add locked storage for Avatar @optim
-(B) 2016-01-15 efficient term rewriting for deduction modulo @calculus @optim
-(B) 2016-01-15 efficient (polarized) literal->clause rewriting for deduction modulo @calculus
-(B) 2016-01-15 question answering
-(A) 2016-01-16 proper calculus for (co)data with mutual types (based on EnumTypes) @calculus
-(A) 2016-01-16 benchmarks from sledgehammer in new syntax, large scale test script @bench
+(D) 2016-01-15 improve polymorphism using benchmarks from sledgehammer @bench @optim
+(D) 2016-01-15 have some basic definitional equality (non recursive?)
+(D) 2016-01-15 rewrite rules on TypedSTerm, for preprocessing (e.g. set rewrite rules in CNF) @refactor
+(D) 2016-01-15 curried application `@` in FOTerm + indices + orderings + syntax @refactor @zf
+(D) 2016-01-15 repair induction, improve it with mutual/nested induction  p:1
+(D) 2016-01-15 add better generalization in induction id:1 @calculus
+(D) 2016-01-15 add locked storage for Avatar @optim
+(D) 2016-01-15 efficient term rewriting for deduction modulo @calculus @optim
+(D) 2016-01-15 efficient (polarized) literal->clause rewriting for deduction modulo @calculus
+(D) 2016-01-15 question answering
+(D) 2016-01-16 proper calculus for (co)data with mutual types (based on EnumTypes) @calculus
+(D) 2016-01-16 benchmarks from sledgehammer in new syntax, large scale test script @bench
 (D) 2016-01-22 update doc/api_intro.txt @doc
-(A) 2016-01-22 add arithmetic into ZF @arith
-(A) 2016-01-23 distinguish goal/negated goal? @refactor
-(B) 2016-01-23 def foo : bar := rw_rule1 and rw_rule2 @zf @calculus
-(A) 2016-01-29 see if can improve featureVector (no translation overhead, adaptability, trail) @optim
+(D) 2016-01-22 add arithmetic into ZF @arith
+(D) 2016-01-23 distinguish goal/negated goal? @refactor
+(D) 2016-01-23 def foo : bar := rw_rule1 and rw_rule2 @zf @calculus
+(D) 2016-01-29 see if can improve featureVector (no translation overhead, adaptability, trail) @optim
 (D) 2016-02-19 update readme @doc
-(A) 2016-02-29 add inductive preds into .zf (translate to new data internally) @zf
-(A) 2016-02-29 move detection of EnumType into preprocessing; add it in AST @refactor
+(D) 2016-02-29 add inductive preds into .zf (translate to new data internally) @zf
+(D) 2016-02-29 move detection of EnumType into preprocessing; add it in AST @refactor
