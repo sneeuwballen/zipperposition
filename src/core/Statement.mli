@@ -80,8 +80,17 @@ end
 
 (** {2 IO} *)
 
-val pp : 'a CCFormat.printer -> 'b CCFormat.printer -> 'c CCFormat.printer -> ('a,'b,'c,_) t CCFormat.printer
-val to_string : 'a CCFormat.printer -> 'b CCFormat.printer -> 'c CCFormat.printer -> ('a,'b,'c,_) t -> string
+val pp :
+  'a CCFormat.printer ->
+  'b CCFormat.printer ->
+  'c CCFormat.printer ->
+  ('a,'b,'c,_) t CCFormat.printer
+val to_string :
+  'a CCFormat.printer ->
+  'b CCFormat.printer ->
+  'c CCFormat.printer ->
+  ('a,'b,'c,_) t ->
+  string
 
 val pp_clause : clause_t CCFormat.printer
 
