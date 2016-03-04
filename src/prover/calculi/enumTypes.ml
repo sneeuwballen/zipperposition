@@ -347,8 +347,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         List.map
           (fun case ->
             Lit.mk_eq
-              (S.FO.apply ~renaming subst (t,0))
-              (S.FO.apply ~renaming subst (case,1)))
+              (S.FO.apply ~renaming subst (t,1))
+              (S.FO.apply ~renaming subst (case,0)))
           decl.decl_cases
       in
       let proof = match decl.decl_proof with
