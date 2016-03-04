@@ -88,6 +88,7 @@ module Make(X : sig
   let _step_init = ref []
 
   let on_start = Signal.create()
+  let on_input_statement = Signal.create()
   let on_empty_clause = Signal.create ()
 
   (** {2 Basic operations} *)

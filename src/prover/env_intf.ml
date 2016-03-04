@@ -139,6 +139,9 @@ module type S = sig
   val on_start : unit Signal.t
   (** Triggered before starting saturation *)
 
+  val on_input_statement : Statement.clause_t Signal.t
+  (** Triggered on every input statement *)
+
   val on_empty_clause : C.t Signal.t
   (** Signal triggered when an empty clause is found *)
 

@@ -274,6 +274,7 @@ let process_file ?meta:_ ~params file =
     end) in
   let env = (module MyEnv : Env.S) in
   setup_env ~env;
+  CCVector.iter (Signal.send MyEnv.on_input_statement) stmts;
   (* extract clauses *)
   let clauses = CCVector.filter_map MyEnv.C.of_statement stmts in
   Util.debugf ~section 2 "@[<2>clauses:@ @[<hv>%a@]@]"
