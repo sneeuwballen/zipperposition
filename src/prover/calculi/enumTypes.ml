@@ -9,6 +9,7 @@ module T = FOTerm
 module S = Substs
 module Lit = Literal
 module Lits = Literals
+module Stmt = Statement
 
 type term = T.t
 
@@ -91,7 +92,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     decl_ty : Type.t;  (* id applied to ty_vars (shortcut) *)
     decl_var : Type.t HVar.t; (* x = ... *)
     decl_cases : term list; (* ... t1 | t2 | ... | tn *)
-    decl_proof : C.t ProofStep.of_; (* justification for the enumeration axiom *)
+    decl_proof :
+      [ `Data of StatementSrc.t * Type.t Statement.data
+      | `Clause of C.t ProofStep.of_
+      ]; (* justification for the enumeration axiom *)
     mutable decl_symbols : ID.Set.t; (* set of declared symbols for t1,...,tn *)
   }
 
@@ -160,11 +164,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     | New of decl
     | AlreadyDeclared of decl
 
-  (* declare an enumerated type *)
-  let declare_ty ~proof ~ty ~var cases =
-    if List.exists (fun t -> not (Type.equal ty (T.ty t))) cases
-      then errorf_ "invalid declaration @[%a@]@ (type mismatch)" (Util.pp_list T.pp) cases;
-    let id, ty_vars = extract_ty_ ty in
+  let declare_ ~proof ~ty ~var ~id ~ty_vars cases =
     if not (check_uniq_var_is_ ~var cases)
       then errorf_ "invalid declaration %a (free variables)" (Util.pp_list T.pp) cases;
     try
@@ -196,6 +196,14 @@ module Make(E : Env.S) : S with module Env = E = struct
       add_decl_ id decl;
       Signal.send on_new_decl decl;
       New decl
+
+  (* declare an enumerated type *)
+  let declare_ty ~proof ~ty ~var cases =
+    if List.exists (fun t -> not (Type.equal ty (T.ty t))) cases
+      then errorf_ "invalid declaration @[%a@]@ (type mismatch)" (Util.pp_list T.pp) cases;
+    let id, ty_vars = extract_ty_ ty in
+    declare_ ~proof:(`Clause proof) ~ty ~var ~id ~ty_vars cases
+
 
   (* detect whether the clause [c] is a declaration of enum type *)
   let detect_decl_ c =
@@ -351,9 +359,12 @@ module Make(E : Env.S) : S with module Env = E = struct
               (S.FO.apply ~renaming subst (case,1)))
           decl.decl_cases
       in
-      let proof =
-        ProofStep.mk_inference
-          ~rule:(ProofStep.mk_rule "axiom_enum_types") [decl.decl_proof] in
+      let proof = match decl.decl_proof with
+        | `Data (src,d) -> ProofStep.mk_data src d
+        | `Clause step ->
+            ProofStep.mk_inference
+              ~rule:(ProofStep.mk_rule "axiom_enum_types") [step]
+      in
       let trail = C.Trail.empty in
       let c' = C.create ~trail lits proof in
       Util.debugf ~section 3 "@[<2>declare enum type for @[%a@]:@ clause @[%a@]@]"
@@ -408,6 +419,68 @@ module Make(E : Env.S) : S with module Env = E = struct
   let is_trivial c =
     C.get_flag flag_enumeration_clause c
 
+  (* detect whether the clause is a declaration of enum type, and if it
+      is, declare the type! *)
+  let _detect_and_declare c =
+    Util.debugf ~section 5 "@[<2>examine clause@ `@[%a@]`@]" (fun k->k C.pp c);
+    match detect_declaration c with
+      | None -> ()
+      | Some (ty,var,cases) ->
+          let is_new = declare_ty ~ty ~var ~proof:(C.proof c) cases in
+          (* clause becomes redundant if it's a new declaration *)
+          match is_new with
+          | New _ -> C.set_flag flag_enumeration_clause c true
+          | AlreadyDeclared _ -> ()
+
+  (* introduce projectors for each constructor's argument, in order to
+     declare the inductive type as an EnumType *)
+  let _declare_inductive ~src d =
+    (* make HVars *)
+    let ty_vars = List.mapi (fun i _ -> HVar.make ~ty:Type.tType i) d.Stmt.data_args in
+    let ty_of_var =
+      Type.app d.Stmt.data_id (List.map Type.var ty_vars) in
+    let v = HVar.make ~ty:ty_of_var 0 in
+    let v_t = T.var v in
+    let cases =
+      List.map
+        (fun (c_id, c_ty) ->
+           (* declare projector functions for this constructor *)
+           let ty_args, ty_ret = Type.open_fun c_ty in
+           let projs_of_v =
+             List.mapi
+               (fun n ty_arg ->
+                  let name = CCFormat.sprintf "proj_%a_%d" ID.pp c_id n in
+                  let proj = ID.make name in
+                  let ty_proj = Type.([ty_ret] ==> ty_arg) in
+                  (* declare projector *)
+                  Ctx.declare proj ty_proj;
+                  T.app (T.const ~ty:ty_proj proj) [v_t])
+               ty_args
+           in
+           (* [c (proj1 v) (proj2 v) ... (proj_n v)] *)
+           T.app (T.const ~ty:c_ty c_id) projs_of_v)
+        d.Stmt.data_cstors
+    in
+    let _ =
+      declare_ ~proof:(`Data (src,d)) ~ty:ty_of_var
+        ~var:v ~id:(I d.Stmt.data_id) ~ty_vars cases
+    in
+    ()
+
+  (* detect whether the input statement contains some EnumType declaration *)
+  let _detect_stmt stmt =
+    let src = Stmt.src stmt in
+    match Stmt.view stmt with
+    | Stmt.Assert c ->
+        let proof = ProofStep.mk_assert src in
+        let c = C.of_forms ~trail:C.Trail.empty c proof in
+        _detect_and_declare c
+    | Stmt.Data l ->
+        List.iter (_declare_inductive ~src) l
+    | Stmt.TyDecl _
+    | Stmt.Def _
+    | Stmt.Goal _ -> ()
+
   let setup () =
     if !_enable then (
       Util.debug ~section  1 "register handling of enumerated types";
@@ -424,21 +497,8 @@ module Make(E : Env.S) : S with module Env = E = struct
               variables of the given type *)
            Env.simplify_active_with instantiate_vars);
       Signature.iter (Ctx.signature ()) (fun s ty -> _on_new_symbol s ~ty);
-      (* detect whether the clause is a declaration of enum type, and if it
-          is, declare the type! *)
-      let _detect_and_declare c =
-        Util.debugf ~section 5 "@[<2>examine clause@ `@[%a@]`@]" (fun k->k C.pp c);
-        match detect_declaration c with
-          | None -> ()
-          | Some (ty,var,cases) ->
-              let is_new = declare_ty ~ty ~var ~proof:(C.proof c) cases in
-              (* clause becomes redundant if it's a new declaration *)
-              match is_new with
-              | New _ -> C.set_flag flag_enumeration_clause c true
-              | AlreadyDeclared _ -> ()
-      in
-      Signal.on_every PS.PassiveSet.on_add_clause _detect_and_declare;
-      Signal.on_every PS.ActiveSet.on_add_clause _detect_and_declare;
+      (* look in input statements  for inductive types *)
+      Signal.on_every Env.on_input_statement _detect_stmt;
     )
 end
 
