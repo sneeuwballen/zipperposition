@@ -66,15 +66,19 @@ module type S = sig
 
   val declare_ty :
     proof:C.t ProofStep.of_ ->
-    ty:Type.t ->
+    ty_id:ID.t ->
+    ty_vars:Type.t HVar.t list ->
     var:Type.t HVar.t ->
     term list ->
     declare_result
-  (** Declare that the given type's domain is the given list of cases
-      for the given variable [var] (whose type must be [ty]).
-      Will be ignored if the type already has a enum declaration.
-      @return either the new declaration, or the already existing one if any
-      @raise Error if the type is not of the form [id(var_1,...,var_n)] *)
+  (** Declare that the domain of the type [ty_id] is restricted to
+      given list of [cases], in the form [forall var. Or_{c in cases} var = c].
+      The type of [var] must be [ty_id ty_vars].
+      Will be ignored if the type already has a enum declaration, and the old
+      declaration will be returned instead.
+      @return either the new declaration, or the already existing one for
+        this type if any
+      @raise Error if some of the preconditions is not filled *)
 
   val instantiate_vars : Env.multi_simpl_rule
   (** Instantiate variables whose type is a known enumerated type,

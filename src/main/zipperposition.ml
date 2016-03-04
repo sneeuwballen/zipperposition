@@ -278,7 +278,7 @@ let process_file ?meta:_ ~params file =
   CCVector.iter (Signal.send MyEnv.on_input_statement) stmts;
   (* extract clauses *)
   let clauses = CCVector.filter_map MyEnv.C.of_statement stmts in
-  Util.debugf ~section 2 "@[<2>clauses:@ @[<hv>%a@]@]"
+  Util.debugf ~section 2 "@[<2>clauses:@ @[<v>%a@]@]"
     (fun k->k (CCFormat.seq ~start:"" ~stop:"" ~sep:" " MyEnv.C.pp) (CCVector.to_seq clauses));
   (* main workload *)
   let module Main = MakeNew(struct

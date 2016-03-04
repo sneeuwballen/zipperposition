@@ -39,10 +39,6 @@ let pp_id_or_builtin out = function
   | I id -> ID.pp out id
   | B b -> Type.pp_builtin out b
 
-(* TODO: remove detection from clauses during proof
-   TODO: perhaps remove detection from clauses other than constant domains,
-   keep the polymorphic complex case for induction *)
-
 (** {2 Inference rules} *)
 
 module type S = sig
@@ -59,14 +55,19 @@ module type S = sig
 
   val declare_ty :
     proof:C.t ProofStep.of_ ->
-    ty:Type.t ->
+    ty_id:ID.t ->
+    ty_vars:Type.t HVar.t list ->
     var:Type.t HVar.t ->
     term list ->
     declare_result
-  (** Declare that the given type's domain is the given list of cases
-      for the given variable [var] (whose type must be [ty]).
-      Will be ignored if the type already has a enum declaration.
-      @return either the new declaration, or the already existing one if any *)
+  (** Declare that the domain of the type [ty_id] is restricted to
+      given list of [cases], in the form [forall var. Or_{c in cases} var = c].
+      The type of [var] must be [ty_id ty_vars].
+      Will be ignored if the type already has a enum declaration, and the old
+      declaration will be returned instead.
+      @return either the new declaration, or the already existing one for
+        this type if any
+      @raise Error if some of the preconditions is not filled *)
 
   val instantiate_vars : Env.multi_simpl_rule
   (** Instantiate variables whose type is a known enumerated type,
@@ -119,6 +120,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     | I id -> ID.Tbl.add decls_by_id id decl
     | B b -> decls_builtin := (b,decl) :: !decls_builtin
 
+  (* triggered whenever a new EnumType is added *)
   let on_new_decl = Signal.create ()
 
   (* check that [var] is the only free (term) variable in all cases *)
@@ -129,54 +131,33 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> Sequence.filter (fun v -> not (Type.equal Type.tType (HVar.ty v)))
     |> Sequence.for_all (HVar.equal var)
 
-  (* if [ty = id(v1,....,vn)] with the variables pairwise distinct,
-     return [id, [v1;...;vn]] else fail *)
-  let extract_ty_ ty =
-    (* check that all vars in [l] are pairwise distinct *)
-    let rec check_all_distinct_ acc l = match l with
-      | [] -> true
-      | v :: l' ->
-          not (CCList.Set.mem ~eq:HVar.equal v acc)
-          && check_all_distinct_ (v :: acc) l'
-    in
-    match Type.view ty with
-    | Type.Builtin i -> B i, []
-    | Type.App (id, []) -> I id, []
-    | Type.App (id, l) ->
-        begin try
-          let l =
-            List.map
-              (fun a -> match Type.view a with Type.Var v -> v | _ -> raise Exit) l
-          in
-          if check_all_distinct_ [] l then I id, l
-          else errorf_ "need variables @[%a@] to be pairwise distinct"
-            (Util.pp_list HVar.pp) l;
-        with Exit ->
-          error_ "need the type to have the shape `const(v1,...,vn)`"
-        end
-    | _ ->
-        error_ "need the type to have the shape `const(v1,...,vn)`"
-
-  let can_extract_ty ty =
-    try ignore (extract_ty_ ty); true
-    with Error msg ->
-      Util.debugf ~section 5
-        "@[<2>type @[%a@] not a proper enum type:@ %s@]" (fun k->k Type.pp ty msg);
-      false
+  (* check that all vars in [l] are pairwise distinct *)
+  let rec check_all_distinct_ acc l = match l with
+    | [] -> true
+    | v :: l' ->
+        not (CCList.Set.mem ~eq:HVar.equal v acc)
+        && check_all_distinct_ (v :: acc) l'
 
   type declare_result =
     | New of decl
     | AlreadyDeclared of decl
 
-  let declare_ ~proof ~ty ~var ~id ~ty_vars cases =
+  let declare_ ~proof ~ty_id:id ~ty_vars ~var cases =
+    if not (check_all_distinct_ [] ty_vars)
+      then errorf_ "invalid declaration %a: duplicate type variable" pp_id_or_builtin id;
     if not (check_uniq_var_is_ ~var cases)
-      then errorf_ "invalid declaration %a (free variables)" (Util.pp_list T.pp) cases;
+      then errorf_ "invalid declaration %a: %a is not the only variable in @[%a@]"
+        pp_id_or_builtin id (Util.pp_list T.pp) cases HVar.pp var;
     try
       let decl = find_decl_ id in
       Util.debugf ~section 3 "@[an enum is already declared for type %a@]"
         (fun k->k pp_id_or_builtin id);
       AlreadyDeclared decl
     with Not_found ->
+      let ty = match id with
+        | I id -> Type.app id (List.map Type.var ty_vars)
+        | B b -> assert (ty_vars=[]); Type.builtin b
+      in
       Util.debugf ~section 1 "@[<2>declare new enum type `@[%a@]`@ (@[cases %a = @[<hv>%a@]@])@]"
         (fun k->k Type.pp ty HVar.pp var (Util.pp_list ~sep:"; " T.pp) cases);
       Util.incr_stat stat_declare;
@@ -202,14 +183,18 @@ module Make(E : Env.S) : S with module Env = E = struct
       New decl
 
   (* declare an enumerated type *)
-  let declare_ty ~proof ~ty ~var cases =
-    if List.exists (fun t -> not (Type.equal ty (T.ty t))) cases
-      then errorf_ "invalid declaration @[%a@]@ (type mismatch)" (Util.pp_list T.pp) cases;
-    let id, ty_vars = extract_ty_ ty in
-    declare_ ~proof:(`Clause proof) ~ty ~var ~id ~ty_vars cases
+  let declare_ty ~proof ~ty_id ~ty_vars ~var cases =
+    declare_ ~proof:(`Clause proof) ~var ~ty_id:(I ty_id) ~ty_vars cases
 
+  let as_simple_ty ty = match Type.view ty with
+    | Type.App (id, []) -> Some (I id)
+    | Type.Builtin b -> Some (B b)
+    | _ -> None
 
-  (* detect whether the clause [c] is a declaration of enum type *)
+  let is_simple_ty ty = as_simple_ty ty <> None
+
+  (* detect whether the clause [c] is a declaration of a simply-typed EnumType
+     with only constants as cases (in other words, a monomorphic finite type) *)
   let detect_decl_ c =
     let eq_var_ ~var t = match T.view t with
       | T.Var v' -> HVar.equal var v'
@@ -217,30 +202,33 @@ module Make(E : Env.S) : S with module Env = E = struct
     and get_var_ t = match T.view t with
       | T.Var v -> v
       | _ -> assert false
+    and is_const t = match T.view t with
+      | T.Const _ -> true
+      | _ -> false
     in
     (* loop over literals checking whether they are all of the form
-       [var = t] for some [t] *)
+       [var = t] for some constant [t] *)
     let rec _check_all_vars ~ty ~var acc lits = match lits with
       | [] ->
           (* now also check that no case has free variables other than [var],
               and that there are at least 2 cases *)
           if check_uniq_var_is_ ~var acc
           && (!_accept_unary_types || List.length acc >= 2)
-          then Some (ty, var, acc)
+          then Some (var, acc)
           else None
-      | Lit.Equation (l, r, true) :: lits' when eq_var_ ~var l ->
+      | Lit.Equation (l, r, true) :: lits' when eq_var_ ~var l && is_const r ->
           _check_all_vars ~ty ~var (r::acc) lits'
-      | Lit.Equation (l, r, true) :: lits' when eq_var_ ~var r ->
+      | Lit.Equation (l, r, true) :: lits' when eq_var_ ~var r && is_const l ->
           _check_all_vars ~ty ~var (l::acc) lits'
       | _ -> None
     in
     let lits = C.lits c in
     if CCArray.exists (fun l -> not (Lit.is_eq l)) lits then None
     else match Array.to_list lits with
-      | Lit.Equation (l,r,true) :: lits when T.is_var l && can_extract_ty (T.ty l) ->
+      | Lit.Equation (l,r,true) :: lits when T.is_var l && is_simple_ty (T.ty l) && is_const r ->
           let var = get_var_ l in
           _check_all_vars ~ty:(T.ty l) ~var [r] lits
-      | Lit.Equation (l,r,true) :: lits when T.is_var r && can_extract_ty (T.ty r) ->
+      | Lit.Equation (l,r,true) :: lits when T.is_var r && is_simple_ty (T.ty r) && is_const l ->
           let var = get_var_ r in
           _check_all_vars ~ty:(T.ty r) ~var [l] lits
       | _ -> None
@@ -429,8 +417,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.debugf ~section 5 "@[<2>examine clause@ `@[%a@]`@]" (fun k->k C.pp c);
     match detect_declaration c with
       | None -> ()
-      | Some (ty,var,cases) ->
-          let is_new = declare_ty ~ty ~var ~proof:(C.proof c) cases in
+      | Some (var,cases) ->
+          let ty_id = CCOpt.get_exn (as_simple_ty (HVar.ty var)) in
+          let is_new = declare_ ~ty_id ~ty_vars:[] ~var ~proof:(`Clause (C.proof c)) cases in
           (* clause becomes redundant if it's a new declaration *)
           match is_new with
           | New _ -> C.set_flag flag_enumeration_clause c true
@@ -467,8 +456,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         d.Stmt.data_cstors
     in
     let _ =
-      declare_ ~proof:(`Data (src,d)) ~ty:ty_of_var
-        ~var:v ~id:(I d.Stmt.data_id) ~ty_vars cases
+      declare_ ~proof:(`Data (src,d))
+        ~var:v ~ty_id:(I d.Stmt.data_id) ~ty_vars cases
     in
     ()
 
@@ -506,8 +495,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       Signature.iter (Ctx.signature ()) (fun s ty -> _on_new_symbol s ~ty);
     )
 end
-
-(* TODO: during preprocessing, scan clauses to find declarations asap *)
 
 (** {2 As Extension} *)
 
