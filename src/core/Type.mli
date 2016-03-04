@@ -70,6 +70,8 @@ val var_of_int : int -> t
 val app : ID.t -> t list -> t
 (** Parametrized type *)
 
+val builtin : builtin -> t
+
 val const : ID.t -> t
 (** Constant sort *)
 

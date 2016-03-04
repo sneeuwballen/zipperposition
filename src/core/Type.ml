@@ -68,6 +68,13 @@ let term = T.builtin ~ty:tType Builtin.Term
 let int = T.builtin ~ty:tType Builtin.TyInt
 let rat = T.builtin ~ty:tType Builtin.TyRat
 
+let builtin = function
+  | TType -> tType
+  | Prop -> prop
+  | Term -> term
+  | Int -> int
+  | Rat -> rat
+
 let var v = T.var v
 
 let var_of_int i = T.var (HVar.make ~ty:tType i)
