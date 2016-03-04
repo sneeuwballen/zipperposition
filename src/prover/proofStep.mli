@@ -36,6 +36,7 @@ type kind =
   | Esa of rule
   | Assert of StatementSrc.t
   | Goal of StatementSrc.t
+  | Data of StatementSrc.t * Type.t Statement.data
   | Trivial (** trivial, or trivial within theories *)
 
 type 'clause result =
@@ -71,6 +72,8 @@ val result_as_form : _ of_ -> form
     Axiom constructors have default role "axiom" *)
 
 val mk_trivial : 'c t
+
+val mk_data : StatementSrc.t -> Type.t Statement.data -> _ t
 
 val mk_assert : StatementSrc.t -> 'c t
 

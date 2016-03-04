@@ -43,6 +43,7 @@ type kind =
   | Esa of rule
   | Assert of StatementSrc.t
   | Goal of StatementSrc.t
+  | Data of StatementSrc.t * Type.t Statement.data
   | Trivial (** trivial, or trivial within theories *)
 
 type 'clause result =
@@ -106,6 +107,9 @@ let mk_step_ kind parents =
   in
   { id=get_id_(); kind; parents; dist_to_goal; }
 
+let mk_data src data =
+  mk_step_ (Data (src,data)) []
+
 let mk_assert src = mk_step_ (Assert src) []
 
 let mk_goal src = mk_step_ (Goal src) []
@@ -158,6 +162,7 @@ let is_trivial = function
 let rule p = match p.kind with
   | Trivial
   | Assert _
+  | Data _
   | Goal _-> None
   | Esa rule
   | Simplification rule
@@ -215,7 +220,7 @@ let depth proof =
     if Tbl.mem explored proof.id then () else begin
       Tbl.add explored proof.id ();
       begin match p.kind with
-        | Assert _ | Goal _ | Trivial -> depth := max d !depth
+        | Assert _ | Goal _ | Trivial | Data _ -> depth := max d !depth
         | Inference _ | Esa _ | Simplification _ -> ()
       end;
       (* explore parents *)
@@ -245,6 +250,7 @@ let pp_kind_tstp out k =
       | None -> Format.fprintf out "file('%s')" file
       | Some name -> Format.fprintf out "file('%s', '%s')" file name
       end
+  | Data _ -> Util.error ~where:"ProofStep" "cannot print `Data` step in TPTP"
   | Inference rule ->
       Format.fprintf out "inference(%a, [status(thm)])" pp_rule rule
   | Simplification rule ->
@@ -255,18 +261,16 @@ let pp_kind_tstp out k =
       Format.fprintf out "trivial([status(thm)])"
 
 let pp_kind out k =
+  let pp_src kind out src =
+    let file = src.StatementSrc.file in
+    match src.StatementSrc.name with
+    | None -> Format.fprintf out "'%s'%s" file kind
+    | Some name -> Format.fprintf out "'%s' in '%s'%s" name file kind
+  in
   match k with
-  | Assert src
-  | Goal src ->
-      let is_goal = match k with Goal _ -> true | _ -> false in
-      let file = src.StatementSrc.file in
-      begin match src.StatementSrc.name with
-      | None ->
-          Format.fprintf out "'%s'%s" file (if is_goal then " (goal)" else "")
-      | Some name ->
-          Format.fprintf out "'%s' in '%s'%s" name file
-            (if is_goal then " (goal)" else "")
-      end
+  | Assert src -> pp_src "" out src
+  | Goal src -> pp_src " (goal)" out src
+  | Data (src, _) -> pp_src " (data)" out src
   | Inference rule ->
       Format.fprintf out "inf %a" pp_rule rule
   | Simplification rule ->
