@@ -1,7 +1,5 @@
 val term : type.
-val list : type.
-val cons : term -> list -> list.
-val nil : list.
+data list := nil | cons term list.
 val append : list -> list -> list.
 val length : list -> int.
 assert (length nil) = 0.

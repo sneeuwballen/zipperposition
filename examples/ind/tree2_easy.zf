@@ -1,7 +1,5 @@
 val term : type.
-val tree : type.
-val empty : tree.
-val node : tree -> term -> tree -> tree.
+data tree := empty | node tree term tree.
 val rev : tree -> tree.
 assert (rev empty) = empty.
 assert

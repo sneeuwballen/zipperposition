@@ -1,7 +1,5 @@
 val term : type.
-val nat : type.
-val s : nat -> nat.
-val z : nat.
+data nat := z | s nat.
 val plus : nat -> nat -> nat.
 val double : nat -> nat.
 assert forall (X:nat). ((plus z X) = X).

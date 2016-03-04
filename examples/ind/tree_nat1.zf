@@ -1,9 +1,7 @@
 val term : type.
-val tree : type.
-val empty : tree.
-val node : tree -> term -> tree -> tree.
+data tree := empty | node tree term tree.
 val rev : tree -> tree.
-val nat : type.
+data nat := z | s nat.
 val size : tree -> nat.
 val subtree : tree -> tree -> prop.
 val mem : term -> tree -> prop.
@@ -12,9 +10,7 @@ assert
   forall (L:tree).
     (forall (R:tree).
        (forall (X:term). ((rev (node L X R)) = (node (rev R) X (rev L))))).
-val z : nat.
 assert (size empty) = z.
-val s : nat -> nat.
 val plus : nat -> nat -> nat.
 assert
   forall (L:tree).
@@ -41,9 +37,6 @@ assert
              (((mem X R) || (mem X L)) => (mem X (node L Y R)))))).
 assert
   forall (X:term). (forall (L:tree). (forall (R:tree). (mem X (node L X R)))).
-val nat : type.
-val s : nat -> nat.
-val z : nat.
 val plus : nat -> nat -> nat.
 val minus : nat -> nat -> nat.
 val less : nat -> nat -> prop.
