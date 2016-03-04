@@ -39,6 +39,10 @@ let pp_id_or_builtin out = function
   | I id -> ID.pp out id
   | B b -> Type.pp_builtin out b
 
+(* TODO: remove detection from clauses during proof
+   TODO: perhaps remove detection from clauses other than constant domains,
+   keep the polymorphic complex case for induction *)
+
 (** {2 Inference rules} *)
 
 module type S = sig
@@ -367,7 +371,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       in
       let trail = C.Trail.empty in
       let c' = C.create ~trail lits proof in
-      Util.debugf ~section 3 "@[<2>declare enum type for @[%a@]:@ clause @[%a@]@]"
+      Util.debugf ~section 3 "@[<2>instantiate enum type axiom on @[%a@]:@ clause @[%a@]@]"
         (fun k->k ID.pp s C.pp c');
       Util.incr_stat stat_instantiate;
       Some c'
@@ -435,6 +439,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* introduce projectors for each constructor's argument, in order to
      declare the inductive type as an EnumType *)
   let _declare_inductive ~src d =
+    Util.debugf ~section 5 "@[<2>examine data %a@]" (fun k->k ID.pp d.Stmt.data_id);
     (* make HVars *)
     let ty_vars = List.mapi (fun i _ -> HVar.make ~ty:Type.tType i) d.Stmt.data_args in
     let ty_of_var =
@@ -486,6 +491,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debug ~section  1 "register handling of enumerated types";
       Env.add_multi_simpl_rule instantiate_vars;
       Env.add_is_trivial is_trivial;
+      (* look in input statements  for inductive types *)
+      Signal.on_every Env.on_input_statement _detect_stmt;
       (* signals: instantiate axioms upon new symbols, or when new
           declarations are added *)
       Signal.on_every Ctx.on_new_symbol
@@ -497,8 +504,6 @@ module Make(E : Env.S) : S with module Env = E = struct
               variables of the given type *)
            Env.simplify_active_with instantiate_vars);
       Signature.iter (Ctx.signature ()) (fun s ty -> _on_new_symbol s ~ty);
-      (* look in input statements  for inductive types *)
-      Signal.on_every Env.on_input_statement _detect_stmt;
     )
 end
 
