@@ -51,30 +51,28 @@ module Make(X : PARAMETERS) = struct
 
   let is_completeness_preserved () = !_complete
 
+  (* declare [symb : ty], with precondition that [symb] is not declared yet *)
+  let declare_new_ symb ty =
+    Util.debugf ~section:Const.section 2 "@[<2>declare new symbol@ @[%a:%a@]@]"
+      (fun k->k ID.pp symb Type.pp ty);
+    _signature := Signature.declare !_signature symb ty;
+    Signal.send on_signature_update !_signature;
+    Signal.send on_new_symbol (symb,ty);
+    Ordering.add_list (ord ()) [symb];
+    ()
+
   let add_signature signature =
     Util.enter_prof prof_add_signature;
     let _diff = Signature.diff signature !_signature in
-    _signature := Signature.merge !_signature signature;
-    Signal.send on_signature_update !_signature;
-    Signature.iter _diff (fun s ty -> Signal.send on_new_symbol (s,ty));
-    !_signature
-      |> Signature.Seq.to_seq
-      |> Sequence.map fst
-      |> Ordering.add_seq !_ord;
+    (* declare new symbols *)
+    Signature.iter _diff declare_new_;
     Util.exit_prof prof_add_signature;
     ()
 
-  let _declare_symb symb ty =
-    let is_new = not (Signature.mem !_signature symb) in
-    _signature := Signature.declare !_signature symb ty;
-    if is_new then (
-      Signal.send on_signature_update !_signature;
-      Signal.send on_new_symbol (symb,ty);
-    )
-
   let declare symb ty =
     Util.enter_prof prof_declare_sym;
-    _declare_symb symb ty;
+    let is_new = not (Signature.mem !_signature symb) in
+    if is_new then declare_new_ symb ty;
     Util.exit_prof prof_declare_sym;
     ()
 
