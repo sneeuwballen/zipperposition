@@ -130,7 +130,14 @@ let parse_file ?cache ~recursive f =
                  parse_this_file ?names:None f
                )
            | A.IncludeOnly (f, names'), _ when recursive ->
-               parse_this_file ~names:names' f
+               if Hashtbl.mem (Lazy.force parse_cache) f
+               then Util.debugf 2 "@[<2>ignore include of `%s`, already parsed@]" (fun k->k f)
+               else (
+                 Util.debugf 2
+                   "@[<2>caution: partial include of `%s` will not be cached"
+                   (fun k->k f);
+                 parse_this_file ~names:names' f
+               )
            | (A.Include _ | A.IncludeOnly _), _ ->
                Queue.push decl result_decls)
         decls
