@@ -24,6 +24,10 @@ let errorf msg = CCFormat.ksprintf msg ~f:error
 
 (** {2 Printing/Parsing} *)
 
+type parse_cache = (string, unit) Hashtbl.t
+
+let create_parse_cache () = Hashtbl.create 16
+
 let find_file name dir =
   (* check if the file exists *)
   let file_exists name =
@@ -93,7 +97,11 @@ let _find_and_open filename dir =
           end
       | None -> errorf "could not find file `%s`" filename
 
-let parse_file ~recursive f =
+let parse_file ?cache ~recursive f =
+  let parse_cache =
+    lazy (if recursive then CCOpt.get_lazy create_parse_cache cache
+      else assert false)
+  in
   let dir = Filename.dirname f in
   let result_decls = Queue.create () in
   (* function that parses one file *)
@@ -114,7 +122,13 @@ let parse_file ~recursive f =
                then Queue.push decl result_decls
                else ()   (* not included *)
            | A.Include f, _ when recursive ->
-               parse_this_file ?names:None f
+               if Hashtbl.mem (Lazy.force parse_cache) f
+               then Util.debugf 2 "@[<2>ignore include of `%s`, already parsed@]" (fun k->k f)
+               else (
+                 (* be sure not to include the file twice *)
+                 Hashtbl.add (Lazy.force parse_cache) f ();
+                 parse_this_file ?names:None f
+               )
            | A.IncludeOnly (f, names'), _ when recursive ->
                parse_this_file ~names:names' f
            | (A.Include _ | A.IncludeOnly _), _ ->

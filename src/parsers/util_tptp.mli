@@ -15,6 +15,11 @@ exception Error of string
 
 (** {2 Printing/Parsing} *)
 
+type parse_cache
+(** Cache that remembers the set of files that have been parsed so far *)
+
+val create_parse_cache : unit -> parse_cache
+
 val find_file : string -> string -> string option
 (** [find_file name dir] looks for a file with the given [name],
     recursively, in [dir], or in its parent dir recursively.
@@ -28,11 +33,13 @@ val parse_lexbuf :
     declarations *)
 
 val parse_file :
+  ?cache:parse_cache ->
   recursive:bool -> string ->
   untyped A.t Sequence.t or_error
 (** Parsing a TPTP file is here presented with a [recursive] option
     that, if true, will make "include" directives to be recursively
     parsed. It uses {!find_file} for included files.
+    @param parse_cache used to avoid including the same file twice, if [recursive=true]
     @return an error-wrapped sequence of declarations. *)
 
 (* TODO: a function that takes a TPTP file, and returns the list of
