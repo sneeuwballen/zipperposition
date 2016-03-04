@@ -83,6 +83,16 @@ let _enable = ref true
 let _instantiate_shielded = ref false
 let _accept_unary_types = ref true
 
+exception Attr_is_projector_of of ID.t
+(** Special attribute for IDs that are projectors of the given type *)
+
+let is_projector_ id ~of_ =
+  List.exists
+    (function
+      | Attr_is_projector_of of' -> ID.equal of_ of'
+      | _ -> false)
+    (ID.payload id)
+
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module C = Env.C
@@ -328,19 +338,25 @@ module Make(E : Env.S) : S with module Env = E = struct
   let instantiate_vars c = Util.with_prof prof_instantiate instantiate_vars_ c
 
   (* assume [s args : decl.decl_ty_id] and [s : ty_s] *)
-  let instantiate_axiom_ ~ty_s s args decl =
+  let instantiate_axiom_ ~ty_s s poly_args decl =
     if ID.Set.mem s decl.decl_symbols
     then None (* already declared *)
     else (
+      let ty_args, _ = Type.open_fun ty_s in
       (* need to add an axiom instance for this symbol and declaration *)
       decl.decl_symbols <- ID.Set.add s decl.decl_symbols;
       (* create the axiom.
-         - build [subst = decl.x->s(v1,...,vn)]
+         - build [subst = decl.x->s(v1,...,vn,u1,...,u_m)]
+           where the [v_i] are type parameters and the [u_i] are
+           term parameters
          - evaluate [decl.x = decl.t1 | decl.t2 .... | decl.t_m] in subst
       *)
-      let vars = List.mapi (fun i ty -> HVar.make ~ty i |> T.var) args in
-      let t = T.app (T.const ~ty:ty_s s) vars in
-      let subst = bind_vars_ (decl,0) (args,1) in
+      let ty_vars = List.mapi (fun i ty -> HVar.make ~ty i |> T.var) poly_args in
+      let vars = List.mapi (fun i ty -> HVar.make ~ty i |> T.var) ty_args in
+      let t = T.app (T.const ~ty:ty_s s) (ty_vars @ vars) in
+      Util.debugf ~section 5 "@[<2>instantiate enum type `%a`@ on @[%a@]@]"
+        (fun k->k pp_id_or_builtin decl.decl_ty_id T.pp t);
+      let subst = bind_vars_ (decl,0) (poly_args,1) in
       let subst = Unif.FO.unification ~subst (T.var decl.decl_var,0) (t,1) in
       let renaming = Ctx.renaming_clear () in
       let lits =
@@ -359,8 +375,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       in
       let trail = C.Trail.empty in
       let c' = C.create ~trail lits proof in
-      Util.debugf ~section 3 "@[<2>instantiate enum type axiom on @[%a@]:@ clause @[%a@]@]"
-        (fun k->k ID.pp s C.pp c');
+      Util.debugf ~section 3 "@[<2>instantiate axiom of enum type `%a` \
+                              on @[%a@]:@ clause @[%a@]@]"
+        (fun k->k pp_id_or_builtin decl.decl_ty_id ID.pp s C.pp c');
       Util.incr_stat stat_instantiate;
       Some c'
     )
@@ -371,11 +388,13 @@ module Make(E : Env.S) : S with module Env = E = struct
      [forall x1:a1...xn:an, id(x1...xn) = t_1[x := id(x1..xn)] or ... or t_m[...]]
      where the [t_i] are the cases of [decl] *)
   let check_decl_ ~ty s decl =
-    match Type.view ty, decl.decl_ty_id with
+    let _, ty_ret = Type.open_fun ty in
+    match Type.view ty_ret, decl.decl_ty_id with
     | Type.Builtin b, B b' when b=b' ->
         instantiate_axiom_ ~ty_s:ty s [] decl
     | Type.App (c, args), I i
       when ID.equal c i
+      && not (is_projector_ s ~of_:i)
       && List.length args = List.length decl.decl_ty_vars->
         instantiate_axiom_ ~ty_s:ty s args decl
     | _ -> None
@@ -388,7 +407,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         check_decl_ ~ty s decl |> CCOpt.to_list
       with Not_found -> []
     in
-    let clauses = match Type.view ty with
+    let clauses =
+      let _, ty_ret = Type.open_fun ty in
+      match Type.view ty_ret with
       | Type.Builtin b -> aux (B b)
       | Type.App (id, _) -> aux (I id)
       | _ -> []
@@ -426,9 +447,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           | AlreadyDeclared _ -> ()
 
   (* introduce projectors for each constructor's argument, in order to
-     declare the inductive type as an EnumType *)
+     declare the inductive type as an EnumType. *)
   let _declare_inductive ~src d =
-    Util.debugf ~section 5 "@[<2>examine data %a@]" (fun k->k ID.pp d.Stmt.data_id);
+    Util.debugf ~section 5 "@[<2>examine data `%a`@]" (fun k->k ID.pp d.Stmt.data_id);
     (* make HVars *)
     let ty_vars = List.mapi (fun i _ -> HVar.make ~ty:Type.tType i) d.Stmt.data_args in
     let ty_of_var =
@@ -445,6 +466,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                (fun n ty_arg ->
                   let name = CCFormat.sprintf "proj_%a_%d" ID.pp c_id n in
                   let proj = ID.make name in
+                  (* remember that proj is a projector for the enum type *)
+                  ID.add_payload proj (Attr_is_projector_of d.Stmt.data_id);
                   let ty_proj = Type.([ty_ret] ==> ty_arg) in
                   (* declare projector *)
                   Ctx.declare proj ty_proj;
