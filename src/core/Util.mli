@@ -76,6 +76,17 @@ val warn : string -> unit
 val warnf : ('a, Format.formatter, unit, unit) format4 -> 'a
 (** Emit warning, with formatting *)
 
+exception Error of string * string
+(** generalist error that do not really belong elsewhere.
+    [Error (where,what)] means that error [what] was raised from [where]. *)
+
+val error : where:string -> string -> 'a
+(** [error msg] raises [Error msg]
+    @raise Error duh *)
+
+val errorf : where:string -> ('b, Format.formatter, unit, 'a) format4 -> 'b
+(** Formatting version of {!error} *)
+
 val pp_pos : Lexing.position -> string
 
 val set_memory_limit : int -> unit

@@ -138,6 +138,18 @@ let warnf msg =
 
 let warn msg = warnf "%s" msg
 
+exception Error of string * string
+
+let () =
+  Printexc.register_printer
+    (function
+      | Error (where,msg) ->
+          Some (CCFormat.sprintf "@[<2>error in %s:@ %s@]" where msg)
+      | _ -> None)
+
+let error ~where msg = raise (Error (where,msg))
+let errorf ~where msg = CCFormat.ksprintf ~f:(error ~where) msg
+
 let pp_pos pos =
   let open Lexing in
   Printf.sprintf "line %d, column %d" pos.pos_lnum (pos.pos_cnum - pos.pos_bol)
