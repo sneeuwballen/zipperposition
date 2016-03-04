@@ -5,7 +5,7 @@ let f_ = ID.make "f"
 let ty_f = 
   TT.Ty.(
     [ record_flatten ["x", int; "y", prop]
-        ~rest:(Some (meta (Var.of_string ~ty:tType "r", ref None)))
+        ~rest:(Some (meta (Var.of_string ~ty:tType "r", ref None, `Generalize)))
     ; int
     ] ==> term
   )
@@ -37,6 +37,6 @@ TypeInference.unify (TT.ty_exn t') TT.Ty.term;;
 let ctx = TypeInference.Ctx.create() in
 add_decls ctx;;
 let t'' = TypeInference.infer_exn ctx t;;
-TypeInference.Ctx.generalize ctx;;
+TypeInference.Ctx.exit_scope ctx;;
 
 ok ();;

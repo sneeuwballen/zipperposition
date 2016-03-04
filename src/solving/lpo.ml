@@ -154,7 +154,7 @@ module MakeSolver(X : sig end) = struct
     try
       AtomTbl.find atom_to_int_ a
     with Not_found ->
-      let i = Solver.make !num_ in
+      let i = Msat.Sat.Fsat.make !num_ in
       incr num_;
       AtomTbl.add atom_to_int_ a i;
       Hashtbl.add int_to_atom_ i a;
@@ -238,9 +238,9 @@ module MakeSolver(X : sig end) = struct
     sol
 
   let print_lit fmt i =
-    if not (Solver.sign i) then Format.fprintf fmt "¬";
+    if not (Msat.Sat.Fsat.sign i) then Format.fprintf fmt "¬";
     try
-      let a = Hashtbl.find int_to_atom_ (Solver.abs i) in
+      let a = Hashtbl.find int_to_atom_ (Msat.Sat.Fsat.abs i) in
       Atom.print fmt a
     with Not_found ->
       Format.fprintf fmt "L%d" (abs (i : Solver.atom :> int))  (* tseitin *)

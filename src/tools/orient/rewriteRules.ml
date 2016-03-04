@@ -67,7 +67,7 @@ let rules_of_pairs pairs =
           end; None
       ) pairs
     in
-    TypeInference.Ctx.generalize ctx;
+    TypeInference.Ctx.exit_scope ctx;
     (* extract typed rules and signature *)
     E.return rules
   with e -> E.of_exn_trace e
