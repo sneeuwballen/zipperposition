@@ -1,0 +1,21 @@
+val term : type.
+val nat : type.
+val s : nat -> nat.
+val z : nat.
+val plus : nat -> nat -> nat.
+val minus : nat -> nat -> nat.
+val less : nat -> nat -> prop.
+val leq : nat -> nat -> prop.
+assert forall (X:nat). ((plus z X) = X).
+assert forall (X:nat). (forall (Y:nat). ((plus (s X) Y) = (s (plus X Y)))).
+assert forall (X:nat). ((minus X z) = X).
+assert forall (X:nat). (forall (Y:nat). ((minus (s X) (s Y)) = (minus X Y))).
+assert forall (X:nat). (less z (s X)).
+assert forall (X:nat). (forall (Y:nat). ((less (s X) (s Y)) <=> (less X Y))).
+assert forall (X:nat). (leq z X).
+assert forall (X:nat). (forall (Y:nat). ((leq (s X) (s Y)) <=> (leq X Y))).
+val p : nat -> nat -> prop.
+val a : nat.
+val b : nat.
+assert forall (X:nat). (forall (Y:nat). ((p X Y) => ((s X) = Y))).
+assert p a b.

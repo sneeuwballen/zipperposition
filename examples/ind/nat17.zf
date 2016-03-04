@@ -1,0 +1,11 @@
+val term : type.
+val nat : type.
+val s : nat -> nat.
+val z : nat.
+val p : nat -> prop.
+val q : nat -> prop.
+assert p z.
+assert q z.
+assert forall (N:nat). (((q N) && (p N)) => (q (s N))).
+assert forall (N:nat). (((q N) && (p N)) => (p (s N))).
+goal forall (N:nat). (p N).

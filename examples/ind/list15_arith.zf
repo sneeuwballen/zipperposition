@@ -1,0 +1,23 @@
+val term : type.
+val list : type.
+val cons : term -> list -> list.
+val nil : list.
+val append : list -> list -> list.
+val length : list -> int.
+assert (length nil) = 0.
+assert
+  forall (X:term).
+    (forall (L:list). ((length (cons X L)) = (1 + (length L)))).
+assert forall (L:list). ((append nil L) = L).
+assert
+  forall (X:term).
+    (forall (L:list).
+       (forall (L2:list). ((append (cons X L) L2) = (cons X (append L L2))))).
+assert (length nil) = 0.
+assert
+  forall (X:term).
+    (forall (L:list). ((length (cons X L)) = (1 + (length L)))).
+goal
+  forall (L1:list).
+    (forall (L2:list).
+       ((length (append L1 L2)) = ((length L1) + (length L2)))).

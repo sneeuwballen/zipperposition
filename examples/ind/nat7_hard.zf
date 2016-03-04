@@ -1,0 +1,15 @@
+val term : type.
+val nat : type.
+val s : nat -> nat.
+val z : nat.
+val plus : nat -> nat -> nat.
+assert forall (X:nat). ((plus z X) = X).
+assert forall (X:nat). (forall (Y:nat). ((plus (s X) Y) = (s (plus X Y)))).
+val x : nat -> nat.
+val p : nat -> nat.
+assert (p z) = z.
+assert forall (N:nat). ((p (s N)) = (plus (p N) (x N))).
+val q : nat -> nat.
+assert (q z) = z.
+assert forall (N:nat). ((q (s N)) = (plus (x N) (q N))).
+goal forall (N:nat). ((p N) = (q N)).

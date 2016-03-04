@@ -1,0 +1,6 @@
+val term : type.
+val nat : type.
+val s : nat -> nat.
+val z : nat.
+val plus : nat -> nat -> nat.
+goal forall (X:nat). (X != (s X)).
