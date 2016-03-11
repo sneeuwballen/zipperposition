@@ -6,8 +6,12 @@
 (** {2 Signature} *)
 module type S = Env_intf.S
 
+type 'a packed = (module S with type C.t = 'a)
+
 (** {2 Build a new Environment} *)
 module Make(X : sig
     module Ctx : Ctx.S
     val params : Params.t
-  end) : S with module Ctx = X.Ctx
+  end) : sig
+    include S with module Ctx = X.Ctx
+  end

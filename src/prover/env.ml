@@ -14,6 +14,8 @@ let section = Util.Section.make ~parent:Const.section "env"
 (** {2 Signature} *)
 module type S = Env_intf.S
 
+type 'a packed = (module S with type C.t = 'a)
+
 module Make(X : sig
     module Ctx : Ctx.S
     val params : Params.t

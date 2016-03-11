@@ -15,14 +15,17 @@ val add_constr : t -> int -> [`partial] Precedence.Constr.t -> unit
 
 val add_constrs : t -> (int * [`partial] Precedence.Constr.t) list -> unit
 
+(** Some values are parametrized by the list of statements *)
+type 'a parametrized = Statement.clause_t Sequence.t -> 'a
+
 val add_constr_rule :
   t ->
   int ->
-  (FOTerm.t Sequence.t -> [`partial] Precedence.Constr.t) ->
+  [`partial] Precedence.Constr.t parametrized ->
   unit
 (** Add a precedence constraint rule *)
 
-val set_weight_rule : t -> (FOTerm.t Sequence.t -> ID.t -> int) -> unit
+val set_weight_rule : t -> (ID.t -> int) parametrized -> unit
 (** Choose the way weights are computed *)
 
 val add_status : t -> (ID.t * Precedence.symbol_status) list -> unit
@@ -30,6 +33,6 @@ val add_status : t -> (ID.t * Precedence.symbol_status) list -> unit
 
 val mk_precedence :
   t ->
-  FOTerm.t Sequence.t ->
+  Statement.clause_t Sequence.t ->
   Precedence.t
 (** Make a precedence *)

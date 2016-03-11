@@ -11,11 +11,13 @@ let prof_mk_prec = Util.mk_profiler "mk_precedence"
 
 let section = Util.Section.make ~parent:Const.section "compute_prec"
 
+type 'a parametrized = Statement.clause_t Sequence.t -> 'a
+
 type t = {
   mutable constrs : (int * [`partial] Precedence.Constr.t) list;
-  mutable constr_rules : (int * (FOTerm.t Sequence.t -> [`partial] Precedence.Constr.t)) list;
+  mutable constr_rules : (int * [`partial] Precedence.Constr.t parametrized) list;
   last_constr : [`total] Precedence.Constr.t;
-  mutable weight_rule : (FOTerm.t Sequence.t -> ID.t -> int);
+  mutable weight_rule : (ID.t -> int) parametrized;
   mutable status : (ID.t * Precedence.symbol_status) list;
 }
 
@@ -49,6 +51,7 @@ let mk_precedence t seq =
   (* set of symbols *)
   let symbols =
     seq
+    |> Sequence.flat_map Statement.Seq.terms
     |> Sequence.flat_map T.Seq.symbols
     |> ID.Set.of_seq
     |> ID.Set.to_list
