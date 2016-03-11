@@ -18,3 +18,4 @@
 (D) 2016-02-19 update readme @doc
 (D) 2016-02-29 add inductive preds into .zf (translate to new data internally) @zf
 (D) 2016-02-29 move detection of EnumType into preprocessing; add it in AST @refactor
+2016-03-07 bring back orphan criterion lazily: mark redundant clauses; discard clause whose ≥ 1 parent is redundant; sweep active from time to time
