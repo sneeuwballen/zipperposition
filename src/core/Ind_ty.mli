@@ -3,6 +3,8 @@
 
 (** {1 Inductive Types} *)
 
+val section : Util.Section.t
+
 (** Constructor for an inductive type *)
 type constructor = {
   cstor_name: ID.t;
@@ -13,22 +15,24 @@ type constructor = {
 
 (** An inductive type, along with its set of constructors *)
 type t = private {
-  id: ID.t; (* name *)
+  ty_id: ID.t; (* name *)
   ty_vars: Type.t HVar.t list; (* list of variables *)
   ty_pattern: Type.t; (* equal to  [id ty_vars] *)
-  constructors : constructor list;
+  ty_constructors : constructor list;
     (* constructors, all returning [pattern] and containing
        no other type variables than [ty_vars] *)
 }
 
-exception AlreadyDeclaredType of ID.t
+exception InvalidDecl of string
+
 exception NotAnInductiveType of ID.t
+
 exception NotAnInductiveConstructor of ID.t
 
 val declare_ty : ID.t -> ty_vars:Type.t HVar.t list -> constructor list -> t
 (** Declare the given inductive type.
-    @raise Failure if the type is already declared
-    @raise Invalid_argument if the list of constructors is empty. *)
+    @raise InvalidDecl if the type is already declared, or the list
+      of constructors is empty *)
 
 val declare_stmt : (_, _, Type.t, _) Statement.t -> unit
 (** [declare_stmt stmt] examines [stmt], and, if the statement is a

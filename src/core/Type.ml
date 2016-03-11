@@ -11,12 +11,14 @@ type ty = t
 
 type builtin = TType | Prop | Term | Rat | Int
 
-let pp_builtin out = function
-  | Prop -> CCFormat.string out "prop"
-  | TType -> CCFormat.string out "type"
-  | Term -> CCFormat.string out "ι"
-  | Int -> CCFormat.string out "int"
-  | Rat -> CCFormat.string out "rat"
+let builtin_conv = function
+  | TType -> Builtin.tType
+  | Prop -> Builtin.prop
+  | Term -> Builtin.term
+  | Rat -> Builtin.ty_rat
+  | Int -> Builtin.ty_int
+
+let pp_builtin out b = Builtin.pp out (builtin_conv b)
 
 type view =
   | Builtin of builtin

@@ -17,27 +17,30 @@ type constructor = {
 
 (** An inductive type, along with its set of constructors *)
 type t = {
-  id: ID.t; (* name *)
+  ty_id: ID.t; (* name *)
   ty_vars: Type.t HVar.t list; (* list of variables *)
   ty_pattern: Type.t; (* equal to  [id ty_vars] *)
-  constructors : constructor list;
+  ty_constructors : constructor list;
     (* constructors, all returning [pattern] and containing
        no other type variables than [ty_vars] *)
 }
 
-let fail_ fmt = CCFormat.ksprintf fmt ~f:failwith
-let invalid_argf_ fmt = CCFormat.ksprintf fmt ~f:invalid_arg
+type id_or_tybuiltin =
+  | I of ID.t
+  | B of Type.builtin
 
-exception AlreadyDeclaredType of ID.t
-exception NotAnInductiveType of ID.t
+exception InvalidDecl of string
+
 exception NotAnInductiveConstructor of ID.t
+
+exception NotAnInductiveType of ID.t
 
 let () =
   let spf = CCFormat.sprintf in
   Printexc.register_printer
   (function
-    | AlreadyDeclaredType id ->
-        Some (spf "%a already declared as an inductive type" ID.pp id)
+    | InvalidDecl msg ->
+        Some (spf "@[<2>invalid declaration:@ %s@]" msg)
     | NotAnInductiveType id ->
         Some (spf "%a is not an inductive type" ID.pp id)
     | NotAnInductiveConstructor id ->
@@ -47,12 +50,16 @@ let () =
 exception Payload_ind_type of t
 exception Payload_ind_cstor of constructor * t
 
+let invalid_decl_ msg = raise (InvalidDecl msg)
+let invalid_declf_ fmt = CCFormat.ksprintf fmt ~f:invalid_decl_
+
 let type_hd_exn ty =
   let _, ret = Type.open_fun ty in
   match Type.view ret with
-  | Type.App (s, _) -> s
+  | Type.Builtin b -> B b
+  | Type.App (s, _) -> I s
   | _ ->
-      invalid_argf_ "expected function type, got %a" Type.pp ty
+      invalid_declf_ "expected function type,@ got `@[%a@]`" Type.pp ty
 
 let as_inductive_ty id =
   CCList.find
@@ -61,37 +68,40 @@ let as_inductive_ty id =
       | _ -> None)
     (ID.payload id)
 
-let as_inductive_ty_exn id = match as_inductive_ty id with
+let as_inductive_ty_exn id =
+  match as_inductive_ty id with
   | Some ty -> ty
-  | None -> raise (NotAnInductiveType id)
+  | None -> invalid_declf_ "%a is not an inductive type" ID.pp id
 
 let is_inductive_ty id =
   match as_inductive_ty id with Some _ -> true | None -> false
 
 let is_inductive_type ty =
-  let id = type_hd_exn ty in
-  is_inductive_ty id
+  match type_hd_exn ty with
+  | B _ -> false
+  | I id -> is_inductive_ty id
 
 let as_inductive_type ty =
-  let id = type_hd_exn ty in
-  as_inductive_ty id
+  match type_hd_exn ty with
+  | B _ -> None
+  | I id -> as_inductive_ty id
 
 (* declare that the given type is inductive *)
 let declare_ty id ~ty_vars constructors =
   Util.debugf ~section 1 "declare inductive type %a" (fun k->k ID.pp id);
   if constructors = []
-  then invalid_argf_ "Ind_types.declare_ty %a: no constructors provided" ID.pp id;
+  then invalid_declf_ "Ind_types.declare_ty %a: no constructors provided" ID.pp id;
   (* check that [ty] is not declared already *)
   List.iter
     (function
-      | Payload_ind_type _ -> fail_ "inductive type %a already declared" ID.pp id;
+      | Payload_ind_type _ -> invalid_declf_ "inductive type %a already declared" ID.pp id;
       | _ -> ())
     (ID.payload id);
   let ity = {
-    id;
+    ty_id=id;
     ty_vars;
     ty_pattern=Type.app id (List.map Type.var ty_vars);
-    constructors;
+    ty_constructors=constructors;
   } in
   (* map the constructors to [ity] too *)
   List.iter

@@ -8,6 +8,8 @@
 
 open Libzipperposition
 
+exception InvalidDecl of string
+
 (** {6 Inductive Case}
 
     An inductive case is a term that belongs to the coverset of some
@@ -56,14 +58,18 @@ val as_cst_exn : ID.t -> cst
 val is_cst : ID.t -> bool
 (** Check whether the given constant is an inductive skolem *)
 
+val on_new_cst : cst Signal.t
+(** Triggered with new inductive constants *)
+
 val declare_cst : ?cover_set_depth:int -> ID.t -> ty:Type.t -> cst
-(** Adds the constant to the set of inductive constants.
+(** Adds the constant to the set of inductive constants, make a coverset...
     @param cover_set_depth depth of cover_set terms; the deeper, the
       larger the cover set will be
     @raise NotAnInductiveType if [ty] is not an inductive type *)
 
-val on_new_cst : cst Signal.t
-(** Triggered with new inductive constants *)
+val declarations_of_cst : cst -> (ID.t * Type.t) Sequence.t
+(** [declarations_of_cst c] returns a list of type declarations that should
+    be made if [c] is new (declare the subcases of its coverset) *)
 
 val cst_equal : cst -> cst -> bool
 val cst_compare : cst -> cst -> int

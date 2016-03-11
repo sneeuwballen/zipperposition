@@ -8,24 +8,27 @@ open Libzipperposition
 
 module T = FOTerm
 
+exception InvalidDecl of string
 exception AlreadyDeclaredConstant of ID.t
 exception NotAnInductiveConstant of ID.t
-exception NotAnInductiveCase of FOTerm.t
 exception NotAnInductiveSubConstant of ID.t
 
 let () =
   let spf = CCFormat.sprintf in
   Printexc.register_printer
   (function
+    | InvalidDecl msg ->
+        Some (spf "@[<2>invalid declaration:@ %s@]" msg)
     | AlreadyDeclaredConstant id ->
         Some (spf "%a already declared as an inductive constant" ID.pp id)
     | NotAnInductiveConstant id ->
         Some (spf "%a is not an inductive constant" ID.pp id)
-    | NotAnInductiveCase t ->
-        Some (spf "@[@[%a@]@ is not an inductive case@]" T.pp t)
     | NotAnInductiveSubConstant id ->
         Some (spf "%a is not an inductive sub-constant" ID.pp id)
     | _ -> None)
+
+let invalid_decl m = raise (InvalidDecl m)
+let invalid_declf m = CCFormat.ksprintf m ~f:invalid_decl
 
 (** {6 Inductive Case} *)
 
@@ -156,144 +159,197 @@ let sub_constants set =
 
 (** {6 Creation of Coverset and Cst} *)
 
-(* monad over "lazy" values *)
-module FunM = CCFun.Monad(struct type t = unit end)
-module FunT = CCList.Traverse(FunM)
-
-(* coverset of given depth for this type and constant *)
-let make_coverset_ ~depth:_ _ity _cst : cover_set =
-  assert false
-  (* FIXME
-  let cst_data = T.Tbl.find _tbl cst in
-  (* list of generators of:
-      - member of the coverset (one of the t such that cst=t)
-      - set of sub-constants of this term *)
-  let rec make depth =
-    (* leaves: fresh constants *)
-    if depth=0
-    then
-      [fun () ->
-        let ty = ity.pattern in
-        let name = CCFormat.sprintf "#%a" ID.pp (type_hd_exn ty) in
-        let c = ID.make name in
-        let t = T.const ~ty c in
-        ID.Tbl.replace cst_data.dominates c ();
-        Ctx.declare c ty;
-        set_blocked t;
-        t, T.Set.singleton t
-      ]
-    (* inner nodes or base cases: constructors *)
-    else CCList.flat_map
-        (fun (f, ty_f) ->
-           match Type.arity ty_f with
-           | Type.NoArity ->
-               fail_ "invalid constructor %a for inductive type %a"
-                 ID.pp f Type.pp ity.pattern
-           | Type.Arity (0, 0) ->
-               if depth > 0
-               then  (* only one answer : f *)
-                 [fun () -> T.const ~ty:ty_f f, T.Set.empty]
-               else []
-           | Type.Arity (0, _) ->
-               let ty_args = Type.expected_args ty_f in
-               CCList.(
-                 make_list (depth-1) ty_args >>= fun mk_args ->
-                 return (fun () ->
-                     let args, set = mk_args () in
-                     T.app (T.const f ~ty:ty_f) args, set)
-               )
-           | Type.Arity (m,_) ->
-               fail_
-                 ("inductive constructor %a requires %d type " ^^
-                  "parameters, expected 0")
-                 ID.pp f m
-        ) ity.constructors
-  (* given a list of types [l], yield all lists of cover terms
-      that have types [l] *)
-  and make_list depth l
-    : (T.t list * T.Set.t) FunM.t list
-    = match l with
-    | [] -> [FunM.return ([], T.Set.empty)]
-    | ty :: tail ->
-        let t_builders = if Unif.Ty.matches ~pattern:ity.pattern ty
-          then make depth
-          else [fun () ->
-              (* not an inductive sub-case, just create a skolem symbol *)
-              let name = CCFormat.sprintf "#%a" ID.pp (type_hd_exn ty) in
-              let c = ID.make name in
-              let t = T.const ~ty c in
-              ID.Tbl.replace cst_data.dominates c ();
-              Ctx.declare c ty;
-              t, T.Set.empty
-            ] in
-        let tail_builders = make_list depth tail in
-        CCList.(
-          t_builders >>= fun mk_t ->
-          tail_builders >>= fun mk_tail ->
-          [FunM.(mk_t >>= fun (t,set) ->
-                 mk_tail >>= fun (tail,set') ->
-                 return (t::tail, T.Set.union set set'))]
-        )
-  in
-  assert (depth>0);
-  (* make the cover set's cases, tagged with `Base or `Rec depending
-     on whether they contain sub-cases *)
-  let cases_and_subs =
-    List.map
-      (fun gen ->
-         let t, set = gen() in
-         (* remember whether [t] is base or recursive case *)
-         if T.Set.is_empty set
-         then (t, `Base), set
-         else (t, `Rec), set)
-      (make depth)
-  in
-  let cases, sub_constants = List.split cases_and_subs in
-  let cases, rec_cases, base_cases =
-    List.fold_left
-      (fun (c,r,b) (t,is_base) -> match is_base with
-         | `Base -> t::c, r, t::b
-         | `Rec -> t::c, t::r, b)
-      ([],[],[]) cases
-  in
-  let sub_constants =
-    List.fold_left T.Set.union T.Set.empty sub_constants in
-  let coverset = {
-    cases = List.map Case.of_term_unsafe cases;
-    rec_cases = List.map Case.of_term_unsafe cases;
-    base_cases = List.map Case.of_term_unsafe cases;
-    sub_constants;
-  } in
-  (* declare sub-constants as such. They won't be candidate for induction
-     and will be smaller than [t] *)
-  List.iter
-    (fun ((t, _), set) ->
-       T.Tbl.add _tbl_case t (cst, coverset);
-       T.Set.iter
-         (fun sub_cst -> T.Tbl.replace _tbl_sub_cst sub_cst (cst, coverset, t))
-         set)
-    cases_and_subs;
-  coverset
-  *)
+type id_or_ty_builtin =
+  | I of ID.t
+  | B of Type.builtin
 
 let type_hd_exn ty =
   let _, ret = Type.open_fun ty in
   match Type.view ret with
-  | Type.App (s, _) -> s
+  | Type.Builtin b -> B b
+  | Type.App (s, _) -> I s
   | _ ->
-      CCFormat.ksprintf ~f:invalid_arg "expected function type, got %a" Type.pp ty
+      invalid_declf "expected function type, got %a" Type.pp ty
+
+(* type declarations required by [c] *)
+let declarations_of_cst c =
+  Sequence.of_list c.cst_coverset
+  |> Sequence.flat_map
+    (fun c -> ID.Set.to_seq c.case_sub)
+  |> Sequence.map
+    (fun id ->
+      let sub = as_sub_cst_exn id in
+      id, sub.sub_cst_ty)
+
+module CoversetState = struct
+  (* state for creating coverset *)
+  type t = {
+    sub_csts: ID.Set.t; (* raw set of constants *)
+    to_declare: (ID.t * Type.t) list;
+      (* those sub-constants need to be declared *)
+  }
+
+  let empty = {
+    sub_csts=ID.Set.empty;
+    to_declare=[];
+  }
+
+  (* state monad *)
+  type 'a m = t -> t * 'a
+
+  let return : 'a -> 'a m = fun x st -> st, x
+  let (>>=) : 'a m -> ('a -> 'b m) -> 'b m
+  = fun x f st ->
+    let st, x' = x st in
+    f x' st
+  let (>|=) : 'a m -> ('a -> 'b) -> 'b m
+  = fun x f st ->
+    let st, x' = x st in
+    st, f x'
+  let get : t m = fun st -> st, st
+  let set : t -> unit m = fun st _ -> st, ()
+
+  (* modify the state: add [c] to the set of cases *)
+  let add_sub_case c ty : unit m =
+    get >>= fun st ->
+    let st = {
+      sub_csts=ID.Set.add c st.sub_csts;
+      to_declare=(c,ty) :: st.to_declare;
+    } in
+    set st
+
+  (* backtracking monad inside the state monad *)
+  type 'a mm = 'a list m
+  let fail : _ mm = fun st -> st, []
+  let yield : 'a -> 'a mm = fun x st -> st, [x]
+  let (>>>=) : 'a mm -> ('a -> 'b mm) -> 'b mm
+  = fun x f st ->
+    let st, xs = x st in
+    CCList.fold_flat_map (fun st x -> f x st) st xs
+  let (>>|=) : 'a mm -> ('a -> 'b) -> 'b mm
+  = fun x f st ->
+    let st, xs = x st in
+    st, List.map f xs
+
+  let rec map_l : ('a -> 'b mm) -> 'a list -> 'b list mm
+  = fun f l -> match l with
+    | [] -> yield []
+    | x :: tl ->
+        f x >>>= fun x' ->
+        map_l f tl >>>= fun tl' ->
+        yield (x'::tl')
+end
+
+(* coverset of given depth for this type and constant *)
+let make_coverset_ ~depth:initial_depth ity : (case * (ID.t * Type.t) list) list =
+  let open CoversetState in
+  (* list of generators of:
+      - member of the coverset (one of the t such that cst=t)
+      - set of sub-constants of this term *)
+  let rec make depth : T.t mm =
+    (* leaves: fresh constants *)
+    if depth=0
+    then (
+      let name = CCFormat.sprintf "#%a" ID.pp ity.Ind_ty.ty_id in
+      let c = ID.make name in
+      (* FIXME: what if there are type parameters?! *)
+      let ty = ity.Ind_ty.ty_pattern  in
+      let t = T.const ~ty c in
+      add_sub_case c ty >>= fun () ->
+      yield t
+    )
+    (* inner nodes or base cases: constructors *)
+    else
+      return ity.Ind_ty.ty_constructors
+      >>>= fun cstor ->
+      let f = cstor.Ind_ty.cstor_name in
+      let ty_f = cstor.Ind_ty.cstor_ty in
+      match Type.arity ty_f with
+       | Type.NoArity ->
+           invalid_declf "invalid constructor %a for inductive type %a"
+             ID.pp f Type.pp ity.Ind_ty.ty_pattern
+       | Type.Arity (0, 0) ->
+           if depth > 0
+           then yield (T.const ~ty:ty_f f)  (* only one answer : f *)
+           else fail
+       | Type.Arity (0, _) ->
+           let ty_args = Type.expected_args ty_f in
+           map_l (make_of_ty (depth-1)) ty_args
+           >>|= fun args ->
+           T.app (T.const ~ty:ty_f f) args
+       | Type.Arity (m,_) ->
+           invalid_declf
+             "inductive constructor %a requires %d type \
+               parameters, expected 0"
+             ID.pp f m
+  (* return a new term of type [ty] *)
+  and make_of_ty depth ty : T.t mm =
+    if Unif.Ty.matches ~pattern:ity.Ind_ty.ty_pattern ty
+    then make depth (* previous case *)
+    else (
+      (* not an inductive sub-case, just create a skolem symbol *)
+      let name = match type_hd_exn ty with
+        | B b -> CCFormat.sprintf "#%a" Type.pp_builtin b
+        | I id -> CCFormat.sprintf "#%a" ID.pp id
+      in
+      let c = ID.make name in
+      let t = T.const ~ty c in
+      add_sub_case c ty >>= fun () ->
+      yield t
+    )
+  in
+  (* build the toplevel values, along with a list of sub-constants
+     to declare *)
+  let make_top =
+    let l = make initial_depth in
+    l >>>= fun t ->
+    (* obtain the current set of sub-constants, and reset it *)
+    get >>= fun state ->
+    set empty >>= fun () ->
+    let case = {
+      case_term=t;
+      case_kind=if ID.Set.is_empty state.sub_csts then `Base else `Rec;
+      case_sub=state.sub_csts;
+    } in
+    yield (case, state.to_declare)
+  in
+  let _st, l = make_top empty in
+  l
 
 let declare_cst ?(cover_set_depth=1) id ~ty =
   if is_cst id then raise (AlreadyDeclaredConstant id);
-  let ity = Ind_ty.as_inductive_ty_exn (type_hd_exn ty) in
-  let cst_coverset = make_coverset_ ~depth:cover_set_depth ity id in
-  Util.debugf 2 "declare new inductive constant %a" (fun k->k ID.pp id);
+  let ity = match type_hd_exn ty with
+    | B b -> invalid_declf "cannot declare a constant of type %a" Type.pp_builtin b
+    | I id -> Ind_ty.as_inductive_ty_exn id
+  in
+  let l = make_coverset_ ~depth:cover_set_depth ity in
+  let cover_set = List.map fst l in
+  Util.debugf ~section:Ind_ty.section 2
+    "@[<2>declare new inductive constant @[%a@]@ with coverset @[%a@]@]"
+    (fun k->k ID.pp id (Util.pp_list pp_case) cover_set);
+  (* build the constant itself *)
   let cst = {
     cst_id=id;
     cst_ty=ty;
     cst_ity=ity;
-    cst_coverset;
+    cst_coverset=cover_set;
   } in
+  ID.add_payload id (Payload_cst cst);
+  (* declare the sub-constants *)
+  List.iter
+    (fun (case,to_declare) ->
+      List.iter
+        (fun (id,ty) ->
+          ID.add_payload id
+            (Payload_sub_cst {
+              sub_cst_term=id;
+              sub_cst_ty=ty;
+              sub_cst_case=case;
+              sub_cst_cst=cst;
+            }))
+        to_declare)
+    l;
+  (* return *)
   Signal.send on_new_cst cst;
   cst
 
