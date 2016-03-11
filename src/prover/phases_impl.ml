@@ -55,7 +55,9 @@ let load_extensions =
   Extensions.register Heuristics.extension;
   Extensions.register Avatar.extension;
   Extensions.register EnumTypes.extension;
+  (* FIXME: this breaks completeness on pb47
   Extensions.register Induction.extension;
+  *)
   let l = Extensions.extensions () in
   Phases.return_phase l
 
