@@ -3,14 +3,26 @@
 
 (** {1 Phases of the Prover} *)
 
+open Libzipperposition
+
 type filename = string
 type 'a or_error = [`Ok of 'a | `Error of string]
 
 (** {2 Phases} *)
 
+type env_with_clauses =
+  Env_clauses : 'c Env.packed * 'c CCVector.ro_vector -> env_with_clauses
+
+type env_with_result =
+  Env_result : 'c Env.packed * 'c Saturate.szs_status -> env_with_result
+
 type ('ret, 'before, 'after) phase =
   | Init : (unit, _, [`Init]) phase (* global setup *)
-  | Parse_CLI : (unit, [`Init], [`Parse_cli]) phase (* parse CLI options *)
+  | Setup_gc : (unit, [`Init], [`Init]) phase
+  | Setup_signal : (unit, [`Init], [`Init]) phase
+  | Parse_CLI :
+    (filename list * Params.t, [`Init], [`Parse_cli]) phase
+    (* parse CLI options: get a list of files to process, and parameters *)
   | LoadExtensions : (Extensions.t list, [`Parse_cli], [`LoadExtensions]) phase
   | Start_file :
     (filename, [`LoadExtensions], [`Start_file]) phase (* file to process *)
@@ -27,18 +39,18 @@ type ('ret, 'before, 'after) phase =
     (* compute orderign and selection function *)
 
   | MakeCtx : ((module Ctx.S), [`Compute_ord_select], [`MakeCtx]) phase
-  | MakeEnv : ((module Env.S), [`MakeCtx], [`MakeEnv]) phase
 
-  | Extract_clauses :
-    ((module Env.S with type C.t = 'c) * 'c CCVector.ro_vector, [`MakeEnv], [`Extract_clauses]) phase
+  | MakeEnv : (env_with_clauses, [`MakeCtx], [`MakeEnv]) phase
 
   | Pre_saturate :
-    ((module Env.S with type C.t = 'c) * 'c CCVector.ro_vector, [`Extract_clauses], [`Pre_saturate]) phase
+    ('c Env.packed * 'c Saturate.szs_status * 'c CCVector.ro_vector,
+      [`MakeEnv], [`Pre_saturate]) phase
 
   | Saturate :
-    ((module Env.S with type C.t = 'c) * 'c Saturate.szs_status, [`Pre_saturate], [`Saturate]) phase
+    (env_with_result, [`Pre_saturate], [`Saturate]) phase
 
-  | Print_stats : (unit, [`Saturate], [`Print_stats]) phase
+  | Print_result : (unit, [`Saturate], [`Print_result]) phase
+  | Print_stats : (unit, [`Print_result], [`Print_stats]) phase
   | Print_dot : (unit, [`Print_stats], [`Print_dot]) phase
   | Exit : (unit, _, [`Exit]) phase
 
@@ -71,6 +83,8 @@ type (+'a, 'p1, 'p2) t = State.t -> (State.t * 'a) or_error
 let string_of_phase : type a b c. (a,b,c) phase -> string
   = function
   | Init -> "init"
+  | Setup_gc -> "setup_gc"
+  | Setup_signal -> "setup_signal"
   | Parse_CLI  -> "parse_cli"
   | LoadExtensions -> "load_extensions"
   | Start_file -> "start_file"
@@ -81,9 +95,9 @@ let string_of_phase : type a b c. (a,b,c) phase -> string
   | Compute_ord_select -> "compute_ord_select"
   | MakeCtx -> "make_ctx"
   | MakeEnv -> "make_env"
-  | Extract_clauses -> "extract_clauses"
   | Pre_saturate  -> "pre_saturate"
   | Saturate -> "saturate"
+  | Print_result -> "print_result"
   | Print_stats -> "print_stats"
   | Print_dot -> "print_dot"
   | Exit -> "exit"
@@ -129,15 +143,26 @@ let current_phase st =
     `Error msg
 
 let start_phase p st =
+  Util.debugf ~section:Const.section 2 "start phase %s" (fun k->k (string_of_phase p));
   let st = State.add State.cur_phase_key (Any_phase p) st in
   `Ok (st, ())
 
-let return_phase x = return x
+let return_phase_err x =
+  current_phase >>= fun p ->
+  Util.debugf ~section:Const.section 2 "terminate phase %s"
+    (fun k->k (string_of_any_phase p));
+  return_err x
 
-let with_phase p ~f =
+let return_phase x = return_phase_err (`Ok x)
+
+let with_phase1 p ~f x =
   start_phase p >>= fun () ->
-  let x = f () in
-  return_phase x
+  let y = f x in
+  return_phase y
+
+let with_phase p ~f = with_phase1 p ~f ()
+
+let with_phase2 p ~f x y = with_phase1 p ~f:(f x) y
 
 let exit =
   start_phase Exit >>= fun () ->
@@ -146,6 +171,19 @@ let exit =
 let get st = `Ok (st, st)
 
 let set new_st _st = `Ok (new_st, ())
+
+let run_parallel l =
+  let rec aux = function
+    | [] -> return ()
+    | [a] -> a
+    | a :: tail ->
+        get >>= fun old_st ->
+        a >>= fun () ->
+        (* restore old state *)
+        set old_st >>= fun () ->
+        aux tail
+  in
+  aux l
 
 let update ~f st =
   let st = f st in

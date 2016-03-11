@@ -6,14 +6,26 @@
     To process a file, the prover goes through a sequence of phases that
     are used to build values. This module reifies the phases. *)
 
+open Libzipperposition
+
 type filename = string
 type 'a or_error = [`Ok of 'a | `Error of string]
 
 (** {2 Phases} *)
 
+type env_with_clauses =
+  Env_clauses : 'c Env.packed * 'c CCVector.ro_vector -> env_with_clauses
+
+type env_with_result =
+  Env_result : 'c Env.packed * 'c Saturate.szs_status -> env_with_result
+
 type ('ret, 'before, 'after) phase =
   | Init : (unit, _, [`Init]) phase (* global setup *)
-  | Parse_CLI : (unit, [`Init], [`Parse_cli]) phase (* parse CLI options *)
+  | Setup_gc : (unit, [`Init], [`Init]) phase
+  | Setup_signal : (unit, [`Init], [`Init]) phase
+  | Parse_CLI :
+    (filename list * Params.t, [`Init], [`Parse_cli]) phase
+    (* parse CLI options: get a list of files to process, and parameters *)
   | LoadExtensions : (Extensions.t list, [`Parse_cli], [`LoadExtensions]) phase
   | Start_file :
     (filename, [`LoadExtensions], [`Start_file]) phase (* file to process *)
@@ -30,18 +42,18 @@ type ('ret, 'before, 'after) phase =
     (* compute orderign and selection function *)
 
   | MakeCtx : ((module Ctx.S), [`Compute_ord_select], [`MakeCtx]) phase
-  | MakeEnv : ((module Env.S), [`MakeCtx], [`MakeEnv]) phase
 
-  | Extract_clauses :
-    ((module Env.S with type C.t = 'c) * 'c CCVector.ro_vector, [`MakeEnv], [`Extract_clauses]) phase
+  | MakeEnv : (env_with_clauses, [`MakeCtx], [`MakeEnv]) phase
 
   | Pre_saturate :
-    ((module Env.S with type C.t = 'c) * 'c CCVector.ro_vector, [`Extract_clauses], [`Pre_saturate]) phase
+    ('c Env.packed * 'c Saturate.szs_status * 'c CCVector.ro_vector,
+      [`MakeEnv], [`Pre_saturate]) phase
 
   | Saturate :
-    ((module Env.S with type C.t = 'c) * 'c Saturate.szs_status, [`Pre_saturate], [`Saturate]) phase
+    (env_with_result, [`Pre_saturate], [`Saturate]) phase
 
-  | Print_stats : (unit, [`Saturate], [`Print_stats]) phase
+  | Print_result : (unit, [`Saturate], [`Print_result]) phase
+  | Print_stats : (unit, [`Print_result], [`Print_stats]) phase
   | Print_dot : (unit, [`Print_stats], [`Print_dot]) phase
   | Exit : (unit, _, [`Exit]) phase
 
@@ -75,12 +87,18 @@ val start_phase : (_, 'p1, 'p2) phase -> (unit, 'p1, [`InPhase of 'p2]) t
 val return_phase : 'a -> ('a, [`InPhase of 'p2], 'p2) t
 (** Finish the given phase *)
 
+val return_phase_err : 'a or_error -> ('a, [`InPhase of 'p2], 'p2) t
+
 val current_phase : (any_phase, _, 'p2) t
 (** Get the current phase *)
 
 val with_phase : ('a, 'p1, 'p2) phase -> f:(unit -> 'a) -> ('a, 'p1, 'p2) t
 (** Start phase, call [f ()] to get the result, return its result
     using {!return_phase} *)
+
+val with_phase1 : ('b, 'p1, 'p2) phase -> f:('a -> 'b) -> 'a -> ('b, 'p1, 'p2) t
+
+val with_phase2 : ('c, 'p1, 'p2) phase -> f:('a -> 'b -> 'c) -> 'a -> 'b -> ('c, 'p1, 'p2) t
 
 val bind :
   ('a, 'p_before, 'p_middle) t ->
@@ -90,6 +108,12 @@ val bind :
 
 val map : ('a, 'p1, 'p2) t -> f:('a -> 'b) -> ('b, 'p1, 'p2) t
 (** Map the current value *)
+
+val run_parallel : (unit, 'p1, 'p2) t list -> (unit, 'p1, 'p2) t
+(** [run_sequentiel l] runs each action of the list in succession,
+    restarting every time with the initial state (once an action
+    has finished, its state is discarded). Only the very last state
+    is kept. *)
 
 module Infix : sig
   val (>>=) : ('a, 'p1, 'p2) t -> ('a -> ('b, 'p2, 'p3) t) -> ('b, 'p1, 'p3) t
