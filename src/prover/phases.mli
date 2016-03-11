@@ -7,6 +7,7 @@
     are used to build values. This module reifies the phases. *)
 
 type filename = string
+type 'a or_error = [`Ok of 'a | `Error of string]
 
 (** {2 Phases} *)
 
@@ -60,6 +61,11 @@ val string_of_any_phase : any_phase -> string
 val return : 'a -> ('a, 'p, 'p) t
 (** Return a value into the monad *)
 
+val fail : string -> (_, _, _) t
+(** Fail with the given error message *)
+
+val return_err : 'a or_error -> ('a, 'p, 'p) t
+
 val exit : (unit, _, [`Exit]) t
 (** Exit *)
 
@@ -87,6 +93,7 @@ val map : ('a, 'p1, 'p2) t -> f:('a -> 'b) -> ('b, 'p1, 'p2) t
 
 module Infix : sig
   val (>>=) : ('a, 'p1, 'p2) t -> ('a -> ('b, 'p2, 'p3) t) -> ('b, 'p1, 'p3) t
+  val (>>?=) : ('a, 'p1, 'p2) t -> ('a -> 'b or_error) -> ('b, 'p1, 'p2) t
   val (>|=) : ('a, 'p1, 'p2) t -> ('a -> 'b) -> ('b, 'p1, 'p2) t
 end
 
@@ -116,9 +123,12 @@ val set : State.t -> (unit, 'a, 'a) t
 
 val update : f:(State.t -> State.t) -> (unit, 'a, 'a) t
 
-val run : State.t -> ('a, [`Init], [`Exit]) t -> State.t * 'a
-(** [run state m] executes the actions in [m] starting with [state],
-    returning some value and the final state. *)
+val run_with : State.t -> ('a, [`Init], [`Exit]) t -> (State.t * 'a) or_error
+(** [run_with state m] executes the actions in [m] starting with [state],
+    returning some value (or error) and the final state. *)
+
+val run : ('a, [`Init], [`Exit]) t -> (State.t * 'a) or_error
+(** [run m] is [run_with State.empty m] *)
 
 (* FIXME
 type callbacks

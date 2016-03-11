@@ -4,6 +4,7 @@
 (** {1 Phases of the Prover} *)
 
 type filename = string
+type 'a or_error = [`Ok of 'a | `Error of string]
 
 (** {2 Phases} *)
 
@@ -65,7 +66,7 @@ module State = struct
 end
 
 (* A simple state monad *)
-type (+'a, 'p1, 'p2) t = State.t -> State.t * 'a
+type (+'a, 'p1, 'p2) t = State.t -> (State.t * 'a) or_error
 
 let string_of_phase : type a b c. (a,b,c) phase -> string
   = function
@@ -89,28 +90,47 @@ let string_of_phase : type a b c. (a,b,c) phase -> string
 
 let string_of_any_phase (Any_phase p) = string_of_phase p
 
-let return x st = st, x
+let return x st = `Ok (st, x)
+
+let return_err x st = match x with
+  | `Ok x -> `Ok (st, x)
+  | `Error msg -> `Error msg
+
+let fail msg _ = `Error msg
 
 let bind x ~f st =
-  let st, x = x st in
-  f x st
+  match x st with
+  | `Ok (st, x) -> f x st
+  | `Error msg -> `Error msg  (*  cut evaluation *)
+
+let bind_err x ~f st =
+  match x st with
+  | `Ok (st, x) -> return_err (f x) st
+  | `Error msg -> `Error msg  (*  cut evaluation *)
+
 
 let map x ~f st =
-  let st, x = x st in
-  st, f x
+  match x st with
+  | `Error msg -> `Error msg
+  | `Ok (st, x) -> `Ok (st, f x)
 
 module Infix = struct
   let (>>=) x f = bind x ~f
+  let (>>?=) x f = bind_err x ~f
   let (>|=) x f = map x ~f
 end
 
 include Infix
 
-let current_phase st = st, State.get_exn State.cur_phase_key st
+let current_phase st =
+  try `Ok (st, State.get_exn State.cur_phase_key st)
+  with Not_found ->
+    let msg = "could not find current phase" in
+    `Error msg
 
 let start_phase p st =
   let st = State.add State.cur_phase_key (Any_phase p) st in
-  st, ()
+  `Ok (st, ())
 
 let return_phase x = return x
 
@@ -119,19 +139,27 @@ let with_phase p ~f =
   let x = f () in
   return_phase x
 
-let exit st =
-  let st, () = start_phase Exit st in
-  return_phase () st
+let exit =
+  start_phase Exit >>= fun () ->
+  return_phase ()
 
-let get st = st, st
+let get st = `Ok (st, st)
 
-let set new_st _st = new_st, ()
+let set new_st _st = `Ok (new_st, ())
 
 let update ~f st =
   let st = f st in
-  st, ()
+  `Ok (st, ())
 
-let run st m = m st
+let run_with st m =
+  try
+    m st
+  with e ->
+    let stack = Printexc.get_backtrace () in
+    let msg = Printexc.to_string e in
+    `Error (msg ^ stack)
+
+let run m = run_with State.empty m
 
 (* FIXME
 type 'a cb = 'a -> unit
