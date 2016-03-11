@@ -86,7 +86,9 @@ let const s = T.const ~ty:T.tType s
 let arrow_ l r = T.app_builtin ~ty:T.tType Builtin.arrow (r :: l)
 
 let arrow l r = match view r with
-  | Fun (l', ret) -> arrow_ (l @ l') ret
+  | Fun (l', ret) ->
+      assert (not (is_fun ret));
+      arrow_ (l @ l') ret
   | _ -> arrow_ l r
 
 let record l ~rest = T.record ~ty:T.tType l ~rest
@@ -175,10 +177,10 @@ let rec depth ty = match view ty with
         d r
 and depth_l l = List.fold_left (fun d t -> max d (depth t)) 0 l
 
-let rec open_fun ty = match view ty with
+let open_fun ty = match view ty with
   | Fun (args, ret) ->
-      let xs, ret' = open_fun ret in
-      args @ xs, ret'
+      assert (not (is_fun ret));
+      args, ret
   | _ -> [], ty
 
 exception ApplyError of string
