@@ -13,14 +13,6 @@ let total_time_ns () = Int64.sub (Oclock.gettime Oclock.monotonic) start_
 let total_time_s () = ns_to_s (total_time_ns ())
 let start_time () = start_
 
-(** Time elapsed since initialization of the program, and time of start *)
-let get_total_time, get_start_time =
-  let start = Oclock.gettime Oclock.monotonic in
-  (fun () ->
-     let stop = Oclock.gettime Oclock.monotonic in
-     Int64.sub stop start),
-  (fun () -> start)
-
 (** {2 Misc} *)
 
 (** Debug section *)
