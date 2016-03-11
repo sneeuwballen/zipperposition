@@ -14,9 +14,6 @@ module Make
   : S
   with module Env = E
 
-val on_enable : unit Signal.t
-(** Triggered if induction is enabled  *)
-
 val init_from_decls :
   (ID.t * Ast_tptp.optional_info) Sequence.t -> unit
 (** Initialize from a bunch of declarations' optional info, if one takes

@@ -48,7 +48,7 @@ module Make
     Lits.Seq.terms lits
     |> Sequence.map T.depth
     |> Sequence.max
-    |> CCOpt.maybe (fun d -> d < 5) true
+    |> CCOpt.map_or ~default:true (fun d -> d < 5)
 
   (* terms that are either inductive constants or sub-constants *)
   let constants_or_sub c =
@@ -66,24 +66,29 @@ module Make
   let generalizable_subterms c =
     let count = T.Tbl.create 16 in
     C.Seq.terms c
-    |> Sequence.flat_map T.Seq.subterms
-    |> Sequence.filter
-      (fun t -> Ind_ty.is_inductive_type (T.ty t) && not (T.is_const t))
-    |> Sequence.iter
-      (fun t ->
-         let n = try T.Tbl.find count t with Not_found -> 0 in
-         T.Tbl.replace count t (n+1)
-      );
+      |> Sequence.flat_map T.Seq.subterms
+      |> Sequence.filter
+        (fun t -> Ind_ty.is_inductive_type (T.ty t) && not (T.is_const t))
+      |> Sequence.iter
+        (fun t ->
+           let n = try T.Tbl.find count t with Not_found -> 0 in
+           T.Tbl.replace count t (n+1));
     (* terms that occur more than once *)
     T.Tbl.to_seq count
-    |> Sequence.filter_map (fun (t,n) -> if n>1 then Some t else None)
-    |> Sequence.to_rev_list
+      |> Sequence.filter_map (fun (t,n) -> if n>1 then Some t else None)
+      |> Sequence.to_rev_list
 
   (* apply the list of replacements [l] to the term [t] *)
   let replace_many l t =
     List.fold_left
       (fun t (old,by) -> T.replace t ~old ~by)
       t l
+
+  (* TODO (similar to Avatar.introduce_lemma, should factorize this)
+     - gather vars of c
+     - make a fresh constant for each variable
+     - replace variables by constants
+     - for each lit, negate it and add [not lit <- trail] *)
 
   (* when a unit clause has inductive constants, take its negation
       and add it as a lemma (some restrictions apply) *)
@@ -168,12 +173,6 @@ module Make
 
   let is_eq_ (t1:Ind_cst.cst) (t2:Ind_cst.case) =
     BoolBox.inject_case t1 t2
-
-  (* TODO (similar to Avatar.introduce_lemma, should factorize this)
-     - gather vars of c
-     - make a fresh constant for each variable
-     - replace variables by constants
-     - for each lit, negate it and add [not lit <- trail] *)
 
   (* [cst] is the minimal term for which [ctx] holds, returns clauses
      expressing that (prepended to [acc]), and a boolean literal. *)
@@ -329,12 +328,17 @@ module Make
     in
     clauses
 
+  (* FIXME: during preprocessing, call this IFF induction enabled and
+     some data present in the problem *)
+  let setup_before_proof () =
+    Util.debugf ~section 1
+      "@[Induction: requires ord=rpo6; select=NoSelection@]" (fun k->k);
+    Params.ord := "rpo6";   (* new default! RPO is necessary*)
+    Params.select := "NoSelection";
+    ()
+
   let register () =
     Util.debug ~section 2 "register induction_lemmas";
-    (* FIXME: move to Extension, probably, so it can be added
-       to {!Compute_prec} before computing precedence
-       Ctx.add_constr 20 IH_ctx.constr_sub_cst;  (* enforce new constraint *)
-    *)
     Env.add_unary_inf "induction_lemmas.cut" inf_introduce_lemmas;
     Env.add_unary_inf "induction_lemmas.ind" inf_assert_minimal;
     Env.add_is_trivial has_trivial_trail;
@@ -373,6 +377,8 @@ module Make
   end
 end
 
+(* FIXME: only do stuff it the input problem contains at least one
+    inductive type — the new default is induction enabled by default! *)
 let extension =
   let action (module E : Env.S) =
     let (module A) = Avatar.get_env (module E) in
@@ -394,6 +400,7 @@ let extension =
      prec_actions=[Prec_do add_constr];
     })
 
+(* FIXME: this should be done on input statements, in a callback inside setup *)
 let init_from_decls pairs =
   let get_str = function
     | Ast_tptp.GNode (s, []) | Ast_tptp.GString s -> s
@@ -419,27 +426,13 @@ let init_from_decls pairs =
      )
     pairs
 
-let on_enable = Signal.create()
-
-let enabled_ = ref false
-let enable_ () =
-  if not !enabled_ then (
-    enabled_ := true;
-    Util.debugf ~section 1
-      "@[Induction: requires ord=rpo6; select=NoSelection@]" (fun k->k);
-    Params.ord := "rpo6";   (* new default! RPO is necessary*)
-    Params.select := "NoSelection";
-    Signal.send on_enable ();
-  )
+let enabled_ = ref true
 
 let () =
   Params.add_opts
-    [ "--induction", Arg.Unit (Signal.send on_enable), " enable induction"
+    [ "--induction", Options.switch_set true enabled_, " enable induction"
+    ; "--no-induction", Options.switch_set false enabled_, " enable induction"
     ; "--induction-depth", Arg.Set_int cover_set_depth_,
         " set default induction depth"
     ; "--show-lemmas", Arg.Set show_lemmas_, " show inductive (candidate) lemmas"
     ]
-
-let () =
-  Signal.once on_enable
-    (fun () -> Extensions.register extension)
