@@ -129,7 +129,7 @@ Library "libzipperposition_prover"
                     Ctx_intf, Clause_intf, Env_intf, ProofState_intf,
                     BBox, BBox_intf, ClauseContext, ClauseQueue_intf,
                     Bool_lit, Bool_lit_intf, Sat_solver, Sat_solver_intf,
-                    Trail, Trail_intf, Ind_cst,
+                    Trail, Trail_intf, Ind_cst, Phases,
                     calculi/Avatar, calculi/Avatar_intf,
                     calculi/Induction, calculi/Induction_intf,
                     calculi/Superposition,
