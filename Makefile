@@ -90,7 +90,7 @@ watch:
 	done
 
 clean-generated:
-	zsh -c 'rm **/*.{mldylib,mlpack,mllib} myocamlbuild.ml -f'
+	zsh -c 'rm **/*.{mldylib,mlpack,mllib,odocl} myocamlbuild.ml -f'
 
 .PHONY: push_doc dot package tags rst_doc open_doc test-all clean-generated
 
