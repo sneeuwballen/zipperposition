@@ -14,10 +14,14 @@ module type S = sig
 
   val flag_lemma : int (** clause is a lemma *)
   val flag_persistent : int (** clause cannot be redundant *)
+  val flag_redundant : int (** clause has been shown to be redundant *)
 
   val set_flag : int -> t -> bool -> unit (** set boolean flag *)
   val get_flag : int -> t -> bool (** get value of boolean flag *)
   val new_flag : unit -> int (** new flag that can be used on clauses *)
+
+  val mark_redundant : t -> unit
+  val is_redundant : t -> bool
 
   (** {2 Basics} *)
 

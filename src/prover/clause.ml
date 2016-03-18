@@ -50,6 +50,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let flag_lemma = new_flag ()
   let flag_persistent = new_flag ()
+  let flag_redundant = new_flag ()
 
   let set_flag flag c truth =
     if truth
@@ -57,6 +58,9 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     else c.flags <- c.flags land (lnot flag)
 
   let get_flag flag c = (c.flags land flag) != 0
+
+  let mark_redundant c = set_flag flag_redundant c true
+  let is_redundant c = get_flag flag_redundant c
 
   (** {2 Hashcons} *)
 
@@ -100,6 +104,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let id_count_ = ref 0
 
+  (* private function for building clauses *)
   let create_inner ~selected ~trail lits proof =
     Util.enter_prof prof_clause_create;
     (* create the structure *)
@@ -367,7 +372,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       Format.fprintf out "@[clause @[%a@]@ at pos @[%a@]@]"
         Lits.pp t.clause.lits Position.pp t.pos
   end
-
 
   (** {2 IO} *)
 
