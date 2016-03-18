@@ -418,6 +418,8 @@ let rec infer_rec ctx t =
       let a = infer_rec ctx a in
       let b = infer_rec ctx b in
       unify ?loc (T.ty_exn a) (T.ty_exn b);
+      if T.Ty.returns_tType (T.ty_exn a)
+      then error_ ?loc "(in)equation @[%a@] ?= @[%a@] is ill-formed" T.pp a T.pp b;
       begin match conn with
         | Builtin.Eq -> T.Form.eq a b
         | Builtin.Neq -> T.Form.neq a b
@@ -557,6 +559,8 @@ let infer_statement_exn ctx st =
     | A.Def (s,ty,t) ->
         let id = ID.make s in
         let ty = infer_ty_exn ctx ty in
+        if T.Ty.returns_tType ty
+        then error_ ?loc "in definition of %a,@ equality between types is forbidden" ID.pp id;
         let t = infer_exn ctx t in
         Ctx.declare ctx id ty;
         Stmt.def ~src id ty t
