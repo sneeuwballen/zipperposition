@@ -48,6 +48,7 @@ val view : t -> view
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 
+val is_tType : t -> bool
 val is_var : t -> bool
 val is_bvar : t -> bool
 val is_app : t -> bool
@@ -153,6 +154,9 @@ val arity : t -> arity_result
 val expected_args : t -> t list
 (** Types expected as function argument by [ty]. The length of the
     list [expected_args ty] is the same as [snd (arity ty)]. *)
+
+val expected_ty_vars : t -> int
+(** Number of type parameters expected. 0 for monomorphic types. *)
 
 val is_ground : t -> bool
 (** Is the type ground? (means that no {!Var} not {!BVar} occurs in it) *)

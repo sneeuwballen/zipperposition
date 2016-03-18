@@ -297,15 +297,23 @@ let contains_symbol f t =
 
 (** {2 Fold} *)
 
-let all_positions ?(vars=false) ?(pos=Position.stop) t f =
+let all_positions ?(vars=false) ?(ty_args=true) ?(pos=Position.stop) t f =
   let rec aux pb t = match view t with
-    | Var _ | DB _ -> if vars then f (t, PB.to_pos pb)
-    | Const _ -> f (t, PB.to_pos pb)
+    | Var _ | DB _ ->
+        if vars && (ty_args || not (Type.is_tType (ty t)))
+        then f (t, PB.to_pos pb)
+    | Const _ ->
+        if ty_args || not (Type.is_tType (ty t))
+        then f (t, PB.to_pos pb)
     | AppBuiltin (_,tl)
     | App (_, tl) ->
-        f (t, PB.to_pos pb);
+        if ty_args || not (Type.is_tType (ty t))
+        then f (t, PB.to_pos pb);
         List.iteri
-          (fun i t' -> aux (PB.arg i pb) t')
+          (fun i t' ->
+            (* if [t'] is a type parameter and [not ty_args], ignore *)
+            if ty_args || not (Type.is_tType (ty t'))
+            then aux (PB.arg i pb) t')
           tl
   in
   aux (PB.of_pos pos) t

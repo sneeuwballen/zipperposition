@@ -168,12 +168,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let idx_simpl () = !_idx_simpl
 
   (* apply operation [f] to some parts of the clause [c] just added/removed
-   * from the active set *)
+     from the active set *)
   let _update_active f c =
     let ord = Ctx.ord () in
     (* index subterms that can be rewritten by superposition *)
     _idx_sup_into :=
-      Lits.fold_terms ~vars:false ~ord ~which:`Max ~subterms:true
+      Lits.fold_terms ~vars:false ~ty_args:false ~ord ~which:`Max ~subterms:true
         ~eligible:(C.Eligible.res c) (C.lits c)
         |> Sequence.fold
           (fun tree (t, pos) ->
@@ -193,7 +193,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         !_idx_sup_from ;
     (* terms that can be demodulated: all subterms (but vars) *)
     _idx_back_demod :=
-      Lits.fold_terms ~vars:false ~ord ~subterms:true ~which:`All
+      Lits.fold_terms ~vars:false ~ty_args:false ~ord ~subterms:true ~which:`All
         ~eligible:C.Eligible.always (C.lits c)
       |> Sequence.fold
         (fun tree (t, pos) ->
@@ -203,7 +203,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Signal.ContinueListening
 
   (* update simpl. index using the clause [c] just added or removed to
-   * the simplification set *)
+     the simplification set *)
   let _update_simpl f c =
     let ord = Ctx.ord () in
     let idx = !_idx_simpl in

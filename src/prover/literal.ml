@@ -442,11 +442,11 @@ let is_absurd lit = match lit with
   | Arith o -> ArithLit.is_absurd o
   | _ -> false
 
-let fold_terms ?(position=Position.stop) ?(vars=false) ~which ~ord ~subterms lit k =
+let fold_terms ?(position=Position.stop) ?(vars=false) ?ty_args ~which ~ord ~subterms lit k =
   (* function to call at terms *)
   let at_term ~pos t =
     if subterms
-    then T.all_positions ~vars ~pos t k
+    then T.all_positions ?ty_args ~vars ~pos t k
     else if T.is_var t && not vars
     then () (* ignore *)
     else k (t, pos)

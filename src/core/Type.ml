@@ -57,6 +57,7 @@ let hash = T.hash
 let equal = T.equal
 let compare = T.compare
 
+let is_tType ty = match view ty with | Builtin TType -> true | _ -> false
 let is_var ty = match view ty with | Var _ -> true | _ -> false
 let is_bvar ty = match view ty with | DB _ -> true | _ -> false
 let is_app ty = match view ty with App _ -> true | _ -> false
@@ -162,6 +163,10 @@ let rec expected_args ty = match view ty with
   | Fun (args, ret) -> args @ expected_args ret
   | Forall ty' -> expected_args ty'
   | DB _ | Var _ | Builtin _ | Record _ | Multiset _ | App _ -> []
+
+let rec expected_ty_vars ty = match view ty with
+  | Forall ty' -> 1 + expected_ty_vars ty'
+  | _ -> 0
 
 let is_ground = T.is_ground
 

@@ -156,7 +156,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let update f c =
     let ord = Ctx.ord () in
     _idx_eq :=
-      Lits.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false
+      Lits.fold_terms ~vars:false ~ty_args:false ~which:`Max ~ord ~subterms:false
         ~eligible:C.Eligible.(filter Lit.is_arith_eqn ** max c)
         (C.lits c)
       |> Sequence.fold
@@ -165,7 +165,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            f acc t with_pos)
         !_idx_eq;
     let left, right =
-      Lits.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false
+      Lits.fold_terms ~vars:false ~ty_args:false ~which:`Max ~ord ~subterms:false
         ~eligible:C.Eligible.(filter Lit.is_arith_ineq** max c)
         (C.lits c)
       |> Sequence.fold
@@ -182,7 +182,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     _idx_ineq_left := left;
     _idx_ineq_right := right;
     _idx_div :=
-      Lits.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false
+      Lits.fold_terms ~vars:false ~ty_args:false ~which:`Max ~ord ~subterms:false
         ~eligible:C.Eligible.(filter Lit.is_arith_divides ** max c)
         (C.lits c)
       |> Sequence.fold
@@ -191,7 +191,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            f acc t with_pos)
         !_idx_div;
     _idx_all :=
-      Lits.fold_terms ~vars:false ~which:`Max ~ord ~subterms:false
+      Lits.fold_terms ~vars:false ~ty_args:false ~which:`Max ~ord ~subterms:false
         ~eligible:C.Eligible.(filter Lit.is_arith ** max c)
         (C.lits c)
       |> Sequence.fold

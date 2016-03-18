@@ -171,10 +171,11 @@ val contains_symbol : ID.t -> t -> bool
 (** High level fold-like combinators *)
 
 val all_positions :
-  ?vars:bool -> ?pos:Position.t ->
+  ?vars:bool -> ?ty_args:bool -> ?pos:Position.t ->
   t -> (t * Position.t) Sequence.t
 (** Iterate on all sub-terms with their position.
-    @param vars specifies whether variables are folded on (default true).
+    @param vars specifies whether variables are folded on (default false).
+    @param ty_args specifies whether type arguments are folded on (default true).
     @param pos the initial position (default empty) *)
 
 (** {2 Some AC-utils} *)

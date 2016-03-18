@@ -141,7 +141,7 @@ val fold_arith_terms : eligible:(int -> Literal.t -> bool) ->
 (** Fold on terms under arithmetic literals, with the focus on
     the current term *)
 
-val fold_terms : ?vars:bool -> which:[<`Max|`All] ->
+val fold_terms : ?vars:bool -> ?ty_args:bool -> which:[<`Max|`All] ->
   ord:Ordering.t -> subterms:bool ->
   eligible:(int -> Literal.t -> bool) ->
   t -> (term * Position.t) Sequence.t
