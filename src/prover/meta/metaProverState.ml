@@ -407,9 +407,9 @@ end
 
 (** {2 Interface to {!Env} *)
 
-let key = CCMixtbl.create_inj ()
+let key = Flex_state.create_key ()
 
-let get_env (module E : Env.S) = CCMixtbl.find ~inj:key E.mixtbl "meta"
+let get_env (module E : Env.S) = E.flex_get key
 
 (** {2 Extension} *)
 
@@ -417,13 +417,13 @@ let extension =
   let action (module E: Env.S) =
     let module M = Make(E) in
     (* register in Env *)
-    CCMixtbl.set ~inj:key E.mixtbl "meta" (module M : S);
+    E.update_flex_state (Flex_state.add key (module M : S));
     M.setup()
   in
   { Extensions.default with Extensions.
     prio = 10;
     name = "meta";
-    actions=[Extensions.Do action];
+    env_actions=[action];
   }
 
 (** {2 CLI Options} *)

@@ -9,64 +9,57 @@ type 'a or_error = [ `Ok of 'a | `Error of string ]
 
 (** {2 Type Definitions} *)
 
+type state = Flex_state.t
+
 (** An extension is allowed to modify an environment *)
-type action =
-  | Do of ((module Env.S) -> unit)
+type env_action = (module Env.S) -> unit
 
-type prec_action =
-  | Prec_do of (Compute_prec.t -> unit)
+type prec_action = state -> Compute_prec.t -> Compute_prec.t
+(** Actions that modify the set of rules {!Compute_prec} *)
 
-type init_action =
-  | Init_do of (unit -> unit)
+type 'a state_actions = ('a -> state -> state) list
+(* a list of actions parametrized by ['a] *)
 
 type t = {
   name : string;
   prio : int;  (** the lower, the more urgent, the earlier it is loaded *)
+  start_file_actions : string state_actions;
+  post_parse_actions : UntypedAST.statement Sequence.t state_actions;
+  post_typing_actions : TypeInference.typed_statement CCVector.ro_vector state_actions;
+  ord_select_actions : (Ordering.t * Selection.t) state_actions;
+  ctx_actions : (module Ctx_intf.S) state_actions;
   prec_actions : prec_action list;
-  init_actions : init_action list;
-  actions : action list;
+  env_actions : env_action list;
 }
-(** An extension contains a number of actions that can modify a {!PEnv},
-    an environment {!Env.S} or run some initialization action
-    (typically, add some CLI argument) *)
 
 let default = {
   name="<no name>";
   prio = 50;
   prec_actions= [];
-  init_actions = [];
-  actions = [];
+  start_file_actions=[];
+  post_parse_actions=[];
+  post_typing_actions=[];
+  ord_select_actions=[];
+  ctx_actions=[];
+  env_actions=[];
 }
 
 (** {2 Registration} *)
 
 let section = Const.section
 
-let (__current : t or_error ref) = ref (`Error "could not load plugin")
+let __current : t or_error ref = ref (`Error "could not load plugin")
 
 let _extensions = Hashtbl.create 11
-
-(* TODO: use a mutex? *)
 
 let register self =
   (* register by name, if loading succeeded *)
   if not (Hashtbl.mem _extensions self.name)
   then (
-    Util.debugf ~section 1 "register extension %s..." (fun k->k self.name);
+    Util.debugf ~section 1 "register extension `%s`..." (fun k->k self.name);
     Hashtbl.replace _extensions self.name self
   );
   __current := `Ok self
-
-(** Apply the extension to the Env.t *)
-let apply_env ~env ext =
-  List.iter (fun (Do f) -> f env) ext.actions
-
-let apply_prec c ext =
-  List.iter (fun (Prec_do f) -> f c) ext.prec_actions
-
-let init ext =
-  Util.debugf ~section 5 "run init actions of %s" (fun k->k ext.name);
-  List.iter (fun (Init_do f) -> f ()) ext.init_actions
 
 let cmp_prio_name a b =
   if a.prio = b.prio
@@ -74,8 +67,7 @@ let cmp_prio_name a b =
   else compare a.prio b.prio
 
 let extensions () =
-  Sequence.of_hashtbl _extensions
-  |> Sequence.map snd
+  CCHashtbl.values _extensions
   |> Sequence.sort_uniq ~cmp:cmp_prio_name  (* sort by increasing priority *)
   |> Sequence.to_list
 
@@ -83,7 +75,4 @@ let by_name name =
   try Some (Hashtbl.find _extensions name)
   with Not_found -> None
 
-let names () =
-  Sequence.of_hashtbl _extensions
-  |> Sequence.map fst
-  |> Sequence.to_list
+let names () = CCHashtbl.keys _extensions

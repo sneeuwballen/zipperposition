@@ -183,5 +183,5 @@ let extension =
   in
   { Extensions.default with Extensions.
     name="ac";
-    actions=[Extensions.Do action];
+    env_actions=[action];
   }

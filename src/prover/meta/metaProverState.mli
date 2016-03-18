@@ -11,7 +11,7 @@ module Make(E : Env.S) : S with module E = E
 
 (** {2 Interface to {!Env}} *)
 
-val key : (module S) CCMixtbl.injection
+val key : (module S) Flex_state.key
 
 val get_env : (module Env.S) -> (module S)
 (** [get_env (module Env)] returns the meta-prover saved in [Env],

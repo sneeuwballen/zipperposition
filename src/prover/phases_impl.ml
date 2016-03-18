@@ -61,19 +61,36 @@ let load_extensions =
   let l = Extensions.extensions () in
   Phases.return_phase l
 
+(* apply functions of [field e], for each extensions [e], to update
+   the current state given some parameter [x]. *)
+let do_extensions ~x ~field =
+  Extensions.extensions ()
+    |> Phases.fold_l ~x:()
+      ~f:(fun () e ->
+        Phases.fold_l (field e) ~x:()
+          ~f:(fun () f -> Phases.update ~f:(f x)))
+
 let start_file file =
   Phases.start_phase Phases.Start_file >>= fun () ->
   Util.debugf ~section 1 "@[@{<Yellow>### process file@ `%s` ###@}@]"
     (fun k->k file);
+  do_extensions ~field:(fun e -> e.Extensions.start_file_actions)
+    ~x:file >>= fun () ->
   Phases.return_phase ()
 
 let parse_file file =
   Phases.start_phase Phases.Parse_file >>= fun () ->
-  Phases.return_phase_err (Parsing_utils.parse file)
+  Parsing_utils.parse file >>?= fun parsed ->
+  do_extensions ~field:(fun e -> e.Extensions.post_parse_actions)
+    ~x:parsed >>= fun () ->
+  Phases.return_phase parsed
 
 let typing stmts =
   Phases.start_phase Phases.Typing >>= fun () ->
-  Phases.return_phase_err (TypeInference.infer_statements ?ctx:None stmts)
+  TypeInference.infer_statements ?ctx:None stmts >>?= fun stmts ->
+  do_extensions ~field:(fun e -> e.Extensions.post_typing_actions)
+    ~x:stmts >>= fun () ->
+  Phases.return_phase stmts
 
 (* obtain clauses  *)
 let cnf ~file decls =
@@ -88,19 +105,25 @@ let cnf ~file decls =
 (* compute a precedence *)
 let compute_prec stmts =
   Phases.start_phase Phases.Compute_prec >>= fun () ->
-  let cp = Compute_prec.create() in
   (* use extensions *)
-  Extensions.extensions ()
-    |> List.iter (Extensions.apply_prec cp);
-  (* add constraint about inductive constructors *)
-  Compute_prec.add_constr cp 10 Ind_cst.prec_constr;
-  (* use "invfreq", with low priority *)
-  Compute_prec.add_constr_rule cp 90
-   (fun seq ->
-     seq
-     |> Sequence.flat_map Statement.Seq.terms
-     |> Sequence.flat_map FOTerm.Seq.symbols
-     |> Precedence.Constr.invfreq);
+  Phases.get >>= fun state ->
+  let cp =
+    Extensions.extensions ()
+    |> List.fold_left
+      (fun cp e -> List.fold_left (fun cp f -> f state cp) cp e.Extensions.prec_actions)
+      Compute_prec.empty
+
+    (* add constraint about inductive constructors *)
+    |> Compute_prec.add_constr 10 Ind_cst.prec_constr
+
+    (* use "invfreq", with low priority *)
+    |> Compute_prec.add_constr_rule 90
+       (fun seq ->
+         seq
+         |> Sequence.flat_map Statement.Seq.terms
+         |> Sequence.flat_map FOTerm.Seq.symbols
+         |> Precedence.Constr.invfreq)
+  in
   let prec = Compute_prec.mk_precedence cp stmts in
   Phases.return_phase prec
 
@@ -108,13 +131,10 @@ let compute_ord_select ~params precedence =
   Phases.start_phase Phases.Compute_ord_select >>= fun () ->
   let ord = params.param_ord precedence in
   let select = Selection.selection_from_string ~ord params.param_select in
+  do_extensions ~field:(fun e->e.Extensions.ord_select_actions)
+    ~x:(ord,select) >>= fun () ->
   Util.debugf ~section 2 "@[<2>selection function:@ %s@]" (fun k->k params.param_select);
   Phases.return_phase (ord, select)
-
-let setup_env ~env =
-  Extensions.extensions ()
-  |> List.iter (Extensions.apply_env ~env);
-  ()
 
 let make_ctx ~signature ~ord ~select =
   Phases.start_phase Phases.MakeCtx >>= fun () ->
@@ -125,13 +145,23 @@ let make_ctx ~signature ~ord ~select =
   end in
   let module Ctx = Ctx.Make(Res) in
   let ctx = (module Ctx : Ctx_intf.S) in
+  do_extensions ~field:(fun e->e.Extensions.ctx_actions)
+    ~x:ctx >>= fun () ->
   Phases.return_phase ctx
+
+let setup_env ~env =
+  Extensions.extensions ()
+    |> List.iter
+      (fun e -> List.iter (fun f -> f env) e.Extensions.env_actions);
+  ()
 
 let make_env ~ctx:(module Ctx : Ctx_intf.S) ~params stmts =
   Phases.start_phase Phases.MakeEnv >>= fun () ->
+  Phases.get >>= fun state ->
   let module MyEnv = Env.Make(struct
       module Ctx = Ctx
       let params = params
+      let flex_state = state
     end) in
   let env1 = (module MyEnv : Env.S) in
   setup_env ~env:env1;

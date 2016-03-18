@@ -527,9 +527,9 @@ let extension =
     let module ET = Make(E) in
     ET.setup ()
   in
-  { Extensions.default with
-    Extensions.name = "enum_types";
-    Extensions.actions=[Extensions.Do register];
+  { Extensions.default with Extensions.
+    name = "enum_types";
+    env_actions=[register];
   }
 
 let () =

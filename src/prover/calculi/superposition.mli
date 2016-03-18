@@ -100,9 +100,9 @@ module type S = sig
   (** Register rules in the environment *)
 end
 
-val key : (module S) CCMixtbl.injection
-(** key to access the Env's Mixtbl. After registration (after
-    calling [register]), the Env's mixtbl contains
+val key : (module S) Flex_state.key
+(** key to access the {!Env.flex_state}. After registration (after
+    calling [register]), the Env's state contains
     a mapping from "superposition" to the packed module. *)
 
 val register : sup:(module S) -> unit

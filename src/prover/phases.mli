@@ -109,6 +109,8 @@ val bind :
 val map : ('a, 'p1, 'p2) t -> f:('a -> 'b) -> ('b, 'p1, 'p2) t
 (** Map the current value *)
 
+val fold_l : f:('a -> 'b -> ('a, 'p, 'p) t) -> x:'a -> 'b list -> ('a, 'p, 'p) t
+
 val run_parallel : (unit, 'p1, 'p2) t list -> (unit, 'p1, 'p2) t
 (** [run_sequentiel l] runs each action of the list in succession,
     restarting every time with the initial state (once an action
@@ -117,53 +119,27 @@ val run_parallel : (unit, 'p1, 'p2) t list -> (unit, 'p1, 'p2) t
 
 module Infix : sig
   val (>>=) : ('a, 'p1, 'p2) t -> ('a -> ('b, 'p2, 'p3) t) -> ('b, 'p1, 'p3) t
-  val (>>?=) : ('a, 'p1, 'p2) t -> ('a -> 'b or_error) -> ('b, 'p1, 'p2) t
+  val (>>?=) : 'a or_error -> ('a -> ('b, 'p1, 'p2) t) -> ('b, 'p1, 'p2) t
   val (>|=) : ('a, 'p1, 'p2) t -> ('a -> 'b) -> ('b, 'p1, 'p2) t
 end
 
 include module type of Infix
 
-(** {2 State that is threaded from phase to phase}  *)
+val empty_state : Flex_state.t
 
-module State : sig
-  type t
+val k_cur_phase : any_phase Flex_state.key
+(** The current phase is stored in the state using this key *)
 
-  val empty : t
+val get : (Flex_state.t, 'a, 'a) t
 
-  type 'a key
-  val create_key : unit -> 'a key
+val set : Flex_state.t -> (unit, 'a, 'a) t
 
-  val add : 'a key -> 'a -> t -> t
+val update : f:(Flex_state.t -> Flex_state.t) -> (unit, 'a, 'a) t
+(** [update ~f] changes the state using [f] *)
 
-  val get : 'a key -> t -> 'a option
-
-  val get_exn : 'a key -> t -> 'a
-  (** @raise Not_found if the key is not present *)
-end
-
-val get : (State.t, 'a, 'a) t
-
-val set : State.t -> (unit, 'a, 'a) t
-
-val update : f:(State.t -> State.t) -> (unit, 'a, 'a) t
-
-val run_with : State.t -> ('a, [`Init], [`Exit]) t -> (State.t * 'a) or_error
+val run_with : Flex_state.t -> ('a, [`Init], [`Exit]) t -> (Flex_state.t * 'a) or_error
 (** [run_with state m] executes the actions in [m] starting with [state],
     returning some value (or error) and the final state. *)
 
-val run : ('a, [`Init], [`Exit]) t -> (State.t * 'a) or_error
-(** [run m] is [run_with State.empty m] *)
-
-(* FIXME
-type callbacks
-
-val empty_callbacks : callbacks
-
-val register_pre : _ phase -> f:(State.t -> State.t) -> callbacks -> callbacks
-(** [register_pre p f] adds [f] to the list of the functions to call
-    before starting phase [p] *)
-
-val register_post : ('p,_,_) phase -> ('p -> State.t -> State.t) -> callbacks -> callbacks
-(** [register_post p f] adds [f] to the list of the functions to call
-    with the result of phase [p], immediately after [p] terminates *)
-*)
+val run : ('a, [`Init], [`Exit]) t -> (Flex_state.t * 'a) or_error
+(** [run m] is [run_with empty_state m] *)

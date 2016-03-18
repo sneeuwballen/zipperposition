@@ -14,17 +14,17 @@ let section = Util.Section.make ~parent:Const.section "compute_prec"
 type 'a parametrized = Statement.clause_t Sequence.t -> 'a
 
 type t = {
-  mutable constrs : (int * [`partial] Precedence.Constr.t) list;
-  mutable constr_rules : (int * [`partial] Precedence.Constr.t parametrized) list;
+  constrs : (int * [`partial] Precedence.Constr.t) list;
+  constr_rules : (int * [`partial] Precedence.Constr.t parametrized) list;
   last_constr : [`total] Precedence.Constr.t;
-  mutable weight_rule : (ID.t -> int) parametrized;
-  mutable status : (ID.t * Precedence.symbol_status) list;
+  weight_rule : (ID.t -> int) parametrized;
+  status : (ID.t * Precedence.symbol_status) list;
 }
 
 (* uniform weight *)
 let _default_weight _ _ = 1
 
-let create () =
+let empty = 
   { constrs = [];
     constr_rules = [];
     last_constr = Precedence.Constr.alpha;
@@ -32,19 +32,15 @@ let create () =
     status = [];
   }
 
-let add_constr t p c =
-  t.constrs <- (p,c)::t.constrs
+let add_constr p c t = { t with constrs=(p,c)::t.constrs; }
 
-let add_constrs t l =
-  List.iter (fun (p,c) -> add_constr t p c) l
+let add_constrs l = List.fold_right (fun (p,c) -> add_constr p c) l
 
-let add_constr_rule t p r =
-  t.constr_rules <- (p, r) :: t.constr_rules
+let add_constr_rule p r t = { t with constr_rules = (p, r) :: t.constr_rules }
 
-let set_weight_rule t r =
-  t.weight_rule <- r
+let set_weight_rule r t = { t with weight_rule = r }
 
-let add_status t l = t.status <- List.rev_append l t.status
+let add_status l t = { t with status = List.rev_append l t.status }
 
 let mk_precedence t seq =
   Util.enter_prof prof_mk_prec;

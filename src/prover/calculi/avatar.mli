@@ -23,7 +23,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
   with module E = E
    and module Solver = Sat
 
-val key : (module S) CCMixtbl.injection
+val key : (module S) Flex_state.key
 
 val get_env : (module Env.S) -> (module S)
 

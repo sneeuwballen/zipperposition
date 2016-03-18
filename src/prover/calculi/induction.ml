@@ -389,15 +389,15 @@ let extension =
     E.Ctx.set_selection_fun Selection.no_select;
     let module M = Make(A.E)(A) in
     M.register ();
-  and add_constr c =
+  and add_constr _ =
     (* add an ordering constraint: ensure that constructors are smaller
        than other terms *)
-    Compute_prec.add_constr c 15 Ind_cst.prec_constr in
+    Compute_prec.add_constr 15 Ind_cst.prec_constr in
   Extensions.(
     {default with
      name="induction_simple";
-     actions=[Do action];
-     prec_actions=[Prec_do add_constr];
+     env_actions=[action];
+     prec_actions=[add_constr];
     })
 
 (* FIXME: this should be done on input statements, in a callback inside setup *)

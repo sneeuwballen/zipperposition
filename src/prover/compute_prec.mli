@@ -7,28 +7,27 @@ open Libzipperposition
 
 type t
 
-val create : unit -> t
+val empty : t
 
-val add_constr : t -> int -> [`partial] Precedence.Constr.t -> unit
+val add_constr : int -> [`partial] Precedence.Constr.t -> t -> t
 (** Add a precedence constraint with its priority. The lower the
     priority, the stronger influence the constraint will have. *)
 
-val add_constrs : t -> (int * [`partial] Precedence.Constr.t) list -> unit
+val add_constrs : (int * [`partial] Precedence.Constr.t) list -> t -> t
 
 (** Some values are parametrized by the list of statements *)
 type 'a parametrized = Statement.clause_t Sequence.t -> 'a
 
 val add_constr_rule :
-  t ->
   int ->
   [`partial] Precedence.Constr.t parametrized ->
-  unit
+  t -> t
 (** Add a precedence constraint rule *)
 
-val set_weight_rule : t -> (ID.t -> int) parametrized -> unit
+val set_weight_rule : (ID.t -> int) parametrized -> t -> t
 (** Choose the way weights are computed *)
 
-val add_status : t -> (ID.t * Precedence.symbol_status) list -> unit
+val add_status : (ID.t * Precedence.symbol_status) list -> t -> t
 (** Specify explicitely the status of some symbols *)
 
 val mk_precedence :

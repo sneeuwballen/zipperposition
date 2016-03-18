@@ -1469,12 +1469,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ()
 end
 
-let key = CCMixtbl.create_inj ()
+let key = Flex_state.create_key()
 
 let register ~sup =
   let module Sup = (val sup : S) in
-  if not (CCMixtbl.mem ~inj:key Sup.Env.mixtbl "superposition")
-  then CCMixtbl.set ~inj:key Sup.Env.mixtbl "superposition" sup
+  let module E = Sup.Env in
+  E.update_flex_state (Flex_state.add key sup)
+
+(* TODO: move DOT index printing into the extension *)
 
 let extension =
   let action env =
@@ -1483,9 +1485,9 @@ let extension =
     Sup.register();
     register ~sup:(module Sup : S)
   in
-  { Extensions.default with
-    Extensions.name="superposition";
-    Extensions.actions = [Extensions.Do action];
+  { Extensions.default with Extensions.
+    name="superposition";
+    env_actions = [action];
   }
 
 let () =

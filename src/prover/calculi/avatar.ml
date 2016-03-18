@@ -23,8 +23,6 @@ let stat_trail_simplify = Util.mk_stat "avatar.simplify_trail"
 
 module type S = Avatar_intf.S
 
-let key = CCMixtbl.create_inj()
-
 module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
 = struct
   module E = E
@@ -344,8 +342,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
     ()
 end
 
-let get_env (module E : Env.S) : (module S) =
-  CCMixtbl.find ~inj:key E.mixtbl "avatar"
+let key = Flex_state.create_key ()
+
+
+let get_env (module E : Env.S) : (module S) = E.flex_get key
 
 let extension =
   let action env =
@@ -353,7 +353,7 @@ let extension =
     Util.debug 1 "create new SAT solver";
     let module Sat = Sat_solver.Make(E.Ctx.BoolBox.Lit)(struct end) in
     let module A = Make(E)(Sat) in
-    CCMixtbl.set ~inj:key E.mixtbl "avatar" (module A : S);
+    E.update_flex_state (Flex_state.add key (module A : S));
     A.register()
   in
-  Extensions.({default with name="avatar"; actions=[Do action]})
+  Extensions.({default with name="avatar"; env_actions=[action]})

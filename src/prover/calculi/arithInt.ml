@@ -2063,9 +2063,9 @@ let extension =
     let module I = Make(E) in
     I.register ()
   in
-  { Extensions.default with
-    Extensions.name="arith_int";
-    Extensions.actions=[Extensions.Do action];
+  { Extensions.default with Extensions.
+    name="arith_int";
+    env_actions=[action];
   }
 
 let _enable_arith () =

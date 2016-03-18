@@ -19,6 +19,7 @@ type 'a packed = (module S with type C.t = 'a)
 module Make(X : sig
     module Ctx : Ctx.S
     val params : Params.t
+    val flex_state : Flex_state.t
   end)
   : S with module Ctx = X.Ctx
 = struct
@@ -626,5 +627,8 @@ module Make(X : sig
 
   (** {2 Misc} *)
 
-  let mixtbl = CCMixtbl.create 16
+  let flex_state_ = ref X.flex_state
+  let flex_state () = !flex_state_
+  let update_flex_state f = CCRef.update f flex_state_
+  let flex_get k = Flex_state.get_exn k !flex_state_
 end

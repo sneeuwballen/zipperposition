@@ -218,6 +218,13 @@ module type S = sig
 
   (** {2 Misc} *)
 
-  val mixtbl : string CCMixtbl.t
-  (** Global hashtable of "stuff" for this particular env *)
+  val flex_state : unit -> Flex_state.t
+  (** State inherited from configuration *)
+
+  val update_flex_state : (Flex_state.t -> Flex_state.t) -> unit
+  (** [update_flex_state f] changes [flex_state ()] using [f] *)
+
+  val flex_get : 'a Flex_state.key -> 'a
+  (** [flex_get k] is the same as [Flex_state.get_exn k (flex_state ())].
+      @raise Not_found if the key is not present *)
 end

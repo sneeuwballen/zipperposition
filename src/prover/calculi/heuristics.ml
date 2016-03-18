@@ -65,7 +65,9 @@ let extension =
     let module H = Make(E) in
     H.register ()
   in
-  Extensions.{ default with name="heuristics"; actions=[Do action]; }
+  Extensions.(
+    { default with name="heuristics"; env_actions=[action]; }
+  )
 
 let () =
   Params.add_opts

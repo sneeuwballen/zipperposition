@@ -57,25 +57,13 @@ type ('ret, 'before, 'after) phase =
 type any_phase = Any_phase : (_, _, _) phase -> any_phase
 (** A phase hidden in an existential type *)
 
-module State = struct
-  module M = CCHet.Map
+module State = Flex_state
 
-  type 'a key = 'a CCHet.Key.t
+(* key used to store the current phase *)
+let k_cur_phase = State.create_key()
 
-  let create_key () = CCHet.Key.create()
-
-  type t = M.t
-
-  let add = M.add
-  let get = M.find
-  let get_exn = M.find_exn
-
-  (* key used to store the current phase *)
-  let cur_phase_key = create_key()
-
-  (* empty state: at Init *)
-  let empty = M.empty |> add cur_phase_key (Any_phase Init)
-end
+(* empty state: at Init *)
+let empty_state = State.empty |> State.add k_cur_phase (Any_phase Init)
 
 (* A simple state monad *)
 type (+'a, 'p1, 'p2) t = State.t -> (State.t * 'a) or_error
@@ -117,14 +105,13 @@ let bind x ~f st =
   | `Ok (st, x) -> f x st
   | `Error msg -> `Error msg  (*  cut evaluation *)
 
-let bind_err x ~f st =
-  match x st with
-  | `Ok (st, x) -> return_err (f x) st
-  | `Error msg -> `Error msg  (*  cut evaluation *)
+let bind_err e ~f st =
+  match e with
+  | `Ok x -> f x st
+  | `Error msg -> fail msg st (*  cut evaluation *)
 
 
-let map x ~f st =
-  match x st with
+let map x ~f st = match x st with
   | `Error msg -> `Error msg
   | `Ok (st, x) -> `Ok (st, f x)
 
@@ -136,15 +123,21 @@ end
 
 include Infix
 
+let rec fold_l ~f ~x = function
+  | [] -> return x
+  | y :: ys -> f x y >>= fun x' -> fold_l ~f ~x:x' ys
+
+type state = Flex_state.t
+
 let current_phase st =
-  try `Ok (st, State.get_exn State.cur_phase_key st)
+  try `Ok (st, State.get_exn k_cur_phase st)
   with Not_found ->
     let msg = "could not find current phase" in
     `Error msg
 
 let start_phase p st =
   Util.debugf ~section:Const.section 2 "start phase %s" (fun k->k (string_of_phase p));
-  let st = State.add State.cur_phase_key (Any_phase p) st in
+  let st = State.add k_cur_phase (Any_phase p) st in
   `Ok (st, ())
 
 let return_phase_err x =
@@ -198,17 +191,3 @@ let run_with st m =
     `Error (msg ^ stack)
 
 let run m = run_with State.empty m
-
-(* FIXME
-type 'a cb = 'a -> unit
-type 'a cbs = 'a cb list
-
-type callbacks =
-  pre_init : unit cbs;
-  post_init : unit cbs;
-
-val empty_callbacks : callbacks
-*)
-
-
-

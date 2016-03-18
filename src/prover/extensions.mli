@@ -1,32 +1,38 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
+open Libzipperposition
+
 (** {1 Dynamic extensions} *)
 
 type 'a or_error = [ `Ok of 'a | `Error of string ]
 
 (** {2 Type Definitions} *)
 
+type state = Flex_state.t
+
 (** An extension is allowed to modify an environment *)
-type action =
-  | Do of ((module Env.S) -> unit)
+type env_action = (module Env.S) -> unit
 
-type prec_action =
-  | Prec_do of (Compute_prec.t -> unit)
+type prec_action = state -> Compute_prec.t -> Compute_prec.t
+(** Actions that modify the set of rules {!Compute_prec} *)
 
-type init_action =
-  | Init_do of (unit -> unit)
+type 'a state_actions = ('a -> state -> state) list
+(* a list of actions parametrized by ['a] *)
 
 type t = {
   name : string;
   prio : int;  (** the lower, the more urgent, the earlier it is loaded *)
+  start_file_actions : string state_actions;
+  post_parse_actions : UntypedAST.statement Sequence.t state_actions;
+  post_typing_actions : TypeInference.typed_statement CCVector.ro_vector state_actions;
+  ord_select_actions : (Ordering.t * Selection.t) state_actions;
+  ctx_actions : (module Ctx_intf.S) state_actions;
   prec_actions : prec_action list;
-  init_actions : init_action list;
-  actions : action list;
+  env_actions : env_action list;
 }
-(** An extension contains a number of actions that can modify a {!PEnv},
-    an environment {!Env.S} or run some initialization action
-    (typically, add some CLI argument) *)
+(** An extension contains a number of actions that can modify the {!Flex_state.t}
+    during preprocessing, or modify the {!Env_intf.S} once it is built. *)
 
 val default : t
 (** Default extension. Does nothing. *)
@@ -37,22 +43,12 @@ val register : t -> unit
 (** Register an extension to the (current) prover. Plugins should call this
     when they are loaded. *)
 
-val apply_env : env:(module Env.S) -> t -> unit
-(** Apply the extension to the Env, adding rules, modifying the env
-    in place. *)
-
-val apply_prec : Compute_prec.t -> t -> unit
-(** Apply the extension to the precedence settings *)
-
-val init : t -> unit
-(** Apply all initialization functions of the given extension *)
-
 val extensions : unit -> t list
 (** All currently available extensions *)
 
 val by_name : string -> t option
 (** Get an extension by its name, if any *)
 
-val names : unit -> string list
+val names : unit -> string Sequence.t
 (** Names of loaded extensions *)
 
