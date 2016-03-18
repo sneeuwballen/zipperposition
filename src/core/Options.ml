@@ -68,6 +68,7 @@ let make () =
     ; "--no-backtrace", switch_opt false Printexc.record_backtrace, " disable backtraces"
     ; "--color", switch_opt true CCFormat.set_color_default, " enable colors"
     ; "--no-color", switch_opt false CCFormat.set_color_default, " disable colors"
+    ; "-nc", switch_opt false CCFormat.set_color_default, " alias to --no-color"
     ; "--mem-limit", Arg.Int Util.set_memory_limit, " memory limit (in MB)"
     ; "--stats", Arg.Set stats, " gather and print statistics"
     ; "--input", Arg.String set_in, " set input format (zf or tptp)"
