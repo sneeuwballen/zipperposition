@@ -103,10 +103,13 @@ let bvar i =
 let forall ty =
   T.bind ~ty:T.tType ~varty:T.tType Binder.forall_ty ty
 
+let rec forall_n n ty =
+  if n=0 then ty
+  else forall (forall_n (n-1) ty)
+
 let multiset ty = T.app_builtin ~ty:T.tType Builtin.multiset [ty]
 
 let (==>) = arrow
-let (@@) = app
 
 let of_term_unsafe t = t
 let of_terms_unsafe l = l
@@ -185,6 +188,14 @@ let open_fun ty = match view ty with
       args, ret
   | _ -> [], ty
 
+let rec open_poly_fun ty = match view ty with
+  | Forall ty' ->
+      let i, args, ret = open_poly_fun ty' in
+      i+1, args, ret
+  | _ ->
+      let args, ret = open_fun ty in
+      0, args, ret
+
 exception ApplyError of string
 
 let () = Printexc.register_printer
@@ -221,8 +232,9 @@ let apply ty args =
       then aux_l ty exp_args' args' env
       else
         err_applyf_
-          "@[<2>Type.apply:@ wrong argument type,@ expected `@[%a@]`@ but got `@[%a@]`@]"
-          T.pp exp' T.pp (T.ty_exn a)
+          "@[<2>Type.apply:@ wrong argument type,@ expected `@[%a@]`@ \
+            but got `@[%a : %a@]`@]"
+          T.pp exp' T.pp a T.pp (T.ty_exn a)
   in
   aux ty args DBEnv.empty
 

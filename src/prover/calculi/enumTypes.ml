@@ -168,8 +168,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         | I id -> Type.app id (List.map Type.var ty_vars)
         | B b -> assert (ty_vars=[]); Type.builtin b
       in
-      Util.debugf ~section 1 "@[<2>declare new enum type `@[%a@]`@ (@[cases %a = @[<hv>%a@]@])@]"
-        (fun k->k Type.pp ty HVar.pp var (Util.pp_list ~sep:"; " T.pp) cases);
+      Util.debugf ~section 1
+        "@[<2>declare new enum type `@[%a@]`@ (@[cases %a ∈ {@[<hv>%a@]}@])@]"
+        (fun k->k Type.pp ty HVar.pp var (Util.pp_list ~sep:", " T.pp) cases);
       Util.incr_stat stat_declare;
       (* set of already declared symbols *)
       let decl_symbols =
@@ -337,7 +338,14 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let instantiate_vars c = Util.with_prof prof_instantiate instantiate_vars_ c
 
-  (* assume [s args : decl.decl_ty_id] and [s : ty_s] *)
+  (* assume [s : ty_s] where [ty_s = _ -> ... -> decl.decl_ty_id poly_args]
+     This builds the axiom
+     [forall x1...xn.
+        let t = s x1...xn in
+        exists y11...y1m. t = c1 y11...y1mn
+        or exists ..... t = c2 ....
+        or ....]
+      where [c1, ..., ck] are the constructors of [decl] *)
   let instantiate_axiom_ ~ty_s s poly_args decl =
     if ID.Set.mem s decl.decl_symbols
     then None (* already declared *)
@@ -346,15 +354,13 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* need to add an axiom instance for this symbol and declaration *)
       decl.decl_symbols <- ID.Set.add s decl.decl_symbols;
       (* create the axiom.
-         - build [subst = decl.x->s(v1,...,vn,u1,...,u_m)]
-           where the [v_i] are type parameters and the [u_i] are
-           term parameters
+         - build [subst = decl.x->s(u1,...,u_m)]
+           where the the [u_i] are variables of the types required by [ty_s]
          - evaluate [decl.x = decl.t1 | decl.t2 .... | decl.t_m] in subst
       *)
-      let ty_vars = List.mapi (fun i ty -> HVar.make ~ty i |> T.var) poly_args in
       let vars = List.mapi (fun i ty -> HVar.make ~ty i |> T.var) ty_args in
-      let t = T.app (T.const ~ty:ty_s s) (ty_vars @ vars) in
-      Util.debugf ~section 5 "@[<2>instantiate enum type `%a`@ on @[%a@]@]"
+      let t = T.app (T.const ~ty:ty_s s) vars in
+      Util.debugf ~section 5 "@[<2>instantiate enum type `%a`@ on `@[%a@]`@]"
         (fun k->k pp_id_or_builtin decl.decl_ty_id T.pp t);
       let subst = bind_vars_ (decl,0) (poly_args,1) in
       let subst = Unif.FO.unification ~subst (T.var decl.decl_var,0) (t,1) in
@@ -432,6 +438,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   let is_trivial c =
     C.get_flag flag_enumeration_clause c
 
+  (* TODO: do this just after type inference *)
+
   (* detect whether the clause is a declaration of enum type, and if it
       is, declare the type! *)
   let _detect_and_declare c =
@@ -452,15 +460,17 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.debugf ~section 5 "@[<2>examine data `%a`@]" (fun k->k ID.pp d.Stmt.data_id);
     (* make HVars *)
     let ty_vars = List.mapi (fun i _ -> HVar.make ~ty:Type.tType i) d.Stmt.data_args in
+    let ty_vars_t = List.map T.var ty_vars in
     let ty_of_var =
       Type.app d.Stmt.data_id (List.map Type.var ty_vars) in
-    let v = HVar.make ~ty:ty_of_var 0 in
+    let v = HVar.make ~ty:ty_of_var (List.length d.Stmt.data_args+1) in
     let v_t = T.var v in
     let cases =
       List.map
         (fun (c_id, c_ty) ->
            (* declare projector functions for this constructor *)
-           let ty_args, ty_ret = Type.open_fun c_ty in
+           let num_ty_vars, ty_args, ty_ret = Type.open_poly_fun c_ty in
+           assert (num_ty_vars = List.length ty_vars);
            let projs_of_v =
              List.mapi
                (fun n ty_arg ->
@@ -468,14 +478,15 @@ module Make(E : Env.S) : S with module Env = E = struct
                   let proj = ID.make name in
                   (* remember that proj is a projector for the enum type *)
                   ID.add_payload proj (Attr_is_projector_of d.Stmt.data_id);
-                  let ty_proj = Type.([ty_ret] ==> ty_arg) in
+                  let ty_proj = Type.(forall_n num_ty_vars ([ty_ret] ==> ty_arg)) in
                   (* declare projector *)
                   Ctx.declare proj ty_proj;
-                  T.app (T.const ~ty:ty_proj proj) [v_t])
+                  T.app (T.const ~ty:ty_proj proj) (ty_vars_t @ [v_t]))
                ty_args
            in
            (* [c (proj1 v) (proj2 v) ... (proj_n v)] *)
-           T.app (T.const ~ty:c_ty c_id) projs_of_v)
+           T.app (T.const ~ty:c_ty c_id) (ty_vars_t @ projs_of_v)
+        )
         d.Stmt.data_cstors
     in
     let _ =

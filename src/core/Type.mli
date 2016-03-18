@@ -88,13 +88,13 @@ val record_flatten : (string*t) list -> rest:t option -> t
       row record [rest] contains some fields also present in the list *)
 
 val forall : t -> t
-(** Quantify over one type variable. Careful with the De Bruijn indices. *)
+(** Quantify over one type variable. Careful with the De Bruijn indices! *)
+
+val forall_n : int -> t -> t
+(** Quantify over [n] type variable. Careful with the De Bruijn indices! *)
 
 val bvar : int -> t
 (** bound variable *)
-
-val (@@) : ID.t -> t list -> t
-(** [s @@ args] applies the sort [s] to arguments [args]. *)
 
 val (==>) : t list -> t -> t
 (** General function type. [l ==> x] is the same as [x] if [l]
@@ -164,7 +164,13 @@ val depth : t -> int
 (** Depth of the type (length of the longest path to some leaf)
     @since 0.5.3 *)
 
-val open_fun : t -> (t list * t)
+val open_poly_fun : t -> int * t list * t
+(** [open_poly_fun ty] "unrolls" polymorphic function arrows from the left, so that
+    [open_fun (forall a b. f a -> (g b -> (c -> d)))] returns [2; [f a;g b;c], d].
+    @return the return type, the number of type variables,
+      and the list of all its arguments *)
+
+val open_fun : t -> t list * t
 (** [open_fun ty] "unrolls" function arrows from the left, so that
     [open_fun (a -> (b -> (c -> d)))] returns [[a;b;c], d].
     @return the return type and the list of all its arguments *)

@@ -53,7 +53,7 @@ module Make(X : PARAMETERS) = struct
 
   (* declare [symb : ty], with precondition that [symb] is not declared yet *)
   let declare_new_ symb ty =
-    Util.debugf ~section:Const.section 2 "@[<2>declare new symbol@ @[%a:%a@]@]"
+    Util.debugf ~section:Const.section 2 "@[<2>@{<cyan>declare new symbol@}@ `@[%a:%a@]`@]"
       (fun k->k ID.pp symb Type.pp ty);
     _signature := Signature.declare !_signature symb ty;
     Signal.send on_signature_update !_signature;

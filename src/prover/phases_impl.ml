@@ -413,8 +413,10 @@ let setup_signal =
   (* signal handler. Re-raise, bugs shouldn't keep hidden *)
   Signal.set_exn_handler
     (fun e ->
+      let stack = Printexc.get_backtrace () in
       let msg = Printexc.to_string e in
       output_string stderr ("exception raised in signal: " ^ msg ^ "\n");
+      output_string stderr stack;
       flush stderr;
       raise e);
   Phases.return_phase ()
