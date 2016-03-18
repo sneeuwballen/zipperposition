@@ -43,16 +43,13 @@ module Make(C : CLAUSE) = struct
 
   (** Get a graph of the proof *)
   let as_graph =
-    {CCGraph.
-      origin=fst;
-      dest=(fun (_,(_,n)) -> n);
-      children=(fun p ->
+    CCGraph.make_labelled_tuple
+      (fun p ->
         match rule p.step with
         | None -> Sequence.empty
         | Some rule ->
             let parents = Sequence.of_list p.step.parents in
-            Sequence.map (fun p' -> p, (rule, p')) parents);
-    }
+            Sequence.map (fun p' -> rule, p') parents)
 
   (** {2 IO} *)
 
@@ -217,7 +214,7 @@ module Make(C : CLAUSE) = struct
         else if is_trivial p.step then `Color "cyan" :: shape :: attrs
         else shape :: attrs
       )
-      ~attrs_e:(fun (_,(r,_)) -> [`Label r.rule_name])
+      ~attrs_e:(fun (_,r,_) -> [`Label r.rule_name])
       out
       seq;
     Format.pp_print_newline out ();
