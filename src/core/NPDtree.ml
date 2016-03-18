@@ -187,31 +187,27 @@ module Make(E : Index.EQUATION) = struct
     !n
 
   let _as_graph =
-    {CCGraph.
-      origin=fst;
-      dest=(fun (_,(_,n)) -> n);
-      children=(fun t ->
-        let s1 =
-          (match t.star with
-            | None -> Sequence.empty
-            | Some t' -> Sequence.singleton (t,("*", t'))
-          )
+    CCGraph.make_labelled_tuple
+      (fun t ->
+        let prefix s = match t.star with
+            | None -> s
+            | Some t' -> Sequence.cons ("*", t') s
         and s2 = ID.Map.to_seq t.map
-          |> Sequence.map (fun (sym, t') -> t, (ID.to_string sym, t'))
+          |> Sequence.map (fun (sym, t') -> ID.to_string sym, t')
         in
-        Sequence.append s1 s2
-      );
-    }
+        prefix s2)
 
   let to_dot out t =
-    CCGraph.Dot.pp
+    let pp = CCGraph.Dot.pp
+      ~eq:(==)
+      ~tbl:(CCGraph.mk_table ~eq:(==) ~hash:Hashtbl.hash 128)
       ~attrs_v:(fun t ->
         let len = Leaf.size t.leaf in
         [`Shape "circle"; `Label (string_of_int len)])
-      ~attrs_e:(fun (_, (e,_)) -> [`Label e])
+      ~attrs_e:(fun (_, e, _) -> [`Label e])
       ~name:"NPDtree" ~graph:_as_graph
-      out t;
-    Format.pp_print_flush out ();
+    in
+    Format.fprintf out "@[<2>%a@]@." pp t;
     ()
 end
 
@@ -437,35 +433,33 @@ module MakeTerm(X : Set.OrderedType) = struct
   let name = "npdtree"
 
   let _as_graph =
-    {CCGraph.
-      origin=fst;
-      dest=(fun (_,(_,n)) -> n);
-      children=(fun t ->
-        let s1 =
-          (match t.star with
-            | None -> Sequence.empty
-            | Some t' -> Sequence.singleton (t,("*", t'))
-          )
+    CCGraph.make_labelled_tuple
+      (fun t ->
+        let prefix s = match t.star with
+            | None -> s
+            | Some t' -> Sequence.cons ("*", t') s
         and s2 = SIMap.to_seq t.map
           |> Sequence.map
             (fun ((sym,i), t') ->
               let label = CCFormat.sprintf "%a/%d" ID.pp sym i in
-              t, (label, t'))
+              label, t')
         in
-        Sequence.append s1 s2
-      );
-    }
+        prefix s2)
 
   (* TODO: print leaf itself *)
 
   let to_dot _ out t =
-    CCGraph.Dot.pp
+    Util.debugf ~section:Util.Section.zip 2
+      "@[<2>print graph of size %d@]" (fun k->k (size t));
+    let pp = CCGraph.Dot.pp
+      ~eq:(==)
+      ~tbl:(CCGraph.mk_table ~eq:(==) ~hash:Hashtbl.hash 128)
       ~attrs_v:(fun t ->
         let len = Leaf.size t.leaf in
         [`Shape "circle"; `Label (string_of_int len)])
-      ~attrs_e:(fun (_, (e,_)) -> [`Label e])
+      ~attrs_e:(fun (_, e,_) -> [`Label e])
       ~name:"NPDtree" ~graph:_as_graph
-      out t;
-    Format.pp_print_flush out ();
+    in
+    Format.fprintf out "@[<2>%a@]@." pp t;
     ()
 end
