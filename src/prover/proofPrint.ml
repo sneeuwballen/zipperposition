@@ -94,6 +94,8 @@ module Make(C : CLAUSE) = struct
         | Goal _ ->
             Format.fprintf out "@[<hv2>%a @[%a@]@ %s %a@]@,"
               pp_bullet () pp_result p.result sep pp_kind p.step.kind
+        | Data _ ->
+            Format.fprintf out "@[<hv2>%a data %a@]@," pp_bullet () pp_kind p.step.kind
         | Trivial ->
             Format.fprintf out "@[<hv2>%a @[%a@]@ %s trivial@]@,"
               pp_bullet () pp_result p.result sep
@@ -129,6 +131,7 @@ module Make(C : CLAUSE) = struct
         | None -> Format.fprintf out "file('%s')" file
         | Some name -> Format.fprintf out "file('%s', '%s')" file name
         end
+    | Data _ -> assert false
     | Inference rule
     | Simplification rule -> pp_step "thm" out (rule,parents)
     | Esa rule -> pp_step "esa" out (rule,parents)
