@@ -21,7 +21,7 @@ module Make(C : CLAUSE) : sig
 
   (** {2 Conversion to a graph of proofs} *)
 
-  val as_graph : (t, t * (ProofStep.rule * t)) CCGraph.t
+  val as_graph : (t, t * ProofStep.rule * t) CCGraph.t
   (** Get a graph of the proof *)
 
   val traverse :
