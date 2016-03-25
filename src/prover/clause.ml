@@ -51,6 +51,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let flag_lemma = new_flag ()
   let flag_persistent = new_flag ()
   let flag_redundant = new_flag ()
+  let flag_backward_simplified = new_flag()
 
   let set_flag flag c truth =
     if truth
@@ -61,6 +62,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let mark_redundant c = set_flag flag_redundant c true
   let is_redundant c = get_flag flag_redundant c
+  let mark_backward_simplified c = set_flag flag_backward_simplified c true
+  let is_backward_simplified c = get_flag flag_backward_simplified c
 
   (** {2 Hashcons} *)
 

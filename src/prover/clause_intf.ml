@@ -15,6 +15,7 @@ module type S = sig
   val flag_lemma : int (** clause is a lemma *)
   val flag_persistent : int (** clause cannot be redundant *)
   val flag_redundant : int (** clause has been shown to be redundant *)
+  val flag_backward_simplified : int (** clause has been backward simplified *)
 
   val set_flag : int -> t -> bool -> unit (** set boolean flag *)
   val get_flag : int -> t -> bool (** get value of boolean flag *)
@@ -22,6 +23,8 @@ module type S = sig
 
   val mark_redundant : t -> unit
   val is_redundant : t -> bool
+  val mark_backward_simplified : t -> unit
+  val is_backward_simplified : t -> bool
 
   (** {2 Basics} *)
 

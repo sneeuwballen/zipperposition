@@ -11,6 +11,10 @@ module Lits = Literals
 
 let section = Util.Section.make ~parent:Const.section "env"
 
+let stat_orphan_criterion = Util.mk_stat "env.orphan_criterion"
+
+let orphan_criterion_ = ref true
+
 (** {2 Signature} *)
 module type S = Env_intf.S
 
@@ -259,14 +263,50 @@ module Make(X : sig
     in
     Sequence.of_list clauses
 
+  (* is [c] the result (after simplification) of an inference in which
+     at least one premise has been backward simplified? *)
+  let orphan_criterion c =
+    let open ProofStep in
+    (* is the current step [p] an inference step? *)
+    let is_inf p = match p.step.kind with
+      | Inference _ -> true
+      | _ -> false
+    in
+    (* recursively traversal of the proof of [c].
+      @param after_inf true if we just crossed an inference step *)
+    let rec aux ~after_inf p =
+      if after_inf
+      then
+        (* after inference step: stop recursion and check *)
+        match p.result with
+        | Clause c' -> C.is_backward_simplified c'
+        | Form _ -> false
+      else
+        List.exists
+          (fun p' -> aux ~after_inf:(is_inf p) p')
+          p.step.parents
+    in
+    let p = C.proof c in
+    let res = List.exists (aux ~after_inf:(is_inf p)) p.step.parents in
+    if res then (
+      Util.incr_stat stat_orphan_criterion;
+      Util.debugf ~section 3
+        "@[<2>`@[%a@]` is redundant by orphan criterion@]" (fun k->k C.pp c);
+    );
+    res
+
   let is_trivial c =
     if C.get_flag C.flag_persistent c then false
     else (
-      let res = match !_is_trivial with
-      | [] -> false
-      | [f] -> f c
-      | [f;g] -> f c || g c
-      | l -> List.exists (fun f -> f c) l
+      let res =
+        C.is_redundant c
+        || orphan_criterion c
+        || begin match !_is_trivial with
+            | [] -> false
+            | [f] -> f c
+            | [f;g] -> f c || g c
+            | l -> List.exists (fun f -> f c) l
+           end
       in
       if res then C.mark_redundant c;
       res
@@ -310,6 +350,7 @@ module Make(X : sig
       let rule = ProofStep.mk_rule ~comment:(StrSet.to_list !applied_rules) "rw" in
       let proof = ProofStep.mk_simp ~rule [C.proof c] in
       let c' = C.create_a ~trail:(C.trail c) lits' proof in
+      assert (not (C.equal c c'));
       Util.debugf ~section 3 "@[term rewritten clause `@[%a@]`@ into `@[%a@]`"
         (fun k->k C.pp c C.pp c');
       SimplM.return_new c'
@@ -341,6 +382,7 @@ module Make(X : sig
       let rule = ProofStep.mk_rule ~comment:(StrSet.to_list !applied_rules) "rw_lit" in
       let proof = ProofStep.mk_simp ~rule [C.proof c]  in
       let c' = C.create_a ~trail:(C.trail c) lits proof in
+      assert (not (C.equal c c'));
       Util.debugf ~section 3 "@[lit rewritten `@[%a@]`@ into `@[%a@]`@]"
         (fun k->k C.pp c C.pp c');
       SimplM.return_new c'
@@ -488,8 +530,9 @@ module Make(X : sig
            match is_new with
            | `Same -> before, after
            | `New ->
-               (* the active clause has been simplified! *)
+               (* the active clause has been backward simplified! *)
                C.mark_redundant c;
+               C.mark_backward_simplified c;
                Util.debugf ~section 2
                  "@[active clause `@[%a@]@ simplified into `@[%a@]`@]"
                  (fun k->k C.pp c C.pp c');
@@ -506,8 +549,14 @@ module Make(X : sig
            match f c with
            | None -> set
            | Some clauses ->
-               let clauses = List.map (fun c -> SimplM.get (basic_simplify c)) clauses in
-               C.mark_redundant c;
+               let redundant, clauses =
+                 CCList.fold_map
+                   (fun red c ->
+                     let c', is_new = basic_simplify c in
+                     (red || is_new=`New), c')
+                   false clauses
+               in
+               if redundant then C.mark_redundant c;
                Util.debugf ~section 3
                 "@[active clause `@[%a@]`@ simplified into clauses `@[%a@]`@]"
                  (fun k->k C.pp c (CCFormat.list C.pp) clauses);
@@ -632,3 +681,10 @@ module Make(X : sig
   let update_flex_state f = CCRef.update f flex_state_
   let flex_get k = Flex_state.get_exn k !flex_state_
 end
+
+let () =
+  Params.add_opts
+  [ "--orphan-criterion", Arg.Set orphan_criterion_, " enable orphan criterion"
+  ; "--no-orphan-criterion", Arg.Clear orphan_criterion_, " disable orphan criterion"
+  ]
+
