@@ -7,6 +7,8 @@
 
 val parse_cli :
   (Phases.filename list * Params.t, [`Init], [`Parse_cli]) Phases.t
+(** Parses the file list and parameters, also puts the parameters in
+  the state *)
 
 val load_extensions : (Extensions.t list, [`Parse_cli], [`LoadExtensions]) Phases.t
 
@@ -15,7 +17,6 @@ val setup_gc : (unit, [`Init], [`Init]) Phases.t
 val setup_signal : (unit, [`Init], [`Init]) Phases.t
 
 val process_file :
-  params:Params.t ->
   Phases.filename ->
   (Phases.env_with_result, [`LoadExtensions], [`Saturate]) Phases.t
 (** [process_file f] parses [f], does the preprocessing phases, including
@@ -30,7 +31,6 @@ val print :
 (** Printing of results *)
 
 val process_files_and_print :
-  params:Params.t ->
   Phases.filename list ->
   (unit, [`LoadExtensions], [`Print_dot]) Phases.t
 (** Process each file in the list successively, printing the results. *)

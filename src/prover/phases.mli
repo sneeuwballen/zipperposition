@@ -127,12 +127,14 @@ include module type of Infix
 
 val empty_state : Flex_state.t
 
-val k_cur_phase : any_phase Flex_state.key
-(** The current phase is stored in the state using this key *)
-
 val get : (Flex_state.t, 'a, 'a) t
 
 val set : Flex_state.t -> (unit, 'a, 'a) t
+
+val get_key : 'a Flex_state.key -> ('a, 'b, 'b) t
+(** [get_key k] returns the value associated with [k] in the state *)
+
+val set_key : 'a Flex_state.key -> 'a -> (unit, 'b, 'b) t
 
 val update : f:(Flex_state.t -> Flex_state.t) -> (unit, 'a, 'a) t
 (** [update ~f] changes the state using [f] *)
@@ -143,3 +145,11 @@ val run_with : Flex_state.t -> ('a, [`Init], [`Exit]) t -> (Flex_state.t * 'a) o
 
 val run : ('a, [`Init], [`Exit]) t -> (Flex_state.t * 'a) or_error
 (** [run m] is [run_with empty_state m] *)
+
+module Key : sig
+  val cur_phase : any_phase Flex_state.key
+  (** The current phase is stored in the state using this key *)
+
+  val params : Params.t Flex_state.key
+  (** Parameters *)
+end

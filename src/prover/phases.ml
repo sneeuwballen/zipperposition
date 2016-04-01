@@ -59,11 +59,14 @@ type any_phase = Any_phase : (_, _, _) phase -> any_phase
 
 module State = Flex_state
 
-(* key used to store the current phase *)
-let k_cur_phase = State.create_key()
+module Key = struct
+  let cur_phase = State.create_key()
+  let params = State.create_key()
+
+end
 
 (* empty state: at Init *)
-let empty_state = State.empty |> State.add k_cur_phase (Any_phase Init)
+let empty_state = State.empty |> State.add Key.cur_phase (Any_phase Init)
 
 (* A simple state monad *)
 type (+'a, 'p1, 'p2) t = State.t -> (State.t * 'a) or_error
@@ -127,17 +130,15 @@ let rec fold_l ~f ~x = function
   | [] -> return x
   | y :: ys -> f x y >>= fun x' -> fold_l ~f ~x:x' ys
 
-type state = Flex_state.t
-
 let current_phase st =
-  try `Ok (st, State.get_exn k_cur_phase st)
+  try `Ok (st, State.get_exn Key.cur_phase st)
   with Not_found ->
     let msg = "could not find current phase" in
     `Error msg
 
 let start_phase p st =
   Util.debugf ~section:Const.section 2 "start phase %s" (fun k->k (string_of_phase p));
-  let st = State.add k_cur_phase (Any_phase p) st in
+  let st = State.add Key.cur_phase (Any_phase p) st in
   `Ok (st, ())
 
 let return_phase_err x =
@@ -163,7 +164,16 @@ let exit =
 
 let get st = `Ok (st, st)
 
+let get_key k st =
+  match Flex_state.get k st with
+  | None -> `Error "key not found"
+  | Some v -> `Ok (st, v)
+
 let set new_st _st = `Ok (new_st, ())
+
+let set_key k v st =
+  let st = Flex_state.add k v st in
+  `Ok (st, ())
 
 let run_parallel l =
   let rec aux = function

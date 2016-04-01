@@ -127,8 +127,9 @@ let compute_prec stmts =
   let prec = Compute_prec.mk_precedence cp stmts in
   Phases.return_phase prec
 
-let compute_ord_select ~params precedence =
+let compute_ord_select precedence =
   Phases.start_phase Phases.Compute_ord_select >>= fun () ->
+  Phases.get_key Phases.Key.params >>= fun params ->
   let ord = params.param_ord precedence in
   let select = Selection.selection_from_string ~ord params.param_select in
   do_extensions ~field:(fun e->e.Extensions.ord_select_actions)
@@ -356,11 +357,12 @@ let parse_cli =
   (* parse arguments *)
   let params = Params.parse_args () in
   let files = CCVector.to_list Params.files in
+  Phases.set_key Phases.Key.params params >>= fun () ->
   print_version ~params;
   Phases.return_phase (files, params)
 
 (* Process the given file (try to solve it) *)
-let process_file ~params file =
+let process_file file =
   start_file file >>= fun () ->
   parse_file file >>= fun stmts ->
   typing stmts >>= fun decls ->
@@ -380,10 +382,11 @@ let process_file ~params file =
   Util.debugf ~section 2 "@[<2>signature:@ @[<hv>%a@]@]" (fun k->k Signature.pp signature);
   compute_prec (CCVector.to_seq stmts) >>= fun precedence ->
   Util.debugf ~section 2 "@[<2>precedence:@ @[%a@]@]" (fun k->k Precedence.pp precedence);
-  compute_ord_select ~params precedence >>= fun (ord, select) ->
+  compute_ord_select precedence >>= fun (ord, select) ->
   (* build the context and env *)
   make_ctx ~signature ~ord ~select >>= fun ctx ->
-  make_env ~ctx ~params stmts >>= fun (Phases.Env_clauses (env,clauses)) ->
+  Phases.get_key Phases.Key.params >>= fun params ->
+  make_env ~params ~ctx stmts >>= fun (Phases.Env_clauses (env,clauses)) ->
   (* main workload *)
   has_goal_ := has_goal; (* FIXME: should be computed at Env initialization *)
   (* pre-saturation *)
@@ -422,9 +425,9 @@ let setup_signal =
   Phases.return_phase ()
 
 (* process several files, printing the result *)
-let process_files_and_print ~params files =
+let process_files_and_print files =
   let f file =
-    process_file ~params file >>= fun (Phases.Env_result (env, res)) ->
+    process_file file >>= fun (Phases.Env_result (env, res)) ->
     print file env res
   in
   let phases = List.map f files in

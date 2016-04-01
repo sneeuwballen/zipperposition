@@ -141,6 +141,7 @@ let _to_multiset_with_idx lits =
     (fun acc i x -> MLI.add acc (x,i))
     MLI.empty lits
 
+(* TODO: optimize! quite a bottleneck on pb47.p with NoSelection *)
 let maxlits_l ~ord lits =
   Util.enter_prof prof_maxlits;
   let m = _to_multiset_with_idx lits in

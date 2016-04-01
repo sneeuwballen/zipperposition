@@ -12,9 +12,9 @@ let phases =
   let open Phases.Infix in
   Phases_impl.setup_gc >>= fun () ->
   Phases_impl.setup_signal >>= fun () ->
-  Phases_impl.parse_cli >>= fun (files, params) ->
+  Phases_impl.parse_cli >>= fun (files, _params) ->
   Phases_impl.load_extensions >>= fun _ ->
-  Phases_impl.process_files_and_print ~params files >>= fun () ->
+  Phases_impl.process_files_and_print files >>= fun () ->
   Phases.exit
 
 let () =
