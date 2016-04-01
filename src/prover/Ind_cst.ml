@@ -98,14 +98,16 @@ let find_cst_in_term t =
   |> Sequence.filter_map
     (fun t -> match T.view t with
       | T.Const id ->
-          let ty = T.ty t in
-          begin match Ind_ty.as_inductive_type ty with
-          | Some ity ->
-              if not (is_cst id) && not (Ind_ty.is_constructor id)
-              then Some (id, ity, ty) (* bingo *)
-              else None
-          | _ -> None
-          end
+          let ty_args, ty_ret = Type.open_fun (T.ty t) in
+          (* must be a constant *)
+          if ty_args=[]
+          then match Ind_ty.as_inductive_type ty_ret with
+            | Some ity ->
+                if not (is_cst id) && not (Ind_ty.is_constructor id)
+                then Some (id, ity, ty_ret) (* bingo *)
+                else None
+            | _ -> None
+          else None
       | _ -> None)
 
 (** {6 Sub-Constants} *)
@@ -325,8 +327,8 @@ let declare_cst ?(cover_set_depth=1) id ~ty =
   let l = make_coverset_ ~depth:cover_set_depth ity in
   let cover_set = List.map fst l in
   Util.debugf ~section:Ind_ty.section 2
-    "@[<2>declare new inductive constant @[%a@]@ with coverset @[%a@]@]"
-    (fun k->k ID.pp id (Util.pp_list pp_case) cover_set);
+    "@[<2>declare new inductive symbol `@[%a : %a@]`@ with coverset {@[%a@]}@]"
+    (fun k->k ID.pp id Type.pp ty (Util.pp_list pp_case) cover_set);
   (* build the constant itself *)
   let cst = {
     cst_id=id;

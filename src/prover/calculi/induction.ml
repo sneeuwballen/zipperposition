@@ -4,7 +4,6 @@
 (** {1 Induction through Cut} *)
 
 open Libzipperposition
-open Libzipperposition_parsers
 
 module Lits = Literals
 module T = FOTerm
@@ -13,7 +12,7 @@ module Ty = Type
 
 module type S = Induction_intf.S
 
-let section = Util.Section.make ~parent:Const.section "ind"
+let section = Util.Section.make ~parent:Const.section "induction"
 
 let cover_set_depth_ = ref 1
 let show_lemmas_ = ref false
@@ -161,6 +160,9 @@ module Make
   let () =
     Signal.on_every Signals.on_exit
       (fun _ -> if !show_lemmas_ then show_lemmas ())
+
+  (* FIXME: should already be done in Ind_ty/Ind_cst?
+    or maybe here. But careful with function symbols (taht are not just constants) *)
 
   (* scan clauses for ground terms of an inductive type,
      and declare those terms *)
