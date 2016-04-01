@@ -54,7 +54,7 @@ let invalid_decl_ msg = raise (InvalidDecl msg)
 let invalid_declf_ fmt = CCFormat.ksprintf fmt ~f:invalid_decl_
 
 let type_hd_exn ty =
-  let _, ret = Type.open_fun ty in
+  let _, _, ret = Type.open_poly_fun ty in
   match Type.view ret with
   | Type.Builtin b -> B b
   | Type.App (s, _) -> I s
