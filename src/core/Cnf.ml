@@ -447,12 +447,9 @@ let rec to_cnf_rec f = match F.view f with
   | F.And l ->
       (* simply concat sub-CNF *)
       CCList.flat_map to_cnf_rec l
-  | F.Or (f'::l) ->
-      (* cartesian products of sub-CNF *)
-      List.fold_left
-        (fun cnf f' -> product (to_cnf_rec f') cnf)
-        (to_cnf_rec f')
-        l
+  | F.Or [] -> assert false
+  | F.Or l ->
+      Util.map_product ~f:to_cnf_rec l
   | F.Forall _
   | F.Exists _ ->
       errorf_
@@ -464,14 +461,6 @@ let rec to_cnf_rec f = match F.view f with
       errorf_
         "@[<2>Cnf.to_cnf_rec:@ can only clausify a NNF formula,@ not @[%a@]@]"
         T.pp f
-  | F.Or [] -> assert false
-(* cartesian product of lists of lists *)
-and product a b =
-  List.fold_left
-    (fun acc litsa -> List.fold_left
-        (fun acc' litsb -> (litsa @ litsb) :: acc')
-        acc b)
-    [] a
 
 let to_cnf f =
   Util.enter_prof prof_to_cnf;

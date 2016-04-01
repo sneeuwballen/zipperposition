@@ -327,6 +327,23 @@ let ord_option c o1 o2 = match o1, o2 with
   | Some _, None -> 1
   | Some x1, Some x2 -> c x1 x2
 
+(* cartesian product of lists of lists *)
+let map_product ~f l =
+  let product a b =
+    List.fold_left
+      (fun acc1 l1 -> List.fold_left
+          (fun acc2 l2 -> (List.rev_append l1 l2) :: acc2)
+          acc1 b)
+      [] a
+  in
+  match l with
+    | [] -> []
+    | l1 :: tail ->
+      List.fold_left
+        (fun acc x -> product (f x) acc)
+        (f l1)
+        tail
+
 (** {2 File utils} *)
 
 type 'a or_error = [`Error of string | `Ok of 'a]

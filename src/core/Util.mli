@@ -161,6 +161,8 @@ val pp_list : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
 
 val ord_option : 'a CCOrd.t -> 'a option CCOrd.t
 
+val map_product : f:('a -> 'b list list) -> 'a list -> 'b list list
+
 (** {2 File utils} *)
 
 type 'a or_error = [`Error of string | `Ok of 'a]
