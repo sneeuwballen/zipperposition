@@ -130,7 +130,7 @@ let pp ppf ppt ppty out st = match st.view with
   | Goal f ->
       fpf out "@[<2>goal@ @[%a@]@]." ppf f
   | NegatedGoal l ->
-      fpf out "@[<2>negated_goal@ @[<v>%a@]@."
+      fpf out "@[<2>negated_goal@ @[<hv>%a@]@]."
         (Util.pp_list ~sep:", " (CCFormat.hovbox ppf)) l
 
 let to_string ppf ppt ppty = CCFormat.to_string (pp ppf ppt ppty)

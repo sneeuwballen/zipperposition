@@ -135,13 +135,13 @@ let current_phase st =
     `Error msg
 
 let start_phase p st =
-  Util.debugf ~section:Const.section 2 "start phase %s" (fun k->k (string_of_phase p));
+  Util.debugf ~section:Const.section 2 "@{<yellow>start phase@} %s" (fun k->k (string_of_phase p));
   let st = State.add Key.cur_phase (Any_phase p) st in
   `Ok (st, ())
 
 let return_phase_err x =
   current_phase >>= fun p ->
-  Util.debugf ~section:Const.section 2 "terminate phase %s"
+  Util.debugf ~section:Const.section 2 "@{<yellow>terminate phase@} %s"
     (fun k->k (string_of_any_phase p));
   return_err x
 

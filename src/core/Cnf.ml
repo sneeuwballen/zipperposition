@@ -636,7 +636,7 @@ let convert ~file seq =
   let ty_ctx = Type.Conv.create() in
   let conv_statement st =
     Util.debugf ~section 5
-      "@[<2>convert@ `@[%a@]`@]" (fun k->k pp_c_statement st);
+      "@[<2>@{<yellow>convert@}@ `@[%a@]`@]" (fun k->k pp_c_statement st);
     let name = st.Statement.src.UntypedAST.name in
     let src = StatementSrc.make ?name file in
     let res = match Statement.view st with
