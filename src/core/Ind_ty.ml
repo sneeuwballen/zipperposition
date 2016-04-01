@@ -53,12 +53,16 @@ exception Payload_ind_cstor of constructor * t
 let invalid_decl_ msg = raise (InvalidDecl msg)
 let invalid_declf_ fmt = CCFormat.ksprintf fmt ~f:invalid_decl_
 
-let type_hd_exn ty =
+let type_hd ty =
   let _, _, ret = Type.open_poly_fun ty in
   match Type.view ret with
-  | Type.Builtin b -> B b
-  | Type.App (s, _) -> I s
-  | _ ->
+  | Type.Builtin b -> Some (B b)
+  | Type.App (s, _) -> Some (I s)
+  | _ -> None
+
+let type_hd_exn ty = match type_hd ty with
+  | Some res -> res
+  | None ->
       invalid_declf_ "expected function type,@ got `@[%a@]`" Type.pp ty
 
 let as_inductive_ty id =
@@ -82,9 +86,9 @@ let is_inductive_type ty =
   | I id -> is_inductive_ty id
 
 let as_inductive_type ty =
-  match type_hd_exn ty with
-  | B _ -> None
-  | I id -> as_inductive_ty id
+  match type_hd ty with
+  | Some (B _) | None -> None
+  | Some (I id) -> as_inductive_ty id
 
 (* declare that the given type is inductive *)
 let declare_ty id ~ty_vars constructors =
