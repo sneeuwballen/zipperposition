@@ -359,6 +359,16 @@ let declare_cst ?(cover_set_depth=1) id ~ty =
             }))
         to_declare)
     l;
+  Util.debugf ~section:Ind_ty.section 5
+    "@[<2>sub-constants:@ @[<v>%a@]@]"
+    (fun k ->
+       let pp_case out case =
+         Format.fprintf out "@[<h>case %a: sub @[<hv>%a@]@]@."
+            pp_case case (Util.pp_list ID.pp)
+            (sub_constants_case case
+             |> Sequence.map (fun c -> c.sub_cst_id) |> Sequence.to_list)
+       in
+       k (CCFormat.seq pp_case) (cases cover_set));
   (* return *)
   Signal.send on_new_cst cst;
   cst
