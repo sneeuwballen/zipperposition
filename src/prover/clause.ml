@@ -148,16 +148,17 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       let src = Statement.src st in
       let proof = if is_goal then ProofStep.mk_goal src else ProofStep.mk_assert src in
       let c = create ~trail:Trail.empty lits proof in
-      Some c
+      c
     in
     match Statement.view st with
     | Statement.Data _
-    | Statement.TyDecl _ -> None
+    | Statement.TyDecl _ -> []
     | Statement.Def (id, ty, t) ->
         let lit = SLiteral.eq (T.const ~ty id) t in
-        of_lits ~is_goal:false [lit]
-    | Statement.Assert lits -> of_lits ~is_goal:false lits
-    | Statement.Goal lits -> of_lits ~is_goal:true lits
+        [of_lits ~is_goal:false [lit]]
+    | Statement.Assert lits -> [of_lits ~is_goal:false lits]
+    | Statement.Goal lits -> [of_lits ~is_goal:true lits]
+    | Statement.NegatedGoal l -> List.map (of_lits ~is_goal:true) l
 
   let update_trail f c =
     let trail = f c.trail in

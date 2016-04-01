@@ -523,6 +523,7 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
           | Stmt.TyDecl _ -> st
           | Stmt.Assert f -> Stmt.assert_ ~src (conv_form ~is_goal:false f)
           | Stmt.Goal f -> Stmt.goal ~src (conv_form ~is_goal:true f)
+          | Stmt.NegatedGoal _ -> assert false
         in
         match add_decls src with
         | [] -> Sequence.return new_st
@@ -586,9 +587,7 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
     List.iter
       (fun (id,ty) -> CCVector.push res (Stmt.ty_decl ~src id ty))
       new_ids;
-    List.iter
-      (fun c -> CCVector.push res (Stmt.assert_ ~src c))
-      clauses;
+    clauses
   in
   CCVector.iter
     (fun st ->
@@ -601,8 +600,14 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
           CCVector.push res (Stmt.data ~src l)
       | Stmt.TyDecl (id,ty) ->
           CCVector.push res (Stmt.ty_decl ~src id ty)
-      | Stmt.Assert f -> conv_form ~src f
-      | Stmt.Goal f -> conv_form ~src (F.not_ f)
+      | Stmt.Assert f ->
+          List.iter
+            (fun c -> CCVector.push res (Stmt.assert_ ~src c))
+            (conv_form ~src f)
+      | Stmt.Goal f ->
+          let l = conv_form ~src (F.not_ f) in
+          CCVector.push res (Stmt.neg_goal ~src l)
+      | Stmt.NegatedGoal _ -> assert false
     )
     v;
   (* return final vector of clauses *)
@@ -638,6 +643,9 @@ let convert ~file seq =
       | Statement.Goal c ->
           let c = clause_to_fo ~ctx:t_ctx c in
           Statement.goal ~src c
+      | Statement.NegatedGoal l ->
+          let l = List.map (clause_to_fo ~ctx:t_ctx) l in
+          Statement.neg_goal ~src l
       | Statement.Assert c ->
           let c = clause_to_fo ~ctx:t_ctx c in
           Statement.assert_ ~src c

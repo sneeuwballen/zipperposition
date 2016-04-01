@@ -123,8 +123,6 @@ module type S = sig
   val register : unit -> unit
 end
 
-let theories = ["arith"]
-
 let enable_arith_ = ref false
 let enable_ac_ = ref false
 let enable_semantic_tauto_ = ref true

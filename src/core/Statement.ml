@@ -23,6 +23,7 @@ type ('f, 't, 'ty) view =
   | Def of ID.t * 'ty * 't
   | Assert of 'f (** assert form *)
   | Goal of 'f (** goal to prove *)
+  | NegatedGoal of 'f list (** goal after negation *)
 
 type ('f, 't, 'ty, 'meta) t = {
   view: ('f, 't, 'ty) view;
@@ -45,6 +46,7 @@ let def ~src id ty t = {src; view=Def (id,ty,t); }
 let data ~src l = {src; view=Data l; }
 let assert_ ~src c = {src; view=Assert c; }
 let goal ~src c = {src; view=Goal c; }
+let neg_goal ~src l = {src; view=NegatedGoal l; }
 
 let map_data ~ty:fty d =
   { d with
@@ -60,6 +62,7 @@ let map ~form ~term ~ty st =
         let l = List.map (map_data ~ty:fty) l in
         Data l
     | Goal f -> Goal (form f)
+    | NegatedGoal l -> NegatedGoal (List.map form l)
     | Assert f -> Assert (form f)
     | TyDecl (id, ty) -> TyDecl (id, fty ty)
   in
@@ -80,6 +83,7 @@ module Seq = struct
             List.iter k d.data_cstors)
           l
     | Goal _
+    | NegatedGoal _
     | Assert _ -> ()
 
   let forms st k = match view st with
@@ -87,6 +91,7 @@ module Seq = struct
     | Data _
     | TyDecl _ -> ()
     | Goal c -> k c
+    | NegatedGoal l -> List.iter k l
     | Assert c -> k c
 
   let lits st = forms st |> Sequence.flat_map Sequence.of_list
@@ -124,6 +129,9 @@ let pp ppf ppt ppty out st = match st.view with
       fpf out "@[<2>assert@ @[%a@]@]." ppf f
   | Goal f ->
       fpf out "@[<2>goal@ @[%a@]@]." ppf f
+  | NegatedGoal l ->
+      fpf out "@[<2>negated_goal@ @[<v>%a@]@."
+        (Util.pp_list ~sep:", " (CCFormat.hovbox ppf)) l
 
 let to_string ppf ppt ppty = CCFormat.to_string (pp ppf ppt ppty)
 
@@ -147,6 +155,11 @@ module TPTP = struct
     | Goal f ->
         let role = "conjecture" in
         fpf out "@[<2>tff(%s, %s,@ (@[%a@])@]." name role ppf f
+    | NegatedGoal l ->
+        let role = "negated_conjecture" in
+        List.iter
+          (fun f -> fpf out "@[<2>tff(%s, %s,@ (@[%a@])@]." name role ppf f)
+          l
     | Def (id, ty, t) ->
         pp_decl out (id,ty);
         fpf out "@[<2>tff(%s, axiom,@ %a =@ @[%a@])@]." name ID.pp id ppt t

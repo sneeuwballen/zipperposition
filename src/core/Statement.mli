@@ -28,6 +28,7 @@ type ('f, 't, 'ty) view =
   | Def of ID.t * 'ty * 't
   | Assert of 'f (** assert form *)
   | Goal of 'f (** goal to prove *)
+  | NegatedGoal of 'f list (** goal after negation *)
 
 type ('f, 't, 'ty, 'meta) t = {
   view: ('f, 't, 'ty) view;
@@ -49,6 +50,7 @@ val def : src:'src -> ID.t -> 'ty -> 't -> (_, 't, 'ty, 'src) t
 val data : src:'src -> 'ty data list -> (_, _, 'ty, 'src) t
 val assert_ : src:'src -> 'f -> ('f, _, _, 'src) t
 val goal : src:'src -> 'f -> ('f, _, _, 'src) t
+val neg_goal : src:'src -> 'f list -> ('f, _, _, 'src) t
 
 val signature : ?init:Signature.t -> (_, _, Type.t, _) t Sequence.t -> Signature.t
 (** Compute signature when the types are using {!Type} *)

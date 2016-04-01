@@ -53,6 +53,10 @@ module type S = sig
   (** (maybe) rewrite a clause to a set of clauses.
       Must return [None] if the clause is unmodified *)
 
+  type clause_conversion_rule = Statement.clause_t -> C.t list option
+  (** A hook to convert a particular statement into a list
+      of clauses *)
+
   (** {2 Modify the Env} *)
 
   val add_passive : C.t Sequence.t -> unit
@@ -117,6 +121,8 @@ module type S = sig
 
   val add_generate : string -> generate_rule -> unit
 
+  val add_clause_conversion : clause_conversion_rule -> unit
+
   val add_step_init : (unit -> unit) -> unit
   (** add a function to call before each saturation step *)
 
@@ -141,6 +147,11 @@ module type S = sig
 
   val on_input_statement : Statement.clause_t Signal.t
   (** Triggered on every input statement *)
+
+  val convert_input_statements :
+    Statement.clause_t CCVector.ro_vector -> C.t CCVector.ro_vector
+  (** Convert raw input statements into clauses, triggering
+      {! on_input_statement} *)
 
   val on_empty_clause : C.t Signal.t
   (** Signal triggered when an empty clause is found *)

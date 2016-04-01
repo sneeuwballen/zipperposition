@@ -27,7 +27,6 @@ module Make(X : sig
   end)
   : S with module Ctx = X.Ctx
 = struct
-
   module Ctx = X.Ctx
   module C = Clause.Make(Ctx)
   module ProofState = ProofState.Make(C)
@@ -78,6 +77,10 @@ module Make(X : sig
   (** (maybe) rewrite a clause to a set of clauses.
       Must return [None] if the clause is unmodified *)
 
+  type clause_conversion_rule = Statement.clause_t -> C.t list option
+  (** A hook to convert a particular statement into a list
+      of clauses *)
+
   let _binary_rules : (string * binary_inf_rule) list ref = ref []
   let _unary_rules : (string * unary_inf_rule) list ref = ref []
   let _rewrite_rules : (string * term_rewrite_rule) list ref = ref []
@@ -92,6 +95,7 @@ module Make(X : sig
   let _empty_clauses = ref C.ClauseSet.empty
   let _multi_simpl_rule : multi_simpl_rule list ref = ref []
   let _generate_rules : (string * generate_rule) list ref = ref []
+  let _clause_conversion_rules : clause_conversion_rule list ref = ref []
   let _step_init = ref []
 
   let on_start = Signal.create()
@@ -177,6 +181,9 @@ module Make(X : sig
 
   let add_multi_simpl_rule rule =
     _multi_simpl_rule := rule :: !_multi_simpl_rule
+
+  let add_clause_conversion r =
+    _clause_conversion_rules := r :: !_clause_conversion_rules
 
   let add_step_init f = _step_init := f :: !_step_init
 
@@ -673,6 +680,24 @@ module Make(X : sig
     else SimplM.return_same res
 
   let step_init () = List.iter (fun f -> f()) !_step_init
+
+  let convert_input_statements stmts =
+    Util.debug ~section 2 "trigger on_input_statement";
+    CCVector.iter (Signal.send on_input_statement) stmts;
+    (* convert clauses, applying hooks when possible *)
+    let rec conv_clause_ rules st = match rules with
+      | [] -> C.of_statement st
+      | r :: rules' ->
+          match r st with
+          | Some l -> l
+          | None -> conv_clause_ rules' st
+    in
+    let clauses =
+      CCVector.flat_map_list (conv_clause_ !_clause_conversion_rules) stmts in
+    Util.debugf ~section 2 "@[<2>clauses:@ @[<v>%a@]@]"
+      (fun k->k (CCFormat.seq ~start:"" ~stop:"" ~sep:" " C.pp)
+      (CCVector.to_seq clauses));
+    clauses
 
   (** {2 Misc} *)
 

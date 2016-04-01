@@ -144,12 +144,6 @@ let make_ctx ~signature ~ord ~select =
     ~x:ctx >>= fun () ->
   Phases.return_phase ctx
 
-let setup_env ~env =
-  Extensions.extensions ()
-    |> List.iter
-      (fun e -> List.iter (fun f -> f env) e.Extensions.env_actions);
-  ()
-
 let make_env ~ctx:(module Ctx : Ctx_intf.S) ~params stmts =
   Phases.start_phase Phases.MakeEnv >>= fun () ->
   Phases.get >>= fun state ->
@@ -159,13 +153,12 @@ let make_env ~ctx:(module Ctx : Ctx_intf.S) ~params stmts =
       let flex_state = state
     end) in
   let env1 = (module MyEnv : Env.S) in
-  setup_env ~env:env1;
-  Util.debug ~section 2 "trigger on_input_statement";
-  CCVector.iter (Signal.send MyEnv.on_input_statement) stmts;
-  let clauses = CCVector.filter_map MyEnv.C.of_statement stmts in
-  Util.debugf ~section 2 "@[<2>clauses:@ @[<v>%a@]@]"
-    (fun k->k (CCFormat.seq ~start:"" ~stop:"" ~sep:" " MyEnv.C.pp)
-      (CCVector.to_seq clauses));
+  (* use extensions to customize env *)
+  Extensions.extensions ()
+    |> List.iter
+      (fun e -> List.iter (fun f -> f env1) e.Extensions.env_actions);
+  (* convert statements to clauses *)
+  let clauses = MyEnv.convert_input_statements stmts in
   let env2 = (module MyEnv : Env.S with type C.t = MyEnv.C.t) in
   Phases.return_phase (Phases.Env_clauses (env2, clauses))
 

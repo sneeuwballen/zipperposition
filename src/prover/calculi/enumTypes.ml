@@ -507,6 +507,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         List.iter (_declare_inductive ~src) l
     | Stmt.TyDecl _
     | Stmt.Def _
+    | Stmt.NegatedGoal _
     | Stmt.Goal _ -> ()
 
   let setup () =
