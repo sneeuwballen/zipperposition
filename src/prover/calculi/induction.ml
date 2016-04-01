@@ -14,13 +14,12 @@ module type S = Induction_intf.S
 
 let section = Util.Section.make ~parent:Const.section "induction"
 
-let cover_set_depth_ = ref 1
-let show_lemmas_ = ref false
-
 let stats_lemmas = Util.mk_stat "induction.lemmas"
 let stats_min = Util.mk_stat "induction.assert_min"
 
 let k_enable : bool Flex_state.key = Flex_state.create_key()
+let k_lemmas_enabled : bool Flex_state.key = Flex_state.create_key()
+let k_show_lemmas : bool Flex_state.key = Flex_state.create_key()
 
 module Make
 (E : Env.S)
@@ -159,10 +158,6 @@ module Make
   let show_lemmas () =
     Util.debugf ~section 1 "@[<2>lemmas:@ [@[<hv>%a@]]@]"
       (fun k->k (Util.pp_list C.pp) !lemmas_)
-
-  let () =
-    Signal.once Signals.on_exit
-      (fun _ -> if !show_lemmas_ then show_lemmas ())
 
   let scan_terms seq : Ind_cst.cst list =
     seq
@@ -410,11 +405,15 @@ module Make
 
   let register () =
     Util.debug ~section 2 "register induction";
-    Env.add_unary_inf "induction_lemmas.cut" inf_introduce_lemmas;
     Env.add_unary_inf "induction_lemmas.ind" inf_assert_minimal;
     Env.add_clause_conversion convert_statement;
     Env.add_is_trivial has_trivial_trail;
     Env.add_simplify injectivity_destruct;
+    (* add lemmas if option is set *)
+    if Env.flex_get k_lemmas_enabled
+      then Env.add_unary_inf "induction_lemmas.cut" inf_introduce_lemmas;
+    if Env.flex_get k_show_lemmas
+      then Signal.once Signals.on_exit (fun _ -> show_lemmas ());
     ()
 
   module Meta = struct
@@ -449,6 +448,8 @@ module Make
 end
 
 let enabled_ = ref true
+let lemmas_enabled_ = ref true
+let show_lemmas_ = ref false
 
 (* if induction is enabled AND there are some inductive types,
    then perform some setup after typing, including setting the key
@@ -475,6 +476,8 @@ let post_typing_hook stmts state =
     state
     |> Flex_state.add Params.key p
     |> Flex_state.add k_enable true
+    |> Flex_state.add k_lemmas_enabled !lemmas_enabled_
+    |> Flex_state.add k_show_lemmas !show_lemmas_
   ) else Flex_state.add k_enable false state
 
 (* if enabled: register the main functor, with inference rules, etc. *)
@@ -512,7 +515,7 @@ let () =
   Params.add_opts
     [ "--induction", Options.switch_set true enabled_, " enable induction"
     ; "--no-induction", Options.switch_set false enabled_, " enable induction"
-    ; "--induction-depth", Arg.Set_int cover_set_depth_,
-        " set default induction depth"
+    ; "--lemmas", Options.switch_set true lemmas_enabled_, " enable lemmas for induction"
+    ; "--no-lemmas", Options.switch_set false lemmas_enabled_, " disable lemmas for induction"
     ; "--show-lemmas", Arg.Set show_lemmas_, " show inductive (candidate) lemmas"
     ]
