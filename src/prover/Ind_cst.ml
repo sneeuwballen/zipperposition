@@ -242,6 +242,15 @@ module CoversetState = struct
         yield (x'::tl')
 end
 
+let n_ = ref 0
+
+let mk_skolem_ pp x =
+  let name = CCFormat.sprintf "#%a_%d" pp x !n_ in
+  incr n_;
+  let c = ID.make name in
+  ID.add_payload c Skolem.Attr_skolem;
+  c
+
 (* coverset of given depth for this type and constant *)
 let make_coverset_ ~depth:initial_depth ity : (case * (ID.t * Type.t) list) list =
   let open CoversetState in
@@ -252,8 +261,7 @@ let make_coverset_ ~depth:initial_depth ity : (case * (ID.t * Type.t) list) list
     (* leaves: fresh constants *)
     if depth=0
     then (
-      let name = CCFormat.sprintf "#%a" ID.pp ity.Ind_ty.ty_id in
-      let c = ID.make name in
+      let c = mk_skolem_ ID.pp ity.Ind_ty.ty_id in
       (* FIXME: what if there are type parameters?! *)
       let ty = ity.Ind_ty.ty_pattern  in
       let t = T.const ~ty c in
@@ -291,12 +299,10 @@ let make_coverset_ ~depth:initial_depth ity : (case * (ID.t * Type.t) list) list
     then make depth (* previous case *)
     else (
       (* not an inductive sub-case, just create a skolem symbol *)
-      let name = match type_hd_exn ty with
-        | B b -> CCFormat.sprintf "#%a" Type.pp_builtin b
-        | I id -> CCFormat.sprintf "#%a" ID.pp id
+      let c = match type_hd_exn ty with
+        | B b -> mk_skolem_ Type.pp_builtin b
+        | I id -> mk_skolem_ ID.pp id
       in
-      let c = ID.make name in
-      ID.add_payload c Skolem.Attr_skolem;
       let t = T.const ~ty c in
       add_sub_case c ty >>= fun () ->
       yield t

@@ -92,6 +92,9 @@ module Make
      - replace variables by constants
      - for each lit, negate it and add [not lit <- trail] *)
 
+  (* FIXME:
+     - use better generalization?
+     - fix typing issues *)
   (* when a unit clause has inductive constants, take its negation
       and add it as a lemma (some restrictions apply) *)
   let inf_introduce_lemmas c =
@@ -222,19 +225,21 @@ module Make
                   C.create_a lits proof ~trail:(C.Trail.singleton b_lit))
                mw.mw_contexts
            in
-           (* clauses [CNF(¬ \And_i ctx[t']) <- b_lit] for
+           (* clauses [CNF(¬ And_i ctx_i[t']) <- b_lit] for
               each t' subterm of case *)
            let neg_clauses =
              Sequence.flat_map
                (fun sub ->
                   let sub = Ind_cst.term_of_sub_cst sub in
-                  (* for each context, apply it to [sub], obtaining a DNF;
+                  (* for each context, apply it to [sub] and negate its
+                     literals, obtaining a DNF of [¬ And_i ctx_i[t']];
                      then turn DNF into CNF *)
                   let clauses =
                     mw.mw_contexts
                     |> Util.map_product
                       ~f:(fun ctx ->
                          let lits = ClauseContext.apply ctx sub in
+                         let lits = Array.map Literal.negate lits in
                          [Array.to_list lits])
                     |> List.map
                       (fun lits ->
