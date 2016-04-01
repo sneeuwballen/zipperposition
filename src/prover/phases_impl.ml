@@ -14,10 +14,6 @@ module O = Ordering
 module Lit = Literal
 module S = Substs
 
-(* TODO: this should be:
-   - parsed as CLI argument
-   - the extension should be loaded (or not) during Phases.LoadExtensions
-  *)
 (* load some other modules, but they might not be registered *)
 module Import = struct
   open! ArithInt
@@ -29,7 +25,6 @@ end
 
 let section = Const.section
 
-(* TODO: move into Zipperposition *)
 (* setup an alarm for abrupt stop *)
 let setup_alarm timeout =
   let handler _ =
@@ -39,6 +34,7 @@ let setup_alarm timeout =
   ignore (Sys.signal Sys.sigalrm (Sys.Signal_handle handler));
   Unix.alarm (max 1 (int_of_float timeout))
 
+(* TODO: move into Zipperposition *)
 let print_version ~params =
   if params.param_version then (
     Format.printf "zipperposition %s@." Const.version;
@@ -55,9 +51,7 @@ let load_extensions =
   Extensions.register Heuristics.extension;
   Extensions.register Avatar.extension;
   Extensions.register EnumTypes.extension;
-  (* FIXME: this breaks completeness on pb47
   Extensions.register Induction.extension;
-  *)
   let l = Extensions.extensions () in
   Phases.return_phase l
 
@@ -129,8 +123,8 @@ let compute_prec stmts =
 
 let compute_ord_select precedence =
   Phases.start_phase Phases.Compute_ord_select >>= fun () ->
-  Phases.get_key Phases.Key.params >>= fun params ->
-  let ord = params.param_ord precedence in
+  Phases.get_key Params.key >>= fun params ->
+  let ord = Ordering.by_name params.param_ord precedence in
   let select = Selection.selection_from_string ~ord params.param_select in
   do_extensions ~field:(fun e->e.Extensions.ord_select_actions)
     ~x:(ord,select) >>= fun () ->
@@ -357,7 +351,7 @@ let parse_cli =
   (* parse arguments *)
   let params = Params.parse_args () in
   let files = CCVector.to_list Params.files in
-  Phases.set_key Phases.Key.params params >>= fun () ->
+  Phases.set_key Params.key params >>= fun () ->
   print_version ~params;
   Phases.return_phase (files, params)
 
@@ -385,7 +379,7 @@ let process_file file =
   compute_ord_select precedence >>= fun (ord, select) ->
   (* build the context and env *)
   make_ctx ~signature ~ord ~select >>= fun ctx ->
-  Phases.get_key Phases.Key.params >>= fun params ->
+  Phases.get_key Params.key >>= fun params ->
   make_env ~params ~ctx stmts >>= fun (Phases.Env_clauses (env,clauses)) ->
   (* main workload *)
   has_goal_ := has_goal; (* FIXME: should be computed at Env initialization *)

@@ -61,8 +61,6 @@ module State = Flex_state
 
 module Key = struct
   let cur_phase = State.create_key()
-  let params = State.create_key()
-
 end
 
 (* empty state: at Init *)

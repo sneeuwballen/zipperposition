@@ -9,7 +9,7 @@ open Libzipperposition
 (* TODO: params to enable/disable some preprocessing *)
 
 type t = {
-  param_ord : Precedence.t -> Ordering.t;
+  param_ord : string;
   param_seed : int;
   param_steps : int;
   param_version : bool;
@@ -82,9 +82,8 @@ let parse_args () =
   if CCVector.is_empty files
     then CCVector.push files "stdin";
   let files = CCVector.freeze files in (* from now on, immutable *)
-  let param_ord = Ordering.by_name !ord in
   (* return parameter structure *)
-  { param_ord; param_seed = !seed; param_steps = !steps;
+  { param_ord= !ord; param_seed = !seed; param_steps = !steps;
     param_version= !version; param_timeout = !timeout;
     param_files = files; param_select = !select;
     param_stats= ! Options.stats;
@@ -92,3 +91,7 @@ let parse_args () =
     param_dot_file = !dot_file;
     param_unary_depth= !unary_depth; param_dot_sat= !dot_sat;
     param_expand_def= !expand_def; }
+
+(* key used to store the parameters in Flex_state *)
+let key : t Flex_state.key = Flex_state.create_key()
+

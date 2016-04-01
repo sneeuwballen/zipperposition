@@ -149,7 +149,4 @@ val run : ('a, [`Init], [`Exit]) t -> (Flex_state.t * 'a) or_error
 module Key : sig
   val cur_phase : any_phase Flex_state.key
   (** The current phase is stored in the state using this key *)
-
-  val params : Params.t Flex_state.key
-  (** Parameters *)
 end
