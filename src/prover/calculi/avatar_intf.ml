@@ -23,6 +23,8 @@ module type S = sig
   val check_satisfiability : E.generate_rule
   (** Checks  that the SAT context is still valid *)
 
+  val pp_bclause : E.Ctx.BoolBox.Lit.t list CCFormat.printer
+
   val save_clause : tag:int -> E.C.t -> unit
   (** Map the tag to the clause *)
 

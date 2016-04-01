@@ -99,7 +99,7 @@ val find_cst_in_term : FOTerm.t -> (ID.t * Ind_ty.t * Type.t) Sequence.t
 
 (** A subterm of some {!case} that has the same (inductive) type *)
 type sub_cst = private {
-  sub_cst_term: ID.t;
+  sub_cst_id: ID.t;
   sub_cst_ty: Type.t;
   sub_cst_case: case;
   sub_cst_cst: cst;
@@ -131,6 +131,8 @@ val sub_constants : cover_set -> sub_cst Sequence.t
 
 val sub_constants_case : case -> sub_cst Sequence.t
 (** All sub-constants that are subterms of a specific case *)
+
+val term_of_sub_cst: sub_cst -> FOTerm.t
 
 (** {6 Classification} *)
 

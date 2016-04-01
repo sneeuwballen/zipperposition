@@ -31,7 +31,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
   module BoolBox = Ctx.BoolBox
   module Solver = Sat
 
-  let _pp_bclause out lits =
+  let pp_bclause out lits =
     Format.fprintf out "@[<hv>%a@]" (Util.pp_list ~sep:" ⊔ " BoolBox.pp) lits
 
   (* map ID -> clause *)
@@ -120,7 +120,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
         save_clause ~tag:(C.id c) c;
         Sat.add_clause ~tag:(C.id c) bool_clause;
         Util.debugf ~section 4 "@[constraint clause is @[%a@]@]"
-          (fun k->k _pp_bclause bool_clause);
+          (fun k->k pp_bclause bool_clause);
         (* return the clauses *)
         Some clauses
 
@@ -148,7 +148,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
         |> List.map C.Trail.Lit.neg
       in
       Util.debugf ~section 4 "@[negate trail of @[%a@] (id %d)@ with @[%a@]@]"
-        (fun k->k C.pp c (C.id c) _pp_bclause b_clause);
+        (fun k->k C.pp c (C.id c) pp_bclause b_clause);
       save_clause ~tag:(C.id c) c;
       Sat.add_clause ~tag:(C.id c) b_clause;
     );

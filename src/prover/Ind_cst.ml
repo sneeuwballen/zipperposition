@@ -113,7 +113,7 @@ let find_cst_in_term t =
 (** {6 Sub-Constants} *)
 
 type sub_cst = {
-  sub_cst_term: ID.t;
+  sub_cst_id: ID.t;
   sub_cst_ty: Type.t;
   sub_cst_case: case;
   sub_cst_cst: cst;
@@ -158,6 +158,8 @@ let sub_constants_case c =
 let sub_constants set =
   Sequence.of_list set
   |> Sequence.flat_map sub_constants_case
+
+let term_of_sub_cst s = T.const ~ty:s.sub_cst_ty s.sub_cst_id
 
 (** {6 Creation of Coverset and Cst} *)
 
@@ -344,7 +346,7 @@ let declare_cst ?(cover_set_depth=1) id ~ty =
         (fun (id,ty) ->
           ID.add_payload id
             (Payload_sub_cst {
-              sub_cst_term=id;
+              sub_cst_id=id;
               sub_cst_ty=ty;
               sub_cst_case=case;
               sub_cst_cst=cst;

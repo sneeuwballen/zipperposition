@@ -29,6 +29,7 @@ module Make
   module Ctx = E.Ctx
   module C = E.C
   module BoolBox = Ctx.BoolBox
+  module BoolLit = BoolBox.Lit
 
   let lemmas_ = ref []
 
@@ -161,89 +162,124 @@ module Make
     Signal.once Signals.on_exit
       (fun _ -> if !show_lemmas_ then show_lemmas ())
 
-  (* scan clauses for ground terms of an inductive type,
-     and declare those terms *)
-  let scan seq : Ind_cst.cst list =
-    Sequence.map C.lits seq
-    |> Sequence.flat_map Lits.Seq.terms
+  let scan_terms seq : Ind_cst.cst list =
+    seq
     |> Sequence.flat_map Ind_cst.find_cst_in_term
     |> Sequence.map
       (fun (id,_,ty) -> Ind_cst.declare_cst id ~ty)
     |> Sequence.to_rev_list
     |> CCList.sort_uniq ~cmp:Ind_cst.cst_compare
 
+  (* scan clauses for ground terms of an inductive type,
+     and declare those terms *)
+  let scan_clause c : Ind_cst.cst list =
+    C.lits c
+    |> Lits.Seq.terms
+    |> scan_terms
+
   let is_eq_ (t1:Ind_cst.cst) (t2:Ind_cst.case) =
     BoolBox.inject_case t1 t2
 
-  (* [cst] is the minimal term for which [ctx] holds, returns clauses
-     expressing that (prepended to [acc]), and a boolean literal. *)
-  let assert_min acc c ctx (cst:Ind_cst.cst) =
-    let set = Ind_cst.cover_set cst in
-    (* for each member [t] of the cover set:
-       - add ctx[t] <- [cst=t]
-       - for each [t' subterm t] of same type, add ~[ctx[t']] <- [cst=t]
-    *)
-    let acc, b_lits =
-      Sequence.fold
-        (fun (acc, b_lits) (case:Ind_cst.case) ->
-           let b_lit = is_eq_ cst case in
-           (* ctx[case] <- b_lit *)
-           let c_case =
-             C.create_a
-               ~trail:(C.Trail.singleton b_lit)
-               (ClauseContext.apply ctx case.Ind_cst.case_term)
-               (ProofStep.mk_inference [C.proof c]
-                  ~rule:(ProofStep.mk_rule ~comment:["ind"] "split"))
+  (* TODO: rephrase this in the context of induction *)
+  (* exhaustivity (inference):
+    if some term [t : tau] is maximal in a clause, [tau] is inductive,
+    and [t] was never split on, then introduce
+    [t = c1(...) or t = c2(...) or ... or t = ck(...)] where the [ci] are
+    constructors of [tau], and [...] are new Skolems of [t];
+    if [t] is ground then Avatar splitting (with xor) should apply directly
+      instead, as an optimization, with [k] unary clauses and 1 bool clause
+  *)
+
+  (* data required for asserting that a constant is the smallest one
+     taht makes a conjunction of clause contexts true in the model *)
+  type min_witness = {
+    mw_cst: Ind_cst.cst;
+      (* the constant *)
+    mw_contexts: ClauseContext.t list;
+      (* the conjunction of contexts for which [cst] is minimal
+         (that is, in the model, any term smaller than [cst] makes at
+         least one context false) *)
+    mw_coverset : Ind_cst.cover_set;
+      (* minimality should be asserted for each case of the coverset *)
+  }
+
+  (* for each member [t] of the cover set:
+     for each ctx in [mw.mw_contexts]:
+      - add ctx[t] <- [cst=t]
+      - for each [t' subterm t] of same type, add clause ~[ctx[t']] <- [cst=t]
+    @param trail precondition to this minimality
+  *)
+  let clauses_of_min_witness ~trail ~proof mw : (C.t list * BoolBox.t list list) =
+    let b_lits = ref [] in
+    let clauses =
+      Ind_cst.cases ~which:`All mw.mw_coverset
+      |> Sequence.flat_map
+        (fun (case:Ind_cst.case) ->
+           let b_lit = is_eq_ mw.mw_cst case in
+           CCList.Ref.push b_lits b_lit;
+           (* clauses [ctx[case] <- b_lit] *)
+           let pos_clauses =
+             List.map
+               (fun ctx ->
+                  let lits = ClauseContext.apply ctx case.Ind_cst.case_term in
+                  C.create_a lits proof ~trail:(C.Trail.singleton b_lit))
+               mw.mw_contexts
            in
-           (* ~ctx[t'] <- b_lit for each t' subterm case *)
-           let c_sub =
-             Sequence.fold
-               (fun c_sub (sub:Ind_cst.sub_cst) ->
-                  (* ~[ctx[sub]] <- b_lit *)
-                  let clauses = assert false
-                  (* FIXME
-                     let lits = ClauseContext.apply ctx (sub:>T.t) in
-                     let f =
-                     lits
-                     |> Literals.to_form
-                     |> F.close_forall
-                     |> F.Base.not_
-                     in
-                     let proof = Proof.mk_f_inference ~theories:["ind"]
-                      ~rule:"min" f [C.proof c]
-                     in
-                     PFormula.create f proof
-                     |> PFormula.Set.singleton
-                     |> Env.cnf
-                     |> C.CSet.to_list
-                     |> List.map (C.update_trail (C.Trail.add b_lit))
-                  *)
+           (* clauses [CNF(¬ \And_i ctx[t']) <- b_lit] for
+              each t' subterm of case *)
+           let neg_clauses =
+             Sequence.flat_map
+               (fun sub ->
+                  let sub = Ind_cst.term_of_sub_cst sub in
+                  (* for each context, apply it to [sub], obtaining a DNF;
+                     then turn DNF into CNF *)
+                  let clauses =
+                    mw.mw_contexts
+                    |> Util.map_product
+                      ~f:(fun ctx ->
+                         let lits = ClauseContext.apply ctx sub in
+                         [Array.to_list lits])
+                    |> List.map
+                      (fun lits ->
+                         C.create lits proof ~trail:(C.Trail.singleton b_lit))
                   in
-                  clauses @ c_sub)
-               [] (Ind_cst.sub_constants_case case)
+                  Sequence.of_list clauses
+               )
+               (Ind_cst.sub_constants_case case)
+            |> Sequence.to_rev_list
            in
+           (* all new clauses *)
+           let res = List.rev_append pos_clauses neg_clauses in
            Util.debugf ~section 2
              "@[<2>minimality of %a@ in case %a:@ @[<hv>%a@]@]"
-             (fun k->k ClauseContext.pp ctx T.pp case.Ind_cst.case_term
-                 (Util.pp_list C.pp) (c_case :: c_sub));
-           (* return new clauses and b_lit *)
-           c_case :: c_sub @ acc, b_lit :: b_lits)
-        (acc, [])
-        (Ind_cst.cases set)
+             (fun k->k Ind_cst.pp_cst mw.mw_cst T.pp case.Ind_cst.case_term
+                 (Util.pp_list C.pp) res);
+           Sequence.of_list res)
+      |> Sequence.to_rev_list
     in
-    (* boolean constraint *)
-    (* FIXME: generate boolean clause(s) instead
-    let qform = (QF.imply
-                (qform_of_trail (C.get_trail c))
-                (QF.xor_l (List.map QF.atom b_lits))
-             ) in
+    (* boolean constraint(s) *)
+    let b_clauses =
+      (* trail => \Or b_lits *)
+      let pre = trail |> C.Trail.to_list |> List.map BoolLit.neg in
+      let post = !b_lits in
+      [ pre @ post ]
+    in
+    Util.debugf ~section 2 "@[<2>add boolean constraints@ @[<hv>%a@]@]"
+      (fun k->k (Util.pp_list A.pp_bclause) b_clauses);
+    clauses, b_clauses
 
-        Util.debugf ~section 2 "@[<2>add boolean constr@ @[%a@]@]"
-        (fun k->k (QF.print_with ~pp_lit:BoolLit.print) qform);
-        Solver.add_form ~tag:(C.id c) qform;
-     *)
-    A.save_clause ~tag:(C.id c) c;
-    acc
+  (* [cst] is the minimal term for which contexts [ctxs] holds, returns
+     clauses expressing that, and assert boolean constraints *)
+  let assert_min ?id ~trail ~proof ctxs (cst:Ind_cst.cst) =
+    let set = Ind_cst.cover_set cst in
+    let mw = {
+      mw_cst=cst;
+      mw_contexts=ctxs;
+      mw_coverset=set;
+    } in
+    let clauses, b_clauses = clauses_of_min_witness ~trail ~proof mw in
+    A.Solver.add_clauses ?tag:id b_clauses;
+    clauses
 
   (* checks whether the trail of [c] is trivial, that is:
      - contains two literals [i = t1] and [i = t2] with [t1], [t2]
@@ -319,24 +355,75 @@ module Make
   (* when a clause contains new inductive constants, assert minimality
      of the clause for all those constants independently *)
   let inf_assert_minimal c =
-    let consts = scan (Sequence.singleton c) in
+    let consts = scan_clause c in
     let clauses =
-      List.fold_left
-        (fun acc cst ->
+      CCList.flat_map
+        (fun cst ->
            let ctx = ClauseContext.extract_exn (C.lits c) (Ind_cst.cst_to_term cst) in
-           assert_min acc c ctx cst)
-        [] consts
+           let proof = ProofStep.mk_inference [C.proof c]
+               ~rule:(ProofStep.mk_rule "min") in
+           assert_min ~id:(C.id c) ~trail:(C.trail c) ~proof [ctx] cst)
+        consts
     in
     clauses
+
+  (* hook for converting some statements to clauses.
+     It check if [Negated_goal l] contains inductive clauses, in which case
+     it state their collective minimality *)
+  let convert_statement st =
+    match Statement.view st with
+    | Statement.NegatedGoal l ->
+        (* find inductive constants *)
+        let consts =
+          Sequence.of_list l
+          |> Sequence.flat_map Sequence.of_list
+          |> Sequence.flat_map SLiteral.to_seq
+          |> scan_terms
+        in
+        if consts=[]
+        then None
+        else (
+          (* first, get "proper" clauses *)
+          let clauses = C.of_statement st in
+          (* for each new inductive constant, assert minimality of
+             this constant w.r.t the set of clauses that contain it *)
+          CCList.flat_map
+            (fun cst ->
+              (* keep only clauses that depend on [cst] *)
+              let ctxs =
+                CCList.filter_map
+                  (fun c ->
+                    ClauseContext.extract (C.lits c) (Ind_cst.cst_to_term cst))
+                  clauses
+              in
+              Util.debugf ~section 2
+                "@[<2>assert minimality of inductive constant @[%a@]@ w.r.t. @[%a@]@]"
+                (fun k->k Ind_cst.pp_cst cst (Util.pp_list ClauseContext.pp) ctxs);
+              let set = Ind_cst.cover_set cst in
+              let mw = {
+                mw_cst=cst;
+                mw_contexts=ctxs;
+                mw_coverset=set;
+              } in
+              let proof = ProofStep.mk_goal (Statement.src st) in
+              let clauses, b_clauses =
+                clauses_of_min_witness ~trail:C.Trail.empty ~proof mw in
+              A.Solver.add_clauses b_clauses;
+              clauses
+            )
+            consts
+          |> CCOpt.return
+        )
+    | _ -> None
 
   let register () =
     Util.debug ~section 2 "register induction_lemmas";
     Env.add_unary_inf "induction_lemmas.cut" inf_introduce_lemmas;
     Env.add_unary_inf "induction_lemmas.ind" inf_assert_minimal;
+    Env.add_clause_conversion convert_statement;
     Env.add_is_trivial has_trivial_trail;
     Env.add_simplify injectivity_destruct;
     ()
-
 
   module Meta = struct
     (* TODO *)
