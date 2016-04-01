@@ -93,7 +93,7 @@ val cases : ?which:[`Rec|`Base|`All] -> cover_set -> case Sequence.t
 val find_cst_in_term : FOTerm.t -> (ID.t * Ind_ty.t * Type.t) Sequence.t
 (** [find_cst_in_lits term] searches subterms of [term] for constants
     that are of an inductive type, that are not constructors nor already
-    declared *)
+    declared, and that are Skolem symbols or sub-constants *)
 
 (** {6 Sub-Constants} *)
 

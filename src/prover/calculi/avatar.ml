@@ -208,7 +208,6 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
     then simplify_trail_ c
     else SimplM.return_same c
 
-
   let skolem_count_ = ref 0
 
   (* make a new skolem symbol *)
@@ -216,6 +215,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
     let name = CCFormat.sprintf "_avatar_%d" !skolem_count_ in
     incr skolem_count_;
     let id = ID.make name in
+    ID.add_payload id Skolem.Attr_skolem;
     Ctx.declare id ty;
     Ordering.add_list (Ctx.ord ()) [id];
     id

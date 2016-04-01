@@ -11,6 +11,8 @@ type form = TypedSTerm.t
 
 let section = Util.Section.(make ~parent:zip "skolem")
 
+exception Attr_skolem
+
 type polarity =
   [ `Pos
   | `Neg
@@ -53,6 +55,7 @@ let fresh_sym_with ~ctx ~ty prefix =
   let n = ctx.sc_gensym in
   ctx.sc_gensym <- n+1;
   let s = ID.make (prefix ^ string_of_int n) in
+  ID.add_payload s Attr_skolem;
   ctx.sc_new_ids <- (s,ty) :: ctx.sc_new_ids;
   ctx.sc_on_new s ty;
   Util.debugf ~section 3 "@[<2>new skolem symbol %a@ with type @[%a@]@]"
@@ -112,3 +115,6 @@ let pop_new_definitions ~ctx =
   let l = ctx.sc_new_defs in
   ctx.sc_new_defs <- [];
   l
+
+let is_skolem id =
+  List.exists (function Attr_skolem -> true | _ -> false) (ID.payload id)

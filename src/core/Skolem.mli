@@ -75,3 +75,11 @@ val pop_new_definitions : ctx:ctx -> definition list
     Will call {!remove_def} so there is no risk of re-using a definition
     with a new polarity. *)
 
+(** {2 Attribute} *)
+
+exception Attr_skolem
+
+val is_skolem : ID.t -> bool
+(** [is_skolem id] returns [true] iff [id] is a Skolem symbol *)
+
+

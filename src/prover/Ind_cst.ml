@@ -103,7 +103,9 @@ let find_cst_in_term t =
           if ty_args=[]
           then match Ind_ty.as_inductive_type ty_ret with
             | Some ity ->
-                if not (is_cst id) && not (Ind_ty.is_constructor id)
+              if not (is_cst id)
+              && not (Ind_ty.is_constructor id)
+              && Skolem.is_skolem id
                 then Some (id, ity, ty_ret) (* bingo *)
                 else None
             | _ -> None
@@ -206,10 +208,6 @@ module CoversetState = struct
   = fun x f st ->
     let st, x' = x st in
     f x' st
-  let (>|=) : 'a m -> ('a -> 'b) -> 'b m
-  = fun x f st ->
-    let st, x' = x st in
-    st, f x'
   let get : t m = fun st -> st, st
   let set : t -> unit m = fun st _ -> st, ()
 
@@ -263,7 +261,7 @@ let make_coverset_ ~depth:initial_depth ity : (case * (ID.t * Type.t) list) list
       yield t
     )
     (* inner nodes or base cases: constructors *)
-    else
+    else (
       return ity.Ind_ty.ty_constructors
       >>>= fun cstor ->
       let f = cstor.Ind_ty.cstor_name in
@@ -286,6 +284,7 @@ let make_coverset_ ~depth:initial_depth ity : (case * (ID.t * Type.t) list) list
              "inductive constructor %a requires %d type \
                parameters, expected 0"
              ID.pp f m
+    )
   (* return a new term of type [ty] *)
   and make_of_ty depth ty : T.t mm =
     if Unif.Ty.matches ~pattern:ity.Ind_ty.ty_pattern ty
@@ -297,6 +296,7 @@ let make_coverset_ ~depth:initial_depth ity : (case * (ID.t * Type.t) list) list
         | I id -> CCFormat.sprintf "#%a" ID.pp id
       in
       let c = ID.make name in
+      ID.add_payload c Skolem.Attr_skolem;
       let t = T.const ~ty c in
       add_sub_case c ty >>= fun () ->
       yield t
