@@ -142,6 +142,7 @@ let _enable_semantic_tauto = ref false
 let _use_simultaneous_sup = ref true
 let _dot_sup_into = ref None
 let _dot_sup_from = ref None
+let _dot_simpl = ref None
 
 module Make(Env : Env.S) : S with module Env = Env = struct
   module Env = Env
@@ -1414,25 +1415,30 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (** {2 Registration} *)
 
   (* print index into file *)
-  let _print_idx file idx =
+  let _print_idx ~f file idx =
     CCIO.with_out file
       (fun oc ->
-         let pp_leaf _ _ = () in
          let out = Format.formatter_of_out_channel oc in
-         Format.fprintf out "@[%a@]@." (TermIndex.to_dot pp_leaf) idx;
+         Format.fprintf out "@[%a@]@." f idx;
          flush oc)
 
   let setup_dot_printers () =
+    let pp_leaf _ _ = () in
     CCOpt.iter
-      (fun f ->
+      (fun file ->
          Signal.once Signals.on_dot_output
-           (fun () -> _print_idx f !_idx_sup_into))
+           (fun () -> _print_idx ~f:(TermIndex.to_dot pp_leaf) file !_idx_sup_into))
       !_dot_sup_into;
     CCOpt.iter
-      (fun f ->
+      (fun file ->
          Signal.once Signals.on_dot_output
-           (fun () -> _print_idx f !_idx_sup_from))
+           (fun () -> _print_idx ~f:(TermIndex.to_dot pp_leaf) file !_idx_sup_from))
       !_dot_sup_from;
+    CCOpt.iter
+      (fun file ->
+         Signal.once Signals.on_dot_output
+           (fun () -> _print_idx ~f:UnitIdx.to_dot file !_idx_simpl))
+      !_dot_simpl;
     ()
 
   let register () =
@@ -1501,6 +1507,9 @@ let () =
     ; "--dot-sup-from"
       , Arg.String (fun s -> _dot_sup_from := Some s)
       , " print superposition-from index into file"
+    ; "--dot-demod"
+      , Arg.String (fun s -> _dot_simpl := Some s)
+      , " print forward rewriting index into file"
     ; "--simultaneous-sup"
       , Arg.Bool (fun b -> _use_simultaneous_sup := b)
       , " enable/disable simultaneous superposition"
