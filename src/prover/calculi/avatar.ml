@@ -5,13 +5,13 @@
 
 open Libzipperposition
 
-module T = Libzipperposition.FOTerm
+module T = FOTerm
 module Lit = Literal
-module Util = Libzipperposition.Util
+module Util = Util
 
 type 'a printer = Format.formatter -> 'a -> unit
 
-let section = Libzipperposition.Util.Section.make ~parent:Const.section "avatar"
+let section = Util.Section.make ~parent:Const.section "avatar"
 (** {2 Avatar} *)
 
 let prof_splits = Util.mk_profiler "avatar.split"
@@ -344,8 +344,9 @@ end
 
 let key = Flex_state.create_key ()
 
-
 let get_env (module E : Env.S) : (module S) = E.flex_get key
+
+let enabled_ = ref true
 
 let extension =
   let action env =
@@ -354,6 +355,15 @@ let extension =
     let module Sat = Sat_solver.Make(E.Ctx.BoolBox.Lit)(struct end) in
     let module A = Make(E)(Sat) in
     E.update_flex_state (Flex_state.add key (module A : S));
-    A.register()
+    if !enabled_ then (
+      Util.debug 1 "enable Avatar";
+      A.register()
+    )
   in
   Extensions.({default with name="avatar"; env_actions=[action]})
+
+let () =
+  Params.add_opts
+  [ "--avatar", Arg.Set enabled_, " enable Avatar"
+  ; "--no-avatar", Arg.Clear enabled_, " disable Avatar"
+  ]
