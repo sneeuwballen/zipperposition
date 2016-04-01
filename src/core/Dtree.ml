@@ -103,7 +103,7 @@ let to_list t =
       (fun k->k T.pp t (Util.pp_list pp_char) l);
     l
 
-module CharMap = Map.Make(struct
+module CharMap = CCMap.Make(struct
   type t = character
   let compare = compare_char
 end)
@@ -254,8 +254,31 @@ module Make(E : Index.EQUATION) = struct
     iter dt (fun _ _ -> incr n);
     !n
 
-  let to_dot _out _t =
-    failwith "DTree.to_dot: not implemented"
+  let _as_graph =
+    CCGraph.make_labelled_tuple
+      (function
+        | TrieLeaf _ -> Sequence.empty
+        | TrieNode m -> CharMap.to_seq m)
+
+  (* TODO: print leaf itself *)
+
+  let to_dot out t =
+    Util.debugf ~section:Util.Section.zip 2
+      "@[<2>print graph of size %d@]" (fun k->k (size t));
+    let pp = CCGraph.Dot.pp
+      ~eq:(==)
+      ~tbl:(CCGraph.mk_table ~eq:(==) ~hash:Hashtbl.hash 128)
+      ~attrs_v:(function
+        | TrieLeaf l ->
+            let len = List.length l in
+            [`Shape "circle"; `Label (string_of_int len)]
+        | TrieNode _ -> [`Shape "circle"])
+      ~attrs_e:(fun (_, e ,_) ->
+        let e = CCFormat.to_string pp_char e in
+        [`Label e])
+      ~name:"NPDtree" ~graph:_as_graph
+    in
+    Format.fprintf out "@[<2>%a@]@." pp t;
 end
 
 module Default = Make(Index.BasicEquation)
