@@ -17,7 +17,8 @@ let section = Util.Section.make ~parent:Const.section "induction"
 let cover_set_depth_ = ref 1
 let show_lemmas_ = ref false
 
-let cover_set_depth () = !cover_set_depth_
+let stats_lemmas = Util.mk_stat "induction.lemmas"
+let stats_min = Util.mk_stat "induction.assert_min"
 
 let k_enable : bool Flex_state.key = Flex_state.create_key()
 
@@ -129,6 +130,7 @@ module Make
         let proof = ProofStep.mk_trivial in
         let clauses, _ = A.introduce_cut lits proof in
         List.iter (fun c -> C.set_flag flag_cut_introduced c true) clauses;
+        Util.incr_stat stats_lemmas;
         Util.debugf ~section 2
           "@[<2>introduce cut@ from %a@ @[<hv0>%a@]@ generalizing on @[%a@]@]"
           (fun k->k C.pp c (Util.pp_list C.pp) clauses
@@ -279,6 +281,7 @@ module Make
     } in
     let clauses, b_clauses = clauses_of_min_witness ~trail ~proof mw in
     A.Solver.add_clauses ?tag:id b_clauses;
+    Util.incr_stat stats_min;
     clauses
 
   (* checks whether the trail of [c] is trivial, that is:
@@ -396,19 +399,8 @@ module Make
                     ClauseContext.extract (C.lits c) (Ind_cst.cst_to_term cst))
                   clauses
               in
-              Util.debugf ~section 2
-                "@[<2>assert minimality of inductive constant @[%a@]@ w.r.t. @[%a@]@]"
-                (fun k->k Ind_cst.pp_cst cst (Util.pp_list ClauseContext.pp) ctxs);
-              let set = Ind_cst.cover_set cst in
-              let mw = {
-                mw_cst=cst;
-                mw_contexts=ctxs;
-                mw_coverset=set;
-              } in
               let proof = ProofStep.mk_goal (Statement.src st) in
-              let clauses, b_clauses =
-                clauses_of_min_witness ~trail:C.Trail.empty ~proof mw in
-              A.Solver.add_clauses b_clauses;
+              let clauses = assert_min ~trail:C.Trail.empty ~proof ctxs cst in
               clauses
             )
             consts
@@ -417,7 +409,7 @@ module Make
     | _ -> None
 
   let register () =
-    Util.debug ~section 2 "register induction_lemmas";
+    Util.debug ~section 2 "register induction";
     Env.add_unary_inf "induction_lemmas.cut" inf_introduce_lemmas;
     Env.add_unary_inf "induction_lemmas.ind" inf_assert_minimal;
     Env.add_clause_conversion convert_statement;

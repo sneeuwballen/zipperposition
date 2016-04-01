@@ -9,7 +9,6 @@
 
 open Libzipperposition
 
-val stat_fresh : Util.stat
 val stat_clause_create : Util.stat
 
 module type S = Clause_intf.S

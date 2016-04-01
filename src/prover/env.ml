@@ -12,6 +12,16 @@ module Lits = Literals
 let section = Util.Section.make ~parent:Const.section "env"
 
 let stat_orphan_criterion = Util.mk_stat "env.orphan_criterion"
+let stat_inferred = Util.mk_stat "env.inferred clauses"
+
+let prof_generate = Util.mk_profiler "generate"
+let prof_generate_unary = Util.mk_profiler "generate_unary"
+let prof_generate_binary = Util.mk_profiler "generate_binary"
+let prof_back_simplify = Util.mk_profiler "back_simplify"
+let prof_simplify = Util.mk_profiler "simplify"
+let prof_all_simplify = Util.mk_profiler "all_simplify"
+let prof_is_redundant = Util.mk_profiler "is_redundant"
+let prof_subsumed_by = Util.mk_profiler "subsumed_by"
 
 let orphan_criterion_ = ref true
 
@@ -209,17 +219,6 @@ module Make(X : sig
     Format.fprintf out "@[<hv2>env(state:@ %a@,)@]" ProofState.debug ()
 
   (** {2 High level operations} *)
-
-  let prof_generate = Util.mk_profiler "generate"
-  let prof_generate_unary = Util.mk_profiler "generate_unary"
-  let prof_generate_binary = Util.mk_profiler "generate_binary"
-  let prof_back_simplify = Util.mk_profiler "back_simplify"
-  let prof_simplify = Util.mk_profiler "simplify"
-  let prof_all_simplify = Util.mk_profiler "all_simplify"
-  let prof_is_redundant = Util.mk_profiler "is_redundant"
-  let prof_subsumed_by = Util.mk_profiler "subsumed_by"
-
-  let stat_inferred = Util.mk_stat "inferred clauses"
 
   type stats = int * int * int
 

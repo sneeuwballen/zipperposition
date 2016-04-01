@@ -12,8 +12,8 @@ module PS = ProofState
 module Sup = Superposition
 module Sel = Selection
 
-let stat_redundant_given = Util.mk_stat "redundant given clauses"
-let stat_processed_given = Util.mk_stat "processed given clauses"
+let stat_redundant_given = Util.mk_stat "saturate.redundant given clauses"
+let stat_processed_given = Util.mk_stat "saturate.processed given clauses"
 
 let section = Util.Section.make ~parent:Const.section "saturate"
 

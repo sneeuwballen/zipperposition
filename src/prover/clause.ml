@@ -12,8 +12,7 @@ module S = Substs
 module Lit = Literal
 module Lits = Literals
 
-let stat_fresh = Util.mk_stat "fresh_clause"
-let stat_clause_create = Util.mk_stat "clause_create"
+let stat_clause_create = Util.mk_stat "clause.create"
 let prof_clause_create = Util.mk_profiler "clause_create"
 
 module type S = Clause_intf.S
