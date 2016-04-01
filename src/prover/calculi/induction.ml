@@ -20,6 +20,8 @@ let show_lemmas_ = ref false
 
 let cover_set_depth () = !cover_set_depth_
 
+let k_enable : bool Flex_state.key = Flex_state.create_key()
+
 module Make
 (E : Env.S)
 (A : Avatar_intf.S with module E = E)
@@ -328,15 +330,6 @@ module Make
     in
     clauses
 
-  (* FIXME: during preprocessing, call this IFF induction enabled and
-     some data present in the problem *)
-  let setup_before_proof () =
-    Util.debugf ~section 1
-      "@[Induction: requires ord=rpo6; select=NoSelection@]" (fun k->k);
-    Params.ord := "rpo6";   (* new default! RPO is necessary*)
-    Params.select := "NoSelection";
-    ()
-
   let register () =
     Util.debug ~section 2 "register induction_lemmas";
     Env.add_unary_inf "induction_lemmas.cut" inf_introduce_lemmas;
@@ -373,14 +366,43 @@ module Make
            ignore (declare_inductive p ity);
            Signal.ContinueListening
         );
-  *)
+    *)
   end
 end
 
-(* FIXME: only do stuff it the input problem contains at least one
-    inductive type — the new default is induction enabled by default! *)
-let extension =
-  let action (module E : Env.S) =
+let enabled_ = ref true
+
+(* if induction is enabled AND there are some inductive types,
+   then perform some setup after typing, including setting the key
+   [k_enable].
+   It will update the parameters. *)
+let post_typing_hook stmts state =
+  let p = Flex_state.get_exn Params.key state in
+  (* only enable if there are inductive types *)
+  let should_enable =
+    CCVector.exists
+      (fun st -> match Statement.view st with
+        | Statement.Data _ -> true
+        | _ -> false)
+      stmts
+  in
+  if !enabled_ && should_enable then (
+    Util.debug ~section 1
+      "Enable induction: requires ord=rpo6; select=NoSelection";
+    let p = {
+      p with Params.
+      param_ord = "rpo6";
+      param_select = "NoSelection";
+    } in
+    state
+    |> Flex_state.add Params.key p
+    |> Flex_state.add k_enable true
+  ) else Flex_state.add k_enable false state
+
+(* if enabled: register the main functor, with inference rules, etc. *)
+let env_action (module E : Env.S) =
+  let is_enabled = E.flex_get k_enable in
+  if is_enabled then (
     let (module A) = Avatar.get_env (module E) in
     (* XXX here we do not use E anymore, because we do not know
        that A.E = E. Therefore, it is simpler to use A.E. *)
@@ -389,44 +411,24 @@ let extension =
     E.Ctx.set_selection_fun Selection.no_select;
     let module M = Make(A.E)(A) in
     M.register ();
-  and add_constr _ =
+  )
+
+(* if enabled, add a precedence constraint *)
+let add_constr state =
+  if Flex_state.get_exn k_enable state then (
     (* add an ordering constraint: ensure that constructors are smaller
        than other terms *)
-    Compute_prec.add_constr 15 Ind_cst.prec_constr in
+    Compute_prec.add_constr 15 Ind_cst.prec_constr
+  ) else CCFun.id
+
+let extension =
   Extensions.(
     {default with
      name="induction_simple";
-     env_actions=[action];
+     post_typing_actions=[post_typing_hook];
+     env_actions=[env_action];
      prec_actions=[add_constr];
     })
-
-(* FIXME: this should be done on input statements, in a callback inside setup *)
-let init_from_decls pairs =
-  let get_str = function
-    | Ast_tptp.GNode (s, []) | Ast_tptp.GString s -> s
-    | _ -> raise Exit
-  in
-  (* search for "inductive(c1, c2, ...)" *)
-  let rec scan_for_constructors = function
-    | Ast_tptp.GNode ("inductive", l) :: tail when List.length l >= 2 ->
-        begin try
-            let constructors = List.map get_str l in
-            Some constructors
-          with Exit ->
-            scan_for_constructors tail
-        end
-    | _ :: tail -> scan_for_constructors tail
-    | []  -> None
-  in
-  Sequence.iter
-    (fun (ty, info) -> match scan_for_constructors info with
-       | None -> ()
-       | Some l ->
-         assert false (* FIXME: should be done on Cnf.TyDecl? declare_ ty l *)
-     )
-    pairs
-
-let enabled_ = ref true
 
 let () =
   Params.add_opts
