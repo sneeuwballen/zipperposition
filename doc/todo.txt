@@ -19,3 +19,6 @@
 (D) 2016-02-29 add inductive preds into .zf (translate to new data internally) @zf
 (D) 2016-02-29 move detection of EnumType into preprocessing; add it in AST @refactor
 2016-03-07 bring back orphan criterion lazily: mark redundant clauses; discard clause whose ≥ 1 parent is redundant; sweep active from time to time
+(A) 2016-04-03 fix lemmas generation (at least make it typesafe)
+(A) 2016-04-03 in avatar, for 0-level propagation, obtain SAT resolution proof so displayed proofs are ok
+2016-04-03 in induction, allow sub-constants to have induction performed on them (up to some depth) --> nested induction

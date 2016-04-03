@@ -1,3 +1,4 @@
+# associativity
 val term : type.
 data nat := z | s nat.
 val plus : nat -> nat -> nat.
