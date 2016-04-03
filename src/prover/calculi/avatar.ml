@@ -179,12 +179,16 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
   let simplify_trail_ c =
     let trail = C.trail c in
     let n_simpl = ref 0 in
+    (* TODO: use SAT resolution proofs for tracking why the trail
+       has been simplified, so that the other branches that have been
+       closed can appear in the proof *)
     let trail =
       C.Trail.filter
         (fun lit ->
           try match Sat.valuation_level lit with
             | true, 0 ->
-                (* [lit] is proven true, it is therefore not necessary to depend on it *)
+                (* [lit] is proven true, it is therefore not necessary
+                   to depend on it *)
                 incr n_simpl;
                 false
             | _ -> true
@@ -196,7 +200,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
       let proof =
         ProofStep.mk_simp ~rule:(ProofStep.mk_rule "simpl_trail") [C.proof c] in
       let c' = C.create_a ~trail (C.lits c) proof in
-      Util.debugf ~section 3 "@[<2>clause @[%a@]@ trail-simplifies into @[%a@]@]"
+      Util.debugf ~section 3
+        "@[<2>clause @[%a@]@ trail-simplifies into @[%a@]@]"
         (fun k->k C.pp c C.pp c');
       SimplM.return_new c'
     )
@@ -297,7 +302,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
           Util.debug ~section 1 "SAT-solver reports \"UNSAT\"";
           let premises =
             let l = Sequence.to_rev_list Sat.unsat_core in
-            Util.debugf ~section 3 "unsat core:@ @[%a@]" (fun k->k (CCList.print CCInt.print) l);
+            Util.debugf ~section 3 "unsat core:@ @[%a@]"
+              (fun k->k (CCList.print CCInt.print) l);
             l
             |> CCList.filter_map (fun tag -> get_clause ~tag)
             |> List.map C.proof

@@ -52,13 +52,11 @@ module Make(L : Bool_lit_intf.S)(Dummy : sig end)
   let pp_ = ref Lit.pp
 
   let pp_clause out c =
-    Format.fprintf out "[@[<hv>%a@]]"
-      (CCFormat.list ~start:"" ~stop:"" ~sep:" ⊔ " !pp_) c
+    Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:" ⊔ " !pp_) c
 
   let tag_ = snd
 
-  let pp_form_simpl out (c,_) =
-    CCFormat.list ~start:"" ~stop:"" ~sep:"" pp_clause out c
+  let pp_form_simpl out (c,_) = Util.pp_list ~sep:"" pp_clause out c
 
   let pp_form fmt f =
     match tag_ f with
@@ -75,14 +73,18 @@ module Make(L : Bool_lit_intf.S)(Dummy : sig end)
   module SatForm = struct
     include Lit
     type proof = unit
-    let fresh () = Lit.make (Lit.payload Lit.dummy) (* FIXME *)
+    let fresh () = Lit.make (Lit.payload Lit.dummy)
     let label _ = assert false
     let add_label _ _ = assert false
     let print = Lit.pp
   end
 
   (* Instantiate solver *)
-  module S = Msat.Solver.Make(SatForm)(Msat.Solver.DummyTheory(SatForm))(struct end)
+  module S =
+    Msat.Solver.Make
+      (SatForm)
+      (Msat.Solver.DummyTheory(SatForm))
+      (struct end)
 
   exception UndecidedLit = S.UndecidedLit
 
@@ -95,7 +97,8 @@ module Make(L : Bool_lit_intf.S)(Dummy : sig end)
     (* add pending clauses *)
     while not (Queue.is_empty queue_) do
       let c, tag = Queue.pop queue_ in
-      Util.debugf ~section 4 "@[<hv2>assume@ @[%a@]@]" (fun k->k pp_form (c,tag));
+      Util.debugf ~section 4 "@[<hv2>assume@ @[%a@]@]"
+        (fun k->k pp_form (c,tag));
       S.assume ?tag c
     done;
     (* solve *)
