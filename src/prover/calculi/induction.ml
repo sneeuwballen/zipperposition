@@ -230,6 +230,7 @@ module Make
            let neg_clauses =
              Sequence.flat_map
                (fun sub ->
+                  (* FIXME: only keep those that have the same type!! *)
                   let sub = Ind_cst.term_of_sub_cst sub in
                   (* for each context, apply it to [sub] and negate its
                      literals, obtaining a DNF of [¬ And_i ctx_i[t']];
