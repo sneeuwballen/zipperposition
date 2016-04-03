@@ -44,7 +44,7 @@ let case_equal a b = FOTerm.equal a.case_term b.case_term
 let case_compare a b = FOTerm.compare a.case_term b.case_term
 let case_hash a = FOTerm.hash a.case_term
 
-let pp_case out c = FOTerm.pp out c.case_term
+let pp_case out c = CCFormat.hovbox FOTerm.pp out c.case_term
 
 let case_is_rec c = c.case_kind = `Rec
 let case_is_base c = c.case_kind = `Base
@@ -203,35 +203,37 @@ module CoversetState = struct
   (* state monad *)
   type 'a m = t -> t * 'a
 
+  (* state monad inside a backtracking monad *)
+  type 'a mm = t -> (t * 'a) list
+  let fail : _ mm = fun _ -> []
   let return : 'a -> 'a m = fun x st -> st, x
-  let (>>=) : 'a m -> ('a -> 'b m) -> 'b m
-  = fun x f st ->
-    let st, x' = x st in
-    f x' st
-  let get : t m = fun st -> st, st
+  let yield : 'a -> 'a mm = fun x st -> [st, x]
+  let yield_l : 'a list -> 'a mm = fun l st -> List.map (fun x -> st,x) l
+  let (>>=) : 'a mm -> ('a -> 'b m) -> 'b mm
+  = fun x_mm f st ->
+    let xs = x_mm st in
+    List.map (fun (st,x) -> f x st) xs
+  let (>>>=) : 'a mm -> ('a -> 'b mm) -> 'b mm
+  = fun x_mm f st ->
+    let xs = x_mm st in
+    CCList.flat_map
+      (fun (st,x) -> f x st)
+      xs
+  let (>>|=) : 'a mm -> ('a -> 'b) -> 'b mm
+  = fun x_mm f st ->
+    let xs = x_mm st in
+    List.map (fun (st,x) -> st, f x) xs
+  let get : t mm = fun st -> [st, st]
   let set : t -> unit m = fun st _ -> st, ()
 
   (* modify the state: add [c] to the set of cases *)
-  let add_sub_case c ty : unit m =
+  let add_sub_case c ty : unit mm =
     get >>= fun st ->
     let st = {
       sub_csts=ID.Set.add c st.sub_csts;
       to_declare=(c,ty) :: st.to_declare;
     } in
     set st
-
-  (* backtracking monad inside the state monad *)
-  type 'a mm = 'a list m
-  let fail : _ mm = fun st -> st, []
-  let yield : 'a -> 'a mm = fun x st -> st, [x]
-  let (>>>=) : 'a mm -> ('a -> 'b mm) -> 'b mm
-  = fun x f st ->
-    let st, xs = x st in
-    CCList.fold_flat_map (fun st x -> f x st) st xs
-  let (>>|=) : 'a mm -> ('a -> 'b) -> 'b mm
-  = fun x f st ->
-    let st, xs = x st in
-    st, List.map f xs
 
   let rec map_l : ('a -> 'b mm) -> 'a list -> 'b list mm
   = fun f l -> match l with
@@ -240,6 +242,9 @@ module CoversetState = struct
         f x >>>= fun x' ->
         map_l f tl >>>= fun tl' ->
         yield (x'::tl')
+
+  let run : 'a mm -> t -> 'a list
+  = fun m st -> List.map snd (m st)
 end
 
 let n_ = ref 0
@@ -266,11 +271,11 @@ let make_coverset_ ~depth:initial_depth ity : (case * (ID.t * Type.t) list) list
       let ty = ity.Ind_ty.ty_pattern  in
       let t = T.const ~ty c in
       add_sub_case c ty >>= fun () ->
-      yield t
+      return t
     )
     (* inner nodes or base cases: constructors *)
     else (
-      return ity.Ind_ty.ty_constructors
+      yield_l ity.Ind_ty.ty_constructors
       >>>= fun cstor ->
       let f = cstor.Ind_ty.cstor_name in
       let ty_f = cstor.Ind_ty.cstor_ty in
@@ -304,8 +309,7 @@ let make_coverset_ ~depth:initial_depth ity : (case * (ID.t * Type.t) list) list
         | I id -> mk_skolem_ ID.pp id
       in
       let t = T.const ~ty c in
-      add_sub_case c ty >>= fun () ->
-      yield t
+      add_sub_case c ty >>|= fun () -> t
     )
   in
   (* build the toplevel values, along with a list of sub-constants
@@ -313,9 +317,8 @@ let make_coverset_ ~depth:initial_depth ity : (case * (ID.t * Type.t) list) list
   let make_top =
     let l = make initial_depth in
     l >>>= fun t ->
-    (* obtain the current set of sub-constants, and reset it *)
-    get >>= fun state ->
-    set empty >>= fun () ->
+    (* obtain the current set of sub-constants *)
+    get >>>= fun state ->
     let case = {
       case_term=t;
       case_kind=if ID.Set.is_empty state.sub_csts then `Base else `Rec;
@@ -323,8 +326,7 @@ let make_coverset_ ~depth:initial_depth ity : (case * (ID.t * Type.t) list) list
     } in
     yield (case, state.to_declare)
   in
-  let _st, l = make_top empty in
-  l
+  run make_top empty
 
 let declare_cst ?(cover_set_depth=1) id ~ty =
   if is_cst id then raise (AlreadyDeclaredConstant id);
@@ -363,7 +365,7 @@ let declare_cst ?(cover_set_depth=1) id ~ty =
     "@[<2>sub-constants:@ @[<v>%a@]@]"
     (fun k ->
        let pp_case out case =
-         Format.fprintf out "@[<h>case %a: sub @[<hv>%a@]@]@."
+         Format.fprintf out "@[<h>case %a: sub {@[<hv>%a@]}@]"
             pp_case case (Util.pp_list ID.pp)
             (sub_constants_case case
              |> Sequence.map (fun c -> c.sub_cst_id) |> Sequence.to_list)
