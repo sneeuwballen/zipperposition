@@ -90,9 +90,6 @@ module type S = sig
   (** Register rules in the environment *)
 end
 
-exception Attr_is_projector_of of ID.t
-(** Special attribute for IDs that are projectors of the given type *)
-
 module Make(E : Env.S) : S with module Env = E
 
 (** {2 As Extension} *)

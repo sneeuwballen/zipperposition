@@ -3,15 +3,14 @@
 
 (** {1 Classification of Constants} *)
 
-(* TODO check this before all declarations?
-   to avoid a constructor to be also declared as sub-constant, etc. *)
-
 open Libzipperposition
 
 type res =
   | Ty of Ind_ty.t
   | Cstor of Ind_ty.constructor * Ind_ty.t
   | Inductive_cst of (Ind_cst.cst option * Ind_cst.sub_cst option)
+  | Projector of ID.t (** projector of some constructor (id: type) *)
+  | DefinedCst of int (** (recursive) definition of given stratification level *)
   | Other
 
 let classify id =
@@ -24,6 +23,8 @@ let classify id =
           let as_cst = Ind_cst.as_cst id in
           let as_sub = Ind_cst.as_sub_cst id in
           Some (Inductive_cst (as_cst, as_sub))
+        | Ind_ty.Payload_ind_projector id -> Some (Projector id)
+        | Statement.Payload_defined_cst l -> Some (DefinedCst l)
         | _ -> None)
       (ID.payload id)
   in
@@ -37,15 +38,18 @@ let dominates_ opt_c opt_sub =
 let prec_constr_ a b =
   let to_int_ = function
     | Ty _ -> 0
-    | Cstor _ -> 1
-    | Inductive_cst _ -> 2
-    | Other -> 3
+    | Projector _ -> 1
+    | Cstor _ -> 2
+    | Inductive_cst _ -> 3
+    | Other -> 4
+    | DefinedCst _ -> 5 (* defined: biggest *)
   in
   let c_a = classify a in
   let c_b = classify b in
   match c_a, c_b with
   | Ty _, Ty _
   | Cstor _, Cstor _
+  | Projector _, Projector _
   | Other, Other -> 0
   | Inductive_cst (c1,sub1), Inductive_cst (c2,sub2) ->
     (* Inductive_cst cases should be compared by "sub-case" order (i.e. `x
@@ -53,9 +57,14 @@ let prec_constr_ a b =
     if dominates_ c1 sub2 then 1
     else if dominates_ c2 sub1 then -1
     else 0
+  | DefinedCst l1, DefinedCst l2 ->
+    (* bigger level means defined later *)
+    CCInt.compare l1 l2
   | Ty _, _
   | Cstor _, _
   | Inductive_cst _, _
+  | Projector _, _
+  | DefinedCst _, _
   | Other, _ -> CCInt.compare (to_int_ c_a) (to_int_ c_b)
 
 let prec_constr = Precedence.Constr.make prec_constr_

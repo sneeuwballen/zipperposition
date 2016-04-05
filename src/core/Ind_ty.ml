@@ -50,6 +50,7 @@ let () =
 exception Payload_ind_type of t
 exception Payload_ind_cstor of constructor * t
 exception Payload_ind_constant
+exception Payload_ind_projector of ID.t
 
 let invalid_decl_ msg = raise (InvalidDecl msg)
 let invalid_declf_ fmt = CCFormat.ksprintf fmt ~f:invalid_decl_
@@ -153,7 +154,7 @@ let declare_inductive_constant id =
 
 let scan_for_constant id ty =
   let n_tyvars, args, ret = Type.open_poly_fun ty in
-  if n_tyvars=0 && args=[] && is_inductive_type ret
+  if n_tyvars=0 && args=[] && is_inductive_type ret && not (Stmt.is_defined_cst id)
   then declare_inductive_constant id
 
 (** {6 Scan Declarations} *)

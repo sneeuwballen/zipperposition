@@ -70,6 +70,37 @@ let map ~form ~term ~ty st =
 
 let map_src ~f st = {st with src=f st.src; }
 
+(** {2 Defined Constants} *)
+
+exception Payload_defined_cst of int
+
+let as_defined_cst id =
+  CCList.find_map
+    (function
+      | Payload_defined_cst l -> Some l
+      | _ -> None)
+    (ID.payload id)
+
+let is_defined_cst id = as_defined_cst id <> None
+
+let declare_defined_cst id l =
+  (* declare that [id] is a defined constant of level [l+1] *)
+  Util.debugf ~section:Util.Section.zip 1 "declare %a as defined constant of level %d"
+    (fun k->k ID.pp id l);
+  ID.add_payload id (Payload_defined_cst l)
+
+let scan_stmt_for_defined_cst st = match view st with
+  | Def (id, _ty, def) ->
+    let l =
+      FOTerm.Seq.symbols def
+      |> Sequence.filter_map as_defined_cst
+      |> Sequence.max
+      |> CCOpt.get 0
+      |> succ
+    in
+    declare_defined_cst id l
+  | _ -> ()
+
 (** {2 Iterators} *)
 
 module Seq = struct

@@ -71,6 +71,25 @@ val map :
 
 val map_src : f:('a -> 'b) -> ('f, 't, 'ty, 'a) t -> ('f, 't, 'ty, 'b) t
 
+(** {2 Defined Constants} *)
+
+val as_defined_cst: ID.t -> int option
+(** [as_defined_cst id] returns [Some level] if [id] is a constant
+    defined at stratification level [level], [None] otherwise *)
+
+val is_defined_cst: ID.t -> bool
+
+val declare_defined_cst : ID.t -> int -> unit
+
+val scan_stmt_for_defined_cst : (_, FOTerm.t, _, _) t -> unit
+(** Try and declare defined constants in the given statement *)
+
+(**/**)
+exception Payload_defined_cst of int
+(** Annotation on IDs that are defined (int: stratification level) *)
+
+(**/**)
+
 (** {2 Iterators} *)
 
 module Seq : sig

@@ -91,5 +91,6 @@ val scan_stmt : (_, _, Type.t, _) Statement.t -> unit
 exception Payload_ind_type of t
 exception Payload_ind_cstor of constructor * t
 exception Payload_ind_constant
+exception Payload_ind_projector of ID.t
 
 (**/**)

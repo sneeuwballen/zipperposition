@@ -52,6 +52,7 @@ let load_extensions =
   Extensions.register Avatar.extension;
   Extensions.register EnumTypes.extension;
   Extensions.register Induction.extension;
+  Extensions.register Rewriting.extension;
   let l = Extensions.extensions () in
   Phases.return_phase l
 
@@ -94,6 +95,8 @@ let cnf ~file decls =
     |> CCVector.to_seq
     |> Cnf.convert ~file
   in
+  do_extensions ~field:(fun e -> e.Extensions.post_cnf_actions)
+    ~x:stmts >>= fun () ->
   Phases.return_phase stmts
 
 (* compute a precedence *)
@@ -363,7 +366,7 @@ let process_file file =
   let signature = Statement.signature (CCVector.to_seq stmts) in
   Util.debugf ~section 2 "@[<2>signature:@ @[<hv>%a@]@]" (fun k->k Signature.pp signature);
   compute_prec (CCVector.to_seq stmts) >>= fun precedence ->
-  Util.debugf ~section 2 "@[<2>precedence:@ @[%a@]@]" (fun k->k Precedence.pp precedence);
+  Util.debugf ~section 1 "@[<2>precedence:@ @[%a@]@]" (fun k->k Precedence.pp precedence);
   compute_ord_select precedence >>= fun (ord, select) ->
   (* build the context and env *)
   make_ctx ~signature ~ord ~select >>= fun ctx ->

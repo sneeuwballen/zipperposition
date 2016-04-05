@@ -26,6 +26,7 @@ type t = {
   start_file_actions : string state_actions;
   post_parse_actions : UntypedAST.statement Sequence.t state_actions;
   post_typing_actions : TypeInference.typed_statement CCVector.ro_vector state_actions;
+  post_cnf_actions: Statement.clause_t CCVector.ro_vector state_actions;
   ord_select_actions : (Ordering.t * Selection.t) state_actions;
   ctx_actions : (module Ctx_intf.S) state_actions;
   prec_actions : prec_action list;
@@ -39,6 +40,7 @@ let default = {
   start_file_actions=[];
   post_parse_actions=[];
   post_typing_actions=[];
+  post_cnf_actions=[];
   ord_select_actions=[];
   ctx_actions=[];
   env_actions=[];
