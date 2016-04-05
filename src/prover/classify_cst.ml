@@ -30,6 +30,18 @@ let classify id =
   | None -> Other
   | Some x -> x
 
+(* FIXME: Sub and Cst should have same precedence, because some
+   sub-constants can ALSO be constants (e.g. #nat0 is sub-constant
+   of #list0 in case cons, but it can also be a constant {z, s #nat1})
+
+   FIXME: also, it means multiple classification is required
+   --> `| Inductive_skolem of [cst | sub] list` where the list can grow,
+     for every non-defined constant that has an inductive type?
+
+   FIXME: also, Inductive_skolem cases should be compared by "sub-case"
+     order (i.e. `x sub-cst-of y` means `x < y`); this is stable
+*)
+
 let prec_constr_ a b =
   let to_int_ = function
     | Ty _ -> 0

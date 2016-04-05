@@ -22,12 +22,8 @@ module Constr = struct
   let invfreq seq =
     (* symbol -> number of occurrences of symbol in seq *)
     let tbl = ID.Tbl.create 16 in
-    Sequence.iter
-      (fun s ->
-        try ID.Tbl.replace tbl s (ID.Tbl.find tbl s + 1)
-        with Not_found -> ID.Tbl.replace tbl s 1)
-      seq;
-    let find_freq s = try ID.Tbl.find tbl s with Not_found -> 0 in
+    Sequence.iter (ID.Tbl.incr tbl) seq;
+    let find_freq s = ID.Tbl.get_or ~or_:0 tbl s in
     (* compare by inverse frequency (higher frequency => smaller) *)
     fun s1 s2 ->
       let n1 = find_freq s1 in
@@ -116,20 +112,21 @@ let snapshot p = p.snapshot
 
 let compare p s1 s2 =
   let lazy tbl = p.tbl in
-  let i1 = try ID.Tbl.find tbl s1 with Not_found -> -1 in
-  let i2 = try ID.Tbl.find tbl s2 with Not_found -> -1 in
+  let i1 = ID.Tbl.get_or ~or_:~-1 tbl s1 in
+  let i2 = ID.Tbl.get_or ~or_:~-1 tbl s2 in
   let c = CCInt.compare i1 i2 in
   if c = 0
-    then ID.compare s1 s2
-    else c
+  then (
+    assert (ID.equal s1 s2);
+    c
+  )
+  else c
 
 let mem p s =
   let lazy tbl = p.tbl in
   ID.Tbl.mem tbl s
 
-let status p s =
-  try ID.Tbl.find p.status s
-  with Not_found -> Lexicographic
+let status p s = ID.Tbl.get_or ~or_:Lexicographic p.status s
 
 let weight p s = p.weight s
 
@@ -189,6 +186,7 @@ let check_inv_ p =
   let rec sorted_ = function
     | [] | [_] -> true
     | s :: ((s' :: _) as tail) ->
+        assert (not (ID.equal s s'));
         p.constr s s' < 0
         &&
         sorted_ tail
@@ -196,36 +194,50 @@ let check_inv_ p =
   sorted_ p.snapshot
 
 let create ?(weight=weight_constant) c l =
-  let l = List.sort c l in
+  let l = CCList.sort_uniq ~cmp:c l in
   let tbl = lazy (mk_tbl_ l) in
-  { snapshot=l;
+  let res = {
+    snapshot=l;
     tbl;
     weight;
     status=ID.Tbl.create 16;
     constr=c;
-  }
+  } in
+  assert (check_inv_ res);
+  res
 
-let add p s =
+let add_list p l =
   (* sorted insertion in snapshot *)
-  let rec insert_ s l = match l with
-    | [] -> [s], true
-    | s' :: l' ->
-        let c = p.constr s s' in
-        if c=0 then l, false  (* not new *)
-        else if c<0 then s :: l, true
+  let rec insert_ id l = match l with
+    | [] -> [id], true
+    | id' :: l' ->
+        let c = p.constr id id' in
+        if c=0 then (
+          assert (ID.equal id id'); (* total order *)
+          l, false  (* not new *)
+        )
+        else if c<0 then id :: l, true
         else
-          let l', ret = insert_ s l' in
-          s' :: l', ret
+          let l', ret = insert_ id l' in
+          id' :: l', ret
   in
-  (* compute new snapshot, but only update precedence if the symbol is new *)
-  let snapshot, is_new = insert_ s p.snapshot in
+  (* compute new snapshot, but only update precedence if any of the symbols is new *)
+  let snapshot, is_new =
+    List.fold_left
+      (fun (snap,new_) id ->
+         let snap,new_' = insert_ id snap in
+         snap, new_ || new_')
+      (p.snapshot,false) l
+  in
   if is_new then (
+    Util.debugf ~section 4 "@[<v>old prec: @[%a@]@,new prec: @[%a@]@."
+      (fun k->k (Util.pp_list ID.pp) p.snapshot (Util.pp_list ID.pp) snapshot);
     assert (check_inv_ p);
     p.snapshot <- snapshot;
     p.tbl <- lazy (mk_tbl_ snapshot);
   )
 
-let add_list p l = List.iter (add p) l
+let add p id = add_list p [id]
 
 let add_seq p seq = Sequence.iter (add p) seq
 
