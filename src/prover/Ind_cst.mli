@@ -10,6 +10,20 @@ open Libzipperposition
 
 exception InvalidDecl of string
 
+exception Payload_ind_constant
+
+val is_inductive_constant : ID.t -> bool
+(** An ID whose type is inductive; nothing more *)
+
+val declare_inductive_constant : ID.t -> unit
+(** Make the ID satisfy {!is_inductive_constant} *)
+
+val scan_constant : ID.t -> Type.t -> unit
+(** Check whether [id : ty] has an inductive type; if yes, then
+    call {!declare_inductive_constant} *)
+
+val scan_stmt : (_, _, Type.t, _) Statement.t -> unit
+
 (** {6 Inductive Case}
 
     An inductive case is a term that belongs to the coverset of some
@@ -137,3 +151,9 @@ val sub_constants_case : case -> sub_cst Sequence.t
 (** All sub-constants that are subterms of a specific case *)
 
 val term_of_sub_cst: sub_cst -> FOTerm.t
+
+val dominates : cst -> sub_cst -> bool
+(** [dominates c sub] is true if [sub] is a sub-constant of [c],
+    or if some sub-constant of [c] dominates [sub] *)
+
+

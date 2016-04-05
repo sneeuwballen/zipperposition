@@ -30,6 +30,26 @@ let () =
 let invalid_decl m = raise (InvalidDecl m)
 let invalid_declf m = CCFormat.ksprintf m ~f:invalid_decl
 
+(** An ID whose type is inductive; nothing more *)
+exception Payload_ind_constant
+
+let is_inductive_constant id =
+  List.exists
+    (function Payload_ind_constant -> true | _ -> false)
+    (ID.payload id)
+
+let declare_inductive_constant id =
+  if not (is_inductive_constant id)
+  then ID.add_payload id Payload_ind_constant
+
+let scan_constant id ty =
+  if Ind_ty.is_inductive_type ty
+  then declare_inductive_constant id
+
+let scan_stmt st = match Statement.view st with
+  | Statement.TyDecl (id, ty) -> scan_constant id ty
+  | _ -> ()
+
 (** {6 Inductive Case} *)
 
 type case = {
@@ -162,6 +182,16 @@ let sub_constants set =
   |> Sequence.flat_map sub_constants_case
 
 let term_of_sub_cst s = T.const ~ty:s.sub_cst_ty s.sub_cst_id
+
+let rec dominates c sub =
+  Sequence.exists
+    (fun sub_c ->
+       ID.equal sub_c.sub_cst_id sub.sub_cst_id
+       ||
+       match as_cst sub_c.sub_cst_id with
+         | None -> false
+         | Some c' -> dominates c' sub)
+    (sub_constants c.cst_coverset)
 
 (** {6 Creation of Coverset and Cst} *)
 

@@ -5,11 +5,16 @@
 
 open Libzipperposition
 
+(* NOTE:
+   Some sub-constants can ALSO be constants (e.g. #nat0 is sub-constant
+   of #list0 in case cons, but it can also be a constant {z, s #nat1}).
+   This explains the {!Inductive_cst} case.
+*)
+
 type res =
   | Ty of Ind_ty.t
   | Cstor of Ind_ty.constructor * Ind_ty.t
-  | Cst of Ind_cst.cst
-  | Sub of Ind_cst.sub_cst
+  | Inductive_cst of (Ind_cst.cst option * Ind_cst.sub_cst option)
   | Other
 
 val classify : ID.t -> res

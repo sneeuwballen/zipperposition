@@ -362,8 +362,9 @@ let process_file file =
   Util.debugf ~section 1 "parsed %d declarations (%s goal(s))"
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
   cnf ~file decls >>= fun stmts ->
-  (* declare inductive types *)
+  (* declare inductive types and constants *)
   CCVector.iter Ind_ty.declare_stmt stmts;
+  CCVector.iter Ind_cst.scan_stmt stmts;
   (* compute signature, precedence, ordering *)
   let signature = Statement.signature (CCVector.to_seq stmts) in
   Util.debugf ~section 2 "@[<2>signature:@ @[<hv>%a@]@]" (fun k->k Signature.pp signature);
