@@ -317,14 +317,14 @@ module Make
         | _ -> false)
 
   let acyclicity lit =
-    (* check if [sub] occurs in [t] under a constructor *)
+    (* check if [sub] occurs in [t] under a constructor, recursively. Stop
+        before entering non-constructor terms *)
     let rec occurs_in_ t ~sub =  match T.view t with
       | T.App (f, l) ->
         begin match T.view f with
-          | T.Const id ->
-            let is_cons = Ind_ty.is_constructor id in
+          | T.Const id when Ind_ty.is_constructor id ->
             List.exists
-              (fun t' -> (is_cons && T.equal sub t') || occurs_in_ t' ~sub)
+              (fun t' -> T.equal sub t' || occurs_in_ t' ~sub)
               l
           | _ -> false
         end
