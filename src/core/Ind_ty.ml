@@ -49,6 +49,7 @@ let () =
 
 exception Payload_ind_type of t
 exception Payload_ind_cstor of constructor * t
+exception Payload_ind_constant
 
 let invalid_decl_ msg = raise (InvalidDecl msg)
 let invalid_declf_ fmt = CCFormat.ksprintf fmt ~f:invalid_decl_
@@ -116,20 +117,6 @@ let declare_ty id ~ty_vars constructors =
   ID.add_payload id (Payload_ind_type ity);
   ity
 
-let declare_stmt st = match Stmt.view st with
-  | Stmt.Data l ->
-      List.iter
-        (fun d ->
-          let ty_vars =
-            List.mapi (fun i v -> HVar.make ~ty:(Var.ty v) i) d.Stmt.data_args
-          and cstors =
-            List.map (fun (c,ty) -> {cstor_name=c; cstor_ty=ty;}) d.Stmt.data_cstors
-          in
-          let _ = declare_ty d.Stmt.data_id ~ty_vars cstors in
-          ())
-        l
-  | _ -> ()
-
 (** {6 Constructors} *)
 
 let as_constructor id =
@@ -149,3 +136,40 @@ let is_constructor s =
 let contains_inductive_types t =
   T.Seq.subterms t
   |> Sequence.exists (fun t -> is_inductive_type (T.ty t))
+
+(** {6 Constants with Inductive Type} *)
+
+let is_inductive_constant id =
+  List.exists
+    (function Payload_ind_constant -> true | _ -> false)
+    (ID.payload id)
+
+let declare_inductive_constant id =
+  if not (is_inductive_constant id)
+  then (
+    Util.debugf ~section 3 "declare inductive constant %a" (fun k->k ID.pp id);
+    ID.add_payload id Payload_ind_constant
+  )
+
+let scan_for_constant id ty =
+  let n_tyvars, args, ret = Type.open_poly_fun ty in
+  if n_tyvars=0 && args=[] && is_inductive_type ret
+  then declare_inductive_constant id
+
+(** {6 Scan Declarations} *)
+
+let scan_stmt st = match Stmt.view st with
+  | Stmt.Data l ->
+      List.iter
+        (fun d ->
+          let ty_vars =
+            List.mapi (fun i v -> HVar.make ~ty:(Var.ty v) i) d.Stmt.data_args
+          and cstors =
+            List.map (fun (c,ty) -> {cstor_name=c; cstor_ty=ty;}) d.Stmt.data_cstors
+          in
+          let _ = declare_ty d.Stmt.data_id ~ty_vars cstors in
+          ())
+        l
+  | Stmt.TyDecl (id, ty)
+  | Stmt.Def (id,ty,_) -> scan_for_constant id ty
+  | _ -> ()

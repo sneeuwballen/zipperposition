@@ -78,6 +78,7 @@ module Seq : sig
   val forms : ('f, _, _, _) t -> 'f Sequence.t
   val lits : (clause, _, _, _) t -> FOTerm.t SLiteral.t Sequence.t
   val terms : (clause, _, _, _) t -> FOTerm.t Sequence.t
+  val symbols : (clause, FOTerm.t, Type.t, _) t -> ID.t Sequence.t
 end
 
 (** {2 IO} *)

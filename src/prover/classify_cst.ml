@@ -20,7 +20,7 @@ let classify id =
       (function
         | Ind_ty.Payload_ind_cstor (c,t) -> Some (Cstor (c,t))
         | Ind_ty.Payload_ind_type x -> Some (Ty x)
-        | Ind_cst.Payload_ind_constant ->
+        | Ind_ty.Payload_ind_constant ->
           let as_cst = Ind_cst.as_cst id in
           let as_sub = Ind_cst.as_sub_cst id in
           Some (Inductive_cst (as_cst, as_sub))

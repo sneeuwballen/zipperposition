@@ -73,6 +73,21 @@ let map_src ~f st = {st with src=f st.src; }
 (** {2 Iterators} *)
 
 module Seq = struct
+  let to_seq st k =
+    let decl id ty = k (`ID id); k (`Ty ty) in
+    match view st with
+      | TyDecl (id,ty) -> decl id ty;
+      | Def (id,ty,t) -> decl id ty; k (`Term t)
+      | Data l ->
+        List.iter
+          (fun d ->
+             decl d.data_id d.data_ty;
+             List.iter (CCFun.uncurry decl) d.data_cstors)
+          l
+      | Assert f
+      | Goal f -> k (`Form f)
+      | NegatedGoal l -> List.iter (fun f -> k (`Form f)) l
+
   let ty_decls st k = match view st with
     | Def (id, ty, _)
     | TyDecl (id, ty) -> k (id,ty)
@@ -97,6 +112,18 @@ module Seq = struct
   let lits st = forms st |> Sequence.flat_map Sequence.of_list
 
   let terms st = lits st |> Sequence.flat_map SLiteral.to_seq
+
+  let symbols st =
+    to_seq st
+    |> Sequence.flat_map
+      (function
+        | `ID id -> Sequence.return id
+        | `Form f ->
+          Sequence.of_list f
+            |> Sequence.flat_map SLiteral.to_seq
+            |> Sequence.flat_map FOTerm.Seq.symbols
+        | `Term t -> FOTerm.Seq.symbols t
+        | `Ty ty -> Type.Seq.symbols ty)
 end
 
 let signature ?(init=Signature.empty) seq =

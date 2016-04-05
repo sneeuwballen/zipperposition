@@ -11,6 +11,9 @@ open Libzipperposition
    This explains the {!Inductive_cst} case.
 *)
 
+(* TODO: case for projectors *)
+(* TODO: case for defined functions (with stratification level) *)
+
 type res =
   | Ty of Ind_ty.t
   | Cstor of Ind_ty.constructor * Ind_ty.t

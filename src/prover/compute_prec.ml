@@ -24,7 +24,7 @@ type t = {
 (* uniform weight *)
 let _default_weight _ _ = 1
 
-let empty = 
+let empty =
   { constrs = [];
     constr_rules = [];
     last_constr = Precedence.Constr.alpha;
@@ -47,8 +47,7 @@ let mk_precedence t seq =
   (* set of symbols *)
   let symbols =
     seq
-    |> Sequence.flat_map Statement.Seq.terms
-    |> Sequence.flat_map T.Seq.symbols
+    |> Sequence.flat_map Statement.Seq.symbols
     |> ID.Set.of_seq
     |> ID.Set.to_list
   in

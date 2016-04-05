@@ -125,6 +125,7 @@ module Tbl = T.Tbl
 module Seq = struct
   let vars = T.Seq.vars
   let sub = T.Seq.subterms
+  let symbols = T.Seq.symbols
   let add_set = T.Seq.add_set
   let max_var = T.Seq.max_var
   let min_var = T.Seq.min_var

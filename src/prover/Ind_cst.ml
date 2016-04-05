@@ -30,26 +30,6 @@ let () =
 let invalid_decl m = raise (InvalidDecl m)
 let invalid_declf m = CCFormat.ksprintf m ~f:invalid_decl
 
-(** An ID whose type is inductive; nothing more *)
-exception Payload_ind_constant
-
-let is_inductive_constant id =
-  List.exists
-    (function Payload_ind_constant -> true | _ -> false)
-    (ID.payload id)
-
-let declare_inductive_constant id =
-  if not (is_inductive_constant id)
-  then ID.add_payload id Payload_ind_constant
-
-let scan_constant id ty =
-  if Ind_ty.is_inductive_type ty
-  then declare_inductive_constant id
-
-let scan_stmt st = match Statement.view st with
-  | Statement.TyDecl (id, ty) -> scan_constant id ty
-  | _ -> ()
-
 (** {6 Inductive Case} *)
 
 type case = {

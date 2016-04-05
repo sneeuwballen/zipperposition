@@ -354,17 +354,11 @@ let process_file file =
   parse_file file >>= fun stmts ->
   typing stmts >>= fun decls ->
   let has_goal = has_goal_decls_ decls in
-  (* FIXME: use [Statement.Data] to declare new inductive
-     types using Ind_ty
-  scan_for_inductive_types decls;
-    (* detect declarations of inductive types *)
-  *)
   Util.debugf ~section 1 "parsed %d declarations (%s goal(s))"
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
   cnf ~file decls >>= fun stmts ->
   (* declare inductive types and constants *)
-  CCVector.iter Ind_ty.declare_stmt stmts;
-  CCVector.iter Ind_cst.scan_stmt stmts;
+  CCVector.iter Ind_ty.scan_stmt stmts;
   (* compute signature, precedence, ordering *)
   let signature = Statement.signature (CCVector.to_seq stmts) in
   Util.debugf ~section 2 "@[<2>signature:@ @[<hv>%a@]@]" (fun k->k Signature.pp signature);
