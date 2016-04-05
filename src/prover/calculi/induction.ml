@@ -316,6 +316,66 @@ module Make
             res
         | _ -> false)
 
+  let acyclicity lit =
+    (* check if [sub] occurs in [t] under a constructor *)
+    let rec occurs_in_ t ~sub =  match T.view t with
+      | T.App (f, l) ->
+        begin match T.view f with
+          | T.Const id ->
+            let is_cons = Ind_ty.is_constructor id in
+            List.exists
+              (fun t' -> (is_cons && T.equal sub t') || occurs_in_ t' ~sub)
+              l
+          | _ -> false
+        end
+      | T.Const _
+      | T.Var _
+      | T.DB _
+      | T.AppBuiltin _ -> false
+    in
+    match lit with
+    | Literal.Equation (l, r, b) ->
+        if
+          ( Ind_ty.is_inductive_type (T.ty l) && occurs_in_ ~sub:l r )
+          ||
+          ( Ind_ty.is_inductive_type (T.ty r) && occurs_in_ ~sub:r l )
+        then if b then `Absurd else `Trivial else `Neither
+    | _ -> `Neither
+
+  let acyclicity_trivial c =
+    let res = C.Seq.lits c
+      |> Sequence.exists
+        (fun lit -> match acyclicity lit with
+          | `Neither
+          | `Absurd -> false
+          | `Trivial -> true
+        )
+    in
+    if res
+    then Util.debugf ~section 3 "@[<2>acyclicity:@ `@[%a@]` is trivial@]" (fun k->k C.pp c);
+    res
+
+  let acyclicity_simplify c =
+    let lits' = C.Seq.lits c
+      |> Sequence.filter
+        (fun lit -> match acyclicity lit with
+          | `Neither
+          | `Trivial -> true
+          | `Absurd -> false (* remove lit *)
+        )
+      |> Sequence.to_array
+    in
+    if Array.length lits' = Array.length (C.lits c)
+    then SimplM.return_same c
+    else (
+      let proof =
+        ProofStep.mk_inference ~rule:(ProofStep.mk_rule "acyclicity") [C.proof c] in
+      let c' = C.create_a ~trail:(C.trail c) lits' proof in
+      Util.debugf ~section 3
+        "@[<2>acyclicity:@ simplify `@[%a@]`@ into `@[%a@]`@]" (fun k->k C.pp c C.pp c');
+      SimplM.return_new c'
+    )
+
   exception FoundInductiveLit of int * (T.t * T.t) list
 
   (* if c is  f(t1,...,tn) != f(t1',...,tn') or d, with f inductive symbol, then
@@ -409,7 +469,9 @@ module Make
     Env.add_unary_inf "induction_lemmas.ind" inf_assert_minimal;
     Env.add_clause_conversion convert_statement;
     Env.add_is_trivial has_trivial_trail;
+    Env.add_is_trivial acyclicity_trivial;
     Env.add_simplify injectivity_destruct;
+    Env.add_simplify acyclicity_simplify;
     (* add lemmas if option is set *)
     if Env.flex_get k_lemmas_enabled
       then Env.add_unary_inf "induction_lemmas.cut" inf_introduce_lemmas;
