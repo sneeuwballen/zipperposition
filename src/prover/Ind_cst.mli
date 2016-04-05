@@ -49,6 +49,8 @@ type cst = private {
   cst_coverset: cover_set; (* the coverset for this constant *)
 }
 
+exception Payload_cst of cst
+
 val as_cst : ID.t -> cst option
 
 val as_cst_exn : ID.t -> cst
@@ -105,6 +107,8 @@ type sub_cst = private {
   sub_cst_cst: cst;
 }
 
+exception Payload_sub_cst of sub_cst
+
 val case_sub : case -> sub_cst Sequence.t
 
 val as_sub_cst : ID.t -> sub_cst option
@@ -133,20 +137,3 @@ val sub_constants_case : case -> sub_cst Sequence.t
 (** All sub-constants that are subterms of a specific case *)
 
 val term_of_sub_cst: sub_cst -> FOTerm.t
-
-(** {6 Classification} *)
-
-type classify_res =
-  | Ty of Ind_ty.t
-  | Cstor of Ind_ty.constructor * Ind_ty.t
-  | Cst of cst
-  | Sub of sub_cst
-  | Other
-
-val classify : ID.t -> classify_res
-(** [classify id] returns the role [id] plays in inductive reasoning *)
-
-val prec_constr : [`partial] Precedence.Constr.t
-(** Partial order on [ID.t], with:
-    regular > constant > sub_constant > cstor *)
-

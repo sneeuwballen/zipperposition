@@ -33,9 +33,6 @@ module Make
 
   let lemmas_ = ref []
 
-  (* annotate clauses that have been introduced by lemma *)
-  let flag_cut_introduced = C.new_flag()
-
   let is_ind_conjecture_ c =
     match C.distance_to_goal c with
     | Some (0 | 1) -> true
@@ -86,28 +83,24 @@ module Make
       (fun t (old,by) -> T.replace t ~old ~by)
       t l
 
-  (* TODO (similar to Avatar.introduce_lemma, should factorize this)
-     - gather vars of c
-     - make a fresh constant for each variable
-     - replace variables by constants
-     - for each lit, negate it and add [not lit <- trail] *)
+  (* fresh var generator *)
+  let fresh_var_gen_ () =
+    let r = ref 0 in
+    fun ty ->
+      let v = T.var_of_int ~ty !r in
+      incr r;
+      v
 
   (* FIXME:
      - use better generalization?
      - fix typing issues *)
+
   (* when a unit clause has inductive constants, take its negation
       and add it as a lemma (some restrictions apply) *)
   let inf_introduce_lemmas c =
     let ind_csts = constants_or_sub c in
     let generalize ~on lit =
-      (* fresh var generator *)
-      let mk_fresh_var_ =
-        let r = ref 0 in
-        fun ty ->
-          let v = T.var_of_int ~ty !r in
-          incr r;
-          v
-      in
+      let mk_fresh_var_ = fresh_var_gen_ () in
       (* abstract w.r.t all those constants (including the term
          being generalized). The latter must occur first, as it
          might contain constants being replaced. *)
@@ -131,7 +124,6 @@ module Make
         (* introduce cut now *)
         let proof = ProofStep.mk_trivial in
         let clauses, _ = A.introduce_cut lits proof in
-        List.iter (fun c -> C.set_flag flag_cut_introduced c true) clauses;
         Util.incr_stat stats_lemmas;
         Util.debugf ~section 2
           "@[<2>introduce cut@ from %a@ @[<hv0>%a@]@ generalizing on @[%a@]@]"
@@ -143,7 +135,7 @@ module Make
     in
     if C.is_ground c
     && not (is_ind_conjecture_ c)
-    && not (C.get_flag flag_cut_introduced c)
+    && not (C.get_flag A.flag_cut_introduced c)
     && C.is_unit_clause c
     && not (has_pos_lit_ c) (* only positive lemmas, therefore C negative *)
     && not (CCList.is_empty ind_csts) (* && not (T.Set.for_all CI.is_inductive set) *)
@@ -503,21 +495,12 @@ let env_action (module E : Env.S) =
     M.register ();
   )
 
-(* if enabled, add a precedence constraint *)
-let add_constr state =
-  if Flex_state.get_exn k_enable state then (
-    (* add an ordering constraint: ensure that constructors are smaller
-       than other terms *)
-    Compute_prec.add_constr 15 Ind_cst.prec_constr
-  ) else CCFun.id
-
 let extension =
   Extensions.(
     {default with
      name="induction_simple";
      post_typing_actions=[post_typing_hook];
      env_actions=[env_action];
-     prec_actions=[add_constr];
     })
 
 let () =

@@ -107,8 +107,8 @@ let compute_prec stmts =
       (fun cp e -> List.fold_left (fun cp f -> f state cp) cp e.Extensions.prec_actions)
       Compute_prec.empty
 
-    (* add constraint about inductive constructors *)
-    |> Compute_prec.add_constr 10 Ind_cst.prec_constr
+    (* add constraint about inductive constructors, etc. *)
+    |> Compute_prec.add_constr 10 Classify_cst.prec_constr
 
     (* use "invfreq", with low priority *)
     |> Compute_prec.add_constr_rule 90
