@@ -228,10 +228,15 @@ module Make
            (* clauses [CNF(¬ And_i ctx_i[t']) <- b_lit] for
               each t' subterm of case *)
            let neg_clauses =
-             Sequence.flat_map
+             Ind_cst.sub_constants_case case
+             |> Sequence.filter_map
                (fun sub ->
-                  (* FIXME: only keep those that have the same type!! *)
+                  (* only keep sub-constants that have the same type as [cst] *)
                   let sub = Ind_cst.term_of_sub_cst sub in
+                  if Type.equal (T.ty sub) mw.mw_cst.Ind_cst.cst_ty
+                  then Some sub else None)
+             |> Sequence.flat_map
+               (fun sub ->
                   (* for each context, apply it to [sub] and negate its
                      literals, obtaining a DNF of [¬ And_i ctx_i[t']];
                      then turn DNF into CNF *)
@@ -246,9 +251,7 @@ module Make
                       (fun lits ->
                          C.create lits proof ~trail:(C.Trail.singleton b_lit))
                   in
-                  Sequence.of_list clauses
-               )
-               (Ind_cst.sub_constants_case case)
+                  Sequence.of_list clauses)
             |> Sequence.to_rev_list
            in
            (* all new clauses *)
