@@ -23,6 +23,7 @@ module type S = sig
   val for_all : (bool_lit -> bool) -> t -> bool
   val exists : (bool_lit -> bool) -> t -> bool
   val of_list : bool_lit list -> t
+  val add_list : t -> bool_lit list -> t
   val to_list : t -> bool_lit list
   val to_seq : t -> bool_lit Sequence.t
 

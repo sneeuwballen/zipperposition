@@ -411,6 +411,17 @@ module Make
         (fun k->k C.pp c C.pp c');
       SimplM.return_new c'
 
+  (* if ID is a sub-constnat, it only is relevant assuming some trail on its
+     parent constant(s) *)
+  let rec trail_of_cst cst =
+    match Ind_cst.as_sub_cst cst.Ind_cst.cst_id with
+    | None -> []
+    | Some sub ->
+      let case = sub.Ind_cst.sub_cst_case in
+      let cst' = sub.Ind_cst.sub_cst_cst in
+      (* ensure [cst=case], and add the trail of [cst] to it *)
+      is_eq_ cst' case :: trail_of_cst cst'
+
   (* when a clause contains new inductive constants, assert minimality
      of the clause for all those constants independently *)
   let inf_assert_minimal c =
@@ -421,7 +432,8 @@ module Make
            let ctx = ClauseContext.extract_exn (C.lits c) (Ind_cst.cst_to_term cst) in
            let proof = ProofStep.mk_inference [C.proof c]
                ~rule:(ProofStep.mk_rule "min") in
-           assert_min ~id:(C.id c) ~trail:(C.trail c) ~proof [ctx] cst)
+           let trail = C.Trail.add_list (C.trail c) (trail_of_cst cst) in
+           assert_min ~id:(C.id c) ~trail ~proof [ctx] cst)
         consts
     in
     clauses

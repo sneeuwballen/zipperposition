@@ -92,26 +92,6 @@ let cases ?(which=`All) set =
   | `Base -> Sequence.filter case_is_base seq
   | `Rec -> Sequence.filter case_is_rec seq
 
-(* find inductive constants in terms *)
-let find_cst_in_term t =
-  T.Seq.subterms t
-  |> Sequence.filter_map
-    (fun t -> match T.view t with
-      | T.Const id ->
-          let ty_args, ty_ret = Type.open_fun (T.ty t) in
-          (* must be a constant *)
-          if ty_args=[]
-          then match Ind_ty.as_inductive_type ty_ret with
-            | Some ity ->
-              if not (is_cst id)
-              && not (Ind_ty.is_constructor id)
-              && Skolem.is_skolem id
-                then Some (id, ity, ty_ret) (* bingo *)
-                else None
-            | _ -> None
-          else None
-      | _ -> None)
-
 (** {6 Sub-Constants} *)
 
 type sub_cst = {
@@ -172,6 +152,36 @@ let rec dominates c sub =
          | None -> false
          | Some c' -> dominates c' sub)
     (sub_constants c.cst_coverset)
+
+(* either:
+   - id is not a sub-constant, or
+   - id is a sub-constant, but with a type different from its parent *)
+let sub_cst_criterion id =
+  match as_sub_cst id with
+    | None -> true
+    | Some sub ->
+      not (Type.equal sub.sub_cst_ty (T.ty sub.sub_cst_case.case_term))
+
+(* find new inductive constant candidates in terms *)
+let find_cst_in_term t =
+  T.Seq.subterms t
+  |> Sequence.filter_map
+    (fun t -> match T.view t with
+      | T.Const id ->
+          let n_tyvars, ty_args, ty_ret = Type.open_poly_fun (T.ty t) in
+          (* must be a constant *)
+          if n_tyvars=0 && ty_args=[]
+          then match Ind_ty.as_inductive_type ty_ret with
+            | Some ity ->
+              if not (is_cst id)
+              && not (Ind_ty.is_constructor id)
+              && sub_cst_criterion id
+              && Skolem.is_skolem id
+                then Some (id, ity, ty_ret) (* bingo *)
+                else None
+            | _ -> None
+          else None
+      | _ -> None)
 
 (** {6 Creation of Coverset and Cst} *)
 

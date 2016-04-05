@@ -33,6 +33,7 @@ module Make(L : Bool_lit_intf.S)
     |> Sequence.map f
     |> Lit.Set.of_seq
   let of_list = Lit.Set.of_list
+  let add_list = Lit.Set.add_list
   let to_list = Lit.Set.to_list
   let is_empty = Lit.Set.is_empty
 
