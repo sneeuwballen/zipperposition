@@ -7,6 +7,7 @@ true: use_menhir
 
 "tests/quick/": -traverse
 "tests/quick/": not_hygienic
+"Problems": -traverse
 
 <src/**/*.ml>: warn(+a-4-42-44-48-50)
 
