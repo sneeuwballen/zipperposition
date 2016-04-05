@@ -43,6 +43,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   (** {2 boolean flags} *)
 
+  type flag = int
+
   let new_flag =
     let flag_gen = Util.Flag.create () in
     fun () -> Util.Flag.get_new flag_gen

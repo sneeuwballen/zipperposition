@@ -5,6 +5,8 @@ module type S = sig
   module E : Env.S
   module Solver : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit
 
+  val flag_cut_introduced : E.C.flag
+
   val split : E.multi_simpl_rule
   (** Split a clause into components *)
 

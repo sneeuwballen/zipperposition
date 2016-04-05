@@ -31,6 +31,9 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
   module BoolBox = Ctx.BoolBox
   module Solver = Sat
 
+  (* annotate clauses that have been introduced by lemma *)
+  let flag_cut_introduced = C.new_flag()
+
   let pp_bclause out lits =
     Format.fprintf out "@[<hv>%a@]" (Util.pp_list ~sep:" ⊔ " BoolBox.pp) lits
 
@@ -229,6 +232,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
       and make a lemma out of it, including Skolemization, etc. *)
   let introduce_cut lits proof : C.t list * BoolBox.t =
     let box = BoolBox.inject_lits lits in
+    Util.debugf ~section 3 "@[<2>introduce cut on@ `@[%a@]`@]"
+      (fun k->k Literals.pp lits);
     (* positive clause *)
     let c_pos =
       C.create_a ~trail:(C.Trail.singleton box) lits proof
@@ -258,7 +263,9 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
           let lit = Lit.negate lit in
           let lit = Lit.apply_subst ~renaming subst (lit,0) in
           let trail = C.Trail.singleton (C.Trail.Lit.neg box) in
-          C.create_a ~trail [| lit |] proof)
+          let c = C.create_a ~trail [| lit |] proof in
+          C.set_flag flag_cut_introduced c true;
+          c)
         lits
       |> Array.to_list
     in
