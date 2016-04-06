@@ -5,3 +5,9 @@ x 2016-01-29 2016-01-20 use msat.eval_level to prune clauses in Avatar (if trail
 x 2016-02-19 2016-01-15 add inductive types in intermediate AST(s), added by preprocessing from TPTP
 x 2016-02-19 2016-01-29 in avatar, use simplify_trail as backward simplification too (filter active set)
 x 2016-04-05 2016-04-03 fix lemmas generation (at least make it typesafe)
+x 2016-04-06 2016-04-05 syntax for function definition (with set of rewrite rules)
+x 2016-04-06 2016-01-15 have some basic definitional equality (non recursive?)
+x 2016-04-06 2016-01-23 distinguish goal/negated goal? @refactor
+x 2016-04-06 2016-01-23 def foo : bar := rw_rule1 and rw_rule2 @zf @calculus
+x 2016-04-06 2016-02-29 move detection of EnumType into preprocessing; add it in AST @refactor
+x 2016-04-06 2016-03-07 bring back orphan criterion lazily: mark redundant clauses; discard clause whose ≥ 1 parent is redundant; sweep active from time to time
