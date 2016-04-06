@@ -7,6 +7,7 @@ open Libzipperposition
 
 module T = FOTerm
 module Stmt = Statement
+module Su = Substs
 
 let section = Util.Section.zip
 
@@ -42,6 +43,9 @@ module RuleSet = struct
   let add r s = S.add s r.lhs_id r
   let add_list l s = List.fold_right add l s
 
+  let find_iter = S.find_iter
+  let find = S.find
+
   let add_stmt stmt t = match Stmt.view stmt with
     | Stmt.Def (id, _, rhs) ->
       (* simple constant *)
@@ -60,7 +64,63 @@ end
 
 (** {2 Normalization} *)
 
-let normalize rules t = t (* TODO *)
+(* TODO: {b long term}
+
+   use De Bruijn  indices for rewrite rules, with RuleSet.t being a
+   decision tree (similar to pattern-matching compilation) on head symbols
+   + equality contraints for non-linear rules.
+
+   Use the FOTerm.DB case extensively... *)
+
+let normalize rules t =
+  (* compute normal form of subterm
+     @return [t'] where [t'] is the normal form of [t] *)
+  let rec reduce ~subst sc t = match T.view t with
+    | T.Const id ->
+      (* pick a constant rule *)
+      begin match RuleSet.find_iter rules id |> Sequence.head with
+        | None -> t
+        | Some r ->
+          assert (T.is_const r.lhs);
+          r.rhs
+      end
+    | T.App (f, l) ->
+      (* first, reduce subterms *)
+      let l' = reduce_l ~subst sc l in
+      let t' = if List.for_all2 T.equal l l' then t else T.app f l' in
+      begin match T.view f with
+        | T.Const id ->
+          let find_rule =
+            RuleSet.find_iter rules id
+            |> Sequence.find
+              (fun r ->
+                 try Some (r, Unif.FO.matching ~subst ~pattern:(r.lhs,sc) (t',0))
+                 with Unif.Fail -> None)
+          in
+          begin match find_rule with
+            | None -> t'
+            | Some (r, subst) ->
+              (* rewrite [t = r.lhs\sigma] into [rhs] (and evaluate [rhs],
+                 which contain variables bound by [subst]) *)
+              Util.debugf ~section 5 "@[<2>rewrite `@[%a@]`@ using `@[%a@]`@ with `@[%a@]`@]"
+                (fun k->k T.pp t' pp_rule r Su.pp subst);
+              Su.FO.apply_no_renaming subst (r.rhs,sc)
+          end
+        | _ -> t'
+      end
+    | T.DB _
+    | T.Var _ ->
+      (* dereference, or return [t] *)
+      Su.FO.apply_no_renaming subst (t,0)
+    | T.AppBuiltin (_,[]) -> t
+    | T.AppBuiltin (b,l) ->
+      let l' = reduce_l ~subst sc l in
+      if List.for_all2 T.equal l l' then t else T.app_builtin ~ty:(T.ty t) b l'
+  (* reduce list *)
+  and reduce_l ~subst sc l =
+    List.map (reduce ~subst sc) l
+  in
+  reduce ~subst:Su.empty 0 t
 
 (** {2 Pre-processing Rules} *)
 
