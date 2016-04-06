@@ -1,0 +1,24 @@
+
+# Example for exercizing rewriting
+# Here, 100 * 3 = (100 + 100) + 100
+
+data nat :=
+  | Z
+  | S nat.
+
+def plus : nat -> nat -> nat where
+  forall x. plus Z x = x
+| forall x y. plus (S x) y = S (plus x y).
+
+def mult : nat -> nat -> nat where
+  forall x. mult Z x = Z
+| forall x y. mult (S x) y = plus y (mult x y).
+
+# 100
+def n : nat := S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S Z))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))).
+
+def three : nat := S (S (S Z)).
+
+goal mult n three = plus (plus n n) n.
+
+
