@@ -8,6 +8,10 @@ open Libzipperposition
 (** {2 Context for a Proof} *)
 module type S = Ctx_intf.S
 
+module Key : sig
+  val lost_completeness : bool Flex_state.key
+end
+
 module type PARAMETERS = sig
   val signature : Signature.t
   val ord : Ordering.t

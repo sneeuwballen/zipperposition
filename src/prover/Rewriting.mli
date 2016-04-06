@@ -21,8 +21,9 @@ module RuleSet : sig
   val add : rule -> t -> t
   val add_list : rule list -> t -> t
 
-  val add_stmt : (_, FOTerm.t, Type.t, _) Statement.t -> t -> t
-  (** [add_stmt st set] adds rewrite rules from [st] to [set], if any *)
+  val add_stmt : (_, FOTerm.t, Type.t, _) Statement.t -> t -> t * int
+  (** [add_stmt st set] adds rewrite rules from [st] to [set], if any.
+      @return the new set of rules, plus the number of new rules *)
 
   val to_seq : t -> rule Sequence.t
   val to_list : t -> rule list

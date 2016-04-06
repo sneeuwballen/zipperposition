@@ -141,8 +141,12 @@ let make_ctx ~signature ~ord ~select =
     let ord = ord
     let select = select
   end in
-  let module Ctx = Ctx.Make(Res) in
-  let ctx = (module Ctx : Ctx_intf.S) in
+  let module MyCtx = Ctx.Make(Res) in
+  let ctx = (module MyCtx : Ctx_intf.S) in
+  Phases.get >>= fun st ->
+  (* did any previous extension break completeness? *)
+  let lost_comp = Flex_state.get_or ~or_:false Ctx.Key.lost_completeness st in
+  if lost_comp then MyCtx.lost_completeness ();
   do_extensions ~field:(fun e->e.Extensions.ctx_actions)
     ~x:ctx >>= fun () ->
   Phases.return_phase ctx

@@ -55,14 +55,15 @@ module RuleSet = struct
       (* simple constant *)
       let r = Rule.make_const id ty rhs in
       Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k->k pp_rule r);
-      add r t
+      add r t, 1
     | Stmt.DefWhere (id, ty, `Fun, l) ->
+      let n = List.length l in
       List.fold_left
         (fun t d ->
            let r = Rule.make id ty d.Stmt.def_args d.Stmt.def_rhs in
            Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k->k pp_rule r);
            add r t)
-        t l
+        t l, n
     | Stmt.DefWhere (id, _, `Prop, _) ->
       (* TODO: deal with it properly (also, in CNF) *)
       Util.errorf ~where:"rewriting"
@@ -71,7 +72,7 @@ module RuleSet = struct
     | Stmt.Data _
     | Stmt.Assert _
     | Stmt.Goal _
-    | Stmt.NegatedGoal _ -> t
+    | Stmt.NegatedGoal _ -> t, 0
 
   let to_seq t = S.to_seq t |> Sequence.map snd
   let to_list t = to_seq t |> Sequence.to_rev_list
@@ -155,11 +156,20 @@ end
 let post_cnf stmts st =
   CCVector.iter Statement.scan_stmt_for_defined_cst stmts;
   (* add set of rules to [st] *)
+  let sum = ref 0 in
   let rules =
-    CCVector.fold (fun set s -> RuleSet.add_stmt s set) RuleSet.empty stmts
+    CCVector.fold
+      (fun set s ->
+         let set, n = RuleSet.add_stmt s set in
+         sum := !sum + n;
+         set)
+      RuleSet.empty stmts
   in
   st
     |> Flex_state.add Key.set rules
+    |> (fun st ->
+        if !sum>0 (* rewriting enabled: bye completeness *)
+        then Flex_state.add Ctx.Key.lost_completeness true st else st)
 
 (* add a term simplification that normalizes terms w.r.t the set of rules *)
 let normalize_simpl (module E : Env_intf.S) =

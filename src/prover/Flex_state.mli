@@ -16,3 +16,5 @@ val get : 'a key -> t -> 'a option
 
 val get_exn : 'a key -> t -> 'a
 (** @raise Not_found if the key is not present *)
+
+val get_or : or_:'a -> 'a key -> t -> 'a

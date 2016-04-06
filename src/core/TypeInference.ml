@@ -476,7 +476,7 @@ let rec infer_rec ctx t =
           T.app_builtin ?loc ~ty b l
       end
   in
-  Util.debugf ~section 5 "@[<hv2>typing of@ `@[%a@]`@ yields `@[%a@]`@ : `@[%a@]`@]"
+  Util.debugf ~section 5 "@[<hv>typing of `@[%a@]`@ yields @[<2>`@[%a@]`@ : `@[%a@]`@]@]"
     (fun k->k PT.pp t T.pp t' T.pp (T.ty_exn t'));
   t'
 

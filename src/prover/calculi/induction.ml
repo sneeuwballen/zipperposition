@@ -553,6 +553,7 @@ let post_typing_hook stmts state =
     |> Flex_state.add k_enable true
     |> Flex_state.add k_lemmas_enabled !lemmas_enabled_
     |> Flex_state.add k_show_lemmas !show_lemmas_
+    |> Flex_state.add Ctx.Key.lost_completeness true
   ) else Flex_state.add k_enable false state
 
 (* if enabled: register the main functor, with inference rules, etc. *)

@@ -21,6 +21,10 @@ module type PARAMETERS = sig
   val select : Selection.t
 end
 
+module Key = struct
+  let lost_completeness = Flex_state.create_key()
+end
+
 module Make(X : PARAMETERS) = struct
   let _ord = ref X.ord
   let _select = ref X.select
