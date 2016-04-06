@@ -435,8 +435,6 @@ module Make(E : Env.S) : S with module Env = E = struct
   let is_trivial c =
     C.get_flag flag_enumeration_clause c
 
-  (* TODO: do this just after type inference *)
-
   (* detect whether the clause is a declaration of enum type, and if it
       is, declare the type! *)
   let _detect_and_declare c =

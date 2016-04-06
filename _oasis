@@ -130,14 +130,13 @@ Library "libzipperposition_prover"
                     BBox, BBox_intf, ClauseContext, ClauseQueue_intf,
                     Bool_lit, Bool_lit_intf, Sat_solver, Sat_solver_intf,
                     Trail, Trail_intf, Ind_cst, Phases, Phases_impl,
-                    Flex_state, Classify_cst,
+                    Flex_state, Classify_cst, Rewriting,
                     calculi/Avatar, calculi/Avatar_intf,
                     calculi/Induction, calculi/Induction_intf,
                     calculi/Superposition,
                     calculi/EnumTypes,
                     calculi/ArithInt,
                     calculi/Heuristics,
-                    calculi/Rewriting,
                     meta/MetaProverState, meta/MetaProverState_intf
   InternalModules:  lib/UnionFind, lib/Signal, lib/Simplex
   Build$:           flag(meta) && flag(parsers) && flag(prover)
