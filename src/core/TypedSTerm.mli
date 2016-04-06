@@ -115,6 +115,7 @@ module Ty : sig
   val is_tType : t -> bool
   val returns : t -> t
   val returns_tType : t -> bool
+  val returns_prop : t -> bool
 end
 
 module Form : sig

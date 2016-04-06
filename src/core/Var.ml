@@ -35,11 +35,18 @@ let pp_fullc out a = ID.pp_fullc out a.id
 
 module Set = struct
   type 'a t = 'a var ID.Map.t
+  let is_empty = ID.Map.is_empty
   let empty = ID.Map.empty
   let add t v = ID.Map.add v.id v t
   let mem t v = ID.Map.mem v.id t
   let find_exn t id = ID.Map.find id t
   let find t id = try Some (find_exn t id) with Not_found -> None
+  let diff a b =
+    ID.Map.merge_safe a b
+      ~f:(fun _ pair -> match pair with
+        | `Left x -> Some x
+        | `Right _ -> None
+        | `Both _ -> None)
   let cardinal t = ID.Map.cardinal t
   let of_seq s = s |> Sequence.map (fun v->v.id, v) |> ID.Map.of_seq
   let to_seq t = ID.Map.to_seq t |> Sequence.map snd

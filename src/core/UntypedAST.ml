@@ -26,6 +26,7 @@ type attrs = {
 type statement_view =
   | Decl of string * ty
   | Def of string * ty * term
+  | DefWhere of string * ty * term list (* list of axioms *)
   | Data of data list
   | Assert of form
   | Goal of form
@@ -42,6 +43,7 @@ let make_ ?loc ?(attrs=default_attrs) stmt = {loc; stmt; attrs; }
 
 let decl ?loc n ty = make_ ?loc (Decl (n,ty))
 let def ?loc n ty t = make_ ?loc (Def (n,ty,t))
+let def_where ?loc n ty l = make_ ?loc (DefWhere (n,ty,l))
 let data ?loc l = make_ ?loc (Data l)
 let assert_ ?loc ?attrs t = make_ ?attrs ?loc (Assert t)
 let goal ?loc ?attrs t = make_ ?attrs ?loc (Goal t)
@@ -53,6 +55,10 @@ let pp_statement out st =
       fpf out "@[<2>val %s :@ @[%a@]@]." id T.pp ty
   | Def (id,ty,t) ->
       fpf out "@[<2>def %s :@ @[%a@]@ := @[%a@]@]." id T.pp ty T.pp t
+  | DefWhere (id,ty,l) ->
+      let pp_ax out t = fpf out "| @[<2>%a@]" T.pp t in
+      fpf out "@[<2>def %s :@ @[%a@]@ where@ @[<v>%a@]@]."
+        id T.pp ty (Util.pp_list ~sep:"" pp_ax) l
   | Data l ->
       let pp_cstor out (id,args) =
         fpf out "@[<2>| @[%s@ %a@]@]" id (Util.pp_list ~sep:" " T.pp) args in

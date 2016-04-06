@@ -28,6 +28,7 @@ type attrs = {
 type statement_view =
   | Decl of string * ty
   | Def of string * ty * term
+  | DefWhere of string * ty * term list (* list of axioms *)
   | Data of data list
   | Assert of form
   | Goal of form
@@ -42,6 +43,7 @@ val default_attrs : attrs
 
 val decl : ?loc:Loc.t -> string -> ty -> statement
 val def : ?loc:Loc.t -> string -> ty -> term -> statement
+val def_where : ?loc:Loc.t -> string -> ty -> term list -> statement
 val data : ?loc:Loc.t -> data list -> statement
 val assert_ : ?loc:Loc.t -> ?attrs:attrs -> term -> statement
 val goal : ?loc:Loc.t -> ?attrs:attrs -> term -> statement

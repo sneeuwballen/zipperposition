@@ -42,11 +42,13 @@ val pp_fullc : _ t CCFormat.printer (** With color *)
 
 module Set : sig
   type +'a t
+  val is_empty : _ t -> bool
   val empty : 'a t
   val add : 'a t -> 'a var -> 'a t
   val mem : 'a t -> 'a var -> bool
   val find : 'a t -> ID.t -> 'a var option
   val find_exn : 'a t -> ID.t -> 'a var
+  val diff : 'a t -> 'a t -> 'a t
   val of_seq : 'a var Sequence.t -> 'a t
   val to_seq : 'a t -> 'a var Sequence.t
   val to_list : 'a t -> 'a var list

@@ -24,6 +24,7 @@
 %token COLON
 %token EQDEF
 %token AND
+%token WHERE
 
 %token LOGIC_TRUE
 %token LOGIC_FALSE
@@ -209,6 +210,13 @@ statement:
     {
       let loc = L.mk_pos $startpos $endpos in
       A.def ~loc v t u
+    }
+  | DEF v=raw_var COLON t=term WHERE
+    VERTICAL_BAR?
+    l=separated_nonempty_list(VERTICAL_BAR, term) DOT
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      A.def_where ~loc v t l
     }
   | ASSERT a=attrs t=term DOT
     {

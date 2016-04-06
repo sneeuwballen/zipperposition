@@ -17,10 +17,19 @@ type 'ty data = {
      [ty1 -> ty2 -> ... -> id args] *)
 }
 
+(** A equational/propositional definition of a symbol using
+    an equation/equivalence.
+    [forall def_vars. id def_args = def_rhs] *)
+type ('t, 'ty) def_clause = {
+  def_args: 't list;
+  def_rhs: 't;
+}
+
 type ('f, 't, 'ty) view =
   | TyDecl of ID.t * 'ty (** id: ty *)
-  | Data of 'ty data list (** Mutally recursive types *)
+  | Data of 'ty data list
   | Def of ID.t * 'ty * 't
+  | DefWhere of ID.t * 'ty * [`Prop | `Fun] * ('t,'ty) def_clause list
   | Assert of 'f (** assert form *)
   | Goal of 'f (** goal to prove *)
   | NegatedGoal of 'f list (** goal after negation *)
@@ -43,6 +52,7 @@ let mk_data id ~args ty cstors =
 
 let ty_decl ~src id ty = {src; view=TyDecl (id,ty); }
 let def ~src id ty t = {src; view=Def (id,ty,t); }
+let def_where ~src id ty ~kind l = {src; view=DefWhere (id,ty,kind,l); }
 let data ~src l = {src; view=Data l; }
 let assert_ ~src c = {src; view=Assert c; }
 let goal ~src c = {src; view=Goal c; }
@@ -58,9 +68,16 @@ let map_data ~ty:fty d =
 let map ~form ~term ~ty st =
   let map_view ~form ~term ~ty:fty = function
     | Def (id, ty, t) -> Def (id, fty ty, term t)
+    | DefWhere (id, ty, kind, l) ->
+      let l = List.map
+          (fun d ->
+             {def_args=List.map term d.def_args; def_rhs=term d.def_rhs})
+          l
+      in
+      DefWhere (id, fty ty, kind, l)
     | Data l ->
-        let l = List.map (map_data ~ty:fty) l in
-        Data l
+    let l = List.map (map_data ~ty:fty) l in
+    Data l
     | Goal f -> Goal (form f)
     | NegatedGoal l -> NegatedGoal (List.map form l)
     | Assert f -> Assert (form f)
@@ -109,6 +126,13 @@ module Seq = struct
     match view st with
       | TyDecl (id,ty) -> decl id ty;
       | Def (id,ty,t) -> decl id ty; k (`Term t)
+      | DefWhere (id,ty,_,l) ->
+        decl id ty;
+        List.iter
+          (fun d ->
+             k (`Term d.def_rhs);
+             List.iter (fun t -> k (`Term t)) d.def_args)
+          l
       | Data l ->
         List.iter
           (fun d ->
@@ -121,6 +145,7 @@ module Seq = struct
 
   let ty_decls st k = match view st with
     | Def (id, ty, _)
+    | DefWhere (id, ty, _, _)
     | TyDecl (id, ty) -> k (id,ty)
     | Data l ->
         List.iter
@@ -134,6 +159,7 @@ module Seq = struct
 
   let forms st k = match view st with
     | Def _
+    | DefWhere _
     | Data _
     | TyDecl _ -> ()
     | Goal c -> k c
@@ -175,6 +201,13 @@ let pp ppf ppt ppty out st = match st.view with
       fpf out "@[<2>val %a :@ @[%a@]@]." ID.pp id ppty ty
   | Def (id,ty,t) ->
       fpf out "@[<2>def %a :@ @[%a@]@ := @[%a@]@]." ID.pp id ppty ty ppt t
+  | DefWhere (id,ty,_,l) ->
+      let pp_ax out d =
+        fpf out "| @[<2>@[%a %a@]@ = @[%a@]@]"
+          ID.pp id (Util.pp_list ~sep:" " ppt) d.def_args ppt d.def_rhs
+      in
+      fpf out "@[<2>def %a :@ @[%a@] where@ @[<v>%a@]@]."
+        ID.pp id ppty ty (Util.pp_list ~sep:"" pp_ax) l
   | Data l ->
       let pp_cstor out (id,ty) =
         fpf out "@[<2>| %a :@ @[%a@]@]" ID.pp id ppty ty in
@@ -221,6 +254,13 @@ module TPTP = struct
     | Def (id, ty, t) ->
         pp_decl out (id,ty);
         fpf out "@[<2>tff(%s, axiom,@ %a =@ @[%a@])@]." name ID.pp id ppt t
+    | DefWhere (id, ty, _, l) ->
+        pp_decl out (id,ty);
+        List.iter
+          (fun d ->
+             fpf out "@[<2>tff(%s, axiom,@ %a(%a) =@ @[%a@])@]."
+               name ID.pp id (Util.pp_list ~sep:", " ppt) d.def_args ppt d.def_rhs)
+          l
     | Data _ -> failwith "cannot print `data` to TPTP"
 
   let to_string ppf ppt ppty = CCFormat.to_string (pp ppf ppt ppty)

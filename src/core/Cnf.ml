@@ -509,7 +509,10 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
         let new_st = match st.Stmt.view with
           | Stmt.Data _
           | Stmt.Def _
+          | Stmt.DefWhere (_,_,`Fun,_)
           | Stmt.TyDecl _ -> st
+          | Stmt.DefWhere (_,_,`Prop,_) ->
+            assert false (* TODO: if prop, then polarize *)
           | Stmt.Assert f -> Stmt.assert_ ~src (conv_form ~is_goal:false f)
           | Stmt.Goal f -> Stmt.goal ~src (conv_form ~is_goal:true f)
           | Stmt.NegatedGoal _ -> assert false
@@ -583,8 +586,9 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
       let src = st.Stmt.src in
       match st.Stmt.view with
       | Stmt.Def (id,ty,t) ->
-        (* TODO: if prop, convert with <=>, otherwise with = *)
           CCVector.push res (Stmt.def ~src id ty t)
+      | Stmt.DefWhere (id,ty,kind,l) ->
+          CCVector.push res (Stmt.def_where ~src ~kind id ty l)
       | Stmt.Data l ->
           CCVector.push res (Stmt.data ~src l)
       | Stmt.TyDecl (id,ty) ->
@@ -649,6 +653,18 @@ let convert ~file seq =
           let ty = Type.Conv.of_simple_term_exn ty_ctx ty in
           let t = FOTerm.Conv.of_simple_term  t_ctx t in
           Statement.def ~src id ty t
+      | Statement.DefWhere (id, ty, kind, l) ->
+          let ty = Type.Conv.of_simple_term_exn ty_ctx ty in
+          let conv_t = FOTerm.Conv.of_simple_term t_ctx in
+          let l =
+            List.map
+              (fun d ->
+                 let open Stmt in
+                 { def_args=List.map conv_t d.def_args;
+                   def_rhs=conv_t d.def_rhs })
+              l
+          in
+          Statement.def_where ~src id ty ~kind l
       | Statement.TyDecl (id, ty) ->
           let ty = Type.Conv.of_simple_term_exn ty_ctx ty in
           Statement.ty_decl ~src id ty

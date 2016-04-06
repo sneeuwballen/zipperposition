@@ -21,8 +21,13 @@ module Rule = struct
   type t = rule
 
   (* constant rule [id := rhs] *)
-  let make_const id rhs =
-    { lhs_id=id; lhs=T.const ~ty:(T.ty rhs) id; rhs; }
+  let make_const id ty rhs =
+    { lhs_id=id; lhs=T.const ~ty id; rhs; }
+
+  (* [id args := rhs] *)
+  let make id ty args rhs =
+    let lhs = T.app (T.const ~ty id) args in
+    { lhs_id=id; lhs; rhs; }
 
   let pp out r =
     Format.fprintf out "@[<2>@[%a@] -->@ @[%a@]@]" T.pp r.lhs T.pp r.rhs
@@ -44,14 +49,29 @@ module RuleSet = struct
   let add_list l s = List.fold_right add l s
 
   let find_iter = S.find_iter
-  let find = S.find
 
   let add_stmt stmt t = match Stmt.view stmt with
-    | Stmt.Def (id, _, rhs) ->
+    | Stmt.Def (id, ty, rhs) ->
       (* simple constant *)
-      let r = Rule.make_const id rhs in
+      let r = Rule.make_const id ty rhs in
+      Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k->k pp_rule r);
       add r t
-    | _ -> t
+    | Stmt.DefWhere (id, ty, `Fun, l) ->
+      List.fold_left
+        (fun t d ->
+           let r = Rule.make id ty d.Stmt.def_args d.Stmt.def_rhs in
+           Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k->k pp_rule r);
+           add r t)
+        t l
+    | Stmt.DefWhere (id, _, `Prop, _) ->
+      (* TODO: deal with it properly (also, in CNF) *)
+      Util.errorf ~where:"rewriting"
+        "definition of %a as a proposition not handled" ID.pp id
+    | Stmt.TyDecl _
+    | Stmt.Data _
+    | Stmt.Assert _
+    | Stmt.Goal _
+    | Stmt.NegatedGoal _ -> t
 
   let to_seq t = S.to_seq t |> Sequence.map snd
   let to_list t = to_seq t |> Sequence.to_rev_list
@@ -90,28 +110,29 @@ let normalize rules t =
       let t' = if List.for_all2 T.equal l l' then t else T.app f l' in
       begin match T.view f with
         | T.Const id ->
+          let sc' = sc+1 in
           let find_rule =
             RuleSet.find_iter rules id
             |> Sequence.find
               (fun r ->
-                 try Some (r, Unif.FO.matching ~subst ~pattern:(r.lhs,sc) (t',0))
+                 try Some (r, Unif.FO.matching ~subst ~pattern:(r.lhs,sc') (t',sc))
                  with Unif.Fail -> None)
           in
           begin match find_rule with
             | None -> t'
             | Some (r, subst) ->
-              (* rewrite [t = r.lhs\sigma] into [rhs] (and evaluate [rhs],
+              (* rewrite [t = r.lhs\sigma] into [rhs] (and normalize [rhs],
                  which contain variables bound by [subst]) *)
               Util.debugf ~section 5 "@[<2>rewrite `@[%a@]`@ using `@[%a@]`@ with `@[%a@]`@]"
                 (fun k->k T.pp t' pp_rule r Su.pp subst);
-              Su.FO.apply_no_renaming subst (r.rhs,sc)
+              reduce ~subst sc' r.rhs
           end
         | _ -> t'
       end
     | T.DB _
     | T.Var _ ->
       (* dereference, or return [t] *)
-      Su.FO.apply_no_renaming subst (t,0)
+      Su.FO.apply_no_renaming subst (t,sc)
     | T.AppBuiltin (_,[]) -> t
     | T.AppBuiltin (b,l) ->
       let l' = reduce_l ~subst sc l in

@@ -421,9 +421,8 @@ module Ty = struct
     | Fun (args, _) -> 0, List.length args
     | _ -> 0, 0
 
-  let is_tType t = match view t with
-    | Builtin TType -> true
-    | _ -> false
+  let is_tType t = match view t with | Builtin TType -> true | _ -> false
+  let is_prop t = match view t with Builtin Prop -> true | _ -> false
 
   let rec returns t = match view t with
     | Fun (_, ret) -> returns ret
@@ -431,6 +430,7 @@ module Ty = struct
     | _ -> t
 
   let returns_tType t = is_tType (returns t)
+  let returns_prop t = is_prop (returns t)
 
   let rec is_mono t = match view t with
     | Builtin _ -> true

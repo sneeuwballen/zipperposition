@@ -22,10 +22,19 @@ type 'ty data = {
      [ty1 -> ty2 -> ... -> id args] *)
 }
 
+(** A equational/propositional definition of a symbol using
+    an equation/equivalence.
+    [id def_args = def_rhs] *)
+type ('t, 'ty) def_clause = {
+  def_args: 't list;
+  def_rhs: 't;
+}
+
 type ('f, 't, 'ty) view =
   | TyDecl of ID.t * 'ty (** id: ty *)
   | Data of 'ty data list
   | Def of ID.t * 'ty * 't
+  | DefWhere of ID.t * 'ty * [`Prop | `Fun] * ('t,'ty) def_clause list
   | Assert of 'f (** assert form *)
   | Goal of 'f (** goal to prove *)
   | NegatedGoal of 'f list (** goal after negation *)
@@ -47,6 +56,10 @@ val mk_data : ID.t -> args:'ty Var.t list -> 'ty -> (ID.t * 'ty) list -> 'ty dat
 
 val ty_decl : src:'src -> ID.t -> 'ty -> (_, _, 'ty, 'src) t
 val def : src:'src -> ID.t -> 'ty -> 't -> (_, 't, 'ty, 'src) t
+val def_where :
+  src:'src -> ID.t -> 'ty -> kind:[`Prop | `Fun] ->
+  ('t, 'ty) def_clause list ->
+  (_, 't, 'ty, 'src) t
 val data : src:'src -> 'ty data list -> (_, _, 'ty, 'src) t
 val assert_ : src:'src -> 'f -> ('f, _, _, 'src) t
 val goal : src:'src -> 'f -> ('f, _, _, 'src) t

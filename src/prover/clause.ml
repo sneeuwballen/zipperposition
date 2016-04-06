@@ -154,12 +154,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     match Statement.view st with
     | Statement.Data _
     | Statement.TyDecl _ -> []
-    | Statement.Def (id, ty, t) ->
-        (* TODO: remember that [id] is defined.
-           later, we should avoid some inferences on defined IDs (e.g. no
-           induction on them) *)
-        let lit = SLiteral.eq (T.const ~ty id) t in
-        [of_lits ~is_goal:false [lit]]
+    | Statement.Def _
+    | Statement.DefWhere _ -> [] (* dealt with by rewriting *)
     | Statement.Assert lits -> [of_lits ~is_goal:false lits]
     | Statement.Goal lits -> [of_lits ~is_goal:true lits]
     | Statement.NegatedGoal l -> List.map (of_lits ~is_goal:true) l
