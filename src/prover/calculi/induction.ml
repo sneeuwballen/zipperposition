@@ -484,6 +484,11 @@ module Make
     Env.add_is_trivial acyclicity_trivial;
     Env.add_simplify injectivity_destruct;
     Env.add_simplify acyclicity_simplify;
+    (* declare new constants to [Ctx] *)
+    Signal.on_every Ind_cst.on_new_cst
+      (fun cst ->
+         Ind_cst.declarations_of_cst cst
+         |> Sequence.iter (CCFun.uncurry Ctx.declare));
     (* add lemmas if option is set *)
     if Env.flex_get k_lemmas_enabled
       then Env.add_unary_inf "induction_lemmas.cut" inf_introduce_lemmas;
