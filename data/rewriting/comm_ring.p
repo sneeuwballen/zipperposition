@@ -1,6 +1,9 @@
 % Commutative rings
 
 val zero : carrier.
+val plus : carrier -> carrier -> carrier.
+val minus : carrier -> carrier.
+val mult : carrier -> carrier -> carrier.
 
 plus X (minus X) --> zero.
 plus X zero --> X.
