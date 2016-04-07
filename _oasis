@@ -141,7 +141,7 @@ Library "libzipperposition_prover"
   InternalModules:  lib/UnionFind, lib/Signal, lib/Simplex
   Build$:           flag(meta) && flag(parsers) && flag(prover)
   Install$:         flag(meta) && flag(parsers) && flag(prover)
-  BuildDepends:     containers, containers.advanced, sequence, gen, unix,
+  BuildDepends:     containers, containers.advanced, sequence, unix,
                     zarith, msat,
                     libzipperposition, libzipperposition.meta,
                     libzipperposition.parsers
