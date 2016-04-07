@@ -1,0 +1,7 @@
+
+# deconstruct pairs
+
+data pair a b := Pair a b.
+
+goal forall a b p. exists x y. p = Pair a b x y.
+
