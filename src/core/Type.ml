@@ -238,7 +238,7 @@ let apply ty args =
       then aux_l ty exp_args' args' env
       else
         err_applyf_
-          "@[<2>Type.apply:@ wrong argument type,@ expected `@[%a@]`@ \
+          "@[<2>Type.apply:@ wrong argument type,@ expected `@[_ : %a@]`@ \
             but got `@[%a : %a@]`@]"
           T.pp exp' T.pp a T.pp (T.ty_exn a)
   in
