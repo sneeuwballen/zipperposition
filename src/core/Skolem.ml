@@ -83,10 +83,16 @@ let skolem_form ~ctx subst ty form =
     with Not_found -> true
   in
   let tyvars, vars = collect_vars form ~filter in
+  Util.debugf ~section 5
+    "@[<2>creating skolem for@ `@[%a@]`@ with tyvars=@[%a@],@ vars=@[%a@],@ subst={@[%a@]}@]"
+    (fun k->k T.pp form (Util.pp_list Var.pp_full) tyvars
+        (Util.pp_list Var.pp_full) vars (Var.Subst.pp T.pp) subst);
   let vars_t = List.map (fun v->T.var v) vars in
   let tyvars_t = List.map (fun v->T.Ty.var v) tyvars in
   (* type of the symbol: quantify over type vars, apply to vars' types *)
-  let ty = T.Ty.forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) ty) in
+  let ty =
+    T.Ty.forall_l tyvars
+      (T.Ty.fun_ (List.map Var.ty vars) (T.Subst.eval subst ty)) in
   let f = fresh_sym ~ctx ~ty in
   T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t)
 
