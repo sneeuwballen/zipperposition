@@ -276,8 +276,9 @@ let mk_skolem_ pp x =
   ID.add_payload c Skolem.Attr_skolem;
   c
 
-(* coverset of given depth for this type and constant *)
-let make_coverset_ ~depth:initial_depth ity : (case * (ID.t * Type.t) list) list =
+(* coverset of given depth for this type under given substitution of
+   ity.ty_vars *)
+let make_coverset_ ~depth:initial_depth ~subst ity : (case * (ID.t * Type.t) list) list =
   let open CoversetState in
   (* list of generators of:
       - member of the coverset (one of the t such that cst=t)
@@ -287,8 +288,7 @@ let make_coverset_ ~depth:initial_depth ity : (case * (ID.t * Type.t) list) list
     if depth=0
     then (
       let c = mk_skolem_ ID.pp ity.Ind_ty.ty_id in
-      (* FIXME: what if there are type parameters?! *)
-      let ty = ity.Ind_ty.ty_pattern  in
+      let ty = Substs.Ty.apply_no_renaming subst (ity.Ind_ty.ty_pattern,0) in
       let t = T.const ~ty c in
       add_sub_case c ty >>= fun () ->
       return t
@@ -299,24 +299,29 @@ let make_coverset_ ~depth:initial_depth ity : (case * (ID.t * Type.t) list) list
       >>>= fun cstor ->
       let f = cstor.Ind_ty.cstor_name in
       let ty_f = cstor.Ind_ty.cstor_ty in
-      match Type.arity ty_f with
-       | Type.NoArity ->
-           invalid_declf "invalid constructor %a for inductive type %a"
-             ID.pp f Type.pp ity.Ind_ty.ty_pattern
-       | Type.Arity (0, 0) ->
-           if depth > 0
-           then yield (T.const ~ty:ty_f f)  (* only one answer : f *)
-           else fail
-       | Type.Arity (0, _) ->
-           let ty_args = Type.expected_args ty_f in
-           map_l (make_of_ty (depth-1)) ty_args
-           >>|= fun args ->
-           T.app (T.const ~ty:ty_f f) args
-       | Type.Arity (m,_) ->
-           invalid_declf
-             "inductive constructor %a requires %d type \
-               parameters, expected 0"
-             ID.pp f m
+      (* apply to ground type parameters *)
+      let ty_params =
+        List.map
+          (fun v ->
+             let v = Type.var v in
+             Substs.Ty.apply_no_renaming subst (v,0))
+          ity.Ind_ty.ty_vars
+      in
+      let ty_f_applied = Type.apply ty_f ty_params in
+      let ty_params = List.map T.of_ty ty_params in
+      let n_ty_params, ty_args_f, _ = Type.open_poly_fun ty_f_applied in
+      assert (n_ty_params=0);
+      if ty_args_f=[]
+      then
+        if depth > 0
+        then yield (T.app (T.const ~ty:ty_f f) ty_params)  (* only one answer : f *)
+        else fail
+      else (
+        (* make fresh type variables and apply *)
+        map_l (make_of_ty (depth-1)) ty_args_f
+        >>|= fun args ->
+        T.app (T.const ~ty:ty_f f) (ty_params @ args)
+      )
     )
   (* return a new term of type [ty] *)
   and make_of_ty depth ty : T.t mm =
@@ -350,11 +355,14 @@ let make_coverset_ ~depth:initial_depth ity : (case * (ID.t * Type.t) list) list
 
 let declare_cst ?(cover_set_depth=1) id ~ty =
   if is_cst id then raise (AlreadyDeclaredConstant id);
+  assert (Type.is_ground ty); (* constant --> not polymorphic *)
   let ity = match type_hd_exn ty with
     | B b -> invalid_declf "cannot declare a constant of type %a" Type.pp_builtin b
     | I id -> Ind_ty.as_inductive_ty_exn id
   in
-  let l = make_coverset_ ~depth:cover_set_depth ity in
+  (* map variables from [ity] to this concrete type *)
+  let subst = Unif.Ty.matching_same_scope ~pattern:ity.Ind_ty.ty_pattern ty ~scope:0 in
+  let l = make_coverset_ ~depth:cover_set_depth ~subst ity in
   let cover_set = List.map fst l in
   Util.debugf ~section:Ind_ty.section 2
     "@[<2>declare new inductive symbol `@[%a : %a@]`@ with coverset {@[%a@]}@]"
