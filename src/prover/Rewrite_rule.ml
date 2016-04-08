@@ -110,6 +110,19 @@ end
 
    Use the FOTerm.DB case extensively... *)
 
+(* check if [l1] and [l2] are the same lists *)
+let rec same_l_rec l1 l2 = match l1, l2 with
+  | [], [] -> true
+  | [], _ | _, [] -> assert false
+  | x1 :: tail1, x2 :: tail2 ->
+    T.equal x1 x2 && same_l_rec tail1 tail2
+
+let same_l l1 l2 = match l1, l2 with
+  | [], [] -> true
+  | [t1], [t2] -> T.equal t1 t2
+  | [t1;u1], [t2;u2] -> T.equal t1 t2 && T.equal u1 u2
+  | _ -> same_l_rec l1 l2
+
 let normalize_term rules t =
   (* compute normal form of subterm
      @return [t'] where [t'] is the normal form of [t] *)
@@ -126,7 +139,7 @@ let normalize_term rules t =
     | T.App (f, l) ->
       (* first, reduce subterms *)
       let l' = reduce_l ~subst sc l in
-      let t' = if List.for_all2 T.equal l l' then t else T.app f l' in
+      let t' = if same_l l l' then t else T.app f l' in
       begin match T.view f with
         | T.Const id ->
           let sc' = sc+1 in
@@ -157,10 +170,12 @@ let normalize_term rules t =
     | T.AppBuiltin (_,[]) -> t
     | T.AppBuiltin (b,l) ->
       let l' = reduce_l ~subst sc l in
-      if List.for_all2 T.equal l l' then t else T.app_builtin ~ty:(T.ty t) b l'
+      if same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l'
   (* reduce list *)
-  and reduce_l ~subst sc l =
-    List.map (reduce ~subst sc) l
+  and reduce_l ~subst sc l = match l with
+    | [] -> []
+    | t :: tail ->
+      reduce ~subst sc t :: reduce_l ~subst sc tail
   in
   reduce ~subst:Su.empty 0 t
 
