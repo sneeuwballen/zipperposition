@@ -14,8 +14,6 @@ module type S = sig
 
   val set_ord : Ordering.t -> unit
 
-  val skolem : Skolem.ctx
-
   val signature : unit -> Signature.t
   (** Current signature *)
 

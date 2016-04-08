@@ -44,6 +44,7 @@ let print_version ~params =
 (* have a list of extensions that should be loaded, and load them
    in phase Phases.LoadExtension
    FIXME: still too global? *)
+(* TODO: just use a list, not "register" *)
 let load_extensions =
   Phases.start_phase Phases.LoadExtensions >>= fun () ->
   Extensions.register Superposition.extension;

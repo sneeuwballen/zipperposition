@@ -31,7 +31,6 @@ module Make(X : PARAMETERS) = struct
   let _signature = ref X.signature
   let _complete = ref true
 
-  let skolem = Skolem.create ~prefix:"zsk" ()
   let renaming = S.Renaming.create ()
   let ord () = !_ord
   let set_ord o = _ord := o
