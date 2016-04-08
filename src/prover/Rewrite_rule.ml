@@ -85,7 +85,7 @@ module Set = struct
       let lhs = Literal.Conv.of_form lhs in
       let rhs = List.map (List.map Literal.Conv.of_form) rhs in
       let r = make_c lhs rhs in
-      Util.debugf ~section 5 "@[<2>add rewrite rule (c)@ `@[%a@]`@]" (fun k->k pp_rule_clause r);
+      Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k->k pp_rule_clause r);
       add_clause r t
     | Stmt.TyDecl _
     | Stmt.Data _

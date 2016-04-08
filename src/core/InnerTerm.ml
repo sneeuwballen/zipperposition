@@ -779,9 +779,9 @@ let pp_depth ?(hooks=[]) depth out t =
     | SimpleApp (s,l) ->
         Format.fprintf out "@[%a@ %a@]" ID.pp s (Util.pp_list (_pp depth)) l
     | AppBuiltin (b, [a]) when Builtin.is_prefix b ->
-        Format.fprintf out "@[<2>%a@ %a@]" Builtin.pp b (_pp depth) a
+        Format.fprintf out "@[<1>%a %a@]" Builtin.pp b (_pp depth) a
     | AppBuiltin (b, [t1;t2]) when Builtin.is_infix b ->
-        Format.fprintf out "(@[<2>%a@ %a@ %a@])" (_pp depth) t1 Builtin.pp b (_pp depth) t2
+        Format.fprintf out "(@[<1>%a@ %a@ %a@])" (_pp depth) t1 Builtin.pp b (_pp depth) t2
     | AppBuiltin (Builtin.Arrow, ret::args) ->
         Format.fprintf out "@[%a@ → %a@]"
           (Util.pp_list ~sep:" → " (_pp_surrounded depth)) args
@@ -791,7 +791,7 @@ let pp_depth ?(hooks=[]) depth out t =
         Format.fprintf out "@[%a(%a)@]" Builtin.pp b (Util.pp_list (_pp depth)) l
     | App (f, []) -> _pp depth out f
     | App (f, l) ->
-        Format.fprintf out "@[<2>%a@ %a@]"
+        Format.fprintf out "@[<1>%a@ %a@]"
           (_pp_surrounded depth) f (Util.pp_list ~sep:" " (_pp_surrounded depth)) l
   and _pp_surrounded depth out t = match view t with
     | Bind _
@@ -808,17 +808,17 @@ let to_string t = CCFormat.to_string pp t
 let rec debugf out t = match view t with
   | AppBuiltin (b,[]) -> Builtin.pp out b
   | AppBuiltin (b,l) ->
-      Format.fprintf out "(@[<2>%a@ %a@])" Builtin.pp b (Util.pp_list debugf) l
+      Format.fprintf out "(@[<1>%a@ %a@])" Builtin.pp b (Util.pp_list debugf) l
   | Var i -> HVar.pp out i
   | DB i -> Format.fprintf out "Y%d" i
   | Const s -> ID.pp out s
   | App (_, []) -> assert false
   | App (s, l) ->
-      Format.fprintf out "(@[<2>%a@ %a@])" debugf s (Util.pp_list debugf) l
+      Format.fprintf out "(@[<1>%a@ %a@])" debugf s (Util.pp_list debugf) l
   | SimpleApp (s, l) ->
-      Format.fprintf out "@[<2>%a(@,%a)@]" ID.pp s (Util.pp_list debugf) l
+      Format.fprintf out "@[<1>%a(@,%a)@]" ID.pp s (Util.pp_list debugf) l
   | Bind (b, varty,t') ->
-      Format.fprintf out "(@[<2>%a@ %a@ %a@])"
+      Format.fprintf out "(@[<1>%a@ %a@ %a@])"
         Binder.pp b debugf varty debugf t'
   | Multiset l ->
       Format.fprintf out "{|@[<hv>%a@]|}" (Util.pp_list debugf) l
