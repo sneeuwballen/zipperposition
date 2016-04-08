@@ -98,7 +98,12 @@ module Make(Env : Env_intf.S) = struct
       (* same constructor: simplify *)
       assert (List.length l1 = List.length l2);
       let other_lits = CCArray.except_idx (C.lits c) idx in
-      let new_lits = List.map2 (fun t1 t2 -> Literal.mk_eq t1 t2) l1 l2 in
+      let new_lits =
+        List.combine l1 l2
+        |> CCList.filter_map
+          (fun (t1,t2) ->
+             if T.equal t1 t2 then None else Some (Literal.mk_eq t1 t2))
+      in
       let rule = ProofStep.mk_rule ~comment:["induction"] "injectivity_destruct+" in
       let proof = ProofStep.mk_inference ~rule [C.proof c] in
       (* make one clause per [new_lits] *)
@@ -123,7 +128,15 @@ module Make(Env : Env_intf.S) = struct
       (* same constructor: simplify *)
       let lits = CCArray.except_idx (C.lits c) idx in
       assert (List.length l1 = List.length l2);
-      let new_lits = List.map2 (fun t1 t2 -> Literal.mk_neq t1 t2) l1 l2 in
+      (* add [ti != ti'] for arguments that are not actually types;
+         types should ALWAYS be equal anyway *)
+      let new_lits =
+        List.combine l1 l2
+        |> CCList.filter_map
+          (fun (t1,t2) ->
+             let ty = T.ty t1 in
+             if Type.is_tType ty then None else Some (Literal.mk_neq t1 t2))
+      in
       let rule = ProofStep.mk_rule ~comment:["induction"] "injectivity_destruct-" in
       let proof = ProofStep.mk_inference ~rule [C.proof c] in
       let c' = C.create ~trail:(C.trail c) (new_lits @ lits) proof in
