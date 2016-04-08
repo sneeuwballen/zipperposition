@@ -80,7 +80,7 @@ module Make(X : sig
   type term_rewrite_rule = FOTerm.t -> FOTerm.t option
   (** Rewrite rule on terms *)
 
-  type lit_rewrite_rule = Literal.t -> Literal.t
+  type lit_rewrite_rule = Literal.t -> Literal.t option
   (** Rewrite rule on literals *)
 
   type multi_simpl_rule = C.t -> C.t list option
@@ -368,19 +368,17 @@ module Make(X : sig
     let rec rewrite_lit rules lit = match rules with
       | [] -> lit
       | (name,r)::rules' ->
-          let lit' = r lit in  (* apply the rule *)
-          if Lit.equal_com lit lit'
-          then rewrite_lit rules' lit
-          else begin
+        match r lit with
+          | None -> rewrite_lit rules' lit
+          | Some lit' ->
             applied_rules := StrSet.add name !applied_rules;
             Util.debugf ~section 5 "@[rewritten lit `@[%a@]`@ into `@[%a@]`@ (using %s)@]"
               (fun k->k Lit.pp lit Lit.pp lit' name);
             rewrite_lit !_lit_rules lit'
-          end
     in
     (* apply lit rules *)
     let lits = Array.map (fun lit -> rewrite_lit !_lit_rules lit) (C.lits c) in
-    if Lits.equal_com lits (C.lits c)
+    if StrSet.is_empty !applied_rules
     then SimplM.return_same c
     else (
       (* simplifications occurred! *)

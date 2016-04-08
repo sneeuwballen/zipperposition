@@ -53,7 +53,7 @@ module type S = sig
   (** semantic tautology deletion, using a congruence closure algorithm
       to see if negative literals imply some positive Literal.t *)
 
-  val handle_distinct_constants : Literal.t -> Literal.t
+  val handle_distinct_constants : Env.lit_rewrite_rule
   (** Decide on "quoted" "symbols" (which are all distinct) *)
 
   val basic_simplify : Env.simplify_rule

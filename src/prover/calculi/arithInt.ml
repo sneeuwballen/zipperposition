@@ -1420,21 +1420,22 @@ module Make(E : Env.S) : S with module Env = E = struct
                 | Some m,
                   T.AppBuiltin (Builtin.Int n,[]),
                   T.AppBuiltin (Builtin.Int opp', []) ->
-                    (* remainder(l1, n) = opp ----> n | l1-opp *)
-                    Lit.mk_divides ~sign n ~power:1 (M.add_const m Z.(~- opp'))
-                | _ -> lit
+                  (* remainder(l1, n) = opp ----> n | l1-opp *)
+                  let lit = Lit.mk_divides ~sign n ~power:1 (M.add_const m Z.(~- opp')) in
+                  Some lit
+                | _ -> None
               end
           | _ ->
               begin match Monome.Int.of_term l, Monome.Int.of_term r with
                 | Some m1, Some m2 ->
                     if sign
-                    then Lit.mk_arith_eq m1 m2
-                    else Lit.mk_arith_neq m1 m2
+                    then Some (Lit.mk_arith_eq m1 m2)
+                    else Some (Lit.mk_arith_neq m1 m2)
                 | _, None
-                | None, _-> lit
+                | None, _-> None
               end
         end
-    | _ -> lit
+    | _ -> None
 
   (** {3 Others} *)
 
@@ -1500,8 +1501,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* Simplification:  a < b  ----> a+1 ≤ b *)
   let canc_less_to_lesseq = function
     | Lit.Arith (AL.Binary (AL.Less, m1, m2)) ->
-        Lit.mk_arith_lesseq (M.succ m1) m2
-    | lit -> lit
+      Some (Lit.mk_arith_lesseq (M.succ m1) m2)
+    | _ -> None
 
   exception VarElim of int * S.t
 

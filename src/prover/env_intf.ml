@@ -46,7 +46,7 @@ module type S = sig
   type term_rewrite_rule = FOTerm.t -> FOTerm.t option
   (** Rewrite rule on terms *)
 
-  type lit_rewrite_rule = Literal.t -> Literal.t
+  type lit_rewrite_rule = Literal.t -> Literal.t option
   (** Rewrite rule on literals *)
 
   type multi_simpl_rule = C.t -> C.t list option

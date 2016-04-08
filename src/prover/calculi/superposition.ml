@@ -57,7 +57,7 @@ module type S = sig
   (** semantic tautology deletion, using a congruence closure algorithm
       to see if negative literals imply some positive Literal.t *)
 
-  val handle_distinct_constants : Literal.t -> Literal.t
+  val handle_distinct_constants : Env.lit_rewrite_rule
   (** Decide on "quoted" "symbols" (which are all distinct) *)
 
   val basic_simplify : Env.simplify_rule
@@ -920,10 +920,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         if is_distinct_ s1 && is_distinct_ s2
         then
           if sign = (ID.equal s1 s2)
-          then Lit.mk_tauto  (* "a" = "a", or "a" != "b" *)
-          else Lit.mk_absurd (* "a" = "b" or "a" != "a" *)
-        else lit
-    | _ -> lit
+          then Some Lit.mk_tauto  (* "a" = "a", or "a" != "b" *)
+          else Some Lit.mk_absurd (* "a" = "b" or "a" != "a" *)
+        else None
+    | _ -> None
 
   exception FoundMatch of T.t * C.t * S.t
 
