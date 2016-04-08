@@ -15,6 +15,12 @@
     * a disequation [c(t1...tn) != c(u1...un)] simplifies into
       [t1 != u1 || ... || tn != un]
       (XXX is it really needed? probably, if we keep literal selection)
+
+  - acyclicity (simplification):
+    * an equation [t = c1(...,(...,ck(...,t, ...), ...),...))] where every [c]
+      is an inductive constructor becomes [false]
+    * an inequation [t != c1(....(...,ck(...,t,...), ...),...)]
+      becomes [true]
 *)
 module Make(E : Env_intf.S) : sig
 

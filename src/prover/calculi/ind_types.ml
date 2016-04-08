@@ -73,46 +73,93 @@ module Make(Env : Env_intf.S) = struct
       SimplM.return_new c'
     )
 
-  exception FoundInductiveLit of int * (T.t * T.t) list
+  (* find, in [c], a literal which a (dis)equation of given sign
+     between two constructors *)
+  let find_cstor_pair ~sign ~eligible c =
+    Lits.fold_lits ~eligible (C.lits c)
+    |> Sequence.find
+      (fun (lit, i) -> match lit with
+         | Literal.Equation (l, r, sign') when sign=sign' ->
+           begin match T.Classic.view l, T.Classic.view r with
+             | T.Classic.App (s1, l1), T.Classic.App (s2, l2)
+              when Ind_ty.is_constructor s1
+              && Ind_ty.is_constructor s2
+               -> Some (i,s1,l1,s2,l2)
+             | _ -> None
+           end
+         | _ -> None)
+
+  (* if c is `f(t1,...,tn) = f(t1',...,tn') or d`, with f inductive cstor, then
+      replace c with `And_i (ti = ti' or d)` *)
+  let injectivity_destruct_pos c =
+    let eligible = C.Eligible.(filter Literal.is_eq) in
+    match find_cstor_pair ~sign:true ~eligible c with
+    | Some (idx,s1,l1,s2,l2) when ID.equal s1 s2 ->
+      (* same constructor: simplify *)
+      assert (List.length l1 = List.length l2);
+      let other_lits = CCArray.except_idx (C.lits c) idx in
+      let new_lits = List.map2 (fun t1 t2 -> Literal.mk_eq t1 t2) l1 l2 in
+      let rule = ProofStep.mk_rule ~comment:["induction"] "injectivity_destruct+" in
+      let proof = ProofStep.mk_inference ~rule [C.proof c] in
+      (* make one clause per [new_lits] *)
+      let clauses =
+        List.map
+          (fun lit ->
+             C.create ~trail:(C.trail c) (lit :: other_lits) proof)
+          new_lits
+      in
+      Util.debugf ~section 3 "@[<hv2>injectivity:@ simplify @[%a@]@ into @[<v>%a@]@]"
+        (fun k->k C.pp c (CCFormat.list C.pp) clauses);
+      Some clauses
+    | Some _
+    | None -> None
 
   (* if c is  f(t1,...,tn) != f(t1',...,tn') or d, with f inductive cstor, then
       replace c with    t1 != t1' or ... or tn != tn' or d *)
-  let injectivity_destruct c =
-    try
-      let eligible = C.Eligible.(filter Literal.is_neq) in
-      Lits.fold_lits ~eligible (C.lits c)
-      |> Sequence.iter
-        (fun (lit, i) -> match lit with
-           | Literal.Equation (l, r, false) ->
-               begin match T.Classic.view l, T.Classic.view r with
-                 | T.Classic.App (s1, l1), T.Classic.App (s2, l2)
-                   when ID.equal s1 s2
-                     && Ind_ty.is_constructor s1
-                   ->
-                     (* destruct *)
-                     assert (List.length l1 = List.length l2);
-                     let pairs = List.combine l1 l2 in
-                     raise (FoundInductiveLit (i, pairs))
-                 | _ -> ()
-               end
-           | _ -> ()
-        );
-      SimplM.return_same c (* nothing happened *)
-    with FoundInductiveLit (idx, pairs) ->
+  let injectivity_destruct_neg c =
+    let eligible = C.Eligible.(filter Literal.is_neq) in
+    match find_cstor_pair ~sign:false ~eligible c with
+    | Some (idx,s1,l1,s2,l2) when ID.equal s1 s2 ->
+      (* same constructor: simplify *)
       let lits = CCArray.except_idx (C.lits c) idx in
-      let new_lits = List.map (fun (t1,t2) -> Literal.mk_neq t1 t2) pairs in
-      let rule = ProofStep.mk_rule ~comment:["induction"] "injectivity_destruct" in
+      assert (List.length l1 = List.length l2);
+      let new_lits = List.map2 (fun t1 t2 -> Literal.mk_neq t1 t2) l1 l2 in
+      let rule = ProofStep.mk_rule ~comment:["induction"] "injectivity_destruct-" in
       let proof = ProofStep.mk_inference ~rule [C.proof c] in
       let c' = C.create ~trail:(C.trail c) (new_lits @ lits) proof in
       Util.debugf ~section 3 "@[<hv2>injectivity:@ simplify @[%a@]@ into @[%a@]@]"
         (fun k->k C.pp c C.pp c');
       SimplM.return_new c'
+    | Some _
+    | None -> SimplM.return_same c
+
+  (* rule on literals that are trivial or absurd depending on toplevel
+     constructor *)
+  let disjointness lit = match lit with
+    | Literal.Equation (l,r,sign) ->
+      begin match T.Classic.view l, T.Classic.view r with
+        | T.Classic.App (s1, _), T.Classic.App (s2, _)
+          when Ind_ty.is_constructor s1
+            && Ind_ty.is_constructor s2
+            && not (ID.equal s1 s2)
+          ->
+          (* s1(...) = s2(...) is absurd,
+             s1(...) != s2(...) is obvious *)
+          if sign
+          then Some Literal.mk_absurd
+          else Some Literal.mk_tauto
+
+        | _ -> None
+      end
+    | _ -> None
 
   let setup() =
     Util.debug ~section 2 "setup inductive types calculus";
     Env.add_is_trivial acyclicity_trivial;
     Env.add_simplify acyclicity_simplify;
-    Env.add_simplify injectivity_destruct;
+    Env.add_simplify injectivity_destruct_neg;
+    Env.add_multi_simpl_rule injectivity_destruct_pos;
+    Env.add_lit_rule "disjointness" disjointness;
     ()
 end
 
