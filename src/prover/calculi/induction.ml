@@ -378,7 +378,7 @@ module Make
 
   exception FoundInductiveLit of int * (T.t * T.t) list
 
-  (* if c is  f(t1,...,tn) != f(t1',...,tn') or d, with f inductive symbol, then
+  (* if c is  f(t1,...,tn) != f(t1',...,tn') or d, with f inductive cstor, then
       replace c with    t1 != t1' or ... or tn != tn' or d *)
   let injectivity_destruct c =
     try

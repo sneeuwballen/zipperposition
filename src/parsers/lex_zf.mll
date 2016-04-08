@@ -56,7 +56,7 @@ rule token = parse
   | "assert" { ASSERT }
   | "goal" { GOAL }
   | "and" { AND }
-  | "where" { WHERE }
+  | "rewrite" { REWRITE }
   | "true" { LOGIC_TRUE }
   | "false" { LOGIC_FALSE }
   | "pi" { PI }

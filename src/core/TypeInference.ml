@@ -544,31 +544,43 @@ type typed_statement = (typed, typed, type_, UntypedAST.attrs) Statement.t
 module A = UntypedAST
 module Stmt = Statement
 
-(* decompose [t] as [forall vars. id args = rhs], return [args, rhs]
+let check_vars ?loc bound lhs rhs =
+  let vars_lhs = T.Seq.free_vars lhs |> Var.Set.of_seq in
+  let vars_rhs = T.Seq.free_vars rhs |> Var.Set.of_seq in
+  (* check that all variables in [lhs] are bound *)
+  let not_bound = Var.Set.diff vars_lhs bound in
+  if not (Var.Set.is_empty not_bound)
+    then error_ ?loc "variables @[%a@] are not bound" Var.Set.pp not_bound;
+  (* check that all variables of [rhs] are within [lhs] *)
+  let only_in_rhs = Var.Set.diff vars_rhs vars_lhs in
+  if not (Var.Set.is_empty only_in_rhs)
+    then error_ ?loc "variables @[%a@] occur in RHS but not LHS" Var.Set.pp only_in_rhs;
+  ()
+
+(* decompose [t] as [forall vars. id args = rhs]
+   or [forall vars. lhs <=> rhs]
+   @return [id, ty, args, rhs] or [lhs,rhs]
   @param bound the set of bound variables so far *)
-let rec as_def_of ?loc bound id t =
+let rec as_def ?loc bound t =
   let fail() =
-    error_ ?loc "expected `forall <vars>. %a <args> = <term>`" ID.pp id
+    error_ ?loc "expected `forall <vars>. <lhs> =/<=> <rhs>`"
   in
   match T.view t with
     | T.Bind (Binder.Forall, v, t) ->
-      as_def_of ?loc (Var.Set.add bound v) id t
-    | T.AppBuiltin ((Builtin.Eq | Builtin.Equiv), [lhs;rhs]) ->
+      as_def ?loc (Var.Set.add bound v) t
+    | T.AppBuiltin (Builtin.Equiv, [lhs;rhs]) ->
+      check_vars ?loc bound lhs rhs;
+      (* check that LHS is a literal *)
+      let lhs = SLiteral.of_form lhs in
+      `Prop (lhs,rhs)
+    | T.AppBuiltin (Builtin.Eq, [lhs;rhs]) ->
+      check_vars ?loc bound lhs rhs;
       begin match T.view lhs with
         | T.App (f, args) ->
           begin match T.view f with
-            | T.Const id' when ID.equal id id' ->
-              let vars =
-                Sequence.of_list (rhs :: args)
-                |> Sequence.flat_map T.Seq.free_vars
-                |> Var.Set.of_seq
-              in
-              let diff = Var.Set.diff vars bound in
-              if Var.Set.is_empty diff
-              then args, rhs
-              else error_ ?loc "variables @[%a@] are not bound" Var.Set.pp diff
-            | T.Const id' ->
-              error_ ?loc "expected function to be %a, not %a" ID.pp id ID.pp id'
+            | T.Const id ->
+              let ty = T.ty_exn f in
+              `Term (id, ty, args, rhs)
             | _ -> fail()
           end
         | _ -> fail()
@@ -597,24 +609,18 @@ let infer_statement_exn ctx st =
         let t = infer_exn ctx t in
         Ctx.declare ctx id ty;
         Stmt.def ~src id ty t
-    | A.DefWhere (_,_,[]) -> assert false
-    | A.DefWhere (s,ty,l) ->
-        let id = ID.make s in
-        let ty = infer_ty_exn ctx ty in
-        if T.Ty.returns_tType ty
-        then error_ ?loc "in definition of %a,@ equality between types is forbidden" ID.pp id;
-        (* declare before type-checking the clauses *)
-        Ctx.declare ctx id ty;
-        let kind = if T.Ty.returns_prop ty then `Prop else `Fun in
-        let l =
-          List.map
-            (fun ax ->
-               let ax = infer_prop_exn ctx ax in
-               let args, rhs = as_def_of ?loc Var.Set.empty id ax in
-               {Stmt. def_args=args; def_rhs=rhs})
-            l
-        in
-        Stmt.def_where ~src id ty ~kind l
+    | A.Rewrite t ->
+        let t =  infer_prop_ ctx t in
+        begin match as_def ?loc Var.Set.empty t with
+          | `Term (id,ty,args,rhs) ->
+            if T.Ty.returns_tType ty
+            then error_ ?loc
+                "in definition of %a,@ equality between types is forbidden" ID.pp id;
+            Stmt.rewrite_term ~src id ty args rhs
+          | `Prop (lhs,rhs) ->
+            assert (T.Ty.is_prop (T.ty_exn rhs));
+            Stmt.rewrite_form ~src lhs [rhs]
+        end
     | A.Data l ->
         (* declare the inductive types *)
         let data_types =

@@ -225,7 +225,7 @@ let of_ast st =
       (* XXX we should look if [ty] returns tType or not *)
       A.TypeDecl (name, s, ty, [])
   | UA.Def (_,_,_)
-  | UA.DefWhere _ -> error "cannot convert `def` statement into TPTP"
+  | UA.Rewrite _ -> error "cannot convert `rewrite` statement into TPTP"
   | UA.Data _ -> error "cannot convert `data` statement into TPTP"
   | UA.Goal f -> A.TFF (name, A.R_conjecture, f, [])
   | UA.Assert f -> A.TFF (name, A.R_axiom, f, [])

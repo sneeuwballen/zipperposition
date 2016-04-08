@@ -41,6 +41,13 @@ let fold f acc = function
   | Eq (a,b)
   | Neq (a,b) -> f (f acc a) b
 
+let iter ~f = function
+  | True
+  | False -> ()
+  | Atom (t, _) -> f t
+  | Eq (a,b)
+  | Neq (a,b) -> f a; f b
+
 let to_seq l f = match l with
   | True
   | False -> ()

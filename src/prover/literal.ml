@@ -278,7 +278,7 @@ let variant ?(subst=S.empty) lit1 lit2 k =
 let are_variant lit1 lit2 =
   not (Sequence.is_empty (variant (Scoped.make lit1 0) (Scoped.make lit2 1)))
 
-let matching ?(subst=Substs.empty) lit1 lit2 k =
+let matching ?(subst=Substs.empty) ~pattern:lit1 lit2 k =
   let op = UnifOp.({
       term=(fun ~subst t1 t2 k ->
           try k (Unif.FO.matching_adapt_scope ~subst ~pattern:t1 t2)
@@ -337,7 +337,7 @@ let subsumes ?(subst=Substs.empty) (lit1,sc1) (lit2,sc2) k =
       ArithLit.subsumes ~subst (o1,sc1) (o2,sc2) k
   | Equation (l1, r1, true), Equation (l2, r2, true) ->
       _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k
-  | _ -> matching ~subst (lit1,sc1) (lit2,sc2) k
+  | _ -> matching ~subst ~pattern:(lit1,sc1) (lit2,sc2) k
 
 let unify ?(subst=Substs.empty) lit1 lit2 k =
   let op = UnifOp.({
@@ -361,18 +361,28 @@ let map f = function
   | True -> True
   | False -> False
 
-let apply_subst ~renaming subst (lit,sc) =
+let apply_subst_ ~f_term ~f_arith_lit subst (lit,sc) =
   match lit with
   | Equation (l,r,sign) ->
-      let new_l = S.FO.apply ~renaming subst (l,sc)
-      and new_r = S.FO.apply ~renaming subst (r,sc) in
+      let new_l = f_term subst (l,sc)
+      and new_r = f_term subst (r,sc) in
       mk_lit new_l new_r sign
   | Prop (p, sign) ->
-      let p' = S.FO.apply ~renaming subst (p,sc) in
+      let p' = f_term subst (p,sc) in
       mk_prop p' sign
-  | Arith o -> Arith (ArithLit.apply_subst ~renaming subst (o,sc))
+  | Arith o -> Arith (f_arith_lit subst (o,sc))
   | True
   | False -> lit
+
+let apply_subst ~renaming subst (lit,sc) =
+  apply_subst_ subst (lit,sc)
+    ~f_term:(S.FO.apply ~renaming)
+    ~f_arith_lit:(ArithLit.apply_subst ~renaming)
+
+let apply_subst_no_renaming subst (lit,sc) =
+  apply_subst_ subst (lit,sc)
+    ~f_term:S.FO.apply_no_renaming
+    ~f_arith_lit:ArithLit.apply_subst_no_renaming
 
 let apply_subst_no_simp ~renaming subst (lit,sc) =
   match lit with

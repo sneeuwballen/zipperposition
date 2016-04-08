@@ -64,7 +64,7 @@ val mk_arith_lesseq : Z.t Monome.t -> Z.t Monome.t -> t
 val mk_divides : ?sign:bool -> Z.t -> power:int -> Z.t Monome.t -> t
 val mk_not_divides : Z.t -> power:int -> Z.t Monome.t -> t
 
-val matching : ?subst:Substs.t -> t Scoped.t -> t Scoped.t ->
+val matching : ?subst:Substs.t -> pattern:t Scoped.t -> t Scoped.t ->
   Substs.t Sequence.t
 (** checks whether subst(lit_a) matches lit_b. Returns alternative
     substitutions s such that s(lit_a) = lit_b and s contains subst. *)
@@ -83,6 +83,8 @@ val are_variant : t -> t -> bool
 
 val apply_subst : renaming:Substs.Renaming.t ->
   Substs.t -> t Scoped.t -> t
+
+val apply_subst_no_renaming : Substs.t -> t Scoped.t -> t
 
 val apply_subst_no_simp : renaming:Substs.Renaming.t ->
   Substs.t -> t Scoped.t -> t

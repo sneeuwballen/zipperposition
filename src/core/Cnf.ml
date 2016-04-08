@@ -509,10 +509,11 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
         let new_st = match st.Stmt.view with
           | Stmt.Data _
           | Stmt.Def _
-          | Stmt.DefWhere (_,_,`Fun,_)
+          | Stmt.RewriteTerm _
           | Stmt.TyDecl _ -> st
-          | Stmt.DefWhere (_,_,`Prop,_) ->
-            assert false (* TODO: if prop, then polarize *)
+          | Stmt.RewriteForm (lhs, rhs) ->
+            let rhs = List.map (conv_form ~is_goal:false) rhs in
+            Stmt.rewrite_form ~src lhs rhs
           | Stmt.Assert f -> Stmt.assert_ ~src (conv_form ~is_goal:false f)
           | Stmt.Goal f -> Stmt.goal ~src (conv_form ~is_goal:true f)
           | Stmt.NegatedGoal _ -> assert false
@@ -587,8 +588,11 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
       match st.Stmt.view with
       | Stmt.Def (id,ty,t) ->
           CCVector.push res (Stmt.def ~src id ty t)
-      | Stmt.DefWhere (id,ty,kind,l) ->
-          CCVector.push res (Stmt.def_where ~src ~kind id ty l)
+      | Stmt.RewriteTerm (id,ty,args,rhs) ->
+          CCVector.push res (Stmt.rewrite_term ~src id ty args rhs)
+      | Stmt.RewriteForm (lhs,rhs) ->
+          let clauses = CCList.flat_map (conv_form ~src) rhs in
+          CCVector.push res (Stmt.rewrite_form ~src lhs clauses)
       | Stmt.Data l ->
           CCVector.push res (Stmt.data ~src l)
       | Stmt.TyDecl (id,ty) ->
@@ -627,6 +631,8 @@ let convert ~file seq =
   (* used for conversion *)
   let t_ctx = FOTerm.Conv.create() in
   let ty_ctx = Type.Conv.create() in
+  let conv_t = FOTerm.Conv.of_simple_term t_ctx in
+  let conv_ty = Type.Conv.of_simple_term_exn ty_ctx in
   let conv_statement st =
     Util.debugf ~section 5
       "@[<2>@{<yellow>convert@}@ `@[%a@]`@]" (fun k->k pp_c_statement st);
@@ -651,22 +657,16 @@ let convert ~file seq =
           Statement.data ~src l
       | Statement.Def (id, ty, t) ->
           let ty = Type.Conv.of_simple_term_exn ty_ctx ty in
-          let t = FOTerm.Conv.of_simple_term  t_ctx t in
+          let t = conv_t t in
           Statement.def ~src id ty t
-      | Statement.DefWhere (id, ty, kind, l) ->
-          let ty = Type.Conv.of_simple_term_exn ty_ctx ty in
-          let conv_t = FOTerm.Conv.of_simple_term t_ctx in
-          let l =
-            List.map
-              (fun d ->
-                 let open Stmt in
-                 { def_args=List.map conv_t d.def_args;
-                   def_rhs=conv_t d.def_rhs })
-              l
-          in
-          Statement.def_where ~src id ty ~kind l
+      | Statement.RewriteTerm (id, ty, args, rhs) ->
+        Statement.rewrite_term ~src id (conv_ty ty) (List.map conv_t args) (conv_t rhs)
+      | Statement.RewriteForm (lhs,rhs) ->
+        Statement.rewrite_form ~src
+          (SLiteral.map ~f:conv_t lhs)
+          (List.map (clause_to_fo ~ctx:t_ctx) rhs)
       | Statement.TyDecl (id, ty) ->
-          let ty = Type.Conv.of_simple_term_exn ty_ctx ty in
+          let ty = conv_ty ty in
           Statement.ty_decl ~src id ty
     in
     Util.debugf ~section 3

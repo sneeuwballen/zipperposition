@@ -155,7 +155,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     | Statement.Data _
     | Statement.TyDecl _ -> []
     | Statement.Def _
-    | Statement.DefWhere _ -> [] (* dealt with by rewriting *)
+    | Statement.RewriteForm _
+    | Statement.RewriteTerm _ -> [] (* dealt with by rewriting *)
     | Statement.Assert lits -> [of_lits ~is_goal:false lits]
     | Statement.Goal lits -> [of_lits ~is_goal:true lits]
     | Statement.NegatedGoal l -> List.map (of_lits ~is_goal:true) l

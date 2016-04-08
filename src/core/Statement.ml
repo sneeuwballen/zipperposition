@@ -17,19 +17,12 @@ type 'ty data = {
      [ty1 -> ty2 -> ... -> id args] *)
 }
 
-(** A equational/propositional definition of a symbol using
-    an equation/equivalence.
-    [forall def_vars. id def_args = def_rhs] *)
-type ('t, 'ty) def_clause = {
-  def_args: 't list;
-  def_rhs: 't;
-}
-
 type ('f, 't, 'ty) view =
   | TyDecl of ID.t * 'ty (** id: ty *)
   | Data of 'ty data list
   | Def of ID.t * 'ty * 't
-  | DefWhere of ID.t * 'ty * [`Prop | `Fun] * ('t,'ty) def_clause list
+  | RewriteTerm of ID.t * 'ty * 't list * 't (* args, rhs *)
+  | RewriteForm of 't SLiteral.t * 'f list (* lhs atomic form, rhs conjunction *)
   | Assert of 'f (** assert form *)
   | Goal of 'f (** goal to prove *)
   | NegatedGoal of 'f list (** goal after negation *)
@@ -52,7 +45,8 @@ let mk_data id ~args ty cstors =
 
 let ty_decl ~src id ty = {src; view=TyDecl (id,ty); }
 let def ~src id ty t = {src; view=Def (id,ty,t); }
-let def_where ~src id ty ~kind l = {src; view=DefWhere (id,ty,kind,l); }
+let rewrite_term ~src id ty args rhs = {src; view=RewriteTerm(id,ty,args,rhs)}
+let rewrite_form ~src lhs rhs = {src; view=RewriteForm(lhs,rhs)}
 let data ~src l = {src; view=Data l; }
 let assert_ ~src c = {src; view=Assert c; }
 let goal ~src c = {src; view=Goal c; }
@@ -68,16 +62,13 @@ let map_data ~ty:fty d =
 let map ~form ~term ~ty st =
   let map_view ~form ~term ~ty:fty = function
     | Def (id, ty, t) -> Def (id, fty ty, term t)
-    | DefWhere (id, ty, kind, l) ->
-      let l = List.map
-          (fun d ->
-             {def_args=List.map term d.def_args; def_rhs=term d.def_rhs})
-          l
-      in
-      DefWhere (id, fty ty, kind, l)
+    | RewriteTerm (id, ty, args, rhs) ->
+      RewriteTerm (id, fty ty, List.map term args, term rhs)
+    | RewriteForm (lhs,rhs) ->
+      RewriteForm (SLiteral.map ~f:term lhs, List.map form rhs)
     | Data l ->
-    let l = List.map (map_data ~ty:fty) l in
-    Data l
+      let l = List.map (map_data ~ty:fty) l in
+      Data l
     | Goal f -> Goal (form f)
     | NegatedGoal l -> NegatedGoal (List.map form l)
     | Assert f -> Assert (form f)
@@ -126,13 +117,13 @@ module Seq = struct
     match view st with
       | TyDecl (id,ty) -> decl id ty;
       | Def (id,ty,t) -> decl id ty; k (`Term t)
-      | DefWhere (id,ty,_,l) ->
-        decl id ty;
-        List.iter
-          (fun d ->
-             k (`Term d.def_rhs);
-             List.iter (fun t -> k (`Term t)) d.def_args)
-          l
+      | RewriteTerm (_,ty,args,rhs) ->
+        k (`Ty ty);
+        List.iter (fun t -> k (`Term t)) args;
+        k (`Term rhs)
+      | RewriteForm (lhs,rhs) ->
+        SLiteral.iter ~f:(fun t -> k (`Term t)) lhs;
+        List.iter (fun f -> k (`Form f)) rhs
       | Data l ->
         List.iter
           (fun d ->
@@ -145,7 +136,6 @@ module Seq = struct
 
   let ty_decls st k = match view st with
     | Def (id, ty, _)
-    | DefWhere (id, ty, _, _)
     | TyDecl (id, ty) -> k (id,ty)
     | Data l ->
         List.iter
@@ -153,16 +143,19 @@ module Seq = struct
             k (d.data_id, d.data_ty);
             List.iter k d.data_cstors)
           l
+    | RewriteTerm _
+    | RewriteForm _
     | Goal _
     | NegatedGoal _
     | Assert _ -> ()
 
   let forms st k = match view st with
     | Def _
-    | DefWhere _
+    | RewriteTerm _
     | Data _
     | TyDecl _ -> ()
     | Goal c -> k c
+    | RewriteForm (_, l)
     | NegatedGoal l -> List.iter k l
     | Assert c -> k c
 
@@ -201,13 +194,12 @@ let pp ppf ppt ppty out st = match st.view with
       fpf out "@[<2>val %a :@ @[%a@]@]." ID.pp id ppty ty
   | Def (id,ty,t) ->
       fpf out "@[<2>def %a :@ @[%a@]@ := @[%a@]@]." ID.pp id ppty ty ppt t
-  | DefWhere (id,ty,_,l) ->
-      let pp_ax out d =
-        fpf out "| @[<2>@[%a %a@]@ = @[%a@]@]"
-          ID.pp id (Util.pp_list ~sep:" " ppt) d.def_args ppt d.def_rhs
-      in
-      fpf out "@[<2>def %a :@ @[%a@] where@ @[<v>%a@]@]."
-        ID.pp id ppty ty (Util.pp_list ~sep:"" pp_ax) l
+  | RewriteTerm (id, _, args, rhs) ->
+      fpf out "@[<2>@[%a %a@]@ = @[%a@]@]"
+        ID.pp id (Util.pp_list ~sep:" " ppt) args ppt rhs
+  | RewriteForm (lhs, rhs) ->
+      fpf out "@[<2>@[%a@]@ <=> @[%a@]@]"
+        (SLiteral.pp ppt) lhs (Util.pp_list ~sep:" && " ppf) rhs
   | Data l ->
       let pp_cstor out (id,ty) =
         fpf out "@[<2>| %a :@ @[%a@]@]" ID.pp id ppty ty in
@@ -254,13 +246,12 @@ module TPTP = struct
     | Def (id, ty, t) ->
         pp_decl out (id,ty);
         fpf out "@[<2>tff(%s, axiom,@ %a =@ @[%a@])@]." name ID.pp id ppt t
-    | DefWhere (id, ty, _, l) ->
-        pp_decl out (id,ty);
-        List.iter
-          (fun d ->
-             fpf out "@[<2>tff(%s, axiom,@ %a(%a) =@ @[%a@])@]."
-               name ID.pp id (Util.pp_list ~sep:", " ppt) d.def_args ppt d.def_rhs)
-          l
+    | RewriteTerm (id, _, args, rhs) ->
+        fpf out "@[<2>tff(%s, axiom,@ %a(%a) =@ @[%a@])@]."
+          name ID.pp id (Util.pp_list ~sep:", " ppt) args ppt rhs
+    | RewriteForm (lhs, rhs) ->
+        fpf out "@[<2>tff(%s, axiom,@ %a <=>@ (@[%a@]))@]."
+          name (SLiteral.TPTP.pp ppt) lhs (Util.pp_list ~sep:" & " ppf) rhs
     | Data _ -> failwith "cannot print `data` to TPTP"
 
   let to_string ppf ppt ppty = CCFormat.to_string (pp ppf ppt ppty)
