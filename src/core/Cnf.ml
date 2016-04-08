@@ -591,8 +591,14 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
       | Stmt.RewriteTerm (id,ty,args,rhs) ->
           CCVector.push res (Stmt.rewrite_term ~src id ty args rhs)
       | Stmt.RewriteForm (lhs,rhs) ->
-          let clauses = CCList.flat_map (conv_form ~src) rhs in
-          CCVector.push res (Stmt.rewrite_form ~src lhs clauses)
+          (* polarized rewriting: make two rewrite rules, one positive,
+             one negative.
+             positive:   lhs <=> cnf(rhs)
+             negative: ¬ lhs <=> cnf(¬ rhs) *)
+          let c_pos = CCList.flat_map (conv_form ~src) rhs in
+          CCVector.push res (Stmt.rewrite_form ~src lhs c_pos);
+          let c_neg = conv_form ~src (F.not_ (F.and_ rhs)) in
+          CCVector.push res (Stmt.rewrite_form ~src (SLiteral.negate lhs) c_neg);
       | Stmt.Data l ->
           CCVector.push res (Stmt.data ~src l)
       | Stmt.TyDecl (id,ty) ->

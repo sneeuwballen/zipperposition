@@ -88,6 +88,13 @@ let sign = function
 let is_pos l = sign l
 let is_neg l = not (sign l)
 
+let negate = function
+  | True -> False
+  | False -> True
+  | Atom (t,sign) -> atom t (not sign)
+  | Eq (a,b) -> neq a b
+  | Neq (a,b) -> eq a b
+
 let fpf = Format.fprintf
 
 let to_form = function

@@ -43,6 +43,9 @@ val sign : _ t -> bool
 val is_pos : _ t -> bool
 val is_neg : _ t -> bool
 
+val negate : 'a t -> 'a t
+(** negation of literal *)
+
 include Interfaces.PRINT1 with type 'a t := 'a t
 
 module TPTP : sig
