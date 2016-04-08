@@ -14,15 +14,6 @@ module O = Ordering
 module Lit = Literal
 module S = Substs
 
-(* load some other modules, but they might not be registered *)
-module Import = struct
-  open! ArithInt
-  open! EnumTypes
-  open! Avatar
-  open! Induction
-  open! Msat
-end
-
 let section = Const.section
 
 (* setup an alarm for abrupt stop *)
@@ -54,6 +45,7 @@ let load_extensions =
   Extensions.register EnumTypes.extension;
   Extensions.register Induction.extension;
   Extensions.register Rewriting.extension;
+  Extensions.register Ind_types.extension;
   let l = Extensions.extensions () in
   Phases.return_phase l
 
