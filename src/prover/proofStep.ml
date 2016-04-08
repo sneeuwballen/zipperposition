@@ -231,15 +231,16 @@ let depth proof =
 
 (** {2 IO} *)
 
-let pp_rule out r =
+let pp_rule ~info out r =
   let pp_info out = function
     | I_subst s -> Format.fprintf out " with @[%a@]" Substs.pp s
     | I_pos p -> Format.fprintf out " at @[%a@]" Position.pp p
     | I_comment s -> Format.fprintf out " %s" s
   in
   let pp_list pp = Util.pp_list ~sep:"" pp in
-  Format.fprintf out
-    "@[%s%a@]" r.rule_name (pp_list pp_info) r.rule_info
+  if info
+  then Format.fprintf out "@[%s%a@]" r.rule_name (pp_list pp_info) r.rule_info
+  else Format.fprintf out "'%s'" r.rule_name
 
 let pp_kind_tstp out k =
   match k with
@@ -252,11 +253,11 @@ let pp_kind_tstp out k =
       end
   | Data _ -> Util.error ~where:"ProofStep" "cannot print `Data` step in TPTP"
   | Inference rule ->
-      Format.fprintf out "inference(%a, [status(thm)])" pp_rule rule
+      Format.fprintf out "inference(%a, [status(thm)])" (pp_rule ~info:false) rule
   | Simplification rule ->
-      Format.fprintf out "inference(%a, [status(thm)])" pp_rule rule
+      Format.fprintf out "inference(%a, [status(thm)])" (pp_rule ~info:false) rule
   | Esa rule ->
-      Format.fprintf out "inference(%a, [status(esa)])" pp_rule rule
+      Format.fprintf out "inference(%a, [status(esa)])" (pp_rule ~info:false) rule
   | Trivial ->
       Format.fprintf out "trivial([status(thm)])"
 
@@ -272,10 +273,10 @@ let pp_kind out k =
   | Goal src -> pp_src " (goal)" out src
   | Data (src, _) -> pp_src " (data)" out src
   | Inference rule ->
-      Format.fprintf out "inf %a" pp_rule rule
+      Format.fprintf out "inf %a" (pp_rule ~info:true) rule
   | Simplification rule ->
-      Format.fprintf out "simp %a" pp_rule rule
+      Format.fprintf out "simp %a" (pp_rule ~info:true) rule
   | Esa rule ->
-      Format.fprintf out "esa %a" pp_rule rule
+      Format.fprintf out "esa %a" (pp_rule ~info:true) rule
   | Trivial -> CCFormat.string out "trivial"
 

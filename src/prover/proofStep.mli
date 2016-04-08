@@ -144,7 +144,7 @@ val depth : _ t -> int
 
 (** {2 IO} *)
 
-val pp_rule : rule CCFormat.printer
+val pp_rule : info:bool -> rule CCFormat.printer
 
 val pp_kind : kind CCFormat.printer
 val pp_kind_tstp : kind CCFormat.printer

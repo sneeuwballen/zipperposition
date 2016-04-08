@@ -118,10 +118,10 @@ module Make(C : CLAUSE) = struct
     let pp_step status out (rule,parents) =
       match parents with
       | [] ->
-        Format.fprintf out "inference(%a, [status(%s)])" pp_rule rule status
+        Format.fprintf out "inference(%a, [status(%s)])" (pp_rule ~info:false) rule status
       | _::_ ->
         Format.fprintf out "inference(%a, [status(%s)], [%a])"
-          pp_rule rule status pp_parents parents
+          (pp_rule ~info:false) rule status pp_parents parents
     in
     match k with
     | Assert src

@@ -396,14 +396,14 @@ let rec infer_rec ctx t =
   | PT.AppBuiltin (Builtin.True, []) -> T.Form.true_
   | PT.AppBuiltin (Builtin.False, []) -> T.Form.false_
   | PT.AppBuiltin (Builtin.And, l) ->
-      let l = List.map (infer_prop_ ctx) l in
+      let l = List.map (infer_prop_ ?loc ctx) l in
       T.Form.and_ ?loc l
   | PT.AppBuiltin (Builtin.Or, l) ->
-      let l = List.map (infer_prop_ ctx) l in
+      let l = List.map (infer_prop_ ?loc ctx) l in
       T.Form.or_ ?loc l
   | PT.AppBuiltin (((Builtin.Equiv | Builtin.Xor | Builtin.Imply) as conn), [a;b]) ->
-      let a = infer_prop_ ctx a
-      and b = infer_prop_ ctx b in
+      let a = infer_prop_ ?loc ctx a
+      and b = infer_prop_ ?loc ctx b in
       begin match conn with
         | Builtin.Equiv -> T.Form.equiv ?loc a b
         | Builtin.Xor -> T.Form.xor ?loc a b
@@ -411,7 +411,7 @@ let rec infer_rec ctx t =
         | _ -> assert false
       end
   | PT.AppBuiltin (Builtin.Not, [a]) ->
-      let a = infer_prop_ ctx a in
+      let a = infer_prop_ ?loc ctx a in
       T.Form.not_ ?loc a
   | PT.AppBuiltin ((Builtin.Eq | Builtin.Neq) as conn, [a;b]) ->
       (* a ?= b *)
@@ -419,7 +419,9 @@ let rec infer_rec ctx t =
       let b = infer_rec ctx b in
       unify ?loc (T.ty_exn a) (T.ty_exn b);
       if T.Ty.returns_tType (T.ty_exn a)
-      then error_ ?loc "(in)equation @[%a@] ?= @[%a@] is ill-formed" T.pp a T.pp b;
+        then error_ ?loc "(in)equation @[%a@] ?= @[%a@] between types is forbidden" T.pp a T.pp b;
+      if T.Ty.returns_prop (T.ty_exn a)
+        then error_ ?loc "(in)equation @[%a@] ?= @[%a@] between prop is forbidden" T.pp a T.pp b;
       begin match conn with
         | Builtin.Eq -> T.Form.eq a b
         | Builtin.Neq -> T.Form.neq a b
@@ -481,9 +483,9 @@ let rec infer_rec ctx t =
   t'
 
 (* infer a term, and force its type to [prop] *)
-and infer_prop_ ctx t =
+and infer_prop_ ?loc ctx t =
   let t = infer_rec ctx t in
-  unify (T.ty_exn t) T.Ty.prop;
+  unify ?loc (T.ty_exn t) T.Ty.prop;
   t
 
 let infer_exn ctx t =
