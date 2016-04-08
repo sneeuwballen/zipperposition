@@ -6,13 +6,13 @@ data nat :=
   | Z
   | S nat.
 
-def plus : nat -> nat -> nat where
-  forall x. plus Z x = x
-| forall x y. plus (S x) y = S (plus x y).
+val plus : nat -> nat -> nat.
+rewrite forall x. plus Z x = x.
+rewrite forall x y. plus (S x) y = S (plus x y).
 
-def mult : nat -> nat -> nat where
-  forall x. mult Z x = Z
-| forall x y. mult (S x) y = plus y (mult x y).
+val mult : nat -> nat -> nat.
+rewrite forall x. mult Z x = Z.
+rewrite forall x y. mult (S x) y = plus y (mult x y).
 
 def two : nat := S (S Z).
 def three : nat := S two.

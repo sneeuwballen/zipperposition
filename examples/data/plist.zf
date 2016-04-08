@@ -16,8 +16,8 @@ val map_f : list nat -> list nat.
 
 assert forall n. f n = S n.
 
-assert map_f (Nil _) = Nil _.
-assert forall x l. map_f (Cons _ x l) = Cons _ (f x) (map_f l).
+rewrite map_f (Nil _) = Nil _.
+rewrite forall x l. map_f (Cons _ x l) = Cons _ (f x) (map_f l).
 
 def two : nat := S (S Z).
 def three : nat := S two.

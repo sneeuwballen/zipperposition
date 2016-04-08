@@ -19,3 +19,7 @@
 (A) 2016-04-06 test polymorphic goal
 (A) 2016-04-06 forbid non-closed terms in ZF (close terms in tptp rather than in type infer)
 (D) 2016-04-06 benchmarks from sledgehammer in new syntax, large scale test script @bench
+(A) 2016-04-07 do not enable induction if all data are non-recursive? or case analysis only?
+(D) 2016-04-08 benchmark/optimize term rewriting
+(D) 2016-04-08 syntax for projectors in data (--> records)
+(B) 2016-04-08 explicit schema for (fun/ind pred) induction (explain how to do induction on `even`) in syntax+induction
