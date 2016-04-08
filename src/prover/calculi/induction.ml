@@ -430,7 +430,7 @@ module Make
 end
 
 let enabled_ = ref true
-let lemmas_enabled_ = ref true
+let lemmas_enabled_ = ref false
 let show_lemmas_ = ref false
 
 (* if induction is enabled AND there are some inductive types,
