@@ -50,11 +50,14 @@ let occurs_check ~depth subst (v,sc_v) t =
             List.exists (fun (_,t') -> check ~depth (t',sc_t)) l
         | T.SimpleApp (_, l)
         | T.AppBuiltin (_, l)
-        | T.Multiset l ->
-            List.exists (fun t' -> check ~depth (t',sc_t)) l
+        | T.Multiset l -> check_l ~depth l sc_t
         | T.App (hd, l) ->
             check ~depth (hd,sc_t) ||
-            List.exists (fun t' -> check ~depth (t',sc_t)) l  (* TODO: unroll *)
+            check_l ~depth l sc_t
+  and check_l ~depth l sc = match l with
+    | [] -> false
+    | [t] -> check ~depth (t,sc)
+    | t :: tail -> check ~depth (t,sc) || check_l ~depth tail sc
   in
   check ~depth t
 
