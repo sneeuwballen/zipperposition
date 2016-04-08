@@ -10,6 +10,9 @@ module Su = Substs
 
 let section = Util.Section.(make ~parent:zip "rewriting")
 
+let stat_term_rw = Util.mk_stat "rw.term steps"
+let stat_clause_rw = Util.mk_stat "rw.clause steps"
+
 type rule_term = {
   lhs: T.t;
   rhs: T.t;
@@ -141,14 +144,16 @@ let normalize_term rules t =
                  which contain variables bound by [subst]) *)
               Util.debugf ~section 5 "@[<2>rewrite `@[%a@]`@ using `@[%a@]`@ with `@[%a@]`@]"
                 (fun k->k T.pp t' pp_rule_term r Su.pp subst);
+              Util.incr_stat stat_term_rw;
               reduce ~subst sc' r.rhs
           end
         | _ -> t'
       end
-    | T.DB _
+    | T.DB _ -> t
     | T.Var _ ->
-      (* dereference, or return [t] *)
-      Su.FO.apply_no_renaming subst (t,sc)
+      (* dereference, or return [t]. Careful not to traverse the already-
+          evaluated value! *)
+      fst (Su.FO.deref subst (t,sc))
     | T.AppBuiltin (_,[]) -> t
     | T.AppBuiltin (b,l) ->
       let l' = reduce_l ~subst sc l in
@@ -185,9 +190,10 @@ let normalize_clause rules lits =
          | None -> None
          | Some clauses ->
            Util.debugf ~section 5
-             "@[<2>rewrote `@[%a@]`@ into `@[<v>%a@]`@]"
+             "@[<2>rewrite `@[%a@]`@ into `@[<v>%a@]`@]"
              (fun k->k Literal.pp lit
                  CCFormat.(list (hvbox (Util.pp_list ~sep:" ∨ " Literal.pp))) clauses);
+           Util.incr_stat stat_clause_rw;
            Some (i, clauses))
       lits
   in

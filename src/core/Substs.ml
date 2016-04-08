@@ -256,6 +256,8 @@ module type SPECIALIZED = sig
 
   val find_exn : t -> var Scoped.t -> term Scoped.t
 
+  val deref : t -> term Scoped.t -> term Scoped.t
+
   val apply : t -> renaming:Renaming.t -> term Scoped.t -> term
   (** Apply the substitution to the given term/type.
       @param renaming used to desambiguate free variables from distinct scopes *)
@@ -270,9 +272,13 @@ module type SPECIALIZED = sig
         the same context, to another term. *)
 end
 
-module Ty = struct
+module Ty : SPECIALIZED with type term = Type.t = struct
   type term = Type.t
   type t = subst
+
+  let deref subst t =
+    let t, sc = deref subst (t : term Scoped.t :> T.t Scoped.t) in
+    Type.of_term_unsafe t, sc
 
   let find_exn subst v =
     let t = find_exn subst v in
@@ -291,6 +297,10 @@ module FO = struct
   type term = FOTerm.t
   type t = subst
 
+  let deref subst t =
+    let t, sc = deref subst (t : term Scoped.t :> T.t Scoped.t) in
+    FOTerm.of_term_unsafe t, sc
+
   let find_exn subst v =
     let t = find_exn subst v in
     Scoped.map FOTerm.of_term_unsafe t
@@ -307,6 +317,10 @@ end
 module HO = struct
   type term = HOTerm.t
   type t = subst
+
+  let deref subst t =
+    let t, sc = deref subst (t : term Scoped.t :> T.t Scoped.t) in
+    HOTerm.of_term_unsafe t, sc
 
   let find_exn subst v =
     let t = find_exn subst v in
