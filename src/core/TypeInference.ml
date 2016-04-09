@@ -569,8 +569,9 @@ let rec as_def ?loc bound t =
     | T.Bind (Binder.Forall, v, t) ->
       as_def ?loc (Var.Set.add bound v) t
     | T.AppBuiltin (Builtin.Equiv, [lhs;rhs]) ->
+      (* check that LHS is a literal, and  that all free variables
+         of RHS occur in LHS (bound variables are ok though) *)
       check_vars ?loc bound lhs rhs;
-      (* check that LHS is a literal *)
       let lhs = SLiteral.of_form lhs in
       `Prop (lhs,rhs)
     | T.AppBuiltin (Builtin.Eq, [lhs;rhs]) ->

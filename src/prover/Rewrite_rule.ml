@@ -181,44 +181,47 @@ let normalize_term rules t =
 
 (* try to rewrite this literal, returning a list of list of lits instead *)
 let step_lit rules lit =
-  let eval_ll subst (l,sc) =
-    List.map
-      (List.map
-         (fun lit -> Literal.apply_subst_no_renaming subst (lit,sc)))
-      l
-  in
   CCList.find_map
     (fun r ->
        let substs = Literal.matching ~pattern:(r.c_lhs,1) (lit,0) in
        match Sequence.head substs with
        | None -> None
-       | Some subst ->
-         (* win! *)
-         let clauses = eval_ll subst (r.c_rhs,1) in
-         Some clauses)
+       | Some subst -> Some (r.c_rhs, subst))
     rules
 
 let normalize_clause rules lits =
+  let eval_ll ~renaming subst (l,sc) =
+    List.map
+      (List.map
+         (fun lit -> Literal.apply_subst ~renaming subst (lit,sc)))
+      l
+  in
   let step =
     CCList.find_mapi
       (fun i lit -> match step_lit rules.Set.clauses lit with
          | None -> None
-         | Some clauses ->
+         | Some (clauses,subst) ->
            Util.debugf ~section 5
-             "@[<2>rewrite `@[%a@]`@ into `@[<v>%a@]`@]"
+             "@[<2>rewrite `@[%a@]`@ into `@[<v>%a@]`@ with @[%a@]@]"
              (fun k->k Literal.pp lit
-                 CCFormat.(list (hvbox (Util.pp_list ~sep:" ∨ " Literal.pp))) clauses);
+                 CCFormat.(list (hvbox (Util.pp_list ~sep:" ∨ " Literal.pp))) clauses
+                Substs.pp subst);
            Util.incr_stat stat_clause_rw;
-           Some (i, clauses))
+           Some (i, clauses, subst))
       lits
   in
   match step with
     | None -> None
-    | Some (i, clause_chunks) ->
-      (* remove rewritten literal, replace by [clause_chunks], distribute to
-         get a CNF again *)
+    | Some (i, clause_chunks, subst) ->
+      (* remove rewritten literal, replace by [clause_chunks], apply
+         substitution (clause_chunks might contain other variables!),
+         distribute to get a CNF again *)
       let lits = CCList.Idx.remove lits i in
+      let renaming = Substs.Renaming.create () in
+      let lits = Literal.apply_subst_list ~renaming subst (lits,0) in
+      let clause_chunks = eval_ll ~renaming subst (clause_chunks,1) in
       let clauses =
-        Util.map_product clause_chunks ~f:(fun new_lits -> [new_lits @ lits])
+        Util.map_product clause_chunks
+          ~f:(fun new_lits -> [new_lits @ lits])
       in
       Some clauses
