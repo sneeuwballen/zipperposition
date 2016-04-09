@@ -213,15 +213,12 @@ let normalize_clause rules lits =
   match step with
     | None -> None
     | Some (i, clause_chunks, subst) ->
+      let renaming = Substs.Renaming.create () in
       (* remove rewritten literal, replace by [clause_chunks], apply
          substitution (clause_chunks might contain other variables!),
          distribute to get a CNF again *)
       let lits = CCList.Idx.remove lits i in
-      let renaming = Substs.Renaming.create () in
       let lits = Literal.apply_subst_list ~renaming subst (lits,0) in
       let clause_chunks = eval_ll ~renaming subst (clause_chunks,1) in
-      let clauses =
-        Util.map_product clause_chunks
-          ~f:(fun new_lits -> [new_lits @ lits])
-      in
+      let clauses = List.map (fun new_lits -> new_lits @ lits) clause_chunks in
       Some clauses
