@@ -1,0 +1,28 @@
+
+# find an integer whose factorial is bigger than some bound
+
+data nat := Z | S nat.
+
+val plus : nat -> nat -> nat.
+rewrite forall x. plus Z x = x.
+rewrite forall x y. plus (S x) y = S (plus x y).
+
+val mult : nat -> nat -> nat.
+rewrite forall x. mult Z x = Z.
+rewrite forall x y. mult (S x) y = plus y (mult x y).
+
+val fact : nat -> nat.
+rewrite fact Z = S Z.
+rewrite forall n. fact (S n) = mult (S n) (fact n).
+
+val leq : nat -> nat -> prop.
+rewrite forall n. leq Z n <=> true.
+rewrite forall m n. leq (S m) (S n) <=> leq m n.
+
+def three : nat := S (S (S Z)).
+def ten : nat := S (mult three three).
+def bound : nat := mult ten ten.
+
+goal exists n. leq bound (fact n).
+
+
