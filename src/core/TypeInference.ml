@@ -170,6 +170,7 @@ module Ctx = struct
         Util.debugf ~section 5 "@[<2>generalize type meta_var %a@]"
           (fun k->k Var.pp v);
         r := Some (T.var v')
+    | None, `NoBind -> assert false
     | Some _, _ -> ()
 
   let exit_scope ctx =

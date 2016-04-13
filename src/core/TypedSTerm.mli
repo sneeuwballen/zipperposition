@@ -23,7 +23,7 @@ type view = private
 
 (* a variable with a one-shot binding, and some annotation about
    whether it can be generalized *)
-and meta_var = t Var.t * t option ref * [`Generalize | `BindDefault]
+and meta_var = t Var.t * t option ref * [`Generalize | `BindDefault | `NoBind]
 
 val view : t -> view
 val loc : t -> location option
@@ -44,6 +44,7 @@ val tType : t
 val prop : t
 
 val var : ?loc:location -> t Var.t -> t
+val var_of_string : ?loc:location -> ty:t -> string -> t
 val app : ?loc:location -> ty:t -> t -> t list -> t
 val const : ?loc:location -> ty:t -> ID.t -> t
 val app_builtin : ?loc:location -> ty:t -> Builtin.t -> t list -> t
@@ -89,6 +90,7 @@ module Ty : sig
 
   val tType : t
   val var : ?loc:location -> t Var.t -> t
+  val var_of_string : ?loc:location -> string -> t
   val meta : ?loc:location -> meta_var -> t
   val fun_ : ?loc:location -> t list -> t -> t
   val app : ?loc:location -> ID.t -> t list -> t
@@ -268,6 +270,9 @@ val apply_unify :
     when applied to parameters [args]. The first elements of [args] might
     be interpreted as types, the other ones as terms (whose types are unified
     against expected types). *)
+
+val deref_rec : t -> t
+(** Follow meta-variables links in all subterms *)
 
 (** {2 Conversion} *)
 

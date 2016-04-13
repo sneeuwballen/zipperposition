@@ -28,7 +28,7 @@ and view =
   | Record of (string * t) list * t option (** extensible record *)
   | Meta of meta_var (** Unification variable *)
 
-and meta_var = t Var.t * t option ref * [`Generalize | `BindDefault]
+and meta_var = t Var.t * t option ref * [`Generalize | `BindDefault | `NoBind]
 
 type term = t
 
@@ -179,6 +179,7 @@ let () = Printexc.register_printer
 let make_ ?loc ~ty view = {term=view; loc; ty=Some ty; }
 
 let var ?loc v = make_ ?loc ~ty:v.Var.ty (Var v)
+let var_of_string ?loc ~ty n = var ?loc (Var.of_string ~ty n)
 let const ?loc ~ty s = make_ ?loc ~ty (Const s)
 let app_builtin ?loc ~ty b l = make_ ?loc ~ty (AppBuiltin (b,l))
 let builtin ?loc ~ty b = make_ ?loc ~ty (AppBuiltin (b,[]))
@@ -385,6 +386,7 @@ module Ty = struct
 
   let tType = tType
   let var = var
+  let var_of_string ?loc v = var_of_string ?loc ~ty:tType v
   let meta = meta
 
   let mk_fun_ ?loc args ret = app_builtin ?loc ~ty:tType Builtin.Arrow (ret::args)
@@ -777,6 +779,24 @@ let unify ?(allow_open=false) ?loc ?(st=UStack.create()) ?(subst=Subst.empty) t1
     | App (f1,l1), App (f2,l2) when List.length l1=List.length l2 ->
         unif_rec subst f1 f2;
         unif_l subst l1 l2
+    | App (f1,l1), App (f2,l2) ->
+        let n1 = List.length l1 in
+        let n2 = List.length l2 in
+        assert (n1 <> n2);
+        (* if [t1 = f1 (hd1 @ tl1)] where [length tl1 = length l2], then
+           unify [f1 hd1] with [f2], and [tl1] with [l2] *)
+        if n1>n2
+        then (
+          let hd1, tl1 = CCList.take_drop (n1-n2) l1 in
+          let f1' = app f1 hd1 ~ty:Ty.(fun_ (List.map ty_exn tl1) (ty_exn t1)) in
+          unif_rec subst f1' f2;
+          unif_l subst tl1 l2
+        ) else (
+          let hd2, tl2 = CCList.take_drop (n2-n1) l2 in
+          let f2' = app f2 hd2 ~ty:Ty.(fun_ (List.map ty_exn tl2) (ty_exn t2)) in
+          unif_rec subst f1 f2';
+          unif_l subst l1 tl2
+        )
     | AppBuiltin (b1,l1), AppBuiltin (b2,l2) when List.length l1=List.length l2 ->
         if Builtin.equal b1 b2
         then unif_l subst l1 l2
@@ -898,6 +918,32 @@ let apply_unify ?allow_open ?loc ?st ?(subst=Subst.empty) ty l =
         aux_l subst exp' ret l'
   in
   aux subst ty l
+
+let rec deref_rec t =
+  match t.term with
+  | Meta (_, {contents=Some t'}, _) -> deref_rec t'
+  | Meta _
+  | Const _ -> {t with ty = CCOpt.map deref_rec t.ty}
+  | Var v -> var (deref_rec_var v)
+  | App (f,l) ->
+    let ty = ty_exn t |> deref_rec in
+    app ~ty (deref_rec f) (deref_rec_l l)
+  | Bind (b,v,t) ->
+    let ty = ty_exn t |> deref_rec in
+    bind ~ty b (deref_rec_var v) (deref_rec t)
+  | AppBuiltin (b,l) ->
+    let ty = ty_exn t |> deref_rec in
+    app_builtin ~ty b (deref_rec_l l)
+  | Multiset l ->
+    let ty = ty_exn t |> deref_rec in
+    multiset ~ty (deref_rec_l l)
+  | Record (l, rest) ->
+    let ty = ty_exn t |> deref_rec in
+    let l = List.map (fun (n,t) -> n, deref_rec t) l in
+    let rest = CCOpt.map deref_rec rest in
+    record_flatten ~ty l ~rest
+and deref_rec_l l = List.map deref_rec l
+and deref_rec_var v = Var.update_ty v ~f:deref_rec
 
 (** {2 Conversion} *)
 
