@@ -5,7 +5,7 @@
 
     Those terms are not designed to be used directly, but rather to provide
     a generic backend (implementing De Bruijn indices, subterms, substitutions,
-    etc.) for other more specific representations like Type, FOTerm, FOFormula...
+    etc.) for other more specific representations like Type, FOTerm, ...
 *)
 
 type t
@@ -18,8 +18,6 @@ type view = private
   | DB of int
   | Bind of Binder.t * t * t (** Type, sub-term *)
   | Const of ID.t (** Constant *)
-  | Record of (string * t) list * t HVar.t option (** Extensible record *)
-  | Multiset of t list (** Multiset of terms *)
   | App of t * t list (** Uncurried application *)
   | SimpleApp of ID.t * t list
   | AppBuiltin of Builtin.t * t list (** For representing special constructors *)
@@ -55,9 +53,6 @@ val app : ty:t -> t -> t list -> t
 val bind : ty:t -> varty:t -> Binder.t -> t -> t
 val var : t HVar.t -> t
 val bvar : ty:t -> nat -> t
-val record : ty:t -> (string * t) list -> rest:t HVar.t option -> t
-val record_flatten : ty:t -> (string * t) list -> rest:t option -> t
-val multiset : ty:t -> t list -> t
 val simple_app : ty:t -> ID.t -> t list -> t
 val app_builtin : ty:t -> Builtin.t -> t list -> t
 val builtin: ty:t -> Builtin.t -> t
@@ -74,8 +69,6 @@ val is_bvar : t -> bool
 val is_const : t -> bool
 val is_bind : t -> bool
 val is_app : t -> bool
-val is_record : t -> bool
-val is_multiset : t -> bool
 
 val hashcons_stats : unit -> int*int*int*int*int*int
 

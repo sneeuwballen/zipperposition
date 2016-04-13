@@ -19,7 +19,7 @@ val empty : t
 val reasoner : t -> Reasoner.t
 (** The inner reasoner, holding a set of clauses and facts *)
 
-val signature : t -> Signature.t
+val signature : t -> Reasoner.ty ID.Map.t
 (** Current signature *)
 
 val add : t -> Reasoner.clause -> t * Reasoner.consequence Sequence.t

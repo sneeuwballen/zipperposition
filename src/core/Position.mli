@@ -8,7 +8,6 @@ type t =
   | Type of t (** Switch to type *)
   | Left of t (** Left term in curried application *)
   | Right of t (** Right term in curried application, and subterm of binder *)
-  | Record_field of string * t (** Field of a record *)
   | Head of t (** Head of uncurried term *)
   | Arg of int * t (** argument term in uncurried term, or in multiset *)
   | Body of t (** Body of binder *)
@@ -21,7 +20,6 @@ val right : t -> t
 val type_ : t -> t
 val left : t -> t
 val right : t -> t
-val record_field : string -> t -> t
 val head : t -> t
 val arg : int -> t -> t
 
@@ -74,8 +72,6 @@ module Build : sig
   (** Add [left] at the end *)
 
   val body : t -> t
-
-  val record_field : string -> t -> t
 
   val head : t -> t
 

@@ -37,8 +37,6 @@ type view = private
   | DB of int
   | App of ID.t * t list (** parametrized type *)
   | Fun of t list * t (** Function type (left to right, no left-nesting) *)
-  | Record of (string*t) list * t HVar.t option (** Record type (+ variable) *)
-  | Multiset of t
   | Forall of t (** explicit quantification using De Bruijn index *)
 
 val view : t -> view
@@ -54,7 +52,6 @@ val is_bvar : t -> bool
 val is_app : t -> bool
 val is_fun : t -> bool
 val is_forall : t -> bool
-val is_record : t -> bool
 
 (** {2 Constructors} *)
 
@@ -80,14 +77,6 @@ val const : ID.t -> t
 val arrow : t list -> t -> t
 (** [arrow l r] is the type [l -> r]. *)
 
-val record : (string*t) list -> rest:t HVar.t option -> t
-(** Record type, with an optional extension *)
-
-val record_flatten : (string*t) list -> rest:t option -> t
-(** Record type with a possibly nested record type.
-    @raise InnerTerm.IllFormedTerm if the
-      row record [rest] contains some fields also present in the list *)
-
 val forall : t -> t
 (** Quantify over one type variable. Careful with the De Bruijn indices! *)
 
@@ -100,9 +89,6 @@ val bvar : int -> t
 val (==>) : t list -> t -> t
 (** General function type. [l ==> x] is the same as [x] if [l]
     is empty. Invariant: the return type is never a function type. *)
-
-val multiset : t -> t
-(** Type of multiset *)
 
 val of_term_unsafe : InnerTerm.t -> t
 (** {b NOTE}: this can break the invariants and make {!view} fail. Only

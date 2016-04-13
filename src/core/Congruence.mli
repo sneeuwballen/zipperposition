@@ -98,5 +98,3 @@ module Make(T : TERM) : S with type term = T.t
 (** {2 Common implementations} *)
 
 module FO : S with type term = FOTerm.t
-
-module HO : S with type term = HOTerm.t

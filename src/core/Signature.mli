@@ -3,6 +3,8 @@
 
 (** {1 Signature} *)
 
+(* TODO: remove useless stuff... *)
+
 type t = private Type.t ID.Map.t
 (** A signature maps symbols to types *)
 

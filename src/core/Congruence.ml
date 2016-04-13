@@ -377,32 +377,3 @@ module FO = Make(struct
       | _, [] -> t
       | _ -> assert false
   end)
-
-module HO = Make(struct
-    module T = HOTerm
-
-    type t = T.t
-    let equal = T.equal
-    let hash = T.hash
-
-    let subterms t = match T.view t with
-      | T.Const _
-      | T.Var _
-      | T.DB _ -> []
-      | T.Lambda (_,t') | T.Forall (_, t') | T.Exists (_, t') -> [t']
-      | T.AppBuiltin (_,l) -> l
-      | T.App (f,l) -> f::l
-      | T.Multiset (_,l) -> l
-      | T.Record _ -> assert false   (* TODO *)
-
-    let update_subterms t l = match T.view t, l with
-      | (T.Const _ | T.Var _ | T.DB _), [] -> t
-      | T.App _, f::l -> T.app f l
-      | T.AppBuiltin (b,_), l -> T.app_builtin ~ty:(T.ty t) b l
-      | T.Lambda (varty, _), [t'] -> T.lambda ~varty t'
-      | T.Forall (varty, _), [t'] -> T.forall ~varty t'
-      | T.Exists (varty, _), [t'] -> T.exists ~varty t'
-      | T.Multiset(ty,_), l -> T.multiset ~ty l
-      | T.Record _, _ -> assert false (* TODO *)
-      | _ -> assert false
-  end)

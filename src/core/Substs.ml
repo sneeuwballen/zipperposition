@@ -215,29 +215,12 @@ let apply subst ~renaming t =
           let hd' = aux (hd,sc_t) in
           let l' = aux_list l sc_t in
           T.app ~ty hd' l'
-      | T.Record (l, rest) ->
-          let rest = match rest with
-            | None -> None
-            | Some v ->
-                begin try
-                  let t' = find_exn subst (v,sc_t) in
-                  Some (aux t')
-                with Not_found ->
-                  let v = HVar.cast v ~ty in
-                  Some (T.var v)
-                end
-          in
-          let l' = List.map (fun (s,t') -> s, aux (t',sc_t)) l in
-          T.record_flatten ~ty l' ~rest
       | T.SimpleApp (s, l) ->
           let l' = aux_list l sc_t in
           T.simple_app ~ty s l'
       | T.AppBuiltin (s, l) ->
           let l' = aux_list l sc_t in
           T.app_builtin ~ty s l'
-      | T.Multiset l ->
-          let l' = aux_list l sc_t in
-          T.multiset ~ty l'
   and aux_list l sc = match l with
     | [] -> []
     | t::l' ->
@@ -310,27 +293,6 @@ module FO = struct
 
   let apply_no_renaming  subst t =
     FOTerm.of_term_unsafe (apply_no_renaming  subst (t : term Scoped.t :> T.t Scoped.t))
-
-  let bind = (bind :> t -> var Scoped.t -> term Scoped.t -> t)
-end
-
-module HO = struct
-  type term = HOTerm.t
-  type t = subst
-
-  let deref subst t =
-    let t, sc = deref subst (t : term Scoped.t :> T.t Scoped.t) in
-    HOTerm.of_term_unsafe t, sc
-
-  let find_exn subst v =
-    let t = find_exn subst v in
-    Scoped.map HOTerm.of_term_unsafe t
-
-  let apply  subst ~renaming t =
-    HOTerm.of_term_unsafe (apply  subst ~renaming (t : term Scoped.t :> T.t Scoped.t))
-
-  let apply_no_renaming  subst t =
-    HOTerm.of_term_unsafe (apply_no_renaming  subst (t : term Scoped.t :> T.t Scoped.t))
 
   let bind = (bind :> t -> var Scoped.t -> term Scoped.t -> t)
 end

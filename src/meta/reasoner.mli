@@ -8,11 +8,12 @@ open Libzipperposition
 (** {2 Meta-level property}
     A meta-level statement is just a higher-order term. *)
 
-type term = HOTerm.t
+type term = TypedSTerm.t
+type ty = term
 type property = term
 type fact = term
 
-val property_ty : Type.t
+val property_ty : TypedSTerm.t
 (** Type of meta-level statements. All terms used within
     the meta-prover should have this type *)
 
@@ -45,7 +46,7 @@ module Clause : sig
 
   module Seq : sig
     val terms : t -> term Sequence.t
-    val vars : t -> Type.t HVar.t Sequence.t
+    val vars : t -> ty Var.t Sequence.t
   end
 end
 

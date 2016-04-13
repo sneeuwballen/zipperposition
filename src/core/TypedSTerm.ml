@@ -46,6 +46,15 @@ let ty t = t.ty
 let ty_exn t = match t.ty with
   | None -> assert false
   | Some x -> x
+let head_exn t = match view t with
+  | Const id -> id
+  | Var _
+  | App (_,_)
+  | Bind (_,_,_)
+  | AppBuiltin (_,_)
+  | Multiset _
+  | Record (_,_)
+  | Meta _ -> assert false
 
 let to_int_ = function
   | Var _ -> 0
@@ -335,6 +344,12 @@ let vars t = Seq.vars t |> Var.Set.of_seq |> Var.Set.to_list
 let free_vars t = Seq.free_vars t |> Var.Set.of_seq |> Var.Set.to_list
 
 let closed t = Seq.free_vars t |> Sequence.is_empty
+
+let rec open_binder b t = match view t with
+  | Bind (b', v, t') when Binder.equal b b' ->
+    let vars, body = open_binder b t' in
+    v :: vars, body
+  | _ -> [], t
 
 let close_all ~ty s t =
   let vars = free_vars t in
@@ -944,6 +959,10 @@ let rec deref_rec t =
     record_flatten ~ty l ~rest
 and deref_rec_l l = List.map deref_rec l
 and deref_rec_var v = Var.update_ty v ~f:deref_rec
+
+let app_infer ?st ?subst f l =
+  let ty = apply_unify ?st ?subst (ty_exn f) l in
+  app ~ty f l
 
 (** {2 Conversion} *)
 

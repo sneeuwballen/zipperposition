@@ -10,16 +10,18 @@ type 'a or_error = [`Ok of 'a | `Error of string]
 let prof_scan_clause = Util.mk_profiler "meta.scan_clause"
 let prof_scan_formula = Util.mk_profiler "meta.scan_formula"
 
-module T = HOTerm
+module T = TypedSTerm
 module M = Libzipperposition_meta
 module Lit = Literal
 module Lits = Literals
+
+type term = T.t
 
 (** {2 Implementation} *)
 
 let section = Util.Section.make ~parent:Const.section "meta"
 
-module LitMap = HOTerm.Map
+module LitMap = T.Map
 
 module type S = MetaProverState_intf.S
 
@@ -36,10 +38,10 @@ module Make(E : Env.S) : S with module E = E = struct
   module C = E.C
 
   type lemma = C.t (** Lemma *)
-  type axiom = ID.t * HOTerm.t list
-  type theory = ID.t * HOTerm.t list
+  type axiom = ID.t * term list
+  type theory = ID.t * term list
   type rewrite = (FOTerm.t * FOTerm.t) list (** Rewrite system *)
-  type pre_rewrite = HORewriting.t
+  type pre_rewrite = (term * term) list
 
   module Result = struct
     type t = {
@@ -90,13 +92,17 @@ module Make(E : Env.S) : S with module E = E = struct
     let pp_theory_axiom out (name, args) =
       Format.fprintf out "%a %a" ID.pp name (Util.pp_list ~sep:" " T.pp) args
 
-    let pp_rewrite_system out l =
+    let pp_rewrite_ ppt out l =
       Format.fprintf out "@[<hov2>rewrite system@ @[<hv>%a@]@]"
         (Util.pp_list
-          (fun out (a,b) -> Format.fprintf out "@[%a@]@ --> @[%a@]" FOTerm.pp a FOTerm.pp b))
+          (fun out (a,b) -> Format.fprintf out "@[%a@]@ --> @[%a@]" ppt a ppt b))
         l
 
-    let pp_pre_rewrite_system out l = HORewriting.pp out l
+    let pp_rewrite_system out l =
+      pp_rewrite_ FOTerm.pp out l
+
+    let pp_pre_rewrite_system out l =
+      pp_rewrite_ T.pp out l
 
     let print out r =
       Format.fprintf out "@[<hv2>results{@ ";
@@ -125,37 +131,41 @@ module Make(E : Env.S) : S with module E = E = struct
   (* TODO move to induction *)
   module Induction = struct
     type ty = {
-      ty : Type.t;
-      cstors : (ID.t * Type.t) list;
+      ty : T.Ty.t;
+      cstors : (ID.t * T.Ty.t) list;
     }
 
     let make ty cstors = {ty; cstors; }
 
     let print out ity =
       let pp_cstor out (s, ty) =
-        Format.fprintf out "@[%a:@,%a@]" ID.pp s Type.pp ty
+        Format.fprintf out "@[%a:@,%a@]" ID.pp s T.pp ty
       in
       Format.fprintf out "@[<hov2>ity{ty:@,%a,@ cstors:@,%a}@]"
-        Type.pp ity.ty (CCList.print pp_cstor) ity.cstors
+        T.pp ity.ty (CCFormat.list pp_cstor) ity.cstors
 
-    let const_cstor = Type.const (ID.make"inductive_constructor")
+    let const_cstor = T.Ty.const (ID.make"inductive_constructor")
 
     (* assert [τ] is inductive using
        [inductive {ty=@τ, cstors=[cstor @ty1 c1, cstor @ty2 c2]}] *)
     let sym_inductive = ID.make "inductive"
-    let ty_sym_inductive = Type.(forall (
+    let ty_sym_inductive =
+      let a = Var.of_string ~ty:T.Ty.tType "a" in
+      T.Ty.(forall a (
         [record ~rest:None [
-            "ty", bvar 0;
+            "ty", T.Ty.var a;
             "cstors", multiset const_cstor
           ]] ==> M.Reasoner.property_ty
       ))
 
     (* build a constructor with a term [cstor(sym)] *)
     let sym_cstor = ID.make "cstor"
-    let ty_sym_cstor = Type.(forall ([bvar 0] ==> const_cstor))
+    let ty_sym_cstor =
+      let a = Var.of_string ~ty:T.Ty.tType "a" in
+      T.Ty.(forall a ([T.Ty.var a] ==> const_cstor))
 
     let signature =
-      Signature.of_list
+      ID.Map.of_list
         [ sym_inductive, ty_sym_inductive
         ; sym_cstor, ty_sym_cstor
         ]
@@ -171,18 +181,21 @@ module Make(E : Env.S) : S with module E = E = struct
       method clauses = []
       method to_fact ity =
         (* encode constructors *)
-        let arg = T.record ~rest:None
-            [ "ty", T.of_ty ity.ty
-            ; "cstors", T.multiset ~ty:const_cstor
+        let arg =
+          (* FIXME *)
+          let ty = assert false in
+          T.record ~rest:None ~ty
+            [ "ty", ity.ty
+            ; "cstors", T.multiset ~ty:(T.Ty.multiset const_cstor)
                 (List.map
                    (fun (s, ty_s) ->
                       (* term "cstor(ty_s, s)", roughly *)
-                      T.app pred_cstor [T.of_ty ty_s; T.const ~ty:ty_s s]
-                   ) ity.cstors
+                      T.app_infer pred_cstor [ty_s; T.const ~ty:ty_s s])
+                   ity.cstors
                 )
             ]
         in
-        T.app pred_inductive [T.of_ty ity.ty; arg]
+        T.app_infer pred_inductive [ity.ty; arg]
       method of_fact _ =
         None (* TODO: real implementation *)
     end
@@ -195,10 +208,10 @@ module Make(E : Env.S) : S with module E = E = struct
 
   module Arith = struct
     let t : unit M.Plugin.t = object
-      method signature = Signature.empty
+      method signature = ID.Map.empty
       method owns _ = false
       method clauses = []
-      method to_fact () = T.TPTP.true_
+      method to_fact () = T.Form.true_
       method of_fact _ = None
     end
   end
@@ -393,7 +406,7 @@ module Make(E : Env.S) : S with module E = E = struct
       (fun () ->
          if !flag_print_signature then
            Util.debugf ~section 1 "@[<hv2>signature:@,%a@]"
-             (fun k->k Signature.pp (M.Prover.signature prover))
+             (fun k->k (ID.Map.print ID.pp T.pp) (M.Prover.signature prover))
       );
     Signal.once Signals.on_exit
       (fun _ ->

@@ -5,19 +5,20 @@
 
 open Libzipperposition
 
-module HOT = HOTerm
+module HOT = TypedSTerm
 
 let section = Util.Section.(make ~parent:zip "meta")
 
 (** {2 Meta-level property}
     A meta-level statement is just a higher-order term. *)
 
-type term = HOTerm.t
+type term = HOT.t
+type ty = term
 type property = term
 type fact = term
 
 let property_id = ID.make "property"
-let property_ty = Type.const property_id
+let property_ty = HOT.Ty.const property_id
 
 (** {2 Meta-Level clause}
     A Horn clause about meta-level properties *)
@@ -41,11 +42,11 @@ module Clause = struct
     let vars_body =
       Sequence.of_list body
       |> Sequence.flat_map HOT.Seq.vars
-      |> HOT.VarSet.of_seq
+      |> Var.Set.of_seq
     in
     HOT.Seq.vars head
       |> Sequence.find
-        (fun v -> if HOT.VarSet.mem v vars_body then None else Some v)
+        (fun v -> if Var.Set.mem vars_body v then None else Some v)
 
   let rule head body =
     match find_unsafe_var head body with
@@ -54,7 +55,7 @@ module Clause = struct
         let msg =
           CCFormat.sprintf
             "@[<2>unsafe Horn clause (var %a):@ @[<2>@[%a@] <-@ @[<hv>%a@]@]@]"
-            HVar.pp v HOT.pp head (Util.pp_list HOT.pp) body
+            Var.pp v HOT.pp head (Util.pp_list HOT.pp) body
         in
         raise (Error msg)
 
@@ -70,12 +71,9 @@ module Clause = struct
     | [] -> failwith "Clause.pop_body"
     | _::body' -> {c with body=body'; }
 
-  let apply_subst subst ~renaming (c,sc) =
-    let head = Substs.HO.apply subst ~renaming (c.head,sc) in
-    let body =
-      List.map
-        (fun t -> Substs.HO.apply subst ~renaming (t,sc))
-        c.body in
+  let deref_clause c =
+    let head = HOT.deref_rec c.head in
+    let body = List.map HOT.deref_rec c.body in
     { head; body; }
 
   module Seq = struct
@@ -171,16 +169,19 @@ module Index = struct
     let set = S.add c set in
     M.add t set idx
 
-  (* fold on unifiable terms and their associated clause *)
-  let retrieve_unify ?(subst=Substs.empty) (idx,sc_idx) t acc k =
-    M.fold
-      (fun t' set acc ->
-         let res = Unif.HO.unification ~subst (t',sc_idx) t in
-         Sequence.fold
-           (fun acc subst ->
-              S.fold (fun clause acc -> k acc clause subst) set acc)
-           acc res)
-      idx acc
+  (* iter on unifiable terms and their associated clause *)
+  let retrieve_unify ?(st=HOT.UStack.create()) idx t k =
+    let level = HOT.UStack.snapshot ~st in
+    M.iter
+      (fun t' set ->
+         begin
+           try
+             HOT.unify ~st t' t;
+             S.iter k set
+           with HOT.UnifyFailure _ -> ()
+         end;
+         HOT.UStack.restore ~st level)
+      idx
 end
 
 (** {2 Fact and Rules Database}
@@ -221,13 +222,11 @@ let __consequences state =
 
 (* add a fact to the DB *)
 let __add_fact ~state ~proof fact =
-  Index.retrieve_unify (Scoped.make state.db.rules 0) (Scoped.make fact 1) ()
-    (fun () clause subst ->
+  Index.retrieve_unify state.db.rules fact
+    (fun clause ->
        (* compute resolvent *)
        Substs.Renaming.clear state.renaming;
-       let clause' =
-         Clause.apply_subst subst ~renaming:state.renaming
-           (Scoped.make (Clause.pop_body clause) 0) in
+       let clause' = Clause.deref_clause clause |> Clause.pop_body in
        (* build proof *)
        let proof_clause = Clause.Map.find clause state.db.all in
        let proof' = Proof.make fact proof clause proof_clause in
@@ -238,15 +237,13 @@ let __add_rule ~state ~proof clause =
   match clause.Clause.body with
   | [] -> assert false
   | lit::_ ->
-      Index.retrieve_unify (Scoped.make state.db.facts 1) (Scoped.make lit 0) ()
-        (fun () fact_clause subst ->
+      Index.retrieve_unify state.db.facts lit
+        (fun fact_clause ->
            assert (Clause.is_fact fact_clause);
            let fact = fact_clause.Clause.head in
            (* compute resolvent *)
            Substs.Renaming.clear state.renaming;
-           let clause' =
-             Clause.apply_subst subst ~renaming:state.renaming
-               (Scoped.make (Clause.pop_body clause) 0) in
+           let clause' = Clause.deref_clause clause in
            (* build proof *)
            let proof_fact = Clause.Map.find fact_clause state.db.all in
            let proof' = Proof.make fact proof_fact clause proof in

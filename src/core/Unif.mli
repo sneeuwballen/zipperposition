@@ -14,18 +14,14 @@ val occurs_check : depth:int -> subst ->
 
 (** {2 Signatures} *)
 
-module type UNARY = Unif_intf.UNARY
-module type NARY = Unif_intf.NARY
+module type S = Unif_intf.S
 
 (** {2 Base (scoped terms)} *)
 
-module Nary : NARY with type term = InnerTerm.t
-
-module Unary : UNARY with type term = InnerTerm.t and type ty = InnerTerm.t
+module Inner : S with type term = InnerTerm.t and type ty = InnerTerm.t
 (** To be used only on terms without {!InnerTerm.Multiset} constructor *)
 
 (** {2 Specializations} *)
 
-module Ty : UNARY with type term = Type.t and type ty = Type.t
-module FO : UNARY with type term = FOTerm.t and type ty = Type.t
-module HO : NARY with type term = HOTerm.t
+module Ty : S with type term = Type.t and type ty = Type.t
+module FO : S with type term = FOTerm.t and type ty = Type.t

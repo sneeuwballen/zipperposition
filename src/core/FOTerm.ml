@@ -530,7 +530,7 @@ module Conv = struct
   type ctx = Type.Conv.ctx
   let create = Type.Conv.create
 
-  let of_simple_term ctx t =
+  let of_simple_term_exn ctx t =
     let rec aux t = match PT.view t with
       | PT.Var v -> var (Type.Conv.var_of_simple_term ctx v)
       | PT.AppBuiltin (Builtin.Wildcard, []) ->
@@ -562,6 +562,10 @@ module Conv = struct
       | PT.Multiset _ -> raise Type.Conv.Error
     in
     aux t
+
+  let of_simple_term ctx t =
+    try Some (of_simple_term_exn ctx t)
+    with Type.Conv.Error -> None
 
   let to_simple_term ?(env=DBEnv.empty) t =
     let tbl = VarTbl.create 16 in

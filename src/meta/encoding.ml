@@ -7,7 +7,7 @@ open Libzipperposition
 
 module T = InnerTerm
 module FOT = FOTerm
-module HOT = HOTerm
+module HOT = TypedSTerm
 
 type 'a printer = Format.formatter -> 'a -> unit
 
@@ -100,10 +100,12 @@ let (>>>) a b = compose a b
 
 let currying =
   let module ListOpt = CCList.Traverse(CCOpt) in
+  let ctx = FOTerm.Conv.create () in
   object
-    method encode c = fmap_clause HOT.of_fo c
+    method encode c =
+      fmap_clause FOTerm.Conv.to_simple_term c
     method decode c =
-    fmap_clause HOT.to_fo c
+    fmap_clause (FOTerm.Conv.of_simple_term ctx) c
       |> List.map opt_seq_lit
       |> ListOpt.sequence_m
   end
@@ -130,28 +132,31 @@ end
     terms are already curried and rigidified, so we only need to replace
     connectives by their multiset versions. *)
 
-let ty_ms = Type.(forall ([multiset (bvar 0)] ==> prop))
+let ty_ms =
+  let a = Var.of_string ~ty:HOT.Ty.tType "a" in
+  HOT.Ty.(forall a ([multiset (HOT.Ty.var a)] ==> prop))
 let eq_conn = HOT.const ~ty:ty_ms (ID.make "=")
 let neq_conn = HOT.const ~ty:ty_ms (ID.make "≠")
-let not_conn = HOT.TPTP.not_
+let not_conn = HOT.const ~ty:HOT.Ty.([prop] ==> prop) (ID.make "¬")
 
 let __encode_lit = function
   | Eq (a, b, truth) ->
-      let ty = HOT.ty a in
+      let ty = HOT.ty_exn a in
+      let ty_mul = HOT.Ty.multiset ty in
       if truth
-      then HOT.app eq_conn [HOT.of_ty ty; HOT.multiset ~ty [a; b]]
-      else HOT.app neq_conn [HOT.of_ty ty; HOT.multiset ~ty [a; b]]
+      then HOT.app_infer eq_conn [ty; HOT.multiset ~ty:ty_mul [a; b]]
+      else HOT.app_infer neq_conn [ty; HOT.multiset ~ty:ty_mul [a; b]]
   | Prop (p, true) -> p
-  | Prop (p, false) -> HOT.app not_conn [p]
-  | Bool true -> HOT.TPTP.true_
-  | Bool false -> HOT.TPTP.false_
+  | Prop (p, false) -> HOT.app_infer not_conn [p]
+  | Bool true -> HOT.Form.true_
+  | Bool false -> HOT.Form.false_
 
 let __decode_lit t = match HOT.view t with
   | HOT.App (hd, [r]) when HOT.equal hd not_conn -> Prop (r, false)
   | HOT.App (hd, [r]) ->
       begin match HOT.view r with
-        | HOT.Multiset (_,[a;b]) when HOT.equal hd eq_conn -> Eq (a, b, true)
-        | HOT.Multiset (_,[a;b]) when HOT.equal hd neq_conn -> Eq (a, b, false)
+        | HOT.Multiset [a;b] when HOT.equal hd eq_conn -> Eq (a, b, true)
+        | HOT.Multiset [a;b] when HOT.equal hd neq_conn -> Eq (a, b, false)
         | _ -> Prop (t, true)
       end
   | _ -> Prop (t, true)
@@ -159,12 +164,12 @@ let __decode_lit t = match HOT.view t with
 let clause_prop = object
   method encode c =
     let lits = List.map __encode_lit c in
-    HOT.close_forall (HOT.multiset ~ty:Type.prop lits)
+    HOT.Form.close_forall (HOT.multiset ~ty:HOT.Ty.(multiset prop) lits)
 
   method decode c =
-    let c = HOT.open_forall c in
+    let _, c = HOT.open_binder Binder.Forall c in
     match HOT.view c with
-    | HOT.Multiset (_,l) -> Some (List.map __decode_lit l)
+    | HOT.Multiset l -> Some (List.map __decode_lit l)
     | _ -> None
 end
 

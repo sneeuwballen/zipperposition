@@ -5,15 +5,17 @@ open Libzipperposition
 
 type 'a or_error = [`Ok of 'a | `Error of string]
 
+type term = TypedSTerm.t
+
 module type S = sig
   module E : Env.S
   module C = E.C
 
   type lemma = C.t (* a lemma *)
-  type axiom = ID.t * HOTerm.t list
-  type theory = ID.t * HOTerm.t list
+  type axiom = ID.t * term list
+  type theory = ID.t * term list
   type rewrite = (FOTerm.t * FOTerm.t) list (** Rewrite system *)
-  type pre_rewrite = HORewriting.t
+  type pre_rewrite = (term * term) list
 
   (** {2 Result: Feedback from the meta-prover} *)
 

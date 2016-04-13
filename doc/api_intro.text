@@ -17,8 +17,6 @@ FeatureVector
 Fingerprint
 Formula
 FormulaShape
-HORewriting
-HOTerm
 Hashcons
 HVar
 IArray
@@ -26,7 +24,6 @@ ID
 Index
 InnerTerm
 Interfaces
-Lambda
 LazyGraph
 LazyList
 Multiset

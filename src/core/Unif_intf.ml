@@ -3,7 +3,7 @@
 
 type subst = Substs.t
 
-module type UNARY = sig
+module type S = sig
   type ty
   type term
 
@@ -54,29 +54,6 @@ module type UNARY = sig
   (** [equal subst t1 s1 t2 s2] returns [true] iff the two terms
       are equal under the given substitution, i.e. if applying the
       substitution will return the same term. *)
-
-  val are_unifiable : term -> term -> bool
-
-  val matches : pattern:term -> term -> bool
-
-  val are_variant : term -> term -> bool
-end
-
-module type NARY = sig
-  type term
-
-  val unification : ?subst:subst ->
-    term Scoped.t -> term Scoped.t -> subst Sequence.t
-  (** unification of two terms *)
-
-  val matching :
-    ?subst:subst ->
-    pattern:term Scoped.t -> term Scoped.t -> subst Sequence.t
-  (** matching of two terms.
-      @raise Invalid_argument if the two scopes are equal. *)
-
-  val variant : ?subst:subst -> term Scoped.t -> term Scoped.t -> subst Sequence.t
-  (** alpha-equivalence checking of two terms *)
 
   val are_unifiable : term -> term -> bool
 

@@ -7,7 +7,7 @@ open Libzipperposition
 open Libzipperposition_parsers
 open Libzipperposition_meta
 
-module HOT = HOTerm
+module HOT = TypedSTerm
 module A = Ast_ho
 module E = CCError
 
@@ -95,25 +95,25 @@ let print_clauses c =
 
 let print_signature signature =
   Format.printf "@[<v2>signature:@,@[%a@]@]@."
-    (CCFormat.seq ~sep:" " (Util.pp_pair ~sep:" : " ID.pp Type.pp))
-    (Signature.Seq.to_seq signature)
+    (CCFormat.seq ~sep:" " (Util.pp_pair ~sep:" : " ID.pp HOT.pp))
+    (ID.Map.to_seq signature)
 
 let pp_theory_axiom out (name, terms) =
   Format.fprintf out "@[<hv>%a@ %a@]" ID.pp name (Util.pp_list ~sep:" " HOT.pp) terms
 
-let pp_rewrite_system out l =
+let pp_rewrite_ ppt out l =
   Format.fprintf out "@[<v2>rewrite system@ %a@]"
-    (Util.pp_list ~sep:"" (Util.pp_pair ~sep:" --> " FOTerm.pp FOTerm.pp)) l
+    (Util.pp_list ~sep:"" (Util.pp_pair ~sep:" --> " ppt ppt)) l
 
-let pp_pre_rewrite_system buf l =
-  HORewriting.pp buf l
+let pp_rewrite_system = pp_rewrite_ FOTerm.pp
+let pp_pre_rewrite_system = pp_rewrite_ HOT.pp
 
 type result = {
   lemmas : Plugin.foclause Sequence.t;
   theories : (ID.t * HOT.t list) Sequence.t;
   axioms : (ID.t * HOT.t list) Sequence.t;
   rewrite : (FOTerm.t * FOTerm.t) list Sequence.t;
-  pre_rewrite : HORewriting.t Sequence.t;
+  pre_rewrite : (HOT.t * HOT.t) list Sequence.t;
 }
 
 (* detect theories in clauses *)

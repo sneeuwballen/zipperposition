@@ -29,6 +29,7 @@ val view : t -> view
 val loc : t -> location option
 val ty : t -> t option
 val ty_exn : t -> t
+val head_exn : t -> ID.t
 
 val deref : t -> t
 (** While [t] is a bound [Meta] variable, follow its link *)
@@ -183,6 +184,9 @@ val closed : t -> bool
 (** [closed t] is [true] iff all bound variables of [t] occur under a
     binder (i.e. they are actually bound in [t]) *)
 
+val open_binder : Binder.t -> t -> t Var.t list * t
+(** [open_binder b (b v1 (b v2... (b vn t)))] returns [[v1,...,vn], t] *)
+
 val var_occurs : var:t Var.t -> t -> bool
 (** [var_occurs ~var t] is [true] iff [var] occurs in [t] *)
 
@@ -273,6 +277,12 @@ val apply_unify :
 
 val deref_rec : t -> t
 (** Follow meta-variables links in all subterms *)
+
+val app_infer :
+  ?st:UStack.t -> ?subst:Subst.t ->
+  t -> t list -> t
+(** [app_infer f l] computes the type [ty] of [f l], and return [app ~ty f l]
+    @raise UnifyFailure if types do not correspond *)
 
 (** {2 Conversion} *)
 

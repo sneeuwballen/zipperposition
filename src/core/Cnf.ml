@@ -41,7 +41,7 @@ let pp_clause out =
   Format.fprintf out "@[<2>%a@]" (Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp))
 
 let clause_to_fo ?(ctx=FOTerm.Conv.create()) c =
-  List.map (SLiteral.map ~f:(FOTerm.Conv.of_simple_term ctx)) c
+  List.map (SLiteral.map ~f:(FOTerm.Conv.of_simple_term_exn ctx)) c
 
 let as_lit = SLiteral.of_form
 
@@ -637,7 +637,7 @@ let convert ~file seq =
   (* used for conversion *)
   let t_ctx = FOTerm.Conv.create() in
   let ty_ctx = Type.Conv.create() in
-  let conv_t = FOTerm.Conv.of_simple_term t_ctx in
+  let conv_t = FOTerm.Conv.of_simple_term_exn t_ctx in
   let conv_ty = Type.Conv.of_simple_term_exn ty_ctx in
   let conv_statement st =
     Util.debugf ~section 5

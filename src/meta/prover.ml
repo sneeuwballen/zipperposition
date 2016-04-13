@@ -11,12 +11,13 @@ type 'a or_error = [`Error of string | `Ok of 'a]
 module P = Plugin
 module R = Reasoner
 module PT = STerm
+module T = TypedSTerm
 module Loc = ParseLocation
 module Err = CCError
 
 type t = {
   reasoner : Reasoner.t;
-  signature : Signature.t;
+  signature : T.Ty.t ID.Map.t;
 }
 
 type clause = Reasoner.clause
@@ -56,21 +57,19 @@ let __clause_of_ast ~ctx ast =
   let ast' = match ast with
     | Ast_ho.Clause (head, body) ->
         (* expected type *)
-        let ret = TypedSTerm.Ty.const Reasoner.property_id in
+        let ret = T.Ty.const Reasoner.property_id in
         (* infer types for head, body, and force all types to be [ret] *)
         let head' = TypeInference.infer_exn ctx head in
-        TypeInference.unify (TypedSTerm.ty_exn head') ret;
+        TypeInference.unify (T.ty_exn head') ret;
         let body' = List.map
             (fun t ->
                let t' = TypeInference.infer_exn ctx t in
-               TypeInference.unify (TypedSTerm.ty_exn t') ret;
+               TypeInference.unify (T.ty_exn t') ret;
                t')
             body
         in
         (* forget types of free variables *)
         TypeInference.Ctx.exit_scope ctx;
-        let head' = HOTerm.of_simple_term head' in
-        let body' = List.map HOTerm.of_simple_term body' in
         Some (Reasoner.Clause.rule head' body')
     | Ast_ho.Type (s, ty) ->
         (* declare the type *)
@@ -90,9 +89,7 @@ let of_ho_ast p decls =
     let p', consequences = Seq.of_seq p clauses in
     (* enrich signature *)
     let tys = TypeInference.Ctx.pop_new_types ctx in
-    let tyctx = Type.Conv.create() in
-    let tys = List.map (fun (s,ty) -> s, Type.Conv.of_simple_term_exn tyctx ty) tys in
-    let p' = {p' with signature= Signature.add_list p'.signature tys} in
+    let p' = {p' with signature= ID.Map.add_list p'.signature tys} in
     Err.return (p', consequences)
   with e -> CCError.of_exn_trace e
 

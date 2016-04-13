@@ -21,7 +21,7 @@ type 'a clause = 'a lit list
 val fmap_clause : ('a -> 'b) -> 'a clause -> 'b clause
 
 type foterm = FOTerm.t
-type hoterm = HOTerm.t
+type hoterm = TypedSTerm.t
 
 type foclause = foterm clause
 type hoclause = hoterm clause

@@ -26,8 +26,6 @@ type view =
   | DB of int
   | App of ID.t * t list (** parametrized type *)
   | Fun of t list * t (** Function type (left to right, no left-nesting) *)
-  | Record of (string*t) list * t HVar.t option (** Record type (+ variable) *)
-  | Multiset of t
   | Forall of t (** explicit quantification using De Bruijn index *)
 
 let view t = match T.view t with
@@ -43,13 +41,11 @@ let view t = match T.view t with
       | _ -> assert false
       end
   | T.AppBuiltin (Builtin.Arrow, (ret :: l)) -> Fun (l, ret)
-  | T.AppBuiltin (Builtin.Multiset, [t]) -> Multiset t
   | T.AppBuiltin (Builtin.Prop, []) -> Builtin Prop
   | T.AppBuiltin (Builtin.TType, []) -> Builtin TType
   | T.AppBuiltin (Builtin.Term, []) -> Builtin Term
   | T.AppBuiltin (Builtin.TyInt, []) -> Builtin Int
   | T.AppBuiltin (Builtin.TyRat, []) -> Builtin Rat
-  | T.Record (l, rest) -> Record (l, rest)
   | _ -> assert false
 
 let hash_fun = T.hash_fun
@@ -63,7 +59,6 @@ let is_bvar ty = match view ty with | DB _ -> true | _ -> false
 let is_app ty = match view ty with App _ -> true | _ -> false
 let is_fun ty = match view ty with | Fun _ -> true | _ -> false
 let is_forall ty = match view ty with | Forall _ -> true | _ -> false
-let is_record ty = match view ty with | Record _ -> true | _ -> false
 
 let tType = T.tType
 let prop = T.builtin ~ty:tType Builtin.Prop
@@ -94,10 +89,6 @@ let arrow l r = match view r with
       arrow_ (l @ l') ret
   | _ -> arrow_ l r
 
-let record l ~rest = T.record ~ty:T.tType l ~rest
-
-let record_flatten l ~rest = T.record_flatten ~ty:tType l ~rest
-
 let bvar i =
   T.bvar ~ty:T.tType i
 
@@ -107,8 +98,6 @@ let forall ty =
 let rec forall_n n ty =
   if n=0 then ty
   else forall (forall_n (n-1) ty)
-
-let multiset ty = T.app_builtin ~ty:T.tType Builtin.multiset [ty]
 
 let (==>) = arrow
 
@@ -153,8 +142,6 @@ let arity ty =
         traverse i (j+1) ty'
     | Forall ty' ->
         traverse (i+1) j ty'
-    | Multiset _
-    | Record _
     | Var _ | Builtin _ -> NoArity
     | DB _
     | App _ -> Arity (i, j)
@@ -163,7 +150,7 @@ let arity ty =
 let rec expected_args ty = match view ty with
   | Fun (args, ret) -> args @ expected_args ret
   | Forall ty' -> expected_args ty'
-  | DB _ | Var _ | Builtin _ | Record _ | Multiset _ | App _ -> []
+  | DB _ | Var _ | Builtin _ | App _ -> []
 
 let rec expected_ty_vars ty = match view ty with
   | Forall ty' -> 1 + expected_ty_vars ty'
@@ -180,12 +167,6 @@ let rec depth ty = match view ty with
   | App (_, l) -> 1 + depth_l l
   | Forall ty' -> 1 + depth ty'
   | Fun (l,ret) -> 1 + max (depth ret) (depth_l l)
-  | Multiset t -> 1 + depth t
-  | Record (r,rest) ->
-      let d = CCOpt.maybe (fun _ -> 1) 0 rest in
-      List.fold_left
-        (fun d (_,ty) -> max d (depth ty))
-        d r
 and depth_l l = List.fold_left (fun d t -> max d (depth t)) 0 l
 
 let open_fun ty = match view ty with
@@ -273,8 +254,6 @@ module TPTP = struct
           (Util.pp_list (pp_tstp_rec depth)) args
     | Fun (args, ret) ->
         Format.fprintf out "%a > %a" (pp_l depth) args (pp_tstp_rec depth) ret
-    | Record _ -> failwith "cannot print record types in TPTP"
-    | Multiset _ -> failwith "cannot print multiset types in TPTP"
     | Forall ty' ->
         Format.fprintf out "!>[Tb%d:$tType]: %a" depth (pp_inner (depth+1)) ty'
   and pp_inner depth out t = match view t with
@@ -300,23 +279,12 @@ let rec pp_rec depth out t = match view t with
   | Builtin b -> pp_builtin out b
   | Var v -> HVar.pp out v
   | DB i -> Format.fprintf out "T%i" (depth-i-1)
-  | Multiset t ->
-      Format.fprintf out "@[<2>multiset@ %a@]" (pp_rec depth) t
   | App (p, []) -> ID.pp out p
   | App (p, args) ->
       Format.fprintf out "@[<2>%a %a@]"
         ID.pp p (Util.pp_list ~sep:" " (pp_rec depth)) args
   | Fun (args, ret) ->
       Format.fprintf out "@[%a →@ %a@]" (pp_l depth) args (pp_rec depth) ret
-  | Record (l, None) ->
-      Format.fprintf out "{@[<hv>%a@]}"
-        (Util.pp_list (fun out (n, t) ->
-             Format.fprintf out "@[%s: %a@]" n (pp_rec depth) t)) l
-  | Record (l, Some v) ->
-      Format.fprintf out "{@[<hv>%a@ | %a@]}"
-        (Util.pp_list
-           (fun buf (n, t) -> Format.fprintf buf "@[%s: %a@]" n (pp_rec depth) t))
-        l HVar.pp v
   | Forall ty' ->
       Format.fprintf out "@[Π T%i.@ %a@]" depth (pp_inner (depth+1)) ty'
 and pp_inner depth out t = match view t with
@@ -397,14 +365,7 @@ module Conv = struct
           let v2db = Var.Subst.add v2db v depth in
           let t' = aux (depth+1) v2db t' in
           forall t'
-      | PT.Record (l, rest) ->
-          let rest = CCOpt.map
-            (fun t -> match PT.view t with
-              | PT.Var v -> aux_var v
-              | _ -> raise Error) rest
-          in
-          let l = List.map (fun (n,t) -> n, aux depth v2db t) l in
-          record l ~rest
+      | PT.Record _ -> failwith "cannot convert record-type into type"
       | PT.Bind _
       | PT.AppBuiltin _
       | PT.Meta _
@@ -452,11 +413,6 @@ module Conv = struct
           let args = List.map (aux env) args in
           let ret = aux env ret in
           PT.Ty.fun_ args ret
-      | Record (l, rest) ->
-          let rest = CCOpt.map (fun v -> aux_var v) rest in
-          PT.record ~ty:PT.tType (List.map (fun (n,ty) -> n, aux env ty) l) ~rest
-      | Multiset t ->
-          PT.app_builtin ~ty:PT.tType Builtin.multiset [aux env t]
       | Forall t' ->
           let v = Var.of_string ~ty:PT.tType
             (CCFormat.sprintf "V%d" (DBEnv.size env)) in

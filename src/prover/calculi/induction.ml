@@ -401,7 +401,7 @@ module Make
   module Meta = struct
     (* TODO *)
     let t : _ Plugin.t = object
-      method signature = Signature.empty
+      method signature = ID.Map.empty
       method clauses = []
       method owns _ = false
       method to_fact _ = assert false

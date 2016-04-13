@@ -41,7 +41,6 @@ let set_in s = input := input_format_of_string s
 let set_out s = output := print_format_of_string s
 
 let _print_types () =
-  HOTerm.print_all_types := true;
   FOTerm.print_all_types := true;
   ()
 

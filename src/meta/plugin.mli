@@ -14,10 +14,11 @@
 open Libzipperposition
 
 type term = Reasoner.term
+type ty = Reasoner.ty
 
 (** Core features of a plugin, that don't depend on its type parameter *)
 class type core = object
-  method signature : Signature.t
+  method signature : ty ID.Map.t
   (** Signature of symbols used *)
 
   method owns : term -> bool
@@ -44,7 +45,7 @@ module Set : sig
   type t
   val empty : t
   val add : t -> core -> t
-  val signature : t -> Signature.t
+  val signature : t -> ty ID.Map.t
 end
 
 (** {2 Builtin plugins} *)
@@ -64,7 +65,7 @@ val lemma : foclause t
 (** Lemma: similar to {!holds}, but explicitely used for facts
     deduced by the meta-prover. In general [lemma f => holds f]. *)
 
-val pre_rewrite : HORewriting.t t
+val pre_rewrite : (term * term) list t
 (** Encodes a rewriting system used for pre-processing a set of clauses,
     into a meta-property. *)
 
@@ -75,7 +76,7 @@ module Base : sig
   val set : Set.t
   (** The set of default plugins *)
 
-  val signature : Signature.t
+  val signature : ty ID.Map.t
 end
 
 (** {2 Interaction with Reasoner} *)
