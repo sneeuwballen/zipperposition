@@ -7,20 +7,25 @@ module Hash = CCHash
 
 type location = ParseLocation.t
 
+type var =
+  | V of string
+  | Wildcard
+
 type t = {
   term : view;
   loc : location option;
 }
+
 and view =
-  | Var of string (** variable *)
+  | Var of var (** variable *)
   | Const of string (** constant *)
   | AppBuiltin of Builtin.t * t list
   | App of t * t list (** apply term *)
   | Bind of Binder.t * typed_var list * t (** bind n variables *)
   | List of t list (** special constructor for lists *)
-  | Record of (string * t) list * string option (** extensible record *)
+  | Record of (string * t) list * var option (** extensible record *)
 
-and typed_var = string * t option
+and typed_var = var * t option
 
 type term = t
 
@@ -37,7 +42,7 @@ let to_int_ = function
   | Record _ -> 8
 
 let rec compare t1 t2 = match t1.term, t2.term with
-  | Var s1, Var s2 -> String.compare s1 s2
+  | Var s1, Var s2 -> Pervasives.compare s1 s2
   | Const s1, Const s2 -> String.compare s1 s2
   | App (s1,l1), App (s2, l2) ->
     let c = compare s1 s2 in
@@ -68,12 +73,12 @@ let rec compare t1 t2 = match t1.term, t2.term with
 
 and compare_typed_var (v1,o1)(v2,o2) =
   let cmp = compare in
-  CCOrd.( String.compare v1 v2 <?> (Util.ord_option cmp, o1, o2) )
+  CCOrd.( Pervasives.compare v1 v2 <?> (Util.ord_option cmp, o1, o2) )
 
 let equal t1 t2 = compare t1 t2 = 0
 
 let rec hash_fun t h = match t.term with
-  | Var s -> Hash.string_ s h
+  | Var v -> hash_var v h
   | Const s -> Hash.string_ s h
   | AppBuiltin (s,l) -> Builtin.hash_fun s (Hash.list_ hash_fun l h)
   | App (s, l) -> Hash.list_ hash_fun l (hash_fun s h)
@@ -81,17 +86,23 @@ let rec hash_fun t h = match t.term with
   | Bind (s,v,t') ->
     h |> Binder.hash_fun s |> hash_fun t' |> Hash.list_ hash_ty_var v
   | Record (l, rest) ->
-    h |> Hash.opt Hash.string_ rest
+    h |> Hash.opt hash_var rest
       |> Hash.list_ (fun (n,t) h -> Hash.string_ n (hash_fun t h)) l
 
 and hash_ty_var (v,ty) h =
-  Hash.string_ v h |> Hash.opt hash_fun ty
+  hash_var v h |> Hash.opt hash_fun ty
+
+and hash_var v h = match v with
+  | V s -> Hash.string s h
+  | Wildcard -> Hash.string "_" h
 
 let hash x = Hash.apply hash_fun x
 
 let make_ ?loc view = {term=view; loc;}
 
-let var ?loc s = make_ ?loc (Var s)
+let mk_var ?loc v = make_ ?loc (Var v)
+let var ?loc s = mk_var ?loc (V s)
+let v_wild = mk_var Wildcard
 let builtin ?loc s = make_ ?loc (AppBuiltin (s,[]))
 let app_builtin ?loc s l = make_ ?loc (AppBuiltin(s,l))
 let app ?loc s l = match l with
@@ -187,9 +198,12 @@ module Seq = struct
       | App (f, l) -> iter bound f; List.iter (iter bound) l
       | Bind (_, v, t') ->
           (* add variables of [v] to the set *)
-          let bound' = List.fold_left
-            (fun set (v,_) -> StringSet.add v set)
-            bound v
+          let bound' =
+            List.fold_left
+              (fun set (v,_) -> match v with
+                 | Wildcard -> set
+                 | V s -> StringSet.add s set)
+              bound v
           in
           iter bound' t'
       | Record (l, _) ->
@@ -200,7 +214,7 @@ module Seq = struct
     subterms_with_bound t
       |> Sequence.filter_map
         (fun (t,bound) -> match t.term with
-          | Var v when not (StringSet.mem v bound) -> Some v
+          | Var (V v) when not (StringSet.mem v bound) -> Some v
           | _ -> None)
 
   let symbols t = subterms t
@@ -216,7 +230,7 @@ let close_all s t =
   let vars = Seq.free_vars t
     |> StringSet.of_seq
     |> StringSet.elements
-    |> List.map (fun v->v,None)
+    |> List.map (fun v->V v,None)
   in
   bind s vars t
 
@@ -225,7 +239,7 @@ let subterm ~strict t ~sub =
   || Sequence.exists (equal sub) (Seq.subterms t)
 
 let rec pp out t = match t.term with
-  | Var s -> CCFormat.string out s
+  | Var v -> pp_var out v
   | Const s -> CCFormat.string out s
   | List l ->
       Format.fprintf out "[@[<hv>%a@]]"
@@ -255,22 +269,26 @@ let rec pp out t = match t.term with
       Format.fprintf out "{@[<hv>%a@]}"
         (Util.pp_list (fun out (s,t') -> Format.fprintf out "%s:%a" s pp t')) l;
   | Record (l, Some r) ->
-      Format.fprintf out "{@[<hv>%a@ | %s@]}"
-        (Util.pp_list (Util.pp_pair ~sep:":" CCFormat.string pp)) l r
+      Format.fprintf out "{@[<hv>%a@ | %a@]}"
+        (Util.pp_list (Util.pp_pair ~sep:":" CCFormat.string pp)) l
+        pp_var r
 and pp_inner out t = match view t with
   | AppBuiltin (_, _::_)
   | App _
   | Bind _ -> Format.fprintf out "(@[%a@])" pp t  (* avoid ambiguities *)
   | _ -> pp out t
 and pp_typed_var out = function
-  | v, None -> CCFormat.string out v
-  | v, Some ty -> Format.fprintf out "%s:%a" v pp ty
+  | v, None -> pp_var out v
+  | v, Some ty -> Format.fprintf out "%a:%a" pp_var v pp ty
 and pp_infix_ b out l = match l with
   | [] -> assert false
   | [t] -> pp_inner out t
   | t :: l' ->
       Format.fprintf out "@[<hv>%a@ @[<hv>%a@ %a@]@]"
         pp_inner t Builtin.pp b (pp_infix_ b) l'
+and pp_var out = function
+  | Wildcard -> CCFormat.string out "_"
+  | V s -> CCFormat.string out s
 
 let to_string = CCFormat.to_string pp
 
@@ -278,7 +296,7 @@ let to_string = CCFormat.to_string pp
 
 module TPTP = struct
   let rec pp out t = match t.term with
-    | Var s -> CCFormat.string out s
+    | Var v -> pp_var out v
     | Const s -> CCFormat.string out s
     | List l ->
       Format.fprintf out "[@[<hv>%a@]]"
@@ -316,14 +334,17 @@ module TPTP = struct
           pp_surrounded t'
     | Record _ -> failwith "cannot print records in TPTP"
   and pp_typed_var out (v,o) = match o with
-    | None -> CCFormat.string out v
+    | None -> pp_var out v
     | Some {term=AppBuiltin ((Builtin.TType | Builtin.Term),[]); _} ->
-        CCFormat.string out v (* implicit type *)
-    | Some ty -> Format.fprintf out "%s:%a" v pp_surrounded ty
+        pp_var out v (* implicit type *)
+    | Some ty -> Format.fprintf out "%a:%a" pp_var v pp_surrounded ty
   and pp_surrounded out t = match t.term with
     | AppBuiltin (_, _::_)
     | Bind _ -> Format.fprintf out "(@[%a@])" pp t
     | _ -> pp out t
+  and pp_var out = function
+    | Wildcard -> CCFormat.string out "$_"
+    | V s -> CCFormat.string out s
 
   let to_string = CCFormat.to_string pp
 end
@@ -332,7 +353,7 @@ end
 
 module ZF = struct
   let rec pp out t = match t.term with
-    | Var s -> CCFormat.string out s
+    | Var v -> pp_var out v
     | Const s -> CCFormat.string out s
     | List l ->
         Format.fprintf out "[@[<hv>%a@]]"
@@ -379,15 +400,18 @@ module ZF = struct
           pp_surrounded t'
     | Record _ -> failwith "cannot print records in ZF"
   and pp_typed_var out (v,o) = match o with
-    | None -> CCFormat.string out v
+    | None -> pp_var out v
     | Some {term=AppBuiltin (Builtin.TType ,[]); _} ->
-        CCFormat.string out v (* implicit type *)
-    | Some ty -> Format.fprintf out "(@[%s:%a@])" v pp_surrounded ty
+        pp_var out v (* implicit type *)
+    | Some ty -> Format.fprintf out "(@[%a:%a@])" pp_var v pp_surrounded ty
   and pp_surrounded out t = match t.term with
     | AppBuiltin (_, _::_)
     | App _
     | Bind _ -> Format.fprintf out "(@[%a@])" pp t
     | _ -> pp out t
+  and pp_var out = function
+    | Wildcard -> CCFormat.string out "_"
+    | V s -> CCFormat.string out s
 
   let to_string = CCFormat.to_string pp
 end

@@ -14,20 +14,25 @@ operation.
 
 type location = ParseLocation.t
 
+type var =
+  | V of string
+  | Wildcard
+
 type t = private {
   term : view;
   loc : location option;
 }
+
 and view =
-  | Var of string (** variable *)
+  | Var of var (** variable *)
   | Const of string (** constant *)
   | AppBuiltin of Builtin.t * t list
   | App of t * t list (** apply term *)
   | Bind of Binder.t * typed_var list * t (** bind n variables *)
   | List of t list (** special constructor for lists *)
-  | Record of (string * t) list * string option (** extensible record *)
+  | Record of (string * t) list * var option (** extensible record *)
 
-and typed_var = string * t option
+and typed_var = var * t option
 
 type term = t
 
@@ -38,6 +43,8 @@ include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 
 val var : ?loc:location -> string -> t
+val v_wild : t (** wildcard *)
+val mk_var : ?loc:location -> var -> t
 val app : ?loc:location -> t -> t list -> t
 val builtin : ?loc:location -> Builtin.t -> t
 val app_builtin : ?loc:location -> Builtin.t -> t list -> t
@@ -45,7 +52,7 @@ val const : ?loc:location -> string -> t
 val bind : ?loc:location -> Binder.t -> typed_var list -> t -> t
 val list_ : ?loc:location -> t list -> t
 val nil : t
-val record : ?loc:location -> (string*t) list -> rest:string option -> t
+val record : ?loc:location -> (string*t) list -> rest:var option -> t
 val at_loc : loc:location -> t -> t
 
 val wildcard : t
@@ -86,7 +93,7 @@ module Tbl : CCHashtbl.S with type key = term
 module StringSet : CCSet.S with type elt = string
 
 module Seq : sig
-  val vars : t -> string Sequence.t
+  val vars : t -> var Sequence.t
   val free_vars : t -> string Sequence.t
   val subterms : t -> t Sequence.t
   val subterms_with_bound : t -> (t * StringSet.t) Sequence.t

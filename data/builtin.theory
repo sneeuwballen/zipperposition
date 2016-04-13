@@ -84,7 +84,7 @@ theory (monoid {op=Mult, neutral=E}) <-
   axiom (associative Mult).
 
 axiom (associative F) <-
-  theory (monoid {op=F | _}).
+  theory (monoid {op=F | R}).
 
 % group
 

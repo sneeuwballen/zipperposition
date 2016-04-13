@@ -80,7 +80,7 @@ let () = Printexc.register_printer
   (function
     | Parse_error (loc, msg) ->
         Some
-          (CCFormat.sprintf "@[<2>parse error:@ @[%s@]@ %a@]" msg Loc.pp loc)
+          (CCFormat.sprintf "@[<4>parse error:@ @[%s@]@ at %a@]" msg Loc.pp loc)
     | _ -> None)
 
 let error loc msg = raise (Parse_error (loc,msg))

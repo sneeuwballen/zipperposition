@@ -73,20 +73,21 @@ raw_var:
   | w=UPPER_WORD { w }
 
 typed_var:
-  | v=raw_var { v, None }
-  | LEFT_PAREN v=raw_var COLON t=term RIGHT_PAREN { v, Some t }
+  | v=raw_var { T.V v, None }
+  | WILDCARD { T.Wildcard, None }
+  | LEFT_PAREN v=raw_var COLON t=term RIGHT_PAREN { T.V v, Some t }
 
 typed_ty_var:
-  | v=raw_var { v, None }
-  | v=raw_var COLON TYPE { v, Some T.tType  }
-  | LEFT_PAREN v=raw_var COLON TYPE RIGHT_PAREN { v, Some T.tType }
+  | v=raw_var { T.V v, None }
+  | v=raw_var COLON TYPE { T.V v, Some T.tType  }
+  | LEFT_PAREN v=raw_var COLON TYPE RIGHT_PAREN { T.V v, Some T.tType }
 
 var:
   | WILDCARD { T.wildcard }
-  | name=raw_var
+  | v=raw_var
     {
       let loc = L.mk_pos $startpos $endpos in
-      T.var ~loc name
+      T.var ~loc v 
     }
 
 const:

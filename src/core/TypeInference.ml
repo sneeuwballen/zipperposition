@@ -227,13 +227,20 @@ module Ctx = struct
 
   (* in ZF, variables might be constant, there is no syntactic difference *)
   let get_var_ ctx v =
-    try Hashtbl.find ctx.env v
-    with Not_found ->
+    let mk_fresh v =
       let ty_v = fresh_ty_meta_var ~dest:`Generalize ctx in
       let v' = Var.of_string ~ty:(T.Ty.meta ty_v) v in
       ctx.local_vars <- v' :: ctx.local_vars;
-      Hashtbl.add ctx.env v (`Var v');
-      `Var v'
+      v'
+    in
+    match v with
+      | PT.Wildcard -> `Var (mk_fresh "_")
+      | PT.V v ->
+        try Hashtbl.find ctx.env v
+        with Not_found ->
+          let v' = mk_fresh v in
+          Hashtbl.add ctx.env v (`Var v');
+          `Var v'
 
   let pop_new_types ctx =
     let l = ctx.new_types in
@@ -258,7 +265,10 @@ let with_typed_vars_ ?loc ~infer_ty ctx vars ~f =
           | None -> T.Ty.meta (Ctx.fresh_ty_meta_var ~dest:`Generalize ctx)
           | Some ty -> infer_ty ?loc ctx ty
         in
-        let v = Var.of_string ~ty v in
+        let v = match v with
+          | PT.Wildcard -> Var.of_string ~ty "_"
+          | PT.V v -> Var.of_string ~ty v
+        in
         (* enter [v] before dealing with next variables, for they might depend
            on it (e.g. [forall (a:type)(l:list a). ...]) *)
         Ctx.with_var ctx v ~f:(fun () -> aux (v :: acc) l')
@@ -293,7 +303,8 @@ let rec infer_ty_ ?loc ctx ty =
         T.Ty.const id
     | PT.App (f, l) ->
         begin match PT.view f with
-        | PT.Var name
+        | PT.Var PT.Wildcard -> error_ ?loc "wildcard function: not supported"
+        | PT.Var (PT.V name)
         | PT.Const name ->
             let id, ty = Ctx.get_id_ ctx ~arity:(List.length l) name in
             unify ?loc (T.Ty.returns ty) T.Ty.tType;
@@ -643,7 +654,7 @@ let infer_statement_exn ctx st =
             (fun d (data_ty,ty_of_data_ty) ->
               (* locally, declare type variables *)
               with_typed_vars ?loc ctx
-                (List.map (fun v->v, Some PT.tType) d.A.data_vars)
+                (List.map (fun v->PT.V v, Some PT.tType) d.A.data_vars)
                 ~f:(fun ty_vars ->
                   (* return type of every constructor: [data_ty ty_vars] *)
                   let ty_ret =

@@ -8,6 +8,8 @@ open Libzipperposition_parsers
 
 type 'a or_error = [`Error of string | `Ok of 'a]
 
+let section = Util.Section.(make ~parent:zip "meta")
+
 module P = Plugin
 module R = Reasoner
 module PT = STerm
@@ -94,6 +96,7 @@ let of_ho_ast p decls =
   with e -> CCError.of_exn_trace e
 
 let parse_file p filename =
+  Util.debugf ~section 1 "parse theory file `%s`" (fun k->k filename);
   try
     let ic = open_in filename in
     let lexbuf = Lexing.from_channel ic in
@@ -109,6 +112,7 @@ let parse_file p filename =
           let msg = Printexc.to_string e in
           Err.fail msg
     end
-  with Sys_error msg ->
-    let msg = Printf.sprintf "could not open file %s: %s" filename msg in
+  with
+  | Sys_error msg ->
+    let msg = Printf.sprintf "could not open file `%s`: %s" filename msg in
     Err.fail msg

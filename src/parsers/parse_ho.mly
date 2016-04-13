@@ -105,6 +105,11 @@ declaration:
     { A.Clause (t, []) }
   | t=term LEFT_ARROW l=separated_nonempty_list(COMMA, term) DOT
     { A.Clause (t,l) }
+  | error
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      UntypedAST.error loc "expected declaration"
+    }
 
 /* records */
 
@@ -166,7 +171,8 @@ unary_type:
       let loc = L.mk_pos $startpos $endpos in
       Term.list_ ~loc l
     }
-  | LEFT_BRACE l=record_body(COLUMN, type_) rest=record_rest(UPPER_WORD) RIGHT_BRACE
+  | LEFT_BRACE l=record_body(COLUMN, type_)
+    rest=record_rest(var_raw) RIGHT_BRACE
     {
       let loc = L.mk_pos $startpos $endpos in
       Term.record ~loc l ~rest
@@ -198,7 +204,7 @@ unary_term:
       let loc = L.mk_pos $startpos $endpos in
       Term.list_ ~loc l
     }
-  | LEFT_BRACE l=record_body(EQ,term) rest=record_rest(UPPER_WORD) RIGHT_BRACE
+  | LEFT_BRACE l=record_body(EQ,term) rest=record_rest(var_raw) RIGHT_BRACE
     {
       let loc = L.mk_pos $startpos $endpos in
       Term.record ~loc l ~rest
@@ -277,17 +283,26 @@ term:
       let loc = L.mk_pos $startpos $endpos in
       Term.exists ~loc v t
     }
-
-var:
-  | w=UPPER_WORD
+  | error
     {
       let loc = L.mk_pos $startpos $endpos in
-      Term.var ~loc w
+      UntypedAST.error loc "expected term"
+    }
+
+var_raw:
+  | w=UPPER_WORD { Term.V w }
+  | WILDCARD { Term.Wildcard }
+
+var:
+  | v=var_raw
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      Term.mk_var ~loc v
     }
 
 typed_var:
-  | v=UPPER_WORD { v, None }
-  | v=UPPER_WORD COLUMN ty=app_type { v, Some ty }
+  | v=var_raw { v, None }
+  | v=var_raw COLUMN ty=app_type { v, Some ty }
 
 typed_vars:
   | v=separated_nonempty_list(COMMA,typed_var) { v }

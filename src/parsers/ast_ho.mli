@@ -19,7 +19,7 @@ include Interfaces.PRINT with type t := t
 
 module Seq : sig
   val terms : t -> term Sequence.t
-  val vars : t -> string Sequence.t
+  val vars : t -> STerm.var Sequence.t
 end
 
 val app_infix : ?loc:location -> string -> term -> term -> term

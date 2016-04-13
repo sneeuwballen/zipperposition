@@ -318,8 +318,8 @@ system_constant: t=system_functor { t }
 system_functor: s=atomic_system_word { s }
 
 typed_var:
-  | v=UPPER_WORD COLUMN ty=tff_atom_type { v, Some ty }
-  | v=UPPER_WORD { v, None }
+  | v=UPPER_WORD COLUMN ty=tff_atom_type { PT.V v, Some ty }
+  | v=UPPER_WORD { PT.V v, None }
 
 typed_vars:
   | l=separated_nonempty_list(COMMA, typed_var) { l }
@@ -354,7 +354,7 @@ tff_ty_vars:
   | l=separated_nonempty_list(COMMA, tff_ty_var) { l }
 
 tff_ty_var:
-  | v=UPPER_WORD COLUMN TYPE_TY { v, Some PT.tType }
+  | v=UPPER_WORD COLUMN TYPE_TY { PT.V v, Some PT.tType }
 
 type_const:
   | WILDCARD { PT.wildcard }
