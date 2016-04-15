@@ -115,8 +115,7 @@ module Inner = struct
   and unif_term ~op subst t1 sc1 t2 sc2 =
     let view1 = T.view t1 and view2 = T.view t2 in
     match view1, view2 with
-    | _ when T.equal t1 t2
-     && (sc1=sc2 || T.is_ground t1) ->
+    | _ when T.equal t1 t2 && sc1=sc2 ->
         subst (* the terms are equal under any substitution *)
     | T.Var _, _
     | _, T.Var _ ->
