@@ -21,6 +21,16 @@ let check_timeout = function
   | None -> false
   | Some timeout -> Util.total_time_s () > timeout
 
+(* progress bar? *)
+let progress_ = ref false
+
+(* print progress (i out of j) *)
+let print_progress i j =
+  let n = i * 40 /j in
+  let line = CCString.init 40 (fun i -> if i<=n then '#' else ' ') in
+  Printf.printf "\r\027[K[%s] %d/%d%!" line i j;
+  ()
+
 (** The SZS status of a state *)
 type 'c szs_status =
   | Unsat of 'c ProofStep.of_
@@ -147,12 +157,16 @@ module Make(E : Env.S) = struct
         end
 
   let given_clause ?(generating=true) ?steps ?timeout () =
+    (* num: number of steps done so far *)
     let rec do_step num =
       if check_timeout timeout then Timeout, num
       else match steps with
         | Some i when num >= i -> Unknown, num
         | _ ->
             (* do one step *)
+            if !progress_ then (
+              match steps with None -> () | Some i -> print_progress num i
+            );
             let status = given_clause_step ~generating num in
             match status with
             | Sat | Unsat _ | Error _ -> status, num (* finished *)
@@ -164,3 +178,9 @@ module Make(E : Env.S) = struct
   let presaturate () =
     given_clause ?steps:None ?timeout:None ~generating:false ()
 end
+
+let () =
+  Params.add_opts
+    [ "--progress", Arg.Set progress_, " progress bar (only with --steps)"
+    ; "-p", Arg.Set progress_, " alias to --progress"
+    ]
