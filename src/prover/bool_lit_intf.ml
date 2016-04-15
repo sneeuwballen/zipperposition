@@ -39,6 +39,8 @@ module type S = sig
   val payload : t -> payload
   (** Obtain the payload *)
 
+  val to_int : t -> int
+
   val pp : t CCFormat.printer
 
   module Set : CCSet.S with type elt = t

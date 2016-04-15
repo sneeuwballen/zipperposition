@@ -16,6 +16,8 @@ exception WrongState of string
 
 let wrong_state_ msg = raise (WrongState msg)
 
+let sat_dump_file_ = ref ""
+
 module type S = Sat_solver_intf.S
 
 module Make(L : Bool_lit_intf.S)(Dummy : sig end)
@@ -28,9 +30,28 @@ module Make(L : Bool_lit_intf.S)(Dummy : sig end)
   (* queue of clauses waiting for being pushed into the solver *)
   let queue_ = Queue.create()
 
-  let add_clause ?tag (c:clause) = Queue.push ([c], tag) queue_
+  (* channel on which to print boolean clauses *)
+  let dump_to : out_channel option ref = ref None
 
-  let add_clauses ?tag l = Queue.push (l, tag) queue_
+  (* print list of clauses on [dump_to], if it's defined *)
+  let dump_l l = match !dump_to with
+    | None -> ()
+    | Some out ->
+      let pp_lit out l = output_string out (string_of_int (L.to_int l)) in
+      let pp_c out c =
+        List.iter (fun l -> output_char out ' '; pp_lit out l) c;
+        output_string out " 0\n";
+      in
+      List.iter (pp_c out) l;
+      flush out
+
+  let add_clause ?tag (c:clause) =
+    dump_l [c];
+    Queue.push ([c], tag) queue_
+
+  let add_clauses ?tag l =
+    dump_l l;
+    Queue.push (l, tag) queue_
 
   let add_clause_seq ?tag (seq:clause Sequence.t) =
     add_clauses ?tag (Sequence.to_rev_list seq)
@@ -139,6 +160,20 @@ module Make(L : Bool_lit_intf.S)(Dummy : sig end)
 
   let set_printer pp = pp_ := pp
 
+  let setup () =
+    if !sat_dump_file_ <> ""
+    then (
+      Util.debugf ~section 1 "dump SAT clauses to `%s`" (fun k->k !sat_dump_file_);
+      try
+        let oc = open_out !sat_dump_file_ in
+        dump_to := Some oc;
+        at_exit (fun () -> close_out_noerr oc);
+      with e ->
+        Util.warnf "@[<2>could not open `%s`:@ %s@]"
+          !sat_dump_file_ (Printexc.to_string e);
+    );
+    ()
+
   type save_level = int
 
   let root_save_level = 0
@@ -147,3 +182,8 @@ module Make(L : Bool_lit_intf.S)(Dummy : sig end)
 
   let restore _ = assert false
 end
+
+let () =
+  Params.add_opts
+    [ "--sat-dump", Arg.Set_string sat_dump_file_, " output SAT problem(s) into <file>"
+    ]

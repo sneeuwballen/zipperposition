@@ -44,6 +44,8 @@ module type S = sig
       that are the tags used to obtain [Unsat].
       @raise WrongState if the last result isn't [Unsat] *)
 
+  val setup: unit -> unit
+
   (** {6 Incrementality}
       We manage a stack for backtracking to older states *)
 

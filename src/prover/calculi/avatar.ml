@@ -366,6 +366,7 @@ let extension =
     let module E = (val env : Env.S) in
     Util.debug 1 "create new SAT solver";
     let module Sat = Sat_solver.Make(E.Ctx.BoolBox.Lit)(struct end) in
+    Sat.setup();
     let module A = Make(E)(Sat) in
     E.update_flex_state (Flex_state.add key (module A : S));
     if !enabled_ then (
