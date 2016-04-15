@@ -93,12 +93,10 @@ let () = Printexc.register_printer
         Some msg
     | _ -> None)
 
-let bind subst v t =
-  try
-    let t' = M.find v subst in
-    if T.equal (fst t) (fst t') then subst
-    else raise (InconsistentBinding (v, t, t'))
-  with Not_found ->
+let bind
+  : t -> var Scoped.t -> T.t Scoped.t -> t
+  = fun subst v t ->
+    assert (not (M.mem v subst));
     M.add v t subst
 
 let remove subst v = M.remove v subst
