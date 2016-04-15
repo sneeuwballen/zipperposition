@@ -97,6 +97,7 @@ module Make(Dummy : sig end)
     | None -> assert false
     | Some p -> p
 
+
   (* map tags to the associated proof *)
   let tag_to_proof_ = Hashtbl.create 32
 
@@ -151,6 +152,14 @@ module Make(Dummy : sig end)
     in
     S.Proof.check p;
     aux p
+
+  let get_proof_of_lit lit =
+    let b, l = valuation_level lit in
+    if not b || l <> 0 then invalid_arg "get_proof_of_lit";
+    let a = S.St.add_atom lit in
+    match S.Proof.prove_atom a with
+      | Some p -> conv_proof_ p
+      | None -> assert false
 
   (* call [S.solve()] in any case, and enforce invariant about eval/unsat_core *)
   let check_unconditional_ () =

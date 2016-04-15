@@ -171,11 +171,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   let simplify_trail_ c =
     let trail = C.trail c in
     let n_simpl = ref 0 in
-    (* TODO: use SAT resolution proofs for tracking why the trail
-       has been simplified, so that the other branches that have been
-       closed can appear in the proof *)
-    let trail =
-      Trail.filter
+    (* remove bool literals made trivial by SAT solver *)
+    let trail, trivial_trail =
+      Trail.to_list trail
+      |> List.partition
         (fun lit ->
           try match Sat.valuation_level lit with
             | true, 0 ->
@@ -185,12 +184,17 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
                 false
             | _ -> true
           with Sat.UndecidedLit -> true)
-        trail
     in
+    let trail = Trail.of_list trail in
     if !n_simpl > 0 then (
       Util.incr_stat stat_trail_simplify;
+      (* use SAT resolution proofs for tracking why the trail
+         has been simplified, so that the other branches that have been
+         closed can appear in the proof *)
+      let proof_removed = List.map Sat.get_proof_of_lit trivial_trail in
       let proof =
-        ProofStep.mk_simp ~rule:(ProofStep.mk_rule "simpl_trail") [C.proof c] in
+        ProofStep.mk_simp ~rule:(ProofStep.mk_rule "simpl_trail")
+          (C.proof c :: proof_removed) in
       let c' = C.create_a ~trail (C.lits c) proof in
       Util.debugf ~section 3
         "@[<2>clause @[%a@]@ trail-simplifies into @[%a@]@]"
