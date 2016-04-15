@@ -15,17 +15,20 @@ type result = Sat_solver_intf.result =
 exception WrongState of string
 
 let wrong_state_ msg = raise (WrongState msg)
+let errorf msg = Util.errorf ~where:"sat_solver" msg
 
 let sat_dump_file_ = ref ""
 
 module type S = Sat_solver_intf.S
 
-module Make(L : Bool_lit_intf.S)(Dummy : sig end)
-: Sat_solver_intf.S with module Lit = L
+module Make(Dummy : sig end)
+: Sat_solver_intf.S
 = struct
-  module Lit = L
+  module Lit = BBox.Lit
 
   type clause = Lit.t list
+  type proof_step = ProofStep.t
+  type proof = ProofStep.of_
 
   (* queue of clauses waiting for being pushed into the solver *)
   let queue_ = Queue.create()
@@ -37,7 +40,7 @@ module Make(L : Bool_lit_intf.S)(Dummy : sig end)
   let dump_l l = match !dump_to with
     | None -> ()
     | Some out ->
-      let pp_lit out l = output_string out (string_of_int (L.to_int l)) in
+      let pp_lit out l = output_string out (string_of_int (Lit.to_int l)) in
       let pp_c out c =
         List.iter (fun l -> output_char out ' '; pp_lit out l) c;
         output_string out " 0\n";
@@ -45,16 +48,16 @@ module Make(L : Bool_lit_intf.S)(Dummy : sig end)
       List.iter (pp_c out) l;
       flush out
 
-  let add_clause ?tag (c:clause) =
+  let add_clause ?(tag=Lit.fresh_id()) ~proof (c:clause) =
     dump_l [c];
-    Queue.push ([c], tag) queue_
+    Queue.push ([c], proof, tag) queue_
 
-  let add_clauses ?tag l =
+  let add_clauses ?(tag=Lit.fresh_id())  ~proof l =
     dump_l l;
-    Queue.push (l, tag) queue_
+    Queue.push (l, proof, tag) queue_
 
-  let add_clause_seq ?tag (seq:clause Sequence.t) =
-    add_clauses ?tag (Sequence.to_rev_list seq)
+  let add_clause_seq ?tag ~proof (seq:clause Sequence.t) =
+    add_clauses ?tag ~proof (Sequence.to_rev_list seq)
 
   let result_ = ref Sat
 
@@ -64,36 +67,35 @@ module Make(L : Bool_lit_intf.S)(Dummy : sig end)
   *)
 
   let eval_fail_ _ = assert (!result_ = Unsat); wrong_state_ "eval"
-  let unsat_core_fail_ _ = assert (!result_ = Sat); wrong_state_ "unsat core"
 
   let eval_ = ref eval_fail_
   let eval_level_ = ref eval_fail_
-  let unsat_core_ : int Sequence.t ref = ref unsat_core_fail_
+  let proof_ : proof option ref = ref None
 
   let pp_ = ref Lit.pp
 
   let pp_clause out c =
     Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:" ⊔ " !pp_) c
 
-  let tag_ = snd
+  let pp_form_simpl out l = Util.pp_list ~sep:"" pp_clause out l
 
-  let pp_form_simpl out (c,_) = Util.pp_list ~sep:"" pp_clause out c
-
-  let pp_form fmt f =
-    match tag_ f with
-    | None -> pp_form_simpl fmt f
-    | Some tag -> Format.fprintf fmt "%a/%d" pp_form_simpl f tag
+  let pp_form fmt (f,tag) =
+    Format.fprintf fmt "[@[<hv>%a@]]/%d" pp_form_simpl f tag
 
   let last_result () = !result_
   let valuation l = !eval_ l
   let valuation_level l = !eval_level_ l
-  let unsat_core k = !unsat_core_ k
 
-  (* TODO: use specific interface of MSat *)
+  let get_proof () = match !proof_ with
+    | None -> assert false
+    | Some p -> p
+
+  (* map tags to the associated proof *)
+  let tag_to_proof_ = Hashtbl.create 32
 
   module SatForm = struct
     include Lit
-    type proof = unit
+    type proof = ProofStep.t
     let fresh () = Lit.make (Lit.payload Lit.dummy)
     let label _ = assert false
     let add_label _ _ = assert false
@@ -109,18 +111,55 @@ module Make(L : Bool_lit_intf.S)(Dummy : sig end)
 
   exception UndecidedLit = S.UndecidedLit
 
+  let bool_clause_of_sat c =
+    S.Proof.to_list c |> List.map (fun a -> a.S.St.lit)
+
+  (* convert a SAT proof into a tree of ProofStep *)
+  let conv_proof_ p : proof =
+    let rec aux p =
+      let open S.Proof in
+      match S.Proof.expand p with
+      | { conclusion=c; step = S.Proof.Hypothesis } ->
+        let tag = match S.get_tag c with
+          | None ->
+            errorf "no tag in leaf of SAT proof (clause %a)" S.St.pp_clause c
+          | Some id -> id
+        in
+        begin
+          try
+            let step = Hashtbl.find tag_to_proof_ tag in
+            let c = bool_clause_of_sat c in
+            ProofStep.mk_bc step c
+          with Not_found -> errorf "no proof for tag %d" tag
+        end
+      | { step = S.Proof.Lemma _; _ } ->
+        errorf "SAT proof involves a lemma"
+      | { conclusion=c; step = S.Proof.Resolution (p1,p2,_) } ->
+        let c = bool_clause_of_sat c in
+        let parents = [aux p1; aux p2] in
+        let step =
+          ProofStep.mk_inference parents
+            ~rule:(ProofStep.mk_rule "sat_resolution")  in
+        ProofStep.mk_bc step c
+    in
+    S.Proof.check p;
+    aux p
+
   (* call [S.solve()] in any case, and enforce invariant about eval/unsat_core *)
   let check_unconditional_ () =
     (* reset functions, so they will fail if called in the wrong state *)
-    unsat_core_ := unsat_core_fail_;
+    proof_ := None;
     eval_ := eval_fail_;
     eval_level_ := eval_fail_;
     (* add pending clauses *)
     while not (Queue.is_empty queue_) do
-      let c, tag = Queue.pop queue_ in
+      let c, proof, tag = Queue.pop queue_ in
       Util.debugf ~section 4 "@[<hv2>assume@ @[%a@]@]"
         (fun k->k pp_form (c,tag));
-      S.assume ?tag c
+      (* remember tag->proof *)
+      assert (not (Hashtbl.mem tag_to_proof_ tag));
+      Hashtbl.add tag_to_proof_ tag proof;
+      S.assume ~tag c
     done;
     (* solve *)
     begin match S.solve () with
@@ -130,20 +169,8 @@ module Make(L : Bool_lit_intf.S)(Dummy : sig end)
       result_ := Sat;
     | S.Unsat ->
       result_ := Unsat;
-      unsat_core_ := begin
-        (* compute Unsat core *)
-        let us = S.get_proof () |> S.unsat_core in
-        (fun k ->
-          us
-          |> CCList.to_seq
-          |> CCFun.tap
-            (fun seq ->
-              Util.debugf ~section 4 "@[unsat_core:@ @[<hv>%a@]@]"
-                (fun k->k (CCFormat.seq S.Proof.print_clause) seq))
-          |> Sequence.filter_map S.get_tag
-          |> Sequence.sort_uniq ~cmp:CCInt.compare
-          |> Sequence.iter k)
-      end;
+      let p = S.get_proof () in
+      proof_ := Some (conv_proof_ p);
     end;
     !result_
 

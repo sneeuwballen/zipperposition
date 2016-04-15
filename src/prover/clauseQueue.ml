@@ -63,8 +63,8 @@ module Make(C : Clause.S) = struct
       let trail = C.trail c in
       let w_lits = weight_lits_ (C.lits c) in
       let w_trail =
-        let module B = C.Ctx.BoolBox in
-        C.Trail.fold
+        let module B = BBox in
+        Trail.fold
           (fun acc t -> match B.payload (B.Lit.abs t) with
              | B.Fresh -> acc
              | B.Clause_component lits -> acc + weight_lits_ lits
@@ -73,7 +73,7 @@ module Make(C : Clause.S) = struct
                  acc + 10)
           0 trail
       in
-      w_lits * Array.length (C.lits c) + w_trail * (C.Trail.length trail) + _depth_ty
+      w_lits * Array.length (C.lits c) + w_trail * (Trail.length trail) + _depth_ty
 
     let penalty_coeff_ = 20
 

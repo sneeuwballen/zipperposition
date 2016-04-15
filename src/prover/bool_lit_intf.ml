@@ -41,6 +41,9 @@ module type S = sig
 
   val to_int : t -> int
 
+  val fresh_id : unit -> int
+  (** Make a fresh ID. Use with care. *)
+
   val pp : t CCFormat.printer
 
   module Set : CCSet.S with type elt = t

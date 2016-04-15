@@ -285,7 +285,8 @@ module Make(X : sig
       then
         (* after inference step: stop recursion and check *)
         match p.result with
-        | Clause c' -> C.is_backward_simplified c'
+        | Clause c' -> SClause.is_backward_simplified c'
+        | BoolClause _
         | Form _ -> false
       else
         List.exists
@@ -302,7 +303,7 @@ module Make(X : sig
     res
 
   let is_trivial c =
-    if C.get_flag C.flag_persistent c then false
+    if C.get_flag SClause.flag_persistent c then false
     else (
       let res =
         C.is_redundant c
@@ -432,7 +433,7 @@ module Make(X : sig
     let open SimplM.Infix in
     fix_simpl c
       ~f:(fun c ->
-        if C.get_flag C.flag_persistent c
+        if C.get_flag SClause.flag_persistent c
         then SimplM.return_same c
         else match !_rw_simplify with
           | [] -> SimplM.return_same c
@@ -445,7 +446,7 @@ module Make(X : sig
     let open SimplM.Infix in
     fix_simpl c
       ~f:(fun c ->
-        if C.get_flag C.flag_persistent c
+        if C.get_flag SClause.flag_persistent c
         then SimplM.return_same c
         else match !_active_simplify with
           | [] -> SimplM.return_same c

@@ -20,79 +20,66 @@ module type S = Clause_intf.S
 (** {2 Type def} *)
 module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   module Ctx = Ctx
-  module BLit = Ctx.BoolBox.Lit
-  module Trail = Trail.Make(BLit)
+  module BLit = BBox
 
-  let pp_trail out trail =
-    if not (Trail.is_empty trail)
-    then
-      Format.fprintf out "@ @<2>← @[<hv>%a@]"
-        (CCFormat.seq ~start:"" ~stop:"" ~sep:" ⊓ " Ctx.BoolBox.pp)
-        (Trail.to_seq trail)
+  type flag = SClause.flag
+
+  (* re-export type, to access fields *)
+  type sclause = SClause.t = private {
+    id: int;
+    lits: Literals.t;
+    trail: Trail.t;
+    mutable flags: flag;
+  }
+
+  type proof_step = ProofStep.t
+  type proof = ProofStep.of_
 
   type t = {
-    lits : Literal.t array; (** the literals *)
-    tag : int; (** unique ID of the clause *)
-    mutable flags : int; (** boolean flags for the clause *)
+    sclause : sclause;
     mutable selected : BV.t Lazy.t; (** bitvector for selected lits*)
-    mutable proof : t ProofStep.t; (** Proof of the clause *)
-    mutable trail : Trail.t; (** boolean trail *)
+    mutable proof : proof_step; (** Proof of the clause *)
   }
 
   type clause = t
 
   (** {2 boolean flags} *)
 
-  type flag = int
+  let get_flag flag c = SClause.get_flag flag c.sclause
+  let set_flag flag c b = SClause.set_flag flag c.sclause b
 
-  let new_flag =
-    let flag_gen = Util.Flag.create () in
-    fun () -> Util.Flag.get_new flag_gen
-
-  let flag_lemma = new_flag ()
-  let flag_persistent = new_flag ()
-  let flag_redundant = new_flag ()
-  let flag_backward_simplified = new_flag()
-
-  let set_flag flag c truth =
-    if truth
-    then c.flags <- c.flags lor flag
-    else c.flags <- c.flags land (lnot flag)
-
-  let get_flag flag c = (c.flags land flag) != 0
-
-  let mark_redundant c = set_flag flag_redundant c true
-  let is_redundant c = get_flag flag_redundant c
-  let mark_backward_simplified c = set_flag flag_backward_simplified c true
-  let is_backward_simplified c = get_flag flag_backward_simplified c
+  let mark_redundant c = set_flag SClause.flag_redundant c true
+  let is_redundant c = get_flag SClause.flag_redundant c
+  let mark_backward_simplified c = set_flag SClause.flag_backward_simplified c true
+  let is_backward_simplified c = get_flag SClause.flag_backward_simplified c
 
   (** {2 Hashcons} *)
 
-  let equal c1 c2 = c1.tag = c2.tag
+  let equal c1 c2 = SClause.equal c1.sclause c2.sclause
 
-  let compare c1 c2 = c1.tag - c2.tag
+  let compare c1 c2 = SClause.compare c1.sclause c2.sclause
 
-  let hash_fun c h = Lits.hash_fun c.lits h
+  let hash_fun c h = Lits.hash_fun c.sclause.lits h
   let hash c = Hash.apply hash_fun c
 
-  let id c = c.tag
+  let id c = SClause.id c.sclause
 
-  let is_ground c = Literals.is_ground c.lits
+  let is_ground c = Literals.is_ground c.sclause.lits
 
-  let weight c = Lits.weight c.lits
+  let weight c = Lits.weight c.sclause.lits
 
-  let trail c = c.trail
-  let has_trail c = not (Trail.is_empty c.trail)
-  let trail_subsumes c1 c2 = Trail.subsumes c1.trail c2.trail
-  let is_active c ~v = Trail.is_active c.trail ~v
+  let trail c = c.sclause.trail
+  let has_trail c = not (Trail.is_empty c.sclause.trail)
+  let trail_subsumes c1 c2 = Trail.subsumes c1.sclause.trail c2.sclause.trail
+  let is_active c ~v = Trail.is_active c.sclause.trail ~v
 
   let trail_l = function
     | [] -> Trail.empty
-    | [c] -> c.trail
-    | [c1; c2] -> Trail.merge c1.trail c2.trail
+    | [c] -> c.sclause.trail
+    | [c1; c2] -> Trail.merge c1.sclause.trail c2.sclause.trail
     | l -> Trail.merge_l (List.map trail l)
 
-  let lits c = c.lits
+  let lits c = c.sclause.lits
 
   module CHashtbl = CCHashtbl.Make(struct
       type t = clause
@@ -106,29 +93,27 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let distance_to_goal c = ProofStep.distance_to_goal c.proof
 
-  let id_count_ = ref 0
-
   (* private function for building clauses *)
-  let create_inner ~selected ~trail lits proof =
+  let create_inner ~selected sclause proof =
     Util.enter_prof prof_clause_create;
     (* create the structure *)
     let c = {
-      lits = lits;
-      flags = 0;
-      tag = ! id_count_;
+      sclause;
       selected;
       proof;
-      trail;
     } in
-    incr id_count_;
     (* return clause *)
     Util.incr_stat stat_clause_create;
     Util.exit_prof prof_clause_create;
     c
 
+  let of_sclause c proof =
+    let selected = lazy (Ctx.select c.lits) in
+    create_inner ~selected c proof
+
   let create_a ~trail lits proof =
     let selected = lazy (Ctx.select lits) in
-    create_inner ~trail ~selected lits proof
+    create_inner ~selected (SClause.make ~trail lits) proof
 
   let create ~trail lits proof =
     create_a ~trail (Array.of_list lits) proof
@@ -162,27 +147,27 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     | Statement.NegatedGoal l -> List.map (of_lits ~is_goal:true) l
 
   let update_trail f c =
-    let trail = f c.trail in
-    create_inner ~trail ~selected:c.selected c.lits c.proof
+    let sclause = SClause.update_trail f c.sclause in
+    create_inner ~selected:c.selected sclause c.proof
 
   let proof_step c = c.proof
 
-  let proof c = ProofStep.mk_c c.proof c
+  let proof c = ProofStep.mk_c c.proof c.sclause
 
   let update_proof c f =
     let new_proof = f c.proof in
-    create_a ~trail:c.trail c.lits new_proof
+    create_a ~trail:c.sclause.trail c.sclause.lits new_proof
 
   let is_empty c =
-    Lits.is_absurd c.lits && Trail.is_empty c.trail
+    Lits.is_absurd c.sclause.lits && Trail.is_empty c.sclause.trail
 
-  let length c = Array.length c.lits
+  let length c = SClause.length c.sclause
 
   (** Apply substitution to the clause. Note that using the same renaming for all
       literals is important. *)
   let apply_subst ~renaming subst (c,sc) =
-    let lits = Literals.apply_subst ~renaming subst (c.lits,sc) in
-    let new_c = create_a ~trail:c.trail lits c.proof in
+    let lits = Literals.apply_subst ~renaming subst (c.sclause.lits,sc) in
+    let new_c = create_a ~trail:c.sclause.trail lits c.proof in
     new_c
 
   let _apply_subst_no_simpl subst (lits,sc) =
@@ -256,7 +241,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       BV.empty () (* no eligible literal when some are selected *)
 
   let is_eligible_param (c,sc) subst ~idx =
-    Lit.is_pos c.lits.(idx)
+    Lit.is_pos c.sclause.lits.(idx)
     &&
     BV.is_empty (Lazy.force c.selected)
     &&
@@ -269,16 +254,16 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let is_selected c i = BV.get (Lazy.force c.selected) i
 
   (** Indexed list of selected literals *)
-  let selected_lits c = BV.selecti (Lazy.force c.selected) c.lits
+  let selected_lits c = BV.selecti (Lazy.force c.selected) c.sclause.lits
 
   (** is the clause a unit clause? *)
-  let is_unit_clause c = match c.lits with
+  let is_unit_clause c = match c.sclause.lits with
     | [|_|] -> true
     | _ -> false
 
   let is_oriented_rule c =
     let ord = Ctx.ord () in
-    match c.lits with
+    match c.sclause.lits with
     | [| Lit.Equation (l, r, true) |] ->
         begin match Ordering.compare ord l r with
           | Comparison.Gt
@@ -291,15 +276,16 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let symbols ?(init=ID.Set.empty) seq =
     Sequence.fold
-      (fun set c -> Lits.symbols ~init:set c.lits)
+      (fun set c -> Lits.symbols ~init:set c.sclause.lits)
       init seq
 
-  let to_forms c = Lits.Conv.to_forms c.lits
+  let to_forms c = Lits.Conv.to_forms c.sclause.lits
+  let to_sclause c = c.sclause
 
   module Seq = struct
-    let lits c = Sequence.of_array c.lits
-    let terms c = lits c |> Sequence.flatMap Lit.Seq.terms
-    let vars c = terms c |> Sequence.flatMap T.Seq.vars
+    let lits c = Sequence.of_array c.sclause.lits
+    let terms c = lits c |> Sequence.flat_map Lit.Seq.terms
+    let vars c = terms c |> Sequence.flat_map T.Seq.vars
   end
 
   (** {2 Filter literals} *)
@@ -324,7 +310,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let filter f _ lit = f lit
 
     let max c =
-      let bv = lazy (Lits.maxlits ~ord:(Ctx.ord ()) c.lits) in
+      let bv = lazy (Lits.maxlits ~ord:(Ctx.ord ()) c.sclause.lits) in
       fun i _ -> BV.get (Lazy.force bv) i
 
     let pos _ lit = Lit.is_pos lit
@@ -350,13 +336,13 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   (** Simple set *)
   module ClauseSet = CCSet.Make(struct
       type t = clause
-      let compare hc1 hc2 = CCInt.compare hc1.tag hc2.tag
+      let compare c1 c2 = SClause.compare c1.sclause c2.sclause
     end)
 
   (** {2 Positions in clauses} *)
 
   module Pos = struct
-    let at c pos = Lits.Pos.at c.lits pos
+    let at c pos = Lits.Pos.at c.sclause.lits pos
   end
 
   module WithPos = struct
@@ -367,7 +353,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     }
 
     let compare t1 t2 =
-      let c = t1.clause.tag - t2.clause.tag in
+      let c = SClause.compare t1.clause.sclause t2.clause.sclause in
       if c <> 0 then c else
         let c = T.compare t1.term t2.term in
         if c <> 0 then c else
@@ -375,10 +361,12 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
     let pp out t =
       Format.fprintf out "@[clause @[%a@]@ at pos @[%a@]@]"
-        Lits.pp t.clause.lits Position.pp t.pos
+        Lits.pp t.clause.sclause.lits Position.pp t.pos
   end
 
   (** {2 IO} *)
+
+  let pp_trail = SClause.pp_trail
 
   let pp out c =
     let pp_selected selected out i =
@@ -402,18 +390,14 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
           lits
       )
     in
-    Format.fprintf out "@[<2>%a%a@]" pp_lits c.lits pp_trail c.trail;
+    Format.fprintf out "@[<2>%a%a@]"
+      pp_lits c.sclause.lits SClause.pp_trail c.sclause.trail;
     ()
 
   (* TODO print trail?! *)
-  let pp_tstp out c =
-    match c.lits with
-    | [| |] -> CCFormat.string out "$false"
-    | [| l |] -> Lit.pp_tstp out l
-    | _ -> Format.fprintf out "(%a)" Lits.pp_tstp c.lits
+  let pp_tstp out c = SClause.pp_tstp out c.sclause
 
-  let pp_tstp_full out c =
-    Format.fprintf out "@[<2>cnf(%d, plain,@ %a).@]" c.tag pp_tstp c
+  let pp_tstp_full out c = SClause.pp_tstp_full out c.sclause
 
   let to_string = CCFormat.to_string pp
 

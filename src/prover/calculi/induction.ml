@@ -28,7 +28,7 @@ module Make
   module Env = E
   module Ctx = E.Ctx
   module C = E.C
-  module BoolBox = Ctx.BoolBox
+  module BoolBox = BBox
   module BoolLit = BoolBox.Lit
 
   let lemmas_ = ref []
@@ -135,7 +135,7 @@ module Make
     in
     if C.is_ground c
     && not (is_ind_conjecture_ c)
-    && not (C.get_flag A.flag_cut_introduced c)
+    && not (C.get_flag Avatar.flag_cut_introduced c)
     && C.is_unit_clause c
     && not (has_pos_lit_ c) (* only positive lemmas, therefore C negative *)
     && not (CCList.is_empty ind_csts) (* && not (T.Set.for_all CI.is_inductive set) *)
@@ -214,7 +214,7 @@ module Make
              List.map
                (fun ctx ->
                   let lits = ClauseContext.apply ctx case.Ind_cst.case_term in
-                  C.create_a lits proof ~trail:(C.Trail.singleton b_lit))
+                  C.create_a lits proof ~trail:(Trail.singleton b_lit))
                mw.mw_contexts
            in
            (* clauses [CNF(¬ And_i ctx_i[t']) <- b_lit] for
@@ -241,7 +241,7 @@ module Make
                          [Array.to_list lits])
                     |> List.map
                       (fun lits ->
-                         C.create lits proof ~trail:(C.Trail.singleton b_lit))
+                         C.create lits proof ~trail:(Trail.singleton b_lit))
                   in
                   Sequence.of_list clauses)
             |> Sequence.to_rev_list
@@ -258,12 +258,12 @@ module Make
     (* boolean constraint(s) *)
     let b_clauses =
       (* trail => \Or b_lits *)
-      let pre = trail |> C.Trail.to_list |> List.map BoolLit.neg in
+      let pre = trail |> Trail.to_list |> List.map BoolLit.neg in
       let post = !b_lits in
       [ pre @ post ]
     in
     Util.debugf ~section 2 "@[<2>add boolean constraints@ @[<hv>%a@]@]"
-      (fun k->k (Util.pp_list A.pp_bclause) b_clauses);
+      (fun k->k (Util.pp_list BBox.pp_bclause) b_clauses);
     clauses, b_clauses
 
   (* [cst] is the minimal term for which contexts [ctxs] holds, returns
@@ -276,7 +276,7 @@ module Make
       mw_coverset=set;
     } in
     let clauses, b_clauses = clauses_of_min_witness ~trail ~proof mw in
-    A.Solver.add_clauses ?tag:id b_clauses;
+    A.Solver.add_clauses ?tag:id ~proof b_clauses;
     Util.incr_stat stats_min;
     clauses
 
@@ -287,7 +287,7 @@ module Make
      - two literals [C in loop(i)], [D in loop(j)] if i,j do not depend
         on one another *)
   let has_trivial_trail c =
-    let trail = C.trail c |> C.Trail.to_seq in
+    let trail = C.trail c |> Trail.to_seq in
     (* all i=t where i is inductive *)
     let relevant_cases =
       trail
@@ -337,7 +337,7 @@ module Make
            let ctx = ClauseContext.extract_exn (C.lits c) (Ind_cst.cst_to_term cst) in
            let proof = ProofStep.mk_inference [C.proof c]
                ~rule:(ProofStep.mk_rule "min") in
-           let trail = C.Trail.add_list (C.trail c) (trail_of_cst cst) in
+           let trail = Trail.add_list (C.trail c) (trail_of_cst cst) in
            assert_min ~id:(C.id c) ~trail ~proof [ctx] cst)
         consts
     in
@@ -373,7 +373,7 @@ module Make
                   clauses
               in
               let proof = ProofStep.mk_goal (Statement.src st) in
-              let clauses = assert_min ~trail:C.Trail.empty ~proof ctxs cst in
+              let clauses = assert_min ~trail:Trail.empty ~proof ctxs cst in
               clauses
             )
             consts

@@ -16,9 +16,13 @@ type 'a printer = Format.formatter -> 'a -> unit
 
 (** {2 Avatar: splitting+sat} *)
 
+val flag_cut_introduced : SClause.flag
+
 module type S = Avatar_intf.S
 
-module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
+module Make
+    (E : Env.S)
+    (Sat : Sat_solver.S)
   : S
   with module E = E
    and module Solver = Sat

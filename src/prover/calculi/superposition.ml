@@ -13,6 +13,8 @@ module Comp = Comparison
 
 let section = Util.Section.make ~parent:Const.section "sup"
 
+let flag_simplified = SClause.new_flag()
+
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C with type t = Env.C.t
@@ -810,7 +812,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         in
         triv || check lits (i+1)
     in
-    let is_tauto = check (C.lits c) 0 || C.Trail.is_trivial (C.trail c) in
+    let is_tauto = check (C.lits c) 0 || Trail.is_trivial (C.trail c) in
     if is_tauto then Util.debugf ~section 3 "@[@[%a@]@ is a tautology@]" (fun k->k C.pp c);
     is_tauto
 
@@ -844,8 +846,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     );
     Util.exit_prof prof_semantic_tautology;
     res
-
-  let flag_simplified = C.new_flag()
 
   let var_in_subst_ subst v sc =
     S.mem subst ((v:T.var:>InnerTerm.t HVar.t),sc)

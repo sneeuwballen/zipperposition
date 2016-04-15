@@ -226,7 +226,7 @@ module Make(E : Env.S) : S with module E = E = struct
 
   type t = {
     mutable prover : M.Prover.t; (* real meta-prover *)
-    mutable sources : C.t ProofStep.of_ LitMap.t; (** for reconstructing proofs *)
+    mutable sources : ProofStep.of_ LitMap.t; (** for reconstructing proofs *)
     mutable results : Result.t;
     mutable new_results : Result.t; (* recent results *)
   }
@@ -299,7 +299,7 @@ module Make(E : Env.S) : S with module E = E = struct
              let proofs = proof_of_explanation p explanation in
              let proof =
                ProofStep.mk_inference ~rule:(ProofStep.mk_rule "lemma") proofs in
-             let c = C.create lits ~trail:C.Trail.empty proof in
+             let c = C.create lits ~trail:Trail.empty proof in
              c))
         consequences
       |> Sequence.to_list

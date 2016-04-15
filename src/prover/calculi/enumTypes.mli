@@ -65,7 +65,7 @@ module type S = sig
     | AlreadyDeclared of decl
 
   val declare_ty :
-    proof:C.t ProofStep.of_ ->
+    proof:ProofStep.of_ ->
     ty_id:ID.t ->
     ty_vars:Type.t HVar.t list ->
     var:Type.t HVar.t ->

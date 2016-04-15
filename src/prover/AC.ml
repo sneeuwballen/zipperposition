@@ -46,8 +46,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* build clause l=r *)
     let add_clause l r =
       let proof = ProofStep.mk_trivial in
-      let c = C.create ~trail:C.Trail.empty [ Lit.mk_eq l r ] proof in
-      C.set_flag C.flag_persistent c true;
+      let c = C.create ~trail:Trail.empty [ Lit.mk_eq l r ] proof in
+      C.set_flag SClause.flag_persistent c true;
       res := c :: !res
     in
     add_clause (f x y) (f y x);
@@ -129,7 +129,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           lits
       in
       let n' = List.length lits in
-      if n' < n && not (C.get_flag C.flag_persistent c)
+      if n' < n && not (C.get_flag SClause.flag_persistent c)
       then (
         (* did some simplification *)
         let symbols = symbols_of_terms (C.Seq.terms c) in

@@ -32,8 +32,8 @@ let print_progress i j =
   ()
 
 (** The SZS status of a state *)
-type 'c szs_status =
-  | Unsat of 'c ProofStep.of_
+type szs_status =
+  | Unsat of ProofStep.of_
   | Sat
   | Unknown
   | Error of string
@@ -42,19 +42,19 @@ type 'c szs_status =
 module type S = sig
   module Env : Env.S
 
-  val given_clause_step : ?generating:bool -> int -> Env.C.t szs_status
+  val given_clause_step : ?generating:bool -> int -> szs_status
   (** Perform one step of the given clause algorithm.
       It performs generating inferences only if [generating] is true (default);
       other parameters are the iteration number and the environment *)
 
   val given_clause:
     ?generating:bool -> ?steps:int -> ?timeout:float ->
-    unit -> Env.C.t szs_status * int
+    unit -> szs_status * int
   (** run the given clause until a timeout occurs or a result
       is found. It returns a tuple (new state, result, number of steps done).
       It performs generating inferences only if [generating] is true (default) *)
 
-  val presaturate : unit -> Env.C.t szs_status * int
+  val presaturate : unit -> szs_status * int
   (** Interreduction of the given state, without generating inferences. Returns
       the number of steps done for presaturation, with status of the set. *)
 end

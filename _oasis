@@ -122,14 +122,14 @@ Library "libzipperposition_prover"
   Pack:             true
   FindlibName:      prover
   FindlibParent:    libzipperposition
-  Modules:          ClauseQueue, Clause, Const, Extensions,
+  Modules:          ClauseQueue, Clause, SClause, Const, Extensions,
                     Literal, Literals, Ctx, ProofStep, ProofPrint, ProofState,
                     Saturate, Selection, AC, AC_intf, SimplM,
                     Compute_prec, Params, Env, Monome, ArithLit, Signals, Multisets,
                     Ctx_intf, Clause_intf, Env_intf, ProofState_intf,
-                    BBox, BBox_intf, ClauseContext, ClauseQueue_intf,
+                    BBox, ClauseContext, ClauseQueue_intf,
                     Bool_lit, Bool_lit_intf, Sat_solver, Sat_solver_intf,
-                    Trail, Trail_intf, Ind_cst, Phases, Phases_impl,
+                    Trail, Ind_cst, Phases, Phases_impl,
                     Flex_state, Classify_cst, Rewrite_rule,
                     calculi/Avatar, calculi/Avatar_intf,
                     calculi/Induction, calculi/Induction_intf,

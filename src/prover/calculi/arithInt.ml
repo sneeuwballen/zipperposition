@@ -133,6 +133,12 @@ let diff_to_lesseq_ = ref `Simplify
 let case_switch_limit = ref 30
 let div_case_switch_limit = ref 100
 
+let flag_tauto = SClause.new_flag ()
+let flag_computed_tauto = SClause.new_flag ()
+
+(* flag to be used to know when a clause cannot be purified *)
+let flag_no_purify = SClause.new_flag ()
+
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module Ctx = Env.Ctx
@@ -1479,9 +1485,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     | Simp.Unsatisfiable _ -> true (* negation unsatisfiable *)
     | Simp.Solution _ -> false
 
-  let flag_tauto = C.new_flag ()
-  let flag_computed_tauto = C.new_flag ()
-
   (* cache the result because it's a bit expensive *)
   let is_tautology c =
     if C.get_flag flag_computed_tauto c
@@ -1593,9 +1596,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     match st with
     | `New -> [c]
     | `Same -> []
-
-  (* flag to be used to know when a clause cannot be purified *)
-  let flag_no_purify = C.new_flag ()
 
   (* replace arith subterms with fresh variable + constraint *)
   let purify c =

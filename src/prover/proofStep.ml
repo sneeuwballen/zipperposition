@@ -9,6 +9,7 @@ module Loc = ParseLocation
 module Hash = CCHash
 
 type form = TypedSTerm.t
+type bool_lit = BBox.Lit.t
 type 'a sequence = ('a -> unit) -> unit
 
 let section = Util.Section.make ~parent:Const.section "proof"
@@ -46,25 +47,26 @@ type kind =
   | Data of StatementSrc.t * Type.t Statement.data
   | Trivial (** trivial, or trivial within theories *)
 
-type 'clause result =
+type result =
   | Form of form
-  | Clause of 'clause
+  | Clause of SClause.t
+  | BoolClause of bool_lit list
 
 (** A proof step, without the conclusion *)
-type +'a t = {
+type t = {
   id: int; (* unique ID *)
   kind: kind;
   dist_to_goal: int option; (* distance to goal *)
-  parents: 'a of_ list;
+  parents: of_ list;
 }
 
 (** Proof Step with its conclusion *)
-and +'a of_ = {
-  step: 'a t;
-  result : 'a result
+and of_ = {
+  step: t;
+  result : result
 }
 
-type 'a proof = 'a of_
+type proof = of_
 
 let result p = p.result
 let step p = p.step
@@ -73,10 +75,10 @@ let parents p = p.parents
 
 let result_as_clause p = match p.result with
   | Clause c -> c
-  | Form _ -> invalid_arg "result_as_clause"
+  | Form _ | BoolClause _ -> invalid_arg "result_as_clause"
 
 let result_as_form p = match p.result with
-  | Clause _ -> invalid_arg "result_as_form"
+  | Clause _ | BoolClause _ -> invalid_arg "result_as_form"
   | Form f -> f
 
 (** {2 Constructors and utils} *)
@@ -148,6 +150,7 @@ let mk_f_esa ~rule f parents =
   mk_f_ step f
 
 let mk_c step c = {step; result=Clause c; }
+let mk_bc step c = {step; result=BoolClause c; }
 
 let adapt_c p c =
   { p with result=Clause c; }

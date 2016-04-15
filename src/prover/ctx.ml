@@ -97,6 +97,4 @@ module Make(X : PARAMETERS) = struct
     let of_form f = Literal.Conv.of_form ~hooks:!_from f
     let to_form f = Literal.Conv.to_form ~hooks:!_to f
   end
-
-  module BoolBox = BBox.Make(struct end)
 end

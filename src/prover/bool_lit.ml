@@ -23,12 +23,17 @@ module Make(Payload : PAYLOAD)
 
   let rec dummy = { id=0; neg=dummy; payload=Payload.dummy; }
 
-  (* factory for literals *)
-  let make =
+  let fresh_id =
     let n = ref 1 in
-    fun payload ->
+    fun () ->
       let id = !n in
       incr n;
+      id
+
+  (* factory for literals *)
+  let make =
+    fun payload ->
+      let id = fresh_id () in
       let rec pos = {
         id;
         payload;

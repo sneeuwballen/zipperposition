@@ -21,21 +21,18 @@ let stat_splits = Util.mk_stat "avatar.splits"
 let stat_trail_trivial = Util.mk_stat "avatar.trivial_trail"
 let stat_trail_simplify = Util.mk_stat "avatar.simplify_trail"
 
+(* annotate clauses that have been introduced by lemma *)
+let flag_cut_introduced = SClause.new_flag()
+
 module type S = Avatar_intf.S
 
-module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
+module Make(E : Env.S)(Sat : Sat_solver.S)
 = struct
   module E = E
   module Ctx = E.Ctx
   module C = E.C
-  module BoolBox = Ctx.BoolBox
   module Solver = Sat
-
-  (* annotate clauses that have been introduced by lemma *)
-  let flag_cut_introduced = C.new_flag()
-
-  let pp_bclause out lits =
-    Format.fprintf out "@[<hv>%a@]" (Util.pp_list ~sep:" ⊔ " BoolBox.pp) lits
+  module BLit = BBox.Lit
 
   (* map ID -> clause *)
   let id_to_clause_ = Hashtbl.create 24
@@ -102,10 +99,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
                let proof =
                  ProofStep.mk_esa ~rule:(ProofStep.mk_rule "split") [C.proof c] in
                let lits = Array.of_list lits in
-               let bool_name = BoolBox.inject_lits lits in
+               let bool_name = BBox.inject_lits lits in
                let trail =
                  C.trail c
-                 |> C.Trail.add bool_name
+                 |> Trail.add bool_name
                in
                let c = C.create_a ~trail lits proof in
                c, bool_name)
@@ -117,13 +114,13 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
         (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
         let bool_guard =
           C.trail c
-          |> C.Trail.to_list
-          |> List.map C.Trail.Lit.neg in
+          |> Trail.to_list
+          |> List.map Trail.Lit.neg in
         let bool_clause = List.append bool_clause bool_guard in
         save_clause ~tag:(C.id c) c;
-        Sat.add_clause ~tag:(C.id c) bool_clause;
+        Sat.add_clause ~tag:(C.id c) ~proof:(C.proof_step c) bool_clause;
         Util.debugf ~section 4 "@[constraint clause is @[%a@]@]"
-          (fun k->k pp_bclause bool_clause);
+          (fun k->k BBox.pp_bclause bool_clause);
         (* return the clauses *)
         Some clauses
 
@@ -144,16 +141,16 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
   let check_empty c =
     if Array.length (C.lits c) = 0 && !filter_absurd_trails_ (C.trail c)
     then (
-      assert (not (C.Trail.is_empty (C.trail c)));
+      assert (not (Trail.is_empty (C.trail c)));
       let b_clause =
         C.trail c
-        |> C.Trail.to_list
-        |> List.map C.Trail.Lit.neg
+        |> Trail.to_list
+        |> List.map Trail.Lit.neg
       in
       Util.debugf ~section 4 "@[negate trail of @[%a@] (id %d)@ with @[%a@]@]"
-        (fun k->k C.pp c (C.id c) pp_bclause b_clause);
+        (fun k->k C.pp c (C.id c) BBox.pp_bclause b_clause);
       save_clause ~tag:(C.id c) c;
-      Sat.add_clause ~tag:(C.id c) b_clause;
+      Sat.add_clause ~tag:(C.id c) ~proof:(C.proof_step c) b_clause;
     );
     [] (* never infers anything! *)
 
@@ -161,7 +158,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
   let trail_is_trivial_ c =
     let trail = C.trail c in
     let res =
-      C.Trail.exists
+      Trail.exists
         (fun lit ->
           try match Sat.valuation_level lit with
             | false, 0 -> true (* false at level 0: proven false *)
@@ -186,7 +183,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
        has been simplified, so that the other branches that have been
        closed can appear in the proof *)
     let trail =
-      C.Trail.filter
+      Trail.filter
         (fun lit ->
           try match Sat.valuation_level lit with
             | true, 0 ->
@@ -230,13 +227,13 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
 
   (* generic mechanism for adding a clause
       and make a lemma out of it, including Skolemization, etc. *)
-  let introduce_cut lits proof : C.t list * BoolBox.t =
-    let box = BoolBox.inject_lits lits in
+  let introduce_cut lits proof : C.t list * BBox.t =
+    let box = BBox.inject_lits lits in
     Util.debugf ~section 3 "@[<2>introduce cut on@ `@[%a@]`@]"
       (fun k->k Literals.pp lits);
     (* positive clause *)
     let c_pos =
-      C.create_a ~trail:(C.Trail.singleton box) lits proof
+      C.create_a ~trail:(Trail.singleton box) lits proof
     in
     (* negative component:
       - gather variables
@@ -262,7 +259,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
           (* negate, apply subst (to use the Skolem symbols) *)
           let lit = Lit.negate lit in
           let lit = Lit.apply_subst ~renaming subst (lit,0) in
-          let trail = C.Trail.singleton (C.Trail.Lit.neg box) in
+          let trail = Trail.singleton (Trail.Lit.neg box) in
           let c = C.create_a ~trail [| lit |] proof in
           C.set_flag flag_cut_introduced c true;
           c)
@@ -283,7 +280,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
         |> Sequence.flat_map
           (fun c ->
             let c = c_of_lemma c in
-            assert (C.trail c |> C.Trail.is_empty);
+            assert (C.trail c |> Trail.is_empty);
             let new_clauses, _box = introduce_cut (C.lits c) (C.proof_step c) in
             Util.debugf ~section 2 "@[<hv2>introduce cut from meta lemma:@,%a@]"
               (fun k->k (CCList.print C.pp) new_clauses);
@@ -307,18 +304,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
           []
       | Sat_solver.Unsat ->
           Util.debug ~section 1 "SAT-solver reports \"UNSAT\"";
-          let premises =
-            let l = Sequence.to_rev_list Sat.unsat_core in
-            Util.debugf ~section 3 "unsat core:@ @[%a@]"
-              (fun k->k (CCList.print CCInt.print) l);
-            l
-            |> CCList.filter_map (fun tag -> get_clause ~tag)
-            |> List.map C.proof
-          in
-          let proof =
-            ProofStep.mk_inference ~rule:(ProofStep.mk_rule "sat") premises
-          in
-          let c = C.create ~trail:C.Trail.empty [] proof in
+          let proof = Sat.get_proof () |> ProofStep.step in
+          let c = C.create ~trail:Trail.empty [] proof in
           [c]
     in
     Signal.send after_check_sat ();
@@ -327,7 +314,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S with module Lit = E.Ctx.BoolBox.Lit)
 
   let register () =
     Util.debug ~section:Const.section 2 "register extension Avatar";
-    Sat.set_printer BoolBox.pp;
+    Sat.set_printer BBox.pp;
     E.add_multi_simpl_rule split;
     E.add_unary_inf "avatar_check_empty" check_empty;
     E.add_generate "avatar_check_sat" check_satisfiability;
@@ -365,7 +352,7 @@ let extension =
   let action env =
     let module E = (val env : Env.S) in
     Util.debug 1 "create new SAT solver";
-    let module Sat = Sat_solver.Make(E.Ctx.BoolBox.Lit)(struct end) in
+    let module Sat = Sat_solver.Make(struct end) in
     Sat.setup();
     let module A = Make(E)(Sat) in
     E.update_flex_state (Flex_state.add key (module A : S));

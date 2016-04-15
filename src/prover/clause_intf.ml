@@ -5,23 +5,19 @@ open Libzipperposition
 
 module type S = sig
   module Ctx : Ctx.S
-  module Trail : Trail_intf.S with module Lit = Ctx.BoolBox.Lit
 
   type t
   type clause = t
 
+  type proof_step = ProofStep.t
+  type proof = ProofStep.of_
+
   (** {2 Flags} *)
 
-  type flag
-
-  val flag_lemma : flag (** clause is a lemma *)
-  val flag_persistent : flag (** clause cannot be redundant *)
-  val flag_redundant : flag (** clause has been shown to be redundant *)
-  val flag_backward_simplified : flag (** clause has been backward simplified *)
+  type flag = SClause.flag
 
   val set_flag : flag -> t -> bool -> unit (** set boolean flag *)
   val get_flag : flag -> t -> bool (** get value of boolean flag *)
-  val new_flag : unit -> flag (** new flag that can be used on clauses *)
 
   val mark_redundant : t -> unit
   val is_redundant : t -> bool
@@ -78,7 +74,7 @@ module type S = sig
   val create :
     trail:Trail.t ->
     Literal.t list ->
-    t ProofStep.t ->
+    proof_step ->
     t
   (** Build a new clause from the given literals.
       @param trail boolean trail
@@ -87,14 +83,16 @@ module type S = sig
   val create_a :
     trail:Trail.t ->
     Literal.t array ->
-    t ProofStep.t ->
+    proof_step ->
     t
   (** Build a new clause from the given literals. *)
+
+  val of_sclause : SClause.t -> proof_step -> t
 
   val of_forms :
     trail:Trail.t ->
     FOTerm.t SLiteral.t list ->
-    t ProofStep.t ->
+    proof_step ->
     t
   (** Directly from list of formulas *)
 
@@ -106,13 +104,13 @@ module type S = sig
   val of_statement : Statement.clause_t -> t list
   (** Extract a clause from a statement, if any *)
 
-  val proof_step : t -> t ProofStep.t
+  val proof_step : t -> proof_step
   (** Extract its proof from the clause *)
 
-  val proof : t -> t ProofStep.of_
+  val proof : t -> proof
   (** Obtain the pair [conclusion, step] *)
 
-  val update_proof : t -> (t ProofStep.t -> t ProofStep.t) -> t
+  val update_proof : t -> (proof_step -> proof_step) -> t
   (** [update_proof c f] creates a new clause that is
       similar to [c] in all aspects, but with
       the proof [f (proof_step c)] *)
@@ -165,6 +163,8 @@ module type S = sig
 
   val symbols : ?init:ID.Set.t -> t Sequence.t -> ID.Set.t
   (** symbols that occur in the clause *)
+
+  val to_sclause : t -> SClause.t
 
   val to_forms : t -> FOTerm.t SLiteral.t list
   (** Easy iteration on an abstract view of literals *)

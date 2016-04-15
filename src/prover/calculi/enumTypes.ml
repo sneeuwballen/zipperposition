@@ -22,6 +22,9 @@ let stat_instantiate = Util.mk_stat "enum_types.instantiate_axiom"
 
 let section = Util.Section.make ~parent:Const.section "enum_ty"
 
+(* flag for clauses that are declarations of enumerated types *)
+let flag_enumeration_clause = SClause.new_flag ()
+
 exception Error of string
 
 let () = Printexc.register_printer
@@ -54,7 +57,7 @@ module type S = sig
     | AlreadyDeclared of decl
 
   val declare_ty :
-    proof:C.t ProofStep.of_ ->
+    proof:ProofStep.of_ ->
     ty_id:ID.t ->
     ty_vars:Type.t HVar.t list ->
     var:Type.t HVar.t ->
@@ -106,7 +109,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     decl_cases : term list; (* ... t1 | t2 | ... | tn *)
     decl_proof :
       [ `Data of StatementSrc.t * Type.t Statement.data
-      | `Clause of C.t ProofStep.of_
+      | `Clause of ProofStep.of_
       ]; (* justification for the enumeration axiom *)
     mutable decl_symbols : ID.Set.t; (* set of declared symbols for t1,...,tn *)
   }
@@ -376,7 +379,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             ProofStep.mk_inference
               ~rule:(ProofStep.mk_rule "axiom_enum_types") [step]
       in
-      let trail = C.Trail.empty in
+      let trail = Trail.empty in
       let c' = C.create ~trail lits proof in
       Util.debugf ~section 3 "@[<2>instantiate axiom of enum type `%a` \
                               on @[%a@]:@ clause @[%a@]@]"
@@ -428,9 +431,6 @@ module Make(E : Env.S) : S with module Env = E = struct
            | Some c -> c::acc)
     in
     PS.PassiveSet.add (Sequence.of_list clauses)
-
-  (* flag for clauses that are declarations of enumerated types *)
-  let flag_enumeration_clause = C.new_flag ()
 
   let is_trivial c =
     C.get_flag flag_enumeration_clause c
@@ -496,7 +496,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     match Stmt.view stmt with
     | Stmt.Assert c ->
         let proof = ProofStep.mk_assert src in
-        let c = C.of_forms ~trail:C.Trail.empty c proof in
+        let c = C.of_forms ~trail:Trail.empty c proof in
         _detect_and_declare c
     | Stmt.Data l ->
         List.iter (_declare_inductive ~src) l

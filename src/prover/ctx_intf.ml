@@ -66,9 +66,5 @@ module type S = sig
 
     val to_form : Literal.t -> FOTerm.t SLiteral.t
   end
-
-  (** {2 Booleans Literals} *)
-
-  module BoolBox: BBox.S
 end
 

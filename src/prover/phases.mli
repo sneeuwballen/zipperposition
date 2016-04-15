@@ -17,7 +17,7 @@ type env_with_clauses =
   Env_clauses : 'c Env.packed * 'c CCVector.ro_vector -> env_with_clauses
 
 type env_with_result =
-  Env_result : 'c Env.packed * 'c Saturate.szs_status -> env_with_result
+  Env_result : 'c Env.packed * Saturate.szs_status -> env_with_result
 
 type ('ret, 'before, 'after) phase =
   | Init : (unit, _, [`Init]) phase (* global setup *)
@@ -46,7 +46,7 @@ type ('ret, 'before, 'after) phase =
   | MakeEnv : (env_with_clauses, [`MakeCtx], [`MakeEnv]) phase
 
   | Pre_saturate :
-    ('c Env.packed * 'c Saturate.szs_status * 'c CCVector.ro_vector,
+    ('c Env.packed * Saturate.szs_status * 'c CCVector.ro_vector,
       [`MakeEnv], [`Pre_saturate]) phase
 
   | Saturate :

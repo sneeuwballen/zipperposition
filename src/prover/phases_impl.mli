@@ -26,7 +26,7 @@ val process_file :
 val print :
   Phases.filename ->
   'c Env.packed ->
-  'c Saturate.szs_status ->
+  Saturate.szs_status ->
   (unit, [`Saturate], [`Print_dot]) Phases.t
 (** Printing of results *)
 

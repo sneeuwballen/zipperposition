@@ -253,9 +253,8 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
 (* Print some content of the state, based on environment variables *)
 let print_dots (type c)
 (module Env : Env_intf.S with type C.t = c)
-(result : c Saturate.szs_status) =
+(result : Saturate.szs_status) =
   Phases.start_phase Phases.Print_dot >>= fun () ->
-  let module PProof = ProofPrint.Make(Env.C) in
   Signal.send Signals.on_dot_output ();
   (* see if we need to print proof state *)
   begin match Env.params.param_dot_file, result with
@@ -273,13 +272,13 @@ let print_dots (type c)
                 else None)
           else Sequence.singleton proof
         in
-        PProof.pp_dot_seq_file ~name dot_f proof
+        ProofPrint.pp_dot_seq_file ~name dot_f proof
     | Some dot_f, (Saturate.Sat | Saturate.Unknown) when Env.params.param_dot_sat ->
         (* print saturated set *)
         let name = "sat_set" in
         let seq = Sequence.append (Env.get_active ()) (Env.get_passive ()) in
         let seq = Sequence.map Env.C.proof seq in
-        PProof.pp_dot_seq_file ~name dot_f seq
+        ProofPrint.pp_dot_seq_file ~name dot_f seq
     | _ -> ()
   end;
   Phases.return_phase ()
@@ -292,9 +291,8 @@ let unsat_to_str () =
 
 let print_szs_result (type c) ~file
 (module Env : Env_intf.S with type C.t = c)
-(result : c Saturate.szs_status) =
+(result : Saturate.szs_status) =
   Phases.start_phase Phases.Print_result >>= fun () ->
-  let module PProof = ProofPrint.Make(Env.C) in
   begin match result with
   | Saturate.Unknown
   | Saturate.Timeout ->
@@ -320,7 +318,7 @@ let print_szs_result (type c) ~file
       (* print status then proof *)
       Format.printf "%% SZS status %s for '%s'@." (unsat_to_str ()) file;
       Format.printf "%% SZS output start Refutation@.";
-      Format.printf "%a@." (PProof.pp !Options.output) proof;
+      Format.printf "%a@." (ProofPrint.pp !Options.output) proof;
       Format.printf "%% SZS output end Refutation@.";
   end;
   Phases.return_phase ()

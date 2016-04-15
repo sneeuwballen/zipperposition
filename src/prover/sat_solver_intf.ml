@@ -8,17 +8,23 @@ type result =
 exception WrongState of string
 
 module type S = sig
-  module Lit : Bool_lit_intf.S
+  module Lit = BBox.Lit
 
   exception UndecidedLit
 
+  type proof_step = ProofStep.t
+  type proof = ProofStep.of_
+
   type clause = Lit.t list
 
-  val add_clause : ?tag:int -> Lit.t list -> unit
+  val add_clause : ?tag:int -> proof:proof_step -> Lit.t list -> unit
+  (** [add_clause ~tag ~proof c] adds the constraint [c] to the SAT solver,
+      annotated with [proof]. [tag] is a unique identifier for this constraint
+      and must not have been already used. *)
 
-  val add_clauses : ?tag:int -> Lit.t list list -> unit
+  val add_clauses : ?tag:int -> proof:proof_step -> Lit.t list list -> unit
 
-  val add_clause_seq : ?tag:int -> Lit.t list Sequence.t -> unit
+  val add_clause_seq : ?tag:int -> proof:proof_step -> Lit.t list Sequence.t -> unit
 
   val check : unit -> result
   (** Is the current problem satisfiable? *)
@@ -39,9 +45,10 @@ module type S = sig
   val set_printer : Lit.t CCFormat.printer -> unit
   (** How to print literals? *)
 
-  val unsat_core : int Sequence.t
-  (** If [Some seq], [seq] is a sequence of integers
-      that are the tags used to obtain [Unsat].
+  val get_proof : unit -> proof
+  (** Return a proof of [false], assuming {!check} returned [Unsat].
+      The leaves of the proof are input clauses' proofs, the internal
+      nodes are clauses deduced by the SAT solver.
       @raise WrongState if the last result isn't [Unsat] *)
 
   val setup: unit -> unit
