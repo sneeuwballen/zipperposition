@@ -48,16 +48,23 @@ module Make(Dummy : sig end)
       List.iter (pp_c out) l;
       flush out
 
-  let add_clause ?(tag=Lit.fresh_id()) ~proof (c:clause) =
+  let fresh_tag_ =
+    let n = ref 0 in
+    fun () ->
+      let x = !n in
+      incr n;
+      x
+
+  let add_clause ~proof (c:clause) =
     dump_l [c];
-    Queue.push ([c], proof, tag) queue_
+    Queue.push ([c], proof, fresh_tag_ ()) queue_
 
-  let add_clauses ?(tag=Lit.fresh_id())  ~proof l =
+  let add_clauses ~proof l =
     dump_l l;
-    Queue.push (l, proof, tag) queue_
+    Queue.push (l, proof, fresh_tag_ ()) queue_
 
-  let add_clause_seq ?tag ~proof (seq:clause Sequence.t) =
-    add_clauses ?tag ~proof (Sequence.to_rev_list seq)
+  let add_clause_seq ~proof (seq:clause Sequence.t) =
+    add_clauses ~proof (Sequence.to_rev_list seq)
 
   let result_ = ref Sat
 
@@ -158,7 +165,7 @@ module Make(Dummy : sig end)
         (fun k->k pp_form (c,tag));
       (* remember tag->proof *)
       assert (not (Hashtbl.mem tag_to_proof_ tag));
-      Hashtbl.add tag_to_proof_ tag proof;
+      Hashtbl.replace tag_to_proof_ tag proof;
       S.assume ~tag c
     done;
     (* solve *)

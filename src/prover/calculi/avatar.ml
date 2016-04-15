@@ -34,12 +34,6 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   module Solver = Sat
   module BLit = BBox.Lit
 
-  (* map ID -> clause *)
-  let id_to_clause_ = Hashtbl.create 24
-
-  let save_clause ~tag c = Hashtbl.replace id_to_clause_ tag c
-  let get_clause ~tag = CCHashtbl.get id_to_clause_ tag
-
   (* union-find that maps vars to list of literals, used for splitting *)
   module UF =
     UnionFind.Make(struct
@@ -117,8 +111,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
           |> Trail.to_list
           |> List.map Trail.Lit.neg in
         let bool_clause = List.append bool_clause bool_guard in
-        save_clause ~tag:(C.id c) c;
-        Sat.add_clause ~tag:(C.id c) ~proof:(C.proof_step c) bool_clause;
+        Sat.add_clause ~proof:(C.proof_step c) bool_clause;
         Util.debugf ~section 4 "@[constraint clause is @[%a@]@]"
           (fun k->k BBox.pp_bclause bool_clause);
         (* return the clauses *)
@@ -149,8 +142,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       in
       Util.debugf ~section 4 "@[negate trail of @[%a@] (id %d)@ with @[%a@]@]"
         (fun k->k C.pp c (C.id c) BBox.pp_bclause b_clause);
-      save_clause ~tag:(C.id c) c;
-      Sat.add_clause ~tag:(C.id c) ~proof:(C.proof_step c) b_clause;
+      Sat.add_clause ~proof:(C.proof_step c) b_clause;
     );
     [] (* never infers anything! *)
 

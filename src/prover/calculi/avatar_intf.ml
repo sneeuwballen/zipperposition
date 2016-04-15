@@ -24,12 +24,6 @@ module type S = sig
   val check_satisfiability : E.generate_rule
   (** Checks  that the SAT context is still valid *)
 
-  val save_clause : tag:int -> E.C.t -> unit
-  (** Map the tag to the clause *)
-
-  val get_clause : tag:int -> E.C.t option
-  (** Recover clause from the tag, if any *)
-
   val introduce_cut :
     Literals.t ->
     ProofStep.t ->

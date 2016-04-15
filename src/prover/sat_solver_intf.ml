@@ -17,14 +17,14 @@ module type S = sig
 
   type clause = Lit.t list
 
-  val add_clause : ?tag:int -> proof:proof_step -> Lit.t list -> unit
+  val add_clause : proof:proof_step -> Lit.t list -> unit
   (** [add_clause ~tag ~proof c] adds the constraint [c] to the SAT solver,
       annotated with [proof]. [tag] is a unique identifier for this constraint
       and must not have been already used. *)
 
-  val add_clauses : ?tag:int -> proof:proof_step -> Lit.t list list -> unit
+  val add_clauses : proof:proof_step -> Lit.t list list -> unit
 
-  val add_clause_seq : ?tag:int -> proof:proof_step -> Lit.t list Sequence.t -> unit
+  val add_clause_seq : proof:proof_step -> Lit.t list Sequence.t -> unit
 
   val check : unit -> result
   (** Is the current problem satisfiable? *)

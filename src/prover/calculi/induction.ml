@@ -268,7 +268,7 @@ module Make
 
   (* [cst] is the minimal term for which contexts [ctxs] holds, returns
      clauses expressing that, and assert boolean constraints *)
-  let assert_min ?id ~trail ~proof ctxs (cst:Ind_cst.cst) =
+  let assert_min ~trail ~proof ctxs (cst:Ind_cst.cst) =
     let set = Ind_cst.cover_set cst in
     let mw = {
       mw_cst=cst;
@@ -276,7 +276,7 @@ module Make
       mw_coverset=set;
     } in
     let clauses, b_clauses = clauses_of_min_witness ~trail ~proof mw in
-    A.Solver.add_clauses ?tag:id ~proof b_clauses;
+    A.Solver.add_clauses ~proof b_clauses;
     Util.incr_stat stats_min;
     clauses
 
@@ -338,7 +338,7 @@ module Make
            let proof = ProofStep.mk_inference [C.proof c]
                ~rule:(ProofStep.mk_rule "min") in
            let trail = Trail.add_list (C.trail c) (trail_of_cst cst) in
-           assert_min ~id:(C.id c) ~trail ~proof [ctx] cst)
+           assert_min ~trail ~proof [ctx] cst)
         consts
     in
     clauses
