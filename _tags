@@ -13,5 +13,4 @@ true: use_menhir
 
 <src/prover/const.cmx>: for-pack(Libzipperposition)
 
-<src/base/{InnerTerm,FOTerm,HOTerm,Type,lib/BV,lib/IArray,lib/Cache}.cmx>: inline(15)
-<src/base/{substs,unif}.cmx>: inline(8)
+<src/core/**/*.cmx>: inline(20)
