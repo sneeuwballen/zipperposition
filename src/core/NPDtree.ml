@@ -297,7 +297,7 @@ module MakeTerm(X : Set.OrderedType) = struct
     let rec skip trie n k =
       if n = 0
         then k trie
-        else
+        else (
           begin match trie.star with
           | None -> ()
           | Some trie' -> skip trie' (n-1) k
@@ -305,6 +305,7 @@ module MakeTerm(X : Set.OrderedType) = struct
           SIMap.iter
             (fun (_,arity) trie' -> skip trie' (n+arity-1) k)
             trie.map
+        )
     in
     skip trie 1 k
 
