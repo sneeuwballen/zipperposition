@@ -28,6 +28,8 @@ let make_t id ty args rhs =
   let lhs = T.app (T.const ~ty id) args in
   { lhs_id=id; lhs; rhs; }
 
+let rhs_term r = r.rhs
+
 let pp_rule_term out r =
   Format.fprintf out "@[<2>@[%a@] -->@ @[%a@]@]" T.pp r.lhs T.pp r.rhs
 
@@ -38,6 +40,8 @@ type rule_clause = {
 (* invariant: all variables in [c_rhs] also occur in [c_lhs] *)
 
 let make_c c_lhs c_rhs = {c_lhs; c_rhs}
+
+let rhs_clause c = c.c_rhs
 
 let pp_rule_clause out r =
   let pp_c = CCFormat.hvbox (Util.pp_list ~sep:" ∨ " Literal.pp) in
@@ -110,19 +114,6 @@ end
 
    Use the FOTerm.DB case extensively... *)
 
-(* check if [l1] and [l2] are the same lists *)
-let rec same_l_rec l1 l2 = match l1, l2 with
-  | [], [] -> true
-  | [], _ | _, [] -> assert false
-  | x1 :: tail1, x2 :: tail2 ->
-    T.equal x1 x2 && same_l_rec tail1 tail2
-
-let same_l l1 l2 = match l1, l2 with
-  | [], [] -> true
-  | [t1], [t2] -> T.equal t1 t2
-  | [t1;u1], [t2;u2] -> T.equal t1 t2 && T.equal u1 u2
-  | _ -> same_l_rec l1 l2
-
 let normalize_term rules t =
   (* compute normal form of subterm
      @return [t'] where [t'] is the normal form of [t] *)
@@ -139,7 +130,7 @@ let normalize_term rules t =
     | T.App (f, l) ->
       (* first, reduce subterms *)
       let l' = reduce_l ~subst sc l in
-      let t' = if same_l l l' then t else T.app f l' in
+      let t' = if T.same_l l l' then t else T.app f l' in
       begin match T.view f with
         | T.Const id ->
           let sc' = sc+1 in
@@ -170,7 +161,7 @@ let normalize_term rules t =
     | T.AppBuiltin (_,[]) -> t
     | T.AppBuiltin (b,l) ->
       let l' = reduce_l ~subst sc l in
-      if same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l'
+      if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l'
   (* reduce list *)
   and reduce_l ~subst sc l = match l with
     | [] -> []
@@ -178,6 +169,22 @@ let normalize_term rules t =
       reduce ~subst sc t :: reduce_l ~subst sc tail
   in
   reduce ~subst:Su.empty 0 t
+
+let narrow_term ?(subst=Substs.empty) (rules,sc_r) (t,sc_t) = match T.view t with
+  | T.Const _ -> Sequence.empty (* already normal form *)
+  | T.App (f, _) ->
+    begin match T.view f with
+      | T.Const id ->
+        Set.find_iter rules id
+        |> Sequence.filter_map
+          (fun r ->
+             try Some (r, Unif.FO.unification ~subst (r.lhs,sc_r) (t,sc_t))
+             with Unif.Fail -> None)
+      | _ -> Sequence.empty
+    end
+  | T.Var _
+  | T.DB _
+  | T.AppBuiltin _ -> Sequence.empty
 
 (* try to rewrite this literal, returning a list of list of lits instead *)
 let step_lit rules lit =
@@ -222,3 +229,10 @@ let normalize_clause rules lits =
       let clause_chunks = eval_ll ~renaming subst (clause_chunks,1) in
       let clauses = List.map (fun new_lits -> new_lits @ lits) clause_chunks in
       Some clauses
+
+let narrow_lit ?(subst=Substs.empty) (rules,sc_r) (lit,sc_lit) =
+  Sequence.of_list rules.Set.clauses
+  |> Sequence.flat_map
+    (fun r ->
+       Literal.unify ~subst (r.c_lhs,sc_r) (lit,sc_lit)
+       |> Sequence.map (fun subst -> r, subst))

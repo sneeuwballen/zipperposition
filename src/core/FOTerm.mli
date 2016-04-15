@@ -56,6 +56,12 @@ module Set : CCSet.S with type elt = t
 module Map : CCMap.S with type key = t
 module Tbl : CCHashtbl.S with type key = t
 
+val same_l : t list -> t list -> bool
+(** [same_l l1 l2] returns [true] if terms of [l1] and [l2] are pairwise
+    equal, [false] otherwise.
+    Precondition: both lists have the same length
+    @raise Assert_failure if lists have not the same length *)
+
 (** {2 Constructors} *)
 
 val var : var -> t

@@ -53,6 +53,18 @@ let ty t = match T.ty t with
   | T.NoType -> assert false
   | T.HasType ty -> Type.of_term_unsafe ty
 
+let rec same_l_rec l1 l2 = match l1, l2 with
+  | [], [] -> true
+  | [], _ | _, [] -> assert false
+  | x1 :: tail1, x2 :: tail2 ->
+    T.equal x1 x2 && same_l_rec tail1 tail2
+
+let same_l l1 l2 = match l1, l2 with
+  | [], [] -> true
+  | [t1], [t2] -> T.equal t1 t2
+  | [t1;u1], [t2;u2] -> T.equal t1 t2 && T.equal u1 u2
+  | _ -> same_l_rec l1 l2
+
 (* split list between types, terms.
    [ty] is the type of the function, [l] the arguments *)
 let rec split_args_ ~ty l = match Type.view ty, l with
