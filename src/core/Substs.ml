@@ -181,15 +181,20 @@ let apply subst ~renaming t =
   let rec aux (t,sc_t) =
     match T.ty t with
     | T.NoType ->
-      assert(T.is_ground t);
+      assert(T.equal T.tType t);
       t
     | T.HasType ty ->
-      let ty = aux (ty,sc_t) in
+      let ty' = aux (ty,sc_t) in
       match T.view t with
-      | T.Const s ->
+      | T.Const id ->
         (* regular constant *)
-        T.const ~ty s
-      | T.DB i -> T.bvar ~ty i
+        if T.equal ty ty'
+        then t
+        else T.const ~ty:ty' id
+      | T.DB i ->
+        if T.equal ty ty'
+        then t
+        else T.bvar ~ty:ty' i
       | T.Var v ->
         (* the most interesting cases!
            switch depending on whether [t] is bound by [subst] or not *)
@@ -204,23 +209,32 @@ let apply subst ~renaming t =
         with Not_found ->
           (* variable not bound by [subst], rename it
               (after specializing its type if needed) *)
-          let v = HVar.cast v ~ty in
-          T.var (Renaming.rename renaming (v,sc_t))
+          let v = HVar.cast v ~ty:ty' in
+          let v' = Renaming.rename renaming (v,sc_t) in
+          if T.equal ty ty' && HVar.equal v v'
+          then t
+          else T.var v'
         end
       | T.Bind (s, varty, sub_t) ->
           let varty' = aux (varty,sc_t) in
           let sub_t' = aux (sub_t,sc_t) in
-          T.bind ~varty:varty' ~ty s sub_t'
+          T.bind ~varty:varty' ~ty:ty' s sub_t'
       | T.App (hd, l) ->
           let hd' = aux (hd,sc_t) in
           let l' = aux_list l sc_t in
-          T.app ~ty hd' l'
+          if T.equal ty ty' && T.equal hd hd' && T.same_l l l'
+          then t
+          else T.app ~ty:ty' hd' l'
       | T.SimpleApp (s, l) ->
           let l' = aux_list l sc_t in
-          T.simple_app ~ty s l'
+          if T.equal ty ty' && T.same_l l l'
+          then t
+          else T.simple_app ~ty:ty' s l'
       | T.AppBuiltin (s, l) ->
           let l' = aux_list l sc_t in
-          T.app_builtin ~ty s l'
+          if T.equal ty ty' && T.same_l l l'
+          then t
+          else T.app_builtin ~ty:ty' s l'
   and aux_list l sc = match l with
     | [] -> []
     | t::l' ->

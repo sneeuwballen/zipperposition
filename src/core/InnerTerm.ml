@@ -38,6 +38,18 @@ let hash t = Hash.apply hash_fun t
 let equal : t -> t -> bool = fun t1 t2 -> t1 == t2
 let compare t1 t2 = Pervasives.compare t1.id t2.id
 
+let rec same_l_rec l1 l2 = match l1, l2 with
+  | [], [] -> true
+  | [], _ | _, [] -> assert false
+  | x1 :: tail1, x2 :: tail2 ->
+    equal x1 x2 && same_l_rec tail1 tail2
+
+let same_l l1 l2 = match l1, l2 with
+  | [], [] -> true
+  | [t1], [t2] -> equal t1 t2
+  | [t1;u1], [t2;u2] -> equal t1 t2 && equal u1 u2
+  | _ -> same_l_rec l1 l2
+
 let _hash_ty t h =
   match t.ty with
   | NoType -> h

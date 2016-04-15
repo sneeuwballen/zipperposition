@@ -39,6 +39,8 @@ val ty_exn : t -> t
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 
+val same_l : t list -> t list -> bool
+
 (** {3 Constructors}
 
     Some constructors, such as {!record}, may raise

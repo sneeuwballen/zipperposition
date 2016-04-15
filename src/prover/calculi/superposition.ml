@@ -685,8 +685,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           | T.Const _ ->
               (* rewrite subterms in call by value *)
               let l' = List.map (fun t' -> normal_form ~restrict:false subst t' scope) l in
-              let hd = Substs.FO.apply_no_renaming subst (hd, scope) in
-              let t' = T.app hd l' in
+              let hd' = Substs.FO.apply_no_renaming subst (hd, scope) in
+              let t' =
+                if T.equal hd hd' && T.same_l l l'
+                then t
+                else T.app hd' l' in
               (* rewrite term at root *)
               reduce_at_root ~restrict t'
           | T.App _

@@ -154,6 +154,7 @@ module Inner = struct
             then unif_list ~unif:(unif_rec ~op) subst l1 sc1 l2 sc2
             else fail()
         | _ ->
+            (* currying: unify "from the right" *)
             let l1, l2 = pair_lists_ f1 l1 f2 l2 in
             unif_list ~unif:(unif_rec ~op) subst l1 sc1 l2 sc2
         end
