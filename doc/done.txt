@@ -11,3 +11,4 @@ x 2016-04-06 2016-01-23 distinguish goal/negated goal? @refactor
 x 2016-04-06 2016-01-23 def foo : bar := rw_rule1 and rw_rule2 @zf @calculus
 x 2016-04-06 2016-02-29 move detection of EnumType into preprocessing; add it in AST @refactor
 x 2016-04-06 2016-03-07 bring back orphan criterion lazily: mark redundant clauses; discard clause whose ≥ 1 parent is redundant; sweep active from time to time
+x 2016-04-15 2016-04-03 in avatar, for 0-level propagation, obtain SAT resolution proof so displayed proofs are ok
