@@ -4,15 +4,16 @@
 (** {1 Arbitrary generation of symbols} *)
 
 open Libzipperposition
-open QCheck
 
-type 'a arbitrary = 'a QCheck.Arbitrary.t
+type 'a arbitrary = 'a QCheck.arbitrary
+type 'a gen = 'a QCheck.Gen.t
 
-let default =
+let default_g =
   let l = List.map ID.make ["f"; "g"; "h"; "a"; "b"; "c"; "d"] in
-  QCheck.Arbitrary.among l
+  QCheck.Gen.oneofl l
 
-let set =
-  Arbitrary.(
-    list default >|= ID.Set.of_list
-  )
+let default = QCheck.make ~print:ID.to_string default_g
+
+let set_g =
+  QCheck.Gen.(list default_g >|= ID.Set.of_list)
+let set = QCheck.make set_g

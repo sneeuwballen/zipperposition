@@ -15,6 +15,7 @@ S src/prover/meta
 S src/main/
 S tests/
 B _build/src/**
+B _build/tests/
 PKG zarith
 PKG containers.data
 PKG containers

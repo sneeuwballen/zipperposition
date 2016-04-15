@@ -4,12 +4,14 @@
 (** {1 Arbitrary generation of symbols} *)
 
 open Libzipperposition
-open QCheck
 
-type 'a arbitrary = 'a QCheck.Arbitrary.t
+type 'a arbitrary = 'a QCheck.arbitrary
+type 'a gen = 'a QCheck.Gen.t
 
-let base =
-  Arbitrary.(among Type.([term; prop; int; rat]))
+let mk_ gen = QCheck.make ~print:Type.to_string ~shrink:Type.Seq.sub gen
+
+let base_g = QCheck.Gen.oneofl Type.([term; prop; int; rat])
+let base = mk_ base_g
 
 let const_ s = Type.const (ID.make s)
 
@@ -19,27 +21,42 @@ let b_ = const_ "b"
 let list_ = ID.make "list"
 let prod_ = ID.make "prod"
 
-let ground =
-  Arbitrary.(
-    let base = among Type.([ term; int; a_; b_ ]) in
-    fix ~max:3 ~base
-      (fun sub -> choose
-        [ lift (Type.app list_) (list_repeat 1 sub)
-        ; lift (Type.app prod_) (list_repeat 2 sub)
-        ; lift2 Type.arrow (list sub) sub
-        ]))
+let ground_g =
+  let open QCheck.Gen in
+  let base = oneofl Type.([ term; int; a_; b_ ]) in
+  let g = fix
+    (fun self n ->
+       let sub = self (n-1) in
+       frequency
+         [ 1, map (Type.app list_) (list_repeat 1 sub)
+         ; 1, map (Type.app prod_) (list_repeat 2 sub)
+         ; 1, map2 Type.arrow (list_size (1--3) sub) sub
+         ; 3, base
+         ])
+  in
+  1 -- 4 >>= g
 
-let default =
-  Arbitrary.(
-    let var = among [Type.var_of_int 0; Type.var_of_int 1 ] in
-    let base =
-      choose
-      [ among [ Type.term; Type.int; a_; b_ ]
+let ground = mk_ ground_g
+
+let default_g =
+  let open QCheck.Gen in
+  let var = oneofl [Type.var_of_int 0; Type.var_of_int 1 ] in
+  let base =
+    oneof
+      [ oneofl [ Type.term; Type.int; a_; b_ ]
       ; var ]
-    in
-    fix ~max:4 ~base (fun sub -> choose
-      [ lift (Type.app list_) (list_repeat 1 sub)
-      ; lift (Type.app prod_) (list_repeat 2 sub)
-      ; lift2 Type.arrow (list sub) sub
-      ]))
+  in
+  let g =
+    fix
+      (fun self n ->
+         let sub = self (n-1) in
+         frequency
+           [ 1, map (Type.app list_) (list_repeat 1 sub)
+           ; 1, map (Type.app prod_) (list_repeat 2 sub)
+           ; 1, map2 Type.arrow (list sub) sub
+           ; 3, base
+           ])
+  in
+  1 -- 4 >>= g
 
+let default = mk_ default_g

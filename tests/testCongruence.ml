@@ -3,7 +3,6 @@
 
 open Libzipperposition
 open Libzipperposition_arbitrary
-open QCheck
 
 module T = FOTerm
 module CC = Congruence.FO
@@ -31,12 +30,12 @@ let check_term_eq_itself =
     CC.is_eq cc t t
   in
   let name = "congruence_term_eq_to_itself" in
-  mk_test ~name ~size:T.size ~pp:T.to_string gen prop
+  QCheck.Test.make ~name gen prop
 
 (* if we build a congruence closure with classes, in each class,
     all elements are equal *)
 let check_classes_are_eq =
-  let gen = Arbitrary.(list (list ArTerm.default)) in
+  let gen = QCheck.(list (list ArTerm.default)) in
   let prop classes =
     let cc = _cc_of_classes classes in
     List.for_all
@@ -46,9 +45,7 @@ let check_classes_are_eq =
       classes
   in
   let name = "congruence_class_members_are_eq" in
-  let size = _size_classes in
-  let pp = PP.(list (list T.to_string)) in
-  mk_test ~name ~pp ~size gen prop
+  QCheck.Test.make ~name gen prop
 
 let props =
   [ check_term_eq_itself

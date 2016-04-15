@@ -5,54 +5,54 @@
 
 open Libzipperposition
 
-module QA = QCheck.Arbitrary
+module QA = QCheck
 module PT = TypedSTerm
 module F = PT.Form
 module AT = ArTerm.PT
 
-type 'a arbitrary = 'a QA.t
+type 'a arbitrary = 'a QA.arbitrary
+type 'a gen = 'a QCheck.Gen.t
 type form = PT.t
 
-let atom =
-  QA.(
-    choose
-      [ AT.pred
-      ; lift F.not_ AT.pred
-      ; lift2 F.eq AT.default AT.default
-      ; lift2 F.neq AT.default AT.default
-      ; among [ F.true_; F.false_ ]
-      ])
+let mk_ gen =
+  QA.make ~print:PT.to_string ~shrink:PT.Seq.subterms gen
 
-let map1_ f self =
-  QA.(
-    self 1 >|= function
-    | [x] -> f x | _ -> assert false
-  )
+let atom_g =
+  let open QCheck.Gen in
+  oneof
+    [ AT.pred_g
+    ; map F.not_ AT.pred_g
+    ; map2 F.eq AT.default_g AT.default_g
+    ; map2 F.neq AT.default_g AT.default_g
+    ; oneofl [ F.true_; F.false_ ]
+    ]
 
-let map2_ f self =
-  QA.(
-    self 2 >|= function
-    | [x;y] -> f x y | _ -> assert false
-  )
+let atom = mk_ atom_g
 
-let default_fuel fuel =
-  QA.(
-    let f = fix_fuel
-        [ `Rec (fun self -> (small_int >>= self) >|= F.or_)
-        ; `Rec (fun self -> (small_int >>= self) >|= F.and_)
-        ; `Rec (fun self -> map2_ F.equiv self)
-        ; `Rec (fun self -> map2_ F.imply self)
-        ; `Rec (fun self -> map1_ F.not_ self)
-        ; `Rec (fun self -> map1_ F.close_forall self)
-        ; `Rec (fun self -> map1_ F.close_forall self)
-        ]
-    in
-    retry (f fuel))
+let default_fuel n =
+  let open QCheck.Gen in
+  fix
+    (fun self n ->
+       let self = self (n-1) in
+       if n=0 then atom_g
+       else oneof
+         [ list_size (1--10) self >|= F.or_
+         ; list_size (1--10) self >|= F.and_
+         ; map2 F.equiv self self
+         ; map2 F.imply self self
+         ; map F.not_ self
+         ; map F.close_forall self
+         ; map F.close_forall self
+         ; atom_g
+         ])
+    n
+
+let default_g = default_fuel 50
+let default = mk_ default_g
+
+let clause_g =
+  let open QCheck.Gen in
+  list_size (0 -- 4) atom_g
 
 let clause =
-  QA.(
-    int 3 >>= fun len ->
-    list_repeat len atom
-  )
-
-let default = QA.(int 50 >>= default_fuel)
+  QA.make ~shrink:QA.Shrink.(list ~shrink:PT.Seq.subterms) clause_g

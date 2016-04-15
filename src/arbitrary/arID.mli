@@ -5,10 +5,13 @@
 
 open Libzipperposition
 
-type 'a arbitrary = 'a QCheck.Arbitrary.t
+type 'a arbitrary = 'a QCheck.arbitrary
+type 'a gen = 'a QCheck.Gen.t
 
+val default_g : ID.t gen
 val default : ID.t arbitrary
 (** Set of symbols *)
 
+val set_g : ID.Set.t gen
 val set : ID.Set.t arbitrary
 (** Arbitrary set of various symbols *)

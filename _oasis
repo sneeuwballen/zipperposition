@@ -231,7 +231,8 @@ Executable run_tests
   CompiledObject:   native
   MainIs:           run_tests.ml
   Build$:           flag(tests) && flag(meta) && flag(qcheck) && flag(parsers)
-  BuildDepends:     libzipperposition, libzipperposition.parsers, oUnit, libzipperposition.meta, libzipperposition.arbitrary
+  BuildDepends:     libzipperposition, libzipperposition.parsers, oUnit,
+                    libzipperposition.meta, libzipperposition.arbitrary, qcheck
 
 # TPTP syntax and type checking
 Executable type_check

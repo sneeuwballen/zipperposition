@@ -5,12 +5,17 @@
 
 open Libzipperposition
 
-type 'a arbitrary = 'a QCheck.Arbitrary.t
+type 'a arbitrary = 'a QCheck.arbitrary
+type 'a gen = 'a QCheck.Gen.t
+
+val default_g : FOTerm.t gen
+
+val default_fuel : int -> FOTerm.t gen
 
 val default : FOTerm.t arbitrary
 (** Default polymorphic term *)
 
-val default_fuel : int -> FOTerm.t arbitrary
+val ground_g : FOTerm.t gen
 
 val ground : FOTerm.t arbitrary
 (** Default ground monomorphic term *)
@@ -18,26 +23,21 @@ val ground : FOTerm.t arbitrary
 val pred : FOTerm.t arbitrary
 (** predicates (type "o") *)
 
-val pos : FOTerm.t -> Position.t arbitrary
+val pos : FOTerm.t -> Position.t gen
 (** Random valid position in the term *)
-
-module HO : sig
-  val ground : HOTerm.t arbitrary
-  (** Ground HO terms *)
-
-  val default : HOTerm.t arbitrary
-  (** HO polymorphic term *)
-end
 
 (** {2 S Terms} *)
 
 module PT : sig
+  val default_g : TypedSTerm.t gen
   val default : TypedSTerm.t arbitrary
   (** Default polymorphic term *)
 
+  val ground_g : TypedSTerm.t gen
   val ground : TypedSTerm.t arbitrary
   (** Default ground monomorphic term *)
 
+  val pred_g : TypedSTerm.t gen
   val pred : TypedSTerm.t arbitrary
   (** predicates (type "prop") *)
 end

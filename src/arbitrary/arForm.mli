@@ -5,16 +5,21 @@
 
 open Libzipperposition
 
-type 'a arbitrary = 'a QCheck.Arbitrary.t
+type 'a arbitrary = 'a QCheck.arbitrary
+type 'a gen = 'a QCheck.Gen.t
 type form = TypedSTerm.t
+
+val atom_g : form gen
 
 val atom : form arbitrary
 (** Atomic formula *)
 
+val clause_g : form list gen
+    
 val clause : form list arbitrary
 (** clause *)
 
 val default : form arbitrary
 (** polymorphic formula with connectives (DB-closed) *)
 
-val default_fuel : int -> form arbitrary
+val default_fuel : int -> form gen

@@ -36,33 +36,35 @@ let _sign = function
   | _ -> 1
 
 let compare_and_partial =
-  let gen = Q.Arbitrary.(
+  let gen = Q.Gen.(
     pair (list small_int) (list small_int) >>= fun (l1, l2) ->
     return (M.of_list l1, M.of_list l2)
-  ) in
+  )
+  and pp =
+    let pp1 = CCFormat.to_string (M.pp CCFormat.int) in
+    Q.Print.pair pp1 pp1
+  in
+  let gen = QCheck.make ~print:pp gen in
   (* "naive" comparison function (using the general ordering on multisets) *)
   let compare' m1 m2 =
     let f x y = Comparison.of_total (Pervasives.compare x y) in
     Comparison.to_total (M.compare_partial f m1 m2)
   in
-  let pp =
-    let pp1 = CCFormat.to_string (M.pp CCFormat.int) in
-    Q.PP.pair pp1 pp1
-  in
   let prop (m1,m2) =
     _sign (compare' m1 m2) = _sign (M.compare m1 m2)
   in
-  Q.mk_test ~name:"multiset_compare_and_compare_partial" ~pp ~n:1000 gen prop
+  QCheck.Test.make ~name:"multiset_compare_and_compare_partial" ~count:1000 gen prop
 
 let max_is_max =
-  let gen = Q.Arbitrary.(map (list small_int) M.of_list) in
+  let pp = CCFormat.to_string (M.pp CCFormat.int) in
+  let gen = Q.(map M.of_list (list small_int)) in
+  let gen = Q.set_print pp gen in
   let prop m =
     let f x y = Comparison.of_total (Pervasives.compare x y) in
     let l = M.max f m |> M.to_list |> List.map fst in
     List.for_all (fun x -> M.is_max f x m) l
   in
-  let pp = CCFormat.to_string (M.pp CCFormat.int) in
-  Q.mk_test ~name:"multiset_max_l_is_max" ~pp ~n:1000 gen prop
+  Q.Test.make ~name:"multiset_max_l_is_max" ~count:1000 gen prop
 
 let suite =
   "test_multiset" >:::

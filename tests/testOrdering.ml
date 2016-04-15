@@ -5,17 +5,10 @@
 
 open Libzipperposition
 open Libzipperposition_arbitrary
-open OUnit
 
 module T = FOTerm
 module S = Substs.FO
 module O = Ordering
-
-let suite =
-  "test_ordering" >:::
-    []
-
-open QCheck
 
 (* [more_specific cm1 cm2] is true if [cmp2] is compatible with, and possibly
     more accurate, than [cmp1]. For instance, Incomparable/Gt is ok, but
@@ -30,9 +23,11 @@ let more_specific cmp1 cmp2 = Comparison.(match cmp1, cmp2 with
 
 let check_ordering_inv_by_subst ord =
   let name = CCFormat.sprintf "ordering_%s_inv_by_subst" (O.name ord) in
-  let pp = PP.triple T.to_string T.to_string Substs.to_string in
+  let pp = QCheck.Print.triple T.to_string T.to_string Substs.to_string in
   (* generate pairs of terms, and grounding substitutions *)
-  let gen = Arbitrary.((pair ArTerm.default ArTerm.default) >>= fun (t1, t2) ->
+  let gen = QCheck.Gen.(
+    (pair ArTerm.default_g ArTerm.default_g)
+    >>= fun (t1, t2) ->
     let vars = Sequence.of_list [t1; t2]
       |> Sequence.flat_map T.Seq.vars
       |> T.VarSet.of_seq
@@ -41,7 +36,7 @@ let check_ordering_inv_by_subst ord =
     let subst st = T.VarSet.fold
       (fun v subst ->
         let v = (v : Type.t HVar.t :> InnerTerm.t HVar.t) in
-        S.bind subst (v,1) (ArTerm.ground st,0))
+        S.bind subst (v,1) (ArTerm.ground_g st,0))
       vars Substs.empty in
     triple (return t1) (return t2) subst)
   in
@@ -49,6 +44,7 @@ let check_ordering_inv_by_subst ord =
     T.size t1 + T.size t2 +
       (Substs.fold (fun n _ (t,_) -> n + T.size (T.of_term_unsafe t)) 0 s)
   in
+  let gen = QCheck.make ~print:pp ~small:size gen in
   (* do type inference on the fly
   let tyctx = TypeInference.Ctx.create () in
   let signature = ref Signature.empty in
@@ -70,7 +66,7 @@ let check_ordering_inv_by_subst ord =
     let o2 = O.compare !ord t1' t2' in
     more_specific o1 o2
   in
-  mk_test ~n:1000 ~name ~pp ~size gen prop
+  QCheck.Test.make ~count:1000 ~name gen prop
 
 let props =
   [ check_ordering_inv_by_subst (O.kbo (Precedence.default []))

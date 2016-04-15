@@ -6,13 +6,12 @@ open OUnit
 
 let suite =
   "all_tests" >:::
-    [ TestTerm.suite
-    ; TestSubsts.suite
-    ; TestOrdering.suite
+    [  TestSubsts.suite
     ; TestMultiset.suite
     ]
 
-let props = QCheck.flatten
+let props =
+  List.flatten
   [ TestTerm.props
   ; TestUnif.props
   ; TestCNF.props
@@ -27,5 +26,5 @@ let specs = Arg.align (Options.make ())
 
 let _ =
   ignore (run_test_tt_main ~arg_specs:specs suite);
-  ignore (QCheck.run_tests props);
+  ignore (QCheck_runner.run_tests_main props);
   ()

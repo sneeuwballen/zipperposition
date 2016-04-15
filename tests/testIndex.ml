@@ -5,7 +5,6 @@
 
 open Libzipperposition
 open Libzipperposition_arbitrary
-open QCheck
 
 module T = FOTerm
 
@@ -23,19 +22,21 @@ module type UnitIndex = sig
   val name : string
 end
 
-(* test unit index *)
-module TestUnit(I : UnitIndex) = struct
-  (* lists of unique terms *)
-  let gen low high = Arbitrary.(
-    list ~len:(low -- high) ArTerm.default >>= fun l ->
+(* lists of unique terms *)
+let gen low high = QCheck.Gen.(
+    list_size (low -- high) ArTerm.default_g >>= fun l ->
     let seq = T.Set.of_list l |> T.Set.to_seq in
     let seq = Sequence.mapi (fun i t -> t, i) seq in
     return (Sequence.persistent seq))
 
-  let pp seq =
-    let pp out (t,i) = Format.fprintf out "%a -> %d" T.pp t i in
-    CCFormat.to_string (CCFormat.seq pp) seq
+let pp seq =
+  let pp out (t,i) = Format.fprintf out "%a -> %d" T.pp t i in
+  CCFormat.to_string (CCFormat.seq pp) seq
 
+let arb i j = QCheck.make ~print:pp (gen i j)
+
+(* test unit index *)
+module TestUnit(I : UnitIndex) = struct
   (* check that the size of index is correct *)
   let check_size_add =
     let prop seq =
@@ -43,7 +44,7 @@ module TestUnit(I : UnitIndex) = struct
       Sequence.length seq = I.size idx
     in
     let name = CCFormat.sprintf "index(%s)_size_after_add" I.name in
-    mk_test ~name (gen 30 100) prop
+    QCheck.Test.make ~name (arb 30 100) prop
 
   (* list of (term,int) that generalize [t] *)
   let find_all idx t =
@@ -64,7 +65,7 @@ module TestUnit(I : UnitIndex) = struct
       seq
     in
     let name = CCFormat.sprintf "index(%s)_gen_retrieved_member" I.name in
-    mk_test ~name (gen 30 100) prop
+    QCheck.Test.make ~name (arb 30 100) prop
 
   (* check that the retrieved terms match the query *)
   let check_gen_retrieved_match =
@@ -82,7 +83,7 @@ module TestUnit(I : UnitIndex) = struct
       seq
     in
     let name = CCFormat.sprintf "index(%s)_gen_retrieved_match" I.name in
-    mk_test ~name (gen 50 150) prop
+    QCheck.Test.make ~name (arb 50 150) prop
 
   (* check that all matching terms are retrieved *)
   let check_all_retrieved =
@@ -103,7 +104,7 @@ module TestUnit(I : UnitIndex) = struct
         seq
     in
     let name = CCFormat.sprintf "index(%s)_all_retrieved" I.name in
-    mk_test ~name (gen 50 150) prop
+    QCheck.Test.make ~name (arb 50 150) prop
 
   (* check the matching of generalization *)
   let props =
@@ -122,12 +123,6 @@ module type TermIndex = sig
 end
 
 module TestTerm(I : TermIndex) = struct
-  (* lists of unique terms *)
-  let gen low high = Arbitrary.(
-    list ~len:(low -- high) ArTerm.default >>= fun l ->
-    let seq = T.Set.of_list l |> T.Set.to_seq in
-    let seq = Sequence.mapi (fun i t -> t, i) seq in
-    return (Sequence.persistent seq))
 
   (* check that the size of index is correct *)
   let check_size_add =
@@ -136,7 +131,7 @@ module TestTerm(I : TermIndex) = struct
       Sequence.length seq = I.size idx
     in
     let name = CCFormat.sprintf "index(%s)_size_after_add" I.name in
-    mk_test ~name (gen 10 100) prop
+    QCheck.Test.make ~name (arb 10 100) prop
 
   (* list of (term,int) that can be retrieved using [retrieve] in [t] *)
   let find_all retrieve idx s_idx t s_t =
@@ -157,7 +152,7 @@ module TestTerm(I : TermIndex) = struct
       seq
     in
     let name = CCFormat.sprintf "index(%s)_gen_retrieved_member" I.name in
-    mk_test ~name (gen 10 100) prop
+    QCheck.Test.make ~name (arb 10 100) prop
 
   (* check that the retrieved terms satisfy the given properry w.r.t the query *)
   let _check_all_retrieved_satisfy retrieve check seq =
@@ -211,34 +206,34 @@ module TestTerm(I : TermIndex) = struct
   let check_retrieved_unify =
     let prop = _check_all_retrieved_satisfy I.retrieve_unifiables Unif.FO.unification in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_unify" I.name in
-    mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
+    QCheck.Test.make ~name ~max_gen:_limit (arb 10 150) prop
 
   let check_retrieved_specializations =
     let prop = _check_all_retrieved_satisfy I.retrieve_specializations
       (fun t1 t2 -> Unif.FO.matching ~pattern:t1 t2) in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_specializations" I.name in
-    mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
+    QCheck.Test.make ~name ~max_gen:_limit (arb 10 150) prop
 
   let check_retrieved_generalizations =
     let prop = _check_all_retrieved_satisfy I.retrieve_generalizations _match_flip in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_generalizations" I.name in
-    mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
+    QCheck.Test.make ~name ~max_gen:_limit (arb 10 150) prop
 
   let check_retrieve_all_unify =
     let prop = _check_all_satisfying_are_retrieved I.retrieve_unifiables Unif.FO.unification in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_unify" I.name in
-    mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
+    QCheck.Test.make ~name ~max_gen:_limit (arb 10 150) prop
 
   let check_retrieve_all_specializations =
     let prop = _check_all_satisfying_are_retrieved I.retrieve_specializations
       (fun t1 t2 -> Unif.FO.matching ~pattern:t1 t2) in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_specializations" I.name in
-    mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
+    QCheck.Test.make ~name ~max_gen:_limit (arb 10 150) prop
 
   let check_retrieve_all_generalizations =
     let prop = _check_all_satisfying_are_retrieved I.retrieve_generalizations _match_flip in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_generalizations" I.name in
-    mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
+    QCheck.Test.make ~name ~max_gen:_limit (arb 10 150) prop
 
   (* check the matching of generalization *)
   let props =
@@ -265,7 +260,7 @@ let props =
   let module TestFingerprint = TestTerm(IntFingerprint) in
   let module IntNPDtree = NPDtree.MakeTerm(OrderedInt) in
   let module TestIntNPDTree = TestTerm(IntNPDtree) in
-  QCheck.flatten
+  List.flatten
     [ TestDtree.props
     ; TestNPDtree.props
     ; TestFingerprint.props
