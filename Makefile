@@ -83,10 +83,11 @@ package: clean
 	tar cavf $(TARBALL) _oasis setup.ml configure myocamlbuild.ml _tags \
 		Makefile pelletier_problems README.md src/ tests/ utils/
 
+WATCH?=all
 watch:
 	while find src/ tests/ -print0 | xargs -0 inotifywait -e delete_self -e modify ; do \
 		echo "============ at `date` ==========" ; \
-		make all; \
+		make $(WATCH); \
 	done
 
 clean-generated:
