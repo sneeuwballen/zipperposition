@@ -23,7 +23,10 @@ let suite =
       :: List.map QCheck_runner.to_ounit_test props
     )
 
-let specs = Arg.align (Options.make ())
+let specs =
+  Arg.align
+    ( ("-seed", Arg.Int QCheck_runner.set_seed, " sed random seed")
+      :: Options.make ())
 
 let _ =
   let res = run_test_tt_main ~arg_specs:specs suite in

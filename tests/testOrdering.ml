@@ -51,16 +51,13 @@ let check_ordering_inv_by_subst ord =
   *)
   let ord = ref ord in
   let prop (t1, t2, subst) =
+    (* declare symbols *)
+    Sequence.of_list [t1;t2]
+      |> Sequence.flat_map T.Seq.symbols
+      |> ID.Set.of_seq |> ID.Set.to_seq
+      |> O.add_seq !ord;
     let t1' = S.apply_no_renaming subst (t1,0) in
     let t2' = S.apply_no_renaming subst (t2,0) in
-    (* FIXME use a fixed signature?
-    ignore (TypeInference.FO.infer tyctx t1 0);
-    ignore (TypeInference.FO.infer tyctx t2 0);
-    ignore (TypeInference.FO.infer tyctx t1' 0);
-    ignore (TypeInference.FO.infer tyctx t2' 0);
-    signature := TypeInference.Ctx.to_signature tyctx;
-    ord := O.add_signature !ord !signature;
-    *)
     (* check that instantiating variables preserves ordering *)
     let o1 = O.compare !ord t1 t2 in
     let o2 = O.compare !ord t1' t2' in
