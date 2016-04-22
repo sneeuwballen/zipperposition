@@ -129,6 +129,8 @@ module type SPECIALIZED = sig
 
   val find_exn : t -> var Scoped.t -> term Scoped.t
 
+  val get_var : t -> var Scoped.t -> term Scoped.t option
+
   val deref : t -> term Scoped.t -> term Scoped.t
 
   val apply : t -> renaming:Renaming.t -> term Scoped.t -> term

@@ -67,11 +67,10 @@ let mem subst v = M.mem v subst
 let rec deref subst ((t,sc_t) as term) =
   match T.view t with
     | T.Var v ->
-        begin try
-          let t' = find_exn subst (v,sc_t) in
-          deref subst t'
-        with Not_found -> term
-        end
+      begin match find subst (v,sc_t) with
+        | Some t' -> deref subst t'
+        | None -> term
+      end
     | _ -> term
 
 (** Recursively lookup a variable in the substitution, until we get a value
@@ -251,6 +250,8 @@ module type SPECIALIZED = sig
 
   val find_exn : t -> var Scoped.t -> term Scoped.t
 
+  val get_var : t -> var Scoped.t -> term Scoped.t option
+
   val deref : t -> term Scoped.t -> term Scoped.t
 
   val apply : t -> renaming:Renaming.t -> term Scoped.t -> term
@@ -275,6 +276,10 @@ module Ty : SPECIALIZED with type term = Type.t = struct
     let t, sc = deref subst (t : term Scoped.t :> T.t Scoped.t) in
     Type.of_term_unsafe t, sc
 
+  let get_var subst v =
+    let o = get_var subst v in
+    CCOpt.map (Scoped.map Type.of_term_unsafe) o
+
   let find_exn subst v =
     let t = find_exn subst v in
     Scoped.map Type.of_term_unsafe t
@@ -288,13 +293,17 @@ module Ty : SPECIALIZED with type term = Type.t = struct
   let bind = (bind :> t -> var Scoped.t -> term Scoped.t -> t)
 end
 
-module FO = struct
+module FO : SPECIALIZED with type term = FOTerm.t = struct
   type term = FOTerm.t
   type t = subst
 
   let deref subst t =
     let t, sc = deref subst (t : term Scoped.t :> T.t Scoped.t) in
     FOTerm.of_term_unsafe t, sc
+
+  let get_var subst v =
+    let o = get_var subst v in
+    CCOpt.map (Scoped.map FOTerm.of_term_unsafe) o
 
   let find_exn subst v =
     let t = find_exn subst v in

@@ -6,7 +6,6 @@
 open Libzipperposition
 
 module PT = STerm
-module HOT = HOTerm
 module Loc = ParseLocation
 
 type name =

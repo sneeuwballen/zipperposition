@@ -81,7 +81,8 @@ let rec next_rec stack = match stack with
 let skip iter = match iter.stack with
   | [] -> None
   | _next::stack' -> next_rec stack'
-and next iter = next_rec iter.stack
+
+let next iter = next_rec iter.stack
 
 (* Iterate on a term *)
 let iterate term = open_term ~stack:[] term
@@ -215,23 +216,28 @@ module Make(E : Index.EQUATION) = struct
         let c1 = i.cur_char in
         CharMap.iter
           (fun c2 subtrie ->
-            (* explore branch that has the same symbol, if any *)
-            if eq_char c2 c1 && not (T.is_var t_pos)
-              then traverse subtrie (next i) subst;
             match c2 with
-            | Variable v2 when S.mem subst (Scoped.set t (v2:>ST.t HVar.t)) ->
-              (* already bound, check consistency *)
-              let t' = S.FO.find_exn subst (Scoped.set t (v2:>ST.t HVar.t)) in
-              if Unif.FO.equal ~subst t t'
-              then traverse subtrie (skip i) subst
             | Variable v2 ->
-              (* try to bind and continue *)
-              begin try
-                let subst = Unif.FO.bind subst
-                  (Scoped.set dt v2) (Scoped.set t t_pos) in
-                traverse subtrie (skip i) subst
-              with Unif.Fail -> () (* incompatible binding *)
+              (* deal with the variable branche in the trie *)
+              begin match S.FO.get_var subst (Scoped.set dt (v2:>ST.t HVar.t)) with
+                | None ->
+                  (* not bound, try to bind and continue *)
+                  begin
+                    try
+                      let subst = Unif.FO.bind subst
+                          (Scoped.set dt v2) (Scoped.set t t_pos) in
+                      traverse subtrie (skip i) subst
+                    with Unif.Fail -> () (* incompatible binding, or occur check *)
+                  end
+                | Some t' ->
+                  (* already bound, check consistency *)
+                  if Unif.FO.equal ~subst t t'
+                  then traverse subtrie (skip i) subst
               end
+            | _ when eq_char c2 c1 ->
+            (* explore branch that has the same symbol, if any *)
+              assert (not (T.is_var t_pos));
+              traverse subtrie (next i) subst;
             | _ -> ())
           m
       | TrieNode _, None
@@ -262,12 +268,17 @@ module Make(E : Index.EQUATION) = struct
 
   (* TODO: print leaf itself *)
 
+  let rec equal_ a b = match a, b with
+    | TrieLeaf l1, TrieLeaf l2 -> l1==l2
+    | TrieNode m1, TrieNode m2 -> m1==m2 || CharMap.equal equal_ m1 m2
+    | TrieLeaf _, _ | TrieNode _, _ -> false
+
   let to_dot out t =
     Util.debugf ~section:Util.Section.zip 2
       "@[<2>print graph of size %d@]" (fun k->k (size t));
     let pp = CCGraph.Dot.pp
-      ~eq:(==)
-      ~tbl:(CCGraph.mk_table ~eq:(==) ~hash:Hashtbl.hash 128)
+      ~eq:equal_
+      ~tbl:(CCGraph.mk_table ~eq:equal_ ~hash:Hashtbl.hash 128)
       ~attrs_v:(function
         | TrieLeaf l ->
             let len = List.length l in

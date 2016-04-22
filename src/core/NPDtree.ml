@@ -42,7 +42,8 @@ let rec next_rec stack = match stack with
 let skip iter = match iter.stack with
   | [] -> None
   | _next::stack' -> next_rec stack'
-and next iter = next_rec iter.stack
+
+let next iter = next_rec iter.stack
 
 (* Iterate on a term *)
 let iterate term = open_term ~stack:[] term
