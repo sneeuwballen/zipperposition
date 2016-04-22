@@ -20,8 +20,9 @@ rewrite forall n. leq Z n <=> true.
 rewrite forall m n. leq (S m) (S n) <=> leq m n.
 
 def three : nat := S (S (S Z)).
-def ten : nat := S (mult three three).
-def bound : nat := mult ten ten.
+
+# bound: 6
+def bound : nat := plus three three.
 
 goal exists n. leq bound (fact n).
 

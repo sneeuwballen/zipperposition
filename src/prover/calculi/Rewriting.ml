@@ -10,8 +10,11 @@ module RR = Rewrite_rule
 
 let section = RR.section
 
-let stat_narrowing_lit = Util.mk_stat "narrow.clause_steps"
+let stat_narrowing_lit = Util.mk_stat "narrow.lit_steps"
 let stat_narrowing_term = Util.mk_stat "narrow.term_steps"
+
+let prof_narrowing_term = Util.mk_profiler "narrow.term"
+let prof_narrowing_lit = Util.mk_profiler "narrow.lit"
 
 module Make(E : Env_intf.S) = struct
   module Env = E
@@ -27,7 +30,50 @@ module Make(E : Env_intf.S) = struct
       Some t'
     )
 
-  (* TODO: term narrowing + contextual extended narrowing *)
+  (* perform term narrowing in [c] *)
+  let narrow_term_passive_ rules c =
+    let eligible = C.Eligible.(res c) in
+    let sc_rule = 1 in
+    let sc_c = 0 in
+    Literals.fold_terms ~vars:false ~subterms:true ~ord:(C.Ctx.ord())
+      ~which:`All ~eligible (C.lits c)
+    |> Sequence.flat_map
+      (fun (u_p, passive_pos) ->
+         RR.narrow_term (rules,sc_rule) (u_p,sc_c)
+         |> Sequence.map
+           (fun (rule,subst) ->
+              let i, lit_pos = Literals.Pos.cut passive_pos in
+              let renaming = C.Ctx.renaming_clear() in
+              (* side literals *)
+              let lits_passive = C.lits c in
+              let lits_passive =
+                Literals.apply_subst ~renaming subst (lits_passive,sc_c) in
+              let lits' = CCArray.except_idx lits_passive i in
+              (* literal in which narrowing took place *)
+              let rhs =
+                Substs.FO.apply ~renaming subst (RR.rhs_term rule, sc_rule) in
+              let new_lit =
+                Literal.Pos.replace lits_passive.(i) ~at:lit_pos
+                  ~by:rhs in
+              (* make new clause *)
+              Util.incr_stat stat_narrowing_term;
+              let proof =
+                ProofStep.mk_inference [C.proof c]
+                  ~rule:(ProofStep.mk_rule "narrow") in
+              let c' = C.create ~trail:(C.trail c) (new_lit :: lits') proof in
+              Util.debugf ~section 3
+                "@[<2>term narrowing:@ from `@[%a@]`@ to `@[%a@]`@ \
+                 using rule `%a`@ and subst @[%a@]@]"
+                (fun k->k C.pp c C.pp c' RR.pp_rule_term rule Substs.pp subst);
+              c'
+           )
+      )
+    |> Sequence.to_rev_list
+
+  let narrow_term_passive rules =
+    Util.with_prof prof_narrowing_term (narrow_term_passive_ rules)
+
+  (* TODO: contextual extended narrowing *)
 
   (* XXX: for now, we only do one step, and let Env.multi_simplify
      manage the fixpoint *)
@@ -48,7 +94,7 @@ module Make(E : Env_intf.S) = struct
         Some clauses
 
   (* narrowing on literals of given clause, using lits rewrite rules *)
-  let narrow_lits rules c =
+  let narrow_lits_ rules c =
     let eligible = C.Eligible.res c in
     let lits = C.lits c in
     Literals.fold_lits ~eligible lits
@@ -83,6 +129,9 @@ module Make(E : Env_intf.S) = struct
            acc)
       []
 
+  let narrow_lits rules =
+    Util.with_prof prof_narrowing_lit (narrow_lits_ rules)
+
   let setup rules =
     Util.debug ~section 1 "register Rewriting to Env...";
     if not (RR.Set.is_empty rules) then (
@@ -90,7 +139,8 @@ module Make(E : Env_intf.S) = struct
       E.Ctx.lost_completeness ();
       E.add_rewrite_rule "rewrite_defs" (simpl_term rules);
       E.add_multi_simpl_rule (simpl_clause rules);
-      E.add_unary_inf "narrow_defs" (narrow_lits rules);
+      E.add_unary_inf "narrow_lit_defs" (narrow_lits rules);
+      E.add_binary_inf "narrow_term_defs" (narrow_term_passive rules);
     )
 end
 
