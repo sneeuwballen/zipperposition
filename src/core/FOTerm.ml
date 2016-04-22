@@ -6,8 +6,8 @@
 module PB = Position.Build
 module T = InnerTerm
 
-let prof_app = Util.mk_profiler "Term.app"
-let prof_ac_normal_form = Util.mk_profiler "ac_normal_form"
+let prof_app = Util.mk_profiler "term.app"
+let prof_ac_normal_form = Util.mk_profiler "term.ac_normal_form"
 
 (** {2 Term} *)
 

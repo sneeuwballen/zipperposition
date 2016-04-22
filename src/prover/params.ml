@@ -63,6 +63,7 @@ let parse_args () =
     ; "--version", Arg.Set version, " print version"
     ; "--steps", Arg.Set_int steps, " maximal number of steps of given clause loop"
     ; "--timeout", Arg.Set_float timeout, " timeout (in seconds)"
+    ; "-t", Arg.Set_float timeout, " short for --timeout"
     ; "--select", Arg.Set_string select, help_select
     ; "--expand-def", Arg.Set expand_def, " expand definitions"
     ; "--proof", Arg.String set_proof, " choose proof printing (none, debug, or tstp)"
