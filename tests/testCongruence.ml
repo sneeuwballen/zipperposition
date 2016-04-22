@@ -35,7 +35,7 @@ let check_term_eq_itself =
 (* if we build a congruence closure with classes, in each class,
     all elements are equal *)
 let check_classes_are_eq =
-  let gen = QCheck.(list (list ArTerm.default)) in
+  let gen = QCheck.(list_of_size Gen.(1--10) (list_of_size Gen.(1--5) ArTerm.default)) in
   let prop classes =
     let cc = _cc_of_classes classes in
     List.for_all

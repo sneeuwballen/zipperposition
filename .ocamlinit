@@ -5,6 +5,7 @@
 #require "containers.data";;
 #require "sequence";;
 #require "gen";;
+#require "oclock";;
 #directory "_build/src/"
 #directory "_build/src/core";;
 #directory "_build/src/prover";;
@@ -23,56 +24,27 @@ let (~<) = ID.make;;
 #install_printer ID.pp;;
 #install_printer Type.pp;;
 #install_printer FOTerm.pp;;
-#install_printer PrologTerm.pp;;
-#install_printer Formula.FO.pp;;
-#install_printer HOTerm.pp;;
+#install_printer STerm.pp;;
+#install_printer TypedSTerm.pp;;
 #install_printer Substs.pp;;
 #install_printer Signature.pp;;
 #install_printer ParseLocation.pp;;
 #install_printer Precedence.pp;;
 #install_printer Ordering.pp;;
 #install_printer Position.pp;;
-module HOT = Logtk.HOTerm;;
 
 (* optional part: parser *)
 print_endline "load parser lib...";;
 #load "libzipperposition_parsers.cma";;
 open Libzipperposition_parsers;;
-#install_printer Ast_tptp.Untyped.fmt;;
-#install_printer Ast_tptp.Typed.fmt;;
-#install_printer Ast_tptp.fmt_general;;
-#install_printer Ast_tptp.fmt_role;;
+#install_printer UntypedAST.pp_statement;;
 let pterm s =
-    let t = Parse_tptp.parse_term Lex_tptp.token (Lexing.from_string s) in
-    let tyctx = TypeInference.Ctx.create Signature.TPTP.base in
-    let _, clos = TypeInference.FO.infer_exn tyctx t in
-    clos tyctx
+    let t = Parse_zf.parse_term Lex_zf.token (Lexing.from_string s) in
+    let tyctx = TypeInference.Ctx.create () in
+    let t = TypeInference.infer_exn tyctx t in
+    TypeInference.Ctx.exit_scope tyctx;
+    t
 ;;
-let pform s =
-    let f = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s) in
-    let tyctx = TypeInference.Ctx.create Signature.TPTP.base in
-    TypeInference.FO.convert_form_exn ~ctx:tyctx f
-;;
-let photerm s =
-    let t = Parse_ho.parse_term Lex_ho.token (Lexing.from_string s) in
-    let tyctx = TypeInference.Ctx.create Signature.TPTP.base in
-    let _, clos = TypeInference.HO.infer_exn tyctx t in
-    TypeInference.Ctx.generalize tyctx;
-    clos tyctx
-;;
-
-(* optional part: meta *)
-print_endline "load meta prover....";;
-#load "libzipperposition_meta.cma";;
-#install_printer Logtk_meta.MetaPattern.pp;;
-#install_printer Logtk_meta.MetaPattern.EncodedForm.pp;;
-#install_printer Logtk_meta.MetaPattern.Set.pp;;
-#install_printer Logtk_meta.MetaKB.pp;;
-open Libzipperposition_meta;;
-let ppat s =
-    let f = pform s in
-    let f = MetaPattern.EncodedForm.encode f in
-    MetaPattern.create f;;
 
 (* optional part: arbitrary *)
 #require "qcheck";;
@@ -85,13 +57,10 @@ print_endline "load prover lib...";;
 module M = Monome;;
 module MF = Monome.Focus;;
 #install_printer FOTerm.pp;;
-#install_printer HOTerm.pp;;
 #install_printer Literal.pp;;
 #install_printer Clause.pp;;
-#install_printer FOFormula.pp;;
-#install_printer PrologTerm.pp;;
+#install_printer STerm.pp;;
 #install_printer Substs.FO.pp;;
-#install_printer Substs.HO.pp;;
 #install_printer Proof.pp;;
 #install_printer Signature.pp;;
 #install_printer Type.pp;;

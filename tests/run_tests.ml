@@ -4,12 +4,6 @@
 open Libzipperposition
 open OUnit
 
-let suite =
-  "all_tests" >:::
-    [  TestSubsts.suite
-    ; TestMultiset.suite
-    ]
-
 let props =
   List.flatten
   [ TestTerm.props
@@ -22,9 +16,17 @@ let props =
   ; TestMultiset.props
   ]
 
+let suite =
+  "all_tests" >:::
+    ( TestSubsts.suite
+      :: TestMultiset.suite
+      :: List.map QCheck_runner.to_ounit_test props
+    )
+
 let specs = Arg.align (Options.make ())
 
 let _ =
-  ignore (run_test_tt_main ~arg_specs:specs suite);
-  ignore (QCheck_runner.run_tests_main props);
+  let res = run_test_tt_main ~arg_specs:specs suite in
+  if List.exists (function (RFailure _) -> true | _ -> false) res
+  then exit 1;
   ()
