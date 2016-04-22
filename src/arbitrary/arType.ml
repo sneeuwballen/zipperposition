@@ -27,10 +27,11 @@ let ground_g =
   let g = fix
     (fun self n ->
        let sub = self (n-1) in
-       frequency
+       if n<=0 then base
+       else frequency
          [ 1, map (Type.app list_) (list_repeat 1 sub)
          ; 1, map (Type.app prod_) (list_repeat 2 sub)
-         ; 1, map2 Type.arrow (list_size (1--3) sub) sub
+         ; 1, map2 Type.arrow (list_size (1--2) sub) sub
          ; 3, base
          ])
   in
@@ -50,10 +51,11 @@ let default_g =
     fix
       (fun self n ->
          let sub = self (n-1) in
-         frequency
+         if n<=0 then base
+         else frequency
            [ 1, map (Type.app list_) (list_repeat 1 sub)
            ; 1, map (Type.app prod_) (list_repeat 2 sub)
-           ; 1, map2 Type.arrow (list sub) sub
+           ; 1, map2 Type.arrow (list_size (1--2) sub) sub
            ; 3, base
            ])
   in

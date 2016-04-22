@@ -29,6 +29,7 @@ val pos : FOTerm.t -> Position.t gen
 (** {2 S Terms} *)
 
 module PT : sig
+  val default_fuel : int -> TypedSTerm.t gen
   val default_g : TypedSTerm.t gen
   val default : TypedSTerm.t arbitrary
   (** Default polymorphic term *)

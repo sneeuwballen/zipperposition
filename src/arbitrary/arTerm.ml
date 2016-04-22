@@ -43,7 +43,7 @@ module PT = struct
       fix
         (fun self n ->
            let self = self (n-1) in
-           if n=0 then base
+           if n<=0 then base
            else frequency
              [ 1, map2 f self self
              ; 1, map g self
@@ -52,7 +52,7 @@ module PT = struct
              ; 3, base
              ])
     in
-    (1 -- 10) >>= t
+    (1 -- 4) >>= t
 
   let ground = mk_ ground_g
 
@@ -66,7 +66,7 @@ module PT = struct
       fix
         (fun self n ->
            let self = self (n-1) in
-           if n=0 then base
+           if n<=0 then base
            else frequency
              [ 3, base
              ; 1, map2 f self self
@@ -78,7 +78,7 @@ module PT = struct
     in
     QA.Gen.((1 -- n) >>= gen)
 
-  let default_g = default_fuel 40
+  let default_g = default_fuel 5
   let default = mk_ default_g
 
   let ty_prop = PT.Ty.prop
