@@ -17,8 +17,11 @@ module PT = struct
   module PT = TypedSTerm
   let _const ~ty s = PT.const ~ty (ID.make s)
 
+  (* strict subterms *)
+  let shrink t = TypedSTerm.Seq.subterms t |> Sequence.drop 1
+
   let mk_ gen =
-    QA.make ~print:TypedSTerm.to_string ~shrink:TypedSTerm.Seq.subterms gen
+    QA.make ~print:TypedSTerm.to_string ~shrink gen
 
   let ty_term = PT.Ty.term
   let ty_fun1 = PT.Ty.([term] ==> term)
@@ -103,8 +106,9 @@ module PT = struct
   let pred = mk_ pred_g
 end
 
-let mk_ gen =
-  QA.make ~print:T.to_string ~shrink:T.Seq.subterms gen
+let shrink t = T.Seq.subterms t |> Sequence.drop 1
+
+let mk_ gen = QA.make ~print:T.to_string ~shrink gen
 
 let ctx = FOTerm.Conv.create()
 

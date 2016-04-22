@@ -23,25 +23,30 @@ module type UnitIndex = sig
 end
 
 (* lists of unique terms *)
-let gen low high = QCheck.Gen.(
+let gen low high =
+  QCheck.Gen.(
     list_size (low -- high) ArTerm.default_g >>= fun l ->
     let seq = T.Set.of_list l |> T.Set.to_seq in
     let seq = Sequence.mapi (fun i t -> t, i) seq in
-    return (Sequence.persistent seq))
+    return (Sequence.to_list seq)
+  )
 
-let pp seq =
-  let pp out (t,i) = Format.fprintf out "%a -> %d" T.pp t i in
-  CCFormat.to_string (CCFormat.seq pp) seq
+let pp l =
+  let pp out (t,i) = Format.fprintf out "@[<2>@[%a@]@ -> %d@]" T.pp t i in
+  CCFormat.to_string (CCFormat.list pp) l
 
-let arb i j = QCheck.make ~print:pp (gen i j)
+let arb i j =
+  let shrink_t = ArTerm.shrink in
+  let shrink = QCheck.Shrink.(list ~shrink:(pair shrink_t int)) in
+  QCheck.make ~shrink ~print:pp (gen i j)
 
 (* test unit index *)
 module TestUnit(I : UnitIndex) = struct
   (* check that the size of index is correct *)
   let check_size_add =
-    let prop seq =
-      let idx = I.add_seq (I.empty ()) seq in
-      Sequence.length seq = I.size idx
+    let prop l =
+      let idx = I.add_list (I.empty ()) l in
+      List.length l = I.size idx
     in
     let name = CCFormat.sprintf "index(%s)_size_after_add" I.name in
     QCheck.Test.make ~name (arb 30 100) prop
@@ -49,61 +54,58 @@ module TestUnit(I : UnitIndex) = struct
   (* list of (term,int) that generalize [t] *)
   let find_all idx t =
     I.retrieve ~sign:true (idx,1) (t,0)
-    |> Sequence.fold
-      (fun acc (t',i,_,_) -> (t', i) :: acc)
-      []
+    |> Sequence.map (fun (t',i,_,_) -> t', i)
+    |> Sequence.to_rev_list
 
   (* check that at least the terms are retrieved *)
   let check_gen_retrieved_member =
-    let prop seq =
-      let idx = I.add_seq (I.empty ()) seq in
-      Sequence.for_all
+    let prop l =
+      let idx = I.add_list (I.empty ()) l in
+      List.for_all
         (fun (t,i) ->
           let retrieved = find_all idx t in
           (* [i] must occur in the list *)
           List.exists (fun (_, i') -> i=i') retrieved)
-      seq
+      l
     in
     let name = CCFormat.sprintf "index(%s)_gen_retrieved_member" I.name in
     QCheck.Test.make ~name (arb 30 100) prop
 
   (* check that the retrieved terms match the query *)
   let check_gen_retrieved_match =
-    let prop seq =
-      let idx = I.add_seq (I.empty ()) seq in
-      Sequence.for_all
+    let prop l =
+      let idx = I.add_list (I.empty ()) l in
+      List.for_all
         (fun (t,_) ->
           let retrieved = find_all idx t in
           (* all terms must match [t] *)
           List.for_all
-            (fun (t',_) ->
-              try ignore (Unif.FO.matching ~pattern:(t',0) (t,1)); true
-              with Unif.Fail -> false)
+            (fun (t',_) -> Unif.FO.matches ~pattern:t' t)
             retrieved)
-      seq
+        l
     in
     let name = CCFormat.sprintf "index(%s)_gen_retrieved_match" I.name in
     QCheck.Test.make ~name (arb 50 150) prop
 
   (* check that all matching terms are retrieved *)
-  let check_all_retrieved =
-    let prop seq =
-      let idx = I.add_seq (I.empty ()) seq in
-      Sequence.for_all
+  let check_all_matching_are_retrieved =
+    let prop l =
+      let idx = I.add_list (I.empty ()) l in
+      List.for_all
         (fun (t,_) ->
           let retrieved = find_all idx t in
-          Sequence.for_all
+          List.for_all
             (fun (t',_) ->
-              try
-                let _ = Unif.FO.matching ~pattern:(t',1) (t,0) in
-                List.exists
-                  (fun (t'',_) -> T.equal t' t'')
-                  retrieved
-              with Unif.Fail -> true)
-            seq)
-        seq
+               if Unif.FO.matches ~pattern:t' t
+               then
+                 List.exists
+                   (fun (t'',_) -> T.equal t' t'')
+                   retrieved
+               else true)
+            l)
+        l
     in
-    let name = CCFormat.sprintf "index(%s)_all_retrieved" I.name in
+    let name = CCFormat.sprintf "index(%s)_all_matching_are_retrieved" I.name in
     QCheck.Test.make ~name (arb 50 150) prop
 
   (* check the matching of generalization *)
@@ -111,7 +113,7 @@ module TestUnit(I : UnitIndex) = struct
     [ check_size_add
     ; check_gen_retrieved_member
     ; check_gen_retrieved_match
-    ; check_all_retrieved
+    ; check_all_matching_are_retrieved
     ]
 end
 
@@ -123,12 +125,11 @@ module type TermIndex = sig
 end
 
 module TestTerm(I : TermIndex) = struct
-
   (* check that the size of index is correct *)
   let check_size_add =
-    let prop seq =
-      let idx = Sequence.fold (fun idx (t,i) -> I.add idx t i) (I.empty ()) seq in
-      Sequence.length seq = I.size idx
+    let prop l =
+      let idx = I.add_list (I.empty()) l in
+      List.length l = I.size idx
     in
     let name = CCFormat.sprintf "index(%s)_size_after_add" I.name in
     QCheck.Test.make ~name (arb 10 100) prop
@@ -142,22 +143,22 @@ module TestTerm(I : TermIndex) = struct
 
   (* check that at least the terms are retrieved *)
   let check_gen_retrieved_member =
-    let prop seq =
-      let idx = Sequence.fold (fun idx (t,i) -> I.add idx t i) (I.empty ()) seq in
-      Sequence.for_all
+    let prop l =
+      let idx = I.add_list (I.empty()) l in
+      List.for_all
         (fun (t,i) ->
           let retrieved = find_all I.retrieve_unifiables idx 0 t 1 in
           (* [i] must occur in the list *)
           List.exists (fun (_, i') -> i=i') retrieved)
-      seq
+      l
     in
     let name = CCFormat.sprintf "index(%s)_gen_retrieved_member" I.name in
     QCheck.Test.make ~name (arb 10 100) prop
 
   (* check that the retrieved terms satisfy the given properry w.r.t the query *)
-  let _check_all_retrieved_satisfy retrieve check seq =
-    let idx = Sequence.fold (fun idx (t,i) -> I.add idx t i) (I.empty ()) seq in
-    Sequence.for_all
+  let _check_all_retrieved_satisfy retrieve check l =
+    let idx = I.add_list (I.empty()) l in
+    List.for_all
       (fun (t,_) ->
         let retrieved = find_all retrieve idx 1 t 0 in
         (* all terms must match [t] *)
@@ -168,15 +169,15 @@ module TestTerm(I : TermIndex) = struct
               Util.debugf 1 "problem with %a and %a" (fun k->k T.pp t T.pp t');
               false)
           retrieved)
-    seq
+    l
 
   (* check that all terms that satisfy the relation with query are retrieved *)
-  let _check_all_satisfying_are_retrieved retrieve check seq =
-    let idx = Sequence.fold (fun idx (t,i) -> I.add idx t i) (I.empty ()) seq in
-    Sequence.for_all
+  let _check_all_satisfying_are_retrieved retrieve check l =
+    let idx = I.add_list (I.empty()) l in
+    List.for_all
       (fun (t,_) ->
         let retrieved = find_all retrieve idx 1 t 0 in
-        Sequence.for_all
+        List.for_all
           (fun (t',i') ->
             try
               let _ = check (t,0) (t',1) in
@@ -184,8 +185,8 @@ module TestTerm(I : TermIndex) = struct
                 (fun (_,i'') -> i' = i'')
                 retrieved
             with Unif.Fail -> true)
-          seq)
-      seq
+          l)
+      l
 
   let _match_flip ?subst t1 t2 =
     Unif.FO.matching ?subst ~pattern:t2 t1

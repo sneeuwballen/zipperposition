@@ -15,10 +15,16 @@ let check_cnf_gives_clauses =
   (* check that the CNf of a formula is in clausal form *)
   let prop f =
     Cnf.cnf_of (Statement.assert_ ~src:() f)
-    |> CCVector.filter_map
+    |> CCVector.flat_map_list
       (fun st -> match Statement.view st with
-        | Statement.TyDecl _ -> None
-        | Statement.Assert c -> Some c)
+        | Statement.Data _
+        | Statement.Def _
+        | Statement.RewriteTerm _
+        | Statement.RewriteForm _
+        | Statement.TyDecl _ -> []
+        | Statement.NegatedGoal l -> l
+        | Statement.Goal c
+        | Statement.Assert c -> [c])
     |> CCVector.map
       (fun c -> F.or_ (List.map SLiteral.to_form c))
     |> CCVector.for_all Cnf.is_clause
