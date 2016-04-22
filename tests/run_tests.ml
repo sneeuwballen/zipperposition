@@ -1,8 +1,7 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-open Libzipperposition
-open OUnit
+open OUnit2
 
 let props =
   List.flatten
@@ -20,16 +19,8 @@ let suite =
   "all_tests" >:::
     ( TestSubsts.suite
       :: TestMultiset.suite
-      :: List.map QCheck_runner.to_ounit_test props
+      :: List.map QCheck_runner.to_ounit2_test props
     )
 
-let specs =
-  Arg.align
-    ( ("-seed", Arg.Int QCheck_runner.set_seed, " sed random seed")
-      :: Options.make ())
-
 let _ =
-  let res = run_test_tt_main ~arg_specs:specs suite in
-  if List.exists (function (RFailure _) -> true | _ -> false) res
-  then exit 1;
-  ()
+  OUnit2.run_test_tt_main ~exit suite

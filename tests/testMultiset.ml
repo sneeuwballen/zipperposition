@@ -1,6 +1,6 @@
 
 open Libzipperposition
-open OUnit
+open OUnit2
 module Q = QCheck
 
 module M = Multiset.Make(struct
@@ -13,18 +13,18 @@ let f x y =
   else if x < y then Comparison.Lt
   else Comparison.Gt
 
-let test_max () =
+let test_max _ =
   let m = M.of_list [1;2;2;3;1] in
   assert_equal (M.of_list [3]) (M.max f m)
 
-let test_compare () =
+let test_compare _ =
   let m1 = M.of_list [1;1;2;3] in
   let m2 = M.of_list [1;2;2;3] in
   assert_equal ~printer:Comparison.to_string Comparison.Lt (M.compare_partial f m1 m2);
   assert_bool "ord" (M.compare m1 m2 < 0);
   ()
 
-let test_cardinal_size () =
+let test_cardinal_size _ =
   let m = M.of_coeffs [1, Z.(~$ 2); 3, Z.(~$ 40)] in
   assert_equal 2 (M.size m);
   assert_equal ~cmp:Z.equal ~printer:Z.to_string Z.(~$ 42) (M.cardinal m);

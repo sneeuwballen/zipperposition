@@ -2,7 +2,7 @@
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 open Libzipperposition
-open OUnit
+open OUnit2
 
 module T = FOTerm
 module S = Substs
@@ -25,7 +25,7 @@ let g x = T.app (__const ~ty:Type.([term] ==> term) g_) [x]
 let h x y z = T.app (__const ~ty:Type.([term;term;term] ==> term) h_) [x;y;z]
 let nil = __const ~ty:Type.(forall (app list_ [bvar 0])) nil_
 
-let test_rename () =
+let test_rename _ =
   let t1 = f x (g y) in
   let t2 = f x (g a) in
   let t3 = g (g x) in
@@ -39,7 +39,7 @@ let test_rename () =
   assert_equal ~cmp:Unif.FO.are_variant ~printer:T.to_string t3'' t3';
   ()
 
-let test_unify () =
+let test_unify _ =
   let f ty x y =
     T.app
       (__const ~ty:Type.(forall ([bvar 0; bvar 0] ==> bvar 0)) f_)

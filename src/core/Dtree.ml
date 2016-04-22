@@ -159,8 +159,8 @@ module Make(E : Index.EQUATION) = struct
         end
       | TrieNode _, [] -> assert false (* ill-formed term *)
       | TrieLeaf _, _ -> assert false  (* wrong arity *)
-  in
-  goto trie t (fun t -> t)
+    in
+    goto trie t (fun t -> t)
 
   type t = trie
 
@@ -224,7 +224,8 @@ module Make(E : Index.EQUATION) = struct
                   (* not bound, try to bind and continue *)
                   begin
                     try
-                      let subst = Unif.FO.bind subst
+                      let subst =
+                        Unif.FO.bind subst
                           (Scoped.set dt v2) (Scoped.set t t_pos) in
                       traverse subtrie (skip i) subst
                     with Unif.Fail -> () (* incompatible binding, or occur check *)
