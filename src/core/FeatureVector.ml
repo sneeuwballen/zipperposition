@@ -247,7 +247,8 @@ module Make(C : Index.CLAUSE) = struct
     let trie' = goto_leaf idx.trie fv k in
     { idx with trie=trie'; }
 
-  let add_seq idx seq = Sequence.fold add idx seq
+  let add_seq = Sequence.fold add
+  let add_list = List.fold_left add
 
   let remove idx c =
     let fv = compute_fv idx.features (C.to_lits c) in

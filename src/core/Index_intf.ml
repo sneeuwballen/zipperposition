@@ -48,6 +48,8 @@ module type TERM_IDX = sig
   val size : t -> int
 
   val add : t -> term -> elt -> t
+  val add_seq : t -> (term * elt) Sequence.t -> t
+  val add_list : t -> (term * elt) list -> t
 
   val remove : t -> term -> elt -> t
 
@@ -98,6 +100,7 @@ module type SUBSUMPTION_IDX = sig
   (** Index the clause *)
 
   val add_seq : t -> C.t Sequence.t -> t
+  val add_list : t -> C.t list -> t
 
   val remove : t -> C.t -> t
   (** Un-index the clause *)
@@ -158,6 +161,7 @@ module type UNIT_IDX = sig
   (** Index the given (in)equation *)
 
   val add_seq : t -> E.t Sequence.t -> t
+  val add_list : t -> E.t list -> t
 
   val remove : t -> E.t -> t
 

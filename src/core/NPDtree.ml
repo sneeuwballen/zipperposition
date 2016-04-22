@@ -125,8 +125,8 @@ module Make(E : Index.EQUATION) = struct
     let k leaf = Leaf.remove leaf t eqn in
     goto_leaf trie t k
 
-  let add_seq dt seq =
-    Sequence.fold add dt seq
+  let add_seq dt seq = Sequence.fold add dt seq
+  let add_list dt = List.fold_left add dt
 
   let remove_seq dt seq =
     Sequence.fold remove dt seq
@@ -285,6 +285,10 @@ module MakeTerm(X : Set.OrderedType) = struct
   let add trie t data =
     let k leaf = Leaf.add leaf t data in
     goto_leaf trie t k
+
+  let add_ trie = CCFun.uncurry (add trie)
+  let add_seq = Sequence.fold add_
+  let add_list = List.fold_left add_
 
   let remove trie t data =
     let k leaf = Leaf.remove leaf t data in

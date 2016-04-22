@@ -171,6 +171,10 @@ module Make(X : Set.OrderedType) = struct
     let features = idx.fp t in  (* features of term *)
     { idx with trie = recurse idx.trie features; }
 
+  let add_ trie = CCFun.uncurry (add trie)
+  let add_seq = Sequence.fold add_
+  let add_list = List.fold_left add_
+
   (** remove t -> data from the trie *)
   let remove idx t data =
     (* recursive deletion *)

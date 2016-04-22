@@ -192,8 +192,8 @@ module Make(E : Index.EQUATION) = struct
     let tree = goto_leaf dt chars k in
     tree
 
-  let add_seq dt seq =
-    Sequence.fold add dt seq
+  let add_seq = Sequence.fold add
+  let add_list = List.fold_left add
 
   let remove_seq dt seq =
     Sequence.fold remove dt seq
