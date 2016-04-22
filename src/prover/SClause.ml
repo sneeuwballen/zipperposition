@@ -56,6 +56,12 @@ let is_backward_simplified c = get_flag flag_backward_simplified c
 
 (** {2 IO} *)
 
+(* list of free variables *)
+let vars_ c =
+  Literals.Seq.vars c.lits
+  |> FOTerm.VarSet.of_seq
+  |> FOTerm.VarSet.to_list
+
 let pp_trail out trail =
   if not (Trail.is_empty trail)
   then
@@ -64,19 +70,14 @@ let pp_trail out trail =
       (Trail.to_seq trail)
 
 let pp out c =
-  let pp_lits out lits =
-    if Array.length lits = 0
-    then CCFormat.string out "⊥"
-    else (
-      let pp_lit out lit =
-        Format.fprintf out "@[%a@]" Literal.pp lit
-      in
-      Format.fprintf out "[@[%a@]]"
-        (CCFormat.array ~start:"" ~stop:"" ~sep:" ∨ " pp_lit)
-        lits
-    )
+  let pp_vars out = function
+    | [] -> ()
+    | l ->
+      Format.fprintf out "forall @[%a@].@ "
+        (Util.pp_list ~sep:" " Type.pp_typed_var) l
   in
-  Format.fprintf out "@[<2>%a%a@]" pp_lits c.lits pp_trail c.trail;
+  Format.fprintf out "@[%a@[<2>%a%a@]@]"
+    pp_vars (vars_ c) Literals.pp c.lits pp_trail c.trail;
   ()
 
 (* TODO print trail with <= *)

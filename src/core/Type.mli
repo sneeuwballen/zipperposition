@@ -189,12 +189,14 @@ val apply_unsafe : t -> InnerTerm.t list -> t
 include Interfaces.PRINT_DE_BRUIJN with type term := t and type t := t
 include Interfaces.PRINT with type t := t
 val pp_surrounded : t CCFormat.printer
+val pp_typed_var : t HVar.t CCFormat.printer
 
 (** {2 TPTP} specific printer and types *)
 
 module TPTP : sig
   include Interfaces.PRINT_DE_BRUIJN with type term := t and type t := t
   include Interfaces.PRINT with type t := t
+  val pp_typed_var : t HVar.t CCFormat.printer
 
   (** {2 Basic types} *)
 

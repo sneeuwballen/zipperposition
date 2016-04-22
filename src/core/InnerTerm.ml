@@ -601,9 +601,7 @@ let pp_depth ?(hooks=[]) depth out t =
         let ty = HVar.ty v in
         begin match view ty with
         | AppBuiltin (Builtin.TType, []) -> Format.fprintf out "A%d" (HVar.id v)
-        | AppBuiltin (Builtin.Term, []) -> HVar.pp out v
-        | _ ->
-            Format.fprintf out "%a:@[%a@]" HVar.pp v (_pp_surrounded depth) ty
+        | _ -> HVar.pp out v
         end
     | DB i -> Format.fprintf out "Y%d" (depth-i-1)
     | Const s -> ID.pp out s

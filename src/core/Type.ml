@@ -270,6 +270,10 @@ module TPTP = struct
 
   let pp_depth ?hooks:_ depth out t = pp_tstp_rec depth out t
 
+  let pp_typed_var out v = match view (HVar.ty v) with
+    | Builtin Term -> HVar.pp out v (* implicit *)
+    | _ -> Format.fprintf out "@[%a : %a@]" HVar.pp v pp (HVar.ty v)
+
   let to_string = CCFormat.to_string pp
 end
 
@@ -303,6 +307,11 @@ let pp out t = pp_rec 0 out t
 let pp_surrounded out t = (pp_inner 0) out t
 
 let to_string = CCFormat.to_string pp
+
+let pp_typed_var out v = match view (HVar.ty v) with
+  | Builtin TType -> Format.fprintf out "A%d" (HVar.id v)
+  | Builtin Term -> HVar.pp out v
+  | _ -> Format.fprintf out "(@[%a:%a@])" HVar.pp v pp (HVar.ty v)
 
 (** {2 Conversions} *)
 
