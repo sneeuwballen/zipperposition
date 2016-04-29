@@ -47,7 +47,7 @@ let _print_types () =
 let switch_opt b f = Arg.Unit (fun () -> f b)
 let switch_set b r = Arg.Unit (fun () -> r := b)
 
-let make_other_opts () =
+let mk_debug_opts () =
   (* debugf level for every section *)
   Util.Section.iter
   |> Sequence.filter_map
@@ -57,6 +57,12 @@ let make_other_opts () =
            ("--debug." ^ name, Arg.Int (Util.Section.set_debug sec),
             " debug level for section " ^ name))
   |> Sequence.to_list
+
+(* Options that can be added by plugins *)
+let other_opts = ref []
+
+let add_opt o = other_opts := o :: !other_opts
+let add_opts l = other_opts := l @ !other_opts
 
 let make () =
   List.rev_append
@@ -75,4 +81,4 @@ let make () =
     ; "--output" , Arg.String set_out , " choose printing format (zf, tptp, default, none)"
     ; "-o", Arg.String set_out, " alias for --output"
     ]
-    (make_other_opts ())
+  (List.rev_append !other_opts (mk_debug_opts ()))

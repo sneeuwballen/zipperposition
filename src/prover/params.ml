@@ -25,12 +25,6 @@ type t = {
   param_unary_depth : int; (** Maximum successive levels of unary inferences *)
 }
 
-(** Options that can be added by plugins *)
-let other_opts = ref []
-
-let add_opt o = other_opts := o :: !other_opts
-let add_opts l = other_opts := l @ !other_opts
-
 let ord = ref "kbo"
 and seed = ref 1928575
 and steps = ref 0
@@ -70,7 +64,7 @@ let parse_args () =
     ; "--color", Arg.Bool CCFormat.set_color_default, " enable/disable ANSI color codes"
     ; "--seed", Arg.Set_int seed, " set random seed"
     ; "--unary-depth", Arg.Set_int unary_depth, " maximum depth for successive unary inferences"
-    ] @ !other_opts @ Options.make ()
+    ] @ Options.make ()
   ) |> List.sort (fun (s1,_,_)(s2,_,_) -> String.compare s1 s2)
     |> Arg.align
   in
@@ -87,6 +81,9 @@ let parse_args () =
     param_dot_file = !dot_file;
     param_unary_depth= !unary_depth; param_dot_sat= !dot_sat;
     param_expand_def= !expand_def; }
+
+let add_opt = Options.add_opt
+let add_opts = Options.add_opts
 
 (* key used to store the parameters in Flex_state *)
 let key : t Flex_state.key = Flex_state.create_key()

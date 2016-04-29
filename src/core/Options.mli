@@ -42,6 +42,12 @@ val switch_opt : 'a -> ('a -> unit) -> Arg.spec
 val switch_set : 'a -> 'a ref -> Arg.spec
 (** [switch_set x r] is the option that, enabled, calls [r := x] *)
 
+val add_opt : (string * Arg.spec * string) -> unit
+(** Add a new command line option *)
+
+val add_opts : (string * Arg.spec * string) list -> unit
+(** Add new command line options *)
+
 val make : unit -> (string * Arg.spec * string) list
 (** Produce of list of options suitable for {!Arg.parse}, that may
     modify global parameters and the given option reference. *)
