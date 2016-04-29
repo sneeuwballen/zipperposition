@@ -9,4 +9,6 @@ module type S = AC_intf.S
 
 module Make(Env: Env.S) : S with module Env = Env
 
+val key_ac : (module S) Flex_state.key
+
 val extension : Extensions.t

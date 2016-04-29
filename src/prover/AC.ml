@@ -24,6 +24,8 @@ type spec = AC_intf.spec
 
 module type S = AC_intf.S
 
+let key_ac : (module S) Flex_state.key = Flex_state.create_key()
+
 module Make(Env : Env.S) : S with module Env = Env = struct
   module Ctx = Env.Ctx
   module Env = Env
@@ -243,6 +245,7 @@ let extension =
   let action env =
     let module E = (val env : Env.S) in
     let module AC = Make(E) in
+    E.flex_add key_ac (module AC : S);
     AC.setup ()
   in
   { Extensions.default with Extensions.

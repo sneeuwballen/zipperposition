@@ -702,6 +702,7 @@ module Make(X : sig
   let flex_state_ = ref X.flex_state
   let flex_state () = !flex_state_
   let update_flex_state f = CCRef.update f flex_state_
+  let flex_add k v = flex_state_ := Flex_state.add k v !flex_state_
   let flex_get k = Flex_state.get_exn k !flex_state_
 end
 
