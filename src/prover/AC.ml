@@ -198,7 +198,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.debugf ~section 3
       "@[<2>add AC axioms for `%a : @[%a@]`:@ @[<hv>%a@]@]"
       (fun k->k ID.pp s Type.pp ty (Util.pp_list C.pp) clauses);
-    Env.add_passive (Sequence.of_list clauses);
+    (* add axioms to either passive, or active set *)
+    if Env.ProofState.ActiveSet.clauses ()
+       |> C.ClauseSet.for_all (C.get_flag flag_axiom)
+    then (
+      (* the only active clauses are other AC axioms, we miss no
+         inference by adding the axioms to active set directly *)
+      Env.add_active (Sequence.of_list clauses)
+    ) else (
+      Env.add_passive (Sequence.of_list clauses);
+    );
     ()
 
   (* TODO: proof stuff *)

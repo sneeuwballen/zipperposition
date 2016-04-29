@@ -40,6 +40,8 @@ module type S = sig
 
     val clauses : unit -> C.ClauseSet.t
     (** Current set of clauses *)
+
+    val num_clauses : unit -> int
   end
 
   module SimplSet : CLAUSE_SET
@@ -55,6 +57,8 @@ module type S = sig
 
     val next : unit -> C.t option
     (** Get-and-remove the next passive clause to process *)
+
+    val num_clauses : unit -> int
   end
 
   (** {6 Misc} *)

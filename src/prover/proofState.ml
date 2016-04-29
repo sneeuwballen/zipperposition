@@ -86,6 +86,7 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
     let on_remove_clause = Signal.create ()
 
     let clauses () = !clauses_
+    let num_clauses () = C.ClauseSet.cardinal !clauses_
 
     let add seq =
       seq
