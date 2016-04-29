@@ -125,10 +125,13 @@ let const ~ty s =
   let my_t = make_ ~ty:(HasType ty) (Const s) in
   H.hashcons my_t
 
-let app ~ty f l =
-  match l with
-  | [] -> f
-  | _::_ ->
+let app ~ty f l = match f.term, l with
+  | _, [] -> f
+  | App (f1, l1), _::_ ->
+    (* flatten *)
+      let my_t = make_ ~ty:(HasType ty) (App (f1,l1 @ l)) in
+      H.hashcons my_t
+  | _ ->
       let my_t = make_ ~ty:(HasType ty) (App (f,l)) in
       H.hashcons my_t
 
