@@ -178,6 +178,15 @@ let equal p1 p2 = p1.id=p2.id
 let compare p1 p2 = CCInt.compare p1.id p2.id
 let hash p = p.id
 
+let compare_by_result p1 p2 = match p1.result, p2.result with
+  | Clause c1, Clause c2 -> SClause.compare c1 c2
+  | Form f1, Form f2 -> TypedSTerm.compare f1 f2
+  | BoolClause l1, BoolClause l2 -> CCOrd.list_ BBox.Lit.compare l1 l2
+  | Clause _, _ -> 1
+  | _, Clause _ -> -1
+  | Form _, _ -> 1
+  | _, Form _ -> -1
+
 (** {2 Proof traversal} *)
 
 module Tbl = CCHashtbl.Make(CCInt)

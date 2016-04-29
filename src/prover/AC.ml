@@ -56,21 +56,20 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let y = T.var_of_int ~ty:ty_ret (ty_args_n + 2) in
     let z = T.var_of_int ~ty:ty_ret (ty_args_n + 3) in
     let f x y = T.app_full (T.const ~ty s) ty_vars_t [x;y] in
-    let res = ref [] in
     (* build clause l=r *)
-    let add_clause l r =
+    let mk_clause l r =
       let proof = ProofStep.mk_trivial in
       let c = C.create ~trail:Trail.empty [ Lit.mk_eq l r ] proof in
       C.set_flag flag_axiom c true;
       C.set_flag SClause.flag_persistent c true;
-      res := c :: !res
+      c
     in
-    add_clause (f x y) (f y x);
-    add_clause (f (f x y) z) (f x (f y z));
-    add_clause (f x (f y z)) (f z (f x y));
-    add_clause (f x (f y z)) (f y (f x z));
-    add_clause (f x (f y z)) (f z (f y x));
-    !res
+    [ mk_clause (f x y) (f y x)
+    ; mk_clause (f (f x y) z) (f x (f y z))
+    ; mk_clause (f x (f y z)) (f z (f x y))
+    ; mk_clause (f x (f y z)) (f y (f x z))
+    ; mk_clause (f x (f y z)) (f z (f y x))
+    ]
 
   let add_ ?proof ~ty s =
     let proof = match proof with
@@ -161,11 +160,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (* did some simplification *)
         let symbols = symbols_of_terms (C.Seq.terms c) in
         let symbols = Sequence.to_list (ID.Set.to_seq symbols) in
-        let ac_proof = CCList.flat_map find_proof symbols in
+        (* gather axioms that were used, removing duplicates *)
+        let ac_proof =
+          CCList.flat_map find_proof symbols
+          |> CCList.sort_uniq ~cmp:ProofStep.compare_by_result in
         let premises = C.proof c :: ac_proof in
         let proof =
           ProofStep.mk_simp premises
-          ~rule:(ProofStep.mk_rule "ac.normalize")
+          ~rule:(ProofStep.mk_rule "AC.normalize")
         in
         let new_c = C.create ~trail:(C.trail c) lits proof in
         Util.exit_prof prof_simplify;

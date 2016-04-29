@@ -121,6 +121,9 @@ val equal : t -> t -> bool
 val hash : t -> int
 val compare : t -> t -> int
 
+val compare_by_result : of_ -> of_ -> int
+(** Compare proofs by their result *)
+
 (** {2 Proof traversal} *)
 
 module Tbl : CCHashtbl.S with type key = int

@@ -22,7 +22,7 @@ let make ~trail lits =
   { lits; trail; id; flags=0; }
 
 let equal c1 c2 = c1.id = c2.id
-let compare c1 c2 = c1.id - c2.id
+let compare c1 c2 = Pervasives.compare c1.id c2.id
 let id c = c.id
 let hash c = Hashtbl.hash c.id
 let lits c = c.lits
