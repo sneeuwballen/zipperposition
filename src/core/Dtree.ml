@@ -10,14 +10,15 @@ module S = Substs
 let prof_dtree_retrieve = Util.mk_profiler "dtree_retrieve"
 
 (** {2 Term traversal}
-Term traversal in prefix order. This is akin to lazy transformation
-to a flatterm. *)
+
+    Term traversal in prefix order. This is akin to lazy transformation
+    to a flatterm. *)
 
 type character =
   | Symbol of ID.t
   | BoundVariable of int
   | Variable of Type.t HVar.t
-  | NonFO
+  | Subterm of T.t (* opaque term, just do matching *)
 
 type iterator = {
   cur_char : character;
@@ -29,7 +30,7 @@ let char_to_int_ = function
   | Symbol _ -> 0
   | BoundVariable _ -> 1
   | Variable _ -> 2
-  | NonFO -> 3
+  | Subterm _ -> 3
 
 let compare_char c1 c2 =
   (* compare variables by index *)
@@ -41,7 +42,7 @@ let compare_char c1 c2 =
   | Symbol s1, Symbol s2 -> ID.compare s1 s2
   | BoundVariable i, BoundVariable j -> i - j
   | Variable v1, Variable v2 -> compare_vars v1 v2
-  | NonFO, NonFO -> 0
+  | Subterm t1, Subterm t2 -> T.compare t1 t2
   | _ -> char_to_int_ c1 - char_to_int_ c2
 
 let eq_char c1 c2 = compare_char c1 c2 = 0
@@ -53,30 +54,41 @@ let term_to_char t =
   | T.Classic.DB i -> BoundVariable i
   | T.Classic.App (f, _) -> Symbol f
   | T.Classic.AppBuiltin _
-  | T.Classic.NonFO -> NonFO
+  | T.Classic.NonFO -> Subterm t
 
 let pp_char out = function
   | Variable v -> HVar.pp out v
   | BoundVariable i -> Format.fprintf out "Y%d" i
   | Symbol f -> ID.pp out f
-  | NonFO -> CCFormat.string out "<nonfo>"
+  | Subterm t -> CCFormat.hbox T.pp out t
+
+(* parameter: maximum depth before we start using Subterm *)
+let max_depth_ = ref 3
 
 let open_term ~stack t =
-  let cur_char = term_to_char t in
-  match T.view t with
-  | T.Var _
-  | T.DB _
-  | T.AppBuiltin _
-  | T.Const _ ->
-      Some {cur_char; cur_term=t; stack=[]::stack;}
-  | T.App (_, l) ->
-      Some {cur_char; cur_term=t; stack=l::stack;}
+  if List.length stack > !max_depth_
+  then (
+    (* opaque. Do not enter the term. *)
+    let cur_char = Subterm t in
+    {cur_char; cur_term=t; stack=[]::stack}
+  )
+  else (
+    let cur_char = term_to_char t in
+    match T.view t with
+    | T.Var _
+    | T.DB _
+    | T.AppBuiltin _
+    | T.Const _ ->
+        {cur_char; cur_term=t; stack=[]::stack;}
+    | T.App (_, l) ->
+        {cur_char; cur_term=t; stack=l::stack;}
+  )
 
 let rec next_rec stack = match stack with
   | [] -> None
   | []::stack' -> next_rec stack'
   | (t::next')::stack' ->
-      open_term ~stack:(next'::stack') t
+      Some (open_term ~stack:(next'::stack') t)
 
 let skip iter = match iter.stack with
   | [] -> None
@@ -85,7 +97,7 @@ let skip iter = match iter.stack with
 let next iter = next_rec iter.stack
 
 (* Iterate on a term *)
-let iterate term = open_term ~stack:[] term
+let iterate term = Some (open_term ~stack:[] term)
 
 (* convert term to list of var/symbol *)
 let to_list t =
@@ -231,8 +243,19 @@ module Make(E : Index.EQUATION) = struct
                   if Unif.FO.equal ~subst (Scoped.set t t_pos) t'
                   then traverse subtrie (skip i) subst
               end
+            | Subterm t2 ->
+              (* fallback to matching *)
+              begin
+                try
+                  let subst =
+                    Unif.FO.matching
+                      ~subst ~pattern:(Scoped.set dt t2) (Scoped.set t t_pos)
+                  in
+                  traverse subtrie (skip i) subst
+                with Unif.Fail -> ()
+              end
             | _ when eq_char c2 c1 ->
-            (* explore branch that has the same symbol, if any *)
+              (* explore branch that has the same symbol, if any *)
               assert (not (T.is_var t_pos));
               traverse subtrie (next i) subst;
             | _ -> ())
@@ -290,3 +313,9 @@ module Make(E : Index.EQUATION) = struct
 end
 
 module Default = Make(Index.BasicEquation)
+
+let () =
+  Options.add_opts
+    [ "--dtree-max-depth", Arg.Set_int max_depth_,
+        " set maximal depth of terms for Dtree (demodulation)"
+    ]
