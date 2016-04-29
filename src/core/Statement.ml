@@ -44,6 +44,7 @@ type clause = FOTerm.t SLiteral.t list
 type clause_t = (clause, FOTerm.t, Type.t) sourced_t
 
 let view t = t.view
+let attrs t = t.attrs
 let src t = t.src
 
 let mk_data id ~args ty cstors =

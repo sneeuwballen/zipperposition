@@ -41,6 +41,10 @@ module type S = sig
       be complete for the given symbol. The [ctx] is required for type inference
       and building clauses . *)
 
+  val scan_statement : (_, FOTerm.t, Type.t, _) Statement.t -> unit
+  (** Check whether the statement contains an "AC" attribute, do the proper
+      declaration in this case *)
+
   (** {2 Rules} *)
 
   val is_trivial_lit : Literal.t -> bool

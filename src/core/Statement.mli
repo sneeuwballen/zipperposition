@@ -49,6 +49,7 @@ type clause = FOTerm.t SLiteral.t list
 type clause_t = (clause, FOTerm.t, Type.t) sourced_t
 
 val view : ('f, 't, 'ty, _) t -> ('f, 't, 'ty) view
+val attrs : (_, _, _, _) t -> attrs
 val src : (_, _, _, 'src) t -> 'src
 
 val mk_data : ID.t -> args:'ty Var.t list -> 'ty -> (ID.t * 'ty) list -> 'ty data

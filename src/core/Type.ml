@@ -137,15 +137,17 @@ type arity_result =
   | NoArity
 
 let arity ty =
-  let rec traverse i j ty = match view ty with
-    | Fun (_,ty') ->
-        traverse i (j+1) ty'
+  (* n_forall: number of forall traversed so far *)
+  let rec traverse n_forall ty = match view ty with
+    | Fun (l,ty') ->
+        assert (not (is_fun ty'));
+        Arity (n_forall, List.length l)
     | Forall ty' ->
-        traverse (i+1) j ty'
+        traverse (n_forall+1) ty'
     | Var _ | Builtin _ -> NoArity
     | DB _
-    | App _ -> Arity (i, j)
-  in traverse 0 0 ty
+    | App _ -> Arity (n_forall, 0)
+  in traverse 0 ty
 
 let rec expected_args ty = match view ty with
   | Fun (args, ret) -> args @ expected_args ret
