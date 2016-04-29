@@ -32,6 +32,8 @@ val case_hash : case -> int
 
 val pp_case : case CCFormat.printer
 
+val case_to_term : case -> FOTerm.t
+
 val case_is_rec : case -> bool
 val case_is_base : case -> bool
 

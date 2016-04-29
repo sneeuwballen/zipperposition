@@ -145,25 +145,11 @@ let pp_tstp out proof =
            Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]).@]@,"
              name role TypedSTerm.TPTP.pp f pp_kind_tstp (p.step.kind,parents)
          | BoolClause c ->
-           Util.errorf ~where:"proof_print"
-             "cannot print bool clause `@[%a@]` in TPTP" BBox.pp_bclause c
-         | Clause c when not (Trail.is_empty (C.trail c)) ->
-           assert false
-         (* FIXME: proper conversion of clauses
-            Format.fprintf out "@[<2>tff(%d, %s,@ @[<2>@[(%a)@]@ %a@],@ @[%a@]).@]@,"
-            name role
-            TypedSTerm.TPTP.pp
-             (C.to_forms c
-                |> Array.map (SLiteral.map ~f:FOTerm.Conv.to_simple_term)
-                |> Array.map SLiteral.to_form
-                |> Array.to_list
-                |> TypedSTerm.Form.or_
-                |> TypedSTerm.Form.close_forall)
-            CC.pp_trail_tstp (CC.trail c)
-            _pp_kind_tstp (p.kind,parents)
-         *)
+           let tr = Trail.of_list c in
+           Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]).@]@,"
+             name role SClause.pp_trail_tstp tr pp_kind_tstp (p.step.kind,parents)
          | Clause c ->
-           Format.fprintf out "@[<2>cnf(%d, %s,@ @[%a@],@ @[%a@]).@]@,"
+           Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]).@]@,"
              name role C.pp_tstp c pp_kind_tstp (p.step.kind,parents)
     );
   Format.fprintf out "@]";

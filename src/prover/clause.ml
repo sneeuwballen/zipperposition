@@ -394,7 +394,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       pp_lits c.sclause.lits SClause.pp_trail c.sclause.trail;
     ()
 
-  (* TODO print trail?! *)
   let pp_tstp out c = SClause.pp_tstp out c.sclause
 
   let pp_tstp_full out c = SClause.pp_tstp_full out c.sclause

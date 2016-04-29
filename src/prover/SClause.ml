@@ -57,8 +57,8 @@ let is_backward_simplified c = get_flag flag_backward_simplified c
 (** {2 IO} *)
 
 (* list of free variables *)
-let vars_ c =
-  Literals.Seq.vars c.lits
+let vars_ lits =
+  Literals.Seq.vars lits
   |> FOTerm.VarSet.of_seq
   |> FOTerm.VarSet.to_list
 
@@ -77,15 +77,46 @@ let pp out c =
         (Util.pp_list ~sep:" " Type.pp_typed_var) l
   in
   Format.fprintf out "@[%a@[<2>%a%a@]@]"
-    pp_vars (vars_ c) Literals.pp c.lits pp_trail c.trail;
+    pp_vars (vars_ c.lits) Literals.pp c.lits pp_trail c.trail;
   ()
 
-(* TODO print trail with <= *)
-let pp_tstp out c =
-  match c.lits with
-    | [| |] -> CCFormat.string out "$false"
-    | [| l |] -> Literal.pp_tstp out l
-    | _ -> Format.fprintf out "(%a)" Literals.pp_tstp c.lits
+let rec pp_lits_tstp out lits = match lits with
+  | [| |] -> CCFormat.string out "$false"
+  | [| l |] -> Literal.pp_tstp out l
+  | _ -> Format.fprintf out "(%a)" Literals.pp_tstp lits
+(* print quantified literals *)
+and pp_closed_lits_tstp out lits =
+  let pp_vars out = function
+    | [] -> ()
+    | l ->
+      Format.fprintf out "![@[%a@]]:@ "
+        (Util.pp_list ~sep:", " Type.TPTP.pp_typed_var) l
+  in
+  Format.fprintf out "@[<2>%a%a@]" pp_vars (vars_ lits) pp_lits_tstp lits
 
+(* print a trail in TPTP *)
+and pp_trail_tstp out trail =
+  (* print a single boolean box *)
+  let pp_box out b = match BBox.payload b with
+    | BBox.Case (l, r) ->
+      let l = Ind_cst.cst_to_term l in
+      let r = Ind_cst.case_to_term r in
+      pp_lits_tstp out [| Literal.mk_eq l r |]
+    | BBox.Clause_component lits ->
+      CCFormat.within "(" ")" pp_closed_lits_tstp out lits
+    | BBox.Fresh -> failwith "cannot print <fresh> boolean box"
+  in
+  Format.fprintf out "@ <= (@[<hv>%a@])"
+    (CCFormat.seq ~start:"" ~stop:"" ~sep:" & " pp_box)
+    (Trail.to_seq trail)
+
+let pp_tstp out c =
+  if Trail.is_empty c.trail
+  then pp_closed_lits_tstp out c.lits
+  else
+    Format.fprintf out "@[<2>(@[%a@])@ %a@]"
+      pp_closed_lits_tstp c.lits pp_trail_tstp c.trail
+
+(* TODO: if all vars are [:term] and trail is empty, use CNF; else use TFF *)
 let pp_tstp_full out c =
-  Format.fprintf out "@[<2>cnf(%d, plain,@ %a).@]" c.id pp_tstp c
+  Format.fprintf out "@[<2>tff(%d, plain,@ %a).@]" c.id pp_tstp c

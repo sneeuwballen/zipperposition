@@ -48,6 +48,7 @@ val is_backward_simplified : t -> bool
 
 val pp : t CCFormat.printer
 val pp_tstp : t CCFormat.printer
-val pp_tstp_full : t CCFormat.printer  (** Print in a cnf() statement *)
+val pp_tstp_full : t CCFormat.printer  (** Print in a toplevel TPTP statement *)
 
 val pp_trail : Trail.t CCFormat.printer
+val pp_trail_tstp : Trail.t CCFormat.printer

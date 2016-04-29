@@ -46,6 +46,8 @@ let case_hash a = FOTerm.hash a.case_term
 
 let pp_case out c = CCFormat.hovbox FOTerm.pp out c.case_term
 
+let case_to_term c = c.case_term
+
 let case_is_rec c = c.case_kind = `Rec
 let case_is_base c = c.case_kind = `Base
 
