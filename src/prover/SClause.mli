@@ -18,6 +18,7 @@ val make : trail:Trail.t -> Literal.t array -> t
 
 val equal : t -> t -> bool
 val compare : t -> t -> int
+val hash : t -> int
 val id : t -> int
 val lits : t -> Literal.t array
 val trail : t -> Trail.t

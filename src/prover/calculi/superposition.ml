@@ -13,6 +13,7 @@ module Comp = Comparison
 
 let section = Util.Section.make ~parent:Const.section "sup"
 
+(* flag meaning the clause has been simplified already *)
 let flag_simplified = SClause.new_flag()
 
 module type S = sig
@@ -701,9 +702,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     normal_form ~restrict S.empty t 0
 
-  (** Demodulate the clause, with restrictions on which terms to rewrite *)
-  let demodulate c =
-    Util.enter_prof prof_demodulate;
+  (* Demodulate the clause, with restrictions on which terms to rewrite *)
+  let demodulate_ c =
     Util.incr_stat stat_demodulate_call;
     let ord = Ctx.ord () in
     (* clauses used to rewrite *)
@@ -732,7 +732,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     if Lits.equal_com (C.lits c) lits
     then (
       (* no rewriting performed *)
-      Util.exit_prof prof_demodulate;
       SimplM.return_same c
     ) else (
       (* construct new clause *)
@@ -746,9 +745,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Util.debugf ~section 3 "@[<hv2>demodulate@ @[%a@]@ into @[%a@]@ using @[%a@]@]"
         (fun k->k C.pp c C.pp new_c (Util.pp_list C.pp) !clauses);
       (* return simplified clause *)
-      Util.exit_prof prof_demodulate;
       SimplM.return_new new_c
     )
+
+  let demodulate c = Util.with_prof prof_demodulate demodulate_ c
 
   (** Find clauses that [given] may demodulate, add them to set *)
   let backward_demodulate set given =

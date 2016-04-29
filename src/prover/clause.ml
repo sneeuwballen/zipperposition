@@ -59,8 +59,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let compare c1 c2 = SClause.compare c1.sclause c2.sclause
 
-  let hash_fun c h = Lits.hash_fun c.sclause.lits h
-  let hash c = Hash.apply hash_fun c
+  let hash c = SClause.hash c.sclause
+  let hash_fun c h = CCHash.int_ (hash c) h
 
   let id c = SClause.id c.sclause
 
