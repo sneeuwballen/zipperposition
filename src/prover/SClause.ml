@@ -97,7 +97,7 @@ and pp_closed_lits_tstp out lits =
 (* print a trail in TPTP *)
 and pp_trail_tstp out trail =
   (* print a single boolean box *)
-  let pp_box out b = match BBox.payload b with
+  let pp_box_unsigned out b = match BBox.payload b with
     | BBox.Case (l, r) ->
       let l = Ind_cst.cst_to_term l in
       let r = Ind_cst.case_to_term r in
@@ -106,7 +106,11 @@ and pp_trail_tstp out trail =
       CCFormat.within "(" ")" pp_closed_lits_tstp out lits
     | BBox.Fresh -> failwith "cannot print <fresh> boolean box"
   in
-  Format.fprintf out "@ <= (@[<hv>%a@])"
+  let pp_box out b =
+    if BBox.Lit.sign b then pp_box_unsigned out b
+    else Format.fprintf out "@[~@ %a@]" pp_box_unsigned b
+  in
+  Format.fprintf out "@[<hv>%a@]"
     (CCFormat.seq ~start:"" ~stop:"" ~sep:" & " pp_box)
     (Trail.to_seq trail)
 
@@ -114,7 +118,7 @@ let pp_tstp out c =
   if Trail.is_empty c.trail
   then pp_closed_lits_tstp out c.lits
   else
-    Format.fprintf out "@[<2>(@[%a@])@ %a@]"
+    Format.fprintf out "@[<2>(@[%a@])@ <= (%a)@]"
       pp_closed_lits_tstp c.lits pp_trail_tstp c.trail
 
 (* TODO: if all vars are [:term] and trail is empty, use CNF; else use TFF *)
