@@ -68,9 +68,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     add_clause (f x (f y z)) (f z (f y x));
     !res
 
-  (* list of newly declared constants *)
-  let new_ids_ : (ID.t * Type.t) list ref = ref []
-
   let add_ ?proof ~ty s =
     let proof = match proof with
       | Some p -> p
@@ -80,7 +77,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     if not (ID.Tbl.mem tbl s)
     then (
       let instance = {ty; sym=s} in
-      new_ids_ := (s, ty) :: !new_ids_;
       ID.Tbl.replace tbl s instance;
       ID.Tbl.replace proofs s proof;
       Signal.send on_add instance
@@ -97,12 +93,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (fun s _ set -> ID.Set.add s set)
       tbl ID.Set.empty
 
-  let symbols_of_terms seq =
-    let module A = T.AC(struct
-        let is_ac = is_ac
-        let is_comm _ = false
-      end) in
-    A.symbols seq
+  module A = T.AC(struct
+      let is_ac = is_ac
+      let is_comm _ = false
+    end)
+
+  let symbols_of_terms seq = A.symbols seq
 
   let proofs () =
     ID.Tbl.fold
@@ -115,7 +111,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     exists_ac ()
     &&
     (
-      let module A = T.AC(struct let is_ac = is_ac let is_comm _ = false end) in
       match Lit.View.as_eqn lit with
       | Some (l, r, true) -> A.equal l r
       | Some _ -> false
@@ -124,7 +119,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let is_trivial c =
     let res = CCArray.exists is_trivial_lit (C.lits c) in
-    if res then Util.incr_stat stat_ac_redundant;
+    if res then (
+      Util.incr_stat stat_ac_redundant;
+      Util.debugf ~section 3 "@[<2>clause `@[%a@]`@ is AC-trivial@]"(fun k->k C.pp c);
+    );
     res
 
   (* simplify: remove literals that are redundant modulo AC *)
@@ -133,14 +131,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     if exists_ac ()
     then (
       let n = Array.length (C.lits c) in
-      let module A = T.AC(struct let is_ac = is_ac let is_comm _ = false end) in
       let lits = Array.to_list (C.lits c) in
       let lits =
         List.filter
-          (fun lit -> match Lit.View.as_eqn lit with
-             | Some (l, r, false) -> not (A.equal l r)
-             | Some _
-             | None -> true)
+          (fun lit -> match lit with
+             | Literal.Equation (l, r, false) -> not (A.equal l r)
+             | _ -> true)
           lits
       in
       let n' = List.length lits in
@@ -153,7 +149,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let premises = C.proof c :: ac_proof in
         let proof =
           ProofStep.mk_simp premises
-          ~rule:(ProofStep.mk_rule ~comment:["ac"] "normalize")
+          ~rule:(ProofStep.mk_rule "ac.normalize")
         in
         let new_c = C.create ~trail:(C.trail c) lits proof in
         Util.exit_prof prof_simplify;
@@ -169,12 +165,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ) else SimplM.return_same c
 
   let install_rules_ () =
-    (* enable AC inferences if needed *)
-    if exists_ac ()
-    then (
-      Env.add_is_trivial is_trivial;
-      Env.add_simplify simplify;
-    );
+    Env.add_is_trivial is_trivial;
+    Env.add_simplify simplify;
     ()
 
   let add ?proof s ty =
@@ -187,6 +179,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     add_ ?proof ~ty s;
     (* add clauses *)
     let clauses = axioms s ty in
+    Util.debugf ~section 3
+      "@[<2>add AC axioms for `%a : @[%a@]`:@ @[<hv>%a@]@]"
+      (fun k->k ID.pp s Type.pp ty (Util.pp_list C.pp) clauses);
     Env.add_passive (Sequence.of_list clauses);
     ()
 
@@ -211,22 +206,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Util.error ~where:"AC"
           "attribute 'AC' only supported on def/decl statements"
 
-  (* add axioms of newly added constants to the passive set *)
-  let add_new_axioms_ () =
-    let l = !new_ids_ in
-    new_ids_ := [];
-    List.fold_left
-      (fun acc (id,ty) ->
-         let ax = axioms id ty in
-         Util.debugf ~section 3
-           "@[<2>add AC axioms for `%a : @[%a@]`:@ @[<hv>%a@]@]"
-           (fun k->k ID.pp id Type.pp ty (Util.pp_list C.pp) ax);
-         List.rev_append ax acc)
-      [] l
-
   (* just look for AC axioms *)
   let setup () =
-    Env.add_generate "AC.axioms" add_new_axioms_;
     Signal.on_every
       Env.on_input_statement scan_statement
 end
