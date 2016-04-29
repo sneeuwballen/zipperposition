@@ -1,0 +1,31 @@
+# exercize narrowing
+
+val set : type -> type.
+
+val mem : pi a. a -> set a -> prop.
+val [AC] union : pi a. set a -> set a -> set a.
+val subeq : pi a. set a -> set a -> prop.
+
+#assert
+#  forall a s1 s2 s3.
+#    union a (union _ s1 s2) s3 = union _ s1 (union _ s2 s3).
+
+#assert
+#  forall a s1 s2.
+#    union a s1 s2 = union a s2 s1.
+
+rewrite
+  forall a s1 s2 x.
+    mem a x (union a s1 s2) <=> mem a x s1 || mem a x s2.
+
+rewrite
+  forall a s1 s2.
+    subeq a s1 s2 <=> (forall x. mem a x s1 => mem a x s2).
+
+goal
+  forall B C.
+  exists A.
+  forall x.
+  mem _ x A => (mem _ x B && mem _ x C).
+
+
