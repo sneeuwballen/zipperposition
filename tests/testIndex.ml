@@ -32,7 +32,7 @@ let gen low high =
   )
 
 let pp l =
-  let pp out (t,i) = Format.fprintf out "@[<2>@[%a@]@ -> %d@]" T.pp t i in
+  let pp out (t,i) = Format.fprintf out "@[<2>`@[<2>%a@]`@ -> %d@]" T.pp t i in
   CCFormat.to_string (CCFormat.list pp) l
 
 let arb i j =
