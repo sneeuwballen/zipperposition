@@ -87,7 +87,9 @@ let process file =
     let decls =
       CCVector.map
         (Statement.map_src
-          ~f:(fun {UntypedAST.name;_} -> StatementSrc.make ?name file))
+           ~f:(fun attrs ->
+             let name = UntypedAST.name_of_attrs attrs in
+             StatementSrc.make ?name file))
         decls
     in
     print_res decls;

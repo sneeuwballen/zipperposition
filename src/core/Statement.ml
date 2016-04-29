@@ -17,6 +17,11 @@ type 'ty data = {
      [ty1 -> ty2 -> ... -> id args] *)
 }
 
+type attr =
+  | A_AC
+
+type attrs = attr list
+
 type ('f, 't, 'ty) view =
   | TyDecl of ID.t * 'ty (** id: ty *)
   | Data of 'ty data list
@@ -29,6 +34,7 @@ type ('f, 't, 'ty) view =
 
 type ('f, 't, 'ty, 'meta) t = {
   view: ('f, 't, 'ty) view;
+  attrs: attrs;
   src: 'meta; (** additional data *)
 }
 
@@ -43,14 +49,16 @@ let src t = t.src
 let mk_data id ~args ty cstors =
   {data_id=id; data_args=args; data_ty=ty; data_cstors=cstors; }
 
-let ty_decl ~src id ty = {src; view=TyDecl (id,ty); }
-let def ~src id ty t = {src; view=Def (id,ty,t); }
-let rewrite_term ~src id ty args rhs = {src; view=RewriteTerm(id,ty,args,rhs)}
-let rewrite_form ~src lhs rhs = {src; view=RewriteForm(lhs,rhs)}
-let data ~src l = {src; view=Data l; }
-let assert_ ~src c = {src; view=Assert c; }
-let goal ~src c = {src; view=Goal c; }
-let neg_goal ~src l = {src; view=NegatedGoal l; }
+let mk_ ?(attrs=[]) ~src view = {src; view; attrs; }
+
+let ty_decl ?attrs ~src id ty = mk_ ?attrs ~src (TyDecl (id,ty))
+let def ?attrs ~src id ty t = mk_ ?attrs ~src (Def (id,ty,t))
+let rewrite_term ?attrs ~src id ty args rhs = mk_ ?attrs ~src (RewriteTerm(id,ty,args,rhs))
+let rewrite_form ?attrs ~src lhs rhs = mk_ ?attrs ~src (RewriteForm(lhs,rhs))
+let data ?attrs ~src l = mk_ ?attrs ~src (Data l)
+let assert_ ?attrs ~src c = mk_ ?attrs ~src (Assert c)
+let goal ?attrs ~src c = mk_ ?attrs ~src (Goal c)
+let neg_goal ?attrs ~src l = mk_ ?attrs ~src (NegatedGoal l)
 
 let map_data ~ty:fty d =
   { d with
@@ -183,22 +191,35 @@ let signature ?(init=Signature.empty) seq =
 
 let add_src ~file st =
   map_src st
-    ~f:(fun {UntypedAST.name;_} -> StatementSrc.make ?name file)
+    ~f:(fun l ->
+      let name =
+        CCList.find_map
+          (function UntypedAST.A_name n-> Some n | _ -> None)
+          l
+      in
+      StatementSrc.make ?name file)
 
 (** {2 IO} *)
 
 let fpf = Format.fprintf
 
+let pp_attr out = function
+  | A_AC -> fpf out "AC"
+
+let pp_attrs out = function
+  | [] -> ()
+  | l -> fpf out "@ [@[%a@]]" (Util.pp_list ~sep:"," pp_attr) l
+
 let pp ppf ppt ppty out st = match st.view with
   | TyDecl (id,ty) ->
-      fpf out "@[<2>val %a :@ @[%a@]@]." ID.pp id ppty ty
+      fpf out "@[<2>val%a %a :@ @[%a@]@]." pp_attrs st.attrs ID.pp id ppty ty
   | Def (id,ty,t) ->
-      fpf out "@[<2>def %a :@ @[%a@]@ := @[%a@]@]." ID.pp id ppty ty ppt t
+      fpf out "@[<2>def%a %a :@ @[%a@]@ := @[%a@]@]." pp_attrs st.attrs ID.pp id ppty ty ppt t
   | RewriteTerm (id, _, args, rhs) ->
-      fpf out "@[<2>@[%a %a@]@ = @[%a@]@]"
+      fpf out "@[<2>rewrite%a @[%a %a@]@ = @[%a@]@]" pp_attrs st.attrs
         ID.pp id (Util.pp_list ~sep:" " ppt) args ppt rhs
   | RewriteForm (lhs, rhs) ->
-      fpf out "@[<2>@[%a@]@ <=> @[%a@]@]"
+      fpf out "@[<2>rewrite%a @[%a@]@ <=> @[%a@]@]" pp_attrs st.attrs
         (SLiteral.pp ppt) lhs (Util.pp_list ~sep:" && " ppf) rhs
   | Data l ->
       let pp_cstor out (id,ty) =
@@ -207,13 +228,13 @@ let pp ppf ppt ppty out st = match st.view with
         fpf out "@[%a : %a@] :=@ @[<v>%a@]"
           ID.pp d.data_id ppty d.data_ty (Util.pp_list ~sep:"" pp_cstor) d.data_cstors
       in
-      fpf out "@[<v>data %a@]" (Util.pp_list ~sep:" and " pp_data) l
+      fpf out "@[<hv>data%a@ %a@]" pp_attrs st.attrs (Util.pp_list ~sep:" and " pp_data) l
   | Assert f ->
-      fpf out "@[<2>assert@ @[%a@]@]." ppf f
+      fpf out "@[<2>assert%a@ @[%a@]@]." pp_attrs st.attrs ppf f
   | Goal f ->
-      fpf out "@[<2>goal@ @[%a@]@]." ppf f
+      fpf out "@[<2>goal%a@ @[%a@]@]." pp_attrs st.attrs ppf f
   | NegatedGoal l ->
-      fpf out "@[<2>negated_goal@ @[<hv>%a@]@]."
+      fpf out "@[<2>negated_goal%a@ @[<hv>%a@]@]." pp_attrs st.attrs
         (Util.pp_list ~sep:", " (CCFormat.hovbox ppf)) l
 
 let to_string ppf ppt ppty = CCFormat.to_string (pp ppf ppt ppty)

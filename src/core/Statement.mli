@@ -22,6 +22,11 @@ type 'ty data = {
      [ty1 -> ty2 -> ... -> id args] *)
 }
 
+type attr =
+  | A_AC
+
+type attrs = attr list
+
 type ('f, 't, 'ty) view =
   | TyDecl of ID.t * 'ty (** id: ty *)
   | Data of 'ty data list
@@ -34,6 +39,7 @@ type ('f, 't, 'ty) view =
 
 type ('f, 't, 'ty, 'meta) t = {
   view: ('f, 't, 'ty) view;
+  attrs: attrs;
   src: 'meta; (** additional data *)
 }
 
@@ -47,14 +53,14 @@ val src : (_, _, _, 'src) t -> 'src
 
 val mk_data : ID.t -> args:'ty Var.t list -> 'ty -> (ID.t * 'ty) list -> 'ty data
 
-val ty_decl : src:'src -> ID.t -> 'ty -> (_, _, 'ty, 'src) t
-val def : src:'src -> ID.t -> 'ty -> 't -> (_, 't, 'ty, 'src) t
-val rewrite_term : src:'src -> ID.t -> 'ty -> 't list -> 't -> (_, 't, 'ty, 'src) t
-val rewrite_form : src:'src -> 't SLiteral.t -> 'f list -> ('f, 't, _, 'src) t
-val data : src:'src -> 'ty data list -> (_, _, 'ty, 'src) t
-val assert_ : src:'src -> 'f -> ('f, _, _, 'src) t
-val goal : src:'src -> 'f -> ('f, _, _, 'src) t
-val neg_goal : src:'src -> 'f list -> ('f, _, _, 'src) t
+val ty_decl : ?attrs:attrs -> src:'src -> ID.t -> 'ty -> (_, _, 'ty, 'src) t
+val def : ?attrs:attrs -> src:'src -> ID.t -> 'ty -> 't -> (_, 't, 'ty, 'src) t
+val rewrite_term : ?attrs:attrs -> src:'src -> ID.t -> 'ty -> 't list -> 't -> (_, 't, 'ty, 'src) t
+val rewrite_form : ?attrs:attrs -> src:'src -> 't SLiteral.t -> 'f list -> ('f, 't, _, 'src) t
+val data : ?attrs:attrs -> src:'src -> 'ty data list -> (_, _, 'ty, 'src) t
+val assert_ : ?attrs:attrs -> src:'src -> 'f -> ('f, _, _, 'src) t
+val goal : ?attrs:attrs -> src:'src -> 'f -> ('f, _, _, 'src) t
+val neg_goal : ?attrs:attrs -> src:'src -> 'f list -> ('f, _, _, 'src) t
 
 val signature : ?init:Signature.t -> (_, _, Type.t, _) t Sequence.t -> Signature.t
 (** Compute signature when the types are using {!Type} *)

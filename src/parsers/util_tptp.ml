@@ -190,7 +190,7 @@ let is_conjecture_ = function
 let to_ast st =
   let conv_form name role f =
     let name = A.string_of_name name in
-    let attrs = {UA.name=Some name; } in
+    let attrs = [UA.A_name name] in
     if is_conjecture_ role
     then UA.goal ~attrs f
     else UA.assert_ ~attrs f
@@ -215,7 +215,7 @@ let name_sym_ sy =
   A.NameString str
 
 let of_ast st =
-  let name = match st.UA.attrs.UA.name with
+  let name = match UA.name st with
     | None -> A.NameString "no_name"
     | Some s -> A.NameString s
   in

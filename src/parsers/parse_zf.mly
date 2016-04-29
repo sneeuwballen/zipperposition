@@ -20,6 +20,7 @@
 %token RIGHT_BRACKET
 
 %token WILDCARD
+%token COMMA
 %token DOT
 %token COLON
 %token EQDEF
@@ -50,6 +51,9 @@
 %token ARROW
 %token PI
 %token VERTICAL_BAR
+
+%token AC
+%token NAME
 
 %token <string> LOWER_WORD
 %token <string> UPPER_WORD
@@ -196,21 +200,25 @@ type_def:
 mutual_types:
   | l=separated_nonempty_list(AND, type_def) { l }
 
+attr:
+  | AC { A.A_AC }
+  | NAME COLON n=raw_var { A.A_name n }
+
 attrs:
-  | LEFT_BRACKET name=raw_var RIGHT_BRACKET
-    { {A.name=Some name; } }
-  | { A.default_attrs }
+  | LEFT_BRACKET l=separated_nonempty_list(COMMA, attr) RIGHT_BRACKET
+    { l }
+  | { [] }
 
 statement:
-  | VAL v=raw_var COLON t=term DOT
+  | VAL a=attrs v=raw_var COLON t=term DOT
     {
       let loc = L.mk_pos $startpos $endpos in
-      A.decl ~loc v t
+      A.decl ~attrs:a ~loc v t
     }
-  | DEF v=raw_var COLON t=term EQDEF u=term DOT
+  | DEF a=attrs v=raw_var COLON t=term EQDEF u=term DOT
     {
       let loc = L.mk_pos $startpos $endpos in
-      A.def ~loc v t u
+      A.def ~attrs:a ~loc v t u
     }
   | REWRITE a=attrs t=term DOT
     {
@@ -227,10 +235,10 @@ statement:
       let loc = L.mk_pos $startpos $endpos in
       A.goal ~attrs:a ~loc t
     }
-  | DATA l=mutual_types DOT
+  | DATA a=attrs l=mutual_types DOT
     {
       let loc = L.mk_pos $startpos $endpos in
-      A.data ~loc l
+      A.data ~attrs:a ~loc l
     }
   | error
     {

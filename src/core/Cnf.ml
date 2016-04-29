@@ -634,6 +634,7 @@ let type_declarations seq =
   |> ID.Map.of_seq
 
 let convert ~file seq =
+  let module A = UntypedAST in
   (* used for conversion *)
   let t_ctx = FOTerm.Conv.create() in
   let ty_ctx = Type.Conv.create() in
@@ -642,42 +643,50 @@ let convert ~file seq =
   let conv_statement st =
     Util.debugf ~section 5
       "@[<2>@{<yellow>convert@}@ `@[%a@]`@]" (fun k->k pp_c_statement st);
-    let name = st.Statement.src.UntypedAST.name in
+    let name =
+      CCList.find_map
+        (function A.A_name n -> Some n | _ -> None)
+        st.Stmt.src
+    and attrs =
+      CCList.filter_map
+        (function A.A_AC -> Some Stmt.A_AC | A.A_name _ -> None)
+        st.Stmt.src
+    in
     let src = StatementSrc.make ?name file in
-    let res = match Statement.view st with
-      | Statement.Goal c ->
+    let res = match Stmt.view st with
+      | Stmt.Goal c ->
           let c = clause_to_fo ~ctx:t_ctx c in
-          Statement.goal ~src c
-      | Statement.NegatedGoal l ->
+          Stmt.goal ~attrs ~src c
+      | Stmt.NegatedGoal l ->
           let l = List.map (clause_to_fo ~ctx:t_ctx) l in
-          Statement.neg_goal ~src l
-      | Statement.Assert c ->
+          Stmt.neg_goal ~attrs ~src l
+      | Stmt.Assert c ->
           let c = clause_to_fo ~ctx:t_ctx c in
-          Statement.assert_ ~src c
-      | Statement.Data l ->
+          Stmt.assert_ ~attrs ~src c
+      | Stmt.Data l ->
           let l =
             List.map
-              (Statement.map_data ~ty:(Type.Conv.of_simple_term_exn ty_ctx))
+              (Stmt.map_data ~ty:(Type.Conv.of_simple_term_exn ty_ctx))
               l
           in
-          Statement.data ~src l
-      | Statement.Def (id, ty, t) ->
+          Stmt.data ~attrs ~src l
+      | Stmt.Def (id, ty, t) ->
           let ty = Type.Conv.of_simple_term_exn ty_ctx ty in
           let t = conv_t t in
-          Statement.def ~src id ty t
-      | Statement.RewriteTerm (id, ty, args, rhs) ->
-        Statement.rewrite_term ~src id (conv_ty ty) (List.map conv_t args) (conv_t rhs)
-      | Statement.RewriteForm (lhs,rhs) ->
-        Statement.rewrite_form ~src
+          Stmt.def ~attrs ~src id ty t
+      | Stmt.RewriteTerm (id, ty, args, rhs) ->
+        Stmt.rewrite_term ~attrs ~src id (conv_ty ty) (List.map conv_t args) (conv_t rhs)
+      | Stmt.RewriteForm (lhs,rhs) ->
+        Stmt.rewrite_form ~attrs ~src
           (SLiteral.map ~f:conv_t lhs)
           (List.map (clause_to_fo ~ctx:t_ctx) rhs)
-      | Statement.TyDecl (id, ty) ->
+      | Stmt.TyDecl (id, ty) ->
           let ty = conv_ty ty in
-          Statement.ty_decl ~src id ty
+          Stmt.ty_decl ~attrs ~src id ty
     in
     Util.debugf ~section 3
       "@[@[<2>convert@ `@[%a@]`@]@ @[<2>into `@[%a@]`@]@]"
-      (fun k->k pp_c_statement st Statement.pp_clause res);
+      (fun k->k pp_c_statement st Stmt.pp_clause res);
     res
   in
   Sequence.map conv_statement seq

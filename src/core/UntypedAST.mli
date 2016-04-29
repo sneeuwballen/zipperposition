@@ -19,10 +19,12 @@ type data = {
   data_cstors: (string * ty list) list;
 }
 
-(** Attributes for assertions *)
-type attrs = {
-  name: string option;
-}
+(** Attributes *)
+type attr =
+  | A_name of string
+  | A_AC
+
+type attrs = attr list
 
 (** Statement *)
 type statement_view =
@@ -41,12 +43,18 @@ type statement = {
 
 val default_attrs : attrs
 
-val decl : ?loc:Loc.t -> string -> ty -> statement
-val def : ?loc:Loc.t -> string -> ty -> term -> statement
-val data : ?loc:Loc.t -> data list -> statement
+val decl : ?loc:Loc.t -> ?attrs:attrs -> string -> ty -> statement
+val def : ?loc:Loc.t -> ?attrs:attrs -> string -> ty -> term -> statement
+val data : ?loc:Loc.t -> ?attrs:attrs -> data list -> statement
 val rewrite : ?loc:Loc.t -> ?attrs:attrs -> term -> statement
 val assert_ : ?loc:Loc.t -> ?attrs:attrs -> term -> statement
 val goal : ?loc:Loc.t -> ?attrs:attrs -> term -> statement
+
+val name_of_attrs : attrs -> string option
+val name : statement -> string option
+
+val pp_attr : attr CCFormat.printer
+val pp_attrs : attrs CCFormat.printer
 
 val pp_statement : statement CCFormat.printer
 

@@ -43,6 +43,7 @@ rule token = parse
   | '[' { LEFT_BRACKET }
   | ']' { RIGHT_BRACKET }
   | '.' { DOT }
+  | ',' { COMMA }
   | '_' { WILDCARD }
   | ':' { COLON }
   | "=" { LOGIC_EQ }
@@ -69,6 +70,8 @@ rule token = parse
   | "exists" { LOGIC_EXISTS }
   | "=>" { LOGIC_IMPLY }
   | "<=>" { LOGIC_EQUIV }
+  | "AC" { AC }
+  | "name" { NAME }
   | lower_word { LOWER_WORD(Lexing.lexeme lexbuf) }
   | upper_word { UPPER_WORD(Lexing.lexeme lexbuf) }
   | _ as c
