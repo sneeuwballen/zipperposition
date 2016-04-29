@@ -465,7 +465,7 @@ module Arith = struct
     match Classic.view t with
       | Classic.Var v when Type.equal (ty t) Type.TPTP.int ->
         Format.fprintf out "I%d" (HVar.id v); true
-      | Classic.Var v ->
+      | Classic.Var v when Type.equal (ty t) Type.TPTP.rat ->
         Format.fprintf out "Q%d" (HVar.id v); true
       | Classic.AppBuiltin (Builtin.Less, [_; a; b]) ->
         Format.fprintf out "%a < %a" pp_surrounded a pp_surrounded b; true
