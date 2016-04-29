@@ -207,6 +207,9 @@ module AC(A : AC_SPEC) : sig
 
   val symbols : t Sequence.t -> ID.Set.t
   (** Set of ID.ts occurring in the terms, that are AC *)
+
+  val seq_symbols : t -> ID.t Sequence.t
+  (** Sequence of AC symbols in this term *)
 end
 
 (** {2 Printing/parsing} *)

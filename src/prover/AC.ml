@@ -12,10 +12,13 @@ open AC_intf
 
 let section = Util.Section.(make ~parent:zip) "AC"
 
-let prof_simplify = Util.mk_profiler "ac.simplify"
+let prof_simplify = Util.mk_profiler "AC.simplify"
 
-let stat_ac_simplify = Util.mk_stat "ac.simplify"
-let stat_ac_redundant = Util.mk_stat "ac.redundant"
+let stat_ac_simplify = Util.mk_stat "AC.simplify"
+let stat_ac_redundant = Util.mk_stat "AC.redundant"
+
+(* flag for clauses that are not AC redundant because they are axioms *)
+let flag_axiom = SClause.new_flag ()
 
 type spec = AC_intf.spec
 
@@ -58,6 +61,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let add_clause l r =
       let proof = ProofStep.mk_trivial in
       let c = C.create ~trail:Trail.empty [ Lit.mk_eq l r ] proof in
+      C.set_flag flag_axiom c true;
       C.set_flag SClause.flag_persistent c true;
       res := c :: !res
     in
@@ -107,18 +111,29 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   (** {2 Rules} *)
 
+  (* does [l ?= r] have at least one AC symbol in it? *)
+  let has_ac_ids_ l r =
+    let seq =
+      Sequence.doubleton l r
+      |> Sequence.flat_map A.seq_symbols
+    in
+    not (Sequence.is_empty seq)
+
   let is_trivial_lit lit =
     exists_ac ()
     &&
     (
-      match Lit.View.as_eqn lit with
-      | Some (l, r, true) -> A.equal l r
-      | Some _ -> false
-      | None -> false
+      match lit with
+      | Lit.Equation (l, r, true) -> has_ac_ids_ l r && A.equal l r
+      | _ -> false
     )
 
   let is_trivial c =
-    let res = CCArray.exists is_trivial_lit (C.lits c) in
+    let res =
+      not (C.get_flag flag_axiom c)
+      &&
+      CCArray.exists is_trivial_lit (C.lits c)
+    in
     if res then (
       Util.incr_stat stat_ac_redundant;
       Util.debugf ~section 3 "@[<2>clause `@[%a@]`@ is AC-trivial@]"(fun k->k C.pp c);
@@ -135,7 +150,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let lits =
         List.filter
           (fun lit -> match lit with
-             | Literal.Equation (l, r, false) -> not (A.equal l r)
+             | Literal.Equation (l, r, false) ->
+               not (has_ac_ids_ l r && A.equal l r)
              | _ -> true)
           lits
       in

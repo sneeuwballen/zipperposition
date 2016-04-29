@@ -7,7 +7,7 @@ module PB = Position.Build
 module T = InnerTerm
 
 let prof_app = Util.mk_profiler "term.app"
-let prof_ac_normal_form = Util.mk_profiler "term.ac_normal_form"
+let prof_ac_normal_form = Util.mk_profiler "term.AC_normal_form"
 
 (** {2 Term} *)
 
@@ -328,9 +328,6 @@ module type AC_SPEC = sig
 end
 
 module AC(A : AC_SPEC) = struct
-  (* FIXME: do not flatten type arguments, by looking at the
-     type of [f] and ruling out as many arguments as the type has parameters *)
-
   let flatten f l =
     let rec flatten acc l = match l with
       | [] -> acc
@@ -349,7 +346,8 @@ module AC(A : AC_SPEC) = struct
   let normal_form t =
     Util.enter_prof prof_ac_normal_form;
     let rec normalize t = match T.view t with
-      | T.Var _ -> t
+      | T.Const _
+      | T.Var _
       | T.DB _ -> t
       | T.App (f, l) when A.is_ac (head_exn f) ->
           let l = flatten (head_exn f) l in
@@ -369,16 +367,20 @@ module AC(A : AC_SPEC) = struct
           let tyargs, l = split_args_ ~ty:(ty f) l in
           begin match l with
           | [a;b] ->
-              let a = normalize a in
-              let b = normalize b in
-              if compare a b > 0
-              then T.app ~ty:(ty t :>T.t) f (tyargs @ [b; a])
-              else t
+              let a' = normalize a in
+              let b' = normalize b in
+              if compare a' b' > 0
+              then T.app ~ty:(ty t :>T.t) f (tyargs @ [b'; a'])
+              else if T.equal a a' && T.equal b b' then t
+              else T.app ~ty:(ty t :>T.t) f (tyargs @ [a'; b'])
           | _ -> t  (* partially applied *)
           end
       | T.App (f, l) ->
           let l = List.map normalize l in
           T.app ~ty:(T.ty_exn t) f l
+      | T.AppBuiltin (b,l) ->
+          let l = List.map normalize l in
+          T.app_builtin ~ty:(T.ty_exn t) b l
       | _ -> assert false
     in
     let t' = normalize t in
@@ -390,9 +392,13 @@ module AC(A : AC_SPEC) = struct
     and t2' = normal_form t2 in
     equal t1' t2'
 
-  let symbols seq =
-    Sequence.flat_map Seq.symbols seq
+  let seq_symbols t =
+    Seq.symbols t
     |> Sequence.filter A.is_ac
+
+  let symbols seq =
+    seq
+    |> Sequence.flat_map seq_symbols
     |> ID.Set.add_seq ID.Set.empty
 end
 
