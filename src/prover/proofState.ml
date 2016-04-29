@@ -30,7 +30,8 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
   (* module TermIndex = Fingerprint.Make(C.WithPos) *)
   module TermIndex = NPDtree.MakeTerm(C.WithPos)
 
-  module UnitIndex = NPDtree.Make(struct
+  (* module UnitIndex = NPDtree.Make(struct *)
+  module UnitIndex = Dtree.Make(struct
       type t = T.t * T.t * bool * C.t
       type rhs = T.t
       let compare (t11,t12,s1,c1) (t21,t22,s2,c2) =
