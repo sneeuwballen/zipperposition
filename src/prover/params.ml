@@ -36,7 +36,6 @@ and seed = ref 1928575
 and steps = ref 0
 and version = ref false
 and timeout = ref 0.
-and proof = ref Options.Print_normal
 and presaturate = ref false
 and dot_file = ref None
 and dot_sat = ref false
@@ -45,9 +44,6 @@ and expand_def = ref false
 and select = ref "SelectComplex"
 and unary_depth = ref 1
 and files = CCVector.create ()
-
-let set_proof s =
-  proof := Options.print_format_of_string s
 
 (** parse_args returns parameters *)
 let parse_args () =
@@ -66,7 +62,6 @@ let parse_args () =
     ; "-t", Arg.Set_float timeout, " short for --timeout"
     ; "--select", Arg.Set_string select, help_select
     ; "--expand-def", Arg.Set expand_def, " expand definitions"
-    ; "--proof", Arg.String set_proof, " choose proof printing (none, debug, or tstp)"
     ; "--presaturate", Arg.Set presaturate,
         " pre-saturate (interreduction of) the initial clause set"
     ; "--dot", Arg.String (fun s -> dot_file := Some s) , " print final state to file in DOT"
