@@ -98,11 +98,7 @@ let to_list t =
   in
   match iterate t with
   | None -> assert false
-  | Some i ->
-    let l = getnext [] i in
-    Util.debugf 5 "dtree.to_list %a = [%a]"
-      (fun k->k T.pp t (Util.pp_list pp_char) l);
-    l
+  | Some i -> getnext [] i
 
 module CharMap = CCMap.Make(struct
   type t = character
@@ -232,7 +228,7 @@ module Make(E : Index.EQUATION) = struct
                   end
                 | Some t' ->
                   (* already bound, check consistency *)
-                  if Unif.FO.equal ~subst t t'
+                  if Unif.FO.equal ~subst (Scoped.set t t_pos) t'
                   then traverse subtrie (skip i) subst
               end
             | _ when eq_char c2 c1 ->
