@@ -234,6 +234,39 @@ val default_hooks : unit -> print_hook list
 val debugf : Format.formatter -> t -> unit
 (** debugf printing, with sorts *)
 
+(** {2 Arith} *)
+
+module Arith : sig
+  val floor : t
+  val ceiling : t
+  val truncate : t
+  val round : t
+
+  val prec : t
+  val succ : t
+
+  val sum : t
+  val difference : t
+  val uminus : t
+  val product : t
+  val quotient : t
+
+  val quotient_e : t
+  val quotient_t : t
+  val quotient_f : t
+  val remainder_e : t
+  val remainder_t : t
+  val remainder_f : t
+
+  val less : t
+  val lesseq : t
+  val greater : t
+  val greatereq : t
+
+  val pp_hook : print_hook
+  (** hook to print arithmetic expressions *)
+end
+
 (** {2 TPTP} *)
 
 module TPTP : sig
@@ -241,40 +274,6 @@ module TPTP : sig
   include Interfaces.PRINT_DE_BRUIJN with type t := t
                                       and type term := t
                                       and type print_hook := print_hook
-
-  module Arith : sig
-    val floor : t
-    val ceiling : t
-    val truncate : t
-    val round : t
-
-    val prec : t
-    val succ : t
-
-    val sum : t
-    val difference : t
-    val uminus : t
-    val product : t
-    val quotient : t
-
-    val quotient_e : t
-    val quotient_t : t
-    val quotient_f : t
-    val remainder_e : t
-    val remainder_t : t
-    val remainder_f : t
-
-    val less : t
-    val lesseq : t
-    val greater : t
-    val greatereq : t
-
-    val arith_hook : print_hook
-    (** hook to print arithmetic expressions *)
-
-    val pp_debugf : t CCFormat.printer
-    (** use arith_hook with pp_debugf *)
-  end
 end
 
 module Conv : sig

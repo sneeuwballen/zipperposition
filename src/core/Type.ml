@@ -313,6 +313,8 @@ let to_string = CCFormat.to_string pp
 let pp_typed_var out v = match view (HVar.ty v) with
   | Builtin TType -> Format.fprintf out "A%d" (HVar.id v)
   | Builtin Term -> HVar.pp out v
+  | Builtin Int -> Format.fprintf out "I%d" (HVar.id v)
+  | Builtin Rat -> Format.fprintf out "Q%d" (HVar.id v)
   | _ -> Format.fprintf out "(@[%a:%a@])" HVar.pp v pp (HVar.ty v)
 
 (** {2 Conversions} *)

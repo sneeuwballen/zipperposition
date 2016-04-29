@@ -2044,12 +2044,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     Ctx.Lit.add_from_hook Lit.Conv.arith_hook_from;
     (* completeness? I don't think so *)
     Ctx.lost_completeness ();
-    (* enable AC-property of sum
-       FIXME
+    (* enable AC-property of sum *)
+    (* FIXME: currently AC doesn't handle builtins
     if !_enable_ac then begin
-      let sum = ID.TPTP.Arith.sum in
+      let sum = ID.Arith.sum in
       let ty = Signature.find_exn Signature.TPTP.Arith.full sum in
-      Ctx.Theories.AC.add ~ty sum;
+      let module A = Env.flex_get AC.key_ac in
+      A.add sum ty;
     end;
     *)
     setup_dot_printers ();
@@ -2071,7 +2072,7 @@ let _enable_arith () =
   if not !enable_arith_ then (
     enable_arith_ := true;
     (* enable arith printing of terms *)
-    T.add_hook T.TPTP.Arith.arith_hook;
+    T.add_hook T.Arith.pp_hook;
     Extensions.register extension;
   )
 

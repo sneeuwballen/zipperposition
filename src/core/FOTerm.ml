@@ -419,7 +419,81 @@ let pp out t = pp_depth ~hooks:!__hooks 0 out t
 
 let to_string = CCFormat.to_string pp
 
-let debugf = T.debugf
+(** {2 Arith} *)
+
+module Arith = struct
+  let ty1 = Type.(forall ([int] ==> bvar 0))
+
+  let floor = builtin ~ty:ty1 Builtin.Arith.floor
+  let ceiling = builtin ~ty:ty1 Builtin.Arith.ceiling
+  let truncate = builtin ~ty:ty1 Builtin.Arith.truncate
+  let round = builtin ~ty:ty1 Builtin.Arith.round
+
+  let prec = builtin ~ty:Type.([int] ==> int) Builtin.Arith.prec
+  let succ = builtin ~ty:Type.([int] ==> int) Builtin.Arith.succ
+
+  let ty2 = Type.(forall ([bvar 0; bvar 0] ==> bvar 0))
+  let ty2i = Type.([int;int] ==> int)
+
+  let sum = builtin ~ty:ty2 Builtin.Arith.sum
+  let difference = builtin ~ty:ty2 Builtin.Arith.difference
+  let uminus = builtin ~ty:ty2 Builtin.Arith.uminus
+  let product = builtin ~ty:ty2 Builtin.Arith.product
+  let quotient = builtin ~ty:ty2 Builtin.Arith.quotient
+
+  let quotient_e = builtin ~ty:ty2i Builtin.Arith.quotient_e
+  let quotient_t = builtin ~ty:ty2i Builtin.Arith.quotient_t
+  let quotient_f = builtin ~ty:ty2i Builtin.Arith.quotient_f
+  let remainder_e = builtin ~ty:ty2i Builtin.Arith.remainder_e
+  let remainder_t = builtin ~ty:ty2i Builtin.Arith.remainder_t
+  let remainder_f = builtin ~ty:ty2i Builtin.Arith.remainder_f
+
+  let ty2o = Type.(forall ([bvar 0; bvar 0] ==> prop))
+
+  let less = builtin ~ty:ty2o Builtin.Arith.less
+  let lesseq = builtin ~ty:ty2o Builtin.Arith.lesseq
+  let greater = builtin ~ty:ty2o Builtin.Arith.greater
+  let greatereq = builtin ~ty:ty2o Builtin.Arith.greatereq
+
+  (* hook that prints arithmetic expressions *)
+  let pp_hook _depth pp_rec out t =
+    let pp_surrounded buf t = match view t with
+      | AppBuiltin (s, [_;_]) when Builtin.is_infix s ->
+        Format.fprintf buf "(@[<hv>%a@])" pp_rec t
+      | _ -> pp_rec buf t
+    in
+    match Classic.view t with
+      | Classic.Var v when Type.equal (ty t) Type.TPTP.int ->
+        Format.fprintf out "I%d" (HVar.id v); true
+      | Classic.Var v ->
+        Format.fprintf out "Q%d" (HVar.id v); true
+      | Classic.AppBuiltin (Builtin.Less, [_; a; b]) ->
+        Format.fprintf out "%a < %a" pp_surrounded a pp_surrounded b; true
+      | Classic.AppBuiltin (Builtin.Lesseq, [_;a; b]) ->
+        Format.fprintf out "%a ≤ %a" pp_surrounded a pp_surrounded b; true
+      | Classic.AppBuiltin (Builtin.Greater, [_;a; b]) ->
+        Format.fprintf out "%a > %a" pp_surrounded a pp_surrounded b; true
+      | Classic.AppBuiltin (Builtin.Greatereq, [_;a; b]) ->
+        Format.fprintf out "%a ≥ %a" pp_surrounded a pp_surrounded b; true
+      | Classic.AppBuiltin (Builtin.Sum, [_;a; b]) ->
+        Format.fprintf out "%a + %a" pp_surrounded a pp_surrounded b; true
+      | Classic.AppBuiltin (Builtin.Difference, [_;a; b]) ->
+        Format.fprintf out "%a - %a" pp_surrounded a pp_surrounded b; true
+      | Classic.AppBuiltin (Builtin.Product, [_;a; b]) ->
+        Format.fprintf out "%a × %a" pp_surrounded a pp_surrounded b; true
+      | Classic.AppBuiltin (Builtin.Quotient, [_;a; b]) ->
+        Format.fprintf out "%a / %a" pp_surrounded a pp_surrounded b; true
+      | Classic.AppBuiltin (Builtin.Quotient_e, [_;a; b]) ->
+        Format.fprintf out "%a // %a" pp_surrounded a pp_surrounded b; true
+      | Classic.AppBuiltin (Builtin.Uminus, [_;a]) ->
+        Format.fprintf out "-%a" pp_surrounded a; true;
+      | Classic.AppBuiltin (Builtin.Remainder_e, [_;a;b]) ->
+        Format.fprintf out "%a mod %a" pp_surrounded a pp_surrounded b; true;
+      | _ -> false  (* default *)
+end
+
+let debugf out t =
+  pp_depth ~hooks:(Arith.pp_hook :: !__hooks) 0 out t
 
 (** {2 TPTP} *)
 
@@ -450,84 +524,6 @@ module TPTP = struct
 
   let pp buf t = pp_depth 0 buf t
   let to_string = CCFormat.to_string pp
-
-  module Arith = struct
-    let term_pp_depth = pp_depth
-
-    open Type.TPTP
-
-    let ty1 = Type.(forall ([int] ==> bvar 0))
-
-    let floor = builtin ~ty:ty1 Builtin.Arith.floor
-    let ceiling = builtin ~ty:ty1 Builtin.Arith.ceiling
-    let truncate = builtin ~ty:ty1 Builtin.Arith.truncate
-    let round = builtin ~ty:ty1 Builtin.Arith.round
-
-    let prec = builtin ~ty:Type.([int] ==> int) Builtin.Arith.prec
-    let succ = builtin ~ty:Type.([int] ==> int) Builtin.Arith.succ
-
-    let ty2 = Type.(forall ([bvar 0; bvar 0] ==> bvar 0))
-    let ty2i = Type.([int;int] ==> int)
-
-    let sum = builtin ~ty:ty2 Builtin.Arith.sum
-    let difference = builtin ~ty:ty2 Builtin.Arith.difference
-    let uminus = builtin ~ty:ty2 Builtin.Arith.uminus
-    let product = builtin ~ty:ty2 Builtin.Arith.product
-    let quotient = builtin ~ty:ty2 Builtin.Arith.quotient
-
-    let quotient_e = builtin ~ty:ty2i Builtin.Arith.quotient_e
-    let quotient_t = builtin ~ty:ty2i Builtin.Arith.quotient_t
-    let quotient_f = builtin ~ty:ty2i Builtin.Arith.quotient_f
-    let remainder_e = builtin ~ty:ty2i Builtin.Arith.remainder_e
-    let remainder_t = builtin ~ty:ty2i Builtin.Arith.remainder_t
-    let remainder_f = builtin ~ty:ty2i Builtin.Arith.remainder_f
-
-    let ty2o = Type.(forall ([bvar 0; bvar 0] ==> o))
-
-    let less = builtin ~ty:ty2o Builtin.Arith.less
-    let lesseq = builtin ~ty:ty2o Builtin.Arith.lesseq
-    let greater = builtin ~ty:ty2o Builtin.Arith.greater
-    let greatereq = builtin ~ty:ty2o Builtin.Arith.greatereq
-
-    (* hook that prints arithmetic expressions *)
-    let arith_hook _depth pp_rec out t =
-      let pp_surrounded buf t = match view t with
-        | AppBuiltin (s, [_;_]) when Builtin.is_infix s ->
-            Format.fprintf buf "(@[<hv>%a@])" pp_rec t
-        | _ -> pp_rec buf t
-      in
-      match Classic.view t with
-      | Classic.Var v when Type.equal (ty t) Type.TPTP.int ->
-          Format.fprintf out "I%d" (HVar.id v); true
-      | Classic.Var v ->
-          Format.fprintf out "Q%d" (HVar.id v); true
-      | Classic.AppBuiltin (Builtin.Less, [_; a; b]) ->
-          Format.fprintf out "%a < %a" pp_surrounded a pp_surrounded b; true
-      | Classic.AppBuiltin (Builtin.Lesseq, [_;a; b]) ->
-          Format.fprintf out "%a ≤ %a" pp_surrounded a pp_surrounded b; true
-      | Classic.AppBuiltin (Builtin.Greater, [_;a; b]) ->
-          Format.fprintf out "%a > %a" pp_surrounded a pp_surrounded b; true
-      | Classic.AppBuiltin (Builtin.Greatereq, [_;a; b]) ->
-          Format.fprintf out "%a ≥ %a" pp_surrounded a pp_surrounded b; true
-      | Classic.AppBuiltin (Builtin.Sum, [_;a; b]) ->
-          Format.fprintf out "%a + %a" pp_surrounded a pp_surrounded b; true
-      | Classic.AppBuiltin (Builtin.Difference, [_;a; b]) ->
-          Format.fprintf out "%a - %a" pp_surrounded a pp_surrounded b; true
-      | Classic.AppBuiltin (Builtin.Product, [_;a; b]) ->
-          Format.fprintf out "%a × %a" pp_surrounded a pp_surrounded b; true
-      | Classic.AppBuiltin (Builtin.Quotient, [_;a; b]) ->
-          Format.fprintf out "%a / %a" pp_surrounded a pp_surrounded b; true
-      | Classic.AppBuiltin (Builtin.Quotient_e, [_;a; b]) ->
-          Format.fprintf out "%a // %a" pp_surrounded a pp_surrounded b; true
-      | Classic.AppBuiltin (Builtin.Uminus, [_;a]) ->
-          Format.fprintf out "-%a" pp_surrounded a; true;
-      | Classic.AppBuiltin (Builtin.Remainder_e, [_;a;b]) ->
-          Format.fprintf out "%a mod %a" pp_surrounded a pp_surrounded b; true;
-      | _ -> false  (* default *)
-
-    let pp_debugf buf t =
-      term_pp_depth ~hooks:(arith_hook:: !__hooks) 0 buf t
-  end
 end
 
 (** {2 Conversions} *)
