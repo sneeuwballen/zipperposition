@@ -279,8 +279,8 @@ module Make(E : Index.EQUATION) = struct
       ~attrs_v:(function
         | TrieLeaf l ->
             let len = List.length l in
-            [`Shape "circle"; `Label (string_of_int len)]
-        | TrieNode _ -> [`Shape "circle"])
+            [`Shape "box"; `Label (string_of_int len)]
+        | TrieNode _ -> [`Shape "circle"; `Label ""])
       ~attrs_e:(fun (_, e ,_) ->
         let e = CCFormat.to_string pp_char e in
         [`Label e])

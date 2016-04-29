@@ -204,7 +204,8 @@ module Make(E : Index.EQUATION) = struct
       ~tbl:(CCGraph.mk_table ~eq:(==) ~hash:Hashtbl.hash 128)
       ~attrs_v:(fun t ->
         let len = Leaf.size t.leaf in
-        [`Shape "circle"; `Label (string_of_int len)])
+        let shape = if len>0 then "box" else "circle" in
+        [`Shape shape; `Label (string_of_int len)])
       ~attrs_e:(fun (_, e, _) -> [`Label e])
       ~name:"NPDtree" ~graph:_as_graph
     in
@@ -462,7 +463,8 @@ module MakeTerm(X : Set.OrderedType) = struct
       ~tbl:(CCGraph.mk_table ~eq:(==) ~hash:Hashtbl.hash 128)
       ~attrs_v:(fun t ->
         let len = Leaf.size t.leaf in
-        [`Shape "circle"; `Label (string_of_int len)])
+        let shape = if len>0 then "box" else "circle" in
+        [`Shape shape; `Label (string_of_int len)])
       ~attrs_e:(fun (_, e,_) -> [`Label e])
       ~name:"NPDtree" ~graph:_as_graph
     in
