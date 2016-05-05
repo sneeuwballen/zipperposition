@@ -229,9 +229,14 @@ module Make(E : Index.EQUATION) = struct
               (* deal with the variable branche in the trie *)
               begin match S.FO.get_var subst (Scoped.set dt (v2:>ST.t HVar.t)) with
                 | None ->
-                  (* not bound, try to bind and continue *)
+                  (* not bound: try to match types + bind, then continue *)
                   begin
                     try
+                      let subst =
+                        Unif.Ty.matching ~subst
+                          ~pattern:(Scoped.set dt (HVar.ty v2))
+                          (Scoped.set t (T.ty t_pos))
+                      in
                       let subst =
                         Unif.FO.bind subst
                           (Scoped.set dt v2) (Scoped.set t t_pos) in
