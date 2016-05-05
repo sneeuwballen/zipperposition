@@ -48,8 +48,6 @@ module Constr : sig
       {b CAUTION}, this order must respect some properties (see {!'a t}) *)
 end
 
-exception Error of string
-
 type t
 (** Total Ordering on a finite number of symbols, plus a few more
     data (weight for KBO, status for RPC) *)

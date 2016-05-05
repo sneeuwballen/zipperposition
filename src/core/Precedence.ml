@@ -79,16 +79,6 @@ end
 
 (* TODO: think about how to compare some builtins (true, false, numbers...) *)
 
-exception Error of string
-
-let () = Printexc.register_printer
-  (function
-    | Error msg -> Some (CCFormat.sprintf "@[<2>error in precedence:@ %s@]" msg)
-    | _ -> None)
-
-let error_ msg = raise (Error msg)
-let errorf_ msg = CCFormat.ksprintf msg ~f:error_
-
 type t = {
   mutable snapshot : ID.t list;
     (* symbols by increasing order *)
