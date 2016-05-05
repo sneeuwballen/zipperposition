@@ -341,7 +341,7 @@ module TPTP = struct
     | "$prec" -> Prec
     | "$succ" -> Succ
     | "$sum" -> Sum
-    | "$diff" -> Difference
+    | "$difference" -> Difference
     | "$uminus" -> Uminus
     | "$product" -> Product
     | "$quotient" -> Quotient
