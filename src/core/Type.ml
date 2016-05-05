@@ -40,6 +40,7 @@ let view t = match T.view t with
       | T.Const id -> App (id, l)
       | _ -> assert false
       end
+  | T.AppBuiltin (Builtin.Arrow, [_]) -> assert false
   | T.AppBuiltin (Builtin.Arrow, (ret :: l)) -> Fun (l, ret)
   | T.AppBuiltin (Builtin.Prop, []) -> Builtin Prop
   | T.AppBuiltin (Builtin.TType, []) -> Builtin TType
@@ -77,10 +78,6 @@ let var v = T.var v
 
 let var_of_int i = T.var (HVar.make ~ty:tType i)
 
-let app s l = T.app ~ty:T.tType (T.const ~ty:T.tType s) l
-
-let const s = T.const ~ty:T.tType s
-
 let arrow_ l r = T.app_builtin ~ty:T.tType Builtin.arrow (r :: l)
 
 let arrow l r = match view r with
@@ -88,6 +85,12 @@ let arrow l r = match view r with
       assert (not (is_fun ret));
       arrow_ (l @ l') ret
   | _ -> arrow_ l r
+
+let app s l =
+  let ty_s = arrow (List.map (fun _ -> T.tType) l) T.tType in
+  T.app ~ty:T.tType (T.const ~ty:ty_s s) l
+
+let const s = T.const ~ty:T.tType s
 
 let bvar i =
   T.bvar ~ty:T.tType i
@@ -189,7 +192,7 @@ exception ApplyError of string
 
 let () = Printexc.register_printer
   (function
-    | ApplyError msg -> Some (CCFormat.sprintf "@[<2>Type.ApplyError:@ %s@]" msg)
+    | ApplyError msg -> Some (Util.err_spf "@[<2>Type.ApplyError:@ %s@]" msg)
     | _ -> None)
 
 let err_apply_ msg = raise (ApplyError msg)
@@ -287,8 +290,8 @@ let rec pp_rec depth out t = match view t with
   | DB i -> Format.fprintf out "T%i" (depth-i-1)
   | App (p, []) -> ID.pp out p
   | App (p, args) ->
-      Format.fprintf out "@[<2>%a %a@]"
-        ID.pp p (Util.pp_list ~sep:" " (pp_rec depth)) args
+      Format.fprintf out "@[<2>%a %a@]/%d"
+        ID.pp p (Util.pp_list ~sep:" " (pp_rec depth)) args (T.id t)
   | Fun (args, ret) ->
       Format.fprintf out "@[%a →@ %a@]" (pp_l depth) args (pp_rec depth) ret
   | Forall ty' ->
