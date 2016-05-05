@@ -1,0 +1,35 @@
+
+# Exercize datatypes
+
+data nat :=
+  | Z
+  | S nat.
+
+data list a :=
+  | Nil
+  | Cons a (list a).
+
+data pair a b := Pair a b.
+
+def three : nat := S (S (S Z)).
+
+val plus : nat -> nat -> nat.
+rewrite forall x. plus Z x = x.
+rewrite forall x y. plus (S x) y = S (plus x y).
+
+val add_pair : pair nat nat -> pair nat nat -> pair nat nat.
+rewrite forall x1 y1 x2 y2.
+  add_pair (Pair _ _ x1 y1) (Pair _ _ x2 y2) = Pair _ _ (plus x1 x2) (plus y1 y2).
+
+val sum_pairwise : list (pair nat nat) -> pair nat nat.
+assert sum_pairwise (Nil _) = Pair _ _ Z Z.
+assert forall p l.
+  sum_pairwise (Cons _ p l) = add_pair p (sum_pairwise l).
+
+val length : pi a. list a -> nat.
+assert length _ (Nil _) = Z.
+assert forall x l. length _ (Cons _ x l) = S (length _ l).
+
+goal exists l.
+  length _ l = three
+  && sum_pairwise l = Pair _ _ three (S three).
