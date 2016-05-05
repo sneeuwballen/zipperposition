@@ -222,11 +222,6 @@ let apply subst ~renaming t =
           if T.equal ty ty' && T.equal hd hd' && T.same_l l l'
           then t
           else T.app ~ty:ty' hd' l'
-      | T.SimpleApp (s, l) ->
-          let l' = aux_list l sc_t in
-          if T.equal ty ty' && T.same_l l l'
-          then t
-          else T.simple_app ~ty:ty' s l'
       | T.AppBuiltin (s, l) ->
           let l' = aux_list l sc_t in
           if T.equal ty ty' && T.same_l l l'

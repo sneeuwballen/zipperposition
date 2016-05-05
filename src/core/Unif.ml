@@ -43,7 +43,6 @@ let occurs_check ~depth subst (v,sc_v) t =
         | T.Bind (_, varty, t') ->
             check ~depth (varty,sc_t) ||
             check ~depth:(depth+1) (t',sc_t)
-        | T.SimpleApp (_, l)
         | T.AppBuiltin (_, l) -> check_l ~depth l sc_t
         | T.App (hd, l) ->
             check ~depth (hd,sc_t) ||
@@ -154,8 +153,6 @@ module Inner = struct
             let l1, l2 = pair_lists_ f1 l1 f2 l2 in
             unif_list ~op subst l1 sc1 l2 sc2
         end
-    | T.SimpleApp (s1,l1), T.SimpleApp (s2, l2) when ID.equal s1 s2 ->
-        unif_list ~op subst l1 sc1 l2 sc2
     | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when Builtin.equal s1 s2 ->
         unif_list ~op subst l1 sc1 l2 sc2
     | _, _ -> raise Fail

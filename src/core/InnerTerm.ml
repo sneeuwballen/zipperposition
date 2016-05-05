@@ -18,7 +18,6 @@ and view =
   | Bind of Binder.t * t * t (** Type, sub-term *)
   | Const of ID.t (** Constant *)
   | App of t * t list (** Uncurried application *)
-  | SimpleApp of ID.t * t list
   | AppBuiltin of Builtin.t * t list (** For representing special constructors *)
 
 and type_result =
@@ -63,8 +62,6 @@ let _hash_norec t h =
         h |> Hash.string_ "bind" |> Binder.hash_fun b |> hash_fun varty |> hash_fun t'
     | Const s -> h |> Hash.string_ "const" |> ID.hash_fun s
     | App (f, l) -> h |> Hash.string_ "app" |> hash_fun f |> Hash.list_ hash_fun l
-    | SimpleApp (b, l) ->
-        h |> Hash.string_ "sapp" |> ID.hash_fun b |> Hash.list_ hash_fun l
     | AppBuiltin (b, l) ->
         h |> Hash.string_ "sapp" |> Builtin.hash_fun b |> Hash.list_ hash_fun l
   in
@@ -144,10 +141,6 @@ let bvar ~ty i =
 let bind ~ty ~varty s t' =
   H.hashcons (make_ ~ty:(HasType ty) (Bind (s, varty, t')))
 
-let simple_app ~ty s l =
-  let my_t = make_ ~ty:(HasType ty) (SimpleApp (s,l)) in
-  H.hashcons my_t
-
 let builtin ~ty b =
   let my_t = make_ ~ty:(HasType ty) (AppBuiltin (b,[])) in
   H.hashcons my_t
@@ -166,7 +159,6 @@ let cast ~ty old = match old.term with
   | Const s -> const ~ty s
   | Bind (s, varty, t') -> bind ~ty s ~varty t'
   | App (f,l) -> app ~ty f l
-  | SimpleApp (s,l) -> simple_app ~ty s l
   | AppBuiltin (s,l) -> app_builtin ~ty s l
 
 let is_var t = match view t with | Var _ -> true | _ -> false
@@ -217,8 +209,7 @@ module DB = struct
     | Bind (_, varty, t') ->
         _to_seq ~depth varty k;
         _to_seq ~depth:(depth+1) t' k
-    | AppBuiltin (_, l)
-    | SimpleApp (_,l) ->
+    | AppBuiltin (_, l) ->
         List.iter (fun t -> _to_seq ~depth t k) l
     | App (f, l) ->
         _to_seq ~depth f k;
@@ -260,8 +251,6 @@ module DB = struct
               bind ~ty ~varty:varty' s t'
           | App (f, l) ->
               app ~ty (recurse ~depth acc f) (List.map (recurse ~depth acc) l)
-          | SimpleApp (s,l) ->
-              simple_app ~ty s (List.map (recurse ~depth acc) l)
           | AppBuiltin (s,l) ->
               app_builtin ~ty s (List.map (recurse ~depth acc) l)
     in
@@ -311,8 +300,6 @@ module DB = struct
             bind ~ty ~varty:varty' s t'
         | App (f, l) ->
             app ~ty (_replace depth ~sub f) (List.map (_replace depth ~sub) l)
-        | SimpleApp (s,l) ->
-            simple_app ~ty s (List.map (_replace depth ~sub) l)
         | AppBuiltin (s,l) ->
             app_builtin ~ty s (List.map (_replace depth ~sub) l)
 
@@ -350,8 +337,6 @@ module DB = struct
             app ~ty (_eval env f) (List.map (_eval env) l)
         | AppBuiltin (s,l) ->
             app_builtin ~ty s (List.map (_eval env) l)
-        | SimpleApp (s,l) ->
-            simple_app ~ty s (List.map (_eval env) l)
 
   let eval env t =
     if DBEnv.is_empty env then t else _eval env t
@@ -379,8 +364,6 @@ module DB = struct
           bind ~ty ~varty:varty' s t'
       | App (f, l) ->
           app ~ty (aux depth f) (List.map (aux depth) l)
-      | SimpleApp (s,l) ->
-          simple_app ~ty s (List.map (aux depth) l)
       | AppBuiltin (s,l) ->
           app_builtin ~ty s (List.map (aux depth) l)
     in
@@ -410,8 +393,7 @@ module Seq = struct
       | DB _
       | Const _ -> ()
       | App (head, l) -> vars head; List.iter vars l
-      | AppBuiltin (_,l)
-      | SimpleApp (_,l) -> List.iter vars l
+      | AppBuiltin (_,l) -> List.iter vars l
       | Bind (_, varty, t') -> vars varty; vars t'
     in
     vars t
@@ -424,7 +406,6 @@ module Seq = struct
       | DB _
       | Const _ -> ()
       | Bind (_, varty, t') -> subterms varty; subterms t'
-      | SimpleApp (_,l)
       | AppBuiltin (_, l) -> List.iter subterms l
       | App(f, l) -> subterms f; List.iter subterms l
     in
@@ -437,8 +418,7 @@ module Seq = struct
       | App (_,l) ->
           let depth' = depth + 1 in
           List.iter (fun t' -> recurse depth' t') l
-      | AppBuiltin (_,l)
-      | SimpleApp (_,l) -> List.iter (recurse (depth+1)) l
+      | AppBuiltin (_,l) -> List.iter (recurse (depth+1)) l
       | Bind (_, varty, t') -> recurse depth varty; recurse (depth+1) t'
       | Const _
       | DB _
@@ -452,7 +432,6 @@ module Seq = struct
       | Var _ -> ()
       | Const s -> k s
       | App (head, l) -> symbols head; List.iter symbols l
-      | SimpleApp  (_,l)
       | AppBuiltin (_,l) -> List.iter symbols l
       | Bind (_, varty, t') -> symbols varty; symbols t'
     in
@@ -467,7 +446,6 @@ module Seq = struct
       match view t with
       | Var _ | DB _ | Const _ -> ()
       | App (head, l) -> types head; List.iter types l
-      | SimpleApp (_,l)
       | AppBuiltin (_,l) -> List.iter types l
       | Bind (_, _, t') -> types t'
     in types t
@@ -527,10 +505,6 @@ module Pos = struct
         let t' = replace (List.nth l n) subpos ~by in
         let l' = CCList.Idx.set l n t' in
         app_builtin ~ty s l'
-    | HasType ty, SimpleApp (s,l), P.Arg (n,subpos) when n < List.length l ->
-        let t' = replace (List.nth l n) subpos ~by in
-        let l' = CCList.Idx.set l n t' in
-        simple_app ~ty s l'
     | _ -> invalid_arg
              (CCFormat.sprintf "position %a not valid in term" P.pp pos)
 end
@@ -548,9 +522,6 @@ let rec replace t ~old ~by = match t.ty, view t with
   | HasType ty, AppBuiltin (s,l) ->
       let l' = List.map (fun t' -> replace t' ~old ~by) l in
       app_builtin ~ty s l'
-  | HasType ty, SimpleApp (s,l) ->
-      let l' = List.map (fun t' -> replace t' ~old ~by) l in
-      simple_app ~ty s l'
   | NoType, _ -> t
   | _, (Var _ | DB _ | Const _) -> t
 
@@ -571,8 +542,7 @@ let rec size t = match view t with
   | Var _
   | DB _ -> 1
   | Bind (_, _, t') -> 1 + size t'
-  | AppBuiltin (_,l)
-  | SimpleApp (_,l) -> List.fold_left (fun s t -> s+size t) 1 l
+  | AppBuiltin (_,l) -> List.fold_left (fun s t -> s+size t) 1 l
   | App (head, l) -> _size_list (1 + size head) l
 and _size_list acc l = match l with
   | [] -> acc
@@ -582,7 +552,6 @@ let depth t =
   Seq.subterms_depth t |> Sequence.map snd |> Sequence.fold max 0
 
 let rec head t = match view t with
-  | SimpleApp (s,_)
   | Const s -> Some s
   | DB _ | Var _ | Bind (_, _, _) | AppBuiltin (_, _) -> None
   | App (h, _) -> head h
@@ -611,9 +580,6 @@ let pp_depth ?(hooks=[]) depth out t =
     | Bind (b, varty, t') ->
         Format.fprintf out "@[<1>%a@ Y%d:@[%a@].@ %a@]" Binder.pp b depth
           (_pp depth) varty (_pp_surrounded (depth+1)) t'
-    | SimpleApp (s,[]) -> ID.pp out s
-    | SimpleApp (s,l) ->
-        Format.fprintf out "@[%a@ %a@]" ID.pp s (Util.pp_list (_pp depth)) l
     | AppBuiltin (b, [a]) when Builtin.is_prefix b ->
         Format.fprintf out "@[<1>%a %a@]" Builtin.pp b (_pp depth) a
     | AppBuiltin (b, [t1;t2]) when Builtin.is_infix b ->
@@ -631,7 +597,6 @@ let pp_depth ?(hooks=[]) depth out t =
           (_pp_surrounded depth) f (Util.pp_list ~sep:" " (_pp_surrounded depth)) l
   and _pp_surrounded depth out t = match view t with
     | Bind _
-    | SimpleApp (_,_::_)
     | AppBuiltin (_,_::_)
     | App (_,_::_) -> Format.fprintf out "(@[%a@])" (_pp depth) t
     | _ -> _pp depth out t
@@ -651,8 +616,6 @@ let rec debugf out t = match view t with
   | App (_, []) -> assert false
   | App (s, l) ->
       Format.fprintf out "(@[<1>%a@ %a@])" debugf s (Util.pp_list debugf) l
-  | SimpleApp (s, l) ->
-      Format.fprintf out "@[<1>%a(@,%a)@]" ID.pp s (Util.pp_list debugf) l
   | Bind (b, varty,t') ->
       Format.fprintf out "(@[<1>%a@ %a@ %a@])"
         Binder.pp b debugf varty debugf t'

@@ -19,7 +19,6 @@ type view = private
   | Bind of Binder.t * t * t (** Type, sub-term *)
   | Const of ID.t (** Constant *)
   | App of t * t list (** Uncurried application *)
-  | SimpleApp of ID.t * t list
   | AppBuiltin of Builtin.t * t list (** For representing special constructors *)
 
 val view : t -> view
@@ -55,7 +54,6 @@ val app : ty:t -> t -> t list -> t
 val bind : ty:t -> varty:t -> Binder.t -> t -> t
 val var : t HVar.t -> t
 val bvar : ty:t -> nat -> t
-val simple_app : ty:t -> ID.t -> t list -> t
 val app_builtin : ty:t -> Builtin.t -> t list -> t
 val builtin: ty:t -> Builtin.t -> t
 
