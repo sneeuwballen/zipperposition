@@ -70,15 +70,18 @@ let pp_trail out trail =
       (CCFormat.seq ~start:"" ~stop:"" ~sep:" ⊓ " BBox.pp)
       (Trail.to_seq trail)
 
-let pp out c =
+let pp_vars out c =
   let pp_vars out = function
     | [] -> ()
     | l ->
       Format.fprintf out "forall @[%a@].@ "
         (Util.pp_list ~sep:" " Type.pp_typed_var) l
   in
+  pp_vars out (vars_ c.lits)
+
+let pp out c =
   Format.fprintf out "@[%a@[<2>%a%a@]@]"
-    pp_vars (vars_ c.lits) Literals.pp c.lits pp_trail c.trail;
+    pp_vars c Literals.pp c.lits pp_trail c.trail;
   ()
 
 let rec pp_lits_tstp out lits = match lits with

@@ -47,6 +47,8 @@ val is_backward_simplified : t -> bool
 
 (** {2 IO} *)
 
+val pp_vars : t CCFormat.printer
+
 val pp : t CCFormat.printer
 val pp_tstp : t CCFormat.printer
 val pp_tstp_full : t CCFormat.printer  (** Print in a toplevel TPTP statement *)

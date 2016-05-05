@@ -904,7 +904,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           ProofStep.mk_simp ~rule:(ProofStep.mk_rule "simplify") [C.proof c] in
         let new_clause = C.create ~trail:(C.trail c) new_lits proof in
         Util.debugf ~section 3
-          "@[<2>@[%a@]@ basic_simplifies into @[%a@]@ with @[%a@]@]"
+          "@[<>@[%a@]@ @[<2>basic_simplifies into@ @[%a@]@]@ with @[%a@]@]"
           (fun k->k C.pp c C.pp new_clause S.pp !subst);
         Util.incr_stat stat_basic_simplify;
         Util.exit_prof prof_basic_simplify;
