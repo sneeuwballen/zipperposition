@@ -80,8 +80,9 @@ let var_of_int i = T.var (HVar.make ~ty:tType i)
 
 let arrow_ l r = T.app_builtin ~ty:T.tType Builtin.arrow (r :: l)
 
-let arrow l r = match view r with
-  | Fun (l', ret) ->
+let arrow l r = match l, view r with
+  | [], _ -> r
+  | _::_, Fun (l', ret) ->
       assert (not (is_fun ret));
       arrow_ (l @ l') ret
   | _ -> arrow_ l r
@@ -290,8 +291,8 @@ let rec pp_rec depth out t = match view t with
   | DB i -> Format.fprintf out "T%i" (depth-i-1)
   | App (p, []) -> ID.pp out p
   | App (p, args) ->
-      Format.fprintf out "@[<2>%a %a@]/%d"
-        ID.pp p (Util.pp_list ~sep:" " (pp_rec depth)) args (T.id t)
+      Format.fprintf out "@[<2>%a %a@]"
+        ID.pp p (Util.pp_list ~sep:" " (pp_rec depth)) args
   | Fun (args, ret) ->
       Format.fprintf out "@[%a →@ %a@]" (pp_l depth) args (pp_rec depth) ret
   | Forall ty' ->
