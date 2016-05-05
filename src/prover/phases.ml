@@ -196,6 +196,6 @@ let run_with st m =
   with e ->
     let stack = Printexc.get_backtrace () in
     let msg = Printexc.to_string e in
-    `Error (msg ^ stack)
+    `Error (msg ^ "\n" ^ stack)
 
 let run m = run_with State.empty m
