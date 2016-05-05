@@ -83,9 +83,10 @@ let is_inductive_ty id =
   match as_inductive_ty id with Some _ -> true | None -> false
 
 let is_inductive_type ty =
-  match type_hd_exn ty with
-  | B _ -> false
-  | I id -> is_inductive_ty id
+  match type_hd ty with
+  | Some (I id) -> is_inductive_ty id
+  | Some (B _)
+  | None -> false
 
 let as_inductive_type ty =
   match type_hd ty with
