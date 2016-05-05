@@ -659,7 +659,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
              then (
                Util.debugf ~section 5
-                "@[<hv2>demod:@ @[t=%a[0],@ l=%a[1],@ r=%a[1]@],@ subst=@[%a@]@]"
+                "@[<hv2>demod:@ @[<hv>t=%a[0],@ l=%a[1],@ r=%a[1]@],@ subst=@[%a@]@]"
                  (fun k->k T.pp t T.pp l T.pp r S.pp subst);
                (* sanity check *)
                assert (
