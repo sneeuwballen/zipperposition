@@ -345,7 +345,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         exists y11...y1m. t = c1 y11...y1mn
         or exists ..... t = c2 ....
         or ....]
-      where [c1, ..., ck] are the constructors of [decl] *)
+      where [c1, ..., ck] are the constructors of [decl].
+      It uses the projectors instead of just skolemizing the "exists" *)
   let instantiate_axiom_ ~ty_s s poly_args decl =
     if ID.Set.mem s decl.decl_symbols
     then None (* already declared *)
@@ -420,7 +421,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       | Type.App (id, _) -> aux (I id)
       | _ -> []
     in
-    PS.PassiveSet.add (Sequence.of_list clauses)
+    (* set of support *)
+    PS.ActiveSet.add (Sequence.of_list clauses)
 
   let _on_new_decl decl =
     let clauses =
