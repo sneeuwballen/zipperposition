@@ -13,15 +13,19 @@ module type S = ClauseQueue_intf.S
 
 type profile = ClauseQueue_intf.profile
 
-let profile_of_string s =
+let profiles_ =
   let open ClauseQueue_intf in
-  match s |> String.trim |> String.lowercase with
-  | "default" -> P_default
-  | "bfs" -> P_bfs
-  | "explore" -> P_explore
-  | "ground" -> P_ground
-  | "goal" -> P_goal
-  | s -> invalid_arg ("unknown queue profile: " ^ s)
+  [ "default", P_default
+  ; "bfs", P_bfs
+  ; "explore", P_explore
+  ; "ground", P_ground
+  ; "goal", P_goal
+  ]
+
+let profile_of_string s =
+  let s = s |> String.trim |> String.lowercase in
+  try List.assoc s profiles_
+  with Not_found -> invalid_arg ("unknown queue profile: " ^ s)
 
 let _profile = ref ClauseQueue_intf.P_default
 let get_profile () = !_profile
@@ -31,9 +35,8 @@ let parse_profile s = _profile := (profile_of_string s)
 let () =
   Params.add_opts
     [ "--clause-queue"
-      , Arg.String parse_profile
-      , " choose which set of clause queues to use \
-         (for selecting next active clause): choices: default,bfs,explore,ground,goal"
+      , Arg.Symbol (List.map fst profiles_, parse_profile)
+      , " choose which set of clause queues to use (for selecting next active clause)"
     ]
 
 module Make(C : Clause.S) = struct

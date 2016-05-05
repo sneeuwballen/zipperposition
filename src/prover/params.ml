@@ -41,10 +41,6 @@ and files = CCVector.create ()
 
 (** parse_args returns parameters *)
 let parse_args () =
-  let help_select = CCFormat.sprintf " selection function (@[<h>%a@])"
-    (Util.pp_list ~sep:"," CCFormat.string)
-    (Selection.available_selections ())
-  in
   (* special handlers *)
   let add_file s = CCVector.push files s in
   (* options list *)
@@ -55,7 +51,6 @@ let parse_args () =
         " maximal number of steps of given clause loop (no limit if negative)"
     ; "--timeout", Arg.Set_float timeout, " timeout (in seconds)"
     ; "-t", Arg.Set_float timeout, " short for --timeout"
-    ; "--select", Arg.Set_string select, help_select
     ; "--expand-def", Arg.Set expand_def, " expand definitions"
     ; "--presaturate", Arg.Set presaturate,
         " pre-saturate (interreduction of) the initial clause set"

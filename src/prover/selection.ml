@@ -141,36 +141,41 @@ let select_complex_except_RR_horn ~strict ~ord lits =
 let default_selection ~ord =
   select_complex ~strict:true ~ord
 
-let __table = Hashtbl.create 17
+let tbl_ = Hashtbl.create 17
 (** table of name -> functions *)
 
 let () =
-  Hashtbl.add __table "NoSelection" (fun ~ord:_ c -> no_select c);
-  Hashtbl.add __table "MaxGoal" (select_max_goal ~strict:true);
-  Hashtbl.add __table "MaxGoalNS" (select_max_goal ~strict:false);
-  Hashtbl.add __table "SelectDiffNegLit" (select_diff_neg_lit ~strict:true);
-  Hashtbl.add __table "SelectDiffNegLitNS" (select_diff_neg_lit ~strict:false);
-  Hashtbl.add __table "SelectComplex" (select_complex ~strict:true);
-  Hashtbl.add __table "SelectComplexNS" (select_complex ~strict:false);
-  Hashtbl.add __table "SelectComplexExceptRRHorn" (select_complex_except_RR_horn ~strict:true);
-  Hashtbl.add __table "SelectComplexExceptRRHornNS" (select_complex_except_RR_horn ~strict:false);
+  Hashtbl.add tbl_ "NoSelection" (fun ~ord:_ c -> no_select c);
+  Hashtbl.add tbl_ "MaxGoal" (select_max_goal ~strict:true);
+  Hashtbl.add tbl_ "MaxGoalNS" (select_max_goal ~strict:false);
+  Hashtbl.add tbl_ "SelectDiffNegLit" (select_diff_neg_lit ~strict:true);
+  Hashtbl.add tbl_ "SelectDiffNegLitNS" (select_diff_neg_lit ~strict:false);
+  Hashtbl.add tbl_ "SelectComplex" (select_complex ~strict:true);
+  Hashtbl.add tbl_ "SelectComplexNS" (select_complex ~strict:false);
+  Hashtbl.add tbl_ "SelectComplexExceptRRHorn" (select_complex_except_RR_horn ~strict:true);
+  Hashtbl.add tbl_ "SelectComplexExceptRRHornNS" (select_complex_except_RR_horn ~strict:false);
   ()
 
 (** selection function from string (may fail) *)
 let selection_from_string ~ord s =
   try
-    let select = Hashtbl.find __table s in
+    let select = Hashtbl.find tbl_ s in
     select ~ord
   with Not_found ->
     failwith ("no such selection function: "^s)
 
 (** available names for selection functions *)
-let available_selections () =
-  let l = ref [] in
-  Hashtbl.iter (fun name _select -> l := name :: !l) __table;
-  !l
+let available_selections () = CCHashtbl.keys_list tbl_
 
 let register name f =
-  (if Hashtbl.mem __table name
-   then failwith ("selection function " ^ name ^ " already defined"));
-  Hashtbl.add __table name f
+  if Hashtbl.mem tbl_ name
+  then failwith ("selection function " ^ name ^ " already defined");
+  Hashtbl.add tbl_ name f
+
+let () =
+  let set_select s = Params.select := s in
+  Params.add_opts
+    [ "--select",
+        Arg.Symbol (available_selections (), set_select),
+        " set literal selection function"
+    ]
