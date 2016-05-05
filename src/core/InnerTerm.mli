@@ -173,6 +173,9 @@ val head : t -> ID.t option
 
 (** {2 IO} *)
 
+val print_hashconsing_ids : bool ref
+(** if enabled, every term will be printed with its unique ID *)
+
 include Interfaces.PRINT with type t := t
 include Interfaces.PRINT_DE_BRUIJN with type t := t
                                     and type term := t

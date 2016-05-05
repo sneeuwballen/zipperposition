@@ -558,6 +558,8 @@ let rec head t = match view t with
 
 (** {3 IO} *)
 
+let print_hashconsing_ids = ref false
+
 type print_hook = int -> (CCFormat.t -> t -> unit) -> CCFormat.t -> t -> bool
 
 let _hooks = ref []
@@ -567,6 +569,8 @@ let pp_depth ?(hooks=[]) depth out t =
   let rec _pp depth out t =
     if List.exists (fun h -> h depth (_pp depth) out t) hooks
     then () (* hook took control *)
+    else if !print_hashconsing_ids
+    then Format.fprintf out "%a@{<Black>/%d@}" (_pp_root depth) t t.id
     else _pp_root depth out t
   and _pp_root depth out t = match view t with
     | Var v ->

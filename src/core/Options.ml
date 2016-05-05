@@ -69,6 +69,7 @@ let make () =
     [ "--debug", Arg.Int Util.set_debug, " debug level (int)"
     ; "--profile", Arg.Set Util.enable_profiling, " enable profiling"
     ; "--print-types", Arg.Unit _print_types , " print type annotations everywhere"
+    ; "--print-hashconsing-id", Arg.Set InnerTerm.print_hashconsing_ids, " print each term's unique hashconsing ID"
     ; "--backtrace", switch_opt true Printexc.record_backtrace, " enable backtraces"
     ; "--no-backtrace", switch_opt false Printexc.record_backtrace, " disable backtraces"
     ; "--color", switch_opt true CCFormat.set_color_default, " enable colors"

@@ -70,6 +70,10 @@ val ksprintf_noc :
   ('b, Format.formatter, unit, 'a) format4 -> 'b
 (** Same as [CCFormat.ksprintf], but without colors *)
 
+val err_spf :
+  ('b, Format.formatter, unit, string) format4 -> 'b
+(** Version of {!sprintf} that adds a colored "error" prefix *)
+
 val warn : string -> unit
 (** Emit warning *)
 

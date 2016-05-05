@@ -120,6 +120,14 @@ let ksprintf_noc ~f fmt =
   Format.kfprintf
     (fun _ -> Format.pp_print_flush out (); f (Buffer.contents buf)) out fmt
 
+(* print error prefix *)
+let pp_error_prefix out () = Format.fprintf out "@{<Red>Error@}: "
+
+let err_spf fmt =
+  CCFormat.ksprintf fmt
+    ~f:(fun s -> CCFormat.sprintf "@[<2>%a%s@]" pp_error_prefix () s)
+
+
 let warn_fmt_ = Format.err_formatter
 
 let warnf msg =
