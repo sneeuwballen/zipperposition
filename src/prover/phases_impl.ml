@@ -226,7 +226,7 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
   let module Sat = Saturate.Make(Env) in
   (* add clauses to passive set of [env] *)
   Env.add_passive clauses;
-  let steps = if Env.params.param_steps = 0
+  let steps = if Env.params.param_steps < 0
     then None
     else (
       Util.debugf ~section 1 "run for %d steps" (fun k->k Env.params.param_steps);

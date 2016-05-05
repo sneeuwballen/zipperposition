@@ -27,7 +27,7 @@ type t = {
 
 let ord = ref "kbo"
 and seed = ref 1928575
-and steps = ref 0
+and steps = ref ~-1
 and version = ref false
 and timeout = ref 0.
 and presaturate = ref false
@@ -51,7 +51,8 @@ let parse_args () =
   let options = (
     [ "--ord", Arg.Set_string ord, " choose ordering (rpo,kbo)"
     ; "--version", Arg.Set version, " print version"
-    ; "--steps", Arg.Set_int steps, " maximal number of steps of given clause loop"
+    ; "--steps", Arg.Set_int steps,
+        " maximal number of steps of given clause loop (no limit if negative)"
     ; "--timeout", Arg.Set_float timeout, " timeout (in seconds)"
     ; "-t", Arg.Set_float timeout, " short for --timeout"
     ; "--select", Arg.Set_string select, help_select
