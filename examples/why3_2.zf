@@ -1,0 +1,44 @@
+# ZF translation of why3_2.p
+
+data bool := True | False.
+
+val match_bool: pi a. bool -> a -> a -> a.
+
+rewrite forall a z1 z2. match_bool a True z1 z2 = z1.
+rewrite forall a z1 z2. match_bool a False z1 z2 = z2.
+
+data tuple0 := Tuple0.
+
+data color := Red | Black.
+
+val match_color: pi a. color -> a -> a -> a.
+
+rewrite forall a x y. match_color a Red x y = x.
+rewrite forall a x y. match_color a Black x y = y.
+
+# TODO: builtin arithmetic in zf
+val int : type.
+
+data tree :=
+  | Leaf
+  | Node color tree int int tree.
+
+val match_tree : pi a. tree -> a -> a -> a.
+
+rewrite forall a x y. match_tree a Leaf x y = x.
+rewrite forall a c l i j r x y. match_tree a (Node c l i j r) x y = y.
+
+val memt : tree -> int -> int -> prop.
+
+assert forall k v.
+  ~ memt Leaf k v
+  &&
+  ( forall c l i j r.
+    memt (Node c l i j r) k v
+    <=> ((k = i && v = j) || memt l k v || memt r k v)).
+
+goal forall l r k v kqt vqt c cqt.
+  memt (Node c l k v r) kqt vqt
+  => memt (Node cqt l k v r) kqt vqt.
+
+
