@@ -13,6 +13,9 @@ let section = Util.Section.(make ~parent:zip "rewriting")
 let stat_term_rw = Util.mk_stat "rw.term steps"
 let stat_clause_rw = Util.mk_stat "rw.clause steps"
 
+let prof_term_rw = Util.mk_profiler "rw.term"
+let prof_clause_rw = Util.mk_profiler "rw.clause"
+
 type rule_term = {
   lhs: T.t;
   rhs: T.t;
@@ -114,7 +117,7 @@ end
 
    Use the FOTerm.DB case extensively... *)
 
-let normalize_term rules t =
+let normalize_term_ rules t =
   (* compute normal form of subterm
      @return [t'] where [t'] is the normal form of [t] *)
   let rec reduce ~subst sc t = match T.view t with
@@ -170,6 +173,9 @@ let normalize_term rules t =
   in
   reduce ~subst:Su.empty 0 t
 
+let normalize_term rules t =
+  Util.with_prof prof_term_rw (normalize_term_ rules) t
+
 let narrow_term ?(subst=Substs.empty) (rules,sc_r) (t,sc_t) = match T.view t with
   | T.Const _ -> Sequence.empty (* already normal form *)
   | T.App (f, _) ->
@@ -196,7 +202,7 @@ let step_lit rules lit =
        | Some subst -> Some (r.c_rhs, subst))
     rules
 
-let normalize_clause rules lits =
+let normalize_clause_ rules lits =
   let eval_ll ~renaming subst (l,sc) =
     List.map
       (List.map
@@ -229,6 +235,9 @@ let normalize_clause rules lits =
       let clause_chunks = eval_ll ~renaming subst (clause_chunks,1) in
       let clauses = List.map (fun new_lits -> new_lits @ lits) clause_chunks in
       Some clauses
+
+let normalize_clause rules lits =
+  Util.with_prof prof_clause_rw (normalize_clause_ rules) lits
 
 let narrow_lit ?(subst=Substs.empty) (rules,sc_r) (lit,sc_lit) =
   Sequence.of_list rules.Set.clauses
