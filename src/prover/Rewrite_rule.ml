@@ -119,59 +119,65 @@ end
 
 let normalize_term_ rules t =
   (* compute normal form of subterm
+     @param k the continuation
      @return [t'] where [t'] is the normal form of [t] *)
-  let rec reduce ~subst sc t = match T.view t with
+  let rec reduce ~subst sc t k = match T.view t with
     | T.Const id ->
       (* pick a constant rule *)
       begin match Set.find_iter rules id |> Sequence.head with
-        | None -> t
+        | None -> k t
         | Some r ->
           assert (T.is_const r.lhs);
           (* reduce [rhs], but no variable can be bound *)
-          reduce ~subst:Substs.empty 0 r.rhs
+          reduce ~subst:Substs.empty 0 r.rhs k
       end
     | T.App (f, l) ->
       (* first, reduce subterms *)
-      let l' = reduce_l ~subst sc l in
-      let t' = if T.same_l l l' then t else T.app f l' in
-      begin match T.view f with
-        | T.Const id ->
-          let sc' = sc+1 in
-          let find_rule =
-            Set.find_iter rules id
-            |> Sequence.find
-              (fun r ->
-                 try Some (r, Unif.FO.matching ~subst ~pattern:(r.lhs,sc') (t',sc))
-                 with Unif.Fail -> None)
-          in
-          begin match find_rule with
-            | None -> t'
-            | Some (r, subst) ->
-              (* rewrite [t = r.lhs\sigma] into [rhs] (and normalize [rhs],
-                 which contain variables bound by [subst]) *)
-              Util.debugf ~section 5 "@[<2>rewrite `@[%a@]`@ using `@[%a@]`@ with `@[%a@]`@]"
-                (fun k->k T.pp t' pp_rule_term r Su.pp subst);
-              Util.incr_stat stat_term_rw;
-              reduce ~subst sc' r.rhs
-          end
-        | _ -> t'
-      end
-    | T.DB _ -> t
+      reduce_l ~subst sc l
+        (fun l' ->
+           let t' = if T.same_l l l' then t else T.app f l' in
+           match T.view f with
+             | T.Const id ->
+               let sc' = sc+1 in
+               let find_rule =
+                 Set.find_iter rules id
+                 |> Sequence.find
+                   (fun r ->
+                      try Some (r, Unif.FO.matching ~subst ~pattern:(r.lhs,sc') (t',sc))
+                      with Unif.Fail -> None)
+               in
+               begin match find_rule with
+                 | None -> k t'
+                 | Some (r, subst) ->
+                   (* rewrite [t = r.lhs\sigma] into [rhs] (and normalize [rhs],
+                      which contain variables bound by [subst]) *)
+                   Util.debugf ~section 5 "@[<2>rewrite `@[%a@]`@ using `@[%a@]`@ with `@[%a@]`@]"
+                     (fun k->k T.pp t' pp_rule_term r Su.pp subst);
+                   Util.incr_stat stat_term_rw;
+                   reduce ~subst sc' r.rhs k
+               end
+             | _ -> k t'
+        )
+    | T.DB _ -> k t
     | T.Var _ ->
       (* dereference, or return [t]. Careful not to traverse the already-
           evaluated value! *)
-      fst (Su.FO.deref subst (t,sc))
-    | T.AppBuiltin (_,[]) -> t
+      k (fst (Su.FO.deref subst (t,sc)))
+    | T.AppBuiltin (_,[]) -> k t
     | T.AppBuiltin (b,l) ->
-      let l' = reduce_l ~subst sc l in
-      if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l'
+      reduce_l ~subst sc l
+        (fun l' ->
+           let t' = if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l' in
+           k t')
   (* reduce list *)
-  and reduce_l ~subst sc l = match l with
-    | [] -> []
+  and reduce_l ~subst sc l k = match l with
+    | [] -> k []
     | t :: tail ->
-      reduce ~subst sc t :: reduce_l ~subst sc tail
+      reduce_l ~subst sc tail
+        (fun tail' -> reduce ~subst sc t
+            (fun t' -> k (t' :: tail')))
   in
-  reduce ~subst:Su.empty 0 t
+  reduce ~subst:Su.empty 0 t (fun t->t)
 
 let normalize_term rules t =
   Util.with_prof prof_term_rw (normalize_term_ rules) t
