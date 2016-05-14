@@ -71,9 +71,10 @@ module Make(C : Clause.S) = struct
           (fun acc t -> match B.payload (B.Lit.abs t) with
              | B.Fresh -> acc
              | B.Clause_component lits -> acc + weight_lits_ lits
-             | B.Case (_,_) ->
-                 (* generic penalty for each inductive hypothesis *)
-                 acc + 10)
+             | B.Case p ->
+               (* generic penalty for each inductive hypothesis *)
+               acc + 2 * Ind_cst.path_length p
+          )
           0 trail
       in
       w_lits * Array.length (C.lits c) + w_trail * (Trail.length trail) + _depth_ty

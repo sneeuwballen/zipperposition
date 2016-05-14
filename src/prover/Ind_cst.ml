@@ -8,10 +8,11 @@ open Libzipperposition
 
 module T = FOTerm
 
+let max_depth_ = ref 4
+
 exception InvalidDecl of string
 exception AlreadyDeclaredConstant of ID.t
 exception NotAnInductiveConstant of ID.t
-exception NotAnInductiveSubConstant of ID.t
 
 let () =
   let spf = CCFormat.sprintf in
@@ -23,22 +24,35 @@ let () =
         Some (spf "%a already declared as an inductive constant" ID.pp id)
     | NotAnInductiveConstant id ->
         Some (spf "%a is not an inductive constant" ID.pp id)
-    | NotAnInductiveSubConstant id ->
-        Some (spf "%a is not an inductive sub-constant" ID.pp id)
     | _ -> None)
 
 let invalid_decl m = raise (InvalidDecl m)
 let invalid_declf m = CCFormat.ksprintf m ~f:invalid_decl
 
-(** {6 Inductive Case} *)
-
-type case = {
-  case_term : FOTerm.t;
-  case_kind: [`Base | `Rec];
-  case_sub: ID.Set.t; (* set of sub-constants *)
+type cst = {
+  cst_id: ID.t;
+  cst_ty: Type.t;
+  cst_ity: Ind_ty.t; (* the corresponding inductive type *)
+  cst_depth: int;
+  cst_parent: cst lazy_t option;
+  cst_coverset: cover_set option; (* the coverset for this constant *)
 }
 
-type cover_set = case list
+and case = {
+  case_term : FOTerm.t;
+  case_kind: [`Base | `Rec]; (* at least one sub-constant? *)
+  case_sub: cst list; (* set of sub-constants *)
+}
+
+and path =
+  | P_nil
+  | P_cons of cst * case * ClauseContext.t list * path
+
+and cover_set = case list
+
+exception Payload_cst of cst
+
+(** {6 Inductive Case} *)
 
 let case_equal a b = FOTerm.equal a.case_term b.case_term
 let case_compare a b = FOTerm.compare a.case_term b.case_term
@@ -51,22 +65,25 @@ let case_to_term c = c.case_term
 let case_is_rec c = c.case_kind = `Rec
 let case_is_base c = c.case_kind = `Base
 
+let case_sub_constants c = Sequence.of_list c.case_sub
+
 (** {6 Inductive Constants} *)
 
-type cst = {
-  cst_id: ID.t;
-  cst_ty: Type.t;
-  cst_ity: Ind_ty.t; (* the corresponding inductive type *)
-  cst_coverset: cover_set; (* the coverset for this constant *)
-}
-
-exception Payload_cst of cst
-
 let cst_to_term c = FOTerm.const ~ty:c.cst_ty c.cst_id
+let cst_id c = c.cst_id
 
 let cst_equal a b = ID.equal a.cst_id b.cst_id
 let cst_compare a b = ID.compare a.cst_id b.cst_id
 let cst_hash a = ID.hash a.cst_id
+
+module CstSet = CCSet.Make(struct
+    type t = cst
+    let compare = cst_compare
+  end)
+
+let cst_depth c = c.cst_depth
+
+let cst_same_type c1 c2 = Type.equal c1.cst_ty c2.cst_ty
 
 let pp_cst out c = ID.pp out c.cst_id
 
@@ -85,84 +102,53 @@ let as_cst_exn id = match as_cst id with
 
 let is_cst id = match as_cst id with Some _ -> true | _ -> false
 
-let cover_set c = c.cst_coverset
+let cst_cover_set c = c.cst_coverset
 
-let cases ?(which=`All) set =
+let cst_cases ?(which=`All) set =
   let seq = Sequence.of_list set in
   match which with
   | `All -> seq
   | `Base -> Sequence.filter case_is_base seq
   | `Rec -> Sequence.filter case_is_rec seq
 
-(** {6 Sub-Constants} *)
-
-type sub_cst = {
-  sub_cst_id: ID.t;
-  sub_cst_ty: Type.t;
-  sub_cst_case: case;
-  sub_cst_cst: cst;
-}
-
-exception Payload_sub_cst of sub_cst
-
-let as_sub_cst id =
-  CCList.find
-    (function
-      | Payload_sub_cst sub -> Some sub
-      | _ -> None)
-    (ID.payload id)
-
-let as_sub_cst_exn id = match as_sub_cst id with
-  | None -> raise (NotAnInductiveSubConstant id)
-  | Some x -> x
-
-let case_sub c =
-  ID.Set.to_seq c.case_sub
-  |> Sequence.map as_sub_cst_exn
-
-let is_sub_cst id = match as_sub_cst id with Some _ -> true | _ -> false
-
-let is_sub_cst_of id cst =
-  match as_sub_cst id with
-  | None -> false
-  | Some sub -> cst_equal sub.sub_cst_cst cst
-
-let as_sub_cst_of id cst =
-  match as_sub_cst id with
-  | Some sub when cst_equal sub.sub_cst_cst cst -> Some sub
-  | _ -> None
-
-let inductive_cst_of_sub_cst sub =
-  sub.sub_cst_cst, sub.sub_cst_case
-
-let sub_constants_case c =
-  ID.Set.to_seq c.case_sub
-  |> Sequence.map as_sub_cst_exn
-
-let sub_constants set =
+let cover_set_sub_constants set =
   Sequence.of_list set
-  |> Sequence.flat_map sub_constants_case
+  |> Sequence.flat_map case_sub_constants
 
-let term_of_sub_cst s = T.const ~ty:s.sub_cst_ty s.sub_cst_id
+let is_sub_cst id = match as_cst id with
+  | None -> false
+  | Some cst -> cst.cst_parent <> None
 
-let rec dominates c sub =
-  Sequence.exists
-    (fun sub_c ->
-       ID.equal sub_c.sub_cst_id sub.sub_cst_id
-       ||
-       match as_cst sub_c.sub_cst_id with
-         | None -> false
-         | Some c' -> dominates c' sub)
-    (sub_constants c.cst_coverset)
+let is_sub_cst_of id c1 =
+  match as_cst id with
+    | None -> false
+    | Some c2 ->
+      match c2.cst_parent with
+        | Some (lazy c1') -> cst_equal c1' c1
+        | None -> false
 
-(* either:
-   - id is not a sub-constant, or
-   - id is a sub-constant, but with a type different from its parent *)
-let sub_cst_criterion id =
-  match as_sub_cst id with
-    | None -> true
-    | Some sub ->
-      not (Type.equal sub.sub_cst_ty (T.ty sub.sub_cst_case.case_term))
+let as_sub_cst_of id c1 =
+  match as_cst id with
+    | None -> None
+    | Some c2 ->
+      match c2.cst_parent with
+        | Some (lazy c1') when cst_equal c1' c1 -> Some c2
+        | _ -> None
+
+let term_of_cst s = T.const ~ty:s.cst_ty s.cst_id
+
+(* [dominates c1 c2] if [c2] is a sub-constant of [c1], or if
+   some sub-constant of [c1] dominates [c2].
+   In any case it means [c1.level < c2.level] *)
+let rec dominates c1 c2 =
+  c1.cst_depth < c2.cst_depth
+  &&
+  match c1.cst_coverset with
+  | None -> false
+  | Some set ->
+    Sequence.exists
+      (fun sub_c -> cst_equal sub_c c2 || dominates sub_c c2)
+      (cover_set_sub_constants set)
 
 (* find new inductive constant candidates in terms *)
 let find_cst_in_term t =
@@ -177,7 +163,6 @@ let find_cst_in_term t =
             | Some ity ->
               if not (is_cst id)
               && not (Ind_ty.is_constructor id)
-              && sub_cst_criterion id
               && Skolem.is_skolem id
                 then Some (id, ity, ty_ret) (* bingo *)
                 else None
@@ -201,26 +186,14 @@ let type_hd_exn ty =
 
 (* type declarations required by [c] *)
 let declarations_of_cst c =
-  Sequence.of_list c.cst_coverset
-  |> Sequence.flat_map
-    (fun c -> ID.Set.to_seq c.case_sub)
-  |> Sequence.map
-    (fun id ->
-      let sub = as_sub_cst_exn id in
-      id, sub.sub_cst_ty)
+  cover_set_sub_constants c
+  |> Sequence.map (fun c' -> c'.cst_id, c'.cst_ty)
 
 module CoversetState = struct
   (* state for creating coverset *)
-  type t = {
-    sub_csts: ID.Set.t; (* raw set of constants *)
-    to_declare: (ID.t * Type.t) list;
-      (* those sub-constants need to be declared *)
-  }
+  type t = CstSet.t (* raw set of constants *)
 
-  let empty = {
-    sub_csts=ID.Set.empty;
-    to_declare=[];
-  }
+  let empty = CstSet.empty
 
   (* state monad *)
   type 'a m = t -> t * 'a
@@ -249,12 +222,9 @@ module CoversetState = struct
   let set : t -> unit m = fun st _ -> st, ()
 
   (* modify the state: add [c] to the set of cases *)
-  let add_sub_case c ty : unit mm =
+  let add_sub_case c : unit mm =
     get >>= fun st ->
-    let st = {
-      sub_csts=ID.Set.add c st.sub_csts;
-      to_declare=(c,ty) :: st.to_declare;
-    } in
+    let st = CstSet.add c st in
     set st
 
   let rec map_l : ('a -> 'b mm) -> 'a list -> 'b list mm
@@ -280,7 +250,13 @@ let mk_skolem_ pp x =
 
 (* coverset of given depth for this type under given substitution of
    ity.ty_vars *)
-let make_coverset_ ~depth:initial_depth ~subst ity : (case * (ID.t * Type.t) list) list =
+let rec make_coverset_
+    ~cover_set_depth
+    ~subst
+    ~parent
+    ity
+  : cover_set
+=
   let open CoversetState in
   (* list of generators of:
       - member of the coverset (one of the t such that cst=t)
@@ -289,11 +265,11 @@ let make_coverset_ ~depth:initial_depth ~subst ity : (case * (ID.t * Type.t) lis
     (* leaves: fresh constants *)
     if depth=0
     then (
-      let c = mk_skolem_ ID.pp ity.Ind_ty.ty_id in
+      let id = mk_skolem_ ID.pp ity.Ind_ty.ty_id in
       let ty = Substs.Ty.apply_no_renaming subst (ity.Ind_ty.ty_pattern,0) in
-      let t = T.const ~ty c in
-      add_sub_case c ty >>= fun () ->
-      return t
+      let sub = declare_cst_ ~cover_set_depth ~parent id ty in
+      add_sub_case sub >>= fun () ->
+      return (term_of_cst sub)
     )
     (* inner nodes or base cases: constructors *)
     else (
@@ -320,87 +296,148 @@ let make_coverset_ ~depth:initial_depth ~subst ity : (case * (ID.t * Type.t) lis
         else fail
       else (
         (* make fresh type variables and apply *)
-        map_l (make_of_ty (depth-1)) ty_args_f
+        map_l (make_of_ty ~parent (depth-1)) ty_args_f
         >>|= fun args ->
         T.app (T.const ~ty:ty_f f) (ty_params @ args)
       )
     )
   (* return a new term of type [ty] *)
-  and make_of_ty depth ty : T.t mm =
+  and make_of_ty ~parent depth ty : T.t mm =
     if Unif.Ty.matches ~pattern:ity.Ind_ty.ty_pattern ty
     then make depth (* previous case *)
     else (
       (* not an inductive sub-case, just create a skolem symbol *)
-      let c = match type_hd_exn ty with
+      let id = match type_hd_exn ty with
         | B b -> mk_skolem_ Type.pp_builtin b
         | I id -> mk_skolem_ ID.pp id
       in
-      let t = T.const ~ty c in
-      add_sub_case c ty >>|= fun () -> t
+      let sub = declare_cst_ ~cover_set_depth ~parent id ty in
+      let t = term_of_cst sub in
+      add_sub_case sub >>|= fun () -> t
     )
   in
   (* build the toplevel values, along with a list of sub-constants
      to declare *)
   let make_top =
-    let l = make initial_depth in
+    let l = make cover_set_depth in
     l >>>= fun t ->
     (* obtain the current set of sub-constants *)
     get >>>= fun state ->
     let case = {
       case_term=t;
-      case_kind=if ID.Set.is_empty state.sub_csts then `Base else `Rec;
-      case_sub=state.sub_csts;
+      case_kind=if CstSet.is_empty state then `Base else `Rec;
+      case_sub=CstSet.elements state;
     } in
-    yield (case, state.to_declare)
+    yield case
   in
   run make_top empty
 
-let declare_cst ?(cover_set_depth=1) id ~ty =
+(* declare new constant *)
+and declare_cst_ ~cover_set_depth ~parent id ty =
   if is_cst id then raise (AlreadyDeclaredConstant id);
   assert (Type.is_ground ty); (* constant --> not polymorphic *)
   let ity = match type_hd_exn ty with
     | B b -> invalid_declf "cannot declare a constant of type %a" Type.pp_builtin b
     | I id -> Ind_ty.as_inductive_ty_exn id
   in
+  (* depth of the constant *)
+  let depth = match parent with
+    | None -> 0
+    | Some (lazy p) -> p.cst_depth + 1
+  in
   (* map variables from [ity] to this concrete type *)
-  let subst = Unif.Ty.matching_same_scope ~pattern:ity.Ind_ty.ty_pattern ty ~scope:0 in
-  let l = make_coverset_ ~depth:cover_set_depth ~subst ity in
-  let cover_set = List.map fst l in
-  Util.debugf ~section:Ind_ty.section 2
-    "@[<2>declare new inductive symbol `@[%a : %a@]`@ with coverset {@[%a@]}@]"
-    (fun k->k ID.pp id Type.pp ty (Util.pp_list pp_case) cover_set);
-  (* build the constant itself *)
-  let cst = {
+  let subst =
+    Unif.Ty.matching_same_scope ~pattern:ity.Ind_ty.ty_pattern ty ~scope:0
+  in
+  (* build coverset and constant, mutually recursive *)
+  let rec cst = lazy {
     cst_id=id;
     cst_ty=ty;
+    cst_depth=depth;
+    cst_parent=parent;
     cst_ity=ity;
     cst_coverset=cover_set;
-  } in
+  }
+  and cover_set =
+    if depth >= !max_depth_
+    then None
+    else Some (make_coverset_ ~cover_set_depth ~subst ~parent:(Some cst) ity)
+  in
+  Util.debugf ~section:Ind_ty.section 2
+    "@[<2>declare new inductive symbol `@[%a : %a@]`\
+     @ with coverset {@[%a@]}@]"
+    (fun k->k ID.pp id Type.pp ty (CCFormat.opt (Util.pp_list pp_case)) cover_set);
+  let cst = Lazy.force cst in
   ID.add_payload id (Payload_cst cst);
-  (* declare the sub-constants *)
-  List.iter
-    (fun (case,to_declare) ->
-      List.iter
-        (fun (id,ty) ->
-          ID.add_payload id
-            (Payload_sub_cst {
-              sub_cst_id=id;
-              sub_cst_ty=ty;
-              sub_cst_case=case;
-              sub_cst_cst=cst;
-            }))
-        to_declare)
-    l;
   Util.debugf ~section:Ind_ty.section 5
     "@[<2>sub-constants:@ @[<v>%a@]@]"
     (fun k ->
        let pp_case out case =
          Format.fprintf out "@[<h>case %a: sub {@[<hv>%a@]}@]"
             pp_case case (Util.pp_list ID.pp)
-            (sub_constants_case case
-             |> Sequence.map (fun c -> c.sub_cst_id) |> Sequence.to_list)
+            (case_sub_constants case
+             |> Sequence.map (fun c -> c.cst_id) |> Sequence.to_list)
        in
-       k (CCFormat.seq pp_case) (cases cover_set));
+       k CCFormat.(opt (list pp_case)) cover_set);
   (* return *)
   Signal.send on_new_cst cst;
   cst
+
+(* declare toplevel constant *)
+let declare_cst ?(cover_set_depth=1) id ~ty =
+  declare_cst_ ~cover_set_depth ~parent:None id ty
+
+(** {6 Path} *)
+
+(* lexico ordering on paths *)
+let rec path_compare p1 p2 = match p1, p2 with
+  | P_nil, P_nil -> 0
+  | P_nil, P_cons _ -> -1
+  | P_cons _, P_nil -> 1
+  | P_cons (cst1, case1, l1, p1'), P_cons (cst2, case2, l2, p2') ->
+    let open CCOrd in
+    cst_compare cst1 cst2
+    <?> (case_compare, case1, case2)
+    <?> (list_ ClauseContext.compare, l1, l2)
+    <?> (path_compare, p1', p2')
+
+let path_equal p1 p2 = path_compare p1 p2 = 0
+
+let rec path_hash_fun p h = match p with
+  | P_nil -> CCHash.int 42 h
+  | P_cons (c,case,l,p') ->
+    h
+    |> CCHash.int (cst_hash c)
+    |> CCHash.int (case_hash case)
+    |> CCHash.list ClauseContext.hash_fun l
+    |> path_hash_fun p'
+
+let path_hash = CCHash.apply path_hash_fun
+
+let rec path_length = function
+  | P_nil -> 0
+  | P_cons (_, _, _, p') -> 1 + path_length p'
+
+let rec pp_path out = function
+  | P_nil -> ()
+  | P_cons (cst, case, l, p') ->
+    Format.fprintf out "@[<hv2>[@[%a = %a@]@ for @[<v>%a@]]"
+      pp_cst cst pp_case case (Util.pp_list ClauseContext.pp) l;
+    if p' <> P_nil then (
+      Format.fprintf out "·@[%a@]" pp_path p'
+    );
+    Format.fprintf out "@]"
+
+let lits_of_path p =
+  let n = path_length p in
+  let a = Array.make n Literal.mk_tauto in
+  let rec aux a i = function
+    | P_nil -> assert (i=n); ()
+    | P_cons (cst, case, _, p') ->
+      let l = cst_to_term cst in
+      let r = case_to_term case in
+      a.(i) <- Literal.mk_eq l r;
+      aux a (i+1) p'
+  in
+  aux a 0 p;
+  a

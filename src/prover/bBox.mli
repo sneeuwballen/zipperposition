@@ -9,13 +9,12 @@
 
 val section : Libzipperposition.Util.Section.t
 
-type inductive_cst = Ind_cst.cst
-type inductive_case = Ind_cst.case
+type inductive_path = Ind_cst.path
 
 type payload = private
   | Fresh (* fresh literal with no particular payload *)
   | Clause_component of Literals.t
-  | Case of inductive_cst * inductive_case  (* [i = t] *)
+  | Case of inductive_path (* branch in the induction tree *)
 
 module Lit : Bool_lit_intf.S with type payload = payload
 
@@ -31,13 +30,10 @@ val inject_lits : Literals.t -> t
     The boolean literal can be negative is the argument is a
     unary negative clause *)
 
-val inject_case : inductive_cst -> inductive_case -> t
+val inject_case : inductive_path -> t
 (** Inject [cst = case] *)
 
 val payload : t -> payload
-
-val inductive_cst : t -> inductive_cst option
-(** Obtain the inductive constant from this boolean lit, if any *)
 
 (** {2 Printers}
     Those printers print the content (injection) of a boolean literal, if any *)

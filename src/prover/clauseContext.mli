@@ -23,6 +23,8 @@ type t = private {
 
 val compare : t -> t -> int
 val equal : t -> t -> bool
+val hash : t -> int
+val hash_fun : t CCHash.hash_fun
 
 val make : Literals.t -> var:FOTerm.var -> t
 (** Make a context from a var and literals containing this var.

@@ -136,7 +136,7 @@ module Make(Env : Env_intf.S) = struct
              let ty = T.ty t1 in
              if Type.is_tType ty then None else Some (Literal.mk_neq t1 t2))
       in
-      let rule = ProofStep.mk_rule ~comment:["induction"] "injectivity_destruct-" in
+      let rule = ProofStep.mk_rule ~comment:["(ind_types)"] "injectivity_destruct-" in
       let proof = ProofStep.mk_inference ~rule [C.proof c] in
       let c' = C.create ~trail:(C.trail c) (new_lits @ lits) proof in
       Util.debugf ~section 3 "@[<hv2>injectivity:@ simplify @[%a@]@ into @[%a@]@]"
