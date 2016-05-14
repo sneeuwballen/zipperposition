@@ -14,7 +14,7 @@ open Libzipperposition
 type res =
   | Ty of Ind_ty.t
   | Cstor of Ind_ty.constructor * Ind_ty.t
-  | Inductive_cst of (Ind_cst.cst option * Ind_cst.sub_cst option)
+  | Inductive_cst of Ind_cst.cst option
   | Projector of ID.t (** projector of some constructor (id: type) *)
   | DefinedCst of int (** (recursive) definition of given stratification level *)
   | Other

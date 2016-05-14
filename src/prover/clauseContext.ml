@@ -36,6 +36,11 @@ let raw_lits t = t.lits
 let compare c1 c2 =
   CCOrd.(HVar.compare c1.var c2.var <?> (Lits.compare, c1.lits, c2.lits))
 
+let hash_fun c h =
+  h |> Literals.hash_fun c.lits |> HVar.hash_fun c.var
+
+let hash = CCHash.apply hash_fun
+
 let make lits ~var =
   assert (Lits.Seq.terms lits
           |> Sequence.exists (T.var_occurs ~var)

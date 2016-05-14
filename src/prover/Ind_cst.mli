@@ -10,6 +10,27 @@ open Libzipperposition
 
 exception InvalidDecl of string
 
+type cst = private {
+  cst_id: ID.t;
+  cst_ty: Type.t;
+  cst_ity: Ind_ty.t; (* the corresponding inductive type *)
+  cst_depth: int;
+  cst_parent: cst lazy_t option;
+  cst_coverset: cover_set option; (* the coverset for this constant *)
+}
+
+and case = private {
+  case_term : FOTerm.t;
+  case_kind: [`Base | `Rec]; (* at least one sub-constant? *)
+  case_sub: cst list; (* set of sub-constants *)
+}
+
+and path =
+  | P_nil
+  | P_cons of cst * case * ClauseContext.t list * path
+
+and cover_set = case list
+
 (** {6 Inductive Case}
 
     An inductive case is a term that belongs to the coverset of some
@@ -17,14 +38,6 @@ exception InvalidDecl of string
     of the cases in its coverset.
 
     Every case starts with a constructor of its type. *)
-
-type case = private {
-  case_term : FOTerm.t;
-  case_kind: [`Base | `Rec];
-  case_sub: ID.Set.t; (* set of sub-constants *)
-}
-
-type cover_set
 
 val case_equal : case -> case -> bool
 val case_compare : case -> case -> int
@@ -37,19 +50,15 @@ val case_to_term : case -> FOTerm.t
 val case_is_rec : case -> bool
 val case_is_base : case -> bool
 
+val case_sub_constants : case -> cst Sequence.t
+(** All sub-constants that are subterms of a specific case *)
+
 (** {6 Inductive Constants}
 
     A ground term of an inductive type. It must correspond to a
     term built with the corresponding {!t} only.
     For instance, a constant of type [nat] should be equal to
     [s^n(0)] in any model. *)
-
-type cst = private {
-  cst_id: ID.t;
-  cst_ty: Type.t;
-  cst_ity: Ind_ty.t; (* the corresponding inductive type *)
-  cst_coverset: cover_set; (* the coverset for this constant *)
-}
 
 exception Payload_cst of cst
 
@@ -60,15 +69,19 @@ val as_cst_exn : ID.t -> cst
     @raise NotAnInductiveConstant if it fails *)
 
 val is_cst : ID.t -> bool
-(** Check whether the given constant is an inductive skolem *)
+(** Check whether the given constant is an inductive constant *)
 
 val on_new_cst : cst Signal.t
 (** Triggered with new inductive constants *)
 
-val declare_cst : ?cover_set_depth:int -> ID.t -> ty:Type.t -> cst
+val declare_cst :
+  ?cover_set_depth:int ->
+  ID.t ->
+  ty:Type.t ->
+  cst
 (** Adds the constant to the set of inductive constants, make a coverset...
     @param cover_set_depth depth of cover_set terms; the deeper, the
-      larger the cover set will be
+      larger the cover set will be (default 1)
     @raise NotAnInductiveType if [ty] is not an inductive type *)
 
 val declarations_of_cst : cst -> (ID.t * Type.t) Sequence.t
@@ -79,11 +92,16 @@ val cst_equal : cst -> cst -> bool
 val cst_compare : cst -> cst -> int
 val cst_hash : cst -> int
 
+val cst_id : cst -> ID.t
+val cst_same_type : cst -> cst -> bool
+
 val cst_to_term : cst -> FOTerm.t
 
 val pp_cst : cst CCFormat.printer
 
-val cover_set : cst -> cover_set
+val cst_depth : cst -> int
+
+val cst_cover_set : cst -> cover_set
 (** Get the cover set of this constant:
 
     a set of ground terms [[t1,...,tn]] with fresh
@@ -91,7 +109,7 @@ val cover_set : cst -> cover_set
     [bigor_{i in 1...n} t=ti] is the skolemized version of the
     exhaustivity axiom on [t]'s type. *)
 
-val cases : ?which:[`Rec|`Base|`All] -> cover_set -> case Sequence.t
+val cst_cases : ?which:[`Rec|`Base|`All] -> cover_set -> case Sequence.t
 (** Cases of the cover set *)
 
 val find_cst_in_term : FOTerm.t -> (ID.t * Ind_ty.t * Type.t) Sequence.t
@@ -99,49 +117,39 @@ val find_cst_in_term : FOTerm.t -> (ID.t * Ind_ty.t * Type.t) Sequence.t
     that are of an inductive type, that are not constructors nor already
     declared, and that are Skolem symbols or sub-constants *)
 
-(** {6 Sub-Constants} *)
-
-(** A subterm of some {!case} that has the same (inductive) type *)
-type sub_cst = private {
-  sub_cst_id: ID.t;
-  sub_cst_ty: Type.t;
-  sub_cst_case: case;
-  sub_cst_cst: cst;
-}
-
-exception Payload_sub_cst of sub_cst
-
-val case_sub : case -> sub_cst Sequence.t
-
-val as_sub_cst : ID.t -> sub_cst option
-
-val as_sub_cst_exn : ID.t -> sub_cst
-(** @raise NotAnInductiveSubConstant in case of failure *)
-
 val is_sub_cst : ID.t -> bool
 (** Is the term a constant that was created within a cover set? *)
 
 val is_sub_cst_of : ID.t -> cst -> bool
 
-val as_sub_cst_of : ID.t -> cst -> sub_cst option
+val as_sub_cst_of : ID.t -> cst -> cst option
 (** downcasts iff [t] is a sub-constant of [cst] *)
 
-val inductive_cst_of_sub_cst : sub_cst -> cst * case
-(** [inductive_cst_of_sub_cst t] finds a pair [c, t'] such
-    that [c] is an inductive const, [t'] belongs to a coverset
-    of [c], and [t] is a sub-constant within [t'].
-    @raise Not_found if [t] isn't an inductive constant *)
-
-val sub_constants : cover_set -> sub_cst Sequence.t
+val cover_set_sub_constants : cover_set -> cst Sequence.t
 (** All sub-constants of a given inductive constant *)
 
-val sub_constants_case : case -> sub_cst Sequence.t
-(** All sub-constants that are subterms of a specific case *)
+val term_of_cst: cst -> FOTerm.t
 
-val term_of_sub_cst: sub_cst -> FOTerm.t
-
-val dominates : cst -> sub_cst -> bool
+val dominates : cst -> cst -> bool
 (** [dominates c sub] is true if [sub] is a sub-constant of [c],
-    or if some sub-constant of [c] dominates [sub] *)
+    or if some sub-constant of [c] dominates [sub] transitively *)
 
+(** {6 Path}
 
+    A path is a sequence of nested inductions on distinct constants
+    and corresponding {b sets} of clause contexts. *)
+
+val path_equal : path -> path -> bool
+val path_compare : path -> path -> int
+val path_hash : path -> int
+
+val path_length : path -> int
+
+val pp_path : path CCFormat.printer
+
+val lits_of_path : path -> Literals.t
+(** Extract the raw equality literals from this path *)
+
+(**/**)
+val max_depth_: int ref
+(**/**)
