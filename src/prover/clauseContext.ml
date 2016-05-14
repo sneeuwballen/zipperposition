@@ -50,6 +50,8 @@ let hash c =
 
 let hash_fun c h = CCHash.int (hash c) h
 
+let hash = CCHash.apply hash_fun
+
 let make lits ~var =
   assert (Lits.Seq.terms lits
           |> Sequence.exists (T.var_occurs ~var)
