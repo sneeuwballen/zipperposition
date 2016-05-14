@@ -85,6 +85,7 @@ end
 let _enable = ref true
 let _instantiate_shielded = ref false
 let _accept_unary_types = ref true
+let _instantiate_projector_axiom = ref false
 
 let is_projector_ id ~of_ =
   List.exists
@@ -338,15 +339,6 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let instantiate_vars c = Util.with_prof prof_instantiate instantiate_vars_ c
 
-  (* assume [s : ty_s] where [ty_s = _ -> ... -> decl.decl_ty_id poly_args]
-     This builds the axiom
-     [forall x1...xn.
-        let t = s x1...xn in
-        exists y11...y1m. t = c1 y11...y1mn
-        or exists ..... t = c2 ....
-        or ....]
-      where [c1, ..., ck] are the constructors of [decl].
-      It uses the projectors instead of just skolemizing the "exists" *)
   let instantiate_axiom_ ~ty_s s poly_args decl =
     if ID.Set.mem s decl.decl_symbols
     then None (* already declared *)
@@ -389,6 +381,20 @@ module Make(E : Env.S) : S with module Env = E = struct
       Some c'
     )
 
+  (* assume [s : ty_s] where [ty_s = _ -> ... -> decl.decl_ty_id poly_args]
+     This builds the axiom
+     [forall x1...xn.
+        let t = s x1...xn in
+        exists y11...y1m. t = c1 y11...y1mn
+        or exists ..... t = c2 ....
+        or ....]
+      where [c1, ..., ck] are the constructors of [decl].
+      It uses the projectors instead of just skolemizing the "exists" *)
+  let instantiate_axiom ~ty_s s poly_args decl =
+    if !_instantiate_projector_axiom
+    then instantiate_axiom_ ~ty_s s poly_args decl
+    else None
+
   (* [check_decl_ id ~ty decl] checks whether [ty] is compatible
      with [decl.decl_ty]. If it is the case, let [c a1...an = ty], we
      add the axiom
@@ -398,12 +404,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     let _, ty_ret = Type.open_fun ty in
     match Type.view ty_ret, decl.decl_ty_id with
     | Type.Builtin b, B b' when b=b' ->
-        instantiate_axiom_ ~ty_s:ty s [] decl
+        instantiate_axiom ~ty_s:ty s [] decl
     | Type.App (c, args), I i
       when ID.equal c i
       && not (is_projector_ s ~of_:i)
       && List.length args = List.length decl.decl_ty_vars->
-        instantiate_axiom_ ~ty_s:ty s args decl
+        instantiate_axiom ~ty_s:ty s args decl
     | _ -> None
 
   (* add axioms for new symbol [s] with type [ty], if needed *)
@@ -552,6 +558,12 @@ let () =
     ; "--no-enum-types"
       , Options.switch_set false _enable
       , " disable inferences for enumerated/inductive types"
+    ; "--projector-axioms"
+      , Options.switch_set true _instantiate_projector_axiom
+      , " enable exhaustiveness axioms for inductive types (with projectors)"
+    ; "--no-projector-axioms"
+      , Options.switch_set false _instantiate_projector_axiom
+      , " disable exhaustiveness axioms for inductive types (with projectors)"
     ; "--enum-shielded"
       , Options.switch_set true _instantiate_shielded
       , " enable/disable instantiation of shielded variables of enum type"
