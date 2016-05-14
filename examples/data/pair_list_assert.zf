@@ -22,15 +22,13 @@ rewrite forall x1 y1 x2 y2.
   add_pair (Pair _ _ x1 y1) (Pair _ _ x2 y2) = Pair _ _ (plus x1 x2) (plus y1 y2).
 
 val sum_pairwise : list (pair nat nat) -> pair nat nat.
-rewrite sum_pairwise (Nil _) = Pair _ _ Z Z.
-rewrite forall p l.
+assert sum_pairwise (Nil _) = Pair _ _ Z Z.
+assert forall p l.
   sum_pairwise (Cons _ p l) = add_pair p (sum_pairwise l).
 
 val length : pi a. list a -> nat.
-rewrite length _ (Nil _) = Z.
-rewrite forall x l. length _ (Cons _ x l) = S (length _ l).
-
-# Find a list of pairs [l] of length 3, where the pairwise sum of its elements is (3,4)
+assert length _ (Nil _) = Z.
+assert forall x l. length _ (Cons _ x l) = S (length _ l).
 
 goal exists l.
   length _ l = three
