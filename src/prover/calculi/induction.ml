@@ -21,6 +21,22 @@ let k_enable : bool Flex_state.key = Flex_state.create_key()
 let k_lemmas_enabled : bool Flex_state.key = Flex_state.create_key()
 let k_show_lemmas : bool Flex_state.key = Flex_state.create_key()
 
+(* TODO
+ in any ground inductive clause C[n]<-Gamma, containing inductive [n]:
+   - find path [p], if any (empty at worst)
+   - extract context C[]
+   - find coverset of [n]
+   - for every [n' < n] in the coverset, strengthen the path
+     (i.e. if there is [c=t, D[]] in the path with the proper
+       type, add [not D[n']], because [n' < n ... < c])
+   - add C[t] <- [n=t · p], Gamma
+     for every [t] in coverset
+   - add boolean clause  [n=t1] or [n=t2] .. or [n=tk] <= Gamma
+     where coverset = {t1, t2, ... tk}
+
+  rule to make trivial any clause with >= 2 incompatible path literals
+*)
+
 module Make
 (E : Env.S)
 (A : Avatar_intf.S with module E = E)
@@ -53,11 +69,11 @@ module Make
   let constants_or_sub c =
     C.Seq.terms c
     |> Sequence.flat_map T.Seq.subterms
-    |> Sequence.filter
+    |> Sequence.filter_map
       (fun t -> match T.view t with
-        | T.Const id -> Ind_cst.is_cst id || Ind_cst.is_sub_cst id
-        | _ -> false)
-    |> Sequence.sort_uniq ~cmp:T.compare
+        | T.Const id -> Ind_cst.as_cst id
+        | _ -> None)
+    |> Sequence.sort_uniq ~cmp:Ind_cst.cst_compare
     |> Sequence.to_rev_list
 
   (* sub-terms of an inductive type, that occur several times (candidate
@@ -93,7 +109,13 @@ module Make
 
   (* FIXME:
      - use better generalization?
-     - fix typing issues *)
+     - fix typing issues, if any remains *)
+
+(* TODO: split this into:
+   - regular (nested) induction rule
+   - heuristic to guess non trivial lemmas (i.e. exclusively with
+     non obvious generalization, other cases are handled by the regular
+     rule); this part is guarded by --lemmas *)
 
   (* when a unit clause has inductive constants, take its negation
       and add it as a lemma (some restrictions apply) *)
@@ -106,7 +128,7 @@ module Make
          might contain constants being replaced. *)
       let replacements =
         List.map
-          (fun t -> t, mk_fresh_var_ (T.ty t))
+          (fun c -> Ind_cst.cst_to_term c, mk_fresh_var_ (Ind_cst.cst_ty c))
           (on @ ind_csts)
       in
       (* replace constants by variables in [lit], then
@@ -128,8 +150,9 @@ module Make
         Util.debugf ~section 2
           "@[<2>introduce cut@ from %a@ @[<hv0>%a@]@ generalizing on @[%a@]@]"
           (fun k->k C.pp c (Util.pp_list C.pp) clauses
-              (Util.pp_list T.pp) on);
-        lemmas_ := List.rev_append clauses !lemmas_;
+              (Util.pp_list Ind_cst.pp_cst) on);
+        lemmas_ :=
+          List.rev_append (List.rev_map C.to_sclause clauses) !lemmas_;
         clauses
       )
     in
@@ -143,16 +166,19 @@ module Make
       assert (Array.length (C.lits c) = 1);
       let lit = (C.lits c).(0) in
       let terms = generalizable_subterms c in
+      (* TODO: keep even composite terms as long as they start
+         with uninterpreted symbol *)
+      let consts = CCList.filter_map Ind_cst.cst_of_term terms in
       (* first, lemma without generalization;
           then, each possible way to generalize a subterm occurring multiple times *)
       List.rev_append
         (generalize ~on:[] lit)
-        (CCList.flat_map (fun t -> generalize ~on:[t] lit) terms)
+        (CCList.flat_map (fun c -> generalize ~on:[c] lit) consts)
     ) else []
 
   let show_lemmas () =
     Util.debugf ~section 1 "@[<2>lemmas:@ [@[<hv>%a@]]@]"
-      (fun k->k (Util.pp_list C.pp) !lemmas_)
+      (fun k->k (Util.pp_list SClause.pp) !lemmas_)
 
   let scan_terms seq : Ind_cst.cst list =
     seq
@@ -169,8 +195,9 @@ module Make
     |> Lits.Seq.terms
     |> scan_terms
 
-  let is_eq_ (t1:Ind_cst.cst) (t2:Ind_cst.case) =
-    BoolBox.inject_case t1 t2
+  let is_eq_ ~path (t1:Ind_cst.cst) (t2:Ind_cst.case) ctxs =
+    let p = Ind_cst.path_cons t1 t2 ctxs path in
+    BoolBox.inject_case p
 
   (* TODO: rephrase this in the context of induction *)
   (* exhaustivity (inference):
@@ -193,21 +220,33 @@ module Make
          least one context false) *)
     mw_coverset : Ind_cst.cover_set;
       (* minimality should be asserted for each case of the coverset *)
+    mw_path: Ind_cst.path;
+      (* path leading to this *)
   }
+
+  (* recover the (possibly empty) path from a boolean trail *)
+  let path_of_trail trail : Ind_cst.path =
+    Trail.to_seq trail
+    |> Sequence.filter_map BBox.as_case
+    |> Sequence.max ~lt:(fun a b -> Ind_cst.path_dominates b a)
+    |> CCOpt.get Ind_cst.path_empty
+
+  (* TODO: incremental strenghtening *)
 
   (* for each member [t] of the cover set:
      for each ctx in [mw.mw_contexts]:
       - add ctx[t] <- [cst=t]
       - for each [t' subterm t] of same type, add clause ~[ctx[t']] <- [cst=t]
+    @param path the current induction branch
     @param trail precondition to this minimality
   *)
   let clauses_of_min_witness ~trail ~proof mw : (C.t list * BoolBox.t list list) =
     let b_lits = ref [] in
     let clauses =
-      Ind_cst.cases ~which:`All mw.mw_coverset
+      Ind_cst.cover_set_cases ~which:`All mw.mw_coverset
       |> Sequence.flat_map
         (fun (case:Ind_cst.case) ->
-           let b_lit = is_eq_ mw.mw_cst case in
+           let b_lit = is_eq_ mw.mw_cst case mw.mw_contexts ~path:mw.mw_path in
            CCList.Ref.push b_lits b_lit;
            (* clauses [ctx[case] <- b_lit] *)
            let pos_clauses =
@@ -220,11 +259,11 @@ module Make
            (* clauses [CNF(¬ And_i ctx_i[t']) <- b_lit] for
               each t' subterm of case *)
            let neg_clauses =
-             Ind_cst.sub_constants_case case
+             Ind_cst.case_sub_constants case
              |> Sequence.filter_map
                (fun sub ->
                   (* only keep sub-constants that have the same type as [cst] *)
-                  let sub = Ind_cst.term_of_sub_cst sub in
+                  let sub = Ind_cst.cst_to_term sub in
                   if Type.equal (T.ty sub) mw.mw_cst.Ind_cst.cst_ty
                   then Some sub else None)
              |> Sequence.flat_map
@@ -269,16 +308,24 @@ module Make
   (* [cst] is the minimal term for which contexts [ctxs] holds, returns
      clauses expressing that, and assert boolean constraints *)
   let assert_min ~trail ~proof ctxs (cst:Ind_cst.cst) =
-    let set = Ind_cst.cover_set cst in
-    let mw = {
-      mw_cst=cst;
-      mw_contexts=ctxs;
-      mw_coverset=set;
-    } in
-    let clauses, b_clauses = clauses_of_min_witness ~trail ~proof mw in
-    A.Solver.add_clauses ~proof b_clauses;
-    Util.incr_stat stats_min;
-    clauses
+    let path = path_of_trail trail in
+    match Ind_cst.cst_cover_set cst with
+      | Some set when not (Ind_cst.path_contains_cst path cst) ->
+        let mw = {
+          mw_cst=cst;
+          mw_contexts=ctxs;
+          mw_coverset=set;
+          mw_path=path;
+        } in
+        let clauses, b_clauses = clauses_of_min_witness ~trail ~proof mw in
+        A.Solver.add_clauses ~proof b_clauses;
+        Util.incr_stat stats_min;
+        clauses
+      | Some _ (* path already contains [cst] *)
+      | None -> []  (* too deep for induction *)
+
+  (* TODO: trail simplification that removes all path literals except
+     the longest? *)
 
   (* checks whether the trail of [c] is trivial, that is:
      - contains two literals [i = t1] and [i = t2] with [t1], [t2]
@@ -288,44 +335,25 @@ module Make
         on one another *)
   let has_trivial_trail c =
     let trail = C.trail c |> Trail.to_seq in
-    (* all i=t where i is inductive *)
-    let relevant_cases =
-      trail
-      |> Sequence.filter_map
-        (fun blit ->
-           match BoolBox.payload (BoolBox.Lit.abs blit) with
-           | BoolBox.Case (l, r) -> Some (`Case (l, r))
-           | _ -> None
-        )
-    in
-    (* is there i such that   i=t1 and i=t2 can be found in the trail? *)
+    (* all boolean literals that express paths *)
+    let relevant_cases = Sequence.filter_map BoolBox.as_case trail in
+    (* are there two distinct incompatible paths in the trail? *)
     Sequence.product relevant_cases relevant_cases
     |> Sequence.exists
-      (function
-        | (`Case (i1, t1), `Case (i2, t2)) ->
-            let res =
-              not (Ind_cst.cst_equal i1 i2)
-                  || (Ind_cst.cst_equal i1 i2
-                      && not (Ind_cst.case_equal t1 t2)) in
-            if res
-            then (
-              Util.debugf ~section 4
-                "@[<2>clause@ @[%a@]@ redundant because of @[%a={%a,%a}@] in trail@]"
-                (fun k->k C.pp c Ind_cst.pp_cst i1 Ind_cst.pp_case t1 Ind_cst.pp_case t2)
-            );
-            res
-        | _ -> false)
-
-  (* if ID is a sub-constant, it only is relevant assuming some trail on its
-     parent constant(s) *)
-  let rec trail_of_cst cst =
-    match Ind_cst.as_sub_cst cst.Ind_cst.cst_id with
-    | None -> []
-    | Some sub ->
-      let case = sub.Ind_cst.sub_cst_case in
-      let cst' = sub.Ind_cst.sub_cst_cst in
-      (* ensure [cst=case], and add the trail of [cst] to it *)
-      is_eq_ cst' case :: trail_of_cst cst'
+      (fun (p1, p2) ->
+         let res =
+           not (Ind_cst.path_equal p1 p2) &&
+           not (Ind_cst.path_dominates p1 p2) &&
+           not (Ind_cst.path_dominates p2 p1)
+         in
+         if res
+         then (
+           Util.debugf ~section 4
+             "@[<2>clause@ @[%a@]@ redundant because of@ \
+              {@[@[%a@],@,@[%a@]}@] in trail@]"
+             (fun k->k C.pp c Ind_cst.pp_path p1 Ind_cst.pp_path p2)
+         );
+         res)
 
   (* when a clause contains new inductive constants, assert minimality
      of the clause for all those constants independently *)
@@ -337,8 +365,7 @@ module Make
            let ctx = ClauseContext.extract_exn (C.lits c) (Ind_cst.cst_to_term cst) in
            let proof = ProofStep.mk_inference [C.proof c]
                ~rule:(ProofStep.mk_rule "min") in
-           let trail = Trail.add_list (C.trail c) (trail_of_cst cst) in
-           assert_min ~trail ~proof [ctx] cst)
+           assert_min ~trail:(C.trail c) ~proof [ctx] cst)
         consts
     in
     clauses
