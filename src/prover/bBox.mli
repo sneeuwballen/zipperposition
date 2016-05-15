@@ -34,6 +34,16 @@ val inject_case : inductive_path -> t
 (** Inject [cst = case] *)
 
 val payload : t -> payload
+(** Obtain the payload of this boolean literal, that is, what the literal
+    represents *)
+
+val as_case : t -> inductive_path option
+(** If [payload t = Case p], then return [Some p], else return [None] *)
+
+val must_be_kept : t -> bool
+(** [must_be_kept lit] means that [lit] should survive in boolean splitting,
+    that is, that if [C <- lit, Gamma] then any clause derived from [C]
+    recursively will have [lit] in its trail. *)
 
 (** {2 Printers}
     Those printers print the content (injection) of a boolean literal, if any *)
