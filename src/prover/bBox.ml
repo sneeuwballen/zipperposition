@@ -128,6 +128,16 @@ let inject_case c t =
     save_ t;
     t
 
+let must_be_kept lit =
+  match Lit.payload (Lit.abs lit) with
+    | Fresh
+    | Clause_component _ -> false
+    | Case _ -> true
+
+let as_case lit = match Lit.payload (Lit.abs lit) with
+  | Case p -> Some p
+  | _ -> None
+
 (* boolean lit -> payload *)
 let payload = Lit.payload
 

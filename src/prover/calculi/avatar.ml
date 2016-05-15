@@ -94,8 +94,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
                  ProofStep.mk_esa ~rule:(ProofStep.mk_rule "split") [C.proof c] in
                let lits = Array.of_list lits in
                let bool_name = BBox.inject_lits lits in
+               (* new trail: keep some literals of [C.trail c], add the new one *)
                let trail =
                  C.trail c
+                 |> Trail.filter BBox.must_be_kept
                  |> Trail.add bool_name
                in
                let c = C.create_a ~trail lits proof in
