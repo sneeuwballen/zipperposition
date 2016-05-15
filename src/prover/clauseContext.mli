@@ -19,6 +19,7 @@ type subst = Substs.t
 type t = private {
   lits : Literals.t;
   var : FOTerm.var;
+  mutable hash: int;
 }
 
 val compare : t -> t -> int
