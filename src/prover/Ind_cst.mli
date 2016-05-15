@@ -10,26 +10,19 @@ open Libzipperposition
 
 exception InvalidDecl of string
 
-type cst = private {
-  cst_id: ID.t;
-  cst_ty: Type.t;
-  cst_ity: Ind_ty.t; (* the corresponding inductive type *)
-  cst_depth: int;
-  cst_parent: cst lazy_t option;
-  cst_coverset: cover_set option; (* the coverset for this constant *)
+type cst
+
+type case
+
+type path_cell = private {
+  path_cst: cst;
+  path_case: case;
+  path_clauses: ClauseContext.t list;
 }
 
-and case = private {
-  case_term : FOTerm.t;
-  case_kind: [`Base | `Rec]; (* at least one sub-constant? *)
-  case_sub: cst list; (* set of sub-constants *)
-}
+type path = path_cell list
 
-and path =
-  | P_nil
-  | P_cons of cst * case * ClauseContext.t list * path
-
-and cover_set = case list
+type cover_set = case list
 
 (** {6 Inductive Case}
 
@@ -52,6 +45,9 @@ val case_is_base : case -> bool
 
 val case_sub_constants : case -> cst Sequence.t
 (** All sub-constants that are subterms of a specific case *)
+
+val cover_set_cases : ?which:[`Rec|`Base|`All] -> cover_set -> case Sequence.t
+(** Cases of the cover set *)
 
 (** {6 Inductive Constants}
 
@@ -82,7 +78,17 @@ val declare_cst :
 (** Adds the constant to the set of inductive constants, make a coverset...
     @param cover_set_depth depth of cover_set terms; the deeper, the
       larger the cover set will be (default 1)
+    @raise AlreadyDeclaredConstant if the constant is declared already
     @raise NotAnInductiveType if [ty] is not an inductive type *)
+
+val cst_of_term : FOTerm.t -> cst option
+(** [cst_of_term t] returns a new or existing constant for this term, if any.
+    @return None if the term is not to be converted into a constant
+    @raise InvalidDecl if the term is not ground nor of an inductive type *)
+
+val cst_of_id : ID.t -> Type.t -> cst
+(** [cst_of_id id ty] returns a new or existing constant for this id.
+    @raise InvalidDecl if the type is not an inductive type *)
 
 val declarations_of_cst : cst -> (ID.t * Type.t) Sequence.t
 (** [declarations_of_cst c] returns a list of type declarations that should
@@ -93,15 +99,16 @@ val cst_compare : cst -> cst -> int
 val cst_hash : cst -> int
 
 val cst_id : cst -> ID.t
-val cst_same_type : cst -> cst -> bool
-
 val cst_to_term : cst -> FOTerm.t
+val cst_ty : cst -> Type.t
+
+val cst_same_type : cst -> cst -> bool
 
 val pp_cst : cst CCFormat.printer
 
 val cst_depth : cst -> int
 
-val cst_cover_set : cst -> cover_set
+val cst_cover_set : cst -> cover_set option
 (** Get the cover set of this constant:
 
     a set of ground terms [[t1,...,tn]] with fresh
@@ -109,13 +116,10 @@ val cst_cover_set : cst -> cover_set
     [bigor_{i in 1...n} t=ti] is the skolemized version of the
     exhaustivity axiom on [t]'s type. *)
 
-val cst_cases : ?which:[`Rec|`Base|`All] -> cover_set -> case Sequence.t
-(** Cases of the cover set *)
-
-val find_cst_in_term : FOTerm.t -> (ID.t * Ind_ty.t * Type.t) Sequence.t
+val find_cst_in_term : FOTerm.t -> cst Sequence.t
 (** [find_cst_in_lits term] searches subterms of [term] for constants
-    that are of an inductive type, that are not constructors nor already
-    declared, and that are Skolem symbols or sub-constants *)
+    that are of an inductive type and that are not constructors.
+    It returns the sequence of such inductive constants. *)
 
 val is_sub_cst : ID.t -> bool
 (** Is the term a constant that was created within a cover set? *)
@@ -127,8 +131,6 @@ val as_sub_cst_of : ID.t -> cst -> cst option
 
 val cover_set_sub_constants : cover_set -> cst Sequence.t
 (** All sub-constants of a given inductive constant *)
-
-val term_of_cst: cst -> FOTerm.t
 
 val dominates : cst -> cst -> bool
 (** [dominates c sub] is true if [sub] is a sub-constant of [c],
@@ -143,7 +145,17 @@ val path_equal : path -> path -> bool
 val path_compare : path -> path -> int
 val path_hash : path -> int
 
+val path_empty : path
+val path_cons : cst -> case -> ClauseContext.t list -> path -> path
+
 val path_length : path -> int
+
+val path_dominates : path -> path -> bool
+(** [path_dominates a b] is true if [b] is a suffix of [a]. In other words,
+    [a] is a path to a subtree of what [b] is a path to. *)
+
+val path_contains_cst : path -> cst -> bool
+(** Does the path contain this inductive constant? *)
 
 val pp_path : path CCFormat.printer
 
