@@ -42,6 +42,7 @@ and case = {
   case_term : FOTerm.t;
   case_kind: [`Base | `Rec]; (* at least one sub-constant? *)
   case_sub: cst list; (* set of sub-constants *)
+  case_skolems: (ID.t * Type.t) list; (* set of other skolems *)
 }
 
 and path_cell = {
@@ -77,6 +78,10 @@ let cover_set_cases ?(which=`All) set =
   | `All -> seq
   | `Base -> Sequence.filter case_is_base seq
   | `Rec -> Sequence.filter case_is_rec seq
+
+let cover_set_skolems c =
+  Sequence.of_list c
+  |> Sequence.flat_map (fun c -> Sequence.of_list c.case_skolems)
 
 (** {6 Inductive Constants} *)
 
@@ -158,7 +163,7 @@ type id_or_ty_builtin =
   | B of Type.builtin
 
 let type_hd_exn ty =
-  let _, ret = Type.open_fun ty in
+  let _, _, ret = Type.open_poly_fun ty in
   match Type.view ret with
   | Type.Builtin b -> B b
   | Type.App (s, _) -> I s
@@ -169,14 +174,23 @@ let type_hd_exn ty =
 let declarations_of_cst c = match c.cst_coverset with
   | None -> Sequence.empty
   | Some set ->
-    cover_set_sub_constants set
-    |> Sequence.map (fun c' -> c'.cst_id, c'.cst_ty)
+    let seq1 =
+      cover_set_sub_constants set
+      |> Sequence.map (fun c' -> c'.cst_id, c'.cst_ty)
+    and seq2 = cover_set_skolems set in
+    Sequence.append seq1 seq2
 
 module CoversetState = struct
   (* state for creating coverset *)
-  type t = CstSet.t (* raw set of constants *)
+  type t = {
+    cst: CstSet.t; (* raw set of constants *)
+    others: (ID.t * Type.t) list; (* non-inductive terms *)
+  }
 
-  let empty = CstSet.empty
+  let empty = {
+    cst=CstSet.empty;
+    others=[];
+  }
 
   (* state monad *)
   type 'a m = t -> t * 'a
@@ -184,13 +198,16 @@ module CoversetState = struct
   (* state monad inside a backtracking monad *)
   type 'a mm = t -> (t * 'a) list
   let fail : _ mm = fun _ -> []
-  let return : 'a -> 'a m = fun x st -> st, x
   let yield : 'a -> 'a mm = fun x st -> [st, x]
   let yield_l : 'a list -> 'a mm = fun l st -> List.map (fun x -> st,x) l
   let (>>=) : 'a mm -> ('a -> 'b m) -> 'b mm
   = fun x_mm f st ->
     let xs = x_mm st in
     List.map (fun (st,x) -> f x st) xs
+  let (>|=) : 'a mm -> ('a -> 'b) -> 'b mm
+  = fun x_mm f st ->
+    let xs = x_mm st in
+    List.map (fun (st,x) -> st, f x) xs
   let (>>>=) : 'a mm -> ('a -> 'b mm) -> 'b mm
   = fun x_mm f st ->
     let xs = x_mm st in
@@ -207,7 +224,12 @@ module CoversetState = struct
   (* modify the state: add [c] to the set of cases *)
   let add_sub_case c : unit mm =
     get >>= fun st ->
-    let st = CstSet.add c st in
+    let st = { st with cst=CstSet.add c st.cst} in
+    set st
+
+  let add_constant id ty : unit mm =
+    get >>= fun st ->
+    let st = { st with others=(id,ty)::st.others} in
     set st
 
   let rec map_l : ('a -> 'b mm) -> 'a list -> 'b list mm
@@ -235,9 +257,9 @@ let mk_skolem_ pp x =
 let declare_cst_ ~parent id ty =
   if is_cst id then raise (AlreadyDeclaredConstant id);
   assert (Type.is_ground ty); (* constant --> not polymorphic *)
-  let ity = match type_hd_exn ty with
-    | B b -> invalid_declf "cannot declare a constant of type %a" Type.pp_builtin b
-    | I id -> Ind_ty.as_inductive_ty_exn id
+  let ity = match Ind_ty.as_inductive_type ty with
+    | Some t -> t
+    | None -> invalid_declf "cannot declare a constant of type %a" Type.pp ty
   in
   (* depth of the constant *)
   let depth = match parent with
@@ -270,6 +292,17 @@ let make_coverset_ ~cover_set_depth cst : cover_set =
     Unif.Ty.matching_same_scope
       ~pattern:ity.Ind_ty.ty_pattern cst.cst_ty ~scope:0
   in
+  (* we declare [id:ty], a new sub-constant of [cst] *)
+  let decl_sub id ty =
+    if Ind_ty.is_inductive_type ty
+    then
+      let sub = declare_cst_ ~parent:(Some cst) id ty in
+      add_sub_case sub >|= fun () ->
+      cst_to_term sub
+    else
+      add_constant id ty >|= fun () ->
+      T.const ~ty id
+  in
   (* list of generators of:
       - member of the coverset (one of the t such that cst=t)
       - set of sub-constants of this term *)
@@ -279,9 +312,7 @@ let make_coverset_ ~cover_set_depth cst : cover_set =
     then (
       let id = mk_skolem_ ID.pp ity.Ind_ty.ty_id in
       let ty = Substs.Ty.apply_no_renaming subst (ity.Ind_ty.ty_pattern,0) in
-      let sub = declare_cst_ ~parent:(Some cst) id ty in
-      add_sub_case sub >>= fun () ->
-      return (cst_to_term sub)
+      decl_sub id ty
     )
     (* inner nodes or base cases: constructors *)
     else (
@@ -323,9 +354,7 @@ let make_coverset_ ~cover_set_depth cst : cover_set =
         | B b -> mk_skolem_ Type.pp_builtin b
         | I id -> mk_skolem_ ID.pp id
       in
-      let sub = declare_cst_ ~parent:(Some cst) id ty in
-      let t = cst_to_term sub in
-      add_sub_case sub >>|= fun () -> t
+      decl_sub id ty
     )
   in
   (* build the toplevel values, along with a list of sub-constants
@@ -337,8 +366,9 @@ let make_coverset_ ~cover_set_depth cst : cover_set =
     get >>>= fun state ->
     let case = {
       case_term=t;
-      case_kind=if CstSet.is_empty state then `Base else `Rec;
-      case_sub=CstSet.elements state;
+      case_kind=if CstSet.is_empty state.cst then `Base else `Rec;
+      case_sub=CstSet.elements state.cst;
+      case_skolems=state.others;
     } in
     yield case
   in

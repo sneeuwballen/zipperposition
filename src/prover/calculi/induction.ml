@@ -20,6 +20,7 @@ let stats_min = Util.mk_stat "induction.assert_min"
 let k_enable : bool Flex_state.key = Flex_state.create_key()
 let k_lemmas_enabled : bool Flex_state.key = Flex_state.create_key()
 let k_show_lemmas : bool Flex_state.key = Flex_state.create_key()
+let k_ind_depth : int Flex_state.key = Flex_state.create_key()
 
 (* TODO
  in any ground inductive clause C[n]<-Gamma, containing inductive [n]:
@@ -230,7 +231,10 @@ module Make
     |> Sequence.max ~lt:(fun a b -> Ind_cst.path_dominates b a)
     |> CCOpt.get Ind_cst.path_empty
 
-  (* TODO: incremental strenghtening *)
+  (* TODO: incremental strenghtening.
+     - when expanding a coverset in clauses_of_min_witness, see if there
+       are other constants in the path with same type, in which case
+     strenghten! *)
 
   (* for each member [t] of the cover set:
      for each ctx in [mw.mw_contexts]:
@@ -251,7 +255,8 @@ module Make
            let pos_clauses =
              List.map
                (fun ctx ->
-                  let lits = ClauseContext.apply ctx case.Ind_cst.case_term in
+                  let t = Ind_cst.case_to_term case in
+                  let lits = ClauseContext.apply ctx t in
                   C.create_a lits proof ~trail:(Trail.singleton b_lit))
                mw.mw_contexts
            in
@@ -263,7 +268,8 @@ module Make
                (fun sub ->
                   (* only keep sub-constants that have the same type as [cst] *)
                   let sub = Ind_cst.cst_to_term sub in
-                  if Type.equal (T.ty sub) mw.mw_cst.Ind_cst.cst_ty
+                  let ty = Ind_cst.cst_ty mw.mw_cst in
+                  if Type.equal (T.ty sub) ty
                   then Some sub else None)
              |> Sequence.flat_map
                (fun sub ->
@@ -288,7 +294,7 @@ module Make
            let res = List.rev_append pos_clauses neg_clauses in
            Util.debugf ~section 2
              "@[<2>minimality of %a@ in case %a:@ @[<hv>%a@]@]"
-             (fun k->k Ind_cst.pp_cst mw.mw_cst T.pp case.Ind_cst.case_term
+             (fun k->k Ind_cst.pp_cst mw.mw_cst T.pp (Ind_cst.case_to_term case)
                  (Util.pp_list C.pp) res);
            Sequence.of_list res)
       |> Sequence.to_rev_list
@@ -397,6 +403,7 @@ module Make
              this constant w.r.t the set of clauses that contain it *)
           CCList.flat_map
             (fun cst ->
+              decl_cst_ cst;
               (* keep only clauses that depend on [cst] *)
               let ctxs =
                 CCList.filter_map
@@ -415,6 +422,9 @@ module Make
 
   let register () =
     Util.debug ~section 2 "register induction";
+    let d = Env.flex_get k_ind_depth in
+    Util.debugf ~section 2 "maximum induction depth: %d" (fun k->k d);
+    Ind_cst.max_depth_ := d;
     Env.add_unary_inf "induction.ind" inf_assert_minimal;
     Env.add_clause_conversion convert_statement;
     Env.add_is_trivial has_trivial_trail;
@@ -464,6 +474,7 @@ end
 let enabled_ = ref true
 let lemmas_enabled_ = ref false
 let show_lemmas_ = ref false
+let depth_ = ref !Ind_cst.max_depth_
 
 (* if induction is enabled AND there are some inductive types,
    then perform some setup after typing, including setting the key
@@ -492,6 +503,7 @@ let post_typing_hook stmts state =
     |> Flex_state.add k_enable true
     |> Flex_state.add k_lemmas_enabled !lemmas_enabled_
     |> Flex_state.add k_show_lemmas !show_lemmas_
+    |> Flex_state.add k_ind_depth !depth_
     |> Flex_state.add Ctx.Key.lost_completeness true
   ) else Flex_state.add k_enable false state
 
@@ -524,4 +536,5 @@ let () =
     ; "--lemmas", Options.switch_set true lemmas_enabled_, " enable lemmas for induction"
     ; "--no-lemmas", Options.switch_set false lemmas_enabled_, " disable lemmas for induction"
     ; "--show-lemmas", Arg.Set show_lemmas_, " show inductive (candidate) lemmas"
+    ; "--induction-depth", Arg.Set_int depth_, " maximum depth of nested induction"
     ]
