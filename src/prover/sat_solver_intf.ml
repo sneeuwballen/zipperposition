@@ -1,9 +1,12 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
+type proof_step = ProofStep.t
+type proof = ProofStep.of_
+
 type result =
   | Sat
-  | Unsat
+  | Unsat of proof
 
 exception WrongState of string
 
@@ -11,9 +14,6 @@ module type S = sig
   module Lit = BBox.Lit
 
   exception UndecidedLit
-
-  type proof_step = ProofStep.t
-  type proof = ProofStep.of_
 
   type clause = Lit.t list
 

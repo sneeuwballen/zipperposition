@@ -222,6 +222,7 @@ module Make
       (* minimality should be asserted for each case of the coverset *)
     mw_path: Ind_cst.path;
       (* path leading to this *)
+    mw_proof: ProofStep.t;
   }
 
   (* recover the (possibly empty) path from a boolean trail *)
@@ -243,7 +244,7 @@ module Make
     @param path the current induction branch
     @param trail precondition to this minimality
   *)
-  let clauses_of_min_witness ~trail ~proof mw : (C.t list * BoolBox.t list list) =
+  let clauses_of_min_witness ~trail mw : (C.t list * BoolBox.t list list) =
     let b_lits = ref [] in
     let clauses =
       Ind_cst.cover_set_cases ~which:`All mw.mw_coverset
@@ -257,7 +258,7 @@ module Make
                (fun ctx ->
                   let t = Ind_cst.case_to_term case in
                   let lits = ClauseContext.apply ctx t in
-                  C.create_a lits proof ~trail:(Trail.singleton b_lit))
+                  C.create_a lits mw.mw_proof ~trail:(Trail.singleton b_lit))
                mw.mw_contexts
            in
            (* clauses [CNF(¬ And_i ctx_i[t']) <- b_lit] for
@@ -285,7 +286,7 @@ module Make
                          [Array.to_list lits])
                     |> List.map
                       (fun lits ->
-                         C.create lits proof ~trail:(Trail.singleton b_lit))
+                         C.create lits mw.mw_proof ~trail:(Trail.singleton b_lit))
                   in
                   Sequence.of_list clauses)
             |> Sequence.to_rev_list
@@ -321,8 +322,9 @@ module Make
           mw_contexts=ctxs;
           mw_coverset=set;
           mw_path=path;
+          mw_proof=proof;
         } in
-        let clauses, b_clauses = clauses_of_min_witness ~trail ~proof mw in
+        let clauses, b_clauses = clauses_of_min_witness ~trail mw in
         A.Solver.add_clauses ~proof b_clauses;
         Util.incr_stat stats_min;
         clauses
@@ -411,9 +413,12 @@ module Make
                     ClauseContext.extract (C.lits c) (Ind_cst.cst_to_term cst))
                   clauses
               in
-              let proof = ProofStep.mk_goal (Statement.src st) in
-              let clauses = assert_min ~trail:Trail.empty ~proof ctxs cst in
-              clauses
+              (* proof: one step from all the clauses above *)
+              let proof =
+                ProofStep.mk_inference (List.map C.proof clauses)
+                  ~rule:(ProofStep.mk_rule "min")
+              in
+              assert_min ~trail:Trail.empty ~proof ctxs cst
             )
             consts
           |> CCOpt.return

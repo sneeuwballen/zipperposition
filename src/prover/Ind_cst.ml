@@ -493,13 +493,12 @@ let pp_path out p =
   let rec aux out = function
   | [] -> ()
   | c :: p' ->
-    Format.fprintf out "@[<hv2>[@[%a = %a@]@ for @[<v>%a@]]@]"
+    Format.fprintf out "@[<hv>[@[%a = %a@]@ for @[<v>%a@]]@]"
       pp_cst c.path_cst pp_case c.path_case
       (Util.pp_list ClauseContext.pp) c.path_clauses;
     if p' <> [] then (
       Format.fprintf out "@,@<1>·%a" aux p'
     );
-    Format.fprintf out "@]"
   in
   Format.fprintf out "@[<hv>%a@]" aux p
 

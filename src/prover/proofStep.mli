@@ -66,8 +66,13 @@ val step : of_ -> t
 val kind : t -> kind
 val parents : t -> of_ list
 
-val result_as_clause : of_ -> SClause.t
-val result_as_form : of_ -> form
+val compare : t -> t -> int
+val hash : t -> int
+val equal : t -> t -> bool
+
+val compare_proof : of_ -> of_ -> int
+val equal_proof : of_ -> of_ -> bool
+val hash_proof : of_ -> int
 
 (** {2 Constructors and utils}
     In all the following constructors, [theories] defaults to the empty list.
@@ -126,28 +131,11 @@ val compare_by_result : of_ -> of_ -> int
 
 (** {2 Proof traversal} *)
 
-module Tbl : CCHashtbl.S with type key = int
-
-val traverse : ?traversed:unit Tbl.t -> t -> t sequence
-(** Traverse the proof. Each proof node is traversed only once,
-    using the set to recognize already traversed proofs. *)
-
-val traverse_depth : ?traversed:unit Tbl.t -> t -> (t * int) sequence
-(** Traverse the proof, yielding each proof node along with its
-    depth from the initial proof. Each proof node is traversed only once,
-    using the set to recognize already traversed proofs. *)
-
 val distance_to_goal : t -> int option
 (** [distance_to_conjecture p] returns [None] if [p] has no ancestor
     that is a conjecture (including [p] itself). It returns [Some d]
     if [d] is the distance, in the proof graph, to the closest
     conjecture ancestor of [p] *)
-
-val to_seq : t -> t Sequence.t
-(** Traverse the subproofs, once each *)
-
-val depth : t -> int
-(** Max depth of the proof *)
 
 (** {2 IO} *)
 
