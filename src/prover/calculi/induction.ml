@@ -180,11 +180,10 @@ module Make
     Util.debugf ~section 1 "@[<2>lemmas:@ [@[<hv>%a@]]@]"
       (fun k->k (Util.pp_list SClause.pp) !lemmas_)
 
+  (* scan terms for inductive constants *)
   let scan_terms seq : Ind_cst.cst list =
     seq
     |> Sequence.flat_map Ind_cst.find_cst_in_term
-    |> Sequence.map
-      (fun (id,_,ty) -> Ind_cst.declare_cst id ~ty)
     |> Sequence.to_rev_list
     |> CCList.sort_uniq ~cmp:Ind_cst.cst_compare
 
@@ -355,6 +354,11 @@ module Make
          );
          res)
 
+  (* ensure the proper declarations are done for this constant *)
+  let decl_cst_ cst =
+    Ind_cst.declarations_of_cst cst
+    |> Sequence.iter (fun (id,ty) -> Ctx.declare id ty)
+
   (* when a clause contains new inductive constants, assert minimality
      of the clause for all those constants independently *)
   let inf_assert_minimal c =
@@ -362,6 +366,7 @@ module Make
     let clauses =
       CCList.flat_map
         (fun cst ->
+           decl_cst_ cst;
            let ctx = ClauseContext.extract_exn (C.lits c) (Ind_cst.cst_to_term cst) in
            let proof = ProofStep.mk_inference [C.proof c]
                ~rule:(ProofStep.mk_rule "min") in

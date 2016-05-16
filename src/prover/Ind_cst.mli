@@ -89,12 +89,17 @@ val declare_cst :
 (** Adds the constant to the set of inductive constants, make a coverset...
     @param cover_set_depth depth of cover_set terms; the deeper, the
       larger the cover set will be (default 1)
+    @raise AlreadyDeclaredConstant if the constant is declared already
     @raise NotAnInductiveType if [ty] is not an inductive type *)
 
 val cst_of_term : FOTerm.t -> cst option
 (** [cst_of_term t] returns a new or existing constant for this term, if any.
     @return None if the term is not to be converted into a constant
     @raise InvalidDecl if the term is not ground nor of an inductive type *)
+
+val cst_of_id : ID.t -> Type.t -> cst
+(** [cst_of_id id ty] returns a new or existing constant for this id.
+    @raise InvalidDecl if the type is not an inductive type *)
 
 val declarations_of_cst : cst -> (ID.t * Type.t) Sequence.t
 (** [declarations_of_cst c] returns a list of type declarations that should
@@ -122,10 +127,10 @@ val cst_cover_set : cst -> cover_set option
     [bigor_{i in 1...n} t=ti] is the skolemized version of the
     exhaustivity axiom on [t]'s type. *)
 
-val find_cst_in_term : FOTerm.t -> (ID.t * Ind_ty.t * Type.t) Sequence.t
+val find_cst_in_term : FOTerm.t -> cst Sequence.t
 (** [find_cst_in_lits term] searches subterms of [term] for constants
-    that are of an inductive type, that are not constructors nor already
-    declared, and that are Skolem symbols or sub-constants *)
+    that are of an inductive type and that are not constructors.
+    It returns the sequence of such inductive constants. *)
 
 val is_sub_cst : ID.t -> bool
 (** Is the term a constant that was created within a cover set? *)

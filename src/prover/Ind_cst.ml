@@ -151,26 +151,6 @@ let rec dominates c1 c2 =
       (fun sub_c -> cst_equal sub_c c2 || dominates sub_c c2)
       (cover_set_sub_constants set)
 
-(* find new inductive constant candidates in terms *)
-let find_cst_in_term t =
-  T.Seq.subterms t
-  |> Sequence.filter_map
-    (fun t -> match T.view t with
-      | T.Const id ->
-          let n_tyvars, ty_args, ty_ret = Type.open_poly_fun (T.ty t) in
-          (* must be a constant *)
-          if n_tyvars=0 && ty_args=[]
-          then match Ind_ty.as_inductive_type ty_ret with
-            | Some ity ->
-              if not (is_cst id)
-              && not (Ind_ty.is_constructor id)
-              && Skolem.is_skolem id
-                then Some (id, ity, ty_ret) (* bingo *)
-                else None
-            | _ -> None
-          else None
-      | _ -> None)
-
 (** {6 Creation of Coverset and Cst} *)
 
 type id_or_ty_builtin =
@@ -395,6 +375,16 @@ let declare_cst ?(cover_set_depth=1) id ~ty =
   cst.cst_coverset <- Some (make_coverset_ ~cover_set_depth cst);
   cst
 
+let cst_of_id id ty =
+  if Ind_ty.is_inductive_type ty
+  (* check if already a constant *)
+  then match as_cst id with
+    | Some c -> c
+    | None -> declare_cst id ~ty
+  else
+    invalid_declf "@[cst_of_id: @[%a:%a@]@ is not of an inductive type@]"
+      ID.pp id Type.pp ty
+
 let cst_of_term t =
   let ty = T.ty t in
   match T.view t with
@@ -405,6 +395,27 @@ let cst_of_term t =
       | None -> Some (declare_cst id ~ty)
     else None
   | _ -> None (* TODO: allow function, if not a constructor *)
+
+(* find inductive constant candidates in terms *)
+let find_cst_in_term t =
+  T.Seq.subterms t
+  |> Sequence.filter_map
+    (fun t -> match T.view t with
+      | T.Const id ->
+          let n_tyvars, ty_args, ty_ret = Type.open_poly_fun (T.ty t) in
+          (* must be a constant *)
+          if n_tyvars=0 && ty_args=[]
+          then
+            if Ind_ty.is_inductive_type ty_ret then
+              if is_cst id
+              || (not (Ind_ty.is_constructor id)
+                  && Skolem.is_skolem id)
+                then Some (cst_of_id id ty_ret) (* bingo *)
+                else None
+            else
+              None
+          else None
+      | _ -> None)
 
 (** {6 Path} *)
 
@@ -448,16 +459,19 @@ let path_dominates p1 p2 =
 let path_contains_cst p c =
   List.exists (fun c' -> cst_equal c c'.path_cst) p
 
-let rec pp_path out = function
+let pp_path out p =
+  let rec aux out = function
   | [] -> ()
   | c :: p' ->
-    Format.fprintf out "@[<hv2>[@[%a = %a@]@ for @[<v>%a@]]"
+    Format.fprintf out "@[<hv2>[@[%a = %a@]@ for @[<v>%a@]]@]"
       pp_cst c.path_cst pp_case c.path_case
       (Util.pp_list ClauseContext.pp) c.path_clauses;
     if p' <> [] then (
-      Format.fprintf out "·@[%a@]" pp_path p'
+      Format.fprintf out "@,@<1>·%a" aux p'
     );
     Format.fprintf out "@]"
+  in
+  Format.fprintf out "@[<hv>%a@]" aux p
 
 let lits_of_path p =
   Array.of_list p
