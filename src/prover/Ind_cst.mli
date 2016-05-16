@@ -10,30 +10,19 @@ open Libzipperposition
 
 exception InvalidDecl of string
 
-type cst = private {
-  cst_id: ID.t;
-  cst_ty: Type.t;
-  cst_ity: Ind_ty.t; (* the corresponding inductive type *)
-  cst_depth: int;
-  cst_parent: cst option;
-  mutable cst_coverset: cover_set option; (* the coverset for this constant *)
-}
+type cst
 
-and case = private {
-  case_term : FOTerm.t;
-  case_kind: [`Base | `Rec]; (* at least one sub-constant? *)
-  case_sub: cst list; (* set of sub-constants *)
-}
+type case
 
-and path_cell = private {
+type path_cell = private {
   path_cst: cst;
   path_case: case;
   path_clauses: ClauseContext.t list;
 }
 
-and path = path_cell list
+type path = path_cell list
 
-and cover_set = case list
+type cover_set = case list
 
 (** {6 Inductive Case}
 
