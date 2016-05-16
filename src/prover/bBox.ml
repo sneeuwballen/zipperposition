@@ -31,14 +31,19 @@ type lit = t
 
 let dummy = Lit.dummy
 
+let payload_to_int_ = function
+  | Fresh -> 0
+  | Clause_component _ -> 1
+  | Case _ -> 2
+
 let compare_payload l1 l2 = match l1, l2 with
   | Fresh, Fresh -> 0
-  | Fresh, _  -> -1
-  | _, Fresh -> 1
   | Clause_component l1, Clause_component l2 -> Lits.compare l1 l2
   | Case p1, Case p2 -> Ind_cst.path_compare p1 p2
-  | Clause_component _, Case _ -> 1
-  | Case _, Clause_component _ -> -1
+  | Fresh, _
+  | Clause_component _, _
+  | Case _, _ ->
+    CCInt.compare (payload_to_int_ l1) (payload_to_int_ l2)
 
 let pp_payload out = function
   | Fresh -> CCFormat.string out "<dummy>"

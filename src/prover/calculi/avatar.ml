@@ -300,9 +300,9 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       | Sat_solver.Sat ->
           Util.debug ~section 3 "SAT-solver reports \"SAT\"";
           []
-      | Sat_solver.Unsat ->
+      | Sat_solver.Unsat proof ->
           Util.debug ~section 1 "SAT-solver reports \"UNSAT\"";
-          let proof = Sat.get_proof () |> ProofStep.step in
+          let proof = ProofStep.step proof in
           let c = C.create ~trail:Trail.empty [] proof in
           [c]
     in

@@ -3,14 +3,14 @@
 
 open Libzipperposition
 
+type proof_step = ProofStep.t
+type proof = ProofStep.of_
+
 module type S = sig
   module Ctx : Ctx.S
 
   type t
   type clause = t
-
-  type proof_step = ProofStep.t
-  type proof = ProofStep.of_
 
   (** {2 Flags} *)
 

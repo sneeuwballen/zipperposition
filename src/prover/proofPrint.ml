@@ -8,6 +8,13 @@ open ProofStep
 
 module C = SClause
 
+(* proof hashtable *)
+module Tbl = CCHashtbl.Make(struct
+    type t = of_
+    let equal = equal_proof
+    let hash = hash_proof
+  end)
+
 let section = ProofStep.section
 
 type t = ProofStep.of_
@@ -25,10 +32,10 @@ let is_proof_of_false p =
 
 let get_name ~namespace p =
   try
-    Tbl.find namespace p.id
+    Tbl.find namespace p
   with Not_found ->
     let n = Tbl.length namespace in
-    Tbl.add namespace p.id n;
+    Tbl.add namespace p n;
     n
 
 (** {2 Conversion to a graph of proofs} *)
@@ -63,9 +70,9 @@ let traverse ?(traversed=Tbl.create 16) proof k =
     while !current <> [] do
       let proof = List.hd !current in
       current := List.tl !current;
-      if Tbl.mem traversed proof.step.id then ()
+      if Tbl.mem traversed proof then ()
       else (
-        Tbl.add traversed proof.step.id ();
+        Tbl.add traversed proof ();
         (* traverse premises first *)
         List.iter (fun proof' -> next := proof' :: !next) proof.step.parents;
         (* yield proof *)
@@ -77,7 +84,7 @@ let traverse ?(traversed=Tbl.create 16) proof k =
     next := [];
   done
 
-let pp_debug out proof =
+let pp_normal out proof =
   let sep = "by" in
   Format.fprintf out "@[<v>";
   let pp_bullet out () = Format.fprintf out "@<1>@{<Green>*@}" in
@@ -129,9 +136,9 @@ let pp_tstp out proof =
   Format.fprintf out "@[<v>";
   traverse proof
     (fun p ->
-       let name = get_name ~namespace p.step in
+       let name = get_name ~namespace p in
        let parents =
-         List.map (fun p -> `Name (get_name ~namespace p.step)) p.step.parents
+         List.map (fun p -> `Name (get_name ~namespace p)) p.step.parents
        in
        let role = "plain" in (* TODO *)
        match p.result with
@@ -153,7 +160,7 @@ let pp_tstp out proof =
 let pp o out proof = match o with
   | Options.Print_none -> Util.debug ~section 1 "proof printing disabled"
   | Options.Print_tptp -> pp_tstp out proof
-  | Options.Print_normal -> pp_debug out proof
+  | Options.Print_normal -> pp_normal out proof
   | Options.Print_zf -> failwith "proof printing in ZF not implemented" (* TODO? *)
 
 let _pp_list_str = Util.pp_list CCFormat.string
@@ -175,8 +182,8 @@ let _to_str_escape fmt =
 
 let pp_dot_seq ~name out seq =
   (* TODO: check proof is a DAG *)
-  let equal p1 p2 = ProofStep.equal p1.step p2.step in
-  let hash p = ProofStep.hash p.step in
+  let equal p1 p2 = ProofStep.equal_proof p1 p2 in
+  let hash p = ProofStep.hash_proof p in
   CCGraph.Dot.pp_seq
     ~tbl:(CCGraph.mk_table ~eq:equal ~hash:hash 64)
     ~eq:equal

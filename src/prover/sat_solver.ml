@@ -8,9 +8,12 @@ open Libzipperposition
 let section = Util.Section.make ~parent:Const.section "msat"
 let prof_call_msat = Util.mk_profiler "msat.call"
 
+type proof_step = Sat_solver_intf.proof_step
+type proof = Sat_solver_intf.proof
+
 type result = Sat_solver_intf.result =
   | Sat
-  | Unsat
+  | Unsat of proof
 
 exception WrongState of string
 
@@ -27,8 +30,6 @@ module Make(Dummy : sig end)
   module Lit = BBox.Lit
 
   type clause = Lit.t list
-  type proof_step = ProofStep.t
-  type proof = ProofStep.of_
 
   (* queue of clauses waiting for being pushed into the solver *)
   let queue_ = Queue.create()
@@ -68,12 +69,14 @@ module Make(Dummy : sig end)
 
   let result_ = ref Sat
 
+  let res_is_unsat_ () = match !result_ with Sat -> false | Unsat _ -> true
+
   (* invariant:
     when result_ = Sat, only eval/eval_level are defined
     when result_ = Unsat, only unsat_core_ is defined
   *)
 
-  let eval_fail_ _ = assert (!result_ = Unsat); wrong_state_ "eval"
+  let eval_fail_ _ = assert (res_is_unsat_ ()); wrong_state_ "eval"
 
   let eval_ = ref eval_fail_
   let eval_level_ = ref eval_fail_
@@ -99,7 +102,7 @@ module Make(Dummy : sig end)
 
 
   (* map tags to the associated proof *)
-  let tag_to_proof_ = Hashtbl.create 32
+  let tag_to_proof_ : (int, proof_step) Hashtbl.t = Hashtbl.create 32
 
   module SatForm = struct
     include Lit
@@ -184,9 +187,9 @@ module Make(Dummy : sig end)
       eval_level_ := S.eval_level;
       result_ := Sat;
     | S.Unsat ->
-      result_ := Unsat;
-      let p = S.get_proof () in
-      proof_ := Some (conv_proof_ p);
+      let p = S.get_proof () |> conv_proof_ in
+      result_ := Unsat p;
+      proof_ := Some p;
     end;
     !result_
 
