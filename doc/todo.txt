@@ -4,9 +4,6 @@
 (D) 2016-01-15 repair induction, improve it with mutual/nested induction  p:1
 (D) 2016-01-15 add better generalization in induction id:1 @calculus
 (D) 2016-01-15 add locked storage for Avatar @optim
-(D) 2016-01-15 efficient term rewriting for deduction modulo @calculus @optim
-(D) 2016-01-15 efficient (polarized) literal->clause rewriting for deduction modulo @calculus
-(D) 2016-01-15 question answering
 (D) 2016-01-16 proper calculus for (co)data with mutual types (based on EnumTypes) @calculus
 (D) 2016-01-22 update doc/api_intro.txt @doc
 (D) 2016-01-22 add arithmetic into ZF @arith
@@ -22,3 +19,5 @@
 (D) 2016-04-08 benchmark/optimize term rewriting
 (D) 2016-04-08 syntax for projectors in data (--> records)
 (B) 2016-04-08 explicit schema for (fun/ind pred) induction (explain how to do induction on `even`) in syntax+induction
+(A) 2016-05-14 add set of used rewrite rules in modulo proofs
+(B) 2016-01-15 question answering
