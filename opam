@@ -29,6 +29,7 @@ depends: [
   "sequence" { >= "0.4" }
   "gen"
   "oclock"
+  "oasis"
   "msat" { >= "0.3" }
 ]
 depopts: [
