@@ -171,6 +171,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let idx_fv () = !_idx_fv
   let idx_simpl () = !_idx_simpl
 
+  type op =
+    | O_add
+    | O_remove
+
   (* apply operation [f] to some parts of the clause [c] just added/removed
      from the active set *)
   let _update_active f c =
@@ -206,10 +210,27 @@ module Make(Env : Env.S) : S with module Env = Env = struct
          !_idx_back_demod;
     Signal.ContinueListening
 
+  (* monotonically increasing number
+     (increased for every new simplification clause)  *)
+  let cur_age, incr_age =
+    let n = ref 1 in
+    (fun () -> !n), (fun () -> incr n; !n)
+
+  (* is [c] a conditional rewrite rule? *)
+  let is_conditional c =
+    not (Trail.is_empty (C.trail c))
+
   (* update simpl. index using the clause [c] just added or removed to
      the simplification set *)
-  let _update_simpl f c =
+  let _update_simpl o c =
     let ord = Ctx.ord () in
+    (* insert/delete, but use the age *)
+    let f env eqn = match o with
+      | O_add ->
+        let age = if is_conditional c then max_int else incr_age() in
+        UnitIdx.add ~age env eqn
+      | O_remove -> UnitIdx.remove env eqn
+    in
     let idx = !_idx_simpl in
     let idx' = match C.lits c with
       | [| Lit.Equation (l,r,true) |] ->
@@ -230,6 +251,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | _ -> idx
     in
     _idx_simpl := idx';
+    assert (UnitIdx.max_age idx' >= UnitIdx.max_age idx);
     Signal.ContinueListening
 
   let () =
@@ -242,9 +264,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
          _idx_fv := SubsumIdx.remove !_idx_fv c;
          _update_active TermIndex.remove c);
     Signal.on PS.SimplSet.on_add_clause
-      (_update_simpl UnitIdx.add);
+      (_update_simpl O_add);
     Signal.on PS.SimplSet.on_remove_clause
-      (_update_simpl UnitIdx.remove);
+      (_update_simpl O_remove);
     ()
 
   (** {6 Inference Rules} *)
@@ -617,10 +639,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
    * simplifications
    * ---------------------------------------------------------------------- *)
 
-  exception RewriteInto of T.t * S.t
-
-  (* TODO: put forward pointers in simpl_set, to make some rewriting steps
-      faster? (invalidate when updated, also allows to reclaim memory) *)
+  exception RewriteInto of T.t * bool (* conditional? *) * S.t
 
   (* TODO: use a record with
      - head
@@ -636,16 +655,20 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     *)
 
   (** Compute normal form of term w.r.t active set. Clauses used to
-      rewrite are added to the clauses hashset.
-      restrict is an option for restricting demodulation in positive maximal terms *)
+      rewrite are added to the set [clauses].
+      @param restrict an option for restricting demodulation in positive maximal terms *)
   let demod_nf ?(restrict=false) c clauses t =
     let ord = Ctx.ord () in
+    let cur_age = cur_age() in
     (* compute normal form of subterm. If restrict is true, substitutions that
-       are variable renamings are forbidden (since we are at root of a max term) *)
+       are variable renamings are forbidden (since we are at root of a max term)
+       @return (t1,t2) where t1 is the inconditional normal form, and t2
+        the conditional normal form *)
     let rec reduce_at_root ~restrict t =
       (* find equations l=r that match subterm *)
       try
-        UnitIdx.retrieve ~sign:true (!_idx_simpl, 1) (t, 0)
+        let age = if restrict then 0 else T.age t in
+        UnitIdx.retrieve ~age ~sign:true (!_idx_simpl, 1) (t, 0)
         |> Sequence.iter
           (fun (l, r, (_,_,_,unit_clause), subst) ->
              (* r is the term subterm is going to be rewritten into *)
@@ -668,39 +691,78 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                    (S.FO.apply_no_renaming subst (r,1)) = Comp.Gt);
                clauses := unit_clause :: !clauses;
                Util.incr_stat stat_demodulate_step;
-               raise (RewriteInto (r, subst))
+               raise (RewriteInto (r, is_conditional unit_clause, subst))
              ));
-        t (* not found any match, normal form found *)
-      with RewriteInto (t', subst) ->
+        t, t (* not found any match, normal form found *)
+      with RewriteInto (t', conditional, subst) ->
         Util.debugf ~section 5 "@[<2>demod:@ rewrite @[%a@]@ into @[%a@]@]"
           (fun k->k T.pp t T.pp t');
-        normal_form ~restrict subst t' 1 (* done one rewriting step, continue *)
+        if conditional
+        then (
+          (* conditional step, [t] is the inconditional normal form *)
+          let _, cond_nf = normal_form ~restrict subst t' 1 in
+          t, cond_nf
+        ) else (
+          (* inconditional step, continue *)
+          normal_form ~restrict subst t' 1
+        )
     (* rewrite innermost-leftmost of [subst(t,scope)]. The initial scope is
        0, but then we normal_form terms in which variables are really the variables
        of the RHS of a previously applied rule (in context 1); all those
        variables are bound to terms in context 0 *)
+    and reduce_cached ~restrict t =
+      if restrict then reduce_at_root ~restrict:true t
+      else (
+        (* use cached normal form, then update it *)
+        let t = T.normal_form t in
+        let (t', _) as res = reduce_at_root ~restrict:false t in
+        T.set_age t cur_age;
+        T.set_normal_form t t'; (* cache inconditional normal form *)
+        res
+      )
+    (* recursive computation, call-by-value *)
     and normal_form ~restrict subst t scope =
       match T.view t with
       | T.App (hd, l) ->
           begin match T.view hd with
           | T.DB _
-          | T.Var _ -> S.FO.apply_no_renaming subst (t, scope)
+          | T.Var _ ->
+            let t' = S.FO.apply_no_renaming subst (t, scope) in
+            t', t'
           | T.Const _ ->
               (* rewrite subterms in call by value *)
-              let l' = List.map (fun t' -> normal_form ~restrict:false subst t' scope) l in
+              let l', l_nf =
+                List.map (fun t' -> normal_form ~restrict:false subst t' scope) l
+                |> List.split
+              in
               let hd' = Substs.FO.apply_no_renaming subst (hd, scope) in
               let t' =
                 if T.equal hd hd' && T.same_l l l'
                 then t
-                else T.app hd' l' in
+                else T.app hd' l'
+              and t_nf =
+                if T.equal hd hd' && T.same_l l l_nf
+                then t
+                else T.app hd' l_nf
+              in
               (* rewrite term at root *)
-              reduce_at_root ~restrict t'
+              if T.equal t' t_nf then (
+                (* all sub-steps were inconditional! *)
+                reduce_cached ~restrict t'
+              ) else (
+                (* cannot inconditionally reduce any further *)
+                let _, nf = reduce_cached ~restrict t_nf in
+                t', nf
+              )
           | T.App _
           | T.AppBuiltin _ -> assert false
           end
-      | _ -> S.FO.apply_no_renaming subst (t,scope)
+      | _ ->
+        let t' = S.FO.apply_no_renaming subst (t,scope) in
+        t', t'
     in
-    normal_form ~restrict S.empty t 0
+    (* return the conditional normal form *)
+    snd (normal_form ~restrict S.empty t 0)
 
   (* Demodulate the clause, with restrictions on which terms to rewrite *)
   let demodulate_ c =
@@ -740,7 +802,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ProofStep.mk_simp
           ~rule:(ProofStep.mk_rule "demod")
           (C.proof c :: List.map C.proof !clauses) in
-      let trail = C.trail c in (* we know that demodulating rules have smaller trail *)
+      let trail = C.trail c in (* we know that demodulating rules have smaller trails *)
       let new_c = C.create_a ~trail lits proof in
       Util.debugf ~section 3 "@[<hv2>demodulate@ @[%a@]@ into @[%a@]@ using @[%a@]@]"
         (fun k->k C.pp c C.pp new_c (Util.pp_list C.pp) !clauses);

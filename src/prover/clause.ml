@@ -375,7 +375,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       if BV.get maxlits i then Format.fprintf out "@{<Black>*@}"
     and pp_dist_goal out c = match distance_to_goal c with
       | None -> ()
-      | Some d -> Format.fprintf out "/%d@ " d
+      | Some d -> Format.fprintf out " (distgoal:%d)@ " d
     in
     (* print literals with a '*' for maximal, and '+' for selected *)
     let selected = Lazy.force c.selected in

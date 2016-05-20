@@ -30,6 +30,18 @@ type view = private
 
 val view : t -> view
 
+val age : t -> int
+(** Last time the term's normal form was computed. Default is 0 *)
+
+val set_age : t -> int -> unit
+(** Set new age. Must be >= the old one *)
+
+val normal_form : t -> t
+(** Current normal form *)
+
+val set_normal_form : t -> t -> unit
+(** Set new normal form *)
+
 
 (** {2 Classic view} *)
 module Classic : sig

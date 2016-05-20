@@ -116,7 +116,7 @@ module Make(E : Index.EQUATION) = struct
   in
   goto trie (iterate t) (fun t -> t)
 
-  let add trie eqn =
+  let add ?age:_ trie eqn =
     let t, _, _ = E.extract eqn in
     let k leaf = Leaf.add leaf t eqn in
     goto_leaf trie t k
@@ -132,7 +132,7 @@ module Make(E : Index.EQUATION) = struct
   let remove_seq dt seq =
     Sequence.fold remove dt seq
 
-  let retrieve ?(subst=S.empty) ~sign dt t k =
+  let retrieve ?age:_ ?(subst=S.empty) ~sign dt t k =
     Util.enter_prof prof_npdtree_retrieve;
     (* extended callback *)
     let k' (t', eqn, subst) =
@@ -172,6 +172,8 @@ module Make(E : Index.EQUATION) = struct
     with e ->
       Util.exit_prof prof_npdtree_retrieve;
       raise e
+
+  let max_age _ = max_int
 
   (** iterate on all (term -> value) in the tree *)
   let rec iter dt k =

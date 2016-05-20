@@ -32,6 +32,11 @@ let view t = match T.view t with
   | T.Const s -> Const s
   | _ -> assert false
 
+let normal_form = T.normal_form
+let set_normal_form = T.set_normal_form
+let age = T.age
+let set_age = T.set_age
+
 (** {2 Comparison, equality, containers} *)
 
 let subterm ~sub t =

@@ -125,14 +125,18 @@ module Make(E : Index.EQUATION) = struct
   type rhs = E.rhs
 
   type trie =
-    | TrieNode of trie CharMap.t       (** map atom -> trie *)
-    | TrieLeaf of (T.t * E.t * int) list
+    | TrieNode of int * trie CharMap.t       (** map atom -> trie *)
+    | TrieLeaf of int * (T.t * E.t * int) list
       (** leaf with (term, value, priority) list *)
 
   let empty_trie n = match n with
-    | TrieNode m when CharMap.is_empty m -> true
-    | TrieLeaf [] -> true
+    | TrieNode (_,m) when CharMap.is_empty m -> true
+    | TrieLeaf (_,[]) -> true
     | _ -> false
+
+  let age_trie = function
+    | TrieLeaf (a,_)
+    | TrieNode (a,_) -> a
 
   (** get/add/remove the leaf for the given flatterm. The
       continuation k takes the leaf, and returns a leaf option
@@ -144,24 +148,30 @@ module Make(E : Index.EQUATION) = struct
     (* function to go to the given leaf, building it if needed *)
     let rec goto trie t rebuild =
       match trie, t with
-      | (TrieLeaf l) as leaf, [] -> (* found leaf *)
-        begin match k l with
+      | (TrieLeaf (a,l)) as leaf, [] -> (* found leaf *)
+        begin match k a l with
         | new_leaf when leaf == new_leaf -> root  (* no change, return same tree *)
-        | new_leaf -> rebuild new_leaf           (* replace by new leaf *)
+        | new_leaf -> rebuild new_leaf (* replace by new leaf *)
         end
-      | TrieNode m, c::t' ->
+      | TrieNode (a,m), c::t' ->
         begin try  (* insert in subtrie *)
           let subtrie = CharMap.find c m in
-          let rebuild' subtrie = match subtrie with
-            | _ when empty_trie subtrie -> rebuild (TrieNode (CharMap.remove c m))
-            | _ -> rebuild (TrieNode (CharMap.add c subtrie m))
+          let rebuild' subtrie =
+            match subtrie with
+            | _ when empty_trie subtrie -> rebuild (TrieNode (a, CharMap.remove c m))
+            | _ ->
+              let a' = max a (age_trie subtrie) in
+              rebuild (TrieNode (a', CharMap.add c subtrie m))
           in
           goto subtrie t' rebuild'
         with Not_found -> (* no subtrie found *)
-          let subtrie = if t' = [] then TrieLeaf [] else TrieNode CharMap.empty
+          let subtrie =
+            if t' = [] then TrieLeaf (0,[]) else TrieNode (0,CharMap.empty)
           and rebuild' subtrie = match subtrie with
             | _ when empty_trie subtrie -> root  (* same tree *)
-            | _ -> rebuild (TrieNode (CharMap.add c subtrie m))
+            | _ ->
+              let a' = max a (age_trie subtrie) in
+              rebuild (TrieNode (a', CharMap.add c subtrie m))
           in
           goto subtrie t' rebuild'
         end
@@ -172,17 +182,21 @@ module Make(E : Index.EQUATION) = struct
 
   type t = trie
 
-  let empty () = TrieNode CharMap.empty
+  let empty () = TrieNode (0,CharMap.empty)
 
   let is_empty = empty_trie
 
-  let add dt eqn =
+  let add ?(age=max_int) dt eqn =
     let t, _, _ = E.extract eqn in
     let priority = E.priority eqn in
     let chars = to_list t in
-    let k l =
+    let k a l =
+      let a' = max a age in
       let l' = (t, eqn, priority)::l in
-      TrieLeaf (List.stable_sort (fun (_, _, p1) (_, _, p2) -> p1 - p2) l')
+      TrieLeaf (
+        a',
+        List.stable_sort (fun (_, _, p1) (_, _, p2) -> p1 - p2) l'
+      )
       (* TODO: linear-time insertion into a sorted list *)
     in
     let tree = goto_leaf dt chars k in
@@ -191,12 +205,12 @@ module Make(E : Index.EQUATION) = struct
   let remove dt eqn =
     let t, _, _ = E.extract eqn in
     let chars = to_list t in
-    let k l =
+    let k a l =
       (* remove tuples that match *)
       let l' = List.filter
         (fun (t', eqn', _) -> t' != t || E.compare eqn eqn' <> 0) l
       in
-      TrieLeaf l'
+      TrieLeaf (a,l')
     in
     let tree = goto_leaf dt chars k in
     tree
@@ -207,18 +221,21 @@ module Make(E : Index.EQUATION) = struct
   let remove_seq dt seq =
     Sequence.fold remove dt seq
 
-  let retrieve ?(subst=S.empty) ~sign dt t k =
+  let retrieve ?(age=0) ?(subst=S.empty) ~sign dt t k =
     Util.enter_prof prof_dtree_retrieve;
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie iter subst =
       match trie, iter with
-      | TrieLeaf l, None ->  (* yield all equations, they all match *)
+      | TrieLeaf (a,_), None when a < age -> () (* too old *)
+      | TrieLeaf (_,l), None ->
+        (* yield all equations, they are potentially recent enough and do match [t] *)
         List.iter
           (fun (_, eqn, _) ->
-            let l, r, sign' = E.extract eqn in
-            if sign = sign' then k (l, r, eqn, subst))
+             let l, r, sign' = E.extract eqn in
+             if sign = sign' then k (l, r, eqn, subst))
           l
-      | TrieNode m, Some i ->
+      | TrieNode (a,_), _ when a < age -> () (* too old *)
+      | TrieNode (_,m), Some i ->
         (* "lazy" transformation to flatterm *)
         let t_pos = i.cur_term in
         let c1 = i.cur_char in
@@ -272,12 +289,14 @@ module Make(E : Index.EQUATION) = struct
     Util.exit_prof prof_dtree_retrieve;
     ()
 
+  let max_age = age_trie
+
   (** iterate on all (term -> value) in the tree *)
   let iter dt k =
     let rec iter trie =
       match trie with
-      | TrieNode m -> CharMap.iter (fun _ sub_dt -> iter sub_dt) m
-      | TrieLeaf l -> List.iter (fun (t, v, _) -> k t v) l
+      | TrieNode (_,m) -> CharMap.iter (fun _ sub_dt -> iter sub_dt) m
+      | TrieLeaf (_,l) -> List.iter (fun (t, v, _) -> k t v) l
     in iter dt
 
   let size dt =
@@ -289,14 +308,18 @@ module Make(E : Index.EQUATION) = struct
     CCGraph.make_labelled_tuple
       (function
         | TrieLeaf _ -> Sequence.empty
-        | TrieNode m -> CharMap.to_seq m)
+        | TrieNode (_,m) -> CharMap.to_seq m)
 
   (* TODO: print leaf itself *)
 
   let rec equal_ a b = match a, b with
-    | TrieLeaf l1, TrieLeaf l2 -> l1==l2
-    | TrieNode m1, TrieNode m2 -> m1==m2 || CharMap.equal equal_ m1 m2
+    | TrieLeaf (_,l1), TrieLeaf (_,l2) -> l1==l2
+    | TrieNode (_,m1), TrieNode (_,m2) -> m1==m2 || CharMap.equal equal_ m1 m2
     | TrieLeaf _, _ | TrieNode _, _ -> false
+
+  let pp_age_ a =
+    if a=max_int then "∞"
+    else string_of_int a
 
   let to_dot out t =
     Util.debugf ~section:Util.Section.zip 2
@@ -305,10 +328,13 @@ module Make(E : Index.EQUATION) = struct
       ~eq:equal_
       ~tbl:(CCGraph.mk_table ~eq:equal_ ~hash:Hashtbl.hash 128)
       ~attrs_v:(function
-        | TrieLeaf l ->
+        | TrieLeaf (a,l) ->
             let len = List.length l in
-            [`Shape "box"; `Label (string_of_int len)]
-        | TrieNode _ -> [`Shape "circle"; `Label ""])
+            let label = Printf.sprintf "%d (age %s)" len (pp_age_ a) in
+            [`Shape "box"; `Label label]
+        | TrieNode (a,_) ->
+          let label = Printf.sprintf "(age %s)" (pp_age_ a) in
+          [`Shape "circle"; `Label label])
       ~attrs_e:(fun (_, e ,_) ->
         let e = CCFormat.to_string pp_char e in
         [`Label e])

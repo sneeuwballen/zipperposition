@@ -157,8 +157,11 @@ module type UNIT_IDX = sig
 
   val is_empty : t -> bool
 
-  val add : t -> E.t -> t
-  (** Index the given (in)equation *)
+  val add : ?age:int -> t -> E.t -> t
+  (** Index the given (in)equation.
+      @param age if provided, this gives an indication of how "recent" the
+        equation is; the equation will be retrieved only for terms that
+        are not more recent than it *)
 
   val add_seq : t -> E.t Sequence.t -> t
   val add_list : t -> E.t list -> t
@@ -173,14 +176,20 @@ module type UNIT_IDX = sig
   val iter : t -> (term -> E.t -> unit) -> unit
   (** Iterate on indexed equations *)
 
+  val max_age : t -> int
+  (** max age registered in the index *)
+
   val retrieve :
-    ?subst:subst -> sign:bool ->
+    ?age:int -> ?subst:subst -> sign:bool ->
     t Scoped.t -> term Scoped.t ->
     (term * rhs * E.t * subst) Sequence.t
   (** [retrieve ~sign (idx,si) (t,st) acc] iterates on
       (in)equations l ?= r of given [sign] and substitutions [subst],
       such that subst(l, si) = t.
-      It therefore finds generalizations of the query term. *)
+      It therefore finds generalizations of the query term.
+      @param age if given, only equations that are more recent than it
+        are guaranteed to be retrieved. Also, the result satisfies [max_age r >= age].
+      *)
 
   val to_dot : t CCFormat.printer
   (** print the index in the DOT format *)

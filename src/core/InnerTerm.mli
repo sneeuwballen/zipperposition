@@ -35,6 +35,18 @@ val ty_exn : t -> t
 (** Same as {!ty}, but fails if the term has no type
     @raise Invalid_argument if the type is [NoType] *)
 
+val age : t -> int
+(** Last time the term's normal form was computed. Default is 0 *)
+
+val set_age : t -> int -> unit
+(** Set new age. Must be >= the old one *)
+
+val normal_form : t -> t
+(** Current normal form *)
+
+val set_normal_form : t -> t -> unit
+(** Set new normal form *)
+
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 
