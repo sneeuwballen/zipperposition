@@ -45,8 +45,7 @@ module Make(Env : Env_intf.S) = struct
         (fun lit -> match acyclicity lit with
           | `Neither
           | `Absurd -> false
-          | `Trivial -> true
-        )
+          | `Trivial -> true)
     in
     if res
     then Util.debugf ~section 3 "@[<2>acyclicity:@ `@[%a@]` is trivial@]" (fun k->k C.pp c);
