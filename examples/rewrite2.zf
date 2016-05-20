@@ -26,6 +26,6 @@ goal
   forall B C.
   exists A.
   forall x.
-  mem _ x A => (mem _ x B || mem _ x C).
+  mem _ x A <=> (mem _ x B || mem _ x C).
 
 
