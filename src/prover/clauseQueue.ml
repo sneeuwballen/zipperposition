@@ -192,9 +192,9 @@ module Make(C : Clause.S) = struct
 
   let take_first q =
     if is_empty q then raise Not_found;
-    let new_h, (_, c) = H.take_exn q.heap in
+    let new_h, (w, c) = H.take_exn q.heap in
     let q' = { q with heap=new_h; } in
-    q', c
+    q', c, w
 
   let name q = q.functions.name
 

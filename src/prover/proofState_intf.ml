@@ -55,7 +55,7 @@ module type S = sig
     val queue : unit -> CQueue.t
     (** Current state of the clause queue *)
 
-    val next : unit -> C.t option
+    val next : unit -> (C.t * ClauseQueue.Weight.t) option
     (** Get-and-remove the next passive clause to process *)
 
     val num_clauses : unit -> int
