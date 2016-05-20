@@ -235,7 +235,9 @@ let apply subst ~renaming t =
   aux t
 
 let apply_no_renaming subst t =
-  apply subst ~renaming:Renaming.dummy t
+  if is_empty subst
+  then Scoped.get t
+  else apply subst ~renaming:Renaming.dummy t
 
 (** {2 Specializations} *)
 
