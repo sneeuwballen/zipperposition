@@ -7,6 +7,9 @@ type profile =
   | P_explore
   | P_ground
   | P_goal
+  | P_goal_bfs
+
+type weight = int list
 
 (** {1 A priority queue of clauses, purely functional} *)
 module type S = sig
@@ -14,35 +17,49 @@ module type S = sig
 
   (** {6 Weight functions} *)
   module WeightFun : sig
-    type t = C.t -> int
+    type single = C.t -> int
     (** attribute a weight to a clause. The smaller, the better (lightweight
         clauses will be favored). A weight must always be positive;
-        the weight of the empty clause should alwyays be 0. *)
+        the weight of the empty clause should always be 0. *)
 
-    val default : t
+    type t = C.t -> weight
+    (** A weight function is a lexicographically ordered sequence of weights *)
+
+    val default : single
     (** Use {!Literal.heuristic_weight} *)
 
-    val age : t
+    val age : single
     (** Returns the age of the clause (or 0 for the empty clause) *)
 
-    val favor_all_neg : t
+    val favor_all_neg : single
     (** Favor clauses with only negative ground lits *)
 
-    val favor_non_all_neg : t
+    val favor_non_all_neg : single
     (** Favor clauses that have at least one non-(ground negative) lit *)
 
-    val favor_ground : t
+    val favor_ground : single
 
-    val favor_horn : t
+    val favor_horn : single
 
-    val favor_goal : t
+    val favor_goal : single
     (** The closest a clause is from the initial goal, the lowest its weight.
         Some threshold is used for clauses that are too far away *)
 
-    val combine : (t * int) list -> t
+    val single : single -> t
+    (** Single weight *)
+
+    val combine_linear : (single * int) list -> t
     (** Combine a list of pairs [w, coeff] where [w] is a weight function,
         and [coeff] a strictly positive number. This is a weighted sum
         of weights. *)
+
+    val combine_lexico : t -> t -> t
+    (** [combine_lexico a b] puts the weight of [a] before the weight of [b],
+        lexicographically. Only clauses for whch [a] gives the same weight
+        are compared using [b] *)
+
+    val combine_lexico_l : t list -> t
+    (** @raise Invalid_argument if the list is empty *)
   end
 
   type t
@@ -65,7 +82,7 @@ module type S = sig
 
   (** {6 Available Queues} *)
 
-  val make : weight:(C.t -> int) -> string -> t
+  val make : weight:WeightFun.t -> string -> t
   (** Bring your own implementation of queue. The [weight] function
       should be fair, i.e. for any clause [c], the weight of [c] should
       eventually be the smallest one in the queue (e.g., using the age

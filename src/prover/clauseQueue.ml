@@ -20,6 +20,7 @@ let profiles_ =
   ; "explore", P_explore
   ; "ground", P_ground
   ; "goal", P_goal
+  ; "goal_bfs", P_goal_bfs
   ]
 
 let profile_of_string s =
@@ -39,20 +40,28 @@ let () =
       , " choose which set of clause queues to use (for selecting next active clause)"
     ]
 
+module Weight = struct
+  type t = int list
+
+  let compare a b = CCOrd.(list_ int_) a b
+  let pp out = CCFormat.(list int) out
+end
+
 module Make(C : Clause.S) = struct
   module C = C
 
   (* weight of a term [t], using the precedence's weight *)
   let term_weight t = FOTerm.size t
 
+  let weight_lits_ l =
+    Array.fold_left
+      (fun acc lit -> acc + Lit.heuristic_weight term_weight lit)
+      0 l
+
   (** {6 Weight functions} *)
   module WeightFun = struct
-    type t = C.t -> int
-
-    let weight_lits_ l =
-      Array.fold_left
-        (fun acc lit -> acc + Lit.heuristic_weight term_weight lit)
-        0 l
+    type single = C.t -> int
+    type t = C.t -> Weight.t
 
     let default c =
       (* maximum depth of types. Avoids reasoning on list (list (list .... (list int))) *)
@@ -118,18 +127,31 @@ module Make(C : Clause.S) = struct
     let favor_non_all_neg c =
       if not (all_ground_neg c) then 0 else penalty_coeff_
 
-    let combine ws =
+    let single w c = [w c]
+
+    let combine_linear ws =
       assert (ws <> []);
       assert (List.for_all (fun (_,c) -> c > 0) ws);
       fun c ->
-        List.fold_left
+        let w = List.fold_left
           (fun sum (w,coeff) -> sum + coeff * w c)
           0 ws
+        in
+        [w]
+
+    let rec combine_lexico_l = function
+      | [] -> invalid_arg "combine_lexico_l"
+      | [f] -> (fun c -> f c)
+      | f :: tail -> (fun c -> f c @ combine_lexico_l tail c)
+
+    let combine_lexico a b = combine_lexico_l [a;b]
   end
 
   module H = CCHeap.Make(struct
-      type t = (int * C.t)
-      let leq (i1, c1) (i2, c2) = i1 <= i2 || (i1 = i2 && C.compare c1 c2 <= 0)
+      type t = (Weight.t * C.t)
+      let leq (w1, c1) (w2, c2) =
+        let c_w = Weight.compare w1 w2 in
+        c_w <= 0 || (c_w = 0 && C.compare c1 c2 <= 0)
     end)
 
   (** A priority queue of clauses, purely functional *)
@@ -138,7 +160,7 @@ module Make(C : Clause.S) = struct
     functions : functions;
   }
   and functions = {
-    weight : C.t -> int;
+    weight : WeightFun.t;
     name : string;
   }
 
@@ -180,31 +202,52 @@ module Make(C : Clause.S) = struct
 
   let goal_oriented =
     let open WeightFun in
-    let weight = combine [age, 1; default, 4; favor_goal, 1; favor_all_neg, 1] in
-    let name = "goal_oriented" in
+    let weight =
+      combine_lexico_l
+        [ single favor_goal
+        ; combine_linear [age, 1; default, 4; favor_all_neg, 1]
+        ]
+    in
+    let name = "goal" in
+    make ~weight name
+
+  let goal_bfs =
+    let open WeightFun in
+    let weight =
+      combine_lexico_l
+        [ single favor_goal
+        ; single age
+        ]
+    in
+    let name = "goal_bfs" in
     make ~weight name
 
   let bfs =
     let open WeightFun in
-    let weight = combine [age, 5; default, 1] in
+    let weight = single age in
     make ~weight "bfs"
 
   let explore =
     let open WeightFun in
-    let weight = combine [age, 1; default, 4; favor_all_neg, 1] in
+    let weight = combine_linear [age, 1; default, 4; favor_all_neg, 1] in
     make ~weight "explore"
 
   let ground =
     let open WeightFun in
-    let weight = combine [age, 1; favor_pos_unit, 1; favor_ground, 2] in
+    let weight =
+      combine_lexico_l
+        [ single favor_ground
+        ; combine_linear [age, 1; favor_pos_unit, 1; default, 2]
+        ]
+    in
     make ~weight "ground"
 
   let default =
     let open WeightFun in
     let weight =
-      combine
-      [ age, 4; default, 3; favor_all_neg, 1
-      ; favor_goal, 1; favor_pos_unit, 1]
+      combine_linear
+        [ age, 4; default, 3; favor_all_neg, 1
+        ; favor_goal, 1; favor_pos_unit, 1]
     in
     make ~weight "default"
 
@@ -216,6 +259,7 @@ module Make(C : Clause.S) = struct
     | P_explore -> explore
     | P_ground -> ground
     | P_goal -> goal_oriented
+    | P_goal_bfs -> goal_bfs
 
   let pp out q = CCFormat.fprintf out "queue %s" (name q)
   let to_string = CCFormat.to_string pp
