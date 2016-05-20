@@ -9,6 +9,7 @@ type t = {
   term : view;
   ty : type_result;
   mutable id : int;
+  mutable normal_form : t option;
 }
 
 (* head form *)
@@ -31,6 +32,10 @@ let ty t = t.ty
 let ty_exn t = match t.ty with
   | NoType -> invalid_arg "InnerTerm.ty_exn"
   | HasType ty -> ty
+
+let normal_form t = t.normal_form
+
+let set_normal_form t t' = t.normal_form <- Some t'
 
 let hash_fun t s = Hash.int_ t.id s
 let hash t = Hash.apply hash_fun t
@@ -116,6 +121,7 @@ let make_ ~ty term = {
   term;
   ty;
   id = ~-1;
+  normal_form=None;
 }
 
 let const ~ty s =

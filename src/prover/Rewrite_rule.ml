@@ -121,7 +121,21 @@ let normalize_term_ rules t =
   (* compute normal form of subterm
      @param k the continuation
      @return [t'] where [t'] is the normal form of [t] *)
-  let rec reduce ~subst sc t k = match T.view t with
+  let rec reduce ~subst sc t k =
+    (* used cached pointer, then update it *)
+    if Substs.is_empty subst
+    then match T.normal_form t with
+      | Some t' -> k t'
+      | None ->
+        reduce_aux ~subst sc t
+          (fun t' ->
+             if not (T.equal t t') then T.set_normal_form t t';
+             k t')
+    else
+      (* no caching possible *)
+      reduce_aux ~subst sc t k
+  and reduce_aux ~subst sc t k =
+    match T.view t with
     | T.Const id ->
       (* pick a constant rule *)
       begin match Set.find_iter rules id |> Sequence.head with

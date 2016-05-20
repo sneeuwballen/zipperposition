@@ -35,6 +35,9 @@ val ty_exn : t -> t
 (** Same as {!ty}, but fails if the term has no type
     @raise Invalid_argument if the type is [NoType] *)
 
+val normal_form : t -> t option
+val set_normal_form : t -> t -> unit
+
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 

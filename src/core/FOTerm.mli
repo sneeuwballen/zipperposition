@@ -30,6 +30,8 @@ type view = private
 
 val view : t -> view
 
+val normal_form : t -> t option
+val set_normal_form : t -> t -> unit
 
 (** {2 Classic view} *)
 module Classic : sig
