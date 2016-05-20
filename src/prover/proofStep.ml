@@ -113,17 +113,22 @@ let combine_dist o p = match o, p.step.dist_to_goal with
   | None, None -> None
   | (Some _ as res), None
   | None, (Some _ as res) -> res
-  | Some x, Some y -> Some (max x y)
+  | Some x, Some y -> Some (min x y)
 
-let mk_step_ kind parents =
-  (* distance to goal *)
-  let dist_to_goal = match parents with
+let dist_to_goal_parents_ parents =
+  match parents with
     | [] -> None
-    | [p] -> CCOpt.map succ p.step.dist_to_goal
+    | [p] -> p.step.dist_to_goal
     | [p1;p2] ->
-        CCOpt.map succ (combine_dist p1.step.dist_to_goal p2)
+        combine_dist p1.step.dist_to_goal p2
     | p::l ->
-        CCOpt.map succ (List.fold_left combine_dist p.step.dist_to_goal l)
+        List.fold_left combine_dist p.step.dist_to_goal l
+
+let mk_step_ ?dist_to_goal kind parents =
+  (* distance to goal *)
+  let dist_to_goal = match dist_to_goal with
+    | None -> CCOpt.map succ (dist_to_goal_parents_ parents)
+    | Some _ as res -> res
   in
   { id=get_id_(); kind; parents; dist_to_goal; }
 
@@ -132,7 +137,7 @@ let mk_data src data =
 
 let mk_assert src = mk_step_ (Assert src) []
 
-let mk_goal src = mk_step_ (Goal src) []
+let mk_goal src = mk_step_ ~dist_to_goal:0 (Goal src) []
 
 let mk_assert' ?loc ~file ~name () =
   let src = StatementSrc.from_file ?loc ~name file in
