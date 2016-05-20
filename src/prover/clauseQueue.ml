@@ -104,16 +104,15 @@ module Make(C : Clause.S) = struct
       if C.is_empty c then 0
       else C.id c
 
-    let goal_threshold_ = 15
+    (* maximum "distance to goal" we consider *)
+    let goal_threshold_ = 40
 
     let favor_goal c =
       if C.is_empty c then 0
       else
-        let d = match C.distance_to_goal c with
+        match C.distance_to_goal c with
           | Some d -> min d goal_threshold_
-          | None -> goal_threshold_
-        in
-        1+d
+          | None -> goal_threshold_ * 2
 
     (* check whether a literal is a ground neg lit *)
     let is_ground_neg lit = Lit.is_neg lit && Lit.is_ground lit
