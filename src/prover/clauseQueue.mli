@@ -19,4 +19,11 @@ val set_profile : profile -> unit
 
 module type S = ClauseQueue_intf.S
 
+module Weight : sig
+  type t = ClauseQueue_intf.weight
+
+  val compare : t -> t -> int
+  val pp : t CCFormat.printer
+end
+
 module Make(C : Clause.S) : S with module C = C

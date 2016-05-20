@@ -21,3 +21,4 @@
 (B) 2016-04-08 explicit schema for (fun/ind pred) induction (explain how to do induction on `even`) in syntax+induction
 (A) 2016-05-14 add set of used rewrite rules in modulo proofs
 (B) 2016-01-15 question answering
+(A) 2016-04-26 parse tptp: use `definition` for rewrite rules
