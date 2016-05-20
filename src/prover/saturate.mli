@@ -4,12 +4,16 @@
 (** {1 Main saturation algorithm.}
     It uses inference rules and simplification rules from Superposition. *)
 
+open Libzipperposition
+
 val check_timeout : float option -> bool
 (** check whether we still have some time w.r.t timeout *)
 
+type answer_tuple = FOTerm.t list
+
 (** The SZS status of a state *)
 type szs_status =
-  | Unsat of ProofStep.of_
+  | Unsat of ProofStep.of_ * answer_tuple option
   | Sat
   | Unknown
   | Error of string

@@ -49,6 +49,7 @@ let as_lit = SLiteral.of_form
 let as_clause f = match F.view f with
   | F.Or l -> List.map as_lit l
   | F.Not _
+  | F.Answer _
   | F.True
   | F.False
   | F.Atom _
@@ -66,6 +67,7 @@ let as_cnf f = match F.view f with
   | F.Not _
   | F.True
   | F.False
+  | F.Answer _
   | F.Atom _
   | F.Neq _
   | F.Eq _ -> [[as_lit f]]
@@ -131,6 +133,7 @@ let miniscope ?(distribute_exists=false) f =
     | F.False
     | F.Neq _
     | F.Eq _
+    | F.Answer _
     | F.Atom _ -> f
   in
   let res = miniscope f in
@@ -144,6 +147,7 @@ let rec nnf f =
   | F.Atom _
   | F.Neq _
   | F.Eq _
+  | F.Answer _
   | F.True
   | F.False -> f
   | F.Not f' ->
@@ -167,6 +171,7 @@ let rec nnf f =
             F.forall var (nnf (F.not_ f''))
         | F.True -> F.false_
         | F.False -> F.true_
+        | F.Answer _
         | F.Atom _ -> f
       end
   | F.And l -> F.and_ (List.map nnf l)
@@ -193,6 +198,7 @@ let skolemize ~ctx f =
     | F.Xor _
     | F.Imply _
     | F.Equiv _ -> error_ "can only skolemize a NNF formula"
+    | F.Answer _
     | F.Atom _
     | F.Eq _
     | F.Neq _ -> T.Subst.eval subst f
@@ -261,6 +267,7 @@ let estimate_num_clauses ~pos f =
   let rec num pos f = match F.view f, pos with
     | F.Eq _, _
     | F.Neq _, _
+    | F.Answer _, _
     | F.Atom _, _
     | F.True, _
     | F.False, _ -> E.Exactly 1
@@ -300,6 +307,7 @@ let rec will_yield_lit f = match F.view f with
   | F.Forall (_, f') -> will_yield_lit f'
   | F.Eq _
   | F.Neq _
+  | F.Answer _
   | F.Atom _
   | F.True
   | F.False -> true
@@ -360,6 +368,7 @@ let introduce_defs ~ctx ~is_pos f =
   and maybe_rename_subformulas ~polarity a b f = match F.view f with
     | F.True
     | F.False
+    | F.Answer _
     | F.Atom _
     | F.Eq _
     | F.Neq _ -> f
@@ -440,6 +449,7 @@ let introduce_defs ~ctx ~is_pos f =
 let rec to_cnf_rec f = match F.view f with
   | F.Eq _
   | F.Neq _
+  | F.Answer _
   | F.Atom _
   | F.True
   | F.False
@@ -533,6 +543,12 @@ type 'a f_statement = (term, term, type_, 'a) Statement.t
 type 'a c_statement = (clause, term, type_, 'a) Statement.t
 (** A statement after CNF *)
 
+let rec chop_exist_prefix_ f = match F.view f with
+  | F.Exists (v, f') ->
+    let vars, f' = chop_exist_prefix_ f' in
+    v :: vars, f'
+  | _ -> [], f
+
 let id_ x = x
 
 (* Transform the clauses into proper CNF; returns a list of clauses *)
@@ -612,8 +628,16 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) ?(neg_src=id_) ?(cnf_src=id_) 
             (fun c -> CCVector.push res (Stmt.assert_ ~src c))
             (conv_form ~src f)
       | Stmt.Goal f ->
+          let vars, body = chop_exist_prefix_ f in
+          (* add "answer" tuple if [f] has an existential prefix *)
+          let f' = if vars=[]
+            then F.not_ f
+            else
+              let ans = F.answer (List.map T.var vars) in
+              F.forall_l vars (F.imply body ans)
+          in
           let src = src |> neg_src |> cnf_src in
-          let l = conv_form ~src (F.not_ f) in
+          let l = conv_form ~src f' in
           CCVector.push res (Stmt.neg_goal ~src l)
       | Stmt.NegatedGoal l ->
           let src = cnf_src src in

@@ -466,6 +466,7 @@ module Form = struct
   type view =
     | True
     | False
+    | Answer of term list
     | Atom of t
     | Eq of t * t
     | Neq of t * t
@@ -489,6 +490,7 @@ module Form = struct
     | AppBuiltin (Builtin.Xor, [a;b]) -> Xor(a,b)
     | AppBuiltin (Builtin.Eq, [a;b]) -> Eq(a,b)
     | AppBuiltin (Builtin.Neq, [a;b]) -> Neq(a,b)
+    | AppBuiltin (Builtin.Answer, l) -> Answer l
     | Bind(Binder.Forall, v, t) -> Forall (v,t)
     | Bind(Binder.Exists, v, t) -> Exists (v,t)
     | Bind((Binder.ForallTy | Binder.Lambda), _, _) -> assert false
@@ -510,6 +512,7 @@ module Form = struct
   let equiv ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Equiv [a;b]
   let xor ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Xor [a;b]
   let imply ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Imply [a;b]
+  let answer l = app_builtin ~ty:Ty.prop Builtin.Answer l
 
   let rec flatten_ (k:[<`And|`Or]) acc l = match l with
     | [] -> acc

@@ -11,6 +11,7 @@ type term = FOTerm.t
 type t = private
   | True
   | False
+  | Answer of term list
   | Equation of term * term * bool
   | Prop of term * bool
   | Arith of ArithLit.t
@@ -33,6 +34,7 @@ val is_eqn : t -> bool            (** is the literal a proper (in)equation or pr
 val is_prop : t -> bool           (** is the literal a boolean proposition? *)
 val is_eq : t -> bool             (** is the literal of the form a = b? *)
 val is_neq : t -> bool            (** is the literal of the form a != b? *)
+val is_answer : t -> bool
 
 val is_arith : t -> bool
 val is_arith_eqn : t -> bool    (** = or != *)
@@ -53,6 +55,7 @@ val mk_true : term -> t     (* true proposition *)
 val mk_false : term -> t    (* false proposition *)
 val mk_tauto : t (* tautological literal *)
 val mk_absurd : t (* absurd literal, like ~ true *)
+val mk_answer : term list -> t (* special absurd literal, holding a subst *)
 
 val mk_arith : ArithLit.t -> t
 val mk_arith_op : ArithLit.op -> Z.t Monome.t -> Z.t Monome.t -> t

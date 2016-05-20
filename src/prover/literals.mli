@@ -29,6 +29,9 @@ val depth : t -> int
 val vars : t -> Type.t HVar.t list
 val is_ground : t -> bool       (** all the literals are ground? *)
 
+val length_heuristic : t -> int
+(** Number of "relevant" literals *)
+
 val to_form : t -> term SLiteral.t list
 (** Make a 'or' formula from literals *)
 

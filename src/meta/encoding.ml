@@ -48,6 +48,7 @@ let foclause_of_clause l =
   List.map
     (function
       | SLiteral.Atom (t, b) -> Prop (t, b)
+      | SLiteral.Answer _
       | SLiteral.True -> Bool true
       | SLiteral.False -> Bool false
       | SLiteral.Eq (a,b) -> Eq (a,b,true)

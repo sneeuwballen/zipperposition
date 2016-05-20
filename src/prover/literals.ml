@@ -95,6 +95,11 @@ let vars lits =
 let is_ground lits =
   CCArray.for_all Lit.is_ground lits
 
+let length_heuristic lits =
+  Array.fold_left
+    (fun n lit -> n + if Lit.is_answer lit || Lit.is_absurd lit then 0 else 1)
+    0 lits
+
 let to_form lits =
   let lits = Array.map Lit.Conv.to_form lits in
   Array.to_list lits
@@ -177,7 +182,8 @@ let is_trivial lits =
   CCArray.exists Lit.is_trivial lits
 
 let is_absurd lits =
-  CCArray.for_all Lit.is_absurd lits
+  let check l = Lit.is_absurd l || Lit.is_answer l in
+  CCArray.for_all check lits
 
 module Seq = struct
   let vars lits =
@@ -304,6 +310,7 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits k =
       | Lit.Prop _
       | Lit.Equation _
       | Lit.Arith _
+      | Lit.Answer _
       | Lit.True
       | Lit.False -> ()
       end;

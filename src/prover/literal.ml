@@ -17,6 +17,7 @@ type term = FOTerm.t
 type t =
   | True
   | False
+  | Answer of term list
   | Equation of term * term * bool
   | Prop of term * bool
   | Arith of ArithLit.t
@@ -29,11 +30,13 @@ let equal l1 l2 =
   | True, True
   | False, False -> true
   | Arith o1, Arith o2 -> ArithLit.equal o1 o2
+  | Answer l1, Answer l2 -> CCList.equal T.equal l1 l2
   | Equation _, _
   | Prop _, _
   | True, _
   | False, _
-  | Arith _, _ -> false
+  | Arith _, _
+  | Answer _, _ -> false
 
 let equal_com l1 l2 =
   match l1, l2 with
@@ -50,6 +53,7 @@ let equal_com l1 l2 =
 (* FIXME: total ordering *)
 let compare l1 l2 =
   let __to_int = function
+    | Answer _ -> -1
     | False -> 0
     | True -> 1
     | Equation _ -> 2
@@ -75,6 +79,7 @@ let fold f acc lit = match lit with
   | Equation (l, r, _) -> f (f acc l) r
   | Prop (p, _) -> f acc p
   | Arith o -> ArithLit.fold f acc o
+  | Answer l -> List.fold_left f acc l
   | True
   | False -> acc
 
@@ -85,6 +90,7 @@ let hash_fun lit h =
   | Prop (p, sign) -> hash_sign sign (T.hash_fun p h)
   | Equation (l, r, sign) ->
       h |> hash_sign sign |> T.hash_fun l |> T.hash_fun r
+  | Answer l -> h |> Hash.list T.hash_fun l
   | True -> h
   | False -> h |> Hash.int_ 23
 
@@ -96,6 +102,7 @@ let weight lit =
 let heuristic_weight weight = function
   | Prop (p, _) -> weight p
   | Equation (l, r, _) -> weight l + weight r
+  | Answer _
   | True
   | False -> 0
   | Arith alit ->
@@ -112,6 +119,7 @@ let sign = function
   | Equation (_, _, sign) -> sign
   | False -> false
   | Arith o -> ArithLit.sign o
+  | Answer _ -> true
   | True -> true
 
 (* specific: for the term comparison *)
@@ -126,6 +134,7 @@ let is_neg lit = not (is_pos lit)
 let is_eqn = function
   | Equation _
   | Prop _ -> true
+  | Answer _
   | Arith _
   | True
   | False -> false
@@ -137,11 +146,16 @@ let is_prop = function
   | Prop _
   | True
   | False -> true
+  | Answer _
   | Arith _
   | Equation _ -> false
 
 let is_arith = function
   | Arith _ -> true
+  | _ -> false
+
+let is_answer = function
+  | Answer _ -> true
   | _ -> false
 
 let _on_arith p lit = match lit with
@@ -197,6 +211,10 @@ let mk_absurd = False
 
 let mk_arith x = Arith x
 
+let mk_answer = function
+  | [] -> mk_tauto
+  | l -> Answer l
+
 let mk_arith_op op m1 m2 = Arith (ArithLit.make op m1 m2)
 let mk_arith_eq m1 m2 = mk_arith_op ArithLit.Equal m1 m2
 let mk_arith_neq m1 m2 = mk_arith_op ArithLit.Different m1 m2
@@ -217,6 +235,7 @@ module Seq = struct
     | Equation(l, r, _) -> k l; k r
     | Prop(p, _) -> k p
     | Arith o -> ArithLit.Seq.terms o k
+    | Answer l -> List.iter k l
     | True
     | False -> ()
 
@@ -358,6 +377,7 @@ let map f = function
       let p' = f p in
       mk_prop p' sign
   | Arith o -> Arith (ArithLit.map f o)
+  | Answer l -> Answer (List.map f l)
   | True -> True
   | False -> False
 
@@ -371,6 +391,8 @@ let apply_subst_ ~f_term ~f_arith_lit subst (lit,sc) =
       let p' = f_term subst (p,sc) in
       mk_prop p' sign
   | Arith o -> Arith (f_arith_lit subst (o,sc))
+  | Answer l ->
+      mk_answer (List.map (fun t -> f_term subst (t,sc)) l)
   | True
   | False -> lit
 
@@ -392,6 +414,8 @@ let apply_subst_no_simp ~renaming subst (lit,sc) =
                 S.FO.apply ~renaming subst (r,sc), sign)
   | Prop (p, sign) ->
       Prop (S.FO.apply ~renaming subst (p,sc), sign)
+  | Answer l ->
+      Answer (List.map (fun t -> S.FO.apply ~renaming subst (t,sc)) l)
   | True
   | False -> lit
 
@@ -406,6 +430,7 @@ let negate lit = match lit with
   | True -> False
   | False -> True
   | Arith o -> Arith (ArithLit.negate o)
+  | Answer _ -> lit (* negation does not make sense *)
 
 let vars lit =
   Seq.vars lit |> T.VarSet.of_seq |> T.VarSet.to_list
@@ -413,6 +438,7 @@ let vars lit =
 let var_occurs v lit = match lit with
   | Prop (p,_) -> T.var_occurs ~var:v p
   | Equation (l,r,_) -> T.var_occurs ~var:v l || T.var_occurs ~var:v r
+  | Answer _
   | Arith _ -> Sequence.exists (T.var_occurs ~var:v) (Seq.terms lit)
   | True
   | False -> false
@@ -420,6 +446,7 @@ let var_occurs v lit = match lit with
 let is_ground lit = match lit with
   | Equation (l,r,_) -> T.is_ground l && T.is_ground r
   | Prop (p, _) -> T.is_ground p
+  | Answer _
   | Arith _ -> Sequence.for_all T.is_ground (Seq.terms lit)
   | True
   | False -> true
@@ -432,6 +459,7 @@ let to_multiset lit = match lit with
   | Equation (l, r, _) -> Multisets.MT.doubleton l r
   | True
   | False -> Multisets.MT.singleton T.true_
+  | Answer l -> Multisets.MT.of_list l
   | Arith alit ->
       AL.Seq.to_multiset alit
       |> Multisets.MT.Seq.of_coeffs Multisets.MT.empty
@@ -442,6 +470,7 @@ let is_trivial lit = match lit with
   | Equation (l, r, true) -> T.equal l r
   | Equation (_, _, false) -> false
   | Arith o -> ArithLit.is_trivial o
+  | Answer _ -> false
   | Prop (_, _) -> false
 
 let is_absurd lit = match lit with
@@ -450,6 +479,7 @@ let is_absurd lit = match lit with
   | Prop (p, true) when T.equal p T.false_ -> true
   | False -> true
   | Arith o -> ArithLit.is_absurd o
+  | Answer _ -> false
   | _ -> false
 
 let fold_terms ?(position=Position.stop) ?(vars=false) ?ty_args ~which ~ord ~subterms lit k =
@@ -482,6 +512,7 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ?ty_args ~which ~ord ~sub
       at_term ~pos:P.(append position (left stop)) p
   | Arith o, _ ->
       ArithLit.fold_terms ~pos:position ~vars ~which ~ord ~subterms o k
+  | Answer _, _
   | True, _
   | False, _ -> ()
 
@@ -494,6 +525,8 @@ let pp_debug ?(hooks=[]) out lit =
     | Prop (p, false) -> Format.fprintf out "¬@[%a@]" T.pp p
     | True -> CCFormat.string out "Τ"
     | False -> CCFormat.string out "⊥"
+    | Answer l ->
+        Format.fprintf out "@{<Black>_answer(@[%a@])@}" (Util.pp_list T.pp) l
     | Equation (l, r, true) ->
         Format.fprintf out "@[<1>%a@ = %a@]" T.pp l T.pp r
     | Equation (l, r, false) ->
@@ -510,6 +543,8 @@ let pp_tstp out lit =
       Format.fprintf out "@[<1>%a@ = %a@]" T.TPTP.pp l T.TPTP.pp r
   | Equation (l, r, false) ->
       Format.fprintf out "@[<1>%a@ != %a@]" T.TPTP.pp l T.TPTP.pp r
+  | Answer l ->
+      Format.fprintf out "$$answer(@[%a@])" (Util.pp_list T.TPTP.pp) l
   | Arith o -> ArithLit.pp_tstp out o
 
 type print_hook = CCFormat.t -> t -> bool
@@ -538,6 +573,7 @@ module Comp = struct
     | Prop (p, _) -> [p]
     | Equation (l, r, _) -> _maxterms2 ~ord l r
     | Arith a -> ArithLit.max_terms ~ord a
+    | Answer _
     | True
     | False -> []
 
@@ -586,8 +622,9 @@ module Comp = struct
   let _cmp_by_kind l1 l2 =
     let open ArithLit in
     let _to_int = function
+      | Answer _ -> 0
       | False
-      | True -> 0
+      | True -> 1
       | Arith (Binary (Equal, _, _)) -> 3
       | Arith (Binary (Different, _, _)) -> 4
       | Arith (Binary (Less, _, _)) -> 5
@@ -617,6 +654,8 @@ module Comp = struct
     | Prop _, Equation _
     | Prop _, True
     | Prop _, False
+    | Answer _, _
+    | _, Answer _
     | Equation _, Equation _
     | Equation _, Prop _
     | Equation _, True
@@ -746,6 +785,7 @@ module Pos = struct
         Sequence.for_all
           (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
           (Monome.Seq.terms d.AL.monome)
+    | Answer _, _
     | True, _
     | False, _ -> true  (* why not. *)
     | Equation _, _ -> _fail_lit lit pos
@@ -811,6 +851,7 @@ module Conv = struct
           | SLiteral.Atom (t,b) -> mk_prop t b
           | SLiteral.Eq (l,r) -> mk_eq l r
           | SLiteral.Neq (l,r) -> mk_neq l r
+          | SLiteral.Answer l -> mk_answer l
         end
 
   let to_form ?(hooks=[]) lit =
@@ -824,12 +865,14 @@ module Conv = struct
         | True -> SLiteral.true_
         | False -> SLiteral.false_
         | Arith o -> ArithLit.to_form o
+        | Answer l -> SLiteral.answer l
 end
 
 module View = struct
   let as_eqn lit = match lit with
     | Equation (l,r,sign) -> Some (l, r, sign)
     | Prop (p, sign) -> Some (p, T.true_, sign)
+    | Answer _
     | True
     | False
     | Arith _ -> None

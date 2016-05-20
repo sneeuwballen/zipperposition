@@ -127,6 +127,7 @@ module Form : sig
   type view =
     | True
     | False
+    | Answer of term list
     | Atom of t
     | Eq of t * t
     | Neq of t * t
@@ -156,6 +157,7 @@ module Form : sig
   val not_ : ?loc:location -> t -> t
   val forall : ?loc:location -> t Var.t -> t -> t
   val exists : ?loc:location -> t Var.t -> t -> t
+  val answer : term list -> t
 
   val forall_l : ?loc:location -> t Var.t list -> t -> t
   val exists_l : ?loc:location -> t Var.t list -> t -> t

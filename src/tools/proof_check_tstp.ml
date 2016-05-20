@@ -79,6 +79,7 @@ let slit_to_form = function
   | SLiteral.Atom (t, false) -> T.not_ t
   | SLiteral.Eq (a,b) -> T.eq a b
   | SLiteral.Neq (a,b) -> T.neq a b
+  | SLiteral.Answer _
   | SLiteral.True -> T.true_
   | SLiteral.False -> T.false_
 

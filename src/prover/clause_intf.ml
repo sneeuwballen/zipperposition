@@ -6,6 +6,8 @@ open Libzipperposition
 type proof_step = ProofStep.t
 type proof = ProofStep.of_
 
+type ans_tuple = FOTerm.t list
+
 module type S = sig
   module Ctx : Ctx.S
 
@@ -87,7 +89,8 @@ module type S = sig
     t
   (** Build a new clause from the given literals. *)
 
-  val of_sclause : SClause.t -> proof_step -> t
+  val of_sclause :
+    SClause.t -> proof_step -> t
 
   val of_forms :
     trail:Trail.t ->
@@ -117,6 +120,10 @@ module type S = sig
 
   val is_empty : t -> bool
   (** Is the clause an empty clause? *)
+
+  val ans : t -> ans_tuple option
+  (** [get_answer c] returns the content of the first [Lit.Answer terms]
+      met in [c], or [None] if [c] contains no answer literal *)
 
   val length : t -> int
   (** Number of literals *)

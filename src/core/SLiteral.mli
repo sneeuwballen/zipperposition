@@ -14,6 +14,7 @@ exception NotALit of form
 type +'t t =
   | True
   | False
+  | Answer of 't list
   | Atom of 't * bool
   | Eq of 't * 't
   | Neq of 't * 't
@@ -32,6 +33,7 @@ val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 
 val true_ : _ t
 val false_ : _ t
+val answer : 'a list -> 'a t
 val eq : 'a -> 'a -> 'a t
 val neq : 'a -> 'a -> 'a t
 val atom : 'a -> bool -> 'a t

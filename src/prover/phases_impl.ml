@@ -261,7 +261,7 @@ let print_dots (type c)
   Signal.send Signals.on_dot_output ();
   (* see if we need to print proof state *)
   begin match Env.params.param_dot_file, result with
-    | Some dot_f, Saturate.Unsat proof ->
+    | Some dot_f, Saturate.Unsat (proof,_) ->
         let name = "unsat_graph" in
         (* print proof of false *)
         let proof =
@@ -317,7 +317,13 @@ let print_szs_result (type c) ~file
             Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
               (fun k->k (CCFormat.seq ~sep:" " Env.C.pp) (Env.get_active ()))
       end
-  | Saturate.Unsat proof ->
+  | Saturate.Unsat (proof,ans) ->
+      (* print answer tuple, if any *)
+      CCOpt.iter
+        (fun tup ->
+           Format.printf "@[<h2>%% answer tuple:@ (@[<h>%a@])@]@."
+             (Util.pp_list FOTerm.pp) tup)
+        ans;
       (* print status then proof *)
       Format.printf "%% SZS status %s for '%s'@." (unsat_to_str ()) file;
       Format.printf "%% SZS output start Refutation@.";

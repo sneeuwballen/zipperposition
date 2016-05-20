@@ -31,9 +31,11 @@ let print_progress i j =
   Printf.printf "\r\027[K[%s] %d/%d%!" line i j;
   ()
 
+type answer_tuple = FOTerm.t list
+
 (** The SZS status of a state *)
 type szs_status =
-  | Unsat of ProofStep.of_
+  | Unsat of ProofStep.of_ * answer_tuple option
   | Sat
   | Unknown
   | Error of string
@@ -96,8 +98,10 @@ module Make(E : Env.S) = struct
               Unknown
           | l, _ when List.exists Env.C.is_empty l ->
               (* empty clause found *)
-              let proof = Env.C.proof (List.find Env.C.is_empty l) in
-              Unsat proof
+              let c = List.find Env.C.is_empty l in
+              let proof = Env.C.proof c in
+              let ans_tuple = Env.C.ans c in
+              Unsat (proof, ans_tuple)
           | c :: l', _ ->
               (* put clauses of [l'] back in passive set *)
               Env.add_passive (Sequence.of_list l');
@@ -140,13 +144,15 @@ module Make(E : Env.S) = struct
                      (* keep clauses  that are not redundant *)
                      if Env.is_trivial c || Env.is_active c || Env.is_passive c
                      then (
-                       Util.debugf ~section 5 "clause `@[%a@]` is trivial, dump" (fun k->k Env.C.pp c);
+                       Util.debugf ~section 5 "clause `@[%a@]` is trivial, dump"
+                         (fun k->k Env.C.pp c);
                        None
                      ) else Some c)
                   inferred_clauses
               in
               CCVector.append_seq new_clauses inferred_clauses;
-              Util.debugf ~section 2 "@[<2>inferred @{<green>new clauses@}:@ [@[<v>%a@]]@]"
+              Util.debugf ~section 2
+                "@[<2>inferred @{<green>new clauses@}:@ [@[<v>%a@]]@]"
                 (fun k->k (CCVector.print ~start:"" ~stop:"" Env.C.pp) new_clauses);
               (* add new clauses (including simplified active clauses)
                  to passive set and simpl_set *)
@@ -154,7 +160,9 @@ module Make(E : Env.S) = struct
               (* test whether the empty clause has been found *)
               match Env.get_some_empty_clause () with
               | None -> Unknown
-              | Some c -> Unsat (Env.C.proof c)
+              | Some c ->
+                let ans = Env.C.ans c in
+                Unsat (Env.C.proof c, ans)
         end
 
   let given_clause ?(generating=true) ?steps ?timeout () =

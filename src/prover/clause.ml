@@ -15,6 +15,8 @@ module Lits = Literals
 let stat_clause_create = Util.mk_stat "clause.create"
 let prof_clause_create = Util.mk_profiler "clause_create"
 
+type ans_tuple = FOTerm.t list
+
 module type S = Clause_intf.S
 
 type proof_step = Clause_intf.proof_step
@@ -132,7 +134,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       (* convert literals *)
       let lits = List.map Ctx.Lit.of_form lits in
       let src = Statement.src st in
-      let proof = if is_goal then ProofStep.mk_goal src else ProofStep.mk_assert src in
+      let proof =
+        if is_goal
+        then ProofStep.mk_goal src
+        else ProofStep.mk_assert src in
       let c = create ~trail:Trail.empty lits proof in
       c
     in
@@ -160,6 +165,13 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let is_empty c =
     Lits.is_absurd c.sclause.lits && Trail.is_empty c.sclause.trail
+
+  let ans c =
+    CCArray.find
+      (function
+        | Lit.Answer l -> Some l
+        | _ -> None)
+      c.sclause.lits
 
   let length c = SClause.length c.sclause
 

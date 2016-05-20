@@ -27,6 +27,7 @@ type t =
   | Term
   | ForallConst (** constant for simulating forall *)
   | ExistsConst (** constant for simulating exists *)
+  | Answer (* for returning existential tuples *)
   | TyInt
   | TyRat
   | Int of Z.t

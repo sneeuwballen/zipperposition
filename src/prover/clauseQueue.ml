@@ -77,7 +77,7 @@ module Make(C : Clause.S) = struct
           )
           0 trail
       in
-      w_lits * Array.length (C.lits c) + w_trail * (Trail.length trail) + _depth_ty
+      w_lits * Lits.length_heuristic (C.lits c) + w_trail * (Trail.length trail) + _depth_ty
 
     let penalty_coeff_ = 20
 
