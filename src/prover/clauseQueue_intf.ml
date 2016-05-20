@@ -74,7 +74,7 @@ module type S = sig
   val is_empty : t -> bool
   (** check whether the queue is empty *)
 
-  val take_first : t -> (t * C.t)
+  val take_first : t -> t * C.t * weight
   (** Take first element of the queue, or raise Not_found *)
 
   val name : t -> string

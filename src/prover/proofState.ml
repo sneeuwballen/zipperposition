@@ -136,9 +136,9 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
       if CQueue.is_empty !queue_
       then None
       else (
-        let q', x = CQueue.take_first !queue_ in
+        let q', x, w = CQueue.take_first !queue_ in
         queue_ := q';
-        Some x
+        Some (x,w)
       )
 
     let next () = Util.with_prof prof_next_passive next_ ()

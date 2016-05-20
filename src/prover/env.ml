@@ -225,7 +225,13 @@ module Make(X : sig
   let stats () = ProofState.stats ()
 
   let next_passive () =
-    ProofState.PassiveSet.next ()
+    match ProofState.PassiveSet.next () with
+      | None -> None
+      | Some (c,w) ->
+        Util.debugf ~section 3
+          "@[<2>select next passive `@[%a@]`@ with weight %a@]"
+          (fun k->k C.pp c ClauseQueue.Weight.pp w);
+        Some c
 
   (** do binary inferences that involve the given clause *)
   let do_binary_inferences c =
