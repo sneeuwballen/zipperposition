@@ -505,19 +505,19 @@ module TPTP = struct
       | DB i ->
           Format.fprintf out "Y%d" (!depth - i - 1);
           (* print type of term *)
-          if !print_all_types || not (Type.equal (ty t) Type.TPTP.i)
+          if !print_all_types && not (Type.equal (ty t) Type.TPTP.i)
           then Format.fprintf out ":%a" (Type.TPTP.pp_depth !depth) (ty t)
       | AppBuiltin (b,[]) -> Builtin.TPTP.pp out b
       | AppBuiltin (b,l) ->
-          Format.fprintf out "(@[<2>%a@ %a@])" Builtin.TPTP.pp b (Util.pp_list pp_rec) l
+          Format.fprintf out "(@[<hov2>%a@ %a@])" Builtin.TPTP.pp b (Util.pp_list pp_rec) l
       | Const s -> ID.pp out s
       | App (f, l) ->
-          Format.fprintf out "@[<hv2>%a(@,%a)@]" pp_rec f
+          Format.fprintf out "@[<hov2>%a(@,%a)@]" pp_rec f
             (Util.pp_list ~sep:", " pp_rec) l
       | Var i ->
           Format.fprintf out "X%d" (HVar.id i);
           (* print type of term *)
-          if !print_all_types || not (Type.equal (ty t) Type.TPTP.i)
+          if !print_all_types && not (Type.equal (ty t) Type.TPTP.i)
           then Format.fprintf out ":%a" (Type.TPTP.pp_depth !depth) (ty t)
     in
     pp_rec out t
