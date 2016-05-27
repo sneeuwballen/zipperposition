@@ -89,7 +89,7 @@ let process file =
         (Statement.map_src
            ~f:(fun attrs ->
              let name = UntypedAST.name_of_attrs attrs in
-             StatementSrc.make ?name file))
+             StatementSrc.from_file ?name file))
         decls
     in
     print_res decls;

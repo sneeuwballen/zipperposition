@@ -533,8 +533,10 @@ type 'a f_statement = (term, term, type_, 'a) Statement.t
 type 'a c_statement = (clause, term, type_, 'a) Statement.t
 (** A statement after CNF *)
 
+let id_ x = x
+
 (* Transform the clauses into proper CNF; returns a list of clauses *)
-let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
+let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) ?(neg_src=id_) ?(cnf_src=id_) seq =
   (* read options *)
   let disable_renaming = List.mem DisableRenaming opts in
   let preprocess =
@@ -595,6 +597,7 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
              one negative.
              positive:   lhs <=> cnf(rhs)
              negative: ¬ lhs <=> cnf(¬ rhs) *)
+          let src = cnf_src src in
           let c_pos = CCList.flat_map (conv_form ~src) rhs in
           CCVector.push res (Stmt.rewrite_form ~src lhs c_pos);
           let c_neg = conv_form ~src (F.not_ (F.and_ rhs)) in
@@ -604,20 +607,25 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
       | Stmt.TyDecl (id,ty) ->
           CCVector.push res (Stmt.ty_decl ~src id ty)
       | Stmt.Assert f ->
+          let src = cnf_src src in
           List.iter
             (fun c -> CCVector.push res (Stmt.assert_ ~src c))
             (conv_form ~src f)
       | Stmt.Goal f ->
+          let src = src |> neg_src |> cnf_src in
           let l = conv_form ~src (F.not_ f) in
           CCVector.push res (Stmt.neg_goal ~src l)
-      | Stmt.NegatedGoal _ -> assert false
+      | Stmt.NegatedGoal l ->
+          let src = cnf_src src in
+          let l = CCList.flat_map (conv_form ~src) l in
+          CCVector.push res (Stmt.neg_goal ~src l)
     )
     v;
   (* return final vector of clauses *)
   CCVector.freeze res
 
-let cnf_of ?opts ?ctx st =
-  cnf_of_seq ?opts ?ctx (Sequence.return st)
+let cnf_of ?opts ?ctx ?neg_src ?cnf_src st =
+  cnf_of_seq ?opts ?ctx ?neg_src ?cnf_src (Sequence.return st)
 
 let pp_f_statement out st = Statement.pp T.pp T.pp T.pp out st
 
@@ -633,7 +641,7 @@ let type_declarations seq =
   |> Sequence.flat_map Seq.ty_decls
   |> ID.Map.of_seq
 
-let convert ~file seq =
+let convert seq =
   let module A = UntypedAST in
   (* used for conversion *)
   let t_ctx = FOTerm.Conv.create() in
@@ -643,16 +651,8 @@ let convert ~file seq =
   let conv_statement st =
     Util.debugf ~section 5
       "@[<2>@{<yellow>convert@}@ `@[%a@]`@]" (fun k->k pp_c_statement st);
-    let name =
-      CCList.find_map
-        (function A.A_name n -> Some n | _ -> None)
-        st.Stmt.src
-    and attrs =
-      CCList.filter_map
-        (function A.A_AC -> Some Stmt.A_AC | A.A_name _ -> None)
-        st.Stmt.src
-    in
-    let src = StatementSrc.make ?name file in
+    let attrs = Stmt.attrs st in
+    let src = Stmt.src st in
     let res = match Stmt.view st with
       | Stmt.Goal c ->
           let c = clause_to_fo ~ctx:t_ctx c in

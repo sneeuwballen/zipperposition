@@ -117,11 +117,11 @@ let mk_assert src = mk_step_ (Assert src) []
 let mk_goal src = mk_step_ (Goal src) []
 
 let mk_assert' ?loc ~file ~name () =
-  let src = StatementSrc.make ?loc ~name file in
+  let src = StatementSrc.from_file ?loc ~name file in
   mk_assert src
 
 let mk_goal' ?loc ~file ~name () =
-  let src = StatementSrc.make ?loc ~name file in
+  let src = StatementSrc.from_file ?loc ~name file in
   mk_goal src
 
 let mk_inference ~rule parents =
@@ -254,15 +254,26 @@ let pp_rule ~info out r =
   then Format.fprintf out "@[%s%a@]" r.rule_name (pp_list pp_info) r.rule_info
   else Format.fprintf out "'%s'" r.rule_name
 
+let rec pp_src_tstp out =
+  let module Src = StatementSrc in
+  function
+    | Src.From_file src ->
+      let file = src.Src.file in
+      begin match src.Src.name with
+        | None -> Format.fprintf out "file('%s')" file
+        | Some name -> Format.fprintf out "file('%s', '%s')" file name
+      end
+    | Src.Neg src' ->
+      Format.fprintf out "inference(@['negate_goal',@ [status(thm)],@ [%a]@])"
+        pp_src_tstp src'
+    | Src.CNF src' ->
+      Format.fprintf out "inference(@['clausify',@ [status(esa)],@ [%a]@])"
+        pp_src_tstp src'
+
 let pp_kind_tstp out k =
   match k with
   | Assert src
-  | Goal src ->
-      let file = src.StatementSrc.file in
-      begin match src.StatementSrc.name with
-      | None -> Format.fprintf out "file('%s')" file
-      | Some name -> Format.fprintf out "file('%s', '%s')" file name
-      end
+  | Goal src -> pp_src_tstp out src
   | Data _ -> Util.error ~where:"ProofStep" "cannot print `Data` step in TPTP"
   | Inference rule ->
       Format.fprintf out "inference(%a, [status(thm)])" (pp_rule ~info:false) rule
@@ -273,17 +284,25 @@ let pp_kind_tstp out k =
   | Trivial ->
       Format.fprintf out "trivial([status(thm)])"
 
+let rec pp_src out src =
+  let module Src = StatementSrc in
+  match src with
+    | Src.From_file src ->
+      let file = src.Src.file in
+      begin match src.Src.name with
+        | None -> Format.fprintf out "'%s'" file
+        | Some name -> Format.fprintf out "'%s' in '%s'" name file
+      end
+    | Src.Neg src' ->
+      Format.fprintf out "(@[neg@ %a@])" pp_src src'
+    | Src.CNF src' ->
+      Format.fprintf out "(@[CNF@ %a@])" pp_src src'
+
 let pp_kind out k =
-  let pp_src kind out src =
-    let file = src.StatementSrc.file in
-    match src.StatementSrc.name with
-    | None -> Format.fprintf out "'%s'%s" file kind
-    | Some name -> Format.fprintf out "'%s' in '%s'%s" name file kind
-  in
   match k with
-  | Assert src -> pp_src "" out src
-  | Goal src -> pp_src " (goal)" out src
-  | Data (src, _) -> pp_src " (data)" out src
+  | Assert src -> pp_src out src
+  | Goal src -> Format.fprintf out "goal %a" pp_src src
+  | Data (src, _) -> Format.fprintf out "data %a" pp_src src
   | Inference rule ->
       Format.fprintf out "inf %a" (pp_rule ~info:true) rule
   | Simplification rule ->

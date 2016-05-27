@@ -68,6 +68,8 @@ val is_cnf : form -> bool
 val cnf_of :
   ?opts:options list ->
   ?ctx:Skolem.ctx ->
+  ?neg_src:('a -> 'a) ->
+  ?cnf_src:('a -> 'a) ->
   'a f_statement ->
   'a c_statement CCVector.ro_vector
 (** Transform the clause into proper CNF; returns a list of statements,
@@ -75,7 +77,10 @@ val cnf_of :
     Options are used to tune the behavior. *)
 
 val cnf_of_seq :
-  ?opts:options list -> ?ctx:Skolem.ctx ->
+  ?opts:options list ->
+  ?ctx:Skolem.ctx ->
+  ?neg_src:('a -> 'a) ->
+  ?cnf_src:('a -> 'a) ->
   'a f_statement Sequence.t ->
   'a c_statement CCVector.ro_vector
 
@@ -87,8 +92,7 @@ val type_declarations :
 (** {2 Conversions} *)
 
 val convert :
-  file:string ->
-  UntypedAST.attrs c_statement Sequence.t ->
+  StatementSrc.t c_statement Sequence.t ->
   Statement.clause_t CCVector.ro_vector
 (** Converts statements based on {!TypedSTerm} into statements
     based on {!FOTerm} and {!Type} *)

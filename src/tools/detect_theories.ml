@@ -34,10 +34,12 @@ let parse_files prover files =
     (fun p file -> E.map fst (Prover.parse_file p file))
     prover files
 
-let to_cnf decls =
+let to_cnf ~file decls =
   E.(
     TypeInference.infer_statements ?ctx:None decls
-    >|= fun decls -> Cnf.cnf_of_seq (CCVector.to_seq decls)
+    >|= CCVector.to_seq
+    >|= Sequence.map (Statement.add_src ~file)
+    >|= Cnf.cnf_of_seq
   )
 
 let count_clauses v =
@@ -60,13 +62,13 @@ let parse_and_cnf files =
       >>= fun decls ->
       Util.debugf 3 "parsed %d declarations..." (fun k->k (Sequence.length decls));
       (* CNF *)
-      to_cnf decls
+      to_cnf ~file decls
       >>= fun stmts ->
       Util.debugf 3 "obtained %d clauses..." (fun k->k (count_clauses stmts));
       (* convert clauses into Encoding.foclause *)
       let stmts =
         CCVector.to_seq stmts
-        |> Cnf.convert ~file
+        |> Cnf.convert
         |> CCVector.to_seq
         |> Sequence.flat_map Statement.Seq.forms
         |> Sequence.map Encoding.foclause_of_clause

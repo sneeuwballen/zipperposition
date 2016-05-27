@@ -153,6 +153,9 @@ val depth : t -> int
 
 val pp_rule : info:bool -> rule CCFormat.printer
 
+val pp_src : StatementSrc.t CCFormat.printer
+val pp_src_tstp : StatementSrc.t CCFormat.printer
+
 val pp_kind : kind CCFormat.printer
 val pp_kind_tstp : kind CCFormat.printer
 

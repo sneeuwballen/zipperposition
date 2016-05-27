@@ -84,9 +84,12 @@ let typing stmts =
 let cnf ~file decls =
   Phases.start_phase Phases.CNF >>= fun () ->
   let stmts =
-    Cnf.cnf_of_seq (CCVector.to_seq decls)
+    decls
     |> CCVector.to_seq
-    |> Cnf.convert ~file
+    |> Sequence.map (Statement.add_src ~file)
+    |> Cnf.cnf_of_seq ~neg_src:StatementSrc.neg ~cnf_src:StatementSrc.cnf
+    |> CCVector.to_seq
+    |> Cnf.convert
   in
   do_extensions ~field:(fun e -> e.Extensions.post_cnf_actions)
     ~x:stmts >>= fun () ->

@@ -191,14 +191,20 @@ let signature ?(init=Signature.empty) seq =
   |> Sequence.fold (fun sigma (id,ty) -> Signature.declare sigma id ty) init
 
 let add_src ~file st =
-  map_src st
-    ~f:(fun l ->
-      let name =
-        CCList.find_map
-          (function UntypedAST.A_name n-> Some n | _ -> None)
-          l
-      in
-      StatementSrc.make ?name file)
+  let module A = UntypedAST in
+  let attrs =
+    CCList.filter_map
+      (function A.A_AC -> Some A_AC | A.A_name _ -> None)
+      st.src
+  and name =
+    CCList.find_map
+      (function A.A_name n-> Some n | _ -> None)
+      st.src
+  in
+  { st with
+      src=StatementSrc.from_file ?name file;
+      attrs;
+  }
 
 (** {2 IO} *)
 
@@ -245,9 +251,9 @@ let pp_clause =
 
 module TPTP = struct
   let pp ppf ppt ppty out st =
-    let name = match StatementSrc.name st.src with
-      | None -> "no_name"
-      | Some n -> n
+    let name = match st.src with
+      | StatementSrc.From_file f -> CCOpt.get "no_name" (StatementSrc.name f)
+      | _ -> "no_name"
     in
     let pp_decl out (id,ty) =
       fpf out "@[<2>tff(%s, type,@ %a :@ @[%a@])@]." name ID.pp id ppty ty

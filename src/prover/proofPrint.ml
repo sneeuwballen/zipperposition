@@ -105,7 +105,6 @@ let _pp_parent out = function
   | `Name i -> Format.fprintf out "%d" i
   | `Theory s -> Format.fprintf out "theory(%s)" s
 
-
 let pp_kind_tstp out (k,parents) =
   let pp_parents = Util.pp_list _pp_parent in
   let pp_step status out (rule,parents) =
@@ -118,12 +117,7 @@ let pp_kind_tstp out (k,parents) =
   in
   match k with
     | Assert src
-    | Goal src ->
-      let file = src.StatementSrc.file in
-      begin match src.StatementSrc.name with
-        | None -> Format.fprintf out "file('%s')" file
-        | Some name -> Format.fprintf out "file('%s', '%s')" file name
-      end
+    | Goal src -> ProofStep.pp_src_tstp out src
     | Data _ -> assert false
     | Inference rule
     | Simplification rule -> pp_step "thm" out (rule,parents)
