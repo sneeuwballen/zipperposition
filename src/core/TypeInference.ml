@@ -589,6 +589,9 @@ let rec as_def ?loc bound t =
     | T.AppBuiltin (Builtin.Eq, [lhs;rhs]) ->
       check_vars ?loc bound lhs rhs;
       begin match T.view lhs with
+        | T.Const id ->
+          let ty = T.ty_exn lhs in
+          `Term (id,ty,[],rhs)
         | T.App (f, args) ->
           begin match T.view f with
             | T.Const id ->

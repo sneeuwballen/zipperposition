@@ -5,7 +5,7 @@
 
     This module is used for two things that overlap:
     - inferring the types of symbols that have not been declared (e.g. in
-    "fof" or "cnf" TPTP statements) so as to enrich a {!.signature}
+    "fof" or "cnf" TPTP statements) so as to enrich a {!Signature}
     - converting {i untyped} terms or formulas into {i typed} formulas, by inferring
     the exact type of each subterm (and possibly inferring type parameters).
 
