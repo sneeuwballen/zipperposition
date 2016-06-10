@@ -38,6 +38,114 @@ let k_ind_depth : int Flex_state.key = Flex_state.create_key()
   rule to make trivial any clause with >= 2 incompatible path literals
 *)
 
+(* TODO: use multiple trail literals for paths, because it allows for
+   better Avatar simplifications/redundancy checks *)
+
+(* recover the (possibly empty) path from a boolean trail *)
+let path_of_trail trail : Ind_cst.path =
+  Trail.to_seq trail
+  |> Sequence.filter_map BBox.as_case
+  |> Sequence.max ~lt:(fun a b -> Ind_cst.path_dominates b a)
+  |> CCOpt.get Ind_cst.path_empty
+
+module Debug(E : Env.S) = struct
+  module C = E.C
+
+  module CstMap =
+    CCMap.Make(struct type t = Ind_cst.cst let compare = Ind_cst.cst_compare end)
+  module CaseMap =
+    CCMap.Make(struct type t = Ind_cst.case let compare = Ind_cst.case_compare end)
+  module ClauseCtxMap =
+    CCMap.Make(struct type t = ClauseContext.t list
+      let compare = CCList.compare ClauseContext.compare end)
+
+  (* tree of inductions *)
+  type ind_tree = {
+    ind_tree: ind_tree CaseMap.t ClauseCtxMap.t CstMap.t;
+    ind_clauses: C.t list;
+  }
+
+  let empty_ind_tree = {ind_tree=CstMap.empty; ind_clauses=[];}
+
+  let tree_of_clauses (seq:C.t Sequence.t) : ind_tree =
+    let rec insert (t:ind_tree) (p:Ind_cst.path) (c:C.t) : ind_tree =
+      match p with
+        | [] ->
+          {t with ind_clauses = c::t.ind_clauses }
+        | {Ind_cst.path_case=case; path_cst=cst; path_clauses=ctxs} :: p' ->
+          let m1 = CstMap.get_or cst t.ind_tree ~or_:ClauseCtxMap.empty in
+          let m2= ClauseCtxMap.get_or ctxs m1 ~or_:CaseMap.empty in
+          let t' = CaseMap.get_or case m2 ~or_:empty_ind_tree in
+          {t with
+           ind_tree=
+             CstMap.add cst
+               (ClauseCtxMap.add ctxs
+                  (CaseMap.add case (insert t' p' c) m2)
+                  m1)
+               t.ind_tree;
+          }
+    in
+    (* insert each clause' trail. Reverse it so that most nested inductions
+       come last *)
+    Sequence.fold
+      (fun t c -> insert t (C.trail c |> path_of_trail |> List.rev) c)
+      empty_ind_tree seq
+
+  let output_ind_tree oc (t:ind_tree) : unit =
+    let module B = PrintBox in
+    let rec to_box t : B.t list =
+      let clauses =
+        List.rev_map (fun c -> B.text (C.to_string c)) t.ind_clauses
+        |> B.tree (B.text "clauses")
+      in
+      CstMap.to_list t.ind_tree
+      |> List.map
+        (fun (c,sub) ->
+           let sub = to_box_ctxs c sub in
+           let label =
+             CCFormat.sprintf "@[<hv>induction on %a :@ %a (parent=%a)@]"
+               Ind_cst.pp_cst c Type.pp (Ind_cst.cst_ty c)
+               (CCFormat.opt Ind_cst.pp_cst) (Ind_cst.cst_parent c)
+           in
+           B.tree (B.text label) sub)
+      |> CCList.cons clauses
+    and to_box_ctxs c ctxs_map : B.t list =
+      ClauseCtxMap.to_list ctxs_map
+      |> List.map
+        (fun (ctxs,sub) ->
+           let label =
+             CCFormat.sprintf "[@[<hv>%a@]]"
+               (Util.pp_list ClauseContext.pp) ctxs |> B.text in
+           let sub = to_box_case c sub in
+           B.tree label sub)
+    and to_box_case c case_m : B.t list =
+      CaseMap.to_list case_m
+      |> List.map
+        (fun (case,sub) ->
+           let label =
+             CCFormat.sprintf "@[case %a = %a@]" Ind_cst.pp_cst c Ind_cst.pp_case case in
+           let sub = to_box sub in
+           B.tree (B.text label) sub)
+    in
+    let box = B.tree B.empty (to_box t) in
+    PrintBox_html.to_string_doc box |> CCIO.write_line oc;
+    ()
+    (* PrintBox_text.output file box *)
+
+  (* output the set of inductive clauses as a tree, in the given file *)
+  let output_ind_tree file =
+    (* gather the tree of inductive clauses *)
+    let tree =
+      Sequence.append
+        (E.ProofState.ActiveSet.clauses () |> C.ClauseSet.to_seq)
+        (E.ProofState.PassiveSet.clauses () |> C.ClauseSet.to_seq)
+      |> tree_of_clauses
+    in
+    CCIO.with_out file
+      (fun oc -> output_ind_tree oc tree);
+    ()
+end
+
 module Make
 (E : Env.S)
 (A : Avatar_intf.S with module E = E)
@@ -112,7 +220,7 @@ module Make
      - use better generalization?
      - fix typing issues, if any remains *)
 
-(* TODO: split this into:
+  (* TODO: split this into:
    - regular (nested) induction rule
    - heuristic to guess non trivial lemmas (i.e. exclusively with
      non obvious generalization, other cases are handled by the regular
@@ -224,13 +332,6 @@ module Make
       (* path leading to this *)
     mw_proof: ProofStep.t;
   }
-
-  (* recover the (possibly empty) path from a boolean trail *)
-  let path_of_trail trail : Ind_cst.path =
-    Trail.to_seq trail
-    |> Sequence.filter_map BBox.as_case
-    |> Sequence.max ~lt:(fun a b -> Ind_cst.path_dominates b a)
-    |> CCOpt.get Ind_cst.path_empty
 
   (* TODO: incremental strenghtening.
      - when expanding a coverset in clauses_of_min_witness, see if there
@@ -369,7 +470,7 @@ module Make
 
   (* when a clause contains new inductive constants, assert minimality
      of the clause for all those constants independently *)
-  let inf_assert_minimal c =
+  let inf_assert_minimal c : C.t list =
     let consts = scan_clause c in
     let clauses =
       CCList.flat_map
@@ -480,6 +581,7 @@ let enabled_ = ref true
 let lemmas_enabled_ = ref false
 let show_lemmas_ = ref false
 let depth_ = ref !Ind_cst.max_depth_
+let dot_ind_tree_ = ref ""
 
 (* if induction is enabled AND there are some inductive types,
    then perform some setup after typing, including setting the key
@@ -524,6 +626,13 @@ let env_action (module E : Env.S) =
     E.Ctx.set_selection_fun Selection.no_select;
     let module M = Make(A.E)(A) in
     M.register ();
+    if !dot_ind_tree_ <> ""
+    then (
+      let module D = Debug(E) in
+      let file = !dot_ind_tree_ in
+      Signal.once Signals.on_dot_output
+        (fun () -> D.output_ind_tree file);
+    )
   )
 
 let extension =
@@ -542,4 +651,5 @@ let () =
     ; "--no-lemmas", Options.switch_set false lemmas_enabled_, " disable lemmas for induction"
     ; "--show-lemmas", Arg.Set show_lemmas_, " show inductive (candidate) lemmas"
     ; "--induction-depth", Arg.Set_int depth_, " maximum depth of nested induction"
+    ; "--dot-induction-tree", Arg.Set_string dot_ind_tree_, " output induction tree in given file"
     ]

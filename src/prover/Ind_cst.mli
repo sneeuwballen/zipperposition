@@ -37,6 +37,7 @@ val case_compare : case -> case -> int
 val case_hash : case -> int
 
 val pp_case : case CCFormat.printer
+val string_of_case : case -> string
 
 val case_to_term : case -> FOTerm.t
 
@@ -102,9 +103,12 @@ val cst_id : cst -> ID.t
 val cst_to_term : cst -> FOTerm.t
 val cst_ty : cst -> Type.t
 
+val cst_parent : cst -> cst option
+
 val cst_same_type : cst -> cst -> bool
 
 val pp_cst : cst CCFormat.printer
+val string_of_cst : cst -> string
 
 val cst_depth : cst -> int
 

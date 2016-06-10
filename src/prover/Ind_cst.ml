@@ -64,6 +64,7 @@ let case_compare a b = FOTerm.compare a.case_term b.case_term
 let case_hash a = FOTerm.hash a.case_term
 
 let pp_case out c = CCFormat.hovbox FOTerm.pp out c.case_term
+let string_of_case = CCFormat.to_string pp_case
 
 let case_to_term c = c.case_term
 
@@ -88,6 +89,7 @@ let cover_set_skolems c =
 let cst_to_term c = FOTerm.const ~ty:c.cst_ty c.cst_id
 let cst_id c = c.cst_id
 let cst_ty c = c.cst_ty
+let cst_parent c = c.cst_parent
 
 let cst_equal a b = ID.equal a.cst_id b.cst_id
 let cst_compare a b = ID.compare a.cst_id b.cst_id
@@ -103,6 +105,7 @@ let cst_depth c = c.cst_depth
 let cst_same_type c1 c2 = Type.equal c1.cst_ty c2.cst_ty
 
 let pp_cst out c = ID.pp out c.cst_id
+let string_of_cst = CCFormat.to_string pp_cst
 
 let on_new_cst = Signal.create()
 
@@ -500,7 +503,7 @@ let pp_path out p =
       Format.fprintf out "@,@<1>·%a" aux p'
     );
   in
-  Format.fprintf out "@[<hv>%a@]" aux p
+  Format.fprintf out "@[<hv-1>%a@]" aux p
 
 let lits_of_path p =
   Array.of_list p
