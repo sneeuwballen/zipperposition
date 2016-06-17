@@ -197,7 +197,8 @@ let pp_dot_seq ~name out seq =
       else if is_trivial p.step then `Color "cyan" :: shape :: attrs
       else shape :: attrs
     )
-    ~attrs_e:(fun (_,r,_) -> [`Label r.rule_name])
+    ~attrs_e:(fun (_,r,_) ->
+      [`Label r.rule_name; `Other ("dir", "back")])
     out
     seq;
   Format.pp_print_newline out ();

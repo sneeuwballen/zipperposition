@@ -87,11 +87,11 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     | _::_ ->
         (* do a simplification! *)
         Util.incr_stat stat_splits;
+        let proof =
+          ProofStep.mk_esa ~rule:(ProofStep.mk_rule "split") [C.proof c] in
         let clauses_and_names =
           List.map
             (fun lits ->
-               let proof =
-                 ProofStep.mk_esa ~rule:(ProofStep.mk_rule "split") [C.proof c] in
                let lits = Array.of_list lits in
                let bool_name = BBox.inject_lits lits in
                (* new trail: keep some literals of [C.trail c], add the new one *)
@@ -113,7 +113,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
           |> Trail.to_list
           |> List.map Trail.Lit.neg in
         let bool_clause = List.append bool_clause bool_guard in
-        Sat.add_clause ~proof:(C.proof_step c) bool_clause;
+        Sat.add_clause ~proof bool_clause;
         Util.debugf ~section 4 "@[constraint clause is @[%a@]@]"
           (fun k->k BBox.pp_bclause bool_clause);
         (* return the clauses *)
