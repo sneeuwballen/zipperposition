@@ -690,6 +690,9 @@ let infer_statement_exn ctx st =
     | A.Assert t ->
         let t = infer_prop_exn ctx t in
         Stmt.assert_ ~src t
+    | A.Lemma t ->
+        let t = infer_prop_exn ctx t in
+        Stmt.lemma ~src [t]
     | A.Goal t ->
         let t = infer_prop_exn ctx t in
         Stmt.goal ~src t

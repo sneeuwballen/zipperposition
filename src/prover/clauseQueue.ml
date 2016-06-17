@@ -70,6 +70,7 @@ module Make(C : Clause.S) = struct
         Trail.fold
           (fun acc t -> match B.payload (B.Lit.abs t) with
              | B.Fresh -> acc
+             | B.Lemma _ -> acc
              | B.Clause_component lits -> acc + weight_lits_ lits
              | B.Case p ->
                (* penalize deep inductions exponentially *)

@@ -29,6 +29,7 @@ type ('f, 't, 'ty) view =
   | RewriteTerm of ID.t * 'ty * 't list * 't (* args, rhs *)
   | RewriteForm of 't SLiteral.t * 'f list (* lhs atomic form, rhs conjunction *)
   | Assert of 'f (** assert form *)
+  | Lemma of 'f list (** lemma to prove and use, using Avatar cut *)
   | Goal of 'f (** goal to prove *)
   | NegatedGoal of 'f list (** goal after negation *)
 
@@ -58,6 +59,7 @@ let rewrite_term ?attrs ~src id ty args rhs = mk_ ?attrs ~src (RewriteTerm(id,ty
 let rewrite_form ?attrs ~src lhs rhs = mk_ ?attrs ~src (RewriteForm(lhs,rhs))
 let data ?attrs ~src l = mk_ ?attrs ~src (Data l)
 let assert_ ?attrs ~src c = mk_ ?attrs ~src (Assert c)
+let lemma ?attrs ~src l = mk_ ?attrs ~src (Lemma l)
 let goal ?attrs ~src c = mk_ ?attrs ~src (Goal c)
 let neg_goal ?attrs ~src l = mk_ ?attrs ~src (NegatedGoal l)
 
@@ -78,6 +80,7 @@ let map ~form ~term ~ty st =
     | Data l ->
       let l = List.map (map_data ~ty:fty) l in
       Data l
+    | Lemma l -> Lemma (List.map form l)
     | Goal f -> Goal (form f)
     | NegatedGoal l -> NegatedGoal (List.map form l)
     | Assert f -> Assert (form f)
@@ -139,6 +142,7 @@ module Seq = struct
              decl d.data_id d.data_ty;
              List.iter (CCFun.uncurry decl) d.data_cstors)
           l
+      | Lemma l -> List.iter (fun f -> k (`Form f)) l
       | Assert f
       | Goal f -> k (`Form f)
       | NegatedGoal l -> List.iter (fun f -> k (`Form f)) l
@@ -154,6 +158,7 @@ module Seq = struct
           l
     | RewriteTerm _
     | RewriteForm _
+    | Lemma _
     | Goal _
     | NegatedGoal _
     | Assert _ -> ()
@@ -165,6 +170,7 @@ module Seq = struct
     | TyDecl _ -> ()
     | Goal c -> k c
     | RewriteForm (_, l)
+    | Lemma l
     | NegatedGoal l -> List.iter k l
     | Assert c -> k c
 
@@ -238,6 +244,9 @@ let pp ppf ppt ppty out st = match st.view with
       fpf out "@[<hv>data%a@ %a@]" pp_attrs st.attrs (Util.pp_list ~sep:" and " pp_data) l
   | Assert f ->
       fpf out "@[<2>assert%a@ @[%a@]@]." pp_attrs st.attrs ppf f
+  | Lemma l ->
+      fpf out "@[<2>lemma%a@ @[%a@]@]."
+        pp_attrs st.attrs (Util.pp_list ~sep:" && " ppf) l
   | Goal f ->
       fpf out "@[<2>goal%a@ @[%a@]@]." pp_attrs st.attrs ppf f
   | NegatedGoal l ->
@@ -263,6 +272,10 @@ module TPTP = struct
     | Assert f ->
         let role = "axiom" in
         fpf out "@[<2>tff(%s, %s,@ (@[%a@])@]." name role ppf f
+    | Lemma l ->
+        let role = "lemma" in
+        fpf out "@[<2>tff(%s, %s,@ (@[%a@])@]." name role
+          (Util.pp_list ~sep:" & " ppf) l
     | Goal f ->
         let role = "conjecture" in
         fpf out "@[<2>tff(%s, %s,@ (@[%a@])@]." name role ppf f

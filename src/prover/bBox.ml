@@ -19,6 +19,7 @@ type inductive_path = Ind_cst.path
 type payload =
   | Fresh (* fresh literal with no particular payload *)
   | Clause_component of Literals.t
+  | Lemma of Literals.t list
   | Case of inductive_path (* branch in the induction tree *)
 
 module Lit = Bool_lit.Make(struct
@@ -35,13 +36,16 @@ let payload_to_int_ = function
   | Fresh -> 0
   | Clause_component _ -> 1
   | Case _ -> 2
+  | Lemma _ -> 3
 
 let compare_payload l1 l2 = match l1, l2 with
   | Fresh, Fresh -> 0
   | Clause_component l1, Clause_component l2 -> Lits.compare l1 l2
+  | Lemma l1, Lemma l2 -> CCList.compare Lits.compare l1 l2
   | Case p1, Case p2 -> Ind_cst.path_compare p1 p2
   | Fresh, _
   | Clause_component _, _
+  | Lemma _, _
   | Case _, _ ->
     CCInt.compare (payload_to_int_ l1) (payload_to_int_ l2)
 
@@ -49,6 +53,9 @@ let pp_payload out = function
   | Fresh -> CCFormat.string out "<dummy>"
   | Clause_component lits ->
       Format.fprintf out "@<1>⟦@[<hv>%a@]@<1>⟧" Lits.pp lits
+  | Lemma lits_l ->
+      Format.fprintf out "@<1>⟦lemma @[<hv>%a@]@<1>⟧"
+        (Util.pp_list ~sep:" & " Lits.pp) lits_l
   | Case p ->
       Format.fprintf out "@<1>⟦@[<hv1>%a@]@<1>⟧" Ind_cst.pp_path p
 
@@ -85,6 +92,7 @@ let save_ lit =
   | Clause_component lits ->
       (* be able to retrieve by lits *)
       _clause_set := FV.add !_clause_set (lits, payload, lit)
+  | Lemma _ -> () (* no retrieval *)
   | Case p ->
       ICaseTbl.add _case_set p (payload, lit)
 
@@ -118,6 +126,11 @@ let inject_lits_ lits  =
 let inject_lits lits =
   Util.with_prof prof_inject_lits inject_lits_ lits
 
+let inject_lemma l =
+  assert (l<>[]);
+  let t = Lit.make (Lemma l) in
+  t
+
 let inject_case p =
   try
     let _, i = ICaseTbl.find _case_set p in
@@ -132,6 +145,7 @@ let must_be_kept lit =
   match Lit.payload (Lit.abs lit) with
     | Fresh
     | Clause_component _ -> false
+    | Lemma _
     | Case _ -> true
 
 let as_case lit = match Lit.payload (Lit.abs lit) with

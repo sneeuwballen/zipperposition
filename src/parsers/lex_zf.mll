@@ -55,6 +55,7 @@ rule token = parse
   | "type" { TYPE }
   | "prop" { PROP }
   | "assert" { ASSERT }
+  | "lemma" { LEMMA }
   | "goal" { GOAL }
   | "and" { AND }
   | "rewrite" { REWRITE }

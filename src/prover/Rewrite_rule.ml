@@ -97,6 +97,7 @@ module Set = struct
     | Stmt.TyDecl _
     | Stmt.Data _
     | Stmt.Assert _
+    | Stmt.Lemma _
     | Stmt.Goal _
     | Stmt.NegatedGoal _ -> t
 

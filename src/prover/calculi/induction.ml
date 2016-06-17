@@ -254,7 +254,8 @@ module Make
       else (
         (* introduce cut now *)
         let proof = ProofStep.mk_trivial in
-        let clauses, _ = A.introduce_cut lits proof in
+        let cut = A.introduce_cut [lits] proof in
+        let clauses = A.cut_res_clauses cut |> Sequence.to_rev_list in
         Util.incr_stat stats_lemmas;
         Util.debugf ~section 2
           "@[<2>introduce cut@ from %a@ @[<hv0>%a@]@ generalizing on @[%a@]@]"
@@ -484,47 +485,79 @@ module Make
     in
     clauses
 
+  (* clauses when we do induction on [cst] *)
+  let induction_on_ ?(trail=Trail.empty) (clauses:C.t list) ~cst : C.t list =
+    decl_cst_ cst;
+    (* keep only clauses that depend on [cst] *)
+    let ctxs =
+      CCList.filter_map
+        (fun c ->
+           ClauseContext.extract (C.lits c) (Ind_cst.cst_to_term cst))
+        clauses
+    in
+    (* proof: one step from all the clauses above *)
+    let proof =
+      ProofStep.mk_inference (List.map C.proof clauses)
+        ~rule:(ProofStep.mk_rule "min")
+    in
+    assert_min ~trail ~proof ctxs cst
+
   (* hook for converting some statements to clauses.
      It check if [Negated_goal l] contains inductive clauses, in which case
-     it states their collective minimality *)
+     it states their collective minimality.
+     It also handles inductive Lemmas *)
   let convert_statement st =
+    let consts_of_l l =
+      Sequence.of_list l
+      |> Sequence.flat_map Sequence.of_list
+      |> Sequence.flat_map SLiteral.to_seq
+      |> scan_terms
+    in
     match Statement.view st with
     | Statement.NegatedGoal l ->
-        (* find inductive constants *)
-        let consts =
-          Sequence.of_list l
-          |> Sequence.flat_map Sequence.of_list
-          |> Sequence.flat_map SLiteral.to_seq
-          |> scan_terms
-        in
-        if consts=[]
-        then None
-        else (
+      (* find inductive constants *)
+      begin match consts_of_l l with
+        | [] -> E.CR_skip
+        | consts ->
           (* first, get "proper" clauses *)
           let clauses = C.of_statement st in
           (* for each new inductive constant, assert minimality of
              this constant w.r.t the set of clauses that contain it *)
+          consts
+          |> CCList.flat_map
+            (fun cst -> induction_on_ clauses ~cst)
+          |> E.cr_add
+        end
+    | _ -> E.cr_skip
+
+  let new_lemmas_ : C.t list ref = ref []
+
+  (* look whether, to prove the lemma, we need induction *)
+  let on_lemma cut =
+    (* find inductive constants in the negative part of the lemma *)
+    let consts =
+      cut.A.cut_neg
+      |> Sequence.of_list
+      |> Sequence.flat_map C.Seq.terms
+      |> scan_terms
+    in
+    begin match consts with
+      | [] -> () (* regular lemma *)
+      | consts ->
+        (* add the condition that the lemma is false *)
+        let trail = Trail.singleton (BoolLit.neg cut.A.cut_lit) in
+        let l =
           CCList.flat_map
-            (fun cst ->
-              decl_cst_ cst;
-              (* keep only clauses that depend on [cst] *)
-              let ctxs =
-                CCList.filter_map
-                  (fun c ->
-                    ClauseContext.extract (C.lits c) (Ind_cst.cst_to_term cst))
-                  clauses
-              in
-              (* proof: one step from all the clauses above *)
-              let proof =
-                ProofStep.mk_inference (List.map C.proof clauses)
-                  ~rule:(ProofStep.mk_rule "min")
-              in
-              assert_min ~trail:Trail.empty ~proof ctxs cst
-            )
+            (fun cst -> induction_on_ ~trail cut.A.cut_neg ~cst)
             consts
-          |> CCOpt.return
-        )
-    | _ -> None
+        in
+        new_lemmas_ := List.rev_append l !new_lemmas_;
+    end
+
+  let inf_new_lemmas () =
+    let l = !new_lemmas_ in
+    new_lemmas_ := [];
+    l
 
   let register () =
     Util.debug ~section 2 "register induction";
@@ -534,6 +567,8 @@ module Make
     Env.add_unary_inf "induction.ind" inf_assert_minimal;
     Env.add_clause_conversion convert_statement;
     Env.add_is_trivial has_trivial_trail;
+    Signal.on_every A.on_input_lemma on_lemma;
+    Env.add_generate "ind.lemmas" inf_new_lemmas;
     (* declare new constants to [Ctx] *)
     Signal.on_every Ind_cst.on_new_cst
       (fun cst ->
@@ -647,6 +682,8 @@ let () =
   Params.add_opts
     [ "--induction", Options.switch_set true enabled_, " enable induction"
     ; "--no-induction", Options.switch_set false enabled_, " enable induction"
+    (* FIXME: remove this; it should belong to aVatar;
+    also an option to display the status of input lemmas according to their box (level 0 in msat?) *)
     ; "--lemmas", Options.switch_set true lemmas_enabled_, " enable lemmas for induction"
     ; "--no-lemmas", Options.switch_set false lemmas_enabled_, " disable lemmas for induction"
     ; "--show-lemmas", Arg.Set show_lemmas_, " show inductive (candidate) lemmas"

@@ -34,6 +34,7 @@ type statement_view =
   | Rewrite of term
   | Data of data list
   | Assert of form
+  | Lemma of form
   | Goal of form
 
 type statement = {
@@ -50,6 +51,7 @@ val def : ?loc:Loc.t -> ?attrs:attrs -> string -> ty -> term -> statement
 val data : ?loc:Loc.t -> ?attrs:attrs -> data list -> statement
 val rewrite : ?loc:Loc.t -> ?attrs:attrs -> term -> statement
 val assert_ : ?loc:Loc.t -> ?attrs:attrs -> term -> statement
+val lemma : ?loc:Loc.t -> ?attrs:attrs -> term -> statement
 val goal : ?loc:Loc.t -> ?attrs:attrs -> term -> statement
 
 val name_of_attrs : attrs -> string option

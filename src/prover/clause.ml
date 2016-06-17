@@ -144,6 +144,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     | Statement.RewriteTerm _ -> [] (* dealt with by rewriting *)
     | Statement.Assert lits -> [of_lits ~is_goal:false lits]
     | Statement.Goal lits -> [of_lits ~is_goal:true lits]
+    | Statement.Lemma l
     | Statement.NegatedGoal l -> List.map (of_lits ~is_goal:true) l
 
   let update_trail f c =

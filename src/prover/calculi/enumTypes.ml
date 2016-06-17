@@ -512,6 +512,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     | Stmt.Def _
     | Stmt.RewriteTerm _
     | Stmt.RewriteForm _
+    | Stmt.Lemma _
     | Stmt.NegatedGoal _
     | Stmt.Goal _ -> ()
 

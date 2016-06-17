@@ -515,6 +515,7 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
             let rhs = List.map (conv_form ~is_goal:false) rhs in
             Stmt.rewrite_form ~src lhs rhs
           | Stmt.Assert f -> Stmt.assert_ ~src (conv_form ~is_goal:false f)
+          | Stmt.Lemma l -> Stmt.lemma ~src (List.map (conv_form ~is_goal:true) l)
           | Stmt.Goal f -> Stmt.goal ~src (conv_form ~is_goal:true f)
           | Stmt.NegatedGoal _ -> assert false
         in
@@ -611,6 +612,10 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) ?(neg_src=id_) ?(cnf_src=id_) 
           List.iter
             (fun c -> CCVector.push res (Stmt.assert_ ~src c))
             (conv_form ~src f)
+      | Stmt.Lemma l ->
+          let src = src |> cnf_src in
+          let l = CCList.flat_map (conv_form ~src) l in
+          CCVector.push res (Stmt.lemma ~src l)
       | Stmt.Goal f ->
           let src = src |> neg_src |> cnf_src in
           let l = conv_form ~src (F.not_ f) in
@@ -660,6 +665,9 @@ let convert seq =
       | Stmt.NegatedGoal l ->
           let l = List.map (clause_to_fo ~ctx:t_ctx) l in
           Stmt.neg_goal ~attrs ~src l
+      | Stmt.Lemma l ->
+          let l = List.map (clause_to_fo ~ctx:t_ctx) l in
+          Stmt.lemma ~attrs ~src l
       | Stmt.Assert c ->
           let c = clause_to_fo ~ctx:t_ctx c in
           Stmt.assert_ ~attrs ~src c

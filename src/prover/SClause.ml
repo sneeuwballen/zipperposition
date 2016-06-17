@@ -107,6 +107,9 @@ and pp_trail_tstp out trail =
       pp_lits_tstp out lits
     | BBox.Clause_component lits ->
       CCFormat.within "(" ")" pp_closed_lits_tstp out lits
+    | BBox.Lemma lits ->
+      CCFormat.within "(" ")"
+        (Util.pp_list ~sep:" & " pp_closed_lits_tstp) out lits
     | BBox.Fresh -> failwith "cannot print <fresh> boolean box"
   in
   let pp_box out b =

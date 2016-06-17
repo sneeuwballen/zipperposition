@@ -14,6 +14,7 @@ type inductive_path = Ind_cst.path
 type payload = private
   | Fresh (* fresh literal with no particular payload *)
   | Clause_component of Literals.t
+  | Lemma of Literals.t list
   | Case of inductive_path (* branch in the induction tree *)
 
 module Lit : Bool_lit_intf.S with type payload = payload
@@ -29,6 +30,11 @@ val inject_lits : Literals.t -> t
     to the same literal unless it is alpha-equivalent to this one.
     The boolean literal can be negative is the argument is a
     unary negative clause *)
+
+val inject_lemma : Literals.t list -> t
+(** Make a new literal from this list of clauses that we are going to cut
+    on. This is generative, meaning that calling it twice with the
+    same arguments will produce distinct literals. *)
 
 val inject_case : inductive_path -> t
 (** Inject [cst = case] *)

@@ -225,4 +225,5 @@ let of_ast st =
   | UA.Data _ -> error "cannot convert `data` statement into TPTP"
   | UA.Goal f -> A.TFF (name, A.R_conjecture, f, [])
   | UA.Assert f -> A.TFF (name, A.R_axiom, f, [])
+  | UA.Lemma f -> A.TFF (name, A.R_lemma, f, [])
 
