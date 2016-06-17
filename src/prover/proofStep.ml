@@ -97,6 +97,12 @@ let compare_proof a b =
 let equal_proof a b = (compare_proof a b = 0)
 let hash_proof a = hash a.step
 
+module PTbl = CCHashtbl.Make(struct
+    type t = of_
+    let equal = equal_proof
+    let hash = hash_proof
+  end)
+
 let compare_by_result a b = compare_result a.result b.result
 
 (** {2 Constructors and utils} *)

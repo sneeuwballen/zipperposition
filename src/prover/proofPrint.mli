@@ -11,7 +11,7 @@ val is_proof_of_false : t -> bool
 
 (** {2 Conversion to a graph of proofs} *)
 
-module Tbl : CCHashtbl.S with type key = t
+module Tbl : module type of ProofStep.PTbl
 
 val as_graph : (t, t * ProofStep.rule * t) CCGraph.t
 (** Get a graph of the proof *)

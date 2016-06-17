@@ -74,6 +74,8 @@ val compare_proof : of_ -> of_ -> int
 val equal_proof : of_ -> of_ -> bool
 val hash_proof : of_ -> int
 
+module PTbl : CCHashtbl.S with type key = of_
+
 (** {2 Constructors and utils}
     In all the following constructors, [theories] defaults to the empty list.
     Axiom constructors have default role "axiom" *)

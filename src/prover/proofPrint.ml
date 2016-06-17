@@ -9,11 +9,7 @@ open ProofStep
 module C = SClause
 
 (* proof hashtable *)
-module Tbl = CCHashtbl.Make(struct
-    type t = of_
-    let equal = equal_proof
-    let hash = hash_proof
-  end)
+module Tbl = PTbl
 
 let section = ProofStep.section
 
