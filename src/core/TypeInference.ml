@@ -214,7 +214,7 @@ module Ctx = struct
   let get_id_ ?loc ~arity ctx name =
     try match Hashtbl.find ctx.env name with
       | `ID (id, ty) -> id, ty
-      | `Var _ -> error_ ?loc "@[<2>expected %s to be a constant, not a variable@]" name
+      | `Var _ -> error_ ?loc "@[<2>expected `%s` to be a constant, not a variable@]" name
     with Not_found ->
       let ty = fresh_fun_ty ~arity ctx in
       Util.debugf ~section 2
@@ -298,7 +298,7 @@ let rec infer_ty_ ?loc ctx ty =
         end
     | PT.Const f ->
         (* constant type *)
-        let id, ty = Ctx.get_id_ ctx ~arity:0 f in
+        let id, ty = Ctx.get_id_ ?loc ctx ~arity:0 f in
         unify ?loc ty T.Ty.tType;
         T.Ty.const id
     | PT.App (f, l) ->
@@ -306,7 +306,7 @@ let rec infer_ty_ ?loc ctx ty =
         | PT.Var PT.Wildcard -> error_ ?loc "wildcard function: not supported"
         | PT.Var (PT.V name)
         | PT.Const name ->
-            let id, ty = Ctx.get_id_ ctx ~arity:(List.length l) name in
+            let id, ty = Ctx.get_id_ ?loc ctx ~arity:(List.length l) name in
             unify ?loc (T.Ty.returns ty) T.Ty.tType;
             let l = List.map aux l in
             (* ensure that the type is well-typed (!) *)

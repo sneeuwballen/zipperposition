@@ -910,24 +910,24 @@ let unify ?(allow_open=false) ?loc ?(st=UStack.create()) ?(subst=Subst.empty) t1
   unif_rec subst t1 t2
 
 let apply_unify ?allow_open ?loc ?st ?(subst=Subst.empty) ty l =
-  Util.debugf ~section 5 "@[<>apply %a@ to [@[%a@]]@]"
+  Util.debugf ~section 5 "@[<>apply `%a`@ to [@[%a@]]@]"
     (fun k->k pp ty (Util.pp_list pp) l);
   let rec aux subst ty l = match Ty.view ty, l with
   | _, [] -> Subst.eval subst ty
   | Ty.Forall (v,ty'), a :: l' ->
       let ty_a = ty_exn a in
       unify ?allow_open ?loc ?st ~subst ty_a tType;
-      Util.debugf ~section 5 "@[bind %a to @[%a@]@]" (fun k->k Var.pp_fullc v pp a);
+      Util.debugf ~section 5 "@[bind `%a` to `@[%a@]`@]" (fun k->k Var.pp_fullc v pp a);
       aux (Subst.add subst v a) ty' l'
   | Ty.Fun (exp, ret), _ ->
       aux_l subst exp ret l
   | (Ty.Meta _ | Ty.Var _ | Ty.App _ | Ty.Builtin _ | Ty.Multiset _ | Ty.Record _), _ ->
-      fail_uniff_ ?loc [] "cannot apply type @[%a@]@ to @[%a@]"
+      fail_uniff_ ?loc [] "cannot apply type `@[%a@]`@ to `@[%a@]`"
         pp ty (Util.pp_list pp) l
   and aux_l subst exp ret l = match exp, l with
     | [], [] -> Subst.eval subst ret
     | _, [] -> Subst.eval subst (Ty.fun_ exp ret)
-    | [], _ -> fail_uniff_ ?loc [] "@[<2>cannot apply type@ @[%a@]@]" pp ret
+    | [], _ -> fail_uniff_ ?loc [] "@[<2>cannot apply type@ `@[%a@]`@]" pp ret
     | exp_a :: exp', a :: l' ->
         unify ?allow_open ?loc ?st ~subst exp_a (ty_exn a);
         aux_l subst exp' ret l'
