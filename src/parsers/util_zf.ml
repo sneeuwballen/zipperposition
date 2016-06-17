@@ -21,7 +21,7 @@ let find_file name ~dir : string option =
   then Some abs_path
   else None
 
-let rec parse_lexbuf_ ?cache ?(recursive=true) lex =
+let rec parse_lexbuf_ ?cache ?(recursive=true) ~dir lex =
   let l =
     Parse_zf.parse_statement_list Lex_zf.token lex
   in
@@ -31,7 +31,7 @@ let rec parse_lexbuf_ ?cache ?(recursive=true) lex =
     CCList.flat_map
       (fun st -> match st.A.stmt with
          | A.Include s ->
-           begin match find_file s ~dir:"." with
+           begin match find_file s ~dir with
              | None ->
                Util.errorf ~where:"utils_zf"
                  "could not find included file `%s`" s
@@ -53,10 +53,11 @@ and parse_file_ ?cache ?recursive file =
     (fun ic ->
        let lexbuf = Lexing.from_channel ic in
        ParseLocation.set_file lexbuf file;
-       parse_lexbuf_ ?cache ?recursive lexbuf)
+       let dir = Filename.dirname file in
+       parse_lexbuf_ ?cache ?recursive ~dir lexbuf)
 
 let parse_lexbuf ?cache ?recursive file : parser_res =
-  try parse_lexbuf_ ?cache ?recursive file
+  try parse_lexbuf_ ?cache ?recursive ~dir:"." file
       |> Sequence.of_list |> CCError.return
   with e -> CCError.of_exn e
 
