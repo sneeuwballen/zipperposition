@@ -26,6 +26,7 @@ type attrs = attr list
 
 (** Statement *)
 type statement_view =
+  | Include of string
   | Decl of string * ty
   | Def of string * ty * term
   | Rewrite of term
@@ -43,6 +44,7 @@ let default_attrs = []
 
 let make_ ?loc ?(attrs=default_attrs) stmt = {loc; stmt; attrs; }
 
+let include_ ?loc ?attrs s = make_ ?loc ?attrs (Include s)
 let decl ?loc ?attrs n ty = make_ ?loc ?attrs (Decl (n,ty))
 let def ?loc ?attrs n ty t = make_ ?loc ?attrs (Def (n,ty,t))
 let rewrite ?loc ?attrs t = make_ ?loc ?attrs (Rewrite t)
@@ -67,6 +69,8 @@ let pp_statement out st =
   let attrs = st.attrs in
   let fpf = Format.fprintf in
   match st.stmt with
+  | Include s ->
+      fpf out "@[<2>include \"%s\"@]@." (String.escaped s)
   | Decl (id,ty) ->
       fpf out "@[<2>val%a %s :@ @[%a@]@]." pp_attrs attrs id T.pp ty
   | Def (id,ty,t) ->

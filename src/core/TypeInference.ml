@@ -610,6 +610,8 @@ let infer_statement_exn ctx st =
   let src = st.A.attrs in
   let loc = st.A.loc in
   let st = match st.A.stmt with
+    | A.Include _ ->
+        error_ ?loc "remaining include statement"
     | A.Decl (s,ty) ->
         (* new type
            TODO: warning if it shadows? *)

@@ -9,6 +9,16 @@
   module L = ParseLocation
   module A = UntypedAST
   module T = A.T
+
+  let unquote s =
+    assert (CCString.prefix ~pre:"\"" s);
+    assert (CCString.suffix ~suf:"\"" s);
+    let s = String.sub s 1 (String.length s-2) in
+    CCString.flat_map
+      (function
+        | '\\' -> ""
+        | c -> String.make 1 c)
+      s
 %}
 
 
@@ -47,6 +57,7 @@
 %token VAL
 %token GOAL
 %token REWRITE
+%token INCLUDE
 
 %token ARROW
 %token PI
@@ -57,6 +68,7 @@
 
 %token <string> LOWER_WORD
 %token <string> UPPER_WORD
+%token <string> QUOTED
 
 %start <Libzipperposition.UntypedAST.statement> parse_statement
 %start <Libzipperposition.UntypedAST.statement list> parse_statement_list
@@ -91,7 +103,7 @@ var:
   | v=raw_var
     {
       let loc = L.mk_pos $startpos $endpos in
-      T.var ~loc v 
+      T.var ~loc v
     }
 
 const:
@@ -210,6 +222,12 @@ attrs:
   | { [] }
 
 statement:
+  | INCLUDE s=QUOTED DOT
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      let s = unquote s in
+      A.include_ ~attrs:[] ~loc s
+    }
   | VAL a=attrs v=raw_var COLON t=term DOT
     {
       let loc = L.mk_pos $startpos $endpos in

@@ -19,7 +19,7 @@ let alpha_numeric = lower_alpha | upper_alpha | numeric | '_'
 let upper_word = upper_alpha alpha_numeric*
 let lower_word = lower_alpha alpha_numeric*
 
-let filepath = '"' ([^ '"'] | '\\' '"')* '"'
+let quoted = '"' ([^ '"'] | '\\' '"')* '"'
 
 let zero_numeric = '0'
 let non_zero_numeric = ['1' - '9']
@@ -72,8 +72,10 @@ rule token = parse
   | "<=>" { LOGIC_EQUIV }
   | "AC" { AC }
   | "name" { NAME }
+  | "include" { INCLUDE }
   | lower_word { LOWER_WORD(Lexing.lexeme lexbuf) }
   | upper_word { UPPER_WORD(Lexing.lexeme lexbuf) }
+  | quoted { QUOTED(Lexing.lexeme lexbuf) }
   | _ as c
     {
       let loc = UntypedAST.Loc.of_lexbuf lexbuf in

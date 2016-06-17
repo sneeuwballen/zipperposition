@@ -28,6 +28,7 @@ type attrs = attr list
 
 (** Statement *)
 type statement_view =
+  | Include of string
   | Decl of string * ty
   | Def of string * ty * term
   | Rewrite of term
@@ -43,6 +44,7 @@ type statement = {
 
 val default_attrs : attrs
 
+val include_ : ?loc:Loc.t -> ?attrs:attrs -> string -> statement
 val decl : ?loc:Loc.t -> ?attrs:attrs -> string -> ty -> statement
 val def : ?loc:Loc.t -> ?attrs:attrs -> string -> ty -> term -> statement
 val data : ?loc:Loc.t -> ?attrs:attrs -> data list -> statement

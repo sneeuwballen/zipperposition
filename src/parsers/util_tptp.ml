@@ -29,16 +29,11 @@ type parse_cache = (string, unit) Hashtbl.t
 let create_parse_cache () = Hashtbl.create 16
 
 let find_file name dir =
-  (* check if the file exists *)
-  let file_exists name =
-    try ignore (Unix.stat name); true
-    with Unix.Unix_error (e, _, _) when e = Unix.ENOENT -> false
-  in
   (* search in [dir], and its parents recursively *)
   let rec search dir =
     let cur_name = Filename.concat dir name in
     Util.debugf 2 "search `%s`@ as `%s`" (fun k->k name cur_name);
-    if file_exists cur_name
+    if Sys.file_exists cur_name
     then Some cur_name
     else
       let dir' = Filename.dirname dir in
@@ -57,7 +52,7 @@ let find_file name dir =
   then match search dir with
     | None -> search_env ()
     | Some _ as res -> res
-  else if file_exists name
+  else if Sys.file_exists name
   then Some name  (* found *)
   else None
 
@@ -220,6 +215,7 @@ let of_ast st =
     | Some s -> A.NameString s
   in
   match st.UA.stmt with
+  | UA.Include s -> A.Include s
   | UA.Decl (s,ty) ->
       let name = name_sym_ s in
       (* XXX we should look if [ty] returns tType or not *)
