@@ -72,8 +72,8 @@ module Make(C : Clause.S) = struct
              | B.Fresh -> acc
              | B.Clause_component lits -> acc + weight_lits_ lits
              | B.Case p ->
-               (* generic penalty for each inductive hypothesis *)
-               acc + 2 * Ind_cst.path_length p
+               (* penalize deep inductions exponentially *)
+               acc + CCInt.pow 2 (4 * Ind_cst.path_length p)
           )
           0 trail
       in
