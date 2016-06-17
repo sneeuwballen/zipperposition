@@ -7,7 +7,7 @@
 docs/*.pdf
 *.aux
 *.out
-_build
+_build/
 tags
 *.aux
 *.out

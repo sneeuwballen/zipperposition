@@ -92,8 +92,8 @@ watch:
 
 clean-generated:
 	rm myocamlbuild.ml || true
-	find -name '*.mldylib' -or -name '*.mlpack' \
-	  -or -name '*.mllib' -or -name '*.odocl' -exec rm -f {} \;
+	find \( -name '*.mldylib' -or -name '*.mlpack' \
+	  -or -name '*.mllib' -or -name '*.odocl' \) -delete
 
 .PHONY: push_doc dot package tags rst_doc open_doc test-all clean-generated
 
