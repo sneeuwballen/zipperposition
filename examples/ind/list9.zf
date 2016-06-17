@@ -1,70 +1,7 @@
-val term : type.
-data nat := z | s nat.
-val plus : nat -> nat -> nat.
-val minus : nat -> nat -> nat.
-val less : nat -> nat -> prop.
-val leq : nat -> nat -> prop.
-assert forall (X:nat). ((plus z X) = X).
-assert forall (X:nat). (forall (Y:nat). ((plus (s X) Y) = (s (plus X Y)))).
-assert forall (X:nat). ((minus X z) = X).
-assert forall (X:nat). (forall (Y:nat). ((minus (s X) (s Y)) = (minus X Y))).
-assert forall (X:nat). (less z (s X)).
-assert forall (X:nat). (forall (Y:nat). ((less (s X) (s Y)) <=> (less X Y))).
-assert forall (X:nat). (leq z X).
-assert forall (X:nat). (forall (Y:nat). ((leq (s X) (s Y)) <=> (leq X Y))).
-data list := nil | cons nat list.
-val count : nat -> list -> nat.
-val length : list -> nat.
-val take : nat -> list -> list.
-val drop : nat -> list -> list.
-val append : list -> list -> list.
-val rev : list -> list.
-val mem : nat -> list -> prop.
-val last : list -> nat.
-val butlast : list -> list.
-assert forall (X:nat). ((count X nil) = z).
-assert
-  forall (X:nat). (forall (L:list). ((count X (cons X L)) = (s (count X L)))).
-assert
-  forall (X:nat).
-    (forall (Y:nat).
-       (forall (L:list). ((X != Y) => ((count X (cons Y L)) = (count X L))))).
-assert (length nil) = z.
-assert
-  forall (X:nat). (forall (L:list). ((length (cons X L)) = (s (length L)))).
-assert forall (L:list). ((append nil L) = L).
-assert
-  forall (X:nat).
-    (forall (L:list).
-       (forall (L2:list). ((append (cons X L) L2) = (cons X (append L L2))))).
-assert forall (L:list). ((take z L) = nil).
-assert
-  forall (N:nat).
-    (forall (X:nat).
-       (forall (L:list). ((take (s N) (cons X L)) = (cons X (take N L))))).
-assert forall (L:list). ((drop z L) = L).
-assert
-  forall (N:nat).
-    (forall (X:nat).
-       (forall (L:list). ((drop (s N) (cons X L)) = (drop N L)))).
-assert (rev nil) = nil.
-assert
-  forall (X:nat).
-    (forall (L:list). ((rev (cons X L)) = (append (rev L) (cons X nil)))).
-assert forall (X:nat). (~ (mem X nil)).
-assert forall (X:nat). (forall (L:list). (mem X (cons X L))).
-assert
-  forall (X:nat).
-    (forall (Y:nat). (forall (L:list). ((mem X L) => (mem X (cons Y L))))).
-assert forall (X:nat). ((last (cons X nil)) = X).
-assert
-  forall (X:nat).
-    (forall (L:list). ((L != nil) => ((last (cons X L)) = (last L)))).
-assert forall (X:nat). ((butlast (cons X nil)) = nil).
-assert
-  forall (X:nat).
-    (forall (L:list).
-       ((L != nil) => ((butlast (cons X L)) = (cons X (butlast L))))).
+
+include "nat.zf".
+include "list.zf".
+
 goal
   forall (L1:list).
     (forall (L2:list).

@@ -1,0 +1,38 @@
+include "nat.zf".
+
+data tree := empty | node tree term tree.
+val rev : tree -> tree.
+val size : tree -> nat.
+val subtree : tree -> tree -> prop.
+val mem : term -> tree -> prop.
+assert (rev empty) = empty.
+assert
+  forall (L:tree).
+    (forall (R:tree).
+       (forall (X:term). ((rev (node L X R)) = (node (rev R) X (rev L))))).
+assert (size empty) = z.
+assert
+  forall (L:tree).
+    (forall (R:tree).
+       (forall (X:term).
+          ((size (node L X R)) = (plus (s z) (plus (size L) (size R)))))).
+assert forall (T:tree). (subtree T T).
+assert
+  forall (T:tree).
+    (forall (X:term).
+       (forall (L:tree).
+          (forall (R:tree). ((subtree T L) => (subtree T (node L X R)))))).
+assert
+  forall (T:tree).
+    (forall (X:term).
+       (forall (L:tree).
+          (forall (R:tree). ((subtree T R) => (subtree T (node L X R)))))).
+assert forall (X:term). (~ (mem X empty)).
+
+assert
+  forall (X:term).
+    (forall (Y:term).
+       (forall (L:tree).
+          (forall (R:tree).
+            mem X (node L Y R) <=>
+             (X = Y || mem X L || mem X R)))).

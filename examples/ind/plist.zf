@@ -1,0 +1,60 @@
+
+# polymorphic lists
+
+include "nat.zf".
+
+data list a :=
+  | nil
+  | cons a (list a).
+
+val count : pi a. a -> list a -> nat.
+val length : pi a. list a -> nat.
+val take : pi a. nat -> list a -> list a.
+val drop : pi a. nat -> list a -> list a.
+val append : pi a. list a -> list a -> list a.
+val rev : pi a. list a -> list a.
+val mem : pi a. a -> list a -> prop.
+val last : pi a. list a -> a.
+val butlast : pi a. list a -> list a.
+
+assert forall a. length a (nil _) = z.
+assert
+  forall a x l.
+  length a (cons _ x l) = s (length _ l).
+
+assert forall A.
+  (forall (L:(list A)). ((append A (nil A) L) = L)).
+assert
+  forall A.
+    (forall (X:A).
+       (forall (L:(list A)).
+          (forall (L2:(list A)).
+             ((append A (cons A X L) L2) = (cons A X (append A L L2)))))).
+assert forall A. ((rev A (nil A)) = (nil A)).
+assert
+  forall A.
+    (forall (X:A).
+       (forall (L:(list A)).
+          ((rev A (cons A X L)) = (append A (rev A L) (cons A X (nil A)))))).
+assert forall A. (forall (X:A). (~ (mem A X (nil A)))).
+assert
+  forall A. (forall (X:A). (forall (L:(list A)). (mem A X (cons A X L)))).
+assert
+  forall A.
+    (forall (X:A).
+       (forall (Y:A).
+          (forall (L:(list A)). ((mem A X L) => (mem A X (cons A Y L)))))).
+assert forall A. (forall (X:A). ((last A (cons A X (nil A))) = X)).
+assert
+  forall A.
+    (forall (X:A).
+       (forall (L:(list A)).
+          ((L != (nil A)) => ((last A (cons A X L)) = (last A L))))).
+assert forall A. (forall (X:A). ((butlast A (cons A X (nil A))) = (nil A))).
+assert
+  forall A.
+    (forall (X:A).
+       (forall (L:(list A)).
+          ((L != (nil A))
+           => ((butlast A (cons A X L)) = (cons A X (butlast A L)))))).
+

@@ -1,8 +1,7 @@
 
 % polymorphic lists
 
-% ugly, it should be $tType > $tType, but anyway.
-tff(plist_ind, type, list : $tType, inductive(cons, nil)).
+tff(plist_ind, type, list : $tType > $tType, inductive(cons, nil)).
 
 tff(ty_cons, type, cons : !>[A:$tType]: (A * list(A)) > list(A)).
 tff(ty_nil, type, nil : !>[A:$tType]: list(A)).

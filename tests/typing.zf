@@ -1,0 +1,7 @@
+val set : type -> type.
+val mem : pi a. a -> set a -> prop.
+val pow : pi a. set a -> set (set a).
+
+rewrite
+ forall a S T.
+ mem (set a) S (pow a T) <=> (forall x. (mem a x S) => (mem a x T)).

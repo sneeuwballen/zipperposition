@@ -1,0 +1,9 @@
+
+# expect: error
+# check that equality between types is disallowed
+
+val a : type.
+val b : type.
+
+assert a=b.
+
