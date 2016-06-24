@@ -71,7 +71,7 @@ Library "libzipperposition"
   CSources:         util_stubs.c, util_stubs.h
   CCOpt:            -Wextra -Wno-unused-parameter
   BuildDepends:     zarith, unix, sequence, containers,
-                    containers.data, bytes, oclock, printbox.html
+                    containers.data, bytes, oclock
 
 Library "libzipperposition_parsers"
   Path:             src/parsers
