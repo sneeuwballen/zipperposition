@@ -1,0 +1,453 @@
+digraph "unsat_graph" {
+  vertex_0 [color=red, label="[]", shape=box, style=filled];
+  vertex_0 -> vertex_1 [label="simpl_trail", dir="back"];
+  vertex_1 [shape=box, label="⟦[#nat_4 = s #nat_21 for [[plus ◇ (s #nat_5) ≠ s (plus ◇ #nat_5)]]]
+·[_avatar_5 = s #nat_5 for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_1 -> vertex_2 [label="sat_resolution", dir="back"];
+  vertex_2 [shape=box, label="¬⟦[#nat_4 = z for [[plus ◇ (s #nat_5) ≠ s (plus ◇ #nat_5)]]]
+  ·[_avatar_5 = s #nat_5 for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+  ·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_2 -> vertex_3 [label="simplify", dir="back"];
+  vertex_3 [color=orange, shape=box, label="[s #nat_5 ≠ s #nat_5]
+  ← ⟦[#nat_4 = z for [[plus ◇ (s #nat_5) ≠ s (plus ◇ #nat_5)]]]
+    ·[_avatar_5 = s #nat_5
+     for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+    ·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_3 -> vertex_4 [label="demod", dir="back"];
+  vertex_4 [color=yellow, shape=box, label="forall (X0:nat). [plus z X0 = X0]", style=filled];
+  vertex_3 -> vertex_5 [label="demod", dir="back"];
+  vertex_5 [shape=box, label="[plus z (s #nat_5) ≠ s (plus z #nat_5)]
+  ← ⟦[#nat_4 = z for [[plus ◇ (s #nat_5) ≠ s (plus ◇ #nat_5)]]]
+    ·[_avatar_5 = s #nat_5
+     for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+    ·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_5 -> vertex_6 [label="min", dir="back"];
+  vertex_6 [shape=box, label="[plus #nat_4 (s #nat_5) ≠ s (plus #nat_4 #nat_5)]
+  ← ⟦[_avatar_5 = s #nat_5
+     for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+    ·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_6 -> vertex_7 [label="demod", dir="back"];
+  vertex_7 [shape=box, label="[s (plus #nat_4 #nat_5) = plus #nat_5 (s #nat_4)]
+  ← ⟦[_avatar_5 = s #nat_5
+     for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+    ·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_7 -> vertex_8 [label="min", dir="back"];
+  vertex_8 [shape=box, label="[s (plus #nat_4 _avatar_5) ≠ plus _avatar_5 (s #nat_4)]
+  ← ⟦[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_8 -> vertex_9 [label="demod", dir="back"];
+  vertex_9 [color=yellow, shape=box, label="forall (X1:nat) (X2:nat). [plus (s X1) X2 = s (plus X1 X2)]", style=filled];
+  vertex_8 -> vertex_10 [label="demod", dir="back"];
+  vertex_10 [shape=box, label="[plus (s #nat_4) _avatar_5 ≠ plus _avatar_5 (s #nat_4)]
+  ← ⟦[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_10 -> vertex_11 [label="min", dir="back"];
+  vertex_11 [shape=box, label="[plus _avatar_4 _avatar_5 ≠ plus _avatar_5 _avatar_4]
+  ← ¬⟦lemma [plus X54 X53 = plus X53 X54]⟧", style=filled];
+  vertex_11 -> vertex_12 [label="lemma", dir="back"];
+  vertex_12 [color=green, shape=box, label="forall (X53:nat) (X54:nat). [plus X54 X53 = plus X53 X54]", style=filled];
+  vertex_6 -> vertex_13 [label="demod", dir="back"];
+  vertex_13 [shape=box, label="[plus #nat_4 (s #nat_5) ≠ plus #nat_5 (s #nat_4)]
+  ← ⟦[_avatar_5 = s #nat_5
+     for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+    ·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_13 -> vertex_14 [label="injectivity_destruct-", dir="back"];
+  vertex_14 [shape=box, label="[s (plus #nat_4 (s #nat_5)) ≠ s (plus #nat_5 (s #nat_4))]
+  ← ⟦[_avatar_5 = s #nat_5
+     for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+    ·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_14 -> vertex_9 [label="demod", dir="back"];
+  vertex_14 -> vertex_15 [label="demod", dir="back"];
+  vertex_15 [shape=box, label="[s (plus #nat_4 (s #nat_5)) ≠ plus (s #nat_5) (s #nat_4)]
+  ← ⟦[_avatar_5 = s #nat_5
+     for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+    ·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_15 -> vertex_8 [label="min", dir="back"];
+  vertex_1 -> vertex_16 [label="sat_resolution", dir="back"];
+  vertex_16 [shape=box, label="⟦[#nat_4 = z for [[plus ◇ (s #nat_5) ≠ s (plus ◇ #nat_5)]]]
+·[_avatar_5 = s #nat_5 for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧ ⊔ 
+⟦[#nat_4 = s #nat_21 for [[plus ◇ (s #nat_5) ≠ s (plus ◇ #nat_5)]]]
+·[_avatar_5 = s #nat_5 for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_16 -> vertex_17 [label="sat_resolution", dir="back"];
+  vertex_17 [shape=box, label="⟦[_avatar_5 = s #nat_5 for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_17 -> vertex_18 [label="sat_resolution", dir="back"];
+  vertex_18 [shape=box, label="⟦[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_18 -> vertex_19 [label="sat_resolution", dir="back"];
+  vertex_19 [shape=box, label="¬⟦lemma [plus X54 X53 = plus X53 X54]⟧", style=filled];
+  vertex_19 -> vertex_20 [label="simpl_trail", dir="back"];
+  vertex_20 [shape=box, label="⟦lemma [sum (append X58 X59) = plus (sum X58) (sum X59)]⟧", style=filled];
+  vertex_20 -> vertex_21 [label="sat_resolution", dir="back"];
+  vertex_21 [shape=box, label="¬⟦[_avatar_10 = cons #nat_11 #list_12
+   for [[sum (append ◇ _avatar_9) ≠ plus (sum ◇) (sum _avatar_9)]]]⟧", style=filled];
+  vertex_21 -> vertex_22 [label="simpl_trail", dir="back"];
+  vertex_22 [shape=box, label="⟦lemma [plus X50 (plus X51 X52) = plus (plus X50 X51) X52]⟧", style=filled];
+  vertex_22 -> vertex_23 [label="sat_resolution", dir="back"];
+  vertex_23 [shape=box, label="¬⟦[_avatar_3 = z
+   for [[plus ◇ (plus _avatar_2 _avatar_1)
+          ≠ plus (plus ◇ _avatar_2) _avatar_1]]]⟧", style=filled];
+  vertex_23 -> vertex_24 [label="simplify", dir="back"];
+  vertex_24 [color=orange, shape=box, label="[plus _avatar_2 _avatar_1 ≠ plus _avatar_2 _avatar_1]
+  ← ⟦[_avatar_3 = z
+     for [[plus ◇ (plus _avatar_2 _avatar_1)
+            ≠ plus (plus ◇ _avatar_2) _avatar_1]]]⟧", style=filled];
+  vertex_24 -> vertex_4 [label="demod", dir="back"];
+  vertex_24 -> vertex_25 [label="demod", dir="back"];
+  vertex_25 [shape=box, label="[plus z (plus _avatar_2 _avatar_1) ≠ plus (plus z _avatar_2) _avatar_1]
+  ← ⟦[_avatar_3 = z
+     for [[plus ◇ (plus _avatar_2 _avatar_1)
+            ≠ plus (plus ◇ _avatar_2) _avatar_1]]]⟧", style=filled];
+  vertex_25 -> vertex_26 [label="min", dir="back"];
+  vertex_26 [shape=box, label="[plus _avatar_3 (plus _avatar_2 _avatar_1)
+  ≠ plus (plus _avatar_3 _avatar_2) _avatar_1]
+  ← ¬⟦lemma [plus X50 (plus X51 X52) = plus (plus X50 X51) X52]⟧", style=filled];
+  vertex_26 -> vertex_27 [label="lemma", dir="back"];
+  vertex_27 [color=green, shape=box, label="forall (X50:nat) (X51:nat) (X52:nat).
+[plus X50 (plus X51 X52) = plus (plus X50 X51) X52]", style=filled];
+  vertex_22 -> vertex_28 [label="sat_resolution", dir="back"];
+  vertex_28 [shape=box, label="⟦lemma [plus X50 (plus X51 X52) = plus (plus X50 X51) X52]⟧ ⊔ 
+⟦[_avatar_3 = z
+ for [[plus ◇ (plus _avatar_2 _avatar_1)
+        ≠ plus (plus ◇ _avatar_2) _avatar_1]]]⟧", style=filled];
+  vertex_28 -> vertex_29 [label="sat_resolution", dir="back"];
+  vertex_29 [shape=box, label="¬⟦[_avatar_3 = s #nat_1
+   for [[plus ◇ (plus _avatar_2 _avatar_1)
+          ≠ plus (plus ◇ _avatar_2) _avatar_1]]]⟧", style=filled];
+  vertex_29 -> vertex_30 [label="simplify", dir="back"];
+  vertex_30 [color=orange, shape=box, label="[s (plus #nat_1 (plus _avatar_2 _avatar_1))
+  ≠ s (plus #nat_1 (plus _avatar_2 _avatar_1))]
+  ← ⟦[_avatar_3 = s #nat_1
+     for [[plus ◇ (plus _avatar_2 _avatar_1)
+            ≠ plus (plus ◇ _avatar_2) _avatar_1]]]⟧", style=filled];
+  vertex_30 -> vertex_9 [label="demod", dir="back"];
+  vertex_30 -> vertex_31 [label="demod", dir="back"];
+  vertex_31 [shape=box, label="[plus #nat_1 (plus _avatar_2 _avatar_1)
+  = plus (plus #nat_1 _avatar_2) _avatar_1]
+  ← ⟦[_avatar_3 = s #nat_1
+     for [[plus ◇ (plus _avatar_2 _avatar_1)
+            ≠ plus (plus ◇ _avatar_2) _avatar_1]]]⟧", style=filled];
+  vertex_31 -> vertex_26 [label="min", dir="back"];
+  vertex_30 -> vertex_32 [label="demod", dir="back"];
+  vertex_32 [shape=box, label="[plus (s #nat_1) (plus _avatar_2 _avatar_1)
+  ≠ plus (plus (s #nat_1) _avatar_2) _avatar_1]
+  ← ⟦[_avatar_3 = s #nat_1
+     for [[plus ◇ (plus _avatar_2 _avatar_1)
+            ≠ plus (plus ◇ _avatar_2) _avatar_1]]]⟧", style=filled];
+  vertex_32 -> vertex_26 [label="min", dir="back"];
+  vertex_28 -> vertex_33 [label="sat_resolution", dir="back"];
+  vertex_33 [shape=box, label="⟦lemma [plus X50 (plus X51 X52) = plus (plus X50 X51) X52]⟧ ⊔ 
+⟦[_avatar_3 = s #nat_1
+ for [[plus ◇ (plus _avatar_2 _avatar_1)
+        ≠ plus (plus ◇ _avatar_2) _avatar_1]]]⟧ ⊔ 
+⟦[_avatar_3 = z
+ for [[plus ◇ (plus _avatar_2 _avatar_1)
+        ≠ plus (plus ◇ _avatar_2) _avatar_1]]]⟧", style=filled];
+  vertex_33 -> vertex_26 [label="min", dir="back"];
+  vertex_21 -> vertex_34 [label="simpl_trail", dir="back"];
+  vertex_34 [color=orange, shape=box, label="⊥
+  ← ⟦lemma [plus X50 (plus X51 X52) = plus (plus X50 X51) X52]⟧ ⊓ 
+    ⟦[_avatar_10 = cons #nat_11 #list_12
+     for [[sum (append ◇ _avatar_9) ≠ plus (sum ◇) (sum _avatar_9)]]]⟧", style=filled];
+  vertex_34 -> vertex_35 [label="simplify", dir="back"];
+  vertex_35 [color=orange, shape=box, label="[plus #nat_11 (plus (sum #list_12) (sum _avatar_9))
+  ≠ plus #nat_11 (plus (sum #list_12) (sum _avatar_9))]
+  ← ⟦lemma [plus X50 (plus X51 X52) = plus (plus X50 X51) X52]⟧ ⊓ 
+    ⟦[_avatar_10 = cons #nat_11 #list_12
+     for [[sum (append ◇ _avatar_9) ≠ plus (sum ◇) (sum _avatar_9)]]]⟧", style=filled];
+  vertex_35 -> vertex_36 [label="s_sup-", dir="back"];
+  vertex_36 [shape=box, label="[plus #nat_11 (plus (sum #list_12) (sum _avatar_9))
+  ≠ plus (plus #nat_11 (sum #list_12)) (sum _avatar_9)]
+  ← ⟦[_avatar_10 = cons #nat_11 #list_12
+     for [[sum (append ◇ _avatar_9) ≠ plus (sum ◇) (sum _avatar_9)]]]⟧", style=filled];
+  vertex_36 -> vertex_37 [label="demod", dir="back"];
+  vertex_37 [color=yellow, shape=box, label="forall (X23:nat) (X24:list) (X25:list).
+[append (cons X23 X24) X25 = cons X23 (append X24 X25)]", style=filled];
+  vertex_36 -> vertex_38 [label="demod", dir="back"];
+  vertex_38 [color=yellow, shape=box, label="forall (X47:nat) (X48:list). [sum (cons X47 X48) = plus X47 (sum X48)]", style=filled];
+  vertex_36 -> vertex_39 [label="demod", dir="back"];
+  vertex_39 [shape=box, label="[sum (append #list_12 _avatar_9) = plus (sum #list_12) (sum _avatar_9)]
+  ← ⟦[_avatar_10 = cons #nat_11 #list_12
+     for [[sum (append ◇ _avatar_9) ≠ plus (sum ◇) (sum _avatar_9)]]]⟧", style=filled];
+  vertex_39 -> vertex_40 [label="min", dir="back"];
+  vertex_40 [shape=box, label="[sum (append _avatar_10 _avatar_9) ≠ plus (sum _avatar_10) (sum _avatar_9)]
+  ← ¬⟦lemma [sum (append X58 X59) = plus (sum X58) (sum X59)]⟧", style=filled];
+  vertex_40 -> vertex_41 [label="lemma", dir="back"];
+  vertex_41 [color=green, shape=box, label="forall (X58:list) (X59:list).
+[sum (append X58 X59) = plus (sum X58) (sum X59)]", style=filled];
+  vertex_36 -> vertex_42 [label="demod", dir="back"];
+  vertex_42 [shape=box, label="[sum (append (cons #nat_11 #list_12) _avatar_9)
+  ≠ plus (sum (cons #nat_11 #list_12)) (sum _avatar_9)]
+  ← ⟦[_avatar_10 = cons #nat_11 #list_12
+     for [[sum (append ◇ _avatar_9) ≠ plus (sum ◇) (sum _avatar_9)]]]⟧", style=filled];
+  vertex_42 -> vertex_40 [label="min", dir="back"];
+  vertex_35 -> vertex_43 [label="s_sup-", dir="back"];
+  vertex_43 [shape=box, label="forall (X50:nat) (X51:nat) (X52:nat).
+[plus X50 (plus X51 X52) = plus (plus X50 X51) X52]
+  ← ⟦lemma [plus X50 (plus X51 X52) = plus (plus X50 X51) X52]⟧", style=filled];
+  vertex_43 -> vertex_27 [label="lemma", dir="back"];
+  vertex_20 -> vertex_44 [label="sat_resolution", dir="back"];
+  vertex_44 [shape=box, label="⟦lemma [sum (append X58 X59) = plus (sum X58) (sum X59)]⟧ ⊔ 
+⟦[_avatar_10 = cons #nat_11 #list_12
+ for [[sum (append ◇ _avatar_9) ≠ plus (sum ◇) (sum _avatar_9)]]]⟧", style=filled];
+  vertex_44 -> vertex_45 [label="sat_resolution", dir="back"];
+  vertex_45 [shape=box, label="¬⟦[_avatar_10 = nil
+   for [[sum (append ◇ _avatar_9) ≠ plus (sum ◇) (sum _avatar_9)]]]⟧", style=filled];
+  vertex_45 -> vertex_46 [label="simplify", dir="back"];
+  vertex_46 [color=orange, shape=box, label="[sum _avatar_9 ≠ sum _avatar_9]
+  ← ⟦[_avatar_10 = nil
+     for [[sum (append ◇ _avatar_9) ≠ plus (sum ◇) (sum _avatar_9)]]]⟧", style=filled];
+  vertex_46 -> vertex_47 [label="demod", dir="back"];
+  vertex_47 [color=yellow, shape=box, label="forall (X22:list). [append nil X22 = X22]", style=filled];
+  vertex_46 -> vertex_48 [label="demod", dir="back"];
+  vertex_48 [color=yellow, shape=box, label="[sum nil = z]", style=filled];
+  vertex_46 -> vertex_4 [label="demod", dir="back"];
+  vertex_46 -> vertex_49 [label="demod", dir="back"];
+  vertex_49 [shape=box, label="[sum (append nil _avatar_9) ≠ plus (sum nil) (sum _avatar_9)]
+  ← ⟦[_avatar_10 = nil
+     for [[sum (append ◇ _avatar_9) ≠ plus (sum ◇) (sum _avatar_9)]]]⟧", style=filled];
+  vertex_49 -> vertex_40 [label="min", dir="back"];
+  vertex_44 -> vertex_50 [label="sat_resolution", dir="back"];
+  vertex_50 [shape=box, label="⟦lemma [sum (append X58 X59) = plus (sum X58) (sum X59)]⟧ ⊔ 
+⟦[_avatar_10 = cons #nat_11 #list_12
+ for [[sum (append ◇ _avatar_9) ≠ plus (sum ◇) (sum _avatar_9)]]]⟧ ⊔ 
+⟦[_avatar_10 = nil
+ for [[sum (append ◇ _avatar_9) ≠ plus (sum ◇) (sum _avatar_9)]]]⟧", style=filled];
+  vertex_50 -> vertex_40 [label="min", dir="back"];
+  vertex_19 -> vertex_51 [label="simpl_trail", dir="back"];
+  vertex_51 [color=orange, shape=box, label="⊥
+  ← ⟦lemma [plus X54 X53 = plus X53 X54]⟧ ⊓ 
+    ⟦lemma [sum (append X58 X59) = plus (sum X58) (sum X59)]⟧", style=filled];
+  vertex_51 -> vertex_52 [label="simplify", dir="back"];
+  vertex_52 [color=orange, shape=box, label="[plus #nat_15 (sum #list_16) ≠ plus #nat_15 (sum #list_16)]
+  ← ⟦lemma [plus X54 X53 = plus X53 X54]⟧ ⊓ 
+    ⟦lemma [sum (append X58 X59) = plus (sum X58) (sum X59)]⟧", style=filled];
+  vertex_52 -> vertex_4 [label="demod", dir="back"];
+  vertex_52 -> vertex_53 [label="demod", dir="back"];
+  vertex_53 [shape=box, label="[plus #nat_15 (plus z (sum #list_16)) ≠ plus #nat_15 (sum #list_16)]
+  ← ⟦lemma [plus X54 X53 = plus X53 X54]⟧ ⊓ 
+    ⟦lemma [sum (append X58 X59) = plus (sum X58) (sum X59)]⟧", style=filled];
+  vertex_53 -> vertex_54 [label="s_sup-", dir="back"];
+  vertex_54 [shape=box, label="[plus (sum #list_16) (plus #nat_15 z) ≠ plus #nat_15 (sum #list_16)]
+  ← ⟦lemma [sum (append X58 X59) = plus (sum X58) (sum X59)]⟧", style=filled];
+  vertex_54 -> vertex_55 [label="demod", dir="back"];
+  vertex_55 [shape=box, label="[sum (rev #list_16) = sum #list_16]", style=filled];
+  vertex_55 -> vertex_56 [label="simpl_trail", dir="back"];
+  vertex_56 [shape=box, label="⟦[zip_sk_0 = cons #nat_15 #list_16 for [[sum (rev ◇) ≠ sum ◇]]]⟧", style=filled];
+  vertex_56 -> vertex_57 [label="sat_resolution", dir="back"];
+  vertex_57 [shape=box, label="¬⟦[zip_sk_0 = nil for [[sum (rev ◇) ≠ sum ◇]]]⟧", style=filled];
+  vertex_57 -> vertex_58 [label="simplify", dir="back"];
+  vertex_58 [color=orange, shape=box, label="[z ≠ z] ← ⟦[zip_sk_0 = nil for [[sum (rev ◇) ≠ sum ◇]]]⟧", style=filled];
+  vertex_58 -> vertex_59 [label="demod", dir="back"];
+  vertex_59 [color=yellow, shape=box, label="[rev nil = nil]", style=filled];
+  vertex_58 -> vertex_48 [label="demod", dir="back"];
+  vertex_58 -> vertex_60 [label="demod", dir="back"];
+  vertex_60 [shape=box, label="[sum (rev nil) ≠ sum nil]
+  ← ⟦[zip_sk_0 = nil for [[sum (rev ◇) ≠ sum ◇]]]⟧", style=filled];
+  vertex_60 -> vertex_61 [label="min", dir="back"];
+  vertex_61 [color=green, shape=box, label="[sum (rev zip_sk_0) ≠ sum zip_sk_0]", style=filled];
+  vertex_56 -> vertex_62 [label="sat_resolution", dir="back"];
+  vertex_62 [shape=box, label="⟦[zip_sk_0 = cons #nat_15 #list_16 for [[sum (rev ◇) ≠ sum ◇]]]⟧ ⊔ 
+⟦[zip_sk_0 = nil for [[sum (rev ◇) ≠ sum ◇]]]⟧", style=filled];
+  vertex_62 -> vertex_61 [label="min", dir="back"];
+  vertex_55 -> vertex_63 [label="simpl_trail", dir="back"];
+  vertex_63 [shape=box, label="[sum (rev #list_16) = sum #list_16]
+  ← ⟦[zip_sk_0 = cons #nat_15 #list_16 for [[sum (rev ◇) ≠ sum ◇]]]⟧", style=filled];
+  vertex_63 -> vertex_61 [label="min", dir="back"];
+  vertex_54 -> vertex_38 [label="demod", dir="back"];
+  vertex_54 -> vertex_48 [label="demod", dir="back"];
+  vertex_54 -> vertex_64 [label="demod", dir="back"];
+  vertex_64 [shape=box, label="[plus (sum (rev #list_16)) (sum (cons #nat_15 nil))
+  ≠ plus #nat_15 (sum #list_16)]
+  ← ⟦lemma [sum (append X58 X59) = plus (sum X58) (sum X59)]⟧", style=filled];
+  vertex_64 -> vertex_65 [label="s_sup-", dir="back"];
+  vertex_65 [shape=box, label="[sum (append (rev #list_16) (cons #nat_15 nil))
+  ≠ plus #nat_15 (sum #list_16)]", style=filled];
+  vertex_65 -> vertex_66 [label="demod", dir="back"];
+  vertex_66 [color=yellow, shape=box, label="forall (X34:list) (X35:nat).
+[rev (cons X35 X34) = append (rev X34) (cons X35 nil)]", style=filled];
+  vertex_65 -> vertex_38 [label="demod", dir="back"];
+  vertex_65 -> vertex_67 [label="demod", dir="back"];
+  vertex_67 [shape=box, label="[sum (rev (cons #nat_15 #list_16)) ≠ sum (cons #nat_15 #list_16)]", style=filled];
+  vertex_67 -> vertex_56 [label="simpl_trail", dir="back"];
+  vertex_67 -> vertex_68 [label="simpl_trail", dir="back"];
+  vertex_68 [shape=box, label="[sum (rev (cons #nat_15 #list_16)) ≠ sum (cons #nat_15 #list_16)]
+  ← ⟦[zip_sk_0 = cons #nat_15 #list_16 for [[sum (rev ◇) ≠ sum ◇]]]⟧", style=filled];
+  vertex_68 -> vertex_61 [label="min", dir="back"];
+  vertex_64 -> vertex_69 [label="s_sup-", dir="back"];
+  vertex_69 [shape=box, label="forall (X58:list) (X59:list).
+[sum (append X58 X59) = plus (sum X58) (sum X59)]
+  ← ⟦lemma [sum (append X58 X59) = plus (sum X58) (sum X59)]⟧", style=filled];
+  vertex_69 -> vertex_41 [label="lemma", dir="back"];
+  vertex_53 -> vertex_70 [label="s_sup-", dir="back"];
+  vertex_70 [shape=box, label="forall (X0:nat) (X1:nat) (X2:nat).
+[plus X1 (plus X0 X2) = plus X2 (plus X1 X0)]
+  ← ⟦lemma [plus X54 X53 = plus X53 X54]⟧", style=filled];
+  vertex_70 -> vertex_22 [label="simpl_trail", dir="back"];
+  vertex_70 -> vertex_71 [label="simpl_trail", dir="back"];
+  vertex_71 [shape=box, label="forall (X0:nat) (X1:nat) (X2:nat).
+[plus X1 (plus X0 X2) = plus X2 (plus X1 X0)]
+  ← ⟦lemma [plus X50 (plus X51 X52) = plus (plus X50 X51) X52]⟧ ⊓ 
+    ⟦lemma [plus X54 X53 = plus X53 X54]⟧", style=filled];
+  vertex_71 -> vertex_43 [label="s_sup+", dir="back"];
+  vertex_71 -> vertex_72 [label="s_sup+", dir="back"];
+  vertex_72 [shape=box, label="forall (X53:nat) (X54:nat).
+[plus X54 X53 = plus X53 X54] ← ⟦lemma [plus X54 X53 = plus X53 X54]⟧", style=filled];
+  vertex_72 -> vertex_12 [label="lemma", dir="back"];
+  vertex_18 -> vertex_73 [label="sat_resolution", dir="back"];
+  vertex_73 [shape=box, label="⟦lemma [plus X54 X53 = plus X53 X54]⟧ ⊔ 
+⟦[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_73 -> vertex_74 [label="sat_resolution", dir="back"];
+  vertex_74 [shape=box, label="¬⟦[_avatar_4 = z for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_74 -> vertex_75 [label="simpl_trail", dir="back"];
+  vertex_75 [shape=box, label="⟦lemma [plus X49 z = X49]⟧", style=filled];
+  vertex_75 -> vertex_76 [label="sat_resolution", dir="back"];
+  vertex_76 [shape=box, label="¬⟦[_avatar_0 = z for [[plus ◇ z ≠ ◇]]]⟧", style=filled];
+  vertex_76 -> vertex_77 [label="simplify", dir="back"];
+  vertex_77 [color=orange, shape=box, label="[z ≠ z] ← ⟦[_avatar_0 = z for [[plus ◇ z ≠ ◇]]]⟧", style=filled];
+  vertex_77 -> vertex_4 [label="demod", dir="back"];
+  vertex_77 -> vertex_78 [label="demod", dir="back"];
+  vertex_78 [shape=box, label="[plus z z ≠ z] ← ⟦[_avatar_0 = z for [[plus ◇ z ≠ ◇]]]⟧", style=filled];
+  vertex_78 -> vertex_79 [label="min", dir="back"];
+  vertex_79 [shape=box, label="[plus _avatar_0 z ≠ _avatar_0] ← ¬⟦lemma [plus X49 z = X49]⟧", style=filled];
+  vertex_79 -> vertex_80 [label="lemma", dir="back"];
+  vertex_80 [color=green, shape=box, label="forall (X49:nat). [plus X49 z = X49]", style=filled];
+  vertex_75 -> vertex_81 [label="sat_resolution", dir="back"];
+  vertex_81 [shape=box, label="⟦lemma [plus X49 z = X49]⟧ ⊔ ⟦[_avatar_0 = z for [[plus ◇ z ≠ ◇]]]⟧", style=filled];
+  vertex_81 -> vertex_82 [label="sat_resolution", dir="back"];
+  vertex_82 [shape=box, label="¬⟦[_avatar_0 = s #nat_0 for [[plus ◇ z ≠ ◇]]]⟧", style=filled];
+  vertex_82 -> vertex_83 [label="simplify", dir="back"];
+  vertex_83 [color=orange, shape=box, label="[s #nat_0 ≠ s #nat_0] ← ⟦[_avatar_0 = s #nat_0 for [[plus ◇ z ≠ ◇]]]⟧", style=filled];
+  vertex_83 -> vertex_9 [label="demod", dir="back"];
+  vertex_83 -> vertex_84 [label="demod", dir="back"];
+  vertex_84 [shape=box, label="[plus #nat_0 z = #nat_0]
+  ← ⟦[_avatar_0 = s #nat_0 for [[plus ◇ z ≠ ◇]]]⟧", style=filled];
+  vertex_84 -> vertex_79 [label="min", dir="back"];
+  vertex_83 -> vertex_85 [label="demod", dir="back"];
+  vertex_85 [shape=box, label="[plus (s #nat_0) z ≠ s #nat_0]
+  ← ⟦[_avatar_0 = s #nat_0 for [[plus ◇ z ≠ ◇]]]⟧", style=filled];
+  vertex_85 -> vertex_79 [label="min", dir="back"];
+  vertex_81 -> vertex_86 [label="sat_resolution", dir="back"];
+  vertex_86 [shape=box, label="⟦lemma [plus X49 z = X49]⟧ ⊔ 
+⟦[_avatar_0 = s #nat_0 for [[plus ◇ z ≠ ◇]]]⟧ ⊔ 
+⟦[_avatar_0 = z for [[plus ◇ z ≠ ◇]]]⟧", style=filled];
+  vertex_86 -> vertex_79 [label="min", dir="back"];
+  vertex_74 -> vertex_87 [label="simpl_trail", dir="back"];
+  vertex_87 [color=orange, shape=box, label="⊥
+  ← ⟦lemma [plus X49 z = X49]⟧ ⊓ 
+    ⟦[_avatar_4 = z for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_87 -> vertex_88 [label="simplify", dir="back"];
+  vertex_88 [color=orange, shape=box, label="[_avatar_5 ≠ _avatar_5]
+  ← ⟦lemma [plus X49 z = X49]⟧ ⊓ 
+    ⟦[_avatar_4 = z for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_88 -> vertex_89 [label="s_sup-", dir="back"];
+  vertex_89 [shape=box, label="[_avatar_5 ≠ plus _avatar_5 z]
+  ← ⟦[_avatar_4 = z for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_89 -> vertex_4 [label="demod", dir="back"];
+  vertex_89 -> vertex_90 [label="demod", dir="back"];
+  vertex_90 [shape=box, label="[plus z _avatar_5 ≠ plus _avatar_5 z]
+  ← ⟦[_avatar_4 = z for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_90 -> vertex_11 [label="min", dir="back"];
+  vertex_88 -> vertex_91 [label="s_sup-", dir="back"];
+  vertex_91 [shape=box, label="forall (X49:nat). [plus X49 z = X49] ← ⟦lemma [plus X49 z = X49]⟧", style=filled];
+  vertex_91 -> vertex_80 [label="lemma", dir="back"];
+  vertex_73 -> vertex_92 [label="sat_resolution", dir="back"];
+  vertex_92 [shape=box, label="⟦lemma [plus X54 X53 = plus X53 X54]⟧ ⊔ 
+⟦[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧ ⊔ 
+⟦[_avatar_4 = z for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_92 -> vertex_11 [label="min", dir="back"];
+  vertex_17 -> vertex_93 [label="sat_resolution", dir="back"];
+  vertex_93 [shape=box, label="¬⟦[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧ ⊔ 
+⟦[_avatar_5 = s #nat_5 for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_93 -> vertex_94 [label="sat_resolution", dir="back"];
+  vertex_94 [shape=box, label="¬⟦[_avatar_5 = z for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+  ·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_94 -> vertex_75 [label="simpl_trail", dir="back"];
+  vertex_94 -> vertex_95 [label="simpl_trail", dir="back"];
+  vertex_95 [color=orange, shape=box, label="⊥
+  ← ⟦lemma [plus X49 z = X49]⟧ ⊓ 
+    ⟦[_avatar_5 = z for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+    ·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_95 -> vertex_96 [label="simplify", dir="back"];
+  vertex_96 [color=orange, shape=box, label="[#nat_4 ≠ #nat_4]
+  ← ⟦lemma [plus X49 z = X49]⟧ ⊓ 
+    ⟦[_avatar_5 = z for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+    ·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_96 -> vertex_97 [label="s_sup-", dir="back"];
+  vertex_97 [shape=box, label="[plus #nat_4 z ≠ #nat_4]
+  ← ⟦[_avatar_5 = z for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+    ·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_97 -> vertex_98 [label="injectivity_destruct-", dir="back"];
+  vertex_98 [shape=box, label="[s (plus #nat_4 z) ≠ s #nat_4]
+  ← ⟦[_avatar_5 = z for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+    ·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_98 -> vertex_4 [label="demod", dir="back"];
+  vertex_98 -> vertex_99 [label="demod", dir="back"];
+  vertex_99 [shape=box, label="[s (plus #nat_4 z) ≠ plus z (s #nat_4)]
+  ← ⟦[_avatar_5 = z for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+    ·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_99 -> vertex_8 [label="min", dir="back"];
+  vertex_96 -> vertex_91 [label="s_sup-", dir="back"];
+  vertex_93 -> vertex_100 [label="sat_resolution", dir="back"];
+  vertex_100 [shape=box, label="¬⟦[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧ ⊔ 
+⟦[_avatar_5 = z for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧ ⊔ 
+⟦[_avatar_5 = s #nat_5 for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_100 -> vertex_8 [label="min", dir="back"];
+  vertex_16 -> vertex_101 [label="sat_resolution", dir="back"];
+  vertex_101 [shape=box, label="¬⟦[_avatar_5 = s #nat_5 for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+  ·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧ ⊔ 
+⟦[#nat_4 = z for [[plus ◇ (s #nat_5) ≠ s (plus ◇ #nat_5)]]]
+·[_avatar_5 = s #nat_5 for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧ ⊔ 
+⟦[#nat_4 = s #nat_21 for [[plus ◇ (s #nat_5) ≠ s (plus ◇ #nat_5)]]]
+·[_avatar_5 = s #nat_5 for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_101 -> vertex_6 [label="min", dir="back"];
+  vertex_0 -> vertex_102 [label="simpl_trail", dir="back"];
+  vertex_102 [color=orange, shape=box, label="⊥
+  ← ⟦[#nat_4 = s #nat_21 for [[plus ◇ (s #nat_5) ≠ s (plus ◇ #nat_5)]]]
+    ·[_avatar_5 = s #nat_5
+     for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+    ·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_102 -> vertex_103 [label="simplify", dir="back"];
+  vertex_103 [color=orange, shape=box, label="[s (plus #nat_21 #nat_5) ≠ s (plus #nat_21 #nat_5)]
+  ← ⟦[#nat_4 = s #nat_21 for [[plus ◇ (s #nat_5) ≠ s (plus ◇ #nat_5)]]]
+    ·[_avatar_5 = s #nat_5
+     for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+    ·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_103 -> vertex_104 [label="s_sup-", dir="back"];
+  vertex_104 [shape=box, label="[plus #nat_21 (s #nat_5) ≠ s (plus #nat_21 #nat_5)]", style=filled];
+  vertex_104 -> vertex_1 [label="simpl_trail", dir="back"];
+  vertex_104 -> vertex_105 [label="simpl_trail", dir="back"];
+  vertex_105 [shape=box, label="[plus #nat_21 (s #nat_5) ≠ s (plus #nat_21 #nat_5)]
+  ← ⟦[#nat_4 = s #nat_21 for [[plus ◇ (s #nat_5) ≠ s (plus ◇ #nat_5)]]]
+    ·[_avatar_5 = s #nat_5
+     for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+    ·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_105 -> vertex_106 [label="injectivity_destruct-", dir="back"];
+  vertex_106 [shape=box, label="[s (plus #nat_21 (s #nat_5)) ≠ s (s (plus #nat_21 #nat_5))]
+  ← ⟦[#nat_4 = s #nat_21 for [[plus ◇ (s #nat_5) ≠ s (plus ◇ #nat_5)]]]
+    ·[_avatar_5 = s #nat_5
+     for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+    ·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_106 -> vertex_9 [label="demod", dir="back"];
+  vertex_106 -> vertex_107 [label="demod", dir="back"];
+  vertex_107 [shape=box, label="[plus (s #nat_21) (s #nat_5) ≠ s (plus (s #nat_21) #nat_5)]
+  ← ⟦[#nat_4 = s #nat_21 for [[plus ◇ (s #nat_5) ≠ s (plus ◇ #nat_5)]]]
+    ·[_avatar_5 = s #nat_5
+     for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+    ·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_107 -> vertex_6 [label="min", dir="back"];
+  vertex_103 -> vertex_108 [label="s_sup-", dir="back"];
+  vertex_108 [shape=box, label="[plus #nat_21 (s #nat_5) = s (plus #nat_21 #nat_5)]
+  ← ⟦[#nat_4 = s #nat_21 for [[plus ◇ (s #nat_5) ≠ s (plus ◇ #nat_5)]]]
+    ·[_avatar_5 = s #nat_5
+     for [[s (plus #nat_4 ◇) ≠ plus ◇ (s #nat_4)]]]
+    ·[_avatar_4 = s #nat_4 for [[plus ◇ _avatar_5 ≠ plus _avatar_5 ◇]]]⟧", style=filled];
+  vertex_108 -> vertex_6 [label="min", dir="back"];
+  }
+
+

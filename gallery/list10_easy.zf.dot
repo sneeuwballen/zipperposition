@@ -1,0 +1,208 @@
+digraph "unsat_graph" {
+  vertex_0 [color=red, label="[]", shape=box, style=filled];
+  vertex_0 -> vertex_1 [label="simpl_trail", dir="back"];
+  vertex_1 [shape=box, label="⟦[_avatar_8 = cons #nat_9 #list_10
+ for [[sum (append ◇ _avatar_7) ≠ plus (sum ◇) (sum _avatar_7)]]]⟧", style=filled];
+  vertex_1 -> vertex_2 [label="sat_resolution", dir="back"];
+  vertex_2 [shape=box, label="¬⟦lemma [sum (append X58 X59) = plus (sum X58) (sum X59)]⟧", style=filled];
+  vertex_2 -> vertex_3 [label="simplify", dir="back"];
+  vertex_3 [color=orange, shape=box, label="[plus #nat_13 (sum #list_14) ≠ plus #nat_13 (sum #list_14)]
+  ← ⟦lemma [sum (append X58 X59) = plus (sum X58) (sum X59)]⟧", style=filled];
+  vertex_3 -> vertex_4 [label="demod", dir="back"];
+  vertex_4 [shape=box, label="[sum (rev #list_14) = sum #list_14]", style=filled];
+  vertex_4 -> vertex_5 [label="simpl_trail", dir="back"];
+  vertex_5 [shape=box, label="⟦[zip_sk_0 = cons #nat_13 #list_14 for [[sum (rev ◇) ≠ sum ◇]]]⟧", style=filled];
+  vertex_5 -> vertex_6 [label="sat_resolution", dir="back"];
+  vertex_6 [shape=box, label="¬⟦[zip_sk_0 = nil for [[sum (rev ◇) ≠ sum ◇]]]⟧", style=filled];
+  vertex_6 -> vertex_7 [label="simplify", dir="back"];
+  vertex_7 [color=orange, shape=box, label="[z ≠ z] ← ⟦[zip_sk_0 = nil for [[sum (rev ◇) ≠ sum ◇]]]⟧", style=filled];
+  vertex_7 -> vertex_8 [label="demod", dir="back"];
+  vertex_8 [color=yellow, shape=box, label="[rev nil = nil]", style=filled];
+  vertex_7 -> vertex_9 [label="demod", dir="back"];
+  vertex_9 [color=yellow, shape=box, label="[sum nil = z]", style=filled];
+  vertex_7 -> vertex_10 [label="demod", dir="back"];
+  vertex_10 [shape=box, label="[sum (rev nil) ≠ sum nil]
+  ← ⟦[zip_sk_0 = nil for [[sum (rev ◇) ≠ sum ◇]]]⟧", style=filled];
+  vertex_10 -> vertex_11 [label="min", dir="back"];
+  vertex_11 [color=green, shape=box, label="[sum (rev zip_sk_0) ≠ sum zip_sk_0]", style=filled];
+  vertex_5 -> vertex_12 [label="sat_resolution", dir="back"];
+  vertex_12 [shape=box, label="⟦[zip_sk_0 = cons #nat_13 #list_14 for [[sum (rev ◇) ≠ sum ◇]]]⟧ ⊔ 
+⟦[zip_sk_0 = nil for [[sum (rev ◇) ≠ sum ◇]]]⟧", style=filled];
+  vertex_12 -> vertex_11 [label="min", dir="back"];
+  vertex_4 -> vertex_13 [label="simpl_trail", dir="back"];
+  vertex_13 [shape=box, label="[sum (rev #list_14) = sum #list_14]
+  ← ⟦[zip_sk_0 = cons #nat_13 #list_14 for [[sum (rev ◇) ≠ sum ◇]]]⟧", style=filled];
+  vertex_13 -> vertex_11 [label="min", dir="back"];
+  vertex_3 -> vertex_14 [label="demod", dir="back"];
+  vertex_14 [color=yellow, shape=box, label="forall (X47:nat) (X48:list). [sum (cons X47 X48) = plus X47 (sum X48)]", style=filled];
+  vertex_3 -> vertex_9 [label="demod", dir="back"];
+  vertex_3 -> vertex_15 [label="demod", dir="back"];
+  vertex_15 [color=yellow, shape=box, label="forall (X53:nat) (X54:nat). [plus X54 X53 = plus X53 X54]", style=filled];
+  vertex_3 -> vertex_16 [label="demod", dir="back"];
+  vertex_16 [color=yellow, shape=box, label="forall (X0:nat). [plus z X0 = X0]", style=filled];
+  vertex_3 -> vertex_17 [label="demod", dir="back"];
+  vertex_17 [shape=box, label="[plus (sum (rev #list_14)) (sum (cons #nat_13 nil))
+  ≠ plus #nat_13 (sum #list_14)]
+  ← ⟦lemma [sum (append X58 X59) = plus (sum X58) (sum X59)]⟧", style=filled];
+  vertex_17 -> vertex_18 [label="s_sup-", dir="back"];
+  vertex_18 [shape=box, label="[sum (append (rev #list_14) (cons #nat_13 nil))
+  ≠ plus #nat_13 (sum #list_14)]", style=filled];
+  vertex_18 -> vertex_19 [label="demod", dir="back"];
+  vertex_19 [color=yellow, shape=box, label="forall (X34:list) (X35:nat).
+[rev (cons X35 X34) = append (rev X34) (cons X35 nil)]", style=filled];
+  vertex_18 -> vertex_14 [label="demod", dir="back"];
+  vertex_18 -> vertex_20 [label="demod", dir="back"];
+  vertex_20 [shape=box, label="[sum (rev (cons #nat_13 #list_14)) ≠ sum (cons #nat_13 #list_14)]", style=filled];
+  vertex_20 -> vertex_5 [label="simpl_trail", dir="back"];
+  vertex_20 -> vertex_21 [label="simpl_trail", dir="back"];
+  vertex_21 [shape=box, label="[sum (rev (cons #nat_13 #list_14)) ≠ sum (cons #nat_13 #list_14)]
+  ← ⟦[zip_sk_0 = cons #nat_13 #list_14 for [[sum (rev ◇) ≠ sum ◇]]]⟧", style=filled];
+  vertex_21 -> vertex_11 [label="min", dir="back"];
+  vertex_17 -> vertex_22 [label="s_sup-", dir="back"];
+  vertex_22 [shape=box, label="forall (X58:list) (X59:list).
+[sum (append X58 X59) = plus (sum X58) (sum X59)]
+  ← ⟦lemma [sum (append X58 X59) = plus (sum X58) (sum X59)]⟧", style=filled];
+  vertex_22 -> vertex_23 [label="lemma", dir="back"];
+  vertex_23 [color=green, shape=box, label="forall (X58:list) (X59:list).
+[sum (append X58 X59) = plus (sum X58) (sum X59)]", style=filled];
+  vertex_1 -> vertex_24 [label="sat_resolution", dir="back"];
+  vertex_24 [shape=box, label="⟦lemma [sum (append X58 X59) = plus (sum X58) (sum X59)]⟧ ⊔ 
+⟦[_avatar_8 = cons #nat_9 #list_10
+ for [[sum (append ◇ _avatar_7) ≠ plus (sum ◇) (sum _avatar_7)]]]⟧", style=filled];
+  vertex_24 -> vertex_25 [label="sat_resolution", dir="back"];
+  vertex_25 [shape=box, label="¬⟦[_avatar_8 = nil
+   for [[sum (append ◇ _avatar_7) ≠ plus (sum ◇) (sum _avatar_7)]]]⟧", style=filled];
+  vertex_25 -> vertex_26 [label="simplify", dir="back"];
+  vertex_26 [color=orange, shape=box, label="[sum _avatar_7 ≠ sum _avatar_7]
+  ← ⟦[_avatar_8 = nil
+     for [[sum (append ◇ _avatar_7) ≠ plus (sum ◇) (sum _avatar_7)]]]⟧", style=filled];
+  vertex_26 -> vertex_27 [label="demod", dir="back"];
+  vertex_27 [color=yellow, shape=box, label="forall (X22:list). [append nil X22 = X22]", style=filled];
+  vertex_26 -> vertex_9 [label="demod", dir="back"];
+  vertex_26 -> vertex_16 [label="demod", dir="back"];
+  vertex_26 -> vertex_28 [label="demod", dir="back"];
+  vertex_28 [shape=box, label="[sum (append nil _avatar_7) ≠ plus (sum nil) (sum _avatar_7)]
+  ← ⟦[_avatar_8 = nil
+     for [[sum (append ◇ _avatar_7) ≠ plus (sum ◇) (sum _avatar_7)]]]⟧", style=filled];
+  vertex_28 -> vertex_29 [label="min", dir="back"];
+  vertex_29 [shape=box, label="[sum (append _avatar_8 _avatar_7) ≠ plus (sum _avatar_8) (sum _avatar_7)]
+  ← ¬⟦lemma [sum (append X58 X59) = plus (sum X58) (sum X59)]⟧", style=filled];
+  vertex_29 -> vertex_23 [label="lemma", dir="back"];
+  vertex_24 -> vertex_30 [label="sat_resolution", dir="back"];
+  vertex_30 [shape=box, label="⟦lemma [sum (append X58 X59) = plus (sum X58) (sum X59)]⟧ ⊔ 
+⟦[_avatar_8 = cons #nat_9 #list_10
+ for [[sum (append ◇ _avatar_7) ≠ plus (sum ◇) (sum _avatar_7)]]]⟧ ⊔ 
+⟦[_avatar_8 = nil
+ for [[sum (append ◇ _avatar_7) ≠ plus (sum ◇) (sum _avatar_7)]]]⟧", style=filled];
+  vertex_30 -> vertex_29 [label="min", dir="back"];
+  vertex_0 -> vertex_31 [label="simpl_trail", dir="back"];
+  vertex_31 [shape=box, label="⟦lemma [plus X50 (plus X51 X52) = plus (plus X50 X51) X52]⟧", style=filled];
+  vertex_31 -> vertex_32 [label="sat_resolution", dir="back"];
+  vertex_32 [shape=box, label="¬⟦[_avatar_3 = z
+   for [[plus ◇ (plus _avatar_2 _avatar_1)
+          ≠ plus (plus ◇ _avatar_2) _avatar_1]]]⟧", style=filled];
+  vertex_32 -> vertex_33 [label="simplify", dir="back"];
+  vertex_33 [color=orange, shape=box, label="[plus _avatar_2 _avatar_1 ≠ plus _avatar_2 _avatar_1]
+  ← ⟦[_avatar_3 = z
+     for [[plus ◇ (plus _avatar_2 _avatar_1)
+            ≠ plus (plus ◇ _avatar_2) _avatar_1]]]⟧", style=filled];
+  vertex_33 -> vertex_16 [label="demod", dir="back"];
+  vertex_33 -> vertex_34 [label="demod", dir="back"];
+  vertex_34 [shape=box, label="[plus z (plus _avatar_2 _avatar_1) ≠ plus (plus z _avatar_2) _avatar_1]
+  ← ⟦[_avatar_3 = z
+     for [[plus ◇ (plus _avatar_2 _avatar_1)
+            ≠ plus (plus ◇ _avatar_2) _avatar_1]]]⟧", style=filled];
+  vertex_34 -> vertex_35 [label="min", dir="back"];
+  vertex_35 [shape=box, label="[plus _avatar_3 (plus _avatar_2 _avatar_1)
+  ≠ plus (plus _avatar_3 _avatar_2) _avatar_1]
+  ← ¬⟦lemma [plus X50 (plus X51 X52) = plus (plus X50 X51) X52]⟧", style=filled];
+  vertex_35 -> vertex_36 [label="lemma", dir="back"];
+  vertex_36 [color=green, shape=box, label="forall (X50:nat) (X51:nat) (X52:nat).
+[plus X50 (plus X51 X52) = plus (plus X50 X51) X52]", style=filled];
+  vertex_31 -> vertex_37 [label="sat_resolution", dir="back"];
+  vertex_37 [shape=box, label="⟦lemma [plus X50 (plus X51 X52) = plus (plus X50 X51) X52]⟧ ⊔ 
+⟦[_avatar_3 = z
+ for [[plus ◇ (plus _avatar_2 _avatar_1)
+        ≠ plus (plus ◇ _avatar_2) _avatar_1]]]⟧", style=filled];
+  vertex_37 -> vertex_38 [label="sat_resolution", dir="back"];
+  vertex_38 [shape=box, label="¬⟦[_avatar_3 = s #nat_1
+   for [[plus ◇ (plus _avatar_2 _avatar_1)
+          ≠ plus (plus ◇ _avatar_2) _avatar_1]]]⟧", style=filled];
+  vertex_38 -> vertex_39 [label="simplify", dir="back"];
+  vertex_39 [color=orange, shape=box, label="[s (plus #nat_1 (plus _avatar_1 _avatar_2))
+  ≠ s (plus #nat_1 (plus _avatar_1 _avatar_2))]
+  ← ⟦[_avatar_3 = s #nat_1
+     for [[plus ◇ (plus _avatar_2 _avatar_1)
+            ≠ plus (plus ◇ _avatar_2) _avatar_1]]]⟧", style=filled];
+  vertex_39 -> vertex_15 [label="demod", dir="back"];
+  vertex_39 -> vertex_40 [label="demod", dir="back"];
+  vertex_40 [color=yellow, shape=box, label="forall (X1:nat) (X2:nat). [plus (s X1) X2 = s (plus X1 X2)]", style=filled];
+  vertex_39 -> vertex_41 [label="demod", dir="back"];
+  vertex_41 [shape=box, label="[plus #nat_1 (plus _avatar_1 _avatar_2)
+  = plus _avatar_1 (plus #nat_1 _avatar_2)]
+  ← ⟦[_avatar_3 = s #nat_1
+     for [[plus ◇ (plus _avatar_2 _avatar_1)
+            ≠ plus (plus ◇ _avatar_2) _avatar_1]]]⟧", style=filled];
+  vertex_41 -> vertex_15 [label="demod", dir="back"];
+  vertex_41 -> vertex_42 [label="demod", dir="back"];
+  vertex_42 [shape=box, label="[plus #nat_1 (plus _avatar_2 _avatar_1)
+  = plus (plus #nat_1 _avatar_2) _avatar_1]
+  ← ⟦[_avatar_3 = s #nat_1
+     for [[plus ◇ (plus _avatar_2 _avatar_1)
+            ≠ plus (plus ◇ _avatar_2) _avatar_1]]]⟧", style=filled];
+  vertex_42 -> vertex_35 [label="min", dir="back"];
+  vertex_39 -> vertex_43 [label="demod", dir="back"];
+  vertex_43 [shape=box, label="[plus (s #nat_1) (plus _avatar_2 _avatar_1)
+  ≠ plus (plus (s #nat_1) _avatar_2) _avatar_1]
+  ← ⟦[_avatar_3 = s #nat_1
+     for [[plus ◇ (plus _avatar_2 _avatar_1)
+            ≠ plus (plus ◇ _avatar_2) _avatar_1]]]⟧", style=filled];
+  vertex_43 -> vertex_35 [label="min", dir="back"];
+  vertex_37 -> vertex_44 [label="sat_resolution", dir="back"];
+  vertex_44 [shape=box, label="⟦lemma [plus X50 (plus X51 X52) = plus (plus X50 X51) X52]⟧ ⊔ 
+⟦[_avatar_3 = s #nat_1
+ for [[plus ◇ (plus _avatar_2 _avatar_1)
+        ≠ plus (plus ◇ _avatar_2) _avatar_1]]]⟧ ⊔ 
+⟦[_avatar_3 = z
+ for [[plus ◇ (plus _avatar_2 _avatar_1)
+        ≠ plus (plus ◇ _avatar_2) _avatar_1]]]⟧", style=filled];
+  vertex_44 -> vertex_35 [label="min", dir="back"];
+  vertex_0 -> vertex_45 [label="simpl_trail", dir="back"];
+  vertex_45 [color=orange, shape=box, label="⊥
+  ← ⟦lemma [plus X50 (plus X51 X52) = plus (plus X50 X51) X52]⟧ ⊓ 
+    ⟦[_avatar_8 = cons #nat_9 #list_10
+     for [[sum (append ◇ _avatar_7) ≠ plus (sum ◇) (sum _avatar_7)]]]⟧", style=filled];
+  vertex_45 -> vertex_46 [label="simplify", dir="back"];
+  vertex_46 [color=orange, shape=box, label="[plus #nat_9 (plus (sum #list_10) (sum _avatar_7))
+  ≠ plus #nat_9 (plus (sum #list_10) (sum _avatar_7))]
+  ← ⟦lemma [plus X50 (plus X51 X52) = plus (plus X50 X51) X52]⟧ ⊓ 
+    ⟦[_avatar_8 = cons #nat_9 #list_10
+     for [[sum (append ◇ _avatar_7) ≠ plus (sum ◇) (sum _avatar_7)]]]⟧", style=filled];
+  vertex_46 -> vertex_47 [label="s_sup-", dir="back"];
+  vertex_47 [shape=box, label="[plus #nat_9 (plus (sum #list_10) (sum _avatar_7))
+  ≠ plus (plus #nat_9 (sum #list_10)) (sum _avatar_7)]
+  ← ⟦[_avatar_8 = cons #nat_9 #list_10
+     for [[sum (append ◇ _avatar_7) ≠ plus (sum ◇) (sum _avatar_7)]]]⟧", style=filled];
+  vertex_47 -> vertex_48 [label="demod", dir="back"];
+  vertex_48 [color=yellow, shape=box, label="forall (X23:nat) (X24:list) (X25:list).
+[append (cons X23 X24) X25 = cons X23 (append X24 X25)]", style=filled];
+  vertex_47 -> vertex_14 [label="demod", dir="back"];
+  vertex_47 -> vertex_49 [label="demod", dir="back"];
+  vertex_49 [shape=box, label="[sum (append #list_10 _avatar_7) = plus (sum #list_10) (sum _avatar_7)]
+  ← ⟦[_avatar_8 = cons #nat_9 #list_10
+     for [[sum (append ◇ _avatar_7) ≠ plus (sum ◇) (sum _avatar_7)]]]⟧", style=filled];
+  vertex_49 -> vertex_29 [label="min", dir="back"];
+  vertex_47 -> vertex_50 [label="demod", dir="back"];
+  vertex_50 [shape=box, label="[sum (append (cons #nat_9 #list_10) _avatar_7)
+  ≠ plus (sum (cons #nat_9 #list_10)) (sum _avatar_7)]
+  ← ⟦[_avatar_8 = cons #nat_9 #list_10
+     for [[sum (append ◇ _avatar_7) ≠ plus (sum ◇) (sum _avatar_7)]]]⟧", style=filled];
+  vertex_50 -> vertex_29 [label="min", dir="back"];
+  vertex_46 -> vertex_51 [label="s_sup-", dir="back"];
+  vertex_51 [shape=box, label="forall (X50:nat) (X51:nat) (X52:nat).
+[plus X50 (plus X51 X52) = plus (plus X50 X51) X52]
+  ← ⟦lemma [plus X50 (plus X51 X52) = plus (plus X50 X51) X52]⟧", style=filled];
+  vertex_51 -> vertex_36 [label="lemma", dir="back"];
+  }
+
+
