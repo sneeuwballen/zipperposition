@@ -102,12 +102,14 @@ and pp_closed_lits_tstp out lits =
 and pp_trail_tstp out trail =
   (* print a single boolean box *)
   let pp_box_unsigned out b = match BBox.payload b with
-    | BBox.Case (l, r) ->
-      let l = Ind_cst.cst_to_term l in
-      let r = Ind_cst.case_to_term r in
-      pp_lits_tstp out [| Literal.mk_eq l r |]
+    | BBox.Case p ->
+      let lits = Ind_cst.lits_of_path p in
+      pp_lits_tstp out lits
     | BBox.Clause_component lits ->
       CCFormat.within "(" ")" pp_closed_lits_tstp out lits
+    | BBox.Lemma lits ->
+      CCFormat.within "(" ")"
+        (Util.pp_list ~sep:" & " pp_closed_lits_tstp) out lits
     | BBox.Fresh -> failwith "cannot print <fresh> boolean box"
   in
   let pp_box out b =

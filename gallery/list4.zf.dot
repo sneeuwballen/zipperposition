@@ -1,0 +1,93 @@
+digraph "unsat_graph" {
+  vertex_0 [color=red, label="[]", shape=box, style=filled];
+  vertex_0 -> vertex_1 [label="simplify", dir="back"];
+  vertex_1 [color=red, label="[]", shape=box, style=filled];
+  vertex_1 -> vertex_2 [label="demod", dir="back"];
+  vertex_2 [color=yellow, shape=box, label="forall (X15:nat) (X16:list). [count X15 (cons X15 X16) = s (count X15 X16)]", style=filled];
+  vertex_1 -> vertex_3 [label="demod", dir="back"];
+  vertex_3 [color=yellow, shape=box, label="forall (X1:nat) (X2:nat). [plus (s X1) X2 = s (plus X1 X2)]", style=filled];
+  vertex_1 -> vertex_4 [label="demod", dir="back"];
+  vertex_4 [shape=box, label="[plus (count zip_sk_0 #list_2) (count zip_sk_0 zip_sk_2)
+  = count zip_sk_0 (append #list_2 zip_sk_2)]", style=filled];
+  vertex_4 -> vertex_5 [label="simpl_trail", dir="back"];
+  vertex_5 [shape=box, label="⟦[zip_sk_1 = cons #nat_1 #list_2
+ for [[plus (count zip_sk_0 ◇) (count zip_sk_0 zip_sk_2)
+        ≠ count zip_sk_0 (append ◇ zip_sk_2)]]]⟧", style=filled];
+  vertex_5 -> vertex_6 [label="sat_resolution", dir="back"];
+  vertex_6 [shape=box, label="¬⟦[zip_sk_1 = nil
+   for [[plus (count zip_sk_0 ◇) (count zip_sk_0 zip_sk_2)
+          ≠ count zip_sk_0 (append ◇ zip_sk_2)]]]⟧", style=filled];
+  vertex_6 -> vertex_7 [label="simplify", dir="back"];
+  vertex_7 [color=orange, shape=box, label="[count zip_sk_0 zip_sk_2 ≠ count zip_sk_0 zip_sk_2]
+  ← ⟦[zip_sk_1 = nil
+     for [[plus (count zip_sk_0 ◇) (count zip_sk_0 zip_sk_2)
+            ≠ count zip_sk_0 (append ◇ zip_sk_2)]]]⟧", style=filled];
+  vertex_7 -> vertex_8 [label="demod", dir="back"];
+  vertex_8 [color=yellow, shape=box, label="forall (X14:nat). [count X14 nil = z]", style=filled];
+  vertex_7 -> vertex_9 [label="demod", dir="back"];
+  vertex_9 [color=yellow, shape=box, label="forall (X0:nat). [plus z X0 = X0]", style=filled];
+  vertex_7 -> vertex_10 [label="demod", dir="back"];
+  vertex_10 [color=yellow, shape=box, label="forall (X22:list). [append nil X22 = X22]", style=filled];
+  vertex_7 -> vertex_11 [label="demod", dir="back"];
+  vertex_11 [shape=box, label="[plus (count zip_sk_0 nil) (count zip_sk_0 zip_sk_2)
+  ≠ count zip_sk_0 (append nil zip_sk_2)]
+  ← ⟦[zip_sk_1 = nil
+     for [[plus (count zip_sk_0 ◇) (count zip_sk_0 zip_sk_2)
+            ≠ count zip_sk_0 (append ◇ zip_sk_2)]]]⟧", style=filled];
+  vertex_11 -> vertex_12 [label="min", dir="back"];
+  vertex_12 [color=green, shape=box, label="[plus (count zip_sk_0 zip_sk_1) (count zip_sk_0 zip_sk_2)
+  ≠ count zip_sk_0 (append zip_sk_1 zip_sk_2)]", style=filled];
+  vertex_5 -> vertex_13 [label="sat_resolution", dir="back"];
+  vertex_13 [shape=box, label="⟦[zip_sk_1 = cons #nat_1 #list_2
+ for [[plus (count zip_sk_0 ◇) (count zip_sk_0 zip_sk_2)
+        ≠ count zip_sk_0 (append ◇ zip_sk_2)]]]⟧ ⊔ 
+⟦[zip_sk_1 = nil
+ for [[plus (count zip_sk_0 ◇) (count zip_sk_0 zip_sk_2)
+        ≠ count zip_sk_0 (append ◇ zip_sk_2)]]]⟧", style=filled];
+  vertex_13 -> vertex_12 [label="min", dir="back"];
+  vertex_4 -> vertex_14 [label="simpl_trail", dir="back"];
+  vertex_14 [shape=box, label="[plus (count zip_sk_0 #list_2) (count zip_sk_0 zip_sk_2)
+  = count zip_sk_0 (append #list_2 zip_sk_2)]
+  ← ⟦[zip_sk_1 = cons #nat_1 #list_2
+     for [[plus (count zip_sk_0 ◇) (count zip_sk_0 zip_sk_2)
+            ≠ count zip_sk_0 (append ◇ zip_sk_2)]]]⟧", style=filled];
+  vertex_14 -> vertex_12 [label="min", dir="back"];
+  vertex_1 -> vertex_15 [label="demod", dir="back"];
+  vertex_15 [shape=box, label="[plus (count zip_sk_0 (cons zip_sk_0 #list_2)) (count zip_sk_0 zip_sk_2)
+  ≠ count zip_sk_0 (cons zip_sk_0 (append #list_2 zip_sk_2))]", style=filled];
+  vertex_15 -> vertex_16 [label="s_sup-", dir="back"];
+  vertex_16 [shape=box, label="[plus (count zip_sk_0 (cons #nat_1 #list_2)) (count zip_sk_0 zip_sk_2)
+  ≠ count zip_sk_0 (cons #nat_1 (append #list_2 zip_sk_2))]", style=filled];
+  vertex_16 -> vertex_17 [label="demod", dir="back"];
+  vertex_17 [color=yellow, shape=box, label="forall (X23:nat) (X24:list) (X25:list).
+[append (cons X23 X24) X25 = cons X23 (append X24 X25)]", style=filled];
+  vertex_16 -> vertex_18 [label="demod", dir="back"];
+  vertex_18 [shape=box, label="[plus (count zip_sk_0 (cons #nat_1 #list_2)) (count zip_sk_0 zip_sk_2)
+  ≠ count zip_sk_0 (append (cons #nat_1 #list_2) zip_sk_2)]", style=filled];
+  vertex_18 -> vertex_5 [label="simpl_trail", dir="back"];
+  vertex_18 -> vertex_19 [label="simpl_trail", dir="back"];
+  vertex_19 [shape=box, label="[plus (count zip_sk_0 (cons #nat_1 #list_2)) (count zip_sk_0 zip_sk_2)
+  ≠ count zip_sk_0 (append (cons #nat_1 #list_2) zip_sk_2)]
+  ← ⟦[zip_sk_1 = cons #nat_1 #list_2
+     for [[plus (count zip_sk_0 ◇) (count zip_sk_0 zip_sk_2)
+            ≠ count zip_sk_0 (append ◇ zip_sk_2)]]]⟧", style=filled];
+  vertex_19 -> vertex_12 [label="min", dir="back"];
+  vertex_15 -> vertex_20 [label="s_sup-", dir="back"];
+  vertex_20 [shape=box, label="[zip_sk_0 = #nat_1]", style=filled];
+  vertex_20 -> vertex_21 [label="clc", dir="back"];
+  vertex_21 [color=yellow, shape=box, label="forall (X17:nat) (X18:nat) (X19:list).
+[X18 = X17 ∨ count X18 (cons X17 X19) = count X18 X19]", style=filled];
+  vertex_20 -> vertex_22 [label="clc", dir="back"];
+  vertex_22 [shape=box, label="[zip_sk_0 = #nat_1 ∨ 
+ count zip_sk_0 (append #list_2 zip_sk_2)
+  ≠ count zip_sk_0 (cons #nat_1 (append #list_2 zip_sk_2))]", style=filled];
+  vertex_22 -> vertex_4 [label="demod", dir="back"];
+  vertex_22 -> vertex_23 [label="demod", dir="back"];
+  vertex_23 [shape=box, label="[zip_sk_0 = #nat_1 ∨ 
+ plus (count zip_sk_0 #list_2) (count zip_sk_0 zip_sk_2)
+  ≠ count zip_sk_0 (cons #nat_1 (append #list_2 zip_sk_2))]", style=filled];
+  vertex_23 -> vertex_16 [label="s_sup-", dir="back"];
+  vertex_23 -> vertex_21 [label="s_sup-", dir="back"];
+  }
+
+

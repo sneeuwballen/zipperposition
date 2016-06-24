@@ -73,13 +73,37 @@ let step p = p.step
 let kind p = p.kind
 let parents p = p.parents
 
-let result_as_clause p = match p.result with
-  | Clause c -> c
-  | Form _ | BoolClause _ -> invalid_arg "result_as_clause"
+let compare a b = CCInt.compare a.id b.id
+let equal a b = (compare a b = 0)
+let hash a = a.id
 
-let result_as_form p = match p.result with
-  | Clause _ | BoolClause _ -> invalid_arg "result_as_form"
-  | Form f -> f
+let res_to_int_ = function
+  | Clause _ -> 0
+  | Form _ -> 1
+  | BoolClause _ -> 2
+
+let compare_result a b = match a, b with
+  | Clause c1, Clause c2 -> SClause.compare c1 c2
+  | Form f1, Form f2 -> TypedSTerm.compare f1 f2
+  | BoolClause l1, BoolClause l2 -> CCOrd.list_ BBox.Lit.compare l1 l2
+  | Clause _, _
+  | Form _, _
+  |  BoolClause _, _ ->
+    CCInt.compare (res_to_int_ a) (res_to_int_ b)
+
+let compare_proof a b =
+  CCOrd.( compare a.step b.step <?> (compare_result, a.result, b.result) )
+
+let equal_proof a b = (compare_proof a b = 0)
+let hash_proof a = hash a.step
+
+module PTbl = CCHashtbl.Make(struct
+    type t = of_
+    let equal = equal_proof
+    let hash = hash_proof
+  end)
+
+let compare_by_result a b = compare_result a.result b.result
 
 (** {2 Constructors and utils} *)
 
@@ -178,68 +202,9 @@ let equal p1 p2 = p1.id=p2.id
 let compare p1 p2 = CCInt.compare p1.id p2.id
 let hash p = p.id
 
-let compare_by_result p1 p2 = match p1.result, p2.result with
-  | Clause c1, Clause c2 -> SClause.compare c1 c2
-  | Form f1, Form f2 -> TypedSTerm.compare f1 f2
-  | BoolClause l1, BoolClause l2 -> CCOrd.list_ BBox.Lit.compare l1 l2
-  | Clause _, _ -> 1
-  | _, Clause _ -> -1
-  | Form _, _ -> 1
-  | _, Form _ -> -1
-
 (** {2 Proof traversal} *)
 
-module Tbl = CCHashtbl.Make(CCInt)
-
-let traverse_depth ?(traversed=Tbl.create 16) proof k =
-  let depth = ref 0 in
-  let current, next = ref [proof], ref [] in
-  while !current <> [] do
-    (* exhaust the current layer of proofs to explore *)
-    while !current <> [] do
-      let proof = List.hd !current in
-      current := List.tl !current;
-      if Tbl.mem traversed proof.id then ()
-      else (
-        Tbl.add traversed proof.id ();
-        (* traverse premises first *)
-        List.iter (fun proof' -> next := proof'.step :: !next) proof.parents;
-        (* yield proof *)
-        k (proof, !depth);
-      )
-    done;
-    (* explore next layer *)
-    current := !next;
-    next := [];
-    incr depth;
-  done
-
-let traverse ?traversed proof k =
-  traverse_depth ?traversed proof (fun (p, _depth) -> k p)
-
 let distance_to_goal p = p.dist_to_goal
-
-let to_seq proof = Sequence.from_iter (fun k -> traverse proof k)
-
-(* Depth of a proof, ie max distance between the root and any axiom *)
-let depth proof =
-  let explored = Tbl.create 11 in
-  let depth = ref 0 in
-  let q = Queue.create () in
-  Queue.push (proof, 0) q;
-  while not (Queue.is_empty q) do
-    let (p, d) = Queue.pop q in
-    if Tbl.mem explored proof.id then () else begin
-      Tbl.add explored proof.id ();
-      begin match p.kind with
-        | Assert _ | Goal _ | Trivial | Data _ -> depth := max d !depth
-        | Inference _ | Esa _ | Simplification _ -> ()
-      end;
-      (* explore parents *)
-      List.iter (fun p' -> Queue.push (p'.step, d+1) q) p.parents
-    end
-  done;
-  !depth
 
 (** {2 IO} *)
 

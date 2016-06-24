@@ -1,0 +1,234 @@
+digraph "unsat_graph" {
+  vertex_0 [color=red, label="[]", shape=box, style=filled];
+  vertex_0 -> vertex_1 [label="simpl_trail"];
+  vertex_1 [shape=box, label="⟦[zip_sk_2 = z for [[¬leq (plus ◇ (s #nat_1)) (plus ◇ zip_sk_1)]]]
+·[zip_sk_0 = s #nat_1
+ for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+     [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_1 -> vertex_2 [label="sat_resolution"];
+  vertex_2 [shape=box, label="¬⟦[zip_sk_2 = s #nat_0
+   for [[¬leq (plus ◇ (s #nat_1)) (plus ◇ zip_sk_1)]]]
+  ·[zip_sk_0 = s #nat_1
+   for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+       [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_2 -> vertex_3 [label="simplify"];
+  vertex_3 [color=orange, shape=box, label="[⊥ ∨ ⊥]
+  ← ⟦[zip_sk_2 = s #nat_0
+     for [[¬leq (plus ◇ (s #nat_1)) (plus ◇ zip_sk_1)]]]
+    ·[zip_sk_0 = s #nat_1
+     for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+         [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_3 -> vertex_4 [label="demod"];
+  vertex_4 [shape=box, label="[leq (plus #nat_0 (s #nat_1)) (plus #nat_0 zip_sk_1)]
+  ← ⟦[zip_sk_2 = s #nat_0
+     for [[¬leq (plus ◇ (s #nat_1)) (plus ◇ zip_sk_1)]]]
+    ·[zip_sk_0 = s #nat_1
+     for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+         [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_4 -> vertex_5 [label="min"];
+  vertex_5 [shape=box, label="[¬leq (plus zip_sk_2 (s #nat_1)) (plus zip_sk_2 zip_sk_1)]
+  ← ⟦[zip_sk_0 = s #nat_1
+     for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+         [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_5 -> vertex_6 [label="min"];
+  vertex_6 [color=green, shape=box, label="[leq zip_sk_0 zip_sk_1]", style=filled];
+  vertex_5 -> vertex_7 [label="min"];
+  vertex_7 [color=green, shape=box, label="[¬leq (plus zip_sk_2 zip_sk_0) (plus zip_sk_2 zip_sk_1)]", style=filled];
+  vertex_3 -> vertex_8 [label="demod"];
+  vertex_8 [shape=box, label="[¬leq (plus #nat_0 (s #nat_1)) (plus #nat_0 zip_sk_1) ∨ ⊥]
+  ← ⟦[zip_sk_2 = s #nat_0
+     for [[¬leq (plus ◇ (s #nat_1)) (plus ◇ zip_sk_1)]]]
+    ·[zip_sk_0 = s #nat_1
+     for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+         [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_8 -> vertex_9 [label="s_sup-"];
+  vertex_9 [shape=box, label="[¬leq (s (plus #nat_0 (s #nat_1))) (s (plus #nat_0 zip_sk_1))]
+  ← ⟦[zip_sk_2 = s #nat_0
+     for [[¬leq (plus ◇ (s #nat_1)) (plus ◇ zip_sk_1)]]]
+    ·[zip_sk_0 = s #nat_1
+     for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+         [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_9 -> vertex_10 [label="demod"];
+  vertex_10 [color=yellow, shape=box, label="forall (X1:nat) (X2:nat). [plus (s X1) X2 = s (plus X1 X2)]", style=filled];
+  vertex_9 -> vertex_11 [label="demod"];
+  vertex_11 [shape=box, label="[¬leq (plus (s #nat_0) (s #nat_1)) (plus (s #nat_0) zip_sk_1)]
+  ← ⟦[zip_sk_2 = s #nat_0
+     for [[¬leq (plus ◇ (s #nat_1)) (plus ◇ zip_sk_1)]]]
+    ·[zip_sk_0 = s #nat_1
+     for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+         [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_11 -> vertex_5 [label="min"];
+  vertex_8 -> vertex_12 [label="s_sup-"];
+  vertex_12 [color=yellow, shape=box, label="forall (X11:nat) (X13:nat). [leq (s X11) (s X13) ∨ ¬leq X11 X13]", style=filled];
+  vertex_1 -> vertex_13 [label="sat_resolution"];
+  vertex_13 [shape=box, label="⟦[zip_sk_2 = z for [[¬leq (plus ◇ (s #nat_1)) (plus ◇ zip_sk_1)]]]
+·[zip_sk_0 = s #nat_1
+ for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+     [[leq ◇ zip_sk_1]]]⟧ ⊔ 
+⟦[zip_sk_2 = s #nat_0
+ for [[¬leq (plus ◇ (s #nat_1)) (plus ◇ zip_sk_1)]]]
+·[zip_sk_0 = s #nat_1
+ for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+     [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_13 -> vertex_14 [label="sat_resolution"];
+  vertex_14 [shape=box, label="⟦[zip_sk_0 = s #nat_1
+ for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+     [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_14 -> vertex_15 [label="sat_resolution"];
+  vertex_15 [shape=box, label="¬⟦[zip_sk_0 = z
+   for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+       [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_15 -> vertex_16 [label="sat_resolution"];
+  vertex_16 [shape=box, label="¬⟦[zip_sk_2 = s #nat_0 for [[¬leq (plus ◇ z) (plus ◇ zip_sk_1)]]]
+  ·[zip_sk_0 = z
+   for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+       [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_16 -> vertex_17 [label="simplify"];
+  vertex_17 [color=orange, shape=box, label="[⊥ ∨ ⊥]
+  ← ⟦[zip_sk_2 = s #nat_0 for [[¬leq (plus ◇ z) (plus ◇ zip_sk_1)]]]
+    ·[zip_sk_0 = z
+     for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+         [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_17 -> vertex_18 [label="demod"];
+  vertex_18 [shape=box, label="[leq (plus #nat_0 z) (plus #nat_0 zip_sk_1)]
+  ← ⟦[zip_sk_2 = s #nat_0 for [[¬leq (plus ◇ z) (plus ◇ zip_sk_1)]]]
+    ·[zip_sk_0 = z
+     for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+         [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_18 -> vertex_19 [label="min"];
+  vertex_19 [shape=box, label="[¬leq (plus zip_sk_2 z) (plus zip_sk_2 zip_sk_1)]
+  ← ⟦[zip_sk_0 = z
+     for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+         [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_19 -> vertex_6 [label="min"];
+  vertex_19 -> vertex_7 [label="min"];
+  vertex_17 -> vertex_20 [label="demod"];
+  vertex_20 [shape=box, label="[¬leq (plus #nat_0 z) (plus #nat_0 zip_sk_1) ∨ ⊥]
+  ← ⟦[zip_sk_2 = s #nat_0 for [[¬leq (plus ◇ z) (plus ◇ zip_sk_1)]]]
+    ·[zip_sk_0 = z
+     for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+         [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_20 -> vertex_21 [label="s_sup-"];
+  vertex_21 [shape=box, label="[¬leq (s (plus #nat_0 z)) (s (plus #nat_0 zip_sk_1))]
+  ← ⟦[zip_sk_2 = s #nat_0 for [[¬leq (plus ◇ z) (plus ◇ zip_sk_1)]]]
+    ·[zip_sk_0 = z
+     for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+         [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_21 -> vertex_10 [label="demod"];
+  vertex_21 -> vertex_22 [label="demod"];
+  vertex_22 [shape=box, label="[¬leq (plus (s #nat_0) z) (plus (s #nat_0) zip_sk_1)]
+  ← ⟦[zip_sk_2 = s #nat_0 for [[¬leq (plus ◇ z) (plus ◇ zip_sk_1)]]]
+    ·[zip_sk_0 = z
+     for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+         [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_22 -> vertex_19 [label="min"];
+  vertex_20 -> vertex_12 [label="s_sup-"];
+  vertex_15 -> vertex_23 [label="sat_resolution"];
+  vertex_23 [shape=box, label="¬⟦[zip_sk_0 = z
+   for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+       [[leq ◇ zip_sk_1]]]⟧ ⊔ 
+⟦[zip_sk_2 = s #nat_0 for [[¬leq (plus ◇ z) (plus ◇ zip_sk_1)]]]
+·[zip_sk_0 = z
+ for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+     [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_23 -> vertex_24 [label="sat_resolution"];
+  vertex_24 [shape=box, label="¬⟦[zip_sk_2 = z for [[¬leq (plus ◇ z) (plus ◇ zip_sk_1)]]]
+  ·[zip_sk_0 = z
+   for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+       [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_24 -> vertex_25 [label="simplify"];
+  vertex_25 [color=orange, shape=box, label="[⊥]
+  ← ⟦[zip_sk_2 = z for [[¬leq (plus ◇ z) (plus ◇ zip_sk_1)]]]
+    ·[zip_sk_0 = z
+     for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+         [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_25 -> vertex_26 [label="demod"];
+  vertex_26 [color=yellow, shape=box, label="forall (X0:nat). [plus z X0 = X0]", style=filled];
+  vertex_25 -> vertex_27 [label="demod"];
+  vertex_27 [color=yellow, shape=box, label="forall (X10:nat). [leq z X10]", style=filled];
+  vertex_25 -> vertex_28 [label="demod"];
+  vertex_28 [shape=box, label="[¬leq (plus z z) (plus z zip_sk_1)]
+  ← ⟦[zip_sk_2 = z for [[¬leq (plus ◇ z) (plus ◇ zip_sk_1)]]]
+    ·[zip_sk_0 = z
+     for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+         [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_28 -> vertex_19 [label="min"];
+  vertex_23 -> vertex_29 [label="sat_resolution"];
+  vertex_29 [shape=box, label="¬⟦[zip_sk_0 = z
+   for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+       [[leq ◇ zip_sk_1]]]⟧ ⊔ 
+⟦[zip_sk_2 = z for [[¬leq (plus ◇ z) (plus ◇ zip_sk_1)]]]
+·[zip_sk_0 = z
+ for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+     [[leq ◇ zip_sk_1]]]⟧ ⊔ 
+⟦[zip_sk_2 = s #nat_0 for [[¬leq (plus ◇ z) (plus ◇ zip_sk_1)]]]
+·[zip_sk_0 = z
+ for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+     [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_29 -> vertex_19 [label="min"];
+  vertex_14 -> vertex_30 [label="sat_resolution"];
+  vertex_30 [shape=box, label="⟦[zip_sk_0 = s #nat_1
+ for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+     [[leq ◇ zip_sk_1]]]⟧ ⊔ 
+⟦[zip_sk_0 = z
+ for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+     [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_30 -> vertex_6 [label="min"];
+  vertex_30 -> vertex_7 [label="min"];
+  vertex_13 -> vertex_31 [label="sat_resolution"];
+  vertex_31 [shape=box, label="¬⟦[zip_sk_0 = s #nat_1
+   for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+       [[leq ◇ zip_sk_1]]]⟧ ⊔ 
+⟦[zip_sk_2 = z for [[¬leq (plus ◇ (s #nat_1)) (plus ◇ zip_sk_1)]]]
+·[zip_sk_0 = s #nat_1
+ for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+     [[leq ◇ zip_sk_1]]]⟧ ⊔ 
+⟦[zip_sk_2 = s #nat_0
+ for [[¬leq (plus ◇ (s #nat_1)) (plus ◇ zip_sk_1)]]]
+·[zip_sk_0 = s #nat_1
+ for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+     [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_31 -> vertex_5 [label="min"];
+  vertex_0 -> vertex_14 [label="simpl_trail"];
+  vertex_0 -> vertex_32 [label="simpl_trail"];
+  vertex_32 [color=orange, shape=box, label="⊥
+  ← ⟦[zip_sk_0 = s #nat_1
+     for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+         [[leq ◇ zip_sk_1]]]⟧ ⊓ 
+    ⟦[zip_sk_2 = z for [[¬leq (plus ◇ (s #nat_1)) (plus ◇ zip_sk_1)]]]
+    ·[zip_sk_0 = s #nat_1
+     for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+         [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_32 -> vertex_33 [label="simplify"];
+  vertex_33 [color=orange, shape=box, label="[⊥]
+  ← ⟦[zip_sk_0 = s #nat_1
+     for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+         [[leq ◇ zip_sk_1]]]⟧ ⊓ 
+    ⟦[zip_sk_2 = z for [[¬leq (plus ◇ (s #nat_1)) (plus ◇ zip_sk_1)]]]
+    ·[zip_sk_0 = s #nat_1
+     for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+         [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_33 -> vertex_34 [label="s_sup-"];
+  vertex_34 [shape=box, label="[¬leq (s #nat_1) zip_sk_1]
+  ← ⟦[zip_sk_2 = z for [[¬leq (plus ◇ (s #nat_1)) (plus ◇ zip_sk_1)]]]
+    ·[zip_sk_0 = s #nat_1
+     for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+         [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_34 -> vertex_26 [label="demod"];
+  vertex_34 -> vertex_35 [label="demod"];
+  vertex_35 [shape=box, label="[¬leq (plus z (s #nat_1)) (plus z zip_sk_1)]
+  ← ⟦[zip_sk_2 = z for [[¬leq (plus ◇ (s #nat_1)) (plus ◇ zip_sk_1)]]]
+    ·[zip_sk_0 = s #nat_1
+     for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+         [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_35 -> vertex_5 [label="min"];
+  vertex_33 -> vertex_36 [label="s_sup-"];
+  vertex_36 [shape=box, label="[leq (s #nat_1) zip_sk_1]
+  ← ⟦[zip_sk_0 = s #nat_1
+     for [[¬leq (plus zip_sk_2 ◇) (plus zip_sk_2 zip_sk_1)]], 
+         [[leq ◇ zip_sk_1]]]⟧", style=filled];
+  vertex_36 -> vertex_6 [label="min"];
+  vertex_36 -> vertex_7 [label="min"];
+  }
+
+

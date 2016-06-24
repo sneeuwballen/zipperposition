@@ -8,9 +8,12 @@ open Libzipperposition
 let section = Util.Section.make ~parent:Const.section "msat"
 let prof_call_msat = Util.mk_profiler "msat.call"
 
+type proof_step = Sat_solver_intf.proof_step
+type proof = Sat_solver_intf.proof
+
 type result = Sat_solver_intf.result =
   | Sat
-  | Unsat
+  | Unsat of proof
 
 exception WrongState of string
 
@@ -27,8 +30,6 @@ module Make(Dummy : sig end)
   module Lit = BBox.Lit
 
   type clause = Lit.t list
-  type proof_step = ProofStep.t
-  type proof = ProofStep.of_
 
   (* queue of clauses waiting for being pushed into the solver *)
   let queue_ = Queue.create()
@@ -68,12 +69,14 @@ module Make(Dummy : sig end)
 
   let result_ = ref Sat
 
+  let res_is_unsat_ () = match !result_ with Sat -> false | Unsat _ -> true
+
   (* invariant:
     when result_ = Sat, only eval/eval_level are defined
     when result_ = Unsat, only unsat_core_ is defined
   *)
 
-  let eval_fail_ _ = assert (!result_ = Unsat); wrong_state_ "eval"
+  let eval_fail_ _ = assert (res_is_unsat_ ()); wrong_state_ "eval"
 
   let eval_ = ref eval_fail_
   let eval_level_ = ref eval_fail_
@@ -99,7 +102,7 @@ module Make(Dummy : sig end)
 
 
   (* map tags to the associated proof *)
-  let tag_to_proof_ = Hashtbl.create 32
+  let tag_to_proof_ : (int, proof_step) Hashtbl.t = Hashtbl.create 32
 
   module SatForm = struct
     include Lit
@@ -119,8 +122,24 @@ module Make(Dummy : sig end)
 
   exception UndecidedLit = S.UndecidedLit
 
-  let bool_clause_of_sat c =
+  type sat_clause = Lit.t list
+
+  let bool_clause_of_sat c : sat_clause =
     S.Proof.to_list c |> List.map (fun a -> a.S.St.lit)
+
+  (* (clause * proof * proof) -> 'a *)
+  module ResTbl = CCHashtbl.Make(struct
+      type t = sat_clause * ProofStep.of_ * ProofStep.of_
+      let equal (c,a1,a2)(c',b1,b2) =
+        CCList.equal Lit.equal c c' &&
+        ProofStep.equal_proof a1 b1 && ProofStep.equal_proof a2 b2
+      let hash (c,a,b) =
+        Hashtbl.hash
+          [List.length c; ProofStep.hash_proof a; ProofStep.hash_proof b]
+    end)
+
+  let tbl0 : (int,proof) Hashtbl.t = Hashtbl.create 16
+  let tbl_res = ResTbl.create 16
 
   (* convert a SAT proof into a tree of ProofStep *)
   let conv_proof_ p : proof =
@@ -133,22 +152,36 @@ module Make(Dummy : sig end)
             errorf "no tag in leaf of SAT proof (clause %a)" S.St.pp_clause c
           | Some id -> id
         in
-        begin
-          try
-            let step = Hashtbl.find tag_to_proof_ tag in
-            let c = bool_clause_of_sat c in
-            ProofStep.mk_bc step c
-          with Not_found -> errorf "no proof for tag %d" tag
+        begin match CCHashtbl.get tbl0 tag with
+        | Some s -> s
+        | None ->
+          begin match CCHashtbl.get tag_to_proof_ tag with
+            | Some step ->
+              let c = bool_clause_of_sat c in
+              let s = ProofStep.mk_bc step c in
+              Hashtbl.add tbl0 tag s;
+              s
+            | None -> errorf "no proof for tag %d" tag
+          end
         end
       | { step = S.Proof.Lemma _; _ } ->
         errorf "SAT proof involves a lemma"
       | { conclusion=c; step = S.Proof.Resolution (p1,p2,_) } ->
         let c = bool_clause_of_sat c in
-        let parents = [aux p1; aux p2] in
-        let step =
-          ProofStep.mk_inference parents
-            ~rule:(ProofStep.mk_rule "sat_resolution")  in
-        ProofStep.mk_bc step c
+        let q1 = aux p1 in
+        let q2 = aux p2 in
+        begin match ResTbl.get tbl_res (c,q1,q2) with
+          | Some s -> s
+          | None ->
+            let parents = [q1; q2] in
+            let step =
+              ProofStep.mk_inference parents
+                ~rule:(ProofStep.mk_rule "sat_resolution")  in
+            let s = ProofStep.mk_bc step c in
+            ResTbl.add tbl_res (c,q1,q2) s;
+            ResTbl.add tbl_res (c,q2,q1) s;
+            s
+        end
     in
     S.Proof.check p;
     aux p
@@ -160,6 +193,10 @@ module Make(Dummy : sig end)
     match S.Proof.prove_atom a with
       | Some p -> conv_proof_ p
       | None -> assert false
+
+  let proved_at_0 lit =
+    let b,l = S.eval_level lit in
+    if l=0 then Some b else None
 
   (* call [S.solve()] in any case, and enforce invariant about eval/unsat_core *)
   let check_unconditional_ () =
@@ -184,9 +221,9 @@ module Make(Dummy : sig end)
       eval_level_ := S.eval_level;
       result_ := Sat;
     | S.Unsat ->
-      result_ := Unsat;
-      let p = S.get_proof () in
-      proof_ := Some (conv_proof_ p);
+      let p = S.get_proof () |> conv_proof_ in
+      result_ := Unsat p;
+      proof_ := Some p;
     end;
     !result_
 

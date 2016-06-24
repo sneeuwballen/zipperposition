@@ -23,6 +23,7 @@ type subst = Substs.t
 type t = {
   lits : Literals.t;
   var : T.var;
+  mutable hash: int;
 }
 type ctx=t
 
@@ -36,11 +37,26 @@ let raw_lits t = t.lits
 let compare c1 c2 =
   CCOrd.(HVar.compare c1.var c2.var <?> (Lits.compare, c1.lits, c2.lits))
 
+let real_hash_fun c h =
+  h |> Literals.hash_fun c.lits |> HVar.hash_fun c.var
+
+let hash c =
+  if c.hash = ~-1 then (
+    let h = CCHash.apply real_hash_fun c in
+    assert (h >= 0);
+    c.hash <- h
+  );
+  c.hash
+
+let hash_fun c h = CCHash.int (hash c) h
+
+let hash = CCHash.apply hash_fun
+
 let make lits ~var =
   assert (Lits.Seq.terms lits
           |> Sequence.exists (T.var_occurs ~var)
          );
-  {lits;var}
+  {lits; var; hash= ~-1}
 
 let extract lits t =
   if Lits.Seq.terms lits |> Sequence.exists (T.subterm ~sub:t)
@@ -58,7 +74,7 @@ let extract lits t =
         (Literal.map (fun root_t -> T.replace root_t ~old:t ~by:var_t))
         lits
     in
-    Some {lits;var}
+    Some {lits; var; hash= ~-1}
   else None
 
 let extract_exn lits t = match extract lits t with
@@ -69,12 +85,12 @@ let _apply_subst subst (lits, sc) =
   let renaming = Subst.Renaming.create () in
   Array.map (fun lit -> Literal.apply_subst_no_simp ~renaming subst (lit, sc)) lits
 
-let apply {lits;var} t =
+let apply {lits; var; _} t =
   let var = (var : T.var :> InnerTerm.t HVar.t) in
   let subst = Subst.FO.bind Subst.empty (var, 0) (t, 1) in
   _apply_subst subst (lits, 0)
 
-let apply_same_scope {lits;var} t =
+let apply_same_scope {lits; var; _} t =
   let var = (var : T.var :> InnerTerm.t HVar.t) in
   let subst = Subst.FO.bind Subst.empty (var, 0) (t, 0) in
   _apply_subst subst (lits, 0)

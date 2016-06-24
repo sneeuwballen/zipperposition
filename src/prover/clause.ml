@@ -17,6 +17,9 @@ let prof_clause_create = Util.mk_profiler "clause_create"
 
 module type S = Clause_intf.S
 
+type proof_step = Clause_intf.proof_step
+type proof = Clause_intf.proof
+
 (** {2 Type def} *)
 module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   module Ctx = Ctx
@@ -31,9 +34,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     trail: Trail.t;
     mutable flags: flag;
   }
-
-  type proof_step = ProofStep.t
-  type proof = ProofStep.of_
 
   type t = {
     sclause : sclause;
@@ -144,6 +144,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     | Statement.RewriteTerm _ -> [] (* dealt with by rewriting *)
     | Statement.Assert lits -> [of_lits ~is_goal:false lits]
     | Statement.Goal lits -> [of_lits ~is_goal:true lits]
+    | Statement.Lemma l
     | Statement.NegatedGoal l -> List.map (of_lits ~is_goal:true) l
 
   let update_trail f c =

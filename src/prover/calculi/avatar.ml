@@ -26,6 +26,9 @@ let flag_cut_introduced = SClause.new_flag()
 
 module type S = Avatar_intf.S
 
+let k_avatar : (module S) Flex_state.key = Flex_state.create_key ()
+let k_show_lemmas : bool Flex_state.key = Flex_state.create_key()
+
 module Make(E : Env.S)(Sat : Sat_solver.S)
 = struct
   module E = E
@@ -87,15 +90,17 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     | _::_ ->
         (* do a simplification! *)
         Util.incr_stat stat_splits;
+        let proof =
+          ProofStep.mk_esa ~rule:(ProofStep.mk_rule "split") [C.proof c] in
         let clauses_and_names =
           List.map
             (fun lits ->
-               let proof =
-                 ProofStep.mk_esa ~rule:(ProofStep.mk_rule "split") [C.proof c] in
                let lits = Array.of_list lits in
                let bool_name = BBox.inject_lits lits in
+               (* new trail: keep some literals of [C.trail c], add the new one *)
                let trail =
                  C.trail c
+                 |> Trail.filter BBox.must_be_kept
                  |> Trail.add bool_name
                in
                let c = C.create_a ~trail lits proof in
@@ -111,7 +116,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
           |> Trail.to_list
           |> List.map Trail.Lit.neg in
         let bool_clause = List.append bool_clause bool_guard in
-        Sat.add_clause ~proof:(C.proof_step c) bool_clause;
+        Sat.add_clause ~proof bool_clause;
         Util.debugf ~section 4 "@[constraint clause is @[%a@]@]"
           (fun k->k BBox.pp_bclause bool_clause);
         (* return the clauses *)
@@ -221,48 +226,123 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     Ordering.add_list (Ctx.ord ()) [id];
     id
 
-  (* generic mechanism for adding a clause
-      and make a lemma out of it, including Skolemization, etc. *)
-  let introduce_cut lits proof : C.t list * BBox.t =
-    let box = BBox.inject_lits lits in
-    Util.debugf ~section 3 "@[<2>introduce cut on@ `@[%a@]`@]"
-      (fun k->k Literals.pp lits);
-    (* positive clause *)
+  type cut_res = {
+    cut_src: Literals.t list ; (** the lemma itself *)
+    cut_pos: E.C.t list; (** clauses true if lemma is true *)
+    cut_neg: E.C.t list; (** clauses true if lemma is false *)
+    cut_lit: BLit.t; (** lit that is true if lemma is true *)
+  }
+
+  let pp_cut_res out c =
+    Format.fprintf out "{@[<hv>pos: @[%a@],@ neg: @[%a@],@ lit: @[%a@]}"
+      (Util.pp_list E.C.pp) c.cut_pos
+      (Util.pp_list E.C.pp) c.cut_neg
+      BLit.pp c.cut_lit
+
+  let cut_res_clauses c =
+    Sequence.append (Sequence.of_list c.cut_pos) (Sequence.of_list c.cut_neg)
+
+  (* generic mechanism for adding clause(s)
+     and make a lemma out of them, including Skolemization, etc. *)
+  let introduce_cut (clauses:Literals.t list) proof : cut_res =
+    Util.debugf ~section 3 "@[<2>introduce cut on@ `[@[%a@]]`@]"
+      (fun k->k (Util.pp_list Literals.pp) clauses);
+    let box = BBox.inject_lemma clauses in
+    (* positive clauses *)
     let c_pos =
-      C.create_a ~trail:(Trail.singleton box) lits proof
+      List.map
+        (fun lits ->
+           C.create_a ~trail:(Trail.singleton box) lits proof)
+        clauses
     in
     (* negative component:
-      - gather variables
+      - gather variables (careful that each clause has its own scope)
       - skolemize them with fresh (inductive?) constants
-      - map each [lit] to [negate subst(lit) <- [not box]] *)
+      - map each [lit] to [not subst(lit)]
+      - compute [bigand_i (bigor_j not c_i_j <- *)
     let c_neg =
-      let vars = Literals.Seq.vars lits
-        |> T.VarSet.of_seq
-        |> T.VarSet.to_list
+      let vars : _ HVar.t Scoped.t list =
+        Sequence.of_list clauses
+        |> Sequence.mapi
+          (fun i lits -> Literals.Seq.vars lits |> Sequence.map (fun v->v,i))
+        |> Sequence.flatten
+        |> Sequence.sort_uniq ~cmp:CCOrd.(pair HVar.compare int_)
+        |> Sequence.to_rev_list
       in
       let subst =
         List.fold_left
-          (fun subst v ->
+          (fun subst (v,i) ->
             let ty = HVar.ty v in
             let id = skolem_ ~ty in
-            Substs.FO.bind subst ((v:T.var:>Substs.var),0) (T.const ~ty id,0))
+            Substs.FO.bind subst ((v:T.var:>Substs.var),i) (T.const ~ty id,0))
           Substs.empty
           vars
       in
       let renaming = Ctx.renaming_clear() in
-      Array.map
-        (fun lit ->
-          (* negate, apply subst (to use the Skolem symbols) *)
-          let lit = Lit.negate lit in
-          let lit = Lit.apply_subst ~renaming subst (lit,0) in
-          let trail = Trail.singleton (Trail.Lit.neg box) in
-          let c = C.create_a ~trail [| lit |] proof in
-          C.set_flag flag_cut_introduced c true;
-          c)
-        lits
-      |> Array.to_list
+      clauses
+      |> List.mapi (fun sc lits -> lits,sc)
+      |> Util.map_product
+        ~f:(fun (lits,sc) ->
+          Array.to_list lits
+          |> List.map
+             (fun lit ->
+                (* negate, apply subst (to use the Skolem symbols). *)
+                let lit = Lit.negate lit in
+                let lit = Lit.apply_subst ~renaming subst (lit,sc) in
+                [lit])
+        )
+      |> List.map
+        (fun neg_lits ->
+           let trail = Trail.singleton (Trail.Lit.neg box) in
+           let c = C.create ~trail neg_lits proof in
+           C.set_flag flag_cut_introduced c true;
+           c)
     in
-    c_pos :: c_neg, box
+    { cut_src=clauses;
+      cut_pos=c_pos;
+      cut_neg=c_neg;
+      cut_lit=box;
+    }
+
+  let on_input_lemma : cut_res Signal.t = Signal.create ()
+
+  let all_lemmas_ = ref []
+
+  let print_lemmas out () =
+    let pp_lemma out c =
+      let status = match Sat.proved_at_0 c.cut_lit with
+        | None -> "unknown"
+        | Some true -> "proved"
+        | Some false -> "refuted"
+      in
+      Format.fprintf out "@[<hv>@{<Green>*@} %s %a@]"
+        status (Util.pp_list Literals.pp) c.cut_src
+    in
+    Format.fprintf out "@[<hv2>lemmas: {@ %a@,@]}"
+      (Util.pp_list pp_lemma) !all_lemmas_;
+    ()
+
+  let show_lemmas () = Format.printf "%a@." print_lemmas ()
+
+  let convert_lemma st = match Statement.view st with
+    | Statement.Lemma l ->
+      let proof_st = ProofStep.mk_goal (Statement.src st) in
+      let l =
+        l
+        |> List.map (List.map Ctx.Lit.of_form)
+        |> List.map Array.of_list
+      in
+      let proof =
+        l
+        |> List.map (fun c -> ProofStep.mk_c proof_st (SClause.make ~trail:Trail.empty c))
+        |> ProofStep.mk_inference ~rule:(ProofStep.mk_rule "lemma")
+      in
+      let cut = introduce_cut l proof in
+      let all_clauses = cut_res_clauses cut |> Sequence.to_rev_list in
+      Signal.send on_input_lemma cut;
+      (* interrupt here *)
+      E.cr_return all_clauses
+    | _ -> E.cr_skip
 
   module Meta(M : MetaProverState.S) = struct
     (* XXX ugly, but I could not find a way to prove M.E.C.t = C.t *)
@@ -277,10 +357,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
           (fun c ->
             let c = c_of_lemma c in
             assert (C.trail c |> Trail.is_empty);
-            let new_clauses, _box = introduce_cut (C.lits c) (C.proof_step c) in
+            let res = introduce_cut [C.lits c] (C.proof_step c) in
             Util.debugf ~section 2 "@[<hv2>introduce cut from meta lemma:@,%a@]"
-              (fun k->k (CCList.print C.pp) new_clauses);
-            Sequence.of_list new_clauses)
+              (fun k->k pp_cut_res res);
+            cut_res_clauses res)
         |> Sequence.to_rev_list
       in
       Queue.clear q;
@@ -298,9 +378,9 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       | Sat_solver.Sat ->
           Util.debug ~section 3 "SAT-solver reports \"SAT\"";
           []
-      | Sat_solver.Unsat ->
+      | Sat_solver.Unsat proof ->
           Util.debug ~section 1 "SAT-solver reports \"UNSAT\"";
-          let proof = Sat.get_proof () |> ProofStep.step in
+          let proof = ProofStep.step proof in
           let c = C.create ~trail:Trail.empty [] proof in
           [c]
     in
@@ -314,8 +394,13 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     E.add_multi_simpl_rule split;
     E.add_unary_inf "avatar_check_empty" check_empty;
     E.add_generate "avatar_check_sat" check_satisfiability;
+    E.add_clause_conversion convert_lemma;
     E.add_is_trivial trail_is_trivial;
     E.add_simplify simplify_trail;
+    if E.flex_get k_show_lemmas then (
+      Signal.on_every on_input_lemma (fun c -> all_lemmas_ := c :: !all_lemmas_);
+      Signal.once Signals.on_exit (fun _ -> show_lemmas ());
+    );
     (* be sure there is an initial valuation *)
     ignore (Sat.check());
     (* meta lemmas *)
@@ -338,11 +423,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     ()
 end
 
-let key = Flex_state.create_key ()
-
-let get_env (module E : Env.S) : (module S) = E.flex_get key
+let get_env (module E : Env.S) : (module S) = E.flex_get k_avatar
 
 let enabled_ = ref true
+let show_lemmas_ = ref false
 
 let extension =
   let action env =
@@ -351,7 +435,8 @@ let extension =
     let module Sat = Sat_solver.Make(struct end) in
     Sat.setup();
     let module A = Make(E)(Sat) in
-    E.update_flex_state (Flex_state.add key (module A : S));
+    E.flex_add k_avatar (module A : S);
+    E.flex_add k_show_lemmas !show_lemmas_;
     if !enabled_ then (
       Util.debug 1 "enable Avatar";
       A.register()
@@ -363,4 +448,5 @@ let () =
   Params.add_opts
   [ "--avatar", Arg.Set enabled_, " enable Avatar"
   ; "--no-avatar", Arg.Clear enabled_, " disable Avatar"
+  ; "--show-lemmas", Arg.Set show_lemmas_, " show status of lemmas"
   ]

@@ -32,6 +32,7 @@ type statement_view =
   | Rewrite of term
   | Data of data list
   | Assert of form
+  | Lemma of form
   | Goal of form
 
 type statement = {
@@ -50,6 +51,7 @@ let def ?loc ?attrs n ty t = make_ ?loc ?attrs (Def (n,ty,t))
 let rewrite ?loc ?attrs t = make_ ?loc ?attrs (Rewrite t)
 let data ?loc ?attrs l = make_ ?loc ?attrs (Data l)
 let assert_ ?loc ?attrs t = make_ ?attrs ?loc (Assert t)
+let lemma ?loc ?attrs t = make_ ?attrs ?loc (Lemma t)
 let goal ?loc ?attrs t = make_ ?attrs ?loc (Goal t)
 
 let pp_attr out = function
@@ -89,6 +91,8 @@ let pp_statement out st =
       fpf out "@[<v>data%a@ %a@]." pp_attrs attrs (Util.pp_list ~sep:" and " pp_data) l
   | Assert f ->
       fpf out "@[<2>assert%a@ @[%a@]@]." pp_attrs attrs T.pp f
+  | Lemma f ->
+      fpf out "@[<2>lemma%a@ @[%a@]@]." pp_attrs attrs T.pp f
   | Goal f ->
       fpf out "@[<2>goal%a@ @[%a@]@]." pp_attrs attrs T.pp f
 

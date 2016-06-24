@@ -1,6 +1,9 @@
 include "nat.zf".
 val double : nat -> nat.
-assert forall (X:nat). (forall (Y:nat). ((plus X (s Y)) = (s (plus X Y)))).
 assert forall (X:nat). ((double (s X)) = (s (s (double X)))).
 assert (double z) = z.
+
+# NOTE: this lemma should help
+lemma forall (X:nat). (forall (Y:nat). ((plus X (s Y)) = (s (plus X Y)))).
+
 goal forall (X:nat). ((double X) = (plus X X)).

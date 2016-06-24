@@ -53,7 +53,12 @@ module type S = sig
   (** (maybe) rewrite a clause to a set of clauses.
       Must return [None] if the clause is unmodified *)
 
-  type clause_conversion_rule = Statement.clause_t -> C.t list option
+  type 'a conversion_result =
+    | CR_skip (** rule didn't fire *)
+    | CR_add of 'a (** add this to the result *)
+    | CR_return of 'a (** shortcut the remaining rules, return this *)
+
+  type clause_conversion_rule = Statement.clause_t -> C.t list conversion_result
   (** A hook to convert a particular statement into a list
       of clauses *)
 
@@ -120,6 +125,10 @@ module type S = sig
   (** Add a literal rewrite rule *)
 
   val add_generate : string -> generate_rule -> unit
+
+  val cr_skip : _ conversion_result
+  val cr_return : 'a -> 'a conversion_result
+  val cr_add : 'a -> 'a conversion_result
 
   val add_clause_conversion : clause_conversion_rule -> unit
 

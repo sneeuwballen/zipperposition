@@ -1,9 +1,12 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
+type proof_step = ProofStep.t
+type proof = ProofStep.of_
+
 type result =
   | Sat
-  | Unsat
+  | Unsat of proof
 
 exception WrongState of string
 
@@ -11,9 +14,6 @@ module type S = sig
   module Lit = BBox.Lit
 
   exception UndecidedLit
-
-  type proof_step = ProofStep.t
-  type proof = ProofStep.of_
 
   type clause = Lit.t list
 
@@ -40,7 +40,13 @@ module type S = sig
   val valuation_level : Lit.t -> bool * int
   (** Gives the value of a literal in the model, as well as its
       decision level. If decision level is 0, the literal has been proved,
-      rather than decided/propagated *)
+      rather than decided/propagated
+      @raise WrongState if the last result wasn't {!Sat} *)
+
+  val proved_at_0 : Lit.t -> bool option
+  (** If the literal has been propagated at decision level 0,
+      return its value (which does not depend on the model).
+      Otherwise return [None] *)
 
   val set_printer : Lit.t CCFormat.printer -> unit
   (** How to print literals? *)

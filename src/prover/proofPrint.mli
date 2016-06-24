@@ -11,11 +11,13 @@ val is_proof_of_false : t -> bool
 
 (** {2 Conversion to a graph of proofs} *)
 
+module Tbl : module type of ProofStep.PTbl
+
 val as_graph : (t, t * ProofStep.rule * t) CCGraph.t
 (** Get a graph of the proof *)
 
 val traverse :
-  ?traversed:unit ProofStep.Tbl.t ->
+  ?traversed:unit Tbl.t ->
   t ->
   t Sequence.t
 
@@ -28,7 +30,7 @@ val pp_notrec : t CCFormat.printer
 (** Non recursive printing on formatter *)
 
 val pp_tstp : t CCFormat.printer
-val pp_debug : t CCFormat.printer
+val pp_normal : t CCFormat.printer
 val pp : Options.print_format -> t CCFormat.printer
 (** Prints the proof according to the given input switch *)
 

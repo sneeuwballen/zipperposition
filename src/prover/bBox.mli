@@ -9,13 +9,13 @@
 
 val section : Libzipperposition.Util.Section.t
 
-type inductive_cst = Ind_cst.cst
-type inductive_case = Ind_cst.case
+type inductive_path = Ind_cst.path
 
 type payload = private
   | Fresh (* fresh literal with no particular payload *)
   | Clause_component of Literals.t
-  | Case of inductive_cst * inductive_case  (* [i = t] *)
+  | Lemma of Literals.t list
+  | Case of inductive_path (* branch in the induction tree *)
 
 module Lit : Bool_lit_intf.S with type payload = payload
 
@@ -31,13 +31,25 @@ val inject_lits : Literals.t -> t
     The boolean literal can be negative is the argument is a
     unary negative clause *)
 
-val inject_case : inductive_cst -> inductive_case -> t
+val inject_lemma : Literals.t list -> t
+(** Make a new literal from this list of clauses that we are going to cut
+    on. This is generative, meaning that calling it twice with the
+    same arguments will produce distinct literals. *)
+
+val inject_case : inductive_path -> t
 (** Inject [cst = case] *)
 
 val payload : t -> payload
+(** Obtain the payload of this boolean literal, that is, what the literal
+    represents *)
 
-val inductive_cst : t -> inductive_cst option
-(** Obtain the inductive constant from this boolean lit, if any *)
+val as_case : t -> inductive_path option
+(** If [payload t = Case p], then return [Some p], else return [None] *)
+
+val must_be_kept : t -> bool
+(** [must_be_kept lit] means that [lit] should survive in boolean splitting,
+    that is, that if [C <- lit, Gamma] then any clause derived from [C]
+    recursively will have [lit] in its trail. *)
 
 (** {2 Printers}
     Those printers print the content (injection) of a boolean literal, if any *)

@@ -14,13 +14,13 @@ module StringTbl = CCHashtbl.Make(struct
     let equal = CCString.equal
   end)
 
-type inductive_cst = Ind_cst.cst
-type inductive_case = Ind_cst.case
+type inductive_path = Ind_cst.path
 
 type payload =
   | Fresh (* fresh literal with no particular payload *)
   | Clause_component of Literals.t
-  | Case of inductive_cst * inductive_case
+  | Lemma of Literals.t list
+  | Case of inductive_path (* branch in the induction tree *)
 
 module Lit = Bool_lit.Make(struct
   type t = payload
@@ -32,23 +32,32 @@ type lit = t
 
 let dummy = Lit.dummy
 
+let payload_to_int_ = function
+  | Fresh -> 0
+  | Clause_component _ -> 1
+  | Case _ -> 2
+  | Lemma _ -> 3
+
 let compare_payload l1 l2 = match l1, l2 with
   | Fresh, Fresh -> 0
-  | Fresh, _  -> -1
-  | _, Fresh -> 1
   | Clause_component l1, Clause_component l2 -> Lits.compare l1 l2
-  | Case (l1,r1), Case (l2,r2) ->
-      CCOrd.(Ind_cst.cst_compare l1 l2 <?> (Ind_cst.case_compare, r1, r2))
-  | Clause_component _, Case _ -> 1
-  | Case _, Clause_component _ -> -1
+  | Lemma l1, Lemma l2 -> CCList.compare Lits.compare l1 l2
+  | Case p1, Case p2 -> Ind_cst.path_compare p1 p2
+  | Fresh, _
+  | Clause_component _, _
+  | Lemma _, _
+  | Case _, _ ->
+    CCInt.compare (payload_to_int_ l1) (payload_to_int_ l2)
 
 let pp_payload out = function
   | Fresh -> CCFormat.string out "<dummy>"
   | Clause_component lits ->
       Format.fprintf out "@<1>⟦@[<hv>%a@]@<1>⟧" Lits.pp lits
-  | Case (c, t) ->
-      Format.fprintf out "@<1>⟦@[<hv1>%a@ = @[%a@]@]@<1>⟧"
-        Ind_cst.pp_cst c Ind_cst.pp_case t
+  | Lemma lits_l ->
+      Format.fprintf out "@<1>⟦lemma @[<hv>%a@]@<1>⟧"
+        (Util.pp_list ~sep:" & " Lits.pp) lits_l
+  | Case p ->
+      Format.fprintf out "@<1>⟦@[<hv1>%a@]@<1>⟧" Ind_cst.pp_path p
 
 module FV = FeatureVector.Make(struct
     type t = Lits.t * payload * lit
@@ -60,11 +69,9 @@ module FV = FeatureVector.Make(struct
   end)
 
 module ICaseTbl = CCHashtbl.Make(struct
-    type t = inductive_cst * inductive_case
-    let equal (c1,t1) (c2,t2) = Ind_cst.cst_equal c1 c2 && Ind_cst.case_equal t1 t2
-    let hash_fun (c,t) h =
-      h |> CCHash.int_ (Ind_cst.cst_hash c) |> CCHash.int_ (Ind_cst.case_hash t)
-    let hash = CCHash.apply hash_fun
+    type t = inductive_path
+    let equal = Ind_cst.path_equal
+    let hash = Ind_cst.path_hash
   end)
 
 let _clause_set = ref (FV.empty()) (* FO lits -> blit *)
@@ -85,8 +92,9 @@ let save_ lit =
   | Clause_component lits ->
       (* be able to retrieve by lits *)
       _clause_set := FV.add !_clause_set (lits, payload, lit)
-  | Case (c, case) ->
-      ICaseTbl.add _case_set (c,case) (payload, lit)
+  | Lemma _ -> () (* no retrieval *)
+  | Case p ->
+      ICaseTbl.add _case_set p (payload, lit)
 
 (* clause -> boolean lit *)
 let inject_lits_ lits  =
@@ -118,23 +126,34 @@ let inject_lits_ lits  =
 let inject_lits lits =
   Util.with_prof prof_inject_lits inject_lits_ lits
 
-let inject_case c t =
+let inject_lemma l =
+  assert (l<>[]);
+  let t = Lit.make (Lemma l) in
+  t
+
+let inject_case p =
   try
-    let _, i = ICaseTbl.find _case_set (c,t) in
+    let _, i = ICaseTbl.find _case_set p in
     i
   with Not_found ->
-    let payload = Case (c, t) in
+    let payload = Case p in
     let t = Lit.make payload in
     save_ t;
     t
 
+let must_be_kept lit =
+  match Lit.payload (Lit.abs lit) with
+    | Fresh
+    | Clause_component _ -> false
+    | Lemma _
+    | Case _ -> true
+
+let as_case lit = match Lit.payload (Lit.abs lit) with
+  | Case p -> Some p
+  | _ -> None
+
 (* boolean lit -> payload *)
 let payload = Lit.payload
-
-let inductive_cst b = match payload b with
-  | Fresh
-  | Clause_component _ -> None
-  | Case (t, _) -> Some t
 
 let pp out i =
   if not (Lit.sign i) then Format.pp_print_string out "¬";

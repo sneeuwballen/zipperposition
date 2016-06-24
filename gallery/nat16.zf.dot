@@ -1,0 +1,130 @@
+digraph "unsat_graph" {
+  vertex_0 [color=red, label="[]", shape=box, style=filled];
+  vertex_0 -> vertex_1 [label="sat_resolution"];
+  vertex_1 [shape=box, label="⟦[q #nat_0]⟧", style=filled];
+  vertex_1 -> vertex_2 [label="sat_resolution"];
+  vertex_2 [shape=box, label="¬⟦[p #nat_0]⟧", style=filled];
+  vertex_2 -> vertex_3 [label="sat_resolution"];
+  vertex_3 [shape=box, label="¬⟦[p (s #nat_0)]⟧", style=filled];
+  vertex_3 -> vertex_4 [label="simpl_trail"];
+  vertex_4 [shape=box, label="⟦[zip_sk_0 = s #nat_0 for [[¬p ◇]], 
+                          [[¬q ◇]]]⟧", style=filled];
+  vertex_4 -> vertex_5 [label="sat_resolution"];
+  vertex_5 [shape=box, label="¬⟦[zip_sk_0 = z for [[¬p ◇]], 
+                     [[¬q ◇]]]⟧", style=filled];
+  vertex_5 -> vertex_6 [label="sat_resolution"];
+  vertex_6 [shape=box, label="¬⟦[zip_sk_0 = z for [[¬p ◇]], 
+                     [[¬q ◇]]]⟧ ⊔ ¬⟦[p z]⟧", style=filled];
+  vertex_6 -> vertex_7 [label="simplify"];
+  vertex_7 [color=orange, shape=box, label="[⊥] ← ⟦[zip_sk_0 = z for [[¬p ◇]], 
+                           [[¬q ◇]]]⟧ ⊓ ⟦[p z]⟧", style=filled];
+  vertex_7 -> vertex_8 [label="s_sup-"];
+  vertex_8 [shape=box, label="[¬p z] ← ⟦[zip_sk_0 = z for [[¬p ◇]], 
+                             [[¬q ◇]]]⟧", style=filled];
+  vertex_8 -> vertex_9 [label="min"];
+  vertex_9 [color=green, shape=box, label="[¬q zip_sk_0]", style=filled];
+  vertex_8 -> vertex_10 [label="min"];
+  vertex_10 [color=green, shape=box, label="[¬p zip_sk_0]", style=filled];
+  vertex_7 -> vertex_11 [label="s_sup-"];
+  vertex_11 [shape=box, label="[p z] ← ⟦[p z]⟧", style=filled];
+  vertex_11 -> vertex_12 [label="split"];
+  vertex_12 [color=yellow, shape=box, label="[p z ∨ q z]", style=filled];
+  vertex_5 -> vertex_13 [label="sat_resolution"];
+  vertex_13 [shape=box, label="¬⟦[zip_sk_0 = z for [[¬p ◇]], 
+                     [[¬q ◇]]]⟧ ⊔ ⟦[p z]⟧", style=filled];
+  vertex_13 -> vertex_14 [label="sat_resolution"];
+  vertex_14 [shape=box, label="⟦[q z]⟧ ⊔ ⟦[p z]⟧", style=filled];
+  vertex_14 -> vertex_12 [label="split"];
+  vertex_13 -> vertex_15 [label="sat_resolution"];
+  vertex_15 [shape=box, label="¬⟦[zip_sk_0 = z for [[¬p ◇]], 
+                     [[¬q ◇]]]⟧ ⊔ ¬⟦[q z]⟧", style=filled];
+  vertex_15 -> vertex_16 [label="simplify"];
+  vertex_16 [color=orange, shape=box, label="[⊥] ← ⟦[zip_sk_0 = z for [[¬p ◇]], 
+                           [[¬q ◇]]]⟧ ⊓ ⟦[q z]⟧", style=filled];
+  vertex_16 -> vertex_17 [label="s_sup-"];
+  vertex_17 [shape=box, label="[¬q z] ← ⟦[zip_sk_0 = z for [[¬p ◇]], 
+                             [[¬q ◇]]]⟧", style=filled];
+  vertex_17 -> vertex_9 [label="min"];
+  vertex_17 -> vertex_10 [label="min"];
+  vertex_16 -> vertex_18 [label="s_sup-"];
+  vertex_18 [shape=box, label="[q z] ← ⟦[q z]⟧", style=filled];
+  vertex_18 -> vertex_12 [label="split"];
+  vertex_4 -> vertex_19 [label="sat_resolution"];
+  vertex_19 [shape=box, label="⟦[zip_sk_0 = s #nat_0 for [[¬p ◇]], 
+                          [[¬q ◇]]]⟧ ⊔ 
+⟦[zip_sk_0 = z for [[¬p ◇]], 
+                   [[¬q ◇]]]⟧", style=filled];
+  vertex_19 -> vertex_9 [label="min"];
+  vertex_19 -> vertex_10 [label="min"];
+  vertex_3 -> vertex_20 [label="simpl_trail"];
+  vertex_20 [color=orange, shape=box, label="⊥
+  ← ⟦[zip_sk_0 = s #nat_0 for [[¬p ◇]], 
+                              [[¬q ◇]]]⟧ ⊓ ⟦[p (s #nat_0)]⟧", style=filled];
+  vertex_20 -> vertex_21 [label="simplify"];
+  vertex_21 [color=orange, shape=box, label="[⊥]
+  ← ⟦[zip_sk_0 = s #nat_0 for [[¬p ◇]], 
+                              [[¬q ◇]]]⟧ ⊓ ⟦[p (s #nat_0)]⟧", style=filled];
+  vertex_21 -> vertex_22 [label="s_sup-"];
+  vertex_22 [shape=box, label="[¬p (s #nat_0)] ← ⟦[zip_sk_0 = s #nat_0 for [[¬p ◇]], 
+                                             [[¬q ◇]]]⟧", style=filled];
+  vertex_22 -> vertex_9 [label="min"];
+  vertex_22 -> vertex_10 [label="min"];
+  vertex_21 -> vertex_23 [label="s_sup-"];
+  vertex_23 [shape=box, label="[p (s #nat_0)] ← ⟦[p (s #nat_0)]⟧", style=filled];
+  vertex_23 -> vertex_24 [label="split"];
+  vertex_24 [shape=box, label="[p (s #nat_0) ∨ ¬p #nat_0]", style=filled];
+  vertex_24 -> vertex_4 [label="simpl_trail"];
+  vertex_24 -> vertex_25 [label="simpl_trail"];
+  vertex_25 [shape=box, label="[p (s #nat_0) ∨ ¬p #nat_0]
+  ← ⟦[zip_sk_0 = s #nat_0 for [[¬p ◇]], 
+                              [[¬q ◇]]]⟧", style=filled];
+  vertex_25 -> vertex_26 [label="simplify"];
+  vertex_26 [shape=box, label="[¬p #nat_0 ∨ p (s #nat_0) ∨ ⊥]
+  ← ⟦[zip_sk_0 = s #nat_0 for [[¬p ◇]], 
+                              [[¬q ◇]]]⟧", style=filled];
+  vertex_26 -> vertex_27 [label="s_sup-"];
+  vertex_27 [shape=box, label="[¬q (s #nat_0)] ← ⟦[zip_sk_0 = s #nat_0 for [[¬p ◇]], 
+                                             [[¬q ◇]]]⟧", style=filled];
+  vertex_27 -> vertex_9 [label="min"];
+  vertex_27 -> vertex_10 [label="min"];
+  vertex_26 -> vertex_28 [label="s_sup-"];
+  vertex_28 [color=yellow, shape=box, label="forall (X14:nat). [p (s X14) ∨ q (s X14) ∨ ¬p X14]", style=filled];
+  vertex_2 -> vertex_29 [label="sat_resolution"];
+  vertex_29 [shape=box, label="¬⟦[p #nat_0]⟧ ⊔ ⟦[p (s #nat_0)]⟧", style=filled];
+  vertex_29 -> vertex_24 [label="split"];
+  vertex_1 -> vertex_30 [label="sat_resolution"];
+  vertex_30 [shape=box, label="⟦[q #nat_0]⟧ ⊔ ⟦[p #nat_0]⟧", style=filled];
+  vertex_30 -> vertex_4 [label="sat_resolution"];
+  vertex_30 -> vertex_31 [label="sat_resolution"];
+  vertex_31 [shape=box, label="¬⟦[zip_sk_0 = s #nat_0 for [[¬p ◇]], 
+                            [[¬q ◇]]]⟧ ⊔ 
+⟦[q #nat_0]⟧ ⊔ 
+⟦[p #nat_0]⟧", style=filled];
+  vertex_31 -> vertex_32 [label="split"];
+  vertex_32 [shape=box, label="[q #nat_0 ∨ p #nat_0]
+  ← ⟦[zip_sk_0 = s #nat_0 for [[¬p ◇]], 
+                              [[¬q ◇]]]⟧", style=filled];
+  vertex_32 -> vertex_9 [label="min"];
+  vertex_32 -> vertex_10 [label="min"];
+  vertex_0 -> vertex_33 [label="sat_resolution"];
+  vertex_33 [shape=box, label="¬⟦[q #nat_0]⟧", style=filled];
+  vertex_33 -> vertex_3 [label="sat_resolution"];
+  vertex_33 -> vertex_34 [label="sat_resolution"];
+  vertex_34 [shape=box, label="¬⟦[q #nat_0]⟧ ⊔ ⟦[p (s #nat_0)]⟧", style=filled];
+  vertex_34 -> vertex_35 [label="split"];
+  vertex_35 [shape=box, label="[p (s #nat_0) ∨ ¬q #nat_0]", style=filled];
+  vertex_35 -> vertex_4 [label="simpl_trail"];
+  vertex_35 -> vertex_36 [label="simpl_trail"];
+  vertex_36 [shape=box, label="[p (s #nat_0) ∨ ¬q #nat_0]
+  ← ⟦[zip_sk_0 = s #nat_0 for [[¬p ◇]], 
+                              [[¬q ◇]]]⟧", style=filled];
+  vertex_36 -> vertex_37 [label="simplify"];
+  vertex_37 [shape=box, label="[¬q #nat_0 ∨ p (s #nat_0) ∨ ⊥]
+  ← ⟦[zip_sk_0 = s #nat_0 for [[¬p ◇]], 
+                              [[¬q ◇]]]⟧", style=filled];
+  vertex_37 -> vertex_27 [label="s_sup-"];
+  vertex_37 -> vertex_38 [label="s_sup-"];
+  vertex_38 [color=yellow, shape=box, label="forall (X14:nat). [p (s X14) ∨ q (s X14) ∨ ¬q X14]", style=filled];
+  }
+
+

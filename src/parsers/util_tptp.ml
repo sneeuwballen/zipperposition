@@ -178,17 +178,24 @@ let has_includes decls =
 
 module UA = UntypedAST
 
-let is_conjecture_ = function
-  | A.R_conjecture -> true
-  | _ -> false
-
 let to_ast st =
   let conv_form name role f =
     let name = A.string_of_name name in
     let attrs = [UA.A_name name] in
-    if is_conjecture_ role
-    then UA.goal ~attrs f
-    else UA.assert_ ~attrs f
+    match role with
+      | A.R_question 
+      | A.R_conjecture -> UA.goal ~attrs f
+      | A.R_negated_conjecture -> UA.goal ~attrs (PT.not_ f)
+      | A.R_lemma -> UA.lemma ~attrs f
+      | A.R_axiom 
+      | A.R_hypothesis 
+      | A.R_definition 
+      | A.R_assumption 
+      | A.R_theorem 
+      | A.R_plain 
+      | A.R_finite _
+      | A.R_type 
+      | A.R_unknown  -> UA.assert_ ~attrs f
   in
   match st with
   | A.Include _
@@ -225,4 +232,5 @@ let of_ast st =
   | UA.Data _ -> error "cannot convert `data` statement into TPTP"
   | UA.Goal f -> A.TFF (name, A.R_conjecture, f, [])
   | UA.Assert f -> A.TFF (name, A.R_axiom, f, [])
+  | UA.Lemma f -> A.TFF (name, A.R_lemma, f, [])
 

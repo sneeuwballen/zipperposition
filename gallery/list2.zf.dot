@@ -1,0 +1,73 @@
+digraph "unsat_graph" {
+  vertex_0 [color=red, label="[]", shape=box, style=filled];
+  vertex_0 -> vertex_1 [label="simplify", dir="back"];
+  vertex_1 [color=red, label="[]", shape=box, style=filled];
+  vertex_1 -> vertex_2 [label="demod", dir="back"];
+  vertex_2 [shape=box, label="[p #nat_4]", style=filled];
+  vertex_2 -> vertex_3 [label="simpl_trail", dir="back"];
+  vertex_3 [shape=box, label="⟦[#nat_0 = s #nat_4 for [[¬p ◇]]]⟧", style=filled];
+  vertex_3 -> vertex_4 [label="sat_resolution", dir="back"];
+  vertex_4 [shape=box, label="¬⟦[#nat_0 = z for [[¬p ◇]]]⟧", style=filled];
+  vertex_4 -> vertex_5 [label="simplify", dir="back"];
+  vertex_5 [color=orange, shape=box, label="[⊥] ← ⟦[#nat_0 = z for [[¬p ◇]]]⟧", style=filled];
+  vertex_5 -> vertex_6 [label="demod", dir="back"];
+  vertex_6 [color=yellow, shape=box, label="[p z]", style=filled];
+  vertex_5 -> vertex_7 [label="demod", dir="back"];
+  vertex_7 [shape=box, label="[¬p z] ← ⟦[#nat_0 = z for [[¬p ◇]]]⟧", style=filled];
+  vertex_7 -> vertex_8 [label="min", dir="back"];
+  vertex_8 [shape=box, label="[¬p #nat_0]", style=filled];
+  vertex_8 -> vertex_9 [label="simplify", dir="back"];
+  vertex_9 [shape=box, label="[⊥ ∨ ¬p #nat_0 ∨ ⊥]", style=filled];
+  vertex_9 -> vertex_10 [label="demod", dir="back"];
+  vertex_10 [shape=box, label="[q #list_1]", style=filled];
+  vertex_10 -> vertex_11 [label="simpl_trail", dir="back"];
+  vertex_11 [shape=box, label="⟦[zip_sk_0 = cons #nat_0 #list_1 for [[¬q ◇]]]⟧", style=filled];
+  vertex_11 -> vertex_12 [label="sat_resolution", dir="back"];
+  vertex_12 [shape=box, label="¬⟦[zip_sk_0 = nil for [[¬q ◇]]]⟧", style=filled];
+  vertex_12 -> vertex_13 [label="simplify", dir="back"];
+  vertex_13 [color=orange, shape=box, label="[⊥] ← ⟦[zip_sk_0 = nil for [[¬q ◇]]]⟧", style=filled];
+  vertex_13 -> vertex_14 [label="demod", dir="back"];
+  vertex_14 [color=yellow, shape=box, label="[q nil]", style=filled];
+  vertex_13 -> vertex_15 [label="demod", dir="back"];
+  vertex_15 [shape=box, label="[¬q nil] ← ⟦[zip_sk_0 = nil for [[¬q ◇]]]⟧", style=filled];
+  vertex_15 -> vertex_16 [label="min", dir="back"];
+  vertex_16 [color=green, shape=box, label="[¬q zip_sk_0]", style=filled];
+  vertex_11 -> vertex_17 [label="sat_resolution", dir="back"];
+  vertex_17 [shape=box, label="⟦[zip_sk_0 = cons #nat_0 #list_1 for [[¬q ◇]]]⟧ ⊔ 
+⟦[zip_sk_0 = nil for [[¬q ◇]]]⟧", style=filled];
+  vertex_17 -> vertex_16 [label="min", dir="back"];
+  vertex_10 -> vertex_18 [label="simpl_trail", dir="back"];
+  vertex_18 [shape=box, label="[q #list_1] ← ⟦[zip_sk_0 = cons #nat_0 #list_1 for [[¬q ◇]]]⟧", style=filled];
+  vertex_18 -> vertex_16 [label="min", dir="back"];
+  vertex_9 -> vertex_19 [label="demod", dir="back"];
+  vertex_19 [shape=box, label="[¬q #list_1 ∨ ¬p #nat_0 ∨ ⊥]", style=filled];
+  vertex_19 -> vertex_20 [label="s_sup-", dir="back"];
+  vertex_20 [shape=box, label="[¬q (cons #nat_0 #list_1)]", style=filled];
+  vertex_20 -> vertex_11 [label="simpl_trail", dir="back"];
+  vertex_20 -> vertex_21 [label="simpl_trail", dir="back"];
+  vertex_21 [shape=box, label="[¬q (cons #nat_0 #list_1)]
+  ← ⟦[zip_sk_0 = cons #nat_0 #list_1 for [[¬q ◇]]]⟧", style=filled];
+  vertex_21 -> vertex_16 [label="min", dir="back"];
+  vertex_19 -> vertex_22 [label="s_sup-", dir="back"];
+  vertex_22 [color=yellow, shape=box, label="forall (X48:nat) (X49:list). [¬p X48 ∨ ¬q X49 ∨ q (cons X48 X49)]", style=filled];
+  vertex_3 -> vertex_23 [label="sat_resolution", dir="back"];
+  vertex_23 [shape=box, label="⟦[#nat_0 = z for [[¬p ◇]]]⟧ ⊔ ⟦[#nat_0 = s #nat_4 for [[¬p ◇]]]⟧", style=filled];
+  vertex_23 -> vertex_8 [label="min", dir="back"];
+  vertex_2 -> vertex_24 [label="simpl_trail", dir="back"];
+  vertex_24 [shape=box, label="[p #nat_4] ← ⟦[#nat_0 = s #nat_4 for [[¬p ◇]]]⟧", style=filled];
+  vertex_24 -> vertex_8 [label="min", dir="back"];
+  vertex_1 -> vertex_25 [label="demod", dir="back"];
+  vertex_25 [shape=box, label="[¬p #nat_4]", style=filled];
+  vertex_25 -> vertex_26 [label="simplify", dir="back"];
+  vertex_26 [shape=box, label="[¬p #nat_4 ∨ ⊥]", style=filled];
+  vertex_26 -> vertex_27 [label="s_sup-", dir="back"];
+  vertex_27 [shape=box, label="[¬p (s #nat_4)]", style=filled];
+  vertex_27 -> vertex_3 [label="simpl_trail", dir="back"];
+  vertex_27 -> vertex_28 [label="simpl_trail", dir="back"];
+  vertex_28 [shape=box, label="[¬p (s #nat_4)] ← ⟦[#nat_0 = s #nat_4 for [[¬p ◇]]]⟧", style=filled];
+  vertex_28 -> vertex_8 [label="min", dir="back"];
+  vertex_26 -> vertex_29 [label="s_sup-", dir="back"];
+  vertex_29 [color=yellow, shape=box, label="forall (X47:nat). [p (s X47) ∨ ¬p X47]", style=filled];
+  }
+
+

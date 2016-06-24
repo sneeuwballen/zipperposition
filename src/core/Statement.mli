@@ -34,6 +34,7 @@ type ('f, 't, 'ty) view =
   | RewriteTerm of ID.t * 'ty * 't list * 't (* args, rhs *)
   | RewriteForm of 't SLiteral.t * 'f list (* lhs atomic form, rhs conjunction *)
   | Assert of 'f (** assert form *)
+  | Lemma of 'f list (** lemma to prove and use, using Avatar cut *)
   | Goal of 'f (** goal to prove *)
   | NegatedGoal of 'f list (** goal after negation *)
 
@@ -60,6 +61,7 @@ val rewrite_term : ?attrs:attrs -> src:'src -> ID.t -> 'ty -> 't list -> 't -> (
 val rewrite_form : ?attrs:attrs -> src:'src -> 't SLiteral.t -> 'f list -> ('f, 't, _, 'src) t
 val data : ?attrs:attrs -> src:'src -> 'ty data list -> (_, _, 'ty, 'src) t
 val assert_ : ?attrs:attrs -> src:'src -> 'f -> ('f, _, _, 'src) t
+val lemma : ?attrs:attrs -> src:'src -> 'f list -> ('f, _, _, 'src) t
 val goal : ?attrs:attrs -> src:'src -> 'f -> ('f, _, _, 'src) t
 val neg_goal : ?attrs:attrs -> src:'src -> 'f list -> ('f, _, _, 'src) t
 

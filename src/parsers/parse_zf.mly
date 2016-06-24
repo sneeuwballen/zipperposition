@@ -57,6 +57,7 @@
 %token VAL
 %token GOAL
 %token REWRITE
+%token LEMMA
 %token INCLUDE
 
 %token ARROW
@@ -247,6 +248,11 @@ statement:
     {
       let loc = L.mk_pos $startpos $endpos in
       A.assert_ ~attrs:a ~loc t
+    }
+  | LEMMA a=attrs t=term DOT
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      A.lemma ~attrs:a ~loc t
     }
   | GOAL a=attrs t=term DOT
     {

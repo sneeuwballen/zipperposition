@@ -87,7 +87,12 @@ module Make(X : sig
   (** (maybe) rewrite a clause to a set of clauses.
       Must return [None] if the clause is unmodified *)
 
-  type clause_conversion_rule = Statement.clause_t -> C.t list option
+  type 'a conversion_result =
+    | CR_skip (** rule didn't fire *)
+    | CR_add of 'a (** add this to the result *)
+    | CR_return of 'a (** shortcut the remaining rules, return this *)
+
+  type clause_conversion_rule = Statement.clause_t -> C.t list conversion_result
   (** A hook to convert a particular statement into a list
       of clauses *)
 
@@ -191,6 +196,10 @@ module Make(X : sig
 
   let add_multi_simpl_rule rule =
     _multi_simpl_rule := rule :: !_multi_simpl_rule
+
+  let cr_skip = CR_skip
+  let cr_add x = CR_add x
+  let cr_return x = CR_return x
 
   let add_clause_conversion r =
     _clause_conversion_rules := r :: !_clause_conversion_rules
@@ -679,16 +688,24 @@ module Make(X : sig
 
   let step_init () = List.iter (fun f -> f()) !_step_init
 
+  let is_lemma_ st = match Statement.view st with
+    | Statement.Lemma _ -> true
+    | _ -> false
+
   let convert_input_statements stmts =
     Util.debug ~section 2 "trigger on_input_statement";
     CCVector.iter (Signal.send on_input_statement) stmts;
     (* convert clauses, applying hooks when possible *)
     let rec conv_clause_ rules st = match rules with
+      | [] when is_lemma_ st ->
+        Util.warnf "@[drop lemma `%a`@]" Statement.pp_clause st;
+        []
       | [] -> C.of_statement st
       | r :: rules' ->
           match r st with
-          | Some l -> l
-          | None -> conv_clause_ rules' st
+            | CR_skip -> conv_clause_ rules' st
+            | CR_return l -> l
+            | CR_add l -> List.rev_append l (conv_clause_ rules' st)
     in
     let clauses =
       CCVector.flat_map_list (conv_clause_ !_clause_conversion_rules) stmts in

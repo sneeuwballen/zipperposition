@@ -10,9 +10,11 @@ assert forall (N:nat). ((p (s N)) = (plus (p N) (x N))).
 val q : nat -> nat.
 assert (q z) = z.
 assert forall (N:nat). ((q (s N)) = (plus (x N) (q N))).
-assert
+
+lemma 
   forall (X:nat).
     (forall (Y:nat).
        (forall (Z:nat). ((plus X (plus Y Z)) = (plus (plus X Y) Z)))).
-assert forall (N1:nat). (forall (N2:nat). ((plus N1 N2) = (plus N2 N1))).
+lemma forall (N1:nat). (forall (N2:nat). ((plus N1 N2) = (plus N2 N1))).
+
 goal forall (N:nat). ((p N) = (q N)).

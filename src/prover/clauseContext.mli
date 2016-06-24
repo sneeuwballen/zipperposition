@@ -19,10 +19,13 @@ type subst = Substs.t
 type t = private {
   lits : Literals.t;
   var : FOTerm.var;
+  mutable hash: int;
 }
 
 val compare : t -> t -> int
 val equal : t -> t -> bool
+val hash : t -> int
+val hash_fun : t CCHash.hash_fun
 
 val make : Literals.t -> var:FOTerm.var -> t
 (** Make a context from a var and literals containing this var.
