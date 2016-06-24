@@ -1,4 +1,10 @@
 include "nat.zf".
+
+# p(n) & q(n) => q(n+1)
+# p(n) & q(n+1) => p(n+1)
+# p0 et q0
+# prove:  !n: p(n)
+
 val p : nat -> prop.
 val q : nat -> prop.
 assert p z.

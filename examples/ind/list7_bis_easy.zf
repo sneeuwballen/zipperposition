@@ -1,0 +1,26 @@
+
+include "nat.zf".
+include "list.zf".
+
+val rev2 : list -> list.
+val rev_append : list -> list -> list.
+
+assert
+  forall (X:nat).
+    forall (L1:list).
+       forall (L2:list).
+          rev_append (cons X L1) L2 = rev_append L1 (cons X L2).
+
+assert forall (L:list). rev_append nil L = L.
+
+assert forall (L:list). rev2 L = rev_append L nil.
+
+# NOTE: introduce explicit lemmas
+
+lemma forall L. append L nil = L.
+
+lemma
+  forall L1 L2 L3.
+    rev_append (rev_append L1 L2) L3 = rev_append L2 (append L1 L3).
+
+goal forall (L:list). rev2 (rev2 L) = L.
