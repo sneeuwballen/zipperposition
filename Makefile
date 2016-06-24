@@ -90,6 +90,9 @@ watch:
 		make $(WATCH); \
 	done
 
+gallery.svg:
+	for i in gallery/*.dot ; do dot -Tsvg "$$i" > "gallery/`basename $${i} .dot`.svg" ; done
+
 clean-generated:
 	rm myocamlbuild.ml || true
 	find \( -name '*.mldylib' -or -name '*.mlpack' \
