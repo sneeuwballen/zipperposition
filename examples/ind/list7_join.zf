@@ -1,0 +1,20 @@
+# correlate "rev" and "rev_append"
+
+include "list.zf".
+
+val rev_append : list -> list -> list.
+
+assert
+  forall (X:nat).
+    forall (L1:list).
+       forall (L2:list).
+          rev_append (cons X L1) L2 = rev_append L1 (cons X L2).
+
+assert forall (L:list). rev_append nil L = L.
+
+lemma forall L. append L nil = L.
+lemma forall L1 L2 L2. append L1 (append L2 L3) = append (append L1 L2) L3.
+lemma forall L1 X L2. append (append L1 (cons X nil)) L2 = append L1 (cons X L2).
+lemma forall L1 L2. rev (append L1 L2) = append (rev L2) (rev L1).
+
+goal forall L1 L2. rev_append L1 L2 = append (rev L1) L2.

@@ -1,0 +1,18 @@
+
+include "list.zf".
+
+# not trivial! proof of `a+b=b+a` is not so easy
+
+val sum : list -> nat.
+assert (sum nil) = z.
+assert
+  forall (N:nat). (forall (L:list). ((sum (cons N L)) = (plus N (sum L)))).
+
+lemma forall X. plus X z = X.
+lemma forall X Y Z. plus X (plus Y Z) = plus (plus X Y) Z.
+assert forall X Y. plus X Y = plus Y X. # NOTE: proof too deep otherwise
+lemma forall L1 X L2. append (append L1 (cons X nil)) L2 = append L1 (cons X L2).
+lemma forall L1 L2. sum (append L1 L2) = plus (sum L1) (sum L2).
+
+goal forall (L:list). ((sum (rev L)) = (sum L)).
+
