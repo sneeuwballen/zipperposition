@@ -24,7 +24,8 @@ module type S = sig
   val check_satisfiability : E.generate_rule
   (** Checks  that the SAT context is still valid *)
 
-  type cut_res = {
+  type cut_res = private {
+    cut_src: Literals.t list ; (** the lemma itself *)
     cut_pos: E.C.t list; (** clauses true if lemma is true *)
     cut_neg: E.C.t list; (** clauses true if lemma is false *)
     cut_lit: BLit.t; (** lit that is true if lemma is true *)
@@ -32,6 +33,9 @@ module type S = sig
 
   val pp_cut_res : cut_res CCFormat.printer
   val cut_res_clauses: cut_res -> E.C.t Sequence.t
+
+  val print_lemmas : unit CCFormat.printer
+  (** print the current list of lemmas, and their status *)
 
   val introduce_cut :
     Literals.t list ->

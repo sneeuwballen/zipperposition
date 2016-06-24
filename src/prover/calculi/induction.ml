@@ -18,8 +18,6 @@ let stats_lemmas = Util.mk_stat "induction.lemmas"
 let stats_min = Util.mk_stat "induction.assert_min"
 
 let k_enable : bool Flex_state.key = Flex_state.create_key()
-let k_lemmas_enabled : bool Flex_state.key = Flex_state.create_key()
-let k_show_lemmas : bool Flex_state.key = Flex_state.create_key()
 let k_ind_depth : int Flex_state.key = Flex_state.create_key()
 
 (* TODO
@@ -156,8 +154,6 @@ module Make
   module BoolBox = BBox
   module BoolLit = BoolBox.Lit
 
-  let lemmas_ = ref []
-
   let is_ind_conjecture_ c =
     match C.distance_to_goal c with
     | Some (0 | 1) -> true
@@ -166,13 +162,6 @@ module Make
 
   let has_pos_lit_ c =
     CCArray.exists Literal.is_pos (C.lits c)
-
-  let is_acceptable_lemma lits =
-    (* not too deep *)
-    Lits.Seq.terms lits
-    |> Sequence.map T.depth
-    |> Sequence.max
-    |> CCOpt.map_or ~default:true (fun d -> d < 5)
 
   (* terms that are either inductive constants or sub-constants *)
   let constants_or_sub c =
@@ -215,80 +204,6 @@ module Make
       let v = T.var_of_int ~ty !r in
       incr r;
       v
-
-  (* FIXME:
-     - use better generalization?
-     - fix typing issues, if any remains *)
-
-  (* TODO: split this into:
-   - regular (nested) induction rule
-   - heuristic to guess non trivial lemmas (i.e. exclusively with
-     non obvious generalization, other cases are handled by the regular
-     rule); this part is guarded by --lemmas *)
-
-  (* when a unit clause has inductive constants, take its negation
-      and add it as a lemma (some restrictions apply) *)
-  let inf_introduce_lemmas c =
-    let ind_csts = constants_or_sub c in
-    let generalize ~on lit =
-      let mk_fresh_var_ = fresh_var_gen_ () in
-      (* abstract w.r.t all those constants (including the term
-         being generalized). The latter must occur first, as it
-         might contain constants being replaced. *)
-      let replacements =
-        List.map
-          (fun c -> Ind_cst.cst_to_term c, mk_fresh_var_ (Ind_cst.cst_ty c))
-          (on @ ind_csts)
-      in
-      (* replace constants by variables in [lit], then
-         let [c] be [forall... (not lit)] *)
-      let lit =
-        lit
-        |> Literal.map (replace_many replacements)
-        |> Literal.negate
-      in
-      let lits = [| lit |] in
-      (* if [box lits] already exists or is too deep, no need to re-do inference *)
-      if not (is_acceptable_lemma lits)
-      then []
-      else (
-        (* introduce cut now *)
-        let proof = ProofStep.mk_trivial in
-        let cut = A.introduce_cut [lits] proof in
-        let clauses = A.cut_res_clauses cut |> Sequence.to_rev_list in
-        Util.incr_stat stats_lemmas;
-        Util.debugf ~section 2
-          "@[<2>introduce cut@ from %a@ @[<hv0>%a@]@ generalizing on @[%a@]@]"
-          (fun k->k C.pp c (Util.pp_list C.pp) clauses
-              (Util.pp_list Ind_cst.pp_cst) on);
-        lemmas_ :=
-          List.rev_append (List.rev_map C.to_sclause clauses) !lemmas_;
-        clauses
-      )
-    in
-    if C.is_ground c
-    && not (is_ind_conjecture_ c)
-    && not (C.get_flag Avatar.flag_cut_introduced c)
-    && C.is_unit_clause c
-    && not (has_pos_lit_ c) (* only positive lemmas, therefore C negative *)
-    && not (CCList.is_empty ind_csts) (* && not (T.Set.for_all CI.is_inductive set) *)
-    then (
-      assert (Array.length (C.lits c) = 1);
-      let lit = (C.lits c).(0) in
-      let terms = generalizable_subterms c in
-      (* TODO: keep even composite terms as long as they start
-         with uninterpreted symbol *)
-      let consts = CCList.filter_map Ind_cst.cst_of_term terms in
-      (* first, lemma without generalization;
-          then, each possible way to generalize a subterm occurring multiple times *)
-      List.rev_append
-        (generalize ~on:[] lit)
-        (CCList.flat_map (fun c -> generalize ~on:[c] lit) consts)
-    ) else []
-
-  let show_lemmas () =
-    Util.debugf ~section 1 "@[<2>lemmas:@ [@[<hv>%a@]]@]"
-      (fun k->k (Util.pp_list SClause.pp) !lemmas_)
 
   (* scan terms for inductive constants *)
   let scan_terms seq : Ind_cst.cst list =
@@ -396,7 +311,7 @@ module Make
            (* all new clauses *)
            let res = List.rev_append pos_clauses neg_clauses in
            Util.debugf ~section 2
-             "@[<2>minimality of %a@ in case %a:@ @[<hv>%a@]@]"
+             "@[<2>minimality of `%a`@ in case `%a`:@ @[<hv>%a@]@]"
              (fun k->k Ind_cst.pp_cst mw.mw_cst T.pp (Ind_cst.case_to_term case)
                  (Util.pp_list C.pp) res);
            Sequence.of_list res)
@@ -488,6 +403,8 @@ module Make
   (* clauses when we do induction on [cst] *)
   let induction_on_ ?(trail=Trail.empty) (clauses:C.t list) ~cst : C.t list =
     decl_cst_ cst;
+    Util.debugf ~section 1 "@[<2>perform induction on `%a`@ in `@[%a@]`@]"
+      (fun k->k Ind_cst.pp_cst cst (Util.pp_list C.pp) clauses);
     (* keep only clauses that depend on [cst] *)
     let ctxs =
       CCList.filter_map
@@ -574,11 +491,6 @@ module Make
       (fun cst ->
          Ind_cst.declarations_of_cst cst
          |> Sequence.iter (CCFun.uncurry Ctx.declare));
-    (* add lemmas if option is set *)
-    if Env.flex_get k_lemmas_enabled
-      then Env.add_unary_inf "induction.cut" inf_introduce_lemmas;
-    if Env.flex_get k_show_lemmas
-      then Signal.once Signals.on_exit (fun _ -> show_lemmas ());
     ()
 
   module Meta = struct
@@ -613,8 +525,6 @@ module Make
 end
 
 let enabled_ = ref true
-let lemmas_enabled_ = ref false
-let show_lemmas_ = ref false
 let depth_ = ref !Ind_cst.max_depth_
 let dot_ind_tree_ = ref ""
 
@@ -643,8 +553,6 @@ let post_typing_hook stmts state =
     state
     |> Flex_state.add Params.key p
     |> Flex_state.add k_enable true
-    |> Flex_state.add k_lemmas_enabled !lemmas_enabled_
-    |> Flex_state.add k_show_lemmas !show_lemmas_
     |> Flex_state.add k_ind_depth !depth_
     |> Flex_state.add Ctx.Key.lost_completeness true
   ) else Flex_state.add k_enable false state
@@ -682,11 +590,6 @@ let () =
   Params.add_opts
     [ "--induction", Options.switch_set true enabled_, " enable induction"
     ; "--no-induction", Options.switch_set false enabled_, " enable induction"
-    (* FIXME: remove this; it should belong to aVatar;
-    also an option to display the status of input lemmas according to their box (level 0 in msat?) *)
-    ; "--lemmas", Options.switch_set true lemmas_enabled_, " enable lemmas for induction"
-    ; "--no-lemmas", Options.switch_set false lemmas_enabled_, " disable lemmas for induction"
-    ; "--show-lemmas", Arg.Set show_lemmas_, " show inductive (candidate) lemmas"
     ; "--induction-depth", Arg.Set_int depth_, " maximum depth of nested induction"
     ; "--dot-induction-tree", Arg.Set_string dot_ind_tree_, " output induction tree in given file"
     ]

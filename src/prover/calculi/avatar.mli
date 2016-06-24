@@ -27,7 +27,7 @@ module Make
   with module E = E
    and module Solver = Sat
 
-val key : (module S) Flex_state.key
+val k_avatar : (module S) Flex_state.key
 
 val get_env : (module Env.S) -> (module S)
 

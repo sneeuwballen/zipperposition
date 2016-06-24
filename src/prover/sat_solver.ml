@@ -194,6 +194,10 @@ module Make(Dummy : sig end)
       | Some p -> conv_proof_ p
       | None -> assert false
 
+  let proved_at_0 lit =
+    let b,l = S.eval_level lit in
+    if l=0 then Some b else None
+
   (* call [S.solve()] in any case, and enforce invariant about eval/unsat_core *)
   let check_unconditional_ () =
     (* reset functions, so they will fail if called in the wrong state *)

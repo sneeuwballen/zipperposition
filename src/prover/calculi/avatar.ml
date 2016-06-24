@@ -26,6 +26,9 @@ let flag_cut_introduced = SClause.new_flag()
 
 module type S = Avatar_intf.S
 
+let k_avatar : (module S) Flex_state.key = Flex_state.create_key ()
+let k_show_lemmas : bool Flex_state.key = Flex_state.create_key()
+
 module Make(E : Env.S)(Sat : Sat_solver.S)
 = struct
   module E = E
@@ -224,6 +227,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     id
 
   type cut_res = {
+    cut_src: Literals.t list ; (** the lemma itself *)
     cut_pos: E.C.t list; (** clauses true if lemma is true *)
     cut_neg: E.C.t list; (** clauses true if lemma is false *)
     cut_lit: BLit.t; (** lit that is true if lemma is true *)
@@ -294,12 +298,31 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
            C.set_flag flag_cut_introduced c true;
            c)
     in
-    { cut_pos=c_pos;
+    { cut_src=clauses;
+      cut_pos=c_pos;
       cut_neg=c_neg;
       cut_lit=box;
     }
 
   let on_input_lemma : cut_res Signal.t = Signal.create ()
+
+  let all_lemmas_ = ref []
+
+  let print_lemmas out () =
+    let pp_lemma out c =
+      let status = match Sat.proved_at_0 c.cut_lit with
+        | None -> "unknown"
+        | Some true -> "proved"
+        | Some false -> "refuted"
+      in
+      Format.fprintf out "@[<hv>@{<Green>*@} %s %a@]"
+        status (Util.pp_list Literals.pp) c.cut_src
+    in
+    Format.fprintf out "@[<hv2>lemmas: {@ %a@,@]}"
+      (Util.pp_list pp_lemma) !all_lemmas_;
+    ()
+
+  let show_lemmas () = Format.printf "%a@." print_lemmas ()
 
   let convert_lemma st = match Statement.view st with
     | Statement.Lemma l ->
@@ -374,6 +397,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     E.add_clause_conversion convert_lemma;
     E.add_is_trivial trail_is_trivial;
     E.add_simplify simplify_trail;
+    if E.flex_get k_show_lemmas then (
+      Signal.on_every on_input_lemma (fun c -> all_lemmas_ := c :: !all_lemmas_);
+      Signal.once Signals.on_exit (fun _ -> show_lemmas ());
+    );
     (* be sure there is an initial valuation *)
     ignore (Sat.check());
     (* meta lemmas *)
@@ -396,11 +423,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     ()
 end
 
-let key = Flex_state.create_key ()
-
-let get_env (module E : Env.S) : (module S) = E.flex_get key
+let get_env (module E : Env.S) : (module S) = E.flex_get k_avatar
 
 let enabled_ = ref true
+let show_lemmas_ = ref false
 
 let extension =
   let action env =
@@ -409,7 +435,8 @@ let extension =
     let module Sat = Sat_solver.Make(struct end) in
     Sat.setup();
     let module A = Make(E)(Sat) in
-    E.update_flex_state (Flex_state.add key (module A : S));
+    E.flex_add k_avatar (module A : S);
+    E.flex_add k_show_lemmas !show_lemmas_;
     if !enabled_ then (
       Util.debug 1 "enable Avatar";
       A.register()
@@ -421,4 +448,5 @@ let () =
   Params.add_opts
   [ "--avatar", Arg.Set enabled_, " enable Avatar"
   ; "--no-avatar", Arg.Clear enabled_, " disable Avatar"
+  ; "--show-lemmas", Arg.Set show_lemmas_, " show status of lemmas"
   ]

@@ -688,11 +688,18 @@ module Make(X : sig
 
   let step_init () = List.iter (fun f -> f()) !_step_init
 
+  let is_lemma_ st = match Statement.view st with
+    | Statement.Lemma _ -> true
+    | _ -> false
+
   let convert_input_statements stmts =
     Util.debug ~section 2 "trigger on_input_statement";
     CCVector.iter (Signal.send on_input_statement) stmts;
     (* convert clauses, applying hooks when possible *)
     let rec conv_clause_ rules st = match rules with
+      | [] when is_lemma_ st ->
+        Util.warnf "@[drop lemma `%a`@]" Statement.pp_clause st;
+        []
       | [] -> C.of_statement st
       | r :: rules' ->
           match r st with
