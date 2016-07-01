@@ -227,12 +227,19 @@ module Make
       (fun k->k (Util.pp_list BBox.pp_bclause) b_clauses);
     clauses, b_clauses
 
+  (* ensure the proper declarations are done for this constant *)
+  let decl_cst_ cst =
+    Util.debugf ~section 3 "@[<2>declare ind.cst. `%a`@]" (fun k->k Ind_cst.pp_cst cst);
+    Ind_cst.declarations_of_cst cst
+    |> Sequence.iter (fun (id,ty) -> Ctx.declare id ty)
+
   (* [cst] is the minimal term for which contexts [ctxs] holds, returns
      clauses expressing that, and assert boolean constraints *)
   let assert_min ~trail ~proof ctxs (cst:Ind_cst.cst) =
     let path = path_of_trail trail in
     match Ind_cst.cst_cover_set cst with
       | Some set when not (Ind_cst.path_contains_cst path cst) ->
+        decl_cst_ cst;
         let mw = {
           mw_cst=cst;
           mw_contexts=ctxs;
@@ -277,11 +284,6 @@ module Make
              (fun k->k C.pp c Ind_cst.pp_path p1 Ind_cst.pp_path p2)
          );
          res)
-
-  (* ensure the proper declarations are done for this constant *)
-  let decl_cst_ cst =
-    Ind_cst.declarations_of_cst cst
-    |> Sequence.iter (fun (id,ty) -> Ctx.declare id ty)
 
   (* when a clause contains new inductive constants, assert minimality
      of the clause for all those constants independently *)
@@ -386,10 +388,7 @@ module Make
     Signal.on_every A.on_input_lemma on_lemma;
     Env.add_generate "ind.lemmas" inf_new_lemmas;
     (* declare new constants to [Ctx] *)
-    Signal.on_every Ind_cst.on_new_cst
-      (fun cst ->
-         Ind_cst.declarations_of_cst cst
-         |> Sequence.iter (CCFun.uncurry Ctx.declare));
+    Signal.on_every Ind_cst.on_new_cst decl_cst_;
     ()
 
   module Meta = struct

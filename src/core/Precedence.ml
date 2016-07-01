@@ -107,6 +107,7 @@ let compare p s1 s2 =
   let c = CCInt.compare i1 i2 in
   if c = 0
   then (
+    (* Format.printf "%a (%d) and %a (%d)@." ID.pp_full s1 i1 ID.pp_full s2 i2; *)
     assert (ID.equal s1 s2);
     c
   )
