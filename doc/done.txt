@@ -14,3 +14,7 @@ x 2016-04-06 2016-03-07 bring back orphan criterion lazily: mark redundant claus
 x 2016-04-15 2016-04-03 in avatar, for 0-level propagation, obtain SAT resolution proof so displayed proofs are ok
 x 2016-05-14 2016-01-15 efficient (polarized) literal->clause rewriting for deduction modulo @calculus
 x 2016-05-14 2016-01-15 efficient term rewriting for deduction modulo @calculus @optim
+x 2016-07-01 2016-04-06 test polymorphic goal
+x 2016-07-01 2016-04-03 in induction, allow sub-constants to have induction performed on them (up to some depth) --> nested induction
+x 2016-07-01 2016-01-15 repair induction, improve it with mutual/nested induction
+x 2016-07-01 2016-04-08 benchmark/optimize term rewriting
