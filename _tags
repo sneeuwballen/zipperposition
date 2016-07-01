@@ -2,8 +2,7 @@
 # OASIS_STOP
 <**/*.cmx>: inline(15)
 
-true: bin_annot, no_alias_deps
-true: use_menhir
+true: bin_annot, no_alias_deps, use_menhir, color(always), optimize(3)
 
 "tests/quick/": -traverse
 "tests/quick/": not_hygienic
@@ -13,4 +12,4 @@ true: use_menhir
 
 <src/prover/const.cmx>: for-pack(Libzipperposition)
 
-<src/core/**/*.cmx>: inline(20)
+<src/**/*.cmx>: inline(20)
