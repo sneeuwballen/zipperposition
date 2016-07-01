@@ -1,0 +1,7 @@
+
+include "tree.zf".
+
+goal
+  forall L X R T.
+    subtree (node L X R) T =>
+    subtree L T.

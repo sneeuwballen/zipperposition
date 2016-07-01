@@ -1,9 +1,5 @@
-val term : type.
-data tree := empty | node tree term tree.
-val rev : tree -> tree.
-assert (rev empty) = empty.
-assert
-  forall (L:tree).
-    (forall (R:tree).
-       (forall (X:term). ((rev (node L X R)) = (node (rev R) X (rev L))))).
+include "tree.zf".
+
+# TODO: find proper lemma, fix precedence bug
+
 goal forall (T:tree). ((rev (rev T)) = T).

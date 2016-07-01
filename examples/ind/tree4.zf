@@ -1,6 +1,6 @@
 include "tree.zf".
 goal
   forall (T1:tree).
-    (forall (T2:tree).
-       (forall (T3:tree).
-          (((subtree T2 T3) && (subtree T1 T2)) => (subtree T1 T3)))).
+  forall (T2:tree).
+  forall (T3:tree).
+  (subtree T2 T3 && subtree T1 T2) => subtree T1 T3.
