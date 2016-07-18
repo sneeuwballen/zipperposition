@@ -426,6 +426,7 @@ let cst_of_term t =
     else None
   | _ -> None (* TODO: allow function, if not a constructor *)
 
+(* TODO: generalize to ground terms *)
 (* find inductive constant candidates in terms *)
 let find_cst_in_term t =
   T.Seq.subterms t
@@ -438,8 +439,7 @@ let find_cst_in_term t =
           then
             if Ind_ty.is_inductive_type ty_ret then
               if is_cst id
-              || (not (Ind_ty.is_constructor id)
-                  && Skolem.is_skolem id)
+              || not (Ind_ty.is_constructor id)
                 then Some (cst_of_id id ty_ret) (* bingo *)
                 else None
             else

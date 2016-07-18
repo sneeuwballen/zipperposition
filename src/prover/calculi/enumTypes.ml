@@ -251,14 +251,14 @@ module Make(E : Env.S) : S with module Env = E = struct
   let vars_under_eq_ lits =
     Sequence.of_array lits
     |> Sequence.filter Lit.is_eq
-    |> Sequence.flatMap Lit.Seq.terms
+    |> Sequence.flat_map Lit.Seq.terms
     |> Sequence.filter T.is_var
 
   (* variables occurring under some function symbol (at non-0 depth) *)
   let _shielded_vars lits =
     Sequence.of_array lits
-    |> Sequence.flatMap Lit.Seq.terms
-    |> Sequence.flatMap T.Seq.subterms_depth
+    |> Sequence.flat_map Lit.Seq.terms
+    |> Sequence.flat_map T.Seq.subterms_depth
     |> Sequence.fmap
       (fun (v,depth) -> if depth>0 && T.is_var v then Some v else None)
     |> T.Seq.add_set T.Set.empty
@@ -297,6 +297,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     | Type.Builtin b -> find_aux (B b) []
     | Type.App (id, l) -> find_aux (I id) l
     | _ -> None
+
+  (* TODO: maybe relax the restriction that is must not be naked, but only
+     up to a given depth (if CLI arg?) *)
 
   (* instantiate variables that belong to an enum case *)
   let instantiate_vars_ c =
