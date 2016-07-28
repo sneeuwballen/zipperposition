@@ -5,6 +5,8 @@
 
 open Libzipperposition
 
+module SI = Msat.Solver_intf
+
 let section = Util.Section.(make ~parent:zip "solving")
 
 (** {6 Constraints} *)
@@ -203,11 +205,11 @@ module MakeSolver(X : sig end) = struct
     | C.False -> F.f_false
 
   (* function to extract symbol -> int from a solution *)
-  let int_of_symbol ~n s =
+  let int_of_symbol sat ~n s =
     let r = ref 0 in
     for i = n downto 1 do
       let lit = digit s i in
-      let is_true = Solver.eval lit in
+      let is_true = sat.SI.eval lit in
       if is_true
       then r := 2 * !r + 1
       else r := 2 * !r
@@ -216,8 +218,8 @@ module MakeSolver(X : sig end) = struct
     !r
 
   (* extract a solution *)
-  let get_solution ~n symbols =
-    let syms = List.rev_map (fun s -> int_of_symbol ~n s, s) symbols in
+  let get_solution sat ~n symbols =
+    let syms = List.rev_map (fun s -> int_of_symbol sat ~n s, s) symbols in
     (* sort in increasing order *)
     let syms = List.sort (fun (n1,_)(n2,_) -> n1-n2) syms in
     (* build solution by imposing f>g iff n(f) > n(g) *)
@@ -280,14 +282,14 @@ module MakeSolver(X : sig end) = struct
     let rec next () =
       Util.debug ~section 5 "check satisfiability";
       match Solver.solve () with
-      | Solver.Sat ->
+      | Solver.Sat sat ->
           Util.debug ~section 5 "next solution exists, try to extract it...";
-          let solution = get_solution ~n symbols in
+          let solution = get_solution sat ~n symbols in
           Util.debugf ~section 5 "... solution is %a" (fun k->k Solution.pp solution);
           (* obtain another solution: negate current one and continue *)
           let tl = lazy (negate ~n solution) in
           LazyList.Cons (solution, tl)
-      | Solver.Unsat ->
+      | Solver.Unsat _ ->
           Util.debug ~section 5 "no solution";
           LazyList.Nil
     and negate ~n:_ solution =
@@ -295,8 +297,8 @@ module MakeSolver(X : sig end) = struct
       let c = Solution.neg_to_constraint solution in
       encode_constr c;
       match Solver.solve () with
-      | Solver.Sat -> next()
-      | Solver.Unsat -> LazyList.Nil
+      | Solver.Sat _ -> next()
+      | Solver.Unsat _ -> LazyList.Nil
     in
     lazy (next())
 end

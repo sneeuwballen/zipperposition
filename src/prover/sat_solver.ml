@@ -5,6 +5,9 @@
 
 open Libzipperposition
 
+module FI = Msat.Formula_intf
+module SI = Msat.Solver_intf
+
 let section = Util.Section.make ~parent:Const.section "msat"
 let prof_call_msat = Util.mk_profiler "msat.call"
 
@@ -106,10 +109,11 @@ module Make(Dummy : sig end)
 
   module SatForm = struct
     include Lit
+    let norm l =
+      let l', b = norm l in
+      l', if b then FI.Negated else FI.Same_sign
     type proof = ProofStep.t
     let fresh () = Lit.make (Lit.payload Lit.dummy)
-    let label _ = assert false
-    let add_label _ _ = assert false
     let print = Lit.pp
   end
 
@@ -195,7 +199,7 @@ module Make(Dummy : sig end)
       | None -> assert false
 
   let proved_at_0 lit =
-    let b,l = S.eval_level lit in
+    let b,l = valuation_level lit in
     if l=0 then Some b else None
 
   (* call [S.solve()] in any case, and enforce invariant about eval/unsat_core *)
@@ -216,12 +220,12 @@ module Make(Dummy : sig end)
     done;
     (* solve *)
     begin match S.solve () with
-    | S.Sat ->
-      eval_ := S.eval;
-      eval_level_ := S.eval_level;
+    | S.Sat s ->
+      eval_ := s.SI.eval;
+      eval_level_ := s.SI.eval_level;
       result_ := Sat;
-    | S.Unsat ->
-      let p = S.get_proof () |> conv_proof_ in
+    | S.Unsat us ->
+      let p = us.SI.get_proof ()  |> conv_proof_ in
       result_ := Unsat p;
       proof_ := Some p;
     end;
@@ -253,14 +257,6 @@ module Make(Dummy : sig end)
           !sat_dump_file_ (Printexc.to_string e);
     );
     ()
-
-  type save_level = int
-
-  let root_save_level = 0
-
-  let save () = assert false
-
-  let restore _ = assert false
 end
 
 let () =
