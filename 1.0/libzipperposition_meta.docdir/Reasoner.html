@@ -1,0 +1,109 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Encoding.html">
+<link rel="next" href="Plugin.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of class methods" rel=Appendix href="index_methods.html">
+<link title="Index of class types" rel=Appendix href="index_class_types.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Encoding" rel="Chapter" href="Encoding.html">
+<link title="Reasoner" rel="Chapter" href="Reasoner.html">
+<link title="Plugin" rel="Chapter" href="Plugin.html">
+<link title="Prover" rel="Chapter" href="Prover.html"><link title="Meta-level property" rel="Section" href="#2_Metalevelproperty">
+<link title="Meta-Level clause" rel="Section" href="#2_MetaLevelclause">
+<link title="Proofs" rel="Section" href="#2_Proofs">
+<link title="Consequences" rel="Section" href="#2_Consequences">
+<link title="Fact and Rules Database" rel="Section" href="#2_FactandRulesDatabase">
+<title>Reasoner</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Encoding.html" title="Encoding">Previous</a>
+&nbsp;<a class="up" href="index.html" title="Index">Up</a>
+&nbsp;<a class="post" href="Plugin.html" title="Plugin">Next</a>
+</div>
+<h1>Module <a href="type_Reasoner.html">Reasoner</a></h1>
+
+<pre><span class="keyword">module</span> Reasoner: <code class="code">sig</code> <a href="Reasoner.html">..</a> <code class="code">end</code></pre><div class="info module top">
+<h1 id="1_MetaLevelreasoner">Meta-Level reasoner</h1><br>
+</div>
+<hr width="100%">
+<br>
+<h2 id="2_Metalevelproperty">Meta-level property</h2>
+    A meta-level statement is just a higher-order term.<br>
+
+<pre><span id="TYPEterm"><span class="keyword">type</span> <code class="type"></code>term</span> = <code class="type">Libzipperposition.TypedSTerm.t</code> </pre>
+
+
+<pre><span id="TYPEty"><span class="keyword">type</span> <code class="type"></code>ty</span> = <code class="type"><a href="Reasoner.html#TYPEterm">term</a></code> </pre>
+
+
+<pre><span id="TYPEproperty"><span class="keyword">type</span> <code class="type"></code>property</span> = <code class="type"><a href="Reasoner.html#TYPEterm">term</a></code> </pre>
+
+
+<pre><span id="TYPEfact"><span class="keyword">type</span> <code class="type"></code>fact</span> = <code class="type"><a href="Reasoner.html#TYPEterm">term</a></code> </pre>
+
+
+<pre><span id="VALproperty_ty"><span class="keyword">val</span> property_ty</span> : <code class="type">Libzipperposition.TypedSTerm.t</code></pre><div class="info ">
+Type of meta-level statements. All terms used within
+    the meta-prover should have this type<br>
+</div>
+
+<pre><span id="VALproperty_id"><span class="keyword">val</span> property_id</span> : <code class="type">Libzipperposition.ID.t</code></pre><br>
+<h2 id="2_MetaLevelclause">Meta-Level clause</h2>
+    A Horn clause about meta-level properties<br>
+
+<pre><span id="EXCEPTIONError"><span class="keyword">exception</span> Error</span> <span class="keyword">of</span> <code class="type">string</code></pre>
+
+<pre><span class="keyword">module</span> <a href="Reasoner.Clause.html">Clause</a>: <code class="code">sig</code> <a href="Reasoner.Clause.html">..</a> <code class="code">end</code></pre>
+<pre><span id="TYPEclause"><span class="keyword">type</span> <code class="type"></code>clause</span> = <code class="type"><a href="Reasoner.Clause.html#TYPEt">Clause.t</a></code> </pre>
+
+<br>
+<h2 id="2_Proofs">Proofs</h2>
+<p>
+
+    Unit-resolution proofs<br>
+
+<pre><span class="keyword">module</span> <a href="Reasoner.Proof.html">Proof</a>: <code class="code">sig</code> <a href="Reasoner.Proof.html">..</a> <code class="code">end</code></pre>
+<pre><span id="TYPEproof"><span class="keyword">type</span> <code class="type"></code>proof</span> = <code class="type"><a href="Reasoner.Proof.html#TYPEt">Proof.t</a></code> </pre>
+
+<br>
+<h2 id="2_Consequences">Consequences</h2>
+    What can be deduced when the Database is updated with new rules
+    and facts.<br>
+
+<pre><span id="TYPEconsequence"><span class="keyword">type</span> <code class="type"></code>consequence</span> = <code class="type"><a href="Reasoner.html#TYPEfact">fact</a> * <a href="Reasoner.html#TYPEproof">proof</a></code> </pre>
+
+<br>
+<h2 id="2_FactandRulesDatabase">Fact and Rules Database</h2>
+<p>
+
+    A database contains a set of Horn-clauses about properties, that allow
+    to reason about them by forward-chaining.<br>
+
+<pre><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> </pre>
+<div class="info ">
+A DB that holds a saturated set of Horn clauses and facts<br>
+</div>
+
+
+<pre><span id="VALempty"><span class="keyword">val</span> empty</span> : <code class="type"><a href="Reasoner.html#TYPEt">t</a></code></pre><div class="info ">
+Empty DB<br>
+</div>
+
+<pre><span id="VALadd"><span class="keyword">val</span> add</span> : <code class="type"><a href="Reasoner.html#TYPEt">t</a> -> <a href="Reasoner.html#TYPEclause">clause</a> -> <a href="Reasoner.html#TYPEt">t</a> * <a href="Reasoner.html#TYPEconsequence">consequence</a> Sequence.t</code></pre><div class="info ">
+Add a clause to the DB, and propagate.
+    See <a href="Reasoner.Seq.html#VALof_seq"><code class="code">Reasoner.Seq.of_seq</code></a> for an efficient batch insertion.<br>
+</div>
+
+<pre><span id="VALadd_fact"><span class="keyword">val</span> add_fact</span> : <code class="type"><a href="Reasoner.html#TYPEt">t</a> -> <a href="Reasoner.html#TYPEfact">fact</a> -> <a href="Reasoner.html#TYPEt">t</a> * <a href="Reasoner.html#TYPEconsequence">consequence</a> Sequence.t</code></pre><div class="info ">
+Add a fact to the DB. Sugar for <a href="Reasoner.html#VALadd"><code class="code">Reasoner.add</code></a><br>
+</div>
+
+<pre><span class="keyword">module</span> <a href="Reasoner.Seq.html">Seq</a>: <code class="code">sig</code> <a href="Reasoner.Seq.html">..</a> <code class="code">end</code></pre></body></html>

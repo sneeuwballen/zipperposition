@@ -1,0 +1,34 @@
+<html><head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<link rel="Start" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of class methods" rel=Appendix href="index_methods.html">
+<link title="Index of class types" rel=Appendix href="index_class_types.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Encoding" rel="Chapter" href="Encoding.html">
+<link title="Reasoner" rel="Chapter" href="Reasoner.html">
+<link title="Plugin" rel="Chapter" href="Plugin.html">
+<link title="Prover" rel="Chapter" href="Prover.html"><title>Reasoner.Clause</title>
+</head>
+<body>
+<code class="code"><span class="keyword">sig</span><br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;t&nbsp;=&nbsp;{&nbsp;head&nbsp;:&nbsp;<span class="constructor">Reasoner</span>.term;&nbsp;body&nbsp;:&nbsp;<span class="constructor">Reasoner</span>.term&nbsp;list;&nbsp;}<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;rule&nbsp;:&nbsp;<span class="constructor">Reasoner</span>.term&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Reasoner</span>.term&nbsp;list&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Reasoner</span>.<span class="constructor">Clause</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;fact&nbsp;:&nbsp;<span class="constructor">Reasoner</span>.term&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Reasoner</span>.<span class="constructor">Clause</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;is_fact&nbsp;:&nbsp;<span class="constructor">Reasoner</span>.<span class="constructor">Clause</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;pp&nbsp;:&nbsp;t&nbsp;<span class="constructor">CCFormat</span>.printer<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;to_string&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;string<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;equal&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;hash_fun&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">CCHash</span>.state&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">CCHash</span>.state<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;hash&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;int<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;compare&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;int<br>
+&nbsp;&nbsp;<span class="keyword">module</span>&nbsp;<span class="constructor">Seq</span>&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">sig</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;terms&nbsp;:&nbsp;<span class="constructor">Reasoner</span>.<span class="constructor">Clause</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Reasoner</span>.term&nbsp;<span class="constructor">Sequence</span>.t<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;vars&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Reasoner</span>.<span class="constructor">Clause</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Reasoner</span>.ty&nbsp;<span class="constructor">Libzipperposition</span>.<span class="constructor">Var</span>.t&nbsp;<span class="constructor">Sequence</span>.t<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">end</span><br>
+<span class="keyword">end</span></code></body></html>

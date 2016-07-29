@@ -1,0 +1,308 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Extensions.html">
+<link rel="next" href="Literals.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="ClauseQueue" rel="Chapter" href="ClauseQueue.html">
+<link title="Clause" rel="Chapter" href="Clause.html">
+<link title="SClause" rel="Chapter" href="SClause.html">
+<link title="Const" rel="Chapter" href="Const.html">
+<link title="Extensions" rel="Chapter" href="Extensions.html">
+<link title="Literal" rel="Chapter" href="Literal.html">
+<link title="Literals" rel="Chapter" href="Literals.html">
+<link title="Ctx" rel="Chapter" href="Ctx.html">
+<link title="ProofStep" rel="Chapter" href="ProofStep.html">
+<link title="ProofPrint" rel="Chapter" href="ProofPrint.html">
+<link title="ProofState" rel="Chapter" href="ProofState.html">
+<link title="Saturate" rel="Chapter" href="Saturate.html">
+<link title="Selection" rel="Chapter" href="Selection.html">
+<link title="AC" rel="Chapter" href="AC.html">
+<link title="AC_intf" rel="Chapter" href="AC_intf.html">
+<link title="SimplM" rel="Chapter" href="SimplM.html">
+<link title="Compute_prec" rel="Chapter" href="Compute_prec.html">
+<link title="Params" rel="Chapter" href="Params.html">
+<link title="Env" rel="Chapter" href="Env.html">
+<link title="Monome" rel="Chapter" href="Monome.html">
+<link title="ArithLit" rel="Chapter" href="ArithLit.html">
+<link title="Signals" rel="Chapter" href="Signals.html">
+<link title="Multisets" rel="Chapter" href="Multisets.html">
+<link title="Ctx_intf" rel="Chapter" href="Ctx_intf.html">
+<link title="Clause_intf" rel="Chapter" href="Clause_intf.html">
+<link title="Env_intf" rel="Chapter" href="Env_intf.html">
+<link title="ProofState_intf" rel="Chapter" href="ProofState_intf.html">
+<link title="BBox" rel="Chapter" href="BBox.html">
+<link title="ClauseContext" rel="Chapter" href="ClauseContext.html">
+<link title="ClauseQueue_intf" rel="Chapter" href="ClauseQueue_intf.html">
+<link title="Bool_lit" rel="Chapter" href="Bool_lit.html">
+<link title="Bool_lit_intf" rel="Chapter" href="Bool_lit_intf.html">
+<link title="Sat_solver" rel="Chapter" href="Sat_solver.html">
+<link title="Sat_solver_intf" rel="Chapter" href="Sat_solver_intf.html">
+<link title="Trail" rel="Chapter" href="Trail.html">
+<link title="Ind_cst" rel="Chapter" href="Ind_cst.html">
+<link title="Phases" rel="Chapter" href="Phases.html">
+<link title="Phases_impl" rel="Chapter" href="Phases_impl.html">
+<link title="Flex_state" rel="Chapter" href="Flex_state.html">
+<link title="Classify_cst" rel="Chapter" href="Classify_cst.html">
+<link title="Rewrite_rule" rel="Chapter" href="Rewrite_rule.html">
+<link title="Avatar" rel="Chapter" href="Avatar.html">
+<link title="Avatar_intf" rel="Chapter" href="Avatar_intf.html">
+<link title="Induction" rel="Chapter" href="Induction.html">
+<link title="Induction_intf" rel="Chapter" href="Induction_intf.html">
+<link title="Superposition" rel="Chapter" href="Superposition.html">
+<link title="Rewriting" rel="Chapter" href="Rewriting.html">
+<link title="EnumTypes" rel="Chapter" href="EnumTypes.html">
+<link title="ArithInt" rel="Chapter" href="ArithInt.html">
+<link title="Heuristics" rel="Chapter" href="Heuristics.html">
+<link title="Ind_types" rel="Chapter" href="Ind_types.html">
+<link title="MetaProverState" rel="Chapter" href="MetaProverState.html">
+<link title="MetaProverState_intf" rel="Chapter" href="MetaProverState_intf.html"><link title="Basic semantic checks" rel="Section" href="#2_Basicsemanticchecks">
+<link title="IO" rel="Section" href="#2_IO">
+<title>Literal</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Extensions.html" title="Extensions">Previous</a>
+&nbsp;<a class="up" href="index.html" title="Index">Up</a>
+&nbsp;<a class="post" href="Literals.html" title="Literals">Next</a>
+</div>
+<h1>Module <a href="type_Literal.html">Literal</a></h1>
+
+<pre><span class="keyword">module</span> Literal: <code class="code">sig</code> <a href="Literal.html">..</a> <code class="code">end</code></pre><div class="info module top">
+<h1 id="1_Equationalliterals">Equational literals</h1><br>
+</div>
+<hr width="100%">
+
+<pre><span id="TYPEterm"><span class="keyword">type</span> <code class="type"></code>term</span> = <code class="type">Libzipperposition.FOTerm.t</code> </pre>
+
+
+<pre><code><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> = private </code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTt.True"><span class="constructor">True</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTt.False"><span class="constructor">False</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTt.Equation"><span class="constructor">Equation</span></span> <span class="keyword">of</span> <code class="type"><a href="Literal.html#TYPEterm">term</a> * <a href="Literal.html#TYPEterm">term</a> * bool</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTt.Prop"><span class="constructor">Prop</span></span> <span class="keyword">of</span> <code class="type"><a href="Literal.html#TYPEterm">term</a> * bool</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTt.Arith"><span class="constructor">Arith</span></span> <span class="keyword">of</span> <code class="type"><a href="ArithLit.html#TYPEt">ArithLit.t</a></code></code></td>
+
+</tr></table>
+
+<div class="info ">
+a literal, that is, a signed atomic formula<br>
+</div>
+
+
+<pre><span id="VALequal"><span class="keyword">val</span> equal</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> <a href="Literal.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+equality of literals<br>
+</div>
+
+<pre><span id="VALequal_com"><span class="keyword">val</span> equal_com</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> <a href="Literal.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+commutative equality of lits<br>
+</div>
+
+<pre><span id="VALcompare"><span class="keyword">val</span> compare</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> <a href="Literal.html#TYPEt">t</a> -> int</code></pre><div class="info ">
+lexicographic comparison of literals<br>
+</div>
+
+<pre><span class="keyword">include</span> Interfaces.HASH</pre>
+
+<pre><span id="VALhash"><span class="keyword">val</span> hash</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> int</code></pre><div class="info ">
+hashing of literal<br>
+</div>
+
+<pre><span id="VALweight"><span class="keyword">val</span> weight</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> int</code></pre><div class="info ">
+weight of the lit (sum of weights of terms)<br>
+</div>
+
+<pre><span id="VALheuristic_weight"><span class="keyword">val</span> heuristic_weight</span> : <code class="type">(<a href="Literal.html#TYPEterm">term</a> -> int) -> <a href="Literal.html#TYPEt">t</a> -> int</code></pre><div class="info ">
+heuristic difficulty to eliminate lit<br>
+</div>
+
+<pre><span id="VALdepth"><span class="keyword">val</span> depth</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> int</code></pre><div class="info ">
+depth of literal<br>
+</div>
+
+<pre><span id="VALsign"><span class="keyword">val</span> sign</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALis_pos"><span class="keyword">val</span> is_pos</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+is the literal positive?<br>
+</div>
+
+<pre><span id="VALis_neg"><span class="keyword">val</span> is_neg</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+is the literal negative?<br>
+</div>
+
+<pre><span id="VALis_eqn"><span class="keyword">val</span> is_eqn</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+is the literal a proper (in)equation or prop?<br>
+</div>
+
+<pre><span id="VALis_prop"><span class="keyword">val</span> is_prop</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+is the literal a boolean proposition?<br>
+</div>
+
+<pre><span id="VALis_eq"><span class="keyword">val</span> is_eq</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+is the literal of the form a = b?<br>
+</div>
+
+<pre><span id="VALis_neq"><span class="keyword">val</span> is_neq</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+is the literal of the form a != b?<br>
+</div>
+
+<pre><span id="VALis_arith"><span class="keyword">val</span> is_arith</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALis_arith_eqn"><span class="keyword">val</span> is_arith_eqn</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+= or !=<br>
+</div>
+
+<pre><span id="VALis_arith_eq"><span class="keyword">val</span> is_arith_eq</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALis_arith_neq"><span class="keyword">val</span> is_arith_neq</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALis_arith_ineq"><span class="keyword">val</span> is_arith_ineq</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+&lt; or &lt;=<br>
+</div>
+
+<pre><span id="VALis_arith_less"><span class="keyword">val</span> is_arith_less</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALis_arith_lesseq"><span class="keyword">val</span> is_arith_lesseq</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALis_arith_divides"><span class="keyword">val</span> is_arith_divides</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALmk_eq"><span class="keyword">val</span> mk_eq</span> : <code class="type"><a href="Literal.html#TYPEterm">term</a> -> <a href="Literal.html#TYPEterm">term</a> -> <a href="Literal.html#TYPEt">t</a></code></pre><div class="info ">
+build literals. If sides so not have the same sort,
+    a SortError will be raised. An ordering must be provided<br>
+</div>
+
+<pre><span id="VALmk_neq"><span class="keyword">val</span> mk_neq</span> : <code class="type"><a href="Literal.html#TYPEterm">term</a> -> <a href="Literal.html#TYPEterm">term</a> -> <a href="Literal.html#TYPEt">t</a></code></pre>
+<pre><span id="VALmk_lit"><span class="keyword">val</span> mk_lit</span> : <code class="type"><a href="Literal.html#TYPEterm">term</a> -> <a href="Literal.html#TYPEterm">term</a> -> bool -> <a href="Literal.html#TYPEt">t</a></code></pre>
+<pre><span id="VALmk_prop"><span class="keyword">val</span> mk_prop</span> : <code class="type"><a href="Literal.html#TYPEterm">term</a> -> bool -> <a href="Literal.html#TYPEt">t</a></code></pre>
+<pre><span id="VALmk_true"><span class="keyword">val</span> mk_true</span> : <code class="type"><a href="Literal.html#TYPEterm">term</a> -> <a href="Literal.html#TYPEt">t</a></code></pre>
+<pre><span id="VALmk_false"><span class="keyword">val</span> mk_false</span> : <code class="type"><a href="Literal.html#TYPEterm">term</a> -> <a href="Literal.html#TYPEt">t</a></code></pre>
+<pre><span id="VALmk_tauto"><span class="keyword">val</span> mk_tauto</span> : <code class="type"><a href="Literal.html#TYPEt">t</a></code></pre>
+<pre><span id="VALmk_absurd"><span class="keyword">val</span> mk_absurd</span> : <code class="type"><a href="Literal.html#TYPEt">t</a></code></pre>
+<pre><span id="VALmk_arith"><span class="keyword">val</span> mk_arith</span> : <code class="type"><a href="ArithLit.html#TYPEt">ArithLit.t</a> -> <a href="Literal.html#TYPEt">t</a></code></pre>
+<pre><span id="VALmk_arith_op"><span class="keyword">val</span> mk_arith_op</span> : <code class="type"><a href="ArithLit.html#TYPEop">ArithLit.op</a> -> Z.t <a href="Monome.html#TYPEt">Monome.t</a> -> Z.t <a href="Monome.html#TYPEt">Monome.t</a> -> <a href="Literal.html#TYPEt">t</a></code></pre>
+<pre><span id="VALmk_arith_eq"><span class="keyword">val</span> mk_arith_eq</span> : <code class="type">Z.t <a href="Monome.html#TYPEt">Monome.t</a> -> Z.t <a href="Monome.html#TYPEt">Monome.t</a> -> <a href="Literal.html#TYPEt">t</a></code></pre>
+<pre><span id="VALmk_arith_neq"><span class="keyword">val</span> mk_arith_neq</span> : <code class="type">Z.t <a href="Monome.html#TYPEt">Monome.t</a> -> Z.t <a href="Monome.html#TYPEt">Monome.t</a> -> <a href="Literal.html#TYPEt">t</a></code></pre>
+<pre><span id="VALmk_arith_less"><span class="keyword">val</span> mk_arith_less</span> : <code class="type">Z.t <a href="Monome.html#TYPEt">Monome.t</a> -> Z.t <a href="Monome.html#TYPEt">Monome.t</a> -> <a href="Literal.html#TYPEt">t</a></code></pre>
+<pre><span id="VALmk_arith_lesseq"><span class="keyword">val</span> mk_arith_lesseq</span> : <code class="type">Z.t <a href="Monome.html#TYPEt">Monome.t</a> -> Z.t <a href="Monome.html#TYPEt">Monome.t</a> -> <a href="Literal.html#TYPEt">t</a></code></pre>
+<pre><span id="VALmk_divides"><span class="keyword">val</span> mk_divides</span> : <code class="type">?sign:bool -> Z.t -> power:int -> Z.t <a href="Monome.html#TYPEt">Monome.t</a> -> <a href="Literal.html#TYPEt">t</a></code></pre>
+<pre><span id="VALmk_not_divides"><span class="keyword">val</span> mk_not_divides</span> : <code class="type">Z.t -> power:int -> Z.t <a href="Monome.html#TYPEt">Monome.t</a> -> <a href="Literal.html#TYPEt">t</a></code></pre>
+<pre><span id="VALmatching"><span class="keyword">val</span> matching</span> : <code class="type">?subst:Libzipperposition.Substs.t -><br>       pattern:<a href="Literal.html#TYPEt">t</a> Libzipperposition.Scoped.t -><br>       <a href="Literal.html#TYPEt">t</a> Libzipperposition.Scoped.t -> Libzipperposition.Substs.t Sequence.t</code></pre><div class="info ">
+checks whether subst(lit_a) matches lit_b. Returns alternative
+    substitutions s such that s(lit_a) = lit_b and s contains subst.<br>
+</div>
+
+<pre><span id="VALsubsumes"><span class="keyword">val</span> subsumes</span> : <code class="type">?subst:Libzipperposition.Substs.t -><br>       <a href="Literal.html#TYPEt">t</a> Libzipperposition.Scoped.t -><br>       <a href="Literal.html#TYPEt">t</a> Libzipperposition.Scoped.t -> Libzipperposition.Substs.t Sequence.t</code></pre><div class="info ">
+More general version of <a href="Literal.html#VALmatching"><code class="code">Literal.matching</code></a>, yields <code class="code">subst</code>
+    such that <code class="code">subst(lit_a) =&gt; lit_b</code>.<br>
+</div>
+
+<pre><span id="VALvariant"><span class="keyword">val</span> variant</span> : <code class="type">?subst:Libzipperposition.Substs.t -><br>       <a href="Literal.html#TYPEt">t</a> Libzipperposition.Scoped.t -><br>       <a href="Literal.html#TYPEt">t</a> Libzipperposition.Scoped.t -> Libzipperposition.Substs.t Sequence.t</code></pre>
+<pre><span id="VALunify"><span class="keyword">val</span> unify</span> : <code class="type">?subst:Libzipperposition.Substs.t -><br>       <a href="Literal.html#TYPEt">t</a> Libzipperposition.Scoped.t -><br>       <a href="Literal.html#TYPEt">t</a> Libzipperposition.Scoped.t -> Libzipperposition.Substs.t Sequence.t</code></pre>
+<pre><span id="VALare_variant"><span class="keyword">val</span> are_variant</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> <a href="Literal.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALapply_subst"><span class="keyword">val</span> apply_subst</span> : <code class="type">renaming:Libzipperposition.Substs.Renaming.t -><br>       Libzipperposition.Substs.t -><br>       <a href="Literal.html#TYPEt">t</a> Libzipperposition.Scoped.t -> <a href="Literal.html#TYPEt">t</a></code></pre>
+<pre><span id="VALapply_subst_no_renaming"><span class="keyword">val</span> apply_subst_no_renaming</span> : <code class="type">Libzipperposition.Substs.t -><br>       <a href="Literal.html#TYPEt">t</a> Libzipperposition.Scoped.t -> <a href="Literal.html#TYPEt">t</a></code></pre>
+<pre><span id="VALapply_subst_no_simp"><span class="keyword">val</span> apply_subst_no_simp</span> : <code class="type">renaming:Libzipperposition.Substs.Renaming.t -><br>       Libzipperposition.Substs.t -><br>       <a href="Literal.html#TYPEt">t</a> Libzipperposition.Scoped.t -> <a href="Literal.html#TYPEt">t</a></code></pre>
+<pre><span id="VALapply_subst_list"><span class="keyword">val</span> apply_subst_list</span> : <code class="type">renaming:Libzipperposition.Substs.Renaming.t -><br>       Libzipperposition.Substs.t -><br>       <a href="Literal.html#TYPEt">t</a> list Libzipperposition.Scoped.t -> <a href="Literal.html#TYPEt">t</a> list</code></pre>
+<pre><span id="VALnegate"><span class="keyword">val</span> negate</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> <a href="Literal.html#TYPEt">t</a></code></pre><div class="info ">
+negate literal<br>
+</div>
+
+<pre><span id="VALmap"><span class="keyword">val</span> map</span> : <code class="type">(<a href="Literal.html#TYPEterm">term</a> -> <a href="Literal.html#TYPEterm">term</a>) -> <a href="Literal.html#TYPEt">t</a> -> <a href="Literal.html#TYPEt">t</a></code></pre><div class="info ">
+functor<br>
+</div>
+
+<pre><span id="VALfold"><span class="keyword">val</span> fold</span> : <code class="type">('a -> <a href="Literal.html#TYPEterm">term</a> -> 'a) -> 'a -> <a href="Literal.html#TYPEt">t</a> -> 'a</code></pre><div class="info ">
+basic fold<br>
+</div>
+
+<pre><span id="VALvars"><span class="keyword">val</span> vars</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> Libzipperposition.Type.t Libzipperposition.HVar.t list</code></pre><div class="info ">
+gather variables<br>
+</div>
+
+<pre><span id="VALvar_occurs"><span class="keyword">val</span> var_occurs</span> : <code class="type">Libzipperposition.Type.t Libzipperposition.HVar.t -> <a href="Literal.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALis_ground"><span class="keyword">val</span> is_ground</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALsymbols"><span class="keyword">val</span> symbols</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> Libzipperposition.ID.Set.t</code></pre>
+<pre><span id="VALroot_terms"><span class="keyword">val</span> root_terms</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> <a href="Literal.html#TYPEterm">term</a> list</code></pre><div class="info ">
+all the terms immediatly under the lit<br>
+</div>
+<br>
+<h2 id="2_Basicsemanticchecks">Basic semantic checks</h2><br>
+
+<pre><span id="VALis_trivial"><span class="keyword">val</span> is_trivial</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALis_absurd"><span class="keyword">val</span> is_absurd</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALfold_terms"><span class="keyword">val</span> fold_terms</span> : <code class="type">?position:Libzipperposition.Position.t -><br>       ?vars:bool -><br>       ?ty_args:bool -><br>       which:[< `All | `Max ] -><br>       ord:Libzipperposition.Ordering.t -><br>       subterms:bool -><br>       <a href="Literal.html#TYPEt">t</a> -> (<a href="Literal.html#TYPEterm">term</a> * Libzipperposition.Position.t) Sequence.t</code></pre><div class="info ">
+Iterate on terms, maybe subterms, of the literal.
+    Variables are ignored if <code class="code">vars</code> is <code class="code">false</code>.
+<p>
+
+    <code class="code">vars</code> decides whether variables are iterated on too (default <code class="code">false</code>)
+    <code class="code">subterms</code> decides whether strict subterms, not only terms that
+    occur directly under the literal, are explored.
+<p>
+
+    <code class="code">which</code> is used to decide which terms to visit:<ul>
+<li>if <code class="code">which</code> is <code class="code">`Max</code>, only the maximal terms are explored</li>
+<li>if <code class="code">which</code> is <code class="code">`All</code>, all root terms are explored</li>
+</ul>
+<br>
+</div>
+
+<pre><span class="keyword">module</span> <a href="Literal.Comp.html">Comp</a>: <code class="code">sig</code> <a href="Literal.Comp.html">..</a> <code class="code">end</code></pre><div class="info">
+Comparisons
+</div>
+
+<pre><span class="keyword">module</span> <a href="Literal.Seq.html">Seq</a>: <code class="code">sig</code> <a href="Literal.Seq.html">..</a> <code class="code">end</code></pre>
+<pre><span class="keyword">module</span> <a href="Literal.Pos.html">Pos</a>: <code class="code">sig</code> <a href="Literal.Pos.html">..</a> <code class="code">end</code></pre><div class="info">
+Positions
+</div>
+
+<pre><span class="keyword">module</span> <a href="Literal.View.html">View</a>: <code class="code">sig</code> <a href="Literal.View.html">..</a> <code class="code">end</code></pre><div class="info">
+Specific views
+</div>
+
+<pre><span class="keyword">module</span> <a href="Literal.Conv.html">Conv</a>: <code class="code">sig</code> <a href="Literal.Conv.html">..</a> <code class="code">end</code></pre><div class="info">
+Conversions
+</div>
+<br>
+<h2 id="2_IO">IO</h2><br>
+
+<pre><span id="TYPEprint_hook"><span class="keyword">type</span> <code class="type"></code>print_hook</span> = <code class="type">CCFormat.t -> <a href="Literal.html#TYPEt">t</a> -> bool</code> </pre>
+<div class="info ">
+might print the literal on the given buffer.<br>
+<b>Returns</b> true if it printed, false otherwise<br>
+</div>
+
+
+<pre><span id="VALadd_default_hook"><span class="keyword">val</span> add_default_hook</span> : <code class="type"><a href="Literal.html#TYPEprint_hook">print_hook</a> -> unit</code></pre>
+<pre><span id="VALpp_debug"><span class="keyword">val</span> pp_debug</span> : <code class="type">?hooks:<a href="Literal.html#TYPEprint_hook">print_hook</a> list -> <a href="Literal.html#TYPEt">t</a> CCFormat.printer</code></pre>
+<pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> CCFormat.printer</code></pre>
+<pre><span id="VALpp_tstp"><span class="keyword">val</span> pp_tstp</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> CCFormat.printer</code></pre>
+<pre><span id="VALto_string"><span class="keyword">val</span> to_string</span> : <code class="type"><a href="Literal.html#TYPEt">t</a> -> string</code></pre></body></html>

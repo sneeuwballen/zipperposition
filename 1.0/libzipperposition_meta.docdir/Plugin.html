@@ -1,0 +1,101 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Reasoner.html">
+<link rel="next" href="Prover.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of class methods" rel=Appendix href="index_methods.html">
+<link title="Index of class types" rel=Appendix href="index_class_types.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Encoding" rel="Chapter" href="Encoding.html">
+<link title="Reasoner" rel="Chapter" href="Reasoner.html">
+<link title="Plugin" rel="Chapter" href="Plugin.html">
+<link title="Prover" rel="Chapter" href="Prover.html"><link title="Builtin plugins" rel="Section" href="#2_Builtinplugins">
+<link title="Interaction with Reasoner" rel="Section" href="#2_InteractionwithReasoner">
+<title>Plugin</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Reasoner.html" title="Reasoner">Previous</a>
+&nbsp;<a class="up" href="index.html" title="Index">Up</a>
+&nbsp;<a class="post" href="Prover.html" title="Prover">Next</a>
+</div>
+<h1>Module <a href="type_Plugin.html">Plugin</a></h1>
+
+<pre><span class="keyword">module</span> Plugin: <code class="code">sig</code> <a href="Plugin.html">..</a> <code class="code">end</code></pre><div class="info module top">
+<h1 id="1_Specializedplugins">Specialized plugins</h1>
+<p>
+
+    A plugin is a bridge between OCaml code and some meta-level property
+    of the prover. For instance, a default plugin is bound to the predicate
+    "holds", which states that some (encoded) clause holds in the current
+    problem. The plugin for "holds" provides a view centered on the "holds"
+    predicate, and allows to add "holds" facts and filter on them.
+    Plugins can handle some inner type that can be encoded/decoded
+    to meta-prover-compatible types.<br>
+</div>
+<hr width="100%">
+
+<pre><span id="TYPEterm"><span class="keyword">type</span> <code class="type"></code>term</span> = <code class="type"><a href="Reasoner.html#TYPEterm">Reasoner.term</a></code> </pre>
+
+
+<pre><span id="TYPEty"><span class="keyword">type</span> <code class="type"></code>ty</span> = <code class="type"><a href="Reasoner.html#TYPEty">Reasoner.ty</a></code> </pre>
+
+
+<pre><span id="TYPEcore"><span class="keyword">class type</span> <a href="Plugin.core-c.html">core</a></span> = <code class="code">object</code> <a href="Plugin.core-c.html">..</a> <code class="code">end</code></pre><div class="info">
+Core features of a plugin, that don't depend on its type parameter
+</div>
+
+<pre><span id="TYPEt"><span class="keyword">class type</span> <code class="type">['a]</code> <a href="Plugin.t-c.html">t</a></span> = <code class="code">object</code> <a href="Plugin.t-c.html">..</a> <code class="code">end</code></pre>
+<pre><span id="TYPEfoclause"><span class="keyword">type</span> <code class="type"></code>foclause</span> = <code class="type"><a href="Encoding.html#TYPEfoclause">Encoding.foclause</a></code> </pre>
+
+
+<pre><span class="keyword">module</span> <a href="Plugin.Set.html">Set</a>: <code class="code">sig</code> <a href="Plugin.Set.html">..</a> <code class="code">end</code></pre><br>
+<h2 id="2_Builtinplugins">Builtin plugins</h2><br>
+
+<pre><span id="VALholds"><span class="keyword">val</span> holds</span> : <code class="type"><a href="Plugin.html#TYPEfoclause">foclause</a> <a href="Plugin.t-c.html">t</a></code></pre><div class="info ">
+holds: statement about which First-Order clause is true in the
+    current problem<br>
+</div>
+
+<pre><span id="VALaxiom"><span class="keyword">val</span> axiom</span> : <code class="type">(Libzipperposition.ID.t * <a href="Plugin.html#TYPEterm">term</a> list) <a href="Plugin.t-c.html">t</a></code></pre><div class="info ">
+axioms present in the problem (name of axiom+type args+argument)<br>
+</div>
+
+<pre><span id="VALtheory"><span class="keyword">val</span> theory</span> : <code class="type">(Libzipperposition.ID.t * <a href="Plugin.html#TYPEterm">term</a> list) <a href="Plugin.t-c.html">t</a></code></pre><div class="info ">
+theories that are present in the problem
+    (name of theory +type args +argument)<br>
+</div>
+
+<pre><span id="VALlemma"><span class="keyword">val</span> lemma</span> : <code class="type"><a href="Plugin.html#TYPEfoclause">foclause</a> <a href="Plugin.t-c.html">t</a></code></pre><div class="info ">
+Lemma: similar to <a href="Plugin.html#VALholds"><code class="code">Plugin.holds</code></a>, but explicitely used for facts
+    deduced by the meta-prover. In general <code class="code">lemma f =&gt; holds f</code>.<br>
+</div>
+
+<pre><span id="VALpre_rewrite"><span class="keyword">val</span> pre_rewrite</span> : <code class="type">(<a href="Plugin.html#TYPEterm">term</a> * <a href="Plugin.html#TYPEterm">term</a>) list <a href="Plugin.t-c.html">t</a></code></pre><div class="info ">
+Encodes a rewriting system used for pre-processing a set of clauses,
+    into a meta-property.<br>
+</div>
+
+<pre><span id="VALrewrite"><span class="keyword">val</span> rewrite</span> : <code class="type">(Libzipperposition.FOTerm.t * Libzipperposition.FOTerm.t) list <a href="Plugin.t-c.html">t</a></code></pre><div class="info ">
+Encodes a set of first-order rewrite rules into a meta-property.<br>
+</div>
+
+<pre><span class="keyword">module</span> <a href="Plugin.Base.html">Base</a>: <code class="code">sig</code> <a href="Plugin.Base.html">..</a> <code class="code">end</code></pre><br>
+<h2 id="2_InteractionwithReasoner">Interaction with Reasoner</h2><br>
+
+<pre><span id="VALfacts"><span class="keyword">val</span> facts</span> : <code class="type"><a href="Reasoner.html#TYPEt">Reasoner.t</a> -> 'a <a href="Plugin.t-c.html">t</a> -> 'a Sequence.t</code></pre><div class="info ">
+Iterate on values that belong to the given plugin
+    and are currently facts in the reasoner<br>
+</div>
+
+<pre><span id="VALof_consequence"><span class="keyword">val</span> of_consequence</span> : <code class="type"><a href="Reasoner.html#TYPEconsequence">Reasoner.consequence</a> -> 'a <a href="Plugin.t-c.html">t</a> -> 'a option</code></pre><div class="info ">
+Try to extract a value from a consequence<br>
+</div>
+
+<pre><span id="VALof_consequences"><span class="keyword">val</span> of_consequences</span> : <code class="type"><a href="Reasoner.html#TYPEconsequence">Reasoner.consequence</a> Sequence.t -> 'a <a href="Plugin.t-c.html">t</a> -> 'a Sequence.t</code></pre></body></html>

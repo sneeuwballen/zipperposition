@@ -1,0 +1,213 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Const.html">
+<link rel="next" href="Literal.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="ClauseQueue" rel="Chapter" href="ClauseQueue.html">
+<link title="Clause" rel="Chapter" href="Clause.html">
+<link title="SClause" rel="Chapter" href="SClause.html">
+<link title="Const" rel="Chapter" href="Const.html">
+<link title="Extensions" rel="Chapter" href="Extensions.html">
+<link title="Literal" rel="Chapter" href="Literal.html">
+<link title="Literals" rel="Chapter" href="Literals.html">
+<link title="Ctx" rel="Chapter" href="Ctx.html">
+<link title="ProofStep" rel="Chapter" href="ProofStep.html">
+<link title="ProofPrint" rel="Chapter" href="ProofPrint.html">
+<link title="ProofState" rel="Chapter" href="ProofState.html">
+<link title="Saturate" rel="Chapter" href="Saturate.html">
+<link title="Selection" rel="Chapter" href="Selection.html">
+<link title="AC" rel="Chapter" href="AC.html">
+<link title="AC_intf" rel="Chapter" href="AC_intf.html">
+<link title="SimplM" rel="Chapter" href="SimplM.html">
+<link title="Compute_prec" rel="Chapter" href="Compute_prec.html">
+<link title="Params" rel="Chapter" href="Params.html">
+<link title="Env" rel="Chapter" href="Env.html">
+<link title="Monome" rel="Chapter" href="Monome.html">
+<link title="ArithLit" rel="Chapter" href="ArithLit.html">
+<link title="Signals" rel="Chapter" href="Signals.html">
+<link title="Multisets" rel="Chapter" href="Multisets.html">
+<link title="Ctx_intf" rel="Chapter" href="Ctx_intf.html">
+<link title="Clause_intf" rel="Chapter" href="Clause_intf.html">
+<link title="Env_intf" rel="Chapter" href="Env_intf.html">
+<link title="ProofState_intf" rel="Chapter" href="ProofState_intf.html">
+<link title="BBox" rel="Chapter" href="BBox.html">
+<link title="ClauseContext" rel="Chapter" href="ClauseContext.html">
+<link title="ClauseQueue_intf" rel="Chapter" href="ClauseQueue_intf.html">
+<link title="Bool_lit" rel="Chapter" href="Bool_lit.html">
+<link title="Bool_lit_intf" rel="Chapter" href="Bool_lit_intf.html">
+<link title="Sat_solver" rel="Chapter" href="Sat_solver.html">
+<link title="Sat_solver_intf" rel="Chapter" href="Sat_solver_intf.html">
+<link title="Trail" rel="Chapter" href="Trail.html">
+<link title="Ind_cst" rel="Chapter" href="Ind_cst.html">
+<link title="Phases" rel="Chapter" href="Phases.html">
+<link title="Phases_impl" rel="Chapter" href="Phases_impl.html">
+<link title="Flex_state" rel="Chapter" href="Flex_state.html">
+<link title="Classify_cst" rel="Chapter" href="Classify_cst.html">
+<link title="Rewrite_rule" rel="Chapter" href="Rewrite_rule.html">
+<link title="Avatar" rel="Chapter" href="Avatar.html">
+<link title="Avatar_intf" rel="Chapter" href="Avatar_intf.html">
+<link title="Induction" rel="Chapter" href="Induction.html">
+<link title="Induction_intf" rel="Chapter" href="Induction_intf.html">
+<link title="Superposition" rel="Chapter" href="Superposition.html">
+<link title="Rewriting" rel="Chapter" href="Rewriting.html">
+<link title="EnumTypes" rel="Chapter" href="EnumTypes.html">
+<link title="ArithInt" rel="Chapter" href="ArithInt.html">
+<link title="Heuristics" rel="Chapter" href="Heuristics.html">
+<link title="Ind_types" rel="Chapter" href="Ind_types.html">
+<link title="MetaProverState" rel="Chapter" href="MetaProverState.html">
+<link title="MetaProverState_intf" rel="Chapter" href="MetaProverState_intf.html"><link title="Dynamic extensions" rel="Section" href="#1_Dynamicextensions">
+<link title="Type Definitions" rel="Subsection" href="#2_TypeDefinitions">
+<link title="Registration" rel="Subsection" href="#2_Registration">
+<title>Extensions</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Const.html" title="Const">Previous</a>
+&nbsp;<a class="up" href="index.html" title="Index">Up</a>
+&nbsp;<a class="post" href="Literal.html" title="Literal">Next</a>
+</div>
+<h1>Module <a href="type_Extensions.html">Extensions</a></h1>
+
+<pre><span class="keyword">module</span> Extensions: <code class="code">sig</code> <a href="Extensions.html">..</a> <code class="code">end</code></pre><div class="info module top">
+<h1 id="1_Dynamicextensions">Dynamic extensions</h1><br>
+</div>
+<hr width="100%">
+<br>
+<h1 id="1_Dynamicextensions">Dynamic extensions</h1><br>
+
+<pre><span id="TYPEor_error"><span class="keyword">type</span> <code class="type">'a</code> or_error</span> = <code class="type">[ `Error of string | `Ok of 'a ]</code> </pre>
+
+<br>
+<h2 id="2_TypeDefinitions">Type Definitions</h2><br>
+
+<pre><span id="TYPEstate"><span class="keyword">type</span> <code class="type"></code>state</span> = <code class="type"><a href="Flex_state.html#TYPEt">Flex_state.t</a></code> </pre>
+
+
+<pre><span id="TYPEenv_action"><span class="keyword">type</span> <code class="type"></code>env_action</span> = <code class="type">(module Env.S) -> unit</code> </pre>
+<div class="info ">
+An extension is allowed to modify an environment<br>
+</div>
+
+
+<pre><span id="TYPEprec_action"><span class="keyword">type</span> <code class="type"></code>prec_action</span> = <code class="type"><a href="Extensions.html#TYPEstate">state</a> -> <a href="Compute_prec.html#TYPEt">Compute_prec.t</a> -> <a href="Compute_prec.html#TYPEt">Compute_prec.t</a></code> </pre>
+<div class="info ">
+Actions that modify the set of rules <a href="Compute_prec.html"><code class="code">Compute_prec</code></a><br>
+</div>
+
+
+<pre><span id="TYPEstate_actions"><span class="keyword">type</span> <code class="type">'a</code> state_actions</span> = <code class="type">('a -> <a href="Extensions.html#TYPEstate">state</a> -> <a href="Extensions.html#TYPEstate">state</a>) list</code> </pre>
+
+
+<pre><code><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> = {</code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTt.name">name</span>&nbsp;: <code class="type">string</code>;</code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTt.prio">prio</span>&nbsp;: <code class="type">int</code>;</code></td>
+<td class="typefieldcomment" align="left" valign="top" ><code>(*</code></td><td class="typefieldcomment" align="left" valign="top" ><div class="info ">
+the lower, the more urgent, the earlier it is loaded<br>
+</div>
+</td><td class="typefieldcomment" align="left" valign="bottom" ><code>*)</code></td>
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTt.start_file_actions">start_file_actions</span>&nbsp;: <code class="type">string <a href="Extensions.html#TYPEstate_actions">state_actions</a></code>;</code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTt.post_parse_actions">post_parse_actions</span>&nbsp;: <code class="type">Libzipperposition.UntypedAST.statement Sequence.t <a href="Extensions.html#TYPEstate_actions">state_actions</a></code>;</code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTt.post_typing_actions">post_typing_actions</span>&nbsp;: <code class="type">Libzipperposition.TypeInference.typed_statement CCVector.ro_vector<br>       <a href="Extensions.html#TYPEstate_actions">state_actions</a></code>;</code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTt.post_cnf_actions">post_cnf_actions</span>&nbsp;: <code class="type">Libzipperposition.Statement.clause_t CCVector.ro_vector<br>       <a href="Extensions.html#TYPEstate_actions">state_actions</a></code>;</code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTt.ord_select_actions">ord_select_actions</span>&nbsp;: <code class="type">(Libzipperposition.Ordering.t * <a href="Selection.html#TYPEt">Selection.t</a>) <a href="Extensions.html#TYPEstate_actions">state_actions</a></code>;</code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTt.ctx_actions">ctx_actions</span>&nbsp;: <code class="type">(module Ctx_intf.S) <a href="Extensions.html#TYPEstate_actions">state_actions</a></code>;</code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTt.prec_actions">prec_actions</span>&nbsp;: <code class="type"><a href="Extensions.html#TYPEprec_action">prec_action</a> list</code>;</code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTt.env_actions">env_actions</span>&nbsp;: <code class="type"><a href="Extensions.html#TYPEenv_action">env_action</a> list</code>;</code></td>
+
+</tr></table>
+}
+
+<div class="info ">
+An extension contains a number of actions that can modify the <a href="Flex_state.html#TYPEt"><code class="code">Flex_state.t</code></a>
+    during preprocessing, or modify the <a href="Env_intf.S.html"><code class="code">Env_intf.S</code></a> once it is built.<br>
+</div>
+
+
+<pre><span id="VALdefault"><span class="keyword">val</span> default</span> : <code class="type"><a href="Extensions.html#TYPEt">t</a></code></pre><div class="info ">
+Default extension. Does nothing.<br>
+</div>
+<br>
+<h2 id="2_Registration">Registration</h2><br>
+
+<pre><span id="VALregister"><span class="keyword">val</span> register</span> : <code class="type"><a href="Extensions.html#TYPEt">t</a> -> unit</code></pre><div class="info ">
+Register an extension to the (current) prover. Plugins should call this
+    when they are loaded.<br>
+</div>
+
+<pre><span id="VALextensions"><span class="keyword">val</span> extensions</span> : <code class="type">unit -> <a href="Extensions.html#TYPEt">t</a> list</code></pre><div class="info ">
+All currently available extensions<br>
+</div>
+
+<pre><span id="VALby_name"><span class="keyword">val</span> by_name</span> : <code class="type">string -> <a href="Extensions.html#TYPEt">t</a> option</code></pre><div class="info ">
+Get an extension by its name, if any<br>
+</div>
+
+<pre><span id="VALnames"><span class="keyword">val</span> names</span> : <code class="type">unit -> string Sequence.t</code></pre><div class="info ">
+Names of loaded extensions<br>
+</div>
+</body></html>

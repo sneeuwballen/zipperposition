@@ -1,0 +1,56 @@
+<html><head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<link rel="Start" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of class methods" rel=Appendix href="index_methods.html">
+<link title="Index of class types" rel=Appendix href="index_class_types.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Encoding" rel="Chapter" href="Encoding.html">
+<link title="Reasoner" rel="Chapter" href="Reasoner.html">
+<link title="Plugin" rel="Chapter" href="Plugin.html">
+<link title="Prover" rel="Chapter" href="Prover.html"><title>Encoding</title>
+</head>
+<body>
+<code class="code"><span class="keyword">sig</span><br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;<span class="keywordsign">'</span>a&nbsp;printer&nbsp;=&nbsp;<span class="constructor">Format</span>.formatter&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="keywordsign">'</span>a&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;<span class="keywordsign">'</span>a&nbsp;lit&nbsp;=&nbsp;<span class="constructor">Eq</span>&nbsp;<span class="keyword">of</span>&nbsp;<span class="keywordsign">'</span>a&nbsp;*&nbsp;<span class="keywordsign">'</span>a&nbsp;*&nbsp;bool&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="constructor">Prop</span>&nbsp;<span class="keyword">of</span>&nbsp;<span class="keywordsign">'</span>a&nbsp;*&nbsp;bool&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="constructor">Bool</span>&nbsp;<span class="keyword">of</span>&nbsp;bool<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;fmap_lit&nbsp;:&nbsp;(<span class="keywordsign">'</span>a&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="keywordsign">'</span>b)&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="keywordsign">'</span>a&nbsp;<span class="constructor">Encoding</span>.lit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="keywordsign">'</span>b&nbsp;<span class="constructor">Encoding</span>.lit<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;<span class="keywordsign">'</span>a&nbsp;clause&nbsp;=&nbsp;<span class="keywordsign">'</span>a&nbsp;<span class="constructor">Encoding</span>.lit&nbsp;list<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;fmap_clause&nbsp;:&nbsp;(<span class="keywordsign">'</span>a&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="keywordsign">'</span>b)&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="keywordsign">'</span>a&nbsp;<span class="constructor">Encoding</span>.clause&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="keywordsign">'</span>b&nbsp;<span class="constructor">Encoding</span>.clause<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;foterm&nbsp;=&nbsp;<span class="constructor">Libzipperposition</span>.<span class="constructor">FOTerm</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;hoterm&nbsp;=&nbsp;<span class="constructor">Libzipperposition</span>.<span class="constructor">TypedSTerm</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;foclause&nbsp;=&nbsp;<span class="constructor">Encoding</span>.foterm&nbsp;<span class="constructor">Encoding</span>.clause<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;hoclause&nbsp;=&nbsp;<span class="constructor">Encoding</span>.hoterm&nbsp;<span class="constructor">Encoding</span>.clause<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;foclause_of_clause&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Libzipperposition</span>.<span class="constructor">FOTerm</span>.t&nbsp;<span class="constructor">Libzipperposition</span>.<span class="constructor">SLiteral</span>.t&nbsp;list&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Encoding</span>.foclause<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;clause_of_foclause&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Encoding</span>.foclause&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Libzipperposition</span>.<span class="constructor">FOTerm</span>.t&nbsp;<span class="constructor">Libzipperposition</span>.<span class="constructor">SLiteral</span>.t&nbsp;list<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;pp_clause&nbsp;:&nbsp;<span class="keywordsign">'</span>a&nbsp;<span class="constructor">Encoding</span>.printer&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="keywordsign">'</span>a&nbsp;<span class="constructor">Encoding</span>.clause&nbsp;<span class="constructor">Encoding</span>.printer<br>
+&nbsp;&nbsp;<span class="keyword">class</span>&nbsp;<span class="keyword">type</span>&nbsp;[<span class="keywordsign">'</span>a,&nbsp;<span class="keywordsign">'</span>b]&nbsp;t&nbsp;=<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">object</span>&nbsp;<span class="keyword">method</span>&nbsp;decode&nbsp;:&nbsp;<span class="keywordsign">'</span>b&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="keywordsign">'</span>a&nbsp;option&nbsp;<span class="keyword">method</span>&nbsp;encode&nbsp;:&nbsp;<span class="keywordsign">'</span>a&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="keywordsign">'</span>b&nbsp;<span class="keyword">end</span><br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;id&nbsp;:&nbsp;(<span class="keywordsign">'</span>a,&nbsp;<span class="keywordsign">'</span>a)&nbsp;<span class="constructor">Encoding</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;compose&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(<span class="keywordsign">'</span>a,&nbsp;<span class="keywordsign">'</span>b)&nbsp;<span class="constructor">Encoding</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(<span class="keywordsign">'</span>b,&nbsp;<span class="keywordsign">'</span>c)&nbsp;<span class="constructor">Encoding</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(<span class="keywordsign">'</span>a,&nbsp;<span class="keywordsign">'</span>c)&nbsp;<span class="constructor">Encoding</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;(&nbsp;&gt;&gt;&gt;&nbsp;)&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(<span class="keywordsign">'</span>a,&nbsp;<span class="keywordsign">'</span>b)&nbsp;<span class="constructor">Encoding</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(<span class="keywordsign">'</span>b,&nbsp;<span class="keywordsign">'</span>c)&nbsp;<span class="constructor">Encoding</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(<span class="keywordsign">'</span>a,&nbsp;<span class="keywordsign">'</span>c)&nbsp;<span class="constructor">Encoding</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;currying&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(<span class="constructor">Encoding</span>.foterm&nbsp;<span class="constructor">Encoding</span>.clause,&nbsp;<span class="constructor">Encoding</span>.hoterm&nbsp;<span class="constructor">Encoding</span>.clause)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Encoding</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">module</span>&nbsp;<span class="constructor">EncodedClause</span>&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">sig</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;t&nbsp;=&nbsp;<span class="keyword">private</span>&nbsp;<span class="constructor">Reasoner</span>.term<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;pp&nbsp;:&nbsp;t&nbsp;<span class="constructor">CCFormat</span>.printer<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;to_string&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;string<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;equal&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;hash_fun&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">CCHash</span>.state&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">CCHash</span>.state<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;hash&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;int<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;compare&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;int<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;__magic&nbsp;:&nbsp;<span class="constructor">Encoding</span>.hoterm&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Encoding</span>.<span class="constructor">EncodedClause</span>.t<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">end</span><br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;clause_prop&nbsp;:&nbsp;(<span class="constructor">Encoding</span>.hoclause,&nbsp;<span class="constructor">Encoding</span>.<span class="constructor">EncodedClause</span>.t)&nbsp;<span class="constructor">Encoding</span>.t<br>
+<span class="keyword">end</span></code></body></html>

@@ -1,0 +1,120 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<link rel="Start" href="index.html">
+<link rel="next" href="Reasoner.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of class methods" rel=Appendix href="index_methods.html">
+<link title="Index of class types" rel=Appendix href="index_class_types.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Encoding" rel="Chapter" href="Encoding.html">
+<link title="Reasoner" rel="Chapter" href="Reasoner.html">
+<link title="Plugin" rel="Chapter" href="Plugin.html">
+<link title="Prover" rel="Chapter" href="Prover.html"><link title="Base definitions" rel="Section" href="#2_Basedefinitions">
+<link title="Encoding abstraction" rel="Subsection" href="#6_Encodingabstraction">
+<link title="Currying" rel="Subsection" href="#6_Currying">
+<link title="Clause encoding" rel="Subsection" href="#6_Clauseencoding">
+<title>Encoding</title>
+</head>
+<body>
+<div class="navbar">&nbsp;<a class="up" href="index.html" title="Index">Up</a>
+&nbsp;<a class="post" href="Reasoner.html" title="Reasoner">Next</a>
+</div>
+<h1>Module <a href="type_Encoding.html">Encoding</a></h1>
+
+<pre><span class="keyword">module</span> Encoding: <code class="code">sig</code> <a href="Encoding.html">..</a> <code class="code">end</code></pre><div class="info module top">
+<h1 id="1_Encodingofclauses">Encoding of clauses</h1><br>
+</div>
+<hr width="100%">
+
+<pre><span id="TYPEprinter"><span class="keyword">type</span> <code class="type">'a</code> printer</span> = <code class="type">Format.formatter -> 'a -> unit</code> </pre>
+
+<br>
+<h2 id="2_Basedefinitions">Base definitions</h2><br>
+
+<pre><code><span id="TYPElit"><span class="keyword">type</span> <code class="type">'a</code> lit</span> = </code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTlit.Eq"><span class="constructor">Eq</span></span> <span class="keyword">of</span> <code class="type">'a * 'a * bool</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTlit.Prop"><span class="constructor">Prop</span></span> <span class="keyword">of</span> <code class="type">'a * bool</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTlit.Bool"><span class="constructor">Bool</span></span> <span class="keyword">of</span> <code class="type">bool</code></code></td>
+
+</tr></table>
+
+
+
+<pre><span id="VALfmap_lit"><span class="keyword">val</span> fmap_lit</span> : <code class="type">('a -> 'b) -> 'a <a href="Encoding.html#TYPElit">lit</a> -> 'b <a href="Encoding.html#TYPElit">lit</a></code></pre>
+<pre><span id="TYPEclause"><span class="keyword">type</span> <code class="type">'a</code> clause</span> = <code class="type">'a <a href="Encoding.html#TYPElit">lit</a> list</code> </pre>
+
+
+<pre><span id="VALfmap_clause"><span class="keyword">val</span> fmap_clause</span> : <code class="type">('a -> 'b) -> 'a <a href="Encoding.html#TYPEclause">clause</a> -> 'b <a href="Encoding.html#TYPEclause">clause</a></code></pre>
+<pre><span id="TYPEfoterm"><span class="keyword">type</span> <code class="type"></code>foterm</span> = <code class="type">Libzipperposition.FOTerm.t</code> </pre>
+
+
+<pre><span id="TYPEhoterm"><span class="keyword">type</span> <code class="type"></code>hoterm</span> = <code class="type">Libzipperposition.TypedSTerm.t</code> </pre>
+
+
+<pre><span id="TYPEfoclause"><span class="keyword">type</span> <code class="type"></code>foclause</span> = <code class="type"><a href="Encoding.html#TYPEfoterm">foterm</a> <a href="Encoding.html#TYPEclause">clause</a></code> </pre>
+
+
+<pre><span id="TYPEhoclause"><span class="keyword">type</span> <code class="type"></code>hoclause</span> = <code class="type"><a href="Encoding.html#TYPEhoterm">hoterm</a> <a href="Encoding.html#TYPEclause">clause</a></code> </pre>
+
+
+<pre><span id="VALfoclause_of_clause"><span class="keyword">val</span> foclause_of_clause</span> : <code class="type">Libzipperposition.FOTerm.t Libzipperposition.SLiteral.t list -><br>       <a href="Encoding.html#TYPEfoclause">foclause</a></code></pre><div class="info ">
+<b>Raises</b> <code>Invalid_argument</code> if the argument is not a proper clause<br>
+</div>
+
+<pre><span id="VALclause_of_foclause"><span class="keyword">val</span> clause_of_foclause</span> : <code class="type"><a href="Encoding.html#TYPEfoclause">foclause</a> -><br>       Libzipperposition.FOTerm.t Libzipperposition.SLiteral.t list</code></pre><div class="info ">
+Convert back to a list of formulas<br>
+<b>Since</b> 0.8<br>
+</div>
+
+<pre><span id="VALpp_clause"><span class="keyword">val</span> pp_clause</span> : <code class="type">'a <a href="Encoding.html#TYPEprinter">printer</a> -> 'a <a href="Encoding.html#TYPEclause">clause</a> <a href="Encoding.html#TYPEprinter">printer</a></code></pre><div class="info ">
+Printer of clauses<br>
+</div>
+<br>
+<h6 id="6_Encodingabstraction">Encoding abstraction</h6><br>
+
+<pre><span id="TYPEt"><span class="keyword">class type</span> <code class="type">[['a, 'b]]</code> <a href="Encoding.t-c.html">t</a></span> = <code class="code">object</code> <a href="Encoding.t-c.html">..</a> <code class="code">end</code></pre>
+<pre><span id="VALid"><span class="keyword">val</span> id</span> : <code class="type">('a, 'a) <a href="Encoding.t-c.html">t</a></code></pre><div class="info ">
+Identity encoding<br>
+</div>
+
+<pre><span id="VALcompose"><span class="keyword">val</span> compose</span> : <code class="type">('a, 'b) <a href="Encoding.t-c.html">t</a> -> ('b, 'c) <a href="Encoding.t-c.html">t</a> -> ('a, 'c) <a href="Encoding.t-c.html">t</a></code></pre><div class="info ">
+Compose two encodings together<br>
+</div>
+
+<pre><span id="VAL(>>>)"><span class="keyword">val</span> (&gt;&gt;&gt;)</span> : <code class="type">('a, 'b) <a href="Encoding.t-c.html">t</a> -> ('b, 'c) <a href="Encoding.t-c.html">t</a> -> ('a, 'c) <a href="Encoding.t-c.html">t</a></code></pre><div class="info ">
+Infix notation for composition<br>
+</div>
+<br>
+<h6 id="6_Currying">Currying</h6><br>
+
+<pre><span id="VALcurrying"><span class="keyword">val</span> currying</span> : <code class="type">(<a href="Encoding.html#TYPEfoterm">foterm</a> <a href="Encoding.html#TYPEclause">clause</a>, <a href="Encoding.html#TYPEhoterm">hoterm</a> <a href="Encoding.html#TYPEclause">clause</a>) <a href="Encoding.t-c.html">t</a></code></pre><br>
+<h6 id="6_Clauseencoding">Clause encoding</h6>
+<p>
+
+    Encode the whole clause into a <code class="code">Reasoner.Property.t</code>, ie a higher-order term
+    that represents a meta-level property.<br>
+
+<pre><span class="keyword">module</span> <a href="Encoding.EncodedClause.html">EncodedClause</a>: <code class="code">sig</code> <a href="Encoding.EncodedClause.html">..</a> <code class="code">end</code></pre>
+<pre><span id="VALclause_prop"><span class="keyword">val</span> clause_prop</span> : <code class="type">(<a href="Encoding.html#TYPEhoclause">hoclause</a>, <a href="Encoding.EncodedClause.html#TYPEt">EncodedClause.t</a>) <a href="Encoding.t-c.html">t</a></code></pre></body></html>

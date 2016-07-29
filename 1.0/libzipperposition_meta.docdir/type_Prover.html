@@ -1,0 +1,46 @@
+<html><head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<link rel="Start" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of class methods" rel=Appendix href="index_methods.html">
+<link title="Index of class types" rel=Appendix href="index_class_types.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Encoding" rel="Chapter" href="Encoding.html">
+<link title="Reasoner" rel="Chapter" href="Reasoner.html">
+<link title="Plugin" rel="Chapter" href="Plugin.html">
+<link title="Prover" rel="Chapter" href="Prover.html"><title>Prover</title>
+</head>
+<body>
+<code class="code"><span class="keyword">sig</span><br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;<span class="keywordsign">'</span>a&nbsp;or_error&nbsp;=&nbsp;[&nbsp;<span class="keywordsign">`</span><span class="constructor">Error</span>&nbsp;<span class="keyword">of</span>&nbsp;string&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="keywordsign">`</span><span class="constructor">Ok</span>&nbsp;<span class="keyword">of</span>&nbsp;<span class="keywordsign">'</span>a&nbsp;]<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;t<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;clause&nbsp;=&nbsp;<span class="constructor">Reasoner</span>.clause<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;empty&nbsp;:&nbsp;<span class="constructor">Prover</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;reasoner&nbsp;:&nbsp;<span class="constructor">Prover</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Reasoner</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;signature&nbsp;:&nbsp;<span class="constructor">Prover</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Reasoner</span>.ty&nbsp;<span class="constructor">Libzipperposition</span>.<span class="constructor">ID</span>.<span class="constructor">Map</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;add&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Prover</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Reasoner</span>.clause&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Prover</span>.t&nbsp;*&nbsp;<span class="constructor">Reasoner</span>.consequence&nbsp;<span class="constructor">Sequence</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;add_fact&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Prover</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Reasoner</span>.fact&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Prover</span>.t&nbsp;*&nbsp;<span class="constructor">Reasoner</span>.consequence&nbsp;<span class="constructor">Sequence</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;add_fo_clause&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Prover</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Encoding</span>.foclause&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Prover</span>.t&nbsp;*&nbsp;<span class="constructor">Reasoner</span>.consequence&nbsp;<span class="constructor">Sequence</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">module</span>&nbsp;<span class="constructor">Seq</span>&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">sig</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;to_seq&nbsp;:&nbsp;<span class="constructor">Prover</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Reasoner</span>.clause&nbsp;<span class="constructor">Sequence</span>.t<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;of_seq&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Prover</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Reasoner</span>.clause&nbsp;<span class="constructor">Sequence</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Prover</span>.t&nbsp;*&nbsp;<span class="constructor">Reasoner</span>.consequence&nbsp;<span class="constructor">Sequence</span>.t<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">end</span><br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;of_ho_ast&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Prover</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Libzipperposition_parsers</span>.<span class="constructor">Ast_ho</span>.t&nbsp;<span class="constructor">Sequence</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;(<span class="constructor">Prover</span>.t&nbsp;*&nbsp;<span class="constructor">Reasoner</span>.consequence&nbsp;<span class="constructor">Sequence</span>.t)&nbsp;<span class="constructor">Prover</span>.or_error<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;parse_file&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Prover</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(<span class="constructor">Prover</span>.t&nbsp;*&nbsp;<span class="constructor">Reasoner</span>.consequence&nbsp;<span class="constructor">Sequence</span>.t)&nbsp;<span class="constructor">Prover</span>.or_error<br>
+<span class="keyword">end</span></code></body></html>

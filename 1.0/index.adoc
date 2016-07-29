@@ -1,0 +1,7 @@
+= Libraries
+
+- link:libzipperposition.docdir/index.html[Libzipperposition: core library with terms, formulas, etc.]
+- link:libzipperposition_arbitrary.docdir/index.html[Libzipperposition_arbitrary: random instances generator]
+- link:libzipperposition_meta.docdir/index.html[Libzipperposition_meta: Meta-level prover]
+- link:libzipperposition_parsers.docdir/index.html[Libzipperposition_parsers: some parsers]
+- link:libzipperposition_prover.docdir/index.html[Libzipperposition_prover: Superposition-specific library]
