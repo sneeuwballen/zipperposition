@@ -5,7 +5,7 @@
 
   A Variable is a pair of a unique Name, and a type.
 
-  @since NEXT_RELEASE *)
+  @since 1.0 *)
 
 type +'a t = private {
   id: ID.t;

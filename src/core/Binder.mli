@@ -3,7 +3,7 @@
 
 (** {1 Binders}
 
-  @since NEXT_RELEASE *)
+  @since 1.0 *)
 
 type t =
   | Exists

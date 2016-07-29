@@ -1,0 +1,73 @@
+# OASIS_START
+# DO NOT EDIT (digest: 3d6ec3b7deaf95cecfdf5978527b7881)
+version = "dev"
+description =
+"Superposition theorem prover, for first order logic with equality."
+requires = "zarith unix sequence containers containers.data bytes oclock"
+archive(byte) = "libzipperposition.cma"
+archive(byte, plugin) = "libzipperposition.cma"
+archive(native) = "libzipperposition.cmxa"
+archive(native, plugin) = "libzipperposition.cmxs"
+exists_if = "libzipperposition.cma"
+package "solving" (
+ version = "dev"
+ description =
+ "Superposition theorem prover, for first order logic with equality."
+ requires = "libzipperposition msat"
+ archive(byte) = "libzipperposition_solving.cma"
+ archive(byte, plugin) = "libzipperposition_solving.cma"
+ archive(native) = "libzipperposition_solving.cmxa"
+ archive(native, plugin) = "libzipperposition_solving.cmxs"
+ exists_if = "libzipperposition_solving.cma"
+)
+
+package "prover" (
+ version = "dev"
+ description =
+ "Superposition theorem prover, for first order logic with equality."
+ requires =
+ "containers containers.advanced sequence unix zarith msat libzipperposition libzipperposition.meta libzipperposition.parsers"
+ archive(byte) = "libzipperposition_prover.cma"
+ archive(byte, plugin) = "libzipperposition_prover.cma"
+ archive(native) = "libzipperposition_prover.cmxa"
+ archive(native, plugin) = "libzipperposition_prover.cmxs"
+ exists_if = "libzipperposition_prover.cma"
+)
+
+package "parsers" (
+ version = "dev"
+ description =
+ "Superposition theorem prover, for first order logic with equality."
+ requires = "libzipperposition"
+ archive(byte) = "libzipperposition_parsers.cma"
+ archive(byte, plugin) = "libzipperposition_parsers.cma"
+ archive(native) = "libzipperposition_parsers.cmxa"
+ archive(native, plugin) = "libzipperposition_parsers.cmxs"
+ exists_if = "libzipperposition_parsers.cma"
+)
+
+package "meta" (
+ version = "dev"
+ description =
+ "Superposition theorem prover, for first order logic with equality."
+ requires = "libzipperposition libzipperposition.parsers"
+ archive(byte) = "libzipperposition_meta.cma"
+ archive(byte, plugin) = "libzipperposition_meta.cma"
+ archive(native) = "libzipperposition_meta.cmxa"
+ archive(native, plugin) = "libzipperposition_meta.cmxs"
+ exists_if = "libzipperposition_meta.cma"
+)
+
+package "arbitrary" (
+ version = "dev"
+ description =
+ "Superposition theorem prover, for first order logic with equality."
+ requires = "libzipperposition qcheck libzipperposition.meta"
+ archive(byte) = "libzipperposition_arbitrary.cma"
+ archive(byte, plugin) = "libzipperposition_arbitrary.cma"
+ archive(native) = "libzipperposition_arbitrary.cmxa"
+ archive(native, plugin) = "libzipperposition_arbitrary.cmxs"
+ exists_if = "libzipperposition_arbitrary.cma"
+)
+# OASIS_STOP
+

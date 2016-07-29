@@ -1,7 +1,9 @@
 opam-version: "1.2"
+name: "zipperposition"
+version: "1.0"
 maintainer: "simon.cruanes@inria.fr"
 author: "Simon Cruanes"
-homepage: "https://www.rocq.inria.fr/deducteam/Zipperposition/index.html"
+homepage: "https://github.com/c-cube/zipperposition"
 build: [
     ["./configure"
         "--bindir" "%{bin}%"
@@ -30,14 +32,14 @@ depends: [
   "gen"
   "oclock"
   "oasis"
-  "msat" { >= "0.3" }
+  "msat" { >= "0.3" < "0.4" }
 ]
 depopts: [
   "menhir" {build}
   "qcheck" {test}
 ]
 available: [
-    ocaml-version >= "4.00.1"
+    ocaml-version >= "4.02.3"
 ]
 tags: [ "logic" "unification" "term" "superposition" "prover" ]
 bug-reports: "https://github.com/c-cube/zipperposition/issues"

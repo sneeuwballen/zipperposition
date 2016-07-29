@@ -7,7 +7,7 @@
   We use those to give names to variables that are not hashconsed (the hashconsing
   does not play nice with names)
 
-  @since NEXT_RELEASE *)
+  @since 1.0 *)
 
 type t = private {
   id: int;
