@@ -5,7 +5,7 @@
 
   Covers numbers, connectives, and builtin types
 
-  @since NEXT_RELEASE *)
+  @since 1.0 *)
 
 type t =
   | Not
