@@ -133,7 +133,7 @@ Library "libzipperposition_prover"
                     Flex_state, Classify_cst, Rewrite_rule,
                     calculi/Avatar, calculi/Avatar_intf,
                     calculi/Induction, calculi/Induction_intf,
-                    calculi/Superposition,
+                    calculi/Superposition, calculi/Superposition_intf,
                     calculi/Rewriting,
                     calculi/EnumTypes,
                     calculi/ArithInt,
