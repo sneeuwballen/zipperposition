@@ -222,7 +222,7 @@ Test all
   Run$:             flag(tests) && flag(qcheck)
 
 Test run
-  Command:      ./tests/run.ml
+  Command:      make frogtest
   Run$:         flag(tests)
 
 Executable run_tests
