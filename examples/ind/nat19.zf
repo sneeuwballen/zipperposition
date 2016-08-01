@@ -1,3 +1,4 @@
+# expect: unsat
 include "nat.zf".
 goal
   forall (X:nat).

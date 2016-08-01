@@ -1,0 +1,12 @@
+# expect: UNSAT
+val term : type.
+val contains : term -> term -> prop.
+val equ : term -> term -> prop.
+assert
+  forall (A:term).
+    (forall (B:term).
+       ((equ A B) <=> (forall (C:term). ((contains A C) <=> (contains B C))))).
+goal
+  forall (A:term).
+    (forall (B:term).
+       (forall (C:term). (((equ B A) && (equ C B)) => (equ C A)))).

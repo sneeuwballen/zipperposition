@@ -1,3 +1,4 @@
+# expect: unsat
 include "nat.zf".
 include "list.zf".
 goal forall (X:nat). (forall (L:list). (mem X (append L (cons X nil)))).

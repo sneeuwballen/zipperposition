@@ -1,0 +1,19 @@
+# expect: UNSAT
+val term : type.
+val k : term -> prop.
+val j : term -> term -> prop.
+val h : term -> term -> prop.
+val g : term -> prop.
+val f : term -> prop.
+assert
+  forall (X:term).
+    (((forall (Y:term). (((h X Y) && (g Y)) => (j X Y))) && (f X))
+     => (forall (Y:term). (((h X Y) && (g Y)) => (k Y)))).
+val l : term -> prop.
+assert ~ (exists (Y:term). ((k Y) && (l Y))).
+assert
+  exists (X:term).
+    ((forall (Y:term). (((h X Y) && (g Y)) => (j X Y))) && 
+     (f X) && 
+     (forall (Y:term). ((h X Y) => (l Y)))).
+goal exists (X:term). ((~ (exists (Y:term). ((h X Y) && (g Y)))) && (f X)).

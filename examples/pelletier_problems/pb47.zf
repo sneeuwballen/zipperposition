@@ -1,0 +1,43 @@
+# expect: UNSAT
+val term : type.
+val p0 : term -> prop.
+val p1 : term -> prop.
+assert (exists (X:term). (p1 X)) && (forall (X:term). ((p1 X) => (p0 X))).
+val p2 : term -> prop.
+assert (exists (X:term). (p2 X)) && (forall (X:term). ((p2 X) => (p0 X))).
+val p3 : term -> prop.
+assert (exists (X:term). (p3 X)) && (forall (X:term). ((p3 X) => (p0 X))).
+val p4 : term -> prop.
+assert (exists (X:term). (p4 X)) && (forall (X:term). ((p4 X) => (p0 X))).
+val p5 : term -> prop.
+assert (exists (X:term). (p5 X)) && (forall (X:term). ((p5 X) => (p0 X))).
+val q0 : term -> prop.
+val q1 : term -> prop.
+assert (forall (X:term). ((q1 X) => (q0 X))) && (exists (X:term). (q1 X)).
+val s : term -> term -> prop.
+val r : term -> term -> prop.
+assert
+  forall (X:term).
+    ((p0 X)
+     => ((forall (Y:term).
+            (((exists (Z:term). ((r Y Z) && (q0 Z))) && (p0 Y) && (s Y X))
+             => (r X Y))) || 
+         (forall (Y:term). ((q0 Y) => (r X Y))))).
+assert
+  forall (X:term).
+    (forall (Y:term). ((((p4 X) || (p5 X)) && (p3 Y)) => (s X Y))).
+assert forall (X:term). (forall (Y:term). (((p2 Y) && (p3 X)) => (s X Y))).
+assert forall (X:term). (forall (Y:term). (((p1 Y) && (p2 X)) => (s X Y))).
+assert
+  forall (X:term).
+    (forall (Y:term). ((((q1 Y) || (p2 Y)) && (p1 X)) => (~ (r X Y)))).
+assert forall (X:term). (forall (Y:term). (((p4 Y) && (p3 X)) => (r X Y))).
+assert
+  forall (X:term). (forall (Y:term). (((p5 Y) && (p3 X)) => (~ (r X Y)))).
+assert
+  forall (X:term).
+    (((p5 X) || (p4 X)) => (exists (Y:term). ((r X Y) && (q0 Y)))).
+goal
+  exists (X:term).
+    (exists (Y:term).
+       ((exists (Z:term). ((r X Y) && (q1 Z) && (r Y Z))) && (p0 X) && (p0 Y))).

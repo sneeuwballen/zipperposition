@@ -1,3 +1,4 @@
+# expect: sat
 
 
 include "nat.zf".

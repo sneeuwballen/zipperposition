@@ -1,3 +1,4 @@
+# expect: unsat
 include "nat.zf".
 val odd : nat -> prop.
 val even : nat -> prop.

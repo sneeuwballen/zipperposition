@@ -1,3 +1,4 @@
+# expect: unsat
 include "nat.zf".
 
 # p(n) & q(n) => q(n+1)

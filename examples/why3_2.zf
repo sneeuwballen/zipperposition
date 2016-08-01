@@ -1,3 +1,4 @@
+# expect: unsat
 # ZF translation of why3_2.p
 
 data bool := True | False.

@@ -1,3 +1,4 @@
+# expect: unsat
 include "nat.zf".
 
 data tree := empty | node tree term tree.

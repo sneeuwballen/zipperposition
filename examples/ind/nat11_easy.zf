@@ -1,3 +1,4 @@
+# expect: unsat
 include "nat.zf".
 
 lemma forall X. minus X z = X.
