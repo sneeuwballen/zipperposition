@@ -1,6 +1,8 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
+open Libzipperposition
+
 module type S = sig
   module E : Env.S
   module Solver : Sat_solver.S
@@ -28,8 +30,18 @@ module type S = sig
     cut_src: Literals.t list ; (** the lemma itself *)
     cut_pos: E.C.t list; (** clauses true if lemma is true *)
     cut_neg: E.C.t list; (** clauses true if lemma is false *)
+    cut_skolems: (ID.t * Type.t) list;
+      (** skolems of universal variables in [cut_neg] *)
     cut_lit: BLit.t; (** lit that is true if lemma is true *)
   }
+  (** This represents a cut on a formula, where we obtain a list
+      of clauses [cut_pos] representing the formula itself with the
+      trail [lemma],
+      and a list of clauses [cut_neg] with the trail [not lemma] that
+      must be refuted to prove the lemma. Those negative clauses correspond
+      to the negation of [forall x1...xn. F]; they are ground and
+      [cut_skolems] contains the list of Skolem constants corresponding
+      to [x1,...,xn] *)
 
   val pp_cut_res : cut_res CCFormat.printer
   val cut_res_clauses: cut_res -> E.C.t Sequence.t

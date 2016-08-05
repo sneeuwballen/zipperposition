@@ -318,6 +318,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   (* choose between regular and simultaneous superposition *)
   let do_superposition info acc=
+    let open SupInfo in
+    assert (Type.equal (T.ty info.s) (T.ty info.t));
+    assert (Type.equal (T.ty info.s) (T.ty info.u_p));
     if !_use_simultaneous_sup
     then do_simultaneous_superposition info acc
     else do_classic_superposition info acc
@@ -572,6 +575,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                  (fun k->k T.pp t T.pp l T.pp r S.pp subst);
                (* sanity check *)
                assert (
+                 Type.equal (T.ty l) (T.ty r) &&
                  O.compare ord
                    (S.FO.apply_no_renaming subst (l,1))
                    (S.FO.apply_no_renaming subst (r,1)) = Comp.Gt);

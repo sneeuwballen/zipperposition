@@ -145,7 +145,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     | Statement.Assert lits -> [of_lits ~is_goal:false lits]
     | Statement.Goal lits -> [of_lits ~is_goal:true lits]
     | Statement.Lemma l
-    | Statement.NegatedGoal l -> List.map (of_lits ~is_goal:true) l
+    | Statement.NegatedGoal (_,l) -> List.map (of_lits ~is_goal:true) l
 
   let update_trail f c =
     let sclause = SClause.update_trail f c.sclause in

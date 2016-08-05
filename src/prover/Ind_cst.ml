@@ -426,25 +426,27 @@ let cst_of_term t =
     else None
   | _ -> None (* TODO: allow function, if not a constructor *)
 
-(* TODO: generalize to ground terms *)
+let is_potential_cst (id:ID.t) (ty:Type.t): bool =
+  let n_tyvars, ty_args, ty_ret = Type.open_poly_fun ty in
+  n_tyvars=0
+  && ty_args=[] (* constant *)
+  && Ind_ty.is_inductive_type ty_ret
+  && (is_cst id || not (Ind_ty.is_constructor id))
+
+(* TODO: generalize to ground terms starting with uninterpreted fun *)
 (* find inductive constant candidates in terms *)
 let find_cst_in_term t =
   T.Seq.subterms t
   |> Sequence.filter_map
     (fun t -> match T.view t with
       | T.Const id ->
+        if is_potential_cst id (T.ty t)
+        then (
           let n_tyvars, ty_args, ty_ret = Type.open_poly_fun (T.ty t) in
-          (* must be a constant *)
-          if n_tyvars=0 && ty_args=[]
-          then
-            if Ind_ty.is_inductive_type ty_ret then
-              if is_cst id
-              || not (Ind_ty.is_constructor id)
-                then Some (cst_of_id id ty_ret) (* bingo *)
-                else None
-            else
-              None
-          else None
+          assert (n_tyvars=0 && ty_args=[]);
+          Some (cst_of_id id ty_ret) (* bingo *)
+        )
+        else None
       | _ -> None)
 
 (** {6 Path} *)

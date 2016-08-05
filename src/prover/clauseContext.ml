@@ -50,23 +50,16 @@ let hash c =
 
 let hash_fun c h = CCHash.int (hash c) h
 
-let hash = CCHash.apply hash_fun
-
 let make lits ~var =
   assert (Lits.Seq.terms lits
-          |> Sequence.exists (T.var_occurs ~var)
-         );
+          |> Sequence.exists (T.var_occurs ~var));
   {lits; var; hash= ~-1}
 
 let extract lits t =
   if Lits.Seq.terms lits |> Sequence.exists (T.subterm ~sub:t)
   then
-    (* create fresh var to replace [t] *)
-    let i = Lits.Seq.terms lits
-            |> Sequence.flat_map T.Seq.vars
-            |> T.Seq.max_var
-    in
-    let var = HVar.make ~ty:(T.ty t) (i+1) in
+    (* create fresh var to replace [t], negative to avoid collisions later *)
+    let var = HVar.make_unsafe ~ty:(T.ty t) ~-2 in
     let var_t = T.var var in
     (* replace [t] with [var] *)
     let lits =

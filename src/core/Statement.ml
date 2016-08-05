@@ -22,6 +22,8 @@ type attr =
 
 type attrs = attr list
 
+type 'ty skolem = ID.t * 'ty
+
 type ('f, 't, 'ty) view =
   | TyDecl of ID.t * 'ty (** id: ty *)
   | Data of 'ty data list
@@ -31,7 +33,7 @@ type ('f, 't, 'ty) view =
   | Assert of 'f (** assert form *)
   | Lemma of 'f list (** lemma to prove and use, using Avatar cut *)
   | Goal of 'f (** goal to prove *)
-  | NegatedGoal of 'f list (** goal after negation *)
+  | NegatedGoal of 'ty skolem list * 'f list (** goal after negation, with skolems *)
 
 type ('f, 't, 'ty, 'meta) t = {
   view: ('f, 't, 'ty) view;
@@ -61,7 +63,7 @@ let data ?attrs ~src l = mk_ ?attrs ~src (Data l)
 let assert_ ?attrs ~src c = mk_ ?attrs ~src (Assert c)
 let lemma ?attrs ~src l = mk_ ?attrs ~src (Lemma l)
 let goal ?attrs ~src c = mk_ ?attrs ~src (Goal c)
-let neg_goal ?attrs ~src l = mk_ ?attrs ~src (NegatedGoal l)
+let neg_goal ?attrs ~src ~skolems l = mk_ ?attrs ~src (NegatedGoal (skolems, l))
 
 let map_data ~ty:fty d =
   { d with
@@ -82,7 +84,9 @@ let map ~form ~term ~ty st =
       Data l
     | Lemma l -> Lemma (List.map form l)
     | Goal f -> Goal (form f)
-    | NegatedGoal l -> NegatedGoal (List.map form l)
+    | NegatedGoal (sk,l) ->
+      let sk = List.map (fun (i,ty)->i, fty ty) sk in
+      NegatedGoal (sk,List.map form l)
     | Assert f -> Assert (form f)
     | TyDecl (id, ty) -> TyDecl (id, fty ty)
   in
@@ -145,7 +149,7 @@ module Seq = struct
       | Lemma l -> List.iter (fun f -> k (`Form f)) l
       | Assert f
       | Goal f -> k (`Form f)
-      | NegatedGoal l -> List.iter (fun f -> k (`Form f)) l
+      | NegatedGoal (_,l) -> List.iter (fun f -> k (`Form f)) l
 
   let ty_decls st k = match view st with
     | Def (id, ty, _)
@@ -171,7 +175,7 @@ module Seq = struct
     | Goal c -> k c
     | RewriteForm (_, l)
     | Lemma l
-    | NegatedGoal l -> List.iter k l
+    | NegatedGoal (_, l) -> List.iter k l
     | Assert c -> k c
 
   let lits st = forms st |> Sequence.flat_map Sequence.of_list
@@ -249,9 +253,12 @@ let pp ppf ppt ppty out st = match st.view with
         pp_attrs st.attrs (Util.pp_list ~sep:" && " ppf) l
   | Goal f ->
       fpf out "@[<2>goal%a@ @[%a@]@]." pp_attrs st.attrs ppf f
-  | NegatedGoal l ->
-      fpf out "@[<2>negated_goal%a@ @[<hv>%a@]@]." pp_attrs st.attrs
+  | NegatedGoal (sk, l) ->
+      let pp_sk out (id,ty) = fpf out "(%a:%a)" ID.pp id ppty ty in
+      fpf out "@[<hv2>negated_goal%a@ @[<hv>%a@]@ # skolems: @[<h>%a@]@]."
+        pp_attrs st.attrs
         (Util.pp_list ~sep:", " (CCFormat.hovbox ppf)) l
+        (Util.pp_list pp_sk) sk
 
 let to_string ppf ppt ppty = CCFormat.to_string (pp ppf ppt ppty)
 
@@ -279,10 +286,11 @@ module TPTP = struct
     | Goal f ->
         let role = "conjecture" in
         fpf out "@[<2>tff(%s, %s,@ (@[%a@])@]." name role ppf f
-    | NegatedGoal l ->
+    | NegatedGoal (_,l) ->
         let role = "negated_conjecture" in
         List.iter
-          (fun f -> fpf out "@[<2>tff(%s, %s,@ (@[%a@])@]." name role ppf f)
+          (fun f ->
+             fpf out "@[<2>tff(%s, %s,@ (@[%a@])@]." name role ppf f)
           l
     | Def (id, ty, t) ->
         pp_decl out (id,ty);

@@ -29,6 +29,7 @@ let make_t_const id ty rhs =
 (* [id args := rhs] *)
 let make_t id ty args rhs =
   let lhs = T.app (T.const ~ty id) args in
+  assert (Type.equal (T.ty lhs) (T.ty rhs));
   { lhs_id=id; lhs; rhs; }
 
 let rhs_term r = r.rhs

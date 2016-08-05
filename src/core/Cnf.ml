@@ -557,7 +557,8 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) ?(neg_src=id_) ?(cnf_src=id_) 
   let v = simplify_and_rename ~ctx ~disable_renaming ~preprocess seq in
   (* reduce the new formulas to CNF *)
   let res = CCVector.create () in
-  let conv_form ~src f =
+  (* convert formula into CNF, returning a list of clauses and a list of skolems *)
+  let conv_form_sk ~src f : (ID.t * type_) list * clause list =
     Util.debugf ~section 4 "@[<2>reduce@ `@[%a@]`@ to CNF@]" (fun k->k T.pp f);
     let clauses =
       try as_cnf f
@@ -583,8 +584,9 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) ?(neg_src=id_) ?(cnf_src=id_) 
     List.iter
       (fun (id,ty) -> CCVector.push res (Stmt.ty_decl ~src id ty))
       new_ids;
-    clauses
+    new_ids, clauses
   in
+  let conv_form ~src f = snd (conv_form_sk ~src f) in
   CCVector.iter
     (fun st ->
       let src = st.Stmt.src in
@@ -618,12 +620,18 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) ?(neg_src=id_) ?(cnf_src=id_) 
           CCVector.push res (Stmt.lemma ~src l)
       | Stmt.Goal f ->
           let src = src |> neg_src |> cnf_src in
-          let l = conv_form ~src (F.not_ f) in
-          CCVector.push res (Stmt.neg_goal ~src l)
-      | Stmt.NegatedGoal l ->
+          let skolems, l = conv_form_sk ~src (F.not_ f) in
+          CCVector.push res (Stmt.neg_goal ~src ~skolems l)
+      | Stmt.NegatedGoal (sk1,l) ->
           let src = cnf_src src in
-          let l = CCList.flat_map (conv_form ~src) l in
-          CCVector.push res (Stmt.neg_goal ~src l)
+          let skolems, l =
+            CCList.fold_flat_map
+              (fun sk f ->
+                 let sk', clauses = conv_form_sk ~src f in
+                  List.rev_append sk' sk, clauses)
+              sk1 l
+          in
+          CCVector.push res (Stmt.neg_goal ~src ~skolems l)
     )
     v;
   (* return final vector of clauses *)
@@ -662,9 +670,10 @@ let convert seq =
       | Stmt.Goal c ->
           let c = clause_to_fo ~ctx:t_ctx c in
           Stmt.goal ~attrs ~src c
-      | Stmt.NegatedGoal l ->
+      | Stmt.NegatedGoal (sk,l) ->
+          let skolems = List.map (fun (id,ty)->id, conv_ty ty) sk in
           let l = List.map (clause_to_fo ~ctx:t_ctx) l in
-          Stmt.neg_goal ~attrs ~src l
+          Stmt.neg_goal ~attrs ~src ~skolems l
       | Stmt.Lemma l ->
           let l = List.map (clause_to_fo ~ctx:t_ctx) l in
           Stmt.lemma ~attrs ~src l

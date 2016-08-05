@@ -230,6 +230,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     cut_src: Literals.t list ; (** the lemma itself *)
     cut_pos: E.C.t list; (** clauses true if lemma is true *)
     cut_neg: E.C.t list; (** clauses true if lemma is false *)
+    cut_skolems: (ID.t * Type.t) list;
+      (** skolems of universal variables in [cut_neg] *)
     cut_lit: BLit.t; (** lit that is true if lemma is true *)
   }
 
@@ -260,7 +262,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       - skolemize them with fresh (inductive?) constants
       - map each [lit] to [not subst(lit)]
       - compute [bigand_i (bigor_j not c_i_j <- *)
-    let c_neg =
+    let skolems, c_neg =
       let vars : _ HVar.t Scoped.t list =
         Sequence.of_list clauses
         |> Sequence.mapi
@@ -269,38 +271,46 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         |> Sequence.sort_uniq ~cmp:CCOrd.(pair HVar.compare int_)
         |> Sequence.to_rev_list
       in
-      let subst =
-        List.fold_left
+      let subst, skolems =
+        CCList.fold_map
           (fun subst (v,i) ->
             let ty = HVar.ty v in
             let id = skolem_ ~ty in
-            Substs.FO.bind subst ((v:T.var:>Substs.var),i) (T.const ~ty id,0))
+            let subst =
+              Substs.FO.bind subst ((v:T.var:>Substs.var),i) (T.const ~ty id,0)
+            in
+            subst, (id,ty)
+          )
           Substs.empty
           vars
       in
       let renaming = Ctx.renaming_clear() in
-      clauses
-      |> List.mapi (fun sc lits -> lits,sc)
-      |> Util.map_product
-        ~f:(fun (lits,sc) ->
-          Array.to_list lits
-          |> List.map
-             (fun lit ->
-                (* negate, apply subst (to use the Skolem symbols). *)
-                let lit = Lit.negate lit in
-                let lit = Lit.apply_subst ~renaming subst (lit,sc) in
-                [lit])
-        )
-      |> List.map
-        (fun neg_lits ->
-           let trail = Trail.singleton (Trail.Lit.neg box) in
-           let c = C.create ~trail neg_lits proof in
-           C.set_flag flag_cut_introduced c true;
-           c)
+      let clauses =
+        clauses
+        |> List.mapi (fun sc lits -> lits,sc)
+        |> Util.map_product
+          ~f:(fun (lits,sc) ->
+            Array.to_list lits
+            |> List.map
+              (fun lit ->
+                 (* negate, apply subst (to use the Skolem symbols). *)
+                 let lit = Lit.negate lit in
+                 let lit = Lit.apply_subst ~renaming subst (lit,sc) in
+                 [lit])
+          )
+        |> List.map
+          (fun neg_lits ->
+             let trail = Trail.singleton (Trail.Lit.neg box) in
+             let c = C.create ~trail neg_lits proof in
+             C.set_flag flag_cut_introduced c true;
+             c)
+      in
+      skolems, clauses
     in
     { cut_src=clauses;
       cut_pos=c_pos;
       cut_neg=c_neg;
+      cut_skolems=skolems;
       cut_lit=box;
     }
 
