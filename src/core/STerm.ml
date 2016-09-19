@@ -155,6 +155,13 @@ let ty_int = builtin Builtin.TyInt
 let ty_rat = builtin Builtin.TyRat
 let forall_ty ?loc vars t = bind ?loc Binder.forall_ty vars t
 
+let ty_unfold =
+  let rec aux acc ty = match ty.term with
+    | AppBuiltin (Builtin.Arrow, ret :: l) ->
+      aux (l@acc) ret
+    | _ -> acc, ty
+  in
+  aux []
 
 let unfold_bind b =
   let rec aux acc t = match t.term with

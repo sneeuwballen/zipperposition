@@ -78,12 +78,14 @@ Library "libzipperposition_parsers"
   Pack:             true
   Modules:          Parse_tptp, Lex_tptp, Ast_tptp, Util_tptp,
                     Ast_ho, Lex_ho, Parse_ho, Trace_tstp,
-                    Parse_zf, Lex_zf, Util_zf, Parsing_utils, CallProver
+                    Parse_zf, Lex_zf, Util_zf,
+                    Util_tip,
+                    Parsing_utils, CallProver
   Build$:           flag(parsers)
   Install$:         flag(parsers)
   FindlibName:      parsers
   FindlibParent:    libzipperposition
-  BuildDepends:     libzipperposition
+  BuildDepends:     libzipperposition, tip_parser
   BuildTools:       menhir
   XMETARequires:    libzipperposition
 

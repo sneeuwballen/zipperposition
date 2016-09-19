@@ -324,7 +324,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let do_superposition info acc=
     let open SupInfo in
     assert (Type.equal (T.ty info.s) (T.ty info.t));
-    assert (Type.equal (T.ty info.s) (T.ty info.u_p));
+    assert (Unif.Ty.equal ~subst:info.subst
+        (T.ty info.s, info.scope_active) (T.ty info.u_p, info.scope_passive));
     if !_use_simultaneous_sup
     then do_simultaneous_superposition info acc
     else do_classic_superposition info acc

@@ -25,4 +25,5 @@ PKG qcheck
 PKG unix
 PKG msat
 PKG oclock
+PKG tip_parser
 FLG -w +a-4-44-48
