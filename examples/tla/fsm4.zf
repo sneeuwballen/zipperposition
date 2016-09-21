@@ -1,0 +1,12 @@
+# expect: unsat
+
+include "fsm.zf".
+
+# liveness: forall t where state=S2, there is a later t' + t where state=S2 again
+
+goal
+  forall t1.
+  at_state t1 = S2 =>
+  (exists t2.
+   t2 != Now &&
+   at_state (add_time t2 t1) = S2).

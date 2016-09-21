@@ -1,0 +1,7 @@
+# expect: unsat
+
+include "fsm.zf".
+
+# S2 is reachable
+
+goal exists t. at_state t = S2.

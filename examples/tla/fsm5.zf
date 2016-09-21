@@ -1,0 +1,10 @@
+
+# expect: unsat
+
+include "fsm.zf".
+
+# every other state is S2
+
+goal
+  forall t1.
+  (at_state t1 = S2 || at_state (Later t1) = S2).
