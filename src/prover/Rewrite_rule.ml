@@ -16,21 +16,28 @@ let stat_clause_rw = Util.mk_stat "rw.clause steps"
 let prof_term_rw = Util.mk_profiler "rw.term"
 let prof_clause_rw = Util.mk_profiler "rw.clause"
 
+(* A rewrite rule, from [lhs] to [rhs]. *)
 type rule_term = {
   lhs: T.t;
   rhs: T.t;
-  lhs_id: ID.t; (* head of lhs *)
+  lhs_db: T.t; (* lhs, after De Bruijn conversion *)
+  rhs_db: T.t; (* rhs, same *)
 }
 
 (* constant rule [id := rhs] *)
 let make_t_const id ty rhs =
-  { lhs_id=id; lhs=T.const ~ty id; rhs; }
+  assert (T.vars_prefix_order rhs = []);
+  let lhs = T.const ~ty id in
+  { lhs; rhs; lhs_db=lhs; rhs_db=rhs; }
 
 (* [id args := rhs] *)
 let make_t id ty args rhs =
   let lhs = T.app (T.const ~ty id) args in
   assert (Type.equal (T.ty lhs) (T.ty rhs));
-  { lhs_id=id; lhs; rhs; }
+  let vars = T.vars_prefix_order lhs in
+  assert (Sequence.for_all
+      (fun v -> CCList.Set.mem ~eq:HVar.equal v vars) (T.Seq.vars rhs));
+  { lhs; rhs; }
 
 let rhs_term r = r.rhs
 
@@ -41,7 +48,10 @@ type rule_clause = {
   c_lhs: Literal.t;
   c_rhs: Literal.t list list; (* list of clauses *)
 }
-(* invariant: all variables in [c_rhs] also occur in [c_lhs] *)
+(* invariant: all variables in [c_rhs] also occur in [c_lhs].
+
+   For clauses we only rewrite step by step, so we can use the regular
+   system of substitutions. *)
 
 let make_c c_lhs c_rhs = {c_lhs; c_rhs}
 
@@ -55,45 +65,262 @@ let pp_rule_clause out r =
 let compare_rule_term r1 r2 =
   CCOrd.(T.compare r1.lhs r2.lhs <?> (T.compare, r1.rhs, r2.rhs))
 
-module Set = struct
-  module S = CCMultiMap.Make(ID)(struct
-      type t = rule_term
-      let compare = compare_rule_term
+module Term_tree = struct
+  type character =
+    | Symbol of ID.t
+    | BoundVariable of int
+    | DB of int
+
+  type iterator = {
+    cur_char : character;
+    cur_term : T.t;
+    stack : T.t list list; (* skip: drop head, next: first of head *)
+  }
+
+  let char_to_int_ = function
+    | Symbol _ -> 0
+    | BoundVariable _ -> 1
+    | DB _ -> 2
+
+  let compare_char c1 c2 =
+    match c1, c2 with
+      | Symbol s1, Symbol s2 -> ID.compare s1 s2
+      | BoundVariable i, BoundVariable j -> i - j
+      | DB v1, DB v2 -> CCInt.compare v1 v2
+      | _ -> char_to_int_ c1 - char_to_int_ c2
+
+  let eq_char c1 c2 = compare_char c1 c2 = 0
+
+  (** first symbol of t, or variable *)
+  let term_to_char t =
+    match T.Classic.view t with
+      | T.Classic.Var v -> Variable v
+      | T.Classic.DB i -> BoundVariable i
+      | T.Classic.App (f, _) -> Symbol f
+      | T.Classic.AppBuiltin _
+      | T.Classic.NonFO -> Subterm t
+
+  let open_term ~stack t =
+    let cur_char = term_to_char t in
+    match T.view t with
+      | T.Var _
+      | T.DB _
+      | T.AppBuiltin _
+      | T.Const _ ->
+        {cur_char; cur_term=t; stack=[]::stack;}
+      | T.App (_, l) ->
+        {cur_char; cur_term=t; stack=l::stack;}
+
+  let rec next_rec stack = match stack with
+    | [] -> None
+    | []::stack' -> next_rec stack'
+    | (t::next')::stack' ->
+      Some (open_term ~stack:(next'::stack') t)
+
+  let skip iter = match iter.stack with
+    | [] -> None
+    | _next::stack' -> next_rec stack'
+
+  let next iter = next_rec iter.stack
+
+  (* convert term to list of var/symbol *)
+  let to_list t =
+    let rec getnext acc iter =
+      let acc' = iter.cur_char :: acc in
+      match next iter with
+        | None -> List.rev acc'
+        | Some iter' ->
+          getnext acc' iter'
+    in
+    match iterate t with
+      | None -> assert false
+      | Some i -> getnext [] i
+
+
+  type symbol =
+    | S_app_builtin of Builtin.t
+    | S_db of int (* bind/compare with given (bound) De bruijn *)
+    | S_const of ID.t
+
+  let compare_sym a b =
+    let to_int = function
+      | S_app_builtin _ -> 0
+      | S_db _ -> 1 
+      | S_const _ -> 2
+    in
+    match a, b with
+      | S_app_builtin b1, S_app_builtin b2 -> Builtin.compare b1 b2
+      | S_db i1, S_db i2 -> CCInt.compare i1 i2
+      | S_const c1, S_const c2 -> ID.compare c1 c2
+      | S_app_builtin _, _
+      | S_db _, _
+      | S_const _, _ -> CCInt.compare (to_int a) (to_int b)
+
+  module Map_sym = CCMap.Make(struct
+      type t = symbol
+      let compare = compare_sym
     end)
 
+  type t =
+    | Empty
+    | Leaf of rule_term (* first added *)
+    | Branch of int * t Map_sym.t (* bind/match on given offset *)
+
+  let empty = Empty
+
+  let is_empty = function Empty ->  true | _ -> false
+
+  module IntMap = CCMap.Make(CCInt)
+
+  (* A pair [i, sym] means that we bind/match the De bruijn variable [i] with
+     the symbol [i] *)
+  type linearized = (int * symbol) list
+
+  (* prefix traversal of the term, also returns a map
+     from variables to De Bruijn indices. *)
+  let linearize (t:T.t): linearized * int IntMap.t =
+    let map = ref IntMap.empty in
+    let offset = ref 0 in (* for real DB indices *)
+    let rec aux i stack : linearized = match stack with
+      | [] -> []
+      | t :: stack ->
+        begin match T.view t with
+          | T.DB _ -> assert false
+          | T.Const id -> (i, S_const id) :: aux (i+1) stack
+          | T.Var v ->
+            let v_id = HVar.id v in
+            begin match IntMap.get v_id !map with
+              | Some db ->
+                assert (db <= i);
+                (i, S_db db) :: aux (i+1) stack
+              | None ->
+                let db = !offset in
+                incr offset;
+                map := IntMap.add v_id db !map;
+                (i, S_db db) :: aux (i+1) stack
+            end
+          | T.App (f, l) ->
+            begin match T.view f with
+              | T.Const id -> (i, S_const id) :: aux (i+1) (l @ stack)
+              | _ -> assert false
+            end
+          | T.AppBuiltin (b,l) ->
+            (i,S_app_builtin b) :: aux (i+1) (l @ stack)
+        end
+    in
+    let l = aux 0 [t] in
+    l, !map
+
+  let replace_vars (subst:int IntMap.t)(t:T.t): T.t =
+    let rec aux t = match T.view t with
+      | T.Const _ -> t
+      | T.App (f,l) -> T.app (aux f) (List.map aux l)
+      | T.AppBuiltin (b,l) -> T.app_builtin ~ty:(T.ty t) b (List.map aux l)
+      | T.Var v ->
+        begin match IntMap.get (HVar.id v) subst with
+          | Some db -> T.bvar ~ty:(T.ty t) db
+          | None -> assert false
+        end
+      | T.DB _ -> assert false
+    in aux t
+
+  let add (r:rule_term) (t:t): t =
+    let symbs, subst = linearize r.lhs in
+    let r = { 
+      lhs = replace_vars subst r.lhs;
+      rhs = replace_vars subst r.rhs;
+    } in
+    (* db_env: is the DB already bound? *)
+    let rec aux (db_env:bool DBEnv.t) (l:linearized) t: t =
+      match l, t with
+        | [], Leaf _ -> t (* already taken *)
+        | [], Empty -> Leaf r
+        | [], Branch _ -> assert false (* wrong arity *)
+        | (i, s) :: tail, Empty ->
+          let db_env = DBEnv.set db_env i true in
+          Branch (i, Map_sym.singleton s (aux db_env tail Empty))
+        | (i, s) :: tail, Branch (j, map) ->
+          assert (i=j);
+          let db_env = DBEnv.set db_env i true in
+          let sub = Map_sym.get_or ~or_:Empty s map in
+          let sub = aux db_env tail sub in
+          Branch (j, Map_sym.add s sub map)
+        | _ :: _, Leaf _ -> assert false (* wrong arity *)
+    in
+    aux DBEnv.empty symbs t
+
+  (* find a matching occurrence for the given pattern.
+     @return [Some (env, r)] if [env(r.lhs) = pat] *)
+  let find (arg:T.t) (t:t): (T.t DBEnv.t * rule_term) option =
+    (* env: bindings for De bruijn indices in the rule
+       offsets: map offsets to subterms of the [arg]
+       stack: prefix traversal of arg
+       t: current subtree
+    *)
+    let rec aux
+        (env:_ DBEnv.t)
+        (offsets:T.t CCRAL.t)
+        (subst:int IntMap.t) stack t = match stack, t with
+      | [], Empty -> None
+      | [], Leaf r -> Some (env, r)
+      | [], Branch _ -> assert false
+      | _::_, (Empty | Leaf _) -> assert false
+      | t :: stack, Branch (i, map) ->
+        let sym = match T.view t with
+          | T.Const id -> S_const id
+          | T.Var _
+            begin
+
+        end
+    in
+    aux DBEnv.empty pat [t]
+
+  let to_seq t yield =
+    let rec aux = function
+      | Empty -> ()
+      | Leaf rule -> yield rule
+      | Branch (_, map) ->
+        Map_sym.iter (fun _ t' -> aux t') map
+    in
+    aux t
+end
+
+module Set = struct
+
   type t = {
-    terms: S.t;
+    terms: Term_tree.t;
     clauses: rule_clause list;
   }
   (* head symbol -> set of rules *)
 
   let empty = {
-    terms=S.empty;
+    terms=Term_tree.empty;
     clauses=[];
   }
 
-  let is_empty t = S.is_empty t.terms && t.clauses=[]
+  let is_empty t = Term_tree.is_empty t.terms && t.clauses=[]
 
-  let add_term r s = {s with terms=S.add s.terms r.lhs_id r}
+  let add_term r s = {s with terms=Term_tree.add r s.terms}
   let add_clause r s = {s with clauses=r :: s.clauses}
-
-  let find_iter s id = S.find_iter s.terms id
 
   let add_stmt stmt t = match Stmt.view stmt with
     | Stmt.Def (id, ty, rhs) ->
       (* simple constant *)
       let r = make_t_const id ty rhs in
-      Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k->k pp_rule_term r);
+      Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]"
+        (fun k->k pp_rule_term r);
       add_term r t
     | Stmt.RewriteTerm (id, ty, args, rhs) ->
       let r = make_t id ty args rhs in
-      Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k->k pp_rule_term r);
+      Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]"
+        (fun k->k pp_rule_term r);
       add_term r t
     | Stmt.RewriteForm (lhs, rhs) ->
       let lhs = Literal.Conv.of_form lhs in
       let rhs = List.map (List.map Literal.Conv.of_form) rhs in
       let r = make_c lhs rhs in
-      Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k->k pp_rule_clause r);
+      Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]"
+        (fun k->k pp_rule_clause r);
       add_clause r t
     | Stmt.TyDecl _
     | Stmt.Data _
@@ -102,7 +329,7 @@ module Set = struct
     | Stmt.Goal _
     | Stmt.NegatedGoal _ -> t
 
-  let to_seq_t t = S.to_seq t.terms |> Sequence.map snd
+  let to_seq_t t = Term_tree.to_seq t.terms
   let to_seq_c t = Sequence.of_list t.clauses
 
   let pp out t =
@@ -156,7 +383,8 @@ let normalize_term_ rules t =
                  | Some (r, subst) ->
                    (* rewrite [t = r.lhs\sigma] into [rhs] (and normalize [rhs],
                       which contain variables bound by [subst]) *)
-                   Util.debugf ~section 5 "@[<2>rewrite `@[%a@]`@ using `@[%a@]`@ with `@[%a@]`@]"
+                   Util.debugf ~section 5
+                     "@[<2>rewrite `@[%a@]`@ using `@[%a@]`@ with `@[%a@]`@]"
                      (fun k->k T.pp t' pp_rule_term r Su.pp subst);
                    Util.incr_stat stat_term_rw;
                    reduce ~subst 1 r.rhs k
