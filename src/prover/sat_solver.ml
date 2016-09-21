@@ -39,6 +39,9 @@ module Make(Dummy : sig end)
   (* queue of clauses waiting for being pushed into the solver *)
   let queue_ = Queue.create()
 
+  (* flag to indicate whether it's time to re-check the model *)
+  let must_check = ref false
+
   (* channel on which to print boolean clauses *)
   let dump_to : out_channel option ref = ref None
 
@@ -61,15 +64,20 @@ module Make(Dummy : sig end)
       incr n;
       x
 
+  let add_clause_ ~proof c =
+    Util.incr_stat stat_num_clauses;
+    (* if the clause has only negative lits: check again *)
+    if List.for_all (fun lit -> not (Lit.sign lit)) c
+    then must_check := true;
+    Queue.push ([c], proof, fresh_tag_ ()) queue_
+
   let add_clause ~proof (c:clause) =
     dump_l [c];
-    Util.incr_stat stat_num_clauses;
-    Queue.push ([c], proof, fresh_tag_ ()) queue_
+    add_clause_ ~proof c
 
   let add_clauses ~proof l =
     dump_l l;
-    Util.add_stat stat_num_clauses (List.length l);
-    Queue.push (l, proof, fresh_tag_ ()) queue_
+    List.iter (add_clause_ ~proof) l
 
   let add_clause_seq ~proof (seq:clause Sequence.t) =
     add_clauses ~proof (Sequence.to_rev_list seq)
@@ -237,8 +245,13 @@ module Make(Dummy : sig end)
     !result_
 
   let check_ () =
-    if Queue.is_empty queue_ then !result_
-    else check_unconditional_ ()
+    if !must_check
+    then (
+      assert (not (Queue.is_empty queue_));
+      must_check := false;
+      check_unconditional_ ()
+    )
+    else !result_
 
   (* initialize eval/eval_level to enforce invariant *)
   let () =
