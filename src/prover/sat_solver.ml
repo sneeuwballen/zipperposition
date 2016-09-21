@@ -10,6 +10,8 @@ module SI = Msat.Solver_intf
 
 let section = Util.Section.make ~parent:Const.section "msat"
 let prof_call_msat = Util.mk_profiler "msat.call"
+let stat_num_clauses = Util.mk_stat "msat.num_clauses"
+let stat_num_calls = Util.mk_stat "msat.num_calls"
 
 type proof_step = Sat_solver_intf.proof_step
 type proof = Sat_solver_intf.proof
@@ -61,10 +63,12 @@ module Make(Dummy : sig end)
 
   let add_clause ~proof (c:clause) =
     dump_l [c];
+    Util.incr_stat stat_num_clauses;
     Queue.push ([c], proof, fresh_tag_ ()) queue_
 
   let add_clauses ~proof l =
     dump_l l;
+    Util.add_stat stat_num_clauses (List.length l);
     Queue.push (l, proof, fresh_tag_ ()) queue_
 
   let add_clause_seq ~proof (seq:clause Sequence.t) =
@@ -208,6 +212,7 @@ module Make(Dummy : sig end)
     proof_ := None;
     eval_ := eval_fail_;
     eval_level_ := eval_fail_;
+    Util.incr_stat stat_num_calls;
     (* add pending clauses *)
     while not (Queue.is_empty queue_) do
       let c, proof, tag = Queue.pop queue_ in
