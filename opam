@@ -39,7 +39,7 @@ depopts: [
   "qcheck" {test}
 ]
 available: [
-    ocaml-version >= "4.00.1"
+    ocaml-version >= "4.02.3"
 ]
 tags: [ "logic" "unification" "term" "superposition" "prover" ]
 bug-reports: "https://github.com/c-cube/zipperposition/issues"
