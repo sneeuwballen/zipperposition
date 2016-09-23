@@ -27,7 +27,7 @@ type t = {
 }
 type ctx=t
 
-let equal c1 c2 = HVar.equal c1.var c2.var && Lits.equal c1.lits c2.lits
+let equal c1 c2 = HVar.equal Type.equal c1.var c2.var && Lits.equal c1.lits c2.lits
 
 let raw_lits t = t.lits
 
@@ -35,7 +35,7 @@ let raw_lits t = t.lits
    if same type, instantiate with some specific "diamond" of that type
    and check for alpha-equiv *)
 let compare c1 c2 =
-  CCOrd.(HVar.compare c1.var c2.var <?> (Lits.compare, c1.lits, c2.lits))
+  CCOrd.(HVar.compare Type.compare c1.var c2.var <?> (Lits.compare, c1.lits, c2.lits))
 
 let real_hash_fun c h =
   h |> Literals.hash_fun c.lits |> HVar.hash_fun c.var

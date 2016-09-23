@@ -32,7 +32,7 @@ let occurs_check ~depth subst (v,sc_v) t =
         check ~depth (ty, sc_t) ||
         match T.view t with
         | T.Var v' ->
-            (HVar.equal v v' && sc_v = sc_t)
+            (HVar.equal T.equal v v' && sc_v = sc_t)
             ||
             begin match Substs.find subst (v',sc_t) with
               | None -> false
@@ -115,10 +115,10 @@ module Inner = struct
     | _, T.Var _ ->
         begin match view1, view2, op with
         | T.Var v1, T.Var v2, O_equal ->
-            if HVar.equal v1 v2 && sc1=sc2
+            if HVar.equal T.equal v1 v2 && sc1=sc2
             then subst else fail()
         | T.Var v1, T.Var v2, (O_unify | O_variant | O_match_protect _)
-          when HVar.equal v1 v2 && sc1=sc2 -> subst
+          when HVar.equal T.equal v1 v2 && sc1=sc2 -> subst
         | T.Var v1, _, O_match_protect (P_vars s) when T.VarSet.mem v1 s ->
             assert (sc1=sc2);
             fail() (* blocked variable *)

@@ -226,7 +226,7 @@ module Seq = struct
 end
 
 let var_occurs ~var t =
-  Sequence.exists (HVar.equal var) (Seq.vars t)
+  Sequence.exists (HVar.equal Type.equal var) (Seq.vars t)
 
 let rec size t = match view t with
   | Var _
@@ -284,7 +284,9 @@ let of_ty t = (t : Type.t :> T.t)
 module Pos = struct
   let at t pos = of_term_unsafe (T.Pos.at (t :> T.t) pos)
 
-  let replace t pos ~by = of_term_unsafe (T.Pos.replace (t:>T.t) pos ~by:(by:>T.t))
+  let replace t pos ~by =
+    assert (Type.equal (at t pos |> ty) (ty t));
+    of_term_unsafe (T.Pos.replace (t:>T.t) pos ~by:(by:>T.t))
 end
 
 let replace t ~old ~by =

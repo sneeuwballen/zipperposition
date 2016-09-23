@@ -285,7 +285,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             then raise (ExitSuperposition "will yield a tautology");
         | _ -> ()
       end;
-      let passive_lit' = Lit.apply_subst_no_simp ~renaming subst (info.passive_lit, sc_p) in
+      let passive_lit' =
+        Lit.apply_subst_no_simp ~renaming subst (info.passive_lit, sc_p)
+      in
       if (
         O.compare ord (S.FO.apply ~renaming info.subst (info.s, sc_a)) t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
@@ -297,8 +299,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let lits_a = Lit.apply_subst_list ~renaming subst (lits_a, sc_a) in
       (* build passive literals and replace u|p\sigma with t\sigma *)
       let u' = S.FO.apply ~renaming subst (info.u_p, sc_p) in
+      assert (Type.equal (T.ty u') (T.ty t'));
       let lits_p = Array.to_list (C.lits info.passive) in
       let lits_p = Lit.apply_subst_list ~renaming subst (lits_p, sc_p) in
+      (* assert (T.equal (Lits.Pos.at (Array.of_list lits_p) info.passive_pos) u'); *)
       let lits_p = List.map (Lit.map (fun t-> T.replace t ~old:u' ~by:t')) lits_p in
       (* build clause *)
       let new_lits = lits_a @ lits_p in

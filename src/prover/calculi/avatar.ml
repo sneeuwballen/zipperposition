@@ -42,7 +42,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     UnionFind.Make(struct
       type key = T.var
       type value = Lit.t list
-      let equal = HVar.equal
+      let equal = HVar.equal Type.equal
       let hash = HVar.hash
       let zero = []
       let merge = List.rev_append
@@ -268,7 +268,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         |> Sequence.mapi
           (fun i lits -> Literals.Seq.vars lits |> Sequence.map (fun v->v,i))
         |> Sequence.flatten
-        |> Sequence.sort_uniq ~cmp:CCOrd.(pair HVar.compare int_)
+        |> Sequence.sort_uniq ~cmp:CCOrd.(pair (HVar.compare Type.compare) int_)
         |> Sequence.to_rev_list
       in
       let subst, skolems =

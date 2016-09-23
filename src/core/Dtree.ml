@@ -35,7 +35,7 @@ let char_to_int_ = function
 let compare_char c1 c2 =
   (* compare variables by index *)
   let compare_vars v1 v2 =
-    let c = HVar.compare v1 v2 in
+    let c = HVar.compare Type.compare v1 v2 in
     if c=0 then Type.compare (HVar.ty v1) (HVar.ty v2) else c
   in
   match c1, c2 with

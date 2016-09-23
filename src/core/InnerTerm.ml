@@ -70,7 +70,7 @@ let _hash_norec t h =
 let rec _eq_norec t1 t2 =
   _eq_ty t1 t2 &&
   match t1.term, t2.term with
-  | Var i, Var j -> HVar.equal i j
+  | Var i, Var j -> HVar.equal equal i j
   | DB i, DB j -> i = j
   | Const s1, Const s2 -> ID.equal s1 s2
   | Bind (b1, varty1, t1'), Bind (b2, varty2, t2') ->
@@ -182,8 +182,8 @@ module Tbl = CCHashtbl.Make(AsKey)
 
 module HVarKey = struct
   type t = term HVar.t
-  let compare = HVar.compare
-  let equal = HVar.equal
+  let compare = HVar.compare compare
+  let equal = HVar.equal equal
   let hash = HVar.hash
 end
 

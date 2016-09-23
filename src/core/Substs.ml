@@ -11,8 +11,8 @@ type var = T.t HVar.t
 
 module VarInt = struct
   type t = var Scoped.t
-  let compare = Scoped.compare HVar.compare
-  let equal = Scoped.equal HVar.equal
+  let compare = Scoped.compare (HVar.compare T.compare)
+  let equal = Scoped.equal (HVar.equal T.equal)
   let hash = Scoped.hash HVar.hash_fun
 end
 
@@ -208,7 +208,7 @@ let apply subst ~renaming t =
               (after specializing its type if needed) *)
           let v = HVar.cast v ~ty:ty' in
           let v' = Renaming.rename renaming (v,sc_t) in
-          if T.equal ty ty' && HVar.equal v v'
+          if T.equal ty ty' && HVar.equal T.equal v v'
           then t
           else T.var v'
         end
@@ -307,7 +307,7 @@ module FO : SPECIALIZED with type term = FOTerm.t = struct
   let apply subst ~renaming t =
     FOTerm.of_term_unsafe (apply subst ~renaming (t : term Scoped.t :> T.t Scoped.t))
 
-  let apply_no_renaming  subst t =
+  let apply_no_renaming subst t =
     FOTerm.of_term_unsafe (apply_no_renaming  subst (t : term Scoped.t :> T.t Scoped.t))
 
   let bind = (bind :> t -> var Scoped.t -> term Scoped.t -> t)

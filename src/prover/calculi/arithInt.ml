@@ -1689,7 +1689,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let is_shielded lits ~var =
     let rec shielded_by_term ~root t = match T.view t with
-      | T.Var v' when HVar.equal v' var -> not root
+      | T.Var v' when HVar.equal Type.equal v' var -> not root
       | T.Var _
       | T.DB _
       | T.Const _ -> false
