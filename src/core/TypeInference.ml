@@ -338,6 +338,16 @@ let infer_ty ctx ty =
   try Err.return (infer_ty_exn ctx ty)
   with e -> Err.of_exn_trace e
 
+(* add type variables if needed, to apply [some_fun:ty_fun] to [l] *)
+let add_implicit_params ty_fun l =
+  let tyvars, args, _ = T.Ty.unfold ty_fun in
+  let l' =
+    if List.length l = List.length args
+    then List.map (fun _ -> PT.wildcard) tyvars
+    else []
+  in
+  l'@l
+
 (* infer a type for [t], possibly updating [ctx]. Also returns a
    continuation to build a typed term. *)
 let rec infer_rec ctx t =
@@ -353,6 +363,7 @@ let rec infer_rec ctx t =
       T.const ~ty id
   | PT.App ({PT.term=PT.Const s; _}, l) ->
       let id, ty_s = Ctx.get_id_ ?loc ~arity:(List.length l) ctx s in
+      let l = add_implicit_params ty_s l in
       (* infer types for arguments *)
       let l = List.map (infer_rec ctx) l in
       Util.debugf ~section 5 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
