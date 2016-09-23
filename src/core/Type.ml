@@ -60,6 +60,7 @@ let is_bvar ty = match view ty with | DB _ -> true | _ -> false
 let is_app ty = match view ty with App _ -> true | _ -> false
 let is_fun ty = match view ty with | Fun _ -> true | _ -> false
 let is_forall ty = match view ty with | Forall _ -> true | _ -> false
+let is_prop ty = match view ty with | Builtin Prop -> true | _ -> false
 
 let tType = T.tType
 let prop = T.builtin ~ty:tType Builtin.Prop

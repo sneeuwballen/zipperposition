@@ -1,3 +1,4 @@
+# expect: unsat
 # exercize rewriting
 
 val set : type -> type.

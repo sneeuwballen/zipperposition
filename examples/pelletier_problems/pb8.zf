@@ -1,0 +1,5 @@
+# expect: UNSAT
+val term : type.
+val q : prop.
+val p : prop.
+goal ((p => q) => p) => p.

@@ -1,2 +1,3 @@
+# expect: unsat
 include "tree.zf".
 goal forall (T:tree). ((rev (rev T)) = T).

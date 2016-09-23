@@ -3,12 +3,16 @@
 
 (** {1 Boolean Literal} *)
 
+open Libzipperposition
+
 module type S = Bool_lit_intf.S
 
 module type PAYLOAD = sig
   type t
   val dummy : t
 end
+
+let stat_num_lit = Util.mk_stat "msat.num_lits"
 
 module Make(Payload : PAYLOAD)
 : S with type payload = Payload.t
@@ -26,6 +30,7 @@ module Make(Payload : PAYLOAD)
   let fresh_id =
     let n = ref 1 in
     fun () ->
+      Util.incr_stat stat_num_lit;
       let id = !n in
       incr n;
       id

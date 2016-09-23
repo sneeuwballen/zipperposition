@@ -1,3 +1,4 @@
+# expect: sat
 val term : type.
 
 data nat :=

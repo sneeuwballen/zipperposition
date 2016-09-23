@@ -75,6 +75,11 @@ tags:
 dot:
 	for i in *.dot; do dot -Tsvg "$$i" > "$$( basename $$i .dot )".svg; done
 
+TEST_FILES = tests/ examples/
+
+frogtest:
+	frogtest run -c ./tests/conf.toml $(TEST_FILES)
+
 TARBALL=zipperposition.tar.gz
 
 package: clean

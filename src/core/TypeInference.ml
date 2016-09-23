@@ -601,6 +601,16 @@ let rec as_def ?loc bound t =
           end
         | _ -> fail()
       end
+    | T.AppBuiltin (Builtin.Not, [lhs]) ->
+      let rhs = T.Form.false_ in
+      check_vars ?loc bound lhs rhs;
+      let lhs = SLiteral.of_form lhs in
+      `Prop (lhs, rhs)
+    | _ when T.Ty.is_prop (T.ty_exn t) ->
+      let rhs = T.Form.true_ in
+      check_vars ?loc bound t rhs;
+      let lhs = SLiteral.of_form t in
+      `Prop (lhs, rhs)
     | _ -> fail()
 
 let infer_statement_exn ctx st =

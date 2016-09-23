@@ -1,3 +1,4 @@
+# expect: unsat
 include "nat.zf".
 val double : nat -> nat.
 assert forall (X:nat). ((double (s X)) = (s (s (double X)))).

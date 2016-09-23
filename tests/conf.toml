@@ -1,0 +1,16 @@
+
+[test]
+
+timeout = 10 # in s
+memory = 2000 # in MB
+provers = [ "zipperposition" ]
+problems = ".*.zf"
+dir = [ "examples", "tests" ]
+
+[zipperposition]
+
+binary = "./zipperposition.native"
+cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory"
+unsat = "SZS status (Theorem|Unsatisfiable)"
+sat = "SZS status (CounterSatisfiable|Satisfiable)"
+timeout = "SZS Status ResourceOut"

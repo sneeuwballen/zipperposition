@@ -1,3 +1,4 @@
+# expect: unsat
 # commutativity
 
 include "nat.zf".

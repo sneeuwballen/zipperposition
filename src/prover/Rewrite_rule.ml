@@ -29,6 +29,7 @@ let make_t_const id ty rhs =
 (* [id args := rhs] *)
 let make_t id ty args rhs =
   let lhs = T.app (T.const ~ty id) args in
+  assert (Type.equal (T.ty lhs) (T.ty rhs));
   { lhs_id=id; lhs; rhs; }
 
 let rhs_term r = r.rhs
@@ -139,12 +140,15 @@ let normalize_term_ rules t =
            let t' = if T.same_l l l' then t else T.app f l' in
            match T.view f with
              | T.Const id ->
-               let sc' = sc+1 in
                let find_rule =
                  Set.find_iter rules id
                  |> Sequence.find
                    (fun r ->
-                      try Some (r, Unif.FO.matching ~subst ~pattern:(r.lhs,sc') (t',sc))
+                      try
+                        let subst' =
+                          Unif.FO.matching ~subst ~pattern:(r.lhs,1) (t',0)
+                        in
+                        Some (r, subst')
                       with Unif.Fail -> None)
                in
                begin match find_rule with
@@ -155,7 +159,7 @@ let normalize_term_ rules t =
                    Util.debugf ~section 5 "@[<2>rewrite `@[%a@]`@ using `@[%a@]`@ with `@[%a@]`@]"
                      (fun k->k T.pp t' pp_rule_term r Su.pp subst);
                    Util.incr_stat stat_term_rw;
-                   reduce ~subst sc' r.rhs k
+                   reduce ~subst 1 r.rhs k
                end
              | _ -> k t'
         )

@@ -116,6 +116,10 @@ val cst_cover_set : cst -> cover_set option
     [bigor_{i in 1...n} t=ti] is the skolemized version of the
     exhaustivity axiom on [t]'s type. *)
 
+val is_potential_cst : ID.t -> Type.t -> bool
+(** [is_potential_cst id ty] returns [true] if [id:ty] is already an
+    inductive constant, or if it can be turned into one *)
+
 val find_cst_in_term : FOTerm.t -> cst Sequence.t
 (** [find_cst_in_lits term] searches subterms of [term] for constants
     that are of an inductive type and that are not constructors.

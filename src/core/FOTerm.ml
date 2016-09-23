@@ -288,6 +288,7 @@ module Pos = struct
 end
 
 let replace t ~old ~by =
+  assert (Type.equal (ty by) (ty old));
   of_term_unsafe (T.replace (t:t:>T.t) ~old:(old:t:>T.t) ~by:(by:t:>T.t))
 
 let symbols ?(init=ID.Set.empty) t =

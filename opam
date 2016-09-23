@@ -30,7 +30,7 @@ depends: [
   "gen"
   "oclock"
   "oasis"
-  "msat" { >= "0.3" < "0.4" }
+  "msat" { >= "0.4" < "0.5" }
 ]
 depopts: [
   "menhir" {build}

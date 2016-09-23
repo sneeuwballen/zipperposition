@@ -27,6 +27,8 @@ type attr =
 
 type attrs = attr list
 
+type 'ty skolem = ID.t * 'ty
+
 type ('f, 't, 'ty) view =
   | TyDecl of ID.t * 'ty (** id: ty *)
   | Data of 'ty data list
@@ -36,7 +38,7 @@ type ('f, 't, 'ty) view =
   | Assert of 'f (** assert form *)
   | Lemma of 'f list (** lemma to prove and use, using Avatar cut *)
   | Goal of 'f (** goal to prove *)
-  | NegatedGoal of 'f list (** goal after negation *)
+  | NegatedGoal of 'ty skolem list * 'f list (** goal after negation, with skolems *)
 
 type ('f, 't, 'ty, 'meta) t = {
   view: ('f, 't, 'ty) view;
@@ -63,7 +65,8 @@ val data : ?attrs:attrs -> src:'src -> 'ty data list -> (_, _, 'ty, 'src) t
 val assert_ : ?attrs:attrs -> src:'src -> 'f -> ('f, _, _, 'src) t
 val lemma : ?attrs:attrs -> src:'src -> 'f list -> ('f, _, _, 'src) t
 val goal : ?attrs:attrs -> src:'src -> 'f -> ('f, _, _, 'src) t
-val neg_goal : ?attrs:attrs -> src:'src -> 'f list -> ('f, _, _, 'src) t
+val neg_goal :
+  ?attrs:attrs -> src:'src -> skolems:'ty skolem list -> 'f list -> ('f, _, 'ty, 'src) t
 
 val signature : ?init:Signature.t -> (_, _, Type.t, _) t Sequence.t -> Signature.t
 (** Compute signature when the types are using {!Type} *)

@@ -1,3 +1,4 @@
+# expect: unsat
 
 # Example to exercize data
 # polymorphic list: specialized map on list

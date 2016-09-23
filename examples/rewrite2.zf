@@ -1,3 +1,4 @@
+# expect: unsat
 # exercize narrowing
 
 val set : type -> type.

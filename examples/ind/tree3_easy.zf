@@ -1,0 +1,10 @@
+
+# expect: unsat
+
+include "tree.zf".
+
+goal
+  forall (X:term).
+    forall (T1:tree).
+       forall (T2:tree). (subtree T1 T2 && mem X T1) => mem X T2.
+

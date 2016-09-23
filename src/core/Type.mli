@@ -52,6 +52,7 @@ val is_bvar : t -> bool
 val is_app : t -> bool
 val is_fun : t -> bool
 val is_forall : t -> bool
+val is_prop : t -> bool
 
 (** {2 Constructors} *)
 

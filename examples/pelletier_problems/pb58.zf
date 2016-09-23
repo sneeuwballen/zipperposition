@@ -1,0 +1,6 @@
+# expect: UNSAT
+val term : type.
+val g : term -> term.
+val f : term -> term.
+assert forall (X:term). (forall (Y:term). ((f X) = (g Y))).
+goal forall (X:term). (forall (Y:term). ((f (f X)) = (f (g Y)))).

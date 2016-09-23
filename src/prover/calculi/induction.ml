@@ -130,6 +130,11 @@ module Make
   type min_witness = {
     mw_cst: Ind_cst.cst;
       (* the constant *)
+    mw_generalize_on: Ind_cst.cst list;
+      (* list of other constants we can generalize in the strengthening.
+         E.g. in [not p(a,b)], with [mw_cst=a], [mw_generalize_on=[b]],
+         we obtain [not p(0,b)], [not p(s(a'),b)], [p(a',X)] where [b]
+         was generalized *)
     mw_contexts: ClauseContext.t list;
       (* the conjunction of contexts for which [cst] is minimal
          (that is, in the model, any term smaller than [cst] makes at
@@ -152,6 +157,28 @@ module Make
      - when expanding a coverset in clauses_of_min_witness, see if there
        are other constants in the path with same type, in which case
      strenghten! *)
+
+  (* replace the constants by fresh variables *)
+  let generalize_lits (lits:Lits.t) ~(generalize_on:Ind_cst.cst list) : Lits.t =
+    if generalize_on=[] then lits
+    else (
+      let offset = (Lits.Seq.vars lits |> T.Seq.max_var) + 1 in
+      (* (constant -> variable) list *)
+      let pairs =
+        List.mapi
+          (fun i c ->
+             let ty = Ind_cst.cst_ty c in
+             let id = Ind_cst.cst_id c in
+             T.const ~ty id, T.var (HVar.make ~ty (i+offset)))
+          generalize_on
+      in
+      Lits.map
+        (fun t ->
+           List.fold_left
+             (fun t (cst,var) -> T.replace ~old:cst ~by:var t)
+             t pairs)
+        lits
+    )
 
   (* for each member [t] of the cover set:
      for each ctx in [mw.mw_contexts]:
@@ -178,7 +205,8 @@ module Make
                mw.mw_contexts
            in
            (* clauses [CNF(¬ And_i ctx_i[t']) <- b_lit] for
-              each t' subterm of case *)
+              each t' subterm of case, with generalization on other
+              inductive constants *)
            let neg_clauses =
              Ind_cst.case_sub_constants case
              |> Sequence.filter_map
@@ -201,8 +229,12 @@ module Make
                          let lits = Array.map Literal.negate lits in
                          [Array.to_list lits])
                     |> List.map
+                      (fun l ->
+                         let lits = Array.of_list l in
+                         generalize_lits ~generalize_on:mw.mw_generalize_on lits)
+                    |> List.map
                       (fun lits ->
-                         C.create lits mw.mw_proof ~trail:(Trail.singleton b_lit))
+                         C.create_a lits mw.mw_proof ~trail:(Trail.singleton b_lit))
                   in
                   Sequence.of_list clauses)
             |> Sequence.to_rev_list
@@ -210,8 +242,11 @@ module Make
            (* all new clauses *)
            let res = List.rev_append pos_clauses neg_clauses in
            Util.debugf ~section 2
-             "@[<2>minimality of `%a`@ in case `%a`:@ @[<hv>%a@]@]"
-             (fun k->k Ind_cst.pp_cst mw.mw_cst T.pp (Ind_cst.case_to_term case)
+             "@[<2>minimality of `%a`@ in case `%a` \
+              @[generalize_on (@[%a@])@]:@ @[<hv>%a@]@]"
+             (fun k-> k
+                 Ind_cst.pp_cst mw.mw_cst T.pp (Ind_cst.case_to_term case)
+                 (Util.pp_list Ind_cst.pp_cst) mw.mw_generalize_on
                  (Util.pp_list C.pp) res);
            Sequence.of_list res)
       |> Sequence.to_rev_list
@@ -235,13 +270,15 @@ module Make
 
   (* [cst] is the minimal term for which contexts [ctxs] holds, returns
      clauses expressing that, and assert boolean constraints *)
-  let assert_min ~trail ~proof ctxs (cst:Ind_cst.cst) =
+  let assert_min
+      ~trail ~proof ~(generalize_on:Ind_cst.cst list) ctxs (cst:Ind_cst.cst) =
     let path = path_of_trail trail in
     match Ind_cst.cst_cover_set cst with
       | Some set when not (Ind_cst.path_contains_cst path cst) ->
         decl_cst_ cst;
         let mw = {
           mw_cst=cst;
+          mw_generalize_on=generalize_on;
           mw_contexts=ctxs;
           mw_coverset=set;
           mw_path=path;
@@ -285,6 +322,8 @@ module Make
          );
          res)
 
+  (* TODO: only do this when the clause already has some induction
+     in its trail (must comes from lemma/goal) *)
   (* when a clause contains new inductive constants, assert minimality
      of the clause for all those constants independently *)
   let inf_assert_minimal c =
@@ -296,13 +335,17 @@ module Make
            let ctx = ClauseContext.extract_exn (C.lits c) (Ind_cst.cst_to_term cst) in
            let proof = ProofStep.mk_inference [C.proof c]
                ~rule:(ProofStep.mk_rule "min") in
-           assert_min ~trail:(C.trail c) ~proof [ctx] cst)
+           (* no generalization, we have no idea whether [consts]
+              originate from a universal quantification *)
+           assert_min ~trail:(C.trail c) ~proof ~generalize_on:[] [ctx] cst)
         consts
     in
     clauses
 
-  (* clauses when we do induction on [cst] *)
-  let induction_on_ ?(trail=Trail.empty) (clauses:C.t list) ~cst : C.t list =
+  (* clauses when we do induction on [cst], generalizing the constants
+     [generalize_on] *)
+  let induction_on_
+      ?(trail=Trail.empty) (clauses:C.t list) ~cst ~generalize_on : C.t list =
     decl_cst_ cst;
     Util.debugf ~section 1 "@[<2>perform induction on `%a`@ in `@[%a@]`@]"
       (fun k->k Ind_cst.pp_cst cst (Util.pp_list C.pp) clauses);
@@ -318,32 +361,37 @@ module Make
       ProofStep.mk_inference (List.map C.proof clauses)
         ~rule:(ProofStep.mk_rule "min")
     in
-    assert_min ~trail ~proof ctxs cst
+    assert_min ~trail ~proof ~generalize_on ctxs cst
+
+  (* find inductive constants within the skolems *)
+  let ind_consts_of_skolems (l:(ID.t*Type.t) list) : Ind_cst.cst list =
+    l
+    |> List.filter (CCFun.uncurry Ind_cst.is_potential_cst)
+    |> List.map (CCFun.uncurry Ind_cst.cst_of_id)
 
   (* hook for converting some statements to clauses.
      It check if [Negated_goal l] contains inductive clauses, in which case
      it states their collective minimality.
      It also handles inductive Lemmas *)
   let convert_statement st =
-    let consts_of_l l =
-      Sequence.of_list l
-      |> Sequence.flat_map Sequence.of_list
-      |> Sequence.flat_map SLiteral.to_seq
-      |> scan_terms
-    in
     match Statement.view st with
-    | Statement.NegatedGoal l ->
+    | Statement.NegatedGoal (skolems, _) ->
       (* find inductive constants *)
-      begin match consts_of_l l with
+      begin match ind_consts_of_skolems skolems with
         | [] -> E.CR_skip
         | consts ->
-          (* first, get "proper" clauses *)
+          (* first, get "proper" clauses, with proofs *)
           let clauses = C.of_statement st in
           (* for each new inductive constant, assert minimality of
              this constant w.r.t the set of clauses that contain it *)
           consts
           |> CCList.flat_map
-            (fun cst -> induction_on_ clauses ~cst)
+            (fun cst ->
+               (* generalize on the other constants *)
+               let generalize_on =
+                 CCList.remove ~eq:Ind_cst.cst_equal ~x:cst consts
+               in
+               induction_on_ clauses ~cst ~generalize_on)
           |> E.cr_add
         end
     | _ -> E.cr_skip
@@ -352,13 +400,8 @@ module Make
 
   (* look whether, to prove the lemma, we need induction *)
   let on_lemma cut =
-    (* find inductive constants in the negative part of the lemma *)
-    let consts =
-      cut.A.cut_neg
-      |> Sequence.of_list
-      |> Sequence.flat_map C.Seq.terms
-      |> scan_terms
-    in
+    (* find inductive constants within the skolems *)
+    let consts = ind_consts_of_skolems cut.A.cut_skolems in
     begin match consts with
       | [] -> () (* regular lemma *)
       | consts ->
@@ -366,7 +409,11 @@ module Make
         let trail = Trail.singleton (BoolLit.neg cut.A.cut_lit) in
         let l =
           CCList.flat_map
-            (fun cst -> induction_on_ ~trail cut.A.cut_neg ~cst)
+            (fun cst ->
+               let generalize_on =
+                 CCList.remove ~eq:Ind_cst.cst_equal ~x:cst consts
+               in
+               induction_on_ ~trail ~generalize_on cut.A.cut_neg ~cst)
             consts
         in
         new_lemmas_ := List.rev_append l !new_lemmas_;

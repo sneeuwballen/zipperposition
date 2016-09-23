@@ -63,19 +63,4 @@ module type S = sig
       @raise Invalid_argument if the literal is not at level 0 *)
 
   val setup: unit -> unit
-
-  (** {6 Incrementality}
-      We manage a stack for backtracking to older states *)
-
-  (* TODO fix this *)
-
-  type save_level
-
-  val root_save_level : save_level
-
-  val save : unit -> save_level
-  (** Save current state on the stack *)
-
-  val restore : save_level -> unit
-  (** Restore to a level below in the stack *)
 end
