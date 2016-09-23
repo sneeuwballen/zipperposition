@@ -431,6 +431,22 @@ module Ty = struct
 
   let close_forall t = close_all ~ty:tType Binder.ForallTy t
 
+  let unfold t =
+    let rec u_forall t = match view t with
+      | Forall (v, t') ->
+        let tyvars, args, ret = u_forall t' in
+        v::tyvars, args, ret
+      | _ ->
+        let args, ret = u_args t in
+        [], args, ret
+    and u_args t = match view t with
+      | Fun (args, ret) ->
+        let args', ret = u_args ret in
+        args @ args', ret
+      | _ -> [], t
+    in
+    u_forall t
+
   let rec arity t = match view t with
     | Forall (_, t') ->
         let a,b = arity t' in

@@ -46,6 +46,7 @@ val var : ?loc:location -> string -> t
 val v_wild : t (** wildcard *)
 val mk_var : ?loc:location -> var -> t
 val app : ?loc:location -> t -> t list -> t
+val app_const : ?loc:location -> string -> t list -> t
 val builtin : ?loc:location -> Builtin.t -> t
 val app_builtin : ?loc:location -> Builtin.t -> t list -> t
 val const : ?loc:location -> string -> t
@@ -86,6 +87,16 @@ val ty_rat : t
 val fun_ty : ?loc:location -> t list -> t -> t
 val forall_ty : ?loc:location -> typed_var list -> t -> t
 
+val ty_unfold : t -> t list * t
+val unfold_bind: Binder.t -> t -> typed_var list * t
+
+val map :
+  bind:('b_acc -> typed_var -> 'b_acc * typed_var) ->
+  f:('b_acc -> term -> term) ->
+  'b_acc ->
+  term ->
+  term
+
 module Set : CCSet.S with type elt = term
 module Map : CCMap.S with type key = term
 module Tbl : CCHashtbl.S with type key = term
@@ -107,7 +118,11 @@ val close_all : Binder.t -> t -> t  (** Bind all free vars with the symbol *)
 val subterm : strict:bool -> t -> sub:t -> bool
   (** is [sub] a (strict?) subterm of the other arg? *)
 
+(** {2 Print} *)
+
 include Interfaces.PRINT with type t := t
+
+(** {2 Formats} *)
 
 module TPTP : sig
   include Interfaces.PRINT with type t := t
@@ -116,3 +131,17 @@ end
 module ZF : sig
   include Interfaces.PRINT with type t := t
 end
+
+(** {2 Subst} *)
+
+module StrMap : CCMap.S with type key = string
+
+type subst = t StrMap.t
+
+val empty_subst : subst
+
+val merge_subst : subst -> subst -> subst
+(** [merge a b] merges [a] into [b], but favors [b] in case
+    of conflict *)
+
+val apply_subst : subst -> term -> term

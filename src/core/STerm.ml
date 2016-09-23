@@ -109,6 +109,7 @@ let app ?loc s l = match l with
   | [] -> s
   | _::_ -> make_ ?loc (App(s,l))
 let const ?loc s = make_ ?loc (Const s)
+let app_const ?loc s l = app (const ?loc s) l
 let bind ?loc s v l = match v with
   | [] -> l
   | _::_ -> make_ ?loc (Bind(s,v,l))
@@ -127,8 +128,8 @@ let is_var = function | {term=Var _; _} -> true | _ -> false
 let true_ = builtin Builtin.true_
 let false_ = builtin Builtin.false_
 
-let and_ ?loc l = app_builtin ?loc Builtin.and_ l
-let or_ ?loc l = app_builtin ?loc Builtin.or_ l
+let and_ ?loc = function [] -> true_ | [x] -> x | l -> app_builtin ?loc Builtin.and_ l
+let or_ ?loc = function [] -> false_ | [x] -> x | l -> app_builtin ?loc Builtin.or_ l
 let not_ ?loc a = app_builtin ?loc Builtin.not_ [a]
 let equiv ?loc a b = app_builtin ?loc Builtin.equiv [a;b]
 let xor ?loc a b = app_builtin ?loc Builtin.xor [a;b]
@@ -154,6 +155,37 @@ let ty_int = builtin Builtin.TyInt
 let ty_rat = builtin Builtin.TyRat
 let forall_ty ?loc vars t = bind ?loc Binder.forall_ty vars t
 
+
+let unfold_bind b =
+  let rec aux acc t = match t.term with
+    | Bind (b', vars, t) when b=b' ->
+      aux (List.rev_append vars acc) t
+    | _ -> List.rev acc, t
+  in
+  aux []
+
+let map ~bind ~f acc t =
+  let loc = t.loc in
+  let view = match t.term with
+    | Var v -> Var v
+    | Const c -> Const c
+    | AppBuiltin (b, l) ->
+      let l = List.map (f acc) l in
+      AppBuiltin (b, l)
+    | App (hd, l) ->
+      let hd = f acc hd in
+      let l = List.map (f acc) l in
+      App (hd, l)
+    | Bind (b, vars, body) ->
+      let acc, vars = CCList.fold_map bind acc vars in
+      let body = f acc body in
+      Bind (b, vars, body)
+    | List l -> List (List.map (f acc) l)
+    | Record (l, row) ->
+      let l = List.map (fun (name,t) -> name, f acc t) l in
+      Record (l, row)
+  in
+  make_ ?loc view
 
 module AsKey = struct
   type t = term
@@ -237,6 +269,8 @@ let close_all s t =
 let subterm ~strict t ~sub =
   (not strict && equal t sub)
   || Sequence.exists (equal sub) (Seq.subterms t)
+
+(** {2 Print} *)
 
 let rec pp out t = match t.term with
   | Var v -> pp_var out v
@@ -415,3 +449,38 @@ module ZF = struct
 
   let to_string = CCFormat.to_string pp
 end
+
+(** {2 Subst} *)
+
+module StrMap = CCMap.Make(String)
+
+type subst = t StrMap.t
+
+let empty_subst = StrMap.empty
+
+let merge_subst a b =
+  StrMap.merge_safe a b
+    ~f:(fun _ v -> match v with
+      | `Both (_,x) -> Some x (* favor right one *)
+      | `Left x | `Right x -> Some x)
+
+(* make fresh copy of [base] not bound in subst *)
+let copy_fresh_ subst v : subst * typed_var = match v with
+  | Wildcard, ty -> subst, (Wildcard, ty)
+  | V base, ty ->
+    let rec aux i =
+      let v = Printf.sprintf "%s%d" base i in
+      if StrMap.mem v subst then aux (i+1) else v
+    in
+    let new_base = aux 0 in
+    StrMap.add base (var new_base) subst, (V new_base, ty)
+
+let rec apply_subst (subst:subst) (t:t): t = match t.term with
+  | Var (V s) -> StrMap.get_or ~or_:t s subst
+  | Var Wildcard -> t
+  | _ ->
+    map
+      ~bind:copy_fresh_
+      ~f:apply_subst
+      subst t
+
