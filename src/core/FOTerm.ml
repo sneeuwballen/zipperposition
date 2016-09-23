@@ -285,7 +285,7 @@ module Pos = struct
   let at t pos = of_term_unsafe (T.Pos.at (t :> T.t) pos)
 
   let replace t pos ~by =
-    assert (Type.equal (at t pos |> ty) (ty t));
+    assert (Type.equal (at t pos |> ty) (ty by));
     of_term_unsafe (T.Pos.replace (t:>T.t) pos ~by:(by:>T.t))
 end
 
