@@ -50,7 +50,8 @@ let as_graph =
 
 let pp_result out = function
   | Form f -> TypedSTerm.pp out f
-  | Clause c -> C.pp out c
+  | Clause c ->
+    Format.fprintf out "%a/%d" C.pp c (C.id c)
   | BoolClause lits -> BBox.pp_bclause out lits
 
 let pp_result_of out proof = pp_result out proof.result
