@@ -432,11 +432,11 @@ let rec infer_rec ctx t =
       unify ?loc (T.ty_exn a) (T.ty_exn b);
       if T.Ty.returns_tType (T.ty_exn a)
         then error_ ?loc "(in)equation @[%a@] ?= @[%a@] between types is forbidden" T.pp a T.pp b;
-      if T.Ty.returns_prop (T.ty_exn a)
-        then error_ ?loc "(in)equation @[%a@] ?= @[%a@] between prop is forbidden" T.pp a T.pp b;
       begin match conn with
-        | Builtin.Eq -> T.Form.eq a b
-        | Builtin.Neq -> T.Form.neq a b
+        | Builtin.Eq ->
+          if T.Ty.returns_prop (T.ty_exn a) then T.Form.equiv a b else T.Form.eq a b
+        | Builtin.Neq ->
+          if T.Ty.returns_prop (T.ty_exn a) then T.Form.xor a b else T.Form.neq a b
         | _ -> assert false
       end
   | PT.Bind(((Binder.Forall | Binder.Exists) as binder), vars, f') ->
