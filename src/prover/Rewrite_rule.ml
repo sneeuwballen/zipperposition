@@ -24,7 +24,9 @@ type rule_term = {
 
 (* constant rule [id := rhs] *)
 let make_t_const id ty rhs =
-  { lhs_id=id; lhs=T.const ~ty id; rhs; }
+  let lhs = T.const ~ty id in
+  assert (Type.equal (T.ty rhs) (T.ty lhs));
+  { lhs_id=id; lhs; rhs; }
 
 (* [id args := rhs] *)
 let make_t id ty args rhs =
@@ -123,7 +125,7 @@ let normalize_term_ rules t =
   (* compute normal form of subterm
      @param k the continuation
      @return [t'] where [t'] is the normal form of [t] *)
-  let rec reduce ~subst sc t k = match T.view t with
+  let rec reduce t k = match T.view t with
     | T.Const id ->
       (* pick a constant rule *)
       begin match Set.find_iter rules id |> Sequence.head with
@@ -131,11 +133,11 @@ let normalize_term_ rules t =
         | Some r ->
           assert (T.is_const r.lhs);
           (* reduce [rhs], but no variable can be bound *)
-          reduce ~subst:Substs.empty 0 r.rhs k
+          reduce r.rhs k
       end
     | T.App (f, l) ->
       (* first, reduce subterms *)
-      reduce_l ~subst sc l
+      reduce_l l
         (fun l' ->
            let t' = if T.same_l l l' then t else T.app f l' in
            match T.view f with
@@ -146,7 +148,7 @@ let normalize_term_ rules t =
                    (fun r ->
                       try
                         let subst' =
-                          Unif.FO.matching ~subst ~pattern:(r.lhs,1) (t',0)
+                          Unif.FO.matching ~pattern:(r.lhs,1) (t',0)
                         in
                         Some (r, subst')
                       with Unif.Fail -> None)
@@ -156,33 +158,33 @@ let normalize_term_ rules t =
                  | Some (r, subst) ->
                    (* rewrite [t = r.lhs\sigma] into [rhs] (and normalize [rhs],
                       which contain variables bound by [subst]) *)
-                   Util.debugf ~section 5 "@[<2>rewrite `@[%a@]`@ using `@[%a@]`@ with `@[%a@]`@]"
+                   Util.debugf ~section 5
+                     "@[<2>rewrite `@[%a@]`@ using `@[%a@]`@ with `@[%a@]`@]"
                      (fun k->k T.pp t' pp_rule_term r Su.pp subst);
                    Util.incr_stat stat_term_rw;
-                   reduce ~subst 1 r.rhs k
+                   (* NOTE: not efficient, will traverse [t'] fully *)
+                   let t' = Substs.FO.apply_no_renaming subst (r.rhs,1) in
+                   reduce t' k
                end
              | _ -> k t'
         )
+    | T.Var _
     | T.DB _ -> k t
-    | T.Var _ ->
-      (* dereference, or return [t]. Careful not to traverse the already-
-          evaluated value! *)
-      k (fst (Su.FO.deref subst (t,sc)))
     | T.AppBuiltin (_,[]) -> k t
     | T.AppBuiltin (b,l) ->
-      reduce_l ~subst sc l
+      reduce_l l
         (fun l' ->
            let t' = if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l' in
            k t')
   (* reduce list *)
-  and reduce_l ~subst sc l k = match l with
+  and reduce_l l k = match l with
     | [] -> k []
     | t :: tail ->
-      reduce_l ~subst sc tail
-        (fun tail' -> reduce ~subst sc t
+      reduce_l tail
+        (fun tail' -> reduce t
             (fun t' -> k (t' :: tail')))
   in
-  reduce ~subst:Su.empty 0 t (fun t->t)
+  reduce t (fun t->t)
 
 let normalize_term rules t =
   Util.with_prof prof_term_rw (normalize_term_ rules) t
