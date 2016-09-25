@@ -391,9 +391,9 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
           lits
       )
     in
-    Format.fprintf out "@[%a@[<2>%a%a@]@]"
+    Format.fprintf out "@[%a@[<2>%a%a@]@]/%d"
       SClause.pp_vars c.sclause pp_lits c.sclause.lits
-      SClause.pp_trail c.sclause.trail;
+      SClause.pp_trail c.sclause.trail c.sclause.id;
     ()
 
   let pp_tstp out c = SClause.pp_tstp out c.sclause

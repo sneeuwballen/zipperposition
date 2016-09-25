@@ -230,11 +230,12 @@ module Make
                          [Array.to_list lits])
                     |> List.map
                       (fun l ->
-                         let lits = Array.of_list l in
-                         generalize_lits ~generalize_on:mw.mw_generalize_on lits)
-                    |> List.map
-                      (fun lits ->
-                         C.create_a lits mw.mw_proof ~trail:(Trail.singleton b_lit))
+                         let lits =
+                           Array.of_list l
+                           |> generalize_lits ~generalize_on:mw.mw_generalize_on
+                         in
+                         C.create_a lits mw.mw_proof
+                           ~trail:(Trail.singleton b_lit))
                   in
                   Sequence.of_list clauses)
             |> Sequence.to_rev_list
@@ -328,13 +329,14 @@ module Make
      of the clause for all those constants independently *)
   let inf_assert_minimal c =
     let consts = scan_clause c in
+    let proof =
+      ProofStep.mk_inference [C.proof c] ~rule:(ProofStep.mk_rule "min")
+    in
     let clauses =
       CCList.flat_map
         (fun cst ->
            decl_cst_ cst;
            let ctx = ClauseContext.extract_exn (C.lits c) (Ind_cst.cst_to_term cst) in
-           let proof = ProofStep.mk_inference [C.proof c]
-               ~rule:(ProofStep.mk_rule "min") in
            (* no generalization, we have no idea whether [consts]
               originate from a universal quantification *)
            assert_min ~trail:(C.trail c) ~proof ~generalize_on:[] [ctx] cst)
