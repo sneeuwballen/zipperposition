@@ -98,6 +98,8 @@ val mk_simp : rule:rule -> of_ list -> t
 
 val mk_esa : rule:rule -> of_ list -> t
 
+val mk_f : t -> form -> of_
+
 val mk_f_trivial : form -> of_
 
 val mk_f_inference : rule:rule -> form -> of_ list -> of_
@@ -123,10 +125,6 @@ val is_goal : t -> bool
 
 val rule : t -> rule option
 (** Rule name for Esa/Simplification/Inference steps *)
-
-val equal : t -> t -> bool
-val hash : t -> int
-val compare : t -> t -> int
 
 val compare_by_result : of_ -> of_ -> int
 (** Compare proofs by their result *)

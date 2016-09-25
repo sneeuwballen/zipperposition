@@ -73,9 +73,9 @@ let step p = p.step
 let kind p = p.kind
 let parents p = p.parents
 
-let compare a b = CCInt.compare a.id b.id
-let equal a b = (compare a b = 0)
-let hash a = a.id
+let equal p1 p2 = p1.id=p2.id
+let compare p1 p2 = CCInt.compare p1.id p2.id
+let hash p = p.id
 
 let res_to_int_ = function
   | Clause _ -> 0
@@ -157,21 +157,21 @@ let mk_simp ~rule parents =
 let mk_esa ~rule parents =
   mk_step_ (Esa rule) parents
 
-let mk_f_ step res = {step; result=Form res; }
+let mk_f step res = {step; result=Form res; }
 
-let mk_f_trivial = mk_f_ mk_trivial
+let mk_f_trivial = mk_f mk_trivial
 
 let mk_f_inference ~rule f parents =
   let step = mk_inference ~rule parents in
-  mk_f_ step f
+  mk_f step f
 
 let mk_f_simp ~rule f parents =
   let step = mk_simp ~rule parents in
-  mk_f_ step f
+  mk_f step f
 
 let mk_f_esa ~rule f parents =
   let step = mk_esa ~rule parents in
-  mk_f_ step f
+  mk_f step f
 
 let mk_c step c = {step; result=Clause c; }
 let mk_bc step c = {step; result=BoolClause c; }
@@ -197,10 +197,6 @@ let rule p = match p.kind with
 
 let is_assert p = match p.kind with Assert _ -> true | _ -> false
 let is_goal p = match p.kind with Goal _ -> true  | _ -> false
-
-let equal p1 p2 = p1.id=p2.id
-let compare p1 p2 = CCInt.compare p1.id p2.id
-let hash p = p.id
 
 (** {2 Proof traversal} *)
 
