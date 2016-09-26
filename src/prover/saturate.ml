@@ -70,7 +70,7 @@ module Make(E : Env.S) = struct
     | None ->
         (* final check: might generate other clauses *)
         let clauses =
-          Env.do_generate()
+          Env.do_generate ~full:true ()
           |> Sequence.filter_map
             (fun c ->
                let c, _ = Env.simplify c in

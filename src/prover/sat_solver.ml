@@ -244,10 +244,10 @@ module Make(Dummy : sig end)
     end;
     !result_
 
-  let check_ () =
-    if !must_check
+  let check_ full =
+    if full || !must_check
     then (
-      assert (not (Queue.is_empty queue_));
+      assert (full || not (Queue.is_empty queue_));
       must_check := false;
       check_unconditional_ ()
     )
@@ -258,7 +258,7 @@ module Make(Dummy : sig end)
     let res = check_unconditional_ () in
     assert (res = Sat)
 
-  let check () = Util.with_prof prof_call_msat check_ ()
+  let check ~full () = Util.with_prof prof_call_msat check_ full
 
   let set_printer pp = pp_ := pp
 

@@ -11,8 +11,9 @@ module type S = sig
   type inf_rule = C.t -> C.t list
   (** An inference returns a list of conclusions *)
 
-  type generate_rule = unit -> C.t list
-  (** Generation of clauses regardless of current clause *)
+  type generate_rule = full:bool -> unit -> C.t list
+  (** Generation of clauses regardless of current clause.
+      @param full if true, perform more thorough checks *)
 
   type binary_inf_rule = inf_rule
   type unary_inf_rule = inf_rule
@@ -189,7 +190,7 @@ module type S = sig
   val do_unary_inferences : C.t -> C.t Sequence.t
   (** do unary inferences for the given clause *)
 
-  val do_generate : unit -> C.t Sequence.t
+  val do_generate : full:bool -> unit -> C.t Sequence.t
   (** do generating inferences *)
 
   val is_trivial : C.t -> bool

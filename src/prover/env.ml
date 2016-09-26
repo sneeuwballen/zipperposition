@@ -45,7 +45,7 @@ module Make(X : sig
   type inf_rule = C.t -> C.t list
   (** An inference returns a list of conclusions *)
 
-  type generate_rule = unit -> C.t list
+  type generate_rule = full:bool -> unit -> C.t list
   (** Generation of clauses regardless of current clause *)
 
   type binary_inf_rule = inf_rule
@@ -267,12 +267,12 @@ module Make(X : sig
     Util.exit_prof prof_generate_unary;
     Sequence.of_list clauses
 
-  let do_generate () =
+  let do_generate ~full () =
     let clauses =
       List.fold_left
         (fun acc (name,g) ->
            Util.debugf ~section 3 "apply generating rule %s" (fun k->k name);
-           List.rev_append (g()) acc)
+           List.rev_append (g ~full ()) acc)
         []
         !_generate_rules
     in
@@ -617,7 +617,7 @@ module Make(X : sig
       )
     done;
     (* generating rules *)
-    let other_clauses = do_generate () in
+    let other_clauses = do_generate ~full:false () in
     (* combine all clauses *)
     let result = Sequence.(
         append

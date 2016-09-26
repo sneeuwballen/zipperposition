@@ -381,10 +381,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   let after_check_sat = Signal.create()
 
   (* Just check the solver *)
-  let check_satisfiability () =
+  let check_satisfiability ~full () =
     Util.enter_prof prof_check;
     Signal.send before_check_sat ();
-    let res = match Sat.check ()  with
+    let res = match Sat.check ~full ()  with
       | Sat_solver.Sat ->
           Util.debug ~section 3 "SAT-solver reports \"SAT\"";
           []

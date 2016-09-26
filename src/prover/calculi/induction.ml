@@ -421,7 +421,7 @@ module Make
         new_lemmas_ := List.rev_append l !new_lemmas_;
     end
 
-  let inf_new_lemmas () =
+  let inf_new_lemmas ~full:_ () =
     let l = !new_lemmas_ in
     new_lemmas_ := [];
     l
