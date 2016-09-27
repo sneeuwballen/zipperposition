@@ -412,7 +412,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       Signal.once Signals.on_exit (fun _ -> show_lemmas ());
     );
     (* be sure there is an initial valuation *)
-    ignore (Sat.check());
+    ignore (Sat.check ~full:true ());
     (* meta lemmas *)
     begin
       try
