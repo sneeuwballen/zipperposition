@@ -214,6 +214,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | _ -> ()
       end;
       let passive_lit' = Lit.apply_subst ~renaming subst (info.passive_lit, sc_p) in
+      let new_trail = C.trail_l [info.active; info.passive] in
+      if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
       if (
         O.compare ord (S.FO.apply ~renaming info.subst (info.s, sc_a)) t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
@@ -239,8 +241,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let proof =
         ProofStep.mk_inference ~rule [C.proof info.active; C.proof info.passive] in
-      let trail = C.trail_l [info.active; info.passive] in
-      let new_clause = C.create ~trail new_lits proof in
+      let new_clause = C.create ~trail:new_trail new_lits proof in
       Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       new_clause :: acc
     with ExitSuperposition reason ->
@@ -288,6 +289,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let passive_lit' =
         Lit.apply_subst_no_simp ~renaming subst (info.passive_lit, sc_p)
       in
+      let new_trail = C.trail_l [info.active; info.passive] in
+      if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
       if (
         O.compare ord (S.FO.apply ~renaming info.subst (info.s, sc_a)) t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
@@ -312,8 +315,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let proof =
         ProofStep.mk_inference ~rule [C.proof info.active; C.proof info.passive] in
-      let trail = C.trail_l [info.active; info.passive] in
-      let new_clause = C.create ~trail new_lits proof in
+      let new_clause = C.create ~trail:new_trail new_lits proof in
       Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       new_clause :: acc
     with ExitSuperposition reason ->
