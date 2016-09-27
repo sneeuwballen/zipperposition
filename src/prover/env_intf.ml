@@ -41,6 +41,9 @@ module type S = sig
        first param is the set of already known redundant clause, the rule
        should add clauses to it *)
 
+  type is_trivial_trail_rule = Trail.t -> bool
+  (** Rule that checks whether the trail is trivial (a tautology) *)
+
   type is_trivial_rule = C.t -> bool
   (** Rule that checks whether the clause is trivial (a tautology) *)
 
@@ -115,6 +118,9 @@ module type S = sig
 
   val add_multi_simpl_rule : multi_simpl_rule -> unit
   (** Add a multi-clause simplification rule *)
+
+  val add_is_trivial_trail : is_trivial_trail_rule -> unit
+  (** Add tautology detection rule *)
 
   val add_is_trivial : is_trivial_rule -> unit
   (** Add tautology detection rule *)
@@ -192,6 +198,9 @@ module type S = sig
 
   val do_generate : full:bool -> unit -> C.t Sequence.t
   (** do generating inferences *)
+
+  val is_trivial_trail : Trail.t -> bool
+  (** Check whether the trail is trivial *)
 
   val is_trivial : C.t -> bool
   (** Check whether the clause is trivial *)

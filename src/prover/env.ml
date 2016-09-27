@@ -74,6 +74,9 @@ module Make(X : sig
        first param is the set of already known redundant clause, the rule
        should add clauses to it *)
 
+  type is_trivial_trail_rule = Trail.t -> bool
+  (** Rule that checks whether the trail is trivial (a tautology) *)
+
   type is_trivial_rule = C.t -> bool
   (** Rule that checks whether the clause is trivial (a tautology) *)
 
@@ -106,6 +109,7 @@ module Make(X : sig
   let _backward_simplify = ref []
   let _redundant = ref []
   let _backward_redundant : backward_redundant_rule list ref = ref []
+  let _is_trivial_trail : is_trivial_trail_rule list ref = ref []
   let _is_trivial : is_trivial_rule list ref = ref []
   let _empty_clauses = ref C.ClauseSet.empty
   let _multi_simpl_rule : multi_simpl_rule list ref = ref []
@@ -184,6 +188,9 @@ module Make(X : sig
 
   let add_simplify r =
     _basic_simplify := r :: !_basic_simplify
+
+  let add_is_trivial_trail r =
+    _is_trivial_trail := r :: !_is_trivial_trail
 
   let add_is_trivial r =
     _is_trivial := r :: !_is_trivial
@@ -311,11 +318,18 @@ module Make(X : sig
     );
     res
 
+  let is_trivial_trail trail = match !_is_trivial_trail with
+    | [] -> false
+    | [f] -> f trail
+    | [f1;f2] -> f1 trail || f2 trail
+    | l -> List.exists (fun f -> f trail) l
+
   let is_trivial c =
     if C.get_flag SClause.flag_persistent c then false
     else (
       let res =
         C.is_redundant c
+        || is_trivial_trail (C.trail c)
         || orphan_criterion c
         || begin match !_is_trivial with
             | [] -> false
