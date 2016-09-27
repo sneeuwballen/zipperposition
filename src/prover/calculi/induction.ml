@@ -295,16 +295,16 @@ module Make
   (* TODO: trail simplification that removes all path literals except
      the longest? *)
 
-  (* checks whether the trail of [c] is trivial, that is:
+  (* checks whether the trail is trivial, that is:
      - contains two literals [i = t1] and [i = t2] with [t1], [t2]
         distinct cover set members, or
      - two literals [loop(i) minimal by a] and [loop(i) minimal by b], or
      - two literals [C in loop(i)], [D in loop(j)] if i,j do not depend
         on one another *)
-  let has_trivial_trail c =
-    let trail = C.trail c |> Trail.to_seq in
+  let trail_is_trivial trail =
+    let seq = Trail.to_seq trail in
     (* all boolean literals that express paths *)
-    let relevant_cases = Sequence.filter_map BoolBox.as_case trail in
+    let relevant_cases = Sequence.filter_map BoolBox.as_case seq in
     (* are there two distinct incompatible paths in the trail? *)
     Sequence.product relevant_cases relevant_cases
     |> Sequence.exists
@@ -317,9 +317,9 @@ module Make
          if res
          then (
            Util.debugf ~section 4
-             "@[<2>clause@ @[%a@]@ redundant because of@ \
-              {@[@[%a@],@,@[%a@]}@] in trail@]"
-             (fun k->k C.pp c Ind_cst.pp_path p1 Ind_cst.pp_path p2)
+             "@[<2>trail@ @[%a@]@ is trivial because of@ \
+              {@[@[%a@],@,@[%a@]}@]@]"
+             (fun k->k C.pp_trail trail Ind_cst.pp_path p1 Ind_cst.pp_path p2)
          );
          res)
 
@@ -433,7 +433,7 @@ module Make
     Ind_cst.max_depth_ := d;
     Env.add_unary_inf "induction.ind" inf_assert_minimal;
     Env.add_clause_conversion convert_statement;
-    Env.add_is_trivial has_trivial_trail;
+    Env.add_is_trivial_trail trail_is_trivial;
     Signal.on_every A.on_input_lemma on_lemma;
     Env.add_generate "ind.lemmas" inf_new_lemmas;
     (* declare new constants to [Ctx] *)

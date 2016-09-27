@@ -151,9 +151,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     );
     [] (* never infers anything! *)
 
-  (* check whether the trail of [c] is false and will remain so *)
-  let trail_is_trivial_ c =
-    let trail = C.trail c in
+  (* check whether the trail is false and will remain so *)
+  let trail_is_trivial_ (trail:Trail.t): bool =
     let res =
       Trail.exists
         (fun lit ->
@@ -165,12 +164,12 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     in
     if res then (
       Util.incr_stat stat_trail_trivial;
-      Util.debugf ~section 3 "@[<2>clause @[%a@]@ has a trivial trail@]" (fun k->k C.pp c);
+      Util.debugf ~section 3 "@[<2>trail @[%a@] is trivial@]" (fun k->k C.pp_trail trail);
     );
     res
 
-  let trail_is_trivial c =
-    Sat.last_result () = Sat_solver.Sat && trail_is_trivial_ c
+  let trail_is_trivial tr =
+    Sat.last_result () = Sat_solver.Sat && trail_is_trivial_ tr
 
   (* simplify the trail of [c] using boolean literals that have been proven *)
   let simplify_trail_ c =
@@ -405,7 +404,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     E.add_unary_inf "avatar_check_empty" check_empty;
     E.add_generate "avatar_check_sat" check_satisfiability;
     E.add_clause_conversion convert_lemma;
-    E.add_is_trivial trail_is_trivial;
+    E.add_is_trivial_trail trail_is_trivial;
     E.add_simplify simplify_trail;
     if E.flex_get k_show_lemmas then (
       Signal.on_every on_input_lemma (fun c -> all_lemmas_ := c :: !all_lemmas_);
