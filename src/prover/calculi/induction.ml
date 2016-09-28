@@ -13,11 +13,14 @@ module Ty = Type
 module type S = Induction_intf.S
 
 let section = Util.Section.make ~parent:Const.section "induction"
+let section_guess = Util.Section.make ~parent:Const.section "lemma_guess"
 
 let stats_lemmas = Util.mk_stat "induction.inductive_lemmas"
+let stats_guess_lemmas = Util.mk_stat "induction.guess_lemmas"
 let stats_min = Util.mk_stat "induction.assert_min"
 
 let k_enable : bool Flex_state.key = Flex_state.create_key()
+let k_lemma_guess : bool Flex_state.key = Flex_state.create_key()
 let k_ind_depth : int Flex_state.key = Flex_state.create_key()
 
 (* TODO
@@ -36,35 +39,21 @@ let k_ind_depth : int Flex_state.key = Flex_state.create_key()
   rule to make trivial any clause with >= 2 incompatible path literals
 *)
 
-module Make
-(E : Env.S)
-(A : Avatar_intf.S with module E = E)
-= struct
-  module Env = E
-  module Ctx = E.Ctx
+(** {2 Guess new Lemmas} *)
+
+module Make_guess_lemma
+    (E : Env.S)(A : Avatar_intf.S with module E = E) : sig
+  val inf_guess_lemma : E.unary_inf_rule
+end = struct
   module C = E.C
-  module BoolBox = BBox
-  module BoolLit = BoolBox.Lit
+
+  let has_pos_lit_ c = CCArray.exists Literal.is_pos (C.lits c)
 
   let is_ind_conjecture_ c =
     match C.distance_to_goal c with
     | Some (0 | 1) -> true
     | Some _
     | None -> false
-
-  let has_pos_lit_ c =
-    CCArray.exists Literal.is_pos (C.lits c)
-
-  (* terms that are either inductive constants or sub-constants *)
-  let constants_or_sub c =
-    C.Seq.terms c
-    |> Sequence.flat_map T.Seq.subterms
-    |> Sequence.filter_map
-      (fun t -> match T.view t with
-        | T.Const id -> Ind_cst.as_cst id
-        | _ -> None)
-    |> Sequence.sort_uniq ~cmp:Ind_cst.cst_compare
-    |> Sequence.to_rev_list
 
   (* sub-terms of an inductive type, that occur several times (candidate
      for "subterm generalization" *)
@@ -89,13 +78,77 @@ module Make
       (fun t (old,by) -> T.replace t ~old ~by)
       t l
 
-  (* fresh var generator *)
-  let fresh_var_gen_ () =
-    let r = ref 0 in
-    fun ty ->
-      let v = T.var_of_int ~ty !r in
-      incr r;
-      v
+  type lemma_candidate = Literals.t list
+
+  (* TODO some basic checks *)
+  let is_acceptable_lemma (_l:lemma_candidate): bool = true
+
+  (* TODO a way of checking if similar lemma already exists *)
+
+  (* when a clause has inductive constants, take its negation
+      and add it as a lemma (some restrictions apply) *)
+  let inf_guess_lemma c =
+    let generalize ~(on:T.t list) () =
+      (* fresh var generator, starting high enough *)
+      let mk_fresh_var_ =
+        let r = ref (C.Seq.vars c |> T.Seq.max_var |> succ) in
+        fun ty ->
+          let v = T.var_of_int ~ty !r in
+          incr r;
+          v
+      in
+      (* abstract w.r.t the terms being generalized. The latter must occur
+         first, as it might contain constants being replaced. *)
+      let replacements =
+        List.map (fun t -> t, mk_fresh_var_ (T.ty t)) on
+      in
+      (* replace constants by variables in [c], then
+          let [f] be [forall... bigAnd_{l in c} not l] *)
+      let lemma = C.lits c
+        |> Literals.map (replace_many replacements)
+        |> Array.map (fun lit -> [| Literal.negate lit |])
+        |> Array.to_list
+      in
+      (* if [box f] already exists or is too deep, no need to re-do inference *)
+      if not (is_acceptable_lemma lemma) (* FIXME || BLit BoolLit.exists_form f *)
+      then []
+      else (
+        (* introduce cut now *)
+        let proof = ProofStep.mk_trivial in
+        let cut = A.introduce_cut lemma proof in
+        A.add_lemma cut;
+        let clauses = cut.A.cut_pos @ cut.A.cut_neg in
+        List.iter (fun c -> C.set_flag SClause.flag_lemma c true) clauses;
+        Util.incr_stat stats_guess_lemmas;
+        Util.debugf ~section:section_guess 2
+          "@[<2>guess lemma generalizing on [@[%a@]]@ in %a@ obtaining @[<hv0>%a@]@]"
+          (fun k->k (Util.pp_list T.pp) on C.pp c (Util.pp_list C.pp) clauses);
+        clauses
+      )
+    in
+    if C.is_ground c
+    && not (is_ind_conjecture_ c)
+    && not (C.get_flag SClause.flag_lemma c)
+    && not (has_pos_lit_ c) (* only positive lemmas, therefore C negative *)
+    && (C.trail c |> Trail.exists BBox.is_inductive) (* in inductive branch *)
+    then
+      let terms = generalizable_subterms c in
+      (* each possible way to generalize a subterm occurring multiple times *)
+      CCList.flat_map (fun t -> generalize ~on:[t] ()) terms
+    else []
+end
+
+(** {2 Perform Induction} *)
+
+module Make
+(E : Env.S)
+(A : Avatar_intf.S with module E = E)
+= struct
+  module Env = E
+  module Ctx = E.Ctx
+  module C = E.C
+  module BoolBox = BBox
+  module BoolLit = BoolBox.Lit
 
   (* scan terms for inductive constants *)
   let scan_terms seq : Ind_cst.cst list =
@@ -446,6 +499,8 @@ module Make
     new_lemmas_ := [];
     l
 
+  (** {2 Register} *)
+
   let register () =
     Util.debug ~section 2 "register induction";
     let d = Env.flex_get k_ind_depth in
@@ -456,12 +511,20 @@ module Make
     Env.add_is_trivial_trail trail_is_trivial;
     Signal.on_every A.on_lemma on_lemma;
     Env.add_generate "ind.lemmas" inf_new_lemmas;
+    if Env.flex_get k_lemma_guess then (
+      Util.debug ~section 2 "enable lemma guessing";
+      let module G = Make_guess_lemma(E)(A) in
+      Env.add_unary_inf "ind.guess_lemma" G.inf_guess_lemma;
+    );
     (* declare new constants to [Ctx] *)
     Signal.on_every Ind_cst.on_new_cst decl_cst_;
     ()
 end
 
+(** {2 Options and Registration} *)
+
 let enabled_ = ref true
+let lemma_guess = ref true
 let depth_ = ref !Ind_cst.max_depth_
 
 (* if induction is enabled AND there are some inductive types,
@@ -489,6 +552,7 @@ let post_typing_hook stmts state =
     state
     |> Flex_state.add Params.key p
     |> Flex_state.add k_enable true
+    |> Flex_state.add k_lemma_guess !lemma_guess
     |> Flex_state.add k_ind_depth !depth_
     |> Flex_state.add Ctx.Key.lost_completeness true
   ) else Flex_state.add k_enable false state
@@ -518,6 +582,8 @@ let extension =
 let () =
   Params.add_opts
     [ "--induction", Options.switch_set true enabled_, " enable induction"
-    ; "--no-induction", Options.switch_set false enabled_, " enable induction"
+    ; "--no-induction", Options.switch_set false enabled_, " disable induction"
+    ; "--lemma-guess", Options.switch_set true lemma_guess, " enable lemma guess"
+    ; "--no-lemma-guess", Options.switch_set false lemma_guess, " disable lemma guess"
     ; "--induction-depth", Arg.Set_int depth_, " maximum depth of nested induction"
     ]
