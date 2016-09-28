@@ -456,7 +456,7 @@ let extension =
 
 let () =
   Params.add_opts
-  [ "--avatar", Arg.Set enabled_, " enable Avatar"
-  ; "--no-avatar", Arg.Clear enabled_, " disable Avatar"
-  ; "--show-lemmas", Arg.Set show_lemmas_, " show status of lemmas"
+  [ "--avatar", Arg.Set enabled_, " enable Avatar splitting"
+  ; "--no-avatar", Arg.Clear enabled_, " disable Avatar splitting"
+  ; "--print-lemmas", Arg.Set show_lemmas_, " show status of Avatar lemmas"
   ]
