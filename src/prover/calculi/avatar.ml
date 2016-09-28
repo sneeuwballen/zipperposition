@@ -397,10 +397,13 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     Util.exit_prof prof_check;
     res
 
-  let register () =
-    Util.debug ~section:Const.section 2 "register extension Avatar";
+  let register ~split:do_split () =
+    Util.debugf ~section:Const.section 2 "register extension Avatar (split: %B)"
+      (fun k->k do_split);
     Sat.set_printer BBox.pp;
-    E.add_multi_simpl_rule split;
+    if do_split then (
+      E.add_multi_simpl_rule split;
+    );
     E.add_unary_inf "avatar_check_empty" check_empty;
     E.add_generate "avatar_check_sat" check_satisfiability;
     E.add_clause_conversion convert_lemma;
@@ -434,7 +437,7 @@ end
 
 let get_env (module E : Env.S) : (module S) = E.flex_get k_avatar
 
-let enabled_ = ref true
+let enabled_ = ref false
 let show_lemmas_ = ref false
 
 let extension =
@@ -446,10 +449,8 @@ let extension =
     let module A = Make(E)(Sat) in
     E.flex_add k_avatar (module A : S);
     E.flex_add k_show_lemmas !show_lemmas_;
-    if !enabled_ then (
-      Util.debug 1 "enable Avatar";
-      A.register()
-    )
+    Util.debug 1 "enable Avatar";
+    A.register ~split:!enabled_ ()
   in
   Extensions.({default with name="avatar"; env_actions=[action]})
 

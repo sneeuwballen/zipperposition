@@ -63,6 +63,8 @@ module type S = sig
   (** Intercepts input lemmas and converts them into clauses.
       Triggers {!on_input_lemma} with the resulting cut *)
 
-  val register : unit -> unit
-  (** Register inference rules to the environment *)
+  val register : split:bool -> unit -> unit
+  (** Register inference rules to the environment
+      @param split if true, the clause splitting rule is added. Otherwise
+      Avatar is only used for other things such as induction. *)
 end
