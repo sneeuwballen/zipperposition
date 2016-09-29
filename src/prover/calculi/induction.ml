@@ -16,8 +16,12 @@ let section = Util.Section.make ~parent:Const.section "induction"
 let section_guess = Util.Section.make ~parent:Const.section "lemma_guess"
 
 let stats_lemmas = Util.mk_stat "induction.inductive_lemmas"
+let stats_guess_lemmas_absurd = Util.mk_stat "induction.guess_lemmas_absurd"
 let stats_guess_lemmas = Util.mk_stat "induction.guess_lemmas"
 let stats_min = Util.mk_stat "induction.assert_min"
+
+let prof_guess_lemma = Util.mk_profiler "induction.guess_lemma"
+let prof_check_lemma = Util.mk_profiler "induction.check_lemma"
 
 let k_enable : bool Flex_state.key = Flex_state.create_key()
 let k_lemma_guess : bool Flex_state.key = Flex_state.create_key()
@@ -46,6 +50,13 @@ module Make_guess_lemma
   val inf_guess_lemma : E.unary_inf_rule
 end = struct
   module C = E.C
+  module SubsumptionIndex = FeatureVector.Make(struct
+      type t = Literals.t
+      let compare = Literals.compare
+      let to_lits c = Array.map Literal.Conv.to_form c |> Sequence.of_array
+    end)
+
+  let section = section_guess
 
   let has_pos_lit_ c = CCArray.exists Literal.is_pos (C.lits c)
 
@@ -80,14 +91,94 @@ end = struct
 
   type lemma_candidate = Literals.t list
 
-  (* TODO some basic checks *)
-  let is_acceptable_lemma (_l:lemma_candidate): bool = true
+  (* set of all lemmas so far, to check if a new candidate lemma
+     has already been tried *)
+  let all_candidates_ = ref (SubsumptionIndex.empty ())
 
-  (* TODO a way of checking if similar lemma already exists *)
+  (* update [all_candidates_] when a lemma is added *)
+  let () =
+    Signal.on_every A.on_lemma
+      (fun cut ->
+         let cs = cut.A.cut_pos |> List.map (fun c -> C.lits c) in
+         all_candidates_ := SubsumptionIndex.add_list !all_candidates_ cs)
+
+  let pp_lemma out (l:lemma_candidate) =
+    Format.fprintf out "{@[<v>%a@]}" (Util.pp_list Literals.pp) l
+
+  (* do only a few steps of inferences *)
+  let max_steps_ = 20
+
+  exception Lemma_yields_false of C.t
+
+  (* check that [lemma] is not obviously absurd or trivial, by making a few steps of
+     superposition inferences between [lemma] and the Active Set.
+     The strategy here is set of support: no inference between clauses of [lemma]
+     and no inferences among active clauses, just between active clauses and
+     those derived from [lemma]. Inferences with trails are dropped because
+     the lemma should be inconditionally true. *)
+  let check_not_absurd_or_trivial (lemma:lemma_candidate): bool =
+    let q : C.t Queue.t = Queue.create() in (* clauses waiting *)
+    let push_c c = Queue.push c q in
+    let n : int ref = ref 0 in (* number of steps *)
+    let trivial = ref true in
+    List.iter
+      (fun lits ->
+         let c = C.create_a ~trail:Trail.empty lits ProofStep.mk_trivial in
+         push_c c)
+      lemma;
+    try
+      while not (Queue.is_empty q) && !n < max_steps_ do
+        incr n;
+        let c = Queue.pop q in
+        let c, _ = E.simplify c in
+        assert (C.trail c |> Trail.is_empty);
+        (* check for empty clause *)
+        if C.is_empty c then raise (Lemma_yields_false c)
+        else if E.is_trivial c then ()
+        else (
+          trivial := false; (* at least one clause does not simplify to [true] *)
+          (* now make inferences with [c] and push non-trivial clauses to [q] *)
+          E.generate c
+          |> Sequence.filter_map
+            (fun new_c ->
+               let new_c, _ = E.simplify new_c in
+               (* discard trivial/conditional clauses; scan for empty clauses *)
+               if not (Trail.is_empty (C.trail new_c)) then None
+               else if E.is_trivial new_c then None
+               else if C.is_empty new_c then raise (Lemma_yields_false new_c)
+               else Some new_c)
+          |> Sequence.iter push_c
+        )
+      done;
+      Util.debugf ~section 2
+        "lemma @[%a@]@ apparently not absurd (after %d steps; trivial:%B)"
+        (fun k->k pp_lemma lemma !n !trivial);
+      not !trivial
+    with Lemma_yields_false c ->
+      assert (C.is_empty c);
+      Util.debugf ~section 2
+        "lemma @[%a@] absurd:@ leads to empty clause %a"
+        (fun k->k pp_lemma lemma C.pp c);
+      Util.incr_stat stats_guess_lemmas_absurd;
+      false
+
+  let check_not_already_tried (lemma:lemma_candidate): bool =
+    let check_lits lits =
+      SubsumptionIndex.retrieve_alpha_equiv_c !all_candidates_ lits
+      |> Sequence.is_empty
+    in
+    List.for_all check_lits lemma
+
+  (* some checks that [l] should be considered as a lemma *)
+  let is_acceptable_lemma_ l : bool =
+    check_not_already_tried l &&
+    check_not_absurd_or_trivial l
+
+  let is_acceptable_lemma x = Util.with_prof prof_check_lemma is_acceptable_lemma_ x
 
   (* when a clause has inductive constants, take its negation
       and add it as a lemma (some restrictions apply) *)
-  let inf_guess_lemma c =
+  let inf_guess_lemma_ c =
     let generalize ~(on:T.t list) () =
       (* fresh var generator, starting high enough *)
       let mk_fresh_var_ =
@@ -136,6 +227,8 @@ end = struct
       (* each possible way to generalize a subterm occurring multiple times *)
       CCList.flat_map (fun t -> generalize ~on:[t] ()) terms
     else []
+
+  let inf_guess_lemma c = Util.with_prof prof_guess_lemma inf_guess_lemma_ c
 end
 
 (** {2 Perform Induction} *)
