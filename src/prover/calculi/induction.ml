@@ -14,7 +14,7 @@ module type S = Induction_intf.S
 
 let section = Util.Section.make ~parent:Const.section "induction"
 
-let stats_lemmas = Util.mk_stat "induction.lemmas"
+let stats_lemmas = Util.mk_stat "induction.inductive_lemmas"
 let stats_min = Util.mk_stat "induction.assert_min"
 
 let k_enable : bool Flex_state.key = Flex_state.create_key()
@@ -418,6 +418,7 @@ module Make
                induction_on_ ~trail ~generalize_on cut.A.cut_neg ~cst)
             consts
         in
+        Util.incr_stat stats_lemmas;
         new_lemmas_ := List.rev_append l !new_lemmas_;
     end
 
