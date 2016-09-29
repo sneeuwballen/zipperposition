@@ -314,12 +314,13 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     }
 
   let on_input_lemma : cut_res Signal.t = Signal.create ()
+  let on_lemma : cut_res Signal.t = Signal.create()
 
   let all_lemmas_ : cut_res list ref = ref []
 
   let add_lemma (c:cut_res): unit =
     all_lemmas_ := c :: !all_lemmas_;
-    Signal.send on_input_lemma c;
+    Signal.send on_lemma c;
     ()
 
   let print_lemmas out () =
@@ -354,6 +355,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       let cut = introduce_cut l proof in
       let all_clauses = cut_res_clauses cut |> Sequence.to_rev_list in
       add_lemma cut;
+      Signal.send on_input_lemma cut;
       (* interrupt here *)
       E.cr_return all_clauses
     | _ -> E.cr_skip

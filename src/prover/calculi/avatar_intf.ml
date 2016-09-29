@@ -62,6 +62,10 @@ module type S = sig
   (** Triggered every time a cut is introduced  for an input lemma
       (i.e. every time a statement of the form `lemma F` is translated) *)
 
+  val on_lemma : cut_res Signal.t
+  (** Triggered every time a cut is introduced, by any means. In
+      particular it is triggered at least as often as {!on_input_lemma} *)
+
   val convert_lemma : E.clause_conversion_rule
   (** Intercepts input lemmas and converts them into clauses.
       Triggers {!on_input_lemma} with the resulting cut *)

@@ -436,7 +436,7 @@ module Make
     Env.add_unary_inf "induction.ind" inf_assert_minimal;
     Env.add_clause_conversion convert_statement;
     Env.add_is_trivial_trail trail_is_trivial;
-    Signal.on_every A.on_input_lemma on_lemma;
+    Signal.on_every A.on_lemma on_lemma;
     Env.add_generate "ind.lemmas" inf_new_lemmas;
     (* declare new constants to [Ctx] *)
     Signal.on_every Ind_cst.on_new_cst decl_cst_;
