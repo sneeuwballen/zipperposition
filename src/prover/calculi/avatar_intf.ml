@@ -55,6 +55,9 @@ module type S = sig
     cut_res
   (** Introduce a cut on the given clause(s). *)
 
+  val add_lemma : cut_res -> unit
+  (** Add the given cut to the list of lemmas *)
+
   val on_input_lemma : cut_res Signal.t
   (** Triggered every time a cut is introduced  for an input lemma
       (i.e. every time a statement of the form `lemma F` is translated) *)
