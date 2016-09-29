@@ -14,3 +14,4 @@ cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory --ou
 unsat = "SZS status (Theorem|Unsatisfiable)"
 sat = "SZS status (CounterSatisfiable|Satisfiable)"
 timeout = "SZS Status ResourceOut"
+version = "git:."
