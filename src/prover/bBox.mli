@@ -51,6 +51,9 @@ val must_be_kept : t -> bool
     that is, that if [C <- lit, Gamma] then any clause derived from [C]
     recursively will have [lit] in its trail. *)
 
+val is_inductive : t -> bool
+(** returns [true] if the bool literal represents an inductive branch *)
+
 (** {2 Printers}
     Those printers print the content (injection) of a boolean literal, if any *)
 
