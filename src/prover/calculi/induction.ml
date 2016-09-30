@@ -17,6 +17,7 @@ let section_guess = Util.Section.make ~parent:Const.section "lemma_guess"
 
 let stats_lemmas = Util.mk_stat "induction.inductive_lemmas"
 let stats_guess_lemmas_absurd = Util.mk_stat "induction.guess_lemmas_absurd"
+let stats_guess_lemmas_trivial = Util.mk_stat "induction.guess_lemmas_trivial"
 let stats_guess_lemmas = Util.mk_stat "induction.guess_lemmas"
 let stats_min = Util.mk_stat "induction.assert_min"
 
@@ -43,6 +44,21 @@ let k_ind_depth : int Flex_state.key = Flex_state.create_key()
   rule to make trivial any clause with >= 2 incompatible path literals
 *)
 
+module Cst_set = CCSet.Make(struct
+    type t = Ind_cst.cst
+    let compare = Ind_cst.cst_compare
+  end)
+
+let scan_term (t:T.t): Cst_set.t =
+  Ind_cst.find_cst_in_term t
+  |> Cst_set.of_seq
+
+(* scan terms for inductive constants *)
+let scan_terms (seq:T.t Sequence.t) : Cst_set.t =
+  seq
+  |> Sequence.flat_map Ind_cst.find_cst_in_term
+  |> Cst_set.of_seq
+
 (** {2 Guess new Lemmas} *)
 
 module Make_guess_lemma
@@ -66,30 +82,22 @@ end = struct
     | Some _
     | None -> false
 
-  (* sub-terms of an inductive type, that occur several times (candidate
+  (* sub-terms that have an inductive (non-arrow) type, candidates
      for "subterm generalization" *)
   let generalizable_subterms c =
-    let count = T.Tbl.create 16 in
     C.Seq.terms c
       |> Sequence.flat_map T.Seq.subterms
       |> Sequence.filter
-        (fun t -> Ind_ty.is_inductive_type (T.ty t) && not (T.is_const t))
-      |> Sequence.iter
         (fun t ->
-           let n = try T.Tbl.find count t with Not_found -> 0 in
-           T.Tbl.replace count t (n+1));
-    (* terms that occur more than once *)
-    T.Tbl.to_seq count
-      |> Sequence.filter_map (fun (t,n) -> if n>1 then Some t else None)
+           assert (T.is_ground t);
+           Type.is_app (T.ty t) &&
+           Ind_ty.is_inductive_type (T.ty t))
+      |> Sequence.sort_uniq ~cmp:T.compare
       |> Sequence.to_rev_list
 
-  (* apply the list of replacements [l] to the term [t] *)
-  let replace_many l t =
-    List.fold_left
-      (fun t (old,by) -> T.replace t ~old ~by)
-      t l
-
   type lemma_candidate = Literals.t list
+
+  let compare_lemma : lemma_candidate CCOrd.t = CCOrd.list_ Literals.compare
 
   (* set of all lemmas so far, to check if a new candidate lemma
      has already been tried *)
@@ -105,7 +113,121 @@ end = struct
   let pp_lemma out (l:lemma_candidate) =
     Format.fprintf out "{@[<v>%a@]}" (Util.pp_list Literals.pp) l
 
-  (* do only a few steps of inferences *)
+  type generalization = (T.Set.t * Type.t) list
+  (** One generalization: a list of clusters, each cluster being
+      a set of terms that should map to the same variable,
+      with some specific type *)
+
+  let pp_generalization out (g:generalization) =
+    let pp_set out (s,_) =
+      Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list T.pp) (T.Set.to_list s)
+    in Format.fprintf out "{@[<hv>%a@]}" (Util.pp_list pp_set) g
+
+  let common_cst c1 c2 : bool =
+    not (Cst_set.is_empty (Cst_set.inter c1 c2))
+
+  (* check predicate [p] on subterms, starting from the root towards the
+     leaves. *)
+  let check_subterms_order_ (c:C.t) (p:T.t -> [`True | `False | `Recurse]): bool =
+    let rec check_term t =
+      match p t with
+        | `True -> true
+        | `False -> false
+        | `Recurse ->
+          match T.view t with
+            | T.AppBuiltin (_, l)
+            | T.App (_, l) -> List.for_all check_term l
+            | T.Const _ | T.DB _ | T.Var _ -> true
+    in
+    C.Seq.terms c |> Sequence.for_all check_term
+
+  (* does every inductive constant of [c] occur only as a
+     non-strict subterm of some element of [g]? *)
+  let covers_all_csts (c:C.t) (g:generalization): bool =
+    let cst_set = C.Seq.terms c |> scan_terms in
+    check_subterms_order_ c
+      (fun t -> match T.view t with
+         | _ when List.exists (fun (set,_) -> T.Set.mem t set) g -> `True
+         | T.Const id ->
+           if Cst_set.exists (fun c -> ID.equal id (Ind_cst.cst_id c)) cst_set
+           then `False else `True
+         | _ -> `Recurse)
+
+  (* does the generalization contain at least one term that is not
+     an inductive constant? *)
+  let has_some_non_cst (g:generalization): bool =
+    let check_t t = match T.view t with
+      | T.Const id -> not (Ind_cst.is_cst id)
+      | _ -> true
+    in
+    List.exists (fun (set,_) -> T.Set.exists check_t set) g
+
+  (* do those terms share at least one common constant? *)
+  let share_common_cst (t1:T.t) (t2:T.t) : bool =
+    common_cst (scan_term t1) (scan_term t2)
+
+  (* TODO:
+     check some things in the generalization. It must be realistic that
+     terms in the same cluster can be equal
+     (e.g. a cluster [t, succ(t)] should flag a generalization as impossible).
+  *)
+
+  (* add a term to the generalization, possibly merging with some existing
+     sets. returns [None] if addition failed. *)
+  let add_term (g:generalization) (t:T.t): generalization option =
+    try
+      let others, set =
+        List.fold_left
+          (fun (others,set_t) (set',ty') ->
+             if T.Set.exists (share_common_cst t) set'
+             then
+               if Type.equal (T.ty t) ty'
+               then others, T.Set.union set_t set'
+               else raise Exit (* should be merged, but can't *)
+             else (set',ty') :: others, set_t)
+          ([], T.Set.singleton t) g
+      in
+      Some ((set, T.ty t) :: others)
+    with Exit -> None
+
+  (* given a set of terms of inductive type that occur in a clause [c], we
+     return all the combinations of those terms that satisfy some criteria.
+
+     Simple generalization:
+     - all the occurrences of inductive constants in [c] are subterms of
+       some cluster in the generalization.
+     - clusters are maximal, that is, two terms that share some sub-constant
+       will belong in the same cluster.
+
+     A cluster is made of different terms that share some ind. constant
+     and will map to the same variable, assuming they all have the same type.
+  *)
+  let enumerate_generalizations (c:C.t) (terms:T.t list): generalization Sequence.t =
+    let cst_set = C.Seq.terms c |> scan_terms in
+    Util.debugf ~section 3
+      "@[<2>try to guess lemmas@ from %a@ \
+       can generalize on [@[%a@]]@ must eliminate [@[%a@]]@]"
+      (fun k->k C.pp c (Util.pp_list T.pp) terms
+          (Util.pp_list Ind_cst.pp_cst) (Cst_set.elements cst_set));
+    (* enumerate states *)
+    let rec aux (g:generalization)(to_process:T.t list): generalization Sequence.t =
+      match to_process with
+        | [] -> Sequence.return g (* done *)
+        | t :: to_process_tail ->
+          let seq1 = match add_term g t with
+            | None -> Sequence.empty  (* skip [t] *)
+            | Some g' -> aux g' to_process_tail
+          and seq2 =
+            aux g to_process_tail (* try without [t] *)
+          in
+          Sequence.append seq1 seq2
+    in
+    aux [] terms
+    |> Sequence.filter
+      (fun g -> has_some_non_cst g && covers_all_csts c g)
+
+  (* do only a few steps of inferences for checking if a candidate lemma
+     is trivial/absurd *)
   let max_steps_ = 20
 
   exception Lemma_yields_false of C.t
@@ -124,7 +246,7 @@ end = struct
     List.iter
       (fun lits ->
          let c = C.create_a ~trail:Trail.empty lits ProofStep.mk_trivial in
-         push_c c)
+         if not (E.is_trivial c) then push_c c)
       lemma;
     try
       while not (Queue.is_empty q) && !n < max_steps_ do
@@ -151,14 +273,15 @@ end = struct
         )
       done;
       Util.debugf ~section 2
-        "lemma @[%a@]@ apparently not absurd (after %d steps; trivial:%B)"
+        "@[<2>lemma @[%a@]@ apparently not absurd (after %d steps; trivial:%B)@]"
         (fun k->k pp_lemma lemma !n !trivial);
+      if !trivial then Util.incr_stat stats_guess_lemmas_trivial;
       not !trivial
     with Lemma_yields_false c ->
       assert (C.is_empty c);
       Util.debugf ~section 2
-        "lemma @[%a@] absurd:@ leads to empty clause %a"
-        (fun k->k pp_lemma lemma C.pp c);
+        "@[<2>lemma @[%a@] absurd:@ leads to empty clause %a (after %d steps)@]"
+        (fun k->k pp_lemma lemma C.pp c !n);
       Util.incr_stat stats_guess_lemmas_absurd;
       false
 
@@ -167,7 +290,11 @@ end = struct
       SubsumptionIndex.retrieve_alpha_equiv_c !all_candidates_ lits
       |> Sequence.is_empty
     in
-    List.for_all check_lits lemma
+    let res = List.for_all check_lits lemma in
+    if not res then (
+      Util.debugf ~section 5 "@[lemma @[%a@]@ already tried@]" (fun k->k pp_lemma lemma)
+    );
+    res
 
   (* some checks that [l] should be considered as a lemma *)
   let is_acceptable_lemma_ l : bool =
@@ -176,56 +303,107 @@ end = struct
 
   let is_acceptable_lemma x = Util.with_prof prof_check_lemma is_acceptable_lemma_ x
 
+  (* make an inference by generalizing on the list of variables [on] in
+     the clause [c] *)
+  let generalize ~(on:generalization) (c:C.t): lemma_candidate =
+    (* fresh var generator, starting high enough *)
+    let mk_fresh_var_ =
+      let r = ref (C.Seq.vars c |> T.Seq.max_var |> succ) in
+      fun ty ->
+        let v = T.var_of_int ~ty !r in
+        incr r;
+        v
+    in
+    (* replace generalized terms by fresh variables *)
+    let replacements : T.t T.Map.t =
+      List.fold_left
+        (fun m (set,ty) ->
+           assert (not (T.Set.is_empty set));
+           T.Set.to_seq set
+           |> Sequence.map (fun t->t,mk_fresh_var_ ty)
+           |> T.Map.add_seq m)
+        T.Map.empty on
+    in
+    (* replace constants by variables in [c], then
+        let [f] be [forall... bigAnd_{l in c} not l] *)
+    let lemma =
+      C.lits c
+      |> Literals.map (fun t -> T.replace_m t replacements)
+      |> Array.map (fun lit -> [| Literal.negate lit |])
+      |> Array.to_list
+    in
+    Util.debugf ~section 2
+      "@[<2>generalizing on %a@ in %a:@ returns @[<hv0>%a@]@]"
+      (fun k->k pp_generalization on C.pp c pp_lemma lemma);
+    lemma
+
+  (* TODO: check conjecture by trying every substitutions of ind. variables
+     with each cstor (fresh variable arguments), and simplifying *)
+
+  (*
+     NOTE: maybe, actually, NEVER do a generalization if there are
+     clusters with several terms. First introduce lemmas to prove those
+     terms are equal; if the lemma is proved, the clause will turn into
+     one with singleton clusters (which will be generalizable!). So,
+     actually, current process should distinguish between
+     - generalization of subterms (accept singleton clusters only!)
+     - candidate equality lemmas otherwise (for non-singleton clusters)
+       to reduce to first case
+  *)
+
+  (* TODO:
+     when a generalization [g] in [c] is obtained, with a cluster [t1, t2…]
+     such that [t1] and [t2] :
+     - are NOT toplevel terms of [c]
+     - at least one is not a constant (but they share >= 1 cst)
+     - look "simpler" than [not c]
+
+     then we can also try the lemma [t1=t2], if it passes the filter.
+
+     For instance, in [f (rev(rev(l))) != f(l)]
+     we might want to prove [l=rev(rev(l))],
+     because we might be able to prove it by induction.
+  *)
+
+  (* check if lemma is relevant/redundant/acceptable, and if yes
+     then turn it into clauses *)
+  let check_and_add_lemma (c:C.t)(lemma:lemma_candidate): C.t list =
+    (* if [box f] already exists or is too deep, no need to re-do inference *)
+    if is_acceptable_lemma lemma
+    then (
+      (* introduce cut now *)
+      let proof = ProofStep.mk_trivial in
+      let cut = A.introduce_cut lemma proof in
+      A.add_lemma cut;
+      let clauses = cut.A.cut_pos @ cut.A.cut_neg in
+      List.iter (fun c -> C.set_flag SClause.flag_lemma c true) clauses;
+      Util.incr_stat stats_guess_lemmas;
+      Util.debugf ~section 2
+        "@[<2>guessed lemma from %a:@ obtaining @[<hv0>%a@]@]"
+        (fun k->k C.pp c (Util.pp_list C.pp) clauses);
+      clauses
+    )
+    else []
+
   (* when a clause has inductive constants, take its negation
       and add it as a lemma (some restrictions apply) *)
   let inf_guess_lemma_ c =
-    let generalize ~(on:T.t list) () =
-      (* fresh var generator, starting high enough *)
-      let mk_fresh_var_ =
-        let r = ref (C.Seq.vars c |> T.Seq.max_var |> succ) in
-        fun ty ->
-          let v = T.var_of_int ~ty !r in
-          incr r;
-          v
-      in
-      (* abstract w.r.t the terms being generalized. The latter must occur
-         first, as it might contain constants being replaced. *)
-      let replacements =
-        List.map (fun t -> t, mk_fresh_var_ (T.ty t)) on
-      in
-      (* replace constants by variables in [c], then
-          let [f] be [forall... bigAnd_{l in c} not l] *)
-      let lemma = C.lits c
-        |> Literals.map (replace_many replacements)
-        |> Array.map (fun lit -> [| Literal.negate lit |])
-        |> Array.to_list
-      in
-      (* if [box f] already exists or is too deep, no need to re-do inference *)
-      if not (is_acceptable_lemma lemma) (* FIXME || BLit BoolLit.exists_form f *)
-      then []
-      else (
-        (* introduce cut now *)
-        let proof = ProofStep.mk_trivial in
-        let cut = A.introduce_cut lemma proof in
-        A.add_lemma cut;
-        let clauses = cut.A.cut_pos @ cut.A.cut_neg in
-        List.iter (fun c -> C.set_flag SClause.flag_lemma c true) clauses;
-        Util.incr_stat stats_guess_lemmas;
-        Util.debugf ~section:section_guess 2
-          "@[<2>guess lemma generalizing on [@[%a@]]@ in %a@ obtaining @[<hv0>%a@]@]"
-          (fun k->k (Util.pp_list T.pp) on C.pp c (Util.pp_list C.pp) clauses);
-        clauses
-      )
-    in
+    let terms = lazy (generalizable_subterms c) in
     if C.is_ground c
     && not (is_ind_conjecture_ c)
     && not (C.get_flag SClause.flag_lemma c)
     && not (has_pos_lit_ c) (* only positive lemmas, therefore C negative *)
     && (C.trail c |> Trail.exists BBox.is_inductive) (* in inductive branch *)
-    then
-      let terms = generalizable_subterms c in
+    && (Lazy.force terms <> [])
+    then (
+      let lazy terms = terms in
       (* each possible way to generalize a subterm occurring multiple times *)
-      CCList.flat_map (fun t -> generalize ~on:[t] ()) terms
+      enumerate_generalizations c terms
+      |> Sequence.map (fun terms' -> generalize c ~on:terms')
+      |> Sequence.sort_uniq ~cmp:compare_lemma
+      |> Sequence.flat_map_l (check_and_add_lemma c)
+      |> Sequence.to_rev_list
+    )
     else []
 
   let inf_guess_lemma c = Util.with_prof prof_guess_lemma inf_guess_lemma_ c
@@ -243,16 +421,9 @@ module Make
   module BoolBox = BBox
   module BoolLit = BoolBox.Lit
 
-  (* scan terms for inductive constants *)
-  let scan_terms seq : Ind_cst.cst list =
-    seq
-    |> Sequence.flat_map Ind_cst.find_cst_in_term
-    |> Sequence.to_rev_list
-    |> CCList.sort_uniq ~cmp:Ind_cst.cst_compare
-
   (* scan clauses for ground terms of an inductive type,
      and declare those terms *)
-  let scan_clause c : Ind_cst.cst list =
+  let scan_clause c : Cst_set.t =
     C.lits c
     |> Lits.Seq.terms
     |> scan_terms
@@ -495,14 +666,14 @@ module Make
       ProofStep.mk_inference [C.proof c] ~rule:(ProofStep.mk_rule "min")
     in
     let clauses =
-      CCList.flat_map
+      Cst_set.elements consts
+      |> CCList.flat_map
         (fun cst ->
            decl_cst_ cst;
            let ctx = ClauseContext.extract_exn (C.lits c) (Ind_cst.cst_to_term cst) in
            (* no generalization, we have no idea whether [consts]
               originate from a universal quantification *)
            assert_min ~trail:(C.trail c) ~proof ~generalize_on:[] [ctx] cst)
-        consts
     in
     clauses
 
