@@ -158,6 +158,12 @@ let is_app t = match T.view t with
   | T.App _ -> true
   | _ -> false
 
+let as_const_exn t = match T.view t with
+  | T.Const c -> c
+  | _ -> invalid_arg "as_const_exn"
+
+let as_const t = try Some (as_const_exn t) with Invalid_argument _ -> None
+
 module Seq = struct
   let vars t k =
     let rec aux t = match view t with
@@ -292,6 +298,9 @@ end
 let replace t ~old ~by =
   assert (Type.equal (ty by) (ty old));
   of_term_unsafe (T.replace (t:t:>T.t) ~old:(old:t:>T.t) ~by:(by:t:>T.t))
+
+let replace_m t m =
+  of_term_unsafe (T.replace_m (t:t:>T.t) (m:t Map.t:>T.t T.Map.t))
 
 let symbols ?(init=ID.Set.empty) t =
   ID.Set.add_seq init (Seq.symbols t)

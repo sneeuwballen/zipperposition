@@ -149,6 +149,9 @@ val replace : t -> old:t -> by:t -> t
 (** [replace t ~old ~by] syntactically replaces all occurrences of [old]
     in [t] by the term [by]. *)
 
+val replace_m : t -> t Map.t -> t
+(** Simultaneous replacement of every [a->b] in the map *)
+
 (** {3 Variables} *)
 
 val bind_vars : ty:t -> Binder.t -> t HVar.t list -> t -> t

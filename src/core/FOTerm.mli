@@ -99,6 +99,9 @@ val is_bvar : t -> bool
 val is_app : t -> bool
 val is_const : t -> bool
 
+val as_const : t -> ID.t option
+val as_const_exn : t -> ID.t
+
 val of_term_unsafe : InnerTerm.t -> t
 (** {b NOTE}: this can break the invariants and make {!view} fail. Only
     apply with caution. *)
@@ -163,6 +166,10 @@ end
 val replace : t -> old:t -> by:t -> t
 (** [replace t ~old ~by] syntactically replaces all occurrences of [old]
     in [t] by the term [by]. *)
+
+val replace_m : t -> t Map.t -> t
+(** [replace t m] syntactically replaces all occurrences of bindings of
+    the map in [t], starting from the root *)
 
 (** {2 High-level operations} *)
 
