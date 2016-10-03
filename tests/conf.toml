@@ -1,4 +1,6 @@
 
+provers = [ "zipperposition" ]
+
 [test]
 
 timeout = 10 # in s
