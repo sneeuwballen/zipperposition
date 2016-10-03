@@ -211,8 +211,9 @@ module Make(Dummy : sig end)
       | None -> assert false
 
   let proved_at_0 lit =
-    let b,l = valuation_level lit in
-    if l=0 then Some b else None
+    if S.true_at_level0 lit then Some true
+    else if S.true_at_level0 (Lit.neg lit) then Some false
+    else None
 
   (* call [S.solve()] in any case, and enforce invariant about eval/unsat_core *)
   let check_unconditional_ () =
