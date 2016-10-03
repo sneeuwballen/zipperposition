@@ -162,24 +162,6 @@ module Make(Dummy : sig end)
     let rec aux p =
       let open S.Proof in
       match S.Proof.expand p with
-      | { conclusion=c; step = S.Proof.Hypothesis } ->
-        let tag = match S.get_tag c with
-          | None ->
-            errorf "no tag in leaf of SAT proof (clause %a)" S.St.pp_clause c
-          | Some id -> id
-        in
-        begin match CCHashtbl.get tbl0 tag with
-        | Some s -> s
-        | None ->
-          begin match CCHashtbl.get tag_to_proof_ tag with
-            | Some step ->
-              let c = bool_clause_of_sat c in
-              let s = ProofStep.mk_bc step c in
-              Hashtbl.add tbl0 tag s;
-              s
-            | None -> errorf "no proof for tag %d" tag
-          end
-        end
       | { step = S.Proof.Lemma _; _ } ->
         errorf "SAT proof involves a lemma"
       | { conclusion=c; step = S.Proof.Resolution (p1,p2,_) } ->
@@ -197,6 +179,24 @@ module Make(Dummy : sig end)
             ResTbl.add tbl_res (c,q1,q2) s;
             ResTbl.add tbl_res (c,q2,q1) s;
             s
+        end
+      | { conclusion=c; step = _ } ->
+        let tag = match S.get_tag c with
+          | None ->
+            errorf "no tag in leaf of SAT proof (clause %a)" S.St.pp_clause c
+          | Some id -> id
+        in
+        begin match CCHashtbl.get tbl0 tag with
+        | Some s -> s
+        | None ->
+          begin match CCHashtbl.get tag_to_proof_ tag with
+            | Some step ->
+              let c = bool_clause_of_sat c in
+              let s = ProofStep.mk_bc step c in
+              Hashtbl.add tbl0 tag s;
+              s
+            | None -> errorf "no proof for tag %d" tag
+          end
         end
     in
     S.Proof.check p;
