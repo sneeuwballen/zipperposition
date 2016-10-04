@@ -83,8 +83,7 @@ frogtest:
 frogtest-tip:
 	@[ -d tip-benchmarks ] || (echo "missing tip-benchmarks/" && exit 1)
 	frogtest run --meta=`git rev-parse HEAD` \
-	  -c ./tip-benchmarks/conf.toml \
-	  tip-benchmarks/
+	  -c ./tip-benchmarks/conf.toml
 
 TARBALL=zipperposition.tar.gz
 
