@@ -6,6 +6,7 @@
 open Libzipperposition
 
 module Lits = Literals
+module TI = InnerTerm
 module T = FOTerm
 module Su = Substs
 module Ty = Type
@@ -226,6 +227,70 @@ end = struct
     |> Sequence.filter
       (fun g -> has_some_non_cst g && covers_all_csts c g)
 
+  (* check lemma on small instances. It returns [true] iff none of the
+     instances reduces to [false] *)
+  let small_check (lemma:lemma_candidate): bool =
+    (* generate instances of [lits]. If [last=true], instantiating variables
+       with parametrized constructors is forbidden *)
+    let gen_instances ~(last:bool) (lits:Literals.t): Literals.t Sequence.t =
+      let rec aux offset subst vars = match vars with
+        | [] ->
+          let renaming = E.Ctx.renaming_clear() in
+          Sequence.return (Literals.apply_subst ~renaming subst (lits,0))
+        | v :: vars' ->
+          begin match Ind_ty.as_inductive_type (HVar.ty v) with
+            | None -> aux offset subst vars' (* ignore [v] *)
+            | Some { Ind_ty.ty_constructors; ty_vars; _ } ->
+              (* try to replace [v] by each constructor *)
+              Sequence.of_list ty_constructors
+              |> Sequence.flat_map
+                (fun {Ind_ty.cstor_ty=c_ty; cstor_name=c_id} ->
+                   let n, ty_args, _ = Type.open_poly_fun c_ty in
+                   assert (n=List.length ty_vars);
+                   if last && ty_args <> []
+                   then Sequence.empty (* fail *)
+                   else (
+                     (* fresh variables as arguments to the constructor *)
+                     let sub_vars =
+                       List.mapi
+                         (fun i ty' -> HVar.make ~ty:ty' (i+offset) |> T.var)
+                         ty_args
+                     in
+                     let t =
+                       T.app_full
+                         (T.const ~ty:c_ty c_id)
+                         (List.map Type.var ty_vars)
+                         sub_vars
+                     in
+                     let subst =
+                       Substs.FO.bind subst ((v:Type.t HVar.t:>TI.t HVar.t),0) (t,0)
+                     in
+                     aux (offset+List.length ty_args) subst vars'
+                   )
+                )
+          end
+      in
+      let vars = Literals.vars lits in
+      let offset = 1 + T.Seq.max_var (Sequence.of_list vars) in
+      aux offset Substs.empty vars
+    in
+    Util.debugf ~section 3 "@[<hv2>small_check lemma@ @[%a@]@]"
+      (fun k->k (Util.pp_list Literals.pp) lemma);
+    Sequence.of_list lemma
+    |> Sequence.flat_map (gen_instances ~last:false) (* depth 1 *)
+    |> Sequence.flat_map (gen_instances ~last:false) (* depth 2 *)
+    |> Sequence.flat_map (gen_instances ~last:true) (* close leaves *)
+    |> Sequence.for_all
+      (fun lits ->
+         let c = C.create_a ~trail:Trail.empty lits ProofStep.mk_trivial in
+         let ds, _ = E.all_simplify c in
+         let res = not (List.exists C.is_empty ds) in
+         Util.debugf ~section 5
+           "@[<hv2>... small_check case@ @[%a@]@ simplified: (@[%a@])@ pass: %B@]"
+           (fun k->k C.pp c (Util.pp_list C.pp) ds res);
+         res
+      )
+
   (* do only a few steps of inferences for checking if a candidate lemma
      is trivial/absurd *)
   let max_steps_ = 20
@@ -299,6 +364,7 @@ end = struct
   (* some checks that [l] should be considered as a lemma *)
   let is_acceptable_lemma_ l : bool =
     check_not_already_tried l &&
+    small_check l &&
     check_not_absurd_or_trivial l
 
   let is_acceptable_lemma x = Util.with_prof prof_check_lemma is_acceptable_lemma_ x
