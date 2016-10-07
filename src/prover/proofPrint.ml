@@ -81,28 +81,29 @@ let traverse ?(traversed=Tbl.create 16) proof k =
     next := [];
   done
 
+let pp_normal_step out step = match step.kind with
+  | Assert _
+  | Goal _ ->
+    Format.fprintf out "@[<hv2>%a@]@," pp_kind step.kind
+  | Data _ ->
+    Format.fprintf out "@[<hv2>data %a@]@," pp_kind step.kind
+  | Trivial -> Format.fprintf out "trivial"
+  | Inference _
+  | Simplification _
+  | Esa _ ->
+    Format.fprintf out "@[<hv2>%a@ with @[<hv>%a@]@]@,"
+      pp_kind step.kind
+      (CCFormat.list ~start:"" ~stop:"" pp_result)
+      (List.map (fun p->p.result) step.parents)
+
 let pp_normal out proof =
   let sep = "by" in
   Format.fprintf out "@[<v>";
   let pp_bullet out = Format.fprintf out "@<1>@{<Green>*@}" in
   traverse proof
-    (fun p -> match p.step.kind with
-       | Assert _
-       | Goal _ ->
-         Format.fprintf out "@[<hv2>%t @[%a@]@ %s %a@]@,"
-           pp_bullet pp_result p.result sep pp_kind p.step.kind
-       | Data _ ->
-         Format.fprintf out "@[<hv2>%t data %a@]@," pp_bullet pp_kind p.step.kind
-       | Trivial ->
-         Format.fprintf out "@[<hv2>%t @[%a@]@ %s trivial@]@,"
-           pp_bullet pp_result p.result sep
-       | Inference _
-       | Simplification _
-       | Esa _ ->
-         Format.fprintf out "@[<hv2>%t @[%a@]@ %s %a@ with @[<hv>%a@]@]@,"
-           pp_bullet pp_result p.result sep pp_kind p.step.kind
-           (CCFormat.list ~start:"" ~stop:"" pp_result)
-           (List.map (fun p->p.result) p.step.parents)
+    (fun p ->
+       Format.fprintf out "@[<hv2>%t @[%a@] %s@ %a@]@,"
+         pp_bullet pp_result p.result sep pp_normal_step p.step
     );
   Format.fprintf out "@]"
 
@@ -180,8 +181,8 @@ let _to_str_escape fmt =
 
 let pp_dot_seq ~name out seq =
   (* TODO: check proof is a DAG *)
-  let equal p1 p2 = ProofStep.equal_proof p1 p2 in
-  let hash p = ProofStep.hash_proof p in
+  let equal = ProofStep.equal_proof in
+  let hash = ProofStep.hash_proof in
   CCGraph.Dot.pp_seq
     ~tbl:(CCGraph.mk_table ~eq:equal ~hash:hash 64)
     ~eq:equal

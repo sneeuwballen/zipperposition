@@ -259,8 +259,6 @@ module Make
       let post = !b_lits in
       [ pre @ post ]
     in
-    Util.debugf ~section 2 "@[<2>add boolean constraints@ @[<hv>%a@]@]"
-      (fun k->k (Util.pp_list BBox.pp_bclause) b_clauses);
     clauses, b_clauses
 
   (* ensure the proper declarations are done for this constant *)
@@ -287,6 +285,9 @@ module Make
         } in
         let clauses, b_clauses = clauses_of_min_witness ~trail mw in
         A.Solver.add_clauses ~proof b_clauses;
+        Util.debugf ~section 2 "@[<2>add boolean constraints@ @[<hv>%a@]@ proof: %a@]"
+          (fun k->k (Util.pp_list BBox.pp_bclause) b_clauses
+              ProofPrint.pp_normal_step proof);
         Util.incr_stat stats_min;
         clauses
       | Some _ (* path already contains [cst] *)

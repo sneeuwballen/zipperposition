@@ -34,6 +34,8 @@ val pp_normal : t CCFormat.printer
 val pp : Options.print_format -> t CCFormat.printer
 (** Prints the proof according to the given input switch *)
 
+val pp_normal_step : ProofStep.t CCFormat.printer
+
 val pp_dot : name:string -> t CCFormat.printer
 (** Pretty print the proof as a DOT graph *)
 
