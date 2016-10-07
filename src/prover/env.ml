@@ -498,6 +498,21 @@ module Make(X : sig
     Util.exit_prof prof_simplify;
     res
 
+  let simplify_term (t:T.t): T.t SimplM.t =
+    let is_new = ref false in
+    let rec reduce_term rules t = match rules with
+      | [] -> if !is_new then SimplM.return_new t else SimplM.return_same t
+      | (_, r)::rules' ->
+        begin match r t with
+          | None -> reduce_term rules' t (* try next rules *)
+          | Some t' ->
+            assert (not (T.equal t t'));
+            is_new := true;
+            reduce_term !_rewrite_rules t'  (* re-apply all rules *)
+        end
+    in
+    reduce_term !_rewrite_rules t
+
   let multi_simplify c : C.t list option =
     let did_something = ref false in
     (* try rules one by one until some of them succeeds *)

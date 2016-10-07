@@ -214,6 +214,9 @@ module type S = sig
   val simplify : simplify_rule
   (** Simplify the clause. *)
 
+  val simplify_term : FOTerm.t -> FOTerm.t SimplM.t
+  (** Simplify the term *)
+
   val backward_simplify : C.t -> C.ClauseSet.t * C.t Sequence.t
   (** Perform backward simplification with the given clause. It returns the
       CSet of clauses that become redundant, and the sequence of those
