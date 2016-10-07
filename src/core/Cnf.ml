@@ -590,9 +590,10 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) ?(neg_src=id_) ?(cnf_src=id_) 
   CCVector.iter
     (fun st ->
       let src = st.Stmt.src in
+      let attrs = Stmt.attrs st in
       match st.Stmt.view with
       | Stmt.Def (id,ty,t) ->
-          CCVector.push res (Stmt.def ~src id ty t)
+          CCVector.push res (Stmt.def ~attrs ~src id ty t)
       | Stmt.RewriteTerm (id,ty,args,rhs) ->
           CCVector.push res (Stmt.rewrite_term ~src id ty args rhs)
       | Stmt.RewriteForm (lhs,rhs) ->
@@ -602,26 +603,26 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) ?(neg_src=id_) ?(cnf_src=id_) 
              negative: ¬ lhs <=> cnf(¬ rhs) *)
           let src = cnf_src src in
           let c_pos = CCList.flat_map (conv_form ~src) rhs in
-          CCVector.push res (Stmt.rewrite_form ~src lhs c_pos);
+          CCVector.push res (Stmt.rewrite_form ~attrs ~src lhs c_pos);
           let c_neg = conv_form ~src (F.not_ (F.and_ rhs)) in
-          CCVector.push res (Stmt.rewrite_form ~src (SLiteral.negate lhs) c_neg);
+          CCVector.push res (Stmt.rewrite_form ~attrs ~src (SLiteral.negate lhs) c_neg);
       | Stmt.Data l ->
-          CCVector.push res (Stmt.data ~src l)
+          CCVector.push res (Stmt.data ~attrs ~src l)
       | Stmt.TyDecl (id,ty) ->
-          CCVector.push res (Stmt.ty_decl ~src id ty)
+          CCVector.push res (Stmt.ty_decl ~attrs ~src id ty)
       | Stmt.Assert f ->
           let src = cnf_src src in
           List.iter
-            (fun c -> CCVector.push res (Stmt.assert_ ~src c))
+            (fun c -> CCVector.push res (Stmt.assert_ ~attrs ~src c))
             (conv_form ~src f)
       | Stmt.Lemma l ->
           let src = src |> cnf_src in
           let l = CCList.flat_map (conv_form ~src) l in
-          CCVector.push res (Stmt.lemma ~src l)
+          CCVector.push res (Stmt.lemma ~attrs ~src l)
       | Stmt.Goal f ->
           let src = src |> neg_src |> cnf_src in
           let skolems, l = conv_form_sk ~src (F.not_ f) in
-          CCVector.push res (Stmt.neg_goal ~src ~skolems l)
+          CCVector.push res (Stmt.neg_goal ~attrs ~src ~skolems l)
       | Stmt.NegatedGoal (sk1,l) ->
           let src = cnf_src src in
           let skolems, l =
@@ -631,7 +632,7 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) ?(neg_src=id_) ?(cnf_src=id_) 
                   List.rev_append sk' sk, clauses)
               sk1 l
           in
-          CCVector.push res (Stmt.neg_goal ~src ~skolems l)
+          CCVector.push res (Stmt.neg_goal ~attrs ~src ~skolems l)
     )
     v;
   (* return final vector of clauses *)
