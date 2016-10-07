@@ -88,11 +88,12 @@ let compare_result a b = match a, b with
   | BoolClause l1, BoolClause l2 -> CCOrd.list_ BBox.Lit.compare l1 l2
   | Clause _, _
   | Form _, _
-  |  BoolClause _, _ ->
+  | BoolClause _, _ ->
     CCInt.compare (res_to_int_ a) (res_to_int_ b)
 
 let compare_proof a b =
-  CCOrd.( compare a.step b.step <?> (compare_result, a.result, b.result) )
+  let (<?>) = CCOrd.(<?>) in
+  compare a.step b.step <?> (compare_result, a.result, b.result)
 
 let equal_proof a b = (compare_proof a b = 0)
 let hash_proof a = hash a.step
