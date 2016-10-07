@@ -66,7 +66,7 @@ let check_ground_novar =
 let check_min_max_vars =
   let gen = ArTerm.default in
   let prop t =
-    let vars = T.vars (Sequence.singleton t) in
+    let vars = T.vars t in
     T.VarSet.is_empty vars || (T.min_var vars <= T.max_var vars)
   in
   QCheck.Test.make ~count:1000 ~name:"term_min_max_var" gen prop

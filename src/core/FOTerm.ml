@@ -260,8 +260,7 @@ let min_var set = VarSet.to_seq set |> Seq.min_var
 
 let add_vars tbl t = Seq.vars t (fun v -> VarTbl.replace tbl v ())
 
-let vars ts =
-  Sequence.flat_map Seq.vars ts |> VarSet.of_seq
+let vars ts = Seq.vars ts |> VarSet.of_seq
 
 let vars_prefix_order t =
   Seq.vars t
