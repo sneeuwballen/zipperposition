@@ -64,12 +64,27 @@ module Make(Dummy : sig end)
       incr n;
       x
 
+  module ClauseTbl = CCHashtbl.Make(struct
+      type t = Lit.t list
+      let equal = CCList.equal Lit.equal
+      let hash = CCHash.apply (CCHash.list Lit.hash_fun)
+    end)
+
+  let clause_tbl_ : (int * proof_step) ClauseTbl.t = ClauseTbl.create 32
+  let tag_to_proof_ : (int, proof_step) Hashtbl.t = Hashtbl.create 32
+
+  (* add clause, if not added already *)
   let add_clause_ ~proof c =
-    Util.incr_stat stat_num_clauses;
-    (* if the clause has only negative lits: check again *)
-    if List.for_all (fun lit -> not (Lit.sign lit)) c
-    then must_check := true;
-    Queue.push ([c], proof, fresh_tag_ ()) queue_
+    if not (ClauseTbl.mem clause_tbl_ c) then (
+      Util.incr_stat stat_num_clauses;
+      (* if the clause has only negative lits: check again *)
+      if List.for_all (fun lit -> not (Lit.sign lit)) c
+      then must_check := true;
+      let tag = fresh_tag_() in
+      ClauseTbl.add clause_tbl_ c (tag,proof);
+      Hashtbl.add tag_to_proof_ tag proof;
+      Queue.push ([c], proof, tag) queue_
+    )
 
   let add_clause ~proof (c:clause) =
     dump_l [c];
@@ -115,10 +130,6 @@ module Make(Dummy : sig end)
     | None -> assert false
     | Some p -> p
 
-
-  (* map tags to the associated proof *)
-  let tag_to_proof_ : (int, proof_step) Hashtbl.t = Hashtbl.create 32
-
   module SatForm = struct
     include Lit
     let norm l =
@@ -154,7 +165,6 @@ module Make(Dummy : sig end)
           [List.length c; ProofStep.hash_proof a; ProofStep.hash_proof b]
     end)
 
-  let tbl0 : (int,proof) Hashtbl.t = Hashtbl.create 16
   let tbl_res = ResTbl.create 16
 
   (* convert a SAT proof into a tree of ProofStep *)
@@ -186,17 +196,11 @@ module Make(Dummy : sig end)
             errorf "no tag in leaf of SAT proof (clause %a)" S.St.pp_clause c
           | Some id -> id
         in
-        begin match CCHashtbl.get tbl0 tag with
-        | Some s -> s
-        | None ->
-          begin match CCHashtbl.get tag_to_proof_ tag with
-            | Some step ->
-              let c = bool_clause_of_sat c in
-              let s = ProofStep.mk_bc step c in
-              Hashtbl.add tbl0 tag s;
-              s
-            | None -> errorf "no proof for tag %d" tag
-          end
+        begin match CCHashtbl.get tag_to_proof_ tag with
+          | Some step ->
+            let c = bool_clause_of_sat c in
+            ProofStep.mk_bc step c
+          | None -> errorf "no proof for tag %d" tag
         end
     in
     S.Proof.check p;
@@ -225,11 +229,8 @@ module Make(Dummy : sig end)
     (* add pending clauses *)
     while not (Queue.is_empty queue_) do
       let c, proof, tag = Queue.pop queue_ in
-      Util.debugf ~section 4 "@[<hv2>assume@ @[%a@]@]"
-        (fun k->k pp_form (c,tag));
-      (* remember tag->proof *)
-      assert (not (Hashtbl.mem tag_to_proof_ tag));
-      Hashtbl.replace tag_to_proof_ tag proof;
+      Util.debugf ~section 4 "@[<hv2>assume@ @[%a@]@ proof: %a@]"
+        (fun k->k pp_form (c,tag) ProofPrint.pp_normal_step proof);
       S.assume ~tag c
     done;
     (* solve *)
