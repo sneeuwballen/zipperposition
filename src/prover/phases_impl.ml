@@ -230,7 +230,8 @@ let presaturate_clauses (type c)
 let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result =
   Phases.start_phase Phases.Saturate >>= fun () ->
   let module Sat = Saturate.Make(Env) in
-  (* add clauses to passive set of [env] *)
+  (* add clauses to passive set of [env], and also to simplification set *)
+  Env.add_simpl clauses;
   Env.add_passive clauses;
   let steps = if Env.params.param_steps < 0
     then None
