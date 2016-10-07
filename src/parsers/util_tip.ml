@@ -168,10 +168,20 @@ let rec conv_term (t:A.term): T.t Choice.t =
     | A.Or l -> T.or_ <$> map_m conv_term l
     | A.Not a -> T.not_ <$> conv_term a
     | A.Forall (vars,body) ->
-      T.forall <$> return (conv_vars vars) <*> conv_term body
+      let vars = conv_vars vars in
+      let body = conv_term_and body in
+      return (T.forall vars body)
     | A.Exists (vars,body) ->
-      T.exists <$> return (conv_vars vars) <*> conv_term body
+      let vars = conv_vars vars in
+      let body = conv_term_and body in
+      return (T.exists vars body)
     | A.Cast (a,_) -> conv_term a
+
+(* same as {!conv_term}, but puts a conjunction afterwards *)
+and conv_term_and (t:A.term): T.t =
+  conv_term t
+  |> Choice.to_list_applied
+  |> T.and_
 
 let conv_decl (d:A.ty A.fun_decl): string * T.t =
   let tyvars = List.map conv_tyvar d.A.fun_ty_vars in
