@@ -27,6 +27,7 @@ let prof_check_lemma = Util.mk_profiler "induction.check_lemma"
 
 let k_enable : bool Flex_state.key = Flex_state.create_key()
 let k_lemma_guess : bool Flex_state.key = Flex_state.create_key()
+let k_lemma_gen_depth : int Flex_state.key = Flex_state.create_key()
 let k_ind_depth : int Flex_state.key = Flex_state.create_key()
 
 (* TODO
@@ -50,10 +51,6 @@ module Cst_set = CCSet.Make(struct
     let compare = Ind_cst.cst_compare
   end)
 
-let scan_term (t:T.t): Cst_set.t =
-  Ind_cst.find_cst_in_term t
-  |> Cst_set.of_seq
-
 (* scan terms for inductive constants *)
 let scan_terms (seq:T.t Sequence.t) : Cst_set.t =
   seq
@@ -64,7 +61,7 @@ let scan_terms (seq:T.t Sequence.t) : Cst_set.t =
 
 module Make_guess_lemma
     (E : Env.S)(A : Avatar_intf.S with module E = E) : sig
-  val inf_guess_lemma : E.unary_inf_rule
+  val inf_guess_lemma : E.generate_rule
 end = struct
   module C = E.C
   module SubsumptionIndex = FeatureVector.Make(struct
@@ -75,30 +72,7 @@ end = struct
 
   let section = section_guess
 
-  let has_pos_lit_ c = CCArray.exists Literal.is_pos (C.lits c)
-
-  let is_ind_conjecture_ c =
-    match C.distance_to_goal c with
-    | Some (0 | 1) -> true
-    | Some _
-    | None -> false
-
-  (* sub-terms that have an inductive (non-arrow) type, candidates
-     for "subterm generalization" *)
-  let generalizable_subterms c =
-    C.Seq.terms c
-      |> Sequence.flat_map T.Seq.subterms
-      |> Sequence.filter
-        (fun t ->
-           assert (T.is_ground t);
-           Type.is_app (T.ty t) &&
-           Ind_ty.is_inductive_type (T.ty t))
-      |> Sequence.sort_uniq ~cmp:T.compare
-      |> Sequence.to_rev_list
-
   type lemma_candidate = Literals.t list
-
-  let compare_lemma : lemma_candidate CCOrd.t = CCOrd.list_ Literals.compare
 
   (* set of all lemmas so far, to check if a new candidate lemma
      has already been tried *)
@@ -113,118 +87,6 @@ end = struct
 
   let pp_lemma out (l:lemma_candidate) =
     Format.fprintf out "{@[<v>%a@]}" (Util.pp_list Literals.pp) l
-
-  type generalization = (T.Set.t * Type.t) list
-  (** One generalization: a list of clusters, each cluster being
-      a set of terms that should map to the same variable,
-      with some specific type *)
-
-  let pp_generalization out (g:generalization) =
-    let pp_set out (s,_) =
-      Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list T.pp) (T.Set.to_list s)
-    in Format.fprintf out "{@[<hv>%a@]}" (Util.pp_list pp_set) g
-
-  let common_cst c1 c2 : bool =
-    not (Cst_set.is_empty (Cst_set.inter c1 c2))
-
-  (* check predicate [p] on subterms, starting from the root towards the
-     leaves. *)
-  let check_subterms_order_ (c:C.t) (p:T.t -> [`True | `False | `Recurse]): bool =
-    let rec check_term t =
-      match p t with
-        | `True -> true
-        | `False -> false
-        | `Recurse ->
-          match T.view t with
-            | T.AppBuiltin (_, l)
-            | T.App (_, l) -> List.for_all check_term l
-            | T.Const _ | T.DB _ | T.Var _ -> true
-    in
-    C.Seq.terms c |> Sequence.for_all check_term
-
-  (* does every inductive constant of [c] occur only as a
-     non-strict subterm of some element of [g]? *)
-  let covers_all_csts (c:C.t) (g:generalization): bool =
-    let cst_set = C.Seq.terms c |> scan_terms in
-    check_subterms_order_ c
-      (fun t -> match T.view t with
-         | _ when List.exists (fun (set,_) -> T.Set.mem t set) g -> `True
-         | T.Const id ->
-           if Cst_set.exists (fun c -> ID.equal id (Ind_cst.cst_id c)) cst_set
-           then `False else `True
-         | _ -> `Recurse)
-
-  (* does the generalization contain at least one term that is not
-     an inductive constant? *)
-  let has_some_non_cst (g:generalization): bool =
-    let check_t t = match T.view t with
-      | T.Const id -> not (Ind_cst.is_cst id)
-      | _ -> true
-    in
-    List.exists (fun (set,_) -> T.Set.exists check_t set) g
-
-  (* do those terms share at least one common constant? *)
-  let share_common_cst (t1:T.t) (t2:T.t) : bool =
-    common_cst (scan_term t1) (scan_term t2)
-
-  (* TODO:
-     check some things in the generalization. It must be realistic that
-     terms in the same cluster can be equal
-     (e.g. a cluster [t, succ(t)] should flag a generalization as impossible).
-  *)
-
-  (* add a term to the generalization, possibly merging with some existing
-     sets. returns [None] if addition failed. *)
-  let add_term (g:generalization) (t:T.t): generalization option =
-    try
-      let others, set =
-        List.fold_left
-          (fun (others,set_t) (set',ty') ->
-             if T.Set.exists (share_common_cst t) set'
-             then
-               if Type.equal (T.ty t) ty'
-               then others, T.Set.union set_t set'
-               else raise Exit (* should be merged, but can't *)
-             else (set',ty') :: others, set_t)
-          ([], T.Set.singleton t) g
-      in
-      Some ((set, T.ty t) :: others)
-    with Exit -> None
-
-  (* given a set of terms of inductive type that occur in a clause [c], we
-     return all the combinations of those terms that satisfy some criteria.
-
-     Simple generalization:
-     - all the occurrences of inductive constants in [c] are subterms of
-       some cluster in the generalization.
-     - clusters are maximal, that is, two terms that share some sub-constant
-       will belong in the same cluster.
-
-     A cluster is made of different terms that share some ind. constant
-     and will map to the same variable, assuming they all have the same type.
-  *)
-  let enumerate_generalizations (c:C.t) (terms:T.t list): generalization Sequence.t =
-    let cst_set = C.Seq.terms c |> scan_terms in
-    Util.debugf ~section 3
-      "@[<2>try to guess lemmas@ from %a@ \
-       can generalize on [@[%a@]]@ must eliminate [@[%a@]]@]"
-      (fun k->k C.pp c (Util.pp_list T.pp) terms
-          (Util.pp_list Ind_cst.pp_cst) (Cst_set.elements cst_set));
-    (* enumerate states *)
-    let rec aux (g:generalization)(to_process:T.t list): generalization Sequence.t =
-      match to_process with
-        | [] -> Sequence.return g (* done *)
-        | t :: to_process_tail ->
-          let seq1 = aux g to_process_tail (* try without [t] *)
-          and seq2 = match add_term g t with
-            | None -> Sequence.empty  (* skip [t] *)
-            | Some g' -> aux g' to_process_tail
-          in
-          Sequence.append seq1 seq2
-    in
-    aux [] terms
-    |> Sequence.filter
-      (fun g -> has_some_non_cst g && covers_all_csts c g)
 
   (* check lemma on small instances. It returns [true] iff none of the
      instances reduces to [false] *)
@@ -400,71 +262,171 @@ end = struct
 
   let is_acceptable_lemma x = Util.with_prof prof_check_lemma is_acceptable_lemma_ x
 
-  (* make an inference by generalizing on the list of variables [on] in
-     the clause [c] *)
-  let generalize ~(on:generalization) (c:C.t): lemma_candidate =
-    (* fresh var generator, starting high enough *)
-    let mk_fresh_var_ =
-      let r = ref (C.Seq.vars c |> T.Seq.max_var |> succ) in
-      fun ty ->
-        let v = T.var_of_int ~ty !r in
-        incr r;
-        v
+  (** {6 Hipspec-like enumeration of possible Lemmas} *)
+
+  (* TODO: try classic lemmas like transitivity on predicates [tau,tau -> prop]
+     where [tau] is inductive?
+     Or even try implication (instead of equality) *)
+
+  (* is this term made only of constructors and variables? *)
+  let cstors_only (t:T.t): bool =
+    T.Seq.subterms t
+    |> Sequence.for_all
+      (fun t -> match T.view t with
+         | T.Const id -> Ind_ty.is_constructor id
+         | T.Var _ | T.DB _ | T.App _ | T.AppBuiltin _ -> true)
+
+  (* [t] head symbol is a function that is not a constructor *)
+  let starts_with_fun (t:T.t): bool = match T.head t with
+    | None -> false
+    | Some id -> not (Ind_ty.is_constructor id)
+
+  (* simple criterion for determining if [t1 = t2] is a possible lemma? *)
+  let is_acceptable_eq (t1:T.t) (t2:T.t) =
+    Type.equal (T.ty t1) (T.ty t2)
+    &&
+    not (T.is_var t1 && T.is_var t2)
+    &&
+    let vars1 = T.vars t1 in
+    let vars2 = T.vars t2 in
+    let ground1 = T.VarSet.is_empty vars1 in
+    let ground2 = T.VarSet.is_empty vars2 in
+    (* both not ground, need some quantification; but if they both
+       have variables, one side must include the variables of the
+       other side *)
+    not (ground1 && ground2) &&
+    ( T.VarSet.subset vars1 vars2 ||
+      T.VarSet.subset vars2 vars1 )
+    &&
+    (* at least one function is required *)
+    not (cstors_only t1 && cstors_only t2)
+    &&
+    (starts_with_fun t1 || starts_with_fun t2)
+
+  (* stream of type variables *)
+  let ty_vars_stream: Type.t HVar.t LazyList.t =
+    LazyList.of_fun (fun i -> HVar.make ~ty:Type.tType i |> CCOpt.return)
+
+  (* never generate terms with more than 3 variables *)
+  let max_vars_gen = 3
+
+  (* generate terms that can occur in an equational (or relational) lemma,
+     from the signature, up to given depth *)
+  let generate_terms ~depth (funs:Signature.t): T.Set.t =
+    let open Sequence.Infix in
+    (* generate terms of [depth] that have type [ty] *)
+    let rec aux_by_ty ~depth vars (ty:Type.t): T.t Sequence.t =
+      assert (depth >= 0);
+      Signature.Seq.to_seq funs
+      |> Sequence.filter_map
+        (fun (id,ty_f) ->
+           let n, ty_args, _ = Type.open_poly_fun ty_f in
+           if depth=0 && ty_args<>[] then None (* too deep *)
+           else Some (n,id,ty_f))
+      |> Sequence.flat_map
+        (fun (n_ty_vars,id_f,ty_f) ->
+           let ty_vars =
+             ty_vars_stream |> LazyList.take n_ty_vars
+             |> LazyList.to_list |> List.map Type.var
+           in
+           let ty_args, ty_ret = Type.apply ty_f ty_vars |> Type.open_fun in
+           begin match
+               try Some (Unif.Ty.matching ~pattern:(ty_ret, 1) (ty,0))
+               with Unif.Fail -> None
+           with
+             | None -> Sequence.empty
+             | Some subst ->
+               (* the return type of [f] matches [ty].
+                  Now, instantiate the type arguments and fill term arguments
+                  by recursing, if not too deep *)
+               let ty_vars =
+                 List.map
+                   (fun v -> Substs.Ty.apply_no_renaming subst (v,1))
+                   ty_vars
+               and ty_args =
+                 List.map
+                   (fun ty -> Substs.Ty.apply_no_renaming subst (ty,1))
+                   ty_args
+               in
+               aux_l ~depth:(depth-1) vars ty_args >|= fun args ->
+               T.app_full (T.const ~ty:ty_f id_f) ty_vars args
+           end)
+
+    (* pick a variable in [vars] that has the proper type *)
+    and pick_var vars (ty:Type.t): T.t Sequence.t =
+      let vars_of_ty =
+        T.VarSet.to_seq vars
+        |> Sequence.filter (fun v -> Type.equal (HVar.ty v) ty)
+      in
+      let num_vars = T.VarSet.cardinal vars in
+      let new_ =
+        if T.VarSet.cardinal vars < max_vars_gen
+        then Sequence.return (HVar.make ~ty num_vars) (* can add another var *)
+        else Sequence.empty
+      in
+      Sequence.append new_ vars_of_ty |> Sequence.map T.var
+
+    (* generate a list of terms corresponding to the types *)
+    and aux_l ~depth vars (tys:Type.t list): T.t list Sequence.t =
+      match tys with
+        | [] -> Sequence.return []
+        | ty :: tys' ->
+          (* to get a term of type [ty], search in [vars] and in signature *)
+          Sequence.append
+            (pick_var vars ty)
+            (aux_by_ty ~depth vars ty)
+          >>= fun t ->
+          (* add variables of [t] to the list *)
+          let vars = T.VarSet.union vars (T.vars t) in
+          (* compute rest of the list *)
+          aux_l ~depth vars tys' >|= fun tail ->
+          t :: tail
     in
-    (* replace generalized terms by fresh variables *)
-    let replacements : T.t T.Map.t =
-      List.fold_left
-        (fun m (set,ty) ->
-           assert (not (T.Set.is_empty set));
-           T.Set.to_seq set
-           |> Sequence.map (fun t->t,mk_fresh_var_ ty)
-           |> T.Map.add_seq m)
-        T.Map.empty on
+    (* generate terms that are not variables.
+       @param vars set of variables we can re-use *)
+    let aux_non_vars ~depth vars: T.t Sequence.t =
+      Signature.Seq.to_seq funs
+      |> Sequence.flat_map
+        (fun (id_f,ty_f) ->
+           let n, _, _ = Type.open_poly_fun ty_f in
+           (* make type variables *)
+           let ty_vars =
+             ty_vars_stream |> LazyList.take n |> LazyList.to_list |> List.map Type.var
+           in
+           (* [ty_f] applied to the fresh type variables *)
+           let ty_args, _ = Type.apply ty_f ty_vars |> Type.open_fun in
+           aux_l ~depth:(depth-1) vars ty_args >|= fun args ->
+           T.app_full (T.const ~ty:ty_f id_f) ty_vars args
+        )
     in
-    (* replace constants by variables in [c], then
-        let [f] be [forall... bigAnd_{l in c} not l] *)
-    let lemma =
-      C.lits c
-      |> Literals.map (fun t -> T.replace_m t replacements)
-      |> Array.map (fun lit -> [| Literal.negate lit |])
-      |> Array.to_list
+    aux_non_vars ~depth T.VarSet.empty
+    |> Sequence.flat_map
+      (* add the variables of [t] themselves *)
+      (fun t -> Sequence.cons t (T.Seq.vars t |> Sequence.map T.var))
+    |> T.Set.of_seq
+
+  (* generate lemma candidates up to a certain depth *)
+  let generate_up_to ~depth (funs:Signature.t): lemma_candidate Sequence.t =
+    (* generate terms, only keep the totally simplified ones *)
+    let terms =
+      generate_terms ~depth funs
+      |> T.Set.filter
+        (fun t ->
+           let new_t = E.simplify_term t in
+           Format.printf "term `@[%a@]` (keep: %B)@." T.pp t (SimplM.is_same new_t);
+           SimplM.is_same new_t)
     in
-    Util.debugf ~section 2
-      "@[<2>generalizing on %a@ in %a:@ returns @[<hv0>%a@]@]"
-      (fun k->k pp_generalization on C.pp c pp_lemma lemma);
-    lemma
+    (* generate the non-ordered pairs that might be relevant equalities *)
+    Sequence.product (T.Set.to_seq terms) (T.Set.to_seq terms)
+    |> Sequence.filter (fun (t1,t2) -> T.compare t1 t2 < 0)
+    |> Sequence.filter (fun (t1,t2) -> is_acceptable_eq t1 t2)
+    |> Sequence.map (fun (t1,t2) -> [[| Literal.mk_eq t1 t2 |]])
 
-  (* TODO: check conjecture by trying every substitutions of ind. variables
-     with each cstor (fresh variable arguments), and simplifying *)
-
-  (*
-     NOTE: maybe, actually, NEVER do a generalization if there are
-     clusters with several terms. First introduce lemmas to prove those
-     terms are equal; if the lemma is proved, the clause will turn into
-     one with singleton clusters (which will be generalizable!). So,
-     actually, current process should distinguish between
-     - generalization of subterms (accept singleton clusters only!)
-     - candidate equality lemmas otherwise (for non-singleton clusters)
-       to reduce to first case
-  *)
-
-  (* TODO:
-     when a generalization [g] in [c] is obtained, with a cluster [t1, t2…]
-     such that [t1] and [t2] :
-     - are NOT toplevel terms of [c]
-     - at least one is not a constant (but they share >= 1 cst)
-     - look "simpler" than [not c]
-
-     then we can also try the lemma [t1=t2], if it passes the filter.
-
-     For instance, in [f (rev(rev(l))) != f(l)]
-     we might want to prove [l=rev(rev(l))],
-     because we might be able to prove it by induction.
-  *)
+  (** {6 Creation of lemmas, Inference Rule} *)
 
   (* check if lemma is relevant/redundant/acceptable, and if yes
      then turn it into clauses *)
-  let check_and_add_lemma (c:C.t)(lemma:lemma_candidate): C.t list =
+  let check_and_add_lemma (lemma:lemma_candidate): C.t list =
     (* if [box f] already exists or is too deep, no need to re-do inference *)
     if is_acceptable_lemma lemma
     then (
@@ -476,34 +438,57 @@ end = struct
       List.iter (fun c -> C.set_flag SClause.flag_lemma c true) clauses;
       Util.incr_stat stats_guess_lemmas;
       Util.debugf ~section 2
-        "@[<2>guessed lemma from %a:@ obtaining @[<hv0>%a@]@]"
-        (fun k->k C.pp c (Util.pp_list C.pp) clauses);
+        "@[<2>guessed lemma@ @[<hv0>%a@]@]"
+        (fun k->k (Util.pp_list C.pp) clauses);
       clauses
     )
     else []
 
-  (* when a clause has inductive constants, take its negation
-      and add it as a lemma (some restrictions apply) *)
-  let inf_guess_lemma_ c =
-    let terms = lazy (generalizable_subterms c) in
-    if C.is_ground c
-    && not (is_ind_conjecture_ c)
-    && not (C.get_flag SClause.flag_lemma c)
-    && not (has_pos_lit_ c) (* only positive lemmas, therefore C negative *)
-    && (C.trail c |> Trail.exists BBox.is_inductive) (* in inductive branch *)
-    && (Lazy.force terms <> [])
-    then (
-      let lazy terms = terms in
-      (* each possible way to generalize a subterm occurring multiple times *)
-      enumerate_generalizations c terms
-      |> Sequence.map (fun terms' -> generalize c ~on:terms')
-      |> Sequence.sort_uniq ~cmp:compare_lemma
-      |> Sequence.flat_map_l (check_and_add_lemma c)
-      |> Sequence.to_rev_list
+  (* functions in the signature that are not skolems and take
+     and return inductive types *)
+  let funs_ : Signature.t lazy_t = lazy (
+    let module CC = Classify_cst in
+    let res =
+      E.Ctx.signature ()
+      |> ID.Map.filter
+        (fun id ty ->
+           begin match CC.classify id with
+             | CC.DefinedCst _ | CC.Other | CC.Cstor _ -> true
+             | CC.Projector _ | CC.Inductive_cst _ | CC.Ty _ -> false
+           end
+           &&
+           (
+             let _, args, ret = Type.open_poly_fun ty in
+             List.for_all Ind_ty.is_inductive_type args && Ind_ty.is_inductive_type ret
+           )
+        )
+    in
+    Util.debugf ~section 2 "@[<2>generate lemmas from signature@ @[%a@]@]"
+      (fun k->k Signature.pp res);
+    res
+  )
+
+  let generate_lemmas ~depth ~funs (): C.t list =
+    generate_up_to ~depth funs
+    |> Sequence.flat_map_l check_and_add_lemma
+    |> Sequence.to_rev_list
+
+  let first_ = ref true
+
+  (* generate some lemmas from the signature *)
+  let inf_guess_lemma_ (full:bool): C.t list =
+    let lazy funs = funs_ in
+    (* do something only if full check, or if we've not been called yet *)
+    if full || !first_ then (
+      first_ := false;
+      let depth = E.flex_get k_lemma_gen_depth in
+      Util.debugf ~section 2 "start guessing lemmas (depth %d)…" (fun k->k depth);
+      generate_lemmas ~depth ~funs ()
     )
     else []
 
-  let inf_guess_lemma c = Util.with_prof prof_guess_lemma inf_guess_lemma_ c
+  let inf_guess_lemma ~full () =
+    Util.with_prof prof_guess_lemma inf_guess_lemma_ full
 end
 
 (** {2 Perform Induction} *)
@@ -875,7 +860,7 @@ module Make
     if Env.flex_get k_lemma_guess then (
       Util.debug ~section 2 "enable lemma guessing";
       let module G = Make_guess_lemma(E)(A) in
-      Env.add_unary_inf "ind.guess_lemma" G.inf_guess_lemma;
+      Env.add_generate "ind.guess_lemma" G.inf_guess_lemma;
     );
     (* declare new constants to [Ctx] *)
     Signal.on_every Ind_cst.on_new_cst decl_cst_;
@@ -887,6 +872,7 @@ end
 let enabled_ = ref true
 let lemma_guess = ref true
 let depth_ = ref !Ind_cst.max_depth_
+let lemma_depth = ref 2
 
 (* if induction is enabled AND there are some inductive types,
    then perform some setup after typing, including setting the key
@@ -915,6 +901,7 @@ let post_typing_hook stmts state =
     |> Flex_state.add k_enable true
     |> Flex_state.add k_lemma_guess !lemma_guess
     |> Flex_state.add k_ind_depth !depth_
+    |> Flex_state.add k_lemma_gen_depth !lemma_depth
     |> Flex_state.add Ctx.Key.lost_completeness true
   ) else Flex_state.add k_enable false state
 
@@ -947,4 +934,5 @@ let () =
     ; "--lemma-guess", Options.switch_set true lemma_guess, " enable lemma guess"
     ; "--no-lemma-guess", Options.switch_set false lemma_guess, " disable lemma guess"
     ; "--induction-depth", Arg.Set_int depth_, " maximum depth of nested induction"
+    ; "--lemma-guess-depth", Arg.Set_int lemma_depth, " maximum depth of lemma generation"
     ]
