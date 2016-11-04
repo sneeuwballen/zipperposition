@@ -674,7 +674,7 @@ module Seq = struct
     | Binary (_, m1, m2) -> M.Seq.terms m1 k; M.Seq.terms m2 k
     | Divides d -> M.Seq.terms d.monome k
 
-  let vars lit = terms lit |> Sequence.flatMap T.Seq.vars
+  let vars lit = terms lit |> Sequence.flat_map T.Seq.vars
 
   let to_multiset = _to_coeffs
 end

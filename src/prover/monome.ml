@@ -190,7 +190,7 @@ module Seq = struct
     fun k -> List.iter (fun (_, t) -> k t) m.terms
 
   let vars m =
-    Sequence.flatMap T.Seq.vars (terms m)
+    Sequence.flat_map T.Seq.vars (terms m)
 
   let coeffs m =
     fun k -> List.iter k m.terms

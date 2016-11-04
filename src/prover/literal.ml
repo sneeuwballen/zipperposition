@@ -223,7 +223,7 @@ module Seq = struct
   let vars lit = Sequence.flat_map T.Seq.vars (terms lit)
 
   let symbols lit =
-    Sequence.flatMap T.Seq.symbols (terms lit)
+    Sequence.flat_map T.Seq.symbols (terms lit)
 
   (* used to represent arithmetic lits... *)
   let _arith_term =

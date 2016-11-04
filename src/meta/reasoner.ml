@@ -79,7 +79,7 @@ module Clause = struct
   module Seq = struct
     let terms c k =
       k c.head; List.iter k c.body
-    let vars c = terms c |> Sequence.flatMap HOT.Seq.vars
+    let vars c = terms c |> Sequence.flat_map HOT.Seq.vars
   end
 
   let hash_fun c h = CCHash.seq HOT.hash_fun (Seq.terms c) h
