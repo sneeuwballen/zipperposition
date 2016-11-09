@@ -154,6 +154,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (_update_simpl UnitIdx.add);
     Signal.on PS.SimplSet.on_remove_clause
       (_update_simpl UnitIdx.remove);
+    (* stronger "forward subsumption" relation: also rewrite using passive clauses *)
+    Signal.on PS.PassiveSet.on_add_clause
+      (_update_simpl UnitIdx.add);
+    Signal.on PS.PassiveSet.on_remove_clause
+      (_update_simpl UnitIdx.remove);
     ()
 
   (** {6 Inference Rules} *)
