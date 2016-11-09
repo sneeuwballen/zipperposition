@@ -169,7 +169,7 @@ module Make(E : Env.S) = struct
         | Some i when num >= i -> Unknown, num
         | _ ->
             (* do one step *)
-            if !progress_ then print_progress num steps;
+            if !progress_ then print_progress num ~steps;
             let status = given_clause_step ~generating num in
             match status with
             | Sat | Unsat _ | Error _ -> status, num (* finished *)
