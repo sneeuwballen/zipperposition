@@ -113,7 +113,7 @@ module Ty : sig
   val close_forall : t -> t
 
   val unfold : t -> t Var.t list * t list * t
-  (** [unfold [forall a b. x y z -> ret] returns the triples
+  (** [unfold [forall a b. x y z -> ret]] returns the triples
       [[a,b], [x,y,z], ret] *)
 
   val arity : t -> int * int
