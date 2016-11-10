@@ -153,7 +153,7 @@ module Flatten = struct
     = fun l subst ->
       Sequence.flat_map (fun x -> x subst) (Sequence.of_list l)
 
-  let of_list 
+  let of_list
     : 'a list -> 'a t
     = fun l subst ->
       Sequence.of_list l |> Sequence.map (fun x->subst,[],x)
