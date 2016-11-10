@@ -1,0 +1,10 @@
+
+# expect: unsat
+
+val f : prop -> prop -> prop.
+
+val a : prop.
+val b : prop.
+
+goal f a a => (f b b || f (~b) (~b)).
+
