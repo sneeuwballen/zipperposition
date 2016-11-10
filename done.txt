@@ -1,0 +1,20 @@
+x 2016-01-15 2016-01-15 cleanup proof representation
+x 2016-01-22 2016-01-22 tool tptp_to_zf
+x 2016-01-22 2016-01-15 new ML-like syntax with explicit type decls, ind types, rewrite rules
+x 2016-01-29 2016-01-20 use msat.eval_level to prune clauses in Avatar (if trail false forever)
+x 2016-02-19 2016-01-15 add inductive types in intermediate AST(s), added by preprocessing from TPTP
+x 2016-02-19 2016-01-29 in avatar, use simplify_trail as backward simplification too (filter active set)
+x 2016-04-05 2016-04-03 fix lemmas generation (at least make it typesafe)
+x 2016-04-06 2016-04-05 syntax for function definition (with set of rewrite rules)
+x 2016-04-06 2016-01-15 have some basic definitional equality (non recursive?)
+x 2016-04-06 2016-01-23 distinguish goal/negated goal? @refactor
+x 2016-04-06 2016-01-23 def foo : bar := rw_rule1 and rw_rule2 @zf @calculus
+x 2016-04-06 2016-02-29 move detection of EnumType into preprocessing; add it in AST @refactor
+x 2016-04-06 2016-03-07 bring back orphan criterion lazily: mark redundant clauses; discard clause whose ≥ 1 parent is redundant; sweep active from time to time
+x 2016-04-15 2016-04-03 in avatar, for 0-level propagation, obtain SAT resolution proof so displayed proofs are ok
+x 2016-05-14 2016-01-15 efficient (polarized) literal->clause rewriting for deduction modulo @calculus
+x 2016-05-14 2016-01-15 efficient term rewriting for deduction modulo @calculus @optim
+x 2016-07-01 2016-04-06 test polymorphic goal
+x 2016-07-01 2016-04-03 in induction, allow sub-constants to have induction performed on them (up to some depth) --> nested induction
+x 2016-07-01 2016-01-15 repair induction, improve it with mutual/nested induction
+x 2016-07-01 2016-04-08 benchmark/optimize term rewriting
