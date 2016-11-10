@@ -29,6 +29,7 @@ and view =
   | App of t * t list (** apply term *)
   | Ite of t * t * t
   | Match of t * match_branch list
+  | Let of (t Var.t * t) list * t
   | Bind of Binder.t * t Var.t * t (** bind variable in term *)
   | AppBuiltin of Builtin.t * t list
   | Multiset of t list
@@ -59,6 +60,7 @@ let head_exn t = match view t with
   | App (_,_)
   | Bind (_,_,_)
   | Ite (_,_,_)
+  | Let _
   | Match (_,_)
   | AppBuiltin (_,_)
   | Multiset _
@@ -76,6 +78,7 @@ let to_int_ = function
   | Meta _ -> 9
   | Ite _ -> 10
   | Match _ -> 11
+  | Let _ -> 12
 
 let rec compare t1 t2 = match view t1, view t2 with
   | Var s1, Var s2 -> Var.compare s1 s2
@@ -107,6 +110,9 @@ let rec compare t1 t2 = match view t1, view t2 with
   | Meta (id1,_,_), Meta (id2,_,_) -> Var.compare id1 id2
   | Ite (a1,b1,c1), Ite (a2,b2,c2) ->
     CCList.compare compare [a1;b1;c1] [a2;b2;c2]
+  | Let (l1,t1), Let (l2,t2) ->
+    CCOrd.( compare t1 t2
+        <?> (list_ (pair Var.compare compare), l1, l2))
   | Match (u1,l1), Match (u2,l2) ->
     let cmp_branch b1 b2 = match b1, b2 with
       | Match_case (s1,vars1,rhs1), Match_case (s2,vars2,rhs2) ->
@@ -123,6 +129,7 @@ let rec compare t1 t2 = match view t1, view t2 with
   | App _, _
   | Bind _, _
   | Ite _, _
+  | Let _, _
   | Match _, _
   | Multiset _, _
   | AppBuiltin _, _
@@ -148,6 +155,7 @@ let rec hash_fun t h = match t.term with
       |> Hash.list_ (fun (n,t) h -> Hash.string_ n (hash_fun t h)) l
   | Ite (a,b,c) ->
     h |> Hash.string "if" |> hash_fun a |> hash_fun b |> hash_fun c
+  | Let (_, u) -> h |> Hash.string "let" |> hash_fun u
   | Match (u, _) ->
     h |> Hash.string "match" |> hash_fun u
   | Meta (id,_,_) -> Var.hash_fun id h
@@ -182,6 +190,10 @@ let rec pp out t = match view t with
       Format.fprintf out "@[<2>%a@ %a@]" Builtin.pp b (Util.pp_list pp_inner) l
   | Ite (a,b,c) ->
       Format.fprintf out "@[<2>if %a@ then %a@ else %a@]" pp a pp b pp c
+  | Let (l, u) ->
+      let pp_binding out (v,t) = Format.fprintf out "@[%a := %a@]" Var.pp v pp t in
+      Format.fprintf out "@[<2>let %a@ in %a@]"
+        (Util.pp_list ~sep:" and " pp_binding) l pp u
   | Match (u, l) ->
       let pp_branch out = function
         | Match_default rhs -> Format.fprintf out "_ -> %a" pp rhs
@@ -235,6 +247,11 @@ let app_builtin ?loc ~ty b l = make_ ?loc ~ty (AppBuiltin (b,l))
 let ite ?loc a b c =
   let ty = match b.ty with None -> assert false | Some ty -> ty in
   make_ ?loc ~ty (Ite (a,b,c))
+let let_ ?loc l u = match l with
+  | [] -> u
+  | _ ->
+    let ty = ty_exn u in
+    make_ ?loc ~ty (Let (l,u))
 let match_ ?loc u l =
   let ty = match l with
     | Match_default {ty=Some ty; _} :: _
@@ -325,6 +342,7 @@ module Seq = struct
           CCOpt.iter iter rest;
           List.iter (fun (_,t) -> iter t) l
       | Ite (a,b,c) -> iter a; iter b; iter c
+      | Let (l,u) -> iter u; List.iter (fun (_,t) -> iter t) l
       | Match (u,l) ->
         iter u;
         List.iter
@@ -362,6 +380,13 @@ module Seq = struct
       | Const _ -> ()
       | App (f, l) -> iter set f; List.iter (iter set) l
       | Ite (a,b,c) -> iter set a; iter set b; iter set c
+      | Let (l,u) ->
+        let set' =
+          List.fold_left
+            (fun bound' (v,u) -> iter set u; Var.Set.add bound' v)
+            set l
+        in
+        iter set' u
       | Match (u,l) ->
         iter set u;
         List.iter
@@ -399,6 +424,10 @@ let rec is_ground t =
   | App (f, l) -> is_ground f && List.for_all is_ground l
   | AppBuiltin (_,l) -> List.for_all is_ground l
   | Ite (a,b,c) -> is_ground a && is_ground b && is_ground c
+  | Let (l,u) ->
+    is_ground u
+    &&
+    List.for_all (fun (_,t) -> is_ground t) l
   | Match (u,l) ->
     is_ground u &&
     List.for_all
@@ -471,6 +500,7 @@ module Ty = struct
     | AppBuiltin (Builtin.Term, []) -> Ty_builtin Term
     | AppBuiltin (Builtin.Arrow, ret::args) -> Ty_fun (args, ret)
     | AppBuiltin (Builtin.Multiset, [t]) -> Ty_multiset t
+    | Let _
     | Ite _
     | Match _
     | Multiset _
@@ -592,6 +622,7 @@ module Form = struct
     | Bind((Binder.ForallTy | Binder.Lambda), _, _) -> assert false
     | Ite _
     | Match _
+    | Let _
     | Multiset _
     | Record _
     | Meta _
@@ -694,6 +725,8 @@ module Subst = struct
           "@[<2>var `@[%a@]` already bound in `@[%a@]`@]" Var.pp v pp subst);
     Var.Subst.add subst v t
 
+  let add_l = List.fold_left (fun subst (v,t) -> add subst v t)
+
   let find_exn = Var.Subst.find_exn
   let find = Var.Subst.find
 
@@ -733,13 +766,24 @@ module Subst = struct
         let b = eval subst b in
         let c = eval subst c in
         ite ?loc:t.loc a b c
+    | Let (l, u) ->
+        let subst', l =
+          CCList.fold_map
+            (fun subst' (v,t) ->
+               let t = eval subst t in
+               let subst', v = rename_var subst' v in
+               subst', (v,t))
+            subst l
+        in
+        let u = eval subst' u in
+        let_ ?loc:t.loc l u
     | Match (u, l) ->
         let u = eval subst u in
         let l =
           List.map
             (function
               | Match_case (c, vars, rhs) ->
-                let subst, vars = CCList.fold_map rename_var  subst vars in
+                let subst, vars = CCList.fold_map rename_var subst vars in
                 Match_case (c, vars, eval subst rhs)
               | Match_default t -> Match_default (eval subst t))
             l
@@ -830,6 +874,11 @@ let occur_check_ ~allow_open ~subst v t =
           | Some t' -> check bound t'
           end
       | Ite (a,b,c) -> check bound a || check bound b || check bound c
+      | Let (l,u) ->
+        List.exists (fun (_,t) -> check bound t) l
+        ||
+        let bound = List.fold_left (fun set (v,_) -> Var.Set.add set v) bound l in
+        check bound u
       | Match (u, l) ->
         check bound u
         ||
@@ -948,6 +997,14 @@ let unify ?(allow_open=false) ?loc ?(st=UStack.create()) ?(subst=Subst.empty) t1
         unif_rec subst a1 a2;
         unif_rec subst b1 b2;
         unif_rec subst c1 c2;
+    | Let (l, u), _ ->
+        (* expand "let" on the fly *)
+        let subst = Subst.add_l subst l in
+        unif_rec subst u t2
+    | _, Let (l, u) ->
+        (* expand "let" on the fly *)
+        let subst = Subst.add_l subst l in
+        unif_rec subst t1 u
     | Match (u1,l1), Match (u2,l2) when List.length l1=List.length l2 ->
         unif_rec subst u1 u2;
         List.iter2
@@ -1117,6 +1174,10 @@ let rec erase t = match view t with
     in
     STerm.match_ u l
   | Multiset l -> STerm.list_ (List.map erase l)
+  | Let (l, u) ->
+    let l = List.map (fun (v,t) -> STerm.V (Var.to_string v), erase t) l in
+    let u = erase u in
+    STerm.let_ l u
   | Record (l, rest) ->
       let rest = CCOpt.map
         (fun t -> match view t with

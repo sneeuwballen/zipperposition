@@ -27,6 +27,7 @@ and view =
   | App of t * t list (** apply term *)
   | Ite of t * t * t
   | Match of t * match_branch list
+  | Let of (var * t) list * t
   | Bind of Binder.t * typed_var list * t (** bind n variables *)
   | List of t list (** special constructor for lists *)
   | Record of (string * t) list * var option (** extensible record *)
@@ -48,6 +49,7 @@ let to_int_ = function
   | Record _ -> 8
   | Ite _ -> 9
   | Match _ -> 10
+  | Let _ -> 11
 
 let rec compare t1 t2 = match t1.term, t2.term with
   | Var s1, Var s2 -> Pervasives.compare s1 s2
@@ -77,17 +79,21 @@ let rec compare t1 t2 = match t1.term, t2.term with
     let cmp_branch b1 b2 = match b1, b2 with
       | Match_case (s1,vars1,rhs1), Match_case (s2,vars2,rhs2) ->
         CCOrd.(String.compare s1 s2
-          <?> (list_ Pervasives.compare, vars1,vars2)
+          <?> (list_ compare_var, vars1,vars2)
           <?> (compare,rhs1,rhs2))
       | Match_default t1, Match_default t2 -> compare t1 t2
       | Match_case _, Match_default _ -> -1
       | Match_default _, Match_case _ -> 1
     in
     CCOrd.( compare u1 u2 <?> (list_ cmp_branch,l1,l2))
+  | Let (l1,t1), Let (l2,t2) ->
+    CCOrd.( compare t1 t2
+        <?> (list_ (pair compare_var compare), l1, l2))
   | (Var _,_)
   | (Const _,_)
   | (Ite _, _)
   | (Match _, _)
+  | (Let _, _)
   | (AppBuiltin (_,_),_)
   | (App (_,_),_)
   | (Bind (_,_,_),_)
@@ -96,7 +102,9 @@ let rec compare t1 t2 = match t1.term, t2.term with
 
 and compare_typed_var (v1,o1)(v2,o2) =
   let cmp = compare in
-  CCOrd.( Pervasives.compare v1 v2 <?> (Util.ord_option cmp, o1, o2) )
+  CCOrd.( compare_var v1 v2 <?> (Util.ord_option cmp, o1, o2) )
+
+and compare_var : var CCOrd.t = Pervasives.compare
 
 let equal t1 t2 = compare t1 t2 = 0
 
@@ -112,6 +120,7 @@ let rec hash_fun t h = match t.term with
     h |> Hash.string "if" |> hash_fun a |> hash_fun b |> hash_fun c
   | Match (u, _) ->
     h |> Hash.string "match" |> hash_fun u
+  | Let (_, u) -> h |> Hash.string "let" |> hash_fun u
   | Record (l, rest) ->
     h |> Hash.opt hash_var rest
       |> Hash.list_ (fun (n,t) h -> Hash.string_ n (hash_fun t h)) l
@@ -142,6 +151,9 @@ let bind ?loc s v l = match v with
   | _::_ -> make_ ?loc (Bind(s,v,l))
 let ite ?loc a b c = make_ ?loc (Ite (a,b,c))
 let match_ ?loc t l = make_ ?loc (Match (t, l))
+let let_ ?loc l u = match l with
+  | [] -> u
+  | _ -> make_ ?loc (Let (l,u))
 let list_ ?loc l = make_ ?loc (List l)
 let nil = list_ []
 let record ?loc l ~rest =
@@ -223,6 +235,7 @@ module Seq = struct
       | AppBuiltin (_,l) -> List.iter iter l
       | App (f, l) -> iter f; List.iter iter l
       | Ite (a,b,c) -> iter a; iter b; iter c
+      | Let (l,u) -> iter u; List.iter (fun (_,t) -> iter t) l
       | Match (u,l) ->
         iter u;
         List.iter
@@ -259,6 +272,13 @@ module Seq = struct
           let bound' = List.fold_left add_typed_var bound v in
           iter bound' t'
       | Ite (a,b,c) -> iter bound a; iter bound b; iter bound c
+      | Let (l,u) ->
+        let bound' =
+          List.fold_left
+            (fun bound' (v,u) -> iter bound u; add_var bound' v)
+            bound l
+        in
+        iter bound' u
       | Match (u,l) ->
         iter bound u;
         List.iter
@@ -331,6 +351,10 @@ let rec pp out t = match t.term with
         pp t'
   | Ite (a,b,c) ->
       Format.fprintf out "@[<2>if %a@ then %a@ else %a@]" pp a pp b pp c
+  | Let (l, u) ->
+      let pp_binding out (v,t) = Format.fprintf out "@[%a := %a@]" pp_var v pp t in
+      Format.fprintf out "@[<2>let %a@ in %a@]"
+        (Util.pp_list ~sep:" and " pp_binding) l pp u
   | Match (u, l) ->
       let pp_branch out = function
         | Match_default rhs -> Format.fprintf out "_ -> %a" pp rhs
@@ -408,6 +432,7 @@ module TPTP = struct
           (Util.pp_list ~sep:"," pp_typed_var) vars
           pp_surrounded t'
     | Ite _ -> failwith "cannot print `ite` in TPTP"
+    | Let _ -> failwith "cannot print `let` in TPTP"
     | Match _ -> failwith "cannot print `match` in TPTP"
     | Record _ -> failwith "cannot print records in TPTP"
   and pp_typed_var out (v,o) = match o with
@@ -472,6 +497,10 @@ module ZF = struct
           pp_surrounded s (Util.pp_list ~sep:" " pp_surrounded) l
     | Ite (a,b,c) ->
         Format.fprintf out "@[<2>if %a@ then %a@ else %a@]" pp a pp b pp c
+    | Let (l, u) ->
+        let pp_binding out (v,t) = Format.fprintf out "@[%a := %a@]" pp_var v pp t in
+        Format.fprintf out "@[<2>let %a@ in %a@]"
+          (Util.pp_list ~sep:" and " pp_binding) l pp u
     | Match (u, l) ->
         let pp_branch out = function
           | Match_default rhs -> Format.fprintf out "_ -> %a" pp rhs
@@ -563,6 +592,17 @@ let rec apply_subst (subst:subst) (t:t): t =
           l
       in
       match_ ?loc u l
+    | Let (l, u) ->
+      let subst', l =
+        CCList.fold_map
+          (fun subst' (v,t) ->
+             let t = apply_subst subst t in
+             let subst', v = copy_fresh_ subst' v in
+             subst', (v,t))
+          subst l
+      in
+      let u = apply_subst subst' u in
+      let_ ?loc l u
     | Bind (b, vars, body) ->
       let subst, vars = CCList.fold_map copy_fresh_tyvar subst vars in
       let body = apply_subst subst body in

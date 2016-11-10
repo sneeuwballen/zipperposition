@@ -21,6 +21,7 @@ type view = private
   | App of t * t list (** apply term *)
   | Ite of t * t * t
   | Match of t * match_branch list
+  | Let of (t Var.t * t) list * t
   | Bind of Binder.t * t Var.t * t (** bind variable in term *)
   | AppBuiltin of Builtin.t * t list
   | Multiset of t list
@@ -56,6 +57,7 @@ val app : ?loc:location -> ty:t -> t -> t list -> t
 val const : ?loc:location -> ty:t -> ID.t -> t
 val ite : ?loc:location -> t -> t -> t -> t
 val match_ : ?loc:location -> t -> match_branch list -> t
+val let_ : ?loc:location -> (t Var.t * t) list -> t -> t
 val app_builtin : ?loc:location -> ty:t -> Builtin.t -> t list -> t
 val builtin : ?loc:location -> ty:t -> Builtin.t -> t
 val bind : ?loc:location -> ty:t -> Binder.t -> t Var.t -> t -> t

@@ -574,6 +574,9 @@ module Conv = struct
       | PT.Bind _
       | PT.Meta _
       | PT.Record _
+      | PT.Ite _
+      | PT.Let _
+      | PT.Match _
       | PT.Multiset _ -> raise Type.Conv.Error
     in
     aux t
