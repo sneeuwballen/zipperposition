@@ -23,11 +23,17 @@ type t = private {
   loc : location option;
 }
 
+and match_branch =
+  | Match_case of string * var list * t
+  | Match_default of t
+
 and view =
   | Var of var (** variable *)
   | Const of string (** constant *)
   | AppBuiltin of Builtin.t * t list
   | App of t * t list (** apply term *)
+  | Ite of t * t * t
+  | Match of t * match_branch list
   | Bind of Binder.t * typed_var list * t (** bind n variables *)
   | List of t list (** special constructor for lists *)
   | Record of (string * t) list * var option (** extensible record *)
@@ -51,6 +57,8 @@ val builtin : ?loc:location -> Builtin.t -> t
 val app_builtin : ?loc:location -> Builtin.t -> t list -> t
 val const : ?loc:location -> string -> t
 val bind : ?loc:location -> Binder.t -> typed_var list -> t -> t
+val ite : ?loc:location -> t -> t -> t -> t
+val match_ : ?loc:location -> t -> match_branch list -> t
 val list_ : ?loc:location -> t list -> t
 val nil : t
 val record : ?loc:location -> (string*t) list -> rest:var option -> t
@@ -90,13 +98,6 @@ val forall_ty : ?loc:location -> typed_var list -> t -> t
 val ty_unfold : t -> t list * t
 val unfold_bind: Binder.t -> t -> typed_var list * t
 
-val map :
-  bind:('b_acc -> typed_var -> 'b_acc * typed_var) ->
-  f:('b_acc -> term -> term) ->
-  'b_acc ->
-  term ->
-  term
-
 module Set : CCSet.S with type elt = term
 module Map : CCMap.S with type key = term
 module Tbl : CCHashtbl.S with type key = term
@@ -121,6 +122,8 @@ val subterm : strict:bool -> t -> sub:t -> bool
 (** {2 Print} *)
 
 include Interfaces.PRINT with type t := t
+val pp_typed_var : typed_var CCFormat.printer
+val pp_var : var CCFormat.printer
 
 (** {2 Formats} *)
 

@@ -11,10 +11,16 @@ type location = ParseLocation.t
 type t
 type term = t
 
+type match_branch =
+  | Match_case of ID.t * t Var.t list * t
+  | Match_default of t
+
 type view = private
   | Var of t Var.t (** variable *)
   | Const of ID.t (** constant *)
   | App of t * t list (** apply term *)
+  | Ite of t * t * t
+  | Match of t * match_branch list
   | Bind of Binder.t * t Var.t * t (** bind variable in term *)
   | AppBuiltin of Builtin.t * t list
   | Multiset of t list
@@ -48,6 +54,8 @@ val var : ?loc:location -> t Var.t -> t
 val var_of_string : ?loc:location -> ty:t -> string -> t
 val app : ?loc:location -> ty:t -> t -> t list -> t
 val const : ?loc:location -> ty:t -> ID.t -> t
+val ite : ?loc:location -> t -> t -> t -> t
+val match_ : ?loc:location -> t -> match_branch list -> t
 val app_builtin : ?loc:location -> ty:t -> Builtin.t -> t list -> t
 val builtin : ?loc:location -> ty:t -> Builtin.t -> t
 val bind : ?loc:location -> ty:t -> Binder.t -> t Var.t -> t -> t
@@ -78,14 +86,14 @@ module Ty : sig
   type builtin = Prop | TType | Term | Int | Rat
 
   type view =
-    | Builtin of builtin
-    | Var of t Var.t
-    | App of ID.t * t list
-    | Fun of t list * t
-    | Forall of t Var.t * t
-    | Multiset of t
-    | Record of (string * t) list * t Var.t option
-    | Meta of meta_var
+    | Ty_builtin of builtin
+    | Ty_var of t Var.t
+    | Ty_app of ID.t * t list
+    | Ty_fun of t list * t
+    | Ty_forall of t Var.t * t
+    | Ty_multiset of t
+    | Ty_record of (string * t) list * t Var.t option
+    | Ty_meta of meta_var
 
   val view : t -> view
 
@@ -158,6 +166,7 @@ module Form : sig
   val and_ : ?loc:location -> t list -> t
   val or_ : ?loc:location -> t list -> t
   val not_ : ?loc:location -> t -> t
+  val ite : ?loc:location -> t -> t -> t -> t
   val forall : ?loc:location -> t Var.t -> t -> t
   val exists : ?loc:location -> t Var.t -> t -> t
 
@@ -232,8 +241,6 @@ module Subst : sig
 
   val eval : t -> term -> term
 
-  val eval_head : t -> term -> term
-
   include Interfaces.PRINT with type t := t
 end
 
@@ -278,9 +285,6 @@ val apply_unify :
     when applied to parameters [args]. The first elements of [args] might
     be interpreted as types, the other ones as terms (whose types are unified
     against expected types). *)
-
-val deref_rec : t -> t
-(** Follow meta-variables links in all subterms *)
 
 val app_infer :
   ?st:UStack.t -> ?subst:Subst.t ->

@@ -16,11 +16,17 @@ type t = {
   loc : location option;
 }
 
+and match_branch =
+  | Match_case of string * var list * t
+  | Match_default of t
+
 and view =
   | Var of var (** variable *)
   | Const of string (** constant *)
   | AppBuiltin of Builtin.t * t list
   | App of t * t list (** apply term *)
+  | Ite of t * t * t
+  | Match of t * match_branch list
   | Bind of Binder.t * typed_var list * t (** bind n variables *)
   | List of t list (** special constructor for lists *)
   | Record of (string * t) list * var option (** extensible record *)
@@ -40,6 +46,8 @@ let to_int_ = function
   | Bind _ -> 6
   | List _ -> 7
   | Record _ -> 8
+  | Ite _ -> 9
+  | Match _ -> 10
 
 let rec compare t1 t2 = match t1.term, t2.term with
   | Var s1, Var s2 -> Pervasives.compare s1 s2
@@ -63,8 +71,23 @@ let rec compare t1 t2 = match t1.term, t2.term with
       then CCOrd.list_ compare_typed_var v1 v2
       else c'
     else c
+  | Ite (a1,b1,c1), Ite (a2,b2,c2) ->
+    CCList.compare compare [a1;b1;c1] [a2;b2;c2]
+  | Match (u1,l1), Match (u2,l2) ->
+    let cmp_branch b1 b2 = match b1, b2 with
+      | Match_case (s1,vars1,rhs1), Match_case (s2,vars2,rhs2) ->
+        CCOrd.(String.compare s1 s2
+          <?> (list_ Pervasives.compare, vars1,vars2)
+          <?> (compare,rhs1,rhs2))
+      | Match_default t1, Match_default t2 -> compare t1 t2
+      | Match_case _, Match_default _ -> -1
+      | Match_default _, Match_case _ -> 1
+    in
+    CCOrd.( compare u1 u2 <?> (list_ cmp_branch,l1,l2))
   | (Var _,_)
   | (Const _,_)
+  | (Ite _, _)
+  | (Match _, _)
   | (AppBuiltin (_,_),_)
   | (App (_,_),_)
   | (Bind (_,_,_),_)
@@ -85,6 +108,10 @@ let rec hash_fun t h = match t.term with
   | List l -> Hash.list_ hash_fun l (Hash.int_ 42 h)
   | Bind (s,v,t') ->
     h |> Binder.hash_fun s |> hash_fun t' |> Hash.list_ hash_ty_var v
+  | Ite (a,b,c) ->
+    h |> Hash.string "if" |> hash_fun a |> hash_fun b |> hash_fun c
+  | Match (u, _) ->
+    h |> Hash.string "match" |> hash_fun u
   | Record (l, rest) ->
     h |> Hash.opt hash_var rest
       |> Hash.list_ (fun (n,t) h -> Hash.string_ n (hash_fun t h)) l
@@ -113,6 +140,8 @@ let app_const ?loc s l = app (const ?loc s) l
 let bind ?loc s v l = match v with
   | [] -> l
   | _::_ -> make_ ?loc (Bind(s,v,l))
+let ite ?loc a b c = make_ ?loc (Ite (a,b,c))
+let match_ ?loc t l = make_ ?loc (Match (t, l))
 let list_ ?loc l = make_ ?loc (List l)
 let nil = list_ []
 let record ?loc l ~rest =
@@ -171,29 +200,6 @@ let unfold_bind b =
   in
   aux []
 
-let map ~bind ~f acc t =
-  let loc = t.loc in
-  let view = match t.term with
-    | Var v -> Var v
-    | Const c -> Const c
-    | AppBuiltin (b, l) ->
-      let l = List.map (f acc) l in
-      AppBuiltin (b, l)
-    | App (hd, l) ->
-      let hd = f acc hd in
-      let l = List.map (f acc) l in
-      App (hd, l)
-    | Bind (b, vars, body) ->
-      let acc, vars = CCList.fold_map bind acc vars in
-      let body = f acc body in
-      Bind (b, vars, body)
-    | List l -> List (List.map (f acc) l)
-    | Record (l, row) ->
-      let l = List.map (fun (name,t) -> name, f acc t) l in
-      Record (l, row)
-  in
-  make_ ?loc view
-
 module AsKey = struct
   type t = term
   let compare = compare
@@ -216,6 +222,14 @@ module Seq = struct
       | List l
       | AppBuiltin (_,l) -> List.iter iter l
       | App (f, l) -> iter f; List.iter iter l
+      | Ite (a,b,c) -> iter a; iter b; iter c
+      | Match (u,l) ->
+        iter u;
+        List.iter
+          (function
+            | Match_case (_,_,rhs)
+            | Match_default rhs -> iter rhs)
+          l
       | Bind (_, _, t') -> iter t'
       | Record (l, _) ->
           List.iter (fun (_,t') -> iter t') l
@@ -228,6 +242,11 @@ module Seq = struct
         | _ -> None)
 
   let subterms_with_bound t k =
+    let add_var set = function
+      | Wildcard -> set
+      | V s -> StringSet.add s set
+    in
+    let add_typed_var set (v,_) = add_var set v in
     let rec iter bound t =
       k (t, bound);
       match t.term with
@@ -237,14 +256,18 @@ module Seq = struct
       | App (f, l) -> iter bound f; List.iter (iter bound) l
       | Bind (_, v, t') ->
           (* add variables of [v] to the set *)
-          let bound' =
-            List.fold_left
-              (fun set (v,_) -> match v with
-                 | Wildcard -> set
-                 | V s -> StringSet.add s set)
-              bound v
-          in
+          let bound' = List.fold_left add_typed_var bound v in
           iter bound' t'
+      | Ite (a,b,c) -> iter bound a; iter bound b; iter bound c
+      | Match (u,l) ->
+        iter bound u;
+        List.iter
+          (function
+            | Match_case (_,vars,rhs) ->
+              let bound' = List.fold_left add_var bound vars in
+              iter bound' rhs
+            | Match_default rhs -> iter bound rhs)
+          l
       | Record (l, _) ->
           List.iter (fun (_,t') -> iter bound t') l
     in iter StringSet.empty t
@@ -306,6 +329,17 @@ let rec pp out t = match t.term with
         Binder.pp s
         (Util.pp_list ~sep:" " pp_typed_var) vars
         pp t'
+  | Ite (a,b,c) ->
+      Format.fprintf out "@[<2>if %a@ then %a@ else %a@]" pp a pp b pp c
+  | Match (u, l) ->
+      let pp_branch out = function
+        | Match_default rhs -> Format.fprintf out "_ -> %a" pp rhs
+        | Match_case (c,vars,rhs) ->
+          Format.fprintf out "(@[case@ %s %a ->@ %a@])"
+            c (Util.pp_list ~sep:" " pp_var) vars pp rhs
+      in
+      Format.fprintf out "@[<hv2>match %a with@ @[<hv>%a@]@ end@]"
+        pp u (Util.pp_list ~sep:" | " pp_branch) l
   | Record (l, None) ->
       Format.fprintf out "{@[<hv>%a@]}"
         (Util.pp_list (fun out (s,t') -> Format.fprintf out "%s:%a" s pp t')) l;
@@ -373,6 +407,8 @@ module TPTP = struct
           Binder.TPTP.pp s
           (Util.pp_list ~sep:"," pp_typed_var) vars
           pp_surrounded t'
+    | Ite _ -> failwith "cannot print `ite` in TPTP"
+    | Match _ -> failwith "cannot print `match` in TPTP"
     | Record _ -> failwith "cannot print records in TPTP"
   and pp_typed_var out (v,o) = match o with
     | None -> pp_var out v
@@ -434,6 +470,17 @@ module ZF = struct
     | App (s, l) ->
         Format.fprintf out "@[<2>%a@ %a@]"
           pp_surrounded s (Util.pp_list ~sep:" " pp_surrounded) l
+    | Ite (a,b,c) ->
+        Format.fprintf out "@[<2>if %a@ then %a@ else %a@]" pp a pp b pp c
+    | Match (u, l) ->
+        let pp_branch out = function
+          | Match_default rhs -> Format.fprintf out "_ -> %a" pp rhs
+          | Match_case (c,vars,rhs) ->
+            Format.fprintf out "(@[case@ %s %a ->@ %a@])"
+              c (Util.pp_list ~sep:" " pp_var) vars pp rhs
+        in
+        Format.fprintf out "@[<hv2>match %a with@ @[<hv>%a@]@ end@]"
+          pp u (Util.pp_list ~sep:" | " pp_branch) l
     | Bind (s, vars, t') ->
         Format.fprintf out "@[<2>%a @[%a@].@ @[%a@]@]"
           Binder.ZF.pp s
@@ -472,22 +519,57 @@ let merge_subst a b =
       | `Left x | `Right x -> Some x)
 
 (* make fresh copy of [base] not bound in subst *)
-let copy_fresh_ subst v : subst * typed_var = match v with
-  | Wildcard, ty -> subst, (Wildcard, ty)
-  | V base, ty ->
+let copy_fresh_ subst v : subst * var = match v with
+  | Wildcard -> subst, Wildcard
+  | V base ->
     let rec aux i =
       let v = Printf.sprintf "%s%d" base i in
       if StrMap.mem v subst then aux (i+1) else v
     in
     let new_base = aux 0 in
-    StrMap.add base (var new_base) subst, (V new_base, ty)
+    StrMap.add base (var new_base) subst, V new_base
 
-let rec apply_subst (subst:subst) (t:t): t = match t.term with
-  | Var (V s) -> StrMap.get_or ~or_:t s subst
-  | Var Wildcard -> t
-  | _ ->
-    map
-      ~bind:copy_fresh_
-      ~f:apply_subst
-      subst t
+let copy_fresh_tyvar subst (v,ty) =
+  let subst, v = copy_fresh_ subst v in
+  subst, (v,ty)
+
+let rec apply_subst (subst:subst) (t:t): t =
+  let loc = t.loc in
+  begin match t.term with
+    | Var (V s) -> StrMap.get_or ~or_:t s subst
+    | Var Wildcard -> t
+    | Const c -> const ?loc c
+    | AppBuiltin (b, l) ->
+      let l = List.map (apply_subst subst) l in
+      app_builtin ?loc b l
+    | App (hd, l) ->
+      let hd = apply_subst subst hd in
+      let l = List.map (apply_subst subst) l in
+      app ?loc hd l
+    | Ite (a,b,c) ->
+      let a = apply_subst subst a in
+      let b = apply_subst subst b in
+      let c = apply_subst subst c in
+      ite ?loc a b c
+    | Match (u,l) ->
+      let u = apply_subst subst u in
+      let l =
+        List.map
+          (function
+            | Match_default rhs -> Match_default (apply_subst subst rhs)
+            | Match_case (c,vars,rhs) ->
+              let subst, vars = CCList.fold_map copy_fresh_ subst vars in
+              Match_case (c, vars, apply_subst subst rhs))
+          l
+      in
+      match_ ?loc u l
+    | Bind (b, vars, body) ->
+      let subst, vars = CCList.fold_map copy_fresh_tyvar subst vars in
+      let body = apply_subst subst body in
+      bind ?loc b vars body
+    | List l -> list_ ?loc (List.map (apply_subst subst) l)
+    | Record (l, row) ->
+      let l = List.map (fun (name,t) -> name, apply_subst subst t) l in
+      record ?loc l ~rest:row
+  end
 
