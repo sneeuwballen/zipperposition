@@ -52,86 +52,6 @@ let rec conv_ty ty = match ty with
   | A.Ty_app (s, args) ->
     T.app (T.const s) (List.map conv_ty args)
 
-module Choice = struct
-  type cond = T.term list (* side conditions *)
-  type 'a t = T.subst -> (T.subst * cond * 'a) Sequence.t
-
-  let empty : 'a t = fun _ -> Sequence.empty
-
-  let return
-    : type a. a -> a t
-    = fun x subst -> Sequence.return (subst, [], x)
-
-  let (>>=)
-    : type a b. a t -> (a -> b t) -> b t
-    = fun seq f subst yield ->
-      seq subst (fun (subst,conds,x) ->
-        f x subst (fun (subst',conds',y) ->
-          yield (T.merge_subst subst subst', conds@conds',y)))
-
-  let (>|=)
-    : type a b. a t -> (a -> b) -> b t
-    = fun seq f subst yield ->
-      seq subst (fun (subst,conds,x) ->
-        yield (subst,conds,f x))
-
-  let (<*>)
-    : ('a -> 'b) t -> 'a t -> 'b t
-    = fun f x ->
-      f >>= fun f ->
-      x >|= fun x -> f x
-
-  let (<$>) f x = x >|= f ?loc:None
-
-  let add_cond
-    : cond -> unit t
-    = fun c subst ->
-      Sequence.return (subst, c, ())
-
-  let add_subst
-    : T.subst -> unit t
-    = fun sigma subst ->
-      Sequence.return (T.merge_subst subst sigma, [], ())
-
-  (* non deterministic choice *)
-  let (<+>)
-    : type a. a t -> a t -> a t
-    = fun x y subst ->
-      Sequence.append (x subst) (y subst)
-
-  let rec map_m f l = match l with
-    | [] -> return []
-    | x :: tail ->
-      f x >>= fun x ->
-      map_m f tail >|= fun tail -> x::tail
-
-  let rec fold_m f acc l = match l with
-    | [] -> return acc
-    | [x] -> f acc x
-    | x :: tail ->
-      f acc x >>= fun acc -> fold_m f acc tail
-
-  let choice_l
-    : 'a t list -> 'a t
-    = fun l subst ->
-      Sequence.flat_map (fun x -> x subst) (Sequence.of_list l)
-
-  let to_list
-    : 'a t -> (T.subst * cond * 'a) list
-    = fun seq ->
-      seq T.StrMap.empty |> Sequence.to_rev_list
-
-  let to_list_applied
-    : T.t t -> T.t list
-    = fun seq ->
-      seq T.empty_subst
-      |> Sequence.map
-        (fun (subst,cond,t) ->
-           let t = match cond with [] -> t | _ -> T.imply (T.and_ cond) t in
-           T.apply_subst subst t)
-      |> Sequence.to_rev_list
-end
-
 let app ?loc x y = T.app ?loc x [y]
 let app_l = T.app
 
@@ -139,49 +59,53 @@ let conv_tyvar v = T.V v, Some T.tType
 let conv_var (v,ty) = T.V v, Some (conv_ty ty)
 let conv_vars = List.map conv_var
 
-(* conversion of terms can yield several possible terms, by
-   eliminating if and match *)
-let rec conv_term (t:A.term): T.t Choice.t =
-  let open Choice in
+let rec conv_term (t:A.term): T.t =
   match t with
-    | A.True -> return T.true_
-    | A.False -> return T.false_
+    | A.True -> T.true_
+    | A.False -> T.false_
     | A.Const s ->
       (* const of variable: let type inference decide *)
-      return (T.var s)
+      T.var s
     | A.App (f,l) ->
-      app_l <$> return (T.const f) <*> map_m conv_term l
+      app_l (T.const f) (List.map conv_term l)
     | A.HO_app (a,b) ->
-      app <$> conv_term a <*> conv_term b
+      app (conv_term a) (conv_term b)
     | A.If (a,b,c) ->
-      conv_term a >>= fun a ->
-      (add_cond [a] >>= fun () -> conv_term b)
-      <+>
-      (add_cond [T.not_ a] >>= fun () -> conv_term c)
-    | A.Match (_,_) -> assert false (* TODO *)
-    | A.Let (_,_) -> assert false (* TODO *)
-    | A.Fun (_,_) -> assert false (* TODO *)
+      T.ite (conv_term a)(conv_term b)(conv_term c)
+    | A.Match (u,l) ->
+      let u = conv_term u in
+      let l = List.map
+          (function
+            | A.Match_default t -> T.Match_default (conv_term t)
+            | A.Match_case (s,vars,t) ->
+              let vars = List.map (fun v->T.V v) vars in
+              T.Match_case (s,vars,conv_term t))
+          l
+      in
+      T.match_ u l
+    | A.Let (l,u) ->
+      let l = List.map (fun (v,t) -> T.V v, conv_term t) l in
+      let u = conv_term u in
+      T.let_ l u
+    | A.Fun (v,t) ->
+      let v = conv_var v in
+      let t = conv_term t in
+      T.lambda [v] t
     | A.Eq (a,b) ->
-      T.eq <$> conv_term a <*> conv_term b
-    | A.Imply (a,b) -> T.imply <$> conv_term a <*> conv_term b
-    | A.And l -> T.and_ <$> map_m conv_term l
-    | A.Or l -> T.or_ <$> map_m conv_term l
-    | A.Not a -> T.not_ <$> conv_term a
+      T.eq (conv_term a)(conv_term b)
+    | A.Imply (a,b) -> T.imply (conv_term a)(conv_term b)
+    | A.And l -> T.and_ (List.map conv_term l)
+    | A.Or l -> T.or_ (List.map conv_term l)
+    | A.Not a -> T.not_ (conv_term a)
     | A.Forall (vars,body) ->
       let vars = conv_vars vars in
-      let body = conv_term_and body in
-      return (T.forall vars body)
+      let body = conv_term body in
+      T.forall vars body
     | A.Exists (vars,body) ->
       let vars = conv_vars vars in
-      let body = conv_term_and body in
-      return (T.exists vars body)
+      let body = conv_term body in
+      T.exists vars body
     | A.Cast (a,_) -> conv_term a
-
-(* same as {!conv_term}, but puts a conjunction afterwards *)
-and conv_term_and (t:A.term): T.t =
-  conv_term t
-  |> Choice.to_list_applied
-  |> T.and_
 
 let conv_decl (d:A.ty A.fun_decl): string * T.t =
   let tyvars = List.map conv_tyvar d.A.fun_ty_vars in
@@ -199,6 +123,22 @@ let conv_def (d:A.typed_var A.fun_decl): string * T.typed_var list * T.t =
   let ty = T.forall_ty tyvars (T.fun_ty ty_args ty_ret) in
   d.A.fun_name, tyvars @ vars, ty
 
+let conv_def ?loc decl body =
+  (* translate into definitions *)
+  let f, vars, ty_f = conv_def decl in
+  let vars_as_t =
+    List.map
+      (function
+        | T.Wildcard, _ -> assert false
+        | T.V s, _ -> T.var s)
+      vars
+  in
+  let def =
+    let body = conv_term body in
+    T.forall ?loc vars (T.eq (T.app_const f vars_as_t) body)
+  in
+  UA.mk_def f ty_f [def]
+
 let convert (st:A.statement): UA.statement list =
   Util.debugf 3 "convert TIP statement@ @[%a@]"
     (fun k->k A.pp_stmt st);
@@ -211,13 +151,13 @@ let convert (st:A.statement): UA.statement list =
       let s, ty = conv_decl d in
       [UA.decl ?loc s ty]
     | A.Stmt_assert t ->
-      let ts = conv_term t |> Choice.to_list_applied in
-      List.map (UA.assert_ ?loc) ts
+      let t = conv_term t in
+      [UA.assert_ ?loc t]
     | A.Stmt_assert_not (tyvars,g) ->
       (* goal *)
       let tyvars = List.map conv_tyvar tyvars in
-      let goals = conv_term g |> Choice.to_list_applied in
-      let g = T.forall_ty ?loc tyvars (T.and_ goals) in
+      let g = conv_term g in
+      let g = T.forall_ty ?loc tyvars g in
       [UA.goal ?loc g]
     | A.Stmt_data (tyvars, l) ->
       let l = List.map
@@ -240,28 +180,13 @@ let convert (st:A.statement): UA.statement list =
     | A.Stmt_check_sat -> [] (* trivial *)
     | A.Stmt_fun_def fr
     | A.Stmt_fun_rec fr ->
-      (* definition becomes a decl + universal axioms *)
-      let f, vars, ty_f = conv_def fr.A.fr_decl in
-      let decl = UA.decl ?loc f ty_f in
-      let vars_as_t =
-        List.map
-          (function
-            | T.Wildcard, _ -> assert false
-            | T.V s, _ -> T.var s)
-          vars
-      in
-      let defs =
-        conv_term fr.A.fr_body
-        |> Choice.to_list_applied
-        |> List.map
-          (fun body ->
-             let ax = T.forall ?loc vars (T.eq (T.app_const f vars_as_t) body) in
-             UA.assert_ ?loc ax)
-      in
-      decl :: defs
-    | A.Stmt_funs_rec _
-      ->
-      assert false (* TODO *)
+      (* translate into definitions *)
+      let l = [conv_def ?loc fr.A.fr_decl fr.A.fr_body] in
+      [UA.def ?loc l]
+    | A.Stmt_funs_rec {A. fsr_decls; fsr_bodies } ->
+      assert (List.length fsr_decls = List.length fsr_bodies);
+      let l = List.map2 (conv_def ?loc) fsr_decls fsr_bodies in
+      [UA.def ?loc l]
 
 let convert_seq = Sequence.flat_map_l convert
 

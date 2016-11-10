@@ -94,6 +94,9 @@ typed_var:
   | WILDCARD { T.Wildcard, None }
   | LEFT_PAREN v=raw_var COLON t=term RIGHT_PAREN { T.V v, Some t }
 
+typed_var_strict:
+  | LEFT_PAREN v=raw_var COLON t=term RIGHT_PAREN { T.V v, t }
+
 typed_ty_var:
   | v=raw_var { T.V v, None }
   | v=raw_var COLON TYPE { T.V v, Some T.tType  }
@@ -222,6 +225,10 @@ attrs:
     { l }
   | { [] }
 
+def:
+ | v=raw_var COLON ty=term EQDEF rules=separated_nonempty_list(AND,term)
+   { A.mk_def v ty rules }
+
 statement:
   | INCLUDE s=QUOTED DOT
     {
@@ -234,10 +241,10 @@ statement:
       let loc = L.mk_pos $startpos $endpos in
       A.decl ~attrs:a ~loc v t
     }
-  | DEF a=attrs v=raw_var COLON t=term EQDEF u=term DOT
+  | DEF a=attrs l=separated_nonempty_list(AND,def) DOT
     {
       let loc = L.mk_pos $startpos $endpos in
-      A.def ~attrs:a ~loc v t u
+      A.def ~attrs:a ~loc l
     }
   | REWRITE a=attrs t=term DOT
     {
