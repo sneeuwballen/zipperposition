@@ -15,6 +15,13 @@ exception Error of string
 
 exception NotCNF of form
 
+val flatten_form : Skolem.ctx -> form -> (form * form list) list
+(** [flatten_form f] returns a sequence of terms that contain
+    only first-order features (no If, no Match, No Let),
+    along with a conjunction of side conditions needed for
+    the new term to be equal to the old one
+    @param skolem ctx is used to introduce definitions for boolean subterms *)
+
 val miniscope : ?distribute_exists:bool -> form -> form
 (** Apply miniscoping transformation to the term.
     @param distribute_exists see whether ?X:(p(X)|q(X)) should be

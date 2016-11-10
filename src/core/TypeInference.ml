@@ -380,6 +380,65 @@ let rec infer_rec ctx t =
          (Util.pp_list T.pp) (List.map T.ty_exn l));
       let ty = T.apply_unify ?loc ~allow_open:true (T.ty_exn f) l in
       T.app ?loc ~ty f l
+  | PT.Ite (a,b,c) ->
+      let a = infer_prop_ ?loc ctx a in
+      let b = infer_rec ctx b in
+      let c = infer_rec ctx c in
+      unify ?loc (T.ty_exn b)(T.ty_exn c);
+      T.ite ?loc a b c
+  | PT.Let (l, u) ->
+      let l =
+        List.map (fun (v,t) ->
+          let t = infer_rec ctx t in
+          (v, Some (T.ty_exn t)), t)
+          l
+      in
+      let vars, terms = List.split l in
+      with_typed_vars_ ?loc ~infer_ty:(fun ?loc:_ _ ty -> ty) ctx vars
+        ~f:(fun vars ->
+          let u = infer_rec ctx u in
+          T.let_ ?loc (List.combine vars terms) u)
+  | PT.Match (u, l) ->
+      (* TODO: more checks, e.g. that matched IDs are from the proper datatype *)
+      let u = infer_rec ctx u in
+      let ty_ret = ref None in
+      let l =
+        List.map
+          (fun b ->
+             let b, ty_rhs = match b with
+               | PT.Match_default rhs ->
+                 let rhs = infer_rec ctx rhs in
+                 T.Match_default rhs, T.ty_exn rhs
+               | PT.Match_case (s, vars, rhs) ->
+                 let id, ty = Ctx.get_id_ ?loc ~arity:(List.length vars) ctx s in
+                 let ty_vars, ty_args, _ = T.Ty.unfold ty in
+                 assert (List.length ty_vars + List.length ty_args = List.length vars);
+                 (* compute expected types of arguments *)
+                 let vars_ty, vars_rest = CCList.take_drop (List.length ty_vars) vars in
+                 with_typed_vars ctx
+                   (List.map (fun v -> v, Some PT.tType) vars_ty)
+                   ~f:(fun vars_ty ->
+                     let vars_ty_as_t = List.map T.Ty.var vars_ty in
+                     let ty = T.apply_unify ?loc ~allow_open:false ty vars_ty_as_t in
+                     let _vars, ty_args, ty_ret = T.Ty.unfold ty in
+                     assert (_vars=[]);
+                     assert (List.length ty_args = List.length vars_rest);
+                     with_typed_vars_ ?loc ~infer_ty:(fun ?loc:_ _ ty -> ty) ctx
+                       (List.map2 (fun v ty_arg -> v, Some ty_arg) vars_rest ty_args)
+                       ~f:(fun vars_rest ->
+                         (* now we have everything in scope, we can convert [rhs] *)
+                         let rhs = infer_rec ctx rhs in
+                         unify ?loc (T.ty_exn rhs) ty_ret;
+                         T.Match_case (id, vars_ty @ vars_rest, rhs), ty_ret))
+             in
+             begin match !ty_ret with
+               | None -> ty_ret := Some ty_rhs
+               | Some ty -> unify ?loc ty ty_rhs
+             end;
+             b)
+          l
+      in
+      T.match_ ?loc u l
   | PT.List [] ->
       let v = Ctx.fresh_ty_meta_var ~dest:`Generalize ctx in
       let ty = T.Ty.multiset (T.Ty.meta v) in
@@ -567,23 +626,29 @@ type typed_statement = (typed, typed, type_, UntypedAST.attrs) Statement.t
 module A = UntypedAST
 module Stmt = Statement
 
-let check_vars ?loc bound lhs rhs =
-  let vars_lhs = T.Seq.free_vars lhs |> Var.Set.of_seq in
+let check_vars_rhs ?loc bound rhs =
   let vars_rhs = T.Seq.free_vars rhs |> Var.Set.of_seq in
+  (* check that all variables of [rhs] are within [lhs] *)
+  let only_in_rhs = Var.Set.diff vars_rhs bound in
+  if not (Var.Set.is_empty only_in_rhs) then (
+    error_ ?loc "variables @[%a@]@ occur in RHS/cond `@[%a@]`@ but are not bound"
+      Var.Set.pp only_in_rhs T.pp rhs;
+  )
+
+(* check that [vars rhs] subseteq [vars lhs] *)
+let check_vars_eqn ?loc bound lhs rhs =
+  let vars_lhs = T.Seq.free_vars lhs |> Var.Set.of_seq in
   (* check that all variables in [lhs] are bound *)
   let not_bound = Var.Set.diff vars_lhs bound in
   if not (Var.Set.is_empty not_bound)
     then error_ ?loc "variables @[%a@] are not bound" Var.Set.pp not_bound;
-  (* check that all variables of [rhs] are within [lhs] *)
-  let only_in_rhs = Var.Set.diff vars_rhs vars_lhs in
-  if not (Var.Set.is_empty only_in_rhs)
-    then error_ ?loc "variables @[%a@] occur in RHS but not LHS" Var.Set.pp only_in_rhs;
+  check_vars_rhs ?loc vars_lhs rhs;
   ()
 
 (* decompose [t] as [forall vars. id args = rhs]
    or [forall vars. lhs <=> rhs]
    @return [id, ty, args, rhs] or [lhs,rhs]
-  @param bound the set of bound variables so far *)
+   @param bound the set of bound variables so far *)
 let rec as_def ?loc bound t =
   let fail() =
     error_ ?loc "expected `forall <vars>. <lhs> =/<=> <rhs>`"
@@ -594,11 +659,11 @@ let rec as_def ?loc bound t =
     | T.AppBuiltin (Builtin.Equiv, [lhs;rhs]) ->
       (* check that LHS is a literal, and  that all free variables
          of RHS occur in LHS (bound variables are ok though) *)
-      check_vars ?loc bound lhs rhs;
+      check_vars_eqn ?loc bound lhs rhs;
       let lhs = SLiteral.of_form lhs in
       `Prop (lhs,rhs)
     | T.AppBuiltin (Builtin.Eq, [lhs;rhs]) ->
-      check_vars ?loc bound lhs rhs;
+      check_vars_eqn ?loc bound lhs rhs;
       begin match T.view lhs with
         | T.Const id ->
           let ty = T.ty_exn lhs in
@@ -614,15 +679,51 @@ let rec as_def ?loc bound t =
       end
     | T.AppBuiltin (Builtin.Not, [lhs]) ->
       let rhs = T.Form.false_ in
-      check_vars ?loc bound lhs rhs;
+      check_vars_eqn ?loc bound lhs rhs;
       let lhs = SLiteral.of_form lhs in
       `Prop (lhs, rhs)
     | _ when T.Ty.is_prop (T.ty_exn t) ->
       let rhs = T.Form.true_ in
-      check_vars ?loc bound t rhs;
+      check_vars_eqn ?loc bound t rhs;
       let lhs = SLiteral.of_form t in
       `Prop (lhs, rhs)
     | _ -> fail()
+
+let infer_defs ?loc ctx (l:A.def list): (_,_,_) Stmt.def list =
+  (* first, declare all *)
+  let decls =
+    List.map
+      (fun d ->
+        let id = ID.make d.A.def_id in
+        let ty = infer_ty_exn ctx d.A.def_ty in
+        (* cannot return [Type] *)
+        if T.Ty.returns_tType ty
+        then error_ ?loc
+            "in definition of %a,@ equality between types is forbidden"
+            ID.pp id;
+        Ctx.declare ctx id ty;
+        id, ty, d.A.def_rules)
+      l
+  in
+  (* now, infer type of each definition *)
+  List.map
+    (fun (id, ty, rules) ->
+       let rules =
+         List.map
+           (fun r ->
+              let r = infer_prop_exn ctx r in
+              let vars = T.free_vars r in
+              begin match as_def ?loc Var.Set.empty r with
+                | `Term (id,_,args,rhs) ->
+                  Stmt.Def_term (vars,id,args,rhs)
+                | `Prop (lhs,rhs) ->
+                  assert (T.Ty.is_prop (T.ty_exn rhs));
+                  Stmt.Def_form (vars,lhs,[rhs])
+              end)
+           rules
+       in
+       Stmt.mk_def id ty rules)
+    decls
 
 let infer_statement_exn ctx st =
   Util.debugf ~section 3 "@[<2>infer types for @{<yellow>statement@}@ `@[%a@]`@]"
@@ -640,14 +741,9 @@ let infer_statement_exn ctx st =
         let ty = infer_ty_exn ctx ty in
         Ctx.declare ctx id ty;
         Stmt.ty_decl ~src id ty
-    | A.Def (s,ty,t) ->
-        let id = ID.make s in
-        let ty = infer_ty_exn ctx ty in
-        if T.Ty.returns_tType ty
-        then error_ ?loc "in definition of %a,@ equality between types is forbidden" ID.pp id;
-        let t = infer_exn ctx t in
-        Ctx.declare ctx id ty;
-        Stmt.def ~src id ty t
+    | A.Def l ->
+        let l = infer_defs ?loc ctx l in
+        Stmt.def ~src l
     | A.Rewrite t ->
         let t =  infer_prop_ ctx t in
         begin match as_def ?loc Var.Set.empty t with

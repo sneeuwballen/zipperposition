@@ -55,14 +55,19 @@ val pp_polarity : polarity CCFormat.printer
 type definition = {
   form : form;
   proxy : form;
+  add_rules: bool;
+  (* do we add the add rules
+     [proxy -> true if form]
+     [proxy -> false if not form] (depending on polarity) *)
   polarity : polarity;
 }
 
 val define :
   ctx:ctx ->
+  add_rules:bool ->
   polarity:polarity ->
   form -> form
-(** [rename_form ~ctx f] returns a new predicate for [f],
+(** [define ~ctx f] returns a new predicate for [f],
     with the free variables of [f] as arguments.
 
     @return the atomic formula that stands for [f]. *)

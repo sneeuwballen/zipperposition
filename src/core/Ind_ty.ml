@@ -178,6 +178,10 @@ let scan_stmt st = match Stmt.view st with
           let _ = declare_ty d.Stmt.data_id ~ty_vars cstors in
           ())
         l
-  | Stmt.TyDecl (id, ty)
-  | Stmt.Def (id,ty,_) -> scan_for_constant id ty
+  | Stmt.TyDecl (id, ty) -> scan_for_constant id ty
+  | Stmt.Def l ->
+    List.iter
+      (fun {Stmt.def_id; def_ty; _} ->
+         scan_for_constant def_id def_ty)
+      l
   | _ -> ()

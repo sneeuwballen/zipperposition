@@ -29,10 +29,20 @@ type attrs = attr list
 
 type 'ty skolem = ID.t * 'ty
 
+type ('f, 't, 'ty) def_rule =
+  | Def_term of 'ty Var.t list * ID.t * 't list * 't (* id vars = rhs *)
+  | Def_form of 'ty Var.t list * 't SLiteral.t * 'f list (* lhs <=> bigand rhs *)
+
+type ('f, 't, 'ty) def = {
+  def_id: ID.t;
+  def_ty: 'ty; (* def_ty = def_vars -> def_ty_ret *)
+  def_rules: ('f, 't, 'ty) def_rule list;
+}
+
 type ('f, 't, 'ty) view =
   | TyDecl of ID.t * 'ty (** id: ty *)
   | Data of 'ty data list
-  | Def of ID.t * 'ty * 't
+  | Def of ('f, 't, 'ty) def list
   | RewriteTerm of ID.t * 'ty * 't list * 't (* args, rhs *)
   | RewriteForm of 't SLiteral.t * 'f list (* lhs atomic form, rhs conjunction *)
   | Assert of 'f (** assert form *)
@@ -56,9 +66,10 @@ val attrs : (_, _, _, _) t -> attrs
 val src : (_, _, _, 'src) t -> 'src
 
 val mk_data : ID.t -> args:'ty Var.t list -> 'ty -> (ID.t * 'ty) list -> 'ty data
+val mk_def : ID.t -> 'ty -> ('f,'t,'ty) def_rule list -> ('f,'t,'ty) def
 
 val ty_decl : ?attrs:attrs -> src:'src -> ID.t -> 'ty -> (_, _, 'ty, 'src) t
-val def : ?attrs:attrs -> src:'src -> ID.t -> 'ty -> 't -> (_, 't, 'ty, 'src) t
+val def : ?attrs:attrs -> src:'src -> ('f,'t,'ty) def list -> ('f, 't, 'ty, 'src) t
 val rewrite_term : ?attrs:attrs -> src:'src -> ID.t -> 'ty -> 't list -> 't -> (_, 't, 'ty, 'src) t
 val rewrite_form : ?attrs:attrs -> src:'src -> 't SLiteral.t -> 'f list -> ('f, 't, _, 'src) t
 val data : ?attrs:attrs -> src:'src -> 'ty data list -> (_, _, 'ty, 'src) t
@@ -78,6 +89,13 @@ val add_src :
 
 val map_data : ty:('ty1 -> 'ty2) -> 'ty1 data -> 'ty2 data
 
+val map_def :
+  form:('f1 -> 'f2) ->
+  term:('t1 -> 't2) ->
+  ty:('ty1 -> 'ty2) ->
+  ('f1, 't1, 'ty1) def ->
+  ('f2, 't2, 'ty2) def
+
 val map :
   form:('f1 -> 'f2) ->
   term:('t1 -> 't2) ->
@@ -95,9 +113,12 @@ val as_defined_cst: ID.t -> int option
 
 val is_defined_cst: ID.t -> bool
 
-val declare_defined_cst : ID.t -> int -> unit
+val declare_defined_cst : ID.t -> level:int -> unit
+(** [declare_defined_cst id ~level] states that [id] is a defined
+    constant of given [level]. It means that it is defined based only
+    on constants of strictly lower levels *)
 
-val scan_stmt_for_defined_cst : (_, FOTerm.t, _, _) t -> unit
+val scan_stmt_for_defined_cst : (clause, FOTerm.t, _, _) t -> unit
 (** Try and declare defined constants in the given statement *)
 
 (**/**)
@@ -118,11 +139,18 @@ end
 
 (** {2 IO} *)
 
+val pp_def :
+  'a CCFormat.printer ->
+  'b CCFormat.printer ->
+  'c CCFormat.printer ->
+  ('a,'b,'c) def CCFormat.printer
+
 val pp :
   'a CCFormat.printer ->
   'b CCFormat.printer ->
   'c CCFormat.printer ->
   ('a,'b,'c,_) t CCFormat.printer
+
 val to_string :
   'a CCFormat.printer ->
   'b CCFormat.printer ->

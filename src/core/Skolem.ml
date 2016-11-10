@@ -27,6 +27,7 @@ let pp_polarity out = function
 type definition = {
   form : form;
   proxy : form;
+  add_rules: bool;
   polarity : polarity;
 }
 
@@ -103,7 +104,7 @@ let pop_new_symbols ~ctx =
 
 (** {2 Definitions} *)
 
-let define ~ctx ~polarity form =
+let define ~ctx ~add_rules ~polarity form =
   let tyvars, vars = collect_vars form in
   let vars_t = List.map (fun v->T.var v) vars in
   let tyvars_t = List.map (fun v->T.Ty.var v) tyvars in
@@ -112,7 +113,7 @@ let define ~ctx ~polarity form =
   let f = fresh_sym_with ~ctx ~ty "zip_tseitin" in
   let proxy = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
   (* register the new definition *)
-  ctx.sc_new_defs <- {form; proxy; polarity; } :: ctx.sc_new_defs;
+  ctx.sc_new_defs <- { form; add_rules; proxy; polarity; } :: ctx.sc_new_defs;
   Util.debugf ~section 5 "@[<2>define formula@ @[%a@]@ with @[%a@]@ and polarity %a@]"
     (fun k->k T.pp form T.pp proxy pp_polarity polarity);
   proxy

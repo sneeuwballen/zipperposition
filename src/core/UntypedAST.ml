@@ -24,11 +24,17 @@ type attr =
 
 type attrs = attr list
 
+type def = {
+  def_id: string;
+  def_ty: ty;
+  def_rules: term list;
+}
+
 (** Statement *)
 type statement_view =
   | Include of string
   | Decl of string * ty
-  | Def of string * ty * term
+  | Def of def list
   | Rewrite of term
   | Data of data list
   | Assert of form
@@ -45,9 +51,11 @@ let default_attrs = []
 
 let make_ ?loc ?(attrs=default_attrs) stmt = {loc; stmt; attrs; }
 
+let mk_def def_id def_ty def_rules = {def_id; def_ty; def_rules}
+
 let include_ ?loc ?attrs s = make_ ?loc ?attrs (Include s)
-let decl ?loc ?attrs n ty = make_ ?loc ?attrs (Decl (n,ty))
-let def ?loc ?attrs n ty t = make_ ?loc ?attrs (Def (n,ty,t))
+let decl ?loc ?attrs f ty = make_ ?loc ?attrs (Decl (f,ty))
+let def ?loc ?attrs l = make_ ?loc ?attrs (Def l)
 let rewrite ?loc ?attrs t = make_ ?loc ?attrs (Rewrite t)
 let data ?loc ?attrs l = make_ ?loc ?attrs (Data l)
 let assert_ ?loc ?attrs t = make_ ?attrs ?loc (Assert t)
@@ -75,8 +83,13 @@ let pp_statement out st =
       fpf out "@[<2>include \"%s\"@]@." (String.escaped s)
   | Decl (id,ty) ->
       fpf out "@[<2>val%a %s :@ @[%a@]@]." pp_attrs attrs id T.pp ty
-  | Def (id,ty,t) ->
-      fpf out "@[<2>def%a %s :@ @[%a@]@ := @[%a@]@]." pp_attrs attrs id T.pp ty T.pp t
+  | Def l ->
+      let pp_def out {def_id=id;def_ty;def_rules} =
+        fpf out "@[<2>@[%s :@ %a@]@ := @[%a@]"
+          id T.pp def_ty (Util.pp_list ~sep:" and " T.pp) def_rules
+      in
+      fpf out "@[<2>def%a %a@]."
+        pp_attrs attrs (Util.pp_list ~sep:"" pp_def) l
   | Rewrite t ->
       fpf out "@[<2>rewrite%a @[%a@]@]." pp_attrs attrs T.pp t
   | Data l ->
