@@ -99,6 +99,9 @@ module Ty : sig
 
   val view : t -> view
 
+  include Interfaces.HASH with type t := t
+  include Interfaces.ORD with type t := t
+
   val tType : t
   val var : ?loc:location -> t Var.t -> t
   val var_of_string : ?loc:location -> string -> t

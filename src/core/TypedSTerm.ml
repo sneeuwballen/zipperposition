@@ -507,6 +507,11 @@ module Ty = struct
     | AppBuiltin _
     | Bind _ -> assert false
 
+  let equal = equal
+  let compare = compare
+  let hash = hash
+  let hash_fun = hash_fun
+
   let tType = tType
   let var = var
   let var_of_string ?loc v = var_of_string ?loc ~ty:tType v
