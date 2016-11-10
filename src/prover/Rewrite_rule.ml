@@ -76,26 +76,41 @@ module Set = struct
 
   let is_empty t = S.is_empty t.terms && t.clauses=[]
 
-  let add_term r s = {s with terms=S.add s.terms r.lhs_id r}
-  let add_clause r s = {s with clauses=r :: s.clauses}
+  let add_term r s =
+    Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k->k pp_rule_term r);
+    {s with terms=S.add s.terms r.lhs_id r}
+
+  let add_clause r s =
+    Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k->k pp_rule_clause r);
+    {s with clauses=r :: s.clauses}
 
   let find_iter s id = S.find_iter s.terms id
 
   let add_stmt stmt t = match Stmt.view stmt with
-    | Stmt.Def (id, ty, rhs) ->
-      (* simple constant *)
-      let r = make_t_const id ty rhs in
-      Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k->k pp_rule_term r);
-      add_term r t
+    | Stmt.Def l ->
+      Sequence.of_list l
+      |> Sequence.flat_map
+        (fun  {Stmt. def_ty=ty; def_rules; _} ->
+           Sequence.of_list def_rules
+           |> Sequence.map (fun r -> ty,r))
+      |> Sequence.fold
+        (fun t (ty,rule) -> match rule with
+           | Stmt.Def_term (_,id,args,rhs) ->
+             let r = make_t id ty args rhs in
+             add_term r t
+           | Stmt.Def_form (_,lhs,rhs) ->
+             let lhs = Literal.Conv.of_form lhs in
+             let rhs = List.map (List.map Literal.Conv.of_form) rhs in
+             let r = make_c lhs rhs in
+             add_clause r t)
+        t
     | Stmt.RewriteTerm (id, ty, args, rhs) ->
       let r = make_t id ty args rhs in
-      Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k->k pp_rule_term r);
       add_term r t
     | Stmt.RewriteForm (lhs, rhs) ->
       let lhs = Literal.Conv.of_form lhs in
       let rhs = List.map (List.map Literal.Conv.of_form) rhs in
       let r = make_c lhs rhs in
-      Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k->k pp_rule_clause r);
       add_clause r t
     | Stmt.TyDecl _
     | Stmt.Data _

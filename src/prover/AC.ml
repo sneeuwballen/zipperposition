@@ -223,13 +223,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (Statement.attrs st)
     in
     if has_ac_attr then match St.view st with
-      | St.TyDecl (id, ty)
-      | St.Def (id, ty, _) ->
-        add id ty
+      | St.TyDecl (id, ty) -> add id ty
+      | St.Def l ->
+        List.iter (fun {Statement.def_id; def_ty; _} -> add def_id def_ty) l
       | St.Data _
       | St.RewriteTerm (_,_,_,_)
       | St.RewriteForm (_,_)
       | St.Assert _
+      | St.Lemma _
       | St.Goal _
       | St.NegatedGoal _ ->
         Util.error ~where:"AC"
