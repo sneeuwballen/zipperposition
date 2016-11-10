@@ -441,36 +441,6 @@ module Make
     (* declare new constants to [Ctx] *)
     Signal.on_every Ind_cst.on_new_cst decl_cst_;
     ()
-
-  module Meta = struct
-    (* TODO *)
-    let t : _ Plugin.t = object
-      method signature = ID.Map.empty
-      method clauses = []
-      method owns _ = false
-      method to_fact _ = assert false
-      method of_fact _ = None (* TODO *)
-    end
-
-    (* TODO
-    let declare_inductive p ity =
-      let ity = Induction.make ity.CI.pattern ity.CI.constructors in
-      Util.debugf ~section 2
-        "@[<hv2>declare inductive type@ %a@]"
-        (fun k->k Induction.print ity);
-      let fact = Induction.t#to_fact ity in
-      add_fact_ p fact
-
-      (* declare inductive types *)
-      E.Ctx.Induction.inductive_ty_seq
-        (fun ity -> ignore (declare_inductive p ity));
-      Signal.on E.Ctx.Induction.on_new_inductive_ty
-        (fun ity ->
-           ignore (declare_inductive p ity);
-           Signal.ContinueListening
-        );
-    *)
-  end
 end
 
 let enabled_ = ref true

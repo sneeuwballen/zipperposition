@@ -360,29 +360,6 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       E.cr_return all_clauses
     | _ -> E.cr_skip
 
-  module Meta(M : MetaProverState.S) = struct
-    (* XXX ugly, but I could not find a way to prove M.E.C.t = C.t *)
-    external c_of_lemma : M.lemma -> C.t = "%identity"
-
-    (* introduce a cut for each lemma proposed by the meta-prover *)
-    let introduce_meta_lemmas (q:M.lemma Queue.t) _given =
-      (* translate all new lemmas into cuts *)
-      let clauses =
-        Sequence.of_queue q
-        |> Sequence.flat_map
-          (fun c ->
-            let c = c_of_lemma c in
-            assert (C.trail c |> Trail.is_empty);
-            let res = introduce_cut [C.lits c] (C.proof_step c) in
-            Util.debugf ~section 2 "@[<hv2>introduce cut from meta lemma:@,%a@]"
-              (fun k->k pp_cut_res res);
-            cut_res_clauses res)
-        |> Sequence.to_rev_list
-      in
-      Queue.clear q;
-      clauses
-  end
-
   let before_check_sat = Signal.create()
   let after_check_sat = Signal.create()
 
@@ -421,23 +398,6 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     );
     (* be sure there is an initial valuation *)
     ignore (Sat.check ~full:true ());
-    (* meta lemmas *)
-    begin
-      try
-        let (module M) = MetaProverState.get_env (module E) in
-        Util.debug ~section 1 "found meta-prover, watch for lemmas";
-        let module M2 = Meta(M) in
-        let q = Queue.create () in
-        Signal.on_every M.on_lemma
-          (fun lemma ->
-             Util.debugf ~section 2 "@[obtained lemma @[%a@]@ from meta-prover@]"
-               (fun k->k M.C.pp lemma);
-             Queue.push lemma q);
-        E.add_unary_inf "avatar_meta_lemmas" (M2.introduce_meta_lemmas q);
-      with Not_found ->
-        Util.debug ~section 1 "could not find meta-prover";
-        ()
-    end;
     ()
 end
 
