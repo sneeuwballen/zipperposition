@@ -126,7 +126,8 @@ Library "libzipperposition_prover"
                     calculi/EnumTypes,
                     calculi/ArithInt,
                     calculi/Heuristics,
-                    calculi/Ind_types
+                    calculi/Ind_types,
+                    calculi/Fool
   InternalModules:  lib/UnionFind, lib/Signal, lib/Simplex
   Build$:           flag(parsers) && flag(prover)
   Install$:         flag(parsers) && flag(prover)
