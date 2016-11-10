@@ -34,6 +34,7 @@
 %token DOT
 %token COLON
 %token EQDEF
+%token WHERE
 %token AND
 
 %token LOGIC_TRUE
@@ -226,7 +227,9 @@ attrs:
   | { [] }
 
 def:
- | v=raw_var COLON ty=term EQDEF rules=separated_nonempty_list(AND,term)
+ | v=raw_var COLON ty=term EQDEF t=term
+   { A.mk_def v ty [T.eq (T.var v) t] }
+ | v=raw_var COLON ty=term WHERE rules=separated_nonempty_list(AND,term)
    { A.mk_def v ty rules }
 
 statement:
