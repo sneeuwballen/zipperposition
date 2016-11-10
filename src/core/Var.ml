@@ -49,6 +49,7 @@ module Set = struct
         | `Both _ -> None)
   let cardinal t = ID.Map.cardinal t
   let of_seq s = s |> Sequence.map (fun v->v.id, v) |> ID.Map.of_seq
+  let of_list l = l |> List.map (fun v->v.id,v) |> ID.Map.of_list
   let to_seq t = ID.Map.to_seq t |> Sequence.map snd
   let to_list t = ID.Map.fold (fun _ v acc ->v::acc) t []
   let pp out t =
@@ -70,4 +71,9 @@ module Subst = struct
       Format.fprintf out "@[%a → %a@]" pp v pp_v x
     in
     CCFormat.seq ~start:"" ~stop:"" ~sep:", " pp_pair out (to_seq t)
+  let merge a b =
+    ID.Map.merge_safe a b
+      ~f:(fun _ v -> match v with
+        | `Both (_,x) -> Some x (* favor right one *)
+        | `Left x | `Right x -> Some x)
 end

@@ -241,6 +241,10 @@ module Subst : sig
   val find_exn : t -> term Var.t -> term
   (** @raise Not_found if the variable is not present *)
 
+  val rename_var : t -> term Var.t -> t * term Var.t
+
+  val merge : t -> t -> t
+
   val eval : t -> term -> term
 
   include Interfaces.PRINT with type t := t

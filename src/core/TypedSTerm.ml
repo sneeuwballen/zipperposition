@@ -730,6 +730,8 @@ module Subst = struct
   let find_exn = Var.Subst.find_exn
   let find = Var.Subst.find
 
+  let merge a b = Var.Subst.merge a b
+
   let rename_var subst v =
     let v' = Var.copy v in
     let subst = add subst v (var v') in
