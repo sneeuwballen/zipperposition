@@ -165,7 +165,7 @@ let ty_error_ a b =
   raise (Type.ApplyError msg)
 
 (* primary constructor for equations and predicates *)
-let mk_lit a b sign =
+let rec mk_lit a b sign =
   if not (Type.equal (T.ty a) (T.ty b)) then ty_error_ a b;
   match T.view a, T.view b with
   | T.AppBuiltin (Builtin.True, []), T.AppBuiltin (Builtin.False, []) -> if sign then False else True
@@ -174,15 +174,18 @@ let mk_lit a b sign =
   | _, T.AppBuiltin (Builtin.True, []) -> Prop (a, sign)
   | T.AppBuiltin (Builtin.False, []), _ -> Prop (b, not sign)
   | _, T.AppBuiltin (Builtin.False, []) -> Prop (a, not sign)
+  | T.AppBuiltin (Builtin.Not, [a']), _ -> mk_lit a' b (not sign)
+  | _, T.AppBuiltin (Builtin.Not, [b']) -> mk_lit a b' (not sign)
   | _ -> Equation (a, b, sign)
 
 let mk_eq a b = mk_lit a b true
 
 let mk_neq a b = mk_lit a b false
 
-let mk_prop p sign = match T.view p with
+let rec mk_prop p sign = match T.view p with
   | T.AppBuiltin (Builtin.True, []) -> if sign then True else False
   | T.AppBuiltin (Builtin.False, []) -> if sign then False else True
+  | T.AppBuiltin (Builtin.Not, [p']) -> mk_prop p' (not sign)
   | _ ->
       if not (Type.equal (T.ty p) Type.prop) then ty_error_ p T.true_;
       Prop (p, sign)
