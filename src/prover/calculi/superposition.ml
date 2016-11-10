@@ -801,9 +801,25 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                          bind X only to [a] or [b], not unify [a] with [b]. *)
                      try_unif i l 0 r 0
                  | _, T.Var v when not (var_in_subst_ !subst v 0) ->
-                     try_unif i r 0 l 0
-                  | _ -> ()
+                   try_unif i r 0 l 0
+                 | _ -> ()
                  end
+             | Lit.Equation (l, r, true) when Type.is_prop (T.ty l) ->
+               begin match T.view l, T.view r with
+                 | ( T.AppBuiltin (Builtin.True, []), T.Var x
+                   | T.Var x, T.AppBuiltin (Builtin.True, []))
+                   when not (var_in_subst_ !subst x 0) ->
+                   (* [C or x=true ---> C[x:=false]] *)
+                   begin
+                     try
+                       let subst' = Unif.FO.bind !subst (x,0) (T.false_,0) in
+                       BV.reset bv i;
+                       subst := subst';
+                     with Unif.Fail -> ()
+                   end
+
+                 | _ -> ()
+               end
              | _ -> ())
         lits;
       let new_lits = BV.select bv lits in
