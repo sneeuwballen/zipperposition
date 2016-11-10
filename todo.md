@@ -11,10 +11,21 @@
   * [x] add "decl + set of rewrite rules" to statement
   * [ ] in Statement, allow a set of rewrite rules to be a definition?
   * [ ] proper translation of definitions in CNF
-  * [ ] make rewrite rules conditional (with conjunction of atomic conditions)
-  * [ ] turn definitions into decl+set of (conditional) rewrite rules during CNF
-  * [ ] handle conditional rules in Rewrite (+ narrowing, where they turn to new lits)
-        (applies iff the whole condition simplifies to true)
+    + introduce datatype for boolean (`btrue|bfalse`) and lift most constructs
+      to it. Means that we distinguish computable logic from classic logic
+      (bool vs prop)....
+      OR express `T.true/T.false` as a regular datatype in prelude?
+    + special splitting rule on booleans (non-recursive datatype), to
+      be sure to decide between btrue/bfalse.
+      → refer to FOOL paper
+    + handle conditional rewriting by adding secondary function
+      `f x = g x if P` becomes `f x = f2 x P` and `f2 x true = g x`
+    + handle matching on non-trivial exprs by secondary function
+      `f x = match g x with C -> rhs` becomes `f x = f2 x (g x)`
+      and `f2 x C = rhs`
+  * ([ ] make rewrite rules conditional (with conjunction of atomic conditions))
+  * ([ ] handle conditional rules in Rewrite (+ narrowing, where they turn to new lits)
+        (applies iff the whole condition simplifies to true))
 
 - use TIP input to run on all benchmarks normally (with rewriting
   instead of assertions, too)
