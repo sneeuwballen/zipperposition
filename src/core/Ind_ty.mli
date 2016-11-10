@@ -23,6 +23,8 @@ type t = private {
        no other type variables than [ty_vars] *)
 }
 
+val pp : t CCFormat.printer
+
 exception InvalidDecl of string
 
 exception NotAnInductiveType of ID.t

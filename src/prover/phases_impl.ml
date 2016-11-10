@@ -362,7 +362,9 @@ let process_file file =
   CCVector.iter Ind_ty.scan_stmt stmts;
   (* compute signature, precedence, ordering *)
   let signature = Statement.signature (CCVector.to_seq stmts) in
-  Util.debugf ~section 2 "@[<2>signature:@ @[<hv>%a@]@]" (fun k->k Signature.pp signature);
+  Util.debugf ~section 1 "@[<2>signature:@ @[<hv>%a@]@]" (fun k->k Signature.pp signature);
+  Util.debugf ~section 1 "(@[classification:@ %a@])"
+    (fun k->k Classify_cst.pp_signature signature);
   compute_prec (CCVector.to_seq stmts) >>= fun precedence ->
   Util.debugf ~section 1 "@[<2>precedence:@ @[%a@]@]" (fun k->k Precedence.pp precedence);
   compute_ord_select precedence >>= fun (ord, select) ->

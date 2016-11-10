@@ -22,6 +22,11 @@ type res =
 val classify : ID.t -> res
 (** [classify id] returns the role [id] plays in inductive reasoning *)
 
+val pp_res : res CCFormat.printer
+
+val pp_signature : Signature.t CCFormat.printer
+(** Print classification of signature *)
+
 val prec_constr : [`partial] Precedence.Constr.t
 (** Partial order on [ID.t], with:
     regular > constant > sub_constant > cstor *)

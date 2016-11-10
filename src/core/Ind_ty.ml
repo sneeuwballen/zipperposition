@@ -55,6 +55,12 @@ exception Payload_ind_projector of ID.t
 let invalid_decl_ msg = raise (InvalidDecl msg)
 let invalid_declf_ fmt = CCFormat.ksprintf fmt ~f:invalid_decl_
 
+let pp out ty =
+  let ppvars out =
+    function [] -> () | l -> Format.fprintf out " %a" (Util.pp_list HVar.pp) l
+  in
+  Format.fprintf out "@[%a%a@]" ID.pp ty.ty_id ppvars ty.ty_vars
+
 let type_hd ty =
   let _, _, ret = Type.open_poly_fun ty in
   match Type.view ret with
