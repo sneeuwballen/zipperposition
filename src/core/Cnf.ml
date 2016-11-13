@@ -86,28 +86,26 @@ let is_cnf f =
   with NotCNF _ | SLiteral.NotALit _ -> false
 
 module Flatten = struct
-  type cond = form list
-
-  type 'a t = T.Subst.t -> (T.Subst.t * cond * 'a) Sequence.t
+  type 'a t = T.Subst.t -> (T.Subst.t * 'a) Sequence.t
 
   let empty : 'a t = fun _ -> Sequence.empty
 
   let return
     : type a. a -> a t
-    = fun x subst -> Sequence.return (subst, [], x)
+    = fun x subst -> Sequence.return (subst, x)
 
   let (>>=)
     : type a b. a t -> (a -> b t) -> b t
     = fun seq f subst yield ->
-      seq subst (fun (subst,conds,x) ->
-        f x subst (fun (subst',conds',y) ->
-          yield (T.Subst.merge subst subst', conds@conds',y)))
+      seq subst (fun (subst,x) ->
+        f x subst (fun (subst',y) ->
+          yield (T.Subst.merge subst subst',y)))
 
   let (>|=)
     : type a b. a t -> (a -> b) -> b t
     = fun seq f subst yield ->
-      seq subst (fun (subst,conds,x) ->
-        yield (subst,conds,f x))
+      seq subst (fun (subst,x) ->
+        yield (subst,f x))
 
   let (<*>)
     : ('a -> 'b) t -> 'a t -> 'b t
@@ -117,18 +115,13 @@ module Flatten = struct
 
   let (<$>) f x = x >|= f ?loc:None
 
-  let add_cond
-    : cond -> unit t
-    = fun c subst ->
-      Sequence.return (subst, c, ())
-
   let add_subst
     : T.Subst.t -> unit t
     = fun sigma subst ->
-      Sequence.return (T.Subst.merge subst sigma, [], ())
+      Sequence.return (T.Subst.merge subst sigma, ())
 
   let get_subst : T.Subst.t t
-    = fun subst -> Sequence.return (subst, [], subst)
+    = fun subst -> Sequence.return (subst, subst)
 
   (* non deterministic choice *)
   let (<+>)
@@ -141,6 +134,16 @@ module Flatten = struct
     | x :: tail ->
       f x >>= fun x ->
       map_m f tail >|= fun tail -> x::tail
+
+  let map_sliteral
+    : ('a -> 'b t) -> 'a SLiteral.t -> 'b SLiteral.t t
+    = fun f lit -> match lit with
+      | SLiteral.True -> return SLiteral.true_
+      | SLiteral.False -> return SLiteral.false_
+      | SLiteral.Atom (t, b) ->
+        f t >|= fun t -> SLiteral.atom t b
+      | SLiteral.Eq (a,b) -> return SLiteral.eq <*> f a <*> f b
+      | SLiteral.Neq (a,b) -> return SLiteral.neq <*> f a <*> f b
 
   let rec fold_m f acc l = match l with
     | [] -> return acc
@@ -156,32 +159,30 @@ module Flatten = struct
   let of_list
     : 'a list -> 'a t
     = fun l subst ->
-      Sequence.of_list l |> Sequence.map (fun x->subst,[],x)
+      Sequence.of_list l |> Sequence.map (fun x->subst,x)
 
   let to_list
-    : 'a t -> (T.Subst.t * cond * 'a) list
+    : 'a t -> (T.Subst.t * 'a) list
     = fun seq ->
       seq T.Subst.empty |> Sequence.to_rev_list
 
-  let to_list_applied
-    : T.t t -> (T.t * form list) list
-    = fun seq ->
-      seq T.Subst.empty
-      |> Sequence.map
-        (fun (subst,cond,t) ->
-           let t = T.Subst.eval subst t in
-           let cond = List.map (T.Subst.eval subst) cond in
-           t, cond)
-      |> Sequence.to_rev_list
+  let to_list' : 'a t -> 'a list
+    = fun seq -> seq T.Subst.empty |> Sequence.map snd |> Sequence.to_rev_list
+
+  let apply_subst_vars_ subst vars =
+    List.map
+      (fun v -> try Var.Subst.find_exn subst v with Not_found -> T.var v)
+      vars
 
   type position =
     | Pos_toplevel (* outside, as a formula *)
     | Pos_inner (* inside a term *)
 
   (* conversion of terms can yield several possible terms, by
-     eliminating if and match *)
-  let flatten_rec (ctx:Skolem.ctx) (pos:position)(t:term): T.t t =
-    let rec aux pos t = match T.view t with
+     eliminating if and match
+     @param vars the variables that can be replaced in the context *)
+  let flatten_rec (ctx:Skolem.ctx) (pos:position) (vars:type_ Var.t list)(t:term): T.t t =
+    let rec aux pos vars t = match T.view t with
       | T.AppBuiltin (Builtin.True, []) -> return F.true_
       | T.AppBuiltin (Builtin.False, []) -> return F.false_
       | T.Var v ->
@@ -194,79 +195,119 @@ module Flatten = struct
       | T.Const _ -> return t
       | T.App (f,l) ->
         T.app ~ty:(T.ty_exn t)
-        <$> aux Pos_inner f
-        <*> map_m (aux Pos_inner) l
+        <$> aux Pos_inner vars f
+        <*> map_m (aux Pos_inner vars) l
       | T.Ite (a,b,c) ->
-        aux Pos_toplevel a >>= fun a ->
-        (add_cond [a] >>= fun () -> aux pos b)
-        <+>
-          (add_cond [F.not_ a] >>= fun () -> aux pos c)
+        begin match T.view a with
+          | T.Var x when List.exists (Var.equal x) vars ->
+            (* substitute [x] with [true] and [false] in either branch *)
+            begin
+              (add_subst (Var.Subst.singleton x F.true_) >>= fun () -> aux pos vars b)
+              <+>
+              (add_subst (Var.Subst.singleton x F.false_) >>= fun () -> aux pos vars c)
+            end
+          | _ ->
+            (* give a name to [if a b c] *)
+            let closure = T.free_vars t in
+            let cases_true =
+              aux pos vars b >>= fun b ->
+              get_subst >|= fun subst ->
+              apply_subst_vars_ subst closure @ [F.true_], T.Subst.eval subst b
+            and cases_false =
+              aux pos vars c >>= fun c ->
+              get_subst >|= fun subst ->
+              apply_subst_vars_ subst closure @ [F.false_], T.Subst.eval subst c
+            in
+            let rules = to_list' (cases_true <+> cases_false) in
+            let def = Skolem.define_term ~ctx ~vars:(closure) rules in
+            aux Pos_toplevel vars a >|= fun a ->
+            T.app ~ty:(T.ty_exn b)
+              (T.const def.Skolem.td_id ~ty:def.Skolem.td_ty)
+              (List.map T.var closure @ [a])
+        end
       | T.Let (l,u) ->
         (* first, process let-bound terms;
            then add all bindings to context and proceed into [u] *)
-        map_m (fun (v,t) -> aux Pos_inner t >|= fun t' -> v, t') l >>= fun l ->
+        map_m (fun (v,t) -> aux Pos_inner vars t
+        >|= fun t' -> v, t') l >>= fun l ->
         let subst =
           List.fold_left (fun s (v,t) -> T.Subst.add s v t) T.Subst.empty l
         in
         add_subst subst >>= fun () ->
-        aux pos u
+        aux pos vars u
       | T.Match (u,l) ->
-        aux Pos_inner u >>= fun u ->
-        get_subst >>= fun cur_subst ->
         begin match T.view u with
-          | T.Var x when not (T.Subst.mem cur_subst x) ->
+          | T.Var x when List.exists (Var.equal x) vars ->
             (* will replace [x] by each constructor *)
-            of_list l >>= fun (c,vars,rhs) ->
-            let subst, vars =
-              CCList.fold_map T.Subst.rename_var T.Subst.empty vars
+            of_list l >>= fun (c,c_vars,rhs) ->
+            let subst, c_vars =
+              CCList.fold_map T.Subst.rename_var T.Subst.empty c_vars
             in
             (* the term [c vars] *)
             let case =
               let ty = T.ty_exn u in
               T.app ~ty
-                (T.const ~ty:(T.Ty.fun_ (List.map Var.ty vars) ty) c)
-                (List.map T.var vars)
+                (T.const ~ty:(T.Ty.fun_ (List.map Var.ty c_vars) ty) c)
+                (List.map T.var c_vars)
             in
             (* bind [x = c vars] *)
             let subst = T.Subst.add subst x case in
             add_subst subst >>= fun () ->
-            (* directly replace by [rhs] *)
-            aux pos rhs
+            (* directly replace by [rhs]. [c_vars] can be replaced themselves. *)
+            aux pos (c_vars@vars) rhs
           | _ ->
             (* give a name to the match *)
             (* TODO: introduce new constant bundled with its definition:
                one rule per case
             let c = Skolem.create
                *)
-            assert false
+            let closure = T.free_vars t in
+            let cases =
+              of_list l >>= fun (cstor,c_vars,rhs) ->
+              aux pos (c_vars@vars) rhs >>= fun rhs ->
+              get_subst >|= fun subst ->
+              let case =
+                T.app ~ty:(T.ty_exn u)
+                  (T.const ~ty:(T.Ty.fun_ (List.map Var.ty c_vars) (T.ty_exn u)) cstor)
+                  (apply_subst_vars_ subst c_vars)
+              in
+              apply_subst_vars_ subst closure @ [case], T.Subst.eval subst rhs
+            in
+            let rules = to_list' cases in
+            let def = Skolem.define_term ~ctx ~vars:(closure) rules in
+            (* now apply definition to [u] *)
+            aux Pos_inner vars u >|= fun u ->
+            T.app ~ty:(T.ty_exn t)
+              (T.const def.Skolem.td_id ~ty:def.Skolem.td_ty)
+              (List.map T.var vars @ [u])
         end
       | T.AppBuiltin (Builtin.Eq, [a;b]) ->
-        (F.eq <$> aux Pos_toplevel a <*> aux Pos_toplevel b)
+        (F.eq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
         >|= aux_maybe_define pos
       | T.AppBuiltin (Builtin.Neq, [a;b]) ->
-        (F.neq <$> aux Pos_toplevel a <*> aux Pos_toplevel b)
+        (F.neq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
         >|= aux_maybe_define pos
       | T.AppBuiltin (Builtin.Imply, [a;b]) ->
-        (F.imply <$> aux Pos_toplevel a <*> aux Pos_toplevel b)
+        (F.imply <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
         >|= aux_maybe_define pos
       | T.AppBuiltin (Builtin.Equiv, [a;b]) ->
-        (F.equiv <$> aux Pos_toplevel a <*> aux Pos_toplevel b)
+        (F.equiv <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
         >|= aux_maybe_define pos
       | T.AppBuiltin (Builtin.Xor, [a;b]) ->
-        (F.xor <$> aux Pos_toplevel a <*> aux Pos_toplevel b)
+        (F.xor <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
         >|= aux_maybe_define pos
       | T.AppBuiltin (Builtin.And, l) ->
-        (F.and_ <$> map_m (aux Pos_toplevel) l) >|= aux_maybe_define pos
+        (F.and_ <$> map_m (aux Pos_toplevel vars) l) >|= aux_maybe_define pos
       | T.AppBuiltin (Builtin.Or, l) ->
-        (F.or_ <$> map_m (aux Pos_toplevel) l) >|= aux_maybe_define pos
+        (F.or_ <$> map_m (aux Pos_toplevel vars) l) >|= aux_maybe_define pos
       | T.AppBuiltin (Builtin.Not, [a]) ->
-        (F.not_ <$> aux Pos_toplevel a) >|= aux_maybe_define pos
+        (F.not_ <$> aux Pos_toplevel vars a) >|= aux_maybe_define pos
       | T.AppBuiltin (b, l) ->
-        return (T.app_builtin ~ty:(T.ty_exn t) b) <*> map_m (aux Pos_inner) l
+        return (T.app_builtin ~ty:(T.ty_exn t) b) <*> map_m (aux Pos_inner vars) l
       | T.Bind (Binder.Forall,var,body) ->
-        (aux Pos_toplevel body >|= F.forall var) >|= aux_maybe_define pos
+        (aux Pos_toplevel vars body >|= F.forall var) >|= aux_maybe_define pos
       | T.Bind (Binder.Exists,var,body) ->
-        (aux Pos_toplevel body >|= F.exists var) >|= aux_maybe_define pos
+        (aux Pos_toplevel vars body >|= F.exists var) >|= aux_maybe_define pos
       | T.Bind (Binder.Lambda, _, _) ->
         Util.errorf ~where:"Cnf.flatten" "cannot eliminate lambda-term"
       | T.Bind (Binder.ForallTy,_,_)
@@ -283,17 +324,10 @@ module Flatten = struct
           def.Skolem.proxy
       end
     in
-    aux pos t
-end
+    aux pos vars t
 
-let flatten_form ctx t =
-  Util.enter_prof prof_flatten;
-  let res =
-    Flatten.flatten_rec ctx Flatten.Pos_toplevel t
-    |> Flatten.to_list_applied
-  in
-  Util.exit_prof prof_flatten;
-  res
+  let flatten_rec_l ctx pos vars l = map_m (flatten_rec ctx pos vars) l
+end
 
 (* miniscoping (push quantifiers as deep as possible in the formula) *)
 let miniscope ?(distribute_exists=false) f =
@@ -707,11 +741,95 @@ let new_defs ~ctx src : (_,_,_,_) Stmt.t list =
     )
     defs
 
+let pp_stmt out st = Stmt.pp T.pp T.pp_inner T.pp_inner out st
+
+(* flatten definitions, removing some constructs such as if/match,
+   introducing new definitions *)
+let flatten ~ctx seq : _ Sequence.t =
+  let open Flatten in
+  let flat_term_rule (r:_ Stmt.term_rule) : _ list =
+    begin
+      let vars, _, _, args, rhs = r in
+      flatten_rec_l ctx Pos_inner vars args >>= fun args ->
+      flatten_rec_l ctx Pos_toplevel vars args >>= fun args ->
+      flatten_rec ctx Pos_toplevel vars rhs >>= fun rhs ->
+      get_subst >|= fun subst ->
+      let args = List.map (T.Subst.eval subst) args in
+      let rhs = T.Subst.eval subst rhs in
+      args, rhs
+    end |> to_list'
+  and flat_form_rule (r:_ Stmt.form_rule) : _ list =
+    begin
+      let vars, lhs, rhs = r in
+      map_sliteral (flatten_rec ctx Pos_inner vars) lhs >>= fun lhs ->
+      flatten_rec_l ctx Pos_inner vars rhs >>= fun rhs ->
+      get_subst >|= fun subst ->
+      let lhs = SLiteral.map ~f:(T.Subst.eval subst) lhs in
+      let rhs = List.map (T.Subst.eval subst) rhs in
+      lhs, rhs
+    end |> to_list'
+  and flatten_axiom f =
+    begin
+      let vars, body = F.unfold_forall f in
+      flatten_rec ctx Pos_toplevel vars body >>= fun body ->
+      let f = F.forall_l vars body in
+      get_subst >|= fun subst ->
+      T.Subst.eval subst f
+    end |> to_list'
+  in
+  let flatten_def d = match d with
+    | Stmt.Def_term ((vars,id,ty,_,_) as r) ->
+      flat_term_rule r
+      |> List.map (fun (args,rhs) -> Stmt.Def_term (vars,id,ty,args,rhs))
+    | Stmt.Def_form ((vars,_,_) as r)->
+      flat_form_rule r
+      |> List.map (fun (lhs,rhs) -> Stmt.Def_form (vars,lhs,rhs))
+  in
+  seq
+  |> Sequence.flat_map_l
+    (fun st ->
+       let src = st.Stmt.src in
+       let attrs = st.Stmt.attrs in
+       let new_sts = match st.Stmt.view with
+         | Stmt.Data _
+         | Stmt.TyDecl _ -> [st]
+         | Stmt.RewriteTerm ((vars,id,ty,_,_) as r) ->
+           flat_term_rule r
+           |> List.map
+             (fun (args,rhs) -> Stmt.rewrite_term ~attrs ~src (vars,id,ty,args,rhs))
+         | Stmt.Def l ->
+           let l =
+             List.map
+               (fun d ->
+                  let rules = CCList.flat_map flatten_def d.Stmt.def_rules in
+                  { d with Stmt.def_rules=rules })
+               l
+               (* TODO *)
+           in
+           [Stmt.def ~src l]
+         | Stmt.RewriteForm ((vars, _, _) as r) ->
+           flat_form_rule r
+           |> List.map (fun (lhs,rhs) -> Stmt.rewrite_form ~src (vars,lhs,rhs))
+         | Stmt.Assert f ->
+           flatten_axiom f
+           |> List.map (fun f -> Stmt.assert_ ~src f)
+         | Stmt.Lemma l ->
+           List.map
+             (fun f -> Stmt.lemma ~src [F.and_ (flatten_axiom f)]) l
+         | Stmt.Goal f ->
+           [Stmt.goal ~src (F.and_ (flatten_axiom f))]
+         | Stmt.NegatedGoal _ -> assert false
+       in
+       Util.debugf ~section 5 "@[<2>flatten `@[%a@]`@ into `@[%a@]`@]"
+         (fun k->k pp_stmt st (Util.pp_list pp_stmt) new_sts);
+       begin match new_defs ~ctx src with
+         | [] -> new_sts
+         | l -> List.rev (List.rev_append new_sts l)
+       end)
+
 (* simplify formulas and rename them. May introduce new formulas *)
 let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
   Util.enter_prof prof_simplify_rename;
-  (* add new declarations before [stmt] *)
-  let add_decls src = new_defs ~ctx src in
   (* process a formula *)
   let process_form ~is_goal f =
     Util.debugf ~section 4 "@[<2>simplify and rename@ `@[%a@]`@]" (fun k->k T.pp f);
@@ -758,9 +876,10 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
           | Stmt.Goal f -> Stmt.goal ~src (process_form ~is_goal:true f)
           | Stmt.NegatedGoal _ -> assert false
         in
-        match add_decls src with
+        begin match new_defs ~ctx src with
           | [] -> Sequence.return new_st
           | l -> Sequence.of_list (List.rev (new_st :: l))
+        end
       )
     |> CCVector.of_seq ?init:None
   in
@@ -793,7 +912,10 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) ?(neg_src=id_) ?(cnf_src=id_) 
       opts
   in
   (* simplify and introduce definitions *)
-  let v = simplify_and_rename ~ctx ~disable_renaming ~preprocess seq in
+  let v =
+    flatten ~ctx seq
+    |> simplify_and_rename ~ctx ~disable_renaming ~preprocess
+  in
   (* reduce the new formulas to CNF *)
   let res = CCVector.create () in
   (* convert formula into CNF, returning a list of clauses and a list of skolems *)
