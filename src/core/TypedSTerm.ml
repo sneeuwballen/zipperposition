@@ -19,9 +19,7 @@ type t = {
   loc : location option;
 }
 
-and match_branch =
-  | Match_case of ID.t * t Var.t list * t
-  | Match_default of t
+and match_branch = ID.t * t Var.t list * t
 
 and view =
   | Var of t Var.t (** variable *)
@@ -114,14 +112,10 @@ let rec compare t1 t2 = match view t1, view t2 with
     CCOrd.( compare t1 t2
         <?> (list_ (pair Var.compare compare), l1, l2))
   | Match (u1,l1), Match (u2,l2) ->
-    let cmp_branch b1 b2 = match b1, b2 with
-      | Match_case (s1,vars1,rhs1), Match_case (s2,vars2,rhs2) ->
-        CCOrd.(ID.compare s1 s2
-          <?> (list_ Var.compare, vars1,vars2)
-          <?> (compare,rhs1,rhs2))
-      | Match_default t1, Match_default t2 -> compare t1 t2
-      | Match_case _, Match_default _ -> -1
-      | Match_default _, Match_case _ -> 1
+    let cmp_branch (s1,vars1,rhs1) (s2,vars2,rhs2) =
+      CCOrd.(ID.compare s1 s2
+        <?> (list_ Var.compare, vars1,vars2)
+        <?> (compare,rhs1,rhs2))
     in
     CCOrd.( compare u1 u2 <?> (list_ cmp_branch,l1,l2))
   | Var _, _
@@ -195,13 +189,11 @@ let rec pp out t = match view t with
       Format.fprintf out "@[<2>let %a@ in %a@]"
         (Util.pp_list ~sep:" and " pp_binding) l pp u
   | Match (u, l) ->
-      let pp_branch out = function
-        | Match_default rhs -> Format.fprintf out "_ -> %a" pp rhs
-        | Match_case (c,vars,rhs) ->
-          Format.fprintf out "(@[case@ %a %a ->@ %a@])"
-            ID.pp c (Util.pp_list ~sep:" " Var.pp) vars pp rhs
+      let pp_branch out (c,vars,rhs) =
+        Format.fprintf out "(@[case@ %a %a ->@ %a@])"
+          ID.pp c (Util.pp_list ~sep:" " Var.pp) vars pp rhs
       in
-      Format.fprintf out "@[<hv2>match %a with@ @[<hv>%a@]@ end@]"
+      Format.fprintf out "@[<hv>@[<hv2>match %a with@ %a@]@ end@]"
         pp u (Util.pp_list ~sep:" | " pp_branch) l
   | Multiset l ->
       Format.fprintf out "[@[%a@]]" (Util.pp_list ~sep:", " pp_inner) l
@@ -254,8 +246,7 @@ let let_ ?loc l u = match l with
     make_ ?loc ~ty (Let (l,u))
 let match_ ?loc u l =
   let ty = match l with
-    | Match_default {ty=Some ty; _} :: _
-    | Match_case (_, _, {ty=Some ty; _}) :: _ -> ty
+    | (_, _, {ty=Some ty; _}) :: _ -> ty
     | _::_
     | [] -> assert false
   in
@@ -345,11 +336,7 @@ module Seq = struct
       | Let (l,u) -> iter u; List.iter (fun (_,t) -> iter t) l
       | Match (u,l) ->
         iter u;
-        List.iter
-          (function
-            | Match_case (_,_,t)
-            | Match_default t -> iter t)
-          l
+        List.iter (fun (_,_,t) -> iter t) l
       | AppBuiltin (_,l)
       | Multiset l -> List.iter iter l
     in iter t
@@ -390,11 +377,9 @@ module Seq = struct
       | Match (u,l) ->
         iter set u;
         List.iter
-          (function
-            | Match_case (_,vars,t) ->
-              let set = List.fold_left Var.Set.add set vars in
-              iter set t
-            | Match_default t -> iter set t)
+          (fun (_,vars,t) ->
+             let set = List.fold_left Var.Set.add set vars in
+             iter set t)
           l
       | Bind (_, v, t') ->
           let set' = Var.Set.add set v in
@@ -430,8 +415,7 @@ let rec is_ground t =
     List.for_all (fun (_,t) -> is_ground t) l
   | Match (u,l) ->
     is_ground u &&
-    List.for_all
-      (function Match_default t | Match_case (_,_,t) -> is_ground t) l
+    List.for_all (fun (_,_,t) -> is_ground t) l
   | Bind (_, v, t') -> is_ground (Var.ty v) && is_ground t'
   | Record (l, rest) ->
       CCOpt.maybe is_ground true rest
@@ -788,11 +772,9 @@ module Subst = struct
         let u = eval subst u in
         let l =
           List.map
-            (function
-              | Match_case (c, vars, rhs) ->
-                let subst, vars = CCList.fold_map rename_var subst vars in
-                Match_case (c, vars, eval subst rhs)
-              | Match_default t -> Match_default (eval subst t))
+            (fun (c, vars, rhs) ->
+               let subst, vars = CCList.fold_map rename_var subst vars in
+               c, vars, eval subst rhs)
             l
         in
         match_ ?loc:t.loc u l
@@ -890,13 +872,11 @@ let occur_check_ ~allow_open ~subst v t =
         check bound u
         ||
         List.exists
-          (function
-            | Match_default t -> check bound t
-            | Match_case (_, vars, rhs) ->
-              let bound =
-                if allow_open then bound else List.fold_left Var.Set.add bound vars
-              in
-              check bound rhs)
+          (fun (_, vars, rhs) ->
+             let bound =
+               if allow_open then bound else List.fold_left Var.Set.add bound vars
+             in
+             check bound rhs)
           l
       | Const _ -> false
       | App (f, l) -> check bound f || List.exists (check bound) l
@@ -1015,17 +995,15 @@ let unify ?(allow_open=false) ?loc ?(st=UStack.create()) ?(subst=Subst.empty) t1
     | Match (u1,l1), Match (u2,l2) when List.length l1=List.length l2 ->
         unif_rec subst u1 u2;
         List.iter2
-          (fun b1 b2 -> match b1, b2 with
-             | Match_default rhs1, Match_default rhs2 -> unif_rec subst rhs1 rhs2
-             | Match_case (c1,vars1,rhs1), Match_case (c2,vars2,rhs2)
-               when List.length vars1 = List.length vars2 ->
+          (fun (c1,vars1,rhs1) (c2,vars2,rhs2) ->
+             if List.length vars1 = List.length vars2 then (
                if not (ID.equal c1 c2)
                then fail_
                    "constructors %a and %a are not compatible (subst {@[%a@]})"
                    ID.pp c1 ID.pp c2 Subst.pp subst;
                let subst = rename_vars_l subst vars1 vars2 in
                unif_rec subst rhs1 rhs2
-             | _ ->
+             ) else
                fail_ "incompatible branches")
           l1 l2
     | AppBuiltin (b1,l1), AppBuiltin (b2,l2) when List.length l1=List.length l2 ->
@@ -1137,7 +1115,8 @@ let apply_unify ?allow_open ?loc ?st ?(subst=Subst.empty) ty l =
       aux (Subst.add subst v a) ty' l'
   | Ty.Ty_fun (exp, ret), _ ->
       aux_l subst exp ret l
-  | (Ty.Ty_meta _ | Ty.Ty_var _ | Ty.Ty_app _ | Ty.Ty_builtin _ | Ty.Ty_multiset _ | Ty.Ty_record _), _ ->
+  | (Ty.Ty_meta _ | Ty.Ty_var _ | Ty.Ty_app _ | Ty.Ty_builtin _
+    | Ty.Ty_multiset _ | Ty.Ty_record _), _ ->
       fail_uniff_ ?loc [] "cannot apply type `@[%a@]`@ to `@[%a@]`"
         pp ty (Util.pp_list pp) l
   and aux_l subst exp ret l = match exp, l with
@@ -1170,13 +1149,11 @@ let rec erase t = match view t with
     let u = erase u in
     let l =
       List.map
-        (function
-          | Match_default rhs -> STerm.Match_default (erase rhs)
-          | Match_case (c,vars,rhs) ->
-            let c = ID.to_string c in
-            let vars = List.map (fun v -> STerm.V (Var.to_string v)) vars in
-            let rhs = erase rhs in
-            STerm.Match_case (c,vars,rhs))
+        (fun (c,vars,rhs) ->
+           let c = ID.to_string c in
+           let vars = List.map (fun v -> STerm.V (Var.to_string v)) vars in
+           let rhs = erase rhs in
+           STerm.Match_case (c,vars,rhs))
         l
     in
     STerm.match_ u l

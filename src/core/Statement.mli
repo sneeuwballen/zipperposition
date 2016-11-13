@@ -29,22 +29,29 @@ type attrs = attr list
 
 type 'ty skolem = ID.t * 'ty
 
+type ('t, 'ty) term_rule = 'ty Var.t list * ID.t * 'ty * 't list * 't
+(** [forall vars, id args = rhs] *)
+
+type ('f, 't, 'ty) form_rule = 'ty Var.t list * 't SLiteral.t * 'f list
+(** [forall vars, lhs <=> bigand rhs] *)
+
 type ('f, 't, 'ty) def_rule =
-  | Def_term of 'ty Var.t list * ID.t * 't list * 't (* id vars = rhs *)
-  | Def_form of 'ty Var.t list * 't SLiteral.t * 'f list (* lhs <=> bigand rhs *)
+  | Def_term of ('t, 'ty) term_rule
+  | Def_form of ('f, 't, 'ty) form_rule
 
 type ('f, 't, 'ty) def = {
   def_id: ID.t;
   def_ty: 'ty; (* def_ty = def_vars -> def_ty_ret *)
   def_rules: ('f, 't, 'ty) def_rule list;
+  def_rewrite: bool; (* rewrite rule or mere assertion? *)
 }
 
 type ('f, 't, 'ty) view =
   | TyDecl of ID.t * 'ty (** id: ty *)
   | Data of 'ty data list
   | Def of ('f, 't, 'ty) def list
-  | RewriteTerm of ID.t * 'ty * 't list * 't (* args, rhs *)
-  | RewriteForm of 't SLiteral.t * 'f list (* lhs atomic form, rhs conjunction *)
+  | RewriteTerm of ('t, 'ty) term_rule
+  | RewriteForm of ('f, 't, 'ty) form_rule
   | Assert of 'f (** assert form *)
   | Lemma of 'f list (** lemma to prove and use, using Avatar cut *)
   | Goal of 'f (** goal to prove *)
@@ -66,12 +73,12 @@ val attrs : (_, _, _, _) t -> attrs
 val src : (_, _, _, 'src) t -> 'src
 
 val mk_data : ID.t -> args:'ty Var.t list -> 'ty -> (ID.t * 'ty) list -> 'ty data
-val mk_def : ID.t -> 'ty -> ('f,'t,'ty) def_rule list -> ('f,'t,'ty) def
+val mk_def : ?rewrite:bool -> ID.t -> 'ty -> ('f,'t,'ty) def_rule list -> ('f,'t,'ty) def
 
 val ty_decl : ?attrs:attrs -> src:'src -> ID.t -> 'ty -> (_, _, 'ty, 'src) t
 val def : ?attrs:attrs -> src:'src -> ('f,'t,'ty) def list -> ('f, 't, 'ty, 'src) t
-val rewrite_term : ?attrs:attrs -> src:'src -> ID.t -> 'ty -> 't list -> 't -> (_, 't, 'ty, 'src) t
-val rewrite_form : ?attrs:attrs -> src:'src -> 't SLiteral.t -> 'f list -> ('f, 't, _, 'src) t
+val rewrite_term : ?attrs:attrs -> src:'src -> ('t, 'ty) term_rule -> (_, 't, 'ty, 'src) t
+val rewrite_form : ?attrs:attrs -> src:'src -> ('f, 't, 'ty) form_rule -> ('f, 't, 'ty, 'src) t
 val data : ?attrs:attrs -> src:'src -> 'ty data list -> (_, _, 'ty, 'src) t
 val assert_ : ?attrs:attrs -> src:'src -> 'f -> ('f, _, _, 'src) t
 val lemma : ?attrs:attrs -> src:'src -> 'f list -> ('f, _, _, 'src) t
@@ -138,6 +145,11 @@ module Seq : sig
 end
 
 (** {2 IO} *)
+
+val pp_def_rule :
+  'a CCFormat.printer ->
+  'b CCFormat.printer ->
+  ('a,'b,_) def_rule CCFormat.printer
 
 val pp_def :
   'a CCFormat.printer ->

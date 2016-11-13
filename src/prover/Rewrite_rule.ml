@@ -95,7 +95,7 @@ module Set = struct
            |> Sequence.map (fun r -> ty,r))
       |> Sequence.fold
         (fun t (ty,rule) -> match rule with
-           | Stmt.Def_term (_,id,args,rhs) ->
+           | Stmt.Def_term (_,id,_,args,rhs) ->
              let r = make_t id ty args rhs in
              add_term r t
            | Stmt.Def_form (_,lhs,rhs) ->
@@ -104,10 +104,10 @@ module Set = struct
              let r = make_c lhs rhs in
              add_clause r t)
         t
-    | Stmt.RewriteTerm (id, ty, args, rhs) ->
+    | Stmt.RewriteTerm (_, id, ty, args, rhs) ->
       let r = make_t id ty args rhs in
       add_term r t
-    | Stmt.RewriteForm (lhs, rhs) ->
+    | Stmt.RewriteForm (_, lhs, rhs) ->
       let lhs = Literal.Conv.of_form lhs in
       let rhs = List.map (List.map Literal.Conv.of_form) rhs in
       let r = make_c lhs rhs in

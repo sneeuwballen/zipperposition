@@ -24,22 +24,29 @@ type attrs = attr list
 
 type 'ty skolem = ID.t * 'ty
 
+type ('t, 'ty) term_rule = 'ty Var.t list * ID.t * 'ty * 't list * 't
+(** [forall vars, id args = rhs] *)
+
+type ('f, 't, 'ty) form_rule = 'ty Var.t list * 't SLiteral.t * 'f list
+(** [forall vars, lhs <=> bigand rhs] *)
+
 type ('f, 't, 'ty) def_rule =
-  | Def_term of 'ty Var.t list * ID.t * 't list * 't (* id vars = rhs *)
-  | Def_form of 'ty Var.t list * 't SLiteral.t * 'f list (* lhs <=> bigand rhs *)
+  | Def_term of ('t, 'ty) term_rule
+  | Def_form of ('f, 't, 'ty) form_rule
 
 type ('f, 't, 'ty) def = {
   def_id: ID.t;
   def_ty: 'ty; (* def_ty = def_vars -> def_ty_ret *)
   def_rules: ('f, 't, 'ty) def_rule list;
+  def_rewrite: bool; (* rewrite rule or mere assertion? *)
 }
 
 type ('f, 't, 'ty) view =
   | TyDecl of ID.t * 'ty (** id: ty *)
   | Data of 'ty data list
   | Def of ('f, 't, 'ty) def list
-  | RewriteTerm of ID.t * 'ty * 't list * 't (* args, rhs *)
-  | RewriteForm of 't SLiteral.t * 'f list (* lhs atomic form, rhs conjunction *)
+  | RewriteTerm of ('t, 'ty) term_rule
+  | RewriteForm of ('f, 't, 'ty) form_rule
   | Assert of 'f (** assert form *)
   | Lemma of 'f list (** lemma to prove and use, using Avatar cut *)
   | Goal of 'f (** goal to prove *)
@@ -63,15 +70,15 @@ let src t = t.src
 let mk_data id ~args ty cstors =
   {data_id=id; data_args=args; data_ty=ty; data_cstors=cstors; }
 
-let mk_def id ty rules =
-  { def_id=id; def_ty=ty; def_rules=rules; }
+let mk_def ?(rewrite=false) id ty rules =
+  { def_id=id; def_ty=ty; def_rules=rules; def_rewrite=rewrite; }
 
 let mk_ ?(attrs=[]) ~src view = {src; view; attrs; }
 
 let ty_decl ?attrs ~src id ty = mk_ ?attrs ~src (TyDecl (id,ty))
 let def ?attrs ~src l = mk_ ?attrs ~src (Def l)
-let rewrite_term ?attrs ~src id ty args rhs = mk_ ?attrs ~src (RewriteTerm(id,ty,args,rhs))
-let rewrite_form ?attrs ~src lhs rhs = mk_ ?attrs ~src (RewriteForm(lhs,rhs))
+let rewrite_term ?attrs ~src r = mk_ ?attrs ~src (RewriteTerm r)
+let rewrite_form ?attrs ~src r = mk_ ?attrs ~src (RewriteForm r)
 let data ?attrs ~src l = mk_ ?attrs ~src (Data l)
 let assert_ ?attrs ~src c = mk_ ?attrs ~src (Assert c)
 let lemma ?attrs ~src l = mk_ ?attrs ~src (Lemma l)
@@ -91,9 +98,9 @@ let map_def ~form:fform ~term:fterm ~ty:fty d =
     def_rules=
       List.map
         (function
-          | Def_term (vars,id,args,rhs) ->
+          | Def_term (vars,id,ty,args,rhs) ->
             let vars = List.map (Var.update_ty ~f:fty) vars in
-            Def_term (vars, id, List.map fterm args, fterm rhs)
+            Def_term (vars, id, fty ty, List.map fterm args, fterm rhs)
           | Def_form (vars,lhs,rhs) ->
             let vars = List.map (Var.update_ty ~f:fty) vars in
             Def_form (vars, SLiteral.map ~f:fterm lhs, List.map fform rhs))
@@ -105,10 +112,12 @@ let map ~form ~term ~ty st =
     | Def l ->
       let l = List.map (map_def ~form ~term ~ty) l in
       Def l
-    | RewriteTerm (id, ty, args, rhs) ->
-      RewriteTerm (id, fty ty, List.map term args, term rhs)
-    | RewriteForm (lhs,rhs) ->
-      RewriteForm (SLiteral.map ~f:term lhs, List.map form rhs)
+    | RewriteTerm (vars, id, ty, args, rhs) ->
+      let vars = List.map (Var.update_ty ~f:fty) vars in
+      RewriteTerm (vars, id, fty ty, List.map term args, term rhs)
+    | RewriteForm (vars,lhs,rhs) ->
+      let vars = List.map (Var.update_ty ~f:fty) vars in
+      RewriteForm (vars, SLiteral.map ~f:term lhs, List.map form rhs)
     | Data l ->
       let l = List.map (map_data ~ty:fty) l in
       Data l
@@ -144,7 +153,7 @@ let declare_defined_cst id ~level =
   ID.add_payload id (Payload_defined_cst level)
 
 let terms_of_rule (d:_ def_rule): _ Sequence.t = match d with
-  | Def_term (_, _, args, rhs) ->
+  | Def_term (_, _, _, args, rhs) ->
     Sequence.of_list (rhs::args)
   | Def_form (_, lhs, rhs) ->
     Sequence.cons lhs (Sequence.of_list rhs |> Sequence.flat_map Sequence.of_list)
@@ -195,7 +204,8 @@ module Seq = struct
   let mk_form f = `Form f
 
   let seq_of_rule (d:_ def_rule): _ Sequence.t = fun k -> match d with
-    | Def_term (vars, _, args, rhs) ->
+    | Def_term (vars, _, ty, args, rhs) ->
+      k (`Ty ty);
       List.iter (fun v->k (`Ty (Var.ty v))) vars;
       List.iter (fun t->k (`Term t)) (rhs::args);
     | Def_form (vars, lhs, rhs) ->
@@ -209,16 +219,16 @@ module Seq = struct
       | TyDecl (id,ty) -> decl id ty;
       | Def l ->
         List.iter
-          (fun {def_id; def_ty; def_rules} ->
+          (fun {def_id; def_ty; def_rules; _} ->
              decl def_id def_ty;
              Sequence.of_list def_rules
              |> Sequence.flat_map seq_of_rule |> Sequence.iter k)
           l
-      | RewriteTerm (_,ty,args,rhs) ->
+      | RewriteTerm (_,_,ty,args,rhs) ->
         k (`Ty ty);
         List.iter (fun t -> k (`Term t)) args;
         k (`Term rhs)
-      | RewriteForm (lhs,rhs) ->
+      | RewriteForm (_,lhs,rhs) ->
         SLiteral.iter ~f:(fun t -> k (`Term t)) lhs;
         List.iter (fun f -> k (`Form f)) rhs
       | Data l ->
@@ -257,7 +267,7 @@ module Seq = struct
     | Data _
     | TyDecl _ -> ()
     | Goal c -> k c
-    | RewriteForm (_, l)
+    | RewriteForm (_,_, l)
     | Lemma l
     | NegatedGoal (_, l) -> List.iter k l
     | Assert c -> k c
@@ -311,21 +321,22 @@ let pp_attrs out = function
   | [] -> ()
   | l -> fpf out "@ [@[%a@]]" (Util.pp_list ~sep:"," pp_attr) l
 
-let pp_def ppf ppt ppty out d =
+let pp_def_rule ppf ppt out d =
   let pp_args out = function
     | [] -> ()
-    | l -> fpf out "@ %a" (Util.pp_list ppt) l
+    | l -> fpf out "@ %a" (Util.pp_list ~sep:" " ppt) l
   in
-  let pp_rule out = function
-    | Def_term (_,id,args,rhs) ->
+  match d with
+    | Def_term (_,id,_,args,rhs) ->
       fpf out "%a%a =@ %a" ID.pp id pp_args args ppt rhs
     | Def_form (_,lhs,rhs) ->
       fpf out "%a =@ (@[<hv>%a@])" (SLiteral.pp ppt) lhs
         (Util.pp_list ~sep:" && " ppf) rhs
-  in
+
+let pp_def ppf ppt ppty out d =
   fpf out "@[<2>@[%a : %a@]@ :=@ @[<hv>%a@]@]"
     ID.pp d.def_id ppty d.def_ty
-    (Util.pp_list ~sep:" and " pp_rule) d.def_rules
+    (Util.pp_list ~sep:" and " (pp_def_rule ppf ppt)) d.def_rules
 
 let pp ppf ppt ppty out st = match st.view with
   | TyDecl (id,ty) ->
@@ -333,10 +344,10 @@ let pp ppf ppt ppty out st = match st.view with
   | Def l ->
       fpf out "@[<2>def%a %a@]."
         pp_attrs st.attrs (Util.pp_list ~sep:"" (pp_def ppf ppt ppty)) l
-  | RewriteTerm (id, _, args, rhs) ->
+  | RewriteTerm (_, id, _, args, rhs) ->
       fpf out "@[<2>rewrite%a @[%a %a@]@ = @[%a@]@]" pp_attrs st.attrs
         ID.pp id (Util.pp_list ~sep:" " ppt) args ppt rhs
-  | RewriteForm (lhs, rhs) ->
+  | RewriteForm (_, lhs, rhs) ->
       fpf out "@[<2>rewrite%a @[%a@]@ <=> @[%a@]@]" pp_attrs st.attrs
         (SLiteral.pp ppt) lhs (Util.pp_list ~sep:" && " ppf) rhs
   | Data l ->
@@ -389,7 +400,7 @@ module TPTP = struct
         | l -> fpf out "(@[%a@])" (Util.pp_list ~sep:"," ppt) l
       in
       let pp_rule out = function
-        | Def_term (vars,id,args,rhs) ->
+        | Def_term (vars,id,_,args,rhs) ->
           fpf out "%a(%a%a =@ %a)" pp_quant_vars vars ID.pp id pp_args args ppt rhs
         | Def_form (vars,lhs,rhs) ->
           fpf out "%a(%a <=>@ (@[<hv>%a@]))" pp_quant_vars vars (SLiteral.pp ppt) lhs
@@ -425,10 +436,10 @@ module TPTP = struct
         l;
       (* define *)
       List.iter (pp_def_axiom out) l
-    | RewriteTerm (id, _, args, rhs) ->
+    | RewriteTerm (_, id, _, args, rhs) ->
         fpf out "@[<2>tff(%s, axiom,@ %a(%a) =@ @[%a@])@]."
           name ID.pp id (Util.pp_list ~sep:", " ppt) args ppt rhs
-    | RewriteForm (lhs, rhs) ->
+    | RewriteForm (_, lhs, rhs) ->
         fpf out "@[<2>tff(%s, axiom,@ %a <=>@ (@[%a@]))@]."
           name (SLiteral.TPTP.pp ppt) lhs (Util.pp_list ~sep:" & " ppf) rhs
     | Data _ -> failwith "cannot print `data` to TPTP"

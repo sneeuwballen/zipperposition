@@ -11,9 +11,7 @@ type location = ParseLocation.t
 type t
 type term = t
 
-type match_branch =
-  | Match_case of ID.t * t Var.t list * t
-  | Match_default of t
+type match_branch = ID.t * t Var.t list * t
 
 type view = private
   | Var of t Var.t (** variable *)

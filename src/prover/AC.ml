@@ -227,8 +227,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | St.Def l ->
         List.iter (fun {Statement.def_id; def_ty; _} -> add def_id def_ty) l
       | St.Data _
-      | St.RewriteTerm (_,_,_,_)
-      | St.RewriteForm (_,_)
+      | St.RewriteTerm _
+      | St.RewriteForm _
       | St.Assert _
       | St.Lemma _
       | St.Goal _
