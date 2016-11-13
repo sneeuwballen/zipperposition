@@ -19,3 +19,4 @@
 (B) 2016-01-15 question answering
 (B) 2016-11-10 consider forward links in NPDtree (for faster skip)
 (A) 2016-11-10 functional induction due:2016-11-12
+(A) 2016-11-14 fix type inference for ~/workspace/tip-benchmarks/benchmarks/isaplanner/prop_01.smt2 due:2016-11-15
