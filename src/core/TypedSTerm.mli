@@ -176,6 +176,7 @@ module Form : sig
   val forall_l : ?loc:location -> t Var.t list -> t -> t
   val exists_l : ?loc:location -> t Var.t list -> t -> t
 
+  val unfold_forall : t -> t Var.t list * t
   val close_forall : ?loc:location -> t -> t
 end
 
@@ -213,6 +214,8 @@ val close_all : ty:t -> Binder.t -> t -> t
 (** Bind all free vars with the symbol *)
 
 include Interfaces.PRINT with type t := t
+
+val pp_inner : t CCFormat.printer
 
 module Set : Sequence.Set.S with type elt = term
 module Map : Sequence.Map.S with type key = term

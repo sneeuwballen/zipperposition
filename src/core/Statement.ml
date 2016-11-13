@@ -328,13 +328,13 @@ let pp_def_rule ppf ppt out d =
   in
   match d with
     | Def_term (_,id,_,args,rhs) ->
-      fpf out "%a%a =@ %a" ID.pp id pp_args args ppt rhs
+      fpf out "@[<2>@[%a%a@] =@ %a@]" ID.pp id pp_args args ppt rhs
     | Def_form (_,lhs,rhs) ->
-      fpf out "%a =@ (@[<hv>%a@])" (SLiteral.pp ppt) lhs
+      fpf out "@[<2>%a =@ (@[<hv>%a@])@]" (SLiteral.pp ppt) lhs
         (Util.pp_list ~sep:" && " ppf) rhs
 
 let pp_def ppf ppt ppty out d =
-  fpf out "@[<2>@[%a : %a@]@ :=@ @[<hv>%a@]@]"
+  fpf out "@[<2>@[%a : %a@]@ where@ @[<hv>%a@]@]"
     ID.pp d.def_id ppty d.def_ty
     (Util.pp_list ~sep:" and " (pp_def_rule ppf ppt)) d.def_rules
 
@@ -401,9 +401,9 @@ module TPTP = struct
       in
       let pp_rule out = function
         | Def_term (vars,id,_,args,rhs) ->
-          fpf out "%a(%a%a =@ %a)" pp_quant_vars vars ID.pp id pp_args args ppt rhs
+          fpf out "%a(@[%a%a@] =@ %a)" pp_quant_vars vars ID.pp id pp_args args ppt rhs
         | Def_form (vars,lhs,rhs) ->
-          fpf out "%a(%a <=>@ (@[<hv>%a@]))" pp_quant_vars vars (SLiteral.pp ppt) lhs
+          fpf out "%a(@[%a@] <=>@ (@[<hv>%a@]))" pp_quant_vars vars (SLiteral.pp ppt) lhs
             (Util.pp_list ~sep:" & " ppf) rhs
       in
       let pp_top_rule out r =

@@ -359,10 +359,10 @@ let rec pp out t = match t.term with
       let pp_branch out = function
         | Match_default rhs -> Format.fprintf out "_ -> %a" pp rhs
         | Match_case (c,vars,rhs) ->
-          Format.fprintf out "(@[case@ %s %a ->@ %a@])"
+          Format.fprintf out "@[<2>case@ %s %a ->@ %a@]"
             c (Util.pp_list ~sep:" " pp_var) vars pp rhs
       in
-      Format.fprintf out "@[<hv2>match %a with@ @[<hv>%a@]@ end@]"
+      Format.fprintf out "@[<hv>@[<hv2>match %a with@ @[<hv>%a@]@]@ end@]"
         pp u (Util.pp_list ~sep:" | " pp_branch) l
   | Record (l, None) ->
       Format.fprintf out "{@[<hv>%a@]}"
@@ -505,10 +505,10 @@ module ZF = struct
         let pp_branch out = function
           | Match_default rhs -> Format.fprintf out "_ -> %a" pp rhs
           | Match_case (c,vars,rhs) ->
-            Format.fprintf out "(@[case@ %s %a ->@ %a@])"
+            Format.fprintf out "@[<2>case@ %s %a ->@ %a@]"
               c (Util.pp_list ~sep:" " pp_var) vars pp rhs
         in
-        Format.fprintf out "@[<hv2>match %a with@ @[<hv>%a@]@ end@]"
+        Format.fprintf out "@[<hv>@[<hv2>match %a with@ @[<hv>%a@]@]@ end@]"
           pp u (Util.pp_list ~sep:" | " pp_branch) l
     | Bind (s, vars, t') ->
         Format.fprintf out "@[<2>%a @[%a@].@ @[%a@]@]"

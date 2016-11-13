@@ -63,6 +63,7 @@ module Subst = struct
   type ('a,'b) t = ('a var * 'b) ID.Map.t
   let empty = ID.Map.empty
   let add t v x = ID.Map.add v.id (v,x) t
+  let singleton v x = add empty v x
   let mem t v = ID.Map.mem v.id t
   let find_exn t v = snd (ID.Map.find v.id t)
   let find t v = try Some (find_exn t v) with Not_found -> None

@@ -63,6 +63,7 @@ end
 module Subst : sig
   type (+'a, +'b) t
   val empty : (_,_) t
+  val singleton : 'a var -> 'b -> ('a,'b) t
   val add : ('a,'b) t -> 'a var -> 'b -> ('a,'b) t
   val mem : ('a,_) t -> 'a var -> bool
   val find : ('a,'b) t -> 'a var -> 'b option

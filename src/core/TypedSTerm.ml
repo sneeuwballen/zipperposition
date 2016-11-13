@@ -190,8 +190,8 @@ let rec pp out t = match view t with
         (Util.pp_list ~sep:" and " pp_binding) l pp u
   | Match (u, l) ->
       let pp_branch out (c,vars,rhs) =
-        Format.fprintf out "(@[case@ %a %a ->@ %a@])"
-          ID.pp c (Util.pp_list ~sep:" " Var.pp) vars pp rhs
+        Format.fprintf out "@[<2>case@ %a %a ->@ %a@]"
+          ID.pp c (Util.pp_list ~sep:" " Var.pp_fullc) vars pp rhs
       in
       Format.fprintf out "@[<hv>@[<hv2>match %a with@ %a@]@ end@]"
         pp u (Util.pp_list ~sep:" | " pp_branch) l
@@ -667,6 +667,12 @@ module Form = struct
 
   let forall_l ?loc = List.fold_right (forall ?loc)
   let exists_l ?loc = List.fold_right (exists ?loc)
+
+  let rec unfold_forall f = match view f with
+    | Forall (v, f') ->
+      let vars, f' = unfold_forall f' in
+      v :: vars, f'
+    | _ -> [], f
 
   let close_forall ?loc f =
     (* quantification over types: outermost *)
