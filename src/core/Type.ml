@@ -347,7 +347,13 @@ module Conv = struct
     ctx.n <- n+1;
     HVar.make ~ty:tType n
 
-  exception Error
+  exception Error of TypedSTerm.t
+
+  let () = Printexc.register_printer
+      (function
+        | Error t ->
+          Some (Util.err_spf "@[<2>Type.Conv.Error on `@[%a@]`@]" PT.pp t)
+        | _ -> None)
 
   let of_simple_term_exn ctx t =
     let rec aux depth v2db t = match PT.view t with
@@ -377,7 +383,7 @@ module Conv = struct
           | PT.Const hd ->
               let l = List.map (aux depth v2db) l in
               app hd l
-          | _ -> raise Error
+          | _ -> raise (Error t)
           end
       | PT.Bind (Binder.ForallTy, v, t') ->
           let v2db = Var.Subst.add v2db v depth in
@@ -387,7 +393,10 @@ module Conv = struct
       | PT.Bind _
       | PT.AppBuiltin _
       | PT.Meta _
-      | PT.Multiset _ -> raise Error
+      | PT.Ite _
+      | PT.Match _
+      | PT.Let _
+      | PT.Multiset _ -> raise (Error t)
     and aux_var v = match Var.Subst.find ctx.vars v with
       | Some v -> v
       | None ->
@@ -409,7 +418,7 @@ module Conv = struct
 
   let of_simple_term ctx t =
     try Some (of_simple_term_exn ctx t)
-    with Error -> None
+    with Error _ -> None
 
   let to_simple_term ?(env=DBEnv.empty) t =
     let tbl = ref VarMap.empty in

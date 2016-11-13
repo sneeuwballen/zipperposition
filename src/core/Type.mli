@@ -229,7 +229,7 @@ module Conv : sig
   val fresh_ty_var : ctx -> t HVar.t
   (** Fresh type variable *)
 
-  exception Error
+  exception Error of TypedSTerm.t
 
   val of_simple_term_exn : ctx -> TypedSTerm.t -> t
   (** @raise Invalid_argument if conversion is impossible *)

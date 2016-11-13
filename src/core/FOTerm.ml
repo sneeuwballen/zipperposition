@@ -577,13 +577,13 @@ module Conv = struct
       | PT.Ite _
       | PT.Let _
       | PT.Match _
-      | PT.Multiset _ -> raise Type.Conv.Error
+      | PT.Multiset _ -> raise (Type.Conv.Error t)
     in
     aux t
 
   let of_simple_term ctx t =
     try Some (of_simple_term_exn ctx t)
-    with Type.Conv.Error -> None
+    with Type.Conv.Error _ -> None
 
   let to_simple_term ?(env=DBEnv.empty) t =
     let tbl = VarTbl.create 16 in
