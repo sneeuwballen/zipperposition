@@ -18,6 +18,8 @@ val make : ty:'a -> ID.t -> 'a t
 val of_string : ty:'a -> string -> 'a t
 (** Make a fresh ID before calling {!make} *)
 
+val makef : ty:'a -> ('b, Format.formatter, unit, 'a t) format4 -> 'b
+
 val gensym : ty:'a -> unit -> 'a t
 
 val copy : 'a t -> 'a t
@@ -51,6 +53,7 @@ module Set : sig
   val diff : 'a t -> 'a t -> 'a t
   val of_seq : 'a var Sequence.t -> 'a t
   val to_seq : 'a t -> 'a var Sequence.t
+  val add_seq : 'a t -> 'a var Sequence.t -> 'a t
   val to_list : 'a t -> 'a var list
   val of_list : 'a var list -> 'a t
   val cardinal : _ t -> int

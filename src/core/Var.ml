@@ -13,6 +13,8 @@ let make ~ty id = {ty; id; }
 
 let of_string ~ty name = {ty; id=ID.make name; }
 
+let makef ~ty msg = CCFormat.ksprintf msg ~f:(of_string ~ty)
+
 let gensym ~ty () = {ty; id=ID.gensym(); }
 
 let copy v = make ~ty:v.ty (ID.copy v.id)
@@ -49,6 +51,7 @@ module Set = struct
         | `Both _ -> None)
   let cardinal t = ID.Map.cardinal t
   let of_seq s = s |> Sequence.map (fun v->v.id, v) |> ID.Map.of_seq
+  let add_seq m s = s |> Sequence.map (fun v->v.id, v) |> ID.Map.add_seq m
   let of_list l = l |> List.map (fun v->v.id,v) |> ID.Map.of_list
   let to_seq t = ID.Map.to_seq t |> Sequence.map snd
   let to_list t = ID.Map.fold (fun _ v acc ->v::acc) t []
