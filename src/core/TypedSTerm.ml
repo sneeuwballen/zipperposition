@@ -52,10 +52,10 @@ let ty t = t.ty
 let ty_exn t = match t.ty with
   | None -> assert false
   | Some x -> x
-let head_exn t = match view t with
+let rec head_exn t = match view t with
   | Const id -> id
+  | App (f,_) -> head_exn f
   | Var _
-  | App (_,_)
   | Bind (_,_,_)
   | Ite (_,_,_)
   | Let _
@@ -63,7 +63,7 @@ let head_exn t = match view t with
   | AppBuiltin (_,_)
   | Multiset _
   | Record (_,_)
-  | Meta _ -> assert false
+  | Meta _ -> raise Not_found
 
 let to_int_ = function
   | Var _ -> 0
