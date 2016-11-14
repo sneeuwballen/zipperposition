@@ -91,7 +91,7 @@ module Set = struct
       Sequence.of_list l
       |> Sequence.flat_map
         (fun {Stmt.def_ty=ty; def_rules; def_rewrite=b; _} ->
-           if b
+           if b || Type.is_const ty
            then Sequence.of_list def_rules |> Sequence.map (fun r -> ty,r)
            else Sequence.empty)
       |> Sequence.fold

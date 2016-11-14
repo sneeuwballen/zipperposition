@@ -50,6 +50,7 @@ val is_tType : t -> bool
 val is_var : t -> bool
 val is_bvar : t -> bool
 val is_app : t -> bool
+val is_const : t -> bool
 val is_fun : t -> bool
 val is_forall : t -> bool
 val is_prop : t -> bool

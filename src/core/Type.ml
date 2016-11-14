@@ -58,6 +58,7 @@ let is_tType ty = match view ty with | Builtin TType -> true | _ -> false
 let is_var ty = match view ty with | Var _ -> true | _ -> false
 let is_bvar ty = match view ty with | DB _ -> true | _ -> false
 let is_app ty = match view ty with App _ -> true | _ -> false
+let is_const ty = match view ty with App (_, []) -> true | _ -> false
 let is_fun ty = match view ty with | Fun _ -> true | _ -> false
 let is_forall ty = match view ty with | Forall _ -> true | _ -> false
 let is_prop ty = match view ty with | Builtin Prop -> true | _ -> false
@@ -201,7 +202,7 @@ let err_apply_ msg = raise (ApplyError msg)
 let err_applyf_ msg = CCFormat.ksprintf msg ~f:err_apply_
 
 (* apply a type to arguments. *)
-let apply ty args =
+let apply ty0 args0 =
   let rec aux ty args env = match T.view ty, args with
     | _, [] -> T.DB.eval env ty
     | T.AppBuiltin(Builtin.Arrow, (ret :: exp_args)), _::_ ->
@@ -227,10 +228,10 @@ let apply ty args =
       else
         err_applyf_
           "@[<2>Type.apply:@ wrong argument type,@ expected `@[_ : %a@]`@ \
-            but got `@[%a : %a@]`@]"
-          T.pp exp' T.pp a T.pp (T.ty_exn a)
+           but got `@[%a : %a@]`@ when applying `%a` to [@[%a@]]@]"
+          T.pp exp' T.pp a T.pp (T.ty_exn a) T.pp ty0 (Util.pp_list T.pp) args0
   in
-  aux ty args DBEnv.empty
+  aux ty0 args0 DBEnv.empty
 
 let apply1 ty a = apply ty [a]
 
