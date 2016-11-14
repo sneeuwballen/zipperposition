@@ -240,9 +240,6 @@ module Flatten = struct
           | T.Var x when List.exists (Var.equal x) vars ->
             (* will replace [x] by each constructor *)
             of_list l >>= fun (c,c_vars,rhs) ->
-            let subst, c_vars =
-              CCList.fold_map T.Subst.rename_var T.Subst.empty c_vars
-            in
             (* the term [c vars] *)
             let case =
               let ty = T.ty_exn u in
@@ -251,7 +248,7 @@ module Flatten = struct
                 (c.T.cstor_args @ List.map T.var c_vars)
             in
             (* bind [x = c vars] *)
-            let subst = T.Subst.add subst x case in
+            let subst = T.Subst.add T.Subst.empty x case in
             add_subst subst >>= fun () ->
             (* directly replace by [rhs]. [c_vars] can be replaced themselves. *)
             aux pos (c_vars@vars) rhs
@@ -320,6 +317,8 @@ module Flatten = struct
           def.Skolem.proxy
       end
     in
+    Util.debugf ~section 5 "@[<2>flatten_rec@ `@[%a@]`@ vars: (@[%a@])@]"
+      (fun k->k T.pp t (Util.pp_list Var.pp_fullc) vars);
     aux pos vars t
 
   let flatten_rec_l ctx pos vars l = map_m (flatten_rec ctx pos vars) l
