@@ -329,6 +329,10 @@ let pp_pair ?(sep=", ") pa pb out (a,b) =
 
 let pp_list ?(sep=", ") pp = CCFormat.list ~start:"" ~stop:"" ~sep pp
 
+let pp_list0 ?(sep=" ") pp_x out = function
+  | [] -> ()
+  | l -> Format.fprintf out " %a" (pp_list ~sep pp_x) l
+
 let ord_option c o1 o2 = match o1, o2 with
   | None, None -> 0
   | None, Some _ -> -1

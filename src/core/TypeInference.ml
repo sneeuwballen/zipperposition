@@ -356,11 +356,11 @@ let mk_metas ctx n =
     (fun _ -> T.Ty.meta (Ctx.fresh_ty_meta_var ~dest:`Generalize ctx))
 
 (* apply type to the relevant number of metas; return the resulting type *)
-let apply_ty_to_metas ?loc ctx (ty:T.Ty.t): T.Ty.t =
+let apply_ty_to_metas ?loc ctx (ty:T.Ty.t): T.Ty.t list * T.Ty.t =
   let ty_vars, _, _ = T.Ty.unfold ty in
   let metas = mk_metas ctx (List.length ty_vars) in
   let ty = T.apply_unify ~allow_open:true ?loc ty metas in
-  ty
+  metas, ty
 
 (* infer a type for [t], possibly updating [ctx]. Also returns a
    continuation to build a typed term. *)
@@ -553,7 +553,7 @@ let rec infer_rec ctx t =
 (* replace a match with possibly a "default" case into a completely
    defined match *)
 and infer_match ?loc ctx ~ty_matched data (l:PT.match_branch list)
-    : (ID.t * type_ Var.t list * T.t) list =
+    : (T.match_cstor * type_ Var.t list * T.t) list =
   let ty_ret = ref None in
   (* check consistency of types in every branch *)
   let check_ty ty : unit = match !ty_ret with
@@ -574,37 +574,40 @@ and infer_match ?loc ctx ~ty_matched data (l:PT.match_branch list)
            check_ty (T.ty_exn rhs);
            (* now cover every missing case *)
            CCList.filter_map
-             (fun (cstor,ty) ->
-                if List.exists (ID.equal cstor) !seen
+             (fun (c_id,c_ty) ->
+                if List.exists (ID.equal c_id) !seen
                 then None
                 else (
-                  (* TODO handle polymorphism properly (create new metas for tyvars) *)
-                  let tyvars, ty_args, ty_ret = T.Ty.unfold ty in
-                  check_ty ty_ret;
+                  let ty_params, c_ty_applied = apply_ty_to_metas ?loc ctx c_ty in
+                  let _vars, ty_args, ty_ret = T.Ty.unfold c_ty_applied in
+                  assert (_vars=[]);
+                  unify ?loc ty_ret ty_matched;
                   let vars =
-                    tyvars @
-                      List.mapi (fun i ty -> Var.makef ~ty "x_%d" i) ty_args
+                    List.mapi (fun i ty -> Var.makef ~ty "x_%d" i) ty_args
+                  in
+                  let cstor =
+                    { T.cstor_id=c_id; cstor_ty=c_ty; cstor_args=ty_params; }
                   in
                   Some (cstor, vars, rhs)
                 ))
              data
          | PT.Match_case (s, vars, rhs) ->
-           let id, ty_s = Ctx.get_id_ ?loc ~arity:(List.length vars) ctx s in
-           if List.exists (ID.equal id) !seen then (
-             error_ ?loc "duplicate branch for constructor `%a`" ID.pp id
+           let c_id, c_ty = Ctx.get_id_ ?loc ~arity:(List.length vars) ctx s in
+           if List.exists (ID.equal c_id) !seen then (
+             error_ ?loc "duplicate branch for constructor `%a`" ID.pp c_id
            );
-           if List.for_all (fun (cstor,_) -> not (ID.equal id cstor)) data then (
-             error_ ?loc "symbol `%a` not a suitable constructor" ID.pp id
+           if List.for_all (fun (cstor,_) -> not (ID.equal c_id cstor)) data then (
+             error_ ?loc "symbol `%a` not a suitable constructor" ID.pp c_id
            );
-           seen := id :: !seen;
+           seen := c_id :: !seen;
            (* apply [ty_s] to some meta variables *)
-           let ty_s_applied = apply_ty_to_metas ?loc ctx ty_s in
-           let _vars, ty_s_args, ty_ret_s = T.Ty.unfold ty_s_applied in
+           let ty_params, c_ty_applied = apply_ty_to_metas ?loc ctx c_ty in
+           let _vars, ty_s_args, ty_ret_s = T.Ty.unfold c_ty_applied in
            assert (_vars=[]);
            unify ?loc ty_ret_s ty_matched;
            if List.length ty_s_args <> List.length vars then (
              error_ ?loc "constructor `%a`@ expected %d arguments,@ got %d"
-               ID.pp id (List.length ty_s_args) (List.length vars);
+               ID.pp c_id (List.length ty_s_args) (List.length vars);
            );
            with_typed_vars_ ?loc ~infer_ty:(fun ?loc:_ _ ty -> ty) ctx
              (List.map2 (fun v ty_arg -> v, Some ty_arg) vars ty_s_args)
@@ -612,14 +615,17 @@ and infer_match ?loc ctx ~ty_matched data (l:PT.match_branch list)
                (* now we have everything in scope, we can convert [rhs] *)
                let rhs = infer_rec ctx rhs in
                check_ty (T.ty_exn rhs);
-               [id, vars, rhs])
+               let cstor =
+                 { T.cstor_id=c_id; cstor_ty=c_ty; cstor_args=ty_params; }
+               in
+               [cstor, vars, rhs])
        end)
     l
   in
   let missing =
     CCList.filter_map
       (fun (id,_) ->
-         if List.exists (fun (id',_,_) -> ID.equal id id') l
+         if List.exists (fun (c,_,_) -> ID.equal id c.T.cstor_id) l
          then None else Some id)
       data
   in

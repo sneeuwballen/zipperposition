@@ -18,8 +18,16 @@ type t = {
   ty : t option;
   loc : location option;
 }
+and term = t
+and ty = t
 
-and match_branch = ID.t * t Var.t list * t
+and match_cstor = {
+  cstor_id: ID.t;
+  cstor_ty: ty;
+  cstor_args: ty list;
+}
+
+and match_branch = match_cstor  * t Var.t list * t
 
 and view =
   | Var of t Var.t (** variable *)
@@ -35,8 +43,6 @@ and view =
   | Meta of meta_var (** Unification variable *)
 
 and meta_var = t Var.t * t option ref * [`Generalize | `BindDefault | `NoBind]
-
-type term = t
 
 let rec deref t = match t.term with
   | Meta (_, {contents=Some t'}, _) -> deref t'
@@ -112,8 +118,9 @@ let rec compare t1 t2 = match view t1, view t2 with
     CCOrd.( compare t1 t2
         <?> (list_ (pair Var.compare compare), l1, l2))
   | Match (u1,l1), Match (u2,l2) ->
-    let cmp_branch (s1,vars1,rhs1) (s2,vars2,rhs2) =
-      CCOrd.(ID.compare s1 s2
+    let cmp_branch (c1,vars1,rhs1) (c2,vars2,rhs2) =
+      CCOrd.(ID.compare c1.cstor_id c2.cstor_id
+        <?> (list_ compare, c1.cstor_args, c2.cstor_args)
         <?> (list_ Var.compare, vars1,vars2)
         <?> (compare,rhs1,rhs2))
     in
@@ -190,8 +197,9 @@ let rec pp out t = match view t with
         (Util.pp_list ~sep:" and " pp_binding) l pp u
   | Match (u, l) ->
       let pp_branch out (c,vars,rhs) =
-        Format.fprintf out "@[<2>case@ %a %a ->@ %a@]"
-          ID.pp c (Util.pp_list ~sep:" " Var.pp_fullc) vars pp rhs
+        Format.fprintf out "@[<2>case@ @[%a%a%a@] ->@ %a@]"
+          ID.pp c.cstor_id (Util.pp_list0 ~sep:" " pp) c.cstor_args
+          (Util.pp_list0 ~sep:" " Var.pp_fullc) vars pp rhs
       in
       Format.fprintf out "@[<hv>@[<hv2>match %a with@ %a@]@ end@]"
         pp u (Util.pp_list ~sep:" | " pp_branch) l
@@ -235,6 +243,7 @@ let make_ ?loc ~ty view = {term=view; loc; ty=Some ty; }
 let var ?loc v = make_ ?loc ~ty:v.Var.ty (Var v)
 let var_of_string ?loc ~ty n = var ?loc (Var.of_string ~ty n)
 let const ?loc ~ty s = make_ ?loc ~ty (Const s)
+let const_of_cstor ?loc c = const ?loc c.cstor_id ~ty:c.cstor_ty
 let app_builtin ?loc ~ty b l = make_ ?loc ~ty (AppBuiltin (b,l))
 let ite ?loc a b c =
   let ty = match b.ty with None -> assert false | Some ty -> ty in
@@ -1002,11 +1011,13 @@ let unify ?(allow_open=false) ?loc ?(st=UStack.create()) ?(subst=Subst.empty) t1
         unif_rec subst u1 u2;
         List.iter2
           (fun (c1,vars1,rhs1) (c2,vars2,rhs2) ->
-             if List.length vars1 = List.length vars2 then (
-               if not (ID.equal c1 c2)
+             if List.length vars1 = List.length vars2
+             && List.length c1.cstor_args = List.length c2.cstor_args then (
+               if not (ID.equal c1.cstor_id c2.cstor_id)
                then fail_
                    "constructors %a and %a are not compatible (subst {@[%a@]})"
-                   ID.pp c1 ID.pp c2 Subst.pp subst;
+                   ID.pp c1.cstor_id ID.pp c2.cstor_id Subst.pp subst;
+               unif_l subst c1.cstor_args c2.cstor_args;
                let subst = rename_vars_l subst vars1 vars2 in
                unif_rec subst rhs1 rhs2
              ) else
@@ -1156,7 +1167,8 @@ let rec erase t = match view t with
     let l =
       List.map
         (fun (c,vars,rhs) ->
-           let c = ID.to_string c in
+           (* type arguments of [c] are ignored as being implicit *)
+           let c = ID.to_string c.cstor_id in
            let vars = List.map (fun v -> STerm.V (Var.to_string v)) vars in
            let rhs = erase rhs in
            STerm.Match_case (c,vars,rhs))

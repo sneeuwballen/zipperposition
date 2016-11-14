@@ -163,6 +163,11 @@ val pp_pair :
 val pp_list : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
 (** Print a list without begin/end separators *)
 
+val pp_list0 : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
+(** Print a list with a whitespace in front if it's non empty, or
+    does nothing if the list is empty
+    Default separator is " " *)
+
 val ord_option : 'a CCOrd.t -> 'a option CCOrd.t
 
 val map_product : f:('a -> 'b list list) -> 'a list -> 'b list list

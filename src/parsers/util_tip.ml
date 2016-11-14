@@ -135,14 +135,14 @@ let conv_def ?loc decl body =
   in
   let def =
     let body = conv_term body in
-    T.forall ?loc vars (T.eq (T.app_const f vars_as_t) body)
+    T.forall ?loc vars (T.eq ?loc (T.app_const ?loc f vars_as_t) body)
   in
   UA.mk_def f ty_f [def]
 
 let convert (st:A.statement): UA.statement list =
-  Util.debugf 3 "convert TIP statement@ @[%a@]"
-    (fun k->k A.pp_stmt st);
   let loc = CCOpt.map conv_loc st.A.loc in
+  Util.debugf 3 "@[<2>convert TIP statement@ @[%a@]@,%a@]"
+    (fun k->k A.pp_stmt st ParseLocation.pp_opt loc);
   match st.A.stmt with
     | A.Stmt_decl_sort (s,i) ->
       let ty = T.fun_ty (CCList.init i (fun _ -> T.tType) ) T.tType in

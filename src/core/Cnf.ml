@@ -247,8 +247,8 @@ module Flatten = struct
             let case =
               let ty = T.ty_exn u in
               T.app ~ty
-                (T.const ~ty:(T.Ty.fun_ (List.map Var.ty c_vars) ty) c)
-                (List.map T.var c_vars)
+                (T.const_of_cstor c)
+                (c.T.cstor_args @ List.map T.var c_vars)
             in
             (* bind [x = c vars] *)
             let subst = T.Subst.add subst x case in
@@ -257,10 +257,6 @@ module Flatten = struct
             aux pos (c_vars@vars) rhs
           | _ ->
             (* give a name to the match *)
-            (* TODO: introduce new constant bundled with its definition:
-               one rule per case
-            let c = Skolem.create
-               *)
             let closure = T.free_vars t in
             let cases =
               of_list l >>= fun (cstor,c_vars,rhs) ->
@@ -268,8 +264,8 @@ module Flatten = struct
               get_subst >|= fun subst ->
               let case =
                 T.app ~ty:(T.ty_exn u)
-                  (T.const ~ty:(T.Ty.fun_ (List.map Var.ty c_vars) (T.ty_exn u)) cstor)
-                  (apply_subst_vars_ subst c_vars)
+                  (T.const_of_cstor cstor)
+                  (cstor.T.cstor_args @ apply_subst_vars_ subst c_vars)
               in
               apply_subst_vars_ subst closure @ [case], T.Subst.eval subst rhs
             in

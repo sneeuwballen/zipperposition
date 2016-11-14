@@ -10,8 +10,16 @@ type location = ParseLocation.t
 
 type t
 type term = t
+type ty = t
 
-type match_branch = ID.t * t Var.t list * t
+(** a constructor of given type, applied to a list of type argumentss *)
+type match_cstor = {
+  cstor_id: ID.t;
+  cstor_ty: ty;
+  cstor_args: ty list;
+}
+
+type match_branch = match_cstor  * t Var.t list * t
 
 type view = private
   | Var of t Var.t (** variable *)
@@ -53,6 +61,7 @@ val var : ?loc:location -> t Var.t -> t
 val var_of_string : ?loc:location -> ty:t -> string -> t
 val app : ?loc:location -> ty:t -> t -> t list -> t
 val const : ?loc:location -> ty:t -> ID.t -> t
+val const_of_cstor : ?loc:location -> match_cstor -> t
 val ite : ?loc:location -> t -> t -> t -> t
 val match_ : ?loc:location -> t -> match_branch list -> t
 val let_ : ?loc:location -> (t Var.t * t) list -> t -> t
