@@ -85,14 +85,11 @@ type term_definition = private {
 
 val define_term :
   ctx:ctx ->
-  vars:type_ Var.t list ->
   (term list * term) list ->
   term_definition
 (** [define_term l] introduces a new function symbol [f] that is
     defined by:
-    - for each [args, rhs] in [l], [f args = rhs]
-
-    @param vars the free variables of the new term *)
+    - for each [args, rhs] in [l], [f args = rhs] *)
 
 type definition =
   | Def_form of form_definition

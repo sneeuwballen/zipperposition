@@ -219,7 +219,7 @@ module Flatten = struct
               apply_subst_vars_ subst closure @ [F.false_], T.Subst.eval subst c
             in
             let rules = to_list' (cases_true <+> cases_false) in
-            let def = Skolem.define_term ~ctx ~vars:(closure) rules in
+            let def = Skolem.define_term ~ctx rules in
             aux Pos_toplevel vars a >|= fun a ->
             T.app ~ty:(T.ty_exn b)
               (T.const def.Skolem.td_id ~ty:def.Skolem.td_ty)
@@ -270,7 +270,7 @@ module Flatten = struct
               apply_subst_vars_ subst closure @ [case], T.Subst.eval subst rhs
             in
             let rules = to_list' cases in
-            let def = Skolem.define_term ~ctx ~vars:(closure) rules in
+            let def = Skolem.define_term ~ctx rules in
             (* now apply definition to [u] *)
             aux Pos_inner vars u >|= fun u ->
             T.app ~ty:(T.ty_exn t)

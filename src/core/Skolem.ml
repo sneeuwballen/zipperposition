@@ -155,7 +155,7 @@ let define_form ~ctx ~add_rules ~polarity form =
   Util.debugf ~section 5 "@[<2>define_form@ %a@]" (fun k->k pp_form_definition def);
   def
 
-let define_term ~ctx ~vars rules : term_definition =
+let define_term ~ctx rules : term_definition =
   let ty_args, ty_ret = match rules with
     | [] -> assert false
     | (args, rhs) :: _ ->
@@ -169,7 +169,7 @@ let define_term ~ctx ~vars rules : term_definition =
        assert (T.Ty.equal ty_ret (T.ty_exn rhs));
        ())
     rules;
-  let ty = T.Ty.fun_ (List.map Var.ty vars @ ty_args) ty_ret in
+  let ty = T.Ty.fun_ ty_args ty_ret in
   let is_prop = T.Ty.is_prop ty_ret in
   (* NOTE: not a skolem, just a mere constant undeclared so far *)
   let id = fresh_id ~ctx "fun_" in
