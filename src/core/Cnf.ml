@@ -768,9 +768,10 @@ let flatten ~ctx seq : _ Sequence.t =
     begin
       let vars, body = F.unfold_forall f in
       flatten_rec ctx Pos_toplevel vars body >>= fun body ->
-      let f = F.forall_l vars body in
       get_subst >|= fun subst ->
-      T.Subst.eval subst f
+      let vars = List.map (Var.update_ty ~f:(T.Subst.eval subst)) vars in
+      let body = T.Subst.eval subst body in
+      F.forall_l vars body
     end |> to_list'
   in
   let flatten_def d = match d with
