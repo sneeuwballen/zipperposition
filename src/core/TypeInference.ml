@@ -702,7 +702,7 @@ let constrain_term_type ?loc ctx t ty =
 
 (** {2 Statements} *)
 
-type typed_statement = (typed, typed, type_, UntypedAST.attrs) Statement.t
+type typed_statement = (typed, typed, type_) Statement.t
 
 module A = UntypedAST
 module Stmt = Statement
@@ -825,7 +825,7 @@ let infer_statement_exn ctx st =
   Util.debugf ~section 3 "@[<2>infer types for @{<yellow>statement@}@ `@[%a@]`@]"
     (fun k->k A.pp_statement st);
   (* auxiliary statements *)
-  let src = st.A.attrs in
+  let mk_src r = Stmt.Src.from_input st.A.attrs r in
   let loc = st.A.loc in
   let st = match st.A.stmt with
     | A.Include _ ->
@@ -836,10 +836,10 @@ let infer_statement_exn ctx st =
         let id = ID.make s in
         let ty = infer_ty_exn ctx ty in
         Ctx.declare ctx id ty;
-        Stmt.ty_decl ~src id ty
+        Stmt.ty_decl ~src:(mk_src Stmt.R_decl) id ty
     | A.Def l ->
         let l = infer_defs ?loc ctx l in
-        Stmt.def ~src l
+        Stmt.def ~src:(mk_src Stmt.R_def) l
     | A.Rewrite t ->
         let t =  infer_prop_ ctx t in
         begin match as_def ?loc Var.Set.empty t with
@@ -847,10 +847,10 @@ let infer_statement_exn ctx st =
             if T.Ty.returns_tType ty
             then error_ ?loc
                 "in definition of %a,@ equality between types is forbidden" ID.pp id;
-            Stmt.rewrite_term ~src (vars,id,ty,args,rhs)
+            Stmt.rewrite_term ~src:(mk_src Stmt.R_assert) (vars,id,ty,args,rhs)
           | `Prop (vars,lhs,rhs) ->
             assert (T.Ty.is_prop (T.ty_exn rhs));
-            Stmt.rewrite_form ~src (vars,lhs,[rhs])
+            Stmt.rewrite_form ~src:(mk_src Stmt.R_assert) (vars,lhs,[rhs])
         end
     | A.Data l ->
         (* declare the inductive types *)
@@ -900,22 +900,25 @@ let infer_statement_exn ctx st =
             data_types
         in
         Ctx.exit_scope ctx;
-        Stmt.data ~src l'
+        Stmt.data ~src:(mk_src Stmt.R_def) l'
     | A.Assert t ->
         let t = infer_prop_exn ctx t in
-        Stmt.assert_ ~src t
+        Stmt.assert_ ~src:(mk_src Stmt.R_assert) t
     | A.Lemma t ->
         let t = infer_prop_exn ctx t in
-        Stmt.lemma ~src [t]
+        Stmt.lemma ~src:(mk_src Stmt.R_assert) [t]
     | A.Goal t ->
         let t = infer_prop_exn ctx t in
-        Stmt.goal ~src t
+        Stmt.goal ~src:(mk_src Stmt.R_goal) t
   in
   (* be sure to bind the remaining meta variables *)
   Ctx.exit_scope ctx;
   let aux =
     Ctx.pop_new_types ctx
-    |> List.map (fun (id,ty) -> Stmt.ty_decl ~src:A.default_attrs id ty)
+    |> List.map
+      (fun (id,ty) ->
+         let src = Stmt.Src.from_input A.default_attrs Stmt.R_decl in
+         Stmt.ty_decl ~src id ty)
   in
   st, aux
 

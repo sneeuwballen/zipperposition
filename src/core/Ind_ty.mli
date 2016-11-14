@@ -81,7 +81,7 @@ val scan_for_constant : ID.t -> Type.t -> unit
 
 (** {6 Scan Declarations} *)
 
-val scan_stmt : (_, _, Type.t, _) Statement.t -> unit
+val scan_stmt : (_, _, Type.t) Statement.t -> unit
 (** [scan_stmt stmt] examines [stmt], and, if the statement is a
     declaration of inductive types or constants,
     it declares them using {!declare_ty} or {!declare_inductive_constant}. *)

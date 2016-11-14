@@ -140,7 +140,7 @@ val constrain_term_type : ?loc:loc -> Ctx.t -> untyped -> type_ -> unit or_error
 
 (** {2 Statements} *)
 
-type typed_statement = (typed, typed, type_, UntypedAST.attrs) Statement.t
+type typed_statement = (typed, typed, type_) Statement.t
 
 val infer_statement_exn :
   Ctx.t ->

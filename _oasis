@@ -61,7 +61,7 @@ Library "libzipperposition"
                     Ordering, Skolem, Cnf, ID, IDOrBuiltin, SLiteral,
                     Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,
                     Congruence, FeatureVector, UntypedAST, Ind_ty,
-                    TypedSTerm, Statement, StatementSrc,
+                    TypedSTerm, Statement,
                     lib/Hashcons, lib/ParseLocation, lib/Multiset, lib/LazyList,
                     lib/IArray, lib/AllocCache, lib/Multiset_intf
   CSources:         util_stubs.c, util_stubs.h

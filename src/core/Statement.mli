@@ -57,42 +57,69 @@ type ('f, 't, 'ty) view =
   | Goal of 'f (** goal to prove *)
   | NegatedGoal of 'ty skolem list * 'f list (** goal after negation, with skolems *)
 
-type ('f, 't, 'ty, 'meta) t = {
-  view: ('f, 't, 'ty) view;
-  attrs: attrs;
-  src: 'meta; (** additional data *)
+(* a statement in a file *)
+type from_file = {
+  file : string;
+  name : string option;
+  loc: ParseLocation.t option;
 }
 
-type ('f, 't, 'ty) sourced_t = ('f, 't, 'ty, StatementSrc.t) t
-
 type clause = FOTerm.t SLiteral.t list
-type clause_t = (clause, FOTerm.t, Type.t) sourced_t
 
-val view : ('f, 't, 'ty, _) t -> ('f, 't, 'ty) view
-val attrs : (_, _, _, _) t -> attrs
-val src : (_, _, _, 'src) t -> 'src
+type ('f, 't, 'ty) t = {
+  view: ('f, 't, 'ty) view;
+  attrs: attrs;
+  src: source;
+}
+
+and role =
+  | R_assert
+  | R_goal
+  | R_def
+  | R_decl
+
+and source = private {
+  src_id: int;
+  src_view: source_view;
+}
+and source_view =
+  | Input of UntypedAST.attrs * role
+  | From_file of from_file * role
+  | Internal of role
+  | Neg of sourced_t
+  | CNF of sourced_t
+
+and result =
+  | Sourced_input of TypedSTerm.t
+  | Sourced_clause of clause
+
+and sourced_t = result * source
+
+type input_t = (TypedSTerm.t, TypedSTerm.t, TypedSTerm.t) t
+type clause_t = (clause, FOTerm.t, Type.t) t
+
+val view : ('f, 't, 'ty) t -> ('f, 't, 'ty) view
+val attrs : (_, _, _) t -> attrs
+val src : (_, _, _) t -> source
 
 val mk_data : ID.t -> args:'ty Var.t list -> 'ty -> (ID.t * 'ty) list -> 'ty data
 val mk_def : ?rewrite:bool -> ID.t -> 'ty -> ('f,'t,'ty) def_rule list -> ('f,'t,'ty) def
 
-val ty_decl : ?attrs:attrs -> src:'src -> ID.t -> 'ty -> (_, _, 'ty, 'src) t
-val def : ?attrs:attrs -> src:'src -> ('f,'t,'ty) def list -> ('f, 't, 'ty, 'src) t
-val rewrite_term : ?attrs:attrs -> src:'src -> ('t, 'ty) term_rule -> (_, 't, 'ty, 'src) t
-val rewrite_form : ?attrs:attrs -> src:'src -> ('f, 't, 'ty) form_rule -> ('f, 't, 'ty, 'src) t
-val data : ?attrs:attrs -> src:'src -> 'ty data list -> (_, _, 'ty, 'src) t
-val assert_ : ?attrs:attrs -> src:'src -> 'f -> ('f, _, _, 'src) t
-val lemma : ?attrs:attrs -> src:'src -> 'f list -> ('f, _, _, 'src) t
-val goal : ?attrs:attrs -> src:'src -> 'f -> ('f, _, _, 'src) t
+val ty_decl : ?attrs:attrs -> src:source -> ID.t -> 'ty -> (_, _, 'ty) t
+val def : ?attrs:attrs -> src:source -> ('f,'t,'ty) def list -> ('f, 't, 'ty) t
+val rewrite_term : ?attrs:attrs -> src:source -> ('t, 'ty) term_rule -> (_, 't, 'ty) t
+val rewrite_form : ?attrs:attrs -> src:source -> ('f, 't, 'ty) form_rule -> ('f, 't, 'ty) t
+val data : ?attrs:attrs -> src:source -> 'ty data list -> (_, _, 'ty) t
+val assert_ : ?attrs:attrs -> src:source -> 'f -> ('f, _, _) t
+val lemma : ?attrs:attrs -> src:source -> 'f list -> ('f, _, _) t
+val goal : ?attrs:attrs -> src:source -> 'f -> ('f, _, _) t
 val neg_goal :
-  ?attrs:attrs -> src:'src -> skolems:'ty skolem list -> 'f list -> ('f, _, 'ty, 'src) t
+  ?attrs:attrs -> src:source -> skolems:'ty skolem list -> 'f list -> ('f, _, 'ty) t
 
-val signature : ?init:Signature.t -> (_, _, Type.t, _) t Sequence.t -> Signature.t
+val signature : ?init:Signature.t -> (_, _, Type.t) t Sequence.t -> Signature.t
 (** Compute signature when the types are using {!Type} *)
 
-val add_src :
-  file:string ->
-  ('f, 't, 'ty, UntypedAST.attrs) t ->
-  ('f, 't, 'ty, StatementSrc.t) t
+val add_src : file:string -> ('f, 't, 'ty) t -> ('f, 't, 'ty) t
 
 val map_data : ty:('ty1 -> 'ty2) -> 'ty1 data -> 'ty2 data
 
@@ -107,10 +134,8 @@ val map :
   form:('f1 -> 'f2) ->
   term:('t1 -> 't2) ->
   ty:('ty1 -> 'ty2) ->
-  ('f1, 't1, 'ty1, 'src) t ->
-  ('f2, 't2, 'ty2, 'src) t
-
-val map_src : f:('a -> 'b) -> ('f, 't, 'ty, 'a) t -> ('f, 't, 'ty, 'b) t
+  ('f1, 't1, 'ty1) t ->
+  ('f2, 't2, 'ty2) t
 
 (** {2 Defined Constants} *)
 
@@ -125,8 +150,46 @@ val declare_defined_cst : ID.t -> level:int -> unit
     constant of given [level]. It means that it is defined based only
     on constants of strictly lower levels *)
 
-val scan_stmt_for_defined_cst : (clause, FOTerm.t, _, _) t -> unit
+val scan_stmt_for_defined_cst : (clause, FOTerm.t, _) t -> unit
 (** Try and declare defined constants in the given statement *)
+
+(** {2 Sourced Statements} *)
+
+(** {2 Statement Source}
+
+    Where a statement originally comes from (file, location, named statement,
+    or result of some transformations, etc.) *)
+module Src : sig
+  type t = source
+
+  val equal : t -> t -> bool
+  val hash : t -> int
+
+  val view : t -> source_view
+
+  val file : from_file -> string
+  val name : from_file -> string option
+  val loc : from_file -> ParseLocation.t option
+
+  val from_input : UntypedAST.attrs -> role -> t
+
+  val from_file : ?loc:ParseLocation.t -> ?name:string -> string -> role -> t
+  (** make a new sourced item. Default [is_conjecture] is [false]. *)
+
+  val internal : role -> t
+
+  val neg : sourced_t -> t
+  val cnf : sourced_t -> t
+
+  val neg_input : TypedSTerm.t -> source -> t
+  val neg_clause : clause -> source -> t
+
+  val cnf_input : TypedSTerm.t -> source -> t
+  val cnf_clause : clause -> source -> t
+
+  val pp_from_file : from_file CCFormat.printer
+  (* include Interfaces.PRINT with type t := t *)
+end
 
 (**/**)
 exception Payload_defined_cst of int
@@ -137,11 +200,11 @@ exception Payload_defined_cst of int
 (** {2 Iterators} *)
 
 module Seq : sig
-  val ty_decls : (_, _, 'ty, _) t -> (ID.t * 'ty) Sequence.t
-  val forms : ('f, _, _, _) t -> 'f Sequence.t
-  val lits : (clause, _, _, _) t -> FOTerm.t SLiteral.t Sequence.t
-  val terms : (clause, _, _, _) t -> FOTerm.t Sequence.t
-  val symbols : (clause, FOTerm.t, Type.t, _) t -> ID.t Sequence.t
+  val ty_decls : (_, _, 'ty) t -> (ID.t * 'ty) Sequence.t
+  val forms : ('f, _, _) t -> 'f Sequence.t
+  val lits : (clause, _, _) t -> FOTerm.t SLiteral.t Sequence.t
+  val terms : (clause, _, _) t -> FOTerm.t Sequence.t
+  val symbols : (clause, FOTerm.t, Type.t) t -> ID.t Sequence.t
 end
 
 (** {2 IO} *)
@@ -161,19 +224,19 @@ val pp :
   'a CCFormat.printer ->
   'b CCFormat.printer ->
   'c CCFormat.printer ->
-  ('a,'b,'c,_) t CCFormat.printer
+  ('a,'b,'c) t CCFormat.printer
 
 val to_string :
   'a CCFormat.printer ->
   'b CCFormat.printer ->
   'c CCFormat.printer ->
-  ('a,'b,'c,_) t ->
+  ('a,'b,'c) t ->
   string
 
 val pp_clause : clause_t CCFormat.printer
 
 module TPTP : sig
-  include Interfaces.PRINT3 with type ('a, 'b, 'c) t := ('a, 'b, 'c) sourced_t
+  include Interfaces.PRINT3 with type ('a, 'b, 'c) t := ('a, 'b, 'c) t
 end
 
 

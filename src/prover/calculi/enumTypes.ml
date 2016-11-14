@@ -109,7 +109,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     decl_var : Type.t HVar.t; (* x = ... *)
     decl_cases : term list; (* ... t1 | t2 | ... | tn *)
     decl_proof :
-      [ `Data of StatementSrc.t * Type.t Statement.data
+      [ `Data of Statement.source * Type.t Statement.data
       | `Clause of ProofStep.of_
       ]; (* justification for the enumeration axiom *)
     mutable decl_symbols : ID.Set.t; (* set of declared symbols for t1,...,tn *)

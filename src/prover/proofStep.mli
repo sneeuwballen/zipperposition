@@ -13,6 +13,8 @@ type 'a sequence = ('a -> unit) -> unit
 
 val section : Util.Section.t
 
+type statement_src = Statement.source
+
 type rule_info =
   | I_subst of Substs.t
   | I_pos of Position.t
@@ -35,9 +37,9 @@ type kind =
   | Inference of rule
   | Simplification of rule
   | Esa of rule
-  | Assert of StatementSrc.t
-  | Goal of StatementSrc.t
-  | Data of StatementSrc.t * Type.t Statement.data
+  | Assert of statement_src
+  | Goal of statement_src
+  | Data of statement_src * Type.t Statement.data
   | Trivial (** trivial, or trivial within theories *)
 
 type result =
@@ -82,11 +84,11 @@ module PTbl : CCHashtbl.S with type key = of_
 
 val mk_trivial : t
 
-val mk_data : StatementSrc.t -> Type.t Statement.data -> t
+val mk_data : statement_src -> Type.t Statement.data -> t
 
-val mk_assert : StatementSrc.t -> t
+val mk_assert : statement_src -> t
 
-val mk_goal : StatementSrc.t -> t
+val mk_goal : statement_src -> t
 
 val mk_assert' : ?loc:Loc.t -> file:string -> name:string -> unit -> t
 
@@ -141,8 +143,8 @@ val distance_to_goal : t -> int option
 
 val pp_rule : info:bool -> rule CCFormat.printer
 
-val pp_src : StatementSrc.t CCFormat.printer
-val pp_src_tstp : StatementSrc.t CCFormat.printer
+val pp_src : statement_src CCFormat.printer
+val pp_src_tstp : statement_src CCFormat.printer
 
 val pp_kind : kind CCFormat.printer
 val pp_kind_tstp : kind CCFormat.printer

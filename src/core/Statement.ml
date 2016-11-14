@@ -52,16 +52,46 @@ type ('f, 't, 'ty) view =
   | Goal of 'f (** goal to prove *)
   | NegatedGoal of 'ty skolem list * 'f list (** goal after negation, with skolems *)
 
-type ('f, 't, 'ty, 'meta) t = {
-  view: ('f, 't, 'ty) view;
-  attrs: attrs;
-  src: 'meta; (** additional data *)
+(* a statement in a file *)
+type from_file = {
+  file : string;
+  name : string option;
+  loc: ParseLocation.t option;
 }
 
-type ('f, 't, 'ty) sourced_t = ('f, 't, 'ty, StatementSrc.t) t
-
 type clause = FOTerm.t SLiteral.t list
-type clause_t = (clause, FOTerm.t, Type.t) sourced_t
+
+type ('f, 't, 'ty) t = {
+  view: ('f, 't, 'ty) view;
+  attrs: attrs;
+  src: source;
+}
+
+and role =
+  | R_assert
+  | R_goal
+  | R_def
+  | R_decl
+
+and source = {
+  src_id: int;
+  src_view: source_view;
+}
+and source_view =
+  | Input of UntypedAST.attrs * role
+  | From_file of from_file * role
+  | Internal of role
+  | Neg of sourced_t
+  | CNF of sourced_t
+
+and result =
+  | Sourced_input of TypedSTerm.t
+  | Sourced_clause of clause
+
+and sourced_t = result * source
+
+type input_t = (TypedSTerm.t, TypedSTerm.t, TypedSTerm.t) t
+type clause_t = (clause, FOTerm.t, Type.t) t
 
 let view t = t.view
 let attrs t = t.attrs
@@ -131,7 +161,53 @@ let map ~form ~term ~ty st =
   in
   {st with view = map_view ~form ~term ~ty st.view; }
 
-let map_src ~f st = {st with src=f st.src; }
+(** {2 Statement Source} *)
+
+module Src = struct
+  type t = source
+
+  let file x = x.file
+  let name x = x.name
+  let loc x = x.loc
+
+  let equal a b = a.src_id = b.src_id
+  let hash a = a.src_id
+  let view a = a.src_view
+
+  let mk_ =
+    let n = ref 0 in
+    fun src_view -> {src_view; src_id=CCRef.get_then_incr n}
+
+  let from_input attrs r : t = mk_ (Input (attrs, r))
+  let from_file ?loc ?name file r : t = mk_ (From_file ({ name; loc; file; }, r))
+  let internal r : t = mk_ (Internal r)
+  let neg x : t = mk_ (Neg x)
+  let cnf x : t = mk_ (CNF x)
+
+  let neg_input f src = neg (Sourced_input f, src)
+  let neg_clause c src = neg (Sourced_clause c, src)
+
+  let cnf_input f src = cnf (Sourced_input f, src)
+  let cnf_clause c src = cnf (Sourced_clause c, src)
+
+  let pp_from_file out x =
+    let pp_name out = function
+      | None -> ()
+      | Some n -> Format.fprintf out "at %s " n
+    in
+    Format.fprintf out "@[<2>%ain@ `%s`@,%a@]"
+      pp_name x.name x.file ParseLocation.pp_opt x.loc
+
+  (*
+  let rec pp out t =
+    match t with
+      | From_file x -> pp_from_file out x
+      | Neg t -> Format.fprintf out "@[<2>neg(%a)@]" pp t
+      | CNF t -> Format.fprintf out "@[<2>cnf(%a)@]" pp t
+
+  let to_string = CCFormat.to_string pp
+     *)
+end
 
 (** {2 Defined Constants} *)
 
@@ -171,7 +247,7 @@ let max_exn seq =
   |> Sequence.max
   |> CCOpt.get_lazy (fun () -> assert false)
 
-let scan_stmt_for_defined_cst (st:(clause,FOTerm.t,_,_) t): unit = match view st with
+let scan_stmt_for_defined_cst (st:(clause,FOTerm.t,_) t): unit = match view st with
   | Def [] -> assert false
   | Def l ->
     (* define all IDs at the same level (the max of those computed) *)
@@ -294,21 +370,23 @@ let signature ?(init=Signature.empty) seq =
   |> Sequence.flat_map Seq.ty_decls
   |> Sequence.fold (fun sigma (id,ty) -> Signature.declare sigma id ty) init
 
-let add_src ~file st =
-  let module A = UntypedAST in
-  let attrs =
-    CCList.filter_map
-      (function A.A_AC -> Some A_AC | A.A_name _ -> None)
-      st.src
-  and name =
-    CCList.find_map
-      (function A.A_name n-> Some n | _ -> None)
-      st.src
-  in
-  { st with
-      src=StatementSrc.from_file ?name file;
-      attrs;
-  }
+let add_src ~file st = match st.src.src_view with
+  | Input (attrs,r) ->
+    let module A = UntypedAST in
+    let attrs =
+      CCList.filter_map
+        (function A.A_AC -> Some A_AC | A.A_name _ -> None)
+        attrs
+    and name =
+      CCList.find_map
+        (function A.A_name n-> Some n | _ -> None)
+        attrs
+    in
+    { st with
+        src=Src.from_file ?name file r;
+        attrs;
+    }
+  | _ -> st
 
 (** {2 IO} *)
 
@@ -379,8 +457,8 @@ let pp_clause =
 
 module TPTP = struct
   let pp ppf ppt ppty out st =
-    let name = match st.src with
-      | StatementSrc.From_file f -> CCOpt.get "no_name" (StatementSrc.name f)
+    let name = match st.src.src_view with
+      | From_file (f,_) -> CCOpt.get "no_name" (Src.name f)
       | _ -> "no_name"
     in
     let pp_decl out (id,ty) =

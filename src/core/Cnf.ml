@@ -716,7 +716,7 @@ type options =
   | PostNNF of (form -> form)  (** any processing that keeps negation at leaves *)
   | PostSkolem of (form -> form) (** must not introduce variables nor negations *)
 
-let new_defs ~ctx src : (_,_,_,_) Stmt.t list =
+let new_defs ~ctx src : (_,_,_) Stmt.t list =
   let defs = Skolem.pop_new_definitions ~ctx in
   List.map
     (function
@@ -882,16 +882,16 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
   Util.exit_prof prof_simplify_rename;
   res
 
-type 'a f_statement = (term, term, type_, 'a) Statement.t
+type f_statement = (term, term, type_) Statement.t
 (** A statement before CNF *)
 
-type 'a c_statement = (clause, term, type_, 'a) Statement.t
+type c_statement = (clause, term, type_) Statement.t
 (** A statement after CNF *)
 
 let id_ x = x
 
 (* Transform the clauses into proper CNF; returns a list of clauses *)
-let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) ?(neg_src=id_) ?(cnf_src=id_) seq =
+let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) seq =
   (* read options *)
   let disable_renaming = List.mem DisableRenaming opts in
   let preprocess =
@@ -915,7 +915,7 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) ?(neg_src=id_) ?(cnf_src=id_) 
   (* reduce the new formulas to CNF *)
   let res = CCVector.create () in
   (* convert formula into CNF, returning a list of clauses and a list of skolems *)
-  let conv_form_sk ~src f : (ID.t * type_) list * clause list =
+  let conv_form_sk f : (ID.t * type_) list * clause list =
     Util.debugf ~section 4 "@[<2>reduce@ `@[%a@]`@ to CNF@]" (fun k->k T.pp f);
     let clauses =
       try as_cnf f
@@ -938,16 +938,19 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) ?(neg_src=id_) ?(cnf_src=id_) 
         clauses
     in
     let new_ids = Skolem.pop_new_skolem_symbols ~ctx in
+    let src = Stmt.Src.internal Stmt.R_decl in
     List.iter
       (fun (id,ty) -> CCVector.push res (Stmt.ty_decl ~src id ty))
       new_ids;
     new_ids, clauses
   in
-  let conv_form ~src f = snd (conv_form_sk ~src f) in
+  let conv_form f =
+    snd (conv_form_sk f)
+  in
   CCVector.iter
     (fun st ->
-      let src = st.Stmt.src in
       let attrs = Stmt.attrs st in
+      let src = Stmt.src st in
       match st.Stmt.view with
       | Stmt.Def l ->
         let l =
@@ -959,8 +962,8 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) ?(neg_src=id_) ?(cnf_src=id_) 
                    (function
                      | Stmt.Def_term _ as d -> [d]
                      | Stmt.Def_form (vars,lhs,rhs) ->
-                       let c_pos = CCList.flat_map (conv_form ~src) rhs in
-                       let c_neg = conv_form ~src (F.not_ (F.and_ rhs)) in
+                       let c_pos = CCList.flat_map conv_form rhs in
+                       let c_neg = conv_form (F.not_ (F.and_ rhs)) in
                        [ Stmt.Def_form (vars,lhs,c_pos);
                          Stmt.Def_form (vars,SLiteral.negate lhs,c_neg);
                        ])
@@ -976,45 +979,46 @@ let cnf_of_seq ?(opts=[]) ?(ctx=Skolem.create ()) ?(neg_src=id_) ?(cnf_src=id_) 
              one negative.
              positive:   lhs <=> cnf(rhs)
              negative: ¬ lhs <=> cnf(¬ rhs) *)
-          let src = cnf_src src in
-          let c_pos = CCList.flat_map (conv_form ~src) rhs in
+          let c_pos = CCList.flat_map conv_form rhs in
           CCVector.push res (Stmt.rewrite_form ~attrs ~src (vars,lhs,c_pos));
-          let c_neg = conv_form ~src (F.not_ (F.and_ rhs)) in
+          let c_neg = conv_form (F.not_ (F.and_ rhs)) in
           CCVector.push res (Stmt.rewrite_form ~attrs ~src (vars,SLiteral.negate lhs,c_neg));
       | Stmt.Data l ->
           CCVector.push res (Stmt.data ~attrs ~src l)
       | Stmt.TyDecl (id,ty) ->
           CCVector.push res (Stmt.ty_decl ~attrs ~src id ty)
       | Stmt.Assert f ->
-          let src = cnf_src src in
+          let src_cnf = Stmt.Src.cnf_input f src in
           List.iter
-            (fun c -> CCVector.push res (Stmt.assert_ ~attrs ~src c))
-            (conv_form ~src f)
+            (fun c -> CCVector.push res (Stmt.assert_ ~attrs ~src:src_cnf c))
+            (conv_form f)
       | Stmt.Lemma l ->
-          let src = src |> cnf_src in
-          let l = CCList.flat_map (conv_form ~src) l in
-          CCVector.push res (Stmt.lemma ~attrs ~src l)
+          let src_cnf = Stmt.Src.cnf_input (F.and_ l) src in
+          let l = CCList.flat_map conv_form l in
+          CCVector.push res (Stmt.lemma ~attrs ~src:src_cnf l)
       | Stmt.Goal f ->
-          let src = src |> neg_src |> cnf_src in
-          let skolems, l = conv_form_sk ~src (F.not_ f) in
-          CCVector.push res (Stmt.neg_goal ~attrs ~src ~skolems l)
+          (* intermediate statement to represent the negation step *)
+          let not_f = F.not_ f in
+          let src_cnf = Stmt.Src.cnf_input not_f (Stmt.Src.neg_input f src) in
+          let skolems, l = conv_form_sk not_f in
+          CCVector.push res (Stmt.neg_goal ~attrs ~src:src_cnf ~skolems l)
       | Stmt.NegatedGoal (sk1,l) ->
-          let src = cnf_src src in
+          let src_cnf = Stmt.Src.cnf_input (F.and_ l) src in
           let skolems, l =
             CCList.fold_flat_map
               (fun sk f ->
-                 let sk', clauses = conv_form_sk ~src f in
-                  List.rev_append sk' sk, clauses)
+                 let sk', clauses = conv_form_sk f in
+                 List.rev_append sk' sk, clauses)
               sk1 l
           in
-          CCVector.push res (Stmt.neg_goal ~attrs ~src ~skolems l)
+          CCVector.push res (Stmt.neg_goal ~attrs ~src:src_cnf ~skolems l)
     )
     v;
   (* return final vector of clauses *)
   CCVector.freeze res
 
-let cnf_of ?opts ?ctx ?neg_src ?cnf_src st =
-  cnf_of_seq ?opts ?ctx ?neg_src ?cnf_src (Sequence.return st)
+let cnf_of ?opts ?ctx st =
+  cnf_of_seq ?opts ?ctx (Sequence.return st)
 
 let pp_f_statement out st = Statement.pp T.pp T.pp T.pp out st
 

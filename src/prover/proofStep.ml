@@ -7,12 +7,15 @@ open Libzipperposition
 
 module Loc = ParseLocation
 module Hash = CCHash
+module Stmt = Statement
 
 type form = TypedSTerm.t
 type bool_lit = BBox.Lit.t
 type 'a sequence = ('a -> unit) -> unit
 
 let section = Util.Section.make ~parent:Const.section "proof"
+
+type statement_src = Statement.source
 
 type rule_info =
   | I_subst of Substs.t
@@ -42,9 +45,9 @@ type kind =
   | Inference of rule
   | Simplification of rule
   | Esa of rule
-  | Assert of StatementSrc.t
-  | Goal of StatementSrc.t
-  | Data of StatementSrc.t * Type.t Statement.data
+  | Assert of statement_src
+  | Goal of statement_src
+  | Data of statement_src * Type.t Statement.data
   | Trivial (** trivial, or trivial within theories *)
 
 type result =
@@ -142,11 +145,11 @@ let mk_assert src = mk_step_ (Assert src) []
 let mk_goal src = mk_step_ (Goal src) []
 
 let mk_assert' ?loc ~file ~name () =
-  let src = StatementSrc.from_file ?loc ~name file in
+  let src = Stmt.Src.from_file ?loc ~name file Stmt.R_assert in
   mk_assert src
 
 let mk_goal' ?loc ~file ~name () =
-  let src = StatementSrc.from_file ?loc ~name file in
+  let src = Stmt.Src.from_file ?loc ~name file Stmt.R_goal in
   mk_goal src
 
 let mk_inference ~rule parents =
@@ -216,21 +219,21 @@ let pp_rule ~info out r =
   then Format.fprintf out "@[%s%a@]" r.rule_name (pp_list pp_info) r.rule_info
   else Format.fprintf out "'%s'" r.rule_name
 
-let rec pp_src_tstp out =
-  let module Src = StatementSrc in
-  function
-    | Src.From_file src ->
-      let file = src.Src.file in
-      begin match src.Src.name with
-        | None -> Format.fprintf out "file('%s')" file
-        | Some name -> Format.fprintf out "file('%s', '%s')" file name
-      end
-    | Src.Neg src' ->
-      Format.fprintf out "inference(@['negate_goal',@ [status(thm)],@ [%a]@])"
-        pp_src_tstp src'
-    | Src.CNF src' ->
-      Format.fprintf out "inference(@['clausify',@ [status(esa)],@ [%a]@])"
-        pp_src_tstp src'
+let rec pp_src_tstp out src = match Stmt.Src.view src with
+  | Stmt.Internal _
+  | Stmt.Input _ -> ()
+  | Stmt.From_file (src,_) ->
+    let file = src.Stmt.file in
+    begin match src.Stmt.name with
+      | None -> Format.fprintf out "file('%s')" file
+      | Some name -> Format.fprintf out "file('%s', '%s')" file name
+    end
+  | Stmt.Neg (_,src') ->
+    Format.fprintf out "inference(@['negate_goal',@ [status(thm)],@ [%a]@])"
+      pp_src_tstp src'
+  | Stmt.CNF (_,src') ->
+    Format.fprintf out "inference(@['clausify',@ [status(esa)],@ [%a]@])"
+      pp_src_tstp src'
 
 let pp_kind_tstp out k =
   match k with
@@ -246,19 +249,19 @@ let pp_kind_tstp out k =
   | Trivial ->
       Format.fprintf out "trivial([status(thm)])"
 
-let rec pp_src out src =
-  let module Src = StatementSrc in
-  match src with
-    | Src.From_file src ->
-      let file = src.Src.file in
-      begin match src.Src.name with
-        | None -> Format.fprintf out "'%s'" file
-        | Some name -> Format.fprintf out "'%s' in '%s'" name file
-      end
-    | Src.Neg src' ->
-      Format.fprintf out "(@[neg@ %a@])" pp_src src'
-    | Src.CNF src' ->
-      Format.fprintf out "(@[CNF@ %a@])" pp_src src'
+let rec pp_src out src = match Stmt.Src.view src with
+  | Stmt.Internal _
+  | Stmt.Input _ -> ()
+  | Stmt.From_file (src,_) ->
+    let file = src.Stmt.file in
+    begin match src.Stmt.name with
+      | None -> Format.fprintf out "'%s'" file
+      | Some name -> Format.fprintf out "'%s' in '%s'" name file
+    end
+  | Stmt.Neg (_,src') ->
+    Format.fprintf out "(@[neg@ %a@])" pp_src src'
+  | Stmt.CNF (_,src') ->
+    Format.fprintf out "(@[CNF@ %a@])" pp_src src'
 
 let pp_kind out k =
   match k with

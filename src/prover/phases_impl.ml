@@ -90,7 +90,7 @@ let cnf ~file decls =
     decls
     |> CCVector.to_seq
     |> Sequence.map (Statement.add_src ~file)
-    |> Cnf.cnf_of_seq ~neg_src:StatementSrc.neg ~cnf_src:StatementSrc.cnf
+    |> Cnf.cnf_of_seq
     |> CCVector.to_seq
     |> Cnf.convert
   in

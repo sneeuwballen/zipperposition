@@ -11,6 +11,7 @@ module T = FOTerm
 module S = Substs
 module Lit = Literal
 module Lits = Literals
+module Stmt = Statement
 
 let stat_clause_create = Util.mk_stat "clause.create"
 let prof_clause_create = Util.mk_profiler "clause_create"
@@ -127,25 +128,62 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let proof = ProofStep.mk_assert' ~file ~name () in
     create ~trail:Trail.empty lits proof
 
+  let rule_neg_ = ProofStep.mk_rule ~comment:["negate goal to find a refutation"] "neg_goal"
+  let rule_cnf_ = ProofStep.mk_rule "cnf"
+
+  module Src_tbl = CCHashtbl.Make(struct
+      type t = Stmt.source
+      let equal = Stmt.Src.equal
+      let hash = Stmt.Src.hash
+    end)
+
+  (* used to share the same SClause.t in the proof *)
+  let input_proof_tbl_ : ProofStep.t Src_tbl.t = Src_tbl.create 32
+
+  let rec proof_of_stmt src =
+    try Src_tbl.find input_proof_tbl_ src
+    with Not_found ->
+      let p = match Stmt.Src.view src with
+        | Stmt.Input (_, Stmt.R_goal) -> ProofStep.mk_goal src
+        | Stmt.Input (_, _) -> ProofStep.mk_assert src
+        | Stmt.From_file (_, Stmt.R_goal) -> ProofStep.mk_goal src
+        | Stmt.From_file (_, _) -> ProofStep.mk_assert src
+        | Stmt.Internal _ -> ProofStep.mk_trivial
+        | Stmt.Neg srcd -> ProofStep.mk_esa ~rule:rule_neg_ [proof_of_sourced srcd]
+        | Stmt.CNF srcd -> ProofStep.mk_esa ~rule:rule_cnf_ [proof_of_sourced srcd]
+      in
+      Src_tbl.add input_proof_tbl_ src p;
+      p
+
+  and proof_of_sourced (res, src) =
+    let p = proof_of_stmt src in
+    begin match res with
+      | Stmt.Sourced_input f ->
+        ProofStep.mk_f p f
+      | Stmt.Sourced_clause c ->
+        let lits = List.map Ctx.Lit.of_form c |> Array.of_list in
+        let c = SClause.make ~trail:Trail.empty lits in
+        ProofStep.mk_c p c
+    end
+
   let of_statement st =
-    let of_lits ~is_goal lits =
+    let of_lits lits =
       (* convert literals *)
       let lits = List.map Ctx.Lit.of_form lits in
-      let src = Statement.src st in
-      let proof = if is_goal then ProofStep.mk_goal src else ProofStep.mk_assert src in
+      let proof = proof_of_stmt (Stmt.src st) in
       let c = create ~trail:Trail.empty lits proof in
       c
     in
-    match Statement.view st with
-    | Statement.Data _
-    | Statement.TyDecl _ -> []
-    | Statement.Def _
-    | Statement.RewriteForm _
-    | Statement.RewriteTerm _ -> [] (* dealt with by rewriting *)
-    | Statement.Assert lits -> [of_lits ~is_goal:false lits]
-    | Statement.Goal lits -> [of_lits ~is_goal:true lits]
-    | Statement.Lemma l
-    | Statement.NegatedGoal (_,l) -> List.map (of_lits ~is_goal:true) l
+    match Stmt.view st with
+    | Stmt.Data _
+    | Stmt.TyDecl _ -> []
+    | Stmt.Def _
+    | Stmt.RewriteForm _
+    | Stmt.RewriteTerm _ -> [] (* dealt with by rewriting *)
+    | Stmt.Assert lits -> [of_lits lits]
+    | Stmt.Goal lits -> [of_lits lits]
+    | Stmt.Lemma l
+    | Stmt.NegatedGoal (_,l) -> List.map of_lits l
 
   let update_trail f c =
     let sclause = SClause.update_trail f c.sclause in
