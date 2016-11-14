@@ -736,11 +736,6 @@ module Subst = struct
 
   let merge a b = Var.Subst.merge a b
 
-  let rename_var subst v =
-    let v' = Var.copy v in
-    let subst = add subst v (var v') in
-    subst, v'
-
   let rec eval subst t = match view t with
     | Var v ->
         begin try
@@ -801,6 +796,12 @@ module Subst = struct
         meta ?loc:t.loc (v, r, k)
   and eval_list subst l =
     List.map (eval subst) l
+
+  (* rename variable and evaluate its type *)
+  and rename_var subst v =
+    let v' = Var.copy v |> Var.update_ty ~f:(eval subst) in
+    let subst = add subst v (var v') in
+    subst, v'
 end
 
 (** {2 Substitutions, Unification} *)
