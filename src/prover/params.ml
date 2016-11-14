@@ -19,6 +19,7 @@ type t = {
   param_dot_file : string option; (** file to print the final state in *)
   param_dot_sat : bool; (** Print saturated set into DOT? *)
   param_dot_all_roots : bool;
+  param_def_as_rewrite: bool;
   param_expand_def : bool; (** expand definitions *)
   param_stats : bool;
   param_presaturate : bool; (** initial interreduction of proof state? *)
@@ -37,6 +38,7 @@ and dot_all_roots = ref false
 and expand_def = ref false
 and select = ref "SelectComplex"
 and unary_depth = ref 1
+and def_as_rewrite = ref false
 and files = CCVector.create ()
 
 (** parse_args returns parameters *)
@@ -60,6 +62,7 @@ let parse_args () =
     ; "--color", Arg.Bool CCFormat.set_color_default, " enable/disable ANSI color codes"
     ; "--seed", Arg.Set_int seed, " set random seed"
     ; "--unary-depth", Arg.Set_int unary_depth, " maximum depth for successive unary inferences"
+    ; "--def-as-rewrite", Arg.Set def_as_rewrite, " treat definitions are rewrite rules"
     ] @ Options.make ()
   ) |> List.sort (fun (s1,_,_)(s2,_,_) -> String.compare s1 s2)
     |> Arg.align
@@ -72,7 +75,7 @@ let parse_args () =
   { param_ord= !ord; param_seed = !seed; param_steps = !steps;
     param_version= !version; param_timeout = !timeout;
     param_files = files; param_select = !select;
-    param_stats= ! Options.stats;
+    param_stats= ! Options.stats; param_def_as_rewrite= !def_as_rewrite;
     param_presaturate = !presaturate; param_dot_all_roots= !dot_all_roots;
     param_dot_file = !dot_file;
     param_unary_depth= !unary_depth; param_dot_sat= !dot_sat;

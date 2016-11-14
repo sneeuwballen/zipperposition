@@ -76,7 +76,9 @@ let parse_file file =
 
 let typing stmts =
   Phases.start_phase Phases.Typing >>= fun () ->
-  TypeInference.infer_statements ?ctx:None stmts >>?= fun stmts ->
+  Phases.get_key Params.key >>= fun params ->
+  let def_as_rewrite = params.Params.param_def_as_rewrite in
+  TypeInference.infer_statements ~def_as_rewrite ?ctx:None stmts >>?= fun stmts ->
   do_extensions ~field:(fun e -> e.Extensions.post_typing_actions)
     ~x:stmts >>= fun () ->
   Phases.return_phase stmts
@@ -364,7 +366,7 @@ let process_file file =
   (* compute signature, precedence, ordering *)
   let signature = Statement.signature (CCVector.to_seq stmts) in
   Util.debugf ~section 1 "@[<2>signature:@ @[<hv>%a@]@]" (fun k->k Signature.pp signature);
-  Util.debugf ~section 1 "(@[classification:@ %a@])"
+  Util.debugf ~section 2 "(@[classification:@ %a@])"
     (fun k->k Classify_cst.pp_signature signature);
   compute_prec (CCVector.to_seq stmts) >>= fun precedence ->
   Util.debugf ~section 1 "@[<2>precedence:@ @[%a@]@]" (fun k->k Precedence.pp precedence);

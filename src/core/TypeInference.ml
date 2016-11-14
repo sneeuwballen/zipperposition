@@ -113,6 +113,8 @@ module Ctx = struct
     default: type_;
     env : env;
       (* map names to variables or IDs *)
+    def_as_rewrite: bool;
+      (* if true, definitions are rewrite rules *)
     mutable new_metas: T.meta_var list;
       (* variables that should be generalized in the global scope
          or bound to [default], if they are not bound *)
@@ -124,9 +126,10 @@ module Ctx = struct
       (* list of symbols whose type has been inferred recently *)
   }
 
-  let create ?(default=T.Ty.term) () =
+  let create ?(def_as_rewrite=false) ?(default=T.Ty.term) () =
     let ctx = {
       default;
+      def_as_rewrite;
       env = Hashtbl.create 32;
       datatypes = ID.Tbl.create 32;
       new_metas=[];
@@ -808,7 +811,7 @@ let infer_defs ?loc ctx (l:A.def list): (_,_,_) Stmt.def list =
               end)
            rules
        in
-       Stmt.mk_def id ty rules)
+       Stmt.mk_def ~rewrite:ctx.Ctx.def_as_rewrite id ty rules)
     decls
 
 let infer_statement_exn ctx st =
@@ -909,7 +912,11 @@ let infer_statement_exn ctx st =
   in
   st, aux
 
-let infer_statements_exn ?(ctx=Ctx.create ()) seq =
+let infer_statements_exn ?(def_as_rewrite=false) ?ctx seq =
+  let ctx = match ctx with
+    | None -> Ctx.create ~def_as_rewrite ()
+    | Some c -> c
+  in
   let res = CCVector.create () in
   Sequence.iter
     (fun st ->
@@ -920,7 +927,7 @@ let infer_statements_exn ?(ctx=Ctx.create ()) seq =
     seq;
   CCVector.freeze res
 
-let infer_statements ?ctx seq =
-  try CCError.return (infer_statements_exn ?ctx seq)
+let infer_statements ?def_as_rewrite ?ctx seq =
+  try CCError.return (infer_statements_exn ?def_as_rewrite ?ctx seq)
   with e -> CCError.of_exn_trace e
 
