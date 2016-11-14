@@ -441,6 +441,11 @@ let vars t = Seq.vars t |> Var.Set.of_seq |> Var.Set.to_list
 
 let free_vars t = Seq.free_vars t |> Var.Set.of_seq |> Var.Set.to_list
 
+let free_vars_l l =
+  Sequence.of_list l
+  |> Sequence.flat_map Seq.free_vars
+  |> Var.Set.of_seq |> Var.Set.to_list
+
 let closed t = Seq.free_vars t |> Sequence.is_empty
 
 let rec open_binder b t = match view t with

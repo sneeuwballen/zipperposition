@@ -208,7 +208,7 @@ module Flatten = struct
             end
           | _ ->
             (* give a name to [if a b c] *)
-            let closure = T.free_vars t in
+            let closure = T.free_vars_l [b;c] in
             let cases_true =
               aux pos vars b >>= fun b ->
               get_subst >|= fun subst ->
@@ -257,7 +257,7 @@ module Flatten = struct
             aux pos (c_vars@vars) rhs
           | _ ->
             (* give a name to the match *)
-            let closure = T.free_vars t in
+            let closure = T.free_vars_l (List.map (fun (_,_,rhs) -> rhs) l) in
             let cases =
               of_list l >>= fun (cstor,c_vars,rhs) ->
               aux pos (c_vars@vars) rhs >>= fun rhs ->

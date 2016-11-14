@@ -221,6 +221,7 @@ val var_occurs : var:t Var.t -> t -> bool
 
 val vars : t -> t Var.t list
 val free_vars : t -> t Var.t list
+val free_vars_l : t list -> t Var.t list
 
 val close_all : ty:t -> Binder.t -> t -> t
 (** Bind all free vars with the symbol *)
