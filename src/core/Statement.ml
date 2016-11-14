@@ -354,10 +354,10 @@ let pp ppf ppt ppty out st = match st.view with
       let pp_cstor out (id,ty) =
         fpf out "@[<2>| %a :@ @[%a@]@]" ID.pp id ppty ty in
       let pp_data out d =
-        fpf out "@[%a : %a@] :=@ @[<v>%a@]"
+        fpf out "@[<hv2>@[%a : %a@] :=@ %a@]"
           ID.pp d.data_id ppty d.data_ty (Util.pp_list ~sep:"" pp_cstor) d.data_cstors
       in
-      fpf out "@[<hv>data%a@ %a@]" pp_attrs st.attrs (Util.pp_list ~sep:" and " pp_data) l
+      fpf out "@[<hv2>data%a@ %a@]" pp_attrs st.attrs (Util.pp_list ~sep:" and " pp_data) l
   | Assert f ->
       fpf out "@[<2>assert%a@ @[%a@]@]." pp_attrs st.attrs ppf f
   | Lemma l ->
