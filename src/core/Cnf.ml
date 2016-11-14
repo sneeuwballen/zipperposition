@@ -758,7 +758,7 @@ let flatten ~ctx seq : _ Sequence.t =
     begin
       let vars, lhs, rhs = r in
       map_sliteral (flatten_rec ctx Pos_inner vars) lhs >>= fun lhs ->
-      flatten_rec_l ctx Pos_inner vars rhs >>= fun rhs ->
+      flatten_rec_l ctx Pos_toplevel vars rhs >>= fun rhs ->
       get_subst >|= fun subst ->
       let lhs = SLiteral.map ~f:(T.Subst.eval subst) lhs in
       let rhs = List.map (T.Subst.eval subst) rhs in
