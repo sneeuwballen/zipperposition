@@ -157,7 +157,7 @@ let convert (st:A.statement): UA.statement list =
       (* goal *)
       let tyvars = List.map conv_tyvar tyvars in
       let g = conv_term g in
-      let g = T.forall_ty ?loc tyvars g in
+      let g = T.forall ?loc tyvars g in
       [UA.goal ?loc g]
     | A.Stmt_data (tyvars, l) ->
       let l = List.map
