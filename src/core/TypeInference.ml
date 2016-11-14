@@ -385,7 +385,7 @@ let rec infer_rec ctx t =
       let l = add_implicit_params ty_id [] |> List.map (infer_rec ctx) in
       let ty = T.apply_unify ?loc ~allow_open:true ty_id l in
       T.app ~ty (T.const ~ty:ty_id id) l
-  | PT.App ({PT.term=PT.Const s; _}, l) ->
+  | PT.App ({PT.term=(PT.Const s | PT.Var (PT.V s)); _}, l) ->
       let id, ty_s = Ctx.get_id_ ?loc ~arity:(List.length l) ctx s in
       let l = add_implicit_params ty_s l in
       (* infer types for arguments *)
