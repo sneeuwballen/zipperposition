@@ -560,6 +560,27 @@ module Ty = struct
     | Ty_fun (args, _) -> 0, List.length args
     | _ -> 0, 0
 
+  let mangle ty =
+    let buf = Buffer.create 32 in
+    let add_id id =
+      let s =
+        ID.name id
+      |> CCString.filter (function '#' -> false | _ -> true)
+      in
+      Buffer.add_string buf s
+    in
+    let rec aux t = match view t with
+      | Ty_builtin TType -> Buffer.add_string buf "type"
+      | Ty_var v -> add_id (Var.id v)
+      | Ty_app (f,[]) -> add_id f
+      | Ty_app (f,l) ->
+        add_id f;
+        List.iter (fun sub -> Buffer.add_char buf '_'; aux sub) l
+      | _ -> ()
+    in
+    aux ty;
+    Buffer.contents buf
+
   let is_tType t = match view t with | Ty_builtin TType -> true | _ -> false
   let is_prop t = match view t with Ty_builtin Prop -> true | _ -> false
 

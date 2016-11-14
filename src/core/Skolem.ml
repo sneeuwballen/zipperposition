@@ -92,7 +92,7 @@ let collect_vars ?(filter=fun _->true) f =
     |> Var.Set.to_list
     |> List.partition is_ty_var
 
-let skolem_form ~ctx subst ty form =
+let skolem_form ~ctx subst ty_var form =
   (* only free variables we are interested in, are those bound to actual
      free variables (the universal variables), not the existential ones
      (bound to Skolem symbols) *)
@@ -110,10 +110,10 @@ let skolem_form ~ctx subst ty form =
   let vars_t = List.map (fun v->T.var v) vars in
   let tyvars_t = List.map (fun v->T.Ty.var v) tyvars in
   (* type of the symbol: quantify over type vars, apply to vars' types *)
-  let ty =
-    T.Ty.forall_l tyvars
-      (T.Ty.fun_ (List.map Var.ty vars) (T.Subst.eval subst ty)) in
-  let f = fresh_skolem ~ctx ~ty in
+  let ty_var = T.Subst.eval subst ty_var in
+  let ty = T.Ty.forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) ty_var) in
+  let prefix = (T.Ty.mangle ty_var) ^ "_" in
+  let f = fresh_skolem_prefix ~ctx ~ty prefix in
   T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t)
 
 let pop_new_skolem_symbols ~ctx =
