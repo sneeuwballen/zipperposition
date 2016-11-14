@@ -373,11 +373,18 @@ let rec infer_rec ctx t =
   | PT.Var name ->
       begin match Ctx.get_var_ ctx name with
       | `Var v -> T.var v
-      | `ID (id, ty) -> T.const ~ty id
+      | `ID (id, ty_id) ->
+        (* implicit parameters, e.g. for [nil] *)
+        let l = add_implicit_params ty_id [] |> List.map (infer_rec ctx) in
+        let ty = T.apply_unify ?loc ~allow_open:true ty_id l in
+        T.app ~ty (T.const ~ty:ty_id id) l
       end
   | PT.Const s ->
-      let id, ty = Ctx.get_id_ ?loc ~arity:0 ctx s in
-      T.const ~ty id
+      let id, ty_id = Ctx.get_id_ ?loc ~arity:0 ctx s in
+      (* implicit parameters, e.g. for [nil] *)
+      let l = add_implicit_params ty_id [] |> List.map (infer_rec ctx) in
+      let ty = T.apply_unify ?loc ~allow_open:true ty_id l in
+      T.app ~ty (T.const ~ty:ty_id id) l
   | PT.App ({PT.term=PT.Const s; _}, l) ->
       let id, ty_s = Ctx.get_id_ ?loc ~arity:(List.length l) ctx s in
       let l = add_implicit_params ty_s l in
