@@ -62,7 +62,8 @@ let parse_args () =
     ; "--color", Arg.Bool CCFormat.set_color_default, " enable/disable ANSI color codes"
     ; "--seed", Arg.Set_int seed, " set random seed"
     ; "--unary-depth", Arg.Set_int unary_depth, " maximum depth for successive unary inferences"
-    ; "--def-as-rewrite", Arg.Set def_as_rewrite, " treat definitions are rewrite rules"
+    ; "--def-as-rewrite", Arg.Set def_as_rewrite, " treat definitions as rewrite rules"
+    ; "--def-as-assert", Arg.Clear def_as_rewrite, " treat definitions as axioms"
     ] @ Options.make ()
   ) |> List.sort (fun (s1,_,_)(s2,_,_) -> String.compare s1 s2)
     |> Arg.align
