@@ -126,7 +126,7 @@ module Ctx = struct
       (* list of symbols whose type has been inferred recently *)
   }
 
-  let create ?(def_as_rewrite=false) ?(default=T.Ty.term) () =
+  let create ?(def_as_rewrite=true) ?(default=T.Ty.term) () =
     let ctx = {
       default;
       def_as_rewrite;
@@ -919,9 +919,9 @@ let infer_statement_exn ctx st =
   in
   st, aux
 
-let infer_statements_exn ?(def_as_rewrite=false) ?ctx seq =
+let infer_statements_exn ?def_as_rewrite ?ctx seq =
   let ctx = match ctx with
-    | None -> Ctx.create ~def_as_rewrite ()
+    | None -> Ctx.create ?def_as_rewrite ()
     | Some c -> c
   in
   let res = CCVector.create () in

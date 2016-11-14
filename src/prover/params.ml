@@ -38,7 +38,7 @@ and dot_all_roots = ref false
 and expand_def = ref false
 and select = ref "SelectComplex"
 and unary_depth = ref 1
-and def_as_rewrite = ref false
+and def_as_rewrite = ref true
 and files = CCVector.create ()
 
 (** parse_args returns parameters *)
