@@ -412,9 +412,9 @@ module TPTP = struct
       Format.fprintf out "%a <~> %a" pp_surrounded a pp_surrounded b
     | AppBuiltin (Builtin.Equiv, [a;b]) ->
       Format.fprintf out "%a <=> %a" pp_surrounded a pp_surrounded b
-    | AppBuiltin (Builtin.Eq, [_;a;b]) ->
+    | AppBuiltin (Builtin.Eq, ([_;a;b] | [a;b])) ->
       Format.fprintf out "%a = %a" pp_surrounded a pp_surrounded b
-    | AppBuiltin (Builtin.Neq, [_;a;b]) ->
+    | AppBuiltin (Builtin.Neq, ([_;a;b] | [a;b])) ->
       Format.fprintf out "%a != %a" pp_surrounded a pp_surrounded b
     | AppBuiltin (Builtin.Arrow, [ret;a]) ->
       Format.fprintf out "%a > %a" pp a pp ret
