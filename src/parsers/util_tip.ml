@@ -47,6 +47,8 @@ let rec conv_ty ty = match ty with
   | A.Ty_bool -> T.prop
   | A.Ty_arrow (args,ret) ->
     T.fun_ty (List.map conv_ty args) (conv_ty ret)
+  | A.Ty_app ("Int",[]) -> T.builtin Builtin.TyInt
+  | A.Ty_app ("Rat",[]) -> T.builtin Builtin.TyRat
   | A.Ty_app (s, []) ->
     T.var s (* var or const: let type inference decide *)
   | A.Ty_app (s, args) ->
@@ -59,15 +61,49 @@ let conv_tyvar v = T.V v, Some T.tType
 let conv_var (v,ty) = T.V v, Some (conv_ty ty)
 let conv_vars = List.map conv_var
 
+(* left-associative *)
+let rec app_reduce f zero l = match l with
+  | [] -> zero
+  | [x] -> x
+  | [x;y] -> T.app_builtin f [x; y]
+  | x :: y :: tail -> app_reduce f zero (T.app_builtin f [x; y] :: tail)
+
+module BA = Builtin.Arith
+
+let zero = T.int_ Z.zero
+let one = T.int_ Z.one
+let plus_l = app_reduce BA.sum zero
+let minus_l = app_reduce BA.difference zero
+let prod_l = app_reduce BA.product one
+
+let as_int s = try Some (Z.of_string s) with _ -> None
+let as_rat s = try Some (Q.of_string s) with _ -> None
+
 let rec conv_term (t:A.term): T.t =
   match t with
     | A.True -> T.true_
     | A.False -> T.false_
+    | A.App (s,[])
     | A.Const s ->
-      (* const of variable: let type inference decide *)
-      T.var s
+      (* look for integer constants, but otherwise
+         let type inference distinguish constants and variables *)
+      begin match as_int s, as_rat s with
+        | Some z, _ -> T.int_ z
+        | None, Some q -> T.rat q
+        | None, None -> T.var s
+      end
     | A.App (f,l) ->
-      app_l (T.const f) (List.map conv_term l)
+      let l = List.map conv_term l in
+      begin match f, l with
+        | "+", _ -> plus_l l
+        | "-", _ -> minus_l l
+        | "*", _ -> prod_l l
+        | ">=", [a;b] -> T.app_builtin BA.greatereq [a;b]
+        | "<=", [a;b] -> T.app_builtin BA.lesseq [a;b]
+        | ">", [a;b] -> T.app_builtin BA.greater [a;b]
+        | "<", [a;b] -> T.app_builtin BA.less [a;b]
+        | _ -> T.app_const f l
+      end
     | A.HO_app (a,b) ->
       app (conv_term a) (conv_term b)
     | A.If (a,b,c) ->
