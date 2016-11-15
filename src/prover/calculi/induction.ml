@@ -284,7 +284,7 @@ end = struct
     | Some id -> not (Ind_ty.is_constructor id)
 
   (* simple criterion for determining if [t1 = t2] is a possible lemma? *)
-  let is_acceptable_eq (t1:T.t) (t2:T.t) =
+  let is_acceptable_eq_ (t1:T.t) (t2:T.t) =
     Type.equal (T.ty t1) (T.ty t2)
     &&
     not (T.is_var t1 && T.is_var t2)
@@ -293,7 +293,7 @@ end = struct
     let vars2 = T.vars t2 in
     let ground1 = T.VarSet.is_empty vars1 in
     let ground2 = T.VarSet.is_empty vars2 in
-    (* both not ground, need some quantification; but if they both
+    (* not both ground, need some quantification; but if they both
        have variables, one side must include the variables of the
        other side *)
     not (ground1 && ground2) &&
@@ -304,6 +304,12 @@ end = struct
     not (cstors_only t1 && cstors_only t2)
     &&
     (starts_with_fun t1 || starts_with_fun t2)
+
+  let is_acceptable_eq t1 t2 =
+    let res = is_acceptable_eq_ t1 t2 in
+    Util.debugf ~section 5 "@[<hv2>acceptable eq `@[%a =@ %a@]`:@ %B@]"
+      (fun k->k T.pp t1 T.pp t2 res);
+    res
 
   (* stream of type variables *)
   let ty_vars_stream: Type.t HVar.t LazyList.t =
