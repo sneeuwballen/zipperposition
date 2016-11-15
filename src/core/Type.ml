@@ -289,7 +289,11 @@ end
 
 let rec pp_rec depth out t = match view t with
   | Builtin b -> pp_builtin out b
-  | Var v -> HVar.pp out v
+  | Var v ->
+    let ty = HVar.ty v in
+    if is_tType ty
+    then Format.fprintf out "A%d" (HVar.id v)
+    else HVar.pp out v
   | DB i -> Format.fprintf out "T%i" (depth-i-1)
   | App (p, []) -> ID.pp out p
   | App (p, args) ->

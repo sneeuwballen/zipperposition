@@ -159,7 +159,7 @@ let is_arith_divides = _on_arith ArithLit.is_divides
 let ty_error_ a b =
   let msg =
     CCFormat.sprintf
-      "@[<2>Literal: incompatible types in equational lit@ for %a : %a@ and %a : %a@]"
+      "@[<2>Literal: incompatible types in equational lit@ for `@[%a : %a@]`@ and `@[%a : %a@]`@]"
       T.pp a Type.pp (T.ty a) T.pp b Type.pp (T.ty b)
   in
   raise (Type.ApplyError msg)
