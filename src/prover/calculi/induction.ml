@@ -172,6 +172,8 @@ module Make
              T.const ~ty id, T.var (HVar.make ~ty (i+offset)))
           generalize_on
       in
+      Util.debugf ~section 5 "@[<2>generalize_lits `@[%a@]`:@ subst (@[%a@])@]"
+        (fun k->k Lits.pp lits CCFormat.(list (pair T.pp T.pp)) pairs);
       Lits.map
         (fun t ->
            List.fold_left
