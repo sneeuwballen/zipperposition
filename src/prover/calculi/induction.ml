@@ -231,51 +231,83 @@ end = struct
      instances reduces to [false] *)
   let small_check (lemma:lemma_candidate): bool =
     (* generate instances of [lits]. If [last=true], instantiating variables
-       with parametrized constructors is forbidden *)
+       with parametrized constructors is forbidden (must return a leaf) *)
     let gen_instances ~(last:bool) (lits:Literals.t): Literals.t Sequence.t =
+      let subst_add subst v t =
+        Substs.FO.bind subst ((v:Type.t HVar.t:>TI.t HVar.t),0) (t,0)
+      and subst_add_ty subst v ty =
+        Substs.Ty.bind subst ((v:Type.t HVar.t:>TI.t HVar.t),0) (ty,0)
+      and subst_mem subst v =
+        Substs.mem subst ((v:Type.t HVar.t:>TI.t HVar.t),0)
+      and subst_apply_ty subst ty =
+        Substs.Ty.apply_no_renaming subst (ty,0)
+      in
       let rec aux offset subst vars = match vars with
         | [] ->
           let renaming = E.Ctx.renaming_clear() in
           Sequence.return (Literals.apply_subst ~renaming subst (lits,0))
+        | v :: vars' when subst_mem subst v ->
+          (* ignore bound variables *)
+          aux offset subst vars'
         | v :: vars' ->
           begin match Ind_ty.as_inductive_type (HVar.ty v) with
+            | None when Type.equal (HVar.ty v) Type.prop ->
+              (* try [true] and [false] *)
+              Sequence.of_list [T.true_; T.false_]
+              |> Sequence.flat_map
+                (fun b ->
+                   let subst = subst_add subst v b in
+                   aux offset subst vars')
             | None -> aux offset subst vars' (* ignore [v] *)
-            | Some { Ind_ty.ty_constructors; ty_vars; _ } ->
+            | Some ({ Ind_ty.ty_constructors; ty_vars; _ }, ind_ty_args) ->
+              assert (List.length ty_vars = List.length ind_ty_args);
+              let ind_ty_args' = List.map (subst_apply_ty subst) ind_ty_args in
               (* try to replace [v] by each constructor *)
               Sequence.of_list ty_constructors
               |> Sequence.flat_map
                 (fun {Ind_ty.cstor_ty=c_ty; cstor_name=c_id} ->
-                   let n, ty_args, _ = Type.open_poly_fun c_ty in
-                   assert (n=List.length ty_vars);
-                   if last && ty_args <> []
+                   let n, _, _ = Type.open_poly_fun c_ty in
+                   assert (n = List.length ty_vars);
+                   let c_ty_args, _ =
+                     Type.apply c_ty ind_ty_args'
+                     |> Type.open_fun
+                   in
+                   if last && c_ty_args <> []
                    then Sequence.empty (* fail *)
                    else (
                      (* fresh variables as arguments to the constructor *)
                      let sub_vars =
                        List.mapi
                          (fun i ty' -> HVar.make ~ty:ty' (i+offset) |> T.var)
-                         ty_args
+                         c_ty_args
                      in
                      let t =
                        T.app_full
                          (T.const ~ty:c_ty c_id)
-                         (List.map Type.var ty_vars)
+                         ind_ty_args'
                          sub_vars
                      in
-                     let subst =
-                       Substs.FO.bind subst ((v:Type.t HVar.t:>TI.t HVar.t),0) (t,0)
-                     in
-                     aux (offset+List.length ty_args) subst vars'
+                     let subst = subst_add subst v t in
+                     aux (offset+List.length c_ty_args) subst vars'
                    )
                 )
           end
       in
       let vars = Literals.vars lits in
+      (* replace type variables by [prop], easy to test *)
+      let ty_vars = List.filter (fun v -> Type.is_tType (HVar.ty v)) vars in
+      let subst =
+        List.fold_left
+          (fun subst v -> subst_add_ty subst v Type.prop)
+          Substs.empty
+          ty_vars
+      in
+      (* offset to allocate new variables without collision *)
       let offset = 1 + T.Seq.max_var (Sequence.of_list vars) in
-      aux offset Substs.empty vars
+      aux offset subst vars
     in
     Util.debugf ~section 3 "@[<hv2>small_check lemma@ @[%a@]@]"
-      (fun k->k (Util.pp_list Literals.pp) lemma);
+      (fun k->k (Util.pp_list Literals.pp_vars) lemma);
     Sequence.of_list lemma
     |> Sequence.flat_map (gen_instances ~last:false) (* depth 1 *)
     |> Sequence.flat_map (gen_instances ~last:false) (* depth 2 *)
