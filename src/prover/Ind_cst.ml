@@ -31,7 +31,8 @@ let invalid_declf m = CCFormat.ksprintf m ~f:invalid_decl
 
 type cst = {
   cst_id: ID.t;
-  cst_ty: Type.t;
+  cst_args: Type.t list;
+  cst_ty: Type.t; (* [cst_ty = cst_id cst_args] *)
   cst_ity: Ind_ty.t; (* the corresponding inductive type *)
   cst_depth: int;
   cst_parent: cst option;
@@ -257,8 +258,8 @@ let mk_skolem_ pp x =
 let declare_cst_ ~parent id ty =
   if is_cst id then raise (AlreadyDeclaredConstant id);
   assert (Type.is_ground ty); (* constant --> not polymorphic *)
-  let ity = match Ind_ty.as_inductive_type ty with
-    | Some t -> t
+  let ity, args = match Ind_ty.as_inductive_type ty with
+    | Some (t,l) -> t,l
     | None -> invalid_declf "cannot declare a constant of type %a" Type.pp ty
   in
   (* depth of the constant *)
@@ -273,6 +274,7 @@ let declare_cst_ ~parent id ty =
     cst_depth=depth;
     cst_parent=parent;
     cst_ity=ity;
+    cst_args=args;
     cst_coverset=None;
   }
   in

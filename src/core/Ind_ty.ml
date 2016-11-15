@@ -94,10 +94,14 @@ let is_inductive_type ty =
   | Some (B _)
   | None -> false
 
-let as_inductive_type ty =
-  match type_hd ty with
-  | Some (B _) | None -> None
-  | Some (I id) -> as_inductive_ty id
+let as_inductive_type ty = match Type.view ty with
+  | Type.App (id, l) ->
+    begin match as_inductive_ty id with
+      | None -> None
+      | Some ity -> Some (ity, l)
+    end
+  | Type.Fun _ | Type.Forall _ | Type.Builtin _ | Type.DB _ | Type.Var _
+    -> None
 
 (* declare that the given type is inductive *)
 let declare_ty id ~ty_vars constructors =
