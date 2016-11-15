@@ -41,6 +41,9 @@ val extract_exn : Literals.t -> term -> t
 (** Unsafe version of {!extract}.
     @raise Invalid_argument if the term is not to be found within the lits *)
 
+val trivial : Literals.t -> term -> t
+(** Trivial context, that contains 0 holes. *)
+
 val apply : t -> term -> Literals.t
 (** [apply c t] fills the hole of [c] with the given term [t]. [t] and [c]
     share no free variables. *)

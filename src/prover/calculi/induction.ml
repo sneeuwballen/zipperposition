@@ -354,11 +354,14 @@ module Make
     decl_cst_ cst;
     Util.debugf ~section 1 "@[<2>perform induction on `%a`@ in `@[%a@]`@]"
       (fun k->k Ind_cst.pp_cst cst (Util.pp_list C.pp) clauses);
-    (* keep only clauses that depend on [cst] *)
+    (* extract a context from every clause, even those that do not contain [cst] *)
     let ctxs =
-      CCList.filter_map
+      List.map
         (fun c ->
-           ClauseContext.extract (C.lits c) (Ind_cst.cst_to_term cst))
+           let sub = Ind_cst.cst_to_term cst in
+           match ClauseContext.extract (C.lits c) sub with
+             | Some ctx -> ctx
+             | None -> ClauseContext.trivial (C.lits c) sub)
         clauses
     in
     (* proof: one step from all the clauses above *)
