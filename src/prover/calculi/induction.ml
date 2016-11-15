@@ -446,7 +446,10 @@ end = struct
       (* introduce cut now *)
       let proof =
         let f = A.form_of_lemma lemma in
-        let parents = [ProofStep.mk_f ProofStep.mk_lemma f] in
+        let proof_f =
+          ProofStep.mk_goal (Statement.Src.internal Statement.R_goal)
+        in
+        let parents = [ProofStep.mk_f proof_f f] in
         ProofStep.mk_esa ~rule:A.lemma_rule parents
       in
       let cut = A.introduce_cut lemma proof in
