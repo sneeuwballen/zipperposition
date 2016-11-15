@@ -215,11 +215,10 @@ end = struct
       match to_process with
         | [] -> Sequence.return g (* done *)
         | t :: to_process_tail ->
-          let seq1 = match add_term g t with
+          let seq1 = aux g to_process_tail (* try without [t] *)
+          and seq2 = match add_term g t with
             | None -> Sequence.empty  (* skip [t] *)
             | Some g' -> aux g' to_process_tail
-          and seq2 =
-            aux g to_process_tail (* try without [t] *)
           in
           Sequence.append seq1 seq2
     in
