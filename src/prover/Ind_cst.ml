@@ -256,6 +256,9 @@ let mk_skolem_ pp x =
 
 (* declare new constant *)
 let declare_cst_ ~parent id ty =
+  Util.debugf ~section:Ind_ty.section 2
+    "@[<2>declare new inductive symbol `@[%a : %a@]`@]"
+    (fun k->k ID.pp id Type.pp ty);
   if is_cst id then raise (AlreadyDeclaredConstant id);
   assert (Type.is_ground ty); (* constant --> not polymorphic *)
   let ity, args = match Ind_ty.as_inductive_type ty with
@@ -278,9 +281,6 @@ let declare_cst_ ~parent id ty =
     cst_coverset=None;
   }
   in
-  Util.debugf ~section:Ind_ty.section 2
-    "@[<2>declare new inductive symbol `@[%a : %a@]`@]"
-    (fun k->k ID.pp id Type.pp ty);
   ID.add_payload id (Payload_cst cst);
   (* return *)
   Signal.send on_new_cst cst;
@@ -433,6 +433,7 @@ let is_potential_cst (id:ID.t) (ty:Type.t): bool =
   n_tyvars=0
   && ty_args=[] (* constant *)
   && Ind_ty.is_inductive_type ty_ret
+  && Type.is_ground ty
   && (is_cst id || not (Ind_ty.is_constructor id))
 
 (* TODO: generalize to ground terms starting with uninterpreted fun *)
