@@ -26,4 +26,4 @@ PKG unix
 PKG msat
 PKG oclock
 PKG tip_parser
-FLG -w +a-4-44-48
+FLG -w +a-4-44-48-50-58
