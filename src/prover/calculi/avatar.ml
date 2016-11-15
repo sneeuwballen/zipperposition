@@ -339,6 +339,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
 
   let show_lemmas () = Format.printf "%a@." print_lemmas ()
 
+  let lemma_rule = ProofStep.mk_rule "lemma"
+
   let convert_lemma st = match Statement.view st with
     | Statement.Lemma l ->
       let proof_st = ProofStep.mk_goal (Statement.src st) in
@@ -350,7 +352,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       let proof =
         l
         |> List.map (fun c -> ProofStep.mk_c proof_st (SClause.make ~trail:Trail.empty c))
-        |> ProofStep.mk_inference ~rule:(ProofStep.mk_rule "lemma")
+        |> ProofStep.mk_inference ~rule:lemma_rule
       in
       let cut = introduce_cut l proof in
       let all_clauses = cut_res_clauses cut |> Sequence.to_rev_list in

@@ -55,6 +55,8 @@ module type S = sig
     cut_res
   (** Introduce a cut on the given clause(s). *)
 
+  val lemma_rule : ProofStep.rule
+
   val add_lemma : cut_res -> unit
   (** Add the given cut to the list of lemmas *)
 

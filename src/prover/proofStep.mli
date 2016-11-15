@@ -41,6 +41,7 @@ type kind =
   | Goal of statement_src
   | Data of statement_src * Type.t Statement.data
   | Trivial (** trivial, or trivial within theories *)
+  | Lemma
 
 type result =
   | Form of form
@@ -83,6 +84,8 @@ module PTbl : CCHashtbl.S with type key = of_
     Axiom constructors have default role "axiom" *)
 
 val mk_trivial : t
+
+val mk_lemma : t
 
 val mk_data : statement_src -> Type.t Statement.data -> t
 
