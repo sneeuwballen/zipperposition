@@ -49,13 +49,18 @@ module type S = sig
   val print_lemmas : unit CCFormat.printer
   (** print the current list of lemmas, and their status *)
 
+  type lemma_candidate = Literals.t list
+
   val introduce_cut :
-    Literals.t list ->
+    lemma_candidate ->
     ProofStep.t ->
     cut_res
   (** Introduce a cut on the given clause(s). *)
 
   val lemma_rule : ProofStep.rule
+
+  val form_of_lemma : lemma_candidate -> TypedSTerm.t
+  (** A formula representation of some lemma candidate *)
 
   val add_lemma : cut_res -> unit
   (** Add the given cut to the list of lemmas *)

@@ -7,7 +7,7 @@ open Libzipperposition
 
 module T = FOTerm
 module Lit = Literal
-module Util = Util
+module PT = TypedSTerm
 
 type 'a printer = Format.formatter -> 'a -> unit
 
@@ -243,6 +243,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   let cut_res_clauses c =
     Sequence.append (Sequence.of_list c.cut_pos) (Sequence.of_list c.cut_neg)
 
+  type lemma_candidate = Literals.t list
+
   (* generic mechanism for adding clause(s)
      and make a lemma out of them, including Skolemization, etc. *)
   let introduce_cut (clauses:Literals.t list) proof : cut_res =
@@ -341,18 +343,31 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
 
   let lemma_rule = ProofStep.mk_rule "lemma"
 
+  (* formula representation of a lemma *)
+  let form_of_lemma (lemma:lemma_candidate): PT.t =
+    let ctx = FOTerm.Conv.create () in
+    lemma
+    |> List.map
+      (fun c ->
+         Literals.Conv.to_forms c
+         |> List.map (SLiteral.map ~f:(FOTerm.Conv.to_simple_term ctx))
+         |> List.map SLiteral.to_form
+         |> PT.Form.or_)
+    |> List.map PT.Form.close_forall
+    |> PT.Form.and_
+
   let convert_lemma st = match Statement.view st with
     | Statement.Lemma l ->
-      let proof_st = ProofStep.mk_goal (Statement.src st) in
+      let proof_src = ProofStep.mk_goal (Statement.src st) in
       let l =
         l
         |> List.map (List.map Ctx.Lit.of_form)
         |> List.map Array.of_list
       in
       let proof =
-        l
-        |> List.map (fun c -> ProofStep.mk_c proof_st (SClause.make ~trail:Trail.empty c))
-        |> ProofStep.mk_inference ~rule:lemma_rule
+        let f = form_of_lemma l in
+        let parents = [ProofStep.mk_f proof_src f] in
+        ProofStep.mk_esa ~rule:lemma_rule parents
       in
       let cut = introduce_cut l proof in
       let all_clauses = cut_res_clauses cut |> Sequence.to_rev_list in

@@ -445,11 +445,8 @@ end = struct
     then (
       (* introduce cut now *)
       let proof =
-        let parents =
-          List.map
-            (fun c -> ProofStep.mk_c ProofStep.mk_lemma (SClause.make ~trail:Trail.empty c))
-            lemma
-        in
+        let f = A.form_of_lemma lemma in
+        let parents = [ProofStep.mk_f ProofStep.mk_lemma f] in
         ProofStep.mk_esa ~rule:A.lemma_rule parents
       in
       let cut = A.introduce_cut lemma proof in
