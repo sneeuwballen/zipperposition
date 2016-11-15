@@ -2,12 +2,24 @@
 
 ## Now
 
+- lemma guessing (wip)
+
+- rule similar to `fool_param` for for datatypes:
+  `C[t]` where `t:nat` (strict subterm) is not a cstor term nor a variable
+  would become `C[S x] ∨ t ≠ S x` and `C[0] ∨ t ≠ 0`
+  * should be terminating (reduces the number of such strict subterms)
+  * is sound, and might be decreasing (check!).
+    It does seem to work for fool.
+  * enables more reductions…
+
 ## Main
 
 - [ ] better traces
   + [ ] rewriting steps should list set of rewrite rules used?
     make rewrite rules part of the proof graph (new case)
   + [x] the CNF part
+
+- use `Type.mangle` for avatar skolems, too
 
 - [ ] functional induction:
   * based on assumption that recursive functions terminate
