@@ -290,5 +290,7 @@ module Conv : sig
   val of_simple_term_exn : ctx -> TypedSTerm.t -> t (** @raise Type.Conv.Error on failure *)
   val to_simple_term :
     ?env:TypedSTerm.t Var.t DBEnv.t ->
-    t -> TypedSTerm.t
+    ctx ->
+    t ->
+    TypedSTerm.t
 end

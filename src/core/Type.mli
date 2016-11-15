@@ -230,6 +230,8 @@ module Conv : sig
   val fresh_ty_var : ctx -> t HVar.t
   (** Fresh type variable *)
 
+  val var_to_simple_var : ?prefix:string -> ctx -> t HVar.t -> TypedSTerm.t Var.t
+
   exception Error of TypedSTerm.t
 
   val of_simple_term_exn : ctx -> TypedSTerm.t -> t
@@ -237,7 +239,9 @@ module Conv : sig
 
   val to_simple_term :
     ?env:TypedSTerm.t Var.t DBEnv.t ->
-    t -> TypedSTerm.t
+    ctx ->
+    t ->
+    TypedSTerm.t
   (** convert a type to a prolog term.
       @param env the current environement for De Bruijn indices *)
 end

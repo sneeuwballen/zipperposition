@@ -585,8 +585,7 @@ module Conv = struct
     try Some (of_simple_term_exn ctx t)
     with Type.Conv.Error _ -> None
 
-  let to_simple_term ?(env=DBEnv.empty) t =
-    let tbl = VarTbl.create 16 in
+  let to_simple_term ?(env=DBEnv.empty) ctx t =
     let module ST = TypedSTerm in
     let rec to_simple_term t =
       match view t with
@@ -600,14 +599,9 @@ module Conv = struct
           ST.app_builtin ~ty:(aux_ty (ty t))
             b (List.map to_simple_term l)
     and aux_var v =
-      try VarTbl.find tbl v
-      with Not_found ->
-        let ty = HVar.ty v in
-        let v' = Var.of_string ~ty:(aux_ty ty)
-          (CCFormat.sprintf "X%d" (HVar.id v)) in
-        VarTbl.add tbl v v';
-        v'
-    and aux_ty ty = Type.Conv.to_simple_term ~env ty
+      Type.Conv.var_to_simple_var ~prefix:"X" ctx v
+    and aux_ty ty =
+      Type.Conv.to_simple_term ~env ctx ty
     in
     to_simple_term t
 end

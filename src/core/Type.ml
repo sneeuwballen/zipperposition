@@ -336,9 +336,10 @@ module Conv = struct
   type ctx = {
     mutable vars: (PT.t, t HVar.t) Var.Subst.t;
     mutable n: int;  (* counter for free vars *)
+    mutable hvars: PT.t Var.t VarMap.t;
   }
 
-  let create () = { vars=Var.Subst.empty; n=0; }
+  let create () = { vars=Var.Subst.empty; n=0; hvars=VarMap.empty; }
 
   let copy t = {t with vars=t.vars; }
 
@@ -425,8 +426,7 @@ module Conv = struct
     try Some (of_simple_term_exn ctx t)
     with Error _ -> None
 
-  let to_simple_term ?(env=DBEnv.empty) t =
-    let tbl = ref VarMap.empty in
+  let rec to_simple_term ?(env=DBEnv.empty) ctx t =
     let rec aux env t = match view t with
       | Builtin Prop -> PT.builtin ~ty:PT.tType Builtin.Prop
       | Builtin TType -> PT.builtin ~ty:PT.tType Builtin.TType
@@ -451,12 +451,15 @@ module Conv = struct
           let t' = aux (DBEnv.push env v) t' in
           PT.bind ~ty:PT.tType Binder.forall_ty v t'
     and aux_var v =
-      try VarMap.find v !tbl
-      with Not_found ->
-        let v' = Var.of_string ~ty:PT.tType
-          (CCFormat.sprintf "A%d" (HVar.id v)) in
-        tbl := VarMap.add v v' !tbl;
-        v'
+      var_to_simple_var ~prefix:"A" ctx v
     in
     aux env t
+
+  and var_to_simple_var ?(prefix="A") ctx v =
+    try VarMap.find v ctx.hvars
+    with Not_found ->
+      let v' = Var.of_string ~ty:(to_simple_term ctx (HVar.ty v))
+          (CCFormat.sprintf "%s%d" prefix (HVar.id v)) in
+      ctx.hvars <- VarMap.add v v' ctx.hvars;
+      v'
 end
