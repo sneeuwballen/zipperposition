@@ -455,6 +455,8 @@ let to_string ppf ppt ppty = CCFormat.to_string (pp ppf ppt ppty)
 let pp_clause =
   pp (Util.pp_list ~sep:" ∨ " (SLiteral.pp FOTerm.pp)) FOTerm.pp Type.pp
 
+let pp_input = pp TypedSTerm.pp TypedSTerm.pp TypedSTerm.pp
+
 module TPTP = struct
   let pp ppf ppt ppty out st =
     let name = match st.src.src_view with

@@ -200,6 +200,8 @@ exception Payload_defined_cst of int
 (** {2 Iterators} *)
 
 module Seq : sig
+  val to_seq : ('f,'t,'ty) t ->
+    [`Term of 't | `Form of 'f | `Ty of 'ty | `ID of ID.t] Sequence.t
   val ty_decls : (_, _, 'ty) t -> (ID.t * 'ty) Sequence.t
   val forms : ('f, _, _) t -> 'f Sequence.t
   val lits : (clause, _, _) t -> FOTerm.t SLiteral.t Sequence.t
@@ -234,6 +236,7 @@ val to_string :
   string
 
 val pp_clause : clause_t CCFormat.printer
+val pp_input : input_t CCFormat.printer
 
 module TPTP : sig
   include Interfaces.PRINT3 with type ('a, 'b, 'c) t := ('a, 'b, 'c) t
