@@ -53,8 +53,8 @@ module Make(E : Env.S) : S with module Env = E = struct
            &&
            begin match T.view t with
              | T.Const _ | T.App _ -> true
-             | T.AppBuiltin (Builtin.Not, _) -> true (* polarity *)
-             | T.AppBuiltin _ -> false
+             | T.AppBuiltin ((Builtin.True | Builtin.False), _) -> false
+             | T.AppBuiltin (_, _) -> true
              | T.Var _ | T.DB _ -> false
            end)
       |> T.Set.of_seq
