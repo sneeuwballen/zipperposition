@@ -28,6 +28,7 @@ let prof_check_lemma = Util.mk_profiler "induction.check_lemma"
 let k_enable : bool Flex_state.key = Flex_state.create_key()
 let k_lemma_guess : bool Flex_state.key = Flex_state.create_key()
 let k_lemma_gen_depth : int Flex_state.key = Flex_state.create_key()
+let k_lemma_gen_max_size : int Flex_state.key = Flex_state.create_key()
 let k_ind_depth : int Flex_state.key = Flex_state.create_key()
 
 (* TODO
@@ -172,10 +173,11 @@ end = struct
     Sequence.of_list lemma
     |> Sequence.flat_map (gen_instances ~last:false) (* depth 1 *)
     |> Sequence.flat_map (gen_instances ~last:false) (* depth 2 *)
+    |> Sequence.flat_map (gen_instances ~last:false) (* depth 3 *)
     |> Sequence.flat_map (gen_instances ~last:true) (* close leaves *)
     |> Sequence.for_all
       (fun lits ->
-         let c = C.create_a ~trail:Trail.empty lits ProofStep.mk_trivial in
+         let c = C.create_a ~trail:Trail.empty lits ProofStep.mk_lemma in
          let ds, _ = E.all_simplify c in
          let res = not (List.exists C.is_empty ds) in
          Util.debugf ~section 5
@@ -308,7 +310,10 @@ end = struct
     LazyList.of_fun (fun i -> HVar.make ~ty:Type.tType i |> CCOpt.return)
 
   (* never generate terms with more than 3 variables *)
-  let max_vars_gen = 3
+  let max_vars_gen = 3 (* FUDGE *)
+
+  (* maximum size of a term on the LHS or RHS of a lemma *)
+  let max_term_size = E.flex_get k_lemma_gen_max_size
 
   (* generate terms that can occur in an equational (or relational) lemma,
      from the signature, up to given depth *)
@@ -348,8 +353,12 @@ end = struct
                    (fun ty -> Substs.Ty.apply_no_renaming subst (ty,1))
                    ty_args
                in
-               aux_l ~depth:(depth-1) vars ty_args >|= fun args ->
-               T.app_full (T.const ~ty:ty_f id_f) ty_vars args
+               aux_l ~depth:(depth-1) vars ty_args >>= fun args ->
+               let res = T.app_full (T.const ~ty:ty_f id_f) ty_vars args in
+               (* check size limit *)
+               if T.size res > max_term_size
+               then Sequence.empty
+               else Sequence.return res
            end)
 
     (* pick a variable in [vars] that has the proper type *)
@@ -395,8 +404,11 @@ end = struct
            in
            (* [ty_f] applied to the fresh type variables *)
            let ty_args, _ = Type.apply ty_f ty_vars |> Type.open_fun in
-           aux_l ~depth:(depth-1) vars ty_args >|= fun args ->
-           T.app_full (T.const ~ty:ty_f id_f) ty_vars args
+           aux_l ~depth:(depth-1) vars ty_args >>= fun args ->
+           let res = T.app_full (T.const ~ty:ty_f id_f) ty_vars args in
+           if T.size res > max_term_size
+           then Sequence.empty
+           else Sequence.return res
         )
     in
     aux_non_vars ~depth T.VarSet.empty
@@ -413,7 +425,8 @@ end = struct
       |> T.Set.filter
         (fun t ->
            let new_t = E.simplify_term t in
-           Format.printf "term `@[%a@]` (keep: %B)@." T.pp t (SimplM.is_same new_t);
+           Util.debugf ~section 5 "@[<2>examine term `@[%a@]` (keep: %B)@]"
+             (fun k->k T.pp t (SimplM.is_same new_t));
            SimplM.is_same new_t)
     in
     (* generate the non-ordered pairs that might be relevant equalities *)
@@ -431,35 +444,50 @@ end = struct
     if is_acceptable_lemma lemma
     then (
       (* introduce cut now *)
-      let proof = ProofStep.mk_trivial in
+      let proof =
+        let parents =
+          List.map
+            (fun c -> ProofStep.mk_c ProofStep.mk_lemma (SClause.make ~trail:Trail.empty c))
+            lemma
+        in
+        ProofStep.mk_esa ~rule:A.lemma_rule parents
+      in
       let cut = A.introduce_cut lemma proof in
       A.add_lemma cut;
       let clauses = cut.A.cut_pos @ cut.A.cut_neg in
       List.iter (fun c -> C.set_flag SClause.flag_lemma c true) clauses;
       Util.incr_stat stats_guess_lemmas;
       Util.debugf ~section 2
-        "@[<2>guessed lemma@ @[<hv0>%a@]@]"
-        (fun k->k (Util.pp_list C.pp) clauses);
+        "@[<2>guessed lemma@ [@[<hv0>%a@]]@]"
+        (fun k->k (Util.pp_list Literals.pp_vars) lemma);
       clauses
     )
     else []
 
   (* functions in the signature that are not skolems and take
-     and return inductive types *)
+     and return inductive types (or variables) *)
   let funs_ : Signature.t lazy_t = lazy (
     let module CC = Classify_cst in
+    let sub_ty_is_ok ty =
+      Type.is_var ty ||
+      Type.is_bvar ty ||
+      Type.is_prop ty ||
+      Ind_ty.is_inductive_type ty
+    in
     let res =
       E.Ctx.signature ()
       |> ID.Map.filter
         (fun id ty ->
            begin match CC.classify id with
-             | CC.DefinedCst _ | CC.Other | CC.Cstor _ -> true
+             | CC.DefinedCst _ | CC.Cstor _ -> true
+             | CC.Other -> false (* XXX not defined --> small check will fail *)
              | CC.Projector _ | CC.Inductive_cst _ | CC.Ty _ -> false
            end
            &&
            (
              let _, args, ret = Type.open_poly_fun ty in
-             List.for_all Ind_ty.is_inductive_type args && Ind_ty.is_inductive_type ret
+             List.for_all sub_ty_is_ok args
+             && sub_ty_is_ok ret
            )
         )
     in
@@ -873,6 +901,7 @@ let enabled_ = ref true
 let lemma_guess = ref true
 let depth_ = ref !Ind_cst.max_depth_
 let lemma_depth = ref 2
+let lemma_max_term_size = ref 7
 
 (* if induction is enabled AND there are some inductive types,
    then perform some setup after typing, including setting the key
@@ -902,6 +931,7 @@ let post_typing_hook stmts state =
     |> Flex_state.add k_lemma_guess !lemma_guess
     |> Flex_state.add k_ind_depth !depth_
     |> Flex_state.add k_lemma_gen_depth !lemma_depth
+    |> Flex_state.add k_lemma_gen_max_size !lemma_max_term_size
     |> Flex_state.add Ctx.Key.lost_completeness true
   ) else Flex_state.add k_enable false state
 
@@ -935,4 +965,5 @@ let () =
     ; "--no-lemma-guess", Options.switch_set false lemma_guess, " disable lemma guess"
     ; "--induction-depth", Arg.Set_int depth_, " maximum depth of nested induction"
     ; "--lemma-guess-depth", Arg.Set_int lemma_depth, " maximum depth of lemma generation"
+    ; "--lemma-guess-size", Arg.Set_int lemma_max_term_size, " maximum size of terms in lemma"
     ]
