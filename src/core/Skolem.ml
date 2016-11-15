@@ -163,10 +163,9 @@ let define_term ~ctx rules : term_definition =
   in
   (* checks *)
   List.iter
-    (fun (args,rhs) ->
+    (fun (args,_) ->
        assert (List.length args = List.length ty_args);
        assert (List.for_all2 (fun t ty -> T.Ty.equal ty (T.ty_exn t)) args ty_args);
-       assert (T.Ty.equal ty_ret (T.ty_exn rhs));
        ())
     rules;
   let ty = T.Ty.fun_ ty_args ty_ret in
