@@ -1,44 +1,32 @@
 
-- accept recursive functions in TIP input (so we know exactly what they look like)
-  * → can allow for simple "smallcheck" in lemma generation
-  * maybe also "smallcheck" for other clauses? probably not.
-  * compile those functions into clauses by flattening, at the last moment
-    (only for non-boolean functions, we know each case will be one clause)
-  * boolean functions? how to do it?
-    NOTE: compile to clauses, or rewrite rules?
 
-  * [x] add full-def to untypedast + parser
-  * [x] add "decl + set of rewrite rules" to statement
-  * [ ] in Statement, allow a set of rewrite rules to be a definition?
-  * [ ] proper translation of definitions in CNF
-    + introduce datatype for boolean (`btrue|bfalse`) and lift most constructs
-      to it. Means that we distinguish computable logic from classic logic
-      (bool vs prop)....
-      OR express `T.true/T.false` as a regular datatype in prelude?
-    + special splitting rule on booleans (non-recursive datatype), to
-      be sure to decide between btrue/bfalse.
-      → refer to FOOL paper
-    + handle conditional rewriting by adding secondary function
-      `f x = g x if P` becomes `f x = f2 x P` and `f2 x true = g x`
-    + handle matching on non-trivial exprs by secondary function
-      `f x = match g x with C -> rhs` becomes `f x = f2 x (g x)`
-      and `f2 x C = rhs`
-  * ([ ] make rewrite rules conditional (with conjunction of atomic conditions))
-  * ([ ] handle conditional rules in Rewrite (+ narrowing, where they turn to new lits)
-        (applies iff the whole condition simplifies to true))
+## Now
 
-- use TIP input to run on all benchmarks normally (with rewriting
-  instead of assertions, too)
+## Main
 
-- functional induction:
+- [ ] better traces
+  + [ ] rewriting steps should list set of rewrite rules used?
+    make rewrite rules part of the proof graph (new case)
+  + [x] the CNF part
+
+- [ ] functional induction:
   * based on assumption that recursive functions terminate
   * build functional induction scheme(s) based on recursive def, might
     prove very useful for some problems
 
-- generate all lemmas up to given depth
+- [ ] generate all lemmas up to given depth
   * need powerful simplifications from the beginning (for smallchecking)
 
-- change generalization technique:
+- refine enum_types for
+  `./zipperposition.native --dot /tmp/truc.dot -t 30 --show-lemmas examples/tla/fsm5.zf --debug 1`
+
+## To Fix
+
+- `examples/by_case.p`  should be unsat, but arith fails
+
+## In Hold
+
+- [ ] change generalization technique:
   * collect all "ground subterms of inductive type without cstor"
      (some are incompatible, if one if subterm of the other)
   * map them to distinct variables
@@ -55,11 +43,6 @@
     that have same inductive cst(s) as subterms generalized as distinct
     variables; the dependency is lost)
     → actually this is useless?
-
-- refine enum_types for
-  `./zipperposition.native --dot /tmp/truc.dot -t 30 --show-lemmas examples/tla/fsm5.zf --debug 1`
-
-## In Hold
 
 - saturation based guessing of lemmas:
   * assume the goal is proved (with set-of-support
@@ -84,3 +67,36 @@ Otter loop?
   * write a small, simple, lightweight index for De Bruijn terms
   * re-write demod/rewriting to use this representation (carry a db_env
     along, as a kind of stack)
+
+- basic support for integers in .zf ? parse numeric constants
+  and a few infix operators
+
+## Done
+
+- [x] accept recursive functions in TIP input
+  * → can allow for simple "smallcheck" in lemma generation
+  * maybe also "smallcheck" for other clauses? probably not.
+  * [x] compile those functions into clauses by flattening, at the last moment
+    (only for non-boolean functions, we know each case will be one clause)
+  * [x] boolean functions? how to do it?
+
+  * [x] add full-def to untypedast + parser
+  * [x] add "decl + set of rewrite rules" to statement
+  * [x] in Statement, allow a set of rewrite rules to be a definition?
+  * [x] proper translation of definitions in CNF
+    + (introduce datatype for boolean (`btrue|bfalse`) and lift most constructs
+      to it. Means that we distinguish computable logic from classic logic
+      (bool vs prop)…)
+      OR express `T.true/T.false` as a regular datatype in prelude?
+    + [x] special splitting rule on booleans (non-recursive datatype), to
+      be sure to decide between btrue/bfalse.
+      → refer to FOOL paper
+    + ([ ] handle conditional rewriting by adding secondary function
+      `f x = g x if P` becomes `f x = f2 x P` and `f2 x true = g x`)
+    + [x] handle matching on non-trivial exprs by secondary function
+      `f x = match g x with C -> rhs` becomes `f x = f2 x (g x)`
+      and `f2 x C = rhs`
+  * [ ] deal with higher-order application?
+  * ([ ] make rewrite rules conditional (with conjunction of atomic conditions))
+  * ([ ] handle conditional rules in Rewrite (+ narrowing, where they turn to new lits)
+        (applies iff the whole condition simplifies to true))
