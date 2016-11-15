@@ -144,6 +144,9 @@ module Make
     mw_path: Ind_cst.path;
       (* path leading to this *)
     mw_proof: ProofStep.t;
+      (* proof for the result *)
+    mw_trail: Trail.t;
+      (* trail to carry *)
   }
 
   (* recover the (possibly empty) path from a boolean trail *)
@@ -152,6 +155,14 @@ module Make
     |> Sequence.filter_map BBox.as_case
     |> Sequence.max ~lt:(fun a b -> Ind_cst.path_dominates b a)
     |> CCOpt.get Ind_cst.path_empty
+
+  (* the rest of the trail *)
+  let trail_rest trail : Trail.t =
+    Trail.filter
+      (fun lit -> match BBox.as_case lit with
+         | None -> true
+         | Some _ -> false)
+      trail
 
   (* TODO: incremental strenghtening.
      - when expanding a coverset in clauses_of_min_witness, see if there
@@ -203,7 +214,7 @@ module Make
                (fun ctx ->
                   let t = Ind_cst.case_to_term case in
                   let lits = ClauseContext.apply ctx t in
-                  C.create_a lits mw.mw_proof ~trail:(Trail.singleton b_lit))
+                  C.create_a lits mw.mw_proof ~trail:(Trail.add b_lit mw.mw_trail))
                mw.mw_contexts
            in
            (* clauses [CNF(¬ And_i ctx_i[t']) <- b_lit] for
@@ -237,7 +248,7 @@ module Make
                            |> generalize_lits ~generalize_on:mw.mw_generalize_on
                          in
                          C.create_a lits mw.mw_proof
-                           ~trail:(Trail.singleton b_lit))
+                           ~trail:(Trail.add b_lit mw.mw_trail))
                   in
                   Sequence.of_list clauses)
             |> Sequence.to_rev_list
@@ -274,6 +285,7 @@ module Make
   let assert_min
       ~trail ~proof ~(generalize_on:Ind_cst.cst list) ctxs (cst:Ind_cst.cst) =
     let path = path_of_trail trail in
+    let trail' = trail_rest trail in
     match Ind_cst.cst_cover_set cst with
       | Some set when not (Ind_cst.path_contains_cst path cst) ->
         decl_cst_ cst;
@@ -284,6 +296,7 @@ module Make
           mw_coverset=set;
           mw_path=path;
           mw_proof=proof;
+          mw_trail=trail';
         } in
         let clauses, b_clauses = clauses_of_min_witness ~trail mw in
         A.Solver.add_clauses ~proof b_clauses;
