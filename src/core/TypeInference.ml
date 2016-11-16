@@ -313,12 +313,7 @@ let rec infer_ty_ ?loc ctx ty =
         | PT.Var (PT.V name)
         | PT.Const name ->
             let id, ty = Ctx.get_id_ ?loc ctx ~arity:(List.length l) name in
-            unify ?loc (T.Ty.returns ty) T.Ty.tType;
-            let l = List.map aux l in
-            (* ensure that the type is well-typed (!) *)
-            let ty_res = T.apply_unify ?loc ~allow_open:false ty l in
-            unify ?loc ty_res T.Ty.tType;
-            T.Ty.app id l
+            aux_app id ty l
         | _ -> error_ ?loc "@[<2>cannot apply non-constant@ `@[%a@]`@]" PT.pp f
         end
     | PT.Bind (Binder.ForallTy, vars, body) ->
@@ -330,6 +325,13 @@ let rec infer_ty_ ?loc ctx ty =
               T.Ty.forall_l vars' body')
     | _ ->
         error_ ?loc "@[<2>`@[%a@]`@ is not a valid type@]" PT.pp ty
+  and aux_app id ty l =
+    unify ?loc (T.Ty.returns ty) T.Ty.tType;
+    let l = List.map aux l in
+    (* ensure that the type is well-typed (!) *)
+    let ty_res = T.apply_unify ?loc ~allow_open:false ty l in
+    unify ?loc ty_res T.Ty.tType;
+    T.Ty.app id l
   in
   aux ty
 
@@ -385,16 +387,22 @@ let rec infer_rec ctx t =
       let l = add_implicit_params ty_id [] |> List.map (infer_rec ctx) in
       let ty = T.apply_unify ?loc ~allow_open:true ty_id l in
       T.app ~ty (T.const ~ty:ty_id id) l
-  | PT.App ({PT.term=(PT.Const s | PT.Var (PT.V s)); _}, l) ->
+  | PT.App ({PT.term=PT.Var v; _}, l) ->
+    begin match Ctx.get_var_ ctx v with
+      | `ID (id,ty) -> infer_app ?loc ctx id ty l
+      | `Var v ->
+        let l = add_implicit_params (Var.ty v) l in
+        (* infer types for arguments *)
+        let l = List.map (infer_rec ctx) l in
+        Util.debugf ~section 5 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
+          (fun k->k Var.pp v T.pp (Var.ty v) (Util.pp_list T.pp) l
+              (Util.pp_list T.pp) (List.map T.ty_exn l));
+        let ty = T.apply_unify ?loc ~allow_open:true (Var.ty v) l in
+        T.app ?loc ~ty (T.var ?loc v) l
+    end
+  | PT.App ({PT.term=PT.Const s; _}, l) ->
       let id, ty_s = Ctx.get_id_ ?loc ~arity:(List.length l) ctx s in
-      let l = add_implicit_params ty_s l in
-      (* infer types for arguments *)
-      let l = List.map (infer_rec ctx) l in
-      Util.debugf ~section 5 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
-        (fun k->k ID.pp id T.pp ty_s (Util.pp_list T.pp) l
-         (Util.pp_list T.pp) (List.map T.ty_exn l));
-      let ty = T.apply_unify ?loc ~allow_open:true ty_s l in
-      T.app ?loc ~ty (T.const ?loc ~ty:ty_s id) l
+      infer_app ?loc ctx id ty_s l
   | PT.App (f,l) ->
       (* higher order application *)
       let f = infer_rec ctx f in
@@ -559,6 +567,16 @@ let rec infer_rec ctx t =
   Util.debugf ~section 5 "@[<hv>typing of `@[%a@]`@ yields @[<2>`@[%a@]`@ : `@[%a@]`@]@]"
     (fun k->k PT.pp t T.pp t' T.pp (T.ty_exn t'));
   t'
+
+and infer_app ?loc ctx id ty_id l =
+  let l = add_implicit_params ty_id l in
+  (* infer types for arguments *)
+  let l = List.map (infer_rec ctx) l in
+  Util.debugf ~section 5 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
+    (fun k->k ID.pp id T.pp ty_id (Util.pp_list T.pp) l
+        (Util.pp_list T.pp) (List.map T.ty_exn l));
+  let ty = T.apply_unify ?loc ~allow_open:true ty_id l in
+  T.app ?loc ~ty (T.const ?loc ~ty:ty_id id) l
 
 (* replace a match with possibly a "default" case into a completely
    defined match *)

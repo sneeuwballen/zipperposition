@@ -52,7 +52,7 @@ let rec conv_ty ty = match ty with
   | A.Ty_app (s, []) ->
     T.var s (* var or const: let type inference decide *)
   | A.Ty_app (s, args) ->
-    T.app (T.const s) (List.map conv_ty args)
+    T.app (T.var s) (List.map conv_ty args)
 
 let app ?loc x y = T.app ?loc x [y]
 let app_l = T.app
