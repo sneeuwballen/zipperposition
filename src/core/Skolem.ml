@@ -50,7 +50,7 @@ type definition =
 type ctx = {
   sc_prefix : string;
   sc_prop_prefix : string;
-  mutable sc_gensym: int;
+  mutable sc_gensym: (string,int) Hashtbl.t; (* prefix -> count *)
   mutable sc_new_defs : definition list; (* "new" definitions *)
   mutable sc_new_ids: (ID.t * type_) list; (* "new" symbols *)
   sc_on_new : ID.t -> type_ -> unit;
@@ -62,16 +62,17 @@ let create
     sc_prefix=prefix;
     sc_prop_prefix=prop_prefix;
     sc_new_defs = [];
-    sc_gensym = 0;
+    sc_gensym = Hashtbl.create 16;
     sc_new_ids = [];
     sc_on_new = on_new;
   } in
   ctx
 
 let fresh_id ~ctx prefix =
-  let n = ctx.sc_gensym in
-  ctx.sc_gensym <- n+1;
-  ID.make (prefix ^ string_of_int n)
+  let n = CCHashtbl.get_or ~or_:0 ctx.sc_gensym prefix in
+  Hashtbl.replace ctx.sc_gensym prefix (n+1);
+  let name = if n=0 then prefix else prefix ^ string_of_int n in
+  ID.make name
 
 let fresh_skolem_prefix ~ctx ~ty prefix =
   let s = fresh_id ~ctx prefix in
