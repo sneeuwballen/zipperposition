@@ -440,7 +440,7 @@ let skolemize ~ctx f =
     | F.False -> f
     | F.Exists (var,f') ->
         (* replace [v] by a fresh skolem term *)
-        let t = Skolem.skolem_form ~ctx subst (Var.ty var) f in
+        let t = Skolem.skolem_form ~ctx subst var f in
         let subst = Var.Subst.add subst var t in
         Util.debugf 2 ~section "@[<2>bind %a to@ @[%a@]@]"
           (fun k->k Var.pp_full var T.pp t);

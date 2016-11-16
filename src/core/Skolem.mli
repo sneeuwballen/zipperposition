@@ -33,10 +33,10 @@ val pop_new_skolem_symbols : ctx:ctx -> (ID.t * type_) list
 
 (** {2 Skolemization} *)
 
-val skolem_form : ctx:ctx -> (type_, term) Var.Subst.t -> type_ -> form -> term
-(** [skolem_form ~ctx subst ty f] returns a term [t] made of a new symbol
+val skolem_form : ctx:ctx -> (type_, term) Var.Subst.t -> type_ Var.t -> form -> term
+(** [skolem_form ~ctx subst var f] returns a term [t] made of a new symbol
     applied to the free variables of [f] that do not occur in [subst].
-    This term should replace some free variable in [f] that has type [ty].
+    This term should replace the variable [var], occurring free in [f].
 
     For instance, [skolem_form ~ctx ø Y p(a, b, Y, X)] will yield
     something like [sk42(X)].
