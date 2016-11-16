@@ -566,26 +566,34 @@ module Ty = struct
     | _ -> 0, 0
 
   let mangle ty =
-    let buf = Buffer.create 32 in
-    let add_id id =
+    let add_id buf id =
       let s =
         ID.name id
       |> CCString.filter (function '#' -> false | _ -> true)
       in
       Buffer.add_string buf s
     in
-    let rec aux t = match view t with
+    let rec aux buf t = match view t with
       | Ty_builtin TType -> Buffer.add_string buf "ty"
       | Ty_builtin Int -> Buffer.add_string buf "int"
       | Ty_builtin Rat -> Buffer.add_string buf "rat"
-      | Ty_var v -> add_id (Var.id v)
-      | Ty_app (f,[]) -> add_id f
+      | Ty_builtin Prop -> Buffer.add_string buf "prop"
+      | Ty_builtin Term -> Buffer.add_string buf "i"
+      | Ty_var v -> add_id buf (Var.id v)
+      | Ty_app (f,[]) -> add_id buf f
       | Ty_app (f,l) ->
-        add_id f;
-        List.iter (fun sub -> Buffer.add_char buf '_'; aux sub) l
-      | _ -> ()
+        add_id buf f;
+        List.iter (fun sub -> Buffer.add_char buf '_'; aux buf sub) l
+      | Ty_fun (args,ret) ->
+        List.iter (fun sub -> aux buf sub; Buffer.add_string buf "_to_") args;
+        aux buf ret;
+      | Ty_forall (v,f) -> Printf.bprintf buf "pi_%a_%a" add_id (Var.id v) aux f
+      | Ty_multiset _
+      | Ty_record (_,_)
+      | Ty_meta _ -> ()
     in
-    aux ty;
+    let buf = Buffer.create 32 in
+    aux buf ty;
     Buffer.contents buf
 
   let is_tType t = match view t with | Ty_builtin TType -> true | _ -> false
