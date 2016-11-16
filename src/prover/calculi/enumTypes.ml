@@ -82,7 +82,7 @@ module type S = sig
   (** Register rules in the environment *)
 end
 
-let _enable = ref true
+let _enable = ref false
 let _instantiate_shielded = ref false
 let _accept_unary_types = ref true
 let _instantiate_projector_axiom = ref false
