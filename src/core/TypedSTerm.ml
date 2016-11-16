@@ -575,7 +575,7 @@ module Ty = struct
       Buffer.add_string buf s
     in
     let rec aux t = match view t with
-      | Ty_builtin TType -> Buffer.add_string buf "type"
+      | Ty_builtin TType -> Buffer.add_string buf "ty"
       | Ty_builtin Int -> Buffer.add_string buf "int"
       | Ty_builtin Rat -> Buffer.add_string buf "rat"
       | Ty_var v -> add_id (Var.id v)

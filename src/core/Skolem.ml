@@ -112,7 +112,7 @@ let skolem_form ~ctx subst ty_var form =
   (* type of the symbol: quantify over type vars, apply to vars' types *)
   let ty_var = T.Subst.eval subst ty_var in
   let ty = T.Ty.forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) ty_var) in
-  let prefix = (T.Ty.mangle ty_var) ^ "_" in
+  let prefix = T.Ty.mangle ty_var in
   let f = fresh_skolem_prefix ~ctx ~ty prefix in
   T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t)
 
