@@ -26,6 +26,7 @@ let wrong_state_ msg = raise (WrongState msg)
 let errorf msg = Util.errorf ~where:"sat_solver" msg
 
 let sat_dump_file_ = ref ""
+let sat_compact_ = ref true
 
 module type S = Sat_solver_intf.S
 
@@ -167,8 +168,22 @@ module Make(Dummy : sig end)
 
   let tbl_res = ResTbl.create 16
 
+  let proof_of_leaf c =
+    (* leaf of the proof *)
+    let tag = match S.get_tag c with
+      | None ->
+        errorf "no tag in leaf of SAT proof (clause %a)" S.St.pp_clause c
+      | Some id -> id
+    in
+    begin match CCHashtbl.get tag_to_proof_ tag with
+      | Some step ->
+        let c = bool_clause_of_sat c in
+        ProofStep.mk_bc step c
+      | None -> errorf "no proof for tag %d" tag
+    end
+
   (* convert a SAT proof into a tree of ProofStep *)
-  let conv_proof_ p : proof =
+  let conv_proof_atomic_ p : proof =
     let rec aux p =
       let open S.Proof in
       match S.Proof.expand p with
@@ -176,6 +191,7 @@ module Make(Dummy : sig end)
         errorf "SAT proof involves a lemma"
       | { conclusion=c; step = S.Proof.Resolution (p1,p2,_) } ->
         let c = bool_clause_of_sat c in
+        (* atomic resolution step *)
         let q1 = aux p1 in
         let q2 = aux p2 in
         begin match ResTbl.get tbl_res (c,q1,q2) with
@@ -190,21 +206,35 @@ module Make(Dummy : sig end)
             ResTbl.add tbl_res (c,q2,q1) s;
             s
         end
-      | { conclusion=c; step = _ } ->
-        let tag = match S.get_tag c with
-          | None ->
-            errorf "no tag in leaf of SAT proof (clause %a)" S.St.pp_clause c
-          | Some id -> id
-        in
-        begin match CCHashtbl.get tag_to_proof_ tag with
-          | Some step ->
-            let c = bool_clause_of_sat c in
-            ProofStep.mk_bc step c
-          | None -> errorf "no proof for tag %d" tag
-        end
+      | { conclusion=c; step = _ } -> proof_of_leaf c
     in
     S.Proof.check p;
     aux p
+
+  let conv_proof_compact_ p : proof =
+    let open S.Proof in
+    let leaves =
+      S.Proof.fold
+        (fun acc pnode -> match pnode with
+           | { step = S.Proof.Lemma _; _ } ->
+             errorf "SAT proof involves a lemma"
+           | { step = S.Proof.Resolution (_,_,_); _ } ->
+             acc (* ignore, intermediate node *)
+           | { conclusion=c; step = _ } ->
+             proof_of_leaf c :: acc)
+        [] p
+    in
+    let {conclusion=c;_} = S.Proof.expand p in
+    let c = bool_clause_of_sat c in
+    let step =
+      ProofStep.mk_inference leaves
+        ~rule:(ProofStep.mk_rule "sat_resolution*")  in
+    ProofStep.mk_bc step c
+
+  let conv_proof_ p =
+    if !sat_compact_
+    then conv_proof_compact_ p
+    else conv_proof_atomic_ p
 
   let get_proof_of_lit lit =
     let b, l = valuation_level lit in
@@ -279,7 +309,11 @@ module Make(Dummy : sig end)
     ()
 end
 
+let set_compact b = sat_compact_ := b
+
 let () =
   Params.add_opts
     [ "--sat-dump", Arg.Set_string sat_dump_file_, " output SAT problem(s) into <file>"
+    ; "--compact-sat", Arg.Set sat_compact_, " compact SAT proofs"
+    ; "--no-compact-sat", Arg.Clear sat_compact_, " do not compact SAT proofs"
     ]
