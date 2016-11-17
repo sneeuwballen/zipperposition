@@ -413,7 +413,7 @@ module Make
                  CCList.remove ~eq:Ind_cst.cst_equal ~x:cst consts
                in
                induction_on_ clauses ~cst ~generalize_on)
-          |> E.cr_add
+          |> E.cr_return (* do not add the clause itself *)
         end
     | _ -> E.cr_skip
 

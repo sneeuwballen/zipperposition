@@ -731,10 +731,11 @@ module Make(X : sig
         []
       | [] -> C.of_statement st
       | r :: rules' ->
-          match r st with
+          begin match r st with
             | CR_skip -> conv_clause_ rules' st
             | CR_return l -> l
             | CR_add l -> List.rev_append l (conv_clause_ rules' st)
+          end
     in
     let clauses =
       CCVector.flat_map_list (conv_clause_ !_clause_conversion_rules) stmts in

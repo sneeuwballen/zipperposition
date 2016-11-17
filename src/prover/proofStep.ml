@@ -98,7 +98,17 @@ let compare_proof a b =
   let (<?>) = CCOrd.(<?>) in
   compare a.step b.step <?> (compare_result, a.result, b.result)
 
-let equal_proof a b = (compare_proof a b = 0)
+let equal_result a b = match a, b with
+  | Clause c1, Clause c2 -> SClause.equal c1 c2
+  | Form f1, Form f2 -> TypedSTerm.equal f1 f2
+  | BoolClause l1, BoolClause l2 -> CCList.equal BBox.Lit.equal l1 l2
+  | Clause _, _
+  | Form _, _
+  | BoolClause _, _ -> false
+
+let equal_proof a b =
+  equal a.step b.step && equal_result a.result b.result
+
 let hash_proof a = hash a.step
 
 module PTbl = CCHashtbl.Make(struct
