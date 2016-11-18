@@ -302,7 +302,30 @@ module Flatten = struct
       | T.Bind (Binder.Exists,var,body) ->
         (aux Pos_toplevel vars body >|= F.exists var) >|= aux_maybe_define pos
       | T.Bind (Binder.Lambda, _, _) ->
-        Util.errorf ~where:"Cnf.flatten" "cannot eliminate lambda-term"
+        (* lambda-lifting *)
+        let fun_vars, body = T.open_binder Binder.Lambda t in
+        assert (fun_vars <> []);
+        (* give a name to [body vars] *)
+        let closure = T.free_vars t in
+        let all_vars = closure @ fun_vars in
+        let cases =
+          (* flatten body, but it can only specify cases for its closure *)
+          aux Pos_toplevel all_vars body >>= fun body' ->
+          get_subst >|= fun subst ->
+          Format.printf "@[<2>subst {@[%a@]}@ closure %a@ body `@[%a@]`@]@."
+            T.Subst.pp subst CCFormat.Dump.(list Var.pp_full) closure T.pp body';
+          apply_subst_vars_ subst all_vars, T.Subst.eval subst body'
+        in
+        let rules = to_list' cases in
+        Format.printf "@[<2>define_lambda `@[%a@]`@ rules: [@[%a@]]@]@."
+          T.pp t (Util.pp_list CCFormat.Dump.(pair (list T.pp) T.pp)) rules;
+        let def = Skolem.define_term ~ctx rules in
+        let res =
+          T.app ~ty:(T.ty_exn t)
+            (T.const def.Skolem.td_id ~ty:def.Skolem.td_ty)
+            (List.map T.var closure)
+        in
+        return res
       | T.Bind (Binder.ForallTy,_,_)
       | T.Multiset _
       | T.Record _
@@ -800,7 +823,6 @@ let flatten ~ctx seq : _ Sequence.t =
                   let rules = CCList.flat_map flatten_def d.Stmt.def_rules in
                   { d with Stmt.def_rules=rules })
                l
-               (* TODO *)
            in
            [Stmt.def ~src l]
          | Stmt.RewriteForm ((vars, _, _) as r) ->
