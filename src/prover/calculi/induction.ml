@@ -326,7 +326,7 @@ end = struct
   let generate_terms ~depth (funs:Signature.t): T.Set.t =
     let open Sequence.Infix in
     (* generate terms of [depth] that have type [ty] *)
-    let rec aux_by_ty ~depth vars (ty:Type.t): T.t Sequence.t =
+    let rec aux_by_ty ~depth (ty:Type.t): T.t Sequence.t =
       assert (depth >= 0);
       Signature.Seq.to_seq funs
       |> Sequence.filter_map
@@ -359,7 +359,7 @@ end = struct
                    (fun ty -> Substs.Ty.apply_no_renaming subst (ty,1))
                    ty_args
                in
-               aux_l ~depth:(depth-1) vars ty_args >>= fun args ->
+               aux_l ~depth:(depth-1) ty_args >>= fun args ->
                let res = T.app_full (T.const ~ty:ty_f id_f) ty_vars args in
                (* check size limit *)
                if T.size res > max_term_size
@@ -367,39 +367,29 @@ end = struct
                else Sequence.return res
            end)
 
-    (* pick a variable in [vars] that has the proper type *)
-    and pick_var vars (ty:Type.t): T.t Sequence.t =
-      let vars_of_ty =
-        T.VarSet.to_seq vars
-        |> Sequence.filter (fun v -> Type.equal (HVar.ty v) ty)
-      in
-      let num_vars = T.VarSet.cardinal vars in
-      let new_ =
-        if T.VarSet.cardinal vars < max_vars_gen
-        then Sequence.return (HVar.make ~ty num_vars) (* can add another var *)
-        else Sequence.empty
-      in
-      Sequence.append new_ vars_of_ty |> Sequence.map T.var
+    (* pick a variable that has the proper type *)
+    and pick_var (ty:Type.t): T.t Sequence.t =
+      Sequence.(0 -- (max_vars_gen-1))
+      |> Sequence.map (fun i -> HVar.make ~ty i)
+      |> Sequence.map T.var
 
     (* generate a list of terms corresponding to the types *)
-    and aux_l ~depth vars (tys:Type.t list): T.t list Sequence.t =
+    and aux_l ~depth (tys:Type.t list): T.t list Sequence.t =
       match tys with
         | [] -> Sequence.return []
         | ty :: tys' ->
           (* to get a term of type [ty], search in [vars] and in signature *)
           Sequence.append
-            (pick_var vars ty)
-            (aux_by_ty ~depth vars ty)
+            (pick_var ty)
+            (aux_by_ty ~depth ty)
           >>= fun t ->
-          (* add variables of [t] to the list *)
-          let vars = T.VarSet.union vars (T.vars t) in
           (* compute rest of the list *)
-          aux_l ~depth vars tys' >|= fun tail ->
+          aux_l ~depth tys' >|= fun tail ->
           t :: tail
     in
     (* generate terms that are not variables.
        @param vars set of variables we can re-use *)
-    let aux_non_vars ~depth vars: T.t Sequence.t =
+    let aux_non_vars ~depth : T.t Sequence.t =
       Signature.Seq.to_seq funs
       |> Sequence.flat_map
         (fun (id_f,ty_f) ->
@@ -410,14 +400,14 @@ end = struct
            in
            (* [ty_f] applied to the fresh type variables *)
            let ty_args, _ = Type.apply ty_f ty_vars |> Type.open_fun in
-           aux_l ~depth:(depth-1) vars ty_args >>= fun args ->
+           aux_l ~depth:(depth-1) ty_args >>= fun args ->
            let res = T.app_full (T.const ~ty:ty_f id_f) ty_vars args in
            if T.size res > max_term_size
            then Sequence.empty
            else Sequence.return res
         )
     in
-    aux_non_vars ~depth T.VarSet.empty
+    aux_non_vars ~depth
     |> Sequence.flat_map
       (* add the variables of [t] themselves *)
       (fun t -> Sequence.cons t (T.Seq.vars t |> Sequence.map T.var))
@@ -470,6 +460,10 @@ end = struct
     )
     else []
 
+  (* TODO: to compute [funs], restriction to defined symbols that are reachable
+     from the goal (would help for big signatures where lots of
+     symbols would never be used) *)
+
   (* functions in the signature that are not skolems and take
      and return inductive types (or variables) *)
   let funs_ : Signature.t lazy_t = lazy (
@@ -478,6 +472,7 @@ end = struct
       Type.is_var ty ||
       Type.is_bvar ty ||
       Type.is_prop ty ||
+      Type.is_tType ty ||
       Ind_ty.is_inductive_type ty
     in
     let res =
