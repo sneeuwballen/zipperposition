@@ -27,9 +27,8 @@ depends: [
   "zarith"
   "containers" { > "0.16" < "1.0" }
   "sequence" { >= "0.4" }
-  "gen"
   "oclock"
-  "oasis"
+  "oasis" { build }
   "msat" { >= "0.4" < "0.5" }
 ]
 depopts: [

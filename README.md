@@ -1,18 +1,27 @@
 # Zipperposition
 
 - Automated theorem prover for first-order logic with equality and theories.
-- Logic toolkit, designed primarily for first-order automated reasoning. It aims
+- Logic toolkit (`libzipperposition`), designed primarily
+  for first-order automated reasoning. It aims
   at providing basic types and algorithms (terms, unification, orderings,
   indexing, etc.) that can be factored out of several applications.
 
 ## Short summary
 
-Zipperposition is intended to be a superposition prover for full first order logic. The accent
-is on flexibility, modularity and simplicity rather than performance, to allow
-quick experimenting on automated theorem proving. It generates TSTP traces.
+Zipperposition is intended to be a superposition prover for full first
+order logic, plus some extensions (datatypes, recursive functions, arithmetic).
+The accent is on flexibility, modularity and simplicity rather than
+performance, to allow quick experimenting on automated theorem proving. It
+generates TSTP traces or graphviz files for nice graphical display.
+
+Zipperposition supports several input formats:
+
+- TSTP (fof, cnf, tff)
+- [TIP](https://tip-org.github.io/)
+- its own native input, extension `.zf` (see directory `examples/`)
 
 Zipperposition is written in the functional and imperative language
-[OCaml](http://caml.inria.fr). The name is a bad play on the words "zipper" (a
+[OCaml](https://ocaml.org). The name is a bad play on the words "zipper" (a
 functional data structure) and "superposition" (the calculus used by the
 prover), although the current implementation is written in quite an imperative style.
 Superposition-based theorem proving is an active field of research, so
@@ -26,11 +35,6 @@ are:
 **Disclaimer**: Note that the prover is currently a prototype and is
 likely not complete. Please don't use it to drive your personal
 nuclear power plant, nor as a trusted tool for critical applications.
-
-**Second Disclaimer**: The code is currently not clean, the last research
-effort was requiring C dependencies and I did not take the time to
-make everything (in particular, plugins and meta-prover) work again. Some
-options or documentation may be plain wrong.
 
 ## License
 
@@ -66,7 +70,8 @@ If you really need to, you can download a release on the
 following [github page for releases](https://github.com/c-cube/zipperposition/releases).
 
 Look in the file `opam` to see which dependencies you need to install.
-They include `menhir`, `zarith`, `containers` and `sequence`, but
+They include `menhir`, `zarith`, `containers`,
+`oclock`, [msat](https://github.com/Gbury/mSAT) and `sequence`, but
 maybe also other libraries. Consider using opam directly if possible.
 
     $ ./configure
@@ -75,13 +80,9 @@ maybe also other libraries. Consider using opam directly if possible.
 
 Additional sub-libraries can be built if their respective dependencies
 are met, and the appropriate `./configure --enable-foobar` flag was set.
-For instance, to build the *meta-prover* library (used to detect axiomatic
-theories), you should run
-
-    $ ./configure --enable-meta
 
 If [menhir](http://cristal.inria.fr/~fpottier/menhir/) is installed, the
-parsers library `Logtk_parsers` can be built with
+parsers library `Libzipperposition_parsers` can be built with
 
     $ ./configure --enable-parsers
 
@@ -100,7 +101,7 @@ Typical usage:
     $ zipperposition --help
     $ zipperposition problem_file [options]
     $ zipperposition --arith ARI114=1.p
-    $ zipperposition --dot /tmp/foo.dot examples/ind/nat1.p
+    $ zipperposition --dot /tmp/foo.dot examples/ind/nat1.zf
 
 to run the prover. Help is available with the option *-help*.
 
@@ -108,7 +109,7 @@ For instance,
 
     $ zipperposition pelletier_problems/pb47.p --ord rpo6 --timeout 30
 
-Several tools are shipped with `Logtk`, including a CNF converter, a type-checker,
+Several tools are shipped with Zipperposition, including a CNF converter, a type-checker,
 etc. They are built if the flag `--enable-tools` is set. Documentation
 will be built provided `--enable-docs` is set.
 
@@ -129,18 +130,14 @@ installation/uninstallation are just:
 Zipperposition's library provides several useful
 parts for logic-related implementations:
 
-- a library packed in a module `Logtk`, with terms, formulas, etc.;
+- a library packed in a module `Libzipperposition`, with terms, formulas, etc.;
+- a library packed in a module `Libzipperposition_parsers`, with parsers for input formats;
 - small tools (see directory `src/tools/`) to illustrate how to use the library
     and provide basic services (type-checking, reduction to CNF, etc.);
-- an optional library in a module `Logtk_meta`,
-    to provide reasoning at the problem level, about the presence of axiomatic
-    theories. A small file describing a few theories can be found in
-    `data/builtin.theory` and one of the tools, `detect_theories`, can be
-    used straightforwardly.
 
 ## Documentation
 
-See [this page](http://cedeela.fr/~simon/software/logtk/).
+See [this page](http://c-cube.github.io/zipperposition/).
 
 There are some examples of how to use the code in `src/tools/`
 and `src/demo/`.
