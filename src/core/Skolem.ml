@@ -157,19 +157,28 @@ let define_form ~ctx ~add_rules ~polarity form =
   def
 
 let define_term ~ctx rules : term_definition =
-  let ty_args, ty_ret = match rules with
+  let args, ty_ret = match rules with
     | [] -> assert false
-    | (args, rhs) :: _ ->
-      List.map T.ty_exn args, T.ty_exn rhs
+    | (args, rhs) :: _ -> args, T.ty_exn rhs
   in
+  (* separate type variables and arguments *)
+  let ty_vars, args =
+    CCList.partition_map
+      (fun t -> match T.view t with
+         | T.Var v when T.Ty.is_tType (Var.ty v) -> `Left v
+         | _ -> `Right t)
+      args
+  in
+  let ty_args = List.map T.ty_exn args in
   (* checks *)
   List.iter
     (fun (args,_) ->
-       assert (List.length args = List.length ty_args);
-       assert (List.for_all2 (fun t ty -> T.Ty.equal ty (T.ty_exn t)) args ty_args);
+       let args' = CCList.drop (List.length ty_vars) args in
+       assert (List.length args' = List.length ty_args);
+       assert (List.for_all2 (fun t ty -> T.Ty.equal ty (T.ty_exn t)) args' ty_args);
        ())
     rules;
-  let ty = T.Ty.fun_ ty_args ty_ret in
+  let ty = T.Ty.forall_l ty_vars (T.Ty.fun_ ty_args ty_ret) in
   let is_prop = T.Ty.is_prop ty_ret in
   (* NOTE: not a skolem, just a mere constant undeclared so far *)
   let id = fresh_id ~ctx "fun_" in

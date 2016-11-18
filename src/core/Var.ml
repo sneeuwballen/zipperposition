@@ -72,7 +72,7 @@ module Subst = struct
   let to_list t = ID.Map.fold (fun _ tup acc -> tup::acc) t []
   let pp pp_v out t =
     let pp_pair out (v,x) =
-      Format.fprintf out "@[%a → %a@]" pp v pp_v x
+      Format.fprintf out "@[%a → %a@]" pp_full v pp_v x
     in
     CCFormat.seq ~start:"" ~stop:"" ~sep:", " pp_pair out (to_seq t)
   let merge a b =

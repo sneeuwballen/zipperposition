@@ -776,6 +776,7 @@ module Subst = struct
     | Var v ->
         begin try
           let t' = Var.Subst.find_exn subst v in
+          assert (t != t');
           eval subst t'
         with Not_found ->
           var ?loc:t.loc (Var.update_ty v ~f:(eval subst))
@@ -784,11 +785,11 @@ module Subst = struct
     | App (f, l) ->
         let ty = eval subst (ty_exn t) in
         app ?loc:t.loc ~ty (eval subst f) (eval_list subst l)
-    | Bind (s, v, t) ->
+    | Bind (s, v, body) ->
         let ty = eval subst (ty_exn t) in
         (* bind [v] to a fresh name to avoid collision *)
         let subst, v' = rename_var subst v in
-        bind ?loc:t.loc ~ty s v' (eval subst t)
+        bind ?loc:t.loc ~ty s v' (eval subst body)
     | AppBuiltin (Builtin.TType,_) -> t
     | AppBuiltin (b,l) ->
         let ty = eval subst (ty_exn t) in
