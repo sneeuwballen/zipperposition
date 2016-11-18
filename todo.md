@@ -2,17 +2,20 @@
 
 ## Now
 
-- lemma guessing (wip)
+- lemma by generalization (if `t` occurs on both sides of ineq?)
+  * see what isaplanner does
+
+## Main
 
 - rule similar to `fool_param` for for datatypes:
   `C[t]` where `t:nat` (strict subterm) is not a cstor term nor a variable
   would become `C[S x] ∨ t ≠ S x` and `C[0] ∨ t ≠ 0`
   * should be terminating (reduces the number of such strict subterms)
+    but careful that with reduction you might find the same clause again,
+    this must be an inference and not a simplification
   * is sound, and might be decreasing (check!).
     It does seem to work for fool.
   * enables more reductions…
-
-## Main
 
 - [ ] better traces
   + [ ] rewriting steps should list set of rewrite rules used?
@@ -34,6 +37,8 @@
 
 ## To Fix
 
+- type error  in `tip-benchmarks/isaplanner/prop_46.smt2`
+- `examples/pelletier_problems/pb49.p` (wrong CNF? also, bad type inference on first axiom)
 - `examples/by_case.p`  should be unsat, but arith fails
 
 ## In Hold
@@ -108,7 +113,7 @@ Otter loop?
     + [x] handle matching on non-trivial exprs by secondary function
       `f x = match g x with C -> rhs` becomes `f x = f2 x (g x)`
       and `f2 x C = rhs`
-  * [ ] deal with higher-order application?
+  * [x] deal with higher-order application?
   * ([ ] make rewrite rules conditional (with conjunction of atomic conditions))
   * ([ ] handle conditional rules in Rewrite (+ narrowing, where they turn to new lits)
         (applies iff the whole condition simplifies to true))
