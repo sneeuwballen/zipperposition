@@ -93,6 +93,13 @@ let collect_vars ?(filter=fun _->true) f =
     |> Var.Set.to_list
     |> List.partition is_ty_var
 
+let ty_forall ?loc v ty =
+  if T.Ty.is_tType (Var.ty v) && T.Ty.returns_tType ty
+  then T.Ty.fun_ ?loc [T.Ty.tType] ty (* [forall v:type. t] becomes [type -> t] *)
+  else T.Ty.forall ?loc v ty
+
+let ty_forall_l = List.fold_right ty_forall
+
 let skolem_form ~ctx subst var form =
   (* only free variables we are interested in, are those bound to actual
      free variables (the universal variables), not the existential ones
@@ -112,7 +119,7 @@ let skolem_form ~ctx subst var form =
   let tyvars_t = List.map (fun v->T.Ty.var v) tyvars in
   (* type of the symbol: quantify over type vars, apply to vars' types *)
   let ty_var = T.Subst.eval subst (Var.ty var) in
-  let ty = T.Ty.forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) ty_var) in
+  let ty = ty_forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) ty_var) in
   let prefix = Var.to_string var in
   let f = fresh_skolem_prefix ~ctx ~ty prefix in
   T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t)
@@ -142,7 +149,7 @@ let define_form ~ctx ~add_rules ~polarity form =
   let vars_t = List.map (fun v->T.var v) vars in
   let tyvars_t = List.map (fun v->T.Ty.var v) tyvars in
   (* similar to {!skolem_form}, but always return [prop] *)
-  let ty = T.Ty.forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) T.Ty.prop) in
+  let ty = ty_forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) T.Ty.prop) in
   let f = fresh_skolem_prefix ~ctx ~ty "zip_tseitin" in
   let proxy = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
   (* register the new definition *)

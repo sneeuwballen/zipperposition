@@ -228,8 +228,9 @@ let apply ty0 args0 =
       else
         err_applyf_
           "@[<2>Type.apply:@ wrong argument type,@ expected `@[_ : %a@]`@ \
-           but got `@[%a : %a@]`@ when applying `%a` to@ [@[%a@]]@]"
+           but got `@[%a : %a@]`@ when applying `%a` to@ [@[%a@]]@ in env [%a]@]"
           T.pp exp' T.pp a T.pp (T.ty_exn a) T.pp ty0 (Util.pp_list T.pp) args0
+          (DBEnv.pp T.pp) env
   in
   aux ty0 args0 DBEnv.empty
 
