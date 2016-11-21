@@ -2,10 +2,16 @@
 
 ## Now
 
+## Main
+
+- make real benchmarks:
+  * add `lemma` statement to tip-parser
+  * parse this in Zipperposition
+  * use quickspec to generate lemmas on Isaplanner problems
+  * run benchmarks (without induction, with induction, with quickspec lemmas)
+
 - lemma by generalization (if `t` occurs on both sides of ineq?)
   * see what isaplanner does
-
-## Main
 
 - rule similar to `fool_param` for for datatypes:
   `C[t]` where `t:nat` (strict subterm) is not a cstor term nor a variable
