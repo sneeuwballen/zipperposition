@@ -27,7 +27,7 @@ module Prover = struct
 
         - "timeout" is the timeout in seconds *)
 
-  let __table = Hashtbl.create 5
+  let __table : (string,t) Hashtbl.t = Hashtbl.create 5
 
   let lookup name = Hashtbl.find __table name
 
