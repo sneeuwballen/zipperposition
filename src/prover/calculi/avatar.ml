@@ -42,7 +42,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     UnionFind.Make(struct
       type key = T.var
       type value = Lit.t list
-      let equal = HVar.equal
+      let equal = HVar.equal Type.equal
       let hash = HVar.hash
       let zero = []
       let merge = List.rev_append
@@ -151,9 +151,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     );
     [] (* never infers anything! *)
 
-  (* check whether the trail of [c] is false and will remain so *)
-  let trail_is_trivial_ c =
-    let trail = C.trail c in
+  (* check whether the trail is false and will remain so *)
+  let trail_is_trivial_ (trail:Trail.t): bool =
     let res =
       Trail.exists
         (fun lit ->
@@ -165,12 +164,12 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     in
     if res then (
       Util.incr_stat stat_trail_trivial;
-      Util.debugf ~section 3 "@[<2>clause @[%a@]@ has a trivial trail@]" (fun k->k C.pp c);
+      Util.debugf ~section 3 "@[<2>trail @[%a@] is trivial@]" (fun k->k C.pp_trail trail);
     );
     res
 
-  let trail_is_trivial c =
-    Sat.last_result () = Sat_solver.Sat && trail_is_trivial_ c
+  let trail_is_trivial tr =
+    Sat.last_result () = Sat_solver.Sat && trail_is_trivial_ tr
 
   (* simplify the trail of [c] using boolean literals that have been proven *)
   let simplify_trail_ c =
@@ -268,7 +267,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         |> Sequence.mapi
           (fun i lits -> Literals.Seq.vars lits |> Sequence.map (fun v->v,i))
         |> Sequence.flatten
-        |> Sequence.sort_uniq ~cmp:CCOrd.(pair HVar.compare int_)
+        |> Sequence.sort_uniq ~cmp:CCOrd.(pair (HVar.compare Type.compare) int_)
         |> Sequence.to_rev_list
       in
       let subst, skolems =
@@ -315,8 +314,14 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     }
 
   let on_input_lemma : cut_res Signal.t = Signal.create ()
+  let on_lemma : cut_res Signal.t = Signal.create()
 
-  let all_lemmas_ = ref []
+  let all_lemmas_ : cut_res list ref = ref []
+
+  let add_lemma (c:cut_res): unit =
+    all_lemmas_ := c :: !all_lemmas_;
+    Signal.send on_lemma c;
+    ()
 
   let print_lemmas out () =
     let pp_lemma out c =
@@ -349,42 +354,20 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       in
       let cut = introduce_cut l proof in
       let all_clauses = cut_res_clauses cut |> Sequence.to_rev_list in
+      add_lemma cut;
       Signal.send on_input_lemma cut;
       (* interrupt here *)
       E.cr_return all_clauses
     | _ -> E.cr_skip
 
-  module Meta(M : MetaProverState.S) = struct
-    (* XXX ugly, but I could not find a way to prove M.E.C.t = C.t *)
-    external c_of_lemma : M.lemma -> C.t = "%identity"
-
-    (* introduce a cut for each lemma proposed by the meta-prover *)
-    let introduce_meta_lemmas (q:M.lemma Queue.t) _given =
-      (* translate all new lemmas into cuts *)
-      let clauses =
-        Sequence.of_queue q
-        |> Sequence.flat_map
-          (fun c ->
-            let c = c_of_lemma c in
-            assert (C.trail c |> Trail.is_empty);
-            let res = introduce_cut [C.lits c] (C.proof_step c) in
-            Util.debugf ~section 2 "@[<hv2>introduce cut from meta lemma:@,%a@]"
-              (fun k->k pp_cut_res res);
-            cut_res_clauses res)
-        |> Sequence.to_rev_list
-      in
-      Queue.clear q;
-      clauses
-  end
-
   let before_check_sat = Signal.create()
   let after_check_sat = Signal.create()
 
   (* Just check the solver *)
-  let check_satisfiability () =
+  let check_satisfiability ~full () =
     Util.enter_prof prof_check;
     Signal.send before_check_sat ();
-    let res = match Sat.check ()  with
+    let res = match Sat.check ~full ()  with
       | Sat_solver.Sat ->
           Util.debug ~section 3 "SAT-solver reports \"SAT\"";
           []
@@ -398,44 +381,29 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     Util.exit_prof prof_check;
     res
 
-  let register () =
-    Util.debug ~section:Const.section 2 "register extension Avatar";
+  let register ~split:do_split () =
+    Util.debugf ~section:Const.section 2 "register extension Avatar (split: %B)"
+      (fun k->k do_split);
     Sat.set_printer BBox.pp;
-    E.add_multi_simpl_rule split;
+    if do_split then (
+      E.add_multi_simpl_rule split;
+    );
     E.add_unary_inf "avatar_check_empty" check_empty;
     E.add_generate "avatar_check_sat" check_satisfiability;
     E.add_clause_conversion convert_lemma;
-    E.add_is_trivial trail_is_trivial;
+    E.add_is_trivial_trail trail_is_trivial;
     E.add_simplify simplify_trail;
     if E.flex_get k_show_lemmas then (
-      Signal.on_every on_input_lemma (fun c -> all_lemmas_ := c :: !all_lemmas_);
       Signal.once Signals.on_exit (fun _ -> show_lemmas ());
     );
     (* be sure there is an initial valuation *)
-    ignore (Sat.check());
-    (* meta lemmas *)
-    begin
-      try
-        let (module M) = MetaProverState.get_env (module E) in
-        Util.debug ~section 1 "found meta-prover, watch for lemmas";
-        let module M2 = Meta(M) in
-        let q = Queue.create () in
-        Signal.on_every M.on_lemma
-          (fun lemma ->
-             Util.debugf ~section 2 "@[obtained lemma @[%a@]@ from meta-prover@]"
-               (fun k->k M.C.pp lemma);
-             Queue.push lemma q);
-        E.add_unary_inf "avatar_meta_lemmas" (M2.introduce_meta_lemmas q);
-      with Not_found ->
-        Util.debug ~section 1 "could not find meta-prover";
-        ()
-    end;
+    ignore (Sat.check ~full:true ());
     ()
 end
 
 let get_env (module E : Env.S) : (module S) = E.flex_get k_avatar
 
-let enabled_ = ref true
+let enabled_ = ref false
 let show_lemmas_ = ref false
 
 let extension =
@@ -447,16 +415,14 @@ let extension =
     let module A = Make(E)(Sat) in
     E.flex_add k_avatar (module A : S);
     E.flex_add k_show_lemmas !show_lemmas_;
-    if !enabled_ then (
-      Util.debug 1 "enable Avatar";
-      A.register()
-    )
+    Util.debug 1 "enable Avatar";
+    A.register ~split:!enabled_ ()
   in
   Extensions.({default with name="avatar"; env_actions=[action]})
 
 let () =
   Params.add_opts
-  [ "--avatar", Arg.Set enabled_, " enable Avatar"
-  ; "--no-avatar", Arg.Clear enabled_, " disable Avatar"
-  ; "--show-lemmas", Arg.Set show_lemmas_, " show status of lemmas"
+  [ "--avatar", Arg.Set enabled_, " enable Avatar splitting"
+  ; "--no-avatar", Arg.Clear enabled_, " disable Avatar splitting"
+  ; "--print-lemmas", Arg.Set show_lemmas_, " show status of Avatar lemmas"
   ]

@@ -13,6 +13,7 @@ module M = Monome
 module MF = Monome.Focus
 module AL = ArithLit
 module ALF = ArithLit.Focus
+module Stmt = Statement
 
 let stat_arith_sup = Util.mk_stat "arith.superposition"
 let stat_arith_cancellation = Util.mk_stat "arith.arith_cancellation"
@@ -123,7 +124,7 @@ module type S = sig
   val register : unit -> unit
 end
 
-let enable_arith_ = ref false
+let enable_arith_ = ref true
 let enable_ac_ = ref false
 let enable_semantic_tauto_ = ref true
 let enable_trivial_ineq_ = ref true
@@ -1689,7 +1690,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let is_shielded lits ~var =
     let rec shielded_by_term ~root t = match T.view t with
-      | T.Var v' when HVar.equal v' var -> not root
+      | T.Var v' when HVar.equal Type.equal v' var -> not root
       | T.Var _
       | T.DB _
       | T.Const _ -> false
@@ -2015,7 +2016,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     ()
 
   let register () =
-    Util.debug ~section 2 "cancellative inf: setup env";
+    Util.debug ~section 2 "arith: setup env";
+    (* enable arith printing of terms *)
+    T.add_hook T.Arith.pp_hook;
+    (* add inference rules *)
     Env.add_binary_inf "canc_sup_active" canc_sup_active;
     Env.add_binary_inf "canc_sup_passive" canc_sup_passive;
     Env.add_unary_inf "cancellation" cancellation;
@@ -2057,36 +2061,54 @@ module Make(E : Env.S) : S with module Env = E = struct
     ()
 end
 
+let k_should_register = Flex_state.create_key ()
+
 let extension =
-  let action env =
+  let env_action env =
     let module E = (val env : Env.S) in
-    let module I = Make(E) in
-    I.register ()
+    if E.flex_get k_should_register then (
+      let module I = Make(E) in
+      I.register ()
+    )
+  and post_typing_action stmts state =
+    let module PT = TypedSTerm in
+    let has_int =
+      CCVector.to_seq stmts
+      |> Sequence.flat_map Stmt.Seq.to_seq
+      |> Sequence.flat_map
+        (function
+          | `ID _ -> Sequence.empty
+          | `Ty ty -> Sequence.return ty
+          | `Form t
+          | `Term t -> PT.Seq.subterms t |> Sequence.filter_map PT.ty)
+      |> Sequence.exists (PT.Ty.equal PT.Ty.int)
+    in
+    let should_reg = !enable_arith_ && has_int in
+    Util.debugf ~section 2 "decision to register arith: %B" (fun k->k should_reg);
+    Flex_state.add k_should_register should_reg state
   in
   { Extensions.default with Extensions.
     name="arith_int";
-    env_actions=[action];
+    post_typing_actions=[post_typing_action];
+    env_actions=[env_action];
   }
 
-let _enable_arith () =
-  if not !enable_arith_ then (
-    enable_arith_ := true;
-    (* enable arith printing of terms *)
-    T.add_hook T.Arith.pp_hook;
-    Extensions.register extension;
-  )
+let () = Extensions.register extension
 
 let () =
   Params.add_opts
     [ "--arith-no-semantic-tauto"
-      , Arg.Unit (fun () -> _enable_arith (); enable_semantic_tauto_ := false)
+      , Arg.Clear enable_semantic_tauto_
       , " disable arithmetic semantic tautology check"
     ; "--arith-no-trivial-ineq"
-      , Arg.Unit (fun () -> _enable_arith (); enable_trivial_ineq_ := false)
+      , Arg.Clear enable_trivial_ineq_
       , " disable inequality triviality checking by rewriting"
     ; "--arith"
-      , Arg.Unit _enable_arith
+      , Arg.Set enable_arith_
       , " enable axiomatic integer arithmetic"
+    ; "--no-arith"
+      , Arg.Clear enable_arith_
+      , " disable axiomatic integer arithmetic"
     ; "--arith-ac"
       , Arg.Set enable_ac_
       , " enable AC axioms for arithmetic (sum)"

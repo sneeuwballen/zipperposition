@@ -42,7 +42,7 @@ let declare signature id ty =
     then raise (Invalid_argument "Signature.declare: non-closed type");
     ID.Map.add id ty signature
 
-let cardinal signature = ID.Map.cardinal signature
+let cardinal = ID.Map.cardinal
 
 let arity signature s =
   let ty = find_exn signature s in
@@ -65,8 +65,6 @@ let merge s1 s2 =
        | Some s1, None -> Some s1
        | None, Some s2 -> Some s2)
     s1 s2
-
-let filter s p = ID.Map.filter p s
 
 let diff s1 s2 =
   ID.Map.merge

@@ -46,6 +46,7 @@ let load_extensions =
   Extensions.register Induction.extension;
   Extensions.register Rewriting.extension;
   Extensions.register Ind_types.extension;
+  Extensions.register Fool.extension;
   let l = Extensions.extensions () in
   Phases.return_phase l
 
@@ -75,7 +76,9 @@ let parse_file file =
 
 let typing stmts =
   Phases.start_phase Phases.Typing >>= fun () ->
-  TypeInference.infer_statements ?ctx:None stmts >>?= fun stmts ->
+  Phases.get_key Params.key >>= fun params ->
+  let def_as_rewrite = params.Params.param_def_as_rewrite in
+  TypeInference.infer_statements ~def_as_rewrite ?ctx:None stmts >>?= fun stmts ->
   do_extensions ~field:(fun e -> e.Extensions.post_typing_actions)
     ~x:stmts >>= fun () ->
   Phases.return_phase stmts
@@ -87,7 +90,7 @@ let cnf ~file decls =
     decls
     |> CCVector.to_seq
     |> Sequence.map (Statement.add_src ~file)
-    |> Cnf.cnf_of_seq ~neg_src:StatementSrc.neg ~cnf_src:StatementSrc.cnf
+    |> Cnf.cnf_of_seq
     |> CCVector.to_seq
     |> Cnf.convert
   in
@@ -362,7 +365,9 @@ let process_file file =
   CCVector.iter Ind_ty.scan_stmt stmts;
   (* compute signature, precedence, ordering *)
   let signature = Statement.signature (CCVector.to_seq stmts) in
-  Util.debugf ~section 2 "@[<2>signature:@ @[<hv>%a@]@]" (fun k->k Signature.pp signature);
+  Util.debugf ~section 1 "@[<2>signature:@ @[<hv>%a@]@]" (fun k->k Signature.pp signature);
+  Util.debugf ~section 2 "(@[classification:@ %a@])"
+    (fun k->k Classify_cst.pp_signature signature);
   compute_prec (CCVector.to_seq stmts) >>= fun precedence ->
   Util.debugf ~section 1 "@[<2>precedence:@ @[%a@]@]" (fun k->k Precedence.pp precedence);
   compute_ord_select precedence >>= fun (ord, select) ->

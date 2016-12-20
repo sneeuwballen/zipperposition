@@ -26,6 +26,7 @@ let wrong_state_ msg = raise (WrongState msg)
 let errorf msg = Util.errorf ~where:"sat_solver" msg
 
 let sat_dump_file_ = ref ""
+let sat_compact_ = ref true
 
 module type S = Sat_solver_intf.S
 
@@ -38,6 +39,9 @@ module Make(Dummy : sig end)
 
   (* queue of clauses waiting for being pushed into the solver *)
   let queue_ = Queue.create()
+
+  (* flag to indicate whether it's time to re-check the model *)
+  let must_check = ref false
 
   (* channel on which to print boolean clauses *)
   let dump_to : out_channel option ref = ref None
@@ -61,15 +65,35 @@ module Make(Dummy : sig end)
       incr n;
       x
 
+  module ClauseTbl = CCHashtbl.Make(struct
+      type t = Lit.t list
+      let equal = CCList.equal Lit.equal
+      let hash = CCHash.apply (CCHash.list Lit.hash_fun)
+    end)
+
+  let clause_tbl_ : (int * proof_step) ClauseTbl.t = ClauseTbl.create 32
+  let tag_to_proof_ : (int, proof_step) Hashtbl.t = Hashtbl.create 32
+
+  (* add clause, if not added already *)
+  let add_clause_ ~proof c =
+    if not (ClauseTbl.mem clause_tbl_ c) then (
+      Util.incr_stat stat_num_clauses;
+      (* if the clause has only negative lits: check again *)
+      if List.for_all (fun lit -> not (Lit.sign lit)) c
+      then must_check := true;
+      let tag = fresh_tag_() in
+      ClauseTbl.add clause_tbl_ c (tag,proof);
+      Hashtbl.add tag_to_proof_ tag proof;
+      Queue.push ([c], proof, tag) queue_
+    )
+
   let add_clause ~proof (c:clause) =
     dump_l [c];
-    Util.incr_stat stat_num_clauses;
-    Queue.push ([c], proof, fresh_tag_ ()) queue_
+    add_clause_ ~proof c
 
   let add_clauses ~proof l =
     dump_l l;
-    Util.add_stat stat_num_clauses (List.length l);
-    Queue.push (l, proof, fresh_tag_ ()) queue_
+    List.iter (add_clause_ ~proof) l
 
   let add_clause_seq ~proof (seq:clause Sequence.t) =
     add_clauses ~proof (Sequence.to_rev_list seq)
@@ -107,10 +131,6 @@ module Make(Dummy : sig end)
     | None -> assert false
     | Some p -> p
 
-
-  (* map tags to the associated proof *)
-  let tag_to_proof_ : (int, proof_step) Hashtbl.t = Hashtbl.create 32
-
   module SatForm = struct
     include Lit
     let norm l =
@@ -146,36 +166,32 @@ module Make(Dummy : sig end)
           [List.length c; ProofStep.hash_proof a; ProofStep.hash_proof b]
     end)
 
-  let tbl0 : (int,proof) Hashtbl.t = Hashtbl.create 16
   let tbl_res = ResTbl.create 16
 
+  let proof_of_leaf c =
+    (* leaf of the proof *)
+    let tag = match S.get_tag c with
+      | None ->
+        errorf "no tag in leaf of SAT proof (clause %a)" S.St.pp_clause c
+      | Some id -> id
+    in
+    begin match CCHashtbl.get tag_to_proof_ tag with
+      | Some step ->
+        let c = bool_clause_of_sat c in
+        ProofStep.mk_bc step c
+      | None -> errorf "no proof for tag %d" tag
+    end
+
   (* convert a SAT proof into a tree of ProofStep *)
-  let conv_proof_ p : proof =
+  let conv_proof_atomic_ p : proof =
     let rec aux p =
       let open S.Proof in
       match S.Proof.expand p with
-      | { conclusion=c; step = S.Proof.Hypothesis } ->
-        let tag = match S.get_tag c with
-          | None ->
-            errorf "no tag in leaf of SAT proof (clause %a)" S.St.pp_clause c
-          | Some id -> id
-        in
-        begin match CCHashtbl.get tbl0 tag with
-        | Some s -> s
-        | None ->
-          begin match CCHashtbl.get tag_to_proof_ tag with
-            | Some step ->
-              let c = bool_clause_of_sat c in
-              let s = ProofStep.mk_bc step c in
-              Hashtbl.add tbl0 tag s;
-              s
-            | None -> errorf "no proof for tag %d" tag
-          end
-        end
       | { step = S.Proof.Lemma _; _ } ->
         errorf "SAT proof involves a lemma"
       | { conclusion=c; step = S.Proof.Resolution (p1,p2,_) } ->
         let c = bool_clause_of_sat c in
+        (* atomic resolution step *)
         let q1 = aux p1 in
         let q2 = aux p2 in
         begin match ResTbl.get tbl_res (c,q1,q2) with
@@ -190,9 +206,35 @@ module Make(Dummy : sig end)
             ResTbl.add tbl_res (c,q2,q1) s;
             s
         end
+      | { conclusion=c; step = _ } -> proof_of_leaf c
     in
     S.Proof.check p;
     aux p
+
+  let conv_proof_compact_ p : proof =
+    let open S.Proof in
+    let leaves =
+      S.Proof.fold
+        (fun acc pnode -> match pnode with
+           | { step = S.Proof.Lemma _; _ } ->
+             errorf "SAT proof involves a lemma"
+           | { step = S.Proof.Resolution (_,_,_); _ } ->
+             acc (* ignore, intermediate node *)
+           | { conclusion=c; step = _ } ->
+             proof_of_leaf c :: acc)
+        [] p
+    in
+    let {conclusion=c;_} = S.Proof.expand p in
+    let c = bool_clause_of_sat c in
+    let step =
+      ProofStep.mk_inference leaves
+        ~rule:(ProofStep.mk_rule "sat_resolution*")  in
+    ProofStep.mk_bc step c
+
+  let conv_proof_ p =
+    if !sat_compact_
+    then conv_proof_compact_ p
+    else conv_proof_atomic_ p
 
   let get_proof_of_lit lit =
     let b, l = valuation_level lit in
@@ -203,8 +245,9 @@ module Make(Dummy : sig end)
       | None -> assert false
 
   let proved_at_0 lit =
-    let b,l = valuation_level lit in
-    if l=0 then Some b else None
+    if S.true_at_level0 lit then Some true
+    else if S.true_at_level0 (Lit.neg lit) then Some false
+    else None
 
   (* call [S.solve()] in any case, and enforce invariant about eval/unsat_core *)
   let check_unconditional_ () =
@@ -216,11 +259,8 @@ module Make(Dummy : sig end)
     (* add pending clauses *)
     while not (Queue.is_empty queue_) do
       let c, proof, tag = Queue.pop queue_ in
-      Util.debugf ~section 4 "@[<hv2>assume@ @[%a@]@]"
-        (fun k->k pp_form (c,tag));
-      (* remember tag->proof *)
-      assert (not (Hashtbl.mem tag_to_proof_ tag));
-      Hashtbl.replace tag_to_proof_ tag proof;
+      Util.debugf ~section 4 "@[<hv2>assume@ @[%a@]@ proof: %a@]"
+        (fun k->k pp_form (c,tag) ProofPrint.pp_normal_step proof);
       S.assume ~tag c
     done;
     (* solve *)
@@ -236,16 +276,21 @@ module Make(Dummy : sig end)
     end;
     !result_
 
-  let check_ () =
-    if Queue.is_empty queue_ then !result_
-    else check_unconditional_ ()
+  let check_ full =
+    if full || !must_check
+    then (
+      assert (full || not (Queue.is_empty queue_));
+      must_check := false;
+      check_unconditional_ ()
+    )
+    else !result_
 
   (* initialize eval/eval_level to enforce invariant *)
   let () =
     let res = check_unconditional_ () in
     assert (res = Sat)
 
-  let check () = Util.with_prof prof_call_msat check_ ()
+  let check ~full () = Util.with_prof prof_call_msat check_ full
 
   let set_printer pp = pp_ := pp
 
@@ -264,7 +309,11 @@ module Make(Dummy : sig end)
     ()
 end
 
+let set_compact b = sat_compact_ := b
+
 let () =
   Params.add_opts
     [ "--sat-dump", Arg.Set_string sat_dump_file_, " output SAT problem(s) into <file>"
+    ; "--compact-sat", Arg.Set sat_compact_, " compact SAT proofs"
+    ; "--no-compact-sat", Arg.Clear sat_compact_, " do not compact SAT proofs"
     ]

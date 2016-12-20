@@ -24,7 +24,9 @@ type rule_term = {
 
 (* constant rule [id := rhs] *)
 let make_t_const id ty rhs =
-  { lhs_id=id; lhs=T.const ~ty id; rhs; }
+  let lhs = T.const ~ty id in
+  assert (Type.equal (T.ty rhs) (T.ty lhs));
+  { lhs_id=id; lhs; rhs; }
 
 (* [id args := rhs] *)
 let make_t id ty args rhs =
@@ -74,26 +76,42 @@ module Set = struct
 
   let is_empty t = S.is_empty t.terms && t.clauses=[]
 
-  let add_term r s = {s with terms=S.add s.terms r.lhs_id r}
-  let add_clause r s = {s with clauses=r :: s.clauses}
+  let add_term r s =
+    Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k->k pp_rule_term r);
+    {s with terms=S.add s.terms r.lhs_id r}
+
+  let add_clause r s =
+    Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k->k pp_rule_clause r);
+    {s with clauses=r :: s.clauses}
 
   let find_iter s id = S.find_iter s.terms id
 
   let add_stmt stmt t = match Stmt.view stmt with
-    | Stmt.Def (id, ty, rhs) ->
-      (* simple constant *)
-      let r = make_t_const id ty rhs in
-      Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k->k pp_rule_term r);
-      add_term r t
-    | Stmt.RewriteTerm (id, ty, args, rhs) ->
+    | Stmt.Def l ->
+      Sequence.of_list l
+      |> Sequence.flat_map
+        (fun {Stmt.def_ty=ty; def_rules; def_rewrite=b; _} ->
+           if b || Type.is_const ty
+           then Sequence.of_list def_rules |> Sequence.map (fun r -> ty,r)
+           else Sequence.empty)
+      |> Sequence.fold
+        (fun t (ty,rule) -> match rule with
+           | Stmt.Def_term (_,id,_,args,rhs) ->
+             let r = make_t id ty args rhs in
+             add_term r t
+           | Stmt.Def_form (_,lhs,rhs) ->
+             let lhs = Literal.Conv.of_form lhs in
+             let rhs = List.map (List.map Literal.Conv.of_form) rhs in
+             let r = make_c lhs rhs in
+             add_clause r t)
+        t
+    | Stmt.RewriteTerm (_, id, ty, args, rhs) ->
       let r = make_t id ty args rhs in
-      Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k->k pp_rule_term r);
       add_term r t
-    | Stmt.RewriteForm (lhs, rhs) ->
+    | Stmt.RewriteForm (_, lhs, rhs) ->
       let lhs = Literal.Conv.of_form lhs in
       let rhs = List.map (List.map Literal.Conv.of_form) rhs in
       let r = make_c lhs rhs in
-      Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k->k pp_rule_clause r);
       add_clause r t
     | Stmt.TyDecl _
     | Stmt.Data _
@@ -123,7 +141,7 @@ let normalize_term_ rules t =
   (* compute normal form of subterm
      @param k the continuation
      @return [t'] where [t'] is the normal form of [t] *)
-  let rec reduce ~subst sc t k = match T.view t with
+  let rec reduce t k = match T.view t with
     | T.Const id ->
       (* pick a constant rule *)
       begin match Set.find_iter rules id |> Sequence.head with
@@ -131,11 +149,11 @@ let normalize_term_ rules t =
         | Some r ->
           assert (T.is_const r.lhs);
           (* reduce [rhs], but no variable can be bound *)
-          reduce ~subst:Substs.empty 0 r.rhs k
+          reduce r.rhs k
       end
     | T.App (f, l) ->
       (* first, reduce subterms *)
-      reduce_l ~subst sc l
+      reduce_l l
         (fun l' ->
            let t' = if T.same_l l l' then t else T.app f l' in
            match T.view f with
@@ -146,7 +164,7 @@ let normalize_term_ rules t =
                    (fun r ->
                       try
                         let subst' =
-                          Unif.FO.matching ~subst ~pattern:(r.lhs,1) (t',0)
+                          Unif.FO.matching ~pattern:(r.lhs,1) (t',0)
                         in
                         Some (r, subst')
                       with Unif.Fail -> None)
@@ -156,33 +174,33 @@ let normalize_term_ rules t =
                  | Some (r, subst) ->
                    (* rewrite [t = r.lhs\sigma] into [rhs] (and normalize [rhs],
                       which contain variables bound by [subst]) *)
-                   Util.debugf ~section 5 "@[<2>rewrite `@[%a@]`@ using `@[%a@]`@ with `@[%a@]`@]"
+                   Util.debugf ~section 5
+                     "@[<2>rewrite `@[%a@]`@ using `@[%a@]`@ with `@[%a@]`@]"
                      (fun k->k T.pp t' pp_rule_term r Su.pp subst);
                    Util.incr_stat stat_term_rw;
-                   reduce ~subst 1 r.rhs k
+                   (* NOTE: not efficient, will traverse [t'] fully *)
+                   let t' = Substs.FO.apply_no_renaming subst (r.rhs,1) in
+                   reduce t' k
                end
              | _ -> k t'
         )
+    | T.Var _
     | T.DB _ -> k t
-    | T.Var _ ->
-      (* dereference, or return [t]. Careful not to traverse the already-
-          evaluated value! *)
-      k (fst (Su.FO.deref subst (t,sc)))
     | T.AppBuiltin (_,[]) -> k t
     | T.AppBuiltin (b,l) ->
-      reduce_l ~subst sc l
+      reduce_l l
         (fun l' ->
            let t' = if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l' in
            k t')
   (* reduce list *)
-  and reduce_l ~subst sc l k = match l with
+  and reduce_l l k = match l with
     | [] -> k []
     | t :: tail ->
-      reduce_l ~subst sc tail
-        (fun tail' -> reduce ~subst sc t
+      reduce_l tail
+        (fun tail' -> reduce t
             (fun t' -> k (t' :: tail')))
   in
-  reduce ~subst:Su.empty 0 t (fun t->t)
+  reduce t (fun t->t)
 
 let normalize_term rules t =
   Util.with_prof prof_term_rw (normalize_term_ rules) t

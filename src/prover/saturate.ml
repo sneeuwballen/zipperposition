@@ -24,12 +24,16 @@ let check_timeout = function
 (* progress bar? *)
 let progress_ = ref false
 
-(* print progress (i out of j) *)
-let print_progress i j =
-  let n = i * 40 /j in
-  let line = CCString.init 40 (fun i -> if i<=n then '#' else ' ') in
-  Printf.printf "\r\027[K[%s] %d/%d%!" line i j;
-  ()
+(* print progress (i out of steps) *)
+let print_progress i ~steps =
+  let prefix = Printf.sprintf "\r\027[K[%.2fs] " (Util.total_time_s ()) in
+  match steps with
+    | Some j ->
+      let n = i * 40 /j in
+      let bar = CCString.init 40 (fun i -> if i<=n then '#' else ' ') in
+      Printf.printf "%s [%s] %d/%d%!" prefix bar i j;
+    | None ->
+      Printf.printf "%s %d steps%!" prefix i;
 
 (** The SZS status of a state *)
 type szs_status =
@@ -70,7 +74,7 @@ module Make(E : Env.S) = struct
     | None ->
         (* final check: might generate other clauses *)
         let clauses =
-          Env.do_generate()
+          Env.do_generate ~full:true ()
           |> Sequence.filter_map
             (fun c ->
                let c, _ = Env.simplify c in
@@ -165,9 +169,7 @@ module Make(E : Env.S) = struct
         | Some i when num >= i -> Unknown, num
         | _ ->
             (* do one step *)
-            if !progress_ then (
-              match steps with None -> () | Some i -> print_progress num i
-            );
+            if !progress_ then print_progress num ~steps;
             let status = given_clause_step ~generating num in
             match status with
             | Sat | Unsat _ | Error _ -> status, num (* finished *)
@@ -182,6 +184,6 @@ end
 
 let () =
   Params.add_opts
-    [ "--progress", Arg.Set progress_, " progress bar (only with --steps)"
+    [ "--progress", Arg.Set progress_, " progress bar"
     ; "-p", Arg.Set progress_, " alias to --progress"
     ]

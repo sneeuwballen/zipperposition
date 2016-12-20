@@ -214,6 +214,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | _ -> ()
       end;
       let passive_lit' = Lit.apply_subst ~renaming subst (info.passive_lit, sc_p) in
+      let new_trail = C.trail_l [info.active; info.passive] in
+      if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
       if (
         O.compare ord (S.FO.apply ~renaming info.subst (info.s, sc_a)) t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
@@ -239,8 +241,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let proof =
         ProofStep.mk_inference ~rule [C.proof info.active; C.proof info.passive] in
-      let trail = C.trail_l [info.active; info.passive] in
-      let new_clause = C.create ~trail new_lits proof in
+      let new_clause = C.create ~trail:new_trail new_lits proof in
       Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       new_clause :: acc
     with ExitSuperposition reason ->
@@ -285,7 +286,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             then raise (ExitSuperposition "will yield a tautology");
         | _ -> ()
       end;
-      let passive_lit' = Lit.apply_subst_no_simp ~renaming subst (info.passive_lit, sc_p) in
+      let passive_lit' =
+        Lit.apply_subst_no_simp ~renaming subst (info.passive_lit, sc_p)
+      in
+      let new_trail = C.trail_l [info.active; info.passive] in
+      if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
       if (
         O.compare ord (S.FO.apply ~renaming info.subst (info.s, sc_a)) t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
@@ -297,8 +302,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let lits_a = Lit.apply_subst_list ~renaming subst (lits_a, sc_a) in
       (* build passive literals and replace u|p\sigma with t\sigma *)
       let u' = S.FO.apply ~renaming subst (info.u_p, sc_p) in
+      assert (Type.equal (T.ty u') (T.ty t'));
       let lits_p = Array.to_list (C.lits info.passive) in
       let lits_p = Lit.apply_subst_list ~renaming subst (lits_p, sc_p) in
+      (* assert (T.equal (Lits.Pos.at (Array.of_list lits_p) info.passive_pos) u'); *)
       let lits_p = List.map (Lit.map (fun t-> T.replace t ~old:u' ~by:t')) lits_p in
       (* build clause *)
       let new_lits = lits_a @ lits_p in
@@ -308,8 +315,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let proof =
         ProofStep.mk_inference ~rule [C.proof info.active; C.proof info.passive] in
-      let trail = C.trail_l [info.active; info.passive] in
-      let new_clause = C.create ~trail new_lits proof in
+      let new_clause = C.create ~trail:new_trail new_lits proof in
       Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       new_clause :: acc
     with ExitSuperposition reason ->
@@ -320,7 +326,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let do_superposition info acc=
     let open SupInfo in
     assert (Type.equal (T.ty info.s) (T.ty info.t));
-    assert (Type.equal (T.ty info.s) (T.ty info.u_p));
+    assert (Unif.Ty.equal ~subst:info.subst
+        (T.ty info.s, info.scope_active) (T.ty info.u_p, info.scope_passive));
     if !_use_simultaneous_sup
     then do_simultaneous_superposition info acc
     else do_classic_superposition info acc
@@ -794,9 +801,25 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                          bind X only to [a] or [b], not unify [a] with [b]. *)
                      try_unif i l 0 r 0
                  | _, T.Var v when not (var_in_subst_ !subst v 0) ->
-                     try_unif i r 0 l 0
-                  | _ -> ()
+                   try_unif i r 0 l 0
+                 | _ -> ()
                  end
+             | Lit.Equation (l, r, true) when Type.is_prop (T.ty l) ->
+               begin match T.view l, T.view r with
+                 | ( T.AppBuiltin (Builtin.True, []), T.Var x
+                   | T.Var x, T.AppBuiltin (Builtin.True, []))
+                   when not (var_in_subst_ !subst x 0) ->
+                   (* [C or x=true ---> C[x:=false]] *)
+                   begin
+                     try
+                       let subst' = Unif.FO.bind !subst (x,0) (T.false_,0) in
+                       BV.reset bv i;
+                       subst := subst';
+                     with Unif.Fail -> ()
+                   end
+
+                 | _ -> ()
+               end
              | _ -> ())
         lits;
       let new_lits = BV.select bv lits in

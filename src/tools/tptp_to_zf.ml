@@ -17,7 +17,7 @@ let pp_stmts out seq =
 
 let declare_term out () =
   let id = ID.make "term" in
-  let st = Statement.ty_decl ~src:UntypedAST.default_attrs id T.Ty.tType in
+  let st = Statement.ty_decl ~src:Statement.(Src.internal R_decl) id T.Ty.tType in
   pp_stmt out st
 
 let process file =

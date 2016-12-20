@@ -19,8 +19,10 @@ let make ~ty i =
 let cast v ~ty = {v with ty; }
 let update_ty v ~f = {v with ty=f v.ty; }
 
-let compare a b = CCOrd.int_ a.id b.id
-let equal a b = a.id = b.id
+let compare cmp a b =
+  let c = CCOrd.int_ a.id b.id  in
+  if c<>0 then c else cmp a.ty b.ty
+let equal eq a b = a.id = b.id && eq a.ty b.ty
 let hash_fun a = CCHash.int a.id
 let hash a = a.id land max_int
 

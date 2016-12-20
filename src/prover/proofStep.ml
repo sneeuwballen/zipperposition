@@ -7,12 +7,15 @@ open Libzipperposition
 
 module Loc = ParseLocation
 module Hash = CCHash
+module Stmt = Statement
 
 type form = TypedSTerm.t
 type bool_lit = BBox.Lit.t
 type 'a sequence = ('a -> unit) -> unit
 
 let section = Util.Section.make ~parent:Const.section "proof"
+
+type statement_src = Statement.source
 
 type rule_info =
   | I_subst of Substs.t
@@ -42,9 +45,9 @@ type kind =
   | Inference of rule
   | Simplification of rule
   | Esa of rule
-  | Assert of StatementSrc.t
-  | Goal of StatementSrc.t
-  | Data of StatementSrc.t * Type.t Statement.data
+  | Assert of statement_src
+  | Goal of statement_src
+  | Data of statement_src * Type.t Statement.data
   | Trivial (** trivial, or trivial within theories *)
 
 type result =
@@ -73,9 +76,9 @@ let step p = p.step
 let kind p = p.kind
 let parents p = p.parents
 
-let compare a b = CCInt.compare a.id b.id
-let equal a b = (compare a b = 0)
-let hash a = a.id
+let equal p1 p2 = p1.id=p2.id
+let compare p1 p2 = CCInt.compare p1.id p2.id
+let hash p = p.id
 
 let res_to_int_ = function
   | Clause _ -> 0
@@ -88,13 +91,24 @@ let compare_result a b = match a, b with
   | BoolClause l1, BoolClause l2 -> CCOrd.list_ BBox.Lit.compare l1 l2
   | Clause _, _
   | Form _, _
-  |  BoolClause _, _ ->
+  | BoolClause _, _ ->
     CCInt.compare (res_to_int_ a) (res_to_int_ b)
 
 let compare_proof a b =
-  CCOrd.( compare a.step b.step <?> (compare_result, a.result, b.result) )
+  let (<?>) = CCOrd.(<?>) in
+  compare a.step b.step <?> (compare_result, a.result, b.result)
 
-let equal_proof a b = (compare_proof a b = 0)
+let equal_result a b = match a, b with
+  | Clause c1, Clause c2 -> SClause.equal c1 c2
+  | Form f1, Form f2 -> TypedSTerm.equal f1 f2
+  | BoolClause l1, BoolClause l2 -> CCList.equal BBox.Lit.equal l1 l2
+  | Clause _, _
+  | Form _, _
+  | BoolClause _, _ -> false
+
+let equal_proof a b =
+  equal a.step b.step && equal_result a.result b.result
+
 let hash_proof a = hash a.step
 
 module PTbl = CCHashtbl.Make(struct
@@ -141,11 +155,11 @@ let mk_assert src = mk_step_ (Assert src) []
 let mk_goal src = mk_step_ (Goal src) []
 
 let mk_assert' ?loc ~file ~name () =
-  let src = StatementSrc.from_file ?loc ~name file in
+  let src = Stmt.Src.from_file ?loc ~name file Stmt.R_assert in
   mk_assert src
 
 let mk_goal' ?loc ~file ~name () =
-  let src = StatementSrc.from_file ?loc ~name file in
+  let src = Stmt.Src.from_file ?loc ~name file Stmt.R_goal in
   mk_goal src
 
 let mk_inference ~rule parents =
@@ -157,21 +171,21 @@ let mk_simp ~rule parents =
 let mk_esa ~rule parents =
   mk_step_ (Esa rule) parents
 
-let mk_f_ step res = {step; result=Form res; }
+let mk_f step res = {step; result=Form res; }
 
-let mk_f_trivial = mk_f_ mk_trivial
+let mk_f_trivial = mk_f mk_trivial
 
 let mk_f_inference ~rule f parents =
   let step = mk_inference ~rule parents in
-  mk_f_ step f
+  mk_f step f
 
 let mk_f_simp ~rule f parents =
   let step = mk_simp ~rule parents in
-  mk_f_ step f
+  mk_f step f
 
 let mk_f_esa ~rule f parents =
   let step = mk_esa ~rule parents in
-  mk_f_ step f
+  mk_f step f
 
 let mk_c step c = {step; result=Clause c; }
 let mk_bc step c = {step; result=BoolClause c; }
@@ -198,10 +212,6 @@ let rule p = match p.kind with
 let is_assert p = match p.kind with Assert _ -> true | _ -> false
 let is_goal p = match p.kind with Goal _ -> true  | _ -> false
 
-let equal p1 p2 = p1.id=p2.id
-let compare p1 p2 = CCInt.compare p1.id p2.id
-let hash p = p.id
-
 (** {2 Proof traversal} *)
 
 let distance_to_goal p = p.dist_to_goal
@@ -219,21 +229,21 @@ let pp_rule ~info out r =
   then Format.fprintf out "@[%s%a@]" r.rule_name (pp_list pp_info) r.rule_info
   else Format.fprintf out "'%s'" r.rule_name
 
-let rec pp_src_tstp out =
-  let module Src = StatementSrc in
-  function
-    | Src.From_file src ->
-      let file = src.Src.file in
-      begin match src.Src.name with
-        | None -> Format.fprintf out "file('%s')" file
-        | Some name -> Format.fprintf out "file('%s', '%s')" file name
-      end
-    | Src.Neg src' ->
-      Format.fprintf out "inference(@['negate_goal',@ [status(thm)],@ [%a]@])"
-        pp_src_tstp src'
-    | Src.CNF src' ->
-      Format.fprintf out "inference(@['clausify',@ [status(esa)],@ [%a]@])"
-        pp_src_tstp src'
+let rec pp_src_tstp out src = match Stmt.Src.view src with
+  | Stmt.Internal _
+  | Stmt.Input _ -> ()
+  | Stmt.From_file (src,_) ->
+    let file = src.Stmt.file in
+    begin match src.Stmt.name with
+      | None -> Format.fprintf out "file('%s')" file
+      | Some name -> Format.fprintf out "file('%s', '%s')" file name
+    end
+  | Stmt.Neg (_,src') ->
+    Format.fprintf out "inference(@['negate_goal',@ [status(thm)],@ [%a]@])"
+      pp_src_tstp src'
+  | Stmt.CNF (_,src') ->
+    Format.fprintf out "inference(@['clausify',@ [status(esa)],@ [%a]@])"
+      pp_src_tstp src'
 
 let pp_kind_tstp out k =
   match k with
@@ -249,19 +259,19 @@ let pp_kind_tstp out k =
   | Trivial ->
       Format.fprintf out "trivial([status(thm)])"
 
-let rec pp_src out src =
-  let module Src = StatementSrc in
-  match src with
-    | Src.From_file src ->
-      let file = src.Src.file in
-      begin match src.Src.name with
-        | None -> Format.fprintf out "'%s'" file
-        | Some name -> Format.fprintf out "'%s' in '%s'" name file
-      end
-    | Src.Neg src' ->
-      Format.fprintf out "(@[neg@ %a@])" pp_src src'
-    | Src.CNF src' ->
-      Format.fprintf out "(@[CNF@ %a@])" pp_src src'
+let rec pp_src out src = match Stmt.Src.view src with
+  | Stmt.Internal _
+  | Stmt.Input _ -> ()
+  | Stmt.From_file (src,_) ->
+    let file = src.Stmt.file in
+    begin match src.Stmt.name with
+      | None -> Format.fprintf out "'%s'" file
+      | Some name -> Format.fprintf out "'%s' in '%s'" name file
+    end
+  | Stmt.Neg (_,src') ->
+    Format.fprintf out "(@[neg@ %a@])" pp_src src'
+  | Stmt.CNF (_,src') ->
+    Format.fprintf out "(@[CNF@ %a@])" pp_src src'
 
 let pp_kind out k =
   match k with

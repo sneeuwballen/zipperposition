@@ -58,6 +58,7 @@ let is_tType ty = match view ty with | Builtin TType -> true | _ -> false
 let is_var ty = match view ty with | Var _ -> true | _ -> false
 let is_bvar ty = match view ty with | DB _ -> true | _ -> false
 let is_app ty = match view ty with App _ -> true | _ -> false
+let is_const ty = match view ty with App (_, []) -> true | _ -> false
 let is_fun ty = match view ty with | Fun _ -> true | _ -> false
 let is_forall ty = match view ty with | Forall _ -> true | _ -> false
 let is_prop ty = match view ty with | Builtin Prop -> true | _ -> false
@@ -201,7 +202,7 @@ let err_apply_ msg = raise (ApplyError msg)
 let err_applyf_ msg = CCFormat.ksprintf msg ~f:err_apply_
 
 (* apply a type to arguments. *)
-let apply ty args =
+let apply ty0 args0 =
   let rec aux ty args env = match T.view ty, args with
     | _, [] -> T.DB.eval env ty
     | T.AppBuiltin(Builtin.Arrow, (ret :: exp_args)), _::_ ->
@@ -227,10 +228,11 @@ let apply ty args =
       else
         err_applyf_
           "@[<2>Type.apply:@ wrong argument type,@ expected `@[_ : %a@]`@ \
-            but got `@[%a : %a@]`@]"
-          T.pp exp' T.pp a T.pp (T.ty_exn a)
+           but got `@[%a : %a@]`@ when applying `%a` to@ [@[%a@]]@ in env [%a]@]"
+          T.pp exp' T.pp a T.pp (T.ty_exn a) T.pp ty0 (Util.pp_list T.pp) args0
+          (DBEnv.pp T.pp) env
   in
-  aux ty args DBEnv.empty
+  aux ty0 args0 DBEnv.empty
 
 let apply1 ty a = apply ty [a]
 
@@ -288,7 +290,11 @@ end
 
 let rec pp_rec depth out t = match view t with
   | Builtin b -> pp_builtin out b
-  | Var v -> HVar.pp out v
+  | Var v ->
+    let ty = HVar.ty v in
+    if is_tType ty
+    then Format.fprintf out "A%d" (HVar.id v)
+    else HVar.pp out v
   | DB i -> Format.fprintf out "T%i" (depth-i-1)
   | App (p, []) -> ID.pp out p
   | App (p, args) ->
@@ -331,9 +337,10 @@ module Conv = struct
   type ctx = {
     mutable vars: (PT.t, t HVar.t) Var.Subst.t;
     mutable n: int;  (* counter for free vars *)
+    mutable hvars: PT.t Var.t VarMap.t;
   }
 
-  let create () = { vars=Var.Subst.empty; n=0; }
+  let create () = { vars=Var.Subst.empty; n=0; hvars=VarMap.empty; }
 
   let copy t = {t with vars=t.vars; }
 
@@ -347,7 +354,13 @@ module Conv = struct
     ctx.n <- n+1;
     HVar.make ~ty:tType n
 
-  exception Error
+  exception Error of TypedSTerm.t
+
+  let () = Printexc.register_printer
+      (function
+        | Error t ->
+          Some (Util.err_spf "@[<2>Type.Conv.Error on `@[%a@]`@]" PT.pp t)
+        | _ -> None)
 
   let of_simple_term_exn ctx t =
     let rec aux depth v2db t = match PT.view t with
@@ -377,7 +390,7 @@ module Conv = struct
           | PT.Const hd ->
               let l = List.map (aux depth v2db) l in
               app hd l
-          | _ -> raise Error
+          | _ -> raise (Error t)
           end
       | PT.Bind (Binder.ForallTy, v, t') ->
           let v2db = Var.Subst.add v2db v depth in
@@ -387,7 +400,10 @@ module Conv = struct
       | PT.Bind _
       | PT.AppBuiltin _
       | PT.Meta _
-      | PT.Multiset _ -> raise Error
+      | PT.Ite _
+      | PT.Match _
+      | PT.Let _
+      | PT.Multiset _ -> raise (Error t)
     and aux_var v = match Var.Subst.find ctx.vars v with
       | Some v -> v
       | None ->
@@ -409,10 +425,9 @@ module Conv = struct
 
   let of_simple_term ctx t =
     try Some (of_simple_term_exn ctx t)
-    with Error -> None
+    with Error _ -> None
 
-  let to_simple_term ?(env=DBEnv.empty) t =
-    let tbl = ref VarMap.empty in
+  let rec to_simple_term ?(env=DBEnv.empty) ctx t =
     let rec aux env t = match view t with
       | Builtin Prop -> PT.builtin ~ty:PT.tType Builtin.Prop
       | Builtin TType -> PT.builtin ~ty:PT.tType Builtin.TType
@@ -437,12 +452,15 @@ module Conv = struct
           let t' = aux (DBEnv.push env v) t' in
           PT.bind ~ty:PT.tType Binder.forall_ty v t'
     and aux_var v =
-      try VarMap.find v !tbl
-      with Not_found ->
-        let v' = Var.of_string ~ty:PT.tType
-          (CCFormat.sprintf "A%d" (HVar.id v)) in
-        tbl := VarMap.add v v' !tbl;
-        v'
+      var_to_simple_var ~prefix:"A" ctx v
     in
     aux env t
+
+  and var_to_simple_var ?(prefix="A") ctx v =
+    try VarMap.find v ctx.hvars
+    with Not_found ->
+      let v' = Var.of_string ~ty:(to_simple_term ctx (HVar.ty v))
+          (CCFormat.sprintf "%s%d" prefix (HVar.id v)) in
+      ctx.hvars <- VarMap.add v v' ctx.hvars;
+      v'
 end

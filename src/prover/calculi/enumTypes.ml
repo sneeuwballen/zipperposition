@@ -82,7 +82,7 @@ module type S = sig
   (** Register rules in the environment *)
 end
 
-let _enable = ref true
+let _enable = ref false
 let _instantiate_shielded = ref false
 let _accept_unary_types = ref true
 let _instantiate_projector_axiom = ref false
@@ -109,7 +109,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     decl_var : Type.t HVar.t; (* x = ... *)
     decl_cases : term list; (* ... t1 | t2 | ... | tn *)
     decl_proof :
-      [ `Data of StatementSrc.t * Type.t Statement.data
+      [ `Data of Statement.source * Type.t Statement.data
       | `Clause of ProofStep.of_
       ]; (* justification for the enumeration axiom *)
     mutable decl_symbols : ID.Set.t; (* set of declared symbols for t1,...,tn *)
@@ -140,13 +140,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> Sequence.of_list
     |> Sequence.flat_map T.Seq.vars
     |> Sequence.filter (fun v -> not (Type.equal Type.tType (HVar.ty v)))
-    |> Sequence.for_all (HVar.equal var)
+    |> Sequence.for_all (HVar.equal Type.equal var)
 
   (* check that all vars in [l] are pairwise distinct *)
   let rec check_all_distinct_ acc l = match l with
     | [] -> true
     | v :: l' ->
-        not (CCList.Set.mem ~eq:HVar.equal v acc)
+        not (CCList.Set.mem ~eq:(HVar.equal Type.equal) v acc)
         && check_all_distinct_ (v :: acc) l'
 
   type declare_result =
@@ -209,7 +209,7 @@ module Make(E : Env.S) : S with module Env = E = struct
      with only constants as cases (in other words, a monomorphic finite type) *)
   let detect_decl_ c =
     let eq_var_ ~var t = match T.view t with
-      | T.Var v' -> HVar.equal var v'
+      | T.Var v' -> HVar.equal Type.equal var v'
       | _ -> false
     and get_var_ t = match T.view t with
       | T.Var v -> v

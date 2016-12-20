@@ -6,3 +6,7 @@
 include module type of Sat_solver_intf
 
 module Make (Dummy : sig end) : S
+
+val set_compact : bool -> unit
+(** Toggle compact proofs.
+    if true, collapse internal resolution nodes in proofs *)

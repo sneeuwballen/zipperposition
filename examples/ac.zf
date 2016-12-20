@@ -1,0 +1,10 @@
+
+# expect: unsat
+
+val term : type.
+val[AC] f : term -> term -> term.
+val d : term.
+val c : term.
+val b : term.
+val a : term.
+goal (f (f (f a b) c) d) = (f b (f d (f a c))).

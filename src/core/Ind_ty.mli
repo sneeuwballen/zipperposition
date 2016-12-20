@@ -23,6 +23,8 @@ type t = private {
        no other type variables than [ty_vars] *)
 }
 
+val pp : t CCFormat.printer
+
 exception InvalidDecl of string
 
 exception NotAnInductiveType of ID.t
@@ -42,7 +44,9 @@ val as_inductive_ty_exn : ID.t -> t
 
 val is_inductive_ty : ID.t -> bool
 
-val as_inductive_type : Type.t -> t option
+val as_inductive_type : Type.t -> (t * Type.t list) option
+(** [as_inductive_ty (list int)] will return [list, [int]] as an
+    inductive type applied to some arguments *)
 
 val is_inductive_type : Type.t -> bool
 (** [is_inductive_type ty] holds iff [ty] is an instance of some
@@ -79,7 +83,7 @@ val scan_for_constant : ID.t -> Type.t -> unit
 
 (** {6 Scan Declarations} *)
 
-val scan_stmt : (_, _, Type.t, _) Statement.t -> unit
+val scan_stmt : (_, _, Type.t) Statement.t -> unit
 (** [scan_stmt stmt] examines [stmt], and, if the statement is a
     declaration of inductive types or constants,
     it declares them using {!declare_ty} or {!declare_inductive_constant}. *)

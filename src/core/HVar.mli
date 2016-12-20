@@ -19,8 +19,8 @@ val ty : 'a t -> 'a
 val cast : 'a t -> ty:'b -> 'b t
 val update_ty : 'a t -> f:('a -> 'b) -> 'b t
 
-val compare : _ t -> _ t -> int
-val equal : _ t -> _ t -> bool
+val compare : ('a -> 'a -> int) -> 'a t -> 'a t -> int
+val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 val hash : _ t -> int
 val hash_fun : _ t CCHash.hash_fun
 

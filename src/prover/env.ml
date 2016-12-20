@@ -45,7 +45,7 @@ module Make(X : sig
   type inf_rule = C.t -> C.t list
   (** An inference returns a list of conclusions *)
 
-  type generate_rule = unit -> C.t list
+  type generate_rule = full:bool -> unit -> C.t list
   (** Generation of clauses regardless of current clause *)
 
   type binary_inf_rule = inf_rule
@@ -73,6 +73,9 @@ module Make(X : sig
   (** find redundant clauses in [ProofState.ActiveSet] w.r.t the clause.
        first param is the set of already known redundant clause, the rule
        should add clauses to it *)
+
+  type is_trivial_trail_rule = Trail.t -> bool
+  (** Rule that checks whether the trail is trivial (a tautology) *)
 
   type is_trivial_rule = C.t -> bool
   (** Rule that checks whether the clause is trivial (a tautology) *)
@@ -106,6 +109,7 @@ module Make(X : sig
   let _backward_simplify = ref []
   let _redundant = ref []
   let _backward_redundant : backward_redundant_rule list ref = ref []
+  let _is_trivial_trail : is_trivial_trail_rule list ref = ref []
   let _is_trivial : is_trivial_rule list ref = ref []
   let _empty_clauses = ref C.ClauseSet.empty
   let _multi_simpl_rule : multi_simpl_rule list ref = ref []
@@ -184,6 +188,9 @@ module Make(X : sig
 
   let add_simplify r =
     _basic_simplify := r :: !_basic_simplify
+
+  let add_is_trivial_trail r =
+    _is_trivial_trail := r :: !_is_trivial_trail
 
   let add_is_trivial r =
     _is_trivial := r :: !_is_trivial
@@ -267,12 +274,12 @@ module Make(X : sig
     Util.exit_prof prof_generate_unary;
     Sequence.of_list clauses
 
-  let do_generate () =
+  let do_generate ~full () =
     let clauses =
       List.fold_left
         (fun acc (name,g) ->
            Util.debugf ~section 3 "apply generating rule %s" (fun k->k name);
-           List.rev_append (g()) acc)
+           List.rev_append (g ~full ()) acc)
         []
         !_generate_rules
     in
@@ -311,11 +318,18 @@ module Make(X : sig
     );
     res
 
+  let is_trivial_trail trail = match !_is_trivial_trail with
+    | [] -> false
+    | [f] -> f trail
+    | [f1;f2] -> f1 trail || f2 trail
+    | l -> List.exists (fun f -> f trail) l
+
   let is_trivial c =
     if C.get_flag SClause.flag_persistent c then false
     else (
       let res =
         C.is_redundant c
+        || is_trivial_trail (C.trail c)
         || orphan_criterion c
         || begin match !_is_trivial with
             | [] -> false
@@ -484,6 +498,21 @@ module Make(X : sig
     Util.exit_prof prof_simplify;
     res
 
+  let simplify_term (t:T.t): T.t SimplM.t =
+    let is_new = ref false in
+    let rec reduce_term rules t = match rules with
+      | [] -> if !is_new then SimplM.return_new t else SimplM.return_same t
+      | (_, r)::rules' ->
+        begin match r t with
+          | None -> reduce_term rules' t (* try next rules *)
+          | Some t' ->
+            assert (not (T.equal t t'));
+            is_new := true;
+            reduce_term !_rewrite_rules t'  (* re-apply all rules *)
+        end
+    in
+    reduce_term !_rewrite_rules t
+
   let multi_simplify c : C.t list option =
     let did_something = ref false in
     (* try rules one by one until some of them succeeds *)
@@ -617,7 +646,7 @@ module Make(X : sig
       )
     done;
     (* generating rules *)
-    let other_clauses = do_generate () in
+    let other_clauses = do_generate ~full:false () in
     (* combine all clauses *)
     let result = Sequence.(
         append
@@ -702,10 +731,11 @@ module Make(X : sig
         []
       | [] -> C.of_statement st
       | r :: rules' ->
-          match r st with
+          begin match r st with
             | CR_skip -> conv_clause_ rules' st
             | CR_return l -> l
             | CR_add l -> List.rev_append l (conv_clause_ rules' st)
+          end
     in
     let clauses =
       CCVector.flat_map_list (conv_clause_ !_clause_conversion_rules) stmts in

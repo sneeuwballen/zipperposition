@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-ZIPPER=./zipperposition.native
-
-perf record --call-graph=dwarf "$ZIPPER" $@
+perf record --call-graph=dwarf $@
 
 perf script \
   | stackcollapse-perf --kernel \

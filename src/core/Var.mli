@@ -18,6 +18,8 @@ val make : ty:'a -> ID.t -> 'a t
 val of_string : ty:'a -> string -> 'a t
 (** Make a fresh ID before calling {!make} *)
 
+val makef : ty:'a -> ('b, Format.formatter, unit, 'a t) format4 -> 'b
+
 val gensym : ty:'a -> unit -> 'a t
 
 val copy : 'a t -> 'a t
@@ -51,7 +53,9 @@ module Set : sig
   val diff : 'a t -> 'a t -> 'a t
   val of_seq : 'a var Sequence.t -> 'a t
   val to_seq : 'a t -> 'a var Sequence.t
+  val add_seq : 'a t -> 'a var Sequence.t -> 'a t
   val to_list : 'a t -> 'a var list
+  val of_list : 'a var list -> 'a t
   val cardinal : _ t -> int
   val pp : _ t CCFormat.printer
 end
@@ -59,10 +63,12 @@ end
 module Subst : sig
   type (+'a, +'b) t
   val empty : (_,_) t
+  val singleton : 'a var -> 'b -> ('a,'b) t
   val add : ('a,'b) t -> 'a var -> 'b -> ('a,'b) t
   val mem : ('a,_) t -> 'a var -> bool
   val find : ('a,'b) t -> 'a var -> 'b option
   val find_exn : ('a,'b) t -> 'a var -> 'b
+  val merge : ('a,'b) t -> ('a,'b) t -> ('a,'b) t
   val of_seq : ('a var * 'b) Sequence.t -> ('a,'b) t
   val to_list : ('a,'b) t -> ('a var * 'b) list
   val to_seq: ('a,'b) t -> ('a var * 'b) Sequence.t

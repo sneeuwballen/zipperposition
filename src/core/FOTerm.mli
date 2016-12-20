@@ -99,6 +99,9 @@ val is_bvar : t -> bool
 val is_app : t -> bool
 val is_const : t -> bool
 
+val as_const : t -> ID.t option
+val as_const_exn : t -> ID.t
+
 val of_term_unsafe : InnerTerm.t -> t
 (** {b NOTE}: this can break the invariants and make {!view} fail. Only
     apply with caution. *)
@@ -130,7 +133,7 @@ val monomorphic : t -> bool (** true if the term contains no type var *)
 val max_var : VarSet.t -> int (** find the maximum variable *)
 val min_var : VarSet.t -> int (** minimum variable *)
 val add_vars : unit VarTbl.t -> t -> unit (** add variables of the term to the set *)
-val vars : t Sequence.t -> VarSet.t (** compute variables of the terms *)
+val vars : t -> VarSet.t (** compute variables of the terms *)
 val vars_prefix_order : t -> var list (** variables in prefix traversal order *)
 val depth : t -> int (** depth of the term *)
 val head : t -> ID.t option (** head ID.t *)
@@ -163,6 +166,10 @@ end
 val replace : t -> old:t -> by:t -> t
 (** [replace t ~old ~by] syntactically replaces all occurrences of [old]
     in [t] by the term [by]. *)
+
+val replace_m : t -> t Map.t -> t
+(** [replace t m] syntactically replaces all occurrences of bindings of
+    the map in [t], starting from the root *)
 
 (** {2 High-level operations} *)
 
@@ -280,8 +287,10 @@ module Conv : sig
   type ctx
   val create : unit -> ctx
   val of_simple_term : ctx -> TypedSTerm.t -> t option
-  val of_simple_term_exn : ctx -> TypedSTerm.t -> t
+  val of_simple_term_exn : ctx -> TypedSTerm.t -> t (** @raise Type.Conv.Error on failure *)
   val to_simple_term :
     ?env:TypedSTerm.t Var.t DBEnv.t ->
-    t -> TypedSTerm.t
+    ctx ->
+    t ->
+    TypedSTerm.t
 end

@@ -70,7 +70,7 @@ let _hash_norec t h =
 let rec _eq_norec t1 t2 =
   _eq_ty t1 t2 &&
   match t1.term, t2.term with
-  | Var i, Var j -> HVar.equal i j
+  | Var i, Var j -> HVar.equal equal i j
   | DB i, DB j -> i = j
   | Const s1, Const s2 -> ID.equal s1 s2
   | Bind (b1, varty1, t1'), Bind (b2, varty2, t2') ->
@@ -182,8 +182,8 @@ module Tbl = CCHashtbl.Make(AsKey)
 
 module HVarKey = struct
   type t = term HVar.t
-  let compare = HVar.compare
-  let equal = HVar.equal
+  let compare = HVar.compare compare
+  let equal = HVar.equal equal
   let hash = HVar.hash
 end
 
@@ -509,21 +509,28 @@ module Pos = struct
              (CCFormat.sprintf "position %a not valid in term" P.pp pos)
 end
 
+let rec replace_m t m = match Map.get t m with
+  | Some u -> u
+  | None ->
+    begin match t.ty, view t with
+      | HasType ty, Bind (s, varty, t') ->
+        bind ~ty ~varty s (replace_m t' m)
+      | HasType ty, App (f, l) ->
+        let f' = replace_m f m in
+        let l' = List.map (fun t' -> replace_m t' m) l in
+        app ~ty f' l'
+      | HasType ty, AppBuiltin (s,l) ->
+        let l' = List.map (fun t' -> replace_m t' m) l in
+        app_builtin ~ty s l'
+      | NoType, _ -> t
+      | _, (Var _ | DB _ | Const _) -> t
+    end
+
 (* [replace t ~old ~by] syntactically replaces all occurrences of [old]
     in [t] by the term [by]. *)
-let rec replace t ~old ~by = match t.ty, view t with
-  | _ when equal t old -> by
-  | HasType ty, Bind (s, varty, t') ->
-      bind ~ty ~varty s (replace t' ~old ~by)
-  | HasType ty, App (f, l) ->
-      let f' = replace f ~old ~by in
-      let l' = List.map (fun t' -> replace t' ~old ~by) l in
-      app ~ty f' l'
-  | HasType ty, AppBuiltin (s,l) ->
-      let l' = List.map (fun t' -> replace t' ~old ~by) l in
-      app_builtin ~ty s l'
-  | NoType, _ -> t
-  | _, (Var _ | DB _ | Const _) -> t
+let replace t ~old ~by =
+  let m = Map.singleton old by in
+  replace_m t m
 
 (** {3 Variables} *)
 

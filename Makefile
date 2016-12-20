@@ -80,6 +80,11 @@ TEST_FILES = tests/ examples/
 frogtest:
 	frogtest run -c ./tests/conf.toml $(TEST_FILES)
 
+frogtest-tip:
+	@[ -d tip-benchmarks ] || (echo "missing tip-benchmarks/" && exit 1)
+	frogtest run --meta=`git rev-parse HEAD` \
+	  -c ./tip-benchmarks/conf.toml
+
 TARBALL=zipperposition.tar.gz
 
 package: clean

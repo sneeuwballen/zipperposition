@@ -1,4 +1,6 @@
 
+provers = [ "zipperposition" ]
+
 [test]
 
 timeout = 10 # in s
@@ -10,7 +12,8 @@ dir = [ "examples", "tests" ]
 [zipperposition]
 
 binary = "./zipperposition.native"
-cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory"
+cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory --output none"
 unsat = "SZS status (Theorem|Unsatisfiable)"
 sat = "SZS status (CounterSatisfiable|Satisfiable)"
 timeout = "SZS Status ResourceOut"
+version = "git:."

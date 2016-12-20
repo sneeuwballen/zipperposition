@@ -14,7 +14,7 @@ module type S = Induction_intf.S
 
 let section = Util.Section.make ~parent:Const.section "induction"
 
-let stats_lemmas = Util.mk_stat "induction.lemmas"
+let stats_lemmas = Util.mk_stat "induction.inductive_lemmas"
 let stats_min = Util.mk_stat "induction.assert_min"
 
 let k_enable : bool Flex_state.key = Flex_state.create_key()
@@ -144,6 +144,9 @@ module Make
     mw_path: Ind_cst.path;
       (* path leading to this *)
     mw_proof: ProofStep.t;
+      (* proof for the result *)
+    mw_trail: Trail.t;
+      (* trail to carry *)
   }
 
   (* recover the (possibly empty) path from a boolean trail *)
@@ -152,6 +155,14 @@ module Make
     |> Sequence.filter_map BBox.as_case
     |> Sequence.max ~lt:(fun a b -> Ind_cst.path_dominates b a)
     |> CCOpt.get Ind_cst.path_empty
+
+  (* the rest of the trail *)
+  let trail_rest trail : Trail.t =
+    Trail.filter
+      (fun lit -> match BBox.as_case lit with
+         | None -> true
+         | Some _ -> false)
+      trail
 
   (* TODO: incremental strenghtening.
      - when expanding a coverset in clauses_of_min_witness, see if there
@@ -172,6 +183,8 @@ module Make
              T.const ~ty id, T.var (HVar.make ~ty (i+offset)))
           generalize_on
       in
+      Util.debugf ~section 5 "@[<2>generalize_lits `@[%a@]`:@ subst (@[%a@])@]"
+        (fun k->k Lits.pp lits CCFormat.(list (pair T.pp T.pp)) pairs);
       Lits.map
         (fun t ->
            List.fold_left
@@ -201,7 +214,7 @@ module Make
                (fun ctx ->
                   let t = Ind_cst.case_to_term case in
                   let lits = ClauseContext.apply ctx t in
-                  C.create_a lits mw.mw_proof ~trail:(Trail.singleton b_lit))
+                  C.create_a lits mw.mw_proof ~trail:(Trail.add b_lit mw.mw_trail))
                mw.mw_contexts
            in
            (* clauses [CNF(¬ And_i ctx_i[t']) <- b_lit] for
@@ -230,11 +243,12 @@ module Make
                          [Array.to_list lits])
                     |> List.map
                       (fun l ->
-                         let lits = Array.of_list l in
-                         generalize_lits ~generalize_on:mw.mw_generalize_on lits)
-                    |> List.map
-                      (fun lits ->
-                         C.create_a lits mw.mw_proof ~trail:(Trail.singleton b_lit))
+                         let lits =
+                           Array.of_list l
+                           |> generalize_lits ~generalize_on:mw.mw_generalize_on
+                         in
+                         C.create_a lits mw.mw_proof
+                           ~trail:(Trail.add b_lit mw.mw_trail))
                   in
                   Sequence.of_list clauses)
             |> Sequence.to_rev_list
@@ -258,8 +272,6 @@ module Make
       let post = !b_lits in
       [ pre @ post ]
     in
-    Util.debugf ~section 2 "@[<2>add boolean constraints@ @[<hv>%a@]@]"
-      (fun k->k (Util.pp_list BBox.pp_bclause) b_clauses);
     clauses, b_clauses
 
   (* ensure the proper declarations are done for this constant *)
@@ -273,6 +285,7 @@ module Make
   let assert_min
       ~trail ~proof ~(generalize_on:Ind_cst.cst list) ctxs (cst:Ind_cst.cst) =
     let path = path_of_trail trail in
+    let trail' = trail_rest trail in
     match Ind_cst.cst_cover_set cst with
       | Some set when not (Ind_cst.path_contains_cst path cst) ->
         decl_cst_ cst;
@@ -283,9 +296,13 @@ module Make
           mw_coverset=set;
           mw_path=path;
           mw_proof=proof;
+          mw_trail=trail';
         } in
         let clauses, b_clauses = clauses_of_min_witness ~trail mw in
         A.Solver.add_clauses ~proof b_clauses;
+        Util.debugf ~section 2 "@[<2>add boolean constraints@ @[<hv>%a@]@ proof: %a@]"
+          (fun k->k (Util.pp_list BBox.pp_bclause) b_clauses
+              ProofPrint.pp_normal_step proof);
         Util.incr_stat stats_min;
         clauses
       | Some _ (* path already contains [cst] *)
@@ -294,16 +311,16 @@ module Make
   (* TODO: trail simplification that removes all path literals except
      the longest? *)
 
-  (* checks whether the trail of [c] is trivial, that is:
+  (* checks whether the trail is trivial, that is:
      - contains two literals [i = t1] and [i = t2] with [t1], [t2]
         distinct cover set members, or
      - two literals [loop(i) minimal by a] and [loop(i) minimal by b], or
      - two literals [C in loop(i)], [D in loop(j)] if i,j do not depend
         on one another *)
-  let has_trivial_trail c =
-    let trail = C.trail c |> Trail.to_seq in
+  let trail_is_trivial trail =
+    let seq = Trail.to_seq trail in
     (* all boolean literals that express paths *)
-    let relevant_cases = Sequence.filter_map BoolBox.as_case trail in
+    let relevant_cases = Sequence.filter_map BoolBox.as_case seq in
     (* are there two distinct incompatible paths in the trail? *)
     Sequence.product relevant_cases relevant_cases
     |> Sequence.exists
@@ -316,9 +333,9 @@ module Make
          if res
          then (
            Util.debugf ~section 4
-             "@[<2>clause@ @[%a@]@ redundant because of@ \
-              {@[@[%a@],@,@[%a@]}@] in trail@]"
-             (fun k->k C.pp c Ind_cst.pp_path p1 Ind_cst.pp_path p2)
+             "@[<2>trail@ @[%a@]@ is trivial because of@ \
+              {@[@[%a@],@,@[%a@]}@]@]"
+             (fun k->k C.pp_trail trail Ind_cst.pp_path p1 Ind_cst.pp_path p2)
          );
          res)
 
@@ -328,13 +345,14 @@ module Make
      of the clause for all those constants independently *)
   let inf_assert_minimal c =
     let consts = scan_clause c in
+    let proof =
+      ProofStep.mk_inference [C.proof c] ~rule:(ProofStep.mk_rule "min")
+    in
     let clauses =
       CCList.flat_map
         (fun cst ->
            decl_cst_ cst;
            let ctx = ClauseContext.extract_exn (C.lits c) (Ind_cst.cst_to_term cst) in
-           let proof = ProofStep.mk_inference [C.proof c]
-               ~rule:(ProofStep.mk_rule "min") in
            (* no generalization, we have no idea whether [consts]
               originate from a universal quantification *)
            assert_min ~trail:(C.trail c) ~proof ~generalize_on:[] [ctx] cst)
@@ -349,11 +367,14 @@ module Make
     decl_cst_ cst;
     Util.debugf ~section 1 "@[<2>perform induction on `%a`@ in `@[%a@]`@]"
       (fun k->k Ind_cst.pp_cst cst (Util.pp_list C.pp) clauses);
-    (* keep only clauses that depend on [cst] *)
+    (* extract a context from every clause, even those that do not contain [cst] *)
     let ctxs =
-      CCList.filter_map
+      List.map
         (fun c ->
-           ClauseContext.extract (C.lits c) (Ind_cst.cst_to_term cst))
+           let sub = Ind_cst.cst_to_term cst in
+           match ClauseContext.extract (C.lits c) sub with
+             | Some ctx -> ctx
+             | None -> ClauseContext.trivial (C.lits c) sub)
         clauses
     in
     (* proof: one step from all the clauses above *)
@@ -392,7 +413,7 @@ module Make
                  CCList.remove ~eq:Ind_cst.cst_equal ~x:cst consts
                in
                induction_on_ clauses ~cst ~generalize_on)
-          |> E.cr_add
+          |> E.cr_return (* do not add the clause itself *)
         end
     | _ -> E.cr_skip
 
@@ -416,10 +437,11 @@ module Make
                induction_on_ ~trail ~generalize_on cut.A.cut_neg ~cst)
             consts
         in
+        Util.incr_stat stats_lemmas;
         new_lemmas_ := List.rev_append l !new_lemmas_;
     end
 
-  let inf_new_lemmas () =
+  let inf_new_lemmas ~full:_ () =
     let l = !new_lemmas_ in
     new_lemmas_ := [];
     l
@@ -431,42 +453,12 @@ module Make
     Ind_cst.max_depth_ := d;
     Env.add_unary_inf "induction.ind" inf_assert_minimal;
     Env.add_clause_conversion convert_statement;
-    Env.add_is_trivial has_trivial_trail;
-    Signal.on_every A.on_input_lemma on_lemma;
+    Env.add_is_trivial_trail trail_is_trivial;
+    Signal.on_every A.on_lemma on_lemma;
     Env.add_generate "ind.lemmas" inf_new_lemmas;
     (* declare new constants to [Ctx] *)
     Signal.on_every Ind_cst.on_new_cst decl_cst_;
     ()
-
-  module Meta = struct
-    (* TODO *)
-    let t : _ Plugin.t = object
-      method signature = ID.Map.empty
-      method clauses = []
-      method owns _ = false
-      method to_fact _ = assert false
-      method of_fact _ = None (* TODO *)
-    end
-
-    (* TODO
-    let declare_inductive p ity =
-      let ity = Induction.make ity.CI.pattern ity.CI.constructors in
-      Util.debugf ~section 2
-        "@[<hv2>declare inductive type@ %a@]"
-        (fun k->k Induction.print ity);
-      let fact = Induction.t#to_fact ity in
-      add_fact_ p fact
-
-      (* declare inductive types *)
-      E.Ctx.Induction.inductive_ty_seq
-        (fun ity -> ignore (declare_inductive p ity));
-      Signal.on E.Ctx.Induction.on_new_inductive_ty
-        (fun ity ->
-           ignore (declare_inductive p ity);
-           Signal.ContinueListening
-        );
-    *)
-  end
 end
 
 let enabled_ = ref true

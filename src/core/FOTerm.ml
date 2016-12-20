@@ -158,6 +158,12 @@ let is_app t = match T.view t with
   | T.App _ -> true
   | _ -> false
 
+let as_const_exn t = match T.view t with
+  | T.Const c -> c
+  | _ -> invalid_arg "as_const_exn"
+
+let as_const t = try Some (as_const_exn t) with Invalid_argument _ -> None
+
 module Seq = struct
   let vars t k =
     let rec aux t = match view t with
@@ -226,7 +232,7 @@ module Seq = struct
 end
 
 let var_occurs ~var t =
-  Sequence.exists (HVar.equal var) (Seq.vars t)
+  Sequence.exists (HVar.equal Type.equal var) (Seq.vars t)
 
 let rec size t = match view t with
   | Var _
@@ -254,8 +260,7 @@ let min_var set = VarSet.to_seq set |> Seq.min_var
 
 let add_vars tbl t = Seq.vars t (fun v -> VarTbl.replace tbl v ())
 
-let vars ts =
-  Sequence.flat_map Seq.vars ts |> VarSet.of_seq
+let vars ts = Seq.vars ts |> VarSet.of_seq
 
 let vars_prefix_order t =
   Seq.vars t
@@ -284,12 +289,17 @@ let of_ty t = (t : Type.t :> T.t)
 module Pos = struct
   let at t pos = of_term_unsafe (T.Pos.at (t :> T.t) pos)
 
-  let replace t pos ~by = of_term_unsafe (T.Pos.replace (t:>T.t) pos ~by:(by:>T.t))
+  let replace t pos ~by =
+    assert (Type.equal (at t pos |> ty) (ty by));
+    of_term_unsafe (T.Pos.replace (t:>T.t) pos ~by:(by:>T.t))
 end
 
 let replace t ~old ~by =
   assert (Type.equal (ty by) (ty old));
   of_term_unsafe (T.replace (t:t:>T.t) ~old:(old:t:>T.t) ~by:(by:t:>T.t))
+
+let replace_m t m =
+  of_term_unsafe (T.replace_m (t:t:>T.t) (m:t Map.t:>T.t T.Map.t))
 
 let symbols ?(init=ID.Set.empty) t =
   ID.Set.add_seq init (Seq.symbols t)
@@ -564,16 +574,18 @@ module Conv = struct
       | PT.Bind _
       | PT.Meta _
       | PT.Record _
-      | PT.Multiset _ -> raise Type.Conv.Error
+      | PT.Ite _
+      | PT.Let _
+      | PT.Match _
+      | PT.Multiset _ -> raise (Type.Conv.Error t)
     in
     aux t
 
   let of_simple_term ctx t =
     try Some (of_simple_term_exn ctx t)
-    with Type.Conv.Error -> None
+    with Type.Conv.Error _ -> None
 
-  let to_simple_term ?(env=DBEnv.empty) t =
-    let tbl = VarTbl.create 16 in
+  let to_simple_term ?(env=DBEnv.empty) ctx t =
     let module ST = TypedSTerm in
     let rec to_simple_term t =
       match view t with
@@ -587,14 +599,9 @@ module Conv = struct
           ST.app_builtin ~ty:(aux_ty (ty t))
             b (List.map to_simple_term l)
     and aux_var v =
-      try VarTbl.find tbl v
-      with Not_found ->
-        let ty = HVar.ty v in
-        let v' = Var.of_string ~ty:(aux_ty ty)
-          (CCFormat.sprintf "X%d" (HVar.id v)) in
-        VarTbl.add tbl v v';
-        v'
-    and aux_ty ty = Type.Conv.to_simple_term ~env ty
+      Type.Conv.var_to_simple_var ~prefix:"X" ctx v
+    and aux_ty ty =
+      Type.Conv.to_simple_term ~env ctx ty
     in
     to_simple_term t
 end

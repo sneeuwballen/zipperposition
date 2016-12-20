@@ -2,7 +2,7 @@
 include "nat.zf".
 val odd : nat -> prop.
 val even : nat -> prop.
-assert
+lemma
   forall (N1:nat). (forall (N2:nat). ((plus N1 (s N2)) = (s (plus N1 N2)))).
 assert odd (s z).
 assert forall (N:nat). ((even N) => (odd (s N))).

@@ -1,0 +1,14 @@
+
+# expect: unsat
+
+val f : prop -> prop -> prop.
+
+val a : prop.
+val b : prop.
+val not_b : prop.
+
+assert (b <=> ~not_b).
+
+goal f a a => (f b b || f not_b not_b).
+
+

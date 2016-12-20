@@ -14,6 +14,8 @@ assert forall (X:nat). (forall (Y:nat). ((plus (s X) Y) = (s (plus X Y)))).
 assert forall (X:nat). ((minus X z) = X).
 assert forall (X:nat). (forall (Y:nat). ((minus (s X) (s Y)) = (minus X Y))).
 assert forall (X:nat). (less z (s X)).
+assert forall X. ~ (less (s X) z).
 assert forall (X:nat). (forall (Y:nat). ((less (s X) (s Y)) <=> (less X Y))).
 assert forall (X:nat). (leq z X).
+assert forall X. ~ (leq (s X) z).
 assert forall (X:nat). (forall (Y:nat). ((leq (s X) (s Y)) <=> (leq X Y))).

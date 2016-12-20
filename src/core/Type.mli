@@ -50,6 +50,7 @@ val is_tType : t -> bool
 val is_var : t -> bool
 val is_bvar : t -> bool
 val is_app : t -> bool
+val is_const : t -> bool
 val is_fun : t -> bool
 val is_forall : t -> bool
 val is_prop : t -> bool
@@ -229,14 +230,18 @@ module Conv : sig
   val fresh_ty_var : ctx -> t HVar.t
   (** Fresh type variable *)
 
-  exception Error
+  val var_to_simple_var : ?prefix:string -> ctx -> t HVar.t -> TypedSTerm.t Var.t
+
+  exception Error of TypedSTerm.t
 
   val of_simple_term_exn : ctx -> TypedSTerm.t -> t
   (** @raise Invalid_argument if conversion is impossible *)
 
   val to_simple_term :
     ?env:TypedSTerm.t Var.t DBEnv.t ->
-    t -> TypedSTerm.t
+    ctx ->
+    t ->
+    TypedSTerm.t
   (** convert a type to a prolog term.
       @param env the current environement for De Bruijn indices *)
 end

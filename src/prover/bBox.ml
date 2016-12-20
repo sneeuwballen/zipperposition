@@ -148,6 +148,10 @@ let must_be_kept lit =
     | Lemma _
     | Case _ -> true
 
+let is_inductive lit = match Lit.payload (Lit.abs lit) with
+  | Case _ -> true
+  | _ -> false
+
 let as_case lit = match Lit.payload (Lit.abs lit) with
   | Case p -> Some p
   | _ -> None

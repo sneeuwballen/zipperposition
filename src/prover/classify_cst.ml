@@ -31,6 +31,21 @@ let classify id =
   | None -> Other
   | Some x -> x
 
+let pp_res out = function
+  | Ty _ -> Format.fprintf out "ind_ty"
+  | Cstor (_, ity) -> Format.fprintf out "cstor of %a" Ind_ty.pp ity
+  | Inductive_cst _ -> Format.fprintf out "ind_cst"
+  | Projector id -> Format.fprintf out "projector_%a" ID.pp id
+  | DefinedCst lev -> Format.fprintf out "defined (level %d)" lev
+  | Other -> CCFormat.string out "other"
+
+let pp_signature out sigma =
+  let pp_pair out (id,ty) =
+    Format.fprintf out "(@[%a : %a (%a)@])" ID.pp id Type.pp ty pp_res (classify id)
+  in
+  Format.fprintf out
+    "{@[<hv>%a@]}" (Util.pp_list ~sep:"," pp_pair) (Signature.to_list sigma)
+
 let dominates_ opt_c opt_sub =
   CCOpt.(get false (map2 Ind_cst.dominates opt_c opt_sub))
 

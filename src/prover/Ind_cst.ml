@@ -31,7 +31,8 @@ let invalid_declf m = CCFormat.ksprintf m ~f:invalid_decl
 
 type cst = {
   cst_id: ID.t;
-  cst_ty: Type.t;
+  cst_args: Type.t list;
+  cst_ty: Type.t; (* [cst_ty = cst_id cst_args] *)
   cst_ity: Ind_ty.t; (* the corresponding inductive type *)
   cst_depth: int;
   cst_parent: cst option;
@@ -255,10 +256,13 @@ let mk_skolem_ pp x =
 
 (* declare new constant *)
 let declare_cst_ ~parent id ty =
+  Util.debugf ~section:Ind_ty.section 2
+    "@[<2>declare new inductive symbol `@[%a : %a@]`@]"
+    (fun k->k ID.pp id Type.pp ty);
   if is_cst id then raise (AlreadyDeclaredConstant id);
   assert (Type.is_ground ty); (* constant --> not polymorphic *)
-  let ity = match Ind_ty.as_inductive_type ty with
-    | Some t -> t
+  let ity, args = match Ind_ty.as_inductive_type ty with
+    | Some (t,l) -> t,l
     | None -> invalid_declf "cannot declare a constant of type %a" Type.pp ty
   in
   (* depth of the constant *)
@@ -273,12 +277,10 @@ let declare_cst_ ~parent id ty =
     cst_depth=depth;
     cst_parent=parent;
     cst_ity=ity;
+    cst_args=args;
     cst_coverset=None;
   }
   in
-  Util.debugf ~section:Ind_ty.section 2
-    "@[<2>declare new inductive symbol `@[%a : %a@]`@]"
-    (fun k->k ID.pp id Type.pp ty);
   ID.add_payload id (Payload_cst cst);
   (* return *)
   Signal.send on_new_cst cst;
@@ -431,6 +433,7 @@ let is_potential_cst (id:ID.t) (ty:Type.t): bool =
   n_tyvars=0
   && ty_args=[] (* constant *)
   && Ind_ty.is_inductive_type ty_ret
+  && Type.is_ground ty
   && (is_cst id || not (Ind_ty.is_constructor id))
 
 (* TODO: generalize to ground terms starting with uninterpreted fun *)

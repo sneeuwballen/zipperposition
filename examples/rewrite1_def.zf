@@ -1,0 +1,19 @@
+# expect: unsat
+# exercize rewriting
+
+val set : type -> type.
+
+val mem : pi a. a -> set a -> prop.
+
+def union : pi a. set a -> set a -> set a where
+  forall a s1 s2 x.
+    mem a x (union a s1 s2) <=> mem a x s1 || mem a x s2 .
+
+def  subeq : pi a. set a -> set a -> prop where
+  forall a s1 s2.
+    subeq a s1 s2 <=> (forall x. mem a x s1 => mem a x s2).
+
+goal
+  forall a A B C.
+    subeq a (union _ A B) C => subeq _ A C && subeq _ B C.
+

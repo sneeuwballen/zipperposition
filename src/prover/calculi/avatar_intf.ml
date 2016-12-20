@@ -55,14 +55,23 @@ module type S = sig
     cut_res
   (** Introduce a cut on the given clause(s). *)
 
+  val add_lemma : cut_res -> unit
+  (** Add the given cut to the list of lemmas *)
+
   val on_input_lemma : cut_res Signal.t
   (** Triggered every time a cut is introduced  for an input lemma
       (i.e. every time a statement of the form `lemma F` is translated) *)
+
+  val on_lemma : cut_res Signal.t
+  (** Triggered every time a cut is introduced, by any means. In
+      particular it is triggered at least as often as {!on_input_lemma} *)
 
   val convert_lemma : E.clause_conversion_rule
   (** Intercepts input lemmas and converts them into clauses.
       Triggers {!on_input_lemma} with the resulting cut *)
 
-  val register : unit -> unit
-  (** Register inference rules to the environment *)
+  val register : split:bool -> unit -> unit
+  (** Register inference rules to the environment
+      @param split if true, the clause splitting rule is added. Otherwise
+      Avatar is only used for other things such as induction. *)
 end

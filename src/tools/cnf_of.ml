@@ -69,8 +69,7 @@ let process file =
     >|= fun st ->
     if !print_in
     then Format.printf "@[<v2>input:@ %a@]@."
-      (CCVector.print ~start:"" ~stop:"" ~sep:""
-        (Statement.pp T.pp T.pp T.pp)) st;
+        (CCVector.print ~start:"" ~stop:"" ~sep:"" Statement.pp_input) st;
     let opts =
       (if !flag_distribute_exists then [Cnf.DistributeExists] else []) @
       (if !flag_disable_renaming then [Cnf.DisableRenaming] else []) @
@@ -84,14 +83,6 @@ let process file =
         (ID.Map.print ~start:"" ~stop:"" ~sep:"" ~arrow:" : " ID.pp T.pp) sigma
     );
     (* print *)
-    let decls =
-      CCVector.map
-        (Statement.map_src
-           ~f:(fun attrs ->
-             let name = UntypedAST.name_of_attrs attrs in
-             StatementSrc.from_file ?name file))
-        decls
-    in
     print_res decls;
     ()
   in match res with

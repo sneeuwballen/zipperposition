@@ -60,10 +60,11 @@ end
 module Ctx : sig
   type t
 
-  val create : ?default:type_ -> unit -> t
+  val create : ?def_as_rewrite:bool -> ?default:type_ -> unit -> t
   (** New context with a signature and default types.
       @param default which types are inferred by default (if not provided
-        then {!type_erm} will be used) *)
+        then {!type_erm} will be used)
+      @param def_as_rewrite if true, definitions will be treated like rewrite rules *)
 
   val copy : t -> t
   (** Copy of the context *)
@@ -139,7 +140,7 @@ val constrain_term_type : ?loc:loc -> Ctx.t -> untyped -> type_ -> unit or_error
 
 (** {2 Statements} *)
 
-type typed_statement = (typed, typed, type_, UntypedAST.attrs) Statement.t
+type typed_statement = (typed, typed, type_) Statement.t
 
 val infer_statement_exn :
   Ctx.t ->
@@ -150,12 +151,15 @@ val infer_statement_exn :
     that were inferred implicitely. *)
 
 val infer_statements_exn :
+  ?def_as_rewrite:bool ->
   ?ctx:Ctx.t ->
   UntypedAST.statement Sequence.t ->
   typed_statement CCVector.ro_vector
-(** Infer all statements *)
+(** Infer all statements
+    @param def_as_rewrite if true, definitions becomes rewrite rules *)
 
 val infer_statements :
+  ?def_as_rewrite:bool ->
   ?ctx:Ctx.t ->
   UntypedAST.statement Sequence.t ->
   typed_statement CCVector.ro_vector or_error

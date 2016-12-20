@@ -55,6 +55,12 @@ exception Payload_ind_projector of ID.t
 let invalid_decl_ msg = raise (InvalidDecl msg)
 let invalid_declf_ fmt = CCFormat.ksprintf fmt ~f:invalid_decl_
 
+let pp out ty =
+  let ppvars out =
+    function [] -> () | l -> Format.fprintf out " %a" (Util.pp_list HVar.pp) l
+  in
+  Format.fprintf out "@[%a%a@]" ID.pp ty.ty_id ppvars ty.ty_vars
+
 let type_hd ty =
   let _, _, ret = Type.open_poly_fun ty in
   match Type.view ret with
@@ -88,10 +94,14 @@ let is_inductive_type ty =
   | Some (B _)
   | None -> false
 
-let as_inductive_type ty =
-  match type_hd ty with
-  | Some (B _) | None -> None
-  | Some (I id) -> as_inductive_ty id
+let as_inductive_type ty = match Type.view ty with
+  | Type.App (id, l) ->
+    begin match as_inductive_ty id with
+      | None -> None
+      | Some ity -> Some (ity, l)
+    end
+  | Type.Fun _ | Type.Forall _ | Type.Builtin _ | Type.DB _ | Type.Var _
+    -> None
 
 (* declare that the given type is inductive *)
 let declare_ty id ~ty_vars constructors =
@@ -172,6 +182,10 @@ let scan_stmt st = match Stmt.view st with
           let _ = declare_ty d.Stmt.data_id ~ty_vars cstors in
           ())
         l
-  | Stmt.TyDecl (id, ty)
-  | Stmt.Def (id,ty,_) -> scan_for_constant id ty
+  | Stmt.TyDecl (id, ty) -> scan_for_constant id ty
+  | Stmt.Def l ->
+    List.iter
+      (fun {Stmt.def_id; def_ty; _} ->
+         scan_for_constant def_id def_ty)
+      l
   | _ -> ()

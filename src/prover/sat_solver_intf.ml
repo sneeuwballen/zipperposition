@@ -26,8 +26,9 @@ module type S = sig
 
   val add_clause_seq : proof:proof_step -> Lit.t list Sequence.t -> unit
 
-  val check : unit -> result
-  (** Is the current problem satisfiable? *)
+  val check : full:bool -> unit -> result
+  (** Is the current problem satisfiable?
+      @param full if true, check unconditionally *)
 
   val last_result : unit -> result
   (** Last computed result. This does not compute a new result *)

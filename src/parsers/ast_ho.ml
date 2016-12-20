@@ -36,7 +36,7 @@ module Seq = struct
 
   let vars decl =
     terms decl
-    |> Sequence.flatMap PT.Seq.vars
+    |> Sequence.flat_map PT.Seq.vars
 end
 
 (* XXX: ad-hoc infix symbol constructor *)

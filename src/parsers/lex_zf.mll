@@ -52,6 +52,7 @@ rule token = parse
   | "->" { ARROW }
   | "val" { VAL }
   | "def" { DEF }
+  | "where" { WHERE }
   | "type" { TYPE }
   | "prop" { PROP }
   | "assert" { ASSERT }

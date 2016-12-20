@@ -374,6 +374,18 @@ let pp out lits =
     Format.fprintf out "[@[<hv>%a@]]"
       (CCFormat.array ~start:"" ~stop:"" ~sep:" ∨ " pp_lit) lits
 
+let pp_vars out lits =
+  let pp_vars out = function
+    | [] -> ()
+    | l ->
+      Format.fprintf out "forall @[%a@].@ "
+        (Util.pp_list ~sep:" " Type.pp_typed_var) l
+  in
+  let vars_ =
+    Seq.vars lits |> T.VarSet.of_seq |> T.VarSet.to_list
+  in
+  Format.fprintf out "@[<2>%a%a@]" pp_vars vars_ pp lits
+
 let pp_tstp out lits =
   if Array.length lits = 0 then CCFormat.string out "$false"
   else

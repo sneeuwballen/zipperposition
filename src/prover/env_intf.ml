@@ -11,8 +11,9 @@ module type S = sig
   type inf_rule = C.t -> C.t list
   (** An inference returns a list of conclusions *)
 
-  type generate_rule = unit -> C.t list
-  (** Generation of clauses regardless of current clause *)
+  type generate_rule = full:bool -> unit -> C.t list
+  (** Generation of clauses regardless of current clause.
+      @param full if true, perform more thorough checks *)
 
   type binary_inf_rule = inf_rule
   type unary_inf_rule = inf_rule
@@ -39,6 +40,9 @@ module type S = sig
   (** find redundant clauses in [ProofState.ActiveSet] w.r.t the clause.
        first param is the set of already known redundant clause, the rule
        should add clauses to it *)
+
+  type is_trivial_trail_rule = Trail.t -> bool
+  (** Rule that checks whether the trail is trivial (a tautology) *)
 
   type is_trivial_rule = C.t -> bool
   (** Rule that checks whether the clause is trivial (a tautology) *)
@@ -115,6 +119,9 @@ module type S = sig
   val add_multi_simpl_rule : multi_simpl_rule -> unit
   (** Add a multi-clause simplification rule *)
 
+  val add_is_trivial_trail : is_trivial_trail_rule -> unit
+  (** Add tautology detection rule *)
+
   val add_is_trivial : is_trivial_rule -> unit
   (** Add tautology detection rule *)
 
@@ -189,8 +196,11 @@ module type S = sig
   val do_unary_inferences : C.t -> C.t Sequence.t
   (** do unary inferences for the given clause *)
 
-  val do_generate : unit -> C.t Sequence.t
+  val do_generate : full:bool -> unit -> C.t Sequence.t
   (** do generating inferences *)
+
+  val is_trivial_trail : Trail.t -> bool
+  (** Check whether the trail is trivial *)
 
   val is_trivial : C.t -> bool
   (** Check whether the clause is trivial *)
@@ -203,6 +213,9 @@ module type S = sig
 
   val simplify : simplify_rule
   (** Simplify the clause. *)
+
+  val simplify_term : FOTerm.t -> FOTerm.t SimplM.t
+  (** Simplify the term *)
 
   val backward_simplify : C.t -> C.ClauseSet.t * C.t Sequence.t
   (** Perform backward simplification with the given clause. It returns the
