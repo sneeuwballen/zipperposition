@@ -18,13 +18,12 @@ def snd : pi (a b : type). pair a b -> b where
   forall x y. fst (Pair x y) = y.
 
 def length : pi a. list a -> nat where
-  length nil = Z and
+  length nil = Z;
   forall x l. length (cons x l) = S (length l).
 
 def split : pi (a:type) (b:type). list (pair a b) -> pair (list a) (list b) where
-  split nil = Pair nil nil
-  and
+  split nil = Pair nil nil;
   forall x y l.
-  split (cons (Pair x y) l) =
-    Pair (cons x (fst (split l))) (cons y (snd (split l))).
+    split (cons (Pair x y) l) =
+      Pair (cons x (fst (split l))) (cons y (snd (split l))).
 

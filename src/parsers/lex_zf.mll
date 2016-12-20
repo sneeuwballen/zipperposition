@@ -46,6 +46,7 @@ rule token = parse
   | ',' { COMMA }
   | '_' { WILDCARD }
   | ':' { COLON }
+  | ';' { SEMI_COLON }
   | "=" { LOGIC_EQ }
   | "!=" { LOGIC_NEQ }
   | ":=" { EQDEF }
