@@ -98,10 +98,14 @@ typed_var:
 typed_var_strict:
   | LEFT_PAREN v=raw_var COLON t=term RIGHT_PAREN { T.V v, t }
 
-typed_ty_var:
-  | v=raw_var { T.V v, None }
-  | v=raw_var COLON TYPE { T.V v, Some T.tType  }
-  | LEFT_PAREN v=raw_var COLON TYPE RIGHT_PAREN { T.V v, Some T.tType }
+typed_ty_var_block:
+  | v=raw_var { [T.V v, None] }
+  | v=raw_var COLON TYPE { [T.V v, Some T.tType] }
+  | LEFT_PAREN v=raw_var+ COLON TYPE RIGHT_PAREN { List.map (fun v -> T.V v, Some T.tType) v }
+
+typed_ty_var_list:
+  | l=typed_ty_var_block { l }
+  | l=typed_ty_var_block l2=typed_ty_var_list { l @ l2 }
 
 var:
   | WILDCARD { T.wildcard }
@@ -191,7 +195,7 @@ term:
       let loc = L.mk_pos $startpos $endpos in
       T.fun_ty ~loc [t] u
     }
-  | PI vars=typed_ty_var+ DOT t=term
+  | PI vars=typed_ty_var_list DOT t=term
     {
       let loc = L.mk_pos $startpos $endpos in
       T.forall_ty ~loc vars t
