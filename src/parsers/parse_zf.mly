@@ -90,13 +90,15 @@ raw_var:
   | w=LOWER_WORD { w }
   | w=UPPER_WORD { w }
 
-typed_var:
-  | v=raw_var { T.V v, None }
-  | WILDCARD { T.Wildcard, None }
-  | LEFT_PAREN v=raw_var COLON t=term RIGHT_PAREN { T.V v, Some t }
+typed_var_block:
+  | v=raw_var { [T.V v, None] }
+  | WILDCARD { [T.Wildcard, None] }
+  | LEFT_PAREN v=raw_var+ COLON t=term RIGHT_PAREN
+    { List.map (fun v -> T.V v, Some t) v }
 
-typed_var_strict:
-  | LEFT_PAREN v=raw_var COLON t=term RIGHT_PAREN { T.V v, t }
+typed_var_list:
+  | l=typed_var_block { l }
+  | l=typed_var_block l2=typed_var_list { l @ l2 }
 
 typed_ty_var_block:
   | v=raw_var { [T.V v, None] }
@@ -180,12 +182,12 @@ or_term:
 
 term:
   | t=or_term { t }
-  | LOGIC_FORALL vars=typed_var+ DOT t=term
+  | LOGIC_FORALL vars=typed_var_list DOT t=term
     {
       let loc = L.mk_pos $startpos $endpos in
       T.forall ~loc vars t
     }
-  | LOGIC_EXISTS vars=typed_var+ DOT t=term
+  | LOGIC_EXISTS vars=typed_var_list DOT t=term
     {
       let loc = L.mk_pos $startpos $endpos in
       T.exists ~loc vars t

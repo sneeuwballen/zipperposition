@@ -2,4 +2,4 @@
 # commutativity
 
 include "nat.zf".
-goal forall (X:nat). (forall (Y:nat). ((plus X Y) = (plus Y X))).
+goal forall (X Y:nat). plus X Y = plus Y X.
