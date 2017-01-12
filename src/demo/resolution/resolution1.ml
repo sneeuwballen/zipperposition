@@ -50,6 +50,10 @@ let _signature = ref Libzipperposition.Signature.empty
       - the_universe
     *)
 
+let conv_ty =
+  let conv_ = Type.Conv.create () in
+  fun t -> Type.Conv.of_simple_term_exn conv_ t
+
 (** {2 Literals and Clauses} *)
 
 (** A literal is an atomic proposition (term of type [$o], i.e. the type of
@@ -112,22 +116,13 @@ module Clause = struct
   (** printing a clause: print literals separated with "|" *)
   let pp out c = CCFormat.list ~sep:" | " Lit.pp out c
 
-  (* conversion from TS.t to T.t *)
-  let conv_term =
-    let conv_ = T.Conv.create () in
-    fun t -> T.Conv.of_simple_term_exn conv_ t
-
-  (** Conversion from list of atomic formulas.
+  (** Conversion from list of {!SLiteral.t}
       type: [Formula.t list -> clause] *)
-  let _of_forms c =
-    let _atom f = match F.view f with
-      | F.Not f' ->
-          begin match F.view f' with
-          | F.Atom t -> conv_term t,false
-          | _ -> failwith (CCFormat.sprintf "unsupported formula %a" TS.pp f)
-          end
-      | F.Atom t -> conv_term t, true
-      | _ -> failwith (CCFormat.sprintf "unsupported formula %a" TS.pp f)
+  let _of_forms (c:T.t SLiteral.t list): t =
+    let _atom f = match f with
+      | SLiteral.Atom (t, sign) -> t, sign
+      | _ ->
+        failwith (CCFormat.sprintf "unsupported formula %a" (SLiteral.pp T.pp) f)
     in
     make (List.map _atom c)
 end
@@ -359,8 +354,18 @@ let process_file f =
         This algorithm is already implemented in {!Libzipperposition}. *)
     >>= fun st ->
     let decls = Cnf.cnf_of_seq ?ctx:None (CCVector.to_seq st) in
-    let sigma = Cnf.type_declarations (CCVector.to_seq decls) in
-    _signature := Libzipperposition.Skolem.to_signature ctx; (* recover signature *)
+    _signature :=
+      CCVector.to_seq decls
+      |> Cnf.type_declarations
+      |> ID.Map.map conv_ty;
+    let clauses =
+      CCVector.to_seq decls
+      |> Cnf.convert
+      |> CCVector.to_seq
+      |> Sequence.flat_map Statement.Seq.forms
+      |> Sequence.map Clause._of_forms
+      |> Sequence.to_rev_list
+    in
     (** Perform saturation (solve the problem) *)
     Err.return (_saturate clauses)
   ) in
@@ -373,10 +378,7 @@ let process_file f =
 
 (** Parse command-line arguments, including the file to process *)
 
-let _options = ref (
-  [
-  ] @ Libzipperposition.Options.global_opts
-  )
+let _options = ref (Options.make ())
 let _help = "usage: resolution file.p"
 let _file = ref None
 
