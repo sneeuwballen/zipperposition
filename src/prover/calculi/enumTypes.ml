@@ -259,7 +259,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Sequence.of_array lits
     |> Sequence.flat_map Lit.Seq.terms
     |> Sequence.flat_map T.Seq.subterms_depth
-    |> Sequence.fmap
+    |> Sequence.filter_map
       (fun (v,depth) -> if depth>0 && T.is_var v then Some v else None)
     |> T.Seq.add_set T.Set.empty
 

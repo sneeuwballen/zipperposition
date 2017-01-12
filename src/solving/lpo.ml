@@ -126,7 +126,23 @@ module C = Constraint
 (** Functor to use Sat, and encode/decode the solution.
     Use "Solving Partial Order Constraints for LPO Termination", Codish & al *)
 module MakeSolver(X : sig end) = struct
-  module Solver = Msat.Sat.Make(struct end)
+  module Lit = struct
+    type t = int
+    let fresh = let n = ref 0 in fun () -> incr n; !n
+    let sign x = x>0
+    let abs = abs
+    let print = Format.pp_print_int
+    let dummy = 0
+    let neg i = -i
+    let hash i = i land max_int
+    let equal i j = i=j
+    let norm i =
+      if i>0 then i, Msat.Formula_intf.Same_sign
+      else -i, Msat.Formula_intf.Negated
+    type proof = ()
+  end
+
+  module Solver = Msat.Solver.Make(Lit)(Msat.Solver.DummyTheory(Lit))(struct end)
 
   (* propositional atoms map symbols to the binary digits of
      their index in the precedence *)
@@ -147,7 +163,6 @@ module MakeSolver(X : sig end) = struct
 
   module AtomTbl = CCHashtbl.Make(Atom)
 
-  let num_ = ref 1
   let atom_to_int_ = AtomTbl.create 16
   let int_to_atom_ = Hashtbl.create 16
 
@@ -156,8 +171,7 @@ module MakeSolver(X : sig end) = struct
     try
       AtomTbl.find atom_to_int_ a
     with Not_found ->
-      let i = Msat.Sat.Fsat.make !num_ in
-      incr num_;
+      let i = Lit.fresh () in
       AtomTbl.add atom_to_int_ a i;
       Hashtbl.add int_to_atom_ i a;
       i
@@ -165,7 +179,7 @@ module MakeSolver(X : sig end) = struct
   (* get the propositional variable that represents the n-th bit of [s] *)
   let digit s n = atom_to_lit (Atom.make s n)
 
-  module F = Msat.Sat.Tseitin
+  module F = Msat.Tseitin.Make(Lit)
 
   (* encode [a < b]_n where [n] is the number of digits.
       either the n-th digit of [a] is false and the one of [b] is true,
@@ -240,9 +254,9 @@ module MakeSolver(X : sig end) = struct
     sol
 
   let print_lit fmt i =
-    if not (Msat.Sat.Fsat.sign i) then Format.fprintf fmt "¬";
+    if not (Lit.sign i) then Format.fprintf fmt "¬";
     try
-      let a = Hashtbl.find int_to_atom_ (Msat.Sat.Fsat.abs i) in
+      let a = Hashtbl.find int_to_atom_ (Lit.abs i) in
       Atom.print fmt a
     with Not_found ->
       Format.fprintf fmt "L%d" (abs (i : Solver.atom :> int))  (* tseitin *)

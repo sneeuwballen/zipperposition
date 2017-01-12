@@ -89,7 +89,7 @@ module Make(C : Index.CLAUSE) = struct
     let max_depth_term symb t =
       let symbs_depths =
         T.Seq.subterms_depth t
-        |> Sequence.fmap
+        |> Sequence.filter_map
           (fun (t,depth) -> match T.Classic.view t with
              | T.Classic.App (s, _) when ID.equal s symb -> Some depth
              | _ -> None)
