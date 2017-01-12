@@ -26,17 +26,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Simple Resolution Prover} *)
 
+open Libzipperposition
+
 module Err = CCError
-module T = Libzipperposition.FOTerm
-module F = Libzipperposition.Formula.FO
-module Substs = Libzipperposition.Substs
-module Unif = Libzipperposition.Unif
-module Util = Libzipperposition.Util
+module T = FOTerm
+module TS = TypedSTerm
+module F = TypedSTerm.Form
+module P = Libzipperposition_parsers
 
 (** Global signature (maps symbols such as "f", "parent_of" or "greater"
     to their type). Every symbol has exactly one type.
     The initial signature is the TPTP signature (logic connectives) *)
-let _signature = ref Libzipperposition.Signature.TPTP.base
+let _signature = ref Libzipperposition.Signature.empty
 
 (** We do not have to do anything about terms, because they are already
     defined in {! Libzipperposition.FOTerm}. Terms are either variables or
@@ -105,11 +106,16 @@ module Clause = struct
       to a term is defined too (the function {!Subst.FO.apply} that
       applies a substitution to a first-order term)
   *)
-  let apply_subst ~renaming subst c s_c =
-    make (List.map (fun (t,b) -> Substs.FO.apply ~renaming subst t s_c, b) c)
+  let apply_subst ~renaming subst (c, s_c) =
+    make (List.map (fun (t,b) -> Substs.FO.apply ~renaming subst (t, s_c), b) c)
 
   (** printing a clause: print literals separated with "|" *)
   let pp out c = CCFormat.list ~sep:" | " Lit.pp out c
+
+  (* conversion from TS.t to T.t *)
+  let conv_term =
+    let conv_ = T.Conv.create () in
+    fun t -> T.Conv.of_simple_term_exn conv_ t
 
   (** Conversion from list of atomic formulas.
       type: [Formula.t list -> clause] *)
@@ -117,11 +123,11 @@ module Clause = struct
     let _atom f = match F.view f with
       | F.Not f' ->
           begin match F.view f' with
-          | F.Atom t -> t,false
-          | _ -> failwith (CCFormat.sprintf "unsupported formula %a" F.pp f)
+          | F.Atom t -> conv_term t,false
+          | _ -> failwith (CCFormat.sprintf "unsupported formula %a" TS.pp f)
           end
-      | F.Atom t -> t, true
-      | _ -> failwith (CCFormat.sprintf "unsupported formula %a" F.pp f)
+      | F.Atom t -> conv_term t, true
+      | _ -> failwith (CCFormat.sprintf "unsupported formula %a" TS.pp f)
     in
     make (List.map _atom c)
 end
@@ -211,13 +217,13 @@ let _factoring c =
           *)
           if i<j && b'
           then try
-            let subst = Unif.FO.unification t 0 t' 0 in
+            let subst = Unif.FO.unification (t, 0) (t', 0) in
             (** Now we have subst(t)=subst(t'), the inference can proceed *)
             let c' = CCList.Idx.remove c i in
             let renaming = Substs.Renaming.create() in
             (** Build the conclusion of the inference (removing one
                 of the factored literals *)
-            let c' = Clause.apply_subst ~renaming subst c' 0 in
+            let c' = Clause.apply_subst ~renaming subst (c',0) in
             Util.debugf 3 "factoring of %a ----> %a" (fun k->k Clause.pp c Clause.pp c');
             (** New clauses go into the passive set *)
             _add_passive c'
@@ -266,8 +272,9 @@ let _resolve_with c =
     (fun i (t,b) ->
       (** Retrieve within the index, mappings [term -> (clause,index)]
           such that [term] unifies with [t]. 0 and 1 are again scopes. *)
-      Index.retrieve_unifiables !_idx 0 t 1 ()
-        (fun () _t' (d,j) subst ->
+      Index.retrieve_unifiables (!_idx,0) (t,1)
+      |> Sequence.iter
+        (fun (_t', (d,j), subst) ->
           let (_,b') = List.nth d j in
           (** We have found [_t'], and a pair [(d, j)] such
               that [d] is another clause, and the [j]-th literal of [d]
@@ -283,10 +290,10 @@ let _resolve_with c =
                 of the clauses together after applying the substitution. *)
             let concl =
               (let c' = CCList.Idx.remove c i in
-               Clause.apply_subst ~renaming subst c' 1)
+               Clause.apply_subst ~renaming subst (c',1))
               @
               (let d' = CCList.Idx.remove d j in
-               Clause.apply_subst ~renaming subst d' 0)
+               Clause.apply_subst ~renaming subst (d',0))
             in
             (** Simplify the resulting clause (remove duplicate literals)
                 and add it into the passive set, to be processed later *)
@@ -340,23 +347,19 @@ let _saturate clauses =
 let process_file f =
   Util.debugf 2 "process file %s..." (fun k->k f);
   let res = Err.(
-    (** parse the file in the TPTP format *)
-    Libzipperposition_parsers.Util_tptp.parse_file ~recursive:true f
+    (** parse the file in the format *)
+    P.Parsing_utils.parse_tptp f
     (** Perform type inference and type checking (possibly updating
         the signature) *)
-    >>= Libzipperposition_parsers.Util_tptp.infer_types (`sign !_signature)
+    >>= TypeInference.infer_statements ?ctx:None
     (** CNF ("clausal normal form"). We transform arbitrary first order
         formulas into a set of clauses (see the {!Clause} module)
         because resolution only works on clauses.
 
         This algorithm is already implemented in {!Libzipperposition}. *)
-    >>= fun (signature, statements) ->
-    let clauses = Libzipperposition_parsers.Util_tptp.Typed.formulas statements in
-    let clauses = Sequence.to_list clauses in
-    (** A way to create fresh symbols for {i Skolemization} *)
-    let ctx = Libzipperposition.Skolem.create ~prefix:"sk" signature in
-    let clauses = Libzipperposition.Cnf.cnf_of_list ~ctx clauses in
-    let clauses = CCList.map Clause._of_forms clauses in
+    >>= fun st ->
+    let decls = Cnf.cnf_of_seq ?ctx:None (CCVector.to_seq st) in
+    let sigma = Cnf.type_declarations (CCVector.to_seq decls) in
     _signature := Libzipperposition.Skolem.to_signature ctx; (* recover signature *)
     (** Perform saturation (solve the problem) *)
     Err.return (_saturate clauses)
