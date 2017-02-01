@@ -3,13 +3,11 @@
 
 (** {1 Compute Precedence} *)
 
-open Libzipperposition
-
 module T = FOTerm
 
 let prof_mk_prec = Util.mk_profiler "mk_precedence"
 
-let section = Util.Section.make ~parent:Const.section "compute_prec"
+let section = Util.Section.(make ~parent:root) "compute_prec"
 
 type 'a parametrized = Statement.clause_t Sequence.t -> 'a
 
