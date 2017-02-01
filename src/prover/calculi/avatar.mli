@@ -12,6 +12,8 @@
     Depends optionally on the "meta" extension.
 *)
 
+open Libzipperposition
+
 type 'a printer = Format.formatter -> 'a -> unit
 
 (** {2 Avatar: splitting+sat} *)

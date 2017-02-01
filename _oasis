@@ -61,7 +61,7 @@ Library "libzipperposition"
                     Ordering, Skolem, Cnf, ID, IDOrBuiltin, SLiteral,
                     Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,
                     Congruence, FeatureVector, UntypedAST, Ind_ty,
-                    TypedSTerm, Statement,
+                    TypedSTerm, Statement, Flex_state,
                     lib/Hashcons, lib/ParseLocation, lib/Multiset, lib/LazyList,
                     lib/Hash, lib/IArray, lib/AllocCache, lib/Multiset_intf
   CSources:         util_stubs.c, util_stubs.h
@@ -118,7 +118,7 @@ Library "libzipperposition_prover"
                     BBox, ClauseContext, ClauseQueue_intf,
                     Bool_lit, Bool_lit_intf, Sat_solver, Sat_solver_intf,
                     Trail, Ind_cst, Phases, Phases_impl,
-                    Flex_state, Classify_cst, Rewrite_rule,
+                    Classify_cst, Rewrite_rule,
                     calculi/Avatar, calculi/Avatar_intf,
                     calculi/Induction, calculi/Induction_intf,
                     calculi/Superposition, calculi/Superposition_intf,

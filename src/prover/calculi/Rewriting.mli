@@ -5,6 +5,8 @@
 
     Deal with definitions as rewrite rules *)
 
+open Libzipperposition
+
 module Make(E : Env_intf.S) : sig
   val setup : Rewrite_rule.Set.t -> unit
 end
