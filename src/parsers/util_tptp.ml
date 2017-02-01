@@ -10,9 +10,9 @@ module PT = STerm
 module F = T.Form
 module A = Ast_tptp
 module Loc = ParseLocation
-module Err = CCError
+module Err = CCResult
 
-type 'a or_error = [`Error of string | `Ok of 'a]
+type 'a or_error = ('a, string) CCResult.t
 
 type typed = T.t
 type untyped = PT.t

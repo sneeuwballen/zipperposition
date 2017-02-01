@@ -19,10 +19,10 @@ let phases =
 
 let () =
   match Phases.run phases with
-  | `Error msg ->
+  | CCResult.Error msg ->
       print_endline msg;
       exit 1
-  | `Ok (_, ()) -> ()
+  | CCResult.Ok (_, ()) -> ()
 
 let _ =
   at_exit

@@ -5,7 +5,7 @@
 
 open Libzipperposition
 
-type 'a or_error = [ `Ok of 'a | `Error of string ]
+type 'a or_error = ('a, string) CCResult.t
 
 (** {2 Type Definitions} *)
 
@@ -50,7 +50,7 @@ let default = {
 
 let section = Const.section
 
-let __current : t or_error ref = ref (`Error "could not load plugin")
+let __current : t or_error ref = ref (CCResult.Error "could not load plugin")
 
 let _extensions = Hashtbl.create 11
 
@@ -61,7 +61,7 @@ let register self =
     Util.debugf ~section 1 "register extension `%s`..." (fun k->k self.name);
     Hashtbl.replace _extensions self.name self
   );
-  __current := `Ok self
+  __current := CCResult.Ok self
 
 let cmp_prio_name a b =
   if a.prio = b.prio

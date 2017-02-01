@@ -762,7 +762,7 @@ module Subst = struct
     if mem subst v
       then invalid_arg
         (CCFormat.sprintf
-          "@[<2>var `@[%a@]` already bound in `@[%a@]`@]" Var.pp v pp subst);
+          "@[<2>var `@[%a@]` already bound in `@[%a@]`@]" Var.pp_full v pp subst);
     Var.Subst.add subst v t
 
   let add_l = List.fold_left (fun subst (v,t) -> add subst v t)

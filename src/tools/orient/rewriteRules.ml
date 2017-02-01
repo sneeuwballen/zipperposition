@@ -8,10 +8,10 @@ open Libzipperposition_parsers
 
 module PT = STerm
 module T = TypedSTerm
-module E = CCError
+module E = CCResult
 module Loc = ParseLocation
 
-type 'a or_error = [`Error of string | `Ok of 'a]
+type 'a or_error = ('a, string) CCResult.t
 
 type statement =
   | Rule of PT.t * PT.t
@@ -62,8 +62,8 @@ let rules_of_pairs pairs =
         | Type (s, ty) ->
           (* declare the type *)
           begin match TypeInference.infer_ty ctx ty with
-          | `Error _ -> ()
-          | `Ok ty -> TypeInference.Ctx.declare ctx (ID.make s) ty
+          | E.Error _ -> ()
+          | E.Ok ty -> TypeInference.Ctx.declare ctx (ID.make s) ty
           end; None
       ) pairs
     in

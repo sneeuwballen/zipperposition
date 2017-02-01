@@ -104,8 +104,8 @@ rule token = parse
 
 
 {
-  module E = CCError
-  type 'a or_error = [`Ok of 'a | `Error of string ]
+  module E = CCResult
+  type 'a or_error = ('a, string) CCResult.t
 
   let decl_of_string s : Ast_ho.t or_error =
     try

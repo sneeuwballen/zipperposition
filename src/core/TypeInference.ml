@@ -10,13 +10,13 @@
 module PT = STerm
 module T = TypedSTerm
 module Loc = ParseLocation
-module Err = CCError
+module Err = CCResult
 module Subst = Var.Subst
 
 let prof_infer = Util.mk_profiler "TypeInference.infer"
 let section = Util.Section.(make ~parent:zip "ty_infer")
 
-type 'a or_error = [`Error of string | `Ok of 'a]
+type 'a or_error = ('a, string) CCResult.t
 
 type type_ = TypedSTerm.t
 type untyped = STerm.t (** untyped term *)
@@ -956,6 +956,6 @@ let infer_statements_exn ?def_as_rewrite ?ctx seq =
   CCVector.freeze res
 
 let infer_statements ?def_as_rewrite ?ctx seq =
-  try CCError.return (infer_statements_exn ?def_as_rewrite ?ctx seq)
-  with e -> CCError.of_exn_trace e
+  try Err.return (infer_statements_exn ?def_as_rewrite ?ctx seq)
+  with e -> Err.of_exn_trace e
 

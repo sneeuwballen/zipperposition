@@ -4,7 +4,7 @@
 (** {1 Utils for Parsing} *)
 
 open Libzipperposition
-open CCError.Infix
+open CCResult.Infix
 
 let parse_tptp file =
   Util_tptp.parse_file ~recursive:true file

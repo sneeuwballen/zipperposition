@@ -11,7 +11,7 @@ module T = STerm
 module S = Substs
 module A = Ast_tptp
 module Hash = CCHash
-module Err = CCError
+module Err = CCResult
 
 type term = STerm.t
 type form = STerm.t
@@ -195,7 +195,7 @@ let size proof = Sequence.length (to_seq proof)
 
 (** {2 IO} *)
 
-type 'a or_error = [`Error of string | `Ok of 'a]
+type 'a or_error = ('a, string) CCResult.t
 
 let of_decls decls =
   let steps = Hashtbl.create 16 in (* maps names to steps *)

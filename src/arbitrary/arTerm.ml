@@ -81,7 +81,7 @@ module PT = struct
     in
     QA.Gen.((1 -- n) >>= gen)
 
-  let default_g = default_fuel 5
+  let default_g = QA.Gen.(1 -- 4 >>= default_fuel)
   let default = mk_ default_g
 
   let ty_prop = PT.Ty.prop

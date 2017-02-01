@@ -10,7 +10,7 @@ module T = TypedSTerm
 module F = T.Form
 module A = Ast_tptp
 
-open CCError.Infix
+open CCResult.Infix
 
 let print_sig = ref false
 let print_in = ref false
@@ -86,8 +86,8 @@ let process file =
     print_res decls;
     ()
   in match res with
-  | `Ok () -> ()
-  | `Error msg ->
+  | CCResult.Ok () -> ()
+  | CCResult.Error msg ->
       print_endline msg;
       exit 1
 

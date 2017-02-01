@@ -8,7 +8,7 @@ open Libzipperposition_parsers
 
 module PT = STerm
 module T = TypedSTerm
-module Err = CCError
+module Err = CCResult
 module A = Ast_tptp
 
 open Err.Infix
@@ -60,10 +60,10 @@ let main () =
       () !files;
   in
   match res with
-  | `Ok () ->
+  | Err.Ok () ->
       print_line ();
       Format.printf "@{<Green>success!@}@."
-  | `Error msg ->
+  | Err.Error msg ->
       print_endline msg
 
 let _ =

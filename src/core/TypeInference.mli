@@ -28,7 +28,7 @@
     to deal with errors (including monadic operators).
 *)
 
-type 'a or_error = [`Error of string | `Ok of 'a]
+type 'a or_error = ('a, string) CCResult.t
 
 type type_ = TypedSTerm.t
 type untyped = STerm.t (** untyped term *)

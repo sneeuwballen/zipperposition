@@ -5,7 +5,7 @@
 
 open Libzipperposition
 
-type 'a or_error = [`Error of string | `Ok of 'a]
+type 'a or_error = ('a, string) CCResult.t
 type untyped = STerm.t
 
 module A = Ast_tptp

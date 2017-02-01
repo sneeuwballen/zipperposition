@@ -5,12 +5,12 @@
 
 open Libzipperposition
 
-module E = CCError
+module E = CCResult
 module A = Tip_ast
 module UA = UntypedAST
 module T = STerm
 
-type parser_res = (A.statement Sequence.t, string) CCError.t
+type parser_res = (A.statement Sequence.t, string) E.t
 type 'a parser_ = 'a -> parser_res
 
 let parse_lexbuf_ lex =
@@ -108,6 +108,12 @@ let rec conv_term (t:A.term): T.t =
       app (conv_term a) (conv_term b)
     | A.If (a,b,c) ->
       T.ite (conv_term a)(conv_term b)(conv_term c)
+    | A.Distinct l ->
+      l
+      |> List.rev_map conv_term
+      |> CCList.diagonal
+      |> List.rev_map (fun (a,b) -> T.neq a b)
+      |> T.and_ ?loc:None
     | A.Match (u,l) ->
       let u = conv_term u in
       let l = List.map
@@ -189,6 +195,9 @@ let convert (st:A.statement): UA.statement list =
     | A.Stmt_assert t ->
       let t = conv_term t in
       [UA.assert_ ?loc t]
+    | A.Stmt_lemma t ->
+      let t = conv_term t in
+      [UA.lemma ?loc t]
     | A.Stmt_assert_not (tyvars,g) ->
       (* goal *)
       let tyvars = List.map conv_tyvar tyvars in

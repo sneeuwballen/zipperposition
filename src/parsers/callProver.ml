@@ -7,10 +7,10 @@ open Libzipperposition
 
 module A = Ast_tptp
 module TT = Trace_tstp
-module Err = CCError
+module Err = CCResult
 module ST = STerm
 
-type 'a or_error = [`Error of string | `Ok of 'a]
+type 'a or_error = ('a, string) CCResult.t
 type untyped = STerm.t
 
 (** {2 Description of provers} *)
@@ -137,8 +137,8 @@ let decls_of_string ~source str =
 let proof_of_decls decls =
   let res = Trace_tstp.of_decls decls in
   match res with
-  | `Error _ -> None
-  | `Ok proof -> Some proof
+  | Err.Error _ -> None
+  | Err.Ok proof -> Some proof
 
 let call_proof ?timeout ?args ~prover decls =
   Err.(
@@ -191,8 +191,8 @@ module Eprover = struct
       (* read its output *)
       let decls, proof =
         match decls_of_string ~source:"E" output with
-        | `Error _ -> None, None
-        | `Ok s ->
+        | Err.Error _ -> None, None
+        | Err.Ok s ->
             (* try to parse proof, if it's a theorem *)
             let proof =
               if answer = Theorem

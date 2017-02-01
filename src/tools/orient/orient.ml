@@ -7,7 +7,7 @@ open Libzipperposition
 open Libzipperposition_solving
 
 module PT = STerm
-module E = CCError
+module E = CCResult
 module T = TypedSTerm
 module Loc = ParseLocation
 
@@ -90,9 +90,9 @@ let () =
     get_solutions solutions !num_solutions
   in
   match res with
-  | `Error msg ->
+  | E.Error msg ->
       print_endline msg
-  | `Ok [] ->
+  | E.Ok [] ->
       print_endline "no solution for this set of rules"
-  | `Ok solutions ->
+  | E.Ok solutions ->
       List.iter print_solution solutions

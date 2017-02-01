@@ -6,7 +6,7 @@
 open Libzipperposition
 open Libzipperposition_parsers
 
-open CCError.Infix
+open CCResult.Infix
 
 module T = TypedSTerm
 
@@ -43,8 +43,8 @@ let () =
   in
   let res = process file in
   match res with
-  | `Ok () -> ()
-  | `Error msg ->
+  | CCResult.Ok () -> ()
+  | CCResult.Error msg ->
       print_endline msg;
       exit 1
 

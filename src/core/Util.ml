@@ -358,10 +358,10 @@ let map_product ~f l =
 
 (** {2 File utils} *)
 
-type 'a or_error = [`Error of string | `Ok of 'a]
+type 'a or_error = ('a, string) CCResult.t
 
 (** Call given command with given output, and return its output as a string *)
-let popen ~cmd ~input =
+let popen ~cmd ~input : _ or_error =
   try
     let from, into = Unix.open_process cmd in
     (* send input to the subprocess *)
@@ -371,7 +371,7 @@ let popen ~cmd ~input =
     let output = CCIO.read_all from in
     (* wait for subprocess to terminate *)
     ignore (Unix.close_process (from, into));
-    CCError.return output
+    CCResult.return output
   with Unix.Unix_error (e, _, _) ->
     let msg = Unix.error_message e in
-    CCError.fail msg
+    CCResult.fail msg

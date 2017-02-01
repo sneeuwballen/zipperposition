@@ -174,7 +174,7 @@ val map_product : f:('a -> 'b list list) -> 'a list -> 'b list list
 
 (** {2 File utils} *)
 
-type 'a or_error = [`Error of string | `Ok of 'a]
+type 'a or_error = ('a, string) CCResult.t
 
 val popen : cmd:string -> input:string -> string or_error
 (** Run the given command [cmd] with the given [input], wait for it

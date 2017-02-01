@@ -7,7 +7,7 @@ open Libzipperposition
 
 module A = Tip_ast
 
-type parser_res = (A.statement Sequence.t, string) CCError.t
+type parser_res = (A.statement Sequence.t, string) CCResult.t
 type 'a parser_ = 'a -> parser_res
 
 val parse_lexbuf : Lexing.lexbuf parser_

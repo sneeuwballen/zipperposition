@@ -28,7 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Libzipperposition
 
-module Err = CCError
+module E = CCResult
 module T = FOTerm
 module TS = TypedSTerm
 module F = TypedSTerm.Form
@@ -341,7 +341,7 @@ let _saturate clauses =
     handling easier (the function [>>=] is a {i monadic bind}). *)
 let process_file f =
   Util.debugf 2 "process file %s..." (fun k->k f);
-  let res = Err.(
+  let res = E.(
     (** parse the file in the format *)
     P.Parsing_utils.parse_tptp f
     (** Perform type inference and type checking (possibly updating
@@ -367,14 +367,14 @@ let process_file f =
       |> Sequence.to_rev_list
     in
     (** Perform saturation (solve the problem) *)
-    Err.return (_saturate clauses)
+    E.return (_saturate clauses)
   ) in
   match res with
-  | `Error msg ->
+  | E.Error msg ->
       print_endline msg;
       exit 1
-  | `Ok `Sat -> print_endline "sat"
-  | `Ok `Unsat -> print_endline "unsat"
+  | E.Ok `Sat -> print_endline "sat"
+  | E.Ok `Unsat -> print_endline "unsat"
 
 (** Parse command-line arguments, including the file to process *)
 

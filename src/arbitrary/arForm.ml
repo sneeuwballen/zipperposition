@@ -19,7 +19,7 @@ let mk_ gen =
 
 let atom_g =
   let open QCheck.Gen in
-  let t = AT.default_fuel 5 in
+  let t = 1 -- 3 >>= AT.default_fuel in
   oneof
     [ AT.pred_g
     ; map F.not_ AT.pred_g
@@ -37,8 +37,8 @@ let default_fuel n =
        let self = self (n-1) in
        if n<=0 then atom_g
        else oneof
-         [ list_size (1--10) self >|= F.or_
-         ; list_size (1--10) self >|= F.and_
+         [ list_size (1--4) self >|= F.or_
+         ; list_size (1--4) self >|= F.and_
          ; map2 F.equiv self self
          ; map2 F.imply self self
          ; map F.not_ self
@@ -48,7 +48,7 @@ let default_fuel n =
          ])
     n
 
-let default_g = default_fuel 5
+let default_g = QCheck.Gen.(1 -- 4 >>= default_fuel)
 let default = mk_ default_g
 
 let clause_g =

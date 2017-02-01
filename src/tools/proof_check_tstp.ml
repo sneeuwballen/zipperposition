@@ -10,7 +10,7 @@ module A = Ast_tptp
 module T = STerm
 module TT = Trace_tstp
 module StepTbl = TT.StepTbl
-module E = CCError
+module E = CCResult
 
 (* result of checking the step: success or failure, with name of prover.
    The step may be unchecked. *)
@@ -162,9 +162,9 @@ let check_all ~progress ~provers ~timeout ~checked =
            (fun prover ->
               (* check step with prover *)
               match  check_step ~timeout ~prover step with
-              | `Ok res ->
+              | E.Ok res ->
                   CheckedTrace.add ~checked step res
-              | `Error msg ->
+              | E.Error msg ->
                   failwith msg)
            provers);
     (* clean line of progress *)
@@ -280,7 +280,7 @@ let () =
   CCFormat.set_color_default true;
   parse_args ();
   match main !file with
-  | `Ok () -> ()
-  | `Error msg ->
+  | E.Ok () -> ()
+  | E.Error msg ->
       print_endline msg;
       exit 1
