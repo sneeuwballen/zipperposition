@@ -10,19 +10,21 @@ module T = TypedSTerm
 module F = T.Form
 
 let check_cnf_gives_clauses =
-  let gen = QCheck.(map F.close_forall ArForm.default) in
+  let gen = QCheck.(map_same_type F.close_forall ArForm.default) in
   let name = "cnf_gives_clauses" in
   (* check that the CNf of a formula is in clausal form *)
   let prop f =
-    Cnf.cnf_of (Statement.assert_ ~src:() f)
+    Cnf.cnf_of
+      (Statement.assert_ ~src:(Statement.Src.from_file "<none>" Statement.R_goal) f)
     |> CCVector.flat_map_list
       (fun st -> match Statement.view st with
         | Statement.Data _
         | Statement.Def _
         | Statement.RewriteTerm _
         | Statement.RewriteForm _
-        | Statement.TyDecl _ -> []
-        | Statement.NegatedGoal l -> l
+        | Statement.TyDecl (_,_) -> []
+        | Statement.Lemma l
+        | Statement.NegatedGoal (_,l) -> l
         | Statement.Goal c
         | Statement.Assert c -> [c])
     |> CCVector.map

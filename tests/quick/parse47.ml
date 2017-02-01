@@ -1,7 +1,7 @@
 #!/usr/bin/env ocaml
 #use "tests/quick/.common.ml";;
 
-module E = CCError
+module E = CCResult
 
 let () =
   let res = E.(
@@ -13,7 +13,7 @@ let () =
     Sequence.for_all TT.closed forms
   ) in
   match res with
-  | `Ok true -> ok ()
-  | `Ok false -> fail "test failed"
-  | `Error msg -> fail msg
+  | E.Ok true -> ok ()
+  | E.Ok false -> fail "test failed"
+  | E.Error msg -> fail msg
 ;;

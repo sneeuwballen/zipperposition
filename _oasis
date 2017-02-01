@@ -186,7 +186,7 @@ Document libzipperposition_prover
   XOCamlbuildLibraries: libzipperposition.prover
 
 Executable run_bench
-  Path:             tests/
+  Path:             tests/bench/
   Install:          false
   CompiledObject:   native
   MainIs:           run_bench.ml

@@ -1,6 +1,6 @@
 
 open Libzipperposition
-open OUnit2
+open OUnit
 module Q = QCheck
 
 module M = Multiset.Make(struct

@@ -203,39 +203,40 @@ module TestTerm(I : TermIndex) = struct
           l)
       l
 
-  let _limit = 0
+  let _count = 100
+  let _limit = _count + 100
 
   let check_retrieved_unify =
     let prop = _check_all_retrieved_satisfy I.retrieve_unifiables Unif.FO.unification in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_unify" I.name in
-    QCheck.Test.make ~name ~max_gen:_limit (arb 10 150) prop
+    QCheck.Test.make ~name ~count:_count ~max_gen:_limit (arb 10 150) prop
 
   let check_retrieved_specializations =
     let prop = _check_all_retrieved_satisfy I.retrieve_specializations
       (fun t1 t2 -> Unif.FO.matching ~pattern:t1 t2) in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_specializations" I.name in
-    QCheck.Test.make ~name ~max_gen:_limit (arb 10 150) prop
+    QCheck.Test.make ~name ~count:_count ~max_gen:_limit (arb 10 150) prop
 
   let check_retrieved_generalizations =
     let prop = _check_all_retrieved_satisfy I.retrieve_generalizations _match_flip in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_generalizations" I.name in
-    QCheck.Test.make ~name ~max_gen:_limit (arb 10 150) prop
+    QCheck.Test.make ~name ~count:_count ~max_gen:_limit (arb 10 150) prop
 
   let check_retrieve_all_unify =
     let prop = _check_all_satisfying_are_retrieved I.retrieve_unifiables Unif.FO.unification in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_unify" I.name in
-    QCheck.Test.make ~name ~max_gen:_limit (arb 10 150) prop
+    QCheck.Test.make ~name ~count:_count ~max_gen:_limit (arb 10 150) prop
 
   let check_retrieve_all_specializations =
     let prop = _check_all_satisfying_are_retrieved I.retrieve_specializations
       (fun t1 t2 -> Unif.FO.matching ~pattern:t1 t2) in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_specializations" I.name in
-    QCheck.Test.make ~name ~max_gen:_limit (arb 10 150) prop
+    QCheck.Test.make ~name ~count:_count ~max_gen:_limit (arb 10 150) prop
 
   let check_retrieve_all_generalizations =
     let prop = _check_all_satisfying_are_retrieved I.retrieve_generalizations _match_flip in
     let name = CCFormat.sprintf "index(%s)_retrieve_imply_generalizations" I.name in
-    QCheck.Test.make ~name ~max_gen:_limit (arb 10 150) prop
+    QCheck.Test.make ~name ~count:_count ~max_gen:_limit (arb 10 150) prop
 
   (* check the matching of generalization *)
   let props =

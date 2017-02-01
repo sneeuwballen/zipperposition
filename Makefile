@@ -57,8 +57,8 @@ push_doc: doc rst_doc
 	rsync -tavu _build/doc/* cedeela.fr:~/simon/root/software/logtk/rst/
 
 test-all: build
-	./run_tests.native
-	./tests/quick/all.sh
+	./run_tests.native --verbose
+	# ./tests/quick/all.sh # FIXME?
 
 INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
