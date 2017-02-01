@@ -3,8 +3,6 @@
 
 (** {1 Builtin Objects} *)
 
-module Hash = CCHash
-
 type t =
   | Not
   | And
@@ -114,11 +112,10 @@ let compare a b = match a, b with
 
 let equal a b = compare a b = 0
 
-let hash_fun s h = match s with
-  | Int i -> Hash.int_ (Z.hash i) h
-  | Rat r -> Hash.string (Q.to_string r) h
-  | c -> Hash.int_ (Hashtbl.hash c) h
-let hash s = Hash.apply hash_fun s
+let hash s = match s with
+  | Int i -> Hash.combine2 1 (Z.hash i)
+  | Rat r -> Hash.combine2 2 (Hash.string (Q.to_string r))
+  | c -> Hash.combine2 3 (Hashtbl.hash c)
 
 module Map = Sequence.Map.Make(struct type t = t_ let compare = compare end)
 module Set = Sequence.Set.Make(struct type t = t_ let compare = compare end)

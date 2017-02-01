@@ -6,7 +6,6 @@
 open Libzipperposition
 
 module Loc = ParseLocation
-module Hash = CCHash
 module Stmt = Statement
 
 type form = TypedSTerm.t

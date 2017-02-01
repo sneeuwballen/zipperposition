@@ -28,7 +28,6 @@ let name t = t.id.ID.name
 let compare a b = ID.compare a.id b.id
 let equal a b = ID.equal a.id b.id
 let hash a = ID.hash a.id
-let hash_fun a = ID.hash_fun a.id
 
 let pp out a = ID.pp out a.id
 let to_string a = ID.to_string a.id

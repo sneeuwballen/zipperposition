@@ -46,7 +46,6 @@ let subterm ~sub t =
   check t
 
 let equal = T.equal
-let hash_fun = T.hash_fun
 let hash = T.hash
 let compare = T.compare
 let ty t = match T.ty t with

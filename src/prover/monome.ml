@@ -5,7 +5,6 @@
 
 open Libzipperposition
 
-module Hash = CCHash
 module T = FOTerm
 
 type term = FOTerm.t
@@ -17,7 +16,7 @@ type 'a num = {
   sign : 'a -> int;
   abs : 'a -> 'a;
   cmp : 'a -> 'a -> int;
-  hash : 'a CCHash.hash_fun;
+  hash : 'a Hash.t;
   zero : 'a;
   one : 'a;
   add : 'a -> 'a -> 'a;
@@ -35,7 +34,7 @@ let z = {
   sign = Z.sign;
   abs = Z.abs;
   cmp = Z.compare;
-  hash = (fun x h -> Hash.int_ (Z.hash x) h);
+  hash = Z.hash;
   zero = Z.zero;
   one = Z.one;
   add = Z.add;
@@ -72,11 +71,10 @@ let compare m1 m2 =
   m1.num.cmp m1.const m2.const
   <?> (CCOrd.list_ cmp_pair, m1.terms, m2.terms)
 
-let hash_fun m h =
-  let hash_pair = Hash.pair m.num.hash T.hash_fun in
-  h |> m.num.hash m.const |> Hash.list_ hash_pair m.terms
-
-let hash m = Hash.apply hash_fun m
+let hash m =
+  Hash.combine3 42
+    (m.num.hash m.const)
+    (Hash.list (Hash.pair m.num.hash T.hash) m.terms)
 
 let ty m = m.num.ty
 

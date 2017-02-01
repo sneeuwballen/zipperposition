@@ -37,18 +37,15 @@ let raw_lits t = t.lits
 let compare c1 c2 =
   CCOrd.(HVar.compare Type.compare c1.var c2.var <?> (Lits.compare, c1.lits, c2.lits))
 
-let real_hash_fun c h =
-  h |> Literals.hash_fun c.lits |> HVar.hash_fun c.var
+let hash_real c = Hash.combine3 42 (Literals.hash c.lits) (HVar.hash c.var)
 
 let hash c =
   if c.hash = ~-1 then (
-    let h = CCHash.apply real_hash_fun c in
+    let h = hash_real c in
     assert (h >= 0);
     c.hash <- h
   );
   c.hash
-
-let hash_fun c h = CCHash.int (hash c) h
 
 let make_ lits var =
   {lits; var; hash= ~-1}

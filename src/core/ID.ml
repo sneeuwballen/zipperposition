@@ -26,7 +26,6 @@ let payload t = t.payload
 let add_payload t e = t.payload <- e :: t.payload
 
 let hash t = t.id
-let hash_fun t h = CCHash.int t.id h
 let equal i1 i2 = i1.id = i2.id
 let compare i1 i2 = Pervasives.compare i1.id i2.id
 

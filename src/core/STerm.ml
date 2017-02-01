@@ -3,8 +3,6 @@
 
 (** {1 S-like Terms}. *)
 
-module Hash = CCHash
-
 type location = ParseLocation.t
 
 type var =
@@ -108,31 +106,29 @@ and compare_var : var CCOrd.t = Pervasives.compare
 
 let equal t1 t2 = compare t1 t2 = 0
 
-let rec hash_fun t h = match t.term with
-  | Var v -> hash_var v h
-  | Const s -> Hash.string_ s h
-  | AppBuiltin (s,l) -> Builtin.hash_fun s (Hash.list_ hash_fun l h)
-  | App (s, l) -> Hash.list_ hash_fun l (hash_fun s h)
-  | List l -> Hash.list_ hash_fun l (Hash.int_ 42 h)
+let rec hash t = match t.term with
+  | Var v -> hash_var v
+  | Const s -> Hash.string s
+  | AppBuiltin (s,l) -> Hash.combine3 10 (Builtin.hash s) (Hash.list hash l)
+  | App (s, l) -> Hash.combine3 20 (hash s) (Hash.list hash l)
+  | List l -> Hash.combine2 30 (Hash.list hash l)
   | Bind (s,v,t') ->
-    h |> Binder.hash_fun s |> hash_fun t' |> Hash.list_ hash_ty_var v
+    Hash.combine4 40 (Binder.hash s) (Hash.list hash_ty_var v) (hash t')
   | Ite (a,b,c) ->
-    h |> Hash.string "if" |> hash_fun a |> hash_fun b |> hash_fun c
-  | Match (u, _) ->
-    h |> Hash.string "match" |> hash_fun u
-  | Let (_, u) -> h |> Hash.string "let" |> hash_fun u
+    Hash.combine4 50 (hash a) (hash b) (hash c)
+  | Match (u, _) -> Hash.combine2 60 (hash u)
+  | Let (_, u) -> Hash.combine2 70 (hash u)
   | Record (l, rest) ->
-    h |> Hash.opt hash_var rest
-      |> Hash.list_ (fun (n,t) h -> Hash.string_ n (hash_fun t h)) l
+    Hash.combine3 80
+      (Hash.opt hash_var rest)
+      (Hash.list (Hash.pair Hash.string hash) l)
 
-and hash_ty_var (v,ty) h =
-  hash_var v h |> Hash.opt hash_fun ty
+and hash_ty_var (v,ty) =
+  Hash.combine3 42 (hash_var v) (Hash.opt hash ty)
 
-and hash_var v h = match v with
-  | V s -> Hash.string s h
-  | Wildcard -> Hash.string "_" h
-
-let hash x = Hash.apply hash_fun x
+and hash_var v = match v with
+  | V s -> Hash.string s
+  | Wildcard -> Hash.string "_"
 
 let make_ ?loc view = {term=view; loc;}
 

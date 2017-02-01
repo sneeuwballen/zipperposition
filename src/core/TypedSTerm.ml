@@ -6,7 +6,6 @@
 These terms are scoped, and possibly typed. Type inference should be
 performed on them. *)
 
-module Hash = CCHash
 module Loc = ParseLocation
 
 type location = ParseLocation.t
@@ -141,27 +140,21 @@ and cmp_fields x y = CCOrd.list_ cmp_field x y
 
 let equal t1 t2 = compare t1 t2 = 0
 
-let rec hash_fun t h = match t.term with
-  | Var s -> h |> Hash.string_ "var" |> Var.hash_fun s
-  | Const s -> h |> Hash.string_ "const" |> ID.hash_fun s
-  | App (s, l) -> h |> Hash.string_ "app" |> hash_fun s |> Hash.list_ hash_fun l
-  | Multiset l ->
-    h |> Hash.string_ "multiset" |> Hash.list_ hash_fun l
-  | AppBuiltin (b,l) ->
-    h |> Builtin.hash_fun b |> Hash.list_ hash_fun l
-  | Bind (s,v,t') ->
-    h |> Binder.hash_fun s |> hash_fun t' |> Var.hash_fun v
+let rec hash t = match t.term with
+  | Var s -> Hash.combine2 1 (Var.hash s)
+  | Const s -> Hash.combine2 2 (ID.hash s)
+  | App (s, l) -> Hash.combine3 3 (hash s) (Hash.list hash l)
+  | Multiset l -> Hash.combine2 4 (Hash.list hash l)
+  | AppBuiltin (b,l) -> Hash.combine3 5 (Builtin.hash b) (Hash.list hash l)
+  | Bind (s,v,t') -> Hash.combine4 6 (Binder.hash s) (Var.hash v) (hash t')
   | Record (l, rest) ->
-    h |> Hash.opt hash_fun rest
-      |> Hash.list_ (fun (n,t) h -> Hash.string_ n (hash_fun t h)) l
-  | Ite (a,b,c) ->
-    h |> Hash.string "if" |> hash_fun a |> hash_fun b |> hash_fun c
-  | Let (_, u) -> h |> Hash.string "let" |> hash_fun u
-  | Match (u, _) ->
-    h |> Hash.string "match" |> hash_fun u
-  | Meta (id,_,_) -> Var.hash_fun id h
-
-let hash x = Hash.apply hash_fun x
+    Hash.combine3 7
+      (Hash.opt hash rest)
+      (Hash.list (Hash.pair Hash.string hash) l)
+  | Ite (a,b,c) -> Hash.combine4 8 (hash a) (hash b) (hash c)
+  | Let (_, u) -> Hash.combine2 9 (hash u)
+  | Match (u, _) -> Hash.combine2 10 (hash u)
+  | Meta (id,_,_) -> Var.hash id
 
 let rec pp out t = match view t with
   | Var s -> Var.pp_fullc out s
@@ -508,7 +501,7 @@ module Ty = struct
   let equal = equal
   let compare = compare
   let hash = hash
-  let hash_fun = hash_fun
+  let hash_fun = hash
 
   let tType = tType
   let var = var

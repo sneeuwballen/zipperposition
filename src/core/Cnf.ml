@@ -3,7 +3,6 @@
 
 (** {1 Reduction to CNF and simplifications} *)
 
-module Hash = CCHash
 module T = TypedSTerm
 module F = T.Form
 module Stmt = Statement

@@ -23,8 +23,7 @@ let compare cmp a b =
   let c = CCOrd.int_ a.id b.id  in
   if c<>0 then c else cmp a.ty b.ty
 let equal eq a b = a.id = b.id && eq a.ty b.ty
-let hash_fun a = CCHash.int a.id
-let hash a = a.id land max_int
+let hash a = Hash.int a.id
 
 let max a b = if a.id < b.id then b else a
 let min a b = if a.id < b.id then a else b

@@ -49,7 +49,6 @@ let view t = match T.view t with
   | T.AppBuiltin (Builtin.TyRat, []) -> Builtin Rat
   | _ -> assert false
 
-let hash_fun = T.hash_fun
 let hash = T.hash
 let equal = T.equal
 let compare = T.compare

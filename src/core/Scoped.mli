@@ -24,8 +24,7 @@ val same_scope : _ t -> _ t -> bool
 
 val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 val compare : 'a CCOrd.t -> 'a t CCOrd.t
-val hash_fun : 'a CCHash.hash_fun -> 'a t CCHash.hash_fun
-val hash : 'a CCHash.hash_fun -> 'a t -> int
+val hash : 'a Hash.t -> 'a t -> int
 
 val map : ('a -> 'b) -> 'a t -> 'b t
 

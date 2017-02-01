@@ -472,16 +472,14 @@ let rec path_compare p1 p2 = match p1, p2 with
 
 let path_equal p1 p2 = path_compare p1 p2 = 0
 
-let rec path_hash_fun p h = match p with
-  | [] -> CCHash.int 42 h
-  | c :: p' ->
-    h
-    |> CCHash.int (cst_hash c.path_cst)
-    |> CCHash.int (case_hash c.path_case)
-    |> CCHash.list ClauseContext.hash_fun c.path_clauses
-    |> path_hash_fun p'
-
-let path_hash = CCHash.apply path_hash_fun
+let rec path_hash p = match p with
+  | [] -> Hash.int 42
+  | c :: p_tail ->
+    Hash.combine4
+      (cst_hash c.path_cst)
+      (case_hash c.path_case)
+      (Hash.list ClauseContext.hash c.path_clauses)
+      (path_hash p_tail)
 
 let path_length = List.length
 

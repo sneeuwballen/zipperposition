@@ -156,8 +156,7 @@ module MakeSolver(X : sig end) = struct
     type t = ID.t * int
     let make s i = s, i
     let equal (s1,i1)(s2,i2) = ID.equal s1 s2 && i1 = i2
-    let hash_fun (s,i) h = h |> ID.hash_fun s |> CCHash.int_ i
-    let hash a = CCHash.apply hash_fun a
+    let hash (s,i) = Hash.combine3 42 (ID.hash s) (Hash.int i)
     let print fmt (s,i) = Format.fprintf fmt "%a/%d" ID.pp s i
   end
 

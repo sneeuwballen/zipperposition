@@ -5,7 +5,6 @@
 
 open Libzipperposition
 
-module Hash = CCHash
 module BV = CCBV
 module T = FOTerm
 module S = Substs
@@ -45,10 +44,7 @@ let compare lits1 lits2 =
     then Array.length lits1 - Array.length lits2
     else check 0
 
-let hash_fun lits h =
-  Hash.array_ Lit.hash_fun lits h
-
-let hash lits = Hash.apply hash_fun lits
+let hash lits = Hash.array Lit.hash lits
 
 let variant ?(subst=S.empty) (a1,sc1) (a2,sc2) k =
   (* match a1.(i...) with a2\bv *)

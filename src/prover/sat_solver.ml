@@ -68,7 +68,7 @@ module Make(Dummy : sig end)
   module ClauseTbl = CCHashtbl.Make(struct
       type t = Lit.t list
       let equal = CCList.equal Lit.equal
-      let hash = CCHash.apply (CCHash.list Lit.hash_fun)
+      let hash = (Hash.list Lit.hash)
     end)
 
   let clause_tbl_ : (int * proof_step) ClauseTbl.t = ClauseTbl.create 32

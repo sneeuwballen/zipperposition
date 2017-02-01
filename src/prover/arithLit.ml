@@ -5,7 +5,6 @@ open Libzipperposition
 
 type term = FOTerm.t
 
-module Hash = CCHash
 module T = FOTerm
 module S = Substs
 module P = Position
@@ -65,16 +64,12 @@ let compare lit1 lit2 = match lit1, lit2 with
   | Binary _,  Divides _ -> 1
   | Divides _, Binary _ -> -1
 
-let hash_fun lit h =
-  let hash_sign s h = Hash.bool_ s h in
-  match lit with
+let hash lit = match lit with
   | Binary (op, m1, m2) ->
-      h |> M.hash_fun m1 |> M.hash_fun m2 |> Hash.int_ (Hashtbl.hash op)
+    Hash.combine4 10 (Hash.poly op) (M.hash m1) (M.hash m2)
   | Divides d ->
-      h |> hash_sign d.sign |> Hash.int_ (Z.hash d.num)
-      |> M.hash_fun d.monome |> Hash.int_ d.power
-
-let hash x = Hash.apply hash_fun x
+    Hash.combine5 20
+      (Hash.bool d.sign) (Z.hash d.num) (M.hash d.monome) (Hash.int d.power)
 
 let sign = function
   | Binary ((Equal | Lesseq | Less), _, _) -> true

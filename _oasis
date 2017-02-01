@@ -63,7 +63,7 @@ Library "libzipperposition"
                     Congruence, FeatureVector, UntypedAST, Ind_ty,
                     TypedSTerm, Statement,
                     lib/Hashcons, lib/ParseLocation, lib/Multiset, lib/LazyList,
-                    lib/IArray, lib/AllocCache, lib/Multiset_intf
+                    lib/Hash, lib/IArray, lib/AllocCache, lib/Multiset_intf
   CSources:         util_stubs.c, util_stubs.h
   CCOpt:            -Wextra -Wno-unused-parameter
   BuildDepends:     zarith, unix, sequence, containers,

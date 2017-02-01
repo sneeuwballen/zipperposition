@@ -17,7 +17,6 @@ let forall_ty = ForallTy
 let compare (a:t) b = Pervasives.compare a b
 let equal (a:t) b = a=b
 let hash (a:t) = Hashtbl.hash a
-let hash_fun a h = CCHash.int (hash a) h
 
 let to_string = function
   | Exists -> "∃"

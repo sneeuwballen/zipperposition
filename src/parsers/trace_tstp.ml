@@ -10,7 +10,6 @@ type id = Ast_tptp.name
 module T = STerm
 module S = Substs
 module A = Ast_tptp
-module Hash = CCHash
 module Err = CCResult
 
 type term = STerm.t

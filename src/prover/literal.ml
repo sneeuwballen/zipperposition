@@ -5,7 +5,6 @@
 
 open Libzipperposition
 
-module Hash = CCHash
 module T = FOTerm
 module S = Substs
 module PB = Position.Build
@@ -78,17 +77,14 @@ let fold f acc lit = match lit with
   | True
   | False -> acc
 
-let hash_fun lit h =
-  let hash_sign b h = Hash.bool_ b h in
+let hash lit =
   match lit with
-  | Arith o -> ArithLit.hash_fun o h
-  | Prop (p, sign) -> hash_sign sign (T.hash_fun p h)
+  | Arith o -> ArithLit.hash o
+  | Prop (p, sign) -> Hash.combine3 20 (Hash.bool sign) (T.hash p)
   | Equation (l, r, sign) ->
-      h |> hash_sign sign |> T.hash_fun l |> T.hash_fun r
-  | True -> h
-  | False -> h |> Hash.int_ 23
-
-let hash lit = Hash.apply hash_fun lit
+    Hash.combine4 30 (Hash.bool sign) (T.hash l) (T.hash r)
+  | True -> 40
+  | False -> 50
 
 let weight lit =
   fold (fun acc t -> acc + T.size t) 0 lit

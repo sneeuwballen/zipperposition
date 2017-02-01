@@ -50,8 +50,7 @@ module Make(Payload : PAYLOAD)
       } in
       pos
 
-  let hash i = i.id land max_int
-  let hash_fun i = CCHash.int (hash i)
+  let hash i = Hash.int i.id
   let equal i j = i.id = j.id
   let compare i j = CCInt.compare i.id j.id
   let neg i = i.neg

@@ -10,7 +10,6 @@ module type S = sig
   val compare : t -> t -> int
   val equal : t -> t -> bool
   val hash : t -> int
-  val hash_fun : t CCHash.hash_fun
 
   val dummy : t
   (** Value that should not be used *)

@@ -5,7 +5,6 @@
 
 open Libzipperposition
 
-module Hash = CCHash
 module BV = CCBV
 module T = FOTerm
 module S = Substs
@@ -24,7 +23,6 @@ type proof = Clause_intf.proof
 (** {2 Type def} *)
 module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   module Ctx = Ctx
-  module BLit = BBox
 
   type flag = SClause.flag
 
@@ -61,7 +59,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let compare c1 c2 = SClause.compare c1.sclause c2.sclause
 
   let hash c = SClause.hash c.sclause
-  let hash_fun c h = CCHash.int_ (hash c) h
 
   let id c = SClause.id c.sclause
 

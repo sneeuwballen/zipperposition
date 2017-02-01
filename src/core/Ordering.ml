@@ -16,10 +16,10 @@ module T = FOTerm
 module TC = FOTerm.Classic
 
 let mk_cache n =
-  let hash2 (a,b) h = T.hash_fun a h |> T.hash_fun b in
+  let hash (a,b) = Hash.combine3 42 (T.hash a) (T.hash b) in
   CCCache.replacing
     ~eq:(fun (a1,b1)(a2,b2) -> T.equal a1 a2 && T.equal b1 b2)
-    ~hash:(CCHash.apply hash2)
+    ~hash
     n
 
 type term = T.t

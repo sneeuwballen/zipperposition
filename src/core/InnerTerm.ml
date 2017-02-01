@@ -3,8 +3,6 @@
 
 (** {1 Scoped Terms} *)
 
-module Hash = CCHash
-
 type t = {
   term : view;
   ty : type_result;
@@ -32,8 +30,7 @@ let ty_exn t = match t.ty with
   | NoType -> invalid_arg "InnerTerm.ty_exn"
   | HasType ty -> ty
 
-let hash_fun t s = Hash.int_ t.id s
-let hash t = Hash.apply hash_fun t
+let hash t = Hash.int t.id
 let equal : t -> t -> bool = fun t1 t2 -> t1 == t2
 let compare t1 t2 = Pervasives.compare t1.id t2.id
 
@@ -49,23 +46,18 @@ let same_l l1 l2 = match l1, l2 with
   | [t1;u1], [t2;u2] -> equal t1 t2 && equal u1 u2
   | _ -> same_l_rec l1 l2
 
-let _hash_ty t h =
-  match t.ty with
-  | NoType -> h
-  | HasType ty -> Hash.int_ ty.id (Hash.string_ "type" h)
+let _hash_ty t = match t.ty with
+  | NoType -> 1
+  | HasType ty -> Hash.combine2 2 ty.id
 
-let _hash_norec t h =
-  let h = match view t with
-    | Var v -> h |> Hash.string_ "var" |> HVar.hash_fun v
-    | DB v -> Hash.int_ v h
-    | Bind (b, varty, t') ->
-        h |> Hash.string_ "bind" |> Binder.hash_fun b |> hash_fun varty |> hash_fun t'
-    | Const s -> h |> Hash.string_ "const" |> ID.hash_fun s
-    | App (f, l) -> h |> Hash.string_ "app" |> hash_fun f |> Hash.list_ hash_fun l
-    | AppBuiltin (b, l) ->
-        h |> Hash.string_ "sapp" |> Builtin.hash_fun b |> Hash.list_ hash_fun l
-  in
-  _hash_ty t h
+let _hash_norec t = match view t with
+  | Var v -> Hash.combine2 1 (HVar.hash v)
+  | DB v -> Hash.combine2 2 (Hash.int v)
+  | Bind (b, varty, t') ->
+    Hash.combine4 3 (Binder.hash b)(hash varty)(hash t')
+  | Const s -> Hash.combine2 4 (ID.hash s)
+  | App (f, l) -> Hash.combine3 10 (hash f) (Hash.list hash l)
+  | AppBuiltin (b, l) -> Hash.combine3 20 (Builtin.hash b) (Hash.list hash l)
 
 let rec _eq_norec t1 t2 =
   _eq_ty t1 t2 &&
@@ -103,7 +95,7 @@ module H = Hashcons.MakeNonWeak(struct
 module H = Hashcons.Make(struct
     type t = term
     let equal = _eq_norec
-    let hash = Hash.apply _hash_norec
+    let hash = _hash_norec
     let tag i t = assert (t.id = ~-1); t.id <- i
   end)
 
