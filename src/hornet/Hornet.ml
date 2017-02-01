@@ -5,16 +5,8 @@
 
 open Libzipperposition
 open Libzipperposition_parsers
-open CCResult.Infix
-
-(* setup an alarm for abrupt stop *)
-let setup_alarm timeout =
-  let handler _ =
-    Format.printf "%% SZS Status ResourceOut@.";
-    Unix.kill (Unix.getpid ()) Sys.sigterm
-  in
-  ignore (Sys.signal Sys.sigalrm (Sys.Signal_handle handler));
-  Unix.alarm (max 1 (int_of_float timeout))
+module E = CCResult
+open E.Infix
 
 let section = Util.Section.(make ~parent:root "hornet")
 
@@ -25,18 +17,19 @@ let parse_file file =
     (fun k->k file);
   Parsing_utils.parse file
 
-let typing stmts =
-  start_ (fun k->k "start typing");
-  Phases.get_key Params.key >>= fun params ->
-  let def_as_rewrite = params.Params.param_def_as_rewrite in
-  TypeInference.infer_statements ~def_as_rewrite ?ctx:None stmts >>?= fun stmts ->
-  do_extensions ~field:(fun e -> e.Extensions.post_typing_actions)
-    ~x:stmts >>= fun () ->
-  Phases.return_phase stmts
+type conf = Flex_state.t
+
+let k_def_as_rewrite : bool Flex_state.key = Flex_state.create_key()
+
+let typing conf stmts =
+  start_ "start typing" (fun k->k);
+  let def_as_rewrite =
+    Flex_state.get_or ~or_:false k_def_as_rewrite conf
+  in
+  TypeInference.infer_statements ~def_as_rewrite ?ctx:None stmts
 
 (* obtain clauses  *)
 let cnf ~file decls =
-  Phases.start_phase Phases.CNF >>= fun () ->
   let stmts =
     decls
     |> CCVector.to_seq
@@ -45,20 +38,14 @@ let cnf ~file decls =
     |> CCVector.to_seq
     |> Cnf.convert
   in
-  do_extensions ~field:(fun e -> e.Extensions.post_cnf_actions)
-    ~x:stmts >>= fun () ->
-  Phases.return_phase stmts
+  E.return stmts
+
+(* TODO: make defined symbols smaller, skolems bigger *)
 
 (* compute a precedence *)
 let compute_prec stmts =
-  Phases.start_phase Phases.Compute_prec >>= fun () ->
-  (* use extensions *)
-  Phases.get >>= fun state ->
   let cp =
-    Extensions.extensions ()
-    |> List.fold_left
-      (fun cp e -> List.fold_left (fun cp f -> f state cp) cp e.Extensions.prec_actions)
-      Compute_prec.empty
+    Compute_prec.empty
 
     (* add constraint about inductive constructors, etc. *)
     |> Compute_prec.add_constr 10 Classify_cst.prec_constr
@@ -72,28 +59,63 @@ let compute_prec stmts =
          |> Precedence.Constr.invfreq)
   in
   let prec = Compute_prec.mk_precedence cp stmts in
-  Phases.return_phase prec
+  E.return prec
 
-let compute_ord_select precedence =
-  Phases.start_phase Phases.Compute_ord_select >>= fun () ->
-  Phases.get_key Params.key >>= fun params ->
-  let ord = Ordering.by_name params.param_ord precedence in
-  let select = Selection.selection_from_string ~ord params.param_select in
-  do_extensions ~field:(fun e->e.Extensions.ord_select_actions)
-    ~x:(ord,select) >>= fun () ->
-  Util.debugf ~section 2 "@[<2>selection function:@ %s@]" (fun k->k params.param_select);
-  Phases.return_phase (ord, select)
+let compute_ord precedence =
+  let ord = Ordering.by_name "kbo" precedence in
+  E.return ord
+
+(* setup an alarm for abrupt stop *)
+let setup_alarm timeout =
+  let handler _ =
+    Format.printf "%% SZS Status ResourceOut@.";
+    Unix.kill (Unix.getpid ()) Sys.sigterm
+  in
+  ignore (Sys.signal Sys.sigalrm (Sys.Signal_handle handler));
+  ignore (Unix.alarm (max 1 (int_of_float timeout)))
+
+let setup_gc () =
+  let gc = Gc.get () in
+  Gc.set { gc with Gc.space_overhead=150; }
+
+(** {2 Main} *)
+
+let time : float ref = ref 0.
+let file : string ref = ref ""
+let def_as_rewrite : bool ref = ref false
+
+let options =
+  Arg.align
+    ([ "--time", Arg.Set_float time, " set timeout";
+       "-t", Arg.Set_float time, " alias to --time";
+       "--def-as-rewrite", Arg.Set def_as_rewrite, " definitions as rewrite rules";
+       "--no-def-as-rewrite", Arg.Clear def_as_rewrite, " definitions as axioms";
+    ] @ Options.make ())
+
+let main () =
+  Arg.parse options (fun s->file := s) "usage: hornet <file>";
+  setup_alarm !time;
+  setup_gc ();
+  let conf =
+    Flex_state.empty
+    |> Flex_state.add k_def_as_rewrite !def_as_rewrite
+  in
+  parse_file !file >>=
+  typing conf >>=
+  cnf ~file:!file >>= fun stmts ->
+  compute_prec (CCVector.to_seq stmts) >>=
+  compute_ord >>= fun ord ->
+  (* TODO *)
+  E.return ()
 
 let () =
-  match Phases.run phases with
-    | `Error msg ->
-      print_endline msg;
-      exit 1
-    | `Ok (_, ()) -> ()
-
-let _ =
   at_exit
     (fun () ->
        Util.debugf ~section 1 "run time: %.3f" (fun k->k (Util.total_time_s ()));
-       Signal.send Signals.on_exit 0)
-
+       Signal.send Signals.on_exit 0);
+  begin match main () with
+    | E.Error msg ->
+      print_endline msg;
+      exit 1
+    | E.Ok () -> ()
+  end

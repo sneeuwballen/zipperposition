@@ -12,6 +12,7 @@ S src/prover
 S src/prover/lib
 S src/prover/calculi
 S src/prover/meta
+S src/hornet/
 S src/main/
 S tests/
 B _build/src/**

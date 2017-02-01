@@ -147,6 +147,17 @@ Executable zipperposition
                     libzipperposition, libzipperposition.parsers,
                     libzipperposition.prover
 
+# experimental prover
+Executable hornet
+  Path:             src/hornet/
+  Install:          true
+  CompiledObject:   native
+  MainIs:           Hornet.ml
+  Build$:           flag(parsers) && flag(prover)
+  Install$:         flag(parsers) && flag(prover)
+  BuildDepends:     containers, sequence, unix,
+                    libzipperposition, libzipperposition.parsers
+
 Document libzipperposition
   Title:                Documentation for Libzipperposition
   Abstract:             Main API documentation for Libzipperposition.
