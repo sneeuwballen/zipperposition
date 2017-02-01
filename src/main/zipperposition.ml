@@ -19,13 +19,13 @@ let phases =
 
 let () =
   match Phases.run phases with
-  | CCResult.Error msg ->
+    | CCResult.Error msg ->
       print_endline msg;
       exit 1
-  | CCResult.Ok (_, ()) -> ()
+    | CCResult.Ok (_, ()) -> ()
 
 let _ =
   at_exit
     (fun () ->
-      Util.debugf ~section 1 "run time: %.3f" (fun k->k (Util.total_time_s ()));
-      Signal.send Signals.on_exit 0)
+       Util.debugf ~section 1 "run time: %.3f" (fun k->k (Util.total_time_s ()));
+       Signal.send Signals.on_exit 0)

@@ -26,10 +26,10 @@ type loc = ParseLocation.t
 exception Error of string
 
 let () = Printexc.register_printer
-  (function
-    | Error msg ->
+    (function
+      | Error msg ->
         Some (CCFormat.sprintf "@[<2>@{<Red>type inference error@}:@ %s@]" msg)
-    | _ -> None)
+      | _ -> None)
 
 (* error-raising function *)
 let error_ ?loc msg =
@@ -112,18 +112,18 @@ module Ctx = struct
   type t = {
     default: type_;
     env : env;
-      (* map names to variables or IDs *)
+    (* map names to variables or IDs *)
     def_as_rewrite: bool;
-      (* if true, definitions are rewrite rules *)
+    (* if true, definitions are rewrite rules *)
     mutable new_metas: T.meta_var list;
-      (* variables that should be generalized in the global scope
-         or bound to [default], if they are not bound *)
+    (* variables that should be generalized in the global scope
+       or bound to [default], if they are not bound *)
     mutable local_vars: T.t Var.t list;
-      (* free variables in the local scope *)
+    (* free variables in the local scope *)
     mutable datatypes: (ID.t * type_) list ID.Tbl.t;
-      (* datatype ID -> list of cstors *)
+    (* datatype ID -> list of cstors *)
     mutable new_types: (ID.t * type_) list;
-      (* list of symbols whose type has been inferred recently *)
+    (* list of symbols whose type has been inferred recently *)
   }
 
   let create ?(def_as_rewrite=true) ?(default=T.Ty.term) () =
@@ -140,7 +140,7 @@ module Ctx = struct
 
   let copy t =
     { t with
-      env = Hashtbl.copy t.env;
+        env = Hashtbl.copy t.env;
     }
 
   (* enter new scope for the variables with those names *)
@@ -148,9 +148,9 @@ module Ctx = struct
     let names =
       List.map
         (fun v ->
-          let name = Var.name v in
-          Hashtbl.add ctx.env name (`Var v);
-          name)
+           let name = Var.name v in
+           Hashtbl.add ctx.env name (`Var v);
+           name)
         vs
     in
     try
@@ -166,18 +166,18 @@ module Ctx = struct
   (* only specialize/generalize variable if it's not bound *)
   let bind_meta ctx (v, r, k) =
     match !r, k with
-    | None, `BindDefault ->
+      | None, `BindDefault ->
         let ty = ctx.default in
         Util.debugf ~section 5 "@[<2>specialize type meta_var %a to@ @[%a@]@]"
           (fun k->k Var.pp v T.pp ty);
         r := Some ty
-    | None, `Generalize ->
+      | None, `Generalize ->
         let v' = Var.copy v in
         Util.debugf ~section 5 "@[<2>generalize type meta_var %a@]"
           (fun k->k Var.pp v);
         r := Some (T.var v')
-    | None, `NoBind -> assert false
-    | Some _, _ -> ()
+      | None, `NoBind -> assert false
+      | Some _, _ -> ()
 
   let exit_scope ctx =
     List.iter (fun v -> Hashtbl.remove ctx.env (Var.name v)) ctx.local_vars;
@@ -257,8 +257,8 @@ end
 (** {2 Hindley-Milner} *)
 
 (* TODO: check, afterwards, that types:
-  - do not contain metas variables
-  - are closed
+   - do not contain metas variables
+   - are closed
 *)
 
 (* convert the typed variables into proper variables [vars'], call [f vars'],
@@ -267,17 +267,17 @@ let with_typed_vars_ ?loc ~infer_ty ctx vars ~f =
   let rec aux acc l = match l with
     | [] -> f (List.rev acc)
     | (v,o) :: l' ->
-        let ty = match o with
-          | None -> T.Ty.meta (Ctx.fresh_ty_meta_var ~dest:`Generalize ctx)
-          | Some ty -> infer_ty ?loc ctx ty
-        in
-        let v = match v with
-          | PT.Wildcard -> Var.of_string ~ty "_"
-          | PT.V v -> Var.of_string ~ty v
-        in
-        (* enter [v] before dealing with next variables, for they might depend
-           on it (e.g. [forall (a:type)(l:list a). ...]) *)
-        Ctx.with_var ctx v ~f:(fun () -> aux (v :: acc) l')
+      let ty = match o with
+        | None -> T.Ty.meta (Ctx.fresh_ty_meta_var ~dest:`Generalize ctx)
+        | Some ty -> infer_ty ?loc ctx ty
+      in
+      let v = match v with
+        | PT.Wildcard -> Var.of_string ~ty "_"
+        | PT.V v -> Var.of_string ~ty v
+      in
+      (* enter [v] before dealing with next variables, for they might depend
+         on it (e.g. [forall (a:type)(l:list a). ...]) *)
+      Ctx.with_var ctx v ~f:(fun () -> aux (v :: acc) l')
   in
   aux [] vars
 
@@ -290,41 +290,41 @@ let rec infer_ty_ ?loc ctx ty =
     | PT.AppBuiltin (Builtin.Prop, []) -> T.Ty.prop
     | PT.AppBuiltin (Builtin.TType, []) -> T.Ty.tType
     | PT.AppBuiltin (Builtin.Arrow, ret :: args) ->
-        let ret = aux ret in
-        let args = List.map aux args in
-        T.Ty.fun_ ?loc args ret
+      let ret = aux ret in
+      let args = List.map aux args in
+      T.Ty.fun_ ?loc args ret
     | PT.Var v ->
-        begin match Ctx.get_var_ ctx v with
+      begin match Ctx.get_var_ ctx v with
         | `Var v ->
-            unify ?loc (Var.ty v) T.Ty.tType;
-            T.Ty.var ?loc v
+          unify ?loc (Var.ty v) T.Ty.tType;
+          T.Ty.var ?loc v
         | `ID (id, ty) ->
-            unify ?loc ty T.Ty.tType;
-            T.Ty.const id
-        end
+          unify ?loc ty T.Ty.tType;
+          T.Ty.const id
+      end
     | PT.Const f ->
-        (* constant type *)
-        let id, ty = Ctx.get_id_ ?loc ctx ~arity:0 f in
-        unify ?loc ty T.Ty.tType;
-        T.Ty.const id
+      (* constant type *)
+      let id, ty = Ctx.get_id_ ?loc ctx ~arity:0 f in
+      unify ?loc ty T.Ty.tType;
+      T.Ty.const id
     | PT.App (f, l) ->
-        begin match PT.view f with
+      begin match PT.view f with
         | PT.Var PT.Wildcard -> error_ ?loc "wildcard function: not supported"
         | PT.Var (PT.V name)
         | PT.Const name ->
-            let id, ty = Ctx.get_id_ ?loc ctx ~arity:(List.length l) name in
-            aux_app id ty l
+          let id, ty = Ctx.get_id_ ?loc ctx ~arity:(List.length l) name in
+          aux_app id ty l
         | _ -> error_ ?loc "@[<2>cannot apply non-constant@ `@[%a@]`@]" PT.pp f
-        end
+      end
     | PT.Bind (Binder.ForallTy, vars, body) ->
-        with_typed_vars_ ?loc ~infer_ty:infer_ty_ ctx vars
-          ~f:(fun vars' ->
-              (* be sure those are type variables *)
-              List.iter (fun v -> unify T.tType (Var.ty v)) vars';
-              let body' = aux body in
-              T.Ty.forall_l vars' body')
+      with_typed_vars_ ?loc ~infer_ty:infer_ty_ ctx vars
+        ~f:(fun vars' ->
+          (* be sure those are type variables *)
+          List.iter (fun v -> unify T.tType (Var.ty v)) vars';
+          let body' = aux body in
+          T.Ty.forall_l vars' body')
     | _ ->
-        error_ ?loc "@[<2>`@[%a@]`@ is not a valid type@]" PT.pp ty
+      error_ ?loc "@[<2>`@[%a@]`@ is not a valid type@]" PT.pp ty
   and aux_app id ty l =
     unify ?loc (T.Ty.returns ty) T.Ty.tType;
     let l = List.map aux l in
@@ -372,53 +372,53 @@ let apply_ty_to_metas ?loc ctx (ty:T.Ty.t): T.Ty.t list * T.Ty.t =
 let rec infer_rec ctx t =
   let loc = PT.loc t in
   let t' = match PT.view t with
-  | PT.Var name ->
+    | PT.Var name ->
       begin match Ctx.get_var_ ctx name with
-      | `Var v -> T.var v
-      | `ID (id, ty_id) ->
-        (* implicit parameters, e.g. for [nil] *)
-        let l = add_implicit_params ty_id [] |> List.map (infer_rec ctx) in
-        let ty = T.apply_unify ?loc ~allow_open:true ty_id l in
-        T.app ~ty (T.const ~ty:ty_id id) l
+        | `Var v -> T.var v
+        | `ID (id, ty_id) ->
+          (* implicit parameters, e.g. for [nil] *)
+          let l = add_implicit_params ty_id [] |> List.map (infer_rec ctx) in
+          let ty = T.apply_unify ?loc ~allow_open:true ty_id l in
+          T.app ~ty (T.const ~ty:ty_id id) l
       end
-  | PT.Const s ->
+    | PT.Const s ->
       let id, ty_id = Ctx.get_id_ ?loc ~arity:0 ctx s in
       (* implicit parameters, e.g. for [nil] *)
       let l = add_implicit_params ty_id [] |> List.map (infer_rec ctx) in
       let ty = T.apply_unify ?loc ~allow_open:true ty_id l in
       T.app ~ty (T.const ~ty:ty_id id) l
-  | PT.App ({PT.term=PT.Var v; _}, l) ->
-    begin match Ctx.get_var_ ctx v with
-      | `ID (id,ty) -> infer_app ?loc ctx id ty l
-      | `Var v ->
-        let l = add_implicit_params (Var.ty v) l in
-        (* infer types for arguments *)
-        let l = List.map (infer_rec ctx) l in
-        Util.debugf ~section 5 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
-          (fun k->k Var.pp v T.pp (Var.ty v) (Util.pp_list T.pp) l
-              (Util.pp_list T.pp) (List.map T.ty_exn l));
-        let ty = T.apply_unify ?loc ~allow_open:true (Var.ty v) l in
-        T.app ?loc ~ty (T.var ?loc v) l
-    end
-  | PT.App ({PT.term=PT.Const s; _}, l) ->
+    | PT.App ({PT.term=PT.Var v; _}, l) ->
+      begin match Ctx.get_var_ ctx v with
+        | `ID (id,ty) -> infer_app ?loc ctx id ty l
+        | `Var v ->
+          let l = add_implicit_params (Var.ty v) l in
+          (* infer types for arguments *)
+          let l = List.map (infer_rec ctx) l in
+          Util.debugf ~section 5 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
+            (fun k->k Var.pp v T.pp (Var.ty v) (Util.pp_list T.pp) l
+                (Util.pp_list T.pp) (List.map T.ty_exn l));
+          let ty = T.apply_unify ?loc ~allow_open:true (Var.ty v) l in
+          T.app ?loc ~ty (T.var ?loc v) l
+      end
+    | PT.App ({PT.term=PT.Const s; _}, l) ->
       let id, ty_s = Ctx.get_id_ ?loc ~arity:(List.length l) ctx s in
       infer_app ?loc ctx id ty_s l
-  | PT.App (f,l) ->
+    | PT.App (f,l) ->
       (* higher order application *)
       let f = infer_rec ctx f in
       let l = List.map (infer_rec ctx) l in
       Util.debugf ~section 5 "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]"
         (fun k->k T.pp f T.pp (T.ty_exn f) (Util.pp_list T.pp) l
-         (Util.pp_list T.pp) (List.map T.ty_exn l));
+            (Util.pp_list T.pp) (List.map T.ty_exn l));
       let ty = T.apply_unify ?loc ~allow_open:true (T.ty_exn f) l in
       T.app ?loc ~ty f l
-  | PT.Ite (a,b,c) ->
+    | PT.Ite (a,b,c) ->
       let a = infer_prop_ ?loc ctx a in
       let b = infer_rec ctx b in
       let c = infer_rec ctx c in
       unify ?loc (T.ty_exn b)(T.ty_exn c);
       T.ite ?loc a b c
-  | PT.Let (l, u) ->
+    | PT.Let (l, u) ->
       let l =
         List.map (fun (v,t) ->
           let t = infer_rec ctx t in
@@ -430,7 +430,7 @@ let rec infer_rec ctx t =
         ~f:(fun vars ->
           let u = infer_rec ctx u in
           T.let_ ?loc (List.combine vars terms) u)
-  | PT.Match (u, l) ->
+    | PT.Match (u, l) ->
       let u = infer_rec ctx u in
       let ty_u = T.ty_exn u in
       (* find the datatype corresponding to [u] *)
@@ -443,51 +443,51 @@ let rec infer_rec ctx t =
       in
       let l = infer_match ?loc ctx ~ty_matched:ty_u data l in
       T.match_ ?loc u l
-  | PT.List [] ->
+    | PT.List [] ->
       let v = Ctx.fresh_ty_meta_var ~dest:`Generalize ctx in
       let ty = T.Ty.multiset (T.Ty.meta v) in
       T.multiset ?loc ~ty []
-  | PT.List (t::l) ->
+    | PT.List (t::l) ->
       let t = infer_rec ctx t in
       let l = List.map (infer_rec ctx) l in
       let ty = T.Ty.multiset (T.ty_exn t) in
       T.multiset ?loc ~ty (t::l)
-  | PT.Record (l,rest) ->
+    | PT.Record (l,rest) ->
       (* infer types of fields *)
       let ty_l, l =
         List.map
-         (fun (n,t) ->
-           let t' = infer_rec ctx t in
-           (n, T.ty_exn t'), (n, t'))
-         l
+          (fun (n,t) ->
+             let t' = infer_rec ctx t in
+             (n, T.ty_exn t'), (n, t'))
+          l
         |> List.split
       in
       let rest =
         CCOpt.map
           (fun s -> match Ctx.get_var_ ctx s with
-            | `Var v -> v
-            | `ID (id,_) -> error_ ?loc "row variable cannot be a constant %a" ID.pp id)
+             | `Var v -> v
+             | `ID (id,_) -> error_ ?loc "row variable cannot be a constant %a" ID.pp id)
           rest
       in
       let ty = T.Ty.record_flatten ty_l ~rest:(CCOpt.map Var.ty rest) in
       T.record ~ty ?loc l ~rest
-  | PT.AppBuiltin (Builtin.Wildcard, []) ->
+    | PT.AppBuiltin (Builtin.Wildcard, []) ->
       (* make a new TYPE variable *)
       let v = Ctx.fresh_ty_meta_var ~dest:`Generalize ctx in
       T.Ty.meta v
-  | PT.AppBuiltin (Builtin.Arrow, ret :: args) ->
+    | PT.AppBuiltin (Builtin.Arrow, ret :: args) ->
       let ret = infer_ty_exn ctx ret in
       let args = List.map (infer_ty_exn ctx) args in
       T.Ty.fun_ ?loc args ret
-  | PT.AppBuiltin (Builtin.True, []) -> T.Form.true_
-  | PT.AppBuiltin (Builtin.False, []) -> T.Form.false_
-  | PT.AppBuiltin (Builtin.And, l) ->
+    | PT.AppBuiltin (Builtin.True, []) -> T.Form.true_
+    | PT.AppBuiltin (Builtin.False, []) -> T.Form.false_
+    | PT.AppBuiltin (Builtin.And, l) ->
       let l = List.map (infer_prop_ ?loc ctx) l in
       T.Form.and_ ?loc l
-  | PT.AppBuiltin (Builtin.Or, l) ->
+    | PT.AppBuiltin (Builtin.Or, l) ->
       let l = List.map (infer_prop_ ?loc ctx) l in
       T.Form.or_ ?loc l
-  | PT.AppBuiltin (((Builtin.Equiv | Builtin.Xor | Builtin.Imply) as conn), [a;b]) ->
+    | PT.AppBuiltin (((Builtin.Equiv | Builtin.Xor | Builtin.Imply) as conn), [a;b]) ->
       let a = infer_prop_ ?loc ctx a
       and b = infer_prop_ ?loc ctx b in
       begin match conn with
@@ -496,16 +496,16 @@ let rec infer_rec ctx t =
         | Builtin.Imply -> T.Form.imply ?loc a b
         | _ -> assert false
       end
-  | PT.AppBuiltin (Builtin.Not, [a]) ->
+    | PT.AppBuiltin (Builtin.Not, [a]) ->
       let a = infer_prop_ ?loc ctx a in
       T.Form.not_ ?loc a
-  | PT.AppBuiltin ((Builtin.Eq | Builtin.Neq) as conn, [a;b]) ->
+    | PT.AppBuiltin ((Builtin.Eq | Builtin.Neq) as conn, [a;b]) ->
       (* a ?= b *)
       let a = infer_rec ctx a in
       let b = infer_rec ctx b in
       unify ?loc (T.ty_exn a) (T.ty_exn b);
       if T.Ty.returns_tType (T.ty_exn a)
-        then error_ ?loc "(in)equation @[%a@] ?= @[%a@] between types is forbidden" T.pp a T.pp b;
+      then error_ ?loc "(in)equation @[%a@] ?= @[%a@] between types is forbidden" T.pp a T.pp b;
       begin match conn with
         | Builtin.Eq ->
           if T.Ty.returns_prop (T.ty_exn a) then T.Form.equiv a b else T.Form.eq a b
@@ -513,38 +513,38 @@ let rec infer_rec ctx t =
           if T.Ty.returns_prop (T.ty_exn a) then T.Form.xor a b else T.Form.neq a b
         | _ -> assert false
       end
-  | PT.Bind(((Binder.Forall | Binder.Exists) as binder), vars, f') ->
+    | PT.Bind(((Binder.Forall | Binder.Exists) as binder), vars, f') ->
       with_non_inferred_typed_vars ?loc ctx vars
         ~f:(fun vars' ->
-            let f' = infer_prop_ ctx f' in
-            match binder with
-              | Binder.Forall -> T.Form.forall_l vars' f'
-              | Binder.Exists -> T.Form.exists_l vars' f'
-              | _ -> assert false)
-  | PT.Bind(Binder.Lambda, vars, t') ->
+          let f' = infer_prop_ ctx f' in
+          match binder with
+            | Binder.Forall -> T.Form.forall_l vars' f'
+            | Binder.Exists -> T.Form.exists_l vars' f'
+            | _ -> assert false)
+    | PT.Bind(Binder.Lambda, vars, t') ->
       with_non_inferred_typed_vars ?loc ctx vars
         ~f:(fun vars' ->
-            let t' = infer_rec ctx t' in
-            let ty = T.Ty.fun_ ?loc (List.map Var.ty vars') (T.ty_exn t') in
-            T.bind_list ?loc ~ty Binder.Lambda vars' t')
-  | PT.Bind (Binder.ForallTy, vars, t') ->
+          let t' = infer_rec ctx t' in
+          let ty = T.Ty.fun_ ?loc (List.map Var.ty vars') (T.ty_exn t') in
+          T.bind_list ?loc ~ty Binder.Lambda vars' t')
+    | PT.Bind (Binder.ForallTy, vars, t') ->
       with_non_inferred_typed_vars ?loc ctx vars
         ~f:(fun vars' ->
-            let t' = infer_rec ctx t' in
-            T.Ty.forall_l ?loc vars' t')
-  | PT.AppBuiltin (Builtin.Int _ as b, []) -> T.builtin ~ty:T.Ty.int b
-  | PT.AppBuiltin (Builtin.Rat _ as b, []) -> T.builtin ~ty:T.Ty.rat b
-  | PT.AppBuiltin (Builtin.TyInt, []) -> T.Ty.int
-  | PT.AppBuiltin (Builtin.TyRat, []) -> T.Ty.rat
-  | PT.AppBuiltin (Builtin.Term, []) -> T.Ty.term
-  | PT.AppBuiltin (Builtin.Prop, []) -> T.Ty.prop
-  | PT.AppBuiltin (Builtin.TType, []) -> T.Ty.tType
-  | PT.AppBuiltin (b,l) ->
+          let t' = infer_rec ctx t' in
+          T.Ty.forall_l ?loc vars' t')
+    | PT.AppBuiltin (Builtin.Int _ as b, []) -> T.builtin ~ty:T.Ty.int b
+    | PT.AppBuiltin (Builtin.Rat _ as b, []) -> T.builtin ~ty:T.Ty.rat b
+    | PT.AppBuiltin (Builtin.TyInt, []) -> T.Ty.int
+    | PT.AppBuiltin (Builtin.TyRat, []) -> T.Ty.rat
+    | PT.AppBuiltin (Builtin.Term, []) -> T.Ty.term
+    | PT.AppBuiltin (Builtin.Prop, []) -> T.Ty.prop
+    | PT.AppBuiltin (Builtin.TType, []) -> T.Ty.tType
+    | PT.AppBuiltin (b,l) ->
       begin match TyBuiltin.ty b with
-      | None ->
+        | None ->
           error_ ?loc
             "@[<2>unexpected builtin in@ `@[%a@]`, expected term@]" PT.pp t
-      | Some ty_b ->
+        | Some ty_b ->
           let i,j = T.Ty.arity ty_b in
           (* some builtin are ad-hoc polymorphic (eq, $less, ...) so
              we need to add wildcards *)
@@ -581,7 +581,7 @@ and infer_app ?loc ctx id ty_id l =
 (* replace a match with possibly a "default" case into a completely
    defined match *)
 and infer_match ?loc ctx ~ty_matched data (l:PT.match_branch list)
-    : (T.match_cstor * type_ Var.t list * T.t) list =
+  : (T.match_cstor * type_ Var.t list * T.t) list =
   let ty_ret = ref None in
   (* check consistency of types in every branch *)
   let check_ty ty : unit = match !ty_ret with
@@ -591,64 +591,64 @@ and infer_match ?loc ctx ~ty_matched data (l:PT.match_branch list)
   let seen = ref [] in
   let seen_default = ref false in
   let l = CCList.flat_map
-    (fun b ->
-       if !seen_default then (
-         error_ ?loc "`default` case should be the last"
-       );
-       begin match b with
-         | PT.Match_default rhs ->
-           seen_default := true;
-           let rhs = infer_rec ctx rhs in
-           check_ty (T.ty_exn rhs);
-           (* now cover every missing case *)
-           CCList.filter_map
-             (fun (c_id,c_ty) ->
-                if List.exists (ID.equal c_id) !seen
-                then None
-                else (
-                  let ty_params, c_ty_applied = apply_ty_to_metas ?loc ctx c_ty in
-                  let _vars, ty_args, ty_ret = T.Ty.unfold c_ty_applied in
-                  assert (_vars=[]);
-                  unify ?loc ty_ret ty_matched;
-                  let vars =
-                    List.mapi (fun i ty -> Var.makef ~ty "x_%d" i) ty_args
-                  in
-                  let cstor =
-                    { T.cstor_id=c_id; cstor_ty=c_ty; cstor_args=ty_params; }
-                  in
-                  Some (cstor, vars, rhs)
-                ))
-             data
-         | PT.Match_case (s, vars, rhs) ->
-           let c_id, c_ty = Ctx.get_id_ ?loc ~arity:(List.length vars) ctx s in
-           if List.exists (ID.equal c_id) !seen then (
-             error_ ?loc "duplicate branch for constructor `%a`" ID.pp c_id
-           );
-           if List.for_all (fun (cstor,_) -> not (ID.equal c_id cstor)) data then (
-             error_ ?loc "symbol `%a` not a suitable constructor" ID.pp c_id
-           );
-           seen := c_id :: !seen;
-           (* apply [ty_s] to some meta variables *)
-           let ty_params, c_ty_applied = apply_ty_to_metas ?loc ctx c_ty in
-           let _vars, ty_s_args, ty_ret_s = T.Ty.unfold c_ty_applied in
-           assert (_vars=[]);
-           unify ?loc ty_ret_s ty_matched;
-           if List.length ty_s_args <> List.length vars then (
-             error_ ?loc "constructor `%a`@ expected %d arguments,@ got %d"
-               ID.pp c_id (List.length ty_s_args) (List.length vars);
-           );
-           with_typed_vars_ ?loc ~infer_ty:(fun ?loc:_ _ ty -> ty) ctx
-             (List.map2 (fun v ty_arg -> v, Some ty_arg) vars ty_s_args)
-             ~f:(fun vars ->
-               (* now we have everything in scope, we can convert [rhs] *)
-               let rhs = infer_rec ctx rhs in
-               check_ty (T.ty_exn rhs);
-               let cstor =
-                 { T.cstor_id=c_id; cstor_ty=c_ty; cstor_args=ty_params; }
-               in
-               [cstor, vars, rhs])
-       end)
-    l
+      (fun b ->
+         if !seen_default then (
+           error_ ?loc "`default` case should be the last"
+         );
+         begin match b with
+           | PT.Match_default rhs ->
+             seen_default := true;
+             let rhs = infer_rec ctx rhs in
+             check_ty (T.ty_exn rhs);
+             (* now cover every missing case *)
+             CCList.filter_map
+               (fun (c_id,c_ty) ->
+                  if List.exists (ID.equal c_id) !seen
+                  then None
+                  else (
+                    let ty_params, c_ty_applied = apply_ty_to_metas ?loc ctx c_ty in
+                    let _vars, ty_args, ty_ret = T.Ty.unfold c_ty_applied in
+                    assert (_vars=[]);
+                    unify ?loc ty_ret ty_matched;
+                    let vars =
+                      List.mapi (fun i ty -> Var.makef ~ty "x_%d" i) ty_args
+                    in
+                    let cstor =
+                      { T.cstor_id=c_id; cstor_ty=c_ty; cstor_args=ty_params; }
+                    in
+                    Some (cstor, vars, rhs)
+                  ))
+               data
+           | PT.Match_case (s, vars, rhs) ->
+             let c_id, c_ty = Ctx.get_id_ ?loc ~arity:(List.length vars) ctx s in
+             if List.exists (ID.equal c_id) !seen then (
+               error_ ?loc "duplicate branch for constructor `%a`" ID.pp c_id
+             );
+             if List.for_all (fun (cstor,_) -> not (ID.equal c_id cstor)) data then (
+               error_ ?loc "symbol `%a` not a suitable constructor" ID.pp c_id
+             );
+             seen := c_id :: !seen;
+             (* apply [ty_s] to some meta variables *)
+             let ty_params, c_ty_applied = apply_ty_to_metas ?loc ctx c_ty in
+             let _vars, ty_s_args, ty_ret_s = T.Ty.unfold c_ty_applied in
+             assert (_vars=[]);
+             unify ?loc ty_ret_s ty_matched;
+             if List.length ty_s_args <> List.length vars then (
+               error_ ?loc "constructor `%a`@ expected %d arguments,@ got %d"
+                 ID.pp c_id (List.length ty_s_args) (List.length vars);
+             );
+             with_typed_vars_ ?loc ~infer_ty:(fun ?loc:_ _ ty -> ty) ctx
+               (List.map2 (fun v ty_arg -> v, Some ty_arg) vars ty_s_args)
+               ~f:(fun vars ->
+                 (* now we have everything in scope, we can convert [rhs] *)
+                 let rhs = infer_rec ctx rhs in
+                 check_ty (T.ty_exn rhs);
+                 let cstor =
+                   { T.cstor_id=c_id; cstor_ty=c_ty; cstor_args=ty_params; }
+                 in
+                 [cstor, vars, rhs])
+         end)
+      l
   in
   let missing =
     CCList.filter_map
@@ -740,7 +740,7 @@ let check_vars_eqn ?loc bound lhs rhs =
   (* check that all variables in [lhs] are bound *)
   let not_bound = Var.Set.diff vars_lhs bound in
   if not (Var.Set.is_empty not_bound)
-    then error_ ?loc "variables @[%a@] are not bound" Var.Set.pp not_bound;
+  then error_ ?loc "variables @[%a@] are not bound" Var.Set.pp not_bound;
   check_vars_rhs ?loc vars_lhs rhs;
   ()
 
@@ -809,15 +809,15 @@ let infer_defs ?loc ctx (l:A.def list): (_,_,_) Stmt.def list =
   let decls =
     List.map
       (fun d ->
-        let id = ID.make d.A.def_id in
-        let ty = infer_ty_exn ctx d.A.def_ty in
-        (* cannot return [Type] *)
-        if T.Ty.returns_tType ty
-        then error_ ?loc
-            "in definition of %a,@ equality between types is forbidden"
-            ID.pp id;
-        Ctx.declare ctx id ty;
-        id, ty, d.A.def_rules)
+         let id = ID.make d.A.def_id in
+         let ty = infer_ty_exn ctx d.A.def_ty in
+         (* cannot return [Type] *)
+         if T.Ty.returns_tType ty
+         then error_ ?loc
+             "in definition of %a,@ equality between types is forbidden"
+             ID.pp id;
+         Ctx.declare ctx id ty;
+         id, ty, d.A.def_rules)
       l
   in
   (* now, infer type of each definition *)
@@ -847,59 +847,59 @@ let infer_statement_exn ctx st =
   let loc = st.A.loc in
   let st = match st.A.stmt with
     | A.Include _ ->
-        error_ ?loc "remaining include statement"
+      error_ ?loc "remaining include statement"
     | A.Decl (s,ty) ->
-        (* new type
-           TODO: warning if it shadows? *)
-        let id = ID.make s in
-        let ty = infer_ty_exn ctx ty in
-        Ctx.declare ctx id ty;
-        Stmt.ty_decl ~src:(mk_src Stmt.R_decl) id ty
+      (* new type
+         TODO: warning if it shadows? *)
+      let id = ID.make s in
+      let ty = infer_ty_exn ctx ty in
+      Ctx.declare ctx id ty;
+      Stmt.ty_decl ~src:(mk_src Stmt.R_decl) id ty
     | A.Def l ->
-        let l = infer_defs ?loc ctx l in
-        Stmt.def ~src:(mk_src Stmt.R_def) l
+      let l = infer_defs ?loc ctx l in
+      Stmt.def ~src:(mk_src Stmt.R_def) l
     | A.Rewrite t ->
-        let t =  infer_prop_ ctx t in
-        begin match as_def ?loc Var.Set.empty t with
-          | `Term (vars,id,ty,args,rhs) ->
-            if T.Ty.returns_tType ty
-            then error_ ?loc
-                "in definition of %a,@ equality between types is forbidden" ID.pp id;
-            Stmt.rewrite_term ~src:(mk_src Stmt.R_assert) (vars,id,ty,args,rhs)
-          | `Prop (vars,lhs,rhs) ->
-            assert (T.Ty.is_prop (T.ty_exn rhs));
-            Stmt.rewrite_form ~src:(mk_src Stmt.R_assert) (vars,lhs,[rhs])
-        end
+      let t =  infer_prop_ ctx t in
+      begin match as_def ?loc Var.Set.empty t with
+        | `Term (vars,id,ty,args,rhs) ->
+          if T.Ty.returns_tType ty
+          then error_ ?loc
+              "in definition of %a,@ equality between types is forbidden" ID.pp id;
+          Stmt.rewrite_term ~src:(mk_src Stmt.R_assert) (vars,id,ty,args,rhs)
+        | `Prop (vars,lhs,rhs) ->
+          assert (T.Ty.is_prop (T.ty_exn rhs));
+          Stmt.rewrite_form ~src:(mk_src Stmt.R_assert) (vars,lhs,[rhs])
+      end
     | A.Data l ->
-        (* declare the inductive types *)
-        let data_types =
-          List.map
-            (fun d ->
-              let data_ty = ID.make d.A.data_name in
-              (* the type [data_ty : type -> type -> ... -> type] *)
-              let ty_of_data_ty =
-                T.Ty.fun_ (List.map (fun _ -> T.Ty.tType) d.A.data_vars) T.Ty.tType
-              in
-              Ctx.declare ctx data_ty ty_of_data_ty;
-              data_ty, ty_of_data_ty)
-            l
-        in
-        (* now we can infer the types of each constructor *)
-        let l' =
-          List.map2
-            (fun d (data_ty,ty_of_data_ty) ->
-              (* locally, declare type variables *)
-              with_non_inferred_typed_vars ?loc ctx
-                (List.map (fun v->PT.V v, Some PT.tType) d.A.data_vars)
-                ~f:(fun ty_vars ->
-                  (* return type of every constructor: [data_ty ty_vars] *)
-                  let ty_ret =
-                    T.Ty.app data_ty (List.map (T.Ty.var ?loc:None) ty_vars)
-                  in
-                  (* infer type of constructors *)
-                  let cstors =
-                    List.map
-                      (fun (name, args) ->
+      (* declare the inductive types *)
+      let data_types =
+        List.map
+          (fun d ->
+             let data_ty = ID.make d.A.data_name in
+             (* the type [data_ty : type -> type -> ... -> type] *)
+             let ty_of_data_ty =
+               T.Ty.fun_ (List.map (fun _ -> T.Ty.tType) d.A.data_vars) T.Ty.tType
+             in
+             Ctx.declare ctx data_ty ty_of_data_ty;
+             data_ty, ty_of_data_ty)
+          l
+      in
+      (* now we can infer the types of each constructor *)
+      let l' =
+        List.map2
+          (fun d (data_ty,ty_of_data_ty) ->
+             (* locally, declare type variables *)
+             with_non_inferred_typed_vars ?loc ctx
+               (List.map (fun v->PT.V v, Some PT.tType) d.A.data_vars)
+               ~f:(fun ty_vars ->
+                 (* return type of every constructor: [data_ty ty_vars] *)
+                 let ty_ret =
+                   T.Ty.app data_ty (List.map (T.Ty.var ?loc:None) ty_vars)
+                 in
+                 (* infer type of constructors *)
+                 let cstors =
+                   List.map
+                     (fun (name, args) ->
                         let c_id = ID.make name in
                         (* type of c: forall ty_vars. ty_args -> ty_ret *)
                         let ty_args = List.map (infer_ty_exn ctx) args in
@@ -909,25 +909,25 @@ let infer_statement_exn ctx st =
                         Ctx.declare ctx c_id ty_c;
                         (* TODO: check absence of other type variables in ty_c *)
                         c_id, ty_c)
-                      d.A.data_cstors
-                  in
-                  ID.Tbl.add ctx.Ctx.datatypes data_ty cstors;
-                  Stmt.mk_data data_ty ty_of_data_ty ~args:ty_vars cstors
-                ))
-            l
-            data_types
-        in
-        Ctx.exit_scope ctx;
-        Stmt.data ~src:(mk_src Stmt.R_def) l'
+                     d.A.data_cstors
+                 in
+                 ID.Tbl.add ctx.Ctx.datatypes data_ty cstors;
+                 Stmt.mk_data data_ty ty_of_data_ty ~args:ty_vars cstors
+               ))
+          l
+          data_types
+      in
+      Ctx.exit_scope ctx;
+      Stmt.data ~src:(mk_src Stmt.R_def) l'
     | A.Assert t ->
-        let t = infer_prop_exn ctx t in
-        Stmt.assert_ ~src:(mk_src Stmt.R_assert) t
+      let t = infer_prop_exn ctx t in
+      Stmt.assert_ ~src:(mk_src Stmt.R_assert) t
     | A.Lemma t ->
-        let t = infer_prop_exn ctx t in
-        Stmt.lemma ~src:(mk_src Stmt.R_assert) [t]
+      let t = infer_prop_exn ctx t in
+      Stmt.lemma ~src:(mk_src Stmt.R_assert) [t]
     | A.Goal t ->
-        let t = infer_prop_exn ctx t in
-        Stmt.goal ~src:(mk_src Stmt.R_goal) t
+      let t = infer_prop_exn ctx t in
+      Stmt.goal ~src:(mk_src Stmt.R_goal) t
   in
   (* be sure to bind the remaining meta variables *)
   Ctx.exit_scope ctx;
@@ -948,10 +948,10 @@ let infer_statements_exn ?def_as_rewrite ?ctx seq =
   let res = CCVector.create () in
   Sequence.iter
     (fun st ->
-      (* add declarations first *)
-      let st, aux = infer_statement_exn ctx st in
-      List.iter (CCVector.push res) aux;
-      CCVector.push res st)
+       (* add declarations first *)
+       let st, aux = infer_statement_exn ctx st in
+       List.iter (CCVector.push res) aux;
+       CCVector.push res st)
     seq;
   CCVector.freeze res
 

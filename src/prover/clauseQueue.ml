@@ -35,8 +35,8 @@ let parse_profile s = _profile := (profile_of_string s)
 let () =
   Params.add_opts
     [ "--clause-queue"
-      , Arg.Symbol (List.map fst profiles_, parse_profile)
-      , " choose which set of clause queues to use (for selecting next active clause)"
+    , Arg.Symbol (List.map fst profiles_, parse_profile)
+    , " choose which set of clause queues to use (for selecting next active clause)"
     ]
 
 module Make(C : Clause.S) = struct
@@ -204,19 +204,19 @@ module Make(C : Clause.S) = struct
     let open WeightFun in
     let weight =
       combine
-      [ age, 4; default, 3; favor_all_neg, 1
-      ; favor_goal, 1; favor_pos_unit, 1]
+        [ age, 4; default, 3; favor_all_neg, 1
+        ; favor_goal, 1; favor_pos_unit, 1]
     in
     make ~weight "default"
 
   let of_profile p =
     let open ClauseQueue_intf in
     match p with
-    | P_default -> default
-    | P_bfs -> bfs
-    | P_explore -> explore
-    | P_ground -> ground
-    | P_goal -> goal_oriented
+      | P_default -> default
+      | P_bfs -> bfs
+      | P_explore -> explore
+      | P_ground -> ground
+      | P_goal -> goal_oriented
 
   let pp out q = CCFormat.fprintf out "queue %s" (name q)
   let to_string = CCFormat.to_string pp

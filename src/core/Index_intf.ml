@@ -30,7 +30,7 @@ module type LEAF = sig
     ?subst:subst ->
     t Scoped.t -> term Scoped.t ->
     (term * elt * subst) Sequence.t
-  (** Match the query term against the indexed terms *)
+    (** Match the query term against the indexed terms *)
 end
 
 module type TERM_IDX = sig

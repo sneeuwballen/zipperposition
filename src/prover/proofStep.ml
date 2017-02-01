@@ -140,9 +140,9 @@ let mk_step_ kind parents =
     | [] -> None
     | [p] -> CCOpt.map succ p.step.dist_to_goal
     | [p1;p2] ->
-        CCOpt.map succ (combine_dist p1.step.dist_to_goal p2)
+      CCOpt.map succ (combine_dist p1.step.dist_to_goal p2)
     | p::l ->
-        CCOpt.map succ (List.fold_left combine_dist p.step.dist_to_goal l)
+      CCOpt.map succ (List.fold_left combine_dist p.step.dist_to_goal l)
   in
   { id=get_id_(); kind; parents; dist_to_goal; }
 
@@ -246,16 +246,16 @@ let rec pp_src_tstp out src = match Stmt.Src.view src with
 
 let pp_kind_tstp out k =
   match k with
-  | Assert src
-  | Goal src -> pp_src_tstp out src
-  | Data _ -> Util.error ~where:"ProofStep" "cannot print `Data` step in TPTP"
-  | Inference rule ->
+    | Assert src
+    | Goal src -> pp_src_tstp out src
+    | Data _ -> Util.error ~where:"ProofStep" "cannot print `Data` step in TPTP"
+    | Inference rule ->
       Format.fprintf out "inference(%a, [status(thm)])" (pp_rule ~info:false) rule
-  | Simplification rule ->
+    | Simplification rule ->
       Format.fprintf out "inference(%a, [status(thm)])" (pp_rule ~info:false) rule
-  | Esa rule ->
+    | Esa rule ->
       Format.fprintf out "inference(%a, [status(esa)])" (pp_rule ~info:false) rule
-  | Trivial ->
+    | Trivial ->
       Format.fprintf out "trivial([status(thm)])"
 
 let rec pp_src out src = match Stmt.Src.view src with
@@ -274,14 +274,14 @@ let rec pp_src out src = match Stmt.Src.view src with
 
 let pp_kind out k =
   match k with
-  | Assert src -> pp_src out src
-  | Goal src -> Format.fprintf out "goal %a" pp_src src
-  | Data (src, _) -> Format.fprintf out "data %a" pp_src src
-  | Inference rule ->
+    | Assert src -> pp_src out src
+    | Goal src -> Format.fprintf out "goal %a" pp_src src
+    | Data (src, _) -> Format.fprintf out "data %a" pp_src src
+    | Inference rule ->
       Format.fprintf out "inf %a" (pp_rule ~info:true) rule
-  | Simplification rule ->
+    | Simplification rule ->
       Format.fprintf out "simp %a" (pp_rule ~info:true) rule
-  | Esa rule ->
+    | Esa rule ->
       Format.fprintf out "esa %a" (pp_rule ~info:true) rule
-  | Trivial -> CCFormat.string out "trivial"
+    | Trivial -> CCFormat.string out "trivial"
 

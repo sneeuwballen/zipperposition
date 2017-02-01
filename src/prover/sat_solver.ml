@@ -31,7 +31,7 @@ let sat_compact_ = ref true
 module type S = Sat_solver_intf.S
 
 module Make(Dummy : sig end)
-: Sat_solver_intf.S
+  : Sat_solver_intf.S
 = struct
   module Lit = BBox.Lit
 
@@ -103,8 +103,8 @@ module Make(Dummy : sig end)
   let res_is_unsat_ () = match !result_ with Sat -> false | Unsat _ -> true
 
   (* invariant:
-    when result_ = Sat, only eval/eval_level are defined
-    when result_ = Unsat, only unsat_core_ is defined
+     when result_ = Sat, only eval/eval_level are defined
+     when result_ = Unsat, only unsat_core_ is defined
   *)
 
   let eval_fail_ _ = assert (res_is_unsat_ ()); wrong_state_ "eval"
@@ -187,26 +187,26 @@ module Make(Dummy : sig end)
     let rec aux p =
       let open S.Proof in
       match S.Proof.expand p with
-      | { step = S.Proof.Lemma _; _ } ->
-        errorf "SAT proof involves a lemma"
-      | { conclusion=c; step = S.Proof.Resolution (p1,p2,_) } ->
-        let c = bool_clause_of_sat c in
-        (* atomic resolution step *)
-        let q1 = aux p1 in
-        let q2 = aux p2 in
-        begin match ResTbl.get tbl_res (c,q1,q2) with
-          | Some s -> s
-          | None ->
-            let parents = [q1; q2] in
-            let step =
-              ProofStep.mk_inference parents
-                ~rule:(ProofStep.mk_rule "sat_resolution")  in
-            let s = ProofStep.mk_bc step c in
-            ResTbl.add tbl_res (c,q1,q2) s;
-            ResTbl.add tbl_res (c,q2,q1) s;
-            s
-        end
-      | { conclusion=c; step = _ } -> proof_of_leaf c
+        | { step = S.Proof.Lemma _; _ } ->
+          errorf "SAT proof involves a lemma"
+        | { conclusion=c; step = S.Proof.Resolution (p1,p2,_) } ->
+          let c = bool_clause_of_sat c in
+          (* atomic resolution step *)
+          let q1 = aux p1 in
+          let q2 = aux p2 in
+          begin match ResTbl.get tbl_res (c,q1,q2) with
+            | Some s -> s
+            | None ->
+              let parents = [q1; q2] in
+              let step =
+                ProofStep.mk_inference parents
+                  ~rule:(ProofStep.mk_rule "sat_resolution")  in
+              let s = ProofStep.mk_bc step c in
+              ResTbl.add tbl_res (c,q1,q2) s;
+              ResTbl.add tbl_res (c,q2,q1) s;
+              s
+          end
+        | { conclusion=c; step = _ } -> proof_of_leaf c
     in
     S.Proof.check p;
     aux p
@@ -265,14 +265,14 @@ module Make(Dummy : sig end)
     done;
     (* solve *)
     begin match S.solve () with
-    | S.Sat s ->
-      eval_ := s.SI.eval;
-      eval_level_ := s.SI.eval_level;
-      result_ := Sat;
-    | S.Unsat us ->
-      let p = us.SI.get_proof ()  |> conv_proof_ in
-      result_ := Unsat p;
-      proof_ := Some p;
+      | S.Sat s ->
+        eval_ := s.SI.eval;
+        eval_level_ := s.SI.eval_level;
+        result_ := Sat;
+      | S.Unsat us ->
+        let p = us.SI.get_proof ()  |> conv_proof_ in
+        result_ := Unsat p;
+        proof_ := Some p;
     end;
     !result_
 

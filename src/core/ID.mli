@@ -3,11 +3,11 @@
 
 (** {1 Unique Identifiers}
 
-  An {!ID.t} is a unique identifier (an integer) with a human-readable name.
-  We use those to give names to variables that are not hashconsed (the hashconsing
-  does not play nice with names)
+    An {!ID.t} is a unique identifier (an integer) with a human-readable name.
+    We use those to give names to variables that are not hashconsed (the hashconsing
+    does not play nice with names)
 
-  @since NEXT_RELEASE *)
+    @since NEXT_RELEASE *)
 
 type t = private {
   id: int;

@@ -227,8 +227,8 @@ let step_lit rules lit =
     (fun r ->
        let substs = Literal.matching ~pattern:(r.c_lhs,1) (lit,0) in
        match Sequence.head substs with
-       | None -> None
-       | Some subst -> Some (r.c_rhs, subst))
+         | None -> None
+         | Some subst -> Some (r.c_rhs, subst))
     rules
 
 let normalize_clause_ rules lits =
@@ -247,7 +247,7 @@ let normalize_clause_ rules lits =
              "@[<2>rewrite `@[%a@]`@ into `@[<v>%a@]`@ with @[%a@]@]"
              (fun k->k Literal.pp lit
                  CCFormat.(list (hvbox (Util.pp_list ~sep:" ∨ " Literal.pp))) clauses
-                Substs.pp subst);
+                 Substs.pp subst);
            Util.incr_stat stat_clause_rw;
            Some (i, clauses, subst))
       lits

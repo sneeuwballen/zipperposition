@@ -242,6 +242,6 @@ module Conv : sig
     ctx ->
     t ->
     TypedSTerm.t
-  (** convert a type to a prolog term.
-      @param env the current environement for De Bruijn indices *)
+    (** convert a type to a prolog term.
+        @param env the current environement for De Bruijn indices *)
 end

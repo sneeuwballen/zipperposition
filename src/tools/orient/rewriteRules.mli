@@ -21,7 +21,7 @@ val rules_of_pairs :
   statement list ->
   rule list or_error
 (** Infer types and signature from a list of statements.
-   @return typed rules and the new signature *)
+    @return typed rules and the new signature *)
 
 val signature : rule Sequence.t -> TypedSTerm.t ID.Map.t
 (** Compute signature *)

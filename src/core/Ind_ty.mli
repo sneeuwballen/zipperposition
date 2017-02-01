@@ -19,8 +19,8 @@ type t = private {
   ty_vars: Type.t HVar.t list; (* list of variables *)
   ty_pattern: Type.t; (* equal to  [id ty_vars] *)
   ty_constructors : constructor list;
-    (* constructors, all returning [pattern] and containing
-       no other type variables than [ty_vars] *)
+  (* constructors, all returning [pattern] and containing
+     no other type variables than [ty_vars] *)
 }
 
 val pp : t CCFormat.printer

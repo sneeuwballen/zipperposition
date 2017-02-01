@@ -141,13 +141,13 @@ module Make(T : TERM) = struct
   let rec pop h = match Stack.top h.stack with
     | Stop -> raise (Invalid_argument "Congruence.pop")
     | Checkpoint ->
-        ignore (Stack.pop h.stack);
-        h.stack_size <- h.stack_size - 1;
-        assert (h.stack_size >= 0);
+      ignore (Stack.pop h.stack);
+      h.stack_size <- h.stack_size - 1;
+      assert (h.stack_size >= 0);
     | Undo f ->
-        ignore (Stack.pop h.stack);
-        f ();
-        pop h
+      ignore (Stack.pop h.stack);
+      f ();
+      pop h
 
   let stack_size cc = cc.stack_size
 
@@ -373,7 +373,7 @@ module FO = Make(struct
 
     let update_subterms t l = match T.view t, l with
       | T.App (hd, l), l' when List.length l = List.length l' ->
-          T.app hd l'
+        T.app hd l'
       | _, [] -> t
       | _ -> assert false
   end)

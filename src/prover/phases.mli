@@ -14,43 +14,43 @@ type 'a or_error = ('a, string) CCResult.t
 (** {2 Phases} *)
 
 type env_with_clauses =
-  Env_clauses : 'c Env.packed * 'c CCVector.ro_vector -> env_with_clauses
+    Env_clauses : 'c Env.packed * 'c CCVector.ro_vector -> env_with_clauses
 
 type env_with_result =
-  Env_result : 'c Env.packed * Saturate.szs_status -> env_with_result
+    Env_result : 'c Env.packed * Saturate.szs_status -> env_with_result
 
 type ('ret, 'before, 'after) phase =
   | Init : (unit, _, [`Init]) phase (* global setup *)
   | Setup_gc : (unit, [`Init], [`Init]) phase
   | Setup_signal : (unit, [`Init], [`Init]) phase
   | Parse_CLI :
-    (filename list * Params.t, [`Init], [`Parse_cli]) phase
-    (* parse CLI options: get a list of files to process, and parameters *)
+      (filename list * Params.t, [`Init], [`Parse_cli]) phase
+  (* parse CLI options: get a list of files to process, and parameters *)
   | LoadExtensions : (Extensions.t list, [`Parse_cli], [`LoadExtensions]) phase
   | Start_file :
-    (filename, [`LoadExtensions], [`Start_file]) phase (* file to process *)
+      (filename, [`LoadExtensions], [`Start_file]) phase (* file to process *)
   | Parse_file :
-    (UntypedAST.statement Sequence.t, [`Start_file], [`Parse_file]) phase (* parse some file *)
+      (UntypedAST.statement Sequence.t, [`Start_file], [`Parse_file]) phase (* parse some file *)
   | Typing :
-    (TypeInference.typed_statement CCVector.ro_vector, [`Parse_file], [`Typing]) phase
+      (TypeInference.typed_statement CCVector.ro_vector, [`Parse_file], [`Typing]) phase
   | CNF :
-    (Statement.clause_t CCVector.ro_vector, [`Typing], [`CNF]) phase
+      (Statement.clause_t CCVector.ro_vector, [`Typing], [`CNF]) phase
   | Compute_prec :
-    (Precedence.t, [`CNF], [`Precedence]) phase
+      (Precedence.t, [`CNF], [`Precedence]) phase
   | Compute_ord_select :
-    (Ordering.t * Selection.t, [`Precedence], [`Compute_ord_select]) phase
-    (* compute orderign and selection function *)
+      (Ordering.t * Selection.t, [`Precedence], [`Compute_ord_select]) phase
+  (* compute orderign and selection function *)
 
   | MakeCtx : ((module Ctx.S), [`Compute_ord_select], [`MakeCtx]) phase
 
   | MakeEnv : (env_with_clauses, [`MakeCtx], [`MakeEnv]) phase
 
   | Pre_saturate :
-    ('c Env.packed * Saturate.szs_status * 'c CCVector.ro_vector,
-      [`MakeEnv], [`Pre_saturate]) phase
+      ('c Env.packed * Saturate.szs_status * 'c CCVector.ro_vector,
+       [`MakeEnv], [`Pre_saturate]) phase
 
   | Saturate :
-    (env_with_result, [`Pre_saturate], [`Saturate]) phase
+      (env_with_result, [`Pre_saturate], [`Saturate]) phase
 
   | Print_result : (unit, [`Saturate], [`Print_result]) phase
   | Print_stats : (unit, [`Print_result], [`Print_stats]) phase

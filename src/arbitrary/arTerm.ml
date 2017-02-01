@@ -48,12 +48,12 @@ module PT = struct
            let self = self (n-1) in
            if n<=0 then base
            else frequency
-             [ 1, map2 f self self
-             ; 1, map g self
-             ; 1, map  h self
-             ; 1, oneof [map2 sum self self; map3 ite self self self]
-             ; 3, base
-             ])
+               [ 1, map2 f self self
+               ; 1, map g self
+               ; 1, map  h self
+               ; 1, oneof [map2 sum self self; map3 ite self self self]
+               ; 3, base
+               ])
     in
     (1 -- 4) >>= t
 
@@ -71,13 +71,13 @@ module PT = struct
            let self = self (n-1) in
            if n<=0 then base
            else frequency
-             [ 3, base
-             ; 1, map2 f self self
-             ; 1, map2 sum self self
-             ; 1, map g self
-             ; 1, map h self
-             ; 1, map3 ite self self self
-             ])
+               [ 3, base
+               ; 1, map2 f self self
+               ; 1, map2 sum self self
+               ; 1, map g self
+               ; 1, map h self
+               ; 1, map3 ite self self self
+               ])
     in
     QA.Gen.((1 -- n) >>= gen)
 

@@ -28,24 +28,24 @@ module Renaming = struct
   let create () = Tbl (H.create 8)
 
   let clear r = match r with
-  | Dummy -> ()
-  | Tbl r ->
-    H.clear r;
-    ()
+    | Dummy -> ()
+    | Tbl r ->
+      H.clear r;
+      ()
 
   (* special renaming that does nothing *)
   let dummy = Dummy
 
   (* rename variable *)
   let rename r ((v,_) as var) = match r with
-  | Dummy -> v  (* do not rename *)
-  | Tbl tbl ->
+    | Dummy -> v  (* do not rename *)
+    | Tbl tbl ->
       begin try
-        H.find tbl var
-      with Not_found ->
-        let v' = HVar.make ~ty:(HVar.ty v) (H.length tbl) in
-        H.add tbl var v';
-        v'
+          H.find tbl var
+        with Not_found ->
+          let v' = HVar.make ~ty:(HVar.ty v) (H.length tbl) in
+          H.add tbl var v';
+          v'
       end
 end
 
@@ -76,20 +76,20 @@ let rec deref subst ((t,sc_t) as term) =
     that is not a variable or that is not bound *)
 let get_var subst v =
   match find subst v with
-  | None -> None
-  | Some t -> Some (deref subst t)
+    | None -> None
+    | Some t -> Some (deref subst t)
 
 exception InconsistentBinding of var Scoped.t * term Scoped.t * term Scoped.t
 
 let () = Printexc.register_printer
-  (function
-    | InconsistentBinding (v, t1, t2) ->
+    (function
+      | InconsistentBinding (v, t1, t2) ->
         let msg = CCFormat.sprintf
-          "@[<2>inconsistent binding@ for %a: %a@ and %a@]"
+            "@[<2>inconsistent binding@ for %a: %a@ and %a@]"
             (Scoped.pp HVar.pp) v (Scoped.pp T.pp) t1 (Scoped.pp T.pp) t2
         in
         Some msg
-    | _ -> None)
+      | _ -> None)
 
 let bind
   : t -> var Scoped.t -> T.t Scoped.t -> t
@@ -102,12 +102,12 @@ let remove subst v = M.remove v subst
 let append s1 s2 =
   M.merge
     (fun v b1 b2 -> match b1, b2 with
-      | None, _ -> b2
-      | _, None -> b1
-      | Some t1, Some t2 ->
-          if Scoped.equal T.equal t1 t2
-          then Some t1
-          else raise (InconsistentBinding (v, t1, t2)))
+       | None, _ -> b2
+       | _, None -> b1
+       | Some t1, Some t2 ->
+         if Scoped.equal T.equal t1 t2
+         then Some t1
+         else raise (InconsistentBinding (v, t1, t2)))
     s1 s2
 
 (*
@@ -125,10 +125,10 @@ let is_renaming subst =
     let codomain = H.create 8 in
     M.iter
       (fun _ (t,sc_t) ->
-        match T.view t with
-        | T.Var v -> H.replace codomain (v,sc_t) ()
-        | _ ->
-            raise Exit (* some var bound to a non-var term *)
+         match T.view t with
+           | T.Var v -> H.replace codomain (v,sc_t) ()
+           | _ ->
+             raise Exit (* some var bound to a non-var term *)
       )
       subst;
     (* as many variables in codomain as variables in domain *)
@@ -145,7 +145,7 @@ let codomain s k = M.iter (fun _ t -> k t) s
 let introduced subst k =
   M.iter
     (fun _ (t,sc_t) ->
-      T.Seq.vars t (fun v -> k (v,sc_t)))
+       T.Seq.vars t (fun v -> k (v,sc_t)))
     subst
 
 let to_seq subst k = M.iter (fun v t -> k (v,t)) subst
@@ -176,60 +176,60 @@ let to_string = CCFormat.to_string pp
 let apply subst ~renaming t =
   let rec aux (t,sc_t) =
     match T.ty t with
-    | T.NoType ->
-      assert(T.equal T.tType t);
-      t
-    | T.HasType ty ->
-      let ty' = aux (ty,sc_t) in
-      match T.view t with
-      | T.Const id ->
-        (* regular constant *)
-        if T.equal ty ty'
-        then t
-        else T.const ~ty:ty' id
-      | T.DB i ->
-        if T.equal ty ty'
-        then t
-        else T.bvar ~ty:ty' i
-      | T.Var v ->
-        (* the most interesting cases!
-           switch depending on whether [t] is bound by [subst] or not *)
-        begin try
-          let (t', _) as term'  = find_exn subst (v,sc_t) in
-          (* NOTE: we used to shift [t'], in case it contained free De
-             Bruijn indices, but that shouldn't happen because only
-             closed terms should appear in substitutions. *)
-          assert (T.DB.closed t');
-          (* also apply [subst] to [t'] *)
-          aux term'
-        with Not_found ->
-          (* variable not bound by [subst], rename it
-              (after specializing its type if needed) *)
-          let v = HVar.cast v ~ty:ty' in
-          let v' = Renaming.rename renaming (v,sc_t) in
-          if T.equal ty ty' && HVar.equal T.equal v v'
-          then t
-          else T.var v'
-        end
-      | T.Bind (s, varty, sub_t) ->
-          let varty' = aux (varty,sc_t) in
-          let sub_t' = aux (sub_t,sc_t) in
-          T.bind ~varty:varty' ~ty:ty' s sub_t'
-      | T.App (hd, l) ->
-          let hd' = aux (hd,sc_t) in
-          let l' = aux_list l sc_t in
-          if T.equal ty ty' && T.equal hd hd' && T.same_l l l'
-          then t
-          else T.app ~ty:ty' hd' l'
-      | T.AppBuiltin (s, l) ->
-          let l' = aux_list l sc_t in
-          if T.equal ty ty' && T.same_l l l'
-          then t
-          else T.app_builtin ~ty:ty' s l'
+      | T.NoType ->
+        assert(T.equal T.tType t);
+        t
+      | T.HasType ty ->
+        let ty' = aux (ty,sc_t) in
+        match T.view t with
+          | T.Const id ->
+            (* regular constant *)
+            if T.equal ty ty'
+            then t
+            else T.const ~ty:ty' id
+          | T.DB i ->
+            if T.equal ty ty'
+            then t
+            else T.bvar ~ty:ty' i
+          | T.Var v ->
+            (* the most interesting cases!
+               switch depending on whether [t] is bound by [subst] or not *)
+            begin try
+                let (t', _) as term'  = find_exn subst (v,sc_t) in
+                (* NOTE: we used to shift [t'], in case it contained free De
+                   Bruijn indices, but that shouldn't happen because only
+                   closed terms should appear in substitutions. *)
+                assert (T.DB.closed t');
+                (* also apply [subst] to [t'] *)
+                aux term'
+              with Not_found ->
+                (* variable not bound by [subst], rename it
+                    (after specializing its type if needed) *)
+                let v = HVar.cast v ~ty:ty' in
+                let v' = Renaming.rename renaming (v,sc_t) in
+                if T.equal ty ty' && HVar.equal T.equal v v'
+                then t
+                else T.var v'
+            end
+          | T.Bind (s, varty, sub_t) ->
+            let varty' = aux (varty,sc_t) in
+            let sub_t' = aux (sub_t,sc_t) in
+            T.bind ~varty:varty' ~ty:ty' s sub_t'
+          | T.App (hd, l) ->
+            let hd' = aux (hd,sc_t) in
+            let l' = aux_list l sc_t in
+            if T.equal ty ty' && T.equal hd hd' && T.same_l l l'
+            then t
+            else T.app ~ty:ty' hd' l'
+          | T.AppBuiltin (s, l) ->
+            let l' = aux_list l sc_t in
+            if T.equal ty ty' && T.same_l l l'
+            then t
+            else T.app_builtin ~ty:ty' s l'
   and aux_list l sc = match l with
     | [] -> []
     | t::l' ->
-        aux (t,sc) :: aux_list l' sc
+      aux (t,sc) :: aux_list l' sc
   in
   aux t
 

@@ -54,7 +54,7 @@ let mk_precedence t seq =
   (* constraints *)
   let constrs =
     t.constrs @
-    List.map (fun (p,rule) -> p, rule seq) t.constr_rules
+      List.map (fun (p,rule) -> p, rule seq) t.constr_rules
   in
   Util.debugf ~section 2 "@[<2>%d precedence constraint(s)@]"
     (fun k->k(List.length constrs));

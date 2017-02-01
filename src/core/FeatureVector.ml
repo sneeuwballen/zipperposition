@@ -52,18 +52,18 @@ module Make(C : Index.CLAUSE) = struct
       | T.DB _ -> 0
       | T.AppBuiltin (_, l)
       | T.App (_, l) ->
-          let depth' = depth + 1 in
-          List.fold_left (fun acc t' -> acc + _depth_term depth' t') depth l
+        let depth' = depth + 1 in
+        List.fold_left (fun acc t' -> acc + _depth_term depth' t') depth l
 
     (* sum of depths at which symbols occur. Eg f(a, g(b)) will yield 4 (f
        is at depth 0) *)
     let sum_of_depths =
       { name = "sum_of_depths";
         f = (fun lits ->
-            Sequence.fold
-              (fun acc lit ->
-                 SLiteral.fold (fun acc t -> acc + _depth_term 0 t) acc lit
-              ) 0 lits);
+          Sequence.fold
+            (fun acc lit ->
+               SLiteral.fold (fun acc t -> acc + _depth_term 0 t) acc lit
+            ) 0 lits);
       }
 
     let _select_sign ~sign lits =
@@ -95,8 +95,8 @@ module Make(C : Index.CLAUSE) = struct
              | _ -> None)
       in
       match Sequence.max symbs_depths with
-      | None -> 0
-      | Some m -> m
+        | None -> 0
+        | Some m -> m
 
     let _max_depth_lits ~sign symb lits =
       Sequence.fold
@@ -153,11 +153,11 @@ module Make(C : Index.CLAUSE) = struct
     (* function to go to the given leaf, building it if needed *)
     let rec goto trie t rebuild =
       match trie, t with
-      | (TrieLeaf set) as leaf, [] -> (* found leaf *)
+        | (TrieLeaf set) as leaf, [] -> (* found leaf *)
           (match k set with
-           | new_leaf when leaf == new_leaf -> root  (* no change, return same tree *)
-           | new_leaf -> rebuild new_leaf)           (* replace by new leaf *)
-      | TrieNode m, c::t' ->
+            | new_leaf when leaf == new_leaf -> root  (* no change, return same tree *)
+            | new_leaf -> rebuild new_leaf)           (* replace by new leaf *)
+        | TrieNode m, c::t' ->
           (try  (* insert in subtrie *)
              let subtrie = IntMap.find c m in
              let rebuild' subtrie = match subtrie with
@@ -174,8 +174,8 @@ module Make(C : Index.CLAUSE) = struct
                | _ -> rebuild (TrieNode (IntMap.add c subtrie m))
              in
              goto subtrie t' rebuild')
-      | TrieNode _, [] -> assert false (* ill-formed term *)
-      | TrieLeaf _, _ -> assert false  (* wrong arity *)
+        | TrieNode _, [] -> assert false (* ill-formed term *)
+        | TrieLeaf _, _ -> assert false  (* wrong arity *)
     in
     goto trie t (fun t -> t)
 
@@ -220,13 +220,13 @@ module Make(C : Index.CLAUSE) = struct
            if Type.equal ty Type.TPTP.o
            then features := [1 + arity, Feature.count_symb_plus s;
                              1 + arity, Feature.count_symb_minus s]
-                            @ !features
+               @ !features
            else
              features := [0, Feature.max_depth_plus s;
                           0, Feature.max_depth_minus s;
                           1 + arity, Feature.count_symb_plus s;
                           1 + arity, Feature.count_symb_minus s]
-                         @ !features);
+               @ !features);
     (* only take a limited number of features *)
     let features = List.sort (fun (s1,_) (s2,_) -> s2 - s1) !features in
     let features = CCList.take max_features features in
@@ -266,11 +266,11 @@ module Make(C : Index.CLAUSE) = struct
     let rec fold_lower fv node = match fv, node with
       | [], TrieLeaf set -> CSet.iter f set
       | i::fv', TrieNode map ->
-          IntMap.iter
-            (fun j subnode -> if j <= i
-              then fold_lower fv' subnode  (* go in the branch *)
-              else ())
-            map
+        IntMap.iter
+          (fun j subnode -> if j <= i
+            then fold_lower fv' subnode  (* go in the branch *)
+            else ())
+          map
       | _ -> failwith "number of features in feature vector changed"
     in
     fold_lower fv idx.trie
@@ -282,11 +282,11 @@ module Make(C : Index.CLAUSE) = struct
     let rec fold_higher fv node = match fv, node with
       | [], TrieLeaf set -> CSet.iter f set
       | i::fv', TrieNode map ->
-          IntMap.iter
-            (fun j subnode -> if j >= i
-              then fold_higher fv' subnode  (* go in the branch *)
-              else ())
-            map
+        IntMap.iter
+          (fun j subnode -> if j >= i
+            then fold_higher fv' subnode  (* go in the branch *)
+            else ())
+          map
       | _ -> failwith "number of features in feature vector changed"
     in
     fold_higher fv idx.trie
@@ -298,11 +298,11 @@ module Make(C : Index.CLAUSE) = struct
     let rec fold_higher fv node = match fv, node with
       | [], TrieLeaf set -> CSet.iter f set
       | i::fv', TrieNode map ->
-          IntMap.iter
-            (fun j subnode -> if j = i
-              then fold_higher fv' subnode  (* go in the branch *)
-              else ())
-            map
+        IntMap.iter
+          (fun j subnode -> if j = i
+            then fold_higher fv' subnode  (* go in the branch *)
+            else ())
+          map
       | _ -> failwith "number of features in feature vector changed"
     in
     fold_higher fv idx.trie

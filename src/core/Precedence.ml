@@ -13,7 +13,7 @@ let section = Util.Section.(make ~parent:zip "precedence")
 
 module Constr = struct
   type 'a t = ID.t -> ID.t -> int
-  constraint 'a = [< `partial | `total]
+    constraint 'a = [< `partial | `total]
 
   let arity arity_of s1 s2 =
     (* bigger arity means bigger symbol *)
@@ -36,10 +36,10 @@ module Constr = struct
       let is_max1 = ID.Set.mem s1 set in
       let is_max2 = ID.Set.mem s2 set in
       match is_max1, is_max2 with
-      | true, true
-      | false, false -> 0
-      | true, false -> 1
-      | false, true -> -1
+        | true, true
+        | false, false -> 0
+        | true, false -> 1
+        | false, true -> -1
 
   let min l =
     let set = ID.Set.of_list l in
@@ -47,16 +47,16 @@ module Constr = struct
       let is_min1 = ID.Set.mem s1 set in
       let is_min2 = ID.Set.mem s2 set in
       match is_min1, is_min2 with
-      | true, true
-      | false, false -> 0
-      | true, false -> -1
-      | false, true -> 1
+        | true, true
+        | false, false -> 0
+        | true, false -> -1
+        | false, true -> 1
 
   (* regular string ordering *)
   let alpha a b =
     let c = String.compare (ID.name a) (ID.name b) in
     if c = 0
-      then ID.compare a b else c
+    then ID.compare a b else c
 
   let compose a b s1 s2 =
     let c = a s1 s2 in
@@ -69,8 +69,8 @@ module Constr = struct
       | [] -> assert false
       | [_,o] -> o
       | (_,o1) :: tail ->
-          let o2 = mk tail in
-          compose o1 o2
+        let o2 = mk tail in
+        compose o1 o2
     in
     mk l
 
@@ -81,15 +81,15 @@ end
 
 type t = {
   mutable snapshot : ID.t list;
-    (* symbols by increasing order *)
+  (* symbols by increasing order *)
   mutable tbl: int ID.Tbl.t Lazy.t;
-    (* symbol -> index in precedence *)
+  (* symbol -> index in precedence *)
   status: symbol_status ID.Tbl.t;
-    (* symbol -> status *)
+  (* symbol -> status *)
   mutable weight: ID.t -> int;
-    (* weight function *)
+  (* weight function *)
   constr : [`total] Constr.t;
-    (* constraint used to build and update the precedence *)
+  (* constraint used to build and update the precedence *)
 }
 
 type precedence = t
@@ -177,10 +177,10 @@ let check_inv_ p =
   let rec sorted_ = function
     | [] | [_] -> true
     | s :: ((s' :: _) as tail) ->
-        assert (not (ID.equal s s'));
-        p.constr s s' < 0
-        &&
-        sorted_ tail
+      assert (not (ID.equal s s'));
+      p.constr s s' < 0
+      &&
+      sorted_ tail
   in
   sorted_ p.snapshot
 
@@ -202,15 +202,15 @@ let add_list p l =
   let rec insert_ id l = match l with
     | [] -> [id], true
     | id' :: l' ->
-        let c = p.constr id id' in
-        if c=0 then (
-          assert (ID.equal id id'); (* total order *)
-          l, false  (* not new *)
-        )
-        else if c<0 then id :: l, true
-        else
-          let l', ret = insert_ id l' in
-          id' :: l', ret
+      let c = p.constr id id' in
+      if c=0 then (
+        assert (ID.equal id id'); (* total order *)
+        l, false  (* not new *)
+      )
+      else if c<0 then id :: l, true
+      else
+        let l', ret = insert_ id l' in
+        id' :: l', ret
   in
   (* compute new snapshot, but only update precedence if any of the symbols is new *)
   let snapshot, is_new =

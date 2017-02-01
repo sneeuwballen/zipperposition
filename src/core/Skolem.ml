@@ -57,7 +57,7 @@ type ctx = {
 }
 
 let create
-?(prefix="zip_sk_") ?(prop_prefix="zip_prop") ?(on_new=fun _ _->()) () =
+    ?(prefix="zip_sk_") ?(prop_prefix="zip_prop") ?(on_new=fun _ _->()) () =
   let ctx = {
     sc_prefix=prefix;
     sc_prop_prefix=prop_prefix;
@@ -88,10 +88,10 @@ let fresh_skolem ~ctx ~ty = fresh_skolem_prefix ~ctx ~ty ctx.sc_prefix
 let collect_vars ?(filter=fun _->true) f =
   let is_ty_var v = T.Ty.is_tType (Var.ty v) in
   T.Seq.free_vars f
-    |> Sequence.filter filter
-    |> Var.Set.of_seq
-    |> Var.Set.to_list
-    |> List.partition is_ty_var
+  |> Sequence.filter filter
+  |> Var.Set.of_seq
+  |> Var.Set.to_list
+  |> List.partition is_ty_var
 
 let ty_forall ?loc v ty =
   if T.Ty.is_tType (Var.ty v) && T.Ty.returns_tType ty

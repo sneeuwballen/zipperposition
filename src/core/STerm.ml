@@ -86,7 +86,7 @@ let rec compare t1 t2 = match t1.term, t2.term with
     CCOrd.( compare u1 u2 <?> (list_ cmp_branch,l1,l2))
   | Let (l1,t1), Let (l2,t2) ->
     CCOrd.( compare t1 t2
-        <?> (list_ (pair compare_var compare), l1, l2))
+      <?> (list_ (pair compare_var compare), l1, l2))
   | (Var _,_)
   | (Const _,_)
   | (Ite _, _)
@@ -227,29 +227,29 @@ module Seq = struct
     let rec iter t =
       k t;
       match t.term with
-      | Var _ | Const _ -> ()
-      | List l
-      | AppBuiltin (_,l) -> List.iter iter l
-      | App (f, l) -> iter f; List.iter iter l
-      | Ite (a,b,c) -> iter a; iter b; iter c
-      | Let (l,u) -> iter u; List.iter (fun (_,t) -> iter t) l
-      | Match (u,l) ->
-        iter u;
-        List.iter
-          (function
-            | Match_case (_,_,rhs)
-            | Match_default rhs -> iter rhs)
-          l
-      | Bind (_, _, t') -> iter t'
-      | Record (l, _) ->
+        | Var _ | Const _ -> ()
+        | List l
+        | AppBuiltin (_,l) -> List.iter iter l
+        | App (f, l) -> iter f; List.iter iter l
+        | Ite (a,b,c) -> iter a; iter b; iter c
+        | Let (l,u) -> iter u; List.iter (fun (_,t) -> iter t) l
+        | Match (u,l) ->
+          iter u;
+          List.iter
+            (function
+              | Match_case (_,_,rhs)
+              | Match_default rhs -> iter rhs)
+            l
+        | Bind (_, _, t') -> iter t'
+        | Record (l, _) ->
           List.iter (fun (_,t') -> iter t') l
     in iter t
 
   let vars t = subterms t
-    |> Sequence.filter_map
-      (fun t -> match t.term with
-        | Var v -> Some v
-        | _ -> None)
+               |> Sequence.filter_map
+                 (fun t -> match t.term with
+                    | Var v -> Some v
+                    | _ -> None)
 
   let subterms_with_bound t k =
     let add_var set = function
@@ -260,56 +260,56 @@ module Seq = struct
     let rec iter bound t =
       k (t, bound);
       match t.term with
-      | Var _ | Const _ -> ()
-      | AppBuiltin (_, l)
-      | List l -> List.iter (iter bound) l
-      | App (f, l) -> iter bound f; List.iter (iter bound) l
-      | Bind (_, v, t') ->
+        | Var _ | Const _ -> ()
+        | AppBuiltin (_, l)
+        | List l -> List.iter (iter bound) l
+        | App (f, l) -> iter bound f; List.iter (iter bound) l
+        | Bind (_, v, t') ->
           (* add variables of [v] to the set *)
           let bound' = List.fold_left add_typed_var bound v in
           iter bound' t'
-      | Ite (a,b,c) -> iter bound a; iter bound b; iter bound c
-      | Let (l,u) ->
-        let bound' =
-          List.fold_left
-            (fun bound' (v,u) -> iter bound u; add_var bound' v)
-            bound l
-        in
-        iter bound' u
-      | Match (u,l) ->
-        iter bound u;
-        List.iter
-          (function
-            | Match_case (_,vars,rhs) ->
-              let bound' = List.fold_left add_var bound vars in
-              iter bound' rhs
-            | Match_default rhs -> iter bound rhs)
-          l
-      | Record (l, _) ->
+        | Ite (a,b,c) -> iter bound a; iter bound b; iter bound c
+        | Let (l,u) ->
+          let bound' =
+            List.fold_left
+              (fun bound' (v,u) -> iter bound u; add_var bound' v)
+              bound l
+          in
+          iter bound' u
+        | Match (u,l) ->
+          iter bound u;
+          List.iter
+            (function
+              | Match_case (_,vars,rhs) ->
+                let bound' = List.fold_left add_var bound vars in
+                iter bound' rhs
+              | Match_default rhs -> iter bound rhs)
+            l
+        | Record (l, _) ->
           List.iter (fun (_,t') -> iter bound t') l
     in iter StringSet.empty t
 
   let free_vars t =
     subterms_with_bound t
-      |> Sequence.filter_map
-        (fun (t,bound) -> match t.term with
-          | Var (V v) when not (StringSet.mem v bound) -> Some v
-          | _ -> None)
+    |> Sequence.filter_map
+      (fun (t,bound) -> match t.term with
+         | Var (V v) when not (StringSet.mem v bound) -> Some v
+         | _ -> None)
 
   let symbols t = subterms t
-      |> Sequence.filter_map
-       (function
-        | {term=Const s; _} -> Some s
-        | _ -> None)
+                  |> Sequence.filter_map
+                    (function
+                      | {term=Const s; _} -> Some s
+                      | _ -> None)
 end
 
 let ground t = Seq.vars t |> Sequence.is_empty
 
 let close_all s t =
   let vars = Seq.free_vars t
-    |> StringSet.of_seq
-    |> StringSet.elements
-    |> List.map (fun v->V v,None)
+             |> StringSet.of_seq
+             |> StringSet.elements
+             |> List.map (fun v->V v,None)
   in
   bind s vars t
 
@@ -323,51 +323,51 @@ let rec pp out t = match t.term with
   | Var v -> pp_var out v
   | Const s -> CCFormat.string out s
   | List l ->
-      Format.fprintf out "[@[<hv>%a@]]"
-        (Util.pp_list ~sep:"," pp) l;
+    Format.fprintf out "[@[<hv>%a@]]"
+      (Util.pp_list ~sep:"," pp) l;
   | AppBuiltin (Builtin.Arrow, [ret;a]) ->
-      Format.fprintf out "@[<2>%a@ → %a@]" pp_inner a pp_inner ret
+    Format.fprintf out "@[<2>%a@ → %a@]" pp_inner a pp_inner ret
   | AppBuiltin (Builtin.Arrow, ret::l) ->
-      Format.fprintf out "@[<2>(%a)@ → %a@]" (Util.pp_list ~sep:" × " pp_inner) l pp_inner ret
+    Format.fprintf out "@[<2>(%a)@ → %a@]" (Util.pp_list ~sep:" × " pp_inner) l pp_inner ret
   | AppBuiltin (b, []) -> Builtin.pp out b
   | AppBuiltin (Builtin.Not, [f]) -> Format.fprintf out "@[¬@ %a@]" pp_inner f
   | AppBuiltin (b, ([t1;t2] | [_;t1;t2])) when Builtin.fixity b = Builtin.Infix_binary ->
-      Format.fprintf out "@[%a %a@ %a@]"  pp_inner t1 Builtin.pp b pp_inner t2
+    Format.fprintf out "@[%a %a@ %a@]"  pp_inner t1 Builtin.pp b pp_inner t2
   | AppBuiltin (b, l) when Builtin.is_infix b && List.length l > 0 ->
-      pp_infix_ b out l
+    pp_infix_ b out l
   | AppBuiltin (s, l) ->
-      Format.fprintf out "%a(@[<2>%a@])"
-        Builtin.pp s (Util.pp_list ~sep:", " pp_inner) l
+    Format.fprintf out "%a(@[<2>%a@])"
+      Builtin.pp s (Util.pp_list ~sep:", " pp_inner) l
   | App (s, l) ->
-      Format.fprintf out "@[<2>%a %a@]"
-        pp s (Util.pp_list ~sep:" " pp_inner) l
+    Format.fprintf out "@[<2>%a %a@]"
+      pp s (Util.pp_list ~sep:" " pp_inner) l
   | Bind (s, vars, t') ->
-      Format.fprintf out "@[<2>%a @[%a@].@ %a@]"
-        Binder.pp s
-        (Util.pp_list ~sep:" " pp_typed_var) vars
-        pp t'
+    Format.fprintf out "@[<2>%a @[%a@].@ %a@]"
+      Binder.pp s
+      (Util.pp_list ~sep:" " pp_typed_var) vars
+      pp t'
   | Ite (a,b,c) ->
-      Format.fprintf out "@[<2>if %a@ then %a@ else %a@]" pp a pp b pp c
+    Format.fprintf out "@[<2>if %a@ then %a@ else %a@]" pp a pp b pp c
   | Let (l, u) ->
-      let pp_binding out (v,t) = Format.fprintf out "@[%a := %a@]" pp_var v pp t in
-      Format.fprintf out "@[<2>let %a@ in %a@]"
-        (Util.pp_list ~sep:" and " pp_binding) l pp u
+    let pp_binding out (v,t) = Format.fprintf out "@[%a := %a@]" pp_var v pp t in
+    Format.fprintf out "@[<2>let %a@ in %a@]"
+      (Util.pp_list ~sep:" and " pp_binding) l pp u
   | Match (u, l) ->
-      let pp_branch out = function
-        | Match_default rhs -> Format.fprintf out "_ -> %a" pp rhs
-        | Match_case (c,vars,rhs) ->
-          Format.fprintf out "@[<2>case@ %s %a ->@ %a@]"
-            c (Util.pp_list ~sep:" " pp_var) vars pp rhs
-      in
-      Format.fprintf out "@[<hv>@[<hv2>match %a with@ @[<hv>%a@]@]@ end@]"
-        pp u (Util.pp_list ~sep:" | " pp_branch) l
+    let pp_branch out = function
+      | Match_default rhs -> Format.fprintf out "_ -> %a" pp rhs
+      | Match_case (c,vars,rhs) ->
+        Format.fprintf out "@[<2>case@ %s %a ->@ %a@]"
+          c (Util.pp_list ~sep:" " pp_var) vars pp rhs
+    in
+    Format.fprintf out "@[<hv>@[<hv2>match %a with@ @[<hv>%a@]@]@ end@]"
+      pp u (Util.pp_list ~sep:" | " pp_branch) l
   | Record (l, None) ->
-      Format.fprintf out "{@[<hv>%a@]}"
-        (Util.pp_list (fun out (s,t') -> Format.fprintf out "%s:%a" s pp t')) l;
+    Format.fprintf out "{@[<hv>%a@]}"
+      (Util.pp_list (fun out (s,t') -> Format.fprintf out "%s:%a" s pp t')) l;
   | Record (l, Some r) ->
-      Format.fprintf out "{@[<hv>%a@ | %a@]}"
-        (Util.pp_list (Util.pp_pair ~sep:":" CCFormat.string pp)) l
-        pp_var r
+    Format.fprintf out "{@[<hv>%a@ | %a@]}"
+      (Util.pp_list (Util.pp_pair ~sep:":" CCFormat.string pp)) l
+      pp_var r
 and pp_inner out t = match view t with
   | AppBuiltin (_, _::_)
   | App _
@@ -380,8 +380,8 @@ and pp_infix_ b out l = match l with
   | [] -> assert false
   | [t] -> pp_inner out t
   | t :: l' ->
-      Format.fprintf out "@[<hv>%a@ @[<hv>%a@ %a@]@]"
-        pp_inner t Builtin.pp b (pp_infix_ b) l'
+    Format.fprintf out "@[<hv>%a@ @[<hv>%a@ %a@]@]"
+      pp_inner t Builtin.pp b (pp_infix_ b) l'
 and pp_var out = function
   | Wildcard -> CCFormat.string out "_"
   | V s -> CCFormat.string out s
@@ -424,10 +424,10 @@ module TPTP = struct
       Format.fprintf out "@[<2>%a(%a)@]"
         pp s (Util.pp_list ~sep:"," pp) l
     | Bind (s, vars, t') ->
-        Format.fprintf out "@[<2>%a[@[%a@]]:@ %a@]"
-          Binder.TPTP.pp s
-          (Util.pp_list ~sep:"," pp_typed_var) vars
-          pp_surrounded t'
+      Format.fprintf out "@[<2>%a[@[%a@]]:@ %a@]"
+        Binder.TPTP.pp s
+        (Util.pp_list ~sep:"," pp_typed_var) vars
+        pp_surrounded t'
     | Ite _ -> failwith "cannot print `ite` in TPTP"
     | Let _ -> failwith "cannot print `let` in TPTP"
     | Match _ -> failwith "cannot print `match` in TPTP"
@@ -435,7 +435,7 @@ module TPTP = struct
   and pp_typed_var out (v,o) = match o with
     | None -> pp_var out v
     | Some {term=AppBuiltin ((Builtin.TType | Builtin.Term),[]); _} ->
-        pp_var out v (* implicit type *)
+      pp_var out v (* implicit type *)
     | Some ty -> Format.fprintf out "%a:%a" pp_var v pp_surrounded ty
   and pp_surrounded out t = match t.term with
     | AppBuiltin (_, _::_)
@@ -455,68 +455,68 @@ module ZF = struct
     | Var v -> pp_var out v
     | Const s -> CCFormat.string out s
     | List l ->
-        Format.fprintf out "[@[<hv>%a@]]"
-          (Util.pp_list ~sep:"," pp) l;
+      Format.fprintf out "[@[<hv>%a@]]"
+        (Util.pp_list ~sep:"," pp) l;
     | AppBuiltin (Builtin.And, l) ->
-        Format.fprintf out "@[<hv>%a@]"
-          (Util.pp_list ~sep:" && " pp_surrounded) l
+      Format.fprintf out "@[<hv>%a@]"
+        (Util.pp_list ~sep:" && " pp_surrounded) l
     | AppBuiltin (Builtin.Or, l) ->
-        Format.fprintf out "@[<hv>%a@]"
-          (Util.pp_list ~sep:" || " pp_surrounded) l
+      Format.fprintf out "@[<hv>%a@]"
+        (Util.pp_list ~sep:" || " pp_surrounded) l
     | AppBuiltin (Builtin.Not, [a]) ->
-        Format.fprintf out "@[<2>~@ @[%a@]@]" pp_surrounded a
+      Format.fprintf out "@[<2>~@ @[%a@]@]" pp_surrounded a
     | AppBuiltin (Builtin.Imply, [a;b]) ->
-        Format.fprintf out "@[@[%a@]@ => @[%a@]@]" pp_surrounded a pp_surrounded b
+      Format.fprintf out "@[@[%a@]@ => @[%a@]@]" pp_surrounded a pp_surrounded b
     | AppBuiltin (Builtin.Xor, [a;b]) ->
-        Format.fprintf out "@[<3>~ (@[%a@]@ <=> @[%a@])@]" pp_surrounded a pp_surrounded b
+      Format.fprintf out "@[<3>~ (@[%a@]@ <=> @[%a@])@]" pp_surrounded a pp_surrounded b
     | AppBuiltin (Builtin.Equiv, [a;b]) ->
-        Format.fprintf out "@[@[%a@]@ <=> @[%a@]@]" pp_surrounded a pp_surrounded b
+      Format.fprintf out "@[@[%a@]@ <=> @[%a@]@]" pp_surrounded a pp_surrounded b
     | AppBuiltin (Builtin.Eq, [_;a;b]) ->
-        Format.fprintf out "@[@[%a@]@ = @[%a@]@]" pp_surrounded a pp_surrounded b
+      Format.fprintf out "@[@[%a@]@ = @[%a@]@]" pp_surrounded a pp_surrounded b
     | AppBuiltin (Builtin.Neq, [_;a;b]) ->
-        Format.fprintf out "@[@[%a@]@ != @[%a@]@]" pp_surrounded a pp_surrounded b
+      Format.fprintf out "@[@[%a@]@ != @[%a@]@]" pp_surrounded a pp_surrounded b
     | AppBuiltin (Builtin.Arrow, [ret;a]) ->
-        Format.fprintf out "@[@[%a@] ->@ @[%a@]@]" pp a pp ret
+      Format.fprintf out "@[@[%a@] ->@ @[%a@]@]" pp a pp ret
     | AppBuiltin (Builtin.Arrow, ret::l) ->
-        Format.fprintf out "@[%a ->@ %a@]"
-          (Util.pp_list~sep:" -> " pp_surrounded)
-          l pp_surrounded ret
+      Format.fprintf out "@[%a ->@ %a@]"
+        (Util.pp_list~sep:" -> " pp_surrounded)
+        l pp_surrounded ret
     | AppBuiltin (s, []) -> Builtin.ZF.pp out s
     | AppBuiltin (s, [a;b])
     | AppBuiltin (s, [_;a;b]) when Builtin.is_infix s ->
-        Format.fprintf out "@[@[%a@]@ %a @[%a@]@]"
-          pp_surrounded a Builtin.ZF.pp s pp_surrounded b
+      Format.fprintf out "@[@[%a@]@ %a @[%a@]@]"
+        pp_surrounded a Builtin.ZF.pp s pp_surrounded b
     | AppBuiltin (s, l) ->
-        Format.fprintf out "@[%a@ %a@]"
-          Builtin.ZF.pp s (Util.pp_list ~sep:", " pp_surrounded) l
+      Format.fprintf out "@[%a@ %a@]"
+        Builtin.ZF.pp s (Util.pp_list ~sep:", " pp_surrounded) l
     | App (s, l) ->
-        Format.fprintf out "@[<2>%a@ %a@]"
-          pp_surrounded s (Util.pp_list ~sep:" " pp_surrounded) l
+      Format.fprintf out "@[<2>%a@ %a@]"
+        pp_surrounded s (Util.pp_list ~sep:" " pp_surrounded) l
     | Ite (a,b,c) ->
-        Format.fprintf out "@[<2>if %a@ then %a@ else %a@]" pp a pp b pp c
+      Format.fprintf out "@[<2>if %a@ then %a@ else %a@]" pp a pp b pp c
     | Let (l, u) ->
-        let pp_binding out (v,t) = Format.fprintf out "@[%a := %a@]" pp_var v pp t in
-        Format.fprintf out "@[<2>let %a@ in %a@]"
-          (Util.pp_list ~sep:" and " pp_binding) l pp u
+      let pp_binding out (v,t) = Format.fprintf out "@[%a := %a@]" pp_var v pp t in
+      Format.fprintf out "@[<2>let %a@ in %a@]"
+        (Util.pp_list ~sep:" and " pp_binding) l pp u
     | Match (u, l) ->
-        let pp_branch out = function
-          | Match_default rhs -> Format.fprintf out "_ -> %a" pp rhs
-          | Match_case (c,vars,rhs) ->
-            Format.fprintf out "@[<2>case@ %s %a ->@ %a@]"
-              c (Util.pp_list ~sep:" " pp_var) vars pp rhs
-        in
-        Format.fprintf out "@[<hv>@[<hv2>match %a with@ @[<hv>%a@]@]@ end@]"
-          pp u (Util.pp_list ~sep:" | " pp_branch) l
+      let pp_branch out = function
+        | Match_default rhs -> Format.fprintf out "_ -> %a" pp rhs
+        | Match_case (c,vars,rhs) ->
+          Format.fprintf out "@[<2>case@ %s %a ->@ %a@]"
+            c (Util.pp_list ~sep:" " pp_var) vars pp rhs
+      in
+      Format.fprintf out "@[<hv>@[<hv2>match %a with@ @[<hv>%a@]@]@ end@]"
+        pp u (Util.pp_list ~sep:" | " pp_branch) l
     | Bind (s, vars, t') ->
-        Format.fprintf out "@[<2>%a @[%a@].@ @[%a@]@]"
-          Binder.ZF.pp s
-          (Util.pp_list ~sep:" " pp_typed_var) vars
-          pp_surrounded t'
+      Format.fprintf out "@[<2>%a @[%a@].@ @[%a@]@]"
+        Binder.ZF.pp s
+        (Util.pp_list ~sep:" " pp_typed_var) vars
+        pp_surrounded t'
     | Record _ -> failwith "cannot print records in ZF"
   and pp_typed_var out (v,o) = match o with
     | None -> pp_var out v
     | Some {term=AppBuiltin (Builtin.TType ,[]); _} ->
-        pp_var out v (* implicit type *)
+      pp_var out v (* implicit type *)
     | Some ty -> Format.fprintf out "(@[%a:%a@])" pp_var v pp_surrounded ty
   and pp_surrounded out t = match t.term with
     | AppBuiltin (_, _::_)

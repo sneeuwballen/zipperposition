@@ -3,7 +3,7 @@
 
 (** {1 Hashconsed Variable}
 
-  A variable for hashconsed terms, paired with a type.
+    A variable for hashconsed terms, paired with a type.
 *)
 
 type +'a t = private {

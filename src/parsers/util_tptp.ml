@@ -64,33 +64,33 @@ let parse_lexbuf ?names buf =
     List.iter
       (fun decl -> match decl, names with
          | (A.CNF _ | A.FOF _ | A.TFF _ | A.THF _ | A.TypeDecl _ | A.NewType _), None ->
-             Queue.push decl q
+           Queue.push decl q
          | (A.CNF _ | A.FOF _ | A.TFF _ | A.THF _ | A.TypeDecl _ | A.NewType _), Some names ->
-             if List.mem (A.get_name decl) names
-             then Queue.push decl q
-             else ()   (* not included *)
+           if List.mem (A.get_name decl) names
+           then Queue.push decl q
+           else ()   (* not included *)
          | (A.Include _ | A.IncludeOnly _), _ ->
-             Queue.push decl q)
+           Queue.push decl q)
       decls;
     Err.return (Sequence.of_queue q)
   with
-  | Error msg | Sys_error msg ->
+    | Error msg | Sys_error msg ->
       Err.fail msg
-  | e ->
+    | e ->
       Err.fail (Printexc.to_string e)
 
 (* find file *)
 let _find_and_open filename dir =
   match filename with
-  | "stdin" -> stdin
-  | _ ->
+    | "stdin" -> stdin
+    | _ ->
       match find_file filename dir with
-      | Some filename ->
+        | Some filename ->
           begin try open_in filename
             with Sys_error msg ->
               errorf "error when opening file `%s`: %s" filename msg
           end
-      | None -> errorf "could not find file `%s`" filename
+        | None -> errorf "could not find file `%s`" filename
 
 let parse_file ?cache ~recursive f =
   let parse_cache =
@@ -111,30 +111,30 @@ let parse_file ?cache ~recursive f =
       List.iter
         (fun decl -> match decl, names with
            | (A.CNF _ | A.FOF _ | A.TFF _ | A.THF _ | A.TypeDecl _ | A.NewType _), None ->
-               Queue.push decl result_decls
+             Queue.push decl result_decls
            | (A.CNF _ | A.FOF _ | A.TFF _ | A.THF _ | A.TypeDecl _ | A.NewType _), Some names ->
-               if List.mem (A.get_name decl) names
-               then Queue.push decl result_decls
-               else ()   (* not included *)
+             if List.mem (A.get_name decl) names
+             then Queue.push decl result_decls
+             else ()   (* not included *)
            | A.Include f, _ when recursive ->
-               if Hashtbl.mem (Lazy.force parse_cache) f
-               then Util.debugf 2 "@[<2>ignore include of `%s`, already parsed@]" (fun k->k f)
-               else (
-                 (* be sure not to include the file twice *)
-                 Hashtbl.add (Lazy.force parse_cache) f ();
-                 parse_this_file ?names:None f
-               )
+             if Hashtbl.mem (Lazy.force parse_cache) f
+             then Util.debugf 2 "@[<2>ignore include of `%s`, already parsed@]" (fun k->k f)
+             else (
+               (* be sure not to include the file twice *)
+               Hashtbl.add (Lazy.force parse_cache) f ();
+               parse_this_file ?names:None f
+             )
            | A.IncludeOnly (f, names'), _ when recursive ->
-               if Hashtbl.mem (Lazy.force parse_cache) f
-               then Util.debugf 2 "@[<2>ignore include of `%s`, already parsed@]" (fun k->k f)
-               else (
-                 Util.debugf 2
-                   "@[<2>caution: partial include of `%s` will not be cached"
-                   (fun k->k f);
-                 parse_this_file ~names:names' f
-               )
+             if Hashtbl.mem (Lazy.force parse_cache) f
+             then Util.debugf 2 "@[<2>ignore include of `%s`, already parsed@]" (fun k->k f)
+             else (
+               Util.debugf 2
+                 "@[<2>caution: partial include of `%s` will not be cached"
+                 (fun k->k f);
+               parse_this_file ~names:names' f
+             )
            | (A.Include _ | A.IncludeOnly _), _ ->
-               Queue.push decl result_decls)
+             Queue.push decl result_decls)
         decls
     with e ->
       close_in input;
@@ -144,8 +144,8 @@ let parse_file ?cache ~recursive f =
     parse_this_file ?names:None f;
     Err.return (Sequence.of_queue result_decls)
   with
-  | Error msg | Sys_error msg -> Err.fail msg
-  | e -> Err.fail (Printexc.to_string e)
+    | Error msg | Sys_error msg -> Err.fail msg
+    | e -> Err.fail (Printexc.to_string e)
 
 let fpf = Format.fprintf
 
@@ -198,16 +198,16 @@ let to_ast st =
       | A.R_unknown  -> UA.assert_ ~attrs f
   in
   match st with
-  | A.Include _
-  | A.IncludeOnly _ -> error "cannot convert `Include` to UntypedAST"
-  | A.TypeDecl (_,s,ty,_)
-  | A.NewType (_,s,ty,_) ->
+    | A.Include _
+    | A.IncludeOnly _ -> error "cannot convert `Include` to UntypedAST"
+    | A.TypeDecl (_,s,ty,_)
+    | A.NewType (_,s,ty,_) ->
       UA.decl s ty
-  | A.TFF (name,role,f,_)
-  | A.THF (name,role,f,_)
-  | A.FOF (name,role,f,_) ->
+    | A.TFF (name,role,f,_)
+    | A.THF (name,role,f,_)
+    | A.FOF (name,role,f,_) ->
       conv_form name role f
-  | A.CNF (name,role,f,_) ->
+    | A.CNF (name,role,f,_) ->
       let f = PT.or_ f in
       conv_form name role f
 
@@ -222,15 +222,15 @@ let of_ast st =
     | Some s -> A.NameString s
   in
   match st.UA.stmt with
-  | UA.Include s -> A.Include s
-  | UA.Decl (s,ty) ->
+    | UA.Include s -> A.Include s
+    | UA.Decl (s,ty) ->
       let name = name_sym_ s in
       (* XXX we should look if [ty] returns tType or not *)
       A.TypeDecl (name, s, ty, [])
-  | UA.Def _ -> error "cannot convert `def` statement into TPTP"
-  | UA.Rewrite _ -> error "cannot convert `rewrite` statement into TPTP"
-  | UA.Data _ -> error "cannot convert `data` statement into TPTP"
-  | UA.Goal f -> A.TFF (name, A.R_conjecture, f, [])
-  | UA.Assert f -> A.TFF (name, A.R_axiom, f, [])
-  | UA.Lemma f -> A.TFF (name, A.R_lemma, f, [])
+    | UA.Def _ -> error "cannot convert `def` statement into TPTP"
+    | UA.Rewrite _ -> error "cannot convert `rewrite` statement into TPTP"
+    | UA.Data _ -> error "cannot convert `data` statement into TPTP"
+    | UA.Goal f -> A.TFF (name, A.R_conjecture, f, [])
+    | UA.Assert f -> A.TFF (name, A.R_axiom, f, [])
+    | UA.Lemma f -> A.TFF (name, A.R_lemma, f, [])
 

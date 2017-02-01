@@ -37,8 +37,8 @@ val switch_opt : 'a -> ('a -> unit) -> Arg.spec
 (** [switch_opt b f] is an option that, when parsed, will call [f b]. Useful
     for
     {[ [ ("--foo", switch_opt true set_foo, " enable foo"
-       ; ("--no-foo", switch_opt false set_foo, " disable foo"]
-     ]} *)
+         ; ("--no-foo", switch_opt false set_foo, " disable foo"]
+    ]} *)
 
 val switch_set : 'a -> 'a ref -> Arg.spec
 (** [switch_set x r] is the option that, enabled, calls [r := x] *)

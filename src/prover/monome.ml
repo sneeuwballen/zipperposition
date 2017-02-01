@@ -88,12 +88,12 @@ let rec _merge ~num op l1 l2 = match l1, l2 with
   | l, []
   | [], l -> l
   | (s1, t1)::l1', (s2, t2)::l2' ->
-      match T.compare t1 t2 with
+    match T.compare t1 t2 with
       | 0 ->
-          let s' = op s1 s2 in
-          if num.cmp num.zero s' = 0
-          then _merge ~num op l1' l2'  (* t disappears *)
-          else (s', t1) :: _merge ~num op l1' l2'
+        let s' = op s1 s2 in
+        if num.cmp num.zero s' = 0
+        then _merge ~num op l1' l2'  (* t disappears *)
+        else (s', t1) :: _merge ~num op l1' l2'
       | n when n < 0 -> (s1, t1) :: _merge ~num op l1' l2
       | _ -> (s2, t2) :: _merge ~num op l1 l2'
 
@@ -137,8 +137,8 @@ let find_exn e t = match find e t with
 
 let mem e t =
   match find e t with
-  | None -> false
-  | Some _ -> true
+    | None -> false
+    | Some _ -> true
 
 let add e s t =
   assert (Type.equal (T.ty t) e.num.ty);
@@ -146,15 +146,15 @@ let add e s t =
   let rec add l s t = match l with
     | [] -> [s, t]
     | (s', t')::l' ->
-        begin match T.compare t t' with
-          | 0 ->
-              let s'' = e.num.add s s' in
-              if e.num.cmp e.num.zero s'' = 0
-              then l'
-              else (s'', t) :: l'
-          | n when n < 0 -> (s, t) :: l
-          | _ -> (s', t') :: add l' s t
-        end
+      begin match T.compare t t' with
+        | 0 ->
+          let s'' = e.num.add s s' in
+          if e.num.cmp e.num.zero s'' = 0
+          then l'
+          else (s'', t) :: l'
+        | n when n < 0 -> (s, t) :: l
+        | _ -> (s', t') :: add l' s t
+      end
   in
   { e with terms = add e.terms s t; }
 
@@ -176,7 +176,7 @@ let add_const e s =
 
 let remove e t =
   { e with
-    terms = List.filter (fun (_, t') -> not (T.equal t t')) e.terms; }
+      terms = List.filter (fun (_, t') -> not (T.equal t t')) e.terms; }
 
 let remove_const e =
   { e with const = e.num.zero; }
@@ -242,10 +242,10 @@ let comparison m1 m2 =
       depends on the model/instance *)
   let m = difference m1 m2 in
   match is_const m, m.num.sign m.const with
-  | false, _ -> Comparison.Incomparable
-  | true, 0 -> Comparison.Eq
-  | true, n when n < 0 -> Comparison.Lt
-  | true, _ -> Comparison.Gt
+    | false, _ -> Comparison.Incomparable
+    | true, 0 -> Comparison.Eq
+    | true, n when n < 0 -> Comparison.Lt
+    | true, _ -> Comparison.Gt
 
 let dominates ~strict m1 m2 = match comparison m1 m2 with
   | Comparison.Eq -> not strict
@@ -260,10 +260,10 @@ let split m =
   let rec partition = function
     | [] -> [], []
     | (c,t)::l' ->
-        let l1, l2 = partition l' in
-        if m.num.sign c > 0
-        then (c,t)::l1, l2
-        else l1, (m.num.uminus c, t)::l2
+      let l1, l2 = partition l' in
+      if m.num.sign c > 0
+      then (c,t)::l1, l2
+      else l1, (m.num.uminus c, t)::l2
   in
   let terms1, terms2 = partition m.terms in
   let m1 = {m with terms=terms1; const=const1; } in
@@ -310,10 +310,10 @@ let pp out e =
     else Format.fprintf out "%s×%a" (e.num.to_string s) T.pp t
   in
   match e.terms with
-  | [] -> CCFormat.string out (e.num.to_string e.const)
-  | _::_ when e.num.sign e.const = 0 ->
+    | [] -> CCFormat.string out (e.num.to_string e.const)
+    | _::_ when e.num.sign e.const = 0 ->
       Util.pp_list ~sep:" + " pp_pair out e.terms
-  | _::_ ->
+    | _::_ ->
       Format.fprintf out "%a + %s"
         (Util.pp_list ~sep:" + " pp_pair) e.terms
         (e.num.to_string e.const)
@@ -329,12 +329,12 @@ let pp_tstp out e =
     | [] -> ()
     | [s, t] -> pp_pair buf (s, t)
     | (s, t)::l' ->
-        Format.fprintf buf "$sum(%a, %a)" pp_pair (s,t) pp_list l'
+      Format.fprintf buf "$sum(%a, %a)" pp_pair (s,t) pp_list l'
   in
   match e.terms with
-  | [] -> CCFormat.string out (e.num.to_string e.const)
-  | _::_ when e.num.sign e.const = 0 -> pp_list out e.terms
-  | _::_ ->
+    | [] -> CCFormat.string out (e.num.to_string e.const)
+    | _::_ when e.num.sign e.const = 0 -> pp_list out e.terms
+    | _::_ ->
       Format.fprintf out "$sum(%s, %a)" (e.num.to_string e.const) pp_list e.terms
 
 let _fail_idx m i =
@@ -375,8 +375,8 @@ module Focus = struct
   (* TODO: optimize *)
   let focus_term m term =
     match find m term with
-    | None -> None
-    | Some coeff ->
+      | None -> None
+      | Some coeff ->
         let rest = remove m term in
         Some {coeff; rest; term; }
 
@@ -467,21 +467,21 @@ module Focus = struct
   (* unification between terms of the same monome *)
   let rec _iter_self ~num ~subst c t l rest const scope k =
     match l with
-    | [] ->
+      | [] ->
         let mf' = { coeff=c; term=t; rest=of_list ~num const rest;} in
         if num.sign c <> 0 then k (mf', subst)
-    | (c', t') :: l' ->
+      | (c', t') :: l' ->
         if Unif.FO.equal ~subst (Scoped.make t scope) (Scoped.make t' scope)
         then
           (* we do not have a choice, [t = t'] is true *)
           _iter_self ~num ~subst (num.add c c') t l' rest const scope k
         else (
           begin try
-            (* maybe we can merge [t] and [t'] *)
-            let subst' = Unif.FO.unification ~subst
-                (Scoped.make t scope) (Scoped.make t' scope)
-            in
-            _iter_self ~num ~subst:subst' (num.add c c') t (l'@ rest) [] const scope k
+              (* maybe we can merge [t] and [t'] *)
+              let subst' = Unif.FO.unification ~subst
+                  (Scoped.make t scope) (Scoped.make t' scope)
+              in
+              _iter_self ~num ~subst:subst' (num.add c c') t (l'@ rest) [] const scope k
             with Unif.Fail -> ()
           end;
           (* we can also choose not to unify [t] and [t']. *)
@@ -497,20 +497,20 @@ module Focus = struct
     let rec choose_first subst l rest = match l with
       | [] -> ()
       | (c,t)::l' ->
-          choose_second subst c t l' rest;
-          choose_first subst l' ((c,t)::rest)
+        choose_second subst c t l' rest;
+        choose_first subst l' ((c,t)::rest)
     and choose_second subst c t l rest = match l with
       | [] -> ()
       | (c',t')::l' ->
-          (* see whether we can unify t and t' *)
-          begin try
+        (* see whether we can unify t and t' *)
+        begin try
             let subst = Unif.FO.unification ~subst (t,sc) (t',sc) in
             (* extend the unifier *)
             _iter_self ~num ~subst (num.add c c') t (l'@rest) [] m.const sc k
-            with Unif.Fail -> ()
-          end;
-          (* ignore t' and search another partner *)
-          choose_second subst c t l' ((c',t')::rest)
+          with Unif.Fail -> ()
+        end;
+        (* ignore t' and search another partner *)
+        choose_second subst c t l' ((c',t')::rest)
     in
     choose_first subst m.terms []
 
@@ -523,7 +523,7 @@ module Focus = struct
         [] mf1.rest.const sc1
         (fun (mf1, subst) ->
            _iter_self ~num ~subst mf2.coeff mf2.term mf2.rest.terms
-            [] mf2.rest.const sc2
+             [] mf2.rest.const sc2
              (fun (mf2, subst) -> k (mf1, mf2, subst)))
     with Unif.Fail -> ()
 
@@ -535,25 +535,25 @@ module Focus = struct
       | [], _
       | _, [] -> ()
       | (c1,t1)::l1', (c2,t2)::l2' ->
-          (* first, choose [t1] and [t2] if they are unifiable, and extend
-              the unifier to the other terms if needed. *)
-          assert (num.sign c1 <> 0 && num.sign c2 <> 0);
-          begin
-            try
-              let subst = Unif.FO.unification ~subst (t1,sc1) (t2,sc2) in
-              Util.debugf 5 "@[<2>unify_mm :@ @[%a = %a@]@ with @[%a@]@]"
-                (fun k->k T.pp t1 T.pp t2 Substs.pp subst);
-              _iter_self ~num ~subst c1 t1 l1' [] m1.const sc1
-                (fun (mf1, subst) ->
-                   _iter_self ~num ~subst c2 t2 l2' [] m2.const sc2
-                     (fun (mf2, subst) -> k (mf1, mf2, subst))
-                )
-            with Unif.Fail -> ()
-          end;
-          (* don't choose [t1] *)
-          choose_first subst l1' ((c1,t1)::rest1) cst1 l2 rest2 cst2 k;
-          (* don't choose [t2] *)
-          choose_first subst l1 rest1 cst1 l2' ((c2,t2)::rest2) cst2 k
+        (* first, choose [t1] and [t2] if they are unifiable, and extend
+            the unifier to the other terms if needed. *)
+        assert (num.sign c1 <> 0 && num.sign c2 <> 0);
+        begin
+          try
+            let subst = Unif.FO.unification ~subst (t1,sc1) (t2,sc2) in
+            Util.debugf 5 "@[<2>unify_mm :@ @[%a = %a@]@ with @[%a@]@]"
+              (fun k->k T.pp t1 T.pp t2 Substs.pp subst);
+            _iter_self ~num ~subst c1 t1 l1' [] m1.const sc1
+              (fun (mf1, subst) ->
+                 _iter_self ~num ~subst c2 t2 l2' [] m2.const sc2
+                   (fun (mf2, subst) -> k (mf1, mf2, subst))
+              )
+          with Unif.Fail -> ()
+        end;
+        (* don't choose [t1] *)
+        choose_first subst l1' ((c1,t1)::rest1) cst1 l2 rest2 cst2 k;
+        (* don't choose [t2] *)
+        choose_first subst l1 rest1 cst1 l2' ((c2,t2)::rest2) cst2 k
     in
     choose_first subst m1.terms [] m1.const m2.terms [] m2.const k
 
@@ -568,13 +568,13 @@ let variant ?(subst=Substs.empty) (m1,sc1) (m2,sc2) k =
   let rec traverse_lists subst (c1,t1) l1' rest2 l2 = match l2 with
     | [] -> ()  (* fail *)
     | (c2,t2)::l2' ->
-        if m1.num.cmp c1 c2 = 0
-        then
-          try
-            let subst = Unif.FO.variant ~subst (t1,sc1) (t2,sc2) in
-            start subst l1' (rest2 @ l2')
-          with Unif.Fail -> ();
-            traverse_lists subst (c1,t1) l1' ((c2,t2)::rest2) l2'
+      if m1.num.cmp c1 c2 = 0
+      then
+        try
+          let subst = Unif.FO.variant ~subst (t1,sc1) (t2,sc2) in
+          start subst l1' (rest2 @ l2')
+        with Unif.Fail -> ();
+          traverse_lists subst (c1,t1) l1' ((c2,t2)::rest2) l2'
   and start subst l1 l2 = match l1, l2 with
     | [], [] -> k subst
     | [], _ | _, [] -> ()
@@ -595,18 +595,18 @@ let matching ?(subst=Substs.empty) (m1,sc1)(m2,sc2) k =
   let rec traverse_lists subst (c1,t1) l1' rest2 l2 = match l2 with
     | [] -> ()
     | (c2,t2)::l2' ->
-        if m1.num.cmp c1 c2 <= 0
-        then (
-          try
-            let subst = Unif.FO.matching_adapt_scope ~subst ~pattern:(t1,sc1) (t2,sc2) in
-            if m1.num.cmp c1 c2 = 0
-            then start subst l1' (rest2 @ l2')
-            else
-              (* some instances of t2 remain to be matched *)
-              start subst l1' ((m1.num.sub c2 c1, t2) :: l2' @ rest2)
-          with Unif.Fail -> ()
-        );
-        traverse_lists subst (c1,t1) l1' ((c2,t2)::rest2) l2'
+      if m1.num.cmp c1 c2 <= 0
+      then (
+        try
+          let subst = Unif.FO.matching_adapt_scope ~subst ~pattern:(t1,sc1) (t2,sc2) in
+          if m1.num.cmp c1 c2 = 0
+          then start subst l1' (rest2 @ l2')
+          else
+            (* some instances of t2 remain to be matched *)
+            start subst l1' ((m1.num.sub c2 c1, t2) :: l2' @ rest2)
+        with Unif.Fail -> ()
+      );
+      traverse_lists subst (c1,t1) l1' ((c2,t2)::rest2) l2'
   and start subst l1 l2 = match l1, l2 with
     | [], [] -> k subst
     | [], _ | _, [] -> ()
@@ -620,20 +620,20 @@ let unify ?(subst=Substs.empty) (m1,sc1)(m2,sc2) k =
   let rec traverse_lists subst (c1,t1) l1' rest2 l2 = match l2 with
     | [] -> ()
     | (c2,t2)::l2' ->
-        begin
-          try
-            let subst = Unif.FO.matching ~subst ~pattern:(t1,sc1) (t2,sc2) in
-            match m1.num.cmp c1 c2 with
+      begin
+        try
+          let subst = Unif.FO.matching ~subst ~pattern:(t1,sc1) (t2,sc2) in
+          match m1.num.cmp c1 c2 with
             | 0 -> start subst l1' (rest2 @ l2')  (* t1 removed *)
             | n when n<0 ->
-                (* t1 removed *)
-                start subst l1' ((m1.num.sub c2 c1, t2) :: l2' @ rest2)
+              (* t1 removed *)
+              start subst l1' ((m1.num.sub c2 c1, t2) :: l2' @ rest2)
             | _ ->
-                (* t2 removed *)
-                start subst ((m1.num.sub c1 c2, t1) :: l1') (l2' @ rest2)
-          with Unif.Fail -> ()
-        end;
-        traverse_lists subst (c1,t1) l1' ((c2,t2)::rest2) l2'
+              (* t2 removed *)
+              start subst ((m1.num.sub c1 c2, t1) :: l1') (l2' @ rest2)
+        with Unif.Fail -> ()
+      end;
+      traverse_lists subst (c1,t1) l1' ((c2,t2)::rest2) l2'
   and start subst l1 l2 = match l1, l2 with
     | [], [] -> k subst
     | [], _ | _, [] -> ()
@@ -655,35 +655,35 @@ module Int = struct
   let of_term_exn t =
     let rec of_term t : t = match T.view t with
       | T.AppBuiltin (Builtin.Sum, [_; t1; t2]) ->
-          let m1 = of_term t1 in
-          let m2 = of_term t2 in
-          sum m1 m2
+        let m1 = of_term t1 in
+        let m2 = of_term t2 in
+        sum m1 m2
       | T.AppBuiltin (Builtin.Difference, [_;t1; t2]) ->
-          let m1 = of_term t1 in
-          let m2 = of_term t2 in
-          difference m1 m2
+        let m1 = of_term t1 in
+        let m2 = of_term t2 in
+        difference m1 m2
       | T.AppBuiltin (Builtin.Uminus, [_;t']) ->
-          let m = of_term t' in
-          uminus m
+        let m = of_term t' in
+        uminus m
       | T.AppBuiltin (Builtin.Product, [_;t1; t2]) ->
-          begin match T.view t1, T.view t2 with
-            | T.AppBuiltin (Builtin.Int n, []), _ ->
-                let m = of_term t2 in
-                product m n
-            | _, T.AppBuiltin (Builtin.Int n, []) ->
-                let m = of_term t1 in
-                product m n
-            | _ -> raise NotLinear
-          end
+        begin match T.view t1, T.view t2 with
+          | T.AppBuiltin (Builtin.Int n, []), _ ->
+            let m = of_term t2 in
+            product m n
+          | _, T.AppBuiltin (Builtin.Int n, []) ->
+            let m = of_term t1 in
+            product m n
+          | _ -> raise NotLinear
+        end
       | T.AppBuiltin (Builtin.Succ, [_;t']) ->
-          let m = of_term t' in
-          succ m
+        let m = of_term t' in
+        succ m
       | T.AppBuiltin (Builtin.Prec, [_;t']) ->
-          let m = of_term t' in
-          pred m
+        let m = of_term t' in
+        pred m
       | T.AppBuiltin (Builtin.Int n, []) -> const n
       | T.AppBuiltin (b, _) when Builtin.is_arith b ->
-          raise NotLinear
+        raise NotLinear
       | T.AppBuiltin _
       | T.Var _
       | T.Const _
@@ -720,17 +720,17 @@ module Int = struct
     let t = match e.terms with
       | [] -> mk_const e.const
       | (c, t)::rest ->
-          (* remove one coeff to make the basic sum *)
-          let sum = mk_product c t in
-          (* add coeff*term for the remaining terms *)
-          let sum = List.fold_left
-              (fun sum (coeff, _t') ->
-                 assert (num.sign coeff <> 0);
-                 mk_sum coeff t sum
-              ) sum rest
-          in
-          (* add the constant (if needed) *)
-          mk_sum_const e.const sum
+        (* remove one coeff to make the basic sum *)
+        let sum = mk_product c t in
+        (* add coeff*term for the remaining terms *)
+        let sum = List.fold_left
+            (fun sum (coeff, _t') ->
+               assert (num.sign coeff <> 0);
+               mk_sum coeff t sum
+            ) sum rest
+        in
+        (* add the constant (if needed) *)
+        mk_sum_const e.const sum
     in
     t
 
@@ -739,9 +739,9 @@ module Int = struct
       List.fold_left
         (fun (cst, changed, acc) (c,t) ->
            match T.view t with
-           | T.AppBuiltin (Builtin.Int n, []) ->
+             | T.AppBuiltin (Builtin.Int n, []) ->
                Z.add cst (Z.mul n c), true, acc
-           | _ -> cst, changed, (c,t)::acc
+             | _ -> cst, changed, (c,t)::acc
         ) (m.const, false, []) m.terms
     in
     if changed
@@ -802,8 +802,8 @@ module Int = struct
     let res = match m.terms with
       | [] -> Z.sign m.const = 0
       | (g,_) :: l ->
-          let g = List.fold_left (fun g (c,_) -> Z.gcd c g) g l in
-          Z.sign (Z.rem m.const g) = 0
+        let g = List.fold_left (fun g (c,_) -> Z.gcd c g) g l in
+        Z.sign (Z.rem m.const g) = 0
     in
     Util.debugf 5 "@[monome @[%a@]@ has instances: %B@]" (fun k->k pp m res);
     res
@@ -828,9 +828,9 @@ module Int = struct
       then match e.terms with
         | [] -> Z.one
         | (c,_)::terms' ->
-            List.fold_left
-              (fun gcd (c, _) -> Z.gcd c gcd)
-              c terms'
+          List.fold_left
+            (fun gcd (c, _) -> Z.gcd c gcd)
+            c terms'
       else
         List.fold_left
           (fun gcd (c, _) -> Z.gcd c gcd)
@@ -864,16 +864,16 @@ module Int = struct
     let split_solution s =
       let vars, nonvars = List.partition (fun (t, _) -> T.is_var t) s in
       let vars = List.map
-        (fun (t,m) -> match T.view t with
-          | T.Var v -> v, m
-          | _ -> assert false)
-        vars
+          (fun (t,m) -> match T.view t with
+             | T.Var v -> v, m
+             | _ -> assert false)
+          vars
       in
       let subst =
         List.fold_left
           (fun subst (v, m) ->
-            let v = (v : T.var :> InnerTerm.t HVar.t) in
-            Substs.FO.bind subst (Scoped.make v 0) (Scoped.make (to_term m) 0))
+             let v = (v : T.var :> InnerTerm.t HVar.t) in
+             Substs.FO.bind subst (Scoped.make v 0) (Scoped.make (to_term m) 0))
           Substs.empty vars
       in
       subst, nonvars
@@ -904,12 +904,12 @@ module Int = struct
         let u, v = match recurse a b [] with
           | [] -> assert false
           | (_a,b,_) :: l ->
-              let u, v = Z.zero, b in
-              List.fold_left
-                (fun (u, v) (_a, _b, q) ->
-                   let u' = Z.sub u (Z.mul v q) in
-                   v, u')
-                (u, v) l
+            let u, v = Z.zero, b in
+            List.fold_left
+              (fun (u, v) (_a, _b, q) ->
+                 let u' = Z.sub u (Z.mul v q) in
+                 v, u')
+              (u, v) l
         in
         u, v
       in
@@ -949,22 +949,22 @@ module Int = struct
       | []
       | [_] -> failwith "diophant_l: expect at least 2 coefficients"
       | [a; b] ->
-          let u, v, gcd = diophant2 a b const in
-          [u; v], gcd
+        let u, v, gcd = diophant2 a b const in
+        [u; v], gcd
       | a1 :: a2 :: l' ->
-          let gcd_1_2 = Z.gcd a1 a2 in
-          let u1, u2, _ = diophant2 a1 a2 gcd_1_2 in
-          (* first, solve [a1 * u1 + a2 * u2 = gcd_1_2]. We then
-              find u1_2, u' such that  [gcd_1_2 * u1_2 + u' * l' = const],
-              after which [a1 * u1 * u1_2 + a2 * u1_2 * u2 + u' * l' = const]
-              and we're done. *)
-          begin match diophant_l (gcd_1_2 :: l') const with
-            | [], _ -> assert false
-            | (u_1_2 :: u'), gcd ->
-                let u1' = Z.mul u1 u_1_2 in
-                let u2' = Z.mul u2 u_1_2 in
-                u1' :: u2' :: u', gcd
-          end
+        let gcd_1_2 = Z.gcd a1 a2 in
+        let u1, u2, _ = diophant2 a1 a2 gcd_1_2 in
+        (* first, solve [a1 * u1 + a2 * u2 = gcd_1_2]. We then
+            find u1_2, u' such that  [gcd_1_2 * u1_2 + u' * l' = const],
+            after which [a1 * u1 * u1_2 + a2 * u1_2 * u2 + u' * l' = const]
+            and we're done. *)
+        begin match diophant_l (gcd_1_2 :: l') const with
+          | [], _ -> assert false
+          | (u_1_2 :: u'), gcd ->
+            let u1' = Z.mul u1 u_1_2 in
+            let u2' = Z.mul u2 u_1_2 in
+            u1' :: u2' :: u', gcd
+        end
 
     (* least common multiple of a and b *)
     let _lcm a b =
@@ -983,10 +983,10 @@ module Int = struct
         (* let's build a linear combination of the variables that are going to
             be provided. for this, we build smaller linear combinations
            {[x1 = lcm(1,2)/l1 k1
-                    ...
-                                xi = -lcm(i-1,i)/li k(i-1) + lcm(i,i+1)/li ki
-                                                               ...
-                                                                             xn = -lcm(n-1,n)/ln k(n-1)
+                 ...
+                   xi = -lcm(i-1,i)/li k(i-1) + lcm(i,i+1)/li ki
+                   ...
+                     xn = -lcm(n-1,n)/ln k(n-1)
            ]}
             where lcm(i,j) = lcm(li, lj).
             This linear combination is of dimension n-1, and is always solution
@@ -1045,43 +1045,43 @@ module Int = struct
         begin match terms with
           | [] when Z.sign m.const = 0 -> [[]]  (* trivial *)
           | [c, t] when Z.sign (Z.rem m.const c) = 0 ->
-              (* [c * x + constant = 0], let [x = - constant / c] *)
-              let n = Z.div (Z.neg m.const) c in
-              [ [t, const n] ]
+            (* [c * x + constant = 0], let [x = - constant / c] *)
+            let n = Z.div (Z.neg m.const) c in
+            [ [t, const n] ]
           | _::_::_ as l when List.exists _is_one_abs l ->
-              (* at leat one of the coefficients is +/- 1. Extract
-                  the corresponding terms *)
-              let unit_terms = List.filter _is_one_abs l in
-              List.map
-                (fun (c, t) ->
-                   let m' = remove m t in
-                   (* t = -m' if the coefficient of t was 1, m' otherwise *)
-                   let m' = if Z.sign c > 0 then uminus m' else m' in
-                   [ t, m' ])
-                unit_terms
+            (* at leat one of the coefficients is +/- 1. Extract
+                the corresponding terms *)
+            let unit_terms = List.filter _is_one_abs l in
+            List.map
+              (fun (c, t) ->
+                 let m' = remove m t in
+                 (* t = -m' if the coefficient of t was 1, m' otherwise *)
+                 let m' = if Z.sign c > 0 then uminus m' else m' in
+                 [ t, m' ])
+              unit_terms
           | _::_::_ as l ->
-              (* extract coefficients *)
-              let l' = List.map fst l in
-              let c = m.const in
-              begin try
-                  let gcd = List.fold_left Z.gcd (List.hd l') (List.tl l') in
-                  (* coefficients for the solution hyperplane *)
-                  let coeffs = coeffs_n l' gcd in
-                  (* initial solution *)
-                  let init, _gcd = diophant_l l' (Z.neg c) in
-                  (* generate fresh vars to describe the solution space *)
-                  let n = List.length l in
-                  let vars = Sequence.(repeat () |> take (n-1) |> to_rev_list) in
-                  let vars = List.map (fun () -> fresh_var num.ty) vars in
-                  (* build general solution by summing variable part and initial solution *)
-                  let monomes = List.map2
-                      (fun var_part const_part -> sum var_part (const const_part))
-                      (coeffs vars)
-                      init
-                  in
-                  [ List.combine (List.map snd l) monomes ]
-                with Failure _ -> []
-              end
+            (* extract coefficients *)
+            let l' = List.map fst l in
+            let c = m.const in
+            begin try
+                let gcd = List.fold_left Z.gcd (List.hd l') (List.tl l') in
+                (* coefficients for the solution hyperplane *)
+                let coeffs = coeffs_n l' gcd in
+                (* initial solution *)
+                let init, _gcd = diophant_l l' (Z.neg c) in
+                (* generate fresh vars to describe the solution space *)
+                let n = List.length l in
+                let vars = Sequence.(repeat () |> take (n-1) |> to_rev_list) in
+                let vars = List.map (fun () -> fresh_var num.ty) vars in
+                (* build general solution by summing variable part and initial solution *)
+                let monomes = List.map2
+                    (fun var_part const_part -> sum var_part (const const_part))
+                    (coeffs vars)
+                    init
+                in
+                [ List.combine (List.map snd l) monomes ]
+              with Failure _ -> []
+            end
           | _ ->  []  (* cannot do much otherwise *)
         end
 
@@ -1093,60 +1093,60 @@ module Int = struct
         begin match m.terms with
           | [] -> []
           | [c, t] when Z.sign (Z.rem c m.const) = 0 ->
-              (* c * t + m < 0 ----> t = (-m / c) - 1 *)
-              let v = Z.div (Z.neg m.const) c in
-              let v = if Z.sign c > 0
-                then Z.pred v
-                else Z.succ v
-              in
-              [ [t, const v] ]
+            (* c * t + m < 0 ----> t = (-m / c) - 1 *)
+            let v = Z.div (Z.neg m.const) c in
+            let v = if Z.sign c > 0
+              then Z.pred v
+              else Z.succ v
+            in
+            [ [t, const v] ]
           | [c, t] ->
-              (* must be integer, take the quotient itself *)
-              let v = Z.div (Z.neg m.const) c in
-              let v = if Z.sign c < 0 then Z.succ v else v in
-              [ [t, const v] ]
+            (* must be integer, take the quotient itself *)
+            let v = Z.div (Z.neg m.const) c in
+            let v = if Z.sign c < 0 then Z.succ v else v in
+            [ [t, const v] ]
           | _::_::_ when List.exists _is_one_abs m.terms ->
-              if strict
-              then
-                (* there is some coefficient equal to one, just extract the
-                   corresponding terms and make them equal to monome + 1 *)
-                let terms = List.filter _is_one_abs m.terms in
-                List.map
-                  (fun (c,t) ->
-                     let m' = remove m t in
-                     let m' = if Z.sign c > 0
-                       then pred (uminus m') (* t + m < 0 ---> t = -m - 1 *)
-                       else succ m'  (* -t + m < 0 ---> t = m + 1 *)
-                     in
-                     [ t, m' ]
-                  )
-                  terms
-              else
-                (* equality is ok, and here we know there are always solutions *)
-                eq_zero ?fresh_var m
+            if strict
+            then
+              (* there is some coefficient equal to one, just extract the
+                 corresponding terms and make them equal to monome + 1 *)
+              let terms = List.filter _is_one_abs m.terms in
+              List.map
+                (fun (c,t) ->
+                   let m' = remove m t in
+                   let m' = if Z.sign c > 0
+                     then pred (uminus m') (* t + m < 0 ---> t = -m - 1 *)
+                     else succ m'  (* -t + m < 0 ---> t = m + 1 *)
+                   in
+                   [ t, m' ]
+                )
+                terms
+            else
+              (* equality is ok, and here we know there are always solutions *)
+              eq_zero ?fresh_var m
           | _::_::_ ->
-              (* the idea: to find instances of m <= 0, we find the smallest positive n
-                 such that m = n is solvable, then we call {!eq_zero}. *)
-              let gcd = List.fold_left
-                  (fun gcd (c,_) -> Z.gcd gcd c)
-                  m.const m.terms
-              in
-              (* now we shift the constant until it is a multiple of the gcd.
-                 m < const  ----> m = const' with const' < const *)
-              let c = Z.neg m.const in
-              let q, r = Z.div_rem c gcd in
-              let c' = if Z.sign r = 0
-                then if strict
-                  then (* already a multiple of gcd. take the previous one, gcd * (q-1) *)
-                    Z.mul (Z.pred q) gcd
-                  else (* equality has solutions *)
-                    c
-                else (* gcd * q < gcd * q + r, ok for both strict and non-strict *)
-                  Z.mul q gcd
-              in
-              let c' = Z.neg c' in
-              let m' = { m with const = c'; } in
-              eq_zero ?fresh_var m'
+            (* the idea: to find instances of m <= 0, we find the smallest positive n
+               such that m = n is solvable, then we call {!eq_zero}. *)
+            let gcd = List.fold_left
+                (fun gcd (c,_) -> Z.gcd gcd c)
+                m.const m.terms
+            in
+            (* now we shift the constant until it is a multiple of the gcd.
+               m < const  ----> m = const' with const' < const *)
+            let c = Z.neg m.const in
+            let q, r = Z.div_rem c gcd in
+            let c' = if Z.sign r = 0
+              then if strict
+                then (* already a multiple of gcd. take the previous one, gcd * (q-1) *)
+                  Z.mul (Z.pred q) gcd
+                else (* equality has solutions *)
+                  c
+              else (* gcd * q < gcd * q + r, ok for both strict and non-strict *)
+                Z.mul q gcd
+            in
+            let c' = Z.neg c' in
+            let m' = { m with const = c'; } in
+            eq_zero ?fresh_var m'
         end
 
     let lt_zero ?fresh_var m =

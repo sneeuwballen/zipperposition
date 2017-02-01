@@ -17,14 +17,14 @@ exception NotAnInductiveConstant of ID.t
 let () =
   let spf = CCFormat.sprintf in
   Printexc.register_printer
-  (function
-    | InvalidDecl msg ->
+    (function
+      | InvalidDecl msg ->
         Some (spf "@[<2>invalid declaration:@ %s@]" msg)
-    | AlreadyDeclaredConstant id ->
+      | AlreadyDeclaredConstant id ->
         Some (spf "%a already declared as an inductive constant" ID.pp id)
-    | NotAnInductiveConstant id ->
+      | NotAnInductiveConstant id ->
         Some (spf "%a is not an inductive constant" ID.pp id)
-    | _ -> None)
+      | _ -> None)
 
 let invalid_decl m = raise (InvalidDecl m)
 let invalid_declf m = CCFormat.ksprintf m ~f:invalid_decl
@@ -76,9 +76,9 @@ let case_sub_constants c = Sequence.of_list c.case_sub
 let cover_set_cases ?(which=`All) set =
   let seq = Sequence.of_list set in
   match which with
-  | `All -> seq
-  | `Base -> Sequence.filter case_is_base seq
-  | `Rec -> Sequence.filter case_is_rec seq
+    | `All -> seq
+    | `Base -> Sequence.filter case_is_base seq
+    | `Rec -> Sequence.filter case_is_rec seq
 
 let cover_set_skolems c =
   Sequence.of_list c
@@ -151,11 +151,11 @@ let rec dominates c1 c2 =
   c1.cst_depth < c2.cst_depth
   &&
   match c1.cst_coverset with
-  | None -> false
-  | Some set ->
-    Sequence.exists
-      (fun sub_c -> cst_equal sub_c c2 || dominates sub_c c2)
-      (cover_set_sub_constants set)
+    | None -> false
+    | Some set ->
+      Sequence.exists
+        (fun sub_c -> cst_equal sub_c c2 || dominates sub_c c2)
+        (cover_set_sub_constants set)
 
 (** {6 Creation of Coverset and Cst} *)
 
@@ -166,9 +166,9 @@ type id_or_ty_builtin =
 let type_hd_exn ty =
   let _, _, ret = Type.open_poly_fun ty in
   match Type.view ret with
-  | Type.Builtin b -> B b
-  | Type.App (s, _) -> I s
-  | _ ->
+    | Type.Builtin b -> B b
+    | Type.App (s, _) -> I s
+    | _ ->
       invalid_declf "expected function type, got %a" Type.pp ty
 
 (* type declarations required by [c] *)
@@ -202,23 +202,23 @@ module CoversetState = struct
   let yield : 'a -> 'a mm = fun x st -> [st, x]
   let yield_l : 'a list -> 'a mm = fun l st -> List.map (fun x -> st,x) l
   let (>>=) : 'a mm -> ('a -> 'b m) -> 'b mm
-  = fun x_mm f st ->
-    let xs = x_mm st in
-    List.map (fun (st,x) -> f x st) xs
+    = fun x_mm f st ->
+      let xs = x_mm st in
+      List.map (fun (st,x) -> f x st) xs
   let (>|=) : 'a mm -> ('a -> 'b) -> 'b mm
-  = fun x_mm f st ->
-    let xs = x_mm st in
-    List.map (fun (st,x) -> st, f x) xs
+    = fun x_mm f st ->
+      let xs = x_mm st in
+      List.map (fun (st,x) -> st, f x) xs
   let (>>>=) : 'a mm -> ('a -> 'b mm) -> 'b mm
-  = fun x_mm f st ->
-    let xs = x_mm st in
-    CCList.flat_map
-      (fun (st,x) -> f x st)
-      xs
+    = fun x_mm f st ->
+      let xs = x_mm st in
+      CCList.flat_map
+        (fun (st,x) -> f x st)
+        xs
   let (>>|=) : 'a mm -> ('a -> 'b) -> 'b mm
-  = fun x_mm f st ->
-    let xs = x_mm st in
-    List.map (fun (st,x) -> st, f x) xs
+    = fun x_mm f st ->
+      let xs = x_mm st in
+      List.map (fun (st,x) -> st, f x) xs
   let get : t mm = fun st -> [st, st]
   let set : t -> unit m = fun st _ -> st, ()
 
@@ -234,15 +234,15 @@ module CoversetState = struct
     set st
 
   let rec map_l : ('a -> 'b mm) -> 'a list -> 'b list mm
-  = fun f l -> match l with
-    | [] -> yield []
-    | x :: tl ->
+    = fun f l -> match l with
+      | [] -> yield []
+      | x :: tl ->
         f x >>>= fun x' ->
         map_l f tl >>>= fun tl' ->
         yield (x'::tl')
 
   let run : 'a mm -> t -> 'a list
-  = fun m st -> List.map snd (m st)
+    = fun m st -> List.map snd (m st)
 end
 
 let n_ = ref 0
@@ -420,13 +420,13 @@ let cst_of_id id ty =
 let cst_of_term t =
   let ty = T.ty t in
   match T.view t with
-  | T.Const id ->
-    if Ind_ty.is_inductive_type ty
-    then match as_cst id with
-      | Some _ as res -> res
-      | None -> Some (declare_cst id ~ty)
-    else None
-  | _ -> None (* TODO: allow function, if not a constructor *)
+    | T.Const id ->
+      if Ind_ty.is_inductive_type ty
+      then match as_cst id with
+        | Some _ as res -> res
+        | None -> Some (declare_cst id ~ty)
+      else None
+    | _ -> None (* TODO: allow function, if not a constructor *)
 
 let is_potential_cst (id:ID.t) (ty:Type.t): bool =
   let n_tyvars, ty_args, ty_ret = Type.open_poly_fun ty in
@@ -442,15 +442,15 @@ let find_cst_in_term t =
   T.Seq.subterms t
   |> Sequence.filter_map
     (fun t -> match T.view t with
-      | T.Const id ->
-        if is_potential_cst id (T.ty t)
-        then (
-          let n_tyvars, ty_args, ty_ret = Type.open_poly_fun (T.ty t) in
-          assert (n_tyvars=0 && ty_args=[]);
-          Some (cst_of_id id ty_ret) (* bingo *)
-        )
-        else None
-      | _ -> None)
+       | T.Const id ->
+         if is_potential_cst id (T.ty t)
+         then (
+           let n_tyvars, ty_args, ty_ret = Type.open_poly_fun (T.ty t) in
+           assert (n_tyvars=0 && ty_args=[]);
+           Some (cst_of_id id ty_ret) (* bingo *)
+         )
+         else None
+       | _ -> None)
 
 (** {6 Path} *)
 
@@ -494,14 +494,14 @@ let path_contains_cst p c =
 
 let pp_path out p =
   let rec aux out = function
-  | [] -> ()
-  | c :: p' ->
-    Format.fprintf out "@[<hv>[@[%a = %a@]@ for @[<v>%a@]]@]"
-      pp_cst c.path_cst pp_case c.path_case
-      (Util.pp_list ClauseContext.pp) c.path_clauses;
-    if p' <> [] then (
-      Format.fprintf out "@,@<1>·%a" aux p'
-    );
+    | [] -> ()
+    | c :: p' ->
+      Format.fprintf out "@[<hv>[@[%a = %a@]@ for @[<v>%a@]]@]"
+        pp_cst c.path_cst pp_case c.path_case
+        (Util.pp_list ClauseContext.pp) c.path_clauses;
+      if p' <> [] then (
+        Format.fprintf out "@,@<1>·%a" aux p'
+      );
   in
   Format.fprintf out "@[<hv>%a@]" aux p
 
@@ -509,6 +509,6 @@ let lits_of_path p =
   Array.of_list p
   |> Array.map
     (fun c ->
-      let l = cst_to_term c.path_cst in
-      let r = case_to_term c.path_case in
-      Literal.mk_eq l r)
+       let l = cst_to_term c.path_cst in
+       let r = case_to_term c.path_case in
+       Literal.mk_eq l r)

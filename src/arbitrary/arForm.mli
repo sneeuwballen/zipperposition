@@ -15,7 +15,7 @@ val atom : form arbitrary
 (** Atomic formula *)
 
 val clause_g : form list gen
-    
+
 val clause : form list arbitrary
 (** clause *)
 

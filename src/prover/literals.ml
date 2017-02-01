@@ -19,20 +19,20 @@ let prof_maxlits = Util.mk_profiler "lits.maxlits"
 let equal lits1 lits2 =
   let rec check i =
     if i = Array.length lits1 then true else
-    Lit.equal lits1.(i) lits2.(i) && check (i+1)
+      Lit.equal lits1.(i) lits2.(i) && check (i+1)
   in
   if Array.length lits1 <> Array.length lits2
-    then false
-    else check 0
+  then false
+  else check 0
 
 let equal_com lits1 lits2 =
   let rec check i =
     if i = Array.length lits1 then true else
-    Lit.equal_com lits1.(i) lits2.(i) && check (i+1)
+      Lit.equal_com lits1.(i) lits2.(i) && check (i+1)
   in
   if Array.length lits1 <> Array.length lits2
-    then false
-    else check 0
+  then false
+  else check 0
 
 let compare lits1 lits2 =
   let rec check i =
@@ -41,8 +41,8 @@ let compare lits1 lits2 =
       if cmp = 0 then check (i+1) else cmp
   in
   if Array.length lits1 <> Array.length lits2
-    then Array.length lits1 - Array.length lits2
-    else check 0
+  then Array.length lits1 - Array.length lits2
+  else check 0
 
 let hash lits = Hash.array Lit.hash lits
 
@@ -50,28 +50,28 @@ let variant ?(subst=S.empty) (a1,sc1) (a2,sc2) k =
   (* match a1.(i...) with a2\bv *)
   let rec iter2 subst bv i =
     if i = Array.length a1
-      then k subst
-      else iter3 subst bv i 0
+    then k subst
+    else iter3 subst bv i 0
   (* find a matching literal for a1.(i), within a2.(j...) *)
   and iter3 subst bv i j =
     if j = Array.length a2
-      then ()  (* stop *)
+    then ()  (* stop *)
     else (
       if not (BV.get bv j)
-        then (
-          (* try to match i-th literal of a1 with j-th literal of a2 *)
-          BV.set bv j;
-          Lit.variant ~subst (a1.(i),sc1) (a2.(i),sc2)
-            (fun subst -> iter2 subst bv (i+1));
-          BV.reset bv j
-        );
+      then (
+        (* try to match i-th literal of a1 with j-th literal of a2 *)
+        BV.set bv j;
+        Lit.variant ~subst (a1.(i),sc1) (a2.(i),sc2)
+          (fun subst -> iter2 subst bv (i+1));
+        BV.reset bv j
+      );
       iter3 subst bv i (j+1)
     )
   in
   if Array.length a1 = Array.length a2
-    then
-      let bv = BV.create ~size:(Array.length a1) false in
-      iter2 subst bv 0
+  then
+    let bv = BV.create ~size:(Array.length a1) false in
+    iter2 subst bv 0
 
 let are_variant a1 a2 =
   not (Sequence.is_empty (variant (Scoped.make a1 0) (Scoped.make a2 1)))
@@ -122,15 +122,15 @@ let neg lits =
 
 (** Multiset of literals, with their index *)
 module MLI = Multiset.Make(struct
-  type t = Lit.t * int
-  let compare (l1,i1)(l2,i2) =
-    if i1=i2 then Lit.compare l1 l2 else Pervasives.compare i1 i2
-end)
+    type t = Lit.t * int
+    let compare (l1,i1)(l2,i2) =
+      if i1=i2 then Lit.compare l1 l2 else Pervasives.compare i1 i2
+  end)
 
 let _compare_lit_with_idx ~ord (lit1,i1) (lit2,i2) =
   if i1=i2
-    then Comparison.Eq (* ignore collisions *)
-    else Lit.Comp.compare ~ord lit1 lit2
+  then Comparison.Eq (* ignore collisions *)
+  else Lit.Comp.compare ~ord lit1 lit2
 
 let _to_multiset_with_idx lits =
   CCArray.foldi
@@ -142,8 +142,8 @@ let maxlits_l ~ord lits =
   Util.enter_prof prof_maxlits;
   let m = _to_multiset_with_idx lits in
   let max = MLI.max_seq (_compare_lit_with_idx ~ord) m
-    |> Sequence.map2 (fun x _ -> x)
-    |> Sequence.to_list
+            |> Sequence.map2 (fun x _ -> x)
+            |> Sequence.to_list
   in
   Util.exit_prof prof_maxlits;
   max
@@ -152,9 +152,9 @@ let maxlits ~ord lits =
   Util.enter_prof prof_maxlits;
   let m = _to_multiset_with_idx lits in
   let max = MLI.max_seq (_compare_lit_with_idx ~ord) m
-    |> Sequence.map2 (fun x _ -> snd x)
-    |> Sequence.to_list
-    |> BV.of_list
+            |> Sequence.map2 (fun x _ -> snd x)
+            |> Sequence.to_list
+            |> BV.of_list
   in
   Util.exit_prof prof_maxlits;
   max
@@ -195,7 +195,7 @@ module Pos = struct
   let _fail_pos pos =
     let msg =
       CCFormat.sprintf
-      "@[<2>invalid literal-array position@ @[%a@]@]" Position.pp pos in
+        "@[<2>invalid literal-array position@ @[%a@]@]" Position.pp pos in
     invalid_arg msg
 
   let at lits pos = match pos with
@@ -278,30 +278,30 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits k =
     else if not (eligible i lits.(i)) then aux (i+1)
     else (
       begin match lits.(i) with
-      | Lit.Equation (l,r,sign) when sign_ok sign ->
-        begin match Ordering.compare ord l r with
-        | Comparison.Gt ->
-            k (l, r, sign, Position.(arg i @@ left @@ stop))
-        | Comparison.Lt ->
-            k (r, l, sign, Position.(arg i @@ right @@ stop))
-        | Comparison.Eq
-        | Comparison.Incomparable ->
-          if both
-          then (
-            (* visit both sides of the equation *)
-            k (r, l, sign, Position.(arg i @@ right @@ stop));
-            k (l, r, sign, Position.(arg i @@ left @@ stop))
-          ) else
-            (* only one side *)
-            k (l, r, sign, Position.(arg i @@ left @@ stop))
-        end
-      | Lit.Prop (p, sign) when sign_ok sign ->
+        | Lit.Equation (l,r,sign) when sign_ok sign ->
+          begin match Ordering.compare ord l r with
+            | Comparison.Gt ->
+              k (l, r, sign, Position.(arg i @@ left @@ stop))
+            | Comparison.Lt ->
+              k (r, l, sign, Position.(arg i @@ right @@ stop))
+            | Comparison.Eq
+            | Comparison.Incomparable ->
+              if both
+              then (
+                (* visit both sides of the equation *)
+                k (r, l, sign, Position.(arg i @@ right @@ stop));
+                k (l, r, sign, Position.(arg i @@ left @@ stop))
+              ) else
+                (* only one side *)
+                k (l, r, sign, Position.(arg i @@ left @@ stop))
+          end
+        | Lit.Prop (p, sign) when sign_ok sign ->
           k (p, T.true_, sign, Position.(arg i @@ left @@ stop))
-      | Lit.Prop _
-      | Lit.Equation _
-      | Lit.Arith _
-      | Lit.True
-      | Lit.False -> ()
+        | Lit.Prop _
+        | Lit.Equation _
+        | Lit.Arith _
+        | Lit.True
+        | Lit.False -> ()
       end;
       aux (i+1)
     )
@@ -314,8 +314,8 @@ let fold_arith ~eligible lits k =
     else if not (eligible i lits.(i)) then aux (i+1)
     else (
       begin match Lit.View.get_arith lits.(i) with
-      | None -> ()
-      | Some x ->
+        | None -> ()
+        | Some x ->
           let pos = Position.(arg i stop) in
           k (x, pos)
       end;
@@ -327,26 +327,26 @@ let fold_arith_terms ~eligible ~which ~ord lits k =
   let module M = Monome in let module MF = Monome.Focus in
   fold_arith ~eligible lits
     (fun (a_lit, pos) ->
-      (* do we use the given term? *)
-      let do_term =
-        match which with
-        | `All -> (fun _ -> true)
-        | `Max ->
-          let max_terms = ArithLit.max_terms ~ord a_lit in
-          fun t -> CCList.Set.mem ~eq:T.equal t max_terms
-      in
-      ArithLit.Focus.fold_terms ~pos a_lit
-        (fun (foc_lit, pos) ->
-          let t = ArithLit.Focus.term foc_lit in
-          if do_term t then k (t, foc_lit, pos))
+       (* do we use the given term? *)
+       let do_term =
+         match which with
+           | `All -> (fun _ -> true)
+           | `Max ->
+             let max_terms = ArithLit.max_terms ~ord a_lit in
+             fun t -> CCList.Set.mem ~eq:T.equal t max_terms
+       in
+       ArithLit.Focus.fold_terms ~pos a_lit
+         (fun (foc_lit, pos) ->
+            let t = ArithLit.Focus.term foc_lit in
+            if do_term t then k (t, foc_lit, pos))
     )
 
 let fold_terms ?(vars=false) ?ty_args ~(which : [< `All|`Max])
-~ord ~subterms ~eligible lits k =
+    ~ord ~subterms ~eligible lits k =
   let rec aux i =
     if i = Array.length lits then ()
     else if not (eligible i lits.(i))
-      then aux (i+1) (* ignore lit *)
+    then aux (i+1) (* ignore lit *)
     else (
       Lit.fold_terms
         ~position:Position.(arg i stop) ?ty_args ~vars ~which ~ord ~subterms
@@ -358,8 +358,8 @@ let fold_terms ?(vars=false) ?ty_args ~(which : [< `All|`Max])
 
 let symbols ?(init=ID.Set.empty) lits =
   Sequence.of_array lits
-    |> Sequence.flat_map Lit.Seq.symbols
-    |> ID.Set.add_seq init
+  |> Sequence.flat_map Lit.Seq.symbols
+  |> ID.Set.add_seq init
 
 (** {3 IO} *)
 
@@ -396,12 +396,12 @@ let to_string a = CCFormat.to_string pp a
 let is_RR_horn_clause lits =
   let bv = pos lits in
   match BV.to_list bv with
-  | [i] ->
-    (* single positive lit, check variables restrictions, ie all vars
-        occur in the head *)
-    let hd_vars = Lit.vars lits.(i) in
-    List.length hd_vars = List.length (vars lits)
-  | _ -> false
+    | [i] ->
+      (* single positive lit, check variables restrictions, ie all vars
+          occur in the head *)
+      let hd_vars = Lit.vars lits.(i) in
+      List.length hd_vars = List.length (vars lits)
+    | _ -> false
 
 (** Recognizes Horn clauses (at most one positive literal) *)
 let is_horn lits =
@@ -410,7 +410,7 @@ let is_horn lits =
 
 let is_pos_eq lits =
   match lits with
-  | [| Lit.Equation (l,r,true) |] -> Some (l,r)
-  | [| Lit.Prop(p,true) |] -> Some (p, T.true_)
-  | [| Lit.True |] -> Some (T.true_, T.true_)
-  | _ -> None
+    | [| Lit.Equation (l,r,true) |] -> Some (l,r)
+    | [| Lit.Prop(p,true) |] -> Some (p, T.true_)
+    | [| Lit.True |] -> Some (T.true_, T.true_)
+    | _ -> None

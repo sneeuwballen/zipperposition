@@ -33,23 +33,23 @@ type 'a arbitrary = 'a QCheck.Arbitrary.t
 (** {2 first order terms} *)
 
 val ground : Untyped.FO.t arbitrary
-  (** Ground terms (unsorted) *)
+(** Ground terms (unsorted) *)
 
 val base : Untyped.FO.t arbitrary
-  (** Basic terms (unsorted) *)
+(** Basic terms (unsorted) *)
 
 val default : Untyped.FO.t arbitrary
-  (** Polymorphic terms *)
+(** Polymorphic terms *)
 
 val arith : Untyped.FO.t arbitrary
-  (** Arithmetic terms *)
+(** Arithmetic terms *)
 
 (** {2 higher order terms} *)
 
 module HO : sig
   val ground : Untyped.HO.t arbitrary
-    (** Ground, non sorted HO terms *)
+  (** Ground, non sorted HO terms *)
 
   val default : Untyped.HO.t arbitrary
-    (** Polymorphic HO terms *)
+  (** Polymorphic HO terms *)
 end

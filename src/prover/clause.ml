@@ -172,15 +172,15 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       c
     in
     match Stmt.view st with
-    | Stmt.Data _
-    | Stmt.TyDecl _ -> []
-    | Stmt.Def _
-    | Stmt.RewriteForm _
-    | Stmt.RewriteTerm _ -> [] (* dealt with by rewriting *)
-    | Stmt.Assert lits -> [of_lits lits]
-    | Stmt.Goal lits -> [of_lits lits]
-    | Stmt.Lemma l
-    | Stmt.NegatedGoal (_,l) -> List.map of_lits l
+      | Stmt.Data _
+      | Stmt.TyDecl _ -> []
+      | Stmt.Def _
+      | Stmt.RewriteForm _
+      | Stmt.RewriteTerm _ -> [] (* dealt with by rewriting *)
+      | Stmt.Assert lits -> [of_lits lits]
+      | Stmt.Goal lits -> [of_lits lits]
+      | Stmt.Lemma l
+      | Stmt.NegatedGoal (_,l) -> List.map of_lits l
 
   let update_trail f c =
     let sclause = SClause.update_trail f c.sclause in
@@ -300,15 +300,15 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let is_oriented_rule c =
     let ord = Ctx.ord () in
     match c.sclause.lits with
-    | [| Lit.Equation (l, r, true) |] ->
+      | [| Lit.Equation (l, r, true) |] ->
         begin match Ordering.compare ord l r with
           | Comparison.Gt
           | Comparison.Lt -> true
           | Comparison.Eq
           | Comparison.Incomparable -> false
         end
-    | [| Lit.Prop (_, true) |] -> true
-    | _ -> false
+      | [| Lit.Prop (_, true) |] -> true
+      | _ -> false
 
   let symbols ?(init=ID.Set.empty) seq =
     Sequence.fold

@@ -15,7 +15,7 @@ end
 let stat_num_lit = Util.mk_stat "msat.num_lits"
 
 module Make(Payload : PAYLOAD)
-: S with type payload = Payload.t
+  : S with type payload = Payload.t
 = struct
   type t = {
     id: int; (* sign = sign of literal *)
@@ -44,10 +44,10 @@ module Make(Payload : PAYLOAD)
         payload;
         neg;
       } and neg = {
-        id= -id;
-        payload;
-        neg=pos;
-      } in
+          id= -id;
+          payload;
+          neg=pos;
+        } in
       pos
 
   let hash i = Hash.int i.id

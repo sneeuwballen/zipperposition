@@ -4,9 +4,9 @@
 
 (** {1 Scoped Value}
 
-  A scoped value is a pair of the value and an (integer) scope.
-  The value contains variables, but a value in a scope A
-  share no variables with the same value in any scope B ≠ A.
+    A scoped value is a pair of the value and an (integer) scope.
+    The value contains variables, but a value in a scope A
+    share no variables with the same value in any scope B ≠ A.
 
 *)
 

@@ -10,7 +10,7 @@ type symbol_status =
 (** {2 Constraints} *)
 module Constr : sig
   type 'a t = private ID.t -> ID.t -> int
-  constraint 'a = [< `partial | `total]
+    constraint 'a = [< `partial | `total]
   (** A partial order on symbols, used to make the precedence more
       precise.
       ['a] encodes the kind of ordering: partial or total

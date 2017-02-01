@@ -12,43 +12,43 @@ type 'a or_error = ('a, string) CCResult.t
 (** {2 Phases} *)
 
 type env_with_clauses =
-  Env_clauses : 'c Env.packed * 'c CCVector.ro_vector -> env_with_clauses
+    Env_clauses : 'c Env.packed * 'c CCVector.ro_vector -> env_with_clauses
 
 type env_with_result =
-  Env_result : 'c Env.packed * Saturate.szs_status -> env_with_result
+    Env_result : 'c Env.packed * Saturate.szs_status -> env_with_result
 
 type ('ret, 'before, 'after) phase =
   | Init : (unit, _, [`Init]) phase (* global setup *)
   | Setup_gc : (unit, [`Init], [`Init]) phase
   | Setup_signal : (unit, [`Init], [`Init]) phase
   | Parse_CLI :
-    (filename list * Params.t, [`Init], [`Parse_cli]) phase
-    (* parse CLI options: get a list of files to process, and parameters *)
+      (filename list * Params.t, [`Init], [`Parse_cli]) phase
+  (* parse CLI options: get a list of files to process, and parameters *)
   | LoadExtensions : (Extensions.t list, [`Parse_cli], [`LoadExtensions]) phase
   | Start_file :
-    (filename, [`LoadExtensions], [`Start_file]) phase (* file to process *)
+      (filename, [`LoadExtensions], [`Start_file]) phase (* file to process *)
   | Parse_file :
-    (UntypedAST.statement Sequence.t, [`Start_file], [`Parse_file]) phase (* parse some file *)
+      (UntypedAST.statement Sequence.t, [`Start_file], [`Parse_file]) phase (* parse some file *)
   | Typing :
-    (TypeInference.typed_statement CCVector.ro_vector, [`Parse_file], [`Typing]) phase
+      (TypeInference.typed_statement CCVector.ro_vector, [`Parse_file], [`Typing]) phase
   | CNF :
-    (Statement.clause_t CCVector.ro_vector, [`Typing], [`CNF]) phase
+      (Statement.clause_t CCVector.ro_vector, [`Typing], [`CNF]) phase
   | Compute_prec :
-    (Precedence.t, [`CNF], [`Precedence]) phase
+      (Precedence.t, [`CNF], [`Precedence]) phase
   | Compute_ord_select :
-    (Ordering.t * Selection.t, [`Precedence], [`Compute_ord_select]) phase
-    (* compute orderign and selection function *)
+      (Ordering.t * Selection.t, [`Precedence], [`Compute_ord_select]) phase
+  (* compute orderign and selection function *)
 
   | MakeCtx : ((module Ctx.S), [`Compute_ord_select], [`MakeCtx]) phase
 
   | MakeEnv : (env_with_clauses, [`MakeCtx], [`MakeEnv]) phase
 
   | Pre_saturate :
-    ('c Env.packed * Saturate.szs_status * 'c CCVector.ro_vector,
-      [`MakeEnv], [`Pre_saturate]) phase
+      ('c Env.packed * Saturate.szs_status * 'c CCVector.ro_vector,
+       [`MakeEnv], [`Pre_saturate]) phase
 
   | Saturate :
-    (env_with_result, [`Pre_saturate], [`Saturate]) phase
+      (env_with_result, [`Pre_saturate], [`Saturate]) phase
 
   | Print_result : (unit, [`Saturate], [`Print_result]) phase
   | Print_stats : (unit, [`Print_result], [`Print_stats]) phase
@@ -72,25 +72,25 @@ type (+'a, 'p1, 'p2) t = State.t -> (State.t * 'a) or_error
 
 let string_of_phase : type a b c. (a,b,c) phase -> string
   = function
-  | Init -> "init"
-  | Setup_gc -> "setup_gc"
-  | Setup_signal -> "setup_signal"
-  | Parse_CLI  -> "parse_cli"
-  | LoadExtensions -> "load_extensions"
-  | Start_file -> "start_file"
-  | Parse_file -> "parse_file"
-  | Typing -> "typing"
-  | CNF -> "cnf"
-  | Compute_prec -> "compute_prec"
-  | Compute_ord_select -> "compute_ord_select"
-  | MakeCtx -> "make_ctx"
-  | MakeEnv -> "make_env"
-  | Pre_saturate  -> "pre_saturate"
-  | Saturate -> "saturate"
-  | Print_result -> "print_result"
-  | Print_stats -> "print_stats"
-  | Print_dot -> "print_dot"
-  | Exit -> "exit"
+    | Init -> "init"
+    | Setup_gc -> "setup_gc"
+    | Setup_signal -> "setup_signal"
+    | Parse_CLI  -> "parse_cli"
+    | LoadExtensions -> "load_extensions"
+    | Start_file -> "start_file"
+    | Parse_file -> "parse_file"
+    | Typing -> "typing"
+    | CNF -> "cnf"
+    | Compute_prec -> "compute_prec"
+    | Compute_ord_select -> "compute_ord_select"
+    | MakeCtx -> "make_ctx"
+    | MakeEnv -> "make_env"
+    | Pre_saturate  -> "pre_saturate"
+    | Saturate -> "saturate"
+    | Print_result -> "print_result"
+    | Print_stats -> "print_stats"
+    | Print_dot -> "print_dot"
+    | Exit -> "exit"
 
 let string_of_any_phase (Any_phase p) = string_of_phase p
 
@@ -104,13 +104,13 @@ let fail msg _ = E.Error msg
 
 let bind x ~f st =
   match x st with
-  | E.Ok (st, x) -> f x st
-  | E.Error msg -> E.Error msg  (*  cut evaluation *)
+    | E.Ok (st, x) -> f x st
+    | E.Error msg -> E.Error msg  (*  cut evaluation *)
 
 let bind_err e ~f st =
   match e with
-  | E.Ok x -> f x st
-  | E.Error msg -> fail msg st (*  cut evaluation *)
+    | E.Ok x -> f x st
+    | E.Error msg -> fail msg st (*  cut evaluation *)
 
 let map x ~f st = match x st with
   | E.Error msg -> E.Error msg
@@ -164,8 +164,8 @@ let get st = E.Ok (st, st)
 
 let get_key k st =
   match Flex_state.get k st with
-  | None -> E.Error "key not found"
-  | Some v -> E.Ok (st, v)
+    | None -> E.Error "key not found"
+    | Some v -> E.Ok (st, v)
 
 let set new_st _st = E.Ok (new_st, ())
 
@@ -178,11 +178,11 @@ let run_parallel l =
     | [] -> return ()
     | [a] -> a
     | a :: tail ->
-        get >>= fun old_st ->
-        a >>= fun () ->
-        (* restore old state *)
-        set old_st >>= fun () ->
-        aux tail
+      get >>= fun old_st ->
+      a >>= fun () ->
+      (* restore old state *)
+      set old_st >>= fun () ->
+      aux tail
   in
   aux l
 

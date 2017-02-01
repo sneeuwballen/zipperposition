@@ -37,15 +37,15 @@ let default_fuel n =
        let self = self (n-1) in
        if n<=0 then atom_g
        else oneof
-         [ list_size (1--4) self >|= F.or_
-         ; list_size (1--4) self >|= F.and_
-         ; map2 F.equiv self self
-         ; map2 F.imply self self
-         ; map F.not_ self
-         ; map F.close_forall self
-         ; map F.close_forall self
-         ; atom_g
-         ])
+           [ list_size (1--4) self >|= F.or_
+           ; list_size (1--4) self >|= F.and_
+           ; map2 F.equiv self self
+           ; map2 F.imply self self
+           ; map F.not_ self
+           ; map F.close_forall self
+           ; map F.close_forall self
+           ; atom_g
+           ])
     n
 
 let default_g = QCheck.Gen.(1 -- 4 >>= default_fuel)

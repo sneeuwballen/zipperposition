@@ -3,8 +3,8 @@
 
 (** {1 Simple Typed Terms}.
 
-These terms are scoped, and possibly typed. Type inference should be
-performed on them. *)
+    These terms are scoped, and possibly typed. Type inference should be
+    performed on them. *)
 
 type location = ParseLocation.t
 

@@ -115,7 +115,7 @@ module Make(E : Env_intf.S) = struct
                      let renaming = E.Ctx.renaming_clear () in
                      let new_lits =
                        (Literal.apply_subst_list ~renaming subst (lits',0)) @
-                       (Literal.apply_subst_list ~renaming subst (c',1))
+                         (Literal.apply_subst_list ~renaming subst (c',1))
                      in
                      C.create ~trail:(C.trail c) new_lits proof)
                   (RR.rhs_clause rule)
@@ -167,8 +167,8 @@ let normalize_simpl (module E : Env_intf.S) =
 let extension =
   let open Extensions in
   { default with
-    name = "rewriting";
-    post_cnf_actions=[post_cnf];
-    env_actions=[normalize_simpl];
+      name = "rewriting";
+      post_cnf_actions=[post_cnf];
+      env_actions=[normalize_simpl];
   }
 

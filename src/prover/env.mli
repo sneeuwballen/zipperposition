@@ -14,5 +14,5 @@ module Make(X : sig
     val params : Params.t
     val flex_state : Flex_state.t
   end) : sig
-    include S with module Ctx = X.Ctx
-  end
+  include S with module Ctx = X.Ctx
+end

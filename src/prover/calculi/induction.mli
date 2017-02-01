@@ -6,9 +6,9 @@
 module type S = Induction_intf.S
 
 module Make
-(E: Env.S)
-(A : Avatar_intf.S with module E = E)
+    (E: Env.S)
+    (A : Avatar_intf.S with module E = E)
   : S
-  with module Env = E
+    with module Env = E
 
 val extension : Extensions.t

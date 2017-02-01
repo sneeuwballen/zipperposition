@@ -137,9 +137,9 @@ module KBO : ORD = struct
   let _weight prec = function
     | IOB.B _ -> 1
     | IOB.I s ->
-        let x = Prec.weight prec s in
-        assert (x>0);
-        x
+      let x = Prec.weight prec s in
+      assert (x>0);
+      x
 
   (** the KBO ordering itself. The implementation is borrowed from
       the kbo_5 version of "things to know when implementing KBO".
@@ -150,42 +150,42 @@ module KBO : ORD = struct
         stands for positive (is t the left term) *)
     let rec balance_weight wb t y pos =
       match TC.view t with
-      | TC.Var x ->
+        | TC.Var x ->
           let x = HVar.id x in
           if pos
           then (add_pos_var balance x; (wb + 1, x = y))
           else (add_neg_var balance x; (wb - 1, x = y))
-      | TC.DB _ -> (if pos then wb + 1 else wb - 1), false
-      | TC.App (s, l) ->
+        | TC.DB _ -> (if pos then wb + 1 else wb - 1), false
+        | TC.App (s, l) ->
           let wb' = if pos
             then wb + _weight prec (IOB.I s)
             else wb - _weight prec (IOB.I s) in
           balance_weight_rec wb' l y pos false
-      | TC.AppBuiltin (b,l) ->
+        | TC.AppBuiltin (b,l) ->
           let wb' = if pos
             then wb + _weight prec (IOB.B b)
             else wb - _weight prec (IOB.B b) in
           balance_weight_rec wb' l y pos false
-      | TC.NonFO -> assert false
+        | TC.NonFO -> assert false
     (** list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms y pos res = match terms with
       | [] -> (wb, res)
       | t::terms' ->
-          let (wb', res') = balance_weight wb t y pos in
-          balance_weight_rec wb' terms' y pos (res || res')
+        let (wb', res') = balance_weight wb t y pos in
+        balance_weight_rec wb' terms' y pos (res || res')
     (** lexicographic comparison *)
     and tckbolex wb terms1 terms2 =
       match terms1, terms2 with
-      | [], [] -> wb, Eq
-      | t1::terms1', t2::terms2' ->
+        | [], [] -> wb, Eq
+        | t1::terms1', t2::terms2' ->
           begin match tckbo wb t1 t2 with
-           | (wb', Eq) -> tckbolex wb' terms1' terms2'
-           | (wb', res) -> (* just compute the weights and return result *)
-               let wb'', _ = balance_weight_rec wb' terms1' 0 true false in
-               let wb''', _ = balance_weight_rec wb'' terms2' 0 false false in
-               wb''', res
+            | (wb', Eq) -> tckbolex wb' terms1' terms2'
+            | (wb', res) -> (* just compute the weights and return result *)
+              let wb'', _ = balance_weight_rec wb' terms1' 0 true false in
+              let wb''', _ = balance_weight_rec wb'' terms2' 0 false false in
+              wb''', res
           end
-      | [], _ | _, [] -> failwith "different arities in lexicographic comparison"
+        | [], _ | _, [] -> failwith "different arities in lexicographic comparison"
     (** commutative comparison. Not linear, must call kbo to
         avoid breaking the weight computing invariants *)
     and tckbocommute wb ss ts =
@@ -198,33 +198,33 @@ module KBO : ORD = struct
     (** tupled version of kbo (kbo_5 of the paper) *)
     and tckbo wb t1 t2 =
       match TC.view t1, TC.view t2 with
-      | _ when T.equal t1 t2 -> (wb, Eq) (* do not update weight or var balance *)
-      | TC.Var x, TC.Var y ->
+        | _ when T.equal t1 t2 -> (wb, Eq) (* do not update weight or var balance *)
+        | TC.Var x, TC.Var y ->
           add_pos_var balance (HVar.id x);
           add_neg_var balance (HVar.id y);
           (wb, Incomparable)
-      | TC.NonFO, _
-      | _, TC.NonFO -> wb, Incomparable
-      | TC.Var x,  _ ->
+        | TC.NonFO, _
+        | _, TC.NonFO -> wb, Incomparable
+        | TC.Var x,  _ ->
           add_pos_var balance (HVar.id x);
           let wb', contains = balance_weight wb t2 (HVar.id x) false in
           (wb' + 1, if contains then Lt else Incomparable)
-      |  _, TC.Var y ->
+        |  _, TC.Var y ->
           add_neg_var balance (HVar.id y);
           let wb', contains = balance_weight wb t1 (HVar.id y) true in
           (wb' - 1, if contains then Gt else Incomparable)
-      (* node/node, De Bruijn/De Bruijn *)
-      | TC.App (f, ss), TC.App (g, ts) -> tckbo_composite wb (IOB.I f) (IOB.I g) ss ts
-      | TC.AppBuiltin (f, ss), TC.App (g, ts) -> tckbo_composite wb (IOB.B f) (IOB.I g) ss ts
-      | TC.App (f, ss), TC.AppBuiltin (g, ts) -> tckbo_composite wb (IOB.I f) (IOB.B g) ss ts
-      | TC.AppBuiltin (f, ss), TC.AppBuiltin (g, ts) -> tckbo_composite wb (IOB.B f) (IOB.B g) ss ts
-      | TC.DB i, TC.DB j ->
+        (* node/node, De Bruijn/De Bruijn *)
+        | TC.App (f, ss), TC.App (g, ts) -> tckbo_composite wb (IOB.I f) (IOB.I g) ss ts
+        | TC.AppBuiltin (f, ss), TC.App (g, ts) -> tckbo_composite wb (IOB.B f) (IOB.I g) ss ts
+        | TC.App (f, ss), TC.AppBuiltin (g, ts) -> tckbo_composite wb (IOB.I f) (IOB.B g) ss ts
+        | TC.AppBuiltin (f, ss), TC.AppBuiltin (g, ts) -> tckbo_composite wb (IOB.B f) (IOB.B g) ss ts
+        | TC.DB i, TC.DB j ->
           (wb, if i = j then Eq else Incomparable)
-      (* node and something else *)
-      | (TC.App (_, _) | TC.AppBuiltin _), TC.DB _ ->
+        (* node and something else *)
+        | (TC.App (_, _) | TC.AppBuiltin _), TC.DB _ ->
           let wb', _ = balance_weight wb t1 0 true in
           wb'-1, Comparison.Gt
-      | TC.DB _, (TC.App (_, _) | TC.AppBuiltin _) ->
+        | TC.DB _, (TC.App (_, _) | TC.AppBuiltin _) ->
           let wb', _ = balance_weight wb t1 0 false in
           wb'+1, Comparison.Lt
     (** tckbo, for composite terms (ie non variables). It takes a ID.t
@@ -240,23 +240,23 @@ module KBO : ORD = struct
       if wb'' > 0 then wb'', g_or_n
       else if wb'' < 0 then wb'', l_or_n
       else match prec_compare prec f g with
-          | n when n > 0 -> wb'', g_or_n
-          | n when n < 0 ->  wb'', l_or_n
-          | _ ->
-              assert (List.length ss = List.length ts);
-              if recursive = Eq then wb'', Eq
-              else if recursive = Lt then wb'', l_or_n
-              else if recursive = Gt then wb'', g_or_n
-              else wb'', Incomparable
+        | n when n > 0 -> wb'', g_or_n
+        | n when n < 0 ->  wb'', l_or_n
+        | _ ->
+          assert (List.length ss = List.length ts);
+          if recursive = Eq then wb'', Eq
+          else if recursive = Lt then wb'', l_or_n
+          else if recursive = Gt then wb'', g_or_n
+          else wb'', Incomparable
     (** recursive comparison *)
     and tckbo_rec wb f g ss ts =
       if IOB.equal f g
       then match prec_status prec f with
         | Prec.Multiset ->
-            (* use multiset or lexicographic comparison *)
-            tckbocommute wb ss ts
+          (* use multiset or lexicographic comparison *)
+          tckbocommute wb ss ts
         | Prec.Lexicographic ->
-            tckbolex wb ss ts
+          tckbolex wb ss ts
       else
         (* just compute variable and weight balances *)
         let wb', _ = balance_weight_rec wb ss 0 true false in
@@ -288,53 +288,53 @@ module RPO6 : ORD = struct
   let rec rpo6 ~prec s t =
     if T.equal s t then Eq else  (* equality test is cheap *)
       match TC.view s, TC.view t with
-      | TC.Var _, TC.Var _ -> Incomparable
-      | _, TC.Var var -> if T.var_occurs ~var s then Gt else Incomparable
-      | TC.Var var, _ -> if T.var_occurs ~var t then Lt else Incomparable
-      (* whatever *)
-      | TC.NonFO, _
-      | _, TC.NonFO -> Comparison.Incomparable
-      (* node/node, De Bruijn/De Bruijn *)
-      | TC.App (f, ss), TC.App (g, ts) -> rpo6_composite ~prec s t (IOB.I f) (IOB.I g) ss ts
-      | TC.AppBuiltin (f, ss), TC.App (g, ts) -> rpo6_composite ~prec s t (IOB.B f) (IOB.I g) ss ts
-      | TC.App (f, ss), TC.AppBuiltin (g, ts) -> rpo6_composite ~prec s t (IOB.I f) (IOB.B g) ss ts
-      | TC.AppBuiltin (f, ss), TC.AppBuiltin (g, ts) -> rpo6_composite ~prec s t (IOB.B f) (IOB.B g) ss ts
-      | TC.DB i, TC.DB j ->
+        | TC.Var _, TC.Var _ -> Incomparable
+        | _, TC.Var var -> if T.var_occurs ~var s then Gt else Incomparable
+        | TC.Var var, _ -> if T.var_occurs ~var t then Lt else Incomparable
+        (* whatever *)
+        | TC.NonFO, _
+        | _, TC.NonFO -> Comparison.Incomparable
+        (* node/node, De Bruijn/De Bruijn *)
+        | TC.App (f, ss), TC.App (g, ts) -> rpo6_composite ~prec s t (IOB.I f) (IOB.I g) ss ts
+        | TC.AppBuiltin (f, ss), TC.App (g, ts) -> rpo6_composite ~prec s t (IOB.B f) (IOB.I g) ss ts
+        | TC.App (f, ss), TC.AppBuiltin (g, ts) -> rpo6_composite ~prec s t (IOB.I f) (IOB.B g) ss ts
+        | TC.AppBuiltin (f, ss), TC.AppBuiltin (g, ts) -> rpo6_composite ~prec s t (IOB.B f) (IOB.B g) ss ts
+        | TC.DB i, TC.DB j ->
           if i = j && Type.equal (T.ty s) (T.ty t) then Eq else Incomparable
-      (* node and something else *)
-      | (TC.App _ | TC.AppBuiltin _), TC.DB _ -> Comparison.Incomparable
-      | TC.DB _, (TC.App _ | TC.AppBuiltin _) -> Comparison.Incomparable
+        (* node and something else *)
+        | (TC.App _ | TC.AppBuiltin _), TC.DB _ -> Comparison.Incomparable
+        | TC.DB _, (TC.App _ | TC.AppBuiltin _) -> Comparison.Incomparable
   (* handle the composite cases *)
   and rpo6_composite ~prec s t f g ss ts =
     match prec_compare prec f g with
-    | 0 ->
+      | 0 ->
         begin match prec_status prec f with
           | Precedence.Multiset ->
-              cMultiset ~prec ss ts (* multiset subterm comparison *)
+            cMultiset ~prec ss ts (* multiset subterm comparison *)
           | Precedence.Lexicographic ->
-              cLMA ~prec s t ss ts  (* lexicographic subterm comparison *)
+            cLMA ~prec s t ss ts  (* lexicographic subterm comparison *)
         end
-    | n when n > 0 -> cMA ~prec s ts
-    | n when n < 0 -> Comparison.opp (cMA ~prec t ss)
-    | _ -> assert false  (* match exhaustively *)
+      | n when n > 0 -> cMA ~prec s ts
+      | n when n < 0 -> Comparison.opp (cMA ~prec t ss)
+      | _ -> assert false  (* match exhaustively *)
   (** try to dominate all the terms in ts by s; but by subterm property
       if some t' in ts is >= s then s < t=g(ts) *)
   and cMA ~prec s ts = match ts with
     | [] -> Gt
     | t::ts' ->
-        (match rpo6 ~prec s t with
-         | Gt -> cMA ~prec s ts'
-         | Eq | Lt -> Lt
-         | Incomparable -> Comparison.opp (alpha ~prec ts' s))
+      (match rpo6 ~prec s t with
+        | Gt -> cMA ~prec s ts'
+        | Eq | Lt -> Lt
+        | Incomparable -> Comparison.opp (alpha ~prec ts' s))
   (** lexicographic comparison of s=f(ss), and t=f(ts) *)
   and cLMA ~prec s t ss ts = match ss, ts with
     | si::ss', ti::ts' ->
-        (match rpo6 ~prec si ti with
-         | Eq -> cLMA ~prec s t ss' ts'
-         | Gt -> cMA ~prec s ts' (* just need s to dominate the remaining elements *)
-         | Lt -> Comparison.opp (cMA ~prec t ss')
-         | Incomparable -> cAA ~prec s t ss' ts'
-        )
+      (match rpo6 ~prec si ti with
+        | Eq -> cLMA ~prec s t ss' ts'
+        | Gt -> cMA ~prec s ts' (* just need s to dominate the remaining elements *)
+        | Lt -> Comparison.opp (cMA ~prec t ss')
+        | Incomparable -> cAA ~prec s t ss' ts'
+      )
     | [], [] -> Eq
     | _ -> assert false (* different length... *)
   (** multiset comparison of subterms (not optimized) *)
@@ -343,16 +343,16 @@ module RPO6 : ORD = struct
   (** bidirectional comparison by subterm property (bidirectional alpha) *)
   and cAA ~prec s t ss ts =
     match alpha ~prec ss t with
-    | Gt -> Gt
-    | Incomparable -> Comparison.opp (alpha ~prec ts s)
-    | _ -> assert false
+      | Gt -> Gt
+      | Incomparable -> Comparison.opp (alpha ~prec ts s)
+      | _ -> assert false
   (** if some s in ss is >= t, then s > t by subterm property and transitivity *)
   and alpha ~prec ss t = match ss with
     | [] -> Incomparable
     | s::ss' ->
-        (match rpo6 ~prec s t with
-         | Eq | Gt -> Gt
-         | Incomparable | Lt -> alpha ~prec ss' t)
+      (match rpo6 ~prec s t with
+        | Eq | Gt -> Gt
+        | Incomparable | Lt -> alpha ~prec ss' t)
 
   let compare_terms ~prec x y =
     Util.enter_prof prof_rpo6;

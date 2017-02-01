@@ -35,10 +35,10 @@ module Section = struct
     let rec add s = match s.descr with
       | Root -> true
       | Sub (name, parent, _) ->
-          let parent_is_root = add parent in
-          if not parent_is_root then Buffer.add_char buf '.';
-          Buffer.add_string buf name;
-          false
+        let parent_is_root = add parent in
+        if not parent_is_root then Buffer.add_char buf '.';
+        Buffer.add_string buf name;
+        false
     in
     ignore (add s);
     Buffer.contents buf
@@ -83,9 +83,9 @@ module Section = struct
       | Sub (_, parent, []) -> cur_level_rec parent
       | Sub (_, parent, [i]) -> max (cur_level_rec parent) (cur_level_rec i)
       | Sub (_, parent, inheriting) ->
-          List.fold_left
-            (fun m i -> max m (cur_level_rec i))
-            (cur_level_rec parent) inheriting
+        List.fold_left
+          (fun m i -> max m (cur_level_rec i))
+          (cur_level_rec parent) inheriting
     else s.level
 
   (* inlinable function *)
@@ -108,8 +108,8 @@ let debugf ?(section=Section.root) l msg k =
     else Format.fprintf debug_fmt_ "@{<Black>@[<4>%.3f[%s]@}@ "
         now section.Section.full_name;
     k (Format.kfprintf
-         (fun fmt -> Format.fprintf fmt "@]@.")
-         debug_fmt_ msg)
+        (fun fmt -> Format.fprintf fmt "@]@.")
+        debug_fmt_ msg)
   )
 
 let debug ?section l msg = debugf ?section l "%s" (fun k->k msg)
@@ -144,7 +144,7 @@ let () =
   Printexc.register_printer
     (function
       | Error (where,msg) ->
-          Some (CCFormat.sprintf "@[<2>error in %s:@ %s@]" where msg)
+        Some (CCFormat.sprintf "@[<2>error in %s:@ %s@]" where msg)
       | _ -> None)
 
 let error ~where msg = raise (Error (where,msg))
@@ -274,7 +274,7 @@ let show_profilers out () =
 let () =
   at_exit
     (fun () ->
-      if !enable_profiling then Format.eprintf "%a@." show_profilers ())
+       if !enable_profiling then Format.eprintf "%a@." show_profilers ())
 
 (** {2 Runtime statistics} *)
 

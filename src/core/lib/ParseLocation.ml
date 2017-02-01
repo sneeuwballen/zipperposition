@@ -51,16 +51,16 @@ let hash a = Hashtbl.hash a
 
 let _min_pos (l1,c1) (l2,c2) =
   if l1 = l2
-    then l1, min c1 c2
+  then l1, min c1 c2
   else if l1 < l2
-    then l1, c1
+  then l1, c1
   else l2, c2
 
 let _max_pos (l1,c1) (l2,c2) =
   if l1 = l2
-    then l1, max c1 c2
+  then l1, max c1 c2
   else if l1 < l2
-    then l2, c2
+  then l2, c2
   else l1, c1
 
 let combine p1 p2 =

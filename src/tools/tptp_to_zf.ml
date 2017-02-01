@@ -43,8 +43,8 @@ let () =
   in
   let res = process file in
   match res with
-  | CCResult.Ok () -> ()
-  | CCResult.Error msg ->
+    | CCResult.Ok () -> ()
+    | CCResult.Error msg ->
       print_endline msg;
       exit 1
 

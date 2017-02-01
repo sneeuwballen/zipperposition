@@ -20,8 +20,8 @@ let flag_disable_renaming = ref false
 let options =
   [ "--signature", Arg.Set print_sig, " print signature"
   ; "--distribute-exist"
-      , Arg.Set flag_distribute_exists
-      , " distribute existential quantifiers during miniscoping"
+  , Arg.Set flag_distribute_exists
+  , " distribute existential quantifiers during miniscoping"
   ; "--disable-def", Arg.Set flag_disable_renaming, " disable definitional CNF"
   ; "--time-limit", Arg.Int Util.set_time_limit, " hard time limit (in s)"
   ; "--print-input", Arg.Set print_in, " print input problem"
@@ -32,32 +32,32 @@ let options =
 let print_res decls = match !Options.output with
   | Options.Print_none -> ()
   | Options.Print_normal ->
-      let ppst =
-        Statement.pp
-          (Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp)) T.pp T.pp
-      in
-      Format.printf "@[<v2>%d statements:@ %a@]@."
-        (CCVector.length decls)
-        (CCVector.print ~start:"" ~stop:"" ~sep:"" ppst)
-        decls
+    let ppst =
+      Statement.pp
+        (Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp)) T.pp T.pp
+    in
+    Format.printf "@[<v2>%d statements:@ %a@]@."
+      (CCVector.length decls)
+      (CCVector.print ~start:"" ~stop:"" ~sep:"" ppst)
+      decls
   | Options.Print_tptp ->
-      let ppst out st =
-        Statement.TPTP.pp
-          (Util.pp_list ~sep:" | " (SLiteral.TPTP.pp T.TPTP.pp)) T.TPTP.pp T.TPTP.pp
-          out st
-      in
-      Format.printf "@[<v>%a@]@."
-        (CCVector.print ~start:"" ~stop:"" ~sep:"" ppst)
-        decls
+    let ppst out st =
+      Statement.TPTP.pp
+        (Util.pp_list ~sep:" | " (SLiteral.TPTP.pp T.TPTP.pp)) T.TPTP.pp T.TPTP.pp
+        out st
+    in
+    Format.printf "@[<v>%a@]@."
+      (CCVector.print ~start:"" ~stop:"" ~sep:"" ppst)
+      decls
   | Options.Print_zf ->
-      let ppst out st =
-        Statement.pp
-          (Util.pp_list ~sep:" || " (SLiteral.ZF.pp T.ZF.pp)) T.ZF.pp T.ZF.pp
-          out st
-      in
-      Format.printf "@[<v>%a@]@."
-        (CCVector.print ~start:"" ~stop:"" ~sep:"" ppst)
-        decls
+    let ppst out st =
+      Statement.pp
+        (Util.pp_list ~sep:" || " (SLiteral.ZF.pp T.ZF.pp)) T.ZF.pp T.ZF.pp
+        out st
+    in
+    Format.printf "@[<v>%a@]@."
+      (CCVector.print ~start:"" ~stop:"" ~sep:"" ppst)
+      decls
 
 (* process the given file, converting it to CNF *)
 let process file =
@@ -72,8 +72,8 @@ let process file =
         (CCVector.print ~start:"" ~stop:"" ~sep:"" Statement.pp_input) st;
     let opts =
       (if !flag_distribute_exists then [Cnf.DistributeExists] else []) @
-      (if !flag_disable_renaming then [Cnf.DisableRenaming] else []) @
-      []
+        (if !flag_disable_renaming then [Cnf.DisableRenaming] else []) @
+        []
     in
     let decls = Cnf.cnf_of_seq ~opts ?ctx:None (CCVector.to_seq st) in
     let sigma = Cnf.type_declarations (CCVector.to_seq decls) in
@@ -86,8 +86,8 @@ let process file =
     print_res decls;
     ()
   in match res with
-  | CCResult.Ok () -> ()
-  | CCResult.Error msg ->
+    | CCResult.Ok () -> ()
+    | CCResult.Error msg ->
       print_endline msg;
       exit 1
 

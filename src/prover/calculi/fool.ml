@@ -82,8 +82,8 @@ let extension =
     ET.setup ()
   in
   { Extensions.default with Extensions.
-    name = "fool";
-    env_actions=[register];
+                         name = "fool";
+                         env_actions=[register];
   }
 
 let () = Extensions.register extension

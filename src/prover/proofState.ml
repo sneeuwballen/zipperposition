@@ -93,20 +93,20 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
     let add seq =
       seq
         (fun c ->
-          if not (C.ClauseSet.mem c !clauses_)
-          then (
-            clauses_ := C.ClauseSet.add c !clauses_;
-            Signal.send on_add_clause c
-          ));
+           if not (C.ClauseSet.mem c !clauses_)
+           then (
+             clauses_ := C.ClauseSet.add c !clauses_;
+             Signal.send on_add_clause c
+           ));
       ()
 
     let remove seq =
       seq (fun c ->
-          if C.ClauseSet.mem c !clauses_
-          then (
-            clauses_ := C.ClauseSet.remove c !clauses_;
-            Signal.send on_remove_clause c
-          ));
+        if C.ClauseSet.mem c !clauses_
+        then (
+          clauses_ := C.ClauseSet.remove c !clauses_;
+          Signal.send on_remove_clause c
+        ));
       ()
   end
 
@@ -127,8 +127,8 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
     include MakeClauseSet(struct end)
 
     let queue_ = ref (
-      let p = ClauseQueue.get_profile () in
-      CQueue.of_profile p)
+        let p = ClauseQueue.get_profile () in
+        CQueue.of_profile p)
 
     let queue () = !queue_
 

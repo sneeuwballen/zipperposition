@@ -41,8 +41,8 @@ module Make(E : Env.S) = struct
 
   let is_too_deep c =
     match !depth_limit_ with
-    | None -> false
-    | Some d ->
+      | None -> false
+      | Some d ->
         let lits = C.lits c in
         let depth = max (_depth_types lits) (Literals.depth lits) in
         if depth > d
@@ -72,8 +72,8 @@ let extension =
 let () =
   Params.add_opts
     [ "--depth-limit"
-        , Arg.Int enable_depth_limit
-        , " set maximal term depth"
+    , Arg.Int enable_depth_limit
+    , " set maximal term depth"
     ];
   ()
 

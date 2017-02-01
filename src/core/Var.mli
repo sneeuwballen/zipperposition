@@ -3,9 +3,9 @@
 
 (** {1 Variable}
 
-  A Variable is a pair of a unique Name, and a type.
+    A Variable is a pair of a unique Name, and a type.
 
-  @since NEXT_RELEASE *)
+    @since NEXT_RELEASE *)
 
 type +'a t = private {
   id: ID.t;

@@ -23,7 +23,7 @@ let combine cmp1 cmp2 = match cmp1, cmp2 with
   | Gt, Incomparable | Incomparable, Gt -> Gt
   | Incomparable, Incomparable -> Incomparable
   | _ ->
-      invalid_arg "inconsistent comparisons"
+    invalid_arg "inconsistent comparisons"
 
 let opp cmp = match cmp with
   | Eq | Incomparable -> cmp
@@ -50,8 +50,8 @@ let (++) = lexico
 
 let (@>>) f g x y =
   match f x y with
-  | Eq -> g x y
-  | res -> res
+    | Eq -> g x y
+    | res -> res
 
 type ('a,'b) combination = {
   call : 'a -> 'a -> 'b;
@@ -65,9 +65,9 @@ let last f = {
 
 let (>>>) f g = {
   call = (fun x y -> match f x y with
-      | Incomparable -> g.call
-      | res -> g.ignore res
-    );
+    | Incomparable -> g.call
+    | res -> g.ignore res
+  );
   ignore = (fun res _ _ -> g.ignore res);
 }
 
@@ -77,7 +77,7 @@ let dominates f l1 l2 =
   let rec find_x l1 y = match l1 with
     | [] -> false
     | x::l1' ->
-        match f x y with
+      match f x y with
         | Gt -> true
         | _ -> find_x l1' y
   and check_all l2 = match l2 with

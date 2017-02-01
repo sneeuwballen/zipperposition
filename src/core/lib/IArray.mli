@@ -34,8 +34,8 @@ val of_list : 'a list -> 'a t
 val to_list : 'a t -> 'a list
 
 val of_array_unsafe : 'a array -> 'a t
-  (** Take ownership of the given array. Careful, the array must {b NOT}
-      be modified afterwards! *)
+(** Take ownership of the given array. Careful, the array must {b NOT}
+    be modified afterwards! *)
 
 val empty : 'a t
 

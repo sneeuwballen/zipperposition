@@ -28,8 +28,8 @@ let classify id =
       (ID.payload id)
   in
   match res with
-  | None -> Other
-  | Some x -> x
+    | None -> Other
+    | Some x -> x
 
 let pp_res out = function
   | Ty _ -> Format.fprintf out "ind_ty"
@@ -61,24 +61,24 @@ let prec_constr_ a b =
   let c_a = classify a in
   let c_b = classify b in
   match c_a, c_b with
-  | Ty _, Ty _
-  | Cstor _, Cstor _
-  | Projector _, Projector _
-  | Other, Other -> 0
-  | Inductive_cst c1, Inductive_cst c2 ->
-    (* Inductive_cst cases should be compared by "sub-case" order (i.e. `x
-       sub-cst-of y` means `x < y`); this is a stable ordering. *)
-    if dominates_ c1 c2 then 1
-    else if dominates_ c2 c1 then -1
-    else 0
-  | DefinedCst l1, DefinedCst l2 ->
-    (* bigger level means defined later *)
-    CCInt.compare l1 l2
-  | Ty _, _
-  | Cstor _, _
-  | Inductive_cst _, _
-  | Projector _, _
-  | DefinedCst _, _
-  | Other, _ -> CCInt.compare (to_int_ c_a) (to_int_ c_b)
+    | Ty _, Ty _
+    | Cstor _, Cstor _
+    | Projector _, Projector _
+    | Other, Other -> 0
+    | Inductive_cst c1, Inductive_cst c2 ->
+      (* Inductive_cst cases should be compared by "sub-case" order (i.e. `x
+         sub-cst-of y` means `x < y`); this is a stable ordering. *)
+      if dominates_ c1 c2 then 1
+      else if dominates_ c2 c1 then -1
+      else 0
+    | DefinedCst l1, DefinedCst l2 ->
+      (* bigger level means defined later *)
+      CCInt.compare l1 l2
+    | Ty _, _
+    | Cstor _, _
+    | Inductive_cst _, _
+    | Projector _, _
+    | DefinedCst _, _
+    | Other, _ -> CCInt.compare (to_int_ c_a) (to_int_ c_b)
 
 let prec_constr = Precedence.Constr.make prec_constr_

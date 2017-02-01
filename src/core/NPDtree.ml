@@ -29,15 +29,15 @@ let open_term ~stack t = match T.view t with
   | T.DB _
   | T.AppBuiltin _
   | T.Const _ ->
-      Some {cur_term=t; stack=[]::stack;}
+    Some {cur_term=t; stack=[]::stack;}
   | T.App (_, l) ->
-      Some {cur_term=t; stack=l::stack;}
+    Some {cur_term=t; stack=l::stack;}
 
 let rec next_rec stack = match stack with
   | [] -> None
   | []::stack' -> next_rec stack'
   | (t::next')::stack' ->
-      open_term ~stack:(next'::stack') t
+    open_term ~stack:(next'::stack') t
 
 let skip iter = match iter.stack with
   | [] -> None
@@ -84,37 +84,37 @@ module Make(E : Index.EQUATION) = struct
           [iter] is an iterator on the current subterm *)
     let rec goto trie iter rebuild =
       match iter with
-      | None ->
-        begin match k trie.leaf with
-          | leaf' when leaf' == trie.leaf -> root (* no change, return same tree *)
-          | leaf' -> rebuild {trie with leaf=leaf'; }
-        end
-      | Some i ->
-        match TC.view i.cur_term with
-          | (TC.Var _ | TC.DB _ | TC.AppBuiltin _ | TC.NonFO) ->
-            let subtrie = match trie.star with
-              | None -> empty ()
-              | Some trie' -> trie'
-            in
-            let rebuild subtrie =
-              if is_empty subtrie
+        | None ->
+          begin match k trie.leaf with
+            | leaf' when leaf' == trie.leaf -> root (* no change, return same tree *)
+            | leaf' -> rebuild {trie with leaf=leaf'; }
+          end
+        | Some i ->
+          match TC.view i.cur_term with
+            | (TC.Var _ | TC.DB _ | TC.AppBuiltin _ | TC.NonFO) ->
+              let subtrie = match trie.star with
+                | None -> empty ()
+                | Some trie' -> trie'
+              in
+              let rebuild subtrie =
+                if is_empty subtrie
                 then rebuild {trie with star=None; }
                 else rebuild {trie with star=Some subtrie ;}
-            in
-            goto subtrie (next i) rebuild
-          | TC.App (s, _) ->
-            let subtrie =
-              try find_sub trie.map s
-              with NoSuchTrie -> empty ()
-            in
-            let rebuild subtrie =
-              if is_empty subtrie
+              in
+              goto subtrie (next i) rebuild
+            | TC.App (s, _) ->
+              let subtrie =
+                try find_sub trie.map s
+                with NoSuchTrie -> empty ()
+              in
+              let rebuild subtrie =
+                if is_empty subtrie
                 then rebuild {trie with map=ID.Map.remove s trie.map; }
                 else rebuild {trie with map=ID.Map.add s subtrie trie.map ;}
-            in
-            goto subtrie (next i) rebuild
-  in
-  goto trie (iterate t) (fun t -> t)
+              in
+              goto subtrie (next i) rebuild
+    in
+    goto trie (iterate t) (fun t -> t)
 
   let add trie eqn =
     let t, _, _ = E.extract eqn in
@@ -142,29 +142,29 @@ module Make(E : Index.EQUATION) = struct
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie iter =
       match iter with
-      | None ->
+        | None ->
           Util.exit_prof prof_npdtree_retrieve;
           Leaf.fold_match ~subst (Scoped.set dt trie.leaf) t k';
           Util.enter_prof prof_npdtree_retrieve;
-      | Some i ->
-        match TC.view i.cur_term with
-          | (TC.Var _ | TC.DB _ | TC.AppBuiltin _ | TC.NonFO) ->
-            begin match trie.star with
-            | None -> ()
-            | Some subtrie ->
-              traverse subtrie (next i)  (* match "*" against "*" *)
-            end
-          | TC.App (s, _) ->
-            begin try
-              let subtrie = find_sub trie.map s in
-              traverse subtrie (next i)
-            with NoSuchTrie -> ()
-            end;
-            begin match trie.star with
-              | None -> ()
-              | Some subtrie ->
-                traverse subtrie (skip i)  (* skip subterm *)
-            end
+        | Some i ->
+          match TC.view i.cur_term with
+            | (TC.Var _ | TC.DB _ | TC.AppBuiltin _ | TC.NonFO) ->
+              begin match trie.star with
+                | None -> ()
+                | Some subtrie ->
+                  traverse subtrie (next i)  (* match "*" against "*" *)
+              end
+            | TC.App (s, _) ->
+              begin try
+                  let subtrie = find_sub trie.map s in
+                  traverse subtrie (next i)
+                with NoSuchTrie -> ()
+              end;
+              begin match trie.star with
+                | None -> ()
+                | Some subtrie ->
+                  traverse subtrie (skip i)  (* skip subterm *)
+              end
     in
     try
       traverse (fst dt) (iterate (fst t));
@@ -177,8 +177,8 @@ module Make(E : Index.EQUATION) = struct
   let rec iter dt k =
     Leaf.iter dt.leaf k;
     begin match dt.star with
-    | None -> ()
-    | Some trie' -> iter trie' k
+      | None -> ()
+      | Some trie' -> iter trie' k
     end;
     ID.Map.iter (fun _ trie' -> iter trie' k) dt.map
 
@@ -190,24 +190,24 @@ module Make(E : Index.EQUATION) = struct
   let _as_graph =
     CCGraph.make_labelled_tuple
       (fun t ->
-        let prefix s = match t.star with
-            | None -> s
-            | Some t' -> Sequence.cons ("*", t') s
-        and s2 = ID.Map.to_seq t.map
-          |> Sequence.map (fun (sym, t') -> ID.to_string sym, t')
-        in
-        prefix s2)
+         let prefix s = match t.star with
+           | None -> s
+           | Some t' -> Sequence.cons ("*", t') s
+         and s2 = ID.Map.to_seq t.map
+                  |> Sequence.map (fun (sym, t') -> ID.to_string sym, t')
+         in
+         prefix s2)
 
   let to_dot out t =
     let pp = CCGraph.Dot.pp
-      ~eq:(==)
-      ~tbl:(CCGraph.mk_table ~eq:(==) ~hash:Hashtbl.hash 128)
-      ~attrs_v:(fun t ->
-        let len = Leaf.size t.leaf in
-        let shape = if len>0 then "box" else "circle" in
-        [`Shape shape; `Label (string_of_int len)])
-      ~attrs_e:(fun (_, e, _) -> [`Label e])
-      ~name:"NPDtree" ~graph:_as_graph
+        ~eq:(==)
+        ~tbl:(CCGraph.mk_table ~eq:(==) ~hash:Hashtbl.hash 128)
+        ~attrs_v:(fun t ->
+          let len = Leaf.size t.leaf in
+          let shape = if len>0 then "box" else "circle" in
+          [`Shape shape; `Label (string_of_int len)])
+        ~attrs_e:(fun (_, e, _) -> [`Label e])
+        ~name:"NPDtree" ~graph:_as_graph
     in
     Format.fprintf out "@[<2>%a@]@." pp t;
     ()
@@ -216,10 +216,10 @@ end
 (** {2 General purpose index} *)
 
 module SIMap = Sequence.Map.Make(struct
-  type t = ID.t * int
-  let compare (s1,i1) (s2,i2) =
-    if i1 = i2 then ID.compare s1 s2 else i1-i2
-end)
+    type t = ID.t * int
+    let compare (s1,i1) (s2,i2) =
+      if i1 = i2 then ID.compare s1 s2 else i1-i2
+  end)
 
 module MakeTerm(X : Set.OrderedType) = struct
   module Leaf = Index.MakeLeaf(X)
@@ -265,8 +265,8 @@ module MakeTerm(X : Set.OrderedType) = struct
             in
             let rebuild subtrie =
               if is_empty subtrie
-                then rebuild {trie with star=None; }
-                else rebuild {trie with star=Some subtrie ;}
+              then rebuild {trie with star=None; }
+              else rebuild {trie with star=Some subtrie ;}
             in
             goto subtrie (next i) rebuild
           | TC.App (s, l) ->
@@ -277,12 +277,12 @@ module MakeTerm(X : Set.OrderedType) = struct
             in
             let rebuild subtrie =
               if is_empty subtrie
-                then rebuild {trie with map=SIMap.remove (s,arity) trie.map; }
-                else rebuild {trie with map=SIMap.add (s,arity) subtrie trie.map ;}
+              then rebuild {trie with map=SIMap.remove (s,arity) trie.map; }
+              else rebuild {trie with map=SIMap.add (s,arity) subtrie trie.map ;}
             in
             goto subtrie (next i) rebuild
-  in
-  goto trie (iterate t) (fun t -> t)
+    in
+    goto trie (iterate t) (fun t -> t)
 
   let add trie t data =
     let k leaf = Leaf.add leaf t data in
@@ -297,21 +297,21 @@ module MakeTerm(X : Set.OrderedType) = struct
     goto_leaf trie t k
 
   (* skip one term in the tree. Calls [k] with [acc] on corresponding
-    subtries. *)
+     subtries. *)
   let skip_tree trie k =
     (* [n]: number of branches to skip (corresponding to subterms) *)
     let rec skip trie n k =
       if n = 0
-        then k trie
-        else (
-          begin match trie.star with
+      then k trie
+      else (
+        begin match trie.star with
           | None -> ()
           | Some trie' -> skip trie' (n-1) k
-          end;
-          SIMap.iter
-            (fun (_,arity) trie' -> skip trie' (n+arity-1) k)
-            trie.map
-        )
+        end;
+        SIMap.iter
+          (fun (_,arity) trie' -> skip trie' (n+arity-1) k)
+          trie.map
+      )
     in
     skip trie 1 k
 
@@ -332,9 +332,9 @@ module MakeTerm(X : Set.OrderedType) = struct
           | TC.App (s, l) ->
             let arity = List.length l in
             begin try
-              let subtrie = SIMap.find (s,arity) trie.map in
-              traverse subtrie (next i)
-            with Not_found -> ()
+                let subtrie = SIMap.find (s,arity) trie.map in
+                traverse subtrie (next i)
+              with Not_found -> ()
             end;
             begin match trie.star with
               | None -> ()
@@ -358,19 +358,19 @@ module MakeTerm(X : Set.OrderedType) = struct
         Leaf.fold_match ~subst (Scoped.set dt trie.leaf) t k;
         Util.enter_prof prof_npdtree_term_generalizations;
       | Some i ->
-          match TC.view i.cur_term with
+        match TC.view i.cur_term with
           | (TC.Var _ | TC.DB _ | TC.AppBuiltin _ | TC.NonFO) ->
             begin match trie.star with
-            | None -> ()
-            | Some subtrie ->
-              traverse subtrie (next i) (* match "*" against "*" only *)
+              | None -> ()
+              | Some subtrie ->
+                traverse subtrie (next i) (* match "*" against "*" only *)
             end
           | TC.App (s, l) ->
             let arity = List.length l in
             begin try
-              let subtrie = SIMap.find (s,arity) trie.map in
-              traverse subtrie (next i)
-            with Not_found -> ()
+                let subtrie = SIMap.find (s,arity) trie.map in
+                traverse subtrie (next i)
+              with Not_found -> ()
             end;
             begin match trie.star with
               | None -> ()
@@ -394,7 +394,7 @@ module MakeTerm(X : Set.OrderedType) = struct
         Leaf.fold_matched ~subst (Scoped.set dt trie.leaf) t k;
         Util.enter_prof prof_npdtree_term_specializations;
       | Some i ->
-          match TC.view i.cur_term with
+        match TC.view i.cur_term with
           | (TC.Var _ | TC.DB _ | TC.AppBuiltin _ | TC.NonFO) ->
             (* match * against any subterm *)
             skip_tree trie
@@ -403,9 +403,9 @@ module MakeTerm(X : Set.OrderedType) = struct
             (* only same symbol *)
             let arity = List.length l in
             begin try
-              let subtrie = SIMap.find (s,arity) trie.map in
-              traverse subtrie (next i)
-            with Not_found -> ()
+                let subtrie = SIMap.find (s,arity) trie.map in
+                traverse subtrie (next i)
+              with Not_found -> ()
             end
     in
     try
@@ -419,16 +419,16 @@ module MakeTerm(X : Set.OrderedType) = struct
   let rec iter dt k =
     Leaf.iter dt.leaf k;
     begin match dt.star with
-    | None -> ()
-    | Some trie' -> iter trie' k
+      | None -> ()
+      | Some trie' -> iter trie' k
     end;
     SIMap.iter (fun _ trie' -> iter trie' k) dt.map
 
   let rec fold dt k acc =
     let acc = Leaf.fold dt.leaf acc k in
     let acc = match dt.star with
-    | None -> acc
-    | Some trie' -> fold trie' k acc
+      | None -> acc
+      | Some trie' -> fold trie' k acc
     in
     SIMap.fold (fun _ trie' acc -> fold trie' k acc) dt.map acc
 
@@ -442,16 +442,16 @@ module MakeTerm(X : Set.OrderedType) = struct
   let _as_graph =
     CCGraph.make_labelled_tuple
       (fun t ->
-        let prefix s = match t.star with
-            | None -> s
-            | Some t' -> Sequence.cons ("*", t') s
-        and s2 = SIMap.to_seq t.map
-          |> Sequence.map
-            (fun ((sym,i), t') ->
-              let label = CCFormat.sprintf "%a/%d" ID.pp sym i in
-              label, t')
-        in
-        prefix s2)
+         let prefix s = match t.star with
+           | None -> s
+           | Some t' -> Sequence.cons ("*", t') s
+         and s2 = SIMap.to_seq t.map
+                  |> Sequence.map
+                    (fun ((sym,i), t') ->
+                       let label = CCFormat.sprintf "%a/%d" ID.pp sym i in
+                       label, t')
+         in
+         prefix s2)
 
   (* TODO: print leaf itself *)
 
@@ -459,14 +459,14 @@ module MakeTerm(X : Set.OrderedType) = struct
     Util.debugf ~section:Util.Section.zip 2
       "@[<2>print graph of size %d@]" (fun k->k (size t));
     let pp = CCGraph.Dot.pp
-      ~eq:(==)
-      ~tbl:(CCGraph.mk_table ~eq:(==) ~hash:Hashtbl.hash 128)
-      ~attrs_v:(fun t ->
-        let len = Leaf.size t.leaf in
-        let shape = if len>0 then "box" else "circle" in
-        [`Shape shape; `Label (string_of_int len)])
-      ~attrs_e:(fun (_, e,_) -> [`Label e])
-      ~name:"NPDtree" ~graph:_as_graph
+        ~eq:(==)
+        ~tbl:(CCGraph.mk_table ~eq:(==) ~hash:Hashtbl.hash 128)
+        ~attrs_v:(fun t ->
+          let len = Leaf.size t.leaf in
+          let shape = if len>0 then "box" else "circle" in
+          [`Shape shape; `Label (string_of_int len)])
+        ~attrs_e:(fun (_, e,_) -> [`Label e])
+        ~name:"NPDtree" ~graph:_as_graph
     in
     Format.fprintf out "@[<2>%a@]@." pp t;
     ()

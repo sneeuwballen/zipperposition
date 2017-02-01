@@ -12,14 +12,14 @@
 (** A datatype declaration *)
 type 'ty data = {
   data_id: ID.t;
-    (** Name of the type *)
+  (** Name of the type *)
   data_args: 'ty Var.t list;
-    (** type parameters *)
+  (** type parameters *)
   data_ty: 'ty;
-    (** type of Id, that is,   [type -> type -> ... -> type] *)
+  (** type of Id, that is,   [type -> type -> ... -> type] *)
   data_cstors: (ID.t * 'ty) list;
-    (** Each constructor is [id, ty]. [ty] must be of the form
-     [ty1 -> ty2 -> ... -> id args] *)
+  (** Each constructor is [id, ty]. [ty] must be of the form
+      [ty1 -> ty2 -> ... -> id args] *)
 }
 
 type attr =

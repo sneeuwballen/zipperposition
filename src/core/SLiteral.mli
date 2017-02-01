@@ -4,7 +4,7 @@
 
 (** {1 Simple Literal}
 
-  Used for reduction to CNF, this is a basic representation of literals *)
+    Used for reduction to CNF, this is a basic representation of literals *)
 
 type form = TypedSTerm.t
 type term = TypedSTerm.t

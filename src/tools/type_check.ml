@@ -45,7 +45,7 @@ let check file =
     Format.printf "@[<v2>statements:@ %a@]@."
       (CCVector.print ~start:"" ~stop:"" ~sep:"" pp_stmt)
       decls;
-  ()
+    ()
 
 let main () =
   CCFormat.set_color_default true;
@@ -60,10 +60,10 @@ let main () =
       () !files;
   in
   match res with
-  | Err.Ok () ->
+    | Err.Ok () ->
       print_line ();
       Format.printf "@{<Green>success!@}@."
-  | Err.Error msg ->
+    | Err.Error msg ->
       print_endline msg
 
 let _ =

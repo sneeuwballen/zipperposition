@@ -24,16 +24,16 @@ module Make(E : Map.OrderedType) = struct
   let rec mem m x = match m with
     | [] -> false
     | (y,_)::m' ->
-        let c = E.compare x y in
-        c = 0 || (c < 0 && mem m' x)
+      let c = E.compare x y in
+      c = 0 || (c < 0 && mem m' x)
 
   let rec find m x = match m with
     | [] -> Z.zero
     | (y,n) :: m' ->
-        let c = E.compare x y in
-        if c = 0 then n
-        else if c < 0 then find m' x
-        else Z.zero
+      let c = E.compare x y in
+      if c = 0 then n
+      else if c < 0 then find m' x
+      else Z.zero
 
   let singleton x = [x, Z.one]
 
@@ -41,10 +41,10 @@ module Make(E : Map.OrderedType) = struct
     let rec aux m x n = match m with
       | [] -> [x, n]
       | (y,n') :: m' ->
-          let c = E.compare x y in
-          if c=0 then (x,Z.add n n') :: m'
-          else if c < 0 then (x,n)::m
-          else (y,n') :: aux m' x n
+        let c = E.compare x y in
+        if c=0 then (x,Z.add n n') :: m'
+        else if c < 0 then (x,n)::m
+        else (y,n') :: aux m' x n
     in
     assert (Z.geq n Z.zero);
     aux m x n
@@ -61,21 +61,21 @@ module Make(E : Map.OrderedType) = struct
   let rec _map f m = match m with
     | [] -> []
     | (x,n)::m' ->
-        let n' = f x n in
-        _cons x n' (_map f m')
+      let n' = f x n in
+      _cons x n' (_map f m')
 
   (* merge two lists together *)
   let rec _merge f m1 m2 = match m1, m2 with
     | [], _ -> m2
     | _, [] -> m1
     | (x1,n1)::m1', (x2,n2)::m2' ->
-        let c = E.compare x1 x2 in
-        if c < 0
-        then _cons x1 (f n1 Z.zero) (_merge f m1' m2)
-        else if c > 0
-        then _cons x2 (f Z.zero n2) (_merge f m1 m2')
-        else
-          _cons x1 (f n1 n2) (_merge f m1' m2')
+      let c = E.compare x1 x2 in
+      if c < 0
+      then _cons x1 (f n1 Z.zero) (_merge f m1' m2)
+      else if c > 0
+      then _cons x2 (f Z.zero n2) (_merge f m1 m2')
+      else
+        _cons x1 (f n1 n2) (_merge f m1' m2')
 
   let union = _merge Z.max
 
@@ -100,8 +100,8 @@ module Make(E : Map.OrderedType) = struct
     List.fold_left
       (fun acc (x, n) ->
          match f x n with
-         | None -> acc
-         | Some (x',n') -> add_coeff acc x' n'
+           | None -> acc
+           | Some (x',n') -> add_coeff acc x' n'
       ) empty m
 
   let filter p m = map_coeff (fun x n -> if p x n then n else Z.zero) m
@@ -166,29 +166,29 @@ module Make(E : Map.OrderedType) = struct
     | [], _
     | _, [] -> false
     | (x1,n1)::m1', (x2,n2)::m2' ->
-        E.compare x1 x2 = 0 && Z.equal n1 n2 && eq m1' m2'
+      E.compare x1 x2 = 0 && Z.equal n1 n2 && eq m1' m2'
 
   let rec cancel m1 m2 = match m1, m2 with
     | [], _
     | _, [] -> m1, m2
     | (x1,n1)::m1', (x2,n2)::m2' ->
-        let c = E.compare x1 x2 in
-        if c = 0
-        then match Z.compare n1 n2 with
-          | 0 -> cancel m1' m2'  (* remove from both sides *)
-          | n when n<0 ->
-              let m1'', m2'' = cancel m1' m2' in
-              m1'', (x2, Z.sub n2 n1) :: m2''  (* keep some at right *)
-          | _ ->
-              let m1'', m2'' = cancel m1' m2' in
-              (x1, Z.sub n1 n2) :: m1'', m2''  (* keep some at left *)
-        else if c < 0
-        then
-          let m1'', m2'' = cancel m1' m2 in
-          (x1,n1)::m1'', m2''
-        else
-          let m1'', m2'' = cancel m1 m2' in
-          m1'', (x2,n2)::m2''
+      let c = E.compare x1 x2 in
+      if c = 0
+      then match Z.compare n1 n2 with
+        | 0 -> cancel m1' m2'  (* remove from both sides *)
+        | n when n<0 ->
+          let m1'', m2'' = cancel m1' m2' in
+          m1'', (x2, Z.sub n2 n1) :: m2''  (* keep some at right *)
+        | _ ->
+          let m1'', m2'' = cancel m1' m2' in
+          (x1, Z.sub n1 n2) :: m1'', m2''  (* keep some at left *)
+      else if c < 0
+      then
+        let m1'', m2'' = cancel m1' m2 in
+        (x1,n1)::m1'', m2''
+      else
+        let m1'', m2'' = cancel m1 m2' in
+        m1'', (x2,n2)::m2''
 
   let compare_partial f m1 m2 =
     let m1, m2 = cancel m1 m2 in
@@ -198,43 +198,43 @@ module Make(E : Map.OrderedType) = struct
        elements of the multset. *)
     let rec check_left ~max1 m1 ~max2 m2 = match m1 with
       | [] ->
-          (* max2 is true if some terms are not dominated within m2 *)
-          let max2 = max2 || (m2<>[]) in
-          begin match max1, max2 with
-            | true, true -> Comparison.Incomparable
-            | true, false -> Comparison.Gt
-            | false, true -> Comparison.Lt
-            | false, false -> Comparison.Eq
-          end
+        (* max2 is true if some terms are not dominated within m2 *)
+        let max2 = max2 || (m2<>[]) in
+        begin match max1, max2 with
+          | true, true -> Comparison.Incomparable
+          | true, false -> Comparison.Gt
+          | false, true -> Comparison.Lt
+          | false, false -> Comparison.Eq
+        end
       | (x1,n1)::m1' ->
-          (* remove terms of [m2] that are dominated by [x1] *)
-          filter_with ~max1 x1 n1 m1' ~max2 m2 []
+        (* remove terms of [m2] that are dominated by [x1] *)
+        filter_with ~max1 x1 n1 m1' ~max2 m2 []
     and filter_with ~max1 x1 n1 m1' ~max2 m2 rest2 = match m2 with
       | [] ->
-          (* [x1] is not dominated *)
-          check_left ~max1:true m1' ~max2 rest2
+        (* [x1] is not dominated *)
+        check_left ~max1:true m1' ~max2 rest2
       | (x2,n2)::m2' ->
-          begin match f x1 x2 with
-            | Comparison.Eq ->
-                let c = Z.compare n1 n2 in
-                if c < 0
-                then (* remove x1 *)
-                  check_left ~max1 m1' ~max2 (List.rev_append m2 rest2)
-                else if c > 0
-                then (* remove x2 *)
-                  filter_with ~max1 x1 Z.(n1-n2) m1' ~max2 m2' rest2
-                else (* remove both *)
-                  check_left ~max1 m1' ~max2 (List.rev_append m2' rest2)
-            | Comparison.Incomparable ->
-                (* keep both *)
-                filter_with ~max1 x1 n1 m1' ~max2 m2' ((x2,n2)::rest2)
-            | Comparison.Gt ->
-                (* remove x2 *)
-                filter_with ~max1 x1 n1 m1' ~max2 m2' rest2
-            | Comparison.Lt ->
-                (* remove x1 *)
-                check_left ~max1 m1' ~max2 (List.rev_append m2 rest2)
-          end
+        begin match f x1 x2 with
+          | Comparison.Eq ->
+            let c = Z.compare n1 n2 in
+            if c < 0
+            then (* remove x1 *)
+              check_left ~max1 m1' ~max2 (List.rev_append m2 rest2)
+            else if c > 0
+            then (* remove x2 *)
+              filter_with ~max1 x1 Z.(n1-n2) m1' ~max2 m2' rest2
+            else (* remove both *)
+              check_left ~max1 m1' ~max2 (List.rev_append m2' rest2)
+          | Comparison.Incomparable ->
+            (* keep both *)
+            filter_with ~max1 x1 n1 m1' ~max2 m2' ((x2,n2)::rest2)
+          | Comparison.Gt ->
+            (* remove x2 *)
+            filter_with ~max1 x1 n1 m1' ~max2 m2' rest2
+          | Comparison.Lt ->
+            (* remove x1 *)
+            check_left ~max1 m1' ~max2 (List.rev_append m2 rest2)
+        end
     in
     check_left ~max1:false m1 ~max2:false m2
 
@@ -244,21 +244,21 @@ module Make(E : Map.OrderedType) = struct
       | [], _ -> -1
       | _, [] -> 1
       | (x1,n1)::m1', (x2,n2)::m2' ->
-          let c = E.compare x1 x2 in
-          if c = 0
-          then
-            let c' = aux m1' m2' in
-            if c' <> 0 then c'
-            else Z.compare n1 n2
-          else if c < 0
-          then
-            let c' = aux m1' m2 in
-            if c' <> 0 then c'
-            else 1
-          else (* c > 0 *)
-            let c' = aux m1 m2' in
-            if c' <> 0 then c'
-            else -1
+        let c = E.compare x1 x2 in
+        if c = 0
+        then
+          let c' = aux m1' m2' in
+          if c' <> 0 then c'
+          else Z.compare n1 n2
+        else if c < 0
+        then
+          let c' = aux m1' m2 in
+          if c' <> 0 then c'
+          else 1
+        else (* c > 0 *)
+          let c' = aux m1 m2' in
+          if c' <> 0 then c'
+          else -1
     in
     aux m1 m2
 
@@ -278,24 +278,24 @@ module Make(E : Map.OrderedType) = struct
       | (x,n)::m' -> check_max x n m' [] k
     and check_max x n m rest k = match m with
       | [] ->
-          (* success, [x] is max *)
-          k x n;
-          filter rest k
+        (* success, [x] is max *)
+        k x n;
+        filter rest k
       | (y,n') :: m' ->
-          begin match f x y with
-            | Comparison.Lt ->
-                (* failure, drop [x] since it's not maximal *)
-                filter (List.rev_append rest m) k
-            | Comparison.Gt ->
-                (* drop [y] *)
-                check_max x n m' rest k
-            | Comparison.Eq ->
-                (* merge x and y together *)
-                check_max x Z.(add n n') m' rest k
-            | Comparison.Incomparable ->
-                (* keep both [x] and [y] *)
-                check_max x n m' ((y,n')::rest) k
-          end
+        begin match f x y with
+          | Comparison.Lt ->
+            (* failure, drop [x] since it's not maximal *)
+            filter (List.rev_append rest m) k
+          | Comparison.Gt ->
+            (* drop [y] *)
+            check_max x n m' rest k
+          | Comparison.Eq ->
+            (* merge x and y together *)
+            check_max x Z.(add n n') m' rest k
+          | Comparison.Incomparable ->
+            (* keep both [x] and [y] *)
+            check_max x n m' ((y,n')::rest) k
+        end
     in
     filter m k
 
