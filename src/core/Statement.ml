@@ -445,7 +445,7 @@ let pp ppf ppt ppty out st = match st.view with
     fpf out "@[<2>goal%a@ @[%a@]@]." pp_attrs st.attrs ppf f
   | NegatedGoal (sk, l) ->
     let pp_sk out (id,ty) = fpf out "(%a:%a)" ID.pp id ppty ty in
-    fpf out "@[<hv2>negated_goal%a@ @[<hv>%a@]@ # skolems: @[<hv>%a@]@]."
+    fpf out "@[<hv2>negated_goal%a@ @[<hv>%a@]@ # skolems: [@[<hv>%a@]]@]."
       pp_attrs st.attrs
       (Util.pp_list ~sep:", " (CCFormat.hovbox ppf)) l
       (Util.pp_list pp_sk) sk

@@ -1049,6 +1049,8 @@ let pp_c_statement out st =
   in
   Statement.pp pp_clause T.pp T.pp out st
 
+let pp_fo_c_statement = Statement.pp_clause
+
 let type_declarations seq =
   let open Statement in
   seq
