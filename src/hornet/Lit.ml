@@ -18,6 +18,10 @@ let true_ = Bool true
 let false_ = Bool false
 let atom ?(sign=true) t = Atom (t, sign)
 
+let sign = function
+  | Atom (_, b)
+  | Bool b -> b
+
 let equal a b: bool = match a, b with
   | Bool b1, Bool b2 -> b1=b2
   | Atom (t1,sign1), Atom (t2,sign2) -> T.equal t1 t2 && sign1=sign2
@@ -32,3 +36,5 @@ let pp out t: unit = match t with
   | Bool b -> Fmt.bool out b
   | Atom (t, true) -> T.pp out t
   | Atom (t, false) -> Fmt.fprintf out "@[@<1>¬@[%a@]@]" T.pp t
+
+let to_string = Fmt.to_string pp

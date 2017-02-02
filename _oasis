@@ -156,7 +156,7 @@ Executable hornet
   MainIs:           hornet.ml
   Build$:           flag(parsers) && flag(prover)
   Install$:         flag(parsers) && flag(prover)
-  BuildDepends:     containers, sequence, unix,
+  BuildDepends:     containers, sequence, unix, msat,
                     libzipperposition, libzipperposition.parsers
 
 Document libzipperposition

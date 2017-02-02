@@ -17,6 +17,7 @@ val true_ : t
 val false_: t
 val atom : ?sign:bool -> term -> t
 
+val sign : t -> bool
 
 include Interfaces.EQ with type t := t
 include Interfaces.HASH with type t := t

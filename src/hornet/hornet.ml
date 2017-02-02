@@ -22,7 +22,7 @@ type conf = Flex_state.t
 
 let k_def_as_rewrite : bool Flex_state.key = Flex_state.create_key()
 
-let typing conf stmts : (_ Statement.t CCVector.ro_vector * _ ID.Map.t, string) E.t =
+let typing conf stmts : (_ Statement.t CCVector.ro_vector * Type.t ID.Map.t, string) E.t =
   start_ "start typing" (fun k->k);
   let def_as_rewrite =
     Flex_state.get_or ~or_:false k_def_as_rewrite conf
@@ -30,13 +30,15 @@ let typing conf stmts : (_ Statement.t CCVector.ro_vector * _ ID.Map.t, string) 
   TypeInference.infer_statements ~def_as_rewrite ?ctx:None stmts >|= fun stmts ->
   (* compute signature *)
   let signature =
+    let conv = Type.Conv.create () in
     CCVector.to_seq stmts
     |> Sequence.flat_map Statement.Seq.ty_decls
+    |> Sequence.map (CCPair.map2 (Type.Conv.of_simple_term_exn conv))
     |> ID.Map.of_seq
   in
   Util.debugf ~section 2 "@[<hv2>signature {@ %a@,}@]"
     (fun k->k
-        Fmt.(seq (Dump.pair ID.pp TypedSTerm.pp))
+        Fmt.(seq (Dump.pair ID.pp Type.pp))
         (ID.Map.to_seq signature));
   Util.debugf ~section 2 "@[<hv2>typed statements {@ %a@,}@]"
     (fun k->
@@ -123,6 +125,7 @@ let main () =
   cnf ~file:!file stmts >>= fun stmts ->
   compute_prec (CCVector.to_seq stmts) >>=
   compute_ord >>= fun ord ->
+  let st = State.create ~ord ~signature ~conf () in
   (* TODO *)
   E.return ()
 
