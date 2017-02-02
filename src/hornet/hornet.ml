@@ -105,6 +105,7 @@ let setup_gc () =
 let time : float ref = ref 0.
 let file : string ref = ref ""
 let def_as_rewrite : bool ref = ref false
+let max_depth : int ref = ref 100
 
 let options =
   Arg.align
@@ -112,6 +113,7 @@ let options =
        "-t", Arg.Set_float time, " alias to --time";
        "--def-as-rewrite", Arg.Set def_as_rewrite, " definitions as rewrite rules";
        "--no-def-as-rewrite", Arg.Clear def_as_rewrite, " definitions as axioms";
+       "--max-depth", Arg.Set_int max_depth, (Fmt.sprintf " maximum depth (default %d)" !max_depth);
     ] @ Options.make ())
 
 let main () =
@@ -127,9 +129,12 @@ let main () =
   cnf ~file:!file stmts >>= fun stmts ->
   compute_prec (CCVector.to_seq stmts) >>=
   compute_ord >>= fun ord ->
-  let st = State.create ~ord ~signature ~conf () in
-  (* TODO *)
-  E.return ()
+  let st =
+    State.create ~ord ~signature ~conf ~theories:[] ~max_depth:!max_depth ()
+  in
+  let res = State.run st in
+  Format.printf "%a@." State.pp_res res;
+  E.return () (* done *)
 
 let () =
   CCFormat.set_color_default true;

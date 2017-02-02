@@ -19,6 +19,7 @@ module type BOOL_LIT = sig
   type view =
     | Fresh of int
     | Select_lit of Clause.General.t * Clause.General.idx
+    | Depth_limit of int
 
   type t = private {
     view: view;
@@ -27,6 +28,7 @@ module type BOOL_LIT = sig
 
   val fresh : unit -> t
   val select_lit : Clause.General.t -> Clause.General.idx -> t
+  val depth_limit : int -> t
 
   include Msat.Formula_intf.S with type t := t and type proof = Proof.t
 end
@@ -52,7 +54,15 @@ module type CONTEXT = sig
   val add_clause : bool_clause -> unit
   val add_clause_l : bool_clause list -> unit
 
-  module Form : Msat.Tseitin_intf.S with type atom = B_lit.t
+  module Form : sig
+    type t
+    val imply : t -> t -> t
+    val atom : B_lit.t -> t
+    val and_ : t list -> t
+    val or_: t list -> t
+    val not_ : t -> t
+  end
+
   val add_form : Form.t -> unit
 
   (** {6 Config} *)
@@ -98,8 +108,22 @@ val create :
   ord:Ordering.t ->
   signature:Type.t ID.Map.t ->
   theories:theory_fun list ->
+  max_depth:int ->
   unit ->
   t
 
 val context : t -> context
+
+(** {2 Result} *)
+
+type res =
+  | Sat
+  | Unsat
+  | Unknown
+
+val pp_res : res CCFormat.printer
+
+val run : t -> res
+(** Main loop. It calls the SAT solver which takes care of
+    (trying to) find a model *)
 

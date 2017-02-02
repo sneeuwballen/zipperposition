@@ -30,6 +30,7 @@ module type BOOL_LIT = sig
   type view =
     | Fresh of int
     | Select_lit of Clause.General.t * Clause.General.idx
+    | Depth_limit of int
 
   type t = private {
     view: view;
@@ -38,6 +39,7 @@ module type BOOL_LIT = sig
 
   val fresh : unit -> t
   val select_lit : Clause.General.t -> Clause.General.idx -> t
+  val depth_limit : int -> t
 
   include Msat.Formula_intf.S with type t := t and type proof = Proof.t
 end
@@ -46,6 +48,7 @@ module Bool_lit(X:sig end) : BOOL_LIT = struct
   type view =
     | Fresh of int
     | Select_lit of Clause.General.t * Clause.General.idx
+    | Depth_limit of int
 
   type proof = Proof.t
 
@@ -66,6 +69,8 @@ module Bool_lit(X:sig end) : BOOL_LIT = struct
 
   let select_lit c i = make_ true (Select_lit (c,i))
 
+  let depth_limit i = make_ true (Depth_limit i)
+
   let neg t = {t with sign=not t.sign}
 
   let norm (t:t): t * FI.negated =
@@ -78,10 +83,13 @@ module Bool_lit(X:sig end) : BOOL_LIT = struct
     &&
     begin match a.view, b.view with
       | Fresh i, Fresh j ->  i=j
+      | Depth_limit i, Depth_limit j -> i=j
       | Select_lit (c1,i1), Select_lit (c2,i2) ->
         Clause.equal (CG.as_clause c1) (CG.as_clause c2) && i1=i2
       | Fresh _, _
-      | Select_lit _, _ -> false
+      | Select_lit _, _
+      | Depth_limit _, _
+        -> false
     end
 
   let hash a : int = match a.view with
@@ -89,12 +97,16 @@ module Bool_lit(X:sig end) : BOOL_LIT = struct
     | Select_lit (c,i) ->
       Hash.combine4 20 (Hash.bool a.sign)
         (Clause.hash (CG.as_clause c)) (Hash.int (i:>int))
+    | Depth_limit i ->
+      Hash.combine2 30 (Hash.int i)
 
   let print out l =
     let pp_view out = function
       | Fresh i -> Fmt.fprintf out "fresh_%d" i
       | Select_lit (c,i) ->
         Fmt.fprintf out "@[select@ :idx %d@ :clause %a@]" (i:>int) CG.pp c
+      | Depth_limit i ->
+        Fmt.fprintf out "[depth@<1>≤%d]" i
     in
     if l.sign
     then Fmt.within "(" ")" pp_view out l.view
@@ -119,7 +131,15 @@ module type CONTEXT = sig
   val add_clause : bool_clause -> unit
   val add_clause_l : bool_clause list -> unit
 
-  module Form : Msat.Tseitin_intf.S with type atom = B_lit.t
+  module Form : sig
+    type t
+    val imply : t -> t -> t
+    val atom : B_lit.t -> t
+    val and_ : t list -> t
+    val or_: t list -> t
+    val not_ : t -> t
+  end
+
   val add_form : Form.t -> unit
 
   (** {6 Config} *)
@@ -215,7 +235,14 @@ module Make(A : ARG) : S = struct
     let raise_conflict c proof = raise (Theory_conflict (c,proof))
     let add_clause_l l = M.assume l
     let add_clause c = add_clause_l [c]
-    module Form = Msat.Tseitin.Make(B_lit)
+    module Form = struct
+      include Msat.Tseitin.Make(B_lit)
+      let imply = make_imply
+      let and_ = make_and
+      let or_ = make_or
+      let not_ = make_not
+      let atom = make_atom
+    end
     let add_form f = add_clause_l (Form.make_cnf f)
   end
 
@@ -239,9 +266,10 @@ type signature = Type.t ID.Map.t
 
 type t = {
   sat: sat_t;
+  max_depth: int;
 }
 
-let create ~conf ~ord ~signature ~theories () =
+let create ~conf ~ord ~signature ~theories ~max_depth () =
   let module M = Make(struct
       let conf = conf
       let signature = signature
@@ -249,9 +277,48 @@ let create ~conf ~ord ~signature ~theories () =
       let theories = theories
     end) in
   let sat = (module M : S) in
-  { sat }
+  { sat; max_depth; }
 
 let context (t:t) =
   let module M = (val t.sat) in
   (module M.Ctx : CONTEXT)
+
+(** {2 Result} *)
+
+type res =
+  | Sat
+  | Unsat
+  | Unknown
+
+let pp_res out = function
+  | Sat -> Fmt.string out "SAT"
+  | Unsat -> Fmt.string out "UNSAT"
+  | Unknown -> Fmt.string out "UNKNOWN"
+
+let run (t:t): res =
+  let module St = (val t.sat) in
+  let module F = St.Ctx.Form in
+  (* currently at depth [d] *)
+  let rec iter (prev_limit:St.B_lit.t option) (d:int) =
+    Util.debugf ~section 1 "@[<2>@{<Yellow>#### DEPTH %d ####@}@]" (fun k->k d);
+    let limit = St.B_lit.depth_limit d in
+    (* [prev_limit => limit] *)
+    CCOpt.iter
+      (fun prev_limit ->
+         St.Ctx.add_form F.(imply (not_ (atom prev_limit)) (atom limit)))
+      prev_limit;
+    (* solve under assumption [limit] *)
+    let res = St.M.solve ~assumptions:[limit] () in
+    begin match res with
+      | St.M.Sat _ ->
+        if d = t.max_depth
+        then Unknown (* TODO: completeness proof(!) *)
+        else iter (Some limit) (d+1) (* increase depth *)
+      | St.M.Unsat _ ->
+        Util.debugf ~section 1 "@[Found unsat@]" (fun k->k);
+        Unsat
+    end
+  in
+  iter None 1
+
 
