@@ -116,6 +116,7 @@ let compare cmp a b =
   aux 0
 
 let to_seq a k = iter k a
+let to_seqi a k = iteri (fun i x -> k(i,x)) a
 
 let of_seq s =
   let l = ref [] in
