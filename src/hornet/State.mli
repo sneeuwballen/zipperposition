@@ -33,6 +33,9 @@ end
 
 (** {2 Context for Theories} *)
 
+(** Each theory is given this context, which serves to communicate
+    with the SAT solver *)
+
 module type CONTEXT = sig
   module B_lit : BOOL_LIT with type proof = Proof.t
 
@@ -52,6 +55,18 @@ type context = (module CONTEXT)
 
 (** {2 Theory} *)
 
+(** A reasoning engine. Each theory is informed when the SAT solver
+    makes some decisions, and when it backtracks.
+    In return, theories can exploit their domain-specific knowledge
+    to propagate new (boolean) clauses to the SAT solver,
+    and to detect unsatisfiability by adding a conflict clause.
+
+    Theories can communicate via boolean literals.
+
+    Initially a theory is a function that takes a context,
+    and returns some callback that will be called when the solver
+    makes decisions *)
+
 module type THEORY = sig
   module Ctx : CONTEXT
 
@@ -66,8 +81,6 @@ type theory_fun = (module THEORY_FUN)
 (** {2 State} *)
 
 type t
-
-(* TODO: pass callbacks for backtrack/assume as parameters *)
 
 val create :
   conf:Flex_state.t ->
