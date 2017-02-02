@@ -111,8 +111,7 @@ let main () =
 let () =
   at_exit
     (fun () ->
-       Util.debugf ~section 1 "run time: %.3f" (fun k->k (Util.total_time_s ()));
-       Signal.send Signals.on_exit 0);
+       Util.debugf ~section 1 "run time: %.3f" (fun k->k (Util.total_time_s ())));
   begin match main () with
     | E.Error msg ->
       print_endline msg;
