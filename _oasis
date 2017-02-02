@@ -153,7 +153,7 @@ Executable hornet
   Path:             src/hornet/
   Install:          true
   CompiledObject:   native
-  MainIs:           Hornet.ml
+  MainIs:           hornet.ml
   Build$:           flag(parsers) && flag(prover)
   Install$:         flag(parsers) && flag(prover)
   BuildDepends:     containers, sequence, unix,

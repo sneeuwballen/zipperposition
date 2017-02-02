@@ -7,6 +7,7 @@ open Libzipperposition
 open Libzipperposition_parsers
 module E = CCResult
 open E.Infix
+module Fmt = CCFormat
 
 let section = Util.Section.(make ~parent:root "hornet")
 
@@ -21,12 +22,27 @@ type conf = Flex_state.t
 
 let k_def_as_rewrite : bool Flex_state.key = Flex_state.create_key()
 
-let typing conf stmts =
+let typing conf stmts : (_ Statement.t CCVector.ro_vector * _ ID.Map.t, string) E.t =
   start_ "start typing" (fun k->k);
   let def_as_rewrite =
     Flex_state.get_or ~or_:false k_def_as_rewrite conf
   in
-  TypeInference.infer_statements ~def_as_rewrite ?ctx:None stmts
+  TypeInference.infer_statements ~def_as_rewrite ?ctx:None stmts >|= fun stmts ->
+  (* compute signature *)
+  let signature =
+    CCVector.to_seq stmts
+    |> Sequence.flat_map Statement.Seq.ty_decls
+    |> ID.Map.of_seq
+  in
+  Util.debugf ~section 2 "@[<hv2>signature {@ %a@,}@]"
+    (fun k->k
+        Fmt.(seq (Dump.pair ID.pp TypedSTerm.pp))
+        (ID.Map.to_seq signature));
+  Util.debugf ~section 2 "@[<hv2>typed statements {@ %a@,}@]"
+    (fun k->
+     let module T = TypedSTerm in
+     k (CCVector.print ~sep:" " (Statement.pp T.pp T.pp T.pp)) stmts);
+  stmts, signature
 
 (* obtain clauses  *)
 let cnf ~file decls =
@@ -38,6 +54,8 @@ let cnf ~file decls =
     |> CCVector.to_seq
     |> Cnf.convert
   in
+  Util.debugf ~section 2 "@[<hv2>CNF {@ %a@,}@]"
+    (fun k-> k (CCVector.print ~sep:" " Cnf.pp_fo_c_statement) stmts);
   E.return stmts
 
 (* TODO: make defined symbols smaller, skolems bigger *)
@@ -101,14 +119,15 @@ let main () =
     |> Flex_state.add k_def_as_rewrite !def_as_rewrite
   in
   parse_file !file >>=
-  typing conf >>=
-  cnf ~file:!file >>= fun stmts ->
+  typing conf >>= fun (stmts, signature) ->
+  cnf ~file:!file stmts >>= fun stmts ->
   compute_prec (CCVector.to_seq stmts) >>=
   compute_ord >>= fun ord ->
   (* TODO *)
   E.return ()
 
 let () =
+  CCFormat.set_color_default true;
   at_exit
     (fun () ->
        Util.debugf ~section 1 "run time: %.3f" (fun k->k (Util.total_time_s ())));
