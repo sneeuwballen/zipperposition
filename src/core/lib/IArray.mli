@@ -26,6 +26,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Immutable Arrays} *)
 
+type 'a equal = 'a -> 'a -> bool
+type 'a ord = 'a -> 'a -> int
+
 type 'a t
 (** Array of values of type 'a *)
 
@@ -72,7 +75,11 @@ val for_all : ('a -> bool) -> 'a t -> bool
 
 val exists : ('a -> bool) -> 'a t -> bool
 
-module Seq : sig
-  val to_seq : 'a t -> 'a Sequence.t
-  val of_seq : 'a Sequence.t -> 'a t
-end
+val equal : 'a equal -> 'a t equal
+
+val compare : 'a ord -> 'a t ord
+
+val hash : 'a Hash.t -> 'a t Hash.t
+
+val to_seq : 'a t -> 'a Sequence.t
+val of_seq : 'a Sequence.t -> 'a t

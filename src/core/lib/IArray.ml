@@ -26,6 +26,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Immutable Arrays} *)
 
+type 'a equal = 'a -> 'a -> bool
+type 'a ord = 'a -> 'a -> int
+
 type 'a t = 'a array
 
 let of_list = Array.of_list
@@ -91,12 +94,32 @@ let exists p a =
     false
   with ExitNow -> true
 
+let equal eq a b =
+  let rec aux i =
+    if i = Array.length a then true
+    else eq a.(i) b.(i) && aux (i+1)
+  in
+  Array.length a = Array.length b
+  &&
+  aux 0
 
-module Seq = struct
-  let to_seq a k = iter k a
+let compare cmp a b =
+  let rec aux i =
+    if i = Array.length a
+    then if i = Array.length b then 0 else -1
+    else if i = Array.length b
+    then 1
+    else
+      let c = cmp a.(i) b.(i) in
+      if c = 0 then aux (i+1) else c
+  in
+  aux 0
 
-  let of_seq s =
-    let l = ref [] in
-    s (fun x -> l := x :: !l);
-    Array.of_list (List.rev !l)
-end
+let to_seq a k = iter k a
+
+let of_seq s =
+  let l = ref [] in
+  s (fun x -> l := x :: !l);
+  Array.of_list (List.rev !l)
+
+let hash f a = Hash.seq f (to_seq a)
