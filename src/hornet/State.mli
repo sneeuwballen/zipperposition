@@ -41,6 +41,8 @@ module type CONTEXT = sig
 
   type bool_clause = B_lit.t list
 
+  (** {6 SAT} *)
+
   val raise_conflict : bool_clause -> Proof.t -> 'a
 
   val on_backtrack : (unit -> unit) -> unit
@@ -52,6 +54,12 @@ module type CONTEXT = sig
 
   module Form : Msat.Tseitin_intf.S with type atom = B_lit.t
   val add_form : Form.t -> unit
+
+  (** {6 Config} *)
+
+  val conf : Flex_state.t
+  val ord : Ordering.t
+  val signature: Type.t ID.Map.t
 end
 
 type context = (module CONTEXT)
@@ -93,6 +101,5 @@ val create :
   unit ->
   t
 
-val conf : t -> Flex_state.t
-val ord : t -> Ordering.t
+val context : t -> context
 

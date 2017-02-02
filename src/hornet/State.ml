@@ -108,6 +108,8 @@ module type CONTEXT = sig
 
   type bool_clause = B_lit.t list
 
+  (** {6 SAT} *)
+
   val raise_conflict : bool_clause -> Proof.t -> 'a
 
   val on_backtrack : (unit -> unit) -> unit
@@ -119,6 +121,12 @@ module type CONTEXT = sig
 
   module Form : Msat.Tseitin_intf.S with type atom = B_lit.t
   val add_form : Form.t -> unit
+
+  (** {6 Config} *)
+
+  val conf : Flex_state.t
+  val ord : Ordering.t
+  val signature: Type.t ID.Map.t
 end
 
 type context = (module CONTEXT)
@@ -146,6 +154,9 @@ end
 
 module type ARG = sig
   val theories : theory_fun list
+  val ord : Ordering.t
+  val signature : Type.t ID.Map.t
+  val conf : Flex_state.t
 end
 
 module Make(A : ARG) : S = struct
@@ -197,6 +208,7 @@ module Make(A : ARG) : S = struct
   module Ctx
     : CONTEXT with module B_lit = B_lit
   = struct
+    include A
     module B_lit = B_lit
     type bool_clause = B_lit.t list
     let on_backtrack f = CCVector.push SAT_theory.backtrack_vec f
@@ -226,16 +238,20 @@ type sat_t = (module S)
 type signature = Type.t ID.Map.t
 
 type t = {
-  conf: Flex_state.t;
-  ord: Ordering.t;
-  signature: signature;
   sat: sat_t;
 }
 
 let create ~conf ~ord ~signature ~theories () =
-  let module M = Make(struct let theories = theories end) in
+  let module M = Make(struct
+      let conf = conf
+      let signature = signature
+      let ord = ord
+      let theories = theories
+    end) in
   let sat = (module M : S) in
-  { conf; ord; signature; sat }
+  { sat }
 
-let conf t = t.conf
-let ord t = t.ord
+let context (t:t) =
+  let module M = (val t.sat) in
+  (module M.Ctx : CONTEXT)
+
