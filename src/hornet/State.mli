@@ -49,6 +49,9 @@ module type CONTEXT = sig
 
   val add_clause : bool_clause -> unit
   val add_clause_l : bool_clause list -> unit
+
+  module Form : Msat.Tseitin_intf.S with type atom = B_lit.t
+  val add_form : Form.t -> unit
 end
 
 type context = (module CONTEXT)

@@ -116,6 +116,9 @@ module type CONTEXT = sig
 
   val add_clause : bool_clause -> unit
   val add_clause_l : bool_clause list -> unit
+
+  module Form : Msat.Tseitin_intf.S with type atom = B_lit.t
+  val add_form : Form.t -> unit
 end
 
 type context = (module CONTEXT)
@@ -200,6 +203,8 @@ module Make(A : ARG) : S = struct
     let raise_conflict c proof = raise (Theory_conflict (c,proof))
     let add_clause_l l = M.assume l
     let add_clause c = add_clause_l [c]
+    module Form = Msat.Tseitin.Make(B_lit)
+    let add_form f = add_clause_l (Form.make_cnf f)
   end
 
   let add_on_assumption_ f =
