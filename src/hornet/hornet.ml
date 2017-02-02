@@ -79,10 +79,12 @@ let compute_prec stmts =
          |> Precedence.Constr.invfreq)
   in
   let prec = Compute_prec.mk_precedence cp stmts in
+  Util.debugf ~section 2 "@[<2>precedence: %a@]" (fun k->k Precedence.pp prec);
   E.return prec
 
 let compute_ord precedence =
   let ord = Ordering.by_name "kbo" precedence in
+  Util.debugf ~section 2 "@[<2>ord: %a@]" (fun k->k Ordering.pp ord);
   E.return ord
 
 (* setup an alarm for abrupt stop *)
