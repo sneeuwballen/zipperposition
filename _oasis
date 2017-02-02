@@ -63,7 +63,8 @@ Library "libzipperposition"
                     Congruence, FeatureVector, UntypedAST, Ind_ty,
                     TypedSTerm, Statement, Flex_state, Compute_prec, 
                     lib/Hashcons, lib/ParseLocation, lib/Multiset, lib/LazyList,
-                    lib/Hash, lib/IArray, lib/AllocCache, lib/Multiset_intf
+                    lib/Hash, lib/IArray, lib/AllocCache, lib/Multiset_intf,
+                    lib/Signal
   CSources:         util_stubs.c, util_stubs.h
   CCOpt:            -Wextra -Wno-unused-parameter
   BuildDepends:     zarith, unix, sequence, containers,
@@ -128,7 +129,7 @@ Library "libzipperposition_prover"
                     calculi/Heuristics,
                     calculi/Ind_types,
                     calculi/Fool
-  InternalModules:  lib/UnionFind, lib/Signal, lib/Simplex
+  InternalModules:  lib/UnionFind, lib/Simplex
   Build$:           flag(parsers) && flag(prover)
   Install$:         flag(parsers) && flag(prover)
   BuildDepends:     containers, containers.advanced, sequence, unix,
