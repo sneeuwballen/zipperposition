@@ -13,12 +13,17 @@ module Fmt = CCFormat
 
 let section = Util.Section.(make ~parent:root) "state"
 
+type term = FOTerm.t
+type ty = Type.t
+type statement = (Clause.t, term, ty) Statement.t
+
+
 (** {2 Proofs} *)
 
 module Proof : sig
   type t
 end = struct
-  type t = unit
+  type t = unit (* TODO: variant with Clause.proof | Sat_proof | … ? *)
 end
 
 (** {2 Boolean Literal} *)
@@ -147,7 +152,7 @@ module type CONTEXT = sig
   val conf : Flex_state.t
   val ord : Ordering.t
   val signature: Type.t ID.Map.t
-  val statements : Statement.clause_t CCVector.ro_vector
+  val statements : statement CCVector.ro_vector
 end
 
 type context = (module CONTEXT)
@@ -178,7 +183,7 @@ module type ARG = sig
   val ord : Ordering.t
   val signature : Type.t ID.Map.t
   val conf : Flex_state.t
-  val statements : Statement.clause_t CCVector.ro_vector
+  val statements : statement CCVector.ro_vector
 end
 
 module Make(A : ARG) : S = struct

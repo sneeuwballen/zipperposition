@@ -129,8 +129,18 @@ let main () =
   cnf ~file:!file stmts >>= fun stmts ->
   compute_prec (CCVector.to_seq stmts) >>=
   compute_ord >>= fun ord ->
+  (* convert statements in {!Clause.t} *)
+  let stmts =
+    CCVector.map
+      (fun stmt ->
+         Statement.map stmt ~form:(Clause.of_slit_l ~stmt) ~term:CCFun.id ~ty:CCFun.id)
+      stmts
+  in
   let st =
-    State.create ~ord ~signature ~conf ~theories:[]
+    State.create ~ord ~signature ~conf
+      ~theories:[
+        Horn_superposition.theory;
+      ]
       ~statements:stmts ~max_depth:!max_depth ()
   in
   let res = State.run st in

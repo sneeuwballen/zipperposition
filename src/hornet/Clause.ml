@@ -4,11 +4,14 @@
 (** {1 General representation of Clauses} *)
 
 open Libzipperposition
+
 module Fmt = CCFormat
+module PW = Position.With
 
 type t = {
   c_lits: Lit.t IArray.t;
   c_kind: c_kind;
+  c_proof: proof;
 }
 
 (* internal kind *)
@@ -17,7 +20,23 @@ and c_kind =
   | C_unit
   | C_general
 
-type clause = t
+and proof =
+  | From_stmt of Statement.clause_t
+  | Instance of clause * Subst.t
+
+and clause = t
+
+(** {2 Basics} *)
+
+let lits c = c.c_lits
+let proof c = c.c_proof
+
+let equal a b = IArray.equal Lit.equal a.c_lits b.c_lits
+let hash a = IArray.hash Lit.hash a.c_lits
+let compare a b = IArray.compare Lit.compare a.c_lits b.c_lits
+let pp out a =
+  Fmt.fprintf out "[@[%a@]]" (Fmt.seq Lit.pp) (IArray.to_seq a.c_lits)
+let to_string = Fmt.to_string pp
 
 let kind_of_lits (c_lits:Lit.t IArray.t): c_kind =
   if IArray.length c_lits=1
@@ -53,7 +72,7 @@ let compare_lits_for_horn_ (l1:Lit.t) (l2:Lit.t) : int =
 (* Smart constructor: might sort the literals for Horn clauses.
    The conclusion comes first, then the remaining ones with some heuristic
    ordering. *)
-let make_ c_kind c_lits =
+let make_ c_kind c_lits c_proof =
   let c_kind, c_lits = match c_kind with
     | C_unit
     | C_general -> c_kind, c_lits
@@ -65,18 +84,13 @@ let make_ c_kind c_lits =
       assert (Lit.sign (IArray.get c_lits 0)); (* first *)
       C_horn 0, c_lits
   in
-  { c_lits; c_kind }
+  { c_lits; c_kind; c_proof }
 
-let make c_lits: t =
+let make c_lits proof: t =
   let c_kind = kind_of_lits c_lits in
-  make_ c_kind c_lits
+  make_ c_kind c_lits proof
 
-let equal a b = IArray.equal Lit.equal a.c_lits b.c_lits
-let hash a = IArray.hash Lit.hash a.c_lits
-let compare a b = IArray.compare Lit.compare a.c_lits b.c_lits
-let pp out a =
-  Fmt.fprintf out "[@[%a@]]" (Fmt.seq Lit.pp) (IArray.to_seq a.c_lits)
-let to_string = Fmt.to_string pp
+let make_l lits proof : t = make (IArray.of_list lits) proof
 
 (** {2 Horn Clauses} *)
 
@@ -100,12 +114,17 @@ module Horn = struct
 
   let body_len c = IArray.length c.c_lits - 1
 
+  let body1 c = IArray.get c.c_lits 1
   let body_get c n =
     assert (idx_ c = 0);
     if n < 0 || n > IArray.length c.c_lits - 2 then invalid_arg "Horn.body_get";
     IArray.get c.c_lits (n-1)
 
   let pp = pp
+
+  let concl_pos c = PW.return (concl c) |> PW.head
+  let body_pos n c = PW.return (body_get c n) |> PW.body |> PW.arg n
+  let body1_pos = body_pos 0
 end
 
 (** {2 Unit Clauses} *)
@@ -139,25 +158,27 @@ module General = struct
   let pp = pp
 end
 
-(** {2 With Position} *)
+module Proof = struct
+  type t = proof
+
+  let from_stmt st = From_stmt st
+  let instance c subst = Instance (c,subst)
+
+  let pp out p : unit = match p with
+    | From_stmt st ->
+      Fmt.fprintf out "(@[from_stmt@ %a@])" Statement.pp_clause st
+    | Instance (c, subst) ->
+      Fmt.fprintf out "(@[<hv2>instance@ :clause %a@ :subst %a@])"
+        pp c Subst.pp subst
+  let to_string = Fmt.to_string pp
+end
+
+(** {2 Pairing with Position} *)
 
 module With_pos = struct
-  type t = {
-    clause: clause;
-    pos: Position.t;
-  }
-  let clause t = t.clause
-  let pos t = t.pos
-
-  let make c p = {clause=c; pos=p}
-
-  let equal t1 t2 = equal t1.clause t2.clause && Position.equal t1.pos t2.pos
-  let compare t1 t2 =
-    let c = compare t1.clause t2.clause in
-    if c=0 then Position.compare t1.pos t2.pos else c
-  let hash t = Hash.combine3 41 (hash t.clause) (Position.hash t.pos)
-  let pp out t =
-    Fmt.fprintf out "(@[:pos %a :in %a@])" Position.pp t.pos pp t.clause
+  type t = clause Position.With.t
+  let compare = PW.compare compare
+  let pp = PW.pp pp
   let to_string = Fmt.to_string pp
 end
 
@@ -178,4 +199,18 @@ let classify (c:t): kind = match c.c_kind with
   | C_horn _ -> Horn c
   | C_general -> General c
 
+
+(** {2 Utils} *)
+
+let of_slit_l ~stmt lits =
+  let conv_slit = function
+    | SLiteral.True -> Lit.true_
+    | SLiteral.False -> Lit.false_
+    | SLiteral.Atom (t,b) -> Lit.atom ~sign:b t
+    | SLiteral.Eq (_,_) -> failwith "TODO: equations"
+    | SLiteral.Neq (_,_) -> failwith "TODO: disequations"
+  in
+  let lits = List.map conv_slit lits in
+  let proof = Proof.from_stmt stmt in
+  make_l lits proof
 

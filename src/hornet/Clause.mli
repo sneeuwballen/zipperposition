@@ -8,7 +8,15 @@ open Libzipperposition
 type t
 type clause = t
 
-val make : Lit.t IArray.t -> t
+type proof = private
+  | From_stmt of Statement.clause_t
+  | Instance of clause * Subst.t
+
+val make : Lit.t IArray.t -> proof -> t
+val make_l : Lit.t list -> proof -> t
+
+val proof : t -> proof
+val lits : t -> Lit.t IArray.t
 
 include Interfaces.EQ with type t := t
 include Interfaces.HASH with type t := t
@@ -31,9 +39,16 @@ module Horn : sig
   (** Number of literals in the body.
       Invariant: always > 0 *)
 
+  val body1 : t -> Lit.t
+  (** Get the first body literal *)
+
   val body_get : t -> int -> Lit.t
   (** Get the [n]-th body literal.
       @raise Invariant if [n] is not within [0... body_len c - 1] *)
+
+  val concl_pos : t -> Lit.t Position.With.t
+  val body1_pos : t -> Lit.t Position.With.t
+  val body_pos : int -> t -> Lit.t Position.With.t
 
   val pp : t CCFormat.printer
 end
@@ -64,21 +79,26 @@ module General : sig
   val pp : t CCFormat.printer
 end
 
-(** {2 With Position} *)
+(** {2 Proof} *)
 
-module With_pos : sig
-  type t = private {
-    clause: clause;
-    pos: Position.t;
-  }
-  val clause : t -> clause
-  val pos : t -> Position.t
+(** Each clause contains its own proof, that is, a derivation from
+    axioms through instanciations/resolution/… *)
 
-  val make : clause -> Position.t -> t
+module Proof : sig
+  type t = proof
+
+  val from_stmt : Statement.clause_t -> t
+  val instance : clause -> Subst.t -> t
 
   include Interfaces.PRINT with type t := t
-  include Interfaces.HASH with type t := t
+end
+
+(** {2 Pairing with Position} *)
+
+module With_pos : sig
+  type t = clause Position.With.t
   include Interfaces.ORD with type t := t
+  include Interfaces.PRINT with type t := t
 end
 
 (** {2 Classification} *)
@@ -95,5 +115,10 @@ type kind =
 
 val classify : t -> kind
 
+(** {2 Utils} *)
 
-
+val of_slit_l :
+  stmt:Statement.clause_t ->
+  FOTerm.t SLiteral.t list ->
+  t
+(** Conversion from some clause in the given statement *)
