@@ -13,21 +13,12 @@ type res =
   | DefinedCst of int (** (recursive) definition of given stratification level *)
   | Other
 
-let classify id =
-  let res =
-    CCList.find
-      (function
-        | Ind_ty.Payload_ind_cstor (c,t) -> Some (Cstor (c,t))
-        | Ind_ty.Payload_ind_type x -> Some (Ty x)
-        | Ind_ty.Payload_ind_constant -> assert false (* TODO *)
-        | Ind_ty.Payload_ind_projector id -> Some (Projector id)
-        | Statement.Payload_defined_cst l -> Some (DefinedCst l)
-        | _ -> None)
-      (ID.payload id)
-  in
-  match res with
-    | None -> Other
-    | Some x -> x
+let classify id = match ID.payload id with
+  | Ind_ty.Payload_ind_cstor (c,t) -> Cstor (c,t)
+  | Ind_ty.Payload_ind_type x -> Ty x
+  | Ind_ty.Payload_ind_projector id -> Projector id
+  | Statement.Payload_defined_cst l -> DefinedCst l
+  | _ -> Other
 
 let pp_res out = function
   | Ty _ -> Format.fprintf out "ind_ty"
@@ -46,10 +37,10 @@ let pp_signature out sigma =
 let prec_constr_ a b =
   let to_int_ = function
     | Ty _ -> 0
-    | Projector _ -> 1
-    | Cstor _ -> 2
-    | Other -> 4
-    | DefinedCst _ -> 5 (* defined: biggest *)
+    | DefinedCst _ -> 5 (* try to make defined smaller, so that constraints are pure *)
+    | Projector _ -> 10
+    | Cstor _ -> 20
+    | Other -> 40
   in
   let c_a = classify a in
   let c_b = classify b in
