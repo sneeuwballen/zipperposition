@@ -8,6 +8,7 @@ open Libzipperposition
 module Fmt = CCFormat
 module T = FOTerm
 
+type ty = Type.t
 type term = T.t
 
 type t =
@@ -38,3 +39,19 @@ let pp out t: unit = match t with
   | Atom (t, false) -> Fmt.fprintf out "@[@<1>¬@[%a@]@]" T.pp t
 
 let to_string = Fmt.to_string pp
+
+
+let vars_seq = function
+  | Bool _ -> Sequence.empty
+  | Atom (t,_) -> T.Seq.vars t
+
+let vars_list l = vars_seq l |> Sequence.to_rev_list
+
+let vars_set l =
+  vars_seq l
+  |> Sequence.to_rev_list
+  |> CCList.sort_uniq ~cmp:(HVar.compare Type.compare)
+
+let weight = function
+  | Bool _ -> 0
+  | Atom (t, _) -> T.weight t

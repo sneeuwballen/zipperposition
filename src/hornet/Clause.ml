@@ -35,9 +35,41 @@ let kind_of_lits (c_lits:Lit.t IArray.t): c_kind =
     end
   )
 
+(* comparison function that makes the positif literal smaller, then
+   favors other literals by heuristic *)
+let compare_lits_for_horn_ (l1:Lit.t) (l2:Lit.t) : int =
+  let sign1 = Lit.sign l1 in
+  let sign2 = Lit.sign l2 in
+  (* make positive lit smaller *)
+  if sign1<>sign2
+  then if sign1 then (assert (not sign2); -1)
+  else (assert sign2; 1)
+  else (
+    let n_vars1 = Lit.vars_set l1 |> List.length in
+    let n_vars2 = Lit.vars_set l2 |> List.length in
+    CCOrd.( int_ n_vars1 n_vars2 <?> (int_, Lit.weight l1, Lit.weight l2) )
+  )
+
+(* Smart constructor: might sort the literals for Horn clauses.
+   The conclusion comes first, then the remaining ones with some heuristic
+   ordering. *)
+let make_ c_kind c_lits =
+  let c_kind, c_lits = match c_kind with
+    | C_unit
+    | C_general -> c_kind, c_lits
+    | C_horn idx ->
+      assert (Lit.sign (IArray.get c_lits idx));
+      let arr = IArray.to_array c_lits in
+      Array.sort compare_lits_for_horn_ arr;
+      let c_lits = IArray.of_array_unsafe arr in
+      assert (Lit.sign (IArray.get c_lits 0)); (* first *)
+      C_horn 0, c_lits
+  in
+  { c_lits; c_kind }
+
 let make c_lits: t =
   let c_kind = kind_of_lits c_lits in
-  { c_lits; c_kind }
+  make_ c_kind c_lits
 
 let equal a b = IArray.equal Lit.equal a.c_lits b.c_lits
 let hash a = IArray.hash Lit.hash a.c_lits
@@ -52,7 +84,7 @@ module Horn = struct
   let as_clause c = c
 
   let idx_ c = match c.c_kind with
-    | C_horn i -> i
+    | C_horn i -> assert (i=0); i
     | _ -> assert false
 
   let concl c = IArray.get c.c_lits (idx_ c)
@@ -64,6 +96,13 @@ module Horn = struct
       (fun (i,lit) -> if i = i_pos then None else Some lit)
 
   let body_l c = body_seq c |> Sequence.to_rev_list
+
+  let body_len c = IArray.length c.c_lits - 1
+
+  let body_get c n =
+    assert (idx_ c = 0);
+    if n < 0 || n > IArray.length c.c_lits - 2 then invalid_arg "Horn.body_get";
+    IArray.get c.c_lits (n-1)
 
   let pp = pp
 end

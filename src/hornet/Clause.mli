@@ -27,6 +27,14 @@ module Horn : sig
 
   val body_l : t -> Lit.t list
 
+  val body_len : t -> int
+  (** Number of literals in the body.
+      Invariant: always > 0 *)
+
+  val body_get : t -> int -> Lit.t
+  (** Get the [n]-th body literal.
+      @raise Invariant if [n] is not within [0... body_len c - 1] *)
+
   val pp : t CCFormat.printer
 end
 
