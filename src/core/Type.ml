@@ -110,6 +110,25 @@ let of_term_unsafe t = t
 let of_terms_unsafe l = l
 let cast_var_unsafe v = v
 
+(** {2 Definitions} *)
+
+type def =
+  | Def_unin of int (* number of type variables *)
+  | Def_data of int * ty list (* data type with number of variables and cstors *)
+
+exception Payload_def of def
+
+
+let def id = match ID.payload id with
+  | Payload_def d -> Some d
+  | _ -> None
+
+let def_exn id = match def id with
+  | Some d -> d
+  | None -> raise Not_found
+
+let set_def id d = ID.set_payload id (Payload_def d)
+
 (** {2 Containers} *)
 
 module Set = T.Set

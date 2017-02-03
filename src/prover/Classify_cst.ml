@@ -8,28 +8,18 @@ open Libzipperposition
 type res =
   | Ty of Ind_ty.t
   | Cstor of Ind_ty.constructor * Ind_ty.t
-  | Inductive_cst of Ind_cst.cst option
+  | Inductive_cst of Ind_cst.cst
   | Projector of ID.t (** projector of some constructor (id: type) *)
   | DefinedCst of int (** (recursive) definition of given stratification level *)
   | Other
 
-let classify id =
-  let res =
-    CCList.find
-      (function
-        | Ind_ty.Payload_ind_cstor (c,t) -> Some (Cstor (c,t))
-        | Ind_ty.Payload_ind_type x -> Some (Ty x)
-        | Ind_ty.Payload_ind_constant ->
-          let as_cst = Ind_cst.as_cst id in
-          Some (Inductive_cst as_cst)
-        | Ind_ty.Payload_ind_projector id -> Some (Projector id)
-        | Statement.Payload_defined_cst l -> Some (DefinedCst l)
-        | _ -> None)
-      (ID.payload id)
-  in
-  match res with
-    | None -> Other
-    | Some x -> x
+let classify id = match ID.payload id with
+  | Ind_ty.Payload_ind_cstor (c,t) -> Cstor (c,t)
+  | Ind_ty.Payload_ind_type x -> Ty x
+  | Ind_cst.Payload_cst c -> Inductive_cst c
+  | Ind_ty.Payload_ind_projector id -> Projector id
+  | Statement.Payload_defined_cst l -> DefinedCst l
+  | _ -> Other
 
 let pp_res out = function
   | Ty _ -> Format.fprintf out "ind_ty"
@@ -46,8 +36,7 @@ let pp_signature out sigma =
   Format.fprintf out
     "{@[<hv>%a@]}" (Util.pp_list ~sep:"," pp_pair) (Signature.to_list sigma)
 
-let dominates_ opt_c opt_sub =
-  CCOpt.(get false (map2 Ind_cst.dominates opt_c opt_sub))
+let dominates_ c sub = Ind_cst.dominates c sub
 
 let prec_constr_ a b =
   let to_int_ = function

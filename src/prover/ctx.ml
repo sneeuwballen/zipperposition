@@ -59,7 +59,6 @@ module Make(X : PARAMETERS) = struct
     Util.debugf ~section:Const.section 2 "@[<2>@{<cyan>declare new symbol@}@ `@[%a:%a@]`@]"
       (fun k->k ID.pp symb Type.pp ty);
     _signature := Signature.declare !_signature symb ty;
-    Ind_ty.scan_for_constant symb ty;
     Signal.send on_signature_update !_signature;
     Signal.send on_new_symbol (symb,ty);
     Ordering.add_list (ord ()) [symb];

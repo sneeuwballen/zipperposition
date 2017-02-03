@@ -69,18 +69,6 @@ val contains_inductive_types : FOTerm.t -> bool
 (** [true] iff the term contains at least one subterm with
     an inductive type *)
 
-(** {6 Constants with Inductive Type} *)
-
-val is_inductive_constant : ID.t -> bool
-(** An ID whose type is inductive; nothing more *)
-
-val declare_inductive_constant : ID.t -> unit
-(** Make the ID satisfy {!is_inductive_constant} *)
-
-val scan_for_constant : ID.t -> Type.t -> unit
-(** Check whether [id : ty] has an inductive type; if yes, then
-    call {!declare_inductive_constant} *)
-
 (** {6 Scan Declarations} *)
 
 val scan_stmt : (_, _, Type.t) Statement.t -> unit
@@ -94,7 +82,6 @@ val scan_stmt : (_, _, Type.t) Statement.t -> unit
 
 exception Payload_ind_type of t
 exception Payload_ind_cstor of constructor * t
-exception Payload_ind_constant
 exception Payload_ind_projector of ID.t
 
 (**/**)

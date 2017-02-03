@@ -76,7 +76,7 @@ let fresh_id ~ctx prefix =
 
 let fresh_skolem_prefix ~ctx ~ty prefix =
   let s = fresh_id ~ctx prefix in
-  ID.add_payload s Attr_skolem;
+  ID.set_payload s Attr_skolem;
   ctx.sc_new_ids <- (s,ty) :: ctx.sc_new_ids;
   ctx.sc_on_new s ty;
   Util.debugf ~section 3 "@[<2>new skolem symbol %a@ with type @[%a@]@]"
@@ -220,5 +220,6 @@ let pop_new_definitions ~ctx =
   ctx.sc_new_defs <- [];
   l
 
-let is_skolem id =
-  List.exists (function Attr_skolem -> true | _ -> false) (ID.payload id)
+let is_skolem id = match ID.payload id with
+  | Attr_skolem -> true
+  | _ -> false

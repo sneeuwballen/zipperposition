@@ -6,7 +6,7 @@
 module T = FOTerm
 module Stmt = Statement
 
-let section = Util.Section.(make ~parent:zip "ind")
+let section = Util.Section.(make ~parent:zip "ind_ty")
 
 type constructor = {
   cstor_name: ID.t;
@@ -49,7 +49,6 @@ let () =
 
 exception Payload_ind_type of t
 exception Payload_ind_cstor of constructor * t
-exception Payload_ind_constant
 exception Payload_ind_projector of ID.t
 
 let invalid_decl_ msg = raise (InvalidDecl msg)
@@ -73,12 +72,9 @@ let type_hd_exn ty = match type_hd ty with
   | None ->
     invalid_declf_ "expected function type,@ got `@[%a@]`" Type.pp ty
 
-let as_inductive_ty id =
-  CCList.find
-    (function
-      | Payload_ind_type ty -> Some ty
-      | _ -> None)
-    (ID.payload id)
+let as_inductive_ty id = match ID.payload id with
+  | Payload_ind_type ty -> Some ty
+  | _ -> None
 
 let as_inductive_ty_exn id =
   match as_inductive_ty id with
@@ -109,11 +105,10 @@ let declare_ty id ~ty_vars constructors =
   if constructors = []
   then invalid_declf_ "Ind_types.declare_ty %a: no constructors provided" ID.pp id;
   (* check that [ty] is not declared already *)
-  List.iter
-    (function
-      | Payload_ind_type _ -> invalid_declf_ "inductive type %a already declared" ID.pp id;
-      | _ -> ())
-    (ID.payload id);
+  begin match ID.payload id with
+    | Payload_ind_type _ -> invalid_declf_ "inductive type %a already declared" ID.pp id;
+    | _ -> ()
+  end;
   let ity = {
     ty_id=id;
     ty_vars;
@@ -123,20 +118,17 @@ let declare_ty id ~ty_vars constructors =
   (* map the constructors to [ity] too *)
   List.iter
     (fun c ->
-       ID.add_payload c.cstor_name (Payload_ind_cstor (c, ity)))
+       ID.set_payload c.cstor_name (Payload_ind_cstor (c, ity)))
     constructors;
   (* map [id] to [ity] *)
-  ID.add_payload id (Payload_ind_type ity);
+  ID.set_payload id (Payload_ind_type ity);
   ity
 
 (** {6 Constructors} *)
 
-let as_constructor id =
-  CCList.find
-    (function
-      | Payload_ind_cstor (cstor,ity) -> Some (cstor,ity)
-      | _ -> None)
-    (ID.payload id)
+let as_constructor id = match ID.payload id with
+  | Payload_ind_cstor (cstor,ity) -> Some (cstor,ity)
+  | _ -> None
 
 let as_constructor_exn id = match as_constructor id with
   | None -> raise (NotAnInductiveConstructor id)
@@ -148,25 +140,6 @@ let is_constructor s =
 let contains_inductive_types t =
   T.Seq.subterms t
   |> Sequence.exists (fun t -> is_inductive_type (T.ty t))
-
-(** {6 Constants with Inductive Type} *)
-
-let is_inductive_constant id =
-  List.exists
-    (function Payload_ind_constant -> true | _ -> false)
-    (ID.payload id)
-
-let declare_inductive_constant id =
-  if not (is_inductive_constant id)
-  then (
-    Util.debugf ~section 3 "declare inductive constant %a" (fun k->k ID.pp id);
-    ID.add_payload id Payload_ind_constant
-  )
-
-let scan_for_constant id ty =
-  let n_tyvars, args, ret = Type.open_poly_fun ty in
-  if n_tyvars=0 && args=[] && is_inductive_type ret && not (Stmt.is_defined_cst id)
-  then declare_inductive_constant id
 
 (** {6 Scan Declarations} *)
 
@@ -181,11 +154,5 @@ let scan_stmt st = match Stmt.view st with
          in
          let _ = declare_ty d.Stmt.data_id ~ty_vars cstors in
          ())
-      l
-  | Stmt.TyDecl (id, ty) -> scan_for_constant id ty
-  | Stmt.Def l ->
-    List.iter
-      (fun {Stmt.def_id; def_ty; _} ->
-         scan_for_constant def_id def_ty)
       l
   | _ -> ()

@@ -220,7 +220,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     let name = CCFormat.sprintf "_avatar_%d" !skolem_count_ in
     incr skolem_count_;
     let id = ID.make name in
-    ID.add_payload id Skolem.Attr_skolem;
+    ID.set_payload id Skolem.Attr_skolem;
     Ctx.declare id ty;
     Ordering.add_list (Ctx.ord ()) [id];
     id

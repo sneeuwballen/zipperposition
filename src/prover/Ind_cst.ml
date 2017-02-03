@@ -107,12 +107,9 @@ let pp_cst out c = ID.pp out c.cst_id
 
 let on_new_cst = Signal.create()
 
-let as_cst id =
-  CCList.find
-    (function
-      | Payload_cst c -> Some c
-      | _ -> None)
-    (ID.payload id)
+let as_cst id = match ID.payload id with
+  | Payload_cst c -> Some c
+  | _ -> None
 
 let as_cst_exn id = match as_cst id with
   | None -> raise (NotAnInductiveConstant id)
@@ -251,7 +248,7 @@ let mk_skolem_ pp x =
   let name = CCFormat.sprintf "#%a_%d" pp x !n_ in
   incr n_;
   let c = ID.make name in
-  ID.add_payload c Skolem.Attr_skolem;
+  ID.set_payload c Skolem.Attr_skolem;
   c
 
 (* declare new constant *)
@@ -281,7 +278,11 @@ let declare_cst_ ~parent id ty =
     cst_coverset=None;
   }
   in
-  ID.add_payload id (Payload_cst cst);
+  ID.set_payload id (Payload_cst cst)
+    ~can_erase:(function
+      | Skolem.Attr_skolem ->
+        true (* special case: promotion from skolem to inductive const *)
+      | _ -> false);
   (* return *)
   Signal.send on_new_cst cst;
   cst

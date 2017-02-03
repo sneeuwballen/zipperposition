@@ -99,6 +99,22 @@ val of_term_unsafe : InnerTerm.t -> t
 val of_terms_unsafe : InnerTerm.t list -> t list
 val cast_var_unsafe : InnerTerm.t HVar.t -> t HVar.t
 
+(** {2 Definition} *)
+
+type def =
+  | Def_unin of int (* number of type variables *)
+  | Def_data of int * ty list (* data type with number of variables and cstors *)
+
+val def : ID.t -> def option
+(** Access the definition of a type *)
+
+val def_exn : ID.t -> def
+(** Unsafe version of {!def}
+    @raise Not_found if not a proper constant *)
+
+val set_def : ID.t -> def -> unit
+(** Set definition of an ID *)
+
 (** {2 Containers} *)
 
 module Set : CCSet.S with type elt = t

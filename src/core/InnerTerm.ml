@@ -7,6 +7,7 @@ type t = {
   term : view;
   ty : type_result;
   mutable id : int;
+  mutable payload: exn;
 }
 
 (* head form *)
@@ -101,14 +102,14 @@ module H = Hashcons.Make(struct
 
 let hashcons_stats () = H.stats ()
 
+exception No_payload
+
 exception IllFormedTerm of string
+
 type nat = int
 
-let make_ ~ty term = {
-  term;
-  ty;
-  id = ~-1;
-}
+let make_ ~ty term =
+  { term; ty; id = ~-1; payload=No_payload; }
 
 let const ~ty s =
   let my_t = make_ ~ty:(HasType ty) (Const s) in
@@ -158,6 +159,16 @@ let is_bvar t = match view t with | DB _ -> true | _ -> false
 let is_const t = match view t with | Const _ -> true | _ -> false
 let is_bind t = match view t with | Bind _ -> true | _ -> false
 let is_app t = match view t with | App _ -> true | _ -> false
+
+(** {3 Payload} *)
+
+let payload t = t.payload
+
+let set_payload_erase t e = t.payload <- e
+
+let set_payload t e = match t.payload with
+  | No_payload -> t.payload <- e
+  | _ -> invalid_arg "Term.set_payload: collision"
 
 (** {3 Containers} *)
 

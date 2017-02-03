@@ -213,20 +213,18 @@ end
 
 exception Payload_defined_cst of int
 
-let as_defined_cst id =
-  CCList.find_map
-    (function
-      | Payload_defined_cst l -> Some l
-      | _ -> None)
-    (ID.payload id)
+let as_defined_cst id = match ID.payload id with
+  | Payload_defined_cst l -> Some l
+  | _ -> None
 
 let is_defined_cst id = as_defined_cst id <> None
 
 let declare_defined_cst id ~level =
   (* declare that [id] is a defined constant of level [l+1] *)
-  Util.debugf ~section:Util.Section.zip 1 "declare %a as defined constant of level %d"
+  Util.debugf ~section:Util.Section.zip 1
+    "@[<2>declare %a@ as defined constant of level %d@]"
     (fun k->k ID.pp id level);
-  ID.add_payload id (Payload_defined_cst level)
+  ID.set_payload id (Payload_defined_cst level)
 
 let terms_of_rule (d:_ def_rule): _ Sequence.t = match d with
   | Def_term (_, _, _, args, rhs) ->

@@ -87,12 +87,9 @@ let _instantiate_shielded = ref false
 let _accept_unary_types = ref true
 let _instantiate_projector_axiom = ref false
 
-let is_projector_ id ~of_ =
-  List.exists
-    (function
-      | Ind_ty.Payload_ind_projector of' -> ID.equal of_ of'
-      | _ -> false)
-    (ID.payload id)
+let is_projector_ id ~of_ = match ID.payload id with
+  | Ind_ty.Payload_ind_projector of' -> ID.equal of_ of'
+  | _ -> false
 
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
@@ -483,7 +480,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   let name = CCFormat.sprintf "proj_%a_%d" ID.pp c_id n in
                   let proj = ID.make name in
                   (* remember that proj is a projector for the enum type *)
-                  ID.add_payload proj (Ind_ty.Payload_ind_projector d.Stmt.data_id);
+                  ID.set_payload proj (Ind_ty.Payload_ind_projector d.Stmt.data_id);
                   let ty_proj = Type.(forall_n num_ty_vars ([ty_ret] ==> ty_arg)) in
                   (* declare projector *)
                   Ctx.declare proj ty_proj;

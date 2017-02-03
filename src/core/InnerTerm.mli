@@ -72,6 +72,19 @@ val is_app : t -> bool
 
 val hashcons_stats : unit -> int*int*int*int*int*int
 
+(** {3 Payload} *)
+
+exception No_payload
+
+val payload : t -> exn
+
+val set_payload : t -> exn -> unit
+(** Set payload.
+    @raise Invalid_argument if there is already a payload *)
+
+val set_payload_erase : t -> exn -> unit
+(** Set payload, ignoring the previous payload. *)
+
 (** {3 Containers} *)
 
 module Map : CCMap.S with type key = term
