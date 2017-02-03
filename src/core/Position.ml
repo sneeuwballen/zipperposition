@@ -81,12 +81,14 @@ module Build = struct
   let of_pos p = P (p, E)
 
   (* how to apply a difference list to a tail list *)
-  let rec __apply tail b = match b with
+  let rec apply_rec tail b = match b with
     | E -> tail
-    | P (pos0,b') -> __apply (append pos0 tail) b'
-    | N (f, b') -> __apply (f tail) b'
+    | P (pos0,b') -> apply_rec (append pos0 tail) b'
+    | N (f, b') -> apply_rec (f tail) b'
 
-  let to_pos b = __apply stop b
+  let apply_flip b pos = apply_rec pos b
+
+  let to_pos b = apply_rec stop b
 
   let suffix b pos =
     (* given a suffix, first append pos to it, then apply b *)
@@ -95,7 +97,9 @@ module Build = struct
   let prefix pos b =
     (* tricky: this doesn't follow the recursive structure. Hence we
         need to first apply b totally, then pre-prend pos *)
-    N ((fun pos1 -> append pos (__apply pos1 b)), E)
+    N ((fun pos1 -> append pos (apply_rec pos1 b)), E)
+
+  let append p1 p2 = N(apply_flip p2, p1)
 
   let left b = N (left, b)
   let right b = N (right, b)
@@ -106,4 +110,59 @@ module Build = struct
 
   let pp out t = pp out (to_pos t)
   let to_string t = to_string (to_pos t)
+end
+
+(** {2 Pairing of value with Pos} *)
+
+module With = struct
+  type 'a t = {
+    value: 'a;
+    mutable pos: Build.t;
+  }
+
+  let get x = x.value
+
+  (* caching pos *)
+  let pos x = match x.pos with
+    | Build.P (pos, Build.E) -> pos
+    | b ->
+      let res = Build.to_pos b in
+      x.pos <- Build.of_pos res;
+      res
+
+  let make_ x p : _ t = {value=x; pos=p}
+  let make x p : _ t = make_ x (Build.of_pos p)
+  let of_pair (x,p) : _ t = make_ x (Build.of_pos p)
+  let return x = make_ x Build.empty
+
+  let map2_ f t = {t with pos=f t.pos}
+  let left t = map2_ Build.left t
+  let right t = map2_ Build.right t
+  let head t = map2_ Build.head t
+  let body t = map2_ Build.body t
+  let arg n t = map2_ (Build.arg n) t
+
+  let map_pos f t =
+    let new_pos = t.pos |> Build.to_pos |> f |> Build.of_pos in
+    make_ t.value new_pos
+
+  let map f t = {t with value=f t.value}
+
+  let flat_map f t =
+    let t' = f t.value in
+    make_ t'.value (Build.append t.pos t'.pos)
+
+  module Infix = struct
+    let (>|=) x f = map f x
+    let (>>=) x f = flat_map f x
+  end
+  include Infix
+
+  let equal f t1 t2 = f t1.value t2.value && equal (pos t1) (pos t2)
+  let compare f t1 t2 =
+    let c = f t1.value t2.value in
+    if c=0 then compare (pos t1) (pos t2) else c
+  let hash f t = Hash.combine3 41 (f t.value) (hash t.pos)
+  let pp f out t =
+    CCFormat.fprintf out "(@[:pos %a :in %a@])" pp (pos t) f t.value
 end
