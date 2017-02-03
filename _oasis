@@ -31,6 +31,11 @@ Flag "bench"
   Description:  Build and run benchmarks
   Default:      false
 
+Flag "long_tests"
+  Description:  Test the prover against a set of problems
+  Default:      false
+
+
 Flag "parsers"
   Description:  Build and install parsers (requires menhir)
   Default:      true
@@ -211,8 +216,8 @@ Test all
   Run$:             flag(tests) && flag(qcheck)
 
 Test run
-  Command:      make frogtest
-  Run$:         flag(tests)
+  Command:          make frogtest
+  Run$:             flag(tests) && flag(long_tests)
 
 Executable run_tests
   Path:             tests/
