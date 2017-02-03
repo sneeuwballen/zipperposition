@@ -38,6 +38,15 @@ module Horn : sig
   val pp : t CCFormat.printer
 end
 
+(** {2 Unit Clauses} *)
+module Unit : sig
+  type t = private clause
+
+  val get: t -> Lit.t
+
+  val pp : t CCFormat.printer
+end
+
 (** {2 General Clause} *)
 
 (** Such clauses are not Horn nor unit. They have at least two positive
@@ -55,13 +64,30 @@ module General : sig
   val pp : t CCFormat.printer
 end
 
+(** {2 With Position} *)
+
+module With_pos : sig
+  type t = private {
+    clause: clause;
+    pos: Position.t;
+  }
+  val clause : t -> clause
+  val pos : t -> Position.t
+
+  val make : clause -> Position.t -> t
+
+  include Interfaces.PRINT with type t := t
+  include Interfaces.HASH with type t := t
+  include Interfaces.ORD with type t := t
+end
+
 (** {2 Classification} *)
 
 (** Some clauses are Horn, some are unit equations, some are unit,
     and the others are general *)
 
 type kind =
-  | Unit_atom of Lit.t
+  | Unit_atom of Unit.t
   | Horn of Horn.t
   | General of General.t
 (* | Unit_eq of Lit.  *) (* TODO *)

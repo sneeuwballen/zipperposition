@@ -70,6 +70,7 @@ module type CONTEXT = sig
   val conf : Flex_state.t
   val ord : Ordering.t
   val signature: Type.t ID.Map.t
+  val statements : Statement.clause_t CCVector.ro_vector
 end
 
 type context = (module CONTEXT)
@@ -108,6 +109,7 @@ val create :
   ord:Ordering.t ->
   signature:Type.t ID.Map.t ->
   theories:theory_fun list ->
+  statements: Statement.clause_t CCVector.ro_vector ->
   max_depth:int ->
   unit ->
   t

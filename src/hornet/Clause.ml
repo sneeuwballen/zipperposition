@@ -73,6 +73,7 @@ let make c_lits: t =
 
 let equal a b = IArray.equal Lit.equal a.c_lits b.c_lits
 let hash a = IArray.hash Lit.hash a.c_lits
+let compare a b = IArray.compare Lit.compare a.c_lits b.c_lits
 let pp out a =
   Fmt.fprintf out "[@[%a@]]" (Fmt.seq Lit.pp) (IArray.to_seq a.c_lits)
 let to_string = Fmt.to_string pp
@@ -107,6 +108,17 @@ module Horn = struct
   let pp = pp
 end
 
+(** {2 Unit Clauses} *)
+module Unit = struct
+  type t = clause
+
+  let get c =
+    assert (IArray.length c.c_lits = 1);
+    IArray.get c.c_lits 0
+
+  let pp = pp
+end
+
 (** {2 General Clause} *)
 
 (** Such clauses are not Horn nor unit. They have at least two positive
@@ -127,20 +139,42 @@ module General = struct
   let pp = pp
 end
 
+(** {2 With Position} *)
+
+module With_pos = struct
+  type t = {
+    clause: clause;
+    pos: Position.t;
+  }
+  let clause t = t.clause
+  let pos t = t.pos
+
+  let make c p = {clause=c; pos=p}
+
+  let equal t1 t2 = equal t1.clause t2.clause && Position.equal t1.pos t2.pos
+  let compare t1 t2 =
+    let c = compare t1.clause t2.clause in
+    if c=0 then Position.compare t1.pos t2.pos else c
+  let hash t = Hash.combine3 41 (hash t.clause) (Position.hash t.pos)
+  let pp out t =
+    Fmt.fprintf out "(@[:pos %a :in %a@])" Position.pp t.pos pp t.clause
+  let to_string = Fmt.to_string pp
+end
+
 (** {2 Classification} *)
 
 (** Some clauses are Horn, some are unit equations, some are unit,
     and the others are general *)
 
 type kind =
-  | Unit_atom of Lit.t
+  | Unit_atom of Unit.t
   | Horn of Horn.t
   | General of General.t
 (* | Unit_eq of Lit.  *) (* TODO *)
 
 
 let classify (c:t): kind = match c.c_kind with
-  | C_unit -> Unit_atom (IArray.get c.c_lits 0)
+  | C_unit -> Unit_atom c
   | C_horn _ -> Horn c
   | C_general -> General c
 

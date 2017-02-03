@@ -22,6 +22,7 @@ val sign : t -> bool
 
 include Interfaces.EQ with type t := t
 include Interfaces.HASH with type t := t
+include Interfaces.ORD with type t := t
 include Interfaces.PRINT with type t := t
 
 val vars_seq : t -> ty HVar.t Sequence.t

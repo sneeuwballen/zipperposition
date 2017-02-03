@@ -147,6 +147,7 @@ module type CONTEXT = sig
   val conf : Flex_state.t
   val ord : Ordering.t
   val signature: Type.t ID.Map.t
+  val statements : Statement.clause_t CCVector.ro_vector
 end
 
 type context = (module CONTEXT)
@@ -177,6 +178,7 @@ module type ARG = sig
   val ord : Ordering.t
   val signature : Type.t ID.Map.t
   val conf : Flex_state.t
+  val statements : Statement.clause_t CCVector.ro_vector
 end
 
 module Make(A : ARG) : S = struct
@@ -269,12 +271,13 @@ type t = {
   max_depth: int;
 }
 
-let create ~conf ~ord ~signature ~theories ~max_depth () =
+let create ~conf ~ord ~signature ~theories ~statements ~max_depth () =
   let module M = Make(struct
       let conf = conf
       let signature = signature
       let ord = ord
       let theories = theories
+      let statements = statements
     end) in
   let sat = (module M : S) in
   { sat; max_depth; }

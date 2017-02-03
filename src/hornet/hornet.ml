@@ -130,7 +130,8 @@ let main () =
   compute_prec (CCVector.to_seq stmts) >>=
   compute_ord >>= fun ord ->
   let st =
-    State.create ~ord ~signature ~conf ~theories:[] ~max_depth:!max_depth ()
+    State.create ~ord ~signature ~conf ~theories:[]
+      ~statements:stmts ~max_depth:!max_depth ()
   in
   let res = State.run st in
   Format.printf "%a@." State.pp_res res;

@@ -33,6 +33,16 @@ let hash = function
   | Bool b -> Hash.combine2 10 (Hash.bool b)
   | Atom (t,sign) -> Hash.combine3 20 (T.hash t) (Hash.bool sign)
 
+let compare a b: int =
+  let to_int = function Bool _ -> 0 | Atom _ -> 1 in
+  begin match a, b with
+    | Bool b1, Bool b2 -> CCOrd.bool_ b1 b2
+    | Atom (t1,sign1), Atom (t2,sign2) ->
+      CCOrd.( T.compare t1 t2 <?> (bool_, sign1, sign2))
+    | Bool _, _
+    | Atom _, _ -> CCInt.compare (to_int a)(to_int b)
+  end
+
 let pp out t: unit = match t with
   | Bool b -> Fmt.bool out b
   | Atom (t, true) -> T.pp out t
