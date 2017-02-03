@@ -61,7 +61,7 @@ Library "libzipperposition"
   Pack:             true
   Modules:          InnerTerm, FOTerm, Type, Util, STerm, Interfaces,
                     DBEnv, Position, Var, HVar,
-                    Substs, Unif, Signature, Scoped, Unif_intf,
+                    Subst, Unif, Signature, Scoped, Unif_intf,
                     TypeInference, Options, Comparison, Precedence, Builtin,
                     Ordering, Skolem, Cnf, ID, IDOrBuiltin, SLiteral,
                     Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,

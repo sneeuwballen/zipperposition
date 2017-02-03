@@ -4,7 +4,7 @@
 (** {1 Unification and Matching} *)
 
 module T = InnerTerm
-module S = Substs
+module S = Subst
 
 exception Fail
 
@@ -34,7 +34,7 @@ let occurs_check ~depth subst (v,sc_v) t =
         | T.Var v' ->
           (HVar.equal T.equal v v' && sc_v = sc_t)
           ||
-          begin match Substs.find subst (v',sc_t) with
+          begin match Subst.find subst (v',sc_t) with
             | None -> false
             | Some t' -> check ~depth t'
           end
@@ -166,11 +166,11 @@ module Inner = struct
       let subst = unif_rec ~op subst (t1,sc1) (t2,sc2) in
       unif_list ~op subst l1' sc1 l2' sc2
 
-  let unification ?(subst=Substs.empty) a b =
+  let unification ?(subst=Subst.empty) a b =
     Util.with_prof prof_unify
       (fun () -> unif_rec ~op:O_unify subst a b) ()
 
-  let matching ?(subst=Substs.empty) ~pattern b =
+  let matching ?(subst=Subst.empty) ~pattern b =
     if Scoped.same_scope pattern b then invalid_arg "Unif.matching: same scopes";
     let scope = Scoped.scope b in
     Util.with_prof prof_matching
@@ -195,7 +195,7 @@ module Inner = struct
         ~scope:(Scoped.scope t) ~pattern:(Scoped.get pattern) (Scoped.get t)
     else matching ?subst ~pattern t
 
-  let variant ?(subst=Substs.empty) a b =
+  let variant ?(subst=Subst.empty) a b =
     unif_rec ~op:O_variant subst a b
 
   let equal ~subst a b =

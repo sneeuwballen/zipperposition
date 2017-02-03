@@ -2,7 +2,7 @@
 (* This file is free software, part of Libzipperposition. See file "license" for more details. *)
 
 type term = FOTerm.t
-type subst = Substs.t
+type subst = Subst.t
 
 module type LEAF = sig
   type t

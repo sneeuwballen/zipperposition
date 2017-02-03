@@ -6,7 +6,7 @@
 open Libzipperposition
 
 module T = FOTerm
-module S = Substs
+module S = Subst
 module Lit = Literal
 module Lits = Literals
 module Stmt = Statement
@@ -274,8 +274,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     List.fold_left2
       (fun subst v arg ->
          let v = (v : Type.t HVar.t :> InnerTerm.t HVar.t) in
-         Substs.Ty.bind subst (v,sc_decl) (arg,sc_args))
-      Substs.empty d.decl_ty_vars args
+         Subst.Ty.bind subst (v,sc_decl) (arg,sc_args))
+      Subst.empty d.decl_ty_vars args
 
   (* given a type [ty], find whether it's an enum type, and if it is the
      case return [Some (decl, subst)] *)

@@ -121,29 +121,29 @@ module type S = sig
   val length : t -> int
   (** Number of literals *)
 
-  val apply_subst : renaming:Substs.Renaming.t -> Substs.t -> t Scoped.t -> t
+  val apply_subst : renaming:Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
   (** apply the substitution to the clause *)
 
-  val maxlits : t Scoped.t -> Substs.t -> CCBV.t
+  val maxlits : t Scoped.t -> Subst.t -> CCBV.t
   (** List of maximal literals *)
 
-  val is_maxlit : t Scoped.t -> Substs.t -> idx:int -> bool
+  val is_maxlit : t Scoped.t -> Subst.t -> idx:int -> bool
   (** Is the i-th literal maximal in subst(clause)? Equivalent to
       Bitvector.get (maxlits ~ord c subst) i *)
 
-  val eligible_res : t Scoped.t -> Substs.t -> CCBV.t
+  val eligible_res : t Scoped.t -> Subst.t -> CCBV.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for resolution. THe literal has to be either maximal
       among selected literals of the same sign, if some literal is selected,
       or maximal if none is selected. *)
 
-  val eligible_param : t Scoped.t -> Substs.t -> CCBV.t
+  val eligible_param : t Scoped.t -> Subst.t -> CCBV.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for paramodulation. That means the literal
       is positive, no literal is selecteed, and the literal
       is maximal among literals of [subst(clause)]. *)
 
-  val is_eligible_param : t Scoped.t -> Substs.t -> idx:int -> bool
+  val is_eligible_param : t Scoped.t -> Subst.t -> idx:int -> bool
   (** Check whether the [idx]-th literal is eligible for paramodulation *)
 
   val has_selected_lits : t -> bool

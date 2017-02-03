@@ -4,7 +4,7 @@
 (** {1 Non-Perfect Discrimination Tree} *)
 
 module T = FOTerm
-module S = Substs
+module S = Subst
 module TC = T.Classic
 
 let prof_npdtree_retrieve = Util.mk_profiler "NPDtree_retrieve"

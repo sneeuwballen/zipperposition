@@ -31,7 +31,6 @@ type lit = t
 
 (** {2 Basics} *)
 
-val equal : t -> t -> bool
 val equal_com : t -> t -> bool
 val compare : t -> t -> int
 
@@ -72,30 +71,30 @@ val fold : ('a -> term -> 'a) -> 'a -> t -> 'a
 
 val map : (term -> term) -> t -> t (** functor *)
 
-type 'a unif = subst:Substs.t -> 'a Scoped.t -> 'a Scoped.t -> Substs.t Sequence.t
+type 'a unif = subst:Subst.t -> 'a Scoped.t -> 'a Scoped.t -> Subst.t Sequence.t
 
 val generic_unif: Z.t Monome.t unif -> t unif
 (** Generic unification/matching/variant, given such an operation on monomes *)
 
-val apply_subst : renaming:Substs.Renaming.t -> Substs.t -> t Scoped.t -> t
+val apply_subst : renaming:Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
 
-val apply_subst_no_renaming : Substs.t -> t Scoped.t -> t
+val apply_subst_no_renaming : Subst.t -> t Scoped.t -> t
 
-val apply_subst_no_simp : renaming:Substs.Renaming.t -> Substs.t -> t Scoped.t -> t
+val apply_subst_no_simp : renaming:Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
 (** Same as {!apply_subst} but takes care {B NOT} simplifying the
     literal. In practice, mostly useful for comparison purpose. *)
 
-val matching : ?subst:Substs.t -> t Scoped.t -> t Scoped.t ->
-  Substs.t Sequence.t
+val matching : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
+  Subst.t Sequence.t
 (** checks whether subst(lit_a) is equal to lit_b. Returns alternative
     substitutions s such that s(lit_a) = lit_b and s contains subst. *)
 
-val variant : ?subst:Substs.t -> t Scoped.t -> t Scoped.t ->
-  Substs.t Sequence.t
+val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
+  Subst.t Sequence.t
 
-val unify : ?subst:Substs.t -> t Scoped.t -> t Scoped.t -> Substs.t Sequence.t
+val unify : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Sequence.t
 
-val subsumes : ?subst:Substs.t -> t Scoped.t -> t Scoped.t -> Substs.t Sequence.t
+val subsumes : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Sequence.t
 (** Find substitutions such that [subst(lit_a)] implies [lit_b]. This is
     more general than matching. *)
 
@@ -190,14 +189,14 @@ module Focus : sig
         than the argument (cannot scale down), or if the literal
         is not a {!Div} *)
 
-  val apply_subst : renaming:Substs.Renaming.t -> Substs.t -> t Scoped.t -> t
+  val apply_subst : renaming:Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
   (** Apply a substitution *)
 
-  val apply_subst_no_renaming : Substs.t -> t Scoped.t -> t
+  val apply_subst_no_renaming : Subst.t -> t Scoped.t -> t
   (** Apply a substitution with renaming (careful with collisions!) *)
 
-  val unify : ?subst:Substs.t -> t Scoped.t -> t Scoped.t ->
-    (t * t * Substs.t) Sequence.t
+  val unify : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
+    (t * t * Subst.t) Sequence.t
   (** Unify the two focused terms, and possibly other terms of their
       respective focused monomes; yield the new literals accounting for
       the unification along with the unifier *)

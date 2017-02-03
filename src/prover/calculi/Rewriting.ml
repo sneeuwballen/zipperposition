@@ -51,7 +51,7 @@ module Make(E : Env_intf.S) = struct
               let lits' = CCArray.except_idx lits_passive i in
               (* literal in which narrowing took place *)
               let rhs =
-                Substs.FO.apply ~renaming subst (RR.rhs_term rule, sc_rule) in
+                Subst.FO.apply ~renaming subst (RR.rhs_term rule, sc_rule) in
               let new_lit =
                 Literal.Pos.replace lits_passive.(i) ~at:lit_pos
                   ~by:rhs in
@@ -64,7 +64,7 @@ module Make(E : Env_intf.S) = struct
               Util.debugf ~section 3
                 "@[<2>term narrowing:@ from `@[%a@]`@ to `@[%a@]`@ \
                  using rule `%a`@ and subst @[%a@]@]"
-                (fun k->k C.pp c C.pp c' RR.pp_rule_term rule Substs.pp subst);
+                (fun k->k C.pp c C.pp c' RR.pp_rule_term rule Subst.pp subst);
               c'
            )
       )
@@ -122,7 +122,7 @@ module Make(E : Env_intf.S) = struct
               in
               Util.debugf ~section 3
                 "@[<2>narrowing of `@[%a@]`@ using `@[%a@]`@ with @[%a@]@ yields @[%a@]@]"
-                (fun k->k C.pp c RR.pp_rule_clause rule Substs.pp subst
+                (fun k->k C.pp c RR.pp_rule_clause rule Subst.pp subst
                     CCFormat.(list (hovbox C.pp)) clauses);
               Util.incr_stat stat_narrowing_lit;
               List.rev_append clauses acc)

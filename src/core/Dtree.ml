@@ -5,7 +5,7 @@
 
 module ST = InnerTerm
 module T = FOTerm
-module S = Substs
+module S = Subst
 
 let prof_dtree_retrieve = Util.mk_profiler "dtree_retrieve"
 

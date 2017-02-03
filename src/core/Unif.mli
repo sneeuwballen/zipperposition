@@ -3,7 +3,7 @@
 
 (** {1 Unification and Matching} *)
 
-type subst = Substs.t
+type subst = Subst.t
 type 'a sequence = ('a -> unit) -> unit
 
 exception Fail

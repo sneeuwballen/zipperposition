@@ -10,13 +10,12 @@ type term = FOTerm.t
 type t = Literal.t array
 (** Array of literals *)
 
-val equal : t -> t -> bool
 val equal_com : t -> t -> bool
 val compare : t -> t -> int
 
 include Interfaces.HASH with type t := t
 
-val variant : ?subst:Substs.t -> t Scoped.t -> t Scoped.t -> Substs.t Sequence.t
+val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Sequence.t
 (** Variant checking (alpha-equivalence). It can reorder literals to do its
     check, so that might be computationnally expensive (a bit
     like subsumption). *)
@@ -32,8 +31,8 @@ val is_ground : t -> bool       (** all the literals are ground? *)
 val to_form : t -> term SLiteral.t list
 (** Make a 'or' formula from literals *)
 
-val apply_subst : renaming:Substs.Renaming.t ->
-  Substs.t -> t Scoped.t -> t
+val apply_subst : renaming:Subst.Renaming.t ->
+  Subst.t -> t Scoped.t -> t
 
 val map : (term -> term) -> t -> t
 

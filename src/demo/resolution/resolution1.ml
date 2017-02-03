@@ -111,7 +111,7 @@ module Clause = struct
       applies a substitution to a first-order term)
   *)
   let apply_subst ~renaming subst (c, s_c) =
-    make (List.map (fun (t,b) -> Substs.FO.apply ~renaming subst (t, s_c), b) c)
+    make (List.map (fun (t,b) -> Subst.FO.apply ~renaming subst (t, s_c), b) c)
 
   (** printing a clause: print literals separated with "|" *)
   let pp out c = CCFormat.list ~sep:" | " Lit.pp out c
@@ -215,7 +215,7 @@ let _factoring c =
                   let subst = Unif.FO.unification (t, 0) (t', 0) in
                   (** Now we have subst(t)=subst(t'), the inference can proceed *)
                   let c' = CCList.Idx.remove c i in
-                  let renaming = Substs.Renaming.create() in
+                  let renaming = Subst.Renaming.create() in
                   (** Build the conclusion of the inference (removing one
                       of the factored literals *)
                   let c' = Clause.apply_subst ~renaming subst (c',0) in
@@ -259,7 +259,7 @@ let _factoring c =
 
     Note: the "0" and "1" are {b scopes}, a trick I use to avoid actually
     renaming variables in one of the clauses. More details can be found
-    in the documentation for {!Substs} or in the talk I (Simon) gave at PAAR
+    in the documentation for {!Subst} or in the talk I (Simon) gave at PAAR
     2014.
 *)
 let _resolve_with c =
@@ -279,7 +279,7 @@ let _resolve_with c =
             *)
             if b<>b'
             then (
-              let renaming = Substs.Renaming.create() in
+              let renaming = Subst.Renaming.create() in
               (** Build the conclusion clause, merging the remainders [c']
                   and [d'] (which live respectively in scope 1 and 0)
                   of the clauses together after applying the substitution. *)

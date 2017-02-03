@@ -6,7 +6,7 @@ open Libzipperposition
 type term = FOTerm.t
 
 module T = FOTerm
-module S = Substs
+module S = Subst
 module P = Position
 module M = Monome
 module MF = Monome.Focus
@@ -230,7 +230,7 @@ let fold f acc = function
   | Divides d ->
     Sequence.fold f acc (Monome.Seq.terms d.monome)
 
-type 'a unif = subst:Substs.t -> 'a Scoped.t -> 'a Scoped.t -> Substs.t Sequence.t
+type 'a unif = subst:Subst.t -> 'a Scoped.t -> 'a Scoped.t -> Subst.t Sequence.t
 
 (* match {x1,y1} in scope 1, with {x2,y2} with scope2 *)
 let unif4 op ~subst x1 y1 sc1 x2 y2 sc2 k =
@@ -256,13 +256,13 @@ let generic_unif m_unif ~subst (lit1,sc1) (lit2,sc2) k =
     | Binary _, Divides _
     | Divides _, Binary _ -> ()
 
-let unify ?(subst=Substs.empty) lit1 lit2 =
+let unify ?(subst=Subst.empty) lit1 lit2 =
   generic_unif (fun ~subst -> M.unify ~subst) ~subst lit1 lit2
 
-let matching ?(subst=Substs.empty) lit1 lit2 =
+let matching ?(subst=Subst.empty) lit1 lit2 =
   generic_unif (fun ~subst -> M.matching ~subst) ~subst lit1 lit2
 
-let variant ?(subst=Substs.empty) lit1 lit2 =
+let variant ?(subst=Subst.empty) lit1 lit2 =
   generic_unif (fun ~subst -> M.variant ~subst) ~subst lit1 lit2
 
 (* Interesting sub-part of the prover. This subsumption relation must be
@@ -518,7 +518,7 @@ module Subsumption = struct
       | _ -> () (* fail *)
 end
 
-let subsumes ?(subst=Substs.empty) (lit1,sc1) (lit2, sc2) k =
+let subsumes ?(subst=Subst.empty) (lit1,sc1) (lit2, sc2) k =
   Subsumption.check ~subst lit1 sc1 lit2 sc2 k
 
 let are_variant lit1 lit2 =
@@ -825,7 +825,7 @@ module Focus = struct
       ~f_m:(fun m -> M.apply_subst_no_renaming subst (m,sc))
       lit
 
-  let unify ?(subst=Substs.empty) (lit1,sc1) (lit2,sc2) k =
+  let unify ?(subst=Subst.empty) (lit1,sc1) (lit2,sc2) k =
     let _set_mf lit mf = match lit with
       | Left (op, _, m) -> Left (op, mf, m)
       | Right (op, m, _) -> Right (op, m, mf)

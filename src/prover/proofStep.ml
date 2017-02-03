@@ -17,7 +17,7 @@ let section = Util.Section.make ~parent:Const.section "proof"
 type statement_src = Statement.source
 
 type rule_info =
-  | I_subst of Substs.t
+  | I_subst of Subst.t
   | I_pos of Position.t
   | I_comment of string
 
@@ -219,7 +219,7 @@ let distance_to_goal p = p.dist_to_goal
 
 let pp_rule ~info out r =
   let pp_info out = function
-    | I_subst s -> Format.fprintf out " with @[%a@]" Substs.pp s
+    | I_subst s -> Format.fprintf out " with @[%a@]" Subst.pp s
     | I_pos p -> Format.fprintf out " at @[%a@]" Position.pp p
     | I_comment s -> Format.fprintf out " %s" s
   in

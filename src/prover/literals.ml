@@ -7,7 +7,7 @@ open Libzipperposition
 
 module BV = CCBV
 module T = FOTerm
-module S = Substs
+module S = Subst
 module Lit = Literal
 
 type term = FOTerm.t

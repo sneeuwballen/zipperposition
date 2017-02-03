@@ -6,7 +6,7 @@ open Libzipperposition
 module BV = CCBV
 module T = FOTerm
 module O = Ordering
-module S = Substs
+module S = Subst
 module Lit = Literal
 module Lits = Literals
 module Comp = Comparison
@@ -608,7 +608,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             | T.Const _ ->
               (* rewrite subterms in call by value *)
               let l' = List.map (fun t' -> normal_form ~restrict:false subst t' scope) l in
-              let hd' = Substs.FO.apply_no_renaming subst (hd, scope) in
+              let hd' = Subst.FO.apply_no_renaming subst (hd, scope) in
               let t' =
                 if T.equal hd hd' && T.same_l l l'
                 then t

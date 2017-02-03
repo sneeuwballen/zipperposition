@@ -6,7 +6,7 @@
 
 module T = FOTerm
 module I = Index
-module S = Substs
+module S = Subst
 
 let prof_traverse = Util.mk_profiler "fingerprint.traverse"
 

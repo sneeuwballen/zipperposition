@@ -7,7 +7,7 @@ open Libzipperposition
 open Libzipperposition_arbitrary
 
 module T = FOTerm
-module S = Substs
+module S = Subst
 
 let (==>) = QCheck.(==>)
 

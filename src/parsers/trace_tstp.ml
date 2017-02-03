@@ -8,7 +8,6 @@ open Libzipperposition
 type id = Ast_tptp.name
 
 module T = STerm
-module S = Substs
 module A = Ast_tptp
 module Err = CCResult
 

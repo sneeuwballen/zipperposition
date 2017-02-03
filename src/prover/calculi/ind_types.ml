@@ -5,7 +5,6 @@ open Libzipperposition
 
 module Lits = Literals
 module T = FOTerm
-module Su = Substs
 
 let section = Ind_ty.section
 

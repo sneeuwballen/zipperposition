@@ -5,7 +5,7 @@ open Libzipperposition
 open OUnit
 
 module T = FOTerm
-module S = Substs
+module S = Subst
 
 let ty = Type.TPTP.i
 let __const ?(ty=ty) s = T.const ~ty s

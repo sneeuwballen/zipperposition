@@ -6,7 +6,7 @@
 open Libzipperposition
 
 module T = FOTerm
-module S = Substs
+module S = Subst
 module PB = Position.Build
 module P = Position
 module AL = ArithLit
@@ -235,10 +235,10 @@ let symbols lit = Seq.symbols lit |> ID.Set.of_seq
 (** Unification-like operation on components of a literal. *)
 module UnifOp = struct
   type op = {
-    term : subst:Substs.t -> term Scoped.t -> term Scoped.t ->
-      Substs.t Sequence.t;
-    monomes : subst:Substs.t -> Z.t Monome.t Scoped.t -> Z.t Monome.t
-        Scoped.t -> Substs.t Sequence.t;
+    term : subst:Subst.t -> term Scoped.t -> term Scoped.t ->
+      Subst.t Sequence.t;
+    monomes : subst:Subst.t -> Z.t Monome.t Scoped.t -> Z.t Monome.t
+        Scoped.t -> Subst.t Sequence.t;
   }
 end
 
@@ -277,7 +277,7 @@ let variant ?(subst=S.empty) lit1 lit2 k =
 let are_variant lit1 lit2 =
   not (Sequence.is_empty (variant (Scoped.make lit1 0) (Scoped.make lit2 1)))
 
-let matching ?(subst=Substs.empty) ~pattern:lit1 lit2 k =
+let matching ?(subst=Subst.empty) ~pattern:lit1 lit2 k =
   let op = UnifOp.({
       term=(fun ~subst t1 t2 k ->
         try k (Unif.FO.matching_adapt_scope ~subst ~pattern:t1 t2)
@@ -329,7 +329,7 @@ let _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k =
   in
   equate_terms ~subst l2 r2 k
 
-let subsumes ?(subst=Substs.empty) (lit1,sc1) (lit2,sc2) k =
+let subsumes ?(subst=Subst.empty) (lit1,sc1) (lit2,sc2) k =
   match lit1, lit2 with
     | Arith o1, Arith o2 ->
       (* use the more specific subsumption mechanism *)
@@ -338,7 +338,7 @@ let subsumes ?(subst=Substs.empty) (lit1,sc1) (lit2,sc2) k =
       _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k
     | _ -> matching ~subst ~pattern:(lit1,sc1) (lit2,sc2) k
 
-let unify ?(subst=Substs.empty) lit1 lit2 k =
+let unify ?(subst=Subst.empty) lit1 lit2 k =
   let op = UnifOp.({
       term=(fun ~subst t1 t2 k ->
         try k (Unif.FO.unification ~subst t1 t2)

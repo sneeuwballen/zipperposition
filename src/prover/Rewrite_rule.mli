@@ -36,10 +36,10 @@ val normalize_term : Set.t -> FOTerm.t -> FOTerm.t
     of rewrite rules *)
 
 val narrow_term :
-  ?subst:Substs.t ->
+  ?subst:Subst.t ->
   Set.t Scoped.t ->
   FOTerm.t Scoped.t ->
-  (rule_term * Substs.t) Sequence.t
+  (rule_term * Subst.t) Sequence.t
 (** [narrow_term rules t] finds the set of rules [(l --> r) in rules]
     and substitutions [sigma] such that [sigma(l) = sigma(t)] *)
 
@@ -48,9 +48,9 @@ val normalize_clause : Set.t -> Literal.t list -> Literal.t list list option
     if no rule applies *)
 
 val narrow_lit :
-  ?subst:Substs.t ->
+  ?subst:Subst.t ->
   Set.t Scoped.t ->
   Literal.t Scoped.t ->
-  (rule_clause * Substs.t) Sequence.t
+  (rule_clause * Subst.t) Sequence.t
 (** [narrow_term rules lit] finds the set of rules [(l --> clauses) in rules]
     and substitutions [sigma] such that [sigma(l) = sigma(tit)] *)

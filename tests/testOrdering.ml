@@ -7,7 +7,7 @@ open Libzipperposition
 open Libzipperposition_arbitrary
 
 module T = FOTerm
-module S = Substs.FO
+module S = Subst.FO
 module O = Ordering
 
 (* [more_specific cm1 cm2] is true if [cmp2] is compatible with, and possibly
@@ -23,7 +23,7 @@ let more_specific cmp1 cmp2 = Comparison.(match cmp1, cmp2 with
 
 let check_ordering_inv_by_subst ord =
   let name = CCFormat.sprintf "ordering_%s_inv_by_subst" (O.name ord) in
-  let pp = QCheck.Print.triple T.to_string T.to_string Substs.to_string in
+  let pp = QCheck.Print.triple T.to_string T.to_string Subst.to_string in
   (* generate pairs of terms, and grounding substitutions *)
   let gen = QCheck.Gen.(
     (pair ArTerm.default_g ArTerm.default_g)
@@ -37,12 +37,12 @@ let check_ordering_inv_by_subst ord =
       (fun v subst ->
         let v = (v : Type.t HVar.t :> InnerTerm.t HVar.t) in
         S.bind subst (v,1) (ArTerm.ground_g st,0))
-      vars Substs.empty in
+      vars Subst.empty in
     triple (return t1) (return t2) subst)
   in
   let size (t1, t2, s) =
     T.size t1 + T.size t2 +
-      (Substs.fold (fun n _ (t,_) -> n + T.size (T.of_term_unsafe t)) 0 s)
+      (Subst.fold (fun n _ (t,_) -> n + T.size (T.of_term_unsafe t)) 0 s)
   in
   let gen = QCheck.make ~print:pp ~small:size gen in
   (* do type inference on the fly

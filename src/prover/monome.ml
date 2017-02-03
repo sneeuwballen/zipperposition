@@ -272,12 +272,12 @@ let split m =
 
 let apply_subst ~renaming subst (m,sc) =
   map
-    (fun t -> Substs.FO.apply ~renaming subst (t,sc))
+    (fun t -> Subst.FO.apply ~renaming subst (t,sc))
     m
 
 let apply_subst_no_renaming subst (m,sc) =
   map
-    (fun t -> Substs.FO.apply_no_renaming subst (t,sc))
+    (fun t -> Subst.FO.apply_no_renaming subst (t,sc))
     m
 
 let is_ground m =
@@ -455,10 +455,10 @@ module Focus = struct
     {coeff; rest; term; }
 
   let apply_subst ~renaming subst mf =
-    _apply_subst (Substs.FO.apply ~renaming) subst mf
+    _apply_subst (Subst.FO.apply ~renaming) subst mf
 
   let apply_subst_no_renaming subst mf =
-    _apply_subst Substs.FO.apply_no_renaming subst mf
+    _apply_subst Subst.FO.apply_no_renaming subst mf
 
   let _id x = x
   let map ?(term=_id) ?(coeff=_id) ?(rest=_id) mf =
@@ -488,11 +488,11 @@ module Focus = struct
           _iter_self ~num ~subst c t l' ((c',t')::rest) const scope k
         )
 
-  let unify_self ?(subst=Substs.empty) (mf,sc) k =
+  let unify_self ?(subst=Subst.empty) (mf,sc) k =
     let num = mf.rest.num in
     _iter_self ~num ~subst mf.coeff mf.term mf.rest.terms [] mf.rest.const sc k
 
-  let unify_self_monome ?(subst=Substs.empty) (m,sc) k =
+  let unify_self_monome ?(subst=Subst.empty) (m,sc) k =
     let num = m.num in
     let rec choose_first subst l rest = match l with
       | [] -> ()
@@ -514,7 +514,7 @@ module Focus = struct
     in
     choose_first subst m.terms []
 
-  let unify_ff ?(subst=Substs.empty) (mf1,sc1) (mf2,sc2) k =
+  let unify_ff ?(subst=Subst.empty) (mf1,sc1) (mf2,sc2) k =
     assert(mf1.rest.num == mf2.rest.num);
     let num = mf1.rest.num in
     try
@@ -527,7 +527,7 @@ module Focus = struct
              (fun (mf2, subst) -> k (mf1, mf2, subst)))
     with Unif.Fail -> ()
 
-  let unify_mm ?(subst=Substs.empty) (m1,sc1) (m2,sc2) k =
+  let unify_mm ?(subst=Subst.empty) (m1,sc1) (m2,sc2) k =
     assert(m1.num==m2.num);
     let num = m1.num in
     (* unify a term of [m1] with a term of [m2] *)
@@ -542,7 +542,7 @@ module Focus = struct
           try
             let subst = Unif.FO.unification ~subst (t1,sc1) (t2,sc2) in
             Util.debugf 5 "@[<2>unify_mm :@ @[%a = %a@]@ with @[%a@]@]"
-              (fun k->k T.pp t1 T.pp t2 Substs.pp subst);
+              (fun k->k T.pp t1 T.pp t2 Subst.pp subst);
             _iter_self ~num ~subst c1 t1 l1' [] m1.const sc1
               (fun (mf1, subst) ->
                  _iter_self ~num ~subst c2 t2 l2' [] m2.const sc2
@@ -558,12 +558,12 @@ module Focus = struct
     choose_first subst m1.terms [] m1.const m2.terms [] m2.const k
 
   (*
-  let unify_fm ?(subst=Substs.empty) mf1 s1 m2 s2 k =
+  let unify_fm ?(subst=Subst.empty) mf1 s1 m2 s2 k =
     assert false  (* TODO? unify_fm *)
   *)
 end
 
-let variant ?(subst=Substs.empty) (m1,sc1) (m2,sc2) k =
+let variant ?(subst=Subst.empty) (m1,sc1) (m2,sc2) k =
   assert (m1.num == m2.num);
   let rec traverse_lists subst (c1,t1) l1' rest2 l2 = match l2 with
     | [] -> ()  (* fail *)
@@ -590,7 +590,7 @@ let variant ?(subst=Substs.empty) (m1,sc1) (m2,sc2) k =
    Also, matching X+f(a) with 1+f(a) will not work.
 
    In summary naked variables are evil. *)
-let matching ?(subst=Substs.empty) (m1,sc1)(m2,sc2) k =
+let matching ?(subst=Subst.empty) (m1,sc1)(m2,sc2) k =
   assert (m1.num == m2.num);
   let rec traverse_lists subst (c1,t1) l1' rest2 l2 = match l2 with
     | [] -> ()
@@ -615,7 +615,7 @@ let matching ?(subst=Substs.empty) (m1,sc1)(m2,sc2) k =
   if m1.num.cmp m1.const m2.const <> 0 then ()
   else start subst m1.terms m2.terms
 
-let unify ?(subst=Substs.empty) (m1,sc1)(m2,sc2) k =
+let unify ?(subst=Subst.empty) (m1,sc1)(m2,sc2) k =
   assert (m1.num == m2.num);
   let rec traverse_lists subst (c1,t1) l1' rest2 l2 = match l2 with
     | [] -> ()
@@ -873,8 +873,8 @@ module Int = struct
         List.fold_left
           (fun subst (v, m) ->
              let v = (v : T.var :> InnerTerm.t HVar.t) in
-             Substs.FO.bind subst (Scoped.make v 0) (Scoped.make (to_term m) 0))
-          Substs.empty vars
+             Subst.FO.bind subst (Scoped.make v 0) (Scoped.make (to_term m) 0))
+          Subst.empty vars
       in
       subst, nonvars
 

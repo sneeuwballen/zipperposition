@@ -12,7 +12,6 @@ open Phases.Infix
 module T = FOTerm
 module O = Ordering
 module Lit = Literal
-module S = Substs
 
 let section = Const.section
 

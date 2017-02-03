@@ -8,7 +8,7 @@ open Libzipperposition
 module T = FOTerm
 module Lit = Literal
 module Lits = Literals
-module S = Substs
+module S = Subst
 module M = Monome
 module MF = Monome.Focus
 module AL = ArithLit
@@ -277,7 +277,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       passive_pos : Position.t;
       passive_lit : ArithLit.Focus.t;
       passive_scope : int;
-      subst : Substs.t;
+      subst : Subst.t;
     }
   end
 
@@ -294,7 +294,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let lit_p = ALF.apply_subst ~renaming subst (info.passive_lit,s_p) in
     Util.debugf ~section 5
       "@[<2>arith superposition@ between @[%a[%d]@]@ and @[%a[%d]@]@ (subst @[%a@])...@]"
-      (fun k->k C.pp info.active s_a C.pp info.passive s_p Substs.pp subst);
+      (fun k->k C.pp info.active s_a C.pp info.passive s_p Subst.pp subst);
     (* check ordering conditions *)
     if C.is_maxlit (info.active,s_a) subst ~idx:idx_a
     && C.is_maxlit (info.passive,s_p) subst ~idx:idx_p
@@ -333,7 +333,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof =
         ProofStep.mk_inference
           ~rule:(ProofStep.mk_rule
-              ~comment:[Substs.to_string subst; CCFormat.sprintf "lhs(%a)" MF.pp mf_a]
+              ~comment:[Subst.to_string subst; CCFormat.sprintf "lhs(%a)" MF.pp mf_a]
               "canc_sup")
           [C.proof info.active; C.proof info.passive] in
       let trail = C.trail_l [info.active;info.passive] in
@@ -634,7 +634,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                       let new_c = C.create ~trail all_lits proof in
                       Util.debugf ~section 3
                         "@[<2>cancellation@ of @[%a@]@ (with %a)@ into @[%a@]@]"
-                        (fun k->k C.pp c Substs.pp subst C.pp new_c);
+                        (fun k->k C.pp c Subst.pp subst C.pp new_c);
                       Util.incr_stat stat_arith_cancellation;
                       new_c :: acc
                     ) else
@@ -665,7 +665,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                       let new_c = C.create ~trail all_lits proof in
                       Util.debugf ~section 3
                         "@[<2>cancellation@ of @[%a@]@ (with %a)@ into @[%a@]@]"
-                        (fun k->k C.pp c Substs.pp subst C.pp new_c);
+                        (fun k->k C.pp c Subst.pp subst C.pp new_c);
                       Util.incr_stat stat_arith_cancellation;
                       new_c :: acc
                     ) else acc)
@@ -765,7 +765,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       right_scope : int;
       right_pos : Position.t;
       right_lit : ArithLit.Focus.t;
-      subst : Substs.t;
+      subst : Subst.t;
     }
   end
 
@@ -789,7 +789,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let lit_r = ALF.apply_subst ~renaming subst (info.right_lit,s_r) in
     Util.debugf ~section 5
       "@[<2>arith chaining@ between @[%a[%d]@]@ and @[%a[%d]@]@ (subst @[%a@])...@]"
-      (fun k->k C.pp info.left s_l C.pp info.right s_r Substs.pp subst);
+      (fun k->k C.pp info.left s_l C.pp info.right s_r Subst.pp subst);
     (* check ordering conditions *)
     if C.is_maxlit (info.left,s_l) subst ~idx:idx_l
     && C.is_maxlit (info.right,s_r) subst ~idx:idx_r
@@ -1150,7 +1150,7 @@ module Make(E : Env.S) : S with module Env = E = struct
          are good *)
       Util.debugf ~section 5
         "@[<2>div. chaining@ with @[%a@]@ between @[%a@] (at %a)@ and@ @[%a@] (at %a)@]"
-        (fun k->k Substs.pp subst C.pp c1 Position.pp pos1 C.pp c2 Position.pp pos2);
+        (fun k->k Subst.pp subst C.pp c1 Position.pp pos1 C.pp c2 Position.pp pos2);
       if Z.lt gcd Z.(pow n power)
       && C.is_maxlit (c1,sc1) subst ~idx:idx1
       && C.is_maxlit (c2,sc2) subst ~idx:idx2
@@ -1380,7 +1380,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   (* do the inference *)
                   Util.debugf ~section 5
                     "@[<2>divisibility@ on @[%a@]@ at @[%a@]@ with @[%a@]...@]"
-                    (fun k->k C.pp c Position.pp pos Substs.pp subst);
+                    (fun k->k C.pp c Position.pp pos Subst.pp subst);
                   let new_lit = match lit' with
                     | ALF.Left (AL.Equal, mf, m)
                     | ALF.Right (AL.Equal, m, mf) ->

@@ -7,7 +7,7 @@ open Libzipperposition
 
 module BV = CCBV
 module T = FOTerm
-module S = Substs
+module S = Subst
 module Lit = Literal
 module Lits = Literals
 module Stmt = Statement
@@ -207,7 +207,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     new_c
 
   let _apply_subst_no_simpl subst (lits,sc) =
-    if Substs.is_empty subst
+    if Subst.is_empty subst
     then lits (* id *)
     else
       let renaming = S.Renaming.create () in

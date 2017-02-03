@@ -11,11 +11,10 @@
 open Libzipperposition
 
 module T = FOTerm
-module Subst = Substs
 module Lits = Literals
 
 type term = T.t
-type subst = Substs.t
+type subst = Subst.t
 
 (** A context is represented as a regular array of literals, containing
     at least one specific variable [x], paired with this variable [x].

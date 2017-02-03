@@ -6,7 +6,7 @@ open Libzipperposition
 (** {1 Rewrite Rules} *)
 module T = FOTerm
 module Stmt = Statement
-module Su = Substs
+module Su = Subst
 
 let section = Util.Section.(make ~parent:zip "rewriting")
 
@@ -179,7 +179,7 @@ let normalize_term_ rules t =
                      (fun k->k T.pp t' pp_rule_term r Su.pp subst);
                    Util.incr_stat stat_term_rw;
                    (* NOTE: not efficient, will traverse [t'] fully *)
-                   let t' = Substs.FO.apply_no_renaming subst (r.rhs,1) in
+                   let t' = Subst.FO.apply_no_renaming subst (r.rhs,1) in
                    reduce t' k
                end
              | _ -> k t'
@@ -205,7 +205,7 @@ let normalize_term_ rules t =
 let normalize_term rules t =
   Util.with_prof prof_term_rw (normalize_term_ rules) t
 
-let narrow_term ?(subst=Substs.empty) (rules,sc_r) (t,sc_t) = match T.view t with
+let narrow_term ?(subst=Subst.empty) (rules,sc_r) (t,sc_t) = match T.view t with
   | T.Const _ -> Sequence.empty (* already normal form *)
   | T.App (f, _) ->
     begin match T.view f with
@@ -247,7 +247,7 @@ let normalize_clause_ rules lits =
              "@[<2>rewrite `@[%a@]`@ into `@[<v>%a@]`@ with @[%a@]@]"
              (fun k->k Literal.pp lit
                  CCFormat.(list (hvbox (Util.pp_list ~sep:" ∨ " Literal.pp))) clauses
-                 Substs.pp subst);
+                 Subst.pp subst);
            Util.incr_stat stat_clause_rw;
            Some (i, clauses, subst))
       lits
@@ -255,7 +255,7 @@ let normalize_clause_ rules lits =
   match step with
     | None -> None
     | Some (i, clause_chunks, subst) ->
-      let renaming = Substs.Renaming.create () in
+      let renaming = Subst.Renaming.create () in
       (* remove rewritten literal, replace by [clause_chunks], apply
          substitution (clause_chunks might contain other variables!),
          distribute to get a CNF again *)
@@ -268,7 +268,7 @@ let normalize_clause_ rules lits =
 let normalize_clause rules lits =
   Util.with_prof prof_clause_rw (normalize_clause_ rules) lits
 
-let narrow_lit ?(subst=Substs.empty) (rules,sc_r) (lit,sc_lit) =
+let narrow_lit ?(subst=Subst.empty) (rules,sc_r) (lit,sc_lit) =
   Sequence.of_list rules.Set.clauses
   |> Sequence.flat_map
     (fun r ->

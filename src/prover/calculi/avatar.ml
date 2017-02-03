@@ -276,11 +276,11 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
              let ty = HVar.ty v in
              let id = skolem_ ~ty in
              let subst =
-               Substs.FO.bind subst ((v:T.var:>Substs.var),i) (T.const ~ty id,0)
+               Subst.FO.bind subst ((v:T.var:>Subst.var),i) (T.const ~ty id,0)
              in
              subst, (id,ty)
           )
-          Substs.empty
+          Subst.empty
           vars
       in
       let renaming = Ctx.renaming_clear() in

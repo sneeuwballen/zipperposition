@@ -11,7 +11,7 @@
 open Libzipperposition
 
 type term = FOTerm.t
-type subst = Substs.t
+type subst = Subst.t
 
 (** A context is represented as a regular array of literals, containing
     at least one specific variable [x], paired with this variable [x].

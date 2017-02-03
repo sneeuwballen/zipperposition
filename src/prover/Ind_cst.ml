@@ -314,7 +314,7 @@ let make_coverset_ ~cover_set_depth cst : cover_set =
     if depth=0
     then (
       let id = mk_skolem_ ID.pp ity.Ind_ty.ty_id in
-      let ty = Substs.Ty.apply_no_renaming subst (ity.Ind_ty.ty_pattern,0) in
+      let ty = Subst.Ty.apply_no_renaming subst (ity.Ind_ty.ty_pattern,0) in
       decl_sub id ty
     )
     (* inner nodes or base cases: constructors *)
@@ -328,7 +328,7 @@ let make_coverset_ ~cover_set_depth cst : cover_set =
         List.map
           (fun v ->
              let v = Type.var v in
-             Substs.Ty.apply_no_renaming subst (v,0))
+             Subst.Ty.apply_no_renaming subst (v,0))
           ity.Ind_ty.ty_vars
       in
       let ty_f_applied = Type.apply ty_f ty_params in

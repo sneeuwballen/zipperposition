@@ -54,7 +54,7 @@ module type S = sig
   val subsumes_with :
     Literals.t Scoped.t ->
     Literals.t Scoped.t ->
-    Substs.FO.t option
+    Subst.FO.t option
   (** returns subsuming subst if the first clause subsumes the second one *)
 
   val eq_subsumes : Literal.t array -> Literal.t array -> bool

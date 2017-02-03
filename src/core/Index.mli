@@ -4,7 +4,7 @@
 (** {1 Generic term indexing} *)
 
 type term = FOTerm.t
-type subst = Substs.t
+type subst = Subst.t
 
 (** {2 Leaf} *)
 

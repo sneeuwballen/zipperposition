@@ -6,7 +6,7 @@
 open Libzipperposition
 
 module T = FOTerm
-module S = Substs
+module S = Subst
 module Unif = Libzipperposition.Unif
 
 (** {2 Context for a Proof} *)

@@ -9,7 +9,7 @@ open Libzipperposition
 
 module T = FOTerm
 module C = Clause
-module S = Substs.FO
+module S = Subst.FO
 module Lit = Literal
 module Lits = Literals
 module Pos = Position
