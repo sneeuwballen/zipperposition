@@ -24,7 +24,7 @@ let arg i pos = Arg (i, pos)
 let body pos = Body pos
 
 let compare = Pervasives.compare
-let eq p1 p2 = compare p1 p2 = 0
+let equal p1 p2 = compare p1 p2 = 0
 let hash p = Hashtbl.hash p
 
 let rev pos =

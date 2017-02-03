@@ -15,8 +15,6 @@ type t =
 type position = t
 
 val stop : t
-val left : t -> t
-val right : t -> t
 val type_ : t -> t
 val left : t -> t
 val right : t -> t
@@ -33,7 +31,7 @@ val append : t -> t -> t
 (** Append two positions *)
 
 val compare : t -> t -> int
-val eq : t -> t -> bool
+val equal : t -> t -> bool
 val hash : t -> int
 
 include Interfaces.PRINT with type t := t
