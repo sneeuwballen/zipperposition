@@ -5,8 +5,10 @@
 
 open Libzipperposition
 
+module BV = CCBV
 module Fmt = CCFormat
 module PW = Position.With
+module S = Subst
 
 type t = {
   c_lits: Lit.t IArray.t;
@@ -97,8 +99,7 @@ let make_l lits proof : t = make (IArray.of_list lits) proof
 let hash_mod_alpha c : int =
   IArray.hash Lit.hash_mod_alpha c.c_lits
 
-let equal_mod_alpha c1 c2 : bool =
-  assert false (* TODO *)
+let is_empty c = IArray.length c.c_lits = 0
 
 (** {2 Horn Clauses} *)
 
@@ -228,3 +229,44 @@ let of_slit_l ~stmt lits =
   let proof = Proof.from_stmt stmt in
   make_l lits proof
 
+(** {2 Unif} *)
+
+let variant ?(subst=S.empty) (c1,sc1) (c2,sc2) : S.t Sequence.t =
+  let a1 = c1.c_lits in
+  let a2 = c2.c_lits in
+  (* match a1.(i...) with a2\bv *)
+  let rec iter2 subst bv i k =
+    if i = IArray.length a1
+    then k subst
+    else iter3 subst bv i 0 k
+  (* find a matching literal for a1.(i), within a2.(j...) *)
+  and iter3 subst bv i j k =
+    if j = IArray.length a2
+    then ()  (* stop *)
+    else (
+      if not (BV.get bv j)
+      then (
+        (* try to match i-th literal of a1 with j-th literal of a2 *)
+        BV.set bv j;
+        Lit.variant ~subst (IArray.get a1 i,sc1) (IArray.get a2 i,sc2)
+          (fun subst -> iter2 subst bv (i+1) k);
+        BV.reset bv j
+      );
+      iter3 subst bv i (j+1) k
+    )
+  in
+  fun yield ->
+    if IArray.length a1 = IArray.length a2
+    then (
+      let bv = BV.create ~size:(IArray.length a1) false in
+      iter2 subst bv 0 yield
+    )
+
+let equal_mod_alpha c1 c2 : bool =
+  not (Sequence.is_empty (variant (c1,0) (c2,1)))
+
+module Tbl_mod_alpha = CCHashtbl.Make(struct
+    type t = clause
+    let equal = equal_mod_alpha
+    let hash = hash_mod_alpha
+  end)

@@ -20,11 +20,11 @@ val make_l : Lit.t list -> proof -> t
 val proof : t -> proof
 val lits : t -> Lit.t IArray.t
 
+val is_empty : t -> bool
+
 include Interfaces.EQ with type t := t
 include Interfaces.HASH with type t := t
 include Interfaces.PRINT with type t := t
-
-val equal_mod_alpha : t -> t -> bool
 
 val hash_mod_alpha : t -> int
 
@@ -130,3 +130,15 @@ val of_slit_l :
   FOTerm.t SLiteral.t list ->
   t
 (** Conversion from some clause in the given statement *)
+
+(** {2 Unif} *)
+
+val variant :
+  ?subst:Subst.t ->
+  t Scoped.t ->
+  t Scoped.t ->
+  Subst.t Sequence.t
+
+val equal_mod_alpha : t -> t -> bool
+
+module Tbl_mod_alpha : CCHashtbl.S with type key = clause
