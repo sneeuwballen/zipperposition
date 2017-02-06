@@ -172,6 +172,8 @@ val ord_option : 'a CCOrd.t -> 'a option CCOrd.t
 
 val map_product : f:('a -> 'b list list) -> 'a list -> 'b list list
 
+module Int_map : CCMap.S with type key = int
+
 (** {2 File utils} *)
 
 type 'a or_error = ('a, string) CCResult.t

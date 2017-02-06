@@ -356,6 +356,8 @@ let map_product ~f l =
         (f l1)
         tail
 
+module Int_map = CCMap.Make(CCInt)
+
 (** {2 File utils} *)
 
 type 'a or_error = ('a, string) CCResult.t
