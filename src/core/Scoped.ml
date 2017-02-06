@@ -2,8 +2,9 @@
 (* This file is free software, part of Libzipperposition. See file "license" for more details. *)
 
 (** {1 Scoped Value} *)
-
-type +'a t = 'a * int
+ 
+type scope = int
+type +'a t = 'a * scope
 
 let make x i = x, i
 

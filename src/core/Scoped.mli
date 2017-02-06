@@ -10,7 +10,8 @@
 
 *)
 
-type +'a t = 'a * int
+type scope = int
+type +'a t = 'a * scope
 
 val make : 'a -> int -> 'a t
 
