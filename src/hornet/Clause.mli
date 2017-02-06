@@ -9,8 +9,10 @@ type t
 type clause = t
 
 type proof = private
-  | From_stmt of Statement.clause_t
-  | Instance of clause * Subst.t
+  | P_from_stmt of Statement.clause_t
+  | P_instance of clause * Subst.t
+  | P_avatar_split of clause (* split into var-disjoint components *)
+  | P_split of clause (* model-driven recursive splitting *)
 
 val make : Lit.t IArray.t -> proof -> t
 val make_l : Lit.t list -> proof -> t
@@ -89,6 +91,8 @@ module Proof : sig
 
   val from_stmt : Statement.clause_t -> t
   val instance : clause -> Subst.t -> t
+  val avatar_split : clause -> t
+  val split : clause -> t
 
   include Interfaces.PRINT with type t := t
 end

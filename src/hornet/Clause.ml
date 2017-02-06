@@ -21,8 +21,10 @@ and c_kind =
   | C_general
 
 and proof =
-  | From_stmt of Statement.clause_t
-  | Instance of clause * Subst.t
+  | P_from_stmt of Statement.clause_t
+  | P_instance of clause * Subst.t
+  | P_avatar_split of clause (* split into var-disjoint components *)
+  | P_split of clause (* model-driven recursive splitting *)
 
 and clause = t
 
@@ -161,15 +163,21 @@ end
 module Proof = struct
   type t = proof
 
-  let from_stmt st = From_stmt st
-  let instance c subst = Instance (c,subst)
+  let from_stmt st = P_from_stmt st
+  let instance c subst = P_instance (c,subst)
+  let avatar_split c = P_avatar_split c
+  let split c = P_split c
 
   let pp out p : unit = match p with
-    | From_stmt st ->
+    | P_from_stmt st ->
       Fmt.fprintf out "(@[from_stmt@ %a@])" Statement.pp_clause st
-    | Instance (c, subst) ->
+    | P_instance (c, subst) ->
       Fmt.fprintf out "(@[<hv2>instance@ :clause %a@ :subst %a@])"
         pp c Subst.pp subst
+    | P_avatar_split c ->
+      Fmt.fprintf out "(@[<hv2>avatar_split@ %a@])" pp c
+    | P_split c ->
+      Fmt.fprintf out "(@[<hv2>split@ %a@])" pp c
   let to_string = Fmt.to_string pp
 end
 
