@@ -1,6 +1,55 @@
-
+# TODO
 
 ## Now
+
+## Hornet
+
+- FO prover
+  * [ ] basic Horn superposition
+  * [ ] dismatching constraints for Horn superposition
+  * [ ] ⊥-grounding for clauses (map each clause to its grounding)
+  * selection of one literal per clause that is ⊥-true (watch them during prop)
+    → map ground lits to the corresponding set of clauses that contain it?
+  * [ ] eager saturation loop, with a bound on the number of unordered
+        inferences for each clause (this bound = the one bound increased
+        during iterative deepening).
+        Ground Horn superposition and oriented rewriting are not bounded.
+  * [ ] some basic redundancy criteria
+
+- hierarchic superposition
+  * [ ] have a flag "abstraction" on `HVar.t`
+  * [ ] update unification/matching algos so that they compute simple
+        mgus (for `abstraction var =?= t`, modify occur-check so that
+        it requires `t` to not contain `var` and to be a pure BG-term)
+  * [ ] Horn clauses need a "constraint" part
+  * [ ] have a basic theory of rationals (Fourier-Motzkin)
+  * [ ] have a theory of datatypes
+  * [ ] have a "define" rule for ground BG-sorted FG-terms (in particular,
+        for datatypes, makes a good replacement to `x=0 ∨ x=s(_)`)
+
+- induction
+  * only on Horn goals (a goal=a Horn clause)
+  * [ ] nested induction, same as in Zipperposition
+  * [ ] strong induction:
+    strengthening of `p(n) => q(n)` gives a new constant `n₀` and:
+    + `p(n0)`, `¬ q(n₀)`
+    + `p(x) => q(x) | x<n₀` where `<` is a BG theory symbol on all datatypes,
+      interpreted as the structural ordering
+  * [ ] explore whether abstraction (from hierarchic superposition) makes
+        it easier to *simplify* candidate lemmas by generalization.
+        Lemmas would be Horn clauses, so generalization is just removing some
+        lits in body/constraint.
+
+- linear integer arithmetic
+  * [ ] Cooper for the BG constraints
+  * [ ] a simple version of Zipperposition's code for the FG terms, as
+        a powerful simplification/rewriting framework
+
+- higher-order
+  * [ ] do HO unification with a bound on the number of difficult choice points
+        (imitation should be free, it's guessing that is severy restricted)
+        → should be good enough for many problems
+  * [ ] some form of bottom-up synthesis?
 
 ## Main
 
@@ -43,7 +92,6 @@
 
 ## To Fix
 
-- type error  in `tip-benchmarks/isaplanner/prop_46.smt2`
 - `examples/pelletier_problems/pb49.p` (wrong CNF? also, bad type inference on first axiom)
 - `examples/by_case.p`  should be unsat, but arith fails
 
