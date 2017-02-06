@@ -23,6 +23,7 @@ type t =
   | Term
   | ForallConst (** constant for simulating forall *)
   | ExistsConst (** constant for simulating exists *)
+  | Grounding (** used for inst-gen *)
   | TyInt
   | TyRat
   | Int of Z.t
@@ -104,6 +105,7 @@ let to_int_ = function
   | Greatereq -> 46
   | ForallConst -> 47
   | ExistsConst -> 48
+  | Grounding -> 50
 
 let compare a b = match a, b with
   | Int i, Int j -> Z.compare i j
@@ -155,6 +157,7 @@ let to_string s = match s with
   | Term -> "ι"
   | ForallConst -> "·∀"
   | ExistsConst -> "·∃"
+  | Grounding -> "★"
   | TyInt -> "int"
   | TyRat -> "rat"
   | Floor -> "floor"
@@ -236,6 +239,7 @@ let prop = Prop
 let term = Term
 let ty_int = TyInt
 let ty_rat = TyRat
+let grounding = Grounding
 
 module Arith = struct
   let floor = Floor
@@ -286,6 +290,7 @@ module TPTP = struct
     | Multiset -> failwith "cannot print this symbol in TPTP"
     | ForallConst -> "!!"
     | ExistsConst -> "??"
+    | Grounding -> "$$ground"
     | TyInt -> "$int"
     | TyRat -> "$rat"
     | Int x -> Z.to_string x
@@ -605,6 +610,7 @@ module ZF = struct
     | Multiset -> failwith "cannot print this symbol in ZF"
     | ForallConst -> "!!"
     | ExistsConst -> "??"
+    | Grounding -> "$$grounding"
     | TyInt -> "int"
     | TyRat -> "rat"
     | Int x -> Z.to_string x

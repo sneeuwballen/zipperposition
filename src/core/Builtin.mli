@@ -27,6 +27,7 @@ type t =
   | Term
   | ForallConst (** constant for simulating forall *)
   | ExistsConst (** constant for simulating exists *)
+  | Grounding (** used for inst-gen *)
   | TyInt
   | TyRat
   | Int of Z.t
@@ -115,6 +116,8 @@ val has_type : t
 
 val wildcard : t    (** $_ for type inference *)
 val multiset : t    (** type of multisets *)
+
+val grounding : t
 
 module Arith : sig
   val floor : t

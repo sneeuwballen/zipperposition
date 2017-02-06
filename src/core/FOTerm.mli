@@ -97,6 +97,9 @@ val app_full : t -> Type.t list -> t list -> t
 val true_ : t
 val false_ : t
 
+val grounding : Type.t -> t
+(** [grounding ty] is a unique constant of type [ty] *)
+
 val is_var : t -> bool
 val is_bvar : t -> bool
 val is_app : t -> bool

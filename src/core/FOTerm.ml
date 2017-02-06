@@ -141,6 +141,8 @@ let app_full f tyargs l =
 let true_ = builtin ~ty:Type.prop Builtin.True
 let false_ = builtin ~ty:Type.prop Builtin.False
 
+let grounding ty = builtin ~ty Builtin.Grounding
+
 let is_var t = match T.view t with
   | T.Var _ -> true
   | _ -> false
