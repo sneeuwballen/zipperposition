@@ -94,6 +94,12 @@ let make c_lits proof: t =
 
 let make_l lits proof : t = make (IArray.of_list lits) proof
 
+let hash_mod_alpha c : int =
+  IArray.hash Lit.hash_mod_alpha c.c_lits
+
+let equal_mod_alpha c1 c2 : bool =
+  assert false (* TODO *)
+
 (** {2 Horn Clauses} *)
 
 module Horn = struct

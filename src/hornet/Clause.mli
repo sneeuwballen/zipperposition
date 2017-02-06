@@ -24,6 +24,10 @@ include Interfaces.EQ with type t := t
 include Interfaces.HASH with type t := t
 include Interfaces.PRINT with type t := t
 
+val equal_mod_alpha : t -> t -> bool
+
+val hash_mod_alpha : t -> int
+
 (** {2 Horn Clauses} *)
 
 module Horn : sig
