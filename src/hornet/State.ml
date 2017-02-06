@@ -28,26 +28,7 @@ end
 
 (** {2 Boolean Literal} *)
 
-(** Encapsulate objects into boolean literals that can be handled by
-    the SAT solver *)
-
-module type BOOL_LIT = sig
-  type view =
-    | Fresh of int
-    | Select_lit of Clause.General.t * Clause.General.idx
-    | Depth_limit of int
-
-  type t = private {
-    view: view;
-    sign: bool;
-  }
-
-  val fresh : unit -> t
-  val select_lit : Clause.General.t -> Clause.General.idx -> t
-  val depth_limit : int -> t
-
-  include Msat.Formula_intf.S with type t := t and type proof = Proof.t
-end
+module type BOOL_LIT = State_intf.BOOL_LIT with type proof = Proof.t
 
 module Bool_lit(X:sig end) : BOOL_LIT = struct
   type view =
@@ -120,51 +101,13 @@ end
 
 (** {2 Context for Theories} *)
 
-module type CONTEXT = sig
-  module B_lit : BOOL_LIT with type proof = Proof.t
-
-  type bool_clause = B_lit.t list
-
-  (** {6 SAT} *)
-
-  val raise_conflict : bool_clause -> Proof.t -> 'a
-
-  val on_backtrack : (unit -> unit) -> unit
-  (** Push the given callback on a stack. It will be
-      called when the SAT solver backtracks. *)
-
-  val add_clause : bool_clause -> unit
-  val add_clause_l : bool_clause list -> unit
-
-  module Form : sig
-    type t
-    val imply : t -> t -> t
-    val atom : B_lit.t -> t
-    val and_ : t list -> t
-    val or_: t list -> t
-    val not_ : t -> t
-  end
-
-  val add_form : Form.t -> unit
-
-  (** {6 Config} *)
-
-  val conf : Flex_state.t
-  val ord : Ordering.t
-  val signature: Type.t ID.Map.t
-  val statements : statement CCVector.ro_vector
-end
+module type CONTEXT = State_intf.CONTEXT with type proof = Proof.t
 
 type context = (module CONTEXT)
 
 (** {2 Theory} *)
 
-module type THEORY = sig
-  module Ctx : CONTEXT
-
-  val name : string
-  val on_assumption : Ctx.B_lit.t -> unit
-end
+module type THEORY = State_intf.THEORY
 
 module type THEORY_FUN = functor(C:CONTEXT) -> THEORY with module Ctx = C
 
@@ -233,10 +176,11 @@ module Make(A : ARG) : S = struct
       (struct end)
 
   module Ctx
-    : CONTEXT with module B_lit = B_lit
+    : CONTEXT with module B_lit = B_lit and type proof = Proof.t
   = struct
     include A
     module B_lit = B_lit
+    type proof = Proof.t
     type bool_clause = B_lit.t list
     let on_backtrack f = CCVector.push SAT_theory.backtrack_vec f
     let raise_conflict c proof = raise (Theory_conflict (c,proof))
