@@ -56,6 +56,9 @@ module Set : CCSet.S with type elt = t
 module Map : CCMap.S with type key = t
 module Tbl : CCHashtbl.S with type key = t
 
+val hash_mod_alpha : t -> int
+(** Hash invariant w.r.t variable renaming *)
+
 val same_l : t list -> t list -> bool
 (** [same_l l1 l2] returns [true] if terms of [l1] and [l2] are pairwise
     equal, [false] otherwise.

@@ -38,7 +38,11 @@ val ty_exn : t -> t
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 
+val hash_mod_alpha : t -> int
+(** Hash invariant w.r.t variable renaming *)
+
 val same_l : t list -> t list -> bool
+(** Physical equality on lists of terms, roughly the same as {!List.forall2 (==)} *)
 
 (** {3 Constructors}
 

@@ -52,6 +52,7 @@ let ty t = match T.ty t with
   | T.NoType -> assert false
   | T.HasType ty -> Type.of_term_unsafe ty
 
+let hash_mod_alpha = T.hash_mod_alpha
 let same_l = T.same_l
 
 (* split list between types, terms.

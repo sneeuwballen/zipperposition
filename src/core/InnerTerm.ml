@@ -60,6 +60,27 @@ let _hash_norec t = match view t with
   | App (f, l) -> Hash.combine3 10 (hash f) (Hash.list hash l)
   | AppBuiltin (b, l) -> Hash.combine3 20 (Builtin.hash b) (Hash.list hash l)
 
+let hash_mod_alpha t : int =
+  let rec aux (d:int) t =
+    let h_t =
+      if d=0 then 10 (* fuel is exhausted *)
+      else match t.term with
+        | Var _ -> 1 (* ignore variable's name *)
+        | DB v -> Hash.combine2 2 (Hash.int v)
+        | Bind (b, varty, t') ->
+          Hash.combine4 3 (Binder.hash b) (aux (d-1) varty) (aux (d-1) t')
+        | Const s -> Hash.combine2 4 (ID.hash s)
+        | App (f, l) -> Hash.combine3 10 (aux (d-1) f) (Hash.list (aux (d-1)) l)
+        | AppBuiltin (b, l) ->
+          Hash.combine3 20 (Builtin.hash b) (Hash.list (aux (d-1)) l)
+    and h_ty = match t.ty with
+      | NoType -> 0
+      | HasType ty -> aux d ty
+    in
+    Hash.combine3 42 h_t h_ty
+  in
+  aux 2 t
+
 let rec _eq_norec t1 t2 =
   _eq_ty t1 t2 &&
   match t1.term, t2.term with
