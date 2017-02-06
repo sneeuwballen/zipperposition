@@ -137,11 +137,18 @@ let main () =
       stmts
   in
   let st =
-    State.create ~ord ~signature ~conf
-      ~theories:[
+    let module A = struct
+      let ord = ord
+      let signature = signature
+      let conf = conf
+      let statements = stmts
+      let max_depth = !max_depth
+      let theories = [
         Horn_superposition.theory;
       ]
-      ~statements:stmts ~max_depth:!max_depth ()
+    end
+    in
+    State.create (module A)
   in
   let res = State.run st in
   Format.printf "%a@." State.pp_res res;
