@@ -41,6 +41,8 @@ let arb i j =
   let shrink = QCheck.Shrink.(list ~shrink:(pair shrink_t int)) in
   QCheck.make ~shrink ~print:pp (gen i j)
 
+let long_factor = 10
+
 (* test unit index *)
 module TestUnit(I : UnitIndex) = struct
   (* check that the size of index is correct *)
@@ -70,7 +72,7 @@ module TestUnit(I : UnitIndex) = struct
       l
     in
     let name = CCFormat.sprintf "index(%s)_gen_retrieved_member" I.name in
-    QCheck.Test.make ~name (arb 30 100) prop
+    QCheck.Test.make ~long_factor ~name (arb 30 100) prop
 
   (* check that the retrieved terms match the query *)
   let check_gen_retrieved_match =
@@ -86,7 +88,7 @@ module TestUnit(I : UnitIndex) = struct
         l
     in
     let name = CCFormat.sprintf "index(%s)_gen_retrieved_match" I.name in
-    QCheck.Test.make ~name (arb 50 150) prop
+    QCheck.Test.make ~long_factor ~name (arb 50 150) prop
 
   (* check that all matching terms are retrieved *)
   let check_all_matching_are_retrieved =
@@ -107,7 +109,7 @@ module TestUnit(I : UnitIndex) = struct
         l
     in
     let name = CCFormat.sprintf "index(%s)_all_matching_are_retrieved" I.name in
-    QCheck.Test.make ~name (arb 50 150) prop
+    QCheck.Test.make ~long_factor ~name (arb 50 150) prop
 
   (* check the matching of generalization *)
   let props =

@@ -31,7 +31,7 @@ let check_cnf_gives_clauses =
       (fun c -> F.or_ (List.map SLiteral.to_form c))
     |> CCVector.for_all Cnf.is_clause
   in
-  QCheck.Test.make ~name gen prop
+  QCheck.Test.make ~long_factor:20 ~name gen prop
 
 let check_miniscope_db_closed =
   let gen = QCheck.(map F.close_forall ArForm.default) in
@@ -41,7 +41,7 @@ let check_miniscope_db_closed =
     let f = Cnf.miniscope f in
     T.closed f
   in
-  QCheck.Test.make ~name gen prop
+  QCheck.Test.make ~long_factor:20 ~name gen prop
 
 let props =
   [ check_cnf_gives_clauses
