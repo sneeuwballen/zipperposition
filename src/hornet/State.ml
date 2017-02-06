@@ -20,117 +20,53 @@ type statement = (Clause.t, term, ty) Statement.t
 
 (** {2 Proofs} *)
 
-module Proof : sig
-  type t
-end = struct
-  type t = unit (* TODO: variant with Clause.proof | Sat_proof | … ? *)
-end
+module type PROOF = State_intf.PROOF
 
 (** {2 Boolean Literal} *)
 
-module type BOOL_LIT = State_intf.BOOL_LIT with type proof = Proof.t
-
-module Bool_lit(X:sig end) : BOOL_LIT = struct
-  type view =
-    | Fresh of int
-    | Select_lit of Clause.General.t * Clause.General.idx
-    | Depth_limit of int
-
-  type proof = Proof.t
-
-  module CG = Clause.General
-
-  type t = {
-    view: view;
-    sign: bool;
-  }
-
-  let make_ sign view = {sign;view}
-
-  let fresh =
-    let n = ref 0 in
-    fun () -> let lit = make_ true (Fresh !n) in incr n; lit
-
-  let dummy = fresh()
-
-  let select_lit c i = make_ true (Select_lit (c,i))
-
-  let depth_limit i = make_ true (Depth_limit i)
-
-  let neg t = {t with sign=not t.sign}
-
-  let norm (t:t): t * FI.negated =
-    if t.sign
-    then t, FI.Same_sign
-    else neg t, FI.Negated
-
-  let equal a b : bool =
-    a.sign = b.sign
-    &&
-    begin match a.view, b.view with
-      | Fresh i, Fresh j ->  i=j
-      | Depth_limit i, Depth_limit j -> i=j
-      | Select_lit (c1,i1), Select_lit (c2,i2) ->
-        Clause.equal (CG.as_clause c1) (CG.as_clause c2) && i1=i2
-      | Fresh _, _
-      | Select_lit _, _
-      | Depth_limit _, _
-        -> false
-    end
-
-  let hash a : int = match a.view with
-    | Fresh i -> Hash.combine3 10 (Hash.bool a.sign) (Hash.int i)
-    | Select_lit (c,i) ->
-      Hash.combine4 20 (Hash.bool a.sign)
-        (Clause.hash (CG.as_clause c)) (Hash.int (i:>int))
-    | Depth_limit i ->
-      Hash.combine2 30 (Hash.int i)
-
-  let print out l =
-    let pp_view out = function
-      | Fresh i -> Fmt.fprintf out "fresh_%d" i
-      | Select_lit (c,i) ->
-        Fmt.fprintf out "@[select@ :idx %d@ :clause %a@]" (i:>int) CG.pp c
-      | Depth_limit i ->
-        Fmt.fprintf out "[depth@<1>≤%d]" i
-    in
-    if l.sign
-    then Fmt.within "(" ")" pp_view out l.view
-    else Fmt.fprintf out "(¬%a)" pp_view l.view
-end
+module type BOOL_LIT = State_intf.BOOL_LIT
 
 (** {2 Context for Theories} *)
 
-module type CONTEXT = State_intf.CONTEXT with type proof = Proof.t
+module type CONTEXT = State_intf.CONTEXT
 
 type context = (module CONTEXT)
 
 (** {2 Theory} *)
 
 module type THEORY = State_intf.THEORY
+module type THEORY_FUN = State_intf.THEORY_FUN
 
-module type THEORY_FUN = functor(C:CONTEXT) -> THEORY with module Ctx = C
-
-type theory_fun = (module THEORY_FUN)
+type theory_fun = State_intf.theory_fun
 
 (** {2 State in a Module} *)
 
 module type S = sig
-  module B_lit : BOOL_LIT with type proof = Proof.t
-  module M : SI.S with type St.formula = B_lit.t and type St.proof = Proof.t
-  module Ctx : CONTEXT with module B_lit = B_lit (* for theories *)
+  type proof
+  module B_lit : BOOL_LIT with type proof = proof
+  module M : SI.S with type St.formula = B_lit.t and type St.proof = proof
+  module Ctx : CONTEXT with module B_lit = B_lit and type Proof.t = proof (* for theories *)
+  val theories : (module THEORY) list
+  val on_exit : unit -> unit
 end
 
-module type ARG = sig
-  val theories : theory_fun list
-  val ord : Ordering.t
-  val signature : Type.t ID.Map.t
-  val conf : Flex_state.t
-  val statements : statement CCVector.ro_vector
-end
+module type ARGS = State_intf.ARGS
 
-module Make(A : ARG) : S = struct
-  module B_lit = Bool_lit(struct end)
+module Make(A : ARGS) : S = struct
+  module Proof : PROOF = struct
+    type t =
+      | Clause_proof of Clause.proof
+
+    let of_clause_proof c : t = Clause_proof c
+
+    let pp out (p:t): unit = match p with
+      | Clause_proof p -> Clause.Proof.pp out p
+
+    let to_string = Fmt.to_string pp
+  end
+  type proof = Proof.t
+
+  module B_lit = Bool_lit.Make(Proof)(struct end)
 
   exception Theory_conflict of B_lit.t list * Proof.t
   (** Raised by a handler when a conflict is detected *)
@@ -176,11 +112,12 @@ module Make(A : ARG) : S = struct
       (struct end)
 
   module Ctx
-    : CONTEXT with module B_lit = B_lit and type proof = Proof.t
+    : CONTEXT with module B_lit = B_lit and type Proof.t = proof
   = struct
     include A
     module B_lit = B_lit
-    type proof = Proof.t
+    module Proof = Proof
+
     type bool_clause = B_lit.t list
     let on_backtrack f = CCVector.push SAT_theory.backtrack_vec f
     let raise_conflict c proof = raise (Theory_conflict (c,proof))
@@ -200,39 +137,31 @@ module Make(A : ARG) : S = struct
   let add_on_assumption_ f =
     SAT_theory.on_assumption_ := f :: !SAT_theory.on_assumption_
 
-  let () =
-    List.iter
+  let theories : (module THEORY) list =
+    List.map
       (fun (module Th_fun : THEORY_FUN) ->
          let module Th = Th_fun(Ctx) in
          Util.debugf ~section 2 "@[add_theory %s@]" (fun k->k Th.name);
-         add_on_assumption_ Th.on_assumption)
+         add_on_assumption_ Th.on_assumption;
+         (module Th : THEORY))
       A.theories
-end
 
-type sat_t = (module S)
+  let on_exit () = List.iter (fun (module Th : THEORY) -> Th.on_exit ()) theories
+end
 
 (** {2 State} *)
 
 type signature = Type.t ID.Map.t
 
-type t = {
-  sat: sat_t;
-  max_depth: int;
-}
+type t = (module S)
 
-let create ~conf ~ord ~signature ~theories ~statements ~max_depth () =
-  let module M = Make(struct
-      let conf = conf
-      let signature = signature
-      let ord = ord
-      let theories = theories
-      let statements = statements
-    end) in
-  let sat = (module M : S) in
-  { sat; max_depth; }
+let create (module A:ARGS) =
+  let module M = Make(A) in
+  let st = (module M : S) in
+  st
 
 let context (t:t) =
-  let module M = (val t.sat) in
+  let module M = (val t) in
   (module M.Ctx : CONTEXT)
 
 (** {2 Result} *)
@@ -248,7 +177,7 @@ let pp_res out = function
   | Unknown -> Fmt.string out "UNKNOWN"
 
 let run (t:t): res =
-  let module St = (val t.sat) in
+  let module St = (val t) in
   let module F = St.Ctx.Form in
   (* currently at depth [d] *)
   let rec iter (prev_limit:St.B_lit.t option) (d:int) =
@@ -259,11 +188,15 @@ let run (t:t): res =
       (fun prev_limit ->
          St.Ctx.add_form F.(imply (not_ (atom prev_limit)) (atom limit)))
       prev_limit;
+    (* set depth limit *)
+    List.iter
+      (fun (module Th : THEORY) -> Th.set_depth_limit d)
+      St.theories;
     (* solve under assumption [limit] *)
     let res = St.M.solve ~assumptions:[limit] () in
     begin match res with
       | St.M.Sat _ ->
-        if d = t.max_depth
+        if d = St.Ctx.max_depth
         then Unknown (* TODO: completeness proof(!) *)
         else iter (Some limit) (d+1) (* increase depth *)
       | St.M.Unsat _ ->
@@ -271,6 +204,9 @@ let run (t:t): res =
         Unsat
     end
   in
-  iter None 1
+  (* compute result *)
+  let res = iter None 1 in
+  St.on_exit ();
+  res
 
 

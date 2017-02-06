@@ -13,44 +13,35 @@ type statement = (Clause.t, term, ty) Statement.t
 
 (** {2 Proofs} *)
 
-module Proof : sig
-  type t
-end
+module type PROOF = State_intf.PROOF
 
 (** {2 Boolean Literals} *)
 
-module type BOOL_LIT = State_intf.BOOL_LIT with type proof = Proof.t
+module type BOOL_LIT = State_intf.BOOL_LIT
 
 (** {2 Context for Theories} *)
 
 (** Each theory is given this context, which serves to communicate
     with the SAT solver *)
 
-module type CONTEXT = State_intf.CONTEXT with type proof = Proof.t
+module type CONTEXT = State_intf.CONTEXT
 
 type context = (module CONTEXT)
 
 (** {2 Theory} *)
 
 module type THEORY = State_intf.THEORY
+module type THEORY_FUN = State_intf.THEORY_FUN
 
-module type THEORY_FUN = functor(C:CONTEXT) -> THEORY with module Ctx = C
-
-type theory_fun = (module THEORY_FUN)
+type theory_fun = State_intf.theory_fun
 
 (** {2 State} *)
 
 type t
 
-val create :
-  conf:Flex_state.t ->
-  ord:Ordering.t ->
-  signature:Type.t ID.Map.t ->
-  theories:theory_fun list ->
-  statements:statement CCVector.ro_vector ->
-  max_depth:int ->
-  unit ->
-  t
+module type ARGS = State_intf.ARGS
+
+val create : (module ARGS) -> t
 
 val context : t -> context
 

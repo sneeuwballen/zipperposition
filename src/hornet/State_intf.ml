@@ -7,36 +7,24 @@ type term = FOTerm.t
 type ty = Type.t
 type statement = (Clause.t, term, ty) Statement.t
 
-(** Encapsulate objects into boolean literals that can be handled by
-    the SAT solver *)
-module type BOOL_LIT = sig
-  type view =
-    | Fresh of int
-    | Select_lit of Clause.General.t * Clause.General.idx
-    | Depth_limit of int (* max number of "risky" inferences *)
+module type PROOF = sig
+  type t
 
-  type t = private {
-    view: view;
-    sign: bool;
-  }
-
-  val fresh : unit -> t
-  val select_lit : Clause.General.t -> Clause.General.idx -> t
-  val depth_limit : int -> t
-
-  type proof
-  include Msat.Formula_intf.S with type t := t and type proof := proof
+  val of_clause_proof : Clause.Proof.t -> t
+  include Interfaces.PRINT with type t := t
 end
 
+module type BOOL_LIT = Bool_lit_intf.S
+
 module type CONTEXT = sig
-  type proof
-  module B_lit : BOOL_LIT with type proof := proof
+  module Proof : PROOF
+  module B_lit : BOOL_LIT with type proof := Proof.t
 
   type bool_clause = B_lit.t list
 
   (** {6 SAT} *)
 
-  val raise_conflict : bool_clause -> proof -> 'a
+  val raise_conflict : bool_clause -> Proof.t -> 'a
 
   val on_backtrack : (unit -> unit) -> unit
   (** Push the given callback on a stack. It will be
@@ -61,6 +49,7 @@ module type CONTEXT = sig
   val conf : Flex_state.t
   val ord : Ordering.t
   val signature: Type.t ID.Map.t
+  val max_depth : int
   val statements : statement CCVector.ro_vector
 end
 
@@ -80,5 +69,28 @@ module type THEORY = sig
   module Ctx : CONTEXT
 
   val name : string
+
   val on_assumption : Ctx.B_lit.t -> unit
+  (** Called every time the SAT solver picks a new boolean literal *)
+
+  val set_depth_limit : int -> unit
+  (** Called when the depth limit is changed *)
+
+  val on_exit : unit -> unit
+  (** Called before exit *)
 end
+
+module type THEORY_FUN = functor(C:CONTEXT) -> THEORY with module Ctx = C
+
+type theory_fun = (module THEORY_FUN)
+
+(** Parameters to create a Context *)
+module type ARGS = sig
+  val theories : theory_fun list
+  val ord : Ordering.t
+  val signature : Type.t ID.Map.t
+  val conf : Flex_state.t
+  val statements : statement CCVector.ro_vector
+  val max_depth : int
+end
+
