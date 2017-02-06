@@ -267,6 +267,13 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
               (Conflict_clause.to_bool_clause c1)
               (Conflict_clause.proof c1)
         end
+      | B_lit.Ground_lit lit, sign ->
+        assert false
+      (* TODO : how to relate proofs?
+        if sign
+        then Saturate.add_clause (Clause.make_l [lit])
+        else Saturate.add_clause (Clause.make_l [Lit.neg lit])
+      *)
       | B_lit.Box_clause _,false -> () (* TODO: if unit negative, maybe? *)
       | B_lit.Select_lit (_,_), true -> () (* TODO: should add to saturate, too *)
       | B_lit.Depth_limit _, _

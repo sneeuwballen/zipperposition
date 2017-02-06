@@ -115,6 +115,16 @@ let hash_mod_alpha = function
     let h2 = max h_t h_u in
     Hash.combine4 30 h1 h2 (Hash.bool sign)
 
+let is_trivial = function
+  | Bool true -> true
+  | Bool false
+  | Atom _ -> false
+  | Eq (a,b,true) -> T.equal a b
+  | Eq (_,_,false) ->
+    false (* TODO: check if distinct cstors/distinct dom elements *)
+
+(** {2 Containers} *)
+
 module As_key = struct
   type t = lit
   let compare = compare

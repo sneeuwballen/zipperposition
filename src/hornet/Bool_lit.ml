@@ -61,22 +61,26 @@ module Make(Proof:PROOF)(X : sig end) : S with type proof = Proof.t = struct
       in
       make_ true atom
 
+  let ground (l:Lit.t): t =
+    assert (Lit.is_ground l);
+    make_ true (A_ground l)
+
   let box_clause =
     (* structural map [clause -> atom] *)
     let tbl = C.Tbl_mod_alpha.create 64 in
     fun c ->
-      let a =
-        try C.Tbl_mod_alpha.find tbl c
-        with Not_found ->
-          let a = A_box_clause (c, fresh_atom_id_()) in
-          C.Tbl_mod_alpha.add tbl c a;
-          a
-      in
-      make_ true a
-
-  let ground (l:Lit.t): t =
-    assert (Lit.is_ground l);
-    make_ true (A_ground l)
+      if C.is_unit_ground c then ground (IArray.get (C.lits c) 0)
+      else (
+        (* make a [Clause c] literal *)
+        let a =
+          try C.Tbl_mod_alpha.find tbl c
+          with Not_found ->
+            let a = A_box_clause (c, fresh_atom_id_()) in
+            C.Tbl_mod_alpha.add tbl c a;
+            a
+        in
+        make_ true a
+      )
 
   let depth_limit i = make_ true (A_depth_limit i)
 

@@ -47,6 +47,7 @@ val weight : t -> int
 
 val hash_mod_alpha : t -> int
 
+val is_trivial : t -> bool
 
 (** {2 Containers} *)
 

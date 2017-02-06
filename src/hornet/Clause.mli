@@ -14,8 +14,12 @@ type proof = private
   | P_avatar_split of clause (* split into var-disjoint components *)
   | P_split of clause (* model-driven recursive splitting *)
 
-val make : Lit.t IArray.t -> proof -> t
-val make_l : Lit.t list -> proof -> t
+(* constraint on the literals *)
+type constraint_ =
+  | Dismatch of Dismatching_constr.t
+
+val make : ?constrs:constraint_ list -> Lit.t IArray.t -> proof -> t
+val make_l : ?constrs:constraint_ list -> Lit.t list -> proof -> t
 
 val proof : t -> proof
 val lits : t -> Lit.t IArray.t
@@ -123,6 +127,8 @@ type kind =
 
 val classify : t -> kind
 
+val is_unit_ground : t -> bool
+
 (** {2 Utils} *)
 
 val of_slit_l :
@@ -130,6 +136,9 @@ val of_slit_l :
   FOTerm.t SLiteral.t list ->
   t
 (** Conversion from some clause in the given statement *)
+
+val is_trivial : t -> bool
+(** Is the clause trivial? *)
 
 (** {2 Unif} *)
 

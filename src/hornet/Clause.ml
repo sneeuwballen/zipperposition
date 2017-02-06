@@ -14,6 +14,7 @@ type t = {
   c_lits: Lit.t IArray.t;
   c_kind: c_kind;
   c_proof: proof;
+  c_constr: constraint_ list;
 }
 
 (* internal kind *)
@@ -29,6 +30,9 @@ and proof =
   | P_split of clause (* model-driven recursive splitting *)
 
 and clause = t
+
+and constraint_ =
+  | Dismatch of Dismatching_constr.t
 
 (** {2 Basics} *)
 
@@ -76,7 +80,7 @@ let compare_lits_for_horn_ (l1:Lit.t) (l2:Lit.t) : int =
 (* Smart constructor: might sort the literals for Horn clauses.
    The conclusion comes first, then the remaining ones with some heuristic
    ordering. *)
-let make_ c_kind c_lits c_proof =
+let make_ c_constr c_kind c_lits c_proof =
   let c_kind, c_lits = match c_kind with
     | C_unit
     | C_general -> c_kind, c_lits
@@ -88,13 +92,13 @@ let make_ c_kind c_lits c_proof =
       assert (Lit.sign (IArray.get c_lits 0)); (* first *)
       C_horn 0, c_lits
   in
-  { c_lits; c_kind; c_proof }
+  { c_constr; c_lits; c_kind; c_proof }
 
-let make c_lits proof: t =
+let make ?(constrs=[]) c_lits proof: t =
   let c_kind = kind_of_lits c_lits in
-  make_ c_kind c_lits proof
+  make_ constrs c_kind c_lits proof
 
-let make_l lits proof : t = make (IArray.of_list lits) proof
+let make_l ?constrs lits proof : t = make ?constrs (IArray.of_list lits) proof
 
 let hash_mod_alpha c : int =
   IArray.hash Lit.hash_mod_alpha c.c_lits
@@ -214,6 +218,8 @@ let classify (c:t): kind = match c.c_kind with
   | C_horn _ -> Horn c
   | C_general -> General c
 
+let is_unit_ground c : bool =
+  IArray.length c.c_lits = 1 && Lit.is_ground (IArray.get c.c_lits 0)
 
 (** {2 Utils} *)
 
@@ -228,6 +234,20 @@ let of_slit_l ~stmt lits =
   let lits = List.map conv_slit lits in
   let proof = Proof.from_stmt stmt in
   make_l lits proof
+
+let constr_trivial_ (c:constraint_): bool = match c with
+  | Dismatch c -> Dismatching_constr.is_trivial c
+
+let is_trivial c =
+  IArray.exists Lit.is_trivial c.c_lits ||
+  begin
+    IArray.to_seqi c.c_lits
+    |> Sequence.exists
+      (fun (i,lit) ->
+         IArray.to_seqi c.c_lits
+         |> Sequence.exists (fun (j,lit') -> i<j && Lit.equal lit (Lit.neg lit')))
+  end ||
+  List.exists constr_trivial_ c.c_constr
 
 (** {2 Unif} *)
 
