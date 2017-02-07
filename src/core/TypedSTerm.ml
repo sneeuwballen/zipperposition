@@ -156,6 +156,13 @@ let rec hash t = match t.term with
   | Match (u, _) -> Hash.combine2 10 (hash u)
   | Meta (id,_,_) -> Var.hash id
 
+
+let rec unfold_binder b f = match f.term with
+  | Bind (b', v, f') when b=b' ->
+    let vars, bod = unfold_binder b f' in
+    v :: vars, bod
+  | _ -> [], f
+
 let rec pp out t = match view t with
   | Var s -> Var.pp_fullc out s
   | Const s -> ID.pp out s
@@ -163,9 +170,13 @@ let rec pp out t = match view t with
   | App (f, l) ->
     Format.fprintf out "@[<2>%a@ %a@]"
       pp_inner f (Util.pp_list ~sep:" " pp_inner) l
-  | Bind (s, v, t) ->
-    Format.fprintf out "@[<2>%a %a%a.@ %a@]"
-      Binder.pp s Var.pp_fullc v pp_var_ty v pp_inner t
+  | Bind (s, _, _) ->
+    let vars, body = unfold_binder s t in
+    let pp_bound_var out v = 
+      Format.fprintf out "@[%a%a@]" Var.pp_fullc v pp_var_ty v
+    in
+    Format.fprintf out "@[<2>%a %a.@ %a@]"
+      Binder.pp s (Util.pp_list ~sep:" " pp_bound_var) vars pp_inner body
   | Record (l, None) ->
     Format.fprintf out "{%a}" pp_fields l
   | Record (l, Some r) ->
@@ -706,11 +717,8 @@ module Form = struct
   let forall_l ?loc = List.fold_right (forall ?loc)
   let exists_l ?loc = List.fold_right (exists ?loc)
 
-  let rec unfold_forall f = match view f with
-    | Forall (v, f') ->
-      let vars, f' = unfold_forall f' in
-      v :: vars, f'
-    | _ -> [], f
+  let unfold_binder = unfold_binder
+  let unfold_forall = unfold_binder Binder.Forall
 
   let close_forall ?loc f =
     (* quantification over types: outermost *)

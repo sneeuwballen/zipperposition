@@ -188,6 +188,8 @@ module Form : sig
   val forall_l : ?loc:location -> t Var.t list -> t -> t
   val exists_l : ?loc:location -> t Var.t list -> t -> t
 
+  val unfold_binder : Binder.t -> t -> t Var.t list * t
+
   val unfold_forall : t -> t Var.t list * t
   val close_forall : ?loc:location -> t -> t
 end
