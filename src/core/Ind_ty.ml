@@ -90,6 +90,10 @@ let is_inductive_type ty =
     | Some (B _)
     | None -> false
 
+let is_inductive_simple_type ty =
+  try is_inductive_ty (TypedSTerm.head_exn ty)
+  with Not_found -> false
+
 let as_inductive_type ty = match Type.view ty with
   | Type.App (id, l) ->
     begin match as_inductive_ty id with
@@ -151,6 +155,22 @@ let scan_stmt st = match Stmt.view st with
            List.mapi (fun i v -> HVar.make ~ty:(Var.ty v) i) d.Stmt.data_args
          and cstors =
            List.map (fun (c,ty) -> {cstor_name=c; cstor_ty=ty;}) d.Stmt.data_cstors
+         in
+         let _ = declare_ty d.Stmt.data_id ~ty_vars cstors in
+         ())
+      l
+  | _ -> ()
+
+let scan_simple_stmt st = match Stmt.view st with
+  | Stmt.Data l ->
+    let conv = Type.Conv.create() in
+    let conv_ty = Type.Conv.of_simple_term_exn conv in
+    List.iter
+      (fun d ->
+         let ty_vars =
+           List.mapi (fun i v -> HVar.make ~ty:(Var.ty v |> conv_ty) i) d.Stmt.data_args
+         and cstors =
+           List.map (fun (c,ty) -> {cstor_name=c; cstor_ty=conv_ty ty;}) d.Stmt.data_cstors
          in
          let _ = declare_ty d.Stmt.data_id ~ty_vars cstors in
          ())

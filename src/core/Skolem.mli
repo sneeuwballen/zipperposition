@@ -108,7 +108,9 @@ val pop_new_definitions : ctx:ctx -> definition list
 
 (** {2 Attribute} *)
 
-exception Attr_skolem
+type kind = K_normal | K_ind (* inductive *)
+
+exception Attr_skolem of kind
 
 val is_skolem : ID.t -> bool
 (** [is_skolem id] returns [true] iff [id] is a Skolem symbol *)

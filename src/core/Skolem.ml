@@ -12,7 +12,9 @@ type form = TypedSTerm.t
 
 let section = Util.Section.(make ~parent:zip "skolem")
 
-exception Attr_skolem
+type kind = K_normal | K_ind (* inductive *)
+
+exception Attr_skolem of kind
 
 type polarity =
   [ `Pos
@@ -76,7 +78,10 @@ let fresh_id ~ctx prefix =
 
 let fresh_skolem_prefix ~ctx ~ty prefix =
   let s = fresh_id ~ctx prefix in
-  ID.set_payload s Attr_skolem;
+  let kind =
+    if Ind_ty.is_inductive_simple_type ty then K_ind else K_normal
+  in
+  ID.set_payload s (Attr_skolem kind);
   ctx.sc_new_ids <- (s,ty) :: ctx.sc_new_ids;
   ctx.sc_on_new s ty;
   Util.debugf ~section 3 "@[<2>new skolem symbol %a@ with type @[%a@]@]"
@@ -221,5 +226,5 @@ let pop_new_definitions ~ctx =
   l
 
 let is_skolem id = match ID.payload id with
-  | Attr_skolem -> true
+  | Attr_skolem _ -> true
   | _ -> false

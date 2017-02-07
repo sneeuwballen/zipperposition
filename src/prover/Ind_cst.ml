@@ -248,7 +248,7 @@ let mk_skolem_ pp x =
   let name = CCFormat.sprintf "#%a_%d" pp x !n_ in
   incr n_;
   let c = ID.make name in
-  ID.set_payload c Skolem.Attr_skolem;
+  ID.set_payload c (Skolem.Attr_skolem Skolem.K_ind);
   c
 
 (* declare new constant *)
@@ -280,7 +280,7 @@ let declare_cst_ ~parent id ty =
   in
   ID.set_payload id (Payload_cst cst)
     ~can_erase:(function
-      | Skolem.Attr_skolem ->
+      | Skolem.Attr_skolem Skolem.K_ind ->
         true (* special case: promotion from skolem to inductive const *)
       | _ -> false);
   (* return *)

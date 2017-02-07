@@ -8,7 +8,7 @@ open Libzipperposition
 type res =
   | Ty of Ind_ty.t
   | Cstor of Ind_ty.constructor * Ind_ty.t
-  | Inductive_cst of Ind_cst.cst
+  | Inductive_cst of Ind_cst.cst option
   | Projector of ID.t (** projector of some constructor (id: type) *)
   | DefinedCst of int (** (recursive) definition of given stratification level *)
   | Other
@@ -16,7 +16,8 @@ type res =
 let classify id = match ID.payload id with
   | Ind_ty.Payload_ind_cstor (c,t) -> Cstor (c,t)
   | Ind_ty.Payload_ind_type x -> Ty x
-  | Ind_cst.Payload_cst c -> Inductive_cst c
+  | Skolem.Attr_skolem Skolem.K_ind -> Inductive_cst None
+  | Ind_cst.Payload_cst c -> Inductive_cst (Some c)
   | Ind_ty.Payload_ind_projector id -> Projector id
   | Statement.Payload_defined_cst l -> DefinedCst l
   | _ -> Other
@@ -36,7 +37,8 @@ let pp_signature out sigma =
   Format.fprintf out
     "{@[<hv>%a@]}" (Util.pp_list ~sep:"," pp_pair) (Signature.to_list sigma)
 
-let dominates_ c sub = Ind_cst.dominates c sub
+let dominates_ opt_c opt_sub =
+  CCOpt.(get false (map2 Ind_cst.dominates opt_c opt_sub))
 
 let prec_constr_ a b =
   let to_int_ = function
