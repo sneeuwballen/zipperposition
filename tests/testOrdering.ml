@@ -65,7 +65,51 @@ let check_ordering_inv_by_subst ord =
   in
   QCheck.Test.make ~count:1000 ~name gen prop
 
+let check_ordering_trans ord =
+  let name = CCFormat.sprintf "ordering_%s_transitive" (O.name ord) in
+  let arb = QCheck.triple ArTerm.default ArTerm.default ArTerm.default in
+  let ord = ref ord in
+  let prop (t1, t2, t3) =
+    (* declare symbols *)
+    Sequence.of_list [t1;t2;t3]
+      |> Sequence.flat_map T.Seq.symbols
+      |> ID.Set.of_seq |> ID.Set.to_seq
+      |> O.add_seq !ord;
+    (* check that instantiating variables preserves ordering *)
+    let o12 = O.compare !ord t1 t2 in
+    let o23 = O.compare !ord t2 t3 in
+    if o12 = Comparison.Lt && o23 = Comparison.Lt
+    then 
+      let o13 = O.compare !ord t1 t3 in
+      o13 = Comparison.Lt
+    else QCheck.assume_fail ()
+  in
+  QCheck.Test.make ~count:1000 ~name arb prop
+
+let check_ordering_subterm ord =
+  let name = CCFormat.sprintf "ordering_%s_subterm_property" (O.name ord) in
+  let arb = ArTerm.default in
+  let ord = ref ord in
+  let prop t =
+    (* declare symbols *)
+    Sequence.of_list [t]
+      |> Sequence.flat_map T.Seq.symbols
+      |> ID.Set.of_seq |> ID.Set.to_seq
+      |> O.add_seq !ord;
+    T.Seq.subterms_depth t
+    |> Sequence.filter_map (fun (t,i) -> if i>0 then Some t else None)
+    |> Sequence.for_all
+      (fun sub -> O.compare !ord t sub = Comparison.Gt)
+  in
+  QCheck.Test.make ~count:1000 ~name arb prop
+
 let props =
-  [ check_ordering_inv_by_subst (O.kbo (Precedence.default []))
-  ; check_ordering_inv_by_subst (O.rpo6 (Precedence.default []))
-  ]
+  CCList.flat_map
+    (fun o ->
+       [ check_ordering_inv_by_subst o;
+         check_ordering_trans o;
+         check_ordering_subterm o;
+       ])
+    [ O.kbo (Precedence.default []);
+      O.rpo6 (Precedence.default []);
+    ]
