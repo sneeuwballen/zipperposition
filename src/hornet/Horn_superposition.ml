@@ -7,28 +7,30 @@ open Libzipperposition
 
 module T = FOTerm
 module C = Clause
+module HC = Horn_clause
 module Fmt = CCFormat
 
-let section = Util.Section.make "horn_sup"
+open Hornet_types
 
+let section = Util.Section.make "horn_sup"
 
 module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
   module Ctx = Ctx
   module B_lit = Ctx.B_lit
 
   (* index term->clause *)
-  module CP_idx = NPDtree.MakeTerm(C.With_pos)
+  module CP_idx = NPDtree.MakeTerm(HC.With_pos)
 
   let name = "horn_superposition"
 
   (* a simplification rule *)
-  type rule_simp = C.t -> C.t option
+  type 'a rule_simp = 'a -> 'a option
 
   (* a simplification rule yielding multiple clauses *)
-  type rule_simp_n = C.t -> C.t list option
+  type 'a rule_simp_n = 'a -> 'a list option
 
   (* an inference rule *)
-  type rule_infer = C.t -> C.t list
+  type 'a rule_infer = 'a -> 'a list
 
   (** {2 Avatar Splitting} *)
 
@@ -40,7 +42,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       that shares no variables with the other [C_j | j≠i] *)
 
   module Avatar : sig
-    val split : rule_simp_n
+    val split : C.t rule_simp_n
   end = struct
     let stat_avatar_split = Util.mk_stat "hornet.avatar_split"
 
@@ -97,7 +99,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         | _::_ ->
           (* do a simplification! *)
           Util.incr_stat stat_avatar_split;
-          let proof = C.Proof.avatar_split c in
+          let proof = Proof.avatar_split c in
           let clauses =
             List.map
               (fun lits ->
@@ -105,7 +107,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
                  C.make lits proof)
               !components
           in
-          Util.debugf ~section 4 "@[split of @[%a@]@ yields [@[<hv>%a@]]@]"
+          Util.debugf ~section 4
+            "@[avatar_split@ :clause @[%a@]@ :yields [@[<hv>%a@]]@]"
             (fun k->k C.pp c (Util.pp_list C.pp) clauses);
           let split_lits =
             List.map Ctx.B_lit.box_clause clauses
@@ -123,14 +126,14 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
     let split c : C.t list option = match C.proof c with
       | _ when IArray.length (C.lits c) <= 1 -> None
-      | C.P_avatar_split _ | C.P_split _ -> None (* by construction, impossible *)
-      | C.P_instance _ | C.P_from_stmt _ ->
+      | P_avatar_split _ | P_split _ -> None (* by construction, impossible *)
+      | P_instance _ | P_from_stmt _ | P_superposition _ ->
         try_split_ (C.lits c) c
   end
 
   (** {2 Inst-Gen-Eq} *)
   module Inst_gen_eq : sig
-
+    val instantiate : C.t rule_infer
   end = struct
     (* TODO:
        - rule to ground non-ground clauses (with a pointer to the grounding)
@@ -138,35 +141,33 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     *)
 
     let stat_split = Util.mk_stat "hornet.split"
+
+    let instantiate _ = assert false
+    (* TODO: when a conflict between selected lits is found, add
+       instantiations *)
   end
 
   (** {2 Saturation Algorithm} *)
 
-  let rules_simp : rule_simp list =
-    [
-    ]
+  let rules_simp : C.t rule_simp list = [ ]
 
-  let rules_simp_n : rule_simp_n list =
-    [ Avatar.split;
-    ]
+  let rules_simp_n : C.t rule_simp_n list = [ Avatar.split; ]
 
-  let rules_infer : rule_infer list =
-    [
-    ]
+  let rules_infer : C.t rule_infer list = [ Inst_gen_eq.instantiate ]
 
   module Conflict_clause : sig
-    type t = private C.t (* an empty clause *)
+    type t = private HC.t (* an empty clause *)
 
-    val make : C.t -> t
+    val make : HC.t -> t
     val to_bool_clause : t -> B_lit.t list
-    val proof : t -> Ctx.Proof.t
+    val proof : t -> HC.proof
     val pp : t CCFormat.printer
   end = struct
-    type t = C.t (* an empty clause *)
-    let make c = assert (C.is_empty c); c
+    type t = HC.t (* an empty clause *)
+    let make c = c
     let to_bool_clause c : B_lit.t list = assert false (* TODO *)
-    let proof c = Ctx.Proof.of_clause_proof (C.proof c)
-    let pp = C.pp
+    let proof c = assert false (* TODO *)
+    let pp = HC.pp
   end
 
   (** Keeps a set of clauses that are saturated up to some limit.
@@ -193,13 +194,17 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     (** Set the limit on derivations *)
 
     val add_clause : C.t -> res
-    (** [add_clause c] adds the clause [c]  to the set, and saturates it
-        again. If, during saturation, the empty clause is derived,
-        [Unsat l] is returned (where [l] is a non-empty list of empty clauses).
-        Otherwise, [Sat] is returned. *)
+    (** [add_clause c] adds the clause [c] to the set, and applies
+        Avatar splitting and Inst_gen_eq to it. *)
 
     val add_clauses : C.t list -> res
     (** Add a list of clauses *)
+
+    val add_horn : HC.t -> res
+    (** [add_horn c] adds the clause [c]  to the set, and saturates it
+        again. If, during saturation, the empty clause is derived,
+        [Unsat l] is returned (where [l] is a non-empty list of empty clauses).
+        Otherwise, [Sat] is returned. *)
   end = struct
     type res =
       | Sat
@@ -219,14 +224,18 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
     let set_limit i = assert (i>0); limit_ := i
 
-    let stats (): stats = assert false
+    let stats (): stats = assert false (* TODO *)
 
     (** {6 Saturation} *)
 
-    exception Conflict_exn of C.t
+    exception Conflict_exn of HC.t
 
     let add_clause c =
-      Util.debugf ~section 5 "@[<2>saturate.add_clause@ %a@]" (fun k->k C.pp c);
+      Util.debugf ~section 3 "@[<2>saturate.add_clause@ %a@]" (fun k->k C.pp c);
+      assert false (*  TODO *)
+
+    let add_horn c =
+      Util.debugf ~section 3 "@[<2>saturate.add_horn@ %a@]" (fun k->k HC.pp c);
       assert false (*  TODO *)
 
     let add_clauses (l:C.t list) =
@@ -254,7 +263,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
   let on_assumption (lit:B_lit.t): unit =
     begin match B_lit.view lit, B_lit.sign lit with
-      | B_lit.Box_clause c, true ->
+      | Bool_lit.Box_clause c, true ->
         let res = Saturate.add_clause c in
         begin match res with
           | Saturate.Sat -> () (* ok *)
@@ -267,17 +276,17 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
               (Conflict_clause.to_bool_clause c1)
               (Conflict_clause.proof c1)
         end
-      | B_lit.Ground_lit lit, sign ->
+      | Bool_lit.Ground_lit lit, sign ->
         assert false
       (* TODO : how to relate proofs?
         if sign
         then Saturate.add_clause (Clause.make_l [lit])
         else Saturate.add_clause (Clause.make_l [Lit.neg lit])
       *)
-      | B_lit.Box_clause _,false -> () (* TODO: if unit negative, maybe? *)
-      | B_lit.Select_lit (_,_), true -> () (* TODO: should add to saturate, too *)
-      | B_lit.Depth_limit _, _
-      | B_lit.Fresh _, _ -> ()
+      | Bool_lit.Box_clause _,false -> () (* TODO: if unit negative, maybe? *)
+      | Bool_lit.Select_lit (_,_), true -> () (* TODO: should add to saturate, too *)
+      | Bool_lit.Depth_limit _, _
+      | Bool_lit.Fresh _, _ -> ()
     end
 
   let set_depth_limit d =

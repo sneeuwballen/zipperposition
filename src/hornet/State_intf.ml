@@ -6,25 +6,18 @@ open Libzipperposition
 type term = FOTerm.t
 type ty = Type.t
 type statement = (Clause.t, term, ty) Statement.t
-
-module type PROOF = sig
-  type t
-
-  val of_clause_proof : Clause.Proof.t -> t
-  include Interfaces.PRINT with type t := t
-end
+type proof = Hornet_types.proof
 
 module type BOOL_LIT = Bool_lit_intf.S
 
 module type CONTEXT = sig
-  module Proof : PROOF
-  module B_lit : BOOL_LIT with type proof := Proof.t
+  module B_lit : BOOL_LIT
 
   type bool_clause = B_lit.t list
 
   (** {6 SAT} *)
 
-  val raise_conflict : bool_clause -> Proof.t -> 'a
+  val raise_conflict : bool_clause -> proof -> 'a
 
   val on_backtrack : (unit -> unit) -> unit
   (** Push the given callback on a stack. It will be

@@ -16,11 +16,7 @@ let section = Util.Section.(make ~parent:root) "state"
 type term = FOTerm.t
 type ty = Type.t
 type statement = (Clause.t, term, ty) Statement.t
-
-
-(** {2 Proofs} *)
-
-module type PROOF = State_intf.PROOF
+type proof = Hornet_types.proof
 
 (** {2 Boolean Literal} *)
 
@@ -42,10 +38,9 @@ type theory_fun = State_intf.theory_fun
 (** {2 State in a Module} *)
 
 module type S = sig
-  type proof
-  module B_lit : BOOL_LIT with type proof = proof
+  module B_lit : BOOL_LIT
   module M : SI.S with type St.formula = B_lit.t and type St.proof = proof
-  module Ctx : CONTEXT with module B_lit = B_lit and type Proof.t = proof (* for theories *)
+  module Ctx : CONTEXT with module B_lit = B_lit (* for theories *)
   val theories : (module THEORY) list
   val on_exit : unit -> unit
 end
@@ -53,27 +48,14 @@ end
 module type ARGS = State_intf.ARGS
 
 module Make(A : ARGS) : S = struct
-  module Proof : PROOF = struct
-    type t =
-      | Clause_proof of Clause.proof
-
-    let of_clause_proof c : t = Clause_proof c
-
-    let pp out (p:t): unit = match p with
-      | Clause_proof p -> Clause.Proof.pp out p
-
-    let to_string = Fmt.to_string pp
-  end
-  type proof = Proof.t
-
-  module B_lit = Bool_lit.Make(Proof)(struct end)
+  module B_lit = Bool_lit.Make(struct end)
 
   exception Theory_conflict of B_lit.t list * Proof.t
   (** Raised by a handler when a conflict is detected *)
 
   module SAT_theory = struct
     type formula = B_lit.t
-    type proof = Proof.t
+    type proof = Hornet_types.proof
 
     let backtrack_vec : (unit -> unit) CCVector.vector = CCVector.create ()
 
@@ -112,11 +94,10 @@ module Make(A : ARGS) : S = struct
       (struct end)
 
   module Ctx
-    : CONTEXT with module B_lit = B_lit and type Proof.t = proof
+    : CONTEXT with module B_lit = B_lit
   = struct
     include A
     module B_lit = B_lit
-    module Proof = Proof
 
     type bool_clause = B_lit.t list
     let on_backtrack f = CCVector.push SAT_theory.backtrack_vec f

@@ -3,8 +3,16 @@
 
 module type S = Bool_lit_intf.S
 
-module type PROOF = sig
-  type t
-end
+type lit = Hornet_types.lit
+type clause = Hornet_types.clause
+type clause_idx = Hornet_types.clause_idx
+type proof = Hornet_types.proof
 
-module Make(Proof:PROOF)(X : sig end) : S with type proof = Proof.t
+type view = Bool_lit_intf.view =
+  | Fresh of int
+  | Box_clause of clause
+  | Select_lit of clause * clause_idx
+  | Ground_lit of lit (* must be ground *)
+  | Depth_limit of int (* max number of "risky" inferences *)
+
+module Make(X : sig end) : S

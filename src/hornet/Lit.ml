@@ -14,10 +14,11 @@ module S = Subst
 type ty = Type.t
 type term = T.t
 
-type t =
+type t = Hornet_types.lit =
   | Bool of bool
   | Atom of term * bool
   | Eq of term * term * bool
+
 type lit = t
 
 let true_ = Bool true
@@ -38,21 +39,8 @@ let sign = function
   | Eq (_,_,b)
   | Bool b -> b
 
-let equal a b: bool = match a, b with
-  | Bool b1, Bool b2 -> b1=b2
-  | Atom (t1,sign1), Atom (t2,sign2) -> T.equal t1 t2 && sign1=sign2
-  | Eq (t1,u1,sign1), Eq (t2,u2,sign2) ->
-    sign1=sign2 &&
-    T.equal t1 t2 && T.equal u1 u2
-  | Bool _, _
-  | Atom _, _
-  | Eq _, _
-    -> false
-
-let hash = function
-  | Bool b -> Hash.combine2 10 (Hash.bool b)
-  | Atom (t,sign) -> Hash.combine3 20 (T.hash t) (Hash.bool sign)
-  | Eq (t,u,sign) -> Hash.combine4 30 (T.hash t) (T.hash u) (Hash.bool sign)
+let equal = Hornet_types_util.equal_lit
+let hash = Hornet_types_util.hash_lit
 
 let compare a b: int =
   let to_int = function Bool _ -> 0 | Atom _ -> 1 | Eq _ -> 2 in
@@ -70,13 +58,7 @@ let compare a b: int =
       -> CCInt.compare (to_int a)(to_int b)
   end
 
-let pp out t: unit = match t with
-  | Bool b -> Fmt.bool out b
-  | Atom (t, true) -> T.pp out t
-  | Atom (t, false) -> Fmt.fprintf out "@[@<1>¬@[%a@]@]" T.pp t
-  | Eq (t,u,true) -> Fmt.fprintf out "@[%a@ = %a@]" T.pp t T.pp u
-  | Eq (t,u,false) -> Fmt.fprintf out "@[%a@ @<1>≠ %a@]" T.pp t T.pp u
-
+let pp = Hornet_types_util.pp_lit
 let to_string = Fmt.to_string pp
 
 (** {2 Helpers} *)

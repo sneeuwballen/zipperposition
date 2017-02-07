@@ -10,10 +10,11 @@ open Libzipperposition
 type ty = Type.t
 type term = FOTerm.t
 
-type t = private
+type t = Hornet_types.lit =
   | Bool of bool
   | Atom of term * bool
   | Eq of term * term * bool
+
 type lit = t
 
 val true_ : t

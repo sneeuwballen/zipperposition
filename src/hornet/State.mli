@@ -11,10 +11,6 @@ type term = FOTerm.t
 type ty = Type.t
 type statement = (Clause.t, term, ty) Statement.t
 
-(** {2 Proofs} *)
-
-module type PROOF = State_intf.PROOF
-
 (** {2 Boolean Literals} *)
 
 module type BOOL_LIT = State_intf.BOOL_LIT
