@@ -5,15 +5,16 @@ open OUnit
 
 let props =
   List.flatten
-  [ TestTerm.props
-  ; TestUnif.props
-  ; TestCNF.props
-  ; TestIndex.props
-  ; TestType.props
-  ; TestOrdering.props
-  ; TestCongruence.props
-  ; TestMultiset.props
-  ]
+    [ TestOrdinal.props;
+      TestTerm.props;
+      TestUnif.props;
+      TestCNF.props;
+      TestIndex.props;
+      TestType.props;
+      TestOrdering.props;
+      TestCongruence.props;
+      TestMultiset.props;
+    ]
 
 let suite =
   "all_tests" >:::

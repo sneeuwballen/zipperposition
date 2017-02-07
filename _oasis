@@ -67,6 +67,7 @@ Library "libzipperposition"
                     Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,
                     Congruence, FeatureVector, UntypedAST, Ind_ty,
                     TypedSTerm, Statement, Flex_state, Compute_prec, 
+                    Ordinal,
                     lib/Hashcons, lib/ParseLocation, lib/Multiset, lib/LazyList,
                     lib/Hash, lib/IArray, lib/AllocCache, lib/Multiset_intf,
                     lib/Signal, lib/UnionFind
