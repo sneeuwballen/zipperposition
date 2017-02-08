@@ -145,6 +145,7 @@ let main () =
       let max_depth = !max_depth
       let theories = [
         Horn_superposition.theory;
+        Splitting.theory;
       ]
     end
     in

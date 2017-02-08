@@ -7,6 +7,7 @@ type term = FOTerm.t
 type ty = Type.t
 type statement = (Clause.t, term, ty) Statement.t
 type proof = Hornet_types.proof
+type event = Hornet_types.event
 
 module type BOOL_LIT = Bool_lit_intf.S
 
@@ -36,6 +37,10 @@ module type CONTEXT = sig
   end
 
   val add_form : Form.t -> unit
+  (** Add boolean form to the SAT solver *)
+
+  val send_event : event -> unit
+  (** Send an event to notify other parts of the prover *)
 
   (** {6 Config} *)
 
@@ -66,11 +71,11 @@ module type THEORY = sig
   val on_assumption : Ctx.B_lit.t -> unit
   (** Called every time the SAT solver picks a new boolean literal *)
 
+  val on_event : event -> unit
+  (** React to events *)
+
   val set_depth_limit : int -> unit
   (** Called when the depth limit is changed *)
-
-  val on_exit : unit -> unit
-  (** Called before exit *)
 end
 
 module type THEORY_FUN = functor(C:CONTEXT) -> THEORY with module Ctx = C

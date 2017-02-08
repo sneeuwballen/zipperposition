@@ -71,3 +71,12 @@ type bool_lit = {
   bl_atom: bool_atom;
   bl_sign: bool;
 }
+
+type event =
+  | E_add_component of clause
+  | E_remove_component of clause
+  | E_select_lit of clause * lit * Dismatching_constr.t list
+  (** [lit | constr] has been selected in some clause *)
+  | E_unselect_lit of clause * lit * Dismatching_constr.t list
+  | E_found_unsat of proof
+  | E_exit

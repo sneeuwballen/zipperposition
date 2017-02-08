@@ -93,3 +93,16 @@ let pp_bool_lit out l =
   if l.bl_sign
   then Fmt.within "(" ")" pp_atom out l.bl_atom
   else Fmt.fprintf out "(¬%a)" pp_atom l.bl_atom
+
+let pp_event out (e:event): unit = match e with
+  | E_add_component c -> Fmt.fprintf out "(@[add_component@ %a@])" pp_clause c
+  | E_remove_component c -> Fmt.fprintf out "(@[remove_component@ %a@])" pp_clause c
+  | E_select_lit (c,lit,cstr) ->
+    Fmt.fprintf out "(@[select_lit@ %a@ :clause %a@ :constr (@[%a@])@])"
+      pp_lit lit pp_clause c (Util.pp_list Dismatching_constr.pp) cstr
+  | E_unselect_lit (c,lit,cstr) ->
+    Fmt.fprintf out "(@[select_lit@ %a@ :clause %a@ :constr (@[%a@])@])"
+      pp_lit lit pp_clause c (Util.pp_list Dismatching_constr.pp) cstr
+  | E_found_unsat p ->
+    Fmt.fprintf out "(@[found_unsat@ :proof %a@])" pp_proof p
+  | E_exit -> Fmt.string out "exit"

@@ -17,6 +17,7 @@ type term = FOTerm.t
 type ty = Type.t
 type statement = (Clause.t, term, ty) Statement.t
 type proof = Hornet_types.proof
+type event = Hornet_types.event
 
 (** {2 Boolean Literal} *)
 
@@ -42,7 +43,6 @@ module type S = sig
   module M : SI.S with type St.formula = B_lit.t and type St.proof = proof
   module Ctx : CONTEXT with module B_lit = B_lit (* for theories *)
   val theories : (module THEORY) list
-  val on_exit : unit -> unit
 end
 
 module type ARGS = State_intf.ARGS
@@ -93,6 +93,9 @@ module Make(A : ARGS) : S = struct
       (SAT_theory)
       (struct end)
 
+  (* defined below *)
+  let send_event_ : (event -> unit) ref = ref (fun _ -> assert false)
+
   module Ctx
     : CONTEXT with module B_lit = B_lit
   = struct
@@ -113,6 +116,7 @@ module Make(A : ARGS) : S = struct
       let atom = make_atom
     end
     let add_form f = add_clause_l (Form.make_cnf f)
+    let send_event e = !send_event_ e
   end
 
   let add_on_assumption_ f =
@@ -127,7 +131,35 @@ module Make(A : ARGS) : S = struct
          (module Th : THEORY))
       A.theories
 
-  let on_exit () = List.iter (fun (module Th : THEORY) -> Th.on_exit ()) theories
+  let () =
+    (* process one single event, possibly triggering other events *)
+    let process_one_event e =
+      Util.debugf ~section 5 "@[process_event@ %a@]" (fun k->k Event.pp e);
+      try
+        List.iter (fun (module Th : THEORY) -> Th.on_event e) theories
+      with exc ->
+        let trace = Util.Exn.string_of_backtrace () in
+        Util.debugf ~section 1 "@[error when processing event %a@ %s@]"
+          (fun k->k Event.pp e trace);
+        raise exc
+    in
+    (* queue of events to handle *)
+    let e_queue : event Queue.t = Queue.create() in
+    let in_event : bool ref = ref false in
+    let send_event e =
+      if !in_event then Queue.push e e_queue
+      else (
+        (* loop for processing events *)
+        in_event := true;
+        process_one_event e;
+        while not (Queue.is_empty e_queue) do
+          let e = Queue.pop e_queue in
+          process_one_event e;
+        done;
+        in_event := false;
+      )
+    in
+    send_event_ := send_event
 end
 
 (** {2 State} *)
@@ -181,7 +213,7 @@ let run (t:t): res =
   in
   (* compute result *)
   let res = iter 1 in
-  St.on_exit ();
+  St.Ctx.send_event Hornet_types.E_exit;
   res
 
 

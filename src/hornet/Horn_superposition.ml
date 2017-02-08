@@ -261,46 +261,40 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
   let idx_heads : CP_idx.t ref = ref idx_heads0
      *)
 
-  let on_assumption (lit:B_lit.t): unit =
-    begin match B_lit.view lit, B_lit.sign lit with
-      | Bool_lit.Box_clause c, true ->
-        let res = Saturate.add_clause c in
-        begin match res with
-          | Saturate.Sat -> () (* ok *)
-          | Saturate.Unsat [] -> assert false
-          | Saturate.Unsat (c1::cs) ->
-            (* TODO: proof management *)
-            Ctx.add_clause_l
-              (List.map Conflict_clause.to_bool_clause cs);
-            Ctx.raise_conflict
-              (Conflict_clause.to_bool_clause c1)
-              (Conflict_clause.proof c1)
-        end
-      | Bool_lit.Ground_lit lit, sign ->
-        assert false
-      (* TODO : how to relate proofs?
-        if sign
-        then Saturate.add_clause (Clause.make_l [lit])
-        else Saturate.add_clause (Clause.make_l [Lit.neg lit])
-      *)
-      | Bool_lit.Box_clause _,false -> () (* TODO: if unit negative, maybe? *)
-      | Bool_lit.Select_lit (_,_), true -> () (* TODO: should add to saturate, too *)
-      | Bool_lit.Depth_limit _, _
-      | Bool_lit.Fresh _, _ -> ()
-    end
-
   let set_depth_limit d =
     Saturate.set_limit d;
     (* add the set of initial clauses *)
     ignore (Saturate.add_clauses initial_clauses);
     ()
 
-  let on_exit () =
-    Util.debugf ~section 1 "@[<2>saturate:@ %a@]"
-      (fun k->
-         let stats = Saturate.stats() in
-         k Saturate.pp_stats stats);
-    ()
+  (* no direct communication with SAT solver *)
+  let on_assumption _ = ()
+
+  (* TODO *)
+  let on_event e =
+    begin match e with
+      | E_add_component _
+      | E_remove_component _
+      | E_select_lit (_,_,_)
+      | E_unselect_lit (_,_,_)
+      | E_found_unsat _ ->
+        ()
+      | E_exit ->
+        Util.debugf ~section 1 "@[<2>saturate:@ %a@]"
+          (fun k->
+             let stats = Saturate.stats() in
+             k Saturate.pp_stats stats);
+        ()
+    end
+
+  (* TODO:
+     - a decent saturation state
+     * active (unit) clauses
+     * passive (horn) clauses
+     * demod index
+     - initial saturation (up to (parameter) initial depth)
+     - react to some events
+  *)
 end
 
 let theory : State.theory_fun = (module Make)
