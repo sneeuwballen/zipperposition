@@ -276,15 +276,18 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       | E_add_component _
       | E_remove_component _
       | E_select_lit (_,_,_)
-      | E_unselect_lit (_,_,_)
-      | E_found_unsat _ ->
-        ()
-      | E_exit ->
+      | E_unselect_lit (_,_,_) ->
+        () (* TODO: add/remove clauses from saturated set *)
+      | E_stage Stage_presaturate ->
+        () (* TODO: pre-saturate *)
+      | E_stage Stage_exit ->
         Util.debugf ~section 1 "@[<2>saturate:@ %a@]"
           (fun k->
              let stats = Saturate.stats() in
              k Saturate.pp_stats stats);
         ()
+      | E_stage (Stage_start | Stage_init) -> ()
+      | E_found_unsat _ -> ()
     end
 
   (* TODO:

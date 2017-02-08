@@ -192,6 +192,9 @@ let pp_res out = function
 let run (t:t): res =
   let module St = (val t) in
   let module F = St.Ctx.Form in
+  St.Ctx.send_event Hornet_types.(E_stage Stage_init);
+  St.Ctx.send_event Hornet_types.(E_stage Stage_presaturate);
+  St.Ctx.send_event Hornet_types.(E_stage Stage_start);
   (* currently at depth [d] *)
   let rec iter (d:int) =
     Util.debugf ~section 1 "@[<2>@{<Yellow>#### DEPTH %d ####@}@]" (fun k->k d);
@@ -213,7 +216,7 @@ let run (t:t): res =
   in
   (* compute result *)
   let res = iter 1 in
-  St.Ctx.send_event Hornet_types.E_exit;
+  St.Ctx.send_event Hornet_types.(E_stage Stage_exit);
   res
 
 

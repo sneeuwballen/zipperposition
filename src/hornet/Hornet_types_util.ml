@@ -94,6 +94,12 @@ let pp_bool_lit out l =
   then Fmt.within "(" ")" pp_atom out l.bl_atom
   else Fmt.fprintf out "(¬%a)" pp_atom l.bl_atom
 
+let pp_stage out = function
+  | Stage_init -> Fmt.string out "init"
+  | Stage_presaturate -> Fmt.string out "presaturate"
+  | Stage_start -> Fmt.string out "start"
+  | Stage_exit -> Fmt.string out "exit"
+
 let pp_event out (e:event): unit = match e with
   | E_add_component c -> Fmt.fprintf out "(@[add_component@ %a@])" pp_clause c
   | E_remove_component c -> Fmt.fprintf out "(@[remove_component@ %a@])" pp_clause c
@@ -105,4 +111,4 @@ let pp_event out (e:event): unit = match e with
       pp_lit lit pp_clause c (Util.pp_list Dismatching_constr.pp) cstr
   | E_found_unsat p ->
     Fmt.fprintf out "(@[found_unsat@ :proof %a@])" pp_proof p
-  | E_exit -> Fmt.string out "exit"
+  | E_stage s -> Fmt.fprintf out "(@[stage %a@])" pp_stage s

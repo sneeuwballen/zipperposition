@@ -72,6 +72,13 @@ type bool_lit = {
   bl_sign: bool;
 }
 
+(* stages in the solver's algorithm *)
+type stage =
+  | Stage_init
+  | Stage_presaturate
+  | Stage_start
+  | Stage_exit
+
 type event =
   | E_add_component of clause
   | E_remove_component of clause
@@ -79,4 +86,4 @@ type event =
   (** [lit | constr] has been selected in some clause *)
   | E_unselect_lit of clause * lit * Dismatching_constr.t list
   | E_found_unsat of proof
-  | E_exit
+  | E_stage of stage
