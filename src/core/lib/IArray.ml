@@ -125,4 +125,9 @@ let of_seq s =
   s (fun x -> l := x :: !l);
   Array.of_list (List.rev !l)
 
-let hash f a = Hash.seq f (to_seq a)
+let hash f a = Hash.array f a
+
+let hash_comm f a =
+  let arr = Array.init (Array.length a) (fun i -> f a.(i)) in
+  Array.sort CCInt.compare arr; (* sort the hashes, so their order does not matter *)
+  Hash.array (fun h->h) arr
