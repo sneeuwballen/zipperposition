@@ -55,7 +55,9 @@ val body1_pos : t -> Lit.t Position.With.t
 
 val body_pos : int -> t -> Lit.t Position.With.t
 
-val pp : t CCFormat.printer
+include Interfaces.PRINT with type t := t
+include Interfaces.HASH with type t := t
+include Interfaces.ORD with type t := t
 
 (** {2 Pairing with Position} *)
 

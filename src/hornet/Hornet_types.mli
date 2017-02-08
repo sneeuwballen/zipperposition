@@ -43,6 +43,7 @@ and c_constraint_ =
   | C_dismatch of Dismatching_constr.t
 
 and horn_clause = {
+  hc_id: int; (* unique ID *)
   hc_head: lit;
   hc_body: lit IArray.t;
   hc_constr: c_constraint_ list;

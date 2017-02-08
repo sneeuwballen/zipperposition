@@ -16,14 +16,21 @@ type constraint_ = Hornet_types.c_constraint_
 type t = Hornet_types.horn_clause
 type horn_clause = t
 
-(* TODO: add a unique ID for fast comparison/storage? *)
+let make =
+  let n_ = ref 0 in
+  fun ?(constr=[]) head body proof ->
+    let hc_id = !n_ in
+    incr n_;
+    { hc_id;
+      hc_head=head;
+      hc_body=body;
+      hc_proof=proof;
+      hc_constr=constr;
+    }
 
-let make ?(constr=[]) head body proof =
-  { hc_head=head;
-    hc_body=body;
-    hc_proof=proof;
-    hc_constr=constr;
-  }
+let equal a b = a.hc_id = b.hc_id
+let hash a = Hash.int a.hc_id
+let compare a b = CCInt.compare a.hc_id b.hc_id
 
 let head c = c.hc_head
 let body c = c.hc_body
@@ -41,6 +48,7 @@ let body_get c n =
   IArray.get (body c) n
 
 let pp = Hornet_types_util.pp_hclause
+let to_string = Fmt.to_string pp
 
 let concl_pos c = PW.return (head c) |> PW.head
 let body_pos n c = PW.return (body_get c n) |> PW.body |> PW.arg n
