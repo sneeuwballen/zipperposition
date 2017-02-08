@@ -117,6 +117,8 @@ module Exn : sig
   (** printer for backtraces, if enabled (print nothing otherwise) *)
 
   val fmt_backtrace : Format.formatter -> unit -> unit
+
+  val string_of_backtrace : unit -> string
 end
 
 (** {2 profiling facilities} *)

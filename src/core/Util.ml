@@ -186,6 +186,11 @@ module Exn = struct
   let fmt_backtrace out () =
     if Printexc.backtrace_status () then
       Format.fprintf out "\nbacktrace:\n%s" (Printexc.get_backtrace ())
+
+  let string_of_backtrace () =
+    if Printexc.backtrace_status ()
+    then "\nbacktrace:\n" ^ Printexc.get_backtrace ()
+    else "<no backtrace>"
 end
 
 (** {2 profiling facilities} *)
