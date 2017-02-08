@@ -16,7 +16,6 @@ let section = Util.Section.make "horn_sup"
 
 module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
   module Ctx = Ctx
-  module B_lit = Ctx.B_lit
 
   (* index term->clause *)
   module CP_idx = NPDtree.MakeTerm(HC.With_pos)
@@ -32,141 +31,26 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
   (* an inference rule *)
   type 'a rule_infer = 'a -> 'a list
 
-  (** {2 Avatar Splitting} *)
-
-  (** Clauses that contain several "components" are split immediately.
-      A clause [C] is splittable if it contains subsets of literals
-      [C_1 \lor … \lor C_n]  where each [C_i]
-      is a component.
-      A component [C_i] is a non-empty subset of the literals of the clause,
-      that shares no variables with the other [C_j | j≠i] *)
-
-  module Avatar : sig
-    val split : C.t rule_simp_n
-  end = struct
-    let stat_avatar_split = Util.mk_stat "hornet.avatar_split"
-
-    (* union-find that maps vars to list of literals, used for splitting *)
-    module UF = UnionFind.Make(struct
-        type key = T.var
-        type value = Lit.t list
-        let equal = HVar.equal Type.equal
-        let hash = HVar.hash
-        let zero = []
-        let merge = List.rev_append
-      end)
-
-    let try_split_ lits c =
-      assert (IArray.length lits >= 2);
-      (* maps each variable to a list of literals. Sets can be merged whenever
-         two variables occur in the same literal.  *)
-      let uf_vars =
-        IArray.to_seq lits
-        |> Sequence.flat_map Lit.vars_seq
-        |> T.VarSet.of_seq
-        |> T.VarSet.to_list
-        |> UF.create
-      (* set of ground literals (each one is its own component) *)
-      and cluster_ground =
-        ref Lit.Set.empty
-      in
-      (* literals belong to either their own ground component, or to every
-          sets in [uf_vars] associated to their variables *)
-      IArray.iter
-        (fun lit ->
-           let v_opt = Lit.vars_seq lit |> Sequence.head in
-           begin match v_opt with
-             | None -> (* ground, lit has its own component *)
-               cluster_ground := Lit.Set.add lit !cluster_ground
-             | Some v ->
-               (* merge other variables of the literal with [v] *)
-               Lit.vars_seq lit
-               |> Sequence.iter
-                 (fun v' ->
-                    UF.add uf_vars v' [lit];  (* lit is in the equiv class of [v'] *)
-                    UF.union uf_vars v v')
-           end)
-        lits;
-
-      (* now gather all the components as a literal list list *)
-      let components = ref [] in
-      Lit.Set.iter (fun lit -> components := [lit] :: !components) !cluster_ground;
-      UF.iter uf_vars (fun _ comp -> components := comp :: !components);
-
-      begin match !components with
-        | [] -> assert (IArray.length lits=0); None
-        | [_] -> None
-        | _::_ ->
-          (* do a simplification! *)
-          Util.incr_stat stat_avatar_split;
-          let proof = Proof.avatar_split c in
-          let clauses =
-            List.map
-              (fun lits ->
-                 let lits = IArray.of_list lits in
-                 C.make lits proof)
-              !components
-          in
-          Util.debugf ~section 4
-            "@[avatar_split@ :clause @[%a@]@ :yields [@[<hv>%a@]]@]"
-            (fun k->k C.pp c (Util.pp_list C.pp) clauses);
-          let split_lits =
-            List.map Ctx.B_lit.box_clause clauses
-          in
-          (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
-          let bool_clause =
-            Ctx.B_lit.neg (Ctx.B_lit.box_clause c) :: split_lits
-          in
-          Ctx.add_clause bool_clause;
-          Util.debugf ~section 4 "@[constraint clause is @[%a@]@]"
-            (fun k->k Ctx.B_lit.pp_clause bool_clause);
-          (* return the clauses *)
-          Some clauses
-      end
-
-    let split c : C.t list option = match C.proof c with
-      | _ when IArray.length (C.lits c) <= 1 -> None
-      | P_avatar_split _ | P_split _ -> None (* by construction, impossible *)
-      | P_instance _ | P_from_stmt _ | P_superposition _ ->
-        try_split_ (C.lits c) c
-  end
-
-  (** {2 Inst-Gen-Eq} *)
-  module Inst_gen_eq : sig
-    val instantiate : C.t rule_infer
-  end = struct
-    (* TODO:
-       - rule to ground non-ground clauses (with a pointer to the grounding)
-       - rule to select a horn subset in non-Horn non-ground clause components
-    *)
-
-    let stat_split = Util.mk_stat "hornet.split"
-
-    let instantiate _ = assert false
-    (* TODO: when a conflict between selected lits is found, add
-       instantiations *)
-  end
-
   (** {2 Saturation Algorithm} *)
 
-  let rules_simp : C.t rule_simp list = [ ]
+  let rules_simp : HC.t rule_simp list = [ ]
 
-  let rules_simp_n : C.t rule_simp_n list = [ Avatar.split; ]
+  let rules_simp_n : HC.t rule_simp_n list = [ ]
 
-  let rules_infer : C.t rule_infer list = [ Inst_gen_eq.instantiate ]
+  let rules_infer : HC.t rule_infer list = [ ]
 
   module Conflict_clause : sig
     type t = private HC.t (* an empty clause *)
 
     val make : HC.t -> t
-    val to_bool_clause : t -> B_lit.t list
+    val to_bool_clause : t -> Bool_lit.t list
     val proof : t -> HC.proof
     val pp : t CCFormat.printer
   end = struct
     type t = HC.t (* an empty clause *)
     let make c = c
-    let to_bool_clause c : B_lit.t list = assert false (* TODO *)
-    let proof c = assert false (* TODO *)
+    let to_bool_clause c : Bool_lit.t list = assert false (* TODO: walk the proof *)
+    let proof _ = assert false (* TODO *)
     let pp = HC.pp
   end
 

@@ -10,6 +10,7 @@ open Libzipperposition
 
 type t = Hornet_types.proof
 type clause = Hornet_types.clause
+type bool_atom = Hornet_types.bool_atom
 
 val from_stmt : Statement.clause_t -> t
 val instance : clause -> Subst.t -> t

@@ -9,12 +9,10 @@ type statement = (Clause.t, term, ty) Statement.t
 type proof = Hornet_types.proof
 type event = Hornet_types.event
 
-module type BOOL_LIT = Bool_lit_intf.S
-
 module type CONTEXT = sig
-  module B_lit : BOOL_LIT
+  type bool_clause = Bool_lit.t list
 
-  type bool_clause = B_lit.t list
+  val bool_state : Bool_lit.state
 
   (** {6 SAT} *)
 
@@ -30,7 +28,7 @@ module type CONTEXT = sig
   module Form : sig
     type t
     val imply : t -> t -> t
-    val atom : B_lit.t -> t
+    val atom : Bool_lit.t -> t
     val and_ : t list -> t
     val or_: t list -> t
     val not_ : t -> t
@@ -68,7 +66,7 @@ module type THEORY = sig
 
   val name : string
 
-  val on_assumption : Ctx.B_lit.t -> unit
+  val on_assumption : Bool_lit.t -> unit
   (** Called every time the SAT solver picks a new boolean literal *)
 
   val on_event : event -> unit

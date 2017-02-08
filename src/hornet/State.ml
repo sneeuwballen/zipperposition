@@ -19,10 +19,6 @@ type statement = (Clause.t, term, ty) Statement.t
 type proof = Hornet_types.proof
 type event = Hornet_types.event
 
-(** {2 Boolean Literal} *)
-
-module type BOOL_LIT = State_intf.BOOL_LIT
-
 (** {2 Context for Theories} *)
 
 module type CONTEXT = State_intf.CONTEXT
@@ -39,27 +35,24 @@ type theory_fun = State_intf.theory_fun
 (** {2 State in a Module} *)
 
 module type S = sig
-  module B_lit : BOOL_LIT
-  module M : SI.S with type St.formula = B_lit.t and type St.proof = proof
-  module Ctx : CONTEXT with module B_lit = B_lit (* for theories *)
+  module M : SI.S with type St.formula = Bool_lit.t and type St.proof = proof
+  module Ctx : CONTEXT (* for theories *)
   val theories : (module THEORY) list
 end
 
 module type ARGS = State_intf.ARGS
 
 module Make(A : ARGS) : S = struct
-  module B_lit = Bool_lit.Make(struct end)
-
-  exception Theory_conflict of B_lit.t list * Proof.t
+  exception Theory_conflict of Bool_lit.t list * Proof.t
   (** Raised by a handler when a conflict is detected *)
 
   module SAT_theory = struct
-    type formula = B_lit.t
+    type formula = Bool_lit.t
     type proof = Hornet_types.proof
 
     let backtrack_vec : (unit -> unit) CCVector.vector = CCVector.create ()
 
-    let on_assumption_ : (B_lit.t -> unit) list ref = ref []
+    let on_assumption_ : (Bool_lit.t -> unit) list ref = ref []
 
     type level = int (* offset in [backtrack] *)
 
@@ -89,26 +82,28 @@ module Make(A : ARGS) : S = struct
 
   module M =
     Msat.Solver.Make
-      (B_lit)
+      (Bool_lit)
       (SAT_theory)
       (struct end)
 
   (* defined below *)
   let send_event_ : (event -> unit) ref = ref (fun _ -> assert false)
 
-  module Ctx
-    : CONTEXT with module B_lit = B_lit
-  = struct
+  module Ctx : CONTEXT = struct
     include A
-    module B_lit = B_lit
+    module Bool_lit = Bool_lit
 
-    type bool_clause = B_lit.t list
+    type bool_clause = Bool_lit.t list
+    let bool_state = Bool_lit.create_state ()
     let on_backtrack f = CCVector.push SAT_theory.backtrack_vec f
     let raise_conflict c proof = raise (Theory_conflict (c,proof))
     let add_clause_l l = M.assume l
     let add_clause c = add_clause_l [c]
     module Form = struct
-      include Msat.Tseitin.Make(B_lit)
+      include Msat.Tseitin.Make(struct
+          include Bool_lit
+          let fresh () = fresh bool_state (* need to pass context implicitely here *)
+        end)
       let imply = make_imply
       let and_ = make_and
       let or_ = make_or

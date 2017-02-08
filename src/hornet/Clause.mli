@@ -11,6 +11,7 @@ type t = Hornet_types.clause
 type clause = t
 
 type horn_clause = Hornet_types.horn_clause
+type bool_lit = Hornet_types.bool_lit
 type idx = Hornet_types.clause_idx
 type proof = Hornet_types.proof
 
@@ -18,8 +19,16 @@ type proof = Hornet_types.proof
 type constraint_ = Hornet_types.c_constraint_ =
   | C_dismatch of Dismatching_constr.t
 
-val make : ?constrs:constraint_ list -> Lit.t IArray.t -> proof -> t
-val make_l : ?constrs:constraint_ list -> Lit.t list -> proof -> t
+(** How to build a clause from a ['a] and other parameters *)
+type 'a builder =
+  ?b_lit:bool_lit lazy_t ->
+  ?constrs:constraint_ list ->
+  'a ->
+  proof ->
+  t
+
+val make : Lit.t IArray.t builder
+val make_l : Lit.t list builder
 
 val proof : t -> proof
 val lits : t -> Lit.t IArray.t
@@ -49,6 +58,7 @@ type kind =
 
 val classify : t -> kind
 
+val is_ground : t -> bool
 val is_unit_ground : t -> bool
 
 (** {2 Utils} *)

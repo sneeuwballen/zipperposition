@@ -19,6 +19,18 @@ let pp_lit out (t:lit): unit = match t with
 let pp_clause out (a:clause) =
   Fmt.fprintf out "[@[%a@]]" (Fmt.seq pp_lit) (IArray.to_seq a.c_lits)
 
+let pp_atom out = function
+  | A_fresh i -> Fmt.fprintf out "fresh_%d" i
+  | A_box_clause (c,i) -> Fmt.fprintf out "%a/%d" pp_clause c i
+  | A_select (c,i,id) ->
+    Fmt.fprintf out "@[select@ :idx %d@ :id %d :clause %a@]" i id pp_clause c
+  | A_ground lit -> pp_lit out lit
+
+let pp_bool_lit out l =
+  if l.bl_sign
+  then Fmt.within "(" ")" pp_atom out l.bl_atom
+  else Fmt.fprintf out "(¬%a)" pp_atom l.bl_atom
+
 let pp_proof out (p:proof) : unit = match p with
   | P_from_stmt st ->
     Fmt.fprintf out "(@[from_stmt@ %a@])" Statement.pp_clause st
@@ -26,7 +38,7 @@ let pp_proof out (p:proof) : unit = match p with
     Fmt.fprintf out "(@[<hv2>instance@ :clause %a@ :subst %a@])"
       pp_clause c Subst.pp subst
   | P_avatar_split c ->
-    Fmt.fprintf out "(@[<hv2>avatar_split@ %a@])" pp_clause c
+    Fmt.fprintf out "(@[<hv2>avatar_split@ :from %a@])" pp_clause c
   | P_split c ->
     Fmt.fprintf out "(@[<hv2>split@ %a@])" pp_clause c
   | P_superposition _ -> assert false (* TODO *)
@@ -81,18 +93,6 @@ let hash_bool_lit a : int = match a.bl_atom with
   | A_select (_,_,i) ->
     Hash.combine3 20 (Hash.bool a.bl_sign) (Hash.int i)
   | A_ground lit -> Hash.combine2 50 (hash_lit lit)
-
-let pp_bool_lit out l =
-  let pp_atom out = function
-    | A_fresh i -> Fmt.fprintf out "fresh_%d" i
-    | A_box_clause (c,i) -> Fmt.fprintf out "%a/%d" pp_clause c i
-    | A_select (c,i,id) ->
-      Fmt.fprintf out "@[select@ :idx %d@ :id %d :clause %a@]" i id pp_clause c
-    | A_ground lit -> pp_lit out lit
-  in
-  if l.bl_sign
-  then Fmt.within "(" ")" pp_atom out l.bl_atom
-  else Fmt.fprintf out "(¬%a)" pp_atom l.bl_atom
 
 let pp_stage out = function
   | Stage_init -> Fmt.string out "init"

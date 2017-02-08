@@ -11,10 +11,6 @@ type term = FOTerm.t
 type ty = Type.t
 type statement = (Clause.t, term, ty) Statement.t
 
-(** {2 Boolean Literals} *)
-
-module type BOOL_LIT = State_intf.BOOL_LIT
-
 (** {2 Context for Theories} *)
 
 (** Each theory is given this context, which serves to communicate

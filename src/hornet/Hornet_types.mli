@@ -16,6 +16,7 @@ type clause = {
   c_lits: lit IArray.t;
   c_kind: c_kind;
   c_proof: proof;
+  c_bool_lit: bool_lit lazy_t option; (* if the clause is a component *)
   c_constr: c_constraint_ list;
 }
 
@@ -32,8 +33,10 @@ and c_kind =
 and proof =
   | P_from_stmt of Statement.clause_t
   | P_instance of clause * Subst.t
-  | P_avatar_split of clause (* split into var-disjoint components *)
-  | P_split of clause (* model-driven recursive splitting *)
+  | P_avatar_split of clause
+  (* given clause has been split into var-disjoint components,
+     one of which is the current clause *)
+  | P_split of clause (* model-driven recursive splitting *) (* TODO *)
   | P_superposition of hc_superposition_step
 
 and c_constraint_ =
@@ -58,7 +61,7 @@ and hc_superposition_step = {
 (* TODO: for "ground", make it point to a mutable list of clauses whose
    grounding contain this literal. Makes for efficient incremental selection.
 *)
-type bool_atom =
+and bool_atom =
   | A_fresh of bool_unique_id
   | A_box_clause of clause * bool_unique_id
   | A_select of clause * clause_idx * bool_unique_id
@@ -67,7 +70,7 @@ type bool_atom =
 (* index of a literal in a clause *)
 and clause_idx = int
 
-type bool_lit = {
+and bool_lit = {
   bl_atom: bool_atom;
   bl_sign: bool;
 }
