@@ -230,16 +230,23 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
     exception Conflict_exn of HC.t
 
-    let add_clause c =
-      Util.debugf ~section 3 "@[<2>saturate.add_clause@ %a@]" (fun k->k C.pp c);
-      assert false (*  TODO *)
-
     let add_horn c =
       Util.debugf ~section 3 "@[<2>saturate.add_horn@ %a@]" (fun k->k HC.pp c);
       assert false (*  TODO *)
 
-    let add_clauses (l:C.t list) =
-      assert false (* TODO *)
+    let add_clause c =
+      Util.debugf ~section 3 "@[<2>saturate.add_clause@ %a@]" (fun k->k C.pp c);
+      begin match C.classify c with
+        | C.Horn hc -> add_horn hc
+        | C.General -> Sat (* wait until it is split *)
+      end
+
+    let rec add_clauses (l:C.t list) = match l with
+      | [] -> Sat
+      | c :: tail ->
+        match add_clause c with
+          | Sat -> add_clauses tail
+          | Unsat p -> Unsat p
   end
 
   (** {2 Unit and Horn Clauses} *)
@@ -263,9 +270,18 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
   let set_depth_limit d =
     Saturate.set_limit d;
-    (* add the set of initial clauses *)
-    ignore (Saturate.add_clauses initial_clauses);
     ()
+
+  let presaturate () =
+    (* add the set of initial clauses *)
+    Util.debug ~section 2 "start presaturation";
+    let res = Saturate.add_clauses initial_clauses in
+    begin match res with
+      | Saturate.Sat -> ()
+      | Saturate.Unsat [] -> assert false
+      | Saturate.Unsat (c::_) ->
+        Ctx.send_event (E_found_unsat (Conflict_clause.proof c))
+    end
 
   (* no direct communication with SAT solver *)
   let on_assumption _ = ()
@@ -279,7 +295,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       | E_unselect_lit (_,_,_) ->
         () (* TODO: add/remove clauses from saturated set *)
       | E_stage Stage_presaturate ->
-        () (* TODO: pre-saturate *)
+        presaturate ()
       | E_stage Stage_exit ->
         Util.debugf ~section 1 "@[<2>saturate:@ %a@]"
           (fun k->

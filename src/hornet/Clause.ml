@@ -62,7 +62,10 @@ let kind_of_lits (c_lits:Lit.t IArray.t) proof: c_kind =
       let body =
         Array.init (IArray.length c_lits-1)
           (fun j ->
-             if j<i then IArray.get c_lits j else IArray.get c_lits (j+1))
+             let lit =
+               if j<i then IArray.get c_lits j else IArray.get c_lits (j+1)
+             in
+             Lit.neg lit)
       in
       Array.sort compare_lits_for_horn_ body; (* sort body in some order *)
       let body = IArray.of_array_unsafe body in

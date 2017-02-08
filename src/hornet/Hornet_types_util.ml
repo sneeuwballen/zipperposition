@@ -36,10 +36,10 @@ let pp_constraint out (c:c_constraint_): unit = match c with
 
 let pp_hclause out (c:horn_clause): unit =
   let pp_constr out = function
-    | [] -> Fmt.unit out ()
-    | l -> Fmt.fprintf out "@[<hv2>| %a@]" (Fmt.list pp_constraint) l
+    | [] -> Fmt.silent out ()
+    | l -> Fmt.fprintf out "| @[<hv>%a@]" (Fmt.list pp_constraint) l
   in
-  Fmt.fprintf out "(@[%a@ <- @[<hv>%a@]@,%a@])"
+  Fmt.fprintf out "(@[%a@ @<1>← @[<hv>%a@]@,%a@])"
     pp_lit c.hc_head
     (Fmt.seq pp_lit) (IArray.to_seq c.hc_body)
     pp_constr c.hc_constr
