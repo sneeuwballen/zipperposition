@@ -11,7 +11,6 @@ type view =
   | Box_clause of clause
   | Select_lit of clause * clause_idx
   | Ground_lit of lit (* must be ground *)
-  | Depth_limit of int (* max number of "risky" inferences *)
 
 (** Encapsulate objects into boolean literals that can be handled by
     the SAT solver *)
@@ -26,7 +25,6 @@ module type S = sig
   val select_lit : clause -> clause_idx -> t
   val box_clause : clause -> t
   val ground : lit -> t
-  val depth_limit : int -> t
 
   include Msat.Formula_intf.S with type t := t and type proof := proof
 

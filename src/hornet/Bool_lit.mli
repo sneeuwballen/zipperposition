@@ -13,6 +13,5 @@ type view = Bool_lit_intf.view =
   | Box_clause of clause
   | Select_lit of clause * clause_idx
   | Ground_lit of lit (* must be ground *)
-  | Depth_limit of int (* max number of "risky" inferences *)
 
 module Make(X : sig end) : S

@@ -21,7 +21,6 @@ type view = Bool_lit_intf.view =
   | Box_clause of clause
   | Select_lit of clause * clause_idx
   | Ground_lit of lit (* must be ground *)
-  | Depth_limit of int (* max number of "risky" inferences *)
 
 type unique_id = Hornet_types.bool_unique_id
 type atom = Hornet_types.bool_atom =
@@ -29,7 +28,6 @@ type atom = Hornet_types.bool_atom =
   | A_box_clause of clause * unique_id
   | A_select of clause * clause_idx * unique_id
   | A_ground of lit
-  | A_depth_limit of int
 
 module Make(X : sig end) : S = struct
   type proof = Hornet_types.proof
@@ -89,8 +87,6 @@ module Make(X : sig end) : S = struct
         make_ true a
       )
 
-  let depth_limit i = make_ true (A_depth_limit i)
-
   let neg t = {t with bl_sign=not t.bl_sign}
 
   let norm (t:t): t * FI.negated =
@@ -111,5 +107,4 @@ module Make(X : sig end) : S = struct
     | A_box_clause (c,_) -> Box_clause c
     | A_select (c,i,_) -> Select_lit(c,i)
     | A_ground lit -> Ground_lit lit
-    | A_depth_limit d -> Depth_limit d
 end

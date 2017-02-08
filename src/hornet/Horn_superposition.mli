@@ -7,7 +7,6 @@
     It works incrementally, by saturating a growing set of Horn Clauses
     up to some pre-defined limit. *)
 
-
 module Make : State.THEORY_FUN
 
 val theory : State.theory_fun

@@ -63,7 +63,6 @@ type bool_atom =
   | A_box_clause of clause * bool_unique_id
   | A_select of clause * clause_idx * bool_unique_id
   | A_ground of lit
-  | A_depth_limit of int
 
 (* index of a literal in a clause *)
 and clause_idx = int

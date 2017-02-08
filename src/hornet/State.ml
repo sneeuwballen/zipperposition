@@ -161,32 +161,26 @@ let run (t:t): res =
   let module St = (val t) in
   let module F = St.Ctx.Form in
   (* currently at depth [d] *)
-  let rec iter (prev_limit:St.B_lit.t option) (d:int) =
+  let rec iter (d:int) =
     Util.debugf ~section 1 "@[<2>@{<Yellow>#### DEPTH %d ####@}@]" (fun k->k d);
-    let limit = St.B_lit.depth_limit d in
-    (* [prev_limit => limit] *)
-    CCOpt.iter
-      (fun prev_limit ->
-         St.Ctx.add_form F.(imply (not_ (atom prev_limit)) (atom limit)))
-      prev_limit;
     (* set depth limit *)
     List.iter
       (fun (module Th : THEORY) -> Th.set_depth_limit d)
       St.theories;
     (* solve under assumption [limit] *)
-    let res = St.M.solve ~assumptions:[limit] () in
+    let res = St.M.solve ~assumptions:[] () in
     begin match res with
       | St.M.Sat _ ->
         if d = St.Ctx.max_depth
         then Unknown (* TODO: completeness proof(!) *)
-        else iter (Some limit) (d+1) (* increase depth *)
+        else iter (d+1) (* increase depth *)
       | St.M.Unsat _ ->
         Util.debugf ~section 1 "@[Found unsat@]" (fun k->k);
         Unsat
     end
   in
   (* compute result *)
-  let res = iter None 1 in
+  let res = iter 1 in
   St.on_exit ();
   res
 

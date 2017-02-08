@@ -65,7 +65,6 @@ let equal_bool_lit a b : bool =
   &&
   begin match a.bl_atom, b.bl_atom with
     | A_fresh i, A_fresh j ->  i=j
-    | A_depth_limit i, A_depth_limit j -> i=j
     | A_box_clause (_,i1), A_box_clause (_,i2) -> i1=i2
     | A_ground l1, A_ground l2 -> equal_lit l1 l2
     | A_select (_,_,id1), A_select (_,_,id2) -> id1=id2
@@ -73,7 +72,6 @@ let equal_bool_lit a b : bool =
     | A_box_clause _, _
     | A_ground _, _
     | A_select _, _
-    | A_depth_limit _, _
       -> false
   end
 
@@ -82,8 +80,6 @@ let hash_bool_lit a : int = match a.bl_atom with
   | A_box_clause (_,i) -> Hash.combine2 15 (Hash.int i)
   | A_select (_,_,i) ->
     Hash.combine3 20 (Hash.bool a.bl_sign) (Hash.int i)
-  | A_depth_limit i ->
-    Hash.combine2 30 (Hash.int i)
   | A_ground lit -> Hash.combine2 50 (hash_lit lit)
 
 let pp_bool_lit out l =
@@ -93,8 +89,6 @@ let pp_bool_lit out l =
     | A_select (c,i,id) ->
       Fmt.fprintf out "@[select@ :idx %d@ :id %d :clause %a@]" i id pp_clause c
     | A_ground lit -> pp_lit out lit
-    | A_depth_limit i ->
-      Fmt.fprintf out "[depth@<1>≤%d]" i
   in
   if l.bl_sign
   then Fmt.within "(" ")" pp_atom out l.bl_atom
