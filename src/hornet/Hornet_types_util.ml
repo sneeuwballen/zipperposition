@@ -22,7 +22,7 @@ let pp_clause out (a:clause) = Fmt.within "[" "]" pp_clause_lits out a
 
 let pp_atom out = function
   | A_fresh i -> Fmt.fprintf out "fresh_%d" i
-  | A_box_clause (c,i) -> Fmt.fprintf out "%a/%d" pp_clause_lits c i
+  | A_box_clause (c,_) -> Fmt.fprintf out "%a" pp_clause_lits c
   | A_select (c,i,id) ->
     Fmt.fprintf out "@[select@ :idx %d@ :id %d :clause %a@]" i id pp_clause c
   | A_ground lit -> pp_lit out lit
@@ -36,7 +36,7 @@ let pp_bool_lit =
   Fmt.within "⟦" "⟧" pp_inner
 
 let pp_bool_clause out l =
-  Fmt.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:" ⊔ " pp_bool_lit) l
+  Fmt.fprintf out "[@[%a@]]" (Util.pp_list ~sep:" ⊔ " pp_bool_lit) l
 
 let pp_constraint out (c:c_constraint_): unit = match c with
   | C_dismatch d -> Dismatching_constr.pp out d
