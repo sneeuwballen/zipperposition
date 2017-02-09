@@ -17,7 +17,7 @@ type clause = {
   c_kind: c_kind;
   c_proof: proof;
   c_bool_lit: bool_lit lazy_t option; (* if the clause is a component *)
-  c_constr: c_constraint_ list;
+  mutable c_constr: c_constraint_ list;
 }
 
 and lit =
@@ -37,7 +37,10 @@ and proof =
   (* given clause has been split into var-disjoint components,
      one of which is the current clause *)
   | P_split of clause (* model-driven recursive splitting *) (* TODO *)
-  | P_superposition of hc_superposition_step
+  | P_bool_tauto (* boolean tautology *)
+  | P_bool_res of bool_res_step
+  | P_hc_superposition of hc_superposition_step
+  | P_hc_simplify of horn_clause
 
 and c_constraint_ =
   | C_dismatch of Dismatching_constr.t
@@ -59,6 +62,15 @@ and hc_superposition_step = {
   hc_sup_subst: Subst.t;
 }
 
+(** Description of a single boolean resolution step
+    between two clauses *)
+and bool_res_step = {
+  bool_res_c1: bool_clause;
+  bool_res_p1: proof;
+  bool_res_c2: bool_clause;
+  bool_res_p2: proof;
+}
+
 (* TODO: for "ground", make it point to a mutable list of clauses whose
    grounding contain this literal. Makes for efficient incremental selection.
 *)
@@ -76,6 +88,8 @@ and bool_lit = {
   bl_sign: bool;
 }
 
+and bool_clause = bool_lit list
+
 (* stages in the solver's algorithm *)
 type stage =
   | Stage_init
@@ -86,8 +100,9 @@ type stage =
 type event =
   | E_add_component of clause
   | E_remove_component of clause
-  | E_select_lit of clause * lit * Dismatching_constr.t list
-  (** [lit | constr] has been selected in some clause *)
-  | E_unselect_lit of clause * lit * Dismatching_constr.t list
+  | E_select_lit of clause * lit * Dismatching_constr.t list (** [lit | constr] has been selected in some clause *)
+  | E_unselect_lit of clause * lit
+  | E_add_ground_lit of lit
+  | E_remove_ground_lit of lit
   | E_found_unsat of proof
   | E_stage of stage

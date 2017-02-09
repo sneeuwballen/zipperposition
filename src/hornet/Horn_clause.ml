@@ -7,6 +7,7 @@ open Libzipperposition
 open Hornet_types
 
 module Fmt = CCFormat
+module Pos = Position
 module PW = Position.With
 
 type clause = Hornet_types.clause
@@ -15,6 +16,8 @@ type constraint_ = Hornet_types.c_constraint_
 
 type t = Hornet_types.horn_clause
 type horn_clause = t
+
+(** {2 Basics} *)
 
 let make =
   let n_ = ref 0 in
@@ -35,24 +38,60 @@ let compare a b = CCInt.compare a.hc_id b.hc_id
 let head c = c.hc_head
 let body c = c.hc_body
 let proof c = c.hc_proof
+let constr c = c.hc_constr
 
 let body_seq c = IArray.to_seq (body c)
 let body_l c = IArray.to_list (body c)
 
 let body_len c = IArray.length (body c)
 
-let body1 c = IArray.get (body c) 0
+let body0 c =
+  if IArray.length (body c) = 0
+  then None
+  else Some (IArray.get (body c) 0)
+
+let body0_exn c = match body0 c with
+  | Some c -> c
+  | None -> invalid_arg "Horn_clause.body0_exn: empty body"
 
 let body_get c n =
   if n < 0 || n >= IArray.length (body c) then invalid_arg "Horn.body_get";
   IArray.get (body c) n
 
+let body_tail c =
+  let n = IArray.length (body c) in
+  if n = 0 then invalid_arg "Horn_clause.body_tail: empty body";
+  IArray.init (n-1) (fun i -> IArray.get (body c) (i-1))
+
 let pp = Hornet_types_util.pp_hclause
 let to_string = Fmt.to_string pp
 
-let concl_pos c = PW.return (head c) |> PW.head
-let body_pos n c = PW.return (body_get c n) |> PW.body |> PW.arg n
-let body1_pos = body_pos 0
+let head_pos c = PW.make (head c) Pos.(head stop)
+let body_pos n c = PW.make (body_get c n) Pos.(arg n @@ body @@ stop)
+let body0_pos = body_pos 0
+
+(** {2 Helpers} *)
+
+let is_trivial c =
+  Lit.is_trivial (head c) ||
+  IArray.exists Lit.is_absurd (body c) ||
+  List.exists
+    (function
+      | C_dismatch d -> Dismatching_constr.is_absurd d)
+    (constr c)
+
+let is_ground c =
+  Lit.is_ground (head c) &&
+  IArray.for_all Lit.is_ground (body c)
+
+(** {2 Containers} *)
+
+module As_key = struct
+  type t = horn_clause
+  let equal = equal
+  let hash = hash
+end
+module Tbl = CCHashtbl.Make(As_key)
 
 (** {2 Pairing with Position} *)
 

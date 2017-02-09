@@ -10,6 +10,7 @@ open Libzipperposition
 type term = FOTerm.t
 type ty = Type.t
 type statement = (Clause.t, term, ty) Statement.t
+type proof = Hornet_types.proof
 
 (** {2 Context for Theories} *)
 
@@ -41,7 +42,7 @@ val context : t -> context
 
 type res =
   | Sat
-  | Unsat
+  | Unsat of proof
   | Unknown
 
 val pp_res : res CCFormat.printer

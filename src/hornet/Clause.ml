@@ -27,6 +27,15 @@ type constraint_ = Hornet_types.c_constraint_ =
 
 let lits c = c.c_lits
 let proof c = c.c_proof
+let constr c = c.c_constr
+let bool_lit c = c.c_bool_lit
+
+let dismatch_constr c =
+  constr c
+  |> CCList.filter_map
+    (function
+      | C_dismatch d -> Some d)
+
 
 let equal a b = IArray.equal Lit.equal a.c_lits b.c_lits
 let hash a = IArray.hash Lit.hash a.c_lits
@@ -57,7 +66,20 @@ let kind_of_lits (c_lits:Lit.t IArray.t) proof: c_kind =
     |> Sequence.filter (fun (_,lit) -> Lit.sign lit)
     |> Sequence.to_rev_list
   in
+  let mk_body arr =
+    Array.sort compare_lits_for_horn_ arr; (* sort body in some order *)
+    IArray.of_array_unsafe arr
+  in
   begin match pos with
+    | [] ->
+      (* negative clause: actually a horn clause with head [false] *)
+      let head = Lit.false_ in
+      let body =
+        Array.init (IArray.length c_lits) (fun i->Lit.neg (IArray.get c_lits i))
+        |> mk_body
+      in
+      let hc = Horn_clause.make head body proof in
+      C_horn hc
     | [i,_] ->
       let head = IArray.get c_lits i in
       let body =
@@ -67,9 +89,8 @@ let kind_of_lits (c_lits:Lit.t IArray.t) proof: c_kind =
                if j<i then IArray.get c_lits j else IArray.get c_lits (j+1)
              in
              Lit.neg lit)
+        |> mk_body
       in
-      Array.sort compare_lits_for_horn_ body; (* sort body in some order *)
-      let body = IArray.of_array_unsafe body in
       let hc = Horn_clause.make head body proof in
       C_horn hc
     | _ -> C_general

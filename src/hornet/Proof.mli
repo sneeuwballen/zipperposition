@@ -7,16 +7,23 @@
     that is, a derivation from axioms through instanciations/resolution/… *)
 
 open Libzipperposition
+open Hornet_types
 
-type t = Hornet_types.proof
-type clause = Hornet_types.clause
-type bool_atom = Hornet_types.bool_atom
+type t = proof
 
 val from_stmt : Statement.clause_t -> t
 val instance : clause -> Subst.t -> t
 val avatar_split : clause -> t
 val split : clause -> t
 
-(* TODO: hc proofs *)
+val bool_tauto : t
+val bool_res : bool_clause -> t -> bool_clause -> t -> t
+
+val hc_sup : Hornet_types.hc_superposition_step -> t
+val hc_simplify : horn_clause -> t
 
 include Interfaces.PRINT with type t := t
+
+(** {2 Print Proof DAG} *)
+
+val pp_dag : t CCFormat.printer

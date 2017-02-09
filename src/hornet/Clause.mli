@@ -32,6 +32,10 @@ val make_l : Lit.t list builder
 
 val proof : t -> proof
 val lits : t -> Lit.t IArray.t
+val bool_lit : t -> bool_lit lazy_t option
+val constr : t -> constraint_ list
+
+val dismatch_constr : t -> Dismatching_constr.t list
 
 val is_empty : t -> bool
 

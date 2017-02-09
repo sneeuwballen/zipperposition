@@ -16,32 +16,27 @@ let pp_lit out (t:lit): unit = match t with
   | Eq (t,u,true) -> Fmt.fprintf out "@[%a@ = %a@]" T.pp t T.pp u
   | Eq (t,u,false) -> Fmt.fprintf out "@[%a@ @<1>≠ %a@]" T.pp t T.pp u
 
-let pp_clause out (a:clause) =
-  Fmt.fprintf out "[@[%a@]]" (Fmt.seq pp_lit) (IArray.to_seq a.c_lits)
+let pp_clause_lits out a =
+  Fmt.fprintf out "@[%a@]" (Fmt.seq pp_lit) (IArray.to_seq a.c_lits)
+let pp_clause out (a:clause) = Fmt.within "[" "]" pp_clause_lits out a
 
 let pp_atom out = function
   | A_fresh i -> Fmt.fprintf out "fresh_%d" i
-  | A_box_clause (c,i) -> Fmt.fprintf out "%a/%d" pp_clause c i
+  | A_box_clause (c,i) -> Fmt.fprintf out "%a/%d" pp_clause_lits c i
   | A_select (c,i,id) ->
     Fmt.fprintf out "@[select@ :idx %d@ :id %d :clause %a@]" i id pp_clause c
   | A_ground lit -> pp_lit out lit
 
-let pp_bool_lit out l =
-  if l.bl_sign
-  then Fmt.within "(" ")" pp_atom out l.bl_atom
-  else Fmt.fprintf out "(¬%a)" pp_atom l.bl_atom
+let pp_bool_lit =
+  let pp_inner out l =
+    if l.bl_sign
+    then pp_atom out l.bl_atom
+    else Fmt.fprintf out "¬%a" pp_atom l.bl_atom
+  in
+  Fmt.within "⟦" "⟧" pp_inner
 
-let pp_proof out (p:proof) : unit = match p with
-  | P_from_stmt st ->
-    Fmt.fprintf out "(@[from_stmt@ %a@])" Statement.pp_clause st
-  | P_instance (c, subst) ->
-    Fmt.fprintf out "(@[<hv2>instance@ :clause %a@ :subst %a@])"
-      pp_clause c Subst.pp subst
-  | P_avatar_split c ->
-    Fmt.fprintf out "(@[<hv2>avatar_split@ :from %a@])" pp_clause c
-  | P_split c ->
-    Fmt.fprintf out "(@[<hv2>split@ %a@])" pp_clause c
-  | P_superposition _ -> assert false (* TODO *)
+let pp_bool_clause out l =
+  Fmt.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:" ⊔ " pp_bool_lit) l
 
 let pp_constraint out (c:c_constraint_): unit = match c with
   | C_dismatch d -> Dismatching_constr.pp out d
@@ -55,6 +50,29 @@ let pp_hclause out (c:horn_clause): unit =
     pp_lit c.hc_head
     (Fmt.seq pp_lit) (IArray.to_seq c.hc_body)
     pp_constr c.hc_constr
+
+let pp_proof out (p:proof) : unit = match p with
+  | P_from_stmt st ->
+    Fmt.fprintf out "(@[from_stmt@ %a@])" Statement.pp_clause st
+  | P_instance (c, subst) ->
+    Fmt.fprintf out "(@[<hv2>instance@ :clause %a@ :subst %a@])"
+      pp_clause c Subst.pp subst
+  | P_avatar_split c ->
+    Fmt.fprintf out "(@[<hv2>avatar_split@ :from %a@])" pp_clause c
+  | P_split c ->
+    Fmt.fprintf out "(@[<hv2>split@ %a@])" pp_clause c
+  | P_bool_tauto -> Fmt.string out "bool_tauto"
+  | P_bool_res r ->
+    Fmt.fprintf out "(@[<hv>bool_res@ :c1 %a@ :c2 %a@])"
+      pp_bool_clause r.bool_res_c1
+      pp_bool_clause r.bool_res_c2
+  | P_hc_superposition sup ->
+    Fmt.fprintf out "(@[<hv2>hc_sup@ :active %a@ :passive %a@ :subst %a@])"
+      pp_hclause sup.hc_sup_active
+      pp_hclause sup.hc_sup_passive
+      Subst.pp sup.hc_sup_subst
+  | P_hc_simplify c ->
+    Fmt.fprintf out "(@[simplify@ %a@])" pp_hclause c
 
 let equal_lit (a:lit) (b:lit): bool = match a, b with
   | Bool b1, Bool b2 -> b1=b2
@@ -106,9 +124,13 @@ let pp_event out (e:event): unit = match e with
   | E_select_lit (c,lit,cstr) ->
     Fmt.fprintf out "(@[select_lit@ %a@ :clause %a@ :constr (@[%a@])@])"
       pp_lit lit pp_clause c (Util.pp_list Dismatching_constr.pp) cstr
-  | E_unselect_lit (c,lit,cstr) ->
-    Fmt.fprintf out "(@[select_lit@ %a@ :clause %a@ :constr (@[%a@])@])"
-      pp_lit lit pp_clause c (Util.pp_list Dismatching_constr.pp) cstr
+  | E_unselect_lit (c,lit) ->
+    Fmt.fprintf out "(@[select_lit@ %a@ :clause %a@])"
+      pp_lit lit pp_clause c
+  | E_add_ground_lit lit ->
+    Fmt.fprintf out "(@[add_ground_lit@ %a@])" pp_lit lit
+  | E_remove_ground_lit lit ->
+    Fmt.fprintf out "(@[remove_ground_lit@ %a@])" pp_lit lit
   | E_found_unsat p ->
     Fmt.fprintf out "(@[found_unsat@ :proof %a@])" pp_proof p
   | E_stage s -> Fmt.fprintf out "(@[stage %a@])" pp_stage s

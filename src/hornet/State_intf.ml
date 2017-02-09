@@ -22,8 +22,8 @@ module type CONTEXT = sig
   (** Push the given callback on a stack. It will be
       called when the SAT solver backtracks. *)
 
-  val add_clause : bool_clause -> unit
-  val add_clause_l : bool_clause list -> unit
+  val add_clause : proof -> bool_clause -> unit
+  val add_clause_l : proof -> bool_clause list -> unit
 
   module Form : sig
     type t
@@ -34,7 +34,7 @@ module type CONTEXT = sig
     val not_ : t -> t
   end
 
-  val add_form : Form.t -> unit
+  val add_form : proof -> Form.t -> unit
   (** Add boolean form to the SAT solver *)
 
   val send_event : event -> unit

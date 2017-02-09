@@ -105,7 +105,7 @@ module Make(Ctx : State.CONTEXT) = struct
           let bool_clause =
             Bool_lit.neg (Bool_lit.box_clause Ctx.bool_state c) :: bool_lits
           in
-          Ctx.add_clause bool_clause;
+          Ctx.add_clause Proof.bool_tauto bool_clause;
           Util.debugf ~section 4 "@[constraint clause is @[%a@]@]"
             (fun k->k Bool_lit.pp_clause bool_clause);
           (* return the clauses *)
@@ -115,8 +115,7 @@ module Make(Ctx : State.CONTEXT) = struct
     let split c : C.t list option = match C.proof c with
       | _ when IArray.length (C.lits c) <= 1 -> None
       | P_avatar_split _ | P_split _ -> None (* by construction, impossible *)
-      | P_instance _ | P_from_stmt _ | P_superposition _ ->
-        try_split_ (C.lits c) c
+      | _ -> try_split_ (C.lits c) c
   end
 
   (** {2 Inst-Gen-Eq} *)
@@ -174,30 +173,20 @@ module Make(Ctx : State.CONTEXT) = struct
   let on_assumption (lit:Bool_lit.t): unit =
     begin match Bool_lit.view lit, Bool_lit.sign lit with
       | Bool_lit.Box_clause c, true ->
-        assert false (* TODO: trigger event? *)
-          (*
-        let res = Saturate.add_clause c in
-        begin match res with
-          | Saturate.Sat -> () (* ok *)
-          | Saturate.Unsat [] -> assert false
-          | Saturate.Unsat (c1::cs) ->
-            (* TODO: proof management *)
-            Ctx.add_clause_l
-              (List.map Conflict_clause.to_bool_clause cs);
-            Ctx.raise_conflict
-              (Conflict_clause.to_bool_clause c1)
-              (Conflict_clause.proof c1)
-        end
-             *)
-      | Bool_lit.Ground_lit lit, sign ->
-        assert false
-      (* TODO : how to relate proofs?
-        if sign
-        then Saturate.add_clause (Clause.make_l [lit])
-        else Saturate.add_clause (Clause.make_l [Lit.neg lit])
-      *)
-      | Bool_lit.Box_clause _,false -> () (* TODO: if unit negative, maybe? *)
-      | Bool_lit.Select_lit (_,_), true -> () (* TODO: should add to saturate, too *)
+        Ctx.on_backtrack
+          (fun () -> Ctx.send_event (E_remove_component c));
+        Ctx.send_event (E_add_component c)
+      | Bool_lit.Box_clause _, false -> () (* TODO: if unit negative, maybe? *)
+      | Bool_lit.Ground_lit lit, true ->
+        Ctx.on_backtrack
+          (fun () -> Ctx.send_event (E_remove_ground_lit lit));
+        Ctx.send_event (E_add_ground_lit lit)
+      | Bool_lit.Ground_lit _, false -> ()
+      | Bool_lit.Select_lit (c,i), true ->
+        let lit = IArray.get (C.lits c) i in
+        Ctx.on_backtrack
+          (fun () -> Ctx.send_event (E_unselect_lit (c, lit)));
+        Ctx.send_event (E_select_lit (c, lit, C.dismatch_constr c))
       | Bool_lit.Select_lit (_,_), false
       | Bool_lit.Fresh _, _
         -> ()
@@ -207,15 +196,17 @@ module Make(Ctx : State.CONTEXT) = struct
   let set_depth_limit _ =
     ()
 
-  (* TODO *)
   let on_event (e:event) =
     begin match e with
       | E_add_component _ | E_remove_component _
-      | E_select_lit (_,_,_) | E_unselect_lit (_,_,_) -> () (* come from here *)
-      | E_stage Stage_start -> split_initial_clauses ()
-      | E_found_unsat _
-      | E_stage _
-        -> ()
+      | E_add_ground_lit _ | E_remove_ground_lit _
+      | E_select_lit _ | E_unselect_lit _ -> () (* come from here *)
+      | E_found_unsat _ -> ()
+      | E_stage s ->
+        begin match s with
+          | Stage_start -> split_initial_clauses ()
+          | _ -> ()
+        end
     end
 end
 

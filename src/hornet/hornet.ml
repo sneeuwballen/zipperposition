@@ -105,7 +105,7 @@ let setup_gc () =
 let time : float ref = ref 0.
 let file : string ref = ref ""
 let def_as_rewrite : bool ref = ref false
-let max_depth : int ref = ref 100
+let max_depth : int ref = ref 4
 
 let options =
   Arg.align
@@ -153,6 +153,11 @@ let main () =
   in
   let res = State.run st in
   Format.printf "%a@." State.pp_res res;
+  begin match res with
+    | State.Sat | State.Unknown -> ()
+    | State.Unsat p ->
+      Format.printf "proof: @[<hv>%a@]@." Proof.pp_dag p
+  end;
   E.return () (* done *)
 
 let () =

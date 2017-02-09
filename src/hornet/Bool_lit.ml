@@ -35,10 +35,8 @@ let norm (t:t): t * FI.negated =
 let equal = Hornet_types_util.equal_bool_lit
 let hash = Hornet_types_util.hash_bool_lit
 let pp = Hornet_types_util.pp_bool_lit
+let to_string = Fmt.to_string pp
 let print = pp
-
-let pp_clause out l =
-  Fmt.fprintf out "@[<hv>%a@]" (Util.pp_list ~sep:" ⊔ " print) l
 
 type view =
   | Fresh of int
@@ -118,3 +116,18 @@ let box_clause state c =
     in
     make_ true a
   )
+
+(** {2 Boolean Clauses} *)
+
+type bool_clause = t list
+
+let pp_clause = Hornet_types_util.pp_bool_clause
+
+(** {2 Containers} *)
+
+module As_key = struct
+  type t = bool_lit
+  let equal = equal
+  let hash = hash
+end
+module Tbl = CCHashtbl.Make(As_key)

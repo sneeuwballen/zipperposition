@@ -19,6 +19,8 @@ type constraint_ = Hornet_types.c_constraint_
 type t = Hornet_types.horn_clause
 type horn_clause = t
 
+(** {2 Basics} *)
+
 val make :
   ?constr:constraint_ list ->
   Lit.t ->
@@ -31,6 +33,8 @@ val head : t -> Lit.t
 
 val body : t -> Lit.t IArray.t
 
+val constr : t -> constraint_ list
+
 val proof : t -> proof
 
 val body_seq : t -> Lit.t Sequence.t
@@ -42,22 +46,40 @@ val body_len : t -> int
 (** Number of literals in the body.
     Invariant: always > 0 *)
 
-val body1 : t -> Lit.t
+val body0 : t -> Lit.t option
 (** Get the first body literal *)
+
+val body0_exn : t -> Lit.t
+(** Get the first body literal
+    @raise Invalid_argument if the body is empty *)
 
 val body_get : t -> int -> Lit.t
 (** Get the [n]-th body literal.
-    @raise Invariant if [n] is not within [0... body_len c - 1] *)
+    @raise Invalid_argument if [n] is not within [0... body_len c - 1] *)
 
-val concl_pos : t -> Lit.t Position.With.t
+val body_tail : t -> Lit.t IArray.t
+(** All the body except literal 0.
+    @raise Invalid_argument if the body is empty *)
 
-val body1_pos : t -> Lit.t Position.With.t
+val head_pos : t -> Lit.t Position.With.t
+
+val body0_pos : t -> Lit.t Position.With.t
 
 val body_pos : int -> t -> Lit.t Position.With.t
+
+(** {2 Helpers} *)
+
+val is_ground : t -> bool
+
+val is_trivial : t -> bool
+
+(** {2 Containers} *)
 
 include Interfaces.PRINT with type t := t
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
+
+module Tbl : CCHashtbl.S with type key = t
 
 (** {2 Pairing with Position} *)
 

@@ -42,6 +42,20 @@ end
 
 module type ARGS = State_intf.ARGS
 
+(** Mapping between proofs and tags *)
+module Proof_tbl : sig
+  val tag_of_proof : proof -> int
+  val proof_of_tag : int -> proof
+end = struct
+  let tbl : (int,proof) Hashtbl.t = Hashtbl.create 128
+  let count = ref 0
+  let tag_of_proof (p:proof): int =
+    let n = CCRef.incr_then_get count in
+    Hashtbl.add tbl n p;
+    n
+  let proof_of_tag i: proof = Hashtbl.find tbl i
+end
+
 module Make(A : ARGS) : S = struct
   exception Theory_conflict of Bool_lit.t list * Proof.t
   (** Raised by a handler when a conflict is detected *)
@@ -69,7 +83,7 @@ module Make(A : ARGS) : S = struct
 
     let assume slice : _ TI.res =
       try
-        for i = slice.TI.start to slice.TI.start + slice.TI.length do
+        for i = slice.TI.start to slice.TI.start + slice.TI.length - 1 do
           let lit = slice.TI.get i in
           List.iter (fun f -> f lit) !on_assumption_
         done;
@@ -97,8 +111,12 @@ module Make(A : ARGS) : S = struct
     let bool_state = Bool_lit.create_state ()
     let on_backtrack f = CCVector.push SAT_theory.backtrack_vec f
     let raise_conflict c proof = raise (Theory_conflict (c,proof))
-    let add_clause_l l = M.assume l
-    let add_clause c = add_clause_l [c]
+    let add_clause_l proof l =
+      let tag = Proof_tbl.tag_of_proof proof in
+      Util.debugf ~section 5 "@[<2>add_bool_clauses@ (@[<hv>%a@])@]"
+        (fun k->k (Util.pp_list Bool_lit.pp_clause) l);
+      M.assume ~tag l
+    let add_clause p c = add_clause_l p [c]
     module Form = struct
       include Msat.Tseitin.Make(struct
           include Bool_lit
@@ -110,7 +128,7 @@ module Make(A : ARGS) : S = struct
       let not_ = make_not
       let atom = make_atom
     end
-    let add_form f = add_clause_l (Form.make_cnf f)
+    let add_form p f = add_clause_l p (Form.make_cnf f)
     let send_event e = !send_event_ e
   end
 
@@ -176,13 +194,18 @@ let context (t:t) =
 
 type res =
   | Sat
-  | Unsat
+  | Unsat of proof
   | Unknown
 
 let pp_res out = function
   | Sat -> Fmt.string out "SAT"
-  | Unsat -> Fmt.string out "UNSAT"
+  | Unsat _ -> Fmt.string out "UNSAT"
   | Unknown -> Fmt.string out "UNKNOWN"
+
+let rebuild_proof us : proof =
+  ignore Proof_tbl.proof_of_tag; (* TODO: use this *)
+  (* TODO: convert the SAT proof into a normal proof *)
+  assert false
 
 let run (t:t): res =
   let module St = (val t) in
@@ -204,9 +227,10 @@ let run (t:t): res =
         if d = St.Ctx.max_depth
         then Unknown (* TODO: completeness proof(!) *)
         else iter (d+1) (* increase depth *)
-      | St.M.Unsat _ ->
+      | St.M.Unsat us ->
         Util.debugf ~section 1 "@[Found unsat@]" (fun k->k);
-        Unsat
+        let p = rebuild_proof us in
+        Unsat p
     end
   in
   (* compute result *)

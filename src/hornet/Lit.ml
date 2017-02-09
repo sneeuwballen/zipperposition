@@ -7,6 +7,7 @@ open Libzipperposition
 
 module Fmt = CCFormat
 module T = FOTerm
+module TI = InnerTerm
 module P = Position
 module PW = Position.With
 module S = Subst
@@ -24,15 +25,47 @@ type lit = t
 let true_ = Bool true
 let false_ = Bool false
 let bool b = Bool b
-let atom ?(sign=true) t = Atom (t, sign)
 
-let eq ?(sign=true) t u =
-  if T.equal t u then bool sign
-  else (
-    (* canonical order *)
-    let left, right = if T.compare t u < 0 then t, u else u, t in
-    Eq (left, right, sign)
-  )
+let ty_error_ a b =
+  let msg =
+    CCFormat.sprintf
+      "@[<2>Literal: incompatible types in equational lit@ \
+       for `@[%a : %a@]`@ and `@[%a : %a@]`@]"
+      T.pp a Type.pp (T.ty a) T.pp b Type.pp (T.ty b)
+  in
+  raise (Type.ApplyError msg)
+
+(* primary constructor for equations and predicates *)
+let rec mk_lit t u sign =
+  if not (Type.equal (T.ty t) (T.ty u)) then ty_error_ t u;
+  begin match TI.view (t:T.t:>TI.t), TI.view (u:T.t:>TI.t) with
+    | TI.AppBuiltin (Builtin.True, []), TI.AppBuiltin (Builtin.False, []) -> bool sign
+    | TI.AppBuiltin (Builtin.False, []), TI.AppBuiltin (Builtin.True, []) -> bool (not sign)
+    | TI.AppBuiltin (Builtin.True, []), _ -> Atom (u, sign)
+    | _, TI.AppBuiltin (Builtin.True, []) -> Atom (t, sign)
+    | TI.AppBuiltin (Builtin.False, []), _ -> Atom (u, not sign)
+    | _, TI.AppBuiltin (Builtin.False, []) -> Atom (t, not sign)
+    | TI.AppBuiltin (Builtin.Not, [t']), _ ->
+      mk_lit (T.of_term_unsafe t') u (not sign)
+    | _, TI.AppBuiltin (Builtin.Not, [u']) ->
+      mk_lit t (T.of_term_unsafe u') (not sign)
+    | _ ->
+      (* canonical order *)
+      let left, right = if T.compare t u < 0 then t, u else u, t in
+      Eq (left, right, sign)
+  end
+
+let eq ?(sign=true) t u = mk_lit t u sign
+
+let rec mk_atom t sign = match T.view t with
+  | T.AppBuiltin (Builtin.True, []) -> bool sign
+  | T.AppBuiltin (Builtin.False, []) -> bool (not sign)
+  | T.AppBuiltin (Builtin.Not, [t']) -> mk_atom t' (not sign)
+  | _ ->
+    if not (Type.equal (T.ty t) Type.prop) then ty_error_ t T.true_;
+    Atom (t, sign)
+
+let atom ?(sign=true) t = mk_atom t sign
 
 let sign = function
   | Atom (_, b)
@@ -104,6 +137,13 @@ let is_trivial = function
   | Eq (a,b,true) -> T.equal a b
   | Eq (_,_,false) ->
     false (* TODO: check if distinct cstors/distinct dom elements *)
+
+let is_absurd lit = match lit with
+  | Eq (l, r, false) when T.equal l r -> true
+  | Atom (p, false) when T.equal p T.true_ -> true
+  | Atom (p, true) when T.equal p T.false_ -> true
+  | Bool false -> true
+  | _ -> false
 
 (** {2 Containers} *)
 

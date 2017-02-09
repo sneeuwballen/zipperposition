@@ -28,6 +28,9 @@ val atom : t -> atom
 val view : t -> view
 val sign : t -> bool
 
+include Interfaces.PRINT with type t := t
+include Interfaces.HASH with type t := t
+
 (** {2 Constructors} *)
 
 type state
@@ -42,4 +45,12 @@ val select_lit : state -> clause -> clause_idx -> t
 val box_clause : state -> clause -> t
 val ground : lit -> t
 
-val pp_clause : t list CCFormat.printer
+(** {2 Boolean Clauses} *)
+
+type bool_clause = t list
+
+val pp_clause : bool_clause CCFormat.printer
+
+(** {2 Containers} *)
+
+module Tbl : CCHashtbl.S with type key = t
