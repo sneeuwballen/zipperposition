@@ -216,7 +216,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
                if i=0
                then (
                  begin match sup.hc_sup_passive_pos with
-                   | P.Body (P.Arg (0, pos_lit)) -> 
+                   | P.Body (P.Arg (0, pos_lit)) ->
                      (* also replace [rewritten] with [t'] in first body lit *)
                      Lit.Pos.replace lit ~at:pos_lit ~by:t'
                    | _ -> assert false
@@ -470,6 +470,23 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     let simplify_fast = simplify Simplifications.rules_simp_fast
     let simplify_full = simplify Simplifications.rules_simp_full
 
+    (* apply the "splitting" rules *)
+    let simplify_n rules0 c =
+      let res = ref [] in
+      let rec aux rules c = match rules with
+        | [] ->
+          (* re-simplify c *)
+          let c = simplify_fast c in
+          CCList.Ref.push res c
+        | r :: rules_tail ->
+          begin match r c with
+            | None -> aux rules_tail c
+            | Some l -> List.iter (aux rules0) l (* from start for each new clause *)
+          end
+      in
+      aux rules0 c;
+      !res
+
     (* the main saturation loop *)
     let rec saturation_loop () = match Passive_set.next () with
       | None -> Sat
@@ -485,11 +502,12 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         ) else (
           (* add to [c] and perform inferences *)
           Active_set.add c;
-          (* infer new clauses *)
+          (* infer new clauses, simplify them, send to passive set *)
           let new_c : HC.t Sequence.t =
             Sequence.of_list rules_infer
             |> Sequence.flat_map_l (fun rule -> rule c)
             |> Sequence.map simplify_fast
+            |> Sequence.flat_map_l (simplify_n Simplifications.rules_simp_n)
             |> Sequence.filter (fun c -> not (HC.is_trivial c))
           in
           Passive_set.add_seq new_c;
@@ -524,18 +542,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     CCVector.to_seq Ctx.statements
     |> Sequence.flat_map Statement.Seq.forms
     |> Sequence.to_rev_list
-
-  (* TODO
-  (* index on the head terms (active paramodulation/resolution) *)
-  let idx_heads0 : CP_idx.t =
-    ??
-    (* TODO
-    (Sequence.of_list horn0
-    |> Sequence.map C.Horn.concl_pos
-                 *)
-
-  let idx_heads : CP_idx.t ref = ref idx_heads0
-     *)
 
   let set_depth_limit d =
     Depth_limit.set d;
