@@ -51,6 +51,13 @@ let pp_hclause out (c:horn_clause): unit =
     (Fmt.seq pp_lit) (IArray.to_seq c.hc_body)
     pp_constr c.hc_constr
 
+let pp_hc_sup out sup : unit =
+  Fmt.fprintf out
+    "(@[<hv2>hc_sup@ :active %a@ :passive %a@ :subst %a@])"
+    (Scoped.pp pp_hclause) sup.hc_sup_active
+    (Scoped.pp pp_hclause) sup.hc_sup_passive
+    Subst.pp sup.hc_sup_subst
+
 let pp_proof out (p:proof) : unit = match p with
   | P_from_stmt st ->
     Fmt.fprintf out "(@[from_stmt@ %a@])" Statement.pp_clause st
@@ -66,11 +73,7 @@ let pp_proof out (p:proof) : unit = match p with
     Fmt.fprintf out "(@[<hv>bool_res@ :c1 %a@ :c2 %a@])"
       pp_bool_clause r.bool_res_c1
       pp_bool_clause r.bool_res_c2
-  | P_hc_superposition sup ->
-    Fmt.fprintf out "(@[<hv2>hc_sup@ :active %a@ :passive %a@ :subst %a@])"
-      pp_hclause sup.hc_sup_active
-      pp_hclause sup.hc_sup_passive
-      Subst.pp sup.hc_sup_subst
+  | P_hc_superposition sup -> pp_hc_sup out sup
   | P_hc_simplify c ->
     Fmt.fprintf out "(@[simplify@ %a@])" pp_hclause c
 

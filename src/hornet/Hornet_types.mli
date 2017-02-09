@@ -51,14 +51,18 @@ and horn_clause = {
   hc_body: lit IArray.t;
   hc_constr: c_constraint_ list;
   hc_proof: proof;
+  hc_unordered_depth: int; (* how many unordered inferences needed? *)
 }
 
 (** Description of a single superposition step *)
 and hc_superposition_step = {
-  hc_sup_active: horn_clause; (* positive unit *)
-  hc_sup_passive: horn_clause; (* non-unit *)
+  hc_sup_active: horn_clause Scoped.t; (* positive unit *)
+  hc_sup_passive: horn_clause Scoped.t; (* non-unit *)
   hc_sup_active_pos: Position.t;
   hc_sup_passive_pos: Position.t;
+  hc_sup_s: term; (* LHS of active eqn *)
+  hc_sup_t: term; (* RHS of active eqn *)
+  hc_sup_rewritten: term; (* unifies with [s] *)
   hc_sup_subst: Subst.t;
 }
 

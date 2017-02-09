@@ -23,6 +23,7 @@ type horn_clause = t
 
 val make :
   ?constr:constraint_ list ->
+  ?unordered_depth:int ->
   Lit.t ->
   Lit.t IArray.t ->
   proof ->
@@ -34,8 +35,13 @@ val head : t -> Lit.t
 val body : t -> Lit.t IArray.t
 
 val constr : t -> constraint_ list
+(** The constraints attached to this clause *)
 
 val proof : t -> proof
+(** Proof of the clause *)
+
+val unordered_depth : t -> int
+(** The number of unordered inference steps required to prove this clause *)
 
 val body_seq : t -> Lit.t Sequence.t
 (** Sequence of body elements *)
@@ -73,6 +79,8 @@ val is_ground : t -> bool
 
 val is_trivial : t -> bool
 
+val is_absurd : t -> bool
+
 (** {2 Containers} *)
 
 include Interfaces.PRINT with type t := t
@@ -88,3 +96,11 @@ module With_pos : sig
   include Interfaces.ORD with type t := t
   include Interfaces.PRINT with type t := t
 end
+
+(** {2 Substitutions} *)
+
+val apply_subst_constr :
+  renaming:Subst.Renaming.t -> Subst.t -> constraint_ Scoped.t -> constraint_
+
+val apply_subst_constr_l :
+  renaming:Subst.Renaming.t -> Subst.t -> constraint_ list Scoped.t -> constraint_ list

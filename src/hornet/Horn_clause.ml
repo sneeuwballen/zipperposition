@@ -21,11 +21,12 @@ type horn_clause = t
 
 let make =
   let n_ = ref 0 in
-  fun ?(constr=[]) head body proof ->
+  fun ?(constr=[]) ?(unordered_depth=0) head body proof ->
     let hc_id = !n_ in
     incr n_;
     { hc_id;
       hc_head=head;
+      hc_unordered_depth=unordered_depth;
       hc_body=body;
       hc_proof=proof;
       hc_constr=constr;
@@ -39,6 +40,7 @@ let head c = c.hc_head
 let body c = c.hc_body
 let proof c = c.hc_proof
 let constr c = c.hc_constr
+let unordered_depth c = c.hc_unordered_depth
 
 let body_seq c = IArray.to_seq (body c)
 let body_l c = IArray.to_list (body c)
@@ -80,6 +82,19 @@ let is_trivial c =
       | C_dismatch d -> Dismatching_constr.is_absurd d)
     (constr c)
 
+(* NOTE: some constraints will have to be solved all at once
+   to obtain an actual substitution *)
+let constr_are_sat (l:constraint_ list): bool =
+  List.for_all
+    (function
+      | C_dismatch d -> not (Dismatching_constr.is_absurd d))
+    l
+
+let is_absurd c =
+  Lit.is_absurd (head c) &&
+  body_len c = 0 &&
+  constr_are_sat (constr c)
+
 let is_ground c =
   Lit.is_ground (head c) &&
   IArray.for_all Lit.is_ground (body c)
@@ -101,3 +116,14 @@ module With_pos = struct
   let pp = PW.pp pp
   let to_string = Fmt.to_string pp
 end
+
+(** {2 Substitutions} *)
+
+let apply_subst_constr ~renaming subst (c,sc) = match c with
+  | C_dismatch d ->
+    C_dismatch (Dismatching_constr.apply_subst ~renaming subst (d,sc))
+
+let apply_subst_constr_l ~renaming subst (l,sc) =
+  List.map
+    (fun c -> apply_subst_constr ~renaming subst (c,sc))
+    l

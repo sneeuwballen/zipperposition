@@ -71,11 +71,29 @@ val at_pos_exn : Position.t -> t -> term
     @raise Not_found if the position is not valid or if it
     empty (would return the lit itself) *)
 
-val active_terms : Ordering.t -> t -> term Position.With.t Sequence.t
+val active_terms : ?pos:Position.t -> Ordering.t -> t -> term Position.With.t Sequence.t
 (** Terms in active position for paramodulation/resolution *)
 
-val passive_terms : Ordering.t -> t -> term Position.With.t Sequence.t
+val passive_terms : ?pos:Position.t -> Ordering.t -> t -> term Position.With.t Sequence.t
 (** Terms in passive position for paramodulation/resolution *)
+
+module Pos : sig
+  val at : t -> Position.t -> term
+  (** retrieve subterm at pos
+      @raise Invalid_argument if the position is invalid *)
+
+  val replace : t -> at:Position.t -> by:term -> t
+  (** [replace t ~at:pos ~by] replaces the subterm at position [pos]
+      in [t] by the term [by]. The two terms should have the same type.
+      @raise Invalid_argument if the position is not valid *)
+end
+
+val get_eqn : t -> Position.t -> (term * term * bool) option
+(** View of a Atom or Eq literal, oriented by the position. If the
+    position selects its left term, return l, r, otherwise r, l.
+    for propositions it will always be p, true.
+    @return None for other literals
+    @raise Invalid_argument if the position doesn't match the literal. *)
 
 (** {2 Unification and Matching} *)
 

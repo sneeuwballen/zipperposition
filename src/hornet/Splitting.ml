@@ -106,7 +106,7 @@ module Make(Ctx : State.CONTEXT) = struct
             Bool_lit.neg (Bool_lit.box_clause Ctx.bool_state c) :: bool_lits
           in
           Ctx.add_clause Proof.bool_tauto bool_clause;
-          Util.debugf ~section 4 "@[constraint clause is @[%a@]@]"
+          Util.debugf ~section 4 "@[<2>constraint clause is@ @[%a@]@]"
             (fun k->k Bool_lit.pp_clause bool_clause);
           (* return the clauses *)
           Some clauses

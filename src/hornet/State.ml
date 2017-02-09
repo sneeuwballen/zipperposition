@@ -130,6 +130,11 @@ module Make(A : ARGS) : S = struct
     end
     let add_form p f = add_clause_l p (Form.make_cnf f)
     let send_event e = !send_event_ e
+
+    let renaming_ = Subst.Renaming.create()
+    let renaming_cleared () =
+      Subst.Renaming.clear renaming_;
+      renaming_
   end
 
   let add_on_assumption_ f =

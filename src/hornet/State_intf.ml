@@ -40,6 +40,11 @@ module type CONTEXT = sig
   val send_event : event -> unit
   (** Send an event to notify other parts of the prover *)
 
+  (** {6 FO} *)
+
+  val renaming_cleared: unit -> Subst.Renaming.t
+  (** A global renaming, reset every time this is called *)
+
   (** {6 Config} *)
 
   val conf : Flex_state.t

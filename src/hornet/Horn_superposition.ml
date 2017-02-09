@@ -8,6 +8,7 @@ open Libzipperposition
 module T = FOTerm
 module C = Clause
 module HC = Horn_clause
+module P = Position
 module Fmt = CCFormat
 
 open Hornet_types
@@ -31,6 +32,15 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
   (* an inference rule *)
   type 'a rule_infer = 'a -> 'a list
 
+  module Depth_limit : sig
+    val set : int -> unit (** Set the limit on derivations *)
+    val get : unit -> int (** Set the limit on derivations *)
+  end = struct
+    let limit_ : int ref = ref 1
+    let set i = assert (i>0); limit_ := i
+    let get () = !limit_
+  end
+
   (** {2 Clause Sets} *)
 
   module type CLAUSE_SET = sig
@@ -38,6 +48,44 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     val mem : HC.t -> bool
     val remove : HC.t -> unit
   end
+
+
+  type idx_elt = term * HC.With_pos.t
+
+  type relevant_pos =
+    | Head of idx_elt list * idx_elt list (* active, passive *)
+    | Body0 of idx_elt list (* passive res, passive sup *)
+
+  let positions_body c : _ Sequence.t =
+    assert (HC.body_len c > 0);
+    Lit.passive_terms
+      ~pos:P.(body @@ arg 0 @@ stop)
+      Ctx.ord (HC.body0_exn c)
+
+  let relevant_pos (c:HC.t): relevant_pos =
+    if HC.body_len c = 0
+    then (
+      (* unit clause: both active and passive *)
+      let head = HC.head c in
+      let active =
+        Lit.passive_terms ~pos:P.(head stop) Ctx.ord head
+        |> Sequence.map (fun (t,pos) -> t, (c,pos))
+        |> Sequence.to_rev_list
+      and passive =
+        Lit.passive_terms ~pos:P.(head stop) Ctx.ord head
+        |> Sequence.map (fun (t,pos) -> t, (c,pos))
+        |> Sequence.to_rev_list
+      in
+      Head (active, passive)
+    ) else (
+      (* horn: only passive *)
+      let passive =
+        positions_body c
+        |> Sequence.map (fun (t,pos) -> t, (c,pos))
+        |> Sequence.to_rev_list
+      in
+      Body0 passive
+    )
 
   (* positive unit clauses *)
   module Active_set : sig
@@ -48,60 +96,19 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
        (active res/paramodulation) *)
     val idx_heads : unit -> CP_idx.t
 
-    (* index on subterms of the first body lit of non-unit clauses
+    (* index on subterms of the first body lit of non-unit clauses,
+       and on the head of unit clauses
        (passive res/paramodulation) *)
-    val idx_body0_sub : unit -> CP_idx.t
+    val idx_sup_into : unit -> CP_idx.t
   end = struct
     let tbl : unit HC.Tbl.t = HC.Tbl.create 512
     let size () = HC.Tbl.length tbl
 
     let idx_heads_ : CP_idx.t ref = ref (CP_idx.empty ())
-    let idx_body0_sub_ : CP_idx.t ref = ref (CP_idx.empty ())
+    let idx_sup_into_ : CP_idx.t ref = ref (CP_idx.empty ())
 
     let idx_heads () = !idx_heads_
-    let idx_body0_sub () = !idx_body0_sub_
-
-    type idx_elt = term * HC.With_pos.t
-
-    type relevant_pos =
-      | Head of idx_elt list * idx_elt list (* active, passive *)
-      | Body0 of idx_elt list (* passive res, passive sup *)
-      | No_pos
-
-    let positions_body c =
-      assert (HC.body_len c > 0);
-      assert false (* TODO: all positions in which we can rewrite *)
-
-    let position_sup t = [] (* TODO *)
-
-    let relevant_pos (c:HC.t): relevant_pos =
-      No_pos
-      (* FIXME
-      if HC.body_len c = 0
-      then match HC.head c with
-        | Lit.Atom (t,sign) ->
-          assert sign;
-          Head ([t, HC.head_pos c], position_sup t)
-        | Lit.Eq (t,u,sign) ->
-          assert sign;
-          assert false
-          (* TODO
-          begin match Ord.compare Ctx.ord t u with
-            | Comparison.Gt ->
-              Position.With.(HC.body
-
-          end
-             *)
-        | Lit.Bool _ -> No_pos
-      else begin match HC.body0 c with
-        | Lit.Bool _ -> No_pos
-        | Lit.Atom (t,sign) ->
-          assert sign;
-          Body0 (Some (t, HC.body0_pos c), positions_body c)
-        | Lit.Eq _ ->
-          Body0 (None, positions_body c)
-      end
-         *)
+    let idx_sup_into () = !idx_sup_into_
 
     let add c =
       if not (HC.Tbl.mem tbl c) then (
@@ -109,10 +116,9 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         begin match relevant_pos c with
           | Head (active, subs) ->
             idx_heads_ := CP_idx.add_list !idx_heads_ active;
-            idx_body0_sub_ := CP_idx.add_list !idx_body0_sub_ subs
+            idx_sup_into_ := CP_idx.add_list !idx_sup_into_ subs
           | Body0 subs ->
-            idx_body0_sub_ := CP_idx.add_list !idx_body0_sub_ subs
-          | No_pos -> ()
+            idx_sup_into_ := CP_idx.add_list !idx_sup_into_ subs
         end
       )
 
@@ -124,10 +130,9 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         begin match relevant_pos c with
           | Head (active, subs) ->
             idx_heads_ := CP_idx.remove_list !idx_heads_ active;
-            idx_body0_sub_ := CP_idx.remove_list !idx_body0_sub_ subs
+            idx_sup_into_ := CP_idx.remove_list !idx_sup_into_ subs
           | Body0 subs ->
-            idx_body0_sub_ := CP_idx.remove_list !idx_body0_sub_ subs
-          | No_pos -> ()
+            idx_sup_into_ := CP_idx.remove_list !idx_sup_into_ subs
         end
       )
   end
@@ -163,6 +168,154 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       | Some (new_q, (_,c)) ->
         q_ := new_q;
         Some c
+  end
+
+  (** {2 Superposition} *)
+  module Sup : sig
+    val rule_infer_active : HC.t rule_infer
+    val rule_infer_passive : HC.t rule_infer
+  end = struct
+    (* do the inference, if we might *)
+    let do_inference (sup:hc_superposition_step): HC.t option =
+      let c, sc_active = sup.hc_sup_active in
+      assert (HC.body_len c=0);
+      let c', sc_passive = sup.hc_sup_passive in
+      let subst = sup.hc_sup_subst in
+      let renaming = Ctx.renaming_cleared () in
+      let s' = Subst.FO.apply ~renaming subst (sup.hc_sup_s,sc_active) in
+      let t' = Subst.FO.apply ~renaming subst (sup.hc_sup_t,sc_active) in
+      (* check ordering on [s>t] *)
+      let ord_ok, unordered_step = match Ordering.compare Ctx.ord s' t' with
+        | Comparison.Gt -> true, 0
+        | Comparison.Lt -> false, 0 (* ill-ordered *)
+        | Comparison.Eq -> false, 0 (* trivial *)
+        | Comparison.Incomparable -> true, 1
+      in
+      let unordered_depth =
+        HC.unordered_depth c + HC.unordered_depth c' + unordered_step
+      in
+      (* check for some trivial inference: using [s=t] to rewrite [s=t] *)
+      let will_be_trivial () =
+        HC.body_len c' = 0 &&
+        Lit.equal (HC.head c) (HC.head c') &&
+        T.equal sup.hc_sup_s sup.hc_sup_rewritten &&
+        Subst.is_renaming subst
+      in
+      (* if all conditions met, do the inference *)
+      if ord_ok &&
+         unordered_depth < Depth_limit.get() &&
+         not (will_be_trivial ())
+      then (
+        (* inference is a go *)
+        let new_head = Lit.apply_subst ~renaming subst (HC.head c',sc_passive) in
+        let new_body =
+          HC.body c'
+          |> IArray.mapi
+            (fun i lit ->
+               let lit = Lit.apply_subst ~renaming subst (lit,sc_passive) in
+               if i=0
+               then (
+                 begin match sup.hc_sup_passive_pos with
+                   | P.Body (P.Arg (0, pos_lit)) -> 
+                     (* also replace [rewritten] with [t'] in first body lit *)
+                     Lit.Pos.replace lit ~at:pos_lit ~by:t'
+                   | _ -> assert false
+                 end
+               ) else lit)
+        in
+        let constr =
+          List.rev_append
+            (HC.apply_subst_constr_l ~renaming subst (HC.constr c,sc_active))
+            (HC.apply_subst_constr_l ~renaming subst (HC.constr c',sc_passive))
+        in
+        let new_c =
+          HC.make ~unordered_depth ~constr new_head new_body (Proof.hc_sup sup)
+        in
+        Util.debugf ~section 4
+          "(@[<2>superposition_step@ :yields %a@ :params %a@])"
+          (fun k->k HC.pp new_c Hornet_types_util.pp_hc_sup sup);
+        Some new_c
+      ) else None
+
+    (* perform active superposition rewriting [s] into [t] *)
+    let active_sup (c:HC.t) (pos_s:P.t) (s:T.t) (t:T.t): HC.t list =
+      let idx = Active_set.idx_sup_into () in
+      let sc_active = 0 in
+      let sc_passive = 1 in
+      CP_idx.retrieve_unifiables (idx,sc_passive) (s,sc_active)
+      |> Sequence.filter_map
+        (fun (u_p,c'_with_pos,subst) ->
+           let c', pos' = c'_with_pos in
+           let sup = {
+             hc_sup_active=(c,sc_active);
+             hc_sup_passive=(c',sc_passive);
+             hc_sup_s=s;
+             hc_sup_t=t;
+             hc_sup_subst=subst;
+             hc_sup_rewritten=u_p;
+             hc_sup_active_pos=pos_s;
+             hc_sup_passive_pos=pos';
+           } in
+           do_inference sup)
+      |> Sequence.to_rev_list
+
+    (* try to use this clause to rewrite other clauses *)
+    let rule_infer_active (c:HC.t) : _ list =
+      if HC.body_len c = 0 then (
+        begin match HC.head c with
+          | Lit.Atom (t, true) ->
+            active_sup c P.(head stop) t T.true_
+          | Lit.Eq (s, t, true) ->
+            begin match Ordering.compare Ctx.ord s t with
+              | Comparison.Gt -> active_sup c P.(head @@ left @@ stop) s t
+              | Comparison.Lt -> active_sup c P.(head @@ right @@ stop) t s
+              | Comparison.Eq -> []
+              | Comparison.Incomparable ->
+                List.rev_append
+                  (active_sup c P.(head @@ left @@ stop) s t)
+                  (active_sup c P.(head @@ right @@ stop) t s)
+            end
+          | Lit.Atom (_,false) | Lit.Eq (_,_,false) -> assert false
+          | Lit.Bool _ -> []
+        end
+      ) else []
+
+    let passive_sup (c:HC.t): _ list =
+      let idx = Active_set.idx_heads () in
+      let sc_active = 0 in
+      let sc_passive = 1 in
+      (* all position that can be rewritten *)
+      let pos_seq =match relevant_pos c with
+        | Head (_,subs) | Body0 subs -> subs
+      in
+      Sequence.of_list pos_seq
+      |> Sequence.flat_map
+        (fun (rewritten,(_,pos_rewritten)) ->
+           (* try to rewrite this sub-term *)
+           CP_idx.retrieve_unifiables (idx,sc_active) (rewritten,sc_passive)
+           |> Sequence.filter_map
+             (fun (s,c'_with_pos,subst) ->
+                let c', pos' = c'_with_pos in
+                let pos_lit' = match pos' with P.Head p'->p' | _ -> assert false in
+                let t = match Lit.get_eqn (HC.head c') pos_lit' with
+                  | Some (s_, t, true) -> assert (T.equal s s_); t
+                  | _ -> assert false
+                in
+                let sup = {
+                  hc_sup_active=(c',sc_active);
+                  hc_sup_passive=(c,sc_passive);
+                  hc_sup_s=s;
+                  hc_sup_t=t;
+                  hc_sup_subst=subst;
+                  hc_sup_rewritten=rewritten;
+                  hc_sup_active_pos=pos';
+                  hc_sup_passive_pos=pos_rewritten;
+                } in
+                do_inference sup
+             ))
+      |> Sequence.to_rev_list
+
+    let rule_infer_passive (c:HC.t): _ list = passive_sup c
   end
 
   (** {2 Simplifications} *)
@@ -224,10 +377,12 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           | Some (lazy blit) -> Sequence.return blit
         end
       | P_instance (c,_) -> bool_lits (C.proof c)
+      | P_bool_tauto -> Sequence.empty
+      | P_bool_res _ -> Sequence.empty (* NOTE: proved, not assumed *)
       | P_hc_superposition sup ->
         Sequence.append
-          (HC.proof sup.hc_sup_active |> bool_lits)
-          (HC.proof sup.hc_sup_passive |> bool_lits)
+          (HC.proof (fst sup.hc_sup_active) |> bool_lits)
+          (HC.proof (fst sup.hc_sup_passive) |> bool_lits)
       | P_hc_simplify c -> bool_lits (HC.proof c)
 
     let bool_lits_l p = bool_lits p |> Sequence.to_rev_list
@@ -250,7 +405,10 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
       The state is a set of Horn clauses, and is backtrackable. *)
 
-  let rules_infer : HC.t rule_infer list = [ ]
+  let rules_infer : HC.t rule_infer list =
+    [ Sup.rule_infer_active;
+      Sup.rule_infer_passive;
+    ]
 
   module Saturate : sig
     type res =
@@ -264,9 +422,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     val pp_stats : stats CCFormat.printer
 
     val stats : unit -> stats
-
-    val set_limit : int -> unit
-    (** Set the limit on derivations *)
 
     val add_clause : C.t -> res
     (** [add_clause c] adds the clause [c] to the set, and applies
@@ -294,10 +449,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
     (** {6 Local State} *)
 
-    let limit_ : int ref = ref 1
-
-    let set_limit i = assert (i>0); limit_ := i
-
     let stats (): stats = {
       num_clauses=Active_set.size();
     }
@@ -319,24 +470,31 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     let simplify_fast = simplify Simplifications.rules_simp_fast
     let simplify_full = simplify Simplifications.rules_simp_full
 
-    exception Conflict_exn of proof
-
     (* the main saturation loop *)
     let rec saturation_loop () = match Passive_set.next () with
       | None -> Sat
       | Some c ->
-        Util.debugf ~section 2 "@[<2>@{<Blue>## saturate@}: given clause@ %a@]"
+        Util.debugf ~section 2
+          "@[<2>@{<Blue>## saturate@}: given clause@ %a@]"
           (fun k->k HC.pp c);
         let c = simplify_full c in
-        (* infer new clauses *)
-        let new_c : HC.t Sequence.t =
-          Sequence.of_list rules_infer
-          |> Sequence.flat_map_l (fun rule -> rule c)
-          |> Sequence.map simplify_fast
-          |> Sequence.filter (fun c -> not (HC.is_trivial c))
-        in
-        Passive_set.add_seq new_c;
-        saturation_loop ()
+        if HC.is_trivial c
+        then saturation_loop ()
+        else if HC.is_absurd c then (
+          Unsat (HC.proof c)
+        ) else (
+          (* add to [c] and perform inferences *)
+          Active_set.add c;
+          (* infer new clauses *)
+          let new_c : HC.t Sequence.t =
+            Sequence.of_list rules_infer
+            |> Sequence.flat_map_l (fun rule -> rule c)
+            |> Sequence.map simplify_fast
+            |> Sequence.filter (fun c -> not (HC.is_trivial c))
+          in
+          Passive_set.add_seq new_c;
+          saturation_loop ()
+        )
 
     let add_horn c : res =
       Util.debugf ~section 2 "@[<2>saturate.add_horn@ %a@]" (fun k->k HC.pp c);
@@ -380,7 +538,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
      *)
 
   let set_depth_limit d =
-    Saturate.set_limit d;
+    Depth_limit.set d;
     ()
 
   let presaturate () =

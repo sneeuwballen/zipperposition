@@ -176,45 +176,104 @@ let at_pos_exn pos lit = match lit, pos with
   | Eq (_,u,_), P.Right pos' -> T.Pos.at u pos'
   | _, _ -> raise Not_found
 
-let active_terms ord lit =
+let active_terms ?(pos=P.stop) ord lit =
   let yield_term t pos = PW.make t pos in
-  match lit with
-  | Atom (t,true) ->
-    T.all_positions ~vars:false ~ty_args:false t
-    |> Sequence.map PW.of_pair
-  | Eq (t,u,true) ->
-    begin match Ordering.compare ord t u with
-      | Comparison.Eq -> Sequence.empty (* trivial *)
-      | Comparison.Incomparable ->
-        Sequence.doubleton
-          (yield_term t (P.left P.stop)) (yield_term u (P.right P.stop))
-      | Comparison.Gt -> Sequence.return (yield_term t (P.left P.stop))
-      | Comparison.Lt -> Sequence.return (yield_term u (P.right P.stop))
-    end
-  | Bool _
-  | Atom (_,false)
-  | Eq (_,_,false) -> Sequence.empty
+  begin match lit with
+    | Atom (t,true) ->
+      T.all_positions ~pos ~vars:false ~ty_args:false t
+      |> Sequence.map PW.of_pair
+    | Eq (t,u,true) ->
+      begin match Ordering.compare ord t u with
+        | Comparison.Eq -> Sequence.empty (* trivial *)
+        | Comparison.Incomparable ->
+          Sequence.doubleton
+            (yield_term t (P.append pos (P.left P.stop)))
+            (yield_term u (P.append pos (P.right P.stop)))
+        | Comparison.Gt ->
+          Sequence.return (yield_term t (P.append pos (P.left P.stop)))
+        | Comparison.Lt ->
+          Sequence.return (yield_term u (P.append pos (P.right P.stop)))
+      end
+    | Bool _
+    | Atom (_,false)
+    | Eq (_,_,false) -> Sequence.empty
+  end
 
-let passive_terms ord lit =
+let passive_terms ?(pos=P.stop) ord lit =
   let explore_term t pos =
     T.all_positions ~pos ~vars:false ~ty_args:false t
     |> Sequence.map PW.of_pair
   in
   match lit with
-  | Atom (t,_) ->
-    T.all_positions ~vars:false ~ty_args:false t
-    |> Sequence.map PW.of_pair
+  | Atom (t,_) -> explore_term t pos
   | Eq (t,u,_) ->
     begin match Ordering.compare ord t u with
       | Comparison.Eq -> Sequence.empty (* trivial *)
       | Comparison.Incomparable ->
         Sequence.append
-          (explore_term t (P.left P.stop))
-          (explore_term u (P.right P.stop))
-      | Comparison.Gt -> explore_term t (P.left P.stop)
-      | Comparison.Lt -> explore_term u (P.right P.stop)
+          (explore_term t (P.append pos (P.left P.stop)))
+          (explore_term u (P.append pos (P.right P.stop)))
+      | Comparison.Gt -> explore_term t (P.append pos (P.left P.stop))
+      | Comparison.Lt -> explore_term u (P.append pos (P.right P.stop))
     end
   | Bool _ -> Sequence.empty
+
+module Pos = struct
+  type split = {
+    lit_pos : P.t;
+    term_pos : P.t;
+    term : term;
+  }
+
+  let _fail_lit lit pos =
+    let msg =
+      Fmt.sprintf "@[<2>invalid position @[%a@]@ in lit @[%a@]@]"
+        P.pp pos pp lit
+    in invalid_arg msg
+
+  let split lit pos = match lit, pos with
+    | Bool true, P.Stop ->
+      {lit_pos=P.stop; term_pos=P.stop; term=T.true_; }
+    | Bool false, P.Stop ->
+      {lit_pos=P.stop; term_pos=P.stop; term=T.false_; }
+    | Eq(l,_,_), P.Left pos' ->
+      {lit_pos=P.(left stop); term_pos=pos'; term=l; }
+    | Eq(_,r,_), P.Right pos' ->
+      {lit_pos=P.(right stop); term_pos=pos'; term=r; }
+    | Atom (p,_), P.Left pos' ->
+      {lit_pos=P.(left stop); term_pos=pos'; term=p; }
+    | _ -> _fail_lit lit pos
+
+  let cut lit pos =
+    let s = split lit pos in
+    s.lit_pos, s.term_pos
+
+  let at lit pos =
+    let s = split lit pos in
+    T.Pos.at s.term s.term_pos
+
+  let replace lit ~at ~by = match lit, at with
+    | Eq(l, r, sign), P.Left pos' ->
+      eq (T.Pos.replace l pos' ~by) r ~sign
+    | Eq(l, r, sign), P.Right pos' ->
+      eq l (T.Pos.replace r pos' ~by) ~sign
+    | Atom (p, sign), P.Left pos' ->
+      atom (T.Pos.replace p pos' ~by) ~sign
+    | Bool _, _ -> lit (* flexible, lit can be the result of a simplification *)
+    | _ -> _fail_lit lit at
+end
+
+let as_eqn lit = match lit with
+  | Eq (l,r,sign) -> Some (l, r, sign)
+  | Atom (p, sign) -> Some (p, T.true_, sign)
+  | Bool _ -> None
+
+let get_eqn lit position = match lit, position with
+  | Eq (l,r,sign), P.Left _ -> Some (l, r, sign)
+  | Eq (l,r,sign), P.Right _ -> Some (r, l, sign)
+  | Atom (p, sign), P.Left _ -> Some (p, T.true_, sign)
+  | Bool _, _ -> None
+  | _ -> invalid_arg "get_eqn: wrong literal or position"
 
 (** {2 Unif} *)
 
