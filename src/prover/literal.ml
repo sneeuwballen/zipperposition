@@ -669,8 +669,10 @@ module Pos = struct
   let split lit pos =
     let module AL = ArithLit in
     match lit, pos with
-      | (True | False), P.Stop ->
+      | True, P.Stop ->
         {lit_pos=P.stop; term_pos=P.stop; term=T.true_; }
+      | False, P.Stop ->
+        {lit_pos=P.stop; term_pos=P.stop; term=T.false_; }
       | Equation (l,_,_), P.Left pos' ->
         {lit_pos=P.(left stop); term_pos=pos'; term=l; }
       | Equation (_,r,_), P.Right pos' ->
