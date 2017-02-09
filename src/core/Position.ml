@@ -115,54 +115,28 @@ end
 (** {2 Pairing of value with Pos} *)
 
 module With = struct
-  type 'a t = {
-    value: 'a;
-    mutable pos: Build.t;
-  }
+  type 'a t = 'a * position
 
-  let get x = x.value
+  let get = fst
+  let pos = snd
 
-  (* caching pos *)
-  let pos x = match x.pos with
-    | Build.P (pos, Build.E) -> pos
-    | b ->
-      let res = Build.to_pos b in
-      x.pos <- Build.of_pos res;
-      res
+  let make x p : _ t = x, p
+  let of_pair p = p
 
-  let make_ x p : _ t = {value=x; pos=p}
-  let make x p : _ t = make_ x (Build.of_pos p)
-  let of_pair (x,p) : _ t = make_ x (Build.of_pos p)
-  let return x = make_ x Build.empty
+  let map_pos f (x,pos) = x, f pos
 
-  let map2_ f t = {t with pos=f t.pos}
-  let left t = map2_ Build.left t
-  let right t = map2_ Build.right t
-  let head t = map2_ Build.head t
-  let body t = map2_ Build.body t
-  let arg n t = map2_ (Build.arg n) t
-
-  let map_pos f t =
-    let new_pos = t.pos |> Build.to_pos |> f |> Build.of_pos in
-    make_ t.value new_pos
-
-  let map f t = {t with value=f t.value}
-
-  let flat_map f t =
-    let t' = f t.value in
-    make_ t'.value (Build.append t.pos t'.pos)
+  let map f (x,pos) = f x, pos
 
   module Infix = struct
     let (>|=) x f = map f x
-    let (>>=) x f = flat_map f x
   end
   include Infix
 
-  let equal f t1 t2 = f t1.value t2.value && equal (pos t1) (pos t2)
+  let equal f t1 t2 = f (get t1) (get t2) && equal (pos t1) (pos t2)
   let compare f t1 t2 =
-    let c = f t1.value t2.value in
+    let c = f (get t1) (get t2) in
     if c=0 then compare (pos t1) (pos t2) else c
-  let hash f t = Hash.combine3 41 (f t.value) (hash t.pos)
+  let hash f t = Hash.combine3 41 (f (get t)) (hash (pos t))
   let pp f out t =
-    CCFormat.fprintf out "(@[:pos %a :in %a@])" pp (pos t) f t.value
+    CCFormat.fprintf out "(@[:pos %a :in %a@])" pp (pos t) f (get t)
 end

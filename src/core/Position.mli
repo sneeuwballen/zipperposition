@@ -10,7 +10,7 @@ type t =
   | Right of t (** Right term in curried application, and subterm of binder *)
   | Head of t (** Head of uncurried term *)
   | Arg of int * t (** argument term in uncurried term, or in multiset *)
-  | Body of t (** Body of binder *)
+  | Body of t (** Body of binder or horn clause *)
 
 type position = t
 
@@ -19,6 +19,7 @@ val type_ : t -> t
 val left : t -> t
 val right : t -> t
 val head : t -> t
+val body : t -> t
 val arg : int -> t -> t
 
 val opp : t -> t
@@ -85,33 +86,21 @@ end
     nicely and designat paths in objects *)
 
 module With : sig
-  type 'a t
-  (** A pair of ['a] and position. *)
+  type 'a t = 'a * position
+  (** A pair of ['a] and position (builder). *)
 
   val get : 'a t -> 'a
   val pos : _ t -> position
 
   val make : 'a -> position -> 'a t
-  val of_pair : ('a * position) -> 'a t
-
-  val return : 'a -> 'a t
-  (** [return x] is [x, stop] *)
-
-  val left : 'a t -> 'a t
-  val right : 'a t -> 'a t
-  val head : 'a t -> 'a t
-  val body : 'a t -> 'a t
-  val arg : int -> 'a t -> 'a t
+  val of_pair : 'a * position -> 'a t
 
   val map_pos : (position -> position) -> 'a t -> 'a t
 
   val map : ('a -> 'b) -> 'a t -> 'b t
 
-  val flat_map : ('a -> 'b t) -> 'a t -> 'b t
-
   module Infix : sig
     val (>|=) : 'a t -> ('a -> 'b) -> 'b t
-    val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
   end
   include module type of Infix
 

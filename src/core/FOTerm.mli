@@ -191,7 +191,7 @@ val contains_symbol : ID.t -> t -> bool
 
 val all_positions :
   ?vars:bool -> ?ty_args:bool -> ?pos:Position.t ->
-  t -> (t * Position.t) Sequence.t
+  t -> t Position.With.t Sequence.t
 (** Iterate on all sub-terms with their position.
     @param vars specifies whether variables are folded on (default false).
     @param ty_args specifies whether type arguments are folded on (default true).

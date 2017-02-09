@@ -4,6 +4,7 @@
 (** {1 First-order terms} *)
 
 module PB = Position.Build
+module PW = Position.With
 module T = InnerTerm
 
 let prof_app = Util.mk_profiler "term.app"
@@ -316,14 +317,15 @@ let all_positions ?(vars=false) ?(ty_args=true) ?(pos=Position.stop) t f =
   let rec aux pb t = match view t with
     | Var _ | DB _ ->
       if vars && (ty_args || not (Type.is_tType (ty t)))
-      then f (t, PB.to_pos pb)
+      then f (PW.make t (PB.to_pos pb))
     | Const _ ->
       if ty_args || not (Type.is_tType (ty t))
-      then f (t, PB.to_pos pb)
+      then f (PW.make t (PB.to_pos pb))
     | AppBuiltin (_,tl)
     | App (_, tl) ->
-      if ty_args || not (Type.is_tType (ty t))
-      then f (t, PB.to_pos pb);
+      if ty_args || not (Type.is_tType (ty t)) then (
+        f (PW.make t (PB.to_pos pb));
+      );
       List.iteri
         (fun i t' ->
            (* if [t'] is a type parameter and [not ty_args], ignore *)

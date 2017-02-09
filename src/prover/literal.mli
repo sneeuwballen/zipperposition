@@ -110,7 +110,7 @@ val fold_terms :
   which:[<`Max|`All] ->
   ord:Ordering.t -> subterms:bool ->
   t ->
-  (term * Position.t) Sequence.t
+  term Position.With.t Sequence.t
 (** Iterate on terms, maybe subterms, of the literal.
     Variables are ignored if [vars] is [false].
 

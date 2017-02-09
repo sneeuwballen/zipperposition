@@ -131,7 +131,7 @@ val fold_eqn : ?both:bool -> ?sign:bool -> ord:Ordering.t ->
 
 val fold_arith :
   eligible:(int -> Literal.t -> bool) ->
-  t -> (ArithLit.t * Position.t) Sequence.t
+  t -> ArithLit.t Position.With.t Sequence.t
 (** Fold over eligible arithmetic literals *)
 
 val fold_arith_terms : eligible:(int -> Literal.t -> bool) ->
@@ -143,7 +143,7 @@ val fold_arith_terms : eligible:(int -> Literal.t -> bool) ->
 val fold_terms : ?vars:bool -> ?ty_args:bool -> which:[<`Max|`All] ->
   ord:Ordering.t -> subterms:bool ->
   eligible:(int -> Literal.t -> bool) ->
-  t -> (term * Position.t) Sequence.t
+  t -> term Position.With.t Sequence.t
 (** See {!Literal.fold_terms}, which is the same but for the
     [eligible] argument *)
 
