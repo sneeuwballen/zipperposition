@@ -17,6 +17,17 @@ type t =
   | Trivial
   | Pairs of (term * term) list
 
+(* TODO: simplification of constraints so that LHS terms are always
+   variables?
+
+   if [has_solution_ c] and the solution is unique (matching),
+   then the solution is itself a constraint [x1…xn </| t1…tn]
+   that is equivalent to [c]
+
+   → maybe the form should be [Pairs of (var * term) list] to reflect that,
+     and we normalize upon substitution
+*)
+
 (* is the constraint trivially true?
    the criterion is: [(t, u)]  is trivial if [t] does not
    match [u], because no substitution will be able to make [t] equal
@@ -58,30 +69,38 @@ let apply_subst ~renaming subst (c, sc_l) : t = match c with
       l
     |> make
 
-let find_solution_ l =
+(* given [t1…tn, u1…un], find a substitution
+   such that [forall i. t_i = u_iσ]. *)
+let find_matching_solution_ l =
   try
     List.fold_left
-      (fun subst (t,u) -> Unif.FO.matching ~subst ~pattern:(t,0) (u,1))
+      (fun subst (t,u) -> Unif.FO.matching ~subst ~pattern:(u,1) (t,0))
       Subst.empty l
     |> CCOpt.return
   with Unif.Fail -> None
 
 (* real test for satisfiability: look for a solution *)
-let has_solution_ (l:constr list): bool = match find_solution_ l with
+let has_matching_solution_ (l:constr list): bool = match find_matching_solution_ l with
   | None -> false
   | Some _ -> true
 
-let find_solution = function
-  | Trivial -> None
-  | Pairs l -> find_solution_ l
-
 let is_trivial = function
   | Trivial -> true
-  | Pairs l -> not (has_solution_ l)
+  | Pairs l ->
+    (* try to unify all pairs. No mgu -> no ground matching either. *)
+    try
+      let _ =
+        List.fold_left
+          (fun subst (t,u) -> Unif.FO.unification ~subst (t,0) (u,1))
+          Subst.empty l
+      in
+      false
+    with Unif.Fail ->
+      true
 
-let is_sat = function
+let is_absurd = function
   | Trivial -> false
-  | Pairs l -> has_solution_ l
+  | Pairs l -> has_matching_solution_ l
 
 (* use "⋪"? *)
 
