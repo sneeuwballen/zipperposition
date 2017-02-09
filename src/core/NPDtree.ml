@@ -129,8 +129,7 @@ module Make(E : Index.EQUATION) = struct
   let add_seq dt seq = Sequence.fold add dt seq
   let add_list dt = List.fold_left add dt
 
-  let remove_seq dt seq =
-    Sequence.fold remove dt seq
+  let remove_seq dt seq = Sequence.fold remove dt seq
 
   let retrieve ?(subst=S.empty) ~sign dt t k =
     Util.enter_prof prof_npdtree_retrieve;
@@ -295,6 +294,10 @@ module MakeTerm(X : Set.OrderedType) = struct
   let remove trie t data =
     let k leaf = Leaf.remove leaf t data in
     goto_leaf trie t k
+
+  let remove_ trie = CCFun.uncurry (remove trie)
+  let remove_seq dt seq = Sequence.fold remove_ dt seq
+  let remove_list dt seq = List.fold_left remove_ dt seq
 
   (* skip one term in the tree. Calls [k] with [acc] on corresponding
      subtries. *)

@@ -52,6 +52,8 @@ module type TERM_IDX = sig
   val add_list : t -> (term * elt) list -> t
 
   val remove : t -> term -> elt -> t
+  val remove_seq : t -> (term * elt) Sequence.t -> t
+  val remove_list : t -> (term * elt) list -> t
 
   val iter : t -> (term -> elt -> unit) -> unit
 

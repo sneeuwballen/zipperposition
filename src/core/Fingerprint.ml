@@ -208,6 +208,10 @@ module Make(X : Set.OrderedType) = struct
     let features = idx.fp t in  (* features of term *)
     { idx with trie = recurse idx.trie features; }
 
+  let remove_ trie = CCFun.uncurry (remove trie)
+  let remove_seq dt seq = Sequence.fold remove_ dt seq
+  let remove_list dt seq = List.fold_left remove_ dt seq
+
   let iter idx f =
     let rec iter trie f = match trie with
       | Empty -> ()
