@@ -130,7 +130,7 @@ module Make(C : Clause.S) = struct
 
   module H = CCHeap.Make(struct
       type t = (int * C.t)
-      let leq (i1, c1) (i2, c2) = i1 <= i2 || (i1 = i2 && C.compare c1 c2 <= 0)
+      let leq (i1, c1) (i2, c2) = i1 < i2 || (i1 = i2 && C.compare c1 c2 <= 0)
     end)
 
   (** A priority queue of clauses, purely functional *)
