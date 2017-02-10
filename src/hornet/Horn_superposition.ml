@@ -161,20 +161,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           (HC.trail c)
     end
 
-  (* remove all clauses that depend on the given boolean lit *)
-  let remove_all (b_lit:bool_lit): unit =
-    let l = match Bool_lit.view b_lit with
-      | A_box_clause r ->
-        let l = r.bool_box_depends in
-        r.bool_box_depends <- [];
-        l
-      | A_select r ->
-        let l = r.bool_select_depends in
-        r.bool_select_depends <- [];
-        l
-      | A_fresh _
-      | A_ground _ -> []
-    in
+  let kill_clauses (l:HC.t list): unit =
     List.iter
       (fun c -> match HC.status c with
          | HC_new -> assert false
@@ -185,8 +172,26 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
            HC.set_status c HC_dead;
            Active_set.remove c; (* if it's active, not any more *)
          | HC_dead -> ())
-      l;
-    ()
+      l
+
+  let remove_all_box (r:bool_box_clause): unit =
+    let l = r.bool_box_depends in
+    r.bool_box_depends <- [];
+    kill_clauses l
+
+  let remove_all_select (r:bool_select): unit =
+    let l = r.bool_select_depends in
+    r.bool_select_depends <- [];
+    kill_clauses l
+
+  (* remove all clauses that depend on the given boolean lit *)
+  let remove_all (b_lit:bool_lit): unit =
+    begin match Bool_lit.view b_lit with
+      | A_box_clause r -> remove_all_box r
+      | A_select r -> remove_all_select r
+      | A_fresh _
+      | A_ground _ -> ()
+    end
 
   module Passive_set : sig
     val add : HC.t -> unit
@@ -746,18 +751,9 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
             check_res (Saturate.add_horn c)
           | C.General -> ()
         end
-      | E_remove_component r ->
-        (* remove this component, and all clauses that depend on it *)
-        begin match C.classify r.bool_box_clause with
-          | C.Horn c ->
-            (* remove all clauses that depend on [c.trail] *)
-            let trail = HC.trail c in
-            List.iter (fun (lazy b_lit) -> remove_all b_lit) trail
-          | C.General -> ()
-        end
-      | E_select_lit (_,_)
-      | E_unselect_lit _ ->
-        () (* TODO: add/remove clauses from saturated set *)
+      | E_remove_component r -> remove_all_box r
+      | E_select_lit (_,_) -> assert false (* TODO *)
+      | E_unselect_lit r -> remove_all_select r
       | E_add_ground_lit _
       | E_stage Stage_presaturate ->
         presaturate ()
