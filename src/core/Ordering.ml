@@ -405,6 +405,9 @@ let tbl_ =
 let default_of_list l =
   rpo6 (Prec.default l)
 
+let default_name = "kbo"
+let names () = CCHashtbl.keys_list tbl_
+
 let default_of_prec prec =
   default_of_list (Prec.snapshot prec)
 
