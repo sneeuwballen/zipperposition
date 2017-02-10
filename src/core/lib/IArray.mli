@@ -65,7 +65,11 @@ val set : 'a t -> int -> 'a -> 'a t
 
 val map : ('a -> 'b) -> 'a t -> 'b t
 
+val map_arr : ('a -> 'b) -> 'a t -> 'b array
+
 val mapi : (int -> 'a -> 'b) -> 'a t -> 'b t
+
+val mapi_arr : (int -> 'a -> 'b) -> 'a t -> 'b array
 
 val append : 'a t -> 'a t -> 'a t
 

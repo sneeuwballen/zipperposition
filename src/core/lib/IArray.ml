@@ -60,8 +60,10 @@ let set a n x =
   a'
 
 let map = Array.map
+let map_arr = Array.map
 
 let mapi = Array.mapi
+let mapi_arr = Array.mapi
 
 let append a b =
   let na = length a in
