@@ -333,8 +333,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       let will_be_trivial () =
         HC.body_len c' = 0 &&
         Lit.equal (HC.head c) (HC.head c') &&
-        T.equal sup.hc_sup_s sup.hc_sup_rewritten &&
-        Subst.is_renaming subst
+        T.equal s' u' && T.equal t' v'
       in
       (* if all conditions met, do the inference *)
       if ord_ok && not (will_be_trivial ())
@@ -658,7 +657,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           Util.debugf ~section 2 "@[<2>@{<Green>found empty clause@}@ %a@]"
             (fun k->k HC.pp c);
           Unsat c
-        ) else if Active_set.variant_mem c then (
+        ) else if Active_set.mem c || Active_set.variant_mem c then (
           Util.debugf ~section 4 "clause %a already in active set, continue"
             (fun k->k HC.pp c);
           saturation_loop ()
