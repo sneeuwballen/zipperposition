@@ -82,8 +82,8 @@ let compute_prec stmts =
   Util.debugf ~section 2 "@[<2>precedence: %a@]" (fun k->k Precedence.pp prec);
   E.return prec
 
-let compute_ord precedence =
-  let ord = Ordering.by_name "kbo" precedence in
+let compute_ord (ord:string) precedence =
+  let ord = Ordering.by_name ord precedence in
   Util.debugf ~section 2 "@[<2>ord: %a@]" (fun k->k Ordering.pp ord);
   E.return ord
 
@@ -106,11 +106,13 @@ let time : float ref = ref 0.
 let file : string ref = ref ""
 let def_as_rewrite : bool ref = ref false
 let max_depth : int ref = ref 4
+let ord_ : string ref = ref Ordering.default_name
 
 let options =
   Arg.align
     ([ "--time", Arg.Set_float time, " set timeout";
        "-t", Arg.Set_float time, " alias to --time";
+       "--ord", Arg.Symbol (Ordering.names(), (:=) ord_), " pick term ordering";
        "--def-as-rewrite", Arg.Set def_as_rewrite, " definitions as rewrite rules";
        "--no-def-as-rewrite", Arg.Clear def_as_rewrite, " definitions as axioms";
        "--max-depth", Arg.Set_int max_depth, (Fmt.sprintf " maximum depth (default %d)" !max_depth);
@@ -128,7 +130,7 @@ let main () =
   typing conf >>= fun (stmts, signature) ->
   cnf ~file:!file stmts >>= fun stmts ->
   compute_prec (CCVector.to_seq stmts) >>=
-  compute_ord >>= fun ord ->
+  compute_ord !ord_ >>= fun ord ->
   (* convert statements in {!Clause.t} *)
   let stmts =
     CCVector.map

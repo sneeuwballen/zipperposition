@@ -180,8 +180,7 @@ let active_terms ?(pos=P.stop) ord lit =
   let yield_term t pos = PW.make t pos in
   begin match lit with
     | Atom (t,true) ->
-      T.all_positions ~pos:(P.append pos (P.left P.stop)) ~vars:false ~ty_args:false t
-      |> Sequence.map PW.of_pair
+      Sequence.return (yield_term t (P.append pos (P.left P.stop)))
     | Eq (t,u,true) ->
       begin match Ordering.compare ord t u with
         | Comparison.Eq -> Sequence.empty (* trivial *)

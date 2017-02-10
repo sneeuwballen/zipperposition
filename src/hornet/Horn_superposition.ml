@@ -269,12 +269,33 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       let renaming = Ctx.renaming_cleared () in
       let s' = Subst.FO.apply ~renaming subst (sup.hc_sup_s,sc_active) in
       let t' = Subst.FO.apply ~renaming subst (sup.hc_sup_t,sc_active) in
-      (* check ordering on [s>t] *)
-      let ord_ok, unordered_step = match Ordering.compare Ctx.ord s' t' with
-        | Comparison.Gt -> true, 0
-        | Comparison.Lt -> false, 0 (* ill-ordered *)
-        | Comparison.Eq -> false, 0 (* trivial *)
-        | Comparison.Incomparable -> true, 1
+      (* passive lit and equation *)
+      let passive_lit, passive_lit_pos = match sup.hc_sup_passive_pos with
+        | P.Body (P.Arg (0, p)) -> HC.body0_exn c', p
+        | P.Head p -> HC.head c', p
+        | _ -> assert false
+      in
+      let u', v' = match Lit.get_eqn passive_lit passive_lit_pos with
+        | Some (u, v, sign) ->
+          assert sign;
+          Subst.FO.apply ~renaming subst (u,sc_passive),
+          Subst.FO.apply ~renaming subst (v,sc_passive)
+        | _ -> assert false
+      in
+      (* check ordering on [s>t] and [u>v], with possibility of non-decreasing
+         inference at the cost of a depth increase *)
+      let ord_ok, unordered_step =
+        match
+          Ordering.compare Ctx.ord s' t',
+          Ordering.compare Ctx.ord u' v'
+        with
+          | Comparison.Gt, (Comparison.Gt | Comparison.Eq) -> true, 0
+          | Comparison.Lt, _
+          | _, Comparison.Lt -> false, 0 (* ill-ordered *)
+          | Comparison.Eq, _ -> false, 0 (* trivial *)
+          | Comparison.Incomparable, (Comparison.Gt | Comparison.Eq)
+          | Comparison.Gt, Comparison.Incomparable -> true, 1
+          | Comparison.Incomparable, Comparison.Incomparable -> true, 2 (* ouch. *)
       in
       let unordered_depth =
         HC.unordered_depth c + HC.unordered_depth c' + unordered_step
@@ -297,14 +318,10 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
             (fun i lit ->
                let lit = Lit.apply_subst ~renaming subst (lit,sc_passive) in
                if i=0
-               then (
-                 begin match sup.hc_sup_passive_pos with
-                   | P.Body (P.Arg (0, pos_lit)) ->
-                     (* also replace [rewritten] with [t'] in first body lit *)
-                     Lit.Pos.replace lit ~at:pos_lit ~by:t'
-                   | _ -> assert false
-                 end
-               ) else lit)
+               then
+                 (* also replace [rewritten] with [t'] in first body lit *)
+                 Lit.Pos.replace lit ~at:passive_lit_pos ~by:t'
+               else lit)
         in
         let constr =
           List.rev_append
@@ -384,7 +401,10 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
                 let c', pos' = c'_with_pos in
                 let pos_lit' = match pos' with P.Head p'->p' | _ -> assert false in
                 let t = match Lit.get_eqn (HC.head c') pos_lit' with
-                  | Some (s_, t, true) -> assert (T.equal s s_); t
+                  | Some (s_, t, true) ->
+                    (*Format.eprintf "hd %a, s=`@[%a@]`, s_=`@[%a@]` pos %a@."
+                      Lit.pp (HC.head c') T.pp s T.pp s_ P.pp pos_lit';*)
+                    assert (T.equal s s_); t
                   | _ ->
                     Format.eprintf "hd %a, pos %a@." Lit.pp (HC.head c') P.pp pos_lit';
                     assert false
