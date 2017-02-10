@@ -121,23 +121,19 @@ let ground state (lit:Lit.t): t =
   make_ sign atom
 
 let box_clause state c =
-  if C.is_unit_ground c
-  then ground state (IArray.get (C.lits c) 0)
-  else (
-    (* make a [Clause c] literal *)
-    let a =
-      try C.Tbl_mod_alpha.find state.box_tbl c
-      with Not_found ->
-        let a = A_box_clause {
-            bool_box_clause=c;
-            bool_box_id=fresh_atom_id_ state;
-          } |> atom_of_view
-        in
-        C.Tbl_mod_alpha.add state.box_tbl c a;
-        a
-    in
-    make_ true a
-  )
+  (* make a [Clause c] literal *)
+  let a =
+    try C.Tbl_mod_alpha.find state.box_tbl c
+    with Not_found ->
+      let a = A_box_clause {
+          bool_box_clause=c;
+          bool_box_id=fresh_atom_id_ state;
+        } |> atom_of_view
+      in
+      C.Tbl_mod_alpha.add state.box_tbl c a;
+      a
+  in
+  make_ true a
 
 (** {2 Boolean Clauses} *)
 

@@ -23,7 +23,7 @@ type constraint_ = Hornet_types.c_constraint_ =
 (** How to build a clause from a ['a] and other parameters *)
 type 'a builder =
   ?trail:bool_trail ->
-  ?constrs:constraint_ list ->
+  ?constr:constraint_ list ->
   'a ->
   proof ->
   t

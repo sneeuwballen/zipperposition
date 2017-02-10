@@ -54,7 +54,13 @@ and horn_clause = {
   hc_trail: bool_trail;
   hc_proof: proof;
   hc_unordered_depth: int; (* how many unordered inferences needed? *)
+  hc_status: horn_clause_status; (* where is the clause in its lifecycle? *)
 }
+
+and horn_clause_status =
+  | HC_new (** Just created, not registered *)
+  | HC_active (** Alive and kicking *)
+  | HC_dead (** Unregistered, inert *)
 
 (** Description of a single superposition step *)
 and hc_superposition_step = {

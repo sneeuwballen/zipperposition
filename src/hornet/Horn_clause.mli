@@ -11,13 +11,11 @@
 *)
 
 open Libzipperposition
+open Hornet_types
 
-type clause = Hornet_types.clause
-type proof = Hornet_types.proof
 type constraint_ = Hornet_types.c_constraint_
-type bool_trail = Hornet_types.bool_trail
 
-type t = Hornet_types.horn_clause
+type t = horn_clause
 type horn_clause = t
 
 (** {2 Basics} *)
@@ -46,6 +44,8 @@ val proof : t -> proof
 
 val unordered_depth : t -> int
 (** The number of unordered inference steps required to prove this clause *)
+
+val status : t -> horn_clause_status
 
 val body_seq : t -> Lit.t Sequence.t
 (** Sequence of body elements *)

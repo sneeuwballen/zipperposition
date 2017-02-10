@@ -62,7 +62,7 @@ let compare_lits_for_horn_ (l1:Lit.t) (l2:Lit.t) : int =
     CCOrd.( int_ n_vars1 n_vars2 <?> (int_, Lit.weight l1, Lit.weight l2) )
   )
 
-let kind_of_lits (c_lits:Lit.t IArray.t) proof: c_kind =
+let kind_of_lits ~trail ~constr (c_lits:Lit.t IArray.t) proof: c_kind =
   (* positive literals *)
   let pos =
     IArray.to_seqi c_lits
@@ -81,7 +81,7 @@ let kind_of_lits (c_lits:Lit.t IArray.t) proof: c_kind =
         Array.init (IArray.length c_lits) (fun i->Lit.neg (IArray.get c_lits i))
         |> mk_body
       in
-      let hc = Horn_clause.make head body proof in
+      let hc = Horn_clause.make ~constr ~trail head body proof in
       C_horn hc
     | [i,_] ->
       let head = IArray.get c_lits i in
@@ -94,7 +94,7 @@ let kind_of_lits (c_lits:Lit.t IArray.t) proof: c_kind =
              Lit.neg lit)
         |> mk_body
       in
-      let hc = Horn_clause.make head body proof in
+      let hc = Horn_clause.make ~constr ~trail head body proof in
       C_horn hc
     | _ -> C_general
   end
@@ -102,7 +102,7 @@ let kind_of_lits (c_lits:Lit.t IArray.t) proof: c_kind =
 (** How to build a clause from a ['a] and other parameters *)
 type 'a builder =
   ?trail:bool_trail ->
-  ?constrs:constraint_ list ->
+  ?constr:constraint_ list ->
   'a ->
   proof ->
   t
@@ -116,12 +116,12 @@ let make_ =
     let c_id = CCRef.incr_then_get n_ in
     { c_id; c_constr; c_trail ; c_lits; c_kind; c_proof }
 
-let make ?(trail=[]) ?(constrs=[]) c_lits proof: t =
-  let c_kind = kind_of_lits c_lits proof in
-  make_ trail constrs c_kind c_lits proof
+let make ?(trail=[]) ?(constr=[]) c_lits proof: t =
+  let c_kind = kind_of_lits ~trail ~constr c_lits proof in
+  make_ trail constr c_kind c_lits proof
 
-let make_l ?trail ?constrs lits proof : t =
-  make ?trail ?constrs (IArray.of_list lits) proof
+let make_l ?trail ?constr lits proof : t =
+  make ?trail ?constr (IArray.of_list lits) proof
 
 let hash_mod_alpha c : int =
   IArray.hash_comm Lit.hash_mod_alpha c.c_lits

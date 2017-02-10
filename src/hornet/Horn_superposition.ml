@@ -49,7 +49,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     val remove : HC.t -> unit
   end
 
-
   type idx_elt = term * HC.With_pos.t
 
   type relevant_pos =
@@ -141,6 +140,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     val add : HC.t -> unit
     val add_l : HC.t list -> unit
     val add_seq : HC.t Sequence.t -> unit
+    val update_depth_limit: int -> unit
+    val has_too_deep_clauses: unit -> bool (** are there clauses frozen b.c. of their depth? *)
     val next : unit -> HC.t option
   end = struct
     (* priority queue *)
@@ -155,13 +156,38 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       let n = HC.body_len c in
       1 + n
 
+    (* queue of clauses to process (passive) *)
     let q_ : H.t  ref = ref H.empty
+
+    (* queue for clauses that are deeper than the current limit *)
+    let too_deep_ : H.t ref = ref H.empty
+
+    let has_too_deep_clauses () = not (H.is_empty !too_deep_)
 
     let add1_ q c = H.add q (weight_ c,c)
 
-    let add c = q_ := add1_ !q_ c
+    let add c =
+      let depth = HC.unordered_depth c in
+      if depth < Depth_limit.get () then (
+        q_ := add1_ !q_ c
+      ) else (
+        too_deep_ := H.add !too_deep_ (depth,c);
+      )
+
     let add_l l = q_ := List.fold_left add1_ !q_ l
     let add_seq l = q_ := Sequence.fold add1_ !q_ l
+
+    (* new depth limit -> some clauses become active *)
+    let update_depth_limit d =
+      assert (Depth_limit.get() = d); (* must be updated first *)
+      let rec aux q = match H.take q with
+        | Some (new_q, (d_c,c)) when d_c < d ->
+          (* [c] becomes passive *)
+          add c;
+          aux new_q
+        | Some _ | None -> q
+      in
+      too_deep_ := aux !too_deep_
 
     let next () = match H.take !q_ with
       | None -> None
@@ -202,9 +228,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         Subst.is_renaming subst
       in
       (* if all conditions met, do the inference *)
-      if ord_ok &&
-         unordered_depth < Depth_limit.get() &&
-         not (will_be_trivial ())
+      if ord_ok && not (will_be_trivial ())
       then (
         (* inference is a go *)
         let new_head = Lit.apply_subst ~renaming subst (HC.head c',sc_passive) in
@@ -232,8 +256,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           HC.make ~unordered_depth ~constr new_head new_body (Proof.hc_sup sup)
         in
         Util.debugf ~section 4
-          "(@[<2>superposition_step@ :yields %a@ :params %a@])"
-          (fun k->k HC.pp new_c Hornet_types_util.pp_hc_sup sup);
+          "(@[<2>superposition_step@ :yields %a@ :params %a@ :depth %d@])"
+          (fun k->k HC.pp new_c Hornet_types_util.pp_hc_sup sup unordered_depth);
         Some new_c
       ) else None
 
@@ -402,6 +426,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
   module Saturate : sig
     type res =
       | Sat
+      | Unknown (* reached depth limit *)
       | Unsat of  Proof_of_false.t
 
     type stats = {
@@ -427,6 +452,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
   end = struct
     type res =
       | Sat
+      | Unknown (* reached depth limit *)
       | Unsat of Proof_of_false.t
 
     type stats = {
@@ -478,7 +504,10 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
     (* the main saturation loop *)
     let rec saturation_loop () = match Passive_set.next () with
-      | None -> Sat
+      | None ->
+        if Passive_set.has_too_deep_clauses ()
+        then Unknown
+        else Sat
       | Some c ->
         Util.debugf ~section 2
           "@[<2>@{<Blue>## saturate@}: given clause@ %a@]"
@@ -520,7 +549,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       | [] -> Sat
       | c :: tail ->
         begin match add_clause c with
-          | Sat -> add_clauses tail
+          | Sat | Unknown -> add_clauses tail
           | Unsat p -> Unsat p
         end
   end
@@ -534,6 +563,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
   let set_depth_limit d =
     Depth_limit.set d;
+    Passive_set.update_depth_limit d;
     ()
 
   let presaturate () =
@@ -541,6 +571,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     Util.debug ~section 2 "start presaturation";
     let res = Saturate.add_clauses initial_clauses in
     begin match res with
+      | Saturate.Unknown
       | Saturate.Sat -> ()
       | Saturate.Unsat p -> Ctx.send_event (E_found_unsat (HC.proof p))
     end
@@ -569,15 +600,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       | E_stage (Stage_start | Stage_init) -> ()
       | E_found_unsat _ -> ()
     end
-
-  (* TODO:
-     - a decent saturation state
-     * active (unit) clauses
-     * passive (horn) clauses
-     * demod index
-     - initial saturation (up to (parameter) initial depth)
-     - react to some events
-  *)
 end
 
 let theory : State.theory_fun = (module Make)

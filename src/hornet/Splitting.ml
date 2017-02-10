@@ -40,7 +40,8 @@ module Make(Ctx : State.CONTEXT) = struct
         let merge = List.rev_append
       end)
 
-    let try_split_ lits c =
+    (* main Avatar splitting function *)
+    let try_split_ lits c : C.t list option =
       assert (IArray.length lits >= 2);
       (* maps each variable to a list of literals. Sets can be merged whenever
          two variables occur in the same literal.  *)

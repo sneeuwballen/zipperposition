@@ -10,10 +10,7 @@ module Fmt = CCFormat
 module Pos = Position
 module PW = Position.With
 
-type clause = Hornet_types.clause
-type proof = Hornet_types.proof
 type constraint_ = Hornet_types.c_constraint_
-type bool_trail = Hornet_types.bool_trail
 
 type t = Hornet_types.horn_clause
 type horn_clause = t
@@ -32,11 +29,15 @@ let make =
       hc_proof=proof;
       hc_trail=trail;
       hc_constr=constr;
+      hc_status=HC_new;
     }
 
 let equal a b = a.hc_id = b.hc_id
 let hash a = Hash.int a.hc_id
 let compare a b = CCInt.compare a.hc_id b.hc_id
+
+let pp = Hornet_types_util.pp_hclause
+let to_string = Fmt.to_string pp
 
 let head c = c.hc_head
 let body c = c.hc_body
@@ -44,6 +45,7 @@ let proof c = c.hc_proof
 let trail c = c.hc_trail
 let constr c = c.hc_constr
 let unordered_depth c = c.hc_unordered_depth
+let status c = c.hc_status
 
 let body_seq c = IArray.to_seq (body c)
 let body_l c = IArray.to_list (body c)
@@ -57,19 +59,19 @@ let body0 c =
 
 let body0_exn c = match body0 c with
   | Some c -> c
-  | None -> invalid_arg "Horn_clause.body0_exn: empty body"
+  | None ->
+    Util.invalid_argf "Horn_clause.body0_exn: empty body in `@[%a@]`" pp c
 
 let body_get c n =
-  if n < 0 || n >= IArray.length (body c) then invalid_arg "Horn.body_get";
+  if n < 0 || n >= IArray.length (body c) then (
+    Util.invalid_argf "Horn.body_get %d in `@[%a@]`" n pp c;
+  );
   IArray.get (body c) n
 
 let body_tail c =
   let n = IArray.length (body c) in
   if n = 0 then invalid_arg "Horn_clause.body_tail: empty body";
   IArray.init (n-1) (fun i -> IArray.get (body c) (i-1))
-
-let pp = Hornet_types_util.pp_hclause
-let to_string = Fmt.to_string pp
 
 let head_pos c = PW.make (head c) Pos.(head stop)
 let body_pos n c = PW.make (body_get c n) Pos.(arg n @@ body @@ stop)
