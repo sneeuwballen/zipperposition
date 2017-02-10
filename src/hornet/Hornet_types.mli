@@ -138,6 +138,7 @@ type event =
   | E_unselect_lit of bool_select
   | E_add_ground_lit of bool_ground
   | E_remove_ground_lit of bool_ground
+  | E_if_sat (** final check of the model *)
   | E_conflict of bool_clause * proof (* boolean conflict in some theory *)
   | E_found_unsat of proof (* final proof *)
   | E_stage of stage

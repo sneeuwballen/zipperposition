@@ -267,7 +267,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       let c', sc_passive = sup.hc_sup_passive in
       let subst = sup.hc_sup_subst in
       let renaming = Ctx.renaming_cleared () in
-      let s' = Subst.FO.apply ~renaming subst (sup.hc_sup_s,sc_active) in
+      let s = sup.hc_sup_s in
+      let s' = Subst.FO.apply ~renaming subst (s,sc_active) in
       let t' = Subst.FO.apply ~renaming subst (sup.hc_sup_t,sc_active) in
       (* passive lit and equation *)
       let passive_lit, passive_lit_pos = match sup.hc_sup_passive_pos with
@@ -278,26 +279,44 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       let u', v' = match Lit.get_eqn passive_lit passive_lit_pos with
         | Some (u, v, sign) ->
           assert sign;
+          assert (not (T.is_var u));
           Subst.FO.apply ~renaming subst (u,sc_passive),
           Subst.FO.apply ~renaming subst (v,sc_passive)
         | _ -> assert false
       in
       (* check ordering on [s>t] and [u>v], with possibility of non-decreasing
          inference at the cost of a depth increase *)
-      let ord_ok, unordered_step =
-        match
-          Ordering.compare Ctx.ord s' t',
-          Ordering.compare Ctx.ord u' v'
-        with
-          | Comparison.Gt, (Comparison.Gt | Comparison.Eq) -> true, 0
-          | Comparison.Lt, _
-          | _, Comparison.Lt -> false, 0 (* ill-ordered *)
-          | Comparison.Eq, _ -> false, 0 (* trivial *)
-          | Comparison.Incomparable, (Comparison.Gt | Comparison.Eq)
-          | Comparison.Gt, Comparison.Incomparable -> true, 1
-          | Comparison.Incomparable, Comparison.Incomparable -> true, 2 (* ouch. *)
+      let cmp_s_t = Ordering.compare Ctx.ord s' t' in
+      let cmp_u_v = Ordering.compare Ctx.ord u' v' in
+      let ord_ok = match cmp_s_t, cmp_u_v with
+        | Comparison.Gt, (Comparison.Gt | Comparison.Eq) -> true
+        | Comparison.Lt, _
+        | _, Comparison.Lt -> false (* ill-ordered *)
+        | Comparison.Eq, _ -> false (* trivial *)
+        | Comparison.Incomparable, (Comparison.Gt | Comparison.Eq)
+        | Comparison.Gt, Comparison.Incomparable -> true
+        | Comparison.Incomparable, Comparison.Incomparable -> true (* ouch. *)
       in
       let unordered_depth =
+        (* malus applied to this particular inference. an inference is
+           safe if:
+           - [s'] is ground, [t'] too, and [s'>t'], or
+           - [s' > t'] and the substitution does not instantiate any
+               passive term for non-ground inferences *)
+        let unordered_step =
+          if (T.is_ground s' &&
+              Ordering.compare Ctx.ord s' t' = Comparison.Gt &&
+              (assert (T.is_ground t'); true)) ||
+             (cmp_s_t = Comparison.Gt &&
+              ( Subst.domain subst
+                |> Sequence.for_all
+                  (fun (v,sc_v) ->
+                     let v = HVar.update_ty ~f:Type.of_term_unsafe v in
+                     sc_v = sc_active ||
+                     (let t,_ = Subst.FO.deref subst (T.var v,sc_v) in T.is_var t))))
+          then 0
+          else 1
+        in
         HC.unordered_depth c + HC.unordered_depth c' + unordered_step
       in
       (* check for some trivial inference: using [s=t] to rewrite [s=t] *)
@@ -537,6 +556,10 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         again. If, during saturation, the empty clause is derived,
         [Unsat l] is returned (where [l] is a non-empty list of empty clauses).
         Otherwise, [Sat] is returned. *)
+
+    val saturate : unit -> res
+    (** Saturate again. Should be called after every increase of depth,
+        since it might unlock some clauses that were too deep till now *)
   end = struct
     type res =
       | Sat
@@ -630,6 +653,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           saturation_loop ()
         )
 
+    let saturate = saturation_loop
+
     let add_horn c : res =
       Util.debugf ~section 2 "@[<2>saturate.add_horn@ %a@]" (fun k->k HC.pp c);
       let c = simplify_fast c in
@@ -660,11 +685,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     |> Sequence.flat_map Statement.Seq.forms
     |> Sequence.to_rev_list
 
-  let set_depth_limit d =
-    Depth_limit.set d;
-    Passive_set.update_depth_limit d;
-    ()
-
   (* check result of saturation and trigger appropriate events *)
   let check_res (res:Saturate.res): unit =
     begin match res with
@@ -675,6 +695,13 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         let conflict_clause = Proof_of_false.to_bool_clause c in
         Ctx.send_event (E_conflict (conflict_clause, HC.proof c));
     end
+
+  let set_depth_limit d =
+    Depth_limit.set d;
+    Passive_set.update_depth_limit d;
+    (* some clauses might have become active *)
+    check_res (Saturate.saturate ());
+    ()
 
   let presaturate () =
     (* add the set of initial clauses *)
@@ -718,6 +745,9 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         ()
       | E_stage (Stage_start | Stage_init) -> ()
       | E_remove_ground_lit _ -> ()
+      | E_if_sat ->
+        (* saturate again *)
+        check_res (Saturate.saturate ())
       | E_conflict _
       | E_found_unsat _ -> ()
     end

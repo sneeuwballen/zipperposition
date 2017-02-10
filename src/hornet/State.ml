@@ -57,6 +57,9 @@ end = struct
 end
 
 module Make(A : ARGS) : S = struct
+  (* defined below *)
+  let send_event_ : (event -> unit) ref = ref (fun _ -> assert false)
+
   module SAT_theory = struct
     type formula = Bool_lit.t
     type proof = Hornet_types.proof
@@ -85,7 +88,9 @@ module Make(A : ARGS) : S = struct
       done;
       TI.Sat
 
-    let if_sat _ = TI.Sat (* TODO: add corresponding hook in THEORY? increase depth? *)
+    let if_sat _ =
+      !send_event_ E_if_sat;
+      TI.Sat
   end
 
   module M =
@@ -93,9 +98,6 @@ module Make(A : ARGS) : S = struct
       (Bool_lit)
       (SAT_theory)
       (struct end)
-
-  (* defined below *)
-  let send_event_ : (event -> unit) ref = ref (fun _ -> assert false)
 
   module Ctx : CONTEXT = struct
     include A

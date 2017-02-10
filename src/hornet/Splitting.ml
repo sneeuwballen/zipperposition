@@ -206,6 +206,7 @@ module Make(Ctx : State.CONTEXT) = struct
       | E_conflict (c,proof) ->
         (* trigger conflict in SAT *)
         Ctx.add_clause proof c
+      | E_if_sat
       | E_found_unsat _ -> ()
       | E_stage s ->
         begin match s with

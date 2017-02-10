@@ -166,6 +166,7 @@ let () =
   CCFormat.set_color_default true;
   at_exit
     (fun () ->
+       if !Options.stats then Util.print_global_stats ();
        Util.debugf ~section 1 "run time: %.3f" (fun k->k (Util.total_time_s ())));
   begin match main () with
     | E.Error msg ->
