@@ -158,8 +158,8 @@ let of_slit_l ~stmt lits =
     | SLiteral.True -> Lit.true_
     | SLiteral.False -> Lit.false_
     | SLiteral.Atom (t,b) -> Lit.atom ~sign:b t
-    | SLiteral.Eq (_,_) -> failwith "TODO: equations"
-    | SLiteral.Neq (_,_) -> failwith "TODO: disequations"
+    | SLiteral.Eq (s,t) -> Lit.eq s t
+    | SLiteral.Neq (s,t) -> Lit.eq ~sign:false s t
   in
   let lits = List.map conv_slit lits in
   let proof = Proof.from_stmt stmt in

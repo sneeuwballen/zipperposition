@@ -121,6 +121,8 @@ let is_ground c =
   Lit.is_ground (head c) &&
   IArray.for_all Lit.is_ground (body c)
 
+let vars_seq = Hornet_types_util.vars_of_hclause
+
 (** {2 Unification} *)
 
 let variant ?(subst=Subst.empty) (c1,sc1) (c2,sc2) : Subst.t Sequence.t =

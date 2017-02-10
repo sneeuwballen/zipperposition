@@ -101,10 +101,7 @@ let neg lit = match lit with
   | Atom (p, sign) -> Atom (p, not sign)
   | Bool b -> Bool (not b)
 
-let vars_seq = function
-  | Bool _ -> Sequence.empty
-  | Atom (t,_) -> T.Seq.vars t
-  | Eq (t,u,_) -> Sequence.append (T.Seq.vars t) (T.Seq.vars u)
+let vars_seq = Hornet_types_util.vars_of_lit
 
 let vars_list l = vars_seq l |> Sequence.to_rev_list
 

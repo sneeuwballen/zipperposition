@@ -61,7 +61,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       (* unit clause: both active and passive *)
       let head = HC.head c in
       let active =
-        Lit.passive_terms ~pos:P.(head stop) Ctx.ord head
+        Lit.active_terms ~pos:P.(head stop) Ctx.ord head
         |> Sequence.map (fun (t,pos) -> t, (c,pos))
         |> Sequence.to_rev_list
       and passive =
@@ -221,6 +221,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       else (
         let depth = HC.unordered_depth c in
         if depth < Depth_limit.get () then (
+          Util.debugf ~section 5 "@[<2>add `%a`@ to passive set@]"
+            (fun k->k HC.pp c);
           q_ := H.add !q_ (weight_ c,c)
         ) else (
           too_deep_ := H.add !too_deep_ (depth,c);
@@ -382,7 +384,9 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
                 let pos_lit' = match pos' with P.Head p'->p' | _ -> assert false in
                 let t = match Lit.get_eqn (HC.head c') pos_lit' with
                   | Some (s_, t, true) -> assert (T.equal s s_); t
-                  | _ -> assert false
+                  | _ ->
+                    Format.eprintf "hd %a, pos %a@." Lit.pp (HC.head c') P.pp pos_lit';
+                    assert false
                 in
                 let sup = {
                   hc_sup_active=(c',sc_active);

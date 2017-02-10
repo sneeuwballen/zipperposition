@@ -55,6 +55,16 @@ let pp_hc_status out (s:horn_clause_status): unit = match s with
   | HC_alive -> Fmt.string out "alive"
   | HC_dead -> Fmt.string out "dead"
 
+let vars_of_lit (l:lit): _ HVar.t Sequence.t = match l with
+  | Bool _ -> Sequence.empty
+  | Atom (t,_) -> T.Seq.vars t
+  | Eq (t,u,_) -> Sequence.append (T.Seq.vars t) (T.Seq.vars u)
+
+let vars_of_hclause c =
+  Sequence.append
+    (vars_of_lit c.hc_head)
+    (IArray.to_seq c.hc_body |> Sequence.flat_map vars_of_lit)
+
 let pp_hclause out (c:horn_clause): unit =
   let pp_constr out = function
     | [] -> Fmt.silent out ()
@@ -63,12 +73,21 @@ let pp_hclause out (c:horn_clause): unit =
     if IArray.length body > 0 then (
       Fmt.fprintf out " @<1>← @[<hv>%a@]" (Fmt.seq pp_lit) (IArray.to_seq body)
     );
+  and pp_vars pp x out = function
+    | [] -> pp out x
+    | vars ->
+      Fmt.fprintf out "@[<2>forall %a.@ %a@]"
+        (Util.pp_list ~sep:" " Type.pp_typed_var) vars pp x
   in
-  Fmt.fprintf out "(@[%a@,%a@,%a@,%a@])"
-    pp_lit c.hc_head
-    pp_body c.hc_body
-    pp_bool_trail_opt c.hc_trail
-    pp_constr c.hc_constr
+  let pp_main out () =
+    Fmt.fprintf out "(@[%a@,%a@,%a@,%a@])"
+      pp_lit c.hc_head
+      pp_body c.hc_body
+      pp_bool_trail_opt c.hc_trail
+      pp_constr c.hc_constr
+  in
+  let vars = vars_of_hclause c |> T.VarSet.of_seq |> T.VarSet.to_list in
+  pp_vars pp_main () out vars
 
 let pp_hc_sup out sup : unit =
   Fmt.fprintf out

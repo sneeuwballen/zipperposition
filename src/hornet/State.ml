@@ -223,7 +223,7 @@ let run (t:t): res =
     begin match res with
       | St.M.Sat _ ->
         if d = St.Ctx.max_depth
-        then Unknown (* TODO: completeness proof(!) *)
+        then Unknown (* TODO: completeness proof(!); also, ask theories if complete *)
         else iter (d+1) (* increase depth *)
       | St.M.Unsat us ->
         Util.debugf ~section 1 "@[Found unsat@]" (fun k->k);
