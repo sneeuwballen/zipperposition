@@ -46,32 +46,9 @@ let compare lits1 lits2 =
 
 let hash lits = Hash.array Lit.hash lits
 
-let variant ?(subst=S.empty) (a1,sc1) (a2,sc2) k =
-  (* match a1.(i...) with a2\bv *)
-  let rec iter2 subst bv i =
-    if i = Array.length a1
-    then k subst
-    else iter3 subst bv i 0
-  (* find a matching literal for a1.(i), within a2.(j...) *)
-  and iter3 subst bv i j =
-    if j = Array.length a2
-    then ()  (* stop *)
-    else (
-      if not (BV.get bv j)
-      then (
-        (* try to match i-th literal of a1 with j-th literal of a2 *)
-        BV.set bv j;
-        Lit.variant ~subst (a1.(i),sc1) (a2.(i),sc2)
-          (fun subst -> iter2 subst bv (i+1));
-        BV.reset bv j
-      );
-      iter3 subst bv i (j+1)
-    )
-  in
-  if Array.length a1 = Array.length a2
-  then
-    let bv = BV.create ~size:(Array.length a1) false in
-    iter2 subst bv 0
+let variant ?(subst=S.empty) (a1,sc1) (a2,sc2) =
+  Unif.unif_array_com subst (a1,sc1) (a2,sc2)
+    ~op:(fun subst x y -> Lit.variant ~subst x y)
 
 let are_variant a1 a2 =
   not (Sequence.is_empty (variant (Scoped.make a1 0) (Scoped.make a2 1)))
