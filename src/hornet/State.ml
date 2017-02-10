@@ -75,7 +75,7 @@ module Make(A : ARGS) : S = struct
     let current_level () = CCVector.length backtrack_vec
 
     let backtrack lev =
-      Util.debugf ~section 3 "@[<2>@{<Blue>backtrack to level %d@}@]" (fun k->k lev);
+      Util.debugf ~section 2 "@[<2>@{<Blue>backtrack to level %d@}@]" (fun k->k lev);
       while CCVector.length backtrack_vec > lev do
         let f = CCVector.pop_exn backtrack_vec in
         f()

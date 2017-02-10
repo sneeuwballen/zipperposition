@@ -76,7 +76,7 @@ let pp_hclause out (c:horn_clause): unit =
   and pp_vars pp x out = function
     | [] -> pp out x
     | vars ->
-      Fmt.fprintf out "@[<2>forall %a.@ %a@]"
+      Fmt.fprintf out "@[<2>∀ %a.@ %a@]"
         (Util.pp_list ~sep:" " Type.pp_typed_var) vars pp x
   in
   let pp_main out () =
@@ -91,9 +91,11 @@ let pp_hclause out (c:horn_clause): unit =
 
 let pp_hc_sup out sup : unit =
   Fmt.fprintf out
-    "(@[<hv2>hc_sup@ :active %a@ :passive %a@ :subst %a@])"
+    "(@[<hv2>hc_sup@ :active %a@ :at %a@ :passive %a@ :at %a@ :subst %a@])"
     (Scoped.pp pp_hclause) sup.hc_sup_active
+    Position.pp sup.hc_sup_active_pos
     (Scoped.pp pp_hclause) sup.hc_sup_passive
+    Position.pp sup.hc_sup_passive_pos
     Subst.pp sup.hc_sup_subst
 
 let pp_proof out (p:proof) : unit = match p with

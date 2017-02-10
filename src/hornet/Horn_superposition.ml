@@ -268,12 +268,13 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
   end = struct
     let stat_infer = Util.mk_stat "hornet.sup_infer_steps"
     let prof_infer_active = Util.mk_profiler "hornet.sup_active"
-    let prof_infer_passive = Util.mk_profiler "hornet.sup_active"
+    let prof_infer_passive = Util.mk_profiler "hornet.sup_passive"
 
     (* do the inference, if it is needed *)
     let do_inference (sup:hc_superposition_step): HC.t option =
       let c, sc_active = sup.hc_sup_active in
       assert (HC.body_len c=0);
+      assert (not (T.is_var sup.hc_sup_rewritten));
       let c', sc_passive = sup.hc_sup_passive in
       let subst = sup.hc_sup_subst in
       let renaming = Ctx.renaming_cleared () in
@@ -289,7 +290,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       let u', v' = match Lit.get_eqn passive_lit passive_lit_pos with
         | Some (u, v, sign) ->
           assert sign;
-          assert (not (T.is_var u));
           Subst.FO.apply ~renaming subst (u,sc_passive),
           Subst.FO.apply ~renaming subst (v,sc_passive)
         | _ -> assert false
@@ -679,13 +679,14 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     let saturate = saturation_loop
 
     let add_horn c : res =
-      Util.debugf ~section 2 "@[<2>saturate.add_horn@ %a@]" (fun k->k HC.pp c);
+      Util.debugf ~section 2 "@[<2>@{<yellow>saturate.add_horn@}@ %a@]"
+        (fun k->k HC.pp c);
       let c = simplify_fast c in
       Passive_set.add c;
       saturation_loop ()
 
     let add_clause c =
-      Util.debugf ~section 3 "@[<2>@{<Yellow>saturate.add_clause@}@ %a@]"
+      Util.debugf ~section 2 "@[<2>@{<Yellow>saturate.add_clause@}@ %a@]"
         (fun k->k C.pp c);
       begin match C.classify c with
         | C.Horn hc -> add_horn hc
