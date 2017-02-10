@@ -174,7 +174,7 @@ let direction ord = function
 
 let at_pos_exn pos lit = match lit, pos with
   | Bool b, P.Stop -> if b then T.true_ else T.false_
-  | Atom (t,_), _ -> T.Pos.at t pos
+  | Atom (t,_), P.Left pos' -> T.Pos.at t pos'
   | Eq (t,_,_), P.Left pos' -> T.Pos.at t pos'
   | Eq (_,u,_), P.Right pos' -> T.Pos.at u pos'
   | _, _ -> raise Not_found
@@ -183,7 +183,7 @@ let active_terms ?(pos=P.stop) ord lit =
   let yield_term t pos = PW.make t pos in
   begin match lit with
     | Atom (t,true) ->
-      T.all_positions ~pos ~vars:false ~ty_args:false t
+      T.all_positions ~pos:(P.append pos (P.left P.stop)) ~vars:false ~ty_args:false t
       |> Sequence.map PW.of_pair
     | Eq (t,u,true) ->
       begin match Ordering.compare ord t u with
@@ -207,19 +207,20 @@ let passive_terms ?(pos=P.stop) ord lit =
     T.all_positions ~pos ~vars:false ~ty_args:false t
     |> Sequence.map PW.of_pair
   in
-  match lit with
-  | Atom (t,_) -> explore_term t pos
-  | Eq (t,u,_) ->
-    begin match Ordering.compare ord t u with
-      | Comparison.Eq -> Sequence.empty (* trivial *)
-      | Comparison.Incomparable ->
-        Sequence.append
-          (explore_term t (P.append pos (P.left P.stop)))
-          (explore_term u (P.append pos (P.right P.stop)))
-      | Comparison.Gt -> explore_term t (P.append pos (P.left P.stop))
-      | Comparison.Lt -> explore_term u (P.append pos (P.right P.stop))
-    end
-  | Bool _ -> Sequence.empty
+  begin match lit with
+    | Atom (t,_) -> explore_term t (P.append pos (P.left P.stop))
+    | Eq (t,u,_) ->
+      begin match Ordering.compare ord t u with
+        | Comparison.Eq -> Sequence.empty (* trivial *)
+        | Comparison.Incomparable ->
+          Sequence.append
+            (explore_term t (P.append pos (P.left P.stop)))
+            (explore_term u (P.append pos (P.right P.stop)))
+        | Comparison.Gt -> explore_term t (P.append pos (P.left P.stop))
+        | Comparison.Lt -> explore_term u (P.append pos (P.right P.stop))
+      end
+    | Bool _ -> Sequence.empty
+  end
 
 module Pos = struct
   type split = {
@@ -229,10 +230,9 @@ module Pos = struct
   }
 
   let _fail_lit lit pos =
-    let msg =
-      Fmt.sprintf "@[<2>invalid position @[%a@]@ in lit @[%a@]@]"
+    Util.errorf ~where:"Lit.Pos"
+      "@[<2>invalid position `@[%a@]`@ in lit `@[%a@]`@]"
         P.pp pos pp lit
-    in invalid_arg msg
 
   let split lit pos = match lit, pos with
     | Bool true, P.Stop ->
@@ -276,7 +276,8 @@ let get_eqn lit position = match lit, position with
   | Eq (l,r,sign), P.Right _ -> Some (r, l, sign)
   | Atom (p, sign), P.Left _ -> Some (p, T.true_, sign)
   | Bool _, _ -> None
-  | _ -> invalid_arg "get_eqn: wrong literal or position"
+  | _ -> Util.errorf ~where:"Lit.get_eqn"
+           "wrong literal `%a` or position `%a`" pp lit P.pp position
 
 (** {2 Unif} *)
 

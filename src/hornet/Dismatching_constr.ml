@@ -8,6 +8,7 @@ open Libzipperposition
 
 module T = FOTerm
 module Fmt = CCFormat
+module BV = CCBV
 
 type term = FOTerm.t
 
@@ -112,3 +113,64 @@ let pp out (c:t): unit = match c with
       (Util.pp_list T.pp) lhs_l (Util.pp_list T.pp) rhs_l
 
 let to_string = Fmt.to_string pp
+
+let vars_seq = function
+  | Trivial -> Sequence.empty
+  | Pairs l ->
+    Sequence.of_list l
+    |> Sequence.map fst
+    |> Sequence.flat_map T.Seq.vars
+
+let vars_l (t:t): _ list =
+  vars_seq t
+  |> Sequence.to_rev_list
+  |> CCList.sort_uniq ~cmp:(HVar.compare Type.compare)
+
+(* find the substitutions making [a1] and [a2] the same constraint *)
+let variants_arr_ subst a1 sc1 a2 sc2 : _ Sequence.t =
+  (* match a1.(i...) with a2\bv *)
+  let rec iter2 subst subst_rhs bv i k =
+    if i = Array.length a1
+    then k subst
+    else iter3 subst subst_rhs bv i 0 k
+  (* find a matching literal for a1.(i), within a2.(j...) *)
+  and iter3 subst subst_rhs bv i j k =
+    if j = Array.length a2
+    then ()  (* stop *)
+    else (
+      if not (BV.get bv j) then (
+        (* try to match i-th literal of a1 with j-th literal of a2 *)
+        BV.set bv j;
+        let t1, u1 = a1.(i) in
+        let t2, u2 = a2.(j) in
+        (* subst(t1=t2) and subst_rhs(u1=u2) must hold *)
+        begin
+          try
+            let subst = Unif.FO.variant ~subst (t1,sc1) (t2,sc2) in
+            let subst_rhs = Unif.FO.variant ~subst:subst_rhs (u1,0)(u2,1) in
+            iter2 subst subst_rhs bv (i+1) k
+          with Unif.Fail -> ()
+        end;
+        BV.reset bv j
+      );
+      iter3 subst subst_rhs bv i (j+1) k
+    )
+  in
+  fun yield ->
+    if Array.length a1 = Array.length a2
+    then (
+      let bv = BV.create ~size:(Array.length a1) false in
+      iter2 subst Subst.empty bv 0 yield
+    )
+
+let variant ?(subst=Subst.empty) (c1,sc1)(c2,sc2) : Subst.t Sequence.t =
+  begin match c1, c2 with
+    | Trivial, Trivial -> Sequence.return subst
+    | Trivial, Pairs _
+    | Pairs _, Trivial -> Sequence.empty
+    | Pairs l1, Pairs l2 ->
+      variants_arr_ subst (Array.of_list l1) sc1 (Array.of_list l2) sc2
+  end
+
+let are_variant a b =
+  not (variant (a,0) (b,0) |> Sequence.is_empty)

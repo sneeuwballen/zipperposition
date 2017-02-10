@@ -72,6 +72,8 @@ let kind_of_lits ~trail ~constr (c_lits:Lit.t IArray.t) proof: c_kind =
   let mk_body arr =
     Array.sort compare_lits_for_horn_ arr; (* sort body in some order *)
     IArray.of_array_unsafe arr
+  and mk_horn head body =
+    Horn_clause.make ~constr ~trail ~unordered_depth:0 head body proof
   in
   begin match pos with
     | [] ->
@@ -81,7 +83,7 @@ let kind_of_lits ~trail ~constr (c_lits:Lit.t IArray.t) proof: c_kind =
         Array.init (IArray.length c_lits) (fun i->Lit.neg (IArray.get c_lits i))
         |> mk_body
       in
-      let hc = Horn_clause.make ~constr ~trail head body proof in
+      let hc = mk_horn head body in
       C_horn hc
     | [i,_] ->
       let head = IArray.get c_lits i in
@@ -94,7 +96,7 @@ let kind_of_lits ~trail ~constr (c_lits:Lit.t IArray.t) proof: c_kind =
              Lit.neg lit)
         |> mk_body
       in
-      let hc = Horn_clause.make ~constr ~trail head body proof in
+      let hc = mk_horn head body in
       C_horn hc
     | _ -> C_general
   end
@@ -182,33 +184,10 @@ let is_trivial c =
 let variant ?(subst=S.empty) (c1,sc1) (c2,sc2) : S.t Sequence.t =
   let a1 = c1.c_lits in
   let a2 = c2.c_lits in
-  (* match a1.(i...) with a2\bv *)
-  let rec iter2 subst bv i k =
-    if i = IArray.length a1
-    then k subst
-    else iter3 subst bv i 0 k
-  (* find a matching literal for a1.(i), within a2.(j...) *)
-  and iter3 subst bv i j k =
-    if j = IArray.length a2
-    then ()  (* stop *)
-    else (
-      if not (BV.get bv j)
-      then (
-        (* try to match i-th literal of a1 with j-th literal of a2 *)
-        BV.set bv j;
-        Lit.variant ~subst (IArray.get a1 i,sc1) (IArray.get a2 i,sc2)
-          (fun subst -> iter2 subst bv (i+1) k);
-        BV.reset bv j
-      );
-      iter3 subst bv i (j+1) k
-    )
-  in
-  fun yield ->
-    if IArray.length a1 = IArray.length a2
-    then (
-      let bv = BV.create ~size:(IArray.length a1) false in
-      iter2 subst bv 0 yield
-    )
+  Unif.unif_array_com subst
+    (IArray.to_array_unsafe a1,sc1)
+    (IArray.to_array_unsafe a2,sc2)
+    ~op:(fun subst x y -> Lit.variant ~subst x y)
 
 let equal_mod_alpha c1 c2 : bool =
   not (Sequence.is_empty (variant (c1,0) (c2,1)))

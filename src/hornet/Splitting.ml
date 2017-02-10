@@ -175,22 +175,22 @@ module Make(Ctx : State.CONTEXT) = struct
 
   let on_assumption (lit:Bool_lit.t): unit =
     begin match Bool_lit.view lit, Bool_lit.sign lit with
-      | Bool_lit.Box_clause (_,r), true ->
+      | A_box_clause r, true ->
         Ctx.on_backtrack
           (fun () -> Ctx.send_event (E_remove_component r));
         Ctx.send_event (E_add_component r)
-      | Bool_lit.Box_clause _, false -> () (* TODO: if unit negative, maybe? *)
-      | Bool_lit.Ground_lit (_,r), true ->
+      | A_box_clause _, false -> () (* TODO: if unit negative, maybe? *)
+      | A_ground r, true ->
         Ctx.on_backtrack
           (fun () -> Ctx.send_event (E_remove_ground_lit r));
         Ctx.send_event (E_add_ground_lit r)
-      | Bool_lit.Ground_lit _, false -> ()
-      | Bool_lit.Select_lit (_,_,r), true ->
+      | A_ground _, false -> ()
+      | A_select r, true ->
         Ctx.on_backtrack
           (fun () -> Ctx.send_event (E_unselect_lit r));
         Ctx.send_event (E_select_lit (r, C.dismatch_constr r.bool_select_clause))
-      | Bool_lit.Select_lit _, false
-      | Bool_lit.Fresh _, _
+      | A_select _, false
+      | A_fresh _, _
         -> ()
     end
 
@@ -203,6 +203,9 @@ module Make(Ctx : State.CONTEXT) = struct
       | E_add_component _ | E_remove_component _
       | E_add_ground_lit _ | E_remove_ground_lit _
       | E_select_lit _ | E_unselect_lit _ -> () (* come from here *)
+      | E_conflict (c,proof) ->
+        (* trigger conflict in SAT *)
+        Ctx.add_clause proof c
       | E_found_unsat _ -> ()
       | E_stage s ->
         begin match s with

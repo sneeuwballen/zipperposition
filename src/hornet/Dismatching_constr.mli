@@ -41,3 +41,15 @@ val is_absurd : t -> bool
 
 include Interfaces.PRINT with type t := t
 
+val vars_seq : t -> Type.t HVar.t Sequence.t
+
+val vars_l : t -> Type.t HVar.t list
+
+val variant :
+  ?subst:Subst.t ->
+  t Scoped.t ->
+  t Scoped.t ->
+  Subst.t Sequence.t
+(** Find substitutions for which these two constraints are variant *)
+
+val are_variant : t -> t -> bool

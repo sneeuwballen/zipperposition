@@ -9,6 +9,7 @@ open Hornet_types
 module Fmt = CCFormat
 module Pos = Position
 module PW = Position.With
+module BV = CCBV
 
 type constraint_ = Hornet_types.c_constraint_
 
@@ -19,7 +20,7 @@ type horn_clause = t
 
 let make =
   let n_ = ref 0 in
-  fun ?(trail=[]) ?(constr=[]) ?(unordered_depth=0) head body proof ->
+  fun ~trail ~constr ~unordered_depth head body proof ->
     let hc_id = !n_ in
     incr n_;
     { hc_id;
@@ -47,6 +48,21 @@ let constr c = c.hc_constr
 let unordered_depth c = c.hc_unordered_depth
 let status c = c.hc_status
 
+let set_status c new_st =
+  begin match c.hc_status, new_st with
+    | HC_new, _
+    | HC_alive, HC_dead
+    | HC_dead, HC_dead -> ()
+    | _ ->
+      Util.errorf
+        ~where:"HC.set_status"
+        "for `@[%a@]`,@ wrong change `%a` -> `%a`"
+        pp c
+        Hornet_types_util.pp_hc_status c.hc_status
+        Hornet_types_util.pp_hc_status new_st
+  end;
+  c.hc_status <- new_st
+
 let body_seq c = IArray.to_seq (body c)
 let body_l c = IArray.to_list (body c)
 
@@ -60,18 +76,18 @@ let body0 c =
 let body0_exn c = match body0 c with
   | Some c -> c
   | None ->
-    Util.invalid_argf "Horn_clause.body0_exn: empty body in `@[%a@]`" pp c
+    Util.errorf ~where:"Horn_clause.body0_exn" "empty body in `@[%a@]`" pp c
 
 let body_get c n =
   if n < 0 || n >= IArray.length (body c) then (
-    Util.invalid_argf "Horn.body_get %d in `@[%a@]`" n pp c;
+    Util.errorf ~where:"Horn.body_get" "%d in `@[%a@]`" n pp c;
   );
   IArray.get (body c) n
 
 let body_tail c =
   let n = IArray.length (body c) in
-  if n = 0 then invalid_arg "Horn_clause.body_tail: empty body";
-  IArray.init (n-1) (fun i -> IArray.get (body c) (i-1))
+  if n = 0 then Util.errorf ~where:"Horn_clause.body_tail" "empty body `@[%a@]`" pp c;
+  IArray.init (n-1) (fun i -> IArray.get (body c) (i+1))
 
 let head_pos c = PW.make (head c) Pos.(head stop)
 let body_pos n c = PW.make (body_get c n) Pos.(arg n @@ body @@ stop)
@@ -82,6 +98,7 @@ let body0_pos = body_pos 0
 let is_trivial c =
   Lit.is_trivial (head c) ||
   IArray.exists Lit.is_absurd (body c) ||
+  Trail.is_absurd (trail c) ||
   List.exists
     (function
       | C_dismatch d -> Dismatching_constr.is_absurd d)
@@ -104,6 +121,59 @@ let is_ground c =
   Lit.is_ground (head c) &&
   IArray.for_all Lit.is_ground (body c)
 
+(** {2 Unification} *)
+
+let variant ?(subst=Subst.empty) (c1,sc1) (c2,sc2) : Subst.t Sequence.t =
+  let variant_constr subst (c1,sc1)(c2,sc2) = match c1, c2 with
+    | C_dismatch d1, C_dismatch d2 ->
+      Dismatching_constr.variant ~subst (d1,sc1) (d2,sc2)
+  in
+  let {
+    hc_unordered_depth=depth1;
+    hc_body=a1;
+    hc_head=h1;
+    hc_constr=c1;
+    hc_trail=tr1;
+    hc_id=id1;
+    hc_status=_;
+    hc_proof=_;
+  } = c1
+  and {
+    hc_unordered_depth=depth2;
+    hc_body=a2;
+    hc_head=h2;
+    hc_constr=c2;
+    hc_trail=tr2;
+    hc_id=id2;
+    hc_status=_;
+    hc_proof=_;
+  } = c2 in
+  if id1=id2 then Sequence.return subst
+  else if depth1=depth2 && Hornet_types_util.equal_bool_trail tr1 tr2 then (
+    Lit.variant ~subst (h1,sc1)(h2,sc2)
+    |> Sequence.flat_map
+      (fun subst ->
+         Unif.unif_array_com subst
+           (IArray.to_array_unsafe a1,sc1)
+           (IArray.to_array_unsafe a2,sc2)
+           ~op:(fun subst x y -> Lit.variant ~subst x y))
+    |> Sequence.flat_map
+      (fun subst ->
+         Unif.unif_list_com subst (c1,sc1)(c2,sc2)
+           ~op:variant_constr)
+  ) else Sequence.empty
+
+let equal_mod_alpha (c1:t) (c2:t) : bool =
+  not (variant (c1,0)(c2,1) |> Sequence.is_empty)
+
+let hash_mod_alpha c: int =
+  Hash.combine4 42
+    (Lit.hash_mod_alpha (head c))
+    (IArray.hash_comm Lit.hash_mod_alpha (body c))
+    (Hash.list_comm
+       (fun (lazy b_lit) -> Hornet_types_util.hash_bool_lit b_lit)
+       (trail c))
+
 (** {2 Containers} *)
 
 module As_key = struct
@@ -112,6 +182,12 @@ module As_key = struct
   let hash = hash
 end
 module Tbl = CCHashtbl.Make(As_key)
+
+module Tbl_mod_alpha = CCHashtbl.Make(struct
+    type t = horn_clause
+    let equal = equal_mod_alpha
+    let hash = hash_mod_alpha
+  end)
 
 (** {2 Pairing with Position} *)
 

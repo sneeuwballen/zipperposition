@@ -57,9 +57,6 @@ end = struct
 end
 
 module Make(A : ARGS) : S = struct
-  exception Theory_conflict of Bool_lit.t list * Proof.t
-  (** Raised by a handler when a conflict is detected *)
-
   module SAT_theory = struct
     type formula = Bool_lit.t
     type proof = Hornet_types.proof
@@ -75,23 +72,20 @@ module Make(A : ARGS) : S = struct
     let current_level () = CCVector.length backtrack_vec
 
     let backtrack lev =
-      Util.debugf ~section 5 "@[<2>backtrack to level %d@]" (fun k->k lev);
+      Util.debugf ~section 3 "@[<2>@{<Blue>backtrack to level %d@}@]" (fun k->k lev);
       while CCVector.length backtrack_vec > lev do
         let f = CCVector.pop_exn backtrack_vec in
         f()
       done
 
     let assume slice : _ TI.res =
-      try
-        for i = slice.TI.start to slice.TI.start + slice.TI.length - 1 do
-          let lit = slice.TI.get i in
-          List.iter (fun f -> f lit) !on_assumption_
-        done;
-        TI.Sat
-      with Theory_conflict (c,proof) ->
-        TI.Unsat (c, proof)
+      for i = slice.TI.start to slice.TI.start + slice.TI.length - 1 do
+        let lit = slice.TI.get i in
+        List.iter (fun f -> f lit) !on_assumption_
+      done;
+      TI.Sat
 
-    let if_sat _ = TI.Sat (* TODO: add corresponding hook in THEORY *)
+    let if_sat _ = TI.Sat (* TODO: add corresponding hook in THEORY? increase depth? *)
   end
 
   module M =
@@ -110,7 +104,6 @@ module Make(A : ARGS) : S = struct
     type bool_clause = Bool_lit.t list
     let bool_state = Bool_lit.create_state ()
     let on_backtrack f = CCVector.push SAT_theory.backtrack_vec f
-    let raise_conflict c proof = raise (Theory_conflict (c,proof))
     let add_clause_l proof l =
       let tag = Proof_tbl.tag_of_proof proof in
       Util.debugf ~section 5 "@[<2>add_bool_clauses@ (@[<hv>%a@])@]"
@@ -235,6 +228,7 @@ let run (t:t): res =
       | St.M.Unsat us ->
         Util.debugf ~section 1 "@[Found unsat@]" (fun k->k);
         let p = rebuild_proof us in
+        St.Ctx.send_event (Hornet_types.E_found_unsat p);
         Unsat p
     end
   in

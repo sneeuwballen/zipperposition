@@ -15,10 +15,12 @@ module Int_map = Util.Int_map
 type atom = Hornet_types.bool_atom
 type proof = Hornet_types.proof
 type t = Hornet_types.bool_lit
+type view = Hornet_types.bool_atom
 
 let atom t = t.bl_atom
 let sign t = t.bl_sign
-let neg t = {t with bl_sign=not t.bl_sign}
+let view t = t.bl_atom
+let neg = Hornet_types_util.neg_bool_lit
 
 let norm (t:t): t * FI.negated =
   if t.bl_sign
@@ -30,18 +32,6 @@ let hash = Hornet_types_util.hash_bool_lit
 let pp = Hornet_types_util.pp_bool_lit
 let to_string = Fmt.to_string pp
 let print = pp
-
-type view =
-  | Fresh of int
-  | Box_clause of clause * bool_box_clause
-  | Select_lit of clause * clause_idx * bool_select
-  | Ground_lit of lit * bool_ground (* must be ground and positive *)
-
-let view (t:t): view = match t.bl_atom.a_view with
-  | A_fresh i -> Fresh i
-  | A_box_clause r -> Box_clause (r.bool_box_clause,r)
-  | A_select r -> Select_lit (r.bool_select_clause, r.bool_select_idx, r)
-  | A_ground r -> Ground_lit (r.bool_ground_lit, r)
 
 (** {2 Constructors} *)
 
@@ -65,7 +55,7 @@ let create_state() : state = {
 let make_ bl_sign bl_atom : t = {bl_atom; bl_sign}
 
 (* stateless *)
-let dummy = make_ true {a_view=A_fresh 0; a_dependent=[]}
+let dummy = make_ true (A_fresh 0)
 
 let of_atom ?(sign=true) a = make_ sign a
 
@@ -74,10 +64,8 @@ let fresh_atom_id_ state: int =
   state.count <- n+1;
   n
 
-let atom_of_view a = {a_view=a; a_dependent=[]}
-
 let fresh state =
-  make_ true (atom_of_view (A_fresh (fresh_atom_id_ state)))
+  make_ true (A_fresh (fresh_atom_id_ state))
 
 let select_lit state c i =
   let atom =
@@ -93,7 +81,8 @@ let select_lit state c i =
           bool_select_lit=IArray.get c.c_lits i;
           bool_select_clause=c;
           bool_select_id=fresh_atom_id_ state;
-        } |> atom_of_view
+          bool_select_depends=[];
+        }
       in
       C.Tbl_mod_alpha.replace state.select_tbl c (Int_map.add i a map);
       a
@@ -113,7 +102,7 @@ let ground state (lit:Lit.t): t =
           bool_ground_lit=lit;
           bool_ground_id=fresh_atom_id_ state;
           bool_ground_instance_of=[];
-        } |> atom_of_view
+        }
       in
       Lit.Tbl.add state.ground_tbl lit atom;
       atom
@@ -128,7 +117,8 @@ let box_clause state c =
       let a = A_box_clause {
           bool_box_clause=c;
           bool_box_id=fresh_atom_id_ state;
-        } |> atom_of_view
+          bool_box_depends=[];
+        }
       in
       C.Tbl_mod_alpha.add state.box_tbl c a;
       a

@@ -21,9 +21,9 @@ type horn_clause = t
 (** {2 Basics} *)
 
 val make :
-  ?trail:bool_trail ->
-  ?constr:constraint_ list ->
-  ?unordered_depth:int ->
+  trail:bool_trail ->
+  constr:constraint_ list ->
+  unordered_depth:int ->
   Lit.t ->
   Lit.t IArray.t ->
   proof ->
@@ -47,6 +47,11 @@ val unordered_depth : t -> int
 
 val status : t -> horn_clause_status
 
+val set_status : t -> horn_clause_status -> unit
+(** change the status
+    @raise Util.Error if the change is not following the order
+    [New -> Alive -> Dead] *)
+
 val body_seq : t -> Lit.t Sequence.t
 (** Sequence of body elements *)
 
@@ -61,15 +66,15 @@ val body0 : t -> Lit.t option
 
 val body0_exn : t -> Lit.t
 (** Get the first body literal
-    @raise Invalid_argument if the body is empty *)
+    @raise Util.Error if the body is empty *)
 
 val body_get : t -> int -> Lit.t
 (** Get the [n]-th body literal.
-    @raise Invalid_argument if [n] is not within [0... body_len c - 1] *)
+    @raise Util.Error if [n] is not within [0... body_len c - 1] *)
 
 val body_tail : t -> Lit.t IArray.t
 (** All the body except literal 0.
-    @raise Invalid_argument if the body is empty *)
+    @raise Util.Error if the body is empty *)
 
 val head_pos : t -> Lit.t Position.With.t
 
@@ -85,6 +90,18 @@ val is_trivial : t -> bool
 
 val is_absurd : t -> bool
 
+(** {2 Unification} *)
+
+val variant :
+  ?subst:Subst.t ->
+  t Scoped.t ->
+  t Scoped.t ->
+  Subst.t Sequence.t
+
+val hash_mod_alpha : t -> int
+
+val equal_mod_alpha : t -> t -> bool
+
 (** {2 Containers} *)
 
 include Interfaces.PRINT with type t := t
@@ -92,6 +109,9 @@ include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 
 module Tbl : CCHashtbl.S with type key = t
+
+module Tbl_mod_alpha : CCHashtbl.S with type key = t
+(** table that uses {!equal_mod_alpha} and {!hash_mod_alpha} *)
 
 (** {2 Pairing with Position} *)
 

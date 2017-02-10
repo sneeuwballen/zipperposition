@@ -16,8 +16,6 @@ module type CONTEXT = sig
 
   (** {6 SAT} *)
 
-  val raise_conflict : bool_clause -> proof -> 'a
-
   val on_backtrack : (unit -> unit) -> unit
   (** Push the given callback on a stack. It will be
       called when the SAT solver backtracks. *)

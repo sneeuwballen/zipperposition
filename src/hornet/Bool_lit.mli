@@ -13,17 +13,12 @@ open Hornet_types
 type atom = Hornet_types.bool_atom
 type t = Hornet_types.bool_lit
 type proof = Hornet_types.proof
+type view = Hornet_types.bool_atom
 
 include Msat.Formula_intf.S with type t := t and type proof := proof
 
-type view =
-  | Fresh of int
-  | Box_clause of clause * bool_box_clause
-  | Select_lit of clause * clause_idx * bool_select
-  | Ground_lit of lit * bool_ground (* must be ground and positive *)
-
-val atom : t -> atom
 val view : t -> view
+val atom : t -> atom
 val sign : t -> bool
 
 include Interfaces.PRINT with type t := t

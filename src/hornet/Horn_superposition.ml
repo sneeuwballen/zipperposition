@@ -43,12 +43,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
   (** {2 Clause Sets} *)
 
-  module type CLAUSE_SET = sig
-    val add : HC.t -> unit
-    val mem : HC.t -> bool
-    val remove : HC.t -> unit
-  end
-
   type idx_elt = term * HC.With_pos.t
 
   type relevant_pos =
@@ -88,7 +82,15 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
   (* positive unit clauses *)
   module Active_set : sig
-    include CLAUSE_SET
+    val add : HC.t -> unit
+
+    val mem : HC.t -> bool
+
+    val variant_mem : HC.t -> bool
+    (** Is there a clause which is a variant of this one? *)
+
+    val remove : HC.t -> unit
+
     val size: unit -> int
 
     (* index on the head equation sides of positive unit clauses
@@ -101,6 +103,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     val idx_sup_into : unit -> CP_idx.t
   end = struct
     let tbl : unit HC.Tbl.t = HC.Tbl.create 512
+    let tbl_mod_alpha : unit HC.Tbl_mod_alpha.t = HC.Tbl_mod_alpha.create 512
     let size () = HC.Tbl.length tbl
 
     let idx_heads_ : CP_idx.t ref = ref (CP_idx.empty ())
@@ -112,6 +115,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     let add c =
       if not (HC.Tbl.mem tbl c) then (
         HC.Tbl.add tbl c ();
+        HC.Tbl_mod_alpha.add tbl_mod_alpha c ();
         begin match relevant_pos c with
           | Head (active, subs) ->
             idx_heads_ := CP_idx.add_list !idx_heads_ active;
@@ -123,9 +127,12 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
     let mem c = HC.Tbl.mem tbl c
 
+    let variant_mem c = HC.Tbl_mod_alpha.mem tbl_mod_alpha c
+
     let remove c =
       if HC.Tbl.mem tbl c then (
         HC.Tbl.remove tbl c;
+        HC.Tbl_mod_alpha.remove tbl_mod_alpha c;
         begin match relevant_pos c with
           | Head (active, subs) ->
             idx_heads_ := CP_idx.remove_list !idx_heads_ active;
@@ -136,9 +143,53 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       )
   end
 
+  (* register the clause in each of its trail's boolean literal.
+     That way, when the literal is backtracked, the clause can be removed *)
+  let register_clause (c:HC.t): unit =
+    begin match HC.status c with
+      | HC_alive | HC_dead -> ()
+      | HC_new ->
+        HC.set_status c HC_alive;
+        List.iter
+          (fun (lazy b_lit) -> match Bool_lit.view b_lit with
+             | A_box_clause r ->
+               r.bool_box_depends <- c :: r.bool_box_depends
+             | A_select r ->
+               r.bool_select_depends <- c :: r.bool_select_depends
+             | A_fresh _
+             | A_ground _ -> ())
+          (HC.trail c)
+    end
+
+  (* remove all clauses that depend on the given boolean lit *)
+  let remove_all (b_lit:bool_lit): unit =
+    let l = match Bool_lit.view b_lit with
+      | A_box_clause r ->
+        let l = r.bool_box_depends in
+        r.bool_box_depends <- [];
+        l
+      | A_select r ->
+        let l = r.bool_select_depends in
+        r.bool_select_depends <- [];
+        l
+      | A_fresh _
+      | A_ground _ -> []
+    in
+    List.iter
+      (fun c -> match HC.status c with
+         | HC_new -> assert false
+         | HC_alive ->
+           (* the clause dies now *)
+           Util.debugf ~section 5 "@[<2>remove clause@ %a,@ now dead@]"
+             (fun k->k HC.pp c);
+           HC.set_status c HC_dead;
+           Active_set.remove c; (* if it's active, not any more *)
+         | HC_dead -> ())
+      l;
+    ()
+
   module Passive_set : sig
     val add : HC.t -> unit
-    val add_l : HC.t list -> unit
     val add_seq : HC.t Sequence.t -> unit
     val update_depth_limit: int -> unit
     val has_too_deep_clauses: unit -> bool (** are there clauses frozen b.c. of their depth? *)
@@ -164,18 +215,19 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
     let has_too_deep_clauses () = not (H.is_empty !too_deep_)
 
-    let add1_ q c = H.add q (weight_ c,c)
-
     let add c =
-      let depth = HC.unordered_depth c in
-      if depth < Depth_limit.get () then (
-        q_ := add1_ !q_ c
-      ) else (
-        too_deep_ := H.add !too_deep_ (depth,c);
+      register_clause c;
+      if HC.status c = HC_dead then () (* useless *)
+      else (
+        let depth = HC.unordered_depth c in
+        if depth < Depth_limit.get () then (
+          q_ := H.add !q_ (weight_ c,c)
+        ) else (
+          too_deep_ := H.add !too_deep_ (depth,c);
+        )
       )
 
-    let add_l l = q_ := List.fold_left add1_ !q_ l
-    let add_seq l = q_ := Sequence.fold add1_ !q_ l
+    let add_seq = Sequence.iter add
 
     (* new depth limit -> some clauses become active *)
     let update_depth_limit d =
@@ -189,11 +241,16 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       in
       too_deep_ := aux !too_deep_
 
-    let next () = match H.take !q_ with
+    (* find the next alive clause *)
+    let rec next () = match H.take !q_ with
       | None -> None
       | Some (new_q, (_,c)) ->
         q_ := new_q;
-        Some c
+        begin match HC.status c with
+          | HC_new -> assert false
+          | HC_alive -> Some c
+          | HC_dead -> next () (* discard dead clause *)
+        end
   end
 
   (** {2 Superposition} *)
@@ -201,7 +258,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     val rule_infer_active : HC.t rule_infer
     val rule_infer_passive : HC.t rule_infer
   end = struct
-    (* do the inference, if we might *)
+    (* do the inference, if it is needed *)
     let do_inference (sup:hc_superposition_step): HC.t option =
       let c, sc_active = sup.hc_sup_active in
       assert (HC.body_len c=0);
@@ -251,12 +308,14 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           List.rev_append
             (HC.apply_subst_constr_l ~renaming subst (HC.constr c,sc_active))
             (HC.apply_subst_constr_l ~renaming subst (HC.constr c',sc_passive))
+        and trail = Trail.merge (HC.trail c) (HC.trail c')
         in
         let new_c =
-          HC.make ~unordered_depth ~constr new_head new_body (Proof.hc_sup sup)
+          HC.make ~unordered_depth ~constr ~trail
+            new_head new_body (Proof.hc_sup sup)
         in
         Util.debugf ~section 4
-          "(@[<2>superposition_step@ :yields %a@ :params %a@ :depth %d@])"
+          "(@[<hv2>superposition_step@ :yields %a@ :params %a@ :depth %d@])"
           (fun k->k HC.pp new_c Hornet_types_util.pp_hc_sup sup unordered_depth);
         Some new_c
       ) else None
@@ -355,14 +414,18 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       | Some (Lit.Bool true) ->
         (* trivial body literal, remove *)
         let c' =
-          HC.make ~constr:(HC.constr c)
+          HC.make
+            ~constr:(HC.constr c) ~trail:(HC.trail c)
+            ~unordered_depth:(HC.unordered_depth c)
             (HC.head c) (HC.body_tail c) (Proof.hc_simplify c)
         in
         Some c'
       | Some (Lit.Eq (t, u, true)) when T.equal t u ->
         (* [a=a] -> true *)
         let c' =
-          HC.make ~constr:(HC.constr c)
+          HC.make
+            ~constr:(HC.constr c) ~trail:(HC.trail c)
+            ~unordered_depth:(HC.unordered_depth c)
             (HC.head c) (HC.body_tail c) (Proof.hc_simplify c)
         in
         Some c'
@@ -480,7 +543,12 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
             | Some c' -> aux rules0 c' (* from start *)
           end
       in
-      aux rules0 c
+      let new_c = aux rules0 c in
+      if not (HC.equal c new_c) then (
+        Util.debugf ~section 5 "@[<2>simplify@ `%a`@ into `%a`@]"
+          (fun k->k HC.pp c HC.pp new_c);
+      );
+      new_c
 
     let simplify_fast = simplify Simplifications.rules_simp_fast
     let simplify_full = simplify Simplifications.rules_simp_full
@@ -513,10 +581,15 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           "@[<2>@{<Blue>## saturate@}: given clause@ %a@]"
           (fun k->k HC.pp c);
         let c = simplify_full c in
-        if HC.is_trivial c
-        then saturation_loop ()
+        if HC.is_trivial c then saturation_loop ()
         else if HC.is_absurd c then (
+          Util.debugf ~section 2 "@[<2>@{<Green>found empty clause@}@ %a@]"
+            (fun k->k HC.pp c);
           Unsat c
+        ) else if Active_set.variant_mem c then (
+          Util.debugf ~section 4 "clause %a already in active set, continue"
+            (fun k->k HC.pp c);
+          saturation_loop ()
         ) else (
           (* add to [c] and perform inferences *)
           Active_set.add c;
@@ -554,7 +627,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         end
   end
 
-  (** {2 Unit and Horn Clauses} *)
+  (** {2 Main} *)
 
   let initial_clauses : C.t list =
     CCVector.to_seq Ctx.statements
@@ -566,15 +639,22 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     Passive_set.update_depth_limit d;
     ()
 
+  (* check result of saturation and trigger appropriate events *)
+  let check_res (res:Saturate.res): unit =
+    begin match res with
+      | Saturate.Unknown
+      | Saturate.Sat -> ()
+      | Saturate.Unsat c ->
+        assert (HC.is_absurd c);
+        let conflict_clause = Proof_of_false.to_bool_clause c in
+        Ctx.send_event (E_conflict (conflict_clause, HC.proof c));
+    end
+
   let presaturate () =
     (* add the set of initial clauses *)
     Util.debug ~section 2 "start presaturation";
     let res = Saturate.add_clauses initial_clauses in
-    begin match res with
-      | Saturate.Unknown
-      | Saturate.Sat -> ()
-      | Saturate.Unsat p -> Ctx.send_event (E_found_unsat (HC.proof p))
-    end
+    check_res res
 
   (* no direct communication with SAT solver *)
   let on_assumption _ = ()
@@ -582,13 +662,26 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
   (* TODO *)
   let on_event e =
     begin match e with
-      | E_add_component _
-      | E_remove_component _
-      | E_add_ground_lit _
-      | E_remove_ground_lit _
+      | E_add_component r ->
+        (* assume this component *)
+        begin match C.classify r.bool_box_clause with
+          | C.Horn c ->
+            check_res (Saturate.add_horn c)
+          | C.General -> ()
+        end
+      | E_remove_component r ->
+        (* remove this component, and all clauses that depend on it *)
+        begin match C.classify r.bool_box_clause with
+          | C.Horn c ->
+            (* remove all clauses that depend on [c.trail] *)
+            let trail = HC.trail c in
+            List.iter (fun (lazy b_lit) -> remove_all b_lit) trail
+          | C.General -> ()
+        end
       | E_select_lit (_,_)
       | E_unselect_lit _ ->
         () (* TODO: add/remove clauses from saturated set *)
+      | E_add_ground_lit _
       | E_stage Stage_presaturate ->
         presaturate ()
       | E_stage Stage_exit ->
@@ -598,6 +691,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
              k Saturate.pp_stats stats);
         ()
       | E_stage (Stage_start | Stage_init) -> ()
+      | E_remove_ground_lit _ -> ()
+      | E_conflict _
       | E_found_unsat _ -> ()
     end
 end
