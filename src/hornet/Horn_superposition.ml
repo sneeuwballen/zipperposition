@@ -310,7 +310,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           List.rev_append
             (HC.apply_subst_constr_l ~renaming subst (HC.constr c,sc_active))
             (HC.apply_subst_constr_l ~renaming subst (HC.constr c',sc_passive))
-        and trail = Trail.merge (HC.trail c) (HC.trail c')
+        and trail =
+          Trail.merge (HC.trail c) (HC.trail c')
         in
         let new_c =
           HC.make ~unordered_depth ~constr ~trail
@@ -616,7 +617,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       saturation_loop ()
 
     let add_clause c =
-      Util.debugf ~section 3 "@[<2>saturate.add_clause@ %a@]" (fun k->k C.pp c);
+      Util.debugf ~section 3 "@[<2>@{<Yellow>saturate.add_clause@}@ %a@]"
+        (fun k->k C.pp c);
       begin match C.classify c with
         | C.Horn hc -> add_horn hc
         | C.General -> Sat (* wait until it is split *)
@@ -656,7 +658,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
   let presaturate () =
     (* add the set of initial clauses *)
-    Util.debug ~section 2 "start presaturation";
+    Util.debugf ~section 2 "@{<Yellow>start presaturation@}"(fun k->k);
     let res = Saturate.add_clauses initial_clauses in
     check_res res
 
