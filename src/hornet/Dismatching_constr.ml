@@ -128,40 +128,20 @@ let vars_l (t:t): _ list =
 
 (* find the substitutions making [a1] and [a2] the same constraint *)
 let variants_arr_ subst a1 sc1 a2 sc2 : _ Sequence.t =
-  (* match a1.(i...) with a2\bv *)
-  let rec iter2 subst subst_rhs bv i k =
-    if i = Array.length a1
-    then k subst
-    else iter3 subst subst_rhs bv i 0 k
-  (* find a matching literal for a1.(i), within a2.(j...) *)
-  and iter3 subst subst_rhs bv i j k =
-    if j = Array.length a2
-    then ()  (* stop *)
-    else (
-      if not (BV.get bv j) then (
-        (* try to match i-th literal of a1 with j-th literal of a2 *)
-        BV.set bv j;
-        let t1, u1 = a1.(i) in
-        let t2, u2 = a2.(j) in
-        (* subst(t1=t2) and subst_rhs(u1=u2) must hold *)
-        begin
-          try
-            let subst = Unif.FO.variant ~subst (t1,sc1) (t2,sc2) in
-            let subst_rhs = Unif.FO.variant ~subst:subst_rhs (u1,0)(u2,1) in
-            iter2 subst subst_rhs bv (i+1) k
-          with Unif.Fail -> ()
-        end;
-        BV.reset bv j
-      );
-      iter3 subst subst_rhs bv i (j+1) k
-    )
-  in
-  fun yield ->
-    if Array.length a1 = Array.length a2
-    then (
-      let bv = BV.create ~size:(Array.length a1) false in
-      iter2 subst Subst.empty bv 0 yield
-    )
+  (* perform simultaneous unification of LHS terms pairwise,
+     and RHS terms pairwise. *)
+  Unif.unif_array_com
+    (subst,Subst.empty)
+    (a1,sc1)
+    (a2,sc2)
+    ~op:(fun (subst,subst_rhs) ((t1,u1),sc1) ((t2,u2),sc2) ->
+      try
+        let subst = Unif.FO.variant ~subst (t1,sc1) (t2,sc2) in
+        let subst_rhs = Unif.FO.variant ~subst:subst_rhs (u1,0)(u2,1) in
+        Sequence.return (subst,subst_rhs)
+      with Unif.Fail ->
+        Sequence.empty)
+  |> Sequence.map fst (* drop the internal substitution *)
 
 let variant ?(subst=Subst.empty) (c1,sc1)(c2,sc2) : Subst.t Sequence.t =
   begin match c1, c2 with
