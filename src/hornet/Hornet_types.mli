@@ -54,12 +54,12 @@ and horn_clause = {
   hc_trail: bool_trail;
   hc_proof: proof;
   hc_unordered_depth: int; (* how many unordered inferences needed? *)
-  hc_status: horn_clause_status; (* where is the clause in its lifecycle? *)
+  mutable hc_status: horn_clause_status; (* where is the clause in its lifecycle? *)
 }
 
 and horn_clause_status =
   | HC_new (** Just created, not registered *)
-  | HC_active (** Alive and kicking *)
+  | HC_alive (** Alive and kicking *)
   | HC_dead (** Unregistered, inert *)
 
 (** Description of a single superposition step *)
@@ -83,12 +83,7 @@ and bool_res_step = {
   bool_res_p2: proof;
 }
 
-and bool_atom = {
-  a_view: bool_atom_view;
-  mutable a_dependent: horn_clause list; (* clauses depending on this *)
-}
-
-and bool_atom_view =
+and bool_atom =
   | A_fresh of bool_unique_id
   | A_box_clause of bool_box_clause
   | A_select of bool_select
@@ -97,6 +92,7 @@ and bool_atom_view =
 and bool_box_clause = {
   bool_box_id: bool_unique_id;
   bool_box_clause: clause;
+  mutable bool_box_depends : horn_clause list; (* clauses depending on this *)
 }
 
 and bool_select = {
@@ -104,6 +100,7 @@ and bool_select = {
   bool_select_idx: clause_idx;
   bool_select_lit: lit; (* [lit = get clause idx] *)
   bool_select_id: bool_unique_id;
+  mutable bool_select_depends : horn_clause list; (* clauses depending on this *)
 }
 
 and bool_ground = {
@@ -141,5 +138,6 @@ type event =
   | E_unselect_lit of bool_select
   | E_add_ground_lit of bool_ground
   | E_remove_ground_lit of bool_ground
-  | E_found_unsat of proof
+  | E_conflict of bool_clause * proof (* boolean conflict in some theory *)
+  | E_found_unsat of proof (* final proof *)
   | E_stage of stage

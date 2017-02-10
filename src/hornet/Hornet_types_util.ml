@@ -20,7 +20,7 @@ let pp_clause_lits out a =
   Fmt.fprintf out "@[%a@]" (Fmt.seq pp_lit) (IArray.to_seq a.c_lits)
 let pp_clause out (a:clause) = Fmt.within "[" "]" pp_clause_lits out a
 
-let pp_atom_view out = function
+let pp_atom out = function
   | A_fresh i -> Fmt.fprintf out "fresh_%d" i
   | A_box_clause b -> Fmt.fprintf out "%a" pp_clause_lits b.bool_box_clause
   | A_select r ->
@@ -29,15 +29,11 @@ let pp_atom_view out = function
       r.bool_select_idx r.bool_select_id pp_clause r.bool_select_clause
   | A_ground r -> pp_lit out r.bool_ground_lit
 
-let pp_atom out a = pp_atom_view out a.a_view
-
-let pp_bool_lit =
-  let pp_inner out l =
-    if l.bl_sign
-    then pp_atom out l.bl_atom
-    else Fmt.fprintf out "¬%a" pp_atom l.bl_atom
-  in
-  Fmt.within "⟦" "⟧" pp_inner
+let pp_bool_lit out l =
+  let pp_inner out l = Fmt.within "⟦" "⟧" pp_atom out l.bl_atom in
+  if l.bl_sign
+  then pp_inner out l
+  else Fmt.fprintf out "¬%a" pp_inner l
 
 let pp_bool_clause out l =
   Fmt.fprintf out "[@[%a@]]" (Util.pp_list ~sep:" ⊔ " pp_bool_lit) l
@@ -54,14 +50,23 @@ let pp_bool_trail_opt out trail = match trail with
 let pp_constraint out (c:c_constraint_): unit = match c with
   | C_dismatch d -> Dismatching_constr.pp out d
 
+let pp_hc_status out (s:horn_clause_status): unit = match s with
+  | HC_new -> Fmt.string out "new"
+  | HC_alive -> Fmt.string out "alive"
+  | HC_dead -> Fmt.string out "dead"
+
 let pp_hclause out (c:horn_clause): unit =
   let pp_constr out = function
     | [] -> Fmt.silent out ()
     | l -> Fmt.fprintf out "| @[<hv>%a@]" (Fmt.list pp_constraint) l
+  and pp_body out body =
+    if IArray.length body > 0 then (
+      Fmt.fprintf out " @<1>← @[<hv>%a@]" (Fmt.seq pp_lit) (IArray.to_seq body)
+    );
   in
-  Fmt.fprintf out "(@[%a@ @<1>← @[<hv>%a@]%a@,%a@])"
+  Fmt.fprintf out "(@[%a@,%a@,%a@,%a@])"
     pp_lit c.hc_head
-    (Fmt.seq pp_lit) (IArray.to_seq c.hc_body)
+    pp_body c.hc_body
     pp_bool_trail_opt c.hc_trail
     pp_constr c.hc_constr
 
@@ -107,10 +112,8 @@ let hash_lit : lit -> int = function
   | Atom (t,sign) -> Hash.combine3 20 (T.hash t) (Hash.bool sign)
   | Eq (t,u,sign) -> Hash.combine4 30 (T.hash t) (T.hash u) (Hash.bool sign)
 
-let equal_bool_lit a b : bool =
-  a.bl_sign = b.bl_sign
-  &&
-  begin match a.bl_atom.a_view, b.bl_atom.a_view with
+let equal_atom (a:bool_atom) b : bool =
+  begin match a, b with
     | A_fresh i, A_fresh j ->  i=j
     | A_box_clause r1, A_box_clause r2 -> r1.bool_box_id = r2.bool_box_id
     | A_ground r1, A_ground r2 -> r1.bool_ground_id = r2.bool_ground_id
@@ -122,7 +125,44 @@ let equal_bool_lit a b : bool =
       -> false
   end
 
-let hash_bool_lit a : int = match a.bl_atom.a_view with
+let equal_bool_lit (a:bool_lit) b : bool =
+  a.bl_sign = b.bl_sign &&
+  equal_atom a.bl_atom b.bl_atom
+
+let compare_atom (a:bool_atom) b : int =
+  let to_int = function
+    | A_fresh _ -> 0
+    | A_box_clause _ -> 1
+    | A_ground _ -> 2
+    | A_select _ -> 3
+  in
+  begin match a, b with
+    | A_fresh i, A_fresh j -> CCInt.compare i j
+    | A_box_clause r1, A_box_clause r2 -> CCInt.compare r1.bool_box_id r2.bool_box_id
+    | A_ground r1, A_ground r2 -> CCInt.compare r1.bool_ground_id r2.bool_ground_id
+    | A_select r1, A_select r2 -> CCInt.compare r1.bool_select_id r2.bool_select_id
+    | A_fresh _, _
+    | A_box_clause _, _
+    | A_ground _, _
+    | A_select _, _
+      -> CCInt.compare (to_int a)(to_int b)
+  end
+
+let compare_bool_lit (a:bool_lit) b : int =
+  let c = CCBool.compare a.bl_sign b.bl_sign in
+  if c<> 0 then c
+  else compare_atom a.bl_atom b.bl_atom
+
+let neg_bool_lit t = {t with bl_sign=not t.bl_sign}
+
+(* same trail, modulo ordering *)
+let equal_bool_trail (a:bool_trail) b: bool =
+  let cmp (lazy a)(lazy b) = compare_bool_lit a b in
+  assert (CCList.is_sorted ~cmp a);
+  assert (CCList.is_sorted ~cmp b);
+  CCList.equal (fun a b-> cmp a b=0) a b
+
+let hash_bool_lit a : int = match a.bl_atom with
   | A_fresh i -> Hash.combine3 10 (Hash.bool a.bl_sign) (Hash.int i)
   | A_box_clause r -> Hash.combine2 15 (Hash.int r.bool_box_id)
   | A_select r ->
@@ -153,6 +193,9 @@ let pp_event out (e:event): unit = match e with
     Fmt.fprintf out "(@[add_ground_lit@ %a@])" pp_lit r.bool_ground_lit
   | E_remove_ground_lit r ->
     Fmt.fprintf out "(@[remove_ground_lit@ %a@])" pp_lit r.bool_ground_lit
+  | E_conflict (c,p) ->
+    Fmt.fprintf out "(@[conflict@ :clause %a@ :proof %a@])"
+      pp_bool_clause c pp_proof p
   | E_found_unsat p ->
     Fmt.fprintf out "(@[found_unsat@ :proof %a@])" pp_proof p
   | E_stage s -> Fmt.fprintf out "(@[stage %a@])" pp_stage s
