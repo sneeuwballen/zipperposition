@@ -125,7 +125,9 @@ let vars_seq = Hornet_types_util.vars_of_hclause
 
 (** {2 Unification} *)
 
-let variant ?(subst=Subst.empty) (c1,sc1) (c2,sc2) : Subst.t Sequence.t =
+let prof_variant = Util.mk_profiler "hornet.horn_clause_variant"
+
+let variant_ subst (c1,sc1) (c2,sc2) : Subst.t Sequence.t =
   let variant_constr subst (c1,sc1)(c2,sc2) = match c1, c2 with
     | C_dismatch d1, C_dismatch d2 ->
       Dismatching_constr.variant ~subst (d1,sc1) (d2,sc2)
@@ -164,6 +166,9 @@ let variant ?(subst=Subst.empty) (c1,sc1) (c2,sc2) : Subst.t Sequence.t =
          Unif.unif_list_com subst (c1,sc1)(c2,sc2)
            ~op:variant_constr)
   ) else Sequence.empty
+
+let variant ?(subst=Subst.empty) a b k =
+  Util.with_prof prof_variant (fun k -> variant_ subst a b k) k
 
 let equal_mod_alpha (c1:t) (c2:t) : bool =
   not (variant (c1,0)(c2,1) |> Sequence.is_empty)

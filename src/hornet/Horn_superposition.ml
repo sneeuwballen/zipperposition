@@ -202,6 +202,9 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           i1 < i2 || (i1 = i2 && HC.compare c1 c2 <= 0)
       end)
 
+    let prof_passive = Util.mk_profiler "hornet.passive_set"
+    let stat_passive_add = Util.mk_stat "hornet.passive_add"
+
     (* "weight" of a clause. for now, just favor unit clauses *)
     let weight_ (c:HC.t): int =
       let n = HC.body_len c in
@@ -215,19 +218,22 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
     let has_too_deep_clauses () = not (H.is_empty !too_deep_)
 
-    let add c =
+    let add_ c =
       register_clause c;
       if HC.status c = HC_dead then () (* useless *)
       else (
         let depth = HC.unordered_depth c in
         if depth < Depth_limit.get () then (
-          Util.debugf ~section 5 "@[<2>add `%a`@ to passive set@]"
+          Util.debugf ~section 3 "@[<2>add `%a`@ to passive set@]"
             (fun k->k HC.pp c);
+          Util.incr_stat stat_passive_add;
           q_ := H.add !q_ (weight_ c,c)
         ) else (
           too_deep_ := H.add !too_deep_ (depth,c);
         )
       )
+
+    let add c = Util.with_prof prof_passive add_ c
 
     let add_seq = Sequence.iter add
 
@@ -260,6 +266,10 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     val rule_infer_active : HC.t rule_infer
     val rule_infer_passive : HC.t rule_infer
   end = struct
+    let stat_infer = Util.mk_stat "hornet.sup_infer_steps"
+    let prof_infer_active = Util.mk_profiler "hornet.sup_active"
+    let prof_infer_passive = Util.mk_profiler "hornet.sup_active"
+
     (* do the inference, if it is needed *)
     let do_inference (sup:hc_superposition_step): HC.t option =
       let c, sc_active = sup.hc_sup_active in
@@ -353,6 +363,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           HC.make ~unordered_depth ~constr ~trail
             new_head new_body (Proof.hc_sup sup)
         in
+        Util.incr_stat stat_infer;
         Util.debugf ~section 4
           "(@[<hv2>superposition_step@ :yields %a@ :params %a@ :depth %d@])"
           (fun k->k HC.pp new_c Hornet_types_util.pp_hc_sup sup unordered_depth);
@@ -382,7 +393,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       |> Sequence.to_rev_list
 
     (* try to use this clause to rewrite other clauses *)
-    let rule_infer_active (c:HC.t) : _ list =
+    let rule_infer_active_ (c:HC.t) : _ list =
       if HC.body_len c = 0 then (
         begin match HC.head c with
           | Lit.Atom (t, true) ->
@@ -401,6 +412,9 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           | Lit.Bool _ -> []
         end
       ) else []
+
+    let rule_infer_active c =
+      Util.with_prof prof_infer_active rule_infer_active_ c
 
     let passive_sup (c:HC.t): _ list =
       let idx = Active_set.idx_heads () in
@@ -442,7 +456,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
              ))
       |> Sequence.to_rev_list
 
-    let rule_infer_passive (c:HC.t): _ list = passive_sup c
+    let rule_infer_passive (c:HC.t): _ list =
+      Util.with_prof prof_infer_passive passive_sup c
   end
 
   (** {2 Simplifications} *)
@@ -452,6 +467,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     val rules_simp_full : HC.t rule_simp list
     val rules_simp_n : HC.t rule_simp_n list
   end = struct
+    let stat_simp_body = Util.mk_stat "hornet.simp_body"
+
     (* simplification of first body literal *)
     let simp_body0 c: HC.t option = match HC.body0 c with
       | None -> None
@@ -463,6 +480,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
             ~unordered_depth:(HC.unordered_depth c)
             (HC.head c) (HC.body_tail c) (Proof.hc_simplify c)
         in
+        Util.incr_stat stat_simp_body;
         Some c'
       | Some (Lit.Eq (t, u, true)) when T.equal t u ->
         (* [a=a] -> true *)
@@ -472,10 +490,10 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
             ~unordered_depth:(HC.unordered_depth c)
             (HC.head c) (HC.body_tail c) (Proof.hc_simplify c)
         in
+        Util.incr_stat stat_simp_body;
         Some c'
       | Some lit when not (Lit.sign lit) -> assert false
       | Some _ -> None
-
 
     let rules_simp_fast = [ simp_body0 ]
 
@@ -618,6 +636,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       aux rules0 c;
       !res
 
+    let stat_loop_count = Util.mk_stat "hornet.saturation_iter_count"
+
     (* the main saturation loop *)
     let rec saturation_loop () = match Passive_set.next () with
       | None ->
@@ -625,6 +645,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         then Unknown
         else Sat
       | Some c ->
+        Util.incr_stat stat_loop_count;
         Util.debugf ~section 2
           "@[<2>@{<Blue>## saturate@}: given clause@ %a@]"
           (fun k->k HC.pp c);
