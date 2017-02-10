@@ -77,9 +77,6 @@ and bool_res_step = {
   bool_res_p2: proof;
 }
 
-(* TODO: for "ground", make it point to a mutable list of clauses whose
-   grounding contain this literal. Makes for efficient incremental selection.
-*)
 and bool_atom = {
   a_view: bool_atom_view;
   mutable a_dependent: horn_clause list; (* clauses depending on this *)
