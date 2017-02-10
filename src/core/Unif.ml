@@ -54,6 +54,34 @@ let occurs_check ~depth subst (v,sc_v) t =
   in
   check ~depth t
 
+let unif_array_com subst ~op (a1,sc1) (a2,sc2) k =
+  let module BV = CCBV in
+  (* match a1.(i...) with a2\bv *)
+  let rec iter2 subst bv i =
+    if i = Array.length a1
+    then k subst
+    else iter3 subst bv i 0
+  (* find a matching literal for a1.(i), within a2.(j...) *)
+  and iter3 subst bv i j =
+    if j = Array.length a2
+    then ()  (* stop *)
+    else (
+      if not (BV.get bv j) then (
+        (* try to match i-th literal of a1 with j-th literal of a2 *)
+        BV.set bv j;
+        op subst (a1.(i),sc1) (a2.(j),sc2)
+          (fun subst -> iter2 subst bv (i+1));
+        BV.reset bv j
+      );
+      iter3 subst bv i (j+1)
+    )
+  in
+  if Array.length a1 = Array.length a2
+  then (
+    let bv = BV.create ~size:(Array.length a1) false in
+    iter2 subst bv 0
+  )
+
 (* in HO, we have [f1 l1] and [f2 l2], where application is left-associative.
    we need to unify from the right (the outermost application is on
    the right) so this returns pairs to unify. *)

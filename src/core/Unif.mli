@@ -12,6 +12,14 @@ exception Fail
 val occurs_check : depth:int -> subst ->
   InnerTerm.t HVar.t Scoped.t -> InnerTerm.t Scoped.t -> bool
 
+(** Generic unification over two arrays (of the same size) *)
+val unif_array_com :
+  subst ->
+  op:(subst -> 'a Scoped.t -> 'a Scoped.t -> subst Sequence.t) ->
+  'a array Scoped.t ->
+  'a array Scoped.t ->
+  subst Sequence.t
+
 (** {2 Signatures} *)
 
 module type S = Unif_intf.S

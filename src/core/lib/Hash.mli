@@ -15,6 +15,11 @@ val list : 'a t -> 'a list t
 val array : 'a t -> 'a array t
 val seq : 'a t -> 'a Sequence.t t
 
+(** Orderless versions *)
+
+val list_comm : 'a t -> 'a list t
+val array_comm : 'a t -> 'a array t
+
 val combine2 : int -> int -> int
 val combine3 : int -> int -> int -> int
 val combine4 : int -> int -> int -> int -> int
