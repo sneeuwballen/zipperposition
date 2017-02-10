@@ -343,14 +343,17 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         let new_head = Lit.apply_subst ~renaming subst (HC.head c',sc_passive) in
         let new_body =
           HC.body c'
-          |> IArray.mapi
-            (fun i lit ->
-               let lit = Lit.apply_subst ~renaming subst (lit,sc_passive) in
-               if i=0
-               then
-                 (* also replace [rewritten] with [t'] in first body lit *)
-                 Lit.Pos.replace lit ~at:passive_lit_pos ~by:t'
-               else lit)
+          |> IArray.map_arr
+            (fun lit -> Lit.apply_subst ~renaming subst (lit,sc_passive))
+        in
+        let new_head, new_body = match sup.hc_sup_passive_pos with
+          | P.Head pos' ->
+            Lit.Pos.replace new_head ~at:pos' ~by:t',
+            IArray.of_array_unsafe new_body
+          | P.Body (P.Arg (0,pos')) ->
+            new_body.(0) <- Lit.Pos.replace new_body.(0) ~at:pos' ~by:t';
+            new_head, IArray.of_array_unsafe new_body
+          | _ -> assert false
         in
         let constr =
           List.rev_append
@@ -397,7 +400,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       if HC.body_len c = 0 then (
         begin match HC.head c with
           | Lit.Atom (t, true) ->
-            active_sup c P.(head stop) t T.true_
+            active_sup c P.(head @@ left @@ stop) t T.true_
           | Lit.Eq (s, t, true) ->
             begin match Ordering.compare Ctx.ord s t with
               | Comparison.Gt -> active_sup c P.(head @@ left @@ stop) s t

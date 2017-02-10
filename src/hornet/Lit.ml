@@ -49,10 +49,7 @@ let rec mk_lit t u sign =
       mk_lit (T.of_term_unsafe t') u (not sign)
     | _, TI.AppBuiltin (Builtin.Not, [u']) ->
       mk_lit t (T.of_term_unsafe u') (not sign)
-    | _ ->
-      (* canonical order *)
-      let left, right = if T.compare t u < 0 then t, u else u, t in
-      Eq (left, right, sign)
+    | _ -> Eq (t, u, sign)
   end
 
 let eq ?(sign=true) t u = mk_lit t u sign
