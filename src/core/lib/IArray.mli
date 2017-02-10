@@ -39,6 +39,9 @@ val to_list : 'a t -> 'a list
 val to_array : 'a t -> 'a array
 (** make a copy into a mutable array *)
 
+val to_array_unsafe : 'a t -> 'a array
+(** Show the underlying array. DO NOT MODIFY *)
+
 val of_array_unsafe : 'a array -> 'a t
 (** Take ownership of the given array. Careful, the array must {b NOT}
     be modified afterwards! *)

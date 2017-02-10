@@ -82,6 +82,9 @@ let unif_array_com subst ~op (a1,sc1) (a2,sc2) k =
     iter2 subst bv 0
   )
 
+let unif_list_com subst ~op (l1,sc1) (l2,sc2) =
+  unif_array_com subst ~op (Array.of_list l1,sc1) (Array.of_list l2,sc2)
+
 (* in HO, we have [f1 l1] and [f2 l2], where application is left-associative.
    we need to unify from the right (the outermost application is on
    the right) so this returns pairs to unify. *)

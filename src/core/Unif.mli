@@ -20,6 +20,14 @@ val unif_array_com :
   'a array Scoped.t ->
   subst Sequence.t
 
+(** Generic unification over two lists (of the same size) *)
+val unif_list_com :
+  subst ->
+  op:(subst -> 'a Scoped.t -> 'a Scoped.t -> subst Sequence.t) ->
+  'a list Scoped.t ->
+  'a list Scoped.t ->
+  subst Sequence.t
+
 (** {2 Signatures} *)
 
 module type S = Unif_intf.S
