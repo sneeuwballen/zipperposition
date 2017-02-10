@@ -361,6 +361,9 @@ let map_product ~f l =
         (f l1)
         tail
 
+let invalid_argf msg = CCFormat.ksprintf msg ~f:invalid_arg
+let failwithf msg = CCFormat.ksprintf msg ~f:failwith
+
 module Int_map = CCMap.Make(CCInt)
 
 (** {2 File utils} *)

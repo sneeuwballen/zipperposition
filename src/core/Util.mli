@@ -174,6 +174,9 @@ val ord_option : 'a CCOrd.t -> 'a option CCOrd.t
 
 val map_product : f:('a -> 'b list list) -> 'a list -> 'b list list
 
+val invalid_argf: ('a, Format.formatter, unit, 'b) format4 -> 'a
+val failwithf : ('a, Format.formatter, unit, 'b) format4 -> 'a
+
 module Int_map : CCMap.S with type key = int
 
 (** {2 File utils} *)
