@@ -89,7 +89,7 @@ module Make(Ctx : State.CONTEXT) = struct
               (fun lits ->
                  let proof = Proof.avatar_split c in
                  let rec sub_clause = lazy (
-                   C.make_l ~b_lit lits proof
+                   C.make_l ~trail:[b_lit] lits proof
                  )
                  and b_lit =
                    lazy (Bool_lit.box_clause Ctx.bool_state (Lazy.force sub_clause))
@@ -98,13 +98,15 @@ module Make(Ctx : State.CONTEXT) = struct
             |> List.split
           in
           Util.debugf ~section 4
-            "@[avatar_split@ :clause @[%a@]@ :yields [@[<hv>%a@]]@]"
-            (fun k->k C.pp c (Util.pp_list C.pp) clauses);
+            "@[<hv2>avatar_split@ :clause @[%a@]@ :yields (@[<hv>%a@])@ @[:trail %a@]@]"
+            (fun k->k C.pp c (Util.pp_list C.pp) clauses Bool_lit.pp_trail (C.trail c));
           (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
-          (* TODO: only add guard if [c] is already boxed? *)
-          let bool_clause =
-            Bool_lit.neg (Bool_lit.box_clause Ctx.bool_state c) :: bool_lits
+          (* guard for the boolean clause *)
+          let guard =
+            C.trail c
+            |> List.map (fun (lazy blit) -> Bool_lit.neg blit)
           in
+          let bool_clause = guard @ bool_lits in
           Ctx.add_clause Proof.bool_tauto bool_clause;
           Util.debugf ~section 4 "@[<2>constraint clause is@ @[%a@]@]"
             (fun k->k Bool_lit.pp_clause bool_clause);
@@ -172,22 +174,21 @@ module Make(Ctx : State.CONTEXT) = struct
 
   let on_assumption (lit:Bool_lit.t): unit =
     begin match Bool_lit.view lit, Bool_lit.sign lit with
-      | Bool_lit.Box_clause c, true ->
+      | Bool_lit.Box_clause (_,r), true ->
         Ctx.on_backtrack
-          (fun () -> Ctx.send_event (E_remove_component c));
-        Ctx.send_event (E_add_component c)
+          (fun () -> Ctx.send_event (E_remove_component r));
+        Ctx.send_event (E_add_component r)
       | Bool_lit.Box_clause _, false -> () (* TODO: if unit negative, maybe? *)
-      | Bool_lit.Ground_lit lit, true ->
+      | Bool_lit.Ground_lit (_,r), true ->
         Ctx.on_backtrack
-          (fun () -> Ctx.send_event (E_remove_ground_lit lit));
-        Ctx.send_event (E_add_ground_lit lit)
+          (fun () -> Ctx.send_event (E_remove_ground_lit r));
+        Ctx.send_event (E_add_ground_lit r)
       | Bool_lit.Ground_lit _, false -> ()
-      | Bool_lit.Select_lit (c,i), true ->
-        let lit = IArray.get (C.lits c) i in
+      | Bool_lit.Select_lit (_,_,r), true ->
         Ctx.on_backtrack
-          (fun () -> Ctx.send_event (E_unselect_lit (c, lit)));
-        Ctx.send_event (E_select_lit (c, lit, C.dismatch_constr c))
-      | Bool_lit.Select_lit (_,_), false
+          (fun () -> Ctx.send_event (E_unselect_lit r));
+        Ctx.send_event (E_select_lit (r, C.dismatch_constr r.bool_select_clause))
+      | Bool_lit.Select_lit _, false
       | Bool_lit.Fresh _, _
         -> ()
     end

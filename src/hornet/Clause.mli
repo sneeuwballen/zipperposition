@@ -12,6 +12,7 @@ type clause = t
 
 type horn_clause = Hornet_types.horn_clause
 type bool_lit = Hornet_types.bool_lit
+type bool_trail = Hornet_types.bool_trail
 type idx = Hornet_types.clause_idx
 type proof = Hornet_types.proof
 
@@ -21,7 +22,7 @@ type constraint_ = Hornet_types.c_constraint_ =
 
 (** How to build a clause from a ['a] and other parameters *)
 type 'a builder =
-  ?b_lit:bool_lit lazy_t ->
+  ?trail:bool_trail ->
   ?constrs:constraint_ list ->
   'a ->
   proof ->
@@ -32,7 +33,7 @@ val make_l : Lit.t list builder
 
 val proof : t -> proof
 val lits : t -> Lit.t IArray.t
-val bool_lit : t -> bool_lit lazy_t option
+val trail : t -> bool_trail
 val constr : t -> constraint_ list
 
 val dismatch_constr : t -> Dismatching_constr.t list
@@ -48,8 +49,6 @@ val hash_mod_alpha : t -> int
 (** The index of a literal in the clause *)
 
 val lits_seq : t -> (idx * Lit.t) Sequence.t
-
-val pp : t CCFormat.printer
 
 (** {2 Classification} *)
 

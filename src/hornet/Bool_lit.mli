@@ -6,23 +6,21 @@
 (** The goal is to encapsulate objects into boolean literals that can be
     handled by the SAT solver *)
 
-type lit = Hornet_types.lit
-type clause = Hornet_types.clause
-type clause_idx = Hornet_types.clause_idx
-type proof = Hornet_types.proof
+open Hornet_types
 
 (** {2 Basics} *)
 
 type atom = Hornet_types.bool_atom
 type t = Hornet_types.bool_lit
+type proof = Hornet_types.proof
 
 include Msat.Formula_intf.S with type t := t and type proof := proof
 
 type view =
   | Fresh of int
-  | Box_clause of clause
-  | Select_lit of clause * clause_idx
-  | Ground_lit of lit (* must be ground and positive *)
+  | Box_clause of clause * bool_box_clause
+  | Select_lit of clause * clause_idx * bool_select
+  | Ground_lit of lit * bool_ground (* must be ground and positive *)
 
 val atom : t -> atom
 val view : t -> view
@@ -43,13 +41,19 @@ val of_atom : ?sign:bool -> atom -> t
 val fresh : state -> t
 val select_lit : state -> clause -> clause_idx -> t
 val box_clause : state -> clause -> t
-val ground : lit -> t
+val ground : state -> lit -> t
 
 (** {2 Boolean Clauses} *)
 
 type bool_clause = t list
 
 val pp_clause : bool_clause CCFormat.printer
+
+(** {2 Boolean Trails} *)
+
+type bool_trail = Hornet_types.bool_trail
+
+val pp_trail : bool_trail CCFormat.printer
 
 (** {2 Containers} *)
 

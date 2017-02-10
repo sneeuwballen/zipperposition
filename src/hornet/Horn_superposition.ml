@@ -358,7 +358,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
   (** {2 Proofs of False} *)
   module Proof_of_false : sig
-    type t = proof
+    type t = Horn_clause.t
 
     val bool_lits : t -> bool_lit Sequence.t
 
@@ -366,24 +366,13 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
     val to_bool_clause : t -> bool_clause
   end = struct
-    type t = proof
+    type t = Horn_clause.t
 
-    let rec bool_lits p = match p with
-      | P_from_stmt _ -> Sequence.empty
-      | P_avatar_split c
-      | P_split c ->
-        begin match C.bool_lit c with
-          | None -> Sequence.empty
-          | Some (lazy blit) -> Sequence.return blit
-        end
-      | P_instance (c,_) -> bool_lits (C.proof c)
-      | P_bool_tauto -> Sequence.empty
-      | P_bool_res _ -> Sequence.empty (* NOTE: proved, not assumed *)
-      | P_hc_superposition sup ->
-        Sequence.append
-          (HC.proof (fst sup.hc_sup_active) |> bool_lits)
-          (HC.proof (fst sup.hc_sup_passive) |> bool_lits)
-      | P_hc_simplify c -> bool_lits (HC.proof c)
+    (* TODO: also take the instances/labels from the proof? *)
+    let bool_lits (c:t): bool_lit Sequence.t =
+      HC.trail c
+      |> Sequence.of_list
+      |> Sequence.map Lazy.force
 
     let bool_lits_l p = bool_lits p |> Sequence.to_rev_list
 
@@ -462,7 +451,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         | r :: rules_tail ->
           begin match r c with
             | None -> aux rules_tail c
-            | Some c' -> aux rules0 c (* from start *)
+            | Some c' -> aux rules0 c' (* from start *)
           end
       in
       aux rules0 c
@@ -498,7 +487,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         if HC.is_trivial c
         then saturation_loop ()
         else if HC.is_absurd c then (
-          Unsat (HC.proof c)
+          Unsat c
         ) else (
           (* add to [c] and perform inferences *)
           Active_set.add c;
@@ -553,7 +542,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     let res = Saturate.add_clauses initial_clauses in
     begin match res with
       | Saturate.Sat -> ()
-      | Saturate.Unsat p -> Ctx.send_event (E_found_unsat p)
+      | Saturate.Unsat p -> Ctx.send_event (E_found_unsat (HC.proof p))
     end
 
   (* no direct communication with SAT solver *)
@@ -566,7 +555,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       | E_remove_component _
       | E_add_ground_lit _
       | E_remove_ground_lit _
-      | E_select_lit (_,_,_)
+      | E_select_lit (_,_)
       | E_unselect_lit _ ->
         () (* TODO: add/remove clauses from saturated set *)
       | E_stage Stage_presaturate ->

@@ -150,9 +150,12 @@ let is_absurd lit = match lit with
 module As_key = struct
   type t = lit
   let compare = compare
+  let equal = equal
+  let hash = hash
 end
 
 module Set = CCSet.Make(As_key)
+module Tbl = CCHashtbl.Make(As_key)
 
 (** {2 Positions} *)
 

@@ -15,6 +15,7 @@ open Libzipperposition
 type clause = Hornet_types.clause
 type proof = Hornet_types.proof
 type constraint_ = Hornet_types.c_constraint_
+type bool_trail = Hornet_types.bool_trail
 
 type t = Hornet_types.horn_clause
 type horn_clause = t
@@ -22,6 +23,7 @@ type horn_clause = t
 (** {2 Basics} *)
 
 val make :
+  ?trail:bool_trail ->
   ?constr:constraint_ list ->
   ?unordered_depth:int ->
   Lit.t ->
@@ -36,6 +38,8 @@ val body : t -> Lit.t IArray.t
 
 val constr : t -> constraint_ list
 (** The constraints attached to this clause *)
+
+val trail : t -> bool_trail
 
 val proof : t -> proof
 (** Proof of the clause *)

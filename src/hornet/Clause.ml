@@ -18,6 +18,7 @@ type clause = t
 type proof = Hornet_types.proof
 type idx = Hornet_types.clause_idx
 type bool_lit = Hornet_types.bool_lit
+type bool_trail = Hornet_types.bool_trail
 type horn_clause = Hornet_types.horn_clause
 
 type constraint_ = Hornet_types.c_constraint_ =
@@ -28,7 +29,7 @@ type constraint_ = Hornet_types.c_constraint_ =
 let lits c = c.c_lits
 let proof c = c.c_proof
 let constr c = c.c_constr
-let bool_lit c = c.c_bool_lit
+let trail c = c.c_trail
 
 let dismatch_constr c =
   constr c
@@ -37,11 +38,13 @@ let dismatch_constr c =
       | C_dismatch d -> Some d)
 
 
-let equal a b = IArray.equal Lit.equal a.c_lits b.c_lits
-let hash a = IArray.hash Lit.hash a.c_lits
-let compare a b = IArray.compare Lit.compare a.c_lits b.c_lits
+let equal a b = a.c_id = b.c_id
+let hash a = Hash.int a.c_id
+let compare a b = CCInt.compare a.c_id b.c_id
 let pp out a =
-  Fmt.fprintf out "[@[%a@]]" (Fmt.seq Lit.pp) (IArray.to_seq a.c_lits)
+  Fmt.fprintf out "[@[%a%a@]]"
+    (Fmt.seq Lit.pp) (IArray.to_seq a.c_lits)
+    Hornet_types_util.pp_bool_trail_opt a.c_trail
 let to_string = Fmt.to_string pp
 
 (* comparison function that makes the positif literal smaller, then
@@ -98,7 +101,7 @@ let kind_of_lits (c_lits:Lit.t IArray.t) proof: c_kind =
 
 (** How to build a clause from a ['a] and other parameters *)
 type 'a builder =
-  ?b_lit:bool_lit lazy_t ->
+  ?trail:bool_trail ->
   ?constrs:constraint_ list ->
   'a ->
   proof ->
@@ -107,15 +110,18 @@ type 'a builder =
 (* Smart constructor: might sort the literals for Horn clauses.
    The conclusion comes first, then the remaining ones with some heuristic
    ordering. *)
-let make_ c_bool_lit c_constr c_kind c_lits c_proof =
-  { c_constr; c_bool_lit; c_lits; c_kind; c_proof }
+let make_ =
+  let n_ = ref 0 in
+  fun c_trail c_constr c_kind c_lits c_proof ->
+    let c_id = CCRef.incr_then_get n_ in
+    { c_id; c_constr; c_trail ; c_lits; c_kind; c_proof }
 
-let make ?b_lit ?(constrs=[]) c_lits proof: t =
+let make ?(trail=[]) ?(constrs=[]) c_lits proof: t =
   let c_kind = kind_of_lits c_lits proof in
-  make_ b_lit constrs c_kind c_lits proof
+  make_ trail constrs c_kind c_lits proof
 
-let make_l ?b_lit ?constrs lits proof : t =
-  make ?b_lit ?constrs (IArray.of_list lits) proof
+let make_l ?trail ?constrs lits proof : t =
+  make ?trail ?constrs (IArray.of_list lits) proof
 
 let hash_mod_alpha c : int =
   IArray.hash_comm Lit.hash_mod_alpha c.c_lits

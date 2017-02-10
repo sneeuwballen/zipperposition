@@ -13,6 +13,7 @@ module PW = Position.With
 type clause = Hornet_types.clause
 type proof = Hornet_types.proof
 type constraint_ = Hornet_types.c_constraint_
+type bool_trail = Hornet_types.bool_trail
 
 type t = Hornet_types.horn_clause
 type horn_clause = t
@@ -21,7 +22,7 @@ type horn_clause = t
 
 let make =
   let n_ = ref 0 in
-  fun ?(constr=[]) ?(unordered_depth=0) head body proof ->
+  fun ?(trail=[]) ?(constr=[]) ?(unordered_depth=0) head body proof ->
     let hc_id = !n_ in
     incr n_;
     { hc_id;
@@ -29,6 +30,7 @@ let make =
       hc_unordered_depth=unordered_depth;
       hc_body=body;
       hc_proof=proof;
+      hc_trail=trail;
       hc_constr=constr;
     }
 
@@ -39,6 +41,7 @@ let compare a b = CCInt.compare a.hc_id b.hc_id
 let head c = c.hc_head
 let body c = c.hc_body
 let proof c = c.hc_proof
+let trail c = c.hc_trail
 let constr c = c.hc_constr
 let unordered_depth c = c.hc_unordered_depth
 

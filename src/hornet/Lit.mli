@@ -54,6 +54,7 @@ val is_absurd : t -> bool
 (** {2 Containers} *)
 
 module Set : CCSet.S with type elt = t
+module Tbl : CCHashtbl.S with type key = t
 
 (** {2 Positions} *)
 

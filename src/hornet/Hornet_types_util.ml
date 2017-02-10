@@ -20,12 +20,16 @@ let pp_clause_lits out a =
   Fmt.fprintf out "@[%a@]" (Fmt.seq pp_lit) (IArray.to_seq a.c_lits)
 let pp_clause out (a:clause) = Fmt.within "[" "]" pp_clause_lits out a
 
-let pp_atom out = function
+let pp_atom_view out = function
   | A_fresh i -> Fmt.fprintf out "fresh_%d" i
-  | A_box_clause (c,_) -> Fmt.fprintf out "%a" pp_clause_lits c
-  | A_select (c,i,id) ->
-    Fmt.fprintf out "@[select@ :idx %d@ :id %d :clause %a@]" i id pp_clause c
-  | A_ground lit -> pp_lit out lit
+  | A_box_clause b -> Fmt.fprintf out "%a" pp_clause_lits b.bool_box_clause
+  | A_select r ->
+    Fmt.fprintf out
+      "@[select@ :idx %d@ :id %d :clause %a@]"
+      r.bool_select_idx r.bool_select_id pp_clause r.bool_select_clause
+  | A_ground r -> pp_lit out r.bool_ground_lit
+
+let pp_atom out a = pp_atom_view out a.a_view
 
 let pp_bool_lit =
   let pp_inner out l =
@@ -38,6 +42,15 @@ let pp_bool_lit =
 let pp_bool_clause out l =
   Fmt.fprintf out "[@[%a@]]" (Util.pp_list ~sep:" ⊔ " pp_bool_lit) l
 
+let pp_bool_trail out (l:bool_trail) =
+  let ppx out (lazy lit) = pp_bool_lit out lit in
+  Fmt.fprintf out "[@[%a@]]" (Util.pp_list ~sep:" ⊓ " ppx) l
+
+let pp_bool_trail_opt out trail = match trail with
+  | [] -> ()
+  | _ ->
+    Fmt.fprintf out " @[<hv2>@<1>⇐@ %a@]" pp_bool_trail trail
+
 let pp_constraint out (c:c_constraint_): unit = match c with
   | C_dismatch d -> Dismatching_constr.pp out d
 
@@ -46,9 +59,10 @@ let pp_hclause out (c:horn_clause): unit =
     | [] -> Fmt.silent out ()
     | l -> Fmt.fprintf out "| @[<hv>%a@]" (Fmt.list pp_constraint) l
   in
-  Fmt.fprintf out "(@[%a@ @<1>← @[<hv>%a@]@,%a@])"
+  Fmt.fprintf out "(@[%a@ @<1>← @[<hv>%a@]%a@,%a@])"
     pp_lit c.hc_head
     (Fmt.seq pp_lit) (IArray.to_seq c.hc_body)
+    pp_bool_trail_opt c.hc_trail
     pp_constr c.hc_constr
 
 let pp_hc_sup out sup : unit =
@@ -96,11 +110,11 @@ let hash_lit : lit -> int = function
 let equal_bool_lit a b : bool =
   a.bl_sign = b.bl_sign
   &&
-  begin match a.bl_atom, b.bl_atom with
+  begin match a.bl_atom.a_view, b.bl_atom.a_view with
     | A_fresh i, A_fresh j ->  i=j
-    | A_box_clause (_,i1), A_box_clause (_,i2) -> i1=i2
-    | A_ground l1, A_ground l2 -> equal_lit l1 l2
-    | A_select (_,_,id1), A_select (_,_,id2) -> id1=id2
+    | A_box_clause r1, A_box_clause r2 -> r1.bool_box_id = r2.bool_box_id
+    | A_ground r1, A_ground r2 -> r1.bool_ground_id = r2.bool_ground_id
+    | A_select r1, A_select r2 -> r1.bool_select_id = r2.bool_select_id
     | A_fresh _, _
     | A_box_clause _, _
     | A_ground _, _
@@ -108,12 +122,12 @@ let equal_bool_lit a b : bool =
       -> false
   end
 
-let hash_bool_lit a : int = match a.bl_atom with
+let hash_bool_lit a : int = match a.bl_atom.a_view with
   | A_fresh i -> Hash.combine3 10 (Hash.bool a.bl_sign) (Hash.int i)
-  | A_box_clause (_,i) -> Hash.combine2 15 (Hash.int i)
-  | A_select (_,_,i) ->
-    Hash.combine3 20 (Hash.bool a.bl_sign) (Hash.int i)
-  | A_ground lit -> Hash.combine2 50 (hash_lit lit)
+  | A_box_clause r -> Hash.combine2 15 (Hash.int r.bool_box_id)
+  | A_select r ->
+    Hash.combine3 20 (Hash.bool a.bl_sign) (Hash.int r.bool_select_id)
+  | A_ground r -> Hash.combine2 50 (Hash.int r.bool_ground_id)
 
 let pp_stage out = function
   | Stage_init -> Fmt.string out "init"
@@ -122,18 +136,23 @@ let pp_stage out = function
   | Stage_exit -> Fmt.string out "exit"
 
 let pp_event out (e:event): unit = match e with
-  | E_add_component c -> Fmt.fprintf out "(@[add_component@ %a@])" pp_clause c
-  | E_remove_component c -> Fmt.fprintf out "(@[remove_component@ %a@])" pp_clause c
-  | E_select_lit (c,lit,cstr) ->
+  | E_add_component r ->
+    Fmt.fprintf out "(@[add_component@ %a@])" pp_clause r.bool_box_clause
+  | E_remove_component r ->
+    Fmt.fprintf out "(@[remove_component@ %a@])" pp_clause r.bool_box_clause
+  | E_select_lit (r,cstr) ->
     Fmt.fprintf out "(@[select_lit@ %a@ :clause %a@ :constr (@[%a@])@])"
-      pp_lit lit pp_clause c (Util.pp_list Dismatching_constr.pp) cstr
-  | E_unselect_lit (c,lit) ->
+      pp_lit r.bool_select_lit
+      pp_clause r.bool_select_clause
+      (Util.pp_list Dismatching_constr.pp) cstr
+  | E_unselect_lit r ->
     Fmt.fprintf out "(@[select_lit@ %a@ :clause %a@])"
-      pp_lit lit pp_clause c
-  | E_add_ground_lit lit ->
-    Fmt.fprintf out "(@[add_ground_lit@ %a@])" pp_lit lit
-  | E_remove_ground_lit lit ->
-    Fmt.fprintf out "(@[remove_ground_lit@ %a@])" pp_lit lit
+      pp_lit r.bool_select_lit
+      pp_clause r.bool_select_clause
+  | E_add_ground_lit r ->
+    Fmt.fprintf out "(@[add_ground_lit@ %a@])" pp_lit r.bool_ground_lit
+  | E_remove_ground_lit r ->
+    Fmt.fprintf out "(@[remove_ground_lit@ %a@])" pp_lit r.bool_ground_lit
   | E_found_unsat p ->
     Fmt.fprintf out "(@[found_unsat@ :proof %a@])" pp_proof p
   | E_stage s -> Fmt.fprintf out "(@[stage %a@])" pp_stage s

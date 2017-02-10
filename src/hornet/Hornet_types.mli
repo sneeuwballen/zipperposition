@@ -13,10 +13,11 @@ type term = FOTerm.t
 type bool_unique_id = int
 
 type clause = {
+  c_id: int; (* unique ID *)
   c_lits: lit IArray.t;
   c_kind: c_kind;
   c_proof: proof;
-  c_bool_lit: bool_lit lazy_t option; (* if the clause is a component *)
+  c_trail: bool_trail; (* components/splits the clause depends on *)
   mutable c_constr: c_constraint_ list;
 }
 
@@ -50,6 +51,7 @@ and horn_clause = {
   hc_head: lit;
   hc_body: lit IArray.t;
   hc_constr: c_constraint_ list;
+  hc_trail: bool_trail;
   hc_proof: proof;
   hc_unordered_depth: int; (* how many unordered inferences needed? *)
 }
@@ -78,11 +80,35 @@ and bool_res_step = {
 (* TODO: for "ground", make it point to a mutable list of clauses whose
    grounding contain this literal. Makes for efficient incremental selection.
 *)
-and bool_atom =
+and bool_atom = {
+  a_view: bool_atom_view;
+  mutable a_dependent: horn_clause list; (* clauses depending on this *)
+}
+
+and bool_atom_view =
   | A_fresh of bool_unique_id
-  | A_box_clause of clause * bool_unique_id
-  | A_select of clause * clause_idx * bool_unique_id
-  | A_ground of lit
+  | A_box_clause of bool_box_clause
+  | A_select of bool_select
+  | A_ground of bool_ground
+
+and bool_box_clause = {
+  bool_box_id: bool_unique_id;
+  bool_box_clause: clause;
+}
+
+and bool_select = {
+  bool_select_clause: clause;
+  bool_select_idx: clause_idx;
+  bool_select_lit: lit; (* [lit = get clause idx] *)
+  bool_select_id: bool_unique_id;
+}
+
+and bool_ground = {
+  bool_ground_lit: lit;
+  bool_ground_id: int;
+  mutable bool_ground_instance_of: clause list;
+  (* clauses whose instance contain this ground lit *)
+}
 
 (* index of a literal in a clause *)
 and clause_idx = int
@@ -94,6 +120,9 @@ and bool_lit = {
 
 and bool_clause = bool_lit list
 
+and bool_trail = bool_lit lazy_t list
+(** A boolean trail, guarding the clauses that hold only in some models *)
+
 (* stages in the solver's algorithm *)
 type stage =
   | Stage_init
@@ -102,11 +131,12 @@ type stage =
   | Stage_exit
 
 type event =
-  | E_add_component of clause
-  | E_remove_component of clause
-  | E_select_lit of clause * lit * Dismatching_constr.t list (** [lit | constr] has been selected in some clause *)
-  | E_unselect_lit of clause * lit
-  | E_add_ground_lit of lit
-  | E_remove_ground_lit of lit
+  | E_add_component of bool_box_clause
+  | E_remove_component of bool_box_clause
+  | E_select_lit of bool_select * Dismatching_constr.t list
+  (** [lit | constr] has been selected in some clause *)
+  | E_unselect_lit of bool_select
+  | E_add_ground_lit of bool_ground
+  | E_remove_ground_lit of bool_ground
   | E_found_unsat of proof
   | E_stage of stage
