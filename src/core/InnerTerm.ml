@@ -215,6 +215,23 @@ module VarMap = CCMap.Make(HVarKey)
 module VarSet = CCSet.Make(HVarKey)
 module VarTbl = CCHashtbl.Make(HVarKey)
 
+(** {3 Basic Printer} *)
+
+let rec debugf out t = match view t with
+  | AppBuiltin (b,[]) -> Builtin.pp out b
+  | AppBuiltin (b,l) ->
+    Format.fprintf out "(@[<1>%a@ %a@])" Builtin.pp b (Util.pp_list debugf) l
+  | Var i -> HVar.pp out i
+  | DB i -> Format.fprintf out "Y%d" i
+  | Const s -> ID.pp out s
+  | App (_, []) -> assert false
+  | App (s, l) ->
+    Format.fprintf out "(@[<1>%a@ %a@])" debugf s (Util.pp_list debugf) l
+  | Bind (b, varty,t') ->
+    Format.fprintf out "(@[<1>%a@ %a@ %a@])"
+      Binder.pp b debugf varty debugf t'
+
+
 (** {3 De Bruijn} *)
 
 module DB = struct
@@ -493,30 +510,35 @@ end
 
 module Pos = struct
   module P = Position
+
+  let fail_ t pos =
+    Util.errorf ~where:"Term.Pos"
+      "@[<2>invalid position `@[%a@]`@ in term `@[%a@]`@]"
+        P.pp pos debugf t
+
   let rec at t pos = match view t, pos with
     | _, P.Type pos' ->
       begin match t.ty with
-        | NoType -> invalid_arg "wrong position: term has no type"
+        | NoType -> fail_ t pos
         | HasType ty -> at ty pos'
       end
     | _, P.Stop -> t
-    | Var _ , _ -> invalid_arg "wrong position in term"
+    | Var _ , _ -> fail_ t pos
     | Bind(_, _, t'), P.Body subpos -> at t' subpos
     | App (t, _), P.Head subpos -> at t subpos
     | App (_, l), P.Arg (n,subpos) when n < List.length l ->
       at (List.nth l n) subpos
     | AppBuiltin (_, l), P.Arg(n,subpos) when n < List.length l ->
       at (List.nth l n) subpos
-    | _ -> invalid_arg
-             (CCFormat.sprintf "position %a not valid in term" P.pp pos)
+    | _ -> fail_ t pos
 
   let rec replace t pos ~by = match t.ty, view t, pos with
     | _, _, P.Stop -> by
-    | NoType, _, P.Type _ -> invalid_arg "wrong position: term has no type"
+    | NoType, _, P.Type _ -> fail_ t pos
     | HasType ty, _, P.Type pos' ->
       let ty = replace ty pos' ~by in
       cast ~ty t
-    | _, Var _, _ -> invalid_arg "wrong position in term"
+    | _, Var _, _ -> fail_ t pos
     | HasType ty, Bind(s, varty, t'), P.Body subpos ->
       bind ~ty ~varty s (replace t' subpos ~by)
     | HasType ty, App (f, l), P.Head subpos ->
@@ -529,8 +551,7 @@ module Pos = struct
       let t' = replace (List.nth l n) subpos ~by in
       let l' = CCList.Idx.set l n t' in
       app_builtin ~ty s l'
-    | _ -> invalid_arg
-             (CCFormat.sprintf "position %a not valid in term" P.pp pos)
+    | _ -> fail_ t pos
 end
 
 let rec replace_m t m = match Map.get t m with
@@ -640,18 +661,3 @@ let pp_depth ?(hooks=[]) depth out t =
 
 let pp out t = pp_depth ~hooks:!_hooks 0 out t
 let to_string t = CCFormat.to_string pp t
-
-let rec debugf out t = match view t with
-  | AppBuiltin (b,[]) -> Builtin.pp out b
-  | AppBuiltin (b,l) ->
-    Format.fprintf out "(@[<1>%a@ %a@])" Builtin.pp b (Util.pp_list debugf) l
-  | Var i -> HVar.pp out i
-  | DB i -> Format.fprintf out "Y%d" i
-  | Const s -> ID.pp out s
-  | App (_, []) -> assert false
-  | App (s, l) ->
-    Format.fprintf out "(@[<1>%a@ %a@])" debugf s (Util.pp_list debugf) l
-  | Bind (b, varty,t') ->
-    Format.fprintf out "(@[<1>%a@ %a@ %a@])"
-      Binder.pp b debugf varty debugf t'
-
