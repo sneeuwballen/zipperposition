@@ -57,7 +57,8 @@ let cnf ~file decls =
     |> Cnf.convert
   in
   Util.debugf ~section 2 "@[<hv2>CNF {@ %a@,}@]"
-    (fun k-> k (Util.pp_seq ~sep:" " Cnf.pp_fo_c_statement) (CCVector.to_seq stmts));
+    (fun k-> k (Util.pp_seq ~sep:" " Cnf.pp_fo_c_statement)
+        (CCVector.to_seq stmts));
   E.return stmts
 
 (* TODO: make defined symbols smaller, skolems bigger *)
@@ -107,6 +108,7 @@ let file : string ref = ref ""
 let def_as_rewrite : bool ref = ref false
 let max_depth : int ref = ref 4
 let ord_ : string ref = ref Ordering.default_name
+let dot_file_ : string ref = ref ""
 
 let options =
   Arg.align
@@ -116,6 +118,7 @@ let options =
        "--def-as-rewrite", Arg.Set def_as_rewrite, " definitions as rewrite rules";
        "--no-def-as-rewrite", Arg.Clear def_as_rewrite, " definitions as axioms";
        "--max-depth", Arg.Set_int max_depth, (Fmt.sprintf " maximum depth (default %d)" !max_depth);
+       "--dot", Arg.Set_string dot_file_, " print proof to file in DOT" ;
     ] @ Options.make ())
 
 let main () =
@@ -158,7 +161,11 @@ let main () =
   begin match res with
     | State.Sat | State.Unknown -> ()
     | State.Unsat p ->
-      Format.printf "proof: @[<hv>%a@]@." Proof.pp_dag p
+      Format.printf "@[<hv2>proof:@ %a@]@." Proof_print.pp_dag p;
+      (* print into DOT *)
+      if !dot_file_ <> "" then (
+        Proof_print.pp_dot_file !dot_file_ p;
+      );
   end;
   E.return () (* done *)
 

@@ -17,8 +17,6 @@ let section = Util.Section.(make ~parent:root) "state"
 type term = FOTerm.t
 type ty = Type.t
 type statement = (Clause.t, term, ty) Statement.t
-type proof = Hornet_types.proof
-type event = Hornet_types.event
 
 (** {2 Context for Theories} *)
 
@@ -247,7 +245,7 @@ end
 
 type res =
   | Sat
-  | Unsat of proof
+  | Unsat of proof_with_res
   | Unknown
 
 let pp_res out = function
@@ -281,7 +279,7 @@ let run (t:t): res =
             module St = St
             let proof = us.SI.get_proof ()
           end) in
-        let p, _ = Rebuild.rebuild() in
+        let p = Rebuild.rebuild() in
         St.Ctx.send_event (Hornet_types.E_found_unsat p);
         Unsat p
     end

@@ -32,20 +32,23 @@ let hc_simplify c = P_hc_simplify c
 let pp = Hornet_types_util.pp_proof
 let to_string = Fmt.to_string pp
 
-(** {2 Print Proof DAG} *)
-
-(* TODO: traverse recursively, with a table to preserve DAG *)
-let pp_dag _ _ = assert false
-
-(* TODO: DOT output *)
-
-let pp_dot _ _ = assert false
-
-(* TODO: a type ['a with_proof] to always store have the conclusion
-   of a proof with it *)
-
-(** {2 Proof + Result} *)
-
-type with_res = proof_with_res
-
-
+let parents (p:t): proof_with_res list = match p with
+  | P_trivial
+  | P_from_stmt _
+  | P_bool_tauto
+    -> []
+  | P_avatar_split c
+  | P_split c
+  | P_instance (c,_) -> [c.c_proof, PR_clause c]
+  | P_bool_res r ->
+    [ r.bool_res_p1, PR_bool_clause r.bool_res_c1;
+      r.bool_res_p2, PR_bool_clause r.bool_res_c2;
+    ]
+  | P_hc_superposition r ->
+    let c1, _ = r.hc_sup_active in
+    let c2, _ = r.hc_sup_passive in
+    [ c1.hc_proof, PR_horn_clause c1;
+      c2.hc_proof, PR_horn_clause c2;
+    ]
+  | P_hc_simplify c ->
+    [ c.hc_proof, PR_horn_clause c]

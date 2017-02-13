@@ -220,6 +220,6 @@ let pp_event out (e:event): unit = match e with
     Fmt.fprintf out "(@[conflict@ :clause %a@ :proof %a@])"
       pp_bool_clause c pp_proof p
   | E_if_sat -> Fmt.string out "if_sat"
-  | E_found_unsat p ->
+  | E_found_unsat (p,_) ->
     Fmt.fprintf out "(@[found_unsat@ :proof %a@])" pp_proof p
   | E_stage s -> Fmt.fprintf out "(@[stage %a@])" pp_stage s

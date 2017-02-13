@@ -42,6 +42,8 @@ val ground : state -> lit -> t
 
 type bool_clause = t list
 
+val equal_clause : bool_clause -> bool_clause -> bool
+val hash_clause : bool_clause -> int
 val pp_clause : bool_clause CCFormat.printer
 
 (** {2 Boolean Trails} *)

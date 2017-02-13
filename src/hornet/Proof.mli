@@ -25,14 +25,5 @@ val hc_simplify : horn_clause -> t
 
 include Interfaces.PRINT with type t := t
 
-(** {2 Print Proof DAG} *)
-
-val pp_dag : t CCFormat.printer
-
-val pp_dot : t CCFormat.printer
-
-(** {2 Proof + Result} *)
-
-type with_res = proof_with_res
-
-
+val parents : t -> proof_with_res list
+(** Immediate parents of this proof step, i.e. the subproofs it uses *)

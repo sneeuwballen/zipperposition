@@ -129,6 +129,8 @@ let box_clause state c =
 
 type bool_clause = t list
 
+let equal_clause = CCList.equal equal
+let hash_clause = Hash.list hash
 let pp_clause = Hornet_types_util.pp_bool_clause
 
 (** {2 Boolean Trails} *)
