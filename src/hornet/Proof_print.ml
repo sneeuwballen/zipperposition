@@ -43,9 +43,10 @@ let get_res (x:proof_with_res): proof_res = snd x
 let as_graph : (t,string) CCGraph.t =
   CCGraph.make
     (fun (p,_) ->
+       let name = Proof.name p in
        Proof.parents p
        |> Sequence.of_list
-       |> Sequence.map (fun p' -> Proof.name (get_proof p'), p'))
+       |> Sequence.map (fun p' -> name, p'))
 
 let is_proof_of_false p = Proof_res.is_absurd (get_res p)
 let is_goal p = match get_proof p with
