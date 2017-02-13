@@ -414,7 +414,7 @@ end
 let bind_vars ~ty b vars t =
   (* subst: bind vars_i to a De Bruijn (reverse list so that last element is 0) *)
   let subst =
-    CCList.Idx.foldi
+    CCList.foldi
       (fun s i v -> VarMap.add v (bvar ~ty:(HVar.ty v) i) s)
       VarMap.empty (List.rev vars)
   in
@@ -545,11 +545,11 @@ module Pos = struct
       app ~ty (replace f subpos ~by) l
     | HasType ty, App (f, l), P.Arg (n,subpos) when n < List.length l ->
       let t' = replace (List.nth l n) subpos ~by in
-      let l' = CCList.Idx.set l n t' in
+      let l' = CCList.set_at_idx n t' l in
       app ~ty f l'
     | HasType ty, AppBuiltin (s,l), P.Arg (n,subpos) when n < List.length l ->
       let t' = replace (List.nth l n) subpos ~by in
-      let l' = CCList.Idx.set l n t' in
+      let l' = CCList.set_at_idx n t' l in
       app_builtin ~ty s l'
     | _ -> fail_ t pos
 end

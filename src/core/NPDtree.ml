@@ -187,7 +187,7 @@ module Make(E : Index.EQUATION) = struct
     !n
 
   let _as_graph =
-    CCGraph.make_labelled_tuple
+    CCGraph.make
       (fun t ->
          let prefix s = match t.star with
            | None -> s
@@ -205,7 +205,7 @@ module Make(E : Index.EQUATION) = struct
           let len = Leaf.size t.leaf in
           let shape = if len>0 then "box" else "circle" in
           [`Shape shape; `Label (string_of_int len)])
-        ~attrs_e:(fun (_, e, _) -> [`Label e])
+        ~attrs_e:(fun e -> [`Label e])
         ~name:"NPDtree" ~graph:_as_graph
     in
     Format.fprintf out "@[<2>%a@]@." pp t;
@@ -443,7 +443,7 @@ module MakeTerm(X : Set.OrderedType) = struct
   let name = "npdtree"
 
   let _as_graph =
-    CCGraph.make_labelled_tuple
+    CCGraph.make
       (fun t ->
          let prefix s = match t.star with
            | None -> s
@@ -468,7 +468,7 @@ module MakeTerm(X : Set.OrderedType) = struct
           let len = Leaf.size t.leaf in
           let shape = if len>0 then "box" else "circle" in
           [`Shape shape; `Label (string_of_int len)])
-        ~attrs_e:(fun (_, e,_) -> [`Label e])
+        ~attrs_e:(fun e -> [`Label e])
         ~name:"NPDtree" ~graph:_as_graph
     in
     Format.fprintf out "@[<2>%a@]@." pp t;

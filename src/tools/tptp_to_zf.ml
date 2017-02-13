@@ -13,7 +13,7 @@ module T = TypedSTerm
 let pp_stmt = Statement.pp T.ZF.pp T.ZF.pp T.ZF.pp
 
 let pp_stmts out seq =
-  CCVector.print ~start:"" ~stop:"" ~sep:"" pp_stmt out seq
+  CCVector.pp ~sep:"" pp_stmt out seq
 
 let declare_term out () =
   let id = ID.make "term" in

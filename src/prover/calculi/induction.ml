@@ -154,7 +154,7 @@ module Make
     Trail.to_seq trail
     |> Sequence.filter_map BBox.as_case
     |> Sequence.max ~lt:(fun a b -> Ind_cst.path_dominates b a)
-    |> CCOpt.get Ind_cst.path_empty
+    |> CCOpt.get_or ~default:Ind_cst.path_empty
 
   (* the rest of the trail *)
   let trail_rest trail : Trail.t =

@@ -38,12 +38,12 @@ let check file =
     |> ID.Map.of_seq
   in
   Format.printf "@[<hv2>signature:@ @[<v>%a@]@]@."
-    (ID.Map.print ~start:"" ~stop:"" ~sep:"" ~arrow:" : " ID.pp T.pp) sigma;
+    (ID.Map.pp ~sep:"" ~arrow:" : " ID.pp T.pp) sigma;
   (* print formulas *)
   if !cat_input then
     let pp_stmt = Statement.pp T.pp T.pp T.pp in
     Format.printf "@[<v2>statements:@ %a@]@."
-      (CCVector.print ~start:"" ~stop:"" ~sep:"" pp_stmt)
+      (CCVector.pp ~sep:"" pp_stmt)
       decls;
     ()
 

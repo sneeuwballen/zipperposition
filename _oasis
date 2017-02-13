@@ -138,8 +138,7 @@ Library "libzipperposition_prover"
   InternalModules:  lib/Simplex
   Build$:           flag(parsers) && flag(prover)
   Install$:         flag(parsers) && flag(prover)
-  BuildDepends:     containers, containers.advanced, sequence, unix,
-                    zarith, msat,
+  BuildDepends:     containers, sequence, unix, zarith, msat,
                     libzipperposition, libzipperposition.parsers
 
 # main executable for the prover

@@ -310,7 +310,7 @@ let fold_arith_terms ~eligible ~which ~ord lits k =
            | `All -> (fun _ -> true)
            | `Max ->
              let max_terms = ArithLit.max_terms ~ord a_lit in
-             fun t -> CCList.Set.mem ~eq:T.equal t max_terms
+             fun t -> CCList.mem ~eq:T.equal t max_terms
        in
        ArithLit.Focus.fold_terms ~pos a_lit
          (fun (foc_lit, pos) ->
@@ -345,7 +345,7 @@ let pp out lits =
   else
     let pp_lit = CCFormat.hovbox Lit.pp in
     Format.fprintf out "[@[<hv>%a@]]"
-      (CCFormat.array ~start:"" ~stop:"" ~sep:" ∨ " pp_lit) lits
+      CCFormat.(array ~sep:(return "@ ∨ ") pp_lit) lits
 
 let pp_vars out lits =
   let pp_vars out = function
@@ -363,7 +363,7 @@ let pp_tstp out lits =
   if Array.length lits = 0 then CCFormat.string out "$false"
   else
     Format.fprintf out "@[%a@]"
-      (CCFormat.array ~start:"" ~stop:"" ~sep:" | " Lit.pp_tstp) lits
+      CCFormat.(array ~sep:(return "@ | ") Lit.pp_tstp) lits
 
 let to_string a = CCFormat.to_string pp a
 

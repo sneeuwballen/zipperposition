@@ -71,7 +71,7 @@ let create
   ctx
 
 let fresh_id ~ctx prefix =
-  let n = CCHashtbl.get_or ~or_:0 ctx.sc_gensym prefix in
+  let n = CCHashtbl.get_or ~default:0 ctx.sc_gensym prefix in
   Hashtbl.replace ctx.sc_gensym prefix (n+1);
   let name = if n=0 then prefix else prefix ^ string_of_int n in
   ID.make name

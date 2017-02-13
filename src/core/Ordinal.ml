@@ -18,7 +18,7 @@ let rec pp out = function
       if b=Zero then Fmt.int out n
       else Fmt.fprintf out "@<1>%d · ω^@[%a@]" n pp_inner b
     in
-    Fmt.fprintf out "%a" (Fmt.list ~sep:" + " pp_pair) l
+    Fmt.fprintf out "%a" (Util.pp_list ~sep:" + " pp_pair) l
 
 (* wrap with "()" *)
 and pp_inner out = function

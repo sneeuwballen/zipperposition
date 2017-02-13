@@ -219,7 +219,7 @@ let presaturate_clauses (type c)
     Env.remove_active clauses;
     Env.remove_passive clauses;
     Util.debugf ~section 2 "@[<2>%d clauses pre-saturated into:@ @[<hv>%a@]@]"
-      (fun k->k num_clauses (CCFormat.seq ~sep:" " Env.C.pp) clauses);
+      (fun k->k num_clauses (Util.pp_seq ~sep:" " Env.C.pp) clauses);
     Phases.return_phase (result, clauses)
   )
   else Phases.return_phase (Saturate.Unknown, CCVector.to_seq clauses)
@@ -314,10 +314,10 @@ let print_szs_result (type c) ~file
         | Options.Print_zf -> failwith "not implemented: printing in ZF" (* TODO *)
         | Options.Print_tptp ->
           Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
-            (fun k->k (CCFormat.seq ~sep:" " Env.C.pp_tstp_full) (Env.get_active ()))
+            (fun k->k (Util.pp_seq ~sep:" " Env.C.pp_tstp_full) (Env.get_active ()))
         | Options.Print_normal ->
           Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
-            (fun k->k (CCFormat.seq ~sep:" " Env.C.pp) (Env.get_active ()))
+            (fun k->k (Util.pp_seq ~sep:" " Env.C.pp) (Env.get_active ()))
       end
     | Saturate.Unsat proof ->
       (* print status then proof *)

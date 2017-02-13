@@ -640,7 +640,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           let max_terms = Lit.Comp.max_terms ~ord lit in
           fun t ->
             (* restrict max terms in literals eligible for resolution *)
-            CCList.Set.mem ~eq:T.equal t max_terms
+            CCList.mem ~eq:T.equal t max_terms
         else (fun _ -> false)
       in
       Lit.map
@@ -655,7 +655,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       SimplM.return_same c
     ) else (
       (* construct new clause *)
-      clauses := CCList.Set.uniq ~eq:C.equal !clauses;
+      clauses := CCList.uniq ~eq:C.equal !clauses;
       let proof =
         ProofStep.mk_simp
           ~rule:(ProofStep.mk_rule "demod")
@@ -829,7 +829,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           let renaming = Ctx.renaming_clear () in
           Lit.apply_subst_list ~renaming !subst (new_lits,0)
       in
-      let new_lits = CCList.Set.uniq ~eq:Lit.equal_com new_lits in
+      let new_lits = CCList.uniq ~eq:Lit.equal_com new_lits in
       if List.length new_lits = Array.length lits
       then (
         Util.exit_prof prof_basic_simplify;
@@ -1019,11 +1019,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let compare_literals_subsumption lita litb =
     CCOrd.(
       (* ground literal is bigger *)
-      bool_ (Lit.is_ground lita) (Lit.is_ground litb)
+      bool (Lit.is_ground lita) (Lit.is_ground litb)
       (* deep literal is smaller *)
-      <?> (map Lit.depth (opp int_), lita, litb)
+      <?> (map Lit.depth (opp int), lita, litb)
       (* heavy literal is smaller *)
-      <?> (map Lit.weight (opp int_), lita, litb)
+      <?> (map Lit.weight (opp int), lita, litb)
     )
 
   (* replace the bitvector system by some backtracking scheme?

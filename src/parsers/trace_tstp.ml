@@ -301,7 +301,7 @@ let parse ?(recursive=true) filename =
     Util_tptp.parse_file ~recursive filename
     >>= fun decls ->
     Util.debugf 1 "@[<2>decls:@ @[<hv>%a@]@]"
-      (fun k->k (CCFormat.seq ~sep:"" (A.pp T.pp)) decls);
+      (fun k->k (Util.pp_seq ~sep:"" (A.pp T.pp)) decls);
     of_decls decls
   )
 
@@ -373,11 +373,11 @@ let pp1 out proof = match proof with
   | InferClause (c, lazy step) ->
     Format.fprintf out "proof for %a (id %a) from\n  %a"
       _pp_clause c A.pp_name (get_id proof)
-      (CCFormat.array ~sep:"\n  " pp0) step.parents
+      CCFormat.(array ~sep:(return "@.  ") pp0) step.parents
   | InferForm (f, lazy step) ->
     Format.fprintf out "proof for %a (id %a) from\n %a"
       T.pp f A.pp_name (get_id proof)
-      (CCFormat.array ~sep:"\n  " pp0) step.parents
+      CCFormat.(array ~sep:(return "@.  ") pp0) step.parents
 
 let pp = pp0
 let to_string = CCFormat.to_string pp

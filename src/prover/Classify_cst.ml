@@ -38,7 +38,7 @@ let pp_signature out sigma =
     "{@[<hv>%a@]}" (Util.pp_list ~sep:"," pp_pair) (Signature.to_list sigma)
 
 let dominates_ opt_c opt_sub =
-  CCOpt.(get false (map2 Ind_cst.dominates opt_c opt_sub))
+  CCOpt.(get_or ~default:false (map2 Ind_cst.dominates opt_c opt_sub))
 
 let prec_constr_ a b =
   let to_int_ = function

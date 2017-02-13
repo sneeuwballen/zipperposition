@@ -38,7 +38,7 @@ let get_name ~namespace p =
 
 (** Get a graph of the proof *)
 let as_graph =
-  CCGraph.make_labelled_tuple
+  CCGraph.make
     (fun p ->
        match rule p.step with
          | None -> Sequence.empty
@@ -93,7 +93,7 @@ let pp_normal_step out step = match step.kind with
   | Esa _ ->
     Format.fprintf out "@[<hv2>%a@ with @[<hv>%a@]@]@,"
       pp_kind step.kind
-      (CCFormat.list ~start:"" ~stop:"" pp_result)
+      (Util.pp_list pp_result)
       (List.map (fun p->p.result) step.parents)
 
 let pp_normal out proof =
@@ -199,7 +199,7 @@ let pp_dot_seq ~name out seq =
       else if is_trivial p.step then `Color "cyan" :: shape :: attrs
       else shape :: attrs
     )
-    ~attrs_e:(fun (_,r,_) ->
+    ~attrs_e:(fun r ->
       [`Label r.rule_name; `Other ("dir", "back")])
     out
     seq;

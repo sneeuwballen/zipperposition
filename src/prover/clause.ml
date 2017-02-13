@@ -422,8 +422,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
             Lit.pp lit (pp_selected selected) i (pp_maxlit max) i
         in
         Format.fprintf out "[@[%a@]]"
-          (CCFormat.arrayi ~start:"" ~stop:"" ~sep:" ∨ " pp_lit)
-          lits
+          (Util.pp_seq ~sep:" ∨ " pp_lit)
+          (Sequence.of_array_i lits)
       )
     in
     Format.fprintf out "@[%a@[<2>%a%a@]@]/%d"
@@ -439,11 +439,11 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let pp_set out set =
     Format.fprintf out "{@[<hv>%a@]}"
-      (CCFormat.seq ~start:"" ~stop:"" ~sep:"," pp)
+      (Util.pp_seq ~sep:"," pp)
       (ClauseSet.to_seq set)
 
   let pp_set_tstp out set =
     Format.fprintf out "@[<v>%a@]"
-      (CCFormat.seq ~start:"" ~stop:"" ~sep:"," pp_tstp)
+      (Util.pp_seq ~sep:"," pp_tstp)
       (ClauseSet.to_seq set)
 end

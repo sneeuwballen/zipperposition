@@ -468,7 +468,7 @@ let rec path_compare p1 p2 = match p1, p2 with
     let open CCOrd in
     cst_compare c1.path_cst c2.path_cst
     <?> (case_compare, c1.path_case, c2.path_case)
-    <?> (list_ ClauseContext.compare, c1.path_clauses, c2.path_clauses)
+    <?> (list ClauseContext.compare, c1.path_clauses, c2.path_clauses)
     <?> (path_compare, p1', p2')
 
 let path_equal p1 p2 = path_compare p1 p2 = 0

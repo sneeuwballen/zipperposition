@@ -49,8 +49,8 @@ let gensym =
     let i = !r / String.length names in
     let j = !r mod String.length names in
     let name = if i=0
-      then CCPrint.sprintf "%c" names.[j]
-      else CCPrint.sprintf "%c%d" names.[j] i
+      then Printf.sprintf "%c" names.[j]
+      else Printf.sprintf "%c%d" names.[j] i
     in
     incr r;
     make name

@@ -69,7 +69,7 @@ let compare m1 m2 =
     m1.num.cmp s1 s2 <?> (T.compare, t1, t2)
   in
   m1.num.cmp m1.const m2.const
-  <?> (CCOrd.list_ cmp_pair, m1.terms, m2.terms)
+  <?> (CCOrd.list cmp_pair, m1.terms, m2.terms)
 
 let hash m =
   Hash.combine3 42
@@ -284,7 +284,7 @@ let is_ground m =
   List.for_all (fun (_, t) -> T.is_ground t) m.terms
 
 let fold f acc m =
-  CCList.Idx.foldi
+  CCList.foldi
     (fun acc i (n, t) -> f acc i n t)
     acc m.terms
 
@@ -299,7 +299,7 @@ let fold_max ~ord f acc m =
     |> Sequence.map2 (fun t _ -> t)
     |> T.Seq.add_set T.Set.empty
   in
-  CCList.Idx.foldi
+  CCList.foldi
     (fun acc i (c, t) -> if T.Set.mem t max then f acc i c t else acc)
     acc m.terms
 
@@ -346,14 +346,14 @@ let nth m n =
 
 let set m n (c,t) =
   try
-    let terms = CCList.Idx.set m.terms n (c,t) in
+    let terms = CCList.set_at_idx n (c,t) m.terms in
     {m with terms; }
   with _ -> _fail_idx m n
 
 let set_term m n t =
   try
     let (c, _) = List.nth m.terms n in
-    let terms = CCList.Idx.set m.terms n (c,t) in
+    let terms = CCList.set_at_idx n (c,t) m.terms in
     {m with terms; }
   with _ -> _fail_idx m n
 
@@ -368,7 +368,7 @@ module Focus = struct
     try
       let coeff, term = List.nth m.terms i in
       assert (m.num.sign coeff <> 0);
-      let rest = {m with terms=CCList.Idx.remove m.terms i} in
+      let rest = {m with terms=CCList.remove_at_idx i m.terms} in
       { term; coeff; rest; }
     with _ -> _fail_idx m i
 
@@ -433,10 +433,10 @@ module Focus = struct
       mf.rest.terms
 
   let fold_m ~pos m acc f =
-    CCList.Idx.foldi
+    CCList.foldi
       (fun acc i (c,t) ->
          let pos = Position.(append pos (arg i stop)) in
-         let rest = {m with terms=CCList.Idx.remove m.terms i} in
+         let rest = {m with terms=CCList.remove_at_idx i m.terms} in
          let mf = {coeff=c; term=t; rest;} in
          f acc mf pos
       ) acc m.terms

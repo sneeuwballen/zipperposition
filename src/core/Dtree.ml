@@ -286,7 +286,7 @@ module Make(E : Index.EQUATION) = struct
     !n
 
   let _as_graph =
-    CCGraph.make_labelled_tuple
+    CCGraph.make
       (function
         | TrieLeaf _ -> Sequence.empty
         | TrieNode m -> CharMap.to_seq m)
@@ -309,7 +309,7 @@ module Make(E : Index.EQUATION) = struct
             let len = List.length l in
             [`Shape "box"; `Label (string_of_int len)]
           | TrieNode _ -> [`Shape "circle"; `Label ""])
-        ~attrs_e:(fun (_, e ,_) ->
+        ~attrs_e:(fun e ->
           let e = CCFormat.to_string pp_char e in
           [`Label e])
         ~name:"NPDtree" ~graph:_as_graph

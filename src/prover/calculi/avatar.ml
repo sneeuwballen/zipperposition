@@ -269,7 +269,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         |> Sequence.mapi
           (fun i lits -> Literals.Seq.vars lits |> Sequence.map (fun v->v,i))
         |> Sequence.flatten
-        |> Sequence.sort_uniq ~cmp:CCOrd.(pair (HVar.compare Type.compare) int_)
+        |> Sequence.sort_uniq ~cmp:CCOrd.(pair (HVar.compare Type.compare) int)
         |> Sequence.to_rev_list
       in
       let subst, skolems =

@@ -37,7 +37,7 @@ module Make(E : Env.S) = struct
     |> Sequence.map T.ty
     |> Sequence.map (fun t -> InnerTerm.depth (t : Type.t :> InnerTerm.t))
     |> Sequence.max ?lt:None
-    |> CCOpt.maybe CCFun.id 0
+    |> CCOpt.map_or ~default:0 CCFun.id
 
   let is_too_deep c =
     match !depth_limit_ with

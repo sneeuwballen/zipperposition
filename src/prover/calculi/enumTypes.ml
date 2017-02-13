@@ -143,7 +143,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let rec check_all_distinct_ acc l = match l with
     | [] -> true
     | v :: l' ->
-      not (CCList.Set.mem ~eq:(HVar.equal Type.equal) v acc)
+      not (CCList.mem ~eq:(HVar.equal Type.equal) v acc)
       && check_all_distinct_ (v :: acc) l'
 
   type declare_result =

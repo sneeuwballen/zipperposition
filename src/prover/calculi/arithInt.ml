@@ -541,7 +541,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* build result clause (if it was simplified) *)
     let res =
       if !did_simplify then (
-        clauses := CCList.Set.uniq ~eq:C.equal !clauses;
+        clauses := CCList.uniq ~eq:C.equal !clauses;
         let proof =
           ProofStep.mk_inference
             ~rule:(ProofStep.mk_rule "canc_demod")
@@ -1105,7 +1105,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         begin match traces with
           | [trace, _lit'] ->
             assert (AL.is_trivial _lit');
-            let trace = CCList.Set.uniq ~eq:C.equal trace in
+            let trace = CCList.uniq ~eq:C.equal trace in
             Some trace
           | _ -> None
         end

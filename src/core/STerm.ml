@@ -55,12 +55,12 @@ let rec compare t1 t2 = match t1.term, t2.term with
   | App (s1,l1), App (s2, l2) ->
     let c = compare s1 s2 in
     if c = 0
-    then CCOrd.list_ compare l1 l2
+    then CCOrd.list compare l1 l2
     else c
   | AppBuiltin (s1,l1), AppBuiltin (s2,l2) ->
     let c = Builtin.compare s1 s2 in
     if c = 0
-    then CCOrd.list_ compare l1 l2
+    then CCOrd.list compare l1 l2
     else c
   | Bind (s1, v1, t1), Bind (s2, v2, t2) ->
     let c = Binder.compare s1 s2 in
@@ -68,7 +68,7 @@ let rec compare t1 t2 = match t1.term, t2.term with
     then
       let c' = compare t1 t2 in
       if c' = 0
-      then CCOrd.list_ compare_typed_var v1 v2
+      then CCOrd.list compare_typed_var v1 v2
       else c'
     else c
   | Ite (a1,b1,c1), Ite (a2,b2,c2) ->
@@ -77,16 +77,16 @@ let rec compare t1 t2 = match t1.term, t2.term with
     let cmp_branch b1 b2 = match b1, b2 with
       | Match_case (s1,vars1,rhs1), Match_case (s2,vars2,rhs2) ->
         CCOrd.(String.compare s1 s2
-          <?> (list_ compare_var, vars1,vars2)
+          <?> (list compare_var, vars1,vars2)
           <?> (compare,rhs1,rhs2))
       | Match_default t1, Match_default t2 -> compare t1 t2
       | Match_case _, Match_default _ -> -1
       | Match_default _, Match_case _ -> 1
     in
-    CCOrd.( compare u1 u2 <?> (list_ cmp_branch,l1,l2))
+    CCOrd.( compare u1 u2 <?> (list cmp_branch,l1,l2))
   | Let (l1,t1), Let (l2,t2) ->
     CCOrd.( compare t1 t2
-      <?> (list_ (pair compare_var compare), l1, l2))
+      <?> (list (pair compare_var compare), l1, l2))
   | (Var _,_)
   | (Const _,_)
   | (Ite _, _)
@@ -562,7 +562,7 @@ let copy_fresh_tyvar subst (v,ty) =
 let rec apply_subst (subst:subst) (t:t): t =
   let loc = t.loc in
   begin match t.term with
-    | Var (V s) -> StrMap.get_or ~or_:t s subst
+    | Var (V s) -> StrMap.get_or ~default:t s subst
     | Var Wildcard -> t
     | Const c -> const ?loc c
     | AppBuiltin (b, l) ->

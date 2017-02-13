@@ -23,7 +23,7 @@ module Constr = struct
     (* symbol -> number of occurrences of symbol in seq *)
     let tbl = ID.Tbl.create 16 in
     Sequence.iter (ID.Tbl.incr tbl) seq;
-    let find_freq s = ID.Tbl.get_or ~or_:0 tbl s in
+    let find_freq s = ID.Tbl.get_or ~default:0 tbl s in
     (* compare by inverse frequency (higher frequency => smaller) *)
     fun s1 s2 ->
       let n1 = find_freq s1 in
@@ -102,8 +102,8 @@ let snapshot p = p.snapshot
 
 let compare p s1 s2 =
   let lazy tbl = p.tbl in
-  let i1 = ID.Tbl.get_or ~or_:~-1 tbl s1 in
-  let i2 = ID.Tbl.get_or ~or_:~-1 tbl s2 in
+  let i1 = ID.Tbl.get_or ~default:~-1 tbl s1 in
+  let i2 = ID.Tbl.get_or ~default:~-1 tbl s2 in
   let c = CCInt.compare i1 i2 in
   if c = 0
   then (
@@ -117,7 +117,7 @@ let mem p s =
   let lazy tbl = p.tbl in
   ID.Tbl.mem tbl s
 
-let status p s = ID.Tbl.get_or ~or_:Lexicographic p.status s
+let status p s = ID.Tbl.get_or ~default:Lexicographic p.status s
 
 let weight p s = p.weight s
 

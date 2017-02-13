@@ -125,8 +125,8 @@ module Set = struct
 
   let pp out t =
     Format.fprintf out "{@[<hv>%a@,%a@]}"
-      (CCFormat.seq ~start:"" ~stop:"" pp_rule_term) (to_seq_t t)
-      (CCFormat.seq ~start:"" ~stop:"" pp_rule_clause) (to_seq_c t)
+      (Util.pp_seq pp_rule_term) (to_seq_t t)
+      (Util.pp_seq pp_rule_clause) (to_seq_c t)
 end
 
 (* TODO: {b long term}
@@ -259,7 +259,7 @@ let normalize_clause_ rules lits =
       (* remove rewritten literal, replace by [clause_chunks], apply
          substitution (clause_chunks might contain other variables!),
          distribute to get a CNF again *)
-      let lits = CCList.Idx.remove lits i in
+      let lits = CCList.remove_at_idx i lits in
       let lits = Literal.apply_subst_list ~renaming subst (lits,0) in
       let clause_chunks = eval_ll ~renaming subst (clause_chunks,1) in
       let clauses = List.map (fun new_lits -> new_lits @ lits) clause_chunks in

@@ -332,7 +332,9 @@ let finally ~do_ f =
 let pp_pair ?(sep=", ") pa pb out (a,b) =
   Format.fprintf out "@[%a%s%a@]" pa a sep pb b
 
-let pp_list ?(sep=", ") pp = CCFormat.list ~start:"" ~stop:"" ~sep pp
+let pp_sep sep out () = Format.fprintf out "%s@," sep
+let pp_list ?(sep=", ") pp = CCFormat.list ~sep:(pp_sep sep) pp
+let pp_seq ?(sep=", ") pp = CCFormat.seq ~sep:(pp_sep sep) pp
 
 let pp_list0 ?(sep=" ") pp_x out = function
   | [] -> ()

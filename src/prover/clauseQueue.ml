@@ -23,7 +23,7 @@ let profiles_ =
   ]
 
 let profile_of_string s =
-  let s = s |> String.trim |> String.lowercase in
+  let s = s |> String.trim |> CCString.lowercase_ascii in
   try List.assoc s profiles_
   with Not_found -> invalid_arg ("unknown queue profile: " ^ s)
 
@@ -61,7 +61,7 @@ module Make(C : Clause.S) = struct
         |> Sequence.map FOTerm.ty
         |> Sequence.map Type.depth
         |> Sequence.max ?lt:None
-        |> CCOpt.maybe CCFun.id 0
+        |> CCOpt.map_or CCFun.id ~default:0
       in
       let trail = C.trail c in
       let w_lits = weight_lits_ (C.lits c) in

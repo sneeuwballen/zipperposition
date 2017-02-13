@@ -61,7 +61,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
     Util.debugf ~section 5
       "@[<2>in clause `@[%a@]`@ possible subterms are [@[<hv>%a@]]@]"
-      (fun k->k C.pp c (T.Set.print ~start:"" ~stop:"" ~sep:"," T.pp) sub_terms);
+      (fun k->k C.pp c (T.Set.pp ~sep:"," T.pp) sub_terms);
     begin
       T.Set.to_seq sub_terms
       |> Sequence.flat_map_l

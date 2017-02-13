@@ -740,7 +740,7 @@ module Make(X : sig
     let clauses =
       CCVector.flat_map_list (conv_clause_ !_clause_conversion_rules) stmts in
     Util.debugf ~section 2 "@[<2>clauses:@ @[<v>%a@]@]"
-      (fun k->k (CCFormat.seq ~start:"" ~stop:"" ~sep:" " C.pp)
+      (fun k->k (Util.pp_seq ~sep:" " C.pp)
           (CCVector.to_seq clauses));
     clauses
 

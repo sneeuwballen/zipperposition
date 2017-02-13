@@ -238,7 +238,7 @@ let level_of_rule (d:_ def_rule): int =
   |> Sequence.flat_map FOTerm.Seq.symbols
   |> Sequence.filter_map as_defined_cst
   |> Sequence.max
-  |> CCOpt.get 0
+  |> CCOpt.get_or ~default:0
 
 let max_exn seq =
   seq
@@ -458,7 +458,7 @@ let pp_input = pp TypedSTerm.pp TypedSTerm.pp TypedSTerm.pp
 module TPTP = struct
   let pp ppf ppt ppty out st =
     let name = match st.src.src_view with
-      | From_file (f,_) -> CCOpt.get "no_name" (Src.name f)
+      | From_file (f,_) -> CCOpt.get_or ~default:"no_name" (Src.name f)
       | _ -> "no_name"
     in
     let pp_decl out (id,ty) =

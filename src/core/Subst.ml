@@ -166,7 +166,7 @@ let pp out subst =
       (Scoped.pp HVar.pp) v (Scoped.pp T.pp) t
   in
   Format.fprintf out "{@[<hv>%a@]}"
-    (CCFormat.seq ~start:"" ~stop:"" ~sep:", " pp_binding)
+    (Util.pp_seq ~sep:", " pp_binding)
     (to_seq subst)
 
 let to_string = CCFormat.to_string pp

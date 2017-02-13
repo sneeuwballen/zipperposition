@@ -87,7 +87,7 @@ let res_to_int_ = function
 let compare_result a b = match a, b with
   | Clause c1, Clause c2 -> SClause.compare c1 c2
   | Form f1, Form f2 -> TypedSTerm.compare f1 f2
-  | BoolClause l1, BoolClause l2 -> CCOrd.list_ BBox.Lit.compare l1 l2
+  | BoolClause l1, BoolClause l2 -> CCOrd.list BBox.Lit.compare l1 l2
   | Clause _, _
   | Form _, _
   | BoolClause _, _ ->

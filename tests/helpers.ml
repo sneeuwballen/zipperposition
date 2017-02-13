@@ -25,6 +25,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** helpers for tests *)
 
+open Libzipperposition
 module R = Random
 
 let seed = 42   (* use a fixed seed for random, for repeatable tests *)
@@ -70,7 +71,7 @@ let print_results ~name (num, success_count, failures, noprecond_count) pp_eleme
   Format.printf "%d tests for %s : %d success, %d failures, %d preconditions failed@."
     num name success_count (List.length failures) noprecond_count;
   if failures <> []
-    then Format.printf "failures @[%a@]@." (CCFormat.list ~sep:"" print_failure) failures
+    then Format.printf "failures @[%a@]@." (Util.pp_list ~sep:"" print_failure) failures
     else ()
 
 (** check property and then print results *)

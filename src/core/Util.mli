@@ -165,6 +165,8 @@ val pp_pair :
 val pp_list : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
 (** Print a list without begin/end separators *)
 
+val pp_seq : ?sep:string -> 'a CCFormat.printer -> 'a Sequence.t CCFormat.printer
+
 val pp_list0 : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
 (** Print a list with a whitespace in front if it's non empty, or
     does nothing if the list is empty

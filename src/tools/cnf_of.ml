@@ -38,7 +38,7 @@ let print_res decls = match !Options.output with
     in
     Format.printf "@[<v2>%d statements:@ %a@]@."
       (CCVector.length decls)
-      (CCVector.print ~start:"" ~stop:"" ~sep:"" ppst)
+      (CCVector.pp ~sep:"" ppst)
       decls
   | Options.Print_tptp ->
     let ppst out st =
@@ -47,7 +47,7 @@ let print_res decls = match !Options.output with
         out st
     in
     Format.printf "@[<v>%a@]@."
-      (CCVector.print ~start:"" ~stop:"" ~sep:"" ppst)
+      (CCVector.pp ~sep:"" ppst)
       decls
   | Options.Print_zf ->
     let ppst out st =
@@ -56,7 +56,7 @@ let print_res decls = match !Options.output with
         out st
     in
     Format.printf "@[<v>%a@]@."
-      (CCVector.print ~start:"" ~stop:"" ~sep:"" ppst)
+      (CCVector.pp ~sep:"" ppst)
       decls
 
 (* process the given file, converting it to CNF *)
@@ -69,7 +69,7 @@ let process file =
     >|= fun st ->
     if !print_in
     then Format.printf "@[<v2>input:@ %a@]@."
-        (CCVector.print ~start:"" ~stop:"" ~sep:"" Statement.pp_input) st;
+        (CCVector.pp ~sep:"" Statement.pp_input) st;
     let opts =
       (if !flag_distribute_exists then [Cnf.DistributeExists] else []) @
         (if !flag_disable_renaming then [Cnf.DisableRenaming] else []) @
@@ -80,7 +80,7 @@ let process file =
     if !print_sig
     then (
       Format.printf "@[<hv2>signature:@ (@[<v>%a@]@])@."
-        (ID.Map.print ~start:"" ~stop:"" ~sep:"" ~arrow:" : " ID.pp T.pp) sigma
+        (ID.Map.pp ~sep:"" ~arrow:" : " ID.pp T.pp) sigma
     );
     (* print *)
     print_res decls;

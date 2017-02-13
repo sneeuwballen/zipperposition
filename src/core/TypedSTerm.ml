@@ -89,7 +89,7 @@ let rec compare t1 t2 = match view t1, view t2 with
   | App (s1,l1), App (s2, l2) ->
     CCOrd.(
       compare s1 s2
-      <?> (CCOrd.list_ compare, l1, l2)
+      <?> (CCOrd.list compare, l1, l2)
     )
   | Bind (s1, v1, t1), Bind (s2, v2, t2) ->
     CCOrd.(
@@ -100,11 +100,11 @@ let rec compare t1 t2 = match view t1, view t2 with
   | AppBuiltin (b1,l1), AppBuiltin (b2,l2) ->
     CCOrd.(
       Builtin.compare b1 b2
-      <?> (CCOrd.list_ compare, l1, l2)
+      <?> (CCOrd.list compare, l1, l2)
     )
   | Multiset l1, Multiset l2 ->
     let l1 = List.sort compare l1 and l2 = List.sort compare l2 in
-    CCOrd.list_ compare l1 l2
+    CCOrd.list compare l1 l2
   | Record (l1, rest1), Record (l2, rest2) ->
     CCOrd.(
       CCOpt.compare compare rest1 rest2
@@ -115,15 +115,15 @@ let rec compare t1 t2 = match view t1, view t2 with
     CCList.compare compare [a1;b1;c1] [a2;b2;c2]
   | Let (l1,t1), Let (l2,t2) ->
     CCOrd.( compare t1 t2
-      <?> (list_ (pair Var.compare compare), l1, l2))
+      <?> (list (pair Var.compare compare), l1, l2))
   | Match (u1,l1), Match (u2,l2) ->
     let cmp_branch (c1,vars1,rhs1) (c2,vars2,rhs2) =
       CCOrd.(ID.compare c1.cstor_id c2.cstor_id
-        <?> (list_ compare, c1.cstor_args, c2.cstor_args)
-        <?> (list_ Var.compare, vars1,vars2)
+        <?> (list compare, c1.cstor_args, c2.cstor_args)
+        <?> (list Var.compare, vars1,vars2)
         <?> (compare,rhs1,rhs2))
     in
-    CCOrd.( compare u1 u2 <?> (list_ cmp_branch,l1,l2))
+    CCOrd.( compare u1 u2 <?> (list cmp_branch,l1,l2))
   | Var _, _
   | Const _, _
   | App _, _
@@ -136,7 +136,7 @@ let rec compare t1 t2 = match view t1, view t2 with
   | Meta _, _
   | Record _, _ -> to_int_ t1.term - to_int_ t2.term
 and cmp_field x y = CCOrd.pair String.compare compare x y
-and cmp_fields x y = CCOrd.list_ cmp_field x y
+and cmp_fields x y = CCOrd.list cmp_field x y
 
 let equal t1 t2 = compare t1 t2 = 0
 
@@ -414,7 +414,7 @@ module Seq = struct
 end
 
 let rec is_ground t =
-  CCOpt.maybe is_ground true t.ty
+  CCOpt.map_or is_ground ~default:true t.ty
   &&
   match t.term with
     | Var _ -> false
@@ -431,7 +431,7 @@ let rec is_ground t =
       List.for_all (fun (_,_,t) -> is_ground t) l
     | Bind (_, v, t') -> is_ground (Var.ty v) && is_ground t'
     | Record (l, rest) ->
-      CCOpt.maybe is_ground true rest
+      CCOpt.map_or is_ground ~default:true rest
       &&
       List.for_all (fun (_,t') -> is_ground t') l
     | Multiset l -> List.for_all is_ground l
@@ -908,7 +908,7 @@ let occur_check_ ~allow_open ~subst v t =
   assert (is_meta v);
   let rec check bound t =
     v == t ||
-    CCOpt.maybe (check bound) false t.ty ||
+    CCOpt.map_or (check bound) ~default:false t.ty ||
     match view t with
       | Meta _ -> equal v t
       | Var v' ->
@@ -940,7 +940,7 @@ let occur_check_ ~allow_open ~subst v t =
       | AppBuiltin (_,l)
       | Multiset l -> List.exists (check bound) l
       | Record (l, rest) ->
-        CCOpt.maybe (check bound) false rest ||
+        CCOpt.map_or (check bound) ~default:false rest ||
         List.exists (fun (_,t) -> check bound t) l
   in
   check Var.Set.empty t
