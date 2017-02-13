@@ -38,7 +38,7 @@ let typing conf stmts : (_ Statement.t CCVector.ro_vector * Type.t ID.Map.t, str
   in
   Util.debugf ~section 2 "@[<hv2>signature {@ %a@,}@]"
     (fun k->k
-        Fmt.(seq (Dump.pair ID.pp Type.pp))
+        Fmt.(seq (hbox (Dump.pair ID.pp Type.pp)))
         (ID.Map.to_seq signature));
   Util.debugf ~section 2 "@[<hv2>typed statements {@ %a@,}@]"
     (fun k->
