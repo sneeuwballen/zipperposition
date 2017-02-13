@@ -10,4 +10,6 @@ type t = Hornet_types.proof_res
 include Interfaces.HASH with type t := t
 include Interfaces.PRINT with type t := t
 
+val is_absurd : t -> bool
+
 module Tbl : CCHashtbl.S with type key = t

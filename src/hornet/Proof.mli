@@ -25,5 +25,8 @@ val hc_simplify : horn_clause -> t
 
 include Interfaces.PRINT with type t := t
 
+val name : t -> string
+(** Name of the rule, no other info *)
+
 val parents : t -> proof_with_res list
 (** Immediate parents of this proof step, i.e. the subproofs it uses *)

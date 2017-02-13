@@ -3,7 +3,9 @@
 
 (** {1 CProofs} *)
 
+open Libzipperposition
 open Hornet_types
+module U = Hornet_types_util
 
 module Fmt = CCFormat
 
@@ -31,6 +33,17 @@ let hc_simplify c = P_hc_simplify c
 
 let pp = Hornet_types_util.pp_proof
 let to_string = Fmt.to_string pp
+
+let name (p:t): string = match p with
+  | P_trivial -> "trivial"
+  | P_from_stmt _ -> "stmt"
+  | P_bool_tauto -> "bool_tauto"
+  | P_avatar_split _ -> "avatar_split"
+  | P_split _ -> "split"
+  | P_instance (_,subst) -> Fmt.sprintf "instance(@[%a@])" Subst.pp subst
+  | P_bool_res r -> Fmt.sprintf "bool_res(%a)" U.pp_bool_lit r.bool_res_atom
+  | P_hc_superposition _ -> "hc_sup"
+  | P_hc_simplify _ -> "hc_simpl"
 
 let parents (p:t): proof_with_res list = match p with
   | P_trivial
