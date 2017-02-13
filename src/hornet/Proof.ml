@@ -9,14 +9,16 @@ module Fmt = CCFormat
 
 type t = proof
 
+let trivial = P_trivial
 let from_stmt st = P_from_stmt st
 let instance c subst = P_instance (c,subst)
 let avatar_split c = P_avatar_split c
 let split c = P_split c
 
 let bool_tauto = P_bool_tauto
-let bool_res c1 p1 c2 p2 =
+let bool_res a c1 p1 c2 p2 =
   let s = {
+    bool_res_atom=a;
     bool_res_c1=c1;
     bool_res_p1=p1;
     bool_res_c2=c2;
@@ -37,5 +39,13 @@ let pp_dag _ _ = assert false
 
 (* TODO: DOT output *)
 
+let pp_dot _ _ = assert false
+
 (* TODO: a type ['a with_proof] to always store have the conclusion
    of a proof with it *)
+
+(** {2 Proof + Result} *)
+
+type with_res = proof_with_res
+
+

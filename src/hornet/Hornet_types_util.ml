@@ -99,6 +99,7 @@ let pp_hc_sup out sup : unit =
     Subst.pp sup.hc_sup_subst
 
 let pp_proof out (p:proof) : unit = match p with
+  | P_trivial -> Fmt.string out "trivial"
   | P_from_stmt st ->
     Fmt.fprintf out "(@[from_stmt@ %a@])" Statement.pp_clause st
   | P_instance (c, subst) ->
@@ -110,7 +111,8 @@ let pp_proof out (p:proof) : unit = match p with
     Fmt.fprintf out "(@[<hv2>split@ %a@])" pp_clause c
   | P_bool_tauto -> Fmt.string out "bool_tauto"
   | P_bool_res r ->
-    Fmt.fprintf out "(@[<hv>bool_res@ :c1 %a@ :c2 %a@])"
+    Fmt.fprintf out "(@[<hv>bool_res@ :on %a@ :c1 %a@ :c2 %a@])"
+      pp_bool_lit r.bool_res_atom
       pp_bool_clause r.bool_res_c1
       pp_bool_clause r.bool_res_c2
   | P_hc_superposition sup -> pp_hc_sup out sup

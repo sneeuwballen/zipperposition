@@ -32,6 +32,7 @@ and c_kind =
   | C_general
 
 and proof =
+  | P_trivial
   | P_from_stmt of Statement.clause_t
   | P_instance of clause * Subst.t
   | P_avatar_split of clause
@@ -42,6 +43,13 @@ and proof =
   | P_bool_res of bool_res_step
   | P_hc_superposition of hc_superposition_step
   | P_hc_simplify of horn_clause
+
+and proof_with_res = proof * proof_res
+
+and proof_res =
+  | PR_horn_clause of horn_clause
+  | PR_clause of clause
+  | PR_bool_clause of bool_clause
 
 and c_constraint_ =
   | C_dismatch of Dismatching_constr.t
@@ -81,6 +89,7 @@ and bool_res_step = {
   bool_res_p1: proof;
   bool_res_c2: bool_clause;
   bool_res_p2: proof;
+  bool_res_atom: bool_lit;
 }
 
 and bool_atom =

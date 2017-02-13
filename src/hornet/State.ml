@@ -4,6 +4,7 @@
 (** {1 State} *)
 
 open Libzipperposition
+open Hornet_types
 
 module SI = Msat.Solver_intf
 module FI = Msat.Formula_intf
@@ -190,6 +191,58 @@ let context (t:t) =
   let module M = (val t) in
   (module M.Ctx : CONTEXT)
 
+(** {2 Rebuild Proof} *)
+
+(* bool_clause -> 'a *)
+module Bool_clause_tbl = CCHashtbl.Make(struct
+    type t = bool_clause
+    let equal = CCList.equal Bool_lit.equal
+    let hash = Hash.list Bool_lit.hash
+  end)
+
+module Proof_build(X : sig
+    module St : S
+    val proof : St.M.Proof.proof
+  end) =
+struct
+  (* convert the SAT proof into a normal proof *)
+  let rebuild () : proof_with_res =
+    let module Pr = X.St.M.Proof in
+    (* map bool_clause -> its proof *)
+    let tbl : proof Bool_clause_tbl.t = Bool_clause_tbl.create 64 in
+    let bool_clause_of_sat c : bool_clause =
+      Pr.to_list c |> List.map (fun a -> a.X.St.M.St.lit)
+    in
+    Pr.check X.proof;
+    let rec aux p : proof * bool_clause = match Pr.expand p with
+      | { Pr.conclusion=c; step=Pr.Assumption|Pr.Hypothesis } ->
+        begin match X.St.M.get_tag c with
+          | None -> assert false
+          | Some tag ->
+            let c = bool_clause_of_sat c in
+            let proof = Proof_tbl.proof_of_tag tag in
+            proof, c
+        end
+      | { Pr.step = Pr.Lemma lemma; conclusion=c } ->
+        let c = bool_clause_of_sat c in
+        lemma, c
+      | { Pr.conclusion=c; step = Pr.Resolution (p1,p2,{X.St.M.St.lit;_}) } ->
+        let c = bool_clause_of_sat c in
+        (* atomic resolution step *)
+        begin match Bool_clause_tbl.get tbl c with
+          | Some pr -> pr, c
+          | None ->
+            let p1, c1 = aux p1 in
+            let p2, c2 = aux p2 in
+            let proof = Proof.bool_res lit c1 p1 c2 p2 in
+            Bool_clause_tbl.add tbl c proof;
+            proof, c
+        end
+    in
+    let proof, c = aux X.proof in
+    proof, PR_bool_clause c
+end
+
 (** {2 Result} *)
 
 type res =
@@ -201,11 +254,6 @@ let pp_res out = function
   | Sat -> Fmt.string out "SAT"
   | Unsat _ -> Fmt.string out "UNSAT"
   | Unknown -> Fmt.string out "UNKNOWN"
-
-let rebuild_proof us : proof =
-  ignore Proof_tbl.proof_of_tag; (* TODO: use this *)
-  (* TODO: convert the SAT proof into a normal proof *)
-  assert false
 
 let run (t:t): res =
   let module St = (val t) in
@@ -229,7 +277,11 @@ let run (t:t): res =
         else iter (d+1) (* increase depth *)
       | St.M.Unsat us ->
         Util.debugf ~section 1 "@[Found unsat@]" (fun k->k);
-        let p = rebuild_proof us in
+        let module Rebuild = Proof_build(struct
+            module St = St
+            let proof = us.SI.get_proof ()
+          end) in
+        let p, _ = Rebuild.rebuild() in
         St.Ctx.send_event (Hornet_types.E_found_unsat p);
         Unsat p
     end
