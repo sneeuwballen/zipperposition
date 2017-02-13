@@ -75,13 +75,13 @@ let hash = Hornet_types_util.hash_lit
 let compare a b: int =
   let to_int = function Bool _ -> 0 | Atom _ -> 1 | Eq _ -> 2 in
   begin match a, b with
-    | Bool b1, Bool b2 -> CCOrd.bool_ b1 b2
+    | Bool b1, Bool b2 -> CCOrd.bool b1 b2
     | Atom (t1,sign1), Atom (t2,sign2) ->
-      CCOrd.( T.compare t1 t2 <?> (bool_, sign1, sign2))
+      CCOrd.( T.compare t1 t2 <?> (bool, sign1, sign2))
     | Eq (t1,u1,sign1), Eq (t2,u2,sign2) ->
       CCOrd.( T.compare t1 t2
         <?> (T.compare, u1, u2)
-        <?> (bool_, sign1, sign2))
+        <?> (bool, sign1, sign2))
     | Bool _, _
     | Atom _, _
     | Eq _, _

@@ -43,7 +43,7 @@ let typing conf stmts : (_ Statement.t CCVector.ro_vector * Type.t ID.Map.t, str
   Util.debugf ~section 2 "@[<hv2>typed statements {@ %a@,}@]"
     (fun k->
      let module T = TypedSTerm in
-     k (CCVector.print ~sep:" " (Statement.pp T.pp T.pp T.pp)) stmts);
+     k (Util.pp_seq ~sep:" " (Statement.pp T.pp T.pp T.pp)) (CCVector.to_seq stmts));
   stmts, signature
 
 (* obtain clauses  *)
@@ -57,7 +57,7 @@ let cnf ~file decls =
     |> Cnf.convert
   in
   Util.debugf ~section 2 "@[<hv2>CNF {@ %a@,}@]"
-    (fun k-> k (CCVector.print ~sep:" " Cnf.pp_fo_c_statement) stmts);
+    (fun k-> k (Util.pp_seq ~sep:" " Cnf.pp_fo_c_statement) (CCVector.to_seq stmts));
   E.return stmts
 
 (* TODO: make defined symbols smaller, skolems bigger *)

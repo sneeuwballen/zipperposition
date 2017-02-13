@@ -59,7 +59,7 @@ let compare_lits_for_horn_ (l1:Lit.t) (l2:Lit.t) : int =
   else (
     let n_vars1 = Lit.vars_set l1 |> List.length in
     let n_vars2 = Lit.vars_set l2 |> List.length in
-    CCOrd.( int_ n_vars1 n_vars2 <?> (int_, Lit.weight l1, Lit.weight l2) )
+    CCOrd.( int n_vars1 n_vars2 <?> (int, Lit.weight l1, Lit.weight l2) )
   )
 
 let kind_of_lits ~trail ~constr (c_lits:Lit.t IArray.t) proof: c_kind =
