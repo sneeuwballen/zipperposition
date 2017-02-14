@@ -7,6 +7,8 @@ open Hornet_types
 
 type t = bool_trail
 
+val is_empty : t -> bool
+
 val make : bool_lit lazy_t list -> t
 
 val merge : t -> t -> t

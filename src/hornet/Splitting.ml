@@ -30,6 +30,24 @@ module Make(Ctx : State.CONTEXT) = struct
   end = struct
     let stat_avatar_split = Util.mk_stat "hornet.avatar_split"
 
+    (* for a component [¬p], add [[¬p] => ¬[p]] to SAT *)
+    let add_neg_lit_complement (b:bool_lit): unit =
+      begin match Bool_lit.view b with
+        | A_box_clause r ->
+          let c = r.bool_box_clause in
+          if C.is_unit_ground c &&
+             Lit.is_neg (IArray.get (C.lits c) 0) &&
+             C.constr c = []
+          then (
+            let lit' = Lit.neg (IArray.get (C.lits c) 0) in
+            let c' = C.make_l ~trail:(C.trail c) [lit'] Proof.trivial in
+            let b' = Bool_lit.box_clause Ctx.bool_state c' in
+            let b_c = [Bool_lit.neg b; Bool_lit.neg b'] in
+            Ctx.add_clause Proof.bool_tauto b_c;
+          )
+        | _ -> ()
+      end
+
     (* union-find that maps vars to list of literals, used for splitting *)
     module UF = UnionFind.Make(struct
         type key = T.var
@@ -107,8 +125,11 @@ module Make(Ctx : State.CONTEXT) = struct
             C.trail c
             |> List.map (fun (lazy blit) -> Bool_lit.neg blit)
           in
+          (* also add boolean constraint to pick ≥ 1 components *)
           let bool_clause = guard @ bool_lits in
           Ctx.add_clause proof bool_clause;
+          (* shortcut: for [¬p], add clause [[¬p] ⇒ ¬[¬p]] *)
+          List.iter add_neg_lit_complement bool_lits;
           Util.debugf ~section 4 "@[<2>constraint clause is@ @[%a@]@]"
             (fun k->k Bool_lit.pp_clause bool_clause);
           (* return the clauses *)

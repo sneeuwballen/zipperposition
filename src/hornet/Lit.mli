@@ -24,6 +24,8 @@ val atom : ?sign:bool -> term -> t
 val eq : ?sign:bool -> term -> term -> t
 
 val sign : t -> bool
+val is_pos : t -> bool (** alias to {!sign} *)
+val is_neg : t -> bool
 
 val neg : t -> t
 (** negate literal *)

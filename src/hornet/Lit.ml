@@ -69,6 +69,9 @@ let sign = function
   | Eq (_,_,b)
   | Bool b -> b
 
+let is_pos = sign
+let is_neg l = not (sign l)
+
 let equal = Hornet_types_util.equal_lit
 let hash = Hornet_types_util.hash_lit
 

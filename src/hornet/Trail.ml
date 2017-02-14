@@ -11,6 +11,7 @@ let cmp_blit = Hornet_types_util.compare_bool_lit
 let equal_blit = Hornet_types_util.equal_bool_lit
 let neg_blit = Hornet_types_util.neg_bool_lit
 let cmp_ (lazy a)(lazy b) = cmp_blit a b
+let is_empty = function [] -> true | _::_ -> false
 
 let make l = CCList.sort_uniq ~cmp:cmp_ l
 
