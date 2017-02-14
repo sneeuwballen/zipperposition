@@ -8,7 +8,7 @@ true: bin_annot, no_alias_deps, use_menhir, color(always), optimize(3)
 "tests/quick/": not_hygienic
 "Problems": -traverse
 
-<src/**/*.ml>: warn(+a-4-42-44-48-50-58)
+<src/**/*.ml>: warn(+a-4-42-44-48-50-58@8)
 
 <src/prover/const.cmx>: for-pack(Libzipperposition)
 
