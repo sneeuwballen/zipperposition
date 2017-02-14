@@ -41,12 +41,11 @@ let pp_dag out (p:t): unit =
 let get_proof (x:proof_with_res): proof = fst x
 let get_res (x:proof_with_res): proof_res = snd x
 
-let as_graph : (t,string) CCGraph.t =
+let as_graph ?compress : (t,string) CCGraph.t =
   CCGraph.make
     (fun (p,_) ->
-       let name = Proof.name p in
-       Proof.parents p
-       |> Sequence.of_list
+       let name, parents =  Proof.get ?compress p in
+       Sequence.of_list parents
        |> Sequence.map (fun p' -> name, p'))
 
 let is_proof_of_false p = Proof_res.is_absurd (get_res p)
@@ -69,7 +68,7 @@ let is_trivial p = match get_proof p with
   | P_trivial | P_bool_tauto -> true
   | _ -> false
 
-let pp_dot out (p:t) : unit =
+let pp_dot ?compress out (p:t) : unit =
   let equal = CCFun.compose_binop get_res Proof_res.equal in
   let hash = CCFun.compose get_res Proof_res.hash in
   let pp_node (p:t) = Proof_res.to_string (get_res p) in
@@ -92,13 +91,13 @@ let pp_dot out (p:t) : unit =
     ~attrs_v
     ~attrs_e
     ~name:"proof"
-    ~graph:as_graph
+    ~graph:(as_graph ?compress)
     out p
 
-let pp_dot_file file p =
+let pp_dot_file ?compress file p =
   CCIO.with_out file
     (fun oc ->
        let out = Format.formatter_of_out_channel oc in
-       pp_dot out p;
+       pp_dot ?compress out p;
        Format.pp_print_flush out ();
        flush oc)

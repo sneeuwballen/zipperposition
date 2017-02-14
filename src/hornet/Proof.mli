@@ -30,3 +30,9 @@ val name : t -> string
 
 val parents : t -> proof_with_res list
 (** Immediate parents of this proof step, i.e. the subproofs it uses *)
+
+val get : ?compress:bool -> t -> string * proof_with_res list
+(** Get name and parent
+    @param compress if true, skip some uninteresting steps *)
+
+

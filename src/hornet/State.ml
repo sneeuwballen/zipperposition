@@ -293,7 +293,7 @@ let run (t:t): res =
             module St = St
             let proof = us.SI.get_proof ()
           end) in
-        let p = Rebuild.rebuild() in
+        let p = Rebuild.rebuild () in
         St.Ctx.send_event (Hornet_types.E_found_unsat p);
         Unsat p
     end

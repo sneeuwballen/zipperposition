@@ -110,6 +110,7 @@ let max_depth : int ref = ref 4
 let ord_ : string ref = ref Ordering.default_name
 let dot_file_ : string ref = ref ""
 let dimacs_file_ : string ref = ref ""
+let compress_proof_ : bool ref = ref true
 
 let options =
   Arg.align
@@ -121,6 +122,8 @@ let options =
        "--max-depth", Arg.Set_int max_depth, (Fmt.sprintf " maximum depth (default %d)" !max_depth);
        "--dot", Arg.Set_string dot_file_, " print proof to <file> in DOT" ;
        "--dimacs", Arg.Set_string dimacs_file_, " print SAT problem in dimacs into <file>" ;
+       "--compress", Arg.Set compress_proof_, " compress proof";
+       "--no-compress", Arg.Clear compress_proof_, " do not compress proof";
     ] @ Options.make ())
 
 let main () =
@@ -151,6 +154,7 @@ let main () =
       let statements = stmts
       let max_depth = !max_depth
       let dimacs_file = if !dimacs_file_ =""then None else Some !dimacs_file_
+      let compress_proof = !compress_proof_
       let theories = [
         Horn_superposition.theory;
         Splitting.theory;
@@ -167,7 +171,7 @@ let main () =
       Format.printf "@[<hv2>proof:@ %a@]@." Proof_print.pp_dag p;
       (* print into DOT *)
       if !dot_file_ <> "" then (
-        Proof_print.pp_dot_file !dot_file_ p;
+        Proof_print.pp_dot_file ~compress:!compress_proof_ !dot_file_ p;
       );
   end;
   E.return () (* done *)

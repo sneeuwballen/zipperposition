@@ -70,10 +70,13 @@ let parents (p:t): proof_with_res list = match p with
     [ c1.hc_proof, PR_horn_clause c1;
       c2.hc_proof, PR_horn_clause c2;
     ]
-  | P_hc_simplify c ->
-    [ c.hc_proof, PR_horn_clause c]
+  | P_hc_simplify c -> [ c.hc_proof, PR_horn_clause c]
 
-
+let get ?(compress=true) (p:t): string * proof_with_res list =
+  let rec aux p = match p with
+    | P_hc_simplify c when compress -> aux c.hc_proof
+    | _ -> name p, parents p
+  in aux p
 
 module Src_tbl = CCHashtbl.Make(struct
     type t = Stmt.source
