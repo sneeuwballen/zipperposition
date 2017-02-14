@@ -322,27 +322,20 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         | Comparison.Gt, Comparison.Incomparable -> true
         | Comparison.Incomparable, Comparison.Incomparable -> true (* ouch. *)
       in
-      let unordered_depth =
+      let unordered_depth () =
         (* malus applied to this particular inference. an inference is
            safe if:
-           - [s'] is ground, [t'] too, and [s'>t'], or
-           - [s' > t'] and the substitution does not instantiate any
-               passive term for non-ground inferences *)
-        let unordered_step =
+           - [s'] is ground, [t'] too, [s'>t'], passive clause is unit or ground
+        *)
+        let step =
           if (T.is_ground s' &&
-              Ordering.compare Ctx.ord s' t' = Comparison.Gt &&
-              (assert (T.is_ground t'); true)) ||
-             (cmp_s_t = Comparison.Gt &&
-              ( Subst.domain subst
-                |> Sequence.for_all
-                  (fun (v,sc_v) ->
-                     let v = HVar.update_ty ~f:Type.of_term_unsafe v in
-                     sc_v = sc_active ||
-                     (let t,_ = Subst.FO.deref subst (T.var v,sc_v) in T.is_var t))))
+              cmp_s_t = Comparison.Gt &&
+              (assert (T.is_ground t'); true) &&
+              (HC.is_ground c' || HC.is_unit_pos c'))
           then 0
           else 1
         in
-        HC.unordered_depth c + HC.unordered_depth c' + unordered_step
+        HC.unordered_depth c + HC.unordered_depth c' + step
       in
       (* check for some trivial inference: using [s=t] to rewrite [s=t] *)
       let will_be_trivial () =
@@ -376,6 +369,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         and trail =
           Trail.merge (HC.trail c) (HC.trail c')
         in
+        let unordered_depth = unordered_depth() in
         let new_c =
           HC.make ~unordered_depth ~constr ~trail
             new_head new_body (Proof.hc_sup sup)
