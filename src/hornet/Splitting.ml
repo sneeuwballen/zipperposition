@@ -171,20 +171,54 @@ module Make(Ctx : State.CONTEXT) = struct
        - rule to select a horn subset in non-Horn non-ground clause components
     *)
 
+    (* ground the literals of [c] *)
+    let ground_lits (c:clause): bool_lit list =
+      let subst =
+        C.vars_l c
+        |> List.map
+          (fun v ->
+             let t = T.grounding (HVar.ty v) in
+             ((v:>InnerTerm.t HVar.t),0), ((t:>InnerTerm.t),0))
+        |> Subst.of_list
+      in
+      let renaming = Ctx.renaming_cleared () in
+      let lits =
+        C.lits c
+        |> IArray.mapi
+          (fun i lit ->
+             (* ground [lit] using the substitution *)
+             let lit' = Lit.apply_subst ~renaming subst (lit,0) in
+             assert (Lit.is_ground lit');
+             let b_lit = Bool_lit.ground Ctx.bool_state lit' in
+             (* register [c] in each ground literal *)
+             begin match Bool_lit.view b_lit with
+               | A_ground r -> 
+                 r.bool_ground_instance_of <- (c,i) :: r.bool_ground_instance_of;
+               | _ -> assert false
+             end;
+             b_lit)
+        |> IArray.to_list
+      in
+      lits
 
     (* TODO:
        - ground the clause, register it to each ground literal
        - add the grounding to SAT
        - remember to select a literal in [on_assumption]
     *)
-    let instantiate _ =
+    let instantiate (c:C.t): unit =
       Util.incr_stat stat_instantiate;
-      assert false
+      Util.debugf ~section 4
+        "@[<2>@{<yellow>inst_gen_eq.instantiate@}@ %a@]"
+        (fun k->k C.pp c);
+      let b_clause = ground_lits c in
+      Ctx.add_clause (Proof.bool_grounding c) b_clause;
+      ()
 
     (* TODO: when a conflict between selected lits is found, add
        instantiations *)
 
-    let try_select (c:clause)(i:clause_idx)(r:bool_ground): unit =
+    let try_select (c:clause)(i:clause_idx)(_:bool_ground): unit =
       begin match C.select c with
         | Some _ -> ()
         | None ->
@@ -217,9 +251,6 @@ module Make(Ctx : State.CONTEXT) = struct
     CCVector.to_seq Ctx.statements
     |> Sequence.flat_map Statement.Seq.forms
     |> Sequence.to_rev_list
-
-  (* TODO: on assumption [Lit some_ground_lit], select the corresponding
-     literal in every FO clause whose grounding contains [some_ground_lit]. *)
 
   (* split a clause into Avatar components, then normally *)
   let rec split_clause (c:C.t): unit =

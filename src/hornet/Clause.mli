@@ -53,6 +53,10 @@ val hash_mod_alpha : t -> int
 
 val lits_seq : t -> (idx * Lit.t) Sequence.t
 
+val vars_seq : t -> Type.t HVar.t Sequence.t
+
+val vars_l : t -> Type.t HVar.t list
+
 (** {2 Classification} *)
 
 (** Some clauses are Horn, some are unit equations, some are unit,

@@ -9,6 +9,7 @@ module BV = CCBV
 module Fmt = CCFormat
 module PW = Position.With
 module S = Subst
+module T = FOTerm
 
 open Hornet_types
 
@@ -141,6 +142,12 @@ let clear_select c = match c.c_select with
 let is_empty c = IArray.length c.c_lits = 0
 
 let lits_seq c = IArray.to_seqi c.c_lits
+
+let vars_seq c =
+  IArray.to_seq c.c_lits
+  |> Sequence.flat_map Lit.vars_seq
+
+let vars_l c = vars_seq c |> T.VarSet.of_seq |> T.VarSet.to_list
 
 (** {2 Classification} *)
 

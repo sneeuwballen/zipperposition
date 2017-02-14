@@ -133,6 +133,8 @@ let pp_proof out (p:proof) : unit = match p with
       pp_bool_lit r.bool_res_atom
       pp_bool_clause r.bool_res_c1
       pp_bool_clause r.bool_res_c2
+  | P_bool_grounding c ->
+    Fmt.fprintf out "(@[<2>grounding@ %a@])" pp_clause c
   | P_hc_superposition sup -> pp_hc_sup out sup
   | P_hc_eq_res (c,subst) ->
     Fmt.fprintf out "(@[<hv>eq_resolution@ :on %a@ :subst %a@])"

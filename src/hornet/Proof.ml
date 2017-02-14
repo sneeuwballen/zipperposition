@@ -29,6 +29,8 @@ let bool_res a c1 p1 c2 p2 =
   } in
   P_bool_res s
 
+let bool_grounding c = P_bool_grounding c
+
 let hc_sup x = P_hc_superposition x
 let hc_eq_res c proof = P_hc_eq_res (c,proof)
 let hc_simplify c = P_hc_simplify c
@@ -47,6 +49,7 @@ let name (p:t): string = match p with
   | P_split _ -> "split"
   | P_instance (_,subst) -> Fmt.sprintf "instance(@[%a@])" Subst.pp subst
   | P_bool_res r -> Fmt.sprintf "bool_res(%a)" U.pp_bool_lit r.bool_res_atom
+  | P_bool_grounding _ -> "grounding"
   | P_hc_superposition _ -> "hc_sup"
   | P_hc_eq_res _ -> "hc_eq_res"
   | P_hc_simplify _ -> "hc_simpl"
@@ -66,6 +69,7 @@ let parents (p:t): proof_with_res list = match p with
     [ r.bool_res_p1, PR_bool_clause r.bool_res_c1;
       r.bool_res_p2, PR_bool_clause r.bool_res_c2;
     ]
+  | P_bool_grounding c -> [c.c_proof, PR_clause c]
   | P_hc_eq_res (c,_) -> [ c.hc_proof, PR_horn_clause c ]
   | P_hc_superposition r ->
     let c1, _ = r.hc_sup_active in
