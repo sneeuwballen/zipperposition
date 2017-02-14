@@ -10,6 +10,7 @@ module HC = Horn_clause
 module P_res = Proof_res
 module U = Hornet_types_util
 module Fmt = CCFormat
+module Stmt = Statement
 
 type t = proof_with_res
 
@@ -51,25 +52,18 @@ let as_graph : (t,string) CCGraph.t =
 let is_proof_of_false p = Proof_res.is_absurd (get_res p)
 
 let is_goal p = match get_proof p with
-  | P_from_stmt st ->
-    begin match Statement.view st with
-      | Statement.Goal _ | Statement.NegatedGoal _ -> true
-      | _ -> false
-    end
+  | P_from_file (_,Stmt.R_goal)
+  | P_from_input Stmt.R_goal -> true
   | _ -> false
 
 let is_assert p = match get_proof p with
-  | P_from_stmt st ->
-    begin match Statement.view st with
-      | Statement.Assert _ | Statement.Def _
-      | Statement.RewriteForm _ | Statement.RewriteTerm _ -> true
-      | _ -> false
-    end
+  | P_from_file (_,(Stmt.R_assert | Stmt.R_def))
+  | P_from_input (Stmt.R_assert | Stmt.R_def) -> true
   | _ -> false
 
 let is_bool_clause p = match get_res p with
   | PR_bool_clause _ -> true
-  | PR_clause _ | PR_horn_clause _ -> false
+  | PR_clause _ | PR_horn_clause _ | PR_formula _ -> false
 
 let is_trivial p = match get_proof p with
   | P_trivial | P_bool_tauto -> true

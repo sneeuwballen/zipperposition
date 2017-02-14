@@ -10,6 +10,7 @@ open Libzipperposition
 
 type ty = Type.t
 type term = FOTerm.t
+type formula = TypedSTerm.t
 type bool_unique_id = int
 
 type clause = {
@@ -33,7 +34,10 @@ and c_kind =
 
 and proof =
   | P_trivial
-  | P_from_stmt of Statement.clause_t
+  | P_from_input of Statement.role (* added to input *)
+  | P_from_file of Statement.from_file * Statement.role
+  | P_cnf_neg of proof_with_res
+  | P_cnf of proof_with_res
   | P_instance of clause * Subst.t
   | P_avatar_split of clause
   (* given clause has been split into var-disjoint components,
@@ -47,6 +51,7 @@ and proof =
 and proof_with_res = proof * proof_res
 
 and proof_res =
+  | PR_formula of formula
   | PR_horn_clause of horn_clause
   | PR_clause of clause
   | PR_bool_clause of bool_clause

@@ -8,6 +8,7 @@ open Hornet_types
 
 module T = FOTerm
 module Fmt = CCFormat
+module Stmt = Statement
 
 let pp_lit out (t:lit): unit = match t with
   | Bool b -> Fmt.bool out b
@@ -99,8 +100,13 @@ let pp_hc_sup out sup : unit =
 
 let pp_proof out (p:proof) : unit = match p with
   | P_trivial -> Fmt.string out "trivial"
-  | P_from_stmt st ->
-    Fmt.fprintf out "(@[from_stmt@ %a@])" Statement.pp_clause st
+  | P_from_file (f,r) ->
+    Fmt.fprintf out "(@[<2>file %a@ :role %a@])"
+      Stmt.Src.pp_from_file f Stmt.Src.pp_role r
+  | P_from_input r ->
+    Fmt.fprintf out "(@[<2>input :role %a@])" Stmt.Src.pp_role r
+  | P_cnf _ -> Fmt.string out "cnf"
+  | P_cnf_neg _ -> Fmt.string out "cnf_neg"
   | P_instance (c, subst) ->
     Fmt.fprintf out "(@[<hv2>instance@ :clause %a@ :subst %a@])"
       pp_clause c Subst.pp subst
@@ -222,3 +228,4 @@ let pp_event out (e:event): unit = match e with
   | E_found_unsat (p,_) ->
     Fmt.fprintf out "(@[found_unsat@ :proof %a@])" pp_proof p
   | E_stage s -> Fmt.fprintf out "(@[stage %a@])" pp_stage s
+

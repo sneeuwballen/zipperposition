@@ -5,14 +5,15 @@
 
 open Libzipperposition
 open Hornet_types
-module U = Hornet_types_util
 
+module U = Hornet_types_util
+module Stmt = Statement
 module Fmt = CCFormat
 
 type t = proof
+type formula = TypedSTerm.t
 
 let trivial = P_trivial
-let from_stmt st = P_from_stmt st
 let instance c subst = P_instance (c,subst)
 let avatar_split c = P_avatar_split c
 let split c = P_split c
@@ -36,7 +37,10 @@ let to_string = Fmt.to_string pp
 
 let name (p:t): string = match p with
   | P_trivial -> "trivial"
-  | P_from_stmt _ -> "stmt"
+  | P_from_input _ -> "from_input"
+  | P_from_file _ -> "from_file"
+  | P_cnf_neg _ -> "cnf_neg"
+  | P_cnf _ -> "cnf"
   | P_bool_tauto -> "bool_tauto"
   | P_avatar_split _ -> "avatar_split"
   | P_split _ -> "split"
@@ -47,9 +51,12 @@ let name (p:t): string = match p with
 
 let parents (p:t): proof_with_res list = match p with
   | P_trivial
-  | P_from_stmt _
   | P_bool_tauto
+  | P_from_file _
+  | P_from_input _
     -> []
+  | P_cnf_neg r
+  | P_cnf r -> [r]
   | P_avatar_split c
   | P_split c
   | P_instance (c,_) -> [c.c_proof, PR_clause c]
@@ -65,3 +72,41 @@ let parents (p:t): proof_with_res list = match p with
     ]
   | P_hc_simplify c ->
     [ c.hc_proof, PR_horn_clause c]
+
+
+
+module Src_tbl = CCHashtbl.Make(struct
+    type t = Stmt.source
+    let equal = Stmt.Src.equal
+    let hash = Stmt.Src.hash
+  end)
+
+(* used to share the same clauses in the proof *)
+let input_proof_tbl_ : t Src_tbl.t = Src_tbl.create 32
+
+let rec proof_of_stmt src : t =
+  try Src_tbl.find input_proof_tbl_ src
+  with Not_found ->
+    let p = match Stmt.Src.view src with
+      | Stmt.Input (_, r) -> P_from_input r
+      | Stmt.From_file (f, r) -> P_from_file (f,r)
+      | Stmt.Internal _ -> trivial
+      | Stmt.Neg srcd -> P_cnf_neg (proof_of_sourced srcd)
+      | Stmt.CNF srcd -> P_cnf (proof_of_sourced srcd)
+    in
+    Src_tbl.add input_proof_tbl_ src p;
+    p
+
+and proof_of_sourced (x:Stmt.sourced_t) : proof_with_res =
+  let module F = TypedSTerm.Form in
+  let r, src = x in
+  let p = proof_of_stmt src in
+  let res = match r with
+    | Stmt.Sourced_input f -> PR_formula f
+    | Stmt.Sourced_clause _ -> assert false (* TODO: how? dep cycles… *)
+  in
+  p, res
+
+(* conversion from statement *)
+let from_stmt (st:(_,_,_)Stmt.t): t = proof_of_stmt (Stmt.src st)
+
