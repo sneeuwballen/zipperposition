@@ -198,6 +198,12 @@ module Src = struct
     Format.fprintf out "@[<2>%ain@ `%s`@,%a@]"
       pp_name x.name x.file ParseLocation.pp_opt x.loc
 
+  let pp_role out = function
+    | R_decl -> CCFormat.string out "decl"
+    | R_assert -> CCFormat.string out "assert"
+    | R_goal -> CCFormat.string out "goal"
+    | R_def -> CCFormat.string out "def"
+
   (*
   let rec pp out t =
     match t with

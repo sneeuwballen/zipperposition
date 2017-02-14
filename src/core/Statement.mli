@@ -189,6 +189,8 @@ module Src : sig
 
   val pp_from_file : from_file CCFormat.printer
   (* include Interfaces.PRINT with type t := t *)
+
+  val pp_role : role CCFormat.printer
 end
 
 (**/**)
