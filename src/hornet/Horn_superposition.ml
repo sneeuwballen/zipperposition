@@ -282,8 +282,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     val rule_infer_passive : HC.t rule_infer
     val rule_eq_resolution : HC.t rule_infer
   end = struct
-    let stat_infer = Util.mk_stat "hornet.sup_infer_steps"
-    let stat_eq_res = Util.mk_stat "hornet.eq_res_steps"
+    let stat_infer = Util.mk_stat "hornet.steps_sup_infer"
+    let stat_eq_res = Util.mk_stat "hornet.steps_eq_res"
     let prof_infer_active = Util.mk_profiler "hornet.sup_active"
     let prof_infer_passive = Util.mk_profiler "hornet.sup_passive"
     let prof_eq_res = Util.mk_profiler "hornet.eq_res"
@@ -507,6 +507,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     let rule_infer_passive (c:HC.t): _ list =
       Util.with_prof prof_infer_passive passive_sup c
 
+    (* TODO: destructive equality resolution (with a variable) *)
+
     let rule_eq_resolution c : _ list =
       Util.with_prof prof_eq_res eq_res c
   end
@@ -560,8 +562,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
   module Proof_of_false : sig
     type t = Horn_clause.t
 
-    val bool_lits : t -> bool_lit Sequence.t
-
     val to_bool_clause : t -> bool_clause
   end = struct
     type t = Horn_clause.t
@@ -610,12 +610,10 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
     val stats : unit -> stats
 
-    val add_clause : C.t -> res
-    (** [add_clause c] adds the clause [c] to the set, and applies
-        Avatar splitting and Inst_gen_eq to it. *)
-
     val add_clauses : C.t list -> res
-    (** Add a list of clauses *)
+    (** Add a list of clauses.
+        For each [c], adds the clause [c] to the set, and applies
+        Avatar splitting and Inst_gen_eq to it. *)
 
     val add_horn : HC.t -> res
     (** [add_horn c] adds the clause [c]  to the set, and saturates it
