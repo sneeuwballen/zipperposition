@@ -153,7 +153,7 @@ module Make(A : ARGS) : S = struct
         List.iter (fun (module Th : THEORY) -> Th.on_event e) theories
       with exc ->
         let trace = Util.Exn.string_of_backtrace () in
-        Util.debugf ~section 1 "@[error when processing event %a@ %s@]"
+        Util.debugf ~section 1 "@[<2>error when processing event@ %a@ :msg %s@]"
           (fun k->k Event.pp e trace);
         raise exc
     in
