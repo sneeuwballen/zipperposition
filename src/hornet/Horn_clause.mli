@@ -91,6 +91,8 @@ val is_trivial : t -> bool
 
 val is_absurd : t -> bool
 
+val is_unit_pos : t -> bool
+
 (** {2 Unification} *)
 
 val variant :

@@ -46,7 +46,7 @@ let pp_bool_trail out (l:bool_trail) =
 let pp_bool_trail_opt out trail = match trail with
   | [] -> ()
   | _ ->
-    Fmt.fprintf out " @[<hv2>@<1>⇐@ %a@]" pp_bool_trail trail
+    Fmt.fprintf out "@ @[<hv2>@<1>⇐@ %a@]" pp_bool_trail trail
 
 let pp_constraint out (c:c_constraint_): unit = match c with
   | C_dismatch d -> Dismatching_constr.pp out d
@@ -68,7 +68,7 @@ let vars_of_hclause c =
 let pp_hclause out (c:horn_clause): unit =
   let pp_constr out = function
     | [] -> Fmt.silent out ()
-    | l -> Fmt.fprintf out "| @[<hv>%a@]" (Fmt.list pp_constraint) l
+    | l -> Fmt.fprintf out "@ | @[<hv>%a@]" (Fmt.list pp_constraint) l
   and pp_body out body =
     if IArray.length body > 0 then (
       Fmt.fprintf out " @<1>← @[<hv>%a@]" (Fmt.seq pp_lit) (IArray.to_seq body)
@@ -80,7 +80,7 @@ let pp_hclause out (c:horn_clause): unit =
         (Util.pp_list ~sep:" " Type.pp_typed_var) vars pp x
   in
   let pp_main out () =
-    Fmt.fprintf out "(@[%a@,%a@,%a@,%a@])"
+    Fmt.fprintf out "(@[%a%a%a%a@])"
       pp_lit c.hc_head
       pp_body c.hc_body
       pp_bool_trail_opt c.hc_trail

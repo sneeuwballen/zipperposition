@@ -125,6 +125,10 @@ let is_ground c =
   Lit.is_ground (head c) &&
   IArray.for_all Lit.is_ground (body c)
 
+let is_unit_pos c =
+  not (Lit.is_absurd (head c)) &&
+  IArray.length (body c) = 0
+
 let vars_seq = Hornet_types_util.vars_of_hclause
 
 (** {2 Unification} *)
