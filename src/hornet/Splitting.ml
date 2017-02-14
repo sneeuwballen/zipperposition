@@ -98,6 +98,7 @@ module Make(Ctx : State.CONTEXT) = struct
                  Lazy.force b_lit, Lazy.force sub_clause)
             |> List.split
           in
+          Util.debugf ~section 2 "@[<2>@{<yellow>avatar.split@}@ %a@]" (fun k->k C.pp c);
           Util.debugf ~section 4
             "@[<hv2>avatar_split@ :clause @[%a@]@ :yields (@[<hv>%a@])@ @[:trail %a@]@]"
             (fun k->k C.pp c (Util.pp_list C.pp) clauses Bool_lit.pp_trail (C.trail c));

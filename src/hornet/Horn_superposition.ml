@@ -143,13 +143,29 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       )
   end
 
+  (* Some clauses are added and removed several times. We keep a
+     cycle counter to distinguish clauses dead at time n (which can
+     be alive at time n+1), from clauses dead at time n+1, that will
+     not be active anymore until cycle n+2. *)
+  let cycle : int ref = ref 0
+
+  (* start a new cycle, so that dead clause can be alive again *)
+  let start_new_cycle () : unit =
+    incr cycle;
+    Util.debugf ~section 4 "@[<2>start_new_cycle (%d)@]" (fun k->k !cycle);
+    ()
+
   (* register the clause in each of its trail's boolean literal.
      That way, when the literal is backtracked, the clause can be removed *)
   let register_clause (c:HC.t): unit =
-    begin match HC.status c with
-      | HC_alive | HC_dead -> ()
-      | HC_new ->
-        HC.set_status c HC_alive;
+    let old_st, old_cycle = HC.status c in
+    begin match old_st with
+      | HC_alive -> ()
+      | HC_dead when old_cycle = !cycle -> () (* up-to-date *)
+      | HC_dead ->
+        assert (old_cycle < !cycle);
+        (* clause is now alive again, with new cycle *)
+        HC.set_status c HC_alive !cycle;
         List.iter
           (fun (lazy b_lit) -> match Bool_lit.view b_lit with
              | A_box_clause r ->
@@ -161,17 +177,21 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           (HC.trail c)
     end
 
+  (* is the clause dead right now? *)
+  let is_dead (c:HC.t): bool = match HC.status c with
+    | HC_alive, _ -> false
+    | HC_dead, n -> n = !cycle
+
   let kill_clauses (l:HC.t list): unit =
     List.iter
       (fun c -> match HC.status c with
-         | HC_new -> assert false
-         | HC_alive ->
+         | HC_alive, _ ->
            (* the clause dies now *)
            Util.debugf ~section 5 "@[<2>remove clause@ %a,@ now dead@]"
              (fun k->k HC.pp c);
-           HC.set_status c HC_dead;
+           HC.set_status c HC_dead !cycle;
            Active_set.remove c; (* if it's active, not any more *)
-         | HC_dead -> ())
+         | HC_dead, _ -> ())
       l
 
   let remove_all_box (r:bool_box_clause): unit =
@@ -183,15 +203,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     let l = r.bool_select_depends in
     r.bool_select_depends <- [];
     kill_clauses l
-
-  (* remove all clauses that depend on the given boolean lit *)
-  let remove_all (b_lit:bool_lit): unit =
-    begin match Bool_lit.view b_lit with
-      | A_box_clause r -> remove_all_box r
-      | A_select r -> remove_all_select r
-      | A_fresh _
-      | A_ground _ -> ()
-    end
 
   module Passive_set : sig
     val add : HC.t -> unit
@@ -225,7 +236,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
     let add_ c =
       register_clause c;
-      if HC.status c = HC_dead then () (* useless *)
+      if is_dead c then () (* useless *)
       else (
         let depth = HC.unordered_depth c in
         if depth < Depth_limit.get () then (
@@ -260,9 +271,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       | Some (new_q, (_,c)) ->
         q_ := new_q;
         begin match HC.status c with
-          | HC_new -> assert false
-          | HC_alive -> Some c
-          | HC_dead -> next () (* discard dead clause *)
+          | HC_alive, _ -> Some c
+          | HC_dead, _ -> next () (* discard dead clause *)
         end
   end
 
@@ -518,8 +528,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
     val bool_lits : t -> bool_lit Sequence.t
 
-    val bool_lits_l : t -> bool_lit list
-
     val to_bool_clause : t -> bool_clause
   end = struct
     type t = Horn_clause.t
@@ -529,8 +537,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       HC.trail c
       |> Sequence.of_list
       |> Sequence.map Lazy.force
-
-    let bool_lits_l p = bool_lits p |> Sequence.to_rev_list
 
     (* find bool lits, then deduplicate and negate them *)
     let to_bool_clause (p:t): bool_clause =
@@ -618,7 +624,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       in
       let new_c = aux rules0 c in
       if not (HC.equal c new_c) then (
-        Util.debugf ~section 5 "@[<2>simplify@ `%a`@ into `%a`@]"
+        Util.debugf ~section 5 "(@[<2>simplify@ `%a`@ :into `%a`@])"
           (fun k->k HC.pp c HC.pp new_c);
       );
       new_c
@@ -687,11 +693,13 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       Util.debugf ~section 2 "@[<2>@{<yellow>saturate.add_horn@}@ %a@]"
         (fun k->k HC.pp c);
       let c = simplify_fast c in
+      (* this clause might be currently dead, but give it another chance *)
+      start_new_cycle();
       Passive_set.add c;
       saturation_loop ()
 
     let add_clause c =
-      Util.debugf ~section 2 "@[<2>@{<Yellow>saturate.add_clause@}@ %a@]"
+      Util.debugf ~section 3 "@[<2>saturate.add_clause@ %a@]"
         (fun k->k C.pp c);
       begin match C.classify c with
         | C.Horn hc -> add_horn hc
@@ -734,7 +742,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
   let presaturate () =
     (* add the set of initial clauses *)
-    Util.debugf ~section 2 "@{<Yellow>start presaturation@}"(fun k->k);
+    Util.debugf ~section 2 "@{<Yellow>## start presaturation ##@}"(fun k->k);
     let res = Saturate.add_clauses initial_clauses in
     check_res res
 

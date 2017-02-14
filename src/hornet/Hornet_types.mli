@@ -62,11 +62,11 @@ and horn_clause = {
   hc_trail: bool_trail;
   hc_proof: proof;
   hc_unordered_depth: int; (* how many unordered inferences needed? *)
-  mutable hc_status: horn_clause_status; (* where is the clause in its lifecycle? *)
+  mutable hc_status: (horn_clause_status * int);
+  (* where is the clause in its lifecycle? int=number of cycles *)
 }
 
 and horn_clause_status =
-  | HC_new (** Just created, not registered *)
   | HC_alive (** Alive and kicking *)
   | HC_dead (** Unregistered, inert *)
 

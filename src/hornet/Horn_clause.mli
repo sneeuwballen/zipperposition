@@ -45,12 +45,13 @@ val proof : t -> proof
 val unordered_depth : t -> int
 (** The number of unordered inference steps required to prove this clause *)
 
-val status : t -> horn_clause_status
+val status : t -> horn_clause_status * int
+(** status + cycle count *)
 
-val set_status : t -> horn_clause_status -> unit
+val set_status : t -> horn_clause_status -> int -> unit
 (** change the status
     @raise Util.Error if the change is not following the order
-    [New -> Alive -> Dead] *)
+      [Dead (n-1) -> Alive n -> Dead n] *)
 
 val body_seq : t -> Lit.t Sequence.t
 (** Sequence of body elements *)

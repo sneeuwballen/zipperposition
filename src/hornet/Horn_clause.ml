@@ -30,7 +30,7 @@ let make =
       hc_proof=proof;
       hc_trail=trail;
       hc_constr=constr;
-      hc_status=HC_new;
+      hc_status=(HC_dead,0);
     }
 
 let equal a b = a.hc_id = b.hc_id
@@ -48,20 +48,24 @@ let constr c = c.hc_constr
 let unordered_depth c = c.hc_unordered_depth
 let status c = c.hc_status
 
-let set_status c new_st =
-  begin match c.hc_status, new_st with
-    | HC_new, _
+let set_status c new_st new_cycle =
+  let old_st, old_cycle = c.hc_status in
+  assert (old_cycle <= new_cycle);
+  begin match old_st, new_st with
+    | HC_dead, HC_alive when old_cycle < new_cycle ->
+      () (* only fine for new cycle *)
     | HC_alive, HC_dead
     | HC_dead, HC_dead -> ()
     | _ ->
       Util.errorf
         ~where:"HC.set_status"
-        "for `@[%a@]`,@ wrong change `%a` -> `%a`"
+        "for `@[%a@]`,@ wrong change@ @[<2>`%a`[time %d]@ -> `%a`[time %d]@]"
         pp c
-        Hornet_types_util.pp_hc_status c.hc_status
-        Hornet_types_util.pp_hc_status new_st
+        Hornet_types_util.pp_hc_status old_st old_cycle
+        Hornet_types_util.pp_hc_status new_st new_cycle
   end;
-  c.hc_status <- new_st
+  c.hc_status <- (new_st,new_cycle);
+  ()
 
 let body_seq c = IArray.to_seq (body c)
 let body_l c = IArray.to_list (body c)

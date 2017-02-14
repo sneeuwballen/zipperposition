@@ -51,7 +51,6 @@ let pp_constraint out (c:c_constraint_): unit = match c with
   | C_dismatch d -> Dismatching_constr.pp out d
 
 let pp_hc_status out (s:horn_clause_status): unit = match s with
-  | HC_new -> Fmt.string out "new"
   | HC_alive -> Fmt.string out "alive"
   | HC_dead -> Fmt.string out "dead"
 
@@ -204,7 +203,7 @@ let pp_event out (e:event): unit = match e with
   | E_remove_component r ->
     Fmt.fprintf out "(@[remove_component@ %a@])" pp_clause r.bool_box_clause
   | E_select_lit (r,cstr) ->
-    Fmt.fprintf out "(@[select_lit@ %a@ :clause %a@ :constr (@[%a@])@])"
+    Fmt.fprintf out "(@[<hv>select_lit@ %a@ :clause %a@ :constr (@[%a@])@])"
       pp_lit r.bool_select_lit
       pp_clause r.bool_select_clause
       (Util.pp_list Dismatching_constr.pp) cstr
@@ -217,7 +216,7 @@ let pp_event out (e:event): unit = match e with
   | E_remove_ground_lit r ->
     Fmt.fprintf out "(@[remove_ground_lit@ %a@])" pp_lit r.bool_ground_lit
   | E_conflict (c,p) ->
-    Fmt.fprintf out "(@[conflict@ :clause %a@ :proof %a@])"
+    Fmt.fprintf out "(@[<hv>conflict@ :clause %a@ :proof %a@])"
       pp_bool_clause c pp_proof p
   | E_if_sat -> Fmt.string out "if_sat"
   | E_found_unsat (p,_) ->

@@ -107,7 +107,7 @@ module Make(A : ARGS) : S = struct
     let on_backtrack f = CCVector.push SAT_theory.backtrack_vec f
     let add_clause_l proof l =
       let tag = Proof_tbl.tag_of_proof proof in
-      Util.debugf ~section 5 "@[<2>add_bool_clauses@ (@[<hv>%a@])@]"
+      Util.debugf ~section 2 "@[<2>add_bool_clauses@ (@[<hv>%a@])@]"
         (fun k->k (Util.pp_list Bool_lit.pp_clause) l);
       M.assume ~tag l
     let add_clause p c = add_clause_l p [c]
