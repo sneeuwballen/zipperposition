@@ -43,6 +43,8 @@ module Make(Ctx : State.CONTEXT) = struct
     (* main Avatar splitting function *)
     let try_split_ lits c : C.t list option =
       assert (IArray.length lits >= 2);
+      (* ground literals (each one is its own component) *)
+      let cluster_ground = ref [] in
       (* maps each variable to a list of literals. Sets can be merged whenever
          two variables occur in the same literal.  *)
       let uf_vars =
@@ -51,9 +53,6 @@ module Make(Ctx : State.CONTEXT) = struct
         |> T.VarSet.of_seq
         |> T.VarSet.to_list
         |> UF.create
-      (* set of ground literals (each one is its own component) *)
-      and cluster_ground =
-        ref Lit.Set.empty
       in
       (* literals belong to either their own ground component, or to every
           sets in [uf_vars] associated to their variables *)
@@ -62,7 +61,7 @@ module Make(Ctx : State.CONTEXT) = struct
            let v_opt = Lit.vars_seq lit |> Sequence.head in
            begin match v_opt with
              | None -> (* ground, lit has its own component *)
-               cluster_ground := Lit.Set.add lit !cluster_ground
+               cluster_ground := lit :: !cluster_ground
              | Some v ->
                (* merge other variables of the literal with [v] *)
                Lit.vars_seq lit
@@ -75,7 +74,7 @@ module Make(Ctx : State.CONTEXT) = struct
 
       (* now gather all the components as a literal list list *)
       let components = ref [] in
-      Lit.Set.iter (fun lit -> components := [lit] :: !components) !cluster_ground;
+      List.iter (fun lit -> components := [lit] :: !components) !cluster_ground;
       UF.iter uf_vars (fun _ comp -> components := comp :: !components);
 
       begin match !components with
