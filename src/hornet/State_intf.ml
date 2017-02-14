@@ -9,6 +9,15 @@ type statement = (Clause.t, term, ty) Statement.t
 type proof = Hornet_types.proof
 type event = Hornet_types.event
 
+module type CTX_ARGS = sig
+  val ord : Ordering.t
+  val signature : Type.t ID.Map.t
+  val conf : Flex_state.t
+  val statements : statement CCVector.ro_vector
+  val max_depth : int
+  val dimacs_file : string option
+end
+
 module type CONTEXT = sig
   type bool_clause = Bool_lit.t list
 
@@ -45,11 +54,7 @@ module type CONTEXT = sig
 
   (** {6 Config} *)
 
-  val conf : Flex_state.t
-  val ord : Ordering.t
-  val signature: Type.t ID.Map.t
-  val max_depth : int
-  val statements : statement CCVector.ro_vector
+  include CTX_ARGS
 end
 
 (** A reasoning engine. Each theory is informed when the SAT solver
@@ -85,11 +90,7 @@ type theory_fun = (module THEORY_FUN)
 
 (** Parameters to create a Context *)
 module type ARGS = sig
+  include CTX_ARGS
   val theories : theory_fun list
-  val ord : Ordering.t
-  val signature : Type.t ID.Map.t
-  val conf : Flex_state.t
-  val statements : statement CCVector.ro_vector
-  val max_depth : int
 end
 

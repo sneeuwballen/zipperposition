@@ -37,6 +37,7 @@ module type S = sig
   module M : SI.S with type St.formula = Bool_lit.t and type St.proof = proof
   module Ctx : CONTEXT (* for theories *)
   val theories : (module THEORY) list
+  val pp_dimacs: unit -> unit
 end
 
 module type ARGS = State_intf.ARGS
@@ -172,6 +173,18 @@ module Make(A : ARGS) : S = struct
       )
     in
     send_event_ := send_event
+
+  (* print SAT problem *)
+  let pp_dimacs () =
+    CCOpt.iter
+      (fun file ->
+         Util.debugf ~section 1 "(@[export_dimacs@ %S@])" (fun k->k file);
+         CCIO.with_out file
+           (fun oc ->
+              let out = Format.formatter_of_out_channel oc in
+              M.export_dimacs out ();
+              Format.pp_print_flush out ()))
+      A.dimacs_file
 end
 
 (** {2 State} *)
@@ -287,6 +300,7 @@ let run (t:t): res =
   (* compute result *)
   let res = iter 1 in
   St.Ctx.send_event Hornet_types.(E_stage Stage_exit);
+  St.pp_dimacs();
   res
 
 
