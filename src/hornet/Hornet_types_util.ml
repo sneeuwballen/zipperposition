@@ -121,6 +121,9 @@ let pp_proof out (p:proof) : unit = match p with
       pp_bool_clause r.bool_res_c1
       pp_bool_clause r.bool_res_c2
   | P_hc_superposition sup -> pp_hc_sup out sup
+  | P_hc_eq_res (c,subst) ->
+    Fmt.fprintf out "(@[<hv>eq_resolution@ :on %a@ :subst %a@])"
+      pp_hclause c Subst.pp subst
   | P_hc_simplify c ->
     Fmt.fprintf out "(@[simplify@ %a@])" pp_hclause c
 

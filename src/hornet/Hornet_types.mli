@@ -46,6 +46,7 @@ and proof =
   | P_bool_tauto (* boolean tautology *)
   | P_bool_res of bool_res_step
   | P_hc_superposition of hc_superposition_step
+  | P_hc_eq_res of horn_clause * Subst.t (* equality resolution *)
   | P_hc_simplify of horn_clause
 
 and proof_with_res = proof * proof_res

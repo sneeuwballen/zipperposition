@@ -280,13 +280,16 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
   module Sup : sig
     val rule_infer_active : HC.t rule_infer
     val rule_infer_passive : HC.t rule_infer
+    val rule_eq_resolution : HC.t rule_infer
   end = struct
     let stat_infer = Util.mk_stat "hornet.sup_infer_steps"
+    let stat_eq_res = Util.mk_stat "hornet.eq_res_steps"
     let prof_infer_active = Util.mk_profiler "hornet.sup_active"
     let prof_infer_passive = Util.mk_profiler "hornet.sup_passive"
+    let prof_eq_res = Util.mk_profiler "hornet.eq_res"
 
     (* do the inference, if it is needed *)
-    let do_inference (sup:hc_superposition_step): HC.t option =
+    let do_sup_inference (sup:hc_superposition_step): HC.t option =
       let c, sc_active = sup.hc_sup_active in
       assert (HC.body_len c=0);
       assert (not (T.is_var sup.hc_sup_rewritten));
@@ -400,7 +403,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
              hc_sup_active_pos=pos_s;
              hc_sup_passive_pos=pos';
            } in
-           do_inference sup)
+           do_sup_inference sup)
       |> Sequence.to_rev_list
 
     (* try to use this clause to rewrite other clauses *)
@@ -423,9 +426,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           | Lit.Bool _ -> []
         end
       ) else []
-
-    let rule_infer_active c =
-      Util.with_prof prof_infer_active rule_infer_active_ c
 
     let passive_sup (c:HC.t): _ list =
       let idx = Active_set.idx_heads () in
@@ -463,12 +463,52 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
                   hc_sup_active_pos=pos';
                   hc_sup_passive_pos=pos_rewritten;
                 } in
-                do_inference sup
+                do_sup_inference sup
              ))
       |> Sequence.to_rev_list
 
+    (* equality resolution *)
+    let eq_res (c:HC.t): _ list = match HC.body0 c with
+      | None -> []
+      | Some (Lit.Eq (a,b,true)) ->
+        let sc = 0 in
+        begin
+          try
+            let subst = Unif.FO.unification (a,sc) (b,sc) in
+            (* do inference, by removing [a=b] from body *)
+            let renaming = Ctx.renaming_cleared () in
+            let new_head = Lit.apply_subst ~renaming subst (HC.head c,sc) in
+            let new_body =
+              HC.body_tail c
+              |> IArray.map_arr
+                (fun lit -> Lit.apply_subst ~renaming subst (lit,sc))
+              |> IArray.of_array_unsafe
+            in
+            let proof = Proof.hc_eq_res c subst in
+            let c' =
+              HC.make new_head new_body proof
+                ~unordered_depth:(HC.unordered_depth c)
+                ~trail:(HC.trail c) ~constr:(HC.constr c)
+            in
+            Util.debugf ~section 4
+              "(@[<hv2>eq_res@ :on %a@ :subst %a@ :yield %a@])"
+              (fun k->k HC.pp c Subst.pp subst HC.pp c');
+            Util.incr_stat stat_eq_res;
+            [c']
+          with Unif.Fail -> []
+        end
+      | Some (Lit.Atom (_,true))  (* TODO: E-unif for true? *)
+      | Some (Lit.Bool _) -> []
+      | Some (Lit.Eq (_,_,false) | Lit.Atom (_,false)) -> assert false
+
+    let rule_infer_active c =
+      Util.with_prof prof_infer_active rule_infer_active_ c
+
     let rule_infer_passive (c:HC.t): _ list =
       Util.with_prof prof_infer_passive passive_sup c
+
+    let rule_eq_resolution c : _ list =
+      Util.with_prof prof_eq_res eq_res c
   end
 
   (** {2 Simplifications} *)
@@ -553,6 +593,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
   let rules_infer : HC.t rule_infer list =
     [ Sup.rule_infer_active;
       Sup.rule_infer_passive;
+      Sup.rule_eq_resolution;
     ]
 
   module Saturate : sig

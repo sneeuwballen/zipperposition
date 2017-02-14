@@ -21,6 +21,7 @@ val bool_tauto : t
 val bool_res : bool_lit -> bool_clause -> t -> bool_clause -> t -> t
 
 val hc_sup : Hornet_types.hc_superposition_step -> t
+val hc_eq_res : horn_clause -> Subst.t -> t
 val hc_simplify : horn_clause -> t
 
 include Interfaces.PRINT with type t := t
