@@ -49,6 +49,7 @@ let as_graph : (t,string) CCGraph.t =
        |> Sequence.map (fun p' -> name, p'))
 
 let is_proof_of_false p = Proof_res.is_absurd (get_res p)
+
 let is_goal p = match get_proof p with
   | P_from_stmt st ->
     begin match Statement.view st with
@@ -56,6 +57,7 @@ let is_goal p = match get_proof p with
       | _ -> false
     end
   | _ -> false
+
 let is_assert p = match get_proof p with
   | P_from_stmt st ->
     begin match Statement.view st with
@@ -64,6 +66,11 @@ let is_assert p = match get_proof p with
       | _ -> false
     end
   | _ -> false
+
+let is_bool_clause p = match get_res p with
+  | PR_bool_clause _ -> true
+  | PR_clause _ | PR_horn_clause _ -> false
+
 let is_trivial p = match get_proof p with
   | P_trivial | P_bool_tauto -> true
   | _ -> false
@@ -81,6 +88,7 @@ let pp_dot out (p:t) : unit =
     else if is_assert p then `Color "yellow" :: attrs
     else if is_goal p then `Color "green" :: attrs
     else if is_trivial p then `Color "cyan" :: attrs
+    else if is_bool_clause p then `Color "orange" :: attrs
     else attrs
   in
   let attrs_e s = [`Label s; `Other ("dir", "back")] in
