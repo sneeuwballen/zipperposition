@@ -35,7 +35,6 @@ val create_state: unit -> state
 val of_atom : ?sign:bool -> atom -> t
 
 val fresh : state -> t
-val select_lit : state -> clause -> clause_idx -> t
 val box_clause : state -> clause -> t
 val ground : state -> lit -> t
 

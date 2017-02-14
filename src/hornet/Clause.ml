@@ -15,11 +15,7 @@ open Hornet_types
 type t = Hornet_types.clause
 type clause = t
 
-type proof = Hornet_types.proof
 type idx = Hornet_types.clause_idx
-type bool_lit = Hornet_types.bool_lit
-type bool_trail = Hornet_types.bool_trail
-type horn_clause = Hornet_types.horn_clause
 
 type constraint_ = Hornet_types.c_constraint_ =
   | C_dismatch of Dismatching_constr.t
@@ -30,6 +26,7 @@ let lits c = c.c_lits
 let proof c = c.c_proof
 let constr c = c.c_constr
 let trail c = c.c_trail
+let depth c = c.c_depth
 
 let dismatch_constr c =
   constr c
@@ -38,9 +35,9 @@ let dismatch_constr c =
       | C_dismatch d -> Some d)
 
 
-let equal a b = a.c_id = b.c_id
-let hash a = Hash.int a.c_id
-let compare a b = CCInt.compare a.c_id b.c_id
+let equal = Hornet_types_util.equal_clause
+let hash = Hornet_types_util.hash_clause
+let compare = Hornet_types_util.compare_clause
 let pp out a =
   Fmt.fprintf out "[@[%a%a@]]"
     (Fmt.seq Lit.pp) (IArray.to_seq a.c_lits)
@@ -73,7 +70,8 @@ let kind_of_lits ~trail ~constr (c_lits:Lit.t IArray.t) proof: c_kind =
     Array.sort compare_lits_for_horn_ arr; (* sort body in some order *)
     IArray.of_array_unsafe arr
   and mk_horn head body =
-    Horn_clause.make ~constr ~trail ~unordered_depth:0 head body proof
+    Horn_clause.make head body proof
+      ~constr ~trail ~unordered_depth:0 ~label:[]
   in
   begin match pos with
     | [] ->
@@ -105,6 +103,7 @@ let kind_of_lits ~trail ~constr (c_lits:Lit.t IArray.t) proof: c_kind =
 type 'a builder =
   ?trail:bool_trail ->
   ?constr:constraint_ list ->
+  ?depth:int ->
   'a ->
   proof ->
   t
@@ -114,19 +113,30 @@ type 'a builder =
    ordering. *)
 let make_ =
   let n_ = ref 0 in
-  fun c_trail c_constr c_kind c_lits c_proof ->
+  fun c_trail c_depth c_constr c_kind c_lits c_proof ->
     let c_id = CCRef.incr_then_get n_ in
-    { c_id; c_constr; c_trail ; c_lits; c_kind; c_proof }
+    { c_id; c_depth; c_constr; c_trail;
+      c_select=None; c_lits; c_kind; c_proof }
 
-let make ?(trail=[]) ?(constr=[]) c_lits proof: t =
+let make ?(trail=[]) ?(constr=[]) ?(depth=0) c_lits proof: t =
   let c_kind = kind_of_lits ~trail ~constr c_lits proof in
-  make_ trail constr c_kind c_lits proof
+  make_ trail depth constr c_kind c_lits proof
 
-let make_l ?trail ?constr lits proof : t =
-  make ?trail ?constr (IArray.of_list lits) proof
+let make_l ?trail ?constr ?depth lits proof : t =
+  make ?trail ?constr ?depth (IArray.of_list lits) proof
 
 let hash_mod_alpha c : int =
   IArray.hash_comm Lit.hash_mod_alpha c.c_lits
+
+let select c = c.c_select
+
+let set_select c (s:select_lit): unit = match c.c_select with
+  | Some _ -> Util.errorf ~where:"clause.set_select" "literal already selected"
+  | None -> c.c_select <- Some s
+
+let clear_select c = match c.c_select with
+  | None -> Util.errorf ~where:"clause.clear_select" "no literal currently selected"
+  | Some _ -> c.c_select <- None
 
 let is_empty c = IArray.length c.c_lits = 0
 
@@ -144,6 +154,10 @@ type kind =
 let classify (c:t): kind = match c.c_kind with
   | C_horn c -> Horn c
   | C_general -> General
+
+let is_horn c = match c.c_kind with
+  | C_horn _ -> true
+  | C_general -> false
 
 let is_ground c : bool =
   IArray.for_all Lit.is_ground (lits c)
@@ -178,6 +192,15 @@ let is_trivial c =
          |> Sequence.exists (fun (j,lit') -> i<j && Lit.equal lit (Lit.neg lit')))
   end ||
   List.exists constr_trivial_ c.c_constr
+
+(* add constraint, re-compute kind (different horn clause) *)
+let add_dismatch_constr (c:t) (d:Dismatching_constr.t): unit =
+  if is_horn c then (
+    Util.errorf ~where:"clause.add_dismatch_constr" "should not be horn:@ `%a`" pp c;
+  );
+  assert (not (is_horn c));
+  c.c_constr <- C_dismatch d :: c.c_constr;
+  ()
 
 (** {2 Unif} *)
 

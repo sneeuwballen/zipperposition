@@ -10,16 +10,21 @@ open Libzipperposition
 
 type ty = Type.t
 type term = FOTerm.t
+type var = ty HVar.t
 type formula = TypedSTerm.t
 type bool_unique_id = int
+
+type 'a var_map = 'a Type.VarMap.t
 
 type clause = {
   c_id: int; (* unique ID *)
   c_lits: lit IArray.t;
-  c_kind: c_kind;
+  c_kind: c_kind; (* mut: can update the horn clause *)
   c_proof: proof;
   c_trail: bool_trail; (* components/splits the clause depends on *)
+  c_depth: int; (* number of instantiations in its proof *)
   mutable c_constr: c_constraint_ list;
+  mutable c_select: select_lit option; (* if there is currently a selected lit *)
 }
 
 and lit =
@@ -68,6 +73,7 @@ and horn_clause = {
   hc_trail: bool_trail;
   hc_proof: proof;
   hc_unordered_depth: int; (* how many unordered inferences needed? *)
+  hc_label: label;
   mutable hc_status: (horn_clause_status * int);
   (* where is the clause in its lifecycle? int=number of cycles *)
 }
@@ -75,6 +81,15 @@ and horn_clause = {
 and horn_clause_status =
   | HC_alive (** Alive and kicking *)
   | HC_dead (** Unregistered, inert *)
+
+(* clause + substitution, for grounding purpose *)
+and labelled_clause = {
+  lc_clause: clause; (* invariant: has selected lit && is_horn *)
+  lc_subst: term var_map; (* substitution to instantiate the clause *)
+}
+
+(* label of a Horn clause: a set of labelled clauses *)
+and label = labelled_clause list
 
 (** Description of a single superposition step *)
 and hc_superposition_step = {
@@ -101,7 +116,6 @@ and bool_res_step = {
 and bool_atom =
   | A_fresh of bool_unique_id
   | A_box_clause of bool_box_clause
-  | A_select of bool_select
   | A_ground of bool_ground
 
 and bool_box_clause = {
@@ -110,19 +124,18 @@ and bool_box_clause = {
   mutable bool_box_depends : horn_clause list; (* clauses depending on this *)
 }
 
-and bool_select = {
-  bool_select_clause: clause;
-  bool_select_idx: clause_idx;
-  bool_select_lit: lit; (* [lit = get clause idx] *)
-  bool_select_id: bool_unique_id;
-  mutable bool_select_depends : horn_clause list; (* clauses depending on this *)
+(* selection of a literal in a non-ground non-horn clause *)
+and select_lit = {
+  select_idx: clause_idx;
+  select_lit: lit; (* [lit = get clause idx] *)
+  mutable select_depends : horn_clause list; (* clauses depending on this *)
 }
 
 and bool_ground = {
   bool_ground_lit: lit;
   bool_ground_id: int;
-  mutable bool_ground_instance_of: clause list;
-  (* clauses whose instance contain this ground lit *)
+  mutable bool_ground_instance_of: (clause*clause_idx) list;
+  (* clauses whose instance contain this ground lit (at given index) *)
 }
 
 (* index of a literal in a clause *)
@@ -148,9 +161,9 @@ type stage =
 type event =
   | E_add_component of bool_box_clause
   | E_remove_component of bool_box_clause
-  | E_select_lit of bool_select * Dismatching_constr.t list
+  | E_select_lit of clause * select_lit * Dismatching_constr.t list
   (** [lit | constr] has been selected in some clause *)
-  | E_unselect_lit of bool_select
+  | E_unselect_lit of clause * select_lit
   | E_add_ground_lit of bool_ground
   | E_remove_ground_lit of bool_ground
   | E_if_sat (** final check of the model *)

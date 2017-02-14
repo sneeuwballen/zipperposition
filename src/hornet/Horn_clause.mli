@@ -24,6 +24,7 @@ val make :
   trail:bool_trail ->
   constr:constraint_ list ->
   unordered_depth:int ->
+  label:label ->
   Lit.t ->
   Lit.t IArray.t ->
   proof ->
@@ -38,6 +39,8 @@ val constr : t -> constraint_ list
 (** The constraints attached to this clause *)
 
 val trail : t -> bool_trail
+
+val label : t -> label
 
 val proof : t -> proof
 (** Proof of the clause *)

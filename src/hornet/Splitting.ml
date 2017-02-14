@@ -142,16 +142,35 @@ module Make(Ctx : State.CONTEXT) = struct
       | _ -> try_split_ (C.lits c) c
   end
 
+  (** Depth limit for inst-gen-eq *)
+  module Depth_limit : sig
+    val set : int -> unit
+    val get : unit -> int
+  end = struct
+    let d_ = ref 1
+    let set = (:=) d_
+    let get () = !d_
+  end
+
   (** {2 Inst-Gen-Eq} *)
+
   module Inst_gen_eq : sig
     val instantiate : C.t -> unit
+    (** Instantiate the given non-horn clause, so as to select
+        its literals depending on the current ground interpretation *)
+
+    val assert_ground : bool_ground -> unit
+    (** Called when the given boolean ground literal is true.
+        This will select some FO literals in clauses whose instance contain
+        the bool ground literal *)
   end = struct
+    let stat_instantiate = Util.mk_stat "hornet.instantiate"
+
     (* TODO:
        - rule to ground non-ground clauses (with a pointer to the grounding)
        - rule to select a horn subset in non-Horn non-ground clause components
     *)
 
-    let stat_instantiate = Util.mk_stat "hornet.instantiate"
 
     (* TODO:
        - ground the clause, register it to each ground literal
@@ -164,6 +183,32 @@ module Make(Ctx : State.CONTEXT) = struct
 
     (* TODO: when a conflict between selected lits is found, add
        instantiations *)
+
+    let try_select (c:clause)(i:clause_idx)(r:bool_ground): unit =
+      begin match C.select c with
+        | Some _ -> ()
+        | None ->
+          (* select the literal of [c] whose instance is [r.bool_ground_lit] *)
+          let sel = {
+            select_lit=IArray.get (C.lits c) i;
+            select_idx=i; (* TODO *)
+            select_depends=[];
+          } in
+          C.set_select c sel;
+          Ctx.send_event (E_select_lit (c,sel,C.dismatch_constr c));
+          (* remove the selection afterwards *)
+          Ctx.on_backtrack
+            (fun () ->
+               C.clear_select c;
+               Ctx.send_event (E_unselect_lit (c,sel)));
+      end
+
+    (* when a boolean literal is asserted, try to select it
+       in every clause whose instance it belongs to *)
+    let assert_ground (r:bool_ground): unit =
+      List.iter
+        (fun (c,i) -> try_select c i r)
+        r.bool_ground_instance_of
   end
 
   (** {2 Non-Horn Clauses} *)
@@ -200,24 +245,19 @@ module Make(Ctx : State.CONTEXT) = struct
         Ctx.on_backtrack
           (fun () -> Ctx.send_event (E_remove_component r));
         Ctx.send_event (E_add_component r)
-      | A_box_clause _, false -> () (* TODO: if unit negative, maybe? *)
+      | A_box_clause _, false -> ()
       | A_ground r, true ->
         Ctx.on_backtrack
           (fun () -> Ctx.send_event (E_remove_ground_lit r));
+        (* maybe select some FO literals in reaction *)
+        Inst_gen_eq.assert_ground r;
         Ctx.send_event (E_add_ground_lit r)
       | A_ground _, false -> ()
-      | A_select r, true ->
-        Ctx.on_backtrack
-          (fun () -> Ctx.send_event (E_unselect_lit r));
-        Ctx.send_event (E_select_lit (r, C.dismatch_constr r.bool_select_clause))
-      | A_select _, false
       | A_fresh _, _
         -> ()
     end
 
-  (* TODO: limit depth of instantiations? *)
-  let set_depth_limit _ =
-    ()
+  let set_depth_limit d = Depth_limit.set d
 
   let on_event (e:event) =
     begin match e with

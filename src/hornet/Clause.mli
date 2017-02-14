@@ -4,17 +4,14 @@
 (** {1 General representation of Clauses} *)
 
 open Libzipperposition
+open Hornet_types
 
 (** An arbitrary clause, typically obtained from the input or by
     instantiation *)
 type t = Hornet_types.clause
 type clause = t
 
-type horn_clause = Hornet_types.horn_clause
-type bool_lit = Hornet_types.bool_lit
-type bool_trail = Hornet_types.bool_trail
 type idx = Hornet_types.clause_idx
-type proof = Hornet_types.proof
 
 (* constraint on the literals *)
 type constraint_ = Hornet_types.c_constraint_ =
@@ -24,6 +21,7 @@ type constraint_ = Hornet_types.c_constraint_ =
 type 'a builder =
   ?trail:bool_trail ->
   ?constr:constraint_ list ->
+  ?depth:int ->
   'a ->
   proof ->
   t
@@ -35,8 +33,13 @@ val proof : t -> proof
 val lits : t -> Lit.t IArray.t
 val trail : t -> bool_trail
 val constr : t -> constraint_ list
+val depth : t -> int
 
 val dismatch_constr : t -> Dismatching_constr.t list
+
+val set_select : t -> select_lit -> unit
+val clear_select : t -> unit
+val select : t -> select_lit option
 
 val is_empty : t -> bool
 
@@ -63,6 +66,7 @@ val classify : t -> kind
 
 val is_ground : t -> bool
 val is_unit_ground : t -> bool
+val is_horn : t -> bool
 
 (** {2 Utils} *)
 
@@ -74,6 +78,10 @@ val of_slit_l :
 
 val is_trivial : t -> bool
 (** Is the clause trivial? *)
+
+val add_dismatch_constr : t -> Dismatching_constr.t -> unit
+(** Add a dismatching constraint to the clause
+    @raise Util.Error if the clause is Horn (not splitted then) *)
 
 (** {2 Unif} *)
 

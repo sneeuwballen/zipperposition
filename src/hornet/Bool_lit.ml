@@ -38,8 +38,6 @@ let print = pp
 
 type state = {
   mutable count: int; (* for fresh counters *)
-  select_tbl : atom Int_map.t C.Tbl_mod_alpha.t;
-  (* structural map [(clause,idx) -> atom] *)
   box_tbl : atom C.Tbl_mod_alpha.t;
   (* map [clause -> atom] modulo alpha, for components *)
   ground_tbl: atom Lit.Tbl.t;
@@ -48,7 +46,6 @@ type state = {
 
 let create_state() : state = {
   count=1;
-  select_tbl=C.Tbl_mod_alpha.create 64;
   box_tbl=C.Tbl_mod_alpha.create 64;
   ground_tbl=Lit.Tbl.create 64;
 }
@@ -67,28 +64,6 @@ let fresh_atom_id_ state: int =
 
 let fresh state =
   make_ true (A_fresh (fresh_atom_id_ state))
-
-let select_lit state c i =
-  let atom =
-    let map =
-      try C.Tbl_mod_alpha.find state.select_tbl c
-      with Not_found -> Int_map.empty
-    in
-    try Int_map.find i map
-    with Not_found ->
-      let a =
-        A_select {
-          bool_select_idx=i;
-          bool_select_lit=IArray.get c.c_lits i;
-          bool_select_clause=c;
-          bool_select_id=fresh_atom_id_ state;
-          bool_select_depends=[];
-        }
-      in
-      C.Tbl_mod_alpha.replace state.select_tbl c (Int_map.add i a map);
-      a
-  in
-  make_ true atom
 
 (* unit ground literal.
    invariant: move [lit]'s sign to the boolean literal sign *)

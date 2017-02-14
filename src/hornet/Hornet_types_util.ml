@@ -24,11 +24,12 @@ let pp_clause out (a:clause) = Fmt.within "[" "]" pp_clause_lits out a
 let pp_atom out = function
   | A_fresh i -> Fmt.fprintf out "fresh_%d" i
   | A_box_clause b -> Fmt.fprintf out "%a" pp_clause_lits b.bool_box_clause
-  | A_select r ->
-    Fmt.fprintf out
-      "@[select@ :idx %d@ :id %d :clause %a@]"
-      r.bool_select_idx r.bool_select_id pp_clause r.bool_select_clause
   | A_ground r -> pp_lit out r.bool_ground_lit
+
+let pp_select out (r:select_lit) =
+  Fmt.fprintf out
+    "@[select@ :idx %d@ :lit %a@]"
+    r.select_idx pp_lit r.select_lit
 
 let pp_bool_lit out l =
   let pp_inner out l = Fmt.within "⟦" "⟧" pp_atom out l.bl_atom in
@@ -65,6 +66,14 @@ let vars_of_hclause c =
     (vars_of_lit c.hc_head)
     (IArray.to_seq c.hc_body |> Sequence.flat_map vars_of_lit)
 
+let pp_lc out (lc:labelled_clause): unit =
+  let pp_subst out s =
+    Fmt.fprintf out "{@[<hv>%a@]}"
+      (Fmt.seq (Fmt.pair HVar.pp T.pp)) (Type.VarMap.to_seq s)
+  in
+  Fmt.fprintf out "(@[%a@ :subst %a@])"
+    pp_clause lc.lc_clause pp_subst lc.lc_subst
+
 let pp_hclause out (c:horn_clause): unit =
   let pp_constr out = function
     | [] -> Fmt.silent out ()
@@ -73,6 +82,9 @@ let pp_hclause out (c:horn_clause): unit =
     if IArray.length body > 0 then (
       Fmt.fprintf out " @<1>← @[<hv>%a@]" (Fmt.seq pp_lit) (IArray.to_seq body)
     );
+  and pp_label out = function
+    | [] -> ()
+    | lcs -> Fmt.fprintf out "@ {@[<hv>%a@]}" (Fmt.list pp_lc) lcs
   and pp_vars pp x out = function
     | [] -> pp out x
     | vars ->
@@ -80,11 +92,12 @@ let pp_hclause out (c:horn_clause): unit =
         (Util.pp_list ~sep:" " Type.pp_typed_var) vars pp x
   in
   let pp_main out () =
-    Fmt.fprintf out "(@[%a%a%a%a@])"
+    Fmt.fprintf out "(@[%a%a%a%a%a@])"
       pp_lit c.hc_head
       pp_body c.hc_body
       pp_bool_trail_opt c.hc_trail
       pp_constr c.hc_constr
+      pp_label c.hc_label
   in
   let vars = vars_of_hclause c |> T.VarSet.of_seq |> T.VarSet.to_list in
   pp_vars pp_main () out vars
@@ -148,11 +161,9 @@ let equal_atom (a:bool_atom) b : bool =
     | A_fresh i, A_fresh j ->  i=j
     | A_box_clause r1, A_box_clause r2 -> r1.bool_box_id = r2.bool_box_id
     | A_ground r1, A_ground r2 -> r1.bool_ground_id = r2.bool_ground_id
-    | A_select r1, A_select r2 -> r1.bool_select_id = r2.bool_select_id
     | A_fresh _, _
     | A_box_clause _, _
     | A_ground _, _
-    | A_select _, _
       -> false
   end
 
@@ -160,22 +171,36 @@ let equal_bool_lit (a:bool_lit) b : bool =
   a.bl_sign = b.bl_sign &&
   equal_atom a.bl_atom b.bl_atom
 
+let equal_clause (a:clause) b: bool = a.c_id = b.c_id
+let hash_clause (a:clause) : int = CCHash.int a.c_id
+let compare_clause a b: int = CCInt.compare a.c_id b.c_id
+
+let equal_lc (a:labelled_clause) b: bool =
+  Type.VarMap.equal T.equal a.lc_subst b.lc_subst &&
+  equal_clause a.lc_clause b.lc_clause
+
+let hash_lc (a:labelled_clause): int =
+  CCHash.combine2
+    CCHash.(seq (pair HVar.hash T.hash) (Type.VarMap.to_seq a.lc_subst))
+    (hash_clause a.lc_clause)
+
+let compare_lc (a:labelled_clause) b: int =
+  CCOrd.(Type.VarMap.compare T.compare a.lc_subst b.lc_subst
+      <?> (compare_clause, a.lc_clause, b.lc_clause))
+
 let compare_atom (a:bool_atom) b : int =
   let to_int = function
     | A_fresh _ -> 0
     | A_box_clause _ -> 1
     | A_ground _ -> 2
-    | A_select _ -> 3
   in
   begin match a, b with
     | A_fresh i, A_fresh j -> CCInt.compare i j
     | A_box_clause r1, A_box_clause r2 -> CCInt.compare r1.bool_box_id r2.bool_box_id
     | A_ground r1, A_ground r2 -> CCInt.compare r1.bool_ground_id r2.bool_ground_id
-    | A_select r1, A_select r2 -> CCInt.compare r1.bool_select_id r2.bool_select_id
     | A_fresh _, _
     | A_box_clause _, _
     | A_ground _, _
-    | A_select _, _
       -> CCInt.compare (to_int a)(to_int b)
   end
 
@@ -196,8 +221,6 @@ let equal_bool_trail (a:bool_trail) b: bool =
 let hash_bool_lit a : int = match a.bl_atom with
   | A_fresh i -> Hash.combine3 10 (Hash.bool a.bl_sign) (Hash.int i)
   | A_box_clause r -> Hash.combine2 15 (Hash.int r.bool_box_id)
-  | A_select r ->
-    Hash.combine3 20 (Hash.bool a.bl_sign) (Hash.int r.bool_select_id)
   | A_ground r -> Hash.combine2 50 (Hash.int r.bool_ground_id)
 
 let pp_stage out = function
@@ -211,15 +234,14 @@ let pp_event out (e:event): unit = match e with
     Fmt.fprintf out "(@[add_component@ %a@])" pp_clause r.bool_box_clause
   | E_remove_component r ->
     Fmt.fprintf out "(@[remove_component@ %a@])" pp_clause r.bool_box_clause
-  | E_select_lit (r,cstr) ->
+  | E_select_lit (c,r,cstr) ->
     Fmt.fprintf out "(@[<hv>select_lit@ %a@ :clause %a@ :constr (@[%a@])@])"
-      pp_lit r.bool_select_lit
-      pp_clause r.bool_select_clause
+      pp_lit r.select_lit
+      pp_clause c
       (Util.pp_list Dismatching_constr.pp) cstr
-  | E_unselect_lit r ->
+  | E_unselect_lit (c,r) ->
     Fmt.fprintf out "(@[select_lit@ %a@ :clause %a@])"
-      pp_lit r.bool_select_lit
-      pp_clause r.bool_select_clause
+      pp_lit r.select_lit pp_clause c
   | E_add_ground_lit r ->
     Fmt.fprintf out "(@[add_ground_lit@ %a@])" pp_lit r.bool_ground_lit
   | E_remove_ground_lit r ->

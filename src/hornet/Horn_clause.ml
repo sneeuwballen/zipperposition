@@ -20,7 +20,7 @@ type horn_clause = t
 
 let make =
   let n_ = ref 0 in
-  fun ~trail ~constr ~unordered_depth head body proof ->
+  fun ~trail ~constr ~unordered_depth ~label head body proof ->
     let hc_id = !n_ in
     incr n_;
     { hc_id;
@@ -30,6 +30,7 @@ let make =
       hc_proof=proof;
       hc_trail=trail;
       hc_constr=constr;
+      hc_label=label;
       hc_status=(HC_dead,0);
     }
 
@@ -44,6 +45,7 @@ let head c = c.hc_head
 let body c = c.hc_body
 let proof c = c.hc_proof
 let trail c = c.hc_trail
+let label c = c.hc_label
 let constr c = c.hc_constr
 let unordered_depth c = c.hc_unordered_depth
 let status c = c.hc_status
@@ -148,6 +150,7 @@ let variant_ subst (c1,sc1) (c2,sc2) : Subst.t Sequence.t =
     hc_trail=tr1;
     hc_id=id1;
     hc_status=_;
+    hc_label=lab1;
     hc_proof=_;
   } = c1
   and {
@@ -157,11 +160,16 @@ let variant_ subst (c1,sc1) (c2,sc2) : Subst.t Sequence.t =
     hc_constr=c2;
     hc_trail=tr2;
     hc_id=id2;
+    hc_label=lab2;
     hc_status=_;
     hc_proof=_;
   } = c2 in
   if id1=id2 then Sequence.return subst
-  else if depth1=depth2 && Hornet_types_util.equal_bool_trail tr1 tr2 then (
+  else if
+    depth1=depth2 &&
+    Hornet_types_util.equal_bool_trail tr1 tr2 &&
+    lab1=[] && lab2=[] (* TODO: check this too *)
+  then (
     Lit.variant ~subst (h1,sc1)(h2,sc2)
     |> Sequence.flat_map
       (fun subst ->

@@ -170,12 +170,18 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           (fun (lazy b_lit) -> match Bool_lit.view b_lit with
              | A_box_clause r ->
                r.bool_box_depends <- c :: r.bool_box_depends
-             | A_select r ->
-               r.bool_select_depends <- c :: r.bool_select_depends
              | A_fresh _
              | A_ground _ -> ())
           (HC.trail c)
     end
+
+  (* TODO: add  field "labelled_clauses" to HC, do this at registration
+     for every clause with selected lit inside it.
+     invariant: an alive HC depends on labelled clause C => C has a selected lit
+
+     | A_select (_,r) ->
+       r.select_depends <- c :: r.select_depends
+  *)
 
   (* is the clause dead right now? *)
   let is_dead (c:HC.t): bool = match HC.status c with
@@ -199,9 +205,9 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     r.bool_box_depends <- [];
     kill_clauses l
 
-  let remove_all_select (r:bool_select): unit =
-    let l = r.bool_select_depends in
-    r.bool_select_depends <- [];
+  let remove_all_select (r:select_lit): unit =
+    let l = r.select_depends in
+    r.select_depends <- [];
     kill_clauses l
 
   module Passive_set : sig
@@ -371,10 +377,14 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
             (HC.apply_subst_constr_l ~renaming subst (HC.constr c',sc_passive))
         and trail =
           Trail.merge (HC.trail c) (HC.trail c')
+        and label =
+          Label.merge
+            (Label.apply_subst ~renaming subst (HC.label c,sc_active))
+            (Label.apply_subst ~renaming subst (HC.label c',sc_passive))
         in
         let unordered_depth = unordered_depth() in
         let new_c =
-          HC.make ~unordered_depth ~constr ~trail
+          HC.make ~unordered_depth ~constr ~trail ~label
             new_head new_body (Proof.hc_sup sup)
         in
         Util.incr_stat stat_infer;
@@ -477,18 +487,21 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
             let subst = Unif.FO.unification (a,sc) (b,sc) in
             (* do inference, by removing [a=b] from body *)
             let renaming = Ctx.renaming_cleared () in
-            let new_head = Lit.apply_subst ~renaming subst (HC.head c,sc) in
-            let new_body =
+            let new_head =
+              Lit.apply_subst ~renaming subst (HC.head c,sc)
+            and new_body =
               HC.body_tail c
               |> IArray.map_arr
                 (fun lit -> Lit.apply_subst ~renaming subst (lit,sc))
               |> IArray.of_array_unsafe
+            and proof = Proof.hc_eq_res c subst
+            and label =
+              Label.apply_subst ~renaming subst (HC.label c,sc)
             in
-            let proof = Proof.hc_eq_res c subst in
             let c' =
               HC.make new_head new_body proof
                 ~unordered_depth:(HC.unordered_depth c)
-                ~trail:(HC.trail c) ~constr:(HC.constr c)
+                ~trail:(HC.trail c) ~constr:(HC.constr c) ~label
             in
             Util.debugf ~section 4
               "(@[<hv2>eq_res@ :on %a@ :subst %a@ :yield %a@])"
@@ -530,7 +543,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         let c' =
           HC.make
             ~constr:(HC.constr c) ~trail:(HC.trail c)
-            ~unordered_depth:(HC.unordered_depth c)
+            ~unordered_depth:(HC.unordered_depth c) ~label:(HC.label c)
             (HC.head c) (HC.body_tail c) (Proof.hc_simplify c)
         in
         Util.incr_stat stat_simp_body;
@@ -540,7 +553,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         let c' =
           HC.make
             ~constr:(HC.constr c) ~trail:(HC.trail c)
-            ~unordered_depth:(HC.unordered_depth c)
+            ~unordered_depth:(HC.unordered_depth c) ~label:(HC.label c)
             (HC.head c) (HC.body_tail c) (Proof.hc_simplify c)
         in
         Util.incr_stat stat_simp_body;
@@ -793,8 +806,10 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           | C.General -> ()
         end
       | E_remove_component r -> remove_all_box r
-      | E_select_lit (_,_) -> assert false (* TODO *)
-      | E_unselect_lit r -> remove_all_select r
+      | E_select_lit (c,sel,constr) ->
+        (* TODO: create and add corresponding horn clause *)
+        assert false
+      | E_unselect_lit (_,r) -> remove_all_select r
       | E_add_ground_lit _
       | E_stage Stage_presaturate ->
         presaturate ()
