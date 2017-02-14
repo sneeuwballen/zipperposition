@@ -96,6 +96,10 @@ val compose : t -> t -> t
 val is_renaming : t -> bool
 (** Check whether the substitution is a variable renaming *)
 
+val equal : t -> t -> bool
+
+val hash : t -> int
+
 include Interfaces.PRINT with type t := t
 
 val fold : ('a -> var Scoped.t -> term Scoped.t -> 'a) -> 'a -> t -> 'a

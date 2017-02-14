@@ -160,6 +160,11 @@ let of_list ?(init=empty) l = match l with
   | _::_ ->
     List.fold_left (fun subst (v,t) -> bind subst v t) init l
 
+let equal (s1:t) s2 : bool = M.equal (Scoped.equal T.equal) s1 s2
+
+let hash (s:t): int =
+  CCHash.(seq (pair (Scoped.hash HVar.hash) (Scoped.hash T.hash))) (M.to_seq s)
+
 let pp out subst =
   let pp_binding out (v,t) =
     Format.fprintf out "@[<2>@[%a@] →@ @[%a@]@]"
