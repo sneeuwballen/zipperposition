@@ -29,6 +29,7 @@ let norm (t:t): t * FI.negated =
 
 let equal = Hornet_types_util.equal_bool_lit
 let hash = Hornet_types_util.hash_bool_lit
+let compare = Hornet_types_util.compare_bool_lit
 let pp = Hornet_types_util.pp_bool_lit
 let to_string = Fmt.to_string pp
 let print = pp

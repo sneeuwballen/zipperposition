@@ -23,6 +23,7 @@ val sign : t -> bool
 
 include Interfaces.PRINT with type t := t
 include Interfaces.HASH with type t := t
+include Interfaces.ORD with type t := t
 
 (** {2 Constructors} *)
 
