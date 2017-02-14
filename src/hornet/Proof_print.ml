@@ -35,7 +35,7 @@ let pp_dag out (p:t): unit =
     end
   in
   let aux' _ () = ignore (aux p) in
-  Format.fprintf out "@[<v>%a@]@." aux' ()
+  Format.fprintf out "@[<v>%a@]" aux' ()
 
 let get_proof (x:proof_with_res): proof = fst x
 let get_res (x:proof_with_res): proof_res = snd x

@@ -82,13 +82,13 @@ module Make(Ctx : State.CONTEXT) = struct
         | [] -> assert (IArray.length lits=0); None
         | [_] -> None
         | _::_ ->
-          (* do a simplification! *)
+          (* do a simplification by splitting [c]! *)
           Util.incr_stat stat_avatar_split;
+          let proof = Proof.avatar_split c in
           let bool_lits, clauses =
             !components
             |> List.map
               (fun lits ->
-                 let proof = Proof.avatar_split c in
                  let rec sub_clause = lazy (
                    C.make_l ~trail:[b_lit] lits proof
                  )
@@ -109,7 +109,7 @@ module Make(Ctx : State.CONTEXT) = struct
             |> List.map (fun (lazy blit) -> Bool_lit.neg blit)
           in
           let bool_clause = guard @ bool_lits in
-          Ctx.add_clause Proof.bool_tauto bool_clause;
+          Ctx.add_clause proof bool_clause;
           Util.debugf ~section 4 "@[<2>constraint clause is@ @[%a@]@]"
             (fun k->k Bool_lit.pp_clause bool_clause);
           (* return the clauses *)
