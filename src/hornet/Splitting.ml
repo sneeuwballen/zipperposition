@@ -333,27 +333,37 @@ module Make(Ctx : State.CONTEXT) = struct
              let c = lc.lc_clause in
              let subst = Labelled_clause.to_subst lc in
              assert (not (Subst.is_renaming subst));
+             (* block this instance from [c] *)
+             let new_constr = Labelled_clause.to_dismatch lc in
+             assert (not (Dismatching_constr.is_trivial new_constr));
+             C.add_dismatch_constr c new_constr;
+             Util.debugf ~section 2
+               "(@[<2>@{<yellow>inst_gen_eq.instantiate@}@ :clause %a@ :subst %a@ :new_dismatch %a@])"
+               (fun k->k C.pp c Subst.pp subst Dismatching_constr.pp new_constr);
              (* apply substitution *)
              let renaming = Ctx.renaming_cleared () in
              let lits' =
                C.lits c
                |> IArray.map (fun lit -> Lit.apply_subst ~renaming subst (lit,0))
              and constr' =
-               List.map
+               CCList.filter_map
                  (function
                    | C_dismatch d ->
-                     C_dismatch (Dismatching_constr.apply_subst ~renaming subst (d,0)))
+                     let d' =
+                       Dismatching_constr.apply_subst ~renaming subst (d,0)
+                     in
+                     if Dismatching_constr.is_trivial d'
+                     then None
+                     else Some (C_dismatch d')
+                 )
                  (C.constr c)
              in
              let c' =
                C.make lits' (Proof.instance c subst)
-                 ~constr:constr' ~trail:Trail.empty
+                 ~constr:constr' ~trail:Trail.empty ~depth:(C.depth c+1)
              in
              (* split new clause *)
              split_clause c';
-             (* block this instance from [c] *)
-             let new_constr = Labelled_clause.to_dismatch lc in
-             C.add_dismatch_constr c new_constr;
              (* constraint has changed, add then remove the clause *)
              Ctx.send_event (E_unselect_lit (c, lc.lc_sel));
              Ctx.send_event (E_select_lit (c, lc.lc_sel, C.constr c));
