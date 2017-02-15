@@ -229,6 +229,9 @@ module Make(Ctx : State.CONTEXT) = struct
           Ctx.on_backtrack
             (fun () ->
                C.clear_select c;
+               Util.debugf ~section 3
+                 "@[<2>@{<yellow>unselect_lit@} `%a`@ :clause %a@]"
+                 (fun k->k Lit.pp sel.select_lit C.pp c);
                Ctx.send_event (E_unselect_lit (c,sel)));
       end
 
@@ -302,7 +305,7 @@ module Make(Ctx : State.CONTEXT) = struct
         |> List.map
           (fun lc ->
              assert (Labelled_clause.is_empty lc);
-             let sel = C.select_exn lc.lc_clause in
+             let sel = lc.lc_sel in
              let idx = sel.select_idx in
              let b_lit = IArray.get (C.grounding_exn lc.lc_clause) idx in
              Bool_lit.neg b_lit)

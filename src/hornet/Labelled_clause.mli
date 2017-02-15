@@ -8,7 +8,7 @@ open Hornet_types
 
 type t = labelled_clause
 
-val make_empty : clause -> t
+val make_empty : clause -> select_lit -> t
 (** Initial empty label for this clause *)
 
 include Interfaces.PRINT with type t := t

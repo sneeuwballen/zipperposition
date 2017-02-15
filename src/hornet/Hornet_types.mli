@@ -88,7 +88,8 @@ and horn_clause_status =
 
 (* clause + substitution, for grounding purpose *)
 and labelled_clause = {
-  lc_clause: clause; (* invariant: has selected lit && is_horn *)
+  lc_clause: clause; (* invariant: non horn *)
+  lc_sel: select_lit; (* the selected lit in [lc_clause] *)
   lc_subst: term var_map; (* substitution to instantiate the clause *)
 }
 

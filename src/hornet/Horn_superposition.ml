@@ -751,7 +751,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       in
       let hc =
         HC.make head body
-          ~constr ~label:[Labelled_clause.make_empty c]
+          ~constr ~label:[Labelled_clause.make_empty c sel]
           ~trail:Trail.empty ~unordered_depth:0
           (Proof.split c sel constr)
       in

@@ -10,9 +10,9 @@ module T = FOTerm
 
 type t = labelled_clause
 
-let make c subst : t = {lc_clause=c; lc_subst=subst}
+let make c sel subst : t = {lc_clause=c; lc_sel=sel; lc_subst=subst}
 
-let make_empty (c:clause): t =
+let make_empty (c:clause) (sel:select_lit): t =
   (* initial subst: maps each var to itself *)
   let subst =
     IArray.to_seq c.c_lits
@@ -22,7 +22,7 @@ let make_empty (c:clause): t =
     |> Sequence.map (fun v -> v, T.var v)
     |> Type.VarMap.of_seq
   in
-  make c subst
+  make c sel subst
 
 let equal = Hornet_types_util.equal_lc
 let hash = Hornet_types_util.hash_lc
