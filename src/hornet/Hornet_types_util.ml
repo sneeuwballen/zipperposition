@@ -70,8 +70,8 @@ let vars_of_hclause c =
     (IArray.to_seq c.hc_body |> Sequence.flat_map vars_of_lit)
 
 (* remove trivial bindings from the substitution *)
-let lc_filter_subst (lc:labelled_clause): (var*term) Sequence.t =
-  Type.VarMap.to_seq lc.lc_subst
+let lc_filter_subst lc_subst: (var*term) Sequence.t =
+  Type.VarMap.to_seq lc_subst
   |> Sequence.filter
     (fun (v,t) -> match T.view t with
        | T.Var v' -> not (HVar.equal Type.equal v v')
@@ -80,7 +80,8 @@ let lc_filter_subst (lc:labelled_clause): (var*term) Sequence.t =
 let pp_lc out (lc:labelled_clause): unit =
   let pp_subst out lc =
     Fmt.fprintf out "{@[<hv>%a@]}"
-      Fmt.(seq (pair ~sep:(return "@ -> ") HVar.pp T.pp)) (lc_filter_subst lc)
+      Fmt.(seq (pair ~sep:(return "@ -> ") HVar.pp T.pp))
+      (lc_filter_subst lc.lc_subst)
   in
   Fmt.fprintf out "(@[%a@ :subst %a@ :select `%a`@])"
     pp_clause lc.lc_clause pp_subst lc pp_lit lc.lc_sel.select_lit

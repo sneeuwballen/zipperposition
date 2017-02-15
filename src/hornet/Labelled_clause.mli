@@ -23,7 +23,7 @@ val apply_subst :
 (** Apply the substitution to each variable in the given scope *)
 
 val is_empty : t -> bool
-(** Is the substitution trivial? *)
+(** Is the substitution trivial? (i.e. a renaming) *)
 
 val to_subst : t -> Subst.t
 (** Build a substitution (all terms have scope 0) *)

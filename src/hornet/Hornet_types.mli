@@ -91,6 +91,7 @@ and labelled_clause = {
   lc_clause: clause; (* invariant: non horn *)
   lc_sel: select_lit; (* the selected lit in [lc_clause] *)
   lc_subst: term var_map; (* substitution to instantiate the clause *)
+  lc_real_subst: Subst.t lazy_t;
 }
 
 (* label of a Horn clause: a set of labelled clauses *)
