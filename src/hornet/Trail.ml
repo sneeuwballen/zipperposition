@@ -13,6 +13,8 @@ let neg_blit = Hornet_types_util.neg_bool_lit
 let cmp_ (lazy a)(lazy b) = cmp_blit a b
 let is_empty = function [] -> true | _::_ -> false
 
+let empty = []
+
 let make l = CCList.sort_uniq ~cmp:cmp_ l
 
 let merge l1 l2 =
@@ -30,3 +32,6 @@ let pp_opt = Hornet_types_util.pp_bool_trail_opt
 let to_string = CCFormat.to_string pp
 let equal = Hornet_types_util.equal_bool_trail
 
+let bool_lits (t:t): bool_lit Sequence.t =
+  Sequence.of_list t
+  |> Sequence.map Lazy.force

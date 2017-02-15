@@ -117,7 +117,7 @@ let make_ =
   fun c_trail c_depth c_constr c_kind c_lits c_proof ->
     let c_id = CCRef.incr_then_get n_ in
     { c_id; c_depth; c_constr; c_trail;
-      c_select=None; c_lits; c_kind; c_proof }
+      c_select=None; c_grounding=None; c_lits; c_kind; c_proof }
 
 let make ?(trail=[]) ?(constr=[]) ?(depth=0) c_lits proof: t =
   let c_kind = kind_of_lits ~trail ~constr c_lits proof in
@@ -131,13 +131,31 @@ let hash_mod_alpha c : int =
 
 let select c = c.c_select
 
+let select_exn c = match select c with
+  | Some s -> s
+  | None ->
+    Util.errorf ~where:"clause.select_exn" "clause `%a`@ has no selected lit" pp c
+
 let set_select c (s:select_lit): unit = match c.c_select with
   | Some _ -> Util.errorf ~where:"clause.set_select" "literal already selected"
   | None -> c.c_select <- Some s
 
 let clear_select c = match c.c_select with
-  | None -> Util.errorf ~where:"clause.clear_select" "no literal currently selected"
   | Some _ -> c.c_select <- None
+  | None ->
+    Util.errorf ~where:"clause.clear_select" "no literal currently selected in@ %a" pp c
+
+let grounding c = c.c_grounding
+
+let grounding_exn c = match c.c_grounding with
+  | Some g -> g
+  | None ->
+    Util.errorf ~where:"clause.grounding_exn" "no grounding for@ %a" pp c
+
+let set_grounding c g = match c.c_grounding with
+  | None -> c.c_grounding <- Some g
+  | Some _ ->
+    Util.errorf ~where:"clause.set_grounding" "`%a`@ already grounded" pp c
 
 let is_empty c = IArray.length c.c_lits = 0
 

@@ -40,6 +40,11 @@ val dismatch_constr : t -> Dismatching_constr.t list
 val set_select : t -> select_lit -> unit
 val clear_select : t -> unit
 val select : t -> select_lit option
+val select_exn : t -> select_lit
+
+val grounding : t -> bool_lit IArray.t option
+val grounding_exn : t -> bool_lit IArray.t
+val set_grounding : t -> bool_lit IArray.t -> unit
 
 val is_empty : t -> bool
 

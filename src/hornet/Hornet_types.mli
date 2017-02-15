@@ -23,8 +23,9 @@ type clause = {
   c_proof: proof;
   c_trail: bool_trail; (* components/splits the clause depends on *)
   c_depth: int; (* number of instantiations in its proof *)
-  mutable c_constr: c_constraint_ list;
+  mutable c_constr: c_constraints;
   mutable c_select: select_lit option; (* if there is currently a selected lit *)
+  mutable c_grounding: bool_lit IArray.t option; (* grounding *)
 }
 
 and lit =
@@ -47,7 +48,7 @@ and proof =
   | P_avatar_split of clause
   (* given clause has been split into var-disjoint components,
      one of which is the current clause *)
-  | P_split of clause (* model-driven recursive splitting *) (* TODO *)
+  | P_split of clause * select_lit * c_constraints (* model-driven recursive splitting *)
   | P_bool_tauto (* boolean tautology *)
   | P_bool_res of bool_res_step
   | P_bool_grounding of clause (* grounding of clause *)
@@ -66,11 +67,13 @@ and proof_res =
 and c_constraint_ =
   | C_dismatch of Dismatching_constr.t
 
+and c_constraints = c_constraint_ list
+
 and horn_clause = {
   hc_id: int; (* unique ID *)
   hc_head: lit;
   hc_body: lit IArray.t;
-  hc_constr: c_constraint_ list;
+  hc_constr: c_constraints;
   hc_trail: bool_trail;
   hc_proof: proof;
   hc_unordered_depth: int; (* how many unordered inferences needed? *)
@@ -162,12 +165,12 @@ type stage =
 type event =
   | E_add_component of bool_box_clause
   | E_remove_component of bool_box_clause
-  | E_select_lit of clause * select_lit * Dismatching_constr.t list
+  | E_select_lit of clause * select_lit * c_constraints
   (** [lit | constr] has been selected in some clause *)
   | E_unselect_lit of clause * select_lit
   | E_add_ground_lit of bool_ground
   | E_remove_ground_lit of bool_ground
   | E_if_sat (** final check of the model *)
-  | E_conflict of bool_clause * proof (* boolean conflict in some theory *)
+  | E_conflict of bool_trail * label * proof (* boolean conflict in some theory *)
   | E_found_unsat of proof_with_res (* final proof *)
   | E_stage of stage

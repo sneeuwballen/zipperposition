@@ -8,12 +8,14 @@ open Hornet_types
 module Fmt = CCFormat
 module LC = Labelled_clause
 
-type t = labelled_clause list
+type t = label
 (** Set of labelled clauses. Invariant: sorted *)
 
 let return l : t = [l]
 
 let make l = CCList.sort_uniq ~cmp:LC.compare l
+
+let all_empty = List.for_all LC.is_empty
 
 let merge = CCList.sorted_merge ~cmp:LC.compare
 
@@ -22,8 +24,9 @@ let apply_subst ~renaming subst (l,sc) =
   |> List.rev_map (fun lc -> LC.apply_subst ~renaming subst (lc,sc))
   |> make
 
-let pp out (l:t): unit =
-  Fmt.fprintf out "{@[<hv>%a@]}" (Fmt.list LC.pp) l
+let to_list (t:t) : _ list = t
+
+let pp = Hornet_types_util.pp_label
 
 let to_string = Fmt.to_string pp
 

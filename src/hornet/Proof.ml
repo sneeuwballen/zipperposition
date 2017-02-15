@@ -16,7 +16,7 @@ type formula = TypedSTerm.t
 let trivial = P_trivial
 let instance c subst = P_instance (c,subst)
 let avatar_split c = P_avatar_split c
-let split c = P_split c
+let split c sel constr = P_split (c,sel,constr)
 
 let bool_tauto = P_bool_tauto
 let bool_res a c1 p1 c2 p2 =
@@ -63,7 +63,7 @@ let parents (p:t): proof_with_res list = match p with
   | P_cnf_neg r
   | P_cnf r -> [r]
   | P_avatar_split c
-  | P_split c
+  | P_split (c,_,_)
   | P_instance (c,_) -> [c.c_proof, PR_clause c]
   | P_bool_res r ->
     [ r.bool_res_p1, PR_bool_clause r.bool_res_c1;

@@ -155,24 +155,20 @@ module Make(Ctx : State.CONTEXT) = struct
   (** {2 Inst-Gen-Eq} *)
 
   module Inst_gen_eq : sig
-    val instantiate : C.t -> unit
-    (** Instantiate the given non-horn clause, so as to select
-        its literals depending on the current ground interpretation *)
+    val grounding : C.t -> unit
+    (** Instantiate the given non-horn clause with grounding subst,
+        so as to select its literals depending on the current ground
+        interpretation *)
 
     val assert_ground : bool_ground -> unit
     (** Called when the given boolean ground literal is true.
         This will select some FO literals in clauses whose instance contain
         the bool ground literal *)
   end = struct
-    let stat_instantiate = Util.mk_stat "hornet.instantiate"
-
-    (* TODO:
-       - rule to ground non-ground clauses (with a pointer to the grounding)
-       - rule to select a horn subset in non-Horn non-ground clause components
-    *)
+    let stat_grounding = Util.mk_stat "hornet.grounding"
 
     (* ground the literals of [c] *)
-    let ground_lits (c:clause): bool_lit list =
+    let ground_lits (c:clause): bool_lit IArray.t =
       let subst =
         C.vars_l c
         |> List.map
@@ -192,31 +188,28 @@ module Make(Ctx : State.CONTEXT) = struct
              let b_lit = Bool_lit.ground Ctx.bool_state lit' in
              (* register [c] in each ground literal *)
              begin match Bool_lit.view b_lit with
-               | A_ground r -> 
+               | A_ground r ->
                  r.bool_ground_instance_of <- (c,i) :: r.bool_ground_instance_of;
                | _ -> assert false
              end;
              b_lit)
-        |> IArray.to_list
       in
       lits
 
-    (* TODO:
-       - ground the clause, register it to each ground literal
-       - add the grounding to SAT
-       - remember to select a literal in [on_assumption]
-    *)
-    let instantiate (c:C.t): unit =
-      Util.incr_stat stat_instantiate;
-      Util.debugf ~section 4
-        "@[<2>@{<yellow>inst_gen_eq.instantiate@}@ %a@]"
-        (fun k->k C.pp c);
-      let b_clause = ground_lits c in
-      Ctx.add_clause (Proof.bool_grounding c) b_clause;
-      ()
-
-    (* TODO: when a conflict between selected lits is found, add
-       instantiations *)
+    let grounding (c:C.t): unit =
+      begin match C.grounding c with
+        | None ->
+          Util.incr_stat stat_grounding;
+          let b_clause = ground_lits c in
+          C.set_grounding c b_clause;
+          let b_clause = IArray.to_list b_clause in
+          Util.debugf ~section 3
+            "@[<2>@{<yellow>inst_gen_eq.instantiate@}@ %a@ :grounding %a@]"
+            (fun k->k C.pp c Bool_lit.pp_clause b_clause);
+          Ctx.add_clause (Proof.bool_grounding c) b_clause;
+          ()
+        | Some _ -> ()
+      end
 
     let try_select (c:clause)(i:clause_idx)(_:bool_ground): unit =
       begin match C.select c with
@@ -225,11 +218,13 @@ module Make(Ctx : State.CONTEXT) = struct
           (* select the literal of [c] whose instance is [r.bool_ground_lit] *)
           let sel = {
             select_lit=IArray.get (C.lits c) i;
-            select_idx=i; (* TODO *)
+            select_idx=i;
             select_depends=[];
           } in
           C.set_select c sel;
-          Ctx.send_event (E_select_lit (c,sel,C.dismatch_constr c));
+          Util.debugf ~section 3 "@[<2>@{<yellow>select_lit@} `%a`@ :clause %a@]"
+            (fun k->k Lit.pp sel.select_lit C.pp c);
+          Ctx.send_event (E_select_lit (c,sel,C.constr c));
           (* remove the selection afterwards *)
           Ctx.on_backtrack
             (fun () ->
@@ -240,6 +235,7 @@ module Make(Ctx : State.CONTEXT) = struct
     (* when a boolean literal is asserted, try to select it
        in every clause whose instance it belongs to *)
     let assert_ground (r:bool_ground): unit =
+      Util.debugf ~section 5 "(@[assert_ground@ %a@])" (fun k->k Lit.pp r.bool_ground_lit);
       List.iter
         (fun (c,i) -> try_select c i r)
         r.bool_ground_instance_of
@@ -263,7 +259,7 @@ module Make(Ctx : State.CONTEXT) = struct
           | None when C.is_ground c ->
             assert (C.is_unit_ground c); (* otherwise, avatar would have split *)
             ()
-          | None -> Inst_gen_eq.instantiate c
+          | None -> Inst_gen_eq.grounding c
         end
     end
 
@@ -278,10 +274,10 @@ module Make(Ctx : State.CONTEXT) = struct
         Ctx.send_event (E_add_component r)
       | A_box_clause _, false -> ()
       | A_ground r, true ->
-        Ctx.on_backtrack
-          (fun () -> Ctx.send_event (E_remove_ground_lit r));
         (* maybe select some FO literals in reaction *)
         Inst_gen_eq.assert_ground r;
+        Ctx.on_backtrack
+          (fun () -> Ctx.send_event (E_remove_ground_lit r));
         Ctx.send_event (E_add_ground_lit r)
       | A_ground _, false -> ()
       | A_fresh _, _
@@ -290,14 +286,43 @@ module Make(Ctx : State.CONTEXT) = struct
 
   let set_depth_limit d = Depth_limit.set d
 
+  (* what to do if a conflict is detected *)
+  let on_conflict (trail:Trail.t) (label:Label.t) (proof:Proof.t): unit =
+    if Label.all_empty label then (
+      (* trigger conflict in SAT using a conflict clause that combines
+         the trail and the label *)
+      let neg_trail =
+        Trail.bool_lits trail
+        |> Bool_lit.Tbl.of_seq_count
+        |> Bool_lit.Tbl.keys
+        |> Sequence.map Bool_lit.neg
+        |> Sequence.to_rev_list
+      and neg_ground_lits =
+        Label.to_list label
+        |> List.map
+          (fun lc ->
+             assert (Labelled_clause.is_empty lc);
+             let sel = C.select_exn lc.lc_clause in
+             let idx = sel.select_idx in
+             let b_lit = IArray.get (C.grounding_exn lc.lc_clause) idx in
+             Bool_lit.neg b_lit)
+      in
+      let conflict = List.rev_append neg_trail neg_ground_lits in
+      Util.debugf ~section 2
+        "(@[<2>conflict@ :trail %a@ :label %a@ :conflict %a@])"
+        (fun k->k Trail.pp trail Label.pp label Bool_lit.pp_clause conflict);
+      Ctx.add_clause proof conflict
+    ) else (
+      assert false (* TODO: do the proper instantiations, removing the
+                      instantiated clauses, and do nth else *)
+    )
+
   let on_event (e:event) =
     begin match e with
       | E_add_component _ | E_remove_component _
       | E_add_ground_lit _ | E_remove_ground_lit _
       | E_select_lit _ | E_unselect_lit _ -> () (* come from here *)
-      | E_conflict (c,proof) ->
-        (* trigger conflict in SAT *)
-        Ctx.add_clause proof c
+      | E_conflict (trail,label,proof) -> on_conflict trail label proof
       | E_if_sat
       | E_found_unsat _ -> ()
       | E_stage s ->

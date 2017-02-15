@@ -571,29 +571,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     let rules_simp_n = [ ]
   end
 
-  (** {2 Proofs of False} *)
-  module Proof_of_false : sig
-    type t = Horn_clause.t
-
-    val to_bool_clause : t -> bool_clause
-  end = struct
-    type t = Horn_clause.t
-
-    (* TODO: also take the instances/labels from the proof? *)
-    let bool_lits (c:t): bool_lit Sequence.t =
-      HC.trail c
-      |> Sequence.of_list
-      |> Sequence.map Lazy.force
-
-    (* find bool lits, then deduplicate and negate them *)
-    let to_bool_clause (p:t): bool_clause =
-      bool_lits p
-      |> Bool_lit.Tbl.of_seq_count
-      |> Bool_lit.Tbl.keys
-      |> Sequence.map Bool_lit.neg
-      |> Sequence.to_rev_list
-  end
-
   (** {2 Saturation} *)
 
   (** Keeps a set of clauses that are saturated up to some limit.
@@ -613,7 +590,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     type res =
       | Sat
       | Unknown (* reached depth limit *)
-      | Unsat of  Proof_of_false.t
+      | Unsat of HC.t (* empty clause *)
 
     type stats = {
       num_clauses: int; (* number of clauses *)
@@ -641,7 +618,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     type res =
       | Sat
       | Unknown (* reached depth limit *)
-      | Unsat of Proof_of_false.t
+      | Unsat of HC.t
 
     type stats = {
       num_clauses: int; (* number of clauses *)
@@ -761,6 +738,27 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         end
   end
 
+  (** {2 Interface to literal-selection} *)
+  module Select : sig
+    val add_select : clause -> select_lit -> c_constraints -> Saturate.res
+  end = struct
+    let add_select (c:clause) (sel:select_lit) (constr:c_constraints): Saturate.res =
+      let lit = sel.select_lit in
+      let head, body =
+        if Lit.is_pos lit
+        then lit, IArray.empty
+        else Lit.false_, IArray.make 1 (Lit.neg lit)
+      in
+      let hc =
+        HC.make head body
+          ~constr ~label:[Labelled_clause.make_empty c]
+          ~trail:Trail.empty ~unordered_depth:0
+          (Proof.split c sel constr)
+      in
+      sel.select_depends <- hc :: sel.select_depends; (* register *)
+      Saturate.add_horn hc
+  end
+
   (** {2 Main} *)
 
   let initial_clauses : C.t list =
@@ -775,8 +773,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       | Saturate.Sat -> ()
       | Saturate.Unsat c ->
         assert (HC.is_absurd c);
-        let conflict_clause = Proof_of_false.to_bool_clause c in
-        Ctx.send_event (E_conflict (conflict_clause, HC.proof c));
+        Ctx.send_event (E_conflict (HC.trail c, HC.label c, HC.proof c));
     end
 
   let set_depth_limit d =
@@ -807,12 +804,9 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         end
       | E_remove_component r -> remove_all_box r
       | E_select_lit (c,sel,constr) ->
-        (* TODO: create and add corresponding horn clause *)
-        assert false
+        check_res (Select.add_select c sel constr)
       | E_unselect_lit (_,r) -> remove_all_select r
-      | E_add_ground_lit _
-      | E_stage Stage_presaturate ->
-        presaturate ()
+      | E_stage Stage_presaturate -> presaturate ()
       | E_stage Stage_exit ->
         Util.debugf ~section 1 "@[<2>saturate:@ %a@]"
           (fun k->
@@ -824,6 +818,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       | E_if_sat ->
         (* saturate again *)
         check_res (Saturate.saturate ())
+      | E_add_ground_lit _
       | E_conflict _
       | E_found_unsat _ -> ()
     end

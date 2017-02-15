@@ -30,6 +30,8 @@ let compare = Hornet_types_util.compare_lc
 let pp = Hornet_types_util.pp_lc
 let to_string = CCFormat.to_string pp
 
+let filter_subst = Hornet_types_util.lc_filter_subst
+
 let apply_subst ~renaming subst (lc,sc) =
   let lc_subst =
     Type.VarMap.map (fun t -> Subst.FO.apply ~renaming subst (t,sc))
@@ -37,16 +39,12 @@ let apply_subst ~renaming subst (lc,sc) =
   in
   { lc with lc_subst }
 
-let is_empty (t:t) =
-  Type.VarMap.for_all
-    (fun v t -> match T.view t with
-       | T.Var v' -> HVar.equal Type.equal v v'
-       | _ -> false)
-    t.lc_subst
+let is_empty (lc:t) =
+  not (Sequence.is_empty (filter_subst lc))
 
 let to_subst (lc:t): Subst.t =
   let sc = 0 in
-  Type.VarMap.to_seq lc.lc_subst
+  filter_subst lc
   |> Sequence.map
     (fun (v,t) ->
        (* add scope, perform ugly casting *)

@@ -7,6 +7,8 @@ open Hornet_types
 
 type t = bool_trail
 
+val empty : t
+
 val is_empty : t -> bool
 
 val make : bool_lit lazy_t list -> t
@@ -19,3 +21,5 @@ include Interfaces.PRINT with type t := t
 include Interfaces.EQ with type t := t
 
 val pp_opt : t CCFormat.printer
+
+val bool_lits : t -> bool_lit Sequence.t

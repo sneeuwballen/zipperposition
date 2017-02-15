@@ -52,6 +52,9 @@ let pp_bool_trail_opt out trail = match trail with
 let pp_constraint out (c:c_constraint_): unit = match c with
   | C_dismatch d -> Dismatching_constr.pp out d
 
+let pp_constraints out (l:c_constraints): unit =
+  Fmt.(hvbox (list pp_constraint)) out l
+
 let pp_hc_status out (s:horn_clause_status): unit = match s with
   | HC_alive -> Fmt.string out "alive"
   | HC_dead -> Fmt.string out "dead"
@@ -66,25 +69,36 @@ let vars_of_hclause c =
     (vars_of_lit c.hc_head)
     (IArray.to_seq c.hc_body |> Sequence.flat_map vars_of_lit)
 
+(* remove trivial bindings from the substitution *)
+let lc_filter_subst (lc:labelled_clause): (var*term) Sequence.t =
+  Type.VarMap.to_seq lc.lc_subst
+  |> Sequence.filter
+    (fun (v,t) -> match T.view t with
+       | T.Var v' -> not (HVar.equal Type.equal v v')
+       | _ -> true)
+
 let pp_lc out (lc:labelled_clause): unit =
-  let pp_subst out s =
+  let pp_subst out lc =
     Fmt.fprintf out "{@[<hv>%a@]}"
-      (Fmt.seq (Fmt.pair HVar.pp T.pp)) (Type.VarMap.to_seq s)
+      Fmt.(seq (pair ~sep:(return "@ -> ") HVar.pp T.pp)) (lc_filter_subst lc)
   in
   Fmt.fprintf out "(@[%a@ :subst %a@])"
-    pp_clause lc.lc_clause pp_subst lc.lc_subst
+    pp_clause lc.lc_clause pp_subst lc
+
+let pp_label out (l:label): unit =
+  Fmt.fprintf out "{@[<hv>%a@]}" (Fmt.list pp_lc) l
 
 let pp_hclause out (c:horn_clause): unit =
   let pp_constr out = function
     | [] -> Fmt.silent out ()
-    | l -> Fmt.fprintf out "@ | @[<hv>%a@]" (Fmt.list pp_constraint) l
+    | l -> Fmt.fprintf out "@ | @[<hv>%a@]" pp_constraints l
   and pp_body out body =
     if IArray.length body > 0 then (
       Fmt.fprintf out " @<1>← @[<hv>%a@]" (Fmt.seq pp_lit) (IArray.to_seq body)
     );
   and pp_label out = function
     | [] -> ()
-    | lcs -> Fmt.fprintf out "@ {@[<hv>%a@]}" (Fmt.list pp_lc) lcs
+    | lcs -> Fmt.fprintf out "@ label:{@[<hv>%a@]}" (Fmt.list pp_lc) lcs
   and pp_vars pp x out = function
     | [] -> pp out x
     | vars ->
@@ -125,8 +139,9 @@ let pp_proof out (p:proof) : unit = match p with
       pp_clause c Subst.pp subst
   | P_avatar_split c ->
     Fmt.fprintf out "(@[<hv2>avatar_split@ :from %a@])" pp_clause c
-  | P_split c ->
-    Fmt.fprintf out "(@[<hv2>split@ %a@])" pp_clause c
+  | P_split (c,sel,constr) ->
+    Fmt.fprintf out "(@[<hv2>split@ :clause %a@ :idx %a@ :constr %a@])"
+      pp_clause c pp_select sel pp_constraints constr
   | P_bool_tauto -> Fmt.string out "bool_tauto"
   | P_bool_res r ->
     Fmt.fprintf out "(@[<hv>bool_res@ :on %a@ :c1 %a@ :c2 %a@])"
@@ -240,7 +255,7 @@ let pp_event out (e:event): unit = match e with
     Fmt.fprintf out "(@[<hv>select_lit@ %a@ :clause %a@ :constr (@[%a@])@])"
       pp_lit r.select_lit
       pp_clause c
-      (Util.pp_list Dismatching_constr.pp) cstr
+      pp_constraints cstr
   | E_unselect_lit (c,r) ->
     Fmt.fprintf out "(@[select_lit@ %a@ :clause %a@])"
       pp_lit r.select_lit pp_clause c
@@ -248,9 +263,9 @@ let pp_event out (e:event): unit = match e with
     Fmt.fprintf out "(@[add_ground_lit@ %a@])" pp_lit r.bool_ground_lit
   | E_remove_ground_lit r ->
     Fmt.fprintf out "(@[remove_ground_lit@ %a@])" pp_lit r.bool_ground_lit
-  | E_conflict (c,p) ->
-    Fmt.fprintf out "(@[<hv>conflict@ :clause %a@ :proof %a@])"
-      pp_bool_clause c pp_proof p
+  | E_conflict (trail,l,p) ->
+    Fmt.fprintf out "(@[<hv>conflict@ :trail %a@ :label %a@ :proof %a@])"
+      pp_bool_trail trail pp_label l pp_proof p
   | E_if_sat -> Fmt.string out "if_sat"
   | E_found_unsat (p,_) ->
     Fmt.fprintf out "(@[found_unsat@ :proof %a@])" pp_proof p

@@ -15,7 +15,7 @@ val trivial : t
 val from_stmt : Statement.clause_t -> t
 val instance : clause -> Subst.t -> t
 val avatar_split : clause -> t
-val split : clause -> t
+val split : clause -> select_lit -> c_constraints -> t
 
 val bool_tauto : t
 val bool_res : bool_lit -> bool_clause -> t -> bool_clause -> t -> t

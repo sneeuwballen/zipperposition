@@ -65,11 +65,9 @@ let fresh_atom_id_ state: int =
 let fresh state =
   make_ true (A_fresh (fresh_atom_id_ state))
 
-(* unit ground literal.
-   invariant: move [lit]'s sign to the boolean literal sign *)
+(* unit ground literal. *)
 let ground state (lit:Lit.t): t =
   assert (Lit.is_ground lit);
-  let lit, sign = if Lit.sign lit then lit, true else Lit.neg lit, false in
   let atom =
     try Lit.Tbl.find state.ground_tbl lit
     with Not_found ->
@@ -83,7 +81,7 @@ let ground state (lit:Lit.t): t =
       Lit.Tbl.add state.ground_tbl lit atom;
       atom
   in
-  make_ sign atom
+  make_ true atom
 
 let box_clause state c =
   (* make a [Clause c] literal *)
