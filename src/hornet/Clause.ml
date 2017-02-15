@@ -102,9 +102,9 @@ let kind_of_lits ~trail ~constr (c_lits:Lit.t IArray.t) proof: c_kind =
 
 (** How to build a clause from a ['a] and other parameters *)
 type 'a builder =
-  ?trail:bool_trail ->
-  ?constr:constraint_ list ->
-  ?depth:int ->
+  trail:bool_trail ->
+  constr:constraint_ list ->
+  depth:int ->
   'a ->
   proof ->
   t
@@ -119,12 +119,12 @@ let make_ =
     { c_id; c_depth; c_constr; c_trail;
       c_select=None; c_grounding=None; c_lits; c_kind; c_proof }
 
-let make ?(trail=[]) ?(constr=[]) ?(depth=0) c_lits proof: t =
+let make ~trail ~constr ~depth c_lits proof: t =
   let c_kind = kind_of_lits ~trail ~constr c_lits proof in
   make_ trail depth constr c_kind c_lits proof
 
-let make_l ?trail ?constr ?depth lits proof : t =
-  make ?trail ?constr ?depth (IArray.of_list lits) proof
+let make_l ~trail ~constr ~depth lits proof : t =
+  make ~trail ~constr ~depth (IArray.of_list lits) proof
 
 let hash_mod_alpha c : int =
   IArray.hash_comm Lit.hash_mod_alpha c.c_lits
@@ -192,7 +192,7 @@ let is_unit_ground c : bool =
 
 (** {2 Utils} *)
 
-let of_slit_l ~stmt lits =
+let of_slit_l ~stmt lits : t =
   let conv_slit = function
     | SLiteral.True -> Lit.true_
     | SLiteral.False -> Lit.false_
@@ -202,7 +202,7 @@ let of_slit_l ~stmt lits =
   in
   let lits = List.map conv_slit lits in
   let proof = Proof.from_stmt stmt in
-  make_l lits proof
+  make_l ~constr:[] ~trail:Trail.empty ~depth:0 lits proof
 
 let constr_trivial_ (c:constraint_): bool = match c with
   | C_dismatch c -> Dismatching_constr.is_trivial c

@@ -40,7 +40,10 @@ module Make(Ctx : State.CONTEXT) = struct
              C.constr c = []
           then (
             let lit' = Lit.neg (IArray.get (C.lits c) 0) in
-            let c' = C.make_l ~trail:(C.trail c) [lit'] Proof.trivial in
+            let c' =
+              C.make_l [lit'] Proof.trivial
+                ~constr:(C.constr c) ~depth:(C.depth c) ~trail:(C.trail c)
+            in
             let b' = Bool_lit.box_clause Ctx.bool_state c' in
             let b_c = [Bool_lit.neg b; Bool_lit.neg b'] in
             Ctx.add_clause Proof.bool_tauto b_c;
@@ -107,7 +110,8 @@ module Make(Ctx : State.CONTEXT) = struct
             |> List.map
               (fun lits ->
                  let rec sub_clause = lazy (
-                   C.make_l ~trail:[b_lit] lits proof
+                   C.make_l lits proof
+                     ~constr:(C.constr c) ~depth:(C.depth c) ~trail:[b_lit]
                  )
                  and b_lit =
                    lazy (Bool_lit.box_clause Ctx.bool_state (Lazy.force sub_clause))
@@ -204,7 +208,7 @@ module Make(Ctx : State.CONTEXT) = struct
           C.set_grounding c b_clause;
           let b_clause = IArray.to_list b_clause in
           Util.debugf ~section 3
-            "@[<2>@{<yellow>inst_gen_eq.instantiate@}@ %a@ :grounding %a@]"
+            "@[<2>@{<yellow>inst_gen_eq.grounding@}@ %a@ :grounding %a@]"
             (fun k->k C.pp c Bool_lit.pp_clause b_clause);
           Ctx.add_clause (Proof.bool_grounding c) b_clause;
           ()
@@ -318,6 +322,9 @@ module Make(Ctx : State.CONTEXT) = struct
         (fun k->k Trail.pp trail Label.pp label Bool_lit.pp_clause conflict);
       Ctx.add_clause proof conflict
     ) else (
+      Util.debugf ~section 2
+        "(@[<2>conflict->instantiate@ :trail %a@ :label %a@])"
+        (fun k->k Trail.pp trail Label.pp label);
       begin
         Label.to_seq label
         |> Sequence.filter (fun lc -> not (Labelled_clause.is_empty lc))

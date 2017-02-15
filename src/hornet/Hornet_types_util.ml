@@ -19,7 +19,6 @@ let pp_lit out (t:lit): unit = match t with
 
 let pp_clause_lits out a =
   Fmt.fprintf out "@[%a@]" (Fmt.seq pp_lit) (IArray.to_seq a.c_lits)
-let pp_clause out (a:clause) = Fmt.within "[" "]" pp_clause_lits out a
 
 let pp_atom out = function
   | A_fresh i -> Fmt.fprintf out "fresh_%d" i
@@ -64,7 +63,10 @@ let vars_of_lit (l:lit): _ HVar.t Sequence.t = match l with
   | Atom (t,_) -> T.Seq.vars t
   | Eq (t,u,_) -> Sequence.append (T.Seq.vars t) (T.Seq.vars u)
 
-let vars_of_hclause c =
+let vars_of_clause (c:clause) =
+  IArray.to_seq c.c_lits |> Sequence.flat_map vars_of_lit
+
+let vars_of_hclause (c:horn_clause) =
   Sequence.append
     (vars_of_lit c.hc_head)
     (IArray.to_seq c.hc_body |> Sequence.flat_map vars_of_lit)
@@ -76,6 +78,33 @@ let lc_filter_subst lc_subst: (var*term) Sequence.t =
     (fun (v,t) -> match T.view t with
        | T.Var v' -> not (HVar.equal Type.equal v v')
        | _ -> true)
+
+(* stuff for printing clauses *)
+module PP_c = struct
+  let pp_constr out = function
+    | [] -> Fmt.silent out ()
+    | l -> Fmt.fprintf out "@ | @[<hv>%a@]" pp_constraints l
+  and pp_body out body =
+    if IArray.length body > 0 then (
+      Fmt.fprintf out " @<1>← @[<hv>%a@]" (Fmt.seq pp_lit) (IArray.to_seq body)
+    );
+  and pp_vars pp x out = function
+    | [] -> pp out x
+    | vars ->
+      Fmt.fprintf out "@[<2>∀ %a.@ %a@]"
+        (Util.pp_list ~sep:" " Type.pp_typed_var) vars pp x
+  and pp_lits out (lits:lit IArray.t) =
+    Fmt.fprintf out "[@[<hv>%a@]]" (Fmt.seq pp_lit) (IArray.to_seq lits)
+end
+
+let pp_clause out (c:clause): unit =
+  let open PP_c in
+  let vars = vars_of_clause c |> T.VarSet.of_seq |> T.VarSet.to_list in
+  let pp_main out () =
+    Fmt.fprintf out "@[<hv2>%a%a@]"
+      pp_clause_lits c pp_constr c.c_constr
+  in
+  pp_vars pp_main () out vars
 
 let pp_lc out (lc:labelled_clause): unit =
   let pp_subst out lc =
@@ -90,21 +119,10 @@ let pp_label out (l:label): unit =
   Fmt.fprintf out "{@[<hv>%a@]}" (Fmt.list pp_lc) l
 
 let pp_hclause out (c:horn_clause): unit =
-  let pp_constr out = function
-    | [] -> Fmt.silent out ()
-    | l -> Fmt.fprintf out "@ | @[<hv>%a@]" pp_constraints l
-  and pp_body out body =
-    if IArray.length body > 0 then (
-      Fmt.fprintf out " @<1>← @[<hv>%a@]" (Fmt.seq pp_lit) (IArray.to_seq body)
-    );
-  and pp_label out = function
+  let open PP_c in
+  let pp_label_opt out = function
     | [] -> ()
-    | lcs -> Fmt.fprintf out "@ label:{@[<hv>%a@]}" (Fmt.list pp_lc) lcs
-  and pp_vars pp x out = function
-    | [] -> pp out x
-    | vars ->
-      Fmt.fprintf out "@[<2>∀ %a.@ %a@]"
-        (Util.pp_list ~sep:" " Type.pp_typed_var) vars pp x
+    | lcs -> Fmt.fprintf out "@ label:%a" pp_label lcs
   in
   let pp_main out () =
     Fmt.fprintf out "(@[%a%a%a%a%a@])"
@@ -112,7 +130,7 @@ let pp_hclause out (c:horn_clause): unit =
       pp_body c.hc_body
       pp_bool_trail_opt c.hc_trail
       pp_constr c.hc_constr
-      pp_label c.hc_label
+      pp_label_opt c.hc_label
   in
   let vars = vars_of_hclause c |> T.VarSet.of_seq |> T.VarSet.to_list in
   pp_vars pp_main () out vars
