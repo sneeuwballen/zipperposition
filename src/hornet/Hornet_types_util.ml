@@ -276,7 +276,7 @@ let pp_event out (e:event): unit = match e with
       pp_clause c
       pp_constraints cstr
   | E_unselect_lit (c,r) ->
-    Fmt.fprintf out "(@[select_lit@ %a@ :clause %a@])"
+    Fmt.fprintf out "(@[unselect_lit@ %a@ :clause %a@])"
       pp_lit r.select_lit pp_clause c
   | E_add_ground_lit r ->
     Fmt.fprintf out "(@[add_ground_lit@ %a@])" pp_lit r.bool_ground_lit
