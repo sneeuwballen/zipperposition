@@ -37,6 +37,13 @@ let apply_subst ~renaming subst (lc,sc) =
   in
   { lc with lc_subst }
 
+let is_empty (t:t) =
+  Type.VarMap.for_all
+    (fun v t -> match T.view t with
+       | T.Var v' -> HVar.equal Type.equal v v'
+       | _ -> false)
+    t.lc_subst
+
 let to_subst (lc:t): Subst.t =
   let sc = 0 in
   Type.VarMap.to_seq lc.lc_subst

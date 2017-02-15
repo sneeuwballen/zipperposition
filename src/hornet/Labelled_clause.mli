@@ -20,6 +20,10 @@ val apply_subst :
   Subst.t ->
   t Scoped.t ->
   t
+(** Apply the substitution to each variable in the given scope *)
+
+val is_empty : t -> bool
+(** Is the substitution trivial? *)
 
 val to_subst : t -> Subst.t
 (** Build a substitution (all terms have scope 0) *)
