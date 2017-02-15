@@ -102,13 +102,19 @@ let body0_pos = body_pos 0
 (** {2 Helpers} *)
 
 let is_trivial c =
-  Lit.is_trivial (head c) ||
-  IArray.exists Lit.is_absurd (body c) ||
-  Trail.is_absurd (trail c) ||
-  List.exists
-    (function
-      | C_dismatch d -> Dismatching_constr.is_absurd d)
-    (constr c)
+  let res =
+    Lit.is_trivial (head c) ||
+    IArray.exists Lit.is_absurd (body c) ||
+    Trail.is_absurd (trail c) ||
+    List.exists
+      (function
+        | C_dismatch d -> Dismatching_constr.is_absurd d)
+      (constr c)
+  in
+  if res then (
+    Util.debugf 5 "(@[<2>is_trivial %a@])" (fun k->k pp c);
+  );
+  res
 
 (* NOTE: some constraints will have to be solved all at once
    to obtain an actual substitution *)
