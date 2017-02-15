@@ -30,13 +30,13 @@ type t =
 *)
 
 (* is the constraint trivially true?
-   the criterion is: [(t, u)]  is trivial if [t] does not
-   match [u], because no substitution will be able to make [t] equal
+   the criterion is: [(t, u)]  is trivial if [t] and [u] are not
+   unifiable, because no substitution will be able to make [t] equal
    to [u].
 *)
 let is_trivial_ (c:constr): bool =
   let t, u = c in
-  not (Unif.FO.matches ~pattern:t u)
+  not (Unif.FO.are_unifiable t u)
 
 let make_simpl_ l =
   if List.exists is_trivial_ l
@@ -70,21 +70,6 @@ let apply_subst ~renaming subst (c, sc_l) : t = match c with
       l
     |> make
 
-(* given [t1…tn, u1…un], find a substitution
-   such that [forall i. t_i = u_iσ]. *)
-let find_matching_solution_ l =
-  try
-    List.fold_left
-      (fun subst (t,u) -> Unif.FO.matching ~subst ~pattern:(u,1) (t,0))
-      Subst.empty l
-    |> CCOpt.return
-  with Unif.Fail -> None
-
-(* real test for satisfiability: look for a solution *)
-let has_matching_solution_ (l:constr list): bool = match find_matching_solution_ l with
-  | None -> false
-  | Some _ -> true
-
 let is_trivial = function
   | Trivial -> true
   | Pairs l ->
@@ -99,9 +84,25 @@ let is_trivial = function
     with Unif.Fail ->
       true
 
+(* given [t1…tn, u1…un], find a substitution
+   such that [forall i. t_i = u_iσ]. *)
+let match_rhs_to_lhs l =
+  try
+    List.fold_left
+      (fun subst (t,u) -> Unif.FO.matching ~subst ~pattern:(u,1) (t,0))
+      Subst.empty l
+    |> CCOpt.return
+  with Unif.Fail -> None
+
+(* absurd if there is a substitution σ such that [forall. t </| u],
+   [t = u\sigma]. Indeed, any instance [tρ] of [t] will match [uσρ]. *)
 let is_absurd = function
   | Trivial -> false
-  | Pairs l -> has_matching_solution_ l
+   | Pairs l ->
+     begin match match_rhs_to_lhs l with
+       | None -> false
+       | Some _ -> true
+     end
 
 (* use "⋪"? *)
 
