@@ -289,6 +289,8 @@ module Make(Ctx : State.CONTEXT) = struct
 
   let set_depth_limit d = Depth_limit.set d
 
+  (* TODO: use depth limit in instantiation (put new clauses in heap?) *)
+
   (* what to do if a conflict is detected *)
   let on_conflict (trail:Trail.t) (label:Label.t) (proof:Proof.t): unit =
     if Label.all_empty label then (
@@ -324,9 +326,6 @@ module Make(Ctx : State.CONTEXT) = struct
              let c = lc.lc_clause in
              let subst = Labelled_clause.to_subst lc in
              assert (not (Subst.is_renaming subst));
-             (* block this from [c] *)
-             let new_constr = Labelled_clause.to_dismatch lc in
-             C.add_dismatch_constr c new_constr;
              (* apply substitution *)
              let renaming = Ctx.renaming_cleared () in
              let lits' =
@@ -343,8 +342,15 @@ module Make(Ctx : State.CONTEXT) = struct
                C.make lits' (Proof.instance c subst)
                  ~constr:constr' ~trail:Trail.empty
              in
-             (* now, split new clause *)
-             split_clause c')
+             (* split new clause *)
+             split_clause c';
+             (* block this instance from [c] *)
+             let new_constr = Labelled_clause.to_dismatch lc in
+             C.add_dismatch_constr c new_constr;
+             (* constraint has changed, add then remove the clause *)
+             Ctx.send_event (E_unselect_lit (c, lc.lc_sel));
+             Ctx.send_event (E_select_lit (c, lc.lc_sel, C.constr c));
+          )
       end
     )
 

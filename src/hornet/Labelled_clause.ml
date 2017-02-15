@@ -39,8 +39,7 @@ let apply_subst ~renaming subst (lc,sc) =
   in
   { lc with lc_subst }
 
-let is_empty (lc:t) =
-  not (Sequence.is_empty (filter_subst lc))
+let is_empty (lc:t) = Sequence.is_empty (filter_subst lc)
 
 let to_subst (lc:t): Subst.t =
   let sc = 0 in
