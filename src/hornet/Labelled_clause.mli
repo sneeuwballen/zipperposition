@@ -28,4 +28,7 @@ val is_empty : t -> bool
 val to_subst : t -> Subst.t
 (** Build a substitution (all terms have scope 0) *)
 
+val to_dismatch : t -> Dismatching_constr.t
+(** Build a dismatching constraints that excludes precisely the
+    current substitution *)
 

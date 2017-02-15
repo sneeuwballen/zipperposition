@@ -25,5 +25,6 @@ val apply_subst :
 val merge : t -> t -> t
 
 val to_list : t -> labelled_clause list
+val to_seq: t -> labelled_clause Sequence.t
 
 include Interfaces.PRINT with type t := t

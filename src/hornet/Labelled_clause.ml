@@ -51,3 +51,9 @@ let to_subst (lc:t): Subst.t =
        ((v:Type.t HVar.t:>InnerTerm.t HVar.t),sc), ((t:T.t:>InnerTerm.t),sc))
   |> Subst.of_seq
 
+let to_dismatch (lc:t): Dismatching_constr.t =
+  filter_subst lc
+  |> Sequence.map (fun (v,t) -> T.var v, t)
+  |> Sequence.to_rev_list
+  |> CCFun.tap (fun l -> assert (l<>[]))
+  |> Dismatching_constr.make

@@ -25,6 +25,7 @@ let apply_subst ~renaming subst (l,sc) =
   |> make
 
 let to_list (t:t) : _ list = t
+let to_seq = Sequence.of_list
 
 let pp = Hornet_types_util.pp_label
 

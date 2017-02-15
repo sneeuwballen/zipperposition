@@ -316,8 +316,36 @@ module Make(Ctx : State.CONTEXT) = struct
         (fun k->k Trail.pp trail Label.pp label Bool_lit.pp_clause conflict);
       Ctx.add_clause proof conflict
     ) else (
-      assert false (* TODO: do the proper instantiations, removing the
-                      instantiated clauses, and do nth else *)
+      begin
+        Label.to_seq label
+        |> Sequence.filter (fun lc -> not (Labelled_clause.is_empty lc))
+        |> Sequence.iter
+          (fun lc ->
+             let c = lc.lc_clause in
+             let subst = Labelled_clause.to_subst lc in
+             assert (not (Subst.is_renaming subst));
+             (* block this from [c] *)
+             let new_constr = Labelled_clause.to_dismatch lc in
+             C.add_dismatch_constr c new_constr;
+             (* apply substitution *)
+             let renaming = Ctx.renaming_cleared () in
+             let lits' =
+               C.lits c
+               |> IArray.map (fun lit -> Lit.apply_subst ~renaming subst (lit,0))
+             and constr' =
+               List.map
+                 (function
+                   | C_dismatch d ->
+                     C_dismatch (Dismatching_constr.apply_subst ~renaming subst (d,0)))
+                 (C.constr c)
+             in
+             let c' =
+               C.make lits' (Proof.instance c subst)
+                 ~constr:constr' ~trail:Trail.empty
+             in
+             (* now, split new clause *)
+             split_clause c')
+      end
     )
 
   let on_event (e:event) =
