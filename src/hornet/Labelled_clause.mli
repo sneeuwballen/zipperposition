@@ -36,3 +36,8 @@ val to_dismatch : t -> Dismatching_constr.t
 (** Build a dismatching constraints that excludes precisely the
     current substitution *)
 
+val variant :
+  ?subst:Subst.t ->
+  t Scoped.t ->
+  t Scoped.t ->
+  Subst.t Sequence.t

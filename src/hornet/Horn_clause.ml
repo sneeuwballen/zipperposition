@@ -164,8 +164,7 @@ let variant_ subst (c1,sc1) (c2,sc2) : Subst.t Sequence.t =
   if id1=id2 then Sequence.return subst
   else if
     depth1=depth2 &&
-    Hornet_types_util.equal_bool_trail tr1 tr2 &&
-    lab1=[] && lab2=[] (* TODO: check this too *)
+    Hornet_types_util.equal_bool_trail tr1 tr2
   then (
     Lit.variant ~subst (h1,sc1)(h2,sc2)
     |> Sequence.flat_map
@@ -176,6 +175,8 @@ let variant_ subst (c1,sc1) (c2,sc2) : Subst.t Sequence.t =
            ~op:(fun subst x y -> Lit.variant ~subst x y))
     |> Sequence.flat_map
       (fun subst -> variant_constr subst (c1,sc1)(c2,sc2))
+    |> Sequence.flat_map
+      (fun subst -> Label.variant ~subst (lab1,sc1)(lab2,sc2))
   ) else Sequence.empty
 
 let variant ?(subst=Subst.empty) a b k =

@@ -3,6 +3,7 @@
 
 (** {1 Label for Horn Clauses} *)
 
+open Libzipperposition
 open Hornet_types
 
 module Fmt = CCFormat
@@ -32,4 +33,8 @@ let to_seq = Sequence.of_list
 let pp = Hornet_types_util.pp_label
 
 let to_string = Fmt.to_string pp
+
+let variant ?(subst=Subst.empty) (l1,sc1)(l2,sc2): Subst.t Sequence.t =
+  Unif.unif_list_com subst (l1,sc1)(l2,sc2)
+    ~op:(fun subst a b -> LC.variant ~subst a b)
 

@@ -216,12 +216,7 @@ let add_dismatch_constr (c:t) (d:Dismatching_constr.t): unit =
 (** {2 Unif} *)
 
 let variant ?(subst=S.empty) (c1,sc1) (c2,sc2) : S.t Sequence.t =
-  let a1 = c1.c_lits in
-  let a2 = c2.c_lits in
-  Unif.unif_array_com subst
-    (IArray.to_array_unsafe a1,sc1)
-    (IArray.to_array_unsafe a2,sc2)
-    ~op:(fun subst x y -> Lit.variant ~subst x y)
+  Lit.variant_arr ~subst (c1.c_lits,sc1)(c2.c_lits,sc2)
 
 let equal_mod_alpha c1 c2 : bool =
   not (Sequence.is_empty (variant (c1,0) (c2,1)))

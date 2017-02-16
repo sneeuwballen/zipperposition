@@ -67,3 +67,13 @@ let to_dismatch (lc:t): Dismatching_constr.t =
   |> Sequence.to_rev_list
   |> CCFun.tap (fun l -> assert (l<>[]))
   |> Dismatching_constr.make
+
+(* the literals corresponding to instantiating the clause with the subst *)
+let lits_instance lc: Lit.t IArray.t =
+  let subst = to_subst lc in
+  Lit.apply_subst_arr_no_renaming subst (lc.lc_clause.c_lits,0)
+
+(* find whether these are variants *)
+let variant ?(subst=Subst.empty) (lc1,sc1)(lc2,sc2): Subst.t Sequence.t =
+  Lit.variant_arr ~subst (lits_instance lc1,sc1) (lits_instance lc2,sc2)
+

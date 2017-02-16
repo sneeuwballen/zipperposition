@@ -421,3 +421,15 @@ let apply_subst_no_simp ~renaming subst (lit,sc) = match lit with
   | Atom (p, sign) ->
     Atom (S.FO.apply ~renaming subst (p,sc), sign)
   | Bool _ -> lit
+
+let variant_arr ?(subst=S.empty) (lits1,sc1)(lits2,sc2): S.t Sequence.t =
+  Unif.unif_array_com subst
+    (IArray.to_array_unsafe lits1,sc1)
+    (IArray.to_array_unsafe lits2,sc2)
+    ~op:(fun subst x y -> variant ~subst x y)
+
+let apply_subst_arr ~renaming subst (lits,sc): t IArray.t =
+  IArray.map (fun lit -> apply_subst ~renaming subst (lit,sc)) lits
+
+let apply_subst_arr_no_renaming subst (lits,sc): t IArray.t =
+  IArray.map (fun lit -> apply_subst_no_renaming subst (lit,sc)) lits

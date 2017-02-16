@@ -139,3 +139,22 @@ val apply_subst_no_simp :
   Subst.t ->
   t Scoped.t ->
   t
+
+(** {2 Arrays of Lits} *)
+
+val variant_arr :
+  ?subst:Subst.t ->
+  t IArray.t Scoped.t ->
+  t IArray.t Scoped.t ->
+  Subst.t Sequence.t
+
+val apply_subst_arr :
+  renaming:Subst.Renaming.t ->
+  Subst.t ->
+  t IArray.t Scoped.t ->
+  t IArray.t
+
+val apply_subst_arr_no_renaming :
+  Subst.t ->
+  t IArray.t Scoped.t ->
+  t IArray.t

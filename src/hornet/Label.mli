@@ -25,6 +25,12 @@ val apply_subst :
   t Scoped.t ->
   t
 
+val variant :
+  ?subst:Subst.t ->
+  t Scoped.t ->
+  t Scoped.t ->
+  Subst.t Sequence.t
+
 val merge : t -> t -> t
 
 val to_list : t -> labelled_clause list
