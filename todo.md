@@ -2,19 +2,45 @@
 
 ## Now
 
+- `Labelled_clause.variant` should check `c1.id=c2.id && variant subst1 subst2` (per-variable)
+- add `Labelled_clause.hash_mod_alpha` for faster indexing
+
+- there is probably a **bug** in `HC.{hash_mod_alpha,variant}`
+  see ∞ loop in `./hornet.native --debug 2 --stats --dot /tmp/truc.dot -t 30 examples/pelletier_problems/pb33.zf`
+
+- depth limit for inst-gen!!
+
+- maybe it's time to add some subsumption?
+- demodulation first? at least it might replace subsumption for
+  pos-unit-clauses (C⇒D means C demodulate D to true?)
+  → check perf gain on `pb65.zf` (0.132s with 10,000 sup inferences right now)
+
 ## Hornet
 
 - FO prover
-  * [ ] basic Horn superposition
-  * [ ] dismatching constraints for Horn superposition
-  * [ ] ⊥-grounding for clauses (map each clause to its grounding)
+  * [x] basic Horn superposition
+  * [x] avatar splitting
+  * [x] dismatching constraints for Horn superposition
+  * [x] ⊥-grounding for clauses (map each clause to its grounding)
   * selection of one literal per clause that is ⊥-true (watch them during prop)
     → map ground lits to the corresponding set of clauses that contain it?
-  * [ ] eager saturation loop, with a bound on the number of unordered
+  * [x] eager saturation loop, with a bound on the number of unordered
         inferences for each clause (this bound = the one bound increased
         during iterative deepening).
         Ground Horn superposition and oriented rewriting are not bounded.
+  * [ ] full check for whether a HC already exists in saturation (avoid loops)
   * [ ] some basic redundancy criteria
+    + [ ] subsumption on positive unit clauses (or maybe full Horn clauses?)
+    + [ ] demodulation
+  * [ ] depth limit for instantiation (too deep->instance goes in a waiting heap)
+  * [x] avatar: on `[-p]`, add clause `[-p] => -[p]` (shortcut)
+
+  `./hornet.native --debug 2 --dot /tmp/truc.dot -t 30 examples/pelletier_problems/pb24.zf` TODO: splitting
+  also: 30, 31, 33, 34
+
+  `./hornet.native --debug 2 --dot /tmp/truc.dot -t 30 examples/pelletier_problems/pb63.zf` TODO: demod
+  `./hornet.native --debug 2 --dot /tmp/truc.dot -t 30 examples/pelletier_problems/pb65.zf` TODO: demod
+  `./hornet.native --debug 2 --dot /tmp/truc.dot -t 30 examples/RNG008-1.p` TODO: subsumption
 
 - hierarchic superposition
   * [ ] have a flag "abstraction" on `HVar.t`
@@ -92,8 +118,11 @@
 
 ## To Fix
 
+- `./zipperposition.native --dot /tmp/truc.dot -t 30 examples/ind/nat_check.zf --debug 5`
 - `examples/pelletier_problems/pb49.p` (wrong CNF? also, bad type inference on first axiom)
 - `examples/by_case.p`  should be unsat, but arith fails
+- `./zipperposition.native --dot /tmp/truc.dot -t 30 examples/pelletier_problems/pb58.zf`
+  seems like the step yielding `f (f X) != X0` is wrong (bad replacement)?
 
 ## In Hold
 
