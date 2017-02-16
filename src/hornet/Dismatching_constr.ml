@@ -88,13 +88,14 @@ let is_trivial = function
     with Unif.Fail ->
       true
 
-(* given [t1…tn, u1…un], find a substitution
+(* given [t1…tn, u1…un], find a substitution extending [subst]
    such that [forall i. t_i = u_iσ]. *)
-let match_rhs_to_lhs l =
+let match_rhs_to_lhs ~subst (l,sc) =
+  let sc_rhs = sc+1 in
   try
     List.fold_left
-      (fun subst (t,u) -> Unif.FO.matching ~subst ~pattern:(u,1) (t,0))
-      Subst.empty l
+      (fun subst (t,u) -> Unif.FO.matching ~subst ~pattern:(u,sc_rhs) (t,sc))
+      subst l
     |> CCOpt.return
   with Unif.Fail -> None
 
@@ -113,7 +114,18 @@ let to_string = Fmt.to_string pp
 let is_absurd c = match c with
   | Trivial -> false
   | Pairs l ->
-    begin match match_rhs_to_lhs l with
+    begin match match_rhs_to_lhs ~subst:Subst.empty (l,0) with
+      | None -> false
+      | Some subst ->
+        Util.debugf 5 "(@[constr_is_absurd %a@ :subst %a@])"
+          (fun k->k pp c Subst.pp subst);
+        true
+    end
+
+let is_absurd_with subst (c,sc): bool = match c with
+  | Trivial -> false
+  | Pairs l ->
+    begin match match_rhs_to_lhs ~subst (l,sc) with
       | None -> false
       | Some subst ->
         Util.debugf 5 "(@[constr_is_absurd %a@ :subst %a@])"

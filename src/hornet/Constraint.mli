@@ -16,6 +16,9 @@ val is_trivial : t -> bool
 val is_absurd: t -> bool
 (** No solution *)
 
+val is_absurd_with: Subst.t -> t Scoped.t -> bool
+(** No solution compatible with this subst *)
+
 val add_dismatch : Dismatching_constr.t -> t -> t
 (** Add another dismatching constraint to this *)
 

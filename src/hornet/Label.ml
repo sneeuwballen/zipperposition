@@ -17,6 +17,8 @@ let make l = CCList.sort_uniq ~cmp:LC.compare l
 
 let all_empty = List.for_all LC.is_empty
 
+let is_absurd = List.exists LC.is_absurd
+
 let merge = CCList.sorted_merge ~cmp:LC.compare
 
 let apply_subst ~renaming subst (l,sc) =

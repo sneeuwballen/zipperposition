@@ -16,6 +16,9 @@ val make : labelled_clause list -> t
 val all_empty : t -> bool
 (** All labelled clauses have empty labels. See {!Labelled_clause.is_empty} *)
 
+val is_absurd : t -> bool
+(** Some labelled clause has unsatisfiable constraints *)
+
 val apply_subst :
   renaming:Subst.Renaming.t ->
   Subst.t ->

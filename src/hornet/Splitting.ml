@@ -362,7 +362,13 @@ module Make(Ctx : State.CONTEXT) = struct
                C.make lits' (Proof.instance c subst)
                  ~constr:constr' ~trail:Trail.empty ~depth:(C.depth c+1)
              in
-             assert (not (C.is_trivial c'));
+             if C.is_trivial c' then (
+               Util.debugf ~section 2
+                 "(@[<hv2>@{<yellow>inst_gen_eq.instantiate_trivial@}@ :clause %a@ \
+                  :subst %a@ :new_clause %a@])"
+                 (fun k->k C.pp c Subst.pp subst C.pp c');
+               assert false
+             );
              (* block this instance from [c] *)
              let new_constr = Labelled_clause.to_dismatch lc in
              assert (not (Dismatching_constr.is_trivial new_constr));

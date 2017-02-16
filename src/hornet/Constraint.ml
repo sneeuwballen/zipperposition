@@ -21,6 +21,11 @@ let is_trivial (c:t): bool =
 let is_absurd (c:t): bool =
   List.exists Dismatching_constr.is_absurd c.constr_dismatch
 
+let is_absurd_with subst (c,sc): bool =
+  List.exists
+    (fun d -> Dismatching_constr.is_absurd_with subst (d,sc))
+    c.constr_dismatch
+
 let add_dismatch (d:Dismatching_constr.t) (c:t): t =
   { constr_dismatch = d :: c.constr_dismatch; }
 

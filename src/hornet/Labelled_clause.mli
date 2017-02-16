@@ -25,6 +25,10 @@ val apply_subst :
 val is_empty : t -> bool
 (** Is the substitution trivial? (i.e. a renaming) *)
 
+val is_absurd : t -> bool
+(** The constraints attached to the clause are not compatible
+    with the current substitution *)
+
 val to_subst : t -> Subst.t
 (** Build a substitution (all terms have scope 0) *)
 

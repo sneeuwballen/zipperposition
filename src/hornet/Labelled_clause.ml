@@ -54,6 +54,13 @@ let is_empty (lc:t) =
   let subst = to_subst lc in
   Subst.is_empty subst || Subst.is_renaming subst
 
+(* absurd if at least one constraint of the clause is absurd under
+   current substitution *)
+let is_absurd (lc:t): bool =
+  Constraint.is_absurd_with
+    (to_subst lc)
+    (lc.lc_clause.c_constr,0)
+
 let to_dismatch (lc:t): Dismatching_constr.t =
   filter_subst lc.lc_subst
   |> Sequence.map (fun (v,t) -> T.var v, t)

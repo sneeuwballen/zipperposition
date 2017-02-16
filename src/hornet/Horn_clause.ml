@@ -104,7 +104,8 @@ let is_trivial c =
     Lit.is_trivial (head c) ||
     IArray.exists Lit.is_absurd (body c) ||
     Trail.is_absurd (trail c) ||
-    Constraint.is_absurd (constr c)
+    Constraint.is_absurd (constr c) ||
+    Label.is_absurd (label c)
   in
   if res then (
     Util.debugf 5 "(@[<2>is_trivial %a@])" (fun k->k pp c);

@@ -44,6 +44,9 @@ val is_absurd : t -> bool
     That happens if all RHS match their LHS already
     (will still hold for every instance). *)
 
+val is_absurd_with: Subst.t -> t Scoped.t -> bool
+(** No solution compatible with this subst *)
+
 include Interfaces.PRINT with type t := t
 
 val vars_seq : t -> Type.t HVar.t Sequence.t
