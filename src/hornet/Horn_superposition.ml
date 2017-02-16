@@ -243,6 +243,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     let add_ c =
       register_clause c;
       if is_dead c then () (* useless *)
+      else if Active_set.mem c then () (* already active *)
       else (
         let depth = HC.unordered_depth c in
         if depth < Depth_limit.get () then (

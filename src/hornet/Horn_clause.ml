@@ -185,6 +185,7 @@ let variant ?(subst=Subst.empty) a b k =
 let equal_mod_alpha (c1:t) (c2:t) : bool =
   not (variant (c1,0)(c2,1) |> Sequence.is_empty)
 
+(* TODO: put label in the hash *)
 let hash_mod_alpha c: int =
   Hash.combine4 42
     (Lit.hash_mod_alpha (head c))
