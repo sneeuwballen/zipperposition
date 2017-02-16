@@ -31,10 +31,7 @@ let dismatch_constr c = c.c_constr.constr_dismatch
 let equal = Hornet_types_util.equal_clause
 let hash = Hornet_types_util.hash_clause
 let compare = Hornet_types_util.compare_clause
-let pp out a =
-  Fmt.fprintf out "[@[%a%a@]]"
-    (Fmt.seq Lit.pp) (IArray.to_seq a.c_lits)
-    Hornet_types_util.pp_bool_trail_opt a.c_trail
+let pp = Hornet_types_util.pp_clause
 let to_string = Fmt.to_string pp
 
 (* comparison function that makes the positif literal smaller, then

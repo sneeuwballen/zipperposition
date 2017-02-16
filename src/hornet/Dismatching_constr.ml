@@ -100,6 +100,7 @@ let match_rhs_to_lhs l =
 
 let pp out (c:t): unit = match c with
   | Trivial -> ()
+  | Pairs [t,u] -> Fmt.fprintf out "(@[<2>%a@ ⋪ %a@])" T.pp t T.pp u
   | Pairs l ->
     let lhs_l, rhs_l = List.split l in
     Fmt.fprintf out "(@[<2>(@[<hv>%a@])@ ⋪ (@[<hv>%a@])@])"

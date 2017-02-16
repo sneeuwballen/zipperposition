@@ -326,14 +326,14 @@ module Make(Ctx : State.CONTEXT) = struct
       in
       let conflict = List.rev_append neg_trail neg_ground_lits in
       Util.debugf ~section 2
-        "(@[<2>conflict@ :trail %a@ :label %a@ :conflict %a@])"
+        "(@[<hv2>conflict@ :trail %a@ :label %a@ :conflict %a@])"
         (fun k->k Trail.pp trail Label.pp label Bool_lit.pp_clause conflict);
       Ctx.add_clause proof conflict
     ) else (
       (* at least one labelled clause needs instantiation, so we don't
          have a conflict here. The real conflict with come from the instance. *)
       Util.debugf ~section 2
-        "(@[<2>conflict->instantiate@ :trail %a@ :label %a@ :instances (@[%a@])@])"
+        "(@[<hv2>conflict->instantiate@ :trail %a@ :label %a@ :instances (@[%a@])@])"
         (fun k->k Trail.pp trail Label.pp label
             (Util.pp_list Labelled_clause.pp) non_trivial_instantiations);
       let clauses_to_instantiate, new_instances =
@@ -361,15 +361,18 @@ module Make(Ctx : State.CONTEXT) = struct
              assert (not (Dismatching_constr.is_trivial new_constr));
              C.add_dismatch_constr c new_constr;
              Util.debugf ~section 2
-               "(@[<2>@{<yellow>inst_gen_eq.instantiate@}@ :clause %a@ :subst %a@ :new_dismatch %a@])"
-               (fun k->k C.pp c Subst.pp subst Dismatching_constr.pp new_constr);
+               "(@[<hv2>@{<yellow>inst_gen_eq.instantiate@}@ :clause %a@ \
+                :subst %a@ :new_dismatch %a@ :all_constr %a@])"
+               (fun k->k C.pp c Subst.pp subst
+                   Dismatching_constr.pp new_constr Constraint.pp (C.constr c));
              (* be ready to remove and re-add c, and to add c' *)
              (c, lc.lc_sel), c')
         |> Sequence.to_rev_list
         |> List.split
       in
       let clauses_to_instantiate =
-        CCList.sort_uniq clauses_to_instantiate
+        CCList.sort_uniq
+          clauses_to_instantiate
           ~cmp:(CCOrd.pair C.compare
               (CCFun.compose_binop (fun sel->sel.select_idx) CCOrd.int))
       in

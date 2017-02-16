@@ -107,7 +107,7 @@ let pp_lc out (lc:labelled_clause): unit =
       Fmt.(seq (pair ~sep:(return "@ -> ") HVar.pp T.pp))
       (lc_filter_subst lc.lc_subst)
   in
-  Fmt.fprintf out "(@[%a@ :subst %a@ :select `%a`@])"
+  Fmt.fprintf out "(@[%a@ @[:subst %a@]@ @[:select `%a`@]@])"
     pp_clause lc.lc_clause pp_subst lc pp_lit lc.lc_sel.select_lit
 
 let pp_label out (l:label): unit =
@@ -266,7 +266,7 @@ let pp_event out (e:event): unit = match e with
   | E_remove_component r ->
     Fmt.fprintf out "(@[remove_component@ %a@])" pp_clause r.bool_box_clause
   | E_select_lit (c,r,cstr) ->
-    Fmt.fprintf out "(@[<hv>select_lit@ %a@ :clause %a@ :constr (@[%a@])@])"
+    Fmt.fprintf out "(@[<hv>select_lit@ %a@ :clause %a@ :constr %a@])"
       pp_lit r.select_lit
       pp_clause c
       pp_constraint cstr
