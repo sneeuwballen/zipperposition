@@ -157,23 +157,8 @@ module Make(A : ARGS) : S = struct
           (fun k->k Event.pp e trace);
         raise exc
     in
-    (* queue of events to handle *)
-    let e_queue : event Queue.t = Queue.create() in
-    let in_event : bool ref = ref false in
-    let send_event e =
-      if !in_event then Queue.push e e_queue
-      else (
-        (* loop for processing events *)
-        in_event := true;
-        process_one_event e;
-        while not (Queue.is_empty e_queue) do
-          let e = Queue.pop e_queue in
-          process_one_event e;
-        done;
-        in_event := false;
-      )
-    in
-    send_event_ := send_event
+    send_event_ := process_one_event;
+    ()
 
   (* print SAT problem *)
   let pp_dimacs () =
