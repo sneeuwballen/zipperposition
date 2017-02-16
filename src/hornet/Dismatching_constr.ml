@@ -38,16 +38,20 @@ let is_trivial_ (c:constr): bool =
   let t, u = c in
   not (Unif.FO.are_unifiable t u)
 
+let cmp_pair = CCOrd.pair T.compare T.compare
+
 let make_simpl_ l =
   if List.exists is_trivial_ l
   then Trivial
-  else Pairs l
+  else Pairs (CCList.sort_uniq ~cmp:cmp_pair l)
+
+let empty = Trivial
 
 let make = make_simpl_
 
 let combine c1 c2 : t = match c1, c2 with
-  | Trivial, _
-  | _, Trivial -> Trivial
+  | Trivial, c
+  | c, Trivial -> c
   | Pairs l1, Pairs l2 ->
     (* must rename variables in right-hand side pairs, so that there is
        no collision between [c1] and [c2]. *)
@@ -94,18 +98,6 @@ let match_rhs_to_lhs l =
     |> CCOpt.return
   with Unif.Fail -> None
 
-(* absurd if there is a substitution σ such that [forall. t </| u],
-   [t = u\sigma]. Indeed, any instance [tρ] of [t] will match [uσρ]. *)
-let is_absurd = function
-  | Trivial -> false
-   | Pairs l ->
-     begin match match_rhs_to_lhs l with
-       | None -> false
-       | Some _ -> true
-     end
-
-(* use "⋪"? *)
-
 let pp out (c:t): unit = match c with
   | Trivial -> ()
   | Pairs l ->
@@ -114,6 +106,19 @@ let pp out (c:t): unit = match c with
       (Util.pp_list T.pp) lhs_l (Util.pp_list T.pp) rhs_l
 
 let to_string = Fmt.to_string pp
+
+(* absurd if there is a substitution σ such that [forall. t </| u],
+   [t = u\sigma]. Indeed, any instance [tρ] of [t] will match [uσρ]. *)
+let is_absurd c = match c with
+  | Trivial -> false
+  | Pairs l ->
+    begin match match_rhs_to_lhs l with
+      | None -> false
+      | Some subst ->
+        Util.debugf 5 "(@[constr_is_absurd %a@ :subst %a@])"
+          (fun k->k pp c Subst.pp subst);
+        true
+    end
 
 let vars_seq = function
   | Trivial -> Sequence.empty

@@ -372,9 +372,9 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           | _ -> assert false
         in
         let constr =
-          List.rev_append
-            (HC.apply_subst_constr_l ~renaming subst (HC.constr c,sc_active))
-            (HC.apply_subst_constr_l ~renaming subst (HC.constr c',sc_passive))
+          Constraint.combine
+            (Constraint.apply_subst ~renaming subst (HC.constr c,sc_active))
+            (Constraint.apply_subst ~renaming subst (HC.constr c',sc_passive))
         and trail =
           Trail.merge (HC.trail c) (HC.trail c')
         and label =
@@ -740,9 +740,9 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
   (** {2 Interface to literal-selection} *)
   module Select : sig
-    val add_select : clause -> select_lit -> c_constraints -> Saturate.res
+    val add_select : clause -> select_lit -> c_constraint -> Saturate.res
   end = struct
-    let add_select (c:clause) (sel:select_lit) (constr:c_constraints): Saturate.res =
+    let add_select (c:clause) (sel:select_lit) (constr:c_constraint): Saturate.res =
       let lit = sel.select_lit in
       let head, body =
         if Lit.is_pos lit

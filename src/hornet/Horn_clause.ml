@@ -11,8 +11,6 @@ module Pos = Position
 module PW = Position.With
 module BV = CCBV
 
-type constraint_ = Hornet_types.c_constraint_
-
 type t = Hornet_types.horn_clause
 type horn_clause = t
 
@@ -106,10 +104,7 @@ let is_trivial c =
     Lit.is_trivial (head c) ||
     IArray.exists Lit.is_absurd (body c) ||
     Trail.is_absurd (trail c) ||
-    List.exists
-      (function
-        | C_dismatch d -> Dismatching_constr.is_absurd d)
-      (constr c)
+    Dismatching_constr.is_absurd (constr c).constr_dismatch
   in
   if res then (
     Util.debugf 5 "(@[<2>is_trivial %a@])" (fun k->k pp c);
@@ -118,11 +113,8 @@ let is_trivial c =
 
 (* NOTE: some constraints will have to be solved all at once
    to obtain an actual substitution *)
-let constr_are_sat (l:constraint_ list): bool =
-  List.for_all
-    (function
-      | C_dismatch d -> not (Dismatching_constr.is_absurd d))
-    l
+let constr_are_sat (c:c_constraint): bool =
+  not (Dismatching_constr.is_absurd c.constr_dismatch)
 
 let is_absurd c =
   Lit.is_absurd (head c) &&
@@ -144,9 +136,9 @@ let vars_seq = Hornet_types_util.vars_of_hclause
 let prof_variant = Util.mk_profiler "hornet.horn_clause_variant"
 
 let variant_ subst (c1,sc1) (c2,sc2) : Subst.t Sequence.t =
-  let variant_constr subst (c1,sc1)(c2,sc2) = match c1, c2 with
-    | C_dismatch d1, C_dismatch d2 ->
-      Dismatching_constr.variant ~subst (d1,sc1) (d2,sc2)
+  let variant_constr subst (c1,sc1)(c2,sc2) =
+    Dismatching_constr.variant ~subst
+      (c1.constr_dismatch,sc1) (c2.constr_dismatch,sc2)
   in
   let {
     hc_unordered_depth=depth1;
@@ -184,9 +176,7 @@ let variant_ subst (c1,sc1) (c2,sc2) : Subst.t Sequence.t =
            (IArray.to_array_unsafe a2,sc2)
            ~op:(fun subst x y -> Lit.variant ~subst x y))
     |> Sequence.flat_map
-      (fun subst ->
-         Unif.unif_list_com subst (c1,sc1)(c2,sc2)
-           ~op:variant_constr)
+      (fun subst -> variant_constr subst (c1,sc1)(c2,sc2))
   ) else Sequence.empty
 
 let variant ?(subst=Subst.empty) a b k =
@@ -229,11 +219,8 @@ end
 
 (** {2 Substitutions} *)
 
-let apply_subst_constr ~renaming subst (c,sc) = match c with
-  | C_dismatch d ->
-    C_dismatch (Dismatching_constr.apply_subst ~renaming subst (d,sc))
+let apply_subst_constr ~renaming subst (c,sc) =
+  { constr_dismatch=
+      Dismatching_constr.apply_subst ~renaming subst (c.constr_dismatch,sc);
+  }
 
-let apply_subst_constr_l ~renaming subst (l,sc) =
-  List.map
-    (fun c -> apply_subst_constr ~renaming subst (c,sc))
-    l

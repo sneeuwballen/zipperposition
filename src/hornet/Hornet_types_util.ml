@@ -48,11 +48,9 @@ let pp_bool_trail_opt out trail = match trail with
   | _ ->
     Fmt.fprintf out "@ @[<hv2>@<1>⇐@ %a@]" pp_bool_trail trail
 
-let pp_constraint out (c:c_constraint_): unit = match c with
-  | C_dismatch d -> Dismatching_constr.pp out d
-
-let pp_constraints out (l:c_constraints): unit =
-  Fmt.(hvbox (list pp_constraint)) out l
+let pp_constraint out (c:c_constraint): unit =
+  if Dismatching_constr.is_trivial c.constr_dismatch then ()
+  else Fmt.fprintf out "@ | @[<hv>%a@]" Dismatching_constr.pp c.constr_dismatch
 
 let pp_hc_status out (s:horn_clause_status): unit = match s with
   | HC_alive -> Fmt.string out "alive"
@@ -81,10 +79,7 @@ let lc_filter_subst lc_subst: (var*term) Sequence.t =
 
 (* stuff for printing clauses *)
 module PP_c = struct
-  let pp_constr out = function
-    | [] -> Fmt.silent out ()
-    | l -> Fmt.fprintf out "@ | @[<hv>%a@]" pp_constraints l
-  and pp_body out body =
+  let pp_body out body =
     if IArray.length body > 0 then (
       Fmt.fprintf out " @<1>← @[<hv>%a@]" (Fmt.seq pp_lit) (IArray.to_seq body)
     );
@@ -102,7 +97,7 @@ let pp_clause out (c:clause): unit =
   let vars = vars_of_clause c |> T.VarSet.of_seq |> T.VarSet.to_list in
   let pp_main out () =
     Fmt.fprintf out "@[<hv2>%a%a@]"
-      pp_clause_lits c pp_constr c.c_constr
+      pp_clause_lits c pp_constraint c.c_constr
   in
   pp_vars pp_main () out vars
 
@@ -129,7 +124,7 @@ let pp_hclause out (c:horn_clause): unit =
       pp_lit c.hc_head
       pp_body c.hc_body
       pp_bool_trail_opt c.hc_trail
-      pp_constr c.hc_constr
+      pp_constraint c.hc_constr
       pp_label_opt c.hc_label
   in
   let vars = vars_of_hclause c |> T.VarSet.of_seq |> T.VarSet.to_list in
@@ -160,7 +155,7 @@ let pp_proof out (p:proof) : unit = match p with
     Fmt.fprintf out "(@[<hv2>avatar_split@ :from %a@])" pp_clause c
   | P_split (c,sel,constr) ->
     Fmt.fprintf out "(@[<hv2>split@ :clause %a@ :idx %a@ :constr %a@])"
-      pp_clause c pp_select sel pp_constraints constr
+      pp_clause c pp_select sel pp_constraint constr
   | P_bool_tauto -> Fmt.string out "bool_tauto"
   | P_bool_res r ->
     Fmt.fprintf out "(@[<hv>bool_res@ :on %a@ :c1 %a@ :c2 %a@])"
@@ -274,7 +269,7 @@ let pp_event out (e:event): unit = match e with
     Fmt.fprintf out "(@[<hv>select_lit@ %a@ :clause %a@ :constr (@[%a@])@])"
       pp_lit r.select_lit
       pp_clause c
-      pp_constraints cstr
+      pp_constraint cstr
   | E_unselect_lit (c,r) ->
     Fmt.fprintf out "(@[unselect_lit@ %a@ :clause %a@])"
       pp_lit r.select_lit pp_clause c

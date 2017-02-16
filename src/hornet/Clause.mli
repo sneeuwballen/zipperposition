@@ -13,14 +13,10 @@ type clause = t
 
 type idx = Hornet_types.clause_idx
 
-(* constraint on the literals *)
-type constraint_ = Hornet_types.c_constraint_ =
-  | C_dismatch of Dismatching_constr.t
-
 (** How to build a clause from a ['a] and other parameters *)
 type 'a builder =
   trail:bool_trail ->
-  constr:constraint_ list ->
+  constr:c_constraint ->
   depth:int ->
   'a ->
   proof ->
@@ -32,10 +28,10 @@ val make_l : Lit.t list builder
 val proof : t -> proof
 val lits : t -> Lit.t IArray.t
 val trail : t -> bool_trail
-val constr : t -> constraint_ list
+val constr : t -> c_constraint
 val depth : t -> int
 
-val dismatch_constr : t -> Dismatching_constr.t list
+val dismatch_constr : t -> Dismatching_constr.t
 
 val set_select : t -> select_lit -> unit
 val clear_select : t -> unit

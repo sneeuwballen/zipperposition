@@ -14,6 +14,9 @@ type term = FOTerm.t
 
 type t
 
+val empty : t
+(** Trivial constraint *)
+
 val make : (term * term) list -> t
 (** [make [t_1,u_1; …; t_n,u_n]]
     makes a dismatching constraint that is satisfied for every
@@ -21,6 +24,8 @@ val make : (term * term) list -> t
     match the pattern [u_i]. *)
 
 val combine : t -> t -> t
+(** Conjunction of the two constraints.
+    {!empty} is neutral for this operation. *)
 
 val apply_subst :
   renaming:Subst.Renaming.t ->

@@ -18,9 +18,6 @@ type clause = t
 
 type idx = Hornet_types.clause_idx
 
-type constraint_ = Hornet_types.c_constraint_ =
-  | C_dismatch of Dismatching_constr.t
-
 (** {2 Basics} *)
 
 let lits c = c.c_lits
@@ -29,12 +26,7 @@ let constr c = c.c_constr
 let trail c = c.c_trail
 let depth c = c.c_depth
 
-let dismatch_constr c =
-  constr c
-  |> CCList.filter_map
-    (function
-      | C_dismatch d -> Some d)
-
+let dismatch_constr c = c.c_constr.constr_dismatch
 
 let equal = Hornet_types_util.equal_clause
 let hash = Hornet_types_util.hash_clause
@@ -103,7 +95,7 @@ let kind_of_lits ~trail ~constr (c_lits:Lit.t IArray.t) proof: c_kind =
 (** How to build a clause from a ['a] and other parameters *)
 type 'a builder =
   trail:bool_trail ->
-  constr:constraint_ list ->
+  constr:c_constraint ->
   depth:int ->
   'a ->
   proof ->
@@ -202,10 +194,7 @@ let of_slit_l ~stmt lits : t =
   in
   let lits = List.map conv_slit lits in
   let proof = Proof.from_stmt stmt in
-  make_l ~constr:[] ~trail:Trail.empty ~depth:0 lits proof
-
-let constr_trivial_ (c:constraint_): bool = match c with
-  | C_dismatch c -> Dismatching_constr.is_trivial c
+  make_l ~constr:Constraint.empty ~trail:Trail.empty ~depth:0 lits proof
 
 let is_trivial c =
   IArray.exists Lit.is_trivial c.c_lits ||
@@ -216,7 +205,7 @@ let is_trivial c =
          IArray.to_seqi c.c_lits
          |> Sequence.exists (fun (j,lit') -> i<j && Lit.equal lit (Lit.neg lit')))
   end ||
-  List.exists constr_trivial_ c.c_constr
+  Constraint.is_absurd c.c_constr
 
 (* add constraint, re-compute kind (different horn clause) *)
 let add_dismatch_constr (c:t) (d:Dismatching_constr.t): unit =
@@ -224,7 +213,7 @@ let add_dismatch_constr (c:t) (d:Dismatching_constr.t): unit =
     Util.errorf ~where:"clause.add_dismatch_constr" "should not be horn:@ `%a`" pp c;
   );
   assert (not (is_horn c));
-  c.c_constr <- C_dismatch d :: c.c_constr;
+  c.c_constr <- Constraint.add_dismatch d c.c_constr;
   ()
 
 (** {2 Unif} *)

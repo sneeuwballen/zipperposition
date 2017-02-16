@@ -37,7 +37,7 @@ module Make(Ctx : State.CONTEXT) = struct
           let c = r.bool_box_clause in
           if C.is_unit_ground c &&
              Lit.is_neg (IArray.get (C.lits c) 0) &&
-             C.constr c = []
+             Constraint.is_trivial (C.constr c)
           then (
             let lit' = Lit.neg (IArray.get (C.lits c) 0) in
             let c' =
@@ -226,10 +226,7 @@ module Make(Ctx : State.CONTEXT) = struct
             select_depends=[];
           } in
           C.set_select c sel;
-          Util.debugf ~section 3 "@[<2>@{<yellow>select_lit@} `%a`@ :clause %a@]"
-            (fun k->k Lit.pp sel.select_lit C.pp c);
-          Ctx.send_event (E_select_lit (c,sel,C.constr c));
-          (* remove the selection afterwards *)
+          (* be sure to remove the selection afterwards *)
           Ctx.on_backtrack
             (fun () ->
                C.clear_select c;
@@ -237,6 +234,10 @@ module Make(Ctx : State.CONTEXT) = struct
                  "@[<2>@{<yellow>unselect_lit@} `%a`@ :clause %a@]"
                  (fun k->k Lit.pp sel.select_lit C.pp c);
                Ctx.send_event (E_unselect_lit (c,sel)));
+          (* select lit *)
+          Util.debugf ~section 3 "@[<2>@{<yellow>select_lit@} `%a`@ :clause %a@]"
+            (fun k->k Lit.pp sel.select_lit C.pp c);
+          Ctx.send_event (E_select_lit (c,sel,C.constr c));
       end
 
     (* when a boolean literal is asserted, try to select it
@@ -282,10 +283,10 @@ module Make(Ctx : State.CONTEXT) = struct
       | A_box_clause _, false -> ()
       | A_ground r, true ->
         (* maybe select some FO literals in reaction *)
-        Inst_gen_eq.assert_ground r;
         Ctx.on_backtrack
           (fun () -> Ctx.send_event (E_remove_ground_lit r));
-        Ctx.send_event (E_add_ground_lit r)
+        Inst_gen_eq.assert_ground r;
+        Ctx.send_event (E_add_ground_lit r);
       | A_ground _, false -> ()
       | A_fresh _, _
         -> ()
@@ -293,13 +294,20 @@ module Make(Ctx : State.CONTEXT) = struct
 
   let set_depth_limit d = Depth_limit.set d
 
-  (* TODO: use depth limit in instantiation (put new clauses in heap?) *)
+  (* TODO: use depth limit in instantiation (put new instances that
+     are too deep in a heap?) *)
 
   (* what to do if a conflict is detected *)
   let on_conflict (trail:Trail.t) (label:Label.t) (proof:Proof.t): unit =
-    if Label.all_empty label then (
-      (* trigger conflict in SAT using a conflict clause that combines
-         the trail and the label *)
+    let non_trivial_instantiations =
+      Label.to_seq label
+      |> Sequence.filter (fun lc -> not (Labelled_clause.is_empty lc))
+      |> Sequence.to_rev_list
+    in
+    if CCList.is_empty non_trivial_instantiations then (
+      (* all instances are trivial (same clause), we can trigger
+           conflict in SAT using a conflict clause that combines
+           the trail and the label *)
       let neg_trail =
         Trail.bool_lits trail
         |> Bool_lit.Tbl.of_seq_count
@@ -322,17 +330,32 @@ module Make(Ctx : State.CONTEXT) = struct
         (fun k->k Trail.pp trail Label.pp label Bool_lit.pp_clause conflict);
       Ctx.add_clause proof conflict
     ) else (
+      (* at least one labelled clause needs instantiation, so we don't
+         have a conflict here. The real conflict with come from the instance. *)
       Util.debugf ~section 2
-        "(@[<2>conflict->instantiate@ :trail %a@ :label %a@])"
-        (fun k->k Trail.pp trail Label.pp label);
-      begin
-        Label.to_seq label
-        |> Sequence.filter (fun lc -> not (Labelled_clause.is_empty lc))
-        |> Sequence.iter
+        "(@[<2>conflict->instantiate@ :trail %a@ :label %a@ :instances (@[%a@])@])"
+        (fun k->k Trail.pp trail Label.pp label
+            (Util.pp_list Labelled_clause.pp) non_trivial_instantiations);
+      let clauses_to_instantiate, new_instances =
+        Sequence.of_list non_trivial_instantiations
+        |> Sequence.map
           (fun lc ->
              let c = lc.lc_clause in
              let subst = Labelled_clause.to_subst lc in
              assert (not (Subst.is_renaming subst));
+             (* apply substitution to create a new instance *)
+             let renaming = Ctx.renaming_cleared () in
+             let lits' =
+               C.lits c
+               |> IArray.map (fun lit -> Lit.apply_subst ~renaming subst (lit,0))
+             and constr' =
+               Constraint.apply_subst ~renaming subst (C.constr c,0)
+             in
+             let c' =
+               C.make lits' (Proof.instance c subst)
+                 ~constr:constr' ~trail:Trail.empty ~depth:(C.depth c+1)
+             in
+             assert (not (C.is_trivial c'));
              (* block this instance from [c] *)
              let new_constr = Labelled_clause.to_dismatch lc in
              assert (not (Dismatching_constr.is_trivial new_constr));
@@ -340,35 +363,25 @@ module Make(Ctx : State.CONTEXT) = struct
              Util.debugf ~section 2
                "(@[<2>@{<yellow>inst_gen_eq.instantiate@}@ :clause %a@ :subst %a@ :new_dismatch %a@])"
                (fun k->k C.pp c Subst.pp subst Dismatching_constr.pp new_constr);
-             (* apply substitution *)
-             let renaming = Ctx.renaming_cleared () in
-             let lits' =
-               C.lits c
-               |> IArray.map (fun lit -> Lit.apply_subst ~renaming subst (lit,0))
-             and constr' =
-               CCList.filter_map
-                 (function
-                   | C_dismatch d ->
-                     let d' =
-                       Dismatching_constr.apply_subst ~renaming subst (d,0)
-                     in
-                     if Dismatching_constr.is_trivial d'
-                     then None
-                     else Some (C_dismatch d')
-                 )
-                 (C.constr c)
-             in
-             let c' =
-               C.make lits' (Proof.instance c subst)
-                 ~constr:constr' ~trail:Trail.empty ~depth:(C.depth c+1)
-             in
-             (* split new clause *)
-             split_clause c';
-             (* constraint has changed, add then remove the clause *)
-             Ctx.send_event (E_unselect_lit (c, lc.lc_sel));
-             Ctx.send_event (E_select_lit (c, lc.lc_sel, C.constr c));
-          )
-      end
+             (* be ready to remove and re-add c, and to add c' *)
+             (c, lc.lc_sel), c')
+        |> Sequence.to_rev_list
+        |> List.split
+      in
+      let clauses_to_instantiate =
+        CCList.sort_uniq clauses_to_instantiate
+          ~cmp:(CCOrd.pair C.compare
+              (CCFun.compose_binop (fun sel->sel.select_idx) CCOrd.int))
+      in
+      (* these clauses have new constraints, remove then re-add them *)
+      List.iter
+        (fun (c,sel) -> Ctx.send_event (E_unselect_lit (c, sel)))
+        clauses_to_instantiate;
+      List.iter
+        (fun (c,sel) -> Ctx.send_event (E_select_lit (c, sel, C.constr c)))
+        clauses_to_instantiate;
+      (* now add the new clauses *)
+      List.iter split_clause new_instances;
     )
 
   let on_event (e:event) =

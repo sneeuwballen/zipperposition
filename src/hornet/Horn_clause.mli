@@ -13,8 +13,6 @@
 open Libzipperposition
 open Hornet_types
 
-type constraint_ = Hornet_types.c_constraint_
-
 type t = horn_clause
 type horn_clause = t
 
@@ -22,7 +20,7 @@ type horn_clause = t
 
 val make :
   trail:bool_trail ->
-  constr:constraint_ list ->
+  constr:c_constraint ->
   unordered_depth:int ->
   label:label ->
   Lit.t ->
@@ -35,7 +33,7 @@ val head : t -> Lit.t
 
 val body : t -> Lit.t IArray.t
 
-val constr : t -> constraint_ list
+val constr : t -> c_constraint
 (** The constraints attached to this clause *)
 
 val trail : t -> bool_trail
@@ -130,7 +128,4 @@ end
 (** {2 Substitutions} *)
 
 val apply_subst_constr :
-  renaming:Subst.Renaming.t -> Subst.t -> constraint_ Scoped.t -> constraint_
-
-val apply_subst_constr_l :
-  renaming:Subst.Renaming.t -> Subst.t -> constraint_ list Scoped.t -> constraint_ list
+  renaming:Subst.Renaming.t -> Subst.t -> c_constraint Scoped.t -> c_constraint

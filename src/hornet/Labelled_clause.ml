@@ -36,12 +36,11 @@ let filter_subst = Hornet_types_util.lc_filter_subst
 let to_subst (lc:t): Subst.t = Lazy.force lc.lc_real_subst
 
 let to_subst_real lc_subst: Subst.t =
-  let sc = 0 in
   filter_subst lc_subst
   |> Sequence.map
     (fun (v,t) ->
        (* add scope, perform ugly casting *)
-       ((v:Type.t HVar.t:>InnerTerm.t HVar.t),sc), ((t:T.t:>InnerTerm.t),sc))
+       ((v:Type.t HVar.t:>InnerTerm.t HVar.t),0), ((t:T.t:>InnerTerm.t),1))
   |> Subst.of_seq
 
 let apply_subst ~renaming subst (lc,sc) =
