@@ -124,8 +124,3 @@ module With_pos : sig
   include Interfaces.ORD with type t := t
   include Interfaces.PRINT with type t := t
 end
-
-(** {2 Substitutions} *)
-
-val apply_subst_constr :
-  renaming:Subst.Renaming.t -> Subst.t -> c_constraint Scoped.t -> c_constraint

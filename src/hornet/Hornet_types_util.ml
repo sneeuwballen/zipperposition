@@ -49,8 +49,13 @@ let pp_bool_trail_opt out trail = match trail with
     Fmt.fprintf out "@ @[<hv2>@<1>⇐@ %a@]" pp_bool_trail trail
 
 let pp_constraint out (c:c_constraint): unit =
-  if Dismatching_constr.is_trivial c.constr_dismatch then ()
-  else Fmt.fprintf out "@ | @[<hv>%a@]" Dismatching_constr.pp c.constr_dismatch
+  Fmt.fprintf out "{@[<hv>%a@]}"
+    (Util.pp_list Dismatching_constr.pp) c.constr_dismatch
+
+let pp_constraint_opt out (c:c_constraint): unit =
+  if not (List.for_all Dismatching_constr.is_trivial c.constr_dismatch) then (
+    Fmt.fprintf out "@ | %a" pp_constraint c
+  )
 
 let pp_hc_status out (s:horn_clause_status): unit = match s with
   | HC_alive -> Fmt.string out "alive"
@@ -97,7 +102,7 @@ let pp_clause out (c:clause): unit =
   let vars = vars_of_clause c |> T.VarSet.of_seq |> T.VarSet.to_list in
   let pp_main out () =
     Fmt.fprintf out "@[<hv2>%a%a@]"
-      pp_clause_lits c pp_constraint c.c_constr
+      pp_clause_lits c pp_constraint_opt c.c_constr
   in
   pp_vars pp_main () out vars
 
@@ -124,7 +129,7 @@ let pp_hclause out (c:horn_clause): unit =
       pp_lit c.hc_head
       pp_body c.hc_body
       pp_bool_trail_opt c.hc_trail
-      pp_constraint c.hc_constr
+      pp_constraint_opt c.hc_constr
       pp_label_opt c.hc_label
   in
   let vars = vars_of_hclause c |> T.VarSet.of_seq |> T.VarSet.to_list in

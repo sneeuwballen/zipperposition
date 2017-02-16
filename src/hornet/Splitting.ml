@@ -16,6 +16,9 @@ module Make(Ctx : State.CONTEXT) = struct
 
   let name = "splitting"
 
+  (* table of all clauses so far *)
+  let clause_set : unit C.Tbl_mod_alpha.t = C.Tbl_mod_alpha.create 256
+
   (** {2 Avatar Splitting} *)
 
   (** Clauses that contain several "components" are split immediately.
@@ -256,20 +259,24 @@ module Make(Ctx : State.CONTEXT) = struct
     |> Sequence.flat_map Statement.Seq.forms
     |> Sequence.to_rev_list
 
-  (* split a clause into Avatar components, then normally *)
+  (* split a clause into Avatar components, then normally.
+     If the clause is already present in {!clause_set}, do nothing *)
   let rec split_clause (c:C.t): unit =
-    begin match C.classify c with
-      | C.Horn _ -> ()
-      | C.General ->
-        (* first, try Avatar splitting *)
-        begin match Avatar.split c with
-          | Some l -> List.iter split_clause l (* recurse *)
-          | None when C.is_ground c ->
-            assert (C.is_unit_ground c); (* otherwise, avatar would have split *)
-            ()
-          | None -> Inst_gen_eq.grounding c
-        end
-    end
+    if not (C.Tbl_mod_alpha.mem clause_set c) then (
+      C.Tbl_mod_alpha.add clause_set c ();
+      begin match C.classify c with
+        | C.Horn _ -> ()
+        | C.General ->
+          (* first, try Avatar splitting *)
+          begin match Avatar.split c with
+            | Some l -> List.iter split_clause l (* recurse *)
+            | None when C.is_ground c ->
+              assert (C.is_unit_ground c); (* otherwise, avatar would have split *)
+              ()
+            | None -> Inst_gen_eq.grounding c
+          end
+      end
+    )
 
   let split_initial_clauses () =
     List.iter split_clause initial_clauses

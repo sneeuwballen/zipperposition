@@ -104,7 +104,7 @@ let is_trivial c =
     Lit.is_trivial (head c) ||
     IArray.exists Lit.is_absurd (body c) ||
     Trail.is_absurd (trail c) ||
-    Dismatching_constr.is_absurd (constr c).constr_dismatch
+    Constraint.is_absurd (constr c)
   in
   if res then (
     Util.debugf 5 "(@[<2>is_trivial %a@])" (fun k->k pp c);
@@ -113,8 +113,7 @@ let is_trivial c =
 
 (* NOTE: some constraints will have to be solved all at once
    to obtain an actual substitution *)
-let constr_are_sat (c:c_constraint): bool =
-  not (Dismatching_constr.is_absurd c.constr_dismatch)
+let constr_are_sat (c:c_constraint): bool = not (Constraint.is_absurd c)
 
 let is_absurd c =
   Lit.is_absurd (head c) &&
@@ -137,8 +136,7 @@ let prof_variant = Util.mk_profiler "hornet.horn_clause_variant"
 
 let variant_ subst (c1,sc1) (c2,sc2) : Subst.t Sequence.t =
   let variant_constr subst (c1,sc1)(c2,sc2) =
-    Dismatching_constr.variant ~subst
-      (c1.constr_dismatch,sc1) (c2.constr_dismatch,sc2)
+    Constraint.variant ~subst (c1,sc1) (c2,sc2)
   in
   let {
     hc_unordered_depth=depth1;
@@ -216,11 +214,3 @@ module With_pos = struct
   let pp = PW.pp pp
   let to_string = Fmt.to_string pp
 end
-
-(** {2 Substitutions} *)
-
-let apply_subst_constr ~renaming subst (c,sc) =
-  { constr_dismatch=
-      Dismatching_constr.apply_subst ~renaming subst (c.constr_dismatch,sc);
-  }
-

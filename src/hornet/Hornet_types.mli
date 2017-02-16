@@ -65,7 +65,7 @@ and proof_res =
   | PR_bool_clause of bool_clause
 
 and c_constraint = {
-  constr_dismatch: Dismatching_constr.t;
+  constr_dismatch: Dismatching_constr.t list;
 }
 
 and horn_clause = {

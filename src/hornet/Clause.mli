@@ -31,7 +31,7 @@ val trail : t -> bool_trail
 val constr : t -> c_constraint
 val depth : t -> int
 
-val dismatch_constr : t -> Dismatching_constr.t
+val dismatch_constr : t -> Dismatching_constr.t list
 
 val set_select : t -> select_lit -> unit
 val clear_select : t -> unit
