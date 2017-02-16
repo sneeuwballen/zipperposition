@@ -495,13 +495,14 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
                 (fun lit -> Lit.apply_subst ~renaming subst (lit,sc))
               |> IArray.of_array_unsafe
             and proof = Proof.hc_eq_res c subst
+            and constr = Constraint.apply_subst ~renaming subst (HC.constr c,sc)
             and label =
               Label.apply_subst ~renaming subst (HC.label c,sc)
             in
             let c' =
               HC.make new_head new_body proof
                 ~unordered_depth:(HC.unordered_depth c)
-                ~trail:(HC.trail c) ~constr:(HC.constr c) ~label
+                ~trail:(HC.trail c) ~constr ~label
             in
             Util.debugf ~section 4
               "(@[<hv2>eq_res@ :on %a@ :subst %a@ :yield %a@])"
