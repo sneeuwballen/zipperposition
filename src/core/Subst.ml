@@ -119,27 +119,24 @@ let fold f acc subst =
 
 let iter f subst = M.iter (fun v t -> f v t) subst
 
-(* is the substitution a renaming? *)
-let is_renaming subst =
-  try
-    let codomain = H.create 8 in
-    M.iter
-      (fun _ (t,sc_t) ->
-         match T.view t with
-           | T.Var v -> H.replace codomain (v,sc_t) ()
-           | _ ->
-             raise Exit (* some var bound to a non-var term *)
-      )
-      subst;
-    (* as many variables in codomain as variables in domain *)
-    H.length codomain = M.cardinal subst
-  with Exit -> false
-
 (* set of variables bound by subst, with their scope *)
 let domain s k = M.iter (fun v _ -> k v) s
 
 (* set of terms that some variables are bound to by the substitution *)
 let codomain s k = M.iter (fun _ t -> k t) s
+
+(* is the substitution a renaming? *)
+let is_renaming subst =
+  let rev =
+    codomain subst
+    |> Sequence.filter_map
+      (fun (t,sc_t) -> match T.view t with
+         | T.Var v -> Some ((v,sc_t),())
+         | _ -> None)
+    |> M.of_seq
+  in
+  (* as many variables in codomain as variables in domain *)
+  M.cardinal rev = M.cardinal subst
 
 (* variables introduced by the subst *)
 let introduced subst k =
