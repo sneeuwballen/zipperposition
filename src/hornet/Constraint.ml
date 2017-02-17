@@ -27,7 +27,9 @@ let is_absurd_with subst (c,sc): bool =
     c.constr_dismatch
 
 let add_dismatch (d:Dismatching_constr.t) (c:t): t =
-  { constr_dismatch = d :: c.constr_dismatch; }
+  if Dismatching_constr.is_empty d
+  then c
+  else { constr_dismatch = d :: c.constr_dismatch; }
 
 let apply_subst ~renaming subst (c,sc): t =
   { constr_dismatch =

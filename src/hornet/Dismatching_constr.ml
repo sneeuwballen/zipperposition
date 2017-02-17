@@ -14,6 +14,9 @@ type term = FOTerm.t
 
 type constr = term * term
 
+let prof_is_absurd  = Util.mk_profiler "dismatch.is_absurd"
+let prof_is_trivial = Util.mk_profiler "dismatching.is_trivial"
+
 type t =
   | Empty (** totally trivial *)
   | Pairs of (term * term) list
@@ -80,7 +83,7 @@ let apply_subst ~renaming subst (c, sc_l) : t = match c with
       l
     |> make
 
-let is_trivial = function
+let is_trivial_ = function
   | Empty -> true
   | Pairs l ->
     (* try to unify all pairs. No mgu -> no ground matching either. *)
@@ -93,6 +96,8 @@ let is_trivial = function
       false
     with Unif.Fail ->
       true
+
+let is_trivial d = Util.with_prof prof_is_trivial is_trivial_ d
 
 (* given [t1…tn, u1…un], find a substitution extending [subst]
    such that [forall i. t_i = u_iσ]. *)
@@ -117,7 +122,7 @@ let to_string = Fmt.to_string pp
 
 (* absurd if there is a substitution σ such that [forall. t </| u],
    [t = u\sigma]. Indeed, any instance [tρ] of [t] will match [uσρ]. *)
-let is_absurd c = match c with
+let is_absurd_ c = match c with
   | Empty -> false
   | Pairs l ->
     begin match match_rhs_to_lhs ~subst:Subst.empty (l,0) with
@@ -128,7 +133,9 @@ let is_absurd c = match c with
         true
     end
 
-let is_absurd_with subst (c,sc): bool = match c with
+let is_absurd d = Util.with_prof prof_is_absurd is_absurd_ d
+
+let is_absurd_with_ subst (c,sc): bool = match c with
   | Empty -> false
   | Pairs l ->
     begin match match_rhs_to_lhs ~subst (l,sc) with
@@ -138,6 +145,9 @@ let is_absurd_with subst (c,sc): bool = match c with
           (fun k->k pp c Subst.pp subst);
         true
     end
+
+let is_absurd_with subst x =
+  Util.with_prof prof_is_absurd (is_absurd_with_ subst) x
 
 let vars_seq = function
   | Empty -> Sequence.empty
