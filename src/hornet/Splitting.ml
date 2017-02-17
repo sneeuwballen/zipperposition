@@ -11,6 +11,9 @@ module C = Clause
 
 let section = Util.Section.make "splitting"
 
+let stat_conflict = Util.mk_stat "hornet.split_conflict"
+let stat_instantiate = Util.mk_stat "hornet.split_instantiate"
+
 module Make(Ctx : State.CONTEXT) = struct
   module Ctx = Ctx
 
@@ -155,8 +158,10 @@ module Make(Ctx : State.CONTEXT) = struct
     val get : unit -> int
   end = struct
     let d_ = ref 1
-    let set = (:=) d_
     let get () = !d_
+    let set new_d =
+      assert (new_d >= !d_);
+      d_ := new_d
   end
 
   (** {2 Inst-Gen-Eq} *)
@@ -299,10 +304,26 @@ module Make(Ctx : State.CONTEXT) = struct
         -> ()
     end
 
-  let set_depth_limit d = Depth_limit.set d
+  module H = CCHeap.Make(struct
+      type t = clause
+      let leq c1 c2: bool =
+        c1.c_depth < c2.c_depth || (c1.c_depth = c2.c_depth && c1.c_id <= c2.c_id)
+    end)
 
-  (* TODO: use depth limit in instantiation (put new instances that
-     are too deep in a heap?) *)
+  (* the clause instances that are currently too deep *)
+  let waiting_instances : H.t ref = ref H.empty
+
+  let set_depth_limit d =
+    Depth_limit.set d; (* do this first *)
+    (* split the clauses that were too deep before *)
+    let rec aux h = match H.take h with
+      | Some (new_h, c) when C.depth c < d ->
+        split_clause c;
+        aux new_h
+      | Some _
+      | None -> h (* return same heap *)
+    in
+    waiting_instances := aux !waiting_instances
 
   (* what to do if a conflict is detected *)
   let on_conflict (trail:Trail.t) (label:Label.t) (proof:Proof.t): unit =
@@ -311,6 +332,7 @@ module Make(Ctx : State.CONTEXT) = struct
       |> Sequence.filter (fun lc -> not (Labelled_clause.is_empty lc))
       |> Sequence.to_rev_list
     in
+    Util.incr_stat stat_conflict;
     if CCList.is_empty non_trivial_instantiations then (
       (* all instances are trivial (same clause), we can trigger
            conflict in SAT using a conflict clause that combines
@@ -362,6 +384,7 @@ module Make(Ctx : State.CONTEXT) = struct
                C.make lits' (Proof.instance c subst)
                  ~constr:constr' ~trail:Trail.empty ~depth:(C.depth c+1)
              in
+             Util.incr_stat stat_instantiate;
              if C.is_trivial c' then (
                Util.debugf ~section 2
                  "(@[<hv2>@{<yellow>inst_gen_eq.instantiate_trivial@}@ :clause %a@ \
@@ -396,8 +419,13 @@ module Make(Ctx : State.CONTEXT) = struct
       List.iter
         (fun (c,sel) -> Ctx.send_event (E_select_lit (c, sel, C.constr c)))
         clauses_to_instantiate;
-      (* now add the new clauses *)
-      List.iter split_clause new_instances;
+      (* now add the new clauses, if not too deep *)
+      List.iter
+        (fun new_c ->
+           if C.depth new_c <= Depth_limit.get()
+           then split_clause new_c
+           else waiting_instances := H.add !waiting_instances new_c)
+        new_instances;
     )
 
   let on_event (e:event) =
