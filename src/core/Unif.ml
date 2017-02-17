@@ -85,6 +85,13 @@ let unif_array_com subst ~op (a1,sc1) (a2,sc2) k =
 let unif_list_com subst ~op (l1,sc1) (l2,sc2) =
   unif_array_com subst ~op (Array.of_list l1,sc1) (Array.of_list l2,sc2)
 
+let rec unif_list subst ~op (l1,sc1) (l2,sc2) k = match l1, l2 with
+  | [], [] -> k subst
+  | [], _ | _, [] -> ()
+  | x1 :: tail1, x2 :: tail2 ->
+    op subst (x1,sc1) (x2,sc2)
+      (fun subst -> unif_list subst ~op (tail1,sc1)(tail2,sc2) k)
+
 (* in HO, we have [f1 l1] and [f2 l2], where application is left-associative.
    we need to unify from the right (the outermost application is on
    the right) so this returns pairs to unify. *)
