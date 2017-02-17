@@ -18,7 +18,7 @@ let pp_lit out (t:lit): unit = match t with
   | Eq (t,u,false) -> Fmt.fprintf out "@[%a@ @<1>≠ %a@]" T.pp t T.pp u
 
 let pp_clause_lits out a =
-  Fmt.fprintf out "@[%a@]" (Fmt.seq pp_lit) (IArray.to_seq a.c_lits)
+  Fmt.fprintf out "@[%a@]" (Util.pp_seq ~sep:" ∨ " pp_lit) (IArray.to_seq a.c_lits)
 
 let pp_atom out = function
   | A_fresh i -> Fmt.fprintf out "fresh_%d" i
@@ -86,7 +86,7 @@ let lc_filter_subst lc_subst: (var*term) Sequence.t =
 module PP_c = struct
   let pp_body out body =
     if IArray.length body > 0 then (
-      Fmt.fprintf out " @<1>← @[<hv>%a@]" (Fmt.seq pp_lit) (IArray.to_seq body)
+      Fmt.fprintf out " @<1>← @[<hv>%a@]" (Util.pp_seq ~sep:" ∧ " pp_lit) (IArray.to_seq body)
     );
   and pp_vars pp x out = function
     | [] -> pp out x
