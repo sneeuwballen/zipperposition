@@ -292,12 +292,18 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     val rule_infer_active : HC.t rule_infer
     val rule_infer_passive : HC.t rule_infer
     val rule_eq_resolution : HC.t rule_infer
+    val rule_destr_eq_resolution : HC.t rule_simp
+    val rule_demod : HC.t rule_simp
   end = struct
     let stat_infer = Util.mk_stat "hornet.steps_sup_infer"
     let stat_eq_res = Util.mk_stat "hornet.steps_eq_res"
+    let stat_destr_eq_res = Util.mk_stat "hornet.steps_destr_res"
+    let stat_demod_call = Util.mk_stat "hornet.calls_demod"
+    let stat_demod_step = Util.mk_stat "hornet.steps_demod"
     let prof_infer_active = Util.mk_profiler "hornet.sup_active"
     let prof_infer_passive = Util.mk_profiler "hornet.sup_passive"
     let prof_eq_res = Util.mk_profiler "hornet.eq_res"
+    let prof_demod = Util.mk_profiler "hornet.demod"
 
     (* do the inference, if it is needed *)
     let do_sup_inference (sup:hc_superposition_step): HC.t option =
@@ -520,13 +526,65 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       | Some (Lit.Bool _) -> []
       | Some (Lit.Eq (_,_,false) | Lit.Atom (_,false)) -> assert false
 
+    (* destructive equality resolution.
+       Works on every literal of the body, not only the first one. *)
+    let rule_destr_eq_resolution (c:HC.t): _ option =
+      let lits = HC.body c in
+      let lit_replace =
+        IArray.to_seqi lits
+        |> Sequence.find
+          (fun (i,lit) -> match lit with
+             | Lit.Eq (a,b,true) ->
+               begin match T.view a, T.view b with
+                 | T.Var x, _ when not (T.var_occurs ~var:x b) -> Some (i,x,b)
+                 | _, T.Var x when not (T.var_occurs ~var:x a) -> Some (i,x,a)
+                 | _ -> None
+               end
+             | _ -> None)
+      in
+      begin match lit_replace with
+        | None -> None
+        | Some (i, x, t) ->
+          (* replace [x] by [t] in the clause, and remove the literal *)
+          let sc = 0 in
+          let subst =
+            Subst.bind Subst.empty ((x:>InnerTerm.t HVar.t),0) ((t:>InnerTerm.t),0)
+          in
+          let new_body =
+            IArray.init (IArray.length lits-1)
+              (fun j-> if j<i then IArray.get lits j else IArray.get lits (j+1))
+          in
+          let renaming = Ctx.renaming_cleared () in
+          let new_head = Lit.apply_subst ~renaming subst (HC.head c,sc)
+          and new_body = Lit.apply_subst_arr ~renaming subst (new_body,sc)
+          and proof = Proof.hc_eq_res c subst
+          and constr = Constraint.apply_subst ~renaming subst (HC.constr c,sc)
+          and label =
+            Label.apply_subst ~renaming subst (HC.label c,sc)
+          in
+            let c' =
+              HC.make new_head new_body proof
+                ~unordered_depth:(HC.unordered_depth c)
+                ~trail:(HC.trail c) ~constr ~label
+            in
+            Util.debugf ~section 4
+              "(@[<hv2>destr_eq_res@ :on %a@ :subst %a@ :yield %a@])"
+              (fun k->k HC.pp c Subst.pp subst HC.pp c');
+            Util.incr_stat stat_destr_eq_res;
+            Some c'
+      end
+
+    let demod_ (c:HC.t): HC.t option =
+      assert false
+
     let rule_infer_active c =
       Util.with_prof prof_infer_active rule_infer_active_ c
 
     let rule_infer_passive (c:HC.t): _ list =
       Util.with_prof prof_infer_passive passive_sup c
 
-    (* TODO: destructive equality resolution (with a variable) *)
+    let rule_demod c =
+      Util.with_prof prof_demod demod_ c
 
     let rule_eq_resolution c : _ list =
       Util.with_prof prof_eq_res eq_res c
@@ -572,7 +630,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     (* TODO: add some form of demodulation, both positive and in body0 *)
     (* TODO: rewriting *)
 
-    let rules_simp_full = rules_simp_fast @ [ ]
+    let rules_simp_full =
+      rules_simp_fast @ [ Sup.rule_destr_eq_resolution; ]
 
     let rules_simp_n = [ ]
   end
