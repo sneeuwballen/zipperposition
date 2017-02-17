@@ -102,7 +102,7 @@ let is_trivial d = Util.with_prof prof_is_trivial is_trivial_ d
 (* given [t1…tn, u1…un], find a substitution [σ] extending [subst]
    such that [forall i. t_i = u_iσ]. *)
 let match_rhs_to_lhs ~subst (l,sc) =
-  let sc_rhs = sc+1 in
+  let sc_rhs = ~-1 in
   try
     List.fold_left
       (fun subst (t,u) -> Unif.FO.matching ~subst ~pattern:(u,sc_rhs) (t,sc))

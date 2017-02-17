@@ -120,8 +120,8 @@ let is_absurd c =
   Lit.is_absurd (head c) &&
   body_len c = 0 &&
   not (Trail.is_absurd (trail c)) &&
-  not (Label.has_no_ground_instance (label c))
-  constr_are_sat (constr c) &&
+  not (Label.has_no_ground_instance (label c)) &&
+  constr_are_sat (constr c)
 
 let is_ground c =
   Lit.is_ground (head c) &&
