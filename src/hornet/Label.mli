@@ -18,6 +18,9 @@ val return : labelled_clause -> t
 
 val make : labelled_clause list -> t
 
+val is_empty : t -> bool
+(** Empty set of labels *)
+
 val all_empty : t -> bool
 (** All labelled clauses have empty labels. See {!Labelled_clause.is_empty} *)
 

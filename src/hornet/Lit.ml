@@ -275,6 +275,11 @@ let get_eqn lit position = match lit, position with
   | _ -> Util.errorf ~where:"Lit.get_eqn"
            "wrong literal `%a` or position `%a`" pp lit P.pp position
 
+let get_eqn_exn lit pos = match get_eqn lit pos with
+  | Some x -> x
+  | None -> Util.errorf ~where:"Lit.get_eqn_exn"
+           "non equational literal `%a`" pp lit P.pp pos
+
 (** {2 Unif} *)
 
 (** Unification-like operation on components of a literal. *)

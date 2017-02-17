@@ -16,6 +16,8 @@ let return l : t = [l]
 
 let make l = CCList.sort_uniq ~cmp:LC.compare l
 
+let is_empty = CCList.is_empty
+
 let all_empty = List.for_all LC.is_empty
 
 let is_absurd = List.exists LC.is_absurd

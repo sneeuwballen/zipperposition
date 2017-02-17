@@ -98,6 +98,10 @@ val get_eqn : t -> Position.t -> (term * term * bool) option
     @return None for other literals
     @raise Invalid_argument if the position doesn't match the literal. *)
 
+val get_eqn_exn : t -> Position.t -> term * term * bool
+(** Same as {!get_eqn}, but
+    @raise Error if the literal is not equational *)
+
 (** {2 Unification and Matching} *)
 
 val variant :

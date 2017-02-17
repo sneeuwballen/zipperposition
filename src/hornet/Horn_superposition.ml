@@ -93,8 +93,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
     val size: unit -> int
 
-    val to_seq : HC.t Sequence.t
-
     (* index on the head equation sides of positive unit clauses
        (active res/paramodulation) *)
     val idx_heads : unit -> CP_idx.t
@@ -128,8 +126,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       )
 
     let mem c = HC.Tbl.mem tbl c
-
-    let to_seq k = HC.Tbl.keys tbl k
 
     let variant_mem c = HC.Tbl_mod_alpha.mem tbl_mod_alpha c
 
@@ -574,8 +570,135 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
             Some c'
       end
 
+    (* Compute normal form of term w.r.t active set. Clauses used to
+       restrict is an option for restricting demodulation
+       in positive unit clauses.
+       add rewriting rules to [rules] *)
+    let demod_nf ~restrict (passive:HC.t)(rules:HC.t list ref) (t:term): term =
+      let ord = Ctx.ord in
+      let idx = Active_set.idx_heads () in
+      (* compute normal form of subterm. If restrict is true, substitutions that
+         are variable renamings are forbidden (since we are at root of a max term) *)
+      let rec reduce_at_root ~restrict t =
+        (* find an equation l=r that match subterm *)
+        let matching_rule =
+          CP_idx.retrieve_generalizations (idx, 1) (t, 0)
+          |> Sequence.find
+            (fun (l, c_with_pos, subst) ->
+               let active, pos = c_with_pos in
+               assert (HC.is_unit_pos active);
+               let lit_pos = match pos with P.Head p -> p | _ -> assert false in
+               let l', r, sign = Lit.get_eqn_exn (HC.head active) lit_pos in
+               assert (sign && T.equal l l');
+               (* check ordering conditions and restriction.
+                  if [restrict], we cannot rewrite [t] with itself,
+                  only with terms that are strictly more general
+                  (avoid self-demodulation of the rewrite rule) *)
+               let ok =
+                 (not restrict || not (Unif.FO.matches ~pattern:t l))
+                 && Trail.subsumes (HC.trail active) (HC.trail passive)
+                 && Ordering.compare ord
+                       (Subst.FO.apply_no_renaming subst (l,1))
+                       (Subst.FO.apply_no_renaming subst (r,1)) = Comparison.Gt
+                 && Label.is_empty (HC.label active) (* TODO: label subsumption *)
+                 && Constraint.is_trivial (HC.constr active) (* TODO: constraint subsumption *)
+               in
+               if ok then (
+                 rules := active :: !rules;
+                 Util.incr_stat stat_demod_step;
+                 Some (r, subst)
+               ) else
+                 None)
+        in
+        begin match matching_rule with
+          | None -> t
+          | Some (t', subst) ->
+            Util.debugf ~section 5 "(@[<2>demod@ :old `@[%a@]`@ :new `@[%a@]`@])"
+              (fun k->k T.pp t T.pp t');
+            normal_form ~restrict subst t' 1 (* done one rewriting step, continue *)
+        end
+      (* rewrite innermost-leftmost of [subst(t,scope)]. The initial scope is
+         0, but then we normal_form terms in which variables are really the variables
+         of the RHS of a previously applied rule (in context 1); all those
+         variables are bound to terms in context 0 *)
+      and normal_form ~restrict subst t scope =
+        begin match T.view t with
+          | T.App (f, l) ->
+            begin match T.view f with
+              | T.DB _
+              | T.Var _ -> Subst.FO.apply_no_renaming subst (t, scope)
+              | T.Const _ ->
+                (* rewrite subterms in call by value *)
+                let l' =
+                  List.map (fun t' -> normal_form ~restrict:false subst t' scope) l
+                and f' =
+                  Subst.FO.apply_no_renaming subst (f, scope)
+                in
+                (* avoid rebuilding term if nothing changed *)
+                let t' =
+                  if T.equal f f' && T.same_l l l'
+                  then t
+                  else T.app f' l'
+                in
+                (* rewrite term at root *)
+                reduce_at_root ~restrict t'
+              | T.App _
+              | T.AppBuiltin _ -> assert false
+            end
+          | _ -> Subst.FO.apply_no_renaming subst (t,scope)
+        end
+      in
+      normal_form ~restrict Subst.empty t 0
+
+    let demod_lit ~head passive (rules:HC.t list ref)(lit:lit): lit =
+      begin match lit with
+        | Atom (p,sign) ->
+          let p = demod_nf ~restrict:head passive rules p in
+          Lit.atom ~sign p
+        | Eq (a,b,sign) when head ->
+          (* head literal: restrict the bigger side(s) *)
+          let c = Ordering.compare Ctx.ord a b in
+          let restrict_a, restrict_b = match c with
+            | Comparison.Gt -> true, false
+            | Comparison.Lt -> false, true
+            | Comparison.Incomparable -> true, true
+            | Comparison.Eq -> false, false
+          in
+          (* demod with given restriction *)
+          Lit.eq ~sign
+            (demod_nf ~restrict:restrict_a passive rules a)
+            (demod_nf ~restrict:restrict_b passive rules b)
+        | Eq (a,b,sign) ->
+          (* demod without restriction *)
+          Lit.eq ~sign
+            (demod_nf ~restrict:false passive rules a)
+            (demod_nf ~restrict:false passive rules b)
+        | Bool _ -> lit
+      end
+
     let demod_ (c:HC.t): HC.t option =
-      assert false
+      Util.incr_stat stat_demod_call;
+      let rules = ref [] in
+      let new_head = demod_lit ~head:true c rules (HC.head c)
+      and new_body =
+        (* only demodulate first body literal *)
+        IArray.mapi
+          (fun i lit ->
+             if i=0 then demod_lit ~head:false c rules lit else lit)
+          (HC.body c)
+      in
+      (* rewriting happened iff there is at least one rule *)
+      if !rules <> [] then (
+        let new_c : HC.t =
+          HC.make new_head new_body (Proof.hc_demod c !rules)
+            ~constr:(HC.constr c) ~trail:(HC.trail c)
+            ~unordered_depth:(HC.unordered_depth c) ~label:(HC.label c)
+        in
+        Util.debugf ~section 3
+          "(@[<2>demod@ :clause %a@ :into %a@ :rules {@[<hv>%a@]}@])"
+          (fun k->k HC.pp c HC.pp new_c (Util.pp_list HC.pp) !rules);
+        Some new_c
+      ) else None
 
     let rule_infer_active c =
       Util.with_prof prof_infer_active rule_infer_active_ c
@@ -631,7 +754,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     (* TODO: rewriting *)
 
     let rules_simp_full =
-      rules_simp_fast @ [ Sup.rule_destr_eq_resolution; ]
+      rules_simp_fast @ [ Sup.rule_destr_eq_resolution; Sup.rule_demod; ]
 
     let rules_simp_n = [ ]
   end

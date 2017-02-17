@@ -20,6 +20,19 @@ let make l = CCList.sort_uniq ~cmp:cmp_ l
 let merge l1 l2 =
   CCList.sorted_merge_uniq ~cmp:cmp_ l1 l2
 
+let subsumes l1 l2: bool =
+  let rec aux l1 l2 = match l1, l2 with
+    | [], _ -> true
+    | _, [] -> false
+    | lazy t1 :: tail1, lazy t2 :: tail2 ->
+      begin match cmp_blit t1 t2 with
+        | 0 -> aux tail1 tail2
+        | n when n<0 -> false (* all elements of [l2] are bigger than [t1] *)
+        | _ -> aux l1 tail2 (* drop [t2] *)
+      end
+  in
+  aux l1 l2
+
 (* absurd if it contains [a] and [not a] *)
 let is_absurd l =
   List.exists

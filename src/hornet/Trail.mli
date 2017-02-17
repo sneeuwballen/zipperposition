@@ -17,6 +17,9 @@ val merge : t -> t -> t
 
 val is_absurd : t -> bool
 
+val subsumes : t -> t -> bool
+(** [subsumes a b] means that [a] is a subset of [b] *)
+
 include Interfaces.PRINT with type t := t
 include Interfaces.EQ with type t := t
 
