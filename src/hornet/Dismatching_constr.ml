@@ -103,6 +103,8 @@ let is_trivial d = Util.with_prof prof_is_trivial is_trivial_ d
    such that [forall i. t_i = u_iσ]. *)
 let match_rhs_to_lhs ~subst (l,sc) =
   let sc_rhs = ~-1 in
+  assert (Subst.codomain subst
+          |> Sequence.map Scoped.scope |> Sequence.for_all (fun s->s>sc_rhs));
   try
     List.fold_left
       (fun subst (t,u) -> Unif.FO.matching ~subst ~pattern:(u,sc_rhs) (t,sc))
