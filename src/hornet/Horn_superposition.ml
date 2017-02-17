@@ -702,7 +702,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
             (fun k->k HC.pp c);
           saturation_loop ()
         ) else (
-          assert (Active_set.to_seq |> Sequence.for_all (fun c'-> not (HC.equal_mod_alpha c c')));
           (* add to [c] and perform inferences *)
           Active_set.add c;
           (* infer new clauses, simplify them, send to passive set *)
