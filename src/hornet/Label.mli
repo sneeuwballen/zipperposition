@@ -24,7 +24,7 @@ val is_empty : t -> bool
 val all_empty : t -> bool
 (** All labelled clauses have empty labels. See {!Labelled_clause.is_empty} *)
 
-val is_absurd : t -> bool
+val has_no_ground_instance : t -> bool
 (** Some labelled clause has unsatisfiable constraints *)
 
 val apply_subst :

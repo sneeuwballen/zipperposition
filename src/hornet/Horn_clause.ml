@@ -105,7 +105,7 @@ let is_trivial c =
     IArray.exists Lit.is_absurd (body c) ||
     Trail.is_absurd (trail c) ||
     Constraint.is_absurd (constr c) ||
-    Label.is_absurd (label c)
+    Label.has_no_ground_instance (label c)
   in
   if res then (
     Util.debugf 5 "(@[<2>is_trivial %a@])" (fun k->k pp c);
@@ -119,7 +119,9 @@ let constr_are_sat (c:c_constraint): bool = not (Constraint.is_absurd c)
 let is_absurd c =
   Lit.is_absurd (head c) &&
   body_len c = 0 &&
-  constr_are_sat (constr c)
+  not (Trail.is_absurd (trail c)) &&
+  not (Label.has_no_ground_instance (label c))
+  constr_are_sat (constr c) &&
 
 let is_ground c =
   Lit.is_ground (head c) &&

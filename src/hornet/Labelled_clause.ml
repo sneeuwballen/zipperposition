@@ -62,13 +62,13 @@ let is_empty (lc:t) =
 
 (* absurd if at least one constraint of the clause is absurd under
    current substitution *)
-let is_absurd_ (lc:t): bool =
+let has_no_ground_instance_ (lc:t): bool =
   Constraint.is_absurd_with
     (to_subst lc)
     (lc.lc_clause.c_constr,0)
 
-let prof_is_absurd = Util.mk_profiler "labelled_clause.is_absurd"
-let is_absurd lc = Util.with_prof prof_is_absurd is_absurd_ lc
+let prof_no_instance = Util.mk_profiler "labelled_clause.has_no_instance"
+let has_no_ground_instance lc = Util.with_prof prof_no_instance has_no_ground_instance_ lc
 
 let to_dismatch (lc:t): Dismatching_constr.t =
   filter_subst lc.lc_subst

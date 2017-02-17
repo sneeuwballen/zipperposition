@@ -99,7 +99,7 @@ let is_trivial_ = function
 
 let is_trivial d = Util.with_prof prof_is_trivial is_trivial_ d
 
-(* given [t1…tn, u1…un], find a substitution extending [subst]
+(* given [t1…tn, u1…un], find a substitution [σ] extending [subst]
    such that [forall i. t_i = u_iσ]. *)
 let match_rhs_to_lhs ~subst (l,sc) =
   let sc_rhs = sc+1 in

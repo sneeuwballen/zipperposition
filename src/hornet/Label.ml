@@ -20,7 +20,7 @@ let is_empty = CCList.is_empty
 
 let all_empty = List.for_all LC.is_empty
 
-let is_absurd = List.exists LC.is_absurd
+let has_no_ground_instance = List.exists LC.has_no_ground_instance
 
 let merge = CCList.sorted_merge_uniq ~cmp:LC.compare
 
