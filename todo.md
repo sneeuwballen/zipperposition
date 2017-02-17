@@ -2,18 +2,12 @@
 
 ## Now
 
-- `Labelled_clause.variant` should check `c1.id=c2.id && variant subst1 subst2` (per-variable)
-- add `Labelled_clause.hash_mod_alpha` for faster indexing
+- subsumption on unit horn clauses!
+- maybe subsumption on other horn clauses, too
 
-- there is probably a **bug** in `HC.{hash_mod_alpha,variant}`
-  see ∞ loop in `./hornet.native --debug 2 --stats --dot /tmp/truc.dot -t 30 examples/pelletier_problems/pb33.zf`
-
-- depth limit for inst-gen!!
-
-- maybe it's time to add some subsumption?
-- demodulation first? at least it might replace subsumption for
-  pos-unit-clauses (C⇒D means C demodulate D to true?)
-  → check perf gain on `pb65.zf` (0.132s with 10,000 sup inferences right now)
+- in `Horn_sup`, replace depth limit by step limit (initial step+
+  a given number of steps every time `saturate` is called)
+  AND use a better priority queue (basic clause selection)
 
 ## Hornet
 
@@ -28,18 +22,33 @@
         inferences for each clause (this bound = the one bound increased
         during iterative deepening).
         Ground Horn superposition and oriented rewriting are not bounded.
-  * [ ] full check for whether a HC already exists in saturation (avoid loops)
+  * [x] full check for whether a HC already exists in saturation (avoid loops)
   * [ ] some basic redundancy criteria
     + [ ] subsumption on positive unit clauses (or maybe full Horn clauses?)
-    + [ ] demodulation
-  * [ ] depth limit for instantiation (too deep->instance goes in a waiting heap)
+    + [x] demodulation
+  * [ ] in demodulation, check *subsumption* of {label,constraint}
+        (instead of just emptyness). Copy from variant?
+  * [ ] deduplicate literals in general clauses
+  * [ ] deduplicate literals in horn clauses' bodies
+  * [x] depth limit for instantiation (too deep->instance goes in a waiting heap)
   * [x] avatar: on `[-p]`, add clause `[-p] => -[p]` (shortcut)
+  * [ ] disequality/disunif constraints for `p ∨ x=y ← q, r, s`.
+        it could still be a Horn clause: `p ← q, r, s | x!=y`?
+        think about it
 
-  `./hornet.native --debug 2 --dot /tmp/truc.dot -t 30 examples/pelletier_problems/pb24.zf` TODO: splitting
-  also: 30, 31, 33, 34
+  `./hornet.native --debug 1 --stats --dot /tmp/truc.dot -t 120 examples/pelletier_problems/pb41.zf --debug 5 |& less`
+  TODO: fix bug (another constraint issue leading to trivial clause instance)
 
-  `./hornet.native --debug 2 --dot /tmp/truc.dot -t 30 examples/pelletier_problems/pb63.zf` TODO: demod
-  `./hornet.native --debug 2 --dot /tmp/truc.dot -t 30 examples/pelletier_problems/pb65.zf` TODO: demod
+  `./hornet.native --debug 2 --dot /tmp/truc.dot -t 30 examples/pelletier_problems/pb34.zf`
+  TODO: make more efficient (maybe do superposition with better heuristic
+    and no depth limit, but step limit, with heavy penalty on
+    clauses with high unordered_depth)
+  also: 38
+
+  subsumption / termination of saturation:
+  `./hornet.native --debug 1 --stats --dot /tmp/truc.dot -t 30 tptp/Problems/RNG/RNG008-3.p`
+  `./hornet.native --debug 1 --stats --dot /tmp/truc.dot -t 30 tptp/Problems/RNG/RNG008-4.p`
+
   `./hornet.native --debug 2 --dot /tmp/truc.dot -t 30 examples/RNG008-1.p` TODO: subsumption
 
 - hierarchic superposition
