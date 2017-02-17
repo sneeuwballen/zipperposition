@@ -9,6 +9,11 @@ open Hornet_types
 type t = Hornet_types.label
 (** Set of labelled clauses. Invariant: sorted *)
 
+include Interfaces.PRINT with type t := t
+include Interfaces.HASH with type t := t
+
+val hash_mod_alpha : t -> int
+
 val return : labelled_clause -> t
 
 val make : labelled_clause list -> t
@@ -35,5 +40,3 @@ val merge : t -> t -> t
 
 val to_list : t -> labelled_clause list
 val to_seq: t -> labelled_clause Sequence.t
-
-include Interfaces.PRINT with type t := t

@@ -22,6 +22,8 @@ val apply_subst :
   t
 (** Apply the substitution to each variable in the given scope *)
 
+val hash_mod_alpha : t -> int
+
 val is_empty : t -> bool
 (** Is the substitution trivial? (i.e. a renaming) *)
 

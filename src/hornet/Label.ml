@@ -34,6 +34,12 @@ let pp = Hornet_types_util.pp_label
 
 let to_string = Fmt.to_string pp
 
+let hash (t:t): int = Hash.list LC.hash t
+
+let hash_mod_alpha (t:t): int = Hash.list_comm LC.hash_mod_alpha t
+
+let equal (a:t)(b:t): bool = CCList.equal LC.equal a b
+
 let variant ?(subst=Subst.empty) (l1,sc1)(l2,sc2): Subst.t Sequence.t =
   Unif.unif_list_com subst (l1,sc1)(l2,sc2)
     ~op:(fun subst a b -> LC.variant ~subst a b)

@@ -31,6 +31,12 @@ let compare = Hornet_types_util.compare_lc
 let pp = Hornet_types_util.pp_lc
 let to_string = CCFormat.to_string pp
 
+let hash_mod_alpha (lc:t): int =
+  Hash.combine2
+    (Hornet_types_util.hash_clause lc.lc_clause)
+    (Hash.(list_comm (pair HVar.hash T.hash_mod_alpha))
+       (Type.VarMap.to_list lc.lc_subst))
+
 let filter_subst = Hornet_types_util.lc_filter_subst
 
 let to_subst (lc:t): Subst.t = Lazy.force lc.lc_real_subst
@@ -62,7 +68,7 @@ let is_absurd_ (lc:t): bool =
     (lc.lc_clause.c_constr,0)
 
 let prof_is_absurd = Util.mk_profiler "labelled_clause.is_absurd"
-let is_absurd lc = Util.with_prof prof_is_absurd is_absurd_
+let is_absurd lc = Util.with_prof prof_is_absurd is_absurd_ lc
 
 let to_dismatch (lc:t): Dismatching_constr.t =
   filter_subst lc.lc_subst
@@ -76,7 +82,17 @@ let lits_instance lc: Lit.t IArray.t =
   let subst = to_subst lc in
   Lit.apply_subst_arr_no_renaming subst (lc.lc_clause.c_lits,0)
 
-(* find whether these are variants *)
+(* find whether these are variants.
+   We use [C.equal] to compare clauses, so it's not totally structural. *)
 let variant ?(subst=Subst.empty) (lc1,sc1)(lc2,sc2): Subst.t Sequence.t =
-  Lit.variant_arr ~subst (lits_instance lc1,sc1) (lits_instance lc2,sc2)
+  if Hornet_types_util.equal_clause lc1.lc_clause lc2.lc_clause
+  then (
+    assert (Type.VarMap.cardinal lc1.lc_subst = Type.VarMap.cardinal lc2.lc_subst);
+    Unif.unif_list subst
+      (Type.VarMap.values lc1.lc_subst |> Sequence.to_rev_list, sc1)
+      (Type.VarMap.values lc2.lc_subst |> Sequence.to_rev_list, sc2)
+      ~op:(fun subst a b ->
+        try Sequence.return (Unif.FO.variant ~subst a b)
+        with Unif.Fail -> Sequence.empty)
+  ) else Sequence.empty
 

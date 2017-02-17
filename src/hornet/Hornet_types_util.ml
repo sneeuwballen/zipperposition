@@ -221,8 +221,8 @@ let hash_lc (a:labelled_clause): int =
     (hash_clause a.lc_clause)
 
 let compare_lc (a:labelled_clause) b: int =
-  CCOrd.(Type.VarMap.compare T.compare a.lc_subst b.lc_subst
-      <?> (compare_clause, a.lc_clause, b.lc_clause))
+  CCOrd.(compare_clause a.lc_clause b.lc_clause
+      <?> (Type.VarMap.compare T.compare, a.lc_subst, b.lc_subst))
 
 let compare_atom (a:bool_atom) b : int =
   let to_int = function

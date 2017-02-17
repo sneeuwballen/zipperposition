@@ -140,7 +140,7 @@ let variant_ subst (c1,sc1) (c2,sc2) : Subst.t Sequence.t =
     Constraint.variant ~subst (c1,sc1) (c2,sc2)
   in
   let {
-    hc_unordered_depth=depth1;
+    hc_unordered_depth=_;
     hc_body=a1;
     hc_head=h1;
     hc_constr=c1;
@@ -151,7 +151,7 @@ let variant_ subst (c1,sc1) (c2,sc2) : Subst.t Sequence.t =
     hc_proof=_;
   } = c1
   and {
-    hc_unordered_depth=depth2;
+    hc_unordered_depth=_;
     hc_body=a2;
     hc_head=h2;
     hc_constr=c2;
@@ -162,10 +162,7 @@ let variant_ subst (c1,sc1) (c2,sc2) : Subst.t Sequence.t =
     hc_proof=_;
   } = c2 in
   if id1=id2 then Sequence.return subst
-  else if
-    depth1=depth2 &&
-    Hornet_types_util.equal_bool_trail tr1 tr2
-  then (
+  else if Hornet_types_util.equal_bool_trail tr1 tr2 then (
     Lit.variant ~subst (h1,sc1)(h2,sc2)
     |> Sequence.flat_map
       (fun subst ->
@@ -185,14 +182,14 @@ let variant ?(subst=Subst.empty) a b k =
 let equal_mod_alpha (c1:t) (c2:t) : bool =
   not (variant (c1,0)(c2,1) |> Sequence.is_empty)
 
-(* TODO: put label in the hash *)
 let hash_mod_alpha c: int =
-  Hash.combine4 42
+  Hash.combine5 42
     (Lit.hash_mod_alpha (head c))
     (IArray.hash_comm Lit.hash_mod_alpha (body c))
     (Hash.list_comm
        (fun (lazy b_lit) -> Hornet_types_util.hash_bool_lit b_lit)
        (trail c))
+    (Label.hash_mod_alpha (label c))
 
 (** {2 Containers} *)
 
