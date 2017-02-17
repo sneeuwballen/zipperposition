@@ -93,6 +93,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
     val size: unit -> int
 
+    val to_seq : HC.t Sequence.t
+
     (* index on the head equation sides of positive unit clauses
        (active res/paramodulation) *)
     val idx_heads : unit -> CP_idx.t
@@ -126,6 +128,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       )
 
     let mem c = HC.Tbl.mem tbl c
+
+    let to_seq k = HC.Tbl.keys tbl k
 
     let variant_mem c = HC.Tbl_mod_alpha.mem tbl_mod_alpha c
 
@@ -698,6 +702,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
             (fun k->k HC.pp c);
           saturation_loop ()
         ) else (
+          assert (Active_set.to_seq |> Sequence.for_all (fun c'-> not (HC.equal_mod_alpha c c')));
           (* add to [c] and perform inferences *)
           Active_set.add c;
           (* infer new clauses, simplify them, send to passive set *)

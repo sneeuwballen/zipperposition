@@ -17,6 +17,9 @@ type t
 val empty : t
 (** Trivial constraint *)
 
+val is_empty : t -> bool
+(** Is the constraint empty? *)
+
 val make : (term * term) list -> t
 (** [make [t_1,u_1; …; t_n,u_n]]
     makes a dismatching constraint that is satisfied for every

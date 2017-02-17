@@ -31,8 +31,10 @@ let add_dismatch (d:Dismatching_constr.t) (c:t): t =
 
 let apply_subst ~renaming subst (c,sc): t =
   { constr_dismatch =
-      List.map
-        (fun d -> Dismatching_constr.apply_subst ~renaming subst (d,sc))
+      CCList.filter_map
+        (fun d ->
+           let d' = Dismatching_constr.apply_subst ~renaming subst (d,sc) in
+           if Dismatching_constr.is_empty d' then None else Some d')
         c.constr_dismatch;
   }
 

@@ -15,7 +15,7 @@ type term = FOTerm.t
 type constr = term * term
 
 type t =
-  | Trivial
+  | Empty (** totally trivial *)
   | Pairs of (term * term) list
 
 (* TODO: simplification of constraints so that LHS terms are always
@@ -34,24 +34,30 @@ type t =
    unifiable, because no substitution will be able to make [t] equal
    to [u].
 *)
-let is_trivial_ (c:constr): bool =
+let is_trivial_pair (c:constr): bool =
   let t, u = c in
   not (Unif.FO.are_unifiable t u)
 
 let cmp_pair = CCOrd.pair T.compare T.compare
 
 let make_simpl_ l =
-  if List.exists is_trivial_ l
-  then Trivial
-  else Pairs (CCList.sort_uniq ~cmp:cmp_pair l)
+  if List.exists is_trivial_pair l
+  then Empty
+  else match l with
+    | [] -> Empty
+    | _ -> Pairs (CCList.sort_uniq ~cmp:cmp_pair l)
 
-let empty = Trivial
+let empty = Empty
+
+let is_empty = function
+  | Empty -> true
+  | Pairs _ -> false
 
 let make = make_simpl_
 
 let combine c1 c2 : t = match c1, c2 with
-  | Trivial, c
-  | c, Trivial -> c
+  | Empty, c
+  | c, Empty -> c
   | Pairs l1, Pairs l2 ->
     (* must rename variables in right-hand side pairs, so that there is
        no collision between [c1] and [c2]. *)
@@ -65,7 +71,7 @@ let combine c1 c2 : t = match c1, c2 with
 
 (* apply substitution. The RHS of each pair is left untouched *)
 let apply_subst ~renaming subst (c, sc_l) : t = match c with
-  | Trivial -> Trivial
+  | Empty -> Empty
   | Pairs l ->
     List.map
       (fun (t,u) ->
@@ -75,7 +81,7 @@ let apply_subst ~renaming subst (c, sc_l) : t = match c with
     |> make
 
 let is_trivial = function
-  | Trivial -> true
+  | Empty -> true
   | Pairs l ->
     (* try to unify all pairs. No mgu -> no ground matching either. *)
     try
@@ -100,7 +106,7 @@ let match_rhs_to_lhs ~subst (l,sc) =
   with Unif.Fail -> None
 
 let pp out (c:t): unit = match c with
-  | Trivial -> ()
+  | Empty -> ()
   | Pairs [t,u] -> Fmt.fprintf out "(@[<2>%a@ ⋪ %a@])" T.pp t T.pp u
   | Pairs l ->
     let lhs_l, rhs_l = List.split l in
@@ -112,7 +118,7 @@ let to_string = Fmt.to_string pp
 (* absurd if there is a substitution σ such that [forall. t </| u],
    [t = u\sigma]. Indeed, any instance [tρ] of [t] will match [uσρ]. *)
 let is_absurd c = match c with
-  | Trivial -> false
+  | Empty -> false
   | Pairs l ->
     begin match match_rhs_to_lhs ~subst:Subst.empty (l,0) with
       | None -> false
@@ -123,7 +129,7 @@ let is_absurd c = match c with
     end
 
 let is_absurd_with subst (c,sc): bool = match c with
-  | Trivial -> false
+  | Empty -> false
   | Pairs l ->
     begin match match_rhs_to_lhs ~subst (l,sc) with
       | None -> false
@@ -134,7 +140,7 @@ let is_absurd_with subst (c,sc): bool = match c with
     end
 
 let vars_seq = function
-  | Trivial -> Sequence.empty
+  | Empty -> Sequence.empty
   | Pairs l ->
     Sequence.of_list l
     |> Sequence.map fst
@@ -164,9 +170,9 @@ let variants_arr_ subst a1 sc1 a2 sc2 : _ Sequence.t =
 
 let variant ?(subst=Subst.empty) (c1,sc1)(c2,sc2) : Subst.t Sequence.t =
   begin match c1, c2 with
-    | Trivial, Trivial -> Sequence.return subst
-    | Trivial, Pairs _
-    | Pairs _, Trivial -> Sequence.empty
+    | Empty, Empty -> Sequence.return subst
+    | Empty, Pairs _
+    | Pairs _, Empty -> Sequence.empty
     | Pairs l1, Pairs l2 ->
       variants_arr_ subst (Array.of_list l1) sc1 (Array.of_list l2) sc2
   end
