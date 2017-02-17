@@ -34,6 +34,7 @@ let bool_grounding c = P_bool_grounding c
 let hc_sup x = P_hc_superposition x
 let hc_eq_res c proof = P_hc_eq_res (c,proof)
 let hc_simplify c = P_hc_simplify c
+let hc_demod c c_l = P_hc_demod (c,c_l)
 
 let pp = Hornet_types_util.pp_proof
 let to_string = Fmt.to_string pp
@@ -53,6 +54,9 @@ let name (p:t): string = match p with
   | P_hc_superposition _ -> "hc_sup"
   | P_hc_eq_res _ -> "hc_eq_res"
   | P_hc_simplify _ -> "hc_simpl"
+  | P_hc_demod _ -> "hc_demod"
+
+let parents_of_hc (c:horn_clause) = c.hc_proof, PR_horn_clause c
 
 let parents (p:t): proof_with_res list = match p with
   | P_trivial
@@ -70,14 +74,14 @@ let parents (p:t): proof_with_res list = match p with
       r.bool_res_p2, PR_bool_clause r.bool_res_c2;
     ]
   | P_bool_grounding c -> [c.c_proof, PR_clause c]
-  | P_hc_eq_res (c,_) -> [ c.hc_proof, PR_horn_clause c ]
+  | P_hc_eq_res (c,_) -> [ parents_of_hc c ]
   | P_hc_superposition r ->
     let c1, _ = r.hc_sup_active in
     let c2, _ = r.hc_sup_passive in
-    [ c1.hc_proof, PR_horn_clause c1;
-      c2.hc_proof, PR_horn_clause c2;
-    ]
-  | P_hc_simplify c -> [ c.hc_proof, PR_horn_clause c]
+    [ parents_of_hc c1; parents_of_hc c2 ]
+  | P_hc_simplify c -> [ parents_of_hc c ]
+  | P_hc_demod (c,c_l) ->
+    parents_of_hc c :: List.rev_map parents_of_hc c_l
 
 let get ?(compress=true) (p:t): string * proof_with_res list =
   let rec aux p = match p with

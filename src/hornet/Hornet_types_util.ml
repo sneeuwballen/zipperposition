@@ -175,6 +175,9 @@ let pp_proof out (p:proof) : unit = match p with
       pp_hclause c Subst.pp subst
   | P_hc_simplify c ->
     Fmt.fprintf out "(@[simplify@ %a@])" pp_hclause c
+  | P_hc_demod (c,c_l) ->
+    Fmt.fprintf out "(@[demod@ :clause %a@ :rules {@[<hv>%a@]}@])"
+      pp_hclause c (Util.pp_list pp_hclause) c_l
 
 let equal_lit (a:lit) (b:lit): bool = match a, b with
   | Bool b1, Bool b2 -> b1=b2

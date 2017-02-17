@@ -24,6 +24,7 @@ val bool_grounding : clause -> t
 val hc_sup : Hornet_types.hc_superposition_step -> t
 val hc_eq_res : horn_clause -> Subst.t -> t
 val hc_simplify : horn_clause -> t
+val hc_demod : horn_clause -> horn_clause list -> t
 
 include Interfaces.PRINT with type t := t
 

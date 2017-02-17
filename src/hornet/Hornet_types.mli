@@ -55,6 +55,7 @@ and proof =
   | P_hc_superposition of hc_superposition_step
   | P_hc_eq_res of horn_clause * Subst.t (* equality resolution *)
   | P_hc_simplify of horn_clause
+  | P_hc_demod of horn_clause * horn_clause list (* passive, active set *)
 
 and proof_with_res = proof * proof_res
 
