@@ -32,6 +32,8 @@ module type CONTEXT = sig
 
   val add_clause : proof -> bool_clause -> unit
   val add_clause_l : proof -> bool_clause list -> unit
+  val valuation_at_level0 : Bool_lit.t -> bool option
+  val proof_of_lit : Bool_lit.t -> proof (** Only if true at level 0 *)
 
   module Form : sig
     type t

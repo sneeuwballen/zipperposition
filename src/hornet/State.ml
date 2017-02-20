@@ -7,7 +7,6 @@ open Libzipperposition
 open Hornet_types
 
 module SI = Msat.Solver_intf
-module FI = Msat.Formula_intf
 module TI = Msat.Theory_intf
 
 module Fmt = CCFormat
@@ -36,6 +35,7 @@ type theory_fun = State_intf.theory_fun
 module type S = sig
   module M : SI.S with type St.formula = Bool_lit.t and type St.proof = proof
   module Ctx : CONTEXT (* for theories *)
+  val rebuild_proof : M.Proof.proof -> proof_with_res
   val theories : (module THEORY) list
   val pp_dimacs: unit -> unit
 end
@@ -55,6 +55,13 @@ end = struct
     n
   let proof_of_tag i: proof = Hashtbl.find tbl i
 end
+
+(* bool_clause -> 'a *)
+module Bool_clause_tbl = CCHashtbl.Make(struct
+    type t = bool_clause
+    let equal = CCList.equal Bool_lit.equal
+    let hash = Hash.list Bool_lit.hash
+  end)
 
 module Make(A : ARGS) : S = struct
   (* defined below *)
@@ -99,6 +106,43 @@ module Make(A : ARGS) : S = struct
       (SAT_theory)
       (struct end)
 
+  (* convert the SAT proof into a normal proof *)
+  let rebuild_proof (p:M.Proof.proof) : proof_with_res =
+    let module Pr = M.Proof in
+    (* map bool_clause -> its proof *)
+    let tbl : proof Bool_clause_tbl.t = Bool_clause_tbl.create 64 in
+    let bool_clause_of_sat c : bool_clause =
+      Pr.to_list c |> List.map (fun a -> a.M.St.lit)
+    in
+    let rec aux p : proof * bool_clause = match Pr.expand p with
+      | { Pr.conclusion=c; step=Pr.Assumption|Pr.Hypothesis } ->
+        begin match M.get_tag c with
+          | None -> assert false
+          | Some tag ->
+            let c = bool_clause_of_sat c in
+            let proof = Proof_tbl.proof_of_tag tag in
+            proof, c
+        end
+      | { Pr.step = Pr.Lemma lemma; conclusion=c } ->
+        let c = bool_clause_of_sat c in
+        lemma, c
+      | { Pr.conclusion=c; step = Pr.Resolution (p1,p2,{M.St.lit;_}) } ->
+        let c = bool_clause_of_sat c in
+        (* atomic resolution step *)
+        begin match Bool_clause_tbl.get tbl c with
+          | Some pr -> pr, c
+          | None ->
+            let p1, c1 = aux p1 in
+            let p2, c2 = aux p2 in
+            let proof = Proof.bool_res lit c1 p1 c2 p2 in
+            Bool_clause_tbl.add tbl c proof;
+            proof, c
+        end
+    in
+    Pr.check p;
+    let proof, c = aux p in
+    proof, PR_bool_clause c
+
   module Ctx : CONTEXT = struct
     include A
     module Bool_lit = Bool_lit
@@ -113,6 +157,16 @@ module Make(A : ARGS) : S = struct
         (fun k->k (Util.pp_list Bool_lit.pp_clause) l);
       M.assume ~tag l
     let add_clause p c = add_clause_l p [c]
+    let valuation_at_level0 lit =
+      if M.true_at_level0 lit then Some true
+      else if M.true_at_level0 (Bool_lit.neg lit) then Some false
+      else None
+    let proof_of_lit lit =
+      let a = M.St.add_atom lit in
+      begin match M.Proof.prove_atom a with
+        | Some p -> fst(rebuild_proof p)
+        | None -> assert false
+      end
     module Form = struct
       include Msat.Tseitin.Make(struct
           include Bool_lit
@@ -188,58 +242,6 @@ let context (t:t) =
   let module M = (val t) in
   (module M.Ctx : CONTEXT)
 
-(** {2 Rebuild Proof} *)
-
-(* bool_clause -> 'a *)
-module Bool_clause_tbl = CCHashtbl.Make(struct
-    type t = bool_clause
-    let equal = CCList.equal Bool_lit.equal
-    let hash = Hash.list Bool_lit.hash
-  end)
-
-module Proof_build(X : sig
-    module St : S
-    val proof : St.M.Proof.proof
-  end) =
-struct
-  (* convert the SAT proof into a normal proof *)
-  let rebuild () : proof_with_res =
-    let module Pr = X.St.M.Proof in
-    (* map bool_clause -> its proof *)
-    let tbl : proof Bool_clause_tbl.t = Bool_clause_tbl.create 64 in
-    let bool_clause_of_sat c : bool_clause =
-      Pr.to_list c |> List.map (fun a -> a.X.St.M.St.lit)
-    in
-    Pr.check X.proof;
-    let rec aux p : proof * bool_clause = match Pr.expand p with
-      | { Pr.conclusion=c; step=Pr.Assumption|Pr.Hypothesis } ->
-        begin match X.St.M.get_tag c with
-          | None -> assert false
-          | Some tag ->
-            let c = bool_clause_of_sat c in
-            let proof = Proof_tbl.proof_of_tag tag in
-            proof, c
-        end
-      | { Pr.step = Pr.Lemma lemma; conclusion=c } ->
-        let c = bool_clause_of_sat c in
-        lemma, c
-      | { Pr.conclusion=c; step = Pr.Resolution (p1,p2,{X.St.M.St.lit;_}) } ->
-        let c = bool_clause_of_sat c in
-        (* atomic resolution step *)
-        begin match Bool_clause_tbl.get tbl c with
-          | Some pr -> pr, c
-          | None ->
-            let p1, c1 = aux p1 in
-            let p2, c2 = aux p2 in
-            let proof = Proof.bool_res lit c1 p1 c2 p2 in
-            Bool_clause_tbl.add tbl c proof;
-            proof, c
-        end
-    in
-    let proof, c = aux X.proof in
-    proof, PR_bool_clause c
-end
-
 (** {2 Result} *)
 
 type res =
@@ -274,11 +276,7 @@ let run (t:t): res =
         else iter (d+1) (* increase depth *)
       | St.M.Unsat us ->
         Util.debugf ~section 1 "@[Found unsat@]" (fun k->k);
-        let module Rebuild = Proof_build(struct
-            module St = St
-            let proof = us.SI.get_proof ()
-          end) in
-        let p = Rebuild.rebuild () in
+        let p = St.rebuild_proof (us.SI.get_proof ()) in
         St.Ctx.send_event (Hornet_types.E_found_unsat p);
         Unsat p
     end
