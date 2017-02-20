@@ -42,7 +42,7 @@ let filter_subst = Hornet_types_util.lc_filter_subst
 let to_subst (lc:t): Subst.t = Lazy.force lc.lc_real_subst
 
 let to_subst_real lc_subst: Subst.t =
-  filter_subst lc_subst
+  Type.VarMap.to_seq lc_subst
   |> Sequence.map
     (fun (v,t) ->
        (* add scope, perform ugly casting *)
@@ -56,9 +56,13 @@ let apply_subst ~renaming subst (lc,sc) =
   in
   { lc with lc_subst; lc_real_subst=lazy (to_subst_real lc_subst) }
 
+(* empty if the substitution is empty, or if it only renames binds
+   variables to other variables *)
 let is_empty (lc:t) =
   let subst = to_subst lc in
-  Subst.is_empty subst || Subst.is_renaming subst
+  Subst.is_empty subst ||
+  ( Subst.codomain subst
+    |> Sequence.for_all (fun (t,_) -> T.is_var (T.of_term_unsafe t)))
 
 (* absurd if at least one constraint of the clause is absurd under
    current substitution *)
