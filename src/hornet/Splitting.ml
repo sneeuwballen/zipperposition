@@ -60,11 +60,11 @@ module Make(Ctx : State.CONTEXT) = struct
     (* union-find that maps vars to list of literals, used for splitting *)
     module UF = UnionFind.Make(struct
         type key = T.var
-        type value = Lit.t list
+        type value = Lit.Set.t
         let equal = HVar.equal Type.equal
         let hash = HVar.hash
-        let zero = []
-        let merge = List.rev_append
+        let zero = Lit.Set.empty
+        let merge = Lit.Set.union
       end)
 
     (* main Avatar splitting function *)
@@ -94,14 +94,14 @@ module Make(Ctx : State.CONTEXT) = struct
                Lit.vars_seq lit
                |> Sequence.iter
                  (fun v' ->
-                    UF.add uf_vars v' [lit];  (* lit is in the equiv class of [v'] *)
+                    UF.add uf_vars v' (Lit.Set.singleton lit);  (* lit is in the equiv class of [v'] *)
                     UF.union uf_vars v v')
            end)
         lits;
 
       (* now gather all the components as a literal list list *)
       let components = ref [] in
-      List.iter (fun lit -> components := [lit] :: !components) !cluster_ground;
+      List.iter (fun lit -> components := Lit.Set.singleton lit :: !components) !cluster_ground;
       UF.iter uf_vars (fun _ comp -> components := comp :: !components);
 
       begin match !components with
@@ -115,6 +115,7 @@ module Make(Ctx : State.CONTEXT) = struct
             !components
             |> List.map
               (fun lits ->
+                 let lits = Lit.Set.to_list lits in
                  let rec sub_clause = lazy (
                    C.make_l lits proof
                      ~constr:(C.constr c) ~depth:(C.depth c) ~trail:[b_lit]
