@@ -29,6 +29,10 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
   (* a simplification rule yielding multiple clauses *)
   type 'a rule_simp_n = 'a -> 'a list option
 
+  (* simplification that simplifies a list of clauses from the active set,
+     removes them, and returns their new version *)
+  type 'a rule_back_simp = 'a -> 'a list
+
   (* an inference rule *)
   type 'a rule_infer = 'a -> 'a list
 
@@ -290,16 +294,19 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     val rule_eq_resolution : HC.t rule_infer
     val rule_destr_eq_resolution : HC.t rule_simp
     val rule_demod : HC.t rule_simp
+    val rule_back_demod : HC.t rule_back_simp
   end = struct
     let stat_infer = Util.mk_stat "hornet.steps_sup_infer"
     let stat_eq_res = Util.mk_stat "hornet.steps_eq_res"
     let stat_destr_eq_res = Util.mk_stat "hornet.steps_destr_res"
     let stat_demod_call = Util.mk_stat "hornet.calls_demod"
     let stat_demod_step = Util.mk_stat "hornet.steps_demod"
+    let stat_back_demod_step = Util.mk_stat "hornet.steps_back_demod"
     let prof_infer_active = Util.mk_profiler "hornet.sup_active"
     let prof_infer_passive = Util.mk_profiler "hornet.sup_passive"
     let prof_eq_res = Util.mk_profiler "hornet.eq_res"
     let prof_demod = Util.mk_profiler "hornet.demod"
+    let prof_back_demod = Util.mk_profiler "hornet.back_demod"
 
     (* do the inference, if it is needed *)
     let do_sup_inference (sup:hc_superposition_step): HC.t option =
@@ -700,6 +707,59 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         Some new_c
       ) else None
 
+    (* find clauses that can be demodulated by the given positive unit eqn.
+       returns the list of demodulated clauses, removed from active set *)
+    let back_demod_ (c:HC.t): HC.t list =
+      let idx = Active_set.idx_sup_into () in
+      let renaming = Ctx.renaming_cleared () in
+      (* find clauses that might be rewritten by l -> r *)
+      let find_candidates ~oriented set l r =
+        CP_idx.retrieve_specializations (idx,1) (l,0)
+        |> Sequence.filter_map
+          (fun (_,c'_with_pos,subst) ->
+             let c', _ = c'_with_pos in
+             (* subst(l) matches t' and is > subst(r), very likely to rewrite! *)
+             if (oriented ||
+                  Ordering.compare Ctx.ord
+                    (Subst.FO.apply ~renaming subst (l,0))
+                    (Subst.FO.apply ~renaming subst (r,0)) = Comparison.Gt) &&
+                Trail.subsumes (HC.trail c) (HC.trail c')
+             then Some c' (* add the clause to the set, it may be rewritten by l -> r *)
+             else None)
+        |> HC.Set.add_seq set
+      in
+      let set = HC.Set.empty in
+      (* gather all candidates *)
+      let candidates =
+        if HC.is_unit_pos c
+        then match HC.head c with
+          | Lit.Eq (l,r,true) ->
+            begin match Ordering.compare Ctx.ord l r with
+              | Comparison.Gt -> find_candidates ~oriented:true set l r
+              | Comparison.Lt -> find_candidates ~oriented:true set r l
+              | _ ->
+                (* both sides can rewrite, but we need to check ordering *)
+                let set = find_candidates ~oriented:false set l r in
+                find_candidates ~oriented:false set r l
+            end
+          | _ -> HC.Set.empty
+        else HC.Set.empty
+      in
+      (* try to simplify candidates by demod now *)
+      let final_set =
+        HC.Set.to_seq candidates
+        |> Sequence.filter_map
+          (fun c' -> match demod_ c' with
+             | None -> None
+             | Some new_c ->
+               (* clause is simplified, remove it and return its new version *)
+               Util.incr_stat stat_back_demod_step;
+               Active_set.remove c';
+               Some new_c)
+        |> Sequence.to_rev_list
+      in
+      final_set
+
     let rule_infer_active c =
       Util.with_prof prof_infer_active rule_infer_active_ c
 
@@ -708,6 +768,9 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
     let rule_demod c =
       Util.with_prof prof_demod demod_ c
+
+    let rule_back_demod c =
+      Util.with_prof prof_back_demod back_demod_ c
 
     let rule_eq_resolution c : _ list =
       Util.with_prof prof_eq_res eq_res c
@@ -719,6 +782,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     val rules_simp_fast : HC.t rule_simp list
     val rules_simp_full : HC.t rule_simp list
     val rules_simp_n : HC.t rule_simp_n list
+    val rules_back_simp : HC.t rule_back_simp list
   end = struct
     let stat_simp_body = Util.mk_stat "hornet.simp_body"
 
@@ -750,13 +814,13 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
     let rules_simp_fast = [ simp_body0 ]
 
-    (* TODO: add some form of demodulation, both positive and in body0 *)
-    (* TODO: rewriting *)
+    (* TODO: rewriting for deduction modulo *)
 
     let rules_simp_full =
       rules_simp_fast @ [ Sup.rule_destr_eq_resolution; Sup.rule_demod; ]
 
     let rules_simp_n = [ ]
+    let rules_back_simp = [ Sup.rule_back_demod ]
   end
 
   (** {2 Saturation} *)
@@ -860,6 +924,12 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       aux rules0 c;
       !res
 
+    (* apply backward simplification rules (simplifies active set using [c]) *)
+    let back_simplify c =
+      CCList.flat_map
+        (fun r -> r c)
+        Simplifications.rules_back_simp
+
     let stat_loop_count = Util.mk_stat "hornet.saturation_iter_count"
 
     (* the main saturation loop *)
@@ -884,12 +954,20 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
             (fun k->k HC.pp c);
           saturation_loop ()
         ) else (
-          (* add to [c] and perform inferences *)
+          (* add to [c] *)
           Active_set.add c;
-          (* infer new clauses, simplify them, send to passive set *)
-          let new_c : HC.t Sequence.t =
+          (* backward simplifications *)
+          let back_simplified =
+            back_simplify c |> Sequence.of_list
+          in
+          (* infer new clauses *)
+          let inferred =
             Sequence.of_list rules_infer
             |> Sequence.flat_map_l (fun rule -> rule c)
+          in
+          (* simplify all new clauses, send to passive set *)
+          let new_c : HC.t Sequence.t =
+            (Sequence.append back_simplified inferred)
             |> Sequence.map simplify_fast
             |> Sequence.flat_map_l (simplify_n Simplifications.rules_simp_n)
             |> Sequence.filter (fun c -> not (HC.is_trivial c))

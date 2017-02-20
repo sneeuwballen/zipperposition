@@ -199,8 +199,10 @@ module As_key = struct
   type t = horn_clause
   let equal = equal
   let hash = hash
+  let compare = compare
 end
 module Tbl = CCHashtbl.Make(As_key)
+module Set = CCSet.Make(As_key)
 
 module Tbl_mod_alpha = CCHashtbl.Make(struct
     type t = horn_clause

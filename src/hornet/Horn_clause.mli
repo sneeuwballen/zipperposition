@@ -113,6 +113,7 @@ include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 
 module Tbl : CCHashtbl.S with type key = t
+module Set : CCSet.S with type elt = t
 
 module Tbl_mod_alpha : CCHashtbl.S with type key = t
 (** table that uses {!equal_mod_alpha} and {!hash_mod_alpha} *)
