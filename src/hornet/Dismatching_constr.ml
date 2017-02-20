@@ -79,18 +79,26 @@ let is_absurd = function
   | Empty -> false
   | Pairs {absurd=lazy b; _} -> b
 
+let cmp_pair = CCOrd.pair T.compare T.compare
+
 let make_simpl_ l =
   if List.exists is_trivial_pair l
   then Empty
   else begin match l with
     | [] -> Empty
     | _ ->
-      let cmp_pair = CCOrd.pair T.compare T.compare in
       Pairs {
         pairs=CCList.sort_uniq ~cmp:cmp_pair l;
         absurd=lazy (is_absurd_ l);
       }
   end
+
+let compare (c1:t)(c2:t): int = match c1, c2 with
+  | Empty, Empty -> 0
+  | Empty, Pairs _ -> -1
+  | Pairs _, Empty -> 1
+  | Pairs {pairs=l1;_}, Pairs {pairs=l2;_} ->
+    CCList.compare cmp_pair l1 l2
 
 let empty = Empty
 

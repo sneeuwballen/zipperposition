@@ -50,6 +50,7 @@ val is_absurd : t -> bool
 val is_absurd_with: Subst.t -> t Scoped.t -> bool
 (** No solution compatible with this subst *)
 
+include Interfaces.ORD with type t := t
 include Interfaces.PRINT with type t := t
 
 val vars_seq : t -> Type.t HVar.t Sequence.t

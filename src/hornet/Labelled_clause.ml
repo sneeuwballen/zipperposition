@@ -65,7 +65,8 @@ let is_empty (lc:t) =
     |> Sequence.for_all (fun (t,_) -> T.is_var (T.of_term_unsafe t)))
 
 (* absurd if at least one constraint of the clause is absurd under
-   current substitution *)
+   current substitution.
+   NOTE: this is not cachable, as [lc.lc_clause.c_constr] is mutable. *)
 let has_no_ground_instance_ (lc:t): bool =
   Constraint.is_absurd_with
     (to_subst lc)
