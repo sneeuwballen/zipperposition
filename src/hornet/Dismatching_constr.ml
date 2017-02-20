@@ -19,7 +19,12 @@ let prof_is_trivial = Util.mk_profiler "dismatching.is_trivial"
 
 type t =
   | Empty (** totally trivial *)
-  | Pairs of (term * term) list
+  | Pairs of pairs
+
+and pairs = {
+  pairs: (term * term) list;
+  absurd: bool lazy_t;
+}
 
 (* TODO: simplification of constraints so that LHS terms are always
    variables?
@@ -41,63 +46,10 @@ let is_trivial_pair (c:constr): bool =
   let t, u = c in
   not (Unif.FO.are_unifiable t u)
 
-let cmp_pair = CCOrd.pair T.compare T.compare
-
-let make_simpl_ l =
-  if List.exists is_trivial_pair l
-  then Empty
-  else match l with
-    | [] -> Empty
-    | _ -> Pairs (CCList.sort_uniq ~cmp:cmp_pair l)
-
-let empty = Empty
-
-let is_empty = function
-  | Empty -> true
-  | Pairs _ -> false
-
-let make = make_simpl_
-
-let combine c1 c2 : t = match c1, c2 with
-  | Empty, c
-  | c, Empty -> c
-  | Pairs l1, Pairs l2 ->
-    (* must rename variables in right-hand side pairs, so that there is
-       no collision between [c1] and [c2]. *)
-    let renaming = Subst.Renaming.create () in
-    let l1 =
-      List.map (fun (t,u) -> t, Subst.FO.apply ~renaming Subst.empty (u,0)) l1
-    and l2 =
-      List.map (fun (t,u) -> t, Subst.FO.apply ~renaming Subst.empty (u,1)) l2
-    in
-    make (List.rev_append l1 l2)
-
-(* apply substitution. The RHS of each pair is left untouched *)
-let apply_subst ~renaming subst (c, sc_l) : t = match c with
-  | Empty -> Empty
-  | Pairs l ->
-    List.map
-      (fun (t,u) ->
-         let t = Subst.FO.apply ~renaming subst (t, sc_l) in
-         t, u)
-      l
-    |> make
-
-let is_trivial_ = function
-  | Empty -> true
-  | Pairs l ->
-    (* try to unify all pairs. No mgu -> no ground matching either. *)
-    try
-      let _ =
-        List.fold_left
-          (fun subst (t,u) -> Unif.FO.unification ~subst (t,0) (u,1))
-          Subst.empty l
-      in
-      false
-    with Unif.Fail ->
-      true
-
-let is_trivial d = Util.with_prof prof_is_trivial is_trivial_ d
+let pp_pairs out l =
+  let lhs_l, rhs_l = List.split l in
+  Fmt.fprintf out "(@[<2>(@[<hv>%a@])@ ⋪ (@[<hv>%a@])@])"
+    (Util.pp_list T.pp) lhs_l (Util.pp_list T.pp) rhs_l
 
 (* given [t1…tn, u1…un], find a substitution [σ] extending [subst]
    such that [forall i. t_i = u_iσ]. *)
@@ -112,34 +64,93 @@ let match_rhs_to_lhs ~subst (l,sc) =
     |> CCOpt.return
   with Unif.Fail -> None
 
+(* absurd if there is a substitution σ such that [forall. t </| u],
+   [t = u\sigma]. Indeed, any instance [tρ] of [t] will match [uσρ]. *)
+let is_absurd_ l =
+  begin match match_rhs_to_lhs ~subst:Subst.empty (l,0) with
+    | None -> false
+    | Some subst ->
+      Util.debugf 5 "(@[constr_is_absurd %a@ :subst %a@])"
+        (fun k->k pp_pairs l Subst.pp subst);
+      true
+  end
+
+let is_absurd = function
+  | Empty -> false
+  | Pairs {absurd=lazy b; _} -> b
+
+let make_simpl_ l =
+  if List.exists is_trivial_pair l
+  then Empty
+  else begin match l with
+    | [] -> Empty
+    | _ ->
+      let cmp_pair = CCOrd.pair T.compare T.compare in
+      Pairs {
+        pairs=CCList.sort_uniq ~cmp:cmp_pair l;
+        absurd=lazy (is_absurd_ l);
+      }
+  end
+
+let empty = Empty
+
+let is_empty = function
+  | Empty -> true
+  | Pairs _ -> false
+
+let make = make_simpl_
+
+let combine c1 c2 : t = match c1, c2 with
+  | Empty, c
+  | c, Empty -> c
+  | Pairs {pairs=l1;_}, Pairs {pairs=l2;_} ->
+    (* must rename variables in right-hand side pairs, so that there is
+       no collision between [c1] and [c2]. *)
+    let renaming = Subst.Renaming.create () in
+    let l1 =
+      List.map (fun (t,u) -> t, Subst.FO.apply ~renaming Subst.empty (u,0)) l1
+    and l2 =
+      List.map (fun (t,u) -> t, Subst.FO.apply ~renaming Subst.empty (u,1)) l2
+    in
+    make (List.rev_append l1 l2)
+
+(* apply substitution. The RHS of each pair is left untouched *)
+let apply_subst ~renaming subst (c, sc_l) : t = match c with
+  | Empty -> Empty
+  | Pairs {pairs=l; _} ->
+    List.map
+      (fun (t,u) ->
+         let t = Subst.FO.apply ~renaming subst (t, sc_l) in
+         t, u)
+      l
+    |> make
+
+let is_trivial_ = function
+  | Empty -> true
+  | Pairs {pairs=l;_} ->
+    (* try to unify all pairs. No mgu -> no ground matching either. *)
+    try
+      let _ =
+        List.fold_left
+          (fun subst (t,u) -> Unif.FO.unification ~subst (t,0) (u,1))
+          Subst.empty l
+      in
+      false
+    with Unif.Fail ->
+      true
+
+let is_trivial d = Util.with_prof prof_is_trivial is_trivial_ d
+
 let pp out (c:t): unit = match c with
   | Empty -> ()
-  | Pairs [t,u] -> Fmt.fprintf out "(@[<2>%a@ ⋪ %a@])" T.pp t T.pp u
-  | Pairs l ->
-    let lhs_l, rhs_l = List.split l in
-    Fmt.fprintf out "(@[<2>(@[<hv>%a@])@ ⋪ (@[<hv>%a@])@])"
-      (Util.pp_list T.pp) lhs_l (Util.pp_list T.pp) rhs_l
+  | Pairs {pairs=[t,u];_} -> Fmt.fprintf out "(@[<2>%a@ ⋪ %a@])" T.pp t T.pp u
+  | Pairs {pairs=l; _} -> pp_pairs out l
 
 let to_string = Fmt.to_string pp
 
-(* absurd if there is a substitution σ such that [forall. t </| u],
-   [t = u\sigma]. Indeed, any instance [tρ] of [t] will match [uσρ]. *)
-let is_absurd_ c = match c with
-  | Empty -> false
-  | Pairs l ->
-    begin match match_rhs_to_lhs ~subst:Subst.empty (l,0) with
-      | None -> false
-      | Some subst ->
-        Util.debugf 5 "(@[constr_is_absurd %a@ :subst %a@])"
-          (fun k->k pp c Subst.pp subst);
-        true
-    end
-
-let is_absurd d = Util.with_prof prof_is_absurd is_absurd_ d
-
 let is_absurd_with_ subst (c,sc): bool = match c with
   | Empty -> false
-  | Pairs l ->
+  | Pairs {pairs=l;_} ->
     begin match match_rhs_to_lhs ~subst (l,sc) with
       | None -> false
       | Some subst ->
@@ -153,7 +164,7 @@ let is_absurd_with subst x =
 
 let vars_seq = function
   | Empty -> Sequence.empty
-  | Pairs l ->
+  | Pairs {pairs=l; _} ->
     Sequence.of_list l
     |> Sequence.map fst
     |> Sequence.flat_map T.Seq.vars
@@ -185,7 +196,7 @@ let variant ?(subst=Subst.empty) (c1,sc1)(c2,sc2) : Subst.t Sequence.t =
     | Empty, Empty -> Sequence.return subst
     | Empty, Pairs _
     | Pairs _, Empty -> Sequence.empty
-    | Pairs l1, Pairs l2 ->
+    | Pairs {pairs=l1;_}, Pairs {pairs=l2;_} ->
       variants_arr_ subst (Array.of_list l1) sc1 (Array.of_list l2) sc2
   end
 
