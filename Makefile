@@ -80,6 +80,12 @@ TEST_FILES = tests/ examples/
 frogtest:
 	frogtest run -c ./tests/conf.toml $(TEST_FILES)
 
+frogtest-zipper:
+	frogtest run -p zipperposition -c ./tests/conf.toml $(TEST_FILES)
+
+frogtest-hornet:
+	frogtest run -p hornet -c ./tests/conf.toml $(TEST_FILES)
+
 frogtest-tip:
 	@[ -d tip-benchmarks ] || (echo "missing tip-benchmarks/" && exit 1)
 	frogtest run --meta=`git rev-parse HEAD` \
