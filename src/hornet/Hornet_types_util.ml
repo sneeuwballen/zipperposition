@@ -158,6 +158,10 @@ let pp_proof out (p:proof) : unit = match p with
       pp_clause c Subst.pp subst
   | P_avatar_split c ->
     Fmt.fprintf out "(@[<hv2>avatar_split@ :from %a@])" pp_clause c
+  | P_avatar_cut (c, lits) ->
+    let pp_pair out (l,_) = pp_bool_lit out l in
+    Fmt.fprintf out "(@[<hv2>avatar_cut@ :from %a@ :lits (@[<hv>%a@])@])"
+      pp_hclause c (Util.pp_list pp_pair) lits
   | P_split (c,sel,constr) ->
     Fmt.fprintf out "(@[<hv2>split@ :clause %a@ :idx %a@ :constr %a@])"
       pp_clause c pp_select sel pp_constraint constr

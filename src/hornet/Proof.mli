@@ -16,6 +16,7 @@ val from_stmt : Statement.clause_t -> t
 val instance : clause -> Subst.t -> t
 val avatar_split : clause -> t
 val split : clause -> select_lit -> c_constraint -> t
+val avatar_cut : horn_clause -> (bool_lit * proof) list -> t
 
 val bool_tauto : t
 val bool_res : bool_lit -> bool_clause -> t -> bool_clause -> t -> t

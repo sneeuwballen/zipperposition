@@ -20,6 +20,10 @@ let make l = CCList.sort_uniq ~cmp:cmp_ l
 let merge l1 l2 =
   CCList.sorted_merge_uniq ~cmp:cmp_ l1 l2
 
+let exists f l = List.exists (fun (lazy blit) -> f blit) l
+let to_list = List.map Lazy.force
+let of_list = List.map Lazy.from_val
+
 let subsumes l1 l2: bool =
   let rec aux l1 l2 = match l1, l2 with
     | [], _ -> true

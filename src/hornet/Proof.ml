@@ -17,6 +17,7 @@ let trivial = P_trivial
 let instance c subst = P_instance (c,subst)
 let avatar_split c = P_avatar_split c
 let split c sel constr = P_split (c,sel,constr)
+let avatar_cut c l = P_avatar_cut (c,l)
 
 let bool_tauto = P_bool_tauto
 let bool_res a c1 p1 c2 p2 =
@@ -47,6 +48,7 @@ let name (p:t): string = match p with
   | P_cnf _ -> "cnf"
   | P_bool_tauto -> "bool_tauto"
   | P_avatar_split _ -> "avatar_split"
+  | P_avatar_cut _ -> "avatar_cut"
   | P_split _ -> "split"
   | P_instance (_,subst) -> Fmt.sprintf "instance(@[%a@])" Subst.pp subst
   | P_bool_res r -> Fmt.sprintf "bool_res(%a)" U.pp_bool_lit r.bool_res_atom
@@ -69,6 +71,8 @@ let parents (p:t): proof_with_res list = match p with
   | P_avatar_split c
   | P_split (c,_,_)
   | P_instance (c,_) -> [c.c_proof, PR_clause c]
+  | P_avatar_cut (c,l) ->
+    parents_of_hc c :: (List.map (fun (lit,p) -> p, PR_bool_clause [lit]) l)
   | P_bool_res r ->
     [ r.bool_res_p1, PR_bool_clause r.bool_res_c1;
       r.bool_res_p2, PR_bool_clause r.bool_res_c2;

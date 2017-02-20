@@ -776,6 +776,76 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       Util.with_prof prof_eq_res eq_res c
   end
 
+  (** {2 Avatar} *)
+
+  (** Part of the Avatar reasoning. Here we do simplifications related
+      to boolean literals that have been {b proved} by the SAT solver,
+      that is, that are propagated at level 0 *)
+
+  module Avatar : sig
+    val has_trivial_trail : HC.t -> bool
+    val simplify_trail : HC.t rule_simp
+  end = struct
+    let stat_trail_trivial = Util.mk_stat "hornet.avatar_trivial_trail"
+    let stat_trail_simplify = Util.mk_stat "hornet.steps_avatar_simplify_trail"
+
+    (* check whether the trail is false and will remain so *)
+    let trail_is_trivial_ (trail:Trail.t): bool =
+      let res =
+        Trail.exists
+          (fun lit -> match Ctx.valuation_at_level0 lit with
+             | Some false -> true (* false at level 0: proven false *)
+             | _ -> false)
+          trail
+      in
+      if res then (
+        Util.incr_stat stat_trail_trivial;
+        Util.debugf ~section 3 "(@[<2>trail @[%a@]@ is trivial@])"
+          (fun k->k Trail.pp trail);
+      );
+      res
+
+    let has_trivial_trail (c:HC.t) =
+      trail_is_trivial_ (HC.trail c)
+
+    (* simplify the trail of [c] using boolean literals that have been proven *)
+    let simplify_trail (c:HC.t): HC.t option =
+      let trail = HC.trail c in
+      let n_simpl = ref 0 in
+      (* remove bool literals made trivial by SAT solver *)
+      let trail, trivial_trail =
+        trail
+        |> List.partition
+          (fun (lazy lit) -> match Ctx.valuation_at_level0 lit with
+             | Some true ->
+               (* [lit] is proven true, it is therefore not necessary
+                    to depend on it *)
+               incr n_simpl;
+               false
+             | _ -> true)
+      in
+      if !n_simpl > 0 then (
+        Util.incr_stat stat_trail_simplify;
+        (* use SAT resolution proofs for tracking why the trail
+           has been simplified, so that the other branches that have been
+           closed can appear in the proof *)
+        let proof_removed =
+          List.map (fun (lazy l) -> l, Ctx.proof_of_lit l) trivial_trail
+        in
+        let proof = Proof.avatar_cut c proof_removed in
+        let new_c : HC.t =
+          HC.make (HC.head c) (HC.body c) proof
+            ~trail ~constr:(HC.constr c) ~label:(HC.label c)
+            ~unordered_depth:(HC.unordered_depth c)
+        in
+        Util.incr_stat stat_trail_simplify;
+        Util.debugf ~section 3
+          "(@[<hv2>avatar_cut@ :clause %a@ :into @[%a@]@ :lits %a@])"
+          (fun k->k HC.pp c HC.pp new_c Trail.pp trivial_trail);
+        Some new_c
+      ) else None
+  end
+
   (** {2 Simplifications} *)
 
   module Simplifications : sig
@@ -812,7 +882,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       | Some lit when not (Lit.sign lit) -> assert false
       | Some _ -> None
 
-    let rules_simp_fast = [ simp_body0 ]
+    let rules_simp_fast = [ simp_body0; Avatar.simplify_trail ]
 
     (* TODO: rewriting for deduction modulo *)
 
@@ -944,8 +1014,9 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           "@[<2>@{<Blue>## saturate@}: given clause@ %a@]"
           (fun k->k HC.pp c);
         let c = simplify_full c in
-        if HC.is_trivial c then saturation_loop ()
-        else if HC.is_absurd c then (
+        if HC.is_trivial c || Avatar.has_trivial_trail c then (
+          saturation_loop ()
+        ) else if HC.is_absurd c then (
           Util.debugf ~section 2 "@[<2>@{<Green>found empty clause@}@ %a@]"
             (fun k->k HC.pp c);
           Unsat c

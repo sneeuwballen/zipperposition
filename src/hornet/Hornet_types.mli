@@ -48,6 +48,7 @@ and proof =
   | P_avatar_split of clause
   (* given clause has been split into var-disjoint components,
      one of which is the current clause *)
+  | P_avatar_cut of horn_clause * (bool_lit * proof) list (* cut the given literals *)
   | P_split of clause * select_lit * c_constraint (* model-driven recursive splitting *)
   | P_bool_tauto (* boolean tautology *)
   | P_bool_res of bool_res_step

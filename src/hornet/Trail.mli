@@ -20,6 +20,12 @@ val is_absurd : t -> bool
 val subsumes : t -> t -> bool
 (** [subsumes a b] means that [a] is a subset of [b] *)
 
+val exists : (bool_lit -> bool) -> t -> bool
+
+val to_list : t -> bool_lit list
+
+val of_list : bool_lit list -> t
+
 include Interfaces.PRINT with type t := t
 include Interfaces.EQ with type t := t
 
