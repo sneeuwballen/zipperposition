@@ -64,4 +64,14 @@ val variant :
   Subst.t Sequence.t
 (** Find substitutions for which these two constraints are variant *)
 
+val matching :
+  ?subst:Subst.t ->
+  t Scoped.t ->
+  t Scoped.t ->
+  Subst.t Sequence.t
+(** Find substitutions for which the first constraint subsumes
+    the second one.
+    It means that every instance accepted by the second will be an
+    instance accepted by the first. *)
+
 val are_variant : t -> t -> bool

@@ -54,6 +54,14 @@ let variant ~subst (c1,sc1)(c2,sc2): Subst.t Sequence.t =
     (c1.constr_dismatch,sc1)(c2.constr_dismatch,sc2)
     ~op:(fun subst a b -> Dismatching_constr.variant ~subst a b)
 
+let matching ?(subst=Subst.empty) (c1,sc1)(c2,sc2): Subst.t Sequence.t =
+  Unif.unif_list_com subst
+    (c1.constr_dismatch,sc1)(c2.constr_dismatch,sc2)
+    ~op:(fun subst a b -> Dismatching_constr.matching ~subst a b)
+
+let subsumes ?subst a b: bool =
+  not (Sequence.is_empty (matching ?subst a b))
+
 let combine (a:t)(b:t): t =
   { constr_dismatch =
       CCList.sorted_merge_uniq ~cmp:Dismatching_constr.compare

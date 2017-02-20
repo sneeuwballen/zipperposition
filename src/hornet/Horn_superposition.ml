@@ -584,12 +584,14 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     let demod_nf ~restrict (passive:HC.t)(rules:HC.t list ref) (t:term): term =
       let ord = Ctx.ord in
       let idx = Active_set.idx_heads () in
+      let sc_active = 1 in
+      let sc_passive = 0 in
       (* compute normal form of subterm. If restrict is true, substitutions that
          are variable renamings are forbidden (since we are at root of a max term) *)
       let rec reduce_at_root ~restrict t =
         (* find an equation l=r that match subterm *)
         let matching_rule =
-          CP_idx.retrieve_generalizations (idx, 1) (t, 0)
+          CP_idx.retrieve_generalizations (idx, sc_active) (t, sc_passive)
           |> Sequence.find
             (fun (l, c_with_pos, subst) ->
                let active, pos = c_with_pos in
@@ -605,10 +607,12 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
                  (not restrict || not (Unif.FO.matches ~pattern:t l))
                  && Trail.subsumes (HC.trail active) (HC.trail passive)
                  && Ordering.compare ord
-                       (Subst.FO.apply_no_renaming subst (l,1))
-                       (Subst.FO.apply_no_renaming subst (r,1)) = Comparison.Gt
-                 && Label.is_empty (HC.label active) (* TODO: label subsumption *)
-                 && Constraint.is_trivial (HC.constr active) (* TODO: constraint subsumption *)
+                       (Subst.FO.apply_no_renaming subst (l,sc_active))
+                       (Subst.FO.apply_no_renaming subst (r,sc_active)) = Comparison.Gt
+                 && Label.subsumes ~subst
+                   (HC.label active,sc_active)(HC.label passive,sc_passive)
+                 && Constraint.subsumes
+                   (HC.constr active,sc_active)(HC.constr passive,sc_passive)
                in
                if ok then (
                  rules := active :: !rules;

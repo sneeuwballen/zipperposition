@@ -101,3 +101,9 @@ let variant ?(subst=Subst.empty) (lc1,sc1)(lc2,sc2): Subst.t Sequence.t =
         with Unif.Fail -> Sequence.empty)
   ) else Sequence.empty
 
+(* it is unclear what would be the exact criterion for a labelled clause
+   to subsume another instance of the same clause with a difference
+   substitution, so we only accept that [lc1] subsumes [lc2] if
+   [lc1 = lc2] *)
+let matching = variant
+

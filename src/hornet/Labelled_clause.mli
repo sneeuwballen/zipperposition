@@ -44,3 +44,9 @@ val variant :
   t Scoped.t ->
   t Scoped.t ->
   Subst.t Sequence.t
+
+val matching :
+  ?subst:Subst.t ->
+  t Scoped.t ->
+  t Scoped.t ->
+  Subst.t Sequence.t

@@ -48,3 +48,9 @@ let variant ?(subst=Subst.empty) (l1,sc1)(l2,sc2): Subst.t Sequence.t =
   Unif.unif_list_com subst (l1,sc1)(l2,sc2)
     ~op:(fun subst a b -> LC.variant ~subst a b)
 
+let matching ?(subst=Subst.empty) (l1,sc1)(l2,sc2): Subst.t Sequence.t =
+  Unif.unif_list_com subst (l1,sc1)(l2,sc2)
+    ~op:(fun subst a b -> LC.matching ~subst a b)
+
+let subsumes ?subst a b: bool =
+  not (Sequence.is_empty (matching ?subst a b))

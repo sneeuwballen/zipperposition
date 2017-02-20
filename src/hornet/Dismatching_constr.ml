@@ -55,6 +55,7 @@ let pp_pairs out l =
    such that [forall i. t_i = u_iσ]. *)
 let match_rhs_to_lhs ~subst (l,sc) =
   let sc_rhs = ~-1 in
+  assert (sc> ~-1);
   assert (Subst.codomain subst
           |> Sequence.map Scoped.scope |> Sequence.for_all (fun s->s>sc_rhs));
   try
@@ -206,6 +207,32 @@ let variant ?(subst=Subst.empty) (c1,sc1)(c2,sc2) : Subst.t Sequence.t =
     | Pairs _, Empty -> Sequence.empty
     | Pairs {pairs=l1;_}, Pairs {pairs=l2;_} ->
       variants_arr_ subst (Array.of_list l1) sc1 (Array.of_list l2) sc2
+  end
+
+(* try to match pairwise [t1,u1] and [t2,u2] such that:
+   [subst(t1)=t2], and there is [subst_rhs] s.t. [subst_rhs(u2)=u1]
+   (that way, [t1,u1] covers all the terms covered by [t2,u2] *)
+let subsumes_arr_ subst a1 sc1 a2 sc2 : _ Sequence.t =
+  Unif.unif_array_com
+    (subst,Subst.empty)
+    (a1,sc1)
+    (a2,sc2)
+    ~op:(fun (subst,subst_rhs) ((t1,u1),sc1) ((t2,u2),sc2) ->
+      try
+        let subst = Unif.FO.matching ~subst ~pattern:(t1,sc1) (t2,sc2) in
+        let subst_rhs = Unif.FO.matching ~subst:subst_rhs ~pattern:(u2,1)(u1,0) in
+        Sequence.return (subst,subst_rhs)
+      with Unif.Fail ->
+        Sequence.empty)
+  |> Sequence.map fst (* drop the internal substitution *)
+
+let matching ?(subst=Subst.empty) (c1,sc1)(c2,sc2) : Subst.t Sequence.t =
+  begin match c1, c2 with
+    | Empty, _ -> Sequence.return subst
+    | Pairs _, Empty ->
+      Sequence.empty (* not finitary, would need to make [c1] trivial *)
+    | Pairs {pairs=l1;_}, Pairs {pairs=l2;_} ->
+      subsumes_arr_ subst (Array.of_list l1) sc1 (Array.of_list l2) sc2
   end
 
 let are_variant a b =

@@ -38,4 +38,18 @@ val variant :
   Subst.t Sequence.t
 (** Substitution that make these two constraints the same *)
 
+val matching :
+  ?subst:Subst.t ->
+  t Scoped.t ->
+  t Scoped.t ->
+  Subst.t Sequence.t
+(** Substitution that make these the first constraint imply the second *)
+
+val subsumes :
+  ?subst:Subst.t ->
+  t Scoped.t ->
+  t Scoped.t ->
+  bool
+(** Substitution that make these the first constraint imply the second *)
+
 include Interfaces.PRINT with type t := t

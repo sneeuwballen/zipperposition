@@ -39,6 +39,19 @@ val variant :
   t Scoped.t ->
   Subst.t Sequence.t
 
+val matching :
+  ?subst:Subst.t ->
+  t Scoped.t ->
+  t Scoped.t ->
+  Subst.t Sequence.t
+(** Substitution that make these the first label imply the second *)
+
+val subsumes :
+  ?subst:Subst.t ->
+  t Scoped.t ->
+  t Scoped.t ->
+  bool
+
 val merge : t -> t -> t
 
 val to_list : t -> labelled_clause list
