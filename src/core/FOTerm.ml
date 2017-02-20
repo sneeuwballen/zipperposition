@@ -169,7 +169,10 @@ let as_const t = try Some (as_const_exn t) with Invalid_argument _ -> None
 
 module Seq = struct
   let vars t k =
-    let rec aux t = match view t with
+    let rec aux t =
+      Type.Seq.vars (ty t) k;
+      aux_term t;
+    and aux_term t = match view t with
       | Var v -> k v
       | Const _
       | DB _ -> ()
