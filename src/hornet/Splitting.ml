@@ -313,9 +313,9 @@ module Make(Ctx : State.CONTEXT) = struct
   (* the clause instances that are currently too deep *)
   let waiting_instances : H.t ref = ref H.empty
 
-  let set_depth_limit d =
-    Depth_limit.set d; (* do this first *)
+  let flush_new_clauses () =
     (* split the clauses that were too deep before *)
+    let d = Depth_limit.get () in
     let rec aux h = match H.take h with
       | Some (new_h, c) when C.depth c < d ->
         split_clause c;
@@ -324,6 +324,10 @@ module Make(Ctx : State.CONTEXT) = struct
       | None -> h (* return same heap *)
     in
     waiting_instances := aux !waiting_instances
+
+  let set_depth_limit d =
+    Depth_limit.set d; (* do this first *)
+    flush_new_clauses ()
 
   (* what to do if a conflict is detected *)
   let on_conflict (trail:Trail.t) (label:Label.t) (proof:Proof.t): unit =
@@ -385,13 +389,6 @@ module Make(Ctx : State.CONTEXT) = struct
                  ~constr:constr' ~trail:Trail.empty ~depth:(C.depth c+1)
              in
              Util.incr_stat stat_instantiate;
-             if C.is_trivial c' then (
-               Util.debugf ~section 2
-                 "(@[<hv2>@{<yellow>inst_gen_eq.instantiate_trivial@}@ :clause %a@ \
-                  :subst %a@ :new_clause %a@])"
-                 (fun k->k C.pp c Subst.pp subst C.pp c');
-               assert false
-             );
              (* block this instance from [c] *)
              let new_constr = Labelled_clause.to_dismatch lc in
              assert (not (Dismatching_constr.is_trivial new_constr));
@@ -419,12 +416,8 @@ module Make(Ctx : State.CONTEXT) = struct
       List.iter
         (fun (c,sel) -> Ctx.send_event (E_select_lit (c, sel, C.constr c)))
         clauses_to_instantiate;
-      (* now add the new clauses, if not too deep *)
-      List.iter
-        (fun new_c ->
-           if C.depth new_c <= Depth_limit.get()
-           then split_clause new_c
-           else waiting_instances := H.add !waiting_instances new_c)
+      List.iter (fun new_c ->
+        waiting_instances := H.add !waiting_instances new_c)
         new_instances;
     )
 
@@ -434,7 +427,7 @@ module Make(Ctx : State.CONTEXT) = struct
       | E_add_ground_lit _ | E_remove_ground_lit _
       | E_select_lit _ | E_unselect_lit _ -> () (* come from here *)
       | E_conflict (trail,label,proof) -> on_conflict trail label proof
-      | E_if_sat
+      | E_if_sat -> flush_new_clauses ()
       | E_found_unsat _ -> ()
       | E_stage s ->
         begin match s with
