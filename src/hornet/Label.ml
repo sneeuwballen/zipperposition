@@ -10,7 +10,8 @@ module Fmt = CCFormat
 module LC = Labelled_clause
 
 type t = label
-(** Set of labelled clauses. Invariant: sorted *)
+(** Set of labelled clauses.
+    Invariants: sorted; all labelled instances of a clause have same literal *)
 
 let return l : t = [l]
 
@@ -20,7 +21,25 @@ let is_empty = CCList.is_empty
 
 let all_empty = List.for_all LC.is_empty
 
-let has_no_ground_instance = List.exists LC.has_no_ground_instance
+let check_inv_sorted_ (l:t): bool =
+  CCList.is_sorted ~cmp:LC.compare l
+
+(* check invariant about labelled instances *)
+let check_inv_ (l:t): bool =
+  List.for_all
+    (fun lc ->
+       List.for_all
+         (fun lc' ->
+            if Hornet_types_util.equal_clause lc.lc_clause lc'.lc_clause
+            then lc.lc_sel.select_idx = lc'.lc_sel.select_idx
+            else true)
+         l)
+    l
+
+let has_no_ground_instance l=
+  assert (check_inv_sorted_ l);
+  assert (check_inv_ l);
+  List.exists LC.has_no_ground_instance l
 
 let merge = CCList.sorted_merge_uniq ~cmp:LC.compare
 
