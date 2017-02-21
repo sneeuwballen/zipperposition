@@ -107,6 +107,10 @@ val current_cycle : unit -> int
 
 val start_new_cycle : unit -> unit
 
+val make_alive_again : t -> unit
+(** The clause is dead or alive with an old cycle; we make it alive again
+    because the boolean trail has changed *)
+
 val is_alive : t -> bool
 
 val is_dead : t -> bool

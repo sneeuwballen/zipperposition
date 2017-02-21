@@ -58,8 +58,9 @@ let set_status c new_st new_cycle =
   c.hc_status <- (new_st,new_cycle);
   ()
 
-  (* register the clause in each of its trail's boolean literal.
-     That way, when the literal is backtracked, the clause can be removed *)
+(* register the clause in each of its trail's boolean literal
+   and labelled clause.
+   That way, when the literal is backtracked, the clause can be removed *)
 let register_ (c:t): unit =
   let old_st, old_cycle = c.hc_status in
   begin match old_st with
@@ -69,13 +70,19 @@ let register_ (c:t): unit =
       assert (old_cycle < !cycle);
       (* clause is now alive again, with new cycle *)
       set_status c HC_alive !cycle;
+      (* register to trail *)
       List.iter
         (fun (lazy b_lit) -> match b_lit.bl_atom with
            | A_box_clause r ->
              r.bool_box_depends <- c :: r.bool_box_depends
            | A_fresh _
            | A_ground _ -> ())
-        c.hc_trail
+        c.hc_trail;
+      (* register to labelled clauses *)
+      List.iter
+        (fun lc ->
+           lc.lc_sel.select_depends <- c :: lc.lc_sel.select_depends)
+        c.hc_label;
   end
 
 let make =
@@ -176,9 +183,17 @@ let current_cycle () = !cycle
 (* is the clause dead right now? *)
 let is_dead (c:t): bool = match status c with
   | HC_alive, _ -> false
-  | HC_dead, n -> n = current_cycle ()
+  | HC_dead, n -> assert (n >= 0); true
 
 let is_alive c = not (is_dead c)
+
+let make_alive_again (c:t): unit =
+  begin match status c with
+    | HC_alive, _ -> ()
+    | HC_dead, n ->
+      assert (n<current_cycle());
+      register_ c;
+  end
 
 let kill (c:t): unit =
   begin match status c with

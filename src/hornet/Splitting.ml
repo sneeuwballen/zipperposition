@@ -415,7 +415,9 @@ module Make(Ctx : State.CONTEXT) = struct
         (fun (c,sel) -> Ctx.send_event (E_unselect_lit (c, sel)))
         clauses_to_instantiate;
       List.iter
-        (fun (c,sel) -> Ctx.send_event (E_select_lit (c, sel, C.constr c)))
+        (fun (c,sel) ->
+           assert (sel.select_depends=[]);
+           Ctx.send_event (E_select_lit (c, sel, C.constr c)))
         clauses_to_instantiate;
       List.iter (fun new_c ->
         waiting_instances := H.add !waiting_instances new_c)

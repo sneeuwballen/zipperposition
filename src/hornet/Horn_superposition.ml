@@ -155,6 +155,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       (fun c ->
          if HC.is_alive c then (
            HC.kill c;
+           assert (HC.is_dead c);
            Active_set.remove c; (* if it's active, not any more *)
          ))
       l
@@ -286,10 +287,9 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       | None -> None
       | Some (new_q, (_,c)) ->
         q_ := new_q;
-        begin match HC.status c with
-          | HC_alive, _ -> Some c
-          | HC_dead, _ -> next () (* discard dead clause *)
-        end
+        if HC.is_dead c
+        then next() (* discard dead clause *)
+        else Some c
   end
 
   (** {2 Superposition} *)
@@ -319,6 +319,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       assert (HC.body_len c=0);
       assert (not (T.is_var sup.hc_sup_rewritten));
       let c', sc_passive = sup.hc_sup_passive in
+      assert (HC.is_alive c);
+      assert (HC.is_alive c');
       let subst = sup.hc_sup_subst in
       let renaming = Ctx.renaming_cleared () in
       let s = sup.hc_sup_s in
@@ -1073,7 +1075,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         (fun k->k HC.pp c);
       let c = simplify_fast c in
       (* this clause might be currently dead, but give it another chance *)
-      HC.start_new_cycle();
       Passive_set.add c;
       saturate ()
 
@@ -1111,7 +1112,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           ~trail:Trail.empty ~unordered_depth:0
           (Proof.split c sel constr)
       in
-      sel.select_depends <- hc :: sel.select_depends; (* register *)
       Saturate.add_horn hc
   end
 
@@ -1154,6 +1154,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         (* assume this component *)
         begin match C.classify r.bool_box_clause with
           | C.Horn c ->
+            HC.start_new_cycle();
+            HC.make_alive_again c;
             check_res (Saturate.add_horn c)
           | C.General -> ()
         end
