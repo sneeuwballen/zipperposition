@@ -15,6 +15,7 @@ module type CTX_ARGS = sig
   val conf : Flex_state.t
   val statements : statement CCVector.ro_vector
   val max_depth : int
+  val saturation_steps : int
   val compress_proof : bool
   val dimacs_file : string option
 end

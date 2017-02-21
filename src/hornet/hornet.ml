@@ -107,6 +107,7 @@ let time : float ref = ref 0.
 let file : string ref = ref ""
 let def_as_rewrite : bool ref = ref false
 let max_depth : int ref = ref 6
+let saturation_steps : int ref = ref 256
 let ord_ : string ref = ref Ordering.default_name
 let dot_file_ : string ref = ref ""
 let dimacs_file_ : string ref = ref ""
@@ -120,6 +121,7 @@ let options =
        "--def-as-rewrite", Arg.Set def_as_rewrite, " definitions as rewrite rules";
        "--no-def-as-rewrite", Arg.Clear def_as_rewrite, " definitions as axioms";
        "--max-depth", Arg.Set_int max_depth, (Fmt.sprintf " maximum depth (default %d)" !max_depth);
+       "--saturation-steps", Arg.Set_int saturation_steps, " saturation steps at every decision";
        "--dot", Arg.Set_string dot_file_, " print proof to <file> in DOT" ;
        "--dimacs", Arg.Set_string dimacs_file_, " print SAT problem in dimacs into <file>" ;
        "--compress", Arg.Set compress_proof_, " compress proof";
@@ -153,6 +155,7 @@ let main () =
       let conf = conf
       let statements = stmts
       let max_depth = !max_depth
+      let saturation_steps = !saturation_steps
       let dimacs_file = if !dimacs_file_ =""then None else Some !dimacs_file_
       let compress_proof = !compress_proof_
       let theories = [

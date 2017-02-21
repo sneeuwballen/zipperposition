@@ -112,8 +112,9 @@ let pp_lc out (lc:labelled_clause): unit =
       Fmt.(seq (pair ~sep:(return "@ -> ") HVar.pp T.pp))
       (lc_filter_subst lc.lc_subst)
   in
-  Fmt.fprintf out "(@[%a@ @[:subst %a@]@ @[:select `%a`@]@])"
+  Fmt.fprintf out "(@[%a@ @[:subst %a@]@ @[:select `%a`/%d@]@])"
     pp_clause lc.lc_clause pp_subst lc pp_lit lc.lc_sel.select_lit
+    lc.lc_sel.select_idx
 
 let pp_label out (l:label): unit =
   Fmt.fprintf out "{@[<hv>%a@]}" (Fmt.list pp_lc) l

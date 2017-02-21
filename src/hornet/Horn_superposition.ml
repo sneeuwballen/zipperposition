@@ -36,12 +36,15 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
   (* an inference rule *)
   type 'a rule_infer = 'a -> 'a list
 
+  (* real depth limit for saturation is [n * depth_limit] *)
+  let depth_limit_coeff : int = 2
+
   module Depth_limit : sig
     val set : int -> unit (** Set the limit on derivations *)
     val get : unit -> int (** Set the limit on derivations *)
   end = struct
     let limit_ : int ref = ref 1
-    let set i = assert (i>0); limit_ := i
+    let set i = assert (i>0); limit_ := depth_limit_coeff * i
     let get () = !limit_
   end
 
@@ -179,14 +182,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           (HC.trail c)
     end
 
-  (* TODO: add  field "labelled_clauses" to HC, do this at registration
-     for every clause with selected lit inside it.
-     invariant: an alive HC depends on labelled clause C => C has a selected lit
-
-     | A_select (_,r) ->
-       r.select_depends <- c :: r.select_depends
-  *)
-
   (* is the clause dead right now? *)
   let is_dead (c:HC.t): bool = match HC.status c with
     | HC_alive, _ -> false
@@ -217,10 +212,66 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
   module Passive_set : sig
     val add : HC.t -> unit
     val add_seq : HC.t Sequence.t -> unit
-    val update_depth_limit: int -> unit
+    val update_depth_limit: unit -> unit
     val has_too_deep_clauses: unit -> bool (** are there clauses frozen b.c. of their depth? *)
     val next : unit -> HC.t option
   end = struct
+    (* heuristic weights for selecting clauses *)
+    module W = struct
+      type t = HC.t -> int
+
+      (* weighted combination *)
+      let combine (ws:(t * int) list): t =
+        assert (ws <> []);
+        assert (List.for_all (fun (_,c) -> c > 0) ws);
+        fun c ->
+          List.fold_left
+            (fun sum (w,coeff) -> sum + coeff * w c)
+            0 ws
+
+      let weight_lits (c:HC.t): int =
+        (Sequence.append (Lit.seq_terms (HC.head c))
+           (HC.body c |> IArray.to_seq |> Sequence.flat_map Lit.seq_terms))
+        |> Sequence.map T.weight
+        |> Sequence.fold (+) 0
+
+      let default (c:HC.t): int =
+        (* maximum depth of types. Avoids reasoning on list (list (list .... (list int))) *)
+        let _depth_ty =
+          (Sequence.append (Lit.seq_terms (HC.head c))
+             (HC.body c |> IArray.to_seq |> Sequence.flat_map Lit.seq_terms))
+          |> Sequence.map FOTerm.ty
+          |> Sequence.map Type.depth
+          |> Sequence.max ?lt:None
+          |> CCOpt.get_or ~default:0
+        in
+        let w_lits = weight_lits c in
+        let trail = HC.trail c in
+        let w_trail = List.length trail in
+        w_lits + w_trail + _depth_ty
+
+      let depth (c:HC.t): int = HC.unordered_depth c
+
+      let favor_ground: t = fun c -> if HC.is_ground c then 0 else 10
+
+      let favor_pos_unit: t = fun c -> if HC.is_unit_pos c then 0 else 10
+
+      let penalty_constraint: t =
+        fun c ->
+          let cs = HC.constr c in
+          5 * List.length cs.constr_dismatch
+
+      let label_constraint: t =
+        fun c -> List.length (HC.label c)
+    end
+
+    (* "weight" of a clause. *)
+    let weight : W.t =
+      W.combine
+        [ W.default, 3; W.depth, 1;
+          W.favor_ground, 2; W.favor_pos_unit, 5;
+          W.penalty_constraint, 1; W.label_constraint, 2; ]
+
     (* priority queue *)
     module H = CCHeap.Make(struct
         type t = (int * HC.t)
@@ -230,11 +281,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
     let prof_passive = Util.mk_profiler "hornet.passive_set"
     let stat_passive_add = Util.mk_stat "hornet.passive_add"
-
-    (* "weight" of a clause. for now, just favor unit clauses *)
-    let weight_ (c:HC.t): int =
-      let n = HC.body_len c in
-      1 + n
 
     (* queue of clauses to process (passive) *)
     let q_ : H.t  ref = ref H.empty
@@ -254,7 +300,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           Util.debugf ~section 3 "@[<2>add `%a`@ to passive set@]"
             (fun k->k HC.pp c);
           Util.incr_stat stat_passive_add;
-          q_ := H.add !q_ (weight_ c,c)
+          q_ := H.add !q_ (weight c,c)
         ) else (
           too_deep_ := H.add !too_deep_ (depth,c);
         )
@@ -265,8 +311,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     let add_seq = Sequence.iter add
 
     (* new depth limit -> some clauses become active *)
-    let update_depth_limit d =
-      assert (Depth_limit.get() = d); (* must be updated first *)
+    let update_depth_limit () =
+      let d = Depth_limit.get() in
       let rec aux q = match H.take q with
         | Some (new_q, (d_c,c)) when d_c < d ->
           (* [c] becomes passive *)
@@ -1007,7 +1053,14 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     let stat_loop_count = Util.mk_stat "hornet.saturation_iter_count"
 
     (* the main saturation loop *)
-    let rec saturation_loop () = match Passive_set.next () with
+    let rec saturation_loop n =
+      if n=0
+      then
+        if Passive_set.has_too_deep_clauses ()
+        then Unknown
+        else Sat
+      else saturate_next n
+    and saturate_next n = match Passive_set.next () with
       | None ->
         if Passive_set.has_too_deep_clauses ()
         then Unknown
@@ -1019,7 +1072,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           (fun k->k HC.pp c);
         let c = simplify_full c in
         if HC.is_trivial c || Avatar.has_trivial_trail c then (
-          saturation_loop ()
+          saturation_loop n
         ) else if HC.is_absurd c then (
           Util.debugf ~section 2 "@[<2>@{<Green>found empty clause@}@ %a@]"
             (fun k->k HC.pp c);
@@ -1027,7 +1080,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         ) else if Active_set.mem c || Active_set.variant_mem c then (
           Util.debugf ~section 4 "clause %a already in active set, continue"
             (fun k->k HC.pp c);
-          saturation_loop ()
+          saturation_loop n
         ) else (
           (* add to [c] *)
           Active_set.add c;
@@ -1048,10 +1101,10 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
             |> Sequence.filter (fun c -> not (HC.is_trivial c))
           in
           Passive_set.add_seq new_c;
-          saturation_loop ()
+          saturation_loop (n-1) (* did one step *)
         )
 
-    let saturate = saturation_loop
+    let saturate () = saturation_loop Ctx.saturation_steps
 
     let add_horn c : res =
       Util.debugf ~section 2 "@[<2>@{<yellow>saturate.add_horn@}@ %a@]"
@@ -1060,7 +1113,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       (* this clause might be currently dead, but give it another chance *)
       start_new_cycle();
       Passive_set.add c;
-      saturation_loop ()
+      saturate ()
 
     let add_clause c =
       Util.debugf ~section 3 "@[<2>saturate.add_clause@ %a@]"
@@ -1119,7 +1172,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
   let set_depth_limit d =
     Depth_limit.set d;
-    Passive_set.update_depth_limit d;
+    Passive_set.update_depth_limit ();
     (* some clauses might have become active *)
     check_res (Saturate.saturate ());
     ()
@@ -1133,7 +1186,6 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
   (* no direct communication with SAT solver *)
   let on_assumption _ = ()
 
-  (* TODO *)
   let on_event e =
     begin match e with
       | E_add_component r ->

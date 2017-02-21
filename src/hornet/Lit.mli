@@ -80,6 +80,8 @@ val active_terms : ?pos:Position.t -> Ordering.t -> t -> term Position.With.t Se
 val passive_terms : ?pos:Position.t -> Ordering.t -> t -> term Position.With.t Sequence.t
 (** Terms in passive position for paramodulation/resolution *)
 
+val seq_terms : t -> term Sequence.t
+
 module Pos : sig
   val at : t -> Position.t -> term
   (** retrieve subterm at pos

@@ -218,6 +218,11 @@ let passive_terms ?(pos=P.stop) ord lit =
     | Bool _ -> Sequence.empty
   end
 
+let seq_terms = function
+  | Atom (t,_) -> Sequence.return t
+  | Eq (a,b,_) -> Sequence.doubleton a b
+  | Bool _ -> Sequence.empty
+
 module Pos = struct
   type split = {
     lit_pos : P.t;
