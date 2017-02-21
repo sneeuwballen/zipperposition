@@ -16,21 +16,12 @@ type horn_clause = t
 
 (** {2 Basics} *)
 
-let make =
-  let n_ = ref 0 in
-  fun ~trail ~constr ~unordered_depth ~label head body proof ->
-    let hc_id = !n_ in
-    incr n_;
-    { hc_id;
-      hc_head=head;
-      hc_unordered_depth=unordered_depth;
-      hc_body=body;
-      hc_proof=proof;
-      hc_trail=trail;
-      hc_constr=constr;
-      hc_label=label;
-      hc_status=(HC_dead,0);
-    }
+
+(* Some clauses are added and removed several times. We keep a
+   cycle counter to distinguish clauses dead at time n (which can
+   be alive at time n+1), from clauses dead at time n+1, that will
+   not be active anymore until cycle n+2. *)
+let cycle : int ref = ref 0
 
 let equal a b = a.hc_id = b.hc_id
 let hash a = Hash.int a.hc_id
@@ -66,6 +57,45 @@ let set_status c new_st new_cycle =
   end;
   c.hc_status <- (new_st,new_cycle);
   ()
+
+  (* register the clause in each of its trail's boolean literal.
+     That way, when the literal is backtracked, the clause can be removed *)
+let register_ (c:t): unit =
+  let old_st, old_cycle = c.hc_status in
+  begin match old_st with
+    | HC_alive -> ()
+    | HC_dead when old_cycle = !cycle -> () (* up-to-date *)
+    | HC_dead ->
+      assert (old_cycle < !cycle);
+      (* clause is now alive again, with new cycle *)
+      set_status c HC_alive !cycle;
+      List.iter
+        (fun (lazy b_lit) -> match b_lit.bl_atom with
+           | A_box_clause r ->
+             r.bool_box_depends <- c :: r.bool_box_depends
+           | A_fresh _
+           | A_ground _ -> ())
+        c.hc_trail
+  end
+
+let make =
+  let n_ = ref 0 in
+  fun ~trail ~constr ~unordered_depth ~label head body proof ->
+    let hc_id = !n_ in
+    incr n_;
+    let c = {
+      hc_id;
+      hc_head=head;
+      hc_unordered_depth=unordered_depth;
+      hc_body=body;
+      hc_proof=proof;
+      hc_trail=trail;
+      hc_constr=constr;
+      hc_label=label;
+      hc_status=(HC_dead,~-1);
+    } in
+    register_ c; (* register right now *)
+    c
 
 let body_seq c = IArray.to_seq (body c)
 let body_l c = IArray.to_list (body c)
@@ -132,6 +162,33 @@ let is_unit_pos c =
   IArray.length (body c) = 0
 
 let vars_seq = Hornet_types_util.vars_of_hclause
+
+(** {2 Life Cycle} *)
+
+(* start a new cycle, so that dead clause can be alive again *)
+let start_new_cycle () : unit =
+  incr cycle;
+  Util.debugf 4 "@[<2>start_new_cycle (%d)@]" (fun k->k !cycle);
+  ()
+
+let current_cycle () = !cycle
+
+(* is the clause dead right now? *)
+let is_dead (c:t): bool = match status c with
+  | HC_alive, _ -> false
+  | HC_dead, n -> n = current_cycle ()
+
+let is_alive c = not (is_dead c)
+
+let kill (c:t): unit =
+  begin match status c with
+    | HC_alive, _ ->
+      (* the clause dies now *)
+      Util.debugf 5 "@[<2>remove clause@ %a,@ now dead@]"
+        (fun k->k pp c);
+      set_status c HC_dead !cycle;
+    | HC_dead, _ -> ()
+  end
 
 (** {2 Unification} *)
 

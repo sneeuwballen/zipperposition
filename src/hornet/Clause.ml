@@ -60,8 +60,9 @@ let kind_of_lits ~trail ~constr (c_lits:Lit.t IArray.t) proof: c_kind =
     Array.sort compare_lits_for_horn_ arr; (* sort body in some order *)
     IArray.of_array_unsafe arr
   and mk_horn head body =
-    Horn_clause.make head body proof
-      ~constr ~trail ~unordered_depth:0 ~label:[]
+    lazy (
+      Horn_clause.make head body proof
+        ~constr ~trail ~unordered_depth:0 ~label:[])
   in
   begin match pos with
     | [] ->
@@ -166,7 +167,7 @@ type kind =
   | General
 
 let classify (c:t): kind = match c.c_kind with
-  | C_horn c -> Horn c
+  | C_horn c -> Horn (Lazy.force c)
   | C_general -> General
 
 let is_horn c = match c.c_kind with

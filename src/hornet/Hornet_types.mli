@@ -35,7 +35,7 @@ and lit =
 
 (* internal kind *)
 and c_kind =
-  | C_horn of horn_clause
+  | C_horn of horn_clause lazy_t
   | C_general
 
 and proof =

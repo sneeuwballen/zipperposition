@@ -94,6 +94,25 @@ val is_absurd : t -> bool
 
 val is_unit_pos : t -> bool
 
+(** {2 Life Cycle} *)
+
+(** A given clause can be alive, then dead, then alive again, … as many
+    times as needed (typically because it comes from the splitting of
+    a full clause, and depends on the boolean model).
+
+    To become alive again after being dead, the "cycle" counter needs
+    to be increased, signalling that the boolean model might have changed. *)
+
+val current_cycle : unit -> int
+
+val start_new_cycle : unit -> unit
+
+val is_alive : t -> bool
+
+val is_dead : t -> bool
+
+val kill : t -> unit
+
 (** {2 Unification} *)
 
 val variant :
