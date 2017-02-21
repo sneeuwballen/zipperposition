@@ -983,9 +983,10 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         [Unsat l] is returned (where [l] is a non-empty list of empty clauses).
         Otherwise, [Sat] is returned. *)
 
-    val saturate : unit -> res
+    val saturate : ?full:bool -> unit -> res
     (** Saturate again. Should be called after every increase of depth,
-        since it might unlock some clauses that were too deep till now *)
+        since it might unlock some clauses that were too deep till now.
+        @param full if true, ignore the saturation limit (default false) *)
   end = struct
     type res =
       | Sat
@@ -1104,7 +1105,9 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           saturation_loop (n-1) (* did one step *)
         )
 
-    let saturate () = saturation_loop Ctx.saturation_steps
+    let saturate ?(full=false) () =
+      let n_steps = if full then max_int else Ctx.saturation_steps in
+      saturation_loop n_steps
 
     let add_horn c : res =
       Util.debugf ~section 2 "@[<2>@{<yellow>saturate.add_horn@}@ %a@]"
@@ -1209,8 +1212,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       | E_stage (Stage_start | Stage_init) -> ()
       | E_remove_ground_lit _ -> ()
       | E_if_sat ->
-        (* saturate again *)
-        check_res (Saturate.saturate ())
+        (* saturate again, fully *)
+        check_res (Saturate.saturate ~full:true ())
       | E_add_ground_lit _
       | E_conflict _
       | E_found_unsat _ -> ()
