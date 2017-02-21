@@ -347,7 +347,7 @@ module Seq = struct
     | Data _
     | TyDecl _ -> ()
     | Goal c -> k c
-    | RewriteForm (_,_, l)
+    | RewriteForm (_,_, _) -> ()
     | Lemma l
     | NegatedGoal (_, l) -> List.iter k l
     | Assert c -> k c
