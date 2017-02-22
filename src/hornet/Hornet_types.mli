@@ -66,6 +66,9 @@ and proof_res =
   | PR_clause of clause
   | PR_bool_clause of bool_clause
 
+(* TODO: (HO) unification constraints
+   TODO: E unification constraints, for datatypes
+   TODO: arith constraints *)
 and c_constraint = {
   constr_dismatch: Dismatching_constr.t list;
 }
