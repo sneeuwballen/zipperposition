@@ -588,7 +588,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
        restrict is an option for restricting demodulation
        in positive unit clauses.
        add rewriting rules to [rules] *)
-    let demod_nf ~restrict (passive:HC.t)(rules:HC.t list ref) (t:term): term =
+    let demod_nf ~restrict (passive:HC.t)(rules:HC.Set.t ref) (t:term): term =
       let ord = Ctx.ord in
       let idx = Active_set.idx_heads () in
       let sc_active = 1 in
@@ -622,7 +622,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
                    (HC.constr active,sc_active)(HC.constr passive,sc_passive)
                in
                if ok then (
-                 rules := active :: !rules;
+                 rules := HC.Set.add active !rules;
                  Util.incr_stat stat_demod_step;
                  Some (r, subst)
                ) else
@@ -668,7 +668,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       in
       normal_form ~restrict Subst.empty t 0
 
-    let demod_lit ~head passive (rules:HC.t list ref)(lit:lit): lit =
+    let demod_lit ~head passive (rules:HC.Set.t ref)(lit:lit): lit =
       begin match lit with
         | Atom (p,sign) ->
           let p = demod_nf ~restrict:head passive rules p in
@@ -696,7 +696,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
     let demod_ (c:HC.t): HC.t option =
       Util.incr_stat stat_demod_call;
-      let rules = ref [] in
+      let rules = ref HC.Set.empty in
       let new_head = demod_lit ~head:true c rules (HC.head c)
       and new_body =
         (* only demodulate first body literal *)
@@ -706,15 +706,17 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           (HC.body c)
       in
       (* rewriting happened iff there is at least one rule *)
-      if !rules <> [] then (
+      if not (HC.Set.is_empty !rules) then (
+        let rules = HC.Set.to_list !rules in
         let new_c : HC.t =
-          HC.make new_head new_body (Proof.hc_demod c !rules)
+          HC.make new_head new_body
+            (Proof.hc_demod c rules)
             ~constr:(HC.constr c) ~trail:(HC.trail c)
             ~unordered_depth:(HC.unordered_depth c) ~label:(HC.label c)
         in
         Util.debugf ~section 3
           "(@[<2>demod@ :clause %a@ :into %a@ :rules {@[<hv>%a@]}@])"
-          (fun k->k HC.pp c HC.pp new_c (Util.pp_list HC.pp) !rules);
+          (fun k->k HC.pp c HC.pp new_c (Util.pp_list HC.pp) rules);
         Some new_c
       ) else None
 
