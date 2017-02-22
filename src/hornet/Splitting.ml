@@ -153,18 +153,6 @@ module Make(Ctx : State.CONTEXT) = struct
       | _ -> try_split_ (C.lits c) c
   end
 
-  (** Depth limit for inst-gen-eq *)
-  module Depth_limit : sig
-    val set : int -> unit
-    val get : unit -> int
-  end = struct
-    let d_ = ref 1
-    let get () = !d_
-    let set new_d =
-      assert (new_d >= !d_);
-      d_ := new_d
-  end
-
   (** {2 Inst-Gen-Eq} *)
 
   module Inst_gen_eq : sig
@@ -305,30 +293,13 @@ module Make(Ctx : State.CONTEXT) = struct
         -> ()
     end
 
-  module H = CCHeap.Make(struct
-      type t = clause
-      let leq c1 c2: bool =
-        c1.c_depth < c2.c_depth || (c1.c_depth = c2.c_depth && c1.c_id <= c2.c_id)
-    end)
-
-  (* the clause instances that are currently too deep *)
-  let waiting_instances : H.t ref = ref H.empty
+  let new_instances_q : C.t Queue.t = Queue.create()
 
   let flush_new_clauses () =
-    (* split the clauses that were too deep before *)
-    let d = Depth_limit.get () in
-    let rec aux h = match H.take h with
-      | Some (new_h, c) when C.depth c < d ->
-        split_clause c;
-        aux new_h
-      | Some _
-      | None -> h (* return same heap *)
-    in
-    waiting_instances := aux !waiting_instances
-
-  let set_depth_limit d =
-    Depth_limit.set d; (* do this first *)
-    flush_new_clauses ()
+    while not (Queue.is_empty new_instances_q) do
+      let c = Queue.pop new_instances_q in
+      split_clause c;
+    done
 
   (* what to do if a conflict is detected *)
   let on_conflict (trail:Trail.t) (label:Label.t) (proof:Proof.t): unit =
@@ -419,10 +390,12 @@ module Make(Ctx : State.CONTEXT) = struct
            assert (sel.select_depends=[]);
            Ctx.send_event (E_select_lit (c, sel, C.constr c)))
         clauses_to_instantiate;
-      List.iter (fun new_c ->
-        waiting_instances := H.add !waiting_instances new_c)
+      List.iter
+        (fun new_c -> Queue.push new_c new_instances_q)
         new_instances;
     )
+
+  let set_depth_limit _ = ()
 
   let on_event (e:event) =
     begin match e with
