@@ -190,48 +190,53 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
             (fun sum (w,coeff) -> sum + coeff * w c)
             0 ws
 
-      let weight_lits (c:HC.t): int =
+      let all_terms c: term Sequence.t =
         (Sequence.append (Lit.seq_terms (HC.head c))
            (HC.body c |> IArray.to_seq |> Sequence.flat_map Lit.seq_terms))
+
+      let weight_lits (c:HC.t): int =
+        all_terms c
         |> Sequence.map T.weight
         |> Sequence.fold (+) 0
 
-      let default (c:HC.t): int =
-        (* maximum depth of types. Avoids reasoning on list (list (list .... (list int))) *)
-        let _depth_ty =
-          (Sequence.append (Lit.seq_terms (HC.head c))
-             (HC.body c |> IArray.to_seq |> Sequence.flat_map Lit.seq_terms))
-          |> Sequence.map FOTerm.ty
-          |> Sequence.map Type.depth
-          |> Sequence.max ?lt:None
-          |> CCOpt.get_or ~default:0
-        in
-        let w_lits = weight_lits c in
-        let trail = HC.trail c in
-        let w_trail = List.length trail in
-        w_lits + w_trail + _depth_ty
+      let depth_lits (c:HC.t): int =
+        all_terms c
+        |> Sequence.map T.depth
+        |> Sequence.max
+        |> CCOpt.get_or ~default:0
 
-      let depth (c:HC.t): int = HC.unordered_depth c
+      let depth_ty (c:HC.t): int =
+        all_terms c
+        |> Sequence.flat_map T.Seq.subterms
+        |> Sequence.map FOTerm.ty
+        |> Sequence.map Type.depth
+        |> Sequence.max ?lt:None
+        |> CCOpt.get_or ~default:0
+
+      let num_vars_lits (c:HC.t): int =
+        all_terms c
+        |> Sequence.flat_map T.Seq.vars
+        |> Sequence.length
+
+      let unordered_depth = HC.unordered_depth
 
       let favor_ground: t = fun c -> if HC.is_ground c then 0 else 10
 
       let favor_pos_unit: t = fun c -> if HC.is_unit_pos c then 0 else 10
-
-      let penalty_constraint: t =
-        fun c ->
-          let cs = HC.constr c in
-          5 * List.length cs.constr_dismatch
-
-      let label_constraint: t =
-        fun c -> List.length (HC.label c)
     end
 
-    (* "weight" of a clause. *)
+    (* "weight" of a clause.
+       favor small clauses with shallow, ground terms *)
     let weight : W.t =
       W.combine
-        [ W.default, 3; W.depth, 1;
-          W.favor_ground, 2; W.favor_pos_unit, 5;
-          W.penalty_constraint, 1; W.label_constraint, 2; ]
+        [ W.depth_ty, 5;
+          W.weight_lits, 2;
+          W.depth_lits, 2;
+          W.num_vars_lits, 3;
+          W.favor_ground, 1;
+          W.unordered_depth, 1;
+          W.favor_pos_unit, 5;
+        ]
 
     (* priority queue *)
     module H = CCHeap.Make(struct
