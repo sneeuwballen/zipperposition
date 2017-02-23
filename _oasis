@@ -65,7 +65,7 @@ Library "libzipperposition"
                     TypeInference, Options, Comparison, Precedence, Builtin,
                     Ordering, Skolem, Cnf, ID, IDOrBuiltin, SLiteral,
                     Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,
-                    Congruence, FeatureVector, UntypedAST, Ind_ty,
+                    Congruence, FeatureVector, FV_tree, UntypedAST, Ind_ty,
                     TypedSTerm, Statement, Flex_state, Compute_prec, 
                     Ordinal,
                     lib/Hashcons, lib/ParseLocation, lib/Multiset, lib/LazyList,
