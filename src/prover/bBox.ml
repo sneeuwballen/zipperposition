@@ -59,13 +59,14 @@ let pp_payload out = function
   | Case p ->
     Format.fprintf out "@<1>⟦@[<hv1>%a@]@<1>⟧" Ind_cst.pp_path p
 
-module FV = FeatureVector.Make(struct
+module FV = FV_tree.Make(struct
     type t = Lits.t * payload * lit
     let compare (l1,i1,j1)(l2,i2,j2) =
       CCOrd.(Lits.compare l1 l2
         <?> (compare_payload, i1, i2)
         <?> (Lit.compare, j1, j2))
     let to_lits (l,_,_) = Lits.to_form l |> Sequence.of_list
+    let labels _ = Util.Int_set.empty
   end)
 
 module ICaseTbl = CCHashtbl.Make(struct

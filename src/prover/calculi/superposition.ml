@@ -1236,7 +1236,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             (* negate literal *)
             lits.(i) <- Lit.negate lits.(i);
             (* test for subsumption *)
-            SubsumIdx.retrieve_subsuming !_idx_fv (Lits.Seq.to_form lits)
+            SubsumIdx.retrieve_subsuming !_idx_fv
+              (Lits.Seq.to_form lits) (C.trail c |> Trail.labels)
             |> Sequence.iter
               (fun c' ->
                  let redundant =

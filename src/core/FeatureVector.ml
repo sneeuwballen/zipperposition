@@ -260,7 +260,7 @@ module Make(C : Index.CLAUSE) = struct
   let remove_seq idx seq = Sequence.fold remove idx seq
 
   (* clauses that subsume (potentially) the given clause *)
-  let retrieve_subsuming idx lits f =
+  let retrieve_subsuming idx lits _ f =
     (* feature vector of [c] *)
     let fv = compute_fv idx.features lits in
     let rec fold_lower fv node = match fv, node with
@@ -276,7 +276,7 @@ module Make(C : Index.CLAUSE) = struct
     fold_lower fv idx.trie
 
   (** clauses that are subsumed (potentially) by the given clause *)
-  let retrieve_subsumed idx lits f =
+  let retrieve_subsumed idx lits _ f =
     (* feature vector of the hc *)
     let fv = compute_fv idx.features lits in
     let rec fold_higher fv node = match fv, node with
@@ -292,7 +292,7 @@ module Make(C : Index.CLAUSE) = struct
     fold_higher fv idx.trie
 
   (** clauses that are potentially alpha-equivalent to the given clause*)
-  let retrieve_alpha_equiv idx lits f =
+  let retrieve_alpha_equiv idx lits _ f =
     (* feature vector of the hc *)
     let fv = compute_fv idx.features lits in
     let rec fold_higher fv node = match fv, node with
@@ -308,13 +308,13 @@ module Make(C : Index.CLAUSE) = struct
     fold_higher fv idx.trie
 
   let retrieve_subsuming_c idx c f =
-    retrieve_subsuming idx (C.to_lits c) f
+    retrieve_subsuming idx (C.to_lits c) (C.labels c) f
 
   let retrieve_subsumed_c idx c f =
-    retrieve_subsumed idx (C.to_lits c) f
+    retrieve_subsumed idx (C.to_lits c) (C.labels c) f
 
   let retrieve_alpha_equiv_c idx c f =
-    retrieve_alpha_equiv idx (C.to_lits c) f
+    retrieve_alpha_equiv idx (C.to_lits c) (C.labels c) f
 
   let iter idx f =
     let rec iter = function

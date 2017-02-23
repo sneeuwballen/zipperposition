@@ -3,6 +3,8 @@
 
 (** {1 Boolean Trail} *)
 
+open Libzipperposition
+
 module Lit = BBox.Lit
 
 type t
@@ -27,6 +29,8 @@ val of_list : bool_lit list -> t
 val add_list : t -> bool_lit list -> t
 val to_list : t -> bool_lit list
 val to_seq : t -> bool_lit Sequence.t
+
+val labels : t -> Index_intf.labels
 
 val subsumes : t -> t -> bool
 (** [subsumes a b] is true iff [a] is a subset of [b] *)

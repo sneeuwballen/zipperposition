@@ -367,6 +367,7 @@ let invalid_argf msg = CCFormat.ksprintf msg ~f:invalid_arg
 let failwithf msg = CCFormat.ksprintf msg ~f:failwith
 
 module Int_map = CCMap.Make(CCInt)
+module Int_set = CCSet.Make(CCInt)
 
 (** {2 File utils} *)
 

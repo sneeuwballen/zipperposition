@@ -10,10 +10,13 @@
     with full-signature features that encompass all symbols at the
     same time. *)
 
+type labels = Index_intf.labels
+
 type feature =
   | N of int
   | S of ID.Set.t
   | M of int ID.Map.t
+  | L of labels
 
 type feature_vector = feature IArray.t
 (** a vector of feature *)
@@ -29,6 +32,7 @@ module Make(C:Index_intf.CLAUSE) : sig
 
     val size_plus : t (** size of positive clause *)
     val size_minus : t (** size of negative clause *)
+    val labels : t
     val weight_plus : t
     val weight_minus : t
     val set_sym_plus : t (** set of positive symbols *)
@@ -41,17 +45,11 @@ module Make(C:Index_intf.CLAUSE) : sig
 
   type feature_funs = Feature_fun.t IArray.t
 
-  val compute_fv : feature_funs -> Index_intf.lits -> feature_vector
+  val compute_fv_c : feature_funs -> C.t -> feature_vector
 
   (** {2 Index} *)
 
   include Index.SUBSUMPTION_IDX with module C = C
-
-  val retrieve_alpha_equiv : t -> Index_intf.lits -> C.t Sequence.t
-  (** Retrieve clauses that are potentially alpha-equivalent to the given clause *)
-
-  val retrieve_alpha_equiv_c : t -> C.t -> C.t Sequence.t
-  (** Retrieve clauses that are potentially alpha-equivalent to the given clause *)
 
   val empty_with : feature_funs -> t
 

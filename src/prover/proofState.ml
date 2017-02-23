@@ -51,6 +51,7 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
       type t = C.t
       let compare = C.compare
       let to_lits c = C.to_forms c |> Sequence.of_list
+      let labels c = C.trail c |> Trail.labels
     end)
 
   (* XXX: no customization of indexing for now

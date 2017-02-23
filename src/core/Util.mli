@@ -180,6 +180,7 @@ val invalid_argf: ('a, Format.formatter, unit, 'b) format4 -> 'a
 val failwithf : ('a, Format.formatter, unit, 'b) format4 -> 'a
 
 module Int_map : CCMap.S with type key = int
+module Int_set : CCSet.S with type elt = int
 
 (** {2 File utils} *)
 

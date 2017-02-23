@@ -9,10 +9,13 @@
 module T = FOTerm
 module Fmt = CCFormat
 
+type labels = Index_intf.labels
+
 type feature =
   | N of int
   | S of ID.Set.t
   | M of int ID.Map.t
+  | L of labels
 
 type feature_vector = feature IArray.t
 (** a vector of feature *)
@@ -20,6 +23,7 @@ type feature_vector = feature IArray.t
 let mk_n i = N i
 let mk_s s = S s
 let mk_m m = M m
+let mk_l s = L s
 
 module Feature : sig
   type t = feature
@@ -38,18 +42,22 @@ end = struct
     | M m ->
       Fmt.fprintf out "(@[mset@ %a@])"
         Fmt.(seq (pair ~sep:silent ID.pp int)) (ID.Map.to_seq m)
+    | L l ->
+      Fmt.fprintf out "(@[labels@ %a@])" Fmt.(seq int) (Util.Int_set.to_seq l)
 
   let to_string = Fmt.to_string pp
 
   let compare f1 f2 : int =
-    let to_int = function N _ -> 0 | S _ -> 1 | M _ -> 2 in
+    let to_int = function N _ -> 0 | S _ -> 1 | M _ -> 2 | L _ -> 3 in
     match f1, f2 with
       | N i1, N i2 -> CCInt.compare i1 i2
       | S s1, S s2 -> ID.Set.compare s1 s2
       | M m1, M m2 -> ID.Map.compare CCInt.compare m1 m2
+      | L m1, L m2 -> Util.Int_set.compare m1 m2
       | N _, _
       | S _, _
       | M _, _
+      | L _, _
         -> CCInt.compare (to_int f1)(to_int f2)
 
   let equal f1 f2 = compare f1 f2 = 0
@@ -64,9 +72,11 @@ end = struct
            Some (op (CCOpt.get_or ~default o1) (CCOpt.get_or ~default o2)))
         m1 m2
       |> mk_m
+    | L s1, L s2 -> Util.Int_set.union s1 s2 |> mk_l
     | N _, _
     | S _, _
     | M _, _
+    | L _, _
       -> assert false
 
   let add = combine_ ~default:0 ~op:(+)
@@ -79,9 +89,11 @@ end = struct
       ID.Map.for_all
         (fun k i1 -> i1 <= ID.Map.get_or ~default:~-1 k m2)
         m1
+    | L s1, L s2 -> Util.Int_set.subset s1 s2
     | N _, _
     | S _, _
     | M _, _
+    | L _, _
       -> assert false
 end
 
@@ -93,10 +105,10 @@ module Make(C: Index_intf.CLAUSE) = struct
   module Feature_fun = struct
     type t = {
       name : string;
-      f : Index_intf.lits -> feature;
+      f : Index_intf.lits -> Index_intf.labels -> feature;
     } (** a function that computes a given feature on clauses *)
 
-    let compute f c = f.f (C.to_lits c)
+    let compute f c = f.f (C.to_lits c) (C.labels c)
 
     let name f = f.name
 
@@ -107,12 +119,12 @@ module Make(C: Index_intf.CLAUSE) = struct
 
     let size_plus =
       make "size+"
-        (fun lits ->
+        (fun lits _ ->
            Sequence.filter SLiteral.is_pos lits |> Sequence.length |> mk_n)
 
     let size_minus =
       make "size-"
-        (fun lits ->
+        (fun lits _ ->
            Sequence.filter SLiteral.is_neg lits |> Sequence.length |> mk_n)
 
     let weight_lit lit =
@@ -120,7 +132,7 @@ module Make(C: Index_intf.CLAUSE) = struct
 
     let weight_ name filter =
       make name
-        (fun lits ->
+        (fun lits _ ->
            Sequence.filter filter lits
            |> Sequence.map weight_lit
            |> Sequence.fold (+) 0
@@ -129,6 +141,8 @@ module Make(C: Index_intf.CLAUSE) = struct
     let weight_plus = weight_ "weight+" SLiteral.is_pos
     let weight_minus = weight_ "weight-" SLiteral.is_neg
 
+    let labels = make "labels" (fun _ labels -> mk_l labels)
+
     (* sequence of symbols of clause, of given sign *)
     let symbols_ filter lits : ID.t Sequence.t =
       lits
@@ -136,7 +150,7 @@ module Make(C: Index_intf.CLAUSE) = struct
       |> Sequence.flat_map SLiteral.to_seq
       |> Sequence.flat_map T.Seq.symbols
 
-    let set_sym_ filter lits =
+    let set_sym_ filter lits _ =
       symbols_ filter lits
       |> ID.Set.of_seq
       |> mk_s
@@ -147,7 +161,7 @@ module Make(C: Index_intf.CLAUSE) = struct
     let set_sym_minus =
       make "set_symb-" (set_sym_ SLiteral.is_neg)
 
-    let multiset_sym_ filter lits =
+    let multiset_sym_ filter lits _ =
       symbols_ filter lits
       |> Sequence.fold
         (fun m id ->
@@ -173,7 +187,7 @@ module Make(C: Index_intf.CLAUSE) = struct
            | T.Const id -> Some (id,d)
            | _ -> None)
 
-    let depth_sym_ filter lits =
+    let depth_sym_ filter lits _ =
       symbols_depth_ filter lits
       |> Sequence.fold
         (fun m (id, d) ->
@@ -191,10 +205,10 @@ module Make(C: Index_intf.CLAUSE) = struct
 
   type feature_funs = Feature_fun.t IArray.t
 
-  let compute_fv funs lits =
-    IArray.map (fun feat -> feat.Feature_fun.f lits) funs
+  let compute_fv funs lits labels : feature_vector =
+    IArray.map (fun feat -> feat.Feature_fun.f lits labels) funs
 
-  let compute_fv_c funs c = compute_fv funs (C.to_lits c)
+  let compute_fv_c funs c : feature_vector = compute_fv funs (C.to_lits c) (C.labels c)
 
   (** {2 Feature Trie} *)
 
@@ -280,6 +294,7 @@ module Make(C: Index_intf.CLAUSE) = struct
         Feature_fun.size_minus;
         Feature_fun.weight_plus;
         Feature_fun.weight_minus;
+        Feature_fun.labels;
         Feature_fun.set_sym_plus;
         Feature_fun.set_sym_minus;
         Feature_fun.depth_sym_plus;
@@ -312,9 +327,9 @@ module Make(C: Index_intf.CLAUSE) = struct
 
   (* retrieve all clauses which have a feature vector [fv] such that
      [check (compute c).(i) fv.(i) = true] *)
-  let retrieve_ ~check idx lits f =
+  let retrieve_ ~check idx lits labels f: unit =
     (* feature vector of the hc *)
-    let fv = compute_fv idx.funs lits in
+    let fv = compute_fv idx.funs lits labels in
     let rec fold_higher i node =
       if i = IArray.length fv
       then match node with
@@ -333,31 +348,31 @@ module Make(C: Index_intf.CLAUSE) = struct
     fold_higher 0 idx.trie
 
   (* clauses that subsume (potentially) the given clause *)
-  let retrieve_subsuming idx c f =
-    retrieve_ idx c f
+  let retrieve_subsuming idx lits labels f: unit =
+    retrieve_ idx lits labels f
       ~check:(fun ~feat_query ~feat_tree ->
         Feature.leq feat_tree feat_query)
 
   (* clauses that are subsumed (potentially) by the given clause *)
-  let retrieve_subsumed idx c f =
-    retrieve_ idx c f
+  let retrieve_subsumed idx lits labels f: unit =
+    retrieve_ idx lits labels f
       ~check:(fun ~feat_query ~feat_tree ->
         Feature.leq feat_query feat_tree)
 
   (* clauses that are potentially alpha-equivalent to the given clause*)
-  let retrieve_alpha_equiv idx c f =
-    retrieve_ idx c f
+  let retrieve_alpha_equiv idx lits labels f: unit =
+    retrieve_ idx lits labels f
       ~check:(fun ~feat_query ~feat_tree ->
         Feature.equal feat_query feat_tree)
 
   let retrieve_subsuming_c idx c f =
-    retrieve_subsuming idx (C.to_lits c) f
+    retrieve_subsuming idx (C.to_lits c) (C.labels c) f
 
   let retrieve_subsumed_c idx c f =
-    retrieve_subsumed idx (C.to_lits c) f
+    retrieve_subsumed idx (C.to_lits c) (C.labels c) f
 
   let retrieve_alpha_equiv_c idx c f =
-    retrieve_alpha_equiv idx (C.to_lits c) f
+    retrieve_alpha_equiv idx (C.to_lits c) (C.labels c) f
 
   let iter idx f =
     let rec iter = function
