@@ -21,6 +21,7 @@ let atom t = t.bl_atom
 let sign t = t.bl_sign
 let view t = t.bl_atom
 let neg = Hornet_types_util.neg_bool_lit
+let to_int = Hornet_types_util.int_of_bool_lit
 
 let norm (t:t): t * FI.negated =
   if t.bl_sign

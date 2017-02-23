@@ -255,6 +255,15 @@ let compare_bool_lit (a:bool_lit) b : int =
 
 let neg_bool_lit t = {t with bl_sign=not t.bl_sign}
 
+let int_of_atom (a:bool_atom): int = match a with
+  | A_box_clause r -> r.bool_box_id
+  | A_fresh i -> i
+  | A_ground r -> r.bool_ground_id
+
+let int_of_bool_lit (t:bool_lit): int =
+  let i = int_of_atom t.bl_atom in
+  if t.bl_sign then i else -i
+
 (* same trail, modulo ordering *)
 let equal_bool_trail (a:bool_trail) b: bool =
   let cmp (lazy a)(lazy b) = compare_bool_lit a b in

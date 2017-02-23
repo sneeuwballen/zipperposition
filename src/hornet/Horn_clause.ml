@@ -176,6 +176,12 @@ let to_lits (c:t): Index_intf.lits =
     (body c |> IArray.to_seq |> Sequence.map Lit.neg)
   |> Sequence.map Lit.to_slit
 
+let labels (c:t): Index_intf.labels =
+  trail c
+  |> Trail.bool_lits
+  |> Sequence.map Hornet_types_util.int_of_bool_lit
+  |> Util.Int_set.of_seq
+
 (** {2 Life Cycle} *)
 
 (* start a new cycle, so that dead clause can be alive again *)

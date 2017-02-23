@@ -20,6 +20,7 @@ include Msat.Formula_intf.S with type t := t and type proof := proof
 val view : t -> view
 val atom : t -> atom
 val sign : t -> bool
+val to_int : t -> int
 
 include Interfaces.PRINT with type t := t
 include Interfaces.HASH with type t := t

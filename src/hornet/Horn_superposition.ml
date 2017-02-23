@@ -978,6 +978,9 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       | Unknown (* reached depth limit *)
       | Unsat of HC.t
 
+    let stat_fwd_subsumed = Util.mk_stat "hornet.subsumed_forward"
+    let stat_backward_subsumed = Util.mk_stat "hornet.subsumed_backward"
+
     type stats = {
       num_clauses: int; (* number of clauses *)
     }
@@ -1070,6 +1073,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         ) else if Active_set.is_subsumed c then (
           Util.debugf ~section 4 "clause %a subsumed by active set, continue"
             (fun k->k HC.pp c);
+          Util.incr_stat stat_fwd_subsumed;
           saturation_loop n
         ) else (
           (* remove clauses subsumed by [c] *)
@@ -1078,6 +1082,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
             (fun c' ->
                Util.debugf ~section 4 "active clause %a@ subsumed by %a,@ remove it"
                  (fun k->k HC.pp c' HC.pp c);
+               Util.incr_stat stat_backward_subsumed;
                Active_set.remove c')
             set;
           (* add to [c] *)
