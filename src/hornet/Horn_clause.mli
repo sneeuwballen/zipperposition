@@ -94,6 +94,8 @@ val is_absurd : t -> bool
 
 val is_unit_pos : t -> bool
 
+include Index_intf.CLAUSE with type t := t
+
 (** {2 Life Cycle} *)
 
 (** A given clause can be alive, then dead, then alive again, … as many
@@ -124,6 +126,17 @@ val variant :
   t Scoped.t ->
   t Scoped.t ->
   Subst.t Sequence.t
+
+val subsumes :
+  ?subst:Subst.t ->
+  t Scoped.t ->
+  t Scoped.t ->
+  Subst.t Sequence.t
+(** Find substitution(s) that makes the first clause
+    subsume the second one *)
+
+val subsumes_pred : t -> t -> bool
+(** Does the first clause subsume the second? *)
 
 val hash_mod_alpha : t -> int
 

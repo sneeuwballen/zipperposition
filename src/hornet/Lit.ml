@@ -101,6 +101,11 @@ let neg lit = match lit with
   | Atom (p, sign) -> Atom (p, not sign)
   | Bool b -> Bool (not b)
 
+let terms (lit:t): term Sequence.t = match lit with
+  | Bool _ -> Sequence.empty
+  | Atom (t,_) -> Sequence.return t
+  | Eq (l,r,_) -> Sequence.doubleton l r
+
 let vars_seq = Hornet_types_util.vars_of_lit
 
 let vars_list l = vars_seq l |> Sequence.to_rev_list
@@ -112,10 +117,15 @@ let vars_set l =
 
 let is_ground t : bool = vars_seq t |> Sequence.is_empty
 
+let depth t : int =
+  terms t |> Sequence.map T.depth |> Sequence.max |> CCOpt.get_or ~default:0
+
 let weight = function
   | Bool _ -> 0
   | Atom (t, _) -> T.weight t
   | Eq (t,u,_) -> T.weight t + T.weight u
+
+let var_occurs ~var t = terms t |> Sequence.exists (T.var_occurs ~var)
 
 let hash_mod_alpha = function
   | Bool b -> Hash.combine2 10 (Hash.bool b)
@@ -141,6 +151,13 @@ let is_absurd lit = match lit with
   | Atom (p, true) when T.equal p T.false_ -> true
   | Bool false -> true
   | _ -> false
+
+let to_slit lit: term SLiteral.t = match lit with
+  | Bool true -> SLiteral.true_
+  | Bool false -> SLiteral.false_
+  | Atom (t, sign) -> SLiteral.atom t sign
+  | Eq (t, u, true) -> SLiteral.eq t u
+  | Eq (t, u, false) -> SLiteral.neq t u
 
 (** {2 Containers} *)
 
@@ -389,6 +406,9 @@ let subsumes ?(subst=Subst.empty) (lit1,sc1) (lit2,sc2) k =
     | Eq (l1, r1, true), Eq (l2, r2, true) ->
       eq_subsumes_ ~subst l1 r1 sc1 l2 r2 sc2 k
     | _ -> matching ~subst ~pattern:(lit1,sc1) (lit2,sc2) k
+
+let subsumes_pred lit1 lit2 : bool =
+  not (subsumes (lit1,0)(lit2,1) |> Sequence.is_empty)
 
 let unify ?(subst=Subst.empty) lit1 lit2 k =
   let op = Unif_gen.op_unif in

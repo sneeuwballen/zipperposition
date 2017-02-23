@@ -31,6 +31,9 @@ let compare = Hornet_types_util.compare_lc
 let pp = Hornet_types_util.pp_lc
 let to_string = CCFormat.to_string pp
 
+let same_clause lc1 lc2: bool = 
+  Hornet_types_util.equal_clause lc1.lc_clause lc2.lc_clause
+
 let hash_mod_alpha (lc:t): int =
   Hash.combine2
     (Hornet_types_util.hash_clause lc.lc_clause)

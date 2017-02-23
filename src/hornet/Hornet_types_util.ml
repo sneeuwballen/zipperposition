@@ -220,8 +220,8 @@ let hash_clause (a:clause) : int = CCHash.int a.c_id
 let compare_clause a b: int = CCInt.compare a.c_id b.c_id
 
 let equal_lc (a:labelled_clause) b: bool =
-  Type.VarMap.equal T.equal a.lc_subst b.lc_subst &&
-  equal_clause a.lc_clause b.lc_clause
+  equal_clause a.lc_clause b.lc_clause &&
+  Type.VarMap.equal T.equal a.lc_subst b.lc_subst
 
 let hash_lc (a:labelled_clause): int =
   CCHash.combine2
@@ -261,6 +261,19 @@ let equal_bool_trail (a:bool_trail) b: bool =
   assert (CCList.is_sorted ~cmp a);
   assert (CCList.is_sorted ~cmp b);
   CCList.equal (fun a b-> cmp a b=0) a b
+
+let subsumes_bool_trail (l1:bool_trail) (l2:bool_trail): bool =
+  let rec aux l1 l2 = match l1, l2 with
+    | [], _ -> true
+    | _, [] -> false
+    | lazy t1 :: tail1, lazy t2 :: tail2 ->
+      begin match compare_bool_lit t1 t2 with
+        | 0 -> aux tail1 tail2
+        | n when n<0 -> false (* all elements of [l2] are bigger than [t1] *)
+        | _ -> aux l1 tail2 (* drop [t2] *)
+      end
+  in
+  aux l1 l2
 
 let hash_bool_lit a : int = match a.bl_atom with
   | A_fresh i -> Hash.combine3 10 (Hash.bool a.bl_sign) (Hash.int i)

@@ -71,5 +71,11 @@ let matching ?(subst=Subst.empty) (l1,sc1)(l2,sc2): Subst.t Sequence.t =
   Unif.unif_list_com subst (l1,sc1)(l2,sc2)
     ~op:(fun subst a b -> LC.matching ~subst a b)
 
-let subsumes ?subst a b: bool =
-  not (Sequence.is_empty (matching ?subst a b))
+let subsumes ?(subst=Subst.empty) (l1,sc1) (l2,sc2) =
+  Unif.unif_list_com
+    ~size:`Smaller
+    ~op:(fun subst a b -> LC.matching ~subst a b)
+    subst (l1,sc1)(l2,sc2)
+
+let subsumes_pred ?subst a b: bool =
+  not (Sequence.is_empty (subsumes ?subst a b))

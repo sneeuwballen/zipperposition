@@ -21,6 +21,8 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
   (* index term->clause *)
   module CP_idx = NPDtree.MakeTerm(HC.With_pos)
 
+  module FV_idx = FV_tree.Make(HC)
+
   let name = "horn_superposition"
 
   (* a simplification rule *)
@@ -93,8 +95,11 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
     val mem : HC.t -> bool
 
-    val variant_mem : HC.t -> bool
-    (** Is there a clause which is a variant of this one? *)
+    val is_subsumed : HC.t -> bool
+    (** Return [true] if the clause is subsumed by the set *)
+
+    val find_subsuming : HC.t -> HC.Set.t
+    (** Find all clauses subsumed by this given clause *)
 
     val remove : HC.t -> unit
 
@@ -110,11 +115,11 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     val idx_sup_into : unit -> CP_idx.t
   end = struct
     let tbl : unit HC.Tbl.t = HC.Tbl.create 512
-    let tbl_mod_alpha : unit HC.Tbl_mod_alpha.t = HC.Tbl_mod_alpha.create 512
     let size () = HC.Tbl.length tbl
 
     let idx_heads_ : CP_idx.t ref = ref (CP_idx.empty ())
     let idx_sup_into_ : CP_idx.t ref = ref (CP_idx.empty ())
+    let idx_fv_ : FV_idx.t ref = ref (FV_idx.empty ())
 
     let idx_heads () = !idx_heads_
     let idx_sup_into () = !idx_sup_into_
@@ -122,7 +127,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     let add c =
       if not (HC.Tbl.mem tbl c) then (
         HC.Tbl.add tbl c ();
-        HC.Tbl_mod_alpha.add tbl_mod_alpha c ();
+        idx_fv_ := FV_idx.add !idx_fv_ c;
         begin match relevant_pos c with
           | Head (active, subs) ->
             idx_heads_ := CP_idx.add_list !idx_heads_ active;
@@ -134,12 +139,10 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
 
     let mem c = HC.Tbl.mem tbl c
 
-    let variant_mem c = HC.Tbl_mod_alpha.mem tbl_mod_alpha c
-
     let remove c =
       if HC.Tbl.mem tbl c then (
         HC.Tbl.remove tbl c;
-        HC.Tbl_mod_alpha.remove tbl_mod_alpha c;
+        idx_fv_ := FV_idx.remove !idx_fv_ c;
         begin match relevant_pos c with
           | Head (active, subs) ->
             idx_heads_ := CP_idx.remove_list !idx_heads_ active;
@@ -148,6 +151,20 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
             idx_sup_into_ := CP_idx.remove_list !idx_sup_into_ subs
         end
       )
+
+    let is_subsumed (c:HC.t): bool =
+      FV_idx.retrieve_subsuming_c !idx_fv_ c
+      |> Sequence.exists
+        (fun c' -> HC.subsumes_pred c' c)
+
+    let find_subsuming (c:HC.t): HC.Set.t =
+      let set =
+        FV_idx.retrieve_subsumed_c !idx_fv_ c
+        |> Sequence.filter
+          (fun c' -> HC.subsumes_pred c c')
+        |> HC.Set.of_seq
+      in
+      set
   end
 
   let kill_clauses (l:HC.t list): unit =
@@ -621,7 +638,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
                  && Ordering.compare ord
                        (Subst.FO.apply_no_renaming subst (l,sc_active))
                        (Subst.FO.apply_no_renaming subst (r,sc_active)) = Comparison.Gt
-                 && Label.subsumes ~subst
+                 && Label.subsumes_pred ~subst
                    (HC.label active,sc_active)(HC.label passive,sc_passive)
                  && Constraint.subsumes
                    (HC.constr active,sc_active)(HC.constr passive,sc_passive)
@@ -1046,11 +1063,23 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
           Util.debugf ~section 2 "@[<2>@{<Green>found empty clause@}@ %a@]"
             (fun k->k HC.pp c);
           Unsat c
-        ) else if Active_set.mem c || Active_set.variant_mem c then (
+        ) else if Active_set.mem c then (
           Util.debugf ~section 4 "clause %a already in active set, continue"
             (fun k->k HC.pp c);
           saturation_loop n
+        ) else if Active_set.is_subsumed c then (
+          Util.debugf ~section 4 "clause %a subsumed by active set, continue"
+            (fun k->k HC.pp c);
+          saturation_loop n
         ) else (
+          (* remove clauses subsumed by [c] *)
+          let set = Active_set.find_subsuming c in
+          HC.Set.iter
+            (fun c' ->
+               Util.debugf ~section 4 "active clause %a@ subsumed by %a,@ remove it"
+                 (fun k->k HC.pp c' HC.pp c);
+               Active_set.remove c')
+            set;
           (* add to [c] *)
           Active_set.add c;
           (* backward simplifications *)

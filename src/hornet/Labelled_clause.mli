@@ -15,6 +15,9 @@ include Interfaces.PRINT with type t := t
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 
+val same_clause : t -> t -> bool
+(** Two labels for the same clause? *)
+
 val apply_subst :
   renaming:Subst.Renaming.t ->
   Subst.t ->

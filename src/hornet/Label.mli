@@ -50,6 +50,12 @@ val subsumes :
   ?subst:Subst.t ->
   t Scoped.t ->
   t Scoped.t ->
+  Subst.t Sequence.t
+
+val subsumes_pred :
+  ?subst:Subst.t ->
+  t Scoped.t ->
+  t Scoped.t ->
   bool
 
 val merge : t -> t -> t

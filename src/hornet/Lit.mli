@@ -40,6 +40,7 @@ include Interfaces.PRINT with type t := t
 
 (** {2 Helpers} *)
 
+val terms : t -> term Sequence.t
 val vars_seq : t -> ty HVar.t Sequence.t
 val vars_list : t -> ty HVar.t list
 val vars_set : t -> ty HVar.t list (** unique *)
@@ -47,11 +48,16 @@ val vars_set : t -> ty HVar.t list (** unique *)
 val is_ground : t -> bool
 
 val weight : t -> int
+val depth : t -> int
+
+val var_occurs : var:ty HVar.t -> t -> bool
 
 val hash_mod_alpha : t -> int
 
 val is_trivial : t -> bool
 val is_absurd : t -> bool
+
+val to_slit : t -> term SLiteral.t
 
 (** {2 Containers} *)
 
@@ -119,6 +125,8 @@ val subsumes :
   t Scoped.t ->
   t Scoped.t ->
   Subst.t Sequence.t
+
+val subsumes_pred : t -> t -> bool
 
 val unify :
   ?subst:Subst.t ->
