@@ -54,7 +54,7 @@ let occurs_check ~depth subst (v,sc_v) t =
   in
   check ~depth t
 
-let unif_array_com subst ~op (a1,sc1) (a2,sc2) k =
+let unif_array_com ?(size=`Same) subst ~op (a1,sc1) (a2,sc2) k =
   let module BV = CCBV in
   (* match a1.(i...) with a2\bv *)
   let rec iter2 subst bv i =
@@ -76,14 +76,17 @@ let unif_array_com subst ~op (a1,sc1) (a2,sc2) k =
       iter3 subst bv i (j+1)
     )
   in
-  if Array.length a1 = Array.length a2
-  then (
+  let size_ok = match size with
+    | `Same -> Array.length a1 = Array.length a2
+    | `Smaller -> Array.length a1 = Array.length a2
+  in
+  if size_ok then (
     let bv = BV.create ~size:(Array.length a1) false in
     iter2 subst bv 0
   )
 
-let unif_list_com subst ~op (l1,sc1) (l2,sc2) =
-  unif_array_com subst ~op (Array.of_list l1,sc1) (Array.of_list l2,sc2)
+let unif_list_com ?size subst ~op (l1,sc1) (l2,sc2) =
+  unif_array_com ?size subst ~op (Array.of_list l1,sc1) (Array.of_list l2,sc2)
 
 let rec unif_list subst ~op (l1,sc1) (l2,sc2) k = match l1, l2 with
   | [], [] -> k subst

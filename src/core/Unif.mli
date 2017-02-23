@@ -12,8 +12,10 @@ exception Fail
 val occurs_check : depth:int -> subst ->
   InnerTerm.t HVar.t Scoped.t -> InnerTerm.t Scoped.t -> bool
 
-(** Generic unification over two arrays (of the same size) *)
+(** Generic unification over two arrays (of the same size, or the first
+    one must be smaller or equal) *)
 val unif_array_com :
+  ?size:[`Same | `Smaller] ->
   'subst ->
   op:('subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Sequence.t) ->
   'a array Scoped.t ->
@@ -28,8 +30,9 @@ val unif_list :
   'a list Scoped.t ->
   'subst Sequence.t
 
-(** Generic unification over two lists (of the same size) *)
+(** Generic unification over two lists (of the same size or smaller) *)
 val unif_list_com :
+  ?size:[`Same | `Smaller] ->
   'subst ->
   op:('subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Sequence.t) ->
   'a list Scoped.t ->

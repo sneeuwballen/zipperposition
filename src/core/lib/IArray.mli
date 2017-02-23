@@ -36,7 +36,7 @@ val of_list : 'a list -> 'a t
 
 val to_list : 'a t -> 'a list
 
-val to_array : 'a t -> 'a array
+val to_array_copy : 'a t -> 'a array
 (** make a copy into a mutable array *)
 
 val to_array_unsafe : 'a t -> 'a array

@@ -35,7 +35,7 @@ let of_list = Array.of_list
 
 let to_list = Array.to_list
 
-let to_array = Array.copy
+let to_array_copy = Array.copy
 
 let to_array_unsafe a = a
 let of_array_unsafe a = a (* bleh. *)
