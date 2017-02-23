@@ -47,7 +47,7 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
         if C.is_oriented_rule c then 2 else 1
     end)
 
-  module SubsumptionIndex = FeatureVector.Make(struct
+  module SubsumptionIndex = FV_tree.Make(struct
       type t = C.t
       let compare = C.compare
       let to_lits c = C.to_forms c |> Sequence.of_list
