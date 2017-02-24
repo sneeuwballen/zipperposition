@@ -1,0 +1,31 @@
+
+provers = [ "zipperposition", "hornet" ]
+
+[test]
+
+timeout = 30 # in s
+memory = 2000 # in MB
+provers = [ "zipperposition", "hornet" ]
+problems = "(.*(\\+|-).*).p"
+dir = [ "tptp" ]
+
+default_expect = "unknown"
+
+[zipperposition]
+
+binary = "./zipperposition.native"
+cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory --output none"
+unsat = "SZS status (Theorem|Unsatisfiable)"
+sat = "SZS status (CounterSatisfiable|Satisfiable)"
+timeout = "SZS Status ResourceOut"
+version = "git:."
+
+[hornet]
+
+binary = "./hornet.native"
+cmd = "./hornet.native $file -t $timeout --max-depth 200"
+unsat = "UNSAT"
+sat = "^SAT"
+timeout = "SZS Status ResourceOut"
+version = "git:."
+

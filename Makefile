@@ -91,6 +91,16 @@ frogtest-tip:
 	frogtest run --meta=`git rev-parse HEAD` \
 	  -c ./tip-benchmarks/conf.toml
 
+BENCH_DIR="bench-$(shell date -Iminutes)"
+frogtest-tptp:
+	@echo "start benchmarks in ${BENCH_DIR}"
+	mkdir -p ${BENCH_DIR}
+	cp zipperposition.native hornet.native ${BENCH_DIR}/
+	ln -s ../tptp/ ${BENCH_DIR}/tptp
+	cp data/bench.toml ${BENCH_DIR}/conf.toml
+	cd ${BENCH_DIR} && frogtest run --meta=`git rev-parse HEAD` \
+	  -c conf.toml
+
 TARBALL=zipperposition.tar.gz
 
 package: clean
