@@ -411,7 +411,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            let pos = Lits.Pos.idx l_pos in
            try
              let subst = Unif.FO.unification (l, 0) (r, 0) in
-             if BV.get (C.eligible_res (clause, 0) subst) pos
+             if BV.get (C.eligible_res_no_subst clause) pos
              (* subst(lit) is maximal, we can do the inference *)
              then (
                Util.incr_stat stat_equality_resolution_call;
@@ -629,7 +629,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* clauses used to rewrite *)
     let clauses = ref [] in
     (* literals that are eligible for resolution *)
-    let eligible_res = lazy (C.eligible_res (c, 0) S.empty) in
+    let eligible_res = lazy (C.eligible_res_no_subst c) in
     (* demodulate literals *)
     let demod_lit i lit =
       (* shall we restrict a subterm? only for max terms in positive

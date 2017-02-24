@@ -137,6 +137,9 @@ module type S = sig
       among selected literals of the same sign, if some literal is selected,
       or maximal if none is selected. *)
 
+  val eligible_res_no_subst : t -> CCBV.t
+  (** More efficient version of {!eligible_res} with [Subst.empty] *)
+
   val eligible_param : t Scoped.t -> Subst.t -> CCBV.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for paramodulation. That means the literal

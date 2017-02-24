@@ -38,6 +38,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     sclause : sclause;
     mutable selected : BV.t Lazy.t; (** bitvector for selected lits*)
     mutable proof : proof_step; (** Proof of the clause *)
+    mutable eligible_res: BV.t option; (* eligible for resolution? *)
   }
 
   type clause = t
@@ -99,6 +100,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       sclause;
       selected;
       proof;
+      eligible_res=None;
     } in
     (* return clause *)
     Util.incr_stat stat_clause_create;
@@ -261,6 +263,15 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       done;
       bv
     )
+
+  let eligible_res_no_subst c =
+    begin match c.eligible_res with
+      | Some r -> r
+      | None ->
+        let bv = eligible_res (c,0) Subst.empty in
+        c.eligible_res <- Some bv;
+        bv
+    end
 
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for paramodulation. *)
