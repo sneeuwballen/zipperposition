@@ -140,7 +140,7 @@ let is_trivial c =
   let res =
     Lit.is_trivial (head c) ||
     IArray.exists Lit.is_absurd (body c) ||
-    Trail.is_absurd (trail c) ||
+    H_trail.is_absurd (trail c) ||
     Constraint.is_absurd (constr c) ||
     Label.has_no_ground_instance (label c)
   in
@@ -156,7 +156,7 @@ let constr_are_sat (c:c_constraint): bool = not (Constraint.is_absurd c)
 let is_absurd c =
   Lit.is_absurd (head c) &&
   body_len c = 0 &&
-  not (Trail.is_absurd (trail c)) &&
+  not (H_trail.is_absurd (trail c)) &&
   not (Label.has_no_ground_instance (label c)) &&
   constr_are_sat (constr c)
 
@@ -178,7 +178,7 @@ let to_lits (c:t): Index_intf.lits =
 
 let labels (c:t): Index_intf.labels =
   trail c
-  |> Trail.bool_lits
+  |> H_trail.bool_lits
   |> Sequence.map Hornet_types_util.int_of_bool_lit
   |> Util.Int_set.of_seq
 

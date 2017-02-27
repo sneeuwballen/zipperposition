@@ -39,7 +39,7 @@ let pp out (a:t): unit = match a with
 let to_string = Fmt.to_string pp
 
 let is_absurd = function
-  | PR_horn_clause hc -> HC.is_absurd hc && Trail.is_empty (HC.trail hc)
+  | PR_horn_clause hc -> HC.is_absurd hc && H_trail.is_empty (HC.trail hc)
   | PR_clause c -> IArray.length (Clause.lits c) = 0
   | PR_bool_clause [] -> true
   | PR_bool_clause _ -> false

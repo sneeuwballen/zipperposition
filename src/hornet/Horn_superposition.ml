@@ -419,7 +419,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
             (Constraint.apply_subst ~renaming subst (HC.constr c,sc_active))
             (Constraint.apply_subst ~renaming subst (HC.constr c',sc_passive))
         and trail =
-          Trail.merge (HC.trail c) (HC.trail c')
+          H_trail.merge (HC.trail c) (HC.trail c')
         and label =
           Label.merge
             (Label.apply_subst ~renaming subst (HC.label c,sc_active))
@@ -634,7 +634,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
                   (avoid self-demodulation of the rewrite rule) *)
                let ok =
                  (not restrict || not (Unif.FO.matches ~pattern:t l))
-                 && Trail.subsumes (HC.trail active) (HC.trail passive)
+                 && H_trail.subsumes (HC.trail active) (HC.trail passive)
                  && Ordering.compare ord
                        (Subst.FO.apply_no_renaming subst (l,sc_active))
                        (Subst.FO.apply_no_renaming subst (r,sc_active)) = Comparison.Gt
@@ -758,7 +758,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
                   Ordering.compare Ctx.ord
                     (Subst.FO.apply ~renaming subst (l,0))
                     (Subst.FO.apply ~renaming subst (r,0)) = Comparison.Gt) &&
-                Trail.subsumes (HC.trail c) (HC.trail c')
+                H_trail.subsumes (HC.trail c) (HC.trail c')
              then Some c' (* add the clause to the set, it may be rewritten by l -> r *)
              else None)
         |> HC.Set.add_seq set
@@ -825,9 +825,9 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
     let stat_trail_simplify = Util.mk_stat "hornet.steps_avatar_simplify_trail"
 
     (* check whether the trail is false and will remain so *)
-    let trail_is_trivial_ (trail:Trail.t): bool =
+    let trail_is_trivial_ (trail:H_trail.t): bool =
       let res =
-        Trail.exists
+        H_trail.exists
           (fun lit -> match Ctx.valuation_at_level0 lit with
              | Some false -> true (* false at level 0: proven false *)
              | _ -> false)
@@ -836,7 +836,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       if res then (
         Util.incr_stat stat_trail_trivial;
         Util.debugf ~section 3 "(@[<2>trail @[%a@]@ is trivial@])"
-          (fun k->k Trail.pp trail);
+          (fun k->k H_trail.pp trail);
       );
       res
 
@@ -876,7 +876,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
         Util.incr_stat stat_trail_simplify;
         Util.debugf ~section 3
           "(@[<hv2>avatar_cut@ :clause %a@ :into @[%a@]@ :lits %a@])"
-          (fun k->k HC.pp c HC.pp new_c Trail.pp trivial_trail);
+          (fun k->k HC.pp c HC.pp new_c H_trail.pp trivial_trail);
         Some new_c
       ) else None
   end
@@ -1150,7 +1150,7 @@ module Make : State.THEORY_FUN = functor(Ctx : State_intf.CONTEXT) -> struct
       let hc =
         HC.make head body
           ~constr ~label:[Labelled_clause.make_empty c sel]
-          ~trail:Trail.empty ~unordered_depth:0
+          ~trail:H_trail.empty ~unordered_depth:0
           (Proof.split c sel constr)
       in
       Saturate.add_horn hc

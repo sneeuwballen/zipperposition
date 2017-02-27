@@ -192,7 +192,7 @@ let of_slit_l ~stmt lits : t =
   in
   let lits = List.map conv_slit lits in
   let proof = Proof.from_stmt stmt in
-  make_l ~constr:Constraint.empty ~trail:Trail.empty ~depth:0 lits proof
+  make_l ~constr:Constraint.empty ~trail:H_trail.empty ~depth:0 lits proof
 
 let is_trivial c =
   IArray.exists Lit.is_trivial c.c_lits ||

@@ -302,7 +302,7 @@ module Make(Ctx : State.CONTEXT) = struct
     done
 
   (* what to do if a conflict is detected *)
-  let on_conflict (trail:Trail.t) (label:Label.t) (proof:Proof.t): unit =
+  let on_conflict (trail:H_trail.t) (label:Label.t) (proof:Proof.t): unit =
     let non_trivial_instantiations =
       Label.to_seq label
       |> Sequence.filter (fun lc -> not (Labelled_clause.is_empty lc))
@@ -314,7 +314,7 @@ module Make(Ctx : State.CONTEXT) = struct
            conflict in SAT using a conflict clause that combines
            the trail and the label *)
       let neg_trail =
-        Trail.bool_lits trail
+        H_trail.bool_lits trail
         |> Bool_lit.Tbl.of_seq_count
         |> Bool_lit.Tbl.keys
         |> Sequence.map Bool_lit.neg
@@ -332,14 +332,14 @@ module Make(Ctx : State.CONTEXT) = struct
       let conflict = List.rev_append neg_trail neg_ground_lits in
       Util.debugf ~section 2
         "(@[<hv2>conflict@ :trail %a@ :label %a@ :conflict %a@])"
-        (fun k->k Trail.pp trail Label.pp label Bool_lit.pp_clause conflict);
+        (fun k->k H_trail.pp trail Label.pp label Bool_lit.pp_clause conflict);
       Ctx.add_clause proof conflict
     ) else (
       (* at least one labelled clause needs instantiation, so we don't
          have a conflict here. The real conflict with come from the instance. *)
       Util.debugf ~section 2
         "(@[<hv2>conflict->instantiate@ :trail %a@ :label %a@ :instances (@[%a@])@])"
-        (fun k->k Trail.pp trail Label.pp label
+        (fun k->k H_trail.pp trail Label.pp label
             (Util.pp_list Labelled_clause.pp) non_trivial_instantiations);
       let clauses_to_instantiate, new_instances =
         Sequence.of_list non_trivial_instantiations
@@ -358,7 +358,7 @@ module Make(Ctx : State.CONTEXT) = struct
              in
              let c' =
                C.make lits' (Proof.instance c subst)
-                 ~constr:constr' ~trail:Trail.empty ~depth:(C.depth c+1)
+                 ~constr:constr' ~trail:H_trail.empty ~depth:(C.depth c+1)
              in
              Util.incr_stat stat_instantiate;
              (* block this instance from [c] *)
