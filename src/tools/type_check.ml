@@ -1,10 +1,10 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 TPTP Syntax and types checking} *)
 
-open Libzipperposition
-open Libzipperposition_parsers
+open Logtk
+open Logtk_parsers
 
 module PT = STerm
 module T = TypedSTerm

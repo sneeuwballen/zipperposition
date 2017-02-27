@@ -3,8 +3,8 @@
 
 (** {1 Parse Rewrite Rules} *)
 
-open Libzipperposition
-open Libzipperposition_parsers
+open Logtk
+open Logtk_parsers
 
 module PT = STerm
 module T = TypedSTerm

@@ -1,11 +1,11 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 TPTP Ast} *)
 
 (* TODO: keep parsing locations? *)
 
-open Libzipperposition
+open Logtk
 
 type name =
   | NameInt of int

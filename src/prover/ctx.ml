@@ -3,11 +3,11 @@
 
 (** {1 Basic context for literals, clauses...} *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
 module S = Subst
-module Unif = Libzipperposition.Unif
+module Unif = Logtk.Unif
 
 (** {2 Context for a Proof} *)
 module type S = Ctx_intf.S

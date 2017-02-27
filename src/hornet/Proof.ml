@@ -3,7 +3,7 @@
 
 (** {1 CProofs} *)
 
-open Libzipperposition
+open Logtk
 open Hornet_types
 
 module U = Hornet_types_util

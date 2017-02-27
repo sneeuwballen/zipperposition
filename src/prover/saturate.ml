@@ -4,7 +4,7 @@
 (** {1 Main saturation algorithm.}
     It uses inference rules and simplification rules from Superposition. *)
 
-open Libzipperposition
+open Logtk
 
 module C = Clause
 module O = Ordering

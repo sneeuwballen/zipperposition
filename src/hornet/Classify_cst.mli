@@ -3,7 +3,7 @@
 
 (** {1 Classification of Constants} *)
 
-open Libzipperposition
+open Logtk
 
 type res =
   | Ty of Ind_ty.t

@@ -27,7 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Parser for HO} *)
 
 {
-  open Libzipperposition
+  open Logtk
   open Parse_ho
 }
 

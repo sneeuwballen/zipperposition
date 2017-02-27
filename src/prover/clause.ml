@@ -3,7 +3,7 @@
 
 (** {1 Clauses} *)
 
-open Libzipperposition
+open Logtk
 
 module BV = CCBV
 module T = FOTerm

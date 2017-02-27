@@ -3,7 +3,7 @@
 
 (** {1 Labelled Clause} *)
 
-open Libzipperposition
+open Logtk
 open Hornet_types
 
 module T = FOTerm

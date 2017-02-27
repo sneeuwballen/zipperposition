@@ -3,7 +3,7 @@
 
 (** {1 Classification of Constants} *)
 
-open Libzipperposition
+open Logtk
 
 (* NOTE:
    Some sub-constants can ALSO be constants (e.g. #nat0 is sub-constant

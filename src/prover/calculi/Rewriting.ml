@@ -3,7 +3,7 @@
 
 (** {1 Rewriting} *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
 module RR = Rewrite_rule

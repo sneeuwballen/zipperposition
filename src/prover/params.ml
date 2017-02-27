@@ -3,7 +3,7 @@
 
 (** {1 Parameters for the prover, etc.} *)
 
-open Libzipperposition
+open Logtk
 
 (* TODO: params to limit depth of preprocessing *)
 (* TODO: params to enable/disable some preprocessing *)

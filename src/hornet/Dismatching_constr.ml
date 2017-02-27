@@ -4,7 +4,7 @@
 
 (** {1 Dismatching Constraint} *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
 module Fmt = CCFormat

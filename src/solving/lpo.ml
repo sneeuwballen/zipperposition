@@ -3,7 +3,7 @@
 
 (** {1 Constraint Solving for LPO} *)
 
-open Libzipperposition
+open Logtk
 
 module SI = Msat.Solver_intf
 
@@ -262,10 +262,10 @@ module MakeSolver(X : sig end) = struct
 
   let print_clause fmt c =
     Format.fprintf fmt "@[<hv2>%a@]"
-      (CCList.print ~sep:" or " print_lit) c
+      (Util.pp_list ~sep:" or " print_lit) c
 
   let print_clauses fmt c =
-    Format.fprintf fmt "@[<v>%a@]" (CCList.print ~sep:"" print_clause) c
+    Format.fprintf fmt "@[<v>%a@]" (Util.pp_list ~sep:"" print_clause) c
 
   (* solve the given list of constraints *)
   let solve_list l =

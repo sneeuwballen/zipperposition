@@ -3,7 +3,7 @@
 
 (** {1 Several Multisets} *)
 
-open Libzipperposition
+open Logtk
 
 module MT = Multiset.Make(FOTerm)
 

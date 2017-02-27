@@ -1,7 +1,7 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-open Libzipperposition
+open Logtk
 
 type proof_step = ProofStep.t
 type proof = ProofStep.of_

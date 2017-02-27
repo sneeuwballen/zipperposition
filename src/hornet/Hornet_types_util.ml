@@ -3,7 +3,7 @@
 
 (** {1 Basics for Hornet Types} *)
 
-open Libzipperposition
+open Logtk
 open Hornet_types
 
 module T = FOTerm

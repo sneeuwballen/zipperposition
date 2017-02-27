@@ -3,8 +3,8 @@
 
 (** Tests for CNF *)
 
-open Libzipperposition
-open Libzipperposition_arbitrary
+open Logtk
+open Logtk_arbitrary
 
 module T = TypedSTerm
 module F = T.Form

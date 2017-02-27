@@ -3,7 +3,7 @@
 
 (** {1 Phases of the Prover} *)
 
-open Libzipperposition
+open Logtk
 module E = CCResult
 
 type filename = string

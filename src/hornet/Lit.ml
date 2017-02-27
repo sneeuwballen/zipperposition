@@ -3,7 +3,7 @@
 
 (** {1 Literal} *)
 
-open Libzipperposition
+open Logtk
 
 module Fmt = CCFormat
 module T = FOTerm

@@ -3,7 +3,7 @@
 
 (** {1 boolean subterms} *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
 

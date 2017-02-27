@@ -3,7 +3,7 @@
 
 (* {1 Superposition on Horn Clauses} *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
 module C = Clause

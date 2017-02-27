@@ -3,7 +3,7 @@
 
 (** {1 Manipulate proofs} *)
 
-open Libzipperposition
+open Logtk
 
 module Loc = ParseLocation
 

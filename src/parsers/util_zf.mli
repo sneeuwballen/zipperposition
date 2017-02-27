@@ -3,7 +3,7 @@
 
 (** {1 Utils for ZF} *)
 
-open Libzipperposition
+open Logtk
 
 type parse_cache
 (** Cache that remembers the set of files that have been parsed so far *)

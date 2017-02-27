@@ -6,7 +6,7 @@
     To process a file, the prover goes through a sequence of phases that
     are used to build values. This module reifies the phases. *)
 
-open Libzipperposition
+open Logtk
 
 type filename = string
 type 'a or_error = ('a, string) CCResult.t

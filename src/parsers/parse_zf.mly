@@ -4,7 +4,7 @@
 (** {1 Parser for Zipperposition Formulas} *)
 
 %{
-  open Libzipperposition
+  open Logtk
 
   module L = ParseLocation
   module A = UntypedAST
@@ -73,10 +73,10 @@
 %token <string> UPPER_WORD
 %token <string> QUOTED
 
-%start <Libzipperposition.UntypedAST.statement> parse_statement
-%start <Libzipperposition.UntypedAST.statement list> parse_statement_list
-%start <Libzipperposition.UntypedAST.term> parse_term
-%start <Libzipperposition.UntypedAST.ty> parse_ty
+%start <Logtk.UntypedAST.statement> parse_statement
+%start <Logtk.UntypedAST.statement list> parse_statement_list
+%start <Logtk.UntypedAST.term> parse_term
+%start <Logtk.UntypedAST.ty> parse_ty
 
 
 %%

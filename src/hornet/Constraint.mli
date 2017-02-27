@@ -3,7 +3,7 @@
 
 (** {1 Constraint for a Clause} *)
 
-open Libzipperposition
+open Logtk
 open Hornet_types
 
 type t = c_constraint

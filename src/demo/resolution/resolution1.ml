@@ -26,21 +26,21 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Simple Resolution Prover} *)
 
-open Libzipperposition
+open Logtk
 
 module E = CCResult
 module T = FOTerm
 module TS = TypedSTerm
 module F = TypedSTerm.Form
-module P = Libzipperposition_parsers
+module P = Logtk_parsers
 
 (** Global signature (maps symbols such as "f", "parent_of" or "greater"
     to their type). Every symbol has exactly one type.
     The initial signature is the TPTP signature (logic connectives) *)
-let _signature = ref Libzipperposition.Signature.empty
+let _signature = ref Logtk.Signature.empty
 
 (** We do not have to do anything about terms, because they are already
-    defined in {! Libzipperposition.FOTerm}. Terms are either variables or
+    defined in {! Logtk.FOTerm}. Terms are either variables or
     applications of a constant (symbol) to a list of sub-terms.
 
     Examples (capitalized letter are variables):
@@ -71,7 +71,7 @@ module Lit = struct
       Printing is useful for informing the user of results or
       for debugfging. *)
 
-  let compare = CCOrd.pair T.compare CCOrd.bool_
+  let compare = CCOrd.pair T.compare CCOrd.bool
   let equal a b = compare a b=0
 
   let pp out (t,b) = Format.fprintf out "%s%a" (if b then "" else "¬") T.pp t
@@ -87,8 +87,8 @@ end
 module Clause = struct
   type t = Lit.t list
 
-  let make l = CCList.Set.uniq ~eq:Lit.equal l
-  let compare = CCOrd.list_ Lit.compare
+  let make l = CCList.uniq ~eq:Lit.equal l
+  let compare = CCOrd.list Lit.compare
   let equal a b = compare a b = 0
 
   (** A clause is trivial if it contains both a literal and its opposite.
@@ -106,7 +106,7 @@ module Clause = struct
       variables of the clause by their image in the substitution (or keep
       them unchanged if they do not appear in the substitution.
 
-      Substitutions are pre-defined in Libzipperposition, and applying a substitution
+      Substitutions are pre-defined in Logtk, and applying a substitution
       to a term is defined too (the function {!Subst.FO.apply} that
       applies a substitution to a first-order term)
   *)
@@ -114,7 +114,7 @@ module Clause = struct
     make (List.map (fun (t,b) -> Subst.FO.apply ~renaming subst (t, s_c), b) c)
 
   (** printing a clause: print literals separated with "|" *)
-  let pp out c = CCFormat.list ~sep:" | " Lit.pp out c
+  let pp out c = Util.pp_list ~sep:" | " Lit.pp out c
 
   (** Conversion from list of {!SLiteral.t}
       type: [Formula.t list -> clause] *)
@@ -141,7 +141,7 @@ end
     at position [i] in the clause [c], we add
     [term -> (c, i)] into the index. Later we will be able to retrieve
     the pair [(c,i)] using any term that {i unifies} with [term]. *)
-module Index = Libzipperposition.NPDtree.MakeTerm(ClauseWithPos)
+module Index = Logtk.NPDtree.MakeTerm(ClauseWithPos)
 
 (** Set of clauses. Easy to define thanks to {!Clause.compare} *)
 module ClauseSet = Set.Make(Clause)
@@ -214,7 +214,7 @@ let _factoring c =
               then try
                   let subst = Unif.FO.unification (t, 0) (t', 0) in
                   (** Now we have subst(t)=subst(t'), the inference can proceed *)
-                  let c' = CCList.Idx.remove c i in
+                  let c' = CCList.remove_at_idx i c in
                   let renaming = Subst.Renaming.create() in
                   (** Build the conclusion of the inference (removing one
                       of the factored literals *)
@@ -284,10 +284,10 @@ let _resolve_with c =
                   and [d'] (which live respectively in scope 1 and 0)
                   of the clauses together after applying the substitution. *)
               let concl =
-                (let c' = CCList.Idx.remove c i in
+                (let c' = CCList.remove_at_idx i c in
                  Clause.apply_subst ~renaming subst (c',1))
                 @
-                  (let d' = CCList.Idx.remove d j in
+                  (let d' = CCList.remove_at_idx j d in
                    Clause.apply_subst ~renaming subst (d',0))
               in
               (** Simplify the resulting clause (remove duplicate literals)
@@ -351,7 +351,7 @@ let process_file f =
           formulas into a set of clauses (see the {!Clause} module)
           because resolution only works on clauses.
 
-          This algorithm is already implemented in {!Libzipperposition}. *)
+          This algorithm is already implemented in {!Logtk}. *)
       >>= fun st ->
       let decls = Cnf.cnf_of_seq ?ctx:None (CCVector.to_seq st) in
       _signature :=

@@ -1,7 +1,7 @@
 
 (** {1 Simple Clause} *)
 
-open Libzipperposition
+open Logtk
 
 type flag = int
 

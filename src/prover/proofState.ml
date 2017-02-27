@@ -5,7 +5,7 @@
     a set of passive clauses (to be processed), and an ordering
     that is used for redundancy elimination.} *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
 module C = Clause

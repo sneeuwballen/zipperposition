@@ -8,7 +8,7 @@
 
     The point is to relate different applications of the same context. *)
 
-open Libzipperposition
+open Logtk
 
 type term = FOTerm.t
 type subst = Subst.t

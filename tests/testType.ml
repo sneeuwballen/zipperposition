@@ -3,8 +3,8 @@
 
 (** Test typing *)
 
-open Libzipperposition
-open Libzipperposition_arbitrary
+open Logtk
+open Logtk_arbitrary
 
 module PT = TypedSTerm
 

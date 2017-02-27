@@ -26,7 +26,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Arbitrary Untyped Terms} *)
 
-open Libzipperposition
+open Logtk
 
 type 'a arbitrary = 'a QCheck.Arbitrary.t
 

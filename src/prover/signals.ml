@@ -3,7 +3,7 @@
 
 (** {1 Useful signals} *)
 
-open Libzipperposition
+open Logtk
 
 let (on_print_stats : unit Signal.t) = Signal.create ()
 (** Called when/if it's time to print statistics *)

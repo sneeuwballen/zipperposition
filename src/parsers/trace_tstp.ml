@@ -1,9 +1,9 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Trace of a TSTP prover} *)
 
-open Libzipperposition
+open Logtk
 
 type id = Ast_tptp.name
 

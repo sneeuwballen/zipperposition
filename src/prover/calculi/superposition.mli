@@ -3,7 +3,7 @@
 
 (** {1 Inference and simplification rules for the superposition calculus} *)
 
-open Libzipperposition
+open Logtk
 
 (** {2 Inference rules} *)
 

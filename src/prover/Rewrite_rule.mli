@@ -3,7 +3,7 @@
 
 (** {1 Rewrite Rules} *)
 
-open Libzipperposition
+open Logtk
 
 val section : Util.Section.t
 

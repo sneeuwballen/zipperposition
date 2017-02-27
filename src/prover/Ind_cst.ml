@@ -4,7 +4,7 @@
     Skolem constants of an inductive type, coversets, etc. required for
     inductive reasoning. *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
 

@@ -3,8 +3,8 @@
 
 (** {1 Test indexing structures} *)
 
-open Libzipperposition
-open Libzipperposition_arbitrary
+open Logtk
+open Logtk_arbitrary
 
 module T = FOTerm
 

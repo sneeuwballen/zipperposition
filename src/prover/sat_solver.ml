@@ -3,7 +3,7 @@
 
 (** {1 Bridge to [MSat] prover} *)
 
-open Libzipperposition
+open Logtk
 
 module FI = Msat.Formula_intf
 module SI = Msat.Solver_intf

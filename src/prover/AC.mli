@@ -3,7 +3,7 @@
 
 (** {1 AC redundancy} *)
 
-open Libzipperposition
+open Logtk
 
 type spec = AC_intf.spec
 

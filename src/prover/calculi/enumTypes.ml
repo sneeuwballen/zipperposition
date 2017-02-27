@@ -3,7 +3,7 @@
 
 (** {1 Inference and simplification rules for Algebraic types} *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
 module S = Subst

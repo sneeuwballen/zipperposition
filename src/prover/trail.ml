@@ -3,7 +3,7 @@
 
 (** {1 Boolean Trail} *)
 
-open Libzipperposition
+open Logtk
 
 module Lit = BBox.Lit
 

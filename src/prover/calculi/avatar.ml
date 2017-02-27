@@ -3,7 +3,7 @@
 
 (** {1 Basic Splitting à la Avatar} *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
 module Lit = Literal

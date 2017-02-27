@@ -3,7 +3,7 @@
 
 (** Test terms *)
 
-open Libzipperposition
+open Logtk
 
 module O = Ordinal
 

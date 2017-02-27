@@ -1,9 +1,9 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Utils related to TPTP parsing} *)
 
-open Libzipperposition
+open Logtk
 
 module T = TypedSTerm
 module PT = STerm

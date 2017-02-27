@@ -6,7 +6,7 @@
 (** Each clause, Horn clause, etc. contains its own proof,
     that is, a derivation from axioms through instanciations/resolution/… *)
 
-open Libzipperposition
+open Logtk
 open Hornet_types
 
 type t = proof

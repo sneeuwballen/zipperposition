@@ -3,7 +3,7 @@
 
 (** {1 AC redundancy} *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
 module Lit = Literal

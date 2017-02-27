@@ -3,7 +3,7 @@
 
 (** {1 Cancellative Inferences} *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
 module Lit = Literal

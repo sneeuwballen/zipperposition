@@ -3,7 +3,7 @@
 
 (** {1 Boolean Literal} *)
 
-open Libzipperposition
+open Logtk
 
 module type S = Bool_lit_intf.S
 

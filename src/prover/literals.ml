@@ -3,7 +3,7 @@
 
 (** {1 Array of literals} *)
 
-open Libzipperposition
+open Logtk
 
 module BV = CCBV
 module T = FOTerm

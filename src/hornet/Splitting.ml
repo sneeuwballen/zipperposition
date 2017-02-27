@@ -3,7 +3,7 @@
 
 (** {1 Avatar + Inst-Gen-Eq} *)
 
-open Libzipperposition
+open Logtk
 open Hornet_types
 
 module T = FOTerm

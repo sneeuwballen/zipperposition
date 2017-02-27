@@ -3,7 +3,7 @@
 
 (** {1 Arbitrary Typed Terms and Formulas} *)
 
-open Libzipperposition
+open Logtk
 
 module QA = QCheck
 module T = FOTerm

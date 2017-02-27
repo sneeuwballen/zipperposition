@@ -3,7 +3,7 @@
 
 (** {1 State} *)
 
-open Libzipperposition
+open Logtk
 open Hornet_types
 
 module SI = Msat.Solver_intf

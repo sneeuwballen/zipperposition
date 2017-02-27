@@ -3,8 +3,8 @@
 
 (** {1 Implementation of Phases} *)
 
-open Libzipperposition
-open Libzipperposition_parsers
+open Logtk
+open Logtk_parsers
 open Params
 
 open Phases.Infix

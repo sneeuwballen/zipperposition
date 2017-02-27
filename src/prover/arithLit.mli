@@ -3,7 +3,7 @@
 
 (** {1 Arithmetic Literal} *)
 
-open Libzipperposition
+open Logtk
 
 type term = FOTerm.t
 

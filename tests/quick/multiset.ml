@@ -1,7 +1,7 @@
 #!/usr/bin/env ocaml
 #use "tests/quick/.common.ml";;
 
-open Libzipperposition
+open Logtk
 let f x y = Comparison.of_total(x-y);;
 
 module M = Multiset.Make(CCInt) ;;

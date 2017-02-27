@@ -3,7 +3,7 @@
 
 (** {1 Equational literals} *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
 module S = Subst

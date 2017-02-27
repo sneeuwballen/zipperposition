@@ -3,7 +3,7 @@
 
 (** {1 General representation of Clauses} *)
 
-open Libzipperposition
+open Logtk
 open Hornet_types
 
 (** An arbitrary clause, typically obtained from the input or by

@@ -3,7 +3,7 @@
 
 (** {1 Global environment for an instance of the prover} *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
 module Lit = Literal

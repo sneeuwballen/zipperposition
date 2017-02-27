@@ -3,7 +3,7 @@
 
 (** {1 General representation of Clauses} *)
 
-open Libzipperposition
+open Logtk
 
 module BV = CCBV
 module Fmt = CCFormat

@@ -3,7 +3,7 @@
 
 (** {1 Priority Queue of clauses} *)
 
-open Libzipperposition
+open Logtk
 
 module O = Ordering
 module Lit = Literal

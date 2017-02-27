@@ -3,8 +3,8 @@
 
 (** {1 Tool to orient a serie of rewriting rules} *)
 
-open Libzipperposition
-open Libzipperposition_solving
+open Logtk
+open Logtk_solving
 
 module PT = STerm
 module E = CCResult

@@ -5,7 +5,7 @@
 
 (** Literals occurring in clauses *)
 
-open Libzipperposition
+open Logtk
 
 type ty = Type.t
 type term = FOTerm.t

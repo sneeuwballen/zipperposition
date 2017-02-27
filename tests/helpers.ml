@@ -25,7 +25,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** helpers for tests *)
 
-open Libzipperposition
+open Logtk
 module R = Random
 
 let seed = 42   (* use a fixed seed for random, for repeatable tests *)

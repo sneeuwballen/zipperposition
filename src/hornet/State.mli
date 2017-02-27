@@ -5,7 +5,7 @@
 
 (** The global state of a proof attempt *)
 
-open Libzipperposition
+open Logtk
 open Hornet_types
 
 type term = FOTerm.t

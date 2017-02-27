@@ -7,7 +7,7 @@
     Now clauses also have a {b trail}, that is, a set of boolean literals
     that it depends upon as a conditional guard. *)
 
-open Libzipperposition
+open Logtk
 
 val stat_clause_create : Util.stat
 

@@ -1,9 +1,9 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Call external provers with TSTP} *)
 
-open Libzipperposition
+open Logtk
 
 type 'a or_error = ('a, string) CCResult.t
 type untyped = STerm.t

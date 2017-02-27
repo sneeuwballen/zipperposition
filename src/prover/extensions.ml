@@ -3,7 +3,7 @@
 
 (** {1 Dynamic extensions} *)
 
-open Libzipperposition
+open Logtk
 
 type 'a or_error = ('a, string) CCResult.t
 

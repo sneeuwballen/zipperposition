@@ -3,8 +3,8 @@
 
 (** {1 Horn Superposition + Splitting} *)
 
-open Libzipperposition
-open Libzipperposition_parsers
+open Logtk
+open Logtk_parsers
 module E = CCResult
 open E.Infix
 module Fmt = CCFormat

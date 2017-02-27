@@ -6,7 +6,7 @@
 (** We gather here the main data structures, because they are
     often mutually recursive *)
 
-open Libzipperposition
+open Logtk
 
 type ty = Type.t
 type term = FOTerm.t

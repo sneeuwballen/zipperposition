@@ -3,7 +3,7 @@
 
 (** {1 Basic context for literals, clauses...} *)
 
-open Libzipperposition
+open Logtk
 
 (** {2 Context for a Proof} *)
 module type S = Ctx_intf.S

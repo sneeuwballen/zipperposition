@@ -3,7 +3,7 @@
 
 (** {1 Polynomes of order 1, over several variables}. *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
 

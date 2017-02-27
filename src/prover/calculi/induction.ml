@@ -3,7 +3,7 @@
 
 (** {1 Induction through Cut} *)
 
-open Libzipperposition
+open Logtk
 
 module Lits = Literals
 module T = FOTerm

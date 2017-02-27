@@ -8,7 +8,7 @@
     Variables in the [u_i] live in a distinct scope than variables
     in the [t_i]. *)
 
-open Libzipperposition
+open Logtk
 
 type term = FOTerm.t
 

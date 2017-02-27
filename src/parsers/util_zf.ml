@@ -3,7 +3,7 @@
 
 (** {1 Utils for ZF} *)
 
-open Libzipperposition
+open Logtk
 
 module A = UntypedAST
 

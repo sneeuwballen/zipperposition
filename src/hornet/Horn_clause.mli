@@ -10,7 +10,7 @@
     is actually the Horn clause [p1 ∧ … ∧ pn => ⊥].
 *)
 
-open Libzipperposition
+open Logtk
 open Hornet_types
 
 type t = horn_clause

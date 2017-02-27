@@ -5,7 +5,7 @@
 
 (** The various results of a proof *)
 
-open Libzipperposition
+open Logtk
 open Hornet_types
 
 module Fmt = CCFormat

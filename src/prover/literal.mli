@@ -3,7 +3,7 @@
 
 (** {1 Equational literals} *)
 
-open Libzipperposition
+open Logtk
 
 type term = FOTerm.t
 

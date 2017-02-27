@@ -12,7 +12,7 @@
     Depends optionally on the "meta" extension.
 *)
 
-open Libzipperposition
+open Logtk
 
 type 'a printer = Format.formatter -> 'a -> unit
 

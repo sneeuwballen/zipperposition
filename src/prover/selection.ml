@@ -4,7 +4,7 @@
 (** Selection functions. Note for splitting: SelectComplex already selects
     in priority "big" negative literals, ie literals that are not split symbols. *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
 module S = Subst.FO

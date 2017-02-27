@@ -3,7 +3,7 @@
 
 (** {1 Utils for TIP} *)
 
-open Libzipperposition
+open Logtk
 
 module E = CCResult
 module A = Tip_ast

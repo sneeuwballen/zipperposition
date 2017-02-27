@@ -3,8 +3,8 @@
 
 (** {1 Convert from TPTP to ZF} *)
 
-open Libzipperposition
-open Libzipperposition_parsers
+open Logtk
+open Logtk_parsers
 
 open CCResult.Infix
 

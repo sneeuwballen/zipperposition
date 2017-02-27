@@ -4,7 +4,7 @@
 (** {1 Lexer for Zipperposition Formulas} *)
 
 {
-  open Libzipperposition
+  open Logtk
   open Parse_zf
 }
 

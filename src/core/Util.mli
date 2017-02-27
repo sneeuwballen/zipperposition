@@ -1,5 +1,5 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Some helpers} *)
 
@@ -40,7 +40,7 @@ module Section : sig
   (** all registered sections *)
 
   val root : t (** Default section, with no parent *)
-  val zip : t (** Section for all Libzipperposition-related things *)
+  val zip : t (** Section for all Logtk-related things *)
 
   val make : ?parent:t -> ?inheriting:t list -> string -> t
   (** [make ?parent ?inheriting name] makes a new section with the given name.

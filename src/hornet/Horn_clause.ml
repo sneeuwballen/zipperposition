@@ -3,7 +3,7 @@
 
 (** {1 Horn Clause} *)
 
-open Libzipperposition
+open Logtk
 open Hornet_types
 
 module Fmt = CCFormat

@@ -3,7 +3,7 @@
 
 (** {1 Print Proofs} *)
 
-open Libzipperposition
+open Logtk
 open Hornet_types
 
 module HC = Horn_clause

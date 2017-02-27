@@ -3,7 +3,7 @@
 
 (** {1 Arbitrary Basic Terms} *)
 
-open Libzipperposition
+open Logtk
 
 module QA = QCheck
 module PT = TypedSTerm

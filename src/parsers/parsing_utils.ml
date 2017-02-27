@@ -3,7 +3,7 @@
 
 (** {1 Utils for Parsing} *)
 
-open Libzipperposition
+open Logtk
 open CCResult.Infix
 
 let parse_tptp file =

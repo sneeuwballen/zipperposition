@@ -3,8 +3,8 @@
 
 (** Test terms *)
 
-open Libzipperposition
-open Libzipperposition_arbitrary
+open Logtk
+open Logtk_arbitrary
 
 module T = FOTerm
 module H = Helpers

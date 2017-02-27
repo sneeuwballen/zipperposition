@@ -3,8 +3,8 @@
 
 (** {1 Main file for the prover} *)
 
+open Logtk
 open Libzipperposition
-open Libzipperposition_prover
 
 let section = Const.section
 
