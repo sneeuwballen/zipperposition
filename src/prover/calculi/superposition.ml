@@ -554,10 +554,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
        - must rewrite matching to work on the record anyway
   *)
 
+  let lazy_false = Lazy.from_val false
+
   (** Compute normal form of term w.r.t active set. Clauses used to
       rewrite are added to the clauses hashset.
       restrict is an option for restricting demodulation in positive maximal terms *)
-  let demod_nf ?(restrict=false) c clauses t =
+  let demod_nf ?(restrict=lazy_false) c clauses t =
     let ord = Ctx.ord () in
     (* compute normal form of subterm. If restrict is true, substitutions that
        are variable renamings are forbidden (since we are at root of a max term) *)
@@ -569,7 +571,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           (fun (l, r, (_,_,_,unit_clause), subst) ->
              (* r is the term subterm is going to be rewritten into *)
              assert (C.is_unit_clause unit_clause);
-             if (not restrict || not (S.is_renaming subst))
+             if (not (Lazy.force restrict) || not (S.is_renaming subst))
              && C.trail_subsumes unit_clause c
              && (C.is_oriented_rule unit_clause ||
                  O.compare ord
@@ -607,7 +609,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             | T.Var _ -> S.FO.apply_no_renaming subst (t, scope)
             | T.Const _ ->
               (* rewrite subterms in call by value *)
-              let l' = List.map (fun t' -> normal_form ~restrict:false subst t' scope) l in
+              let l' =
+                List.map (fun t' -> normal_form ~restrict:lazy_false subst t' scope) l
+              in
               let hd' = Subst.FO.apply_no_renaming subst (hd, scope) in
               let t' =
                 if T.equal hd hd' && T.same_l l l'
@@ -632,17 +636,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let eligible_res = lazy (C.eligible_res_no_subst c) in
     (* demodulate literals *)
     let demod_lit i lit =
+      let max_terms = lazy (Lit.Comp.max_terms ~ord lit) in
       (* shall we restrict a subterm? only for max terms in positive
           equations that are eligible for resolution *)
-      let restrict_term =
+      let restrict_term t = lazy (
         if Lit.is_eq lit && BV.get (Lazy.force eligible_res) i
         then
-          let max_terms = Lit.Comp.max_terms ~ord lit in
-          fun t ->
-            (* restrict max terms in literals eligible for resolution *)
-            CCList.mem ~eq:T.equal t max_terms
-        else (fun _ -> false)
-      in
+          (* restrict max terms in literals eligible for resolution *)
+          CCList.mem ~eq:T.equal t (Lazy.force max_terms)
+        else false
+      ) in
       Lit.map
         (fun t -> demod_nf ~restrict:(restrict_term t) c clauses t)
         lit
