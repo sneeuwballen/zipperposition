@@ -2,12 +2,7 @@
 
 ## Now
 
-- subsumption on unit horn clauses!
-- maybe subsumption on other horn clauses, too
-
-- in `Horn_sup`, replace depth limit by step limit (initial step+
-  a given number of steps every time `saturate` is called)
-  AND use a better priority queue (basic clause selection)
+- penalize clauses with several positive lits?
 
 ## Hornet
 
@@ -128,10 +123,13 @@
 ## To Fix
 
 - `./zipperposition.native --dot /tmp/truc.dot -t 30 examples/ind/nat_check.zf --debug 5`
-- `examples/pelletier_problems/pb49.p` (wrong CNF? also, bad type inference on first axiom)
-- `examples/by_case.p`  should be unsat, but arith fails
-- `./zipperposition.native --dot /tmp/truc.dot -t 30 examples/pelletier_problems/pb58.zf`
-  seems like the step yielding `f (f X) != X0` is wrong (bad replacement)?
+
+- `./zipperposition.native -p -o none -t 30 --dot /tmp/truc.dot examples/GEG024=1.p --debug 1`
+  seems like heuristics are bad here (`--clause-queue bfs` works fine),
+  need to penalize some deep series of arith inferences
+
+  → also need to find good way of indexing these for subsumption
+  (e.g. feature vectors with lower/upper bounds?)
 
 ## In Hold
 
