@@ -9,7 +9,7 @@ module T = FOTerm
 module Lit = Literal
 
 let depth_limit_ = ref None
-let max_vars = ref 6
+let max_vars = ref 10
 
 let enable_depth_limit i =
   if i <= 0 then invalid_arg "Heuristics.enable_depth_limit";
