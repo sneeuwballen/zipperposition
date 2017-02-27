@@ -105,11 +105,14 @@ module Make
     |> CCList.sort_uniq ~cmp:Ind_cst.cst_compare
 
   (* scan clauses for ground terms of an inductive type,
-     and declare those terms *)
+     and declare those terms. Only do this if the clause is part of an
+     inductive proof, by looking at the trail *)
   let scan_clause c : Ind_cst.cst list =
-    C.lits c
-    |> Lits.Seq.terms
-    |> scan_terms
+    if C.trail c |> Trail.exists BoolBox.is_inductive then (
+      C.lits c
+      |> Lits.Seq.terms
+      |> scan_terms
+    ) else []
 
   let is_eq_ ~path (t1:Ind_cst.cst) (t2:Ind_cst.case) ctxs =
     let p = Ind_cst.path_cons t1 t2 ctxs path in
