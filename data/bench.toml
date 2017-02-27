@@ -1,5 +1,5 @@
 
-provers = [ "zipperposition", "hornet" ]
+provers = [ "zipperposition", "hornet", "read-tptp" ]
 
 [test]
 
@@ -9,6 +9,7 @@ provers = [ "zipperposition", "hornet" ]
 problems = "(.*(\\+|-).*).p"
 dir = [ "tptp" ]
 
+expect = "program:read-tptp"
 default_expect = "unknown"
 
 [zipperposition]
@@ -28,4 +29,12 @@ unsat = "UNSAT"
 sat = "^SAT"
 timeout = "SZS Status ResourceOut"
 version = "git:."
+
+[read-tptp]
+
+# parse "expected" result
+binary = "grep"
+cmd = "grep Status $file"
+unsat = "(Theorem|Unsatisfiable)"
+sat = "(CounterSatisfiable|Satisfiable)"
 
