@@ -73,12 +73,12 @@ module Make(C : Clause.S) = struct
              | B.Lemma _ -> acc
              | B.Clause_component lits -> acc + weight_lits_ lits
              | B.Case p ->
-               (* penalize deep inductions exponentially *)
-               acc + CCInt.pow 2 (4 * Ind_cst.path_length p)
+               (* penalize deep inductions quadratically *)
+               acc + CCInt.pow (Ind_cst.path_length p) 2
           )
           0 trail
       in
-      w_lits * Array.length (C.lits c) + w_trail * (Trail.length trail) + _depth_ty
+      w_lits * Array.length (C.lits c) + w_trail + _depth_ty
 
     let penalty_coeff_ = 20
 
