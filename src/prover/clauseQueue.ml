@@ -202,23 +202,29 @@ module Make(C : Clause.S) = struct
 
   let goal_oriented =
     let open WeightFun in
-    let weight = combine [age, 1; default, 4; favor_goal, 1; favor_all_neg, 1] in
+    let weight =
+      combine [age, 1; default, 4; favor_small_num_vars, 2;
+               favor_goal, 1; favor_all_neg, 1] in
     let name = "goal_oriented" in
     make ~weight name
 
   let bfs =
     let open WeightFun in
-    let weight = combine [age, 5; default, 1] in
+    let weight = combine [age, 5; default, 1; favor_small_num_vars, 1; ] in
     make ~weight "bfs"
 
   let explore =
     let open WeightFun in
-    let weight = combine [age, 1; default, 4; favor_all_neg, 1] in
+    let weight =
+      combine [age, 1; default, 4; favor_small_num_vars, 1; favor_all_neg, 1]
+    in
     make ~weight "explore"
 
   let ground =
     let open WeightFun in
-    let weight = combine [age, 1; favor_pos_unit, 1; favor_ground, 2] in
+    let weight =
+      combine [age, 1; favor_pos_unit, 1; favor_ground, 2; favor_small_num_vars, 10; ]
+    in
     make ~weight "ground"
 
   let default =
