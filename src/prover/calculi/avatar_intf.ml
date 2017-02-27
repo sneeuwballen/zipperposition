@@ -1,7 +1,7 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-open Libzipperposition
+open Logtk
 
 module type S = sig
   module E : Env.S
@@ -31,7 +31,7 @@ module type S = sig
     cut_pos: E.C.t list; (** clauses true if lemma is true *)
     cut_neg: E.C.t list; (** clauses true if lemma is false *)
     cut_skolems: (ID.t * Type.t) list;
-      (** skolems of universal variables in [cut_neg] *)
+    (** skolems of universal variables in [cut_neg] *)
     cut_lit: BLit.t; (** lit that is true if lemma is true *)
   }
   (** This represents a cut on a formula, where we obtain a list

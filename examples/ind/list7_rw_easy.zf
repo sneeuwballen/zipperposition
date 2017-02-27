@@ -1,0 +1,45 @@
+# expect: unsat
+
+val nat : type.
+data list := nil | cons nat list.
+
+val append : list -> list -> list.
+
+rewrite forall (L:list). ((append nil L) = L).
+rewrite
+  forall (X:nat).
+    (forall (L:list).
+       (forall (L2:list). ((append (cons X L) L2) = (cons X (append L L2))))).
+
+val rev : list -> list.
+
+rewrite (rev nil) = nil.
+rewrite
+  forall (X:nat).
+    (forall (L:list). ((rev (cons X L)) = (append (rev L) (cons X nil)))).
+
+# magic lemma.
+#
+# The idea is, we're stuck on:
+# `rev (append (rev L) (cons X nil)) != cons X L`
+# with hypothesis `rev (rev L) = L`
+#
+# we notce that, by replacing the rightmost `L` by `rev (rev L)` using hypothesis,
+# we get `rev (append (rev L) (cons X nil)) != cons X (rev (rev L))`.
+# Now we generalize `rev L` into a new variable `Z` (occurs on both sides,
+#   at reductive positions):
+# `rev (append Z (cons X nil)) != cons X (rev Z)`
+# and get the good lemma!
+
+# OR: once at `rev (append (rev L) (cons X nil)) != cons X (rev (rev L))`
+# we assume our goal holds, i.e. `∀X. rev (rev X) = X`, we turn the subgoal
+# into a lemma candidate: `∀X L. rev (append (rev L) (cons X nil)) = cons X L`,
+# and do a bit of superposition with the goal `rev (rev X) = X`.
+#
+# This yields: `rev (append L0 (cons X nil)) = cons X L0` with `L = rev L0`
+# which we should keep because it has a variable in reductive
+# position (unlike the original lemma).
+# TL;DR use the goal (heuristically) to simplify candidate lemmas so they are reductive
+lemma forall X L. rev (append L (cons X nil)) = cons X (rev L).
+
+goal forall (L:list). ((rev (rev L)) = L).

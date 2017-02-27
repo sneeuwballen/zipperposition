@@ -3,7 +3,7 @@
 
 (** {1 Parameters for the prover, etc.} *)
 
-open Libzipperposition
+open Logtk
 
 (* TODO: params to limit depth of preprocessing *)
 (* TODO: params to enable/disable some preprocessing *)
@@ -50,12 +50,12 @@ let parse_args () =
     [ "--ord", Arg.Set_string ord, " choose ordering (rpo,kbo)"
     ; "--version", Arg.Set version, " print version"
     ; "--steps", Arg.Set_int steps,
-        " maximal number of steps of given clause loop (no limit if negative)"
+      " maximal number of steps of given clause loop (no limit if negative)"
     ; "--timeout", Arg.Set_float timeout, " timeout (in seconds)"
     ; "-t", Arg.Set_float timeout, " short for --timeout"
     ; "--expand-def", Arg.Set expand_def, " expand definitions"
     ; "--presaturate", Arg.Set presaturate,
-        " pre-saturate (interreduction of) the initial clause set"
+      " pre-saturate (interreduction of) the initial clause set"
     ; "--dot", Arg.String (fun s -> dot_file := Some s) , " print final state to file in DOT"
     ; "--dot-sat", Arg.Set dot_sat, " print saturated set into DOT"
     ; "--dot-all-roots", Arg.Set dot_all_roots, " print all empty clauses into DOT"
@@ -66,11 +66,11 @@ let parse_args () =
     ; "--def-as-assert", Arg.Clear def_as_rewrite, " treat definitions as axioms"
     ] @ Options.make ()
   ) |> List.sort (fun (s1,_,_)(s2,_,_) -> String.compare s1 s2)
-    |> Arg.align
+                |> Arg.align
   in
   Arg.parse options add_file "solve problems in files";
   if CCVector.is_empty files
-    then CCVector.push files "stdin";
+  then CCVector.push files "stdin";
   let files = CCVector.freeze files in (* from now on, immutable *)
   (* return parameter structure *)
   { param_ord= !ord; param_seed = !seed; param_steps = !steps;

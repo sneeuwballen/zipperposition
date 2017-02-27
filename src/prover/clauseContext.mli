@@ -8,10 +8,10 @@
 
     The point is to relate different applications of the same context. *)
 
-open Libzipperposition
+open Logtk
 
 type term = FOTerm.t
-type subst = Substs.t
+type subst = Subst.t
 
 (** A context is represented as a regular array of literals, containing
     at least one specific variable [x], paired with this variable [x].
@@ -25,7 +25,6 @@ type t = private {
 val compare : t -> t -> int
 val equal : t -> t -> bool
 val hash : t -> int
-val hash_fun : t CCHash.hash_fun
 
 val make : Literals.t -> var:FOTerm.var -> t
 (** Make a context from a var and literals containing this var.

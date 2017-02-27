@@ -1,9 +1,9 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 TPTP Ast} *)
 
-open Libzipperposition
+open Logtk
 
 module PT = STerm
 module Loc = ParseLocation
@@ -85,9 +85,9 @@ let rec pp_general out d = match d with
   | GVar s -> CCFormat.string out s
   | GColumn (a, b) -> Format.fprintf out "%a: %a" pp_general a pp_general b
   | GNode (f, l) ->
-      Format.fprintf out "%s(%a)" f (Util.pp_list pp_general) l
+    Format.fprintf out "%s(%a)" f (Util.pp_list pp_general) l
   | GList l ->
-      Format.fprintf out "[%a]" (Util.pp_list pp_general) l
+    Format.fprintf out "[%a]" (Util.pp_list pp_general) l
 
 let rec pp_general_debugf out d = match d with
   | GString s -> Format.fprintf out "GSstr %s" s
@@ -95,15 +95,15 @@ let rec pp_general_debugf out d = match d with
   | GVar s -> Format.fprintf out "GVar %s" s
   | GColumn (a, b) -> Format.fprintf out "%a: %a" pp_general_debugf a pp_general_debugf b
   | GNode (f, l) ->
-      Format.fprintf out "GNode(%s[%a])" f (Util.pp_list pp_general_debugf) l
+    Format.fprintf out "GNode(%s[%a])" f (Util.pp_list pp_general_debugf) l
   | GList l ->
-      CCFormat.list pp_general_debugf out l
+    CCFormat.list pp_general_debugf out l
 
 let pp_generals out l = match l with
   | [] -> ()
   | _::_ ->
-      Format.fprintf out ",@ ";
-      Util.pp_list ~sep:", " pp_general out l
+    Format.fprintf out ",@ ";
+    Util.pp_list ~sep:", " pp_general out l
 
 type 'a t =
   | CNF of name * role * 'a list * optional_info
@@ -127,7 +127,7 @@ let get_name = function
   | NewType (n, _, _, _) -> n
   | IncludeOnly _
   | Include _ ->
-      invalid_arg "Ast_tptp.name_of_decl: include directive has no name"
+    invalid_arg "Ast_tptp.name_of_decl: include directive has no name"
 
 (** {2 IO} *)
 
@@ -140,22 +140,22 @@ let pp_form_ pp out (logic, name, role, f, generals) =
 let pp pp_t out = function
   | Include filename -> fpf out "@[<hv2>include(@,'%s'@,).@]" filename
   | IncludeOnly (filename, names) ->
-      fpf out "@[<2>include('%s',@ [@[%a@]]@])." filename (Util.pp_list pp_name) names
+    fpf out "@[<2>include('%s',@ [@[%a@]]@])." filename (Util.pp_list pp_name) names
   | TypeDecl (name, s, ty, g) ->
-      fpf out "@[<2>tff(%a, type,@ (@[%s : %a@])%a@])."
-        pp_name name s pp_t ty pp_generals g
+    fpf out "@[<2>tff(%a, type,@ (@[%s : %a@])%a@])."
+      pp_name name s pp_t ty pp_generals g
   | NewType (name, s, kind, g) ->
-      fpf out "@[<2>tff(%a, type,@ (@[%s : %a@])%a@])."
-        pp_name name s pp_t kind pp_generals g
+    fpf out "@[<2>tff(%a, type,@ (@[%s : %a@])%a@])."
+      pp_name name s pp_t kind pp_generals g
   | CNF (name, role, c, generals) ->
-      pp_form_
-        (Util.pp_list ~sep:" | " pp_t) out
-        ("cnf", name, role, c, generals)
+    pp_form_
+      (Util.pp_list ~sep:" | " pp_t) out
+      ("cnf", name, role, c, generals)
   | FOF (name, role, f, generals) ->
-      pp_form_ pp_t out ("fof", name, role, f, generals)
+    pp_form_ pp_t out ("fof", name, role, f, generals)
   | TFF (name, role, f, generals) ->
-      pp_form_ pp_t out ("tff", name, role, f, generals)
+    pp_form_ pp_t out ("tff", name, role, f, generals)
   | THF (name, role, f, generals) ->
-      pp_form_ pp_t out ("thf", name, role, f, generals)
+    pp_form_ pp_t out ("thf", name, role, f, generals)
 
 let to_string ppt = CCFormat.to_string (pp ppt)

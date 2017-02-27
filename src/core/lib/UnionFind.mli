@@ -48,38 +48,38 @@ end
 (** Build a union-find module from a key/value specification *)
 module Make(P : PAIR) : sig
   type key = P.key
-    (** Elements that can be compared *)
+  (** Elements that can be compared *)
 
   type value = P.value
-    (** Values associated with elements *)
+  (** Values associated with elements *)
 
   type t
-    (** The union-find imperative structure itself *)
+  (** The union-find imperative structure itself *)
 
   val create : key list -> t
-    (** Create a union-find for the given elements. Elements are mapped
-        to zero by default. *)
+  (** Create a union-find for the given elements. Elements are mapped
+      to zero by default. *)
 
   val mem : t -> key -> bool
-    (** Does the key belong to the UF? *)
+  (** Does the key belong to the UF? *)
 
   val find : t -> key -> key
-    (** Finds the representative of this key's equivalence class.
-        @raise Not_found if the key does not belong to the UF *)
+  (** Finds the representative of this key's equivalence class.
+      @raise Not_found if the key does not belong to the UF *)
 
   val find_value : t -> key -> value
-    (** Find value for the given element. The value is the monoid
-        merge of all values associated to [key]'s equivalence class.
-        @raise Not_found if [mem uf key] is false. *)
+  (** Find value for the given element. The value is the monoid
+      merge of all values associated to [key]'s equivalence class.
+      @raise Not_found if [mem uf key] is false. *)
 
   val union : t -> key -> key -> unit
-    (** Merge two elements (and their equivalence classes) *)
+  (** Merge two elements (and their equivalence classes) *)
 
   val add : t -> key -> value -> unit
-    (** Add the given value to the key's class (monoid). It modifies the value
-        by merging it with [value]. If the key does not belong
-        to the union-find, it is added. *)
+  (** Add the given value to the key's class (monoid). It modifies the value
+      by merging it with [value]. If the key does not belong
+      to the union-find, it is added. *)
 
   val iter : t -> (key -> value -> unit) -> unit
-    (** Iterate on representative and their value *)
+  (** Iterate on representative and their value *)
 end

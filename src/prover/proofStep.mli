@@ -3,7 +3,7 @@
 
 (** {1 Manipulate proofs} *)
 
-open Libzipperposition
+open Logtk
 
 module Loc = ParseLocation
 
@@ -16,7 +16,7 @@ val section : Util.Section.t
 type statement_src = Statement.source
 
 type rule_info =
-  | I_subst of Substs.t
+  | I_subst of Subst.t
   | I_pos of Position.t
   | I_comment of string
 
@@ -26,7 +26,7 @@ type rule = {
 }
 
 val mk_rule :
-  ?subst:Substs.t list ->
+  ?subst:Subst.t list ->
   ?pos:Position.t list ->
   ?comment:string list ->
   string ->

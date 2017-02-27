@@ -3,7 +3,7 @@
 
 (** {1 Induction through Cut} *)
 
-open Libzipperposition
+open Logtk
 
 module Lits = Literals
 module T = FOTerm
@@ -21,7 +21,7 @@ let k_enable : bool Flex_state.key = Flex_state.create_key()
 let k_ind_depth : int Flex_state.key = Flex_state.create_key()
 
 (* TODO
- in any ground inductive clause C[n]<-Gamma, containing inductive [n]:
+   in any ground inductive clause C[n]<-Gamma, containing inductive [n]:
    - find path [p], if any (empty at worst)
    - extract context C[]
    - find coverset of [n]
@@ -33,12 +33,12 @@ let k_ind_depth : int Flex_state.key = Flex_state.create_key()
    - add boolean clause  [n=t1] or [n=t2] .. or [n=tk] <= Gamma
      where coverset = {t1, t2, ... tk}
 
-  rule to make trivial any clause with >= 2 incompatible path literals
+   rule to make trivial any clause with >= 2 incompatible path literals
 *)
 
 module Make
-(E : Env.S)
-(A : Avatar_intf.S with module E = E)
+    (E : Env.S)
+    (A : Avatar_intf.S with module E = E)
 = struct
   module Env = E
   module Ctx = E.Ctx
@@ -48,9 +48,9 @@ module Make
 
   let is_ind_conjecture_ c =
     match C.distance_to_goal c with
-    | Some (0 | 1) -> true
-    | Some _
-    | None -> false
+      | Some (0 | 1) -> true
+      | Some _
+      | None -> false
 
   let has_pos_lit_ c =
     CCArray.exists Literal.is_pos (C.lits c)
@@ -61,8 +61,8 @@ module Make
     |> Sequence.flat_map T.Seq.subterms
     |> Sequence.filter_map
       (fun t -> match T.view t with
-        | T.Const id -> Ind_cst.as_cst id
-        | _ -> None)
+         | T.Const id -> Ind_cst.as_cst id
+         | _ -> None)
     |> Sequence.sort_uniq ~cmp:Ind_cst.cst_compare
     |> Sequence.to_rev_list
 
@@ -71,17 +71,17 @@ module Make
   let generalizable_subterms c =
     let count = T.Tbl.create 16 in
     C.Seq.terms c
-      |> Sequence.flat_map T.Seq.subterms
-      |> Sequence.filter
-        (fun t -> Ind_ty.is_inductive_type (T.ty t) && not (T.is_const t))
-      |> Sequence.iter
-        (fun t ->
-           let n = try T.Tbl.find count t with Not_found -> 0 in
-           T.Tbl.replace count t (n+1));
+    |> Sequence.flat_map T.Seq.subterms
+    |> Sequence.filter
+      (fun t -> Ind_ty.is_inductive_type (T.ty t) && not (T.is_const t))
+    |> Sequence.iter
+      (fun t ->
+         let n = try T.Tbl.find count t with Not_found -> 0 in
+         T.Tbl.replace count t (n+1));
     (* terms that occur more than once *)
     T.Tbl.to_seq count
-      |> Sequence.filter_map (fun (t,n) -> if n>1 then Some t else None)
-      |> Sequence.to_rev_list
+    |> Sequence.filter_map (fun (t,n) -> if n>1 then Some t else None)
+    |> Sequence.to_rev_list
 
   (* apply the list of replacements [l] to the term [t] *)
   let replace_many l t =
@@ -105,11 +105,14 @@ module Make
     |> CCList.sort_uniq ~cmp:Ind_cst.cst_compare
 
   (* scan clauses for ground terms of an inductive type,
-     and declare those terms *)
+     and declare those terms. Only do this if the clause is part of an
+     inductive proof, by looking at the trail *)
   let scan_clause c : Ind_cst.cst list =
-    C.lits c
-    |> Lits.Seq.terms
-    |> scan_terms
+    if C.trail c |> Trail.exists BoolBox.is_inductive then (
+      C.lits c
+      |> Lits.Seq.terms
+      |> scan_terms
+    ) else []
 
   let is_eq_ ~path (t1:Ind_cst.cst) (t2:Ind_cst.case) ctxs =
     let p = Ind_cst.path_cons t1 t2 ctxs path in
@@ -117,11 +120,11 @@ module Make
 
   (* TODO: rephrase this in the context of induction *)
   (* exhaustivity (inference):
-    if some term [t : tau] is maximal in a clause, [tau] is inductive,
-    and [t] was never split on, then introduce
-    [t = c1(...) or t = c2(...) or ... or t = ck(...)] where the [ci] are
-    constructors of [tau], and [...] are new Skolems of [t];
-    if [t] is ground then Avatar splitting (with xor) should apply directly
+     if some term [t : tau] is maximal in a clause, [tau] is inductive,
+     and [t] was never split on, then introduce
+     [t = c1(...) or t = c2(...) or ... or t = ck(...)] where the [ci] are
+     constructors of [tau], and [...] are new Skolems of [t];
+     if [t] is ground then Avatar splitting (with xor) should apply directly
       instead, as an optimization, with [k] unary clauses and 1 bool clause
   *)
 
@@ -129,24 +132,24 @@ module Make
      taht makes a conjunction of clause contexts true in the model *)
   type min_witness = {
     mw_cst: Ind_cst.cst;
-      (* the constant *)
+    (* the constant *)
     mw_generalize_on: Ind_cst.cst list;
-      (* list of other constants we can generalize in the strengthening.
-         E.g. in [not p(a,b)], with [mw_cst=a], [mw_generalize_on=[b]],
-         we obtain [not p(0,b)], [not p(s(a'),b)], [p(a',X)] where [b]
-         was generalized *)
+    (* list of other constants we can generalize in the strengthening.
+       E.g. in [not p(a,b)], with [mw_cst=a], [mw_generalize_on=[b]],
+       we obtain [not p(0,b)], [not p(s(a'),b)], [p(a',X)] where [b]
+       was generalized *)
     mw_contexts: ClauseContext.t list;
-      (* the conjunction of contexts for which [cst] is minimal
-         (that is, in the model, any term smaller than [cst] makes at
-         least one context false) *)
+    (* the conjunction of contexts for which [cst] is minimal
+       (that is, in the model, any term smaller than [cst] makes at
+       least one context false) *)
     mw_coverset : Ind_cst.cover_set;
-      (* minimality should be asserted for each case of the coverset *)
+    (* minimality should be asserted for each case of the coverset *)
     mw_path: Ind_cst.path;
-      (* path leading to this *)
+    (* path leading to this *)
     mw_proof: ProofStep.t;
-      (* proof for the result *)
+    (* proof for the result *)
     mw_trail: Trail.t;
-      (* trail to carry *)
+    (* trail to carry *)
   }
 
   (* recover the (possibly empty) path from a boolean trail *)
@@ -154,7 +157,7 @@ module Make
     Trail.to_seq trail
     |> Sequence.filter_map BBox.as_case
     |> Sequence.max ~lt:(fun a b -> Ind_cst.path_dominates b a)
-    |> CCOpt.get Ind_cst.path_empty
+    |> CCOpt.get_or ~default:Ind_cst.path_empty
 
   (* the rest of the trail *)
   let trail_rest trail : Trail.t =
@@ -197,8 +200,8 @@ module Make
      for each ctx in [mw.mw_contexts]:
       - add ctx[t] <- [cst=t]
       - for each [t' subterm t] of same type, add clause ~[ctx[t']] <- [cst=t]
-    @param path the current induction branch
-    @param trail precondition to this minimality
+     @param path the current induction branch
+     @param trail precondition to this minimality
   *)
   let clauses_of_min_witness ~trail mw : (C.t list * BoolBox.t list list) =
     let b_lits = ref [] in
@@ -238,9 +241,9 @@ module Make
                     mw.mw_contexts
                     |> Util.map_product
                       ~f:(fun ctx ->
-                         let lits = ClauseContext.apply ctx sub in
-                         let lits = Array.map Literal.negate lits in
-                         [Array.to_list lits])
+                        let lits = ClauseContext.apply ctx sub in
+                        let lits = Array.map Literal.negate lits in
+                        [Array.to_list lits])
                     |> List.map
                       (fun l ->
                          let lits =
@@ -251,7 +254,7 @@ module Make
                            ~trail:(Trail.add b_lit mw.mw_trail))
                   in
                   Sequence.of_list clauses)
-            |> Sequence.to_rev_list
+             |> Sequence.to_rev_list
            in
            (* all new clauses *)
            let res = List.rev_append pos_clauses neg_clauses in
@@ -396,26 +399,26 @@ module Make
      It also handles inductive Lemmas *)
   let convert_statement st =
     match Statement.view st with
-    | Statement.NegatedGoal (skolems, _) ->
-      (* find inductive constants *)
-      begin match ind_consts_of_skolems skolems with
-        | [] -> E.CR_skip
-        | consts ->
-          (* first, get "proper" clauses, with proofs *)
-          let clauses = C.of_statement st in
-          (* for each new inductive constant, assert minimality of
-             this constant w.r.t the set of clauses that contain it *)
-          consts
-          |> CCList.flat_map
-            (fun cst ->
-               (* generalize on the other constants *)
-               let generalize_on =
-                 CCList.remove ~eq:Ind_cst.cst_equal ~x:cst consts
-               in
-               induction_on_ clauses ~cst ~generalize_on)
-          |> E.cr_return (* do not add the clause itself *)
+      | Statement.NegatedGoal (skolems, _) ->
+        (* find inductive constants *)
+        begin match ind_consts_of_skolems skolems with
+          | [] -> E.CR_skip
+          | consts ->
+            (* first, get "proper" clauses, with proofs *)
+            let clauses = C.of_statement st in
+            (* for each new inductive constant, assert minimality of
+               this constant w.r.t the set of clauses that contain it *)
+            consts
+            |> CCList.flat_map
+              (fun cst ->
+                 (* generalize on the other constants *)
+                 let generalize_on =
+                   CCList.remove ~eq:Ind_cst.cst_equal ~x:cst consts
+                 in
+                 induction_on_ clauses ~cst ~generalize_on)
+            |> E.cr_return (* do not add the clause itself *)
         end
-    | _ -> E.cr_skip
+      | _ -> E.cr_skip
 
   let new_lemmas_ : C.t list ref = ref []
 
@@ -474,8 +477,8 @@ let post_typing_hook stmts state =
   let should_enable =
     CCVector.exists
       (fun st -> match Statement.view st with
-        | Statement.Data _ -> true
-        | _ -> false)
+         | Statement.Data _ -> true
+         | _ -> false)
       stmts
   in
   if !enabled_ && should_enable then (
@@ -483,8 +486,8 @@ let post_typing_hook stmts state =
       "Enable induction: requires ord=rpo6; select=NoSelection";
     let p = {
       p with Params.
-      param_ord = "rpo6";
-      param_select = "NoSelection";
+          param_ord = "rpo6";
+          param_select = "NoSelection";
     } in
     state
     |> Flex_state.add Params.key p
@@ -510,9 +513,9 @@ let env_action (module E : Env.S) =
 let extension =
   Extensions.(
     {default with
-     name="induction_simple";
-     post_typing_actions=[post_typing_hook];
-     env_actions=[env_action];
+       name="induction_simple";
+       post_typing_actions=[post_typing_hook];
+       env_actions=[env_action];
     })
 
 let () =

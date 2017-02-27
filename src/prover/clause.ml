@@ -3,12 +3,11 @@
 
 (** {1 Clauses} *)
 
-open Libzipperposition
+open Logtk
 
-module Hash = CCHash
 module BV = CCBV
 module T = FOTerm
-module S = Substs
+module S = Subst
 module Lit = Literal
 module Lits = Literals
 module Stmt = Statement
@@ -24,7 +23,6 @@ type proof = Clause_intf.proof
 (** {2 Type def} *)
 module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   module Ctx = Ctx
-  module BLit = BBox
 
   type flag = SClause.flag
 
@@ -40,6 +38,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     sclause : sclause;
     mutable selected : BV.t Lazy.t; (** bitvector for selected lits*)
     mutable proof : proof_step; (** Proof of the clause *)
+    mutable eligible_res: BV.t option; (* eligible for resolution? *)
   }
 
   type clause = t
@@ -61,7 +60,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let compare c1 c2 = SClause.compare c1.sclause c2.sclause
 
   let hash c = SClause.hash c.sclause
-  let hash_fun c h = CCHash.int_ (hash c) h
 
   let id c = SClause.id c.sclause
 
@@ -102,6 +100,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       sclause;
       selected;
       proof;
+      eligible_res=None;
     } in
     (* return clause *)
     Util.incr_stat stat_clause_create;
@@ -175,15 +174,15 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       c
     in
     match Stmt.view st with
-    | Stmt.Data _
-    | Stmt.TyDecl _ -> []
-    | Stmt.Def _
-    | Stmt.RewriteForm _
-    | Stmt.RewriteTerm _ -> [] (* dealt with by rewriting *)
-    | Stmt.Assert lits -> [of_lits lits]
-    | Stmt.Goal lits -> [of_lits lits]
-    | Stmt.Lemma l
-    | Stmt.NegatedGoal (_,l) -> List.map of_lits l
+      | Stmt.Data _
+      | Stmt.TyDecl _ -> []
+      | Stmt.Def _
+      | Stmt.RewriteForm _
+      | Stmt.RewriteTerm _ -> [] (* dealt with by rewriting *)
+      | Stmt.Assert lits -> [of_lits lits]
+      | Stmt.Goal lits -> [of_lits lits]
+      | Stmt.Lemma l
+      | Stmt.NegatedGoal (_,l) -> List.map of_lits l
 
   let update_trail f c =
     let sclause = SClause.update_trail f c.sclause in
@@ -210,7 +209,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     new_c
 
   let _apply_subst_no_simpl subst (lits,sc) =
-    if Substs.is_empty subst
+    if Subst.is_empty subst
     then lits (* id *)
     else
       let renaming = S.Renaming.create () in
@@ -265,6 +264,15 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       bv
     )
 
+  let eligible_res_no_subst c =
+    begin match c.eligible_res with
+      | Some r -> r
+      | None ->
+        let bv = eligible_res (c,0) Subst.empty in
+        c.eligible_res <- Some bv;
+        bv
+    end
+
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for paramodulation. *)
   let eligible_param (c,sc) subst =
@@ -303,15 +311,15 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let is_oriented_rule c =
     let ord = Ctx.ord () in
     match c.sclause.lits with
-    | [| Lit.Equation (l, r, true) |] ->
+      | [| Lit.Equation (l, r, true) |] ->
         begin match Ordering.compare ord l r with
           | Comparison.Gt
           | Comparison.Lt -> true
           | Comparison.Eq
           | Comparison.Incomparable -> false
         end
-    | [| Lit.Prop (_, true) |] -> true
-    | _ -> false
+      | [| Lit.Prop (_, true) |] -> true
+      | _ -> false
 
   let symbols ?(init=ID.Set.empty) seq =
     Sequence.fold
@@ -425,8 +433,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
             Lit.pp lit (pp_selected selected) i (pp_maxlit max) i
         in
         Format.fprintf out "[@[%a@]]"
-          (CCFormat.arrayi ~start:"" ~stop:"" ~sep:" ∨ " pp_lit)
-          lits
+          (Util.pp_seq ~sep:" ∨ " pp_lit)
+          (Sequence.of_array_i lits)
       )
     in
     Format.fprintf out "@[%a@[<2>%a%a@]@]/%d"
@@ -442,11 +450,11 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let pp_set out set =
     Format.fprintf out "{@[<hv>%a@]}"
-      (CCFormat.seq ~start:"" ~stop:"" ~sep:"," pp)
+      (Util.pp_seq ~sep:"," pp)
       (ClauseSet.to_seq set)
 
   let pp_set_tstp out set =
     Format.fprintf out "@[<v>%a@]"
-      (CCFormat.seq ~start:"" ~stop:"" ~sep:"," pp_tstp)
+      (Util.pp_seq ~sep:"," pp_tstp)
       (ClauseSet.to_seq set)
 end

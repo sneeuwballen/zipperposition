@@ -1,9 +1,10 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Scoped Value} *)
-
-type +'a t = 'a * int
+ 
+type scope = int
+type +'a t = 'a * scope
 
 let make x i = x, i
 
@@ -24,8 +25,7 @@ let compare c v1 v2 =
   if scope v1 = scope v2 then c (get v1) (get v2)
   else Pervasives.compare (scope v1) (scope v2)
 
-let hash_fun f v h = CCHash.int (scope v) h |> f (get v)
-let hash f v = CCHash.apply (hash_fun f) v
+let hash f (v,sc) = Hash.combine2 (Hash.int sc) (f v)
 
 let pp p out v =
   Format.fprintf out "@[%a[%d]@]" p (get v) (scope v)

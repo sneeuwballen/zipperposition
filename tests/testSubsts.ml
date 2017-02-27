@@ -1,11 +1,11 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-open Libzipperposition
-open OUnit2
+open Logtk
+open OUnit
 
 module T = FOTerm
-module S = Substs
+module S = Subst
 
 let ty = Type.TPTP.i
 let __const ?(ty=ty) s = T.const ~ty s

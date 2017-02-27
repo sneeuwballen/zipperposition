@@ -1,18 +1,18 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Unique Identifiers}
 
-  An {!ID.t} is a unique identifier (an integer) with a human-readable name.
-  We use those to give names to variables that are not hashconsed (the hashconsing
-  does not play nice with names)
+    An {!ID.t} is a unique identifier (an integer) with a human-readable name.
+    We use those to give names to variables that are not hashconsed (the hashconsing
+    does not play nice with names)
 
-  @since NEXT_RELEASE *)
+    @since NEXT_RELEASE *)
 
 type t = private {
   id: int;
   name: string;
-  mutable payload: exn list; (** Use [exn] as an open type for user-defined payload *)
+  mutable payload: exn; (** Use [exn] as an open type for user-defined payload *)
 }
 
 val make : string -> t
@@ -23,9 +23,18 @@ val copy : t -> t
 
 val id : t -> int
 val name : t -> string
-val payload : t -> exn list
+val payload : t -> exn
 
-val add_payload : t -> exn -> unit
+exception No_payload
+
+val set_payload : ?can_erase:(exn -> bool) -> t -> exn -> unit
+(** Set given exception as payload.
+    @param can_erase if provided, checks whether the current value
+      can be safely erased.
+    @raise Invalid_argument if there already is a payload. *)
+
+val set_payload_erase : t -> exn -> unit
+(** Set given exception as payload. Erases any previous value. *)
 
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t

@@ -3,8 +3,6 @@
 
 (** {1 Compute Precedence} *)
 
-open Libzipperposition
-
 type t
 
 val empty : t

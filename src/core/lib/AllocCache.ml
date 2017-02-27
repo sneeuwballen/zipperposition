@@ -1,12 +1,12 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Simple Cache for Allocations} *)
 
 module Arr = struct
   type 'a t = {
     caches: 'a array array array;
-      (* array of buckets, where each bucket is an array of arrays *)
+    (* array of buckets, where each bucket is an array of arrays *)
     max_buck_size: int;
     sizes: int array; (* number of cached arrays in each bucket *)
   }

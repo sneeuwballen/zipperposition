@@ -3,6 +3,8 @@
 
 (** {1 Boolean Trail} *)
 
+open Logtk
+
 module Lit = BBox.Lit
 
 type bool_lit = Lit.t
@@ -11,8 +13,7 @@ type t = Lit.Set.t
 
 let equal = Lit.Set.equal
 let compare = Lit.Set.compare
-let hash_fun trail h = CCHash.seq Lit.hash_fun (Lit.Set.to_seq trail) h
-let hash = CCHash.apply hash_fun
+let hash trail = Hash.seq Lit.hash (Lit.Set.to_seq trail)
 
 let empty = Lit.Set.empty
 let mem = Lit.Set.mem
@@ -60,3 +61,8 @@ let is_active trail ~v =
     trail
 
 let to_seq = Lit.Set.to_seq
+
+let labels (t:t) =
+  to_seq t
+  |> Sequence.map BBox.Lit.to_int
+  |> Util.Int_set.of_seq

@@ -4,7 +4,7 @@
 (** {1 Parser for Zipperposition Formulas} *)
 
 %{
-  open Libzipperposition
+  open Logtk
 
   module L = ParseLocation
   module A = UntypedAST
@@ -32,6 +32,7 @@
 %token WILDCARD
 %token COMMA
 %token DOT
+%token SEMI_COLON
 %token COLON
 %token EQDEF
 %token WHERE
@@ -72,10 +73,10 @@
 %token <string> UPPER_WORD
 %token <string> QUOTED
 
-%start <Libzipperposition.UntypedAST.statement> parse_statement
-%start <Libzipperposition.UntypedAST.statement list> parse_statement_list
-%start <Libzipperposition.UntypedAST.term> parse_term
-%start <Libzipperposition.UntypedAST.ty> parse_ty
+%start <Logtk.UntypedAST.statement> parse_statement
+%start <Logtk.UntypedAST.statement list> parse_statement_list
+%start <Logtk.UntypedAST.term> parse_term
+%start <Logtk.UntypedAST.ty> parse_ty
 
 
 %%
@@ -235,7 +236,7 @@ attrs:
 def:
  | v=raw_var COLON ty=term EQDEF t=term
    { A.mk_def v ty [T.eq (T.var v) t] }
- | v=raw_var COLON ty=term WHERE rules=separated_nonempty_list(AND,term)
+ | v=raw_var COLON ty=term WHERE rules=separated_nonempty_list(SEMI_COLON,term)
    { A.mk_def v ty rules }
 
 statement:

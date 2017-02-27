@@ -3,13 +3,11 @@
 
 (** {1 Compute Precedence} *)
 
-open Libzipperposition
-
 module T = FOTerm
 
 let prof_mk_prec = Util.mk_profiler "mk_precedence"
 
-let section = Util.Section.make ~parent:Const.section "compute_prec"
+let section = Util.Section.(make ~parent:root) "compute_prec"
 
 type 'a parametrized = Statement.clause_t Sequence.t -> 'a
 
@@ -54,7 +52,7 @@ let mk_precedence t seq =
   (* constraints *)
   let constrs =
     t.constrs @
-    List.map (fun (p,rule) -> p, rule seq) t.constr_rules
+      List.map (fun (p,rule) -> p, rule seq) t.constr_rules
   in
   Util.debugf ~section 2 "@[<2>%d precedence constraint(s)@]"
     (fun k->k(List.length constrs));

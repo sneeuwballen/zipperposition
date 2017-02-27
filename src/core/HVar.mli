@@ -1,9 +1,9 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Hashconsed Variable}
 
-  A variable for hashconsed terms, paired with a type.
+    A variable for hashconsed terms, paired with a type.
 *)
 
 type +'a t = private {
@@ -22,7 +22,6 @@ val update_ty : 'a t -> f:('a -> 'b) -> 'b t
 val compare : ('a -> 'a -> int) -> 'a t -> 'a t -> int
 val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 val hash : _ t -> int
-val hash_fun : _ t CCHash.hash_fun
 
 val max : 'a t -> 'a t -> 'a t
 val min : 'a t -> 'a t -> 'a t

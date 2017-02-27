@@ -1,5 +1,5 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Global CLI options}
 
@@ -18,10 +18,10 @@ type input_format =
 
 let input_format_of_string s =
   match s |> String.trim |> String.lowercase with
-  | "tptp" | "tstp" -> I_tptp
-  | "zf" -> I_zf
-  | "tip" -> I_tip
-  | s -> failwith ("unknown input format " ^ s)
+    | "tptp" | "tstp" -> I_tptp
+    | "zf" -> I_zf
+    | "tip" -> I_tip
+    | s -> failwith ("unknown input format " ^ s)
 
 type print_format =
   | Print_none
@@ -31,11 +31,11 @@ type print_format =
 
 let print_format_of_string s =
   match s |> String.trim |> String.lowercase with
-  | "none" -> Print_none
-  | "tptp" | "tstp" -> Print_tptp
-  | "default" | "normal" -> Print_normal
-  | "zf" -> Print_zf
-  | _ -> failwith ("unknown print format " ^ s)
+    | "none" -> Print_none
+    | "tptp" | "tstp" -> Print_tptp
+    | "default" | "normal" -> Print_normal
+    | "zf" -> Print_zf
+    | _ -> failwith ("unknown print format " ^ s)
 
 let input = ref I_guess
 let output = ref Print_normal
@@ -86,4 +86,4 @@ let make () =
     ; "--output" , Arg.String set_out , " choose printing format (zf, tptp, default, none)"
     ; "-o", Arg.String set_out, " alias for --output"
     ]
-  (List.rev_append !other_opts (mk_debug_opts ()))
+    (List.rev_append !other_opts (mk_debug_opts ()))

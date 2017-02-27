@@ -1,11 +1,11 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Variable}
 
-  A Variable is a pair of a unique Name, and a type.
+    A Variable is a pair of a unique Name, and a type.
 
-  @since NEXT_RELEASE *)
+    @since NEXT_RELEASE *)
 
 type +'a t = private {
   id: ID.t;
@@ -35,7 +35,6 @@ val name : _ t -> string
 val compare : _ t -> _ t -> int
 val equal : _ t -> _ t -> bool
 val hash : _ t -> int
-val hash_fun : _ t CCHash.hash_fun
 
 val pp : _ t CCFormat.printer
 val to_string : _ t -> string

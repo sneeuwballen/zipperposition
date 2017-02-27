@@ -3,33 +3,35 @@
 
 (** Tests for CNF *)
 
-open Libzipperposition
-open Libzipperposition_arbitrary
+open Logtk
+open Logtk_arbitrary
 
 module T = TypedSTerm
 module F = T.Form
 
 let check_cnf_gives_clauses =
-  let gen = QCheck.(map F.close_forall ArForm.default) in
+  let gen = QCheck.(map_same_type F.close_forall ArForm.default) in
   let name = "cnf_gives_clauses" in
   (* check that the CNf of a formula is in clausal form *)
   let prop f =
-    Cnf.cnf_of (Statement.assert_ ~src:() f)
+    Cnf.cnf_of
+      (Statement.assert_ ~src:(Statement.Src.from_file "<none>" Statement.R_goal) f)
     |> CCVector.flat_map_list
       (fun st -> match Statement.view st with
         | Statement.Data _
         | Statement.Def _
         | Statement.RewriteTerm _
         | Statement.RewriteForm _
-        | Statement.TyDecl _ -> []
-        | Statement.NegatedGoal l -> l
+        | Statement.TyDecl (_,_) -> []
+        | Statement.Lemma l
+        | Statement.NegatedGoal (_,l) -> l
         | Statement.Goal c
         | Statement.Assert c -> [c])
     |> CCVector.map
       (fun c -> F.or_ (List.map SLiteral.to_form c))
     |> CCVector.for_all Cnf.is_clause
   in
-  QCheck.Test.make ~name gen prop
+  QCheck.Test.make ~long_factor:20 ~name gen prop
 
 let check_miniscope_db_closed =
   let gen = QCheck.(map F.close_forall ArForm.default) in
@@ -39,7 +41,7 @@ let check_miniscope_db_closed =
     let f = Cnf.miniscope f in
     T.closed f
   in
-  QCheck.Test.make ~name gen prop
+  QCheck.Test.make ~long_factor:20 ~name gen prop
 
 let props =
   [ check_cnf_gives_clauses

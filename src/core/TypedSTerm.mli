@@ -1,10 +1,10 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Simple Typed Terms}.
 
-These terms are scoped, and possibly typed. Type inference should be
-performed on them. *)
+    These terms are scoped, and possibly typed. Type inference should be
+    performed on them. *)
 
 type location = ParseLocation.t
 
@@ -187,6 +187,8 @@ module Form : sig
 
   val forall_l : ?loc:location -> t Var.t list -> t -> t
   val exists_l : ?loc:location -> t Var.t list -> t -> t
+
+  val unfold_binder : Binder.t -> t -> t Var.t list * t
 
   val unfold_forall : t -> t Var.t list * t
   val close_forall : ?loc:location -> t -> t

@@ -1,11 +1,10 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-open Libzipperposition
+open Logtk
 
 module Lits = Literals
 module T = FOTerm
-module Su = Substs
 
 let section = Ind_ty.section
 
@@ -31,21 +30,21 @@ module Make(Env : Env_intf.S) = struct
       | T.AppBuiltin _ -> false
     in
     match lit with
-    | Literal.Equation (l, r, b) ->
+      | Literal.Equation (l, r, b) ->
         if
           ( Ind_ty.is_inductive_type (T.ty l) && occurs_in_ ~sub:l r )
           ||
           ( Ind_ty.is_inductive_type (T.ty r) && occurs_in_ ~sub:r l )
         then if b then `Absurd else `Trivial else `Neither
-    | _ -> `Neither
+      | _ -> `Neither
 
   let acyclicity_trivial c =
     let res = C.Seq.lits c
-      |> Sequence.exists
-        (fun lit -> match acyclicity lit with
-          | `Neither
-          | `Absurd -> false
-          | `Trivial -> true)
+              |> Sequence.exists
+                (fun lit -> match acyclicity lit with
+                   | `Neither
+                   | `Absurd -> false
+                   | `Trivial -> true)
     in
     if res
     then Util.debugf ~section 3 "@[<2>acyclicity:@ `@[%a@]` is trivial@]" (fun k->k C.pp c);
@@ -53,13 +52,13 @@ module Make(Env : Env_intf.S) = struct
 
   let acyclicity_simplify c =
     let lits' = C.Seq.lits c
-      |> Sequence.filter
-        (fun lit -> match acyclicity lit with
-          | `Neither
-          | `Trivial -> true
-          | `Absurd -> false (* remove lit *)
-        )
-      |> Sequence.to_array
+                |> Sequence.filter
+                  (fun lit -> match acyclicity lit with
+                     | `Neither
+                     | `Trivial -> true
+                     | `Absurd -> false (* remove lit *)
+                  )
+                |> Sequence.to_array
     in
     if Array.length lits' = Array.length (C.lits c)
     then SimplM.return_same c
@@ -81,8 +80,8 @@ module Make(Env : Env_intf.S) = struct
          | Literal.Equation (l, r, sign') when sign=sign' ->
            begin match T.Classic.view l, T.Classic.view r with
              | T.Classic.App (s1, l1), T.Classic.App (s2, l2)
-              when Ind_ty.is_constructor s1
-              && Ind_ty.is_constructor s2
+               when Ind_ty.is_constructor s1
+                 && Ind_ty.is_constructor s2
                -> Some (i,s1,l1,s2,l2)
              | _ -> None
            end
@@ -93,57 +92,57 @@ module Make(Env : Env_intf.S) = struct
   let injectivity_destruct_pos c =
     let eligible = C.Eligible.(filter Literal.is_eq) in
     match find_cstor_pair ~sign:true ~eligible c with
-    | Some (idx,s1,l1,s2,l2) when ID.equal s1 s2 ->
-      (* same constructor: simplify *)
-      assert (List.length l1 = List.length l2);
-      let other_lits = CCArray.except_idx (C.lits c) idx in
-      let new_lits =
-        List.combine l1 l2
-        |> CCList.filter_map
-          (fun (t1,t2) ->
-             if T.equal t1 t2 then None else Some (Literal.mk_eq t1 t2))
-      in
-      let rule = ProofStep.mk_rule ~comment:["induction"] "injectivity_destruct+" in
-      let proof = ProofStep.mk_inference ~rule [C.proof c] in
-      (* make one clause per [new_lits] *)
-      let clauses =
-        List.map
-          (fun lit ->
-             C.create ~trail:(C.trail c) (lit :: other_lits) proof)
-          new_lits
-      in
-      Util.debugf ~section 3 "@[<hv2>injectivity:@ simplify @[%a@]@ into @[<v>%a@]@]"
-        (fun k->k C.pp c (CCFormat.list C.pp) clauses);
-      Some clauses
-    | Some _
-    | None -> None
+      | Some (idx,s1,l1,s2,l2) when ID.equal s1 s2 ->
+        (* same constructor: simplify *)
+        assert (List.length l1 = List.length l2);
+        let other_lits = CCArray.except_idx (C.lits c) idx in
+        let new_lits =
+          List.combine l1 l2
+          |> CCList.filter_map
+            (fun (t1,t2) ->
+               if T.equal t1 t2 then None else Some (Literal.mk_eq t1 t2))
+        in
+        let rule = ProofStep.mk_rule ~comment:["induction"] "injectivity_destruct+" in
+        let proof = ProofStep.mk_inference ~rule [C.proof c] in
+        (* make one clause per [new_lits] *)
+        let clauses =
+          List.map
+            (fun lit ->
+               C.create ~trail:(C.trail c) (lit :: other_lits) proof)
+            new_lits
+        in
+        Util.debugf ~section 3 "@[<hv2>injectivity:@ simplify @[%a@]@ into @[<v>%a@]@]"
+          (fun k->k C.pp c (CCFormat.list C.pp) clauses);
+        Some clauses
+      | Some _
+      | None -> None
 
   (* if c is  f(t1,...,tn) != f(t1',...,tn') or d, with f inductive cstor, then
       replace c with    t1 != t1' or ... or tn != tn' or d *)
   let injectivity_destruct_neg c =
     let eligible = C.Eligible.(filter Literal.is_neq) in
     match find_cstor_pair ~sign:false ~eligible c with
-    | Some (idx,s1,l1,s2,l2) when ID.equal s1 s2 ->
-      (* same constructor: simplify *)
-      let lits = CCArray.except_idx (C.lits c) idx in
-      assert (List.length l1 = List.length l2);
-      (* add [ti != ti'] for arguments that are not actually types;
-         types should ALWAYS be equal anyway *)
-      let new_lits =
-        List.combine l1 l2
-        |> CCList.filter_map
-          (fun (t1,t2) ->
-             let ty = T.ty t1 in
-             if Type.is_tType ty then None else Some (Literal.mk_neq t1 t2))
-      in
-      let rule = ProofStep.mk_rule ~comment:["(ind_types)"] "injectivity_destruct-" in
-      let proof = ProofStep.mk_inference ~rule [C.proof c] in
-      let c' = C.create ~trail:(C.trail c) (new_lits @ lits) proof in
-      Util.debugf ~section 3 "@[<hv2>injectivity:@ simplify @[%a@]@ into @[%a@]@]"
-        (fun k->k C.pp c C.pp c');
-      SimplM.return_new c'
-    | Some _
-    | None -> SimplM.return_same c
+      | Some (idx,s1,l1,s2,l2) when ID.equal s1 s2 ->
+        (* same constructor: simplify *)
+        let lits = CCArray.except_idx (C.lits c) idx in
+        assert (List.length l1 = List.length l2);
+        (* add [ti != ti'] for arguments that are not actually types;
+           types should ALWAYS be equal anyway *)
+        let new_lits =
+          List.combine l1 l2
+          |> CCList.filter_map
+            (fun (t1,t2) ->
+               let ty = T.ty t1 in
+               if Type.is_tType ty then None else Some (Literal.mk_neq t1 t2))
+        in
+        let rule = ProofStep.mk_rule ~comment:["(ind_types)"] "injectivity_destruct-" in
+        let proof = ProofStep.mk_inference ~rule [C.proof c] in
+        let c' = C.create ~trail:(C.trail c) (new_lits @ lits) proof in
+        Util.debugf ~section 3 "@[<hv2>injectivity:@ simplify @[%a@]@ into @[%a@]@]"
+          (fun k->k C.pp c C.pp c');
+        SimplM.return_new c'
+      | Some _
+      | None -> SimplM.return_same c
 
   (* rule on literals that are trivial or absurd depending on toplevel
      constructor *)
@@ -182,6 +181,6 @@ let env_act (module E : Env_intf.S) =
 let extension =
   let open Extensions in
   { default with
-    name="ind_types";
-    env_actions=[env_act]
+      name="ind_types";
+      env_actions=[env_act]
   }

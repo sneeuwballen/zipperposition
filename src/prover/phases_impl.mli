@@ -8,7 +8,7 @@
 val parse_cli :
   (Phases.filename list * Params.t, [`Init], [`Parse_cli]) Phases.t
 (** Parses the file list and parameters, also puts the parameters in
-  the state *)
+    the state *)
 
 val load_extensions : (Extensions.t list, [`Parse_cli], [`LoadExtensions]) Phases.t
 

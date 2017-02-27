@@ -4,7 +4,7 @@
     Skolem constants of an inductive type, coversets, etc. required for
     inductive reasoning. *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
 
@@ -17,14 +17,14 @@ exception NotAnInductiveConstant of ID.t
 let () =
   let spf = CCFormat.sprintf in
   Printexc.register_printer
-  (function
-    | InvalidDecl msg ->
+    (function
+      | InvalidDecl msg ->
         Some (spf "@[<2>invalid declaration:@ %s@]" msg)
-    | AlreadyDeclaredConstant id ->
+      | AlreadyDeclaredConstant id ->
         Some (spf "%a already declared as an inductive constant" ID.pp id)
-    | NotAnInductiveConstant id ->
+      | NotAnInductiveConstant id ->
         Some (spf "%a is not an inductive constant" ID.pp id)
-    | _ -> None)
+      | _ -> None)
 
 let invalid_decl m = raise (InvalidDecl m)
 let invalid_declf m = CCFormat.ksprintf m ~f:invalid_decl
@@ -76,9 +76,9 @@ let case_sub_constants c = Sequence.of_list c.case_sub
 let cover_set_cases ?(which=`All) set =
   let seq = Sequence.of_list set in
   match which with
-  | `All -> seq
-  | `Base -> Sequence.filter case_is_base seq
-  | `Rec -> Sequence.filter case_is_rec seq
+    | `All -> seq
+    | `Base -> Sequence.filter case_is_base seq
+    | `Rec -> Sequence.filter case_is_rec seq
 
 let cover_set_skolems c =
   Sequence.of_list c
@@ -107,12 +107,9 @@ let pp_cst out c = ID.pp out c.cst_id
 
 let on_new_cst = Signal.create()
 
-let as_cst id =
-  CCList.find
-    (function
-      | Payload_cst c -> Some c
-      | _ -> None)
-    (ID.payload id)
+let as_cst id = match ID.payload id with
+  | Payload_cst c -> Some c
+  | _ -> None
 
 let as_cst_exn id = match as_cst id with
   | None -> raise (NotAnInductiveConstant id)
@@ -151,11 +148,11 @@ let rec dominates c1 c2 =
   c1.cst_depth < c2.cst_depth
   &&
   match c1.cst_coverset with
-  | None -> false
-  | Some set ->
-    Sequence.exists
-      (fun sub_c -> cst_equal sub_c c2 || dominates sub_c c2)
-      (cover_set_sub_constants set)
+    | None -> false
+    | Some set ->
+      Sequence.exists
+        (fun sub_c -> cst_equal sub_c c2 || dominates sub_c c2)
+        (cover_set_sub_constants set)
 
 (** {6 Creation of Coverset and Cst} *)
 
@@ -166,9 +163,9 @@ type id_or_ty_builtin =
 let type_hd_exn ty =
   let _, _, ret = Type.open_poly_fun ty in
   match Type.view ret with
-  | Type.Builtin b -> B b
-  | Type.App (s, _) -> I s
-  | _ ->
+    | Type.Builtin b -> B b
+    | Type.App (s, _) -> I s
+    | _ ->
       invalid_declf "expected function type, got %a" Type.pp ty
 
 (* type declarations required by [c] *)
@@ -202,23 +199,23 @@ module CoversetState = struct
   let yield : 'a -> 'a mm = fun x st -> [st, x]
   let yield_l : 'a list -> 'a mm = fun l st -> List.map (fun x -> st,x) l
   let (>>=) : 'a mm -> ('a -> 'b m) -> 'b mm
-  = fun x_mm f st ->
-    let xs = x_mm st in
-    List.map (fun (st,x) -> f x st) xs
+    = fun x_mm f st ->
+      let xs = x_mm st in
+      List.map (fun (st,x) -> f x st) xs
   let (>|=) : 'a mm -> ('a -> 'b) -> 'b mm
-  = fun x_mm f st ->
-    let xs = x_mm st in
-    List.map (fun (st,x) -> st, f x) xs
+    = fun x_mm f st ->
+      let xs = x_mm st in
+      List.map (fun (st,x) -> st, f x) xs
   let (>>>=) : 'a mm -> ('a -> 'b mm) -> 'b mm
-  = fun x_mm f st ->
-    let xs = x_mm st in
-    CCList.flat_map
-      (fun (st,x) -> f x st)
-      xs
+    = fun x_mm f st ->
+      let xs = x_mm st in
+      CCList.flat_map
+        (fun (st,x) -> f x st)
+        xs
   let (>>|=) : 'a mm -> ('a -> 'b) -> 'b mm
-  = fun x_mm f st ->
-    let xs = x_mm st in
-    List.map (fun (st,x) -> st, f x) xs
+    = fun x_mm f st ->
+      let xs = x_mm st in
+      List.map (fun (st,x) -> st, f x) xs
   let get : t mm = fun st -> [st, st]
   let set : t -> unit m = fun st _ -> st, ()
 
@@ -234,15 +231,15 @@ module CoversetState = struct
     set st
 
   let rec map_l : ('a -> 'b mm) -> 'a list -> 'b list mm
-  = fun f l -> match l with
-    | [] -> yield []
-    | x :: tl ->
+    = fun f l -> match l with
+      | [] -> yield []
+      | x :: tl ->
         f x >>>= fun x' ->
         map_l f tl >>>= fun tl' ->
         yield (x'::tl')
 
   let run : 'a mm -> t -> 'a list
-  = fun m st -> List.map snd (m st)
+    = fun m st -> List.map snd (m st)
 end
 
 let n_ = ref 0
@@ -251,7 +248,7 @@ let mk_skolem_ pp x =
   let name = CCFormat.sprintf "#%a_%d" pp x !n_ in
   incr n_;
   let c = ID.make name in
-  ID.add_payload c Skolem.Attr_skolem;
+  ID.set_payload c (Skolem.Attr_skolem Skolem.K_ind);
   c
 
 (* declare new constant *)
@@ -281,7 +278,11 @@ let declare_cst_ ~parent id ty =
     cst_coverset=None;
   }
   in
-  ID.add_payload id (Payload_cst cst);
+  ID.set_payload id (Payload_cst cst)
+    ~can_erase:(function
+      | Skolem.Attr_skolem Skolem.K_ind ->
+        true (* special case: promotion from skolem to inductive const *)
+      | _ -> false);
   (* return *)
   Signal.send on_new_cst cst;
   cst
@@ -313,7 +314,7 @@ let make_coverset_ ~cover_set_depth cst : cover_set =
     if depth=0
     then (
       let id = mk_skolem_ ID.pp ity.Ind_ty.ty_id in
-      let ty = Substs.Ty.apply_no_renaming subst (ity.Ind_ty.ty_pattern,0) in
+      let ty = Subst.Ty.apply_no_renaming subst (ity.Ind_ty.ty_pattern,0) in
       decl_sub id ty
     )
     (* inner nodes or base cases: constructors *)
@@ -327,7 +328,7 @@ let make_coverset_ ~cover_set_depth cst : cover_set =
         List.map
           (fun v ->
              let v = Type.var v in
-             Substs.Ty.apply_no_renaming subst (v,0))
+             Subst.Ty.apply_no_renaming subst (v,0))
           ity.Ind_ty.ty_vars
       in
       let ty_f_applied = Type.apply ty_f ty_params in
@@ -420,13 +421,13 @@ let cst_of_id id ty =
 let cst_of_term t =
   let ty = T.ty t in
   match T.view t with
-  | T.Const id ->
-    if Ind_ty.is_inductive_type ty
-    then match as_cst id with
-      | Some _ as res -> res
-      | None -> Some (declare_cst id ~ty)
-    else None
-  | _ -> None (* TODO: allow function, if not a constructor *)
+    | T.Const id ->
+      if Ind_ty.is_inductive_type ty
+      then match as_cst id with
+        | Some _ as res -> res
+        | None -> Some (declare_cst id ~ty)
+      else None
+    | _ -> None (* TODO: allow function, if not a constructor *)
 
 let is_potential_cst (id:ID.t) (ty:Type.t): bool =
   let n_tyvars, ty_args, ty_ret = Type.open_poly_fun ty in
@@ -442,15 +443,15 @@ let find_cst_in_term t =
   T.Seq.subterms t
   |> Sequence.filter_map
     (fun t -> match T.view t with
-      | T.Const id ->
-        if is_potential_cst id (T.ty t)
-        then (
-          let n_tyvars, ty_args, ty_ret = Type.open_poly_fun (T.ty t) in
-          assert (n_tyvars=0 && ty_args=[]);
-          Some (cst_of_id id ty_ret) (* bingo *)
-        )
-        else None
-      | _ -> None)
+       | T.Const id ->
+         if is_potential_cst id (T.ty t)
+         then (
+           let n_tyvars, ty_args, ty_ret = Type.open_poly_fun (T.ty t) in
+           assert (n_tyvars=0 && ty_args=[]);
+           Some (cst_of_id id ty_ret) (* bingo *)
+         )
+         else None
+       | _ -> None)
 
 (** {6 Path} *)
 
@@ -467,21 +468,19 @@ let rec path_compare p1 p2 = match p1, p2 with
     let open CCOrd in
     cst_compare c1.path_cst c2.path_cst
     <?> (case_compare, c1.path_case, c2.path_case)
-    <?> (list_ ClauseContext.compare, c1.path_clauses, c2.path_clauses)
+    <?> (list ClauseContext.compare, c1.path_clauses, c2.path_clauses)
     <?> (path_compare, p1', p2')
 
 let path_equal p1 p2 = path_compare p1 p2 = 0
 
-let rec path_hash_fun p h = match p with
-  | [] -> CCHash.int 42 h
-  | c :: p' ->
-    h
-    |> CCHash.int (cst_hash c.path_cst)
-    |> CCHash.int (case_hash c.path_case)
-    |> CCHash.list ClauseContext.hash_fun c.path_clauses
-    |> path_hash_fun p'
-
-let path_hash = CCHash.apply path_hash_fun
+let rec path_hash p = match p with
+  | [] -> Hash.int 42
+  | c :: p_tail ->
+    Hash.combine4
+      (cst_hash c.path_cst)
+      (case_hash c.path_case)
+      (Hash.list ClauseContext.hash c.path_clauses)
+      (path_hash p_tail)
 
 let path_length = List.length
 
@@ -496,14 +495,14 @@ let path_contains_cst p c =
 
 let pp_path out p =
   let rec aux out = function
-  | [] -> ()
-  | c :: p' ->
-    Format.fprintf out "@[<hv>[@[%a = %a@]@ for @[<v>%a@]]@]"
-      pp_cst c.path_cst pp_case c.path_case
-      (Util.pp_list ClauseContext.pp) c.path_clauses;
-    if p' <> [] then (
-      Format.fprintf out "@,@<1>·%a" aux p'
-    );
+    | [] -> ()
+    | c :: p' ->
+      Format.fprintf out "@[<hv>[@[%a = %a@]@ for @[<v>%a@]]@]"
+        pp_cst c.path_cst pp_case c.path_case
+        (Util.pp_list ClauseContext.pp) c.path_clauses;
+      if p' <> [] then (
+        Format.fprintf out "@,@<1>·%a" aux p'
+      );
   in
   Format.fprintf out "@[<hv>%a@]" aux p
 
@@ -511,6 +510,6 @@ let lits_of_path p =
   Array.of_list p
   |> Array.map
     (fun c ->
-      let l = cst_to_term c.path_cst in
-      let r = case_to_term c.path_case in
-      Literal.mk_eq l r)
+       let l = cst_to_term c.path_cst in
+       let r = case_to_term c.path_case in
+       Literal.mk_eq l r)

@@ -41,10 +41,10 @@ end
 (** Build a union-find module from a key/value specification *)
 module Make(P : PAIR) = struct
   type key = P.key
-    (** Elements that can be compared *)
+  (** Elements that can be compared *)
 
   type value = P.value
-    (** Values associated with elements *)
+  (** Values associated with elements *)
 
   type node = {
     mutable n_repr : key;     (* representative *)
@@ -75,13 +75,13 @@ module Make(P : PAIR) = struct
     let node = H.find t key in
     (* if key is its own representative, done; otherwise recurse toward key's root *)
     if P.equal key node.n_repr
-      then node
-      else begin
-        (* path compression *)
-        let node' = find_root t node.n_repr in
-        node.n_repr <- node'.n_repr;
-        node'
-      end
+    then node
+    else begin
+      (* path compression *)
+      let node' = find_root t node.n_repr in
+      node.n_repr <- node'.n_repr;
+      node'
+    end
 
   let find t key = (find_root t key).n_repr
 
@@ -92,11 +92,11 @@ module Make(P : PAIR) = struct
   let union t k1 k2 =
     let n1, n2 = find_root t k1, find_root t k2 in
     if not (P.equal n1.n_repr n2.n_repr)
-      then begin
-        (* k2 points to k1, and k1 points to the new value *)
-        n1.n_value <- P.merge n1.n_value n2.n_value;
-        n2.n_repr <- n1.n_repr;
-      end
+    then begin
+      (* k2 points to k1, and k1 points to the new value *)
+      n1.n_value <- P.merge n1.n_value n2.n_value;
+      n2.n_repr <- n1.n_repr;
+    end
 
   (** Add the given value to the key (monoid) *)
   let add t key value =

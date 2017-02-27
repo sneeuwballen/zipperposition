@@ -3,7 +3,7 @@
 
 (** {1 Inference and simplification rules for "Enum Types"} *)
 
-open Libzipperposition
+open Logtk
 
 type term = FOTerm.t
 

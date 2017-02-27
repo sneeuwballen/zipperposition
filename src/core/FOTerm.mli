@@ -56,6 +56,9 @@ module Set : CCSet.S with type elt = t
 module Map : CCMap.S with type key = t
 module Tbl : CCHashtbl.S with type key = t
 
+val hash_mod_alpha : t -> int
+(** Hash invariant w.r.t variable renaming *)
+
 val same_l : t list -> t list -> bool
 (** [same_l l1 l2] returns [true] if terms of [l1] and [l2] are pairwise
     equal, [false] otherwise.
@@ -93,6 +96,9 @@ val app_full : t -> Type.t list -> t list -> t
 
 val true_ : t
 val false_ : t
+
+val grounding : Type.t -> t
+(** [grounding ty] is a unique constant of type [ty] *)
 
 val is_var : t -> bool
 val is_bvar : t -> bool
@@ -185,7 +191,7 @@ val contains_symbol : ID.t -> t -> bool
 
 val all_positions :
   ?vars:bool -> ?ty_args:bool -> ?pos:Position.t ->
-  t -> (t * Position.t) Sequence.t
+  t -> t Position.With.t Sequence.t
 (** Iterate on all sub-terms with their position.
     @param vars specifies whether variables are folded on (default false).
     @param ty_args specifies whether type arguments are folded on (default true).

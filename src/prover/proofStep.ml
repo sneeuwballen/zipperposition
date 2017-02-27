@@ -3,10 +3,9 @@
 
 (** {1 Manipulate proofs} *)
 
-open Libzipperposition
+open Logtk
 
 module Loc = ParseLocation
-module Hash = CCHash
 module Stmt = Statement
 
 type form = TypedSTerm.t
@@ -18,7 +17,7 @@ let section = Util.Section.make ~parent:Const.section "proof"
 type statement_src = Statement.source
 
 type rule_info =
-  | I_subst of Substs.t
+  | I_subst of Subst.t
   | I_pos of Position.t
   | I_comment of string
 
@@ -88,7 +87,7 @@ let res_to_int_ = function
 let compare_result a b = match a, b with
   | Clause c1, Clause c2 -> SClause.compare c1 c2
   | Form f1, Form f2 -> TypedSTerm.compare f1 f2
-  | BoolClause l1, BoolClause l2 -> CCOrd.list_ BBox.Lit.compare l1 l2
+  | BoolClause l1, BoolClause l2 -> CCOrd.list BBox.Lit.compare l1 l2
   | Clause _, _
   | Form _, _
   | BoolClause _, _ ->
@@ -141,9 +140,9 @@ let mk_step_ kind parents =
     | [] -> None
     | [p] -> CCOpt.map succ p.step.dist_to_goal
     | [p1;p2] ->
-        CCOpt.map succ (combine_dist p1.step.dist_to_goal p2)
+      CCOpt.map succ (combine_dist p1.step.dist_to_goal p2)
     | p::l ->
-        CCOpt.map succ (List.fold_left combine_dist p.step.dist_to_goal l)
+      CCOpt.map succ (List.fold_left combine_dist p.step.dist_to_goal l)
   in
   { id=get_id_(); kind; parents; dist_to_goal; }
 
@@ -220,7 +219,7 @@ let distance_to_goal p = p.dist_to_goal
 
 let pp_rule ~info out r =
   let pp_info out = function
-    | I_subst s -> Format.fprintf out " with @[%a@]" Substs.pp s
+    | I_subst s -> Format.fprintf out " with @[%a@]" Subst.pp s
     | I_pos p -> Format.fprintf out " at @[%a@]" Position.pp p
     | I_comment s -> Format.fprintf out " %s" s
   in
@@ -247,16 +246,16 @@ let rec pp_src_tstp out src = match Stmt.Src.view src with
 
 let pp_kind_tstp out k =
   match k with
-  | Assert src
-  | Goal src -> pp_src_tstp out src
-  | Data _ -> Util.error ~where:"ProofStep" "cannot print `Data` step in TPTP"
-  | Inference rule ->
+    | Assert src
+    | Goal src -> pp_src_tstp out src
+    | Data _ -> Util.error ~where:"ProofStep" "cannot print `Data` step in TPTP"
+    | Inference rule ->
       Format.fprintf out "inference(%a, [status(thm)])" (pp_rule ~info:false) rule
-  | Simplification rule ->
+    | Simplification rule ->
       Format.fprintf out "inference(%a, [status(thm)])" (pp_rule ~info:false) rule
-  | Esa rule ->
+    | Esa rule ->
       Format.fprintf out "inference(%a, [status(esa)])" (pp_rule ~info:false) rule
-  | Trivial ->
+    | Trivial ->
       Format.fprintf out "trivial([status(thm)])"
 
 let rec pp_src out src = match Stmt.Src.view src with
@@ -275,14 +274,14 @@ let rec pp_src out src = match Stmt.Src.view src with
 
 let pp_kind out k =
   match k with
-  | Assert src -> pp_src out src
-  | Goal src -> Format.fprintf out "goal %a" pp_src src
-  | Data (src, _) -> Format.fprintf out "data %a" pp_src src
-  | Inference rule ->
+    | Assert src -> pp_src out src
+    | Goal src -> Format.fprintf out "goal %a" pp_src src
+    | Data (src, _) -> Format.fprintf out "data %a" pp_src src
+    | Inference rule ->
       Format.fprintf out "inf %a" (pp_rule ~info:true) rule
-  | Simplification rule ->
+    | Simplification rule ->
       Format.fprintf out "simp %a" (pp_rule ~info:true) rule
-  | Esa rule ->
+    | Esa rule ->
       Format.fprintf out "esa %a" (pp_rule ~info:true) rule
-  | Trivial -> CCFormat.string out "trivial"
+    | Trivial -> CCFormat.string out "trivial"
 

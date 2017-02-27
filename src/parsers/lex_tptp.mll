@@ -4,7 +4,7 @@
 (** {1 TPTP Lexer} *)
 
 {
-  open Libzipperposition
+  open Logtk
   open Parse_tptp
 }
 

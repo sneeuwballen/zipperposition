@@ -19,8 +19,8 @@ type t = private {
   ty_vars: Type.t HVar.t list; (* list of variables *)
   ty_pattern: Type.t; (* equal to  [id ty_vars] *)
   ty_constructors : constructor list;
-    (* constructors, all returning [pattern] and containing
-       no other type variables than [ty_vars] *)
+  (* constructors, all returning [pattern] and containing
+     no other type variables than [ty_vars] *)
 }
 
 val pp : t CCFormat.printer
@@ -52,6 +52,8 @@ val is_inductive_type : Type.t -> bool
 (** [is_inductive_type ty] holds iff [ty] is an instance of some
     registered type (registered with {!declare_ty}). *)
 
+val is_inductive_simple_type : TypedSTerm.t -> bool
+
 (** {6 Constructors} *)
 
 val is_constructor : ID.t -> bool
@@ -69,18 +71,6 @@ val contains_inductive_types : FOTerm.t -> bool
 (** [true] iff the term contains at least one subterm with
     an inductive type *)
 
-(** {6 Constants with Inductive Type} *)
-
-val is_inductive_constant : ID.t -> bool
-(** An ID whose type is inductive; nothing more *)
-
-val declare_inductive_constant : ID.t -> unit
-(** Make the ID satisfy {!is_inductive_constant} *)
-
-val scan_for_constant : ID.t -> Type.t -> unit
-(** Check whether [id : ty] has an inductive type; if yes, then
-    call {!declare_inductive_constant} *)
-
 (** {6 Scan Declarations} *)
 
 val scan_stmt : (_, _, Type.t) Statement.t -> unit
@@ -88,13 +78,15 @@ val scan_stmt : (_, _, Type.t) Statement.t -> unit
     declaration of inductive types or constants,
     it declares them using {!declare_ty} or {!declare_inductive_constant}. *)
 
+val scan_simple_stmt : (_, _, TypedSTerm.t) Statement.t -> unit
+(** Same as {!scan_stmt} but on earlier statements *)
+
 (**/**)
 
 (** Exceptions used to store information in IDs *)
 
 exception Payload_ind_type of t
 exception Payload_ind_cstor of constructor * t
-exception Payload_ind_constant
 exception Payload_ind_projector of ID.t
 
 (**/**)

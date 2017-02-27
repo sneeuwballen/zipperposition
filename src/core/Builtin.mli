@@ -1,11 +1,11 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Builtin Objects}
 
-  Covers numbers, connectives, and builtin types
+    Covers numbers, connectives, and builtin types
 
-  @since NEXT_RELEASE *)
+    @since NEXT_RELEASE *)
 
 type t =
   | Not
@@ -27,6 +27,7 @@ type t =
   | Term
   | ForallConst (** constant for simulating forall *)
   | ExistsConst (** constant for simulating exists *)
+  | Grounding (** used for inst-gen *)
   | TyInt
   | TyRat
   | Int of Z.t
@@ -116,6 +117,8 @@ val has_type : t
 val wildcard : t    (** $_ for type inference *)
 val multiset : t    (** type of multisets *)
 
+val grounding : t
+
 module Arith : sig
   val floor : t
   val ceiling : t
@@ -153,7 +156,7 @@ module Set : Sequence.Set.S with type elt = t
 module Tbl : Hashtbl.S with type key = t
 
 (** {2 TPTP Interface}
-Creates symbol and give them properties. *)
+    Creates symbol and give them properties. *)
 
 module TPTP : sig
   val connectives : Set.t
@@ -170,7 +173,7 @@ end
     must verify {!is_numeric} (and most of the time, have the same type).
     The semantics of operations follows
     {{: http://www.cs.miami.edu/~tptp/TPTP/TR/TPTPTR.shtml#Arithmetic} TPTP}.
-  *)
+*)
 
 module ArithOp : sig
   exception TypeMismatch of string
@@ -237,9 +240,9 @@ module ArithOp : sig
   val greatereq : t -> t -> bool
 
   val divisors : Z.t -> Z.t list
-    (** List of non-trivial strict divisors of the int.
-        @return [] if int <= 1, the list of divisors otherwise. Empty list
-          for prime numbers, obviously. *)
+  (** List of non-trivial strict divisors of the int.
+      @return [] if int <= 1, the list of divisors otherwise. Empty list
+        for prime numbers, obviously. *)
 end
 
 (** {2 ZF} *)

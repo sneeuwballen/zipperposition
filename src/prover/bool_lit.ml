@@ -3,7 +3,7 @@
 
 (** {1 Boolean Literal} *)
 
-open Libzipperposition
+open Logtk
 
 module type S = Bool_lit_intf.S
 
@@ -15,7 +15,7 @@ end
 let stat_num_lit = Util.mk_stat "msat.num_lits"
 
 module Make(Payload : PAYLOAD)
-: S with type payload = Payload.t
+  : S with type payload = Payload.t
 = struct
   type t = {
     id: int; (* sign = sign of literal *)
@@ -44,14 +44,13 @@ module Make(Payload : PAYLOAD)
         payload;
         neg;
       } and neg = {
-        id= -id;
-        payload;
-        neg=pos;
-      } in
+          id= -id;
+          payload;
+          neg=pos;
+        } in
       pos
 
-  let hash i = i.id land max_int
-  let hash_fun i = CCHash.int (hash i)
+  let hash i = Hash.int i.id
   let equal i j = i.id = j.id
   let compare i j = CCInt.compare i.id j.id
   let neg i = i.neg

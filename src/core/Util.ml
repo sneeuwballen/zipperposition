@@ -1,5 +1,5 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Some helpers} *)
 
@@ -35,10 +35,10 @@ module Section = struct
     let rec add s = match s.descr with
       | Root -> true
       | Sub (name, parent, _) ->
-          let parent_is_root = add parent in
-          if not parent_is_root then Buffer.add_char buf '.';
-          Buffer.add_string buf name;
-          false
+        let parent_is_root = add parent in
+        if not parent_is_root then Buffer.add_char buf '.';
+        Buffer.add_string buf name;
+        false
     in
     ignore (add s);
     Buffer.contents buf
@@ -83,9 +83,9 @@ module Section = struct
       | Sub (_, parent, []) -> cur_level_rec parent
       | Sub (_, parent, [i]) -> max (cur_level_rec parent) (cur_level_rec i)
       | Sub (_, parent, inheriting) ->
-          List.fold_left
-            (fun m i -> max m (cur_level_rec i))
-            (cur_level_rec parent) inheriting
+        List.fold_left
+          (fun m i -> max m (cur_level_rec i))
+          (cur_level_rec parent) inheriting
     else s.level
 
   (* inlinable function *)
@@ -108,8 +108,8 @@ let debugf ?(section=Section.root) l msg k =
     else Format.fprintf debug_fmt_ "@{<Black>@[<4>%.3f[%s]@}@ "
         now section.Section.full_name;
     k (Format.kfprintf
-         (fun fmt -> Format.fprintf fmt "@]@.")
-         debug_fmt_ msg)
+        (fun fmt -> Format.fprintf fmt "@]@.")
+        debug_fmt_ msg)
   )
 
 let debug ?section l msg = debugf ?section l "%s" (fun k->k msg)
@@ -144,7 +144,7 @@ let () =
   Printexc.register_printer
     (function
       | Error (where,msg) ->
-          Some (CCFormat.sprintf "@[<2>error in %s:@ %s@]" where msg)
+        Some (CCFormat.sprintf "@[<2>error in %s:@ %s@]" where msg)
       | _ -> None)
 
 let error ~where msg = raise (Error (where,msg))
@@ -186,6 +186,11 @@ module Exn = struct
   let fmt_backtrace out () =
     if Printexc.backtrace_status () then
       Format.fprintf out "\nbacktrace:\n%s" (Printexc.get_backtrace ())
+
+  let string_of_backtrace () =
+    if Printexc.backtrace_status ()
+    then "\nbacktrace:\n" ^ Printexc.get_backtrace ()
+    else "<no backtrace>"
 end
 
 (** {2 profiling facilities} *)
@@ -274,7 +279,7 @@ let show_profilers out () =
 let () =
   at_exit
     (fun () ->
-      if !enable_profiling then Format.eprintf "%a@." show_profilers ())
+       if !enable_profiling then Format.eprintf "%a@." show_profilers ())
 
 (** {2 Runtime statistics} *)
 
@@ -327,7 +332,9 @@ let finally ~do_ f =
 let pp_pair ?(sep=", ") pa pb out (a,b) =
   Format.fprintf out "@[%a%s%a@]" pa a sep pb b
 
-let pp_list ?(sep=", ") pp = CCFormat.list ~start:"" ~stop:"" ~sep pp
+let pp_sep sep out () = Format.fprintf out "%s@," sep
+let pp_list ?(sep=", ") pp = CCFormat.list ~sep:(pp_sep sep) pp
+let pp_seq ?(sep=", ") pp = CCFormat.seq ~sep:(pp_sep sep) pp
 
 let pp_list0 ?(sep=" ") pp_x out = function
   | [] -> ()
@@ -356,12 +363,18 @@ let map_product ~f l =
         (f l1)
         tail
 
+let invalid_argf msg = CCFormat.ksprintf msg ~f:invalid_arg
+let failwithf msg = CCFormat.ksprintf msg ~f:failwith
+
+module Int_map = CCMap.Make(CCInt)
+module Int_set = CCSet.Make(CCInt)
+
 (** {2 File utils} *)
 
-type 'a or_error = [`Error of string | `Ok of 'a]
+type 'a or_error = ('a, string) CCResult.t
 
 (** Call given command with given output, and return its output as a string *)
-let popen ~cmd ~input =
+let popen ~cmd ~input : _ or_error =
   try
     let from, into = Unix.open_process cmd in
     (* send input to the subprocess *)
@@ -371,7 +384,7 @@ let popen ~cmd ~input =
     let output = CCIO.read_all from in
     (* wait for subprocess to terminate *)
     ignore (Unix.close_process (from, into));
-    CCError.return output
+    CCResult.return output
   with Unix.Unix_error (e, _, _) ->
     let msg = Unix.error_message e in
-    CCError.fail msg
+    CCResult.fail msg

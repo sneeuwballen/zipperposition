@@ -1,5 +1,5 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Skolem symbols} *)
 
@@ -12,7 +12,9 @@ type form = TypedSTerm.t
 
 let section = Util.Section.(make ~parent:zip "skolem")
 
-exception Attr_skolem
+type kind = K_normal | K_ind (* inductive *)
+
+exception Attr_skolem of kind
 
 type polarity =
   [ `Pos
@@ -57,7 +59,7 @@ type ctx = {
 }
 
 let create
-?(prefix="zip_sk_") ?(prop_prefix="zip_prop") ?(on_new=fun _ _->()) () =
+    ?(prefix="zip_sk_") ?(prop_prefix="zip_prop") ?(on_new=fun _ _->()) () =
   let ctx = {
     sc_prefix=prefix;
     sc_prop_prefix=prop_prefix;
@@ -69,14 +71,17 @@ let create
   ctx
 
 let fresh_id ~ctx prefix =
-  let n = CCHashtbl.get_or ~or_:0 ctx.sc_gensym prefix in
+  let n = CCHashtbl.get_or ~default:0 ctx.sc_gensym prefix in
   Hashtbl.replace ctx.sc_gensym prefix (n+1);
   let name = if n=0 then prefix else prefix ^ string_of_int n in
   ID.make name
 
 let fresh_skolem_prefix ~ctx ~ty prefix =
   let s = fresh_id ~ctx prefix in
-  ID.add_payload s Attr_skolem;
+  let kind =
+    if Ind_ty.is_inductive_simple_type ty then K_ind else K_normal
+  in
+  ID.set_payload s (Attr_skolem kind);
   ctx.sc_new_ids <- (s,ty) :: ctx.sc_new_ids;
   ctx.sc_on_new s ty;
   Util.debugf ~section 3 "@[<2>new skolem symbol %a@ with type @[%a@]@]"
@@ -88,10 +93,10 @@ let fresh_skolem ~ctx ~ty = fresh_skolem_prefix ~ctx ~ty ctx.sc_prefix
 let collect_vars ?(filter=fun _->true) f =
   let is_ty_var v = T.Ty.is_tType (Var.ty v) in
   T.Seq.free_vars f
-    |> Sequence.filter filter
-    |> Var.Set.of_seq
-    |> Var.Set.to_list
-    |> List.partition is_ty_var
+  |> Sequence.filter filter
+  |> Var.Set.of_seq
+  |> Var.Set.to_list
+  |> List.partition is_ty_var
 
 let ty_forall ?loc v ty =
   if T.Ty.is_tType (Var.ty v) && T.Ty.returns_tType ty
@@ -120,7 +125,7 @@ let skolem_form ~ctx subst var form =
   (* type of the symbol: quantify over type vars, apply to vars' types *)
   let ty_var = T.Subst.eval subst (Var.ty var) in
   let ty = ty_forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) ty_var) in
-  let prefix = Var.to_string var in
+  let prefix = "sk_" ^ Var.to_string var in
   let f = fresh_skolem_prefix ~ctx ~ty prefix in
   T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t)
 
@@ -220,5 +225,6 @@ let pop_new_definitions ~ctx =
   ctx.sc_new_defs <- [];
   l
 
-let is_skolem id =
-  List.exists (function Attr_skolem -> true | _ -> false) (ID.payload id)
+let is_skolem id = match ID.payload id with
+  | Attr_skolem _ -> true
+  | _ -> false

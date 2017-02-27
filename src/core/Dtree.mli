@@ -6,7 +6,7 @@
 (** This module provides a simplification index, based on a
     perfect discrimination tree (see "the handbook of automated reasoning",
     chapter "term indexing", for instance).
-    *)
+*)
 
 module Make(E : Index.EQUATION) : Index.UNIT_IDX with module E = E
 

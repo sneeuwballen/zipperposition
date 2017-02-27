@@ -26,20 +26,21 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Simple Resolution Prover} *)
 
-module Err = CCError
-module T = Libzipperposition.FOTerm
-module F = Libzipperposition.Formula.FO
-module Substs = Libzipperposition.Substs
-module Unif = Libzipperposition.Unif
-module Util = Libzipperposition.Util
+open Logtk
+
+module E = CCResult
+module T = FOTerm
+module TS = TypedSTerm
+module F = TypedSTerm.Form
+module P = Logtk_parsers
 
 (** Global signature (maps symbols such as "f", "parent_of" or "greater"
     to their type). Every symbol has exactly one type.
     The initial signature is the TPTP signature (logic connectives) *)
-let _signature = ref Libzipperposition.Signature.TPTP.base
+let _signature = ref Logtk.Signature.empty
 
 (** We do not have to do anything about terms, because they are already
-    defined in {! Libzipperposition.FOTerm}. Terms are either variables or
+    defined in {! Logtk.FOTerm}. Terms are either variables or
     applications of a constant (symbol) to a list of sub-terms.
 
     Examples (capitalized letter are variables):
@@ -47,7 +48,11 @@ let _signature = ref Libzipperposition.Signature.TPTP.base
       - age_of(grandmother_of(frida))
       - Y
       - the_universe
-    *)
+*)
+
+let conv_ty =
+  let conv_ = Type.Conv.create () in
+  fun t -> Type.Conv.of_simple_term_exn conv_ t
 
 (** {2 Literals and Clauses} *)
 
@@ -66,7 +71,7 @@ module Lit = struct
       Printing is useful for informing the user of results or
       for debugfging. *)
 
-  let compare = CCOrd.pair T.compare CCOrd.bool_
+  let compare = CCOrd.pair T.compare CCOrd.bool
   let equal a b = compare a b=0
 
   let pp out (t,b) = Format.fprintf out "%s%a" (if b then "" else "¬") T.pp t
@@ -82,8 +87,8 @@ end
 module Clause = struct
   type t = Lit.t list
 
-  let make l = CCList.Set.uniq ~eq:Lit.equal l
-  let compare = CCOrd.list_ Lit.compare
+  let make l = CCList.uniq ~eq:Lit.equal l
+  let compare = CCOrd.list Lit.compare
   let equal a b = compare a b = 0
 
   (** A clause is trivial if it contains both a literal and its opposite.
@@ -92,8 +97,8 @@ module Clause = struct
   let is_trivial c =
     List.exists
       (fun (t,b) ->
-        b &&
-        List.exists (fun (t',b') -> not b' && T.equal t t') c
+         b &&
+         List.exists (fun (t',b') -> not b' && T.equal t t') c
       ) c
 
   (** A substitution maps some variables to terms. Here this function will
@@ -101,27 +106,23 @@ module Clause = struct
       variables of the clause by their image in the substitution (or keep
       them unchanged if they do not appear in the substitution.
 
-      Substitutions are pre-defined in Libzipperposition, and applying a substitution
+      Substitutions are pre-defined in Logtk, and applying a substitution
       to a term is defined too (the function {!Subst.FO.apply} that
       applies a substitution to a first-order term)
   *)
-  let apply_subst ~renaming subst c s_c =
-    make (List.map (fun (t,b) -> Substs.FO.apply ~renaming subst t s_c, b) c)
+  let apply_subst ~renaming subst (c, s_c) =
+    make (List.map (fun (t,b) -> Subst.FO.apply ~renaming subst (t, s_c), b) c)
 
   (** printing a clause: print literals separated with "|" *)
-  let pp out c = CCFormat.list ~sep:" | " Lit.pp out c
+  let pp out c = Util.pp_list ~sep:" | " Lit.pp out c
 
-  (** Conversion from list of atomic formulas.
+  (** Conversion from list of {!SLiteral.t}
       type: [Formula.t list -> clause] *)
-  let _of_forms c =
-    let _atom f = match F.view f with
-      | F.Not f' ->
-          begin match F.view f' with
-          | F.Atom t -> t,false
-          | _ -> failwith (CCFormat.sprintf "unsupported formula %a" F.pp f)
-          end
-      | F.Atom t -> t, true
-      | _ -> failwith (CCFormat.sprintf "unsupported formula %a" F.pp f)
+  let _of_forms (c:T.t SLiteral.t list): t =
+    let _atom f = match f with
+      | SLiteral.Atom (t, sign) -> t, sign
+      | _ ->
+        failwith (CCFormat.sprintf "unsupported formula %a" (SLiteral.pp T.pp) f)
     in
     make (List.map _atom c)
 end
@@ -140,7 +141,7 @@ end
     at position [i] in the clause [c], we add
     [term -> (c, i)] into the index. Later we will be able to retrieve
     the pair [(c,i)] using any term that {i unifies} with [term]. *)
-module Index = Libzipperposition.NPDtree.MakeTerm(ClauseWithPos)
+module Index = Logtk.NPDtree.MakeTerm(ClauseWithPos)
 
 (** Set of clauses. Easy to define thanks to {!Clause.compare} *)
 module ClauseSet = Set.Make(Clause)
@@ -188,12 +189,12 @@ let _add_active c =
 
 (** Factoring inference (takes one clause and deduce other clauses):
 
-{[
-A or A' or C
----------------
-sigma (A' or C)
-if sigma(A) = sigma(A')
-]}
+    {[
+      A or A' or C
+      ---------------
+        sigma (A' or C)
+          if sigma(A) = sigma(A')
+    ]}
 
     means that if the clause has two positive literals (A,true) and (A',true)
     with some substitution sigma such that sigma(A)=sigma(A'), then
@@ -203,37 +204,37 @@ if sigma(A) = sigma(A')
 let _factoring c =
   List.iteri
     (fun i (t,b) ->
-      if b then List.iteri
-        (fun j (t',b') ->
-          (** Only try the inference if the two literals have positive sign.
-              The restriction [i < j] is used not to do the same inference
-              twice (symmetry).
-          *)
-          if i<j && b'
-          then try
-            let subst = Unif.FO.unification t 0 t' 0 in
-            (** Now we have subst(t)=subst(t'), the inference can proceed *)
-            let c' = CCList.Idx.remove c i in
-            let renaming = Substs.Renaming.create() in
-            (** Build the conclusion of the inference (removing one
-                of the factored literals *)
-            let c' = Clause.apply_subst ~renaming subst c' 0 in
-            Util.debugf 3 "factoring of %a ----> %a" (fun k->k Clause.pp c Clause.pp c');
-            (** New clauses go into the passive set *)
-            _add_passive c'
-          with Unif.Fail -> ()
-        ) c
+       if b then List.iteri
+           (fun j (t',b') ->
+              (** Only try the inference if the two literals have positive sign.
+                  The restriction [i < j] is used not to do the same inference
+                  twice (symmetry).
+              *)
+              if i<j && b'
+              then try
+                  let subst = Unif.FO.unification (t, 0) (t', 0) in
+                  (** Now we have subst(t)=subst(t'), the inference can proceed *)
+                  let c' = CCList.remove_at_idx i c in
+                  let renaming = Subst.Renaming.create() in
+                  (** Build the conclusion of the inference (removing one
+                      of the factored literals *)
+                  let c' = Clause.apply_subst ~renaming subst (c',0) in
+                  Util.debugf 3 "factoring of %a ----> %a" (fun k->k Clause.pp c Clause.pp c');
+                  (** New clauses go into the passive set *)
+                  _add_passive c'
+                with Unif.Fail -> ()
+           ) c
     ) c
 
 (** Resolution inference rule, between the clause [C] and any clause [D]
     from the active set.
 
-{[
-A or C    ¬A' or D
-------------------
-  sigma(C or D)
-if sigma(A) = sigma(A')
-]}
+    {[
+      A or C    ¬A' or D
+      ------------------
+        sigma(C or D)
+          if sigma(A) = sigma(A')
+    ]}
 
     This rule is called "resolution" and it's one of the first automated proof
     technique ever. If "resolves" together two complementary literals in
@@ -258,44 +259,45 @@ if sigma(A) = sigma(A')
 
     Note: the "0" and "1" are {b scopes}, a trick I use to avoid actually
     renaming variables in one of the clauses. More details can be found
-    in the documentation for {!Substs} or in the talk I (Simon) gave at PAAR
+    in the documentation for {!Subst} or in the talk I (Simon) gave at PAAR
     2014.
 *)
 let _resolve_with c =
   List.iteri
     (fun i (t,b) ->
-      (** Retrieve within the index, mappings [term -> (clause,index)]
-          such that [term] unifies with [t]. 0 and 1 are again scopes. *)
-      Index.retrieve_unifiables !_idx 0 t 1 ()
-        (fun () _t' (d,j) subst ->
-          let (_,b') = List.nth d j in
-          (** We have found [_t'], and a pair [(d, j)] such
-              that [d] is another clause, and the [j]-th literal of [d]
-              begin [_t', b']).
-              If [b] and [b'] are complementary we are in the case where
-              resolution applies.
-          *)
-          if b<>b'
-          then (
-            let renaming = Substs.Renaming.create() in
-            (** Build the conclusion clause, merging the remainders [c']
-                and [d'] (which live respectively in scope 1 and 0)
-                of the clauses together after applying the substitution. *)
-            let concl =
-              (let c' = CCList.Idx.remove c i in
-               Clause.apply_subst ~renaming subst c' 1)
-              @
-              (let d' = CCList.Idx.remove d j in
-               Clause.apply_subst ~renaming subst d' 0)
-            in
-            (** Simplify the resulting clause (remove duplicate literals)
-                and add it into the passive set, to be processed later *)
-            let concl = Clause.make concl in
-            Util.debugf 3 "resolution of %a and %a ---> %a"
-              (fun k->k Clause.pp c Clause.pp d Clause.pp concl);
-            _add_passive concl
-          )
-        )
+       (** Retrieve within the index, mappings [term -> (clause,index)]
+           such that [term] unifies with [t]. 0 and 1 are again scopes. *)
+       Index.retrieve_unifiables (!_idx,0) (t,1)
+       |> Sequence.iter
+         (fun (_t', (d,j), subst) ->
+            let (_,b') = List.nth d j in
+            (** We have found [_t'], and a pair [(d, j)] such
+                that [d] is another clause, and the [j]-th literal of [d]
+                begin [_t', b']).
+                If [b] and [b'] are complementary we are in the case where
+                resolution applies.
+            *)
+            if b<>b'
+            then (
+              let renaming = Subst.Renaming.create() in
+              (** Build the conclusion clause, merging the remainders [c']
+                  and [d'] (which live respectively in scope 1 and 0)
+                  of the clauses together after applying the substitution. *)
+              let concl =
+                (let c' = CCList.remove_at_idx i c in
+                 Clause.apply_subst ~renaming subst (c',1))
+                @
+                  (let d' = CCList.remove_at_idx j d in
+                   Clause.apply_subst ~renaming subst (d',0))
+              in
+              (** Simplify the resulting clause (remove duplicate literals)
+                  and add it into the passive set, to be processed later *)
+              let concl = Clause.make concl in
+              Util.debugf 3 "resolution of %a and %a ---> %a"
+                (fun k->k Clause.pp c Clause.pp d Clause.pp concl);
+              _add_passive concl
+            )
+         )
     ) c
 
 (** Main saturation algorithm, a simple "given clause" loop. This is
@@ -330,7 +332,7 @@ let _saturate clauses =
     done;
     `Sat
   with
-  | Unsat -> `Unsat
+    | Unsat -> `Unsat
 
 (** {2 Main} *)
 
@@ -339,41 +341,44 @@ let _saturate clauses =
     handling easier (the function [>>=] is a {i monadic bind}). *)
 let process_file f =
   Util.debugf 2 "process file %s..." (fun k->k f);
-  let res = Err.(
-    (** parse the file in the TPTP format *)
-    Libzipperposition_parsers.Util_tptp.parse_file ~recursive:true f
-    (** Perform type inference and type checking (possibly updating
-        the signature) *)
-    >>= Libzipperposition_parsers.Util_tptp.infer_types (`sign !_signature)
-    (** CNF ("clausal normal form"). We transform arbitrary first order
-        formulas into a set of clauses (see the {!Clause} module)
-        because resolution only works on clauses.
+  let res = E.(
+      (** parse the file in the format *)
+      P.Parsing_utils.parse_tptp f
+      (** Perform type inference and type checking (possibly updating
+          the signature) *)
+      >>= TypeInference.infer_statements ?ctx:None
+      (** CNF ("clausal normal form"). We transform arbitrary first order
+          formulas into a set of clauses (see the {!Clause} module)
+          because resolution only works on clauses.
 
-        This algorithm is already implemented in {!Libzipperposition}. *)
-    >>= fun (signature, statements) ->
-    let clauses = Libzipperposition_parsers.Util_tptp.Typed.formulas statements in
-    let clauses = Sequence.to_list clauses in
-    (** A way to create fresh symbols for {i Skolemization} *)
-    let ctx = Libzipperposition.Skolem.create ~prefix:"sk" signature in
-    let clauses = Libzipperposition.Cnf.cnf_of_list ~ctx clauses in
-    let clauses = CCList.map Clause._of_forms clauses in
-    _signature := Libzipperposition.Skolem.to_signature ctx; (* recover signature *)
-    (** Perform saturation (solve the problem) *)
-    Err.return (_saturate clauses)
-  ) in
+          This algorithm is already implemented in {!Logtk}. *)
+      >>= fun st ->
+      let decls = Cnf.cnf_of_seq ?ctx:None (CCVector.to_seq st) in
+      _signature :=
+        CCVector.to_seq decls
+        |> Cnf.type_declarations
+        |> ID.Map.map conv_ty;
+      let clauses =
+        CCVector.to_seq decls
+        |> Cnf.convert
+        |> CCVector.to_seq
+        |> Sequence.flat_map Statement.Seq.forms
+        |> Sequence.map Clause._of_forms
+        |> Sequence.to_rev_list
+      in
+      (** Perform saturation (solve the problem) *)
+      E.return (_saturate clauses)
+    ) in
   match res with
-  | `Error msg ->
+    | E.Error msg ->
       print_endline msg;
       exit 1
-  | `Ok `Sat -> print_endline "sat"
-  | `Ok `Unsat -> print_endline "unsat"
+    | E.Ok `Sat -> print_endline "sat"
+    | E.Ok `Unsat -> print_endline "unsat"
 
 (** Parse command-line arguments, including the file to process *)
 
-let _options = ref (
-  [
-  ] @ Libzipperposition.Options.global_opts
-  )
+let _options = ref (Options.make ())
 let _help = "usage: resolution file.p"
 let _file = ref None
 
@@ -384,7 +389,7 @@ let _set_file f = match !_file with
 let main () =
   Arg.parse !_options _set_file _help;
   match !_file with
-  | None -> print_endline _help; exit 0
-  | Some f -> process_file f
+    | None -> print_endline _help; exit 0
+    | Some f -> process_file f
 
 let () = main()

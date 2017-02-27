@@ -4,7 +4,7 @@
 (** {1 boolean subterms} *)
 
 
-open Libzipperposition
+open Logtk
 
 type term = FOTerm.t
 

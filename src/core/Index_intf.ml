@@ -1,8 +1,8 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 type term = FOTerm.t
-type subst = Substs.t
+type subst = Subst.t
 
 module type LEAF = sig
   type t
@@ -30,7 +30,7 @@ module type LEAF = sig
     ?subst:subst ->
     t Scoped.t -> term Scoped.t ->
     (term * elt * subst) Sequence.t
-  (** Match the query term against the indexed terms *)
+    (** Match the query term against the indexed terms *)
 end
 
 module type TERM_IDX = sig
@@ -52,6 +52,8 @@ module type TERM_IDX = sig
   val add_list : t -> (term * elt) list -> t
 
   val remove : t -> term -> elt -> t
+  val remove_seq : t -> (term * elt) Sequence.t -> t
+  val remove_list : t -> (term * elt) list -> t
 
   val iter : t -> (term -> elt -> unit) -> unit
 
@@ -76,6 +78,8 @@ end
 type lits = term SLiteral.t Sequence.t
 (** Sequence of literals, as a cheap abstraction on query clauses *)
 
+type labels = Util.Int_set.t
+
 module type CLAUSE = sig
   type t
 
@@ -84,6 +88,10 @@ module type CLAUSE = sig
 
   val to_lits : t -> lits
   (** Iterate on literals of the clause *)
+
+  val labels : t -> labels
+  (** Some integer labels. We assume that if [c] to subsume [d],
+      then [labels c] is a subset of [labels d] *)
 end
 
 module type SUBSUMPTION_IDX = sig
@@ -107,17 +115,23 @@ module type SUBSUMPTION_IDX = sig
 
   val remove_seq : t -> C.t Sequence.t -> t
 
-  val retrieve_subsuming : t -> lits -> C.t Sequence.t
+  val retrieve_subsuming : t -> lits -> labels -> C.t Sequence.t
   (** Fold on a set of indexed candidate clauses, that may subsume
       the given clause. *)
 
   val retrieve_subsuming_c : t -> C.t -> C.t Sequence.t
 
-  val retrieve_subsumed : t -> lits -> C.t Sequence.t
+  val retrieve_subsumed : t -> lits -> labels -> C.t Sequence.t
   (** Fold on a set of indexed candidate clauses, that may be subsumed by
       the given clause *)
 
   val retrieve_subsumed_c : t -> C.t -> C.t Sequence.t
+
+  val retrieve_alpha_equiv : t -> lits -> labels -> C.t Sequence.t
+  (** Retrieve clauses that are potentially alpha-equivalent to the given clause *)
+
+  val retrieve_alpha_equiv_c : t -> C.t -> C.t Sequence.t
+  (** Retrieve clauses that are potentially alpha-equivalent to the given clause *)
 
   val iter : t -> C.t Sequence.t
 

@@ -62,6 +62,9 @@ val by_name : string -> Precedence.t -> t
 (** Choose ordering by name among registered ones, or
     @raise Invalid_argument if no ordering with the given name are registered. *)
 
+val names : unit -> string list
+val default_name : string
+
 val register : string -> (Precedence.t -> t) -> unit
 (** Register a new ordering, which can depend on a precedence.
     The name must not be registered already.

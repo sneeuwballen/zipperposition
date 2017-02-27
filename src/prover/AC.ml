@@ -3,7 +3,7 @@
 
 (** {1 AC redundancy} *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
 module Lit = Literal
@@ -77,7 +77,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let proof = match proof with
       | Some p -> p
       | None -> (* new axioms *)
-          List.map C.proof (axioms s ty)
+        List.map C.proof (axioms s ty)
     in
     if not (ID.Tbl.mem tbl s)
     then (
@@ -125,8 +125,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     &&
     (
       match lit with
-      | Lit.Equation (l, r, true) -> has_ac_ids_ l r && A.equal l r
-      | _ -> false
+        | Lit.Equation (l, r, true) -> has_ac_ids_ l r && A.equal l r
+        | _ -> false
     )
 
   let is_trivial c =
@@ -169,7 +169,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let premises = C.proof c :: ac_proof in
         let proof =
           ProofStep.mk_simp premises
-          ~rule:(ProofStep.mk_rule "AC.normalize")
+            ~rule:(ProofStep.mk_rule "AC.normalize")
         in
         let new_c = C.create ~trail:(C.trail c) lits proof in
         Util.exit_prof prof_simplify;
@@ -250,6 +250,6 @@ let extension =
     AC.setup ()
   in
   { Extensions.default with Extensions.
-    name="ac";
-    env_actions=[action];
+                         name="ac";
+                         env_actions=[action];
   }

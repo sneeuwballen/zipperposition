@@ -8,10 +8,11 @@ build: [
         "--disable-tests"
         "--disable-docs"
         "--%{menhir:enable}%-parsers"
+        "--disable-hornet-prover"
+        "--enable-zipperposition-prover"
         "--disable-solving"
         "--disable-qcheck"
         "--disable-tools"
-        "--enable-meta"
     ]
     [make]
 ]
@@ -25,11 +26,11 @@ depends: [
   "base-bytes"
   "base-unix"
   "zarith"
-  "containers" { > "0.16" < "1.0" }
+  "containers" { > "1.0" }
   "sequence" { >= "0.4" }
   "oclock"
   "oasis" { build }
-  "msat" { >= "0.4" < "0.5" }
+  "msat" { >= "0.5" < "0.7" }
 ]
 depopts: [
   "menhir" {build}

@@ -7,7 +7,7 @@
     properties into boolean literals, and maintains a bijection between
     encapsulated values and boolean literals *)
 
-val section : Libzipperposition.Util.Section.t
+val section : Logtk.Util.Section.t
 
 type inductive_path = Ind_cst.path
 

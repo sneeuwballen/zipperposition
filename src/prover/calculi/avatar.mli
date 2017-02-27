@@ -12,6 +12,8 @@
     Depends optionally on the "meta" extension.
 *)
 
+open Logtk
+
 type 'a printer = Format.formatter -> 'a -> unit
 
 (** {2 Avatar: splitting+sat} *)
@@ -24,8 +26,8 @@ module Make
     (E : Env.S)
     (Sat : Sat_solver.S)
   : S
-  with module E = E
-   and module Solver = Sat
+    with module E = E
+     and module Solver = Sat
 
 val k_avatar : (module S) Flex_state.key
 

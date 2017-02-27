@@ -1,5 +1,5 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Substitutions}
 
@@ -95,6 +95,10 @@ val compose : t -> t -> t
 
 val is_renaming : t -> bool
 (** Check whether the substitution is a variable renaming *)
+
+val equal : t -> t -> bool
+
+val hash : t -> int
 
 include Interfaces.PRINT with type t := t
 

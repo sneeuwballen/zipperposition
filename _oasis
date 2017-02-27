@@ -31,6 +31,10 @@ Flag "bench"
   Description:  Build and run benchmarks
   Default:      false
 
+Flag "long_tests"
+  Description:  Test the prover against a set of problems
+  Default:      false
+
 Flag "parsers"
   Description:  Build and install parsers (requires menhir)
   Default:      true
@@ -39,9 +43,13 @@ Flag "solving"
   Description:  Build and install constraint solvers (requires "msat")
   Default:      false
 
-Flag "prover"
-  Description:  Build and install the main prover and its library
+Flag "zipperposition_prover"
+  Description:  Build and install Zipperposition
   Default:      true
+
+Flag "hornet_prover"
+  Description:  Build and install Hornet
+  Default:      false
 
 Flag "qcheck"
   Description:  Build and install QCheck random generators
@@ -51,25 +59,27 @@ Flag "demo"
   Description:  Build and install demo programs
   Default:      false
 
-Library "libzipperposition"
+Library "logtk"
   Path:             src/core/
   Pack:             true
   Modules:          InnerTerm, FOTerm, Type, Util, STerm, Interfaces,
                     DBEnv, Position, Var, HVar,
-                    Substs, Unif, Signature, Scoped, Unif_intf,
+                    Subst, Unif, Signature, Scoped, Unif_intf,
                     TypeInference, Options, Comparison, Precedence, Builtin,
                     Ordering, Skolem, Cnf, ID, IDOrBuiltin, SLiteral,
                     Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,
-                    Congruence, FeatureVector, UntypedAST, Ind_ty,
-                    TypedSTerm, Statement,
+                    Congruence, FeatureVector, FV_tree, UntypedAST, Ind_ty,
+                    TypedSTerm, Statement, Flex_state, Compute_prec, 
+                    Ordinal,
                     lib/Hashcons, lib/ParseLocation, lib/Multiset, lib/LazyList,
-                    lib/IArray, lib/AllocCache, lib/Multiset_intf
+                    lib/Hash, lib/IArray, lib/AllocCache, lib/Multiset_intf,
+                    lib/Signal, lib/UnionFind
   CSources:         util_stubs.c, util_stubs.h
   CCOpt:            -Wextra -Wno-unused-parameter
   BuildDepends:     zarith, unix, sequence, containers,
                     containers.data, bytes, oclock
 
-Library "libzipperposition_parsers"
+Library "logtk_parsers"
   Path:             src/parsers
   Pack:             true
   Modules:          Parse_tptp, Lex_tptp, Ast_tptp, Util_tptp,
@@ -80,45 +90,43 @@ Library "libzipperposition_parsers"
   Build$:           flag(parsers)
   Install$:         flag(parsers)
   FindlibName:      parsers
-  FindlibParent:    libzipperposition
-  BuildDepends:     libzipperposition, tip_parser
+  FindlibParent:    logtk 
+  BuildDepends:     logtk, tip_parser
   BuildTools:       menhir
-  XMETARequires:    libzipperposition
 
-Library "libzipperposition_solving"
+Library "logtk_solving"
   Path:             src/solving
   Pack:             true
-  FindlibParent:    libzipperposition
+  FindlibParent:    logtk
   FindlibName:      solving
   Modules:          Lpo
   Build$:           flag(solving)
   Install$:         flag(solving)
-  BuildDepends:     libzipperposition, msat
+  BuildDepends:     logtk, msat
 
-Library "libzipperposition_arbitrary"
+Library "logtk_arbitrary"
   Path:             src/arbitrary/
   Pack:             true
   FindlibName:      arbitrary
-  FindlibParent:    libzipperposition
+  FindlibParent:    logtk
   Modules:          ArTerm, ArForm, ArType, ArID
-  BuildDepends:     libzipperposition, qcheck
+  BuildDepends:     logtk, qcheck
   Build$:           flag(qcheck)
   Install$:         flag(qcheck)
 
-Library "libzipperposition_prover"
+Library "libzipperposition"
   Path:             src/prover/
   Pack:             true
-  FindlibName:      prover
-  FindlibParent:    libzipperposition
+  FindlibName:      libzipperposition
   Modules:          ClauseQueue, Clause, SClause, Const, Extensions,
                     Literal, Literals, Ctx, ProofStep, ProofPrint, ProofState,
                     Saturate, Selection, AC, AC_intf, SimplM,
-                    Compute_prec, Params, Env, Monome, ArithLit, Signals, Multisets,
+                    Params, Env, Monome, ArithLit, Signals, Multisets,
                     Ctx_intf, Clause_intf, Env_intf, ProofState_intf,
                     BBox, ClauseContext, ClauseQueue_intf,
                     Bool_lit, Bool_lit_intf, Sat_solver, Sat_solver_intf,
                     Trail, Ind_cst, Phases, Phases_impl,
-                    Flex_state, Classify_cst, Rewrite_rule,
+                    Classify_cst, Rewrite_rule,
                     calculi/Avatar, calculi/Avatar_intf,
                     calculi/Induction, calculi/Induction_intf,
                     calculi/Superposition, calculi/Superposition_intf,
@@ -128,12 +136,11 @@ Library "libzipperposition_prover"
                     calculi/Heuristics,
                     calculi/Ind_types,
                     calculi/Fool
-  InternalModules:  lib/UnionFind, lib/Signal, lib/Simplex
-  Build$:           flag(parsers) && flag(prover)
-  Install$:         flag(parsers) && flag(prover)
-  BuildDepends:     containers, containers.advanced, sequence, unix,
-                    zarith, msat,
-                    libzipperposition, libzipperposition.parsers
+  InternalModules:  lib/Simplex
+  Build$:           flag(parsers) && flag("zipperposition_prover")
+  Install$:         flag(parsers) && flag("zipperposition_prover")
+  BuildDepends:     containers, sequence, unix, zarith, msat,
+                    logtk, logtk.parsers
 
 # main executable for the prover
 Executable zipperposition
@@ -141,57 +148,67 @@ Executable zipperposition
   Install:          true
   CompiledObject:   native
   MainIs:           zipperposition.ml
-  Build$:           flag(parsers) && flag(prover)
-  Install$:         flag(parsers) && flag(prover)
+  Build$:           flag(parsers) && flag("zipperposition_prover")
+  Install$:         flag(parsers) && flag("zipperposition_prover")
   BuildDepends:     containers, sequence, unix,
-                    libzipperposition, libzipperposition.parsers,
-                    libzipperposition.prover
+                    logtk, logtk.parsers, libzipperposition
+
+# experimental prover
+Executable hornet
+  Path:             src/hornet/
+  Install:          true
+  CompiledObject:   native
+  MainIs:           hornet.ml
+  Build$:           flag(parsers) && flag("hornet_prover")
+  Install$:         flag(parsers) && flag("hornet_prover")
+  BuildDepends:     containers, sequence, unix, msat,
+                    logtk, logtk.parsers
+
+Document logtk
+  Title:                Documentation for Logtk
+  Abstract:             Main API documentation for Logtk.
+  Type:                 ocamlbuild (0.3)
+  BuildTools+:          ocamldoc
+  Install$:             flag(docs)
+  Build$:               flag(docs)
+  XOCamlbuildPath:      .
+  XOCamlbuildLibraries: logtk
+  XOCamlbuildExtraArgs: "-docflags '-keep-code -colorize-code -short-functors -charset utf-8'"
+
+Document logtk_parsers
+  Title:                Logtk_parsers documentation
+  Type:                 ocamlbuild (0.3)
+  BuildTools+:          ocamldoc
+  Install$:             flag(docs) && flag(parsers)
+  Build$:               flag(docs) && flag(parsers)
+  XOCamlbuildPath:      .
+  XOCamlbuildLibraries: logtk.parsers
+
+Document logtk_arbitrary
+  Title:                Logtk_arbitrary documentation
+  Type:                 ocamlbuild (0.3)
+  BuildTools+:          ocamldoc
+  Install$:             flag(docs) && flag(qcheck)
+  Build$:               flag(docs) && flag(qcheck)
+  XOCamlbuildPath:      .
+  XOCamlbuildLibraries: logtk.arbitrary
 
 Document libzipperposition
-  Title:                Documentation for Libzipperposition
-  Abstract:             Main API documentation for Libzipperposition.
+  Title:                Libzipperpositio documentation
   Type:                 ocamlbuild (0.3)
   BuildTools+:          ocamldoc
   Install$:             flag(docs)
   Build$:               flag(docs)
   XOCamlbuildPath:      .
   XOCamlbuildLibraries: libzipperposition
-  XOCamlbuildExtraArgs: "-docflags '-keep-code -colorize-code -short-functors -charset utf-8'"
-
-Document libzipperposition_parsers
-  Title:                Libzipperposition_parsers documentation
-  Type:                 ocamlbuild (0.3)
-  BuildTools+:          ocamldoc
-  Install$:             flag(docs) && flag(parsers)
-  Build$:               flag(docs) && flag(parsers)
-  XOCamlbuildPath:      .
-  XOCamlbuildLibraries: libzipperposition.parsers
-
-Document libzipperposition_arbitrary
-  Title:                Libzipperposition_arbitrary documentation
-  Type:                 ocamlbuild (0.3)
-  BuildTools+:          ocamldoc
-  Install$:             flag(docs) && flag(qcheck)
-  Build$:               flag(docs) && flag(qcheck)
-  XOCamlbuildPath:      .
-  XOCamlbuildLibraries: libzipperposition.arbitrary
-
-Document libzipperposition_prover
-  Title:                Libzipperposition_prover documentation
-  Type:                 ocamlbuild (0.3)
-  BuildTools+:          ocamldoc
-  Install$:             flag(docs)
-  Build$:               flag(docs)
-  XOCamlbuildPath:      .
-  XOCamlbuildLibraries: libzipperposition.prover
 
 Executable run_bench
-  Path:             tests/
+  Path:             tests/bench/
   Install:          false
   CompiledObject:   native
   MainIs:           run_bench.ml
   Build$:           flag(bench) && flag(tests)
-  BuildDepends:     libzipperposition, benchmark, qcheck, libzipperposition.arbitrary
+  BuildDepends:     logtk, benchmark, qcheck, logtk.arbitrary
 
 Test all
   Command:          make test-all
@@ -199,8 +216,8 @@ Test all
   Run$:             flag(tests) && flag(qcheck)
 
 Test run
-  Command:      make frogtest
-  Run$:         flag(tests)
+  Command:          make frogtest
+  Run$:             flag(tests) && flag(long_tests)
 
 Executable run_tests
   Path:             tests/
@@ -208,8 +225,8 @@ Executable run_tests
   CompiledObject:   native
   MainIs:           run_tests.ml
   Build$:           flag(tests) && flag(qcheck) && flag(parsers)
-  BuildDepends:     libzipperposition, libzipperposition.parsers, oUnit,
-                    libzipperposition.arbitrary, qcheck
+  BuildDepends:     logtk, logtk.parsers, oUnit,
+                    logtk.arbitrary, qcheck
 
 # TPTP syntax and type checking
 Executable type_check
@@ -218,7 +235,7 @@ Executable type_check
   Install$:         flag(tools) && flag(parsers)
   CompiledObject:   native
   MainIs:           type_check.ml
-  BuildDepends:     libzipperposition, libzipperposition.parsers
+  BuildDepends:     logtk, logtk.parsers
 
 # Conversion to CNF
 Executable cnf_of
@@ -227,7 +244,7 @@ Executable cnf_of
   Install$:         flag(tools) && flag(parsers)
   CompiledObject:   native
   MainIs:           cnf_of.ml
-  BuildDepends:     libzipperposition, libzipperposition.parsers
+  BuildDepends:     logtk, logtk.parsers
 
 # proof checking
 Executable tptp_to_zf
@@ -236,7 +253,7 @@ Executable tptp_to_zf
   Install$:         flag(tools) && flag(parsers)
   CompiledObject:   native
   MainIs:           tptp_to_zf.ml
-  BuildDepends:     libzipperposition, libzipperposition.parsers
+  BuildDepends:     logtk, logtk.parsers
 
 # Orienting rewrite rules with LPO
 Executable orient
@@ -245,7 +262,7 @@ Executable orient
   Install$:         flag(tools) && flag(parsers) && flag(solving)
   CompiledObject:   native
   MainIs:           orient.ml
-  BuildDepends:     libzipperposition, libzipperposition.parsers, libzipperposition.solving, msat
+  BuildDepends:     logtk, logtk.parsers, logtk.solving, msat
 
 # proof checking
 Executable proof_check_tstp
@@ -254,7 +271,7 @@ Executable proof_check_tstp
   Install$:         flag(tools) && flag(parsers)
   CompiledObject:   native
   MainIs:           proof_check_tstp.ml
-  BuildDepends:     libzipperposition, libzipperposition.parsers
+  BuildDepends:     logtk, logtk.parsers
 
 # Demo: resolution
 Executable resolution1
@@ -263,7 +280,7 @@ Executable resolution1
   Install:          false
   CompiledObject:   native
   MainIs:           resolution1.ml
-  BuildDepends:     libzipperposition, libzipperposition.parsers, sequence, containers
+  BuildDepends:     logtk, logtk.parsers, sequence, containers
 
 SourceRepository head
   Type: git

@@ -55,6 +55,9 @@ val is_fun : t -> bool
 val is_forall : t -> bool
 val is_prop : t -> bool
 
+val hash_mod_alpha : t -> int
+(** Hash invariant w.r.t variable renaming *)
+
 (** {2 Constructors} *)
 
 val tType : t
@@ -98,6 +101,22 @@ val of_term_unsafe : InnerTerm.t -> t
 
 val of_terms_unsafe : InnerTerm.t list -> t list
 val cast_var_unsafe : InnerTerm.t HVar.t -> t HVar.t
+
+(** {2 Definition} *)
+
+type def =
+  | Def_unin of int (* number of type variables *)
+  | Def_data of int * ty list (* data type with number of variables and cstors *)
+
+val def : ID.t -> def option
+(** Access the definition of a type *)
+
+val def_exn : ID.t -> def
+(** Unsafe version of {!def}
+    @raise Not_found if not a proper constant *)
+
+val set_def : ID.t -> def -> unit
+(** Set definition of an ID *)
 
 (** {2 Containers} *)
 
@@ -242,6 +261,6 @@ module Conv : sig
     ctx ->
     t ->
     TypedSTerm.t
-  (** convert a type to a prolog term.
-      @param env the current environement for De Bruijn indices *)
+    (** convert a type to a prolog term.
+        @param env the current environement for De Bruijn indices *)
 end

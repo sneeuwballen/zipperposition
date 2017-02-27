@@ -1,7 +1,7 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
-type subst = Substs.t
+type subst = Subst.t
 
 module type S = sig
   type ty

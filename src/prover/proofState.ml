@@ -5,11 +5,11 @@
     a set of passive clauses (to be processed), and an ordering
     that is used for redundancy elimination.} *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
 module C = Clause
-module S = Substs.FO
+module S = Subst.FO
 module Lit = Literal
 module Lits = Literals
 module Pos = Position
@@ -47,10 +47,11 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
         if C.is_oriented_rule c then 2 else 1
     end)
 
-  module SubsumptionIndex = FeatureVector.Make(struct
+  module SubsumptionIndex = FV_tree.Make(struct
       type t = C.t
       let compare = C.compare
       let to_lits c = C.to_forms c |> Sequence.of_list
+      let labels c = C.trail c |> Trail.labels
     end)
 
   (* XXX: no customization of indexing for now
@@ -93,20 +94,20 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
     let add seq =
       seq
         (fun c ->
-          if not (C.ClauseSet.mem c !clauses_)
-          then (
-            clauses_ := C.ClauseSet.add c !clauses_;
-            Signal.send on_add_clause c
-          ));
+           if not (C.ClauseSet.mem c !clauses_)
+           then (
+             clauses_ := C.ClauseSet.add c !clauses_;
+             Signal.send on_add_clause c
+           ));
       ()
 
     let remove seq =
       seq (fun c ->
-          if C.ClauseSet.mem c !clauses_
-          then (
-            clauses_ := C.ClauseSet.remove c !clauses_;
-            Signal.send on_remove_clause c
-          ));
+        if C.ClauseSet.mem c !clauses_
+        then (
+          clauses_ := C.ClauseSet.remove c !clauses_;
+          Signal.send on_remove_clause c
+        ));
       ()
   end
 
@@ -127,8 +128,8 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
     include MakeClauseSet(struct end)
 
     let queue_ = ref (
-      let p = ClauseQueue.get_profile () in
-      CQueue.of_profile p)
+        let p = ClauseQueue.get_profile () in
+        CQueue.of_profile p)
 
     let queue () = !queue_
 

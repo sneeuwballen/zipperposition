@@ -1,9 +1,7 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Builtin Objects} *)
-
-module Hash = CCHash
 
 type t =
   | Not
@@ -25,6 +23,7 @@ type t =
   | Term
   | ForallConst (** constant for simulating forall *)
   | ExistsConst (** constant for simulating exists *)
+  | Grounding (** used for inst-gen *)
   | TyInt
   | TyRat
   | Int of Z.t
@@ -106,6 +105,7 @@ let to_int_ = function
   | Greatereq -> 46
   | ForallConst -> 47
   | ExistsConst -> 48
+  | Grounding -> 50
 
 let compare a b = match a, b with
   | Int i, Int j -> Z.compare i j
@@ -114,11 +114,10 @@ let compare a b = match a, b with
 
 let equal a b = compare a b = 0
 
-let hash_fun s h = match s with
-  | Int i -> Hash.int_ (Z.hash i) h
-  | Rat r -> Hash.string (Q.to_string r) h
-  | c -> Hash.int_ (Hashtbl.hash c) h
-let hash s = Hash.apply hash_fun s
+let hash s = match s with
+  | Int i -> Hash.combine2 1 (Z.hash i)
+  | Rat r -> Hash.combine2 2 (Hash.string (Q.to_string r))
+  | c -> Hash.combine2 3 (Hashtbl.hash c)
 
 module Map = Sequence.Map.Make(struct type t = t_ let compare = compare end)
 module Set = Sequence.Set.Make(struct type t = t_ let compare = compare end)
@@ -158,6 +157,7 @@ let to_string s = match s with
   | Term -> "ι"
   | ForallConst -> "·∀"
   | ExistsConst -> "·∃"
+  | Grounding -> "★"
   | TyInt -> "int"
   | TyRat -> "rat"
   | Floor -> "floor"
@@ -195,13 +195,13 @@ type fixity =
 
 let fixity = function
   | And | Or ->
-      Infix_nary
+    Infix_nary
   | Imply | Equiv | Xor | Eq | Neq | HasType
   | Sum | Difference | Product
   | Quotient | Quotient_e | Quotient_f | Quotient_t
   | Remainder_e | Remainder_t | Remainder_f
   | Less | Lesseq | Greater | Greatereq ->
-      Infix_binary
+    Infix_binary
   | _ -> Prefix
 
 let is_prefix o = fixity o = Prefix
@@ -239,6 +239,7 @@ let prop = Prop
 let term = Term
 let ty_int = TyInt
 let ty_rat = TyRat
+let grounding = Grounding
 
 module Arith = struct
   let floor = Floor
@@ -289,6 +290,7 @@ module TPTP = struct
     | Multiset -> failwith "cannot print this symbol in TPTP"
     | ForallConst -> "!!"
     | ExistsConst -> "??"
+    | Grounding -> "$$ground"
     | TyInt -> "$int"
     | TyRat -> "$rat"
     | Int x -> Z.to_string x
@@ -367,7 +369,7 @@ module TPTP = struct
 
   (* TODO add the other ones *)
   let connectives = Set.of_seq
-  (Sequence.of_list [ and_; or_; equiv; imply; ])
+      (Sequence.of_list [ and_; or_; equiv; imply; ])
 
   let is_connective = function
     | Int _
@@ -377,8 +379,8 @@ end
 
 module ArithOp = struct
   exception TypeMismatch of string
-    (** This exception is raised when Arith functions are called
-        on non-numeric values (Cst). *)
+  (** This exception is raised when Arith functions are called
+      on non-numeric values (Cst). *)
 
   (* helper to raise errors *)
   let _ty_mismatch fmt =
@@ -419,50 +421,50 @@ module ArithOp = struct
     | `Int -> one_i
 
   let is_zero = function
-  | Int n -> Z.sign n = 0
-  | Rat n -> Q.sign n = 0
-  | s -> _ty_mismatch "not a number: %a" pp s
+    | Int n -> Z.sign n = 0
+    | Rat n -> Q.sign n = 0
+    | s -> _ty_mismatch "not a number: %a" pp s
 
   let is_one = function
-  | Int n -> Z.equal n Z.one
-  | Rat n -> Q.equal n Q.one
-  | s -> _ty_mismatch "not a number: %a" pp s
+    | Int n -> Z.equal n Z.one
+    | Rat n -> Q.equal n Q.one
+    | s -> _ty_mismatch "not a number: %a" pp s
 
   let is_minus_one = function
-  | Int n -> Z.equal n Z.minus_one
-  | Rat n -> Q.equal n Q.minus_one
-  | s -> _ty_mismatch "not a number: %a" pp s
+    | Int n -> Z.equal n Z.minus_one
+    | Rat n -> Q.equal n Q.minus_one
+    | s -> _ty_mismatch "not a number: %a" pp s
 
   let floor s = match s with
-  | Int _ -> s
-  | Rat n -> mk_int (Q.to_bigint n)
-  | s -> _ty_mismatch "not a numeric constant: %a" pp s
+    | Int _ -> s
+    | Rat n -> mk_int (Q.to_bigint n)
+    | s -> _ty_mismatch "not a numeric constant: %a" pp s
 
   let ceiling s = match s with
-  | Int _ -> s
-  | Rat _ -> failwith "Q.ceiling: not implemented" (* TODO *)
-  | s -> _ty_mismatch "not a numeric constant: %a" pp s
+    | Int _ -> s
+    | Rat _ -> failwith "Q.ceiling: not implemented" (* TODO *)
+    | s -> _ty_mismatch "not a numeric constant: %a" pp s
 
   let truncate s = match s with
-  | Int _ -> s
-  | Rat n when Q.sign n >= 0 -> mk_int (Q.to_bigint n)
-  | Rat _ -> failwith "Q.truncate: not implemented" (* TODO *)
-  | s -> _ty_mismatch "not a numeric constant: %a" pp s
+    | Int _ -> s
+    | Rat n when Q.sign n >= 0 -> mk_int (Q.to_bigint n)
+    | Rat _ -> failwith "Q.truncate: not implemented" (* TODO *)
+    | s -> _ty_mismatch "not a numeric constant: %a" pp s
 
   let round s = match s with
-  | Int _ -> s
-  | Rat _ -> failwith "Q.round: not implemented" (* TODO *)
-  | s -> _ty_mismatch "not a numeric constant: %a" pp s
+    | Int _ -> s
+    | Rat _ -> failwith "Q.round: not implemented" (* TODO *)
+    | s -> _ty_mismatch "not a numeric constant: %a" pp s
 
   let prec s = match s with
-  | Int n -> mk_int Z.(n - one)
-  | Rat n -> mk_rat Q.(n - one)
-  | s -> _ty_mismatch "not a numeric constant: %a" pp s
+    | Int n -> mk_int Z.(n - one)
+    | Rat n -> mk_rat Q.(n - one)
+    | s -> _ty_mismatch "not a numeric constant: %a" pp s
 
   let succ s = match s with
-  | Int n -> mk_int Z.(n + one)
-  | Rat n -> mk_rat Q.(n + one)
-  | s -> _ty_mismatch "not a numeric constant: %a" pp s
+    | Int n -> mk_int Z.(n + one)
+    | Rat n -> mk_rat Q.(n + one)
+    | s -> _ty_mismatch "not a numeric constant: %a" pp s
 
   let err2_ s1 s2 = match s1, s2 with
     | Int _, Rat _
@@ -470,104 +472,104 @@ module ArithOp = struct
     | _ -> _ty_mismatch "not numeric constants: %a, %a" pp s1 pp s2
 
   let sum s1 s2 = match s1, s2 with
-  | Int n1, Int n2 -> mk_int Z.(n1 + n2)
-  | Rat n1, Rat n2 -> mk_rat Q.(n1 + n2)
-  | _ -> err2_ s1 s2
+    | Int n1, Int n2 -> mk_int Z.(n1 + n2)
+    | Rat n1, Rat n2 -> mk_rat Q.(n1 + n2)
+    | _ -> err2_ s1 s2
 
   let difference s1 s2 = match s1, s2 with
-  | Int n1, Int n2 -> mk_int Z.(n1 - n2)
-  | Rat n1, Rat n2 -> mk_rat Q.(n1 - n2)
-  | _ -> err2_ s1 s2
+    | Int n1, Int n2 -> mk_int Z.(n1 - n2)
+    | Rat n1, Rat n2 -> mk_rat Q.(n1 - n2)
+    | _ -> err2_ s1 s2
 
   let uminus s = match s with
-  | Int n -> mk_int (Z.neg n)
-  | Rat n -> mk_rat (Q.neg n)
-  | s -> _ty_mismatch "not a numeric constant: %a" pp s
+    | Int n -> mk_int (Z.neg n)
+    | Rat n -> mk_rat (Q.neg n)
+    | s -> _ty_mismatch "not a numeric constant: %a" pp s
 
   let product s1 s2 = match s1, s2 with
-  | Int n1, Int n2 -> mk_int Z.(n1 * n2)
-  | Rat n1, Rat n2 -> mk_rat Q.(n1 * n2)
-  | _ -> err2_ s1 s2
+    | Int n1, Int n2 -> mk_int Z.(n1 * n2)
+    | Rat n1, Rat n2 -> mk_rat Q.(n1 * n2)
+    | _ -> err2_ s1 s2
 
   let quotient s1 s2 = match s1, s2 with
-  | Int n1, Int n2 ->
-    let q, r = Z.div_rem n1 n2 in
-    if Z.sign r = 0
+    | Int n1, Int n2 ->
+      let q, r = Z.div_rem n1 n2 in
+      if Z.sign r = 0
       then mk_int q
       else _ty_mismatch "non-exact integral division: %a / %a" pp s1 pp s2
-  | Rat n1, Rat n2 ->
-    if Q.sign n2 = 0
-    then raise Division_by_zero
-    else mk_rat (Q.div n1 n2)
-  | _ -> err2_ s1 s2
+    | Rat n1, Rat n2 ->
+      if Q.sign n2 = 0
+      then raise Division_by_zero
+      else mk_rat (Q.div n1 n2)
+    | _ -> err2_ s1 s2
 
   let quotient_e s1 s2 = match s1, s2 with
-  | Int n1, Int n2 -> mk_int (Z.div n1 n2)
-  | _ ->
-    if sign s2 > 0
+    | Int n1, Int n2 -> mk_int (Z.div n1 n2)
+    | _ ->
+      if sign s2 > 0
       then floor (quotient s1 s2)
       else ceiling (quotient s1 s2)
 
   let quotient_t s1 s2 = match s1, s2 with
-  | Int n1, Int n2 -> mk_int (Z.div n1 n2)
-  | _ -> truncate (quotient s1 s2)
+    | Int n1, Int n2 -> mk_int (Z.div n1 n2)
+    | _ -> truncate (quotient s1 s2)
 
   let quotient_f s1 s2 = match s1, s2 with
-  | Int n1, Int n2 -> mk_int (Z.div n1 n2)
-  | _ -> floor (quotient s1 s2)
+    | Int n1, Int n2 -> mk_int (Z.div n1 n2)
+    | _ -> floor (quotient s1 s2)
 
   let remainder_e s1 s2 = match s1, s2 with
-  | Int n1, Int n2 -> mk_int (Z.rem n1 n2)
-  | _ -> difference s1 (product (quotient_e s1 s2) s2)
+    | Int n1, Int n2 -> mk_int (Z.rem n1 n2)
+    | _ -> difference s1 (product (quotient_e s1 s2) s2)
 
   let remainder_t s1 s2 = match s1, s2 with
-  | Int n1, Int n2 -> mk_int (Z.rem n1 n2)
-  | _ -> difference s1 (product (quotient_t s1 s2) s2)
+    | Int n1, Int n2 -> mk_int (Z.rem n1 n2)
+    | _ -> difference s1 (product (quotient_t s1 s2) s2)
 
   let remainder_f s1 s2 = match s1, s2 with
-  | Int n1, Int n2 -> mk_int (Z.rem n1 n2)
-  | _ -> difference s1 (product (quotient_f s1 s2) s2)
+    | Int n1, Int n2 -> mk_int (Z.rem n1 n2)
+    | _ -> difference s1 (product (quotient_f s1 s2) s2)
 
   let to_int s = match s with
-  | Int _ -> s
-  | _ -> floor s
+    | Int _ -> s
+    | _ -> floor s
 
   let to_rat s = match s with
-  | Int n -> mk_rat (Q.of_bigint n)
-  | Rat _ -> s
-  | _ -> _ty_mismatch "not a numeric constant: %a" pp s
+    | Int n -> mk_rat (Q.of_bigint n)
+    | Rat _ -> s
+    | _ -> _ty_mismatch "not a numeric constant: %a" pp s
 
   let abs s = match s with
-  | Int n -> mk_int (Z.abs n)
-  | Rat n -> mk_rat (Q.abs n)
-  | _ -> _ty_mismatch "not a numeric constant: %a" pp s
+    | Int n -> mk_int (Z.abs n)
+    | Rat n -> mk_rat (Q.abs n)
+    | _ -> _ty_mismatch "not a numeric constant: %a" pp s
 
   let divides a b = match a, b with
-  | Rat i, Rat _ -> Q.sign i <> 0
-  | Int a, Int b ->
-    Z.sign a <> 0 &&
-    Z.sign (Z.rem b a) = 0
-  | _ -> _ty_mismatch "divides: expected two numerical types"
+    | Rat i, Rat _ -> Q.sign i <> 0
+    | Int a, Int b ->
+      Z.sign a <> 0 &&
+      Z.sign (Z.rem b a) = 0
+    | _ -> _ty_mismatch "divides: expected two numerical types"
 
   let gcd a b = match a, b with
-  | Rat _, Rat _ -> one_rat
-  | Int a, Int b -> mk_int (Z.gcd a b)
-  | _ -> _ty_mismatch "gcd: expected two numerical types"
+    | Rat _, Rat _ -> one_rat
+    | Int a, Int b -> mk_int (Z.gcd a b)
+    | _ -> _ty_mismatch "gcd: expected two numerical types"
 
   let lcm a b = match a, b with
-  | Rat _, Rat _ -> one_rat
-  | Int a, Int b -> mk_int (Z.lcm a b)
-  | _ -> _ty_mismatch "gcd: expected two numerical types"
+    | Rat _, Rat _ -> one_rat
+    | Int a, Int b -> mk_int (Z.lcm a b)
+    | _ -> _ty_mismatch "gcd: expected two numerical types"
 
   let less s1 s2 = match s1, s2 with
-  | Int n1, Int n2 -> Z.lt n1 n2
-  | Rat n1, Rat n2 -> Q.lt n1 n2
-  | _ -> err2_ s1 s2
+    | Int n1, Int n2 -> Z.lt n1 n2
+    | Rat n1, Rat n2 -> Q.lt n1 n2
+    | _ -> err2_ s1 s2
 
   let lesseq s1 s2 = match s1, s2 with
-  | Int n1, Int n2 -> Z.leq n1 n2
-  | Rat n1, Rat n2 -> Q.leq n1 n2
-  | _ -> err2_ s1 s2
+    | Int n1, Int n2 -> Z.leq n1 n2
+    | Rat n1, Rat n2 -> Q.leq n1 n2
+    | _ -> err2_ s1 s2
 
   let greater s1 s2 = less s2 s1
 
@@ -576,15 +578,15 @@ module ArithOp = struct
   (* factorize [n] into a product of prime numbers. [n] must be positive *)
   let divisors n =
     if (Z.leq n Z.zero)
-      then raise (Invalid_argument "prime_factors: expected number > 0")
+    then raise (Invalid_argument "prime_factors: expected number > 0")
     else try
-      let n = Z.to_int n in
-      let l = ref [] in
-      for i = 2 to n/2 do
-        if i < n && n mod i = 0 then l := i :: !l
-      done;
-      List.rev_map Z.of_int !l
-    with Z.Overflow -> []  (* too big *)
+        let n = Z.to_int n in
+        let l = ref [] in
+        for i = 2 to n/2 do
+          if i < n && n mod i = 0 then l := i :: !l
+        done;
+        List.rev_map Z.of_int !l
+      with Z.Overflow -> []  (* too big *)
 end
 
 module ZF = struct
@@ -608,6 +610,7 @@ module ZF = struct
     | Multiset -> failwith "cannot print this symbol in ZF"
     | ForallConst -> "!!"
     | ExistsConst -> "??"
+    | Grounding -> "$$grounding"
     | TyInt -> "int"
     | TyRat -> "rat"
     | Int x -> Z.to_string x

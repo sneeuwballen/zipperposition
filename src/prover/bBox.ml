@@ -1,7 +1,7 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-open Libzipperposition
+open Logtk
 
 module Lits = Literals
 
@@ -23,9 +23,9 @@ type payload =
   | Case of inductive_path (* branch in the induction tree *)
 
 module Lit = Bool_lit.Make(struct
-  type t = payload
-  let dummy = Fresh
-end)
+    type t = payload
+    let dummy = Fresh
+  end)
 
 type t = Lit.t
 type lit = t
@@ -52,20 +52,21 @@ let compare_payload l1 l2 = match l1, l2 with
 let pp_payload out = function
   | Fresh -> CCFormat.string out "<dummy>"
   | Clause_component lits ->
-      Format.fprintf out "@<1>⟦@[<hv>%a@]@<1>⟧" Lits.pp lits
+    Format.fprintf out "@<1>⟦@[<hv>%a@]@<1>⟧" Lits.pp lits
   | Lemma lits_l ->
-      Format.fprintf out "@<1>⟦lemma @[<hv>%a@]@<1>⟧"
-        (Util.pp_list ~sep:" & " Lits.pp) lits_l
+    Format.fprintf out "@<1>⟦lemma @[<hv>%a@]@<1>⟧"
+      (Util.pp_list ~sep:" & " Lits.pp) lits_l
   | Case p ->
-      Format.fprintf out "@<1>⟦@[<hv1>%a@]@<1>⟧" Ind_cst.pp_path p
+    Format.fprintf out "@<1>⟦@[<hv1>%a@]@<1>⟧" Ind_cst.pp_path p
 
-module FV = FeatureVector.Make(struct
+module FV = FV_tree.Make(struct
     type t = Lits.t * payload * lit
     let compare (l1,i1,j1)(l2,i2,j2) =
       CCOrd.(Lits.compare l1 l2
-             <?> (compare_payload, i1, i2)
-             <?> (Lit.compare, j1, j2))
+        <?> (compare_payload, i1, i2)
+        <?> (Lit.compare, j1, j2))
     let to_lits (l,_,_) = Lits.to_form l |> Sequence.of_list
+    let labels _ = Util.Int_set.empty
   end)
 
 module ICaseTbl = CCHashtbl.Make(struct
@@ -88,12 +89,12 @@ let _retrieve_alpha_equiv lits =
 let save_ lit =
   let payload = Lit.payload lit in
   match payload with
-  | Fresh -> ()
-  | Clause_component lits ->
+    | Fresh -> ()
+    | Clause_component lits ->
       (* be able to retrieve by lits *)
       _clause_set := FV.add !_clause_set (lits, payload, lit)
-  | Lemma _ -> () (* no retrieval *)
-  | Case p ->
+    | Lemma _ -> () (* no retrieval *)
+    | Case p ->
       ICaseTbl.add _case_set p (payload, lit)
 
 (* clause -> boolean lit *)
@@ -101,7 +102,7 @@ let inject_lits_ lits  =
   (* special case: one negative literal. *)
   let lits, sign = match lits with
     | [| lit0 |] when Literal.is_ground lit0 && Literal.is_neg lit0 ->
-        [| Literal.negate lits.(0) |], false
+      [| Literal.negate lits.(0) |], false
     | _ -> lits, true
   in
   (* retrieve clause. the index doesn't matter for retrieval *)
@@ -110,18 +111,18 @@ let inject_lits_ lits  =
     (function
       | lits', Clause_component _, blit
         when Lits.are_variant lits lits' ->
-          Some blit
+        Some blit
       | _ -> None)
   |> Sequence.head
   |> (function
-      | Some t -> Lit.apply_sign sign t
-      | None ->
-          (* build new literal *)
-          let lits_copy = Array.copy lits in
-          let t = Lit.make (Clause_component lits_copy) in
-          (* maintain mapping *)
-          save_ t;
-          Lit.apply_sign sign t)
+    | Some t -> Lit.apply_sign sign t
+    | None ->
+      (* build new literal *)
+      let lits_copy = Array.copy lits in
+      let t = Lit.make (Clause_component lits_copy) in
+      (* maintain mapping *)
+      save_ t;
+      Lit.apply_sign sign t)
 
 let inject_lits lits =
   Util.with_prof prof_inject_lits inject_lits_ lits

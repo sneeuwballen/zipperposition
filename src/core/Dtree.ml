@@ -5,7 +5,7 @@
 
 module ST = InnerTerm
 module T = FOTerm
-module S = Substs
+module S = Subst
 
 let prof_dtree_retrieve = Util.mk_profiler "dtree_retrieve"
 
@@ -39,22 +39,22 @@ let compare_char c1 c2 =
     if c=0 then Type.compare (HVar.ty v1) (HVar.ty v2) else c
   in
   match c1, c2 with
-  | Symbol s1, Symbol s2 -> ID.compare s1 s2
-  | BoundVariable i, BoundVariable j -> i - j
-  | Variable v1, Variable v2 -> compare_vars v1 v2
-  | Subterm t1, Subterm t2 -> T.compare t1 t2
-  | _ -> char_to_int_ c1 - char_to_int_ c2
+    | Symbol s1, Symbol s2 -> ID.compare s1 s2
+    | BoundVariable i, BoundVariable j -> i - j
+    | Variable v1, Variable v2 -> compare_vars v1 v2
+    | Subterm t1, Subterm t2 -> T.compare t1 t2
+    | _ -> char_to_int_ c1 - char_to_int_ c2
 
 let eq_char c1 c2 = compare_char c1 c2 = 0
 
 (** first symbol of t, or variable *)
 let term_to_char t =
   match T.Classic.view t with
-  | T.Classic.Var v -> Variable v
-  | T.Classic.DB i -> BoundVariable i
-  | T.Classic.App (f, _) -> Symbol f
-  | T.Classic.AppBuiltin _
-  | T.Classic.NonFO -> Subterm t
+    | T.Classic.Var v -> Variable v
+    | T.Classic.DB i -> BoundVariable i
+    | T.Classic.App (f, _) -> Symbol f
+    | T.Classic.AppBuiltin _
+    | T.Classic.NonFO -> Subterm t
 
 let pp_char out = function
   | Variable v -> HVar.pp out v
@@ -75,12 +75,12 @@ let open_term ~stack t =
   else (
     let cur_char = term_to_char t in
     match T.view t with
-    | T.Var _
-    | T.DB _
-    | T.AppBuiltin _
-    | T.Const _ ->
+      | T.Var _
+      | T.DB _
+      | T.AppBuiltin _
+      | T.Const _ ->
         {cur_char; cur_term=t; stack=[]::stack;}
-    | T.App (_, l) ->
+      | T.App (_, l) ->
         {cur_char; cur_term=t; stack=l::stack;}
   )
 
@@ -88,7 +88,7 @@ let rec next_rec stack = match stack with
   | [] -> None
   | []::stack' -> next_rec stack'
   | (t::next')::stack' ->
-      Some (open_term ~stack:(next'::stack') t)
+    Some (open_term ~stack:(next'::stack') t)
 
 let skip iter = match iter.stack with
   | [] -> None
@@ -104,18 +104,18 @@ let to_list t =
   let rec getnext acc iter =
     let acc' = iter.cur_char :: acc in
     match next iter with
-    | None -> List.rev acc'
-    | Some iter' ->
+      | None -> List.rev acc'
+      | Some iter' ->
         getnext acc' iter'
   in
   match iterate t with
-  | None -> assert false
-  | Some i -> getnext [] i
+    | None -> assert false
+    | Some i -> getnext [] i
 
 module CharMap = CCMap.Make(struct
-  type t = character
-  let compare = compare_char
-end)
+    type t = character
+    let compare = compare_char
+  end)
 
 (** {2 Discrimination tree} *)
 
@@ -127,7 +127,7 @@ module Make(E : Index.EQUATION) = struct
   type trie =
     | TrieNode of trie CharMap.t       (** map atom -> trie *)
     | TrieLeaf of (T.t * E.t * int) list
-      (** leaf with (term, value, priority) list *)
+    (** leaf with (term, value, priority) list *)
 
   let empty_trie n = match n with
     | TrieNode m when CharMap.is_empty m -> true
@@ -144,29 +144,29 @@ module Make(E : Index.EQUATION) = struct
     (* function to go to the given leaf, building it if needed *)
     let rec goto trie t rebuild =
       match trie, t with
-      | (TrieLeaf l) as leaf, [] -> (* found leaf *)
-        begin match k l with
-        | new_leaf when leaf == new_leaf -> root  (* no change, return same tree *)
-        | new_leaf -> rebuild new_leaf           (* replace by new leaf *)
-        end
-      | TrieNode m, c::t' ->
-        begin try  (* insert in subtrie *)
-          let subtrie = CharMap.find c m in
-          let rebuild' subtrie = match subtrie with
-            | _ when empty_trie subtrie -> rebuild (TrieNode (CharMap.remove c m))
-            | _ -> rebuild (TrieNode (CharMap.add c subtrie m))
-          in
-          goto subtrie t' rebuild'
-        with Not_found -> (* no subtrie found *)
-          let subtrie = if t' = [] then TrieLeaf [] else TrieNode CharMap.empty
-          and rebuild' subtrie = match subtrie with
-            | _ when empty_trie subtrie -> root  (* same tree *)
-            | _ -> rebuild (TrieNode (CharMap.add c subtrie m))
-          in
-          goto subtrie t' rebuild'
-        end
-      | TrieNode _, [] -> assert false (* ill-formed term *)
-      | TrieLeaf _, _ -> assert false  (* wrong arity *)
+        | (TrieLeaf l) as leaf, [] -> (* found leaf *)
+          begin match k l with
+            | new_leaf when leaf == new_leaf -> root  (* no change, return same tree *)
+            | new_leaf -> rebuild new_leaf           (* replace by new leaf *)
+          end
+        | TrieNode m, c::t' ->
+          begin try  (* insert in subtrie *)
+              let subtrie = CharMap.find c m in
+              let rebuild' subtrie = match subtrie with
+                | _ when empty_trie subtrie -> rebuild (TrieNode (CharMap.remove c m))
+                | _ -> rebuild (TrieNode (CharMap.add c subtrie m))
+              in
+              goto subtrie t' rebuild'
+            with Not_found -> (* no subtrie found *)
+              let subtrie = if t' = [] then TrieLeaf [] else TrieNode CharMap.empty
+              and rebuild' subtrie = match subtrie with
+                | _ when empty_trie subtrie -> root  (* same tree *)
+                | _ -> rebuild (TrieNode (CharMap.add c subtrie m))
+              in
+              goto subtrie t' rebuild'
+          end
+        | TrieNode _, [] -> assert false (* ill-formed term *)
+        | TrieLeaf _, _ -> assert false  (* wrong arity *)
     in
     goto trie t (fun t -> t)
 
@@ -194,7 +194,7 @@ module Make(E : Index.EQUATION) = struct
     let k l =
       (* remove tuples that match *)
       let l' = List.filter
-        (fun (t', eqn', _) -> t' != t || E.compare eqn eqn' <> 0) l
+          (fun (t', eqn', _) -> t' != t || E.compare eqn eqn' <> 0) l
       in
       TrieLeaf l'
     in
@@ -212,61 +212,61 @@ module Make(E : Index.EQUATION) = struct
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie iter subst =
       match trie, iter with
-      | TrieLeaf l, None ->  (* yield all equations, they all match *)
-        List.iter
-          (fun (_, eqn, _) ->
-            let l, r, sign' = E.extract eqn in
-            if sign = sign' then k (l, r, eqn, subst))
-          l
-      | TrieNode m, Some i ->
-        (* "lazy" transformation to flatterm *)
-        let t_pos = i.cur_term in
-        let c1 = i.cur_char in
-        CharMap.iter
-          (fun c2 subtrie ->
-            match c2 with
-            | Variable v2 ->
-              (* deal with the variable branche in the trie *)
-              begin match S.FO.get_var subst (Scoped.set dt (v2:>ST.t HVar.t)) with
-                | None ->
-                  (* not bound: try to match types + bind, then continue *)
-                  begin
-                    try
-                      let subst =
-                        Unif.Ty.matching ~subst
-                          ~pattern:(Scoped.set dt (HVar.ty v2))
-                          (Scoped.set t (T.ty t_pos))
-                      in
-                      let subst =
-                        Unif.FO.bind subst
-                          (Scoped.set dt v2) (Scoped.set t t_pos) in
-                      traverse subtrie (skip i) subst
-                    with Unif.Fail -> () (* incompatible binding, or occur check *)
-                  end
-                | Some t' ->
-                  (* already bound, check consistency *)
-                  if Unif.FO.equal ~subst (Scoped.set t t_pos) t'
-                  then traverse subtrie (skip i) subst
-              end
-            | Subterm t2 ->
-              (* fallback to matching *)
-              begin
-                try
-                  let subst =
-                    Unif.FO.matching
-                      ~subst ~pattern:(Scoped.set dt t2) (Scoped.set t t_pos)
-                  in
-                  traverse subtrie (skip i) subst
-                with Unif.Fail -> ()
-              end
-            | _ when eq_char c2 c1 ->
-              (* explore branch that has the same symbol, if any *)
-              assert (not (T.is_var t_pos));
-              traverse subtrie (next i) subst;
-            | _ -> ())
-          m
-      | TrieNode _, None
-      | TrieLeaf _, Some _ -> ()
+        | TrieLeaf l, None ->  (* yield all equations, they all match *)
+          List.iter
+            (fun (_, eqn, _) ->
+               let l, r, sign' = E.extract eqn in
+               if sign = sign' then k (l, r, eqn, subst))
+            l
+        | TrieNode m, Some i ->
+          (* "lazy" transformation to flatterm *)
+          let t_pos = i.cur_term in
+          let c1 = i.cur_char in
+          CharMap.iter
+            (fun c2 subtrie ->
+               match c2 with
+                 | Variable v2 ->
+                   (* deal with the variable branche in the trie *)
+                   begin match S.FO.get_var subst (Scoped.set dt (v2:>ST.t HVar.t)) with
+                     | None ->
+                       (* not bound: try to match types + bind, then continue *)
+                       begin
+                         try
+                           let subst =
+                             Unif.Ty.matching ~subst
+                               ~pattern:(Scoped.set dt (HVar.ty v2))
+                               (Scoped.set t (T.ty t_pos))
+                           in
+                           let subst =
+                             Unif.FO.bind subst
+                               (Scoped.set dt v2) (Scoped.set t t_pos) in
+                           traverse subtrie (skip i) subst
+                         with Unif.Fail -> () (* incompatible binding, or occur check *)
+                       end
+                     | Some t' ->
+                       (* already bound, check consistency *)
+                       if Unif.FO.equal ~subst (Scoped.set t t_pos) t'
+                       then traverse subtrie (skip i) subst
+                   end
+                 | Subterm t2 ->
+                   (* fallback to matching *)
+                   begin
+                     try
+                       let subst =
+                         Unif.FO.matching
+                           ~subst ~pattern:(Scoped.set dt t2) (Scoped.set t t_pos)
+                       in
+                       traverse subtrie (skip i) subst
+                     with Unif.Fail -> ()
+                   end
+                 | _ when eq_char c2 c1 ->
+                   (* explore branch that has the same symbol, if any *)
+                   assert (not (T.is_var t_pos));
+                   traverse subtrie (next i) subst;
+                 | _ -> ())
+            m
+        | TrieNode _, None
+        | TrieLeaf _, Some _ -> ()
     in
     traverse (fst dt) (iterate (fst t)) subst;
     Util.exit_prof prof_dtree_retrieve;
@@ -276,8 +276,8 @@ module Make(E : Index.EQUATION) = struct
   let iter dt k =
     let rec iter trie =
       match trie with
-      | TrieNode m -> CharMap.iter (fun _ sub_dt -> iter sub_dt) m
-      | TrieLeaf l -> List.iter (fun (t, v, _) -> k t v) l
+        | TrieNode m -> CharMap.iter (fun _ sub_dt -> iter sub_dt) m
+        | TrieLeaf l -> List.iter (fun (t, v, _) -> k t v) l
     in iter dt
 
   let size dt =
@@ -286,7 +286,7 @@ module Make(E : Index.EQUATION) = struct
     !n
 
   let _as_graph =
-    CCGraph.make_labelled_tuple
+    CCGraph.make
       (function
         | TrieLeaf _ -> Sequence.empty
         | TrieNode m -> CharMap.to_seq m)
@@ -302,17 +302,17 @@ module Make(E : Index.EQUATION) = struct
     Util.debugf ~section:Util.Section.zip 2
       "@[<2>print graph of size %d@]" (fun k->k (size t));
     let pp = CCGraph.Dot.pp
-      ~eq:equal_
-      ~tbl:(CCGraph.mk_table ~eq:equal_ ~hash:Hashtbl.hash 128)
-      ~attrs_v:(function
-        | TrieLeaf l ->
+        ~eq:equal_
+        ~tbl:(CCGraph.mk_table ~eq:equal_ ~hash:Hashtbl.hash 128)
+        ~attrs_v:(function
+          | TrieLeaf l ->
             let len = List.length l in
             [`Shape "box"; `Label (string_of_int len)]
-        | TrieNode _ -> [`Shape "circle"; `Label ""])
-      ~attrs_e:(fun (_, e ,_) ->
-        let e = CCFormat.to_string pp_char e in
-        [`Label e])
-      ~name:"NPDtree" ~graph:_as_graph
+          | TrieNode _ -> [`Shape "circle"; `Label ""])
+        ~attrs_e:(fun e ->
+          let e = CCFormat.to_string pp_char e in
+          [`Label e])
+        ~name:"NPDtree" ~graph:_as_graph
     in
     Format.fprintf out "@[<2>%a@]@." pp t;
 end
@@ -322,5 +322,5 @@ module Default = Make(Index.BasicEquation)
 let () =
   Options.add_opts
     [ "--dtree-max-depth", Arg.Set_int max_depth_,
-        " set maximal depth of terms for Dtree (demodulation)"
+      " set maximal depth of terms for Dtree (demodulation)"
     ]

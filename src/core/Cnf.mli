@@ -1,5 +1,5 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Reduction to CNF and simplifications} *)
 
@@ -59,6 +59,8 @@ type c_statement = (clause, term, type_) Statement.t
 
 val pp_f_statement : f_statement CCFormat.printer
 val pp_c_statement : c_statement CCFormat.printer
+val pp_fo_c_statement : (FOTerm.t SLiteral.t list, FOTerm.t, Type.t) Statement.t CCFormat.printer
+
 
 val is_clause : form -> bool
 val is_cnf : form -> bool

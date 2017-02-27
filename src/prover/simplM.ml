@@ -31,14 +31,14 @@ let rec app_list l x = match l with
 let rec map_l f l = match l with
   | [] -> return_same []
   | x :: tail ->
-      f x >>= fun x' ->
-      map_l f tail >>= fun tail' ->
-      return_same (x' :: tail')
+    f x >>= fun x' ->
+    map_l f tail >>= fun tail' ->
+    return_same (x' :: tail')
 
 let rec fold_l f acc l = match l with
   | [] -> return_same acc
   | x :: tail ->
-      f acc x >>= fun acc -> fold_l f acc tail
+    f acc x >>= fun acc -> fold_l f acc tail
 
 module Infix = struct
   let (>>=) = (>>=)

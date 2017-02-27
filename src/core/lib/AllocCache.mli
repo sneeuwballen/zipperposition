@@ -1,13 +1,13 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Simple Cache for Allocations}
 
-  Be very careful not to use-after-free or double-free.
+    Be very careful not to use-after-free or double-free.
 
-  {b NOT THREAD SAFE}
+    {b NOT THREAD SAFE}
 
-  @since NEXT_RELEASE
+    @since NEXT_RELEASE
 
 *)
 

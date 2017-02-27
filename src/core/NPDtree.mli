@@ -7,7 +7,7 @@
     non-perfect discrimination tree (see "the handbook of automated reasoning",
     chapter "term indexing", for instance). It should be more compact
     in memory than {!Dtree}, and maybe more optimized too.
-    *)
+*)
 
 module Make(E : Index.EQUATION) : Index.UNIT_IDX with module E = E
 

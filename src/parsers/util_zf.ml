@@ -3,7 +3,7 @@
 
 (** {1 Utils for ZF} *)
 
-open Libzipperposition
+open Logtk
 
 module A = UntypedAST
 
@@ -11,7 +11,7 @@ type parse_cache = (string,unit) Hashtbl.t
 
 let create_parse_cache () = Hashtbl.create 8
 
-type parser_res = (UntypedAST.statement Sequence.t, string) CCError.t
+type parser_res = (UntypedAST.statement Sequence.t, string) CCResult.t
 type 'a parser_ = 'a -> parser_res
 
 let find_file name ~dir : string option =
@@ -58,8 +58,8 @@ and parse_file_ ?cache ?recursive file =
 
 let parse_lexbuf ?cache ?recursive file : parser_res =
   try parse_lexbuf_ ?cache ?recursive ~dir:"." file
-      |> Sequence.of_list |> CCError.return
-  with e -> CCError.of_exn e
+      |> Sequence.of_list |> CCResult.return
+  with e -> CCResult.of_exn e
 
 let parse_stdin () : parser_res =
   let lexbuf = Lexing.from_channel stdin in
@@ -72,5 +72,5 @@ let parse_file ?cache ?recursive file : parser_res =
   else try
       parse_file_ ?cache ?recursive file
       |> Sequence.of_list
-      |> CCError.return
-  with e -> CCError.of_exn e
+      |> CCResult.return
+    with e -> CCResult.of_exn e

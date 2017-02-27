@@ -26,6 +26,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Immutable Arrays} *)
 
+type 'a equal = 'a -> 'a -> bool
+type 'a ord = 'a -> 'a -> int
+
 type 'a t
 (** Array of values of type 'a *)
 
@@ -33,9 +36,15 @@ val of_list : 'a list -> 'a t
 
 val to_list : 'a t -> 'a list
 
+val to_array_copy : 'a t -> 'a array
+(** make a copy into a mutable array *)
+
+val to_array_unsafe : 'a t -> 'a array
+(** Show the underlying array. DO NOT MODIFY *)
+
 val of_array_unsafe : 'a array -> 'a t
-  (** Take ownership of the given array. Careful, the array must {b NOT}
-      be modified afterwards! *)
+(** Take ownership of the given array. Careful, the array must {b NOT}
+    be modified afterwards! *)
 
 val empty : 'a t
 
@@ -56,7 +65,11 @@ val set : 'a t -> int -> 'a -> 'a t
 
 val map : ('a -> 'b) -> 'a t -> 'b t
 
+val map_arr : ('a -> 'b) -> 'a t -> 'b array
+
 val mapi : (int -> 'a -> 'b) -> 'a t -> 'b t
+
+val mapi_arr : (int -> 'a -> 'b) -> 'a t -> 'b array
 
 val append : 'a t -> 'a t -> 'a t
 
@@ -72,7 +85,15 @@ val for_all : ('a -> bool) -> 'a t -> bool
 
 val exists : ('a -> bool) -> 'a t -> bool
 
-module Seq : sig
-  val to_seq : 'a t -> 'a Sequence.t
-  val of_seq : 'a Sequence.t -> 'a t
-end
+val equal : 'a equal -> 'a t equal
+
+val compare : 'a ord -> 'a t ord
+
+val hash : 'a Hash.t -> 'a t Hash.t
+
+val hash_comm : 'a Hash.t -> 'a t Hash.t
+(** Commutative hash *)
+
+val to_seq : 'a t -> 'a Sequence.t
+val to_seqi : 'a t -> (int * 'a) Sequence.t
+val of_seq : 'a Sequence.t -> 'a t

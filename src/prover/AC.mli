@@ -3,6 +3,8 @@
 
 (** {1 AC redundancy} *)
 
+open Logtk
+
 type spec = AC_intf.spec
 
 module type S = AC_intf.S

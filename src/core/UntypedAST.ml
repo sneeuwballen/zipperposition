@@ -79,20 +79,20 @@ let pp_statement out st =
   let attrs = st.attrs in
   let fpf = Format.fprintf in
   match st.stmt with
-  | Include s ->
+    | Include s ->
       fpf out "@[<2>include \"%s\"@]@." (String.escaped s)
-  | Decl (id,ty) ->
+    | Decl (id,ty) ->
       fpf out "@[<2>val%a %s :@ @[%a@]@]." pp_attrs attrs id T.pp ty
-  | Def l ->
+    | Def l ->
       let pp_def out {def_id=id;def_ty;def_rules} =
         fpf out "@[<2>@[%s :@ %a@]@ := @[%a@]"
           id T.pp def_ty (Util.pp_list ~sep:" and " T.pp) def_rules
       in
       fpf out "@[<2>def%a %a@]."
         pp_attrs attrs (Util.pp_list ~sep:"" pp_def) l
-  | Rewrite t ->
+    | Rewrite t ->
       fpf out "@[<2>rewrite%a @[%a@]@]." pp_attrs attrs T.pp t
-  | Data l ->
+    | Data l ->
       let pp_cstor out (id,args) =
         fpf out "@[<2>| @[%s@ %a@]@]" id (Util.pp_list ~sep:" " T.pp) args in
       let pp_data out d =
@@ -102,11 +102,11 @@ let pp_statement out st =
           (Util.pp_list ~sep:"" pp_cstor) d.data_cstors
       in
       fpf out "@[<v>data%a@ %a@]." pp_attrs attrs (Util.pp_list ~sep:" and " pp_data) l
-  | Assert f ->
+    | Assert f ->
       fpf out "@[<2>assert%a@ @[%a@]@]." pp_attrs attrs T.pp f
-  | Lemma f ->
+    | Lemma f ->
       fpf out "@[<2>lemma%a@ @[%a@]@]." pp_attrs attrs T.pp f
-  | Goal f ->
+    | Goal f ->
       fpf out "@[<2>goal%a@ @[%a@]@]." pp_attrs attrs T.pp f
 
 (** {2 Errors} *)
@@ -114,11 +114,11 @@ let pp_statement out st =
 exception Parse_error of Loc.t * string
 
 let () = Printexc.register_printer
-  (function
-    | Parse_error (loc, msg) ->
+    (function
+      | Parse_error (loc, msg) ->
         Some
           (CCFormat.sprintf "@[<4>parse error:@ @[%s@]@ at %a@]" msg Loc.pp loc)
-    | _ -> None)
+      | _ -> None)
 
 let error loc msg = raise (Parse_error (loc,msg))
 let errorf loc msg = CCFormat.ksprintf msg ~f:(error loc)

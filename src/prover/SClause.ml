@@ -1,7 +1,7 @@
 
 (** {1 Simple Clause} *)
 
-open Libzipperposition
+open Logtk
 
 type flag = int
 
@@ -67,7 +67,7 @@ let pp_trail out trail =
   if not (Trail.is_empty trail)
   then
     Format.fprintf out "@ @<2>← @[<hv>%a@]"
-      (CCFormat.seq ~start:"" ~stop:"" ~sep:" ⊓ " BBox.pp)
+      (Util.pp_seq ~sep:" ⊓ " BBox.pp)
       (Trail.to_seq trail)
 
 let pp_vars out c =
@@ -117,7 +117,7 @@ and pp_trail_tstp out trail =
     else Format.fprintf out "@[~@ %a@]" pp_box_unsigned b
   in
   Format.fprintf out "@[<hv>%a@]"
-    (CCFormat.seq ~start:"" ~stop:"" ~sep:" & " pp_box)
+    (Util.pp_seq ~sep:" & " pp_box)
     (Trail.to_seq trail)
 
 let pp_tstp out c =

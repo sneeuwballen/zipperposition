@@ -4,7 +4,7 @@
 (** {1 Lexer for Zipperposition Formulas} *)
 
 {
-  open Libzipperposition
+  open Logtk
   open Parse_zf
 }
 
@@ -46,6 +46,7 @@ rule token = parse
   | ',' { COMMA }
   | '_' { WILDCARD }
   | ':' { COLON }
+  | ';' { SEMI_COLON }
   | "=" { LOGIC_EQ }
   | "!=" { LOGIC_NEQ }
   | ":=" { EQDEF }

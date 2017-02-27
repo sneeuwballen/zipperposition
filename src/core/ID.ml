@@ -1,21 +1,23 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Unique Identifiers} *)
 
 type t = {
   id: int;
   name: string;
-  mutable payload: exn list; (** Use [exn] as an open type for user-defined payload *)
+  mutable payload: exn; (** Use [exn] as an open type for user-defined payload *)
 }
 type t_ = t
+
+exception No_payload
 
 let make =
   let n = ref 0 in
   fun name ->
     let id = !n in
     incr n;
-    {id; name; payload=[]; }
+    {id; name; payload=No_payload; }
 
 let copy t = make t.name
 
@@ -23,10 +25,14 @@ let id t = t.id
 let name t = t.name
 let payload t = t.payload
 
-let add_payload t e = t.payload <- e :: t.payload
+let set_payload_erase t e = t.payload <- e
+
+let set_payload ?(can_erase=fun _->false) t e = match t.payload with
+  | No_payload -> t.payload <- e
+  | old_e when can_erase old_e -> t.payload <- e
+  | old_e -> invalid_arg ("ID.set_payload: collision with "^ Printexc.to_string old_e)
 
 let hash t = t.id
-let hash_fun t h = CCHash.int t.id h
 let equal i1 i2 = i1.id = i2.id
 let compare i1 i2 = Pervasives.compare i1.id i2.id
 
@@ -43,8 +49,8 @@ let gensym =
     let i = !r / String.length names in
     let j = !r mod String.length names in
     let name = if i=0
-      then CCPrint.sprintf "%c" names.[j]
-      else CCPrint.sprintf "%c%d" names.[j] i
+      then Printf.sprintf "%c" names.[j]
+      else Printf.sprintf "%c%d" names.[j] i
     in
     incr r;
     make name

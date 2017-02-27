@@ -41,7 +41,7 @@ Skolem
 Sourced
 SLiteral
 STerm
-Substs
+Subst
 Transform
 Type
 TypeInference

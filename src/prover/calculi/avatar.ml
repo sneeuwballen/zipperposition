@@ -3,7 +3,7 @@
 
 (** {1 Basic Splitting à la Avatar} *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
 module Lit = Literal
@@ -68,9 +68,9 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       (fun lit ->
          let v_opt = Lit.Seq.vars lit |> Sequence.head in
          match v_opt with
-         | None -> (* ground, lit has its own component *)
+           | None -> (* ground, lit has its own component *)
              cluster_ground := LitSet.add lit !cluster_ground
-         | Some v ->
+           | Some v ->
              (* merge other variables of the literal with [v] *)
              Lit.Seq.vars lit
              |> Sequence.iter
@@ -85,9 +85,9 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     UF.iter uf_vars (fun _ comp -> components := comp :: !components);
 
     match !components with
-    | [] -> assert (Array.length lits=0); None
-    | [_] -> None
-    | _::_ ->
+      | [] -> assert (Array.length lits=0); None
+      | [_] -> None
+      | _::_ ->
         (* do a simplification! *)
         Util.incr_stat stat_splits;
         let proof =
@@ -156,10 +156,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     let res =
       Trail.exists
         (fun lit ->
-          try match Sat.valuation_level lit with
-            | false, 0 -> true (* false at level 0: proven false *)
-            | _ -> false
-          with Sat.UndecidedLit -> false)
+           try match Sat.valuation_level lit with
+             | false, 0 -> true (* false at level 0: proven false *)
+             | _ -> false
+           with Sat.UndecidedLit -> false)
         trail
     in
     if res then (
@@ -180,14 +180,14 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       Trail.to_list trail
       |> List.partition
         (fun lit ->
-          try match Sat.valuation_level lit with
-            | true, 0 ->
-                (* [lit] is proven true, it is therefore not necessary
-                   to depend on it *)
-                incr n_simpl;
-                false
-            | _ -> true
-          with Sat.UndecidedLit -> true)
+           try match Sat.valuation_level lit with
+             | true, 0 ->
+               (* [lit] is proven true, it is therefore not necessary
+                  to depend on it *)
+               incr n_simpl;
+               false
+             | _ -> true
+           with Sat.UndecidedLit -> true)
     in
     let trail = Trail.of_list trail in
     if !n_simpl > 0 then (
@@ -220,7 +220,9 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     let name = CCFormat.sprintf "_avatar_%d" !skolem_count_ in
     incr skolem_count_;
     let id = ID.make name in
-    ID.add_payload id Skolem.Attr_skolem;
+    ID.set_payload id
+      (Skolem.Attr_skolem
+         (if Ind_ty.is_inductive_type ty then Skolem.K_ind else Skolem.K_normal));
     Ctx.declare id ty;
     Ordering.add_list (Ctx.ord ()) [id];
     id
@@ -230,7 +232,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     cut_pos: E.C.t list; (** clauses true if lemma is true *)
     cut_neg: E.C.t list; (** clauses true if lemma is false *)
     cut_skolems: (ID.t * Type.t) list;
-      (** skolems of universal variables in [cut_neg] *)
+    (** skolems of universal variables in [cut_neg] *)
     cut_lit: BLit.t; (** lit that is true if lemma is true *)
   }
 
@@ -257,30 +259,30 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         clauses
     in
     (* negative component:
-      - gather variables (careful that each clause has its own scope)
-      - skolemize them with fresh (inductive?) constants
-      - map each [lit] to [not subst(lit)]
-      - compute [bigand_i (bigor_j not c_i_j <- *)
+       - gather variables (careful that each clause has its own scope)
+       - skolemize them with fresh (inductive?) constants
+       - map each [lit] to [not subst(lit)]
+       - compute [bigand_i (bigor_j not c_i_j <- *)
     let skolems, c_neg =
       let vars : _ HVar.t Scoped.t list =
         Sequence.of_list clauses
         |> Sequence.mapi
           (fun i lits -> Literals.Seq.vars lits |> Sequence.map (fun v->v,i))
         |> Sequence.flatten
-        |> Sequence.sort_uniq ~cmp:CCOrd.(pair (HVar.compare Type.compare) int_)
+        |> Sequence.sort_uniq ~cmp:CCOrd.(pair (HVar.compare Type.compare) int)
         |> Sequence.to_rev_list
       in
       let subst, skolems =
         CCList.fold_map
           (fun subst (v,i) ->
-            let ty = HVar.ty v in
-            let id = skolem_ ~ty in
-            let subst =
-              Substs.FO.bind subst ((v:T.var:>Substs.var),i) (T.const ~ty id,0)
-            in
-            subst, (id,ty)
+             let ty = HVar.ty v in
+             let id = skolem_ ~ty in
+             let subst =
+               Subst.FO.bind subst ((v:T.var:>Subst.var),i) (T.const ~ty id,0)
+             in
+             subst, (id,ty)
           )
-          Substs.empty
+          Subst.empty
           vars
       in
       let renaming = Ctx.renaming_clear() in
@@ -369,13 +371,13 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     Signal.send before_check_sat ();
     let res = match Sat.check ~full ()  with
       | Sat_solver.Sat ->
-          Util.debug ~section 3 "SAT-solver reports \"SAT\"";
-          []
+        Util.debug ~section 3 "SAT-solver reports \"SAT\"";
+        []
       | Sat_solver.Unsat proof ->
-          Util.debug ~section 1 "SAT-solver reports \"UNSAT\"";
-          let proof = ProofStep.step proof in
-          let c = C.create ~trail:Trail.empty [] proof in
-          [c]
+        Util.debug ~section 1 "SAT-solver reports \"UNSAT\"";
+        let proof = ProofStep.step proof in
+        let c = C.create ~trail:Trail.empty [] proof in
+        [c]
     in
     Signal.send after_check_sat ();
     Util.exit_prof prof_check;
@@ -422,7 +424,7 @@ let extension =
 
 let () =
   Params.add_opts
-  [ "--avatar", Arg.Set enabled_, " enable Avatar splitting"
-  ; "--no-avatar", Arg.Clear enabled_, " disable Avatar splitting"
-  ; "--print-lemmas", Arg.Set show_lemmas_, " show status of Avatar lemmas"
-  ]
+    [ "--avatar", Arg.Set enabled_, " enable Avatar splitting"
+    ; "--no-avatar", Arg.Clear enabled_, " disable Avatar splitting"
+    ; "--print-lemmas", Arg.Set show_lemmas_, " show status of Avatar lemmas"
+    ]

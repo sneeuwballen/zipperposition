@@ -3,17 +3,17 @@
 
 (** {1 Convert from TPTP to ZF} *)
 
-open Libzipperposition
-open Libzipperposition_parsers
+open Logtk
+open Logtk_parsers
 
-open CCError.Infix
+open CCResult.Infix
 
 module T = TypedSTerm
 
 let pp_stmt = Statement.pp T.ZF.pp T.ZF.pp T.ZF.pp
 
 let pp_stmts out seq =
-  CCVector.print ~start:"" ~stop:"" ~sep:"" pp_stmt out seq
+  CCVector.pp ~sep:"" pp_stmt out seq
 
 let declare_term out () =
   let id = ID.make "term" in
@@ -43,8 +43,8 @@ let () =
   in
   let res = process file in
   match res with
-  | `Ok () -> ()
-  | `Error msg ->
+    | CCResult.Ok () -> ()
+    | CCResult.Error msg ->
       print_endline msg;
       exit 1
 

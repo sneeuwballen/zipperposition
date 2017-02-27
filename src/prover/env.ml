@@ -3,7 +3,7 @@
 
 (** {1 Global environment for an instance of the prover} *)
 
-open Libzipperposition
+open Logtk
 
 module T = FOTerm
 module Lit = Literal
@@ -295,15 +295,15 @@ module Make(X : sig
       | _ -> false
     in
     (* recursively traversal of the proof of [c].
-      @param after_inf true if we just crossed an inference step *)
+       @param after_inf true if we just crossed an inference step *)
     let rec aux ~after_inf p =
       if after_inf
       then
         (* after inference step: stop recursion and check *)
         match p.result with
-        | Clause c' -> SClause.is_backward_simplified c'
-        | BoolClause _
-        | Form _ -> false
+          | Clause c' -> SClause.is_backward_simplified c'
+          | BoolClause _
+          | Form _ -> false
       else
         List.exists
           (fun p' -> aux ~after_inf:(is_inf p) p')
@@ -332,11 +332,11 @@ module Make(X : sig
         || is_trivial_trail (C.trail c)
         || orphan_criterion c
         || begin match !_is_trivial with
-            | [] -> false
-            | [f] -> f c
-            | [f;g] -> f c || g c
-            | l -> List.exists (fun f -> f c) l
-           end
+          | [] -> false
+          | [f] -> f c
+          | [f;g] -> f c || g c
+          | l -> List.exists (fun f -> f c) l
+        end
       in
       if res then C.mark_redundant c;
       res
@@ -356,11 +356,11 @@ module Make(X : sig
     let applied_rules = ref StrSet.empty in
     let rec reduce_term rules t =
       match rules with
-      | [] -> t
-      | (name, r)::rules' ->
+        | [] -> t
+        | (name, r)::rules' ->
           begin match r t with
-          | None -> reduce_term rules' t (* try next rules *)
-          | Some t' ->
+            | None -> reduce_term rules' t (* try next rules *)
+            | Some t' ->
               applied_rules := StrSet.add name !applied_rules;
               Util.debugf ~section 5 "@[rewrite `@[%a@]`@ into `@[%a@]`@]"
                 (fun k->k T.pp t T.pp t');
@@ -418,11 +418,11 @@ module Make(X : sig
 
   (* apply simplification in a fixpoint *)
   let rec fix_simpl
-  : f:(C.t -> C.t SimplM.t) -> C.t -> C.t SimplM.t
-  = fun ~f c ->
-    let open SimplM.Infix in
-    let new_c = f c in
-    if C.equal c (SimplM.get new_c)
+    : f:(C.t -> C.t SimplM.t) -> C.t -> C.t SimplM.t
+    = fun ~f c ->
+      let open SimplM.Infix in
+      let new_c = f c in
+      if C.equal c (SimplM.get new_c)
       then new_c (* fixpoint reached *)
       else (
         (* some progress was made *)
@@ -481,19 +481,19 @@ module Make(X : sig
     let open SimplM.Infix in
     Util.enter_prof prof_simplify;
     let res = fix_simpl c
-      ~f:(fun c ->
-        let old_c = c in
-        basic_simplify c >>=
-        (* simplify with unit clauses, then all active clauses *)
-        rewrite >>=
-        rw_simplify >>=
-        basic_simplify >>=
-        active_simplify >|= fun c ->
-        if not (Lits.equal_com (C.lits c) (C.lits old_c))
-        then
-          Util.debugf ~section 2 "@[clause `@[%a@]`@ simplified into `@[%a@]`@]"
-            (fun k->k C.pp old_c C.pp c);
-        c)
+        ~f:(fun c ->
+          let old_c = c in
+          basic_simplify c >>=
+          (* simplify with unit clauses, then all active clauses *)
+          rewrite >>=
+          rw_simplify >>=
+          basic_simplify >>=
+          active_simplify >|= fun c ->
+          if not (Lits.equal_com (C.lits c) (C.lits old_c))
+          then
+            Util.debugf ~section 2 "@[clause `@[%a@]`@ simplified into `@[%a@]`@]"
+              (fun k->k C.pp old_c C.pp c);
+          c)
     in
     Util.exit_prof prof_simplify;
     res
@@ -519,7 +519,7 @@ module Make(X : sig
     let rec try_next c rules = match rules with
       | [] -> None
       | r::rules' ->
-          match r c with
+        match r c with
           | Some l -> Some l
           | None -> try_next c rules'
     in
@@ -533,10 +533,10 @@ module Make(X : sig
         let c, st = basic_simplify c in
         if st = `New then did_something := true;
         match try_next c !_multi_simpl_rule with
-        | None ->
+          | None ->
             (* keep the clause! *)
             set := C.ClauseSet.add c !set;
-        | Some l ->
+          | Some l ->
             did_something := true;
             List.iter (fun c -> Queue.push c q) l;
       )
@@ -551,10 +551,10 @@ module Make(X : sig
   (* find candidates for backward simplification in active set *)
   let backward_simplify_find_candidates given =
     match !_backward_simplify with
-    | [] -> C.ClauseSet.empty
-    | [f] -> f given
-    | [f;g] -> C.ClauseSet.union (f given) (g given)
-    | l ->
+      | [] -> C.ClauseSet.empty
+      | [f] -> f given
+      | [f;g] -> C.ClauseSet.union (f given) (g given)
+      | l ->
         List.fold_left
           (fun set f -> C.ClauseSet.union set (f given))
           C.ClauseSet.empty l
@@ -571,8 +571,8 @@ module Make(X : sig
         (fun c (before, after) ->
            let c', is_new = rw_simplify c in
            match is_new with
-           | `Same -> before, after
-           | `New ->
+             | `Same -> before, after
+             | `New ->
                (* the active clause has been backward simplified! *)
                C.mark_redundant c;
                C.mark_backward_simplified c;
@@ -590,18 +590,18 @@ module Make(X : sig
       C.ClauseSet.fold
         (fun c set ->
            match f c with
-           | None -> set
-           | Some clauses ->
+             | None -> set
+             | Some clauses ->
                let redundant, clauses =
                  CCList.fold_map
                    (fun red c ->
-                     let c', is_new = basic_simplify c in
-                     (red || is_new=`New), c')
+                      let c', is_new = basic_simplify c in
+                      (red || is_new=`New), c')
                    false clauses
                in
                if redundant then C.mark_redundant c;
                Util.debugf ~section 3
-                "@[active clause `@[%a@]`@ simplified into clauses `@[%a@]`@]"
+                 "@[active clause `@[%a@]`@ simplified into clauses `@[%a@]`@]"
                  (fun k->k C.pp c (CCFormat.list C.pp) clauses);
                (c, clauses) :: set)
         (ProofState.ActiveSet.clauses ()) []
@@ -660,10 +660,10 @@ module Make(X : sig
   (* check whether the clause is redundant w.r.t the current active_set *)
   let is_redundant_ c =
     let res = match !_redundant with
-        | [] -> false
-        | [f] -> f c
-        | [f;g] -> f c || g c
-        | l -> List.exists (fun f -> f c) l
+      | [] -> false
+      | [f] -> f c
+      | [f;g] -> f c || g c
+      | l -> List.exists (fun f -> f c) l
     in
     if res then C.mark_redundant c;
     res
@@ -702,12 +702,12 @@ module Make(X : sig
       then ()
       else match multi_simplify c with
         | None ->
-            (* clause has reached fixpoint *)
-            set := C.ClauseSet.add c !set
+          (* clause has reached fixpoint *)
+          set := C.ClauseSet.add c !set
         | Some l ->
-            (* continue processing *)
-            did_simplify := true;
-            List.iter (fun c -> Queue.push c q) l
+          (* continue processing *)
+          did_simplify := true;
+          List.iter (fun c -> Queue.push c q) l
     done;
     let res = C.ClauseSet.to_list !set in
     Util.exit_prof prof_all_simplify;
@@ -731,17 +731,17 @@ module Make(X : sig
         []
       | [] -> C.of_statement st
       | r :: rules' ->
-          begin match r st with
-            | CR_skip -> conv_clause_ rules' st
-            | CR_return l -> l
-            | CR_add l -> List.rev_append l (conv_clause_ rules' st)
-          end
+        begin match r st with
+          | CR_skip -> conv_clause_ rules' st
+          | CR_return l -> l
+          | CR_add l -> List.rev_append l (conv_clause_ rules' st)
+        end
     in
     let clauses =
       CCVector.flat_map_list (conv_clause_ !_clause_conversion_rules) stmts in
     Util.debugf ~section 2 "@[<2>clauses:@ @[<v>%a@]@]"
-      (fun k->k (CCFormat.seq ~start:"" ~stop:"" ~sep:" " C.pp)
-      (CCVector.to_seq clauses));
+      (fun k->k (Util.pp_seq ~sep:" " C.pp)
+          (CCVector.to_seq clauses));
     clauses
 
   (** {2 Misc} *)
@@ -755,7 +755,7 @@ end
 
 let () =
   Params.add_opts
-  [ "--orphan-criterion", Arg.Set orphan_criterion_, " enable orphan criterion"
-  ; "--no-orphan-criterion", Arg.Clear orphan_criterion_, " disable orphan criterion"
-  ]
+    [ "--orphan-criterion", Arg.Set orphan_criterion_, " enable orphan criterion"
+    ; "--no-orphan-criterion", Arg.Clear orphan_criterion_, " disable orphan criterion"
+    ]
 

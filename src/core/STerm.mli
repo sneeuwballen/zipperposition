@@ -3,13 +3,13 @@
 
 (** {1 S-like Terms}.
 
-Those terms are not hashconsed, nor do they use De Bruijn indices. Their
-simplicity make them good for heavy AST transformations, output of parsing,
-etc.
+    Those terms are not hashconsed, nor do they use De Bruijn indices. Their
+    simplicity make them good for heavy AST transformations, output of parsing,
+    etc.
 
-Terms are only compared, hashsed, etc. by their "term" component (the algebraic
-variant). Additional fields (location...) are ignored for almost every
-operation.
+    Terms are only compared, hashsed, etc. by their "term" component (the algebraic
+    variant). Additional fields (location...) are ignored for almost every
+    operation.
 *)
 
 type location = ParseLocation.t
@@ -111,7 +111,7 @@ module Seq : sig
   val free_vars : t -> string Sequence.t
   val subterms : t -> t Sequence.t
   val subterms_with_bound : t -> (t * StringSet.t) Sequence.t
-    (** subterm and variables bound at this subterm *)
+  (** subterm and variables bound at this subterm *)
 
   val symbols : t -> string Sequence.t
 end
@@ -119,7 +119,7 @@ end
 val ground : t -> bool
 val close_all : Binder.t -> t -> t  (** Bind all free vars with the symbol *)
 val subterm : strict:bool -> t -> sub:t -> bool
-  (** is [sub] a (strict?) subterm of the other arg? *)
+(** is [sub] a (strict?) subterm of the other arg? *)
 
 (** {2 Print} *)
 

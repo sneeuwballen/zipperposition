@@ -1,5 +1,5 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Variable} *)
 
@@ -28,7 +28,6 @@ let name t = t.id.ID.name
 let compare a b = ID.compare a.id b.id
 let equal a b = ID.equal a.id b.id
 let hash a = ID.hash a.id
-let hash_fun a = ID.hash_fun a.id
 
 let pp out a = ID.pp out a.id
 let to_string a = ID.to_string a.id
@@ -55,8 +54,7 @@ module Set = struct
   let of_list l = l |> List.map (fun v->v.id,v) |> ID.Map.of_list
   let to_seq t = ID.Map.to_seq t |> Sequence.map snd
   let to_list t = ID.Map.fold (fun _ v acc ->v::acc) t []
-  let pp out t =
-    CCFormat.seq ~start:"" ~stop:"" ~sep:", " pp out (to_seq t)
+  let pp out t = Util.pp_seq ~sep:", " pp out (to_seq t)
 end
 
 module Subst = struct
@@ -74,7 +72,7 @@ module Subst = struct
     let pp_pair out (v,x) =
       Format.fprintf out "@[%a → %a@]" pp_full v pp_v x
     in
-    CCFormat.seq ~start:"" ~stop:"" ~sep:", " pp_pair out (to_seq t)
+    Util.pp_seq ~sep:", " pp_pair out (to_seq t)
   let merge a b =
     ID.Map.merge_safe a b
       ~f:(fun _ v -> match v with

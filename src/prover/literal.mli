@@ -3,7 +3,7 @@
 
 (** {1 Equational literals} *)
 
-open Libzipperposition
+open Logtk
 
 type term = FOTerm.t
 
@@ -15,7 +15,6 @@ type t = private
   | Prop of term * bool
   | Arith of ArithLit.t
 
-val equal : t -> t -> bool         (** equality of literals *)
 val equal_com : t -> t -> bool     (** commutative equality of lits *)
 val compare : t -> t -> int     (** lexicographic comparison of literals *)
 
@@ -64,33 +63,33 @@ val mk_arith_lesseq : Z.t Monome.t -> Z.t Monome.t -> t
 val mk_divides : ?sign:bool -> Z.t -> power:int -> Z.t Monome.t -> t
 val mk_not_divides : Z.t -> power:int -> Z.t Monome.t -> t
 
-val matching : ?subst:Substs.t -> pattern:t Scoped.t -> t Scoped.t ->
-  Substs.t Sequence.t
+val matching : ?subst:Subst.t -> pattern:t Scoped.t -> t Scoped.t ->
+  Subst.t Sequence.t
 (** checks whether subst(lit_a) matches lit_b. Returns alternative
     substitutions s such that s(lit_a) = lit_b and s contains subst. *)
 
-val subsumes : ?subst:Substs.t -> t Scoped.t -> t Scoped.t ->
-  Substs.t Sequence.t
+val subsumes : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
+  Subst.t Sequence.t
 (** More general version of {!matching}, yields [subst]
     such that [subst(lit_a) => lit_b]. *)
 
-val variant : ?subst:Substs.t -> t Scoped.t -> t Scoped.t ->
-  Substs.t Sequence.t
+val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
+  Subst.t Sequence.t
 
-val unify : ?subst:Substs.t -> t Scoped.t -> t Scoped.t -> Substs.t Sequence.t
+val unify : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> Subst.t Sequence.t
 
 val are_variant : t -> t -> bool
 
-val apply_subst : renaming:Substs.Renaming.t ->
-  Substs.t -> t Scoped.t -> t
+val apply_subst : renaming:Subst.Renaming.t ->
+  Subst.t -> t Scoped.t -> t
 
-val apply_subst_no_renaming : Substs.t -> t Scoped.t -> t
+val apply_subst_no_renaming : Subst.t -> t Scoped.t -> t
 
-val apply_subst_no_simp : renaming:Substs.Renaming.t ->
-  Substs.t -> t Scoped.t -> t
+val apply_subst_no_simp : renaming:Subst.Renaming.t ->
+  Subst.t -> t Scoped.t -> t
 
-val apply_subst_list : renaming:Substs.Renaming.t ->
-  Substs.t -> t list Scoped.t -> t list
+val apply_subst_list : renaming:Subst.Renaming.t ->
+  Subst.t -> t list Scoped.t -> t list
 
 val negate : t -> t   (** negate literal *)
 val map : (term -> term) -> t -> t (** functor *)
@@ -111,7 +110,7 @@ val fold_terms :
   which:[<`Max|`All] ->
   ord:Ordering.t -> subterms:bool ->
   t ->
-  (term * Position.t) Sequence.t
+  term Position.With.t Sequence.t
 (** Iterate on terms, maybe subterms, of the literal.
     Variables are ignored if [vars] is [false].
 

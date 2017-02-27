@@ -1,5 +1,5 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Hashconsed Variable} *)
 
@@ -20,11 +20,10 @@ let cast v ~ty = {v with ty; }
 let update_ty v ~f = {v with ty=f v.ty; }
 
 let compare cmp a b =
-  let c = CCOrd.int_ a.id b.id  in
+  let c = CCOrd.int a.id b.id  in
   if c<>0 then c else cmp a.ty b.ty
 let equal eq a b = a.id = b.id && eq a.ty b.ty
-let hash_fun a = CCHash.int a.id
-let hash a = a.id land max_int
+let hash a = Hash.int a.id
 
 let max a b = if a.id < b.id then b else a
 let min a b = if a.id < b.id then a else b

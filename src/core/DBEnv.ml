@@ -51,7 +51,7 @@ let mem env n =
 
 let set env n x =
   if n<0 || n >= env.size then raise (Invalid_argument "DBEnv.set");
-  {env with stack= CCList.Idx.set env.stack n (Some x); }
+  {env with stack= CCList.set_at_idx n (Some x) env.stack; }
 
 let num_bindings db =
   let rec count acc l = match l with

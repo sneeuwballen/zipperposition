@@ -3,11 +3,11 @@
 
 (** Test unification *)
 
-open Libzipperposition
-open Libzipperposition_arbitrary
+open Logtk
+open Logtk_arbitrary
 
 module T = FOTerm
-module S = Substs
+module S = Subst
 
 let (==>) = QCheck.(==>)
 
@@ -24,7 +24,7 @@ let check_unify_gives_unifier =
     with Unif.Fail ->
       false ==> true
   in
-  QCheck.Test.make ~count:1000 ~name gen prop
+  QCheck.Test.make ~long_factor:20 ~count:1000 ~name gen prop
 
 let check_variant =
   let gen = ArTerm.default in
@@ -34,7 +34,7 @@ let check_variant =
     let t' = S.FO.apply ~renaming S.empty (t,0) in
     Unif.FO.are_variant t t'
   in
-  QCheck.Test.make ~name gen prop
+  QCheck.Test.make ~long_factor:20 ~name gen prop
 
 let check_matching =
   let gen = QCheck.pair ArTerm.default ArTerm.default in
@@ -49,7 +49,7 @@ let check_matching =
     with Unif.Fail ->
       false ==> true
   in
-  QCheck.Test.make ~count:1000 ~name gen prop
+  QCheck.Test.make ~long_factor:20 ~count:1000 ~name gen prop
 
 let props =
   [ check_unify_gives_unifier

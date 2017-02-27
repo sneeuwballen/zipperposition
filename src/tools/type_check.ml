@@ -1,14 +1,14 @@
 
-(* This file is free software, part of Libzipperposition. See file "license" for more details. *)
+(* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 TPTP Syntax and types checking} *)
 
-open Libzipperposition
-open Libzipperposition_parsers
+open Logtk
+open Logtk_parsers
 
 module PT = STerm
 module T = TypedSTerm
-module Err = CCError
+module Err = CCResult
 module A = Ast_tptp
 
 open Err.Infix
@@ -38,14 +38,14 @@ let check file =
     |> ID.Map.of_seq
   in
   Format.printf "@[<hv2>signature:@ @[<v>%a@]@]@."
-    (ID.Map.print ~start:"" ~stop:"" ~sep:"" ~arrow:" : " ID.pp T.pp) sigma;
+    (ID.Map.pp ~sep:"" ~arrow:" : " ID.pp T.pp) sigma;
   (* print formulas *)
   if !cat_input then
     let pp_stmt = Statement.pp T.pp T.pp T.pp in
     Format.printf "@[<v2>statements:@ %a@]@."
-      (CCVector.print ~start:"" ~stop:"" ~sep:"" pp_stmt)
+      (CCVector.pp ~sep:"" pp_stmt)
       decls;
-  ()
+    ()
 
 let main () =
   CCFormat.set_color_default true;
@@ -60,10 +60,10 @@ let main () =
       () !files;
   in
   match res with
-  | `Ok () ->
+    | Err.Ok () ->
       print_line ();
       Format.printf "@{<Green>success!@}@."
-  | `Error msg ->
+    | Err.Error msg ->
       print_endline msg
 
 let _ =
