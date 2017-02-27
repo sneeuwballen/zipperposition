@@ -1634,6 +1634,18 @@ module Make(E : Env.S) : S with module Env = E = struct
       ||
       ( not root && Type.equal (T.ty t) Type.TPTP.int)
     in
+    let purify_sub t =
+      Util.debugf ~section 5 "@[<2>need to purify term@ @[%a@]@]" (fun k->k T.pp t);
+      (* purify the term and add a constraint *)
+      begin match M.Int.of_term t with
+        | None ->
+          Util.debugf ~section 5
+            "@[<2>could not purify@ @[%a@]@ (non linear; cache)@]" (fun k->k T.pp t);
+          C.set_flag flag_no_purify c true;
+          t  (* non linear, abort. *)
+        | Some m -> replace t ~by:m
+      end
+    in
     (* purify a term (adding constraints to the list).  *)
     let rec purify_term ~root t = match TC.view t with
       | TC.AppBuiltin (b, []) when Builtin.is_numeric b -> t   (* keep constants *)
@@ -1641,17 +1653,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       | TC.DB _
       | TC.Var _ -> t
       | TC.AppBuiltin (Builtin.Int _, []) -> t  (* don't purify numbers *)
-      | TC.AppBuiltin (b, _l) when should_purify ~root b t ->
-        Util.debugf ~section 5 "@[<2>need to purify term@ @[%a@]@]" (fun k->k T.pp t);
-        (* purify the term and add a constraint *)
-        begin match M.Int.of_term t with
-          | None ->
-            Util.debugf ~section 5
-              "@[<2>could not purify@ @[%a@]@ (non linear; cache)@]" (fun k->k T.pp t);
-            C.set_flag flag_no_purify c true;
-            t  (* non linear, abort. *)
-          | Some m -> replace t ~by:m
-        end
+      | TC.AppBuiltin (b, _l) when should_purify ~root b t -> purify_sub t
+      | TC.App _ when (not root && Type.equal (T.ty t) Type.TPTP.int) ->
+        purify_sub t (* uninterpreted int subterm *)
       | TC.AppBuiltin _
       | TC.App _ ->
         (* not an arith term. *)
