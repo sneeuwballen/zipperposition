@@ -44,8 +44,12 @@ Flag "solving"
   Description:  Build and install constraint solvers (requires "msat")
   Default:      false
 
-Flag "prover"
-  Description:  Build and install the main prover and its library
+Flag "zipperposition"
+  Description:  Build and install Zipperposition
+  Default:      true
+
+Flag "hornet"
+  Description:  Build and install Hornet
   Default:      true
 
 Flag "qcheck"
@@ -136,8 +140,8 @@ Library "libzipperposition_prover"
                     calculi/Ind_types,
                     calculi/Fool
   InternalModules:  lib/Simplex
-  Build$:           flag(parsers) && flag(prover)
-  Install$:         flag(parsers) && flag(prover)
+  Build$:           flag(parsers) && flag(zipperposition)
+  Install$:         flag(parsers) && flag(zipperposition)
   BuildDepends:     containers, sequence, unix, zarith, msat,
                     libzipperposition, libzipperposition.parsers
 
@@ -147,8 +151,8 @@ Executable zipperposition
   Install:          true
   CompiledObject:   native
   MainIs:           zipperposition.ml
-  Build$:           flag(parsers) && flag(prover)
-  Install$:         flag(parsers) && flag(prover)
+  Build$:           flag(parsers) && flag(zipperposition)
+  Install$:         flag(parsers) && flag(zipperposition)
   BuildDepends:     containers, sequence, unix,
                     libzipperposition, libzipperposition.parsers,
                     libzipperposition.prover
@@ -159,8 +163,8 @@ Executable hornet
   Install:          true
   CompiledObject:   native
   MainIs:           hornet.ml
-  Build$:           flag(parsers) && flag(prover)
-  Install$:         flag(parsers) && flag(prover)
+  Build$:           flag(parsers) && flag(hornet)
+  Install$:         flag(parsers) && flag(hornet)
   BuildDepends:     containers, sequence, unix, msat,
                     libzipperposition, libzipperposition.parsers
 
