@@ -8,10 +8,11 @@ build: [
         "--disable-tests"
         "--disable-docs"
         "--%{menhir:enable}%-parsers"
+        "--disable-hornet-prover"
+        "--enable-zipperposition-prover"
         "--disable-solving"
         "--disable-qcheck"
         "--disable-tools"
-        "--enable-meta"
     ]
     [make]
 ]
