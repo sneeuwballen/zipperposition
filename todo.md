@@ -2,7 +2,20 @@
 
 ## Now
 
-- penalize clauses with several positive lits?
+- parse arith in ZF (and possibly TIP?)
+  `./zipperposition.native -p -o none -t 30 --dot /tmp/truc.dot examples/frontpage.zf`
+
+- write doc for zipper
+  * [ ] large readme with usage tutorial
+  * [ ] a list of inference rules?
+
+- heuristics:
+  * [ ] get back to a simple "pick-given ratio" with current sophisticated
+    heap and a regular `Queue.t`?
+    `/zipperposition.native -p --stats -o none -t 30 --dot /tmp/truc.dot examples/SEU140+2.p`
+    should pass, doesn't look that hard (E does it)
+    → check on all TPTP, though
+  * [ ] penalize clauses with several positive lits?
 
 ## Hornet
 
