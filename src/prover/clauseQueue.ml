@@ -146,12 +146,11 @@ module Make(C : Clause.S) = struct
   end
 
   module H = CCHeap.Make(struct
-      (* heap ordered by [weight, exact age] *)
-      type t = (int * int * C.t)
-      let leq (i1, j1, c1) (i2, j2, c2) =
+      (* heap ordered by [weight, real age(id)] *)
+      type t = (int * C.t)
+      let leq (i1, c1) (i2, c2) =
         i1 < i2 ||
-        (i1 = i2 &&
-         (j1 < j2 || (j1 = j2 && C.compare c1 c2 <= 0)))
+        (i1 = i2 && C.compare c1 c2 <= 0)
     end)
 
   (** A priority queue of clauses, purely functional *)
@@ -178,7 +177,7 @@ module Make(C : Clause.S) = struct
 
   let add q c =
     let w = q.functions.weight c in
-    let heap = H.insert (w, C.id c, c) q.heap in
+    let heap = H.insert (w, c) q.heap in
     { q with heap; }
 
   let adds q hcs =
@@ -186,13 +185,13 @@ module Make(C : Clause.S) = struct
       Sequence.fold
         (fun heap c ->
            let w = q.functions.weight c in
-           H.insert (w,C.id c,c) heap)
+           H.insert (w,c) heap)
         q.heap hcs in
     { q with heap; }
 
   let take_first q =
     if is_empty q then raise Not_found;
-    let new_h, (_, _, c) = H.take_exn q.heap in
+    let new_h, (_, c) = H.take_exn q.heap in
     let q' = { q with heap=new_h; } in
     q', c
 
