@@ -97,14 +97,14 @@ Typical usage:
 
     $ zipperposition --help
     $ zipperposition problem_file [options]
-    $ zipperposition --arith ARI114=1.p
+    $ zipperposition --arith examples/ARI114=1.p
     $ zipperposition --dot /tmp/foo.dot examples/ind/nat1.zf
 
 to run the prover. Help is available with the option `--help`.
 
 For instance,
 
-    $ zipperposition pelletier_problems/pb47.p --ord rpo6 --timeout 30
+    $ zipperposition examples/pelletier_problems/pb47.p --ord rpo6 --timeout 30
 
 Several tools are shipped with Zipperposition, including a CNF converter, a type-checker,
 etc. They are built if the flag `--enable-tools` is set. Documentation
