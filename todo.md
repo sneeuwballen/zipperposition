@@ -2,11 +2,15 @@
 
 ## Now
 
-- parse arith in ZF (and possibly TIP?)
+- parse arith in ZF (and possibly TIP?) with normal OCaml priorities
   `./zipperposition.native -p -o none -t 30 --dot /tmp/truc.dot examples/frontpage.zf`
+  translate `frontpage.p` into `frontpage.p` (arith + inductive types)
 
 - write doc for zipper
   * [ ] large readme with usage tutorial
+  * [ ] detailed `.zf` syntax, including definitions and rewrite rules
+        and operator priorities
+  * [ ] `-o none` and how to print graphviz proofs
   * [ ] a list of inference rules?
 
 - heuristics:
