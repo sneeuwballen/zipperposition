@@ -209,7 +209,7 @@ module Make(C : Clause.S) = struct
 
   let bfs =
     let open WeightFun in
-    let weight = combine [age, 5; default, 1; favor_small_num_vars, 1; ] in
+    let weight = age in
     make ~weight "bfs"
 
   let explore =
