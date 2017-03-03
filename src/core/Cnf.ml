@@ -6,6 +6,7 @@
 module T = TypedSTerm
 module F = T.Form
 module Stmt = Statement
+module Fmt = CCFormat
 
 let prof_estimate = Util.mk_profiler "cnf.estimate_num_clauses"
 let prof_simplify_rename = Util.mk_profiler "cnf.simplify_rename"
@@ -27,12 +28,12 @@ exception NotCNF of form
 
 let () = Printexc.register_printer
     (function
-      | Error msg -> Some (CCFormat.sprintf "@[<2>error in CNF:@ %s@]" msg)
-      | NotCNF f -> Some (CCFormat.sprintf "@[<2>error:@ @[%a@]@ is not in CNF@]" T.pp f)
+      | Error msg -> Some (Fmt.sprintf "@[<2>error in CNF:@ %s@]" msg)
+      | NotCNF f -> Some (Fmt.sprintf "@[<2>error:@ @[%a@]@ is not in CNF@]" T.pp f)
       | _ -> None)
 
 let error_ msg = raise (Error msg)
-let errorf_ msg = CCFormat.ksprintf msg ~f:error_
+let errorf_ msg = Fmt.ksprintf msg ~f:error_
 let not_cnf_ f = raise (NotCNF f)
 
 type clause = lit list
@@ -177,6 +178,13 @@ module Flatten = struct
     | Pos_toplevel (* outside, as a formula *)
     | Pos_inner (* inside a term *)
 
+  (* put type variables first *)
+  let ty_vars_first (l:_ Var.t list): _ Var.t list =
+    let ty_vars, other_vars =
+      List.partition (fun v -> T.Ty.is_tType (Var.ty v)) l
+    in
+    ty_vars @ other_vars
+
   (* conversion of terms can yield several possible terms, by
      eliminating if and match
      @param vars the variables that can be replaced in the context *)
@@ -207,7 +215,7 @@ module Flatten = struct
             end
           | _ ->
             (* give a name to [if a b c] *)
-            let closure = T.free_vars_l [b;c] in
+            let closure = T.free_vars_l [b;c] |> ty_vars_first in
             let cases_true =
               aux pos vars b >>= fun b ->
               get_subst >|= fun subst ->
@@ -253,7 +261,9 @@ module Flatten = struct
             aux pos (c_vars@vars) rhs
           | _ ->
             (* give a name to the match *)
-            let closure = T.free_vars_l (List.map (fun (_,_,rhs) -> rhs) l) in
+            let closure =
+              T.free_vars_l (List.map (fun (_,_,rhs) -> rhs) l) |> ty_vars_first
+            in
             let cases =
               of_list l >>= fun (cstor,c_vars,rhs) ->
               aux pos (c_vars@vars) rhs >>= fun rhs ->
@@ -305,19 +315,20 @@ module Flatten = struct
         let fun_vars, body = T.open_binder Binder.Lambda t in
         assert (fun_vars <> []);
         (* give a name to [body vars] *)
-        let closure = T.free_vars t in
+        let closure = T.free_vars t |> ty_vars_first in
         let all_vars = closure @ fun_vars in
         let cases =
           (* flatten body, but it can only specify cases for its closure *)
           aux Pos_toplevel all_vars body >>= fun body' ->
           get_subst >|= fun subst ->
-          Format.printf "@[<2>subst {@[%a@]}@ closure %a@ body `@[%a@]`@]@."
-            T.Subst.pp subst CCFormat.Dump.(list Var.pp_full) closure T.pp body';
+          Util.debugf ~section 5 "@[<2>subst {@[%a@]}@ closure %a@ body `@[%a@]`@]@."
+            (fun k->k T.Subst.pp subst Fmt.Dump.(list Var.pp_full) closure T.pp body');
           apply_subst_vars_ subst all_vars, T.Subst.eval subst body'
         in
         let rules = to_list' cases in
-        Format.printf "@[<2>define_lambda `@[%a@]`@ rules: [@[%a@]]@]@."
-          T.pp t (Util.pp_list CCFormat.Dump.(pair (list T.pp) T.pp)) rules;
+        Util.debugf ~section 5 "@[<2>define_lambda `@[%a@]`@ rules: [@[%a@]]@]@."
+          (fun k->k T.pp t
+              Fmt.(Util.pp_list Dump.(pair (list T.pp) T.pp) |> hovbox) rules);
         let def = Skolem.define_term ~ctx rules in
         let res =
           T.app ~ty:(T.ty_exn t)
@@ -510,8 +521,8 @@ module Estimation = struct
     | Exactly _, TooBig -> false
 
   let pp out = function
-    | TooBig -> CCFormat.string out "<too big>"
-    | Exactly n -> CCFormat.int out n
+    | TooBig -> Fmt.string out "<too big>"
+    | Exactly n -> Fmt.int out n
 end
 
 (* estimate the number of clauses needed by this formula. *)

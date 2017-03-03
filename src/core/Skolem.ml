@@ -5,6 +5,7 @@
 
 module T = TypedSTerm
 module Stmt = Statement
+module Fmt = CCFormat
 
 type type_ = TypedSTerm.t
 type term = TypedSTerm.t
@@ -169,6 +170,9 @@ let define_form ~ctx ~add_rules ~polarity form =
   def
 
 let define_term ~ctx rules : term_definition =
+  Util.debugf ~section 4
+    "(@[<hv2>define_term@ :rules (@[<hv>%a@])@])"
+    (fun k->k (Util.pp_list Fmt.(Dump.(pair (list T.pp |> hovbox) T.pp |> hovbox))) rules);
   let args, ty_ret = match rules with
     | [] -> assert false
     | (args, rhs) :: _ -> args, T.ty_exn rhs
