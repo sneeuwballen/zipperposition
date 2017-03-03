@@ -185,6 +185,9 @@ module Flatten = struct
     in
     ty_vars @ other_vars
 
+  let pp_rules =
+    Fmt.(Util.pp_list Dump.(pair (list T.pp_inner |> hovbox) T.pp) |> hovbox)
+
   (* conversion of terms can yield several possible terms, by
      eliminating if and match
      @param vars the variables that can be replaced in the context *)
@@ -261,8 +264,16 @@ module Flatten = struct
             aux pos (c_vars@vars) rhs
           | _ ->
             (* give a name to the match *)
+            (* first, compute closure variables, i.e. variables that are free
+               in the branches. *)
             let closure =
-              T.free_vars_l (List.map (fun (_,_,rhs) -> rhs) l) |> ty_vars_first
+              l
+              |> List.rev_map
+                (fun (_,match_vars,rhs) ->
+                   (* match variables are not free *)
+                   T.Form.forall_l match_vars rhs)
+              |> T.free_vars_l
+              |> ty_vars_first
             in
             let cases =
               of_list l >>= fun (cstor,c_vars,rhs) ->
@@ -276,12 +287,14 @@ module Flatten = struct
               apply_subst_vars_ subst closure @ [case], T.Subst.eval subst rhs
             in
             let rules = to_list' cases in
+            Util.debugf ~section 5 "(@[define_match@ :term %a@ :rules %a@])"
+              (fun k->k T.pp t pp_rules rules);
             let def = Skolem.define_term ~ctx rules in
             (* now apply definition to [u] *)
             aux Pos_inner vars u >|= fun u ->
             T.app ~ty:(T.ty_exn t)
               (T.const def.Skolem.td_id ~ty:def.Skolem.td_ty)
-              (List.map T.var vars @ [u])
+              (List.map T.var closure @ [u])
         end
       | T.AppBuiltin (Builtin.Eq, [a;b]) ->
         (F.eq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
@@ -322,13 +335,12 @@ module Flatten = struct
           aux Pos_toplevel all_vars body >>= fun body' ->
           get_subst >|= fun subst ->
           Util.debugf ~section 5 "@[<2>subst {@[%a@]}@ closure %a@ body `@[%a@]`@]@."
-            (fun k->k T.Subst.pp subst Fmt.Dump.(list Var.pp_full) closure T.pp body');
+            (fun k->k T.Subst.pp subst Fmt.(Dump.(list Var.pp_full)|>hovbox) closure T.pp body');
           apply_subst_vars_ subst all_vars, T.Subst.eval subst body'
         in
         let rules = to_list' cases in
         Util.debugf ~section 5 "@[<2>define_lambda `@[%a@]`@ rules: [@[%a@]]@]@."
-          (fun k->k T.pp t
-              Fmt.(Util.pp_list Dump.(pair (list T.pp) T.pp) |> hovbox) rules);
+          (fun k->k T.pp t pp_rules rules);
         let def = Skolem.define_term ~ctx rules in
         let res =
           T.app ~ty:(T.ty_exn t)
