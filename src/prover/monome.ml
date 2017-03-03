@@ -53,15 +53,12 @@ type 'a t = {
 }
 type 'a monome = 'a t
 
-let eq m1 m2 =
+let equal m1 m2 =
   assert (m1.num == m2.num);
-  m1.num.cmp m1.const m2.const = 0
-  &&
-  try
-    List.for_all2
-      (fun (a1,t1) (a2, t2) -> m1.num.cmp a1 a2 = 0 && T.equal t1 t2)
-      m1.terms m2.terms
-  with Invalid_argument _ -> false
+  m1.num.cmp m1.const m2.const = 0 &&
+  CCList.equal
+    (fun (a1,t1) (a2, t2) -> m1.num.cmp a1 a2 = 0 && T.equal t1 t2)
+    m1.terms m2.terms
 
 let compare m1 m2 =
   let open CCOrd in

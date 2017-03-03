@@ -172,7 +172,7 @@ let rec pp out t = match view t with
       pp_inner f (Util.pp_list ~sep:" " pp_inner) l
   | Bind (s, _, _) ->
     let vars, body = unfold_binder s t in
-    let pp_bound_var out v = 
+    let pp_bound_var out v =
       Format.fprintf out "@[%a%a@]" Var.pp_fullc v pp_var_ty v
     in
     Format.fprintf out "@[<2>%a %a.@ %a@]"
@@ -202,7 +202,7 @@ let rec pp out t = match view t with
   | Match (u, l) ->
     let pp_branch out (c,vars,rhs) =
       Format.fprintf out "@[<2>case@ @[%a%a%a@] ->@ %a@]"
-        ID.pp c.cstor_id (Util.pp_list0 ~sep:" " pp) c.cstor_args
+        ID.pp c.cstor_id (Util.pp_list0 ~sep:" " pp_inner) c.cstor_args
         (Util.pp_list0 ~sep:" " Var.pp_fullc) vars pp rhs
     in
     Format.fprintf out "@[<hv>@[<hv2>match %a with@ %a@]@ end@]"
@@ -213,9 +213,9 @@ let rec pp out t = match view t with
     assert (!r = None); (* we used {!view} *)
     Format.fprintf out "?%a" Var.pp id
 and pp_inner out t = match view t with
-  | AppBuiltin (_, _::_)
-  | App _
-  | Bind _ -> Format.fprintf out "(@[%a@])" pp t  (* avoid ambiguities *)
+  | AppBuiltin (_, _::_) | Ite (_,_,_) | App _ | Let (_,_) | Bind _
+    ->
+    Format.fprintf out "(@[%a@])" pp t  (* avoid ambiguities *)
   | _ -> pp out t
 and pp_field out (name,t) =
   Format.fprintf out "%s=%a" name pp_inner t

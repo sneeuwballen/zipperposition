@@ -37,16 +37,16 @@ type lit = t
 
 let equal lit1 lit2 = match lit1, lit2 with
   | Binary (op1, x1, y1), Binary (op2, x2, y2) ->
-    op1 = op2 && M.eq x1 x2 && M.eq y1 y2
+    op1 = op2 && M.equal x1 x2 && M.equal y1 y2
   | Divides d1, Divides d2 ->
     d1.sign = d2.sign && d1.power = d2.power &&
-    Z.equal d1.num d2.num && M.eq d1.monome d2.monome
+    Z.equal d1.num d2.num && M.equal d1.monome d2.monome
   | _, _ -> false
 
 let equal_com lit1 lit2 = match lit1, lit2 with
   | Binary (op1, x1, y1), Binary (op2, x2, y2)
     when op1 = op2 && (op1 = Equal || op1 = Different) ->
-    (M.eq x1 x2 && M.eq y1 y2) || (M.eq x1 y2 && M.eq x2 y1)
+    (M.equal x1 x2 && M.equal y1 y2) || (M.equal x1 y2 && M.equal x2 y1)
   | _ -> equal lit1 lit2
 
 let compare lit1 lit2 = match lit1, lit2 with
@@ -558,7 +558,7 @@ let is_trivial = function
     M.is_const d.monome && Z.sign (Z.erem (M.const d.monome) d.num) = 0
   | Divides d ->
     M.is_const d.monome && Z.sign (Z.erem (M.const d.monome) d.num) <> 0
-  | Binary (Equal, m1, m2) -> M.eq m1 m2
+  | Binary (Equal, m1, m2) -> M.equal m1 m2
   | Binary (Less, m1, m2) -> M.dominates ~strict:true m2 m1
   | Binary (Lesseq, m1, m2) -> M.dominates ~strict:false m2 m1
   | Binary (Different, m1, m2) ->
@@ -569,8 +569,8 @@ let is_trivial = function
     (* trivial if: either it's a!=0, with a a constant, or if
        the GCD of all coefficients does not divide the constant
        (unsolvable diophantine equation) *)
-    (M.is_const m && Z.sign (M.const m) <> 0)
-    || (Z.sign (Z.rem (M.const m) gcd) <> 0)
+    (M.is_const m && Z.sign (M.const m) <> 0) ||
+    (Z.sign (Z.rem (M.const m) gcd) <> 0)
 
 let is_absurd = function
   | Binary (Equal, m1, m2) ->
@@ -582,7 +582,7 @@ let is_absurd = function
        (unsolvable diophantine equation) *)
     (M.is_const m && M.sign m <> 0)
     || (Z.sign (Z.rem (M.const m) gcd) <> 0)
-  | Binary (Different, m1, m2) -> M.eq m1 m2
+  | Binary (Different, m1, m2) -> M.equal m1 m2
   | Binary (Less, m1, m2) ->
     let m = M.difference m1 m2 in
     M.is_const m && M.sign m >= 0

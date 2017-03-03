@@ -18,7 +18,7 @@ type 'a t
 
 type 'a monome = 'a t
 
-val eq : 'n t -> 'n t -> bool       (* structural equality *)
+val equal : 'n t -> 'n t -> bool       (* structural equality *)
 val compare : 'n t -> 'n t -> int   (* arbitrary total order on monomes *)
 val hash : _ t -> int
 

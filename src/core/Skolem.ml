@@ -5,6 +5,7 @@
 
 module T = TypedSTerm
 module Stmt = Statement
+module Fmt = CCFormat
 
 type type_ = TypedSTerm.t
 type term = TypedSTerm.t
@@ -168,20 +169,24 @@ let define_form ~ctx ~add_rules ~polarity form =
   Util.debugf ~section 5 "@[<2>define_form@ %a@]" (fun k->k pp_form_definition def);
   def
 
+let pp_rules =
+  Fmt.(Util.pp_list Dump.(pair (list T.pp_inner |> hovbox) T.pp) |> hovbox)
+
 let define_term ~ctx rules : term_definition =
-  let args, ty_ret = match rules with
+  Util.debugf ~section 5
+    "(@[<hv2>define_term@ :rules (@[<hv>%a@])@])" (fun k->k pp_rules rules);
+  let some_args, ty_ret = match rules with
     | [] -> assert false
     | (args, rhs) :: _ -> args, T.ty_exn rhs
   in
-  (* separate type variables and arguments *)
-  let ty_vars, args =
+  (* separate type variables and type of arguments *)
+  let ty_vars, ty_args =
     CCList.partition_map
       (fun t -> match T.view t with
          | T.Var v when T.Ty.is_tType (Var.ty v) -> `Left v
-         | _ -> `Right t)
-      args
+         | _ -> `Right (T.ty_exn t))
+      some_args
   in
-  let ty_args = List.map T.ty_exn args in
   (* checks *)
   List.iter
     (fun (args,_) ->
@@ -217,7 +222,7 @@ let define_term ~ctx rules : term_definition =
     td_rules=rules;
   } in
   ctx.sc_new_defs <- Def_term def :: ctx.sc_new_defs;
-  Util.debugf ~section 5 "@[<2>define_term@ %a@]" (fun k->k pp_term_definition def);
+  Util.debugf ~section 4 "@[<2>define_term@ %a@]" (fun k->k pp_term_definition def);
   def
 
 let pop_new_definitions ~ctx =

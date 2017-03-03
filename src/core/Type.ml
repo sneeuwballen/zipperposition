@@ -235,8 +235,10 @@ let apply ty0 args0 =
       err_applyf_
         "@[<2>Type.apply:@ expected quantified or function type,@ but got @[%a@]"
         T.pp ty
-  and aux_l ty exp_args args env = match exp_args, args with
-    | _, [] -> T.DB.eval env ty
+  and aux_l ty_ret exp_args args env = match exp_args, args with
+    | [], [] -> T.DB.eval env ty_ret
+    | _, [] ->
+      T.DB.eval env (arrow_ exp_args ty_ret)
     | [], _ ->
       err_applyf_ "@[<2>Type.apply:@ unexpected arguments @[%a@]@]"
         (CCFormat.list T.pp) args
@@ -244,7 +246,7 @@ let apply ty0 args0 =
       (* expected type: [exp];  [a]: actual value, whose type must match [exp] *)
       let exp' = T.DB.eval env exp in
       if T.equal exp' (T.ty_exn a)
-      then aux_l ty exp_args' args' env
+      then aux_l ty_ret exp_args' args' env
       else
         err_applyf_
           "@[<2>Type.apply:@ wrong argument type,@ expected `@[_ : %a@]`@ \

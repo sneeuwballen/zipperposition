@@ -291,30 +291,31 @@ let make_coverset_ ~cover_set_depth cst : cover_set =
   let open CoversetState in
   (* map variables from [ity] to this concrete type *)
   let ity = cst.cst_ity in
-  let subst =
-    Unif.Ty.matching_same_scope
-      ~pattern:ity.Ind_ty.ty_pattern cst.cst_ty ~scope:0
-  in
+  let scope = 0 in
   (* we declare [id:ty], a new sub-constant of [cst] *)
   let decl_sub id ty =
     if Ind_ty.is_inductive_type ty
-    then
+    then (
       let sub = declare_cst_ ~parent:(Some cst) id ty in
       add_sub_case sub >|= fun () ->
       cst_to_term sub
-    else
+    ) else (
       add_constant id ty >|= fun () ->
       T.const ~ty id
+    )
   in
   (* list of generators of:
       - member of the coverset (one of the t such that cst=t)
       - set of sub-constants of this term *)
-  let rec make depth : T.t mm =
+  let rec make (depth:int)(subst:Subst.t) : T.t mm =
+    Util.debugf ~section:Ind_ty.section 5
+      "(@[make_cover_set@ :ty %a@ :depth %d@ :subst %a@])"
+      (fun k->k Ind_ty.pp ity depth Subst.pp subst);
     (* leaves: fresh constants *)
     if depth=0
     then (
       let id = mk_skolem_ ID.pp ity.Ind_ty.ty_id in
-      let ty = Subst.Ty.apply_no_renaming subst (ity.Ind_ty.ty_pattern,0) in
+      let ty = Subst.Ty.apply_no_renaming subst (ity.Ind_ty.ty_pattern,scope) in
       decl_sub id ty
     )
     (* inner nodes or base cases: constructors *)
@@ -328,7 +329,7 @@ let make_coverset_ ~cover_set_depth cst : cover_set =
         List.map
           (fun v ->
              let v = Type.var v in
-             Subst.Ty.apply_no_renaming subst (v,0))
+             Subst.Ty.apply_no_renaming subst (v,scope))
           ity.Ind_ty.ty_vars
       in
       let ty_f_applied = Type.apply ty_f ty_params in
@@ -349,21 +350,30 @@ let make_coverset_ ~cover_set_depth cst : cover_set =
     )
   (* return a new term of type [ty] *)
   and make_of_ty depth ty : T.t mm =
-    if Unif.Ty.matches ~pattern:ity.Ind_ty.ty_pattern ty
-    then make depth (* previous case *)
-    else (
-      (* not an inductive sub-case, just create a skolem symbol *)
-      let id = match type_hd_exn ty with
-        | B b -> mk_skolem_ Type.pp_builtin b
-        | I id -> mk_skolem_ ID.pp id
-      in
-      decl_sub id ty
-    )
+    let subst =
+      try Some (Unif.Ty.matching_same_scope
+              ~pattern:ity.Ind_ty.ty_pattern ty ~scope)
+      with Unif.Fail -> None
+    in
+    begin match subst with
+      | Some subst -> make depth subst (* previous case *)
+      | None ->
+        (* not an inductive sub-case, just create a skolem symbol *)
+        let id = match type_hd_exn ty with
+          | B b -> mk_skolem_ Type.pp_builtin b
+          | I id -> mk_skolem_ ID.pp id
+        in
+        decl_sub id ty
+    end
+  in
+  let subst =
+    Unif.Ty.matching_same_scope
+      ~pattern:ity.Ind_ty.ty_pattern cst.cst_ty ~scope
   in
   (* build the toplevel values, along with a list of sub-constants
      to declare *)
   let make_top =
-    let l = make cover_set_depth in
+    let l = make cover_set_depth subst in
     l >>>= fun t ->
     (* obtain the current set of sub-constants *)
     get >>>= fun state ->
