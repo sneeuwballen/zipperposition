@@ -75,6 +75,7 @@ let one = T.int_ Z.one
 let plus_l = app_reduce BA.sum zero
 let minus_l = app_reduce BA.difference zero
 let prod_l = app_reduce BA.product one
+let quotient_l = app_reduce BA.quotient_e one
 
 let as_int s = try Some (Z.of_string s) with _ -> None
 let as_rat s = try Some (Q.of_string s) with _ -> None
@@ -98,6 +99,7 @@ let rec conv_term (t:A.term): T.t =
         | "+", _ -> plus_l l
         | "-", _ -> minus_l l
         | "*", _ -> prod_l l
+        | "/", _ -> quotient_l l
         | ">=", [a;b] -> T.app_builtin BA.greatereq [a;b]
         | "<=", [a;b] -> T.app_builtin BA.lesseq [a;b]
         | ">", [a;b] -> T.app_builtin BA.greater [a;b]
