@@ -329,14 +329,20 @@ module RPO6 : ORD = struct
   (** lexicographic comparison of s=f(ss), and t=f(ts) *)
   and cLMA ~prec s t ss ts = match ss, ts with
     | si::ss', ti::ts' ->
-      (match rpo6 ~prec si ti with
+      begin match rpo6 ~prec si ti with
         | Eq -> cLMA ~prec s t ss' ts'
         | Gt -> cMA ~prec s ts' (* just need s to dominate the remaining elements *)
         | Lt -> Comparison.opp (cMA ~prec t ss')
         | Incomparable -> cAA ~prec s t ss' ts'
-      )
+      end
     | [], [] -> Eq
-    | _ -> assert false (* different length... *)
+
+    (* below are rules for extending to HO terms, likely
+       incomplete and dangerous!
+       TODO: instead compare types, which MUST be distinct in
+       this case since the head symbol is the same *)
+    | [], _::_ -> Lt
+    | _::_, [] -> Gt
   (** multiset comparison of subterms (not optimized) *)
   and cMultiset ~prec ss ts =
     MT.compare_partial_l (rpo6 ~prec) ss ts
