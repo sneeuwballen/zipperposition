@@ -20,7 +20,7 @@ generates TSTP traces or graphviz files for nice graphical display.
 
 Zipperposition supports several input formats:
 
-- TSTP (fof, cnf, tff)
+- TPTP (fof, cnf, tff)
 - https://tip-org.github.io/[TIP]
 - its own native input, extension `.zf` (see directory `examples/`)
 
@@ -50,7 +50,7 @@ This project is licensed under the BSD2 license. See the `LICENSE` file.
 
 The recommended way to install Zipperposition is through http://opam.ocaml.org/[opam].
 You need to have GMP (with headers) installed (it's not handled by opam).  Once
-you installed GMP and opam, type:
+you have installed GMP and opam, type:
 
 ----
 $ opam install zipperposition
@@ -226,7 +226,7 @@ conjunction:: `a && b`
 disjunction:: `a || b`
 negation:: `~ a`
 equality:: `a = b`
-disequality:: `a != b` (synonym for `~ (a == b)`)
+disequality:: `a != b` (synonym for `~ (a = b)`)
 implication:: `a => b`
 equivalence:: `a <=> b`
 
