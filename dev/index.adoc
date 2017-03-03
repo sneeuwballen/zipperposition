@@ -1,0 +1,7 @@
+= Libraries
+
+- link:libzipperposition.docdir/index.html[Logtk: core library with terms, formulas, etc.]
+- link:libzipperposition_arbitrary.docdir/index.html[Logtk_arbitrary: random instances generator]
+- link:libzipperposition_meta.docdir/index.html[Logtk_meta: Meta-level prover]
+- link:libzipperposition_parsers.docdir/index.html[Logtk_parsers: some parsers]
+- link:libzipperposition.docdir/index.html[Libzipperposition: Superposition-specific library]
