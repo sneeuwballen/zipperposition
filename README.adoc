@@ -145,9 +145,17 @@ $ make uninstall
 === Native Syntax
 
 The native syntax, with file extension `.zf`, resembles a simple fragment of
-ML with explicit polymorphism. Every symbol must be declared, using
-the builtin type `prop` for propositions. A type is declared
-like this: `val i : type.` and a parametrized type: `val array: type -> type.`
+ML with explicit polymorphism. Many examples
+in `examples/` are written using this syntax.
+A vim https://github.com/c-cube/vim-zf[syntax coloring file] is available.
+
+
+==== Basics
+
+Comments start with `#` and continue to the end of the line.
+Every symbol must be declared, using the builtin type `prop` for propositions.
+A type is declared like this: `val i : type.`
+and a parametrized type: `val array: type -> type.`
 
 ----
 val i : type.
@@ -208,6 +216,155 @@ the empty clause: zipperposition works by negating the goal before looking
 for proving `false`. Indeed, proving `a ⇒ b` is equivalent to deducing
 `false` from `a ∧ ¬b`.
 
+==== Connectives and Quantifiers
+
+The connectives are:
+
+true:: `true`
+false:: `false`
+conjunction:: `a && b`
+disjunction:: `a || b`
+negation:: `~ a`
+equality:: `a = b`
+disequality:: `a != b` (synonym for `~ (a == b)`)
+implication:: `a => b`
+equivalence:: `a <=> b`
+
+Implication and equivalence have the same priority as disjunction.
+Conjunction binds tighter, meaning that `a && b || c`
+is actually parsed as `(a && b) || c`.
+Negation is even stronger: `~ a && b` means `(~ a) && b`.
+
+Binders extend as far as possible to their right, and are typed, although
+the type constraint can be omitted if it can be inferred:
+
+universal quantification:: `forall x. F`
+  or in its typed form: `forall (x:ty). F`
+existential quantification:: `exists x. F`
+
+Polymorphic symbols can be declare using `pi <var>. type`,
+for instance `val f : pi a b. a -> array a b -> b` is a polymorphic
+function that takes 2 type arguments, then 2 term arguments.
+An application of `f` will look like `f nat (list bool) (Succ Z) empty`.
+Type arguments might be omitted if they can be inferred.
+
+==== Inclusion
+
+It can be convenient to put commonly used axioms in a separate file.
+The statement
+
+----
+include "foo.zf".
+----
+
+will include the corresponding file (whose path is relative to the
+current file).
+
+==== Advanced Syntax
+
+There are more advanced concepts that are mostly related to induction:
+
+datatypes:: (here, Peano numbers and polymorphic lists)
++
+----
+data nat := Zero | Succ nat.
+
+data list a := nil | cons a (list a).
+----
+
+simple definitions::
++
+----
+def four : nat := Succ (Succ (Succ (Succ Zero))).
+----
+
+rewrite rules::
++
+A rewrite rule is similar to an `assert` statement, except it is much
+more efficient. Zipperposition assumes that the set of rewrite rules
+in its input is *confluent* and *terminating* (otherwise, no guarantee
+applies). Rewriting can be done on terms and on atomic formulas:
++
+----
+val set : type -> type.
+
+val member : pi a. a -> set a -> prop.
+
+val union : pi a. set a -> set a -> set a.
+
+rewrite forall a (x:a)(s1:set a)(s2:set a).
+  member x (union s1 s2) <=> (member x s1 || member x s2).
+
+val subset : pi a. set a -> set a -> prop.
+
+rewrite forall a (s1:set a)(s2:set a).
+  subset s1 s2 <=> (forall x. member x s1 => member x s2).
+
+val equal_set : pi a. set a -> set a -> prop.
+
+rewrite forall a (s1:set a) s2.
+  equal_set s1 s2 <=> subset s1 s2 && subset s2 s1.
+
+# now show that union is associative:
+goal forall a (s1:set a) s2 s3.
+  equal_set
+   (union s1 (union s2 s3))
+   (union (union s1 s2) s3).
+----
+
+recursive definitions::
++
+one can write recursive functions (assuming they terminate), they
+will be desugared to a declaration + a set of rewrite rules:
++
+----
+def plus : nat -> nat -> nat where
+  forall y. plus Zero y = y;
+  forall x y. plus (Succ x) y = Succ (plus x y).
+----
++
+Mutually recursive definitions are separated by `and`:
++
+----
+def even : nat -> prop where
+  even Zero;
+  forall x. even (Succ x) = odd x
+and odd : nat -> prop where
+  forall x. odd (Succ x) = even x.
+----
++
+Zipperposition is able to do simple inductive proofs using these recursive
+functions and datatypes:
++
+----
+$ cat doc/plus_assoc.zf
+data nat := Zero | Succ nat.
+def plus : nat -> nat -> nat where
+  forall y. plus Zero y = y;
+  forall x y. plus (Succ x) y = Succ (plus x y).
+goal forall (x:nat) y z. plus x (plus y z) = plus (plus x y) z.
+
+$ zipperposition doc/plus_assoc.zf -o none
+% done 17 iterations
+% SZS status Theorem for 'doc/plus_assoc.zf'
+----
+
+AC symbols::
++
+Some symbols can be declared "associative commutative": they satisfy
++
+- `forall x y z. f x (f y z) = f (f x y) z`
+- `forall x y. f x y = f y x`.
++
+the following statement is a bit more efficient than writing the corresponding
+axioms:
++
+----
+val[AC] f : foo -> foo -> foo.
+----
+
+=== Graphical Display of Proofs
+
 A handy way of displaying the proof is to use http://graphviz.org/[graphviz]:
 
 ----
@@ -222,6 +379,11 @@ $ dot -Tsvg /tmp/example.dot > some_picture.svg
 ----
 
 image::doc/example_proof.svg[alt="simple proof graph",link="doc/example_proof.svg"]
+
+=== Proof Format
+
+It is possible to avoid displaying the proof at all, by using `-o none`.
+A TSTP derivation can be obtained with `-o tstp`.
 
 
 === Library
