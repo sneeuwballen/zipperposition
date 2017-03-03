@@ -142,6 +142,88 @@ $ make install
 $ make uninstall
 ----
 
+=== Native Syntax
+
+The native syntax, with file extension `.zf`, resembles a simple fragment of
+ML with explicit polymorphism. Every symbol must be declared, using
+the builtin type `prop` for propositions. A type is declared
+like this: `val i : type.` and a parametrized type: `val array: type -> type.`
+
+----
+val i : type.
+val a : i.
+
+val f : i -> i. # a function
+val p : i -> i -> prop. # a binary predicate
+----
+
+Then, axioms and the goal:
+
+----
+assert forall x y. p x y => p y x.
+assert p a (f a).
+
+goal exists (x:i). p (f x) x.
+----
+
+We can run the prover link:doc/example.zf[on a file containing these declarations].
+It will display a proof very quickly:
+
+----
+$ ./zipperposition.native example.zf
+
+% done 3 iterations
+% SZS status Theorem for 'example.zf'
+% SZS output start Refutation
+* ⊥/7 by simp simplify with [⊥]/5
+* [⊥]/5 by
+  inf s_sup- with {X2[1] → a[0]}
+    with [p (f a) a]/4, forall (X2:i). [¬p (f X2) X2]/2
+
+* forall (X2:i). [¬p (f X2) X2]/2 by
+  esa cnf with ¬ (∃ x/13:i. (p (f x/13) x/13))
+
+* [p (f a) a]/4 by simp simplify with [p (f a) a ∨ ⊥]/3
+* [p (f a) a ∨ ⊥]/3 by
+  inf s_sup- with {X0[0] → f a[1], X1[0] → a[1]}
+    with [p a (f a)]/1, forall (X0:i) (X1:i). [p X0 X1 ∨ ¬p X1 X0]/0
+
+* ¬ (∃ x/13:i. (p (f x/13) x/13)) by
+  esa neg_goal negate goal to find a refutation
+    with ∃ x/13:i. (p (f x/13) x/13)
+
+* ∃ x/13:i. (p (f x/13) x/13) by goal 'example.zf'
+* forall (X0:i) (X1:i). [p X0 X1 ∨ ¬p X1 X0]/0 by
+  esa cnf with ∀ x/9:i y/11:i. ((p x/9 y/11) ⇒ (p y/11 x/9))
+
+* [p a (f a)]/1 by esa cnf with p a (f a)
+* p a (f a) by 'example.zf'
+* ∀ x/9:i y/11:i. ((p x/9 y/11) ⇒ (p y/11 x/9)) by 'example.zf'
+
+% SZS output end Refutation
+----
+
+Each `*` -prefixed item in the list is an inference step. The top step is
+the empty clause: zipperposition works by negating the goal before looking
+for proving `false`. Indeed, proving `a ⇒ b` is equivalent to deducing
+`false` from `a ∧ ¬b`.
+
+A handy way of displaying the proof is to use http://graphviz.org/[graphviz]:
+
+----
+$ ./zipperposition.native --dot /tmp/example.dot example.zf
+$ dot -Txlib /tmp/example.dot
+----
+
+One can generate an image from the `.dot` file:
+
+----
+$ dot -Tsvg /tmp/example.dot > some_picture.svg
+----
+
+image::doc/example_proof.svg[alt="simple proof graph",link="doc/example_proof.svg"]
+
+
 === Library
 
 Zipperposition's library provides several useful

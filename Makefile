@@ -49,7 +49,7 @@ rst_doc:
 	@echo "build Sphinx documentation (into _build/doc)"
 	sphinx-build doc _build/doc
 	mkdir -p gh-pages/rst/
-	cp -r _build/doc/*.html _build/doc/*.js gh-pages/rst
+	cp -r _build/doc/*.html _build/doc/*.js _build/doc/_static gh-pages/rst
 
 open_doc: rst_doc
 	firefox _build/doc/contents.html
