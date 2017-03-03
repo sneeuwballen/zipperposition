@@ -592,9 +592,6 @@ and infer_match ?loc ctx ~ty_matched data (l:PT.match_branch list)
   let seen_default = ref false in
   let l = CCList.flat_map
       (fun b ->
-         if !seen_default then (
-           error_ ?loc "`default` case should be the last"
-         );
          begin match b with
            | PT.Match_default rhs ->
              seen_default := true;
