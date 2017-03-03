@@ -404,13 +404,14 @@ let pp_attrs out = function
   | l -> fpf out "@ [@[%a@]]" (Util.pp_list ~sep:"," pp_attr) l
 
 let pp_def_rule ppf ppt out d =
+  let pp_arg = CCFormat.within "(" ")" ppt in
   let pp_args out = function
     | [] -> ()
-    | l -> fpf out "@ %a" (Util.pp_list ~sep:" " ppt) l
+    | l -> fpf out "@ %a" (Util.pp_list ~sep:" " pp_arg) l
   in
   match d with
     | Def_term (_,id,_,args,rhs) ->
-      fpf out "@[<2>@[%a%a@] =@ %a@]" ID.pp id pp_args args ppt rhs
+      fpf out "@[<2>@[<2>%a%a@] =@ %a@]" ID.pp id pp_args args ppt rhs
     | Def_form (_,lhs,rhs) ->
       fpf out "@[<2>%a =@ (@[<hv>%a@])@]" (SLiteral.pp ppt) lhs
         (Util.pp_list ~sep:" && " ppf) rhs
@@ -418,14 +419,14 @@ let pp_def_rule ppf ppt out d =
 let pp_def ppf ppt ppty out d =
   fpf out "@[<2>@[%a : %a@]@ where@ @[<hv>%a@]@]"
     ID.pp d.def_id ppty d.def_ty
-    (Util.pp_list ~sep:" and " (pp_def_rule ppf ppt)) d.def_rules
+    (Util.pp_list ~sep:";" (pp_def_rule ppf ppt)) d.def_rules
 
 let pp ppf ppt ppty out st = match st.view with
   | TyDecl (id,ty) ->
     fpf out "@[<2>val%a %a :@ @[%a@]@]." pp_attrs st.attrs ID.pp id ppty ty
   | Def l ->
     fpf out "@[<2>def%a %a@]."
-      pp_attrs st.attrs (Util.pp_list ~sep:"" (pp_def ppf ppt ppty)) l
+      pp_attrs st.attrs (Util.pp_list ~sep:" and " (pp_def ppf ppt ppty)) l
   | RewriteTerm (_, id, _, args, rhs) ->
     fpf out "@[<2>rewrite%a @[%a %a@]@ = @[%a@]@]" pp_attrs st.attrs
       ID.pp id (Util.pp_list ~sep:" " ppt) args ppt rhs
