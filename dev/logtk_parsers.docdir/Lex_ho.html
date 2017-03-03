@@ -1,0 +1,49 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Ast_ho.html">
+<link rel="next" href="Parse_ho.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Parse_tptp" rel="Chapter" href="Parse_tptp.html">
+<link title="Lex_tptp" rel="Chapter" href="Lex_tptp.html">
+<link title="Ast_tptp" rel="Chapter" href="Ast_tptp.html">
+<link title="Util_tptp" rel="Chapter" href="Util_tptp.html">
+<link title="Ast_ho" rel="Chapter" href="Ast_ho.html">
+<link title="Lex_ho" rel="Chapter" href="Lex_ho.html">
+<link title="Parse_ho" rel="Chapter" href="Parse_ho.html">
+<link title="Trace_tstp" rel="Chapter" href="Trace_tstp.html">
+<link title="Parse_zf" rel="Chapter" href="Parse_zf.html">
+<link title="Lex_zf" rel="Chapter" href="Lex_zf.html">
+<link title="Util_zf" rel="Chapter" href="Util_zf.html">
+<link title="Util_tip" rel="Chapter" href="Util_tip.html">
+<link title="Parsing_utils" rel="Chapter" href="Parsing_utils.html">
+<link title="CallProver" rel="Chapter" href="CallProver.html"><title>Lex_ho</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Ast_ho.html" title="Ast_ho">Previous</a>
+&nbsp;<a class="up" href="index.html" title="Index">Up</a>
+&nbsp;<a class="post" href="Parse_ho.html" title="Parse_ho">Next</a>
+</div>
+<h1>Module <a href="type_Lex_ho.html">Lex_ho</a></h1>
+
+<pre><span class="keyword">module</span> Lex_ho: <code class="code">sig</code> <a href="Lex_ho.html">..</a> <code class="code">end</code></pre><hr width="100%">
+
+<pre><span id="VAL__ocaml_lex_tables"><span class="keyword">val</span> __ocaml_lex_tables</span> : <code class="type">Lexing.lex_tables</code></pre>
+<pre><span id="VALtoken"><span class="keyword">val</span> token</span> : <code class="type">Lexing.lexbuf -> <a href="Parse_ho.html#TYPEtoken">Parse_ho.token</a></code></pre>
+<pre><span id="VAL__ocaml_lex_token_rec"><span class="keyword">val</span> __ocaml_lex_token_rec</span> : <code class="type">Lexing.lexbuf -> int -> <a href="Parse_ho.html#TYPEtoken">Parse_ho.token</a></code></pre>
+<pre><span class="keyword">module</span> <a href="Lex_ho.E.html">E</a>: <code class="type">CCResult</code></pre>
+<pre><span id="TYPEor_error"><span class="keyword">type</span> <code class="type">'a</code> or_error</span> = <code class="type">('a, string) CCResult.t</code> </pre>
+
+
+<pre><span id="VALdecl_of_string"><span class="keyword">val</span> decl_of_string</span> : <code class="type">string -> <a href="Ast_ho.html#TYPEt">Ast_ho.t</a> <a href="Lex_ho.html#TYPEor_error">or_error</a></code></pre>
+<pre><span id="VALdecls_of_string"><span class="keyword">val</span> decls_of_string</span> : <code class="type">string -> <a href="Ast_ho.html#TYPEt">Ast_ho.t</a> list <a href="Lex_ho.html#TYPEor_error">or_error</a></code></pre>
+<pre><span id="VALterm_of_string"><span class="keyword">val</span> term_of_string</span> : <code class="type">string -> Logtk.STerm.t option</code></pre>
+<pre><span id="VALpterm"><span class="keyword">val</span> pterm</span> : <code class="type">string -> Logtk.TypedSTerm.t option</code></pre></body></html>

@@ -1,0 +1,274 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Trail.html">
+<link rel="next" href="Phases.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="ClauseQueue" rel="Chapter" href="ClauseQueue.html">
+<link title="Clause" rel="Chapter" href="Clause.html">
+<link title="SClause" rel="Chapter" href="SClause.html">
+<link title="Const" rel="Chapter" href="Const.html">
+<link title="Extensions" rel="Chapter" href="Extensions.html">
+<link title="Literal" rel="Chapter" href="Literal.html">
+<link title="Literals" rel="Chapter" href="Literals.html">
+<link title="Ctx" rel="Chapter" href="Ctx.html">
+<link title="ProofStep" rel="Chapter" href="ProofStep.html">
+<link title="ProofPrint" rel="Chapter" href="ProofPrint.html">
+<link title="ProofState" rel="Chapter" href="ProofState.html">
+<link title="Saturate" rel="Chapter" href="Saturate.html">
+<link title="Selection" rel="Chapter" href="Selection.html">
+<link title="AC" rel="Chapter" href="AC.html">
+<link title="AC_intf" rel="Chapter" href="AC_intf.html">
+<link title="SimplM" rel="Chapter" href="SimplM.html">
+<link title="Params" rel="Chapter" href="Params.html">
+<link title="Env" rel="Chapter" href="Env.html">
+<link title="Monome" rel="Chapter" href="Monome.html">
+<link title="ArithLit" rel="Chapter" href="ArithLit.html">
+<link title="Signals" rel="Chapter" href="Signals.html">
+<link title="Multisets" rel="Chapter" href="Multisets.html">
+<link title="Ctx_intf" rel="Chapter" href="Ctx_intf.html">
+<link title="Clause_intf" rel="Chapter" href="Clause_intf.html">
+<link title="Env_intf" rel="Chapter" href="Env_intf.html">
+<link title="ProofState_intf" rel="Chapter" href="ProofState_intf.html">
+<link title="BBox" rel="Chapter" href="BBox.html">
+<link title="ClauseContext" rel="Chapter" href="ClauseContext.html">
+<link title="ClauseQueue_intf" rel="Chapter" href="ClauseQueue_intf.html">
+<link title="Bool_lit" rel="Chapter" href="Bool_lit.html">
+<link title="Bool_lit_intf" rel="Chapter" href="Bool_lit_intf.html">
+<link title="Sat_solver" rel="Chapter" href="Sat_solver.html">
+<link title="Sat_solver_intf" rel="Chapter" href="Sat_solver_intf.html">
+<link title="Trail" rel="Chapter" href="Trail.html">
+<link title="Ind_cst" rel="Chapter" href="Ind_cst.html">
+<link title="Phases" rel="Chapter" href="Phases.html">
+<link title="Phases_impl" rel="Chapter" href="Phases_impl.html">
+<link title="Classify_cst" rel="Chapter" href="Classify_cst.html">
+<link title="Rewrite_rule" rel="Chapter" href="Rewrite_rule.html">
+<link title="Avatar" rel="Chapter" href="Avatar.html">
+<link title="Avatar_intf" rel="Chapter" href="Avatar_intf.html">
+<link title="Induction" rel="Chapter" href="Induction.html">
+<link title="Induction_intf" rel="Chapter" href="Induction_intf.html">
+<link title="Superposition" rel="Chapter" href="Superposition.html">
+<link title="Superposition_intf" rel="Chapter" href="Superposition_intf.html">
+<link title="Rewriting" rel="Chapter" href="Rewriting.html">
+<link title="EnumTypes" rel="Chapter" href="EnumTypes.html">
+<link title="ArithInt" rel="Chapter" href="ArithInt.html">
+<link title="Heuristics" rel="Chapter" href="Heuristics.html">
+<link title="Ind_types" rel="Chapter" href="Ind_types.html">
+<link title="Fool" rel="Chapter" href="Fool.html"><link title="Inductive Case" rel="Section" href="#6_InductiveCase">
+<link title="Inductive Constants" rel="Section" href="#6_InductiveConstants">
+<link title="Path" rel="Section" href="#6_Path">
+<title>Ind_cst</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Trail.html" title="Trail">Previous</a>
+&nbsp;<a class="up" href="index.html" title="Index">Up</a>
+&nbsp;<a class="post" href="Phases.html" title="Phases">Next</a>
+</div>
+<h1>Module <a href="type_Ind_cst.html">Ind_cst</a></h1>
+
+<pre><span class="keyword">module</span> Ind_cst: <code class="code">sig</code> <a href="Ind_cst.html">..</a> <code class="code">end</code></pre><div class="info module top">
+<h1 id="1_InductiveConstantsandCases">Inductive Constants and Cases</h1>
+<p>
+
+    Skolem constants of an inductive type, coversets, etc. required for
+    inductive reasoning.<br>
+</div>
+<hr width="100%">
+
+<pre><span id="EXCEPTIONInvalidDecl"><span class="keyword">exception</span> InvalidDecl</span> <span class="keyword">of</span> <code class="type">string</code></pre>
+
+<pre><span id="TYPEcst"><span class="keyword">type</span> <code class="type"></code>cst</span> </pre>
+
+
+<pre><span id="TYPEcase"><span class="keyword">type</span> <code class="type"></code>case</span> </pre>
+
+
+<pre><code><span id="TYPEpath_cell"><span class="keyword">type</span> <code class="type"></code>path_cell</span> = private {</code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTpath_cell.path_cst">path_cst</span>&nbsp;: <code class="type"><a href="Ind_cst.html#TYPEcst">cst</a></code>;</code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTpath_cell.path_case">path_case</span>&nbsp;: <code class="type"><a href="Ind_cst.html#TYPEcase">case</a></code>;</code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTpath_cell.path_clauses">path_clauses</span>&nbsp;: <code class="type"><a href="ClauseContext.html#TYPEt">ClauseContext.t</a> list</code>;</code></td>
+
+</tr></table>
+}
+
+
+
+<pre><span id="TYPEpath"><span class="keyword">type</span> <code class="type"></code>path</span> = <code class="type"><a href="Ind_cst.html#TYPEpath_cell">path_cell</a> list</code> </pre>
+
+
+<pre><span id="TYPEcover_set"><span class="keyword">type</span> <code class="type"></code>cover_set</span> = <code class="type"><a href="Ind_cst.html#TYPEcase">case</a> list</code> </pre>
+
+<br>
+<h6 id="6_InductiveCase">Inductive Case</h6>
+<p>
+
+    An inductive case is a term that belongs to the coverset of some
+    inductive constant. The inductive constant must fall into one
+    of the cases in its coverset.
+<p>
+
+    Every case starts with a constructor of its type.<br>
+
+<pre><span id="VALcase_equal"><span class="keyword">val</span> case_equal</span> : <code class="type"><a href="Ind_cst.html#TYPEcase">case</a> -> <a href="Ind_cst.html#TYPEcase">case</a> -> bool</code></pre>
+<pre><span id="VALcase_compare"><span class="keyword">val</span> case_compare</span> : <code class="type"><a href="Ind_cst.html#TYPEcase">case</a> -> <a href="Ind_cst.html#TYPEcase">case</a> -> int</code></pre>
+<pre><span id="VALcase_hash"><span class="keyword">val</span> case_hash</span> : <code class="type"><a href="Ind_cst.html#TYPEcase">case</a> -> int</code></pre>
+<pre><span id="VALpp_case"><span class="keyword">val</span> pp_case</span> : <code class="type"><a href="Ind_cst.html#TYPEcase">case</a> CCFormat.printer</code></pre>
+<pre><span id="VALcase_to_term"><span class="keyword">val</span> case_to_term</span> : <code class="type"><a href="Ind_cst.html#TYPEcase">case</a> -> Logtk.FOTerm.t</code></pre>
+<pre><span id="VALcase_is_rec"><span class="keyword">val</span> case_is_rec</span> : <code class="type"><a href="Ind_cst.html#TYPEcase">case</a> -> bool</code></pre>
+<pre><span id="VALcase_is_base"><span class="keyword">val</span> case_is_base</span> : <code class="type"><a href="Ind_cst.html#TYPEcase">case</a> -> bool</code></pre>
+<pre><span id="VALcase_sub_constants"><span class="keyword">val</span> case_sub_constants</span> : <code class="type"><a href="Ind_cst.html#TYPEcase">case</a> -> <a href="Ind_cst.html#TYPEcst">cst</a> Sequence.t</code></pre><div class="info ">
+All sub-constants that are subterms of a specific case<br>
+</div>
+
+<pre><span id="VALcover_set_cases"><span class="keyword">val</span> cover_set_cases</span> : <code class="type">?which:[ `All | `Base | `Rec ] -><br>       <a href="Ind_cst.html#TYPEcover_set">cover_set</a> -> <a href="Ind_cst.html#TYPEcase">case</a> Sequence.t</code></pre><div class="info ">
+Cases of the cover set<br>
+</div>
+<br>
+<h6 id="6_InductiveConstants">Inductive Constants</h6>
+<p>
+
+    A ground term of an inductive type. It must correspond to a
+    term built with the corresponding <code class="code">t</code> only.
+    For instance, a constant of type <code class="code">nat</code> should be equal to
+    <code class="code">s^n(0)</code> in any model.<br>
+
+<pre><span id="EXCEPTIONPayload_cst"><span class="keyword">exception</span> Payload_cst</span> <span class="keyword">of</span> <code class="type"><a href="Ind_cst.html#TYPEcst">cst</a></code></pre>
+
+<pre><span id="VALas_cst"><span class="keyword">val</span> as_cst</span> : <code class="type">Logtk.ID.t -> <a href="Ind_cst.html#TYPEcst">cst</a> option</code></pre>
+<pre><span id="VALas_cst_exn"><span class="keyword">val</span> as_cst_exn</span> : <code class="type">Logtk.ID.t -> <a href="Ind_cst.html#TYPEcst">cst</a></code></pre><div class="info ">
+Unsafe version of <a href="Ind_cst.html#VALas_cst"><code class="code">Ind_cst.as_cst</code></a><br>
+<b>Raises</b> <code>NotAnInductiveConstant</code> if it fails<br>
+</div>
+
+<pre><span id="VALis_cst"><span class="keyword">val</span> is_cst</span> : <code class="type">Logtk.ID.t -> bool</code></pre><div class="info ">
+Check whether the given constant is an inductive constant<br>
+</div>
+
+<pre><span id="VALon_new_cst"><span class="keyword">val</span> on_new_cst</span> : <code class="type"><a href="Ind_cst.html#TYPEcst">cst</a> Logtk.Signal.t</code></pre><div class="info ">
+Triggered with new inductive constants<br>
+</div>
+
+<pre><span id="VALdeclare_cst"><span class="keyword">val</span> declare_cst</span> : <code class="type">?cover_set_depth:int -> Logtk.ID.t -> ty:Logtk.Type.t -> <a href="Ind_cst.html#TYPEcst">cst</a></code></pre><div class="info ">
+Adds the constant to the set of inductive constants, make a coverset...<br>
+<b>Raises</b><ul><li><code>AlreadyDeclaredConstant</code> if the constant is declared already</li>
+<li><code>NotAnInductiveType</code> if <code class="code">ty</code> is not an inductive type</li>
+</ul>
+</div>
+<div class="param_info"><code class="code">cover_set_depth</code> : depth of cover_set terms; the deeper, the
+      larger the cover set will be (default 1)</div>
+
+<pre><span id="VALcst_of_term"><span class="keyword">val</span> cst_of_term</span> : <code class="type">Logtk.FOTerm.t -> <a href="Ind_cst.html#TYPEcst">cst</a> option</code></pre><div class="info ">
+<code class="code">cst_of_term t</code> returns a new or existing constant for this term, if any.<br>
+<b>Raises</b> <code>InvalidDecl</code> if the term is not ground nor of an inductive type<br>
+<b>Returns</b> None if the term is not to be converted into a constant<br>
+</div>
+
+<pre><span id="VALcst_of_id"><span class="keyword">val</span> cst_of_id</span> : <code class="type">Logtk.ID.t -> Logtk.Type.t -> <a href="Ind_cst.html#TYPEcst">cst</a></code></pre><div class="info ">
+<code class="code">cst_of_id id ty</code> returns a new or existing constant for this id.<br>
+<b>Raises</b> <code>InvalidDecl</code> if the type is not an inductive type<br>
+</div>
+
+<pre><span id="VALdeclarations_of_cst"><span class="keyword">val</span> declarations_of_cst</span> : <code class="type"><a href="Ind_cst.html#TYPEcst">cst</a> -> (Logtk.ID.t * Logtk.Type.t) Sequence.t</code></pre><div class="info ">
+<code class="code">declarations_of_cst c</code> returns a list of type declarations that should
+    be made if <code class="code">c</code> is new (declare the subcases of its coverset)<br>
+</div>
+
+<pre><span id="VALcst_equal"><span class="keyword">val</span> cst_equal</span> : <code class="type"><a href="Ind_cst.html#TYPEcst">cst</a> -> <a href="Ind_cst.html#TYPEcst">cst</a> -> bool</code></pre>
+<pre><span id="VALcst_compare"><span class="keyword">val</span> cst_compare</span> : <code class="type"><a href="Ind_cst.html#TYPEcst">cst</a> -> <a href="Ind_cst.html#TYPEcst">cst</a> -> int</code></pre>
+<pre><span id="VALcst_hash"><span class="keyword">val</span> cst_hash</span> : <code class="type"><a href="Ind_cst.html#TYPEcst">cst</a> -> int</code></pre>
+<pre><span id="VALcst_id"><span class="keyword">val</span> cst_id</span> : <code class="type"><a href="Ind_cst.html#TYPEcst">cst</a> -> Logtk.ID.t</code></pre>
+<pre><span id="VALcst_to_term"><span class="keyword">val</span> cst_to_term</span> : <code class="type"><a href="Ind_cst.html#TYPEcst">cst</a> -> Logtk.FOTerm.t</code></pre>
+<pre><span id="VALcst_ty"><span class="keyword">val</span> cst_ty</span> : <code class="type"><a href="Ind_cst.html#TYPEcst">cst</a> -> Logtk.Type.t</code></pre>
+<pre><span id="VALcst_same_type"><span class="keyword">val</span> cst_same_type</span> : <code class="type"><a href="Ind_cst.html#TYPEcst">cst</a> -> <a href="Ind_cst.html#TYPEcst">cst</a> -> bool</code></pre>
+<pre><span id="VALpp_cst"><span class="keyword">val</span> pp_cst</span> : <code class="type"><a href="Ind_cst.html#TYPEcst">cst</a> CCFormat.printer</code></pre>
+<pre><span id="VALcst_depth"><span class="keyword">val</span> cst_depth</span> : <code class="type"><a href="Ind_cst.html#TYPEcst">cst</a> -> int</code></pre>
+<pre><span id="VALcst_cover_set"><span class="keyword">val</span> cst_cover_set</span> : <code class="type"><a href="Ind_cst.html#TYPEcst">cst</a> -> <a href="Ind_cst.html#TYPEcover_set">cover_set</a> option</code></pre><div class="info ">
+Get the cover set of this constant:
+<p>
+
+    a set of ground terms <code class="code">[t1,...,tn]</code> with fresh
+    constants inside (that are not declared as inductive!) such that
+    <code class="code">bigor_{i in 1...n} t=ti</code> is the skolemized version of the
+    exhaustivity axiom on <code class="code">t</code>'s type.<br>
+</div>
+
+<pre><span id="VALis_potential_cst"><span class="keyword">val</span> is_potential_cst</span> : <code class="type">Logtk.ID.t -> Logtk.Type.t -> bool</code></pre><div class="info ">
+<code class="code">is_potential_cst id ty</code> returns <code class="code">true</code> if <code class="code">id:ty</code> is already an
+    inductive constant, or if it can be turned into one<br>
+</div>
+
+<pre><span id="VALfind_cst_in_term"><span class="keyword">val</span> find_cst_in_term</span> : <code class="type">Logtk.FOTerm.t -> <a href="Ind_cst.html#TYPEcst">cst</a> Sequence.t</code></pre><div class="info ">
+<code class="code">find_cst_in_lits term</code> searches subterms of <code class="code">term</code> for constants
+    that are of an inductive type and that are not constructors.
+    It returns the sequence of such inductive constants.<br>
+</div>
+
+<pre><span id="VALis_sub_cst"><span class="keyword">val</span> is_sub_cst</span> : <code class="type">Logtk.ID.t -> bool</code></pre><div class="info ">
+Is the term a constant that was created within a cover set?<br>
+</div>
+
+<pre><span id="VALis_sub_cst_of"><span class="keyword">val</span> is_sub_cst_of</span> : <code class="type">Logtk.ID.t -> <a href="Ind_cst.html#TYPEcst">cst</a> -> bool</code></pre>
+<pre><span id="VALas_sub_cst_of"><span class="keyword">val</span> as_sub_cst_of</span> : <code class="type">Logtk.ID.t -> <a href="Ind_cst.html#TYPEcst">cst</a> -> <a href="Ind_cst.html#TYPEcst">cst</a> option</code></pre><div class="info ">
+downcasts iff <code class="code">t</code> is a sub-constant of <code class="code">cst</code><br>
+</div>
+
+<pre><span id="VALcover_set_sub_constants"><span class="keyword">val</span> cover_set_sub_constants</span> : <code class="type"><a href="Ind_cst.html#TYPEcover_set">cover_set</a> -> <a href="Ind_cst.html#TYPEcst">cst</a> Sequence.t</code></pre><div class="info ">
+All sub-constants of a given inductive constant<br>
+</div>
+
+<pre><span id="VALdominates"><span class="keyword">val</span> dominates</span> : <code class="type"><a href="Ind_cst.html#TYPEcst">cst</a> -> <a href="Ind_cst.html#TYPEcst">cst</a> -> bool</code></pre><div class="info ">
+<code class="code">dominates c sub</code> is true if <code class="code">sub</code> is a sub-constant of <code class="code">c</code>,
+    or if some sub-constant of <code class="code">c</code> dominates <code class="code">sub</code> transitively<br>
+</div>
+<br>
+<h6 id="6_Path">Path</h6>
+<p>
+
+    A path is a sequence of nested inductions on distinct constants
+    and corresponding <b>sets</b> of clause contexts.<br>
+
+<pre><span id="VALpath_equal"><span class="keyword">val</span> path_equal</span> : <code class="type"><a href="Ind_cst.html#TYPEpath">path</a> -> <a href="Ind_cst.html#TYPEpath">path</a> -> bool</code></pre>
+<pre><span id="VALpath_compare"><span class="keyword">val</span> path_compare</span> : <code class="type"><a href="Ind_cst.html#TYPEpath">path</a> -> <a href="Ind_cst.html#TYPEpath">path</a> -> int</code></pre>
+<pre><span id="VALpath_hash"><span class="keyword">val</span> path_hash</span> : <code class="type"><a href="Ind_cst.html#TYPEpath">path</a> -> int</code></pre>
+<pre><span id="VALpath_empty"><span class="keyword">val</span> path_empty</span> : <code class="type"><a href="Ind_cst.html#TYPEpath">path</a></code></pre>
+<pre><span id="VALpath_cons"><span class="keyword">val</span> path_cons</span> : <code class="type"><a href="Ind_cst.html#TYPEcst">cst</a> -><br>       <a href="Ind_cst.html#TYPEcase">case</a> -> <a href="ClauseContext.html#TYPEt">ClauseContext.t</a> list -> <a href="Ind_cst.html#TYPEpath">path</a> -> <a href="Ind_cst.html#TYPEpath">path</a></code></pre>
+<pre><span id="VALpath_length"><span class="keyword">val</span> path_length</span> : <code class="type"><a href="Ind_cst.html#TYPEpath">path</a> -> int</code></pre>
+<pre><span id="VALpath_dominates"><span class="keyword">val</span> path_dominates</span> : <code class="type"><a href="Ind_cst.html#TYPEpath">path</a> -> <a href="Ind_cst.html#TYPEpath">path</a> -> bool</code></pre><div class="info ">
+<code class="code">path_dominates a b</code> is true if <code class="code">b</code> is a suffix of <code class="code">a</code>. In other words,
+    <code class="code">a</code> is a path to a subtree of what <code class="code">b</code> is a path to.<br>
+</div>
+
+<pre><span id="VALpath_contains_cst"><span class="keyword">val</span> path_contains_cst</span> : <code class="type"><a href="Ind_cst.html#TYPEpath">path</a> -> <a href="Ind_cst.html#TYPEcst">cst</a> -> bool</code></pre><div class="info ">
+Does the path contain this inductive constant?<br>
+</div>
+
+<pre><span id="VALpp_path"><span class="keyword">val</span> pp_path</span> : <code class="type"><a href="Ind_cst.html#TYPEpath">path</a> CCFormat.printer</code></pre>
+<pre><span id="VALlits_of_path"><span class="keyword">val</span> lits_of_path</span> : <code class="type"><a href="Ind_cst.html#TYPEpath">path</a> -> <a href="Literals.html#TYPEt">Literals.t</a></code></pre><div class="info ">
+Extract the raw equality literals from this path<br>
+</div>
+</body></html>

@@ -1,0 +1,197 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Literal.html">
+<link rel="next" href="Ctx.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="ClauseQueue" rel="Chapter" href="ClauseQueue.html">
+<link title="Clause" rel="Chapter" href="Clause.html">
+<link title="SClause" rel="Chapter" href="SClause.html">
+<link title="Const" rel="Chapter" href="Const.html">
+<link title="Extensions" rel="Chapter" href="Extensions.html">
+<link title="Literal" rel="Chapter" href="Literal.html">
+<link title="Literals" rel="Chapter" href="Literals.html">
+<link title="Ctx" rel="Chapter" href="Ctx.html">
+<link title="ProofStep" rel="Chapter" href="ProofStep.html">
+<link title="ProofPrint" rel="Chapter" href="ProofPrint.html">
+<link title="ProofState" rel="Chapter" href="ProofState.html">
+<link title="Saturate" rel="Chapter" href="Saturate.html">
+<link title="Selection" rel="Chapter" href="Selection.html">
+<link title="AC" rel="Chapter" href="AC.html">
+<link title="AC_intf" rel="Chapter" href="AC_intf.html">
+<link title="SimplM" rel="Chapter" href="SimplM.html">
+<link title="Params" rel="Chapter" href="Params.html">
+<link title="Env" rel="Chapter" href="Env.html">
+<link title="Monome" rel="Chapter" href="Monome.html">
+<link title="ArithLit" rel="Chapter" href="ArithLit.html">
+<link title="Signals" rel="Chapter" href="Signals.html">
+<link title="Multisets" rel="Chapter" href="Multisets.html">
+<link title="Ctx_intf" rel="Chapter" href="Ctx_intf.html">
+<link title="Clause_intf" rel="Chapter" href="Clause_intf.html">
+<link title="Env_intf" rel="Chapter" href="Env_intf.html">
+<link title="ProofState_intf" rel="Chapter" href="ProofState_intf.html">
+<link title="BBox" rel="Chapter" href="BBox.html">
+<link title="ClauseContext" rel="Chapter" href="ClauseContext.html">
+<link title="ClauseQueue_intf" rel="Chapter" href="ClauseQueue_intf.html">
+<link title="Bool_lit" rel="Chapter" href="Bool_lit.html">
+<link title="Bool_lit_intf" rel="Chapter" href="Bool_lit_intf.html">
+<link title="Sat_solver" rel="Chapter" href="Sat_solver.html">
+<link title="Sat_solver_intf" rel="Chapter" href="Sat_solver_intf.html">
+<link title="Trail" rel="Chapter" href="Trail.html">
+<link title="Ind_cst" rel="Chapter" href="Ind_cst.html">
+<link title="Phases" rel="Chapter" href="Phases.html">
+<link title="Phases_impl" rel="Chapter" href="Phases_impl.html">
+<link title="Classify_cst" rel="Chapter" href="Classify_cst.html">
+<link title="Rewrite_rule" rel="Chapter" href="Rewrite_rule.html">
+<link title="Avatar" rel="Chapter" href="Avatar.html">
+<link title="Avatar_intf" rel="Chapter" href="Avatar_intf.html">
+<link title="Induction" rel="Chapter" href="Induction.html">
+<link title="Induction_intf" rel="Chapter" href="Induction_intf.html">
+<link title="Superposition" rel="Chapter" href="Superposition.html">
+<link title="Superposition_intf" rel="Chapter" href="Superposition_intf.html">
+<link title="Rewriting" rel="Chapter" href="Rewriting.html">
+<link title="EnumTypes" rel="Chapter" href="EnumTypes.html">
+<link title="ArithInt" rel="Chapter" href="ArithInt.html">
+<link title="Heuristics" rel="Chapter" href="Heuristics.html">
+<link title="Ind_types" rel="Chapter" href="Ind_types.html">
+<link title="Fool" rel="Chapter" href="Fool.html"><link title="IO" rel="Section" href="#2_IO">
+<link title="Special kinds of literal arrays" rel="Section" href="#2_Specialkindsofliteralarrays">
+<link title="High order combinators" rel="Subsection" href="#3_Highordercombinators">
+<title>Literals</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Literal.html" title="Literal">Previous</a>
+&nbsp;<a class="up" href="index.html" title="Index">Up</a>
+&nbsp;<a class="post" href="Ctx.html" title="Ctx">Next</a>
+</div>
+<h1>Module <a href="type_Literals.html">Literals</a></h1>
+
+<pre><span class="keyword">module</span> Literals: <code class="code">sig</code> <a href="Literals.html">..</a> <code class="code">end</code></pre><div class="info module top">
+<h1 id="1_Arrayofliterals">Array of literals</h1><br>
+</div>
+<hr width="100%">
+
+<pre><span id="TYPEterm"><span class="keyword">type</span> <code class="type"></code>term</span> = <code class="type">Logtk.FOTerm.t</code> </pre>
+
+
+<pre><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> = <code class="type"><a href="Literal.html#TYPEt">Literal.t</a> array</code> </pre>
+<div class="info ">
+Array of literals<br>
+</div>
+
+
+<pre><span id="VALequal_com"><span class="keyword">val</span> equal_com</span> : <code class="type"><a href="Literals.html#TYPEt">t</a> -> <a href="Literals.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALcompare"><span class="keyword">val</span> compare</span> : <code class="type"><a href="Literals.html#TYPEt">t</a> -> <a href="Literals.html#TYPEt">t</a> -> int</code></pre>
+<pre><span class="keyword">include</span> Interfaces.HASH</pre>
+
+<pre><span id="VALvariant"><span class="keyword">val</span> variant</span> : <code class="type">?subst:Logtk.Subst.t -><br>       <a href="Literals.html#TYPEt">t</a> Logtk.Scoped.t -><br>       <a href="Literals.html#TYPEt">t</a> Logtk.Scoped.t -> Logtk.Subst.t Sequence.t</code></pre><div class="info ">
+Variant checking (alpha-equivalence). It can reorder literals to do its
+    check, so that might be computationnally expensive (a bit
+    like subsumption).<br>
+</div>
+
+<pre><span id="VALare_variant"><span class="keyword">val</span> are_variant</span> : <code class="type"><a href="Literals.html#TYPEt">t</a> -> <a href="Literals.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+Simple interface on top of <a href="Literals.html#VALvariant"><code class="code">Literals.variant</code></a> with distinc scopes<br>
+</div>
+
+<pre><span id="VALweight"><span class="keyword">val</span> weight</span> : <code class="type"><a href="Literals.html#TYPEt">t</a> -> int</code></pre>
+<pre><span id="VALdepth"><span class="keyword">val</span> depth</span> : <code class="type"><a href="Literals.html#TYPEt">t</a> -> int</code></pre>
+<pre><span id="VALvars"><span class="keyword">val</span> vars</span> : <code class="type"><a href="Literals.html#TYPEt">t</a> -> Logtk.Type.t Logtk.HVar.t list</code></pre>
+<pre><span id="VALis_ground"><span class="keyword">val</span> is_ground</span> : <code class="type"><a href="Literals.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+all the literals are ground?<br>
+</div>
+
+<pre><span id="VALto_form"><span class="keyword">val</span> to_form</span> : <code class="type"><a href="Literals.html#TYPEt">t</a> -> <a href="Literals.html#TYPEterm">term</a> Logtk.SLiteral.t list</code></pre><div class="info ">
+Make a 'or' formula from literals<br>
+</div>
+
+<pre><span id="VALapply_subst"><span class="keyword">val</span> apply_subst</span> : <code class="type">renaming:Logtk.Subst.Renaming.t -><br>       Logtk.Subst.t -> <a href="Literals.html#TYPEt">t</a> Logtk.Scoped.t -> <a href="Literals.html#TYPEt">t</a></code></pre>
+<pre><span id="VALmap"><span class="keyword">val</span> map</span> : <code class="type">(<a href="Literals.html#TYPEterm">term</a> -> <a href="Literals.html#TYPEterm">term</a>) -> <a href="Literals.html#TYPEt">t</a> -> <a href="Literals.html#TYPEt">t</a></code></pre>
+<pre><span id="VALpos"><span class="keyword">val</span> pos</span> : <code class="type"><a href="Literals.html#TYPEt">t</a> -> CCBV.t</code></pre>
+<pre><span id="VALneg"><span class="keyword">val</span> neg</span> : <code class="type"><a href="Literals.html#TYPEt">t</a> -> CCBV.t</code></pre>
+<pre><span id="VALmaxlits"><span class="keyword">val</span> maxlits</span> : <code class="type">ord:Logtk.Ordering.t -> <a href="Literals.html#TYPEt">t</a> -> CCBV.t</code></pre><div class="info ">
+Bitvector of positions of maximal literals<br>
+</div>
+
+<pre><span id="VALmaxlits_l"><span class="keyword">val</span> maxlits_l</span> : <code class="type">ord:Logtk.Ordering.t -> <a href="Literals.html#TYPEt">t</a> -> (<a href="Literal.html#TYPEt">Literal.t</a> * int) list</code></pre><div class="info ">
+List of maximal literals, with their index, among the array<br>
+</div>
+
+<pre><span id="VALis_max"><span class="keyword">val</span> is_max</span> : <code class="type">ord:Logtk.Ordering.t -> <a href="Literals.html#TYPEt">t</a> -> int -> bool</code></pre><div class="info ">
+Is the i-th literal maximal in the ordering?<br>
+</div>
+
+<pre><span id="VALis_trivial"><span class="keyword">val</span> is_trivial</span> : <code class="type"><a href="Literals.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+Tautology? (simple syntactic criterion only)<br>
+</div>
+
+<pre><span id="VALis_absurd"><span class="keyword">val</span> is_absurd</span> : <code class="type"><a href="Literals.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+All literals are false, or there are no literals<br>
+</div>
+
+<pre><span class="keyword">module</span> <a href="Literals.Seq.html">Seq</a>: <code class="code">sig</code> <a href="Literals.Seq.html">..</a> <code class="code">end</code></pre><br>
+<h3 id="3_Highordercombinators">High order combinators</h3><br>
+
+<pre><span class="keyword">module</span> <a href="Literals.Pos.html">Pos</a>: <code class="code">sig</code> <a href="Literals.Pos.html">..</a> <code class="code">end</code></pre>
+<pre><span class="keyword">module</span> <a href="Literals.Conv.html">Conv</a>: <code class="code">sig</code> <a href="Literals.Conv.html">..</a> <code class="code">end</code></pre>
+<pre><span class="keyword">module</span> <a href="Literals.View.html">View</a>: <code class="code">sig</code> <a href="Literals.View.html">..</a> <code class="code">end</code></pre>
+<pre><span id="VALfold_lits"><span class="keyword">val</span> fold_lits</span> : <code class="type">eligible:(int -> <a href="Literal.html#TYPEt">Literal.t</a> -> bool) -><br>       <a href="Literals.html#TYPEt">t</a> -> (<a href="Literal.html#TYPEt">Literal.t</a> * int) Sequence.t</code></pre><div class="info ">
+Fold over literals who satisfy <code class="code">eligible</code>. The folded function
+    is given the literal and its index.<br>
+</div>
+
+<pre><span id="VALfold_eqn"><span class="keyword">val</span> fold_eqn</span> : <code class="type">?both:bool -><br>       ?sign:bool -><br>       ord:Logtk.Ordering.t -><br>       eligible:(int -> <a href="Literal.html#TYPEt">Literal.t</a> -> bool) -><br>       <a href="Literals.html#TYPEt">t</a> -><br>       (<a href="Literals.html#TYPEterm">term</a> * <a href="Literals.html#TYPEterm">term</a> * bool * Logtk.Position.t) Sequence.t</code></pre><div class="info ">
+fold f over all literals sides, with their positions.
+    f is given <code class="code">(left side, right side, sign, position of left side)</code>
+    if <code class="code">ord</code> is present, then only the max side of an oriented
+      equation will be visited, otherwise they will both be explored.
+    if <code class="code">both = true</code>, then both sides of a non-oriented equation
+      will be visited, otherwise only one side.
+    if <code class="code">sign = true</code>, then only positive equations are visited; if it's
+      <code class="code">false</code>, only negative ones; if it's not defined, both.<br>
+</div>
+
+<pre><span id="VALfold_arith"><span class="keyword">val</span> fold_arith</span> : <code class="type">eligible:(int -> <a href="Literal.html#TYPEt">Literal.t</a> -> bool) -><br>       <a href="Literals.html#TYPEt">t</a> -> <a href="ArithLit.html#TYPEt">ArithLit.t</a> Logtk.Position.With.t Sequence.t</code></pre><div class="info ">
+Fold over eligible arithmetic literals<br>
+</div>
+
+<pre><span id="VALfold_arith_terms"><span class="keyword">val</span> fold_arith_terms</span> : <code class="type">eligible:(int -> <a href="Literal.html#TYPEt">Literal.t</a> -> bool) -><br>       which:[< `All | `Max ] -><br>       ord:Logtk.Ordering.t -><br>       <a href="Literals.html#TYPEt">t</a> -><br>       (<a href="Literals.html#TYPEterm">term</a> * <a href="ArithLit.Focus.html#TYPEt">ArithLit.Focus.t</a> * Logtk.Position.t) Sequence.t</code></pre><div class="info ">
+Fold on terms under arithmetic literals, with the focus on
+    the current term<br>
+</div>
+
+<pre><span id="VALfold_terms"><span class="keyword">val</span> fold_terms</span> : <code class="type">?vars:bool -><br>       ?ty_args:bool -><br>       which:[< `All | `Max ] -><br>       ord:Logtk.Ordering.t -><br>       subterms:bool -><br>       eligible:(int -> <a href="Literal.html#TYPEt">Literal.t</a> -> bool) -><br>       <a href="Literals.html#TYPEt">t</a> -> <a href="Literals.html#TYPEterm">term</a> Logtk.Position.With.t Sequence.t</code></pre><div class="info ">
+See <a href="Literal.html#VALfold_terms"><code class="code">Literal.fold_terms</code></a>, which is the same but for the
+    <code class="code">eligible</code> argument<br>
+</div>
+
+<pre><span id="VALsymbols"><span class="keyword">val</span> symbols</span> : <code class="type">?init:Logtk.ID.Set.t -> <a href="Literals.html#TYPEt">t</a> -> Logtk.ID.Set.t</code></pre><br>
+<h2 id="2_IO">IO</h2><br>
+
+<pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Literals.html#TYPEt">t</a> CCFormat.printer</code></pre>
+<pre><span id="VALpp_vars"><span class="keyword">val</span> pp_vars</span> : <code class="type"><a href="Literals.html#TYPEt">t</a> CCFormat.printer</code></pre>
+<pre><span id="VALpp_tstp"><span class="keyword">val</span> pp_tstp</span> : <code class="type"><a href="Literals.html#TYPEt">t</a> CCFormat.printer</code></pre>
+<pre><span id="VALto_string"><span class="keyword">val</span> to_string</span> : <code class="type"><a href="Literals.html#TYPEt">t</a> -> string</code></pre><br>
+<h2 id="2_Specialkindsofliteralarrays">Special kinds of literal arrays</h2><br>
+
+<pre><span id="VALis_RR_horn_clause"><span class="keyword">val</span> is_RR_horn_clause</span> : <code class="type"><a href="Literals.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+Recognized whether the clause is a Range-Restricted Horn clause<br>
+</div>
+
+<pre><span id="VALis_horn"><span class="keyword">val</span> is_horn</span> : <code class="type"><a href="Literals.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+Recognizes Horn clauses (at most one positive literal)<br>
+</div>
+
+<pre><span id="VALis_pos_eq"><span class="keyword">val</span> is_pos_eq</span> : <code class="type"><a href="Literals.html#TYPEt">t</a> -> (<a href="Literals.html#TYPEterm">term</a> * <a href="Literals.html#TYPEterm">term</a>) option</code></pre><div class="info ">
+Recognize whether the clause is a positive unit equality.<br>
+</div>
+</body></html>

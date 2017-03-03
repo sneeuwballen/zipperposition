@@ -1,0 +1,105 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link rel="next" href="Statement.Seq.html">
+<link rel="Up" href="Statement.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="InnerTerm" rel="Chapter" href="InnerTerm.html">
+<link title="FOTerm" rel="Chapter" href="FOTerm.html">
+<link title="Type" rel="Chapter" href="Type.html">
+<link title="Util" rel="Chapter" href="Util.html">
+<link title="STerm" rel="Chapter" href="STerm.html">
+<link title="Interfaces" rel="Chapter" href="Interfaces.html">
+<link title="DBEnv" rel="Chapter" href="DBEnv.html">
+<link title="Position" rel="Chapter" href="Position.html">
+<link title="Var" rel="Chapter" href="Var.html">
+<link title="HVar" rel="Chapter" href="HVar.html">
+<link title="Subst" rel="Chapter" href="Subst.html">
+<link title="Unif" rel="Chapter" href="Unif.html">
+<link title="Signature" rel="Chapter" href="Signature.html">
+<link title="Scoped" rel="Chapter" href="Scoped.html">
+<link title="Unif_intf" rel="Chapter" href="Unif_intf.html">
+<link title="TypeInference" rel="Chapter" href="TypeInference.html">
+<link title="Options" rel="Chapter" href="Options.html">
+<link title="Comparison" rel="Chapter" href="Comparison.html">
+<link title="Precedence" rel="Chapter" href="Precedence.html">
+<link title="Builtin" rel="Chapter" href="Builtin.html">
+<link title="Ordering" rel="Chapter" href="Ordering.html">
+<link title="Skolem" rel="Chapter" href="Skolem.html">
+<link title="Cnf" rel="Chapter" href="Cnf.html">
+<link title="ID" rel="Chapter" href="ID.html">
+<link title="IDOrBuiltin" rel="Chapter" href="IDOrBuiltin.html">
+<link title="SLiteral" rel="Chapter" href="SLiteral.html">
+<link title="Index" rel="Chapter" href="Index.html">
+<link title="Index_intf" rel="Chapter" href="Index_intf.html">
+<link title="Dtree" rel="Chapter" href="Dtree.html">
+<link title="Fingerprint" rel="Chapter" href="Fingerprint.html">
+<link title="NPDtree" rel="Chapter" href="NPDtree.html">
+<link title="Binder" rel="Chapter" href="Binder.html">
+<link title="Congruence" rel="Chapter" href="Congruence.html">
+<link title="FeatureVector" rel="Chapter" href="FeatureVector.html">
+<link title="FV_tree" rel="Chapter" href="FV_tree.html">
+<link title="UntypedAST" rel="Chapter" href="UntypedAST.html">
+<link title="Ind_ty" rel="Chapter" href="Ind_ty.html">
+<link title="TypedSTerm" rel="Chapter" href="TypedSTerm.html">
+<link title="Statement" rel="Chapter" href="Statement.html">
+<link title="Flex_state" rel="Chapter" href="Flex_state.html">
+<link title="Compute_prec" rel="Chapter" href="Compute_prec.html">
+<link title="Ordinal" rel="Chapter" href="Ordinal.html">
+<link title="Hashcons" rel="Chapter" href="Hashcons.html">
+<link title="ParseLocation" rel="Chapter" href="ParseLocation.html">
+<link title="Multiset" rel="Chapter" href="Multiset.html">
+<link title="LazyList" rel="Chapter" href="LazyList.html">
+<link title="Hash" rel="Chapter" href="Hash.html">
+<link title="IArray" rel="Chapter" href="IArray.html">
+<link title="AllocCache" rel="Chapter" href="AllocCache.html">
+<link title="Multiset_intf" rel="Chapter" href="Multiset_intf.html">
+<link title="Signal" rel="Chapter" href="Signal.html">
+<link title="UnionFind" rel="Chapter" href="UnionFind.html"><title>Statement.Src</title>
+</head>
+<body>
+<div class="navbar">&nbsp;<a class="up" href="Statement.html" title="Statement">Up</a>
+&nbsp;<a class="post" href="Statement.Seq.html" title="Statement.Seq">Next</a>
+</div>
+<h1>Module <a href="type_Statement.Src.html">Statement.Src</a></h1>
+
+<pre><span class="keyword">module</span> Src: <code class="code"><span class="keyword">sig</span></code> <a href="Statement.Src.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info module top">
+<h2 id="2_StatementSource">Statement Source</h2>
+<p>
+
+    Where a statement originally comes from (file, location, named statement,
+    or result of some transformations, etc.)<br>
+</div>
+<hr width="100%">
+
+<pre><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> = <code class="type"><a href="Statement.html#TYPEsource">Statement.source</a></code> </pre>
+
+
+<pre><span id="VALequal"><span class="keyword">val</span> equal</span> : <code class="type"><a href="Statement.Src.html#TYPEt">t</a> -> <a href="Statement.Src.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALhash"><span class="keyword">val</span> hash</span> : <code class="type"><a href="Statement.Src.html#TYPEt">t</a> -> int</code></pre>
+<pre><span id="VALview"><span class="keyword">val</span> view</span> : <code class="type"><a href="Statement.Src.html#TYPEt">t</a> -> <a href="Statement.html#TYPEsource_view">Statement.source_view</a></code></pre>
+<pre><span id="VALfile"><span class="keyword">val</span> file</span> : <code class="type"><a href="Statement.html#TYPEfrom_file">Statement.from_file</a> -> string</code></pre>
+<pre><span id="VALname"><span class="keyword">val</span> name</span> : <code class="type"><a href="Statement.html#TYPEfrom_file">Statement.from_file</a> -> string option</code></pre>
+<pre><span id="VALloc"><span class="keyword">val</span> loc</span> : <code class="type"><a href="Statement.html#TYPEfrom_file">Statement.from_file</a> -> <a href="ParseLocation.html#TYPEt">ParseLocation.t</a> option</code></pre>
+<pre><span id="VALfrom_input"><span class="keyword">val</span> from_input</span> : <code class="type"><a href="UntypedAST.html#TYPEattrs">UntypedAST.attrs</a> -> <a href="Statement.html#TYPErole">Statement.role</a> -> <a href="Statement.Src.html#TYPEt">t</a></code></pre>
+<pre><span id="VALfrom_file"><span class="keyword">val</span> from_file</span> : <code class="type">?loc:<a href="ParseLocation.html#TYPEt">ParseLocation.t</a> -><br>       ?name:string -> string -> <a href="Statement.html#TYPErole">Statement.role</a> -> <a href="Statement.Src.html#TYPEt">t</a></code></pre><div class="info ">
+make a new sourced item. Default <code class="code">is_conjecture</code> is <code class="code"><span class="keyword">false</span></code>.<br>
+</div>
+
+<pre><span id="VALinternal"><span class="keyword">val</span> internal</span> : <code class="type"><a href="Statement.html#TYPErole">Statement.role</a> -> <a href="Statement.Src.html#TYPEt">t</a></code></pre>
+<pre><span id="VALneg"><span class="keyword">val</span> neg</span> : <code class="type"><a href="Statement.html#TYPEsourced_t">Statement.sourced_t</a> -> <a href="Statement.Src.html#TYPEt">t</a></code></pre>
+<pre><span id="VALcnf"><span class="keyword">val</span> cnf</span> : <code class="type"><a href="Statement.html#TYPEsourced_t">Statement.sourced_t</a> -> <a href="Statement.Src.html#TYPEt">t</a></code></pre>
+<pre><span id="VALneg_input"><span class="keyword">val</span> neg_input</span> : <code class="type"><a href="TypedSTerm.html#TYPEt">TypedSTerm.t</a> -> <a href="Statement.html#TYPEsource">Statement.source</a> -> <a href="Statement.Src.html#TYPEt">t</a></code></pre>
+<pre><span id="VALneg_clause"><span class="keyword">val</span> neg_clause</span> : <code class="type"><a href="Statement.html#TYPEclause">Statement.clause</a> -> <a href="Statement.html#TYPEsource">Statement.source</a> -> <a href="Statement.Src.html#TYPEt">t</a></code></pre>
+<pre><span id="VALcnf_input"><span class="keyword">val</span> cnf_input</span> : <code class="type"><a href="TypedSTerm.html#TYPEt">TypedSTerm.t</a> -> <a href="Statement.html#TYPEsource">Statement.source</a> -> <a href="Statement.Src.html#TYPEt">t</a></code></pre>
+<pre><span id="VALcnf_clause"><span class="keyword">val</span> cnf_clause</span> : <code class="type"><a href="Statement.html#TYPEclause">Statement.clause</a> -> <a href="Statement.html#TYPEsource">Statement.source</a> -> <a href="Statement.Src.html#TYPEt">t</a></code></pre>
+<pre><span id="VALpp_from_file"><span class="keyword">val</span> pp_from_file</span> : <code class="type"><a href="Statement.html#TYPEfrom_file">Statement.from_file</a> CCFormat.printer</code></pre>
+<pre><span id="VALpp_role"><span class="keyword">val</span> pp_role</span> : <code class="type"><a href="Statement.html#TYPErole">Statement.role</a> CCFormat.printer</code></pre></body></html>

@@ -1,5 +1,8 @@
 = Zipperposition
 
-Documentation:
+link:rst/index.html[High-Level Documentation]
 
+== API Documentation
+
+- link:dev/index.html[dev]
 - link:1.0/index.html[1.0]

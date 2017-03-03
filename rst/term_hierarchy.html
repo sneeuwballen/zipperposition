@@ -1,0 +1,163 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Term representations &#8212; logtk  documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Meta-Prover Design" href="meta_prover.html" />
+    <link rel="prev" title="List of Modules" href="modules.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="term-representations">
+<h1>Term representations<a class="headerlink" href="#term-representations" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="rationale">
+<h2>Rationale<a class="headerlink" href="#rationale" title="Permalink to this headline">¶</a></h2>
+<p>The new version of Logtk attemps to reduce code duplication by using a single
+core representation for scoped terms, which is <code class="docutils literal"><span class="pre">ScopedTerm</span></code>. A second representation,
+<code class="docutils literal"><span class="pre">PrologTerm</span></code>, is used for simple AST representation and manipulation, and
+is a bit the dual of <code class="docutils literal"><span class="pre">ScopedTerm</span></code>.</p>
+<p><code class="docutils literal"><span class="pre">ScopedTerm</span></code>&#8216;s goal is to centralize all hashconsing, comparison, De Bruijn
+indices manipulations, etc. in a single representation. As a consequence,
+substitutions (<code class="docutils literal"><span class="pre">Substs</span></code>) and unification (<code class="docutils literal"><span class="pre">Unif</span></code>) are defined only once,
+and work on scoped terms.</p>
+</div>
+<div class="section" id="specialized-representations">
+<h2>Specialized Representations<a class="headerlink" href="#specialized-representations" title="Permalink to this headline">¶</a></h2>
+<p><code class="docutils literal"><span class="pre">ScopedTerm</span></code> is nice, but it hardly represents any usual structure, because
+it is too general. To enforce structural invariants, check types, and provide
+a more specific view of an algebraic structure, we use a nice feature of
+OCaml called <strong>private aliases</strong>.</p>
+<p>For instance, <code class="docutils literal"><span class="pre">Type</span></code> is a representation of polymorphic simple types.
+The type <code class="docutils literal"><span class="pre">Type.t</span></code> is declared as</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="nb">type</span> <span class="n">t</span> <span class="o">=</span> <span class="n">private</span> <span class="n">ScopedTerm</span><span class="o">.</span><span class="n">t</span>
+</pre></div>
+</div>
+<p>which means that a <code class="docutils literal"><span class="pre">Type.t</span></code> is a subtype of <code class="docutils literal"><span class="pre">ScopedTerm.t</span></code>. Then, functions
+like <code class="docutils literal"><span class="pre">Type.view</span> <span class="pre">:</span> <span class="pre">Type.t</span> <span class="pre">-&gt;</span> <span class="pre">Type.view</span></code> (a specific variant) or
+<code class="docutils literal"><span class="pre">Type.of_term</span> <span class="pre">:</span> <span class="pre">ScopedTerm.t</span> <span class="pre">-&gt;</span> <span class="pre">Type.t</span> <span class="pre">option</span></code> can be used. Special
+constructors like <code class="docutils literal"><span class="pre">var</span> <span class="pre">:</span> <span class="pre">int</span> <span class="pre">-&gt;</span> <span class="pre">Type.t</span></code> are also provided and directly
+provide instances of <code class="docutils literal"><span class="pre">Type.t</span></code> that have some structural constraints enforced.</p>
+<p>Every specialized representation has its own <code class="docutils literal"><span class="pre">kind</span></code>, a tag that allows to
+check in constant-time whether a <code class="docutils literal"><span class="pre">ScopedTerm.t</span></code> actually is a <code class="docutils literal"><span class="pre">Type.t</span></code> or not.</p>
+</div>
+<div class="section" id="hierarchy">
+<h2>Hierarchy<a class="headerlink" href="#hierarchy" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><code class="docutils literal"><span class="pre">ScopedTerm</span></code>
+hashconsed terms with scoping and De Bruijn indices for bound variables.
+Almost every term has a &#8220;type&#8221;, that is itself a term (theoretically
+it should be possible to use this representation for calculus of construction)<ul>
+<li><code class="docutils literal"><span class="pre">FOTerm</span></code>
+first-order terms, as usual. No binder, no magic.</li>
+<li><code class="docutils literal"><span class="pre">HOTerm</span></code>
+higher-order terms with lambdas, multisets and records.</li>
+<li><code class="docutils literal"><span class="pre">Type</span></code>
+polymorphic types.</li>
+<li><code class="docutils literal"><span class="pre">Formula</span></code>
+formulas parametrized on the terms that represent atoms. <code class="docutils literal"><span class="pre">Formula.FO</span></code>
+is an instance that has <code class="docutils literal"><span class="pre">FOTerm.t</span></code> as terms</li>
+</ul>
+</li>
+<li><code class="docutils literal"><span class="pre">PrologTerm</span></code>
+terms with named variables, no hashconsing, and not much typing.</li>
+</ul>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="contents.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Term representations</a><ul>
+<li><a class="reference internal" href="#rationale">Rationale</a></li>
+<li><a class="reference internal" href="#specialized-representations">Specialized Representations</a></li>
+<li><a class="reference internal" href="#hierarchy">Hierarchy</a></li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="contents.html">Documentation overview</a><ul>
+      <li>Previous: <a href="modules.html" title="previous chapter">List of Modules</a></li>
+      <li>Next: <a href="meta_prover.html" title="next chapter">Meta-Prover Design</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/term_hierarchy.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/term_hierarchy.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

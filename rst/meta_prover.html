@@ -1,0 +1,293 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Meta-Prover Design &#8212; logtk  documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Higher-Order indexing" href="ho_indexing.html" />
+    <link rel="prev" title="Term representations" href="term_hierarchy.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="meta-prover-design">
+<h1>Meta-Prover Design<a class="headerlink" href="#meta-prover-design" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="intro">
+<h2>Intro<a class="headerlink" href="#intro" title="Permalink to this headline">¶</a></h2>
+<p>The <em>meta-prover</em> is a software component that is responsible for reasoning
+about <strong>properties</strong> of logic symbols, but not for solving the actual
+problem at hand. It deals with the higher-level structure of a problem, more
+at the level of meta-data than the raw axioms given by the user.
+See <a class="reference internal" href="#burelcruanes2013" id="id1">[BurelCruanes2013]</a> for more details.</p>
+</div>
+<div class="section" id="structure">
+<h2>Structure<a class="headerlink" href="#structure" title="Permalink to this headline">¶</a></h2>
+<p>The meta-prover has two main tasks to carry out:</p>
+<ol class="arabic simple">
+<li><dl class="first docutils">
+<dt>Scannings</dt>
+<dd>for <strong>patterns</strong> in clauses it is given (from a running resolution
+or superposition prover, or from an input file...). A successful scan
+may add <strong>facts</strong> about the problem (presence of a given axiom instance).</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt>Reasoning</dt>
+<dd>over known facts and structures (theories, lemmas, etc.), using
+both a known <strong>knowledge base</strong> (definition of theories, known lemmas)
+and the results of scanning.</dd>
+</dl>
+</li>
+</ol>
+</div>
+<div class="section" id="implementation">
+<h2>Implementation<a class="headerlink" href="#implementation" title="Permalink to this headline">¶</a></h2>
+<p>The logic representation of the meta-prover is a form of <code class="docutils literal"><span class="pre">HOTerm</span></code>, ie.
+first-order terms with currying, no quantifiers. The relevant variants (a
+<code class="docutils literal"><span class="pre">Lambda</span></code> variant is omitted) are:</p>
+<ul>
+<li><dl class="first docutils">
+<dt><code class="docutils literal"><span class="pre">Var</span> <span class="pre">:</span> <span class="pre">int</span> <span class="pre">-&gt;</span> <span class="pre">term</span></code></dt>
+<dd><p class="first last">a universal variable, typed, used for abstracted symbols, and for
+Horn clauses</p>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt><code class="docutils literal"><span class="pre">RigidVar</span> <span class="pre">:</span> <span class="pre">int</span> <span class="pre">-&gt;</span> <span class="pre">term</span></code></dt>
+<dd><p class="first last">a universal variable, typed, used for problem-level quantification. This
+can only by matched with another <strong>rigid variable</strong> (for alpha renaming).</p>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt><code class="docutils literal"><span class="pre">TyAt</span> <span class="pre">:</span> <span class="pre">type</span> <span class="pre">*</span> <span class="pre">term</span> <span class="pre">-&gt;</span> <span class="pre">term</span></code></dt>
+<dd><p class="first last">curried application of a term to a type (for polymorphism)</p>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt><code class="docutils literal"><span class="pre">At</span> <span class="pre">:</span> <span class="pre">term</span> <span class="pre">*</span> <span class="pre">term</span> <span class="pre">-&gt;</span> <span class="pre">term</span></code></dt>
+<dd><p class="first last">curried application of a term to another term</p>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt><code class="docutils literal"><span class="pre">Multiset</span> <span class="pre">:</span> <span class="pre">term</span> <span class="pre">list</span> <span class="pre">-&gt;</span> <span class="pre">term</span></code></dt>
+<dd><p class="first last">multiset of terms, very handy for representing clauses. Unification of
+multiset is not AC-unification, but instead unifies subterms pairwise.
+All terms must have the same type <code class="docutils literal"><span class="pre">tau</span></code>, in which case the multiset
+has type <code class="docutils literal"><span class="pre">multiset(tau)</span></code>. This is used both for equational literals,
+with <code class="docutils literal"><span class="pre">eq_lit</span> <span class="pre">{|</span> <span class="pre">a,</span> <span class="pre">b</span> <span class="pre">|}</span></code> representing <code class="docutils literal"><span class="pre">a</span> <span class="pre">=</span> <span class="pre">b</span></code> (resp. <code class="docutils literal"><span class="pre">neq_lit</span></code>)
+and clauses (multisets of literals).</p>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt><code class="docutils literal"><span class="pre">Record</span> <span class="pre">:</span> <span class="pre">(string*term)</span> <span class="pre">list</span> <span class="pre">*</span> <span class="pre">term</span> <span class="pre">option</span> <span class="pre">-&gt;</span> <span class="pre">term</span></code></dt>
+<dd><p class="first">record value, with a list of <code class="docutils literal"><span class="pre">field</span> <span class="pre">:</span> <span class="pre">term</span></code> pairs (with pairwise distinct
+fields) and an optional &#8220;remainder&#8221; part that must be a variable
+of type <code class="docutils literal"><span class="pre">record(T)</span></code> (with <code class="docutils literal"><span class="pre">T</span></code> some type). The type of the record
+is given by <a class="reference internal" href="#the-typing-rules-for-records">the typing rules for records</a>.
+The remainder part is used for unification, for instance</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="p">{</span><span class="n">x</span><span class="p">:</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span><span class="mi">2</span> <span class="o">|</span> <span class="n">R</span><span class="p">}</span> <span class="o">==</span> <span class="p">{</span><span class="n">x</span><span class="p">:</span><span class="mi">1</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span><span class="n">Y</span><span class="p">,</span> <span class="n">color</span><span class="p">:</span> <span class="n">red</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>succeeds and yields</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">X</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">Y</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">R</span> <span class="o">=</span> <span class="p">{</span><span class="n">color</span><span class="p">:</span><span class="n">red</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>applying the substitution to the first record yields</p>
+<div class="last highlight-default"><div class="highlight"><pre><span></span><span class="p">{</span><span class="n">x</span><span class="p">:</span><span class="mi">1</span><span class="p">,</span> <span class="n">Y</span><span class="p">:</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="p">:</span><span class="n">red</span><span class="p">}</span><span class="n">bound</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+</li>
+</ul>
+<p id="the-typing-rules-for-records">The typing rules for records are the following</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">t_1</span><span class="p">:</span><span class="n">tau_1</span> <span class="o">....</span>                        <span class="n">t_n</span> <span class="p">:</span> <span class="n">tau_n</span>
+<span class="o">-------------------------------------------------</span>
+<span class="p">{</span><span class="n">f_1</span><span class="p">:</span><span class="n">t_1</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="n">f_n</span><span class="p">:</span><span class="n">t_n</span><span class="p">}</span> <span class="p">:</span>             <span class="p">{</span><span class="n">f_i</span><span class="p">:</span><span class="n">tau_i</span><span class="p">}</span>
+
+<span class="n">t_i</span> <span class="p">:</span> <span class="n">tau_i</span>                             <span class="n">y</span> <span class="p">:</span> <span class="n">tau_y</span>
+<span class="o">-------------------------------------------------</span>
+<span class="p">{</span><span class="n">f_1</span><span class="p">:</span><span class="n">t_1</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="n">f_n</span><span class="p">:</span><span class="n">t_n</span> <span class="o">|</span> <span class="n">y</span><span class="p">}</span> <span class="p">:</span> <span class="p">{</span><span class="n">f_i</span><span class="p">:</span><span class="n">tau_i</span> <span class="o">|</span> <span class="n">tau_y</span><span class="p">}</span>
+</pre></div>
+</div>
+<div class="section" id="scanning">
+<h3>Scanning<a class="headerlink" href="#scanning" title="Permalink to this headline">¶</a></h3>
+<p>We need a specific mix of matching and alpha-equivalence checking for
+scanning <strong>concrete clauses</strong> so as to find instances of <strong>patterns</strong>. A
+<strong>pattern</strong> is just a term in which all salient function symbols (which occur
+in some structure at the meta-level) as <em>abstracted</em> into variables. The
+meta-prover must remember which variables are regular universal variables,
+and which ones are abstracted functions.</p>
+<p>The scanning operation must <em>bind</em> abstracted variables to concrete terms
+(the matching part) but cannot bind universal variables to anything else than
+other universal variables (the alpha-equivalence part). Binding type variables
+is ok.</p>
+<p>For instance, if a pattern for commutativity is <code class="docutils literal"><span class="pre">F</span> <span class="pre">X</span> <span class="pre">Y</span> <span class="pre">=</span> <span class="pre">F</span> <span class="pre">Y</span> <span class="pre">X</span></code> with
+abstracted variable <code class="docutils literal"><span class="pre">F</span></code>, then scanning the concrete clause <code class="docutils literal"><span class="pre">g</span> <span class="pre">a</span> <span class="pre">X</span> <span class="pre">Y</span> <span class="pre">=</span> <span class="pre">g</span> <span class="pre">a</span> <span class="pre">Y</span> <span class="pre">X</span></code>
+succeeds by binding <code class="docutils literal"><span class="pre">F</span></code> to the concrete term <code class="docutils literal"><span class="pre">g</span> <span class="pre">a</span></code>, and binding
+universal variables <code class="docutils literal"><span class="pre">X</span></code> and <code class="docutils literal"><span class="pre">Y</span></code> to other universal variables.</p>
+<p>Scanning is actually done by encoding the problem clauses, in a shallow way,
+using <code class="docutils literal"><span class="pre">Multiset</span></code> constructors and <code class="docutils literal"><span class="pre">RigidVar</span></code>. For a clause <code class="docutils literal"><span class="pre">c</span></code>
+let <code class="docutils literal"><span class="pre">c'</span></code> be its encoding; we then add <code class="docutils literal"><span class="pre">holds</span> <span class="pre">c'</span> <span class="pre">&lt;-</span> <span class="pre">.</span></code> to the clauses
+of the reasoner so that it can match axiom definitions. Axioms are
+described by <code class="docutils literal"><span class="pre">axiom</span> <span class="pre">foo</span> <span class="pre">&lt;-</span> <span class="pre">holds</span> <span class="pre">c.</span></code> where <code class="docutils literal"><span class="pre">c</span></code> is the clause that
+describes the axiom.</p>
+<p>The encoding of clauses is done by:</p>
+<ol class="arabic simple">
+<li>currying applications</li>
+<li><dl class="first docutils">
+<dt>replacing free variables by <code class="docutils literal"><span class="pre">RigidVar</span></code> instances (in order to force</dt>
+<dd>unification to be only alpha-equivalence on those)</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt>replacing equational literals <code class="docutils literal"><span class="pre">a</span> <span class="pre">=</span> <span class="pre">b</span></code> by <code class="docutils literal"><span class="pre">eq_lit</span> <span class="pre">[a,</span> <span class="pre">b]</span></code></dt>
+<dd>and <code class="docutils literal"><span class="pre">a</span> <span class="pre">!=</span> <span class="pre">b</span></code> by <code class="docutils literal"><span class="pre">neq_lit</span> <span class="pre">[a,</span> <span class="pre">b]</span></code></dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt>replacing the clause by <code class="docutils literal"><span class="pre">[l1,</span> <span class="pre">l2,</span> <span class="pre">...,</span> <span class="pre">ln]</span></code> where the <code class="docutils literal"><span class="pre">li</span></code> are</dt>
+<dd>the encoded literals.</dd>
+</dl>
+</li>
+<li>adding <code class="docutils literal"><span class="pre">holds</span> <span class="pre">c.</span></code> to the meta-prover where <code class="docutils literal"><span class="pre">c</span></code> is the encoded clause.</li>
+</ol>
+</div>
+<div class="section" id="reasoning">
+<h3>Reasoning<a class="headerlink" href="#reasoning" title="Permalink to this headline">¶</a></h3>
+<p>As all rules are Horn clauses, of the shape <code class="docutils literal"><span class="pre">A</span> <span class="pre">&lt;-</span> <span class="pre">B_1,</span> <span class="pre">...,</span> <span class="pre">B_n</span></code>, or simple
+atoms that we call <strong>facts</strong>. Since we embed universal variables, or type
+variables, it actually isn&#8217;t always true that atoms are ground.</p>
+<p>The idea is simply to use a term index, and regular unification, to perform
+<strong>unit resolution</strong>. Roughly, the rule is</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">A</span> <span class="o">&lt;-</span> <span class="n">B_1</span><span class="p">,</span> <span class="n">B_2</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="n">B_n</span>        <span class="n">B</span>
+<span class="o">--------------------------------</span>
+     <span class="n">sigma</span><span class="p">(</span><span class="n">A</span> <span class="o">&lt;-</span> <span class="n">B_2</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="n">B_n</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="n">sigma</span><span class="p">(</span><span class="n">B_1</span><span class="p">)</span> <span class="o">=</span> <span class="n">sigma</span><span class="p">(</span><span class="n">B</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="indexing">
+<h3>Indexing<a class="headerlink" href="#indexing" title="Permalink to this headline">¶</a></h3>
+<p>It is important to have some form of indexing. See the page
+about <a class="reference internal" href="ho_indexing.html#ho-indexing"><span class="std std-ref">Higher-Order indexing</span></a>.</p>
+</div>
+</div>
+<div class="section" id="biblio">
+<h2>Biblio<a class="headerlink" href="#biblio" title="Permalink to this headline">¶</a></h2>
+<table class="docutils citation" frame="void" id="burelcruanes2013" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[BurelCruanes2013]</a></td><td><a class="reference external" href="http://hal.inria.fr/hal-00919759">http://hal.inria.fr/hal-00919759</a></td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="contents.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Meta-Prover Design</a><ul>
+<li><a class="reference internal" href="#intro">Intro</a></li>
+<li><a class="reference internal" href="#structure">Structure</a></li>
+<li><a class="reference internal" href="#implementation">Implementation</a><ul>
+<li><a class="reference internal" href="#scanning">Scanning</a></li>
+<li><a class="reference internal" href="#reasoning">Reasoning</a></li>
+<li><a class="reference internal" href="#indexing">Indexing</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#biblio">Biblio</a></li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="contents.html">Documentation overview</a><ul>
+      <li>Previous: <a href="term_hierarchy.html" title="previous chapter">Term representations</a></li>
+      <li>Next: <a href="ho_indexing.html" title="next chapter">Higher-Order indexing</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/meta_prover.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/meta_prover.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

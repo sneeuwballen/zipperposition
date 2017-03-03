@@ -1,0 +1,121 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Higher-Order indexing &#8212; logtk  documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Type Inference" href="type_inference.html" />
+    <link rel="prev" title="Meta-Prover Design" href="meta_prover.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="higher-order-indexing">
+<span id="ho-indexing"></span><h1>Higher-Order indexing<a class="headerlink" href="#higher-order-indexing" title="Permalink to this headline">¶</a></h1>
+<p>Ideas for indexing of <code class="docutils literal"><span class="pre">HOTerm.t</span></code>. We draw some ideas from <a class="reference external" href="http://www4.in.tum.de/~schulz/PAPERS/Schulz-DedTref-2010.pdf">fingerprint indexing</a>
+and mostly <a class="reference external" href="http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.26.1122">path indexing</a>.</p>
+<p>The basic idea currently is to extend <em>path indexing</em> so that it can deal with
+binders, extensible records and mainly <em>multisets</em>. To do so, we use an
+extended representation of positions in terms, with a non-deterministic
+variant:</p>
+<ul class="simple">
+<li><code class="docutils literal"><span class="pre">Left</span></code>
+go to the left part of an application: <code class="docutils literal"><span class="pre">(l</span> <span class="pre">&#64;</span> <span class="pre">r).left</span> <span class="pre">=</span> <span class="pre">l</span></code>.</li>
+<li><code class="docutils literal"><span class="pre">Right</span></code>
+go to the right part of an application: <code class="docutils literal"><span class="pre">(l</span> <span class="pre">&#64;</span> <span class="pre">r).right</span> <span class="pre">=</span> <span class="pre">r</span></code>.</li>
+<li><code class="docutils literal"><span class="pre">Record_field</span> <span class="pre">of</span> <span class="pre">string</span></code>
+access the given record field, as in <code class="docutils literal"><span class="pre">{x:t</span> <span class="pre">|</span> <span class="pre">_}.x</span> <span class="pre">=</span> <span class="pre">t</span></code>.</li>
+<li><code class="docutils literal"><span class="pre">Record_rest</span></code>
+access the rest of the extensible record. Basically <code class="docutils literal"><span class="pre">{_</span> <span class="pre">|</span> <span class="pre">R}.rest</span> <span class="pre">=</span> <span class="pre">R</span></code>.</li>
+<li><code class="docutils literal"><span class="pre">multiset</span> <span class="pre">of</span> <span class="pre">int</span></code>
+access <strong>some</strong> element of a multiset that has <code class="docutils literal"><span class="pre">n</span></code> elements. Here
+the choice is non-deterministic, and insertion and retrieval operations
+will need to take it into account.</li>
+</ul>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="contents.html">Documentation overview</a><ul>
+      <li>Previous: <a href="meta_prover.html" title="previous chapter">Meta-Prover Design</a></li>
+      <li>Next: <a href="type_inference.html" title="next chapter">Type Inference</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/ho_indexing.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/ho_indexing.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

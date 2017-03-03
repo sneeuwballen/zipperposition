@@ -1,0 +1,351 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Ind_cst.html">
+<link rel="next" href="Phases_impl.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="ClauseQueue" rel="Chapter" href="ClauseQueue.html">
+<link title="Clause" rel="Chapter" href="Clause.html">
+<link title="SClause" rel="Chapter" href="SClause.html">
+<link title="Const" rel="Chapter" href="Const.html">
+<link title="Extensions" rel="Chapter" href="Extensions.html">
+<link title="Literal" rel="Chapter" href="Literal.html">
+<link title="Literals" rel="Chapter" href="Literals.html">
+<link title="Ctx" rel="Chapter" href="Ctx.html">
+<link title="ProofStep" rel="Chapter" href="ProofStep.html">
+<link title="ProofPrint" rel="Chapter" href="ProofPrint.html">
+<link title="ProofState" rel="Chapter" href="ProofState.html">
+<link title="Saturate" rel="Chapter" href="Saturate.html">
+<link title="Selection" rel="Chapter" href="Selection.html">
+<link title="AC" rel="Chapter" href="AC.html">
+<link title="AC_intf" rel="Chapter" href="AC_intf.html">
+<link title="SimplM" rel="Chapter" href="SimplM.html">
+<link title="Params" rel="Chapter" href="Params.html">
+<link title="Env" rel="Chapter" href="Env.html">
+<link title="Monome" rel="Chapter" href="Monome.html">
+<link title="ArithLit" rel="Chapter" href="ArithLit.html">
+<link title="Signals" rel="Chapter" href="Signals.html">
+<link title="Multisets" rel="Chapter" href="Multisets.html">
+<link title="Ctx_intf" rel="Chapter" href="Ctx_intf.html">
+<link title="Clause_intf" rel="Chapter" href="Clause_intf.html">
+<link title="Env_intf" rel="Chapter" href="Env_intf.html">
+<link title="ProofState_intf" rel="Chapter" href="ProofState_intf.html">
+<link title="BBox" rel="Chapter" href="BBox.html">
+<link title="ClauseContext" rel="Chapter" href="ClauseContext.html">
+<link title="ClauseQueue_intf" rel="Chapter" href="ClauseQueue_intf.html">
+<link title="Bool_lit" rel="Chapter" href="Bool_lit.html">
+<link title="Bool_lit_intf" rel="Chapter" href="Bool_lit_intf.html">
+<link title="Sat_solver" rel="Chapter" href="Sat_solver.html">
+<link title="Sat_solver_intf" rel="Chapter" href="Sat_solver_intf.html">
+<link title="Trail" rel="Chapter" href="Trail.html">
+<link title="Ind_cst" rel="Chapter" href="Ind_cst.html">
+<link title="Phases" rel="Chapter" href="Phases.html">
+<link title="Phases_impl" rel="Chapter" href="Phases_impl.html">
+<link title="Classify_cst" rel="Chapter" href="Classify_cst.html">
+<link title="Rewrite_rule" rel="Chapter" href="Rewrite_rule.html">
+<link title="Avatar" rel="Chapter" href="Avatar.html">
+<link title="Avatar_intf" rel="Chapter" href="Avatar_intf.html">
+<link title="Induction" rel="Chapter" href="Induction.html">
+<link title="Induction_intf" rel="Chapter" href="Induction_intf.html">
+<link title="Superposition" rel="Chapter" href="Superposition.html">
+<link title="Superposition_intf" rel="Chapter" href="Superposition_intf.html">
+<link title="Rewriting" rel="Chapter" href="Rewriting.html">
+<link title="EnumTypes" rel="Chapter" href="EnumTypes.html">
+<link title="ArithInt" rel="Chapter" href="ArithInt.html">
+<link title="Heuristics" rel="Chapter" href="Heuristics.html">
+<link title="Ind_types" rel="Chapter" href="Ind_types.html">
+<link title="Fool" rel="Chapter" href="Fool.html"><link title="Phases" rel="Section" href="#2_Phases">
+<link title="Main Type" rel="Section" href="#2_MainType">
+<title>Phases</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Ind_cst.html" title="Ind_cst">Previous</a>
+&nbsp;<a class="up" href="index.html" title="Index">Up</a>
+&nbsp;<a class="post" href="Phases_impl.html" title="Phases_impl">Next</a>
+</div>
+<h1>Module <a href="type_Phases.html">Phases</a></h1>
+
+<pre><span class="keyword">module</span> Phases: <code class="code">sig</code> <a href="Phases.html">..</a> <code class="code">end</code></pre><div class="info module top">
+<h1 id="1_PhasesoftheProver">Phases of the Prover</h1>
+<p>
+
+    To process a file, the prover goes through a sequence of phases that
+    are used to build values. This module reifies the phases.<br>
+</div>
+<hr width="100%">
+
+<pre><span id="TYPEfilename"><span class="keyword">type</span> <code class="type"></code>filename</span> = <code class="type">string</code> </pre>
+
+
+<pre><span id="TYPEor_error"><span class="keyword">type</span> <code class="type">'a</code> or_error</span> = <code class="type">('a, string) CCResult.t</code> </pre>
+
+<br>
+<h2 id="2_Phases">Phases</h2><br>
+
+<pre><code><span id="TYPEenv_with_clauses"><span class="keyword">type</span> <code class="type"></code>env_with_clauses</span> = </code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTenv_with_clauses.Env_clauses"><span class="constructor">Env_clauses</span></span> <span class="keyword">:</span> <code class="type">'c <a href="Env.html#TYPEpacked">Env.packed</a> * 'c CCVector.ro_vector</code> <span class="keyword">-></span> <code class="type"><a href="Phases.html#TYPEenv_with_clauses">env_with_clauses</a></code></code></td>
+
+</tr></table>
+
+
+
+<pre><code><span id="TYPEenv_with_result"><span class="keyword">type</span> <code class="type"></code>env_with_result</span> = </code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTenv_with_result.Env_result"><span class="constructor">Env_result</span></span> <span class="keyword">:</span> <code class="type">'c <a href="Env.html#TYPEpacked">Env.packed</a> * <a href="Saturate.html#TYPEszs_status">Saturate.szs_status</a></code> <span class="keyword">-></span> <code class="type"><a href="Phases.html#TYPEenv_with_result">env_with_result</a></code></code></td>
+
+</tr></table>
+
+
+
+<pre><code><span id="TYPEphase"><span class="keyword">type</span> <code class="type">('ret, 'before, 'after)</code> phase</span> = </code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTphase.Init"><span class="constructor">Init</span></span> <span class="keyword">:</span> <code class="type">(unit, 'a, [ `Init ]) <a href="Phases.html#TYPEphase">phase</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTphase.Setup_gc"><span class="constructor">Setup_gc</span></span> <span class="keyword">:</span> <code class="type">(unit, [ `Init ], [ `Init ]) <a href="Phases.html#TYPEphase">phase</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTphase.Setup_signal"><span class="constructor">Setup_signal</span></span> <span class="keyword">:</span> <code class="type">(unit, [ `Init ], [ `Init ]) <a href="Phases.html#TYPEphase">phase</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTphase.Parse_CLI"><span class="constructor">Parse_CLI</span></span> <span class="keyword">:</span> <code class="type">(<a href="Phases.html#TYPEfilename">filename</a> list * <a href="Params.html#TYPEt">Params.t</a>, [ `Init ], [ `Parse_cli ]) <a href="Phases.html#TYPEphase">phase</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTphase.LoadExtensions"><span class="constructor">LoadExtensions</span></span> <span class="keyword">:</span> <code class="type">(<a href="Extensions.html#TYPEt">Extensions.t</a> list, [ `Parse_cli ], [ `LoadExtensions ]) <a href="Phases.html#TYPEphase">phase</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTphase.Start_file"><span class="constructor">Start_file</span></span> <span class="keyword">:</span> <code class="type">(<a href="Phases.html#TYPEfilename">filename</a>, [ `LoadExtensions ], [ `Start_file ]) <a href="Phases.html#TYPEphase">phase</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTphase.Parse_file"><span class="constructor">Parse_file</span></span> <span class="keyword">:</span> <code class="type">(Logtk.UntypedAST.statement Sequence.t, [ `Start_file ], [ `Parse_file ])<br>       <a href="Phases.html#TYPEphase">phase</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTphase.Typing"><span class="constructor">Typing</span></span> <span class="keyword">:</span> <code class="type">(Logtk.TypeInference.typed_statement CCVector.ro_vector, [ `Parse_file ],<br>        [ `Typing ])<br>       <a href="Phases.html#TYPEphase">phase</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTphase.CNF"><span class="constructor">CNF</span></span> <span class="keyword">:</span> <code class="type">(Logtk.Statement.clause_t CCVector.ro_vector, [ `Typing ], [ `CNF ])<br>       <a href="Phases.html#TYPEphase">phase</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTphase.Compute_prec"><span class="constructor">Compute_prec</span></span> <span class="keyword">:</span> <code class="type">(Logtk.Precedence.t, [ `CNF ], [ `Precedence ]) <a href="Phases.html#TYPEphase">phase</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTphase.Compute_ord_select"><span class="constructor">Compute_ord_select</span></span> <span class="keyword">:</span> <code class="type">(Logtk.Ordering.t * <a href="Selection.html#TYPEt">Selection.t</a>, [ `Precedence ], [ `Compute_ord_select ])<br>       <a href="Phases.html#TYPEphase">phase</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTphase.MakeCtx"><span class="constructor">MakeCtx</span></span> <span class="keyword">:</span> <code class="type">((module Ctx.S), [ `Compute_ord_select ], [ `MakeCtx ]) <a href="Phases.html#TYPEphase">phase</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTphase.MakeEnv"><span class="constructor">MakeEnv</span></span> <span class="keyword">:</span> <code class="type">(<a href="Phases.html#TYPEenv_with_clauses">env_with_clauses</a>, [ `MakeCtx ], [ `MakeEnv ]) <a href="Phases.html#TYPEphase">phase</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTphase.Pre_saturate"><span class="constructor">Pre_saturate</span></span> <span class="keyword">:</span> <code class="type">('c <a href="Env.html#TYPEpacked">Env.packed</a> * <a href="Saturate.html#TYPEszs_status">Saturate.szs_status</a> * 'c CCVector.ro_vector, [ `MakeEnv ],<br>        [ `Pre_saturate ])<br>       <a href="Phases.html#TYPEphase">phase</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTphase.Saturate"><span class="constructor">Saturate</span></span> <span class="keyword">:</span> <code class="type">(<a href="Phases.html#TYPEenv_with_result">env_with_result</a>, [ `Pre_saturate ], [ `Saturate ]) <a href="Phases.html#TYPEphase">phase</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTphase.Print_result"><span class="constructor">Print_result</span></span> <span class="keyword">:</span> <code class="type">(unit, [ `Saturate ], [ `Print_result ]) <a href="Phases.html#TYPEphase">phase</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTphase.Print_stats"><span class="constructor">Print_stats</span></span> <span class="keyword">:</span> <code class="type">(unit, [ `Print_result ], [ `Print_stats ]) <a href="Phases.html#TYPEphase">phase</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTphase.Print_dot"><span class="constructor">Print_dot</span></span> <span class="keyword">:</span> <code class="type">(unit, [ `Print_stats ], [ `Print_dot ]) <a href="Phases.html#TYPEphase">phase</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTphase.Exit"><span class="constructor">Exit</span></span> <span class="keyword">:</span> <code class="type">(unit, 'b, [ `Exit ]) <a href="Phases.html#TYPEphase">phase</a></code></code></td>
+
+</tr></table>
+
+
+
+<pre><code><span id="TYPEany_phase"><span class="keyword">type</span> <code class="type"></code>any_phase</span> = </code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTany_phase.Any_phase"><span class="constructor">Any_phase</span></span> <span class="keyword">:</span> <code class="type">('a, 'b, 'c) <a href="Phases.html#TYPEphase">phase</a></code> <span class="keyword">-></span> <code class="type"><a href="Phases.html#TYPEany_phase">any_phase</a></code></code></td>
+<td class="typefieldcomment" align="left" valign="top" ><code>(*</code></td><td class="typefieldcomment" align="left" valign="top" ><div class="info ">
+A phase hidden in an existential type<br>
+</div>
+</td><td class="typefieldcomment" align="left" valign="bottom" ><code>*)</code></td>
+</tr></table>
+
+
+<br>
+<h2 id="2_MainType">Main Type</h2><br>
+
+<pre><span id="TYPEt"><span class="keyword">type</span> <code class="type">(+'a, 'p1, 'p2)</code> t</span> </pre>
+<div class="info ">
+Monad type, representing an action starting at phase <code class="code">'p1</code>
+    and stopping at phase <code class="code">'p2</code><br>
+</div>
+
+
+<pre><span id="VALstring_of_phase"><span class="keyword">val</span> string_of_phase</span> : <code class="type">('a, 'b, 'c) <a href="Phases.html#TYPEphase">phase</a> -> string</code></pre>
+<pre><span id="VALstring_of_any_phase"><span class="keyword">val</span> string_of_any_phase</span> : <code class="type"><a href="Phases.html#TYPEany_phase">any_phase</a> -> string</code></pre>
+<pre><span id="VALreturn"><span class="keyword">val</span> return</span> : <code class="type">'a -> ('a, 'p, 'p) <a href="Phases.html#TYPEt">t</a></code></pre><div class="info ">
+Return a value into the monad<br>
+</div>
+
+<pre><span id="VALfail"><span class="keyword">val</span> fail</span> : <code class="type">string -> ('a, 'b, 'c) <a href="Phases.html#TYPEt">t</a></code></pre><div class="info ">
+Fail with the given error message<br>
+</div>
+
+<pre><span id="VALreturn_err"><span class="keyword">val</span> return_err</span> : <code class="type">'a <a href="Phases.html#TYPEor_error">or_error</a> -> ('a, 'p, 'p) <a href="Phases.html#TYPEt">t</a></code></pre>
+<pre><span id="VALexit"><span class="keyword">val</span> exit</span> : <code class="type">(unit, 'a, [ `Exit ]) <a href="Phases.html#TYPEt">t</a></code></pre><div class="info ">
+Exit<br>
+</div>
+
+<pre><span id="VALstart_phase"><span class="keyword">val</span> start_phase</span> : <code class="type">('a, 'p1, 'p2) <a href="Phases.html#TYPEphase">phase</a> -> (unit, 'p1, [ `InPhase of 'p2 ]) <a href="Phases.html#TYPEt">t</a></code></pre><div class="info ">
+Start the given phase<br>
+</div>
+
+<pre><span id="VALreturn_phase"><span class="keyword">val</span> return_phase</span> : <code class="type">'a -> ('a, [ `InPhase of 'p2 ], 'p2) <a href="Phases.html#TYPEt">t</a></code></pre><div class="info ">
+Finish the given phase<br>
+</div>
+
+<pre><span id="VALreturn_phase_err"><span class="keyword">val</span> return_phase_err</span> : <code class="type">'a <a href="Phases.html#TYPEor_error">or_error</a> -> ('a, [ `InPhase of 'p2 ], 'p2) <a href="Phases.html#TYPEt">t</a></code></pre>
+<pre><span id="VALcurrent_phase"><span class="keyword">val</span> current_phase</span> : <code class="type">(<a href="Phases.html#TYPEany_phase">any_phase</a>, 'a, 'p2) <a href="Phases.html#TYPEt">t</a></code></pre><div class="info ">
+Get the current phase<br>
+</div>
+
+<pre><span id="VALwith_phase"><span class="keyword">val</span> with_phase</span> : <code class="type">('a, 'p1, 'p2) <a href="Phases.html#TYPEphase">phase</a> -> f:(unit -> 'a) -> ('a, 'p1, 'p2) <a href="Phases.html#TYPEt">t</a></code></pre><div class="info ">
+Start phase, call <code class="code">f ()</code> to get the result, return its result
+    using <a href="Phases.html#VALreturn_phase"><code class="code">Phases.return_phase</code></a><br>
+</div>
+
+<pre><span id="VALwith_phase1"><span class="keyword">val</span> with_phase1</span> : <code class="type">('b, 'p1, 'p2) <a href="Phases.html#TYPEphase">phase</a> -> f:('a -> 'b) -> 'a -> ('b, 'p1, 'p2) <a href="Phases.html#TYPEt">t</a></code></pre>
+<pre><span id="VALwith_phase2"><span class="keyword">val</span> with_phase2</span> : <code class="type">('c, 'p1, 'p2) <a href="Phases.html#TYPEphase">phase</a> -><br>       f:('a -> 'b -> 'c) -> 'a -> 'b -> ('c, 'p1, 'p2) <a href="Phases.html#TYPEt">t</a></code></pre>
+<pre><span id="VALbind"><span class="keyword">val</span> bind</span> : <code class="type">('a, 'p_before, 'p_middle) <a href="Phases.html#TYPEt">t</a> -><br>       f:('a -> ('b, 'p_middle, 'p_after) <a href="Phases.html#TYPEt">t</a>) -><br>       ('b, 'p_before, 'p_after) <a href="Phases.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">bind state f</code> calls <code class="code">f</code> to go one step further from <code class="code">state</code><br>
+</div>
+
+<pre><span id="VALmap"><span class="keyword">val</span> map</span> : <code class="type">('a, 'p1, 'p2) <a href="Phases.html#TYPEt">t</a> -> f:('a -> 'b) -> ('b, 'p1, 'p2) <a href="Phases.html#TYPEt">t</a></code></pre><div class="info ">
+Map the current value<br>
+</div>
+
+<pre><span id="VALfold_l"><span class="keyword">val</span> fold_l</span> : <code class="type">f:('a -> 'b -> ('a, 'p, 'p) <a href="Phases.html#TYPEt">t</a>) -><br>       x:'a -> 'b list -> ('a, 'p, 'p) <a href="Phases.html#TYPEt">t</a></code></pre>
+<pre><span id="VALrun_parallel"><span class="keyword">val</span> run_parallel</span> : <code class="type">(unit, 'p1, 'p2) <a href="Phases.html#TYPEt">t</a> list -> (unit, 'p1, 'p2) <a href="Phases.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">run_sequentiel l</code> runs each action of the list in succession,
+    restarting every time with the initial state (once an action
+    has finished, its state is discarded). Only the very last state
+    is kept.<br>
+</div>
+
+<pre><span class="keyword">module</span> <a href="Phases.Infix.html">Infix</a>: <code class="code">sig</code> <a href="Phases.Infix.html">..</a> <code class="code">end</code></pre>
+<pre><span class="keyword">include</span> <a href="Phases.Infix.html">Phases.Infix</a></pre>
+
+<pre><span id="VALempty_state"><span class="keyword">val</span> empty_state</span> : <code class="type">Logtk.Flex_state.t</code></pre>
+<pre><span id="VALget"><span class="keyword">val</span> get</span> : <code class="type">(Logtk.Flex_state.t, 'a, 'a) <a href="Phases.html#TYPEt">t</a></code></pre>
+<pre><span id="VALset"><span class="keyword">val</span> set</span> : <code class="type">Logtk.Flex_state.t -> (unit, 'a, 'a) <a href="Phases.html#TYPEt">t</a></code></pre>
+<pre><span id="VALget_key"><span class="keyword">val</span> get_key</span> : <code class="type">'a Logtk.Flex_state.key -> ('a, 'b, 'b) <a href="Phases.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">get_key k</code> returns the value associated with <code class="code">k</code> in the state<br>
+</div>
+
+<pre><span id="VALset_key"><span class="keyword">val</span> set_key</span> : <code class="type">'a Logtk.Flex_state.key -> 'a -> (unit, 'b, 'b) <a href="Phases.html#TYPEt">t</a></code></pre>
+<pre><span id="VALupdate"><span class="keyword">val</span> update</span> : <code class="type">f:(Logtk.Flex_state.t -> Logtk.Flex_state.t) -> (unit, 'a, 'a) <a href="Phases.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">update ~f</code> changes the state using <code class="code">f</code><br>
+</div>
+
+<pre><span id="VALrun_with"><span class="keyword">val</span> run_with</span> : <code class="type">Logtk.Flex_state.t -><br>       ('a, [ `Init ], [ `Exit ]) <a href="Phases.html#TYPEt">t</a> -><br>       (Logtk.Flex_state.t * 'a) <a href="Phases.html#TYPEor_error">or_error</a></code></pre><div class="info ">
+<code class="code">run_with state m</code> executes the actions in <code class="code">m</code> starting with <code class="code">state</code>,
+    returning some value (or error) and the final state.<br>
+</div>
+
+<pre><span id="VALrun"><span class="keyword">val</span> run</span> : <code class="type">('a, [ `Init ], [ `Exit ]) <a href="Phases.html#TYPEt">t</a> -><br>       (Logtk.Flex_state.t * 'a) <a href="Phases.html#TYPEor_error">or_error</a></code></pre><div class="info ">
+<code class="code">run m</code> is <code class="code">run_with empty_state m</code><br>
+</div>
+
+<pre><span class="keyword">module</span> <a href="Phases.Key.html">Key</a>: <code class="code">sig</code> <a href="Phases.Key.html">..</a> <code class="code">end</code></pre></body></html>

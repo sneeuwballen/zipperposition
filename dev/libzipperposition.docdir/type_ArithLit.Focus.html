@@ -1,0 +1,112 @@
+<html><head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="ClauseQueue" rel="Chapter" href="ClauseQueue.html">
+<link title="Clause" rel="Chapter" href="Clause.html">
+<link title="SClause" rel="Chapter" href="SClause.html">
+<link title="Const" rel="Chapter" href="Const.html">
+<link title="Extensions" rel="Chapter" href="Extensions.html">
+<link title="Literal" rel="Chapter" href="Literal.html">
+<link title="Literals" rel="Chapter" href="Literals.html">
+<link title="Ctx" rel="Chapter" href="Ctx.html">
+<link title="ProofStep" rel="Chapter" href="ProofStep.html">
+<link title="ProofPrint" rel="Chapter" href="ProofPrint.html">
+<link title="ProofState" rel="Chapter" href="ProofState.html">
+<link title="Saturate" rel="Chapter" href="Saturate.html">
+<link title="Selection" rel="Chapter" href="Selection.html">
+<link title="AC" rel="Chapter" href="AC.html">
+<link title="AC_intf" rel="Chapter" href="AC_intf.html">
+<link title="SimplM" rel="Chapter" href="SimplM.html">
+<link title="Params" rel="Chapter" href="Params.html">
+<link title="Env" rel="Chapter" href="Env.html">
+<link title="Monome" rel="Chapter" href="Monome.html">
+<link title="ArithLit" rel="Chapter" href="ArithLit.html">
+<link title="Signals" rel="Chapter" href="Signals.html">
+<link title="Multisets" rel="Chapter" href="Multisets.html">
+<link title="Ctx_intf" rel="Chapter" href="Ctx_intf.html">
+<link title="Clause_intf" rel="Chapter" href="Clause_intf.html">
+<link title="Env_intf" rel="Chapter" href="Env_intf.html">
+<link title="ProofState_intf" rel="Chapter" href="ProofState_intf.html">
+<link title="BBox" rel="Chapter" href="BBox.html">
+<link title="ClauseContext" rel="Chapter" href="ClauseContext.html">
+<link title="ClauseQueue_intf" rel="Chapter" href="ClauseQueue_intf.html">
+<link title="Bool_lit" rel="Chapter" href="Bool_lit.html">
+<link title="Bool_lit_intf" rel="Chapter" href="Bool_lit_intf.html">
+<link title="Sat_solver" rel="Chapter" href="Sat_solver.html">
+<link title="Sat_solver_intf" rel="Chapter" href="Sat_solver_intf.html">
+<link title="Trail" rel="Chapter" href="Trail.html">
+<link title="Ind_cst" rel="Chapter" href="Ind_cst.html">
+<link title="Phases" rel="Chapter" href="Phases.html">
+<link title="Phases_impl" rel="Chapter" href="Phases_impl.html">
+<link title="Classify_cst" rel="Chapter" href="Classify_cst.html">
+<link title="Rewrite_rule" rel="Chapter" href="Rewrite_rule.html">
+<link title="Avatar" rel="Chapter" href="Avatar.html">
+<link title="Avatar_intf" rel="Chapter" href="Avatar_intf.html">
+<link title="Induction" rel="Chapter" href="Induction.html">
+<link title="Induction_intf" rel="Chapter" href="Induction_intf.html">
+<link title="Superposition" rel="Chapter" href="Superposition.html">
+<link title="Superposition_intf" rel="Chapter" href="Superposition_intf.html">
+<link title="Rewriting" rel="Chapter" href="Rewriting.html">
+<link title="EnumTypes" rel="Chapter" href="EnumTypes.html">
+<link title="ArithInt" rel="Chapter" href="ArithInt.html">
+<link title="Heuristics" rel="Chapter" href="Heuristics.html">
+<link title="Ind_types" rel="Chapter" href="Ind_types.html">
+<link title="Fool" rel="Chapter" href="Fool.html"><title>ArithLit.Focus</title>
+</head>
+<body>
+<code class="code"><span class="keyword">sig</span><br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;t&nbsp;=<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Left</span>&nbsp;<span class="keyword">of</span>&nbsp;<span class="constructor">ArithLit</span>.op&nbsp;*&nbsp;<span class="constructor">Z</span>.t&nbsp;<span class="constructor">Monome</span>.<span class="constructor">Focus</span>.t&nbsp;*&nbsp;<span class="constructor">Z</span>.t&nbsp;<span class="constructor">Monome</span>.t<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="constructor">Right</span>&nbsp;<span class="keyword">of</span>&nbsp;<span class="constructor">ArithLit</span>.op&nbsp;*&nbsp;<span class="constructor">Z</span>.t&nbsp;<span class="constructor">Monome</span>.t&nbsp;*&nbsp;<span class="constructor">Z</span>.t&nbsp;<span class="constructor">Monome</span>.<span class="constructor">Focus</span>.t<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="constructor">Div</span>&nbsp;<span class="keyword">of</span>&nbsp;<span class="constructor">Z</span>.t&nbsp;<span class="constructor">Monome</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="constructor">ArithLit</span>.divides<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;mk_left&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">ArithLit</span>.op&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Z</span>.t&nbsp;<span class="constructor">Monome</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Z</span>.t&nbsp;<span class="constructor">Monome</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;mk_right&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">ArithLit</span>.op&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Z</span>.t&nbsp;<span class="constructor">Monome</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Z</span>.t&nbsp;<span class="constructor">Monome</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;mk_div&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;?sign:bool&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Z</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;power:int&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Z</span>.t&nbsp;<span class="constructor">Monome</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;get&nbsp;:&nbsp;<span class="constructor">ArithLit</span>.lit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Position</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;option<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;get_exn&nbsp;:&nbsp;<span class="constructor">ArithLit</span>.lit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Position</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;focus_term&nbsp;:&nbsp;<span class="constructor">ArithLit</span>.lit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.term&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;option<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;focus_term_exn&nbsp;:&nbsp;<span class="constructor">ArithLit</span>.lit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.term&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;replace&nbsp;:&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Z</span>.t&nbsp;<span class="constructor">Monome</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.lit<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;term&nbsp;:&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.term<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;focused_monome&nbsp;:&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Z</span>.t&nbsp;<span class="constructor">Monome</span>.<span class="constructor">Focus</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;opposite_monome&nbsp;:&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Z</span>.t&nbsp;<span class="constructor">Monome</span>.t&nbsp;option<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;opposite_monome_exn&nbsp;:&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Z</span>.t&nbsp;<span class="constructor">Monome</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;is_max&nbsp;:&nbsp;ord:<span class="constructor">Logtk</span>.<span class="constructor">Ordering</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;is_strictly_max&nbsp;:&nbsp;ord:<span class="constructor">Logtk</span>.<span class="constructor">Ordering</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;map_lit&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;f_m:(<span class="constructor">Z</span>.t&nbsp;<span class="constructor">Monome</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Z</span>.t&nbsp;<span class="constructor">Monome</span>.t)&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;f_mf:(<span class="constructor">Z</span>.t&nbsp;<span class="constructor">Monome</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Z</span>.t&nbsp;<span class="constructor">Monome</span>.<span class="constructor">Focus</span>.t)&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;product&nbsp;:&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Z</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;scale&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;*&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;scale_power&nbsp;:&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;int&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;apply_subst&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;renaming:<span class="constructor">Logtk</span>.<span class="constructor">Subst</span>.<span class="constructor">Renaming</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Subst</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Scoped</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;apply_subst_no_renaming&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Subst</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Scoped</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;unify&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;?subst:<span class="constructor">Logtk</span>.<span class="constructor">Subst</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Scoped</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Scoped</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;(<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;*&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;*&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Subst</span>.t)&nbsp;<span class="constructor">Sequence</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;fold_terms&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;?pos:<span class="constructor">Logtk</span>.<span class="constructor">Position</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">ArithLit</span>.lit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;*&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Position</span>.t)&nbsp;<span class="constructor">Sequence</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;op&nbsp;:&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;[&nbsp;<span class="keywordsign">`</span><span class="constructor">Binary</span>&nbsp;<span class="keyword">of</span>&nbsp;<span class="constructor">ArithLit</span>.op&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="keywordsign">`</span><span class="constructor">Divides</span>&nbsp;]<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;unfocus&nbsp;:&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ArithLit</span>.lit<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;pp&nbsp;:&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="constructor">CCFormat</span>.printer<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;to_string&nbsp;:&nbsp;<span class="constructor">ArithLit</span>.<span class="constructor">Focus</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;string<br>
+<span class="keyword">end</span></code></body></html>

@@ -1,0 +1,144 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Monome.Int.Modulo.html">
+<link rel="Up" href="Monome.Int.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="ClauseQueue" rel="Chapter" href="ClauseQueue.html">
+<link title="Clause" rel="Chapter" href="Clause.html">
+<link title="SClause" rel="Chapter" href="SClause.html">
+<link title="Const" rel="Chapter" href="Const.html">
+<link title="Extensions" rel="Chapter" href="Extensions.html">
+<link title="Literal" rel="Chapter" href="Literal.html">
+<link title="Literals" rel="Chapter" href="Literals.html">
+<link title="Ctx" rel="Chapter" href="Ctx.html">
+<link title="ProofStep" rel="Chapter" href="ProofStep.html">
+<link title="ProofPrint" rel="Chapter" href="ProofPrint.html">
+<link title="ProofState" rel="Chapter" href="ProofState.html">
+<link title="Saturate" rel="Chapter" href="Saturate.html">
+<link title="Selection" rel="Chapter" href="Selection.html">
+<link title="AC" rel="Chapter" href="AC.html">
+<link title="AC_intf" rel="Chapter" href="AC_intf.html">
+<link title="SimplM" rel="Chapter" href="SimplM.html">
+<link title="Params" rel="Chapter" href="Params.html">
+<link title="Env" rel="Chapter" href="Env.html">
+<link title="Monome" rel="Chapter" href="Monome.html">
+<link title="ArithLit" rel="Chapter" href="ArithLit.html">
+<link title="Signals" rel="Chapter" href="Signals.html">
+<link title="Multisets" rel="Chapter" href="Multisets.html">
+<link title="Ctx_intf" rel="Chapter" href="Ctx_intf.html">
+<link title="Clause_intf" rel="Chapter" href="Clause_intf.html">
+<link title="Env_intf" rel="Chapter" href="Env_intf.html">
+<link title="ProofState_intf" rel="Chapter" href="ProofState_intf.html">
+<link title="BBox" rel="Chapter" href="BBox.html">
+<link title="ClauseContext" rel="Chapter" href="ClauseContext.html">
+<link title="ClauseQueue_intf" rel="Chapter" href="ClauseQueue_intf.html">
+<link title="Bool_lit" rel="Chapter" href="Bool_lit.html">
+<link title="Bool_lit_intf" rel="Chapter" href="Bool_lit_intf.html">
+<link title="Sat_solver" rel="Chapter" href="Sat_solver.html">
+<link title="Sat_solver_intf" rel="Chapter" href="Sat_solver_intf.html">
+<link title="Trail" rel="Chapter" href="Trail.html">
+<link title="Ind_cst" rel="Chapter" href="Ind_cst.html">
+<link title="Phases" rel="Chapter" href="Phases.html">
+<link title="Phases_impl" rel="Chapter" href="Phases_impl.html">
+<link title="Classify_cst" rel="Chapter" href="Classify_cst.html">
+<link title="Rewrite_rule" rel="Chapter" href="Rewrite_rule.html">
+<link title="Avatar" rel="Chapter" href="Avatar.html">
+<link title="Avatar_intf" rel="Chapter" href="Avatar_intf.html">
+<link title="Induction" rel="Chapter" href="Induction.html">
+<link title="Induction_intf" rel="Chapter" href="Induction_intf.html">
+<link title="Superposition" rel="Chapter" href="Superposition.html">
+<link title="Superposition_intf" rel="Chapter" href="Superposition_intf.html">
+<link title="Rewriting" rel="Chapter" href="Rewriting.html">
+<link title="EnumTypes" rel="Chapter" href="EnumTypes.html">
+<link title="ArithInt" rel="Chapter" href="ArithInt.html">
+<link title="Heuristics" rel="Chapter" href="Heuristics.html">
+<link title="Ind_types" rel="Chapter" href="Ind_types.html">
+<link title="Fool" rel="Chapter" href="Fool.html"><title>Monome.Int.Solve</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Monome.Int.Modulo.html" title="Monome.Int.Modulo">Previous</a>
+&nbsp;<a class="up" href="Monome.Int.html" title="Monome.Int">Up</a>
+&nbsp;</div>
+<h1>Module <a href="type_Monome.Int.Solve.html">Monome.Int.Solve</a></h1>
+
+<pre><span class="keyword">module</span> Solve: <code class="code">sig</code> <a href="Monome.Int.Solve.html">..</a> <code class="code">end</code></pre><hr width="100%">
+
+<pre><span id="TYPEsolution"><span class="keyword">type</span> <code class="type"></code>solution</span> = <code class="type">(<a href="Monome.html#TYPEterm">Monome.term</a> * <a href="Monome.Int.html#TYPEt">Monome.Int.t</a>) list</code> </pre>
+<div class="info ">
+List of constraints (term = monome). It means that
+        if all those constraints are satisfied, then a solution
+        to the given problem has been found<br>
+</div>
+
+
+<pre><span id="VALsplit_solution"><span class="keyword">val</span> split_solution</span> : <code class="type"><a href="Monome.Int.Solve.html#TYPEsolution">solution</a> -> Logtk.Subst.t * <a href="Monome.Int.Solve.html#TYPEsolution">solution</a></code></pre><div class="info ">
+Split the solution into a variable substitution, and a
+        list of constraints on non-variable terms<br>
+</div>
+
+<pre><span id="VALdiophant2"><span class="keyword">val</span> diophant2</span> : <code class="type">Z.t -> Z.t -> Z.t -> Z.t * Z.t * Z.t</code></pre><div class="info ">
+Find the solution vector for this diophantine equation, or fails.<br>
+<b>Raises</b> <code>Failure</code> if the equation is unsolvable<br>
+<b>Returns</b> a triple <code class="code">u, v, gcd</code> such that for all int <code class="code">k</code>,
+        <code class="code">u + b * k, v - a * k</code> is solution of equation <code class="code">a * x + b * y = const</code>.<br>
+</div>
+
+<pre><span id="VALdiophant_l"><span class="keyword">val</span> diophant_l</span> : <code class="type">Z.t list -> Z.t -> Z.t list * Z.t</code></pre><div class="info ">
+generalize diophantine equation solving to a list of at least two
+        coefficients.<br>
+<b>Raises</b> <code>Failure</code> if the equation is not solvable<br>
+<b>Returns</b> a list of Bezout coefficients, and the
+          GCD of the input list, or fails<br>
+</div>
+
+<pre><span id="VALcoeffs_n"><span class="keyword">val</span> coeffs_n</span> : <code class="type">Z.t list -> Z.t -> <a href="Monome.html#TYPEterm">Monome.term</a> list -> <a href="Monome.Int.html#TYPEt">Monome.Int.t</a> list</code></pre><div class="info ">
+<code class="code">coeffs_n l gcd</code>, if <code class="code">length l = n</code>, returns a function that
+        takes a list of <code class="code">n-1</code> terms <code class="code">k1, ..., k(n-1)</code> and returns a list of
+        monomes <code class="code">m1, ..., mn</code> that depend on <code class="code">k1, ..., k(n-1)</code> such that the sum
+        <code class="code">l1 * m1 + l2 * m2 + ... + ln * mn = 0</code>.
+<p>
+
+        <b>Note</b> that the input list of the solution must have <code class="code">n-1</code> elements,
+        but that it returns a list of <code class="code">n</code> elements!<br>
+</div>
+
+<pre><span id="VALeq_zero"><span class="keyword">val</span> eq_zero</span> : <code class="type">?fresh_var:(Logtk.Type.t -> <a href="Monome.html#TYPEterm">Monome.term</a>) -><br>       <a href="Monome.Int.html#TYPEt">Monome.Int.t</a> -> <a href="Monome.Int.Solve.html#TYPEsolution">solution</a> list</code></pre><div class="info ">
+Returns substitutions that make the monome always equal to zero.
+        Fresh variables may be generated using <code class="code">fresh_var</code>,
+        for diophantine equations. Returns the empty list if no solution is
+        found.
+<p>
+
+        For instance, on the monome 2X + 3Y - 7, it may generate a new variable
+        Z and return the substitution  <code class="code">X -&gt; 3Z - 7, Y -&gt; 2Z + 7</code><br>
+</div>
+
+<pre><span id="VALlower_zero"><span class="keyword">val</span> lower_zero</span> : <code class="type">?fresh_var:(Logtk.Type.t -> <a href="Monome.html#TYPEterm">Monome.term</a>) -><br>       strict:bool -> <a href="Monome.Int.html#TYPEt">Monome.Int.t</a> -> <a href="Monome.Int.Solve.html#TYPEsolution">solution</a> list</code></pre><div class="info ">
+Solve for the monome to be always lower than zero (<code class="code">strict</code> determines
+        whether the inequality is strict or not). This
+        may not return all solutions, but a subspace of it<br>
+</div>
+<div class="param_info"><code class="code">fresh_var</code> : see <code class="code">solve_eq_zero</code></div>
+
+<pre><span id="VALlt_zero"><span class="keyword">val</span> lt_zero</span> : <code class="type">?fresh_var:(Logtk.Type.t -> <a href="Monome.html#TYPEterm">Monome.term</a>) -><br>       <a href="Monome.Int.html#TYPEt">Monome.Int.t</a> -> <a href="Monome.Int.Solve.html#TYPEsolution">solution</a> list</code></pre><div class="info ">
+Shortcut for <a href="Monome.Int.Solve.html#VALlower_zero"><code class="code">Monome.Int.Solve.lower_zero</code></a> when <code class="code">strict = true</code><br>
+</div>
+
+<pre><span id="VALleq_zero"><span class="keyword">val</span> leq_zero</span> : <code class="type">?fresh_var:(Logtk.Type.t -> <a href="Monome.html#TYPEterm">Monome.term</a>) -><br>       <a href="Monome.Int.html#TYPEt">Monome.Int.t</a> -> <a href="Monome.Int.Solve.html#TYPEsolution">solution</a> list</code></pre><div class="info ">
+Shortcut for <a href="Monome.Int.Solve.html#VALlower_zero"><code class="code">Monome.Int.Solve.lower_zero</code></a> when <code class="code">strict = false</code><br>
+</div>
+
+<pre><span id="VALneq_zero"><span class="keyword">val</span> neq_zero</span> : <code class="type">?fresh_var:(Logtk.Type.t -> <a href="Monome.html#TYPEterm">Monome.term</a>) -><br>       <a href="Monome.Int.html#TYPEt">Monome.Int.t</a> -> <a href="Monome.Int.Solve.html#TYPEsolution">solution</a> list</code></pre><div class="info ">
+Find some solutions that negate the equation. For now it
+        just takes solutions to <code class="code">m &lt; 0</code>.<br>
+</div>
+</body></html>

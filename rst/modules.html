@@ -1,0 +1,269 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>List of Modules &#8212; logtk  documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Term representations" href="term_hierarchy.html" />
+    <link rel="prev" title="Tutorial" href="tutorial.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="list-of-modules">
+<h1>List of Modules<a class="headerlink" href="#list-of-modules" title="Permalink to this headline">¶</a></h1>
+<p>The most up-to-date reference to the list of modules is in the <code class="docutils literal"><span class="pre">_oasis</span></code> file
+at the root of the project. This file describes how to build parts of the
+library.</p>
+<p>In this document we give a high-level view of what every module in <code class="docutils literal"><span class="pre">Logtk</span></code>
+does.</p>
+<div class="section" id="main-library">
+<h2>Main Library<a class="headerlink" href="#main-library" title="Permalink to this headline">¶</a></h2>
+<p>The main library contains a single packed module, <code class="docutils literal"><span class="pre">Logtk</span></code>, which depends
+only on <code class="docutils literal"><span class="pre">zarith</span></code> (a wrapper around <a class="reference external" href="https://gmplib.org/">GMP</a> used
+for arbitrary-precision arithmetic) and <code class="docutils literal"><span class="pre">unix</span></code> (the standard OCaml
+wrapper to the Posix APIs). This module
+contains other modules, for instance <code class="docutils literal"><span class="pre">Logtk.FOTerm</span></code> for representing
+first-order terms. It is often useful to rename modules prior to their
+use, for instance</p>
+<div class="highlight-ocaml"><div class="highlight"><pre><span></span><span class="k">module</span> <span class="nc">T</span> <span class="o">=</span> <span class="nn">Logtk</span><span class="p">.</span><span class="nc">FOTerm</span>
+<span class="k">module</span> <span class="nc">P</span> <span class="o">=</span> <span class="nn">Logtk</span><span class="p">.</span><span class="nc">Position</span>
+</pre></div>
+</div>
+<p>This technique allows to keep identifiers short, without using the <code class="docutils literal"><span class="pre">open</span></code>
+directive that makes code hard to read (one cannot easily find which opened
+module some identifier comes from).</p>
+<dl class="docutils">
+<dt><code class="docutils literal"><span class="pre">Logtk</span></code></dt>
+<dd><ul class="first last simple">
+<li><code class="docutils literal"><span class="pre">Symbol</span></code>: representation of logical constants, including text symbols and numeric symbols (using <code class="docutils literal"><span class="pre">Zarith</span></code>).</li>
+<li><code class="docutils literal"><span class="pre">ScopedTerm</span></code>: common internal representation for terms, formulas, etc.  that handles De Bruijn indices, substitutions, and hashconsing.</li>
+<li><code class="docutils literal"><span class="pre">PrologTerm</span></code>: the dual of <code class="docutils literal"><span class="pre">ScopedTerm</span></code>, an untyped AST with locations but no hashconsing nor scoping.</li>
+<li><code class="docutils literal"><span class="pre">FOTerm</span></code>: first-order typed terms (built on top of <code class="docutils literal"><span class="pre">ScopedTerm</span></code>)</li>
+<li><code class="docutils literal"><span class="pre">HOTerm</span></code>: higher-order typed terms</li>
+<li><dl class="first docutils">
+<dt><code class="docutils literal"><span class="pre">Formula</span></code>: formulas parametrized by the terms at their leaves.</dt>
+<dd><ul class="first last">
+<li><code class="docutils literal"><span class="pre">Formula.FO</span></code>: first-order formulas (with typed terms).</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt><code class="docutils literal"><span class="pre">Type</span></code>: polymorphic types with explicit quantification, built on</dt>
+<dd>top of <code class="docutils literal"><span class="pre">ScopedTerm</span></code>, used by <code class="docutils literal"><span class="pre">FOTerm</span></code> and <code class="docutils literal"><span class="pre">HOTerm</span></code>.</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt><code class="docutils literal"><span class="pre">Unif</span></code>: unification algorithms, both unary and n-ary.</dt>
+<dd><ul class="first last">
+<li><code class="docutils literal"><span class="pre">Unif.FO</span></code>: specialization for <code class="docutils literal"><span class="pre">FOTerm</span></code></li>
+<li><code class="docutils literal"><span class="pre">Unif.Ty</span></code>: specialization for <code class="docutils literal"><span class="pre">Type</span></code></li>
+<li>similar sub-modules.</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><code class="docutils literal"><span class="pre">Substs</span></code>: substitutions on free variables for types and terms.</li>
+<li><code class="docutils literal"><span class="pre">DBEnv</span></code>: De Bruijn environments for bound variables.</li>
+<li><code class="docutils literal"><span class="pre">Signature</span></code>: map from symbols to types</li>
+<li><code class="docutils literal"><span class="pre">TypeInference</span></code>: Hindley-Milner-like type inference algorithm, that converts <code class="docutils literal"><span class="pre">PrologTerm</span></code> to typed terms and formulas.</li>
+<li><code class="docutils literal"><span class="pre">Precedence</span></code>: total ordering on symbols.</li>
+<li><code class="docutils literal"><span class="pre">Ordering</span></code>: orderings on terms, including LPO and KBO (parametrized by <code class="docutils literal"><span class="pre">Precedence</span></code>).</li>
+<li><code class="docutils literal"><span class="pre">Position</span></code>: positions in terms (paths in trees)</li>
+<li><code class="docutils literal"><span class="pre">Cnf</span></code>: transformation of formulas into <em>Clause Normal Form</em></li>
+<li><dl class="first docutils">
+<dt><code class="docutils literal"><span class="pre">Index</span></code>: definition of term index signatures. Related modules:</dt>
+<dd><ul class="first last">
+<li><code class="docutils literal"><span class="pre">Dtree</span></code>: perfect discrimination tree, for rewriting</li>
+<li><code class="docutils literal"><span class="pre">NPDtree</span></code>: non-perfect discrimination tree, for rewriting and term indexing</li>
+<li><code class="docutils literal"><span class="pre">Fingerprint</span></code>: fingerprint term indexing</li>
+<li><code class="docutils literal"><span class="pre">FastFingerprint</span></code>: attempt (failed for now) to make <code class="docutils literal"><span class="pre">Fingerprint</span></code> faster</li>
+<li><code class="docutils literal"><span class="pre">FeatureVector</span></code>: feature-vector indexing for subsumption</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><code class="docutils literal"><span class="pre">Rewriting</span></code>: rewriting on terms, ordered rewriting, formula rewriting.</li>
+<li><code class="docutils literal"><span class="pre">FormulaShape</span></code>: detection of some specific formulas (definitions...).</li>
+<li><code class="docutils literal"><span class="pre">Skolem</span></code>: skolemization and definitional CNF.</li>
+<li><code class="docutils literal"><span class="pre">Lambda</span></code>: lambda-calculus (beta reduction) on higher-order terms.</li>
+<li><code class="docutils literal"><span class="pre">Transform</span></code>: computation of fixpoints over transformations of formulas</li>
+<li><code class="docutils literal"><span class="pre">Multiset</span></code>: low level multiset of elements, with multiset ordering</li>
+<li><code class="docutils literal"><span class="pre">Congruence</span></code>: simple congruence closure on terms (decides ground equality)</li>
+<li>and many helpers modules that can be found in <code class="docutils literal"><span class="pre">src/base/lib/</span></code>, including locations, iterators, hashconsing, combinators, etc.</li>
+</ul>
+</dd>
+</dl>
+</div>
+<div class="section" id="parsers">
+<h2>Parsers<a class="headerlink" href="#parsers" title="Permalink to this headline">¶</a></h2>
+<p>This sub-library is optional and will only be built if
+<a class="reference external" href="http://gallium.inria.fr/~fpottier/menhir/">menhir</a> (an
+excellent parser generator for OCaml) is installed. Currently it
+contains parsers for two file formats. Again the library is
+a packed module <code class="docutils literal"><span class="pre">Logtk_parsers</span></code> (e.g. <code class="docutils literal"><span class="pre">Logtk_parsers.Ast_tptpt</span></code>).</p>
+<dl class="docutils">
+<dt><code class="docutils literal"><span class="pre">Logtk_parsers</span></code></dt>
+<dd><ul class="first last simple">
+<li><dl class="first docutils">
+<dt><code class="docutils literal"><span class="pre">TPTP</span></code>:</dt>
+<dd><ul class="first last">
+<li><code class="docutils literal"><span class="pre">Trace_tstp</span></code>: proof traces from TSTP provers.</li>
+<li><code class="docutils literal"><span class="pre">CallProver</span></code>: call a TSTP prover on a problem.</li>
+<li><code class="docutils literal"><span class="pre">Parse_tptp</span></code>: TPTP parser</li>
+<li><code class="docutils literal"><span class="pre">Lex_tptp</span></code>: TPTP lexer</li>
+<li><code class="docutils literal"><span class="pre">Ast_tptp</span></code>: AST yielded by the parser</li>
+<li><code class="docutils literal"><span class="pre">Util_tptp</span></code>: higher-level interface to the TPTP parser (the one to use)</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt><code class="docutils literal"><span class="pre">HO</span></code> (an ad-hoc format for higher-order terms with multisets and</dt>
+<dd>extensible records):
+- <code class="docutils literal"><span class="pre">Parse_ho</span></code>: parser for a simple Higher-Order format
+- <code class="docutils literal"><span class="pre">Lex_ho</span></code>: lexer for a simple Higher-Order format
+- <code class="docutils literal"><span class="pre">Ast_ho</span></code>: AST yielded by <code class="docutils literal"><span class="pre">Parse_ho</span></code></dd>
+</dl>
+</li>
+</ul>
+</dd>
+</dl>
+</div>
+<div class="section" id="meta-prover">
+<h2>Meta-Prover<a class="headerlink" href="#meta-prover" title="Permalink to this headline">¶</a></h2>
+<p>A prover that reasons about features of the problem at hand: higher-level
+properties of symbols, algebraic structures, etc. See <a class="reference external" href="meta_prover">there</a>
+for more details. The library is packed into <code class="docutils literal"><span class="pre">Logtk_meta</span></code>.</p>
+<dl class="docutils">
+<dt><code class="docutils literal"><span class="pre">Logtk_meta</span></code></dt>
+<dd><ul class="first last simple">
+<li><code class="docutils literal"><span class="pre">Encoding</span></code>: encoding of formulas and terms into HO terms.</li>
+<li><code class="docutils literal"><span class="pre">Reasoner</span></code>: forward-chaining reasoner on meta-level facts.</li>
+<li><code class="docutils literal"><span class="pre">Plugin</span></code>: bridge between HO terms and their proof-level meaning.</li>
+<li><code class="docutils literal"><span class="pre">Prover</span></code>: general interface to the meta-prover.</li>
+</ul>
+</dd>
+</dl>
+</div>
+<div class="section" id="arbitrary-instances">
+<h2>Arbitrary Instances<a class="headerlink" href="#arbitrary-instances" title="Permalink to this headline">¶</a></h2>
+<p>This module is only built if <a class="reference external" href="https://github.com/c-cube/qcheck/">qcheck</a>
+(a random property-testing library similar to Haskell&#8217;s QuickCheck) is
+installed. It provides random generators for terms, formulas, etc.
+The library is packed into <code class="docutils literal"><span class="pre">Logtk_arbitrary</span></code>.</p>
+<ul class="simple">
+<li><dl class="first docutils">
+<dt><code class="docutils literal"><span class="pre">Logtk_arbitrary</span></code> (random generators for <code class="docutils literal"><span class="pre">qcheck</span></code> random-testing, optional)</dt>
+<dd><ul class="first last">
+<li><code class="docutils literal"><span class="pre">ArTerm</span></code>: generation of random terms</li>
+<li><code class="docutils literal"><span class="pre">ArForm</span></code>: random first order formulas</li>
+<li><code class="docutils literal"><span class="pre">ArType</span></code>: random types</li>
+<li><code class="docutils literal"><span class="pre">ArSignature</span></code>: random signatures</li>
+<li><code class="docutils literal"><span class="pre">ArSymbol</span></code>: random symbols</li>
+<li><code class="docutils literal"><span class="pre">ArPattern</span></code>: random meta-patterns</li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="contents.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">List of Modules</a><ul>
+<li><a class="reference internal" href="#main-library">Main Library</a></li>
+<li><a class="reference internal" href="#parsers">Parsers</a></li>
+<li><a class="reference internal" href="#meta-prover">Meta-Prover</a></li>
+<li><a class="reference internal" href="#arbitrary-instances">Arbitrary Instances</a></li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="contents.html">Documentation overview</a><ul>
+      <li>Previous: <a href="tutorial.html" title="previous chapter">Tutorial</a></li>
+      <li>Next: <a href="term_hierarchy.html" title="next chapter">Term representations</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/modules.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/modules.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

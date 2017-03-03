@@ -1,0 +1,253 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link rel="Up" href="Multiset.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="InnerTerm" rel="Chapter" href="InnerTerm.html">
+<link title="FOTerm" rel="Chapter" href="FOTerm.html">
+<link title="Type" rel="Chapter" href="Type.html">
+<link title="Util" rel="Chapter" href="Util.html">
+<link title="STerm" rel="Chapter" href="STerm.html">
+<link title="Interfaces" rel="Chapter" href="Interfaces.html">
+<link title="DBEnv" rel="Chapter" href="DBEnv.html">
+<link title="Position" rel="Chapter" href="Position.html">
+<link title="Var" rel="Chapter" href="Var.html">
+<link title="HVar" rel="Chapter" href="HVar.html">
+<link title="Subst" rel="Chapter" href="Subst.html">
+<link title="Unif" rel="Chapter" href="Unif.html">
+<link title="Signature" rel="Chapter" href="Signature.html">
+<link title="Scoped" rel="Chapter" href="Scoped.html">
+<link title="Unif_intf" rel="Chapter" href="Unif_intf.html">
+<link title="TypeInference" rel="Chapter" href="TypeInference.html">
+<link title="Options" rel="Chapter" href="Options.html">
+<link title="Comparison" rel="Chapter" href="Comparison.html">
+<link title="Precedence" rel="Chapter" href="Precedence.html">
+<link title="Builtin" rel="Chapter" href="Builtin.html">
+<link title="Ordering" rel="Chapter" href="Ordering.html">
+<link title="Skolem" rel="Chapter" href="Skolem.html">
+<link title="Cnf" rel="Chapter" href="Cnf.html">
+<link title="ID" rel="Chapter" href="ID.html">
+<link title="IDOrBuiltin" rel="Chapter" href="IDOrBuiltin.html">
+<link title="SLiteral" rel="Chapter" href="SLiteral.html">
+<link title="Index" rel="Chapter" href="Index.html">
+<link title="Index_intf" rel="Chapter" href="Index_intf.html">
+<link title="Dtree" rel="Chapter" href="Dtree.html">
+<link title="Fingerprint" rel="Chapter" href="Fingerprint.html">
+<link title="NPDtree" rel="Chapter" href="NPDtree.html">
+<link title="Binder" rel="Chapter" href="Binder.html">
+<link title="Congruence" rel="Chapter" href="Congruence.html">
+<link title="FeatureVector" rel="Chapter" href="FeatureVector.html">
+<link title="FV_tree" rel="Chapter" href="FV_tree.html">
+<link title="UntypedAST" rel="Chapter" href="UntypedAST.html">
+<link title="Ind_ty" rel="Chapter" href="Ind_ty.html">
+<link title="TypedSTerm" rel="Chapter" href="TypedSTerm.html">
+<link title="Statement" rel="Chapter" href="Statement.html">
+<link title="Flex_state" rel="Chapter" href="Flex_state.html">
+<link title="Compute_prec" rel="Chapter" href="Compute_prec.html">
+<link title="Ordinal" rel="Chapter" href="Ordinal.html">
+<link title="Hashcons" rel="Chapter" href="Hashcons.html">
+<link title="ParseLocation" rel="Chapter" href="ParseLocation.html">
+<link title="Multiset" rel="Chapter" href="Multiset.html">
+<link title="LazyList" rel="Chapter" href="LazyList.html">
+<link title="Hash" rel="Chapter" href="Hash.html">
+<link title="IArray" rel="Chapter" href="IArray.html">
+<link title="AllocCache" rel="Chapter" href="AllocCache.html">
+<link title="Multiset_intf" rel="Chapter" href="Multiset_intf.html">
+<link title="Signal" rel="Chapter" href="Signal.html">
+<link title="UnionFind" rel="Chapter" href="UnionFind.html"><link title="Comparisons" rel="Section" href="#6_Comparisons">
+<title>Multiset.S</title>
+</head>
+<body>
+<div class="navbar">&nbsp;<a class="up" href="Multiset.html" title="Multiset">Up</a>
+&nbsp;</div>
+<h1>Module type <a href="type_Multiset.S.html">Multiset.S</a></h1>
+
+<pre><span class="keyword">module type</span> S = <code class="type"><a href="Multiset_intf.S.html">Multiset_intf.S</a></code></pre><hr width="100%">
+
+<pre><span id="TYPEelt"><span class="keyword">type</span> <code class="type"></code>elt</span> </pre>
+<div class="info ">
+Elements of the multiset<br>
+</div>
+
+
+<pre><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> </pre>
+<div class="info ">
+A multiset of elements of type 'a<br>
+</div>
+
+
+<pre><span id="VALsize"><span class="keyword">val</span> size</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEt">t</a> -> int</code></pre><div class="info ">
+Number of distinct elements.<br>
+</div>
+
+<pre><span id="VALcardinal"><span class="keyword">val</span> cardinal</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEt">t</a> -> Z.t</code></pre><div class="info ">
+Number of unique occurrences of elements (the multiplicity of each
+      element is considered)<br>
+</div>
+
+<pre><span id="VALempty"><span class="keyword">val</span> empty</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+Empty multiset<br>
+</div>
+
+<pre><span id="VALis_empty"><span class="keyword">val</span> is_empty</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+Is the multiset empty?<br>
+</div>
+
+<pre><span id="VALmem"><span class="keyword">val</span> mem</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEelt">elt</a> -> bool</code></pre><div class="info ">
+Is the element part of the multiset?<br>
+</div>
+
+<pre><span id="VALfind"><span class="keyword">val</span> find</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEelt">elt</a> -> Z.t</code></pre><div class="info ">
+Return the multiplicity of the element within the multiset.
+      Will return <code class="code"><span class="constructor">Z</span>.zero</code> if the element is not part of the multiset<br>
+</div>
+
+<pre><span id="VALsingleton"><span class="keyword">val</span> singleton</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEelt">elt</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a></code></pre>
+<pre><span id="VALdoubleton"><span class="keyword">val</span> doubleton</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEelt">elt</a> -> <a href="Multiset_intf.S.html#TYPEelt">elt</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a></code></pre>
+<pre><span id="VALadd"><span class="keyword">val</span> add</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEelt">elt</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+Add one occurrence of the element<br>
+</div>
+
+<pre><span id="VALadd_coeff"><span class="keyword">val</span> add_coeff</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEelt">elt</a> -> Z.t -> <a href="Multiset_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+Add several occurrences of the element<br>
+</div>
+
+<pre><span id="VALunion"><span class="keyword">val</span> union</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+Union of multisets (max of multiplicies)<br>
+</div>
+
+<pre><span id="VALintersection"><span class="keyword">val</span> intersection</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+Intersection of multisets (min of multiplicies)<br>
+</div>
+
+<pre><span id="VALsum"><span class="keyword">val</span> sum</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+Sum of multiplicies<br>
+</div>
+
+<pre><span id="VALdifference"><span class="keyword">val</span> difference</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+Difference of multisets. If <code class="code">x</code> has a bigger multiplicity in the
+      second argument it won't appear in the result<br>
+</div>
+
+<pre><span id="VALproduct"><span class="keyword">val</span> product</span> : <code class="type">Z.t -> <a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+Multiply all multiplicities with the given coefficient<br>
+</div>
+
+<pre><span id="VALfilter"><span class="keyword">val</span> filter</span> : <code class="type">(<a href="Multiset_intf.S.html#TYPEelt">elt</a> -> Z.t -> bool) -><br>       <a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+Filter out elements that don't satisfy the predicate<br>
+</div>
+
+<pre><span id="VALmap"><span class="keyword">val</span> map</span> : <code class="type">(<a href="Multiset_intf.S.html#TYPEelt">elt</a> -> <a href="Multiset_intf.S.html#TYPEelt">elt</a>) -><br>       <a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+Apply a function to all elements<br>
+</div>
+
+<pre><span id="VALmap_coeff"><span class="keyword">val</span> map_coeff</span> : <code class="type">(<a href="Multiset_intf.S.html#TYPEelt">elt</a> -> Z.t -> Z.t) -> <a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+Apply a function to all coefficients.<br>
+</div>
+
+<pre><span id="VALfilter_map"><span class="keyword">val</span> filter_map</span> : <code class="type">(<a href="Multiset_intf.S.html#TYPEelt">elt</a> -> Z.t -> (<a href="Multiset_intf.S.html#TYPEelt">elt</a> * Z.t) option) -><br>       <a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+More powerful mapping<br>
+</div>
+
+<pre><span id="VALflat_map"><span class="keyword">val</span> flat_map</span> : <code class="type">(<a href="Multiset_intf.S.html#TYPEelt">elt</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a>) -><br>       <a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+replace each element by a multiset in its own<br>
+</div>
+
+<pre><span class="keyword">module</span> <a href="Multiset_intf.S.Seq.html">Seq</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Multiset_intf.S.Seq.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
+<pre><span id="VALiter"><span class="keyword">val</span> iter</span> : <code class="type">(<a href="Multiset_intf.S.html#TYPEelt">elt</a> -> unit) -> <a href="Multiset_intf.S.html#TYPEt">t</a> -> unit</code></pre><div class="info ">
+Iterate on distinct occurrences of elements<br>
+</div>
+
+<pre><span id="VALfold"><span class="keyword">val</span> fold</span> : <code class="type">('a -> <a href="Multiset_intf.S.html#TYPEelt">elt</a> -> 'a) -> 'a -> <a href="Multiset_intf.S.html#TYPEt">t</a> -> 'a</code></pre><div class="info ">
+fold on occurrences of elements<br>
+</div>
+
+<pre><span id="VALiter_coeffs"><span class="keyword">val</span> iter_coeffs</span> : <code class="type">(<a href="Multiset_intf.S.html#TYPEelt">elt</a> -> Z.t -> unit) -> <a href="Multiset_intf.S.html#TYPEt">t</a> -> unit</code></pre><div class="info ">
+Iterate on elements with their multiplicity<br>
+</div>
+
+<pre><span id="VALfold_coeffs"><span class="keyword">val</span> fold_coeffs</span> : <code class="type">('a -> <a href="Multiset_intf.S.html#TYPEelt">elt</a> -> Z.t -> 'a) -> 'a -> <a href="Multiset_intf.S.html#TYPEt">t</a> -> 'a</code></pre><div class="info ">
+Fold on elements with their multiplicity<br>
+</div>
+
+<pre><span id="VALfor_all"><span class="keyword">val</span> for_all</span> : <code class="type">(<a href="Multiset_intf.S.html#TYPEelt">elt</a> -> bool) -> <a href="Multiset_intf.S.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALexists"><span class="keyword">val</span> exists</span> : <code class="type">(<a href="Multiset_intf.S.html#TYPEelt">elt</a> -> bool) -> <a href="Multiset_intf.S.html#TYPEt">t</a> -> bool</code></pre>
+<pre><span id="VALchoose"><span class="keyword">val</span> choose</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEelt">elt</a></code></pre><div class="info ">
+Chose one element, or<br>
+<b>Raises</b> <code>Not_found</code> if the multiset is empty<br>
+</div>
+
+<pre><span id="VALof_list"><span class="keyword">val</span> of_list</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEelt">elt</a> list -> <a href="Multiset_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+Multiset from list<br>
+</div>
+
+<pre><span id="VALof_coeffs"><span class="keyword">val</span> of_coeffs</span> : <code class="type">(<a href="Multiset_intf.S.html#TYPEelt">elt</a> * Z.t) list -> <a href="Multiset_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+From list of elements with multiplicities. Multiplicities lower
+      than 0 will not count.<br>
+</div>
+
+<pre><span id="VALof_iarray"><span class="keyword">val</span> of_iarray</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEelt">elt</a> <a href="IArray.html#TYPEt">IArray.t</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+From immutable array<br>
+</div>
+
+<pre><span id="VALof_array"><span class="keyword">val</span> of_array</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEelt">elt</a> array -> <a href="Multiset_intf.S.html#TYPEt">t</a></code></pre>
+<pre><span id="VALto_list"><span class="keyword">val</span> to_list</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEt">t</a> -> (<a href="Multiset_intf.S.html#TYPEelt">elt</a> * Z.t) list</code></pre><div class="info ">
+List of elements with their coefficients<br>
+</div>
+
+<pre><span id="VALeq"><span class="keyword">val</span> eq</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+Check equality of two multisets<br>
+</div>
+
+<pre><span id="VALcancel"><span class="keyword">val</span> cancel</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEt">t</a> -><br>       <a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a> * <a href="Multiset_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+Remove common elements from the multisets. For instance,
+      on <code class="code">{1,1,2}</code> and <code class="code">{1,2,2,3}</code>, <code class="code">cancel</code> will return <code class="code">({1},&nbsp;{2,3})</code><br>
+</div>
+<br>
+<h6 id="6_Comparisons">Comparisons</h6>
+<p>
+
+      In the following, the comparison function must be equality-compatible
+      with <code class="code"><span class="constructor">E</span>.compare</code>. In other words, if <code class="code"><span class="constructor">E</span>.compare&nbsp;x&nbsp;y&nbsp;=&nbsp;0</code> then
+      <code class="code">f&nbsp;x&nbsp;y&nbsp;=&nbsp;<span class="constructor">Comparison</span>.<span class="constructor">Eq</span></code> must hold.<br>
+
+<pre><span id="VALcompare"><span class="keyword">val</span> compare</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a> -> int</code></pre><div class="info ">
+Compare two multisets with the multiset extension of <code class="code"><span class="constructor">E</span>.compare</code><br>
+</div>
+
+<pre><span id="VALcompare_partial"><span class="keyword">val</span> compare_partial</span> : <code class="type">(<a href="Multiset_intf.S.html#TYPEelt">elt</a> -> <a href="Multiset_intf.S.html#TYPEelt">elt</a> -> <a href="Comparison.html#TYPEt">Comparison.t</a>) -><br>       <a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Comparison.html#TYPEt">Comparison.t</a></code></pre><div class="info ">
+Compare two multisets with the multiset extension of the
+      given ordering. This ordering is total iff the element
+      ordering is.<br>
+</div>
+
+<pre><span id="VALis_max"><span class="keyword">val</span> is_max</span> : <code class="type">(<a href="Multiset_intf.S.html#TYPEelt">elt</a> -> <a href="Multiset_intf.S.html#TYPEelt">elt</a> -> <a href="Comparison.html#TYPEt">Comparison.t</a>) -><br>       <a href="Multiset_intf.S.html#TYPEelt">elt</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+Is the given element maximal (ie not dominated by any
+      other element) within the multiset?<br>
+</div>
+
+<pre><span id="VALmax"><span class="keyword">val</span> max</span> : <code class="type">(<a href="Multiset_intf.S.html#TYPEelt">elt</a> -> <a href="Multiset_intf.S.html#TYPEelt">elt</a> -> <a href="Comparison.html#TYPEt">Comparison.t</a>) -><br>       <a href="Multiset_intf.S.html#TYPEt">t</a> -> <a href="Multiset_intf.S.html#TYPEt">t</a></code></pre><div class="info ">
+Maximal elements of the multiset, w.r.t the given ordering.<br>
+</div>
+
+<pre><span id="VALmax_seq"><span class="keyword">val</span> max_seq</span> : <code class="type">(<a href="Multiset_intf.S.html#TYPEelt">elt</a> -> <a href="Multiset_intf.S.html#TYPEelt">elt</a> -> <a href="Comparison.html#TYPEt">Comparison.t</a>) -><br>       <a href="Multiset_intf.S.html#TYPEt">t</a> -> (<a href="Multiset_intf.S.html#TYPEelt">elt</a>, Z.t) Sequence.t2</code></pre><div class="info ">
+Fold on maximal elements<br>
+</div>
+
+<pre><span id="VALmax_l"><span class="keyword">val</span> max_l</span> : <code class="type">(<a href="Multiset_intf.S.html#TYPEelt">elt</a> -> <a href="Multiset_intf.S.html#TYPEelt">elt</a> -> <a href="Comparison.html#TYPEt">Comparison.t</a>) -><br>       <a href="Multiset_intf.S.html#TYPEelt">elt</a> list -> <a href="Multiset_intf.S.html#TYPEelt">elt</a> list</code></pre><div class="info ">
+Maximal elements of a list<br>
+</div>
+
+<pre><span id="VALcompare_partial_l"><span class="keyword">val</span> compare_partial_l</span> : <code class="type">(<a href="Multiset_intf.S.html#TYPEelt">elt</a> -> <a href="Multiset_intf.S.html#TYPEelt">elt</a> -> <a href="Comparison.html#TYPEt">Comparison.t</a>) -><br>       <a href="Multiset_intf.S.html#TYPEelt">elt</a> list -> <a href="Multiset_intf.S.html#TYPEelt">elt</a> list -> <a href="Comparison.html#TYPEt">Comparison.t</a></code></pre><div class="info ">
+Compare two multisets represented as list of elements<br>
+</div>
+
+<pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Multiset_intf.S.html#TYPEelt">elt</a> CCFormat.printer -> <a href="Multiset_intf.S.html#TYPEt">t</a> CCFormat.printer</code></pre></body></html>

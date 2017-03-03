@@ -1,0 +1,98 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Literal.Pos.html">
+<link rel="next" href="Literal.Conv.html">
+<link rel="Up" href="Literal.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="ClauseQueue" rel="Chapter" href="ClauseQueue.html">
+<link title="Clause" rel="Chapter" href="Clause.html">
+<link title="SClause" rel="Chapter" href="SClause.html">
+<link title="Const" rel="Chapter" href="Const.html">
+<link title="Extensions" rel="Chapter" href="Extensions.html">
+<link title="Literal" rel="Chapter" href="Literal.html">
+<link title="Literals" rel="Chapter" href="Literals.html">
+<link title="Ctx" rel="Chapter" href="Ctx.html">
+<link title="ProofStep" rel="Chapter" href="ProofStep.html">
+<link title="ProofPrint" rel="Chapter" href="ProofPrint.html">
+<link title="ProofState" rel="Chapter" href="ProofState.html">
+<link title="Saturate" rel="Chapter" href="Saturate.html">
+<link title="Selection" rel="Chapter" href="Selection.html">
+<link title="AC" rel="Chapter" href="AC.html">
+<link title="AC_intf" rel="Chapter" href="AC_intf.html">
+<link title="SimplM" rel="Chapter" href="SimplM.html">
+<link title="Params" rel="Chapter" href="Params.html">
+<link title="Env" rel="Chapter" href="Env.html">
+<link title="Monome" rel="Chapter" href="Monome.html">
+<link title="ArithLit" rel="Chapter" href="ArithLit.html">
+<link title="Signals" rel="Chapter" href="Signals.html">
+<link title="Multisets" rel="Chapter" href="Multisets.html">
+<link title="Ctx_intf" rel="Chapter" href="Ctx_intf.html">
+<link title="Clause_intf" rel="Chapter" href="Clause_intf.html">
+<link title="Env_intf" rel="Chapter" href="Env_intf.html">
+<link title="ProofState_intf" rel="Chapter" href="ProofState_intf.html">
+<link title="BBox" rel="Chapter" href="BBox.html">
+<link title="ClauseContext" rel="Chapter" href="ClauseContext.html">
+<link title="ClauseQueue_intf" rel="Chapter" href="ClauseQueue_intf.html">
+<link title="Bool_lit" rel="Chapter" href="Bool_lit.html">
+<link title="Bool_lit_intf" rel="Chapter" href="Bool_lit_intf.html">
+<link title="Sat_solver" rel="Chapter" href="Sat_solver.html">
+<link title="Sat_solver_intf" rel="Chapter" href="Sat_solver_intf.html">
+<link title="Trail" rel="Chapter" href="Trail.html">
+<link title="Ind_cst" rel="Chapter" href="Ind_cst.html">
+<link title="Phases" rel="Chapter" href="Phases.html">
+<link title="Phases_impl" rel="Chapter" href="Phases_impl.html">
+<link title="Classify_cst" rel="Chapter" href="Classify_cst.html">
+<link title="Rewrite_rule" rel="Chapter" href="Rewrite_rule.html">
+<link title="Avatar" rel="Chapter" href="Avatar.html">
+<link title="Avatar_intf" rel="Chapter" href="Avatar_intf.html">
+<link title="Induction" rel="Chapter" href="Induction.html">
+<link title="Induction_intf" rel="Chapter" href="Induction_intf.html">
+<link title="Superposition" rel="Chapter" href="Superposition.html">
+<link title="Superposition_intf" rel="Chapter" href="Superposition_intf.html">
+<link title="Rewriting" rel="Chapter" href="Rewriting.html">
+<link title="EnumTypes" rel="Chapter" href="EnumTypes.html">
+<link title="ArithInt" rel="Chapter" href="ArithInt.html">
+<link title="Heuristics" rel="Chapter" href="Heuristics.html">
+<link title="Ind_types" rel="Chapter" href="Ind_types.html">
+<link title="Fool" rel="Chapter" href="Fool.html"><title>Literal.View</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Literal.Pos.html" title="Literal.Pos">Previous</a>
+&nbsp;<a class="up" href="Literal.html" title="Literal">Up</a>
+&nbsp;<a class="post" href="Literal.Conv.html" title="Literal.Conv">Next</a>
+</div>
+<h1>Module <a href="type_Literal.View.html">Literal.View</a></h1>
+
+<pre><span class="keyword">module</span> View: <code class="code">sig</code> <a href="Literal.View.html">..</a> <code class="code">end</code></pre><div class="info module top">
+<h2 id="2_Specificviews">Specific views</h2><br>
+</div>
+<hr width="100%">
+
+<pre><span id="VALas_eqn"><span class="keyword">val</span> as_eqn</span> : <code class="type"><a href="Literal.html#TYPEt">Literal.t</a> -> (<a href="Literal.html#TYPEterm">Literal.term</a> * <a href="Literal.html#TYPEterm">Literal.term</a> * bool) option</code></pre>
+<pre><span id="VALget_eqn"><span class="keyword">val</span> get_eqn</span> : <code class="type"><a href="Literal.html#TYPEt">Literal.t</a> -> Logtk.Position.t -> (<a href="Literal.html#TYPEterm">Literal.term</a> * <a href="Literal.html#TYPEterm">Literal.term</a> * bool) option</code></pre><div class="info ">
+View of a Prop or Equation literal, oriented by the position. If the
+      position selects its left term, return l, r, otherwise r, l.
+      for propositions it will always be p, true.<br>
+<b>Raises</b> <code>Invalid_argument</code> if the position doesn't match the literal.<br>
+<b>Returns</b> None for other literals<br>
+</div>
+
+<pre><span id="VALget_arith"><span class="keyword">val</span> get_arith</span> : <code class="type"><a href="Literal.html#TYPEt">Literal.t</a> -> <a href="ArithLit.html#TYPEt">ArithLit.t</a> option</code></pre><div class="info ">
+Extract an arithmetic literal<br>
+</div>
+
+<pre><span id="VALfocus_arith"><span class="keyword">val</span> focus_arith</span> : <code class="type"><a href="Literal.html#TYPEt">Literal.t</a> -> Logtk.Position.t -> <a href="ArithLit.Focus.html#TYPEt">ArithLit.Focus.t</a> option</code></pre><div class="info ">
+Focus on a specific term in an arithmetic literal. The focused term is
+      removed from its monome, and its coefficient is returned.<br>
+</div>
+
+<pre><span id="VALunfocus_arith"><span class="keyword">val</span> unfocus_arith</span> : <code class="type"><a href="ArithLit.Focus.html#TYPEt">ArithLit.Focus.t</a> -> <a href="Literal.html#TYPEt">Literal.t</a></code></pre></body></html>

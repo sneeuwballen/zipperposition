@@ -1,0 +1,127 @@
+<html><head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="ClauseQueue" rel="Chapter" href="ClauseQueue.html">
+<link title="Clause" rel="Chapter" href="Clause.html">
+<link title="SClause" rel="Chapter" href="SClause.html">
+<link title="Const" rel="Chapter" href="Const.html">
+<link title="Extensions" rel="Chapter" href="Extensions.html">
+<link title="Literal" rel="Chapter" href="Literal.html">
+<link title="Literals" rel="Chapter" href="Literals.html">
+<link title="Ctx" rel="Chapter" href="Ctx.html">
+<link title="ProofStep" rel="Chapter" href="ProofStep.html">
+<link title="ProofPrint" rel="Chapter" href="ProofPrint.html">
+<link title="ProofState" rel="Chapter" href="ProofState.html">
+<link title="Saturate" rel="Chapter" href="Saturate.html">
+<link title="Selection" rel="Chapter" href="Selection.html">
+<link title="AC" rel="Chapter" href="AC.html">
+<link title="AC_intf" rel="Chapter" href="AC_intf.html">
+<link title="SimplM" rel="Chapter" href="SimplM.html">
+<link title="Params" rel="Chapter" href="Params.html">
+<link title="Env" rel="Chapter" href="Env.html">
+<link title="Monome" rel="Chapter" href="Monome.html">
+<link title="ArithLit" rel="Chapter" href="ArithLit.html">
+<link title="Signals" rel="Chapter" href="Signals.html">
+<link title="Multisets" rel="Chapter" href="Multisets.html">
+<link title="Ctx_intf" rel="Chapter" href="Ctx_intf.html">
+<link title="Clause_intf" rel="Chapter" href="Clause_intf.html">
+<link title="Env_intf" rel="Chapter" href="Env_intf.html">
+<link title="ProofState_intf" rel="Chapter" href="ProofState_intf.html">
+<link title="BBox" rel="Chapter" href="BBox.html">
+<link title="ClauseContext" rel="Chapter" href="ClauseContext.html">
+<link title="ClauseQueue_intf" rel="Chapter" href="ClauseQueue_intf.html">
+<link title="Bool_lit" rel="Chapter" href="Bool_lit.html">
+<link title="Bool_lit_intf" rel="Chapter" href="Bool_lit_intf.html">
+<link title="Sat_solver" rel="Chapter" href="Sat_solver.html">
+<link title="Sat_solver_intf" rel="Chapter" href="Sat_solver_intf.html">
+<link title="Trail" rel="Chapter" href="Trail.html">
+<link title="Ind_cst" rel="Chapter" href="Ind_cst.html">
+<link title="Phases" rel="Chapter" href="Phases.html">
+<link title="Phases_impl" rel="Chapter" href="Phases_impl.html">
+<link title="Classify_cst" rel="Chapter" href="Classify_cst.html">
+<link title="Rewrite_rule" rel="Chapter" href="Rewrite_rule.html">
+<link title="Avatar" rel="Chapter" href="Avatar.html">
+<link title="Avatar_intf" rel="Chapter" href="Avatar_intf.html">
+<link title="Induction" rel="Chapter" href="Induction.html">
+<link title="Induction_intf" rel="Chapter" href="Induction_intf.html">
+<link title="Superposition" rel="Chapter" href="Superposition.html">
+<link title="Superposition_intf" rel="Chapter" href="Superposition_intf.html">
+<link title="Rewriting" rel="Chapter" href="Rewriting.html">
+<link title="EnumTypes" rel="Chapter" href="EnumTypes.html">
+<link title="ArithInt" rel="Chapter" href="ArithInt.html">
+<link title="Heuristics" rel="Chapter" href="Heuristics.html">
+<link title="Ind_types" rel="Chapter" href="Ind_types.html">
+<link title="Fool" rel="Chapter" href="Fool.html"><title>Ind_cst</title>
+</head>
+<body>
+<code class="code"><span class="keyword">sig</span><br>
+&nbsp;&nbsp;<span class="keyword">exception</span>&nbsp;<span class="constructor">InvalidDecl</span>&nbsp;<span class="keyword">of</span>&nbsp;string<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;cst<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;case<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;path_cell&nbsp;=&nbsp;<span class="keyword">private</span>&nbsp;{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;path_cst&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.cst;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;path_case&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.case;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;path_clauses&nbsp;:&nbsp;<span class="constructor">ClauseContext</span>.t&nbsp;list;<br>
+&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;path&nbsp;=&nbsp;<span class="constructor">Ind_cst</span>.path_cell&nbsp;list<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;cover_set&nbsp;=&nbsp;<span class="constructor">Ind_cst</span>.case&nbsp;list<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;case_equal&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.case&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.case&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;case_compare&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.case&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.case&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;int<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;case_hash&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.case&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;int<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;pp_case&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.case&nbsp;<span class="constructor">CCFormat</span>.printer<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;case_to_term&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.case&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">FOTerm</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;case_is_rec&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.case&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;case_is_base&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.case&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;case_sub_constants&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.case&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="constructor">Sequence</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cover_set_cases&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;?which:[&nbsp;<span class="keywordsign">`</span><span class="constructor">All</span>&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="keywordsign">`</span><span class="constructor">Base</span>&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="keywordsign">`</span><span class="constructor">Rec</span>&nbsp;]&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Ind_cst</span>.cover_set&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.case&nbsp;<span class="constructor">Sequence</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">exception</span>&nbsp;<span class="constructor">Payload_cst</span>&nbsp;<span class="keyword">of</span>&nbsp;<span class="constructor">Ind_cst</span>.cst<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;as_cst&nbsp;:&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">ID</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;option<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;as_cst_exn&nbsp;:&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">ID</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.cst<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;is_cst&nbsp;:&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">ID</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;on_new_cst&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Signal</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;declare_cst&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;?cover_set_depth:int&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">ID</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;ty:<span class="constructor">Logtk</span>.<span class="constructor">Type</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.cst<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cst_of_term&nbsp;:&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">FOTerm</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;option<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cst_of_id&nbsp;:&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">ID</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Type</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.cst<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;declarations_of_cst&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(<span class="constructor">Logtk</span>.<span class="constructor">ID</span>.t&nbsp;*&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Type</span>.t)&nbsp;<span class="constructor">Sequence</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cst_equal&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cst_compare&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;int<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cst_hash&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;int<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cst_id&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">ID</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cst_to_term&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">FOTerm</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cst_ty&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Type</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cst_same_type&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;pp_cst&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="constructor">CCFormat</span>.printer<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cst_depth&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;int<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cst_cover_set&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.cover_set&nbsp;option<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;is_potential_cst&nbsp;:&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">ID</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">Type</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;find_cst_in_term&nbsp;:&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">FOTerm</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="constructor">Sequence</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;is_sub_cst&nbsp;:&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">ID</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;is_sub_cst_of&nbsp;:&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">ID</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;as_sub_cst_of&nbsp;:&nbsp;<span class="constructor">Logtk</span>.<span class="constructor">ID</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;option<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cover_set_sub_constants&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.cover_set&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="constructor">Sequence</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;dominates&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;path_equal&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.path&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.path&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;path_compare&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.path&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.path&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;int<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;path_hash&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.path&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;int<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;path_empty&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.path<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;path_cons&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Ind_cst</span>.case&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">ClauseContext</span>.t&nbsp;list&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.path&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.path<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;path_length&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.path&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;int<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;path_dominates&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.path&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.path&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;path_contains_cst&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.path&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Ind_cst</span>.cst&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;pp_path&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.path&nbsp;<span class="constructor">CCFormat</span>.printer<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;lits_of_path&nbsp;:&nbsp;<span class="constructor">Ind_cst</span>.path&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Literals</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;max_depth_&nbsp;:&nbsp;int&nbsp;<span class="constructor">Pervasives</span>.ref<br>
+<span class="keyword">end</span></code></body></html>

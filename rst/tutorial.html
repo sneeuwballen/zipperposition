@@ -1,0 +1,334 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Tutorial &#8212; logtk  documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="List of Modules" href="modules.html" />
+    <link rel="prev" title="Getting Started" href="getting_started.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="tutorial">
+<h1>Tutorial<a class="headerlink" href="#tutorial" title="Permalink to this headline">¶</a></h1>
+<p>Some small tools are provided with <code class="docutils literal"><span class="pre">Logtk</span></code>&#8216;s source code. They can be
+found in <code class="docutils literal"><span class="pre">src/tools/</span></code> and have various dependencies (parsers,
+meta-prover, etc.). Their source code can be helpful to see how some
+specific tools (meta-prover, type-checking, parsing) are used.</p>
+<p>Let&#8217;s start with the basics: symbols, terms and types. We assume in the
+following that the basic library has been linked and <code class="docutils literal"><span class="pre">Logtk</span></code> has
+been opened, for instance in an ocamlfind-enabled toplevel with</p>
+<div class="highlight-ocaml"><div class="highlight"><pre><span></span><span class="o">#</span><span class="n">require</span> <span class="s2">&quot;logtk&quot;</span><span class="o">;;</span>  <span class="c">(* load module *)</span>
+
+<span class="k">open</span> <span class="nc">Logtk</span><span class="o">;;</span>  <span class="c">(* brings the content of Logtk into the scope *)</span>
+</pre></div>
+</div>
+<div class="section" id="symbols-terms-and-types">
+<h2>Symbols, Terms and Types<a class="headerlink" href="#symbols-terms-and-types" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="symbols">
+<h3>Symbols<a class="headerlink" href="#symbols" title="Permalink to this headline">¶</a></h3>
+<p>Automated Theorem Proving belongs to <em>symbolic reasoning</em>. As the name
+hints, all we are going to do is manipulating <em>symbols</em>. For this
+<code class="docutils literal"><span class="pre">Logtk</span></code> provides a <a class="reference external" href="../Symbol.html">Symbol module</a>. A symbol
+can be either a numeric constant, a <em>connective</em> or a <a class="reference internal" href="#hashconsed" id="id1">[hashconsed]</a> string:</p>
+<div class="highlight-ocaml"><div class="highlight"><pre><span></span><span class="k">let</span> <span class="n">f</span> <span class="o">=</span> <span class="nn">Symbol</span><span class="p">.</span><span class="n">of_string</span> <span class="s2">&quot;f&quot;</span><span class="o">;;</span>
+<span class="k">let</span> <span class="n">g</span> <span class="o">=</span> <span class="nn">Symbol</span><span class="p">.</span><span class="n">of_string</span> <span class="s2">&quot;g&quot;</span><span class="o">;;</span>
+
+<span class="c">(* machine integer *)</span>
+<span class="k">let</span> <span class="n">twelve</span> <span class="o">=</span> <span class="nn">Symbol</span><span class="p">.</span><span class="n">of_int</span> <span class="mi">12</span><span class="o">;;</span>
+
+<span class="c">(* big integer, here built from string *)</span>
+<span class="k">let</span> <span class="n">very_big_num</span> <span class="o">=</span> <span class="nn">Symbol</span><span class="p">.</span><span class="n">mk_int</span> <span class="o">(</span><span class="nn">Z</span><span class="p">.</span><span class="n">of_string</span> <span class="s2">&quot;99999999999999999999999&quot;</span><span class="o">);;</span>
+</pre></div>
+</div>
+<p>Some symbols are already defined because they are pervasive in logic.
+We call those <em>connectives</em>. They are defined in
+<a class="reference external" href="../Symbol.Base.html">Symbol.Base</a>. For instance:</p>
+<div class="highlight-ocaml"><div class="highlight"><pre><span></span><span class="c">(* logic equivalence *)</span>
+<span class="k">let</span> <span class="n">equiv</span> <span class="o">=</span> <span class="nn">Symbol</span><span class="p">.</span><span class="nn">Base</span><span class="p">.</span><span class="n">equiv</span><span class="o">;;</span>
+
+<span class="c">(* logic &quot;or&quot; *)</span>
+<span class="k">let</span> <span class="n">or_</span> <span class="o">=</span> <span class="nn">Symbol</span><span class="p">.</span><span class="nn">Base</span><span class="p">.</span><span class="n">or_</span><span class="o">;;</span>
+</pre></div>
+</div>
+<p>Like many other modules, <code class="docutils literal"><span class="pre">Symbol</span></code> defines many operators such
+as equality, comparison, hashing and printing.</p>
+<div class="highlight-ocaml"><div class="highlight"><pre><span></span><span class="c">(* use a custom printer for symbols *)</span>
+<span class="o">#</span><span class="n">install_printer</span> <span class="nn">Symbol</span><span class="p">.</span><span class="n">fmt</span><span class="o">;;</span>
+
+<span class="k">let</span> <span class="n">a</span> <span class="o">=</span> <span class="nn">Symbol</span><span class="p">.</span><span class="n">of_string</span> <span class="s2">&quot;a&quot;</span><span class="o">;;</span>
+<span class="k">let</span> <span class="n">b</span> <span class="o">=</span> <span class="nn">Symbol</span><span class="p">.</span><span class="n">of_string</span> <span class="s2">&quot;b&quot;</span><span class="o">;;</span>
+<span class="c">(* printed as &quot;a&quot; and &quot;b&quot; respectively *)</span>
+
+<span class="nn">Symbol</span><span class="p">.</span><span class="n">eq</span> <span class="n">a</span> <span class="n">a</span><span class="o">;;</span>
+<span class="c">(* true *)</span>
+
+<span class="k">let</span> <span class="n">foo0</span> <span class="o">=</span> <span class="nn">Symbol</span><span class="p">.</span><span class="n">gensym</span> <span class="o">~</span><span class="n">prefix</span><span class="o">:</span><span class="s2">&quot;foo&quot;</span> <span class="bp">()</span><span class="o">;;</span>
+<span class="c">(* a symbol named &quot;foo_0&quot; or something like this *)</span>
+
+<span class="k">let</span> <span class="n">foo1</span> <span class="o">=</span> <span class="nn">Symbol</span><span class="p">.</span><span class="n">gensym</span> <span class="o">~</span><span class="n">prefix</span><span class="o">:</span><span class="s2">&quot;foo&quot;</span> <span class="bp">()</span><span class="o">;;</span>
+<span class="c">(* another symbol named &quot;foo_1&quot; *)</span>
+
+<span class="nn">Symbol</span><span class="p">.</span><span class="n">cmp</span> <span class="n">foo0</span> <span class="n">foo1</span><span class="o">;;</span>
+<span class="c">(* total ordering on symbols:</span>
+<span class="c">   -1 because the first is smaller (has been created before) *)</span>
+
+<span class="nn">Symbol</span><span class="p">.</span><span class="nn">TPTP</span><span class="p">.</span><span class="n">rat</span><span class="o">;;</span>
+<span class="c">(* a symbol named &quot;$rat&quot;, representing the types of rationals in TPTP. *)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="types">
+<h3>Types<a class="headerlink" href="#types" title="Permalink to this headline">¶</a></h3>
+<p>In <code class="docutils literal"><span class="pre">Logtk</span></code>, terms are always typed. Dealing with untyped logic only
+means dealing with terms that all have the same (unique) type. The type system
+is rank-1 polymorphism, à la ML (following the
+<a class="reference external" href="http://www.cs.miami.edu/~tptp/TPTP/Proposals/TFF1.html">TFF1 draft</a>).</p>
+<p>The module <a class="reference external" href="../Type.html">Type</a> represents such polymorphic types. We can
+build them, print them, etc. in pretty much the same way as symbols:</p>
+<div class="highlight-ocaml"><div class="highlight"><pre><span></span><span class="c">(* useful in the toplevel only, to print types nicely *)</span>
+<span class="o">#</span><span class="n">install_printer</span> <span class="nn">Type</span><span class="p">.</span><span class="n">fmt</span><span class="o">;;</span>
+
+<span class="k">let</span> <span class="n">ty1</span> <span class="o">=</span>
+  <span class="k">let</span> <span class="k">open</span> <span class="nc">Type</span> <span class="k">in</span>
+  <span class="n">const</span> <span class="n">a</span> <span class="o">&lt;==</span> <span class="o">[</span><span class="n">const</span> <span class="n">a</span><span class="o">;</span> <span class="n">var</span> <span class="mi">0</span><span class="o">];;</span>
+
+<span class="c">(* or, without the infix operator nor the .() syntax: *)</span>
+<span class="k">let</span> <span class="n">ty1&#39;</span> <span class="o">=</span> <span class="nn">Type</span><span class="p">.</span><span class="n">arrow_list</span> <span class="o">[</span><span class="nn">Type</span><span class="p">.</span><span class="n">const</span> <span class="n">a</span><span class="o">;</span> <span class="nn">Type</span><span class="p">.</span><span class="n">var</span> <span class="mi">0</span><span class="o">]</span> <span class="o">(</span><span class="nn">Type</span><span class="p">.</span><span class="n">const</span> <span class="n">a</span><span class="o">);;</span>
+</pre></div>
+</div>
+<p>Let us examine closer the structure of types. It is exposed in
+<code class="docutils literal"><span class="pre">src/base/type.mli</span></code> as:</p>
+<div class="highlight-ocaml"><div class="highlight"><pre><span></span><span class="k">type</span> <span class="n">t</span> <span class="o">=</span> <span class="k">private</span> <span class="nn">ScopedTerm</span><span class="p">.</span><span class="n">t</span>
+<span class="c">(** Type is a subtype of the general structure ScopedTerm.t,</span>
+<span class="c">    with explicit conversion *)</span>
+
+<span class="k">type</span> <span class="n">view</span> <span class="o">=</span> <span class="k">private</span>
+  <span class="o">|</span> <span class="nc">Var</span> <span class="k">of</span> <span class="kt">int</span>              <span class="c">(** Type variable *)</span>
+  <span class="o">|</span> <span class="nc">BVar</span> <span class="k">of</span> <span class="kt">int</span>             <span class="c">(** Bound variable (De Bruijn index) *)</span>
+  <span class="o">|</span> <span class="nc">App</span> <span class="k">of</span> <span class="n">symbol</span> <span class="o">*</span> <span class="n">t</span> <span class="kt">list</span>  <span class="c">(** parametrized type *)</span>
+  <span class="o">|</span> <span class="nc">Fun</span> <span class="k">of</span> <span class="n">t</span> <span class="o">*</span> <span class="n">t</span>            <span class="c">(** Function type (left to right) *)</span>
+  <span class="o">|</span> <span class="nc">Record</span> <span class="k">of</span> <span class="o">(</span><span class="kt">string</span><span class="o">*</span><span class="n">t</span><span class="o">)</span> <span class="kt">list</span> <span class="o">*</span> <span class="n">t</span> <span class="n">option</span>  <span class="c">(** Record type *)</span>
+  <span class="o">|</span> <span class="nc">Forall</span> <span class="k">of</span> <span class="n">t</span>             <span class="c">(** explicit quantification using De Bruijn index *)</span>
+
+<span class="k">val</span> <span class="n">view</span> <span class="o">:</span> <span class="n">t</span> <span class="o">-&gt;</span> <span class="n">view</span>
+</pre></div>
+</div>
+<p>So, <code class="docutils literal"><span class="pre">Type.t</span></code> is actually a <em>private alias</em> to the internal
+type <code class="docutils literal"><span class="pre">ScopedTerm.t</span></code>. This is explained in <a class="reference external" href="term_hierarchy">the page about
+the term hierarchy</a>. Then, a private type <code class="docutils literal"><span class="pre">Type.view</span></code>
+is defined, and a function <code class="docutils literal"><span class="pre">view</span></code> allows to pattern-match on
+the root of any instance of <code class="docutils literal"><span class="pre">Type.t</span></code>. Types are built of variables,
+bound variables, symbol applications (including constants when
+the list of arguments is empty), function types, record types (a more
+advanced topic) and explicitely quantified types.</p>
+<p>In practice we can use <code class="docutils literal"><span class="pre">view</span></code> this way:</p>
+<div class="highlight-ocaml"><div class="highlight"><pre><span></span><span class="k">let</span> <span class="n">ty2</span> <span class="o">=</span>
+  <span class="k">let</span> <span class="k">open</span> <span class="nc">Type</span> <span class="k">in</span>
+  <span class="n">app</span> <span class="n">f</span> <span class="o">[</span><span class="n">const</span> <span class="n">a</span><span class="o">;</span> <span class="n">const</span> <span class="n">b</span><span class="o">];;</span>
+
+<span class="k">let</span> <span class="n">arity_of_ty2</span> <span class="o">=</span>
+  <span class="k">match</span> <span class="nn">Type</span><span class="p">.</span><span class="n">view</span> <span class="n">ty2</span> <span class="k">with</span>
+  <span class="o">|</span> <span class="nn">Type</span><span class="p">.</span><span class="nc">App</span> <span class="o">(_,</span> <span class="n">l</span><span class="o">)</span> <span class="o">-&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">length</span> <span class="n">l</span>
+  <span class="o">|</span> <span class="o">_</span> <span class="o">-&gt;</span> <span class="mi">0</span><span class="o">;;</span>
+<span class="c">(* arity is 2, l is (locally) the list of arguments *)</span>
+</pre></div>
+</div>
+<p>Types can only be built using the <em>constructors</em> exposed in the module. Those
+are the functions whose return type is <code class="docutils literal"><span class="pre">Type.t</span></code>, including <code class="docutils literal"><span class="pre">var</span></code>,
+<code class="docutils literal"><span class="pre">app</span></code>, <code class="docutils literal"><span class="pre">const</span></code> and <code class="docutils literal"><span class="pre">forall</span></code>, but also infix synonyms. Some standard
+TPTP types are pre-defined in the <a class="reference external" href="../Type.TPTP.html">Type.TPTP module</a>.</p>
+<div class="highlight-ocaml"><div class="highlight"><pre><span></span><span class="c">(* polymorphic equality, returning a proposition. *)</span>
+<span class="k">let</span> <span class="n">type_of_eq</span> <span class="o">=</span>
+  <span class="k">let</span> <span class="k">open</span> <span class="nc">Type</span> <span class="k">in</span>
+  <span class="k">let</span> <span class="n">x</span> <span class="o">=</span> <span class="n">var</span> <span class="mi">0</span> <span class="k">in</span>  <span class="c">(* type var *)</span>
+  <span class="n">forall</span> <span class="o">[</span><span class="n">x</span><span class="o">]</span> <span class="o">(</span><span class="nn">TPTP</span><span class="p">.</span><span class="n">o</span> <span class="o">&lt;==</span> <span class="o">[</span><span class="n">x</span><span class="o">;</span> <span class="n">x</span><span class="o">]);;</span>
+
+<span class="k">let</span> <span class="n">list_</span> <span class="n">x</span> <span class="o">=</span> <span class="n">app</span> <span class="o">(</span><span class="nn">Symbol</span><span class="p">.</span><span class="n">of_string</span> <span class="s2">&quot;list&quot;</span><span class="o">)</span> <span class="o">[</span><span class="n">x</span><span class="o">];;</span>
+
+<span class="c">(* the type of a polymorphic list constructor &quot;cons&quot;: forall &#39;a. &#39;a * &#39;a list -&gt; &#39;a list *)</span>
+<span class="k">let</span> <span class="n">type_of_cons</span> <span class="o">=</span>
+  <span class="k">let</span> <span class="k">open</span> <span class="nc">Type</span> <span class="k">in</span>
+  <span class="k">let</span> <span class="n">x</span> <span class="o">=</span> <span class="n">var</span> <span class="mi">0</span> <span class="k">in</span>
+  <span class="n">forall</span> <span class="o">[</span><span class="n">x</span><span class="o">]</span> <span class="o">(</span><span class="n">list_</span> <span class="n">x</span> <span class="o">&lt;==</span> <span class="o">[</span><span class="n">x</span><span class="o">;</span> <span class="n">list_</span> <span class="n">x</span><span class="o">]);;</span>
+
+<span class="c">(* the type of &quot;nil&quot;, the empty list, parametrized by the type of the elements of the list *)</span>
+<span class="k">let</span> <span class="n">type_of_nil</span> <span class="o">=</span>
+  <span class="k">let</span> <span class="n">x</span> <span class="o">=</span> <span class="nn">Type</span><span class="p">.</span><span class="n">var</span> <span class="mi">0</span> <span class="k">in</span>
+  <span class="nn">Type</span><span class="p">.</span><span class="n">forall</span> <span class="o">[</span><span class="n">x</span><span class="o">]</span> <span class="o">(</span><span class="n">list_</span> <span class="n">x</span><span class="o">);;</span>
+
+<span class="c">(* type of &quot;cons int&quot;, the constructor of list of integers *)</span>
+<span class="k">let</span> <span class="n">int_list</span> <span class="o">=</span> <span class="nn">Type</span><span class="p">.</span><span class="n">apply</span> <span class="n">type_of_cons</span> <span class="nn">Type</span><span class="p">.</span><span class="nn">TPTP</span><span class="p">.</span><span class="n">int</span> <span class="o">;;</span>
+</pre></div>
+</div>
+<p>Note that we build quantified polymorphic types using free variables, because
+the constructor <code class="docutils literal"><span class="pre">forall</span></code> takes care of the De Bruijn indices itself.
+<code class="docutils literal"><span class="pre">x</span></code> will not appear in the resulting type because it will be a bound
+variable. Conversely, <code class="docutils literal"><span class="pre">Type.apply</span></code> is used to apply a type to another one.</p>
+<ul class="simple">
+<li><code class="docutils literal"><span class="pre">Type.apply</span> <span class="pre">(forall</span> <span class="pre">[x]</span> <span class="pre">T)</span> <span class="pre">a</span></code> will be <code class="docutils literal"><span class="pre">[T/x]a</span></code>, a (partial) monomorphization of the left argument</li>
+<li><code class="docutils literal"><span class="pre">Type.apply</span> <span class="pre">(a</span> <span class="pre">-&gt;</span> <span class="pre">b)</span> <span class="pre">a</span></code> will be <code class="docutils literal"><span class="pre">b</span></code>, the application of a function type to a matching argument.</li>
+</ul>
+</div>
+<div class="section" id="terms">
+<h3>Terms<a class="headerlink" href="#terms" title="Permalink to this headline">¶</a></h3>
+<p>We focus on first-order (polymorhphic) terms. Those are defined
+in <a class="reference external" href="../FOTerm.html">the module FOTerm</a>. The structure of the
+module is similar to <code class="docutils literal"><span class="pre">Type</span></code>; first, let&#8217;s see the definition of a term.</p>
+<div class="highlight-ocaml"><div class="highlight"><pre><span></span><span class="k">type</span> <span class="n">t</span> <span class="o">=</span> <span class="k">private</span> <span class="nn">ScopedTerm</span><span class="p">.</span><span class="n">t</span>
+
+<span class="k">type</span> <span class="n">view</span> <span class="o">=</span> <span class="k">private</span>
+  <span class="o">|</span> <span class="nc">Var</span> <span class="k">of</span> <span class="kt">int</span>              <span class="c">(** Term variable *)</span>
+  <span class="o">|</span> <span class="nc">BVar</span> <span class="k">of</span> <span class="kt">int</span>             <span class="c">(** Bound variable (De Bruijn index) *)</span>
+  <span class="o">|</span> <span class="nc">Const</span> <span class="k">of</span> <span class="nn">Symbol</span><span class="p">.</span><span class="n">t</span>       <span class="c">(** Typed constant *)</span>
+  <span class="o">|</span> <span class="nc">TyApp</span> <span class="k">of</span> <span class="n">t</span> <span class="o">*</span> <span class="nn">Type</span><span class="p">.</span><span class="n">t</span>     <span class="c">(** Application to type *)</span>
+  <span class="o">|</span> <span class="nc">App</span> <span class="k">of</span> <span class="n">t</span>  <span class="o">*</span> <span class="n">t</span> <span class="kt">list</span>      <span class="c">(** Application to a list of terms (cannot be left-nested) *)</span>
+
+<span class="k">val</span> <span class="n">view</span> <span class="o">:</span> <span class="n">t</span> <span class="o">-&gt;</span> <span class="n">view</span>
+</pre></div>
+</div>
+<p>We can also examine and build them in a similar way:</p>
+<div class="highlight-ocaml"><div class="highlight"><pre><span></span><span class="o">#</span><span class="n">install_printer</span> <span class="nn">FOTerm</span><span class="p">.</span><span class="n">fmt</span><span class="o">;;</span>
+
+<span class="k">module</span> <span class="nc">T</span> <span class="o">=</span> <span class="nc">FOTerm</span><span class="o">;;</span>
+
+<span class="c">(* the constructor of lists &quot;cons&quot;, with its type. The ~ty is a named argument *)</span>
+<span class="k">let</span> <span class="n">cons</span> <span class="o">=</span> <span class="nn">T</span><span class="p">.</span><span class="n">const</span> <span class="o">~</span><span class="n">ty</span><span class="o">:</span><span class="n">type_of_cons</span> <span class="o">(</span><span class="nn">Symbol</span><span class="p">.</span><span class="n">of_string</span> <span class="s2">&quot;cons&quot;</span><span class="o">);;</span>
+
+<span class="c">(* constructor of empty list *)</span>
+<span class="k">let</span> <span class="n">nil</span> <span class="o">=</span> <span class="nn">T</span><span class="p">.</span><span class="n">const</span> <span class="o">~</span><span class="n">ty</span><span class="o">:</span><span class="n">type_of_nil</span> <span class="o">(</span><span class="nn">Symbol</span><span class="p">.</span><span class="n">of_string</span> <span class="s2">&quot;nil&quot;</span><span class="o">);;</span>
+
+<span class="c">(* build a numeric constant *)</span>
+<span class="k">let</span> <span class="n">const_i</span> <span class="n">i</span> <span class="o">=</span>
+  <span class="nn">T</span><span class="p">.</span><span class="n">const</span> <span class="o">~</span><span class="n">ty</span><span class="o">:</span><span class="nn">Type</span><span class="p">.</span><span class="nn">TPTP</span><span class="p">.</span><span class="n">int</span> <span class="o">(</span><span class="nn">Symbol</span><span class="p">.</span><span class="n">of_int</span> <span class="n">i</span><span class="o">);;</span>
+
+<span class="c">(* the empty list of terms of the TPTP type $i *)</span>
+<span class="k">let</span> <span class="n">l_empty</span> <span class="o">=</span> <span class="nn">T</span><span class="p">.</span><span class="n">tyapp</span> <span class="n">nil</span> <span class="nn">Type</span><span class="p">.</span><span class="nn">TPTP</span><span class="p">.</span><span class="n">i</span><span class="o">;;</span>
+
+<span class="c">(* the integer list [1;2;3;4] as a term *)</span>
+<span class="k">let</span> <span class="n">l</span> <span class="o">=</span>
+  <span class="nn">List</span><span class="p">.</span><span class="n">fold_right</span>
+   <span class="o">(</span><span class="k">fun</span> <span class="n">i</span> <span class="n">tl</span> <span class="o">-&gt;</span>
+     <span class="nn">T</span><span class="p">.</span><span class="n">app_full</span> <span class="n">cons</span> <span class="o">[</span><span class="nn">Type</span><span class="p">.</span><span class="nn">TPTP</span><span class="p">.</span><span class="n">int</span><span class="o">]</span> <span class="o">[</span><span class="n">const_i</span> <span class="n">i</span><span class="o">;</span> <span class="n">tl</span><span class="o">]</span>
+   <span class="o">)</span> <span class="o">[</span><span class="mi">1</span><span class="o">;</span><span class="mi">2</span><span class="o">;</span><span class="mi">3</span><span class="o">;</span><span class="mi">4</span><span class="o">]</span> <span class="o">(</span><span class="nn">T</span><span class="p">.</span><span class="n">tyapp</span> <span class="n">nil</span> <span class="nn">Type</span><span class="p">.</span><span class="nn">TPTP</span><span class="p">.</span><span class="n">int</span><span class="o">)</span> <span class="o">;;</span>
+
+<span class="c">(* the type of l is &quot;list of integers&quot; *)</span>
+<span class="nn">Type</span><span class="p">.</span><span class="n">eq</span> <span class="o">(</span><span class="nn">T</span><span class="p">.</span><span class="n">ty</span> <span class="n">l</span><span class="o">)</span> <span class="n">int_list</span><span class="o">;;</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="links">
+<h2>Links<a class="headerlink" href="#links" title="Permalink to this headline">¶</a></h2>
+<table class="docutils citation" frame="void" id="hashconsed" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[hashconsed]</a></td><td>Hashconsing is a technique that maximizes sharing
+of values using a (weak) hash table. In a hashconsed structure, physical
+equality and structural equality are the same, and memory usage is
+typically reduced.</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="contents.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Tutorial</a><ul>
+<li><a class="reference internal" href="#symbols-terms-and-types">Symbols, Terms and Types</a><ul>
+<li><a class="reference internal" href="#symbols">Symbols</a></li>
+<li><a class="reference internal" href="#types">Types</a></li>
+<li><a class="reference internal" href="#terms">Terms</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#links">Links</a></li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="contents.html">Documentation overview</a><ul>
+      <li>Previous: <a href="getting_started.html" title="previous chapter">Getting Started</a></li>
+      <li>Next: <a href="modules.html" title="next chapter">List of Modules</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/tutorial.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/tutorial.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

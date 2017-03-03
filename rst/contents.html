@@ -1,0 +1,209 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Documentation &#8212; logtk  documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Getting Started" href="getting_started.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="documentation">
+<h1>Documentation<a class="headerlink" href="#documentation" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="presentation">
+<h2>Presentation<a class="headerlink" href="#presentation" title="Permalink to this headline">¶</a></h2>
+<p>Logtk is a free library for manipulating formal logic terms and formulas. It
+is licensed under the BSD2 license for the <a class="reference external" href="http://ocaml.org/">OCaml</a> programming
+language.</p>
+<p>Logtk provides several useful parts for logic-related implementations:</p>
+<ul class="simple">
+<li>a library packed in a module <code class="docutils literal"><span class="pre">Logtk</span></code>, with terms, formulas, etc.;</li>
+<li><dl class="first docutils">
+<dt>small tools (see directory <code class="docutils literal"><span class="pre">src/tools/</span></code>) to illustrate how to use the library</dt>
+<dd>and provide basic services (type-checking, reduction to CNF, etc.);</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt>an optional library in a module <code class="docutils literal"><span class="pre">Logtk_meta</span></code>,</dt>
+<dd>to provide reasoning at the problem level, about the presence of axiomatic
+theories. A small file describing a few theories can be found in
+<code class="docutils literal"><span class="pre">data/builtin.theory</span></code> and one of the tools, <code class="docutils literal"><span class="pre">detect_theories</span></code>, can be
+used straightforwardly.</dd>
+</dl>
+</li>
+</ul>
+</div>
+<div class="section" id="where-to-go-next">
+<h2>Where to go next<a class="headerlink" href="#where-to-go-next" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>Compilation/installation instructions <a class="reference external" href="getting_started">getting started</a></li>
+<li>A <a class="reference external" href="tutorial">tutorial</a> to learn the basics</li>
+<li>A <a class="reference external" href="modules">more comprehensive list of modules</a></li>
+</ul>
+</div>
+<div class="section" id="contact">
+<h2>Contact<a class="headerlink" href="#contact" title="Permalink to this headline">¶</a></h2>
+<p>If you have troubles of any kind, write to <code class="docutils literal"><span class="pre">simon</span> <span class="pre">DOT</span> <span class="pre">cruanes</span> <span class="pre">AT</span> <span class="pre">inria</span> <span class="pre">DOT</span> <span class="pre">fr</span></code>
+or to the <a class="reference external" href="https://github.com/c-cube/logtk/issues">bugtracker</a>. Contributions,
+patches, and new features (e.g. parsers) are very welcome.</p>
+</div>
+<div class="section" id="table-of-contents">
+<h2>Table of Contents<a class="headerlink" href="#table-of-contents" title="Permalink to this headline">¶</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Getting Started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="getting_started.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="getting_started.html#download">Download</a></li>
+<li class="toctree-l2"><a class="reference internal" href="getting_started.html#compilation">Compilation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="getting_started.html#installation">Installation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="tutorial.html#symbols-terms-and-types">Symbols, Terms and Types</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="tutorial.html#symbols">Symbols</a></li>
+<li class="toctree-l3"><a class="reference internal" href="tutorial.html#types">Types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="tutorial.html#terms">Terms</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial.html#links">Links</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">List of modules</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#main-library">Main Library</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#parsers">Parsers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#meta-prover">Meta-Prover</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#arbitrary-instances">Arbitrary Instances</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="term_hierarchy.html">Hierarchy of term representations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="term_hierarchy.html#rationale">Rationale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="term_hierarchy.html#specialized-representations">Specialized Representations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="term_hierarchy.html#hierarchy">Hierarchy</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="meta_prover.html">Meta-Prover</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="meta_prover.html#intro">Intro</a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_prover.html#structure">Structure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_prover.html#implementation">Implementation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="meta_prover.html#scanning">Scanning</a></li>
+<li class="toctree-l3"><a class="reference internal" href="meta_prover.html#reasoning">Reasoning</a></li>
+<li class="toctree-l3"><a class="reference internal" href="meta_prover.html#indexing">Indexing</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="meta_prover.html#biblio">Biblio</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="ho_indexing.html">Higher-Order indexing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="type_inference.html">Type Inference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="type_inference.html#sketch-of-the-algorithm">Sketch of the algorithm</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="hysteresis.html">Hysteresis (preprocessor to E)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="hysteresis.html#tasks">Tasks</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="hysteresis.html#pre-rewrite-rules">Pre-rewrite rules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hysteresis.html#rewrite-rules">Rewrite rules</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="#">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Documentation</a><ul>
+<li><a class="reference internal" href="#presentation">Presentation</a></li>
+<li><a class="reference internal" href="#where-to-go-next">Where to go next</a></li>
+<li><a class="reference internal" href="#contact">Contact</a></li>
+<li><a class="reference internal" href="#table-of-contents">Table of Contents</a></li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="#">Documentation overview</a><ul>
+      <li>Next: <a href="getting_started.html" title="next chapter">Getting Started</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/contents.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/contents.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

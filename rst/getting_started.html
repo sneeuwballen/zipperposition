@@ -1,0 +1,169 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Getting Started &#8212; logtk  documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Tutorial" href="tutorial.html" />
+    <link rel="prev" title="Documentation" href="contents.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="getting-started">
+<h1>Getting Started<a class="headerlink" href="#getting-started" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="requirements">
+<h2>Requirements<a class="headerlink" href="#requirements" title="Permalink to this headline">¶</a></h2>
+<p>You will need OCaml &gt;= 4.00.1 or higher with ocamlbuild,
+<a class="reference external" href="https://forge.ocamlcore.org/projects/zarith/">zarith</a>
+and the standard library.</p>
+<p>Some modules come from
+<a class="reference external" href="https://github.com/c-cube/ocaml-containers/">ocaml-containers</a> and
+are packaged with the library.</p>
+</div>
+<div class="section" id="download">
+<h2>Download<a class="headerlink" href="#download" title="Permalink to this headline">¶</a></h2>
+<p>You can download archives <a class="reference external" href="https://github.com/c-cube/logtk/releases">on github</a>
+or use git directly :</p>
+<div class="highlight-sh"><div class="highlight"><pre><span></span>git clone https://github.com/c-cube/logtk.git
+</pre></div>
+</div>
+</div>
+<div class="section" id="compilation">
+<h2>Compilation<a class="headerlink" href="#compilation" title="Permalink to this headline">¶</a></h2>
+<p>Additional sub-libraries can be built if their respective dependencies
+are met, and the appropriate <code class="docutils literal"><span class="pre">./configure</span> <span class="pre">--enable-foobar</span></code> flag was set.
+For instance, to build the <em>meta-prover</em> library (used to detect axiomatic
+theories), you should run</p>
+<div class="highlight-sh"><div class="highlight"><pre><span></span>$ ./configure --enable-meta
+</pre></div>
+</div>
+<p>If <a class="reference external" href="http://cristal.inria.fr/~fpottier/menhir/">menhir</a> is installed, the
+parsers library <code class="docutils literal"><span class="pre">Logtk_parsers</span></code> can be built with</p>
+<div class="highlight-sh"><div class="highlight"><pre><span></span>$ ./configure --enable-parsers
+</pre></div>
+</div>
+<p>If you have installed <a class="reference external" href="https://github.com/c-cube/qcheck/">qcheck</a>, for instance
+via <code class="docutils literal"><span class="pre">opam</span> <span class="pre">install</span> <span class="pre">qcheck</span></code>, you can enable the property-based testing and
+random term generators with</p>
+<div class="highlight-sh"><div class="highlight"><pre><span></span>$ ./configure --enable-qcheck --enable-tests
+$ make tests
+</pre></div>
+</div>
+<p>Several tools are shipped with <code class="docutils literal"><span class="pre">Logtk</span></code>, including a CNF converter, a type-checker,
+etc. They are built if the flag <code class="docutils literal"><span class="pre">--enable-tools</span></code> is set. API Documentation
+will be built provided <code class="docutils literal"><span class="pre">--enable-docs</span></code> is set.</p>
+<p>After the configuration is done, to build the library, documentation and tools
+(given the appropriate flags are set), type in a terminal located in the root
+directory of the project:</p>
+<div class="highlight-sh"><div class="highlight"><pre><span></span>$ make
+</pre></div>
+</div>
+</div>
+<div class="section" id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h2>
+<p>If you use <code class="docutils literal"><span class="pre">ocamlfind</span></code> (which is strongly recommended),
+installation/uninstallation are just:</p>
+<div class="highlight-sh"><div class="highlight"><pre><span></span>$ make install
+$ make uninstall
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="contents.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Getting Started</a><ul>
+<li><a class="reference internal" href="#requirements">Requirements</a></li>
+<li><a class="reference internal" href="#download">Download</a></li>
+<li><a class="reference internal" href="#compilation">Compilation</a></li>
+<li><a class="reference internal" href="#installation">Installation</a></li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="contents.html">Documentation overview</a><ul>
+      <li>Previous: <a href="contents.html" title="previous chapter">Documentation</a></li>
+      <li>Next: <a href="tutorial.html" title="next chapter">Tutorial</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/getting_started.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/getting_started.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
