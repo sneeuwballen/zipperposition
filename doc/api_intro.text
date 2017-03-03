@@ -1,7 +1,7 @@
 
 The documentation can be found {{:rst/contents.html} here}.
 
-{2 API Documentation}
+{2 API Documentation for Logtk}
 
 {!modules:
 Binder
@@ -9,19 +9,24 @@ Builtin
 Cache
 Cnf
 Comparison
+Compute_prec
 Congruence
 DBEnv
 Dtree
 FOTerm
 FeatureVector
 Fingerprint
+Flex_state
 Formula
 FormulaShape
+FV_tree
 Hashcons
 HVar
 IArray
 ID
+IDOrBuiltin
 Index
+Ind_ty
 InnerTerm
 Interfaces
 LazyGraph
@@ -31,11 +36,13 @@ NPDtree
 Options
 Ordering
 Ordering_intf
+Ordinal
 ParseLocation
 Position
 Precedence
-PrologTerm
+STerm
 Scoped
+Signal
 Signature
 Skolem
 Sourced
@@ -45,8 +52,10 @@ Subst
 Transform
 Type
 TypeInference
-TypedPrologTerm
+TypedSTerm
 Unif
+UnionFind
+UntypedAST
 Util
 Var
 }
