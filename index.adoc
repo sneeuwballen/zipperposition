@@ -1,6 +1,6 @@
 = Zipperposition
 
-link:rst/index.html[High-Level Documentation]
+link:rst/contents.html[High-Level Documentation]
 
 == API Documentation
 
