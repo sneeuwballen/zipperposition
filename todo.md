@@ -2,17 +2,6 @@
 
 ## Now
 
-- parse arith in ZF (and possibly TIP?) with normal OCaml priorities
-  `./zipperposition.native -p -o none -t 30 --dot /tmp/truc.dot examples/frontpage.zf`
-  translate `frontpage.p` into `frontpage.p` (arith + inductive types)
-
-- write doc for zipper
-  * [ ] large readme with usage tutorial
-  * [ ] detailed `.zf` syntax, including definitions and rewrite rules
-        and operator priorities
-  * [ ] `-o none` and how to print graphviz proofs
-  * [ ] a list of inference rules?
-
 - heuristics:
   * [ ] get back to a simple "pick-given ratio" with current sophisticated
     heap and a regular `Queue.t`?
@@ -20,8 +9,29 @@
     should pass, doesn't look that hard (E does it)
     → check on all TPTP, though
   * [ ] penalize clauses with several positive lits?
+  * [ ] do not penalize deep induction (instead, restrict induction to
+        positions that are active wrt definitions?)
+
+- introduce builtin symbols S, K, and I, and use them to λ-lift?
+  * [ ] HO unification based on that (purify sub-terms of functional type,
+      and deal with `a != b` of functional types by successive steps
+      of HO unification (structural rules = simplifications,
+      choice points = inferences)
+  * [ ] use Jasmin's KBO for higher-order terms
+  * [ ] fix RPO for partially applied terms
+  * [ ] fix unification and indexing for higher-order terms
+      (must consider them as right-parenthesed, be careful)
+  * [ ] parse THF-0 and try on TPTP
+  → some inductive problems contain higher-order
+
+- put rewrite rules (and their source) in proofs
+
+- progress bar in hornet
 
 ## Hornet
+
+- fix:
+  * [ ] remove trivial clauses in splitting
 
 - FO prover
   * [x] basic Horn superposition
@@ -35,11 +45,13 @@
         during iterative deepening).
         Ground Horn superposition and oriented rewriting are not bounded.
   * [x] full check for whether a HC already exists in saturation (avoid loops)
-  * [ ] some basic redundancy criteria
-    + [ ] subsumption on positive unit clauses (or maybe full Horn clauses?)
+  * [x] some basic redundancy criteria
+    + [x] subsumption on full horn clauses
     + [x] demodulation
-  * [ ] in demodulation, check *subsumption* of {label,constraint}
+  * [x] in demodulation, check *subsumption* of {label,constraint}
         (instead of just emptyness). Copy from variant?
+        → important because many unit positive clauses will have a label
+          or at least a (dismatching) constraint after splitting
   * [ ] deduplicate literals in general clauses
   * [ ] deduplicate literals in horn clauses' bodies
   * [x] depth limit for instantiation (too deep->instance goes in a waiting heap)
@@ -47,9 +59,12 @@
   * [ ] disequality/disunif constraints for `p ∨ x=y ← q, r, s`.
         it could still be a Horn clause: `p ← q, r, s | x!=y`?
         think about it
-
-  `./hornet.native --debug 1 --stats --dot /tmp/truc.dot -t 120 examples/pelletier_problems/pb41.zf --debug 5 |& less`
-  TODO: fix bug (another constraint issue leading to trivial clause instance)
+  * [ ] label merging rule, as DNF (set of labels, basically)?
+        (each HC contains a list of clauses to re-add if it dies, the ones
+         that were subsumed by label merging.
+         OR: only part of a clause may die (hard!!))
+        → might be too complicated to be worth it (try to have as few general
+          clauses as possible anyway)
 
   `./hornet.native --debug 2 --dot /tmp/truc.dot -t 30 examples/pelletier_problems/pb34.zf`
   TODO: make more efficient (maybe do superposition with better heuristic
@@ -62,6 +77,16 @@
   `./hornet.native --debug 1 --stats --dot /tmp/truc.dot -t 30 tptp/Problems/RNG/RNG008-4.p`
 
   `./hornet.native --debug 2 --dot /tmp/truc.dot -t 30 examples/RNG008-1.p` TODO: subsumption
+
+- deduction modulo
+  * [ ] move rewrite rules to core library
+  * [ ] store rewrite rules in the defined (head) literal
+  * [ ] adapt zipper code for horn clauses (what about rewriting on
+        literals that does not yield a positive conjunction??)
+  * [ ] improve efficiency heavily (e.g. on narrowing)̵
+        → narrowing might be part of the "constraint" solving, not saturation
+        → should eventually beat smbc on this (use SAT solver to guide)
+        → think about mix of E-unif and HO-unif, driven by SAT
 
 - hierarchic superposition
   * [ ] have a flag "abstraction" on `HVar.t`
@@ -98,16 +123,25 @@
         → should be good enough for many problems
   * [ ] some form of bottom-up synthesis?
 
-## Main
+## Zipperposition
 
-- make real benchmarks:
-  * add `lemma` statement to tip-parser
-  * parse this in Zipperposition
-  * use quickspec to generate lemmas on Isaplanner problems
-  * run benchmarks (without induction, with induction, with quickspec lemmas)
+- make real inductive benchmarks:
+  * [x] add `lemma` statement to tip-parser
+  * [x] parse this in Zipperposition
+  * [ ] use quickspec to generate lemmas on Isaplanner problems
+  * [ ] run benchmarks (without induction, with induction, with quickspec lemmas)
 
 - lemma by generalization (if `t` occurs on both sides of ineq?)
   * see what isaplanner does
+  * use "Aubin" paper (generalize exactly the subterms at reductive position),
+    but this requires to have tighter control over rules/definitions first
+
+- documentation
+  * [x] large readme with usage tutorial
+  * [x] detailed `.zf` syntax, including definitions and rewrite rules
+        and operator priorities
+  * [x] `-o none` and how to print graphviz proofs
+  * [ ] a list of inference rules?
 
 - rule similar to `fool_param` for for datatypes:
   `C[t]` where `t:nat` (strict subterm) is not a cstor term nor a variable
@@ -134,12 +168,7 @@
 - [ ] generate all lemmas up to given depth
   * need powerful simplifications from the beginning (for smallchecking)
 
-- refine enum_types for
-  `./zipperposition.native --dot /tmp/truc.dot -t 30 --show-lemmas examples/tla/fsm5.zf --debug 1`
-
 ## To Fix
-
-- `./zipperposition.native --dot /tmp/truc.dot -t 30 examples/ind/nat_check.zf --debug 5`
 
 - `./zipperposition.native -p -o none -t 30 --dot /tmp/truc.dot examples/GEG024=1.p --debug 1`
   seems like heuristics are bad here (`--clause-queue bfs` works fine),
@@ -147,6 +176,16 @@
 
   → also need to find good way of indexing these for subsumption
   (e.g. feature vectors with lower/upper bounds?)
+
+- `./zipperposition.native -p --stats -o none --dot /tmp/truc.dot -t 30 examples/ind/list13.zf`
+  need to avoid drowning in search space here
+
+- `./zipperposition.native -p --stats -o none --dot /tmp/truc.dot -t 30 tip-benchmarks/isaplanner/prop_83.smt2 -t 120`
+    trivial with `--clause-queue bfs`, need some fairness (using pick-given)
+
+- rewriting:
+  `./zipperposition.native -p --stats -o none --dot /tmp/truc.dot -t 30 tip-benchmarks/tip2015/sort_MSortBUPermutes.smt2`
+  (maybe a rewrite rule that we try to use on paritally applied function)
 
 ## In Hold
 
