@@ -18,7 +18,7 @@ build: [
 ]
 install: [make "install"]
 remove: [
-    ["ocamlfind" "remove" "libzipperposition"]
+    [make "uninstall"]
     ["rm" "%{bin}%/zipperposition"]
 ]
 depends: [
