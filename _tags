@@ -10,7 +10,7 @@ true: bin_annot, no_alias_deps, use_menhir, color(always), optimize(3)
 "tptp": -traverse
 <*bench*/>: -traverse
 
-<src/**/*.ml>: warn(+a-4-42-44-48-50-58@8)
+<src/**/*.ml>: warn(+a-4-42-44-48-50-58-32-60@8)
 
 <src/prover/const.cmx>: for-pack(Libzipperposition)
 
