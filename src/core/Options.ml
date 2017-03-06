@@ -17,7 +17,7 @@ type input_format =
   | I_guess
 
 let input_format_of_string s =
-  match s |> String.trim |> String.lowercase with
+  match s |> String.trim |> CCString.lowercase_ascii with
     | "tptp" | "tstp" -> I_tptp
     | "zf" -> I_zf
     | "tip" -> I_tip
@@ -30,7 +30,7 @@ type print_format =
   | Print_zf
 
 let print_format_of_string s =
-  match s |> String.trim |> String.lowercase with
+  match s |> String.trim |> CCString.lowercase_ascii with
     | "none" -> Print_none
     | "tptp" | "tstp" -> Print_tptp
     | "default" | "normal" -> Print_normal

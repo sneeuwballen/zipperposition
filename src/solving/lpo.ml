@@ -139,7 +139,7 @@ module MakeSolver(X : sig end) = struct
     let norm i =
       if i>0 then i, Msat.Formula_intf.Same_sign
       else -i, Msat.Formula_intf.Negated
-    type proof = ()
+    type proof = unit
   end
 
   module Solver = Msat.Solver.Make(Lit)(Msat.Solver.DummyTheory(Lit))(struct end)
