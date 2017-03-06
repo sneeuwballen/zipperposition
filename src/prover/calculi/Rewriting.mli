@@ -8,7 +8,7 @@
 open Logtk
 
 module Make(E : Env_intf.S) : sig
-  val setup : Rewrite_lit.Set.t -> unit
+  val setup : has_rw:bool -> Rewrite_lit.Set.t -> unit
 end
 
 module Key : sig

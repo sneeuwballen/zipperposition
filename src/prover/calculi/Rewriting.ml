@@ -135,19 +135,22 @@ module Make(E : Env_intf.S) = struct
   let narrow_lits rules =
     Util.with_prof prof_narrowing_lit (narrow_lits_ rules)
 
-  let setup rules =
+  let setup ~has_rw rules =
     Util.debug ~section 1 "register Rewriting to Env...";
-    Util.debugf ~section 2 "@[<v2>rewrite rules:@ %a@]" (fun k->k RL.Set.pp rules);
-    E.Ctx.lost_completeness ();
     E.add_rewrite_rule "rewrite_defs" simpl_term;
-    E.add_multi_simpl_rule (simpl_clause rules);
-    E.add_unary_inf "narrow_lit_defs" (narrow_lits rules);
     E.add_binary_inf "narrow_term_defs" narrow_term_passive;
+    if has_rw then  E.Ctx.lost_completeness ();
+    if not (RL.Set.is_empty rules) then (
+      Util.debugf ~section 2 "@[<v2>rewrite rules on lits:@ %a@]" (fun k->k RL.Set.pp rules);
+      E.add_multi_simpl_rule (simpl_clause rules);
+      E.add_unary_inf "narrow_lit_defs" (narrow_lits rules);
+    );
     ()
 end
 
 module Key = struct
   let rules = Flex_state.create_key()
+  let has_rw = Flex_state.create_key()
 end
 
 let post_cnf stmts st =
@@ -157,14 +160,26 @@ let post_cnf stmts st =
     CCVector.fold
       (fun set s -> RL.Set.add_stmt s set)
       RL.Set.empty stmts
+  (* check if there are rewrite rules *)
+  and has_rw =
+    CCVector.to_seq stmts
+    |> Sequence.exists
+      (fun st -> match Statement.view st with
+         | Statement.RewriteForm _
+         | Statement.RewriteTerm _
+         | Statement.Def _ -> true
+         | _ -> false)
   in
-  Flex_state.add Key.rules rules st
+  st
+  |> Flex_state.add Key.rules rules
+  |> Flex_state.add Key.has_rw has_rw
 
 (* add a term simplification that normalizes terms w.r.t the set of rules *)
 let normalize_simpl (module E : Env_intf.S) =
   let module M = Make(E) in
   let rules = E.flex_get Key.rules in
-  M.setup rules
+  let has_rw = E.flex_get Key.has_rw in
+  M.setup ~has_rw rules
 
 let extension =
   let open Extensions in
