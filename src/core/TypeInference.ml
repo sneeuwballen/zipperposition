@@ -825,7 +825,12 @@ let infer_defs ?loc ctx (l:A.def list): (_,_,_) Stmt.def list =
            (fun r ->
               let r = infer_prop_exn ctx r in
               begin match as_def ?loc Var.Set.empty r with
-                | `Term (vars,id,_,args,rhs) ->
+                | `Term (vars,id',_,args,rhs) ->
+                  (* check that we talk about the same ID *)
+                  if not (ID.equal id id') then (
+                    error_ ?loc "rule `%a`@ for `%a` has head symbol `%a`"
+                      T.pp r ID.pp id ID.pp id';
+                  );
                   Stmt.Def_term (vars,id,ty,args,rhs)
                 | `Prop (vars,lhs,rhs) ->
                   assert (T.Ty.is_prop (T.ty_exn rhs));

@@ -1,0 +1,15 @@
+# expect: error
+
+data nat := Z | S nat.
+data pair a b := Pair a b.
+
+data list a :=
+  | nil
+  | cons a (list a).
+
+def fst : pi (a b : type). pair a b -> a where
+  forall x y. fst (Pair x y) = x.
+
+# WRONG: head does not match
+def snd : pi (a b : type). pair a b -> b where
+  forall x y. fst (Pair x y) = y.
