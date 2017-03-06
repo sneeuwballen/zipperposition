@@ -7,7 +7,7 @@ build: [
         "--bindir" "%{bin}%"
         "--disable-tests"
         "--disable-docs"
-        "--%{menhir:enable}%-parsers"
+        "--%{menhir+tip-parser:enable}%-parsers"
         "--disable-hornet-prover"
         "--enable-zipperposition-prover"
         "--disable-solving"
@@ -18,7 +18,7 @@ build: [
 ]
 install: [make "install"]
 remove: [
-    ["ocamlfind" "remove" "libzipperposition"]
+    [make "uninstall"]
     ["rm" "%{bin}%/zipperposition"]
 ]
 depends: [
@@ -31,9 +31,10 @@ depends: [
   "oclock"
   "oasis" { build }
   "msat" { >= "0.5" < "0.7" }
+  "menhir" {build}
+  "tip-parser"
 ]
 depopts: [
-  "menhir" {build}
   "qcheck" {test}
 ]
 available: [

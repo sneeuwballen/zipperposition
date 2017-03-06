@@ -56,6 +56,7 @@ rule token = parse
   | "where" { WHERE }
   | "type" { TYPE }
   | "prop" { PROP }
+  | "int" { INT }
   | "assert" { ASSERT }
   | "lemma" { LEMMA }
   | "goal" { GOAL }
@@ -69,6 +70,13 @@ rule token = parse
   | "||" { LOGIC_OR }
   | "|" { VERTICAL_BAR }
   | "~" { LOGIC_NOT }
+  | "*" { ARITH_PRODUCT }
+  | "+" { ARITH_PLUS }
+  | "-" { ARITH_MINUS }
+  | "<" { ARITH_LT }
+  | "<=" { ARITH_LEQ }
+  | ">" { ARITH_GT }
+  | ">=" { ARITH_GEQ }
   | "forall" { LOGIC_FORALL }
   | "exists" { LOGIC_EXISTS }
   | "=>" { LOGIC_IMPLY }
@@ -78,6 +86,7 @@ rule token = parse
   | "include" { INCLUDE }
   | lower_word { LOWER_WORD(Lexing.lexeme lexbuf) }
   | upper_word { UPPER_WORD(Lexing.lexeme lexbuf) }
+  | integer { INTEGER(Lexing.lexeme lexbuf) }
   | quoted { QUOTED(Lexing.lexeme lexbuf) }
   | _ as c
     {

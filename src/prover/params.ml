@@ -69,8 +69,10 @@ let parse_args () =
                 |> Arg.align
   in
   Arg.parse options add_file "solve problems in files";
-  if CCVector.is_empty files
-  then CCVector.push files "stdin";
+  if CCVector.is_empty files then (
+    CCVector.push files "stdin";
+    if !Options.input = Options.I_guess then Options.input := Options.I_zf;
+  );
   let files = CCVector.freeze files in (* from now on, immutable *)
   (* return parameter structure *)
   { param_ord= !ord; param_seed = !seed; param_steps = !steps;

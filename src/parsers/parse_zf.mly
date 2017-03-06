@@ -50,6 +50,15 @@
 %token LOGIC_NEQ
 %token LOGIC_EQUIV
 
+%token ARITH_PLUS
+%token ARITH_MINUS
+%token ARITH_PRODUCT
+%token ARITH_LT
+%token ARITH_LEQ
+%token ARITH_GT
+%token ARITH_GEQ
+
+%token INT
 %token PROP
 %token TYPE
 
@@ -72,6 +81,7 @@
 %token <string> LOWER_WORD
 %token <string> UPPER_WORD
 %token <string> QUOTED
+%token <string> INTEGER
 
 %start <Logtk.UntypedAST.statement> parse_statement
 %start <Logtk.UntypedAST.statement list> parse_statement_list
@@ -121,12 +131,14 @@ var:
 const:
   | TYPE { T.tType }
   | PROP { T.prop }
+  | INT { T.ty_int }
   | LOGIC_TRUE { T.true_ }
   | LOGIC_FALSE { T.false_ }
 
 atomic_term:
   | v=var { v }
   | t=const { t }
+  | i=INTEGER { T.int_ (Z.of_string i) }
   | LEFT_PAREN t=term RIGHT_PAREN { t }
 
 apply_term:
@@ -136,20 +148,62 @@ apply_term:
       let loc = L.mk_pos $startpos $endpos in
       T.app ~loc t u
     }
-  | LOGIC_NOT t=apply_term
+  | ARITH_MINUS t=apply_term
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.app_builtin ~loc Builtin.Uminus [t]
+    }
+
+mult_term:
+  | t=apply_term { t }
+  | a=apply_term ARITH_PRODUCT b=mult_term
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.app_builtin ~loc Builtin.Product [a;b]
+    }
+
+%inline PLUS_OP:
+  | ARITH_PLUS { Builtin.Sum }
+  | ARITH_MINUS { Builtin.Difference }
+
+plus_term:
+  | t=mult_term { t }
+  | a=mult_term o=PLUS_OP b=plus_term
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.app_builtin ~loc o [a;b]
+    }
+
+%inline ARITH_OP:
+  | ARITH_LT { Builtin.Less }
+  | ARITH_LEQ { Builtin.Lesseq }
+  | ARITH_GT { Builtin.Greater }
+  | ARITH_GEQ { Builtin.Greatereq }
+
+arith_op_term:
+  | t=plus_term { t }
+  | a=plus_term o=ARITH_OP b=plus_term
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.app_builtin ~loc o [a;b]
+    }
+
+not_term:
+  | t=arith_op_term { t }
+  | LOGIC_NOT t=atomic_term
     {
       let loc = L.mk_pos $startpos $endpos in
       T.not_ ~loc t
     }
 
 eq_term:
-  | t=apply_term { t }
-  | t=apply_term LOGIC_EQ u=apply_term
+  | t=not_term { t }
+  | t=not_term LOGIC_EQ u=not_term
     {
       let loc = L.mk_pos $startpos $endpos in
       T.eq ~loc t u
     }
-  | t=apply_term LOGIC_NEQ u=apply_term
+  | t=not_term LOGIC_NEQ u=not_term
     {
       let loc = L.mk_pos $startpos $endpos in
       T.neq ~loc t u
