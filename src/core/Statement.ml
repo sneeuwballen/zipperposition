@@ -59,7 +59,8 @@ type from_file = {
   loc: ParseLocation.t option;
 }
 
-type clause = FOTerm.t SLiteral.t list
+type lit = FOTerm.t SLiteral.t
+type clause = lit list
 
 type ('f, 't, 'ty) t = {
   view: ('f, 't, 'ty) view;
@@ -217,20 +218,73 @@ end
 
 (** {2 Defined Constants} *)
 
-exception Payload_defined_cst of int
+type form_rewrite = lit * clause list
+(** Basic rewrite rule for literals *)
+
+type form_definition = form_rewrite list
+(** Definition for a literal *)
+
+type definition =
+  | D_term of Rewrite_term.defined_cst
+  | D_form of form_rewrite list
+
+exception Payload_defined_form of int * form_definition ref
 
 let as_defined_cst id = match ID.payload id with
-  | Payload_defined_cst l -> Some l
+  | Payload_defined_form (l,d) -> Some (l, D_form !d)
+  | Rewrite_term.Payload_defined_cst c ->
+    Some (Rewrite_term.Defined_cst.level c, D_term c)
   | _ -> None
+
+let as_defined_cst_level id = CCOpt.map fst @@ as_defined_cst id
 
 let is_defined_cst id = as_defined_cst id <> None
 
-let declare_defined_cst id ~level =
+let declare_defined_form id ~level def =
   (* declare that [id] is a defined constant of level [l+1] *)
   Util.debugf ~section:Util.Section.zip 1
     "@[<2>declare %a@ as defined constant of level %d@]"
     (fun k->k ID.pp id level);
-  ID.set_payload id (Payload_defined_cst level)
+  ID.set_payload id (Payload_defined_form (level, ref def));
+  ()
+
+let declare_defined_form_or_add id (r:form_rewrite): unit =
+  begin match ID.payload id with
+    | Payload_defined_form (_,l) -> l := r :: !l
+    | _ -> declare_defined_form ~level:0 id [r]
+  end
+
+let declare_defined_cst_term id ~level rules: unit =
+  let _ = Rewrite_term.declare_defined_cst ~level id rules in
+  ()
+
+let conv_term_rule (r:_ term_rule): Rewrite_term.rule =
+  let _, id, ty, args, rhs = r in
+  Rewrite_term.Rule.make id ty args rhs
+
+let as_term_rules (l:_ def_rule list): Rewrite_term.rule list option =
+  assert (l <> []);
+  if List.for_all (function Def_term _ -> true | _ -> false) l
+  then (
+    l
+    |> List.map
+      (function
+        | Def_term r -> conv_term_rule r
+        | Def_form _ -> assert false)
+    |> CCOpt.return
+  ) else None
+
+let as_clause_rules (l:_ def_rule list): form_definition option =
+  assert (l <> []);
+  if List.for_all (function Def_form _ -> true | _ -> false) l
+  then (
+    l
+    |> List.map
+      (function
+        | Def_form (_,lit,rhs) -> lit, rhs
+        | Def_term _ -> assert false)
+    |> CCOpt.return
+  ) else None
 
 let terms_of_rule (d:_ def_rule): _ Sequence.t = match d with
   | Def_term (_, _, _, args, rhs) ->
@@ -242,7 +296,7 @@ let terms_of_rule (d:_ def_rule): _ Sequence.t = match d with
 let level_of_rule (d:_ def_rule): int =
   terms_of_rule d
   |> Sequence.flat_map FOTerm.Seq.symbols
-  |> Sequence.filter_map as_defined_cst
+  |> Sequence.filter_map as_defined_cst_level
   |> Sequence.max
   |> CCOpt.get_or ~default:0
 
@@ -251,7 +305,7 @@ let max_exn seq =
   |> Sequence.max
   |> CCOpt.get_lazy (fun () -> assert false)
 
-let scan_stmt_for_defined_cst (st:(clause,FOTerm.t,_) t): unit = match view st with
+let scan_stmt_for_defined_cst (st:(clause,FOTerm.t,Type.t) t): unit = match view st with
   | Def [] -> assert false
   | Def l ->
     (* define all IDs at the same level (the max of those computed) *)
@@ -262,19 +316,43 @@ let scan_stmt_for_defined_cst (st:(clause,FOTerm.t,_) t): unit = match view st w
              Sequence.of_list def_rules
              |> Sequence.map level_of_rule
              |> max_exn
+           and def =
+             let open CCOpt.Infix in
+             ((as_term_rules def_rules >|= fun l -> `Term l)
+              <+>
+                (as_clause_rules def_rules >|= fun l -> `Form l))
+             |> CCOpt.get_lazy (fun _ -> assert false)
            in
-           def_id, lev)
+           def_id, lev, def)
         l
     in
     let level =
       Sequence.of_list ids_and_levels
-      |> Sequence.map snd
+      |> Sequence.map (fun (_,l,_) -> l)
       |> max_exn
       |> succ
     in
     List.iter
-      (fun (id,_) -> declare_defined_cst id ~level)
+      (fun (id,_,def) -> match def with
+         | `Term l -> declare_defined_cst_term ~level id l
+         | `Form def -> declare_defined_form ~level id def)
       ids_and_levels
+  | RewriteTerm rule ->
+    (* declare the rule, possibly making its head defined *)
+    let r = conv_term_rule rule in
+    let id = Rewrite_term.Rule.head_id r in
+    Rewrite_term.declare_cst_or_add id r
+  | RewriteForm (_,lhs,rhs) ->
+    let r = lhs, rhs in
+    (* is this rule associated to an ID? *)
+    let lhs, _ = r in
+    let head_id = match lhs with
+      | SLiteral.Atom (t,_) -> FOTerm.head t
+      | _ -> None
+    in
+    CCOpt.iter
+      (fun id -> declare_defined_form_or_add id r)
+      head_id
   | _ -> ()
 
 (** {2 Iterators} *)

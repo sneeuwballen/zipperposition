@@ -8,11 +8,11 @@
 open Logtk
 
 module Make(E : Env_intf.S) : sig
-  val setup : Rewrite_rule.Set.t -> unit
+  val setup : Rewrite_lit.Set.t -> unit
 end
 
 module Key : sig
-  val rules : Rewrite_rule.Set.t Flex_state.key
+  val rules : Rewrite_lit.Set.t Flex_state.key
 end
 
 val extension : Extensions.t

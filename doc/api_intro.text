@@ -40,6 +40,7 @@ Ordinal
 ParseLocation
 Position
 Precedence
+Rewrite_term
 STerm
 Scoped
 Signal

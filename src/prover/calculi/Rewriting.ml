@@ -6,9 +6,10 @@
 open Logtk
 
 module T = FOTerm
-module RR = Rewrite_rule
+module RT = Rewrite_term
+module RL = Rewrite_lit
 
-let section = RR.section
+let section = RL.section
 
 let stat_narrowing_lit = Util.mk_stat "narrow.lit_steps"
 let stat_narrowing_term = Util.mk_stat "narrow.term_steps"
@@ -21,17 +22,20 @@ module Make(E : Env_intf.S) = struct
   module C = E.C
 
   (* simplification rule *)
-  let simpl_term rules t =
-    let t' = RR.normalize_term rules t in
-    if T.equal t t' then None
-    else (
+  let simpl_term t =
+    let t', rules = RT.normalize_term t in
+    if T.equal t t' then (
+      assert (RT.R_set.is_empty rules);
+      None
+    ) else (
       Util.debugf ~section 2
-        "@[<2>@{<green>rewrite@} `@[%a@]`@ into `@[%a@]`@]" (fun k->k T.pp t T.pp t');
+        "@[<2>@{<green>rewrite@} `@[%a@]`@ into `@[%a@]`@ :using %a@]"
+        (fun k->k T.pp t T.pp t' RT.pp_rule_set rules);
       Some t'
     )
 
   (* perform term narrowing in [c] *)
-  let narrow_term_passive_ rules c =
+  let narrow_term_passive_ c: C.t list =
     let eligible = C.Eligible.(res c) in
     let sc_rule = 1 in
     let sc_c = 0 in
@@ -39,7 +43,7 @@ module Make(E : Env_intf.S) = struct
       ~which:`All ~eligible (C.lits c)
     |> Sequence.flat_map
       (fun (u_p, passive_pos) ->
-         RR.narrow_term (rules,sc_rule) (u_p,sc_c)
+         RT.narrow_term ~scope_rules:sc_rule (u_p,sc_c)
          |> Sequence.map
            (fun (rule,subst) ->
               let i, lit_pos = Literals.Pos.cut passive_pos in
@@ -51,7 +55,7 @@ module Make(E : Env_intf.S) = struct
               let lits' = CCArray.except_idx lits_passive i in
               (* literal in which narrowing took place *)
               let rhs =
-                Subst.FO.apply ~renaming subst (RR.rhs_term rule, sc_rule) in
+                Subst.FO.apply ~renaming subst (RT.Rule.rhs rule, sc_rule) in
               let new_lit =
                 Literal.Pos.replace lits_passive.(i) ~at:lit_pos
                   ~by:rhs in
@@ -64,14 +68,13 @@ module Make(E : Env_intf.S) = struct
               Util.debugf ~section 3
                 "@[<2>term narrowing:@ from `@[%a@]`@ to `@[%a@]`@ \
                  using rule `%a`@ and subst @[%a@]@]"
-                (fun k->k C.pp c C.pp c' RR.pp_rule_term rule Subst.pp subst);
+                (fun k->k C.pp c C.pp c' RT.Rule.pp rule Subst.pp subst);
               c'
            )
       )
     |> Sequence.to_rev_list
 
-  let narrow_term_passive rules =
-    Util.with_prof prof_narrowing_term (narrow_term_passive_ rules)
+  let narrow_term_passive = Util.with_prof prof_narrowing_term narrow_term_passive_
 
   (* TODO: contextual extended narrowing *)
 
@@ -79,7 +82,7 @@ module Make(E : Env_intf.S) = struct
      manage the fixpoint *)
   let simpl_clause rules c =
     let lits = C.lits c |> Array.to_list in
-    match RR.normalize_clause rules lits with
+    match RL.normalize_clause rules lits with
       | None -> None
       | Some clauses ->
         let proof = ProofStep.mk_simp ~rule:(ProofStep.mk_rule "rw_clause") [C.proof c] in
@@ -100,7 +103,7 @@ module Make(E : Env_intf.S) = struct
     Literals.fold_lits ~eligible lits
     |> Sequence.fold
       (fun acc (lit,i) ->
-         RR.narrow_lit (rules,1) (lit,0)
+         RL.narrow_lit (rules,1) (lit,0)
          |> Sequence.fold
            (fun acc (rule,subst) ->
               let proof =
@@ -118,11 +121,11 @@ module Make(E : Env_intf.S) = struct
                          (Literal.apply_subst_list ~renaming subst (c',1))
                      in
                      C.create ~trail:(C.trail c) new_lits proof)
-                  (RR.rhs_clause rule)
+                  (RL.rhs rule)
               in
               Util.debugf ~section 3
                 "@[<2>narrowing of `@[%a@]`@ using `@[%a@]`@ with @[%a@]@ yields @[%a@]@]"
-                (fun k->k C.pp c RR.pp_rule_clause rule Subst.pp subst
+                (fun k->k C.pp c RL.pp_rule rule Subst.pp subst
                     CCFormat.(list (hovbox C.pp)) clauses);
               Util.incr_stat stat_narrowing_lit;
               List.rev_append clauses acc)
@@ -134,14 +137,13 @@ module Make(E : Env_intf.S) = struct
 
   let setup rules =
     Util.debug ~section 1 "register Rewriting to Env...";
-    if not (RR.Set.is_empty rules) then (
-      Util.debugf ~section 2 "@[<v2>rewrite rules:@ %a@]" (fun k->k RR.Set.pp rules);
-      E.Ctx.lost_completeness ();
-      E.add_rewrite_rule "rewrite_defs" (simpl_term rules);
-      E.add_multi_simpl_rule (simpl_clause rules);
-      E.add_unary_inf "narrow_lit_defs" (narrow_lits rules);
-      E.add_binary_inf "narrow_term_defs" (narrow_term_passive rules);
-    )
+    Util.debugf ~section 2 "@[<v2>rewrite rules:@ %a@]" (fun k->k RL.Set.pp rules);
+    E.Ctx.lost_completeness ();
+    E.add_rewrite_rule "rewrite_defs" simpl_term;
+    E.add_multi_simpl_rule (simpl_clause rules);
+    E.add_unary_inf "narrow_lit_defs" (narrow_lits rules);
+    E.add_binary_inf "narrow_term_defs" narrow_term_passive;
+    ()
 end
 
 module Key = struct
@@ -153,8 +155,8 @@ let post_cnf stmts st =
   (* add set of rules to [st] *)
   let rules =
     CCVector.fold
-      (fun set s -> RR.Set.add_stmt s set)
-      RR.Set.empty stmts
+      (fun set s -> RL.Set.add_stmt s set)
+      RL.Set.empty stmts
   in
   Flex_state.add Key.rules rules st
 

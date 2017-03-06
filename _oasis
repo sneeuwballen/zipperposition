@@ -70,7 +70,7 @@ Library "logtk"
                     Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,
                     Congruence, FeatureVector, FV_tree, UntypedAST, Ind_ty,
                     TypedSTerm, Statement, Flex_state, Compute_prec, 
-                    Ordinal,
+                    Ordinal, Rewrite_term,
                     lib/Hashcons, lib/ParseLocation, lib/Multiset, lib/LazyList,
                     lib/Hash, lib/IArray, lib/AllocCache, lib/Multiset_intf,
                     lib/Signal, lib/UnionFind
@@ -126,7 +126,7 @@ Library "libzipperposition"
                     BBox, ClauseContext, ClauseQueue_intf,
                     Bool_lit, Bool_lit_intf, Sat_solver, Sat_solver_intf,
                     Trail, Ind_cst, Phases, Phases_impl,
-                    Classify_cst, Rewrite_rule,
+                    Classify_cst, Rewrite_lit,
                     calculi/Avatar, calculi/Avatar_intf,
                     calculi/Induction, calculi/Induction_intf,
                     calculi/Superposition, calculi/Superposition_intf,

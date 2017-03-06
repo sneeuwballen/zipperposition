@@ -10,7 +10,7 @@ type res =
   | Cstor of Ind_ty.constructor * Ind_ty.t
   | Inductive_cst of Ind_cst.cst option
   | Projector of ID.t (** projector of some constructor (id: type) *)
-  | DefinedCst of int (** (recursive) definition of given stratification level *)
+  | DefinedCst of int * Statement.definition
   | Other
 
 let classify id = match ID.payload id with
@@ -19,7 +19,10 @@ let classify id = match ID.payload id with
   | Skolem.Attr_skolem Skolem.K_ind -> Inductive_cst None
   | Ind_cst.Payload_cst c -> Inductive_cst (Some c)
   | Ind_ty.Payload_ind_projector id -> Projector id
-  | Statement.Payload_defined_cst l -> DefinedCst l
+  | Rewrite_term.Payload_defined_cst cst ->
+    DefinedCst (Rewrite_term.Defined_cst.level cst, Statement.D_term cst)
+  | Statement.Payload_defined_form (l,def) ->
+    DefinedCst (l,Statement.D_form !def)
   | _ -> Other
 
 let pp_res out = function
@@ -27,7 +30,7 @@ let pp_res out = function
   | Cstor (_, ity) -> Format.fprintf out "cstor of %a" Ind_ty.pp ity
   | Inductive_cst _ -> Format.fprintf out "ind_cst"
   | Projector id -> Format.fprintf out "projector_%a" ID.pp id
-  | DefinedCst lev -> Format.fprintf out "defined (level %d)" lev
+  | DefinedCst (lev,_) -> Format.fprintf out "defined (level %d)" lev
   | Other -> CCFormat.string out "other"
 
 let pp_signature out sigma =
@@ -62,7 +65,7 @@ let prec_constr_ a b =
       if dominates_ c1 c2 then 1
       else if dominates_ c2 c1 then -1
       else 0
-    | DefinedCst l1, DefinedCst l2 ->
+    | DefinedCst (l1,_), DefinedCst (l2,_) ->
       (* bigger level means defined later *)
       CCInt.compare l1 l2
     | Ty _, _
