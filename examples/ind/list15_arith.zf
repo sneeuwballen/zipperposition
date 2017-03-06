@@ -1,11 +1,5 @@
 
-# expect: error
-
-# should be: unsat
-# but there are two issues:
-# - zf doesn't have (yet) a notion of numbers, nor arithmetic operators
-# - the flag --arith should be enabled
-
+# expect: unsat
 
 val term : type.
 data list := nil | cons term list.
