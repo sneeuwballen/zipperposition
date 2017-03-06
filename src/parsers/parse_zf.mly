@@ -190,7 +190,7 @@ arith_op_term:
 
 not_term:
   | t=arith_op_term { t }
-  | LOGIC_NOT t=atomic_term
+  | LOGIC_NOT t=arith_op_term
     {
       let loc = L.mk_pos $startpos $endpos in
       T.not_ ~loc t
