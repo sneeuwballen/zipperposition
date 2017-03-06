@@ -39,7 +39,7 @@ let () =
     , " choose which set of clause queues to use (for selecting next active clause)"
     ]
 
-module Make(C : Clause.S) = struct
+module Make(C : Clause_intf.S) = struct
   module C = C
 
   (* weight of a term [t], using the precedence's weight *)
@@ -155,85 +155,103 @@ module Make(C : Clause.S) = struct
 
   (** A priority queue of clauses, purely functional *)
   type t = {
-    heap : H.t;
-    functions : functions;
-  }
-  and functions = {
-    weight : C.t -> int;
-    name : string;
+    mutable heap : H.t;
+    mutable queue: C.t Queue.t;
+    tbl: unit C.Tbl.t;
+    mutable time_before_fifo: int;
+    (* cycles from 0 to ratio, changed at every [take_first].
+       when 0, pick in fifo; other pick from heap and decrease *)
+    ratio: int;
+    weight: C.t -> int;
+    name: string;
   }
 
   (** generic clause queue based on some ordering on clauses, given
       by a weight function *)
-  let make ~weight name =
-    let functions = {
-      weight;
+  let make ~ratio ~weight name =
+    if ratio <= 0 then invalid_arg "ClauseQueue.make: ratio must be >0";
+    { weight;
       name;
-    } in
-    { heap = H.empty; functions; }
+      ratio;
+      time_before_fifo=ratio;
+      heap = H.empty;
+      queue=Queue.create();
+      tbl=C.Tbl.create 256;
+    }
 
-  let is_empty q =
-    H.is_empty q.heap
+  let is_empty (q:t) = C.Tbl.length q.tbl = 0
 
   let add q c =
-    let w = q.functions.weight c in
-    let heap = H.insert (w, c) q.heap in
-    { q with heap; }
+    if not (C.Tbl.mem q.tbl c) then (
+      C.Tbl.add q.tbl c ();
+      let w = q.weight c in
+      let heap = H.insert (w, c) q.heap in
+      q.heap <- heap;
+      Queue.push c q.queue;
+    )
 
-  let adds q hcs =
-    let heap =
-      Sequence.fold
-        (fun heap c ->
-           let w = q.functions.weight c in
-           H.insert (w,c) heap)
-        q.heap hcs in
-    { q with heap; }
+  let add_seq q hcs = Sequence.iter (add q) hcs
 
-  let take_first q =
+  let rec take_first q =
     if is_empty q then raise Not_found;
-    let new_h, (_, c) = H.take_exn q.heap in
-    let q' = { q with heap=new_h; } in
-    q', c
+    (* find next clause *)
+    let c =
+      if q.time_before_fifo = 0
+      then (
+        q.time_before_fifo <- q.ratio;
+        Queue.pop q.queue
+      ) else (
+        assert (q.time_before_fifo > 0);
+        q.time_before_fifo <- q.time_before_fifo - 1;
+        let new_h, (_, c) = H.take_exn q.heap in
+        q.heap <- new_h;
+        c
+      )
+    in
+    if C.Tbl.mem q.tbl c then (
+      C.Tbl.remove q.tbl c;
+      c
+    ) else take_first q (* spurious *)
 
-  let name q = q.functions.name
+  let name q = q.name
 
   (** {6 Combination of queues} *)
 
-  let goal_oriented =
+  let goal_oriented : t =
     let open WeightFun in
     let weight =
       combine [age, 1; default, 4; favor_small_num_vars, 2;
                favor_goal, 1; favor_all_neg, 1] in
     let name = "goal_oriented" in
-    make ~weight name
+    make ~ratio:6 ~weight name
 
-  let bfs =
+  let bfs : t =
     let open WeightFun in
     let weight = age in
-    make ~weight "bfs"
+    make ~ratio:1 ~weight "bfs"
 
-  let explore =
+  let explore : t =
     let open WeightFun in
     let weight =
       combine [age, 1; default, 4; favor_small_num_vars, 1; favor_all_neg, 1]
     in
-    make ~weight "explore"
+    make ~ratio:6 ~weight "explore"
 
-  let ground =
+  let ground : t =
     let open WeightFun in
     let weight =
       combine [age, 1; favor_pos_unit, 1; favor_ground, 2; favor_small_num_vars, 10; ]
     in
-    make ~weight "ground"
+    make ~ratio:6 ~weight "ground"
 
-  let default =
+  let default : t =
     let open WeightFun in
     let weight =
       combine
         [ age, 4; default, 3; favor_all_neg, 1; favor_small_num_vars, 2
         ; favor_goal, 1; favor_pos_unit, 1]
     in
-    make ~weight "default"
+    make ~ratio:6 ~weight "default"
 
   let of_profile p =
     let open ClauseQueue_intf in

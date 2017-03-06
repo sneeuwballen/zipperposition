@@ -80,7 +80,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let lits c = c.sclause.lits
 
-  module CHashtbl = CCHashtbl.Make(struct
+  module Tbl = CCHashtbl.Make(struct
       type t = clause
       let hash = hash
       let equal = equal

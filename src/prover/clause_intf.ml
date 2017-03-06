@@ -36,7 +36,7 @@ module type S = sig
   val is_ground : t -> bool
   val weight : t -> int
 
-  module CHashtbl : CCHashtbl.S with type key = t
+  module Tbl : CCHashtbl.S with type key = t
 
   val is_goal : t -> bool
   (** Looking at the clause's proof, return [true] iff the clause is an

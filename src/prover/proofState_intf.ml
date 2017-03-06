@@ -6,7 +6,7 @@ open Logtk
 (** {2 Set of active clauses} *)
 module type S = sig
   module Ctx : Ctx.S
-  module C : Clause.S
+  module C : Clause_intf.S
 
   module CQueue : ClauseQueue.S with module C = C and type C.t = C.t
   (** Priority queues on clauses *)
@@ -52,7 +52,7 @@ module type S = sig
     val clauses : unit -> C.ClauseSet.t
     (** Current set of clauses *)
 
-    val queue : unit -> CQueue.t
+    val queue : CQueue.t
     (** Current state of the clause queue *)
 
     val next : unit -> C.t option
