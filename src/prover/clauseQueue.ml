@@ -63,22 +63,8 @@ module Make(C : Clause_intf.S) = struct
         |> Sequence.max ?lt:None
         |> CCOpt.map_or CCFun.id ~default:0
       in
-      let trail = C.trail c in
       let w_lits = weight_lits_ (C.lits c) in
-      let w_trail =
-        let module B = BBox in
-        Trail.fold
-          (fun acc t -> match B.payload (B.Lit.abs t) with
-             | B.Fresh -> acc
-             | B.Lemma _ -> acc
-             | B.Clause_component lits -> acc + weight_lits_ lits
-             | B.Case p ->
-               (* penalize deep inductions quadratically *)
-               acc + CCInt.pow (Ind_cst.path_length p) 2
-          )
-          0 trail
-      in
-      w_lits * Array.length (C.lits c) + w_trail + _depth_ty
+      w_lits * Array.length (C.lits c) + _depth_ty
 
     let penalty_coeff_ = 20
 
