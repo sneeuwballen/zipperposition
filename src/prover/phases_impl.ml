@@ -250,7 +250,7 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
     | Saturate.Unsat _ -> result, 0  (* already found unsat during presaturation *)
     | _ -> Sat.given_clause ~generating:true ?steps ?timeout ()
   in
-  Format.printf "%% done %d iterations@." num;
+  Format.printf "%% done %d iterations in %.1fs@." num (Util.total_time_s());
   Util.debugf ~section 1 "@[<2>final precedence:@ @[%a@]@]"
     (fun k->k Precedence.pp (Env.precedence ()));
   Phases.return_phase result
