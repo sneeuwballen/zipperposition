@@ -12,6 +12,8 @@ module Ty = Type
 
 module type S = Induction_intf.S
 
+type term = T.t
+
 let section = Util.Section.make ~parent:Const.section "induction"
 
 let stats_lemmas = Util.mk_stat "induction.inductive_lemmas"
@@ -20,7 +22,7 @@ let stats_min = Util.mk_stat "induction.assert_min"
 let k_enable : bool Flex_state.key = Flex_state.create_key()
 let k_ind_depth : int Flex_state.key = Flex_state.create_key()
 
-(* TODO
+(*
    in any ground inductive clause C[n]<-Gamma, containing inductive [n]:
    - find path [p], if any (empty at worst)
    - extract context C[]
@@ -68,7 +70,7 @@ module Make
 
   (* sub-terms of an inductive type, that occur several times (candidate
      for "subterm generalization" *)
-  let generalizable_subterms c =
+  let generalizable_subterms c: term list =
     let count = T.Tbl.create 16 in
     C.Seq.terms c
     |> Sequence.flat_map T.Seq.subterms

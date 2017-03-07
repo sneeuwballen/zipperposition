@@ -94,7 +94,7 @@ let cst_equal a b = ID.equal a.cst_id b.cst_id
 let cst_compare a b = ID.compare a.cst_id b.cst_id
 let cst_hash a = ID.hash a.cst_id
 
-module CstSet = CCSet.Make(struct
+module Cst_set = CCSet.Make(struct
     type t = cst
     let compare = cst_compare
   end)
@@ -181,12 +181,12 @@ let declarations_of_cst c = match c.cst_coverset with
 module CoversetState = struct
   (* state for creating coverset *)
   type t = {
-    cst: CstSet.t; (* raw set of constants *)
+    cst: Cst_set.t; (* raw set of constants *)
     others: (ID.t * Type.t) list; (* non-inductive terms *)
   }
 
   let empty = {
-    cst=CstSet.empty;
+    cst=Cst_set.empty;
     others=[];
   }
 
@@ -222,7 +222,7 @@ module CoversetState = struct
   (* modify the state: add [c] to the set of cases *)
   let add_sub_case c : unit mm =
     get >>= fun st ->
-    let st = { st with cst=CstSet.add c st.cst} in
+    let st = { st with cst=Cst_set.add c st.cst} in
     set st
 
   let add_constant id ty : unit mm =
@@ -379,8 +379,8 @@ let make_coverset_ ~cover_set_depth cst : cover_set =
     get >>>= fun state ->
     let case = {
       case_term=t;
-      case_kind=if CstSet.is_empty state.cst then `Base else `Rec;
-      case_sub=CstSet.elements state.cst;
+      case_kind=if Cst_set.is_empty state.cst then `Base else `Rec;
+      case_sub=Cst_set.elements state.cst;
       case_skolems=state.others;
     } in
     yield case

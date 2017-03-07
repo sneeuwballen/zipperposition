@@ -140,6 +140,9 @@ val dominates : cst -> cst -> bool
 (** [dominates c sub] is true if [sub] is a sub-constant of [c],
     or if some sub-constant of [c] dominates [sub] transitively *)
 
+module Cst_set : CCSet.S with type elt = cst
+(** Set of constants *)
+
 (** {6 Path}
 
     A path is a sequence of nested inductions on distinct constants
