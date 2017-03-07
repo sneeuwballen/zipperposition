@@ -264,16 +264,19 @@ let normalize_term_ (t:term): term * rule_set =
     | T.Const id ->
       (* pick a constant rule *)
       begin match rules_of_id id |> Sequence.head with
-        | None -> k t
-        | Some r ->
-          assert (T.is_const r.rule_lhs && T.equal t r.rule_lhs);
+        | Some r when T.is_const r.rule_lhs ->
           (* reduce [rhs], but no variable can be bound *)
+          assert (T.equal t r.rule_lhs);
           set := R_set.add r !set;
           Util.incr_stat stat_term_rw;
           Util.debugf ~section 5
             "@[<2>rewrite `@[%a@]`@ using `@[%a@]`@]"
             (fun k->k T.pp t Rule.pp r);
           reduce r.rule_rhs k
+        | Some _ ->
+          assert (Type.is_fun (T.ty t) || Type.is_forall (T.ty t));
+          k t (* must be a partial application *)
+        | None -> k t
       end
     | T.App (f, l) ->
       (* first, reduce subterms *)
