@@ -16,11 +16,7 @@ type subst = Subst.t
 (** A context is represented as a regular array of literals, containing
     at least one specific variable [x], paired with this variable [x].
     Applying the context is a mere substitution *)
-type t = private {
-  lits : Literals.t;
-  var : FOTerm.var;
-  mutable hash: int;
-}
+type t
 
 val compare : t -> t -> int
 val equal : t -> t -> bool
