@@ -2,28 +2,6 @@
 
 ## Now
 
-- heuristics:
-  * [ ] get back to a simple "pick-given ratio" with current sophisticated
-    heap and a regular `Queue.t`?
-    `/zipperposition.native -p --stats -o none -t 30 --dot /tmp/truc.dot examples/SEU140+2.p`
-    should pass, doesn't look that hard (E does it)
-    → check on all TPTP, though
-  * [ ] penalize clauses with several positive lits?
-  * [ ] do not penalize deep induction (instead, restrict induction to
-        positions that are active wrt definitions?)
-
-- introduce builtin symbols S, K, and I, and use them to λ-lift?
-  * [ ] HO unification based on that (purify sub-terms of functional type,
-      and deal with `a != b` of functional types by successive steps
-      of HO unification (structural rules = simplifications,
-      choice points = inferences)
-  * [ ] use Jasmin's KBO for higher-order terms
-  * [ ] fix RPO for partially applied terms
-  * [ ] fix unification and indexing for higher-order terms
-      (must consider them as right-parenthesed, be careful)
-  * [ ] parse THF-0 and try on TPTP
-  → some inductive problems contain higher-order
-
 - put rewrite rules (and their source) in proofs
 
 - progress bar in hornet
@@ -125,7 +103,59 @@
 
 ## Zipperposition
 
-- make real inductive benchmarks:
+- only do induction on active positions
+  * [ ] check that it fixes previous regression on `list10_easy.zf`, `nat2.zf`…)
+  * [ ] also check that sub-induction seems to hold water with smallcheck
+        (i.e. does the ∀-quantified goal pass smallcheck?), otherwise
+        do not do sub-induction.
+        → will be useful after purification (approximation leads to too
+          many inferences, some of which yield non-inductively true constraints,
+          so we need to check constraints before solving them by induction)
+
+- purification:
+  * [ ] think of purification at invariant/accumulator positions for
+        defined terms of inductive types
+        (steal code from arith)
+  * [ ] de-purify when variable not guarded anymore
+        → global notion of purification that interacts well with destr-eq-res?
+  * [ ] purification of accumulator positions might be a HO variable
+        applied to input parameters (to represent the dependency)?
+        → need some HO unif!
+
+- Higher-Order:
+  * [ ] introduce builtin symbols S, K, and I
+  * [ ] HO unification based on that (purify sub-terms of functional type,
+      and deal with `a != b` of functional types by successive steps
+      of HO unification (structural rules = simplifications,
+      choice points = inferences)
+  * [ ] use Jasmin's KBO for higher-order terms
+  * [ ] fix RPO for partially applied terms
+  * [ ] fix unification and indexing for higher-order terms
+      (must consider them as right-parenthesed, be careful)
+  * [ ] parse THF-0 and try on TPTP
+      → some inductive problems contain higher-order
+  * [ ] use S,K,I to λ-lift instead of introducing new symbol?
+  * [ ] consider whether B,C combinators help make smaller unifiers
+
+- rewriting:
+  * [ ] for each rule, compile _fast_ pre-checks (e.g.
+        matched term must have symbol `f` at arg position `i`) and use
+        these before attempting call to `matching`
+  * [ ] in proof, put set of rewrite rules used in simplification steps,
+        at least in full (non-compressed) version
+
+- heuristics:
+  * [x] get back to a simple "pick-given ratio" with current sophisticated
+    heap and a regular `Queue.t`?
+    `/zipperposition.native -p --stats -o none -t 30 --dot /tmp/truc.dot examples/SEU140+2.p`
+    should pass, doesn't look that hard (E does it)
+    → check on all TPTP, though
+  * [ ] penalize clauses with several positive lits?
+  * [x] do not penalize deep induction (instead, restrict induction to
+        positions that are active wrt definitions?)
+
+- [x] make real inductive benchmarks
+    (ok using tip-benchmarks)
   * [x] add `lemma` statement to tip-parser
   * [x] parse this in Zipperposition
   * [ ] use quickspec to generate lemmas on Isaplanner problems
