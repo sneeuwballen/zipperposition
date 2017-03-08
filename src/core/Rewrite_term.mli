@@ -98,6 +98,9 @@ val normalize_term : term -> term * rule_set
     of rewrite rules stored in IDs.
     Returns the new term and the set of rules that were used *)
 
+val normalize_term_fst : term -> term
+(** Same as {!normalize_term} but ignores the set of rules *)
+
 (* TODO: [app f l] which is the same as [T.app f l], but also reduces
    whenever [f] is a defined constant with one rule which matches [l] *)
 

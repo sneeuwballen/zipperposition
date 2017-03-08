@@ -333,6 +333,8 @@ let normalize_term_ (t:term): term * rule_set =
 let normalize_term (t:term): term * rule_set =
   Util.with_prof prof_term_rw normalize_term_ t
 
+let normalize_term_fst t = fst (normalize_term t)
+
 let narrow_term ?(subst=Subst.empty) ~scope_rules:sc_r (t,sc_t): _ Sequence.t =
   begin match T.view t with
     | T.Const _ -> Sequence.empty (* already normal form *)
