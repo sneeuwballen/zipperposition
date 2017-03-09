@@ -20,6 +20,7 @@ let prof_check = Util.mk_profiler "avatar.check"
 let stat_splits = Util.mk_stat "avatar.splits"
 let stat_trail_trivial = Util.mk_stat "avatar.trivial_trail"
 let stat_trail_simplify = Util.mk_stat "avatar.simplify_trail"
+let stat_backward_simp_trail = Util.mk_stat "avatar.backward_simplify_trail"
 
 (* annotate clauses that have been introduced by lemma *)
 let flag_cut_introduced = SClause.new_flag()
@@ -171,47 +172,89 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   let trail_is_trivial tr =
     Sat.last_result () = Sat_solver.Sat && trail_is_trivial_ tr
 
+  type trail_status =
+    | Tr_trivial
+    | Tr_simplify_into of BLit.t list * BLit.t list (* kept, removed *)
+    | Tr_same
+
+  exception Trail_is_trivial
+
+  (* return [new_trail], [is_trivial] *)
+  let simplify_opt (trail:Trail.t): trail_status =
+    let n_simpl = ref 0 in
+    try
+      let trail, removed =
+        Trail.to_list trail
+        |> List.partition
+          (fun lit ->
+             try match Sat.valuation_level lit with
+               | true, 0 ->
+                 (* [lit] is proven true, it is therefore not necessary
+                    to depend on it *)
+                 incr n_simpl;
+                 false
+               | false, 0 ->
+                 (* [lit] is proven false, the whole trail is trivial *)
+                 raise Trail_is_trivial
+               | _ -> true
+             with Sat.UndecidedLit -> true)
+      in
+      if !n_simpl > 0
+      then (
+        assert (removed<>[]);
+        Tr_simplify_into (trail, removed)
+      ) else Tr_same
+    with Trail_is_trivial ->
+      Tr_trivial
+
   (* simplify the trail of [c] using boolean literals that have been proven *)
   let simplify_trail_ c =
     let trail = C.trail c in
-    let n_simpl = ref 0 in
     (* remove bool literals made trivial by SAT solver *)
-    let trail, trivial_trail =
-      Trail.to_list trail
-      |> List.partition
-        (fun lit ->
-           try match Sat.valuation_level lit with
-             | true, 0 ->
-               (* [lit] is proven true, it is therefore not necessary
-                  to depend on it *)
-               incr n_simpl;
-               false
-             | _ -> true
-           with Sat.UndecidedLit -> true)
-    in
-    let trail = Trail.of_list trail in
-    if !n_simpl > 0 then (
-      Util.incr_stat stat_trail_simplify;
-      (* use SAT resolution proofs for tracking why the trail
-         has been simplified, so that the other branches that have been
-         closed can appear in the proof *)
-      let proof_removed = List.map Sat.get_proof_of_lit trivial_trail in
-      let proof =
-        ProofStep.mk_simp ~rule:(ProofStep.mk_rule "simpl_trail")
-          (C.proof c :: proof_removed) in
-      let c' = C.create_a ~trail (C.lits c) proof in
-      Util.debugf ~section 3
-        "@[<2>clause @[%a@]@ trail-simplifies into @[%a@]@]"
-        (fun k->k C.pp c C.pp c');
-      SimplM.return_new c'
-    )
-    else SimplM.return_same c
+    begin match simplify_opt trail with
+      | Tr_same
+      | Tr_trivial -> SimplM.return_same c (* handled by [is_trivial] *)
+      | Tr_simplify_into (new_trail, removed_trail) ->
+        Util.incr_stat stat_trail_simplify;
+        let new_trail = Trail.of_list new_trail in
+        (* use SAT resolution proofs for tracking why the trail
+           has been simplified, so that the other branches that have been
+           closed can appear in the proof *)
+        let proof_removed = List.map Sat.get_proof_of_lit removed_trail in
+        let proof =
+          ProofStep.mk_simp ~rule:(ProofStep.mk_rule "simpl_trail")
+            (C.proof c :: proof_removed) in
+        let c' = C.create_a ~trail:new_trail (C.lits c) proof in
+        Util.debugf ~section 3
+          "@[<2>clause @[%a@]@ trail-simplifies into @[%a@]@]"
+          (fun k->k C.pp c C.pp c');
+        SimplM.return_new c'
+    end
 
   (* only simplify if SAT *)
   let simplify_trail c =
     if Sat.last_result () = Sat_solver.Sat
     then simplify_trail_ c
     else SimplM.return_same c
+
+  (* subset of active clauses that have a trivial trail or simplifiable
+     trail *)
+  let backward_simplify_trails (_:C.t): C.ClauseSet.t =
+    if Sat.last_result () = Sat_solver.Sat then (
+      E.ProofState.ActiveSet.clauses ()
+      |> C.ClauseSet.filter
+        (fun c ->
+           let ok = match simplify_opt (C.trail c) with
+             | Tr_trivial | Tr_simplify_into _ -> true
+             | Tr_same -> false
+           in
+           if ok then (
+             Util.incr_stat stat_backward_simp_trail;
+             Util.debugf ~section 5
+               "(@[<2>backward_simplify_trail@ %a@])" (fun k->k C.pp c);
+           );
+           ok)
+    ) else C.ClauseSet.empty
 
   let skolem_count_ = ref 0
 
@@ -394,6 +437,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     E.add_generate "avatar_check_sat" check_satisfiability;
     E.add_clause_conversion convert_lemma;
     E.add_is_trivial_trail trail_is_trivial;
+    E.add_backward_simplify backward_simplify_trails;
     E.add_simplify simplify_trail;
     if E.flex_get k_show_lemmas then (
       Signal.once Signals.on_exit (fun _ -> show_lemmas ());
