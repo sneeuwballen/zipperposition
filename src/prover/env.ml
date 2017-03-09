@@ -352,7 +352,7 @@ module Make(X : sig
 
   (** Apply rewrite rules AND evaluation functions *)
   let rewrite c =
-    Util.debugf ~section 5 "rewrite clause@ `@[%a@]`..." (fun k->k C.pp c);
+    Util.debugf ~section 5 "@[<2>rewrite clause@ `@[%a@]`...@]" (fun k->k C.pp c);
     let applied_rules = ref StrSet.empty in
     let rec reduce_term rules t =
       match rules with
@@ -362,7 +362,7 @@ module Make(X : sig
             | None -> reduce_term rules' t (* try next rules *)
             | Some t' ->
               applied_rules := StrSet.add name !applied_rules;
-              Util.debugf ~section 5 "@[rewrite `@[%a@]`@ into `@[%a@]`@]"
+              Util.debugf ~section 5 "@[<2>rewrite `@[%a@]`@ into `@[%a@]`@]"
                 (fun k->k T.pp t T.pp t');
               reduce_term !_rewrite_rules t'  (* re-apply all rules *)
           end
@@ -564,14 +564,33 @@ module Make(X : sig
     Util.enter_prof prof_back_simplify;
     (* set of candidate clauses, that may be unit-simplifiable *)
     let candidates = backward_simplify_find_candidates given in
+    let back_simplify c =
+      let open SimplM.Infix in
+      fix_simpl c
+        ~f:(fun c ->
+          let old_c = c in
+          basic_simplify c >>=
+          (* simplify with unit clauses, then all active clauses *)
+          rewrite >>=
+          rw_simplify >>=
+          basic_simplify >|= fun c ->
+          if not (Lits.equal_com (C.lits c) (C.lits old_c)) then (
+            Util.debugf ~section 2 "@[clause `@[%a@]`@ simplified into `@[%a@]`@]"
+              (fun k->k C.pp old_c C.pp c);
+          );
+          c)
+    in
     (* try to simplify the candidates. Before is the set of clauses that
        are simplified, after is the list of those clauses after simplification *)
     let before, after =
       C.ClauseSet.fold
         (fun c (before, after) ->
-           let c', is_new = rw_simplify c in
-           match is_new with
-             | `Same -> before, after
+           let c', is_new = back_simplify c in
+           begin match is_new with
+             | `Same ->
+               if is_trivial c'
+               then C.ClauseSet.add c before, after (* just remove the clause *)
+               else before, after
              | `New ->
                (* the active clause has been backward simplified! *)
                C.mark_redundant c;
@@ -579,7 +598,8 @@ module Make(X : sig
                Util.debugf ~section 2
                  "@[active clause `@[%a@]@ simplified into `@[%a@]`@]"
                  (fun k->k C.pp c C.pp c');
-               C.ClauseSet.add c before, c' :: after)
+               C.ClauseSet.add c before, c' :: after
+           end)
         candidates (C.ClauseSet.empty, [])
     in
     Util.exit_prof prof_back_simplify;
