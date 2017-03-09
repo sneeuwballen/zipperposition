@@ -221,7 +221,7 @@ let add_list p l =
       (p.snapshot,false) l
   in
   if is_new then (
-    Util.debugf ~section 4 "@[<v>old prec: @[%a@]@,new prec: @[%a@]@."
+    Util.debugf ~section 4 "@[<v>old prec: @[%a@]@,new prec: @[%a@]@]"
       (fun k->k (Util.pp_list ID.pp) p.snapshot (Util.pp_list ID.pp) snapshot);
     assert (check_inv_ p);
     p.snapshot <- snapshot;
