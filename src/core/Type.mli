@@ -212,6 +212,9 @@ include Interfaces.PRINT with type t := t
 val pp_surrounded : t CCFormat.printer
 val pp_typed_var : t HVar.t CCFormat.printer
 
+val mangle : t -> string
+val pp_mangle : t CCFormat.printer
+
 (** {2 TPTP} specific printer and types *)
 
 module TPTP : sig
