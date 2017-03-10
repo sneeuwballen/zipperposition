@@ -18,6 +18,8 @@ type t = private {
 val make : string -> t
 (** Makes a fresh ID *)
 
+val makef : ('a, Format.formatter, unit, t) format4 -> 'a
+
 val copy : t -> t
 (** Copy with a new ID *)
 
