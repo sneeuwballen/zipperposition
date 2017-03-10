@@ -10,6 +10,7 @@ module RT = Rewrite_term
 let section = Util.Section.(make "test_prop")
 let stat_small_check = Util.mk_stat "small_check.calls"
 let stat_small_check_fail = Util.mk_stat "small_check.fails"
+let stat_small_check_ok = Util.mk_stat "small_check.ok"
 let prof_small_check = Util.mk_profiler "small_check"
 
 type term = T.t
@@ -205,6 +206,7 @@ let small_check ?depth:(max_depth=default_depth) (f:form): res =
     aux offset subst (List.map (fun v->v,0) vars)
   in
   Util.debugf ~section 3 "@[<hv2>small_check@ :form @[%a@]@]" (fun k->k pp_form f);
+  Util.incr_stat stat_small_check;
   (* try to find a substitution which falsifies the formula *)
   let subst_opt =
     let vars = vars_of_form f in
@@ -216,10 +218,13 @@ let small_check ?depth:(max_depth=default_depth) (f:form): res =
          form_is_false ~renaming subst (f,sc))
   in
   begin match subst_opt with
-    | None -> R_ok (* could not find a counter-ex *)
+    | None ->
+      Util.incr_stat stat_small_check_ok;
+      R_ok (* could not find a counter-ex *)
     | Some subst ->
       Util.debugf ~section 5
         "@[<hv2>... counter-example: %a@]" (fun k->k Subst.pp subst);
+      Util.incr_stat stat_small_check_fail;
       R_fail subst
   end
 
