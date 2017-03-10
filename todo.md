@@ -108,6 +108,39 @@
 
 ## Zipperposition
 
+- rewrite induction so it does everything by cut.
+  * pros
+    + it all becomes sound (assuming hidden induction principle): each cut
+      is really the introduction of an instance of the induction principle
+    + no nested induction anymore
+    + allows to use `smallcheck` before trying a lemma
+    + allows to refine a lemma by generalizing (Aubin 77) some specific
+      subterms and some specific occurrences of variables, based on
+      their position below defined symbols (in particular, for accumulator terms)
+    + similar subgoals that would be distinct before (same goal, different
+      skolems) are now the same lemma, thanks to the α-equiv checking
+  * [ ] from a clause `C` with inductive _skolems_ `{a,b,c}` we can generalize
+        on these skolems without worrying,
+        and try to prove `∀xyz. ¬C[x/a,y/b,z/c]` (but only do induction
+        on variables that occur in active positions)
+  * [ ] remove trail literals for induction (and remove clause context,
+        might have the higher-order induction principle for proof
+        production though)
+  * [ ] generate fresh coverset every time; new inductive skolem constants
+        really become branch dependent
+        (no need to prevent branches from interfering every again!)
+  * [ ] call `small_check` on candidate inductive formulas;
+        try simple generalizations backed by `small_check` before starting.
+        → will be useful after purification (approximation leads to too
+          many inferences, some of which yield non-inductively true constraints,
+          so we need to check constraints before solving them by induction)
+  * [ ] only do induction on active positions
+        → check that it fixes previous regression on `list10_easy.zf`, `nat2.zf`…)
+  * [ ] some clause constraints (e.g. `a+s b ≠ s (a+b)`) might deserve
+        their own induction, because no other rule (not even E-unification)
+        will be able to solve these.
+        → Again, need very good and fast `small_check`…
+
 - [ ] hierarchic superposition for datatypes (with defined functions being part
     of the background)
   * [ ] need corresponding TKBO with 2 levels
@@ -154,6 +187,11 @@
       → some inductive problems contain higher-order
   * [ ] use S,K,I to λ-lift instead of introducing new symbol?
   * [ ] consider whether B,C combinators help make smaller unifiers
+  * [ ] introduce one `fold` combinator per datatype, use these for
+        HO-unification when arguments are of a datatype
+        → need some hack for mutually recursive datatypes (perhaps take
+          all arguments in each case, so we can properly write recursive
+          definitions)
 
 - rewriting:
   * [ ] for each rule, compile _fast_ pre-checks (e.g.
@@ -220,7 +258,7 @@
 
 - `./zipperposition.native -p -o none -t 30 --dot /tmp/truc.dot examples/GEG024=1.p --debug 1`
   seems like heuristics are bad here (`--clause-queue bfs` works fine),
-  need to penalize some deep series of arith inferences
+  need to penalize some deep series of arith inferences **NO**
 
   → also need to find good way of indexing these for subsumption
   (e.g. feature vectors with lower/upper bounds?)
@@ -231,9 +269,14 @@
 - `./zipperposition.native -p --stats -o none --dot /tmp/truc.dot -t 30 tip-benchmarks/isaplanner/prop_83.smt2 -t 120`
     trivial with `--clause-queue bfs`, need some fairness (using pick-given)
 
-- rewriting:
-  `./zipperposition.native -p --stats -o none --dot /tmp/truc.dot -t 30 tip-benchmarks/tip2015/sort_MSortBUPermutes.smt2`
-  (maybe a rewrite rule that we try to use on paritally applied function)
+- `./zipperposition.native -p -o none -t 30 --dot /tmp/truc.dot tip-benchmarks/isaplanner/prop_66.smt2`
+  better lemmas in induction
+  `./zipperposition.native -p -o none -t 30 --dot /tmp/truc.dot tip-benchmarks/isaplanner/prop_85.smt2`
+  `./zipperposition.native -p -o none -t 30 --dot /tmp/truc.dot tip-benchmarks/isaplanner/prop_22.smt2`
+
+- `./zipperposition.native -p --stats -o none -t 30 --dot /tmp/truc.dot tip-benchmarks/isaplanner/prop_03.smt2`
+  too many induction inferences are made, should only do it on active positions
+  since we have a rewrite system
 
 ## In Hold
 
