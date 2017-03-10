@@ -45,6 +45,7 @@ type kind =
   | Esa of rule
   | Assert of statement_src
   | Goal of statement_src
+  | Lemma
   | Data of statement_src * Type.t Statement.data
   | Trivial (** trivial, or trivial within theories *)
 
@@ -95,6 +96,8 @@ val mk_data : statement_src -> Type.t Statement.data -> t
 val mk_assert : statement_src -> t
 
 val mk_goal : statement_src -> t
+
+val mk_lemma : t
 
 val mk_assert' : ?loc:Loc.t -> file:string -> name:string -> unit -> t
 

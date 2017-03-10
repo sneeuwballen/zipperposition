@@ -49,6 +49,7 @@ type kind =
   | Esa of rule
   | Assert of statement_src
   | Goal of statement_src
+  | Lemma
   | Data of statement_src * Type.t Statement.data
   | Trivial (** trivial, or trivial within theories *)
 
@@ -130,6 +131,7 @@ let get_id_ () =
   n
 
 let mk_trivial = {id=get_id_(); parents=[]; kind=Trivial; dist_to_goal=None; }
+let mk_lemma = {id=get_id_(); parents=[]; kind=Lemma; dist_to_goal=Some 0; }
 
 let combine_dist o p = match o, p.step.dist_to_goal with
   | None, None -> None
@@ -204,6 +206,7 @@ let is_trivial = function
 
 let rule p = match p.kind with
   | Trivial
+  | Lemma
   | Assert _
   | Data _
   | Goal _-> None
@@ -212,7 +215,7 @@ let rule p = match p.kind with
   | Inference rule -> Some rule
 
 let is_assert p = match p.kind with Assert _ -> true | _ -> false
-let is_goal p = match p.kind with Goal _ -> true  | _ -> false
+let is_goal p = match p.kind with Goal _ | Lemma -> true | _ -> false
 
 (** {2 Proof traversal} *)
 
@@ -251,6 +254,7 @@ let pp_kind_tstp out k =
   match k with
     | Assert src
     | Goal src -> pp_src_tstp out src
+    | Lemma -> Format.fprintf out "lemma"
     | Data _ -> Util.error ~where:"ProofStep" "cannot print `Data` step in TPTP"
     | Inference rule ->
       Format.fprintf out "inference(%a, [status(thm)])" (pp_rule ~info:false) rule
@@ -279,6 +283,7 @@ let pp_kind out k =
   match k with
     | Assert src -> pp_src out src
     | Goal src -> Format.fprintf out "goal %a" pp_src src
+    | Lemma -> Format.fprintf out "lemma"
     | Data (src, _) -> Format.fprintf out "data %a" pp_src src
     | Inference rule ->
       Format.fprintf out "inf %a" (pp_rule ~info:true) rule

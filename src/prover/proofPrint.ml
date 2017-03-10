@@ -87,6 +87,7 @@ let pp_normal_step out step = match step.kind with
     Format.fprintf out "@[<hv2>%a@]@," pp_kind step.kind
   | Data _ ->
     Format.fprintf out "@[<hv2>data %a@]@," pp_kind step.kind
+  | Lemma -> Format.fprintf out "lemma"
   | Trivial -> Format.fprintf out "trivial"
   | Inference _
   | Simplification _
@@ -128,6 +129,7 @@ let pp_kind_tstp out (k,parents) =
     | Inference rule
     | Simplification rule -> pp_step "thm" out (rule,parents)
     | Esa rule -> pp_step "esa" out (rule,parents)
+    | Lemma -> Format.fprintf out "lemma"
     | Trivial -> assert(parents=[]); Format.fprintf out "trivial([status(thm)])"
 
 let pp_tstp out proof =

@@ -45,7 +45,7 @@ module Case = struct
   let is_base c = c.case_kind = `Base
 
   let sub_constants c = c.case_sub
-  let skolems c = Sequence.of_list c.case_skolems
+  let skolems c = c.case_skolems
 end
 
 let top t = t.cs_top
@@ -67,7 +67,7 @@ let pp out (set:t): unit =
 
 let skolems (c:t) =
   Sequence.of_list c.cs_cases
-  |> Sequence.flat_map Case.skolems
+  |> Sequence.flat_map_l Case.skolems
 
 let sub_constants (set:t) =
   Sequence.of_list set.cs_cases

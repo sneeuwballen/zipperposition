@@ -57,7 +57,8 @@ let pp_payload out = function
     Format.fprintf out "@<1>⟦lemma @[<hv>%a@]@<1>⟧"
       (Util.pp_list ~sep:" & " Lits.pp) lits_l
   | Case p ->
-    Format.fprintf out "@<1>⟦@[<hv1>%a@]@<1>⟧" Cover_set.Case.pp p
+    Format.fprintf out "@<1>⟦@[<hv1>%a@]@<1>⟧"
+      Literal.pp (Cover_set.Case.to_lit p)
 
 module FV = FV_tree.Make(struct
     type t = Lits.t * payload * lit

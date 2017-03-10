@@ -9,35 +9,210 @@ module Lits = Literals
 module T = FOTerm
 module Su = Substs
 module Ty = Type
+module Fmt = CCFormat
 
 module type S = Induction_intf.S
 
 type term = T.t
+type var = T.var
 
 let section = Util.Section.make ~parent:Const.section "induction"
 
 let stats_lemmas = Util.mk_stat "induction.inductive_lemmas"
-let stats_min = Util.mk_stat "induction.assert_min"
+let stats_trivial_lemmas = Util.mk_stat "induction.trivial_lemmas"
+let stats_absurd_lemmas = Util.mk_stat "induction.absurd_lemmas"
+let stats_inductions = Util.mk_stat "induction.inductions"
 
 let k_enable : bool Flex_state.key = Flex_state.create_key()
 let k_ind_depth : int Flex_state.key = Flex_state.create_key()
+let k_test_depth : int Flex_state.key = Flex_state.create_key()
 
-(*
-   in any ground inductive clause C[n]<-Gamma, containing inductive [n]:
-   - find path [p], if any (empty at worst)
-   - extract context C[]
-   - find coverset of [n]
-   - for every [n' < n] in the coverset, strengthen the path
-     (i.e. if there is [c=t, D[]] in the path with the proper
-       type, add [not D[n']], because [n' < n ... < c])
-   - add C[t] <- [n=t · p], Gamma
-     for every [t] in coverset
-   - add boolean clause  [n=t1] or [n=t2] .. or [n=tk] <= Gamma
-     where coverset = {t1, t2, ... tk}
+(** {2 Formula to be Proved Inductively *)
+module Goal : sig
+  type t
 
-   rule to make trivial any clause with >= 2 incompatible path literals
+  val trivial : t
+  (** trivial goal *)
+
+  val make : Literals.t list -> t
+
+  val form : t -> Cut_form.t
+  val cs : t -> Literals.t list
+  val vars : t -> T.VarSet.t
+
+  val ind_vars : t -> var list
+  (** the inductive variables *)
+
+  type status =
+    | S_trivial
+    | S_ok
+    | S_falsifiable of Subst.t
+
+  val test : t -> status
+
+  val pp : t CCFormat.printer
+end = struct
+  type status =
+    | S_trivial
+    | S_ok
+    | S_falsifiable of Subst.t
+
+  (* formula to be proved inductively. The clauses share some variables,
+     they are not independent *)
+  type t = {
+    cut: Cut_form.t;
+    test_res: status lazy_t;
+  }
+
+  let trivial: t =
+    {cut=Cut_form.trivial; test_res=Lazy.from_val S_trivial}
+
+  let test_ (cs:Literals.t list): status =
+    (* test and save *)
+    let form = List.map Literals.Conv.to_forms cs in
+    begin match Test_prop.small_check form with
+      | Test_prop.R_ok -> S_ok
+      | Test_prop.R_fail subst -> S_falsifiable subst
+    end
+
+  let make cs: t =
+    let cut = Cut_form.make cs in
+    let test_res = lazy (test_ cs) in
+    {cut; test_res}
+
+  let form t = t.cut
+  let cs t = Cut_form.cs t.cut
+  let vars t = Cut_form.vars t.cut
+  let test (t:t): status = Lazy.force t.test_res
+  let ind_vars t = Cut_form.ind_vars t.cut
+
+  let pp out (f:t): unit = Cut_form.pp out f.cut
+end
+
+(** {2 More Thorough Testing of Clauses} *)
+module Goal_test(E : Env_intf.S) : sig
+  type goal = Goal.t
+
+  val check_not_absurd_or_trivial : goal -> bool
+
+  val is_acceptable_goal : goal -> bool
+end = struct
+  module C = E.C
+
+  type goal = Goal.t
+
+  exception Yield_false of C.t
+
+  (* do only a few steps of inferences for checking if a candidate lemma
+     is trivial/absurd *)
+  let max_steps_ = 20
+  (* TODO: put option for that *)
+
+  (* check that [lemma] is not obviously absurd or trivial, by making a few steps of
+     superposition inferences between [lemma] and the Active Set.
+     The strategy here is set of support: no inference between clauses of [lemma]
+     and no inferences among active clauses, just between active clauses and
+     those derived from [lemma]. Inferences with trails are dropped because
+     the lemma should be inconditionally true. *)
+  let check_not_absurd_or_trivial (g:goal): bool =
+    Util.debugf ~section 2 "@[<2>@{<green>assess goal@}@ %a@]"
+      (fun k->k Goal.pp g);
+    let q : C.t Queue.t = Queue.create() in (* clauses waiting *)
+    let push_c c = Queue.push c q in
+    let n : int ref = ref 0 in (* number of steps *)
+    let trivial = ref true in
+    (* add goal's clauses to the local saturation set *)
+    List.iter
+      (fun lits ->
+         let c = C.create_a ~trail:Trail.empty lits ProofStep.mk_trivial in
+         if not (E.is_trivial c) then push_c c)
+      (Goal.cs g);
+    try
+      while not (Queue.is_empty q) && !n < max_steps_ do
+        incr n;
+        let c = Queue.pop q in
+        let c, _ = E.simplify c in
+        assert (C.trail c |> Trail.is_empty);
+        (* check for empty clause *)
+        if C.is_empty c then raise (Yield_false c)
+        else if E.is_trivial c then ()
+        else (
+          trivial := false; (* at least one clause does not simplify to [true] *)
+          (* now make inferences with [c] and push non-trivial clauses to [q] *)
+          E.generate c
+          |> Sequence.filter_map
+            (fun new_c ->
+               let new_c, _ = E.simplify new_c in
+               (* discard trivial/conditional clauses; scan for empty clauses *)
+               if not (Trail.is_empty (C.trail new_c)) then None
+               else if E.is_trivial new_c then None
+               else if C.is_empty new_c then raise (Yield_false new_c)
+               else Some new_c)
+          |> Sequence.iter push_c
+        )
+      done;
+      Util.debugf ~section 2
+        "@[<2>lemma @[%a@]@ apparently not absurd (after %d steps; trivial:%B)@]"
+        (fun k->k Goal.pp g !n !trivial);
+      if !trivial then Util.incr_stat stats_trivial_lemmas;
+      not !trivial
+    with Yield_false c ->
+      assert (C.is_empty c);
+      Util.debugf ~section 2
+        "@[<2>lemma @[%a@] absurd:@ leads to empty clause %a (after %d steps)@]"
+        (fun k->k Goal.pp g C.pp c !n);
+      Util.incr_stat stats_absurd_lemmas;
+      false
+
+  (* some checks that [g] should be considered as a goal *)
+  let is_acceptable_goal (g:goal) : bool =
+    Goal.test g = Goal.S_ok &&
+    check_not_absurd_or_trivial g
+end
+
+(* data flow for induction:
+
+   1) Introduce lemmas
+     - some lemmas come directly from the input, and are directly
+       asserted in Avatar
+     - some other lemmas are "guessed" from regular clauses that
+       contain inductive skolems. From these clauses (where we do not know
+       what to do with these skolems in general), a lemma is
+       built by negating the clauses and replacing the skolems by fresh
+       variables.
+
+       The goals obtained from this second source (given clauses)
+       are pre-processed:
+       - they are tested (see {!Test_prop}) to avoid trying to prove
+         trivially false lemmas
+       - they might be generalized using a collection of heuristics.
+         Each generalization is also tested.
+
+       Then, the surviving goals are added to Avatar using [A.introduce_cut].
+
+   2) new lemmas from Avatar (coming from 1)) are checked for {b variables}
+      with an inductive type.
+      For each such variable satisfying some side condition (e.g. occurring
+      at least once in active position), a fresh coverset of the variable's
+      type is built, and fresh skolems are created for the other variables.
+
+      Clauses of the goal (they share variables) are then instantiated
+      to the ground with these skolems (and each case of the coverset)
+      and then negated. We add a trail to them. The trail contains [not lemma]
+        and the corresponding case literal.
+      The resulting formulas are re-normalized  into CNF and added to
+      the resulting set of clauses.
+      In addition, for each recursive case of the coverset, induction
+      hypothesis are added (instantiating the goal with this case,
+      keeping the other variables identical).
+
+    3) the resulting set of clauses
 *)
 
+(* TODO: strong induction? instead of using sub-constants of the case
+   in the induction hypothesis, use a constraint [x < top] *)
+
+(** {2 Calculus of Induction} *)
 module Make
     (E : Env.S)
     (A : Avatar_intf.S with module E = E)
@@ -47,6 +222,7 @@ module Make
   module C = E.C
   module BoolBox = BBox
   module BoolLit = BoolBox.Lit
+  module Goal_test = Goal_test(E)
 
   let is_ind_conjecture_ c =
     match C.distance_to_goal c with
@@ -54,20 +230,9 @@ module Make
       | Some _
       | None -> false
 
-  let has_pos_lit_ c =
-    CCArray.exists Literal.is_pos (C.lits c)
+  let has_pos_lit_ c = CCArray.exists Literal.is_pos (C.lits c)
 
-  (* terms that are either inductive constants or sub-constants *)
-  let constants_or_sub c =
-    C.Seq.terms c
-    |> Sequence.flat_map T.Seq.subterms
-    |> Sequence.filter_map
-      (fun t -> match T.view t with
-         | T.Const id -> Ind_cst.as_cst id
-         | _ -> None)
-    |> Sequence.sort_uniq ~cmp:Ind_cst.cst_compare
-    |> Sequence.to_rev_list
-
+  (* TODO: remove or adapt (using notion of position of defined symbols) *)
   (* sub-terms of an inductive type, that occur several times (candidate
      for "subterm generalization" *)
   let generalizable_subterms c: term list =
@@ -85,243 +250,283 @@ module Make
     |> Sequence.filter_map (fun (t,n) -> if n>1 then Some t else None)
     |> Sequence.to_rev_list
 
-  (* apply the list of replacements [l] to the term [t] *)
-  let replace_many l t =
-    List.fold_left
-      (fun t (old,by) -> T.replace t ~old ~by)
-      t l
-
   (* fresh var generator *)
-  let fresh_var_gen_ () =
+  let fresh_var_gen_ (): Type.t -> T.t =
     let r = ref 0 in
     fun ty ->
       let v = T.var_of_int ~ty !r in
       incr r;
       v
 
-  (* scan terms for inductive constants *)
-  let scan_terms seq : Ind_cst.cst list =
+  (* scan terms for inductive skolems. *)
+  let scan_terms (seq:term Sequence.t) : Ind_cst.ind_skolem list =
     seq
-    |> Sequence.flat_map Ind_cst.find_cst_in_term
+    |> Sequence.flat_map Ind_cst.find_ind_skolems
     |> Sequence.to_rev_list
-    |> CCList.sort_uniq ~cmp:Ind_cst.cst_compare
+    |> CCList.sort_uniq ~cmp:Ind_cst.ind_skolem_compare
 
   (* scan clauses for ground terms of an inductive type,
      and declare those terms. Only do this if the clause is part of an
      inductive proof, by looking at the trail *)
-  let scan_clause c : Ind_cst.cst list =
-    if C.trail c |> Trail.exists BoolBox.is_inductive then (
+  let scan_clause (c:C.t) : Ind_cst.ind_skolem list =
+    if C.trail c |> Trail.exists BoolBox.is_lemma then (
       C.lits c
       |> Lits.Seq.terms
       |> scan_terms
     ) else []
 
-  let is_eq_ ~path (t1:Ind_cst.cst) (t2:Ind_cst.case) ctxs =
-    let p = Ind_cst.path_cons t1 t2 ctxs path in
-    BoolBox.inject_case p
+  (* goal for induction *)
+  (* ensure the proper declarations are done for this coverset *)
+  let decl_cst_of_set (set:Cover_set.t): unit =
+    Util.debugf ~section 3
+      "@[<2>declare coverset@ `%a`@]" (fun k->k Cover_set.pp set);
+    begin
+      Cover_set.declarations set
+      |> Sequence.iter (fun (id,ty) -> Ctx.declare id ty)
+    end
 
-  (* TODO: rephrase this in the context of induction *)
-  (* exhaustivity (inference):
-     if some term [t : tau] is maximal in a clause, [tau] is inductive,
-     and [t] was never split on, then introduce
-     [t = c1(...) or t = c2(...) or ... or t = ck(...)] where the [ci] are
-     constructors of [tau], and [...] are new Skolems of [t];
-     if [t] is ground then Avatar splitting (with xor) should apply directly
-      instead, as an optimization, with [k] unary clauses and 1 bool clause
-  *)
-
-  (* data required for asserting that a constant is the smallest one
-     taht makes a conjunction of clause contexts true in the model *)
-  type min_witness = {
-    mw_cst: Ind_cst.cst;
-    (* the constant *)
-    mw_generalize_on: Ind_cst.cst list;
-    (* list of other constants we can generalize in the strengthening.
-       E.g. in [not p(a,b)], with [mw_cst=a], [mw_generalize_on=[b]],
-       we obtain [not p(0,b)], [not p(s(a'),b)], [p(a',X)] where [b]
-       was generalized *)
-    mw_contexts: ClauseContext.t list;
-    (* the conjunction of contexts for which [cst] is minimal
-       (that is, in the model, any term smaller than [cst] makes at
-       least one context false) *)
-    mw_coverset : Ind_cst.cover_set;
-    (* minimality should be asserted for each case of the coverset *)
-    mw_path: Ind_cst.path;
-    (* path leading to this *)
-    mw_proof: ProofStep.t;
-    (* proof for the result *)
-    mw_trail: Trail.t;
-    (* trail to carry *)
-  }
-
-  (* recover the (possibly empty) path from a boolean trail *)
-  let path_of_trail trail : Ind_cst.path =
-    Trail.to_seq trail
-    |> Sequence.filter_map BBox.as_case
-    |> Sequence.max ~lt:(fun a b -> Ind_cst.path_dominates b a)
-    |> CCOpt.get_or ~default:Ind_cst.path_empty
-
-  (* the rest of the trail *)
-  let trail_rest trail : Trail.t =
-    Trail.filter
-      (fun lit -> match BBox.as_case lit with
-         | None -> true
-         | Some _ -> false)
-      trail
-
-  (* TODO: incremental strenghtening.
-     - when expanding a coverset in clauses_of_min_witness, see if there
-       are other constants in the path with same type, in which case
-     strenghten! *)
-
-  (* replace the constants by fresh variables *)
-  let generalize_lits (lits:Lits.t) ~(generalize_on:Ind_cst.cst list) : Lits.t =
-    if generalize_on=[] then lits
-    else (
-      let offset = (Lits.Seq.vars lits |> T.Seq.max_var) + 1 in
-      (* (constant -> variable) list *)
-      let pairs =
-        List.mapi
-          (fun i c ->
-             let ty = Ind_cst.cst_ty c in
-             let id = Ind_cst.cst_id c in
-             T.const ~ty id, T.var (HVar.make ~ty (i+offset)))
-          generalize_on
-      in
-      Util.debugf ~section 5 "@[<2>generalize_lits `@[%a@]`:@ subst (@[%a@])@]"
-        (fun k->k Lits.pp lits CCFormat.(list (pair T.pp T.pp)) pairs);
-      Lits.map
-        (fun t ->
-           List.fold_left
-             (fun t (cst,var) -> T.replace ~old:cst ~by:var t)
-             t pairs)
-        lits
-    )
-
-  (* for each member [t] of the cover set:
-     for each ctx in [mw.mw_contexts]:
-      - add ctx[t] <- [cst=t]
-      - for each [t' subterm t] of same type, add clause ~[ctx[t']] <- [cst=t]
-     @param path the current induction branch
-     @param trail precondition to this minimality
-  *)
-  let clauses_of_min_witness ~trail mw : (C.t list * BoolBox.t list list) =
+  (* induction on the given variable *)
+  let ind_on_var (cut:A.cut_res)(v:T.var): C.t list =
+    let g = A.cut_form cut in
+    let ty = HVar.ty v in
+    let depth = A.cut_depth cut in
+    let cut_blit = A.cut_lit cut in
+    (* proof step *)
+    let proof =
+      ProofStep.mk_inference (List.map C.proof (A.cut_pos cut))
+        ~rule:(ProofStep.mk_rulef "induction(%a)" HVar.pp v)
+    and c_set = Cover_set.make ~depth ty in
+    decl_cst_of_set c_set;
+    Util.debugf ~section 2
+      "(@[ind_on_var `%a`@ :form %a@ cover_set %a@])"
+      (fun k->k HVar.pp v Cut_form.pp g Cover_set.pp c_set);
+    (* other variables -> become skolems *)
+    let subst_skolems: Subst.t =
+      Cut_form.vars g
+      |> T.VarSet.remove v
+      |> T.VarSet.to_list
+      |> List.map
+        (fun v ->
+           let ty_v = HVar.ty v in
+           let id = Ind_cst.make_skolem ty_v in
+           Ctx.declare id ty_v;
+           ((v:var:>InnerTerm.t HVar.t),0), (T.const ~ty:ty_v id,0))
+      |> Subst.FO.of_list ?init:None
+    in
+    (* set of boolean literal. We will add their exclusive disjonction to
+       the SAT solver. *)
     let b_lits = ref [] in
+    (* build clauses for the induction on [v] *)
     let clauses =
-      Ind_cst.cover_set_cases ~which:`All mw.mw_coverset
-      |> Sequence.flat_map
-        (fun (case:Ind_cst.case) ->
-           let b_lit = is_eq_ mw.mw_cst case mw.mw_contexts ~path:mw.mw_path in
-           CCList.Ref.push b_lits b_lit;
-           (* clauses [ctx[case] <- b_lit] *)
+      Cover_set.cases ~which:`All c_set
+      |> Sequence.flat_map_l
+        (fun (case:Cover_set.case) ->
+           (* literal for this case *)
+           let b_lit_case = BBox.inject_case case in
+           CCList.Ref.push b_lits b_lit_case;
+           (* clauses [goal[v := t'] <- b_lit(case), ¬cut.blit]
+              for every [t'] sub-constant of [case] *)
            let pos_clauses =
-             List.map
-               (fun ctx ->
-                  let t = Ind_cst.case_to_term case in
-                  let lits = ClauseContext.apply ctx t in
-                  C.create_a lits mw.mw_proof ~trail:(Trail.add b_lit mw.mw_trail))
-               mw.mw_contexts
-           in
-           (* clauses [CNF(¬ And_i ctx_i[t']) <- b_lit] for
-              each t' subterm of case, with generalization on other
-              inductive constants *)
-           let neg_clauses =
-             Ind_cst.case_sub_constants case
-             |> Sequence.filter_map
-               (fun sub ->
+             Cover_set.Case.sub_constants case
+             |> CCList.filter_map
+               (fun sub_cst ->
                   (* only keep sub-constants that have the same type as [cst] *)
-                  let sub = Ind_cst.cst_to_term sub in
-                  let ty = Ind_cst.cst_ty mw.mw_cst in
-                  if Type.equal (T.ty sub) ty
-                  then Some sub else None)
-             |> Sequence.flat_map
-               (fun sub ->
-                  (* for each context, apply it to [sub] and negate its
-                     literals, obtaining a DNF of [¬ And_i ctx_i[t']];
-                     then turn DNF into CNF *)
-                  let clauses =
-                    mw.mw_contexts
-                    |> Util.map_product
-                      ~f:(fun ctx ->
-                        let lits = ClauseContext.apply ctx sub in
-                        let lits = Array.map Literal.negate lits in
-                        [Array.to_list lits])
-                    |> List.map
-                      (fun l ->
-                         let lits =
-                           Array.of_list l
-                           |> generalize_lits ~generalize_on:mw.mw_generalize_on
-                         in
-                         C.create_a lits mw.mw_proof
-                           ~trail:(Trail.add b_lit mw.mw_trail))
-                  in
-                  Sequence.of_list clauses)
-             |> Sequence.to_rev_list
+                  if Type.equal (Ind_cst.ty sub_cst) ty
+                  then (
+                    let t = Ind_cst.to_term sub_cst in
+                    Some t
+                  ) else None)
+             |> CCList.flat_map
+               (fun t' ->
+                  let g' = Cut_form.subst1 v t' g in
+                  Cut_form.cs g'
+                  |> List.map
+                    (fun lits ->
+                       let trail =
+                         [ b_lit_case;
+                           BoolLit.neg cut_blit;
+                         ] |> Trail.of_list
+                       in
+                       C.create_a lits proof ~trail))
+           in
+           (* clauses [CNF[¬goal[case]) <- b_lit(case), ¬cut.blit] with
+              other variables being replaced by skolem symbols *)
+           let neg_clauses =
+             let subst =
+               Subst.FO.bind
+                 subst_skolems
+                 ((v:var:>InnerTerm.t HVar.t),0)
+                 (Cover_set.Case.to_term case,0)
+             in
+             let renaming = Ctx.renaming_clear () in
+             (* for each clause, apply [subst] to it and negate its
+                literals, obtaining a DNF of [¬ And_i ctx_i[case]];
+                then turn DNF into CNF *)
+             begin
+               Cut_form.apply_subst ~renaming subst (g,0)
+               |> Cut_form.cs
+               |> Util.map_product
+                 ~f:(fun lits ->
+                   let lits = Array.map Literal.negate lits in
+                   [Array.to_list lits])
+               |> List.map
+                 (fun l ->
+                    let lits = Array.of_list l in
+                    let trail =
+                      [ BoolLit.neg cut_blit;
+                        b_lit_case;
+                      ] |> Trail.of_list
+                    in
+                    C.create_a lits proof ~trail)
+             end
            in
            (* all new clauses *)
            let res = List.rev_append pos_clauses neg_clauses in
            Util.debugf ~section 2
-             "@[<2>minimality of `%a`@ in case `%a` \
-              @[generalize_on (@[%a@])@]:@ @[<hv>%a@]@]"
-             (fun k-> k
-                 Ind_cst.pp_cst mw.mw_cst T.pp (Ind_cst.case_to_term case)
-                 (Util.pp_list Ind_cst.pp_cst) mw.mw_generalize_on
+             "(@[<2>induction on `%a`@ :form %a@ :case `%a`@ \
+              :res [@[<hv>%a@]]@])"
+             (fun k-> k HVar.pp v Cut_form.pp g Cover_set.Case.pp case
                  (Util.pp_list C.pp) res);
-           Sequence.of_list res)
+           res)
       |> Sequence.to_rev_list
     in
     (* boolean constraint(s) *)
     let b_clauses =
-      (* trail => \Or b_lits *)
-      let pre = trail |> Trail.to_list |> List.map BoolLit.neg in
-      let post = !b_lits in
-      [ pre @ post ]
+      (* [¬ cut_blit => \Or_{t in cases} b_lit(t)] *)
+      let b_at_least_one = cut_blit :: !b_lits
+      (* for each case t!=u, [¬b_lit(t) ∨ ¬b_lit(u)] *)
+      and b_at_most_one =
+        CCList.diagonal !b_lits
+        |> List.rev_map
+          (fun (l1,l2) -> [BoolLit.neg l1; BoolLit.neg l2])
+      in
+      b_at_least_one :: b_at_most_one
     in
-    clauses, b_clauses
+    A.Solver.add_clauses ~proof b_clauses;
+    Util.debugf ~section 2 "@[<2>add boolean constraints@ @[<hv>%a@]@ proof: %a@]"
+      (fun k->k (Util.pp_list BBox.pp_bclause) b_clauses
+          ProofPrint.pp_normal_step proof);
+    Util.incr_stat stats_inductions;
+    (* return the clauses *)
+    clauses
 
-  (* ensure the proper declarations are done for this constant *)
-  let decl_cst_ cst =
-    Util.debugf ~section 3 "@[<2>declare ind.cst. `%a`@]" (fun k->k Ind_cst.pp_cst cst);
-    Ind_cst.declarations_of_cst cst
-    |> Sequence.iter (fun (id,ty) -> Ctx.declare id ty)
+  (* TODO: here, put more restrictions over which varaibles can be
+     candidate for induction (w.r.t active positions) *)
 
-  (* [cst] is the minimal term for which contexts [ctxs] holds, returns
-     clauses expressing that, and assert boolean constraints *)
-  let assert_min
-      ~trail ~proof ~(generalize_on:Ind_cst.cst list) ctxs (cst:Ind_cst.cst) =
-    let path = path_of_trail trail in
-    let trail' = trail_rest trail in
-    match Ind_cst.cst_cover_set cst with
-      | Some set when not (Ind_cst.path_contains_cst path cst) ->
-        decl_cst_ cst;
-        let mw = {
-          mw_cst=cst;
-          mw_generalize_on=generalize_on;
-          mw_contexts=ctxs;
-          mw_coverset=set;
-          mw_path=path;
-          mw_proof=proof;
-          mw_trail=trail';
-        } in
-        let clauses, b_clauses = clauses_of_min_witness ~trail mw in
-        A.Solver.add_clauses ~proof b_clauses;
-        Util.debugf ~section 2 "@[<2>add boolean constraints@ @[<hv>%a@]@ proof: %a@]"
-          (fun k->k (Util.pp_list BBox.pp_bclause) b_clauses
-              ProofPrint.pp_normal_step proof);
-        Util.incr_stat stats_min;
-        clauses
-      | Some _ (* path already contains [cst] *)
-      | None -> []  (* too deep for induction *)
+  (* main inductive proof of lemmas that have inductive variables *)
+  let prove_lemma (cut:A.cut_res): C.t list =
+    let g = A.cut_form cut in
+    begin match Cut_form.ind_vars g with
+      | [] -> []
+      | ivars ->
+        (* for each variable, build a coverset of its type,
+           and do a case distinction on the [top] constant of this
+           coverset. *)
+        CCList.flat_map (ind_on_var cut) ivars
+    end
 
-  (* TODO: trail simplification that removes all path literals except
-     the longest? *)
+  (* replace the constants by fresh variables in the given clauses,
+     returning a goal *)
+  let generalize_clauses
+      (cs:Lits.t list)
+      ~(generalize_on:Ind_cst.ind_skolem list) : Goal.t =
+    if generalize_on=[] then Goal.trivial
+    else (
+      (* offset to allocate new variables *)
+      let offset =
+        Sequence.of_list cs
+        |> Sequence.flat_map Lits.Seq.vars
+        |> T.Seq.max_var
+        |> succ
+      in
+      (* (constant -> variable) list *)
+      let pairs =
+        List.mapi
+          (fun i (id,ty) ->
+             T.const ~ty id, T.var (HVar.make ~ty (i+offset)))
+          generalize_on
+        |> T.Map.of_list
+      in
+      Util.debugf ~section 5
+        "@[<2>generalize_lits@ :in `@[<hv>%a@]`@ :subst (@[%a@])@]"
+        (fun k->k (Util.pp_list ~sep:"∧" Lits.pp) cs
+            (T.Map.pp T.pp T.pp) pairs);
+      (* replace skolems by the new variables, then negate the formula
+         and re-CNF the negation *)
+      begin
+        cs
+        |> Util.map_product
+          ~f:(fun lits ->
+             lits
+             |> Array.map
+               (fun lit ->
+                  lit
+                  |> Literal.map (fun t -> T.replace_m t pairs)
+                  |> Literal.negate
+                  |> CCList.return)
+             |> Array.to_list)
+        |> List.map Array.of_list
+        |> Goal.make
+      end
+    )
 
-  (* checks whether the trail is trivial, that is:
-     - contains two literals [i = t1] and [i = t2] with [t1], [t2]
-        distinct cover set members, or
-     - two literals [loop(i) minimal by a] and [loop(i) minimal by b], or
-     - two literals [C in loop(i)], [D in loop(j)] if i,j do not depend
-        on one another *)
+  (* FIXME: obtain depth by taking 1+max depth of [generalize_on].
+     If above threshold, print msg and do nothing *)
+  (* try to prove theses clauses by turning the given constants into
+     variables, negating the clauses, adn introducing the result
+     as a lemma to be proved by induction *)
+  let prove_by_ind (clauses:C.t list) ~generalize_on : unit =
+    Util.debugf ~section 1 "(@[<2>prove by induction@ :clauses [@[%a@]]@]"
+      (fun k->k (Util.pp_list C.pp) clauses);
+    let goal =
+      generalize_clauses
+        (List.map C.lits clauses)
+        ~generalize_on
+    in
+    (* check if goal is worth the effort *)
+    if Goal_test.is_acceptable_goal goal then (
+      let proof = ProofStep.mk_lemma in
+      let cut = A.introduce_cut (Goal.form goal) proof in
+      A.add_lemma cut
+    );
+    ()
+
+  (* Try to prove the given clause by introducing an inductive lemma. *)
+  let inf_prove_by_ind (c:C.t): C.t list =
+    let consts = scan_clause c in
+    if consts<>[] then (
+      prove_by_ind [c] ~generalize_on:consts;
+    );
+    []
+
+  (* hook for converting some statements to clauses.
+     It check if [Negated_goal l] contains clauses with inductive skolems,
+     in which case it tries to prove these clauses by induction in a lemma.
+  *)
+  let convert_statement st =
+    begin match Statement.view st with
+      | Statement.NegatedGoal (skolems, _) ->
+        (* find inductive skolems in there *)
+        let ind_skolems =
+          List.filter
+            (fun (id,ty) -> Ind_cst.id_is_ind_skolem id ty)
+            skolems
+        in
+        begin match ind_skolems with
+          | [] -> E.CR_skip
+          | consts ->
+            (* introduce one lemma where all the skolems are
+               replaced by variables *)
+            let clauses = C.of_statement st in
+            prove_by_ind clauses ~generalize_on:consts;
+            (* "skip" in any case, because the proof is done in a cut anyway *)
+            E.CR_skip
+        end
+      | _ -> E.cr_skip
+    end
+
+(* checks whether the trail is trivial, that is, it contains
+   two literals [i = t1] and [i = t2] with [t1], [t2] distinct cover set cases *)
   let trail_is_trivial trail =
     let seq = Trail.to_seq trail in
     (* all boolean literals that express paths *)
@@ -329,126 +534,29 @@ module Make
     (* are there two distinct incompatible paths in the trail? *)
     Sequence.product relevant_cases relevant_cases
     |> Sequence.exists
-      (fun (p1, p2) ->
-         let res =
-           not (Ind_cst.path_equal p1 p2) &&
-           not (Ind_cst.path_dominates p1 p2) &&
-           not (Ind_cst.path_dominates p2 p1)
-         in
-         if res
-         then (
+      (fun (c1, c2) ->
+         let res = not (Cover_set.Case.equal c1 c2) in
+         if res then (
            Util.debugf ~section 4
-             "@[<2>trail@ @[%a@]@ is trivial because of@ \
-              {@[@[%a@],@,@[%a@]}@]@]"
-             (fun k->k C.pp_trail trail Ind_cst.pp_path p1 Ind_cst.pp_path p2)
+             "(@[<2>trail@ @[%a@]@ is trivial because of@ \
+              {@[@[%a@],@,@[%a@]}@]@])"
+             (fun k->k C.pp_trail trail Cover_set.Case.pp c1 Cover_set.Case.pp c2)
          );
          res)
 
-  (* TODO: only do this when the clause already has some induction
-     in its trail (must comes from lemma/goal) *)
-  (* when a clause contains new inductive constants, assert minimality
-     of the clause for all those constants independently *)
-  let inf_assert_minimal c =
-    let consts = scan_clause c in
-    let proof =
-      ProofStep.mk_inference [C.proof c] ~rule:(ProofStep.mk_rule "min")
-    in
-    let clauses =
-      CCList.flat_map
-        (fun cst ->
-           decl_cst_ cst;
-           let ctx = ClauseContext.extract_exn (C.lits c) (Ind_cst.cst_to_term cst) in
-           (* no generalization, we have no idea whether [consts]
-              originate from a universal quantification *)
-           assert_min ~trail:(C.trail c) ~proof ~generalize_on:[] [ctx] cst)
-        consts
-    in
-    clauses
-
-  (* clauses when we do induction on [cst], generalizing the constants
-     [generalize_on] *)
-  let induction_on_
-      ?(trail=Trail.empty) (clauses:C.t list) ~cst ~generalize_on : C.t list =
-    decl_cst_ cst;
-    Util.debugf ~section 1 "@[<2>perform induction on `%a`@ in `@[%a@]`@]"
-      (fun k->k Ind_cst.pp_cst cst (Util.pp_list C.pp) clauses);
-    (* extract a context from every clause, even those that do not contain [cst] *)
-    let ctxs =
-      List.map
-        (fun c ->
-           let sub = Ind_cst.cst_to_term cst in
-           match ClauseContext.extract (C.lits c) sub with
-             | Some ctx -> ctx
-             | None -> ClauseContext.trivial (C.lits c) sub)
-        clauses
-    in
-    (* proof: one step from all the clauses above *)
-    let proof =
-      ProofStep.mk_inference (List.map C.proof clauses)
-        ~rule:(ProofStep.mk_rule "min")
-    in
-    assert_min ~trail ~proof ~generalize_on ctxs cst
-
-  (* find inductive constants within the skolems *)
-  let ind_consts_of_skolems (l:(ID.t*Type.t) list) : Ind_cst.cst list =
-    l
-    |> List.filter (CCFun.uncurry Ind_cst.is_potential_cst)
-    |> List.map (CCFun.uncurry Ind_cst.cst_of_id)
-
-  (* hook for converting some statements to clauses.
-     It check if [Negated_goal l] contains inductive clauses, in which case
-     it states their collective minimality.
-     It also handles inductive Lemmas *)
-  let convert_statement st =
-    match Statement.view st with
-      | Statement.NegatedGoal (skolems, _) ->
-        (* find inductive constants *)
-        begin match ind_consts_of_skolems skolems with
-          | [] -> E.CR_skip
-          | consts ->
-            (* first, get "proper" clauses, with proofs *)
-            let clauses = C.of_statement st in
-            (* for each new inductive constant, assert minimality of
-               this constant w.r.t the set of clauses that contain it *)
-            consts
-            |> CCList.flat_map
-              (fun cst ->
-                 (* generalize on the other constants *)
-                 let generalize_on =
-                   CCList.remove ~eq:Ind_cst.cst_equal ~x:cst consts
-                 in
-                 induction_on_ clauses ~cst ~generalize_on)
-            |> E.cr_return (* do not add the clause itself *)
-        end
-      | _ -> E.cr_skip
-
-  let new_lemmas_ : C.t list ref = ref []
+  let new_clauses_from_lemmas_ : C.t list ref = ref []
 
   (* look whether, to prove the lemma, we need induction *)
   let on_lemma cut =
-    (* find inductive constants within the skolems *)
-    let consts = ind_consts_of_skolems cut.A.cut_skolems in
-    begin match consts with
-      | [] -> () (* regular lemma *)
-      | consts ->
-        (* add the condition that the lemma is false *)
-        let trail = Trail.singleton (BoolLit.neg cut.A.cut_lit) in
-        let l =
-          CCList.flat_map
-            (fun cst ->
-               let generalize_on =
-                 CCList.remove ~eq:Ind_cst.cst_equal ~x:cst consts
-               in
-               induction_on_ ~trail ~generalize_on cut.A.cut_neg ~cst)
-            consts
-        in
-        Util.incr_stat stats_lemmas;
-        new_lemmas_ := List.rev_append l !new_lemmas_;
-    end
+    let l = prove_lemma cut in
+    if l<>[] then (
+      Util.incr_stat stats_lemmas;
+      new_clauses_from_lemmas_ := List.rev_append l !new_clauses_from_lemmas_;
+    )
 
   let inf_new_lemmas ~full:_ () =
-    let l = !new_lemmas_ in
-    new_lemmas_ := [];
+    let l = !new_clauses_from_lemmas_ in
+    new_clauses_from_lemmas_ := [];
     l
 
   let register () =
@@ -456,18 +564,17 @@ module Make
     let d = Env.flex_get k_ind_depth in
     Util.debugf ~section 2 "maximum induction depth: %d" (fun k->k d);
     Ind_cst.max_depth_ := d;
-    Env.add_unary_inf "induction.ind" inf_assert_minimal;
+    Env.add_unary_inf "induction.ind" inf_prove_by_ind;
     Env.add_clause_conversion convert_statement;
     Env.add_is_trivial_trail trail_is_trivial;
     Signal.on_every A.on_lemma on_lemma;
     Env.add_generate "ind.lemmas" inf_new_lemmas;
-    (* declare new constants to [Ctx] *)
-    Signal.on_every Ind_cst.on_new_cst decl_cst_;
     ()
 end
 
 let enabled_ = ref true
 let depth_ = ref !Ind_cst.max_depth_
+let test_depth = ref Test_prop.default_depth
 
 (* if induction is enabled AND there are some inductive types,
    then perform some setup after typing, including setting the key
@@ -495,6 +602,7 @@ let post_typing_hook stmts state =
     |> Flex_state.add Params.key p
     |> Flex_state.add k_enable true
     |> Flex_state.add k_ind_depth !depth_
+    |> Flex_state.add k_test_depth !test_depth
     |> Flex_state.add Ctx.Key.lost_completeness true
   ) else Flex_state.add k_enable false state
 
@@ -525,4 +633,7 @@ let () =
     [ "--induction", Options.switch_set true enabled_, " enable induction"
     ; "--no-induction", Options.switch_set false enabled_, " enable induction"
     ; "--induction-depth", Arg.Set_int depth_, " maximum depth of nested induction"
+    ; "--small-check-depth",
+      Arg.Set_int test_depth,
+      " set default depth limit for smallcheck"
     ]
