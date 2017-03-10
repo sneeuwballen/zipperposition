@@ -2,6 +2,11 @@
 
 ## Now
 
+- fix:
+  `./zipperposition.native -p --stats -o none --dot /tmp/truc.dot -t 30 examples/ind/nat2.zf`
+  gives up and should not.
+  → THEN, re-enable heuristic to penalize a bit deeply inductive clauses
+
 - put rewrite rules (and their source) in proofs
 
 - progress bar in hornet
@@ -103,6 +108,14 @@
 
 ## Zipperposition
 
+- [ ] hierarchic superposition for datatypes (with defined functions being part
+    of the background)
+  * [ ] need corresponding TKBO with 2 levels
+  * [ ] with TKBO implemented, removed the code that forces rpo6 to be
+        used when induction is enabled
+  * narrowing with defined symbols would ± correspond to E-unification on pure
+    background literals
+
 - only do induction on active positions
   * [ ] check that it fixes previous regression on `list10_easy.zf`, `nat2.zf`…)
   * [ ] also check that sub-induction seems to hold water with smallcheck
@@ -111,6 +124,11 @@
         → will be useful after purification (approximation leads to too
           many inferences, some of which yield non-inductively true constraints,
           so we need to check constraints before solving them by induction)
+  * [ ] use subsumption on candidate lemmas:
+        + if a *proved* lemma subsumes the current candidate, then skip candidate
+        + when a lemma is proved, find other lemmas that are subsumed by it?
+          or this might be automatic, but asserting [L2] if L1 proved and L1⇒L2
+            might still help with the many clauses derived from L2
 
 - purification:
   * [ ] think of purification at invariant/accumulator positions for
