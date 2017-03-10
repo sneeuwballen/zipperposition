@@ -39,6 +39,9 @@ let mk_rule ?(subst=[]) ?(pos=[]) ?(comment=[]) name =
       |> map_append (fun x->I_comment x) comment;
   }
 
+let mk_rulef ?subst ?pos ?comment fmt =
+  CCFormat.ksprintf ~f:(mk_rule ?subst ?pos ?comment) fmt
+
 (** Classification of proof steps *)
 type kind =
   | Inference of rule

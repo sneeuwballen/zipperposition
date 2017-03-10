@@ -19,3 +19,4 @@ val small_check : ?depth:int -> form -> res
     up to [depth], or [R_fail subst] if [subst] makes [form]
     evaluate to [false] *)
 
+val default_depth: int

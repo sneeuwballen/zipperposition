@@ -22,7 +22,7 @@ type res =
   | R_fail of Subst.t (* counter-example *)
 
 (* default depth for small check *)
-let default_depth_ : int ref = ref 3
+let default_depth = 3
 
 type 'a t_view =
   | T_Z of Z.t
@@ -115,7 +115,7 @@ let vars_of_form (f:form): var list =
 
 (* check lemma on small instances. It returns [true] iff none of the
    instances reduces to [false] *)
-let small_check ?depth:(max_depth= !default_depth_) (f:form): res =
+let small_check ?depth:(max_depth=default_depth) (f:form): res =
   let sc = 0 in
   let subst_add subst v t =
     Subst.FO.bind subst ((v:Type.t HVar.t:>TI.t HVar.t),sc) (t,sc)
@@ -227,10 +227,3 @@ let small_check ?depth:(max_depth= !default_depth_) (f:form): res =
 let starts_with_fun (t:T.t): bool = match T.head t with
   | None -> false
   | Some id -> not (Ind_ty.is_constructor id)
-
-let () =
-  Options.add_opts
-    [ "--small-check-depth",
-      Arg.Set_int default_depth_,
-      " set default depth limit for smallcheck";
-    ]

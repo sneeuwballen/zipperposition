@@ -103,8 +103,8 @@ and pp_trail_tstp out trail =
   (* print a single boolean box *)
   let pp_box_unsigned out b = match BBox.payload b with
     | BBox.Case p ->
-      let lits = Ind_cst.lits_of_path p in
-      pp_lits_tstp out lits
+      let lit = Cover_set.Case.to_lit p in
+      Literal.pp_tstp out lit
     | BBox.Clause_component lits ->
       CCFormat.within "(" ")" pp_closed_lits_tstp out lits
     | BBox.Lemma lits ->

@@ -149,6 +149,7 @@ module type SPECIALIZED = sig
   (** Add [v] -> [t] to the substitution. Both terms have a context.
       @raise InconsistentBinding if [v] is already bound in
         the same context, to another term. *)
+  val of_list : ?init:t -> (var Scoped.t * term Scoped.t) list -> t
 end
 
 module Ty : SPECIALIZED with type term = Type.t

@@ -5,11 +5,14 @@
 
 (** Use for reasoning by case during induction *)
 
+open Logtk
+
 type cst = Ind_cst.t
+type term = FOTerm.t
 
 type case
 
-type t = case list
+type t
 
 (** {6 Inductive Case}
 
@@ -27,16 +30,24 @@ module Case : sig
 
   val pp : t CCFormat.printer
 
-  val to_term : t -> FOTerm.t
-
   val is_rec : t -> bool
   val is_base : t -> bool
 
+  val to_term : t -> term
   val to_lit : t -> Literal.t
 
-  val sub_constants : t -> cst Sequence.t
+  val sub_constants : t -> cst list
   (** All sub-constants that are subterms of a specific case *)
+
+  val skolems : t -> (ID.t * Type.t) list
 end
+
+val pp : t CCFormat.printer
+
+val ty : t -> Type.t
+
+val top : t -> cst
+(** top constant of the coverset *)
 
 val declarations : t -> (ID.t * Type.t) Sequence.t
 (** [declarations set] returns a list of type declarations that should
@@ -48,7 +59,7 @@ val cases : ?which:[`Rec|`Base|`All] -> t -> case Sequence.t
 val sub_constants : t -> cst Sequence.t
 (** All sub-constants of a given inductive constant *)
 
-val make : ?coverset_depth:int -> depth:int -> Type.t -> t
+val make : ?cover_set_depth:int -> depth:int -> Type.t -> t
 (** Build a cover set for the given type.
 
     a set of ground terms [[t1,...,tn]] with fresh
@@ -57,4 +68,6 @@ val make : ?coverset_depth:int -> depth:int -> Type.t -> t
     exhaustivity axiom on [t]'s type.
 
     @param depth the induction depth for the top constant in the coverset
+    @param cover_set_depth the depth of each case, that is, the number of
+    constructor between the root of terms and leaf constants. default [1].
 *)

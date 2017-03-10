@@ -9,13 +9,13 @@
 
 val section : Logtk.Util.Section.t
 
-type inductive_path = Ind_cst.path
+type inductive_case = Cover_set.case
 
 type payload = private
   | Fresh (* fresh literal with no particular payload *)
   | Clause_component of Literals.t
   | Lemma of Literals.t list
-  | Case of inductive_path (* branch in the induction tree *)
+  | Case of inductive_case
 
 module Lit : Bool_lit_intf.S with type payload = payload
 
@@ -36,14 +36,16 @@ val inject_lemma : Literals.t list -> t
     on. This is generative, meaning that calling it twice with the
     same arguments will produce distinct literals. *)
 
-val inject_case : inductive_path -> t
+val inject_case : inductive_case -> t
 (** Inject [cst = case] *)
 
 val payload : t -> payload
 (** Obtain the payload of this boolean literal, that is, what the literal
     represents *)
 
-val as_case : t -> inductive_path option
+val is_case : t -> bool
+
+val as_case : t -> inductive_case option
 (** If [payload t = Case p], then return [Some p], else return [None] *)
 
 val must_be_kept : t -> bool
@@ -51,8 +53,8 @@ val must_be_kept : t -> bool
     that is, that if [C <- lit, Gamma] then any clause derived from [C]
     recursively will have [lit] in its trail. *)
 
-val is_inductive : t -> bool
-(** returns [true] if the bool literal represents an inductive branch *)
+val is_lemma : t -> bool
+(** returns [true] if the bool literal represents a lemma *)
 
 (** {2 Printers}
     Those printers print the content (injection) of a boolean literal, if any *)

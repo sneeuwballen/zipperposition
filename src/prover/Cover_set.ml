@@ -11,6 +11,7 @@ module Fmt = CCFormat
 (** Use for reasoning by case during induction *)
 
 type cst = Ind_cst.t
+type term = FOTerm.t
 
 type case = {
   case_top: cst; (* copy of the coverset's top constant *)
@@ -36,7 +37,6 @@ module Case = struct
   let pp out c = Fmt.hovbox FOTerm.pp out c.case_term
 
   let to_term c = c.case_term
-
   let to_lit c =
     let lhs = Ind_cst.to_term c.case_top in
     Literal.mk_eq lhs (to_term c)
@@ -44,9 +44,12 @@ module Case = struct
   let is_rec c = c.case_kind = `Rec
   let is_base c = c.case_kind = `Base
 
-  let sub_constants c = Sequence.of_list c.case_sub
+  let sub_constants c = c.case_sub
   let skolems c = Sequence.of_list c.case_skolems
 end
+
+let top t = t.cs_top
+let ty t = Ind_cst.ty (top t)
 
 let cases ?(which=`All) (set:t): case Sequence.t =
   let seq = Sequence.of_list set.cs_cases in
@@ -56,16 +59,22 @@ let cases ?(which=`All) (set:t): case Sequence.t =
     | `Rec -> Sequence.filter Case.is_rec seq
   end
 
+let pp out (set:t): unit =
+  Format.fprintf out
+    "(@[coverset of type `@[%a@]@ :top `%a`@ :cases [@[<hv>%a@]]@])"
+    Type.pp (ty set) Ind_cst.pp (top set)
+    (Util.pp_list Case.pp) set.cs_cases
+
 let skolems (c:t) =
   Sequence.of_list c.cs_cases
   |> Sequence.flat_map Case.skolems
 
 let sub_constants (set:t) =
   Sequence.of_list set.cs_cases
-  |> Sequence.flat_map Case.sub_constants
+  |> Sequence.flat_map_l Case.sub_constants
 
 (* type declarations required by [c] *)
-let declarations_of_cst (set:t) =
+let declarations (set:t) =
   let decl_of_cst c = Ind_cst.id c, Ind_cst.ty c in
   let seq1 =
     sub_constants set |> Sequence.map decl_of_cst
@@ -136,19 +145,6 @@ module State_ = struct
   let run : 'a mm -> t -> 'a list
     = fun m st -> List.map snd (m st)
 end
-
-type id_or_ty_builtin =
-  | I of ID.t
-  | B of Type.builtin
-
-let type_hd_exn ty : id_or_ty_builtin =
-  let _, _, ret = Type.open_poly_fun ty in
-  begin match Type.view ret with
-    | Type.Builtin b -> B b
-    | Type.App (s, _) -> I s
-    | _ ->
-      Util.errorf ~where:"cover_set" "expected function type, got %a" Type.pp ty
-  end
 
 let make_coverset_ ~cover_set_depth ~depth (ty:Type.t)(ity:Ind_ty.t) : t =
   let open State_ in
@@ -251,21 +247,22 @@ let make_coverset_ ~cover_set_depth ~depth (ty:Type.t)(ity:Ind_ty.t) : t =
 
 (* compute coverset on the fly, if need be *)
 let make ?(cover_set_depth=1) ~depth (ty:Type.t): t =
+  if cover_set_depth <= 0 then (
+    Util.invalid_argf "Cover_set.make: cover_set_depth=%d must be > 0"
+      cover_set_depth;
+  );
   begin match Ind_ty.as_inductive_type ty with
     | Some (ity,_) ->
       let set = make_coverset_ ~cover_set_depth ~depth ty ity in
       Util.debugf ~section:Ind_ty.section 2
-        "@[<2>new coverset of type `@[%a@]`@ :top `%a`@ :cases [@[<hv>%a@]]@]"
-        (fun k->k Type.pp ty Ind_cst.pp set.cs_top
-            (Util.pp_list Case.pp) set.cs_cases);
+        "@[<2>new coverset:@ %a@]" (fun k->k pp set);
       Util.debugf ~section:Ind_ty.section 5
         "@[<2>sub-constants:@ @[<v>%a@]@]"
         (fun k ->
            let pp_case out case =
              Format.fprintf out "@[<h>case %a: sub {@[<hv>%a@]}@]"
                Case.pp case (Util.pp_list ID.pp)
-               (Case.sub_constants case
-                |> Sequence.map Ind_cst.id |> Sequence.to_list)
+               (Case.sub_constants case |> List.rev_map Ind_cst.id)
            in
            k (Util.pp_list pp_case) set.cs_cases);
       set

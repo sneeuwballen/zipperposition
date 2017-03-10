@@ -7,7 +7,7 @@ open Logtk
 
 module T = FOTerm
 module Lit = Literal
-module Util = Util
+module Fmt = CCFormat
 
 type 'a printer = Format.formatter -> 'a -> unit
 
@@ -270,102 +270,64 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     id
 
   type cut_res = {
-    cut_src: Literals.t list ; (** the lemma itself *)
+    cut_form: Cut_form.t; (** the lemma itself *)
     cut_pos: E.C.t list; (** clauses true if lemma is true *)
-    cut_neg: E.C.t list; (** clauses true if lemma is false *)
-    cut_skolems: (ID.t * Type.t) list;
-    (** skolems of universal variables in [cut_neg] *)
     cut_lit: BLit.t; (** lit that is true if lemma is true *)
+    cut_depth: int; (** if the lemma is used to prove another lemma *)
+    cut_proof: ProofStep.t; (** where does the lemma come from? *)
   }
 
-  let pp_cut_res out c =
-    Format.fprintf out "{@[<hv>pos: @[%a@],@ neg: @[%a@],@ lit: @[%a@]}"
-      (Util.pp_list E.C.pp) c.cut_pos
-      (Util.pp_list E.C.pp) c.cut_neg
-      BLit.pp c.cut_lit
+  let cut_form c = c.cut_form
+  let cut_pos c = c.cut_pos
+  let cut_lit c = c.cut_lit
+  let cut_depth c = c.cut_depth
+  let cut_proof c = c.cut_proof
 
-  let cut_res_clauses c =
-    Sequence.append (Sequence.of_list c.cut_pos) (Sequence.of_list c.cut_neg)
+  let pp_cut_res out (c:cut_res): unit =
+    let pp_depth out d = if d>0  then Format.fprintf out "@ :depth %d" d in
+    Format.fprintf out "(@[<hv>cut@ :form @[%a@]@ :lit @[%a@]%a)"
+      (Util.pp_list E.C.pp) c.cut_pos
+      BLit.pp c.cut_lit pp_depth c.cut_depth
+
+  let cut_res_clauses c = Sequence.of_list c.cut_pos
 
   (* generic mechanism for adding clause(s)
      and make a lemma out of them, including Skolemization, etc. *)
-  let introduce_cut (clauses:Literals.t list) proof : cut_res =
-    Util.debugf ~section 3 "@[<2>introduce cut on@ `[@[%a@]]`@]"
-      (fun k->k (Util.pp_list Literals.pp) clauses);
-    let box = BBox.inject_lemma clauses in
+  let introduce_cut ?(depth=0) (f:Cut_form.t) proof : cut_res =
+    let box = BBox.inject_lemma (Cut_form.cs f) in
     (* positive clauses *)
     let c_pos =
       List.map
         (fun lits ->
            C.create_a ~trail:(Trail.singleton box) lits proof)
-        clauses
+        (Cut_form.cs f)
     in
-    (* negative component:
-       - gather variables (careful that each clause has its own scope)
-       - skolemize them with fresh (inductive?) constants
-       - map each [lit] to [not subst(lit)]
-       - compute [bigand_i (bigor_j not c_i_j <- *)
-    let skolems, c_neg =
-      let vars : _ HVar.t Scoped.t list =
-        Sequence.of_list clauses
-        |> Sequence.mapi
-          (fun i lits -> Literals.Seq.vars lits |> Sequence.map (fun v->v,i))
-        |> Sequence.flatten
-        |> Sequence.sort_uniq ~cmp:CCOrd.(pair (HVar.compare Type.compare) int)
-        |> Sequence.to_rev_list
-      in
-      let subst, skolems =
-        CCList.fold_map
-          (fun subst (v,i) ->
-             let ty = HVar.ty v in
-             let id = skolem_ ~ty in
-             let subst =
-               Subst.FO.bind subst ((v:T.var:>Subst.var),i) (T.const ~ty id,0)
-             in
-             subst, (id,ty)
-          )
-          Subst.empty
-          vars
-      in
-      let renaming = Ctx.renaming_clear() in
-      let clauses =
-        clauses
-        |> List.mapi (fun sc lits -> lits,sc)
-        |> Util.map_product
-          ~f:(fun (lits,sc) ->
-            Array.to_list lits
-            |> List.map
-              (fun lit ->
-                 (* negate, apply subst (to use the Skolem symbols). *)
-                 let lit = Lit.negate lit in
-                 let lit = Lit.apply_subst ~renaming subst (lit,sc) in
-                 [lit])
-          )
-        |> List.map
-          (fun neg_lits ->
-             let trail = Trail.singleton (Trail.Lit.neg box) in
-             let c = C.create ~trail neg_lits proof in
-             C.set_flag flag_cut_introduced c true;
-             c)
-      in
-      skolems, clauses
-    in
-    { cut_src=clauses;
-      cut_pos=c_pos;
-      cut_neg=c_neg;
-      cut_skolems=skolems;
-      cut_lit=box;
-    }
+    { cut_form=f; cut_pos=c_pos; cut_lit=box;
+      cut_depth=depth; cut_proof=proof; }
 
   let on_input_lemma : cut_res Signal.t = Signal.create ()
   let on_lemma : cut_res Signal.t = Signal.create()
 
-  let all_lemmas_ : cut_res list ref = ref []
+  module Lemma_tbl = BBox.Lit.Tbl
+
+  (* map from [cut.cut_lit] to [cut] *)
+  let all_lemmas_ : cut_res Lemma_tbl.t = Lemma_tbl.create 64
 
   let add_lemma (c:cut_res): unit =
-    all_lemmas_ := c :: !all_lemmas_;
-    Signal.send on_lemma c;
-    ()
+    if not (Lemma_tbl.mem all_lemmas_ c.cut_lit) then (
+      Util.debugf ~section 3 "(@[<2>add_lemma@ :on `[@[<hv>%a@]]`@])"
+        (fun k->k Cut_form.pp c.cut_form);
+      Lemma_tbl.add all_lemmas_ c.cut_lit c;
+      Signal.send on_lemma c;
+    ) else (
+      (* already existing lemma *)
+      Util.debugf ~section 3
+        "(@[<2>add_lemma [already there]@ :on `[@[<hv>%a@]]`@])"
+        (fun k->k Cut_form.pp c.cut_form);
+    )
+
+  let lemma_seq : cut_res Sequence.t =
+    fun yield -> Lemma_tbl.iter (fun _ c -> yield c) all_lemmas_
 
   let print_lemmas out () =
     let pp_lemma out c =
@@ -375,10 +337,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         | Some false -> "refuted"
       in
       Format.fprintf out "@[<hv>@{<Green>*@} %s %a@]"
-        status (Util.pp_list Literals.pp) c.cut_src
+        status Cut_form.pp c.cut_form
     in
     Format.fprintf out "@[<hv2>lemmas: {@ %a@,@]}"
-      (Util.pp_list pp_lemma) !all_lemmas_;
+      (Util.pp_seq pp_lemma) lemma_seq;
     ()
 
   let show_lemmas () = Format.printf "%a@." print_lemmas ()
@@ -386,17 +348,18 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   let convert_lemma st = match Statement.view st with
     | Statement.Lemma l ->
       let proof_st = ProofStep.mk_goal (Statement.src st) in
-      let l =
+      let f =
         l
         |> List.map (List.map Ctx.Lit.of_form)
         |> List.map Array.of_list
+        |> Cut_form.make
       in
       let proof =
-        l
+        Cut_form.cs f
         |> List.map (fun c -> ProofStep.mk_c proof_st (SClause.make ~trail:Trail.empty c))
         |> ProofStep.mk_inference ~rule:(ProofStep.mk_rule "lemma")
       in
-      let cut = introduce_cut l proof in
+      let cut = introduce_cut f proof in
       let all_clauses = cut_res_clauses cut |> Sequence.to_rev_list in
       add_lemma cut;
       Signal.send on_input_lemma cut;

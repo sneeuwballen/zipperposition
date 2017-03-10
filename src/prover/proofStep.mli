@@ -32,6 +32,12 @@ val mk_rule :
   string ->
   rule
 
+val mk_rulef:
+  ?subst:Subst.t list ->
+  ?pos:Position.t list ->
+  ?comment:string list ->
+  ('a, Format.formatter, unit, rule) format4 -> 'a
+
 (** Classification of proof steps *)
 type kind =
   | Inference of rule

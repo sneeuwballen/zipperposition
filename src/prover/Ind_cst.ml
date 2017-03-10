@@ -12,7 +12,6 @@ module T = FOTerm
 let max_depth_ = ref 4
 
 exception InvalidDecl of string
-exception AlreadyDeclaredConstant of ID.t
 exception NotAnInductiveConstant of ID.t
 
 let () =
@@ -21,8 +20,6 @@ let () =
     (function
       | InvalidDecl msg ->
         Some (spf "@[<2>invalid declaration:@ %s@]" msg)
-      | AlreadyDeclaredConstant id ->
-        Some (spf "%a already declared as an inductive constant" ID.pp id)
       | NotAnInductiveConstant id ->
         Some (spf "%a is not an inductive constant" ID.pp id)
       | _ -> None)
@@ -81,16 +78,17 @@ let n_ = ref 0
 let make_skolem ty : ID.t =
   let c = ID.makef "#%s_%d" (Type.mangle ty) !n_ in
   incr n_;
-  ID.set_payload c (Skolem.Attr_skolem Skolem.K_ind);
+  if Ind_ty.is_inductive_type ty then (
+    ID.set_payload c (Skolem.Attr_skolem Skolem.K_ind);
+  );
   c
 
-(* TODO: merge into [make] *)
 (* declare new constant *)
-let declare ?(depth=0) id ~ty =
+let declare ~depth id ty =
   Util.debugf ~section:Ind_ty.section 2
     "@[<2>declare new inductive symbol@ `@[%a : %a@]`@ :depth %d@]"
     (fun k->k ID.pp id Type.pp ty depth);
-  if id_is_cst id then raise (AlreadyDeclaredConstant id);
+  assert (not (id_is_cst id));
   assert (Type.is_ground ty); (* constant --> not polymorphic *)
   let ity, args = match Ind_ty.as_inductive_type ty with
     | Some (t,l) -> t,l
@@ -116,52 +114,36 @@ let declare ?(depth=0) id ~ty =
 
 let make ?(depth=0) (ty:Type.t): t =
   let id = make_skolem ty in
-  declare ~depth id ~ty
+  declare ~depth id ty
 
-let of_id id ty =
-  if Ind_ty.is_inductive_type ty
-  (* check if already a constant *)
-  then match id_as_cst id with
-    | Some c -> c
-    | None -> declare id ~ty
-  else
-    invalid_declf "@[cst_of_id: @[%a:%a@]@ is not of an inductive type@]"
-      ID.pp id Type.pp ty
+let dominates (c1:t)(c2:t): bool =
+  c1.cst_depth < c2.cst_depth
 
-let of_term t =
-  let ty = T.ty t in
-  match T.view t with
-    | T.Const id ->
-      if Ind_ty.is_inductive_type ty
-      then match id_as_cst id with
-        | Some _ as res -> res
-        | None -> Some (declare id ~ty)
-      else None
-    | _ -> None (* TODO: allow function, if not a constructor *)
+(** {2 Inductive Skolems} *)
 
-let id_is_potential_cst (id:ID.t) (ty:Type.t): bool =
+type ind_skolem = ID.t * Type.t
+
+let ind_skolem_compare = CCOrd.pair ID.compare Type.compare
+
+let id_is_ind_skolem (id:ID.t) (ty:Type.t): bool =
   let n_tyvars, ty_args, ty_ret = Type.open_poly_fun ty in
   n_tyvars=0
   && ty_args=[] (* constant *)
   && Ind_ty.is_inductive_type ty_ret
   && Type.is_ground ty
-  && (id_is_cst id || not (Ind_ty.is_constructor id))
+  && (id_is_cst id || (not (Ind_ty.is_constructor id) && Skolem.is_skolem id))
 
-(* TODO: generalize to ground terms starting with uninterpreted fun *)
 (* find inductive constant candidates in terms *)
-let find_in_term t =
+let find_ind_skolems t : ind_skolem Sequence.t =
   T.Seq.subterms t
   |> Sequence.filter_map
     (fun t -> match T.view t with
        | T.Const id ->
-         if id_is_potential_cst id (T.ty t)
+         let ty = T.ty t in
+         if id_is_ind_skolem id ty
          then (
-           let n_tyvars, ty_args, ty_ret = Type.open_poly_fun (T.ty t) in
+           let n_tyvars, ty_args, _ = Type.open_poly_fun ty in
            assert (n_tyvars=0 && ty_args=[]);
-           Some (of_id id ty_ret) (* bingo *)
-         )
-         else None
+           Some (id, ty)
+         ) else None
        | _ -> None)
-
-let dominates (c1:t)(c2:t): bool =
-  c1.cst_depth < c2.cst_depth

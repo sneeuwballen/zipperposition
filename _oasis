@@ -125,7 +125,7 @@ Library "libzipperposition"
                     Ctx_intf, Clause_intf, Env_intf, ProofState_intf,
                     BBox, ClauseContext, ClauseQueue_intf,
                     Bool_lit, Bool_lit_intf, Sat_solver, Sat_solver_intf,
-                    Trail, Ind_cst, Phases, Phases_impl,
+                    Trail, Ind_cst, Cover_set, Cut_form, Phases, Phases_impl,
                     Classify_cst, Rewrite_lit,
                     calculi/Avatar, calculi/Avatar_intf,
                     calculi/Induction, calculi/Induction_intf,

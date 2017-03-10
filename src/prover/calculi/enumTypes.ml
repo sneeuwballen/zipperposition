@@ -298,6 +298,10 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* TODO: maybe relax the restriction that is must not be naked, but only
      up to a given depth (if CLI arg?) *)
 
+  (* TODO: only instantiate naked variables that are in positive equations;
+     those in negative equations may come from purification and must be
+     found be E-unification *)
+
   (* instantiate variables that belong to an enum case *)
   let instantiate_vars_ c =
     (* which variables are candidate? depends on a CLI flag *)
