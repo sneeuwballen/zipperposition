@@ -133,6 +133,10 @@ let id_is_ind_skolem (id:ID.t) (ty:Type.t): bool =
   && Type.is_ground ty
   && (id_is_cst id || (not (Ind_ty.is_constructor id) && Skolem.is_skolem id))
 
+let ind_skolem_depth (id:ID.t): int = match id_as_cst id with
+  | None -> 0
+  | Some c -> depth c
+
 (* find inductive constant candidates in terms *)
 let find_ind_skolems t : ind_skolem Sequence.t =
   T.Seq.subterms t

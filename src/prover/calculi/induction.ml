@@ -200,6 +200,8 @@ module Make
   module BoolLit = BoolBox.Lit
   module Goal_test = Goal_test(E)
 
+  let max_depth = Env.flex_get k_ind_depth
+
   let is_ind_conjecture_ c =
     match C.distance_to_goal c with
       | Some (0 | 1) -> true
@@ -446,24 +448,33 @@ module Make
       end
     )
 
-  (* FIXME: obtain depth by taking 1+max depth of [generalize_on].
-     If above threshold, print msg and do nothing *)
   (* try to prove theses clauses by turning the given constants into
      variables, negating the clauses, adn introducing the result
      as a lemma to be proved by induction *)
   let prove_by_ind (clauses:C.t list) ~generalize_on : unit =
-    Util.debugf ~section 1 "(@[<2>prove by induction@ :clauses [@[%a@]]@]"
+    Util.debugf ~section 5 "(@[<2>consider_proving_by_induction@ :clauses [@[%a@]]@]"
       (fun k->k (Util.pp_list C.pp) clauses);
     let goal =
       generalize_clauses
         (List.map C.lits clauses)
         ~generalize_on
     in
-    (* check if goal is worth the effort *)
-    if Goal_test.is_acceptable_goal goal then (
-      let proof = ProofStep.mk_lemma in
-      let cut = A.introduce_cut (Goal.form goal) proof in
-      A.add_lemma cut
+    let depth =
+      Sequence.of_list generalize_on
+      |> Sequence.map (fun (id,_) -> Ind_cst.ind_skolem_depth id)
+      |> Sequence.max
+      |> CCOpt.map_or ~default:0 succ
+    in
+    if depth <= max_depth then (
+      (* check if goal is worth the effort *)
+      if Goal_test.is_acceptable_goal goal then (
+        Util.debugf ~section 1
+          "(@[<2>@{<green>prove_by_induction@}@ :clauses [@[%a@]]@]"
+          (fun k->k (Util.pp_list C.pp) clauses);
+        let proof = ProofStep.mk_lemma in
+        let cut = A.introduce_cut ~depth (Goal.form goal) proof in
+        A.add_lemma cut
+      );
     );
     ()
 

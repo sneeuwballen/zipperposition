@@ -73,6 +73,9 @@ val find_ind_skolems : FOTerm.t -> ind_skolem Sequence.t
     that are of an inductive type and that are skolems or
     (already) inductive constants. *)
 
+val ind_skolem_depth : ID.t -> int
+(** depth of the skolem (0 if not an inductive constant) *)
+
 (**/**)
 val max_depth_: int ref
 
