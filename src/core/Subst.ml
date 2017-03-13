@@ -291,7 +291,7 @@ module Ty : SPECIALIZED with type term = Type.t = struct
   let of_list = (of_list :> ?init:t -> (var Scoped.t * term Scoped.t) list -> t)
 end
 
-module FO : SPECIALIZED with type term = FOTerm.t = struct
+module FO = struct
   type term = FOTerm.t
   type t = subst
 
@@ -315,4 +315,7 @@ module FO : SPECIALIZED with type term = FOTerm.t = struct
 
   let bind = (bind :> t -> var Scoped.t -> term Scoped.t -> t)
   let of_list = (of_list :> ?init:t -> (var Scoped.t * term Scoped.t) list -> t)
+
+  let bind' = (bind :> t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t)
+  let of_list' = (of_list :> ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t)
 end
