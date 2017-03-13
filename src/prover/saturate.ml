@@ -110,7 +110,7 @@ module Make(E : Env.S) = struct
             assert (not (Env.is_redundant c));
             (* process the given clause! *)
             Util.incr_stat stat_processed_given;
-            Util.debugf ~section 2 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
+            Util.debugf ~section 1 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
             Util.debugf ~section 1 "@[<2>@{<green>given@} (%d steps):@ `@[%a@]`@]"
               (fun k->k num Env.C.pp c);
             (* find clauses that are subsumed by given in active_set *)
