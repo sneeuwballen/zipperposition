@@ -318,6 +318,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       Util.debugf ~section 3 "(@[<2>add_lemma@ :on `[@[<hv>%a@]]`@])"
         (fun k->k Cut_form.pp c.cut_form);
       Lemma_tbl.add all_lemmas_ c.cut_lit c;
+      (* actually add the clauses to passive set *)
+      E.ProofState.PassiveSet.add (cut_res_clauses c);
       Signal.send on_lemma c;
     ) else (
       (* already existing lemma *)
