@@ -42,7 +42,7 @@ let pp out (f:t): unit =
     pp_body out ()
   ) else (
     Fmt.fprintf out "(@[<2>forall %a.@ %a@])"
-      (Util.pp_list Type.pp_typed_var) (T.VarSet.to_list f.vars) pp_body ()
+      (Util.pp_list ~sep:" " Type.pp_typed_var) (T.VarSet.to_list f.vars) pp_body ()
   )
 
 let to_string = Fmt.to_string pp
