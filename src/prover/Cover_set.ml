@@ -15,7 +15,7 @@ type term = FOTerm.t
 
 type case = {
   case_top: cst; (* copy of the coverset's top constant *)
-  case_term : FOTerm.t;
+  case_term : FOTerm.t; (* rhs *)
   case_kind: [`Base | `Rec]; (* at least one sub-constant? *)
   case_sub: cst list; (* set of sub-constants *)
   case_skolems: (ID.t * Type.t) list; (* set of other skolems *)
@@ -30,11 +30,16 @@ type t = {
 
 module Case = struct
   type t = case
-  let equal a b = FOTerm.equal a.case_term b.case_term
-  let compare a b = FOTerm.compare a.case_term b.case_term
-  let hash a = FOTerm.hash a.case_term
+  let equal a b =
+    Ind_cst.equal a.case_top b.case_top && T.equal a.case_term b.case_term
+  let compare a b =
+    CCOrd.Infix.(
+      Ind_cst.compare a.case_top b.case_top
+      <?> (FOTerm.compare, a.case_term, b.case_term))
+  let hash a =
+    Hash.combine2 (Ind_cst.hash a.case_top) (T.hash a.case_term)
 
-  let pp out c = Fmt.hovbox FOTerm.pp out c.case_term
+  let pp out c = Fmt.hovbox T.pp out c.case_term
 
   let to_term c = c.case_term
   let to_lit c =
