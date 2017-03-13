@@ -15,7 +15,7 @@ type payload = private
   | Fresh (* fresh literal with no particular payload *)
   | Clause_component of Literals.t
   | Lemma of Cut_form.t
-  | Case of inductive_case
+  | Case of inductive_case list
 
 module Lit : Bool_lit_intf.S with type payload = payload
 
@@ -36,7 +36,7 @@ val inject_lemma : Cut_form.t -> t
     on. This is generative, meaning that calling it twice with the
     same arguments will produce distinct literals. *)
 
-val inject_case : inductive_case -> t
+val inject_case : inductive_case list -> t
 (** Inject [cst = case] *)
 
 val payload : t -> payload
@@ -45,8 +45,10 @@ val payload : t -> payload
 
 val is_case : t -> bool
 
-val as_case : t -> inductive_case option
+val as_case : t -> inductive_case list option
 (** If [payload t = Case p], then return [Some p], else return [None] *)
+
+val as_lemma : t -> Cut_form.t option
 
 val must_be_kept : t -> bool
 (** [must_be_kept lit] means that [lit] should survive in boolean splitting,

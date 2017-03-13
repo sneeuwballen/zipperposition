@@ -159,6 +159,11 @@ module T_view : sig
     | T_builtin of Builtin.t * 'a list
 
   val view : term -> term t
+
+  val active_subterms : term -> term Sequence.t
+  (** Visit all active subterms in the given term.
+      A subterm is active if it's under a cstor, uninterpreted symbol,
+      builtin, or under a defined function at an active position *)
 end = struct
   type 'a t =
     | T_var of T.var
@@ -190,6 +195,28 @@ end = struct
         | _ -> T_app (f,l)
       end
     | T.DB _ -> assert false
+
+  let active_subterms t yield: unit =
+    let rec aux t =
+      yield t;
+      begin match view t with
+        | T_app_defined (_, c, l) ->
+          let pos = RT.Defined_cst.defined_positions c in
+          assert (IArray.length pos >= List.length l);
+          (* only look under active positions *)
+          List.iteri
+            (fun i sub ->
+               if IArray.get pos i = RT.Pos_active then aux sub)
+            l
+        | T_var _ -> ()
+        | T_app (f,l) ->
+          aux f;
+          List.iter aux l
+        | T_app_cstor (_,l) -> List.iter aux l
+        | T_builtin (_,l)
+        | T_app_unin (_,l) -> List.iter aux l
+      end
+    in aux t
 end
 
 (* data flow for induction:
@@ -309,32 +336,40 @@ module Make
       |> Sequence.iter (fun (id,ty) -> Ctx.declare id ty)
     end
 
-  (* induction on the given variable *)
-  let ind_on_var (cut:A.cut_res)(v:T.var): C.t list =
+  (* induction on the given variables *)
+  let ind_on_vars (cut:A.cut_res)(vars:T.var list): C.t list =
+    assert (vars<>[]);
     let g = A.cut_form cut in
-    let ty = HVar.ty v in
     let depth = A.cut_depth cut in
     let cut_blit = A.cut_lit cut in
     (* proof step *)
     let proof =
       ProofStep.mk_inference (List.map C.proof (A.cut_pos cut))
-        ~rule:(ProofStep.mk_rulef "induction(%a)" HVar.pp v)
-    and c_set = Cover_set.make ~cover_set_depth ~depth ty in
-    decl_cst_of_set c_set;
+        ~rule:(ProofStep.mk_rulef "induction(@[<h>%a@])" (Util.pp_list HVar.pp) vars)
+    in
+    let c_sets =
+      List.map
+        (fun v ->
+           let ty = HVar.ty v in
+           v, Cover_set.make ~cover_set_depth ~depth ty)
+        vars
+    in
+    List.iter (fun (_,set) -> decl_cst_of_set set) c_sets;
     Util.debugf ~section 2
-      "(@[<hv2>ind_on_var `%a`@ :form %a@ :cover_set %a@])"
-      (fun k->k HVar.pp v Cut_form.pp g Cover_set.pp c_set);
+      "(@[<hv2>ind_on_vars (@[%a@])@ :form %a@ :cover_sets (@[<hv>%a@])@])"
+      (fun k->k (Util.pp_list HVar.pp) vars Cut_form.pp g
+          (Util.pp_list (Fmt.Dump.pair HVar.pp Cover_set.pp)) c_sets);
     (* other variables -> become skolems *)
     let subst_skolems: Subst.t =
       Cut_form.vars g
-      |> T.VarSet.remove v
+      |> (fun set -> T.VarSet.diff set (T.VarSet.of_list vars))
       |> T.VarSet.to_list
       |> List.map
         (fun v ->
            let ty_v = HVar.ty v in
            let id = Ind_cst.make_skolem ty_v in
            Ctx.declare id ty_v;
-           (v,0), (T.const ~ty:ty_v id,0))
+           (v,0), (T.const ~ty:ty_v id,1))
       |> Subst.FO.of_list' ?init:None
     in
     (* set of boolean literal. We will add their exclusive disjonction to
@@ -342,27 +377,39 @@ module Make
     let b_lits = ref [] in
     (* build clauses for the induction on [v] *)
     let clauses =
-      Cover_set.cases ~which:`All c_set
-      |> Sequence.flat_map_l
-        (fun (case:Cover_set.case) ->
+      Util.map_product c_sets
+        ~f:(fun (v,set) ->
+          Cover_set.cases ~which:`All set
+          |> Sequence.to_list
+          |> List.map (fun case -> [v,case]))
+      |> CCList.flat_map
+        (fun (cases:(T.var * Cover_set.case) list) ->
+           assert (cases<>[]);
            (* literal for this case *)
-           let b_lit_case = BBox.inject_case case in
+           let b_lit_case = BBox.inject_case (List.map snd cases) in
            CCList.Ref.push b_lits b_lit_case;
            (* clauses [goal[v := t'] <- b_lit(case), ¬cut.blit]
               for every [t'] sub-constant of [case] *)
            let pos_clauses =
-             Cover_set.Case.sub_constants case
-             |> CCList.filter_map
-               (fun sub_cst ->
-                  (* only keep sub-constants that have the same type as [cst] *)
-                  if Type.equal (Ind_cst.ty sub_cst) ty
-                  then (
-                    let t = Ind_cst.to_term sub_cst in
-                    Some t
-                  ) else None)
-             |> CCList.flat_map
-               (fun t' ->
-                  let g' = Cut_form.subst1 v t' g in
+             Util.seq_map_l cases
+               ~f:(fun (v,case) ->
+                 Cover_set.Case.sub_constants case
+                 |> CCList.filter_map
+                   (fun sub_cst ->
+                      (* only keep sub-constants that have the same type as [v] *)
+                      if Type.equal (Ind_cst.ty sub_cst) (HVar.ty v) then (
+                        let t = Ind_cst.to_term sub_cst in
+                        Some (v,t)
+                      ) else None))
+             |> Sequence.flat_map_l
+               (fun v_and_t_list ->
+                  let subst =
+                    v_and_t_list
+                    |> List.map (fun (v,t) -> (v,0),(t,1))
+                    |> Subst.FO.of_list' ?init:None
+                  in
+                  let renaming = Ctx.renaming_clear () in
+                  let g' = Cut_form.apply_subst ~renaming subst (g,0) in
                   Cut_form.cs g'
                   |> List.map
                     (fun lits ->
@@ -372,13 +419,15 @@ module Make
                          ] |> Trail.of_list
                        in
                        C.create_a lits proof ~trail))
+             |> Sequence.to_list
            in
            (* clauses [CNF[¬goal[case]) <- b_lit(case), ¬cut.blit] with
               other variables being replaced by skolem symbols *)
            let neg_clauses =
              let subst =
-               Subst.FO.bind'
-                 subst_skolems (v,0) (Cover_set.Case.to_term case,0)
+               cases
+               |> List.map (fun (v,c) -> (v,0),(Cover_set.Case.to_term c,1))
+               |> Subst.FO.of_list' ~init:subst_skolems
              in
              let renaming = Ctx.renaming_clear () in
              (* for each clause, apply [subst] to it and negate its
@@ -405,13 +454,14 @@ module Make
            (* all new clauses *)
            let res = List.rev_append pos_clauses neg_clauses in
            Util.debugf ~section 2
-             "(@[<2>induction on `%a`@ :form %a@ @[<2>:case `%a`@]@ \
-              @[<2>:res [@[<hv>%a@]]@]@])"
-             (fun k-> k HVar.pp v Cut_form.pp g Cover_set.Case.pp case
-                 (Util.pp_list C.pp) res);
+             "(@[<2>induction on (@[%a@])@ :form %a@ @[<2>:cases (@[%a@])@]@ \
+              :depth %d@ @[<2>:res [@[<hv>%a@]]@]@])"
+             (fun k-> k (Util.pp_list HVar.pp) vars Cut_form.pp g
+                 (Util.pp_list (Fmt.Dump.pair HVar.pp Cover_set.Case.pp)) cases
+                 depth (Util.pp_list C.pp) res);
            res)
-      |> Sequence.to_rev_list
     in
+    (* FIXME: should do CNF here, too *)
     (* boolean constraint(s) *)
     let b_clauses =
       (* [\Or_{t in cases} b_lit(t)] *)
@@ -434,7 +484,7 @@ module Make
 
   (* does the variable occur in an active position in [f],
      or under some uninterpreted position? *)
-  let occurs_in_active_pos (f:Cut_form.t)(x:T.var): bool =
+  let var_occurs_under_active_pos (f:Cut_form.t)(x:T.var): bool =
     let open T_view in
     let is_x (t:term): bool = match T.view t with
       | T.Var y -> HVar.equal Type.equal x y
@@ -471,10 +521,75 @@ module Make
       |> Sequence.exists check_sub
     end
 
+  let active_subterms_form (f:Cut_form.t): T.t Sequence.t =
+    Cut_form.cs f
+    |> Sequence.of_list
+    |> Sequence.flat_map Sequence.of_array
+    |> Sequence.flat_map Literal.Seq.terms
+    |> Sequence.flat_map T_view.active_subterms
+
   (* should we do induction on [x] in [c]? *)
   let should_do_ind_on_var (f:Cut_form.t) (x:T.var): bool =
     not (E.flex_get k_limit_to_active) ||
-    occurs_in_active_pos f x
+    var_occurs_under_active_pos f x
+
+  module UF_vars =
+    UnionFind.Make(struct
+      type key = T.var
+      type value = T.var list
+      let equal = HVar.equal Type.equal
+      let hash = HVar.hash
+      let zero = []
+      let merge = List.rev_append
+    end)
+
+  let eq_var = HVar.equal Type.equal
+
+  (* group together variables that occur at active positions under
+     the same subterm *)
+  let find_var_clusters (f:Cut_form.t) (vars:T.var list): T.var list list =
+    let uf = UF_vars.create [] in
+    List.iter (fun v -> UF_vars.add uf v [v]) vars;
+    begin
+      active_subterms_form f
+      |> Sequence.iter
+        (fun t -> match T_view.view t with
+           | T_view.T_app_defined (_,c,l) ->
+             let pos = RT.Defined_cst.defined_positions c in
+             Sequence.of_list l
+             |> Sequence.zip_i |> Sequence.zip
+             |> Sequence.diagonal
+             |> Sequence.filter_map
+               (fun ((i1,t1),(i2,t2)) ->
+                  match T.as_var t1, T.as_var t2 with
+                    | Some x, Some y
+                      when
+                        i1 < i2 &&
+                        IArray.get pos i1 = RT.Pos_active &&
+                        IArray.get pos i2 = RT.Pos_active &&
+                        not (eq_var x y) &&
+                        CCList.mem ~eq:eq_var x vars &&
+                        CCList.mem ~eq:eq_var y vars
+                      ->
+                      Some (x,y)
+                    | _ -> None)
+             |> Sequence.iter
+               (fun (x,y) ->
+                  assert (not (eq_var x y));
+                  UF_vars.union uf x y)
+           | _ -> ())
+    end;
+    let res =
+      UF_vars.to_seq uf
+      |> Sequence.map snd
+      |> Sequence.to_rev_list
+    in
+    Util.debugf ~section 3
+      "(@[<hv2>induction_clusters@ :in %a@ :clusters (@[<hv>%a@])@])"
+      (fun k->k Cut_form.pp f
+          (Util.pp_list Fmt.(within "(" ")" @@ hvbox @@ Util.pp_list HVar.pp))
+          res);
+    res
 
   (* main inductive proof of lemmas that have inductive variables *)
   let prove_lemma (cut:A.cut_res): C.t list =
@@ -495,10 +610,11 @@ module Make
                ok)
             ivars
         in
+        let clusters = find_var_clusters g ivars in
         (* for each variable, build a coverset of its type,
            and do a case distinction on the [top] constant of this
            coverset. *)
-        CCList.flat_map (ind_on_var cut) ivars
+        CCList.flat_map (ind_on_vars cut) clusters
     end
 
   (* replace the constants by fresh variables in the given clauses,
@@ -611,25 +727,46 @@ module Make
       | _ -> E.cr_skip
     end
 
-(* checks whether the trail is trivial, that is, it contains
-   two literals [i = t1] and [i = t2] with [t1], [t2] distinct cover set cases *)
-  let trail_is_trivial trail =
+  (* checks whether the trail is trivial, that is, it contains
+     two literals [i = t1] and [i = t2] with [t1], [t2] distinct cover set cases *)
+  let trail_is_trivial_cases trail =
     let seq = Trail.to_seq trail in
     (* all boolean literals that express paths *)
     let relevant_cases = Sequence.filter_map BoolBox.as_case seq in
     (* are there two distinct incompatible cases in the trail? *)
-    Sequence.product relevant_cases relevant_cases
+    Sequence.diagonal relevant_cases
     |> Sequence.exists
       (fun (c1, c2) ->
          let res =
-           Cover_set.Case.same_cst c1 c2 &&
-           not (Cover_set.Case.equal c1 c2)
+           not (List.length c1 = List.length c2) ||
+           not (CCList.equal Cover_set.Case.equal c1 c2)
          in
          if res then (
            Util.debugf ~section 4
              "(@[<2>trail@ @[%a@]@ is trivial because of@ \
-              {@[@[%a@],@,@[%a@]}@]@])"
-             (fun k->k C.pp_trail trail Cover_set.Case.pp c1 Cover_set.Case.pp c2)
+              {@[(@[%a@]),@,(@[%a@])}@]@])"
+             (fun k->k C.pp_trail trail
+                 (Util.pp_list Cover_set.Case.pp) c1
+                 (Util.pp_list Cover_set.Case.pp )c2)
+         );
+         res)
+
+  (* make trails with several lemmas in them trivial, so that we have to wait
+     for a lemma to be proved before we can  use it to prove another lemma *)
+  let trail_is_trivial_lemmas trail =
+    let seq = Trail.to_seq trail in
+    (* all boolean literals that express paths *)
+    let relevant_cases = Sequence.filter_map BoolBox.as_lemma seq in
+    (* are there two distinct incompatible cases in the trail? *)
+    Sequence.diagonal relevant_cases
+    |> Sequence.exists
+      (fun (c1, c2) ->
+         let res = not (Cut_form.equal c1 c2) in
+         if res then (
+           Util.debugf ~section 4
+             "(@[<2>trail@ @[%a@]@ is trivial because of lemmas@ \
+              {@[(@[%a@]),@,(@[%a@])}@]@])"
+             (fun k->k C.pp_trail trail Cut_form.pp c1 Cut_form.pp c2);
          );
          res)
 
@@ -655,7 +792,10 @@ module Make
     Ind_cst.max_depth_ := d;
     Env.add_unary_inf "induction.ind" inf_prove_by_ind;
     Env.add_clause_conversion convert_statement;
-    Env.add_is_trivial_trail trail_is_trivial;
+    Env.add_is_trivial_trail trail_is_trivial_cases;
+    if E.flex_get Avatar.k_simplify_trail then (
+      Env.add_is_trivial_trail trail_is_trivial_lemmas;
+    );
     Signal.on_every A.on_lemma on_lemma;
     Env.add_generate "ind.lemmas" inf_new_lemmas;
     ()

@@ -23,7 +23,7 @@ type payload =
   | Fresh (* fresh literal with no particular payload *)
   | Clause_component of Literals.t
   | Lemma of Cut_form.t
-  | Case of inductive_case (* branch in the induction tree *)
+  | Case of inductive_case list (* branch in the induction tree *)
 
 module Lit = Bool_lit.Make(struct
     type t = payload
@@ -45,7 +45,7 @@ let compare_payload l1 l2 = match l1, l2 with
   | Fresh, Fresh -> 0
   | Clause_component l1, Clause_component l2 -> Lits.compare l1 l2
   | Lemma l1, Lemma l2 -> Cut_form.compare l1 l2
-  | Case p1, Case p2 -> Cover_set.Case.compare p1 p2
+  | Case p1, Case p2 -> CCList.compare Cover_set.Case.compare p1 p2
   | Fresh, _
   | Clause_component _, _
   | Lemma _, _
@@ -58,9 +58,9 @@ let pp_payload out = function
     Format.fprintf out "@<1>⟦@[<hv>%a@]@<1>⟧" Lits.pp lits
   | Lemma f ->
     Format.fprintf out "@<1>⟦lemma %a@<1>⟧" Cut_form.pp f
-  | Case p ->
+  | Case c ->
     Format.fprintf out "@<1>⟦@[<hv1>%a@]@<1>⟧"
-      Literal.pp (Cover_set.Case.to_lit p)
+      (Util.pp_list ~sep:" ∧ " Literal.pp) (List.map Cover_set.Case.to_lit c)
 
 (* index for components (to ensure α-equivalence components map to the same
    boolean lit *)
@@ -90,11 +90,15 @@ module FV_lemma = FV_tree.Make(struct
     let labels _ = Util.Int_set.empty
   end)
 
-module ICaseTbl = CCHashtbl.Make(Cover_set.Case)
+module ICaseTbl = CCHashtbl.Make(struct
+    type t = Cover_set.case list
+    let equal = CCList.equal Cover_set.Case.equal
+    let hash = Hash.list Cover_set.Case.hash
+  end)
 
 let _clause_set = ref (FV_components.empty()) (* FO lits -> blit *)
 let _lemma_set = ref (FV_lemma.empty()) (* lemma -> blit *)
-let _case_set = ICaseTbl.create 15 (* cst=cst -> blit *)
+let _case_set = ICaseTbl.create 16 (* cst=term-> blit *)
 
 (* should never be used *)
 let dummy_payload = Fresh
@@ -175,6 +179,8 @@ let inject_lemma f =
   Util.with_prof prof_inject_lemma inject_lemma_ f
 
 let inject_case p =
+  (* normalize by sorting the list of cases *)
+  let p = List.sort Cover_set.Case.compare p in
   try
     let _, i = ICaseTbl.find _case_set p in
     i
@@ -201,6 +207,10 @@ let is_case lit = match Lit.payload (Lit.abs lit) with
 
 let as_case lit = match Lit.payload (Lit.abs lit) with
   | Case p -> Some p
+  | _ -> None
+
+let as_lemma lit = match Lit.payload (Lit.abs lit) with
+  | Lemma f -> Some f
   | _ -> None
 
 (* boolean lit -> payload *)
