@@ -315,8 +315,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
 
   let add_lemma (c:cut_res): unit =
     if not (Lemma_tbl.mem all_lemmas_ c.cut_lit) then (
-      Util.debugf ~section 3 "(@[<2>add_lemma@ :on `[@[<hv>%a@]]`@])"
-        (fun k->k Cut_form.pp c.cut_form);
+      Util.debugf ~section 2 "(@[<2>add_lemma@ :on `[@[<hv>%a@]]`@ :lit %a@])"
+        (fun k->k Cut_form.pp c.cut_form BBox.pp c.cut_lit);
       Lemma_tbl.add all_lemmas_ c.cut_lit c;
       (* actually add the clauses to passive set *)
       E.ProofState.PassiveSet.add (cut_res_clauses c);

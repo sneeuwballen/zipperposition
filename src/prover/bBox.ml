@@ -7,6 +7,7 @@ module Lits = Literals
 
 let section = Util.Section.make ~parent:Const.section "bbox"
 let prof_inject_lits = Util.mk_profiler "bbox.inject_lits"
+let pp_bbox_id : bool ref = ref true
 
 module StringTbl = CCHashtbl.Make(struct
     type t = string
@@ -162,8 +163,16 @@ let as_case lit = match Lit.payload (Lit.abs lit) with
 let payload = Lit.payload
 
 let pp out i =
-  if not (Lit.sign i) then Format.pp_print_string out "¬";
-  pp_payload out (payload i)
+  if not (Lit.sign i) then CCFormat.string out "¬";
+  pp_payload out (payload i);
+  if !pp_bbox_id then Format.fprintf out "@{<Black>/%d@}" (Lit.to_int i|>abs);
+  ()
 
 let pp_bclause out lits =
   Format.fprintf out "@[<hv>%a@]" (Util.pp_list ~sep:" ⊔ " pp) lits
+
+let () =
+  Options.add_opts
+    [ "--pp-bbox-id", Arg.Set pp_bbox_id, " print boolean literals' IDs";
+      "--no-pp-bbox-id", Arg.Clear pp_bbox_id, " do not print boolean literals' IDs";
+    ]
