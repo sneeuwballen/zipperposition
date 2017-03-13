@@ -24,6 +24,10 @@ type res =
 val classify : ID.t -> res
 (** [classify id] returns the role [id] plays in inductive reasoning *)
 
+val id_is_cstor : ID.t -> bool
+val id_is_projector : ID.t -> bool
+val id_is_defined : ID.t -> bool
+
 val pp_res : res CCFormat.printer
 
 val pp_signature : Signature.t CCFormat.printer

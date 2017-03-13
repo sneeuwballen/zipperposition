@@ -25,6 +25,10 @@ let classify id = match ID.payload id with
     DefinedCst (l,Statement.D_form !def)
   | _ -> Other
 
+let id_is_cstor id = match classify id with Cstor _ -> true | _ -> false
+let id_is_projector id = match classify id with Projector _ -> true | _ -> false
+let id_is_defined id = match classify id with DefinedCst _ -> true | _ -> false
+
 let pp_res out = function
   | Ty _ -> Format.fprintf out "ind_ty"
   | Cstor (_, ity) -> Format.fprintf out "cstor of %a" Ind_ty.pp ity

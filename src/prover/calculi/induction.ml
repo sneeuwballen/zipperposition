@@ -10,6 +10,7 @@ module T = FOTerm
 module Su = Substs
 module Ty = Type
 module Fmt = CCFormat
+module RT = Rewrite_term
 
 module type S = Induction_intf.S
 
@@ -26,6 +27,7 @@ let stats_inductions = Util.mk_stat "induction.inductions"
 let k_enable : bool Flex_state.key = Flex_state.create_key()
 let k_ind_depth : int Flex_state.key = Flex_state.create_key()
 let k_test_depth : int Flex_state.key = Flex_state.create_key()
+let k_limit_to_active : bool Flex_state.key = Flex_state.create_key()
 
 (** {2 Formula to be Proved Inductively *)
 module Goal : sig
@@ -144,6 +146,49 @@ end = struct
   let is_acceptable_goal (g:goal) : bool =
     Goal.test g = Goal.S_ok &&
     check_not_absurd_or_trivial g
+end
+
+module T_view : sig
+  type 'a t =
+    | T_var of T.var
+    | T_app_defined of ID.t * Rewrite_term.defined_cst * 'a list
+    | T_app_cstor of ID.t * 'a list
+    | T_app_unin of ID.t * 'a list
+    | T_app of 'a * 'a list
+    | T_builtin of Builtin.t * 'a list
+
+  val view : term -> term t
+end = struct
+  type 'a t =
+    | T_var of T.var
+    | T_app_defined of ID.t * Rewrite_term.defined_cst * 'a list
+    | T_app_cstor of ID.t * 'a list
+    | T_app_unin of ID.t * 'a list
+    | T_app of 'a * 'a list
+    | T_builtin of Builtin.t * 'a list
+
+  let view (t:term): term t = match T.view t with
+    | T.AppBuiltin (b, l) -> T_builtin (b,l)
+    | T.Var v -> T_var v
+    | T.Const id when Ind_ty.is_constructor id -> T_app_cstor (id, [])
+    | T.Const id when Classify_cst.id_is_defined id ->
+      begin match RT.as_defined_cst id with
+        | Some c -> T_app_defined (id, c, [])
+        | None -> T_app_unin (id, [])
+      end
+    | T.Const id -> T_app_unin (id, [])
+    | T.App (f, l) ->
+      begin match T.view f with
+        | T.Const id when Ind_ty.is_constructor id -> T_app_cstor (id, l)
+        | T.Const id when Classify_cst.id_is_defined id ->
+          begin match RT.as_defined_cst id with
+            | Some c -> T_app_defined (id, c, l)
+            | None -> T_app_unin (id, l)
+          end
+        | T.Const id -> T_app_unin (id, l)
+        | _ -> T_app (f,l)
+      end
+    | T.DB _ -> assert false
 end
 
 (* data flow for induction:
@@ -387,8 +432,49 @@ module Make
     (* return the clauses *)
     clauses
 
-  (* TODO: here, put more restrictions over which varaibles can be
-     candidate for induction (w.r.t active positions) *)
+  (* does the variable occur in an active position in [f],
+     or under some uninterpreted position? *)
+  let occurs_in_active_pos (f:Cut_form.t)(x:T.var): bool =
+    let open T_view in
+    let is_x (t:term): bool = match T.view t with
+      | T.Var y -> HVar.equal Type.equal x y
+      | _ -> false
+    in
+    (* true if [x] occurs in active positions somewhere in [t] *)
+    let rec check_sub(t:term): bool = match T_view.view t with
+      | T_app_defined (_, c, l) ->
+        let pos = RT.Defined_cst.defined_positions c in
+        assert (IArray.length pos >= List.length l);
+        (* only look under active positions *)
+        begin
+          Sequence.of_list l
+          |> Sequence.zip_i |> Sequence.zip
+          |> Sequence.exists
+            (fun (i,u) ->
+               IArray.get pos i = RT.Pos_active &&
+               ( is_x u || check_sub u ))
+        end
+      | T_var _ -> false
+      | T_app (f,l) -> check_sub f || List.exists check_eq_or_sub l
+      | T_app_cstor (_,l) -> List.exists check_sub l
+      | T_builtin (_,l)
+      | T_app_unin (_,l) -> List.exists check_eq_or_sub l (* approx *)
+    (* true if [t=x] or if [x] occurs in active positions somewhere in [t] *)
+    and check_eq_or_sub (t:term): bool =
+      is_x t || check_sub t
+    in
+    begin
+      Cut_form.cs f
+      |> Sequence.of_list
+      |> Sequence.flat_map Sequence.of_array
+      |> Sequence.flat_map Literal.Seq.terms
+      |> Sequence.exists check_sub
+    end
+
+  (* should we do induction on [x] in [c]? *)
+  let should_do_ind_on_var (f:Cut_form.t) (x:T.var): bool =
+    not (E.flex_get k_limit_to_active) ||
+    occurs_in_active_pos f x
 
   (* main inductive proof of lemmas that have inductive variables *)
   let prove_lemma (cut:A.cut_res): C.t list =
@@ -396,6 +482,19 @@ module Make
     begin match Cut_form.ind_vars g with
       | [] -> []
       | ivars ->
+        (* filter on which variables we do induction *)
+        let ivars =
+          List.filter
+            (fun v ->
+               let ok = should_do_ind_on_var g v in
+               if not ok then (
+                 Util.debugf ~section 3
+                   "(@[ind: inactive variable `%a`@ :in %a@])"
+                   (fun k->k HVar.pp v Cut_form.pp g);
+               );
+               ok)
+            ivars
+        in
         (* for each variable, build a coverset of its type,
            and do a case distinction on the [top] constant of this
            coverset. *)
@@ -564,6 +663,7 @@ end
 let enabled_ = ref true
 let depth_ = ref !Ind_cst.max_depth_
 let test_depth = ref Test_prop.default_depth
+let limit_to_active = ref true
 
 (* if induction is enabled AND there are some inductive types,
    then perform some setup after typing, including setting the key
@@ -592,6 +692,7 @@ let post_typing_hook stmts state =
     |> Flex_state.add k_enable true
     |> Flex_state.add k_ind_depth !depth_
     |> Flex_state.add k_test_depth !test_depth
+    |> Flex_state.add k_limit_to_active !limit_to_active
     |> Flex_state.add Ctx.Key.lost_completeness true
   ) else Flex_state.add k_enable false state
 
@@ -625,4 +726,6 @@ let () =
     ; "--small-check-depth",
       Arg.Set_int test_depth,
       " set default depth limit for smallcheck"
+    ; "--ind-only-active-pos", Arg.Set limit_to_active, " limit induction to active positions"
+    ; "--no-ind-only-active-pos", Arg.Clear limit_to_active, " limit induction to active positions"
     ]
