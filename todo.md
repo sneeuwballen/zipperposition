@@ -151,7 +151,7 @@
 
 - only do induction on active positions
   * [ ] check that it fixes previous regression on `list10_easy.zf`, `nat2.zf`…)
-  * [ ] also check that sub-induction seems to hold water with smallcheck
+  * [x] also check that sub-induction seems to hold water with smallcheck
         (i.e. does the ∀-quantified goal pass smallcheck?), otherwise
         do not do sub-induction.
         → will be useful after purification (approximation leads to too
@@ -159,6 +159,16 @@
           so we need to check constraints before solving them by induction)
   * [ ] use subsumption on candidate lemmas:
         + if a *proved* lemma subsumes the current candidate, then skip candidate
+        + if an unknown lemma subsumes the current candidate, delay it;
+          wait until the subsuming one is proved/disproved
+        + **OR**,
+            when a candidate lemma is subsumed by some active lemma,
+            lock it and store it somewhere, waiting for one of the following
+            conditions to happen:
+          1. when a lemma is proved, delete candidate lemmas it subsumes
+          2. when a lemma is disproved, unlock candidate lemmas that it
+             subsumes and activate them (unless they are locked by other lemmas)
+          → might even be in Avatar itself, as a generic mechanism!
         + when a lemma is proved, find other lemmas that are subsumed by it?
           or this might be automatic, but asserting [L2] if L1 proved and L1⇒L2
             might still help with the many clauses derived from L2
