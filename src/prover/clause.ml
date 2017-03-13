@@ -18,7 +18,6 @@ let prof_clause_create = Util.mk_profiler "clause_create"
 module type S = Clause_intf.S
 
 type proof_step = Clause_intf.proof_step
-type proof = Clause_intf.proof
 
 (** {2 Type def} *)
 module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
