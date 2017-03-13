@@ -119,23 +119,43 @@
       their position below defined symbols (in particular, for accumulator terms)
     + similar subgoals that would be distinct before (same goal, different
       skolems) are now the same lemma, thanks to the α-equiv checking
-  * [ ] from a clause `C` with inductive _skolems_ `{a,b,c}` we can generalize
+  * [x] from a clause `C` with inductive _skolems_ `{a,b,c}` we can generalize
         on these skolems without worrying,
         and try to prove `∀xyz. ¬C[x/a,y/b,z/c]` (but only do induction
         on variables that occur in active positions)
-  * [ ] remove trail literals for induction (and remove clause context,
+  * [x] remove trail literals for induction (and remove clause context,
         might have the higher-order induction principle for proof
         production though)
-  * [ ] generate fresh coverset every time; new inductive skolem constants
+  * [x] generate fresh coverset every time; new inductive skolem constants
         really become branch dependent
         (no need to prevent branches from interfering every again!)
-  * [ ] call `small_check` on candidate inductive formulas;
+  * [x] call `small_check` on candidate inductive formulas;
         try simple generalizations backed by `small_check` before starting.
         → will be useful after purification (approximation leads to too
           many inferences, some of which yield non-inductively true constraints,
           so we need to check constraints before solving them by induction)
   * [ ] only do induction on active positions
         → check that it fixes previous regression on `list10_easy.zf`, `nat2.zf`…)
+  * [ ] might be a bug in candidate lemmas regarding α-equiv checking
+        (see on `nat2.zf`, should have only one lemma?)
+  * [ ] use subsumption on candidate lemmas:
+        + if a *proved* lemma subsumes the current candidate, then skip candidate
+        + if an unknown lemma subsumes the current candidate, delay it;
+          wait until the subsuming one is proved/disproved
+        + **OR**,
+            when a candidate lemma is subsumed by some active lemma,
+            lock it and store it somewhere, waiting for one of the following
+            conditions to happen:
+          1. when a lemma is proved, delete candidate lemmas it subsumes
+          2. when a lemma is disproved, unlock candidate lemmas that it
+             subsumes and activate them (unless they are locked by other lemmas)
+          → might even be in Avatar itself, as a generic mechanism!
+        + when a lemma is proved, find other lemmas that are subsumed by it?
+          or this might be automatic, but asserting [L2] if L1 proved and L1⇒L2
+            might still help with the many clauses derived from L2
+        + might need a signal `on_{dis_,}proved_lemma` for noticing
+          taht a lemma is not (dis,)proved by the SAT solver.
+          → Hook into it to unlock/remove candidates subsumed by the lemma.
   * [ ] some clause constraints (e.g. `a+s b ≠ s (a+b)`) might deserve
         their own induction, because no other rule (not even E-unification)
         will be able to solve these.
@@ -157,21 +177,6 @@
         → will be useful after purification (approximation leads to too
           many inferences, some of which yield non-inductively true constraints,
           so we need to check constraints before solving them by induction)
-  * [ ] use subsumption on candidate lemmas:
-        + if a *proved* lemma subsumes the current candidate, then skip candidate
-        + if an unknown lemma subsumes the current candidate, delay it;
-          wait until the subsuming one is proved/disproved
-        + **OR**,
-            when a candidate lemma is subsumed by some active lemma,
-            lock it and store it somewhere, waiting for one of the following
-            conditions to happen:
-          1. when a lemma is proved, delete candidate lemmas it subsumes
-          2. when a lemma is disproved, unlock candidate lemmas that it
-             subsumes and activate them (unless they are locked by other lemmas)
-          → might even be in Avatar itself, as a generic mechanism!
-        + when a lemma is proved, find other lemmas that are subsumed by it?
-          or this might be automatic, but asserting [L2] if L1 proved and L1⇒L2
-            might still help with the many clauses derived from L2
 
 - purification:
   * [ ] think of purification at invariant/accumulator positions for
