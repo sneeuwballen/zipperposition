@@ -383,9 +383,9 @@ let process_file file =
   Phases.return (Phases.Env_result (env, result))
 
 let print file env result =
-  print_szs_result ~file env result >>= fun () ->
   (* print some statistics *)
   print_stats env >>= fun () ->
+  print_szs_result ~file env result >>= fun () ->
   print_dots env result
 
 let setup_gc =

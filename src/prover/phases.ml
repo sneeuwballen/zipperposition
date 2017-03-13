@@ -50,9 +50,9 @@ type ('ret, 'before, 'after) phase =
   | Saturate :
       (env_with_result, [`Pre_saturate], [`Saturate]) phase
 
-  | Print_result : (unit, [`Saturate], [`Print_result]) phase
-  | Print_stats : (unit, [`Print_result], [`Print_stats]) phase
-  | Print_dot : (unit, [`Print_stats], [`Print_dot]) phase
+  | Print_stats : (unit, [`Saturate], [`Print_stats]) phase
+  | Print_result : (unit, [`Print_stats], [`Print_result]) phase
+  | Print_dot : (unit, [`Print_result], [`Print_dot]) phase
   | Exit : (unit, _, [`Exit]) phase
 
 type any_phase = Any_phase : (_, _, _) phase -> any_phase
