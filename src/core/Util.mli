@@ -176,6 +176,8 @@ val ord_option : 'a CCOrd.t -> 'a option CCOrd.t
 
 val map_product : f:('a -> 'b list list) -> 'a list -> 'b list list
 
+val seq_map_l : f:('a -> 'b list) -> 'a list -> 'b list Sequence.t
+
 val invalid_argf: ('a, Format.formatter, unit, 'b) format4 -> 'a
 val failwithf : ('a, Format.formatter, unit, 'b) format4 -> 'a
 

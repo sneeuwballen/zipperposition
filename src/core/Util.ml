@@ -367,6 +367,17 @@ let map_product ~f l =
         (f l1)
         tail
 
+let seq_map_l ~f l =
+  let rec aux l yield = match l with
+    | [] -> yield []
+    | x :: tail ->
+      let ys = f x in
+      List.iter
+        (fun y -> aux tail (fun l -> yield (y::l)))
+        ys
+  in
+  aux l
+
 let invalid_argf msg = Fmt.ksprintf msg ~f:invalid_arg
 let failwithf msg = Fmt.ksprintf msg ~f:failwith
 

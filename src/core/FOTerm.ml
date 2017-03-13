@@ -167,6 +167,12 @@ let as_const_exn t = match T.view t with
 
 let as_const t = try Some (as_const_exn t) with Invalid_argument _ -> None
 
+let as_var_exn t = match T.view t with
+  | T.Var v -> (Type.cast_var_unsafe v)
+  | _ -> invalid_arg "as_var_exn"
+
+let as_var t = try Some (as_var_exn t) with Invalid_argument _ -> None
+
 module Seq = struct
   let vars t k =
     let rec aux t =

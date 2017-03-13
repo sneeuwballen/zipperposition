@@ -113,4 +113,7 @@ module Make(P : PAIR) = struct
     H.iter
       (fun key node -> if P.equal key node.n_repr then f key node.n_value)
       t
+
+  let to_seq t f =
+    iter t (fun x y -> f (x,y))
 end
