@@ -61,7 +61,7 @@ let cases ?(which=`All) (set:t): case Sequence.t =
 
 let pp out (set:t): unit =
   Format.fprintf out
-    "(@[coverset of type `@[%a@]@ :top `%a`@ :cases [@[<hv>%a@]]@])"
+    "(@[<hv2>coverset of type `@[%a@]`@ :top `%a`@ :cases [@[<hv>%a@]]@])"
     Type.pp (ty set) Ind_cst.pp (top set)
     (Util.pp_list Case.pp) set.cs_cases
 

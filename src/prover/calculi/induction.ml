@@ -368,8 +368,8 @@ module Make
     in
     (* boolean constraint(s) *)
     let b_clauses =
-      (* [¬ cut_blit => \Or_{t in cases} b_lit(t)] *)
-      let b_at_least_one = cut_blit :: !b_lits
+      (* [\Or_{t in cases} b_lit(t)] *)
+      let b_at_least_one = !b_lits
       (* for each case t!=u, [¬b_lit(t) ∨ ¬b_lit(u)] *)
       and b_at_most_one =
         CCList.diagonal !b_lits
