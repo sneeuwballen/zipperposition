@@ -36,6 +36,9 @@ module Case : sig
   val to_term : t -> term
   val to_lit : t -> Literal.t
 
+  val same_cst : t -> t -> bool
+  (** true iff the two cases are on the same constant *)
+
   val sub_constants : t -> cst list
   (** All sub-constants that are subterms of a specific case *)
 

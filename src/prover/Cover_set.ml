@@ -41,6 +41,8 @@ module Case = struct
     let lhs = Ind_cst.to_term c.case_top in
     Literal.mk_eq lhs (to_term c)
 
+  let same_cst c1 c2 = Ind_cst.equal c1.case_top c2.case_top
+
   let is_rec c = c.case_kind = `Rec
   let is_base c = c.case_kind = `Base
 
@@ -219,7 +221,7 @@ let make_coverset_ ~cover_set_depth ~depth (ty:Type.t)(ity:Ind_ty.t) : t =
     begin match subst with
       | Some subst -> make depth subst (* previous case *)
       | None ->
-        mk_skolem ty (* not an inductive sub-case, just create a skolem symbol *)
+        decl_sub ty (* not an inductive sub-case, just create a skolem symbol *)
     end
   in
   let subst =

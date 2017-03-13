@@ -244,14 +244,13 @@ module Make
     |> CCList.sort_uniq ~cmp:Ind_cst.ind_skolem_compare
 
   (* scan clauses for ground terms of an inductive type,
-     and declare those terms. Only do this if the clause is part of an
-     inductive proof, by looking at the trail *)
+     and perform induction on these terms.  *)
   let scan_clause (c:C.t) : Ind_cst.ind_skolem list =
-    if C.trail c |> Trail.exists BoolBox.is_lemma then (
+    begin
       C.lits c
       |> Lits.Seq.terms
       |> scan_terms
-    ) else []
+    end
 
   (* goal for induction *)
   (* ensure the proper declarations are done for this coverset *)
@@ -361,8 +360,8 @@ module Make
            (* all new clauses *)
            let res = List.rev_append pos_clauses neg_clauses in
            Util.debugf ~section 2
-             "(@[<2>induction on `%a`@ :form %a@ :case `%a`@ \
-              :res [@[<hv>%a@]]@])"
+             "(@[<2>induction on `%a`@ :form %a@ @[<2>:case `%a`@]@ \
+              @[<2>:res [@[<hv>%a@]]@]@])"
              (fun k-> k HVar.pp v Cut_form.pp g Cover_set.Case.pp case
                  (Util.pp_list C.pp) res);
            res)
@@ -463,7 +462,7 @@ module Make
       Sequence.of_list generalize_on
       |> Sequence.map (fun (id,_) -> Ind_cst.ind_skolem_depth id)
       |> Sequence.max
-      |> CCOpt.map_or ~default:0 succ
+      |> CCOpt.get_or ~default:0
     in
     if depth <= max_depth then (
       (* check if goal is worth the effort *)
@@ -518,11 +517,14 @@ module Make
     let seq = Trail.to_seq trail in
     (* all boolean literals that express paths *)
     let relevant_cases = Sequence.filter_map BoolBox.as_case seq in
-    (* are there two distinct incompatible paths in the trail? *)
+    (* are there two distinct incompatible cases in the trail? *)
     Sequence.product relevant_cases relevant_cases
     |> Sequence.exists
       (fun (c1, c2) ->
-         let res = not (Cover_set.Case.equal c1 c2) in
+         let res =
+           Cover_set.Case.same_cst c1 c2 &&
+           not (Cover_set.Case.equal c1 c2)
+         in
          if res then (
            Util.debugf ~section 4
              "(@[<2>trail@ @[%a@]@ is trivial because of@ \
