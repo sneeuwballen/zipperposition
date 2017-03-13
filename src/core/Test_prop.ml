@@ -116,7 +116,7 @@ let vars_of_form (f:form): var list =
 
 (* check lemma on small instances. It returns [true] iff none of the
    instances reduces to [false] *)
-let small_check ?depth:(max_depth=default_depth) (f:form): res =
+let small_check_ ~max_depth (f:form): res =
   let sc = 0 in
   let subst_add subst v t =
     Subst.FO.bind subst ((v:Type.t HVar.t:>TI.t HVar.t),sc) (t,sc)
@@ -227,6 +227,9 @@ let small_check ?depth:(max_depth=default_depth) (f:form): res =
       Util.incr_stat stat_small_check_fail;
       R_fail subst
   end
+
+let small_check ?depth:(max_depth=default_depth) (f:form): res =
+  Util.with_prof prof_small_check (small_check_ ~max_depth) f
 
 (* [t] head symbol is a function that is not a constructor *)
 let starts_with_fun (t:T.t): bool = match T.head t with
