@@ -20,7 +20,7 @@ type inductive_case = Cover_set.case
 type payload =
   | Fresh (* fresh literal with no particular payload *)
   | Clause_component of Literals.t
-  | Lemma of Literals.t list
+  | Lemma of Cut_form.t
   | Case of inductive_case (* branch in the induction tree *)
 
 module Lit = Bool_lit.Make(struct
@@ -42,7 +42,7 @@ let payload_to_int_ = function
 let compare_payload l1 l2 = match l1, l2 with
   | Fresh, Fresh -> 0
   | Clause_component l1, Clause_component l2 -> Lits.compare l1 l2
-  | Lemma l1, Lemma l2 -> CCList.compare Lits.compare l1 l2
+  | Lemma l1, Lemma l2 -> Cut_form.compare l1 l2
   | Case p1, Case p2 -> Cover_set.Case.compare p1 p2
   | Fresh, _
   | Clause_component _, _
@@ -54,14 +54,15 @@ let pp_payload out = function
   | Fresh -> CCFormat.string out "<dummy>"
   | Clause_component lits ->
     Format.fprintf out "@<1>⟦@[<hv>%a@]@<1>⟧" Lits.pp lits
-  | Lemma lits_l ->
-    Format.fprintf out "@<1>⟦lemma @[<hv>%a@]@<1>⟧"
-      (Util.pp_list ~sep:" & " Lits.pp) lits_l
+  | Lemma f ->
+    Format.fprintf out "@<1>⟦lemma %a@<1>⟧" Cut_form.pp f
   | Case p ->
     Format.fprintf out "@<1>⟦@[<hv1>%a@]@<1>⟧"
       Literal.pp (Cover_set.Case.to_lit p)
 
-module FV = FV_tree.Make(struct
+(* index for components (to ensure α-equivalence components map to the same
+   boolean lit *)
+module FV_components = FV_tree.Make(struct
     type t = Lits.t * payload * lit
     let compare (l1,i1,j1)(l2,i2,j2) =
       CCOrd.(Lits.compare l1 l2
@@ -71,9 +72,26 @@ module FV = FV_tree.Make(struct
     let labels _ = Util.Int_set.empty
   end)
 
+(* index for lemmas, to ensure α-equivalent lemmas have the same lit *)
+module FV_lemma = FV_tree.Make(struct
+    type t = Cut_form.t * payload * lit
+    let compare (l1,i1,j1)(l2,i2,j2) =
+      CCOrd.(Cut_form.compare l1 l2
+        <?> (compare_payload, i1, i2)
+        <?> (Lit.compare, j1, j2))
+    (* approximation here, we represent it as a clause. monotonicity
+       w.r.t features should still apply *)
+    let to_lits (l,_,_) =
+      Cut_form.cs l
+      |> Sequence.of_list
+      |> Sequence.flat_map_l Lits.to_form
+    let labels _ = Util.Int_set.empty
+  end)
+
 module ICaseTbl = CCHashtbl.Make(Cover_set.Case)
 
-let _clause_set = ref (FV.empty()) (* FO lits -> blit *)
+let _clause_set = ref (FV_components.empty()) (* FO lits -> blit *)
+let _lemma_set = ref (FV_lemma.empty()) (* lemma -> blit *)
 let _case_set = ICaseTbl.create 15 (* cst=cst -> blit *)
 
 (* should never be used *)
@@ -81,19 +99,24 @@ let dummy_payload = Fresh
 let dummy_t = Lit.make dummy_payload
 
 let _retrieve_alpha_equiv lits =
-  FV.retrieve_alpha_equiv_c !_clause_set (lits,dummy_payload,dummy_t)
+  FV_components.retrieve_alpha_equiv_c !_clause_set (lits,dummy_payload,dummy_t)
+
+let _retrieve_lemma (f:Cut_form.t) =
+  FV_lemma.retrieve_alpha_equiv_c !_lemma_set (f,dummy_payload,dummy_t)
 
 (* put [lit] inside mappings, for retrieval by definition *)
 let save_ lit =
   let payload = Lit.payload lit in
-  match payload with
+  begin match payload with
     | Fresh -> ()
     | Clause_component lits ->
       (* be able to retrieve by lits *)
-      _clause_set := FV.add !_clause_set (lits, payload, lit)
-    | Lemma _ -> () (* no retrieval *)
+      _clause_set := FV_components.add !_clause_set (lits, payload, lit)
+    | Lemma f ->
+      _lemma_set := FV_lemma.add !_lemma_set (f, payload, lit)
     | Case p ->
       ICaseTbl.add _case_set p (payload, lit)
+  end
 
 (* clause -> boolean lit *)
 let inject_lits_ lits  =
@@ -104,15 +127,16 @@ let inject_lits_ lits  =
     | _ -> lits, true
   in
   (* retrieve clause. the index doesn't matter for retrieval *)
-  _retrieve_alpha_equiv lits
-  |> Sequence.filter_map
-    (function
-      | lits', Clause_component _, blit
-        when Lits.are_variant lits lits' ->
-        Some blit
-      | _ -> None)
-  |> Sequence.head
-  |> (function
+  let old_lit =
+    _retrieve_alpha_equiv lits
+    |> Sequence.find_map
+      (function
+        | lits', Clause_component _, blit
+          when Lits.are_variant lits lits' ->
+          Some blit
+        | _ -> None)
+  in
+  begin match old_lit with
     | Some t -> Lit.apply_sign sign t
     | None ->
       (* build new literal *)
@@ -120,15 +144,30 @@ let inject_lits_ lits  =
       let t = Lit.make (Clause_component lits_copy) in
       (* maintain mapping *)
       save_ t;
-      Lit.apply_sign sign t)
+      Lit.apply_sign sign t
+  end
 
 let inject_lits lits =
   Util.with_prof prof_inject_lits inject_lits_ lits
 
-let inject_lemma l =
-  assert (l<>[]);
-  let t = Lit.make (Lemma l) in
-  t
+let inject_lemma (f:Cut_form.t): t =
+  let old_lit =
+    _retrieve_lemma f
+    |> Sequence.find_map
+      (function
+        | f', Lemma _, blit when Cut_form.are_variant f f' ->
+          Some blit
+        | _ -> None)
+  in
+  begin match old_lit with
+    | Some lit -> lit
+    | None ->
+      (* build new literal *)
+      let lit = Lit.make (Lemma f) in
+      (* maintain mapping *)
+      save_ lit;
+      lit
+  end
 
 let inject_case p =
   try

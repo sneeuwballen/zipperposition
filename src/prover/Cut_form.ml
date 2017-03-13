@@ -28,6 +28,10 @@ let make cs =
 let vars t = t.vars
 let cs t = t.cs
 
+let hash (f:t): int = Hash.list Literals.hash f.cs
+let equal f1 f2: bool = CCList.equal Literals.equal f1.cs f2.cs
+let compare f1 f2 = CCList.compare Literals.compare f1.cs f2.cs
+
 let pp out (f:t): unit =
   let pp_c = Literals.pp in
   let pp_body out () = match f.cs with
@@ -39,6 +43,21 @@ let pp out (f:t): unit =
   ) else (
     Fmt.fprintf out "(@[<2>forall %a.@ %a@])"
       (Util.pp_list Type.pp_typed_var) (T.VarSet.to_list f.vars) pp_body ()
+  )
+
+let to_string = Fmt.to_string pp
+
+let pp_tstp out (f:t): unit =
+  let pp_c = Fmt.within "(" ")" Literals.pp_tstp in
+  let pp_body out () = match f.cs with
+    | [c] -> pp_c out c
+    | _ -> Fmt.fprintf out "(@[%a@])" (Util.pp_list ~sep:" & " pp_c) f.cs
+  in
+  if T.VarSet.is_empty f.vars then (
+    pp_body out ()
+  ) else (
+    Fmt.fprintf out "(@[<2>![%a]:@ (%a)@])"
+      (Util.pp_list Type.TPTP.pp_typed_var) (T.VarSet.to_list f.vars) pp_body ()
   )
 
 let ind_vars t =
@@ -58,3 +77,12 @@ let subst1 (v:var) (t:term) (f:t): t =
     Subst.FO.bind Subst.empty ((v:var:>InnerTerm.t HVar.t),0) (t,1)
   in
   apply_subst ~renaming subst (f,0)
+
+(* find substitutions making [f1] and [f2] variants, if possible *)
+let variant ~subst (f1,sc1)(f2,sc2): Subst.t Sequence.t =
+  Unif.unif_list_com ~size:`Same subst
+    ~op:(fun subst c1 c2 -> Literals.variant ~subst c1 c2)
+    (f1.cs,sc1)(f2.cs,sc2)
+
+let are_variant f1 f2: bool =
+  not @@ Sequence.is_empty @@ variant ~subst:Subst.empty (f1,1)(f2,0)

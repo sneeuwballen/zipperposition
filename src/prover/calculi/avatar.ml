@@ -294,7 +294,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   (* generic mechanism for adding clause(s)
      and make a lemma out of them, including Skolemization, etc. *)
   let introduce_cut ?(depth=0) (f:Cut_form.t) proof : cut_res =
-    let box = BBox.inject_lemma (Cut_form.cs f) in
+    let box = BBox.inject_lemma f in
     (* positive clauses *)
     let c_pos =
       List.map

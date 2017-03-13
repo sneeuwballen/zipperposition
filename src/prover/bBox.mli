@@ -14,7 +14,7 @@ type inductive_case = Cover_set.case
 type payload = private
   | Fresh (* fresh literal with no particular payload *)
   | Clause_component of Literals.t
-  | Lemma of Literals.t list
+  | Lemma of Cut_form.t
   | Case of inductive_case
 
 module Lit : Bool_lit_intf.S with type payload = payload
@@ -31,8 +31,8 @@ val inject_lits : Literals.t -> t
     The boolean literal can be negative is the argument is a
     unary negative clause *)
 
-val inject_lemma : Literals.t list -> t
-(** Make a new literal from this list of clauses that we are going to cut
+val inject_lemma : Cut_form.t -> t
+(** Make a new literal from this formula that we are going to cut
     on. This is generative, meaning that calling it twice with the
     same arguments will produce distinct literals. *)
 

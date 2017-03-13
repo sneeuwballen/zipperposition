@@ -18,7 +18,10 @@ type t = private {
 val make : Literals.t list -> t
 val trivial : t
 
-val pp : t CCFormat.printer
+include Interfaces.HASH with type t := t
+include Interfaces.ORD with type t := t
+include Interfaces.PRINT with type t := t
+val pp_tstp : t CCFormat.printer
 
 val vars : t -> FOTerm.VarSet.t
 val cs : t -> Literals.t list
@@ -30,3 +33,7 @@ val subst1 : var -> term -> t -> t
 (** Substitution of one variable *)
 
 val apply_subst : renaming:Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
+
+val are_variant : t -> t -> bool
+(** Are these two cut formulas alpha-equivalent? *)
+
