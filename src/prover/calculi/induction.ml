@@ -28,6 +28,7 @@ let k_enable : bool Flex_state.key = Flex_state.create_key()
 let k_ind_depth : int Flex_state.key = Flex_state.create_key()
 let k_test_depth : int Flex_state.key = Flex_state.create_key()
 let k_limit_to_active : bool Flex_state.key = Flex_state.create_key()
+let k_coverset_depth : int Flex_state.key = Flex_state.create_key()
 
 (** {2 Formula to be Proved Inductively *)
 module Goal : sig
@@ -246,6 +247,7 @@ module Make
   module Goal_test = Goal_test(E)
 
   let max_depth = Env.flex_get k_ind_depth
+  let cover_set_depth = Env.flex_get k_coverset_depth
 
   let is_ind_conjecture_ c =
     match C.distance_to_goal c with
@@ -317,10 +319,10 @@ module Make
     let proof =
       ProofStep.mk_inference (List.map C.proof (A.cut_pos cut))
         ~rule:(ProofStep.mk_rulef "induction(%a)" HVar.pp v)
-    and c_set = Cover_set.make ~depth ty in
+    and c_set = Cover_set.make ~cover_set_depth ~depth ty in
     decl_cst_of_set c_set;
     Util.debugf ~section 2
-      "(@[ind_on_var `%a`@ :form %a@ cover_set %a@])"
+      "(@[<hv2>ind_on_var `%a`@ :form %a@ :cover_set %a@])"
       (fun k->k HVar.pp v Cut_form.pp g Cover_set.pp c_set);
     (* other variables -> become skolems *)
     let subst_skolems: Subst.t =
@@ -423,7 +425,7 @@ module Make
       b_at_least_one :: b_at_most_one
     in
     A.Solver.add_clauses ~proof b_clauses;
-    Util.debugf ~section 2 "@[<2>add boolean constraints@ @[<hv>%a@]@ proof: %a@]"
+    Util.debugf ~section 2 "@[<2>add boolean constraints@ @[<hv>%a@]@ :proof %a@]"
       (fun k->k (Util.pp_list BBox.pp_bclause) b_clauses
           ProofPrint.pp_normal_step proof);
     Util.incr_stat stats_inductions;
@@ -487,7 +489,7 @@ module Make
                let ok = should_do_ind_on_var g v in
                if not ok then (
                  Util.debugf ~section 3
-                   "(@[ind: inactive variable `%a`@ :in %a@])"
+                   "(@[<hv>ind: inactive variable `%a`@ :in %a@])"
                    (fun k->k HVar.pp v Cut_form.pp g);
                );
                ok)
@@ -522,7 +524,7 @@ module Make
         |> T.Map.of_list
       in
       Util.debugf ~section 5
-        "@[<2>generalize_lits@ :in `@[<hv>%a@]`@ :subst (@[%a@])@]"
+        "@[<hv2>generalize_lits@ :in `@[<hv>%a@]`@ :subst (@[%a@])@]"
         (fun k->k (Util.pp_list ~sep:"∧" Lits.pp) cs
             (T.Map.pp T.pp T.pp) pairs);
       (* replace skolems by the new variables, then negate the formula
@@ -548,7 +550,8 @@ module Make
      variables, negating the clauses, adn introducing the result
      as a lemma to be proved by induction *)
   let prove_by_ind (clauses:C.t list) ~generalize_on : unit =
-    Util.debugf ~section 5 "(@[<2>consider_proving_by_induction@ :clauses [@[%a@]]@]"
+    Util.debugf ~section 5
+      "(@[<2>consider_proving_by_induction@ :clauses [@[%a@]]@]"
       (fun k->k (Util.pp_list C.pp) clauses);
     let goal =
       generalize_clauses
@@ -565,7 +568,7 @@ module Make
       (* check if goal is worth the effort *)
       if Goal_test.is_acceptable_goal goal then (
         Util.debugf ~section 1
-          "(@[<2>@{<green>prove_by_induction@}@ :clauses [@[%a@]]@]"
+          "(@[<2>@{<green>prove_by_induction@}@ :clauses (@[%a@])@])"
           (fun k->k (Util.pp_list C.pp) clauses);
         let proof = ProofStep.mk_lemma in
         let cut = A.introduce_cut ~depth (Goal.form goal) proof in
@@ -662,6 +665,7 @@ let enabled_ = ref true
 let depth_ = ref !Ind_cst.max_depth_
 let test_depth = ref Test_prop.default_depth
 let limit_to_active = ref true
+let coverset_depth = ref 1
 
 (* if induction is enabled AND there are some inductive types,
    then perform some setup after typing, including setting the key
@@ -691,6 +695,7 @@ let post_typing_hook stmts state =
     |> Flex_state.add k_ind_depth !depth_
     |> Flex_state.add k_test_depth !test_depth
     |> Flex_state.add k_limit_to_active !limit_to_active
+    |> Flex_state.add k_coverset_depth !coverset_depth
     |> Flex_state.add Ctx.Key.lost_completeness true
   ) else Flex_state.add k_enable false state
 
@@ -726,4 +731,5 @@ let () =
       " set default depth limit for smallcheck"
     ; "--ind-only-active-pos", Arg.Set limit_to_active, " limit induction to active positions"
     ; "--no-ind-only-active-pos", Arg.Clear limit_to_active, " limit induction to active positions"
+    ; "--ind-coverset-depth", Arg.Set_int coverset_depth, " coverset depth in induction"
     ]
