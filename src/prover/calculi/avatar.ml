@@ -29,6 +29,7 @@ module type S = Avatar_intf.S
 
 let k_avatar : (module S) Flex_state.key = Flex_state.create_key ()
 let k_show_lemmas : bool Flex_state.key = Flex_state.create_key()
+let k_simplify_trail : bool Flex_state.key = Flex_state.create_key()
 
 module Make(E : Env.S)(Sat : Sat_solver.S)
 = struct
@@ -401,8 +402,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     E.add_generate "avatar_check_sat" check_satisfiability;
     E.add_clause_conversion convert_lemma;
     E.add_is_trivial_trail trail_is_trivial;
-    E.add_backward_simplify backward_simplify_trails;
-    E.add_simplify simplify_trail;
+    if E.flex_get k_simplify_trail then (
+      E.add_backward_simplify backward_simplify_trails;
+      E.add_simplify simplify_trail;
+    );
     if E.flex_get k_show_lemmas then (
       Signal.once Signals.on_exit (fun _ -> show_lemmas ());
     );
@@ -415,6 +418,7 @@ let get_env (module E : Env.S) : (module S) = E.flex_get k_avatar
 
 let enabled_ = ref false
 let show_lemmas_ = ref false
+let simplify_trail_ = ref true
 
 let extension =
   let action env =
@@ -425,6 +429,7 @@ let extension =
     let module A = Make(E)(Sat) in
     E.flex_add k_avatar (module A : S);
     E.flex_add k_show_lemmas !show_lemmas_;
+    E.flex_add k_simplify_trail !simplify_trail_;
     Util.debug 1 "enable Avatar";
     A.register ~split:!enabled_ ()
   in
@@ -435,4 +440,6 @@ let () =
     [ "--avatar", Arg.Set enabled_, " enable Avatar splitting"
     ; "--no-avatar", Arg.Clear enabled_, " disable Avatar splitting"
     ; "--print-lemmas", Arg.Set show_lemmas_, " show status of Avatar lemmas"
+    ; "--avatar-simp-trail", Arg.Set simplify_trail_, " simplify boolean trails in Avatar"
+    ; "--no-avatar-simp-trail", Arg.Clear simplify_trail_, " do not simplify boolean trails in Avatar"
     ]
