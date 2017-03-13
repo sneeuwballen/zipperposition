@@ -103,64 +103,40 @@ end = struct
 
   exception Yield_false of C.t
 
-  (* do only a few steps of inferences for checking if a candidate lemma
-     is trivial/absurd *)
-  let max_steps_ = 20
-  (* TODO: put option for that *)
+  (* check that [lemma] is not obviously absurd or trivial, by using
+     the corresponding inference rules from env [E].
 
-  (* check that [lemma] is not obviously absurd or trivial, by making a few steps of
-     superposition inferences between [lemma] and the Active Set.
-     The strategy here is set of support: no inference between clauses of [lemma]
-     and no inferences among active clauses, just between active clauses and
-     those derived from [lemma]. Inferences with trails are dropped because
-     the lemma should be inconditionally true. *)
+     We do not try to refute it with a few superposition steps because
+     in cases it would work (lemma is wrong, attempted nonetheless,
+     and refutable in a few steps), the lemma will be disproved and
+     simplified away by saturation anyway.
+  *)
   let check_not_absurd_or_trivial (g:goal): bool =
     Util.debugf ~section 2 "@[<2>@{<green>assess goal@}@ %a@]"
       (fun k->k Goal.pp g);
-    let q : C.t Queue.t = Queue.create() in (* clauses waiting *)
-    let push_c c = Queue.push c q in
-    let n : int ref = ref 0 in (* number of steps *)
     let trivial = ref true in
-    (* add goal's clauses to the local saturation set *)
-    List.iter
-      (fun lits ->
-         let c = C.create_a ~trail:Trail.empty lits ProofStep.mk_trivial in
-         if not (E.is_trivial c) then push_c c)
-      (Goal.cs g);
     try
-      while not (Queue.is_empty q) && !n < max_steps_ do
-        incr n;
-        let c = Queue.pop q in
-        let c, _ = E.simplify c in
-        assert (C.trail c |> Trail.is_empty);
-        (* check for empty clause *)
-        if C.is_empty c then raise (Yield_false c)
-        else if E.is_trivial c then ()
-        else (
-          trivial := false; (* at least one clause does not simplify to [true] *)
-          (* now make inferences with [c] and push non-trivial clauses to [q] *)
-          E.generate c
-          |> Sequence.filter_map
-            (fun new_c ->
-               let new_c, _ = E.simplify new_c in
-               (* discard trivial/conditional clauses; scan for empty clauses *)
-               if not (Trail.is_empty (C.trail new_c)) then None
-               else if E.is_trivial new_c then None
-               else if C.is_empty new_c then raise (Yield_false new_c)
-               else Some new_c)
-          |> Sequence.iter push_c
-        )
-      done;
+      (* fully simplify each goal's clause, check if absurd or trivial *)
+      List.iter
+        (fun lits ->
+           let c = C.create_a ~trail:Trail.empty lits ProofStep.mk_trivial in
+           let cs, _ = E.all_simplify c in
+           begin match CCList.find_pred C.is_empty cs with
+             | Some c_empty -> raise (Yield_false c_empty)
+             | None ->
+               if not (List.for_all E.is_trivial cs) then trivial := false
+           end)
+        (Goal.cs g);
       Util.debugf ~section 2
-        "@[<2>lemma @[%a@]@ apparently not absurd (after %d steps; trivial:%B)@]"
-        (fun k->k Goal.pp g !n !trivial);
+        "@[<2>lemma @[%a@]@ apparently not absurd (trivial:%B)@]"
+        (fun k->k Goal.pp g !trivial);
       if !trivial then Util.incr_stat stats_trivial_lemmas;
       not !trivial
     with Yield_false c ->
       assert (C.is_empty c);
       Util.debugf ~section 2
-        "@[<2>lemma @[%a@] absurd:@ leads to empty clause %a (after %d steps)@]"
-        (fun k->k Goal.pp g C.pp c !n);
+        "@[<2>lemma @[%a@] absurd:@ leads to empty clause `%a`@]"
+        (fun k->k Goal.pp g C.pp c);
       Util.incr_stat stats_absurd_lemmas;
       false
 
