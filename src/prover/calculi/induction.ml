@@ -332,8 +332,8 @@ module Make
            let ty_v = HVar.ty v in
            let id = Ind_cst.make_skolem ty_v in
            Ctx.declare id ty_v;
-           ((v:var:>InnerTerm.t HVar.t),0), (T.const ~ty:ty_v id,0))
-      |> Subst.FO.of_list ?init:None
+           (v,0), (T.const ~ty:ty_v id,0))
+      |> Subst.FO.of_list' ?init:None
     in
     (* set of boolean literal. We will add their exclusive disjonction to
        the SAT solver. *)
@@ -375,10 +375,8 @@ module Make
               other variables being replaced by skolem symbols *)
            let neg_clauses =
              let subst =
-               Subst.FO.bind
-                 subst_skolems
-                 ((v:var:>InnerTerm.t HVar.t),0)
-                 (Cover_set.Case.to_term case,0)
+               Subst.FO.bind'
+                 subst_skolems (v,0) (Cover_set.Case.to_term case,0)
              in
              let renaming = Ctx.renaming_clear () in
              (* for each clause, apply [subst] to it and negate its
