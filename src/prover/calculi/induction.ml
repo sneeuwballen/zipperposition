@@ -389,8 +389,8 @@ module Make
                |> Cut_form.cs
                |> Util.map_product
                  ~f:(fun lits ->
-                   let lits = Array.map Literal.negate lits in
-                   [Array.to_list lits])
+                   let lits = Array.map (fun l -> [Literal.negate l]) lits in
+                   Array.to_list lits)
                |> List.map
                  (fun l ->
                     let lits = Array.of_list l in
