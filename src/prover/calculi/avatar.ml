@@ -335,18 +335,36 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   let lemma_seq : cut_res Sequence.t =
     fun yield -> Lemma_tbl.iter (fun _ c -> yield c) all_lemmas_
 
+  (* is this literal involved in the proof? *)
+  let rec in_proof_of_ (p:ProofStep.of_) (lit:BLit.t): bool =
+    let eq_abs l1 l2 = BLit.equal (BLit.abs l1) (BLit.abs l2) in
+    let in_proof_ (p:ProofStep.t) (lit:BLit.t): bool =
+      List.exists (fun parent -> in_proof_of_ parent lit) (ProofStep.parents p)
+    in
+    begin match ProofStep.result p with
+      | ProofStep.Form _
+      | ProofStep.Clause _ -> in_proof_ (ProofStep.step p) lit
+      | ProofStep.BoolClause l ->
+        List.exists (eq_abs lit) l || in_proof_ (ProofStep.step p) lit
+    end
+
   let print_lemmas out () =
+    let in_core = match Sat.get_proof_opt () with
+      | None -> (fun _ -> false)
+      | Some p -> in_proof_of_ p
+    in
     let pp_lemma out c =
       let status = match Sat.proved_at_0 c.cut_lit with
         | None -> "unknown"
+        | Some _ when in_core c.cut_lit -> "in_proof"
         | Some true -> "proved"
         | Some false -> "refuted"
       in
       Format.fprintf out "@[<hv>@{<Green>*@} %s %a@]"
         status Cut_form.pp c.cut_form
     in
-    Format.fprintf out "@[<hv2>lemmas: {@ %a@,@]}"
-      (Util.pp_seq pp_lemma) lemma_seq;
+    Format.fprintf out "@[<v2>lemmas: {@ %a@,@]}"
+      (Util.pp_seq ~sep:"" pp_lemma) lemma_seq;
     ()
 
   let show_lemmas () = Format.printf "%a@." print_lemmas ()

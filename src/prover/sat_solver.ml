@@ -130,6 +130,8 @@ module Make(Dummy : sig end)
     | None -> assert false
     | Some p -> p
 
+  let get_proof_opt () = !proof_
+
   module SatForm = struct
     include Lit
     let norm l =
