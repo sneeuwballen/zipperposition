@@ -134,10 +134,38 @@
         → will be useful after purification (approximation leads to too
           many inferences, some of which yield non-inductively true constraints,
           so we need to check constraints before solving them by induction)
-  * [ ] only do induction on active positions
+  * [x] only do induction on active positions
         → check that it fixes previous regression on `list10_easy.zf`, `nat2.zf`…)
-  * [ ] might be a bug in candidate lemmas regarding α-equiv checking
+  * [x] might be a bug in candidate lemmas regarding α-equiv checking
         (see on `nat2.zf`, should have only one lemma?)
+  * [ ] **fix**: notion of active position should also work for
+        defined propositions (look into clause rules)
+        → factor the computation of positions out of `rewrite_term`
+          and abstract it so it takes a list of LHS
+        → move this into `Statement`? propositions defined by clause rules
+          with `atom t` as LHS should be as "defined" as term RW rules
+  * [ ] check if two variables are interchangeable (i.e. `{X→Y,Y→X}`
+      gives same form). In this case don't do induction on the second one.
+  * [x] do induction on multiple variables, **iff** they occur in active
+        positions in the same subterm.
+        + just combine the coversets for each variable
+        + same as splitting, do union-find of `x,y` if there is an active subterm
+          `f …x…y…` where both `x` and `y` are active
+        + should subsume/replace the individual inductions (which are bound
+          to fail since the subterms will not reduce because of one of
+          their arg)
+        + goes with generalization? If a non-var occurs in active position,
+          it must be generalized? Maybe in 2 successive steps…
+        + [ ] example: should prove transitivity of ≤
+          `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/nat21.zf`
+        → might be sufficient for many cases where we used to use nested ind.
+  * [ ] functional induction:
+    + based on assumption that recursive functions terminate
+    + build functional induction scheme(s) based on recursive def, might
+        prove very useful for some problems.
+    + applies for goals of the form `P[f(x…)]` with only variables in
+      active/accumulator positions of `f`. In inductive hypothesis,
+      use `P[f(skolems…)]`? or is it automatic with multi-var-induction?
   * [ ] use subsumption on candidate lemmas:
         + if a *proved* lemma subsumes the current candidate, then skip candidate
         + if an unknown lemma subsumes the current candidate, delay it;
@@ -154,23 +182,54 @@
           or this might be automatic, but asserting [L2] if L1 proved and L1⇒L2
             might still help with the many clauses derived from L2
         + might need a signal `on_{dis_,}proved_lemma` for noticing
-          taht a lemma is not (dis,)proved by the SAT solver.
+          that a lemma is now (dis,)proved by the SAT solver.
           → Hook into it to unlock/remove candidates subsumed by the lemma.
   * [ ] some clause constraints (e.g. `a+s b ≠ s (a+b)`) might deserve
         their own induction, because no other rule (not even E-unification)
         will be able to solve these.
         → Again, need very good and fast `small_check`…
+  * [ ] when generalizing `f X a != f a X`, which currently yields
+      the lemma `f X Y = f Y X`, instead we could "skolemize" `X`
+      with a HO variable, obtaining `f (H Y) Y = f Y (H Y)`.
+      see `examples/ind/nat6.zf` for a case where it can help
+      (we need `H` because there already is a skolem out there).
+  * [ ] strong induction?
+      + use explicit `<|` subterm relation for the hypothesis
+      + use special transitive rel saturation rules for `<|`
+        (and nonstrict version `≤|`)
+      + also use custom rules for subterm (using constructors)
+        including simplification of `t <| cstor^N(t)`
+        and corresponding unification inference rule
+        → acyclicity just becomes the axiom `¬ (x <| x)` combined with above rules
+      + no need for coverset anymore, just introduce skolems, but need
+        (depth-limited) case-split on arbitrary constants/ground terms.
+        → decouples case split and induction
+      + when generalizing `¬P[a,b]` into `∀xy. P[x,y]`, when doing induction
+        on `x`, might instead prove: `∀xy. y ≤| b ⇒ P[x,y]`? this way we
+        can re-use hypothesis on `y` (and maybe `x`)?
+      + multi-variable induction requires `<|` to work on tuples or multisets
+        on both sides…
+      + `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/nat21.zf`
 
-- [ ] hierarchic superposition for datatypes (with defined functions being part
-    of the background)
-  * [ ] need corresponding TKBO with 2 levels
-  * [ ] with TKBO implemented, removed the code that forces rpo6 to be
-        used when induction is enabled
-  * narrowing with defined symbols would ± correspond to E-unification on pure
-    background literals
+- theory of datatypes
+  * [ ] inference for acyclicity (not just simplification):
+        given `C ∨ s = t`, look for σ such that `sσ = tσ` is absurd by acyclicity.
+        Then infer `Cσ` from that.
+        E.g. `s (f x) = s (s (f a))` would give `σ={x→a}`
+        (do anti-unification with cstors only, then try to unify
+         cstor-prefixed subterms on one side with the root on the other side)
+  * [ ] hierarchic superposition for datatypes (with defined functions being part
+      of the background)
+    + [ ] need corresponding TKBO with 2 levels
+    + [ ] with TKBO implemented, removed the code that forces rpo6 to be
+          used when induction is enabled
+    + narrowing with defined symbols would ± correspond to E-unification on pure
+      background literals
+  * [ ] look into "superposition for fixed domains" more seriously
+        (ask Weidenbach for more details?)
 
 - only do induction on active positions
-  * [ ] check that it fixes previous regression on `list10_easy.zf`, `nat2.zf`…)
+  * [x] check that it fixes previous regression on `list10_easy.zf`, `nat2.zf`…)
   * [x] also check that sub-induction seems to hold water with smallcheck
         (i.e. does the ∀-quantified goal pass smallcheck?), otherwise
         do not do sub-induction.
@@ -187,6 +246,9 @@
   * [ ] purification of accumulator positions might be a HO variable
         applied to input parameters (to represent the dependency)?
         → need some HO unif!
+  * [ ] should emulate speculative lemma guessing from Kapur et al.
+      check on:
+    `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/nat15_def.zf`
 
 - Higher-Order:
   * [ ] introduce builtin symbols S, K, and I
@@ -261,11 +323,6 @@
 
 - use `Type.mangle` for avatar skolems, too
 
-- [ ] functional induction:
-  * based on assumption that recursive functions terminate
-  * build functional induction scheme(s) based on recursive def, might
-    prove very useful for some problems
-
 - [ ] generate all lemmas up to given depth
   * need powerful simplifications from the beginning (for smallchecking)
 
@@ -288,6 +345,9 @@
   better lemmas in induction
   `./zipperposition.native -p -o none -t 30 --dot /tmp/truc.dot tip-benchmarks/isaplanner/prop_85.smt2`
   `./zipperposition.native -p -o none -t 30 --dot /tmp/truc.dot tip-benchmarks/isaplanner/prop_22.smt2`
+
+  with speculative paramodulation
+  `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/nat15_def.zf`
 
 - `./zipperposition.native -p --stats -o none -t 30 --dot /tmp/truc.dot tip-benchmarks/isaplanner/prop_03.smt2`
   too many induction inferences are made, should only do it on active positions
