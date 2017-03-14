@@ -23,7 +23,7 @@ type res =
   | R_fail of Subst.t (* counter-example *)
 
 (* default depth for small check *)
-let default_depth = 3
+let default_depth = 4
 
 type 'a t_view =
   | T_Z of Z.t
