@@ -33,10 +33,11 @@ let set_profile p = _profile := p
 let parse_profile s = _profile := (profile_of_string s)
 
 let () =
+  let o = Arg.Symbol (List.map fst profiles_, parse_profile) in
   Params.add_opts
-    [ "--clause-queue"
-    , Arg.Symbol (List.map fst profiles_, parse_profile)
-    , " choose which set of clause queues to use (for selecting next active clause)"
+    [ "--clause-queue", o,
+      " choose which set of clause queues to use (for selecting next active clause)";
+      "-cq", o, " alias to --clause-queue"
     ]
 
 module Make(C : Clause_intf.S) = struct
