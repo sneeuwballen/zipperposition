@@ -156,19 +156,22 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   (* check whether the trail is false and will remain so *)
   let trail_is_trivial_ (trail:Trail.t): bool =
     let res =
-      Trail.exists
+      Trail.to_seq trail
+      |> Sequence.find_map
         (fun lit ->
            try match Sat.valuation_level lit with
-             | false, 0 -> true (* false at level 0: proven false *)
-             | _ -> false
-           with Sat.UndecidedLit -> false)
-        trail
+             | false, 0 -> Some lit (* false at level 0: proven false *)
+             | _ -> None
+           with Sat.UndecidedLit -> None)
     in
-    if res then (
-      Util.incr_stat stat_trail_trivial;
-      Util.debugf ~section 3 "@[<2>trail @[%a@] is trivial@]" (fun k->k C.pp_trail trail);
-    );
-    res
+    begin match res with
+      | None -> false
+      | Some lit ->
+        Util.incr_stat stat_trail_trivial;
+        Util.debugf ~section 3 "(@[<hv2>trivial_trail@ :trail @[<hv>%a@]@ :lit `%a`@]"
+          (fun k->k C.pp_trail trail BBox.pp lit);
+        true
+    end
 
   let trail_is_trivial tr =
     Sat.last_result () = Sat_solver.Sat && trail_is_trivial_ tr
