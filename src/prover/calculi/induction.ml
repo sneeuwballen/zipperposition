@@ -679,8 +679,17 @@ module Make
       |> Sequence.map (fun (id,_) -> Ind_cst.ind_skolem_depth id)
       |> Sequence.max
       |> CCOpt.get_or ~default:0
+    (* the trail should not contain a positive "lemma" atom.
+       We accept negative lemma atoms because the induction can be used to
+       prove the lemma *)
+    and no_pos_lemma_in_trail () =
+      Sequence.of_list clauses
+      |> Sequence.map C.trail
+      |> Sequence.flat_map Trail.to_seq
+      |> Sequence.for_all
+        (fun lit -> not (BoolLit.sign lit && BBox.is_lemma lit))
     in
-    if depth <= max_depth then (
+    if depth <= max_depth && no_pos_lemma_in_trail () then (
       (* check if goal is worth the effort *)
       if Goal_test.is_acceptable_goal goal then (
         Util.debugf ~section 1
