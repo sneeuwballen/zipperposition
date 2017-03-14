@@ -314,6 +314,15 @@ module Make
   let scan_terms (seq:term Sequence.t) : Ind_cst.ind_skolem list =
     seq
     |> Sequence.flat_map Ind_cst.find_ind_skolems
+    |> Sequence.filter
+      (fun (id,_) ->
+         begin match Ind_cst.id_as_cst id with
+           | None -> true
+           | Some c ->
+             (* do not generalize on sub-constants,
+                there are induction hypothesis on them that we will need *)
+             not (Ind_cst.is_sub c)
+         end)
     |> Sequence.to_rev_list
     |> CCList.sort_uniq ~cmp:Ind_cst.ind_skolem_compare
 
@@ -765,12 +774,18 @@ module Make
   let trail_is_trivial_lemmas trail =
     let seq = Trail.to_seq trail in
     (* all boolean literals that express paths *)
-    let relevant_cases = Sequence.filter_map BoolBox.as_lemma seq in
-    (* are there two distinct incompatible cases in the trail? *)
+    let relevant_cases =
+      seq
+      |> Sequence.filter_map
+        (fun lit ->
+           BoolBox.as_lemma lit
+           |> CCOpt.map (fun lemma -> lemma, BoolLit.sign lit))
+    in
+    (* are there two distinct positive lemma literals in the trail? *)
     Sequence.diagonal relevant_cases
     |> Sequence.exists
-      (fun (c1, c2) ->
-         let res = not (Cut_form.equal c1 c2) in
+      (fun ((c1,sign1), (c2,sign2)) ->
+         let res = sign1 && sign2 && not (Cut_form.equal c1 c2) in
          if res then (
            Util.debugf ~section 4
              "(@[<2>trail@ @[%a@]@ is trivial because of lemmas@ \

@@ -32,6 +32,7 @@ type t = {
   cst_args: Type.t list;
   cst_ty: Type.t; (* [cst_ty = cst_id cst_args] *)
   cst_ity: Ind_ty.t; (* the corresponding inductive type *)
+  cst_is_sub: bool; (* sub-constant? *)
   cst_depth: int; (* how many induction lead to this one? *)
 }
 
@@ -71,6 +72,8 @@ let id_as_cst_exn id = match id_as_cst id with
 
 let id_is_cst id = match id_as_cst id with Some _ -> true | _ -> false
 
+let is_sub c = c.cst_is_sub
+
 (** {6 Creation of Coverset and Cst} *)
 
 let n_ = ref 0
@@ -84,10 +87,10 @@ let make_skolem ty : ID.t =
   c
 
 (* declare new constant *)
-let declare ~depth id ty =
+let declare ~depth ~is_sub id ty =
   Util.debugf ~section:Ind_ty.section 2
-    "@[<2>declare new inductive symbol@ `@[%a : %a@]`@ :depth %d@]"
-    (fun k->k ID.pp id Type.pp ty depth);
+    "@[<2>declare new inductive symbol@ `@[%a : %a@]`@ :depth %d :is_sub %B@]"
+    (fun k->k ID.pp id Type.pp ty depth is_sub);
   assert (not (id_is_cst id));
   assert (Type.is_ground ty); (* constant --> not polymorphic *)
   let ity, args = match Ind_ty.as_inductive_type ty with
@@ -101,6 +104,7 @@ let declare ~depth id ty =
     cst_depth=depth;
     cst_ity=ity;
     cst_args=args;
+    cst_is_sub=is_sub;
   }
   in
   ID.set_payload id (Payload_cst cst)
@@ -112,9 +116,9 @@ let declare ~depth id ty =
   Signal.send on_new_cst cst;
   cst
 
-let make ?(depth=0) (ty:Type.t): t =
+let make ?(depth=0) ~is_sub (ty:Type.t): t =
   let id = make_skolem ty in
-  declare ~depth id ty
+  declare ~depth ~is_sub id ty
 
 let dominates (c1:t)(c2:t): bool =
   c1.cst_depth < c2.cst_depth

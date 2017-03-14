@@ -157,7 +157,7 @@ let make_coverset_ ~cover_set_depth ~depth (ty:Type.t)(ity:Ind_ty.t) : t =
   let open State_ in
   (* map variables from [ity] to this concrete type *)
   let scope = 0 in
-  let cs_top = Ind_cst.make ~depth ty in
+  let cs_top = Ind_cst.make ~depth ~is_sub:false ty in
   (* how to make a simple skolem *)
   let mk_skolem ty : T.t mm =
     let id = Ind_cst.make_skolem ty in
@@ -168,7 +168,7 @@ let make_coverset_ ~cover_set_depth ~depth (ty:Type.t)(ity:Ind_ty.t) : t =
   let decl_sub ty : T.t mm =
     if Ind_ty.is_inductive_type ty
     then (
-      let sub = Ind_cst.make ~depth:(depth+1) ty in
+      let sub = Ind_cst.make ~depth:(depth+1) ~is_sub:true ty in
       add_sub_case sub >|= fun () ->
       Ind_cst.to_term sub
     ) else mk_skolem ty
