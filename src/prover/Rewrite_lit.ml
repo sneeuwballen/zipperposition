@@ -89,7 +89,7 @@ let step_lit rules lit =
        let substs = Literal.matching ~pattern:(r.c_lhs,1) (lit,0) in
        match Sequence.head substs with
          | None -> None
-         | Some subst -> Some (r.c_rhs, subst))
+         | Some subst -> Some (r, subst))
     rules
 
 let normalize_clause_ rules lits =
@@ -103,12 +103,13 @@ let normalize_clause_ rules lits =
     CCList.find_mapi
       (fun i lit -> match step_lit rules.Set.clauses lit with
          | None -> None
-         | Some (clauses,subst) ->
+         | Some (rule,subst) ->
+           let clauses = rule.c_rhs in
            Util.debugf ~section 5
-             "@[<2>rewrite `@[%a@]`@ into `@[<v>%a@]`@ with @[%a@]@]"
+             "@[<2>rewrite `@[%a@]`@ :into `@[<v>%a@]`@ :with @[%a@]@ :rule `%a`@]"
              (fun k->k Literal.pp lit
-                 CCFormat.(list (hvbox (Util.pp_list ~sep:" ∨ " Literal.pp))) clauses
-                 Subst.pp subst);
+                 (Util.pp_list (CCFormat.hvbox (Util.pp_list ~sep:" ∨ " Literal.pp)))
+                 clauses Subst.pp subst pp_rule rule);
            Util.incr_stat stats_rw;
            Some (i, clauses, subst))
       lits
