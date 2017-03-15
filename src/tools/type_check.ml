@@ -29,8 +29,10 @@ let options = Arg.align (
 let check file =
   print_line ();
   Format.printf "checking file `%s`...@." file;
-  Parsing_utils.parse file
-  >>= TypeInference.infer_statements ?ctx:None
+  let input = Parsing_utils.guess_input file in
+  Parsing_utils.parse_file input file
+  >>= TypeInference.infer_statements
+    ~on_undef:(Parsing_utils.on_undef_id input) ?ctx:None
   >|= fun decls ->
   let sigma =
     CCVector.to_seq decls

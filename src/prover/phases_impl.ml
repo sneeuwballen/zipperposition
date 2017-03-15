@@ -68,16 +68,20 @@ let start_file file =
 
 let parse_file file =
   Phases.start_phase Phases.Parse_file >>= fun () ->
-  Parsing_utils.parse file >>?= fun parsed ->
+  let input = Parsing_utils.guess_input file in
+  Parsing_utils.parse_file input file >>?= fun parsed ->
   do_extensions ~field:(fun e -> e.Extensions.post_parse_actions)
     ~x:parsed >>= fun () ->
-  Phases.return_phase parsed
+  Phases.return_phase (input,parsed)
 
-let typing stmts =
+let typing (input,stmts) =
   Phases.start_phase Phases.Typing >>= fun () ->
   Phases.get_key Params.key >>= fun params ->
   let def_as_rewrite = params.Params.param_def_as_rewrite in
-  TypeInference.infer_statements ~def_as_rewrite ?ctx:None stmts >>?= fun stmts ->
+  TypeInference.infer_statements
+    ~on_undef:(Parsing_utils.on_undef_id input)
+    ~def_as_rewrite ?ctx:None stmts
+  >>?= fun stmts ->
   do_extensions ~field:(fun e -> e.Extensions.post_typing_actions)
     ~x:stmts >>= fun () ->
   Phases.return_phase stmts

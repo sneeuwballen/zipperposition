@@ -12,6 +12,7 @@ module T = TypedSTerm
 module Loc = ParseLocation
 module Err = CCResult
 module Subst = Var.Subst
+module Fmt = CCFormat
 
 let prof_infer = Util.mk_profiler "TypeInference.infer"
 let section = Util.Section.(make ~parent:zip "ty_infer")
@@ -115,6 +116,8 @@ module Ctx = struct
     (* map names to variables or IDs *)
     def_as_rewrite: bool;
     (* if true, definitions are rewrite rules *)
+    on_undef: [`Warn | `Fail | `Guess];
+    (* what to do when we meet an undefined symbol *)
     mutable new_metas: T.meta_var list;
     (* variables that should be generalized in the global scope
        or bound to [default], if they are not bound *)
@@ -126,10 +129,11 @@ module Ctx = struct
     (* list of symbols whose type has been inferred recently *)
   }
 
-  let create ?(def_as_rewrite=true) ?(default=T.Ty.term) () =
+  let create ?(def_as_rewrite=true) ?(default=T.Ty.term) ?(on_undef=`Guess) () =
     let ctx = {
       default;
       def_as_rewrite;
+      on_undef;
       env = Hashtbl.create 32;
       datatypes = ID.Tbl.create 32;
       new_metas=[];
@@ -191,8 +195,9 @@ module Ctx = struct
   let declare ctx s ty =
     let name = ID.name s in
     Util.debugf ~section 3 "@{<yellow>declare@} %a:@ @[%a@]" (fun k->k ID.pp s T.pp ty);
-    if Hashtbl.mem ctx.env name
-    then Util.warnf "@[<2>shadowing identifier %s@]" name;
+    if Hashtbl.mem ctx.env name then (
+      Util.warnf "@[<2>shadowing identifier %s@]" name;
+    );
     Hashtbl.add ctx.env name (`ID (s,ty))
 
   (* generate fresh type var. *)
@@ -217,15 +222,32 @@ module Ctx = struct
     let ty = T.Ty.fun_ (List.map (fun v->T.Ty.meta v) new_vars) (T.Ty.meta ret) in
     ty
 
+  let find_close_names ctx (s:string): string list =
+    CCHashtbl.keys ctx.env
+    |> Sequence.filter
+      (fun s' -> CCString.edit_distance s s' < 2)
+    |> Sequence.to_rev_list
+    |> CCList.sort_uniq ~cmp:String.compare
+
+  let pp_names out = function
+    | [] -> ()
+    | l ->
+      Fmt.fprintf out " (did you mean any of [@[%a@]]?)" (Util.pp_list Fmt.string) l
+
   let get_id_ ?loc ~arity ctx name =
     try match Hashtbl.find ctx.env name with
       | `ID (id, ty) -> id, ty
       | `Var _ -> error_ ?loc "@[<2>expected `%s` to be a constant, not a variable@]" name
     with Not_found ->
       let ty = fresh_fun_ty ~arity ctx in
-      Util.debugf ~section 2
-        "@[<2>unknown constant %s,@ will infer a default type @[%a@]@]"
-        (fun k->k name T.pp ty);
+      begin match ctx.on_undef with
+        | `Fail -> error_ ?loc "unknown identifier %s" name
+        | `Guess -> ()
+        | `Warn ->
+          Util.warnf
+            "@[<2>unknown constant %s@,%a,@ will create one with type @[%a@]@]"
+            name pp_names (find_close_names ctx name) T.pp ty;
+      end;
       let id = ID.make name in
       Hashtbl.add ctx.env name (`ID (id, ty));
       ctx.new_types <- (id, ty) :: ctx.new_types;
@@ -244,6 +266,14 @@ module Ctx = struct
       | PT.V v ->
         try Hashtbl.find ctx.env v
         with Not_found ->
+          begin match ctx.on_undef with
+            | `Fail -> error_ "unknown variable %s@,%a" v pp_names (find_close_names ctx v)
+            | `Guess -> ()
+            | `Warn ->
+              Util.warnf
+                "@[<2>create implicit variable %s@,%a@]"
+                v pp_names (find_close_names ctx v);
+          end;
           let v' = mk_fresh v in
           Hashtbl.add ctx.env v (`Var v');
           `Var v'
@@ -942,9 +972,9 @@ let infer_statement_exn ctx st =
   in
   st, aux
 
-let infer_statements_exn ?def_as_rewrite ?ctx seq =
+let infer_statements_exn ?def_as_rewrite ?on_undef ?ctx seq =
   let ctx = match ctx with
-    | None -> Ctx.create ?def_as_rewrite ()
+    | None -> Ctx.create ?def_as_rewrite ?on_undef ()
     | Some c -> c
   in
   let res = CCVector.create () in
@@ -957,7 +987,7 @@ let infer_statements_exn ?def_as_rewrite ?ctx seq =
     seq;
   CCVector.freeze res
 
-let infer_statements ?def_as_rewrite ?ctx seq =
-  try Err.return (infer_statements_exn ?def_as_rewrite ?ctx seq)
+let infer_statements ?def_as_rewrite ?on_undef ?ctx seq =
+  try Err.return (infer_statements_exn ?def_as_rewrite ?on_undef ?ctx seq)
   with e -> Err.of_exn_trace e
 
