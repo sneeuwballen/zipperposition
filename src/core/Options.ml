@@ -85,5 +85,6 @@ let make () =
     ; "-i", Arg.String set_in, " alias for --input"
     ; "--output" , Arg.String set_out , " choose printing format (zf, tptp, default, none)"
     ; "-o", Arg.String set_out, " alias for --output"
+    ; "--break", Arg.Set Util.break_on_debug, " wait for user input after each debug message"
     ]
     (List.rev_append !other_opts (mk_debug_opts ()))

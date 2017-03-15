@@ -93,7 +93,7 @@ module Make(E : Env_intf.S) = struct
         in
         Util.debugf ~section 2
           "@[<2>@{<green>rewrite@} `@[%a@]`@ into `@[<v>%a@]`@]"
-          (fun k->k C.pp c CCFormat.(list C.pp) clauses);
+          (fun k->k C.pp c (Util.pp_list C.pp) clauses);
         Some clauses
 
   (* narrowing on literals of given clause, using lits rewrite rules *)

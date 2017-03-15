@@ -97,6 +97,12 @@ module Section = struct
     else s.level
 end
 
+let break_on_debug = ref false
+
+(* wait for user input *)
+let wait_user_input () =
+  ignore (input_line stdin)
+
 let set_debug = Section.set_debug Section.root
 let get_debug () = Section.root.Section.level
 
@@ -110,7 +116,10 @@ let debugf ?(section=Section.root) l msg k =
     else Format.fprintf debug_fmt_ "@{<Black>@[<4>%.3f[%s]@}@ "
         now section.Section.full_name;
     k (Format.kfprintf
-        (fun fmt -> Format.fprintf fmt "@]@.")
+        (fun fmt ->
+           Format.fprintf fmt "@]@.";
+           if !break_on_debug then wait_user_input();
+        )
         debug_fmt_ msg)
   )
 

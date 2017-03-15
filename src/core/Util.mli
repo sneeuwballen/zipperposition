@@ -54,6 +54,9 @@ end
 val set_debug : int -> unit (** Set debug level of [Section.root] *)
 val get_debug : unit -> int (** Current debug level for [Section.root] *)
 
+val break_on_debug : bool ref
+(** Shall we wait for user input after each debug message? *)
+
 val debugf : ?section:Section.t ->
   int ->
   ('a, Format.formatter, unit, unit) format4 ->
