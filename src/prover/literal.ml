@@ -182,6 +182,8 @@ let rec mk_prop p sign = match T.view p with
   | T.AppBuiltin (Builtin.True, []) -> if sign then True else False
   | T.AppBuiltin (Builtin.False, []) -> if sign then False else True
   | T.AppBuiltin (Builtin.Not, [p']) -> mk_prop p' (not sign)
+  | T.AppBuiltin (Builtin.Eq, [a;b]) -> mk_lit a b sign
+  | T.AppBuiltin (Builtin.Neq, [a;b]) -> mk_lit a b (not sign)
   | _ ->
     if not (Type.equal (T.ty p) Type.prop) then ty_error_ p T.true_;
     Prop (p, sign)

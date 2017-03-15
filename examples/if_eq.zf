@@ -1,0 +1,13 @@
+# expect: unsat
+
+val term : type.
+val a : term.
+val b : term.
+
+assert a != b.
+
+def f : term -> term where
+  forall x. f x = (if x=a then f b else x).
+
+goal forall x. f x != a.
+
