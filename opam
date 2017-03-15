@@ -18,6 +18,17 @@ build: [
 ]
 install: [make "install"]
 remove: [
+    ["./configure"
+        "--bindir" "%{bin}%"
+        "--disable-tests"
+        "--disable-docs"
+        "--%{menhir+tip-parser:enable}%-parsers"
+        "--disable-hornet-prover"
+        "--enable-zipperposition-prover"
+        "--disable-solving"
+        "--disable-qcheck"
+        "--disable-tools"
+    ]
     [make "uninstall"]
     ["rm" "%{bin}%/zipperposition"]
 ]
