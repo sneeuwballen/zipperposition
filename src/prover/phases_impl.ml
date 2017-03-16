@@ -68,7 +68,7 @@ let start_file file =
 
 let parse_file file =
   Phases.start_phase Phases.Parse_file >>= fun () ->
-  let input = Parsing_utils.guess_input file in
+  let input = Parsing_utils.input_of_file file in
   Parsing_utils.parse_file input file >>?= fun parsed ->
   do_extensions ~field:(fun e -> e.Extensions.post_parse_actions)
     ~x:parsed >>= fun () ->

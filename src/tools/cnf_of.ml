@@ -64,7 +64,7 @@ let process file =
   Util.debugf 1 "process file %s" (fun k->k file);
   let res =
     (* parse *)
-    let input = Parsing_utils.guess_input file in
+    let input = Parsing_utils.input_of_file file in
     Parsing_utils.parse_file input file
     >>= TypeInference.infer_statements ~on_undef:(Parsing_utils.on_undef_id input) ?ctx:None
     >|= fun st ->

@@ -29,7 +29,7 @@ let options = Arg.align (
 let check file =
   print_line ();
   Format.printf "checking file `%s`...@." file;
-  let input = Parsing_utils.guess_input file in
+  let input = Parsing_utils.input_of_file file in
   Parsing_utils.parse_file input file
   >>= TypeInference.infer_statements
     ~on_undef:(Parsing_utils.on_undef_id input) ?ctx:None
