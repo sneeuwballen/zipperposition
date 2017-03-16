@@ -26,7 +26,10 @@ let guess_input (file:string): input =
   then I_tip
   else if CCString.suffix ~suf:".zf" file
   then I_zf
-  else failwith ("unable to guess syntax for " ^ file)
+  else (
+    Util.warnf "unable to guess syntax for `%s`, use native syntax" file;
+    I_zf
+  )
 
 (** Parse file using the input format chosen by the user *)
 let input_of_file (file:string): input = match !Options.input with
