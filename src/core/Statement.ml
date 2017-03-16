@@ -481,23 +481,33 @@ let pp_attrs out = function
   | [] -> ()
   | l -> fpf out "@ [@[%a@]]" (Util.pp_list ~sep:"," pp_attr) l
 
-let pp_def_rule ppf ppt out d =
+let pp_typedvar ppty out v = fpf out "(%a:%a)" Var.pp v ppty (Var.ty v)
+let pp_typedvar_l ppty = Util.pp_list ~sep:" " (pp_typedvar ppty)
+
+let pp_def_rule ppf ppt ppty out d =
   let pp_arg = CCFormat.within "(" ")" ppt in
   let pp_args out = function
     | [] -> ()
     | l -> fpf out "@ %a" (Util.pp_list ~sep:" " pp_arg) l
+  and pp_vars out = function
+    | [] -> ()
+    | l -> fpf out "forall %a.@ " (pp_typedvar_l ppty) l
   in
-  match d with
-    | Def_term (_,id,_,args,rhs) ->
-      fpf out "@[<2>@[<2>%a%a@] =@ %a@]" ID.pp id pp_args args ppt rhs
-    | Def_form (_,lhs,rhs) ->
-      fpf out "@[<2>%a =@ (@[<hv>%a@])@]" (SLiteral.pp ppt) lhs
+  begin match d with
+    | Def_term (vars,id,_,args,rhs) ->
+      fpf out "@[<2>%a@[<2>%a%a@] =@ %a@]"
+        pp_vars vars ID.pp id pp_args args ppt rhs
+    | Def_form (vars,lhs,rhs) ->
+      fpf out "@[<2>%a%a =@ (@[<hv>%a@])@]"
+        pp_vars vars
+        (SLiteral.pp ppt) lhs
         (Util.pp_list ~sep:" && " ppf) rhs
+  end
 
 let pp_def ppf ppt ppty out d =
   fpf out "@[<2>@[%a : %a@]@ where@ @[<hv>%a@]@]"
     ID.pp d.def_id ppty d.def_ty
-    (Util.pp_list ~sep:";" (pp_def_rule ppf ppt)) d.def_rules
+    (Util.pp_list ~sep:";" (pp_def_rule ppf ppt ppty)) d.def_rules
 
 let pp ppf ppt ppty out st = match st.view with
   | TyDecl (id,ty) ->

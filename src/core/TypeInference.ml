@@ -795,7 +795,7 @@ let rec as_def ?loc bound t =
     in
     `Prop (vars, lhs, rhs)
   in
-  match T.view t with
+  begin match T.view t with
     | T.Bind (Binder.Forall, v, t) ->
       as_def ?loc (Var.Set.add bound v) t
     | T.AppBuiltin (Builtin.Equiv, [lhs;rhs]) ->
@@ -830,6 +830,7 @@ let rec as_def ?loc bound t =
       let lhs = SLiteral.of_form t in
       yield_prop lhs rhs
     | _ -> fail()
+  end
 
 let infer_defs ?loc ctx (l:A.def list): (_,_,_) Stmt.def list =
   (* first, declare all *)

@@ -329,5 +329,6 @@ end
 
 module ZF : sig
   include Interfaces.PRINT with type t := t
+  val pp_inner : t CCFormat.printer
 end
 

@@ -142,7 +142,7 @@ let pp_form_definition out def =
     T.pp def.proxy T.pp def.form def.add_rules pp_polarity def.polarity
 
 let pp_term_definition out def =
-  let pp_rule out r = Stmt.pp_def_rule T.pp T.pp out r in
+  let pp_rule out r = Stmt.pp_def_rule T.pp T.pp T.pp out r in
   Format.fprintf out "(@[<hv>def_term `%a : %a`@ rules: (@[<hv>%a@])@])"
     ID.pp def.td_id T.pp def.td_ty (Util.pp_list pp_rule) def.td_rules
 

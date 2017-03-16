@@ -457,6 +457,8 @@ module ZF = struct
     | List l ->
       Format.fprintf out "[@[<hv>%a@]]"
         (Util.pp_list ~sep:"," pp) l;
+    | AppBuiltin (Builtin.TType, _) -> CCFormat.string out "type"
+    | AppBuiltin (Builtin.TyInt, _) -> CCFormat.string out "int"
     | AppBuiltin (Builtin.And, l) ->
       Format.fprintf out "@[<hv>%a@]"
         (Util.pp_list ~sep:" && " pp_surrounded) l
@@ -527,6 +529,7 @@ module ZF = struct
     | Wildcard -> CCFormat.string out "_"
     | V s -> CCFormat.string out s
 
+  let pp_inner = pp_surrounded
   let to_string = CCFormat.to_string pp
 end
 

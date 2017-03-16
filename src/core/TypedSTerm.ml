@@ -336,7 +336,7 @@ module Seq = struct
     let rec iter t =
       k t;
       CCOpt.iter iter t.ty;
-      match t.term with
+      match (deref t).term with
         | Meta _
         | Var _
         | Const _ -> ()
@@ -374,7 +374,7 @@ module Seq = struct
     let rec iter set t =
       k (t,set);
       CCOpt.iter (iter set) t.ty;
-      match t.term with
+      match view t with
         | Meta _
         | Var _
         | Const _ -> ()
@@ -1238,6 +1238,7 @@ end
 
 module ZF = struct
   let pp out t = STerm.ZF.pp out (erase t)
+  let pp_inner out t = STerm.ZF.pp_inner out (erase t)
   let to_string t = STerm.ZF.to_string (erase t)
 end
 

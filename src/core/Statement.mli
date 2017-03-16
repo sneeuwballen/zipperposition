@@ -232,7 +232,8 @@ end
 val pp_def_rule :
   'a CCFormat.printer ->
   'b CCFormat.printer ->
-  ('a,'b,_) def_rule CCFormat.printer
+  'c CCFormat.printer ->
+  ('a,'b,'c) def_rule CCFormat.printer
 
 val pp_def :
   'a CCFormat.printer ->
