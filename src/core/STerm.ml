@@ -325,6 +325,9 @@ let rec pp out t = match t.term with
   | List l ->
     Format.fprintf out "[@[<hv>%a@]]"
       (Util.pp_list ~sep:"," pp) l;
+  | AppBuiltin (Builtin.TType, []) -> CCFormat.string out "type"
+  | AppBuiltin (Builtin.TyInt, []) -> CCFormat.string out "int"
+  | AppBuiltin (Builtin.TyRat, []) -> CCFormat.string out "rat"
   | AppBuiltin (Builtin.Arrow, [ret;a]) ->
     Format.fprintf out "@[<2>%a@ → %a@]" pp_inner a pp_inner ret
   | AppBuiltin (Builtin.Arrow, ret::l) ->

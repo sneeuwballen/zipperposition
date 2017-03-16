@@ -152,7 +152,7 @@ let to_string s = match s with
   | Arrow -> "→"
   | Wildcard -> "_"
   | Multiset -> "Ms"
-  | TType -> "TType"
+  | TType -> "type"
   | Prop -> "prop"
   | Term -> "ι"
   | ForallConst -> "·∀"
