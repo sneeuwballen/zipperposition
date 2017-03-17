@@ -623,6 +623,15 @@ module Ty = struct
     | Ty_forall (_,_) -> false
 end
 
+let sort_ty_vars_first : t Var.t list -> t Var.t list =
+  List.sort
+    (fun v1 v2 ->
+       begin match Ty.is_tType (Var.ty v1), Ty.is_tType (Var.ty v2) with
+         | true, false -> -1
+         | false, true -> 1
+         | _ -> 0
+       end)
+
 module Form = struct
   type t = term
   type view =

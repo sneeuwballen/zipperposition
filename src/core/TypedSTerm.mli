@@ -149,6 +149,9 @@ module Ty : sig
   val returns_prop : t -> bool
 end
 
+val sort_ty_vars_first : t Var.t list -> t Var.t list
+(** sort the given list of variables by putting type variables first *)
+
 module Form : sig
   type t = term
   type view =

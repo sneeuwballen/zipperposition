@@ -784,6 +784,7 @@ let rec as_def ?loc bound t =
       |> Sequence.flat_map T.Seq.free_vars
       |> Var.Set.add_seq bound
       |> Var.Set.to_list
+      |> T.sort_ty_vars_first
     in
     `Term (vars, id, ty, args, rhs)
   and yield_prop lhs rhs =
@@ -792,6 +793,7 @@ let rec as_def ?loc bound t =
       |> Sequence.flat_map T.Seq.free_vars
       |> Var.Set.add_seq bound
       |> Var.Set.to_list
+      |> T.sort_ty_vars_first
     in
     `Prop (vars, lhs, rhs)
   in
@@ -840,10 +842,11 @@ let infer_defs ?loc ctx (l:A.def list): (_,_,_) Stmt.def list =
          let id = ID.make d.A.def_id in
          let ty = infer_ty_exn ctx d.A.def_ty in
          (* cannot return [Type] *)
-         if T.Ty.returns_tType ty
-         then error_ ?loc
+         if T.Ty.returns_tType ty then (
+           error_ ?loc
              "in definition of %a,@ equality between types is forbidden"
              ID.pp id;
+         );
          Ctx.declare ctx id ty;
          id, ty, d.A.def_rules)
       l
@@ -898,9 +901,10 @@ let infer_statement_exn ctx st =
       let t =  infer_prop_ ctx t in
       begin match as_def ?loc Var.Set.empty t with
         | `Term (vars,id,ty,args,rhs) ->
-          if T.Ty.returns_tType ty
-          then error_ ?loc
+          if T.Ty.returns_tType ty then (
+            error_ ?loc
               "in definition of %a,@ equality between types is forbidden" ID.pp id;
+          );
           Stmt.rewrite_term ~src:(mk_src Stmt.R_assert) (vars,id,ty,args,rhs)
         | `Prop (vars,lhs,rhs) ->
           assert (T.Ty.is_prop (T.ty_exn rhs));
