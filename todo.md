@@ -2,10 +2,16 @@
 
 ## Now
 
+- CLI option to hide types when printing terms (useful with lot of polymorphism)
+
 - fix:
-  `./zipperposition.native -p --stats -o none --dot /tmp/truc.dot -t 30 examples/ind/nat2.zf`
-  gives up and should not.
-  → THEN, re-enable heuristic to penalize a bit deeply inductive clauses
+  smallcheck should work with propositional rewrite rules
+  (maybe provide it with the set of rewrite rules; maybe re-compute from statement info)
+  → `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/nat15_easy.zf`
+    check wrong lemmas and rate of success of smallcheck
+  → `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/nat21.zf --steps 1000`
+    same, look at `small_check.fails`
+  - also see that active positions are defined for these predicates, too
 
 - heavy penalty on the number of variables per clause (quadratic
   function n_vars → weight)
@@ -16,8 +22,6 @@
 - maybe subsumption on other horn clauses, too
 
 - put rewrite rules (and their source) in proofs
-
-- progress bar in hornet
 
 ## Hornet
 
@@ -148,10 +152,11 @@
         (see on `nat2.zf`, should have only one lemma?)
   * [ ] **fix**: notion of active position should also work for
         defined propositions (look into clause rules)
-        → factor the computation of positions out of `rewrite_term`
-          and abstract it so it takes a list of LHS
-        → move this into `Statement`? propositions defined by clause rules
-          with `atom t` as LHS should be as "defined" as term RW rules
+        + [ ] factor the computation of positions out of `rewrite_term`
+            and abstract it so it takes a list of LHS
+        + [ ] move this into `Statement`? propositions defined by clause rules
+            with `atom t` as LHS should be as "defined" as term RW rules
+        + [ ] small check truly needs to use clause rules, too
   * [ ] check if two variables are interchangeable (i.e. `{X→Y,Y→X}`
       gives same form). In this case don't do induction on the second one.
   * [x] do induction on multiple variables, **iff** they occur in active
@@ -247,8 +252,20 @@
           of a **recursive** datatype (always possible to pick distinct
           values). For non-recursive datatypes we need to do it.
           → check on `examples/data/unit_…` problems
+    + need a theory solver (msat + small SMT?) that deals with parameters
+      → parameters are the way of dealing with exhaustiveness
   * [ ] look into "superposition for fixed domains" more seriously
         (ask Weidenbach for more details?)
+
+- conditional rewriting
+  * [ ] parse `rewrite forall vars. ∧_i a_i => l = r`
+  * [ ] same for clausal rewriting
+  * [ ] handling by *inference* rule that unifies (rewrite & narrowing are the same)
+    `∧_i a_i => l = r           C[l]    lσ=a
+    ----------------------------------------
+        ∧_i a_iσ => C[rσ]`
+      which is a form of superposition that is artificially restricted to
+      rewriting `l` first
 
 - only do induction on active positions
   * [x] check that it fixes previous regression on `list10_easy.zf`, `nat2.zf`…)
@@ -350,6 +367,12 @@
 
 ## To Fix
 
+- `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/list10_easy.zf`
+  should be easy to solve, but terrible pref (in part because of demod/rpo6?)
+  → profile
+  → check if because of incompleteness (run for a long time)
+  → use hierarchic KBO instead, see if it works better
+
 - `./zipperposition.native -p -o none -t 30 --dot /tmp/truc.dot examples/GEG024=1.p --debug 1`
   seems like heuristics are bad here (`--clause-queue bfs` works fine),
   need to penalize some deep series of arith inferences **NO**
@@ -357,23 +380,13 @@
   → also need to find good way of indexing these for subsumption
   (e.g. feature vectors with lower/upper bounds?)
 
-- `./zipperposition.native -p --stats -o none --dot /tmp/truc.dot -t 30 examples/ind/list13.zf`
-  need to avoid drowning in search space here
-
-- `./zipperposition.native -p --stats -o none --dot /tmp/truc.dot -t 30 tip-benchmarks/isaplanner/prop_83.smt2 -t 120`
-    trivial with `--clause-queue bfs`, need some fairness (using pick-given)
-
 - `./zipperposition.native -p -o none -t 30 --dot /tmp/truc.dot tip-benchmarks/isaplanner/prop_66.smt2`
   better lemmas in induction
   `./zipperposition.native -p -o none -t 30 --dot /tmp/truc.dot tip-benchmarks/isaplanner/prop_85.smt2`
-  `./zipperposition.native -p -o none -t 30 --dot /tmp/truc.dot tip-benchmarks/isaplanner/prop_22.smt2`
 
-  with speculative paramodulation
+  with speculative paramodulation/generalization
   `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/nat15_def.zf`
-
-- `./zipperposition.native -p --stats -o none -t 30 --dot /tmp/truc.dot tip-benchmarks/isaplanner/prop_03.smt2`
-  too many induction inferences are made, should only do it on active positions
-  since we have a rewrite system
+  `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/nat22.zf`
 
 ## In Hold
 
