@@ -114,6 +114,7 @@ let compute_prec stmts =
 
     (* add constraint about inductive constructors, etc. *)
     |> Compute_prec.add_constr 10 Classify_cst.prec_constr
+    |> Compute_prec.set_weight_rule (fun _ -> Classify_cst.weight_fun)
 
     (* use "invfreq", with low priority *)
     |> Compute_prec.add_constr_rule 90
@@ -130,6 +131,7 @@ let compute_ord_select precedence =
   Phases.start_phase Phases.Compute_ord_select >>= fun () ->
   Phases.get_key Params.key >>= fun params ->
   let ord = Ordering.by_name params.param_ord precedence in
+  Util.debugf ~section 2 "@[<2>ordering %s@]" (fun k->k (Ordering.name ord));
   let select = Selection.selection_from_string ~ord params.param_select in
   do_extensions ~field:(fun e->e.Extensions.ord_select_actions)
     ~x:(ord,select) >>= fun () ->
@@ -333,8 +335,9 @@ let print_szs_result (type c) ~file
   Phases.return_phase ()
 
 (* print weight of [s] within precedence [prec] *)
-let _pp_weight prec out s =
-  Format.fprintf out "w(%a)=%d" ID.pp s (Precedence.weight prec s)
+let pp_weight prec out s =
+  Format.fprintf out "w(%a)=%a"
+    ID.pp s Precedence.Weight.pp (Precedence.weight prec s)
 
 (* does the sequence of declarations contain at least one conjecture? *)
 let has_goal_decls_ decls =

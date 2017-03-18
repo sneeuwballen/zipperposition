@@ -80,3 +80,14 @@ let prec_constr_ a b =
     | Other, _ -> CCInt.compare (to_int_ c_a) (to_int_ c_b)
 
 let prec_constr = Precedence.Constr.make prec_constr_
+
+let weight_fun (id:ID.t): Precedence.Weight.t =
+  let module W = Precedence.Weight in
+  begin match classify id with
+    | Ty _ -> W.int 1
+    | Projector _ -> W.int 1
+    | Cstor _ -> W.int 1
+    | Inductive_cst _ -> W.omega_plus 1
+    | Other -> W.omega_plus 4
+    | DefinedCst _ -> W.omega_plus 5 (* defined: biggest *)
+  end

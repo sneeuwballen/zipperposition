@@ -37,3 +37,4 @@ val prec_constr : [`partial] Precedence.Constr.t
 (** Partial order on [ID.t], with:
     regular > constant > sub_constant > cstor *)
 
+val weight_fun : Precedence.weight_fun

@@ -9,7 +9,46 @@ type symbol_status =
 
 let section = Util.Section.(make ~parent:zip "precedence")
 
-(** {3 Constraints} *)
+(** {2 Weight of Symbols} *)
+module Weight = struct
+  type t = {
+    omega: int;
+    one: int;
+  }
+  (** [a, b] is [a·ω + b] *)
+
+  let make omega one = {omega; one}
+
+  let int i : t = make 0 i
+  let zero = int 0
+  let one = int 1
+  let omega : t = make 1 0
+  let omega_plus i : t = make 1 i
+
+  let add a b: t = {omega=a.omega+b.omega; one=a.one+b.one}
+  let diff a b: t = {omega=a.omega-b.omega; one=a.one-b.one}
+
+  module Infix = struct
+    let (+) = add
+    let (-) = diff
+  end
+  include Infix
+
+  let compare a b: int =
+    if a.omega=b.omega
+    then CCInt.compare a.one b.one
+    else CCInt.compare a.omega b.omega
+
+  let sign a: int = compare a zero
+
+  let pp out (a:t): unit =
+    if a.omega=0 then CCFormat.int out a.one
+    else if a.one=0 then Format.fprintf out "%d@<1>·@<1>ω" a.omega
+    else Format.fprintf out "%d@<1>·@<1>ω+%d" a.omega a.one
+  let to_string = CCFormat.to_string pp
+end
+
+(** {2 Constraints} *)
 
 module Constr = struct
   type 'a t = ID.t -> ID.t -> int
@@ -86,7 +125,7 @@ type t = {
   (* symbol -> index in precedence *)
   status: symbol_status ID.Tbl.t;
   (* symbol -> status *)
-  mutable weight: ID.t -> int;
+  mutable weight: ID.t -> Weight.t;
   (* weight function *)
   constr : [`total] Constr.t;
   (* constraint used to build and update the precedence *)
@@ -160,13 +199,13 @@ let mk_tbl_ l =
 
 (** {3 Weight} *)
 
-type weight_fun = ID.t -> int
+type weight_fun = ID.t -> Weight.t
 
 (* weight of f = arity of f + 4 *)
-let weight_modarity ~arity a = arity a + 4
+let weight_modarity ~arity a = Weight.int (arity a + 4)
 
 (* constant weight *)
-let weight_constant _ = 4
+let weight_constant _ = Weight.int 4
 
 let set_weight p f = p.weight <- f
 

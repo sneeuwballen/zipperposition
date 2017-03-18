@@ -15,12 +15,12 @@ type t = {
   constrs : (int * [`partial] Precedence.Constr.t) list;
   constr_rules : (int * [`partial] Precedence.Constr.t parametrized) list;
   last_constr : [`total] Precedence.Constr.t;
-  weight_rule : (ID.t -> int) parametrized;
+  weight_rule : Precedence.weight_fun parametrized;
   status : (ID.t * Precedence.symbol_status) list;
 }
 
 (* uniform weight *)
-let _default_weight _ _ = 1
+let _default_weight _ = Precedence.weight_constant
 
 let empty =
   { constrs = [];
