@@ -7,6 +7,14 @@
   gives up and should not.
   → THEN, re-enable heuristic to penalize a bit deeply inductive clauses
 
+- heavy penalty on the number of variables per clause (quadratic
+  function n_vars → weight)
+
+- same penalty in hornet
+
+- subsumption on unit horn clauses!
+- maybe subsumption on other horn clauses, too
+
 - put rewrite rules (and their source) in proofs
 
 - progress bar in hornet
@@ -221,10 +229,24 @@
   * [ ] hierarchic superposition for datatypes (with defined functions being part
       of the background)
     + [ ] need corresponding TKBO with 2 levels
+          (just replace KBO with it anyway, and build weight fun
+          from constant classification)
     + [ ] with TKBO implemented, removed the code that forces rpo6 to be
-          used when induction is enabled
+          used when induction is enabled, as well as constraint disabling
     + narrowing with defined symbols would ± correspond to E-unification on pure
       background literals
+    + [ ] add purification inference (read carefully!)
+          → do we want weak abstraction? would need 2 kinds of vars then
+    + [ ] add "case split" rule for `t != u` where they are of a datatype.
+          use a table for caching split for a given ground `t`.
+          split looks like `t = cstor1(…) | … | t=cstor_k(…)` where
+          each `…` is a list of fresh _parameters_ (i.e. possibly inductive
+          skolems).
+          → avatar should fire on that!
+          Do **not** do case split on `α != β` where both are parameters
+          of a **recursive** datatype (always possible to pick distinct
+          values). For non-recursive datatypes we need to do it.
+          → check on `examples/data/unit_…` problems
   * [ ] look into "superposition for fixed domains" more seriously
         (ask Weidenbach for more details?)
 
