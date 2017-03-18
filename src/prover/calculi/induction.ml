@@ -836,7 +836,6 @@ let coverset_depth = ref 1
    [k_enable].
    It will update the parameters. *)
 let post_typing_hook stmts state =
-  let p = Flex_state.get_exn Params.key state in
   (* only enable if there are inductive types *)
   let should_enable =
     CCVector.exists
@@ -846,15 +845,8 @@ let post_typing_hook stmts state =
       stmts
   in
   if !enabled_ && should_enable then (
-    Util.debug ~section 1
-      "Enable induction: requires ord=rpo6; select=NoSelection";
-    let p = {
-      p with Params.
-          param_ord = "rpo6";
-          param_select = "NoSelection";
-    } in
+    Util.debug ~section 1 "Enable induction";
     state
-    |> Flex_state.add Params.key p
     |> Flex_state.add k_enable true
     |> Flex_state.add k_ind_depth !depth_
     |> Flex_state.add k_test_depth !test_depth
