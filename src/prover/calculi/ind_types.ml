@@ -29,7 +29,7 @@ module Make(Env : Env_intf.S) = struct
       | T.DB _
       | T.AppBuiltin _ -> false
     in
-    match lit with
+    begin match lit with
       | Literal.Equation (l, r, b) ->
         if
           ( Ind_ty.is_inductive_type (T.ty l) && occurs_in_ ~sub:l r )
@@ -37,17 +37,21 @@ module Make(Env : Env_intf.S) = struct
           ( Ind_ty.is_inductive_type (T.ty r) && occurs_in_ ~sub:r l )
         then if b then `Absurd else `Trivial else `Neither
       | _ -> `Neither
+    end
 
   let acyclicity_trivial c: bool =
-    let res = C.Seq.lits c
-              |> Sequence.exists
-                (fun lit -> match acyclicity lit with
-                   | `Neither
-                   | `Absurd -> false
-                   | `Trivial -> true)
+    let res =
+      C.Seq.lits c
+      |> Sequence.exists
+        (fun lit -> match acyclicity lit with
+           | `Neither
+           | `Absurd -> false
+           | `Trivial -> true)
     in
-    if res
-    then Util.debugf ~section 3 "@[<2>acyclicity:@ `@[%a@]` is trivial@]" (fun k->k C.pp c);
+    if res then (
+      Util.debugf ~section 3 "@[<2>acyclicity:@ `@[%a@]` is trivial@]"
+        (fun k->k C.pp c);
+    );
     res
 
   let acyclicity_simplify c: C.t SimplM.t =
