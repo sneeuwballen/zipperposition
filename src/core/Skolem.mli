@@ -31,6 +31,9 @@ val fresh_skolem_prefix : ctx:ctx -> ty:type_ -> string -> ID.t
 val pop_new_skolem_symbols : ctx:ctx -> (ID.t * type_) list
 (** Remove and return the list of newly created Skolem symbols *)
 
+val counter : ctx -> int
+(** Monotonic counter, increased at every definition *)
+
 (** {2 Skolemization} *)
 
 val skolem_form : ctx:ctx -> (type_, term) Var.Subst.t -> type_ Var.t -> form -> term
@@ -62,6 +65,8 @@ type form_definition = private {
      [proxy -> true if form]
      [proxy -> false if not form] (depending on polarity) *)
   polarity : polarity;
+  src: Statement.source;
+  (* source for this definition *)
 }
 
 val pp_form_definition : form_definition CCFormat.printer
@@ -70,6 +75,7 @@ val define_form :
   ctx:ctx ->
   add_rules:bool ->
   polarity:polarity ->
+  src:(ID.t -> Statement.source) ->
   form ->
   form_definition
 (** [define ~ctx f] returns a new predicate for [f],

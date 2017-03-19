@@ -6,7 +6,7 @@ provers = [ "zipperposition", "hornet", "read-tptp" ]
 timeout = 30 # in s
 memory = 2000 # in MB
 provers = [ "zipperposition", "hornet" ]
-problems = "(.*(\\+|-).*).p"
+problems = ".*(\\+|-).*\.p"
 dir = [ "tptp" ]
 
 expect = "program:read-tptp"

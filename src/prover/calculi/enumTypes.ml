@@ -298,6 +298,10 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* TODO: maybe relax the restriction that is must not be naked, but only
      up to a given depth (if CLI arg?) *)
 
+  (* TODO: only instantiate naked variables that are in positive equations;
+     those in negative equations may come from purification and must be
+     found be E-unification *)
+
   (* instantiate variables that belong to an enum case *)
   let instantiate_vars_ c =
     (* which variables are candidate? depends on a CLI flag *)
@@ -477,8 +481,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            let projs_of_v =
              List.mapi
                (fun n ty_arg ->
-                  let name = CCFormat.sprintf "proj_%a_%d" ID.pp c_id n in
-                  let proj = ID.make name in
+                  let proj = ID.makef "proj_%a_%d" ID.pp c_id n in
                   (* remember that proj is a projector for the enum type *)
                   ID.set_payload proj (Ind_ty.Payload_ind_projector d.Stmt.data_id);
                   let ty_proj = Type.(forall_n num_ty_vars ([ty_ret] ==> ty_arg)) in

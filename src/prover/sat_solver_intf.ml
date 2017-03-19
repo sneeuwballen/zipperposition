@@ -58,6 +58,9 @@ module type S = sig
       nodes are clauses deduced by the SAT solver.
       @raise WrongState if the last result isn't [Unsat] *)
 
+  val get_proof_opt : unit -> proof option
+  (** Obtain the proof, if any *)
+
   val get_proof_of_lit : Lit.t -> proof
   (** [get_proof_of_lit lit] returns the proof of [lit], assuming it has been
       proved true at level 0 (see {!valuation_level})

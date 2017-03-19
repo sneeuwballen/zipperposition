@@ -1,0 +1,20 @@
+# expect: unsat
+
+data unit := Unit.
+data nat := Z | S nat.
+data list a := Nil | Cons a (list a).
+
+def length : pi a. list a -> nat where
+  length (Nil _) = Z;
+  forall x l. length (Cons x l) = S (length l).
+
+val a : list unit.
+val b : list unit.
+
+def two : nat := S (S Z).
+
+assert length a = two.
+assert length b = two.
+
+goal a=b.
+

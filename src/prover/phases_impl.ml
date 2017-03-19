@@ -68,16 +68,20 @@ let start_file file =
 
 let parse_file file =
   Phases.start_phase Phases.Parse_file >>= fun () ->
-  Parsing_utils.parse file >>?= fun parsed ->
+  let input = Parsing_utils.input_of_file file in
+  Parsing_utils.parse_file input file >>?= fun parsed ->
   do_extensions ~field:(fun e -> e.Extensions.post_parse_actions)
     ~x:parsed >>= fun () ->
-  Phases.return_phase parsed
+  Phases.return_phase (input,parsed)
 
-let typing stmts =
+let typing (input,stmts) =
   Phases.start_phase Phases.Typing >>= fun () ->
   Phases.get_key Params.key >>= fun params ->
   let def_as_rewrite = params.Params.param_def_as_rewrite in
-  TypeInference.infer_statements ~def_as_rewrite ?ctx:None stmts >>?= fun stmts ->
+  TypeInference.infer_statements
+    ~on_undef:(Parsing_utils.on_undef_id input)
+    ~def_as_rewrite ?ctx:None stmts
+  >>?= fun stmts ->
   do_extensions ~field:(fun e -> e.Extensions.post_typing_actions)
     ~x:stmts >>= fun () ->
   Phases.return_phase stmts
@@ -110,6 +114,7 @@ let compute_prec stmts =
 
     (* add constraint about inductive constructors, etc. *)
     |> Compute_prec.add_constr 10 Classify_cst.prec_constr
+    |> Compute_prec.set_weight_rule (fun _ -> Classify_cst.weight_fun)
 
     (* use "invfreq", with low priority *)
     |> Compute_prec.add_constr_rule 90
@@ -126,6 +131,7 @@ let compute_ord_select precedence =
   Phases.start_phase Phases.Compute_ord_select >>= fun () ->
   Phases.get_key Params.key >>= fun params ->
   let ord = Ordering.by_name params.param_ord precedence in
+  Util.debugf ~section 2 "@[<2>ordering %s@]" (fun k->k (Ordering.name ord));
   let select = Selection.selection_from_string ~ord params.param_select in
   do_extensions ~field:(fun e->e.Extensions.ord_select_actions)
     ~x:(ord,select) >>= fun () ->
@@ -250,7 +256,7 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
     | Saturate.Unsat _ -> result, 0  (* already found unsat during presaturation *)
     | _ -> Sat.given_clause ~generating:true ?steps ?timeout ()
   in
-  Format.printf "%% done %d iterations@." num;
+  Format.printf "%% done %d iterations in %.1fs@." num (Util.total_time_s());
   Util.debugf ~section 1 "@[<2>final precedence:@ @[%a@]@]"
     (fun k->k Precedence.pp (Env.precedence ()));
   Phases.return_phase result
@@ -329,8 +335,9 @@ let print_szs_result (type c) ~file
   Phases.return_phase ()
 
 (* print weight of [s] within precedence [prec] *)
-let _pp_weight prec out s =
-  Format.fprintf out "w(%a)=%d" ID.pp s (Precedence.weight prec s)
+let pp_weight prec out s =
+  Format.fprintf out "w(%a)=%a"
+    ID.pp s Precedence.Weight.pp (Precedence.weight prec s)
 
 (* does the sequence of declarations contain at least one conjecture? *)
 let has_goal_decls_ decls =
@@ -383,9 +390,9 @@ let process_file file =
   Phases.return (Phases.Env_result (env, result))
 
 let print file env result =
-  print_szs_result ~file env result >>= fun () ->
   (* print some statistics *)
   print_stats env >>= fun () ->
+  print_szs_result ~file env result >>= fun () ->
   print_dots env result
 
 let setup_gc =

@@ -24,24 +24,29 @@ module type S = sig
       it's negated and sent to the SAT solver *)
 
   val check_satisfiability : E.generate_rule
-  (** Checks  that the SAT context is still valid *)
+  (** Checks that the SAT context is still valid *)
 
   type cut_res = private {
-    cut_src: Literals.t list ; (** the lemma itself *)
+    cut_form: Cut_form.t; (** the lemma itself *)
     cut_pos: E.C.t list; (** clauses true if lemma is true *)
-    cut_neg: E.C.t list; (** clauses true if lemma is false *)
-    cut_skolems: (ID.t * Type.t) list;
-    (** skolems of universal variables in [cut_neg] *)
     cut_lit: BLit.t; (** lit that is true if lemma is true *)
+    cut_depth: int; (** if the lemma is used to prove another lemma *)
+    cut_proof: ProofStep.t; (** where does the lemma come from? *)
   }
   (** This represents a cut on a formula, where we obtain a list
       of clauses [cut_pos] representing the formula itself with the
-      trail [lemma],
-      and a list of clauses [cut_neg] with the trail [not lemma] that
-      must be refuted to prove the lemma. Those negative clauses correspond
-      to the negation of [forall x1...xn. F]; they are ground and
-      [cut_skolems] contains the list of Skolem constants corresponding
-      to [x1,...,xn] *)
+      trail [lemma], and a boolean literal [cut_lit] that is true iff
+      the trail is true.
+
+      Other modules, when a cut is introduced, will try to disprove
+      the lemma (e.g. by induction or theory reasoning).
+  *)
+
+  val cut_form : cut_res -> Cut_form.t
+  val cut_pos : cut_res -> E.C.t list
+  val cut_lit : cut_res -> BLit.t
+  val cut_depth : cut_res -> int
+  val cut_proof : cut_res -> ProofStep.t
 
   val pp_cut_res : cut_res CCFormat.printer
   val cut_res_clauses: cut_res -> E.C.t Sequence.t
@@ -50,13 +55,15 @@ module type S = sig
   (** print the current list of lemmas, and their status *)
 
   val introduce_cut :
-    Literals.t list ->
+    ?depth:int ->
+    Cut_form.t ->
     ProofStep.t ->
     cut_res
-  (** Introduce a cut on the given clause(s). *)
+  (** Introduce a cut on the given clause(s). Pure. *)
 
   val add_lemma : cut_res -> unit
-  (** Add the given cut to the list of lemmas *)
+  (** Add the given cut to the list of lemmas. Modifies the global list
+      of lemmas. *)
 
   val on_input_lemma : cut_res Signal.t
   (** Triggered every time a cut is introduced  for an input lemma

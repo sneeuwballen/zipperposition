@@ -22,7 +22,7 @@ val add_constr_rule :
   t -> t
 (** Add a precedence constraint rule *)
 
-val set_weight_rule : (ID.t -> int) parametrized -> t -> t
+val set_weight_rule : Precedence.weight_fun parametrized -> t -> t
 (** Choose the way weights are computed *)
 
 val add_status : (ID.t * Precedence.symbol_status) list -> t -> t

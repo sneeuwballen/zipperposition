@@ -262,6 +262,7 @@ module type SPECIALIZED = sig
   (** Add [v] -> [t] to the substitution. Both terms have a context.
       @raise InconsistentBinding if [v] is already bound in
         the same context, to another term. *)
+  val of_list : ?init:t -> (var Scoped.t * term Scoped.t) list -> t
 end
 
 module Ty : SPECIALIZED with type term = Type.t = struct
@@ -287,9 +288,10 @@ module Ty : SPECIALIZED with type term = Type.t = struct
     Type.of_term_unsafe (apply_no_renaming subst (t : term Scoped.t :> T.t Scoped.t))
 
   let bind = (bind :> t -> var Scoped.t -> term Scoped.t -> t)
+  let of_list = (of_list :> ?init:t -> (var Scoped.t * term Scoped.t) list -> t)
 end
 
-module FO : SPECIALIZED with type term = FOTerm.t = struct
+module FO = struct
   type term = FOTerm.t
   type t = subst
 
@@ -312,4 +314,8 @@ module FO : SPECIALIZED with type term = FOTerm.t = struct
     FOTerm.of_term_unsafe (apply_no_renaming  subst (t : term Scoped.t :> T.t Scoped.t))
 
   let bind = (bind :> t -> var Scoped.t -> term Scoped.t -> t)
+  let of_list = (of_list :> ?init:t -> (var Scoped.t * term Scoped.t) list -> t)
+
+  let bind' = (bind :> t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t)
+  let of_list' = (of_list :> ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t)
 end

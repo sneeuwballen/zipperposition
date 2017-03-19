@@ -14,6 +14,7 @@ module Sel = Selection
 
 let stat_redundant_given = Util.mk_stat "saturate.redundant given clauses"
 let stat_processed_given = Util.mk_stat "saturate.processed given clauses"
+let stat_steps = Util.mk_stat "saturate.steps"
 
 let section = Util.Section.make ~parent:Const.section "saturate"
 
@@ -92,6 +93,7 @@ module Make(E : Env.S) = struct
           Unknown
         )
       | Some c ->
+        Util.incr_stat stat_steps;
         begin match Env.all_simplify c with
           | [], _ ->
             Util.incr_stat stat_redundant_given;
@@ -110,7 +112,7 @@ module Make(E : Env.S) = struct
             assert (not (Env.is_redundant c));
             (* process the given clause! *)
             Util.incr_stat stat_processed_given;
-            Util.debugf ~section 2 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
+            Util.debugf ~section 1 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
             Util.debugf ~section 1 "@[<2>@{<green>given@} (%d steps):@ `@[%a@]`@]"
               (fun k->k num Env.C.pp c);
             (* find clauses that are subsumed by given in active_set *)

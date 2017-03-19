@@ -15,7 +15,7 @@ def swap : pi (a b : type). pair a b -> pair b a where
 def fst : pi (a b : type). pair a b -> a where
   forall x y. fst (Pair x y) = x.
 def snd : pi (a b : type). pair a b -> b where
-  forall x y. fst (Pair x y) = y.
+  forall x y. snd (Pair x y) = y.
 
 def length : pi a. list a -> nat where
   length nil = Z;

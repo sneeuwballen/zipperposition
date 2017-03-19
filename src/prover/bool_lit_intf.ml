@@ -46,4 +46,5 @@ module type S = sig
   val pp : t CCFormat.printer
 
   module Set : CCSet.S with type elt = t
+  module Tbl : CCHashtbl.S with type key = t
 end

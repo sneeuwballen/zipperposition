@@ -18,8 +18,10 @@ build: [
 ]
 install: [make "install"]
 remove: [
-    [make "uninstall"]
-    ["rm" "%{bin}%/zipperposition"]
+    ["ocamlfind" "remove" "logtk"]
+    ["ocamlfind" "remove" "libzipperposition"]
+    ["rm" "-f" "%{bin}%/zipperposition"]
+    ["rm" "-f" "%{bin}%/hornet"]
 ]
 depends: [
   "ocamlfind" { build }
@@ -30,7 +32,7 @@ depends: [
   "sequence" { >= "0.4" }
   "oclock"
   "oasis" { build }
-  "msat" { >= "0.5" < "0.7" }
+  "msat" { >= "0.5" }
   "menhir" {build}
   "tip-parser"
 ]

@@ -41,7 +41,7 @@ let role_of_string = function
   | "hypothesis" -> R_hypothesis
   | "definition" -> R_definition
   | "assumption" ->  R_assumption
-  | "lemma" -> R_lemma
+  | "lemma" -> R_axiom (* R_lemma makes problems harder *)
   | "theorem" -> R_theorem
   | "conjecture" -> R_conjecture
   | "negated_conjecture" -> R_negated_conjecture

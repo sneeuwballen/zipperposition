@@ -350,6 +350,37 @@ let pp_typed_var out v = match view (HVar.ty v) with
   | Builtin Rat -> Format.fprintf out "Q%d" (HVar.id v)
   | _ -> Format.fprintf out "(@[%a:%a@])" HVar.pp v pp (HVar.ty v)
 
+let mangle (ty:t): string =
+  let add_id buf id =
+    let s =
+      ID.name id
+      |> CCString.filter (function '#' -> false | _ -> true)
+    in
+    Buffer.add_string buf s
+  in
+  let rec aux buf t = match view t with
+    | Builtin TType -> Buffer.add_string buf "ty"
+    | Builtin Int -> Buffer.add_string buf "int"
+    | Builtin Rat -> Buffer.add_string buf "rat"
+    | Builtin Prop -> Buffer.add_string buf "prop"
+    | Builtin Term -> Buffer.add_string buf "i"
+    | Var _ -> Buffer.add_string buf "_"
+    | DB i -> Printf.bprintf buf "A%d" i
+    | App (f,[]) -> add_id buf f
+    | App (f,l) ->
+      add_id buf f;
+      List.iter (fun sub -> Buffer.add_char buf '_'; aux buf sub) l
+    | Fun (args,ret) ->
+      List.iter (fun sub -> aux buf sub; Buffer.add_string buf "_to_") args;
+      aux buf ret;
+    | Forall f -> Printf.bprintf buf "pi_%a" aux f
+  in
+  let buf = Buffer.create 32 in
+  aux buf ty;
+  Buffer.contents buf
+
+let pp_mangle out ty = CCFormat.string out (mangle ty)
+
 (** {2 Conversions} *)
 
 module Conv = struct

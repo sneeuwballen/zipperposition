@@ -12,7 +12,7 @@ let section = Ind_ty.section
 module Make(Env : Env_intf.S) = struct
   module C = Env.C
 
-  let acyclicity lit =
+  let acyclicity lit: [`Absurd | `Trivial | `Neither] =
     (* check if [sub] occurs in [t] under a constructor, recursively. Stop
         before entering non-constructor terms *)
     let rec occurs_in_ t ~sub =  match T.view t with
@@ -29,7 +29,7 @@ module Make(Env : Env_intf.S) = struct
       | T.DB _
       | T.AppBuiltin _ -> false
     in
-    match lit with
+    begin match lit with
       | Literal.Equation (l, r, b) ->
         if
           ( Ind_ty.is_inductive_type (T.ty l) && occurs_in_ ~sub:l r )
@@ -37,28 +37,33 @@ module Make(Env : Env_intf.S) = struct
           ( Ind_ty.is_inductive_type (T.ty r) && occurs_in_ ~sub:r l )
         then if b then `Absurd else `Trivial else `Neither
       | _ -> `Neither
+    end
 
-  let acyclicity_trivial c =
-    let res = C.Seq.lits c
-              |> Sequence.exists
-                (fun lit -> match acyclicity lit with
-                   | `Neither
-                   | `Absurd -> false
-                   | `Trivial -> true)
+  let acyclicity_trivial c: bool =
+    let res =
+      C.Seq.lits c
+      |> Sequence.exists
+        (fun lit -> match acyclicity lit with
+           | `Neither
+           | `Absurd -> false
+           | `Trivial -> true)
     in
-    if res
-    then Util.debugf ~section 3 "@[<2>acyclicity:@ `@[%a@]` is trivial@]" (fun k->k C.pp c);
+    if res then (
+      Util.debugf ~section 3 "@[<2>acyclicity:@ `@[%a@]` is trivial@]"
+        (fun k->k C.pp c);
+    );
     res
 
-  let acyclicity_simplify c =
-    let lits' = C.Seq.lits c
-                |> Sequence.filter
-                  (fun lit -> match acyclicity lit with
-                     | `Neither
-                     | `Trivial -> true
-                     | `Absurd -> false (* remove lit *)
-                  )
-                |> Sequence.to_array
+  let acyclicity_simplify c: C.t SimplM.t =
+    let lits' =
+      C.Seq.lits c
+      |> Sequence.filter
+        (fun lit -> match acyclicity lit with
+           | `Neither
+           | `Trivial -> true
+           | `Absurd -> false (* remove lit *)
+        )
+      |> Sequence.to_array
     in
     if Array.length lits' = Array.length (C.lits c)
     then SimplM.return_same c

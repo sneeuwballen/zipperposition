@@ -66,7 +66,10 @@ module Make(Payload : PAYLOAD)
   module AsKey = struct
     type t = lit
     let compare = compare
+    let hash = hash
+    let equal = equal
   end
 
   module Set = CCSet.Make(AsKey)
+  module Tbl = CCHashtbl.Make(AsKey)
 end

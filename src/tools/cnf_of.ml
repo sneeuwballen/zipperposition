@@ -64,8 +64,9 @@ let process file =
   Util.debugf 1 "process file %s" (fun k->k file);
   let res =
     (* parse *)
-    Parsing_utils.parse file
-    >>= TypeInference.infer_statements ?ctx:None
+    let input = Parsing_utils.input_of_file file in
+    Parsing_utils.parse_file input file
+    >>= TypeInference.infer_statements ~on_undef:(Parsing_utils.on_undef_id input) ?ctx:None
     >|= fun st ->
     if !print_in
     then Format.printf "@[<v2>input:@ %a@]@."

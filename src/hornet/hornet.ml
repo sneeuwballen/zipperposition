@@ -16,7 +16,8 @@ let start_ k = Util.debugf ~section 1 k
 let parse_file file =
   Util.debugf ~section 1 "@[@{<Yellow>### process file@ `%s` ###@}@]"
     (fun k->k file);
-  Parsing_utils.parse file
+  let input = Parsing_utils.input_of_file file in
+  Parsing_utils.parse_file input file
 
 type conf = Flex_state.t
 

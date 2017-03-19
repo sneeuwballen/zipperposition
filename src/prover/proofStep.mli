@@ -32,6 +32,12 @@ val mk_rule :
   string ->
   rule
 
+val mk_rulef:
+  ?subst:Subst.t list ->
+  ?pos:Position.t list ->
+  ?comment:string list ->
+  ('a, Format.formatter, unit, rule) format4 -> 'a
+
 (** Classification of proof steps *)
 type kind =
   | Inference of rule
@@ -39,6 +45,7 @@ type kind =
   | Esa of rule
   | Assert of statement_src
   | Goal of statement_src
+  | Lemma
   | Data of statement_src * Type.t Statement.data
   | Trivial (** trivial, or trivial within theories *)
 
@@ -46,6 +53,7 @@ type result =
   | Form of form
   | Clause of SClause.t
   | BoolClause of bool_lit list
+  | Stmt of Statement.input_t
 
 (** A proof step, without the conclusion *)
 type t = private {
@@ -90,6 +98,8 @@ val mk_assert : statement_src -> t
 
 val mk_goal : statement_src -> t
 
+val mk_lemma : t
+
 val mk_assert' : ?loc:Loc.t -> file:string -> name:string -> unit -> t
 
 val mk_goal' : ?loc:Loc.t -> file:string -> name:string -> unit -> t
@@ -113,6 +123,8 @@ val mk_f_esa : rule:rule -> form -> of_ list -> of_
 val mk_c : t -> SClause.t -> of_
 
 val mk_bc : t -> bool_lit list -> of_
+
+val mk_stmt : t -> Statement.input_t -> of_
 
 val adapt_f : of_ -> form -> of_
 val adapt_c : of_ -> SClause.t -> of_

@@ -336,7 +336,7 @@ module Seq = struct
     let rec iter t =
       k t;
       CCOpt.iter iter t.ty;
-      match t.term with
+      match (deref t).term with
         | Meta _
         | Var _
         | Const _ -> ()
@@ -374,7 +374,7 @@ module Seq = struct
     let rec iter set t =
       k (t,set);
       CCOpt.iter (iter set) t.ty;
-      match t.term with
+      match view t with
         | Meta _
         | Var _
         | Const _ -> ()
@@ -622,6 +622,15 @@ module Ty = struct
     | Ty_var _
     | Ty_forall (_,_) -> false
 end
+
+let sort_ty_vars_first : t Var.t list -> t Var.t list =
+  List.sort
+    (fun v1 v2 ->
+       begin match Ty.is_tType (Var.ty v1), Ty.is_tType (Var.ty v2) with
+         | true, false -> -1
+         | false, true -> 1
+         | _ -> 0
+       end)
 
 module Form = struct
   type t = term
@@ -1238,6 +1247,7 @@ end
 
 module ZF = struct
   let pp out t = STerm.ZF.pp out (erase t)
+  let pp_inner out t = STerm.ZF.pp_inner out (erase t)
   let to_string t = STerm.ZF.to_string (erase t)
 end
 

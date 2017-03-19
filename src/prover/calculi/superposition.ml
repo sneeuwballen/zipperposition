@@ -594,8 +594,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              ));
         t (* not found any match, normal form found *)
       with RewriteInto (t', subst) ->
-        Util.debugf ~section 5 "@[<2>demod:@ rewrite @[%a@]@ into @[%a@]@]"
-          (fun k->k T.pp t T.pp t');
+        Util.debugf ~section 5
+          "@[<2>demod:@ rewrite `@[%a@]`@ into `@[%a@]`@ using %a@]"
+          (fun k->k T.pp t T.pp t' Subst.pp subst);
         normal_form ~restrict subst t' 1 (* done one rewriting step, continue *)
     (* rewrite innermost-leftmost of [subst(t,scope)]. The initial scope is
        0, but then we normal_form terms in which variables are really the variables

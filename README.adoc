@@ -349,6 +349,16 @@ $ zipperposition doc/plus_assoc.zf -o none
 % SZS status Theorem for 'doc/plus_assoc.zf'
 ----
 
+conditionals::
++
+tests on boolean formulas are written `if a then b else c`, where `a:prop`,
+`b`, and `c`, are terms. `b` and `c` must have the same type.
+
+pattern-matching::
++
+shallow pattern matching is written `match <term> with [case]+ end`
+where each case is `| <constructor> [var]* -> <term>`.
+
 AC symbols::
 +
 Some symbols can be declared "associative commutative": they satisfy

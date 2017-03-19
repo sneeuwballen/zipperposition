@@ -8,9 +8,9 @@ open Logtk
 type res =
   | Ty of Ind_ty.t
   | Cstor of Ind_ty.constructor * Ind_ty.t
-  | Inductive_cst of Ind_cst.cst option
+  | Inductive_cst of Ind_cst.t option
   | Projector of ID.t (** projector of some constructor (id: type) *)
-  | DefinedCst of int (** (recursive) definition of given stratification level *)
+  | DefinedCst of int * Statement.definition
   | Other
 
 let classify id = match ID.payload id with
@@ -19,15 +19,22 @@ let classify id = match ID.payload id with
   | Skolem.Attr_skolem Skolem.K_ind -> Inductive_cst None
   | Ind_cst.Payload_cst c -> Inductive_cst (Some c)
   | Ind_ty.Payload_ind_projector id -> Projector id
-  | Statement.Payload_defined_cst l -> DefinedCst l
+  | Rewrite_term.Payload_defined_cst cst ->
+    DefinedCst (Rewrite_term.Defined_cst.level cst, Statement.D_term cst)
+  | Statement.Payload_defined_form (l,def) ->
+    DefinedCst (l,Statement.D_form !def)
   | _ -> Other
+
+let id_is_cstor id = match classify id with Cstor _ -> true | _ -> false
+let id_is_projector id = match classify id with Projector _ -> true | _ -> false
+let id_is_defined id = match classify id with DefinedCst _ -> true | _ -> false
 
 let pp_res out = function
   | Ty _ -> Format.fprintf out "ind_ty"
   | Cstor (_, ity) -> Format.fprintf out "cstor of %a" Ind_ty.pp ity
   | Inductive_cst _ -> Format.fprintf out "ind_cst"
   | Projector id -> Format.fprintf out "projector_%a" ID.pp id
-  | DefinedCst lev -> Format.fprintf out "defined (level %d)" lev
+  | DefinedCst (lev,_) -> Format.fprintf out "defined (level %d)" lev
   | Other -> CCFormat.string out "other"
 
 let pp_signature out sigma =
@@ -62,7 +69,7 @@ let prec_constr_ a b =
       if dominates_ c1 c2 then 1
       else if dominates_ c2 c1 then -1
       else 0
-    | DefinedCst l1, DefinedCst l2 ->
+    | DefinedCst (l1,_), DefinedCst (l2,_) ->
       (* bigger level means defined later *)
       CCInt.compare l1 l2
     | Ty _, _
@@ -73,3 +80,14 @@ let prec_constr_ a b =
     | Other, _ -> CCInt.compare (to_int_ c_a) (to_int_ c_b)
 
 let prec_constr = Precedence.Constr.make prec_constr_
+
+let weight_fun (id:ID.t): Precedence.Weight.t =
+  let module W = Precedence.Weight in
+  begin match classify id with
+    | Ty _ -> W.int 1
+    | Projector _ -> W.int 1
+    | Cstor _ -> W.int 1
+    | Inductive_cst _ -> W.omega_plus 1
+    | Other -> W.omega_plus 4
+    | DefinedCst _ -> W.omega_plus 5 (* defined: biggest *)
+  end

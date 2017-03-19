@@ -19,6 +19,8 @@ let make =
     incr n;
     {id; name; payload=No_payload; }
 
+let makef fmt = CCFormat.ksprintf ~f:make fmt
+
 let copy t = make t.name
 
 let id t = t.id

@@ -59,19 +59,22 @@ type from_file = {
   loc: ParseLocation.t option;
 }
 
-type clause = FOTerm.t SLiteral.t list
+type lit = FOTerm.t SLiteral.t
+type formula = TypedSTerm.t
+type clause = lit list
 
-type ('f, 't, 'ty) t = {
-  view: ('f, 't, 'ty) view;
-  attrs: attrs;
-  src: source;
-}
-
-and role =
+type role =
   | R_assert
   | R_goal
   | R_def
   | R_decl
+
+type ('f, 't, 'ty) t = {
+  id: int;
+  view: ('f, 't, 'ty) view;
+  attrs: attrs;
+  src: source;
+}
 
 and source = {
   src_id: int;
@@ -83,16 +86,20 @@ and source_view =
   | Internal of role
   | Neg of sourced_t
   | CNF of sourced_t
+  | Renaming of sourced_t * ID.t * formula (* renamed this formula *)
+  | Preprocess of sourced_t * string
 
 and result =
   | Sourced_input of TypedSTerm.t
   | Sourced_clause of clause
+  | Sourced_statement of input_t
 
 and sourced_t = result * source
 
-type input_t = (TypedSTerm.t, TypedSTerm.t, TypedSTerm.t) t
-type clause_t = (clause, FOTerm.t, Type.t) t
+and input_t = (TypedSTerm.t, TypedSTerm.t, TypedSTerm.t) t
+and clause_t = (clause, FOTerm.t, Type.t) t
 
+let compare a b = CCInt.compare a.id b.id
 let view t = t.view
 let attrs t = t.attrs
 let src t = t.src
@@ -103,7 +110,9 @@ let mk_data id ~args ty cstors =
 let mk_def ?(rewrite=false) id ty rules =
   { def_id=id; def_ty=ty; def_rules=rules; def_rewrite=rewrite; }
 
-let mk_ ?(attrs=[]) ~src view = {src; view; attrs; }
+let id_n_ = ref 0
+let mk_ ?(attrs=[]) ~src view: (_,_,_) t =
+  {id=CCRef.incr_then_get id_n_; src; view; attrs; }
 
 let ty_decl ?attrs ~src id ty = mk_ ?attrs ~src (TyDecl (id,ty))
 let def ?attrs ~src l = mk_ ?attrs ~src (Def l)
@@ -183,12 +192,19 @@ module Src = struct
   let internal r : t = mk_ (Internal r)
   let neg x : t = mk_ (Neg x)
   let cnf x : t = mk_ (CNF x)
+  let renaming x id f : t = mk_ (Renaming (x, id, f))
+  let preprocess x str : t = mk_ (Preprocess (x,str))
 
   let neg_input f src = neg (Sourced_input f, src)
   let neg_clause c src = neg (Sourced_clause c, src)
 
   let cnf_input f src = cnf (Sourced_input f, src)
   let cnf_clause c src = cnf (Sourced_clause c, src)
+
+  let renaming_input input id f =
+    renaming (Sourced_statement input, input.src) id f
+  let preprocess_input input str =
+    preprocess (Sourced_statement input, input.src) str
 
   let pp_from_file out x =
     let pp_name out = function
@@ -217,20 +233,73 @@ end
 
 (** {2 Defined Constants} *)
 
-exception Payload_defined_cst of int
+type form_rewrite = lit * clause list
+(** Basic rewrite rule for literals *)
+
+type form_definition = form_rewrite list
+(** Definition for a literal *)
+
+type definition =
+  | D_term of Rewrite_term.defined_cst
+  | D_form of form_rewrite list
+
+exception Payload_defined_form of int * form_definition ref
 
 let as_defined_cst id = match ID.payload id with
-  | Payload_defined_cst l -> Some l
+  | Payload_defined_form (l,d) -> Some (l, D_form !d)
+  | Rewrite_term.Payload_defined_cst c ->
+    Some (Rewrite_term.Defined_cst.level c, D_term c)
   | _ -> None
+
+let as_defined_cst_level id = CCOpt.map fst @@ as_defined_cst id
 
 let is_defined_cst id = as_defined_cst id <> None
 
-let declare_defined_cst id ~level =
+let declare_defined_form id ~level def =
   (* declare that [id] is a defined constant of level [l+1] *)
   Util.debugf ~section:Util.Section.zip 1
     "@[<2>declare %a@ as defined constant of level %d@]"
     (fun k->k ID.pp id level);
-  ID.set_payload id (Payload_defined_cst level)
+  ID.set_payload id (Payload_defined_form (level, ref def));
+  ()
+
+let declare_defined_form_or_add id (r:form_rewrite): unit =
+  begin match ID.payload id with
+    | Payload_defined_form (_,l) -> l := r :: !l
+    | _ -> declare_defined_form ~level:0 id [r]
+  end
+
+let declare_defined_cst_term id ~level rules: unit =
+  let _ = Rewrite_term.declare_defined_cst ~level id rules in
+  ()
+
+let conv_term_rule (r:_ term_rule): Rewrite_term.rule =
+  let _, id, ty, args, rhs = r in
+  Rewrite_term.Rule.make id ty args rhs
+
+let as_term_rules (l:_ def_rule list): Rewrite_term.rule list option =
+  assert (l <> []);
+  if List.for_all (function Def_term _ -> true | _ -> false) l
+  then (
+    l
+    |> List.map
+      (function
+        | Def_term r -> conv_term_rule r
+        | Def_form _ -> assert false)
+    |> CCOpt.return
+  ) else None
+
+let as_clause_rules (l:_ def_rule list): form_definition option =
+  assert (l <> []);
+  if List.for_all (function Def_form _ -> true | _ -> false) l
+  then (
+    l
+    |> List.map
+      (function
+        | Def_form (_,lit,rhs) -> lit, rhs
+        | Def_term _ -> assert false)
+    |> CCOpt.return
+  ) else None
 
 let terms_of_rule (d:_ def_rule): _ Sequence.t = match d with
   | Def_term (_, _, _, args, rhs) ->
@@ -242,7 +311,7 @@ let terms_of_rule (d:_ def_rule): _ Sequence.t = match d with
 let level_of_rule (d:_ def_rule): int =
   terms_of_rule d
   |> Sequence.flat_map FOTerm.Seq.symbols
-  |> Sequence.filter_map as_defined_cst
+  |> Sequence.filter_map as_defined_cst_level
   |> Sequence.max
   |> CCOpt.get_or ~default:0
 
@@ -251,7 +320,7 @@ let max_exn seq =
   |> Sequence.max
   |> CCOpt.get_lazy (fun () -> assert false)
 
-let scan_stmt_for_defined_cst (st:(clause,FOTerm.t,_) t): unit = match view st with
+let scan_stmt_for_defined_cst (st:(clause,FOTerm.t,Type.t) t): unit = match view st with
   | Def [] -> assert false
   | Def l ->
     (* define all IDs at the same level (the max of those computed) *)
@@ -262,19 +331,43 @@ let scan_stmt_for_defined_cst (st:(clause,FOTerm.t,_) t): unit = match view st w
              Sequence.of_list def_rules
              |> Sequence.map level_of_rule
              |> max_exn
+           and def =
+             let open CCOpt.Infix in
+             ((as_term_rules def_rules >|= fun l -> `Term l)
+              <+>
+                (as_clause_rules def_rules >|= fun l -> `Form l))
+             |> CCOpt.get_lazy (fun _ -> assert false)
            in
-           def_id, lev)
+           def_id, lev, def)
         l
     in
     let level =
       Sequence.of_list ids_and_levels
-      |> Sequence.map snd
+      |> Sequence.map (fun (_,l,_) -> l)
       |> max_exn
       |> succ
     in
     List.iter
-      (fun (id,_) -> declare_defined_cst id ~level)
+      (fun (id,_,def) -> match def with
+         | `Term l -> declare_defined_cst_term ~level id l
+         | `Form def -> declare_defined_form ~level id def)
       ids_and_levels
+  | RewriteTerm rule ->
+    (* declare the rule, possibly making its head defined *)
+    let r = conv_term_rule rule in
+    let id = Rewrite_term.Rule.head_id r in
+    Rewrite_term.declare_cst_or_add id r
+  | RewriteForm (_,lhs,rhs) ->
+    let r = lhs, rhs in
+    (* is this rule associated to an ID? *)
+    let lhs, _ = r in
+    let head_id = match lhs with
+      | SLiteral.Atom (t,_) -> FOTerm.head t
+      | _ -> None
+    in
+    CCOpt.iter
+      (fun id -> declare_defined_form_or_add id r)
+      head_id
   | _ -> ()
 
 (** {2 Iterators} *)
@@ -403,23 +496,33 @@ let pp_attrs out = function
   | [] -> ()
   | l -> fpf out "@ [@[%a@]]" (Util.pp_list ~sep:"," pp_attr) l
 
-let pp_def_rule ppf ppt out d =
+let pp_typedvar ppty out v = fpf out "(%a:%a)" Var.pp v ppty (Var.ty v)
+let pp_typedvar_l ppty = Util.pp_list ~sep:" " (pp_typedvar ppty)
+
+let pp_def_rule ppf ppt ppty out d =
   let pp_arg = CCFormat.within "(" ")" ppt in
   let pp_args out = function
     | [] -> ()
     | l -> fpf out "@ %a" (Util.pp_list ~sep:" " pp_arg) l
+  and pp_vars out = function
+    | [] -> ()
+    | l -> fpf out "forall %a.@ " (pp_typedvar_l ppty) l
   in
-  match d with
-    | Def_term (_,id,_,args,rhs) ->
-      fpf out "@[<2>@[<2>%a%a@] =@ %a@]" ID.pp id pp_args args ppt rhs
-    | Def_form (_,lhs,rhs) ->
-      fpf out "@[<2>%a =@ (@[<hv>%a@])@]" (SLiteral.pp ppt) lhs
+  begin match d with
+    | Def_term (vars,id,_,args,rhs) ->
+      fpf out "@[<2>%a@[<2>%a%a@] =@ %a@]"
+        pp_vars vars ID.pp id pp_args args ppt rhs
+    | Def_form (vars,lhs,rhs) ->
+      fpf out "@[<2>%a%a =@ (@[<hv>%a@])@]"
+        pp_vars vars
+        (SLiteral.pp ppt) lhs
         (Util.pp_list ~sep:" && " ppf) rhs
+  end
 
 let pp_def ppf ppt ppty out d =
   fpf out "@[<2>@[%a : %a@]@ where@ @[<hv>%a@]@]"
     ID.pp d.def_id ppty d.def_ty
-    (Util.pp_list ~sep:";" (pp_def_rule ppf ppt)) d.def_rules
+    (Util.pp_list ~sep:";" (pp_def_rule ppf ppt ppty)) d.def_rules
 
 let pp ppf ppt ppty out st = match st.view with
   | TyDecl (id,ty) ->

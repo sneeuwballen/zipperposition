@@ -64,19 +64,22 @@ type from_file = {
   loc: ParseLocation.t option;
 }
 
-type clause = FOTerm.t SLiteral.t list
+type lit = FOTerm.t SLiteral.t
+type formula = TypedSTerm.t
+type clause = lit list
 
-type ('f, 't, 'ty) t = {
-  view: ('f, 't, 'ty) view;
-  attrs: attrs;
-  src: source;
-}
-
-and role =
+type role =
   | R_assert
   | R_goal
   | R_def
   | R_decl
+
+type ('f, 't, 'ty) t = {
+  id: int;
+  view: ('f, 't, 'ty) view;
+  attrs: attrs;
+  src: source;
+}
 
 and source = private {
   src_id: int;
@@ -88,15 +91,20 @@ and source_view =
   | Internal of role
   | Neg of sourced_t
   | CNF of sourced_t
+  | Renaming of sourced_t * ID.t * formula (* renamed this formula *)
+  | Preprocess of sourced_t * string
 
 and result =
   | Sourced_input of TypedSTerm.t
   | Sourced_clause of clause
+  | Sourced_statement of input_t
 
 and sourced_t = result * source
 
-type input_t = (TypedSTerm.t, TypedSTerm.t, TypedSTerm.t) t
-type clause_t = (clause, FOTerm.t, Type.t) t
+and input_t = (TypedSTerm.t, TypedSTerm.t, TypedSTerm.t) t
+and clause_t = (clause, FOTerm.t, Type.t) t
+
+val compare : (_, _, _) t -> (_, _, _) t -> int
 
 val view : ('f, 't, 'ty) t -> ('f, 't, 'ty) view
 val attrs : (_, _, _) t -> attrs
@@ -139,18 +147,32 @@ val map :
 
 (** {2 Defined Constants} *)
 
-val as_defined_cst: ID.t -> int option
+type form_rewrite = lit * clause list
+(** Basic rewrite rule for literals *)
+
+type form_definition = form_rewrite list
+(** Definition for a literal *)
+
+type definition =
+  | D_term of Rewrite_term.defined_cst
+  | D_form of form_definition
+
+val as_defined_cst: ID.t -> (int * definition) option
 (** [as_defined_cst id] returns [Some level] if [id] is a constant
     defined at stratification level [level], [None] otherwise *)
 
+val as_defined_cst_level : ID.t -> int option
+
 val is_defined_cst: ID.t -> bool
 
-val declare_defined_cst : ID.t -> level:int -> unit
+val declare_defined_form : ID.t -> level:int -> form_definition -> unit
 (** [declare_defined_cst id ~level] states that [id] is a defined
     constant of given [level]. It means that it is defined based only
     on constants of strictly lower levels *)
 
-val scan_stmt_for_defined_cst : (clause, FOTerm.t, _) t -> unit
+val declare_defined_cst_term : ID.t -> level:int -> Rewrite_term.rule list -> unit
+
+val scan_stmt_for_defined_cst : (clause, FOTerm.t, Type.t) t -> unit
 (** Try and declare defined constants in the given statement *)
 
 (** {2 Sourced Statements} *)
@@ -180,12 +202,17 @@ module Src : sig
 
   val neg : sourced_t -> t
   val cnf : sourced_t -> t
+  val preprocess : sourced_t -> string -> t
+  val renaming : sourced_t -> ID.t -> formula -> t
 
   val neg_input : TypedSTerm.t -> source -> t
   val neg_clause : clause -> source -> t
 
   val cnf_input : TypedSTerm.t -> source -> t
   val cnf_clause : clause -> source -> t
+
+  val preprocess_input : input_t -> string -> t
+  val renaming_input : input_t -> ID.t -> formula -> t
 
   val pp_from_file : from_file CCFormat.printer
   (* include Interfaces.PRINT with type t := t *)
@@ -194,8 +221,9 @@ module Src : sig
 end
 
 (**/**)
-exception Payload_defined_cst of int
-(** Annotation on IDs that are defined (int: stratification level) *)
+
+exception Payload_defined_form of int * form_definition ref
+(** Annotation on propositional IDs that are defined (int: stratification level) *)
 
 (**/**)
 
@@ -216,7 +244,8 @@ end
 val pp_def_rule :
   'a CCFormat.printer ->
   'b CCFormat.printer ->
-  ('a,'b,_) def_rule CCFormat.printer
+  'c CCFormat.printer ->
+  ('a,'b,'c) def_rule CCFormat.printer
 
 val pp_def :
   'a CCFormat.printer ->

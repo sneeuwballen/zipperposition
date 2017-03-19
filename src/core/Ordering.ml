@@ -6,6 +6,7 @@
 module Prec = Precedence
 module MT = Multiset.Make(FOTerm)
 module IOB = IDOrBuiltin
+module W = Precedence.Weight
 
 open Comparison
 
@@ -92,11 +93,11 @@ module KBO : ORD = struct
   }
 
   (** create a balance for the two terms *)
-  let mk_balance t1 t2 =
+  let mk_balance t1 t2: var_balance =
     if T.is_ground t1 && T.is_ground t2
-    then
+    then (
       { offset = 0; pos_counter = 0; neg_counter = 0; balance = [||]; }
-    else begin
+    ) else (
       let vars = Sequence.of_list [t1; t2] |> Sequence.flat_map T.Seq.vars in
       (* TODO: compute both at the same time *)
       let minvar = T.Seq.min_var vars in
@@ -112,15 +113,16 @@ module KBO : ORD = struct
       } in
       Obj.set_tag (Obj.repr vb.balance) Obj.no_scan_tag;  (* no GC scan *)
       vb
-    end
+    )
 
   (** add a positive variable *)
   let add_pos_var balance idx =
     let idx = idx - balance.offset in
     let n = balance.balance.(idx) in
-    (if n = 0
-     then balance.pos_counter <- balance.pos_counter + 1
-     else if n = -1 then balance.neg_counter <- balance.neg_counter - 1
+    if n = 0
+    then balance.pos_counter <- balance.pos_counter + 1
+    else (
+      if n = -1 then balance.neg_counter <- balance.neg_counter - 1
     );
     balance.balance.(idx) <- n + 1
 
@@ -128,18 +130,16 @@ module KBO : ORD = struct
   let add_neg_var balance idx =
     let idx = idx - balance.offset in
     let n = balance.balance.(idx) in
-    (if n = 0
-     then balance.neg_counter <- balance.neg_counter + 1
-     else if n = 1 then balance.pos_counter <- balance.pos_counter - 1
+    if n = 0
+    then balance.neg_counter <- balance.neg_counter + 1
+    else (
+      if n = 1 then balance.pos_counter <- balance.pos_counter - 1
     );
     balance.balance.(idx) <- n - 1
 
-  let _weight prec = function
-    | IOB.B _ -> 1
-    | IOB.I s ->
-      let x = Prec.weight prec s in
-      assert (x>0);
-      x
+  let weight prec = function
+    | IOB.B _ -> W.int 1
+    | IOB.I s -> Prec.weight prec s
 
   (** the KBO ordering itself. The implementation is borrowed from
       the kbo_5 version of "things to know when implementing KBO".
@@ -148,30 +148,38 @@ module KBO : ORD = struct
     let balance = mk_balance t1 t2 in
     (** variable balance, weight balance, t contains variable y. pos
         stands for positive (is t the left term) *)
-    let rec balance_weight wb t y pos =
+    let rec balance_weight (wb:W.t) t y pos: W.t * bool =
       match TC.view t with
         | TC.Var x ->
           let x = HVar.id x in
-          if pos
-          then (add_pos_var balance x; (wb + 1, x = y))
-          else (add_neg_var balance x; (wb - 1, x = y))
-        | TC.DB _ -> (if pos then wb + 1 else wb - 1), false
+          if pos then (
+            add_pos_var balance x;
+            W.(wb + one), x = y
+          ) else (
+            add_neg_var balance x;
+            W.(wb - one), x = y
+          )
+        | TC.DB _ ->
+          let w = if pos then W.(wb + one) else W.(wb - one) in
+          w, false
         | TC.App (s, l) ->
+          let open W.Infix in
           let wb' = if pos
-            then wb + _weight prec (IOB.I s)
-            else wb - _weight prec (IOB.I s) in
+            then wb + weight prec (IOB.I s)
+            else wb - weight prec (IOB.I s) in
           balance_weight_rec wb' l y pos false
         | TC.AppBuiltin (b,l) ->
+          let open W.Infix in
           let wb' = if pos
-            then wb + _weight prec (IOB.B b)
-            else wb - _weight prec (IOB.B b) in
+            then wb + weight prec (IOB.B b)
+            else wb - weight prec (IOB.B b) in
           balance_weight_rec wb' l y pos false
         | TC.NonFO -> assert false
     (** list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms y pos res = match terms with
       | [] -> (wb, res)
       | t::terms' ->
-        let (wb', res') = balance_weight wb t y pos in
+        let wb', res' = balance_weight wb t y pos in
         balance_weight_rec wb' terms' y pos (res || res')
     (** lexicographic comparison *)
     and tckbolex wb terms1 terms2 =
@@ -196,7 +204,7 @@ module KBO : ORD = struct
       let wb'', _ = balance_weight_rec wb' ts 0 false false in
       wb'', res
     (** tupled version of kbo (kbo_5 of the paper) *)
-    and tckbo wb t1 t2 =
+    and tckbo (wb:W.t) t1 t2 =
       match TC.view t1, TC.view t2 with
         | _ when T.equal t1 t2 -> (wb, Eq) (* do not update weight or var balance *)
         | TC.Var x, TC.Var y ->
@@ -208,11 +216,11 @@ module KBO : ORD = struct
         | TC.Var x,  _ ->
           add_pos_var balance (HVar.id x);
           let wb', contains = balance_weight wb t2 (HVar.id x) false in
-          (wb' + 1, if contains then Lt else Incomparable)
+          (W.(wb' + one), if contains then Lt else Incomparable)
         |  _, TC.Var y ->
           add_neg_var balance (HVar.id y);
           let wb', contains = balance_weight wb t1 (HVar.id y) true in
-          (wb' - 1, if contains then Gt else Incomparable)
+          (W.(wb' - one), if contains then Gt else Incomparable)
         (* node/node, De Bruijn/De Bruijn *)
         | TC.App (f, ss), TC.App (g, ts) -> tckbo_composite wb (IOB.I f) (IOB.I g) ss ts
         | TC.AppBuiltin (f, ss), TC.App (g, ts) -> tckbo_composite wb (IOB.B f) (IOB.I g) ss ts
@@ -223,22 +231,22 @@ module KBO : ORD = struct
         (* node and something else *)
         | (TC.App (_, _) | TC.AppBuiltin _), TC.DB _ ->
           let wb', _ = balance_weight wb t1 0 true in
-          wb'-1, Comparison.Gt
+          W.(wb'-one), Comparison.Gt
         | TC.DB _, (TC.App (_, _) | TC.AppBuiltin _) ->
           let wb', _ = balance_weight wb t1 0 false in
-          wb'+1, Comparison.Lt
+          W.(wb'+one), Comparison.Lt
     (** tckbo, for composite terms (ie non variables). It takes a ID.t
         and a list of subterms. *)
     and tckbo_composite wb f g ss ts =
       (* do the recursive computation of kbo *)
       let wb', recursive = tckbo_rec wb f g ss ts in
-      let wb'' = wb' + _weight prec f - _weight prec g in
+      let wb'' = W.(wb' + weight prec f - weight prec g) in
       (* check variable condition *)
       let g_or_n = if balance.neg_counter = 0 then Gt else Incomparable
       and l_or_n = if balance.pos_counter = 0 then Lt else Incomparable in
       (* lexicographic product of weight and precedence *)
-      if wb'' > 0 then wb'', g_or_n
-      else if wb'' < 0 then wb'', l_or_n
+      if W.sign wb'' > 0 then wb'', g_or_n
+      else if W.sign wb'' < 0 then wb'', l_or_n
       else match prec_compare prec f g with
         | n when n > 0 -> wb'', g_or_n
         | n when n < 0 ->  wb'', l_or_n
@@ -264,7 +272,7 @@ module KBO : ORD = struct
         wb'', Incomparable
     in
     try
-      let _, res = tckbo 0 t1 t2 in
+      let _, res = tckbo W.zero t1 t2 in
       AllocCache.Arr.free alloc_cache balance.balance;
       res
     with e ->

@@ -58,6 +58,14 @@
 %token ARITH_GT
 %token ARITH_GEQ
 
+%token IF
+%token THEN
+%token ELSE
+
+%token MATCH
+%token WITH
+%token END
+
 %token INT
 %token PROP
 %token TYPE
@@ -101,6 +109,10 @@ raw_var:
   | w=LOWER_WORD { w }
   | w=UPPER_WORD { w }
 
+var_or_wildcard:
+  | v=raw_var { T.V v }
+  | WILDCARD { T.Wildcard }
+
 typed_var_block:
   | v=raw_var { [T.V v, None] }
   | WILDCARD { [T.Wildcard, None] }
@@ -135,11 +147,20 @@ const:
   | LOGIC_TRUE { T.true_ }
   | LOGIC_FALSE { T.false_ }
 
+match_branch:
+  | VERTICAL_BAR c=raw_var vars=var_or_wildcard* ARROW rhs=term
+    { T.Match_case (c,vars,rhs) }
+
 atomic_term:
   | v=var { v }
   | t=const { t }
   | i=INTEGER { T.int_ (Z.of_string i) }
   | LEFT_PAREN t=term RIGHT_PAREN { t }
+  | MATCH t=term WITH l=match_branch+ END
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.match_ ~loc t l
+    }
 
 apply_term:
   | t=atomic_term { t }
@@ -190,7 +211,7 @@ arith_op_term:
 
 not_term:
   | t=arith_op_term { t }
-  | LOGIC_NOT t=atomic_term
+  | LOGIC_NOT t=arith_op_term
     {
       let loc = L.mk_pos $startpos $endpos in
       T.not_ ~loc t
@@ -256,6 +277,11 @@ term:
     {
       let loc = L.mk_pos $startpos $endpos in
       T.forall_ty ~loc vars t
+    }
+  | IF a=term THEN b=term ELSE c=term
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.ite ~loc a b c
     }
   | error
     {

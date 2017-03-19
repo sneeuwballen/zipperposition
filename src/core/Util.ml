@@ -3,6 +3,8 @@
 
 (** {1 Some helpers} *)
 
+module Fmt = CCFormat
+
 (** {2 Time facilities} *)
 
 let start_ = Oclock.gettime Oclock.monotonic
@@ -95,6 +97,12 @@ module Section = struct
     else s.level
 end
 
+let break_on_debug = ref false
+
+(* wait for user input *)
+let wait_user_input () =
+  ignore (input_line stdin)
+
 let set_debug = Section.set_debug Section.root
 let get_debug () = Section.root.Section.level
 
@@ -108,7 +116,10 @@ let debugf ?(section=Section.root) l msg k =
     else Format.fprintf debug_fmt_ "@{<Black>@[<4>%.3f[%s]@}@ "
         now section.Section.full_name;
     k (Format.kfprintf
-        (fun fmt -> Format.fprintf fmt "@]@.")
+        (fun fmt ->
+           Format.fprintf fmt "@]@.";
+           if !break_on_debug then wait_user_input();
+        )
         debug_fmt_ msg)
   )
 
@@ -124,8 +135,8 @@ let ksprintf_noc ~f fmt =
 let pp_error_prefix out () = Format.fprintf out "@{<Red>Error@}: "
 
 let err_spf fmt =
-  CCFormat.ksprintf fmt
-    ~f:(fun s -> CCFormat.sprintf "@[<2>%a%s@]" pp_error_prefix () s)
+  Fmt.ksprintf fmt
+    ~f:(fun s -> Fmt.sprintf "@[<2>%a%s@]" pp_error_prefix () s)
 
 
 let warn_fmt_ = Format.err_formatter
@@ -144,11 +155,13 @@ let () =
   Printexc.register_printer
     (function
       | Error (where,msg) ->
-        Some (CCFormat.sprintf "@[<2>error in %s:@ %s@]" where msg)
+        Some (Fmt.sprintf "@[<2>error in %s:@ %s@]" where msg)
+      | Invalid_argument msg ->
+        Some (Fmt.sprintf "@[<2>invalid_argument: %s@]" msg)
       | _ -> None)
 
 let error ~where msg = raise (Error (where,msg))
-let errorf ~where msg = CCFormat.ksprintf ~f:(error ~where) msg
+let errorf ~where msg = Fmt.ksprintf ~f:(error ~where) msg
 
 let pp_pos pos =
   let open Lexing in
@@ -333,8 +346,8 @@ let pp_pair ?(sep=", ") pa pb out (a,b) =
   Format.fprintf out "@[%a%s%a@]" pa a sep pb b
 
 let pp_sep sep out () = Format.fprintf out "%s@," sep
-let pp_list ?(sep=", ") pp = CCFormat.list ~sep:(pp_sep sep) pp
-let pp_seq ?(sep=", ") pp = CCFormat.seq ~sep:(pp_sep sep) pp
+let pp_list ?(sep=", ") pp = Fmt.list ~sep:(pp_sep sep) pp
+let pp_seq ?(sep=", ") pp = Fmt.seq ~sep:(pp_sep sep) pp
 
 let pp_list0 ?(sep=" ") pp_x out = function
   | [] -> ()
@@ -363,8 +376,19 @@ let map_product ~f l =
         (f l1)
         tail
 
-let invalid_argf msg = CCFormat.ksprintf msg ~f:invalid_arg
-let failwithf msg = CCFormat.ksprintf msg ~f:failwith
+let seq_map_l ~f l =
+  let rec aux l yield = match l with
+    | [] -> yield []
+    | x :: tail ->
+      let ys = f x in
+      List.iter
+        (fun y -> aux tail (fun l -> yield (y::l)))
+        ys
+  in
+  aux l
+
+let invalid_argf msg = Fmt.ksprintf msg ~f:invalid_arg
+let failwithf msg = Fmt.ksprintf msg ~f:failwith
 
 module Int_map = CCMap.Make(CCInt)
 module Int_set = CCSet.Make(CCInt)

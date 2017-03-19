@@ -38,6 +38,8 @@ type form_definition = {
      [proxy -> true if form]
      [proxy -> false if not form] (depending on polarity) *)
   polarity : polarity;
+  src: Statement.source;
+  (* source for this definition *)
 }
 
 type term_definition = {
@@ -53,6 +55,7 @@ type definition =
 type ctx = {
   sc_prefix : string;
   sc_prop_prefix : string;
+  mutable sc_counter: int;
   mutable sc_gensym: (string,int) Hashtbl.t; (* prefix -> count *)
   mutable sc_new_defs : definition list; (* "new" definitions *)
   mutable sc_new_ids: (ID.t * type_) list; (* "new" symbols *)
@@ -64,12 +67,15 @@ let create
   let ctx = {
     sc_prefix=prefix;
     sc_prop_prefix=prop_prefix;
+    sc_counter=0;
     sc_new_defs = [];
     sc_gensym = Hashtbl.create 16;
     sc_new_ids = [];
     sc_on_new = on_new;
   } in
   ctx
+
+let incr_counter ctx = ctx.sc_counter <- ctx.sc_counter + 1
 
 let fresh_id ~ctx prefix =
   let n = CCHashtbl.get_or ~default:0 ctx.sc_gensym prefix in
@@ -78,6 +84,7 @@ let fresh_id ~ctx prefix =
   ID.make name
 
 let fresh_skolem_prefix ~ctx ~ty prefix =
+  incr_counter ctx;
   let s = fresh_id ~ctx prefix in
   let kind =
     if Ind_ty.is_inductive_simple_type ty then K_ind else K_normal
@@ -107,6 +114,7 @@ let ty_forall ?loc v ty =
 let ty_forall_l = List.fold_right ty_forall
 
 let skolem_form ~ctx subst var form =
+  incr_counter ctx;
   (* only free variables we are interested in, are those bound to actual
      free variables (the universal variables), not the existential ones
      (bound to Skolem symbols) *)
@@ -135,6 +143,8 @@ let pop_new_skolem_symbols ~ctx =
   ctx.sc_new_ids <- [];
   l
 
+let counter ctx = ctx.sc_counter
+
 (** {2 Definitions} *)
 
 let pp_form_definition out def =
@@ -142,7 +152,7 @@ let pp_form_definition out def =
     T.pp def.proxy T.pp def.form def.add_rules pp_polarity def.polarity
 
 let pp_term_definition out def =
-  let pp_rule out r = Stmt.pp_def_rule T.pp T.pp out r in
+  let pp_rule out r = Stmt.pp_def_rule T.pp T.pp T.pp out r in
   Format.fprintf out "(@[<hv>def_term `%a : %a`@ rules: (@[<hv>%a@])@])"
     ID.pp def.td_id T.pp def.td_ty (Util.pp_list pp_rule) def.td_rules
 
@@ -150,7 +160,8 @@ let pp_definition out = function
   | Def_form f -> pp_form_definition out f
   | Def_term t -> pp_term_definition out t
 
-let define_form ~ctx ~add_rules ~polarity form =
+let define_form ~ctx ~add_rules ~polarity ~src form =
+  incr_counter ctx;
   let tyvars, vars = collect_vars form in
   let vars_t = List.map (fun v->T.var v) vars in
   let tyvars_t = List.map (fun v->T.Ty.var v) tyvars in
@@ -164,6 +175,7 @@ let define_form ~ctx ~add_rules ~polarity form =
     add_rules;
     proxy;
     polarity;
+    src=src f;
   } in
   ctx.sc_new_defs <- Def_form def :: ctx.sc_new_defs;
   Util.debugf ~section 5 "@[<2>define_form@ %a@]" (fun k->k pp_form_definition def);
@@ -175,6 +187,7 @@ let pp_rules =
 let define_term ~ctx rules : term_definition =
   Util.debugf ~section 5
     "(@[<hv2>define_term@ :rules (@[<hv>%a@])@])" (fun k->k pp_rules rules);
+  incr_counter ctx;
   let some_args, ty_ret = match rules with
     | [] -> assert false
     | (args, rhs) :: _ -> args, T.ty_exn rhs

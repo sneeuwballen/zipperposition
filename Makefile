@@ -88,10 +88,18 @@ frogtest-zipper:
 frogtest-hornet:
 	frogtest run -p hornet -c ./tests/conf.toml $(TEST_FILES)
 
-frogtest-tip:
+tip-benchmarks:
+	git submodule update --init tip-benchmarks
+
+frogtest-tip: tip-benchmarks
 	@[ -d tip-benchmarks ] || (echo "missing tip-benchmarks/" && exit 1)
-	frogtest run --meta=`git rev-parse HEAD` \
-	  -c ./tip-benchmarks/conf.toml
+	frogtest run --meta=`git rev-parse HEAD` -c ./data/tip.toml
+
+# restricted version of frogtest-tip
+frogtest-tip-isaplanner: tip-benchmarks
+	@[ -d tip-benchmarks ] || (echo "missing tip-benchmarks/" && exit 1)
+	frogtest run --meta=`git rev-parse HEAD` -c ./data/tip.toml \
+	  tip-benchmarks/benchmarks/isaplanner/
 
 BENCH_DIR="bench-$(shell date -Iminutes)"
 frogtest-tptp:

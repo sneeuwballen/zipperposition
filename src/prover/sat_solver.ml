@@ -78,9 +78,8 @@ module Make(Dummy : sig end)
   let add_clause_ ~proof c =
     if not (ClauseTbl.mem clause_tbl_ c) then (
       Util.incr_stat stat_num_clauses;
-      (* if the clause has only negative lits: check again *)
-      if List.for_all (fun lit -> not (Lit.sign lit)) c
-      then must_check := true;
+      (* add new clause -> check again *)
+      must_check := true;
       let tag = fresh_tag_() in
       ClauseTbl.add clause_tbl_ c (tag,proof);
       Hashtbl.add tag_to_proof_ tag proof;
@@ -131,13 +130,14 @@ module Make(Dummy : sig end)
     | None -> assert false
     | Some p -> p
 
+  let get_proof_opt () = !proof_
+
   module SatForm = struct
     include Lit
     let norm l =
       let l', b = norm l in
       l', if b then FI.Negated else FI.Same_sign
     type proof = ProofStep.t
-    let fresh () = Lit.make (Lit.payload Lit.dummy)
     let print = Lit.pp
   end
 
@@ -280,6 +280,7 @@ module Make(Dummy : sig end)
     if full || !must_check
     then (
       assert (full || not (Queue.is_empty queue_));
+      Util.debug ~section 5 "check_real";
       must_check := false;
       check_unconditional_ ()
     )

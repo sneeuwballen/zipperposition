@@ -7,15 +7,11 @@ open Logtk
 
 val section : Util.Section.t
 
-type rule_term
+type rule
 
-val rhs_term : rule_term -> FOTerm.t
-val pp_rule_term : rule_term CCFormat.printer
-
-type rule_clause
-
-val rhs_clause : rule_clause -> Literal.t list list
-val pp_rule_clause : rule_clause CCFormat.printer
+val lhs : rule -> Literal.t
+val rhs : rule -> Literal.t list list
+val pp_rule : rule CCFormat.printer
 
 (** {6 Set of Rewrite Rules} *)
 module Set : sig
@@ -28,20 +24,10 @@ module Set : sig
   val add_stmt : Statement.clause_t -> t -> t
   (** [add_stmt st set] adds rewrite rules from [st] to [set], if any *)
 
+  val to_seq : t -> rule Sequence.t
+
   val pp : t CCFormat.printer
 end
-
-val normalize_term : Set.t -> FOTerm.t -> FOTerm.t
-(** [normalize rules t] computes the normal form of [t] w.r.t the set
-    of rewrite rules *)
-
-val narrow_term :
-  ?subst:Subst.t ->
-  Set.t Scoped.t ->
-  FOTerm.t Scoped.t ->
-  (rule_term * Subst.t) Sequence.t
-(** [narrow_term rules t] finds the set of rules [(l --> r) in rules]
-    and substitutions [sigma] such that [sigma(l) = sigma(t)] *)
 
 val normalize_clause : Set.t -> Literal.t list -> Literal.t list list option
 (** normalize literals of the clause w.r.t. rules, or return [None]
@@ -51,6 +37,6 @@ val narrow_lit :
   ?subst:Subst.t ->
   Set.t Scoped.t ->
   Literal.t Scoped.t ->
-  (rule_clause * Subst.t) Sequence.t
+  (rule * Subst.t) Sequence.t
 (** [narrow_term rules lit] finds the set of rules [(l --> clauses) in rules]
     and substitutions [sigma] such that [sigma(l) = sigma(tit)] *)

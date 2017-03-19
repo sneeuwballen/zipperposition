@@ -1,0 +1,7 @@
+# expect: unsat
+
+# need generalization to work (to go back to associativity of +)
+
+include "nat.zf".
+
+goal forall X. plus X (plus X X) = plus (plus X X) X.

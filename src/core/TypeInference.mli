@@ -60,11 +60,17 @@ end
 module Ctx : sig
   type t
 
-  val create : ?def_as_rewrite:bool -> ?default:type_ -> unit -> t
+  val create :
+    ?def_as_rewrite:bool ->
+    ?default:type_ ->
+    ?on_undef:[`Warn | `Fail | `Guess] ->
+    unit ->
+    t
   (** New context with a signature and default types.
       @param default which types are inferred by default (if not provided
         then {!type_erm} will be used)
-      @param def_as_rewrite if true, definitions will be treated like rewrite rules *)
+      @param def_as_rewrite if true, definitions will be treated like rewrite rules
+      @param on_undef behavior when an undefined identifier is met *)
 
   val copy : t -> t
   (** Copy of the context *)
@@ -152,6 +158,7 @@ val infer_statement_exn :
 
 val infer_statements_exn :
   ?def_as_rewrite:bool ->
+  ?on_undef:[`Warn | `Fail | `Guess] ->
   ?ctx:Ctx.t ->
   UntypedAST.statement Sequence.t ->
   typed_statement CCVector.ro_vector
@@ -160,6 +167,7 @@ val infer_statements_exn :
 
 val infer_statements :
   ?def_as_rewrite:bool ->
+  ?on_undef:[`Warn | `Fail | `Guess] ->
   ?ctx:Ctx.t ->
   UntypedAST.statement Sequence.t ->
   typed_statement CCVector.ro_vector or_error

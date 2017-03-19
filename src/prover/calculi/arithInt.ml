@@ -1941,12 +1941,11 @@ module Make(E : Env.S) : S with module Env = E = struct
           (* prepare to build clauses *)
           let acc = ref [] in
           let add_clause ~by ~which lits =
-            let rule = ProofStep.mk_rule "var_elim"
-                ~comment:
-                  [ which
-                  ; CCFormat.sprintf "elim %s×%a → %a"
-                      (Z.to_string view.NVE.lcm) HVar.pp x M.pp by]
+            let rule_name =
+              CCFormat.sprintf "var_elim(%s×%a → %a)" (Z.to_string view.NVE.lcm)
+                HVar.pp x M.pp by
             in
+            let rule = ProofStep.mk_rule rule_name ~comment: [ which] in
             let proof = ProofStep.mk_inference ~rule [C.proof c] in
             let new_c = C.create ~trail:(C.trail c) lits proof in
             Util.debugf ~section 5

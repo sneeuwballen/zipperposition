@@ -9,13 +9,13 @@
 
 val section : Logtk.Util.Section.t
 
-type inductive_path = Ind_cst.path
+type inductive_case = Cover_set.case
 
 type payload = private
   | Fresh (* fresh literal with no particular payload *)
   | Clause_component of Literals.t
-  | Lemma of Literals.t list
-  | Case of inductive_path (* branch in the induction tree *)
+  | Lemma of Cut_form.t
+  | Case of inductive_case list
 
 module Lit : Bool_lit_intf.S with type payload = payload
 
@@ -31,28 +31,32 @@ val inject_lits : Literals.t -> t
     The boolean literal can be negative is the argument is a
     unary negative clause *)
 
-val inject_lemma : Literals.t list -> t
-(** Make a new literal from this list of clauses that we are going to cut
+val inject_lemma : Cut_form.t -> t
+(** Make a new literal from this formula that we are going to cut
     on. This is generative, meaning that calling it twice with the
     same arguments will produce distinct literals. *)
 
-val inject_case : inductive_path -> t
+val inject_case : inductive_case list -> t
 (** Inject [cst = case] *)
 
 val payload : t -> payload
 (** Obtain the payload of this boolean literal, that is, what the literal
     represents *)
 
-val as_case : t -> inductive_path option
+val is_case : t -> bool
+
+val as_case : t -> inductive_case list option
 (** If [payload t = Case p], then return [Some p], else return [None] *)
+
+val as_lemma : t -> Cut_form.t option
 
 val must_be_kept : t -> bool
 (** [must_be_kept lit] means that [lit] should survive in boolean splitting,
     that is, that if [C <- lit, Gamma] then any clause derived from [C]
     recursively will have [lit] in its trail. *)
 
-val is_inductive : t -> bool
-(** returns [true] if the bool literal represents an inductive branch *)
+val is_lemma : t -> bool
+(** returns [true] if the bool literal represents a lemma *)
 
 (** {2 Printers}
     Those printers print the content (injection) of a boolean literal, if any *)

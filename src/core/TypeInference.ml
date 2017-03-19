@@ -12,6 +12,7 @@ module T = TypedSTerm
 module Loc = ParseLocation
 module Err = CCResult
 module Subst = Var.Subst
+module Fmt = CCFormat
 
 let prof_infer = Util.mk_profiler "TypeInference.infer"
 let section = Util.Section.(make ~parent:zip "ty_infer")
@@ -28,7 +29,7 @@ exception Error of string
 let () = Printexc.register_printer
     (function
       | Error msg ->
-        Some (CCFormat.sprintf "@[<2>@{<Red>type inference error@}:@ %s@]" msg)
+        Some (CCFormat.sprintf "@[@{<Red>type inference error@}:@ %s@]" msg)
       | _ -> None)
 
 (* error-raising function *)
@@ -115,6 +116,8 @@ module Ctx = struct
     (* map names to variables or IDs *)
     def_as_rewrite: bool;
     (* if true, definitions are rewrite rules *)
+    on_undef: [`Warn | `Fail | `Guess];
+    (* what to do when we meet an undefined symbol *)
     mutable new_metas: T.meta_var list;
     (* variables that should be generalized in the global scope
        or bound to [default], if they are not bound *)
@@ -126,10 +129,11 @@ module Ctx = struct
     (* list of symbols whose type has been inferred recently *)
   }
 
-  let create ?(def_as_rewrite=true) ?(default=T.Ty.term) () =
+  let create ?(def_as_rewrite=true) ?(default=T.Ty.term) ?(on_undef=`Guess) () =
     let ctx = {
       default;
       def_as_rewrite;
+      on_undef;
       env = Hashtbl.create 32;
       datatypes = ID.Tbl.create 32;
       new_metas=[];
@@ -191,8 +195,9 @@ module Ctx = struct
   let declare ctx s ty =
     let name = ID.name s in
     Util.debugf ~section 3 "@{<yellow>declare@} %a:@ @[%a@]" (fun k->k ID.pp s T.pp ty);
-    if Hashtbl.mem ctx.env name
-    then Util.warnf "@[<2>shadowing identifier %s@]" name;
+    if Hashtbl.mem ctx.env name then (
+      Util.warnf "@[<2>shadowing identifier %s@]" name;
+    );
     Hashtbl.add ctx.env name (`ID (s,ty))
 
   (* generate fresh type var. *)
@@ -217,15 +222,32 @@ module Ctx = struct
     let ty = T.Ty.fun_ (List.map (fun v->T.Ty.meta v) new_vars) (T.Ty.meta ret) in
     ty
 
+  let find_close_names ctx (s:string): string list =
+    CCHashtbl.keys ctx.env
+    |> Sequence.filter
+      (fun s' -> CCString.edit_distance s s' < 2)
+    |> Sequence.to_rev_list
+    |> CCList.sort_uniq ~cmp:String.compare
+
+  let pp_names out = function
+    | [] -> ()
+    | l ->
+      Fmt.fprintf out " (did you mean any of [@[%a@]]?)" (Util.pp_list Fmt.string) l
+
   let get_id_ ?loc ~arity ctx name =
     try match Hashtbl.find ctx.env name with
       | `ID (id, ty) -> id, ty
       | `Var _ -> error_ ?loc "@[<2>expected `%s` to be a constant, not a variable@]" name
     with Not_found ->
       let ty = fresh_fun_ty ~arity ctx in
-      Util.debugf ~section 2
-        "@[<2>unknown constant %s,@ will infer a default type @[%a@]@]"
-        (fun k->k name T.pp ty);
+      begin match ctx.on_undef with
+        | `Fail -> error_ ?loc "unknown identifier %s" name
+        | `Guess -> ()
+        | `Warn ->
+          Util.warnf
+            "@[<2>unknown constant %s@,%a,@ will create one with type @[%a@]@]"
+            name pp_names (find_close_names ctx name) T.pp ty;
+      end;
       let id = ID.make name in
       Hashtbl.add ctx.env name (`ID (id, ty));
       ctx.new_types <- (id, ty) :: ctx.new_types;
@@ -244,6 +266,14 @@ module Ctx = struct
       | PT.V v ->
         try Hashtbl.find ctx.env v
         with Not_found ->
+          begin match ctx.on_undef with
+            | `Fail -> error_ "unknown variable %s@,%a" v pp_names (find_close_names ctx v)
+            | `Guess -> ()
+            | `Warn ->
+              Util.warnf
+                "@[<2>create implicit variable %s@,%a@]"
+                v pp_names (find_close_names ctx v);
+          end;
           let v' = mk_fresh v in
           Hashtbl.add ctx.env v (`Var v');
           `Var v'
@@ -754,6 +784,7 @@ let rec as_def ?loc bound t =
       |> Sequence.flat_map T.Seq.free_vars
       |> Var.Set.add_seq bound
       |> Var.Set.to_list
+      |> T.sort_ty_vars_first
     in
     `Term (vars, id, ty, args, rhs)
   and yield_prop lhs rhs =
@@ -762,10 +793,11 @@ let rec as_def ?loc bound t =
       |> Sequence.flat_map T.Seq.free_vars
       |> Var.Set.add_seq bound
       |> Var.Set.to_list
+      |> T.sort_ty_vars_first
     in
     `Prop (vars, lhs, rhs)
   in
-  match T.view t with
+  begin match T.view t with
     | T.Bind (Binder.Forall, v, t) ->
       as_def ?loc (Var.Set.add bound v) t
     | T.AppBuiltin (Builtin.Equiv, [lhs;rhs]) ->
@@ -800,6 +832,7 @@ let rec as_def ?loc bound t =
       let lhs = SLiteral.of_form t in
       yield_prop lhs rhs
     | _ -> fail()
+  end
 
 let infer_defs ?loc ctx (l:A.def list): (_,_,_) Stmt.def list =
   (* first, declare all *)
@@ -809,10 +842,11 @@ let infer_defs ?loc ctx (l:A.def list): (_,_,_) Stmt.def list =
          let id = ID.make d.A.def_id in
          let ty = infer_ty_exn ctx d.A.def_ty in
          (* cannot return [Type] *)
-         if T.Ty.returns_tType ty
-         then error_ ?loc
+         if T.Ty.returns_tType ty then (
+           error_ ?loc
              "in definition of %a,@ equality between types is forbidden"
              ID.pp id;
+         );
          Ctx.declare ctx id ty;
          id, ty, d.A.def_rules)
       l
@@ -825,7 +859,15 @@ let infer_defs ?loc ctx (l:A.def list): (_,_,_) Stmt.def list =
            (fun r ->
               let r = infer_prop_exn ctx r in
               begin match as_def ?loc Var.Set.empty r with
-                | `Term (vars,id,_,args,rhs) ->
+                | `Term (vars,id',_,args,rhs) ->
+                  (* check that we talk about the same ID *)
+                  if not (ID.equal id id') then (
+                    error_ ?loc
+                      "rule `%a`@ for `%a` has head symbol `%a`@ \
+                       every rule in the definition of `%a` \
+                       must start with `%a`"
+                      T.pp r ID.pp id ID.pp id' ID.pp id ID.pp id;
+                  );
                   Stmt.Def_term (vars,id,ty,args,rhs)
                 | `Prop (vars,lhs,rhs) ->
                   assert (T.Ty.is_prop (T.ty_exn rhs));
@@ -859,9 +901,10 @@ let infer_statement_exn ctx st =
       let t =  infer_prop_ ctx t in
       begin match as_def ?loc Var.Set.empty t with
         | `Term (vars,id,ty,args,rhs) ->
-          if T.Ty.returns_tType ty
-          then error_ ?loc
+          if T.Ty.returns_tType ty then (
+            error_ ?loc
               "in definition of %a,@ equality between types is forbidden" ID.pp id;
+          );
           Stmt.rewrite_term ~src:(mk_src Stmt.R_assert) (vars,id,ty,args,rhs)
         | `Prop (vars,lhs,rhs) ->
           assert (T.Ty.is_prop (T.ty_exn rhs));
@@ -937,9 +980,9 @@ let infer_statement_exn ctx st =
   in
   st, aux
 
-let infer_statements_exn ?def_as_rewrite ?ctx seq =
+let infer_statements_exn ?def_as_rewrite ?on_undef ?ctx seq =
   let ctx = match ctx with
-    | None -> Ctx.create ?def_as_rewrite ()
+    | None -> Ctx.create ?def_as_rewrite ?on_undef ()
     | Some c -> c
   in
   let res = CCVector.create () in
@@ -952,7 +995,7 @@ let infer_statements_exn ?def_as_rewrite ?ctx seq =
     seq;
   CCVector.freeze res
 
-let infer_statements ?def_as_rewrite ?ctx seq =
-  try Err.return (infer_statements_exn ?def_as_rewrite ?ctx seq)
+let infer_statements ?def_as_rewrite ?on_undef ?ctx seq =
+  try Err.return (infer_statements_exn ?def_as_rewrite ?on_undef ?ctx seq)
   with e -> Err.of_exn_trace e
 

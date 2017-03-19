@@ -54,6 +54,9 @@ end
 val set_debug : int -> unit (** Set debug level of [Section.root] *)
 val get_debug : unit -> int (** Current debug level for [Section.root] *)
 
+val break_on_debug : bool ref
+(** Shall we wait for user input after each debug message? *)
+
 val debugf : ?section:Section.t ->
   int ->
   ('a, Format.formatter, unit, unit) format4 ->
@@ -175,6 +178,8 @@ val pp_list0 : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
 val ord_option : 'a CCOrd.t -> 'a option CCOrd.t
 
 val map_product : f:('a -> 'b list list) -> 'a list -> 'b list list
+
+val seq_map_l : f:('a -> 'b list) -> 'a list -> 'b list Sequence.t
 
 val invalid_argf: ('a, Format.formatter, unit, 'b) format4 -> 'a
 val failwithf : ('a, Format.formatter, unit, 'b) format4 -> 'a

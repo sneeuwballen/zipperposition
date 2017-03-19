@@ -39,6 +39,9 @@ let mk_rule ?(subst=[]) ?(pos=[]) ?(comment=[]) name =
       |> map_append (fun x->I_comment x) comment;
   }
 
+let mk_rulef ?subst ?pos ?comment fmt =
+  CCFormat.ksprintf ~f:(mk_rule ?subst ?pos ?comment) fmt
+
 (** Classification of proof steps *)
 type kind =
   | Inference of rule
@@ -46,6 +49,7 @@ type kind =
   | Esa of rule
   | Assert of statement_src
   | Goal of statement_src
+  | Lemma
   | Data of statement_src * Type.t Statement.data
   | Trivial (** trivial, or trivial within theories *)
 
@@ -53,6 +57,7 @@ type result =
   | Form of form
   | Clause of SClause.t
   | BoolClause of bool_lit list
+  | Stmt of Statement.input_t
 
 (** A proof step, without the conclusion *)
 type t = {
@@ -83,15 +88,18 @@ let res_to_int_ = function
   | Clause _ -> 0
   | Form _ -> 1
   | BoolClause _ -> 2
+  | Stmt _ -> 3
 
 let compare_result a b = match a, b with
   | Clause c1, Clause c2 -> SClause.compare c1 c2
   | Form f1, Form f2 -> TypedSTerm.compare f1 f2
   | BoolClause l1, BoolClause l2 -> CCOrd.list BBox.Lit.compare l1 l2
+  | Stmt s1, Stmt s2 -> Statement.compare s1 s2
   | Clause _, _
   | Form _, _
-  | BoolClause _, _ ->
-    CCInt.compare (res_to_int_ a) (res_to_int_ b)
+  | BoolClause _, _
+  | Stmt _, _
+    -> CCInt.compare (res_to_int_ a) (res_to_int_ b)
 
 let compare_proof a b =
   let (<?>) = CCOrd.(<?>) in
@@ -101,9 +109,12 @@ let equal_result a b = match a, b with
   | Clause c1, Clause c2 -> SClause.equal c1 c2
   | Form f1, Form f2 -> TypedSTerm.equal f1 f2
   | BoolClause l1, BoolClause l2 -> CCList.equal BBox.Lit.equal l1 l2
+  | Stmt s1, Stmt s2 -> Statement.compare s1 s2 = 0
   | Clause _, _
   | Form _, _
-  | BoolClause _, _ -> false
+  | BoolClause _, _
+  | Stmt _, _
+    -> false
 
 let equal_proof a b =
   equal a.step b.step && equal_result a.result b.result
@@ -127,6 +138,7 @@ let get_id_ () =
   n
 
 let mk_trivial = {id=get_id_(); parents=[]; kind=Trivial; dist_to_goal=None; }
+let mk_lemma = {id=get_id_(); parents=[]; kind=Lemma; dist_to_goal=Some 0; }
 
 let combine_dist o p = match o, p.step.dist_to_goal with
   | None, None -> None
@@ -188,6 +200,7 @@ let mk_f_esa ~rule f parents =
 
 let mk_c step c = {step; result=Clause c; }
 let mk_bc step c = {step; result=BoolClause c; }
+let mk_stmt step stmt = {step; result=Stmt stmt; }
 
 let adapt_c p c =
   { p with result=Clause c; }
@@ -201,6 +214,7 @@ let is_trivial = function
 
 let rule p = match p.kind with
   | Trivial
+  | Lemma
   | Assert _
   | Data _
   | Goal _-> None
@@ -209,7 +223,7 @@ let rule p = match p.kind with
   | Inference rule -> Some rule
 
 let is_assert p = match p.kind with Assert _ -> true | _ -> false
-let is_goal p = match p.kind with Goal _ -> true  | _ -> false
+let is_goal p = match p.kind with Goal _ | Lemma -> true | _ -> false
 
 (** {2 Proof traversal} *)
 
@@ -243,11 +257,19 @@ let rec pp_src_tstp out src = match Stmt.Src.view src with
   | Stmt.CNF (_,src') ->
     Format.fprintf out "inference(@['clausify',@ [status(esa)],@ [%a]@])"
       pp_src_tstp src'
+  | Stmt.Preprocess ((_,src'),msg) ->
+    Format.fprintf out
+      "inference(@['%s',@ [status(esa)],@ [%a]@])" msg pp_src_tstp src'
+  | Stmt.Renaming ((_,src'), id, form) ->
+    Format.fprintf out
+      "inference(@['renaming',@ [status(esa)],@ [%a],@ on(@[%a<=>%a@])@])"
+      pp_src_tstp src' ID.pp id TypedSTerm.TPTP.pp form
 
 let pp_kind_tstp out k =
   match k with
     | Assert src
     | Goal src -> pp_src_tstp out src
+    | Lemma -> Format.fprintf out "lemma"
     | Data _ -> Util.error ~where:"ProofStep" "cannot print `Data` step in TPTP"
     | Inference rule ->
       Format.fprintf out "inference(%a, [status(thm)])" (pp_rule ~info:false) rule
@@ -271,11 +293,17 @@ let rec pp_src out src = match Stmt.Src.view src with
     Format.fprintf out "(@[neg@ %a@])" pp_src src'
   | Stmt.CNF (_,src') ->
     Format.fprintf out "(@[CNF@ %a@])" pp_src src'
+  | Stmt.Renaming ((_,src'), id, form) ->
+    Format.fprintf out "(@[renaming@ [%a]@ :name %a@ :on @[%a@]@])"
+      pp_src src' ID.pp id TypedSTerm.pp form
+  | Stmt.Preprocess ((_,src'),msg) ->
+    Format.fprintf out "(@[preprocess@ [%a]@ :msg %S@])" pp_src src' msg
 
 let pp_kind out k =
   match k with
     | Assert src -> pp_src out src
     | Goal src -> Format.fprintf out "goal %a" pp_src src
+    | Lemma -> Format.fprintf out "lemma"
     | Data (src, _) -> Format.fprintf out "data %a" pp_src src
     | Inference rule ->
       Format.fprintf out "inf %a" (pp_rule ~info:true) rule

@@ -1,0 +1,21 @@
+
+provers = [ "zipperposition" ]
+
+[test]
+
+default_expect = "unsat"
+
+timeout = 30 # in s
+memory = 2000 # in MB
+provers = [ "zipperposition" ]
+problems = ".*.smt2"
+dir = [ "tip-benchmarks/benchmarks/" ]
+
+[zipperposition]
+
+binary = "./zipperposition.native"
+cmd = "./zipperposition.native $file --timeout $timeout --mem-limit $memory --output none"
+unsat = "SZS status (Theorem|Unsatisfiable)"
+sat = "SZS status (CounterSatisfiable|Satisfiable)"
+timeout = "SZS Status ResourceOut"
+version = "git:."

@@ -107,6 +107,8 @@ val is_const : t -> bool
 
 val as_const : t -> ID.t option
 val as_const_exn : t -> ID.t
+val as_var : t -> var option
+val as_var_exn : t -> var
 
 val of_term_unsafe : InnerTerm.t -> t
 (** {b NOTE}: this can break the invariants and make {!view} fail. Only
