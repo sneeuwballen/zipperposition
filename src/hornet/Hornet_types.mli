@@ -44,6 +44,8 @@ and proof =
   | P_from_file of Statement.from_file * Statement.role
   | P_cnf_neg of proof_with_res
   | P_cnf of proof_with_res
+  | P_renaming of proof_with_res * ID.t * formula
+  | P_preprocess of proof_with_res * string
   | P_instance of clause * Subst.t
   | P_avatar_split of clause
   (* given clause has been split into var-disjoint components,

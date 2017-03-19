@@ -53,6 +53,7 @@ type result =
   | Form of form
   | Clause of SClause.t
   | BoolClause of bool_lit list
+  | Stmt of Statement.input_t
 
 (** A proof step, without the conclusion *)
 type t = private {
@@ -122,6 +123,8 @@ val mk_f_esa : rule:rule -> form -> of_ list -> of_
 val mk_c : t -> SClause.t -> of_
 
 val mk_bc : t -> bool_lit list -> of_
+
+val mk_stmt : t -> Statement.input_t -> of_
 
 val adapt_f : of_ -> form -> of_
 val adapt_c : of_ -> SClause.t -> of_

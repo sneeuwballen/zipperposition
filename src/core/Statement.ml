@@ -60,19 +60,21 @@ type from_file = {
 }
 
 type lit = FOTerm.t SLiteral.t
+type formula = TypedSTerm.t
 type clause = lit list
 
-type ('f, 't, 'ty) t = {
-  view: ('f, 't, 'ty) view;
-  attrs: attrs;
-  src: source;
-}
-
-and role =
+type role =
   | R_assert
   | R_goal
   | R_def
   | R_decl
+
+type ('f, 't, 'ty) t = {
+  id: int;
+  view: ('f, 't, 'ty) view;
+  attrs: attrs;
+  src: source;
+}
 
 and source = {
   src_id: int;
@@ -84,16 +86,20 @@ and source_view =
   | Internal of role
   | Neg of sourced_t
   | CNF of sourced_t
+  | Renaming of sourced_t * ID.t * formula (* renamed this formula *)
+  | Preprocess of sourced_t * string
 
 and result =
   | Sourced_input of TypedSTerm.t
   | Sourced_clause of clause
+  | Sourced_statement of input_t
 
 and sourced_t = result * source
 
-type input_t = (TypedSTerm.t, TypedSTerm.t, TypedSTerm.t) t
-type clause_t = (clause, FOTerm.t, Type.t) t
+and input_t = (TypedSTerm.t, TypedSTerm.t, TypedSTerm.t) t
+and clause_t = (clause, FOTerm.t, Type.t) t
 
+let compare a b = CCInt.compare a.id b.id
 let view t = t.view
 let attrs t = t.attrs
 let src t = t.src
@@ -104,7 +110,9 @@ let mk_data id ~args ty cstors =
 let mk_def ?(rewrite=false) id ty rules =
   { def_id=id; def_ty=ty; def_rules=rules; def_rewrite=rewrite; }
 
-let mk_ ?(attrs=[]) ~src view = {src; view; attrs; }
+let id_n_ = ref 0
+let mk_ ?(attrs=[]) ~src view: (_,_,_) t =
+  {id=CCRef.incr_then_get id_n_; src; view; attrs; }
 
 let ty_decl ?attrs ~src id ty = mk_ ?attrs ~src (TyDecl (id,ty))
 let def ?attrs ~src l = mk_ ?attrs ~src (Def l)
@@ -184,12 +192,19 @@ module Src = struct
   let internal r : t = mk_ (Internal r)
   let neg x : t = mk_ (Neg x)
   let cnf x : t = mk_ (CNF x)
+  let renaming x id f : t = mk_ (Renaming (x, id, f))
+  let preprocess x str : t = mk_ (Preprocess (x,str))
 
   let neg_input f src = neg (Sourced_input f, src)
   let neg_clause c src = neg (Sourced_clause c, src)
 
   let cnf_input f src = cnf (Sourced_input f, src)
   let cnf_clause c src = cnf (Sourced_clause c, src)
+
+  let renaming_input input id f =
+    renaming (Sourced_statement input, input.src) id f
+  let preprocess_input input str =
+    preprocess (Sourced_statement input, input.src) str
 
   let pp_from_file out x =
     let pp_name out = function

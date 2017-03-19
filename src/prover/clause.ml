@@ -13,7 +13,6 @@ module Lits = Literals
 module Stmt = Statement
 
 let stat_clause_create = Util.mk_stat "clause.create"
-let prof_clause_create = Util.mk_profiler "clause_create"
 
 module type S = Clause_intf.S
 
@@ -93,7 +92,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   (* private function for building clauses *)
   let create_inner ~selected sclause proof =
-    Util.enter_prof prof_clause_create;
     (* create the structure *)
     let c = {
       sclause;
@@ -103,7 +101,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     } in
     (* return clause *)
     Util.incr_stat stat_clause_create;
-    Util.exit_prof prof_clause_create;
     c
 
   let of_sclause c proof =
@@ -128,6 +125,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let rule_neg_ = ProofStep.mk_rule ~comment:["negate goal to find a refutation"] "neg_goal"
   let rule_cnf_ = ProofStep.mk_rule "cnf"
+  let rule_renaming_ = ProofStep.mk_rule "renaming"
+  let rule_preprocess_ msg = ProofStep.mk_rulef "preprocess(%s)" msg
 
   module Src_tbl = CCHashtbl.Make(struct
       type t = Stmt.source
@@ -149,6 +148,13 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         | Stmt.Internal _ -> ProofStep.mk_trivial
         | Stmt.Neg srcd -> ProofStep.mk_esa ~rule:rule_neg_ [proof_of_sourced srcd]
         | Stmt.CNF srcd -> ProofStep.mk_esa ~rule:rule_cnf_ [proof_of_sourced srcd]
+        | Stmt.Preprocess (srcd,msg) ->
+          ProofStep.mk_esa ~rule:(rule_preprocess_ msg) [proof_of_sourced srcd]
+        | Stmt.Renaming (srcd,id,form) ->
+          ProofStep.mk_esa ~rule:rule_renaming_
+            [proof_of_sourced srcd;
+             ProofStep.mk_f_trivial
+               TypedSTerm.(Form.eq (const id ~ty:Ty.prop) form)]
       in
       Src_tbl.add input_proof_tbl_ src p;
       p
@@ -162,6 +168,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         let lits = List.map Ctx.Lit.of_form c |> Array.of_list in
         let c = SClause.make ~trail:Trail.empty lits in
         ProofStep.mk_c p c
+      | Stmt.Sourced_statement stmt ->
+        ProofStep.mk_stmt p stmt
     end
 
   let of_statement st =

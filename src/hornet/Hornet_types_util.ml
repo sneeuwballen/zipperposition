@@ -154,6 +154,8 @@ let pp_proof out (p:proof) : unit = match p with
     Fmt.fprintf out "(@[<2>input :role %a@])" Stmt.Src.pp_role r
   | P_cnf _ -> Fmt.string out "cnf"
   | P_cnf_neg _ -> Fmt.string out "cnf_neg"
+  | P_renaming (_,id,_) -> Fmt.fprintf out "(@[renaming :id %a@])" ID.pp id
+  | P_preprocess (_,msg) -> Fmt.fprintf out "(@[preprocess %S@])" msg
   | P_instance (c, subst) ->
     Fmt.fprintf out "(@[<hv2>instance@ :clause %a@ :subst %a@])"
       pp_clause c Subst.pp subst

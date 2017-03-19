@@ -303,6 +303,7 @@ module Make(X : sig
         match p.result with
           | Clause c' -> SClause.is_backward_simplified c'
           | BoolClause _
+          | Stmt _
           | Form _ -> false
       else
         List.exists

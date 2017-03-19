@@ -57,6 +57,7 @@ type result =
   | Form of form
   | Clause of SClause.t
   | BoolClause of bool_lit list
+  | Stmt of Statement.input_t
 
 (** A proof step, without the conclusion *)
 type t = {
@@ -87,15 +88,18 @@ let res_to_int_ = function
   | Clause _ -> 0
   | Form _ -> 1
   | BoolClause _ -> 2
+  | Stmt _ -> 3
 
 let compare_result a b = match a, b with
   | Clause c1, Clause c2 -> SClause.compare c1 c2
   | Form f1, Form f2 -> TypedSTerm.compare f1 f2
   | BoolClause l1, BoolClause l2 -> CCOrd.list BBox.Lit.compare l1 l2
+  | Stmt s1, Stmt s2 -> Statement.compare s1 s2
   | Clause _, _
   | Form _, _
-  | BoolClause _, _ ->
-    CCInt.compare (res_to_int_ a) (res_to_int_ b)
+  | BoolClause _, _
+  | Stmt _, _
+    -> CCInt.compare (res_to_int_ a) (res_to_int_ b)
 
 let compare_proof a b =
   let (<?>) = CCOrd.(<?>) in
@@ -105,9 +109,12 @@ let equal_result a b = match a, b with
   | Clause c1, Clause c2 -> SClause.equal c1 c2
   | Form f1, Form f2 -> TypedSTerm.equal f1 f2
   | BoolClause l1, BoolClause l2 -> CCList.equal BBox.Lit.equal l1 l2
+  | Stmt s1, Stmt s2 -> Statement.compare s1 s2 = 0
   | Clause _, _
   | Form _, _
-  | BoolClause _, _ -> false
+  | BoolClause _, _
+  | Stmt _, _
+    -> false
 
 let equal_proof a b =
   equal a.step b.step && equal_result a.result b.result
@@ -193,6 +200,7 @@ let mk_f_esa ~rule f parents =
 
 let mk_c step c = {step; result=Clause c; }
 let mk_bc step c = {step; result=BoolClause c; }
+let mk_stmt step stmt = {step; result=Stmt stmt; }
 
 let adapt_c p c =
   { p with result=Clause c; }
@@ -249,6 +257,13 @@ let rec pp_src_tstp out src = match Stmt.Src.view src with
   | Stmt.CNF (_,src') ->
     Format.fprintf out "inference(@['clausify',@ [status(esa)],@ [%a]@])"
       pp_src_tstp src'
+  | Stmt.Preprocess ((_,src'),msg) ->
+    Format.fprintf out
+      "inference(@['%s',@ [status(esa)],@ [%a]@])" msg pp_src_tstp src'
+  | Stmt.Renaming ((_,src'), id, form) ->
+    Format.fprintf out
+      "inference(@['renaming',@ [status(esa)],@ [%a],@ on(@[%a<=>%a@])@])"
+      pp_src_tstp src' ID.pp id TypedSTerm.TPTP.pp form
 
 let pp_kind_tstp out k =
   match k with
@@ -278,6 +293,11 @@ let rec pp_src out src = match Stmt.Src.view src with
     Format.fprintf out "(@[neg@ %a@])" pp_src src'
   | Stmt.CNF (_,src') ->
     Format.fprintf out "(@[CNF@ %a@])" pp_src src'
+  | Stmt.Renaming ((_,src'), id, form) ->
+    Format.fprintf out "(@[renaming@ [%a]@ :name %a@ :on @[%a@]@])"
+      pp_src src' ID.pp id TypedSTerm.pp form
+  | Stmt.Preprocess ((_,src'),msg) ->
+    Format.fprintf out "(@[preprocess@ [%a]@ :msg %S@])" pp_src src' msg
 
 let pp_kind out k =
   match k with

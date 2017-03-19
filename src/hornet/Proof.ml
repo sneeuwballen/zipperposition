@@ -46,6 +46,8 @@ let name (p:t): string = match p with
   | P_from_file _ -> "from_file"
   | P_cnf_neg _ -> "cnf_neg"
   | P_cnf _ -> "cnf"
+  | P_renaming _ -> "renaming"
+  | P_preprocess _ -> "preprocess"
   | P_bool_tauto -> "bool_tauto"
   | P_avatar_split _ -> "avatar_split"
   | P_avatar_cut _ -> "avatar_cut"
@@ -68,6 +70,12 @@ let parents (p:t): proof_with_res list = match p with
     -> []
   | P_cnf_neg r
   | P_cnf r -> [r]
+  | P_preprocess (r, _) -> [r]
+  | P_renaming (r, id, form) ->
+    let def =
+      trivial, PR_formula (TypedSTerm.(Form.eq (const id ~ty:Ty.prop) form))
+    in
+    [r; def]
   | P_avatar_split c
   | P_split (c,_,_)
   | P_instance (c,_) -> [c.c_proof, PR_clause c]
@@ -111,6 +119,9 @@ let rec proof_of_stmt src : t =
       | Stmt.Internal _ -> trivial
       | Stmt.Neg srcd -> P_cnf_neg (proof_of_sourced srcd)
       | Stmt.CNF srcd -> P_cnf (proof_of_sourced srcd)
+      | Stmt.Preprocess (srcd,str) -> P_preprocess (proof_of_sourced srcd, str)
+      | Stmt.Renaming (srcd, id, form) ->
+        P_renaming (proof_of_sourced srcd, id, form)
     in
     Src_tbl.add input_proof_tbl_ src p;
     p
@@ -121,6 +132,7 @@ and proof_of_sourced (x:Stmt.sourced_t) : proof_with_res =
   let p = proof_of_stmt src in
   let res = match r with
     | Stmt.Sourced_input f -> PR_formula f
+    | Stmt.Sourced_statement _
     | Stmt.Sourced_clause _ -> assert false (* TODO: how? dep cycles… *)
   in
   p, res

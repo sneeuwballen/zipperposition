@@ -342,6 +342,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       List.exists (fun parent -> in_proof_of_ parent lit) (ProofStep.parents p)
     in
     begin match ProofStep.result p with
+      | ProofStep.Stmt _
       | ProofStep.Form _
       | ProofStep.Clause _ -> in_proof_ (ProofStep.step p) lit
       | ProofStep.BoolClause l ->

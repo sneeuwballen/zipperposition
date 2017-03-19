@@ -53,6 +53,7 @@ let pp_result out = function
   | Clause c ->
     Format.fprintf out "%a/%d" C.pp c (C.id c)
   | BoolClause lits -> BBox.pp_bclause out lits
+  | Stmt stmt -> Statement.pp_input out stmt
 
 let pp_result_of out proof = pp_result out proof.result
 
@@ -142,7 +143,7 @@ let pp_tstp out proof =
          List.map (fun p -> `Name (get_name ~namespace p)) p.step.parents
        in
        let role = "plain" in (* TODO *)
-       match p.result with
+       begin match p.result with
          | Form f ->
            Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]).@]@,"
              name role TypedSTerm.TPTP.pp f pp_kind_tstp (p.step.kind,parents)
@@ -153,7 +154,10 @@ let pp_tstp out proof =
          | Clause c ->
            Format.fprintf out "@[<2>tff(%d, %s,@ @[%a@],@ @[%a@]).@]@,"
              name role C.pp_tstp c pp_kind_tstp (p.step.kind,parents)
-    );
+         | Stmt stmt ->
+           let module T = TypedSTerm in
+           Statement.pp T.TPTP.pp T.TPTP.pp T.TPTP.pp out stmt
+       end);
   Format.fprintf out "@]";
   ()
 
