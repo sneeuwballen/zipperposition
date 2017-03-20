@@ -287,9 +287,7 @@ module Make
 
   let has_pos_lit_ c = CCArray.exists Literal.is_pos (C.lits c)
 
-  (* TODO: remove or adapt (using notion of position of defined symbols) *)
-  (* sub-terms of an inductive type, that occur several times (candidate
-     for "subterm generalization" *)
+  (* TODO: readapt? *)
   let generalizable_subterms c: term list =
     let count = T.Tbl.create 16 in
     C.Seq.terms c
@@ -469,7 +467,7 @@ module Make
              "(@[<2>induction on (@[%a@])@ :form %a@ @[<2>:cases (@[%a@])@]@ \
               :depth %d@ @[<2>:res [@[<hv>%a@]]@]@])"
              (fun k-> k (Util.pp_list HVar.pp) vars Cut_form.pp g
-                 (Util.pp_list (Fmt.Dump.pair HVar.pp Cover_set.Case.pp)) cases
+                 (Util.pp_list Fmt.(pair ~sep:(return ":=@ ") HVar.pp Cover_set.Case.pp)) cases
                  depth (Util.pp_list C.pp) res);
            res)
     in
@@ -630,7 +628,7 @@ module Make
     end
 
   (* replace the constants by fresh variables in the given clauses,
-     returning a goal *)
+     returning a goal. *)
   let generalize_clauses
       (cs:Lits.t list)
       ~(generalize_on:Ind_cst.ind_skolem list) : Goal.t =
@@ -676,11 +674,17 @@ module Make
 
   (* try to prove theses clauses by turning the given constants into
      variables, negating the clauses, adn introducing the result
-     as a lemma to be proved by induction *)
+     as a lemma to be proved by induction.
+
+      @param generalize_on the set of (skolem) constants that are replaced
+       by free variables in the negation of [clauses] *)
   let prove_by_ind (clauses:C.t list) ~generalize_on : unit =
     Util.debugf ~section 5
-      "(@[<2>consider_proving_by_induction@ :clauses [@[%a@]]@]"
-      (fun k->k (Util.pp_list C.pp) clauses);
+      "(@[<2>consider_proving_by_induction@ \
+       :clauses [@[%a@]]@ :generalize_on (@[%a@])@]"
+      (fun k->k (Util.pp_list C.pp) clauses
+          (Util.pp_list Fmt.(pair ~sep:(return ":@ ") ID.pp Type.pp))
+          generalize_on);
     let goal =
       generalize_clauses
         (List.map C.lits clauses)
@@ -705,8 +709,8 @@ module Make
       (* check if goal is worth the effort *)
       if Goal_test.is_acceptable_goal goal then (
         Util.debugf ~section 1
-          "(@[<2>@{<green>prove_by_induction@}@ :clauses (@[%a@])@])"
-          (fun k->k (Util.pp_list C.pp) clauses);
+          "(@[<2>@{<green>prove_by_induction@}@ :clauses (@[%a@])@ :goal %a@])"
+          (fun k->k (Util.pp_list C.pp) clauses Goal.pp goal);
         let proof = ProofStep.mk_lemma in
         let cut = A.introduce_cut ~depth (Goal.form goal) proof in
         A.add_lemma cut

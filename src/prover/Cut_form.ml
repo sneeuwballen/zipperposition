@@ -36,7 +36,7 @@ let pp out (f:t): unit =
   let pp_c = Literals.pp in
   let pp_body out () = match f.cs with
     | [c] -> pp_c out c
-    | _ -> Fmt.fprintf out "∧{@[%a@]}" (Util.pp_list ~sep:"," pp_c) f.cs
+    | _ -> Fmt.fprintf out "@<1>∧{@[<hv>%a@]}" (Util.pp_list ~sep:"," pp_c) f.cs
   in
   if T.VarSet.is_empty f.vars then (
     pp_body out ()
