@@ -32,6 +32,15 @@ let () = Printexc.register_printer
         Some (CCFormat.sprintf "@[@{<Red>type inference error@}:@ %s@]" msg)
       | _ -> None)
 
+let error_on_incomplete_match_ = ref false
+let () =
+  Options.add_opts
+    [ "--require-exhaustive-matches", Arg.Set error_on_incomplete_match_,
+        " fail if pattern matches are not exhaustive";
+      "--no-require-exhautive-matches", Arg.Clear error_on_incomplete_match_,
+        " accept non-exhaustive pattern matches";
+    ]
+
 (* error-raising function *)
 let error_ ?loc msg =
   CCFormat.ksprintf msg
@@ -471,7 +480,7 @@ let rec infer_rec ctx t =
         with Not_found ->
           error_ ?loc "type `@[%a@]` is not a known datatype" T.pp ty_u
       in
-      let l = infer_match ?loc ctx ~ty_matched:ty_u data l in
+      let l = infer_match ?loc ctx ~ty_matched:ty_u t data l in
       T.match_ ?loc u l
     | PT.List [] ->
       let v = Ctx.fresh_ty_meta_var ~dest:`Generalize ctx in
@@ -610,7 +619,7 @@ and infer_app ?loc ctx id ty_id l =
 
 (* replace a match with possibly a "default" case into a completely
    defined match *)
-and infer_match ?loc ctx ~ty_matched data (l:PT.match_branch list)
+and infer_match ?loc ctx ~ty_matched t data (l:PT.match_branch list)
   : (T.match_cstor * type_ Var.t list * T.t) list =
   let ty_ret = ref None in
   (* check consistency of types in every branch *)
@@ -687,7 +696,14 @@ and infer_match ?loc ctx ~ty_matched data (l:PT.match_branch list)
   begin match missing with
     | [] -> l
     | _::_ ->
-      error_ ?loc "missing cases in match: (@[%a@])" (Util.pp_list ID.pp) missing
+      if !error_on_incomplete_match_ then (
+        error_ ?loc "missing cases in match: (@[%a@])@ :in `%a`"
+          (Util.pp_list ID.pp) missing PT.pp t
+      ) else (
+        Util.warnf "%a@,missing cases in match: (@[%a@])@ :in `%a`"
+          Loc.pp_opt loc (Util.pp_list ID.pp) missing PT.pp t;
+        l
+      )
   end
 
 (* infer a term, and force its type to [prop] *)
