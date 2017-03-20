@@ -69,12 +69,16 @@ end = struct
   let trivial: t =
     {cut=Cut_form.trivial; test_res=Lazy.from_val S_trivial}
 
+  (* trivial clause? *)
+  let trivial_c (c:Literals.t): bool = Literals.is_trivial c
+
   let test_ (cs:Literals.t list): status =
     (* test and save *)
     let form = List.map Literals.Conv.to_forms cs in
-    begin match Test_prop.small_check form with
-      | Test_prop.R_ok -> S_ok
-      | Test_prop.R_fail subst -> S_falsifiable subst
+    begin match List.exists trivial_c cs, Test_prop.small_check form with
+      | false, Test_prop.R_ok -> S_ok
+      | true, _ -> S_trivial
+      | _, Test_prop.R_fail subst -> S_falsifiable subst
     end
 
   let make cs: t =

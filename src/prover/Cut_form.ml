@@ -22,7 +22,7 @@ let make cs =
     Sequence.of_list cs
     |> Sequence.flat_map Literals.Seq.vars
     |> T.VarSet.of_seq
-  in
+  and cs = CCList.sort_uniq ~cmp:Literals.compare cs in
   {cs; vars;}
 
 let vars t = t.vars
