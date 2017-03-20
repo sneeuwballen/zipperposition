@@ -34,15 +34,7 @@ let equal_com lits1 lits2 =
   then false
   else check 0
 
-let compare lits1 lits2 =
-  let rec check i =
-    if i = Array.length lits1 then 0 else
-      let cmp = compare lits1.(i) lits2.(i) in
-      if cmp = 0 then check (i+1) else cmp
-  in
-  if Array.length lits1 <> Array.length lits2
-  then Array.length lits1 - Array.length lits2
-  else check 0
+let compare lits1 lits2 = CCArray.compare Lit.compare lits1 lits2
 
 let hash lits = Hash.array Lit.hash lits
 
@@ -147,7 +139,31 @@ let is_max ~ord lits =
     MLI.is_max (_compare_lit_with_idx ~ord) (lit,i) m
 
 let is_trivial lits =
-  CCArray.exists Lit.is_trivial lits
+  (* check if a pair of lits is trivial *)
+  let rec check_multi lits i =
+    if i = Array.length lits then false
+    else
+      let triv = match lits.(i) with
+        | Lit.Prop (p, sign) ->
+          CCArray.exists
+            (function
+              | Lit.Prop (p', sign') when sign = not sign' ->
+                T.equal p p'  (* p  \/  ~p *)
+              | _ -> false)
+            lits
+        | Lit.Equation (l, r, true) when T.equal l r -> true
+        | Lit.Equation (l, r, sign) ->
+          CCArray.exists
+            (function
+              | Lit.Equation (l', r', sign') when sign = not sign' ->
+                (T.equal l l' && T.equal r r') || (T.equal l r' && T.equal l' r)
+              | _ -> false)
+            lits
+        | lit -> Lit.is_trivial lit
+      in
+      triv || check_multi lits (i+1)
+  in
+  CCArray.exists Lit.is_trivial lits || check_multi lits 0
 
 let is_absurd lits =
   CCArray.for_all Lit.is_absurd lits

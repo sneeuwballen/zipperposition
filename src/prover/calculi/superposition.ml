@@ -713,30 +713,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     set'
 
   let is_tautology c =
-    let rec check lits i =
-      if i = Array.length lits then false
-      else
-        let triv = match lits.(i) with
-          | Lit.Prop (p, sign) ->
-            CCArray.exists
-              (function
-                | Lit.Prop (p', sign') when sign = not sign' ->
-                  T.equal p p'  (* p  \/  ~p *)
-                | _ -> false)
-              lits
-          | Lit.Equation (l, r, true) when T.equal l r -> true
-          | Lit.Equation (l, r, sign) ->
-            CCArray.exists
-              (function
-                | Lit.Equation (l', r', sign') when sign = not sign' ->
-                  (T.equal l l' && T.equal r r') || (T.equal l r' && T.equal l' r)
-                | _ -> false)
-              lits
-          | lit -> Lit.is_trivial lit
-        in
-        triv || check lits (i+1)
-    in
-    let is_tauto = check (C.lits c) 0 || Trail.is_trivial (C.trail c) in
+    let is_tauto = Lits.is_trivial (C.lits c) || Trail.is_trivial (C.trail c) in
     if is_tauto then Util.debugf ~section 3 "@[@[%a@]@ is a tautology@]" (fun k->k C.pp c);
     is_tauto
 
