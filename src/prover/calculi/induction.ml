@@ -736,8 +736,14 @@ module Make
           | [] -> E.CR_skip
           | consts ->
             (* introduce one lemma where all the skolems are
-               replaced by variables *)
-            let clauses = C.of_statement st in
+               replaced by variables. But first, simplify these clauses
+               because otherwise the inductive subgoals
+               (which are simplified) will not match
+               the inductive hypothesis. *)
+            let clauses =
+              C.of_statement st
+              |> CCList.flat_map (fun c -> fst (E.all_simplify c))
+            in
             prove_by_ind clauses ~generalize_on:consts;
             (* "skip" in any case, because the proof is done in a cut anyway *)
             E.CR_skip
@@ -804,6 +810,7 @@ module Make
       new_clauses_from_lemmas_ := List.rev_append l !new_clauses_from_lemmas_;
     )
 
+  (* return the list of new lemmas *)
   let inf_new_lemmas ~full:_ () =
     let l = !new_clauses_from_lemmas_ in
     new_clauses_from_lemmas_ := [];
