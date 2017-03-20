@@ -35,9 +35,6 @@ val make_skolem : Type.t -> ID.t
 val make : ?depth:int -> is_sub:bool -> Type.t -> t
 (** Make a new constant of the given type *)
 
-val is_sub : t -> bool
-(** Is the constant a sub-constant (i.e. a subterm of a case in a coverset)? *)
-
 val equal : t -> t -> bool
 val compare : t -> t -> int
 val hash : t -> int
@@ -59,6 +56,29 @@ val dominates : t -> t -> bool
 
 module Cst_set : CCSet.S with type elt = t
 (** Set of constants *)
+
+(** {2 Sub-Constant} *)
+
+(** A sub-constant is an inductive constant that appears in one of the
+    cases of a coverset.
+    It follows that there should have some induction hypothesis that
+    provides additional information on the constant. *)
+
+type sub
+
+val is_sub : t -> bool
+(** Is the constant a sub-constant (i.e. a subterm of a case in a coverset)? *)
+
+val as_sub : t -> sub option
+val as_sub_exn : t -> sub
+
+val id_as_sub : ID.t -> sub option
+
+val sub_ind_hypothesis: sub -> Literals.t list
+(** current set of registered induction hypothesis for this sub-constant *)
+
+val sub_add_ind_hypothesis : sub -> Literals.t list -> unit
+(** add the given hypothesis to the sub-constant *)
 
 (** {2 Inductive Skolems} *)
 

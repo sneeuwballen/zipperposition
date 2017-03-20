@@ -311,19 +311,11 @@ module Make
       incr r;
       v
 
-  (* scan terms for inductive skolems. *)
+  (* scan terms for inductive skolems.
+     we generalize on these in [not C] so we can refute [C] by induction *)
   let scan_terms (seq:term Sequence.t) : Ind_cst.ind_skolem list =
     seq
     |> Sequence.flat_map Ind_cst.find_ind_skolems
-    |> Sequence.filter
-      (fun (id,_) ->
-         begin match Ind_cst.id_as_cst id with
-           | None -> true
-           | Some c ->
-             (* do not generalize on sub-constants,
-                there are induction hypothesis on them that we will need *)
-             not (Ind_cst.is_sub c)
-         end)
     |> Sequence.to_rev_list
     |> CCList.sort_uniq ~cmp:Ind_cst.ind_skolem_compare
 
@@ -409,26 +401,35 @@ module Make
                       (* only keep sub-constants that have the same type as [v] *)
                       if Type.equal (Ind_cst.ty sub_cst) (HVar.ty v) then (
                         let t = Ind_cst.to_term sub_cst in
-                        Some (v,t)
+                        Some (v,sub_cst,t)
                       ) else None))
              |> Sequence.flat_map_l
-               (fun v_and_t_list ->
+               (fun v_sub_t_list ->
                   let subst =
-                    v_and_t_list
-                    |> List.map (fun (v,t) -> (v,0),(t,1))
+                    v_sub_t_list
+                    |> List.map (fun (v,_,t) -> (v,0),(t,1))
                     |> Subst.FO.of_list' ?init:None
                   in
                   let renaming = Ctx.renaming_clear () in
                   let g' = Cut_form.apply_subst ~renaming subst (g,0) in
-                  Cut_form.cs g'
-                  |> List.map
-                    (fun lits ->
-                       let trail =
-                         [ b_lit_case;
-                           BoolLit.neg cut_blit;
-                         ] |> Trail.of_list
-                       in
-                       C.create_a lits proof ~trail))
+                  let cs =
+                    Cut_form.cs g'
+                    |> List.map
+                      (fun lits ->
+                         let trail =
+                           [ b_lit_case;
+                             BoolLit.neg cut_blit;
+                           ] |> Trail.of_list
+                         in
+                         C.create_a lits proof ~trail)
+                  in
+                  (* register the hypothesis to all the sub-constants *)
+                  List.iter
+                    (fun (_,sub,_) ->
+                       let sub = Ind_cst.as_sub_exn sub in
+                       Ind_cst.sub_add_ind_hypothesis sub (List.map C.lits cs))
+                    v_sub_t_list;
+                  cs)
              |> Sequence.to_list
            in
            (* clauses [CNF[¬goal[case]) <- b_lit(case), ¬cut.blit] with
@@ -634,35 +635,58 @@ module Make
       ~(generalize_on:Ind_cst.ind_skolem list) : Goal.t =
     if generalize_on=[] then Goal.trivial
     else (
-      (* offset to allocate new variables *)
-      let offset =
+      (* If the constants in [generalize_on] appear in some induction
+         hypothesis, add the induction hypothesis to [cs].
+         The goal is to keep the hypothesis in the generated lemma) *)
+      let cs_hypothesis =
+        CCList.flat_map
+          (fun (id,_) -> match Ind_cst.id_as_sub id with
+             | None -> []
+             | Some sub ->
+               let l = Ind_cst.sub_ind_hypothesis sub in
+               Util.debugf ~section 2 "(@[add_ind_hyp@ :sub %a@ :cs (@[%a@])@])"
+                 (fun k->k ID.pp id (Util.pp_list Literals.pp) l);
+               l)
+          generalize_on
+      in
+      let cs =
+        List.rev_append cs_hypothesis cs
+        |> CCList.sort_uniq ~cmp:Literals.compare
+      in
+      (* replace free variables by skolems *)
+      let subst =
         Sequence.of_list cs
         |> Sequence.flat_map Lits.Seq.vars
-        |> T.Seq.max_var
-        |> succ
-      in
+        |> T.VarSet.of_seq |> T.VarSet.to_list
+        |> List.map
+          (fun v ->
+             let ty = HVar.ty v in
+             let c = Ind_cst.make_skolem ty in
+             Ctx.declare c ty;
+             (v,0), (T.const c ~ty,0))
+        |> Subst.FO.of_list' ?init:None
       (* (constant -> variable) list *)
-      let pairs =
+      and pairs =
         List.mapi
           (fun i (id,ty) ->
-             T.const ~ty id, T.var (HVar.make ~ty (i+offset)))
+             T.const ~ty id, T.var (HVar.make ~ty i))
           generalize_on
         |> T.Map.of_list
       in
       Util.debugf ~section 5
-        "@[<hv2>generalize_lits@ :in `@[<hv>%a@]`@ :subst (@[%a@])@]"
+        "@[<hv2>generalize_lits@ :in `@[<hv>%a@]`@ :subst %a@ :replace (@[%a@])@]"
         (fun k->k (Util.pp_list ~sep:"∧" Lits.pp) cs
-            (T.Map.pp T.pp T.pp) pairs);
+            Subst.pp subst (T.Map.pp T.pp T.pp) pairs);
       (* replace skolems by the new variables, then negate the formula
          and re-CNF the negation *)
       begin
         cs
         |> Util.map_product
           ~f:(fun lits ->
-             lits
+            lits
              |> Array.map
                (fun lit ->
-                  lit
+                  Literal.apply_subst_no_renaming subst (lit,0)
                   |> Literal.map (fun t -> T.replace_m t pairs)
                   |> Literal.negate
                   |> CCList.return)
@@ -832,7 +856,8 @@ module Make
     Env.add_clause_conversion convert_statement;
     Env.add_is_trivial_trail trail_is_trivial_cases;
     if E.flex_get Avatar.k_simplify_trail then (
-      Env.add_is_trivial_trail trail_is_trivial_lemmas;
+      (* TODO: re-enable if compatible with nested induction *)
+      (* Env.add_is_trivial_trail trail_is_trivial_lemmas; *)
     );
     Signal.on_every A.on_lemma on_lemma;
     Env.add_generate "ind.lemmas" inf_new_lemmas;

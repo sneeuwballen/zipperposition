@@ -27,12 +27,16 @@ let () =
 let invalid_decl m = raise (InvalidDecl m)
 let invalid_declf m = CCFormat.ksprintf m ~f:invalid_decl
 
+type sub_cst = {
+  mutable sub_hypothesis: Literals.t list; (* induction hypothesis *)
+}
+
 type t = {
   cst_id: ID.t;
   cst_args: Type.t list;
   cst_ty: Type.t; (* [cst_ty = cst_id cst_args] *)
   cst_ity: Ind_ty.t; (* the corresponding inductive type *)
-  cst_is_sub: bool; (* sub-constant? *)
+  cst_sub: sub_cst option; (* sub-constant? if yes, carry ind hypothesis *)
   cst_depth: int; (* how many induction lead to this one? *)
 }
 
@@ -72,9 +76,7 @@ let id_as_cst_exn id = match id_as_cst id with
 
 let id_is_cst id = match id_as_cst id with Some _ -> true | _ -> false
 
-let is_sub c = c.cst_is_sub
-
-(** {6 Creation of Coverset and Cst} *)
+(** {6 Creation of Cst} *)
 
 let n_ = ref 0
 
@@ -96,6 +98,8 @@ let declare ~depth ~is_sub id ty =
   let ity, args = match Ind_ty.as_inductive_type ty with
     | Some (t,l) -> t,l
     | None -> invalid_declf "cannot declare a constant of type %a" Type.pp ty
+  and sub =
+    if is_sub then Some {sub_hypothesis=[]} else None
   in
   (* build coverset and constant, mutually recursive *)
   let cst = {
@@ -104,7 +108,7 @@ let declare ~depth ~is_sub id ty =
     cst_depth=depth;
     cst_ity=ity;
     cst_args=args;
-    cst_is_sub=is_sub;
+    cst_sub=sub;
   }
   in
   ID.set_payload id (Payload_cst cst)
@@ -122,6 +126,24 @@ let make ?(depth=0) ~is_sub (ty:Type.t): t =
 
 let dominates (c1:t)(c2:t): bool =
   c1.cst_depth < c2.cst_depth
+
+(** {2 Sub-Constant} *)
+
+type sub = sub_cst
+
+let is_sub c = CCOpt.is_some c.cst_sub
+
+let as_sub c = c.cst_sub
+let as_sub_exn c = match c.cst_sub with
+  | Some s -> s
+  | None -> Util.invalid_argf "as_sub_exn: constant `%a` is not a sub-constant" pp c
+
+let id_as_sub id = CCOpt.(id_as_cst id >>= as_sub)
+
+let sub_ind_hypothesis (s:sub): _ list = s.sub_hypothesis
+
+let sub_add_ind_hypothesis (s:sub) cs: unit =
+  s.sub_hypothesis <- List.rev_append cs s.sub_hypothesis
 
 (** {2 Inductive Skolems} *)
 
