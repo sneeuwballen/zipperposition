@@ -312,14 +312,15 @@ module Make
       v
 
   (* scan terms for inductive skolems. *)
-  let scan_terms (seq:term Sequence.t) : Ind_cst.ind_skolem list =
+  let scan_terms ~mode (seq:term Sequence.t) : Ind_cst.ind_skolem list =
     seq
     |> Sequence.flat_map Ind_cst.find_ind_skolems
     |> Sequence.filter
       (fun (id,_) ->
-         begin match Ind_cst.id_as_cst id with
-           | None -> true
-           | Some c ->
+         begin match Ind_cst.id_as_cst id, mode with
+           | None, _ -> true
+           | Some _, `All -> true
+           | Some c, `No_sub_cst ->
              (* do not generalize on sub-constants,
                 there are induction hypothesis on them that we will need *)
              not (Ind_cst.is_sub c)
@@ -328,12 +329,19 @@ module Make
     |> CCList.sort_uniq ~cmp:Ind_cst.ind_skolem_compare
 
   (* scan clauses for ground terms of an inductive type,
-     and perform induction on these terms.  *)
-  let scan_clause (c:C.t) : Ind_cst.ind_skolem list =
+     and perform induction on these terms.
+      @return a list of ways to generalize the given clause *)
+  let scan_clause (c:C.t) : Ind_cst.ind_skolem list list =
+    let l1 =
+      C.lits c |> Lits.Seq.terms |> scan_terms ~mode:`All
+    and l2 =
+      C.lits c |> Lits.Seq.terms |> scan_terms ~mode:`No_sub_cst
+    in
+    (* remove duplicates, empty lists, etc. *)
     begin
-      C.lits c
-      |> Lits.Seq.terms
-      |> scan_terms
+      [l1; l2]
+      |> CCList.sort_uniq ~cmp:(CCList.compare Ind_cst.ind_skolem_compare)
+      |> List.filter (fun l -> not (CCList.is_empty l))
     end
 
   (* goal for induction *)
@@ -720,10 +728,11 @@ module Make
 
   (* Try to prove the given clause by introducing an inductive lemma. *)
   let inf_prove_by_ind (c:C.t): C.t list =
-    let consts = scan_clause c in
-    if consts<>[] then (
-      prove_by_ind [c] ~generalize_on:consts;
-    );
+    List.iter
+      (fun consts ->
+         assert (consts<>[]);
+         prove_by_ind [c] ~generalize_on:consts)
+      (scan_clause c);
     []
 
   (* hook for converting some statements to clauses.

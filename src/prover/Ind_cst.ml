@@ -128,6 +128,7 @@ let dominates (c1:t)(c2:t): bool =
 type ind_skolem = ID.t * Type.t
 
 let ind_skolem_compare = CCOrd.pair ID.compare Type.compare
+let ind_skolem_equal a b = ind_skolem_compare a b = 0
 
 let id_is_ind_skolem (id:ID.t) (ty:Type.t): bool =
   let n_tyvars, ty_args, ty_ret = Type.open_poly_fun ty in

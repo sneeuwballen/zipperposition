@@ -65,6 +65,7 @@ module Cst_set : CCSet.S with type elt = t
 type ind_skolem = ID.t * Type.t
 
 val ind_skolem_compare : ind_skolem -> ind_skolem -> int
+val ind_skolem_equal : ind_skolem -> ind_skolem -> bool
 
 val id_is_ind_skolem : ID.t -> Type.t -> bool
 (** [id_is_potential_cst id ty] returns [true] if [id:ty] is
