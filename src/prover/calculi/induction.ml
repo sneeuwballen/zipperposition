@@ -7,7 +7,6 @@ open Logtk
 
 module Lits = Literals
 module T = FOTerm
-module Su = Substs
 module Ty = Type
 module Fmt = CCFormat
 module RT = Rewrite_term
