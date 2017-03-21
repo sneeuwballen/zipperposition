@@ -40,7 +40,7 @@ module Section : sig
   (** all registered sections *)
 
   val root : t (** Default section, with no parent *)
-  val zip : t (** Section for all Logtk-related things *)
+  val base : t (** Section for basic logtk things *)
 
   val make : ?parent:t -> ?inheriting:t list -> string -> t
   (** [make ?parent ?inheriting name] makes a new section with the given name.

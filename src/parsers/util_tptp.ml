@@ -21,7 +21,7 @@ exception Error of string
 
 let error msg = raise (Error msg)
 let errorf msg = CCFormat.ksprintf msg ~f:error
-let section = Util.Section.root
+let section = Util.Section.base
 
 (** {2 Printing/Parsing} *)
 

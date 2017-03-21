@@ -15,7 +15,7 @@ module Subst = Var.Subst
 module Fmt = CCFormat
 
 let prof_infer = Util.mk_profiler "TypeInference.infer"
-let section = Util.Section.(make ~parent:zip "ty_infer")
+let section = Util.Section.(make "ty-infer")
 
 type 'a or_error = ('a, string) CCResult.t
 

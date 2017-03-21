@@ -6,7 +6,7 @@
 module T = FOTerm
 module Stmt = Statement
 
-let section = Util.Section.(make ~parent:zip "ind_ty")
+let section = Util.Section.make "ind_ty"
 
 type constructor = {
   cstor_name: ID.t;

@@ -15,7 +15,7 @@ let prof_to_cnf = Util.mk_profiler "cnf.distribute"
 let prof_miniscope = Util.mk_profiler "cnf.miniscope"
 let prof_skolemize = Util.mk_profiler "cnf.skolemize"
 
-let section = Util.Section.make ~parent:Util.Section.zip "cnf"
+let section = Util.Section.make "cnf"
 
 type term = T.t
 type type_ = T.t

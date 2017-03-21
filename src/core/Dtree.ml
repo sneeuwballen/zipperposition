@@ -299,7 +299,7 @@ module Make(E : Index.EQUATION) = struct
     | TrieLeaf _, _ | TrieNode _, _ -> false
 
   let to_dot out t =
-    Util.debugf ~section:Util.Section.zip 2
+    Util.debugf ~section:Util.Section.base 2
       "@[<2>print graph of size %d@]" (fun k->k (size t));
     let pp = CCGraph.Dot.pp
         ~eq:equal_

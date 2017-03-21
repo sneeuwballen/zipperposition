@@ -10,7 +10,7 @@ module Loc = ParseLocation
 
 type location = ParseLocation.t
 
-let section = Util.Section.(make ~parent:zip "typedSTerm")
+let section = Util.Section.make "typedSTerm"
 
 type t = {
   term : view;

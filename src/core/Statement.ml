@@ -257,7 +257,7 @@ let is_defined_cst id = as_defined_cst id <> None
 
 let declare_defined_form id ~level def =
   (* declare that [id] is a defined constant of level [l+1] *)
-  Util.debugf ~section:Util.Section.zip 1
+  Util.debugf ~section:Util.Section.base 1
     "@[<2>declare %a@ as defined constant of level %d@]"
     (fun k->k ID.pp id level);
   ID.set_payload id (Payload_defined_form (level, ref def));

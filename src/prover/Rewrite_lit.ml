@@ -8,7 +8,7 @@ module T = FOTerm
 module Stmt = Statement
 module Su = Subst
 
-let section = Util.Section.(make ~parent:zip "rewriting")
+let section = Util.Section.make "rewriting"
 let stats_rw = Util.mk_stat "rw.steps_clause"
 let prof_rw = Util.mk_profiler "rw.clause"
 

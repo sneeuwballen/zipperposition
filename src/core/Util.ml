@@ -71,7 +71,7 @@ module Section = struct
       Hashtbl.add section_table name' sec;
       sec
 
-  let zip = make "zip"
+  let base = make "base"
 
   let iter yield =
     yield ("", root);

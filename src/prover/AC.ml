@@ -10,7 +10,7 @@ module Lit = Literal
 
 open AC_intf
 
-let section = Util.Section.(make ~parent:zip) "AC"
+let section = Util.Section.make "AC"
 
 let prof_simplify = Util.mk_profiler "AC.simplify"
 
