@@ -25,7 +25,7 @@ let stats_inductions = Util.mk_stat "induction.inductions"
 
 let k_enable : bool Flex_state.key = Flex_state.create_key()
 let k_ind_depth : int Flex_state.key = Flex_state.create_key()
-let k_test_depth : int Flex_state.key = Flex_state.create_key()
+let k_test_limit : int Flex_state.key = Flex_state.create_key()
 let k_limit_to_active : bool Flex_state.key = Flex_state.create_key()
 let k_coverset_depth : int Flex_state.key = Flex_state.create_key()
 
@@ -75,10 +75,10 @@ end = struct
   let test_ (cs:Literals.t list): status =
     (* test and save *)
     let form = List.map Literals.Conv.to_forms cs in
-    begin match List.exists trivial_c cs, Test_prop.small_check form with
-      | false, Test_prop.R_ok -> S_ok
-      | true, _ -> S_trivial
-      | _, Test_prop.R_fail subst -> S_falsifiable subst
+    if List.exists trivial_c cs then S_trivial
+    else begin match Test_prop.check_form form with
+      | Test_prop.R_ok -> S_ok
+      | Test_prop.R_fail subst -> S_falsifiable subst
     end
 
   let make cs: t =
@@ -107,7 +107,29 @@ end = struct
 
   type goal = Goal.t
 
+  let test_goal_is_ok (g:Goal.t): bool =
+    begin match Goal.test g with
+      | Goal.S_ok -> true
+      | Goal.S_trivial ->
+        Util.incr_stat stats_trivial_lemmas;
+        Util.debugf ~section 2 "(@[<2>lemma_trivial@ @[%a@]@@])" (fun k->k Goal.pp g);
+        false
+      | Goal.S_falsifiable subst ->
+        Util.debugf ~section 2
+          "(@[<2>lemma_absurd@ @[%a@]@ :subst %a@])"
+          (fun k->k Goal.pp g Subst.pp subst);
+        Util.incr_stat stats_absurd_lemmas;
+        false
+    end
+
   exception Yield_false of C.t
+
+  (* TODO: re-establish this, but only do it if smallcheck failed
+      (also, do the 20 steps of resolution only in last resort)
+
+      → if goal passes tests, can we use the demod/sup steps to infer active
+         positions? (e.g. looking at which variables were substituted with
+         cstor terms) *)
 
   (* check that [lemma] is not obviously absurd or trivial, by using
      the corresponding inference rules from env [E].
@@ -148,7 +170,7 @@ end = struct
 
   (* some checks that [g] should be considered as a goal *)
   let is_acceptable_goal (g:goal) : bool =
-    Goal.test g = Goal.S_ok &&
+    test_goal_is_ok g &&
     check_not_absurd_or_trivial g
 end
 
@@ -850,7 +872,7 @@ end
 
 let enabled_ = ref true
 let depth_ = ref !Ind_cst.max_depth_
-let test_depth = ref Test_prop.default_depth
+let test_limit = ref Test_prop.default_limit
 let limit_to_active = ref true
 let coverset_depth = ref 1
 
@@ -872,7 +894,7 @@ let post_typing_hook stmts state =
     state
     |> Flex_state.add k_enable true
     |> Flex_state.add k_ind_depth !depth_
-    |> Flex_state.add k_test_depth !test_depth
+    |> Flex_state.add k_test_limit !test_limit
     |> Flex_state.add k_limit_to_active !limit_to_active
     |> Flex_state.add k_coverset_depth !coverset_depth
     |> Flex_state.add Ctx.Key.lost_completeness true
@@ -905,9 +927,9 @@ let () =
     [ "--induction", Options.switch_set true enabled_, " enable induction"
     ; "--no-induction", Options.switch_set false enabled_, " enable induction"
     ; "--induction-depth", Arg.Set_int depth_, " maximum depth of nested induction"
-    ; "--small-check-depth",
-      Arg.Set_int test_depth,
-      " set default depth limit for smallcheck"
+    ; "--ind-test-limit",
+      Arg.Set_int test_limit,
+      " set limit for property testing in induction"
     ; "--ind-only-active-pos", Arg.Set limit_to_active, " limit induction to active positions"
     ; "--no-ind-only-active-pos", Arg.Clear limit_to_active, " limit induction to active positions"
     ; "--ind-coverset-depth", Arg.Set_int coverset_depth, " coverset depth in induction"
