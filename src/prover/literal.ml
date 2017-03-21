@@ -46,7 +46,6 @@ let equal_com l1 l2 =
     | Arith o1, Arith o2 -> ArithLit.equal_com o1 o2
     | _ -> equal l1 l2  (* regular comparison *)
 
-(* FIXME: total ordering *)
 let compare l1 l2 =
   let __to_int = function
     | False -> 0
