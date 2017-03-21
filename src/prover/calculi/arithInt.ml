@@ -2065,6 +2065,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 end
 
 let k_should_register = Flex_state.create_key ()
+let k_has_arith = Flex_state.create_key ()
 
 let extension =
   let env_action env =
@@ -2072,6 +2073,9 @@ let extension =
     if E.flex_get k_should_register then (
       let module I = Make(E) in
       I.register ()
+    ) else if E.flex_get k_has_arith then (
+      (* arith not enabled, so we cannot solve the problem, do not answer "sat" *)
+      E.Ctx.lost_completeness ();
     )
   and post_typing_action stmts state =
     let module PT = TypedSTerm in
@@ -2088,7 +2092,9 @@ let extension =
     in
     let should_reg = !enable_arith_ && has_int in
     Util.debugf ~section 2 "decision to register arith: %B" (fun k->k should_reg);
-    Flex_state.add k_should_register should_reg state
+    state
+    |> Flex_state.add k_should_register should_reg
+    |> Flex_state.add k_has_arith has_int
   in
   { Extensions.default with Extensions.
                          name="arith_int";
