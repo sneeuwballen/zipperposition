@@ -708,7 +708,7 @@ module Form = struct
     | l -> app_builtin ?loc ~ty:Ty.prop Builtin.And (flatten_ `And [] l)
 
   let or_ ?loc = function
-    | [] -> true_
+    | [] -> false_
     | [t] -> t
     | l -> app_builtin ?loc ~ty:Ty.prop Builtin.Or (flatten_ `Or [] l)
 
