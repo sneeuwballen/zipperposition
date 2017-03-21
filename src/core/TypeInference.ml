@@ -125,6 +125,8 @@ module Ctx = struct
     (* map names to variables or IDs *)
     def_as_rewrite: bool;
     (* if true, definitions are rewrite rules *)
+    on_var: [`Default | `Infer];
+    (* what to do for variables without type annotation *)
     on_undef: [`Warn | `Fail | `Guess];
     (* what to do when we meet an undefined symbol *)
     mutable new_metas: T.meta_var list;
@@ -138,10 +140,11 @@ module Ctx = struct
     (* list of symbols whose type has been inferred recently *)
   }
 
-  let create ?(def_as_rewrite=true) ?(default=T.Ty.term) ?(on_undef=`Guess) () =
+  let create ?(def_as_rewrite=true) ?(default=T.Ty.term) ?(on_var=`Infer) ?(on_undef=`Guess) () =
     let ctx = {
       default;
       def_as_rewrite;
+      on_var;
       on_undef;
       env = Hashtbl.create 32;
       datatypes = ID.Tbl.create 32;
@@ -209,8 +212,12 @@ module Ctx = struct
     );
     Hashtbl.add ctx.env name (`ID (s,ty))
 
+  let default_dest ctx = match ctx.on_var with
+    | `Default -> `BindDefault
+    | `Infer -> `Generalize
+
   (* generate fresh type var. *)
-  let fresh_ty_meta_var ?(dest=`BindDefault) ctx : T.meta_var =
+  let fresh_ty_meta_var ctx ?(dest=default_dest ctx) : T.meta_var =
     let v = Var.gensym ~ty:T.tType () in
     let r = ref None in
     let meta = v, r, dest in
@@ -265,7 +272,8 @@ module Ctx = struct
   (* in ZF, variables might be constant, there is no syntactic difference *)
   let get_var_ ctx v =
     let mk_fresh v =
-      let ty_v = fresh_ty_meta_var ~dest:`Generalize ctx in
+      let dest = default_dest ctx in
+      let ty_v = fresh_ty_meta_var ~dest ctx in
       let v' = Var.of_string ~ty:(T.Ty.meta ty_v) v in
       ctx.local_vars <- v' :: ctx.local_vars;
       v'
@@ -996,9 +1004,9 @@ let infer_statement_exn ctx st =
   in
   st, aux
 
-let infer_statements_exn ?def_as_rewrite ?on_undef ?ctx seq =
+let infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?ctx seq =
   let ctx = match ctx with
-    | None -> Ctx.create ?def_as_rewrite ?on_undef ()
+    | None -> Ctx.create ?def_as_rewrite ?on_var ?on_undef ()
     | Some c -> c
   in
   let res = CCVector.create () in
@@ -1011,7 +1019,7 @@ let infer_statements_exn ?def_as_rewrite ?on_undef ?ctx seq =
     seq;
   CCVector.freeze res
 
-let infer_statements ?def_as_rewrite ?on_undef ?ctx seq =
-  try Err.return (infer_statements_exn ?def_as_rewrite ?on_undef ?ctx seq)
+let infer_statements ?def_as_rewrite ?on_var ?on_undef ?ctx seq =
+  try Err.return (infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?ctx seq)
   with e -> Err.of_exn_trace e
 

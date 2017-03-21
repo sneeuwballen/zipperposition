@@ -30,7 +30,7 @@ type ('ret, 'before, 'after) phase =
   | Start_file :
       (filename, [`LoadExtensions], [`Start_file]) phase (* file to process *)
   | Parse_file :
-      (Parsing_utils.input * UntypedAST.statement Sequence.t,
+      (Input_format.t * UntypedAST.statement Sequence.t,
        [`Start_file], [`Parse_file]) phase (* parse some file *)
   | Typing :
       (TypeInference.typed_statement CCVector.ro_vector, [`Parse_file], [`Typing]) phase

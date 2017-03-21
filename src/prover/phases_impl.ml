@@ -79,7 +79,8 @@ let typing (input,stmts) =
   Phases.get_key Params.key >>= fun params ->
   let def_as_rewrite = params.Params.param_def_as_rewrite in
   TypeInference.infer_statements
-    ~on_undef:(Parsing_utils.on_undef_id input)
+    ~on_var:(Input_format.on_var input)
+    ~on_undef:(Input_format.on_undef_id input)
     ~def_as_rewrite ?ctx:None stmts
   >>?= fun stmts ->
   do_extensions ~field:(fun e -> e.Extensions.post_typing_actions)
