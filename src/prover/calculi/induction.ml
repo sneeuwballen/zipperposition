@@ -555,6 +555,23 @@ module Make
       |> Sequence.exists check_sub
     end
 
+  (* variable appears only naked, i.e. directly under [=] *)
+  let var_always_naked (f:Cut_form.t)(x:T.var): bool =
+    let check_t t = T.is_var t || not (T.var_occurs ~var:x t) in
+    begin
+      Cut_form.cs f
+      |> Sequence.of_list
+      |> Sequence.flat_map Sequence.of_array
+      |> Sequence.for_all
+        (function
+          | Literal.Equation (l,r,_) ->
+            let check_t t = T.is_var t || not (T.var_occurs ~var:x t) in
+            check_t l && check_t r
+          | Literal.Prop (t,_) -> check_t t
+          | Literal.Arith _ -> false
+          | Literal.True | Literal.False -> true)
+    end
+
   let active_subterms_form (f:Cut_form.t): T.t Sequence.t =
     Cut_form.cs f
     |> Sequence.of_list
@@ -565,7 +582,8 @@ module Make
   (* should we do induction on [x] in [c]? *)
   let should_do_ind_on_var (f:Cut_form.t) (x:T.var): bool =
     not (E.flex_get k_limit_to_active) ||
-    var_occurs_under_active_pos f x
+    var_occurs_under_active_pos f x ||
+    var_always_naked f x
 
   module UF_vars =
     UnionFind.Make(struct
@@ -584,6 +602,18 @@ module Make
   let find_var_clusters (f:Cut_form.t) (vars:T.var list): T.var list list =
     let uf = UF_vars.create [] in
     List.iter (fun v -> UF_vars.add uf v [v]) vars;
+    (* naked variables together *)
+    begin match CCList.find_pred (var_always_naked f) vars with
+      | None -> ()
+      | Some v ->
+        List.iter
+          (fun v' ->
+             if not (HVar.equal Type.equal v v') && var_always_naked f v' then (
+               UF_vars.union uf v v';
+             ))
+          vars;
+    end;
+    (* other variables grouped by occurring at active pos in same subterm *)
     begin
       active_subterms_form f
       |> Sequence.iter
