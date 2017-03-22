@@ -26,6 +26,8 @@ type t = {
   (* true iff the type is (mutually) recursive *)
 }
 
+let equal a b = ID.equal a.ty_id b.ty_id
+
 type id_or_tybuiltin =
   | I of ID.t
   | B of Type.builtin
@@ -104,25 +106,33 @@ let as_inductive_type ty = match Type.view ty with
   | Type.Fun _ | Type.Forall _ | Type.Builtin _ | Type.DB _ | Type.Var _
     -> None
 
-let is_recursive (t:t) = Lazy.force t.ty_is_rec
+let is_recursive (t:t) =
+  let new_ = Lazy.is_val t.ty_is_rec in
+  let res = Lazy.force t.ty_is_rec in
+  if new_ then (
+    Util.debugf ~section 3 "(@[is_recursive@ :ty %a@ :res %B@])"
+      (fun k->k pp t res);
+  );
+  res
 
 (* is [top] recursive? *)
 let is_rec_ (top:t): bool =
-  let rec aux_ity (seen:t list) (ity:t): bool =
-    if CCList.mem ~eq:(==) ity seen then true
+  let rec find_in_ity (seen:t list) (ity:t): bool =
+    if CCList.mem ~eq:equal ity seen then false (* loop *)
     else (
       let seen = ity :: seen in
       List.exists
-        (fun cstor -> aux_ty seen cstor.cstor_ty)
+        (fun cstor -> find_in_ty seen cstor.cstor_ty)
         ity.ty_constructors
     )
-  and aux_ty (seen:t list) (ty:Type.t) = match Type.view ty with
+  and find_in_ty (seen:t list) (ty:Type.t) = match Type.view ty with
+    | Type.Forall ty' -> find_in_ty seen ty'
     | Type.App (id,l) ->
-      ID.equal id top.ty_id || List.exists (aux_ty seen) l
-    | Type.Fun (args,_) -> List.exists (aux_ty seen) args
-    | _ -> false
+      ID.equal id top.ty_id || List.exists (find_in_ty seen) l
+    | Type.Fun (args,_) -> List.exists (find_in_ty seen) args
+    | Type.Builtin _ | Type.Var _ | Type.DB _ -> false
   in
-  aux_ity [] top
+  find_in_ity [] top
 
 (* declare that the given type is inductive *)
 let declare_ty id ~ty_vars constructors =
