@@ -22,6 +22,8 @@ type t = {
   ty_constructors : constructor list;
   (* constructors, all returning [pattern] and containing
      no other type variables than [ty_vars] *)
+  ty_is_rec: bool lazy_t;
+  (* true iff the type is (mutually) recursive *)
 }
 
 type id_or_tybuiltin =
@@ -102,6 +104,26 @@ let as_inductive_type ty = match Type.view ty with
   | Type.Fun _ | Type.Forall _ | Type.Builtin _ | Type.DB _ | Type.Var _
     -> None
 
+let is_recursive (t:t) = Lazy.force t.ty_is_rec
+
+(* is [top] recursive? *)
+let is_rec_ (top:t): bool =
+  let rec aux_ity (seen:t list) (ity:t): bool =
+    if CCList.mem ~eq:(==) ity seen then true
+    else (
+      let seen = ity :: seen in
+      List.exists
+        (fun cstor -> aux_ty seen cstor.cstor_ty)
+        ity.ty_constructors
+    )
+  and aux_ty (seen:t list) (ty:Type.t) = match Type.view ty with
+    | Type.App (id,l) ->
+      ID.equal id top.ty_id || List.exists (aux_ty seen) l
+    | Type.Fun (args,_) -> List.exists (aux_ty seen) args
+    | _ -> false
+  in
+  aux_ity [] top
+
 (* declare that the given type is inductive *)
 let declare_ty id ~ty_vars constructors =
   Util.debugf ~section 1 "declare inductive type %a" (fun k->k ID.pp id);
@@ -112,11 +134,12 @@ let declare_ty id ~ty_vars constructors =
     | Payload_ind_type _ -> invalid_declf_ "inductive type %a already declared" ID.pp id;
     | _ -> ()
   end;
-  let ity = {
+  let rec ity = {
     ty_id=id;
     ty_vars;
     ty_pattern=Type.app id (List.map Type.var ty_vars);
     ty_constructors=constructors;
+    ty_is_rec=lazy (is_rec_ ity);
   } in
   (* map the constructors to [ity] too *)
   List.iter

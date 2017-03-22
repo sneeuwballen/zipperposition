@@ -21,6 +21,17 @@
       is an inductive constructor becomes [false]
     * an inequation [t != c1(....(...,ck(...,t,...), ...),...)]
       becomes [true]
+
+  - acyclicity (inference):
+    same as the simplification but also unifies one side of the equation
+     with subterms in cstor-generated contexts
+
+   - exhaustiveness (inference):
+      for a maximal ground literal [t != u], where at least one of [t,u] is not
+      an inductive constant (i.e. a parameter of the background theory),
+      we instantiate the exhaustiveness axiom for [t] and [u], i.e.
+      [t = cstor1(…) | … | t = cstor_n(…)] with fresh sub-constants in
+      the […].
 *)
 module Make(E : Env_intf.S) : sig
 

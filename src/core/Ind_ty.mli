@@ -21,6 +21,8 @@ type t = private {
   ty_constructors : constructor list;
   (* constructors, all returning [pattern] and containing
      no other type variables than [ty_vars] *)
+  ty_is_rec: bool lazy_t;
+  (* true iff the type is (mutually) recursive *)
 }
 
 val pp : t CCFormat.printer
@@ -53,6 +55,8 @@ val is_inductive_type : Type.t -> bool
     registered type (registered with {!declare_ty}). *)
 
 val is_inductive_simple_type : TypedSTerm.t -> bool
+
+val is_recursive : t -> bool
 
 (** {6 Constructors} *)
 

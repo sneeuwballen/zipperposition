@@ -85,7 +85,7 @@ let weight_fun (id:ID.t): Precedence.Weight.t =
     | Ty _ -> W.int 1
     | Projector _ -> W.int 1
     | Cstor _ -> W.int 1
-    | Inductive_cst _ -> W.omega_plus 1
+    | Inductive_cst _ -> W.int 2
     | Other -> W.omega_plus 4
     | DefinedCst _ -> W.omega_plus 5 (* defined: biggest *)
   end
