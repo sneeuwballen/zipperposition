@@ -63,7 +63,14 @@ let pp_tstp out (f:t): unit =
 let ind_vars t =
   vars t
   |> T.VarSet.to_list
-  |> List.filter (fun v -> Ind_ty.is_inductive_type (HVar.ty v))
+  |> List.filter
+    (fun v ->
+       let ty = HVar.ty v in
+       (* only do induction on variables of infinite types *)
+       begin match Ind_ty.as_inductive_type ty with
+         | Some (ity,_) -> Ind_ty.is_recursive ity
+         | None -> false
+       end)
 
 let apply_subst ~renaming subst (f,sc): t =
   let cs =
