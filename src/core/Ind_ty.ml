@@ -106,6 +106,8 @@ let as_inductive_type ty = match Type.view ty with
   | Type.Fun _ | Type.Forall _ | Type.Builtin _ | Type.DB _ | Type.Var _
     -> None
 
+let as_inductive_type_exn ty = as_inductive_type ty |> CCOpt.get_exn
+
 let is_recursive (t:t) =
   let new_ = Lazy.is_val t.ty_is_rec in
   let res = Lazy.force t.ty_is_rec in
@@ -122,14 +124,19 @@ let is_rec_ (top:t): bool =
     else (
       let seen = ity :: seen in
       List.exists
-        (fun cstor -> find_in_ty seen cstor.cstor_ty)
+        (fun cstor -> find_in_ty_args seen cstor.cstor_ty)
         ity.ty_constructors
     )
+  and find_in_ty_args seen ty = match Type.view ty with
+    | Type.Forall ty' -> find_in_ty_args seen ty'
+    | Type.Fun (args,_) -> List.exists (find_in_ty seen) args
+    | Type.App _ | Type.Builtin _ | Type.Var _ | Type.DB _ -> false
   and find_in_ty (seen:t list) (ty:Type.t) = match Type.view ty with
     | Type.Forall ty' -> find_in_ty seen ty'
     | Type.App (id,l) ->
       ID.equal id top.ty_id || List.exists (find_in_ty seen) l
-    | Type.Fun (args,_) -> List.exists (find_in_ty seen) args
+    | Type.Fun (args,ret) ->
+      find_in_ty seen ret || List.exists (find_in_ty seen) args
     | Type.Builtin _ | Type.Var _ | Type.DB _ -> false
   in
   find_in_ity [] top

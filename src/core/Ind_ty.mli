@@ -50,6 +50,8 @@ val as_inductive_type : Type.t -> (t * Type.t list) option
 (** [as_inductive_ty (list int)] will return [list, [int]] as an
     inductive type applied to some arguments *)
 
+val as_inductive_type_exn : Type.t -> t * Type.t list
+
 val is_inductive_type : Type.t -> bool
 (** [is_inductive_type ty] holds iff [ty] is an instance of some
     registered type (registered with {!declare_ty}). *)
