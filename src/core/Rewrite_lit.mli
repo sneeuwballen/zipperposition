@@ -3,8 +3,6 @@
 
 (** {1 Rewrite Rules} *)
 
-open Logtk
-
 val section : Util.Section.t
 
 type rule

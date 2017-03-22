@@ -1,8 +1,6 @@
 
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-open Logtk
-
 (** {1 Rewrite Rules} *)
 module T = FOTerm
 module Stmt = Statement
