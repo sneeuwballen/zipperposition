@@ -3,8 +3,6 @@
 
 (** {1 Array of literals} *)
 
-open Logtk
-
 module BV = CCBV
 module T = FOTerm
 module S = Subst
@@ -325,12 +323,12 @@ let fold_arith_terms ~eligible ~which ~ord lits k =
          match which with
            | `All -> (fun _ -> true)
            | `Max ->
-             let max_terms = ArithLit.max_terms ~ord a_lit in
+             let max_terms = Arith_lit.max_terms ~ord a_lit in
              fun t -> CCList.mem ~eq:T.equal t max_terms
        in
-       ArithLit.Focus.fold_terms ~pos a_lit
+       Arith_lit.Focus.fold_terms ~pos a_lit
          (fun (foc_lit, pos) ->
-            let t = ArithLit.Focus.term foc_lit in
+            let t = Arith_lit.Focus.term foc_lit in
             if do_term t then k (t, foc_lit, pos))
     )
 

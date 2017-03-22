@@ -3,8 +3,6 @@
 
 (** {1 Polynomes of order 1, over several variables}. *)
 
-open Logtk
-
 module T = FOTerm
 
 type term = FOTerm.t

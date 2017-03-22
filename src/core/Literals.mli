@@ -3,8 +3,6 @@
 
 (** {1 Array of literals} *)
 
-open Logtk
-
 type term = FOTerm.t
 
 type t = Literal.t array
@@ -103,13 +101,13 @@ module View : sig
       is the Literal.t at the given position.
       @raise Invalid_argument if the position is not valid in the *)
 
-  val get_arith : t -> Position.t -> ArithLit.Focus.t option
+  val get_arith : t -> Position.t -> Arith_lit.Focus.t option
 
   (** The following functions will raise [Invalid_argument] if the
       position is not valid or if the literal isn't what's asked for *)
 
   val get_eqn_exn : t -> Position.t -> (term * term * bool)
-  val get_arith_exn : t -> Position.t -> ArithLit.Focus.t
+  val get_arith_exn : t -> Position.t -> Arith_lit.Focus.t
 end
 
 val fold_lits : eligible:(int -> Literal.t -> bool) ->
@@ -131,12 +129,12 @@ val fold_eqn : ?both:bool -> ?sign:bool -> ord:Ordering.t ->
 
 val fold_arith :
   eligible:(int -> Literal.t -> bool) ->
-  t -> ArithLit.t Position.With.t Sequence.t
+  t -> Arith_lit.t Position.With.t Sequence.t
 (** Fold over eligible arithmetic literals *)
 
 val fold_arith_terms : eligible:(int -> Literal.t -> bool) ->
   which:[<`Max|`All] -> ord:Ordering.t ->
-  t -> (term * ArithLit.Focus.t * Position.t) Sequence.t
+  t -> (term * Arith_lit.Focus.t * Position.t) Sequence.t
 (** Fold on terms under arithmetic literals, with the focus on
     the current term *)
 

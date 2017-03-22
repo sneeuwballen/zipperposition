@@ -3,8 +3,6 @@
 
 (** {1 Equational literals} *)
 
-open Logtk
-
 type term = FOTerm.t
 
 (** a literal, that is, a signed atomic formula *)
@@ -13,7 +11,7 @@ type t = private
   | False
   | Equation of term * term * bool
   | Prop of term * bool
-  | Arith of ArithLit.t
+  | Arith of Arith_lit.t
 
 val equal_com : t -> t -> bool     (** commutative equality of lits *)
 val compare : t -> t -> int     (** lexicographic comparison of literals *)
@@ -53,8 +51,8 @@ val mk_false : term -> t    (* false proposition *)
 val mk_tauto : t (* tautological literal *)
 val mk_absurd : t (* absurd literal, like ~ true *)
 
-val mk_arith : ArithLit.t -> t
-val mk_arith_op : ArithLit.op -> Z.t Monome.t -> Z.t Monome.t -> t
+val mk_arith : Arith_lit.t -> t
+val mk_arith_op : Arith_lit.op -> Z.t Monome.t -> Z.t Monome.t -> t
 val mk_arith_eq : Z.t Monome.t -> Z.t Monome.t -> t
 val mk_arith_neq : Z.t Monome.t -> Z.t Monome.t -> t
 val mk_arith_less : Z.t Monome.t -> Z.t Monome.t -> t
@@ -194,14 +192,14 @@ module View : sig
       @return None for other literals
       @raise Invalid_argument if the position doesn't match the literal. *)
 
-  val get_arith : t -> ArithLit.t option
+  val get_arith : t -> Arith_lit.t option
   (** Extract an arithmetic literal *)
 
-  val focus_arith : t -> Position.t -> ArithLit.Focus.t option
+  val focus_arith : t -> Position.t -> Arith_lit.Focus.t option
   (** Focus on a specific term in an arithmetic literal. The focused term is
       removed from its monome, and its coefficient is returned. *)
 
-  val unfocus_arith : ArithLit.Focus.t -> t
+  val unfocus_arith : Arith_lit.Focus.t -> t
 end
 
 (** {2 Conversions} *)

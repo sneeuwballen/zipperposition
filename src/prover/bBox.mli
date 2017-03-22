@@ -7,7 +7,9 @@
     properties into boolean literals, and maintains a bijection between
     encapsulated values and boolean literals *)
 
-val section : Logtk.Util.Section.t
+open Logtk
+
+val section : Util.Section.t
 
 type inductive_case = Cover_set.case
 

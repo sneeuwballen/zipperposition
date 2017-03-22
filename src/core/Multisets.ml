@@ -3,8 +3,6 @@
 
 (** {1 Several Multisets} *)
 
-open Logtk
-
 module MT = Multiset.Make(FOTerm)
 
 module MMT = Multiset.Make(MT)

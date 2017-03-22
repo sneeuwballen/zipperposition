@@ -9,8 +9,6 @@
     are "f(X)" and "a", with coefficients "1" and "3".
 *)
 
-open Logtk
-
 type term = FOTerm.t
 
 type 'a t

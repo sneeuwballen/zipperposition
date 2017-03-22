@@ -3,6 +3,8 @@
 
 (** {1 Simple Clause} *)
 
+open Logtk
+
 type flag
 
 type t = private {

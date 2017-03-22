@@ -11,8 +11,8 @@ module Lits = Literals
 module S = Subst
 module M = Monome
 module MF = Monome.Focus
-module AL = ArithLit
-module ALF = ArithLit.Focus
+module AL = Arith_lit
+module ALF = AL.Focus
 module Stmt = Statement
 
 let stat_arith_sup = Util.mk_stat "arith.superposition"
@@ -271,11 +271,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     type t = {
       active : C.t;
       active_pos : Position.t;
-      active_lit : ArithLit.Focus.t;
+      active_lit : AL.Focus.t;
       active_scope : int;
       passive : C.t;
       passive_pos : Position.t;
-      passive_lit : ArithLit.Focus.t;
+      passive_lit : AL.Focus.t;
       passive_scope : int;
       subst : Subst.t;
     }
@@ -424,7 +424,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.exit_prof prof_arith_sup;
     res
 
-  exception SimplifyInto of ArithLit.t * C.t * S.t
+  exception SimplifyInto of AL.t * C.t * S.t
 
   (* how to simplify the passive lit with the active lit, in one step *)
   let _try_demod_step ~subst passive_lit _s_p c pos active_lit s_a c' _pos' =
@@ -760,11 +760,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       left : C.t;
       left_scope : int;
       left_pos : Position.t;
-      left_lit : ArithLit.Focus.t;
+      left_lit : AL.Focus.t;
       right : C.t;
       right_scope : int;
       right_pos : Position.t;
-      right_lit : ArithLit.Focus.t;
+      right_lit : AL.Focus.t;
       subst : Subst.t;
     }
   end
