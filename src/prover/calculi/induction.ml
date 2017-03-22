@@ -628,6 +628,7 @@ module Make
   (* main inductive proof of lemmas that have inductive variables *)
   let prove_lemma (cut:A.cut_res): C.t list =
     let g = A.cut_form cut in
+    Util.debugf ~section 5 "(@[<hv>prove_lemma@ %a@])" (fun k->k Cut_form.pp g);
     begin match Cut_form.ind_vars g with
       | [] -> []
       | ivars ->

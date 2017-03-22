@@ -136,7 +136,7 @@ let id_is_ind_skolem (id:ID.t) (ty:Type.t): bool =
   && ty_args=[] (* constant *)
   && Ind_ty.is_inductive_type ty_ret
   && Type.is_ground ty
-  && (id_is_cst id || (not (Ind_ty.is_constructor id) && Skolem.is_skolem id))
+  && (id_is_cst id || (not (Ind_ty.is_constructor id) && not (Rewrite.is_defined_cst id)))
 
 let ind_skolem_depth (id:ID.t): int = match id_as_cst id with
   | None -> 0
