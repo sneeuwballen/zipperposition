@@ -80,7 +80,7 @@ end = struct
 
   let test_ (cs:Literals.t list): status =
     (* test and save *)
-    if List.exists trivial_c cs then S_trivial
+    if List.for_all trivial_c cs then S_trivial
     else begin match Test_prop.check_form cs with
       | Test_prop.R_ok -> S_ok
       | Test_prop.R_fail subst -> S_falsifiable subst

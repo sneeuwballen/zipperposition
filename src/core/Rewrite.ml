@@ -64,8 +64,8 @@ let pp_term_rules out (s:term_rule Sequence.t): unit =
 
 let pp_lit_rule out r =
   let pp_c = CCFormat.hvbox (Util.pp_list ~sep:" ∨ " Literal.pp) in
-  Format.fprintf out "@[<2>@[%a@] ==>@ @[<v>%a@]@]"
-    Literal.pp r.lit_lhs (Util.pp_list pp_c) r.lit_rhs
+  Format.fprintf out "@[<2>@[%a@] ==>@ [@[<v>%a@]]@]"
+    Literal.pp r.lit_lhs (Util.pp_list ~sep:"∧" pp_c) r.lit_rhs
 
 let pp_lit_rules out (s:lit_rule Sequence.t): unit =
   Format.fprintf out "{@[<hv>%a@]}" (Util.pp_seq pp_lit_rule) s
