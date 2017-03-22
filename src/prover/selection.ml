@@ -85,16 +85,18 @@ let select_diff_neg_lit ~strict ~ord:_ lits =
       find_lit best_diff best_idx lits (i+1)
   in
   (* search such a lit among the clause's lits *)
-  if _pure_superposition lits
-  then match find_lit (-1) (-1) lits 0 with
-    | -1 -> BV.empty ()
-    | n when strict -> BV.of_list [n]
-    | n ->
-      let bv = select_positives lits in
-      BV.set bv n;
-      assert (_validate_select lits bv);
-      bv
-  else BV.empty ()
+  if _pure_superposition lits then (
+    let res = match find_lit (-1) (-1) lits 0 with
+      | -1 -> BV.empty ()
+      | n when strict -> BV.of_list [n]
+      | n ->
+        let bv = select_positives lits in
+        BV.set bv n;
+        bv
+    in
+    assert (_validate_select lits res);
+    res
+  ) else BV.empty ()
 
 let select_complex ~strict ~ord lits =
   (* find the ground negative literal with highest diff in size *)
