@@ -42,6 +42,7 @@ val view : t -> view
 val loc : t -> location option
 val ty : t -> t option
 val ty_exn : t -> t
+val head : t -> ID.t option
 val head_exn : t -> ID.t (** @raise Not_found if not an application/const *)
 
 val deref : t -> t

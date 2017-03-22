@@ -895,6 +895,16 @@ let infer_defs ?loc ctx (l:A.def list): (_,_,_) Stmt.def list =
                   Stmt.Def_term (vars,id,ty,args,rhs)
                 | `Prop (vars,lhs,rhs) ->
                   assert (T.Ty.is_prop (T.ty_exn rhs));
+                  let ok = match lhs with
+                    | SLiteral.Atom (t,_) ->
+                      T.head t |> CCOpt.map_or (ID.equal id) ~default:false
+                    | _ -> false
+                  in
+                  if not ok then (
+                    error_ ?loc
+                      "rule `%a`@ must have `%a` as head symbol"
+                      T.pp r ID.pp id
+                  );
                   Stmt.Def_form (vars,lhs,[rhs])
               end)
            rules

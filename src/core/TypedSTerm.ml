@@ -70,6 +70,8 @@ let rec head_exn t = match view t with
   | Record (_,_)
   | Meta _ -> raise Not_found
 
+let head t = try Some (head_exn t) with Not_found -> None
+
 let to_int_ = function
   | Var _ -> 0
   | Const _ -> 3

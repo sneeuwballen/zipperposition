@@ -1,4 +1,7 @@
-# expect: unsat
+
+# expect: error
+# definitions are wrong!
+
 # exercize rewriting
 
 val set : type -> type.
