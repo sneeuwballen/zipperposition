@@ -30,7 +30,7 @@ let k_limit_to_active : bool Flex_state.key = Flex_state.create_key()
 let k_coverset_depth : int Flex_state.key = Flex_state.create_key()
 
 (** {2 Formula to be Proved Inductively *)
-module Goal : sig
+module Make_goal(E : Env_intf.S) : sig
   type t
 
   val trivial : t
@@ -45,14 +45,20 @@ module Goal : sig
   val ind_vars : t -> var list
   (** the inductive variables *)
 
+  val pp : t CCFormat.printer
+
   type status =
     | S_trivial
     | S_ok
     | S_falsifiable of Subst.t
 
   val test : t -> status
+  (** Testing using {!Test_prop} *)
 
-  val pp : t CCFormat.printer
+  val check_not_absurd_or_trivial : t -> bool
+  (** More thorough testing *)
+
+  val is_acceptable_goal : t -> bool
 end = struct
   type status =
     | S_trivial
@@ -72,11 +78,13 @@ end = struct
   (* trivial clause? *)
   let trivial_c (c:Literals.t): bool = Literals.is_trivial c
 
+  (* find literal rewrite rules *)
+  let lit_rules = E.flex_get Rewriting.Key.rules
+
   let test_ (cs:Literals.t list): status =
     (* test and save *)
-    let form = List.map Literals.Conv.to_forms cs in
     if List.exists trivial_c cs then S_trivial
-    else begin match Test_prop.check_form form with
+    else begin match Test_prop.check_form lit_rules cs with
       | Test_prop.R_ok -> S_ok
       | Test_prop.R_fail subst -> S_falsifiable subst
     end
@@ -93,31 +101,20 @@ end = struct
   let ind_vars t = Cut_form.ind_vars t.cut
 
   let pp out (f:t): unit = Cut_form.pp out f.cut
-end
 
-(** {2 More Thorough Testing of Clauses} *)
-module Goal_test(E : Env_intf.S) : sig
-  type goal = Goal.t
-
-  val check_not_absurd_or_trivial : goal -> bool
-
-  val is_acceptable_goal : goal -> bool
-end = struct
   module C = E.C
 
-  type goal = Goal.t
-
-  let test_goal_is_ok (g:Goal.t): bool =
-    begin match Goal.test g with
-      | Goal.S_ok -> true
-      | Goal.S_trivial ->
+  let test_goal_is_ok (g:t): bool =
+    begin match test g with
+      | S_ok -> true
+      | S_trivial ->
         Util.incr_stat stats_trivial_lemmas;
-        Util.debugf ~section 2 "(@[<2>lemma_trivial@ @[%a@]@@])" (fun k->k Goal.pp g);
+        Util.debugf ~section 2 "(@[<2>lemma_trivial@ @[%a@]@@])" (fun k->k pp g);
         false
-      | Goal.S_falsifiable subst ->
+      | S_falsifiable subst ->
         Util.debugf ~section 2
           "(@[<2>lemma_absurd@ @[%a@]@ :subst %a@])"
-          (fun k->k Goal.pp g Subst.pp subst);
+          (fun k->k pp g Subst.pp subst);
         Util.incr_stat stats_absurd_lemmas;
         false
     end
@@ -139,9 +136,9 @@ end = struct
      and refutable in a few steps), the lemma will be disproved and
      simplified away by saturation anyway.
   *)
-  let check_not_absurd_or_trivial (g:goal): bool =
+  let check_not_absurd_or_trivial (g:t): bool =
     Util.debugf ~section 2 "@[<2>@{<green>assess goal@}@ %a@]"
-      (fun k->k Goal.pp g);
+      (fun k->k pp g);
     let trivial = ref true in
     try
       (* fully simplify each goal's clause, check if absurd or trivial *)
@@ -154,22 +151,22 @@ end = struct
              | None ->
                if not (List.for_all E.is_trivial cs) then trivial := false
            end)
-        (Goal.cs g);
+        (cs g);
       Util.debugf ~section 2
         "@[<2>lemma @[%a@]@ apparently not absurd (trivial:%B)@]"
-        (fun k->k Goal.pp g !trivial);
+        (fun k->k pp g !trivial);
       if !trivial then Util.incr_stat stats_trivial_lemmas;
       not !trivial
     with Yield_false c ->
       assert (C.is_empty c);
       Util.debugf ~section 2
         "@[<2>lemma @[%a@] absurd:@ leads to empty clause `%a`@]"
-        (fun k->k Goal.pp g C.pp c);
+        (fun k->k pp g C.pp c);
       Util.incr_stat stats_absurd_lemmas;
       false
 
   (* some checks that [g] should be considered as a goal *)
-  let is_acceptable_goal (g:goal) : bool =
+  let is_acceptable_goal (g:t) : bool =
     test_goal_is_ok g &&
     check_not_absurd_or_trivial g
 end
@@ -296,7 +293,7 @@ module Make
   module C = E.C
   module BoolBox = BBox
   module BoolLit = BoolBox.Lit
-  module Goal_test = Goal_test(E)
+  module Goal = Make_goal(E)
 
   let max_depth = Env.flex_get k_ind_depth
   let cover_set_depth = Env.flex_get k_coverset_depth
@@ -737,7 +734,7 @@ module Make
     in
     if depth <= max_depth && no_pos_lemma_in_trail () then (
       (* check if goal is worth the effort *)
-      if Goal_test.is_acceptable_goal goal then (
+      if Goal.is_acceptable_goal goal then (
         Util.debugf ~section 1
           "(@[<2>@{<green>prove_by_induction@}@ :clauses (@[%a@])@ :goal %a@])"
           (fun k->k (Util.pp_list C.pp) clauses Goal.pp goal);

@@ -16,15 +16,24 @@ type rule = {
 }
 (* invariant: all variables in [c_rhs] also occur in [c_lhs] *)
 
-let make_c c_lhs c_rhs = {c_lhs; c_rhs}
+module Rule = struct
+  type t = rule
 
-let lhs c = c.c_lhs
-let rhs c = c.c_rhs
+  let make_c c_lhs c_rhs = {c_lhs; c_rhs}
 
-let pp_rule out r =
-  let pp_c = CCFormat.hvbox (Util.pp_list ~sep:" ∨ " Literal.pp) in
-  Format.fprintf out "@[<2>@[%a@] ==>@ @[<v>%a@]@]"
-    Literal.pp r.c_lhs (Util.pp_list pp_c) r.c_rhs
+  let lhs c = c.c_lhs
+  let rhs c = c.c_rhs
+
+  let compare r1 r2: int =
+    let open CCOrd.Infix in
+    Literal.compare r1.c_lhs r2.c_lhs
+    <?> (CCList.compare (CCList.compare Literal.compare), r1.c_rhs, r2.c_rhs)
+
+  let pp out r =
+    let pp_c = CCFormat.hvbox (Util.pp_list ~sep:" ∨ " Literal.pp) in
+    Format.fprintf out "@[<2>@[%a@] ==>@ @[<v>%a@]@]"
+      Literal.pp r.c_lhs (Util.pp_list pp_c) r.c_rhs
+end
 
 module Set = struct
   type t = {
@@ -39,7 +48,7 @@ module Set = struct
   let is_empty t: bool = t.clauses=[]
 
   let add_clause r s =
-    Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k->k pp_rule r);
+    Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k->k Rule.pp r);
     {clauses=r :: s.clauses}
 
   let add_stmt stmt t = match Stmt.view stmt with
@@ -56,14 +65,14 @@ module Set = struct
            | Stmt.Def_form (_,lhs,rhs) ->
              let lhs = Literal.Conv.of_form lhs in
              let rhs = List.map (List.map Literal.Conv.of_form) rhs in
-             let r = make_c lhs rhs in
+             let r = Rule.make_c lhs rhs in
              add_clause r t)
         t
     | Stmt.RewriteTerm _ -> t
     | Stmt.RewriteForm (_, lhs, rhs) ->
       let lhs = Literal.Conv.of_form lhs in
       let rhs = List.map (List.map Literal.Conv.of_form) rhs in
-      let r = make_c lhs rhs in
+      let r = Rule.make_c lhs rhs in
       add_clause r t
     | Stmt.TyDecl _
     | Stmt.Data _
@@ -77,7 +86,7 @@ module Set = struct
 
   let pp out t =
     Format.fprintf out "{@[<hv>%a@]}"
-      (Util.pp_seq pp_rule) (to_seq t)
+      (Util.pp_seq Rule.pp) (to_seq t)
 end
 
 (* try to rewrite this literal, returning a list of list of lits instead *)
@@ -90,7 +99,7 @@ let step_lit rules lit =
          | Some subst -> Some (r, subst))
     rules
 
-let normalize_clause_ rules lits =
+let normalize_clause_ rules (lits:Literals.t) =
   let eval_ll ~renaming subst (l,sc) =
     List.map
       (List.map
@@ -98,7 +107,7 @@ let normalize_clause_ rules lits =
       l
   in
   let step =
-    CCList.find_mapi
+    CCArray.findi
       (fun i lit -> match step_lit rules.Set.clauses lit with
          | None -> None
          | Some (rule,subst) ->
@@ -107,7 +116,7 @@ let normalize_clause_ rules lits =
              "@[<2>rewrite `@[%a@]`@ :into `@[<v>%a@]`@ :with @[%a@]@ :rule `%a`@]"
              (fun k->k Literal.pp lit
                  (Util.pp_list (CCFormat.hvbox (Util.pp_list ~sep:" ∨ " Literal.pp)))
-                 clauses Subst.pp subst pp_rule rule);
+                 clauses Subst.pp subst Rule.pp rule);
            Util.incr_stat stats_rw;
            Some (i, clauses, subst))
       lits
@@ -119,10 +128,14 @@ let normalize_clause_ rules lits =
       (* remove rewritten literal, replace by [clause_chunks], apply
          substitution (clause_chunks might contain other variables!),
          distribute to get a CNF again *)
-      let lits = CCList.remove_at_idx i lits in
+      let lits = CCArray.except_idx lits i in
       let lits = Literal.apply_subst_list ~renaming subst (lits,0) in
       let clause_chunks = eval_ll ~renaming subst (clause_chunks,1) in
-      let clauses = List.map (fun new_lits -> new_lits @ lits) clause_chunks in
+      let clauses =
+        List.rev_map
+          (fun new_lits -> Array.of_list (new_lits @ lits))
+          clause_chunks
+      in
       Some clauses
   end
 

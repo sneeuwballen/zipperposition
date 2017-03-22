@@ -81,14 +81,14 @@ module Make(E : Env_intf.S) = struct
   (* XXX: for now, we only do one step, and let Env.multi_simplify
      manage the fixpoint *)
   let simpl_clause rules c =
-    let lits = C.lits c |> Array.to_list in
+    let lits = C.lits c in
     match RL.normalize_clause rules lits with
       | None -> None
       | Some clauses ->
         let proof = ProofStep.mk_simp ~rule:(ProofStep.mk_rule "rw_clause") [C.proof c] in
         let clauses =
           List.map
-            (fun c' -> C.create ~trail:(C.trail c) c' proof)
+            (fun c' -> C.create_a ~trail:(C.trail c) c' proof)
             clauses
         in
         Util.debugf ~section 2
@@ -121,11 +121,11 @@ module Make(E : Env_intf.S) = struct
                          (Literal.apply_subst_list ~renaming subst (c',1))
                      in
                      C.create ~trail:(C.trail c) new_lits proof)
-                  (RL.rhs rule)
+                  (RL.Rule.rhs rule)
               in
               Util.debugf ~section 3
                 "@[<2>narrowing of `@[%a@]`@ using `@[%a@]`@ with @[%a@]@ yields @[%a@]@]"
-                (fun k->k C.pp c RL.pp_rule rule Subst.pp subst
+                (fun k->k C.pp c RL.Rule.pp rule Subst.pp subst
                     CCFormat.(list (hovbox C.pp)) clauses);
               Util.incr_stat stat_narrowing_lit;
               List.rev_append clauses acc)

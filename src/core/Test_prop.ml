@@ -3,20 +3,23 @@
 
 module TI = InnerTerm
 module T = FOTerm
-module Lit = SLiteral
 module Fmt = CCFormat
+
 module RT = Rewrite_term
+module RL = Rewrite_lit
 
 let section = Util.Section.(make "test_prop")
 let stat_narrow = Util.mk_stat "test_prop.narrow.calls"
 let stat_narrow_fail = Util.mk_stat "test_prop.narrow.fails"
 let stat_narrow_ok = Util.mk_stat "test_prop.narrow.ok"
-let stat_narrow_step = Util.mk_stat "test_prop.narrow.steps"
+let stat_narrow_step_term = Util.mk_stat "test_prop.narrow.steps_term"
+let stat_narrow_step_lit = Util.mk_stat "test_prop.narrow.steps_lit"
 let prof_narrow = Util.mk_profiler "test_prop.narrow"
 
 type term = T.t
-type lit = term SLiteral.t
-type form = lit list list
+type lit = Literal.t
+type clause = Literals.t
+type form = clause list
 type var = Type.t HVar.t
 
 type res =
@@ -51,8 +54,7 @@ let t_view (t:term): term t_view = match T.view t with
   | T.DB _ -> assert false
 
 let pp_form out (f:form): unit =
-  let pp_lit = SLiteral.pp T.pp in
-  let pp_c = Fmt.(within "(" ")" @@ list ~sep:(return "@<1>∨@ ") pp_lit) in
+  let pp_c = Literals.pp in
   begin match f with
     | [c] -> pp_c out c
     | _ -> Fmt.fprintf out "∧{@[%a@]}" (Util.pp_list ~sep:"," pp_c) f
@@ -60,7 +62,7 @@ let pp_form out (f:form): unit =
 
 module Narrow : sig
   val default_limit: int
-  val check_form: limit:int -> form -> res
+  val check_form: limit:int -> RL.Set.t -> form -> res
 end = struct
   let default_limit = 50
 
@@ -78,64 +80,48 @@ end = struct
       (fun t -> Subst.FO.apply ~renaming subst (t,sc1))
       s1
 
-  (* is it impossible for these terms to be equal? check if a cstor-only
-     path leads to distinct constructors/constants *)
-  let rec cannot_be_eq (t1:term)(t2:term): bool =
-    begin match t_view t1, t_view t2 with
-      | T_Z z1, T_Z z2 -> not (Z.equal z1 z2)
-      | T_Q n1, T_Q n2 -> not (Q.equal n1 n2)
-      | T_bool b1, T_bool b2 -> not (b1 = b2)
-      | T_cstor (id1,l1), T_cstor (id2,l2) ->
-        not (ID.equal id1 id2) ||
-        (List.length l1 = List.length l2 &&
-         List.exists2 cannot_be_eq l1 l2)
-      | T_Z _, _
-      | T_Q _, _
-      | T_bool _, _
-      | T_cstor _, _
-      | T_app _, _
-      | T_fun_app _, _
-      | T_builtin _, _
-      | T_var _, _ -> false
-    end
-
-  (* is the literal [false]? *)
-  let lit_is_false lit: bool = match lit with
-    | Lit.Atom (t, true) -> T.equal t T.false_
-    | Lit.Atom (t, false) -> T.equal t T.true_
-    | Lit.False -> true
-    | Lit.True -> false
-    | Lit.Neq (a,b) -> T.equal a b
-    | Lit.Eq (a, b) -> cannot_be_eq a b
-
-  let form_is_false (f:form): bool =
-    List.exists (List.for_all lit_is_false) f
+  let form_is_false (f:form): bool = List.exists Literals.is_absurd f
 
   (* free variables of the form *)
   let vars_of_form (f:form): var list =
     Sequence.of_list f
-    |> Sequence.flat_map Sequence.of_list
-    |> Sequence.flat_map SLiteral.to_seq
-    |> Sequence.flat_map T.Seq.vars
+    |> Sequence.flat_map Literals.Seq.vars
     |> T.VarSet.of_seq |> T.VarSet.to_list
 
-  (* apply substitution to literal *)
-  let subst_lit ~renaming (subst:Subst.t)(lit:lit Scoped.t): lit =
-    let lit, sc = lit in
-    Lit.map lit ~f:(fun t -> Subst.FO.apply ~renaming subst (t,sc))
-
-  let normalize_form (f:form): form =
-    List.map (List.map (Lit.map ~f:RT.normalize_term_fst)) f
+  let normalize_form (rules:RL.Set.t) (f:form): form =
+    (* fixpoint of rewriting *)
+    let rec normalize (c:clause): clause Sequence.t =
+      let progress=ref false in
+      (* how to normalize a term/lit *)
+      let rw_term t =
+        let t', rules = RT.normalize_term t in
+        if not (RT.R_set.is_empty rules) then progress := true;
+        t'
+      in
+      let rw_terms c = Literals.map rw_term c
+      and rw_clause c = match RL.normalize_clause rules c with
+        | None -> [c]
+        | Some cs ->
+          progress := true;
+          cs
+      in
+      let cs = c |> rw_terms |> rw_clause in
+      if !progress
+      then normalize_form cs (* normalize each result recursively *)
+      else Sequence.of_list cs (* done *)
+    and normalize_form (f:form): clause Sequence.t =
+      Sequence.of_list f |> Sequence.flat_map normalize
+    in
+    normalize_form f |> Sequence.to_rev_list
 
   (* perform term narrowing in [f] *)
-  let narrow_term (acc:subst_acc) (f:form): (subst_acc*form) list =
+  let narrow_term (rules:RL.Set.t) (acc:subst_acc) (f:form): (subst_acc*form) Sequence.t =
     let sc_rule = 1 in
     let sc_c = 0 in
     (* find the various pairs (rule,subst) that can apply *)
     let subst_rule_l =
       Sequence.of_list f
-      |> Sequence.flat_map Sequence.of_list
-      |> Sequence.flat_map Lit.to_seq
+      |> Sequence.flat_map Literals.Seq.terms
       |> Sequence.flat_map T.Seq.subterms
       |> Sequence.flat_map
         (fun t -> RT.narrow_term ~scope_rules:sc_rule (t,sc_c))
@@ -143,27 +129,63 @@ end = struct
       |> CCList.sort_uniq ~cmp:(CCOrd.pair RT.Rule.compare Subst.compare)
     in
     (* now do one step for each *)
-    List.rev_map
-      (fun (rule,subst) ->
-         let renaming = Subst.Renaming.create() in
-         (* evaluate new formula by substituting and evaluating *)
-         let f' =
-           List.map
-             (List.map (fun lit -> subst_lit ~renaming subst (lit,sc_c))) f
-           |> normalize_form
-         in
-         (* make new formula *)
-         Util.incr_stat stat_narrow_step;
-         Util.debugf ~section 5
-           "(@[<2>test_prop.narrow@ :from %a@ :to %a@ :rule %a@ :subst %a@])"
-           (fun k->k pp_form f pp_form f' RT.Rule.pp rule Subst.pp subst);
-         let new_acc = compose ~renaming subst (acc,sc_c) in
-         new_acc, f')
-      subst_rule_l
+    begin
+      Sequence.of_list subst_rule_l
+      |> Sequence.map
+        (fun (rule,subst) ->
+           let renaming = Subst.Renaming.create() in
+           (* evaluate new formula by substituting and evaluating *)
+           let f' =
+             List.map
+               (fun lits -> Literals.apply_subst ~renaming subst (lits,sc_c)) f
+             |> normalize_form rules
+           in
+           (* make new formula *)
+           Util.incr_stat stat_narrow_step_term;
+           Util.debugf ~section 5
+             "(@[<2>test_prop.narrow_term@ :from %a@ :to %a@ :rule %a@ :subst %a@])"
+             (fun k->k pp_form f pp_form f' RT.Rule.pp rule Subst.pp subst);
+           let new_acc = compose ~renaming subst (acc,sc_c) in
+           new_acc, f')
+    end
+
+  (* perform lit narrowing in [f] *)
+  let narrow_lit (rules:RL.Set.t) (acc:subst_acc) (f:form): (subst_acc*form) Sequence.t =
+    let sc_rule = 1 in
+    let sc_c = 0 in
+    (* find the various pairs (rule,subst) that can apply *)
+    let subst_rule_l =
+      Sequence.of_list f
+      |> Sequence.flat_map Sequence.of_array
+      |> Sequence.flat_map
+        (fun lit -> RL.narrow_lit (rules,sc_rule) (lit,sc_c))
+      |> Sequence.to_rev_list
+      |> CCList.sort_uniq ~cmp:(CCOrd.pair RL.Rule.compare Subst.compare)
+    in
+    (* now do one step for each *)
+    begin
+      Sequence.of_list subst_rule_l
+      |> Sequence.map
+        (fun (rule,subst) ->
+           let renaming = Subst.Renaming.create() in
+           (* evaluate new formula by substituting and evaluating *)
+           let f' =
+             List.map
+               (fun lits -> Literals.apply_subst ~renaming subst (lits,sc_c)) f
+             |> normalize_form rules
+           in
+           (* make new formula *)
+           Util.incr_stat stat_narrow_step_lit;
+           Util.debugf ~section 5
+             "(@[<2>test_prop.narrow_lit@ :from %a@ :to %a@ :rule %a@ :subst %a@])"
+             (fun k->k pp_form f pp_form f' RL.Rule.pp rule Subst.pp subst);
+           let new_acc = compose ~renaming subst (acc,sc_c) in
+           new_acc, f')
+    end
 
   exception Found_unsat of Subst.t
 
-  let check_form ~limit (f:form) =
+  let check_form ~limit (rules:RL.Set.t) (f:form) =
     Util.incr_stat stat_narrow;
     let q = Queue.create() in
     let acc0 =
@@ -177,8 +199,12 @@ end = struct
       while !n > 0 && not (Queue.is_empty q) do
         decr n;
         let subst, f = Queue.pop q in
-        let new_f_l = narrow_term subst f in
-        List.iter
+        let new_f_l =
+          Sequence.append
+            (narrow_term rules subst f)
+            (narrow_lit rules subst f)
+        in
+        Sequence.iter
           (fun (acc,f') ->
              if form_is_false f' then (
                let subst = subst_of_acc acc in
@@ -194,8 +220,8 @@ end
 
 let default_limit = Narrow.default_limit
 
-let check_form ?(limit=Narrow.default_limit) (f:form): res =
-  Util.with_prof prof_narrow (Narrow.check_form ~limit) f
+let check_form ?(limit=Narrow.default_limit) (rules:RL.Set.t) (f:form): res =
+  Util.with_prof prof_narrow (Narrow.check_form rules ~limit) f
 
 (* [t] head symbol is a function that is not a constructor *)
 let starts_with_fun (t:T.t): bool = match T.head t with

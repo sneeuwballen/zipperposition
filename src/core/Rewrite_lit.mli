@@ -7,9 +7,13 @@ val section : Util.Section.t
 
 type rule
 
-val lhs : rule -> Literal.t
-val rhs : rule -> Literal.t list list
-val pp_rule : rule CCFormat.printer
+module Rule : sig
+  type t = rule
+  val lhs : t -> Literal.t
+  val rhs : t -> Literal.t list list
+  val compare : t -> t -> int
+  val pp : t CCFormat.printer
+end
 
 (** {6 Set of Rewrite Rules} *)
 module Set : sig
@@ -27,7 +31,7 @@ module Set : sig
   val pp : t CCFormat.printer
 end
 
-val normalize_clause : Set.t -> Literal.t list -> Literal.t list list option
+val normalize_clause : Set.t -> Literals.t -> Literals.t list option
 (** normalize literals of the clause w.r.t. rules, or return [None]
     if no rule applies *)
 
