@@ -246,11 +246,18 @@ module Make(Env : Env_intf.S) = struct
   (* all ground terms for which we already applied the exhaustiveness inf *)
   let exhaustiveness_tbl_ : unit T.Tbl.t = T.Tbl.create 128
 
+  (* purely made of cstors and skolems *)
+  let rec pure_value (t:term): bool = match as_cstor_app t with
+    | Some (_, l) -> List.for_all pure_value l
+    | None ->
+      begin match T.view t with
+        | T.Const id -> not (Classify_cst.id_is_defined id)
+        | T.App (f,l) -> pure_value f && List.for_all pure_value l
+        | T.Var _ | T.DB _ | T.AppBuiltin _
+          -> false
+      end
+
   let exhaustiveness (c:C.t): C.t list =
-    let is_param t = match T.view t with
-      | T.Const id -> Ind_cst.id_is_cst id
-      | _ -> false
-    in
     let mk_sub_skolem (t:term) (ty:Type.t): ID.t =
       if Ind_ty.is_inductive_type ty then (
         (* declare a constant, with a depth that (if any)
@@ -317,32 +324,14 @@ module Make(Env : Env_intf.S) = struct
         (function
           | Literal.Equation (l, r, false)
             when Ind_ty.is_inductive_type (T.ty l) ->
-            let ity, _ = Ind_ty.as_inductive_type (T.ty l) |> CCOpt.get_exn in
-            let non_rec = not (Ind_ty.is_recursive ity) in
             (* [l != r] with some specific criteria.
                We always do it for ground terms of
-               non-recursive inductive types, or for ground terms
-               that are not parameters (i.e. not inductive constants).
-               For [a != b] where both are parameters, it is required
-               to instantiate them only if the type is non-recursive.
+               non-recursive inductive types.
             *)
-            (* FIXME: actually we'd need a notion of "infinite type" rather
-               than just recursive/non-recursive… *)
-            if
-              (non_rec || not (is_param l && is_param r)) &&
-              T.is_ground l && T.is_ground r
-            then [l; r]
-            else if
-              T.is_ground l &&
-              (non_rec || not (is_param l)) &&
-               is_cstor_app r
-            then [l]
-            else if
-              T.is_ground r &&
-              (non_rec || not (is_param r)) &&
-              is_cstor_app l
-            then [r]
-            else []
+            if Ind_ty.is_recursive
+                (Ind_ty.as_inductive_type_exn (T.ty l) |> fst)
+            then [] (* induction *)
+            else List.filter (fun t -> T.is_ground t && pure_value t) [l;r]
           | _ -> [])
       (* remove cstor-headed terms *)
       |> Sequence.filter
