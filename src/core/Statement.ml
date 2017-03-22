@@ -306,7 +306,13 @@ let scan_stmt_for_defined_cst (st:(clause,FOTerm.t,Type.t) t): unit = match view
   | Def l ->
     (* define all IDs at the same level (the max of those computed) *)
     let ids_and_levels =
-      List.map
+      l
+      |> List.filter
+        (fun {def_ty=ty; def_rewrite=b; _} ->
+           (* definitions require [b=true] or the LHS be a constant *)
+           let _, args, _ = Type.open_poly_fun ty in
+           b || CCList.is_empty args)
+      |> List.map
         (fun {def_id; def_rules; _} ->
            let lev =
              Sequence.of_list def_rules
@@ -320,7 +326,6 @@ let scan_stmt_for_defined_cst (st:(clause,FOTerm.t,Type.t) t): unit = match view
              |> CCOpt.get_lazy (fun _ -> assert false)
            in
            def_id, lev, def)
-        l
     in
     let level =
       Sequence.of_list ids_and_levels
@@ -351,39 +356,6 @@ let scan_stmt_for_defined_cst (st:(clause,FOTerm.t,Type.t) t): unit = match view
         Rewrite.Defined_cst.add_eq_rule r
     end
   | _ -> ()
-
-(* FIXME: also scan for literal constants
-    let add_stmt stmt t = match Stmt.view stmt with
-      | Stmt.Def l ->
-        Sequence.of_list l
-        |> Sequence.flat_map
-          (fun {Stmt.def_ty=ty; def_rules; def_rewrite=b; _} ->
-             if b || Type.is_const ty
-             then Sequence.of_list def_rules
-             else Sequence.empty)
-        |> Sequence.fold
-          (fun t rule -> match rule with
-             | Stmt.Def_term _ -> t
-             | Stmt.Def_form (_,lhs,rhs) ->
-               let lhs = Literal.Conv.of_form lhs in
-               let rhs = List.map (List.map Literal.Conv.of_form) rhs in
-               let r = Rule.make_c lhs rhs in
-               add_clause r t)
-          t
-      | Stmt.RewriteTerm _ -> t
-      | Stmt.RewriteForm (_, lhs, rhs) ->
-        let lhs = Literal.Conv.of_form lhs in
-        let rhs = List.map (List.map Literal.Conv.of_form) rhs in
-        let r = Rule.make_c lhs rhs in
-        add_clause r t
-      | Stmt.TyDecl _
-      | Stmt.Data _
-      | Stmt.Assert _
-      | Stmt.Lemma _
-      | Stmt.Goal _
-      | Stmt.NegatedGoal _
-        -> t
-*)
 
 (** {2 Inductive Types} *)
 
