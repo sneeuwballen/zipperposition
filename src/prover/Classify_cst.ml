@@ -19,10 +19,8 @@ let classify id = match ID.payload id with
   | Skolem.Attr_skolem Skolem.K_ind -> Inductive_cst None
   | Ind_cst.Payload_cst c -> Inductive_cst (Some c)
   | Ind_ty.Payload_ind_projector id -> Projector id
-  | Rewrite_term.Payload_defined_cst cst ->
-    DefinedCst (Rewrite_term.Defined_cst.level cst, Statement.D_term cst)
-  | Statement.Payload_defined_form (l,def) ->
-    DefinedCst (l,Statement.D_form !def)
+  | Rewrite.Payload_defined_cst cst ->
+    DefinedCst (Rewrite.Defined_cst.level cst, Rewrite.Defined_cst.rules cst)
   | _ -> Other
 
 let id_is_cstor id = match classify id with Cstor _ -> true | _ -> false

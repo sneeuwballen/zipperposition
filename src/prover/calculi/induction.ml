@@ -9,7 +9,7 @@ module Lits = Literals
 module T = FOTerm
 module Ty = Type
 module Fmt = CCFormat
-module RT = Rewrite_term
+module RW = Rewrite
 
 module type S = Induction_intf.S
 
@@ -78,13 +78,10 @@ end = struct
   (* trivial clause? *)
   let trivial_c (c:Literals.t): bool = Literals.is_trivial c
 
-  (* find literal rewrite rules *)
-  let lit_rules = E.flex_get Rewriting.Key.rules
-
   let test_ (cs:Literals.t list): status =
     (* test and save *)
     if List.exists trivial_c cs then S_trivial
-    else begin match Test_prop.check_form lit_rules cs with
+    else begin match Test_prop.check_form cs with
       | Test_prop.R_ok -> S_ok
       | Test_prop.R_fail subst -> S_falsifiable subst
     end
@@ -174,7 +171,7 @@ end
 module T_view : sig
   type 'a t =
     | T_var of T.var
-    | T_app_defined of ID.t * Rewrite_term.defined_cst * 'a list
+    | T_app_defined of ID.t * Rewrite.Defined_cst.t * 'a list
     | T_app_cstor of ID.t * 'a list
     | T_app_unin of ID.t * 'a list
     | T_app of 'a * 'a list
@@ -189,7 +186,7 @@ module T_view : sig
 end = struct
   type 'a t =
     | T_var of T.var
-    | T_app_defined of ID.t * Rewrite_term.defined_cst * 'a list
+    | T_app_defined of ID.t * Rewrite.Defined_cst.t * 'a list
     | T_app_cstor of ID.t * 'a list
     | T_app_unin of ID.t * 'a list
     | T_app of 'a * 'a list
@@ -200,7 +197,7 @@ end = struct
     | T.Var v -> T_var v
     | T.Const id when Ind_ty.is_constructor id -> T_app_cstor (id, [])
     | T.Const id when Classify_cst.id_is_defined id ->
-      begin match RT.as_defined_cst id with
+      begin match RW.as_defined_cst id with
         | Some c -> T_app_defined (id, c, [])
         | None -> T_app_unin (id, [])
       end
@@ -209,7 +206,7 @@ end = struct
       begin match T.view f with
         | T.Const id when Ind_ty.is_constructor id -> T_app_cstor (id, l)
         | T.Const id when Classify_cst.id_is_defined id ->
-          begin match RT.as_defined_cst id with
+          begin match RW.as_defined_cst id with
             | Some c -> T_app_defined (id, c, l)
             | None -> T_app_unin (id, l)
           end
@@ -223,12 +220,12 @@ end = struct
       yield t;
       begin match view t with
         | T_app_defined (_, c, l) ->
-          let pos = RT.Defined_cst.defined_positions c in
+          let pos = RW.Defined_cst.defined_positions c in
           assert (IArray.length pos >= List.length l);
           (* only look under active positions *)
           List.iteri
             (fun i sub ->
-               if IArray.get pos i = RT.Pos_active then aux sub)
+               if IArray.get pos i = Defined_pos.P_active then aux sub)
             l
         | T_var _ -> ()
         | T_app (f,l) ->
@@ -530,7 +527,7 @@ module Make
     (* true if [x] occurs in active positions somewhere in [t] *)
     let rec check_sub(t:term): bool = match T_view.view t with
       | T_app_defined (_, c, l) ->
-        let pos = RT.Defined_cst.defined_positions c in
+        let pos = RW.Defined_cst.defined_positions c in
         assert (IArray.length pos >= List.length l);
         (* only look under active positions *)
         begin
@@ -538,7 +535,7 @@ module Make
           |> Sequence.zip_i |> Sequence.zip
           |> Sequence.exists
             (fun (i,u) ->
-               IArray.get pos i = RT.Pos_active &&
+               IArray.get pos i = Defined_pos.P_active &&
                ( is_x u || check_sub u ))
         end
       | T_var _ -> false
@@ -592,7 +589,7 @@ module Make
       |> Sequence.iter
         (fun t -> match T_view.view t with
            | T_view.T_app_defined (_,c,l) ->
-             let pos = RT.Defined_cst.defined_positions c in
+             let pos = RW.Defined_cst.defined_positions c in
              Sequence.of_list l
              |> Sequence.zip_i |> Sequence.zip
              |> Sequence.diagonal
@@ -602,8 +599,8 @@ module Make
                     | Some x, Some y
                       when
                         i1 < i2 &&
-                        IArray.get pos i1 = RT.Pos_active &&
-                        IArray.get pos i2 = RT.Pos_active &&
+                        IArray.get pos i1 = Defined_pos.P_active &&
+                        IArray.get pos i2 = Defined_pos.P_active &&
                         not (eq_var x y) &&
                         CCList.mem ~eq:eq_var x vars &&
                         CCList.mem ~eq:eq_var y vars

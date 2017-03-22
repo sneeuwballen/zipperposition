@@ -4,7 +4,6 @@
 (** {1 Inductive Types} *)
 
 module T = FOTerm
-module Stmt = Statement
 
 let section = Util.Section.make "ind_ty"
 
@@ -144,35 +143,3 @@ let is_constructor s =
 let contains_inductive_types t =
   T.Seq.subterms t
   |> Sequence.exists (fun t -> is_inductive_type (T.ty t))
-
-(** {6 Scan Declarations} *)
-
-let scan_stmt st = match Stmt.view st with
-  | Stmt.Data l ->
-    List.iter
-      (fun d ->
-         let ty_vars =
-           List.mapi (fun i v -> HVar.make ~ty:(Var.ty v) i) d.Stmt.data_args
-         and cstors =
-           List.map (fun (c,ty) -> {cstor_name=c; cstor_ty=ty;}) d.Stmt.data_cstors
-         in
-         let _ = declare_ty d.Stmt.data_id ~ty_vars cstors in
-         ())
-      l
-  | _ -> ()
-
-let scan_simple_stmt st = match Stmt.view st with
-  | Stmt.Data l ->
-    let conv = Type.Conv.create() in
-    let conv_ty = Type.Conv.of_simple_term_exn conv in
-    List.iter
-      (fun d ->
-         let ty_vars =
-           List.mapi (fun i v -> HVar.make ~ty:(Var.ty v |> conv_ty) i) d.Stmt.data_args
-         and cstors =
-           List.map (fun (c,ty) -> {cstor_name=c; cstor_ty=conv_ty ty;}) d.Stmt.data_cstors
-         in
-         let _ = declare_ty d.Stmt.data_id ~ty_vars cstors in
-         ())
-      l
-  | _ -> ()

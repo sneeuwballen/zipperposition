@@ -63,14 +63,14 @@ Library "logtk"
   Path:             src/core/
   Pack:             true
   Modules:          InnerTerm, FOTerm, Type, Util, STerm, Interfaces,
-                    DBEnv, Position, Var, HVar,
+                    DBEnv, Position, Var, HVar, Defined_pos,
                     Subst, Unif, Signature, Scoped, Unif_intf,
                     TypeInference, Options, Comparison, Precedence, Builtin,
                     Ordering, Skolem, Cnf, ID, IDOrBuiltin, SLiteral,
                     Index, Index_intf, Dtree, Fingerprint, NPDtree, Binder,
                     Congruence, FeatureVector, FV_tree, UntypedAST, Ind_ty,
                     TypedSTerm, Statement, Flex_state, Compute_prec, 
-                    Ordinal, Rewrite_term, Rewrite_lit, Test_prop, Input_format,
+                    Ordinal, Rewrite, Test_prop, Input_format,
                     Multisets, Literal, Literals, Arith_lit, Monome,
                     lib/Hashcons, lib/ParseLocation, lib/Multiset, lib/LazyList,
                     lib/Hash, lib/IArray, lib/AllocCache, lib/Multiset_intf,

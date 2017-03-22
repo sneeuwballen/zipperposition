@@ -71,16 +71,6 @@ val contains_inductive_types : FOTerm.t -> bool
 (** [true] iff the term contains at least one subterm with
     an inductive type *)
 
-(** {6 Scan Declarations} *)
-
-val scan_stmt : (_, _, Type.t) Statement.t -> unit
-(** [scan_stmt stmt] examines [stmt], and, if the statement is a
-    declaration of inductive types or constants,
-    it declares them using {!declare_ty} or {!declare_inductive_constant}. *)
-
-val scan_simple_stmt : (_, _, TypedSTerm.t) Statement.t -> unit
-(** Same as {!scan_stmt} but on earlier statements *)
-
 (**/**)
 
 (** Exceptions used to store information in IDs *)

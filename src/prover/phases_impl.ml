@@ -365,7 +365,7 @@ let process_file file =
   parse_file file >>= fun stmts ->
   typing stmts >>= fun decls ->
   (* declare inductive types and constants *)
-  CCVector.iter Ind_ty.scan_simple_stmt decls;
+  CCVector.iter Statement.scan_simple_stmt_for_ind_ty decls;
   let has_goal = has_goal_decls_ decls in
   Util.debugf ~section 1 "parsed %d declarations (%s goal(s))"
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
