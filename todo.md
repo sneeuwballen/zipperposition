@@ -2,16 +2,22 @@
 
 ## Now
 
-- CLI option to hide types when printing terms (useful with lot of polymorphism)
+- bring back a tiny amount of smallcheck to instnatiate variables
+  and realize that `forall l1 l2:list.  l1=l2` is absurd
 
-- fix:
-  smallcheck should work with propositional rewrite rules
-  (maybe provide it with the set of rewrite rules; maybe re-compute from statement info)
-  → `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/nat15_easy.zf`
-    check wrong lemmas and rate of success of smallcheck
-  → `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/nat21.zf --steps 1000`
-    same, look at `small_check.fails`
-  - also see that active positions are defined for these predicates, too
+- simple generalization of a variable with ≥ 2 occurrences in active pos,
+  and ≥ 1 passive occurrences
+
+- heuristic:
+  * [ ] per-inference penalty `int` field in clause. The higher, the
+        worst. Each inference adds its own penalty, with
+        a high penalty for sup/chaining from variable (explosion);
+        replaces `age` in all queues but the `bfs` one
+        → assess on GEG problems
+        → also handicap risky inductions (these where all vars are generalized?)
+        → also handicap very prolific arith rules
+
+- CLI option to hide types when printing terms (useful with lot of polymorphism)
 
 - heavy penalty on the number of variables per clause (quadratic
   function n_vars → weight)
@@ -120,8 +126,8 @@
 
 ## Zipperposition
 
-- rewrite induction so it does everything by cut.
-  * pros
+- new induction that does everything by cut.
+  * discussion
     + it all becomes sound (assuming hidden induction principle): each cut
       is really the introduction of an instance of the induction principle
     + no nested induction anymore
@@ -150,6 +156,7 @@
         → check that it fixes previous regression on `list10_easy.zf`, `nat2.zf`…)
   * [x] might be a bug in candidate lemmas regarding α-equiv checking
         (see on `nat2.zf`, should have only one lemma?)
+  * [x] do induction on *simplified* formula (e.g. for HO functions)
   * [ ] **fix**: notion of active position should also work for
         defined propositions (look into clause rules)
         + [ ] factor the computation of positions out of `rewrite_term`
@@ -267,15 +274,6 @@
       which is a form of superposition that is artificially restricted to
       rewriting `l` first
 
-- only do induction on active positions
-  * [x] check that it fixes previous regression on `list10_easy.zf`, `nat2.zf`…)
-  * [x] also check that sub-induction seems to hold water with smallcheck
-        (i.e. does the ∀-quantified goal pass smallcheck?), otherwise
-        do not do sub-induction.
-        → will be useful after purification (approximation leads to too
-          many inferences, some of which yield non-inductively true constraints,
-          so we need to check constraints before solving them by induction)
-
 - purification:
   * [ ] think of purification at invariant/accumulator positions for
         defined terms of inductive types
@@ -365,7 +363,58 @@
 - [ ] generate all lemmas up to given depth
   * need powerful simplifications from the beginning (for smallchecking)
 
+##$ Done
+
+- only do induction on active positions
+  * [x] check that it fixes previous regression on `list10_easy.zf`, `nat2.zf`…)
+  * [x] also check that sub-induction seems to hold water with smallcheck
+        (i.e. does the ∀-quantified goal pass smallcheck?), otherwise
+        do not do sub-induction.
+        → will be useful after purification (approximation leads to too
+          many inferences, some of which yield non-inductively true constraints,
+          so we need to check constraints before solving them by induction)
+
+- [x] replace smallcheck by narrowing with a steps limit, not depth limit
+
+- [x] accept recursive functions in TIP input
+  * → can allow for simple "smallcheck" in lemma generation
+  * maybe also "smallcheck" for other clauses? probably not.
+  * [x] compile those functions into clauses by flattening, at the last moment
+    (only for non-boolean functions, we know each case will be one clause)
+  * [x] boolean functions? how to do it?
+
+  * [x] add full-def to untypedast + parser
+  * [x] add "decl + set of rewrite rules" to statement
+  * [x] in Statement, allow a set of rewrite rules to be a definition?
+  * [x] proper translation of definitions in CNF
+    + (introduce datatype for boolean (`btrue|bfalse`) and lift most constructs
+      to it. Means that we distinguish computable logic from classic logic
+      (bool vs prop)…)
+      OR express `T.true/T.false` as a regular datatype in prelude?
+    + [x] special splitting rule on booleans (non-recursive datatype), to
+      be sure to decide between btrue/bfalse.
+      → refer to FOOL paper
+    + ([ ] handle conditional rewriting by adding secondary function
+      `f x = g x if P` becomes `f x = f2 x P` and `f2 x true = g x`)
+    + [x] handle matching on non-trivial exprs by secondary function
+      `f x = match g x with C -> rhs` becomes `f x = f2 x (g x)`
+      and `f2 x C = rhs`
+  * [x] deal with higher-order application?
+  * ([ ] make rewrite rules conditional (with conjunction of atomic conditions))
+  * ([ ] handle conditional rules in Rewrite (+ narrowing, where they turn to new lits)
+        (applies iff the whole condition simplifies to true))
+
+- make `Test_prop` work with propositional rewrite rules
+  → `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/nat15.zf`
+    check wrong lemmas and rate of success of smallcheck
+  → `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/nat21.zf --steps 1000`
+    same, look at `small_check.fails`
+
 ## To Fix
+
+- incompleteness:
+  * `./zipperposition.native --stats --print-lemmas -o none --dot /tmp/truc.dot -t 30 tptp/Problems/MGT/MGT011-1.p --debug 2 --select SelectDiffNegLit`
+    (works with SelectDiffNegLitNS, must be a slightly too restrictive inf rule)
 
 - `./zipperposition.native --print-lemmas --stats -o none -t 30 --dot /tmp/truc.dot examples/ind/list10_easy.zf`
   should be easy to solve, but terrible pref (in part because of demod/rpo6?)
@@ -432,35 +481,3 @@ Otter loop?
   * re-write demod/rewriting to use this representation (carry a db_env
     along, as a kind of stack)
 
-- basic support for integers in .zf ? parse numeric constants
-  and a few infix operators
-
-## Done
-
-- [x] accept recursive functions in TIP input
-  * → can allow for simple "smallcheck" in lemma generation
-  * maybe also "smallcheck" for other clauses? probably not.
-  * [x] compile those functions into clauses by flattening, at the last moment
-    (only for non-boolean functions, we know each case will be one clause)
-  * [x] boolean functions? how to do it?
-
-  * [x] add full-def to untypedast + parser
-  * [x] add "decl + set of rewrite rules" to statement
-  * [x] in Statement, allow a set of rewrite rules to be a definition?
-  * [x] proper translation of definitions in CNF
-    + (introduce datatype for boolean (`btrue|bfalse`) and lift most constructs
-      to it. Means that we distinguish computable logic from classic logic
-      (bool vs prop)…)
-      OR express `T.true/T.false` as a regular datatype in prelude?
-    + [x] special splitting rule on booleans (non-recursive datatype), to
-      be sure to decide between btrue/bfalse.
-      → refer to FOOL paper
-    + ([ ] handle conditional rewriting by adding secondary function
-      `f x = g x if P` becomes `f x = f2 x P` and `f2 x true = g x`)
-    + [x] handle matching on non-trivial exprs by secondary function
-      `f x = match g x with C -> rhs` becomes `f x = f2 x (g x)`
-      and `f2 x C = rhs`
-  * [x] deal with higher-order application?
-  * ([ ] make rewrite rules conditional (with conjunction of atomic conditions))
-  * ([ ] handle conditional rules in Rewrite (+ narrowing, where they turn to new lits)
-        (applies iff the whole condition simplifies to true))
