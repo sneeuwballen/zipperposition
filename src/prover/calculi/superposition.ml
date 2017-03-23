@@ -482,7 +482,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_equality_factoring clause =
     Util.enter_prof prof_infer_equality_factoring;
-    let eligible = C.Eligible.(filter Lit.is_eq) in
+    let eligible = C.Eligible.(filter Lit.is_pos) in
     (* find root terms that are unifiable with s and are not in the
        literal at s_pos. Calls [k] with a position and substitution *)
     let find_unifiable_lits idx s _s_pos k =
@@ -637,14 +637,24 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let eligible_res = lazy (C.eligible_res_no_subst c) in
     (* demodulate literals *)
     let demod_lit i lit =
-      let max_terms = lazy (Lit.Comp.max_terms ~ord lit) in
+      (* strictly maximal terms might be blocked *)
+      let strictly_max = lazy (
+        begin match lit with
+          | Lit.Equation (t1,t2,true) -> 
+            begin match O.compare ord t1 t2 with
+              | Comp.Gt -> [t1] | Comp.Lt -> [t2] | _ -> []
+            end
+          | Lit.Prop (t,true) -> [t]
+          | _ -> []
+        end
+      ) in
       (* shall we restrict a subterm? only for max terms in positive
           equations that are eligible for resolution *)
       let restrict_term t = lazy (
-        if Lit.is_eq lit && BV.get (Lazy.force eligible_res) i
+        if Lit.is_pos lit && BV.get (Lazy.force eligible_res) i
         then
-          (* restrict max terms in literals eligible for resolution *)
-          CCList.mem ~eq:T.equal t (Lazy.force max_terms)
+          (* restrict max terms in positive literals eligible for resolution *)
+          CCList.mem ~eq:T.equal t (Lazy.force strictly_max)
         else false
       ) in
       Lit.map

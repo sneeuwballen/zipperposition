@@ -289,7 +289,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       (* maximal ones *)
       let bv = Lits.maxlits ~ord lits' in
       (* only keep literals that are positive equations *)
-      BV.filter bv (fun i -> Lit.is_eq lits'.(i));
+      BV.filter bv (fun i -> Lit.is_pos lits'.(i));
       bv
     ) else
       BV.empty () (* no eligible literal when some are selected *)
